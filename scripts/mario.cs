@@ -25,10 +25,6 @@ public partial class mario : CharacterBody3D
 
     public override void _PhysicsProcess(double delta)
 	{
-		//Make CameraController match theposition of Mario
-
-
-
 		Vector3 velocity = Velocity;
 
 		// Add the gravity.
@@ -64,11 +60,5 @@ public partial class mario : CharacterBody3D
 		}
 		
 		MoveAndSlide();
-	}
-
-	public void UnhandledInput(InputEvent inputEvent){
-		if(inputEvent.IsActionType(InputEventMouseMotion)){
-
-		}
 	}
 }
