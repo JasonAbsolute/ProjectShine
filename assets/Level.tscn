@@ -1,27 +1,44 @@
-[gd_scene load_steps=7 format=3 uid="uid://cwve1f1kpa2pf"]
+[gd_scene load_steps=10 format=3 uid="uid://cwve1f1kpa2pf"]
 
-[ext_resource type="PackedScene" uid="uid://eeo1qx1vbacf" path="res://assets/mario.tscn" id="1_ocr32"]
+[ext_resource type="PackedScene" uid="uid://eeo1qx1vbacf" path="res://assets/Mario.tscn" id="1_ocr32"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_82gkg"]
+sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
+ground_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
+
+[sub_resource type="Sky" id="Sky_kpowp"]
+sky_material = SubResource("ProceduralSkyMaterial_82gkg")
+
+[sub_resource type="Environment" id="Environment_g6m7q"]
+background_mode = 2
+sky = SubResource("Sky_kpowp")
+tonemap_mode = 2
+glow_enabled = true
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_8pqrm"]
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_3lbb3"]
-albedo_color = Color(0.257222, 0.257222, 1.44392e-07, 1)
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gt73o"]
 
 [sub_resource type="BoxMesh" id="BoxMesh_s6h6r"]
-material = SubResource("StandardMaterial3D_3lbb3")
+material = SubResource("StandardMaterial3D_gt73o")
 
-[sub_resource type="Sky" id="Sky_6a68s"]
-process_mode = 3
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ldqj5"]
+albedo_color = Color(0, 0, 0, 1)
 
-[sub_resource type="Environment" id="Environment_vof36"]
-background_mode = 1
-background_color = Color(1, 1, 1, 1)
-sky = SubResource("Sky_6a68s")
+[sub_resource type="BoxMesh" id="BoxMesh_s3nef"]
+material = SubResource("StandardMaterial3D_ldqj5")
 
 [node name="Level" type="Node3D"]
 
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_g6m7q")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.866023, -0.433016, 0.250001, 0, 0.499998, 0.866027, -0.500003, 0.749999, -0.43301, 0, 0, 0)
+shadow_enabled = true
+
 [node name="StaticBody3D" type="StaticBody3D" parent="."]
-transform = Transform3D(100, 0, 0, 0, 1, 0, 0, 0, 100, 0, 0, 0)
+transform = Transform3D(100, 0, 0, 0, 1, 0, 0, 0, 100, 0.15142, 0.0386906, -0.301396)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D"]
 shape = SubResource("BoxShape3D_8pqrm")
@@ -30,17 +47,13 @@ shape = SubResource("BoxShape3D_8pqrm")
 mesh = SubResource("BoxMesh_s6h6r")
 
 [node name="mario" parent="." instance=ExtResource("1_ocr32")]
-transform = Transform3D(-0.996775, 0, 0.080251, 0, 1, 0, -0.080251, 0, -0.996775, 0, 1.29671, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.836503, 0)
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0769241, 7.68674, 5.01447)
-light_energy = 3.618
-sky_mode = 1
+[node name="StaticBody3D3" type="StaticBody3D" parent="."]
+transform = Transform3D(20, 0, 0, 0, 1, 0, 0, 0, 20, 13.6968, 1.82492, 0)
 
-[node name="DirectionalLight3D2" type="DirectionalLight3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, -0.953101, 0.302653, 0, -0.302653, -0.953101, 0.153848, 3.97025, -13.7176)
-light_energy = 3.618
-sky_mode = 1
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D3"]
+shape = SubResource("BoxShape3D_8pqrm")
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
-environment = SubResource("Environment_vof36")
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D3"]
+mesh = SubResource("BoxMesh_s3nef")
