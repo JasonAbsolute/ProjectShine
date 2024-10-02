@@ -2,20 +2,18 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://jmcv5elda82k"
-path.s3tc="res://.godot/imported/mario_ma_mdl1_2.png-1dcb28b3e45255b97df0e67ee6eb9928.s3tc.ctex"
+uid="uid://djpywp35dsqql"
+path.s3tc="res://.godot/imported/Mario_ma_mdl1_2.png-455e2ff05ad38c01ad06a40d452716fd.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
 }
-generator_parameters={
-"md5": "d2656e5caa17c048fb0f42c2bc10b310"
-}
+generator_parameters={}
 
 [deps]
 
-source_file="res://models/mario_ma_mdl1_2.png"
-dest_files=["res://.godot/imported/mario_ma_mdl1_2.png-1dcb28b3e45255b97df0e67ee6eb9928.s3tc.ctex"]
+source_file="res://models/Mario_ma_mdl1_2.png"
+dest_files=["res://.godot/imported/Mario_ma_mdl1_2.png-455e2ff05ad38c01ad06a40d452716fd.s3tc.ctex"]
 
 [params]
 

@@ -1,6 +1,7 @@
-[gd_scene load_steps=10 format=3 uid="uid://cwve1f1kpa2pf"]
+[gd_scene load_steps=13 format=3 uid="uid://cwve1f1kpa2pf"]
 
-[ext_resource type="PackedScene" uid="uid://eeo1qx1vbacf" path="res://assets/Mario.tscn" id="1_ocr32"]
+[ext_resource type="PackedScene" uid="uid://m1jgafa8bof4" path="res://assets/Mario.tscn" id="2_22e8p"]
+[ext_resource type="PackedScene" uid="uid://7exkcbpcjut8" path="res://assets/marioHUD.tscn" id="2_w7srv"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_82gkg"]
 sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
@@ -28,6 +29,11 @@ albedo_color = Color(0, 0, 0, 1)
 [sub_resource type="BoxMesh" id="BoxMesh_s3nef"]
 material = SubResource("StandardMaterial3D_ldqj5")
 
+[sub_resource type="Skin" id="Skin_dipj8"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cl6yo"]
+albedo_color = Color(0.45098, 0.188235, 0.266667, 1)
+
 [node name="Level" type="Node3D"]
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
@@ -46,14 +52,29 @@ shape = SubResource("BoxShape3D_8pqrm")
 [node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D"]
 mesh = SubResource("BoxMesh_s6h6r")
 
-[node name="mario" parent="." instance=ExtResource("1_ocr32")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.836503, 0)
-
 [node name="StaticBody3D3" type="StaticBody3D" parent="."]
 transform = Transform3D(20, 0, 0, 0, 1, 0, 0, 0, 20, 13.6968, 1.82492, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D3"]
 shape = SubResource("BoxShape3D_8pqrm")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D3"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+transform = Transform3D(20, 0, 0, 0, 1, 0, 0, 0, 20, 13.6968, 1.82492, 0)
 mesh = SubResource("BoxMesh_s3nef")
+skeleton = NodePath("../StaticBody3D3")
+
+[node name="HUD" parent="." instance=ExtResource("2_w7srv")]
+
+[node name="Mario" parent="." instance=ExtResource("2_22e8p")]
+transform = Transform3D(0.946685, 0, 0, 0, 0.946685, 0, 0, 0, 0.946685, 0, 0, 0)
+
+[node name="StaticBody3D4" type="StaticBody3D" parent="."]
+transform = Transform3D(49.8048, 1.03777, 0, -28.6864, 1.80175, 0, 0, 0, 20, -17.5933, 4.39074, -7.49818)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D4"]
+shape = SubResource("BoxShape3D_8pqrm")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D4"]
+mesh = SubResource("BoxMesh_s6h6r")
+skin = SubResource("Skin_dipj8")
+surface_material_override/0 = SubResource("StandardMaterial3D_cl6yo")
