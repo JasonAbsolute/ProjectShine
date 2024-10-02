@@ -1,0 +1,21 @@
+[gd_scene load_steps=5 format=3 uid="uid://7exkcbpcjut8"]
+
+[ext_resource type="Script" path="res://scripts/marioHUD.cs" id="1_3akmx"]
+[ext_resource type="FontFile" uid="uid://d2mk8l467fkuo" path="res://Font/Delfino.ttf" id="2_b1vjd"]
+
+[sub_resource type="Theme" id="Theme_5nip6"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_fi7ug"]
+font = ExtResource("2_b1vjd")
+font_size = 46
+
+[node name="marioHUD" type="Node2D"]
+script = ExtResource("1_3akmx")
+
+[node name="marioState" type="Label" parent="."]
+offset_right = 276.0
+offset_bottom = 77.0
+theme = SubResource("Theme_5nip6")
+theme_type_variation = &"HeaderLarge"
+text = "Mario State: "
+label_settings = SubResource("LabelSettings_fi7ug")
