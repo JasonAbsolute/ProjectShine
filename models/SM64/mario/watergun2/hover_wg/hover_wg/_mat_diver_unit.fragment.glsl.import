@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://c2m2o4yv0vnys"
+path="res://.godot/imported/_mat_diver_unit.fragment.glsl-dc1ebee5d2fd3286b38591434e4e8816.res"
+
+[deps]
+
+source_file="res://models/SM64/mario/watergun2/hover_wg/hover_wg/_mat_diver_unit.fragment.glsl"
+dest_files=["res://.godot/imported/_mat_diver_unit.fragment.glsl-dc1ebee5d2fd3286b38591434e4e8816.res"]
+
+[params]
+

@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://lc6bcrm3y4bg"
+path="res://.godot/imported/_mat_froater(3).vertex.glsl-132f471d47d6aeec736d04387827089b.res"
+
+[deps]
+
+source_file="res://models/Mario/mario/watergun2/body/wg_mdl1/_mat_froater(3).vertex.glsl"
+dest_files=["res://.godot/imported/_mat_froater(3).vertex.glsl-132f471d47d6aeec736d04387827089b.res"]
+
+[params]
+

@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://dihjl3ju5qnpf"
+path="res://.godot/imported/_mat_eye_L.vertex.glsl-bd80a5b9a885bbc9338c4ce012256332.res"
+
+[deps]
+
+source_file="res://models/Luigi/mario/bmd/ma_mdl1/_mat_eye_L.vertex.glsl"
+dest_files=["res://.godot/imported/_mat_eye_L.vertex.glsl-bd80a5b9a885bbc9338c4ce012256332.res"]
+
+[params]
+

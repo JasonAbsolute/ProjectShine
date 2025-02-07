@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://bdt08su02kiv1"
+path="res://.godot/imported/_mat_normal_nozzle_body.fragment.glsl-9cdf097073103657a09fdd1d6292ae0e.res"
+
+[deps]
+
+source_file="res://models/Yoshi/mario/watergun2/normal_wg/normal_wg/_mat_normal_nozzle_body.fragment.glsl"
+dest_files=["res://.godot/imported/_mat_normal_nozzle_body.fragment.glsl-9cdf097073103657a09fdd1d6292ae0e.res"]
+
+[params]
+

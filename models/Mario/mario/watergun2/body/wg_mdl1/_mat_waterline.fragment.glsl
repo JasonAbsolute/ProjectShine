@@ -1,0 +1,24 @@
+#version 430
+
+
+struct Texture {
+  sampler2D sampler;
+  mat3x2 transform2d;
+};
+
+uniform sampler2D texture0;
+uniform Texture texture1;
+uniform vec3 color_GxMaterialColor1;
+uniform float scalar_GxMaterialAlpha1;
+
+in vec2 uv0;
+
+out vec4 fragColor;
+
+void main() {
+  vec3 colorComponent = clamp(texture(texture1.sampler, texture1.transform2d * vec3((uv0).x, (uv0).y, 1)).rgb*color_GxMaterialColor1*vec3(2), 0, 1);
+
+  float alphaComponent = texture(texture1.sampler, texture1.transform2d * vec3((uv0).x, (uv0).y, 1)).a*texture(texture0, uv0).a*scalar_GxMaterialAlpha1;
+
+  fragColor = vec4(colorComponent, alphaComponent);
+}

@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://cntpgbqaoac47"
+path="res://.godot/imported/_mat_froater(2).fragment.glsl-2addc2ef3bf1293f4959c912b56baa64.res"
+
+[deps]
+
+source_file="res://models/Yoshi/mario/watergun2/body/wg_mdl1/_mat_froater(2).fragment.glsl"
+dest_files=["res://.godot/imported/_mat_froater(2).fragment.glsl-2addc2ef3bf1293f4959c912b56baa64.res"]
+
+[params]
+

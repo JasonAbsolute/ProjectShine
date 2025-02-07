@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://bxjnttao836qm"
+path="res://.godot/imported/_mat_yoshi_nozzle.vertex.glsl-a7dcbe7ec65737aa03ed527b34fe065a.res"
+
+[deps]
+
+source_file="res://models/Mario/mario/watergun2/yoshi_wg/yoshi_wg/_mat_yoshi_nozzle.vertex.glsl"
+dest_files=["res://.godot/imported/_mat_yoshi_nozzle.vertex.glsl-a7dcbe7ec65737aa03ed527b34fe065a.res"]
+
+[params]
+

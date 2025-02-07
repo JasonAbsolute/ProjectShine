@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://bnp1kh5xevv4v"
+path="res://.godot/imported/_mat_normal_nozzle_body.fragment.glsl-a9c729edceecc2f6f3636f23d4cc8b46.res"
+
+[deps]
+
+source_file="res://models/Koopa/mario/watergun2/normal_wg/normal_wg/_mat_normal_nozzle_body.fragment.glsl"
+dest_files=["res://.godot/imported/_mat_normal_nozzle_body.fragment.glsl-a9c729edceecc2f6f3636f23d4cc8b46.res"]
+
+[params]
+

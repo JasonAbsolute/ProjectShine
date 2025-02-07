@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://it1jk30nmdkk"
+path="res://.godot/imported/_mat_yoshi_nozzle.fragment.glsl-88211bdf1a755a91f1c744fe0f723e8b.res"
+
+[deps]
+
+source_file="res://models/Koopa/mario/watergun2/yoshi_wg/yoshi_wg/_mat_yoshi_nozzle.fragment.glsl"
+dest_files=["res://.godot/imported/_mat_yoshi_nozzle.fragment.glsl-88211bdf1a755a91f1c744fe0f723e8b.res"]
+
+[params]
+

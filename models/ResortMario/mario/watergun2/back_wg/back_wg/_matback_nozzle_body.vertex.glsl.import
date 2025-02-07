@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://ds2pn760o3qwc"
+path="res://.godot/imported/_matback_nozzle_body.vertex.glsl-467ef8d17a22c907971bceebfd4216a2.res"
+
+[deps]
+
+source_file="res://models/ResortMario/mario/watergun2/back_wg/back_wg/_matback_nozzle_body.vertex.glsl"
+dest_files=["res://.godot/imported/_matback_nozzle_body.vertex.glsl-467ef8d17a22c907971bceebfd4216a2.res"]
+
+[params]
+

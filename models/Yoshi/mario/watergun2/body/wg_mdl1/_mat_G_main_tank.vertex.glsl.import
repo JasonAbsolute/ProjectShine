@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://bmx6unfgtkhfe"
+path="res://.godot/imported/_mat_G_main_tank.vertex.glsl-0519f7b9987f5e178e840a2fa964efe0.res"
+
+[deps]
+
+source_file="res://models/Yoshi/mario/watergun2/body/wg_mdl1/_mat_G_main_tank.vertex.glsl"
+dest_files=["res://.godot/imported/_mat_G_main_tank.vertex.glsl-0519f7b9987f5e178e840a2fa964efe0.res"]
+
+[params]
+

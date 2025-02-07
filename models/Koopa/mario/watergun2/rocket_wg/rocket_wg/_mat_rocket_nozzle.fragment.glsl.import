@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://dsvkhiqms6ktv"
+path="res://.godot/imported/_mat_rocket_nozzle.fragment.glsl-9346f57741b4ef4047104cc055a29ee5.res"
+
+[deps]
+
+source_file="res://models/Koopa/mario/watergun2/rocket_wg/rocket_wg/_mat_rocket_nozzle.fragment.glsl"
+dest_files=["res://.godot/imported/_mat_rocket_nozzle.fragment.glsl-9346f57741b4ef4047104cc055a29ee5.res"]
+
+[params]
+

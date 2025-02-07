@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://eexcvcdtuoag"
+path="res://.godot/imported/_matback_nozzle_body.fragment.glsl-50a7808be8b454673cd9cc757159385b.res"
+
+[deps]
+
+source_file="res://models/Yoshi/mario/watergun2/back_wg/back_wg/_matback_nozzle_body.fragment.glsl"
+dest_files=["res://.godot/imported/_matback_nozzle_body.fragment.glsl-50a7808be8b454673cd9cc757159385b.res"]
+
+[params]
+

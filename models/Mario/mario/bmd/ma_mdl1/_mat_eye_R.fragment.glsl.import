@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://cse3r18yxrqid"
+path="res://.godot/imported/_mat_eye_R.fragment.glsl-6878a93139e45eab7ba428ff14c603d7.res"
+
+[deps]
+
+source_file="res://models/Mario/mario/bmd/ma_mdl1/_mat_eye_R.fragment.glsl"
+dest_files=["res://.godot/imported/_mat_eye_R.fragment.glsl-6878a93139e45eab7ba428ff14c603d7.res"]
+
+[params]
+

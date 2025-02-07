@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://dllw4o3kjm4wq"
+path="res://.godot/imported/_mat_head(2).fragment.glsl-e3245370294addbdcf62e23e82b156f1.res"
+
+[deps]
+
+source_file="res://models/Koopa/mario/bmd/ma_mdl1/_mat_head(2).fragment.glsl"
+dest_files=["res://.godot/imported/_mat_head(2).fragment.glsl-e3245370294addbdcf62e23e82b156f1.res"]
+
+[params]
+

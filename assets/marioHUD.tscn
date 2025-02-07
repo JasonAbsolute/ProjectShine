@@ -1,6 +1,6 @@
 [gd_scene load_steps=5 format=3 uid="uid://7exkcbpcjut8"]
 
-[ext_resource type="Script" path="res://scripts/marioHUD.cs" id="1_3akmx"]
+[ext_resource type="Script" uid="uid://bbseevj82y0ki" path="res://scripts/marioHUD.cs" id="1_3akmx"]
 [ext_resource type="FontFile" uid="uid://d2mk8l467fkuo" path="res://Font/Delfino.ttf" id="2_b1vjd"]
 
 [sub_resource type="Theme" id="Theme_5nip6"]
@@ -18,4 +18,13 @@ offset_bottom = 77.0
 theme = SubResource("Theme_5nip6")
 theme_type_variation = &"HeaderLarge"
 text = "Mario State: "
+label_settings = SubResource("LabelSettings_fi7ug")
+
+[node name="currentAnimation" type="Label" parent="."]
+offset_top = 58.0
+offset_right = 290.0
+offset_bottom = 135.0
+theme = SubResource("Theme_5nip6")
+theme_type_variation = &"HeaderLarge"
+text = "Current Animation:"
 label_settings = SubResource("LabelSettings_fi7ug")

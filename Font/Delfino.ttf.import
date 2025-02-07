@@ -15,6 +15,7 @@ dest_files=["res://.godot/imported/Delfino.ttf-2ac8f92bc11c65cc214991ce8f161d5b.
 Rendering=null
 antialiasing=1
 generate_mipmaps=false
+disable_embedded_bitmaps=true
 multichannel_signed_distance_field=false
 msdf_pixel_range=8
 msdf_size=48

@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://cdljsmwr5olel"
+path="res://.godot/imported/_mat_head.fragment.glsl-2733a0601df2096501d17d2300c44a64.res"
+
+[deps]
+
+source_file="res://models/Luigi/mario/bmd/ma_mdl1/_mat_head.fragment.glsl"
+dest_files=["res://.godot/imported/_mat_head.fragment.glsl-2733a0601df2096501d17d2300c44a64.res"]
+
+[params]
+
