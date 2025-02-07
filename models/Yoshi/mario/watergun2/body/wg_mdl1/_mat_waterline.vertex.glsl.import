@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://8l74t5h14fb8"
+path="res://.godot/imported/_mat_waterline.vertex.glsl-36901b550ee5309770508db2bf407260.res"
+
+[deps]
+
+source_file="res://models/Yoshi/mario/watergun2/body/wg_mdl1/_mat_waterline.vertex.glsl"
+dest_files=["res://.godot/imported/_mat_waterline.vertex.glsl-36901b550ee5309770508db2bf407260.res"]
+
+[params]
+

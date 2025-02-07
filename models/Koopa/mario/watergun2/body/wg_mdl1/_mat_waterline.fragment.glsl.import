@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://fby1tri6syf4"
+path="res://.godot/imported/_mat_waterline.fragment.glsl-488a19f7fbcb7ae039ce905f522c8637.res"
+
+[deps]
+
+source_file="res://models/Koopa/mario/watergun2/body/wg_mdl1/_mat_waterline.fragment.glsl"
+dest_files=["res://.godot/imported/_mat_waterline.fragment.glsl-488a19f7fbcb7ae039ce905f522c8637.res"]
+
+[params]
+

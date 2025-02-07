@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://cur0ajck6dddn"
+path="res://.godot/imported/_mat_G_main_tank.vertex.glsl-b530e2a819c051b6a985e6dcd24a3539.res"
+
+[deps]
+
+source_file="res://models/Koopa/mario/watergun2/body/wg_mdl1/_mat_G_main_tank.vertex.glsl"
+dest_files=["res://.godot/imported/_mat_G_main_tank.vertex.glsl-b530e2a819c051b6a985e6dcd24a3539.res"]
+
+[params]
+

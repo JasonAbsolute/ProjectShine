@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://c0d21l1q3qyaa"
+path="res://.godot/imported/_mat_G_main.fragment.glsl-9a2dae08c667531ff86c44217ff331f9.res"
+
+[deps]
+
+source_file="res://models/ResortMario/mario/watergun2/body/wg_mdl1/_mat_G_main.fragment.glsl"
+dest_files=["res://.godot/imported/_mat_G_main.fragment.glsl-9a2dae08c667531ff86c44217ff331f9.res"]
+
+[params]
+

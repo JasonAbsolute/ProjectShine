@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://bd000tl8wf1qh"
+path="res://.godot/imported/_mat_diverhelm_top.fragment.glsl-2cec4828946930288cf5cf5501ae6871.res"
+
+[deps]
+
+source_file="res://models/SM64/mario/watergun2/body/diver_helm/_mat_diverhelm_top.fragment.glsl"
+dest_files=["res://.godot/imported/_mat_diverhelm_top.fragment.glsl-2cec4828946930288cf5cf5501ae6871.res"]
+
+[params]
+

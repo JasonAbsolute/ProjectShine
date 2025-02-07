@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://dmupwxqco817b"
+path="res://.godot/imported/_mat_dummy_nozzle_body.fragment.glsl-4b81e9b4991d6f12d7cc41c28c8c9c67.res"
+
+[deps]
+
+source_file="res://models/Koopa/mario/watergun2/dummy_wg/dummy_wg/_mat_dummy_nozzle_body.fragment.glsl"
+dest_files=["res://.godot/imported/_mat_dummy_nozzle_body.fragment.glsl-4b81e9b4991d6f12d7cc41c28c8c9c67.res"]
+
+[params]
+

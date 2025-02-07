@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://b1mvx1yfcmhad"
+path="res://.godot/imported/_mat_diverhelm_top.vertex.glsl-7f9363ad85b71d707ecbdfb480453254.res"
+
+[deps]
+
+source_file="res://models/Yoshi/mario/watergun2/body/diver_helm/_mat_diverhelm_top.vertex.glsl"
+dest_files=["res://.godot/imported/_mat_diverhelm_top.vertex.glsl-7f9363ad85b71d707ecbdfb480453254.res"]
+
+[params]
+

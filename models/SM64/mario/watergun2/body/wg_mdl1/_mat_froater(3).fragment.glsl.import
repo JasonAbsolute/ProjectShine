@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://c5p6xgk8wfvy0"
+path="res://.godot/imported/_mat_froater(3).fragment.glsl-091cd62b3bbd2d835c427e963f36b298.res"
+
+[deps]
+
+source_file="res://models/SM64/mario/watergun2/body/wg_mdl1/_mat_froater(3).fragment.glsl"
+dest_files=["res://.godot/imported/_mat_froater(3).fragment.glsl-091cd62b3bbd2d835c427e963f36b298.res"]
+
+[params]
+

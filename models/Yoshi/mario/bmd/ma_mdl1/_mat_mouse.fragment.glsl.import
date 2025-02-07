@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://jlrt72g30xb2"
+path="res://.godot/imported/_mat_mouse.fragment.glsl-955bf3d76e5490bd90b414380f3492aa.res"
+
+[deps]
+
+source_file="res://models/Yoshi/mario/bmd/ma_mdl1/_mat_mouse.fragment.glsl"
+dest_files=["res://.godot/imported/_mat_mouse.fragment.glsl-955bf3d76e5490bd90b414380f3492aa.res"]
+
+[params]
+

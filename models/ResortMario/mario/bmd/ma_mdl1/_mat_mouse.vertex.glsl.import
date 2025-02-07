@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://dcq2m01swo7rf"
+path="res://.godot/imported/_mat_mouse.vertex.glsl-98d6c0711a57ca0fa0a63102d817305f.res"
+
+[deps]
+
+source_file="res://models/ResortMario/mario/bmd/ma_mdl1/_mat_mouse.vertex.glsl"
+dest_files=["res://.godot/imported/_mat_mouse.vertex.glsl-98d6c0711a57ca0fa0a63102d817305f.res"]
+
+[params]
+

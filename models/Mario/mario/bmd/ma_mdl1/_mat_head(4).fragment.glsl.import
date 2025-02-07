@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://cun140pysggix"
+path="res://.godot/imported/_mat_head(4).fragment.glsl-abbc5ce1b0d8f290839a3f5e256294ef.res"
+
+[deps]
+
+source_file="res://models/Mario/mario/bmd/ma_mdl1/_mat_head(4).fragment.glsl"
+dest_files=["res://.godot/imported/_mat_head(4).fragment.glsl-abbc5ce1b0d8f290839a3f5e256294ef.res"]
+
+[params]
+

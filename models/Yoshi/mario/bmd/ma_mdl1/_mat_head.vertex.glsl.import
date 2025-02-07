@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://gj1iu7ijtw84"
+path="res://.godot/imported/_mat_head.vertex.glsl-e8e4044fd4799f7e8ba6a56b88cfe42a.res"
+
+[deps]
+
+source_file="res://models/Yoshi/mario/bmd/ma_mdl1/_mat_head.vertex.glsl"
+dest_files=["res://.godot/imported/_mat_head.vertex.glsl-e8e4044fd4799f7e8ba6a56b88cfe42a.res"]
+
+[params]
+

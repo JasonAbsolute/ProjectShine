@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://bg43qiuim342s"
+path="res://.godot/imported/_mat_head(7).vertex.glsl-8de988deed5be9fae404cc2cc5222963.res"
+
+[deps]
+
+source_file="res://models/ResortMario/mario/bmd/ma_mdl1/_mat_head(7).vertex.glsl"
+dest_files=["res://.godot/imported/_mat_head(7).vertex.glsl-8de988deed5be9fae404cc2cc5222963.res"]
+
+[params]
+

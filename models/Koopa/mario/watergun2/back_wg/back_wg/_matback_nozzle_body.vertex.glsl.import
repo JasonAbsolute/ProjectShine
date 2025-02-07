@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://dyw830je0c3nl"
+path="res://.godot/imported/_matback_nozzle_body.vertex.glsl-e55c93f1572b26d6ef4885b531198d6f.res"
+
+[deps]
+
+source_file="res://models/Koopa/mario/watergun2/back_wg/back_wg/_matback_nozzle_body.vertex.glsl"
+dest_files=["res://.godot/imported/_matback_nozzle_body.vertex.glsl-e55c93f1572b26d6ef4885b531198d6f.res"]
+
+[params]
+

@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://dm3vyy3gixgnc"
+path="res://.godot/imported/_mat_dummy_nozzle_body.vertex.glsl-bf2809ceb31b0bdabfd772bf3eb63fb7.res"
+
+[deps]
+
+source_file="res://models/Yoshi/mario/watergun2/dummy_wg/dummy_wg/_mat_dummy_nozzle_body.vertex.glsl"
+dest_files=["res://.godot/imported/_mat_dummy_nozzle_body.vertex.glsl-bf2809ceb31b0bdabfd772bf3eb63fb7.res"]
+
+[params]
+

@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://banj6mkhg7ivn"
+path="res://.godot/imported/_mat_rocket_nozzle.vertex.glsl-7c42ea5b98db8a9ecc92b5b6a286ed80.res"
+
+[deps]
+
+source_file="res://models/Mario/mario/watergun2/rocket_wg/rocket_wg/_mat_rocket_nozzle.vertex.glsl"
+dest_files=["res://.godot/imported/_mat_rocket_nozzle.vertex.glsl-7c42ea5b98db8a9ecc92b5b6a286ed80.res"]
+
+[params]
+

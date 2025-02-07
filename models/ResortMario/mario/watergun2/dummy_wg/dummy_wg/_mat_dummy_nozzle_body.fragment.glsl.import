@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://dcbddl5tp34vn"
+path="res://.godot/imported/_mat_dummy_nozzle_body.fragment.glsl-17f68933167efb5bc0690e5f1529fa38.res"
+
+[deps]
+
+source_file="res://models/ResortMario/mario/watergun2/dummy_wg/dummy_wg/_mat_dummy_nozzle_body.fragment.glsl"
+dest_files=["res://.godot/imported/_mat_dummy_nozzle_body.fragment.glsl-17f68933167efb5bc0690e5f1529fa38.res"]
+
+[params]
+

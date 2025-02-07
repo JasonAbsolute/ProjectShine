@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://e3t8dew7ghsq"
+path="res://.godot/imported/_mat_diver_unit.vertex.glsl-3c7fc74e19e77e5f13225a00e6d091e4.res"
+
+[deps]
+
+source_file="res://models/Koopa/mario/watergun2/hover_wg/hover_wg/_mat_diver_unit.vertex.glsl"
+dest_files=["res://.godot/imported/_mat_diver_unit.vertex.glsl-3c7fc74e19e77e5f13225a00e6d091e4.res"]
+
+[params]
+

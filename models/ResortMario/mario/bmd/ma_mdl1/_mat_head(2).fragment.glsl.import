@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://64ehk33gt1hi"
+path="res://.godot/imported/_mat_head(2).fragment.glsl-a60add69da5c619f66b1adc903615500.res"
+
+[deps]
+
+source_file="res://models/ResortMario/mario/bmd/ma_mdl1/_mat_head(2).fragment.glsl"
+dest_files=["res://.godot/imported/_mat_head(2).fragment.glsl-a60add69da5c619f66b1adc903615500.res"]
+
+[params]
+

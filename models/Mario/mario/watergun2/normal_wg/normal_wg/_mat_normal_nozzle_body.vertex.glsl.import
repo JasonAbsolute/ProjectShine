@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://df2spyl6oieiv"
+path="res://.godot/imported/_mat_normal_nozzle_body.vertex.glsl-ed351045f9337ca301b80b38da7f7e5c.res"
+
+[deps]
+
+source_file="res://models/Mario/mario/watergun2/normal_wg/normal_wg/_mat_normal_nozzle_body.vertex.glsl"
+dest_files=["res://.godot/imported/_mat_normal_nozzle_body.vertex.glsl-ed351045f9337ca301b80b38da7f7e5c.res"]
+
+[params]
+
