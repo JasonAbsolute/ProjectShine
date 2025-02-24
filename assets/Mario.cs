@@ -18,18 +18,21 @@ public partial class Mario : CharacterBody3D
         doubleJumpLanding,
         tripleJumpLanding,
         diving,
+        bellySlidingFromDive,
+        singleRollout,
+        gettingUpFromSliding,
     }
 
-    public const float RUN_SPEED = 16;
+    public const float RUN_SPEED = 26;
     public const int thisistest = 0;
     public const float ROLL_SPEED = 22;
-    public const float BASE_JUMP_VELOCITY = 6;
-    public const float MAX_JUMP_VELOCITY = 10;
+    public const float BASE_JUMP_VELOCITY = 50;
+    public const float MAX_JUMP_VELOCITY = 18;
     public MarioState stateOfMario;
     private readonly CircularBuffer<MarioState> stateHistory = new CircularBuffer<MarioState>(20);
 
     [Export]
-    public float GRAVITY = 8.19f;
+    public Vector3 GRAVITY = new Vector3(0, -140, 0);
     public float rotation_angle = 0.0f;
 
     public double mouseSensitivity = 0.001;
@@ -82,6 +85,8 @@ public partial class Mario : CharacterBody3D
     // Get the gravity from the project settings to be synced with RigidBody nodes.
     public float gravity = ProjectSettings.GetSetting("physics/3d/default_gravity").AsSingle();
 
+    public int gettingUpFromSlidingTimer = 53;
+
     public override void _Ready()
     {
         base._Ready();
@@ -128,7 +133,8 @@ public partial class Mario : CharacterBody3D
         // Add the gravity.
         if (!IsOnFloor())
         {
-            velocity += GetGravity() * (float)delta;
+            velocity += GRAVITY * (float)delta;
+            Console.WriteLine("gravity: " + GRAVITY);
         }
 
         if (stateOfMario != MarioState.idle)
@@ -192,102 +198,149 @@ public partial class Mario : CharacterBody3D
         direction = direction.Rotated(Vector3.Up, springArmPivot.Rotation.Y);
 
         var walkingStrength = LstickVec.Length();
+        //This is the main logic loop for Player being on the ground
         if (IsOnFloor())
         {
             isJumping = false;
             jumpHoldTime = 0.0f;
             currentJumpVelocity = BASE_JUMP_VELOCITY;
-
-            if (Input.IsActionPressed("key_space") || Input.IsActionPressed("button_a"))
+            if (stateOfMario == MarioState.gettingUpFromSliding)
             {
-                isJumping = true;
-                velocity.Y = BASE_JUMP_VELOCITY;
-                stateOfMario = MarioState.singleJump;
-                animPlayer.Play("ma_jump");
-            }
-
-            // Setting Mario to be idle
-            if (direction == Vector3.Zero && !isJumping)
-            {
-                stateOfMario = MarioState.idle;
-            }
-
-            velocity.X = Mathf.Lerp(velocity.X, direction.X * RUN_SPEED, .5f);
-            velocity.Z = Mathf.Lerp(velocity.Z, direction.Z * RUN_SPEED, .5f);
-            if (direction != Vector3.Zero)
-            {
-                armature.Rotation = armature.Rotation with
+                gettingUpFromSlidingTimer--;
+                //Play this animation but if the player does any input then let other animations override.
+                //maybe use timer or learn about timmers and how to handle?
+                animPlayer.Play("ma_lost");
+                if (gettingUpFromSlidingTimer == 0)
                 {
-                    Y = Mathf.LerpAngle(
-                        armature.Rotation.Y,
-                        Mathf.Atan2(-velocity.X, -velocity.Z),
-                        .2f
-                    ),
-                };
-                if (Input.IsActionJustPressed("button_b"))
-                {
-                    animPlayer.Play("ma_sldct");
-                    stateOfMario = MarioState.diving;
-                    velocity.X = Mathf.Lerp(velocity.X, direction.X * RUN_SPEED * 100, .01f);
-                    velocity.Z = Mathf.Lerp(velocity.Z, direction.Z * RUN_SPEED * 100, .01f);
-                    velocity.Y += 10;
-                }
-                else if (walkingStrength > .5)
-                {
-                    animPlayer.Play("ma_run2", -1, 1.5f);
-                    stateOfMario = MarioState.sprinting;
-                }
-                else
-                {
-                    animPlayer.Play("ma_run1");
-                    stateOfMario = MarioState.running;
+                    gettingUpFromSlidingTimer = 53;
+                    stateOfMario = MarioState.idle;
                 }
             }
             else
             {
-                if (
-                    (
-                        stateHistory.Contains(MarioState.singleJump)
-                        || stateHistory.Contains(MarioState.tripleJump)
-                    )
-                    && direction == Vector3.Zero
-                )
+                if (stateOfMario == MarioState.bellySlidingFromDive)
                 {
-                    animPlayer.Play("ma_laend");
-                }
-                else if (stateHistory.Contains(MarioState.doubleJump) && direction == Vector3.Zero)
-                {
-                    Console.WriteLine("landing double");
-                    animPlayer.Play("ma_2jmed_Armature");
+                    velocity.X = Mathf.Lerp(velocity.X, 0, .05f);
+                    velocity.Z = Mathf.Lerp(velocity.Z, 0, .05f);
+                    Console.WriteLine("Vel: " + velocity);
+                    if (velocity.X < 0.5 && velocity.Z < 0.5)
+                    {
+                        stateOfMario = MarioState.gettingUpFromSliding;
+                    }
                 }
                 else
                 {
-                    animPlayer.Play("ma_wait");
-                    stateOfMario = MarioState.idle;
-                }
-            }
+                    if (stateOfMario == MarioState.diving)
+                    {
+                        animPlayer.Play("ma_slpbk");
+                        stateOfMario = MarioState.bellySlidingFromDive;
+                    }
+                    else
+                    {
+                        if (Input.IsActionPressed("key_space") || Input.IsActionPressed("button_a"))
+                        {
+                            isJumping = true;
+                            velocity.Y = BASE_JUMP_VELOCITY;
+                            stateOfMario = MarioState.singleJump;
+                            animPlayer.Play("ma_jump");
+                        }
 
-            if (Input.IsActionPressed("key_space") || Input.IsActionPressed("button_a"))
-            {
-                lastKnownDirection = direction;
-                isJumping = true;
-                if (stateHistory.Contains(MarioState.doubleJump))
-                {
-                    velocity.Y = MAX_JUMP_VELOCITY;
-                    stateOfMario = MarioState.tripleJump;
-                    animPlayer.Play("ma_demo_gate_out_rolling_get");
-                }
-                else if (stateHistory.Contains(MarioState.singleJump))
-                {
-                    velocity.Y = BASE_JUMP_VELOCITY * 1.7f;
-                    stateOfMario = MarioState.doubleJump;
-                    animPlayer.Play("ma_2jmp1");
-                }
-                else
-                {
-                    velocity.Y = BASE_JUMP_VELOCITY;
-                    stateOfMario = MarioState.singleJump;
-                    animPlayer.Play("ma_jump");
+                        // Setting Mario to be idle
+                        if (direction == Vector3.Zero && !isJumping)
+                        {
+                            stateOfMario = MarioState.idle;
+                        }
+
+                        velocity.X = Mathf.Lerp(velocity.X, direction.X * RUN_SPEED, .5f);
+                        velocity.Z = Mathf.Lerp(velocity.Z, direction.Z * RUN_SPEED, .5f);
+                        if (direction != Vector3.Zero)
+                        {
+                            armature.Rotation = armature.Rotation with
+                            {
+                                Y = Mathf.LerpAngle(
+                                    armature.Rotation.Y,
+                                    Mathf.Atan2(-velocity.X, -velocity.Z),
+                                    .2f
+                                ),
+                            };
+                            if (Input.IsActionJustPressed("button_b"))
+                            {
+                                animPlayer.Play("ma_sldct");
+                                stateOfMario = MarioState.diving;
+                                velocity.X = Mathf.Lerp(
+                                    velocity.X,
+                                    direction.X * RUN_SPEED * 100,
+                                    .01f
+                                );
+                                velocity.Z = Mathf.Lerp(
+                                    velocity.Z,
+                                    direction.Z * RUN_SPEED * 100,
+                                    .01f
+                                );
+                                velocity.Y += 10;
+                            }
+                            else if (walkingStrength > .5)
+                            {
+                                animPlayer.Play("ma_run2", -1, 1.5f);
+                                stateOfMario = MarioState.sprinting;
+                            }
+                            else
+                            {
+                                animPlayer.Play("ma_run1");
+                                stateOfMario = MarioState.running;
+                            }
+                        }
+                        else
+                        {
+                            if (
+                                (
+                                    stateHistory.Contains(MarioState.singleJump)
+                                    || stateHistory.Contains(MarioState.tripleJump)
+                                )
+                                && direction == Vector3.Zero
+                            )
+                            {
+                                animPlayer.Play("ma_laend");
+                            }
+                            else if (
+                                stateHistory.Contains(MarioState.doubleJump)
+                                && direction == Vector3.Zero
+                            )
+                            {
+                                Console.WriteLine("landing double");
+                                animPlayer.Play("ma_2jmed_Armature");
+                            }
+                            else
+                            {
+                                animPlayer.Play("ma_wait");
+                                stateOfMario = MarioState.idle;
+                            }
+                        }
+
+                        if (Input.IsActionPressed("key_space") || Input.IsActionPressed("button_a"))
+                        {
+                            lastKnownDirection = direction;
+                            isJumping = true;
+                            if (stateHistory.Contains(MarioState.doubleJump))
+                            {
+                                velocity.Y = MAX_JUMP_VELOCITY;
+                                stateOfMario = MarioState.tripleJump;
+                                animPlayer.Play("ma_demo_gate_out_rolling_get");
+                            }
+                            else if (stateHistory.Contains(MarioState.singleJump))
+                            {
+                                velocity.Y = BASE_JUMP_VELOCITY * 1.7f;
+                                stateOfMario = MarioState.doubleJump;
+                                animPlayer.Play("ma_2jmp1");
+                            }
+                            else
+                            {
+                                velocity.Y = BASE_JUMP_VELOCITY;
+                                stateOfMario = MarioState.singleJump;
+                                animPlayer.Play("ma_jump");
+                            }
+                        }
+                    }
                 }
             }
         }

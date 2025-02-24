@@ -1,6 +1,7 @@
-[gd_scene load_steps=15 format=3 uid="uid://cwve1f1kpa2pf"]
+[gd_scene load_steps=16 format=3 uid="uid://cwve1f1kpa2pf"]
 
 [ext_resource type="PackedScene" uid="uid://ejk8ujmsqr60" path="res://assets/Mario.tscn" id="2_22e8p"]
+[ext_resource type="PackedScene" uid="uid://chxfxlmk4gvks" path="res://assets/PiantaMaleNormal.tscn" id="2_i3ws1"]
 [ext_resource type="PackedScene" uid="uid://7exkcbpcjut8" path="res://assets/marioHUD.tscn" id="2_w7srv"]
 [ext_resource type="PackedScene" uid="uid://lxisv6iyx202" path="res://assets/SleepyBoo.tscn" id="4_fjm2c"]
 [ext_resource type="PackedScene" uid="uid://doqjj0ahoycbe" path="res://assets/plaza.tscn" id="4_i3ws1"]
@@ -47,7 +48,10 @@ transform = Transform3D(-0.866023, -0.433016, 0.250001, 0, 0.499998, 0.866027, -
 shadow_enabled = true
 
 [node name="Mario" parent="." instance=ExtResource("2_22e8p")]
-transform = Transform3D(-0.03, 0, -2.62268e-09, 0, 0.03, 0, 2.62268e-09, 0, -0.03, -155.834, -9.68296, -83.5924)
+transform = Transform3D(-0.03, 0, -2.62268e-09, 0, 0.03, 0, 2.62268e-09, 0, -0.03, -135.152, -8.00222, -23.1577)
+
+[node name="PiantaMaleNormal" parent="." instance=ExtResource("2_i3ws1")]
+transform = Transform3D(0.03, 0, 0, 0, 0.03, 0, 0, 0, 0.03, -94.983, -9.27239, -72.2841)
 
 [node name="StaticBody3D" type="StaticBody3D" parent="."]
 transform = Transform3D(99.9779, 0, 2.10297, 0, 1, 0, -2.10297, 0, 99.9779, 0.15142, 0.0386906, -0.301396)
