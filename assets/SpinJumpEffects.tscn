@@ -1,0 +1,41 @@
+[gd_scene load_steps=9 format=3 uid="uid://dtgp7u1r3mue"]
+
+[ext_resource type="Material" uid="uid://wqe5ie5hvfco" path="res://BlueMaterialGeometry.tres" id="1_078cb"]
+[ext_resource type="Material" uid="uid://dcdwxr2m3ajw3" path="res://BlueProcessMaterial.tres" id="2_dj6rn"]
+[ext_resource type="RibbonTrailMesh" uid="uid://w0jsafw01rti" path="res://SpingingTrailMesh.tres" id="3_7huwi"]
+[ext_resource type="Material" uid="uid://b48xoppvk2l3x" path="res://RedMaterialGeometry.tres" id="4_7huwi"]
+[ext_resource type="Material" uid="uid://bjcxrfsy7x2fn" path="res://RedProcessMaterial.tres" id="5_gomlu"]
+[ext_resource type="Material" uid="uid://dd25lmd66lwta" path="res://WhiteMaterialGeometry.tres" id="6_seakk"]
+[ext_resource type="Material" uid="uid://di1edfkldiasb" path="res://WhiteProcessMaterial.tres" id="7_m2cyo"]
+
+[sub_resource type="RibbonTrailMesh" id="RibbonTrailMesh_seakk"]
+size = 6.714
+section_segments = 4
+
+[node name="SpinJumpEffects" type="Node3D"]
+
+[node name="BlueTrailEffect" type="GPUParticles3D" parent="."]
+material_override = ExtResource("1_078cb")
+local_coords = true
+trail_enabled = true
+trail_lifetime = 0.7
+process_material = ExtResource("2_dj6rn")
+draw_pass_1 = ExtResource("3_7huwi")
+
+[node name="RedTrailEffect" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 17.7417, 0)
+material_override = ExtResource("4_7huwi")
+local_coords = true
+trail_enabled = true
+trail_lifetime = 0.7
+process_material = ExtResource("5_gomlu")
+draw_pass_1 = ExtResource("3_7huwi")
+
+[node name="WhiteTrailEffect" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 48.6768, 0)
+material_override = ExtResource("6_seakk")
+local_coords = true
+trail_enabled = true
+trail_lifetime = 0.7
+process_material = ExtResource("7_m2cyo")
+draw_pass_1 = SubResource("RibbonTrailMesh_seakk")

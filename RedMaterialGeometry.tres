@@ -1,0 +1,13 @@
+[gd_resource type="StandardMaterial3D" load_steps=2 format=3 uid="uid://b48xoppvk2l3x"]
+
+[ext_resource type="Texture2D" uid="uid://dphf44p22wl23" path="res://Font/H_ma_polmask1_i4.png" id="1_o216w"]
+
+[resource]
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+vertex_color_is_srgb = true
+albedo_color = Color(1, 0, 0, 0.541176)
+albedo_texture = ExtResource("1_o216w")
+use_particle_trails = true

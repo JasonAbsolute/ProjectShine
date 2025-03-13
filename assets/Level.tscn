@@ -48,7 +48,7 @@ transform = Transform3D(-0.866023, -0.433016, 0.250001, 0, 0.499998, 0.866027, -
 shadow_enabled = true
 
 [node name="Mario" parent="." instance=ExtResource("2_22e8p")]
-transform = Transform3D(-0.03, 0, -2.62268e-09, 0, 0.03, 0, 2.62268e-09, 0, -0.03, -135.152, -8.00222, -23.1577)
+transform = Transform3D(-0.03, 0, -4.52987e-09, 0, 0.03, 0, 4.52987e-09, 0, -0.03, -183.612, 146.953, -44.7244)
 
 [node name="PiantaMaleNormal" parent="." instance=ExtResource("2_i3ws1")]
 transform = Transform3D(0.03, 0, 0, 0, 0.03, 0, 0, 0, 0.03, -94.983, -9.27239, -72.2841)

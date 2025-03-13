@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://dih7m3fgfluex"]
+
+[ext_resource type="Script" uid="uid://bdfw4qj4u1shx" path="res://assets/ZEffectSpawner.cs" id="1_q7g1d"]
+[ext_resource type="PackedScene" uid="uid://dnl1alxju3i1g" path="res://assets/ZEffect.tscn" id="2_1tgll"]
+
+[node name="ZEffectSpawner" type="Node3D"]
+script = ExtResource("1_q7g1d")
+zEffectScene = ExtResource("2_1tgll")
+
+[node name="ZParent" type="Node3D" parent="."]

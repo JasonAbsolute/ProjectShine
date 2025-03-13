@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 public class CircularBuffer<T>
 {
-     private readonly List<T> list;
+    public readonly List<T> list;
     private readonly int maxSize;
 
     public CircularBuffer(int size)

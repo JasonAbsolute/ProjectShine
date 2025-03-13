@@ -359935,42 +359935,42 @@ key_lcrtl={
 ]
 }
 Lstick_left={
-"deadzone": 0.07,
+"deadzone": 0.0,
 "events": [Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":0,"axis_value":-1.0,"script":null)
 ]
 }
 Lstick_right={
-"deadzone": 0.07,
+"deadzone": 0.0,
 "events": [Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":0,"axis_value":1.0,"script":null)
 ]
 }
 Lstick_up={
-"deadzone": 0.07,
+"deadzone": 0.0,
 "events": [Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":1,"axis_value":-1.0,"script":null)
 ]
 }
 Lstick_down={
-"deadzone": 0.07,
+"deadzone": 0.0,
 "events": [Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":1,"axis_value":1.0,"script":null)
 ]
 }
 Rstick_left={
-"deadzone": 0.5,
+"deadzone": 0.0,
 "events": [Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":2,"axis_value":-1.0,"script":null)
 ]
 }
 Rstick_right={
-"deadzone": 0.5,
+"deadzone": 0.0,
 "events": [Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":2,"axis_value":1.0,"script":null)
 ]
 }
 Rstick_up={
-"deadzone": 0.5,
+"deadzone": 0.0,
 "events": [Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":3,"axis_value":-1.0,"script":null)
 ]
 }
 Rstick_down={
-"deadzone": 0.5,
+"deadzone": 0.0,
 "events": [Object(InputEventJoypadMotion,"resource_local_to_scene":false,"resource_name":"","device":-1,"axis":3,"axis_value":1.0,"script":null)
 ]
 }
