@@ -146,15 +146,15 @@ _data = {
 &"debutelesa_wait": SubResource("Animation_v3e74")
 }
 
-[node name="SleepyBoo" type="RigidBody3D"]
+[node name="SleepyBoo" type="RigidBody3D" groups=["pickable"]]
 script = ExtResource("1_6lbnf")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-transform = Transform3D(0.03, 0, 0, 0, 0.03, 0, 0, 0, 0.03, 0, 4.38791, 0.33591)
+transform = Transform3D(0.005, 0, 0, 0, 0.005, 0, 0, 0, 0.005, 0.165448, 0.764918, 0.0983178)
 shape = SubResource("SphereShape3D_6lbnf")
 
 [node name="Armature" type="Node3D" parent="."]
-transform = Transform3D(0.03, 0, 0, 0, 0.03, 0, 0, 0, 0.03, 0, 0, 0)
+transform = Transform3D(0.005, 0, 0, 0, 0.005, 0, 0, 0, 0.005, 0, 0, 0)
 
 [node name="Skeleton3D" type="Skeleton3D" parent="Armature"]
 bones/0/name = "root"

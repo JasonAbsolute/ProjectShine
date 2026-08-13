@@ -35,7 +35,7 @@ public partial class ZEffectSpawner : Node3D
                 spawnPosition
                     + new Vector3(
                         (float)GD.RandRange(-0.2, 0.2), // Small horizontal variation
-                        1.5f + (1.75f * i) * 0.5f, // Lower starting height
+                        .5f + (.75f * i) * 0.5f, // Lower starting height
                         (float)GD.RandRange(-0.2, 0.2)
                     )
             );
@@ -55,10 +55,10 @@ public partial class ZEffectSpawner : Node3D
             Tween tween = zSprite.CreateTween();
 
             // Scale animation (gradual increase)
-            zSprite.Scale = Vector3.One * (4f + (3 * i));
+            zSprite.Scale = Vector3.One * (.05f + (.1f * i));
 
             // Move animation (upward float)
-            tween.TweenProperty(zSprite, "position:y", zSprite.Position.Y + 4.5f, animationTime);
+            tween.TweenProperty(zSprite, "position:y", zSprite.Position.Y + .5f, animationTime);
 
             // Fade-out animation
             tween.TweenProperty(zSprite, "modulate:a", 0, animationTime);

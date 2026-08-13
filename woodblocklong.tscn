@@ -1,0 +1,65 @@
+[gd_scene load_steps=7 format=4 uid="uid://cfdsmmqe42w7v"]
+
+[ext_resource type="Script" uid="uid://blnn0heiyhda3" path="res://assets/MovingPlatform.cs" id="1_c24t6"]
+[ext_resource type="Texture2D" uid="uid://p248y7shgg0w" path="res://Levels/secret1/platforms/Woodblocklong_B_cerenaEX0_wood.png" id="1_qvlo0"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ot3kg"]
+resource_name = "m0_o9"
+cull_mode = 2
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("1_qvlo0")
+roughness = 0.5
+
+[sub_resource type="ArrayMesh" id="ArrayMesh_j3g4i"]
+resource_name = "Woodblocklong_meshId0_name"
+_surfaces = [{
+"aabb": AABB(-13.4039, -3.35099, -13.4039, 26.8079, 6.70197, 26.8079),
+"attribute_data": PackedByteArray("/////xUAmz8AAAg//////+B/jz8AAIg+/////wAAALwIAK4+/////w4AED0AABQ//////yoAkj8AAJA+/////x+AmD8AAAQ//////wAAAL0AAKg+/////wAAYD0AABg//////wAAID38/xQ///////V/mj8AAAQ//////xUAjz8AAIg+/////wAAgLwIAK4+/////w4AML0AAKg+/////wAAlD8AAJA+/////wAAID0AABg//////+v/mD/8/wQ//////+B/mz/8/wg//////x+AnD8AAAg//////wAAAL0IAKY+/////wqAkT8IAI4+/////wAAwLwAALA+/////wqAkT8AAIg+/////w4AcD0AABg//////wAAwDwAABQ/"),
+"bone_aabbs": [AABB(-13.4039, -3.35099, -13.4039, 26.8079, 6.70197, 26.8079)],
+"format": 34359745567,
+"index_count": 132,
+"index_data": PackedByteArray("CgASAAsACwASAAwAEgAKAAEACgALABMABgAMABIAEgABAAYACwAMABQAEwALAAIAFAACAAsACgATAA0AFQABAAoACgANABUADQATAAQAEwACAAQACQAVAA0ABQABABUABQAVAAkABAARAA0ACQANABEAAAAEAAIABAAAABEAAAACAAcABwACABQAEAARAAAACQARABAAAAAHABYAAAAWABAABwAUAA4AFgAHAA4ADgAUAAwAEAAWAAgADgAIABYACQAQAA8AEAAIAA8ADwAFAAkADgAMABcADgAXAAgAFwAMAAYAAwAPAAgACAAXAAMAAwAFAA8AFwAGAAMAAwABAAUAAwAGAAEA"),
+"lods": [7.85649, PackedByteArray("CgAGAAsACwAGAAwABgAKAAEAAwAMAAYAAwAGAAEACgANAAEACgALAAQACgAEAA0ACwAMAAIABAALAAIADgACAAwADgAMAAMAAwABAAUABwACAA4ADgADAAgADgAIAAcAAwAFAA8AAwAPAAgABQABAAkADwAFAAkACQABAA0AEAAIAA8ACQAQAA8AEAAHAAgACQANABEACQARABAABAARAA0AAAAHABAAEAARAAAABAAAABEAAAACAAcAAAAEAAIA"), 9.08803, PackedByteArray("AQAGAAIABwACAAYABwAGAAMAAwAGAAEABwADAAgAAQACAAQAAAACAAcAAAAHAAgAAAAEAAIACQABAAQACQAEAAAAAwABAAUABQABAAkAAwAFAAgACQAAAAUAAAAIAAUA"), 127.715, PackedByteArray("AQACAAQAAAAEAAIABQABAAQABQAEAAAAAwACAAEAAwABAAUAAAACAAMAAAADAAUA"), 127.715, PackedByteArray("AAABAAIAAwACAAEAAAACAAMAAwABAAAA")],
+"material": SubResource("StandardMaterial3D_ot3kg"),
+"name": "m0_o9",
+"primitive": 3,
+"skin_data": PackedByteArray("AAAAAAAAAAD//wAAAAAAAAAAAAAAAAAA//8AAAAAAAAAAAAAAAAAAP//AAAAAAAAAAAAAAAAAAD//wAAAAAAAAAAAAAAAAAA//8AAAAAAAAAAAAAAAAAAP//AAAAAAAAAAAAAAAAAAD//wAAAAAAAAAAAAAAAAAA//8AAAAAAAAAAAAAAAAAAP//AAAAAAAAAAAAAAAAAAD//wAAAAAAAAAAAAAAAAAA//8AAAAAAAAAAAAAAAAAAP//AAAAAAAAAAAAAAAAAAD//wAAAAAAAAAAAAAAAAAA//8AAAAAAAAAAAAAAAAAAP//AAAAAAAAAAAAAAAAAAD//wAAAAAAAAAAAAAAAAAA//8AAAAAAAAAAAAAAAAAAP//AAAAAAAAAAAAAAAAAAD//wAAAAAAAAAAAAAAAAAA//8AAAAAAAAAAAAAAAAAAP//AAAAAAAAAAAAAAAAAAD//wAAAAAAAAAAAAAAAAAA//8AAAAAAAAAAAAAAAAAAP//AAAAAAAA"),
+"uv_scale": Vector4(0, 0, 0, 0),
+"vertex_count": 24,
+"vertex_data": PackedByteArray("/hlRwZN2VsD+GVHB/hlRwZN2VkD+GVFB/hlRQYt2VsD/GVFB/hlRQYt2VkD/GVHB/hlRwYt2VsD/GVFB/hlRwYt2VkD/GVHB/hlRQZN2VkD+GVFB/hlRQZN2VsD+GVHB/hlRQUkEQUCPdlbBj3ZWwUkEQUD/GVHB/hlRwVEEQUCOdlZB/hlRQUkEQcCPdlZBj3ZWQVEEQUD+GVFBj3ZWwUkEQcD/GVFBj3ZWQVEEQcD+GVHB/hlRwUkEQUCPdlbB/hlRwVEEQcCOdlbBj3ZWwVEEQcD+GVHB/hlRQVEEQUCOdlZB/hlRwUkEQcCPdlZBj3ZWQUkEQcD/GVFBj3ZWwVEEQUD+GVFB/hlRQVEEQcCOdlbBj3ZWQUkEQUD/GVHB2XySAZcBpThpftb8////P5WBKAOYAYZpJYNs/kkByMZsfigDTQGROdZ8bP6YAXW4koHW/JgBiMcog5IBWwDjWKr5d/4aG3rNVAbYhx966Il7flOGkCViUoaBq3nAYUlzI/hThqV5IfzbB6t5XXEKA6r5J3hzek52VAZ3/hc+uJ9UBoQBuyuBKVQGJHiled0DhoFThoos69Z4fqt59RylMSP4q3kHYKR92wdThiUGEn+q+YcBUHcvAar52oebcPj8")
+}]
+blend_shape_mode = 0
+
+[sub_resource type="Skin" id="Skin_cjnfl"]
+resource_name = "Skin"
+bind_count = 1
+bind/0/name = &"Large"
+bind/0/bone = -1
+bind/0/pose = Transform3D(29.842, 0, 0, 0, 29.842, -2.25301e-06, 0, 2.25301e-06, 29.842, 0, 0, 0)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_c24t6"]
+size = Vector3(26.8022, 6.72467, 26.9043)
+
+[node name="Woodblocklong" type="AnimatableBody3D"]
+sync_to_physics = false
+script = ExtResource("1_c24t6")
+
+[node name="skeleton_root" type="Node3D" parent="."]
+transform = Transform3D(0.0335099, 0, 0, 0, 0, -0.0335099, 0, 0.0335099, 0, 0, 0, 0)
+
+[node name="Skeleton3D" type="Skeleton3D" parent="skeleton_root"]
+bones/0/name = "Large"
+bones/0/parent = -1
+bones/0/rest = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
+bones/0/enabled = true
+bones/0/position = Vector3(0, 0, 0)
+bones/0/rotation = Quaternion(-0.707107, 0, 0, 0.707107)
+bones/0/scale = Vector3(1, 1, 1)
+
+[node name="mesh-0" type="MeshInstance3D" parent="skeleton_root/Skeleton3D"]
+mesh = SubResource("ArrayMesh_j3g4i")
+skin = SubResource("Skin_cjnfl")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.00268555, -0.00674438, -0.0478516)
+shape = SubResource("BoxShape3D_c24t6")

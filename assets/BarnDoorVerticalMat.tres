@@ -1,0 +1,10 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://calgbb4d4mvui"]
+
+[ext_resource type="Shader" uid="uid://dhouhulpgfxqq" path="res://assets/BarnDoorWipe.gdshader" id="1_gev6x"]
+
+[resource]
+shader = ExtResource("1_gev6x")
+shader_parameter/progress = 1.0
+shader_parameter/wipe_color = Color(0, 0, 0, 1)
+shader_parameter/edge_softness = 0.005
+shader_parameter/horizontal = false

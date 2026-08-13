@@ -1,0 +1,77 @@
+using Godot;
+
+/// <summary>
+/// The "SHINE!" banner shown during the collect cutscene. Uses the real SMS
+/// bubbly letter graphics sliced out of Font/FontForShine.png (one AtlasTexture
+/// .tres per letter — ShineLetterS/H/I/N/E/Excl), each a white-fill/black-outline
+/// glyph tinted to its game color via self_modulate (S green, H pink, I yellow,
+/// N blue, E orange, ! red). Letters rush in from the left with a slight
+/// per-letter cascade into an ascending diagonal, hold, then fade.
+///
+/// Spawned fresh per shine (see Mario.StartShineGet) and frees itself when done.
+/// </summary>
+public partial class ShineGetPopup : Control
+{
+	// AppearDelay is measured from cutscene start: the camera spends ~2.4s on
+	// the behind-beat + swing before the front grab shot, and the letters
+	// arrive ~1.2s after that.
+	[Export] public float AppearDelay = 3.5f;
+	[Export] public float LetterSlideDuration = 0.32f;
+	[Export] public float LetterStagger = 0.05f;
+	[Export] public float SlideInDistance = 700f;
+	[Export] public float HoldDuration = 2.0f;
+	[Export] public float FadeOutDuration = 0.4f;
+
+	public override void _Ready()
+	{
+		Modulate = new Color(1, 1, 1, 1);
+
+		var banner = GetNodeOrNull<Control>("Banner");
+		if (banner == null) return;
+
+		int i = 0;
+		float lettersDone = AppearDelay;
+		foreach (Node child in banner.GetChildren())
+		{
+			// Letters are TextureRects (their color is in self_modulate, so we
+			// animate modulate:a for the fade without disturbing the tint).
+			if (child is not Control letter) continue;
+
+			Vector2 rest = letter.Position;
+			letter.Position = rest + new Vector2(-SlideInDistance, 0f);
+			letter.Modulate = new Color(1, 1, 1, 0);
+
+			float delay = AppearDelay + i * LetterStagger;
+			var t = CreateTween();
+			t.TweenInterval(delay);
+			t.Parallel().TweenProperty(letter, "modulate:a", 1f, 0.12f);
+			t.TweenProperty(letter, "position", rest, LetterSlideDuration)
+				.SetEase(Tween.EaseType.Out).SetTrans(Tween.TransitionType.Back);
+
+			lettersDone = delay + LetterSlideDuration;
+			i++;
+		}
+
+		int s = 0;
+		foreach (Node child in GetChildren())
+		{
+			if (child is not Label star || !star.Name.ToString().StartsWith("Star")) continue;
+
+			star.PivotOffset = star.Size / 2f;
+			Vector2 restScale = star.Scale;
+			star.Scale = Vector2.Zero;
+
+			var st = CreateTween();
+			st.TweenInterval(AppearDelay + 0.35f + s * 0.07f);
+			st.TweenProperty(star, "scale", restScale * 1.25f, 0.14f)
+				.SetEase(Tween.EaseType.Out).SetTrans(Tween.TransitionType.Back);
+			st.TweenProperty(star, "scale", restScale, 0.1f);
+			s++;
+		}
+
+		var fade = CreateTween();
+		fade.TweenInterval(lettersDone + HoldDuration);
+		fade.TweenProperty(this, "modulate:a", 0f, FadeOutDuration);
+		fade.TweenCallback(Callable.From(QueueFree));
+	}
+}

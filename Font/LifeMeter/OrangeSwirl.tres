@@ -1,0 +1,7 @@
+[gd_resource type="AtlasTexture" load_steps=2 format=3 uid="uid://c6uxy8o3xpe7s"]
+
+[ext_resource type="Texture2D" uid="uid://jxmmb4qhsy5u" path="res://Font/LifeMeter/LifeSpriteSheet.png" id="1_micub"]
+
+[resource]
+atlas = ExtResource("1_micub")
+region = Rect2(98, 60, 53, 58)

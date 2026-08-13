@@ -1,0 +1,217 @@
+[gd_scene load_steps=22 format=3 uid="uid://b3sl0a4qttndu"]
+
+[ext_resource type="Script" uid="uid://go4y2upfp52g" path="res://Font/LifeMeter/LifeMeter.cs" id="1_c6tgf"]
+[ext_resource type="Texture2D" uid="uid://djwqbcw5lqgdo" path="res://Font/LifeMeter/PaintBlob.tres" id="2_gbyf6"]
+[ext_resource type="Texture2D" uid="uid://bg023ouxwqfju" path="res://Font/LifeMeter/GraySwirl.tres" id="3_sqptk"]
+[ext_resource type="Texture2D" uid="uid://bwuyvnu1hfwd7" path="res://Font/LifeMeter/GraySegment0.tres" id="4_08she"]
+[ext_resource type="Texture2D" uid="uid://b4j553qgyvhq6" path="res://Font/LifeMeter/GraySegment1.tres" id="5_jhn7a"]
+[ext_resource type="Texture2D" uid="uid://gfkadppxp405" path="res://Font/LifeMeter/GraySegment2.tres" id="6_d3esu"]
+[ext_resource type="Texture2D" uid="uid://dls21rc85muvi" path="res://Font/LifeMeter/GraySegment3.tres" id="7_0dwmw"]
+[ext_resource type="Texture2D" uid="uid://blbhi4b4dr1v6" path="res://Font/LifeMeter/GraySegment4.tres" id="8_wtnab"]
+[ext_resource type="Texture2D" uid="uid://deexh5vujj5gn" path="res://Font/LifeMeter/GraySegment5.tres" id="9_f6rtf"]
+[ext_resource type="Texture2D" uid="uid://dxmxx22irqswe" path="res://Font/LifeMeter/GraySegment6.tres" id="10_g5eay"]
+[ext_resource type="Texture2D" uid="uid://c433ns3grhatv" path="res://Font/LifeMeter/GraySegment7.tres" id="11_fgq55"]
+[ext_resource type="Texture2D" uid="uid://c6uxy8o3xpe7s" path="res://Font/LifeMeter/OrangeSwirl.tres" id="12_1ejcv"]
+[ext_resource type="Texture2D" uid="uid://b6ffikqa3gnko" path="res://Font/LifeMeter/OrangeSegment0.tres" id="13_oqu8q"]
+[ext_resource type="Texture2D" uid="uid://cpkd13ik5jjt" path="res://Font/LifeMeter/OrangeSegment1.tres" id="14_cwo8s"]
+[ext_resource type="Texture2D" uid="uid://b6ygoeam8w704" path="res://Font/LifeMeter/OrangeSegment2.tres" id="15_4vj81"]
+[ext_resource type="Texture2D" uid="uid://csoscteehyc7f" path="res://Font/LifeMeter/OrangeSegment3.tres" id="16_g3ac1"]
+[ext_resource type="Texture2D" uid="uid://dtotvfpwfqgn4" path="res://Font/LifeMeter/OrangeSegment4.tres" id="17_6auax"]
+[ext_resource type="Texture2D" uid="uid://b2hqxnri8hclv" path="res://Font/LifeMeter/OrangeSegment5.tres" id="18_qvggd"]
+[ext_resource type="Texture2D" uid="uid://b0sc85llt2tji" path="res://Font/LifeMeter/OrangeSegment6.tres" id="19_x13ag"]
+[ext_resource type="Texture2D" uid="uid://cidoai6wmay2d" path="res://Font/LifeMeter/OrangeSegment7.tres" id="20_o52e2"]
+[ext_resource type="Texture2D" uid="uid://qbwbwkrtu3k4" path="res://Font/LifeMeter/LifeText.tres" id="21_kwmg7"]
+
+[node name="LifeMeter" type="Node2D"]
+script = ExtResource("1_c6tgf")
+
+[node name="PaintBlobBG" type="TextureRect" parent="."]
+modulate = Color(0.505882, 0.266667, 0, 0.717647)
+offset_left = 16.0
+offset_top = 18.0
+offset_right = 104.0
+offset_bottom = 104.0
+scale = Vector2(0.957925, 1.00852)
+texture = ExtResource("2_gbyf6")
+
+[node name="GrayLayer" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="GraySwirl" type="TextureRect" parent="GrayLayer"]
+layout_mode = 0
+offset_left = 29.0
+offset_top = 33.0
+offset_right = 82.0
+offset_bottom = 91.0
+scale = Vector2(1.0391, 1.08063)
+texture = ExtResource("3_sqptk")
+
+[node name="GraySegment0" type="TextureRect" parent="GrayLayer"]
+layout_mode = 0
+offset_left = 9.99998
+offset_top = 23.0
+offset_right = 50.0
+offset_bottom = 63.0
+scale = Vector2(0.59632, 0.688461)
+texture = ExtResource("4_08she")
+
+[node name="GraySegment1" type="TextureRect" parent="GrayLayer"]
+layout_mode = 0
+offset_left = 5.0
+offset_top = 52.0
+offset_right = 45.0
+offset_bottom = 92.0
+scale = Vector2(0.572712, 0.62906)
+texture = ExtResource("5_jhn7a")
+
+[node name="GraySegment2" type="TextureRect" parent="GrayLayer"]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 78.0
+offset_right = 48.0
+offset_bottom = 118.0
+scale = Vector2(0.747815, 0.689512)
+texture = ExtResource("6_d3esu")
+
+[node name="GraySegment3" type="TextureRect" parent="GrayLayer"]
+layout_mode = 0
+offset_left = 33.0
+offset_top = 96.0
+offset_right = 73.0
+offset_bottom = 136.0
+scale = Vector2(0.540837, 0.669716)
+texture = ExtResource("7_0dwmw")
+
+[node name="GraySegment4" type="TextureRect" parent="GrayLayer"]
+layout_mode = 0
+offset_left = 61.0
+offset_top = 92.0
+offset_right = 101.0
+offset_bottom = 132.0
+scale = Vector2(0.615336, 0.71972)
+texture = ExtResource("8_wtnab")
+
+[node name="GraySegment5" type="TextureRect" parent="GrayLayer"]
+layout_mode = 0
+offset_left = 80.0
+offset_top = 77.0
+offset_right = 120.0
+offset_bottom = 117.0
+scale = Vector2(0.696933, 0.693866)
+texture = ExtResource("9_f6rtf")
+
+[node name="GraySegment6" type="TextureRect" parent="GrayLayer"]
+layout_mode = 0
+offset_left = 84.0
+offset_top = 47.0
+offset_right = 124.0
+offset_bottom = 87.0
+scale = Vector2(0.603628, 0.664498)
+texture = ExtResource("10_g5eay")
+
+[node name="GraySegment7" type="TextureRect" parent="GrayLayer"]
+layout_mode = 0
+offset_left = 77.0
+offset_top = 21.0
+offset_right = 117.0
+offset_bottom = 61.0
+scale = Vector2(0.69508, 0.69348)
+texture = ExtResource("11_fgq55")
+
+[node name="OrangeLayer" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 40.0
+offset_bottom = 40.0
+
+[node name="OrangeSwirl" type="TextureRect" parent="OrangeLayer"]
+layout_mode = 0
+offset_left = 26.0
+offset_top = 31.0
+offset_right = 79.0
+offset_bottom = 89.0
+scale = Vector2(1.13214, 1.16724)
+texture = ExtResource("12_1ejcv")
+
+[node name="OrangeSegment0" type="TextureRect" parent="OrangeLayer"]
+layout_mode = 0
+offset_left = 9.0
+offset_top = 21.0
+offset_right = 49.0
+offset_bottom = 61.0
+scale = Vector2(0.60349, 0.666602)
+texture = ExtResource("13_oqu8q")
+
+[node name="OrangeSegment1" type="TextureRect" parent="OrangeLayer"]
+layout_mode = 0
+offset_left = 5.0
+offset_top = 51.0
+offset_right = 45.0
+offset_bottom = 91.0
+scale = Vector2(0.549947, 0.553833)
+texture = ExtResource("14_cwo8s")
+
+[node name="OrangeSegment2" type="TextureRect" parent="OrangeLayer"]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 77.0
+offset_right = 48.0
+offset_bottom = 117.0
+scale = Vector2(0.665153, 0.641891)
+texture = ExtResource("15_4vj81")
+
+[node name="OrangeSegment3" type="TextureRect" parent="OrangeLayer"]
+layout_mode = 0
+offset_left = 32.0
+offset_top = 96.0
+offset_right = 72.0
+offset_bottom = 136.0
+scale = Vector2(0.509343, 0.550651)
+texture = ExtResource("16_g3ac1")
+
+[node name="OrangeSegment4" type="TextureRect" parent="OrangeLayer"]
+layout_mode = 0
+offset_left = 60.0
+offset_top = 91.0
+offset_right = 100.0
+offset_bottom = 131.0
+scale = Vector2(0.581715, 0.657058)
+texture = ExtResource("17_6auax")
+
+[node name="OrangeSegment5" type="TextureRect" parent="OrangeLayer"]
+layout_mode = 0
+offset_left = 80.0
+offset_top = 75.0
+offset_right = 120.0
+offset_bottom = 115.0
+scale = Vector2(0.638877, 0.69936)
+texture = ExtResource("18_qvggd")
+
+[node name="OrangeSegment6" type="TextureRect" parent="OrangeLayer"]
+layout_mode = 0
+offset_left = 85.0
+offset_top = 46.0
+offset_right = 125.0
+offset_bottom = 86.0
+scale = Vector2(0.507753, 0.556301)
+texture = ExtResource("19_x13ag")
+
+[node name="OrangeSegment7" type="TextureRect" parent="OrangeLayer"]
+layout_mode = 0
+offset_left = 76.0
+offset_top = 21.0
+offset_right = 116.0
+offset_bottom = 61.0
+scale = Vector2(0.678329, 0.6012)
+texture = ExtResource("20_o52e2")
+
+[node name="LifeText" type="TextureRect" parent="."]
+offset_left = 26.0
+offset_top = -2.0
+offset_right = 86.0
+offset_bottom = 38.0
+scale = Vector2(1.07369, 0.863545)
+texture = ExtResource("21_kwmg7")

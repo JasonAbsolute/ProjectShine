@@ -16,11 +16,11 @@ particles_anim_h_frames = 1
 particles_anim_v_frames = 1
 particles_anim_loop = false
 use_point_size = true
-point_size = 128.0
+point_size = 58.0
 
 [sub_resource type="Curve" id="Curve_h4wgj"]
-_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(0.218579, 0.611526), -2.48917, -2.48917, 0, 0, Vector2(0.39071, 0.132871), 0.0, 0.0, 0, 0, Vector2(0.833333, 0.105123), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
-point_count = 5
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(0.756831, 0), 0.0, 0.0, 0, 0, Vector2(1, 0), 0.0, 0.0, 0, 0]
+point_count = 3
 
 [sub_resource type="CurveTexture" id="CurveTexture_fie51"]
 curve = SubResource("Curve_h4wgj")
@@ -32,14 +32,14 @@ emission_ring_height = 1.0
 emission_ring_radius = 10.0
 emission_ring_inner_radius = 10.0
 emission_ring_cone_angle = 90.0
-direction = Vector3(0, 1, 0)
+direction = Vector3(0, 9, 0)
 initial_velocity_min = 0.2
 initial_velocity_max = 0.8
 radial_velocity_min = 200.0
 radial_velocity_max = 200.0
-gravity = Vector3(0, 0, 0)
-scale_min = 35.65
-scale_max = 35.65
+gravity = Vector3(0, 300, 0)
+scale_min = 5.94
+scale_max = 5.94
 alpha_curve = SubResource("CurveTexture_fie51")
 
 [sub_resource type="QuadMesh" id="QuadMesh_1a8ai"]
@@ -49,8 +49,9 @@ alpha_curve = SubResource("CurveTexture_fie51")
 [node name="LandingParticles" type="GPUParticles3D" parent="."]
 material_override = SubResource("StandardMaterial3D_8aldo")
 amount = 40
-lifetime = 0.54
-explosiveness = 1.0
+lifetime = 0.57
+speed_scale = 0.7
+explosiveness = 0.9
 trail_lifetime = 1.52
 process_material = SubResource("ParticleProcessMaterial_8aldo")
 draw_pass_1 = SubResource("QuadMesh_1a8ai")

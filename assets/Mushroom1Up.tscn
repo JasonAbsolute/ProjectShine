@@ -1,0 +1,34 @@
+[gd_scene load_steps=8 format=3 uid="uid://mushroom1up_scene"]
+
+[ext_resource type="Script" path="res://assets/Mushroom1Up.cs" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://dkrynlh4rx18p" path="res://models/1-upMushroom/1-upMushroom.glb" id="2_model"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
+radius = 0.35
+height = 0.8
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_detection"]
+radius = 6.0
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_pickup"]
+radius = 0.65
+
+[node name="Mushroom1Up" type="CharacterBody3D"]
+script = ExtResource("1_script")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4, 0)
+shape = SubResource("CapsuleShape3D_body")
+
+[node name="DetectionZone" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DetectionZone"]
+shape = SubResource("SphereShape3D_detection")
+
+[node name="PickupZone" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupZone"]
+shape = SubResource("SphereShape3D_pickup")

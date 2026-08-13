@@ -1,0 +1,144 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://Font/HudElements/ShineGetPopup.cs" id="1_popup"]
+[ext_resource type="Texture2D" path="res://Font/HudElements/ShineLetterS.tres" id="2_s"]
+[ext_resource type="Texture2D" path="res://Font/HudElements/ShineLetterH.tres" id="3_h"]
+[ext_resource type="Texture2D" path="res://Font/HudElements/ShineLetterI.tres" id="4_i"]
+[ext_resource type="Texture2D" path="res://Font/HudElements/ShineLetterN.tres" id="5_n"]
+[ext_resource type="Texture2D" path="res://Font/HudElements/ShineLetterE.tres" id="6_e"]
+[ext_resource type="Texture2D" path="res://Font/HudElements/ShineLetterExcl.tres" id="7_x"]
+
+[node name="ShineGetPopup" type="Control"]
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
+script = ExtResource("1_popup")
+
+[node name="Banner" type="Control" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
+
+[node name="LetterS" type="TextureRect" parent="Banner"]
+offset_left = -340.0
+offset_top = 165.0
+offset_right = -212.0
+offset_bottom = 289.0
+pivot_offset = Vector2(64, 62)
+rotation = -0.14
+self_modulate = Color(0.16, 0.71, 0.24, 1)
+texture = ExtResource("2_s")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LetterH" type="TextureRect" parent="Banner"]
+offset_left = -240.0
+offset_top = 145.0
+offset_right = -112.0
+offset_bottom = 269.0
+pivot_offset = Vector2(64, 62)
+rotation = 0.08
+self_modulate = Color(0.96, 0.36, 0.62, 1)
+texture = ExtResource("3_h")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LetterI" type="TextureRect" parent="Banner"]
+offset_left = -150.0
+offset_top = 158.0
+offset_right = -44.0
+offset_bottom = 282.0
+pivot_offset = Vector2(53, 62)
+rotation = -0.1
+self_modulate = Color(1, 0.83, 0.16, 1)
+texture = ExtResource("4_i")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LetterN" type="TextureRect" parent="Banner"]
+offset_left = -66.0
+offset_top = 132.0
+offset_right = 62.0
+offset_bottom = 256.0
+pivot_offset = Vector2(64, 62)
+rotation = 0.07
+self_modulate = Color(0.26, 0.52, 0.96, 1)
+texture = ExtResource("5_n")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LetterE" type="TextureRect" parent="Banner"]
+offset_left = 34.0
+offset_top = 146.0
+offset_right = 162.0
+offset_bottom = 270.0
+pivot_offset = Vector2(64, 62)
+rotation = -0.08
+self_modulate = Color(0.98, 0.52, 0.13, 1)
+texture = ExtResource("6_e")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="LetterBang" type="TextureRect" parent="Banner"]
+offset_left = 132.0
+offset_top = 120.0
+offset_right = 232.0
+offset_bottom = 244.0
+pivot_offset = Vector2(50, 62)
+rotation = 0.12
+self_modulate = Color(0.95, 0.22, 0.2, 1)
+texture = ExtResource("7_x")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="StarA" type="Label" parent="."]
+offset_left = -370.0
+offset_top = 120.0
+offset_right = -330.0
+offset_bottom = 160.0
+theme_override_font_sizes/font_size = 32
+theme_override_colors/font_color = Color(1, 1, 0.7, 1)
+text = "★"
+
+[node name="StarB" type="Label" parent="."]
+offset_left = -110.0
+offset_top = 270.0
+offset_right = -70.0
+offset_bottom = 310.0
+theme_override_font_sizes/font_size = 26
+theme_override_colors/font_color = Color(1, 1, 0.85, 1)
+text = "★"
+
+[node name="StarC" type="Label" parent="."]
+offset_left = 120.0
+offset_top = 250.0
+offset_right = 160.0
+offset_bottom = 290.0
+theme_override_font_sizes/font_size = 24
+theme_override_colors/font_color = Color(1, 1, 0.75, 1)
+text = "★"
+
+[node name="StarD" type="Label" parent="."]
+offset_left = 250.0
+offset_top = 110.0
+offset_right = 290.0
+offset_bottom = 150.0
+theme_override_font_sizes/font_size = 28
+theme_override_colors/font_color = Color(1, 1, 0.8, 1)
+text = "★"
+
+[node name="StarE" type="Label" parent="."]
+offset_left = -30.0
+offset_top = 100.0
+offset_right = 10.0
+offset_bottom = 140.0
+theme_override_font_sizes/font_size = 22
+theme_override_colors/font_color = Color(1, 1, 0.9, 1)
+text = "★"

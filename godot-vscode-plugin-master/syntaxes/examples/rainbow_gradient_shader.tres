@@ -1,6 +1,6 @@
-[gd_resource type="ShaderMaterial" load_steps=2 format=2]
+[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://cvyy7n7td4mnn"]
 
-[sub_resource type="Shader" id=63]
+[sub_resource type="Shader" id="63"]
 code = "// HSV to RBG from https://www.rapidtables.com/convert/color/hsv-to-rgb.html
 // Rotation matrix from https://en.wikipedia.org/wiki/Rotation_matrix
 
@@ -35,7 +35,4 @@ void fragment() {
 }"
 
 [resource]
-shader = SubResource( 63 )
-shader_param/strength = 0.5
-shader_param/speed = 0.5
-shader_param/angle = 0.0
+shader = SubResource("63")
