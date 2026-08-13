@@ -1,0 +1,232 @@
+[gd_scene load_steps=14 format=3 uid="uid://dqohgxy44rds2"]
+
+[ext_resource type="Script" uid="uid://hkrve2j4m52p" path="res://assets/SpinJumpEffects.cs" id="1_extxl"]
+
+[sub_resource type="Shader" id="Shader_gby33"]
+resource_local_to_scene = true
+code = "shader_type spatial;
+render_mode unshaded, cull_disabled, depth_draw_never, blend_add;
+
+uniform sampler2D puff_tex : source_color;
+uniform vec4 tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);
+
+uniform float spin_speed = 10.0;     // fast internal motion (not object rotation)
+uniform float tile_u = 3.0;         // number of puffs around the ring
+uniform float alpha = 1.0;           // overall intensity
+
+// Ring shape (UV-space donut)
+uniform float ring_radius = 0.7;     // where the ring sits (0..~1)
+uniform float ring_thickness = 0.42;  // band thickness
+uniform float ring_softness = 0.04;   // feather edges
+
+void fragment() {
+    // UV center at (0.5, 0.5)
+    vec2 p = UV - vec2(0.5);
+
+    // Radius in \"donut space\"
+    float r = length(p) * 2.0;
+
+    float half_t = ring_thickness * 0.5;
+
+    // Donut mask: 1 in the band, 0 inside hole and outside ring
+    float inner = smoothstep(ring_radius - half_t - ring_softness, ring_radius - half_t, r);
+    float outer = 1.0 - smoothstep(ring_radius + half_t, ring_radius + half_t + ring_softness, r);
+    float ring_mask = inner * outer;
+
+    // Polar angle around center -> u
+    float ang = atan(p.y, p.x);                 // -pi..pi
+    float u = (ang / 6.2831853) + 0.5;          // 0..1 around circle
+    float u_tiles = u * tile_u + TIME * spin_speed;
+
+    // IMPORTANT: sample inside each tile so you get repeated puffs
+    float tile_x = fract(u_tiles);
+
+    // v goes across ring thickness (0..1)
+    float v = clamp((r - (ring_radius - half_t)) / max(ring_thickness, 0.0001), 0.0, 1.0);
+
+    vec4 tex = texture(puff_tex, vec2(tile_x, v));
+
+    // View-angle fade: visible from above, fades at side view
+    float ndv = clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0);
+
+    float a = tex.a * ring_mask * alpha;
+
+    ALBEDO = tex.rgb * tint.rgb * a;
+    ALPHA = a;
+}
+"
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_extxl"]
+load_path = "res://.godot/imported/T_VFX_simple_1.png-4aa545c27848f09b06047488126fccd1.s3tc.ctex"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_078cb"]
+render_priority = 0
+shader = SubResource("Shader_gby33")
+shader_parameter/puff_tex = SubResource("CompressedTexture2D_extxl")
+shader_parameter/tint = Color(1, 1, 1, 1)
+shader_parameter/spin_speed = 5.0
+shader_parameter/tile_u = 3.0
+shader_parameter/alpha = 1.0
+shader_parameter/ring_radius = 0.7
+shader_parameter/ring_thickness = 0.42
+shader_parameter/ring_softness = 0.04
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_078cb"]
+
+[sub_resource type="Shader" id="Shader_dj6rn"]
+resource_local_to_scene = true
+code = "shader_type spatial;
+render_mode unshaded, cull_disabled, depth_draw_never, blend_add;
+
+uniform sampler2D puff_tex : source_color;
+uniform vec4 tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);
+
+uniform float spin_speed = 10.0;     // fast internal motion (not object rotation)
+uniform float tile_u = 3.0;         // number of puffs around the ring
+uniform float alpha = 1.0;           // overall intensity
+
+// Ring shape (UV-space donut)
+uniform float ring_radius = 0.7;     // where the ring sits (0..~1)
+uniform float ring_thickness = 0.42;  // band thickness
+uniform float ring_softness = 0.04;   // feather edges
+
+void fragment() {
+    // UV center at (0.5, 0.5)
+    vec2 p = UV - vec2(0.5);
+
+    // Radius in \"donut space\"
+    float r = length(p) * 2.0;
+
+    float half_t = ring_thickness * 0.5;
+
+    // Donut mask: 1 in the band, 0 inside hole and outside ring
+    float inner = smoothstep(ring_radius - half_t - ring_softness, ring_radius - half_t, r);
+    float outer = 1.0 - smoothstep(ring_radius + half_t, ring_radius + half_t + ring_softness, r);
+    float ring_mask = inner * outer;
+
+    // Polar angle around center -> u
+    float ang = atan(p.y, p.x);                 // -pi..pi
+    float u = (ang / 6.2831853) + 0.5;          // 0..1 around circle
+    float u_tiles = u * tile_u + TIME * spin_speed;
+
+    // IMPORTANT: sample inside each tile so you get repeated puffs
+    float tile_x = fract(u_tiles);
+
+    // v goes across ring thickness (0..1)
+    float v = clamp((r - (ring_radius - half_t)) / max(ring_thickness, 0.0001), 0.0, 1.0);
+
+    vec4 tex = texture(puff_tex, vec2(tile_x, v));
+
+    // View-angle fade: visible from above, fades at side view
+    float ndv = clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0);
+
+    float a = tex.a * ring_mask * alpha;
+
+    ALBEDO = tex.rgb * tint.rgb * a;
+    ALPHA = a;
+}
+"
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_078cb"]
+load_path = "res://.godot/imported/T_VFX_simple_1.png-4aa545c27848f09b06047488126fccd1.s3tc.ctex"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_gomlu"]
+render_priority = 0
+shader = SubResource("Shader_dj6rn")
+shader_parameter/puff_tex = SubResource("CompressedTexture2D_078cb")
+shader_parameter/tint = Color(0, 1, 0, 0.0627451)
+shader_parameter/spin_speed = 5.0
+shader_parameter/tile_u = 3.0
+shader_parameter/alpha = 1.0
+shader_parameter/ring_radius = 0.7
+shader_parameter/ring_thickness = 0.42
+shader_parameter/ring_softness = 0.04
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_dj6rn"]
+
+[sub_resource type="Shader" id="Shader_seakk"]
+resource_local_to_scene = true
+code = "shader_type spatial;
+render_mode unshaded, cull_disabled, depth_draw_never, blend_add;
+
+uniform sampler2D puff_tex : source_color;
+uniform vec4 tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);
+
+uniform float spin_speed = 10.0;     // fast internal motion (not object rotation)
+uniform float tile_u = 3.0;         // number of puffs around the ring
+uniform float alpha = 1.0;           // overall intensity
+
+// Ring shape (UV-space donut)
+uniform float ring_radius = 0.7;     // where the ring sits (0..~1)
+uniform float ring_thickness = 0.42;  // band thickness
+uniform float ring_softness = 0.04;   // feather edges
+
+void fragment() {
+    // UV center at (0.5, 0.5)
+    vec2 p = UV - vec2(0.5);
+
+    // Radius in \"donut space\"
+    float r = length(p) * 2.0;
+
+    float half_t = ring_thickness * 0.5;
+
+    // Donut mask: 1 in the band, 0 inside hole and outside ring
+    float inner = smoothstep(ring_radius - half_t - ring_softness, ring_radius - half_t, r);
+    float outer = 1.0 - smoothstep(ring_radius + half_t, ring_radius + half_t + ring_softness, r);
+    float ring_mask = inner * outer;
+
+    // Polar angle around center -> u
+    float ang = atan(p.y, p.x);                 // -pi..pi
+    float u = (ang / 6.2831853) + 0.5;          // 0..1 around circle
+    float u_tiles = u * tile_u + TIME * spin_speed;
+
+    // IMPORTANT: sample inside each tile so you get repeated puffs
+    float tile_x = fract(u_tiles);
+
+    // v goes across ring thickness (0..1)
+    float v = clamp((r - (ring_radius - half_t)) / max(ring_thickness, 0.0001), 0.0, 1.0);
+
+    vec4 tex = texture(puff_tex, vec2(tile_x, v));
+
+    // View-angle fade: visible from above, fades at side view
+    float ndv = clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0);
+
+    float a = tex.a * ring_mask * alpha;
+
+    ALBEDO = tex.rgb * tint.rgb * a;
+    ALPHA = a;
+}
+"
+
+[sub_resource type="CompressedTexture2D" id="CompressedTexture2D_gby33"]
+load_path = "res://.godot/imported/T_VFX_simple_1.png-4aa545c27848f09b06047488126fccd1.s3tc.ctex"
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_uxtey"]
+render_priority = 0
+shader = SubResource("Shader_seakk")
+shader_parameter/puff_tex = SubResource("CompressedTexture2D_gby33")
+shader_parameter/tint = Color(1, 0, 0, 1)
+shader_parameter/spin_speed = 5.0
+shader_parameter/tile_u = 3.0
+shader_parameter/alpha = 1.0
+shader_parameter/ring_radius = 0.7
+shader_parameter/ring_thickness = 0.42
+shader_parameter/ring_softness = 0.04
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_7huwi"]
+
+[node name="SpinJumpEffects" type="Node3D"]
+script = ExtResource("1_extxl")
+
+[node name="white" type="MeshInstance3D" parent="."]
+material_override = SubResource("ShaderMaterial_078cb")
+mesh = SubResource("PlaneMesh_078cb")
+
+[node name="blue" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0024386, 0)
+material_override = SubResource("ShaderMaterial_gomlu")
+mesh = SubResource("PlaneMesh_dj6rn")
+
+[node name="red" type="MeshInstance3D" parent="."]
+material_override = SubResource("ShaderMaterial_uxtey")
+mesh = SubResource("PlaneMesh_7huwi")

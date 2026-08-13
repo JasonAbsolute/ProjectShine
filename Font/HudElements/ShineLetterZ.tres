@@ -1,0 +1,7 @@
+[gd_resource type="AtlasTexture" format=3 uid="uid://dmf3jv802klx0"]
+
+[ext_resource type="Texture2D" uid="uid://cfgdaos4nlues" path="res://Font/FontForShine.png" id="1_exviq"]
+
+[resource]
+atlas = ExtResource("1_exviq")
+region = Rect2(457, 571, 60, 61)

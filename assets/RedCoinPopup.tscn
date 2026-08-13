@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://assets/RedCoinPopup.cs" id="1_script"]
+
+[node name="RedCoinPopup" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Sprite3D" type="Sprite3D" parent="."]
+billboard = 1
+pixel_size = 0.025

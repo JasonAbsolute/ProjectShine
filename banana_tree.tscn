@@ -1,0 +1,101 @@
+[gd_scene format=3 uid="uid://dy7wq3fjb5owj"]
+
+[ext_resource type="PackedScene" uid="uid://diykmqkpxkg52" path="res://Levels/secret1/platforms/BananaTree.glb" id="1_cicad"]
+[ext_resource type="Texture2D" uid="uid://b2sm8frfvfiiq" path="res://Levels/secret1/platforms/BananaTree_bananatree.png" id="2_k1avd"]
+[ext_resource type="Script" uid="uid://cqyr0qdkioim6" path="res://assets/PalmTreeGrab.cs" id="3_k1avd"]
+[ext_resource type="Script" uid="uid://bv3s2te0sbdst" path="res://assets/BananaLeafBounce.cs" id="4_5pm2o"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_5pm2o"]
+cull_mode = 2
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_k1avd")
+roughness = 0.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_gx48c"]
+cull_mode = 2
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_k1avd")
+roughness = 0.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dr1kx"]
+cull_mode = 2
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_k1avd")
+roughness = 0.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pn30q"]
+cull_mode = 2
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_k1avd")
+roughness = 0.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hf1fi"]
+cull_mode = 2
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_k1avd")
+roughness = 0.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_6x24k"]
+cull_mode = 2
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_k1avd")
+roughness = 0.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_d5g8k"]
+cull_mode = 2
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_k1avd")
+roughness = 0.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_o2pag"]
+cull_mode = 2
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_k1avd")
+roughness = 0.5
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ne0wa"]
+cull_mode = 2
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_k1avd")
+roughness = 0.5
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_k1avd"]
+height = 90.0
+radius = 5.5
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_5pm2o"]
+height = 90.0
+radius = 6.5
+
+[node name="BananaTree" unique_id=837740162 instance=ExtResource("1_cicad")]
+transform = Transform3D(0.125, 0, 0, 0, 0.125, 0, 0, 0, 0.125, 0, 0, 0)
+
+[node name="Mesh_0_001" parent="Armature_001/Skeleton3D" parent_id_path=PackedInt32Array(1429430848) index="0" unique_id=2014113989]
+surface_material_override/0 = SubResource("StandardMaterial3D_5pm2o")
+surface_material_override/1 = SubResource("StandardMaterial3D_gx48c")
+surface_material_override/2 = SubResource("StandardMaterial3D_dr1kx")
+surface_material_override/3 = SubResource("StandardMaterial3D_pn30q")
+surface_material_override/4 = SubResource("StandardMaterial3D_hf1fi")
+surface_material_override/5 = SubResource("StandardMaterial3D_6x24k")
+surface_material_override/6 = SubResource("StandardMaterial3D_d5g8k")
+surface_material_override/7 = SubResource("StandardMaterial3D_o2pag")
+surface_material_override/8 = SubResource("StandardMaterial3D_ne0wa")
+
+[node name="TrunkBody" type="StaticBody3D" parent="." index="2" unique_id=905702152]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TrunkBody" index="0" unique_id=645188312]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 45, 0)
+shape = SubResource("CylinderShape3D_k1avd")
+
+[node name="GrabZone" type="Area3D" parent="." index="3" unique_id=155340648]
+script = ExtResource("3_k1avd")
+TrunkAxisPath = NodePath("../TrunkBody")
+Climbable = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="GrabZone" index="0" unique_id=333556237]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 45, 0)
+shape = SubResource("CylinderShape3D_5pm2o")
+
+[node name="Leaves" type="Node3D" parent="." index="4" unique_id=1365082118]
+script = ExtResource("4_5pm2o")
+MeshInstancePath = NodePath("../Armature_001/Skeleton3D/Mesh_0_001")

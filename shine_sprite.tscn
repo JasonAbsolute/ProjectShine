@@ -1,0 +1,60 @@
+[gd_scene format=3 uid="uid://biv4ticii2qoh"]
+
+[ext_resource type="PackedScene" uid="uid://dufe0kqiuratb" path="res://models/ShineSprite/ShineSprite.glb" id="1_uco35"]
+[ext_resource type="Script" uid="uid://5tim0n5pviod" path="res://assets/ShineSprite.cs" id="2_shine"]
+[ext_resource type="Texture2D" uid="uid://dp0dd6inbi3o6" path="res://models/ShineSprite/ShineSprite_shine_0.png" id="3_axu25"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_axu25"]
+resource_name = "_starglow_hidden"
+transparency = 1
+shading_mode = 0
+albedo_color = Color(1, 1, 1, 0)
+albedo_texture = ExtResource("3_axu25")
+uv1_scale = Vector3(0.9, 0.9, 1)
+uv1_offset = Vector3(0, 2.23517e-08, 0)
+texture_repeat = false
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_2ttgx"]
+resource_name = "_mat_shine_body"
+albedo_color = Color(1, 0.8, 0.2, 1)
+albedo_texture = ExtResource("3_axu25")
+metallic = 0.85
+metallic_specular = 0.7
+roughness = 0.32
+emission_enabled = true
+emission = Color(1, 0.78, 0.3, 1)
+emission_energy_multiplier = 0.35
+uv1_scale = Vector3(1.52832, 1.52832, 1)
+uv1_offset = Vector3(-0.15, -0.15, 0)
+texture_repeat = false
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_pickup"]
+radius = 79.0
+
+[node name="ShineSprite" unique_id=1110047867 instance=ExtResource("1_uco35")]
+transform = Transform3D(0.006, 0, 0, 0, 0.006, 0, 0, 0, 0.006, 0, 0, 0)
+script = ExtResource("2_shine")
+FlyDownDuration = 1.1
+FlyDownStartOffset = Vector3(-1, 2.9, -0.5)
+FlyDownGrabOffset = Vector3(0, 0.7, -0.06)
+
+[node name="Skeleton3D" parent="Armature" index="0"]
+bones/0/position = Vector3(0, 213.883, -7.3209e-06)
+bones/0/scale = Vector3(0.5, 0.5, 0.5)
+bones/1/position = Vector3(80.6971, 1.95361, 3.78991)
+bones/2/position = Vector3(-1.20547e-20, 69.8395, 8.18262e-13)
+bones/2/rotation = Quaternion(-2.48279e-14, 0.482184, -1.35916e-14, 0.87607)
+
+[node name="Mesh_0" parent="Armature/Skeleton3D" index="0"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -48.1984, 0)
+surface_material_override/0 = SubResource("StandardMaterial3D_axu25")
+surface_material_override/1 = SubResource("StandardMaterial3D_2ttgx")
+
+[node name="fast64_f3d_material_library_PlaneObject" parent="." index="1"]
+visible = false
+
+[node name="PickupZone" type="Area3D" parent="." index="3" unique_id=1907104803]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupZone" index="0" unique_id=1873374221]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 200, 0)
+shape = SubResource("SphereShape3D_pickup")

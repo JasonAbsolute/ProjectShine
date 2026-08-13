@@ -1,0 +1,55 @@
+[gd_scene load_steps=7 format=3 uid="uid://bqwg6es2jda63"]
+
+[ext_resource type="Script" uid="uid://dyb6dqg4sgr53" path="res://Font/HudElements/RedCoinHud.cs" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://df2hgo7vfmkpq" path="res://Font/HudElements/coinBackground.tres" id="2_bg"]
+[ext_resource type="Texture2D" uid="uid://cciv0qnr6dbpl" path="res://Font/HudElements/coinRed.tres" id="3_coin"]
+[ext_resource type="Texture2D" uid="uid://dfq5qjc563v1u" path="res://Font/HudElements/coinX.tres" id="4_x"]
+[ext_resource type="Texture2D" uid="uid://bhofbvkf3u4yx" path="res://Font/HudElements/coin0.tres" id="5_zero"]
+[ext_resource type="Texture2D" uid="uid://cemapsgj62lbg" path="res://Font/HudElements/coinSlash.tres" id="6_slash"]
+
+[node name="RedCoinHud" type="Node2D"]
+script = ExtResource("1_script")
+
+[node name="Background" type="TextureRect" parent="."]
+modulate = Color(0.2, 1, 0.2, 0.8)
+offset_left = 4.0
+offset_top = 14.0
+offset_right = 184.0
+offset_bottom = 36.0
+texture = ExtResource("2_bg")
+
+[node name="CoinIcon" type="TextureRect" parent="."]
+offset_left = 6.0
+offset_top = 4.0
+offset_right = 6.0
+offset_bottom = 4.0
+texture = ExtResource("3_coin")
+
+[node name="CoinX" type="TextureRect" parent="."]
+offset_left = 37.0
+offset_top = 10.0
+offset_right = 65.0
+offset_bottom = 40.0
+texture = ExtResource("4_x")
+
+[node name="CountDigit" type="TextureRect" parent="."]
+offset_left = 68.0
+offset_top = -5.0
+offset_right = 99.0
+offset_bottom = 30.0
+texture = ExtResource("5_zero")
+
+[node name="CoinSlash" type="TextureRect" parent="."]
+offset_left = 84.0
+offset_top = 4.0
+offset_right = 122.0
+offset_bottom = 51.0
+rotation = 0.0727283
+texture = ExtResource("6_slash")
+
+[node name="TotalDigit" type="TextureRect" parent="."]
+offset_left = 106.0
+offset_top = 22.0
+offset_right = 137.0
+offset_bottom = 57.0
+texture = ExtResource("5_zero")

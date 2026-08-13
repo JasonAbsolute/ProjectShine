@@ -1,7 +1,9 @@
-[gd_scene load_steps=10 format=4 uid="uid://lxisv6iyx202"]
+[gd_scene load_steps=12 format=4 uid="uid://lxisv6iyx202"]
 
+[ext_resource type="Script" uid="uid://xl2jhhyuvffw" path="res://assets/SleepyBoo.cs" id="1_6lbnf"]
 [ext_resource type="Texture2D" uid="uid://2eirv2su7omw" path="res://models/Eniemes/SleepyBoo/Godot/SleepyBoo_debutelesa_0.png" id="1_krfrv"]
 [ext_resource type="Texture2D" uid="uid://dnxi4unewvo0b" path="res://models/Eniemes/SleepyBoo/Godot/SleepyBoo_debutelesa_1.png" id="2_ci2p0"]
+[ext_resource type="PackedScene" uid="uid://dih7m3fgfluex" path="res://assets/ZEffectSpawner.tscn" id="3_ci2p0"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_6lbnf"]
 radius = 147.81
@@ -144,14 +146,15 @@ _data = {
 &"debutelesa_wait": SubResource("Animation_v3e74")
 }
 
-[node name="SleepyBoo" type="RigidBody3D"]
+[node name="SleepyBoo" type="RigidBody3D" groups=["pickable"]]
+script = ExtResource("1_6lbnf")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
-transform = Transform3D(0.03, 0, 0, 0, 0.03, 0, 0, 0, 0.03, 0, 4.38791, 0.33591)
+transform = Transform3D(0.005, 0, 0, 0, 0.005, 0, 0, 0, 0.005, 0.165448, 0.764918, 0.0983178)
 shape = SubResource("SphereShape3D_6lbnf")
 
 [node name="Armature" type="Node3D" parent="."]
-transform = Transform3D(0.03, 0, 0, 0, 0.03, 0, 0, 0, 0.03, 0, 0, 0)
+transform = Transform3D(0.005, 0, 0, 0, 0.005, 0, 0, 0, 0.005, 0, 0, 0)
 
 [node name="Skeleton3D" type="Skeleton3D" parent="Armature"]
 bones/0/name = "root"
@@ -213,3 +216,6 @@ libraries = {
 &"": SubResource("AnimationLibrary_moo7f")
 }
 autoplay = "debutelesa_wait"
+
+[node name="ZEffectSpawner" parent="." instance=ExtResource("3_ci2p0")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.83024, 6.52922, 0)

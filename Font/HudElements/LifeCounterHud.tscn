@@ -1,0 +1,64 @@
+[gd_scene format=3 uid="uid://j2vnciyq44f8"]
+
+[ext_resource type="Script" uid="uid://w3h50wulotd1" path="res://Font/HudElements/LifeCounterHud.cs" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://df2hgo7vfmkpq" path="res://Font/HudElements/coinBackground.tres" id="2_bg"]
+[ext_resource type="Texture2D" uid="uid://c2rwsmn7vtbpk" path="res://Font/HudElements/marioHeadIcon.tres" id="3_head"]
+[ext_resource type="Texture2D" uid="uid://cot6xc11kpi2y" path="res://Font/HudElements/marioTextHud.tres" id="4_text"]
+[ext_resource type="Texture2D" uid="uid://dfq5qjc563v1u" path="res://Font/HudElements/coinX.tres" id="5_x"]
+[ext_resource type="Texture2D" uid="uid://bhofbvkf3u4yx" path="res://Font/HudElements/coin0.tres" id="6_zero"]
+
+[node name="LifeCounterHud" type="Node2D" unique_id=576090273]
+script = ExtResource("1_script")
+
+[node name="Background" type="TextureRect" parent="." unique_id=1422895971]
+modulate = Color(0.2, 1, 0.2, 0.8)
+offset_left = 11.0
+offset_top = 42.2211
+offset_right = 231.0
+offset_bottom = 64.2211
+rotation = -0.246638
+scale = Vector2(0.767447, 0.963253)
+texture = ExtResource("2_bg")
+
+[node name="MarioHead" type="TextureRect" parent="." unique_id=574078413]
+offset_left = 19.0
+offset_top = 30.2211
+offset_right = 54.0
+offset_bottom = 67.2211
+texture = ExtResource("3_head")
+
+[node name="MarioText" type="TextureRect" parent="." unique_id=646124719]
+offset_left = 0.999998
+offset_top = 18.2211
+offset_right = 81.0
+offset_bottom = 48.2211
+rotation = -0.253805
+scale = Vector2(0.750271, 0.8751)
+texture = ExtResource("4_text")
+
+[node name="CoinX" type="TextureRect" parent="." unique_id=741217445]
+offset_left = 56.0
+offset_top = 31.2211
+offset_right = 84.0
+offset_bottom = 62.2211
+rotation = -0.194094
+scale = Vector2(0.882573, 0.839245)
+texture = ExtResource("5_x")
+
+[node name="TensDigit" type="TextureRect" parent="." unique_id=850001413]
+offset_left = 80.0
+offset_top = 24.0976
+offset_right = 111.0
+offset_bottom = 59.0976
+rotation = -0.315873
+scale = Vector2(0.817912, 0.859913)
+texture = ExtResource("6_zero")
+
+[node name="OnesDigit" type="TextureRect" parent="." unique_id=1582259232]
+offset_left = 104.0
+offset_top = 18.0
+offset_right = 135.0
+offset_bottom = 53.0
+rotation = -0.315873
+scale = Vector2(0.817912, 0.859913)
+texture = ExtResource("6_zero")

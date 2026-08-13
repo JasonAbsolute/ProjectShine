@@ -1,0 +1,51 @@
+[gd_scene load_steps=8 format=3 uid="uid://delxpxy0gt873"]
+
+[ext_resource type="Script" uid="uid://do5oxl8fyy7ow" path="res://assets/Gooble.cs" id="1_610nq"]
+[ext_resource type="PackedScene" uid="uid://btn6akvyop415" path="res://models/Eniemes/Gooby/Gooble.glb" id="1_xcf38"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_cy8ll"]
+radius = 0.596495
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_610nq"]
+radius = 8.292
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_reh70"]
+radius = 3.617
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_38oju"]
+radius = 0.617311
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_610nq"]
+size = Vector3(1, 0.050354, 1)
+
+[node name="Gooble" type="CharacterBody3D"]
+script = ExtResource("1_610nq")
+
+[node name="Model" parent="." instance=ExtResource("1_xcf38")]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.593348, 0)
+shape = SubResource("SphereShape3D_cy8ll")
+
+[node name="DetectionZone" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DetectionZone"]
+shape = SubResource("SphereShape3D_610nq")
+
+[node name="AttackZone" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="AttackZone"]
+shape = SubResource("SphereShape3D_reh70")
+
+[node name="Hurtbox" type="Area3D" parent="."]
+monitoring = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Hurtbox"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.445975, 0)
+shape = SubResource("SphereShape3D_38oju")
+
+[node name="StompZone" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StompZone"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0914, 0)
+shape = SubResource("BoxShape3D_610nq")

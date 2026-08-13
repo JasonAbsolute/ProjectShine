@@ -1,0 +1,32 @@
+[gd_scene load_steps=6 format=3 uid="uid://dpyyerf1eto7p"]
+
+[ext_resource type="PackedScene" uid="uid://b54pc5peh00fe" path="res://assets/StartingPlatform.tscn" id="1_2vand"]
+[ext_resource type="PackedScene" uid="uid://d3ph56ccg345h" path="res://assets/Mario2.tscn" id="2_jgpco"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_jgpco"]
+sky_top_color = Color(0.35, 0.55, 0.9, 1)
+sky_horizon_color = Color(0.65, 0.75, 0.9, 1)
+ground_bottom_color = Color(0.35, 0.55, 0.9, 1)
+ground_horizon_color = Color(0.65, 0.75, 0.9, 1)
+
+[sub_resource type="Sky" id="Sky_sec01"]
+sky_material = SubResource("ProceduralSkyMaterial_jgpco")
+
+[sub_resource type="Environment" id="Environment_uc0gf"]
+background_mode = 1
+background_energy_multiplier = 3.68
+sky = SubResource("Sky_sec01")
+ambient_light_source = 2
+ambient_light_color = Color(0.877701, 0.883559, 0.882111, 1)
+ambient_light_energy = 0.64
+glow_enabled = true
+
+[node name="Node3D" type="Node3D"]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_uc0gf")
+
+[node name="SecrectPlatform2" parent="." instance=ExtResource("1_2vand")]
+transform = Transform3D(102.988, 0, 0, 0, 53.031, 0, 0, 0, 109.811, 0, 0, 0)
+
+[node name="Mario" parent="." instance=ExtResource("2_jgpco")]

@@ -1,0 +1,46 @@
+[gd_scene load_steps=6 format=3 uid="uid://g3g83bjl2d8k"]
+
+[ext_resource type="Script" uid="uid://b3wvtiot5v02t" path="res://Font/HudElements/YellowCoinHud.cs" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://df2hgo7vfmkpq" path="res://Font/HudElements/coinBackground.tres" id="2_bg"]
+[ext_resource type="Texture2D" uid="uid://c4b772jh65ub2" path="res://Font/HudElements/coinYellow.tres" id="3_coin"]
+[ext_resource type="Texture2D" uid="uid://dfq5qjc563v1u" path="res://Font/HudElements/coinX.tres" id="4_x"]
+[ext_resource type="Texture2D" uid="uid://bhofbvkf3u4yx" path="res://Font/HudElements/coin0.tres" id="5_zero"]
+
+[node name="YellowCoinHud" type="Node2D"]
+script = ExtResource("1_script")
+
+[node name="Background" type="TextureRect" parent="."]
+modulate = Color(0.2, 1, 0.2, 0.8)
+offset_left = 4.0
+offset_top = 14.0
+offset_right = 184.0
+offset_bottom = 36.0
+texture = ExtResource("2_bg")
+
+[node name="CoinIcon" type="TextureRect" parent="."]
+offset_left = 10.0
+offset_top = 6.0
+offset_right = 10.0
+offset_bottom = 6.0
+texture = ExtResource("3_coin")
+
+[node name="CoinX" type="TextureRect" parent="."]
+offset_left = 37.0
+offset_top = 10.0
+offset_right = 65.0
+offset_bottom = 40.0
+texture = ExtResource("4_x")
+
+[node name="TensDigit" type="TextureRect" parent="."]
+offset_left = 63.0
+offset_top = 8.0
+offset_right = 94.0
+offset_bottom = 43.0
+texture = ExtResource("5_zero")
+
+[node name="OnesDigit" type="TextureRect" parent="."]
+offset_left = 90.0
+offset_top = 8.0
+offset_right = 121.0
+offset_bottom = 43.0
+texture = ExtResource("5_zero")

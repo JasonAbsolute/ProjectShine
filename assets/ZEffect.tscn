@@ -1,0 +1,9 @@
+[gd_scene load_steps=2 format=3 uid="uid://dnl1alxju3i1g"]
+
+[ext_resource type="Texture2D" uid="uid://d1k16fwg8ppnp" path="res://Font/SleepyZ.png" id="1_wefnf"]
+
+[node name="ZEffect" type="Node3D"]
+
+[node name="Sprite3D" type="Sprite3D" parent="."]
+billboard = 1
+texture = ExtResource("1_wefnf")

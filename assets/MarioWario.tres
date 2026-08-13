@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="PlayerProfile" load_steps=3 format=3 uid="uid://e21s8tfck6x3"]
+
+[ext_resource type="Script" uid="uid://c22kcpsmssr2e" path="res://assets/PlayerProfile.cs" id="1_13x8y"]
+[ext_resource type="Texture2D" uid="uid://ch24vakeh22y3" path="res://Font/untitled_ma_mdl1_0 - Copy.png" id="1_igucy"]
+
+[resource]
+script = ExtResource("1_13x8y")
+ProfileName = "Player 1"
+BodyTexture = ExtResource("1_igucy")
+metadata/_custom_type_script = ExtResource("1_13x8y")
