@@ -25,6 +25,17 @@ using Godot;
 [Tool]
 public partial class ShineSprite : Node3D
 {
+    [Signal] public delegate void SpawnEntranceFinishedEventHandler();
+
+    /// <summary>How long a newly awarded Shine takes to appear.</summary>
+    [Export] public float SpawnEntranceDuration = 1.15f;
+
+    /// <summary>Vertical distance the Shine rises while appearing.</summary>
+    [Export] public float SpawnEntranceRise = 1.5f;
+
+    /// <summary>Full turns made while the Shine appears.</summary>
+    [Export] public float SpawnEntranceTurns = 2f;
+
     [Export]
     public string FloatAnimName = "shine_float";
 
@@ -93,6 +104,11 @@ public partial class ShineSprite : Node3D
     private bool _collected;
     private Area3D _pickupZone;
     private AnimationPlayer _animPlayer;
+
+    private bool _spawnEntrancePlaying;
+    private bool _pausedTreeForSpawnEntrance;
+    private ProcessModeEnum _processModeBeforeSpawnEntrance;
+    private Tween _spawnEntranceTween;
 
     // Cutscene tracking / end state.
     private Mario _mario;
@@ -174,6 +190,97 @@ public partial class ShineSprite : Node3D
             BuildShineEffects();
 
         CaptureNeutralPose();
+    }
+
+    /// <summary>
+    /// Reveals a newly awarded Shine while gameplay is frozen. This node switches
+    /// to Always processing so its tween and effects continue while SceneTree is
+    /// paused, then restores both its prior process mode and the tree pause state.
+    /// </summary>
+    public void PlaySpawnEntrance()
+    {
+        if (_spawnEntrancePlaying || _collected)
+            return;
+
+        var tree = GetTree();
+        if (tree == null)
+            return;
+
+        _spawnEntrancePlaying = true;
+        _processModeBeforeSpawnEntrance = ProcessMode;
+        ProcessMode = ProcessModeEnum.Always;
+
+        if (_pickupZone != null)
+            _pickupZone.Monitoring = false;
+
+        _pausedTreeForSpawnEntrance = !tree.Paused;
+        if (_pausedTreeForSpawnEntrance)
+            tree.Paused = true;
+
+        Vector3 targetScale = Scale;
+        Vector3 targetPosition = Position;
+        Vector3 targetRotation = Rotation;
+        float duration = Mathf.Max(SpawnEntranceDuration, 0.01f);
+
+        // Keep the basis invertible while visually starting near zero. The
+        // Shine's FX code uses child global transforms during this tween.
+        Scale = targetScale * 0.05f;
+        Position = targetPosition - Vector3.Up * SpawnEntranceRise;
+        Rotation = new Vector3(
+            targetRotation.X,
+            targetRotation.Y - Mathf.Pi * 2f * SpawnEntranceTurns,
+            targetRotation.Z
+        );
+
+        _spawnEntranceTween = CreateTween();
+        _spawnEntranceTween.SetPauseMode(Tween.TweenPauseMode.Process);
+        _spawnEntranceTween.SetParallel(true);
+        _spawnEntranceTween.TweenProperty(this, "scale", targetScale, duration)
+            .SetEase(Tween.EaseType.Out)
+            .SetTrans(Tween.TransitionType.Back);
+        _spawnEntranceTween.TweenProperty(this, "position", targetPosition, duration)
+            .SetEase(Tween.EaseType.Out)
+            .SetTrans(Tween.TransitionType.Cubic);
+        _spawnEntranceTween.TweenProperty(this, "rotation", targetRotation, duration)
+            .SetEase(Tween.EaseType.Out)
+            .SetTrans(Tween.TransitionType.Cubic);
+        _spawnEntranceTween.Finished += FinishSpawnEntrance;
+
+        GD.Print($"[ShineSprite] spawn entrance started; world_paused={tree.Paused}");
+    }
+
+    private void FinishSpawnEntrance()
+    {
+        if (!_spawnEntrancePlaying)
+            return;
+
+        _spawnEntrancePlaying = false;
+        _spawnEntranceTween = null;
+
+        if (_pickupZone != null)
+            _pickupZone.Monitoring = true;
+
+        ProcessMode = _processModeBeforeSpawnEntrance;
+
+        var tree = GetTree();
+        if (_pausedTreeForSpawnEntrance && tree != null)
+            tree.Paused = false;
+        _pausedTreeForSpawnEntrance = false;
+
+        EmitSignal(SignalName.SpawnEntranceFinished);
+        GD.Print($"[ShineSprite] spawn entrance finished; world_paused={tree?.Paused}");
+    }
+
+    public override void _ExitTree()
+    {
+        // Never strand the game paused if a scene transition removes the Shine
+        // before its entrance tween completes.
+        if (_spawnEntrancePlaying && _pausedTreeForSpawnEntrance)
+        {
+            var tree = GetTree();
+            if (tree != null)
+                tree.Paused = false;
+        }
     }
 
     /// <summary>Snapshots the skeleton's idle bone pose (after the AnimationPlayer
@@ -284,7 +391,12 @@ public partial class ShineSprite : Node3D
         // calibrates here (the actual FX pin is applied at the end, below).
         AnimateShineEffects(d);
 
-        if (_ending)
+        if (_spawnEntrancePlaying)
+        {
+            // The entrance tween owns position, rotation, and scale while the
+            // rest of the tree is paused.
+        }
+        else if (_ending)
         {
             // Idle spin while it floats up and shrinks away.
             RotateY(IdleSpinSpeed * d);

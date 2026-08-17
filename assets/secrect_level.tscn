@@ -8,7 +8,9 @@
 [ext_resource type="PackedScene" uid="uid://7exkcbpcjut8" path="res://assets/marioHUD.tscn" id="4_68tks"]
 [ext_resource type="PackedScene" uid="uid://ciuxr0opwr0bq" path="res://woodblock_wide.tscn" id="5_0vdqm"]
 [ext_resource type="PackedScene" uid="uid://75n8tcdc68kl" path="res://normal_block.tscn" id="6_q2v1k"]
+[ext_resource type="Script" uid="uid://c1sb4qbx8bhct" path="res://assets/ShineTimer.cs" id="8_5ivlt"]
 [ext_resource type="PackedScene" uid="uid://cfm7oejwuaw6g" path="res://rotating_block.tscn" id="9_jrgyt"]
+[ext_resource type="PackedScene" uid="uid://i5mkpo3g5rvl" path="res://Font/HudElements/TimerHud.tscn" id="9_vfiki"]
 [ext_resource type="PackedScene" uid="uid://cr166pmwl5j31" path="res://StarPlatform.tscn" id="10_iedye"]
 [ext_resource type="PackedScene" uid="uid://3i321r0h4sxx" path="res://1_up_mushroom.tscn" id="11_tboex"]
 [ext_resource type="PackedScene" uid="uid://ce12h7rgk2obv" path="res://Font/HudElements/ending_platofrom.tscn" id="15_omoxa"]
@@ -20,6 +22,9 @@
 [ext_resource type="PackedScene" uid="uid://biv4ticii2qoh" path="res://shine_sprite.tscn" id="19_ijhng"]
 [ext_resource type="Material" uid="uid://calgbb4d4mvui" path="res://assets/BarnDoorVerticalMat.tres" id="19_iy0hs"]
 [ext_resource type="Material" uid="uid://ci6tqch6df7sm" path="res://assets/BarnDoorHorizontalMat.tres" id="20_lb5gq"]
+[ext_resource type="PackedScene" uid="uid://sl4eiatl1iww" path="res://red_coin_switch.tscn" id="25_nerkb"]
+[ext_resource type="PackedScene" uid="uid://c3f2gbtt1spi3" path="res://Font/HudElements/SignPopup.tscn" id="26_1a0fl"]
+[ext_resource type="PackedScene" uid="uid://bg77g21t33nld" path="res://red_coin.tscn" id="27_redcoin"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_sky01"]
 sky_top_color = Color(0.35, 0.55, 0.9, 1)
@@ -152,6 +157,7 @@ _data = {
 }
 
 [node name="SecrectLevel" type="Node3D" unique_id=1270959915]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.7725229)
 script = ExtResource("1_clyci")
 PreviewShot = true
 IntroCameraPath = NodePath("IntroCamRig/IntroCamera")
@@ -318,6 +324,17 @@ Waypoints = PackedVector3Array(0, 6, 0)
 [node name="Mario" parent="." unique_id=731191351 instance=ExtResource("2_c15bh")]
 transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 5.652491e-05, 5.689038, 2.9386635)
 
+[node name="ShineTimer" type="Node" parent="Mario" unique_id=1953780351]
+script = ExtResource("8_5ivlt")
+LevelPath = NodePath("../..")
+MarioPath = NodePath("..")
+
+[node name="TimerHud" parent="Mario" unique_id=274535939 instance=ExtResource("9_vfiki")]
+position = Vector2(20, 565)
+rotation = -0.293949
+TimerPath = NodePath("../ShineTimer")
+RedCoinHudPath = NodePath("../RedCoinHud")
+
 [node name="marioHUD" parent="." unique_id=641833733 instance=ExtResource("4_68tks")]
 visible = false
 
@@ -358,15 +375,15 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.23197, 23.2576, -55.831905
 [node name="Fruitpapaya" parent="." unique_id=670386181 instance=ExtResource("18_ditv7")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 22.16, -107.033)
 
-[node name="ShineSprite2" parent="." unique_id=709127491 instance=ExtResource("19_ijhng")]
+[node name="ShineSprite2" parent="." unique_id=384789216 instance=ExtResource("19_ijhng")]
 transform = Transform3D(0.012, 0, 0, 0, 0.012, 0, 0, 0, 0.012, -0.09262228, 23.153206, -236.36215)
 EndShrinkDuration = 0.5
 
+[node name="RedCoinShineSpawn" type="Marker3D" parent="." unique_id=709127491]
+transform = Transform3D(0.012, 0, 0, 0, 0.012, 0, 0, 0, 0.012, -0.09262228, 25.096918, -228.2852)
+
 [node name="TreeNormal3" parent="." unique_id=1974189681 instance=ExtResource("16_y2x5n")]
 transform = Transform3D(0.57, 0, 0, 0, 0.57, 0, 0, 0, 0.57, -6.517873, 0.19090462, -0.27445936)
-
-[node name="TreeNormal4" parent="." unique_id=885285136 instance=ExtResource("16_y2x5n")]
-transform = Transform3D(0.57, 0, 0, 0, 0.57, 0, 0, 0, 0.57, 6.8405724, 0.19090462, -0.27445936)
 
 [node name="RotatingBlock2" parent="." unique_id=870189386 instance=ExtResource("9_jrgyt")]
 transform = Transform3D(3.5, 0, 0, 0, 3.5, 0, 0, 0, 3.5, -6.7985554, 25.140453, -117.42214)
@@ -456,3 +473,39 @@ material = ExtResource("20_lb5gq")
 offset_right = 1920.0
 offset_bottom = 1080.0
 mouse_filter = 2
+
+[node name="RedCoinSwitch" parent="." unique_id=1051594538 instance=ExtResource("25_nerkb")]
+transform = Transform3D(2.125, 0, 0, 0, 2.125, 0, 0, 0, 2.125, 3.8966737, 0, 0)
+ShineTimerPath = NodePath("../Mario/ShineTimer")
+CameraPath = NodePath("../Mario/CamController")
+SignPopupScene = ExtResource("26_1a0fl")
+RedCoinScene = ExtResource("27_redcoin")
+RedCoinSpawnsPath = NodePath("../RedCoinSpawns")
+RedCoinShineScene = ExtResource("19_ijhng")
+RedCoinShineSpawnPath = NodePath("../RedCoinShineSpawn")
+
+[node name="RedCoinSpawns" type="Node3D" parent="." unique_id=1543532005]
+
+[node name="Spawn01" type="Marker3D" parent="RedCoinSpawns" unique_id=1920760078]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.372056, 5.8791323, -11.578947)
+
+[node name="Spawn02" type="Marker3D" parent="RedCoinSpawns" unique_id=228873018]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.498634, 16.53693, -33.623108)
+
+[node name="Spawn03" type="Marker3D" parent="RedCoinSpawns" unique_id=1377256363]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.378983, 31.87648, -53.25302)
+
+[node name="Spawn04" type="Marker3D" parent="RedCoinSpawns" unique_id=1019595532]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -13.094363, 28.993229, -66.93875)
+
+[node name="Spawn05" type="Marker3D" parent="RedCoinSpawns" unique_id=1008882166]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 14.872157, 28.131216, -94.57514)
+
+[node name="Spawn06" type="Marker3D" parent="RedCoinSpawns" unique_id=1880006476]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.9454031, 33.853634, -114.772415)
+
+[node name="Spawn07" type="Marker3D" parent="RedCoinSpawns" unique_id=1872011144]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 24.781832, -188.1536)
+
+[node name="Spawn08" type="Marker3D" parent="RedCoinSpawns" unique_id=393310007]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 24.11001, -212.16144)

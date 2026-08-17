@@ -27,6 +27,7 @@ public partial class SunshineCamera : Node3D
         OverShoulder,  // Y button: Mario frozen, tight OTS view, free 360° look
         Free,          // no auto-behind ever; player owns the camera fully (e.g. cutscene staging)
         ShineGet,      // shine sprite collect cutscene: fixed low-angle hero shot, no player input
+        TalkingPOV,    // reading a sign / switch dialogue: Mario frozen, held side-on medium shot
     }
 
     [Export] public CamMode Mode { get; set; } = CamMode.Normal;
@@ -147,6 +148,21 @@ public partial class SunshineCamera : Node3D
     /// <summary>Dutch-tilt roll (degrees) held during the hero pose — the SMS
     /// shot slopes the horizon up to the right. Ramps in over the crane.</summary>
     [Export] public float ShineGetRollDeg = 9f;
+
+    // ============================================================
+    //                       TalkingPOV (sign / switch dialogue)
+    // ============================================================
+    // Locked dialogue framing based on the reference: camera sits low on
+    // Mario's left side, looking across him rather than straight at his back.
+    // The negative local Z translation shifts Mario out from behind the banner
+    // into the lower-right of frame while the panel owns the center-left.
+    [Export] public Vector3 TalkingPOVLocalOffset = new(-0.60f, 1.20f, -0.10f);
+    /// <summary>Orbit from directly behind Mario toward his left side.</summary>
+    [Export] public float TalkingPOVYawOffsetDeg = -32f;
+    [Export] public float TalkingPOVPitchDeg = 0f;
+    [Export] public float TalkingPOVRadius = 1.0f;
+    /// <summary>Glide duration, in and out — matches OverShoulderEntryDuration's role.</summary>
+    [Export] public float TalkingPOVEntryDuration = 0.45f;
 
     private Path3D _shineRail;
     private PathFollow3D _shineRailFollow;
@@ -384,6 +400,13 @@ public partial class SunshineCamera : Node3D
             case CamMode.LButton:      TickLButton(dt, lstick, moving);                   break;
             case CamMode.OverShoulder: TickOverShoulder(dt, rstick, camManual);           break;
             case CamMode.Free:         TickFree(dt, rstick, camManual);                   break;
+            case CamMode.TalkingPOV:
+                // Refresh exported framing every frame so Remote Inspector tuning
+                // applies immediately while the sign is still open.
+                _tgtYaw    = GetVisualYaw() + Mathf.DegToRad(TalkingPOVYawOffsetDeg);
+                _tgtPitch  = Mathf.DegToRad(TalkingPOVPitchDeg);
+                _tgtRadius = TalkingPOVRadius * _rigScale;
+                break;
             // ShineGet handled earlier via early-return — never reached here.
         }
 
@@ -607,6 +630,11 @@ public partial class SunshineCamera : Node3D
             // tracks him cleanly as he turns. Uses GetVisualYaw() to handle flipped rigs.
             offset = OverShoulderLocalOffset.Rotated(Vector3.Up, GetVisualYaw()) * _rigScale;
         }
+        else if (Mode == CamMode.TalkingPOV)
+        {
+            // Same local-offset-rotated-by-facing treatment as OverShoulder.
+            offset = TalkingPOVLocalOffset.Rotated(Vector3.Up, GetVisualYaw()) * _rigScale;
+        }
         else
         {
             offset = TargetOffset * _rigScale;
@@ -771,6 +799,51 @@ public partial class SunshineCamera : Node3D
     {
         if (_target is Mario mario)
             mario.CameraLocked = locked;
+    }
+
+    // ============================================================
+    //                       TalkingPOV (sign / switch dialogue)
+    // ============================================================
+    // Driven by gameplay events (e.g. RedCoinSwitch showing its sign), same
+    // calling convention as EnterShineGetShot — not input-detected here.
+    public void EnterTalkingPOV()
+    {
+        Mode = CamMode.TalkingPOV;
+        SetMarioLocked(true);
+
+        // Dialogue owns a dedicated non-controllable Mario state and animation.
+        if (_target is Mario mario)
+            mario.EnterTalkingState();
+
+        _tgtYaw    = GetVisualYaw() + Mathf.DegToRad(TalkingPOVYawOffsetDeg);
+        _tgtPitch  = Mathf.DegToRad(TalkingPOVPitchDeg);
+        _tgtRadius = TalkingPOVRadius * _rigScale;
+        _modeTransitionTimer = TalkingPOVEntryDuration;
+    }
+
+    public void ExitTalkingPOV()
+    {
+        if (Mode != CamMode.TalkingPOV) return;
+        Mode = CamMode.Normal;
+        if (_target is Mario mario)
+            mario.ExitTalkingState();
+        SetMarioLocked(false);
+
+        // Same "return to Normal" reset as ExitOverShoulder — sweep back to a
+        // proper third-person framing behind Mario at the default zoom level.
+        _tgtYaw = GetBehindYaw();
+        if (LinkPitchToRadius)
+        {
+            _zoomT     = DefaultZoomT;
+            _tgtPitch  = ZoomTtoPitch(_zoomT);
+            _tgtRadius = ZoomTtoRadius(_zoomT);
+        }
+        else
+        {
+            _tgtPitch  = Mathf.DegToRad(DefaultPitchDeg);
+            _tgtRadius = BaseRadius * _rigScale;
+        }
+        _modeTransitionTimer = TalkingPOVEntryDuration;
     }
 
     // ============================================================

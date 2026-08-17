@@ -63,6 +63,7 @@ public partial class Mario : CharacterBody3D
         treeTopReach,
         shineGet,
         dead,
+        talking,
     }
 
     private struct AirControlProfile
@@ -91,6 +92,14 @@ public partial class Mario : CharacterBody3D
             this.stopSnap = stopSnap;
         }
     }
+
+    /// <summary>Fires the instant Mario grabs a shine (start of the collect
+    /// cutscene, StartShineGet) — not after the celebration plays out. Anything
+    /// that should stop the moment the goal is reached, not after watching him
+    /// pose with it — e.g. a ShineTimer, speedrun or countdown alike — should
+    /// hook this instead of AddShine() (which only fires later, mid-cutscene,
+    /// timed for the HUD count-up flourish).</summary>
+    [Signal] public delegate void ShineCollectedEventHandler();
 
     private bool fPrev = false;
     private float pickupFailT = 0f;
@@ -377,6 +386,43 @@ public partial class Mario : CharacterBody3D
         22.213216f,
         8.885286f,
         11.550872f,
+        0.155492f
+    );
+
+    // Dive is a committed lunge, not a steerable jump — so unlike every profile
+    // above, maxSpeed matches DIVE_SPEED_XZ itself rather than a jump's slower
+    // cap. That's the difference between "some air control" and "full air
+    // control": with a jump-speed maxSpeed, ApplyAirControl would immediately
+    // brake the dive from 16 down toward ~9 the instant it started steering,
+    // gutting the lunge's distance even when held perfectly straight. Matching
+    // maxSpeed to DIVE_SPEED_XZ means holding forward preserves the full dive,
+    // while accel (kept low, well under AIR_SINGLE's) still lets the stick bend
+    // the trajectory left/right over the course of the dive. reverseMax is 0 —
+    // you can curve a dive, not abort one.
+    // accel bumped 1.5x (4.442643 -> 6.663965) per playtest feedback: the curve
+    // was there but too subtle to feel. Bumped again to 2x base (-> 8.885286)
+    // per follow-up feedback.
+    private readonly AirControlProfile AIR_DIVE = new AirControlProfile(
+        DIVE_SPEED_XZ, // 16 - don't bleed off the lunge's distance
+        8.885286f, // 4.442643 * 2
+        8.885286f, // 20 * SCALE_FIX
+        2.221321f, // 5 * SCALE_FIX - slow drag; neutral stick shouldn't stall the dive early
+        0f,
+        0.155492f
+    );
+
+    // Rollout gets its own profile rather than reusing AIR_SINGLE — bumping
+    // AIR_SINGLE's accel would also strengthen single/double/triple jump's air
+    // control, which nobody asked for. Same shape as AIR_SINGLE otherwise;
+    // accel bumped 1.5x (8.885286 -> 13.327929) per playtest feedback, same as
+    // AIR_DIVE above. Bumped again to 2x base (-> 17.770572) per follow-up
+    // feedback.
+    private readonly AirControlProfile AIR_ROLLOUT = new AirControlProfile(
+        8.885286f,
+        17.770572f, // 8.885286 * 2
+        15.549251f,
+        8.885286f,
+        0f,
         0.155492f
     );
 
@@ -1213,6 +1259,7 @@ public partial class Mario : CharacterBody3D
         ForceLoop("ma_pivot");
         ForceLoop("ma_sstep");
         ForceLoop("ma_wait");
+        ForceLoop("ma_t_wait");
         ForceLoop("ma_sleep_wait");
         ForceLoop("ma_demo_gate_out_rolling_get"); // Triple jump loops
 
@@ -1264,6 +1311,44 @@ public partial class Mario : CharacterBody3D
     /// trajectory (gravity + momentum) so the SMS Y-turn/Kenny-kick mechanic works.
     /// </summary>
     public bool CameraLocked { get; set; } = false;
+
+    // Prevent the A press that closes dialogue from also becoming a jump/action
+    // on the first unlocked physics frame.
+    private int _talkingReleaseLockFrames = 0;
+
+    /// <summary>
+    /// Snaps Mario to a standing idle pose/animation regardless of what he was
+    /// doing. Retained for non-dialogue callers; sign dialogue uses the dedicated
+    /// talking state below.
+    /// </summary>
+    public void ForceStandingIdle()
+    {
+        stateOfMario = MarioState.idle;
+        SetMarioState(MarioState.idle);
+    }
+
+    /// <summary>Enter non-controllable sign/NPC dialogue and loop ma_t_wait.</summary>
+    public void EnterTalkingState()
+    {
+        _talkingReleaseLockFrames = 0;
+        velocity = Vector3.Zero;
+        Velocity = Vector3.Zero;
+        stateOfMario = MarioState.talking;
+        SetMarioState(stateOfMario);
+    }
+
+    /// <summary>Return from dialogue to normal idle control.</summary>
+    public void ExitTalkingState()
+    {
+        if (stateOfMario != MarioState.talking)
+            return;
+
+        velocity = Vector3.Zero;
+        Velocity = Vector3.Zero;
+        stateOfMario = MarioState.idle;
+        SetMarioState(stateOfMario);
+        _talkingReleaseLockFrames = 2;
+    }
 
     /// <summary>
     /// Fully hides and freezes Mario — used by Level's intro-pan cutscene, where
@@ -1324,6 +1409,15 @@ public partial class Mario : CharacterBody3D
         }
         UpdateTurnLean((float)delta);
 
+        if (_talkingReleaseLockFrames > 0)
+        {
+            _talkingReleaseLockFrames--;
+            velocity = Vector3.Zero;
+            Velocity = Vector3.Zero;
+            wasOnFloor = IsOnFloor();
+            return;
+        }
+
         if (CameraLocked)
         {
             bool wasAirPrev = !wasOnFloor;
@@ -1377,6 +1471,7 @@ public partial class Mario : CharacterBody3D
                 && stateOfMario != MarioState.groundPoundLanding
                 && stateOfMario != MarioState.shineGet
                 && stateOfMario != MarioState.bonk
+                && stateOfMario != MarioState.talking
             )
             {
                 stateOfMario = MarioState.landing;
@@ -1901,6 +1996,18 @@ public partial class Mario : CharacterBody3D
                     stateOfMario = MarioState.ledgeFall;
                     SetMarioState(MarioState.ledgeFall);
                 }
+                else if (!isJumping && stateOfMario == MarioState.rolloutRun)
+                {
+                    // Rolled off a ledge while coasting (rolloutRun isn't a
+                    // "normal" locomotion state, so it's deliberately not in
+                    // isGroundedLocoState above — routing it to ledgeFall like
+                    // the rest would strip his air control entirely). Hand off
+                    // to singleRollout instead, which the universal air-control
+                    // block already knows how to steer (AIR_SINGLE profile),
+                    // so the speed he carried into the roll isn't wasted.
+                    stateOfMario = MarioState.singleRollout;
+                    SetMarioState(MarioState.singleRollout);
+                }
 
                 if (stateOfMario == MarioState.SpinJump)
                 {
@@ -2415,6 +2522,7 @@ public partial class Mario : CharacterBody3D
                             stateOfMario = MarioState.singleRollout;
                             // Roll jump - special animation, keeping AnimationPlayer
                             SetMarioState(stateOfMario);
+                            StartRolloutXZ();
                             rolloutAction(delta);
                             // velocity.X = direction.X DIVE_SPEED_XZ;
                             // velocity.Z = direction.Z DIVE_SPEED_XZ;
@@ -3219,14 +3327,12 @@ public partial class Mario : CharacterBody3D
             // --- UNIVERSAL AIR CONTROL (profiles per state) ---
             if (TryGetAirProfile(stateOfMario, out var prof))
             {
-                // Don't fight states that *own* XZ explicitly
+                // Don't fight states that *own* XZ explicitly. Diving states used
+                // to be listed here too — now handled instead by AIR_DIVE (a
+                // profile tuned to curve the dive without slowing it down), so
+                // TryGetAirProfile's diving cases above can actually run.
                 bool ownsXZ =
-                    stateOfMario == MarioState.diving
-                    || stateOfMario == MarioState.singleJumpDive
-                    || stateOfMario == MarioState.doubleJumpDive
-                    || stateOfMario == MarioState.tripleJumpDive
-                    || stateOfMario == MarioState.singleRollout
-                    || stateOfMario == MarioState.wallSlide
+                    stateOfMario == MarioState.wallSlide
                     || stateOfMario == MarioState.ledgeFall;
 
                 if (!ownsXZ)
@@ -3427,17 +3533,13 @@ public partial class Mario : CharacterBody3D
                 lastFacingDirection = lockDir;
                 landingFacingDir = lockDir;
 
-                // Keep PI offset during landing animation (matches sideflip visual),
-                // _Process auto-clear snaps to forward when landing state ends
-                float landingYaw = Mathf.Wrap(
-                    YawFromDir(lockDir) + SIDEFLIP_YAW_OFFSET,
-                    -Mathf.Pi,
-                    Mathf.Pi
-                );
-                sideFlipLockedYaw = landingYaw;
+                // The reused single-jump landing animation is authored facing forward,
+                // so clear the side-flip PI offset as soon as Mario touches down.
+                float landingYaw = BaseYawFromDir(lockDir);
+                sideFlipLockedYaw = 0f;
                 armature.Rotation = new Vector3(0f, landingYaw, 0f);
 
-                _sideFlipLanding = true;
+                _sideFlipLanding = false;
                 sideFlipDirLocked = false;
             }
 
@@ -3524,10 +3626,10 @@ public partial class Mario : CharacterBody3D
                     return;
                 }
 
-            // Use sideflip landing animation for sideflip
+            // Reuse the normal single-jump landing animation and short lock.
             if (airStateAtImpact == MarioState.sideFlip)
             {
-                EnterLanding(MarioState.tripleJumpLanding, "ma_tjmp2");
+                EnterLanding(MarioState.singleJumpLanding, "ma_laend");
             }
             else
             {
@@ -3665,7 +3767,10 @@ public partial class Mario : CharacterBody3D
 
     private void rolloutAction(double delta)
     {
-        // Hold-to-boost rollout jump height (Y)
+        // Hold-to-boost rollout jump height (Y). This alone is meant to keep
+        // running every frame button_a is held (it's the same charge-up shape
+        // as the single/double jump hold-height logic) — it does NOT touch
+        // X/Z, so it no longer fights the universal air-control block below.
         if (initalJumpHold)
         {
             jumpHoldTime += (float)delta;
@@ -3676,8 +3781,18 @@ public partial class Mario : CharacterBody3D
                 velocity.Y = Mathf.Lerp(BASE_ROLLOUT_VELOCITY, MAX_ROLLOUT_VELOCITY, a);
             }
         }
+    }
 
-        // Pick rollout direction (locked to facing / movement)
+    // Launch the rollout's horizontal speed. Deliberately called ONCE, only on
+    // the frame singleRollout is entered — this used to live inside
+    // rolloutAction() and re-run every frame button_a was held, which pinned
+    // X/Z back to pure lastFacingDirection every tick and made the universal
+    // air-control block's steering (which runs later the same frame, and
+    // every frame after) invisible: it could never out-fight a full XZ reset
+    // happening right before it. Now it only sets the initial launch vector;
+    // ApplyAirControl (AIR_SINGLE) owns steering from then on.
+    private void StartRolloutXZ()
+    {
         Vector3 dir = lastFacingDirection;
         if (dir == Vector3.Zero)
         {
@@ -3689,7 +3804,6 @@ public partial class Mario : CharacterBody3D
         }
         dir = dir.Normalized();
 
-        // ✅ FIXED rollout horizontal speed (ignore previous velocity)
         velocity.X = dir.X * ROLLOUT_SPEED_XZ;
         velocity.Z = dir.Z * ROLLOUT_SPEED_XZ;
     }
@@ -5193,6 +5307,10 @@ public partial class Mario : CharacterBody3D
 
     private void EnterWallSlide(Vector3 incomingVel)
     {
+        // Wall sliding takes over from every airborne move; spin visuals must not
+        // keep emitting after the SpinJump state has ended.
+        isSpining(false);
+
         stateOfMario = MarioState.wallSlide;
         wallSlideLostWallFrames = 0;
 
@@ -5502,7 +5620,15 @@ public partial class Mario : CharacterBody3D
                 return true;
 
             case MarioState.bellyRollout:
-                p = AIR_SINGLE; // Use same air control as single jump
+            case MarioState.singleRollout:
+                p = AIR_ROLLOUT;
+                return true;
+
+            case MarioState.diving:
+            case MarioState.singleJumpDive:
+            case MarioState.doubleJumpDive:
+            case MarioState.tripleJumpDive:
+                p = AIR_DIVE;
                 return true;
 
             case MarioState.stomping:
@@ -7291,9 +7417,12 @@ public partial class Mario : CharacterBody3D
         {
             // Touched mid-air: lock him NOW so he can't keep jumping/steering.
             // XZ is already snapped to the shine; kill horizontal so he drops
-            // STRAIGHT down. StartShineGet fires when he lands.
+            // straight down in the normal fall animation until the cutscene starts.
             _pendingShine = shine;
             CameraLocked = true;
+            isSpining(false);
+            stateOfMario = MarioState.ledgeFall;
+            SetMarioState(stateOfMario);
             velocity.X = 0f;
             velocity.Z = 0f;
         }
@@ -7303,6 +7432,12 @@ public partial class Mario : CharacterBody3D
 
     private void StartShineGet(ShineSprite shine)
     {
+        // Shine collection owns Mario's presentation from here on; no previous
+        // airborne move may leave its visual effects running into the cutscene.
+        isSpining(false);
+
+        EmitSignal(SignalName.ShineCollected);
+
         // Kill ALL momentum and plant him — no slide, no residual fall/arc.
         // (StartShineGet only fires once he's grounded, so zeroing Y here just
         // stops him dead; the CameraLocked freeze keeps him there.)
@@ -7814,6 +7949,7 @@ public partial class Mario : CharacterBody3D
             string fallbackAnim = state switch
             {
                 MarioState.idle => "ma_wait",
+                MarioState.talking => "ma_t_wait",
                 MarioState.sneak => "ma_sstep",
                 MarioState.running => "ma_run1",
                 MarioState.walking => "ma_run1",
@@ -7861,6 +7997,14 @@ public partial class Mario : CharacterBody3D
         {
             case MarioState.idle:
                 _sm.Travel("ma_wait");
+                break;
+            case MarioState.talking:
+                // ma_t_wait is present in the AnimationPlayer library but not as
+                // an AnimationTree state, so play its forced loop directly.
+                if (animTree != null)
+                    animTree.Active = false;
+                if (animPlayer.CurrentAnimation != "ma_t_wait")
+                    animPlayer.Play("ma_t_wait");
                 break;
             case MarioState.pivot:
                 _sm.Travel("ma_pivot");

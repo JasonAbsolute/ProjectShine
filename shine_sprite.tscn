@@ -34,16 +34,19 @@ radius = 79.0
 [node name="ShineSprite" unique_id=1110047867 instance=ExtResource("1_uco35")]
 transform = Transform3D(0.006, 0, 0, 0, 0.006, 0, 0, 0, 0.006, 0, 0, 0)
 script = ExtResource("2_shine")
+SpawnEntranceDuration = 4.0
+SpawnEntranceRise = 2.5
+SpawnEntranceTurns = 13.0
 FlyDownDuration = 1.1
 FlyDownStartOffset = Vector3(-1, 2.9, -0.5)
 FlyDownGrabOffset = Vector3(0, 0.7, -0.06)
 
 [node name="Skeleton3D" parent="Armature" index="0"]
-bones/0/position = Vector3(0, 213.883, -7.3209e-06)
+bones/0/position = Vector3(0, 213.88275, -7.3208953e-06)
 bones/0/scale = Vector3(0.5, 0.5, 0.5)
-bones/1/position = Vector3(80.6971, 1.95361, 3.78991)
-bones/2/position = Vector3(-1.20547e-20, 69.8395, 8.18262e-13)
-bones/2/rotation = Quaternion(-2.48279e-14, 0.482184, -1.35916e-14, 0.87607)
+bones/1/position = Vector3(80.69709, 1.9536057, 3.7899072)
+bones/2/position = Vector3(-1.20546864e-20, 69.83947, 8.182621e-13)
+bones/2/rotation = Quaternion(-2.482792e-14, 0.48218396, -1.3591604e-14, 0.87607)
 
 [node name="Mesh_0" parent="Armature/Skeleton3D" index="0"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -48.1984, 0)
