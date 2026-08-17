@@ -1,0 +1,87 @@
+[gd_scene format=3 uid="uid://bli25eiutcxiv"]
+
+[ext_resource type="Script" uid="uid://bau1a2oo5vftr" path="res://assets/RedCoinSpawnPuffFx.cs" id="1_uqob5"]
+[ext_resource type="Texture2D" uid="uid://b72rddkndxjcs" path="res://assets/SpawnPuff_soft_blue.png" id="2_6yjqu"]
+[ext_resource type="Texture2D" uid="uid://qm3yctutu518" path="res://assets/red_coin_green_dot.png" id="3_734je"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_05bfg"]
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_6yjqu")
+disable_receive_shadows = true
+billboard_mode = 1
+
+[sub_resource type="QuadMesh" id="QuadMesh_pm217"]
+material = SubResource("StandardMaterial3D_05bfg")
+size = Vector2(1.5, 1.5)
+
+[sub_resource type="Curve" id="Curve_msioo"]
+_data = [Vector2(0, 0.18), 0.0, 0.0, 0, 0, Vector2(0.55, 1), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+point_count = 3
+
+[sub_resource type="Gradient" id="Gradient_el1kn"]
+offsets = PackedFloat32Array(0, 0.28, 1)
+colors = PackedColorArray(1, 1, 1, 0.96, 1, 1, 1, 0.96, 1, 1, 1, 0)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_p3ya4"]
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("3_734je")
+disable_receive_shadows = true
+billboard_mode = 1
+
+[sub_resource type="QuadMesh" id="QuadMesh_fuxfx"]
+material = SubResource("StandardMaterial3D_p3ya4")
+size = Vector2(0.11, 0.11)
+
+[sub_resource type="Curve" id="Curve_ksxgi"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 0.3), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="Gradient" id="Gradient_7oq0g"]
+offsets = PackedFloat32Array(0, 0.48, 1)
+colors = PackedColorArray(0.56, 1, 0.08, 1, 0.56, 1, 0.08, 1, 0.56, 1, 0.08, 0)
+
+[node name="RedCoinSpawnPuff" type="Node3D" unique_id=1429939293]
+script = ExtResource("1_uqob5")
+
+[node name="SmokeParticles" type="CPUParticles3D" parent="." unique_id=661154778]
+emitting = false
+amount = 18
+lifetime = 0.84
+one_shot = true
+speed_scale = 1.5899999999999999
+explosiveness = 1.0
+randomness = 0.12
+local_coords = true
+mesh = SubResource("QuadMesh_pm217")
+direction = Vector3(0, 1, 0)
+spread = 180.0
+gravity = Vector3(0, 0, 0)
+initial_velocity_min = 1.0
+initial_velocity_max = 1.0
+scale_amount_curve = SubResource("Curve_msioo")
+color_ramp = SubResource("Gradient_el1kn")
+
+[node name="GreenDotParticles" type="CPUParticles3D" parent="." unique_id=2050200490]
+emitting = false
+amount = 7
+lifetime = 0.4
+one_shot = true
+explosiveness = 1.0
+randomness = 0.05
+local_coords = true
+mesh = SubResource("QuadMesh_fuxfx")
+direction = Vector3(0, 1, 0)
+spread = 180.0
+gravity = Vector3(0, 0, 0)
+initial_velocity_min = 1.75
+initial_velocity_max = 3.05
+scale_amount_min = 0.82
+scale_amount_max = 1.18
+scale_amount_curve = SubResource("Curve_ksxgi")
+color_ramp = SubResource("Gradient_7oq0g")

@@ -1,0 +1,9 @@
+[gd_resource type="LabelSettings" format=3 uid="uid://b1686pcv3m7yy"]
+
+[ext_resource type="FontFile" uid="uid://d2mk8l467fkuo" path="res://Font/Delfino.ttf" id="1_fnonf"]
+
+[resource]
+font = ExtResource("1_fnonf")
+font_size = 24
+outline_size = 4
+outline_color = Color(0.101960786, 0.101960786, 0.36862746, 1)

@@ -66,6 +66,13 @@ public partial class Level : Node3D
     /// independent wipe then closes over this many seconds instead.</summary>
     [Export] public float ClosingWipeDuration = 0.5f;
 
+    /// <summary>Fires the instant Mario actually has control — right after
+    /// RevealFromIntro (or immediately, deferred, if this level has no intro at
+    /// all). Anything that shouldn't run during a non-interactive intro pan —
+    /// e.g. a ShineTimer's AutoStart — should wait on this instead of assuming
+    /// _Ready() means "the player can act now."</summary>
+    [Signal] public delegate void MarioReadyEventHandler();
+
     private Mario _mario;
     private Camera3D _introCamera;
     private AnimationPlayer _introAnimPlayer;
@@ -84,7 +91,13 @@ public partial class Level : Node3D
         }
 
         if (!PreviewShot)
-            return; // nothing to do — Mario plays normally, no intro
+        {
+            // No intro — Mario already has control from frame one. Deferred so
+            // anything subscribing in its own _Ready() (which runs this same
+            // frame, possibly after this one) still catches it.
+            CallDeferred(nameof(EmitMarioReady));
+            return;
+        }
 
         _introCamera = GetNodeOrNull<Camera3D>(IntroCameraPath);
         _introAnimPlayer = GetNodeOrNull<AnimationPlayer>(IntroAnimationPlayerPath);
@@ -99,6 +112,9 @@ public partial class Level : Node3D
                 "Level: PreviewShot is on but IntroCameraPath/IntroAnimationPlayerPath "
                     + "aren't both set — skipping intro."
             );
+            // Mario was never suppressed (that happens below) — he already has
+            // control, so anything waiting on MarioReady still needs to hear it.
+            CallDeferred(nameof(EmitMarioReady));
             return;
         }
 
@@ -157,6 +173,13 @@ public partial class Level : Node3D
     {
         _introSkipRequested = true; // guard: keep this from firing again below
         _introAnimPlayer.AnimationFinished -= OnIntroAnimationFinished;
+
+        // NOT snapping Iris here — IntroAnimationName is deliberately left
+        // playing (see below), so if skip happens before its own Iris-in track
+        // finishes (~0.4s), that track is still actively writing to the same
+        // shader param every frame and would just overwrite a one-time set
+        // made at this point on the very next tick. SpawnMario() does the
+        // authoritative clear instead, at the one moment nothing can fight it.
 
         // Deliberately NOT stopping/seeking IntroAnimationName here — the camera
         // keeps panning exactly as authored, just hidden behind the wipe that's
@@ -231,6 +254,15 @@ public partial class Level : Node3D
 
     private void SpawnMario()
     {
+        // Authoritative clear: whatever state IntroAnimationName's Iris-in
+        // track left this in (finished normally, or cut short by a skip that
+        // landed before it finished), this is the one moment nothing can fight
+        // it — Play(SpawnAnimationName) below replaces IntroAnimationName on
+        // this same player outright, so no other animation is still writing to
+        // this shader param after this point.
+        if (_irisRect?.Material is ShaderMaterial irisMat)
+            irisMat.SetShaderParameter("progress", 1f);
+
         Transform3D? spawnXform = _spawnPoint?.GlobalTransform;
 
         switch (Entrance)
@@ -257,7 +289,15 @@ public partial class Level : Node3D
             float wipeLength = spawnAnim != null ? (float)spawnAnim.Length : 1.2f;
             GetTree().CreateTimer(wipeLength + GoTextDelayAfterSpawnWipe).Timeout += SpawnGoTextPopup;
         }
+
+        // RevealFromIntro above already re-enabled Mario's input/physics — the
+        // barn door and GO! banner are purely cosmetic overlays happening on
+        // top of a Mario who can already move, so control starts here, not
+        // whenever those finish.
+        EmitMarioReady();
     }
+
+    private void EmitMarioReady() => EmitSignal(SignalName.MarioReady);
 
     /// <summary>"GO!" banner seen when Mario lands — spawned fresh, frees itself
     /// when its animation finishes (see GoTextPopup.cs), not a persistent HUD element.</summary>

@@ -2,10 +2,18 @@ using Godot;
 
 public partial class RedCoinHud : Node2D
 {
-    [Export] public int MaxRedCoins = 8;
+    [Export]
+    public int MaxRedCoins = 8;
 
     /// <summary>How far below the on-screen position the HUD rests when hidden. Larger = further off-screen.</summary>
-    [Export] public float HiddenOffsetY = 200f;
+    [Export]
+    public float HiddenOffsetY = 200f;
+
+    /// <summary>How far up this HUD moves (negative Y) while a TimerHud is
+    /// showing, so the two stack (red coins on top, timer below) instead of
+    /// overlapping — see SetTimerActive, called by TimerHud on show/hide.</summary>
+    [Export]
+    public float TimerActiveShiftY = -52f;
 
     private TextureRect _countDigit;
     private TextureRect _totalDigit;
@@ -18,6 +26,8 @@ public partial class RedCoinHud : Node2D
     private Control[] _waveElements;
     private Vector2[] _restPositions;
     private int _count;
+    private bool _isShown;
+    private Vector2 _timerShift = Vector2.Zero;
 
     private const float WaveOffset = 50f;
     private const float WaveStagger = 0.05f;
@@ -73,12 +83,14 @@ public partial class RedCoinHud : Node2D
 
     public void ShowHud()
     {
+        _isShown = true;
         _posTween?.Kill();
         Position = _offScreenPos;
         ResetElements();
 
         _posTween = CreateTween();
-        _posTween.TweenProperty(this, "position", _onScreenPos, 0.35f)
+        _posTween
+            .TweenProperty(this, "position", _onScreenPos + _timerShift, 0.35f)
             .SetEase(Tween.EaseType.Out)
             .SetTrans(Tween.TransitionType.Back);
 
@@ -95,11 +107,30 @@ public partial class RedCoinHud : Node2D
 
     public void HideHud()
     {
+        _isShown = false;
         _posTween?.Kill();
         _posTween = CreateTween();
-        _posTween.TweenProperty(this, "position", _offScreenPos, 0.2f)
+        _posTween
+            .TweenProperty(this, "position", _offScreenPos, 0.2f)
             .SetEase(Tween.EaseType.In)
             .SetTrans(Tween.TransitionType.Quad);
+    }
+
+    /// <summary>Called by TimerHud when it shows/hides — slides this HUD up out
+    /// of the timer's way (or back down) if currently visible; if currently
+    /// hidden, just remembers the shift for the next ShowHud().</summary>
+    public void SetTimerActive(bool active)
+    {
+        _timerShift = active ? new Vector2(0f, TimerActiveShiftY) : Vector2.Zero;
+        if (!_isShown)
+            return;
+
+        _posTween?.Kill();
+        _posTween = CreateTween();
+        _posTween
+            .TweenProperty(this, "position", _onScreenPos + _timerShift, 0.25f)
+            .SetEase(Tween.EaseType.Out)
+            .SetTrans(Tween.TransitionType.Back);
     }
 
     private void ResetElements()

@@ -1,0 +1,154 @@
+[gd_scene format=3 uid="uid://c3f2gbtt1spi3"]
+
+[ext_resource type="Script" uid="uid://dr5bj3frdkn23" path="res://Font/HudElements/SignPopup.cs" id="1_c8i82"]
+[ext_resource type="Texture2D" uid="uid://bf3ehu8uis3n1" path="res://assets/SignpopTextBox.png" id="2_thp0i"]
+[ext_resource type="LabelSettings" uid="uid://b1686pcv3m7yy" path="res://Font/HudElements/SignPopupLabelSettings.tres" id="3_c8i82"]
+[ext_resource type="FontFile" uid="uid://d2mk8l467fkuo" path="res://Font/Delfino.ttf" id="4_main_font"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_main"]
+font = ExtResource("4_main_font")
+font_size = 38
+outline_size = 4
+outline_color = Color(0.101960786, 0.101960786, 0.36862746, 1)
+
+[sub_resource type="LabelSettings" id="LabelSettings_good_luck"]
+font = ExtResource("4_main_font")
+font_size = 34
+outline_size = 4
+outline_color = Color(0.101960786, 0.101960786, 0.36862746, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_prompt_outer"]
+bg_color = Color(0.0862745, 0.054902, 0.737255, 1)
+corner_radius_top_left = 20
+corner_radius_top_right = 20
+corner_radius_bottom_right = 20
+corner_radius_bottom_left = 20
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_prompt_dot"]
+bg_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 12
+corner_radius_top_right = 12
+corner_radius_bottom_right = 12
+corner_radius_bottom_left = 12
+
+[node name="SignPopup" type="Control" unique_id=367079329]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_c8i82")
+
+[node name="Banner" type="TextureRect" parent="." unique_id=322764739]
+modulate = Color(1, 1, 1, 0.87)
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250.0
+offset_top = -190.0
+offset_right = 250.0
+offset_bottom = 190.0
+rotation = -0.16
+pivot_offset = Vector2(250, 190)
+mouse_filter = 2
+texture = ExtResource("2_thp0i")
+expand_mode = 1
+
+[node name="Line1" type="Label" parent="Banner" unique_id=992475140]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 50.574677
+offset_top = 43.88562
+offset_right = -49.425323
+offset_bottom = 95.88562
+grow_horizontal = 2
+text = "Collect 8 red coins"
+label_settings = SubResource("LabelSettings_main")
+horizontal_alignment = 1
+vertical_alignment = 2
+
+[node name="Line2" type="Label" parent="Banner" unique_id=537017218]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 50.605957
+offset_top = 94.968445
+offset_right = -49.394043
+offset_bottom = 146.96844
+grow_horizontal = 2
+text = "before the timer"
+label_settings = SubResource("LabelSettings_main")
+horizontal_alignment = 1
+vertical_alignment = 2
+
+[node name="Line3" type="Label" parent="Banner" unique_id=87298350]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 46.887173
+offset_top = 143.0406
+offset_right = -53.112823
+offset_bottom = 195.0406
+grow_horizontal = 2
+text = "runs out!"
+label_settings = SubResource("LabelSettings_main")
+horizontal_alignment = 1
+vertical_alignment = 2
+
+[node name="Line5" type="Label" parent="Banner" unique_id=1193784126]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 49.71266
+offset_top = 244.79039
+offset_right = -50.287354
+offset_bottom = 292.7904
+grow_horizontal = 2
+text = "GOOD LUCK!"
+label_settings = SubResource("LabelSettings_good_luck")
+horizontal_alignment = 1
+vertical_alignment = 2
+
+[node name="Line6" type="Label" parent="Banner" unique_id=781701501]
+layout_mode = 0
+anchor_right = 1.0
+offset_left = 50.0
+offset_top = 267.0
+offset_right = -50.0
+offset_bottom = 299.0
+label_settings = ExtResource("3_c8i82")
+horizontal_alignment = 1
+vertical_alignment = 2
+
+[node name="AcknowledgePrompt" type="Panel" parent="." unique_id=739763939]
+z_index = 2
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = 23.0
+offset_top = 198.0
+offset_right = 63.0
+offset_bottom = 238.0
+grow_horizontal = 2
+grow_vertical = 2
+pivot_offset = Vector2(20, 20)
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_prompt_outer")
+
+[node name="Dot" type="Panel" parent="AcknowledgePrompt" unique_id=1927115179]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 32.0
+offset_bottom = 32.0
+pivot_offset = Vector2(12, 12)
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_prompt_dot")

@@ -1,0 +1,25 @@
+[gd_scene format=3 uid="uid://sl4eiatl1iww"]
+
+[ext_resource type="PackedScene" uid="uid://ce8m25r0mcndj" path="res://Levels/secret1/platforms/RedCoinSwitch.glb" id="1_7ei2p"]
+[ext_resource type="Script" uid="uid://bjrwv02y3lxmp" path="res://assets/RedCoinSwitch.cs" id="2_bl6vr"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_uouv7"]
+size = Vector3(1, 0.4, 1)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wubht"]
+size = Vector3(1, 0.3, 1)
+
+[node name="RedCoinSwitch" unique_id=1051594538 instance=ExtResource("1_7ei2p")]
+script = ExtResource("2_bl6vr")
+
+[node name="SwitchBody" type="StaticBody3D" parent="." index="2" unique_id=1805471221]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SwitchBody" index="0" unique_id=496664123]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
+shape = SubResource("BoxShape3D_uouv7")
+
+[node name="HitZone" type="Area3D" parent="." index="3" unique_id=934230033]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HitZone" index="0" unique_id=1965745351]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.55, 0)
+shape = SubResource("BoxShape3D_wubht")
