@@ -1,7 +1,7 @@
 [gd_scene load_steps=6 format=3 uid="uid://dpyyerf1eto7p"]
 
 [ext_resource type="PackedScene" uid="uid://b54pc5peh00fe" path="res://assets/StartingPlatform.tscn" id="1_2vand"]
-[ext_resource type="PackedScene" uid="uid://d3ph56ccg345h" path="res://assets/Mario2.tscn" id="2_jgpco"]
+[ext_resource type="PackedScene" path="res://assets/Mario.tscn" id="2_jgpco"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_jgpco"]
 sky_top_color = Color(0.35, 0.55, 0.9, 1)

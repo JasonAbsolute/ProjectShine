@@ -3,8 +3,9 @@
 [ext_resource type="Shader" uid="uid://d1vjs15xeefjl" path="res://assets/IrisWipe.gdshader" id="1_so7y2"]
 
 [resource]
+resource_local_to_scene = true
 shader = ExtResource("1_so7y2")
-shader_parameter/progress = 1.0
+shader_parameter/progress = 0.0
 shader_parameter/wipe_color = Color(0, 0, 0, 1)
 shader_parameter/edge_softness = 0.01
 shader_parameter/rect_size = Vector2(1920, 1080)

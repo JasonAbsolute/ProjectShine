@@ -1,0 +1,228 @@
+[gd_scene format=3 uid="uid://bieb60ih0a6w4"]
+
+[ext_resource type="Script" uid="uid://h274ijsmornb" path="res://assets/CharacterSelect.cs" id="1_script"]
+[ext_resource type="Resource" path="res://assets/characters/MarioEntry.tres" id="2_mario"]
+[ext_resource type="Resource" path="res://assets/characters/LuigiEntry.tres" id="3_luigi"]
+[ext_resource type="Resource" path="res://assets/characters/KoopaEntry.tres" id="4_koopa"]
+[ext_resource type="Resource" path="res://assets/characters/PiantissimoEntry.tres" id="5_pianti"]
+[ext_resource type="Texture2D" uid="uid://sjwc2cvryw5j" path="res://Font/CharacterSelect/SelectHand.png" id="6_hand"]
+[ext_resource type="Texture2D" uid="uid://clk3k5lf0nfbn" path="res://Font/CharacterSelect/MenuGraphic6.png" id="7_sunl"]
+[ext_resource type="Texture2D" uid="uid://jexf4yi6sllv" path="res://Font/CharacterSelect/MenuGraphic4.png" id="10_palm"]
+[ext_resource type="Texture2D" uid="uid://cajjskvybjfi5" path="res://Font/CharacterSelect/MenuGraphic11.png" id="10_xrkx3"]
+[ext_resource type="Texture2D" uid="uid://crqvururetsyn" path="res://Font/CharacterSelect/MenuGraphic7.png" id="12_greenblob"]
+[ext_resource type="Texture2D" uid="uid://iwld5brm4v6n" path="res://Font/CharacterSelect/MenuGraphic10.png" id="13_f2fum"]
+[ext_resource type="Texture2D" uid="uid://cmnm7ru0n052" path="res://Font/CharacterSelect/MenuGraphic8.png" id="13_sunflower"]
+[ext_resource type="Texture2D" uid="uid://ffhg2psc0fxh" path="res://Font/CharacterSelect/MenuGraphic2.png" id="14_fishb"]
+[ext_resource type="Texture2D" uid="uid://drj2axgfyejce" path="res://Font/CharacterSelect/MenuGraphic1.png" id="15_pinkblob"]
+[ext_resource type="Script" uid="uid://coe211ja8nkdx" path="res://assets/SnapRotate.cs" id="40_snap"]
+[ext_resource type="Texture2D" uid="uid://kfyytoolf68u" path="res://Font/CharacterSelect/background.png" id="50_bg"]
+[ext_resource type="Resource" path="res://assets/characters/WarioEntry.tres" id="61_wario"]
+[ext_resource type="Resource" path="res://assets/characters/WaluigiEntry.tres" id="62_waluigi"]
+[ext_resource type="Resource" path="res://assets/characters/YoshiEntry.tres" id="63_yoshi"]
+[ext_resource type="PackedScene" uid="uid://bg72dlcmvwypi" path="res://assets/CharacterPoster.tscn" id="51_poster"]
+[ext_resource type="Texture2D" uid="uid://cuqnfpj2nqqrx" path="res://Font/CharacterSelect/PlayerSelectText.png" id="52_title"]
+[ext_resource type="Shader" uid="uid://dy4lyx2nlb5pf" path="res://assets/ArtGradient.gdshader" id="60_grad"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sun"]
+shader = ExtResource("60_grad")
+shader_parameter/color_a = Color(1, 0.847, 0.263, 1)
+shader_parameter/color_b = Color(0.937, 0.404, 0.031, 1)
+shader_parameter/radial = true
+shader_parameter/bias = 0.85
+
+[node name="CharacterSelect" type="Control" unique_id=1878214339]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+Characters = [ExtResource("2_mario"), ExtResource("3_luigi"), ExtResource("4_koopa"), ExtResource("5_pianti"), ExtResource("61_wario"), ExtResource("62_waluigi"), ExtResource("63_yoshi")]
+PosterScene = ExtResource("51_poster")
+SelectHandPath = NodePath("SelectHand")
+SelectHandGap = 16.0
+
+[node name="Background" type="TextureRect" parent="." unique_id=150886938]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("50_bg")
+expand_mode = 1
+stretch_mode = 6
+
+[node name="Decor" type="Control" parent="." unique_id=1376984382]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="SunLeft" type="TextureRect" parent="Decor" unique_id=2090620864]
+material = SubResource("ShaderMaterial_sun")
+layout_mode = 0
+offset_left = 1004.0
+offset_top = 21.0
+offset_right = 1116.0
+offset_bottom = 133.0
+mouse_filter = 2
+texture = ExtResource("7_sunl")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="SunRight" type="TextureRect" parent="Decor" unique_id=162983146]
+layout_mode = 0
+offset_left = 13.999998
+offset_top = 39.0
+offset_right = 174.0
+offset_bottom = 199.0
+rotation = -0.31723714
+scale = Vector2(0.7703192, 0.7703192)
+mouse_filter = 2
+texture = ExtResource("10_xrkx3")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Palm" type="TextureRect" parent="Decor" unique_id=1333016324]
+layout_mode = 0
+offset_left = 40.999996
+offset_top = 541.0
+offset_right = 241.0
+offset_bottom = 741.0
+rotation = -0.18793921
+scale = Vector2(0.5, 0.5)
+mouse_filter = 2
+texture = ExtResource("10_palm")
+expand_mode = 1
+stretch_mode = 5
+script = ExtResource("40_snap")
+HoldSeconds = 0.5
+
+[node name="GreenBlob" type="TextureRect" parent="Decor" unique_id=43591074]
+layout_mode = 0
+offset_left = 461.0
+offset_top = 585.99994
+offset_right = 518.9176
+offset_bottom = 643.91754
+rotation = -0.49029806
+mouse_filter = 2
+texture = ExtResource("12_greenblob")
+expand_mode = 1
+stretch_mode = 5
+script = ExtResource("40_snap")
+HoldSeconds = 0.5
+
+[node name="Sunflower" type="TextureRect" parent="Decor" unique_id=6731750]
+layout_mode = 0
+offset_left = 723.0
+offset_top = 497.99997
+offset_right = 810.0
+offset_bottom = 585.0
+rotation = 0.37367368
+mouse_filter = 2
+texture = ExtResource("13_sunflower")
+expand_mode = 1
+stretch_mode = 5
+script = ExtResource("40_snap")
+AngleDegrees = -15.0
+HoldSeconds = 0.5
+
+[node name="FishB" type="TextureRect" parent="Decor" unique_id=1857142387]
+layout_mode = 0
+offset_left = 882.0
+offset_top = 594.0
+offset_right = 947.943
+offset_bottom = 661.7368
+rotation = -0.49723327
+mouse_filter = 2
+texture = ExtResource("14_fishb")
+expand_mode = 1
+stretch_mode = 5
+script = ExtResource("40_snap")
+HoldSeconds = 0.5
+
+[node name="PinkBlob" type="TextureRect" parent="Decor" unique_id=326522851]
+layout_mode = 0
+offset_left = 1059.0
+offset_top = 566.99994
+offset_right = 1105.008
+offset_bottom = 613.008
+rotation = -0.28080183
+mouse_filter = 2
+texture = ExtResource("15_pinkblob")
+expand_mode = 1
+stretch_mode = 5
+script = ExtResource("40_snap")
+AngleDegrees = -15.0
+HoldSeconds = 0.5
+
+[node name="Pianta" type="TextureRect" parent="Decor" unique_id=439161933]
+layout_mode = 0
+offset_left = 255.00003
+offset_top = 518.0
+offset_right = 326.16263
+offset_bottom = 589.1626
+rotation = 0.31891346
+mouse_filter = 2
+texture = ExtResource("13_f2fum")
+expand_mode = 1
+stretch_mode = 5
+script = ExtResource("40_snap")
+AngleDegrees = -15.0
+HoldSeconds = 0.5
+
+[node name="Title" type="TextureRect" parent="." unique_id=1432238995]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 14.0
+offset_bottom = 106.0
+grow_horizontal = 2
+mouse_filter = 2
+texture = ExtResource("52_title")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Portraits" type="HBoxContainer" parent="." unique_id=682612973]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -476.0
+offset_top = -204.0
+offset_right = 476.0
+offset_bottom = 126.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 24
+alignment = 1
+
+[node name="SelectHand" type="TextureRect" parent="." unique_id=1099967009]
+visible = false
+custom_minimum_size = Vector2(64, 92)
+layout_mode = 0
+offset_right = 64.0
+offset_bottom = 92.0
+mouse_filter = 2
+texture = ExtResource("6_hand")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="FadeOut" type="ColorRect" parent="." unique_id=930000001]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0)

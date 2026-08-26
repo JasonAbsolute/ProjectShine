@@ -20,19 +20,21 @@ public partial class SpinJumpEffects : Node3D
     [Export]
     public Texture2D PuffTex;
 
-    // Offsets so rings aren’t stacked perfectly
+    // Offsets so rings aren't stacked perfectly. Named by ROLE like the
+    // colours above - the child nodes are still white/blue/red, but those
+    // are position labels, not the hue any given character uses.
     [Export]
-    public float BlueYOffset = 0.10f;
+    public float UpperYOffset = 0.10f;
 
     [Export]
-    public float RedYOffset = -0.06f;
+    public float LowerYOffset = -0.06f;
 
     // Small scale differences so they feel layered
     [Export]
-    public float BlueScaleMul = 1.03f;
+    public float UpperScaleMul = 1.03f;
 
     [Export]
-    public float RedScaleMul = 0.98f;
+    public float LowerScaleMul = 0.98f;
 
     // How much to randomize each ring per spawn
     [Export]
@@ -43,6 +45,26 @@ public partial class SpinJumpEffects : Node3D
 
     [Export]
     public float ZTiltMaxDeg = 12f;
+
+    // --- Ring colours ------------------------------------------------------
+    // Named by ROLE rather than by hue, because the hue is exactly what varies
+    // per character: Mario's lower ring is red, Luigi's is green. The child
+    // nodes are still called white/blue/red (Mario's original palette) so
+    // existing scenes keep resolving - treat those as position labels.
+
+    [ExportGroup("Ring Colors")]
+    /// <summary>Tint for the middle/main ring - the "white" child node.</summary>
+    [Export]
+    public Color MainRingColor = Colors.White;
+
+    /// <summary>Tint for the upper, slightly larger ring - the "blue" child node.</summary>
+    [Export]
+    public Color UpperRingColor = new(0.35f, 0.70f, 1.00f, 1f);
+
+    /// <summary>Tint for the lower, slightly smaller ring - the "red" child node.</summary>
+    [Export]
+    public Color LowerRingColor = new(1.00f, 0.25f, 0.25f, 1f);
+    [ExportGroup("")]
 
     private readonly RandomNumberGenerator _rng = new();
 
@@ -99,10 +121,13 @@ public partial class SpinJumpEffects : Node3D
             GD.PushWarning("SpinJumpEffects: PuffTex is not assigned in Inspector.");
         }
 
-        // Hard-set tint per ring
-        _whiteMat.SetShaderParameter("tint", Colors.White);
-        _blueMat.SetShaderParameter("tint", new Color(0.35f, 0.70f, 1.00f, 1f));
-        _redMat.SetShaderParameter("tint", new Color(1.00f, 0.25f, 0.25f, 1f));
+        // Tint per ring, driven by the exported Ring Colors so each character
+        // scene can recolour the trail without touching code or the shader.
+        // MakeUniqueShaderMat already duplicated these materials, so setting
+        // them here is per-instance and cannot leak across characters.
+        _whiteMat.SetShaderParameter("tint", MainRingColor);
+        _blueMat.SetShaderParameter("tint", UpperRingColor);
+        _redMat.SetShaderParameter("tint", LowerRingColor);
 
         SetVisibleAll(false);
     }
@@ -195,8 +220,8 @@ public partial class SpinJumpEffects : Node3D
         ApplyToRing(
             _blueMesh,
             _blueMat,
-            y: baseY + BlueYOffset + _rng.RandfRange(-YJitter, YJitter),
-            s: (baseS * BlueScaleMul) + _rng.RandfRange(-ScaleJitter, ScaleJitter),
+            y: baseY + UpperYOffset + _rng.RandfRange(-YJitter, YJitter),
+            s: (baseS * UpperScaleMul) + _rng.RandfRange(-ScaleJitter, ScaleJitter),
             zTilt: zTilt,
             alpha: 1f,
             radius: _rng.RandfRange(0.5f, 0.6f),
@@ -209,8 +234,8 @@ public partial class SpinJumpEffects : Node3D
         ApplyToRing(
             _redMesh,
             _redMat,
-            y: baseY + RedYOffset + _rng.RandfRange(-YJitter, YJitter),
-            s: (baseS * RedScaleMul) + _rng.RandfRange(-ScaleJitter, ScaleJitter),
+            y: baseY + LowerYOffset + _rng.RandfRange(-YJitter, YJitter),
+            s: (baseS * LowerScaleMul) + _rng.RandfRange(-ScaleJitter, ScaleJitter),
             zTilt: zTilt,
             alpha: 1f,
             radius: _rng.RandfRange(0.70f, 0.77f),

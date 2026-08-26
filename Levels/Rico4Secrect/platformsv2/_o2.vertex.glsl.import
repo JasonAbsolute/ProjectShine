@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://dj2t0i7jy3ewc"
+path="res://.godot/imported/_o2.vertex.glsl-3867afc7ee791edca5d915fa346c3d07.res"
+
+[deps]
+
+source_file="res://Levels/Rico4Secrect/platformsv2/_o2.vertex.glsl"
+dest_files=["res://.godot/imported/_o2.vertex.glsl-3867afc7ee791edca5d915fa346c3d07.res"]
+
+[params]
+

@@ -1,0 +1,50 @@
+[gd_scene format=3]
+
+[ext_resource type="PackedScene" uid="uid://d3ph56ccg345h" path="res://assets/Player.tscn" id="1_base"]
+[ext_resource type="ArrayMesh" path="res://models/Wario/Godot/WarioMesh.res" id="2_mesh"]
+[ext_resource type="Skin" path="res://models/Wario/Godot/WarioSkin.tres" id="3_skin"]
+[ext_resource type="Resource" path="res://assets/Wario.tres" id="4_profile"]
+
+[ext_resource type="PackedScene" path="res://models/Wario/Godot/Hands/ma_hnd3l.glb" id="90_ma_hnd3l"]
+[ext_resource type="PackedScene" path="res://models/Wario/Godot/Hands/ma_hnd2l.glb" id="91_ma_hnd2l"]
+[ext_resource type="PackedScene" path="res://models/Wario/Godot/Hands/ma_hnd3r.glb" id="92_ma_hnd3r"]
+[ext_resource type="PackedScene" path="res://models/Wario/Godot/Hands/ma_hnd2r.glb" id="93_ma_hnd2r"]
+[ext_resource type="PackedScene" path="res://models/Wario/Godot/Hands/ma_hnd4r.glb" id="94_ma_hnd4r"]
+
+[node name="Wario" unique_id=1500100001 instance=ExtResource("1_base")]
+Profile = ExtResource("4_profile")
+
+[node name="SpinJumpEffects" parent="." index="10" unique_id=821645171]
+UpperRingColor = Color(1, 0.85, 0.15, 1)
+LowerRingColor = Color(0.85, 0.65, 0.0, 1)
+
+[node name="Mesh_0" parent="Armature/Skeleton3D" parent_id_path=PackedInt32Array(1267083812) index="0" unique_id=1070017404]
+mesh = ExtResource("2_mesh")
+skin = ExtResource("3_skin")
+
+[node name="Model" parent="Armature/Skeleton3D/LeftHandBone/LeftHandClosed" parent_id_path=PackedInt32Array(79429134) index="0" unique_id=910000001]
+visible = false
+
+[node name="WarioHand" parent="Armature/Skeleton3D/LeftHandBone/LeftHandClosed" parent_id_path=PackedInt32Array(79429134) index="1" unique_id=940000001 instance=ExtResource("90_ma_hnd3l")]
+
+[node name="Model" parent="Armature/Skeleton3D/LeftHandBone/LeftHandSlightyOpen" parent_id_path=PackedInt32Array(187824780) index="0" unique_id=910000002]
+visible = false
+
+[node name="WarioHand" parent="Armature/Skeleton3D/LeftHandBone/LeftHandSlightyOpen" parent_id_path=PackedInt32Array(187824780) index="1" unique_id=940000002 instance=ExtResource("91_ma_hnd2l")]
+
+[node name="Model" parent="Armature/Skeleton3D/RightHandBone/RightHandClosed" parent_id_path=PackedInt32Array(1806419434) index="0" unique_id=910000003]
+visible = false
+
+[node name="WarioHand" parent="Armature/Skeleton3D/RightHandBone/RightHandClosed" parent_id_path=PackedInt32Array(1806419434) index="1" unique_id=940000003 instance=ExtResource("92_ma_hnd3r")]
+
+[node name="Model" parent="Armature/Skeleton3D/RightHandBone/RightHandSlightyOpen" parent_id_path=PackedInt32Array(1241712103) index="0" unique_id=910000004]
+visible = false
+
+[node name="WarioHand" parent="Armature/Skeleton3D/RightHandBone/RightHandSlightyOpen" parent_id_path=PackedInt32Array(1241712103) index="1" unique_id=940000004 instance=ExtResource("93_ma_hnd2r")]
+
+[node name="Model" parent="Armature/Skeleton3D/RightHandBone/RightHandWithHat" parent_id_path=PackedInt32Array(1045529354) index="0" unique_id=910000005]
+visible = false
+
+[node name="WarioHand" parent="Armature/Skeleton3D/RightHandBone/RightHandWithHat" parent_id_path=PackedInt32Array(1045529354) index="1" unique_id=940000005 instance=ExtResource("94_ma_hnd4r")]
+
+[editable path="Armature/Skeleton3D/RightHandBone/RightHandClosed/Model"]

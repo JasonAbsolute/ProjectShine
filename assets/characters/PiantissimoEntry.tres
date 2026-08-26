@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CharacterEntry" format=3 uid="uid://cncnd8i82u6vi"]
+
+[ext_resource type="Script" uid="uid://dgwvqcjfth5pi" path="res://assets/CharacterEntry.cs" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://bux1vriff0ckk" path="res://assets/Piantissimo.tscn" id="2_scene"]
+[ext_resource type="Texture2D" uid="uid://txbes4cse17x" path="res://Font/CharacterSelect/PaintissimoHead.png" id="3_head"]
+[ext_resource type="Texture2D" uid="uid://bw1g5kwshjldr" path="res://Font/CharacterSelect/PiantissimoText.png" id="4_name"]
+[ext_resource type="Texture2D" uid="uid://k8lo16uwystw" path="res://Font/CharacterSelect/StrokeP.png" id="5_strokem"]
+
+[resource]
+script = ExtResource("1_script")
+DisplayName = "Piantissimo"
+PlayerScene = ExtResource("2_scene")
+HeadArt = ExtResource("3_head")
+NameArt = ExtResource("4_name")
+StrokeArt = ExtResource("5_strokem")
+PaintColor = Color(0.996, 0.902, 0.067, 1)
+metadata/_custom_type_script = ExtResource("1_script")

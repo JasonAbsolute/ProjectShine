@@ -1,0 +1,5 @@
+[gd_resource type="StandardMaterial3D" format=3]
+
+[resource]
+resource_name = "KoopaHand"
+albedo_color = Color(0.816, 0.627, 0.031, 1)

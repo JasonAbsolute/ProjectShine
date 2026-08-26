@@ -27,6 +27,24 @@ public partial class GameData : Node
 
     public int BlueCoinCount => _collectedBlueCoins.Count;
 
+    // ----------------------------------------------------- character select --
+
+    /// <summary>
+    /// Who the player picked on the Player Select screen. Set by
+    /// CharacterSelect.cs before it changes scene; read by PlayerSpawner in
+    /// whatever level loads next.
+    ///
+    /// Deliberately NOT saved to disk — a character choice belongs to the run,
+    /// not the save file, and persisting it would silently override the menu.
+    /// </summary>
+    public CharacterEntry SelectedCharacter { get; set; }
+
+    /// <summary>Convenience for PlayerSpawner. Null when nothing is selected yet.</summary>
+    public PackedScene SelectedCharacterScene => SelectedCharacter?.PlayerScene;
+
+    /// <summary>Display name of the current pick, or "None" if a level was run directly.</summary>
+    public string SelectedCharacterName => SelectedCharacter?.DisplayName ?? "None";
+
     public override void _Input(InputEvent @event)
     {
         if (@event is InputEventKey key && key.Pressed && key.Keycode == Key.F8)

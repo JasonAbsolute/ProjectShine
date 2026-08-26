@@ -1,0 +1,68 @@
+[gd_scene format=3 uid="uid://ccwvv4i14sn5b"]
+
+[ext_resource type="PackedScene" uid="uid://d3ph56ccg345h" path="res://assets/Player.tscn" id="1_base"]
+[ext_resource type="ArrayMesh" uid="uid://do5aewfrcixf2" path="res://models/Koopa/Godot/KoopaMesh.res" id="2_mesh"]
+[ext_resource type="Skin" path="res://models/Koopa/Godot/KoopaSkin.tres" id="3_skin"]
+[ext_resource type="Resource" uid="uid://drhiltsxiujxj" path="res://assets/Koopa.tres" id="4_profile"]
+[ext_resource type="Material" path="res://models/Koopa/Godot/materials/_mat_head.tres" id="5_m0"]
+[ext_resource type="Material" path="res://models/Koopa/Godot/materials/_mat_head_3.tres" id="6_m1"]
+[ext_resource type="Material" path="res://models/Koopa/Godot/materials/_mat_head_4.tres" id="7_m2"]
+[ext_resource type="Material" path="res://models/Koopa/Godot/materials/_mat_head_2.tres" id="8_m3"]
+[ext_resource type="Material" path="res://models/Koopa/Godot/materials/_mat_head_5.tres" id="9_m4"]
+[ext_resource type="Material" path="res://models/Koopa/Godot/materials/_mat_head_6.tres" id="10_m5"]
+[ext_resource type="Material" path="res://models/Koopa/Godot/materials/_mat_head_7.tres" id="11_m6"]
+[ext_resource type="Material" path="res://models/Koopa/Godot/materials/_mat_eye_L.tres" id="12_m7"]
+[ext_resource type="Material" path="res://models/Koopa/Godot/materials/_mat_head_8.tres" id="13_m8"]
+[ext_resource type="Material" path="res://models/Koopa/Godot/materials/_mat_eye_R.tres" id="14_m9"]
+[ext_resource type="Material" path="res://models/Koopa/Godot/materials/_mat_mouse.tres" id="15_m10"]
+[ext_resource type="PackedScene" uid="uid://bklfgnxysgdlf" path="res://models/Koopa/Godot/Hands/ma_hnd3l.glb" id="25_3l"]
+[ext_resource type="PackedScene" uid="uid://bgy5nnsnjcxal" path="res://models/Koopa/Godot/Hands/ma_hnd3r.glb" id="26_3r"]
+
+[node name="Koopa" unique_id=1979298595 instance=ExtResource("1_base")]
+Profile = ExtResource("4_profile")
+
+[node name="SpinJumpEffects" parent="." index="10" unique_id=821645171]
+UpperRingColor = Color(1, 0.8, 0.15, 1)
+LowerRingColor = Color(0.25, 0.85, 0.3, 1)
+
+[node name="Mesh_0" parent="Armature/Skeleton3D" parent_id_path=PackedInt32Array(1267083812) index="0" unique_id=1070017404]
+mesh = ExtResource("2_mesh")
+skin = ExtResource("3_skin")
+surface_material_override/0 = ExtResource("5_m0")
+surface_material_override/1 = ExtResource("6_m1")
+surface_material_override/2 = ExtResource("7_m2")
+surface_material_override/3 = ExtResource("8_m3")
+surface_material_override/4 = ExtResource("9_m4")
+surface_material_override/5 = ExtResource("10_m5")
+surface_material_override/6 = ExtResource("11_m6")
+surface_material_override/7 = ExtResource("12_m7")
+surface_material_override/8 = ExtResource("13_m8")
+surface_material_override/9 = ExtResource("14_m9")
+surface_material_override/10 = ExtResource("15_m10")
+
+[node name="Model" parent="Armature/Skeleton3D/LeftHandBone/LeftHandClosed" parent_id_path=PackedInt32Array(79429134) index="0" unique_id=910000001]
+visible = false
+
+[node name="KoopaHand" parent="Armature/Skeleton3D/LeftHandBone/LeftHandClosed" parent_id_path=PackedInt32Array(79429134) index="1" unique_id=2008772250 instance=ExtResource("25_3l")]
+
+[node name="Model" parent="Armature/Skeleton3D/LeftHandBone/LeftHandSlightyOpen" parent_id_path=PackedInt32Array(187824780) index="0" unique_id=910000002]
+visible = false
+
+[node name="KoopaHand" parent="Armature/Skeleton3D/LeftHandBone/LeftHandSlightyOpen" parent_id_path=PackedInt32Array(187824780) index="1" unique_id=4647002 instance=ExtResource("25_3l")]
+
+[node name="Model" parent="Armature/Skeleton3D/RightHandBone/RightHandClosed" parent_id_path=PackedInt32Array(1806419434) index="0" unique_id=910000003]
+visible = false
+
+[node name="KoopaHand" parent="Armature/Skeleton3D/RightHandBone/RightHandClosed" parent_id_path=PackedInt32Array(1806419434) index="1" unique_id=2010661779 instance=ExtResource("26_3r")]
+
+[node name="Model" parent="Armature/Skeleton3D/RightHandBone/RightHandSlightyOpen" parent_id_path=PackedInt32Array(1241712103) index="0" unique_id=910000004]
+visible = false
+
+[node name="KoopaHand" parent="Armature/Skeleton3D/RightHandBone/RightHandSlightyOpen" parent_id_path=PackedInt32Array(1241712103) index="1" unique_id=401471168 instance=ExtResource("26_3r")]
+
+[node name="Model" parent="Armature/Skeleton3D/RightHandBone/RightHandWithHat" parent_id_path=PackedInt32Array(1045529354) index="0" unique_id=910000005]
+visible = false
+
+[node name="KoopaHand" parent="Armature/Skeleton3D/RightHandBone/RightHandWithHat" parent_id_path=PackedInt32Array(1045529354) index="1" unique_id=694000097 instance=ExtResource("26_3r")]
+
+[editable path="Armature/Skeleton3D/RightHandBone/RightHandClosed/Model"]

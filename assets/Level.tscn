@@ -4,7 +4,7 @@
 [ext_resource type="PackedScene" uid="uid://7exkcbpcjut8" path="res://assets/marioHUD.tscn" id="2_w7srv"]
 [ext_resource type="PackedScene" uid="uid://lxisv6iyx202" path="res://assets/SleepyBoo.tscn" id="4_fjm2c"]
 [ext_resource type="PackedScene" uid="uid://doqjj0ahoycbe" path="res://assets/plaza.tscn" id="4_i3ws1"]
-[ext_resource type="PackedScene" uid="uid://d3ph56ccg345h" path="res://assets/Mario2.tscn" id="5_i3ws1"]
+[ext_resource type="PackedScene" path="res://assets/Mario.tscn" id="5_i3ws1"]
 [ext_resource type="PackedScene" uid="uid://delxpxy0gt873" path="res://assets/Gooble.tscn" id="6_rakau"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_82gkg"]

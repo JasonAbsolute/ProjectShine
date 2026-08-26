@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=4 uid="uid://lxisv6iyx202"]
+[gd_scene format=4 uid="uid://lxisv6iyx202"]
 
 [ext_resource type="Script" uid="uid://xl2jhhyuvffw" path="res://assets/SleepyBoo.cs" id="1_6lbnf"]
 [ext_resource type="Texture2D" uid="uid://2eirv2su7omw" path="res://models/Eniemes/SleepyBoo/Godot/SleepyBoo_debutelesa_0.png" id="1_krfrv"]
@@ -11,13 +11,11 @@ radius = 147.81
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_2nqdo"]
 resource_name = "_mat_body"
 albedo_texture = ExtResource("1_krfrv")
-metallic = 1.0
 texture_repeat = false
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1tr78"]
 resource_name = "_mat_eye"
 albedo_texture = ExtResource("2_ci2p0")
-metallic = 1.0
 texture_repeat = false
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_rdcda"]
@@ -146,17 +144,17 @@ _data = {
 &"debutelesa_wait": SubResource("Animation_v3e74")
 }
 
-[node name="SleepyBoo" type="RigidBody3D" groups=["pickable"]]
+[node name="SleepyBoo" type="RigidBody3D" unique_id=1863804568 groups=["pickable"]]
 script = ExtResource("1_6lbnf")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=949522810]
 transform = Transform3D(0.005, 0, 0, 0, 0.005, 0, 0, 0, 0.005, 0.165448, 0.764918, 0.0983178)
 shape = SubResource("SphereShape3D_6lbnf")
 
-[node name="Armature" type="Node3D" parent="."]
+[node name="Armature" type="Node3D" parent="." unique_id=633340695]
 transform = Transform3D(0.005, 0, 0, 0, 0.005, 0, 0, 0, 0.005, 0, 0, 0)
 
-[node name="Skeleton3D" type="Skeleton3D" parent="Armature"]
+[node name="Skeleton3D" type="Skeleton3D" parent="Armature" unique_id=447343943]
 bones/0/name = "root"
 bones/0/parent = -1
 bones/0/rest = Transform3D(1, 2.92898e-16, 3.42285e-08, -8.78695e-16, 1, 1.71143e-08, -3.42285e-08, -1.71143e-08, 1, 0, 0, 0)
@@ -207,15 +205,13 @@ bones/6/position = Vector3(87.0577, 82.2627, 108.916)
 bones/6/rotation = Quaternion(0.302872, 0.854196, 0.400353, -0.135414)
 bones/6/scale = Vector3(1, 1, 1)
 
-[node name="Mesh_0" type="MeshInstance3D" parent="Armature/Skeleton3D"]
+[node name="Mesh_0" type="MeshInstance3D" parent="Armature/Skeleton3D" unique_id=1647192314]
 mesh = SubResource("ArrayMesh_rdcda")
 skin = SubResource("Skin_46jus")
 
-[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
-libraries = {
-&"": SubResource("AnimationLibrary_moo7f")
-}
-autoplay = "debutelesa_wait"
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1988423700]
+libraries/ = SubResource("AnimationLibrary_moo7f")
+autoplay = &"debutelesa_wait"
 
-[node name="ZEffectSpawner" parent="." instance=ExtResource("3_ci2p0")]
+[node name="ZEffectSpawner" parent="." unique_id=395481897 instance=ExtResource("3_ci2p0")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.83024, 6.52922, 0)

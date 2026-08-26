@@ -1,0 +1,103 @@
+[remap]
+
+importer="scene"
+importer_version=1
+type="PackedScene"
+uid="uid://mdc6fcctdtdb"
+path="res://.godot/imported/Koopa.gltf-43e837efeebdf40247e95b35e8a31d27.scn"
+
+[deps]
+
+source_file="res://models/Koopa/Godot/Koopa.gltf"
+dest_files=["res://.godot/imported/Koopa.gltf-43e837efeebdf40247e95b35e8a31d27.scn"]
+
+[params]
+
+nodes/root_type=""
+nodes/root_name=""
+nodes/root_script=null
+mesh_library/use_node_names_as_mesh_names=false
+array_mesh/deduplicate_surfaces=true
+nodes/apply_root_scale=true
+nodes/root_scale=1.0
+nodes/import_as_skeleton_bones=false
+nodes/use_name_suffixes=true
+nodes/use_node_type_suffixes=true
+meshes/ensure_tangents=true
+meshes/generate_lods=true
+meshes/create_shadow_meshes=true
+meshes/light_baking=1
+meshes/lightmap_texel_size=0.2
+meshes/force_disable_compression=false
+skins/use_named_skins=true
+animation/import=false
+animation/fps=30
+animation/trimming=false
+animation/remove_immutable_tracks=true
+animation/import_rest_as_RESET=false
+import_script/path=""
+materials/extract=0
+materials/extract_format=0
+materials/extract_path=""
+_subresources={
+"materials": {
+"_mat_eye_L": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://models/Koopa/Godot/materials/_mat_eye_L.tres",
+"use_external/path": "res://models/Koopa/Godot/materials/_mat_eye_L.tres"
+},
+"_mat_eye_R": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://models/Koopa/Godot/materials/_mat_eye_R.tres",
+"use_external/path": "res://models/Koopa/Godot/materials/_mat_eye_R.tres"
+},
+"_mat_head": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://models/Koopa/Godot/materials/_mat_head.tres",
+"use_external/path": "res://models/Koopa/Godot/materials/_mat_head.tres"
+},
+"_mat_head(2)": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://models/Koopa/Godot/materials/_mat_head_2.tres",
+"use_external/path": "res://models/Koopa/Godot/materials/_mat_head_2.tres"
+},
+"_mat_head(3)": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://models/Koopa/Godot/materials/_mat_head_3.tres",
+"use_external/path": "res://models/Koopa/Godot/materials/_mat_head_3.tres"
+},
+"_mat_head(4)": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://models/Koopa/Godot/materials/_mat_head_4.tres",
+"use_external/path": "res://models/Koopa/Godot/materials/_mat_head_4.tres"
+},
+"_mat_head(5)": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://models/Koopa/Godot/materials/_mat_head_5.tres",
+"use_external/path": "res://models/Koopa/Godot/materials/_mat_head_5.tres"
+},
+"_mat_head(6)": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://models/Koopa/Godot/materials/_mat_head_6.tres",
+"use_external/path": "res://models/Koopa/Godot/materials/_mat_head_6.tres"
+},
+"_mat_head(7)": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://models/Koopa/Godot/materials/_mat_head_7.tres",
+"use_external/path": "res://models/Koopa/Godot/materials/_mat_head_7.tres"
+},
+"_mat_head(8)": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://models/Koopa/Godot/materials/_mat_head_8.tres",
+"use_external/path": "res://models/Koopa/Godot/materials/_mat_head_8.tres"
+},
+"_mat_mouse": {
+"use_external/enabled": true,
+"use_external/fallback_path": "res://models/Koopa/Godot/materials/_mat_mouse.tres",
+"use_external/path": "res://models/Koopa/Godot/materials/_mat_mouse.tres"
+}
+}
+}
+gltf/naming_version=1
+gltf/embedded_image_handling=1
+gltf/texture_map_mode=0

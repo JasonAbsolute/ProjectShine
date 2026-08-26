@@ -1,4 +1,4 @@
-[gd_resource type="AtlasTexture" load_steps=2 format=3 uid="uid://blbhi4b4dr1v6"]
+[gd_resource type="AtlasTexture" format=3 uid="uid://blbhi4b4dr1v6"]
 
 [ext_resource type="Texture2D" uid="uid://jxmmb4qhsy5u" path="res://Font/LifeMeter/LifeSpriteSheet.png" id="1_guprq"]
 

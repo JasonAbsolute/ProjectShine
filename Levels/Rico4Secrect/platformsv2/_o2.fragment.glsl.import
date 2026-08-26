@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://b3jc8x0ns321i"
+path="res://.godot/imported/_o2.fragment.glsl-6cce57167a9124adbe7dd765339a9c87.res"
+
+[deps]
+
+source_file="res://Levels/Rico4Secrect/platformsv2/_o2.fragment.glsl"
+dest_files=["res://.godot/imported/_o2.fragment.glsl-6cce57167a9124adbe7dd765339a9c87.res"]
+
+[params]
+

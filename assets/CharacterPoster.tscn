@@ -1,0 +1,76 @@
+[gd_scene load_steps=10 format=3 uid="uid://bg72dlcmvwypi"]
+
+[ext_resource type="Script" uid="uid://dh43dfl0molbm" path="res://assets/CharacterPoster.cs" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://b4vdjark4jc1g" path="res://Font/CharacterSelect/WantedPoster.png" id="2_frame"]
+[ext_resource type="Texture2D" uid="uid://bklhpoe4iy7ld" path="res://Font/CharacterSelect/MarioText.png" id="3_3878e"]
+[ext_resource type="Texture2D" uid="uid://32qva2kky46b" path="res://Font/CharacterSelect/MarioHead.png" id="4_pv10k"]
+
+[ext_resource type="Script" path="res://assets/PaintReveal.cs" id="5_paint"]
+[ext_resource type="Shader" path="res://assets/PaintReveal.gdshader" id="6_pshader"]
+[ext_resource type="Texture2D" path="res://Font/CharacterSelect/StrokeM.png" id="7_strokem"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_paint"]
+resource_local_to_scene = true
+shader = ExtResource("6_pshader")
+shader_parameter/paint_color = Color(0.933, 0.016, 0, 1)
+shader_parameter/progress = 0.0
+shader_parameter/softness = 0.06
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_none"]
+
+[node name="CharacterPoster" type="Button" unique_id=698424064]
+custom_minimum_size = Vector2(220, 320)
+offset_right = 220.0
+offset_bottom = 320.0
+theme_override_styles/normal = SubResource("StyleBoxEmpty_none")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_none")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_none")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_none")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_none")
+flat = true
+script = ExtResource("1_script")
+
+[node name="Frame" type="TextureRect" parent="." unique_id=1446609640]
+layout_mode = 0
+offset_right = 220.0
+offset_bottom = 320.0
+scale = Vector2(0.8207163, 1.0403367)
+mouse_filter = 2
+texture = ExtResource("2_frame")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="NameArt" type="TextureRect" parent="." unique_id=1641536496]
+layout_mode = 0
+offset_left = 38.0
+offset_top = 103.0
+offset_right = 184.2473
+offset_bottom = 170.0
+scale = Vector2(0.906372, 0.97352594)
+mouse_filter = 2
+texture = ExtResource("3_3878e")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="HeadArt" type="TextureRect" parent="." unique_id=1748694241]
+layout_mode = 0
+offset_left = 54.0
+offset_top = 159.0
+offset_right = 152.0
+offset_bottom = 260.2857
+scale = Vector2(1.0981697, 1.0304573)
+mouse_filter = 2
+texture = ExtResource("4_pv10k")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Paint" type="TextureRect" parent="." unique_id=920000001]
+material = SubResource("ShaderMaterial_paint")
+layout_mode = 0
+offset_right = 220.0
+offset_bottom = 320.0
+mouse_filter = 2
+texture = ExtResource("7_strokem")
+expand_mode = 1
+stretch_mode = 5
+script = ExtResource("5_paint")

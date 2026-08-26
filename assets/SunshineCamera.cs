@@ -1145,15 +1145,17 @@ public partial class SunshineCamera : Node3D
         if (_target == null) return;
 
         var cs = _target.GetNodeOrNull<CollisionShape3D>("CollisionShape3D");
+        float total = 0f;
         if (cs?.Shape is CapsuleShape3D cap)
+            total = cap.Height + 2f * cap.Radius; // Height excludes the hemispherical caps
+        else if (cs?.Shape is CylinderShape3D cyl)
+            total = cyl.Height; // flat caps — Height is already the full extent
+
+        if (total > 0.01f)
         {
-            float total = cap.Height + 2f * cap.Radius;
-            if (total > 0.01f)
-            {
-                float sy = _target.GlobalTransform.Basis.Scale.Y;
-                float h = total * Mathf.Max(0.01f, sy);
-                _rigScale = h / Mathf.Max(0.01f, ReferenceTargetHeight);
-            }
+            float sy = _target.GlobalTransform.Basis.Scale.Y;
+            float h = total * Mathf.Max(0.01f, sy);
+            _rigScale = h / Mathf.Max(0.01f, ReferenceTargetHeight);
         }
     }
 }

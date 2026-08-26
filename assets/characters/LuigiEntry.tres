@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CharacterEntry" format=3 uid="uid://cf52d1g7et4fy"]
+
+[ext_resource type="Script" uid="uid://dgwvqcjfth5pi" path="res://assets/CharacterEntry.cs" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://do1htdyjedtix" path="res://assets/Luigi.tscn" id="2_scene"]
+[ext_resource type="Texture2D" uid="uid://d1tqlvrkfor6d" path="res://Font/CharacterSelect/LuigiHead.png" id="3_head"]
+[ext_resource type="Texture2D" uid="uid://qxqkemkybhe3" path="res://Font/CharacterSelect/LuigiText.png" id="4_name"]
+[ext_resource type="Texture2D" uid="uid://bm65cff88ajof" path="res://Font/CharacterSelect/StrokeL.png" id="5_strokem"]
+
+[resource]
+script = ExtResource("1_script")
+DisplayName = "Luigi"
+PlayerScene = ExtResource("2_scene")
+HeadArt = ExtResource("3_head")
+NameArt = ExtResource("4_name")
+StrokeArt = ExtResource("5_strokem")
+PaintColor = Color(0.341, 0.937, 0.059, 1)
+metadata/_custom_type_script = ExtResource("1_script")

@@ -20,6 +20,11 @@ const MANAGED_SERVER_WS_PORT_SETTING := "godot_ai/managed_server_ws_port"
 ## the managed-server record so a reloaded plugin instance adopting the
 ## same server keeps authenticating; cleared with the rest of the record.
 const MANAGED_SERVER_WS_TOKEN_SETTING := "godot_ai/managed_server_ws_token"
+## keep_server_on_exit (#800): records whether the managed server was
+## launched with the keep-alive env opt-outs, so a later session adopting
+## the survivor routes its own editor exit through detach too. The live
+## setting can't answer that — it may have changed since the spawn.
+const MANAGED_SERVER_KEEP_ALIVE_SETTING := "godot_ai/managed_server_keep_alive"
 const UPDATE_RELOAD_RUNNER_SCRIPT := preload("res://addons/godot_ai/update_reload_runner.gd")
 
 ## Server lifecycle + port discovery extracted from this file (#297 PR 5).
@@ -45,6 +50,7 @@ const EditorLogBuffer := preload("res://addons/godot_ai/utils/editor_log_buffer.
 const SurfacedErrorTracker := preload("res://addons/godot_ai/utils/surfaced_error_tracker.gd")
 const Dock := preload("res://addons/godot_ai/mcp_dock.gd")
 const DebuggerPlugin := preload("res://addons/godot_ai/debugger/mcp_debugger_plugin.gd")
+const VisionRoutingScript := preload("res://addons/godot_ai/vision_routing.gd")
 const ExportPlugin := preload("res://addons/godot_ai/export/mcp_export_plugin.gd")
 const ClientConfigurator := preload("res://addons/godot_ai/client_configurator.gd")
 const WindowsPortReservation := preload("res://addons/godot_ai/utils/windows_port_reservation.gd")
@@ -84,6 +90,17 @@ const SERVER_WATCH_MS := 30 * 1000
 ## a spawn a crash until this window elapses so the watch loop has time to
 ## observe either the pid-file (dev venv) or the port listening (uvx).
 const SPAWN_GRACE_MS := 5 * 1000
+## Windows only (#797). A uv-created venv launches the real server under a
+## different PID than the one `OS.create_process` returns, and that watched PID
+## has been seen dying on a healthy boot while the server was still starting
+## and had not written its pid-file yet. Past SPAWN_GRACE_MS that reads as
+## "server exited" and only the crash-survivor adoption path rescues the
+## session. While no pid-file has appeared we keep watching until this longer
+## window closes, rather than calling a handoff an exit. Sized to cover a cold
+## uvx resolve on top of the launcher hop, and kept well under SERVER_WATCH_MS
+## so a genuinely dead Windows spawn is still diagnosed inside the watch rather
+## than falling off the end of it.
+const SPAWN_HANDOFF_MS := 15 * 1000
 const SERVER_STATUS_PATH := "/godot-ai/status"
 const SERVER_STATUS_PROBE_TIMEOUT_MS := 800
 const STARTUP_TRACE_COUNTER_NAMES := [
@@ -134,6 +151,7 @@ var _surfaced_error_tracker
 var _editor_logger: Logger
 var _dock
 var _debugger_plugin
+var _vision_routing
 var _export_plugin
 ## Spawn / stop / adopt orchestration plus state machine; allocated in
 ## `_init` so test fixtures (which never enter the tree) can drive
@@ -273,6 +291,9 @@ func _enter_tree() -> void:
 	_telemetry = Telemetry.new(_connection)
 
 	_debugger_plugin = DebuggerPlugin.new(_log_buffer, _game_log_buffer, _editor_log_buffer, _surfaced_error_tracker)
+	_vision_routing = VisionRoutingScript.new()
+	_vision_routing.log_buffer = _log_buffer
+	_debugger_plugin.vision_routing = _vision_routing
 	add_debugger_plugin(_debugger_plugin)
 	_connection.debugger_plugin = _debugger_plugin
 	_ensure_game_helper_autoload()
@@ -286,11 +307,15 @@ func _enter_tree() -> void:
 	## all plugin-lifetime objects) and released by _dispatcher.clear() in
 	## _exit_tree.
 	var undo := get_undo_redo()
-	_dispatcher.register_lazy_handler("editor", HANDLERS_DIR + "editor_handler.gd", [_log_buffer, _connection, _debugger_plugin, _game_log_buffer, _editor_log_buffer, null, _surfaced_error_tracker])
+	_dispatcher.register_lazy_handler("editor", HANDLERS_DIR + "editor_handler.gd", [_log_buffer, _connection, _debugger_plugin, _game_log_buffer, _editor_log_buffer, null, _surfaced_error_tracker, _vision_routing])
 	_dispatcher.register_lazy_handler("scene", HANDLERS_DIR + "scene_handler.gd", [_connection])
 	_dispatcher.register_lazy_handler("node", HANDLERS_DIR + "node_handler.gd", [undo])
 	_dispatcher.register_lazy_handler("project", HANDLERS_DIR + "project_handler.gd", [_connection, _debugger_plugin, _editor_log_buffer])
-	_dispatcher.register_lazy_handler("client", HANDLERS_DIR + "client_handler.gd", [])
+	_dispatcher.register_lazy_handler(
+		"client",
+		HANDLERS_DIR + "client_handler.gd",
+		[_connection, ClientConfigurator.capture_launch_context()],
+	)
 	_dispatcher.register_lazy_handler("script", HANDLERS_DIR + "script_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("resource", HANDLERS_DIR + "resource_handler.gd", [undo, _connection])
 	_dispatcher.register_lazy_handler("api", HANDLERS_DIR + "api_handler.gd", [])
@@ -298,7 +323,7 @@ func _enter_tree() -> void:
 	_dispatcher.register_lazy_handler("signal", HANDLERS_DIR + "signal_handler.gd", [undo])
 	_dispatcher.register_lazy_handler("autoload", HANDLERS_DIR + "autoload_handler.gd", [])
 	_dispatcher.register_lazy_handler("input", HANDLERS_DIR + "input_handler.gd", [])
-	_dispatcher.register_lazy_handler("test", HANDLERS_DIR + "test_handler.gd", [undo, _log_buffer, _dispatcher])
+	_dispatcher.register_lazy_handler("test", HANDLERS_DIR + "test_handler.gd", [undo, _log_buffer, _dispatcher, _connection])
 	_dispatcher.register_lazy_handler("batch", HANDLERS_DIR + "batch_handler.gd", [_dispatcher, undo])
 	_dispatcher.register_lazy_handler("ui", HANDLERS_DIR + "ui_handler.gd", [undo])
 	_dispatcher.register_lazy_handler("theme", HANDLERS_DIR + "theme_handler.gd", [undo, _connection])
@@ -314,6 +339,8 @@ func _enter_tree() -> void:
 	_dispatcher.register_lazy_handler("control_draw_recipe", HANDLERS_DIR + "control_draw_recipe_handler.gd", [undo])
 	_dispatcher.register_lazy_handler("tilemap", HANDLERS_DIR + "tilemap_handler.gd", [undo])
 	_dispatcher.register_lazy_handler("tileset", HANDLERS_DIR + "tileset_handler.gd", [])
+	_dispatcher.register_lazy_handler("gridmap", HANDLERS_DIR + "gridmap_handler.gd", [undo])
+	_dispatcher.register_lazy_handler("csg", HANDLERS_DIR + "csg_handler.gd", [undo])
 
 	_dispatcher.register_lazy("get_editor_state", "editor", &"get_editor_state")
 	_dispatcher.register_lazy("get_scene_tree", "scene", &"get_scene_tree")
@@ -450,6 +477,13 @@ func _enter_tree() -> void:
 	_dispatcher.register_lazy("tilemap_get_cells", "tilemap", &"get_used_cells")
 	_dispatcher.register_lazy("tileset_get_atlas_tiles", "tileset", &"get_atlas_tiles")
 	_dispatcher.register_lazy("tileset_get_atlas_image", "tileset", &"get_atlas_image")
+	_dispatcher.register_lazy("gridmap_set_item", "gridmap", &"set_item")
+	_dispatcher.register_lazy("gridmap_fill", "gridmap", &"fill")
+	_dispatcher.register_lazy("gridmap_clear", "gridmap", &"clear_layer")
+	_dispatcher.register_lazy("gridmap_get_used_cells", "gridmap", &"get_used_cells")
+	_dispatcher.register_lazy("gridmap_list_library_items", "gridmap", &"list_library_items")
+	_dispatcher.register_lazy("csg_create", "csg", &"create")
+	_dispatcher.register_lazy("csg_set_operation", "csg", &"set_operation")
 
 	_connection.dispatcher = _dispatcher
 	add_child(_connection)
@@ -457,6 +491,7 @@ func _enter_tree() -> void:
 
 	# Dock panel
 	_dock = Dock.new()
+	_dock.vision_routing = _vision_routing
 	_dock.name = "Godot AI"
 	_dock.setup(_connection, _log_buffer, self)
 	add_control_to_dock(DOCK_SLOT_RIGHT_BL, _dock)
@@ -528,6 +563,9 @@ func _exit_tree() -> void:
 	# destructors run here, while their scripts are still loaded.
 	if _dispatcher:
 		_dispatcher.clear()
+	if _vision_routing:
+		_vision_routing.shutdown()
+		_vision_routing = null
 
 	if _dock:
 		remove_control_from_docks(_dock)
@@ -552,7 +590,12 @@ func _exit_tree() -> void:
 	_editor_log_buffer = null
 	_surfaced_error_tracker = null
 
-	_stop_server()
+	## keep_server_on_exit (#800): the manager routes on the spawn-time
+	## keep-alive flag (persisted in the managed-server record), NOT the
+	## live setting — detach leaves the server for the next session (or a
+	## same-session disable/enable cycle) to adopt. Explicit stops (dock
+	## Restart, update reload) still kill via _stop_server.
+	_lifecycle.teardown_for_editor_exit()
 	## Symmetric with prepare_for_update_reload: the static guard persists
 	## across disable/enable within a single editor session, so the re-enabled
 	## plugin instance's _start_server would short-circuit and never respawn.
@@ -868,15 +911,47 @@ static func _probe_live_server_status(port: int, timeout_ms: int = SERVER_STATUS
 	if not (parsed is Dictionary):
 		result["error"] = "invalid_json"
 		return result
-	result["reachable"] = true
-	result["name"] = str(parsed.get("name", ""))
-	result["version"] = _extract_server_version(parsed)
-	result["ws_port"] = int(parsed.get("ws_port", 0))
-	## `package_path` was added in v2.4.4 (#416) so the dock's
-	## "Incompatible server" banner can name the source of a version
-	## skew. Older servers omit it; treat the missing field as "".
-	result["package_path"] = str(parsed.get("package_path", ""))
+	result.merge(_project_status_payload(parsed), true)
 	return result
+
+
+## Project a parsed `/godot-ai/status` body into the probe's result shape.
+##
+## Extracted from the probe so it can be tested against a real payload. The
+## probe is a whitelist — a field the server publishes does not reach callers
+## unless it is copied here — and that is silent: the consumer just sees a
+## missing key. #824's lease check shipped reading `active_lease_count` while
+## this projection dropped it, so the branch was dead on every platform, and
+## the tests could not see it because they hand-built the result dict this
+## function is supposed to produce. Add new fields here, and cover them with a
+## projection test rather than a fabricated `live_status`.
+static func _project_status_payload(parsed: Dictionary) -> Dictionary:
+	var projected := {
+		"reachable": true,
+		"name": str(parsed.get("name", "")),
+		"version": _extract_server_version(parsed),
+		"ws_port": int(parsed.get("ws_port", 0)),
+		## `package_path` was added in v2.4.4 (#416) so the dock's
+		## "Incompatible server" banner can name the source of a version
+		## skew. Older servers omit it; treat the missing field as "".
+		"package_path": str(parsed.get("package_path", "")),
+	}
+	## #824: advisory attach-lease count, consumed by teardown to decide
+	## detach-vs-kill. Absent stays absent rather than defaulting to 0, so
+	## `ServerLifecycleManager.active_lease_count` keeps distinguishing "backend
+	## too old to publish this" from "backend reports zero leases" — both stop
+	## the server, but only one of them is a compatibility statement.
+	## Anything that is not a finite whole number is dropped, for the same
+	## reason the value is clamped downstream: a malformed count must not read
+	## as occupancy and keep a server alive. Godot parses every JSON number as
+	## a float, so the whole-number test is what distinguishes a real count
+	## from junk — truncating 1.5 to 1 would manufacture a held lease.
+	var raw: Variant = parsed.get("active_lease_count")
+	if raw is int or raw is float:
+		var numeric := float(raw)
+		if is_finite(numeric) and numeric == floor(numeric):
+			projected["active_lease_count"] = int(numeric)
+	return projected
 
 
 func _probe_live_server_status_for_port(port: int) -> Dictionary:
@@ -1068,6 +1143,14 @@ func _respawn_with_refresh() -> void:
 ## is only meaningful for `CRASHED`.
 func get_server_status() -> Dictionary:
 	return _lifecycle.get_status_dict()
+
+
+## Diagnostic accessor for the dock's ownership label. Positive = a PID this
+## plugin instance spawned (or re-acquired via the managed record); -1 = an
+## adopted external/attach-owned backend. Display only — adoption transfers
+## end-of-life responsibility, so this value is never kill proof (#669).
+func get_server_pid() -> int:
+	return _lifecycle.get_server_pid()
 
 
 func get_resolved_ws_port() -> int:
@@ -1553,7 +1636,7 @@ func _wait_for_port_free(port: int, timeout_s: float) -> void:
 func _read_managed_server_record() -> Dictionary:
 	var es := EditorInterface.get_editor_settings()
 	if es == null:
-		return {"pid": 0, "version": "", "ws_port": 0, "ws_token": ""}
+		return {"pid": 0, "version": "", "ws_port": 0, "ws_token": "", "keep_alive": false}
 	var pid: int = 0
 	if es.has_setting(MANAGED_SERVER_PID_SETTING):
 		pid = int(es.get_setting(MANAGED_SERVER_PID_SETTING))
@@ -1566,10 +1649,19 @@ func _read_managed_server_record() -> Dictionary:
 	var ws_token: String = ""
 	if es.has_setting(MANAGED_SERVER_WS_TOKEN_SETTING):
 		ws_token = str(es.get_setting(MANAGED_SERVER_WS_TOKEN_SETTING))
-	return {"pid": pid, "version": version, "ws_port": ws_port, "ws_token": ws_token}
+	var keep_alive := false
+	if es.has_setting(MANAGED_SERVER_KEEP_ALIVE_SETTING):
+		keep_alive = bool(es.get_setting(MANAGED_SERVER_KEEP_ALIVE_SETTING))
+	return {
+		"pid": pid,
+		"version": version,
+		"ws_port": ws_port,
+		"ws_token": ws_token,
+		"keep_alive": keep_alive,
+	}
 
 
-func _write_managed_server_record(pid: int, version: String) -> void:
+func _write_managed_server_record(pid: int, version: String, keep_alive: bool = false) -> void:
 	var es := EditorInterface.get_editor_settings()
 	if es == null:
 		return
@@ -1577,6 +1669,7 @@ func _write_managed_server_record(pid: int, version: String) -> void:
 	es.set_setting(MANAGED_SERVER_VERSION_SETTING, version)
 	es.set_setting(MANAGED_SERVER_WS_PORT_SETTING, _resolved_ws_port)
 	es.set_setting(MANAGED_SERVER_WS_TOKEN_SETTING, _ws_auth_token)
+	es.set_setting(MANAGED_SERVER_KEEP_ALIVE_SETTING, keep_alive)
 
 
 ## Keep the in-memory token, the connection's handshake field, and (via the
@@ -1607,9 +1700,16 @@ func _clear_managed_server_record() -> void:
 		es.set_setting(MANAGED_SERVER_WS_PORT_SETTING, 0)
 	if es.has_setting(MANAGED_SERVER_WS_TOKEN_SETTING):
 		es.set_setting(MANAGED_SERVER_WS_TOKEN_SETTING, "")
+	if es.has_setting(MANAGED_SERVER_KEEP_ALIVE_SETTING):
+		es.set_setting(MANAGED_SERVER_KEEP_ALIVE_SETTING, false)
 
 
 func prepare_for_update_reload() -> void:
+	if _dispatcher != null:
+		# Stop accepting handler work and hand any live status worker to its
+		# frame-polled teardown coroutine. _exit_tree() calls clear() again; the
+		# second call is intentionally inert because the caches are empty.
+		_dispatcher.clear()
 	_lifecycle.prepare_for_update_reload()
 
 

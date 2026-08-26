@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" load_steps=2 format=3]
+
+[ext_resource type="Texture2D" uid="uid://cwu3cexck5h4g" path="res://models/Koopa/mario/bmd/ma_mdl1/ma_mdl1_0.png" id="1_tex"]
+
+[resource]
+resource_name = "_mat_head(2)"
+cull_mode = 2
+albedo_texture = ExtResource("1_tex")
+texture_repeat = false

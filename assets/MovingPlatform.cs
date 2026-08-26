@@ -82,6 +82,12 @@ public partial class MovingPlatform : AnimatableBody3D
         }
     }
 
+    // Spin is rebuilt from these each frame rather than accumulated into the
+    // basis, so a non-uniform scale can't shear it. See _PhysicsProcess.
+    private Basis _spinRestRotation = Basis.Identity; // authored rotation, scale stripped
+    private Vector3 _spinScale = Vector3.One; // authored scale, kept out of the rotation
+    private float _spinAngle = 0f; // accumulated spin, radians
+
     private Vector3 _startPosition;
     private int _currentWaypoint = 0;
     private int _direction = 1;
@@ -103,10 +109,23 @@ public partial class MovingPlatform : AnimatableBody3D
 
     public override void _Ready()
     {
+        // Split the authored basis into rotation and scale ONCE, before anything
+        // starts spinning it. Orthonormalized() gram-schmidts the columns to
+        // recover the pure rotation; Basis.Scale gives the column lengths back.
+        _spinRestRotation = Transform.Basis.Orthonormalized();
+        _spinScale = Transform.Basis.Scale;
+        _spinAngle = 0f;
+
         _startPosition = GlobalPosition;
         _pathLength = Waypoints.Length + 1; // +1 for origin
         _segmentStartPos = _startPosition;
-        SyncToPhysics = false;
+        // A standing character's own collision resolution needs the physics
+        // server to actually compute this body's motion (not just see it
+        // teleport to a new GlobalPosition each tick with no continuity
+        // between frames) to smoothly carry them along — true for rotation
+        // and translation alike, so this is unconditional now rather than
+        // spin-only.
+        SyncToPhysics = true;
         if (_pathLength > 1)
             _segmentLength = (_startPosition - GetWaypointPosition(1)).Length();
         ApplyTint(this);
@@ -175,7 +194,25 @@ public partial class MovingPlatform : AnimatableBody3D
         // Handle rotation
         if (SpinSpeed != 0f && SpinAxis != Vector3.Zero)
         {
-            RotateObjectLocal(SpinAxis.Normalized(), Mathf.DegToRad(SpinSpeed * dt));
+            // NOT RotateObjectLocal. That right-multiplies the existing basis
+            // (basis = basis * R), which is only a rotation when the basis is
+            // already a pure rotation. These platforms are routinely scaled
+            // NON-UNIFORMLY — umaibou12 is (2.095, 0.14, 1.0) — and for a scale
+            // S the product S*R is a SHEAR, not a rotation: the basis columns
+            // change length as the angle sweeps (2.095/0.14 at 0°, 1.48/1.48 at
+            // 45°, 0.14/2.095 at 90°). The long and thin axes morph through each
+            // other instead of the slab tumbling rigidly — it reads as the mesh
+            // "spinning" rather than flipping, and it shears the collision shape
+            // every frame, which is what breaks collisions on scaled platforms.
+            //
+            // Instead: accumulate the ANGLE, and rebuild as R * S each frame so
+            // the mesh is scaled in its own local frame and then rotated as a
+            // rigid body. Scaling the columns of R by S is exactly R * diag(S).
+            _spinAngle += Mathf.DegToRad(SpinSpeed * dt);
+
+            Basis r = _spinRestRotation * new Basis(SpinAxis.Normalized(), _spinAngle);
+            Basis rigid = new Basis(r.X * _spinScale.X, r.Y * _spinScale.Y, r.Z * _spinScale.Z);
+            Transform = new Transform3D(rigid, Transform.Origin);
         }
 
         // Handle waypoint movement

@@ -39,6 +39,7 @@ public partial class Mario : CharacterBody3D
         landing,
         rolloutRun,
         wallSlide,
+        slipping,
         wallJump,
         ledgeHang,
         ledgeClimb,
@@ -211,17 +212,25 @@ public partial class Mario : CharacterBody3D
     private const float WALL_STICK_SPEED = 0.710823f; // 1.6 * SCALE_FIX
 
     private const float WALL_KICK_UP_VEL = 14.660723f; // 33 * SCALE_FIX
-    private const float WALL_KICK_OUT_SPEED = 11.106608f; // 25 * SCALE_FIX
+    private const float WALL_KICK_OUT_SPEED = 9.773814f; // 22 * SCALE_FIX — pulled back down, less shoot-off distance on a quick tap
 
     // If you still use these older ones anywhere:
     private const float WALL_MIN_APPROACH_SPEED = 1.999189f; // 4.5 * SCALE_FIX
 
     // Variable wall jump height (scaled)
-    private const float WALL_JUMP_BASE_UP_VEL = 8.885286f; // 20 * SCALE_FIX
+    private const float WALL_JUMP_BASE_UP_VEL = 11.995136f; // 27 * SCALE_FIX — more pop on a quick tap
     private const float WALL_JUMP_MAX_UP_VEL = 22.213216f; // 50 * SCALE_FIX
     private const float MAX_WALL_JUMP_HOLD_TIME = 0.25f;
 
+    // Wall jump XZ steering is split into two axes (see ApplyWallJumpAirControl) so
+    // "extend/brake along the kick direction" and "redirect left/right" can be tuned
+    // independently — AIR_WALLJUMP.accel (8.885) governs the former, this governs
+    // the latter. Kept at half that rate as a starting point for "still steerable,
+    // just less than forward."
+    private const float WALL_JUMP_LATERAL_ACCEL = 4.442643f;
+
     private const float DIVE_POP_Y = 8f;
+    private const float AIR_DIVE_Y_BOOST = 4.5f; // added on top of whatever Y velocity the jump-hold ramp had at the moment of diving, so a jump-dive always arcs instead of reading as a flat lunge
     private const float DIVE_SPEED_XZ = 16f;
     private const float ROLLOUT_SPEED_XZ = 20.216458f; // 32 * SCALE_FIX (tune 12–16)
 
@@ -249,6 +258,9 @@ public partial class Mario : CharacterBody3D
     private readonly CircularBuffer<MarioState> stateHistory = new CircularBuffer<MarioState>(7);
 
     private bool wasOnFloor = true;
+    private MarioState _lastDbgState = MarioState.idle;
+    private bool _lastDbgOnFloor = true;
+    private int _jumpDbgFrames = 0; // when >0, [LAND_DBG] prints every frame instead of only on change
 
     // --- Jump buffer (press A slightly before landing) ---
     private const int JUMP_BUFFER_FRAMES = 6; // ~0.1s at 60fps
@@ -349,11 +361,12 @@ public partial class Mario : CharacterBody3D
     );
 
     private readonly AirControlProfile AIR_WALLJUMP = new AirControlProfile(
+        13.328f, // 30 * SCALE_FIX — raised above WALL_KICK_OUT_SPEED (9.77) so holding toward
+        // his facing direction can actually extend/carry the kick instead of reining it back in
+        8.885286f, // accel restored — strong control when pointing where he's already facing
+        11.106608f, // 25 * SCALE_FIX — brake strengthened, backward input now has real bite again
         8.885286f,
-        8.885286f,
-        15.549251f,
-        8.885286f,
-        0f,
+        0f, // no pull-back reversal allowed
         0.155492f
     );
 
@@ -454,7 +467,7 @@ public partial class Mario : CharacterBody3D
 
     // --- Wall slide entry tuning (per-state) ---
     private const float WALL_MIN_APPROACH_SPEED_DEFAULT = 8.0f; // <-- was effectively 4.5
-    private const float WALL_APPROACH_DOT_DEFAULT = 0.62f; // <-- was 0.55
+    private const float WALL_APPROACH_DOT_DEFAULT = 0.5f; // cos(60deg) — <-- was 0.62 (~51.7deg)
 
     private const float WALL_MIN_HORIZONTAL_RATIO = 0.18f;
 
@@ -462,6 +475,46 @@ public partial class Mario : CharacterBody3D
 
 
     private MarioState lastRecordedState;
+    // ===================== ROLLOUT SLOPE BOOST =====================
+    // Rolling out onto a ramp and driving UP it lets him exceed RUN_SPEED for
+    // as long as he's on the slope. Deliberately uphill-only and cut dead the
+    // moment he reaches flat ground.
+    //
+    // Note this runs against the grain of the physics (and of SMS's own
+    // slopeProcess(), whose arithmetic adds speed facing DOWNhill and subtracts
+    // it facing uphill) — it's a chosen game-feel behaviour, not a simulation.
+
+    /// <summary>Extra m/s on top of RUN_SPEED at full steepness driving
+    /// straight uphill. Scaled down by both the slope's steepness and how
+    /// directly he's heading up it, so a gentle ramp or a diagonal line gives
+    /// proportionally less. RUN_SPEED is 11.55 for scale.</summary>
+    [Export]
+    public float RolloutSlopeMaxBoost = 9.0f;
+
+    /// <summary>How fast the boost ramps in/out toward its target (m/s²). At
+    /// the default it reaches full boost in roughly a third of a second.</summary>
+    [Export]
+    public float RolloutSlopeBoostAccel = 20f;
+
+    /// <summary>Steepness (sin of the slope angle) below which the ground counts
+    /// as flat and the boost is cut. 0.1 ≈ 5.7°, enough to ignore trivial
+    /// unevenness without eating a real ramp.</summary>
+    [Export]
+    public float RolloutSlopeFlatThreshold = 0.1f;
+
+    private float _rolloutSlopeBoost = 0f; // current extra speed on top of RUN_SPEED
+    private bool _rolloutBoostArmed = false; // set on rollout landing, cleared at flat ground / idle
+
+    /// <summary>Upward velocity below which a rollout counts as "done rising" and
+    /// is allowed to land. The roll does NOT need to finish its arc or its
+    /// animation — once he's touching the ground and no longer meaningfully
+    /// going up, he hands straight off to rolloutRun (and the slope boost).
+    /// Measured before this existed: 4-5 frames of singleRollout skimming a
+    /// 33.8° ramp at velY=+0.15 with onFloor=True, waiting for velY to go
+    /// negative. Still comfortably above the ~8 m/s a fresh roll launches at,
+    /// so it can't re-open the ground-jump hijack.</summary>
+    private const float ROLLOUT_LAND_MAX_RISE = 2f;
+
     private const float ROLLOUT_RUN_DECEL = 0.08f; // stick neutral slow-down
     private const float ROLLOUT_RUN_ACCEL = 0.25f; // responsiveness when stick held
     private const float ROLLOUT_STOP_SPEED = 1.2f; // below this, snap to idle
@@ -680,6 +733,8 @@ public partial class Mario : CharacterBody3D
     private Vector3 _ledgeLocalStandPos; // stand position in platform's local space
     private Vector3 _ledgeLocalWallNormal; // wall normal in platform's local space
 
+    private float _baseFloorSnapLength; // captured in _Ready — see jump-launch snap override
+
     private CollisionShape3D bodyCol;
     private float capRadiusWorld;
     private float capHalfHeightWorld; // (cap.Height*0.5 + cap.Radius) in WORLD units
@@ -757,6 +812,81 @@ public partial class Mario : CharacterBody3D
 
     private int wallSlideLostWallFrames = 0;
 
+    // --- SLIP (steep ground too shallow to count as a real wall) ---
+    private const float WALL_TRUE_VERTICAL_MIN_ANGLE_DEG = 75f; // surfaces steeper than this (angle from Up) are a real wall, eligible for wall-slide/wall-jump; anything between floor_max_angle and this is just steep ground he can't stand on — slip instead
+    /// <summary>Top slide speed along the slope's downhill tangent at FULL
+    /// (vertical) steepness; the actual cap is this * the steepness curve, so
+    /// on a 66° face it's ~91% of this. For scale: RUN_SPEED is 11.55 and
+    /// ROLLOUT_SPEED_XZ is 20.2, so anything under ~12 here makes slipping
+    /// slower than walking — which is what the old 6.5 was doing (6.5 *
+    /// sin(66°) = 5.9, about half walking pace).</summary>
+    [Export]
+    public float SlipMaxSpeed = 22f;
+
+    /// <summary>Fraction of REAL gravity that pulls him down the fall line.
+    /// 1.0 is true physics: accel = GRAVITY (62.2) * sin(angle), i.e. 56.8 m/s²
+    /// on a 66° face. The old hand-picked constant was 14, ~4.4x weaker than
+    /// gravity, which is why the slide crawled instead of dropping him. Lower
+    /// this for a floatier, more forgiving slip.</summary>
+    [Export]
+    public float SlipGravityScale = 1.0f;
+
+    /// <summary>Exponent applied to sin(angle) before it scales speed/accel.
+    /// 1.0 = true physics. Worth knowing: across the whole slip band sin only
+    /// runs 0.906 (65°) to 0.966 (75°) — barely 7% — so at 1.0 every slippable
+    /// slope is effectively "max speed" and the angle is almost unfelt. Raising
+    /// this exaggerates the difference between a just-too-steep face and a
+    /// near-vertical one (at 4.0 the same band spreads 0.67 to 0.87), at the
+    /// cost of making the shallow end slower.</summary>
+    [Export]
+    public float SlipSteepnessCurve = 1.0f;
+
+    /// <summary>Minimum horizontal speed (m/s) on reaching walkable ground for
+    /// a slip to continue as a belly slide. Below this he just stands up, so a
+    /// slip that trickled to a stop doesn't flop onto his belly for one frame
+    /// and immediately play the get-up. For scale, a full-speed 66° slip
+    /// arrives at roughly 8 m/s horizontal.</summary>
+    [Export]
+    public float SlipExitSlideMinSpeed = 3.0f;
+
+    /// <summary>Multiplier on the horizontal speed carried from a slip into the
+    /// belly slide. 1.0 is the honest physical carry — the floor absorbs the
+    /// slip's vertical component (~91% of it on a 66° face), so he arrives much
+    /// slower than his slide speed suggests. Raise above 1.0 if that reads too
+    /// tame and you want the slope to fling him further.</summary>
+    [Export]
+    public float SlipExitSlideBoost = 1.0f;
+
+    /// <summary>Hard floor on downward velocity while slipping — a safety net
+    /// for pathological geometry, NOT a speed control. It is additionally
+    /// clamped at runtime so it can never bind tighter than the slide's own
+    /// cap: on a steep face the slide is almost entirely vertical (91% of it at
+    /// 66°), so a fall limit set above the slide speed would silently throttle
+    /// the slide instead. The old -13 was doing exactly that.</summary>
+    [Export]
+    public float SlipMaxFallSpeed = -26f;
+    private const float SLIP_HOP_UP_VEL = 6f; // weak escape hop — not a directional wall-kick, this isn't a real wall
+    private const float SLIP_LAND_DURATION = 0.458333f; // ma_slpla's real clip length
+    private int slipLostSurfaceFrames = 0;
+    private Vector3 lastSlipNormal = Vector3.Zero;
+    private float slipAirLaunchTimer = 0f; // >0 while ma_slpla should override ma_jump right after leaving a slip for airborne (sliding off the edge, or the escape hop)
+    private Vector3 slipSlideVel = Vector3.Zero; // slide velocity IN the slope's tangent plane; builds from rest each slip episode and is steered by the stick
+
+    /// <summary>How hard the stick can push the slide while slipping (m/s²).
+    /// Modelled on SMS's `doSliding()`, which does NOT let the stick set the
+    /// slide direction — it adds a small acceleration to the existing slide
+    /// velocity each frame (scaled there by stick magnitude * 0.03125), so you
+    /// carve gradually instead of turning on a dime. Keep this well BELOW the
+    /// fall-line pull (GRAVITY * SlipGravityScale * slopeFactor, ~57 on a 66°
+    /// face) so gravity always dominates the descent. The downhill component is
+    /// additionally hard-clamped to never go negative, so no amount of tuning
+    /// here lets him climb ground he can't stand on. Note this is now a much
+    /// smaller share of total accel than it was against the old constant 14, so
+    /// steering will feel weaker — raise it if carving is too subtle.</summary>
+    [Export]
+    public float SlipSteerAccel = 9.0f;
+    private bool _slipFacingUphill = false; // locked at entry: ma_slpbk (facing uphill, slides backward) vs ma_slip (facing downhill, slides forward)
+
     //Sleeping effects
     private ZEffectSpawner zEffectSpawner;
 
@@ -773,6 +903,24 @@ public partial class Mario : CharacterBody3D
     private StandardMaterial3D LeftHandMaterial;
     private Node3D RightClosedHand;
     private Node3D LeftClosedHand;
+
+    // Third variant. Present in the scene but was never referenced by any code,
+    // so it rendered permanently on top of whichever hand was actually selected
+    // — the "all the hands are showing at once" problem. Unused by the pose
+    // rules below for now; wired up so it can be given a state later.
+    private Node3D RightSlightlyOpenHand;
+    private Node3D LeftSlightlyOpenHand;
+
+    private enum HandPose
+    {
+        Open,
+        Closed,
+        SlightlyOpen,
+    }
+
+    // Deliberately starts at an invalid value so the first ApplyHandPose always
+    // writes, rather than assuming the scene's default visibility is correct.
+    private HandPose _handPose = (HandPose)(-1);
 
     // Captured at setup so ShowOpenHands() can restore the open-hand materials
     // exactly (the closed-hand swap sets their albedo to transparent).
@@ -843,6 +991,24 @@ public partial class Mario : CharacterBody3D
     public Vector3 HeadLookUpAxis = new(0f, 0f, 1f);
 
     private HeadForwardLock _headLock;
+    private FootIK _footIK;
+    private float _footIKWeight = 0f;
+
+    /// <summary>Master switch for slope foot IK.</summary>
+    [Export]
+    public bool FootIKEnabled = true;
+
+    /// <summary>Ground steeper than this (degrees from flat) stops Mario dozing
+    /// off while idle. The sit/sleep clips lay him out flat, so on a ramp he'd
+    /// sit straight through it.</summary>
+    [Export]
+    public float SleepMaxSlopeDegrees = 8f;
+
+    /// <summary>How fast the foot IK eases in/out (weight per second). Fast
+    /// enough to be planted by the time he settles, slow enough that entering
+    /// idle doesn't snap the legs.</summary>
+    [Export]
+    public float FootIKEaseSpeed = 6f;
     private float _headLockWeight;
 
     // --- Turn lean (leans the WAIST left/right into a turn, same IK target the
@@ -982,6 +1148,7 @@ public partial class Mario : CharacterBody3D
     {
         base._Ready();
         CacheCapsuleWorldMetrics();
+        _baseFloorSnapLength = FloorSnapLength;
 
         // Health / Lives setup
         _health = StartingHealth;
@@ -1082,6 +1249,34 @@ public partial class Mario : CharacterBody3D
             _headLock = new HeadForwardLock { Name = "HeadForwardLock" };
             skeleton.AddChild(_headLock);
 
+            // Foot IK — plants each foot on a slope independently.
+            //
+            // PREFER a node placed in Player.tscn: created-in-code nodes never
+            // show up in the inspector, so none of FootIK's tunables
+            // (MaxHipDrop, HipDropToLowest, AlignFeetToSurface, FootOffset...)
+            // would be reachable for tuning. Only fall back to constructing one
+            // if the scene doesn't have it, so an older scene still works.
+            _footIK = skeleton.GetNodeOrNull<FootIK>("FootIK");
+            if (_footIK == null)
+            {
+                _footIK = new FootIK
+                {
+                    Name = "FootIK",
+                    FootOffset = footOffset,
+                    RayUp = ikRaycastHeight,
+                };
+                skeleton.AddChild(_footIK);
+                GD.PushWarning(
+                    "Mario: no FootIK node in the scene — created one at runtime. "
+                        + "Its exports won't appear in the inspector; add a FootIK "
+                        + "child under Armature/Skeleton3D to tune it."
+                );
+            }
+
+            // Set regardless of which path made it — Mario's own RID isn't
+            // knowable from the scene file.
+            _footIK.ExcludeBodies = new Godot.Collections.Array<Rid> { GetRid() };
+
             // Head bobble (jnt_head) — the most visible SMS jiggle. Positional
             // only, so HeadForwardLock keeps owning the head's rotation
             // (look-forward/up).
@@ -1165,6 +1360,13 @@ public partial class Mario : CharacterBody3D
 
         // Start IK
         skeletonIK3DWaist.Stop();
+
+        // Swap in the character body FIRST. SetupSleeping (and anything else that
+        // caches a surface material off Mesh_0) must run against the final mesh,
+        // or it caches Mario's surfaces and ApplyProfile then replaces the mesh
+        // underneath them - which is why Luigi's eyes never closed.
+        if (Profile != null)
+            ApplyProfile(Profile);
 
         //Setting up anything related to sleeping
         SetupSleeping();
@@ -1299,9 +1501,6 @@ public partial class Mario : CharacterBody3D
             }
         }
 
-        // Apply player profile colors if one is assigned
-        if (Profile != null)
-            ApplyProfile(Profile);
     }
 
     /// <summary>
@@ -1386,6 +1585,27 @@ public partial class Mario : CharacterBody3D
 
     public override void _PhysicsProcess(double delta)
     {
+        if (slipAirLaunchTimer > 0f)
+            slipAirLaunchTimer -= (float)delta;
+
+        // A fresh jump launch vs floor-snap: this is the real cause of "jump
+        // gets stuck gliding on a steep ramp" — Godot's floor_snap_length
+        // re-glues Mario to the ramp within the SAME MoveAndSlide call before
+        // velocity.Y has had one tick to actually separate him from it, so
+        // IsOnFloor() never goes false and he just slides along the surface
+        // forever in the jump pose. Zero the snap for exactly the frames
+        // where he's in a launched-jump state and still (spuriously) reading
+        // as grounded; restore it the instant either resolves, so normal
+        // ground-sticking (ramps, edges) is unaffected everywhere else.
+        bool inJumpLaunchState =
+            stateOfMario == MarioState.singleJump
+            || stateOfMario == MarioState.doubleJump
+            || stateOfMario == MarioState.tripleJump
+            || stateOfMario == MarioState.SpinJump
+            || stateOfMario == MarioState.backFlip
+            || stateOfMario == MarioState.sideFlip;
+        FloorSnapLength = (inJumpLaunchState && IsOnFloor()) ? 0f : _baseFloorSnapLength;
+
         // Sample horizontal acceleration on the fixed physics step for the chest
         // jiggle. Uses last frame's resolved Velocity (post-MoveAndSlide) — clean,
         // and correctly zero when he's cruising at a steady speed.
@@ -2101,7 +2321,19 @@ public partial class Mario : CharacterBody3D
         // Dive bonks are detected immediately after MoveAndSlide(), where this
         // frame's wall collisions and the pre-impact velocity are both available.
 
-        if (IsOnFloor()) //This is the main logic loop for Player being on the ground
+        // singleRollout / bellyRollout are AIR states that launch from a grounded
+        // frame. On a ramp they clip the surface while still RISING — measured
+        // live: singleRollout, onFloor=True, velY=+7.97 on a 33.8° ramp, one
+        // frame after the roll began. Letting the grounded branch run on that
+        // frame spends the still-live jumpBuffer (the very same A press that
+        // STARTED the roll, jumpBuffer=4 of 6 remaining) as a generic ground
+        // jump, so the rollout turns into a singleJump almost immediately.
+        // While he's still going up, he is not grounded in any meaningful sense.
+        bool rollingUpwardOffGround =
+            (stateOfMario == MarioState.singleRollout || stateOfMario == MarioState.bellyRollout)
+            && velocity.Y > ROLLOUT_LAND_MAX_RISE;
+
+        if (IsOnFloor() && !rollingUpwardOffGround) //This is the main logic loop for Player being on the ground
         {
             // === GROUNDED SPIN ===
             // Already grounded-spinning: keep spinning in place, damp motion,
@@ -2317,10 +2549,17 @@ public partial class Mario : CharacterBody3D
                     velocity.X = landingCarryVelXZ.X;
                     velocity.Z = landingCarryVelXZ.Y;
 
-                    // Allow jump-cancel out of landing (continues jump chain)
-                    if (!landingJumpConsumed && Input.IsActionJustPressed("button_a"))
+                    // Allow jump-cancel out of landing (continues jump chain). Uses
+                    // the jump buffer instead of a same-frame IsActionJustPressed
+                    // check — a press landing on the exact frame EnterLanding() was
+                    // called (or a frame either side of it) could otherwise be
+                    // missed entirely, eating the input and reading as "jump doesn't
+                    // work" right when he's most likely to be pressing it (landing
+                    // from a bounce/launch while already trying to keep moving).
+                    if (!landingJumpConsumed && jumpBuffer > 0)
                     {
                         landingJumpConsumed = true;
+                        jumpBuffer = 0;
                         StartJumpFromLanding();
                         goto EndFrame;
                     }
@@ -2494,6 +2733,12 @@ public partial class Mario : CharacterBody3D
                     if (stateOfMario == MarioState.bellySlidingFromDive)
                     {
                         bellyRolloutTimer = 20;
+
+                        // Deliberately terrain-blind — belly slide ignores slope
+                        // direction/steepness entirely, same flat friction regardless
+                        // of what he's sliding over. Staying attached to steep ground
+                        // is handled globally via floor_max_angle/floor_snap_length,
+                        // not by redirecting his velocity here.
                         velocity.X = Mathf.Lerp(velocity.X, 0, .05f);
                         velocity.Z = Mathf.Lerp(velocity.Z, 0, .05f);
 
@@ -2564,6 +2809,12 @@ public partial class Mario : CharacterBody3D
                                 stateOfMario = MarioState.idle;
                             }
 
+                            // Rollout slope boost. Must run before groundSpeed is
+                            // read — the Lerp below is 0.5/frame, so the cap it
+                            // targets IS his speed within about two frames and
+                            // there's no surplus that could survive on its own.
+                            UpdateRolloutSlopeBoost(delta);
+
                             //this is the running need to apply the strength of the stick
                             float groundSpeed =
                                 (stateOfMario == MarioState.sneak)
@@ -2574,7 +2825,9 @@ public partial class Mario : CharacterBody3D
                                             0f,
                                             1f
                                         )
-                                    : RUN_SPEED;
+                                    // Sneak deliberately excluded — a boosted tiptoe
+                                    // would look wrong and reads as a bug.
+                                    : RUN_SPEED + _rolloutSlopeBoost;
                             velocity.X = Mathf.Lerp(velocity.X, direction.X * groundSpeed, .5f);
                             velocity.Z = Mathf.Lerp(velocity.Z, direction.Z * groundSpeed, .5f);
 
@@ -2706,15 +2959,34 @@ public partial class Mario : CharacterBody3D
                                 {
                                     // wall states own their animation/state — don't override
                                 }
+                                else if (
+                                    stateOfMario == MarioState.singleJump
+                                    || stateOfMario == MarioState.doubleJump
+                                    || stateOfMario == MarioState.tripleJump
+                                    || stateOfMario == MarioState.SpinJump
+                                    || stateOfMario == MarioState.backFlip
+                                    || stateOfMario == MarioState.sideFlip
+                                )
+                                {
+                                    // Just launched — IsOnFloor() can stay true for a tick or
+                                    // two after a jump trigger (steep terrain, floor snap,
+                                    // corner of a rotating platform), which re-enters this
+                                    // grounded classification block before he's visibly left
+                                    // the ground. Without this guard it unconditionally
+                                    // stomped stateOfMario back to sprinting/running/sneak
+                                    // based on current stick input, which read as "jump
+                                    // instantly reverts to running" even though the jump
+                                    // itself triggered correctly. Let gravity/air logic own
+                                    // the state from here instead.
+                                }
                                 else if (walkingStrength > .5f)
                                 {
                                     stateOfMario = MarioState.sprinting;
                                     SetMarioState(stateOfMario);
-
-                                    RightHandMaterial.AlbedoColor = new Color(0, 0, 0, 0);
-                                    LeftHandMaterial.AlbedoColor = new Color(0, 0, 0, 0);
-                                    LeftClosedHand.Visible = true;
-                                    RightClosedHand.Visible = true;
+                                    // Hands are driven by UpdateHandPose() now.
+                                    // This used to swap them to closed inline and
+                                    // nothing ever swapped them back, so they
+                                    // stayed clenched for the rest of the run.
                                 }
                                 else if (walkingStrength <= SNEAK_MAX_INPUT)
                                 {
@@ -2767,6 +3039,17 @@ public partial class Mario : CharacterBody3D
                                             if (heldBody != null)
                                             {
                                                 // Just play normal idle with carry blend
+                                                SetMarioState(stateOfMario);
+                                            }
+                                            // Don't doze off on a slope — the sit/sleep
+                                            // clips lay him down flat, so on an incline he
+                                            // sits straight through the surface. Same shape
+                                            // as the carrying guard above: hold normal idle
+                                            // and reset the wind-down so it starts fresh
+                                            // once he's back on level ground.
+                                            else if (OnSleepBlockingSlope())
+                                            {
+                                                SleepStatus(false); // also resets every sleep timer
                                                 SetMarioState(stateOfMario);
                                             }
                                             else if (idleTimer == 0)
@@ -2850,14 +3133,22 @@ public partial class Mario : CharacterBody3D
                                 }
                             }
 
-                            if (
-                                Input.IsActionJustPressed("key_space")
-                                || Input.IsActionJustPressed("button_a")
-                            )
+                            if (jumpBuffer > 0)
                             {
+                                // Buffered instead of IsActionJustPressed — a brief
+                                // IsOnFloor() flicker (steep terrain, corner of a
+                                // rotating platform) can route the exact frame of the
+                                // press into the airborne branch instead of this one;
+                                // IsActionJustPressed never fires again once back on
+                                // floor, silently eating the jump. jumpBuffer is set
+                                // from a top-of-frame check that runs unconditionally
+                                // every tick regardless of branch, and persists for a
+                                // few frames, so the next grounded frame still catches it.
+                                jumpBuffer = 0;
                                 jumpChainStage = 0;
                                 jumpChainTimer = 0;
                                 isJumping = true;
+                                _jumpDbgFrames = 40;
 
                                 // 1) SPIN WINS
                                 if (spinBuffer > 0)
@@ -2995,6 +3286,19 @@ public partial class Mario : CharacterBody3D
             if (stateOfMario == MarioState.wallSlide)
             {
                 TickWallSlide(delta);
+                goto EndFrame;
+            }
+
+            // --- SLIP (steep ground too shallow to be a real wall) ---
+            if (CanStartSlip())
+            {
+                if (stateOfMario != MarioState.slipping)
+                    EnterSlip(velocity);
+            }
+
+            if (stateOfMario == MarioState.slipping)
+            {
+                TickSlip(delta, inputDirWorld, stickStrength);
                 goto EndFrame;
             }
 
@@ -3191,10 +3495,16 @@ public partial class Mario : CharacterBody3D
                         {
                             if (jumpHoldTime < MAX_JUMP_HOLD_TIME_SINGLE)
                             {
+                                // Front-loaded (sqrt) instead of linear: a reflexive
+                                // dive-cancel only ever captures the first few physics
+                                // frames of this ramp, so most of the height gain needs
+                                // to land early to be felt at all. Still reaches the
+                                // same MAX_JUMP_VELOCITY_SINGLE ceiling at the same
+                                // MAX_JUMP_HOLD_TIME_SINGLE cutoff as before.
                                 velocity.Y =
                                     BASE_JUMP_VELOCITY
                                     + (MAX_JUMP_VELOCITY_SINGLE - BASE_JUMP_VELOCITY)
-                                        * (jumpHoldTime / MAX_JUMP_HOLD_TIME_SINGLE)
+                                        * Mathf.Sqrt(jumpHoldTime / MAX_JUMP_HOLD_TIME_SINGLE)
                                     + (walkingStrength * 7);
                             }
                         }
@@ -3210,6 +3520,7 @@ public partial class Mario : CharacterBody3D
                             Vector3 diveDirection = lastFacingDirection.Normalized();
                             velocity.X = diveDirection.X * DIVE_SPEED_XZ;
                             velocity.Z = diveDirection.Z * DIVE_SPEED_XZ;
+                            velocity.Y += AIR_DIVE_Y_BOOST;
                         }
                     }
                     else if (
@@ -3220,10 +3531,13 @@ public partial class Mario : CharacterBody3D
                         jumpHoldTime += (float)delta;
                         if (jumpHoldTime < MAX_JUMP_HOLD_TIME_DOUBLE)
                         {
+                            // Front-loaded (sqrt) for the same reason as the single-jump
+                            // ramp above — a reflexive dive-cancel only ever captures the
+                            // first few physics frames of this window.
                             velocity.Y =
                                 BASE_JUMP_VELOCITY
                                 + (MAX_JUMP_VELOCITY_DOUBLE - BASE_JUMP_VELOCITY)
-                                    * (jumpHoldTime / MAX_JUMP_HOLD_TIME_DOUBLE)
+                                    * Mathf.Sqrt(jumpHoldTime / MAX_JUMP_HOLD_TIME_DOUBLE)
                                 + (walkingStrength * 7);
                         }
                         if (
@@ -3237,6 +3551,7 @@ public partial class Mario : CharacterBody3D
 
                             velocity.X = diveDirection.X * DIVE_SPEED_XZ;
                             velocity.Z = diveDirection.Z * DIVE_SPEED_XZ;
+                            velocity.Y += AIR_DIVE_Y_BOOST;
                         }
                     }
                 }
@@ -3339,14 +3654,26 @@ public partial class Mario : CharacterBody3D
                 {
                     if (stateOfMario == MarioState.backFlip)
                         ApplyBackflipAirControl(delta, prof);
+                    else if (stateOfMario == MarioState.wallJump && !_isTreeJumpAirborne)
+                        ApplyWallJumpAirControl(delta, prof, WALL_JUMP_LATERAL_ACCEL);
                     else
-                        ApplyAirControl(delta, prof);
+                        // Speed preservation is scoped to the plain single jump
+                        // for now — the flips/dives own their arcs deliberately.
+                        ApplyAirControl(
+                            delta,
+                            prof,
+                            preserveTakeoffSpeed: stateOfMario == MarioState.singleJump
+                        );
                 }
             }
         }
 
         EndFrame:
-        if (stateOfMario != MarioState.wallSlide && stateOfMario != MarioState.bellySlidingFromDive)
+        if (
+            stateOfMario != MarioState.wallSlide
+            && stateOfMario != MarioState.bellySlidingFromDive
+            && stateOfMario != MarioState.slipping
+        )
             slideDustFx?.Stop();
 
         if (stateOfMario != lastRecordedState)
@@ -3357,11 +3684,51 @@ public partial class Mario : CharacterBody3D
         Last4FacingDirections.Add(lastFacingDirection);
         Vector3 preSlideVelocity = velocity;
         MarioState preMoveState = stateOfMario;
+
+        // A jump launching on a steep slope needs an explicit gap, not just
+        // upward velocity — floor_max_angle=83° is so permissive that
+        // MoveAndSlide's slide-along-floor classification treats a launch
+        // that doesn't clear the surface fast enough as more floor-sliding
+        // instead of leaving it: onFloor stays true, gravity code never
+        // runs (it's gated on being airborne), and velocity.Y just sits
+        // frozen at the launch value while he climbs the ramp like a rail
+        // (confirmed via [LAND_DBG]: postSlideVelY == preSlideVelY, constant,
+        // for 30+ frames straight). Nudging him off the surface along the
+        // floor normal the instant a launch fires gives this frame's
+        // MoveAndSlide a real gap to resolve against instead of a surface
+        // it can re-glue to via slide projection.
+        // The > 2f threshold only catches strong launches. An AIR state resting
+        // on the floor with a small positive Y is a deadlock: gravity is gated
+        // on being airborne so Y never decays, and the landing test requires
+        // Y <= 0 so it can never fire either. Measured live: singleJump,
+        // onFloor=True, velY frozen at exactly +1.38 for ~20 frames while posY
+        // climbed -20.3 to -18.0 — he railed up the ramp in the jump animation.
+        // That's the "gliding". Any upward velocity in an air state earns the
+        // clearance; TryGetAirProfile is the existing "is this an air state"
+        // test, so grounded locomotion (which sits at Y=0 anyway) is unaffected.
+        bool inAirState = TryGetAirProfile(stateOfMario, out _);
+        if (IsOnFloor() && (velocity.Y > 2f || (inAirState && velocity.Y > 0.01f)))
+        {
+            GlobalPosition += GetFloorNormal() * 0.12f;
+        }
+
         // One-way leaf platform: pass through when moving upward
         SetCollisionMaskValue(3, velocity.Y <= 0.1f);
         Velocity = velocity;
         MoveAndSlide();
         velocity = Velocity;
+
+        if (stateOfMario != _lastDbgState || IsOnFloor() != _lastDbgOnFloor || _jumpDbgFrames > 0)
+        {
+            float ang = IsOnFloor() ? Mathf.RadToDeg(GetFloorNormal().AngleTo(Vector3.Up)) : -1f;
+            GD.Print(
+                $"[LAND_DBG] onFloor={IsOnFloor()} state={stateOfMario} floorAngle={ang:F1} preSlideVelY={preSlideVelocity.Y:F2} postSlideVelY={velocity.Y:F2} posY={GlobalPosition.Y:F3} jumpBuffer={jumpBuffer} isJumping={isJumping}"
+            );
+            _lastDbgState = stateOfMario;
+            _lastDbgOnFloor = IsOnFloor();
+            if (_jumpDbgFrames > 0)
+                _jumpDbgFrames--;
+        }
 
         // Collision data is valid only after MoveAndSlide. Preserve the incoming
         // dive speed above because MoveAndSlide removes the into-wall component.
@@ -3400,11 +3767,137 @@ public partial class Mario : CharacterBody3D
             }
         }
 
+        if (stateOfMario == MarioState.slipping)
+        {
+            if (IsOnFloor())
+            {
+                slipLostSurfaceFrames = 0;
+
+                // Slid down onto walkable ground. Don't snap him upright —
+                // carry the momentum into the BELLY SLIDE, which already owns
+                // everything that should happen next and needs no duplication:
+                // the friction ramp-down, the ma_lost get-up once he runs out
+                // of speed with no input, and A -> bellyRollout / singleRollout
+                // picked by speed (checkSpeedForBellyRoll). B still re-dives.
+                //
+                // Note the slide arrives with only the HORIZONTAL part of the
+                // slip: on a 66° face the slide is ~91% vertical, so a 20 m/s
+                // slip lands as roughly 8 m/s along the ground once the floor
+                // absorbs the vertical. That's the physically honest carry —
+                // raise SlipExitSlideBoost if it reads too tame.
+                float exitSpeed = new Vector2(velocity.X, velocity.Z).Length();
+                if (exitSpeed >= SlipExitSlideMinSpeed)
+                {
+                    if (SlipExitSlideBoost != 1.0f)
+                    {
+                        velocity.X *= SlipExitSlideBoost;
+                        velocity.Z *= SlipExitSlideBoost;
+                    }
+                    stateOfMario = MarioState.bellySlidingFromDive;
+                }
+                else
+                {
+                    // Trickled to a stop on the way down — nothing to slide
+                    // with, so stand up as before rather than flopping onto
+                    // his belly for one frame and immediately getting back up.
+                    stateOfMario = MarioState.idle;
+                }
+                SetMarioState(stateOfMario);
+            }
+            else if (IsOnWall())
+            {
+                slipLostSurfaceFrames = 0;
+                lastSlipNormal = GetWallNormal();
+            }
+            else
+            {
+                slipLostSurfaceFrames++;
+                if (slipLostSurfaceFrames > WALL_SLIDE_LOST_WALL_GRACE)
+                {
+                    // Slid off the edge — fall normally. ma_slpla plays
+                    // instead of ma_jump for this leave-slip beat.
+                    slipLostSurfaceFrames = 0;
+                    stateOfMario = MarioState.singleJump;
+                    slipAirLaunchTimer = SLIP_LAND_DURATION;
+                    SetMarioState(stateOfMario);
+                }
+            }
+        }
+
         PostMoveWallCheck(preSlideVelocity, preMoveState);
         CheckGroundWallEntry(preMoveState, inputDirWorld, stickStrength);
 
         bool onFloorNow = IsOnFloor();
-        bool justLanded = onFloorNow && !wasOnFloorPrev;
+        // A single-frame IsOnFloor() flicker (more likely to happen at speed on a
+        // steep incline) shouldn't count as "landing" if he was already a grounded
+        // locomotion state a moment ago — he never actually left the ground long
+        // enough to be airborne. Without this, running up a steep slope could
+        // repeatedly trip EnterLanding() below, which forces velocity.Y = 0 and
+        // locks him into landing-recovery, eating jump input until it happens to
+        // land in the narrow !landingJumpConsumed window — i.e. "can't jump at
+        // that angle" even though he was never really airborne to begin with. A
+        // genuine walk-off-a-ledge fall reclassifies stateOfMario to ledgeFall (see
+        // the !IsOnFloor() branch above) before this can fire, so this only
+        // suppresses the false-positive flicker case, not real landings.
+        bool wasGroundedLocoAtImpact =
+            preMoveState == MarioState.idle
+            || preMoveState == MarioState.sneak
+            || preMoveState == MarioState.walking
+            || preMoveState == MarioState.running
+            || preMoveState == MarioState.sprinting
+            || preMoveState == MarioState.pivot
+            || preMoveState == MarioState.sideFlipTurning;
+        // Second, stronger signal on top of the state check above: a longer
+        // flicker (2-3 frames instead of 1, more likely on steeper/faster cases)
+        // gives the walk-off-ledge detector in the !IsOnFloor() branch above just
+        // enough time to already reclassify preMoveState to ledgeFall before he
+        // touches back down — which defeats the grounded-state check by itself.
+        // Real falls build up real downward speed under gravity; a brief flicker
+        // doesn't have time to. Require actual fall speed at touchdown too.
+        bool hadRealFallSpeed = preSlideVelocity.Y < -3f;
+
+        // ...but ONLY demand that proof for the case it was written for. The
+        // flicker it guards against reclassifies to ledgeFall before touchdown
+        // (that's the whole reason the grounded-state check above isn't enough),
+        // so ledgeFall is the only state that needs to prove it fell for real.
+        //
+        // Requiring it unconditionally broke landings that are genuinely gentle:
+        // coming down onto an UPHILL ramp, the ramp rises to meet him, so
+        // relative vertical speed at contact is tiny. Confirmed live —
+        // touchdown at preSlideVelY = -1.85 on a 33.8° ramp failed the > 3 gate,
+        // so justLanded stayed false, the landing block never ran, and he was
+        // left stuck in singleJump ON the ground: gravity gated off, Y frozen at
+        // 0, sliding up the slope in the jump animation until he stopped.
+        bool needsFallSpeedProof = preMoveState == MarioState.ledgeFall;
+
+        // The old `< -3` test was quietly doing TWO jobs, and dropping it
+        // wholesale broke the second one. Direction is the real invariant: you
+        // cannot be landing while still travelling UP. A dive launches at
+        // velocity.Y = +8 (DIVE_POP_Y) and, going into a rising ramp, clips the
+        // surface within a frame or two while still moving upward — without
+        // this it registers as touchdown, dumps him straight into
+        // bellySlidingFromDive and out to running, i.e. "can't dive on ramps".
+        //
+        // Magnitude stays gated to ledgeFall only (see above), so a genuinely
+        // gentle uphill landing (-1.85 measured) still counts.
+        bool movingDownward = preSlideVelocity.Y <= 0f;
+
+        // A rollout is allowed to land while still drifting up a little — see
+        // ROLLOUT_LAND_MAX_RISE. Without this he keeps rolling for several
+        // frames after he's visibly back on the ramp, waiting for velY to cross
+        // zero, which reads as the roll animation having to play itself out
+        // before sprinting (and the boost) can start.
+        bool rolloutSettling =
+            (preMoveState == MarioState.singleRollout || preMoveState == MarioState.bellyRollout)
+            && preSlideVelocity.Y <= ROLLOUT_LAND_MAX_RISE;
+        movingDownward = movingDownward || rolloutSettling;
+
+        bool justLanded =
+            onFloorNow
+            && !wasOnFloorPrev
+            && !wasGroundedLocoAtImpact
+            && movingDownward
+            && (!needsFallSpeedProof || hadRealFallSpeed);
 
         if (justLanded)
         {
@@ -3557,6 +4050,19 @@ public partial class Mario : CharacterBody3D
                 wasOnFloor = onFloorNow; // keep your floor latch correct
                 return; // IMPORTANT: don’t goto EndFrame here
             }
+
+            // Slipping already picked his landing state up in the post-move slip
+            // block (belly slide if he carried speed off the face, idle if he
+            // trickled to a stop) — that block runs on IsOnFloor() directly, so
+            // it fires even on a slow slip where justLanded is false for want of
+            // fall speed. Bail out before the generic EnterLanding below can
+            // overwrite that with ma_laend.
+            if (airStateAtImpact == MarioState.slipping)
+            {
+                wasOnFloor = onFloorNow;
+                return;
+            }
+
             // If we landed from a rollout, go straight into runout (no landing anim)
             if (
                 airStateAtImpact == MarioState.bellyRollout
@@ -3638,12 +4144,16 @@ public partial class Mario : CharacterBody3D
         }
 
         wasOnFloor = onFloorNow;
+
+        UpdatePlatformTilt(delta);
     }
 
     public override void _Process(double delta)
     {
         UpdateRunBob((float)delta);
         UpdateHeadLock((float)delta);
+        UpdateFootIK((float)delta);
+        UpdateHandPose();
         UpdateJiggle((float)delta);
 
         // Ground-pound streak effect: on only during the actual fall (not the air-stall).
@@ -3825,15 +4335,31 @@ public partial class Mario : CharacterBody3D
         //setting up the nodes for hands
         RightClosedHand = GetNode<Node3D>("Armature/Skeleton3D/RightHandBone/RightHandClosed");
         LeftClosedHand = GetNode<Node3D>("Armature/Skeleton3D/LeftHandBone/LeftHandClosed");
-        marioMesh = GetNode<MeshInstance3D>("Armature/Skeleton3D/Mesh_0");
-        MeshInstance3D RightHandMeshClosed = GetNode<MeshInstance3D>(
-            "Armature/Skeleton3D/RightHandBone/RightHandClosed/ma_hnd3r_armature/Skeleton3D/ma_hnd3r"
+
+        // NOTE the scene spells these "Slighty", not "Slightly".
+        RightSlightlyOpenHand = GetNodeOrNull<Node3D>(
+            "Armature/Skeleton3D/RightHandBone/RightHandSlightyOpen"
         );
+        LeftSlightlyOpenHand = GetNodeOrNull<Node3D>(
+            "Armature/Skeleton3D/LeftHandBone/LeftHandSlightyOpen"
+        );
+        marioMesh = GetNode<MeshInstance3D>("Armature/Skeleton3D/Mesh_0");
+        // Find the mesh inside the closed right hand rather than hard-coding a path
+        // through its internals - a different character's hand model will not have
+        // the same node names as Mario's ma_hnd3r_armature.
+        MeshInstance3D RightHandMeshClosed = FindFirstMeshInstance(RightClosedHand);
+        if (RightHandMeshClosed == null)
+        {
+            GD.PushWarning("setupHandSwaping: no MeshInstance3D inside RightHandClosed.");
+            return;
+        }
 
-        int RightHandSurface = 4; // Adjust based on debug output
-        int LeftHandSurface = 5; // Adjust based on debug output
-
-        int HandSwapSurface = 0;
+        // The wrist stubs on the BODY mesh, located by material name. Surface order
+        // differs per character - these are 4/5 on Mario and Koopa, but on Luigi
+        // index 5 is _mat_eye_L, which had this tinting his eye instead of his hand
+        // (and fighting SetupSleeping over the same surface).
+        int RightHandSurface = FindSurfaceByMaterialName(marioMesh, "_mat_head(5)", 4);
+        int LeftHandSurface = FindSurfaceByMaterialName(marioMesh, "_mat_head(6)", 5);
 
         Material originalLeftMaterial =
             marioMesh.GetSurfaceOverrideMaterial(LeftHandSurface)
@@ -3864,12 +4390,16 @@ public partial class Mario : CharacterBody3D
             GD.PrintErr("ERROR: Right Hand material not found or invalid!");
         }
 
-        RightHandClosedMaterial = (StandardMaterial3D)originalRightMaterial.Duplicate();
+        if (originalRightMaterial is StandardMaterial3D)
+        {
+            RightHandClosedMaterial = (StandardMaterial3D)originalRightMaterial.Duplicate();
+            RightHandMeshClosed.SetSurfaceOverrideMaterial(0, RightHandClosedMaterial);
+        }
 
-        RightHandMeshClosed.SetSurfaceOverrideMaterial(0, RightHandClosedMaterial);
-
-        RightHandMaterial.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
-        LeftHandMaterial.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+        if (RightHandMaterial != null)
+            RightHandMaterial.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+        if (LeftHandMaterial != null)
+            LeftHandMaterial.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
 
         // Remember the open-hand albedo so ShowOpenHands() can restore it after
         // the closed-hand swap zeroes it out.
@@ -3881,6 +4411,38 @@ public partial class Mario : CharacterBody3D
         GD.Print("Hand materials successfully duplicated and assigned.");
     }
 
+    /// <summary>
+    /// Index of the first surface whose material resource_name starts with
+    /// <paramref name="namePrefix"/>, or <paramref name="fallback"/> if none
+    /// matches. Lets per-character features find their surface without every
+    /// character having to hardcode an index.
+    /// </summary>
+    private static int FindSurfaceByMaterialName(
+        MeshInstance3D meshInstance,
+        string namePrefix,
+        int fallback
+    )
+    {
+        if (meshInstance?.Mesh == null)
+            return fallback;
+
+        for (int i = 0; i < meshInstance.Mesh.GetSurfaceCount(); i++)
+        {
+            var mat =
+                meshInstance.GetSurfaceOverrideMaterial(i)
+                ?? meshInstance.Mesh.SurfaceGetMaterial(i);
+
+            if (mat != null && mat.ResourceName.StartsWith(namePrefix))
+                return i;
+        }
+
+        GD.PushWarning(
+            $"FindSurfaceByMaterialName: no surface named '{namePrefix}*', "
+                + $"falling back to index {fallback}."
+        );
+        return fallback;
+    }
+
     /**
         This Sets up anything that involved with sleeping
         also helps setup any replaceing textures involving the eyes
@@ -3890,10 +4452,17 @@ public partial class Mario : CharacterBody3D
         //sleeping effects
         zEffectSpawner = GetNode<ZEffectSpawner>("ZEffectSpawner");
         // Load the textures from your files (update the paths)
-        awakeEyeTexture = (Texture2D)
-            ResourceLoader.Load("res://models/Mario/mario/bmd/ma_mdl1/H_ma_eye1_s3tc.png");
-        sleepingEyeTexture = (Texture2D)
-            ResourceLoader.Load("res://models/Mario/mario/bmd/ma_mdl1/H_ma_eye1_s3tc_shut.png");
+        // Per-character if the profile supplies them, else Mario's originals.
+        awakeEyeTexture =
+            Profile?.AwakeEyeTexture
+            ?? (Texture2D)
+                ResourceLoader.Load("res://models/Mario/mario/bmd/ma_mdl1/H_ma_eye1_s3tc.png");
+        sleepingEyeTexture =
+            Profile?.SleepingEyeTexture
+            ?? (Texture2D)
+                ResourceLoader.Load(
+                    "res://models/Mario/mario/bmd/ma_mdl1/H_ma_eye1_s3tc_shut.png"
+                );
 
         // Get Mario's main mesh
         marioMesh = GetNode<MeshInstance3D>("Armature/Skeleton3D/Mesh_0");
@@ -3903,8 +4472,12 @@ public partial class Mario : CharacterBody3D
             return;
         }
 
-        int leftEyeSurface = 7; // Adjust based on debug output
-        int rightEyeSurface = 8; // Adjust based on debug output
+        // Locate the eyes by MATERIAL NAME rather than a hardcoded index. Surface
+        // order differs per character (Mario's eyes are 7/8, Luigi's are 5/6),
+        // but both rigs name the materials _mat_eye_L / _mat_eye_R - Luigi's just
+        // carry a ".001" suffix from the Blender round-trip, so match on prefix.
+        int leftEyeSurface = FindSurfaceByMaterialName(marioMesh, "_mat_eye_L", 7);
+        int rightEyeSurface = FindSurfaceByMaterialName(marioMesh, "_mat_eye_R", 8);
 
         // Left Eye Material
         Material originalLeftMaterial =
@@ -4413,8 +4986,11 @@ public partial class Mario : CharacterBody3D
         {
             Vector3 normal = GetSlideCollision(i).GetNormal();
 
-            // Ignore floors, ceilings, and gentle slopes; only wall-like contacts bonk.
-            if (Mathf.Abs(normal.Y) > 0.65f)
+            // Ignore floors, ceilings, and slopes too shallow to be a real
+            // wall — same 75° cutoff as wall-slide/slip (WALL_TRUE_VERTICAL_MIN_ANGLE_DEG),
+            // so diving into a too-steep-to-stand slope doesn't bonk, it's
+            // just ground he can't stand on.
+            if (Mathf.Abs(normal.Y) > Mathf.Cos(Mathf.DegToRad(WALL_TRUE_VERTICAL_MIN_ANGLE_DEG)))
                 continue;
 
             Vector3 normalXZ = new Vector3(normal.X, 0f, normal.Z);
@@ -4803,6 +5379,15 @@ public partial class Mario : CharacterBody3D
 
         stateOfMario = MarioState.rolloutRun;
 
+        // Arm the uphill slope boost for this rollout. Starts at zero and is
+        // fed by UpdateRolloutSlopeBoost only while he's actually driving up a
+        // ramp; survives the handoff into running/sprinting.
+        _rolloutBoostArmed = true;
+        _rolloutSlopeBoost = 0f;
+        GD.Print( // TEMP DIAGNOSTIC
+            $"[BOOST] ARMED via EnterRolloutRun  speed={new Vector2(velocity.X, velocity.Z).Length():F2}"
+        );
+
         // Decide initial facing (prefer stick if held, else keep momentum direction)
         Vector3 faceDir = Vector3.Zero;
 
@@ -4826,6 +5411,90 @@ public partial class Mario : CharacterBody3D
 
         // Play run immediately (no landing anim)
         SetMarioState(stateOfMario);
+    }
+
+    /// <summary>
+    /// Feeds <see cref="_rolloutSlopeBoost"/>, the surplus added to RUN_SPEED
+    /// while a rollout is driving UP a ramp.
+    ///
+    /// The boost can't live inside the rolloutRun state itself: HandleRolloutRun
+    /// hands off to running/sprinting the instant the stick is held, which is
+    /// exactly when you'd be steering up the ramp. So it's armed on rollout
+    /// landing and survives into normal running, gating the ground speed cap
+    /// until the ground goes flat.
+    ///
+    /// Uphill-only by design. The floor normal's horizontal component points
+    /// DOWNhill, so uphill is its negation; the dot against his heading means a
+    /// diagonal line up the ramp earns proportionally less than a straight one,
+    /// and heading downhill earns nothing (clamped at 0) rather than draining it.
+    /// </summary>
+
+
+    private void UpdateRolloutSlopeBoost(double delta)
+    {
+        if (!_rolloutBoostArmed)
+        {
+            _rolloutSlopeBoost = 0f;
+            // Deliberately silent: this is the steady state for the whole game.
+            // Logging it every 6 frames floods the 2000-line ring buffer and
+            // evicts the rollout frames we're actually trying to read.
+            return;
+        }
+
+        // Airborne (jumped off the ramp, launched off a lip): hold whatever he
+        // built rather than feeding or cutting it, so landing back on the same
+        // ramp continues instead of restarting from zero.
+        if (!IsOnFloor())
+        {
+            return;
+        }
+
+        if (stateOfMario == MarioState.idle)
+        {
+            _rolloutSlopeBoost = 0f;
+            _rolloutBoostArmed = false;
+            return;
+        }
+
+        Vector3 nXZ = new Vector3(GetFloorNormal().X, 0f, GetFloorNormal().Z);
+        float steepness = nXZ.Length(); // == sin(slope angle)
+
+        if (steepness < RolloutSlopeFlatThreshold)
+        {
+            // Back on flat ground — cut immediately, not a fade.
+            _rolloutSlopeBoost = 0f;
+            _rolloutBoostArmed = false;
+            return;
+        }
+
+        Vector3 heading = new Vector3(direction.X, 0f, direction.Z);
+        if (heading.LengthSquared() < 0.0001f)
+        {
+            // Standing still on the ramp: hold what he earned rather than
+            // draining it. Only flat ground takes the boost away.
+            return;
+        }
+
+        Vector3 uphill = -nXZ.Normalized();
+        float uphillness = Mathf.Max(0f, heading.Normalized().Dot(uphill));
+
+        // RATCHET — the boost only ever climbs while he's on a slope. Turning
+        // round and running back DOWN, or cutting across, holds whatever he
+        // built instead of bleeding it off; the single thing that clears it is
+        // reaching flat ground (the DISARM flat branch above).
+        //
+        // Without this, uphillness collapses to 0 the instant he turns and the
+        // speed evaporated under him — visible in the log as
+        // "up=0.00 boost=0.00" while still standing on a 33.8° face.
+        float target = RolloutSlopeMaxBoost * steepness * uphillness;
+        if (target > _rolloutSlopeBoost)
+        {
+            _rolloutSlopeBoost = Mathf.MoveToward(
+                _rolloutSlopeBoost,
+                target,
+                RolloutSlopeBoostAccel * (float)delta
+            );
+        }
     }
 
     private bool HandleRolloutRun(double delta, Vector3 inputDirWorld, float stickStrength)
@@ -5009,16 +5678,63 @@ public partial class Mario : CharacterBody3D
     /// <summary>Restore Mario's OPEN hands — undoes the closed-hand swap the
     /// sprint state does (transparent open-hand material + visible closed
     /// meshes). Used by the shine-get so he holds the shine with an open hand.</summary>
-    private void ShowOpenHands()
+    private void ShowOpenHands() => ApplyHandPose(HandPose.Open);
+
+    /// <summary>Picks the hand mesh from Mario's current state. Open by default,
+    /// clenched while sprinting or airborne off a jump.
+    ///
+    /// Single owner for hand visibility. It used to be swapped inline when
+    /// sprinting started, with nothing swapping it back, so his hands stayed
+    /// clenched forever after the first sprint — and the third "slightly open"
+    /// variant was never touched by anything, leaving it rendering on top of
+    /// whichever hand was actually selected.</summary>
+    private void UpdateHandPose()
     {
+        bool clenched =
+            stateOfMario == MarioState.sprinting
+            || stateOfMario == MarioState.singleJump
+            || stateOfMario == MarioState.doubleJump
+            || stateOfMario == MarioState.tripleJump
+            || stateOfMario == MarioState.sideFlip
+            || stateOfMario == MarioState.backFlip
+            || stateOfMario == MarioState.SpinJump
+            || stateOfMario == MarioState.wallJump;
+
+        ApplyHandPose(clenched ? HandPose.Closed : HandPose.Open);
+    }
+
+    /// <summary>Makes exactly one hand variant visible. Idempotent — early-outs
+    /// unless the pose actually changed, so it's safe to call every frame.
+    ///
+    /// The open hands are SURFACES on Mario's main mesh rather than separate
+    /// nodes, so they're hidden by zeroing their albedo alpha instead of a
+    /// Visible flag; the other two are instanced scenes on the hand bones.</summary>
+    private void ApplyHandPose(HandPose pose)
+    {
+        if (_handPose == pose)
+            return;
+        _handPose = pose;
+
+        bool openVisible = pose == HandPose.Open;
+        Color openAlbedoR = openVisible ? _rightHandOpenAlbedo : new Color(0, 0, 0, 0);
+        Color openAlbedoL = openVisible ? _leftHandOpenAlbedo : new Color(0, 0, 0, 0);
+
         if (RightHandMaterial != null)
-            RightHandMaterial.AlbedoColor = _rightHandOpenAlbedo;
+            RightHandMaterial.AlbedoColor = openAlbedoR;
         if (LeftHandMaterial != null)
-            LeftHandMaterial.AlbedoColor = _leftHandOpenAlbedo;
+            LeftHandMaterial.AlbedoColor = openAlbedoL;
+
+        bool closed = pose == HandPose.Closed;
         if (RightClosedHand != null)
-            RightClosedHand.Visible = false;
+            RightClosedHand.Visible = closed;
         if (LeftClosedHand != null)
-            LeftClosedHand.Visible = false;
+            LeftClosedHand.Visible = closed;
+
+        bool slightly = pose == HandPose.SlightlyOpen;
+        if (RightSlightlyOpenHand != null)
+            RightSlightlyOpenHand.Visible = slightly;
+        if (LeftSlightlyOpenHand != null)
+            LeftSlightlyOpenHand.Visible = slightly;
     }
 
     private bool CanStartWallSlide()
@@ -5043,6 +5759,14 @@ public partial class Mario : CharacterBody3D
 
         Vector3 n = GetWallNormal();
         if (n == Vector3.Zero)
+            return false;
+
+        // Only a genuinely near-vertical surface counts as a real wall to
+        // kick off of. Godot's own floor/wall split is a single threshold
+        // (floor_max_angle), so a merely-steep ramp that fails the floor
+        // check still comes through here as "wall" — that's CanStartSlip's
+        // job, not a real wall-jump.
+        if (Mathf.RadToDeg(n.AngleTo(Vector3.Up)) < WALL_TRUE_VERTICAL_MIN_ANGLE_DEG)
             return false;
 
         // Per-state entry requirements
@@ -5079,6 +5803,419 @@ public partial class Mario : CharacterBody3D
         float approach = vDir.Dot(-nXZ);
 
         return approach >= minApproachDot;
+    }
+
+    private bool CanStartSlip()
+    {
+        if (IsOnFloor())
+            return false;
+        if (!IsOnWall())
+            return false;
+
+        if (stateOfMario == MarioState.bellySlidingFromDive)
+            return false;
+        if (
+            stateOfMario == MarioState.diving
+            || stateOfMario == MarioState.singleJumpDive
+            || stateOfMario == MarioState.doubleJumpDive
+            || stateOfMario == MarioState.tripleJumpDive
+        )
+            return false;
+
+        Vector3 n = GetWallNormal();
+        if (n == Vector3.Zero)
+            return false;
+
+        // Steep ground, not a real wall: Godot already rejected this as
+        // floor (angle > floor_max_angle), but it's still short of true-wall
+        // steepness — that's the slip band.
+        return Mathf.RadToDeg(n.AngleTo(Vector3.Up)) < WALL_TRUE_VERTICAL_MIN_ANGLE_DEG;
+    }
+
+    private void EnterSlip(Vector3 incomingVel)
+    {
+        isSpining(false);
+
+        stateOfMario = MarioState.slipping;
+        slipLostSurfaceFrames = 0;
+        slipSlideVel = Vector3.Zero;
+
+        lastSlipNormal = GetWallNormal();
+        if (lastSlipNormal == Vector3.Zero)
+            lastSlipNormal = -lastFacingDirection;
+
+        Vector3 nXZ = new Vector3(lastSlipNormal.X, 0, lastSlipNormal.Z);
+        Vector3 downhillXZ = (nXZ.Length() > 0.001f) ? nXZ.Normalized() : -lastFacingDirection;
+        Vector3 uphillXZ = -downhillXZ;
+
+        // ma_slpbk (slip back) if he was facing/moving UP the slope when he
+        // hit the too-steep patch — slides backward, keeps facing uphill.
+        // ma_slip (forward) otherwise — reorients to face downhill and
+        // slides forward. Locked for the whole episode so the animation
+        // doesn't flip mid-slide.
+        Vector3 approachXZ = new Vector3(incomingVel.X, 0, incomingVel.Z);
+        Vector3 refDir =
+            (approachXZ.Length() > 0.5f) ? approachXZ.Normalized() : lastFacingDirection;
+        _slipFacingUphill = refDir.Dot(downhillXZ) < -0.3f;
+
+        Vector3 faceDir = _slipFacingUphill ? uphillXZ : downhillXZ;
+        if (faceDir != Vector3.Zero)
+        {
+            lastFacingDirection = faceDir;
+            armature.Rotation = new Vector3(0f, YawFromDir(faceDir), 0f);
+        }
+
+        // Straight into the slide loop — ma_slpla is not an entry/landing
+        // animation, it's what plays when LEAVING slip for airborne (sliding
+        // off the edge, or the escape hop), see TickSlip's exit paths.
+        SetMarioState(MarioState.slipping);
+
+        if (velocity.Y > 0f)
+            velocity.Y = 0f;
+    }
+
+    private void TickSlip(double delta, Vector3 inputDirWorld, float stickStrength)
+    {
+
+        Vector3 n = IsOnWall() ? GetWallNormal() : lastSlipNormal;
+        if (n == Vector3.Zero)
+            n = lastSlipNormal;
+
+        Vector3 nXZ = new Vector3(n.X, 0, n.Z);
+        if (nXZ.Length() < 0.001f)
+            nXZ = new Vector3(lastSlipNormal.X, 0, lastSlipNormal.Z);
+        Vector3 downhillXZ = (nXZ.Length() > 0.001f) ? nXZ.Normalized() : Vector3.Zero;
+
+        slideDustFx?.Emit(GlobalPosition - n.Normalized() * capRadiusWorld, Vector3.Up);
+
+        // Slide DOWN the slope, along its actual surface — a fixed
+        // horizontal speed plus separately-clamped vertical fall doesn't
+        // point along the real surface (especially at steeper angles), so
+        // MoveAndSlide read the mismatch as him moving away from it and
+        // ejected him instead of sliding him along it. Project straight-down
+        // onto the slope's tangent plane instead: for a near-vertical
+        // surface this is mostly vertical, for a shallow one mostly
+        // horizontal, always parallel to the actual face.
+        Vector3 fullNormal = (n.LengthSquared() > 0.0001f) ? n.Normalized() : Vector3.Up;
+        Vector3 slopeDownDir = Vector3.Down - Vector3.Down.Dot(fullNormal) * fullNormal;
+        if (slopeDownDir.LengthSquared() > 0.0001f)
+            slopeDownDir = slopeDownDir.Normalized();
+
+        // Speed accelerates from rest toward a steepness-scaled top speed —
+        // nXZ's length (before normalizing to downhillXZ) is sin(angle from
+        // Up): 0 at flat, 1 at a vertical wall. Both the ceiling AND the
+        // ramp-up rate scale with it, so a steeper slope both slides faster
+        // AND gets there quicker, rather than snapping straight to a target
+        // speed. This isn't just for feel: a future "slip zone" mechanic
+        // (forcing a slip regardless of real geometry, as a "you shouldn't
+        // be standing here" catch-all) will hand this an arbitrary angle, so
+        // the speed needs to genuinely respond to steepness rather than
+        // being a flat constant that only happened to look right for the
+        // narrow 65-75 band real slopes currently use.
+        float steepness = nXZ.Length();
+
+        // The slide is a VECTOR in the slope's tangent plane, not a scalar
+        // speed pinned to the fall line — that's what makes steering possible.
+        //
+        // Curved surfaces (and moving platforms) turn the normal under him, so
+        // re-flatten last frame's slide onto the CURRENT tangent plane before
+        // integrating, or the carried velocity slowly drifts out of the face.
+        slipSlideVel -= fullNormal * slipSlideVel.Dot(fullNormal);
+
+        // Steepness curve — see SlipSteepnessCurve. At 1.0 this is just
+        // sin(angle), i.e. true physics.
+        float slopeFactor =
+            SlipSteepnessCurve == 1.0f
+                ? steepness
+                : Mathf.Pow(steepness, SlipSteepnessCurve);
+
+        // Gravity down the fall line, now derived from ACTUAL gravity rather
+        // than a hand-picked constant, so the pull genuinely tracks the slope.
+        Vector3 accel = slopeDownDir * (GRAVITY.Length() * SlipGravityScale * slopeFactor);
+
+        // Stick steering, modelled on SMS's doSliding(): the stick contributes
+        // an ACCELERATION to the existing slide rather than overriding its
+        // direction, so he carves round gradually instead of snapping to the
+        // held direction. Flattened onto the tangent plane too, so steering can
+        // never push him into the surface or peel him off it.
+        if (stickStrength > DEADZONE && inputDirWorld != Vector3.Zero)
+        {
+            Vector3 steer = inputDirWorld.Normalized();
+            steer -= fullNormal * steer.Dot(fullNormal);
+            if (steer.LengthSquared() > 0.0001f)
+                accel += steer.Normalized() * (SlipSteerAccel * stickStrength);
+        }
+
+        slipSlideVel += accel * (float)delta;
+
+        // Hard guarantee: steering can slow the descent but never reverse it.
+        // He's on ground he physically can't stand on, so uphill progress has to
+        // stay impossible however SlipSteerAccel is tuned — otherwise a steep
+        // face becomes climbable by just holding up.
+        float alongDown = slipSlideVel.Dot(slopeDownDir);
+        if (alongDown < 0f)
+            slipSlideVel -= slopeDownDir * alongDown;
+
+        // Same steepness-scaled ceiling as before, now capping the whole 2D
+        // slide instead of a scalar — so steering REDIRECTS speed rather than
+        // stacking on top of it, and a diagonal carve can't outrun a straight
+        // fall-line drop.
+        float maxSpeed = SlipMaxSpeed * slopeFactor;
+        if (slipSlideVel.Length() > maxSpeed)
+            slipSlideVel = slipSlideVel.Normalized() * maxSpeed;
+
+        velocity = slipSlideVel;
+        // Small adhesion push into the surface, same idea as wall-slide's,
+        // so MoveAndSlide keeps recognizing contact frame to frame instead
+        // of drifting off it.
+        velocity -= fullNormal * WALL_STICK_SPEED;
+
+        // Safety net only. Clamped against the slide's own cap so it can never
+        // bind tighter than maxSpeed — on a steep face the slide is nearly all
+        // vertical, so a fall limit above the slide speed would throttle the
+        // slide itself rather than acting as a backstop (the old -13 did).
+        // Mathf.Min on two negatives picks the more permissive one.
+        float fallFloor = Mathf.Min(SlipMaxFallSpeed, -(maxSpeed + WALL_STICK_SPEED + 1f));
+        if (velocity.Y < fallFloor)
+            velocity.Y = fallFloor;
+
+        // Face the way he's ACTUALLY sliding, not the raw fall line, so the
+        // steering reads on the model. Which of ma_slip / ma_slpbk is playing
+        // stays locked from entry (_slipFacingUphill), so this only rotates
+        // him within that choice rather than flipping the animation mid-slide.
+        Vector3 headingXZ = new Vector3(slipSlideVel.X, 0, slipSlideVel.Z);
+        headingXZ =
+            headingXZ.LengthSquared() > 0.01f ? headingXZ.Normalized() : downhillXZ;
+        Vector3 faceDir = _slipFacingUphill ? -headingXZ : headingXZ;
+        if (faceDir != Vector3.Zero)
+        {
+            float targetYaw = YawFromDir(faceDir);
+            float t = Mathf.Clamp((float)(WALL_SLIDE_FACE_SPEED * delta), 0f, 1f);
+            float newYaw = Mathf.LerpAngle(armature.Rotation.Y, targetYaw, t);
+            armature.Rotation = new Vector3(0f, newYaw, 0f);
+            lastFacingDirection = faceDir;
+        }
+
+        // Escape hop only — a plain vertical pop, not a directional
+        // wall-kick, since this was never a real wall to push off of.
+        if (Input.IsActionJustPressed("button_a"))
+        {
+            velocity.Y = SLIP_HOP_UP_VEL;
+            stateOfMario = MarioState.singleJump;
+            slipAirLaunchTimer = SLIP_LAND_DURATION; // ma_slpla plays instead of ma_jump for this leave-slip beat
+            SetMarioState(stateOfMario);
+        }
+    }
+
+    /// <summary>
+    /// Purely visual — while diving, belly-sliding, or slipping on ANY
+    /// slope (static ramp or moving platform alike), tilts the armature so
+    /// his belly lies flush against the actual surface instead of always
+    /// staying world-upright while the ground underneath is tilted. Aligns
+    /// the armature's up axis to the current contact normal each frame,
+    /// keeping the facing direction that state's own logic already set.
+    /// Never touches GlobalPosition, velocity, or collision. Runs last in
+    /// _PhysicsProcess so it layers on top instead of being overwritten by
+    /// a later yaw-set call the same frame. Leaving one of these states
+    /// explicitly snaps back to pure yaw immediately — some destinations
+    /// (rollout) don't do their own armature.Rotation overwrite, so the
+    /// tilt would otherwise persist incorrectly.
+    /// </summary>
+    private bool _wasPlatformTilting = false;
+    private Basis _tiltCurrentRotation = Basis.Identity; // smoothed PURE rotation only — mirror/scale applied fresh each frame, never fed back in
+
+    /// <summary>Flat sink toward the surface (metres) for the PRONE states
+    /// (dive / belly slide), on top of the shared slope term. Covers the prone
+    /// animation's own belly-above-origin height — the part that does NOT vary
+    /// with slope. Tune on FLAT ground, where the slope term is zero and this
+    /// is the only thing acting. Purely visual: the collider is untouched, so
+    /// it can't push him through geometry.</summary>
+    [Export]
+    public float BellyTiltSurfaceOffset = 0.15f;
+
+    /// <summary>Same idea as BellyTiltSurfaceOffset but for slipping, where
+    /// he's upright on his feet rather than prone, so the pose sits differently
+    /// against the surface and wants its own flat term. Defaults to 0 — slip
+    /// only ever happens on steep ground, so the shared slope term below is
+    /// doing nearly all the work there and this is just trim.</summary>
+    [Export]
+    public float SlipTiltSurfaceOffset = 0f;
+
+    /// <summary>Scales the geometric slope compensation, which is
+    /// capRadiusWorld * sin(slope angle). This one is shared by ALL the tilt
+    /// states because it comes from the COLLIDER, not the pose: a vertical
+    /// cylinder resting against an inclined plane always contacts on its bottom
+    /// rim, whatever the angle, leaving the body origin exactly that far clear
+    /// of the surface. 1.0 is the true geometric value; 0 disables it. Only
+    /// worth moving off 1.0 if a pose's own shape makes the exact value read
+    /// wrong at steep angles.</summary>
+    [Export]
+    public float TiltSlopeCompensation = 1.0f;
+
+    private void UpdatePlatformTilt(double delta)
+    {
+        bool wantsTilt =
+            stateOfMario == MarioState.diving
+            || stateOfMario == MarioState.bellySlidingFromDive
+            || stateOfMario == MarioState.slipping;
+
+        if (!wantsTilt)
+        {
+            if (_wasPlatformTilting)
+            {
+                armature.Rotation = new Vector3(0f, YawFromDir(lastFacingDirection), 0f);
+                armature.Position = armatureBaseLocalPos; // undo the belly sink
+            }
+            _wasPlatformTilting = false;
+            return;
+        }
+
+        Vector3 normal;
+        if (IsOnFloor())
+            normal = GetFloorNormal();
+        else if (IsOnWall())
+            normal = GetWallNormal();
+        else
+            return; // airborne mid-dive — no surface to lie against
+
+        if (normal == Vector3.Zero)
+            return;
+        if (lastFacingDirection == Vector3.Zero)
+            return;
+
+        // Normalize once up front — the sink below relies on |normal.xz| being
+        // exactly sin(slope angle), which only holds for a unit normal.
+        normal = normal.Normalized();
+
+        // Start from the SAME yaw-only basis every other state already uses
+        // (proven correct-handedness for this mesh), then lay him onto the
+        // surface with a PITCH followed by a ROLL, rather than one shortest-arc
+        // rotation from Up to the normal. Shortest-arc rotates about Up × normal,
+        // an axis with no relationship to his heading, so it drags the heading
+        // sideways as it tilts. Pitch-then-roll reaches the same final up axis
+        // while leaving the heading exactly where the state machine put it.
+        Basis yawBasis = new Basis(Vector3.Up, YawFromDir(lastFacingDirection));
+        Vector3 right = yawBasis.X;
+
+        Vector3 normalInPitchPlane = normal - normal.Dot(right) * right;
+        if (normalInPitchPlane.LengthSquared() < 0.0001f)
+            return; // normal is (near-)parallel to right — no well-defined pitch
+
+        // PITCH — lean along his facing axis, like a plane pitching with level
+        // wings. This alone handles a slope he's sliding straight down.
+        float pitchAngle = Vector3.Up.SignedAngleTo(normalInPitchPlane.Normalized(), right);
+
+        // ROLL — the rest of the alignment. Pitch only tilts him forward/back,
+        // so sliding diagonally across a slope, or riding a platform that tips
+        // sideways, still left one side lifted clear of the surface.
+        //
+        // After the pitch his up is normalInPitchPlane and {right, upPitched,
+        // rollAxis} is orthonormal. The full normal has NO component along
+        // rollAxis (it is normalInPitchPlane plus a pure `right` term, and both
+        // of those are perpendicular to rollAxis), so it lies in the plane the
+        // roll sweeps through — one roll about his own forward axis therefore
+        // carries upPitched exactly onto the normal, giving belly-flush contact.
+        // Rolling about his forward axis is also precisely what protects the
+        // heading: a rotation fixes its own axis, and the pitch before it only
+        // tilted the facing inside its own vertical plane, so the horizontal
+        // heading survives both steps untouched.
+        Vector3 upPitched = normalInPitchPlane.Normalized();
+        Vector3 rollAxis = right.Cross(upPitched);
+        if (rollAxis.LengthSquared() < 0.0001f)
+            return; // degenerate — no well-defined forward axis to roll about
+        rollAxis = rollAxis.Normalized();
+        float rollAngle = upPitched.SignedAngleTo(normal, rollAxis);
+
+        // `normal`, `right`, `rollAxis` and Vector3.Up are all WORLD space, so
+        // both Basis(axis, angle) rotations above are WORLD rotations — but
+        // armature.Transform is a LOCAL transform, and every level places the
+        // Mario body with its own yaw (~180°, plus ~2° of roll in Level.tscn).
+        // Writing a world rotation straight into the local transform composes
+        // the body's yaw on top of it, which mirrors the horizontal part of the
+        // resulting up axis: the tilt comes out leaning the opposite way and
+        // drives his face into the slope instead of laying his belly along it.
+        // Conjugating just the AXES into the body's space applies the identical
+        // world rotations from inside the local transform
+        // (P⁻¹·Rot(v,θ)·P == Rot(P⁻¹v, θ)), and is an exact no-op when the body
+        // is unrotated.
+        //
+        // The yaw half deliberately stays in the existing local convention: the
+        // mesh is authored backwards and the body's 180° is precisely what
+        // cancels it, so converting that too would snap him 180° the instant
+        // the tilt engages.
+        Basis toBodySpace = GlobalBasis.Orthonormalized().Inverse();
+        Vector3 pitchAxisLocal = (toBodySpace * right).Normalized();
+        Vector3 rollAxisLocal = (toBodySpace * rollAxis).Normalized();
+
+        // Roll is applied AFTER the pitch, so it left-multiplies it.
+        Basis targetRotation =
+            new Basis(rollAxisLocal, rollAngle)
+            * new Basis(pitchAxisLocal, pitchAngle)
+            * yawBasis;
+
+        // Smooth toward the target — GetWallNormal()/GetFloorNormal() can
+        // flicker frame to frame right at a floor/wall classification
+        // boundary (the same contact-flicker class of bug fought all
+        // session elsewhere). Snap instantly on the very first tilting
+        // frame (no previous target to blend from) instead of blending
+        // from a stale pose.
+        if (!_wasPlatformTilting)
+            _tiltCurrentRotation = targetRotation;
+        else
+        {
+            float t = Mathf.Clamp((float)(WALL_SLIDE_FACE_SPEED * delta), 0f, 1f);
+            _tiltCurrentRotation = _tiltCurrentRotation.Slerp(targetRotation, t).Orthonormalized();
+        }
+        _wasPlatformTilting = true;
+
+        // Sink him toward the surface along his OWN down axis (the tilted rig's
+        // local -Y, which the tilt above just aligned with -normal), NOT world
+        // down — on a ramp those differ, and world-down would slide the belly
+        // along the slope instead of straight into it. Rebuilt from
+        // armatureBaseLocalPos every frame rather than accumulated, so it can't
+        // creep. Origin lives in the Mario body's space, which is unit-scaled,
+        // so these are plain metres.
+        //
+        // Two terms:
+        //
+        // 1. The GEOMETRIC gap, shared by every tilt state because it comes from
+        //    the COLLIDER, not the pose. His collider is a cylinder with a FLAT
+        //    bottom face, and that face never tilts. Resting it against an
+        //    inclined plane, the support point in the -normal direction
+        //    maximises (-t*cos + -r*(n·u)) over axis height t and radial
+        //    direction u — which lands at t=0 for EVERY angle, i.e. always on
+        //    the bottom rim, on the uphill side. That leaves the body origin
+        //    (the centre of the bottom face) hanging capRadiusWorld*sin(angle)
+        //    clear of the surface, measured perpendicular. We sink along the
+        //    perpendicular, so sin is the right factor — and sin is exactly the
+        //    horizontal magnitude of a unit normal, so no trig call, and it's
+        //    the same "steepness" idiom TickSlip already uses. It degrades
+        //    correctly at both ends: 0 on flat ground, and exactly
+        //    capRadiusWorld against a vertical wall (pure side contact). Being
+        //    bounded by 1.0, unlike tan, it also can't blow up when steep.
+        //
+        //    This is why slip floated: it's on 65-75° ground, where this term is
+        //    ~0.34 — nearly all of the gap — and slip used to be excluded from
+        //    it on the mistaken belief that a steep contact was a side contact
+        //    rather than a bottom-rim one.
+        //
+        // 2. A flat artistic fudge for the pose's own height above the origin.
+        //    This one DOES differ per state, since prone-on-his-belly and
+        //    upright-on-his-feet sit against the surface differently.
+        float steepness = new Vector2(normal.X, normal.Z).Length(); // == sin(slope angle)
+        float sink = capRadiusWorld * steepness * TiltSlopeCompensation;
+        sink +=
+            stateOfMario == MarioState.slipping
+                ? SlipTiltSurfaceOffset
+                : BellyTiltSurfaceOffset;
+
+        Vector3 tiltedOrigin = armatureBaseLocalPos - _tiltCurrentRotation.Y * sink;
+
+        Vector3 origScale = armature.Transform.Basis.Scale;
+        armature.Transform = new Transform3D(
+            _tiltCurrentRotation.Scaled(origScale),
+            tiltedOrigin
+        );
     }
 
     // ===================== GROUND WALL PUSH / SHUFFLE =====================
@@ -5482,15 +6619,28 @@ public partial class Mario : CharacterBody3D
             return;
         if (stateOfMario == MarioState.wallJump && wallKickLock > 0)
             return;
-        if (stateOfMario == MarioState.wallSlide)
-            return;
-        if (wallRegrabCooldown > 0)
+        if (stateOfMario == MarioState.wallSlide || stateOfMario == MarioState.slipping)
             return;
         if (!IsOnWall())
             return;
 
         Vector3 n = GetWallNormal();
         if (n == Vector3.Zero)
+            return;
+
+        // This is the FIRST-CONTACT trigger — fires the same frame
+        // MoveAndSlide resolves the hit, before CanStartWallSlide's
+        // sustaining check even runs — so the real-wall-vs-steep-slope angle
+        // gate has to live here, not just there. Every slope contact was
+        // routing straight into wallSlide regardless of angle because this
+        // path never checked it.
+        if (Mathf.RadToDeg(n.AngleTo(Vector3.Up)) < WALL_TRUE_VERTICAL_MIN_ANGLE_DEG)
+        {
+            EnterSlip(preSlideVelocity);
+            return;
+        }
+
+        if (wallRegrabCooldown > 0)
             return;
 
         // Per-state entry requirements based on what you were doing when you struck the wall
@@ -5640,7 +6790,11 @@ public partial class Mario : CharacterBody3D
         return false;
     }
 
-    private void ApplyAirControl(double delta, AirControlProfile prof)
+    private void ApplyAirControl(
+        double delta,
+        AirControlProfile prof,
+        bool preserveTakeoffSpeed = false
+    )
     {
         float dt = (float)delta;
 
@@ -5673,10 +6827,33 @@ public partial class Mario : CharacterBody3D
         float dot = velDir.Dot(desiredDir);
         bool braking = dot < 0.0f;
 
+        // Is the stick opposing the direction he LAUNCHED in? Measured against
+        // the fixed takeoff vector, not current velocity — same reasoning as
+        // ApplyBackflipAirControl: current velocity gets steered, so classifying
+        // against it makes the meaning of "opposite" drift mid-flight.
+        bool opposingTakeoff = false;
+        if (preserveTakeoffSpeed && airTakeoffDirValid)
+        {
+            Vector2 takeoffXZ = new Vector2(airTakeoffDirXZ.X, airTakeoffDirXZ.Z);
+            if (takeoffXZ.LengthSquared() > 0.0001f)
+                opposingTakeoff = desiredDir.Dot(takeoffXZ.Normalized()) < -0.35f;
+        }
+
         float targetSpeed;
         if (!braking)
         {
             targetSpeed = prof.maxSpeed * walkingStrength;
+
+            // Don't let steering SCRUB speed he took off with. MoveToward pulls
+            // both ways, so with AIR_SINGLE.maxSpeed = 8.885 — already below
+            // RUN_SPEED = 11.55 — every jump from a sprint was being hauled back
+            // down mid-flight (a boosted 14.55 bled off in ~0.64s, about one
+            // jump's length). Raising the target to whatever he's actually doing
+            // keeps full steering authority while making the cap a floor he can
+            // exceed, so a faster run genuinely jumps farther. Holding AGAINST
+            // the takeoff direction opts out and brakes normally.
+            if (preserveTakeoffSpeed && !opposingTakeoff)
+                targetSpeed = Mathf.Max(targetSpeed, speed);
         }
         else
         {
@@ -5760,6 +6937,82 @@ public partial class Mario : CharacterBody3D
         if (pushingForward && velXZ.Length() < prof.stopSnap)
             velXZ = Vector2.Zero;
 
+        velocity.X = velXZ.X;
+        velocity.Z = velXZ.Y;
+    }
+
+    // Same shape as ApplyAirControl, but steers the forward (along wallKickDir) and
+    // lateral (perpendicular to it) components of velocity at independent rates.
+    // Regular ApplyAirControl only has one accel knob shared by "extend the kick"
+    // and "redirect left/right" — raising it enough to feel responsive pushing
+    // toward his facing direction also made side-to-side redirection too strong,
+    // since both go through the same rate. Decomposing onto the kick axis lets
+    // forward stay snappy (prof.accel/prof.brake, same braking/reverse behavior as
+    // the generic version) while lateral gets its own, weaker rate.
+    private void ApplyWallJumpAirControl(double delta, AirControlProfile prof, float lateralAccel)
+    {
+        float dt = (float)delta;
+        Vector2 velXZ = new Vector2(velocity.X, velocity.Z);
+        bool hasInput = walkingStrength > DEADZONE && direction != Vector3.Zero;
+
+        if (!hasInput)
+        {
+            velXZ = velXZ.MoveToward(Vector2.Zero, prof.drag * dt);
+            if (velXZ.Length() < prof.stopSnap)
+                velXZ = Vector2.Zero;
+            velocity.X = velXZ.X;
+            velocity.Z = velXZ.Y;
+            return;
+        }
+
+        Vector2 kickDirXZ = new Vector2(wallKickDir.X, wallKickDir.Z);
+        if (kickDirXZ.Length() < 0.001f)
+            kickDirXZ = (velXZ.Length() > 0.001f) ? velXZ.Normalized() : Vector2.Down;
+        kickDirXZ = kickDirXZ.Normalized();
+        Vector2 lateralAxis = new Vector2(-kickDirXZ.Y, kickDirXZ.X);
+
+        Vector3 desired3 = direction.Normalized();
+        Vector2 desiredDir = new Vector2(desired3.X, desired3.Z);
+        if (desiredDir.Length() < 0.001f)
+            return;
+        desiredDir = desiredDir.Normalized();
+
+        // Same target velocity the generic function would use (desiredDir * maxSpeed),
+        // just decomposed onto the kick-relative axes instead of steered as one vector.
+        float desiredForward = desiredDir.Dot(kickDirXZ);
+        float desiredLateral = desiredDir.Dot(lateralAxis);
+
+        float curForward = velXZ.Dot(kickDirXZ);
+        float curLateral = velXZ.Dot(lateralAxis);
+
+        bool brakingForward = desiredForward < 0f;
+        float targetForward;
+        if (!brakingForward)
+        {
+            targetForward = prof.maxSpeed * walkingStrength * desiredForward;
+        }
+        else
+        {
+            bool allowReverse =
+                (prof.reverseMax > 0f) && (walkingStrength > 0.65f) && (desiredForward < -0.35f);
+            targetForward = allowReverse ? (prof.reverseMax * walkingStrength * desiredForward) : 0f;
+        }
+        float forwardRate = brakingForward ? prof.brake : prof.accel;
+        curForward = Mathf.MoveToward(curForward, targetForward, forwardRate * dt);
+        if (brakingForward && Mathf.Abs(curForward) < prof.stopSnap)
+            curForward = 0f;
+
+        float targetLateral = prof.maxSpeed * walkingStrength * desiredLateral;
+        curLateral = Mathf.MoveToward(curLateral, targetLateral, lateralAccel * dt);
+        // Only snap to exact zero when actually settling toward zero (near-zero
+        // target too) — snapping whenever the CURRENT value is merely small also
+        // caught the very first ramp-up step away from zero every frame, since a
+        // single frame's step (lateralAccel * dt) is smaller than stopSnap. That
+        // reset it right back to 0 every tick, permanently, regardless of accel.
+        if (Mathf.Abs(targetLateral) < prof.stopSnap && Mathf.Abs(curLateral) < prof.stopSnap)
+            curLateral = 0f;
+
+        velXZ = kickDirXZ * curForward + lateralAxis * curLateral;
         velocity.X = velXZ.X;
         velocity.Z = velXZ.Y;
     }
@@ -6565,6 +7818,11 @@ public partial class Mario : CharacterBody3D
             radius = cap.Radius;
             height = cap.Height; // capsule cylinder height (not total incl hemispheres)
         }
+        else if (colShape?.Shape is CylinderShape3D cyl)
+        {
+            radius = cyl.Radius;
+            height = cyl.Height; // cylinder height is already the full extent (flat caps)
+        }
 
         float forwardLenWorld = 0.977382f; // 2.2 * SCALE_FIX
         float chestYWorld = 0.577543f; // 1.3 * SCALE_FIX
@@ -6732,9 +7990,21 @@ public partial class Mario : CharacterBody3D
     private void CacheCapsuleWorldMetrics()
     {
         bodyCol = GetNodeOrNull<CollisionShape3D>("CollisionShape3D");
-        if (bodyCol == null || bodyCol.Shape is not CapsuleShape3D cap)
+        float radius;
+        float halfHeight;
+        if (bodyCol?.Shape is CapsuleShape3D cap)
         {
-            GD.PushError("Expected CollisionShape3D with CapsuleShape3D.");
+            radius = cap.Radius;
+            halfHeight = cap.Height * 0.5f + cap.Radius; // Height excludes the hemispherical caps
+        }
+        else if (bodyCol?.Shape is CylinderShape3D cyl)
+        {
+            radius = cyl.Radius;
+            halfHeight = cyl.Height * 0.5f; // flat caps — Height is already the full extent
+        }
+        else
+        {
+            GD.PushError("Expected CollisionShape3D with CapsuleShape3D or CylinderShape3D.");
             return;
         }
 
@@ -6744,8 +8014,8 @@ public partial class Mario : CharacterBody3D
         if (s < 0.0001f)
             s = 0.0001f;
 
-        capRadiusWorld = cap.Radius * s;
-        capHalfHeightWorld = (cap.Height * 0.5f + cap.Radius) * s;
+        capRadiusWorld = radius * s;
+        capHalfHeightWorld = halfHeight * s;
 
         // bottom of capsule in WORLD Y
         float bottomY = bodyCol.GlobalPosition.Y - capHalfHeightWorld;
@@ -6830,6 +8100,15 @@ public partial class Mario : CharacterBody3D
         if (_runBobWeight <= 0.0001f)
             return;
 
+        // While the surface tilt owns the rig it also owns armature.Position (it
+        // sinks him along his own down axis to keep the belly on the slope), and
+        // this runs in _Process — AFTER the tilt's _PhysicsProcess write. Bailing
+        // out here stops the bob's tail-off from stomping the sink for the few
+        // frames its weight takes to ease back to zero after a dive starts. The
+        // weight/phase updates above still run, so it eases out normally.
+        if (_wasPlatformTilting)
+            return;
+
         float speedFactor = Mathf.Clamp(
             new Vector2(velocity.X, velocity.Z).Length() / RUN_SPEED,
             0.5f,
@@ -6852,6 +8131,67 @@ public partial class Mario : CharacterBody3D
     /// sprint) and out otherwise, cancelling the side-to-side head turn baked into
     /// the locomotion clips. The actual pose override runs in HeadForwardLock (a
     /// skeleton modifier), after the animation.</summary>
+    /// <summary>Eases the slope foot IK in for IDLE and PIVOT only, and out
+    /// everywhere else.
+    ///
+    /// Scoped that tightly on purpose: SMS doesn't plant feet while walking or
+    /// running, and it also keeps foot IK off jnt_waist while the running waist
+    /// IK (skeletonIK3DWaist, root_bone = jnt_waist) owns that same bone. Both
+    /// writing the waist in one frame would fight. The two state sets are
+    /// disjoint — running/sprinting for the waist, idle/pivot here — so they can
+    /// never overlap, and that's load-bearing rather than coincidence.
+    ///
+    /// Also requires IsOnFloor(): mid-air the probe would either miss entirely
+    /// or, worse, find ground far below and stretch his legs toward it.</summary>
+    /// <summary>Slope steeper than <see cref="SleepMaxSlopeDegrees"/> (measured
+    /// from flat) blocks the idle sit/sleep wind-down. Those clips lay him out
+    /// flat, so on an incline he'd sit and lie straight through the surface.
+    /// Small by design — this is meant to catch genuine ramps, not to stop him
+    /// sleeping on ground that's a fraction off level.</summary>
+    private bool OnSleepBlockingSlope()
+    {
+        if (!IsOnFloor())
+            return false;
+        return Mathf.RadToDeg(GetFloorNormal().AngleTo(Vector3.Up)) > SleepMaxSlopeDegrees;
+    }
+
+    private void UpdateFootIK(float delta)
+    {
+        if (_footIK == null)
+            return;
+
+        // Sitting/sleeping is an idle VARIANT, not its own MarioState — the
+        // timer chain in the idle branch plays ma_sit -> ma_sit_wait ->
+        // ma_sleep -> ma_sleep_wait straight through animPlayer while
+        // stateOfMario stays idle. So it can't be gated on state. His feet
+        // leave the standing pose entirely in those clips (he's sat down),
+        // and planting them to the ground fights the animation.
+        bool sittingOrAsleep = false;
+        if (animPlayer != null)
+        {
+            string clip = animPlayer.CurrentAnimation;
+            sittingOrAsleep =
+                !string.IsNullOrEmpty(clip)
+                && (clip.StartsWith("ma_sit") || clip.StartsWith("ma_sleep"));
+        }
+
+        // Idle AND pivot. Pivot was briefly excluded because the IK was planting
+        // the foot the turn picks up — but that was a flaw in how the targets
+        // were built (forcing each ankle onto its hit point), not something
+        // inherent to pivot. FootIK now measures each foot's ANIMATED lift
+        // against the ground under the body and re-references it to the ground
+        // under that foot, so a lifted foot stays lifted and only the terrain
+        // difference is applied. See the probe section in FootIK.
+        bool wants =
+            FootIKEnabled
+            && IsOnFloor()
+            && !sittingOrAsleep
+            && (stateOfMario == MarioState.idle || stateOfMario == MarioState.pivot);
+
+        _footIKWeight = Mathf.MoveToward(_footIKWeight, wants ? 1f : 0f, FootIKEaseSpeed * delta);
+        _footIK.Weight = _footIKWeight;
+    }
+
     private void UpdateHeadLock(float delta)
     {
         if (_headLock == null)
@@ -7610,6 +8950,137 @@ public partial class Mario : CharacterBody3D
             || stateOfMario == MarioState.pivot;
     }
 
+    /// <summary>
+    /// Hang a character's headgear off the <c>M_head_cap1</c> bone, creating the
+    /// BoneAttachment3D on first use. Doing it here rather than in Player.tscn
+    /// keeps the base scene free of an empty node that only one character needs,
+    /// and means adding headgear to a future character is a profile change only.
+    /// </summary>
+    private void ApplyHeadGear(PlayerProfile profile)
+    {
+        var skeleton = GetNodeOrNull<Skeleton3D>("Armature/Skeleton3D");
+        if (skeleton == null)
+            return;
+
+        var attach = skeleton.GetNodeOrNull<BoneAttachment3D>(HEAD_GEAR_NODE);
+
+        if (profile.HeadGear == null)
+        {
+            // Nothing to wear - clear anything a previous profile left behind.
+            if (attach != null)
+            {
+                skeleton.RemoveChild(attach);
+                attach.QueueFree();
+            }
+            return;
+        }
+
+        if (skeleton.FindBone("M_head_cap1") < 0)
+        {
+            GD.PushWarning("ApplyHeadGear: skeleton has no 'M_head_cap1' bone.");
+            return;
+        }
+
+        if (attach == null)
+        {
+            attach = new BoneAttachment3D { Name = HEAD_GEAR_NODE };
+            skeleton.AddChild(attach);
+            attach.BoneName = "M_head_cap1";
+        }
+
+        foreach (var child in attach.GetChildren())
+        {
+            attach.RemoveChild(child);
+            child.QueueFree();
+        }
+
+        if (profile.HeadGear.Instantiate() is not Node3D gear)
+        {
+            GD.PushWarning("ApplyHeadGear: HeadGear scene is not a Node3D.");
+            return;
+        }
+
+        attach.AddChild(gear);
+        gear.Scale = Vector3.One * Mathf.Max(0.001f, profile.HeadGearScale);
+    }
+
+    /// <summary>
+    /// Swap one hand attachment for a character-specific model. Frees the old
+    /// child and instances the replacement under the same parent with the same
+    /// name, transform and visibility - so hardcoded node paths elsewhere keep
+    /// resolving. No-op when <paramref name="replacement"/> is null.
+    ///
+    /// parentPath is the hand SLOT (the container the swap code toggles) and
+    /// childName is "Model" - replacing the child keeps the slot's own
+    /// visibility, which ShowOpenHands/ShowClosedHands drive.
+    ///
+    /// NOTE the scene spells the open variants "Slighty", not "Slightly".
+    /// </summary>
+    private void ReplaceHand(string parentPath, string childName, PackedScene replacement)
+    {
+        if (replacement == null)
+            return;
+
+        var parent = GetNodeOrNull<Node3D>(parentPath);
+        if (parent == null)
+        {
+            GD.PushWarning($"ReplaceHand: missing '{parentPath}'.");
+            return;
+        }
+
+        var old = parent.GetNodeOrNull<Node3D>(childName);
+        var xform = old?.Transform ?? Transform3D.Identity;
+        bool wasVisible = old?.Visible ?? true;
+
+        if (old != null)
+        {
+            parent.RemoveChild(old);
+            old.QueueFree();
+        }
+
+        if (replacement.Instantiate() is not Node3D fresh)
+        {
+            GD.PushWarning($"ReplaceHand: '{childName}' replacement is not a Node3D.");
+            return;
+        }
+
+        fresh.Name = childName;
+        parent.AddChild(fresh);
+        fresh.Transform = xform;
+        fresh.Visible = wasVisible;
+    }
+
+    /// <summary>
+    /// Depth-first search for the first MeshInstance3D in an instantiated model,
+    /// used to lift a character body out of PlayerProfile.BodyScene. Imported
+    /// glTF nests it under Armature/Skeleton3D, but the depth is not guaranteed
+    /// across exporters, so this does not hard-code a path.
+    /// </summary>
+    private static MeshInstance3D FindFirstMeshInstance(Node node)
+    {
+        if (node is MeshInstance3D mi)
+            return mi;
+
+        foreach (var child in node.GetChildren())
+        {
+            var found = FindFirstMeshInstance(child);
+            if (found != null)
+                return found;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The Armature scale as authored in the scene (~0.0134334, which cancels the
+    /// 74.4414 bind-pose convention). Captured on the first ApplyProfile call so
+    /// PlayerProfile.BodyScale can multiply it instead of overwriting it.
+    /// </summary>
+    private Vector3 _armatureBaseScale = Vector3.Zero;
+
+    /// <summary>Name of the runtime-created headgear BoneAttachment3D.</summary>
+    private const string HEAD_GEAR_NODE = "HeadCapBone";
+
     public void ApplyProfile(PlayerProfile profile)
     {
         if (profile == null)
@@ -7620,6 +9091,92 @@ public partial class Mario : CharacterBody3D
         {
             GD.PushWarning("ApplyProfile: Could not find Armature/Skeleton3D/Mesh_0");
             return;
+        }
+
+        // --- body swap: mesh and skin travel as a matched pair ---
+        // Every character rides the SAME Skeleton3D and the same ma_*.res
+        // animations (they bind by bone name), so swapping a character is just
+        // swapping the geometry and its bind poses.
+        Mesh newMesh = profile.BodyMesh;
+        Skin newSkin = profile.BodySkin;
+
+        // BodyScene is the ergonomic path: lift the mesh and its own Skin out of
+        // the imported model together so the two can never be mismatched.
+        // Explicit BodyMesh/BodySkin win if the user set them.
+        if (newMesh == null && profile.BodyScene != null)
+        {
+            var probe = profile.BodyScene.Instantiate();
+            var src = FindFirstMeshInstance(probe);
+
+            if (src == null)
+            {
+                GD.PushWarning(
+                    $"ApplyProfile: '{profile.ProfileName}' BodyScene contains no "
+                        + "MeshInstance3D - keeping the current body."
+                );
+            }
+            else
+            {
+                newMesh = src.Mesh;
+                newSkin = src.Skin;
+            }
+
+            probe.QueueFree();
+        }
+
+        if (newMesh != null)
+        {
+            if (newSkin == null)
+            {
+                GD.PushWarning(
+                    $"ApplyProfile: '{profile.ProfileName}' supplies a body mesh but no "
+                        + "Skin. They are a matched pair - the mesh will deform "
+                        + "incorrectly against the shared skeleton."
+                );
+            }
+
+            // Drop overrides left by a previously applied profile BEFORE swapping.
+            // Surface counts differ per character (Mario has 11, Luigi 10), so a
+            // stale override would otherwise land on the wrong surface.
+            for (int i = mesh.GetSurfaceOverrideMaterialCount() - 1; i >= 0; i--)
+                mesh.SetSurfaceOverrideMaterial(i, null);
+
+            mesh.Mesh = newMesh;
+
+            if (newSkin != null)
+                mesh.Skin = newSkin;
+        }
+
+        // --- hands ---
+        // Swap the attachment models in place, keeping each node's NAME and
+        // TRANSFORM, so every existing GetNode path and the hand-swap logic keep
+        // working untouched.
+        // Each slot is a Node3D container whose NAME the hand-swap code toggles;
+        // the model sits inside it as "Model". Swapping the child leaves the
+        // container (and its visibility state) alone.
+        const string LH = "Armature/Skeleton3D/LeftHandBone";
+        const string RH = "Armature/Skeleton3D/RightHandBone";
+        ReplaceHand($"{LH}/LeftHandClosed",       "Model", profile.LeftHandClosed);
+        ReplaceHand($"{LH}/LeftHandSlightyOpen",  "Model", profile.LeftHandSlightlyOpen);
+        ReplaceHand($"{RH}/RightHandClosed",      "Model", profile.RightHandClosed);
+        ReplaceHand($"{RH}/RightHandSlightyOpen", "Model", profile.RightHandSlightlyOpen);
+        ReplaceHand($"{RH}/RightHandWithHat",     "Model", profile.RightHandWithHat);
+
+        ApplyHeadGear(profile);
+
+        // --- per-character scale ---
+        // Applied to the Armature, not the mesh node: a skinned MeshInstance3D
+        // follows its skeleton, so scaling that node is unreliable. Scaling the
+        // Armature takes the skeleton and everything bone-attached (hands, cap)
+        // with it, and deliberately leaves CollisionShape3D alone so the tuned
+        // physics stays shared across characters.
+        var armature = GetNodeOrNull<Node3D>("Armature");
+        if (armature != null)
+        {
+            if (_armatureBaseScale == Vector3.Zero)
+                _armatureBaseScale = armature.Scale;
+
+            armature.Scale = _armatureBaseScale * Mathf.Max(0.001f, profile.BodyScale);
         }
 
         int surfaceCount = mesh.Mesh.GetSurfaceCount();
@@ -7633,9 +9190,20 @@ public partial class Mario : CharacterBody3D
             string path = origMat.AlbedoTexture.ResourcePath;
             Texture2D replacement = null;
 
-            if (profile.BodyTexture != null && path.Contains("ma_mdl1_0"))
+            // Which atlas is "body" and which is "eyes" differs per character
+            // (Mario's eyes are on ma_mdl1_1, Luigi's on ma_mdl1_2), so the
+            // profile carries its own match strings instead of hardcoding them.
+            if (
+                profile.BodyTexture != null
+                && !string.IsNullOrEmpty(profile.BodyTextureMatch)
+                && path.Contains(profile.BodyTextureMatch)
+            )
                 replacement = profile.BodyTexture;
-            else if (profile.EyesTexture != null && path.Contains("ma_mdl1_1"))
+            else if (
+                profile.EyesTexture != null
+                && !string.IsNullOrEmpty(profile.EyesTextureMatch)
+                && path.Contains(profile.EyesTextureMatch)
+            )
                 replacement = profile.EyesTexture;
 
             if (replacement == null)
@@ -7681,7 +9249,17 @@ public partial class Mario : CharacterBody3D
         // If ma_run1 is your normal run and ma_run2 is sprint, you can tune these.
         float full = RUN_SPEED; // or use (stateOfMario==sprinting ? RUN_SPEED : RUN_SPEED*0.7f)
 
-        float t = Mathf.Clamp(speedXZ / Mathf.Max(full, 0.001f), 0f, 1.25f);
+        // Ceiling has to leave room for the rollout slope boost, or the anim
+        // saturates and a boosted run cycles at exactly the same rate as a
+        // normal one — the speed is there but reads as nothing happening.
+        // Derived from the boost so raising RolloutSlopeMaxBoost widens this
+        // automatically, and floored at the original 1.25 so nothing regresses.
+        float maxRatio = Mathf.Max(
+            1.25f,
+            1f + Mathf.Max(0f, RolloutSlopeMaxBoost) / Mathf.Max(RUN_SPEED, 0.001f)
+        );
+
+        float t = Mathf.Clamp(speedXZ / Mathf.Max(full, 0.001f), 0f, maxRatio);
 
         // Map speed -> playback speed (widen RunAnimSpeedMax for a faster full-tilt cycle).
         return Mathf.Lerp(RunAnimSpeedMin, RunAnimSpeedMax, t);
@@ -8022,7 +9600,10 @@ public partial class Mario : CharacterBody3D
                 _sm.Travel("ma_run2");
                 break;
             case MarioState.singleJump:
-                _sm.Travel("ma_jump");
+                // Just left a slip for airborne (slid off the edge, or the
+                // escape hop) — ma_slpla plays for that beat instead of the
+                // normal jump pose.
+                _sm.Start(slipAirLaunchTimer > 0f ? "ma_slpla" : "ma_jump");
                 break;
             case MarioState.doubleJump:
                 // Double jump: ma_2jmp1 while rising, ma_2jmp2 while falling
@@ -8086,6 +9667,17 @@ public partial class Mario : CharacterBody3D
                 break;
             case MarioState.wallSlide:
                 _sm.Travel("ma_wsld");
+                break;
+
+            case MarioState.slipping:
+                // Start, not Travel — ma_slpla/ma_slpbk/ma_slip are only
+                // graph-connected in the ground-pound/belly-rollout
+                // recovery neighborhood (they're reused for that too).
+                // Travel() pathfinds through the graph to reach them, which
+                // from a jump/wall-slide state routes through whatever
+                // unrelated recovery animation is on that path — the "weird
+                // animation" flash. Start() jumps straight there.
+                _sm.Start(_slipFacingUphill ? "ma_slpbk" : "ma_slip");
                 break;
             case MarioState.wallJump:
                 _sm.Travel("ma_wjmp");

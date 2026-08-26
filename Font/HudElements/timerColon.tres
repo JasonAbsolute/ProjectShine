@@ -1,4 +1,4 @@
-[gd_resource type="AtlasTexture" load_steps=2 format=3]
+[gd_resource type="AtlasTexture" format=3 uid="uid://dd370ujl82ll0"]
 
 [ext_resource type="Texture2D" uid="uid://sw5nlsvy481r" path="res://Font/HudElements/hud.png" id="1_timer_colon"]
 

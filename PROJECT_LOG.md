@@ -259,16 +259,285 @@ This stops the SpringArm-based camera from catching on the orbiting mushroom whi
 
 `Mario2.tscn` Mario node now has:
 ```
-floor_max_angle = 0.872665     # 50° (was 45° default)
+floor_max_angle = 1.134464     # 65° (was 50°, originally 45° default)
 floor_snap_length = 0.6         # camera-snap-to-floor; default was 0 (caused flying off slopes)
 floor_constant_speed = true     # no slowdown going uphill
 floor_block_on_wall = true      # default but explicit
+platform_on_leave = 2           # DoNothing — don't inherit platform velocity on leave
 ```
+
+Collision shape is a **`CylinderShape3D`** (`height 1.8701391`, `radius 0.37304688`), swapped from the
+original capsule — the capsule's rounded bottom was launching him off slope corners. The shape matters
+beyond collision: see the belly-tilt sink below, which is derived from that radius.
 
 These were missing entirely before, causing slope misbehavior. Documentation cheat-sheet:
 - Mario flies off downhill → raise `floor_snap_length`.
 - Mario slows uphill → ensure `floor_constant_speed = true`.
-- Can't walk up a steep slope → raise `floor_max_angle` (50° = 0.873, 60° = 1.047, etc.).
+- Can't walk up a steep slope → raise `floor_max_angle` (50° = 0.873, 60° = 1.047, 65° = 1.134).
+
+Angle bands, for reference:
+
+| Angle from vertical | Classified as | Mario's state |
+|---|---|---|
+| 0° – 65° | Floor | Walkable |
+| 65° – 75° | Wall (`floor_max_angle` exceeded) | `slipping` — slides down, can't stand |
+| 75°+ | Wall (`WALL_TRUE_VERTICAL_MIN_ANGLE_DEG`) | `wallSlide` / `wallJump` eligible |
+
+---
+
+## Surface Tilt — belly-on-the-ground on slopes & moving platforms
+
+`Mario.cs` → `UpdatePlatformTilt(double delta)`. Purely visual: rotates and offsets the **armature only**.
+Never touches `GlobalPosition`, `Velocity`, or collision, so it can't push him through geometry.
+
+Runs **last** in `_PhysicsProcess` so it layers on top of whatever yaw the state machine set that frame.
+
+Active in three states: `diving`, `bellySlidingFromDive`, `slipping`.
+
+### What it does
+
+1. **Pitch** — leans him along his facing axis (plane pitching with level wings).
+2. **Roll** — supplies the rest of the alignment, so his up-axis lands exactly on the surface normal.
+   This is what makes him bank on a platform that tips sideways, and lie flush when sliding diagonally
+   across a slope rather than straight down it.
+3. **Sink** — drops the rig along its own (now surface-aligned) down axis to close the gap left by the
+   collider, so the belly touches instead of hovering.
+
+### Inspector exports (on Mario)
+
+| Export | Default | Applies to | Effect |
+|---|---|---|---|
+| `TiltSlopeCompensation` | `1.0` | **all 3 states** | Scales the collider-derived gap `capRadiusWorld * sin(angle)`. `1.0` = true geometric value. `0` = disable. |
+| `BellyTiltSurfaceOffset` | `0.15` | `diving`, `bellySlidingFromDive` | Flat sink (metres) for the **prone** pose's belly-above-origin height. |
+| `SlipTiltSurfaceOffset` | `0.0` | `slipping` | Flat sink (metres) for the **upright** slip pose. Trim only — the slope term does nearly all the work at 65–75°. |
+
+**Tune in this order:** `BellyTiltSurfaceOffset` on FLAT ground first (the slope term is zero there, so
+it's the only thing acting), then check a ramp and only touch `TiltSlopeCompensation` if the exact
+geometric value reads wrong. Splitting them this way means fixing ramps can't break flat ground.
+
+### The sink formula
+
+```
+sink = capRadiusWorld * sin(slopeAngle) * TiltSlopeCompensation
+     + (slipping ? SlipTiltSurfaceOffset : BellyTiltSurfaceOffset)
+```
+
+`capRadiusWorld` ≈ **0.373** (cylinder radius × world scale 1). `sin(slopeAngle)` is computed as
+`new Vector2(normal.X, normal.Z).Length()` — the horizontal magnitude of a **unit** normal IS the sine,
+so no trig call. Same `steepness` idiom `TickSlip` already uses.
+
+### Computed sink at the defaults
+
+| Slope | slope term | Belly (`+0.15`) | Slip (`+0.0`) |
+|---|---|---|---|
+| 0° (flat) | 0.000 | **0.150** | — |
+| 10° | 0.065 | **0.215** | — |
+| 20° | 0.128 | **0.278** | — |
+| 30° | 0.187 | **0.337** | — |
+| 45° | 0.264 | **0.414** | — |
+| 60° | 0.323 | **0.473** | — |
+| 65° (max floor) | 0.338 | **0.488** | **0.338** |
+| 70° | 0.351 | — | **0.351** |
+| 75° (slip ceiling) | 0.360 | — | **0.360** |
+
+Belly slide can reach 65°; slip only exists in the 65–75° band.
+
+### Why the slope term exists (the geometry)
+
+The collider is a cylinder with a **flat bottom face that never tilts**. Resting it against an inclined
+plane, the support point in the `-normal` direction maximises `(-t·cos - r·(n·u))` over axis height `t`
+and radial direction `u` — that lands at `t = 0` for **every** angle. So contact is always on the
+**bottom rim**, on the uphill side, leaving the body origin (centre of that face) hanging
+`capRadiusWorld * sin(angle)` clear of the surface, measured perpendicular.
+
+Sanity checks that it's the right formula: **0** on flat ground, and exactly `capRadiusWorld` against a
+vertical wall (the pure side-contact case, recovered as a limit rather than needing its own branch).
+Being bounded by 1.0 — unlike `tan` — it also can't blow up as a surface approaches vertical.
+
+### ⚠️ Gotcha: the Mario body node is yawed 180° in every level
+
+This is the big one, and it silently inverted the tilt for a long time. See also **Multi-Character System → the spawner must hand its rotation down to the character** — the same 180° is what makes `PlayerSpawner` transfer its basis to the spawned node instead of keeping it, since `Mario.cs` also uses that local basis as the movement input frame.
+
+| Scene | Mario instance basis |
+|---|---|
+| `Rico4Secret.tscn` | `(-1,0,~0, 0,1,0, ~0,0,-1)` — 180° yaw |
+| `secrect_level.tscn` | same |
+| `Level.tscn` | same, **plus ~2° roll** (`0.0348995`) |
+
+`armature.Transform` is a **LOCAL** transform. The tilt computes everything in **WORLD** space
+(`Vector3.Up`, `GetFloorNormal()`, `YawFromDir(...)`), so writing a world rotation straight into the
+local transform composes the body's 180° on top of it — which **mirrors the horizontal component of the
+resulting up-axis**. The tilt amount stayed correct but leaned the opposite way, driving his face into
+the slope.
+
+Fix: conjugate only the **rotation axes** into body space —
+`P⁻¹·Rot(v,θ)·P == Rot(P⁻¹v, θ)` — via `GlobalBasis.Orthonormalized().Inverse()`. Exact no-op when the
+body is unrotated, so it's safe in any level.
+
+**The yaw half deliberately stays in the local convention.** The mesh is authored backwards (local `+Z`
+forward) and the body's 180° is precisely what cancels it. Converting the yaw too would snap him 180°
+the instant the tilt engages.
+
+### ⚠️ Gotcha: why pitch-then-roll, not shortest-arc
+
+A shortest-arc rotation from `Up` to the normal rotates about `Up × normal` — an axis with no
+relationship to his heading — so it drags the facing sideways as it tilts. Pitch-then-roll reaches the
+identical final up-axis while leaving the heading exactly where the state machine put it, because the
+roll axis **is** his forward axis and a rotation fixes its own axis.
+
+That the roll lands `up` exactly on the normal isn't approximate: after the pitch,
+`{right, upPitched, rollAxis}` is orthonormal and the normal has **no** component along `rollAxis`
+(it's `normalInPitchPlane` plus a pure `right` term, both perpendicular to it), so it lies in the plane
+the roll sweeps through.
+
+### ⚠️ Gotcha: `UpdateRunBob` also writes `armature.Position`
+
+It runs in `_Process` — **after** the tilt's `_PhysicsProcess` write — and its weight takes a few frames
+to ease to zero when you dive out of a run. Without a guard it stomps the sink for exactly those frames.
+`UpdateRunBob` now early-outs while `_wasPlatformTilting`, after the weight/phase update so it still
+eases out normally.
+
+The tilt also restores `armature.Position = armatureBaseLocalPos` on exit, so the sink can't leak into
+the next state. The origin is rebuilt from `armatureBaseLocalPos` every frame, never accumulated, so it
+can't creep over a long slide.
+
+### Smoothing
+
+Reuses `WALL_SLIDE_FACE_SPEED` (18) as the slerp rate toward the target basis — floor/wall normals
+flicker frame-to-frame right at the classification boundary. Snaps instantly on the first tilting frame
+rather than blending from a stale pose.
+
+---
+
+## Slip — sliding on too-steep ground
+
+`Mario.cs` → `CanStartSlip()` / `EnterSlip()` / `TickSlip()`, plus the exit handling in the
+post-`MoveAndSlide` block. State is `MarioState.slipping`.
+
+Fires on ground steeper than `floor_max_angle` (65°) but shallower than
+`WALL_TRUE_VERTICAL_MIN_ANGLE_DEG` (75°) — see the angle-band table in the Slope/Floor section.
+Steeper than 75° is a real wall and goes to `wallSlide` / `wallJump` instead.
+
+### Animations
+
+| Situation | Animation | Chosen |
+|---|---|---|
+| Hit the face moving UPhill → slides backward | `ma_slpbk` | at entry, locked for the episode |
+| Otherwise → faces downhill, slides forward | `ma_slip` | at entry, locked for the episode |
+| Leaving slip for airborne (edge or escape hop) | `ma_slpla` | via `slipAirLaunchTimer` |
+
+Locked via `_slipFacingUphill` at entry so the animation can't flip mid-slide. `SetMarioState` uses
+`_sm.Start()` not `Travel()` for these — they're only graph-connected in the ground-pound/rollout
+recovery neighbourhood, so `Travel()` pathfinds through unrelated clips and flashes them.
+
+### Inspector exports
+
+| Export | Default | Effect |
+|---|---|---|
+| `SlipMaxSpeed` | `22` | Top slide speed at vertical; actual cap is this × slope factor |
+| `SlipGravityScale` | `1.0` | Fraction of real `GRAVITY` (62.2) pulling down the fall line. 1.0 = true physics |
+| `SlipSteepnessCurve` | `1.0` | Exponent on `sin(angle)`. 1.0 = physics; higher exaggerates angle differences |
+| `SlipSteerAccel` | `9.0` | Stick authority over the slide (m/s²) |
+| `SlipMaxFallSpeed` | `-26` | Safety backstop on fall speed — **not** a speed control, see gotcha below |
+| `SlipExitSlideMinSpeed` | `3.0` | Min horizontal speed on reaching flat ground to continue as a belly slide |
+| `SlipExitSlideBoost` | `1.0` | Multiplier on speed carried from slip into the belly slide |
+
+### Resulting speeds (at the defaults)
+
+`accel = GRAVITY * SlipGravityScale * slopeFactor`, `maxSpeed = SlipMaxSpeed * slopeFactor`,
+where `slopeFactor = sin(angle) ^ SlipSteepnessCurve`. `RUN_SPEED` is 11.55 for scale.
+
+| Angle | sin | accel (m/s²) | max speed | vs RUN | time to max |
+|---|---|---|---|---|---|
+| 45° | 0.707 | 44.0 | 15.56 | 1.35× | 0.35 s |
+| 65° | 0.906 | 56.4 | 19.94 | 1.73× | 0.35 s |
+| 66° | 0.914 | 56.8 | 20.10 | 1.74× | 0.35 s |
+| 70° | 0.940 | 58.4 | 20.67 | 1.79× | 0.35 s |
+| 75° | 0.966 | 60.1 | 21.25 | 1.84× | 0.35 s |
+| 90° | 1.000 | 62.2 | 22.00 | 1.90× | 0.35 s |
+
+Previously these were hard constants `SLIP_SLIDE_SPEED = 6.5` / `SLIP_SLIDE_ACCEL = 14`, giving
+**5.94 m/s** at 66° — about half walking pace — with accel 4.4× weaker than real gravity.
+
+### ⚠️ Gotcha: `SLIP_MAX_FALL` was a hidden throttle
+
+The old `SLIP_MAX_FALL = -13` clamp looked like a safety limit but was actually the binding speed
+constraint. On a steep face the slide is almost entirely **vertical** — at 66° the downhill tangent is
+`(0.407 horizontal, -0.914 vertical)` — so a fall-speed clamp of 13 caps the slide at `13 / 0.914 ≈
+14.2 m/s` no matter what the speed cap says. Raising `SlipMaxSpeed` alone would have done nothing.
+
+It's now clamped at runtime against the slide's own cap so it can never bind tighter:
+```csharp
+float fallFloor = Mathf.Min(SlipMaxFallSpeed, -(maxSpeed + WALL_STICK_SPEED + 1f));
+```
+
+### ⚠️ Gotcha: the angle barely varies inside the slip band
+
+Across the entire 65–75° band, `sin` only runs **0.906 → 0.966** — about 7%. At
+`SlipSteepnessCurve = 1.0` every slippable slope is effectively max speed and the angle is almost
+unfelt. That's real physics, not a bug. `SlipSteepnessCurve` is the knob if you want it felt:
+
+| curve | 65° | 75° | spread |
+|---|---|---|---|
+| 1.0 | 19.94 | 21.25 | 1.31 m/s |
+| 2.0 | 18.07 | 20.53 | 2.46 m/s |
+| 4.0 | 14.84 | 19.15 | 4.31 m/s |
+
+Tradeoff: higher curve slows the shallow end. Matters much more if arbitrary-angle "slip zones" get
+added later.
+
+### Steering (modelled on the SMS decomp)
+
+From `doSliding()` in [doldecomp/sms](https://github.com/doldecomp/sms) `src/Player/MarioRun.cpp`:
+```c
+mSlideVelX += sn * (mSlideVelZ * (mIntendedMag * 0.03125f)) * getSlideStickMult();
+```
+The key design point: **the stick never sets the slide direction.** It adds a small acceleration to an
+existing slide velocity vector, scaled by stick magnitude × `0.03125` (~1/32 authority), so you carve
+gradually rather than turning on a dime.
+
+Ours works the same way. `slipSlideVel` is a vector **in the slope's tangent plane** (it used to be a
+scalar speed pinned to the fall line, which made steering structurally impossible):
+
+1. Re-project onto the *current* tangent plane each frame — curved surfaces and rotating platforms turn
+   the normal underneath him, and carried velocity otherwise drifts out of the face.
+2. Add gravity down the fall line.
+3. Add stick acceleration, flattened onto the tangent plane so it can't push into or off the surface.
+4. **Clamp the downhill component to never go negative** — steering can slow the descent but never
+   reverse it, so no tuning of `SlipSteerAccel` makes a too-steep face climbable.
+5. Cap total magnitude, so steering *redirects* speed rather than stacking on it.
+
+He faces his actual slide direction (not the raw fall line) so steering reads on the model, within the
+`_slipFacingUphill` choice locked at entry.
+
+Not ported from SMS: per-surface friction params (`mSlipParamsNormal`, `mSlipParamsWaterGround`, …) and
+the up/down-slope accel split. The single steepness-scaled accel covers that for now.
+
+### Exiting onto walkable ground
+
+He does **not** snap to idle. Momentum carries into `MarioState.bellySlidingFromDive`, which already
+owns everything that should happen next — no duplicated logic:
+
+| Behaviour | Provided by |
+|---|---|
+| Friction ramp-down | `Lerp(velocity, 0, .05)` in the belly-slide tick |
+| Get-up when stopped, no input | → `gettingUpFromSliding` (`ma_lost`) under 0.1 speed |
+| A → `bellyRollout` / `singleRollout` | `checkSpeedForBellyRoll()` |
+| B → re-dive | belly-slide tick |
+| Surface tilt continues | `bellySlidingFromDive` is already a tilt state |
+
+**Speed carried** is only the HORIZONTAL part, since the floor absorbs the vertical: a 20.10 m/s slip at
+66° arrives at `20.10 × cos(66°) ≈ **8.17 m/s**` (~0.71× RUN_SPEED), giving roughly a 1.4 s slide.
+`SlipExitSlideBoost` exists if that reads too tame.
+
+**Why the decision lives in the post-move slip block, not the landing block:** `justLanded` requires
+`preSlideVelocity.Y < -3`, which a *slow* slip never reaches. The slip block keys off `IsOnFloor()`
+directly so it fires either way. A guard in the landing block (`airStateAtImpact == slipping`) stops the
+generic `EnterLanding`/`ma_laend` from overwriting the choice.
+
+**Existing quirk, left alone:** `checkSpeedForBellyRoll()` returns true when speed is *low*, so it's
+**slow → `bellyRollout`, fast → `singleRollout`**. It also tests per-axis rather than magnitude, so a
+diagonal at 2.9/2.9 (≈4.1 m/s actual) still counts as "slow".
 
 ---
 
@@ -313,6 +582,8 @@ Tree animations have their loop modes set in `_Ready` (for the looping ones).
 - **Canvas UI is authored against a 1152×648 base** (`stretch/mode=canvas_items`, no viewport override), stretched ~1.68× to the real window. Size `Control` pixel offsets for that base, not for what looks right at native screen resolution, or elements render way oversized (bit the `SignPopup` banner).
 - **`SpringArm3D`'s collision avoidance can silently shorten a requested camera radius** in tight spots — always sanity-check `get_hit_length()` vs. the `spring_length` you set, and verify close-range camera framing with an actual screenshot (see TalkingPOV section above).
 - **`CameraLocked` on Mario freezes velocity, not his current animation/pose** — anything that locks him mid-action should explicitly call `Mario.ForceStandingIdle()` (or similar) first, or he'll visibly hold whatever transient pose he was in.
+- **`ma_mdl1.glb`'s root node had NO NAME, and Godot invents one — the invented name changed between engine versions.** Godot ≤4.6 called an unnamed glTF root `Armature`; 4.7 calls it `Node`. On the 4.7 upgrade the model silently re-imported and every one of the 200 animation `.res` files was re-baked with tracks pointing at `Node/Skeleton3D:...` while `Mario2.tscn` still had `Armature/Skeleton3D` — **6016 "couldn't resolve track" warnings and an editor that froze under the volume**. Restoring the files from git could not hold, because nothing in the project ever *specified* the name; the importer re-derived it on every import. **Fixed at the source:** the glb's JSON chunk was patched to give node 0 the explicit name `Armature` (BIN chunk untouched, byte-identical). **How to apply:** if you ever re-export this model from Blender, **name the armature object before exporting** or the unnamed root — and this entire bug — comes straight back. Symptom to watch for: mass `_update_caches: ... couldn't resolve track` spam right after any engine upgrade or reimport.
+- **The Mario body node itself carries a 180° yaw in every level** (plus ~2° roll in `Level.tscn`), and `armature.Transform` is a LOCAL transform. Any world-space basis written straight into it gets the body's yaw composed on top — which mirrors the horizontal part of the result. Rotation *axes* must be conjugated into body space first (`GlobalBasis.Inverse()`). This silently inverted the surface tilt; see the Surface Tilt section. Note the yaw convention itself is load-bearing: the mesh is authored backwards and that 180° is what cancels it, so don't "fix" the body rotation.
 
 ---
 
@@ -331,13 +602,14 @@ Tree animations have their loop modes set in `_Ready` (for the looping ones).
 - `assets/ShineTimer.cs` — generic countdown/count-up timer, HUD-agnostic
 - `Font/HudElements/SignPopup.cs` + `.tscn`, `SignPopupLabelSettings.tres` — generic 7-line ruled-sign popup
 - `Font/HudElements/TimerHud.cs` + `.tscn` — MM:SS:CC display for ShineTimer
+- `Skyboxes/SecretCourseGlow/secret_course_glow_v9.gdshader` + `SecretCourseGlow_v9.tres`, `B_crasicmario.png`, `P_casino_glow2mm_level0.png` — Rico4 secret-course background (glow dot grid + climbing Mario sprite), shared/reusable for future secret courses
 
 ### Significantly modified
-- `assets/Mario.cs` — tree climb states, GP-jump, CameraLocked, head-look hooks, `ForceStandingIdle()`, AIR_DIVE/AIR_ROLLOUT air-control accel tuning, etc.
+- `assets/Mario.cs` — tree climb states, GP-jump, CameraLocked, head-look hooks, `ForceStandingIdle()`, AIR_DIVE/AIR_ROLLOUT air-control accel tuning, `slipping` state, `UpdatePlatformTilt()` surface tilt + sink, etc.
 - `assets/SunshineCamera.cs` — added `CamMode.TalkingPOV` (OverShoulder-style, locked, event-driven)
 - `assets/YellowCoin.cs`, `RedCoin.cs`, `BlueCoin.cs` — LaunchAsDrop integration; `RedCoin` also gained `Collected` signal + spawn-puff
 - `assets/Mushroom1Up.cs` — collision disable on pickup
-- `assets/Mario2.tscn` — floor properties
+- `assets/Mario2.tscn` — floor properties, capsule → `CylinderShape3D` collider swap
 - `assets/secrect_level.tscn` — RedCoinSwitch instance wired to ShineTimer/SignPopup/CamController
 - `Font/HudElements/RedCoinHud.cs` — HiddenOffsetY export
 - `Font/HudElements/PalmTree.tscn` — collision shapes, scripts
@@ -708,3 +980,327 @@ Added `CamMode.TalkingPOV` to `SunshineCamera.cs` for "camera swings in to watch
 - **`project_run(mode="current"|"main")` is idempotent when the game is already running** — `was_already_running: true`, no rebuild, no relaunch. If you just edited a `.cs` file and need the change live, you **must** `project_manage(op="stop")` first, *then* `project_run` again — otherwise you'll test stale code and get confusing results (burned a full diagnostic detour on exactly this once this session).
 - **`editor_screenshot(source="game")` can silently return a stale/frozen frame** (`stale_frame: true`, "window appears backgrounded") if the game window isn't OS-focused, which it usually isn't in this headless-ish workflow — don't trust a screenshot that doesn't visually match what you just did; check `stale_frame` and retry, or better, verify state via `game_eval` reads (signals fired, mode enums, `IsRunning` flags) which aren't affected by window focus.
 - For anything gameplay-adjacent (camera framing, physics-driven positioning), **verify with an actual screenshot, not just the math** — this file's own ShineGet section already learned this lesson once; TalkingPOV's aim-height bug (aiming at ~94% of Mario's height instead of chest-center, cropping his whole lower body out at close range) and the SpringArm collision-shortening were both only caught by looking at renders, not by reasoning about the polar-camera formulas.
+
+---
+
+## Air Control Tuning (Dive / Rollout)
+
+**File:** `assets/Mario.cs` — `AIR_DIVE` and `AIR_ROLLOUT` (`AirControlProfile` instances)
+
+`AirControlProfile.accel` is "how fast we steer toward desired velocity" while airborne — the knob that makes a dive or rollout feel like it can actually be curved mid-air versus just ballistically committed once launched. Bumped twice per playtest feedback, same multiplier applied to both moves each time so they stay matched:
+
+| Move | Base accel | 1st pass (1.5×) | 2nd pass (2×, current) |
+|---|---:|---:|---:|
+| `AIR_DIVE` | 4.442643 | 6.663965 | **8.885286** |
+| `AIR_ROLLOUT` | 8.885286 | 13.327929 | **17.770572** |
+
+Other fields on the same profiles (`maxSpeed`, `brake`, `drag`, `reverseMax`, `stopSnap`) were untouched — only steering responsiveness changed, not top speed or how hard braking against your own momentum hits.
+
+---
+
+## Rico4 Secret Course — Background Glow Shader
+
+**Files:** `Skyboxes/SecretCourseGlow/secret_course_glow_v9.gdshader` + `SecretCourseGlow_v9.tres`, applied as `material_override` on `Levels/Rico4Secrect/Skybox/rico_4_secret_skybox.tscn`'s `Rico4SecretSkybox/Armature/Skeleton3D/Mesh_0`.
+
+Recreation of the classic SMS secret-course background: a dark void covered in a grid of glowing dots, with small clusters of Mario's 8-bit jump sprite scattered across it, slowly climbing, periodically cutting between a "normal" (red/yellow, big) look and a "green" (small) look.
+
+### What "Rico 4" is
+
+Episode 4 of Ricco Harbor: **"The Secret of Ricco Tower"** — the harbor's one secret course (rotating/gear platforms, reused later as Twisty Trials Galaxy in SMG2). Its replay mode is an 8-red-coins-in-90-seconds challenge — i.e. the exact same mechanic as the `RedCoinSwitch` system documented above. This background is the standard SMS secret-course backdrop, not unique to Ricco Tower specifically.
+
+### Source assets
+
+The glow/sprite textures didn't survive this project's usual Blender BMD→GLB export pipeline (same class of loss as the vertex-color/white-texture issue noted elsewhere in this doc). Recovered from a separate extraction tool output and copied in:
+
+- `Skyboxes/SecretCourseGlow/B_crasicmario.png` (64×64, RGB) — the tiled Mario sprite. Blue field = "background" pixels, red/yellow pixels = the actual sprite.
+- `Skyboxes/SecretCourseGlow/P_casino_glow2mm_level0.png` (128×128, gray+alpha) — the soft dot-grid glow pattern, baked as a 4×4 array of dots per tile.
+- Source path (for re-extraction if ever needed): `C:\Users\Jaysonn\Documents\FinModelUtility-main\cli\out\super_mario_sunshine\data\scene\coro_ex2\map\map\sky\`. That folder also had the original TEV fragment shader recompiled to GLSL (`_VRsph.fragment.glsl`) — decoding it (`color = clamp(marioSprite.rgb * colorRegister * glowDots.rgb, 0, 1)`, both textures sampled through independent per-texture 2D transforms) is what the whole shader below is a reimplementation of.
+
+### Architecture (v9)
+
+- **Coordinate space:** does NOT use the mesh's own UV — uses a longitude/latitude remap computed from the surface normal instead (`atan(n.x,n.z)/TAU+0.5`, `asin(n.y)/PI+0.5`). See gotcha below for why.
+- **Two-layer composite, not a plain multiply:** each `mario_tex` sample is classified as "background" (blue-dominant) or "character" (red/yellow-dominant) via `step(r+g, b)`. Background pixels always render as a fixed `bg_color`, completely ignoring the phase tint; only character pixels get `tint * sample`. This is what keeps the grid a clean, consistent blue in both phases instead of the tint discoloring everything including the dot grid.
+- **Cell/fill split for independent size + spacing:** the sprite doesn't just tile at native size — each "cell" (pitch set by `mario_uv_scale_a/b`) samples the sprite only within a shrunk `mario_sprite_size` fraction of that cell, with everything outside that fraction treated as background. Lets size and spacing be tuned independently instead of being locked together by one tiling frequency.
+- **Motion is discrete hops, not continuous scroll** — `floor(time_in_phase / hop_interval_seconds)` steps a fixed distance per interval, matching the reference video's "hop up a dot every ~15 frames" look rather than a smooth drift.
+- **Phase switch is a hard cut** — `t` is exactly `0.0` or `1.0` (a step function on elapsed time-in-phase), never blended. Confirmed against frame-by-frame reference video: consecutive frames go from nothing to a full-size block with zero fade.
+- **Hop offset resets to zero at the start of every phase** (`time_in_phase`, not raw global `TIME`) — since cell density changes at every phase cut, carrying an accumulated offset into a differently-sized grid put cells at an arbitrary alignment and occasionally clipped a sprite at a cell boundary. Resetting means every phase starts from the same clean alignment every cycle.
+- **Background dot grid (`glow_tex`) doesn't scroll at all** — confirmed directly against the reference: only the Mario layer moves.
+
+### Tunable parameters
+
+All live on the `SecretCourseGlow_v9.tres` material — select the skybox mesh (`Rico4SecretSkybox/Armature/Skeleton3D/Mesh_0` inside `rico_4_secret_skybox.tscn`) and open its Material Override in the Inspector.
+
+| Parameter | Current | Effect |
+|---|---:|---|
+| `mario_uv_scale_a` | (1.265, 1.265) | Cell spacing/density, "normal" phase. Lower = fewer, bigger, farther-apart cells. |
+| `mario_uv_scale_b` | (4, 4) | Same, "green" phase. |
+| `mario_sprite_size` | 0.85 | Fraction (0–1) of each cell the sprite actually fills. `1.0` = touches its neighbors, no gap. Lower = shrinks the sprite and opens a margin — independent of cell spacing above. |
+| `hop_direction` | (0.6, 1.0) | Diagonal climb direction. Only the X:Y ratio matters (normalized in-shader). |
+| `hop_interval_seconds` | 0.5 | Time between hops. `0.5` = 15 frames @ 30fps. Lower = faster hopping. |
+| `hop_distance_dots` | 4.025 | How many glow-dot-cells each hop covers. |
+| `glow_uv_scale` | (16, 16) | Density of the background dot grid itself. Higher = more, smaller dots. |
+| `bg_color` | (0.15, 0.35, 0.95) | Fixed blue for background dots — ALWAYS this color, untouched by the phase tint. |
+| `color_a` | white (1,1,1) | Tint during the "normal" phase — white shows the sprite's own red/yellow coloring unmodified. |
+| `color_b` | (0.3, 1, 0.45) | Tint during the "green" phase. |
+| `hold_a_seconds` | 4.3 | How long the "normal" phase holds before cutting to green. |
+| `hold_b_seconds` | 4.3 | How long the "green" phase holds before cutting back. |
+
+### Gotchas hit building this
+
+- **Editing an already-loaded `.gdshader` file's source text in place does NOT hot-reload** — the `ShaderMaterial` keeps using stale default uniform values even after `filesystem_manage.scan()`. Workaround used throughout: any *structural* shader change (new logic, new uniforms) got a brand-new filename (`_v2`, `_v3`, ... `_v9`) to guarantee a fresh, uncached load. Pure *value* tweaks on an already-working shader (no code change) DO apply fine via `material_manage.set_shader_param` without needing a new file.
+- **`material_override` set on a node that's a nested child of an *instanced* sub-scene doesn't reliably persist** through the outer level scene — same issue hit earlier with `SunshineCamera` export values. Fix used every time: open the skybox's OWN scene file (`rico_4_secret_skybox.tscn`) directly and set/save the material there, then `force_reload` the level scene that instances it. Setting it through `Rico4Secret.tscn` directly silently didn't save.
+- **The skybox mesh's raw import scale was enormous** — even at an initial `0.19` Node3D scale, its AABB was still ~5864 units across (raw mesh ~30,000+ units), which sat right at/past the gameplay camera's `far=4000` clip plane and rendered solid black. Rescaled down to **0.03**, which brought the AABB to a sane ~925 units. Lesson for any future large-scale imported GLB: check `aabb_size` after placing it, don't assume a "small-looking" scale number is actually small.
+- **Switching from raw mesh UV to normal-based coordinates changes what the same scale number visually means.** A value tuned to look right under the mesh's raw UV (e.g. cell scale `1.265`) can render as completely invisible (tile so huge the visible camera window samples only its background pixels) once the coordinate space changes — had to re-find equivalent values empirically after the seam fix rather than assume the old numbers still applied.
+- **`NORMAL` is VIEW-SPACE by default in a spatial shader's `fragment()`** — using it directly for a coordinate meant to stay fixed in world/object space made the whole pattern swim/rotate with the camera. Fixed by capturing `NORMAL` in `vertex()` (object-space there) into a `varying` and using that in `fragment()` instead.
+- **Any spherical-to-planar coordinate mapping has an inherent seam** (here: the ±180° longitude wrap and the pole singularities) — switching to normal-based coordinates fixed the *distortion* problem (mesh's own non-uniform raw UV) but doesn't eliminate seams as a concept. If a hard edge shows up again at very low cell counts, this is the next place to look.
+- Same MCP testing gotchas as the TalkingPOV section apply here too (`project_manage(op="stop")` before re-testing a code change, `stale_frame` on `editor_screenshot`, prefer `game_eval` reads over screenshots for confirming state) — this shader's iteration loop leaned on all of them repeatedly.
+
+---
+
+## Multi-Character System
+
+Seven playable characters share one base scene. Inspired by Super Mario Eclipse's three-character roster.
+
+### Architecture
+
+| File | Role |
+|---|---|
+| `assets/Player.tscn` | Shared base — skeleton, camera rig, hand slots, VFX, all 51 nodes. Formerly `Mario2.tscn`. |
+| `assets/<Name>.tscn` | Thin inherited scene. Overrides only the mesh, skin, spin-jump colours and hand attachments. |
+| `assets/<Name>.tres` | `PlayerProfile` — eye textures, head gear, texture-match strings. |
+| `assets/characters/<Name>Entry.tres` | `CharacterEntry` — what the select screen shows: display name, scene, head art, name art, stroke art, paint colour. |
+
+Adding a character touches **no code**. Everything is data.
+
+### Roster
+
+| | Mesh source | Head art | Name art | Stroke | Hands | Hat |
+|---|---|---|---|---|---|---|
+| Mario | original | ✓ | ✓ | M (extracted) | base | — |
+| Luigi | Luigi.blend | ✓ | ✓ | L | ✓ | — |
+| Koopa | — | ✓ | — | K | ✓ | — |
+| Piantissimo | — | ✓ | ✓ | P | ✓ | ✓ |
+| Wario | BSMSO | ✓ | — | W | ✓ | ✓ |
+| Waluigi | BSMSO | ✓ | — | W | ✓ | ✓ |
+| Yoshi | BSMSO | ✓ | — | Y | ✓ | — |
+
+Outstanding: `NameArt` for Koopa, Wario, Waluigi, Yoshi (falls back to plain `DisplayName` text on the poster).
+
+### PlayerSpawner (`assets/PlayerSpawner.cs`)
+
+Levels no longer hard-code a character instance. A `PlayerSpawner` Node3D marks the spawn point; at
+runtime it instantiates `GameData.Instance.SelectedCharacterScene` (or `FallbackCharacter` when running
+the level directly from the editor) and adopts it as its own child.
+
+- Adopts as **its own child**, not a sibling. During ready propagation the parent is blocked
+  ("Parent node is busy setting up children"), and `call_deferred` would push the spawn past
+  `Level._Ready`, which needs the player to already exist.
+- Snapshots `GetChildren()` **before** `AddChild(player)`, or the player ends up in its own handover
+  list and gets reparented into itself.
+- Handover only suits nodes that don't resolve NodePaths in their own `_Ready` — those run before the
+  spawner does. `ShineTimer` and `TimerHud` therefore live at the level root, declared *after* the spawner.
+
+### ⚠️ Gotcha: the spawner must hand its rotation down to the character
+
+Directly related to the 180°-yaw gotcha in the Surface Tilt section. `Mario.cs` composes movement as:
+
+```csharp
+inputDirWorld = (Transform.Basis * new Vector3(LstickVec.X, 0, LstickVec.Y)).Normalized();
+inputDirWorld = inputDirWorld.Rotated(Vector3.Up, camYaw);   // camYaw is springArmPivot's LOCAL yaw
+```
+
+That is the character's **local** basis plus the camera's **local** yaw, and the two only sum to the
+camera's world yaw while the character's parent is unrotated. Any rotation left on the spawner leaks in
+as a constant offset — a 180° there comes out as **inverted controls**, not as a turned character.
+
+So `PlayerSpawner._Ready` transfers its authored basis to the spawned character and keeps only the
+position, reproducing exactly the graph levels had before spawners existed. `ExtraFacingDegrees` (default
+0) is available for a per-spawn nudge.
+
+Two wrong fixes were tried first, both because the 180° was placed relative to the wrong node:
+putting it on the character root **while the spawner was also rotated** (doubled), and moving it to the
+Armature (root went identity but the parent's rotation still leaked). The value was never the problem —
+its position in the hierarchy was.
+
+---
+
+## Character Select Screen
+
+`assets/CharacterSelect.tscn` / `.cs`. Base viewport is **1152 × 648** (project has no explicit
+`viewport_width`/`viewport_height`, so Godot's default applies, scaled via `stretch/mode="canvas_items"`).
+Authoring against 1920×1080 is why decor kept landing offscreen.
+
+### Flow
+
+Poster focused → `Highlight(i)` brightens it, scales it to `SelectedScale` (1.06) and slides the P1 hand
+beneath → confirm → `PlayStamp()` paints the character's letter → hold `StampHoldSeconds` (0.45) →
+fade to black over `FadeSeconds` (0.7) → `ChangeSceneToFile(LevelToLoad)`.
+
+`Confirm` is `async void` with a `_confirming` guard so a second input can't double-load.
+
+### Gotchas
+
+- **`MoveHandTo` must be deferred.** Containers lay out on the next frame, so reading a poster's
+  `GlobalPosition` in the same frame gives the pre-layout value.
+- **Setting `PivotOffset` displaces a scaled or rotated node.** Safe only while scale is 1 — the poster
+  sets its pivot before scaling for exactly this reason. The Palm decor hit the general case and needed
+  `Position += delta - basis * delta` compensation.
+- **`flat = true` does not suppress the focus StyleBox.** All five button states need `StyleBoxEmpty`
+  or a white outline draws around the selected poster.
+- **`anchors_preset = 8` is centre-anchored**, so offsets are measured from the centre, not the top.
+- **`HBoxContainer` lays out on minimum size**, so scaling a poster is purely visual and won't shove
+  its neighbours.
+
+---
+
+## Paint Stamp — stroke-order maps
+
+The letter painted onto a poster when a character is picked. Full runbook, with a live demo, is
+published as an artifact; this is the summary.
+
+### The idea
+
+Super Mario Eclipse animates its stamp as 16 frames. Those frames are **strictly additive** — ink is only
+ever added, never erased — so every pixel has a well-defined moment it was painted. That collapses all 16
+into one texture:
+
+```
+R channel = when this pixel was painted (0 = first stroke, 255 = last)
+A channel = the finished shape
+```
+
+`assets/PaintReveal.gdshader` walks the whole draw from a single `progress` uniform. 138 KB for six
+letters, against 35 MB of source frames — and the shader has no idea which letter it is drawing, so a new
+letter is a new texture, not new code.
+
+### Tools
+
+| Tool | Does |
+|---|---|
+| `tools/bake_stroke_order.py` | Collapses a progressive frame sequence into one order map. Recovers frame order from ink coverage, since the source filenames are hashes. |
+| `tools/make_stroke.py` | Synthesises a letter from brush paths, for letters the source art never had. |
+
+### Brush parameters (`tools/make_stroke.py`)
+
+| | Value | Notes |
+|---|---|---|
+| `NIB_RATIO` | 0.34 | Short ÷ long axis of the chisel tip. **The dominant value.** Above ~0.5 every stroke is uniform and reads as felt-tip. |
+| `PEN_ANGLE` | −0.60 | Radians the nib is held at. |
+| `SLANT` | 0.45 | Italic shear, x-units per y-unit. Re-leans every letter at once, then recentres. |
+| `BASE_Y` | 0.82 | Height the shear pivots about. |
+| `ROUGHNESS` | 40.0 | Outline wander. Above ~70 it speckles. |
+| `GRAIN` | 14.0 | Wander wavelength. **Below ~10 it reads as a bad scan.** |
+| `width` | 0.086 | Stroke radius as a fraction of canvas. Coupled to `NIB_RATIO`. |
+
+### ⚠️ Gotcha: the raggedness metric is a trap
+
+Edge roughness — perimeter against a smoothed copy — measures the extracted M at **1.067** and a clean
+generated letter at **1.001**. Two full passes were spent adding noise to close that gap, and both made
+the letter look like a bad scan. The M scores rough because of a few **sharp corners and flat cut ends**;
+its actual outline is smooth.
+
+Match on **per-stroke width** (9.4%), never on total ink — different letters have different stroke counts.
+Matching ink made the L's strokes 46% too fat. And compare by eye, side by side at 300px+.
+
+### ⚠️ Gotcha: soft-edge reveals need a hard endpoint
+
+The shader runs its window slightly past 1: `progress * (1.0 + softness)`. Without it the last-painted
+pixels sit permanently half-drawn. Same failure as the wipe shader that left a lingering line.
+
+### ⚠️ Gotcha: the ShaderMaterial is shared
+
+All four posters share the scene's material, so `PaintReveal._Ready` duplicates it per instance.
+Remove that and every poster animates in unison.
+
+---
+
+## SMS Model Import Pipeline
+
+Six scripts in `tools/` turn a mod archive into a playable character. Full runbook published as an
+artifact — the traps are documented there in detail.
+
+| Tool | Does |
+|---|---|
+| `unpack_rarc.py` | `.arc` / uncompressed `.szs` → loose BMDs. |
+| `prep_character_glb.py` | Blender pass: merges the doubled skin, sets `metallicFactor` to 0. |
+| `make_skin_tres.py` | Generates the Godot `Skin` from glTF inverse bind matrices. Replaces the manual Advanced-Import step. |
+| `extract_bmd_texture.py` | Decodes RGB565 from a BMD's TEX1 when the converter mangles it. |
+| `fix_sms_part.py` | Repairs an accessory glb: forces OPAQUE, zeroes metallic, resets bogus alpha. |
+| `repoint_part_texture.py` | Rebinds an accessory to the atlas its UVs actually sample. |
+
+Existing checks `vet_rig.py` and `predict_rest.py` still gate eligibility.
+
+### Source: BSMSO 1.1 CustomModels
+
+14 complete Mario-replacement archives. **11 convert cleanly** (Birdo, Daytendo, Luigi, Needle,
+Nightendo, Nokissia, Piantissimo, Shadow Luigi, Waluigi, Wario, Yoshi). Shadow, Shadow Mario and Sonic
+crash FinModelUtility with the same `ArgumentOutOfRangeException` — not an archive problem, their BMDs are
+structurally identical to the working ones. They need SuperBMD or a Blender J3D importer.
+
+The `.arc` files are plain uncompressed RARC despite the extension; only `Yoshi.szs` is Yaz0, and its
+`.arc` twin isn't.
+
+### ⚠️ Gotcha: accessories are bound to the wrong texture
+
+The converter binds caps and hands to a small intensity mask from their own BMD, when the UVs actually
+index into the **character's body atlas**. The part imports grey or white.
+
+**Zero colour saturation on an accessory texture is the tell.** Confirm by sampling its `TEXCOORD_0`
+against the body atlas — Wario's cap returned `#E8BC00` yellow, Waluigi's `#6000C8` purple. Same fault
+that made Piantissimo's helmet white; it hits every hand as well as every cap.
+
+Do **not** just tint a grey part — that looks nearly right and buries the real bug.
+
+### ⚠️ Gotcha: I4 intensity is copied into alpha
+
+Intensity-only textures arrive with the intensity duplicated into the alpha channel, and `alphaMode` set
+to `BLEND`, so parts render semi-transparent. Signature is exact: every pixel has `alpha == red` and none
+is fully opaque. A real cut-out mask won't match its own intensity on every pixel, so the test is safe to
+automate.
+
+### ⚠️ Gotcha: deleting a source texture mid-flight cascades
+
+After repointing a glb, the old PNG is unused — but deleting it while Godot holds import state for it
+makes every dependent reimport fail. **A resource whose dependency fails to load fails itself**, so a
+broken `WarioCap.glb` takes down `Wario.tres`, `Profile` comes back null, and you get two symptoms that
+look nothing like a texture problem:
+
+- **No hat** — `ApplyHeadGear` has no `HeadGear`
+- **Mario's eyes** — `SetupSleeping` does `Profile?.AwakeEyeTexture ?? <Mario's>`, and `SleepStatus(false)`
+  writes that fallback into both eye materials
+
+Read the editor log first; the reimport failures name the cause immediately. Stop the game, rescan, relaunch.
+
+### ⚠️ Gotcha: two checks that lie
+
+- **A Blender rest render is not predictive.** It shows the raw bind pose, not the skinned result on
+  `Player.tscn`'s skeleton. Yoshi renders as a collapsed heap and is fine in game.
+- **`predict_rest.py` cries wolf on wide characters.** Its "NOT upright" flag compares height against
+  *arm span*; Wario and Waluigi both trip it and both are correct.
+
+Three bind conventions are in play and **all are valid** — Luigi `(96.20, −2.95, −0.12)`,
+Koopa/Piantissimo/Yoshi `(61.00, −39.01, 0.00)`, Wario/Waluigi `(1.50, 97.14, −0.35)`. Matching a
+known-good character's convention is evidence; deviating from one is not evidence of a fault.
+
+### Hand slot mapping
+
+| BMD | Verts | Slot |
+|---|---|---|
+| `ma_hnd3l` / `ma_hnd3r` | 137 | LeftHandClosed / RightHandClosed |
+| `ma_hnd2l` / `ma_hnd2r` | 132 | LeftHandSlightyOpen / RightHandSlightyOpen |
+| `ma_hnd4r` | varies | RightHandWithHat |
+
+Counts match Mario's own slot models. `ma_hnd4r` is the one most likely to fail conversion — fall back to
+the closed fist for a character with no cap (Yoshi does).
+
+---
+
+## Level Intro — first-frame flash
+
+`Level._Ready` called `OpenTransitionRects()`, which sets every transition rect fully open, while
+`StartIntro` is deferred. The level therefore rendered in full for a frame or two before `intro_pan`'s
+`t=0` Iris key landed — a visible flash of the level before the transition began.
+
+`CoverForIntro()` now asserts that same `t=0` value up front when `PreviewShot` is on, so the first
+rendered frame is already covered. Every path where the intro doesn't actually run re-opens the rects, so
+a misconfigured level can't come up stuck black.

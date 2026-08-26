@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="PlayerProfile" format=3 uid="uid://cmsk4fj6cl3r3"]
+
+[ext_resource type="Script" uid="uid://c22kcpsmssr2e" path="res://assets/PlayerProfile.cs" id="1_p"]
+[ext_resource type="Texture2D" uid="uid://de3uk6ecbe2fl" path="res://models/Piantissimo/textures/H_ma_eye1_s3tc.tga" id="2_eyeopen"]
+[ext_resource type="Texture2D" uid="uid://ely8h7nyura1" path="res://models/Mario/mario/bmd/ma_mdl1/H_ma_eye1_s3tc_shut.png" id="3_eyeshut"]
+[ext_resource type="PackedScene" uid="uid://c26lxyjlnlsss" path="res://models/Piantissimo/Godot/Parts/PiantissimoCap.glb" id="4_cap"]
+
+[resource]
+script = ExtResource("1_p")
+ProfileName = "Piantissimo"
+AwakeEyeTexture = ExtResource("2_eyeopen")
+SleepingEyeTexture = ExtResource("3_eyeshut")
+HeadGear = ExtResource("4_cap")
+metadata/_custom_type_script = ExtResource("1_p")

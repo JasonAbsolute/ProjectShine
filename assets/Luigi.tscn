@@ -1,0 +1,44 @@
+[gd_scene format=3 uid="uid://do1htdyjedtix"]
+
+[ext_resource type="PackedScene" uid="uid://d3ph56ccg345h" path="res://assets/Player.tscn" id="1_base"]
+[ext_resource type="ArrayMesh" uid="uid://lri7ra4riag8" path="res://models/Luigi/Godot/LuigiMesh.res" id="2_mesh"]
+[ext_resource type="Skin" path="res://models/Luigi/Godot/LuigiSkin.tres" id="3_skin"]
+[ext_resource type="Resource" uid="uid://kfv7lgwjh28y" path="res://assets/Luigi.tres" id="4_profile"]
+[ext_resource type="Material" path="res://models/Luigi/Godot/materials/_mat_head.tres" id="5_m0"]
+[ext_resource type="Material" uid="uid://lgc48qnfsb0y" path="res://models/Luigi/Godot/materials/_mat_head_2.tres" id="6_m1"]
+[ext_resource type="Material" path="res://models/Luigi/Godot/materials/_mat_head_8.tres" id="7_m2"]
+[ext_resource type="Material" path="res://models/Luigi/Godot/materials/_mat_head_3.tres" id="8_m3"]
+[ext_resource type="Material" path="res://models/Luigi/Godot/materials/_mat_head_4.tres" id="9_m4"]
+[ext_resource type="Material" path="res://models/Luigi/Godot/materials/_mat_eye_L.tres" id="10_m5"]
+[ext_resource type="Material" path="res://models/Luigi/Godot/materials/_mat_eye_R.tres" id="11_m6"]
+[ext_resource type="Material" path="res://models/Luigi/Godot/materials/_mat_head_5.tres" id="12_m7"]
+[ext_resource type="Material" path="res://models/Luigi/Godot/materials/_mat_head_6.tres" id="13_m8"]
+[ext_resource type="Material" path="res://models/Luigi/Godot/materials/_mat_head_7.tres" id="14_m9"]
+
+[node name="Luigi" unique_id=80970915 instance=ExtResource("1_base")]
+Profile = ExtResource("4_profile")
+
+[node name="SpinJumpEffects" parent="." index="10" unique_id=821645171]
+LowerRingColor = Color(0.25, 1, 0.35, 1)
+
+[node name="Mesh_0" parent="Armature/Skeleton3D" parent_id_path=PackedInt32Array(1267083812) index="0" unique_id=1070017404]
+mesh = ExtResource("2_mesh")
+skin = ExtResource("3_skin")
+surface_material_override/0 = ExtResource("5_m0")
+surface_material_override/1 = ExtResource("6_m1")
+surface_material_override/2 = ExtResource("7_m2")
+surface_material_override/3 = ExtResource("8_m3")
+surface_material_override/4 = ExtResource("9_m4")
+surface_material_override/5 = ExtResource("10_m5")
+surface_material_override/6 = ExtResource("11_m6")
+surface_material_override/7 = ExtResource("12_m7")
+surface_material_override/8 = ExtResource("13_m8")
+surface_material_override/9 = ExtResource("14_m9")
+
+[node name="LeftHandSlightyOpen" parent="Armature/Skeleton3D/LeftHandBone" parent_id_path=PackedInt32Array(258625953) index="1" unique_id=187824780]
+transform = Transform3D(0.845, 0, -1.1175871e-07, 5.9604645e-08, 0.845, 2.9802322e-08, 1.4901161e-08, 0, 0.845, -0.18101501, 1.0654254, 2.9464302)
+
+[node name="ma_hnd3r" parent="Armature/Skeleton3D/RightHandBone/RightHandClosed/Model/ma_hnd3r_armature/Skeleton3D" index="0"]
+transform = Transform3D(0.81, -1.5916405e-07, -3.9790983e-08, 1.5916403e-07, 0.81, -1.3263669e-07, 3.9791008e-08, 1.3263667e-07, 0.81, 0.040317535, -0.28846455, -3.814457)
+
+[editable path="Armature/Skeleton3D/RightHandBone/RightHandClosed/Model"]

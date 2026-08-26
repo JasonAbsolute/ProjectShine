@@ -1,0 +1,13 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://lgc48qnfsb0y"]
+
+[ext_resource type="Texture2D" uid="uid://d1proa4swjjrm" path="res://models/Luigi/mario/bmd/ma_mdl1/ma_mdl1_1.png" id="1_tex"]
+
+[resource]
+resource_name = "_mat_head(2).001"
+transparency = 1
+cull_mode = 2
+vertex_color_use_as_albedo = true
+albedo_color = Color(1, 1, 1, 0)
+albedo_texture = ExtResource("1_tex")
+albedo_texture_force_srgb = true
+texture_repeat = false

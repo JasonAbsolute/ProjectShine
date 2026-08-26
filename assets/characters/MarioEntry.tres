@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="CharacterEntry" format=3 uid="uid://b20oyjaihlb72"]
+
+[ext_resource type="Script" uid="uid://dgwvqcjfth5pi" path="res://assets/CharacterEntry.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://assets/Mario.tscn" id="2_scene"]
+[ext_resource type="Texture2D" uid="uid://32qva2kky46b" path="res://Font/CharacterSelect/MarioHead.png" id="3_head"]
+[ext_resource type="Texture2D" uid="uid://bklhpoe4iy7ld" path="res://Font/CharacterSelect/MarioText.png" id="4_name"]
+[ext_resource type="Texture2D" uid="uid://detb4gc8etww7" path="res://Font/CharacterSelect/StrokeM.png" id="5_strokem"]
+
+[resource]
+script = ExtResource("1_script")
+PlayerScene = ExtResource("2_scene")
+HeadArt = ExtResource("3_head")
+NameArt = ExtResource("4_name")
+StrokeArt = ExtResource("5_strokem")
+metadata/_custom_type_script = ExtResource("1_script")

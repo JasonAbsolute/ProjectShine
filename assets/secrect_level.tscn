@@ -3,7 +3,7 @@
 [ext_resource type="PackedScene" uid="uid://ixatc3527xb6" path="res://assets/test_from_website.tscn" id="1_3jyoo"]
 [ext_resource type="PackedScene" uid="uid://b54pc5peh00fe" path="res://assets/StartingPlatform.tscn" id="1_4kpif"]
 [ext_resource type="Script" uid="uid://3aw1w481iqnu" path="res://assets/Level.cs" id="1_clyci"]
-[ext_resource type="PackedScene" uid="uid://d3ph56ccg345h" path="res://assets/Mario2.tscn" id="2_c15bh"]
+[ext_resource type="PackedScene" path="res://assets/Mario.tscn" id="2_c15bh"]
 [ext_resource type="PackedScene" uid="uid://cfdsmmqe42w7v" path="res://woodblocklong.tscn" id="3_68tks"]
 [ext_resource type="PackedScene" uid="uid://7exkcbpcjut8" path="res://assets/marioHUD.tscn" id="4_68tks"]
 [ext_resource type="PackedScene" uid="uid://ciuxr0opwr0bq" path="res://woodblock_wide.tscn" id="5_0vdqm"]
@@ -32,13 +32,13 @@ sky_horizon_color = Color(0.65, 0.75, 0.9, 1)
 ground_bottom_color = Color(0.35, 0.55, 0.9, 1)
 ground_horizon_color = Color(0.65, 0.75, 0.9, 1)
 
-[sub_resource type="Sky" id="Sky_ditv7"]
+[sub_resource type="Sky" id="Sky_nerkb"]
 sky_material = SubResource("ProceduralSkyMaterial_sky01")
 
 [sub_resource type="Environment" id="Environment_c3bw8"]
 background_mode = 1
 background_energy_multiplier = 3.68
-sky = SubResource("Sky_ditv7")
+sky = SubResource("Sky_nerkb")
 ambient_light_source = 2
 ambient_light_color = Color(0.877701, 0.883559, 0.882111, 1)
 ambient_light_energy = 0.64
@@ -69,6 +69,30 @@ tracks/1/keys = {
 "transitions": PackedFloat32Array(1),
 "update": 0,
 "values": [Vector3(0, 27.97026, -230.63713)]
+}
+tracks/2/type = "value"
+tracks/2/imported = false
+tracks/2/enabled = true
+tracks/2/path = NodePath("../TransitionLayer/Iris:material")
+tracks/2/interp = 1
+tracks/2/loop_wrap = true
+tracks/2/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [ExtResource("18_q5q8x")]
+}
+tracks/3/type = "value"
+tracks/3/imported = false
+tracks/3/enabled = true
+tracks/3/path = NodePath("../TransitionLayer/BarnDoorHorizontal:material")
+tracks/3/interp = 1
+tracks/3/loop_wrap = true
+tracks/3/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [ExtResource("20_lb5gq")]
 }
 
 [sub_resource type="Animation" id="Animation_ditv7"]

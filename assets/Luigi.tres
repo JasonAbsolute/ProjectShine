@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="PlayerProfile" format=3 uid="uid://kfv7lgwjh28y"]
+
+[ext_resource type="Script" uid="uid://c22kcpsmssr2e" path="res://assets/PlayerProfile.cs" id="1_luigi"]
+[ext_resource type="Texture2D" uid="uid://boc01ysm00c5b" path="res://models/Luigi/mario/bmd/ma_mdl1/H_ma_eye1_s3tc.png" id="3_eyeopen"]
+[ext_resource type="Texture2D" uid="uid://ely8h7nyura1" path="res://models/Mario/mario/bmd/ma_mdl1/H_ma_eye1_s3tc_shut.png" id="4_eyeshut"]
+
+[resource]
+script = ExtResource("1_luigi")
+ProfileName = "Luigi"
+EyesTextureMatch = "ma_mdl1_2"
+AwakeEyeTexture = ExtResource("3_eyeopen")
+SleepingEyeTexture = ExtResource("4_eyeshut")
+metadata/_custom_type_script = "uid://c22kcpsmssr2e"

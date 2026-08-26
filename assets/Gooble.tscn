@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://delxpxy0gt873"]
+[gd_scene format=3 uid="uid://delxpxy0gt873"]
 
 [ext_resource type="Script" uid="uid://do5oxl8fyy7ow" path="res://assets/Gooble.cs" id="1_610nq"]
 [ext_resource type="PackedScene" uid="uid://btn6akvyop415" path="res://models/Eniemes/Gooby/Gooble.glb" id="1_xcf38"]
@@ -18,34 +18,34 @@ radius = 0.617311
 [sub_resource type="BoxShape3D" id="BoxShape3D_610nq"]
 size = Vector3(1, 0.050354, 1)
 
-[node name="Gooble" type="CharacterBody3D"]
+[node name="Gooble" type="CharacterBody3D" unique_id=974490050]
 script = ExtResource("1_610nq")
 
-[node name="Model" parent="." instance=ExtResource("1_xcf38")]
+[node name="Model" parent="." unique_id=304011591 instance=ExtResource("1_xcf38")]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=2116325851]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.593348, 0)
 shape = SubResource("SphereShape3D_cy8ll")
 
-[node name="DetectionZone" type="Area3D" parent="."]
+[node name="DetectionZone" type="Area3D" parent="." unique_id=618388214]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="DetectionZone"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DetectionZone" unique_id=23327789]
 shape = SubResource("SphereShape3D_610nq")
 
-[node name="AttackZone" type="Area3D" parent="."]
+[node name="AttackZone" type="Area3D" parent="." unique_id=885128099]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="AttackZone"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="AttackZone" unique_id=1522358294]
 shape = SubResource("SphereShape3D_reh70")
 
-[node name="Hurtbox" type="Area3D" parent="."]
+[node name="Hurtbox" type="Area3D" parent="." unique_id=707428479]
 monitoring = false
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Hurtbox"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Hurtbox" unique_id=1737552593]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.445975, 0)
 shape = SubResource("SphereShape3D_38oju")
 
-[node name="StompZone" type="Area3D" parent="."]
+[node name="StompZone" type="Area3D" parent="." unique_id=939932443]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="StompZone"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StompZone" unique_id=642987786]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0914, 0)
 shape = SubResource("BoxShape3D_610nq")

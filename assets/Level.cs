@@ -90,6 +90,38 @@ public partial class Level : Node3D
             return;
         }
 
+        // Resolve and CLEAR the transition rects before anything else — in
+        // particular BEFORE the no-intro early-out below. These rects are
+        // fullscreen black; whether they're covering the screen is entirely a
+        // function of their shader `progress`, and nothing else in this scene
+        // guarantees a sane starting value:
+        //
+        //   - intro_pan keys Iris at t=0, so Iris is self-correcting.
+        //   - intro_pan NEVER touches BarnDoorHorizontal — it only has to
+        //     already be open for the 7.5s pan to be visible at all.
+        //   - With PreviewShot off, no animation runs, so NOTHING touches any
+        //     of them.
+        //
+        // That left the start state implicitly inherited from whatever value
+        // happened to be saved in the shared .tres, which is exactly how the
+        // whole level came up black once BarnDoorHorizontalMat drifted to 0.
+        // Assert it here instead of trusting the resource.
+        _irisRect = GetNodeOrNull<ColorRect>(IrisRectPath);
+        _barnDoorVerticalRect = GetNodeOrNull<ColorRect>(BarnDoorVerticalRectPath);
+        _barnDoorHorizontalRect = GetNodeOrNull<ColorRect>(BarnDoorHorizontalRectPath);
+        SizeTransitionRects();
+        OpenTransitionRects();
+
+        // An intro is about to run, so pre-cover the screen. OpenTransitionRects
+        // leaves everything open and StartIntro is deferred, which means the
+        // level renders in full for a frame or two before intro_pan's t=0 Iris
+        // key lands — a visible flash of the level before the transition starts.
+        // Assert the animation's own starting value here instead of waiting for
+        // it. Re-opened below on every path where the intro doesn't actually run,
+        // so a misconfigured level can never come up stuck black.
+        if (PreviewShot)
+            CoverForIntro();
+
         if (!PreviewShot)
         {
             // No intro — Mario already has control from frame one. Deferred so
@@ -102,9 +134,6 @@ public partial class Level : Node3D
         _introCamera = GetNodeOrNull<Camera3D>(IntroCameraPath);
         _introAnimPlayer = GetNodeOrNull<AnimationPlayer>(IntroAnimationPlayerPath);
         _spawnPoint = GetNodeOrNull<Node3D>(MarioSpawnPointPath);
-        _irisRect = GetNodeOrNull<ColorRect>(IrisRectPath);
-        _barnDoorVerticalRect = GetNodeOrNull<ColorRect>(BarnDoorVerticalRectPath);
-        _barnDoorHorizontalRect = GetNodeOrNull<ColorRect>(BarnDoorHorizontalRectPath);
 
         if (_introCamera == null || _introAnimPlayer == null)
         {
@@ -112,13 +141,12 @@ public partial class Level : Node3D
                 "Level: PreviewShot is on but IntroCameraPath/IntroAnimationPlayerPath "
                     + "aren't both set — skipping intro."
             );
+            OpenTransitionRects();
             // Mario was never suppressed (that happens below) — he already has
             // control, so anything waiting on MarioReady still needs to hear it.
             CallDeferred(nameof(EmitMarioReady));
             return;
         }
-
-        SizeTransitionRects();
 
         _mario.SuppressForIntro();
         _introAnimPlayer.AnimationFinished += OnIntroAnimationFinished;
@@ -149,6 +177,35 @@ public partial class Level : Node3D
 
         if (_irisRect?.Material is ShaderMaterial irisMat)
             irisMat.SetShaderParameter("rect_size", size);
+    }
+
+    /// <summary>
+    /// Forces every transition rect fully OPEN (shader `progress = 1`), i.e.
+    /// completely transparent. Both wipe shaders share the convention
+    /// 0 = fully covered, 1 = fully open.
+    ///
+    /// Safe to call before playing intro_pan: that animation keys Iris to 0 at
+    /// t=0 and only reaches BarnDoorVertical at t≈7.03, so it overrides this
+    /// wherever it actually cares, while BarnDoorHorizontal — which it never
+    /// touches — correctly stays open for the duration of the pan.
+    /// </summary>
+    private void OpenTransitionRects()
+    {
+        foreach (var rect in new[] { _irisRect, _barnDoorVerticalRect, _barnDoorHorizontalRect })
+        {
+            if (rect?.Material is ShaderMaterial mat)
+                mat.SetShaderParameter("progress", 1.0f);
+        }
+    }
+
+    /// <summary>
+    /// Puts the Iris where intro_pan's t=0 key puts it, so the screen is already
+    /// covered on the first rendered frame.
+    /// </summary>
+    private void CoverForIntro()
+    {
+        if (_irisRect?.Material is ShaderMaterial mat)
+            mat.SetShaderParameter("progress", 0f);
     }
 
     private void StartIntro()

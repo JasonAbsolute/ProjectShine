@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CharacterEntry" format=3 uid="uid://ct4w7djl8qsub"]
+
+[ext_resource type="Script" uid="uid://dgwvqcjfth5pi" path="res://assets/CharacterEntry.cs" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://ccwvv4i14sn5b" path="res://assets/Koopa.tscn" id="2_scene"]
+[ext_resource type="Texture2D" uid="uid://b4fedeelqqno7" path="res://Font/CharacterSelect/StrokeK.png" id="3_strokem"]
+
+[ext_resource type="Texture2D" path="res://Font/CharacterSelect/KoopaHead.png" id="4_head"]
+
+[resource]
+script = ExtResource("1_script")
+DisplayName = "Koopa"
+HeadArt = ExtResource("4_head")
+PlayerScene = ExtResource("2_scene")
+StrokeArt = ExtResource("3_strokem")
+PaintColor = Color(0, 0.067, 0.878, 1)
+metadata/_custom_type_script = ExtResource("1_script")

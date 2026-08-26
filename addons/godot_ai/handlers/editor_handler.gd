@@ -3,6 +3,7 @@ extends RefCounted
 
 const ErrorCodes := preload("res://addons/godot_ai/utils/error_codes.gd")
 const Telemetry := preload("res://addons/godot_ai/telemetry.gd")
+const VisionRoutingScript := preload("res://addons/godot_ai/vision_routing.gd")
 
 ## Handles editor state, selection, log, screenshot, and performance commands.
 
@@ -15,9 +16,10 @@ var _game_log_buffer: McpGameLogBuffer
 var _editor_log_buffer: McpEditorLogBuffer
 var _debugger_errors_root: Node
 var _surfaced_error_tracker
+var _vision_routing: VisionRoutingScript = null
 
 
-func _init(log_buffer: McpLogBuffer, connection: McpConnection = null, debugger_plugin: McpDebuggerPlugin = null, game_log_buffer: McpGameLogBuffer = null, editor_log_buffer: McpEditorLogBuffer = null, debugger_errors_root: Node = null, surfaced_error_tracker = null) -> void:
+func _init(log_buffer: McpLogBuffer, connection: McpConnection = null, debugger_plugin: McpDebuggerPlugin = null, game_log_buffer: McpGameLogBuffer = null, editor_log_buffer: McpEditorLogBuffer = null, debugger_errors_root: Node = null, surfaced_error_tracker = null, vision_routing: VisionRoutingScript = null) -> void:
 	_log_buffer = log_buffer
 	_connection = connection
 	_debugger_plugin = debugger_plugin
@@ -25,6 +27,7 @@ func _init(log_buffer: McpLogBuffer, connection: McpConnection = null, debugger_
 	_editor_log_buffer = editor_log_buffer
 	_debugger_errors_root = debugger_errors_root
 	_surfaced_error_tracker = surfaced_error_tracker
+	_vision_routing = vision_routing
 	if _surfaced_error_tracker == null:
 		_surfaced_error_tracker = McpSurfacedErrorTracker.new(_editor_log_buffer, _game_log_buffer, _debugger_errors_root)
 
@@ -67,6 +70,13 @@ func get_selection(_params: Dictionary) -> Dictionary:
 
 
 const VALID_LOG_SOURCES := ["plugin", "game", "editor", "all"]
+
+## Deferred budget for the `input_sequence` game op. Unlike the one-shot game
+## ops (covered by game_command's 15s entry), it drives the game forward one
+## frame per step, so the reply legitimately takes seconds. The game side caps
+## the sequence length (GameHelper.MAX_SEQUENCE_FRAMES) well inside this; the
+## budget is the backstop for a frozen game loop, mirroring take_screenshot.
+const INPUT_SEQUENCE_TIMEOUT_SEC := 30.0
 
 
 func get_logs(params: Dictionary) -> Dictionary:
@@ -412,6 +422,18 @@ func _compute_coverage_angles(aabb: AABB) -> Array[Dictionary]:
 
 
 func take_screenshot(params: Dictionary) -> Dictionary:
+	## Vision Routing hook: when enabled, the capture is described by the
+	## configured vision provider on a worker thread and the text description
+	## is returned instead of the raw image (see vision_routing.gd). Off, no
+	## key, or non-image results keep the original behavior. The single source
+	## of truth for the `match source:` dispatch lives in _take_screenshot_impl
+	## (pinned by tests/unit/test_docs_screenshot_sources.py).
+	if _vision_routing != null and _vision_routing.is_routing_enabled():
+		return _vision_routing.route_editor_screenshot(params, Callable(self, "_take_screenshot_impl"), _connection)
+	return _take_screenshot_impl(params)
+
+
+func _take_screenshot_impl(params: Dictionary) -> Dictionary:
 	var source: String = params.get("source", "viewport")
 	var max_resolution: int = params.get("max_resolution", 0)
 	var view_target: String = params.get("view_target", "")
@@ -1018,5 +1040,21 @@ func game_command(params: Dictionary) -> Dictionary:
 			"Missing request_id — cannot correlate deferred response")
 
 	var command_params: Dictionary = params.get("params", {})
+
+	## input_sequence steps the game forward frame-by-frame in one call, so it
+	## needs a far larger budget than the one-shot game ops that share the
+	## `game_command` deferred entry (15s). Widen both timers only for it: the
+	## debugger-side pending timer (below) and the dispatcher-side deferred
+	## budget (via the sentinel's `_deferred_timeout_ms`). Every other op keeps
+	## request_game_command's tight default.
+	if op == "input_sequence":
+		_debugger_plugin.request_game_command(
+			op, command_params, request_id, _connection, INPUT_SEQUENCE_TIMEOUT_SEC
+		)
+		return {
+			"_deferred": true,
+			"_deferred_timeout_ms": int(INPUT_SEQUENCE_TIMEOUT_SEC * 1000.0),
+		}
+
 	_debugger_plugin.request_game_command(op, command_params, request_id, _connection)
 	return McpDispatcher.DEFERRED_RESPONSE

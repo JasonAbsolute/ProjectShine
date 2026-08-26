@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="PlayerProfile" format=3]
+
+[ext_resource type="Script" uid="uid://c22kcpsmssr2e" path="res://assets/PlayerProfile.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://models/Yoshi/Godot/Yoshi_1.png" id="2_eyes"]
+
+[resource]
+script = ExtResource("1_script")
+ProfileName = "Yoshi"
+AwakeEyeTexture = ExtResource("2_eyes")
+metadata/_custom_type_script = "uid://c22kcpsmssr2e"
