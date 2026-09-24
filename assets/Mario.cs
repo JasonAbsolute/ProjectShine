@@ -225,6 +225,8 @@ public partial class Mario : CharacterBody3D
     private bool _smsFallCancel = false;       // unk78 bit 0x100: the LAUNCH had the fall-cancel flag; survives in-air state changes
     private readonly SmsStickRotate _smsSpin = new SmsStickRotate(); // makeHistory/checkStickRotate: stick-spin detector
     private int _smsSpinSign = 1;              // +1 counter-clockwise (RIGHT_ROTATE_JUMP), -1 clockwise (LEFT_ROTATE_JUMP)
+    private float _smsLandAccum = 0f;          // sub-tick accumulator for the landing window
+    private float _smsBonkAccum = 0f;          // sub-tick accumulator for the bonk slide
     [Export] public bool SmsDebugPrint = true;  // dev branch: print launches, slide decisions and jump apexes to the output
     [Export] public float SmsRollJumpMinSpeed = 20f; // catching(): slide speed (SMS units/tick) above which A is the big roll-jump. Game value: mario.prm mClashSpeed = 40 (big roll only within ~0.13 s of touchdown); 20 chosen by feel (Jaysonn, 2026-09-24) -- a deliberate deviation
     private float _smsDbgStartY = 0f, _smsDbgMaxY = 0f, _smsDbgAir = 0f;
@@ -2593,7 +2595,21 @@ public partial class Mario : CharacterBody3D
                     velocity.Y = 0f;
 
                     // Keep moving in the direction you landed with (decays with friction)
-                    landingCarryVelXZ = landingCarryVelXZ.Lerp(Vector2.Zero, LANDING_FRICTION);
+                    if (UseSmsPhysics)
+                    {
+                        // jumpSlipCommon(): stick held -> fwd *= 0.98 per tick (he keeps moving, no steering yet);
+                        // neutral -> skid 4/tick while fwd >= 16, below that he coasts until the window ends.
+                        float landFwd = SmsUnits.MpsToSpeed(landingCarryVelXZ.Length());
+                        Vector2 landDir = landFwd > 1e-4f ? landingCarryVelXZ.Normalized() : Vector2.Zero;
+                        int landTicks = SmsUnits.TicksFor(delta, ref _smsLandAccum);
+                        for (int li = 0; li < landTicks; li++)
+                            SmsRun.LandSlipTick(ref landFwd, _smsIntendedMag > 0f);
+                        landingCarryVelXZ = landDir * SmsUnits.SpeedToMps(landFwd);
+                    }
+                    else
+                    {
+                        landingCarryVelXZ = landingCarryVelXZ.Lerp(Vector2.Zero, LANDING_FRICTION);
+                    }
                     velocity.X = landingCarryVelXZ.X;
                     velocity.Z = landingCarryVelXZ.Y;
 
@@ -2659,6 +2675,33 @@ public partial class Mario : CharacterBody3D
                             }
                         }
 
+                        if (UseSmsPhysics)
+                        {
+                            // *_JUMP_END: with the stick held he is RUN on the very first tick at fwd = max(fwd, mag)
+                            // (setStatusToRunning); with the stick neutral waitProcess() zeroes his velocity.
+                            if (_smsIntendedMag > 0f)
+                            {
+                                float endFwd = SmsUnits.MpsToSpeed(landingCarryVelXZ.Length());
+                                if (endFwd < _smsIntendedMag)
+                                {
+                                    Vector3 endDir = landingCarryVelXZ.Length() > 1e-4f
+                                        ? new Vector3(landingCarryVelXZ.X, 0f, landingCarryVelXZ.Y).Normalized()
+                                        : new Vector3(landingFacingDir.X, 0f, landingFacingDir.Z);
+                                    if (endDir.LengthSquared() > 1e-6f)
+                                    {
+                                        endDir = endDir.Normalized();
+                                        float endMps = SmsUnits.SpeedToMps(_smsIntendedMag);
+                                        velocity.X = endDir.X * endMps;
+                                        velocity.Z = endDir.Z * endMps;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                velocity.X = 0f;
+                                velocity.Z = 0f;
+                            }
+                        }
                         // Otherwise transition normally based on buffered input
                         direction = bufferedDir;
                         walkingStrength = bufferedStrength;
@@ -3900,6 +3943,8 @@ public partial class Mario : CharacterBody3D
 
         PostMoveWallCheck(preSlideVelocity, preMoveState);
         CheckGroundWallEntry(preMoveState, inputDirWorld, stickStrength);
+        if (UseSmsPhysics)
+            SmsGroundWallBonk(preSlideVelocity, preMoveState);
 
         bool onFloorNow = IsOnFloor();
         // A single-frame IsOnFloor() flicker (more likely to happen at speed on a
@@ -4945,7 +4990,10 @@ public partial class Mario : CharacterBody3D
         landingJumpConsumed = false;
 
         // Sideflip landing (ma_tjmp2) is a longer animation — give it more lock time
-        landingTimer = (landingState == MarioState.tripleJumpLanding) ? 20 : 7;
+        // SMS: JumpSlipRecord.mMaxTimer = 16 ticks (8 frames) for the single/double landing, 4 ticks (2 frames) after a triple.
+        landingTimer = UseSmsPhysics
+            ? (landingState == MarioState.tripleJumpLanding ? SmsParams.Timing.JumpSlipWindowTicksUltra / 2 : SmsParams.Timing.JumpSlipWindowTicks / 2)
+            : ((landingState == MarioState.tripleJumpLanding) ? 20 : 7);
     }
 
     private void StartJumpFromLanding()
@@ -5094,8 +5142,8 @@ public partial class Mario : CharacterBody3D
 
         Vector3 velocityXZ = new Vector3(impactVelocity.X, 0f, impactVelocity.Z);
         float speed = velocityXZ.Length();
-        if (speed < BonkMinDiveSpeed)
-            return false;
+        if (!UseSmsPhysics && speed < BonkMinDiveSpeed)
+            return false; // SMS: jumpCatch() bonks at any speed
 
         Vector3 travelDirection = velocityXZ / speed;
         for (int i = 0; i < GetSlideCollisionCount(); i++)
@@ -5117,7 +5165,10 @@ public partial class Mario : CharacterBody3D
             if (travelDirection.Dot(-normalXZ) <= 0.25f)
                 continue;
 
-            EnterBonk(normalXZ);
+            if (UseSmsPhysics)
+                SmsEnterBonk(travelDirection.Bounce(normalXZ), Mathf.Min(velocity.Y, 0f), "dive", SmsUnits.MpsToSpeed(speed));
+            else
+                EnterBonk(normalXZ);
             return true;
         }
 
@@ -5153,14 +5204,19 @@ public partial class Mario : CharacterBody3D
     {
         if (_bonkAirborne)
         {
-            velocity += GRAVITY * (float)delta;
+            if (!UseSmsPhysics)
+                velocity += GRAVITY * (float)delta; // SMS mode: SmsAirTick already applied 1.0/tick
             if (IsOnFloor())
             {
                 // Landed: play the get-up animation to completion before control.
                 _bonkAirborne = false;
                 _bonkTimer = 0f;
-                velocity.X = _bonkAwayDirection.X * BonkLandingSlideSpeed;
-                velocity.Z = _bonkAwayDirection.Z * BonkLandingSlideSpeed;
+                if (!UseSmsPhysics)
+                {
+                    velocity.X = _bonkAwayDirection.X * BonkLandingSlideSpeed;
+                    velocity.Z = _bonkAwayDirection.Z * BonkLandingSlideSpeed;
+                }
+                // SMS (SHORT_BACK_DOWN): the 16/tick knockback carries into the slide and decays below.
                 _sm.Travel("ma_sdown");
                 TriggerLandingDust();
             }
@@ -5168,14 +5224,32 @@ public partial class Mario : CharacterBody3D
         }
 
         // Get-up phase: hold controls while the short backward skid eases to a stop.
-        velocity.X = Mathf.MoveToward(velocity.X, 0f, BonkLandingSlideDeceleration * (float)delta);
-        velocity.Z = Mathf.MoveToward(velocity.Z, 0f, BonkLandingSlideDeceleration * (float)delta);
+        if (UseSmsPhysics)
+        {
+            // downingCommon(): fwd *= 0.96 per tick while ma_sdown plays, stop below 1
+            int bonkTicks = SmsUnits.TicksFor(delta, ref _smsBonkAccum);
+            float bonkMul = 1f;
+            for (int bi = 0; bi < bonkTicks; bi++)
+                bonkMul *= SmsParams.Timing.BonkDownFriction;
+            velocity.X *= bonkMul;
+            velocity.Z *= bonkMul;
+            if (new Vector2(velocity.X, velocity.Z).Length() < SmsUnits.SpeedToMps(1f))
+            {
+                velocity.X = 0f;
+                velocity.Z = 0f;
+            }
+        }
+        else
+        {
+            velocity.X = Mathf.MoveToward(velocity.X, 0f, BonkLandingSlideDeceleration * (float)delta);
+            velocity.Z = Mathf.MoveToward(velocity.Z, 0f, BonkLandingSlideDeceleration * (float)delta);
+        }
         velocity.Y = -2f;
 
         _bonkTimer += (float)delta;
         float len = (float)_sm.GetCurrentLength();
         float pos = (float)_sm.GetCurrentPlayPosition();
-        bool done = (len > 0.001f && pos >= len - 0.03f) || _bonkTimer > 1.5f;
+        bool done = (len > 0.001f && pos >= len - 0.03f) || _bonkTimer > (UseSmsPhysics ? 3f : 1.5f); // SMS: the get-up lasts the whole ma_sdown animation
         if (done)
         {
             velocity.X = 0f;
@@ -6793,6 +6867,32 @@ public partial class Mario : CharacterBody3D
 
         Vector3 vXZ = new Vector3(preSlideVelocity.X, 0, preSlideVelocity.Z);
         float speed = vXZ.Length();
+        if (UseSmsPhysics)
+        {
+            // jumpingBasic() case 2 (any jump state that really hits a wall): fwd > ClashSpeed (40) -> knocked down
+            // (JUMP_SHORT_BACK_DOWN: 16/tick backwards, vertical speed untouched); 16 < fwd <= 40 -> wall slide;
+            // fwd <= 16 -> he just stops against the wall and keeps falling.
+            bool smsHitWall = speed > 1e-4f && (vXZ / speed).Dot(-nXZ) >= minApproachDot
+                && stateOfMario != MarioState.bonk
+                && airStateAtContact != MarioState.groundPoundFalling
+                && airStateAtContact != MarioState.groundPoundStartup;
+            if (smsHitWall)
+            {
+                float smsFwd = SmsUnits.MpsToSpeed(speed);
+                if (smsFwd > SmsParams.Mario.ClashSpeed)
+                {
+                    SmsEnterBonk(-(vXZ / speed), velocity.Y, "air wall hit", smsFwd);
+                    return;
+                }
+                if (smsFwd <= SmsParams.Timing.AirWallSlideMinFwd)
+                {
+                    velocity.X = 0f;
+                    velocity.Z = 0f;
+                    return;
+                }
+            }
+            minSpeed = SmsUnits.SpeedToMps(SmsParams.Timing.AirWallSlideMinFwd);
+        }
         if (speed < minSpeed)
             return;
 
@@ -10104,6 +10204,62 @@ public partial class Mario : CharacterBody3D
             || stateOfMario == MarioState.sideFlip || stateOfMario == MarioState.wallJump
             || stateOfMario == MarioState.stomping;
         return eligible && _smsSpin.Check(out _smsSpinSign);
+    }
+
+    /// <summary>
+    /// JUMP_SHORT_BACK_DOWN entry (jumpDownCommon): knocked back at 16 units/tick along <paramref name="backDir"/> with the
+    /// given vertical speed, facing the way he came; TickBonk lands him into SHORT_BACK_DOWN (ma_sdown) where the slide
+    /// decays 0.96 per tick and the get-up cannot be interrupted.
+    /// </summary>
+    private void SmsEnterBonk(Vector3 backDir, float vyMps, string why, float fwdAtHit)
+    {
+        StopWaistIKHard();
+        isSpining(false);
+        stateOfMario = MarioState.bonk;
+        _bonkAirborne = true;
+        _bonkTimer = 0f;
+        backDir.Y = 0f;
+        backDir = backDir.LengthSquared() > 1e-6f ? backDir.Normalized() : -SmsFacingOrVelocityDir();
+        _bonkAwayDirection = backDir;
+        float back = SmsUnits.SpeedToMps(SmsParams.Timing.BonkBackSpeed);
+        velocity.X = backDir.X * back;
+        velocity.Z = backDir.Z * back;
+        velocity.Y = vyMps;
+        _smsTrueVyValid = false;
+        Vector3 faceWall = -backDir;
+        lastFacingDirection = faceWall;
+        armature.Rotation = new Vector3(0f, YawFromDir(faceWall), 0f);
+        SetMarioState(stateOfMario); // -> ma_bkdwn
+        SpawnBonkStars(faceWall);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS bonk] {why} at fwd {fwdAtHit:F1} (threshold {SmsParams.Mario.ClashSpeed:F0}) -> knocked back 16/tick, vy {SmsUnits.MpsToSpeed(vyMps):F1}");
+    }
+
+    /// <summary>
+    /// running() case 2: hitting a wall on the ground faster than ClashSpeed (40) knocks him down with no hop. The run cap is
+    /// 32, so this only happens with borrowed speed (roll-jump run-out at 55, slopes, dashes).
+    /// </summary>
+    private void SmsGroundWallBonk(Vector3 preMoveVel, MarioState preMoveState)
+    {
+        if (!IsOnFloor() || !IsOnWall() || stateOfMario == MarioState.bonk)
+            return;
+        bool runState = preMoveState == MarioState.running || preMoveState == MarioState.sprinting
+            || preMoveState == MarioState.walking || preMoveState == MarioState.rolloutRun;
+        if (!runState)
+            return;
+        Vector3 n = GetWallNormal();
+        n.Y = 0f;
+        if (n.LengthSquared() < 1e-6f)
+            return;
+        n = n.Normalized();
+        Vector3 v = new Vector3(preMoveVel.X, 0f, preMoveVel.Z);
+        float sp = v.Length();
+        if (sp < 1e-4f || (v / sp).Dot(-n) < 0.5f) // must run into it, not brush along it
+            return;
+        float fwd = SmsUnits.MpsToSpeed(sp);
+        if (fwd <= SmsParams.Mario.ClashSpeed)
+            return;
+        SmsEnterBonk(-(v / sp), 0f, "ground wall hit", fwd);
     }
 
     /// <summary>doRunning() + walkEnd() + the skid U-turn, for one physics frame (2 sub-ticks at 60 Hz).</summary>

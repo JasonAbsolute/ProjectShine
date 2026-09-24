@@ -176,6 +176,9 @@ public static class SmsParams
         public const float TurnAngleRad = 0x471C * SmsUnits.BamToRad;   // 100.1 deg: reversal that triggers the skid turn
         public const float TurnSkidAnimMinFwd = 18f;    // turnning: fwd >= 18 uses the skid anim, else the quick turn
         public const float SpinModelDegPerTick = 22.5f; // rotateJumping: mModelFaceAngle += 4096 BAM per tick (2700 deg/s)
+        public const int JumpSlipWindowTicksUltra = 4;   // ultraJumpSlip: the triple jump's landing window is only 4 ticks
+        public const float BonkBackSpeed = 16f;          // jumpDownCommon(..., -16): knocked back at 16/tick until he lands
+        public const float BonkDownFriction = 0.96f;     // downingCommon: the backward slide decays 0.96 per tick while ma_sdown plays
     }
 }
 
@@ -346,10 +349,7 @@ public static class SmsRun
         {
             fwd = SmsMath.Converge(fwd, 0f, SmsParams.Timing.BrakeDecel);
         }
-        else
-        {
-            fwd = 0f;
-        }
+        // else: below 16 with the stick neutral jumpSlipCommon only zeroes mVel.y; he coasts until *_JUMP_END stops him.
     }
 
     /// <summary>doRunningAnimation thresholds: 0 = soft step, 1 = walk, 2 = run (hysteresis Walk2Soft / Soft2Walk).</summary>
