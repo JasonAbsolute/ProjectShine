@@ -4136,11 +4136,34 @@ public partial class Mario : CharacterBody3D
             }
 
             // If we landed from a rollout, go straight into runout (no landing anim)
+            // catchStop() lands in MARIO_STATUS_LAND_END: waitProcess() zeroes the velocity and ma_laend plays,
+            // so the small roll ends standing. With the stick held, jumpEndEvents() turns it into RUN on the first
+            // tick with fwd = max(fwd, mag) (setStatusToRunning) -- the rollout-run hand-off below does that.
+            bool smsCatchStopStop = UseSmsPhysics && airStateAtImpact == MarioState.bellyRollout && _smsIntendedMag <= 0f;
+            if (smsCatchStopStop)
+            {
+                velocity.X = 0f;
+                velocity.Z = 0f;
+            }
             if (
-                airStateAtImpact == MarioState.bellyRollout
-                || airStateAtImpact == MarioState.singleRollout
+                !smsCatchStopStop
+                && (airStateAtImpact == MarioState.bellyRollout
+                    || airStateAtImpact == MarioState.singleRollout)
             )
             {
+                if (UseSmsPhysics && _smsIntendedMag > 0f)
+                {
+                    // setStatusToRunning(RUN): 0 <= fwd < mag -> fwd = mag, along the way he is already moving.
+                    Vector3 landXZ = new Vector3(velocity.X, 0f, velocity.Z);
+                    float landFwd = SmsUnits.MpsToSpeed(landXZ.Length());
+                    if (landXZ.Length() > 0.05f && landFwd < _smsIntendedMag)
+                    {
+                        Vector3 landDir = landXZ.Normalized();
+                        float landMps = SmsUnits.SpeedToMps(_smsIntendedMag);
+                        velocity.X = landDir.X * landMps;
+                        velocity.Z = landDir.Z * landMps;
+                    }
+                }
                 EnterRolloutRun(inputDirWorld, stickStrength);
                 // If jump was buffered while airborne, queue it for NEXT frame (pre-ground-logic)
                 if (jumpBuffer > 0)
