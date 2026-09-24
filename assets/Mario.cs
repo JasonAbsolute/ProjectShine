@@ -226,6 +226,7 @@ public partial class Mario : CharacterBody3D
     private readonly SmsStickRotate _smsSpin = new SmsStickRotate(); // makeHistory/checkStickRotate: stick-spin detector
     private int _smsSpinSign = 1;              // +1 counter-clockwise (RIGHT_ROTATE_JUMP), -1 clockwise (LEFT_ROTATE_JUMP)
     [Export] public bool SmsDebugPrint = true;  // dev branch: print launches, slide decisions and jump apexes to the output
+    [Export] public float SmsRollJumpMinSpeed = 40f; // catching(): slide speed (SMS units/tick) above which A is the big roll-jump; mario.prm mClashSpeed = 40. Lower = easier roll-jump (deviation from the game)
     private float _smsDbgStartY = 0f, _smsDbgMaxY = 0f, _smsDbgAir = 0f;
     private bool _smsDbgAirborne = false;
     private MarioState _smsDbgKind = MarioState.idle;
@@ -2812,10 +2813,11 @@ public partial class Mario : CharacterBody3D
                             velocity.Z = 0;
                             stateOfMario = MarioState.gettingUpFromSliding;
                         }
-                        if (UseSmsPhysics && jumpBuffer >= JUMP_BUFFER_FRAMES - 1)
+                        if (UseSmsPhysics && jumpBuffer >= JUMP_BUFFER_FRAMES - 2)
                         {
-                            // A pressed this physics frame or the previous one (= one 30 fps frame in SMS, so a press that lands
-                            // on the touchdown frame still counts, as it does in the game where catching() runs that same tick).
+                            // A pressed within the last 3 physics frames (50 ms). SMS polls the pad once per 30 fps frame and runs
+                            // catching() in the very tick the dive lands, so a press anywhere in the landing frame (up to 33 ms
+                            // before the touchdown tick) counts; Godot only reaches this block one frame after touchdown.
                             // catching(): fwd > ClashSpeed (40) -> ROTATE_BROAD_JUMP (singleRollout: vy 38, fwd 55, the big roll
                             // jump); otherwise CATCH_STOP (bellyRollout: vy 30, slide speed kept, ma_roll then ma_slpla).
                             SmsRolloutLaunch();
@@ -10068,7 +10070,7 @@ public partial class Mario : CharacterBody3D
         Vector3 dir = speed > 0.5f ? velXZ / speed : SmsFacingOrVelocityDir();
         float fwd = SmsUnits.MpsToSpeed(speed);
         float vy = SmsUnits.MpsToSpeed(velocity.Y);
-        bool broad = SmsSlide.CanRollout(fwd);
+        bool broad = fwd > SmsRollJumpMinSpeed;
         SmsAir.Launch kind = broad ? SmsAir.Launch.RotateBroadJump : SmsAir.Launch.CatchStop;
         SmsAir.ApplyLaunch(kind, ref fwd, ref vy);
         stateOfMario = broad ? MarioState.singleRollout : MarioState.bellyRollout;
@@ -10085,7 +10087,7 @@ public partial class Mario : CharacterBody3D
         jumpHoldTime = 0f;
         jumpBuffer = 0;
         if (SmsDebugPrint)
-            GD.Print($"[SMS slide] A at fwd {SmsUnits.MpsToSpeed(speed):F1} ({speed:F1} m/s, threshold 40) -> {kind}: "
+            GD.Print($"[SMS slide] A at fwd {SmsUnits.MpsToSpeed(speed):F1} ({speed:F1} m/s, threshold {SmsRollJumpMinSpeed:F0}) -> {kind}: "
                 + (broad ? "singleRollout / ma_roll_jump, fwd 55 vy 38" : $"bellyRollout / ma_roll, fwd kept {fwd:F1} vy 30"));
     }
 
@@ -10251,7 +10253,8 @@ public partial class Mario : CharacterBody3D
         if (SmsDebugPrint && _smsDbgAirborne && IsOnFloor())
         {
             float h = _smsDbgMaxY - _smsDbgStartY;
-            GD.Print($"[SMS jump] {_smsDbgKind}: apex {h:F2} m = {SmsUnits.MetresToUnits(h):F0} units = {h / 2.15f:F2} Mario heights, airtime {_smsDbgAir:F2} s");
+            float landXzMps = new Vector2(velocity.X, velocity.Z).Length();
+            GD.Print($"[SMS jump] {_smsDbgKind}: apex {h:F2} m = {SmsUnits.MetresToUnits(h):F0} units = {h / 2.15f:F2} Mario heights, airtime {_smsDbgAir:F2} s, touchdown xz {SmsUnits.MpsToSpeed(landXzMps):F1} ({landXzMps:F1} m/s)");
             _smsDbgAirborne = false;
         }
         if (IsOnFloor() || IsOnCeiling())
