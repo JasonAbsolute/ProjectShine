@@ -226,7 +226,7 @@ public partial class Mario : CharacterBody3D
     private readonly SmsStickRotate _smsSpin = new SmsStickRotate(); // makeHistory/checkStickRotate: stick-spin detector
     private int _smsSpinSign = 1;              // +1 counter-clockwise (RIGHT_ROTATE_JUMP), -1 clockwise (LEFT_ROTATE_JUMP)
     [Export] public bool SmsDebugPrint = true;  // dev branch: print launches, slide decisions and jump apexes to the output
-    [Export] public float SmsRollJumpMinSpeed = 40f; // catching(): slide speed (SMS units/tick) above which A is the big roll-jump; mario.prm mClashSpeed = 40. Lower = easier roll-jump (deviation from the game)
+    [Export] public float SmsRollJumpMinSpeed = 20f; // catching(): slide speed (SMS units/tick) above which A is the big roll-jump. Game value: mario.prm mClashSpeed = 40 (big roll only within ~0.13 s of touchdown); 20 chosen by feel (Jaysonn, 2026-09-24) -- a deliberate deviation
     private float _smsDbgStartY = 0f, _smsDbgMaxY = 0f, _smsDbgAir = 0f;
     private bool _smsDbgAirborne = false;
     private MarioState _smsDbgKind = MarioState.idle;
