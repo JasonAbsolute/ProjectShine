@@ -222,6 +222,13 @@ public partial class Mario : CharacterBody3D
     private float _smsMoveVyMps = 0f;
     private bool _smsTrueVyValid = false;
     private int _smsWallSlideTicks = 0;
+    private bool _smsFallCancel = false;       // unk78 bit 0x100: the LAUNCH had the fall-cancel flag; survives in-air state changes
+    private readonly SmsStickRotate _smsSpin = new SmsStickRotate(); // makeHistory/checkStickRotate: stick-spin detector
+    private int _smsSpinSign = 1;              // +1 counter-clockwise (RIGHT_ROTATE_JUMP), -1 clockwise (LEFT_ROTATE_JUMP)
+    [Export] public bool SmsDebugPrint = false; // print launch/apex/airtime per jump to the output
+    private float _smsDbgStartY = 0f, _smsDbgMaxY = 0f, _smsDbgAir = 0f;
+    private bool _smsDbgAirborne = false;
+    private MarioState _smsDbgKind = MarioState.idle;
 
     // --- WALL SLIDE / WALL KICK ---
     private const float WALL_SLIDE_MAX_FALL = -11.106608f; // -25 * SCALE_FIX
@@ -2018,7 +2025,7 @@ public partial class Mario : CharacterBody3D
             spinInput = (spinBuffer > 0);
 
             // Spin jump cancels stomp and resets chain
-            if (spinInput && CanStartSpinInAir())
+            if ((UseSmsPhysics ? SmsAirSpinDetected() : spinInput) && CanStartSpinInAir())
             {
                 _stompChain = 0;
                 StartSpinJumpFromAir();
@@ -2339,6 +2346,8 @@ public partial class Mario : CharacterBody3D
         // SpinInput should be a ONE-FRAME pulse.
         // Reset it at the start of this frame and let UpdateSpinInput set it.
         UpdateSpinInput(LstickVec);
+        if (UseSmsPhysics)
+            _smsSpin.Push(_smsIntendedMag > 0f && inputDirWorld != Vector3.Zero, SmsMath.YawFromDir(inputDirWorld));
 
         if (spinBuffer > 0)
             spinBuffer--;
@@ -2703,7 +2712,7 @@ public partial class Mario : CharacterBody3D
 
                         isJumping = true;
 
-                        if (spinBuffer > 0)
+                        if (SmsOrBufferedSpin())
                         {
                             spinBuffer = 0;
                             StartSpinJump();
@@ -2803,14 +2812,11 @@ public partial class Mario : CharacterBody3D
                             velocity.Z = 0;
                             stateOfMario = MarioState.gettingUpFromSliding;
                         }
-                        bool smsSlowSlide = UseSmsPhysics
-                            && !SmsSlide.CanRollout(SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()));
-                        if (Input.IsActionPressed("button_a") && smsSlowSlide)
+                        if (UseSmsPhysics && (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space")))
                         {
-                            // catching(): A during a slow slide (fwd <= ClashSpeed 40) just gets up — no hop in Sunshine.
-                            velocity.X = 0;
-                            velocity.Z = 0;
-                            stateOfMario = MarioState.gettingUpFromSliding;
+                            // catching(): fwd > ClashSpeed (40) -> ROTATE_BROAD_JUMP (singleRollout: vy 38, fwd 55, the big roll
+                            // jump); otherwise CATCH_STOP (bellyRollout: vy 30, slide speed kept, ma_roll then ma_slpla).
+                            SmsRolloutLaunch();
                         }
                         else if (Input.IsActionPressed("button_a") && !UseSmsPhysics && checkSpeedForBellyRoll(velocity))
                         {
@@ -2818,7 +2824,7 @@ public partial class Mario : CharacterBody3D
                             velocity.Y = GETTING_UP_FROM_SLIDE_ROLL;
                             SetMarioState(stateOfMario);
                         }
-                        else if (Input.IsActionPressed("button_a"))
+                        else if (!UseSmsPhysics && Input.IsActionPressed("button_a"))
                         {
                             stateOfMario = MarioState.singleRollout;
                             // Roll jump - special animation, keeping AnimationPlayer
@@ -3219,7 +3225,7 @@ public partial class Mario : CharacterBody3D
                                 _jumpDbgFrames = 40;
 
                                 // 1) SPIN WINS
-                                if (spinBuffer > 0)
+                                if (SmsOrBufferedSpin())
                                 {
                                     spinBuffer = 0;
                                     StartSpinJump();
@@ -3460,7 +3466,7 @@ public partial class Mario : CharacterBody3D
 
             // Air-spin: no extra height, no state change
             // If player does the stick spin while airborne, enter SpinJump state (NO height boost)
-            if (spinInput && CanStartSpinInAir())
+            if ((UseSmsPhysics ? SmsAirSpinDetected() : spinInput) && CanStartSpinInAir())
             {
                 StartSpinJumpFromAir();
                 spinInput = false; // consume
@@ -4343,12 +4349,7 @@ public partial class Mario : CharacterBody3D
     {
         if (UseSmsPhysics)
         {
-            // Fixed SMS launch (vy 38); releasing A early is handled by the fall cancel in SmsAirTick.
-            if (initalJumpHold && jumpHoldTime == 0f)
-            {
-                velocity.Y = SmsUnits.SpeedToMps(SmsParams.Jump.RotBroadJumpForceY);
-                _smsTrueVyValid = false;
-            }
+            // Rollout launch velocities are set once in SmsRolloutLaunch(); Sunshine has no hold-to-rise.
             if (initalJumpHold)
                 jumpHoldTime += (float)delta;
             return;
@@ -4594,7 +4595,7 @@ public partial class Mario : CharacterBody3D
     {
         if (stateOfMario == MarioState.SpinJump)
         {
-            float degreesPerSecond = 2000f;
+            float degreesPerSecond = UseSmsPhysics ? _smsSpinSign * SmsParams.Timing.SpinModelDegPerTick * 120f : 2000f;
             float angleThisFrame = degreesPerSecond * (float)delta * (Mathf.Pi / 180.0f);
             armature.RotateObjectLocal(Vector3.Up, angleThisFrame);
         }
@@ -4692,6 +4693,11 @@ public partial class Mario : CharacterBody3D
                 // Keep armature locked at sideflip yaw during landing animation
                 armature.Rotation = new Vector3(0f, sideFlipLockedYaw, 0f);
             }
+        }
+        else if (UseSmsPhysics && _smsFaceValid && _smsFaceSource == 2 && !IsOnFloor() && SmsStateSteers(stateOfMario))
+        {
+            // Sunshine: the model keeps facing mFaceAngle in the air; sideways stick drift does not turn him.
+            armature.Rotation = armature.Rotation with { Y = BaseYawFromDir(SmsMath.DirFromYaw(_smsFaceYaw)) };
         }
         else
         {
@@ -4926,7 +4932,7 @@ public partial class Mario : CharacterBody3D
         jumpChainStage = 0;
         jumpChainTimer = 0;
 
-        if (spinBuffer > 0)
+        if (SmsOrBufferedSpin())
         {
             spinBuffer = 0;
             StartSpinJump();
@@ -5660,7 +5666,7 @@ public partial class Mario : CharacterBody3D
             isJumping = true;
 
             // 1) SPIN JUMP if buffered
-            if (spinBuffer > 0)
+            if (SmsOrBufferedSpin())
             {
                 spinBuffer = 0;
                 StartSpinJump();
@@ -7137,7 +7143,7 @@ public partial class Mario : CharacterBody3D
         landingEnteredThisContact = false;
 
         // SPIN wins if available
-        if (spinBuffer > 0)
+        if (SmsOrBufferedSpin())
         {
             spinBuffer = 0;
             StartSpinJumpPreserveXZ(); // <-- new function below
@@ -9968,13 +9974,21 @@ public partial class Mario : CharacterBody3D
     /// </summary>
     private void SmsLaunch(SmsAir.Launch kind)
     {
-        Vector3 faceDir = SmsFacingOrVelocityDir();
         Vector3 velXZ = new Vector3(velocity.X, 0f, velocity.Z);
         float speed = velXZ.Length();
+        // On the ground SMS velocity always points along mFaceAngle, so the takeoff face IS the velocity
+        // direction. The U-turn jump faces the stick (their code has already set lastFacingDirection to
+        // it) and the backflip faces the way the model looks while moving backwards.
+        Vector3 faceDir = (kind == SmsAir.Launch.UTurnJump || kind == SmsAir.Launch.BackJump || speed <= 0.5f)
+            ? SmsFacingOrVelocityDir()
+            : velXZ / speed;
         float sign = (speed > 1e-4f && velXZ.Dot(faceDir) < 0f) ? -1f : 1f;
         float fwd = SmsUnits.MpsToSpeed(sign * speed);
         float vy = SmsUnits.MpsToSpeed(velocity.Y);
         SmsAir.ApplyLaunch(kind, ref fwd, ref vy);
+        _smsFallCancel = SmsAir.FallCancelEligible(kind);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS launch] {kind}: fwd {fwd:F1} ({SmsUnits.SpeedToMps(fwd):F1} m/s) vy {vy:F1} cancel {_smsFallCancel}");
         float mps = SmsUnits.SpeedToMps(fwd);
         velocity.X = faceDir.X * mps;
         velocity.Z = faceDir.Z * mps;
@@ -9997,15 +10011,70 @@ public partial class Mario : CharacterBody3D
             velocity.Z = dir.Z * DIVE_SPEED_XZ;
             return;
         }
-        float fwd = SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length());
+        // Sunshine dives along mFaceAngle: in the air that is the takeoff face (the stick does not redirect
+        // a dive), on the ground it is the way he is running (or looking, when standing).
+        Vector3 velXZ0 = new Vector3(velocity.X, 0f, velocity.Z);
+        if (!fromGround && _smsFaceValid && _smsFaceSource == 2)
+            dir = SmsMath.DirFromYaw(_smsFaceYaw);
+        else if (velXZ0.Length() > 0.5f)
+            dir = velXZ0.Normalized();
+        lastFacingDirection = dir;
+        float fwd = SmsUnits.MpsToSpeed(velXZ0.Length());
         float vy = SmsUnits.MpsToSpeed(velocity.Y);
         SmsAir.ApplyLaunch(fromGround ? SmsAir.Launch.JumpCatchGround : SmsAir.Launch.JumpCatchAir, ref fwd, ref vy);
+        _smsFallCancel = false;
         float mps = SmsUnits.SpeedToMps(fwd);
         velocity.X = dir.X * mps;
         velocity.Z = dir.Z * mps;
         velocity.Y = SmsUnits.SpeedToMps(vy);
         SmsLatchFace(dir, 2);
         _smsTrueVyValid = false;
+    }
+
+    /// <summary>
+    /// A pressed during the belly slide (catching()): above ClashSpeed (40) it is MARIO_STATUS_ROTATE_BROAD_JUMP
+    /// (vy 38, fwd 55, fall-cancellable); otherwise MARIO_STATUS_CATCH_STOP, a vy-30 hop that keeps the slide
+    /// speed and rolls him to his feet (not cancellable).
+    /// </summary>
+    private void SmsRolloutLaunch()
+    {
+        Vector3 velXZ = new Vector3(velocity.X, 0f, velocity.Z);
+        float speed = velXZ.Length();
+        Vector3 dir = speed > 0.5f ? velXZ / speed : SmsFacingOrVelocityDir();
+        float fwd = SmsUnits.MpsToSpeed(speed);
+        float vy = SmsUnits.MpsToSpeed(velocity.Y);
+        bool broad = SmsSlide.CanRollout(fwd);
+        SmsAir.Launch kind = broad ? SmsAir.Launch.RotateBroadJump : SmsAir.Launch.CatchStop;
+        SmsAir.ApplyLaunch(kind, ref fwd, ref vy);
+        stateOfMario = broad ? MarioState.singleRollout : MarioState.bellyRollout;
+        SetMarioState(stateOfMario);
+        float mps = SmsUnits.SpeedToMps(fwd);
+        velocity.X = dir.X * mps;
+        velocity.Z = dir.Z * mps;
+        velocity.Y = SmsUnits.SpeedToMps(vy);
+        lastFacingDirection = dir;
+        SmsLatchFace(dir, 2);
+        _smsTrueVyValid = false;
+        _smsFallCancel = SmsAir.FallCancelEligible(kind);
+        initalJumpHold = true;
+        jumpHoldTime = 0f;
+        if (SmsDebugPrint)
+            GD.Print($"[SMS launch] {kind} from slide at fwd {SmsUnits.MpsToSpeed(speed):F1}: fwd {fwd:F1} vy {vy:F1}");
+    }
+
+    /// <summary>considerRotateJumpStart(): on the ground, A becomes a spin jump if the stick was just spun.</summary>
+    private bool SmsOrBufferedSpin() => UseSmsPhysics ? _smsSpin.Check(out _smsSpinSign) : spinBuffer > 0;
+
+    /// <summary>
+    /// considerJumpRotate(): only a single, double, U-turn, wall or trample jump can turn into a spin jump in the
+    /// air (jumpingCommonEvents is not called from the triple, back, dive, roll or hip-drop handlers).
+    /// </summary>
+    private bool SmsAirSpinDetected()
+    {
+        bool eligible = stateOfMario == MarioState.singleJump || stateOfMario == MarioState.doubleJump
+            || stateOfMario == MarioState.sideFlip || stateOfMario == MarioState.wallJump
+            || stateOfMario == MarioState.stomping;
+        return eligible && _smsSpin.Check(out _smsSpinSign);
     }
 
     /// <summary>doRunning() + walkEnd() + the skid U-turn, for one physics frame (2 sub-ticks at 60 Hz).</summary>
@@ -10067,18 +10136,23 @@ public partial class Mario : CharacterBody3D
         float vyMps = (_smsTrueVyValid && Mathf.Abs(velocity.Y - _smsMoveVyMps) < 1e-3f) ? _smsTrueVy : velocity.Y;
         float vy = SmsUnits.MpsToSpeed(vyMps);
         bool aHeld = Input.IsActionPressed("button_a") || Input.IsActionPressed("key_space");
-        SmsAir.Launch kind = SmsLaunchKindFor(stateOfMario);
-        bool cancel = SmsAir.FallCancelEligible(kind);
+        bool cancel = _smsFallCancel;
         SmsAir.GravityMode gmode = stateOfMario == MarioState.SpinJump ? SmsAir.GravityMode.SpinJump : SmsAir.GravityMode.Normal;
         float sumMoveVy = 0f;
 
         if (SmsStateSteers(stateOfMario))
         {
-            if (!_smsFaceValid || _smsFaceSource != 2 || lastFacingDirection != _smsLatchedFacing)
-                SmsLatchFace(new Vector3(lastFacingDirection.X, 0f, lastFacingDirection.Z), 2);
+            Vector3 velXZ = new Vector3(velocity.X, 0f, velocity.Z);
+            if (!_smsFaceValid || _smsFaceSource != 2)
+            {
+                // Entered the air without a launch call (walked off, lost a wall, ledge hop...): the face is
+                // the way he is moving, else the way he looks, and there is no fall cancel. Launches latch
+                // explicitly and it stays put.
+                SmsLatchFace(velXZ.Length() > 0.5f ? velXZ : new Vector3(lastFacingDirection.X, 0f, lastFacingDirection.Z), 2);
+                _smsFallCancel = false;
+            }
             Vector3 faceDir = SmsMath.DirFromYaw(_smsFaceYaw);
             Vector3 sideDir = faceDir.Rotated(Vector3.Up, Mathf.Pi * 0.5f);
-            Vector3 velXZ = new Vector3(velocity.X, 0f, velocity.Z);
             float fwd = SmsUnits.MpsToSpeed(velXZ.Dot(faceDir));
             bool stick = stickDir.LengthSquared() > 1e-6f && _smsIntendedMag > 0f;
             float d = stick ? faceDir.SignedAngleTo(new Vector3(stickDir.X, 0f, stickDir.Z).Normalized(), Vector3.Up) : 0f;
@@ -10107,6 +10181,20 @@ public partial class Mario : CharacterBody3D
         _smsMoveVyMps = velocity.Y;
         _smsTrueVy = SmsUnits.SpeedToMps(vy);
         _smsTrueVyValid = true;
+
+        if (SmsDebugPrint)
+        {
+            if (!_smsDbgAirborne)
+            {
+                _smsDbgAirborne = true;
+                _smsDbgStartY = GlobalPosition.Y;
+                _smsDbgMaxY = GlobalPosition.Y;
+                _smsDbgAir = 0f;
+                _smsDbgKind = stateOfMario;
+            }
+            _smsDbgMaxY = Mathf.Max(_smsDbgMaxY, GlobalPosition.Y);
+            _smsDbgAir += (float)delta;
+        }
     }
 
     /// <summary>catching()/doSliding(): belly-slide friction per sub-tick, with the stick's small influence.</summary>
@@ -10133,6 +10221,12 @@ public partial class Mario : CharacterBody3D
     /// <summary>After MoveAndSlide: keep the post-gravity vertical speed unless the world changed it.</summary>
     private void SmsAfterMove()
     {
+        if (SmsDebugPrint && _smsDbgAirborne && IsOnFloor())
+        {
+            float h = _smsDbgMaxY - _smsDbgStartY;
+            GD.Print($"[SMS jump] {_smsDbgKind}: apex {h:F2} m = {SmsUnits.MetresToUnits(h):F0} units = {h / 2.15f:F2} Mario heights, airtime {_smsDbgAir:F2} s");
+            _smsDbgAirborne = false;
+        }
         if (IsOnFloor() || IsOnCeiling())
         {
             _smsTrueVyValid = false;

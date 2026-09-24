@@ -175,6 +175,7 @@ public static class SmsParams
         public const float AirWallBonkMinFwd = 38f;     // … >= 38 -> bonk (JUMP_SHORT_BACK_DOWN), else LAND_SAFE_DOWN (fwd -8)
         public const float TurnAngleRad = 0x471C * SmsUnits.BamToRad;   // 100.1 deg: reversal that triggers the skid turn
         public const float TurnSkidAnimMinFwd = 18f;    // turnning: fwd >= 18 uses the skid anim, else the quick turn
+        public const float SpinModelDegPerTick = 22.5f; // rotateJumping: mModelFaceAngle += 4096 BAM per tick (2700 deg/s)
     }
 }
 
@@ -203,6 +204,59 @@ public static class SmsStick
 
     /// <summary>Intended magnitude normalised to 0..1 (mag / 32).</summary>
     public static float Strength01(Vector2 axis) => IntendedMag(axis) / 32f;
+}
+
+/// <summary>
+/// Spin-jump detection (TMario::makeHistory + checkStickRotate). While the stick is off-centre SMS records
+/// the intended (world) yaw every tick into a StickRotateTime (40 tick = 0.333 s) sliding window and clears
+/// it the moment the stick is released; a spin is recognised when the window contains all four 90-degree
+/// sectors centred on the cardinal directions. The check runs when A is pressed on the ground
+/// (considerRotateJumpStart, before a normal / double / triple jump) and every tick of a single, double,
+/// U-turn, wall or trample jump (considerJumpRotate: the jump becomes a spin jump, velocity untouched).
+/// Godot samples once per 60 Hz physics frame, so the window is 20 samples.
+/// </summary>
+public sealed class SmsStickRotate
+{
+    public const int Window = SmsParams.Controller.StickRotateTime / 2;
+    private readonly float[] _yaw = new float[Window];
+    private int _count;
+
+    /// <summary>Feed one physics frame. <paramref name="stickHeld"/> = intended magnitude &gt; 0.</summary>
+    public void Push(bool stickHeld, float intendedYaw)
+    {
+        if (!stickHeld) { _count = 0; return; }
+        if (_count >= Window)
+        {
+            Array.Copy(_yaw, 1, _yaw, 0, Window - 1);
+            _count = Window - 1;
+        }
+        _yaw[_count++] = intendedYaw;
+    }
+
+    public void Clear() => _count = 0;
+
+    /// <summary>
+    /// True when the recorded yaws cover all four sectors. <paramref name="spinSign"/> is +1 when the yaw
+    /// mostly increased (counter-clockwise seen from above, SMS RIGHT_ROTATE_JUMP) and -1 otherwise
+    /// (clockwise, LEFT_ROTATE_JUMP); the model spins the same way the stick was spun.
+    /// </summary>
+    public bool Check(out int spinSign)
+    {
+        bool q0 = false, q1 = false, q2 = false, q3 = false;
+        int inc = 0, dec = 0;
+        const float q = MathF.PI * 0.25f, h = MathF.PI * 0.75f;
+        for (int i = 0; i < _count - 1; i++)
+        {
+            float a = SmsMath.WrapAngle(_yaw[i]);
+            if (a < -h || a > h) q0 = true;
+            if (-h <= a && a <= -q) q1 = true;
+            if (-q < a && a < q) q2 = true;
+            if (q <= a && a <= h) q3 = true;
+            if (SmsMath.WrapAngle(_yaw[i + 1] - _yaw[i]) > 0f) inc++; else dec++;
+        }
+        spinSign = inc > dec ? 1 : -1;
+        return q0 && q1 && q2 && q3;
+    }
 }
 
 public static class SmsMath
@@ -350,6 +404,7 @@ public static class SmsAir
         JumpCatchGround,  // MARIO_STATUS_JUMP_CATCH (B on ground, fwd > 15): vy = 20, fwd = min(15 + fwd, 48)
         HipDrop,          // MARIO_STATUS_HIP_DROP:        hang, then vy = -80 constant
         RotateBroadJump,  // MARIO_STATUS_ROTATE_BROAD_JUMP: vy = 38, fwd = 55 (rollout from a belly slide)
+        CatchStop,        // MARIO_STATUS_CATCH_STOP (0x8A6): A during a belly slide at fwd <= ClashSpeed: vy = 30, fwd kept, roll to the feet
         Trample1,         // stomp bounce: vy = 0.25*fwd + 35, fwd *= 0.8
         Trample2,         // vy = 0.25*fwd + 45
         Trample3,         // vy = 0.25*fwd + 70
@@ -379,13 +434,17 @@ public static class SmsAir
             case Launch.WallJump:
                 vy = 62f; fwd = 24f; break;
             case Launch.JumpCatchAir:
-                fwd = MathF.Min(15f + fwd, 48f); break;
+                // checkBackTrig(): setPlayerVelocity(JumpJumpCatchSp = 80) first, then the JUMP_CATCH case
+                // does min(15 + fwd, 48) -> an air dive ALWAYS leaves at 48, whatever the speed before it.
+                fwd = MathF.Min(15f + SmsParams.Jump.JumpJumpCatchSp, 48f); break;
             case Launch.JumpCatchGround:
                 vy = 20f; fwd = MathF.Min(15f + fwd, 48f); break;
             case Launch.HipDrop:
                 vy = 0f; fwd = 0f; break;
             case Launch.RotateBroadJump:
                 vy = SmsParams.Jump.RotBroadJumpForceY; fwd = SmsParams.Jump.RotBroadJumpForce; break;
+            case Launch.CatchStop:
+                vy = 30f; break;  // catchStop(): fwd is kept
             case Launch.Trample1:
                 vy = fwd * 0.25f + SmsParams.Mario.TramplePowStep1; fwd *= 0.8f; break;
             case Launch.Trample2:
@@ -542,6 +601,26 @@ public static class SmsSelfTest
         Check("stick full tilt -> mag", SmsStick.IntendedMag(new Vector2(1f, 0f)), 32f, 0.001f);
         Check("stick half tilt -> mag", SmsStick.IntendedMag(new Vector2(0.5f, 0f)), 9.73f, 0.1f);
         Check("stick 5% tilt -> mag (deadzone)", SmsStick.IntendedMag(new Vector2(0.05f, 0f)), 0f, 0.001f);
+        // Spin detection: a clockwise circle in 12 samples is a spin (sign -1), a half turn is not, release clears.
+        {
+            var det = new SmsStickRotate();
+            for (int i = 0; i < 12; i++) det.Push(true, -i * (MathF.PI / 6f));
+            bool spin = det.Check(out int sign);
+            Check("stick spin detected", spin ? 1f : 0f, 1f, 0f);
+            Check("stick spin sign (clockwise = -1)", sign, -1f, 0f);
+            det.Clear();
+            for (int i = 0; i < 6; i++) det.Push(true, i * (MathF.PI / 6f));
+            Check("half turn is not a spin", det.Check(out _) ? 1f : 0f, 0f, 0f);
+            det.Push(false, 0f);
+            Check("release clears the spin history", det.Check(out _) ? 1f : 0f, 0f, 0f);
+        }
+        // Air dive from a standing jump: fwd = min(15 + 80, 48) = 48, vy untouched.
+        {
+            float fwd = 0f, vy = 10f;
+            SmsAir.ApplyLaunch(SmsAir.Launch.JumpCatchAir, ref fwd, ref vy);
+            Check("air dive fwd", fwd, 48f, 0f);
+            Check("air dive keeps vy", vy, 10f, 0f);
+        }
         GD.Print(ok ? "[SMS selftest] ALL OK" : "[SMS selftest] FAILURES ABOVE");
         return ok;
     }
