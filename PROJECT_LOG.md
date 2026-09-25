@@ -1304,3 +1304,258 @@ the closed fist for a character with no cap (Yoshi does).
 `CoverForIntro()` now asserts that same `t=0` value up front when `PreviewShot` is on, so the first
 rendered frame is already covered. Every path where the intro doesn't actually run re-opens the rects, so
 a misconfigured level can't come up stuck black.
+
+---
+
+## SMS 1:1 Physics Port (branch `sms-physics`)
+
+**Files:** `assets/Sms/SmsPhysics.cs` (new), `assets/Sms/SmsSlopeHipDrop.cs` (new), `assets/Mario.cs` (bridge methods at the end of the class + patched launch / ground / air / slide / landing / bonk / ground-pound sites)
+
+Replaces the hand-tuned movement numbers with the real Super Mario Sunshine player physics, ported from the
+`doldecomp/sms` decompilation (`src/Player/`: `MarioInit.cpp`, `MarioMove.cpp`, `MarioRun.cpp`, `MarioJump.cpp`,
+`MarioPhysics.cpp`) and using the **shipped** tuning values decoded from the disc's `data/params.szs`
+(`/mario/jump.prm`, `run.prm`, `mario.prm`, `slipparamnormal.prm`, `controller.prm`). The `MarioState` machine,
+`SetMarioState` animation map, VFX and collision are unchanged; what changed is where the numbers and the movement
+equations come from. Everything sits behind one toggle so the old feel is one click away. Ten commits,
+`7eea539` → `e469a5e`, each one a playtest iteration with Jaysonn.
+
+### Inspector exports (on Mario)
+
+| Export | Default | Meaning |
+|---|---|---|
+| `UseSmsPhysics` | `true` | Master switch. Off = the previous hand-tuned physics, untouched. |
+| `SmsDebugPrint` | `true` (dev branch) | Prints launches, slide decisions, jump apexes, bonks and ground pounds to Output. Turn off for release. |
+| `SmsRollJumpMinSpeed` | `20` | `catching()`: slide speed above which A is the big roll-jump. **Game value is 40**; 20 chosen by feel — a deliberate deviation. |
+| `KeepGroundPoundJump` | `false` | Restores the GP-jump (see Ground Pound section above). Off because Sunshine has no such move. |
+
+On Play, Output must show `[SMS selftest] ALL OK` and `[SMS selftest] slope/hipdrop ALL OK`. Anything else means a
+constant or equation was edited into an inconsistent state — fix before playtesting.
+
+### Units and time base
+
+- SMS runs at 30 fps but the director steps the player **4 sub-ticks per frame (120 Hz)**. Velocity fields
+  (`mForwardVel`, `mVel.y`) are in units per *frame*; each tick moves `vel / 4` and subtracts gravity once.
+- Mario is 160 units tall. Our `ma_mdl1.glb` armature import scale is `0.0134334`, so **1 metre = 74.44 units**
+  (`SmsUnits.UnitsPerMetre`). Jump heights therefore land at the right fraction of Mario's own height.
+- Conversions (`SmsUnits`): `m/s = v × 30 / 74.44 = v × 0.403`; `m/s² = g × 3600 / 74.44 = g × 48.36`.
+- Godot's 60 Hz physics frame runs however many 120 Hz ticks `SmsUnits.TicksFor(delta, ref accum)` says (normally 2),
+  so timers stay correct if the physics rate changes.
+- Vertical bookkeeping: `_smsTrueVy` is the post-gravity SMS value; `velocity.Y` handed to `MoveAndSlide` is the
+  sub-tick average. `SmsAfterMove` restores the true value after the move. Don't read `velocity.Y` for SMS logic.
+
+Reference conversions at this scale:
+
+| SMS | Converted | |
+|---|---|---|
+| Gravity 1.0 | 48.36 m/s² | old `GRAVITY` was 62.2 |
+| Spin-jump fall gravity 0.35 | 16.9 m/s² | only while descending in a spin jump |
+| Run max 32 | 12.9 m/s | old `RUN_SPEED` was 11.55 — already close |
+| ClashSpeed 40 | 16.1 m/s | the one threshold behind every wall/slide decision |
+| Terminal −75 | −30.2 m/s | |
+| Standing single jump vy 42 | apex 0.35 s, 3.03 m = 1.41 Mario heights | matches the real game |
+
+### ⚠️ Gotcha: the compiled-in defaults are not the game
+
+`MarioInit.cpp`'s `PARAM_INIT` values are what the code *starts* with; `params.szs` overrides them at boot and the
+differences are large. Anyone porting from the decomp source alone tunes to the wrong game.
+
+| Param | code default | shipped |
+|---|---:|---:|
+| Gravity | 0.8 | **1.0** |
+| SpinJumpGravity | 0.6 | **0.35** |
+| JumpAccelControl (air steer) | 0.5 | **0.008** |
+| JumpSlideControl (air side drift) | 0.5 | 0.3 |
+| UltraJumpForce (triple) | 70 | **75**, XZ kept ×1.0 |
+| TurnJumpForce / BackJumpForceY / RotateJumpForceY | 62 | **70** |
+| HipAttackSpeedY (GP fall) | −50 | **−80** |
+| SecJumpEnableSp (double min speed) | 20 | **0** |
+| TriJumpEnableSp (triple min speed) | 20 | **25** |
+| RotBroadJumpForce / ForceY (roll-jump) | 60 / 20 | **55 / 38** |
+| Run DecBrake / Soft2Walk / Walk2Soft | 1 / 8 / 5 | 5 / 13 / 8 |
+| SlipFriction (belly slide) | 0.9 | **0.97** |
+
+### ⚠️ Gotcha: 4 sub-ticks per frame (acceleration is ×3600, not ×900)
+
+Gravity is subtracted once per *tick* while the velocity is per *frame*, so an acceleration of `g` is
+`g × 120 × 30` units/s². Using 900 (one tick per frame) makes every jump 4× too floaty and is an easy mistake to
+make when reading `jumpProcess` in isolation. Sanity check that catches it: a standing single jump must apex at
+10.5 frames / 0.35 s.
+
+### Stick (`SmsStick`, `controller.prm`)
+
+`raw = 128·axis` → deadzone ±7 (with 6 subtracted) → length × 0.78² → clamp 64 → `mag = 32·(len/64)²`. Quadratic,
+so a half tilt walks and full magnitude arrives at ~82 % tilt. `mag` is the run target speed (0..32); sneak goes
+through the same curve.
+
+### Run (`SmsRun`, `doRunning`)
+
+- Accelerate toward `min(32, mag)`: `fwd += 1.1 − fwd/43` per tick (the SM64 lineage); above target on flat ground
+  brake 5/tick (`DecBrake`); stick released `−1/tick` (`walkEnd`); braking/skid `−4/tick`.
+- Turning is speed-independent (`RunningRotSp` 1500 BAM/tick shipped min == max) and **preserves speed** — velocity
+  always points along the face angle on the ground. A stick reversal of more than ~100° skids instead of turning.
+- Gait bands with hysteresis: soft step ↔ walk at 8 / 13 (`Walk2Soft` / `Soft2Walk`).
+
+### Jumps and air (`SmsAir`)
+
+Launch table (`setStatusToJumping`), all in SMS units, `fwd` = speed at the moment of the press:
+
+| Launch | vy | fwd | Notes |
+|---|---|---|---|
+| Single | 0.25·fwd + 42 | ×0.8 | fall-cancel |
+| Double | 0.25·fwd + 52 | ×0.8 | no minimum speed; fall-cancel |
+| Triple | 0.15·fwd + 75 | ×1.0 | needs fwd ≥ 25; no cancel |
+| Spin (ground) | 0.25·fwd + 70 | ×0.8 | no cancel |
+| Sideflip (U-turn) | 70 | 8 | new direction |
+| Backflip | 70 | −18 | |
+| Wall kick | 62 | 24 | away from the wall; fall-cancel |
+| Dive from the air | unchanged | **48 always** | `checkBackTrig` sets 80 then caps at 48 |
+| Dive from the ground | 20 | min(15 + fwd, 48) | needs fwd > 15 |
+| Roll-jump (from slide) | 38 | 55 | `ROTATE_BROAD_JUMP`, `ma_roll_jump`; fall-cancel |
+| Small roll (from slide) | 30 | kept | `CATCH_STOP`, `ma_roll` |
+| Stomp bounce 1 / 2 / 3 | 0.25·fwd + 35 / 45 / 70 | ×0.8 | |
+| Ground pound | 0 | 0 | then −80 constant |
+
+- **Variable height is the fall-cancel, not a hold ramp:** while A is released and `vy > 20`, `vy *= 0.75` per
+  tick. Only the launches marked fall-cancel have it (`_smsFallCancel` is a property of the launch, so a spun
+  single jump keeps its cut and a ground spin jump never has one).
+- Air control is nearly committed: forward steer `0.008·mag·cos(Δ)` per tick, sideways drift `0.3·mag·sin(Δ)` applied as
+  a transient offset (not accumulated, as in the game), horizontal air speed capped at 80, air brake 0.999/tick.
+- The face angle is latched **once** at launch, from the velocity direction (not the model, which the old code snaps to
+  the stick — that snapped the takeoff direction and lost speed). The model holds it in the air; no per-frame yaw.
+- Jump chain window 16 ticks (0.133 s) after touchdown; A inside it = next chained jump, B = dive (vy 20).
+- Gravity mode `SpinJump` (0.35) applies only while falling in a spin jump; everything else 1.0. Terminal −75.
+
+### Spin jump (`SmsStickRotate`)
+
+There is no separate spin-input buffer. While the stick is off-centre the intended yaw is recorded into a 40-tick
+(0.333 s) sliding window, cleared the instant the stick is released; a spin is recognised when all four 90° sectors
+are present. Godot samples once per physics frame, so the window is 20 samples. Checked at two moments:
+1. every ground A press, **before** single/double/triple (`considerRotateJumpStart`) — so a spin beats the chain;
+2. every tick of a single, double, sideflip, wall or stomp jump (`considerJumpRotate`): the jump becomes a spin jump
+   on the spot with velocity untouched. Triples, dives, rolls and backflips can't convert.
+The model spins 2700°/s in the direction the stick was spun. The R-tap ground spin still exists and launches with the
+`RotateJump` values.
+
+### Belly slide and rollout (`SmsSlide`, `catching()`)
+
+- Slide friction `fwd *= 0.97` per tick, plus `StickSlideMult 0.005·stick` pushing — net loss ≈1 %/tick with the
+  stick held, 3 % neutral. Stops below 1 (`ma_lost` get-up). A dive lands at ≈47.
+- Uphill the slide additionally loses `1.5·sin(angle)` per tick (`slipparamnormal` SlideAccele 0 / 1.5) and stops at
+  the top; downhill gets **no** gravity assist, friction only.
+- **A during the slide** (fresh press; SMS reads the frame-pressed bit, so holding A into the dive does nothing):
+  `fwd > SmsRollJumpMinSpeed` → roll-jump (`singleRollout`, lands into run-out); otherwise the small roll
+  (`bellyRollout`, `ma_roll` then `ma_slpla`), which keeps the slide speed and lands like `LAND_END`: velocity zeroed
+  → dead stop unless the stick is held, in which case RUN on the first tick at `max(current, stick)`.
+- **B during the slide** re-dives (vy 20).
+- The press is accepted across the touchdown frame (this frame or the previous one): the game evaluates A on the
+  same tick the dive lands, Godot reaches the slide code one physics frame later, and the press was being lost.
+
+### ⚠️ Gotcha: the game's roll-jump is a 130 ms trick
+
+With ClashSpeed 40 as the threshold and a dive landing at ≈47 decaying 1 %/tick, the big roll-jump only exists for
+the first ~0.13 s after touchdown on flat ground; anything later is the small roll. That is what the decomp says
+(`MarioRun.cpp` is NonMatching, so an inverted comparison is conceivable but unproven). Jaysonn wants the big roll
+reachable at about half speed, hence `SmsRollJumpMinSpeed = 20`. Session log of the decision: `logForLarry.txt`.
+
+### Landing window (`jumpSlipCommon` / `*_JUMP_END`)
+
+No input-locked landing lag exists in the game. What exists:
+
+| | Single / double | Triple |
+|---|---|---|
+| Slip window | 16 ticks (0.133 s) | 4 ticks (0.033 s) |
+| Stick held during window | keep moving, `fwd *= 0.98`/tick, no steering | same |
+| Stick neutral during window | skid −4/tick while ≥ 16, coast below | same |
+| Exit, stick held | RUN on the first tick at `max(current, stick)` — no re-accel dip | same |
+| Exit, stick neutral | dead stop; landing anim plays until stick or A interrupts | same |
+
+The old code froze 7 / 20 frames; the triple no longer locks you for a third of a second.
+
+### Wall hits and knockdowns (all keyed on ClashSpeed 40)
+
+| Situation | Rule |
+|---|---|
+| Jump hits a wall | < 16: stop against it, keep falling · 16–40: wall slide · > 40: knockdown |
+| Dive hits a wall | knockdown at **any** speed, mirrored path (`Bounce`), rising speed cut to 0 |
+| Running into a wall | > 40: knockdown with no hop (unreachable above the run cap 32 without borrowed speed) |
+| A during belly slide | > `SmsRollJumpMinSpeed` (20): roll-jump · otherwise the small roll |
+
+Knockdown: 16/tick backwards (6.4 m/s), vertical speed left alone (no pop), no extra gravity (the old bonk applied
+its own on top of the general one — removed). On touchdown `SHORT_BACK_DOWN`: slide decays ×0.96/tick (~1.3 m)
+while `ma_sdown` plays to the end, uninterruptible, then get-up, then WAIT. Normal jumps cap at 32, so air knockdowns
+come from roll-jumps and dives, and ground knockdowns only from borrowed speed (roll-jump run-out, downhill).
+Wall slide: velocity zeroed for the first 20 ticks (`stayWall`), then `vy = −0.5·t` capped at −30.
+
+### Ground pound (`SmsHipDrop`, `hipAttacking` / `hipAttackEnd`)
+
+- R starts a **true hover: 60 ticks (0.5 s) with all velocity zeroed** — a pound from a sprint drops straight down.
+- For the first 40 ticks he lifts `(40 − t) × 0.125` units/tick, 102.5 units = 1.38 m total, rate fading 8 m/s → 0.
+  A roof within reach stops the lift. Floor contact during the hover = landing.
+- The hover ends on the tick count, not on `ma_hipsr`; the fall is −80/tick **constant** (32.2 m/s), no gravity,
+  no steering.
+- Landing: no inputs read while `ma_hiped` plays (jump buffer zeroed); any stick or A input cancels `ma_slped`, and
+  A there is an ordinary standing jump (`StartGroundJumpPreserveXZ`).
+- The GP-jump (fixed 19.5 m/s spinning jump out of the landing) is not a Sunshine move and is off in SMS mode;
+  `KeepGroundPoundJump` brings it back.
+
+### Slopes (`SmsSlope`, `walkProcess` / `slopeProcess`)
+
+- Shipped `slipparamnormal` has **SlopeAccele 0 / 0**: running speed is not changed by slopes at all. Only special
+  surfaces accelerate (sandy "45" slopes 1.0 / 0.022, force-slip goop 4.5 / 2.0, slider courses) — not mapped yet.
+- `walkProcess` (`MarioPhysics.cpp:214`) steps horizontally by `vel/4 × normal.y` then snaps to the floor: speed
+  **along the surface** is always `fwd`, horizontal speed is `fwd·cos(slope)` in every direction, across a hill too.
+- Godot with `floor_constant_speed = true` (verified in `character_body_3d.cpp`
+  `_move_and_slide_grounded`) already does this **along the gradient**, uphill and downhill (the downhill case is the
+  `_on_floor_if_snapped` redirect). The only gap was *across* a slope, which Godot ran 1/ny too fast.
+  `SmsSlope.GroundStepScale = sqrt(ny² + (n_h·dir)²)` (1 along the gradient, ny across) scales the horizontal velocity
+  length before the move and un-scales it after.
+- `SlipStart 0.4` (66°) is the game's standable limit; his slip system is left as is.
+
+### ⚠️ Gotcha: never hand `MoveAndSlide` an upward velocity while grounded
+
+`c173ccf` lifted the ground step into the floor plane so it would follow the slope. Going uphill that vector points
+up, and `CharacterBody3D` treats `velocity.dot(up) > 0` as "leaving the floor": it skips `_snap_on_floor` **and** the
+downhill constant-speed redirect for that frame. Every uphill lip and every steeper-to-shallower triangle launched
+Mario in a straight line — "no stick to ground" all over Delfino Plaza. Fixed in `e469a5e`: the ground velocity stays
+horizontal (`vy = min(vy, 0)`, then 0 on floor) and only its **length** is scaled. Downhill still relies on the
+per-frame drop being under `floor_snap_length` (0.6 m).
+
+### ⚠️ Gotcha: the "still rising" landing guard plus a floor latch can trap a state
+
+A landing was only accepted when the floor latch was clear **and** vy ≤ 0. A roll-jump clipping a rising slope
+arrives still going up, the frame is refused, but the latch gets set anyway; `MoveAndSlide` then keeps pushing him
+up the surface with positive vy, the guard keeps failing, and the latch prevents a retry — stuck in the roll state
+until airborne again. Fix (`e0afd10`): ignore floor contact for 3 frames after a roll launch (the original reason for
+the guard: on the launch frame floor snapping still reports the ground he just left), then **any** floor contact
+lands regardless of vy, as `checkGroundAtJumping` does. The same latch pattern still exists for ordinary jumps; if a
+jump ever "sticks" to a ramp, it is the same fix one line wider.
+
+### ⚠️ Gotcha: a stale branch below new code
+
+`982638b`: the first slide fix left an old `else if (A held)` rollout branch live below the new SMS decision, so
+holding A during any slide took the legacy full-speed rollout regardless of speed. When patching a decision point in
+`Mario.cs`, read to the end of the block — several sites have a legacy fallback below them.
+
+### Debug output (`SmsDebugPrint`)
+
+`[SMS launch] <kind> …` on every launch, `[SMS jump] <state>: apex X m = Y units = Z Mario heights, airtime T s` on
+landing, `[SMS slide] A at fwd … -> CatchStop/RollJump …` on every slide press, `[SMS bonk] …` with speed and cause,
+`[SMS gp] …` for hover/lift/land, `[LAND_DBG]` around landing detection. Expected standing single: 1.41 heights /
+0.70 s airtime; double from a run ≈2.9 heights; triple ≈5; spin ≈3.9.
+
+### Deliberate deviations from the game
+
+- `SmsRollJumpMinSpeed = 20` (game 40) — feel.
+- `doRunning` target uses `min(32, mag)`; the NonMatching decomp prints `max()`, which contradicts SM64 (this code's
+  ancestor) and makes the shipped `Soft2Walk` / `Walk2Soft` thresholds meaningless.
+- `KeepGroundPoundJump` toggle (off) keeps the non-Sunshine GP-jump available.
+- The slip system, collision model (`MoveAndSlide`, cylinder) and animation timings are still ours.
+
+### Not ported (next)
+
+- Ledge snap: SMS snaps Mario down ledges up to 100 units (1.34 m) while running; `floor_snap_length` is 0.6 m.
+- Step-up: SMS walks up steps to 30 units (0.40 m) instantly; Godot's cylinder has no step-up.
+- `LAND_SAFE_DOWN` (the no-wall-plane stumble), the skid-into-wall bonk (`braking()` case 2).
+- Surface types (45 / goop / slider) need a material → `SmsSlope.Surface` map.
+- SMS slip states (`SLIP_FORE/BACK` use `doSliding` on the same 0 / 1.5 params — facing-downhill slips on normal
+  ground have no acceleration in the game).
