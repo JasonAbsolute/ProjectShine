@@ -1329,6 +1329,7 @@ equations come from. Everything sits behind one toggle so the old feel is one cl
 | `KeepGroundPoundJump` | `false` | Restores the GP-jump (see Ground Pound section above). Off because Sunshine has no such move. |
 | `SmsLedgeSnap` | `true` | Step DOWN ledges up to 100 units (1.34 m) without leaving the ground: sets `floor_snap_length` to 1.343 m (Player.tscn ships 0.6). |
 | `SmsStepUp` | `true` | Step UP risers up to 30 units (0.40 m) without breaking stride (`SmsTryStepUp`, after MoveAndSlide). |
+| `SmsRollJumpKnockdown` | `false` | **Deviation.** Off: the roll-jump wall-slides on a head-height wall. On: the decomp's rule (knockdown above 40; the roll-jump launches at 55 and never drops under 40 with the stick held). |
 
 On Play, Output must show `[SMS selftest] ALL OK` and `[SMS selftest] slope/hipdrop ALL OK`. Anything else means a
 constant or equation was edited into an inconsistent state — fix before playtesting.
@@ -1586,6 +1587,10 @@ landing, `[SMS slide] A at fwd … -> CatchStop/RollJump …` on every slide pre
 ### Deliberate deviations from the game
 
 - `SmsRollJumpMinSpeed = 20` (game 40) — feel.
+- `SmsRollJumpKnockdown = false`: the roll-jump into a wall that reaches head height wall-slides. `rotateBroadJumping()` →
+  `jumpingBasic(…, 1)` case 2 knocks it down above 40, and it never drops under 40 with the stick held; Jaysonn's
+  memory of the game is a slide, and it is not verifiable here without Dolphin. Walls below head height were already
+  no hit for it (ledge bit). Flip the toggle to get the code's rule back.
 - `doRunning` target uses `min(32, mag)`; the NonMatching decomp prints `max()`, which contradicts SM64 (this code's
   ancestor) and makes the shipped `Soft2Walk` / `Walk2Soft` thresholds meaningless.
 - `KeepGroundPoundJump` toggle (off) keeps the non-Sunshine GP-jump available.

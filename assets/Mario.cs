@@ -235,6 +235,7 @@ public partial class Mario : CharacterBody3D
     private const float SmsSlideKnockdownMinFwd = 16f; // slippingBasic(): a belly slide (CATCH) into a head-on wall above this -> CATCH_DOWN, else stop and get up
     [Export] public bool SmsLedgeSnap = true;   // checkGroundAtWalking: step DOWN ledges up to 100 units (1.34 m) without leaving the ground (floor_snap_length)
     [Export] public bool SmsStepUp = true;      // checkGroundAtWalking: step UP risers up to 30 units (0.40 m) without breaking stride
+    [Export] public bool SmsRollJumpKnockdown = false; // DEVIATION: decomp jumpingBasic() knocks the roll-jump (fwd 55 > ClashSpeed 40) down on a head-height wall; Jaysonn (2026-09-24) wants the wall slide he remembers from the game. true = the code's rule
     private bool _smsSteppedUp = false;         // this frame's grounded MoveAndSlide hit a riser he has since stepped onto
     [Export] public float SmsRollJumpMinSpeed = 20f; // catching(): slide speed (SMS units/tick) above which A is the big roll-jump. Game value: mario.prm mClashSpeed = 40 (big roll only within ~0.13 s of touchdown); 20 chosen by feel (Jaysonn, 2026-09-24) -- a deliberate deviation
     private float _smsDbgStartY = 0f, _smsDbgMaxY = 0f, _smsDbgAir = 0f;
@@ -7057,6 +7058,15 @@ public partial class Mario : CharacterBody3D
                     // falling), otherwise nothing happens. A roll-jump into a platform edge is never a knockdown.
                     if (SmsDebugPrint)
                         GD.Print($"[SMS wall] {airStateAtContact} at fwd {smsFwd:F1}: wall below head height (feet + 150 units), ignored (ledge grab may take it)");
+                    return;
+                }
+                if (airStateAtContact == MarioState.singleRollout && !SmsRollJumpKnockdown && smsFwd > SmsParams.Timing.AirWallSlideMinFwd)
+                {
+                    // Deviation by request: the roll-jump (ROTATE_BROAD_JUMP, fwd 55, never under 40 with the stick held)
+                    // wall-slides on a head-height wall instead of the knockdown jumpingBasic() case 2 gives above 40.
+                    if (SmsDebugPrint)
+                        GD.Print($"[SMS wall] roll-jump into a head-height wall at fwd {smsFwd:F1}: wall slide (SmsRollJumpKnockdown off; the decomp says knockdown above 40)");
+                    EnterWallSlide(preSlideVelocity);
                     return;
                 }
                 if (smsFwd > SmsParams.Mario.ClashSpeed)
