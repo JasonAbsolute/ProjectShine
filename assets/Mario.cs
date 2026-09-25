@@ -3477,7 +3477,10 @@ public partial class Mario : CharacterBody3D
             }
 
             // --- WALL SLIDE / WALL JUMP ---
-            if ((stateOfMario != MarioState.wallJump || wallKickLock <= 0) && CanStartWallSlide())
+            // SMS: the wall slide is entered from PostMoveWallCheck only (jumpingBasic case 2: 16 < fwd <= 40 into a
+            // head-height wall). This legacy pre-move entry (8 m/s minimum, fall ratio, takeoff cone, regrab cooldown)
+            // would re-grab walls the game has just ignored.
+            if (!UseSmsPhysics && (stateOfMario != MarioState.wallJump || wallKickLock <= 0) && CanStartWallSlide())
             {
                 if (stateOfMario != MarioState.wallSlide)
                     EnterWallSlide(velocity); // <-- pass current velocity
@@ -3984,8 +3987,26 @@ public partial class Mario : CharacterBody3D
                     wallSlideLostWallFrames = 0;
                     stateOfMario = MarioState.singleJump; // or whatever air state
 
+                    if (UseSmsPhysics)
+                    {
+                        // stayWall(), mWallPlane == nullptr: face += 180 (away from the wall), velocity 0, MARIO_STATUS_LANDING:
+                        // a plain fall whose landing opens the LAND_SLIP window (a double jump is available).
+                        Vector3 away = new Vector3(lastWallNormal.X, 0f, lastWallNormal.Z);
+                        if (away.LengthSquared() > 1e-6f)
+                        {
+                            away = away.Normalized();
+                            lastFacingDirection = away;
+                            armature.Rotation = new Vector3(0f, YawFromDir(away), 0f);
+                            SmsLatchFace(away, 2);
+                        }
+                        velocity.X = 0f;
+                        velocity.Z = 0f;
+                        _smsFallCancel = false;
+                        if (SmsDebugPrint)
+                            GD.Print("[SMS wall] slide lost the wall: fall, facing away");
+                    }
                     // When falling off wall naturally (not jumping), face movement direction
-                    if (inputDirWorld != Vector3.Zero)
+                    else if (inputDirWorld != Vector3.Zero)
                     {
                         Vector3 moveDir = new Vector3(inputDirWorld.X, 0, inputDirWorld.Z);
                         if (moveDir.Length() > 0.001f)
@@ -4368,6 +4389,18 @@ public partial class Mario : CharacterBody3D
             }
             else if (airStateAtImpact == MarioState.doubleJump)
             {
+                jumpChainStage = 2;
+                jumpChainTimer = JumpChainWindowFrames;
+            }
+            else if (UseSmsPhysics && airStateAtImpact == MarioState.wallJump)
+            {
+                // jumpWall() lands in JUMP_SLIP: a double jump is available after a wall kick.
+                jumpChainStage = 1;
+                jumpChainTimer = JumpChainWindowFrames;
+            }
+            else if (UseSmsPhysics && airStateAtImpact == MarioState.stomping)
+            {
+                // trample() lands in SEC_JUMP_SLIP: a triple is available after a stomp bounce (needs fwd >= 25).
                 jumpChainStage = 2;
                 jumpChainTimer = JumpChainWindowFrames;
             }
@@ -6896,8 +6929,8 @@ public partial class Mario : CharacterBody3D
             velocity += GRAVITY * (float)delta * WALL_SLIDE_GRAVITY_SCALE;
         }
 
-        // Clamp fall speed
-        if (velocity.Y < WALL_SLIDE_MAX_FALL)
+        // Clamp fall speed (legacy; stayWall() caps itself at -0.5 * 60 = -30 units = -12.1 m/s)
+        if (!UseSmsPhysics && velocity.Y < WALL_SLIDE_MAX_FALL)
             velocity.Y = WALL_SLIDE_MAX_FALL;
 
         // Only allowed action: wall kick
@@ -6941,6 +6974,9 @@ public partial class Mario : CharacterBody3D
             SmsLatchFace(outDir, 2);
             _smsTrueVyValid = false;
             _smsNoLandFrames = 3;
+            _smsFallCancel = SmsAir.FallCancelEligible(SmsAir.Launch.WallJump); // release A early -> the rise is cut, as for a jump
+            if (SmsDebugPrint)
+                GD.Print($"[SMS launch] WallJump: fwd 24.0 ({kickOut:F1} m/s) vy 62.0 cancel {_smsFallCancel}, out {outDir}");
         }
         else
         {
@@ -6962,10 +6998,11 @@ public partial class Mario : CharacterBody3D
         lastFacingDirection = outDir;
         armature.Rotation = new Vector3(0f, WallJumpYawFromDir(outDir), 0f);
 
-        // Commit / lock stuff
+        // Commit / lock stuff. SMS has neither: the kick is fwd 24 under normal air control from the first tick, and
+        // re-sticking to the wall just kicked is prevented by doJumping() ignoring a backward stick while rising.
         wallKickDir = outDir;
-        wallKickLock = WALL_KICK_LOCK_FRAMES;
-        wallRegrabCooldown = WALL_REGRAB_COOLDOWN_FRAMES;
+        wallKickLock = UseSmsPhysics ? 0 : WALL_KICK_LOCK_FRAMES;
+        wallRegrabCooldown = UseSmsPhysics ? 0 : WALL_REGRAB_COOLDOWN_FRAMES;
 
         // Enable variable-hold window
         wallJumpHoldActive = true;
@@ -10747,6 +10784,13 @@ public partial class Mario : CharacterBody3D
             float fwd = SmsUnits.MpsToSpeed(velXZ.Dot(faceDir));
             bool stick = stickDir.LengthSquared() > 1e-6f && _smsIntendedMag > 0f;
             float d = stick ? faceDir.SignedAngleTo(new Vector3(stickDir.X, 0f, stickDir.Z).Normalized(), Vector3.Up) : 0f;
+            // doJumping(): while a WALL_JUMP is still rising, a stick more than 90 deg from the face is ignored (mag = 0), so
+            // he cannot steer back into the wall he just kicked. This, not a cooldown, is the game's re-stick protection.
+            if (stick && stateOfMario == MarioState.wallJump && vy > 0f && Mathf.Abs(d) > Mathf.Pi * 0.5f)
+            {
+                stick = false;
+                d = 0f;
+            }
             float sumSide = 0f;
             for (int i = 0; i < n; i++)
             {
