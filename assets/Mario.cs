@@ -230,8 +230,8 @@ public partial class Mario : CharacterBody3D
     private int _smsSpinSign = 1;              // +1 counter-clockwise (RIGHT_ROTATE_JUMP), -1 clockwise (LEFT_ROTATE_JUMP)
     private float _smsLandAccum = 0f;          // sub-tick accumulator for the landing window
     private float _smsBonkAccum = 0f;          // sub-tick accumulator for the bonk slide
-    private int _smsRolloutNoLandFrames = 0;   // frames after a roll launch during which floor contact is the ground he just left
-    [Export] public bool SmsDebugPrint = true;  // dev branch: print launches, slide decisions and jump apexes to the output
+    private int _smsNoLandFrames = 0;          // frames after ANY launch during which floor contact is the ground he just left
+    [Export] public bool SmsDebugPrint = false; // print launches, slide decisions, jump apexes, bonks and GP to the output (tuning aid)
     [Export] public float SmsRollJumpMinSpeed = 20f; // catching(): slide speed (SMS units/tick) above which A is the big roll-jump. Game value: mario.prm mClashSpeed = 40 (big roll only within ~0.13 s of touchdown); 20 chosen by feel (Jaysonn, 2026-09-24) -- a deliberate deviation
     private float _smsDbgStartY = 0f, _smsDbgMaxY = 0f, _smsDbgAir = 0f;
     private bool _smsDbgAirborne = false;
@@ -4121,11 +4121,14 @@ public partial class Mario : CharacterBody3D
             && !wasGroundedLocoAtImpact
             && movingDownward
             && (!needsFallSpeedProof || hadRealFallSpeed);
-        // SMS: a roll touching the floor is a landing (checkGroundAtJumping) whatever its vertical speed, except on
-        // the launch frames where floor snapping still reports the ground he just left. Without this a roll that
-        // clips a rising slope keeps its air state (the floor latch is already set) until it leaves the floor again.
-        if (UseSmsPhysics && onFloorNow && _smsRolloutNoLandFrames <= 0
-            && (preMoveState == MarioState.singleRollout || preMoveState == MarioState.bellyRollout))
+        // SMS: any launched jump touching the floor is a landing (MarioPhysics.cpp checkGroundAtJumping: pos.y <= floor
+        // -> land, no test on mVel.y) whatever its vertical speed, except on the launch frames where floor snapping
+        // still reports the ground he just left. Without this a jump / roll / dive that clips a RISING slope keeps
+        // its air state until it leaves the floor again: movingDownward fails while he is pushed up the surface and
+        // the floor latch (wasOnFloor) is already set, so no later frame can land either. Rolls only in e0afd10;
+        // widened to every launched air state. ledgeFall keeps its own fall-speed proof above (different bug).
+        if (UseSmsPhysics && onFloorNow && _smsNoLandFrames <= 0
+            && SmsStateSteers(preMoveState) && preMoveState != MarioState.ledgeHopUp)
             justLanded = true;
 
         if (justLanded)
@@ -6891,6 +6894,7 @@ public partial class Mario : CharacterBody3D
             velocity.Y = SmsUnits.SpeedToMps(62f);
             SmsLatchFace(outDir, 2);
             _smsTrueVyValid = false;
+            _smsNoLandFrames = 3;
         }
         else
         {
@@ -9684,6 +9688,7 @@ public partial class Mario : CharacterBody3D
             velocity.X *= 0.8f;
             velocity.Z *= 0.8f;
             _smsTrueVyValid = false;
+            _smsNoLandFrames = 3;
         }
         velocity.Y = bounceVel;
 
@@ -10232,6 +10237,7 @@ public partial class Mario : CharacterBody3D
         velocity.Y = SmsUnits.SpeedToMps(vy);
         SmsLatchFace(faceDir, 2);
         _smsTrueVyValid = false;
+        _smsNoLandFrames = 3; // see the landing rule: floor snapping still reports the ground just left
     }
 
     /// <summary>
@@ -10266,6 +10272,7 @@ public partial class Mario : CharacterBody3D
         velocity.Y = SmsUnits.SpeedToMps(vy);
         SmsLatchFace(dir, 2);
         _smsTrueVyValid = false;
+        _smsNoLandFrames = 3;
     }
 
     /// <summary>
@@ -10293,7 +10300,7 @@ public partial class Mario : CharacterBody3D
         SmsLatchFace(dir, 2);
         _smsTrueVyValid = false;
         _smsFallCancel = SmsAir.FallCancelEligible(kind);
-        _smsRolloutNoLandFrames = 3; // floor snapping still reports the ground for a frame or two after the launch
+        _smsNoLandFrames = 3; // floor snapping still reports the ground for a frame or two after the launch
         initalJumpHold = true;
         jumpHoldTime = 0f;
         jumpBuffer = 0;
@@ -10526,8 +10533,8 @@ public partial class Mario : CharacterBody3D
     /// <summary>After MoveAndSlide: keep the post-gravity vertical speed unless the world changed it.</summary>
     private void SmsAfterMove()
     {
-        if (_smsRolloutNoLandFrames > 0)
-            _smsRolloutNoLandFrames--;
+        if (_smsNoLandFrames > 0)
+            _smsNoLandFrames--;
         if (SmsDebugPrint && _smsDbgAirborne && IsOnFloor())
         {
             float h = _smsDbgMaxY - _smsDbgStartY;

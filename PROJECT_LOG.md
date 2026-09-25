@@ -1324,7 +1324,7 @@ equations come from. Everything sits behind one toggle so the old feel is one cl
 | Export | Default | Meaning |
 |---|---|---|
 | `UseSmsPhysics` | `true` | Master switch. Off = the previous hand-tuned physics, untouched. |
-| `SmsDebugPrint` | `true` (dev branch) | Prints launches, slide decisions, jump apexes, bonks and ground pounds to Output. Turn off for release. |
+| `SmsDebugPrint` | `false` | Prints launches, slide decisions, jump apexes, bonks and ground pounds to Output. Turn on in the inspector while tuning. |
 | `SmsRollJumpMinSpeed` | `20` | `catching()`: slide speed above which A is the big roll-jump. **Game value is 40**; 20 chosen by feel — a deliberate deviation. |
 | `KeepGroundPoundJump` | `false` | Restores the GP-jump (see Ground Pound section above). Off because Sunshine has no such move. |
 
@@ -1527,8 +1527,10 @@ arrives still going up, the frame is refused, but the latch gets set anyway; `Mo
 up the surface with positive vy, the guard keeps failing, and the latch prevents a retry — stuck in the roll state
 until airborne again. Fix (`e0afd10`): ignore floor contact for 3 frames after a roll launch (the original reason for
 the guard: on the launch frame floor snapping still reports the ground he just left), then **any** floor contact
-lands regardless of vy, as `checkGroundAtJumping` does. The same latch pattern still exists for ordinary jumps; if a
-jump ever "sticks" to a ramp, it is the same fix one line wider.
+lands regardless of vy, as `checkGroundAtJumping` does (`MarioPhysics.cpp`: `pos.y <= floor` → land, no test on
+`mVel.y`). Widened afterwards from rolls to every launched air state (jumps, spin, flips, wall kick, dives, stomp
+bounce): each launch sets `_smsNoLandFrames = 3`, and after that any floor contact in a `SmsStateSteers` state
+lands. `ledgeFall` keeps its separate fall-speed-proof rule.
 
 ### ⚠️ Gotcha: a stale branch below new code
 
