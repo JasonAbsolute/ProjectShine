@@ -237,7 +237,6 @@ public partial class Mario : CharacterBody3D
     [Export] public bool SmsLedgeSnap = true;   // checkGroundAtWalking: step DOWN ledges up to 100 units (1.34 m) without leaving the ground (floor_snap_length)
     [Export] public bool SmsStepUp = true;      // checkGroundAtWalking: step UP risers up to 30 units (0.40 m) without breaking stride
     [Export] public int SmsWallSlidePinTicks = 4;     // stayWall(): 120 Hz ticks of zero velocity when the slide begins. Game value 10 (83 ms, felt sticky); 4 (33 ms) by request, playtested; 0 = slides at once
-    [Export] public bool SmsWallSlideKnockOff = true;  // stayWall() -> checkBackTrig(): B (dive into the wall) and the ground-pound button (hip-drop startup meets the wall) both knock him off the wall backwards. Off = B and R do nothing on a wall
     [Export] public bool SmsRollJumpKnockdown = false; // DEVIATION: decomp jumpingBasic() knocks the roll-jump (fwd 55 > ClashSpeed 40) down on a head-height wall; Jaysonn (2026-09-24) wants the wall slide he remembers from the game. true = the code's rule
     private bool _smsSteppedUp = false;         // this frame's grounded MoveAndSlide hit a riser he has since stepped onto
     [Export] public float SmsRollJumpMinSpeed = 20f; // catching(): slide speed (SMS units/tick) above which A is the big roll-jump. Game value: mario.prm mClashSpeed = 40 (big roll only within ~0.13 s of touchdown); 20 chosen by feel (Jaysonn, 2026-09-24) -- a deliberate deviation
@@ -3604,9 +3603,9 @@ public partial class Mario : CharacterBody3D
                 spinInput = false; // consume
             }
 
-            // --- GROUND POUND from air (R button) ---
+            // --- GROUND POUND from air (L, as in Sunshine; L also re-centres the camera, which the camera scripts read from the same action) ---
             if (
-                Input.IsActionJustPressed("button_r")
+                Input.IsActionJustPressed("button_l")
                 && stateOfMario != MarioState.groundPoundStartup
                 && stateOfMario != MarioState.groundPoundFalling
                 && stateOfMario != MarioState.wallSlide
@@ -6790,8 +6789,7 @@ public partial class Mario : CharacterBody3D
         }
     }
 
-    /// <summary>Air ground pound startup (R): the hover, then the fall. Also HIP_DROP out of a wall slide (stayWall() ->
-    /// checkBackTrig()). Moved out of the main loop unchanged.</summary>
+    /// <summary>Air ground pound startup (L): the hover, then the fall. Moved out of the main loop unchanged.</summary>
     private void StartGroundPoundFromAir()
     {
         // Enter ground pound startup — freeze in air and play startup anim
@@ -6830,7 +6828,7 @@ public partial class Mario : CharacterBody3D
         _smsHipDrop.Reset();
         _smsTrueVyValid = false;
         if (UseSmsPhysics && SmsDebugPrint)
-            GD.Print($"[SMS gp] R pressed: hover {SmsParams.Timing.HipDropHangTicks / SmsUnits.TicksPerSecond:F2} s with a {SmsUnits.UnitsToMetres(102.5f):F2} m lift, then fall at {SmsUnits.SpeedToMps(SmsParams.Jump.HipAttackSpeedY):F1} m/s");
+            GD.Print($"[SMS gp] L pressed: hover {SmsParams.Timing.HipDropHangTicks / SmsUnits.TicksPerSecond:F2} s with a {SmsUnits.UnitsToMetres(102.5f):F2} m lift, then fall at {SmsUnits.SpeedToMps(SmsParams.Jump.HipAttackSpeedY):F1} m/s");
     }
 
     private void EnterWallSlide(Vector3 incomingVel)
@@ -6950,31 +6948,17 @@ public partial class Mario : CharacterBody3D
         if (!UseSmsPhysics && velocity.Y < WALL_SLIDE_MAX_FALL)
             velocity.Y = WALL_SLIDE_MAX_FALL;
 
-        // stayWall(): A -> wall kick. Then checkBackTrig(), where both back triggers end the same way because he faces INTO the
-        // wall while sliding (the approach mirrored across the normal):
-        //   L -> HIP_DROP, but hipAttacking() state 1 runs jumpProcess(0) on its very first tick, the wall is in front of the
-        //        face, so r == 2: setPlayerVelocity(-16), vy 0, JUMP_SHORT_BACK_DOWN. No hover, no fall: knocked off backwards.
-        //   B -> JUMP_CATCH along the face at fwd 48 with the slide's vy; next frame jumpCatch() case 2 (playerRefrection(1),
-        //        JUMP_SHORT_BACK_DOWN) bounces him off backwards too.
-        // SmsWallSlideKnockOff = false makes both buttons do nothing on the wall (the camera still gets them).
+        // stayWall(): A -> wall kick. Then checkBackTrig(): B -> JUMP_CATCH along the face, which points INTO the wall while
+        // sliding (the approach mirrored across the normal), at fwd 48 with the slide's vy; next frame jumpCatch() case 2
+        // (playerRefrection(1), JUMP_SHORT_BACK_DOWN) bounces him off backwards. The ground-pound button does nothing here:
+        // the decomp's L -> HIP_DROP ends in the same knock-off (hipAttacking()'s first tick meets the wall in front of the
+        // face), but in the shipped game as Jaysonn remembers it L only re-centres the camera on a wall, so: nothing.
         if (Input.IsActionJustPressed("button_a"))
         {
             DoWallJump();
             return;
         }
-        if (UseSmsPhysics && SmsWallSlideKnockOff && Input.IsActionJustPressed("button_r"))
-        {
-            Vector3 back = wallPlannedKickDir; // backwards from the slide face = away from the wall along the mirrored path
-            if (back.LengthSquared() < 1e-6f)
-                back = new Vector3(lastWallNormal.X, 0f, lastWallNormal.Z);
-            if (back.LengthSquared() < 1e-6f)
-                return;
-            if (SmsDebugPrint)
-                GD.Print("[SMS wall] R during the slide: HIP_DROP startup meets the wall in front of the face -> knocked off backwards (JUMP_SHORT_BACK_DOWN, vy 0)");
-            SmsEnterBonk(back.Normalized(), 0f, "hip drop startup against the wall", 0f);
-            return;
-        }
-        if (UseSmsPhysics && SmsWallSlideKnockOff && Input.IsActionJustPressed("button_b"))
+        if (UseSmsPhysics && Input.IsActionJustPressed("button_b"))
         {
             Vector3 into = -wallPlannedKickDir; // the slide face: the approach mirrored across the wall, pointing into it
             if (into.LengthSquared() < 1e-6f)
