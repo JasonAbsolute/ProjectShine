@@ -1603,6 +1603,34 @@ grounded branch):
 The legacy steep-band slide (`CanStartSlip` / `TickSlip`: 68°–75° contact that Godot does not call a floor, since
 `floor_max_angle` is 68°) is unchanged; the two never overlap (`_smsSurfaceSlip`).
 
+### Ledge hang (`hangonCheck` / `hanging` / `checkDescent`, `SmsParams.Hanging`)
+
+**Grab** (`hangonCheck`, reached from `checkGroundAtJumping` with the ledge bit): the wall is solid at feet + 30 and clear at
+feet + 150 (the same two probes that make it a ledge rather than a wall hit); the top — the ground 60 units inside the wall,
+looked up from feet + 160 — is **more than 100 units (1.34 m) above the feet**, so grabbable tops sit between chest and head
+height; 160 units of headroom over it; not force-slip, not tagged `noledge`; he is falling or at the apex (vy ≤ 0) and moving
+into the wall. Only the ledge-bit moves grab: jumps, falls, the second jump, the wall kick, landing hops, the U-turn jump, the
+stomp bounce and the broad jumps — never the triple, spin, backflip, dives or the ground pound. The port grabbed tops between
+0.58 and 1.04 m (chest ray hit, head ray clear) from any air state, so head-high ledges were unreachable and waist-high walls
+were grabbed; SMS mode now uses the game's geometry (`SmsTryLedgeGrab`). The hang anchor and the climb (`ma_hgup`) are the
+port's.
+
+**Hang** (`hanging`), each tick: B → `startHangLanding(WALL_SLIDE)`: out to the wall face, down 100 units (or to the ground),
+and he **wall-slides** down the wall (not a plain drop). A with 160 units of headroom → the vault. The stick counts after 40
+ticks: within 0x400 (5.6°) of the face, i.e. straight into the wall, with headroom → **climb**; beyond 0x71c7 (160°), pulling
+away → **let go** (`LAND_SAFE_DOWN`, a plain fall); anything else → **shimmy** along the ledge at `MoveSp 0.06 × mag`
+units/tick (3.1 m/s at full stick), following the wall round corners while the normals agree within `HangWallMovableAngle`
+(dot > 0.3) and the top stays within −100/+50, `ma_hmov_l/r` at `units moved × AnmRate 0.8`; the shimmy stops after
+`RapidTime` 2000 ticks (16.7 s) and at `LimitTime` **2400 ticks (20 s) he lets go by himself**. Ground within 100 units below
+(30 behind) with headroom → he vaults up on his own.
+
+**Descend** (`checkDescent`, end of `running`): walking slowly (fwd < `DescentSp` 10 = 4 m/s) up to an edge whose wall is
+within 10 units at feet − 10, normal pointing the way he faces, with the ground beyond more than 160 units down: he turns to
+face the platform, `ma_hgdwn` plays (`MarioState.ledgeDescend`, the animation is driven directly, it is not in the tree) and
+he hangs. Run at it and he runs off as before.
+
+Debug lines: `[SMS ledge] grab / vault / let go / stick into the wall: climb / edge ahead: climb down`.
+
 ### ⚠️ Gotcha: never hand `MoveAndSlide` an upward velocity while grounded
 
 `c173ccf` lifted the ground step into the floor plane so it would follow the slope. Going uphill that vector points
@@ -1720,3 +1748,5 @@ ground has to carry upward velocity (launches do) or exceed 1.34 m.
   the wall inside the 4-tick window above 16 — skipped; the "ground wall kick" in `running()` is dead code (A is
   consumed as a jump first).
 - Surface types and the floor slip: done, see Surface types. Tagging the plaza's surfaces is editor work.
+- Ledge hang: done, see Ledge hang. Not ported: the fence catch (`FENCE_CATCH`), the hang-under-roof states
+  (`HANG_ROOF` / `MOVE_ROOF`), `ANIM_HANG` at `AnmRapid` after 16.7 s.

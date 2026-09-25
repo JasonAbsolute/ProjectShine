@@ -156,6 +156,30 @@ public static class SmsParams
         public const float LengthMult = 0.78f;          // stick length *= 0.78^2 = 0.6084
     }
 
+    public static class Hanging // /mario/hanging.prm + the constants in hangonCheck / hanging / checkDescent
+    {
+        public const float MoveSp = 0.06f;              // shimmy: units per tick per unit of stick magnitude (x32 max = 1.92/tick, 3.1 m/s)
+        public const float AnmRate = 0.8f;              // ANIM_HMOV rate = units moved per frame * this
+        public const int RapidTime = 2000;              // ticks (16.7 s): shimmy stops, ANIM_HANG plays at AnmRapid
+        public const int LimitTime = 2400;              // ticks (20 s): he lets go (LAND_SAFE_DOWN)
+        public const float AnmRapid = 8f;
+        public const float DescentSp = 10f;             // checkDescent: max fwd to climb down over an edge; also its wall radius
+        public const float WallMovableAngle = 0.3f;     // mDeParams.mHangWallMovableAngle: min dot of old/new wall normals while shimmying
+        public const float WallLowUnits = 30f;          // the wall must be solid here (feet + 30)
+        public const float WallHighUnits = 150f;        // ... and clear here (feet + 150), else it is a wall hit
+        public const float TopMinUnits = 100f;          // the ledge top must be more than this above the feet
+        public const float TopSearchUnits = 160f;       // the top is looked up from feet + 160 down
+        public const float InsideUnits = 60f;           // ... 60 units inside the wall
+        public const float HeadroomUnits = 160f;        // roof clearance above the top needed to grab, climb or vault
+        public const float DropUnits = 100f;            // startHangLanding: down 100 unless the ground is nearer
+        public const float AutoVaultBelowUnits = 100f;  // ground within this below (30 units behind) -> HANG_JUMPING by itself
+        public const int StickDelayTicks = 40;          // mStatusTimer >= 0x28 before the stick does anything
+        public const int StickClimbBam = 0x400;         // stick within 5.6 deg of the face: climb
+        public const int StickDropBam = 0x71c7;         // stick beyond 160 deg from the face: let go
+        public const float DescentEdgeUnits = 10f;      // checkDescent: wall search radius at feet - 10
+        public const float DescentDropUnits = 160f;     // ... and the ground beyond must be more than this below
+    }
+
     public static class Timing
     {
         public const int JumpSlipWindowTicks = 16;      // JumpSlipRecord.mMaxTimer: landing window for the jump chain (0.133 s)

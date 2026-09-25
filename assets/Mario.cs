@@ -65,6 +65,7 @@ public partial class Mario : CharacterBody3D
         shineGet,
         dead,
         talking,
+        ledgeDescend, // SMS: climbing down over an edge into a hang (checkDescent -> DESCEND, ma_hgdwn)
     }
 
     private struct AirControlProfile
@@ -2465,11 +2466,23 @@ public partial class Mario : CharacterBody3D
             (stateOfMario == MarioState.singleRollout || stateOfMario == MarioState.bellyRollout)
             && velocity.Y > ROLLOUT_LAND_MAX_RISE;
 
+        if (stateOfMario == MarioState.ledgeDescend)
+        {
+            // DESCEND: pinned at the edge while ma_hgdwn plays, then HANGING. No MoveAndSlide, like the hang.
+            SmsTickLedgeDescend(delta);
+            Velocity = Vector3.Zero;
+            wasOnFloor = false;
+            return;
+        }
+
         if (IsOnFloor() && !rollingUpwardOffGround) //This is the main logic loop for Player being on the ground
         {
             // SMS surface slip: isSlipStart() on a floor Godot lets him stand on (a slider, a "45" surface past 30 deg,
             // wet ground, force slip). The game's SLIP_FORE / SLIP_BACK owns the frame while it runs.
             if (UseSmsPhysics && SmsSurfaceSlipFrame(delta))
+                goto EndFrame;
+            // checkDescent(): walking slowly up to a drop of more than 160 units, he climbs down and hangs from the edge
+            if (UseSmsPhysics && SmsCheckDescent())
                 goto EndFrame;
 
             // === GROUNDED SPIN ===
@@ -6525,6 +6538,395 @@ public partial class Mario : CharacterBody3D
         }
     }
 
+    // =====================================================================================
+    //  SMS LEDGE HANG  (hangonCheck / hanging / checkDescent, see SmsParams.Hanging)
+    // =====================================================================================
+    private int _smsHangTicks = 0;              // mStatusTimer while hanging
+    private bool _smsHangMovingAnim = false;    // ma_hmov_l/r is driving the AnimationPlayer directly
+    private Vector3 _smsLedgeWallPoint = Vector3.Zero; // where the +30 probe met the wall (XZ) -- the hang anchor's wall point
+
+    private bool SmsRay(Vector3 from, Vector3 to, out Godot.Collections.Dictionary hit)
+    {
+        var q = PhysicsRayQueryParameters3D.Create(from, to, CollisionMask);
+        q.CollideWithAreas = false;
+        q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+        hit = GetWorld3D().DirectSpaceState.IntersectRay(q);
+        return hit.Count > 0;
+    }
+
+    /// <summary>
+    /// hangonCheck(): the grab test, in the game's geometry. The wall must be solid at feet + 30 and clear at feet + 150 (the
+    /// same probes that make it a ledge instead of a wall hit), the top -- the ground 60 units inside the wall, looked up from
+    /// feet + 160 -- must be more than 100 units above the feet, with 160 units of headroom over it.
+    /// </summary>
+    private bool SmsTryLedgeGrab()
+    {
+        if (!SmsWallLedgeBit(stateOfMario))
+            return false; // the triple, spin, backflip, dives and the hip drop never grab
+        if (velocity.Y > 0f)
+            return false;
+        Vector3 velXZ = new Vector3(velocity.X, 0f, velocity.Z);
+        Vector3 probeDir = velXZ.Length() > 0.05f ? velXZ.Normalized()
+            : (_smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : new Vector3(lastFacingDirection.X, 0f, lastFacingDirection.Z));
+        if (probeDir.LengthSquared() < 1e-6f)
+            return false;
+        probeDir = probeDir.Normalized();
+        float feetY = SmsFeetY();
+        float reach = SmsUnits.UnitsToMetres(50f); // checkWallPlane radius
+        Vector3 c = GlobalPosition;
+        Vector3 lowFrom = new Vector3(c.X, feetY + SmsUnits.UnitsToMetres(SmsParams.Hanging.WallLowUnits), c.Z);
+        if (!SmsRay(lowFrom, lowFrom + probeDir * reach, out var low))
+            return false;
+        if (low["collider"].AsGodotObject() is not StaticBody3D)
+            return false; // environment only (AnimatableBody3D platforms included)
+        Vector3 n = ((Vector3)low["normal"]);
+        n.Y = 0f;
+        if (n.LengthSquared() < 1e-6f)
+            return false;
+        n = n.Normalized();
+        if (velXZ.Dot(-n) < -1e-3f)
+            return false; // moving away from it
+        Vector3 highFrom = new Vector3(c.X, feetY + SmsUnits.UnitsToMetres(SmsParams.Hanging.WallHighUnits), c.Z);
+        if (SmsRay(highFrom, highFrom + probeDir * reach, out _))
+            return false; // reaches head height: that is a wall, not a ledge
+        Vector3 wallP = (Vector3)low["position"];
+        Vector3 inside = wallP - n * SmsUnits.UnitsToMetres(SmsParams.Hanging.InsideUnits);
+        Vector3 topFrom = new Vector3(inside.X, feetY + SmsUnits.UnitsToMetres(SmsParams.Hanging.TopSearchUnits), inside.Z);
+        if (!SmsRay(topFrom, topFrom + Vector3.Down * (SmsUnits.UnitsToMetres(SmsParams.Hanging.TopSearchUnits) + 0.3f), out var top))
+            return false;
+        float topY = ((Vector3)top["position"]).Y;
+        Vector3 topN = (Vector3)top["normal"];
+        float above = topY - feetY;
+        if (above <= SmsUnits.UnitsToMetres(SmsParams.Hanging.TopMinUnits) || topN.Y < 0.5f)
+            return false;
+        if (above > SmsUnits.UnitsToMetres(SmsParams.Hanging.WallHighUnits) + 0.1f)
+            return false; // an overhang above a low wall: not a ledge
+        Vector3 roofFrom = new Vector3(inside.X, topY + 0.02f, inside.Z);
+        if (SmsRay(roofFrom, roofFrom + Vector3.Up * SmsUnits.UnitsToMetres(SmsParams.Hanging.HeadroomUnits), out _))
+            return false; // no room to hang under a roof
+        Node topNode = top["collider"].AsGodotObject() as Node;
+        if (topNode != null)
+        {
+            string tag = SmsSurfaceTagOf(topNode).Trim().ToLowerInvariant();
+            if (tag == "forceslip" || tag == "goop" || tag == "all" || tag == "noledge" || tag == "nograb")
+                return false;
+        }
+        if (SmsDebugPrint)
+            GD.Print($"[SMS ledge] grab from {stateOfMario}: top {SmsUnits.MetresToUnits(above):F0} units above the feet ({above:F2} m), wall '{(low["collider"].AsGodotObject() as Node)?.Name}'");
+        SmsEnterLedgeHang(wallP, n, topY, low["collider"].AsGodotObject());
+        return true;
+    }
+
+    /// <summary>The port's hang anchor: feet at the top height, body at the wall face; the animation hangs the model.</summary>
+    private void SmsEnterLedgeHang(Vector3 wallP, Vector3 nXZ, float topY, GodotObject collider)
+    {
+        _smsLedgeWallPoint = new Vector3(wallP.X, topY, wallP.Z);
+        ledgeTopPoint = _smsLedgeWallPoint;
+        ledgeWallNormal = nXZ;
+        Vector3 standXZ = wallP - nXZ * LEDGE_STAND_FORWARD;
+        ledgeStandPos = new Vector3(standXZ.X, BodyYForCapsuleBottomY(topY) + LEDGE_STAND_UP, standXZ.Z);
+        isSpining(false);
+        isJumping = false;
+        stateOfMario = MarioState.ledgeHang;
+        SetMarioState(stateOfMario);
+        LockArmatureVisualRoot();
+        float hangBackDist = capRadiusWorld * 0.1f;
+        ledgeHangPos = new Vector3(wallP.X + nXZ.X * hangBackDist, topY, wallP.Z + nXZ.Z * hangBackDist);
+        GlobalPosition = ledgeHangPos;
+        velocity = Vector3.Zero;
+        Velocity = Vector3.Zero;
+        ledgePinned = true;
+        _smsHangTicks = 0;
+        _smsHangMovingAnim = false;
+        _smsTrueVyValid = false;
+        if (collider is AnimatableBody3D abody)
+        {
+            _ledgePlatformBody = abody;
+            Transform3D inv = abody.GlobalTransform.AffineInverse();
+            _ledgeLocalHangPos = inv * ledgeHangPos;
+            _ledgeLocalStandPos = inv * ledgeStandPos;
+            _ledgeLocalWallNormal = inv.Basis * ledgeWallNormal;
+        }
+        else
+        {
+            _ledgePlatformBody = null;
+        }
+        lastFacingDirection = -nXZ;
+        SmsLatchFace(-nXZ, 1);
+        armature.Rotation = new Vector3(0f, BaseYawFromDir(-ledgeWallNormal), 0f);
+    }
+
+    private bool SmsLedgeHeadroom()
+    {
+        Vector3 inside = ledgeTopPoint - ledgeWallNormal * 0.5f;
+        Vector3 from = new Vector3(inside.X, ledgeTopPoint.Y + 0.02f, inside.Z);
+        return !SmsRay(from, from + Vector3.Up * SmsUnits.UnitsToMetres(SmsParams.Hanging.HeadroomUnits), out _);
+    }
+
+    /// <summary>startHangLanding(): let go. Out to the wall face, down 100 units (or to the ground if it is nearer), velocity 0,
+    /// still facing the wall; then the wall slide (B) or a plain fall (stick away, the 20 s limit).</summary>
+    private void SmsHangLetGo(bool toWallSlide, string why)
+    {
+        Vector3 n = ledgeWallNormal;
+        Vector3 xz = ledgeHangPos + n * (capRadiusWorld + 0.02f);
+        float drop = SmsUnits.UnitsToMetres(SmsParams.Hanging.DropUnits);
+        Vector3 from = new Vector3(xz.X, ledgeHangPos.Y, xz.Z);
+        float y = ledgeHangPos.Y - drop;
+        if (SmsRay(from, from + Vector3.Down * drop, out var g))
+            y = ((Vector3)g["position"]).Y;
+        ledgePinned = false;
+        _ledgePlatformBody = null;
+        _smsHangMovingAnim = false;
+        ledgeRegrabCooldown = LEDGE_REGRAB_COOLDOWN_FRAMES;
+        GlobalPosition = new Vector3(xz.X, y, xz.Z);
+        velocity = Vector3.Zero;
+        _smsTrueVyValid = false;
+        lastFacingDirection = -n;
+        SmsLatchFace(-n, 2);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS ledge] let go ({why}): {(toWallSlide ? "wall slide" : "fall")}, dropped {ledgeHangPos.Y - y:F2} m");
+        if (toWallSlide)
+        {
+            lastWallNormal = n;
+            EnterWallSlide(Vector3.Zero);
+            lastWallNormal = n;
+            wallIncomingDirXZ = -n;
+            wallPlannedKickDir = n;
+            lastFacingDirection = n;
+            armature.Rotation = new Vector3(0f, WallSlideYawFromDir(n), 0f);
+        }
+        else
+        {
+            stateOfMario = MarioState.ledgeFall;
+            SetMarioState(stateOfMario);
+        }
+    }
+
+    /// <summary>HANG_JUMPING: the vault onto the ledge (the port's hop, kept).</summary>
+    private void SmsLedgeVault(string why)
+    {
+        if (SmsDebugPrint)
+            GD.Print($"[SMS ledge] vault ({why})");
+        _smsHangMovingAnim = false;
+        stateOfMario = MarioState.ledgeHopUp;
+        SetMarioState(stateOfMario);
+        Vector3 fwdOntoLedge = -ledgeWallNormal;
+        velocity = Vector3.Zero;
+        velocity.Y = LEDGE_HOP_UP_VEL;
+        velocity.X = fwdOntoLedge.X * LEDGE_HOP_FWD_SPEED;
+        velocity.Z = fwdOntoLedge.Z * LEDGE_HOP_FWD_SPEED;
+        ledgePinned = false;
+        _ledgePlatformBody = null;
+        ledgeRegrabCooldown = LEDGE_REGRAB_COOLDOWN_FRAMES;
+    }
+
+    /// <summary>hanging(): one frame of the hang. Runs after the pin; returns having set the animation.</summary>
+    private void SmsTickLedgeHang(double delta)
+    {
+        int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
+        _smsHangTicks = Math.Min(_smsHangTicks + n, SmsParams.Hanging.LimitTime);
+        Vector3 nXZ = ledgeWallNormal;
+        Vector3 intoWall = -nXZ;
+        bool headroom = SmsLedgeHeadroom();
+        LockArmatureVisualRoot();
+
+        if (Input.IsActionJustPressed("button_b"))
+        {
+            SmsHangLetGo(true, "B");
+            return;
+        }
+        if ((Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space")) && headroom)
+        {
+            SmsLedgeVault("A");
+            return;
+        }
+
+        bool moved = false;
+        bool stick = direction.LengthSquared() > 1e-6f && _smsIntendedMag > 0f;
+        if (_smsHangTicks >= SmsParams.Hanging.StickDelayTicks && stick)
+        {
+            Vector3 stickDir = new Vector3(direction.X, 0f, direction.Z).Normalized();
+            float diff = intoWall.SignedAngleTo(stickDir, Vector3.Up); // mIntendedYaw - mFaceAngle.y
+            float climbBand = SmsParams.Hanging.StickClimbBam * SmsUnits.BamToRad;
+            float dropBand = SmsParams.Hanging.StickDropBam * SmsUnits.BamToRad;
+            if (Mathf.Abs(diff) <= climbBand && headroom)
+            {
+                if (SmsDebugPrint)
+                    GD.Print("[SMS ledge] stick into the wall: climb (ASCEND)");
+                _smsHangMovingAnim = false;
+                stateOfMario = MarioState.ledgeClimb;
+                SetMarioState(stateOfMario);
+                ledgeClimbT = 0f;
+                return;
+            }
+            if (Mathf.Abs(diff) >= dropBand)
+            {
+                SmsHangLetGo(false, "stick away");
+                return;
+            }
+            if (_smsHangTicks < SmsParams.Hanging.RapidTime)
+            {
+                // shimmy along the wall the way the stick points, following the wall around corners
+                Vector3 tangent = nXZ.Cross(Vector3.Up).Normalized();
+                if (tangent.Dot(stickDir) < 0f)
+                    tangent = -tangent;
+                float unitsPerTick = SmsParams.Hanging.MoveSp * _smsIntendedMag;
+                float step = SmsUnits.UnitsToMetres(unitsPerTick) * n;
+                Vector3 cand = _smsLedgeWallPoint + tangent * step; // the wall point, at the top height
+                Vector3 wallFrom = new Vector3(cand.X, cand.Y - SmsUnits.UnitsToMetres(20f), cand.Z) + nXZ * (capRadiusWorld + 0.05f);
+                if (SmsRay(wallFrom, wallFrom + intoWall * (capRadiusWorld + 0.05f + SmsUnits.UnitsToMetres(50f)), out var w)
+                    && w["collider"].AsGodotObject() is StaticBody3D)
+                {
+                    Vector3 n2 = (Vector3)w["normal"];
+                    n2.Y = 0f;
+                    if (n2.LengthSquared() > 1e-6f)
+                    {
+                        n2 = n2.Normalized();
+                        Vector3 wp = (Vector3)w["position"];
+                        Vector3 inside = wp - n2 * SmsUnits.UnitsToMetres(SmsParams.Hanging.InsideUnits);
+                        Vector3 topFrom = new Vector3(inside.X, cand.Y + SmsUnits.UnitsToMetres(50f), inside.Z);
+                        if (nXZ.Dot(n2) > SmsParams.Hanging.WallMovableAngle
+                            && SmsRay(topFrom, topFrom + Vector3.Down * SmsUnits.UnitsToMetres(150f), out var t))
+                        {
+                            float topY = ((Vector3)t["position"]).Y;
+                            if (topY > cand.Y - SmsUnits.UnitsToMetres(100f) && topY < cand.Y + SmsUnits.UnitsToMetres(50f))
+                            {
+                                float movedUnits = SmsUnits.MetresToUnits((new Vector3(wp.X, 0f, wp.Z) - new Vector3(_smsLedgeWallPoint.X, 0f, _smsLedgeWallPoint.Z)).Length());
+                                _smsLedgeWallPoint = new Vector3(wp.X, topY, wp.Z);
+                                ledgeTopPoint = _smsLedgeWallPoint;
+                                ledgeWallNormal = n2;
+                                float hangBackDist = capRadiusWorld * 0.1f;
+                                ledgeHangPos = new Vector3(wp.X + n2.X * hangBackDist, topY, wp.Z + n2.Z * hangBackDist);
+                                Vector3 standXZ = wp - n2 * LEDGE_STAND_FORWARD;
+                                ledgeStandPos = new Vector3(standXZ.X, BodyYForCapsuleBottomY(topY) + LEDGE_STAND_UP, standXZ.Z);
+                                if (_ledgePlatformBody != null)
+                                {
+                                    Transform3D inv = _ledgePlatformBody.GlobalTransform.AffineInverse();
+                                    _ledgeLocalHangPos = inv * ledgeHangPos;
+                                    _ledgeLocalStandPos = inv * ledgeStandPos;
+                                    _ledgeLocalWallNormal = inv.Basis * ledgeWallNormal;
+                                }
+                                GlobalPosition = ledgeHangPos;
+                                lastFacingDirection = -n2;
+                                SmsLatchFace(-n2, 1);
+                                armature.Rotation = new Vector3(0f, BaseYawFromDir(-n2), 0f);
+                                moved = true;
+                                // ANIM_HMOV_L / R at units-per-frame * AnmRate (the game's frame is 4 ticks)
+                                Vector3 left = Vector3.Up.Cross(intoWall).Normalized();
+                                string anim = tangent.Dot(left) > 0f ? "ma_hmov_l" : "ma_hmov_r";
+                                float rate = Mathf.Clamp(unitsPerTick * 4f * SmsParams.Hanging.AnmRate, 0.5f, 8f);
+                                if (!_smsHangMovingAnim || animPlayer.CurrentAnimation != anim)
+                                {
+                                    if (animTree != null)
+                                        animTree.Active = false;
+                                    animPlayer.Play(anim);
+                                    _smsHangMovingAnim = true;
+                                }
+                                animPlayer.SpeedScale = rate;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (_smsHangTicks >= SmsParams.Hanging.LimitTime)
+        {
+            SmsHangLetGo(false, "20 s limit");
+            return;
+        }
+        if (headroom)
+        {
+            // ground within 100 units below, 30 units behind him: he just gets up
+            Vector3 behind = ledgeHangPos + nXZ * SmsUnits.UnitsToMetres(30f);
+            Vector3 from = new Vector3(behind.X, ledgeHangPos.Y, behind.Z);
+            if (SmsRay(from, from + Vector3.Down * SmsUnits.UnitsToMetres(SmsParams.Hanging.AutoVaultBelowUnits), out _))
+            {
+                SmsLedgeVault("ground right below");
+                return;
+            }
+        }
+        if (!moved)
+        {
+            if (_smsHangMovingAnim || animPlayer.CurrentAnimation != "ma_hang")
+            {
+                animPlayer.SpeedScale = 1f;
+                _smsHangMovingAnim = false;
+                SetMarioState(MarioState.ledgeHang); // ma_hang through the tree again
+            }
+        }
+    }
+
+    /// <summary>
+    /// checkDescent() (end of running()): walking slowly (fwd < 10) up to an edge whose drop is more than 160 units, he turns
+    /// to face the platform, climbs down (ANIM_HGDWN) and hangs from it. The wall must be within 10 units at feet - 10 with
+    /// its normal pointing the way he faces.
+    /// </summary>
+    private bool SmsCheckDescent()
+    {
+        if (heldBody != null)
+            return false;
+        switch (stateOfMario)
+        {
+            case MarioState.walking: case MarioState.running: case MarioState.sprinting: case MarioState.sneak: case MarioState.idle: case MarioState.pivot:
+                break;
+            default:
+                return false;
+        }
+        Vector3 velXZ = new Vector3(velocity.X, 0f, velocity.Z);
+        float fwd = SmsUnits.MpsToSpeed(velXZ.Length());
+        if (fwd >= SmsParams.Hanging.DescentSp || fwd < 0.5f)
+            return false; // fast: he runs off; still: no
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : velXZ.Normalized();
+        if (face.LengthSquared() < 1e-6f)
+            return false;
+        face = face.Normalized();
+        float feetY = SmsFeetY();
+        // the edge: a wall within 10 units, at feet - 10, whose normal points the way he faces (the cliff face below the edge)
+        Vector3 edgeAhead = GlobalPosition + face * (capRadiusWorld + SmsUnits.UnitsToMetres(SmsParams.Hanging.DescentEdgeUnits));
+        Vector3 from = new Vector3(edgeAhead.X, feetY - SmsUnits.UnitsToMetres(10f), edgeAhead.Z);
+        if (!SmsRay(from, from - face * (capRadiusWorld + SmsUnits.UnitsToMetres(SmsParams.Hanging.DescentEdgeUnits) + 0.05f), out var w))
+            return false; // no cliff face below the edge ahead
+        if (w["collider"].AsGodotObject() is not StaticBody3D)
+            return false;
+        Vector3 n = (Vector3)w["normal"];
+        n.Y = 0f;
+        if (n.LengthSquared() < 1e-6f || n.Normalized().Dot(face) <= 0f)
+            return false;
+        n = n.Normalized();
+        Vector3 wp = (Vector3)w["position"];
+        // the ground beyond the edge must be more than 160 units below
+        Vector3 beyond = new Vector3(wp.X, feetY + 0.05f, wp.Z) + n * 0.15f;
+        if (SmsRay(beyond, beyond + Vector3.Down * (SmsUnits.UnitsToMetres(SmsParams.Hanging.DescentDropUnits) + 0.05f), out _))
+            return false;
+        if (SmsDebugPrint)
+            GD.Print($"[SMS ledge] edge ahead at fwd {fwd:F1}: climb down (DESCEND)");
+        SmsEnterLedgeHang(new Vector3(wp.X, feetY, wp.Z), n, feetY, w["collider"].AsGodotObject());
+        stateOfMario = MarioState.ledgeDescend;
+        SetMarioState(stateOfMario); // ma_hgdwn, driven directly
+        return true;
+    }
+
+    private void SmsTickLedgeDescend(double delta)
+    {
+        if (!UpdateLedgePlatformPositions())
+        {
+            SmsHangLetGo(false, "platform gone");
+            return;
+        }
+        velocity = Vector3.Zero;
+        GlobalPosition = ledgeHangPos;
+        armature.Rotation = new Vector3(0f, BaseYawFromDir(-ledgeWallNormal), 0f);
+        LockArmatureVisualRoot();
+        if (animPlayer.CurrentAnimation != "ma_hgdwn" || !animPlayer.IsPlaying()
+            || animPlayer.CurrentAnimationPosition >= animPlayer.CurrentAnimationLength - 0.01)
+        {
+            stateOfMario = MarioState.ledgeHang;
+            _smsHangTicks = 0;
+            SetMarioState(stateOfMario);
+        }
+    }
+
     private void EnterSlip(Vector3 incomingVel)
     {
         isSpining(false);
@@ -7974,9 +8376,11 @@ public partial class Mario : CharacterBody3D
             return false;
         if (IsOnFloor())
             return false;
+        if (UseSmsPhysics)
+            return SmsTryLedgeGrab(); // hangonCheck(): feet + 30 / + 150 probes, top 100..150 above the feet, 160 of headroom
 
         // don't grab during these
-        if (stateOfMario == MarioState.wallSlide || stateOfMario == MarioState.wallJump)
+        if (stateOfMario == MarioState.wallSlide || stateOfMario == MarioState.wallJump || stateOfMario == MarioState.ledgeDescend)
             return false;
         if (
             stateOfMario == MarioState.diving
@@ -8162,6 +8566,13 @@ public partial class Mario : CharacterBody3D
             velocity = Vector3.Zero;
             GlobalPosition = ledgeHangPos;
             armature.Rotation = new Vector3(0f, BaseYawFromDir(-ledgeWallNormal), 0f);
+        }
+
+        if (UseSmsPhysics)
+        {
+            // hanging(): B lets go into a wall slide, A vaults, the stick climbs / shimmies / drops, 20 s limit
+            SmsTickLedgeHang(delta);
+            return;
         }
 
         if (animPlayer.CurrentAnimation != "ma_hang")
@@ -10560,6 +10971,13 @@ public partial class Mario : CharacterBody3D
                 break;
             case MarioState.ledgeHopUp:
                 _sm.Travel("ma_hgjmp");
+                break;
+            case MarioState.ledgeDescend:
+                // ma_hgdwn is in the AnimationPlayer library but not in the tree: drive it directly (the next SetMarioState
+                // re-enables the tree)
+                if (animTree != null)
+                    animTree.Active = false;
+                animPlayer.Play("ma_hgdwn");
                 break;
             case MarioState.pickupFail:
                 _sm.Travel("ma_get_fail");
