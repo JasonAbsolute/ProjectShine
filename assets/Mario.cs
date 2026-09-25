@@ -237,7 +237,7 @@ public partial class Mario : CharacterBody3D
     [Export] public bool SmsLedgeSnap = true;   // checkGroundAtWalking: step DOWN ledges up to 100 units (1.34 m) without leaving the ground (floor_snap_length)
     [Export] public bool SmsStepUp = true;      // checkGroundAtWalking: step UP risers up to 30 units (0.40 m) without breaking stride
     [Export] public int SmsWallSlidePinTicks = 4;     // stayWall(): 120 Hz ticks of zero velocity when the slide begins. Game value 10 (83 ms, felt sticky); 4 (33 ms) by request, playtested; 0 = slides at once
-    [Export] public bool SmsWallSlideDive = true;      // stayWall() -> checkBackTrig(): B during a wall slide dives along the face, INTO the wall, and bounces off into the knockdown. Off = B does nothing on a wall
+    [Export] public bool SmsWallSlideKnockOff = true;  // stayWall() -> checkBackTrig(): B (dive into the wall) and the ground-pound button (hip-drop startup meets the wall) both knock him off the wall backwards. Off = B and R do nothing on a wall
     [Export] public bool SmsRollJumpKnockdown = false; // DEVIATION: decomp jumpingBasic() knocks the roll-jump (fwd 55 > ClashSpeed 40) down on a head-height wall; Jaysonn (2026-09-24) wants the wall slide he remembers from the game. true = the code's rule
     private bool _smsSteppedUp = false;         // this frame's grounded MoveAndSlide hit a riser he has since stepped onto
     [Export] public float SmsRollJumpMinSpeed = 20f; // catching(): slide speed (SMS units/tick) above which A is the big roll-jump. Game value: mario.prm mClashSpeed = 40 (big roll only within ~0.13 s of touchdown); 20 chosen by feel (Jaysonn, 2026-09-24) -- a deliberate deviation
@@ -6950,23 +6950,31 @@ public partial class Mario : CharacterBody3D
         if (!UseSmsPhysics && velocity.Y < WALL_SLIDE_MAX_FALL)
             velocity.Y = WALL_SLIDE_MAX_FALL;
 
-        // stayWall(): A -> wall kick. Then checkBackTrig(): L -> HIP_DROP straight down the wall; B -> JUMP_CATCH along the
-        // face, which during the slide points INTO the wall (the approach mirrored across the normal), at fwd 48 with the
-        // slide's vy. Next frame the dive hits the wall (jumpCatch() case 2): playerRefrection(1) and JUMP_SHORT_BACK_DOWN, so
-        // he bounces off backwards into the knockdown. That is the game's B on a wall; SmsWallSlideDive turns it off.
+        // stayWall(): A -> wall kick. Then checkBackTrig(), where both back triggers end the same way because he faces INTO the
+        // wall while sliding (the approach mirrored across the normal):
+        //   L -> HIP_DROP, but hipAttacking() state 1 runs jumpProcess(0) on its very first tick, the wall is in front of the
+        //        face, so r == 2: setPlayerVelocity(-16), vy 0, JUMP_SHORT_BACK_DOWN. No hover, no fall: knocked off backwards.
+        //   B -> JUMP_CATCH along the face at fwd 48 with the slide's vy; next frame jumpCatch() case 2 (playerRefrection(1),
+        //        JUMP_SHORT_BACK_DOWN) bounces him off backwards too.
+        // SmsWallSlideKnockOff = false makes both buttons do nothing on the wall (the camera still gets them).
         if (Input.IsActionJustPressed("button_a"))
         {
             DoWallJump();
             return;
         }
-        if (UseSmsPhysics && Input.IsActionJustPressed("button_r"))
+        if (UseSmsPhysics && SmsWallSlideKnockOff && Input.IsActionJustPressed("button_r"))
         {
+            Vector3 back = wallPlannedKickDir; // backwards from the slide face = away from the wall along the mirrored path
+            if (back.LengthSquared() < 1e-6f)
+                back = new Vector3(lastWallNormal.X, 0f, lastWallNormal.Z);
+            if (back.LengthSquared() < 1e-6f)
+                return;
             if (SmsDebugPrint)
-                GD.Print("[SMS wall] R during the slide: HIP_DROP down the wall");
-            StartGroundPoundFromAir();
+                GD.Print("[SMS wall] R during the slide: HIP_DROP startup meets the wall in front of the face -> knocked off backwards (JUMP_SHORT_BACK_DOWN, vy 0)");
+            SmsEnterBonk(back.Normalized(), 0f, "hip drop startup against the wall", 0f);
             return;
         }
-        if (UseSmsPhysics && SmsWallSlideDive && Input.IsActionJustPressed("button_b"))
+        if (UseSmsPhysics && SmsWallSlideKnockOff && Input.IsActionJustPressed("button_b"))
         {
             Vector3 into = -wallPlannedKickDir; // the slide face: the approach mirrored across the wall, pointing into it
             if (into.LengthSquared() < 1e-6f)

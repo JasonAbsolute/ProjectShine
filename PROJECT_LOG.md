@@ -1330,7 +1330,7 @@ equations come from. Everything sits behind one toggle so the old feel is one cl
 | `SmsLedgeSnap` | `true` | Step DOWN ledges up to 100 units (1.34 m) without leaving the ground: sets `floor_snap_length` to 1.343 m (Player.tscn ships 0.6). |
 | `SmsStepUp` | `true` | Step UP risers up to 30 units (0.40 m) without breaking stride (`SmsTryStepUp`, after MoveAndSlide). |
 | `SmsWallSlidePinTicks` | `4` | Ticks (120 Hz) of zero velocity when a wall slide begins. The game's is 10 (`stayWall`, 83 ms; the state machine runs per 5 ms tick, verified in `TMarDirector::direct`), which playtested as "sticks to the wall"; 4 (33 ms) keeps a slight catch before the slide. Deviation by request. 0 = slides at once. |
-| `SmsWallSlideDive` | `true` | B during a wall slide dives along the face — which points *into* the wall — and the wall hit bounces him off backwards into the knockdown (`stayWall` → `checkBackTrig` → `JUMP_CATCH` → `jumpCatch` case 2). The game's "let go", with a penalty. `false` = B does nothing on a wall. |
+| `SmsWallSlideKnockOff` | `true` | B and the ground-pound button during a wall slide both knock him off the wall backwards (`stayWall` → `checkBackTrig`): B dives along the face, which points *into* the wall, and `jumpCatch` case 2 bounces him off; L enters `HIP_DROP`, whose first `hipAttacking` tick meets the wall in front of the face and turns into `JUMP_SHORT_BACK_DOWN` (no ground pound ever happens). `false` = both buttons do nothing on a wall. Jaysonn remembers L doing nothing but the camera in the real game; the code reads as a knock-off — unresolved without footage. |
 | `SmsRollJumpKnockdown` | `false` | **Deviation.** Off: the roll-jump wall-slides on a head-height wall. On: the decomp's rule (knockdown above 40; the roll-jump launches at 55 and never drops under 40 with the stick held). |
 
 On Play, Output must show `[SMS selftest] ALL OK` and `[SMS selftest] slope/hipdrop ALL OK`. Anything else means a
@@ -1495,8 +1495,8 @@ to −16), so pulling back toward a wall he just kicked, or drifting sideways in
 Wall slide: velocity zeroed for the first **10** ticks (83 ms; `stayWall` advances its timer twice per pinned tick; the
 port defaults to 4 — see `SmsWallSlidePinTicks`), then
 `vy = −0.5·timer` with the timer already at 21 — −10.5 (−4.2 m/s) at once — capped at −30 (−12.1 m/s) from tick 50; the
-position is nudged into the wall each tick (`WALL_STICK_SPEED`); the stick does nothing; the slide ends by A (kick), R
-(`HIP_DROP` straight down the wall), B (dive along the face, into the wall → bounce-off knockdown, see `SmsWallSlideDive`),
+position is nudged into the wall each tick (`WALL_STICK_SPEED`); the stick does nothing; the slide ends by A (kick), R or B
+(both knock him off backwards, see `SmsWallSlideKnockOff`; there is no ground pound off a wall),
 landing (face turned away, `LANDING` → `LAND_SLIP`: double available) or losing the wall (face away, velocity 0, fall).
 Wall kick (`startJumpWall` → `setStatusToJumping` WALL_JUMP): vy 62, fwd 24 along the bounce direction (the heading
 mirrored across the wall normal), fall-cancellable, no hold, no commit lock, no regrab cooldown. While the kick is
