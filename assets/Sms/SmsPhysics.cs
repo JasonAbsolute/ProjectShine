@@ -544,11 +544,14 @@ public static class SmsAir
     }
 
     /// <summary>stayWall(): vertical speed while sliding down a wall, by ticks spent on it.</summary>
-    public static float WallSlideVy(int ticksOnWall)
+    public static float WallSlideVy(int ticksOnWall) => WallSlideVy(ticksOnWall, SmsParams.Timing.WallSlideStickTicks);
+
+    /// <summary>Same, with the pin length as a parameter (Mario.SmsWallSlidePinTicks; the game's value is 10).</summary>
+    public static float WallSlideVy(int ticksOnWall, int pinTicks)
     {
         // stayWall(): timer += 1 every tick and += 1 again while < 20 (with mVel = 0), so ticks 1..10 are pinned; from
         // tick 11 the timer is ticks + 10 and vy = -0.5 * min(timer, 60): -10.5 at once, -30 from tick 50.
-        if (ticksOnWall <= SmsParams.Timing.WallSlideStickTicks) return 0f;
+        if (ticksOnWall <= pinTicks) return 0f;
         int timer = Math.Min(ticksOnWall + SmsParams.Timing.WallSlideTimerOffset, SmsParams.Timing.WallSlideMaxTicks);
         return -timer * 0.5f;
     }
