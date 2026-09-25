@@ -214,6 +214,9 @@ public partial class Mario : CharacterBody3D
     [Export] public bool SmsSelfTestOnReady = true;
     private float _smsIntendedMag = 0f;        // SMS mIntendedMag, 0..32 (quadratic stick curve)
     private float _smsTickAccum = 0f;          // 120 Hz sub-tick remainder
+    private readonly SmsHipDrop _smsHipDrop = new SmsHipDrop(); // hipAttacking(): 60-tick hover with lift, then a constant -80/tick fall
+    private bool _smsGroundMoved = false;      // this frame's MoveAndSlide was given the walkProcess() ground step (see EndFrame)
+    private float _smsGroundMoveNy = 1f;       // floor normal.y that step was scaled by
     private float _smsFaceYaw = 0f;            // SMS mFaceAngle.y (radians, Godot yaw, world space)
     private bool _smsFaceValid = false;
     private int _smsFaceSource = 0;            // 1 = ground, 2 = air
@@ -740,6 +743,12 @@ public partial class Mario : CharacterBody3D
     [Export]
     public float GroundPoundJumpVelocity = 19.5f; // fixed launch speed (height = v²/(2g))
 
+    /// <summary>The GP-jump is not a Sunshine move: hipAttackEnd() honours no input while ma_hiped plays, and A during
+    /// ma_slped (slipEnd -> checkAllMotions) is an ordinary standing jump. With UseSmsPhysics the game's rules apply
+    /// unless this is on; the legacy physics path always keeps the GP-jump.</summary>
+    [Export]
+    public bool KeepGroundPoundJump = false;
+
     [Export]
     public float GroundPoundJumpSpinTurns = 1.0f; // full 360° rotations during the rise
     private bool _isGroundPoundJump = false;
@@ -1186,7 +1195,10 @@ public partial class Mario : CharacterBody3D
             GroundPoundJumpVelocity *= heightKeep;
             GRAVITY = new Vector3(0f, -smsG, 0f);
             if (SmsSelfTestOnReady)
+            {
                 SmsSelfTest.Run();
+                SmsSlopeSelfTest.Run();
+            }
         }
         base._Ready();
         CacheCapsuleWorldMetrics();
@@ -2054,6 +2066,44 @@ public partial class Mario : CharacterBody3D
         // --- GROUND POUND ---
         if (stateOfMario == MarioState.groundPoundStartup)
         {
+            if (UseSmsPhysics)
+            {
+                // hipAttacking() state 1: 60 ticks (0.5 s) with ALL velocity zeroed every tick (setPlayerVelocity(0),
+                // mVel.y = 0), so a pound from a run drops straight down. On each of the first 40 ticks he drifts up
+                // (40 - t) * 0.125 units (102.5 units = 1.38 m in total) unless his head would hit a roof. ma_hipsr just
+                // plays over the hover; the tick count, not the animation, ends it, and the fall starts at once (no stall).
+                int gpTicks = SmsUnits.TicksFor(delta, ref _smsTickAccum);
+                float liftUnits = 0f;
+                bool startFall = false;
+                for (int i = 0; i < gpTicks && !startFall; i++)
+                {
+                    _smsHipDrop.Step(IsOnCeiling(), out _, out float l);
+                    liftUnits += l;
+                    startFall = _smsHipDrop.Current == SmsHipDrop.Phase.Fall;
+                }
+                velocity.X = 0f;
+                velocity.Z = 0f;
+                velocity.Y = liftUnits > 0f ? SmsUnits.UnitsToMetres(liftUnits) / (float)delta : 0f; // MoveAndSlide applies the lift; a roof stops it
+                _smsTrueVyValid = false;
+                if (IsOnFloor())
+                {
+                    // Ground under him during the hover (a platform rose into him): jumpProcess() == 1 -> JUMP_END, an
+                    // ordinary landing rather than a pound.
+                    velocity = Vector3.Zero;
+                    EnterLanding(MarioState.landing, "ma_laend");
+                    goto EndFrame;
+                }
+                if (startFall)
+                {
+                    _groundPoundStalling = false;
+                    stateOfMario = MarioState.groundPoundFalling;
+                    SetMarioState(MarioState.groundPoundFalling);
+                    if (SmsDebugPrint)
+                        GD.Print($"[SMS gp] hover done after {SmsParams.Timing.HipDropHangTicks} ticks, falling at {SmsUnits.SpeedToMps(SmsParams.Jump.HipAttackSpeedY):F1} m/s (constant, no steering)");
+                }
+                goto EndFrame;
+            }
+
             // Freeze in the air — no gravity, no movement
             velocity = Vector3.Zero;
 
@@ -2100,6 +2150,10 @@ public partial class Mario : CharacterBody3D
                 // Get animation length for the landing timer
                 var hipedAnim = animPlayer.GetAnimation("ma_hiped");
                 _groundPoundLandingTimer = hipedAnim != null ? (float)hipedAnim.Length : 0.5f;
+                _smsHipDrop.Land();
+                if (UseSmsPhysics && SmsDebugPrint)
+                    GD.Print($"[SMS gp] landed: ma_hiped {_groundPoundLandingTimer:F2} s with no inputs, then ma_slped (stick or A cancels it)"
+                        + (KeepGroundPoundJump ? " [KeepGroundPoundJump on: A launches the GP-jump]" : ""));
 
                 TriggerLandingDust();
 
@@ -2113,9 +2167,16 @@ public partial class Mario : CharacterBody3D
         {
             velocity = Vector3.Zero;
 
+            // hipAttackEnd(): while ma_hiped plays no input is read at all (jumpEndCommon has no input checks), so in
+            // SMS mode a press during it is dropped rather than buffered into ma_slped.
+            bool smsGpRules = UseSmsPhysics && !KeepGroundPoundJump;
+            if (smsGpRules && !_groundPoundSlpedPlaying)
+                jumpBuffer = 0;
+
             // GP-jump can fire at ANY time during groundPoundLanding (both the impact
             // ma_hiped phase and the get-up ma_slped phase). Press A → launch.
-            if (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space"))
+            // Not a Sunshine move: only on the legacy path or with KeepGroundPoundJump.
+            if (!smsGpRules && (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space")))
             {
                 _groundPoundSlpedPlaying = false;
                 jumpChainStage = 0;
@@ -2146,6 +2207,14 @@ public partial class Mario : CharacterBody3D
                 bool wantsMove = walkingStrength > DEADZONE;
 
                 _groundPoundSlpedTimer -= (float)delta;
+                if (smsGpRules && jumpBuffer > 0)
+                {
+                    // slipEnd(): A -> checkAllMotions() -> an ordinary jump from a standstill (vy 42; a stick spin makes it a
+                    // spin jump, as on any other ground A press).
+                    _groundPoundSlpedPlaying = false;
+                    StartGroundJumpPreserveXZ();
+                    goto EndFrame;
+                }
                 if (wantsMove || _groundPoundSlpedTimer <= 0f)
                 {
                     _groundPoundSlpedPlaying = false;
@@ -3564,6 +3633,10 @@ public partial class Mario : CharacterBody3D
                 spinJumpDirLocked = false;
                 _groundPoundStalling = false;
                 _groundPoundSlpedPlaying = false;
+                _smsHipDrop.Reset();
+                _smsTrueVyValid = false;
+                if (UseSmsPhysics && SmsDebugPrint)
+                    GD.Print($"[SMS gp] R pressed: hover {SmsParams.Timing.HipDropHangTicks / SmsUnits.TicksPerSecond:F2} s with a {SmsUnits.UnitsToMetres(102.5f):F2} m lift, then fall at {SmsUnits.SpeedToMps(SmsParams.Jump.HipAttackSpeedY):F1} m/s");
 
                 goto EndFrame;
             }
@@ -3830,9 +3903,34 @@ public partial class Mario : CharacterBody3D
 
         // One-way leaf platform: pass through when moving upward
         SetCollisionMaskValue(3, velocity.Y <= 0.1f);
-        Velocity = velocity;
+
+        // walkProcess(): on a walkable floor Sunshine steps HORIZONTALLY by vel * normal.y and snaps y to the floor, so the
+        // distance covered along the surface is exactly fwd on any slope (horizontal speed is fwd * cos). Godot's
+        // floor_constant_speed gives that only uphill (it needs a collision with the floor); downhill it moves the full
+        // horizontal step and snaps, 1/cos too fast, and across a slope it is not scaled at all. Hand MoveAndSlide the
+        // scaled step lifted into the floor plane, then undo the scale on what it moved and drop the in-plane vertical
+        // part: SMS keeps mVel.y = 0 on the ground (so no ski-jump off an uphill lip either).
+        _smsGroundMoved = UseSmsPhysics && IsOnFloor() && !inAirState && velocity.Y <= 0.01f
+            && stateOfMario != MarioState.slipping && stateOfMario != MarioState.wallSlide;
+        if (_smsGroundMoved)
+        {
+            Vector3 floorN = GetFloorNormal();
+            _smsGroundMoveNy = Mathf.Max(floorN.Y, SmsParams.Mario.SlipStart);
+            Velocity = SmsSlope.GroundMoveVelocity(new Vector3(velocity.X, 0f, velocity.Z), floorN);
+        }
+        else
+        {
+            Velocity = velocity;
+        }
         MoveAndSlide();
         velocity = Velocity;
+        if (_smsGroundMoved)
+        {
+            velocity.X /= _smsGroundMoveNy; // a wall's clipping of the step survives the un-scale
+            velocity.Z /= _smsGroundMoveNy;
+            if (IsOnFloor())
+                velocity.Y = 0f;
+        }
         if (UseSmsPhysics)
             SmsAfterMove();
 
@@ -10286,16 +10384,16 @@ public partial class Mario : CharacterBody3D
         float fwd = SmsUnits.MpsToSpeed(velXZ.Dot(faceDir)); // signed forward speed along the facing
         bool stick = direction.LengthSquared() > 1e-6f && _smsIntendedMag > 0f;
         float intendedYaw = stick ? SmsMath.YawFromDir(direction.Normalized()) : _smsFaceYaw;
-        float floorNy = IsOnFloor() ? GetFloorNormal().Y : 1f;
+        Vector3 floorN = IsOnFloor() ? GetFloorNormal() : Vector3.Up;
+        float floorNy = floorN.Y;
 
         for (int i = 0; i < n; i++)
         {
             if (!stick)
             {
                 SmsRun.WalkEndTick(ref fwd); // stick released: 1/tick
-                continue;
             }
-            if (SmsRun.IsTurnReversal(_smsFaceYaw, intendedYaw) && fwd >= SmsParams.Run.TurnNeedSp)
+            else if (SmsRun.IsTurnReversal(_smsFaceYaw, intendedYaw) && fwd >= SmsParams.Run.TurnNeedSp)
             {
                 // turnning(): skid down at 4/tick, then TURN_END facing the stick at fwd 8.
                 SmsRun.BrakeTick(ref fwd);
@@ -10310,6 +10408,9 @@ public partial class Mario : CharacterBody3D
                 SmsRun.AccelTick(ref fwd, _smsIntendedMag, floorNy);
                 _smsFaceYaw = SmsMath.ConvergeAngle(_smsFaceYaw, intendedYaw, SmsRun.TurnRateRad(fwd));
             }
+            // slopeProcess(): slope accel by surface type (0/0 on normal ground, so slopes do not change running speed)
+            // and the RunningMax clamp. The step itself is scaled by normal.y in the EndFrame block (walkProcess()).
+            fwd = SmsSlope.RunSlopeTick(fwd, floorN, SmsMath.DirFromYaw(_smsFaceYaw));
         }
         faceDir = SmsMath.DirFromYaw(_smsFaceYaw);
         float mps = SmsUnits.SpeedToMps(fwd);
@@ -10401,8 +10502,14 @@ public partial class Mario : CharacterBody3D
         Vector3 slideDir = velXZ / speed;
         float fwd = SmsUnits.MpsToSpeed(speed);
         float cs = (direction.LengthSquared() > 1e-6f && _smsIntendedMag > 0f) ? slideDir.Dot(direction.Normalized()) : 0f;
+        // slideProcess(): the slope term is added along the downhill direction before the friction multiply. Normal ground:
+        // nothing when sliding downhill (friction only, no gravity assist), 1.5 * sin(slope) per tick against him when
+        // sliding uphill, so he loses it and gets up near the top.
+        Vector3 slideFloorN = IsOnFloor() ? GetFloorNormal() : Vector3.Up;
+        float slopeDv = SmsSlope.SlideSlopeDeltaFwd(slideFloorN, slideDir);
         for (int i = 0; i < n; i++)
         {
+            fwd += slopeDv;
             if (SmsSlide.Tick(ref fwd, _smsIntendedMag, cs))
                 break;
         }
