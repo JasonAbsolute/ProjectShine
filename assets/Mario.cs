@@ -3945,7 +3945,7 @@ public partial class Mario : CharacterBody3D
                 velocity.Y = 0f;
         }
         _smsSteppedUp = false;
-        if (_smsGroundMoved && SmsStepUp)
+        if (UseSmsPhysics && SmsStepUp)
             SmsTryStepUp(preSlideVelocity, preMovePos, delta, preMoveState);
         if (UseSmsPhysics)
             SmsAfterMove();
@@ -3964,7 +3964,8 @@ public partial class Mario : CharacterBody3D
 
         // Collision data is valid only after MoveAndSlide. Preserve the incoming
         // dive speed above because MoveAndSlide removes the into-wall component.
-        TryEnterDiveBonkAfterMove(preSlideVelocity, preMoveState);
+        if (!_smsSteppedUp) // the "wall" was a riser under 30 units: he has landed on the step, the game never saw a wall
+            TryEnterDiveBonkAfterMove(preSlideVelocity, preMoveState);
 
         if (stateOfMario == MarioState.wallSlide)
         {
@@ -4056,9 +4057,9 @@ public partial class Mario : CharacterBody3D
             }
         }
 
-        PostMoveWallCheck(preSlideVelocity, preMoveState);
         if (!_smsSteppedUp) // the wall MoveAndSlide reported was a riser he is now standing on top of
         {
+            PostMoveWallCheck(preSlideVelocity, preMoveState);
             CheckGroundWallEntry(preMoveState, inputDirWorld, stickStrength);
             if (UseSmsPhysics)
                 SmsGroundWallBonk(preSlideVelocity, preMoveState);
@@ -5161,13 +5162,21 @@ public partial class Mario : CharacterBody3D
             Vector3 dirLock = spinTripleQueued ? spinTripleDir : _jumpChainStartDir;
             spinTripleQueued = false;
 
-            lastFacingDirection = dirLock;
-            armature.Rotation = new Vector3(0, YawFromDir(dirLock), 0);
+            if (!UseSmsPhysics)
+            {
+                // Legacy only. SMS: jumpSlipEvents() -> changePlayerJumping(ULTRA_JUMP) -> setStatusToJumping() never
+                // touches mFaceAngle, so the triple leaves along the CURRENT face, i.e. the way he is moving in the
+                // landing window (landingCarryVelXZ, already in velocity; SmsLaunch reads it). The remembered chain-start
+                // direction is the model's facing at a standing single jump, and a chain carried the other way launched
+                // the triple backwards ("jumping south, the triple goes north").
+                lastFacingDirection = dirLock;
+                armature.Rotation = new Vector3(0, YawFromDir(dirLock), 0);
 
-            // Optional but recommended: keep speed but align it with the locked dir
-            float speedCarry = landingCarryVelXZ.Length();
-            velocity.X = dirLock.X * speedCarry;
-            velocity.Z = dirLock.Z * speedCarry;
+                // Optional but recommended: keep speed but align it with the locked dir
+                float speedCarry = landingCarryVelXZ.Length();
+                velocity.X = dirLock.X * speedCarry;
+                velocity.Z = dirLock.Z * speedCarry;
+            }
             spinBuffer = 0;
             spinInput = false;
             spinTracking = false;
@@ -7016,10 +7025,19 @@ public partial class Mario : CharacterBody3D
                 {
                     velocity.X = 0f;
                     velocity.Z = 0f;
+                    if (SmsDebugPrint)
+                        GD.Print($"[SMS wall] air hit at fwd {smsFwd:F1} (<= 16) from {airStateAtContact}: stop against the wall, keep falling");
                     return;
                 }
+                // 16 < fwd <= 40 into a real wall: MARIO_STATUS_WALL_SLIDE, unconditionally. jumpingBasic() case 2 has
+                // no fall-speed ratio and no takeoff cone; its +-60 deg glancing band is the approach dot above. The
+                // legacy gates below (WALL_MIN_HORIZONTAL_RATIO, takeoff cone) refused slides the game gives.
+                if (SmsDebugPrint)
+                    GD.Print($"[SMS wall] air hit at fwd {smsFwd:F1} (16..40) from {airStateAtContact}: wall slide");
+                EnterWallSlide(preSlideVelocity);
+                return;
             }
-            minSpeed = SmsUnits.SpeedToMps(SmsParams.Timing.AirWallSlideMinFwd);
+            return; // glancing contact (the game's 60..120 deg band), a knockdown in progress or a ground pound: not a wall hit
         }
         if (speed < minSpeed)
             return;
@@ -10398,7 +10416,8 @@ public partial class Mario : CharacterBody3D
         s == MarioState.walking || s == MarioState.running || s == MarioState.sprinting || s == MarioState.sneak
         || s == MarioState.rolloutRun || s == MarioState.idle || s == MarioState.pivot || s == MarioState.carrying
         || s == MarioState.wallPush || s == MarioState.wallShuffle || s == MarioState.landing
-        || s == MarioState.singleJumpLanding || s == MarioState.doubleJumpLanding || s == MarioState.tripleJumpLanding;
+        || s == MarioState.singleJumpLanding || s == MarioState.doubleJumpLanding || s == MarioState.tripleJumpLanding
+        || s == MarioState.bellySlidingFromDive; // the slide uses the same ground check: it climbs stairs
 
     /// <summary>
     /// checkGroundAtWalking(): the ground under the next position is looked up from feet + 30 units, so a floor up to
@@ -10410,9 +10429,24 @@ public partial class Mario : CharacterBody3D
     /// </summary>
     private void SmsTryStepUp(Vector3 preMoveVel, Vector3 preMovePos, double delta, MarioState preMoveState)
     {
-        if (!IsOnFloor() || !IsOnWall() || !SmsStepUpAllowed(preMoveState))
+        if (!IsOnWall())
             return;
-        Vector3 want = new Vector3(preMoveVel.X, 0f, preMoveVel.Z) * (float)delta * _smsGroundStepScale; // what MoveAndSlide was asked to do
+        bool grounded = IsOnFloor();
+        if (grounded)
+        {
+            if (!_smsGroundMoved || !SmsStepUpAllowed(preMoveState))
+                return;
+        }
+        else
+        {
+            // Same lookup in the air: checkGroundAtJumping() tests walls at feet + 30 and + 150 and reads the ground from
+            // feet + 30, so a jump or dive that meets a riser lower than 30 units LANDS on the step rather than hitting a
+            // wall (a dive onto stairs belly-slides up them). Not on the launch frames (the riser may be the ground he
+            // just left) and not from ledgeFall, whose landing needs its own fall-speed proof.
+            if (_smsNoLandFrames > 0 || !SmsStateSteers(preMoveState) || preMoveState == MarioState.ledgeHopUp)
+                return;
+        }
+        Vector3 want = new Vector3(preMoveVel.X, 0f, preMoveVel.Z) * (float)delta * (grounded ? _smsGroundStepScale : 1f); // what MoveAndSlide was asked to do
         if (want.LengthSquared() < 1e-8f)
             return;
         Vector3 did = GlobalPosition - preMovePos;
@@ -10444,7 +10478,7 @@ public partial class Mario : CharacterBody3D
         velocity.Y = 0f;
         _smsSteppedUp = true;
         if (SmsDebugPrint)
-            GD.Print($"[SMS step] up {rise:F2} m ({SmsUnits.MetresToUnits(rise):F0} units) onto {hit.GetType().Name} '{(hit as Node)?.Name}', remaining {remaining.Length():F3} m, speed kept {new Vector2(velocity.X, velocity.Z).Length():F1} m/s");
+            GD.Print($"[SMS step] {(grounded ? "up" : "landed from " + preMoveState + " on a step")} {rise:F2} m ({SmsUnits.MetresToUnits(rise):F0} units) onto {hit.GetType().Name} '{(hit as Node)?.Name}', remaining {remaining.Length():F3} m, speed kept {new Vector2(velocity.X, velocity.Z).Length():F1} m/s");
     }
 
     /// <summary>doRunning() + walkEnd() + the skid U-turn, for one physics frame (2 sub-ticks at 60 Hz).</summary>

@@ -1488,6 +1488,19 @@ while `ma_sdown` plays to the end, uninterruptible, then get-up, then WAIT. Norm
 come from roll-jumps and dives, and ground knockdowns only from borrowed speed (roll-jump run-out, downhill).
 Wall slide: velocity zeroed for the first 20 ticks (`stayWall`), then `vy = −0.5·t` capped at −30.
 
+In SMS mode `PostMoveWallCheck` decides all three air outcomes itself from `jumpingBasic()` case 2: knockdown above 40,
+wall slide for 16–40 (no fall-speed ratio, no takeoff cone — the legacy gates refused slides the game gives; the
+game's ±60° glancing band is the approach dot ≥ 0.5), stop at or below 16, nothing at all for a glancing touch.
+A riser lower than 30 units is not a wall in the air either (`checkGroundAtJumping` tests walls at feet + 30 and
++ 150): see Ground contact — the step-up runs for air states and a dive onto stairs belly-slides up them.
+
+### ⚠️ Gotcha: surplus speed survives on slopes, and that is where the "random" knockdowns come from
+
+`doRunning` only brakes speed above the target (`DecBrake` 5/tick) on ground with `normal.y ≥ 0.95`
+(`DecStartNrmY`, flatter than ~18°). A roll-jump lands at ≈50 and drops to 32 within 4 ticks on flat ground, but on
+any steeper ramp the 50 is kept the whole way up. Run off the top into a wall and `fwd > 40` knocks him down — as
+in the game. Plain running (cap 32) can never bonk; if a knockdown looks wrong, read the `[SMS bonk]` line's speed.
+
 ### Ground pound (`SmsHipDrop`, `hipAttacking` / `hipAttackEnd`)
 
 - R starts a **true hover: 60 ticks (0.5 s) with all velocity zeroed** — a pound from a sprint drops straight down.
@@ -1534,6 +1547,14 @@ lands regardless of vy, as `checkGroundAtJumping` does (`MarioPhysics.cpp`: `pos
 bounce): each launch sets `_smsNoLandFrames = 3`, and after that any floor contact in a `SmsStateSteers` state
 lands. `ledgeFall` keeps its separate fall-speed-proof rule.
 
+### ⚠️ Gotcha: the legacy triple jump re-aimed the velocity
+
+`StartJumpFromLanding` stage 2 pointed the carried speed at `_jumpChainStartDir`, the direction the *first* jump of
+the chain left in (recorded as the model's facing for a standing jump). In SMS `setStatusToJumping` never touches
+the face angle and `jumpSlipCommon` never turns during the window, so a chained jump leaves along the current
+velocity; the re-aim launched triples backwards when the chain had turned. Legacy path kept for `!UseSmsPhysics`.
+Chained jumps cannot be aimed with the stick at the press in the game: only the tiny air control applies.
+
 ### ⚠️ Gotcha: a stale branch below new code
 
 `982638b`: the first slide fix left an old `else if (A held)` rollout branch live below the new SMS decision, so
@@ -1570,8 +1591,13 @@ because wall planes are only tested at feet + 30 and feet + 60 and a lower riser
   (`SmsGroundContact.IsStep`, normal within `floor_max_angle`) belonging to a `StaticBody3D` / `AnimatableBody3D` /
   `CsgShape3D`, it moves him there, `ApplyFloorSnap()`s, restores the horizontal speed the riser clipped, and sets
   `_smsSteppedUp` so `CheckGroundWallEntry` and `SmsGroundWallBonk` skip that frame (the wall was the step).
-  Allowed from the locomotion states only (`SmsStepUpAllowed`): no stepping while belly sliding, bonked, slipping,
-  crouching or spinning. Debug line: `[SMS step] up 0.30 m (22 units) onto StaticBody3D 'Stairs' ...`.
+  Allowed from the locomotion states and the belly slide (`SmsStepUpAllowed`): not while bonked, slipping, crouching
+  or spinning. Debug line: `[SMS step] up 0.30 m (22 units) onto StaticBody3D 'Stairs' ...`.
+- Air step-up: `checkGroundAtJumping` uses the same feet + 30 lookup and only tests walls at feet + 30 / + 150, so a
+  jump or dive that meets a riser lower than 30 units lands ON the step. `SmsTryStepUp` therefore also runs for
+  launched air states (`SmsStateSteers`, not on the 3 launch frames, not from `ledgeFall`); a success is a landing
+  (`_smsSteppedUp` skips `TryEnterDiveBonkAfterMove` and `PostMoveWallCheck` that frame, the landing rule does the
+  rest: dive → belly slide, jump → `JUMP_END`). Risers taller than 0.40 m relative to the feet are walls, as in the game.
 
 ### ⚠️ Gotcha: a long floor snap is also a long downhill redirect
 
