@@ -161,8 +161,9 @@ public static class SmsParams
         public const int JumpSlipWindowTicks = 16;      // JumpSlipRecord.mMaxTimer: landing window for the jump chain (0.133 s)
         public const int HipDropHangTicks = 60;         // hipAttacking state 1 duration
         public const int HipDropLiftTicks = 40;         // lift = 0.5*(40 - t), applied *0.25
-        public const int WallSlideStickTicks = 20;      // stayWall: velocity zeroed for the first 20 ticks
-        public const int WallSlideMaxTicks = 60;        // vy = -0.5 * t, t capped at 60 -> -30
+        public const int WallSlideStickTicks = 10;      // stayWall: mStatusTimer counts TWICE per pinned tick (+1 at the top, +1 in the < 20 branch), so mVel = 0 for 10 ticks (83 ms)
+        public const int WallSlideTimerOffset = 10;     // after the pin the timer is ticks + 10: -10.5 on the first sliding tick
+        public const int WallSlideMaxTicks = 60;        // vy = -0.5 * timer, timer capped at 60 -> -30 (-12.1 m/s) from tick 50
         public const float FallCancelMinVy = 20f;       // isFallCancel: A released && vy > 20 -> vy *= 0.75
         public const float FallCancelMult = 0.75f;
         public const float TerminalVy = -75f;
@@ -545,9 +546,11 @@ public static class SmsAir
     /// <summary>stayWall(): vertical speed while sliding down a wall, by ticks spent on it.</summary>
     public static float WallSlideVy(int ticksOnWall)
     {
-        if (ticksOnWall < SmsParams.Timing.WallSlideStickTicks) return 0f;
-        int t = Math.Min(ticksOnWall, SmsParams.Timing.WallSlideMaxTicks);
-        return -t * 0.5f;
+        // stayWall(): timer += 1 every tick and += 1 again while < 20 (with mVel = 0), so ticks 1..10 are pinned; from
+        // tick 11 the timer is ticks + 10 and vy = -0.5 * min(timer, 60): -10.5 at once, -30 from tick 50.
+        if (ticksOnWall <= SmsParams.Timing.WallSlideStickTicks) return 0f;
+        int timer = Math.Min(ticksOnWall + SmsParams.Timing.WallSlideTimerOffset, SmsParams.Timing.WallSlideMaxTicks);
+        return -timer * 0.5f;
     }
 }
 

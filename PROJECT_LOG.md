@@ -1488,7 +1488,8 @@ Knockdown: 16/tick backwards (6.4 m/s), vertical speed left alone (no pop), no e
 its own on top of the general one — removed). On touchdown `SHORT_BACK_DOWN`: slide decays ×0.96/tick (~1.3 m)
 while `ma_sdown` plays to the end, uninterruptible, then get-up, then WAIT. Normal jumps cap at 32, so air knockdowns
 come from roll-jumps and dives, and ground knockdowns only from borrowed speed (roll-jump run-out, downhill).
-Wall slide: velocity zeroed for the first 20 ticks (`stayWall`), then `vy = −0.5·t` capped at −30 (−12.1 m/s); the
+Wall slide: velocity zeroed for the first **10** ticks (83 ms; `stayWall` advances its timer twice per pinned tick), then
+`vy = −0.5·timer` with the timer already at 21 — −10.5 (−4.2 m/s) at once — capped at −30 (−12.1 m/s) from tick 50; the
 position is nudged into the wall each tick (`WALL_STICK_SPEED`); the stick does nothing; the slide ends only by A (kick),
 landing (face turned away, `LANDING` → `LAND_SLIP`: double available) or losing the wall (face away, velocity 0, fall).
 Wall kick (`startJumpWall` → `setStatusToJumping` WALL_JUMP): vy 62, fwd 24 along the bounce direction (the heading
