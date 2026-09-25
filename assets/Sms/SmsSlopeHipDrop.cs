@@ -223,6 +223,7 @@ public static class SmsGroundContact
     public const float StepUpUnits = 30f;        // checkGroundPlane(v.x, v.y + 30, v.z): a floor this far up is ground
     public const float WallCheckLowUnits = 30f;  // checkWallPlane(v, 30, r/2)
     public const float WallCheckHighUnits = 60f; // checkWallPlane(v, 60, r)
+    public const float WallCheckHeadUnits = 150f; // checkGroundAtJumping: checkWallPlane(pos, 150, r); with the ledge bit a wall below this is no wall hit
 
     /// <summary>Godot floor_snap_length for the ledge-down rule: 1.343 m at this scale (Player.tscn shipped 0.6).</summary>
     public static float LedgeDropMetres => SmsUnits.UnitsToMetres(LedgeDropUnits);

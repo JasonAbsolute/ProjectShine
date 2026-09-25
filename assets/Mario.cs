@@ -7031,13 +7031,34 @@ public partial class Mario : CharacterBody3D
             // jumpingBasic() case 2 (any jump state that really hits a wall): fwd > ClashSpeed (40) -> knocked down
             // (JUMP_SHORT_BACK_DOWN: 16/tick backwards, vertical speed untouched); 16 < fwd <= 40 -> wall slide;
             // fwd <= 16 -> he just stops against the wall and keeps falling.
-            bool smsHitWall = speed > 1e-4f && (vXZ / speed).Dot(-nXZ) >= minApproachDot
+            // checkGroundAtJumping(): a wall hit needs the face within mClashAngle (12000 BAM = 65.9 deg) of head-on.
+            float smsApproachMin = MathF.Cos(SmsParams.Jump.ClashAngle * SmsUnits.BamToRad); // 0.41
+            bool smsHitWall = speed > 1e-4f && (vXZ / speed).Dot(-nXZ) >= smsApproachMin
                 && stateOfMario != MarioState.bonk
                 && airStateAtContact != MarioState.groundPoundFalling
                 && airStateAtContact != MarioState.groundPoundStartup;
             if (smsHitWall)
             {
                 float smsFwd = SmsUnits.MpsToSpeed(speed);
+                if (airStateAtContact == MarioState.bellyRollout)
+                {
+                    // catchStop() case 2: the small roll into any wall just stops (setPlayerVelocity(0)) and lands.
+                    velocity.X = 0f;
+                    velocity.Z = 0f;
+                    if (SmsDebugPrint)
+                        GD.Print($"[SMS wall] small roll (CATCH_STOP) into a wall at fwd {smsFwd:F1}: stop, no slide");
+                    return;
+                }
+                if (SmsWallLedgeBit(airStateAtContact)
+                    && !SmsWallReachesHeight(nXZ, SmsUnits.UnitsToMetres(SmsGroundContact.WallCheckHeadUnits)))
+                {
+                    // checkGroundAtJumping() with the ledge bit: the wall does not reach feet + 150 units (2.0 m), so it is
+                    // not a wall hit -- hangonCheck() may grab its ledge (TryStartLedgeGrab runs before the move while
+                    // falling), otherwise nothing happens. A roll-jump into a platform edge is never a knockdown.
+                    if (SmsDebugPrint)
+                        GD.Print($"[SMS wall] {airStateAtContact} at fwd {smsFwd:F1}: wall below head height (feet + 150 units), ignored (ledge grab may take it)");
+                    return;
+                }
                 if (smsFwd > SmsParams.Mario.ClashSpeed)
                 {
                     SmsEnterBonk(-(vXZ / speed), velocity.Y, "air wall hit", smsFwd);
@@ -10441,6 +10462,35 @@ public partial class Mario : CharacterBody3D
         || s == MarioState.singleJumpLanding || s == MarioState.doubleJumpLanding || s == MarioState.tripleJumpLanding
         || s == MarioState.bellySlidingFromDive; // the slide uses the same ground check: it climbs stairs
 
+    /// <summary>
+    /// checkGroundAtJumping(target, param) bit 1: the statuses whose wall hit is ignored (or turned into a ledge grab) when
+    /// the wall does not reach feet + 150 units. Passed by jumping() [JUMP and FALL], secJumping(), landing(), uTurnJumping(),
+    /// jumpWall(), trample(), broadJumping(), rotateBroadJumping(). Not by the triple, backflip, spin jump, dive, catchStop
+    /// or hip drop, which treat every wall as a wall.
+    /// </summary>
+    private static bool SmsWallLedgeBit(MarioState s) =>
+        s == MarioState.singleJump || s == MarioState.doubleJump || s == MarioState.ledgeFall
+        || s == MarioState.sideFlip || s == MarioState.wallJump || s == MarioState.stomping
+        || s == MarioState.singleRollout;
+
+    /// <summary>
+    /// Does the wall he is touching continue up to <paramref name="heightAboveFeet"/> metres? A ray from the body centre at
+    /// that height toward the wall (into -normal), 6 cm past the body radius. The game's checkWallPlane(pos, 150, r).
+    /// </summary>
+    private bool SmsWallReachesHeight(Vector3 wallNormalXZ, float heightAboveFeet)
+    {
+        Vector3 dir = -wallNormalXZ;
+        dir.Y = 0f;
+        if (dir.LengthSquared() < 1e-6f)
+            return true;
+        dir = dir.Normalized();
+        Vector3 from = new Vector3(GlobalPosition.X, SmsFeetY() + heightAboveFeet, GlobalPosition.Z);
+        var q = PhysicsRayQueryParameters3D.Create(from, from + dir * (capRadiusWorld + 0.06f), CollisionMask);
+        q.CollideWithAreas = false;
+        q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+        return GetWorld3D().DirectSpaceState.IntersectRay(q).Count > 0;
+    }
+
     /// <summary>World Y of the bottom of the collision shape (the feet). ComputeFeetPosition() is the capsule-style value used by the FX.</summary>
     private float SmsFeetY() => (bodyCol != null ? bodyCol.GlobalPosition.Y : GlobalPosition.Y) - capHalfHeightWorld;
 
@@ -10574,7 +10624,26 @@ public partial class Mario : CharacterBody3D
                 GD.Print($"[SMS step] {where} {preMoveState}: not a wall (ground past it is level, rise {rise:F3} m), speed kept {new Vector2(velocity.X, velocity.Z).Length():F1} m/s");
             return;
         }
-        GlobalPosition += remaining + Vector3.Up * rise;
+        // Treads shorter than the body radius: moving by the whole remainder puts the cylinder INTO the next riser and
+        // Godot's recovery pushes him back out next frame (the jitter). Find the next riser along the tread and stop the
+        // front edge at it. On such stairs he still climbs one riser per frame -- that is the geometry -- but cleanly.
+        Vector3 advance = remaining;
+        {
+            Vector3 treadFrom = new Vector3(groundP.X, groundP.Y + 0.02f, groundP.Z) + dir * 0.005f;
+            var qTread = PhysicsRayQueryParameters3D.Create(treadFrom, treadFrom + dir * 1.5f, CollisionMask);
+            qTread.CollideWithAreas = false;
+            qTread.Exclude = exclude;
+            var hTread = space.IntersectRay(qTread);
+            if (hTread.Count > 0)
+            {
+                float treadDepth = (((Vector3)hTread["position"]) - groundFrom).Dot(dir); // riser face to next riser face
+                float maxAdvance = MathF.Max(0f, treadDepth + 0.03f - 0.005f);            // front edge stops 5 mm short
+                float wantLen = remaining.Length();
+                if (wantLen > maxAdvance)
+                    advance = remaining * (maxAdvance / wantLen);
+            }
+        }
+        GlobalPosition += advance + Vector3.Up * rise;
         ApplyFloorSnap();
         velocity.X = preMoveVel.X; // the riser clipped the horizontal speed; the game never saw a wall
         velocity.Z = preMoveVel.Z;

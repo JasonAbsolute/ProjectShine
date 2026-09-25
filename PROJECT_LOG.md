@@ -1491,7 +1491,21 @@ Wall slide: velocity zeroed for the first 20 ticks (`stayWall`), then `vy = −0
 
 In SMS mode `PostMoveWallCheck` decides all three air outcomes itself from `jumpingBasic()` case 2: knockdown above 40,
 wall slide for 16–40 (no fall-speed ratio, no takeoff cone — the legacy gates refused slides the game gives; the
-game's ±60° glancing band is the approach dot ≥ 0.5), stop at or below 16, nothing at all for a glancing touch.
+game's head-on band is `mClashAngle` 12000 BAM = 65.9°, approach dot ≥ 0.41), stop at or below 16, nothing at all
+for a glancing touch. Two more rules from `checkGroundAtJumping` / `catchStop`:
+
+- **Head-height rule.** Walls are tested at feet + 30 *and* feet + 150 units. For the statuses that pass the ledge bit
+  (single/double jump, fall, sideflip, wall kick, stomp bounce, roll-jump — not the triple, backflip, spin, dive, small
+  roll or ground pound) a wall that does **not** reach feet + 150 (2.0 m above his feet at that moment) is not a wall
+  hit at all: `hangonCheck` may grab its ledge (falling, top more than 100 units above the feet, roof clear), otherwise
+  nothing happens and he is just pushed off it. So a roll-jump into a platform edge never knocks him down; only a
+  wall taller than his head at contact does (`SmsWallReachesHeight`, ray at feet + 2.015 m).
+- **Small roll.** `catchStop()` into any wall: `setPlayerVelocity(0)` — he stops in the air and drops; no slide.
+
+Why the roll-jump bonks in this build more than in the game: with `SmsRollJumpMinSpeed` at 20 nearly every A out of
+a slide is the 55-speed roll-jump, and with the stick held forward `doJumping` adds 0.008·32 = 0.256/tick against
+the −0.2/tick above 32, so it never drops under 40 — into a head-height wall that is a knockdown, every time, in the
+game too. At the game's threshold (40) the common roll is the small one, which stops.
 A riser lower than 30 units is not a wall in the air either (`checkGroundAtJumping` tests walls at feet + 30 and
 + 150): see Ground contact — the step-up runs for air states and a dive onto stairs belly-slides up them.
 
@@ -1593,7 +1607,9 @@ because wall planes are only tested at feet + 30 and feet + 60 and a lower riser
   feet + 0.45 m at a point 3 cm past the riser face. A rest 0.01–0.40 m above the feet on a floor-angled face
   (normal within `floor_max_angle`) of a `StaticBody3D` / `AnimatableBody3D` / `CsgShape3D` is a step: he is moved by
   the blocked remainder of the motion plus the rise, `ApplyFloorSnap()`ed, and given back the horizontal speed the
-  riser clipped. A rest *level* with the feet (or below) means the "wall" was a trimesh edge, a lip under a
+  riser clipped — the advance is capped at the next riser (a ray along the tread from the landing point), so on treads
+  shorter than the body radius the front edge stops at the riser instead of entering it and being pushed back out the
+  next frame (the jitter). A rest *level* with the feet (or below) means the "wall" was a trimesh edge, a lip under a
   centimetre or a knee-high rail: it is dismissed, speed kept, no move. Both outcomes set `_smsSteppedUp`, which
   makes `TryEnterDiveBonkAfterMove`, `PostMoveWallCheck`, `CheckGroundWallEntry` and `SmsGroundWallBonk` skip the
   frame. Rays, not a full-body `TestMove`: a 1.87 m cylinder raised above the step limit overlaps the next risers of
