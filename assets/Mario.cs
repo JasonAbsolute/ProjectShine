@@ -6241,7 +6241,19 @@ public partial class Mario : CharacterBody3D
             }
         }
         if (hit == null)
-            return; // held by the floor snap alone this frame: keep the last known surface
+        {
+            // Standing still, or held by the floor snap alone, the body never moves into the floor and MoveAndSlide reports
+            // no collision. checkGround() is a ray in the game; ask the floor under the feet directly.
+            Vector3 from = new Vector3(GlobalPosition.X, SmsFeetY() + 0.1f, GlobalPosition.Z);
+            var q = PhysicsRayQueryParameters3D.Create(from, from + Vector3.Down * 0.8f, CollisionMask);
+            q.CollideWithAreas = false;
+            q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+            var r = GetWorld3D().DirectSpaceState.IntersectRay(q);
+            if (r.Count > 0)
+                hit = r["collider"].AsGodotObject() as Node;
+        }
+        if (hit == null)
+            return; // nothing under the feet this frame: keep the last known surface
         string tag = SmsSurfaceTagOf(hit).Trim().ToLowerInvariant();
         SmsSlope.Surface s = SmsSlope.Surface.Normal;
         bool noSlip = false;
@@ -6255,7 +6267,11 @@ public partial class Mario : CharacterBody3D
                 s = GetFloorNormal().Y > 0.99f ? SmsSlope.Surface.WaterGround : SmsSlope.Surface.WaterSlope;
                 break;
             case "noslip": noSlip = true; break;
-            default: break;
+            case "normal": break;
+            default:
+                if (SmsDebugPrint && tag != _smsSurfaceTag)
+                    GD.Print($"[SMS surface] unknown tag '{tag}' on '{hit.Name}' -- expected normal | slider | 45 | forceslip | wet | noslip; treated as normal");
+                break;
         }
         if (SmsDebugPrint && (s != _smsSurface || noSlip != _smsSurfaceNoSlip))
             GD.Print($"[SMS surface] {(noSlip ? "noslip" : s.ToString())} ('{hit.Name}', tag '{tag}')");
