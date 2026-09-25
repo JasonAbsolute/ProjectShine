@@ -236,7 +236,7 @@ public partial class Mario : CharacterBody3D
     private const float SmsSlideKnockdownMinFwd = 16f; // slippingBasic(): a belly slide (CATCH) into a head-on wall above this -> CATCH_DOWN, else stop and get up
     [Export] public bool SmsLedgeSnap = true;   // checkGroundAtWalking: step DOWN ledges up to 100 units (1.34 m) without leaving the ground (floor_snap_length)
     [Export] public bool SmsStepUp = true;      // checkGroundAtWalking: step UP risers up to 30 units (0.40 m) without breaking stride
-    [Export] public int SmsWallSlidePinTicks = 10;    // stayWall(): 120 Hz ticks of zero velocity when the slide begins. Game value 10 (83 ms); 0 = slides at once (deviation)
+    [Export] public int SmsWallSlidePinTicks = 4;     // stayWall(): 120 Hz ticks of zero velocity when the slide begins. Game value 10 (83 ms, felt sticky); 4 (33 ms) by request, playtested; 0 = slides at once
     [Export] public bool SmsRollJumpKnockdown = false; // DEVIATION: decomp jumpingBasic() knocks the roll-jump (fwd 55 > ClashSpeed 40) down on a head-height wall; Jaysonn (2026-09-24) wants the wall slide he remembers from the game. true = the code's rule
     private bool _smsSteppedUp = false;         // this frame's grounded MoveAndSlide hit a riser he has since stepped onto
     [Export] public float SmsRollJumpMinSpeed = 20f; // catching(): slide speed (SMS units/tick) above which A is the big roll-jump. Game value: mario.prm mClashSpeed = 40 (big roll only within ~0.13 s of touchdown); 20 chosen by feel (Jaysonn, 2026-09-24) -- a deliberate deviation

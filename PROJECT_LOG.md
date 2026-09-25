@@ -1329,7 +1329,7 @@ equations come from. Everything sits behind one toggle so the old feel is one cl
 | `KeepGroundPoundJump` | `false` | Restores the GP-jump (see Ground Pound section above). Off because Sunshine has no such move. |
 | `SmsLedgeSnap` | `true` | Step DOWN ledges up to 100 units (1.34 m) without leaving the ground: sets `floor_snap_length` to 1.343 m (Player.tscn ships 0.6). |
 | `SmsStepUp` | `true` | Step UP risers up to 30 units (0.40 m) without breaking stride (`SmsTryStepUp`, after MoveAndSlide). |
-| `SmsWallSlidePinTicks` | `10` | Ticks (120 Hz) of zero velocity when a wall slide begins. 10 is the game (`stayWall`, 83 ms; verified the state machine runs per 5 ms tick in `TMarDirector::direct`). 0 = slides at once — a deviation if used. |
+| `SmsWallSlidePinTicks` | `4` | Ticks (120 Hz) of zero velocity when a wall slide begins. The game's is 10 (`stayWall`, 83 ms; the state machine runs per 5 ms tick, verified in `TMarDirector::direct`), which playtested as "sticks to the wall"; 4 (33 ms) keeps a slight catch before the slide. Deviation by request. 0 = slides at once. |
 | `SmsRollJumpKnockdown` | `false` | **Deviation.** Off: the roll-jump wall-slides on a head-height wall. On: the decomp's rule (knockdown above 40; the roll-jump launches at 55 and never drops under 40 with the stick held). |
 
 On Play, Output must show `[SMS selftest] ALL OK` and `[SMS selftest] slope/hipdrop ALL OK`. Anything else means a
@@ -1491,7 +1491,8 @@ while `ma_sdown` plays to the end, uninterruptible, then get-up, then WAIT. Norm
 come from roll-jumps and dives, and ground knockdowns only from borrowed speed (roll-jump run-out, downhill).
 The face is fixed for the whole jump (`doJumping` never turns it; the back stick drives the forward speed negative instead,
 to −16), so pulling back toward a wall he just kicked, or drifting sideways into one he is flying past, never grabs it.
-Wall slide: velocity zeroed for the first **10** ticks (83 ms; `stayWall` advances its timer twice per pinned tick), then
+Wall slide: velocity zeroed for the first **10** ticks (83 ms; `stayWall` advances its timer twice per pinned tick; the
+port defaults to 4 — see `SmsWallSlidePinTicks`), then
 `vy = −0.5·timer` with the timer already at 21 — −10.5 (−4.2 m/s) at once — capped at −30 (−12.1 m/s) from tick 50; the
 position is nudged into the wall each tick (`WALL_STICK_SPEED`); the stick does nothing; the slide ends only by A (kick),
 landing (face turned away, `LANDING` → `LAND_SLIP`: double available) or losing the wall (face away, velocity 0, fall).
