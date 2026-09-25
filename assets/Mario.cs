@@ -10470,9 +10470,12 @@ public partial class Mario : CharacterBody3D
         }
         else
         {
-            // Airborne or landing this frame: launched air states only, not on the launch frames (the riser may be the
-            // ground he just left), not from ledgeFall (its landing needs its own fall-speed proof).
-            if (_smsNoLandFrames > 0 || !SmsStateSteers(preMoveState) || preMoveState == MarioState.ledgeHopUp)
+            // Airborne or landing this frame: launched air states only, not from ledgeFall (its landing needs its own
+            // fall-speed proof). Launch frames are NOT excluded: _smsNoLandFrames guards FLOOR contact with the ground he
+            // just left, and a wall contact is a wall contact. A dive or roll from the foot of a staircase meets the
+            // first riser within a frame, and the game lands it on the step (logForLarry.txt: re-dive from the slide,
+            // `dive at fwd 48.1` one frame after the launch).
+            if (!SmsStateSteers(preMoveState) || preMoveState == MarioState.ledgeHopUp)
                 return;
         }
         Vector3 want = new Vector3(preMoveVel.X, 0f, preMoveVel.Z) * (float)delta * (fromGround ? _smsGroundStepScale : 1f); // what MoveAndSlide was asked to do
@@ -10577,6 +10580,8 @@ public partial class Mario : CharacterBody3D
         velocity.Z = preMoveVel.Z;
         velocity.Y = 0f;
         _smsSteppedUp = true;
+        if (!fromGround)
+            _smsNoLandFrames = 0; // he is standing on the step: the landing rule takes it this frame (JUMP_END / belly slide), as checkGroundAtJumping does
         if (SmsDebugPrint)
             GD.Print($"[SMS step] {where} {preMoveState}: up {rise:F2} m ({SmsUnits.MetresToUnits(rise):F0} units) onto {hit.GetType().Name} '{(hit as Node)?.Name}', remaining {remaining.Length():F3} m, speed kept {new Vector2(velocity.X, velocity.Z).Length():F1} m/s");
     }

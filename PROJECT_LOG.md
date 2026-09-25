@@ -1607,9 +1607,22 @@ because wall planes are only tested at feet + 30 and feet + 60 and a lower riser
   the plaza stairs). It is now the third case of the same probe.
 - Air step-up: `checkGroundAtJumping` uses the same feet + 30 lookup and only tests walls at feet + 30 / + 150, so a
   jump or dive that meets a riser lower than 30 units lands ON the step. `SmsTryStepUp` therefore also runs for
-  launched air states (`SmsStateSteers`, not on the 3 launch frames, not from `ledgeFall`); a success is a landing
+  launched air states (`SmsStateSteers`, not from `ledgeFall`), **including the launch frames**: `_smsNoLandFrames`
+  guards floor contact with the ground just left, not wall contact, and a dive or roll from the foot of a staircase
+  meets the first riser within one frame (`logForLarry.txt`: re-dive from the slide, `dive at fwd 48.1` a frame
+  later). A step taken from the air zeroes `_smsNoLandFrames` so the landing fires the same frame; a success is a landing
   (`_smsSteppedUp` skips `TryEnterDiveBonkAfterMove` and `PostMoveWallCheck` that frame, the landing rule does the
   rest: dive → belly slide, jump → `JUMP_END`). Risers taller than 0.40 m relative to the feet are walls, as in the game.
+
+### ⚠️ Gotcha: a wide flat-bottomed body climbs narrow stairs as a ramp
+
+`logForLarry.txt`: `ground bellySlidingFromDive: up 0.35 m (26 units)` eleven frames running, `posY` −13.41 → −9.56.
+Those plaza stairs have 26-unit risers and treads shorter than the 0.37 m body radius, so the cylinder's front edge
+is against the next riser every frame and it rises one riser per frame at slide speed: 3.85 m in 0.18 s. That is
+the geometry, not a bug — a body this wide can only stand at the height of the highest tread under its footprint,
+so a staircase steeper than its own diameter allows is a ~58° ramp to it. The game's point-Mario climbs the same
+geometry the same way (one riser per tread crossed). If a particular staircase feels like a launch, the fix is the
+collision mesh (a ramp under the visual steps, as Nintendo did for many SMS stairs), not the physics.
 
 ### ⚠️ Gotcha: a long floor snap is also a long downhill redirect
 
