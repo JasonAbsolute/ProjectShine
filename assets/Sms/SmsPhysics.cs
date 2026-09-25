@@ -371,13 +371,18 @@ public static class SmsSlide
     /// the slide has stopped (|fwd| below SlideStopCatch).
     /// </summary>
     public static bool Tick(ref float fwd, float intendedMag, float stickVsSlideCos)
+        => Tick(ref fwd, intendedMag, stickVsSlideCos, SmsSlope.Normal, false);
+
+    /// <summary>Same, with the surface's slipparam set (friction, SlideStopCatch) and doSliding()'s never-stop rule for
+    /// isUnk1 / isSlider ground.</summary>
+    public static bool Tick(ref float fwd, float intendedMag, float stickVsSlideCos, SmsSlope.Params p, bool neverStops)
     {
         float cs = stickVsSlideCos;
         if (cs < 0f && fwd >= 0f)
             cs *= 0.01f * (0.5f * fwd) + 0.5f;
-        float mult = 0.02f * (intendedMag * 0.03125f * cs) + SmsParams.SlipNormal.SlipFriction;
+        float mult = 0.02f * (intendedMag * 0.03125f * cs) + p.SlipFriction;
         fwd *= mult;
-        if (fwd * fwd < SmsParams.SlipNormal.SlideStopCatch * SmsParams.SlipNormal.SlideStopCatch)
+        if (!neverStops && fwd * fwd < p.SlideStop * p.SlideStop)
         {
             fwd = 0f;
             return true;

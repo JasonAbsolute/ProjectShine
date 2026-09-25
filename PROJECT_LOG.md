@@ -1554,7 +1554,7 @@ in the game. Plain running (cap 32) can never bonk; if a knockdown looks wrong, 
 ### Slopes (`SmsSlope`, `walkProcess` / `slopeProcess`)
 
 - Shipped `slipparamnormal` has **SlopeAccele 0 / 0**: running speed is not changed by slopes at all. Only special
-  surfaces accelerate (sandy "45" slopes 1.0 / 0.022, force-slip goop 4.5 / 2.0, slider courses) — not mapped yet.
+  surfaces accelerate (sandy "45" slopes 1.0 / 0.022, force-slip goop 4.5 / 2.0, slider courses) — see Surface types.
 - `walkProcess` (`MarioPhysics.cpp:214`) steps horizontally by `vel/4 × normal.y` then snaps to the floor: speed
   **along the surface** is always `fwd`, horizontal speed is `fwd·cos(slope)` in every direction, across a hill too.
 - Godot with `floor_constant_speed = true` (verified in `character_body_3d.cpp`
@@ -1563,6 +1563,43 @@ in the game. Plain running (cap 32) can never bonk; if a knockdown looks wrong, 
   `SmsSlope.GroundStepScale = sqrt(ny² + (n_h·dir)²)` (1 along the gradient, ny across) scales the horizontal velocity
   length before the move and un-scales it after.
 - `SlipStart 0.4` (66°) is the game's standable limit; his slip system is left as is.
+
+### Surface types (`SmsSlope.Surface`, `isSlipStart` / `doSliding` / `slideProcess`)
+
+The game classes every collision triangle (`TBGCheckData`), and the class picks one of the `slipparam*.prm` sets. In
+Godot the class lives on the collision body: metadata **`sms_surface`** (a String) on the `StaticBody3D` or a parent up
+to three levels up, or a node group **`sms_<class>`**. Untagged geometry is `normal`, so nothing changes until a body is
+tagged. A tag applies to the whole body: to make one slope a slider, give it its own `StaticBody3D`.
+
+| Tag | Game class | Slips when | Params (`slipparam*.prm`) |
+|---|---|---|---|
+| `normal` (default) | plain ground | floor steeper than `SlipStart 0.4` (66°) | friction 0.97, slide accel 0 / 1.5, stop 1, stick 0.005, yaw 100 |
+| `45` | `isUnk2` (sandy / steep "45" slopes) | steeper than 30° | friction 0.93, **run slope accel 1.0 / 0.022** (running downhill speeds up), slide accel 0 / 0, stop 0 |
+| `slider` | `isSlider` (the slide courses) | always, never stops | friction 0.975, slide accel 4.5 / 2, stop 3, stick 0.025, yaw 512 |
+| `forceslip` | `isUnk1` / goop | always, never stops, **no jump out** | friction 0.95, run slope accel 4.5 / 2, slide accel 4 / 5 |
+| `wet` | `isWetGround` | as normal (66°) | flat (n.y > 0.99): friction 0.985, slide accel 5 / 2, stop 5 · sloped: friction 0.98, stick 0.1 |
+| `noslip` | `isUnk3` | never | normal |
+
+What the class changes, all in `Mario.cs` (`SmsUpdateSurface` after the move, `SmsSurfaceSlipFrame` at the top of the
+grounded branch):
+
+- **Running** (`slopeProcess`): the run slope term uses the surface's `SlopeAccele`. Normal ground stays 0 / 0.
+- **Belly slide** (`doSliding`): the surface's friction and stop speed; on a slider or force slip it never stops on its own.
+- **The floor slip** (`SLIP_FORE` / `SLIP_BACK`), the game's standing slide, which the port did not have: when `isSlipStart`
+  says the floor slips (by class and angle), standing, landing, squatting and wall-pushing enter it at once; running
+  enters it only when (nearly) stopped or facing within 90° of downhill (`isRunningSlipStart`), so you can run up a slider
+  while you face up it. It starts with his ground velocity; facing downhill is `ma_slip`, facing uphill `ma_slpbk`
+  (slides backwards). Each tick (`doSliding` + `slideProcess`): the stick adds `0.02·(mag/32)·cos` to the friction
+  multiplier (pulling against the slide brakes it) and rotates the slide toward the stick by `sin·(mag/32)·StickSlideMult`;
+  the slope adds `(facing downhill ? SlideAccelUp : SlideAccelDown)·sin(slope)` along downhill; friction multiplies; the
+  face turns toward the slide direction at `SlideAngleYSp·fwd/32` BAM per tick; speed caps at 100. It ends when the speed
+  drops under `SlideStop` (never on a slider / force slip) — he stands — or by A after 20 ticks (facing downhill, if the
+  class allows the jump), B (dive, vy 20), running out of floor (a plain fall), or a wall: still slipping, the slide bounces
+  off it at ×0.9 (at least 4); on a floor that stopped slipping, above 16 it is the knockdown, below it a stop.
+- Debug lines: `[SMS surface] <class> ('<node>', tag '<tag>')` on change, `[SMS slip] start / end / into a wall`.
+
+The legacy steep-band slide (`CanStartSlip` / `TickSlip`: 68°–75° contact that Godot does not call a floor, since
+`floor_max_angle` is 68°) is unchanged; the two never overlap (`_smsSurfaceSlip`).
 
 ### ⚠️ Gotcha: never hand `MoveAndSlide` an upward velocity while grounded
 
@@ -1676,7 +1713,8 @@ ground has to carry upward velocity (launches do) or exceed 1.34 m.
 
 ### Not ported (next)
 
-- `LAND_SAFE_DOWN` (the no-wall-plane stumble), the skid-into-wall bonk (`braking()` case 2).
-- Surface types (45 / goop / slider) need a material → `SmsSlope.Surface` map.
-- SMS slip states (`SLIP_FORE/BACK` use `doSliding` on the same 0 / 1.5 params — facing-downhill slips on normal
-  ground have no acceleration in the game).
+- Not mechanics after all: `LAND_SAFE_DOWN` is only reached from invalid ground data (out-of-bounds recovery); the
+  skid-into-wall knockdown lives in `braking()`, entered only by releasing the stick during a U-turn skid, and needs
+  the wall inside the 4-tick window above 16 — skipped; the "ground wall kick" in `running()` is dead code (A is
+  consumed as a jump first).
+- Surface types and the floor slip: done, see Surface types. Tagging the plaza's surfaces is editor work.

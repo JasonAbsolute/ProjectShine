@@ -2467,6 +2467,11 @@ public partial class Mario : CharacterBody3D
 
         if (IsOnFloor() && !rollingUpwardOffGround) //This is the main logic loop for Player being on the ground
         {
+            // SMS surface slip: isSlipStart() on a floor Godot lets him stand on (a slider, a "45" surface past 30 deg,
+            // wet ground, force slip). The game's SLIP_FORE / SLIP_BACK owns the frame while it runs.
+            if (UseSmsPhysics && SmsSurfaceSlipFrame(delta))
+                goto EndFrame;
+
             // === GROUNDED SPIN ===
             // Already grounded-spinning: keep spinning in place, damp motion,
             // and allow a spin-jump (A) in any direction at any time.
@@ -3494,6 +3499,14 @@ public partial class Mario : CharacterBody3D
                 goto EndFrame;
             }
 
+            if (stateOfMario == MarioState.slipping && _smsSurfaceSlip)
+            {
+                // slippingBasic() walkProcess() 0 -> SLIP_FALL: the floor slip ran out of floor, he falls as he is
+                SmsExitSurfaceSlip("left the floor");
+                stateOfMario = MarioState.ledgeFall;
+                SetMarioState(stateOfMario);
+            }
+
             // --- SLIP (steep ground too shallow to be a real wall) ---
             if (CanStartSlip())
             {
@@ -3893,7 +3906,7 @@ public partial class Mario : CharacterBody3D
         // floor" (vel_dir_facing_up) and skips both the floor snap and the constant-speed redirect, so every uphill lip
         // and every steeper-to-shallower triangle launched him. SMS keeps mVel.y = 0 on the ground and so do we.
         _smsGroundMoved = UseSmsPhysics && IsOnFloor() && !inAirState && velocity.Y <= 0.01f
-            && stateOfMario != MarioState.slipping && stateOfMario != MarioState.wallSlide;
+            && (stateOfMario != MarioState.slipping || _smsSurfaceSlip) && stateOfMario != MarioState.wallSlide;
         if (_smsGroundMoved)
         {
             Vector3 hv = new Vector3(velocity.X, 0f, velocity.Z);
@@ -3988,7 +4001,7 @@ public partial class Mario : CharacterBody3D
             }
         }
 
-        if (stateOfMario == MarioState.slipping)
+        if (stateOfMario == MarioState.slipping && !_smsSurfaceSlip)
         {
             if (IsOnFloor())
             {
@@ -6179,9 +6192,320 @@ public partial class Mario : CharacterBody3D
         return Mathf.RadToDeg(n.AngleTo(Vector3.Up)) < WALL_TRUE_VERTICAL_MIN_ANGLE_DEG;
     }
 
+    // =====================================================================================
+    //  SMS SURFACE TYPES  (TBGCheckData ground classes -> slipparam*.prm sets, see SmsSlope.Surface)
+    //  The collider under his feet declares its class with metadata "sms_surface" (a String) on the collision body or on
+    //  a parent up to three levels up, or with a node group "sms_<class>". Classes: normal (the default, so untagged
+    //  geometry is unchanged) | slider | 45 | forceslip | wet | noslip.
+    // =====================================================================================
+    private SmsSlope.Surface _smsSurface = SmsSlope.Surface.Normal;
+    private bool _smsSurfaceNoSlip = false;     // isUnk3(): never slips, whatever the angle
+    private string _smsSurfaceNode = "";
+    private string _smsSurfaceTag = "normal";
+    private bool _smsSurfaceSlip = false;       // the slipping state is the game's floor slip (SLIP_FORE / SLIP_BACK), not the legacy steep-band slide
+    private Vector3 _smsSlipVel = Vector3.Zero; // mSlideVelX / mSlideVelZ, units per frame
+    private int _smsSlipTicks = 0;              // mStatusTimer of the slip (the A exit opens after 20)
+
+    private static string SmsSurfaceTagOf(Node start)
+    {
+        Node n = start;
+        for (int depth = 0; n != null && depth < 3; depth++, n = n.GetParent())
+        {
+            if (n.HasMeta("sms_surface"))
+                return n.GetMeta("sms_surface").AsString();
+            foreach (StringName g in n.GetGroups())
+            {
+                string gs = g.ToString();
+                if (gs.StartsWith("sms_"))
+                    return gs.Substring(4);
+            }
+        }
+        return "normal";
+    }
+
+    /// <summary>After the move: which ground class he is standing on. Runs every frame on the floor.</summary>
+    private void SmsUpdateSurface()
+    {
+        if (!IsOnFloor())
+            return;
+        Node hit = null;
+        float cosMax = MathF.Cos(FloorMaxAngle);
+        for (int i = 0; i < GetSlideCollisionCount(); i++)
+        {
+            KinematicCollision3D c = GetSlideCollision(i);
+            if (c.GetNormal().Y >= cosMax - 1e-3f)
+            {
+                hit = c.GetCollider() as Node;
+                if (hit != null)
+                    break;
+            }
+        }
+        if (hit == null)
+            return; // held by the floor snap alone this frame: keep the last known surface
+        string tag = SmsSurfaceTagOf(hit).Trim().ToLowerInvariant();
+        SmsSlope.Surface s = SmsSlope.Surface.Normal;
+        bool noSlip = false;
+        switch (tag)
+        {
+            case "slider": s = SmsSlope.Surface.Slider; break;
+            case "45": case "fortyfive": case "slip45": s = SmsSlope.Surface.FortyFive; break;
+            case "forceslip": case "goop": case "all": s = SmsSlope.Surface.ForceSlip; break;
+            case "wet": case "water": case "waterground": case "waterslope":
+                // isWetGround(): the flat set when n.y > 0.99, the slope set otherwise (re-picked every frame)
+                s = GetFloorNormal().Y > 0.99f ? SmsSlope.Surface.WaterGround : SmsSlope.Surface.WaterSlope;
+                break;
+            case "noslip": noSlip = true; break;
+            default: break;
+        }
+        if (SmsDebugPrint && (s != _smsSurface || noSlip != _smsSurfaceNoSlip))
+            GD.Print($"[SMS surface] {(noSlip ? "noslip" : s.ToString())} ('{hit.Name}', tag '{tag}')");
+        _smsSurface = s;
+        _smsSurfaceNoSlip = noSlip;
+        _smsSurfaceNode = hit.Name;
+        _smsSurfaceTag = tag;
+    }
+
+    private bool SmsSurfaceSlipStarts(Vector3 floorN) => !_smsSurfaceNoSlip && SmsSlope.SlipStarts(floorN, _smsSurface);
+
+    /// <summary>
+    /// isSlipStart() on a floor Godot lets him stand on (a slider, a "45" surface steeper than 30 deg, wet ground...). Runs the
+    /// game's SLIP_FORE / SLIP_BACK (slipForeCommon / slipBackCommon -> doSliding + slideProcess + slippingBasic) and owns the
+    /// frame while it does. Returns false when the floor is not slippery and he is not in that slip.
+    /// </summary>
+    private bool SmsSurfaceSlipFrame(double delta)
+    {
+        Vector3 floorN = GetFloorNormal();
+        bool slipStart = SmsSurfaceSlipStarts(floorN);
+        if (!(stateOfMario == MarioState.slipping && _smsSurfaceSlip))
+        {
+            if (!slipStart || !SmsSurfaceSlipCanStart(floorN))
+                return false;
+            SmsEnterSurfaceSlip(floorN);
+        }
+        SmsSurfaceSlipTick(delta, floorN, slipStart);
+        return true;
+    }
+
+    private bool SmsSurfaceSlipCanStart(Vector3 floorN)
+    {
+        switch (stateOfMario)
+        {
+            case MarioState.idle:
+            case MarioState.pivot:
+            case MarioState.sneak:
+            case MarioState.crouch:
+            case MarioState.landing:
+            case MarioState.singleJumpLanding:
+            case MarioState.doubleJumpLanding:
+            case MarioState.tripleJumpLanding:
+            case MarioState.wallPush:
+            case MarioState.wallShuffle:
+                return true; // checkAllMotions() / jumpSlipCommon() / squatSlipping(): the slip starts as soon as the floor says so
+            case MarioState.walking:
+            case MarioState.running:
+            case MarioState.sprinting:
+            case MarioState.rolloutRun:
+            {
+                // isRunningSlipStart(): from a run only when (nearly) stopped or facing within 90 deg of downhill (isFrontSlip).
+                // Facing uphill he keeps running -- on a slider the slope term is 0 / 0, so he can run up it while he faces up.
+                Vector3 v = new Vector3(velocity.X, 0f, velocity.Z);
+                if (SmsUnits.MpsToSpeed(v.Length()) <= 0.1f)
+                    return true;
+                Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : new Vector3(lastFacingDirection.X, 0f, lastFacingDirection.Z);
+                return SmsSlope.FacingDownhill(floorN, face);
+            }
+            default:
+                return false; // slides, dives, rolls, ledges, trees, carrying, knockdowns, ground pounds keep their own handlers
+        }
+    }
+
+    private void SmsEnterSurfaceSlip(Vector3 floorN)
+    {
+        isSpining(false);
+        isJumping = false;
+        Vector3 v = new Vector3(velocity.X, 0f, velocity.Z);
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw)
+            : (v.Length() > 0.5f ? v.Normalized() : new Vector3(lastFacingDirection.X, 0f, lastFacingDirection.Z));
+        if (face.LengthSquared() < 1e-6f)
+            face = Vector3.Forward;
+        face = face.Normalized();
+        SmsLatchFace(face, 1);
+        // setStatusToRunning(SLIP): the slide starts with his ground velocity (mSlideVel tracks mVel); FORE when facing within
+        // 90 deg of downhill, BACK otherwise (he slides backwards and keeps facing uphill: ma_slpbk)
+        _smsSlipVel = new Vector3(SmsUnits.MpsToSpeed(v.X), 0f, SmsUnits.MpsToSpeed(v.Z));
+        _smsSlipTicks = 0;
+        _smsSurfaceSlip = true;
+        _slipFacingUphill = SmsSlope.SlopeMag(floorN) > 1e-4f && !SmsSlope.FacingDownhill(floorN, face);
+        slipLostSurfaceFrames = 0;
+        lastFacingDirection = face;
+        armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
+        stateOfMario = MarioState.slipping;
+        SetMarioState(MarioState.slipping); // ma_slip / ma_slpbk by _slipFacingUphill
+        if (velocity.Y > 0f)
+            velocity.Y = 0f;
+        if (SmsDebugPrint)
+            GD.Print($"[SMS slip] start on {_smsSurface} ('{_smsSurfaceNode}'), floor {Mathf.RadToDeg(floorN.AngleTo(Vector3.Up)):F0} deg, {(_slipFacingUphill ? "SLIP_BACK" : "SLIP_FORE")} at fwd {SmsUnits.MpsToSpeed(v.Length()):F1}");
+    }
+
+    private void SmsExitSurfaceSlip(string why)
+    {
+        _smsSurfaceSlip = false;
+        if (SmsDebugPrint)
+            GD.Print($"[SMS slip] end: {why} (fwd {_smsSlipVel.Length():F1}, {_smsSlipTicks} ticks)");
+    }
+
+    private void SmsSurfaceSlipTick(double delta, Vector3 floorN, bool slipStart)
+    {
+        int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
+        SmsSlope.Params p = SmsSlope.For(_smsSurface);
+        bool neverStops = SmsSlope.NeverStops(_smsSurface);
+        Vector3 downhill = SmsSlope.Downhill(floorN);
+        float sinSlope = SmsSlope.SlopeMag(floorN);
+        Vector3 v = _smsSlipVel;
+        float faceYaw = _smsFaceYaw;
+        bool stick = direction.LengthSquared() > 1e-6f && _smsIntendedMag > 0f;
+        float stickYaw = stick ? SmsMath.YawFromDir(direction.Normalized()) : 0f;
+        float mag = stick ? _smsIntendedMag : 0f;
+
+        // slippingBasic(): B -> JUMP_CATCH with mVel.y = 20, at any time
+        if (Input.IsActionJustPressed("button_b"))
+        {
+            Vector3 dir = v.LengthSquared() > 1e-6f ? v.Normalized() : SmsMath.DirFromYaw(faceYaw);
+            velocity.X = SmsUnits.SpeedToMps(v.X);
+            velocity.Z = SmsUnits.SpeedToMps(v.Z);
+            SmsExitSurfaceSlip("B: dive");
+            stateOfMario = MarioState.diving;
+            SetMarioState(stateOfMario);
+            SmsSetDiveVelocity(dir, fromGround: true); // fwd = min(15 + fwd, 48), vy 20
+            return;
+        }
+        // slipForeCommon(): after 20 ticks, A jumps out when the surface's canSlipJump (JumpEnable) allows it. slipBackCommon():
+        // facing uphill, A does nothing while the floor still slips.
+        if (_smsSlipTicks > 20 && p.JumpEnable && !_slipFacingUphill
+            && (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space")))
+        {
+            velocity.X = SmsUnits.SpeedToMps(v.X);
+            velocity.Z = SmsUnits.SpeedToMps(v.Z);
+            SmsExitSurfaceSlip("A: jump");
+            jumpChainStage = 0;
+            jumpChainTimer = 0;
+            isJumping = true;
+            stateOfMario = MarioState.singleJump;
+            SmsLaunch(SmsAir.Launch.Jump);
+            SetMarioState(stateOfMario);
+            return;
+        }
+
+        bool stopped = false;
+        for (int i = 0; i < n && !stopped; i++)
+        {
+            if (_smsSlipTicks <= 20)
+                _smsSlipTicks++;
+            float fwd = v.Length();
+            float slideYaw = fwd > 1e-4f ? SmsMath.YawFromDir(v / fwd) : faceYaw;
+            // doSliding(): the stick's pull on the slide (friction term and a rotation toward the stick, magnitude kept)
+            float cs = 0f, sn = 0f, d = 0f;
+            if (stick)
+            {
+                d = SmsMath.WrapAngle(stickYaw - slideYaw);
+                cs = MathF.Cos(d);
+                sn = MathF.Sin(d);
+                if (cs < 0f)
+                    cs *= 0.01f * (0.5f * fwd) + 0.5f;
+            }
+            float mult = 0.02f * (mag * 0.03125f * cs) + p.SlipFriction;
+            if (stick && fwd > 1e-4f && p.StickSlideMult > 0f)
+            {
+                slideYaw += MathF.Sign(d) * MathF.Abs(sn) * (mag * 0.03125f) * p.StickSlideMult;
+                v = SmsMath.DirFromYaw(slideYaw) * fwd;
+            }
+            // slideProcess(0, mult): the slope pulls along downhill by which way he FACES, then friction
+            float acc = (SmsSlope.FacingDownhill(floorN, SmsMath.DirFromYaw(faceYaw)) ? p.SlideAccelUp : p.SlideAccelDown) * sinSlope;
+            v += downhill * acc;
+            v *= mult;
+            fwd = v.Length();
+            if (fwd > 1e-4f)
+            {
+                slideYaw = SmsMath.YawFromDir(v / fwd);
+                // the face turns toward the slide direction (or, when more than 90 deg from it, settles on facing straight
+                // away from it) at SlideAngleYSp * fwd / 32 BAM per tick
+                float angSp = 0.03125f * (p.SlideAngleYSp * fwd) * SmsUnits.BamToRad;
+                float turn = SmsMath.WrapAngle(faceYaw - slideYaw);
+                float target = MathF.Abs(turn) <= MathF.PI * 0.5f ? 0f : (turn > 0f ? MathF.PI : -MathF.PI);
+                turn = SmsMath.Converge(turn, target, angSp);
+                faceYaw = SmsMath.WrapAngle(slideYaw + turn);
+            }
+            if (fwd > 100f)
+            {
+                v *= 100f / fwd;
+                fwd = 100f;
+            }
+            if (!neverStops && fwd * fwd < p.SlideStop * p.SlideStop)
+            {
+                v = Vector3.Zero;
+                stopped = true;
+            }
+        }
+
+        // slippingBasic() case 2: a wall while the floor still slips bounces the slide off it (x0.9, at least 4); on a floor
+        // that no longer slips, above 16 it is the CATCH_DOWN knockdown, below it he just stops
+        if (!stopped && IsOnWall())
+        {
+            Vector3 wn = GetWallNormal();
+            wn.Y = 0f;
+            float fwdNow = v.Length();
+            if (wn.LengthSquared() > 1e-6f && fwdNow > 1e-4f)
+            {
+                wn = wn.Normalized();
+                Vector3 dir = v / fwdNow;
+                if (dir.Dot(-wn) > 0.5f)
+                {
+                    if (slipStart)
+                    {
+                        float m = MathF.Max(fwdNow * 0.9f, 4f);
+                        v = dir.Bounce(wn) * m;
+                        if (SmsDebugPrint)
+                            GD.Print($"[SMS slip] into a wall: bounced, {m:F1}");
+                    }
+                    else if (fwdNow > SmsSlideKnockdownMinFwd)
+                    {
+                        _smsSlipVel = v;
+                        SmsExitSurfaceSlip("wall knockdown");
+                        SmsEnterBonk(dir.Bounce(wn), 0f, "slip into a wall", fwdNow);
+                        return;
+                    }
+                    else
+                    {
+                        v = Vector3.Zero;
+                        stopped = true;
+                    }
+                }
+            }
+        }
+
+        _smsSlipVel = v;
+        _smsFaceYaw = faceYaw;
+        _smsFaceValid = true;
+        _smsFaceSource = 1;
+        Vector3 faceDir = SmsMath.DirFromYaw(faceYaw);
+        lastFacingDirection = faceDir;
+        armature.Rotation = new Vector3(0f, YawFromDir(faceDir), 0f);
+        velocity.X = SmsUnits.SpeedToMps(v.X);
+        velocity.Z = SmsUnits.SpeedToMps(v.Z);
+        velocity.Y = Mathf.Min(velocity.Y, 0f); // mVel.y = 0 on the ground; the floor snap keeps him on the slope
+        if (stopped)
+        {
+            // doSliding() under SlideStopNormal (never on a slider / force slip): setPlayerVelocity(0), SLIP_END, he stands
+            SmsExitSurfaceSlip("stopped");
+            stateOfMario = MarioState.idle;
+            SetMarioState(stateOfMario);
+        }
+    }
+
     private void EnterSlip(Vector3 incomingVel)
     {
         isSpining(false);
+        _smsSurfaceSlip = false; // this is the legacy steep-band slide, not the game's floor slip
 
         stateOfMario = MarioState.slipping;
         slipLostSurfaceFrames = 0;
@@ -10777,7 +11101,7 @@ public partial class Mario : CharacterBody3D
             }
             // slopeProcess(): slope accel by surface type (0/0 on normal ground, so slopes do not change running speed)
             // and the RunningMax clamp. The step itself is scaled by normal.y in the EndFrame block (walkProcess()).
-            fwd = SmsSlope.RunSlopeTick(fwd, floorN, SmsMath.DirFromYaw(_smsFaceYaw));
+            fwd = SmsSlope.RunSlopeTick(fwd, floorN, SmsMath.DirFromYaw(_smsFaceYaw), _smsSurface);
         }
         faceDir = SmsMath.DirFromYaw(_smsFaceYaw);
         float mps = SmsUnits.SpeedToMps(fwd);
@@ -10880,11 +11204,13 @@ public partial class Mario : CharacterBody3D
         // nothing when sliding downhill (friction only, no gravity assist), 1.5 * sin(slope) per tick against him when
         // sliding uphill, so he loses it and gets up near the top.
         Vector3 slideFloorN = IsOnFloor() ? GetFloorNormal() : Vector3.Up;
-        float slopeDv = SmsSlope.SlideSlopeDeltaFwd(slideFloorN, slideDir);
+        float slopeDv = SmsSlope.SlideSlopeDeltaFwd(slideFloorN, slideDir, _smsSurface);
+        SmsSlope.Params slipP = SmsSlope.For(_smsSurface);
+        bool neverStops = SmsSlope.NeverStops(_smsSurface);
         for (int i = 0; i < n; i++)
         {
             fwd += slopeDv;
-            if (SmsSlide.Tick(ref fwd, _smsIntendedMag, cs))
+            if (SmsSlide.Tick(ref fwd, _smsIntendedMag, cs, slipP, neverStops))
                 break;
         }
         float mps = SmsUnits.SpeedToMps(fwd);
@@ -10895,6 +11221,7 @@ public partial class Mario : CharacterBody3D
     /// <summary>After MoveAndSlide: keep the post-gravity vertical speed unless the world changed it.</summary>
     private void SmsAfterMove()
     {
+        SmsUpdateSurface();
         if (_smsNoLandFrames > 0)
             _smsNoLandFrames--;
         if (SmsDebugPrint && _smsDbgAirborne && IsOnFloor())

@@ -56,6 +56,9 @@ public static class SmsSlope
         _ => Normal,
     };
 
+    /// <summary>doSliding(): on isUnk1 (force slip) and isSlider ground the slide never stops on its own, however slow.</summary>
+    public static bool NeverStops(Surface s) => s == Surface.ForceSlip || s == Surface.Slider;
+
     /// <summary>mDeParams.mRunningMax (mario.prm): the clamp slopeProcess applies after adding slope accel.</summary>
     public const float RunningMax = 80f;
 
