@@ -211,6 +211,38 @@ public sealed class SmsHipDrop
         => hangTick < SmsParams.Timing.HipDropLiftTicks ? (SmsParams.Timing.HipDropLiftTicks - hangTick) * 0.5f : 0f;
 }
 
+/// <summary>
+/// checkGroundAtWalking() (MarioPhysics.cpp): ground contact limits while walking. The floor under the next position is
+/// looked up from feet + 30 units: up to 100 units below Mario is set onto it (ledges are stepped DOWN instantly), further
+/// than that he falls; a floor up to 30 units ABOVE the feet is found by the same lookup and stepped onto, because wall
+/// planes are only tested at feet + 30 and feet + 60 and a lower riser is not a wall.
+/// </summary>
+public static class SmsGroundContact
+{
+    public const float LedgeDropUnits = 100f;    // v.y > floorY + 100 -> fall (return 0); else mPosition.y = floorY
+    public const float StepUpUnits = 30f;        // checkGroundPlane(v.x, v.y + 30, v.z): a floor this far up is ground
+    public const float WallCheckLowUnits = 30f;  // checkWallPlane(v, 30, r/2)
+    public const float WallCheckHighUnits = 60f; // checkWallPlane(v, 60, r)
+
+    /// <summary>Godot floor_snap_length for the ledge-down rule: 1.343 m at this scale (Player.tscn shipped 0.6).</summary>
+    public static float LedgeDropMetres => SmsUnits.UnitsToMetres(LedgeDropUnits);
+    /// <summary>Highest riser walked up without breaking stride: 0.403 m.</summary>
+    public static float StepUpMetres => SmsUnits.UnitsToMetres(StepUpUnits);
+
+    /// <summary>
+    /// A downward probe that came to rest <paramref name="rise"/> metres above the feet on a surface whose normal has
+    /// <paramref name="normalY"/> is a step to take: a real rise, no taller than the step limit, and floor-angled (the
+    /// riser itself, or a wall-steep slope, has a nearly horizontal normal and is rejected).
+    /// </summary>
+    public static bool IsStep(float rise, float normalY, float floorMaxAngleRad)
+    {
+        if (rise <= 0.01f || rise > StepUpMetres)
+            return false;
+        float ang = MathF.Acos(Math.Clamp(normalY, -1f, 1f));
+        return ang <= floorMaxAngleRad;
+    }
+}
+
 public static class SmsSlopeSelfTest
 {
     public static bool Run()
@@ -262,6 +294,18 @@ public static class SmsSlopeSelfTest
             Check("fall speed m/s", SmsUnits.SpeedToMps(-80f), -32.24f, 0.05f);
             for (int i = 0; i < 80; i++) gp.Step(false, out vy, out _);
             Check("super after 80 falling ticks", gp.IsSuper ? 1f : 0f, 1f, 0f);
+        }
+        // Ground contact (checkGroundAtWalking): ledge-down 100 units, step-up 30 units.
+        Check("ledge drop metres", SmsGroundContact.LedgeDropMetres, 1.343f, 0.002f);
+        Check("step up metres", SmsGroundContact.StepUpMetres, 0.403f, 0.002f);
+        {
+            float fma = Mathf.DegToRad(68f);
+            Check("step 0.30 m on flat is a step", SmsGroundContact.IsStep(0.30f, 1f, fma) ? 1f : 0f, 1f, 0f);
+            Check("step 0.40 m on flat is a step", SmsGroundContact.IsStep(0.40f, 1f, fma) ? 1f : 0f, 1f, 0f);
+            Check("step 0.45 m is too tall", SmsGroundContact.IsStep(0.45f, 1f, fma) ? 1f : 0f, 0f, 0f);
+            Check("riser face (n.y 0.1) is not a step", SmsGroundContact.IsStep(0.30f, 0.1f, fma) ? 1f : 0f, 0f, 0f);
+            Check("no rise is not a step", SmsGroundContact.IsStep(0.0f, 1f, fma) ? 1f : 0f, 0f, 0f);
+            Check("30 deg step top is a step", SmsGroundContact.IsStep(0.30f, 0.866f, fma) ? 1f : 0f, 1f, 0f);
         }
         GD.Print(ok ? "[SMS selftest] slope/hipdrop ALL OK" : "[SMS selftest] slope/hipdrop FAILURES");
         return ok;

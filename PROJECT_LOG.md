@@ -1327,6 +1327,8 @@ equations come from. Everything sits behind one toggle so the old feel is one cl
 | `SmsDebugPrint` | `false` | Prints launches, slide decisions, jump apexes, bonks and ground pounds to Output. Turn on in the inspector while tuning. |
 | `SmsRollJumpMinSpeed` | `20` | `catching()`: slide speed above which A is the big roll-jump. **Game value is 40**; 20 chosen by feel — a deliberate deviation. |
 | `KeepGroundPoundJump` | `false` | Restores the GP-jump (see Ground Pound section above). Off because Sunshine has no such move. |
+| `SmsLedgeSnap` | `true` | Step DOWN ledges up to 100 units (1.34 m) without leaving the ground: sets `floor_snap_length` to 1.343 m (Player.tscn ships 0.6). |
+| `SmsStepUp` | `true` | Step UP risers up to 30 units (0.40 m) without breaking stride (`SmsTryStepUp`, after MoveAndSlide). |
 
 On Play, Output must show `[SMS selftest] ALL OK` and `[SMS selftest] slope/hipdrop ALL OK`. Anything else means a
 constant or equation was edited into an inconsistent state — fix before playtesting.
@@ -1553,10 +1555,33 @@ landing, `[SMS slide] A at fwd … -> CatchStop/RollJump …` on every slide pre
 - `KeepGroundPoundJump` toggle (off) keeps the non-Sunshine GP-jump available.
 - The slip system, collision model (`MoveAndSlide`, cylinder) and animation timings are still ours.
 
+### Ground contact (`SmsGroundContact`, `checkGroundAtWalking`)
+
+`walkProcess` steps horizontally, then `checkGroundAtWalking` looks the floor up from **feet + 30 units**: if it is
+more than 100 units below, Mario falls; otherwise his y is *set* to it. So ledges up to 100 units (1.34 m) are
+stepped down instantly with no fall state, and a floor up to 30 units (0.40 m) *above* the feet is stepped onto,
+because wall planes are only tested at feet + 30 and feet + 60 and a lower riser is not a wall to the game.
+
+- Ledge-down: Godot's `floor_snap_length` is the same mechanism, so SMS mode sets it to 1.343 m every frame
+  (`SmsLedgeSnap`); the launch-frame override to 0 stays. Expect no `ledgeFall` on curbs, stairs and dock edges.
+- Step-up: the cylinder is stopped by any riser. `SmsTryStepUp` runs after a grounded `MoveAndSlide` that reported a
+  wall: it takes the blocked remainder of the requested horizontal motion, probes with `TestMove` from `remainder +
+  2 × 0.40 m` straight down, and if the body comes to rest 0.01–0.40 m above the feet on a floor-angled surface
+  (`SmsGroundContact.IsStep`, normal within `floor_max_angle`) belonging to a `StaticBody3D` / `AnimatableBody3D` /
+  `CsgShape3D`, it moves him there, `ApplyFloorSnap()`s, restores the horizontal speed the riser clipped, and sets
+  `_smsSteppedUp` so `CheckGroundWallEntry` and `SmsGroundWallBonk` skip that frame (the wall was the step).
+  Allowed from the locomotion states only (`SmsStepUpAllowed`): no stepping while belly sliding, bonked, slipping,
+  crouching or spinning. Debug line: `[SMS step] up 0.30 m (22 units) onto StaticBody3D 'Stairs' ...`.
+
+### ⚠️ Gotcha: a long floor snap is also a long downhill redirect
+
+`floor_snap_length` feeds `_on_floor_if_snapped`, the downhill constant-speed redirect. At 1.34 m a run off a
+1 m ledge is *redirected along the previous floor plane* (a no-op on flat ground) and then snapped down, so
+horizontal speed is preserved through the drop exactly as in the game. Anything that must actually leave the
+ground has to carry upward velocity (launches do) or exceed 1.34 m.
+
 ### Not ported (next)
 
-- Ledge snap: SMS snaps Mario down ledges up to 100 units (1.34 m) while running; `floor_snap_length` is 0.6 m.
-- Step-up: SMS walks up steps to 30 units (0.40 m) instantly; Godot's cylinder has no step-up.
 - `LAND_SAFE_DOWN` (the no-wall-plane stumble), the skid-into-wall bonk (`braking()` case 2).
 - Surface types (45 / goop / slider) need a material → `SmsSlope.Surface` map.
 - SMS slip states (`SLIP_FORE/BACK` use `doSliding` on the same 0 / 1.5 params — facing-downhill slips on normal

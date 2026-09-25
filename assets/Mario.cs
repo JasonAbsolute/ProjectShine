@@ -232,6 +232,9 @@ public partial class Mario : CharacterBody3D
     private float _smsBonkAccum = 0f;          // sub-tick accumulator for the bonk slide
     private int _smsNoLandFrames = 0;          // frames after ANY launch during which floor contact is the ground he just left
     [Export] public bool SmsDebugPrint = false; // print launches, slide decisions, jump apexes, bonks and GP to the output (tuning aid)
+    [Export] public bool SmsLedgeSnap = true;   // checkGroundAtWalking: step DOWN ledges up to 100 units (1.34 m) without leaving the ground (floor_snap_length)
+    [Export] public bool SmsStepUp = true;      // checkGroundAtWalking: step UP risers up to 30 units (0.40 m) without breaking stride
+    private bool _smsSteppedUp = false;         // this frame's grounded MoveAndSlide hit a riser he has since stepped onto
     [Export] public float SmsRollJumpMinSpeed = 20f; // catching(): slide speed (SMS units/tick) above which A is the big roll-jump. Game value: mario.prm mClashSpeed = 40 (big roll only within ~0.13 s of touchdown); 20 chosen by feel (Jaysonn, 2026-09-24) -- a deliberate deviation
     private float _smsDbgStartY = 0f, _smsDbgMaxY = 0f, _smsDbgAir = 0f;
     private bool _smsDbgAirborne = false;
@@ -1658,7 +1661,11 @@ public partial class Mario : CharacterBody3D
             || stateOfMario == MarioState.SpinJump
             || stateOfMario == MarioState.backFlip
             || stateOfMario == MarioState.sideFlip;
-        FloorSnapLength = (inJumpLaunchState && IsOnFloor()) ? 0f : _baseFloorSnapLength;
+        // checkGroundAtWalking(): the floor is looked up to 100 units (1.34 m) below the feet and Mario is SET onto it;
+        // only further than that does he fall. Godot's floor_snap_length is the same mechanism (Player.tscn ships 0.6 m),
+        // and it also feeds the downhill constant-speed redirect. The launch-frame override stays.
+        float baseSnap = (UseSmsPhysics && SmsLedgeSnap) ? SmsGroundContact.LedgeDropMetres : _baseFloorSnapLength;
+        FloorSnapLength = (inJumpLaunchState && IsOnFloor()) ? 0f : baseSnap;
 
         // Sample horizontal acceleration on the fixed physics step for the chest
         // jiggle. Uses last frame's resolved Velocity (post-MoveAndSlide) — clean,
@@ -3927,6 +3934,7 @@ public partial class Mario : CharacterBody3D
         {
             Velocity = velocity;
         }
+        Vector3 preMovePos = GlobalPosition;
         MoveAndSlide();
         velocity = Velocity;
         if (_smsGroundMoved)
@@ -3936,6 +3944,9 @@ public partial class Mario : CharacterBody3D
             if (IsOnFloor())
                 velocity.Y = 0f;
         }
+        _smsSteppedUp = false;
+        if (_smsGroundMoved && SmsStepUp)
+            SmsTryStepUp(preSlideVelocity, preMovePos, delta, preMoveState);
         if (UseSmsPhysics)
             SmsAfterMove();
 
@@ -4046,9 +4057,12 @@ public partial class Mario : CharacterBody3D
         }
 
         PostMoveWallCheck(preSlideVelocity, preMoveState);
-        CheckGroundWallEntry(preMoveState, inputDirWorld, stickStrength);
-        if (UseSmsPhysics)
-            SmsGroundWallBonk(preSlideVelocity, preMoveState);
+        if (!_smsSteppedUp) // the wall MoveAndSlide reported was a riser he is now standing on top of
+        {
+            CheckGroundWallEntry(preMoveState, inputDirWorld, stickStrength);
+            if (UseSmsPhysics)
+                SmsGroundWallBonk(preSlideVelocity, preMoveState);
+        }
 
         bool onFloorNow = IsOnFloor();
         // A single-frame IsOnFloor() flicker (more likely to happen at speed on a
@@ -10378,6 +10392,59 @@ public partial class Mario : CharacterBody3D
         if (fwd <= SmsParams.Mario.ClashSpeed)
             return;
         SmsEnterBonk(-(v / sp), 0f, "ground wall hit", fwd);
+    }
+
+    private static bool SmsStepUpAllowed(MarioState s) =>
+        s == MarioState.walking || s == MarioState.running || s == MarioState.sprinting || s == MarioState.sneak
+        || s == MarioState.rolloutRun || s == MarioState.idle || s == MarioState.pivot || s == MarioState.carrying
+        || s == MarioState.wallPush || s == MarioState.wallShuffle || s == MarioState.landing
+        || s == MarioState.singleJumpLanding || s == MarioState.doubleJumpLanding || s == MarioState.tripleJumpLanding;
+
+    /// <summary>
+    /// checkGroundAtWalking(): the ground under the next position is looked up from feet + 30 units, so a floor up to
+    /// 30 units (0.40 m) above the feet is simply stepped onto; wall planes are only tested at feet + 30 and + 60, so a
+    /// lower riser is not a wall to the game at all. Godot's cylinder is stopped by any riser, so when a grounded
+    /// MoveAndSlide reported a wall, probe from above the blocked remainder of the motion: if the body comes to rest
+    /// within the step height on a floor-angled surface of level geometry, move onto it and keep the running speed the
+    /// riser clipped. Runs after MoveAndSlide; sets _smsSteppedUp so the wall-push / ground-bonk checks skip this frame.
+    /// </summary>
+    private void SmsTryStepUp(Vector3 preMoveVel, Vector3 preMovePos, double delta, MarioState preMoveState)
+    {
+        if (!IsOnFloor() || !IsOnWall() || !SmsStepUpAllowed(preMoveState))
+            return;
+        Vector3 want = new Vector3(preMoveVel.X, 0f, preMoveVel.Z) * (float)delta * _smsGroundStepScale; // what MoveAndSlide was asked to do
+        if (want.LengthSquared() < 1e-8f)
+            return;
+        Vector3 did = GlobalPosition - preMovePos;
+        did.Y = 0f;
+        Vector3 remaining = want - did;
+        if (remaining.LengthSquared() < 1e-6f)
+            return; // the wall did not take anything off the step
+        Vector3 n = GetWallNormal();
+        n.Y = 0f;
+        if (n.LengthSquared() < 1e-6f || want.Normalized().Dot(-n.Normalized()) < 0.3f)
+            return; // brushing along it, not walking into it
+        float clearance = 2f * SmsGroundContact.StepUpMetres;
+        Transform3D from = GlobalTransform;
+        from.Origin += remaining + Vector3.Up * clearance;
+        var probe = new KinematicCollision3D();
+        if (!TestMove(from, Vector3.Down * clearance, probe))
+            return; // nothing within reach under the raised probe: a drop, not a step
+        Vector3 landing = from.Origin + probe.GetTravel();
+        float rise = landing.Y - GlobalPosition.Y;
+        if (!SmsGroundContact.IsStep(rise, probe.GetNormal().Y, FloorMaxAngle))
+            return; // too tall, the riser itself / a wall-steep slope, or no rise (the probe found the floor he is on)
+        GodotObject hit = probe.GetCollider();
+        if (hit is not StaticBody3D && hit is not AnimatableBody3D && hit is not CsgShape3D)
+            return; // level geometry only: never onto enemies, pickups or the thing he carries
+        GlobalPosition = landing;
+        ApplyFloorSnap();
+        velocity.X = preMoveVel.X; // the riser clipped the horizontal speed; the game never saw a wall
+        velocity.Z = preMoveVel.Z;
+        velocity.Y = 0f;
+        _smsSteppedUp = true;
+        if (SmsDebugPrint)
+            GD.Print($"[SMS step] up {rise:F2} m ({SmsUnits.MetresToUnits(rise):F0} units) onto {hit.GetType().Name} '{(hit as Node)?.Name}', remaining {remaining.Length():F3} m, speed kept {new Vector2(velocity.X, velocity.Z).Length():F1} m/s");
     }
 
     /// <summary>doRunning() + walkEnd() + the skid U-turn, for one physics frame (2 sub-ticks at 60 Hz).</summary>
