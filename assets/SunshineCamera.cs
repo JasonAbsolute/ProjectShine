@@ -282,6 +282,7 @@ public partial class SunshineCamera : Node3D
 
     // L-button tap detection
     private float _lButtonHeldTime = -1f;   // -1 = not pressed
+    private bool  _lButtonPressIgnored = false; // this press started in the air: it is the ground pound, not the camera
 
     private float _rigScale = 1f;
 
@@ -1009,8 +1010,16 @@ public partial class SunshineCamera : Node3D
         if (Input.IsActionPressed(LButtonAction))
         {
             // Pressed this frame? Start the held timer
-            if (_lButtonHeldTime < 0f) _lButtonHeldTime = 0f;
+            if (_lButtonHeldTime < 0f)
+            {
+                _lButtonHeldTime = 0f;
+                // L is also the ground pound. A press that starts in the air belongs to the pound, not the camera:
+                // ignore it for the whole press (no tap re-centre on release, no hold mode). Ground or wall: camera.
+                _lButtonPressIgnored = !IsTargetOnGroundOrWall();
+            }
             else _lButtonHeldTime += dt;
+
+            if (_lButtonPressIgnored) return;
 
             // If held past tap window, enter LButton mode
             if (Mode == CamMode.Normal && _lButtonHeldTime > TapMaxDuration)
@@ -1019,12 +1028,13 @@ public partial class SunshineCamera : Node3D
         else
         {
             // Released
-            if (_lButtonHeldTime >= 0f && _lButtonHeldTime <= TapMaxDuration)
+            if (!_lButtonPressIgnored && _lButtonHeldTime >= 0f && _lButtonHeldTime <= TapMaxDuration)
             {
                 // It was a TAP — instant recenter (snap behind Mario)
                 DoRecenter();
             }
             _lButtonHeldTime = -1f;
+            _lButtonPressIgnored = false;
 
             // Always return to Normal once L is released
             if (Mode == CamMode.LButton) Mode = CamMode.Normal;
@@ -1123,6 +1133,10 @@ public partial class SunshineCamera : Node3D
 
     private bool IsTargetOnFloor()
         => _target is CharacterBody3D cb && cb.IsOnFloor();
+
+    /// <summary>Where the L button means the camera: on the ground, or pressed against a wall in the wall slide.</summary>
+    private bool IsTargetOnGroundOrWall()
+        => IsTargetOnFloor() || (_target is Mario m && m.stateOfMario == Mario.MarioState.wallSlide);
 
     private static Vector2 ApplyDeadzone(Vector2 v, float dz)
     {

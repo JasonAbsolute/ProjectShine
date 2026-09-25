@@ -1491,15 +1491,18 @@ while `ma_sdown` plays to the end, uninterruptible, then get-up, then WAIT. Norm
 come from roll-jumps and dives, and ground knockdowns only from borrowed speed (roll-jump run-out, downhill).
 The face is fixed for the whole jump (`doJumping` never turns it; the back stick drives the forward speed negative instead,
 to −16), so pulling back toward a wall he just kicked, or drifting sideways into one he is flying past, never grabs it.
-The ground pound is on **L**, Sunshine's layout (`button_l`, shared with the camera re-centre: in the air L does both, as in
-the game). On a wall slide the ground-pound button does nothing. The decomp's `checkBackTrig` does enter `HIP_DROP` there,
-but `hipAttacking`'s first tick meets the wall in front of the face and turns it into `JUMP_SHORT_BACK_DOWN` — a knock-off,
-never a ground pound — while the shipped game as remembered only re-centres the camera; we follow the memory here.
+The ground pound is on **L**, Sunshine's layout (`button_l`, shared with the camera). The camera takes L only when Mario is
+on the ground or in the wall slide; a press that starts in the air is the ground pound alone, no re-centre and no hold mode
+(`SunshineCamera.UpdateLButtonState`; the game's camera re-centres on any L press — `execFrontRotate_` — a deviation by
+request). On a wall slide neither B nor the ground-pound button does anything. The decomp's `checkBackTrig` would take both:
+B dives along the face into the wall and `jumpCatch` case 2 bounces him off; L enters `HIP_DROP`, whose first `hipAttacking`
+tick meets the wall in front of the face and turns it into `JUMP_SHORT_BACK_DOWN` — a knock-off either way, never a ground
+pound. The shipped game as remembered does nothing on a wall but re-centre the camera; we follow the memory here.
 Wall slide: velocity zeroed for the first **10** ticks (83 ms; `stayWall` advances its timer twice per pinned tick; the
 port defaults to 4 — see `SmsWallSlidePinTicks`), then
 `vy = −0.5·timer` with the timer already at 21 — −10.5 (−4.2 m/s) at once — capped at −30 (−12.1 m/s) from tick 50; the
-position is nudged into the wall each tick (`WALL_STICK_SPEED`); the stick does nothing; the slide ends by A (kick), B (dive
-along the face, which points into the wall, so `jumpCatch` case 2 bounces him off backwards into the knockdown),
+position is nudged into the wall each tick (`WALL_STICK_SPEED`); the stick, B and the ground-pound button do nothing; the
+slide ends by A (kick),
 landing (face turned away, `LANDING` → `LAND_SLIP`: double available) or losing the wall (face away, velocity 0, fall).
 Wall kick (`startJumpWall` → `setStatusToJumping` WALL_JUMP): vy 62, fwd 24 along the bounce direction (the heading
 mirrored across the wall normal), fall-cancellable, no hold, no commit lock, no regrab cooldown. While the kick is

@@ -6948,33 +6948,12 @@ public partial class Mario : CharacterBody3D
         if (!UseSmsPhysics && velocity.Y < WALL_SLIDE_MAX_FALL)
             velocity.Y = WALL_SLIDE_MAX_FALL;
 
-        // stayWall(): A -> wall kick. Then checkBackTrig(): B -> JUMP_CATCH along the face, which points INTO the wall while
-        // sliding (the approach mirrored across the normal), at fwd 48 with the slide's vy; next frame jumpCatch() case 2
-        // (playerRefrection(1), JUMP_SHORT_BACK_DOWN) bounces him off backwards. The ground-pound button does nothing here:
-        // the decomp's L -> HIP_DROP ends in the same knock-off (hipAttacking()'s first tick meets the wall in front of the
-        // face), but in the shipped game as Jaysonn remembers it L only re-centres the camera on a wall, so: nothing.
+        // stayWall(): A -> wall kick, the only exit here. The decomp's checkBackTrig() would also take B (JUMP_CATCH along the
+        // face, which points INTO the wall, so jumpCatch() case 2 bounces him off) and L (HIP_DROP, whose first hipAttacking()
+        // tick meets the wall in front of the face: the same knock-off), but in the shipped game as Jaysonn remembers it
+        // neither does anything on a wall (L re-centres the camera), so neither does here.
         if (Input.IsActionJustPressed("button_a"))
-        {
             DoWallJump();
-            return;
-        }
-        if (UseSmsPhysics && Input.IsActionJustPressed("button_b"))
-        {
-            Vector3 into = -wallPlannedKickDir; // the slide face: the approach mirrored across the wall, pointing into it
-            if (into.LengthSquared() < 1e-6f)
-                into = -new Vector3(lastWallNormal.X, 0f, lastWallNormal.Z);
-            if (into.LengthSquared() < 1e-6f)
-                return;
-            into = into.Normalized();
-            stateOfMario = MarioState.diving;
-            SetMarioState(stateOfMario);
-            SmsLatchFace(into, 2);
-            SmsSetDiveVelocity(into, fromGround: false); // JumpCatchAir launch: fwd = min(15 + 80, 48), vy kept
-            wallSlideLostWallFrames = 0;
-            if (SmsDebugPrint)
-                GD.Print($"[SMS wall] B during the slide: dive along the face, into the wall at 48 ({SmsUnits.SpeedToMps(48f):F1} m/s); the wall hit bounces him off backwards (knockdown)");
-            return;
-        }
     }
 
     private void DoWallJump()
