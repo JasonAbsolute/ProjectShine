@@ -1567,9 +1567,11 @@ in the game. Plain running (cap 32) can never bonk; if a knockdown looks wrong, 
 ### Surface types (`SmsSlope.Surface`, `isSlipStart` / `doSliding` / `slideProcess`)
 
 The game classes every collision triangle (`TBGCheckData`), and the class picks one of the `slipparam*.prm` sets. In
-Godot the class lives on the collision body: metadata **`sms_surface`** (a String) on the `StaticBody3D` or a parent up
-to three levels up, or a node group **`sms_<class>`**. Untagged geometry is `normal`, so nothing changes until a body is
-tagged. A tag applies to the whole body: to make one slope a slider, give it its own `StaticBody3D`.
+Godot the class lives on the collision body: metadata **`sms_surface`** = the class (a String) on the `StaticBody3D` or a
+parent up to three levels up, or a metadata key named **`sms_<class>`** (any value), or a node group **`sms_<class>`**.
+Untagged geometry is `normal`, so nothing changes until a body is tagged. A tag applies to the whole body: to make one
+slope a slider, give it its own `StaticBody3D`. A flat slider has no slope to pull him, so he only stands in the slip
+pose (A jumps out): tilt it.
 
 | Tag | Game class | Slips when | Params (`slipparam*.prm`) |
 |---|---|---|---|

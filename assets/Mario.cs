@@ -6213,6 +6213,13 @@ public partial class Mario : CharacterBody3D
         {
             if (n.HasMeta("sms_surface"))
                 return n.GetMeta("sms_surface").AsString();
+            foreach (StringName m in n.GetMetaList())
+            {
+                // the group spelling used as a metadata key also works: sms_slider = anything
+                string ms = m.ToString();
+                if (ms.StartsWith("sms_") && ms != "sms_surface")
+                    return ms.Substring(4);
+            }
             foreach (StringName g in n.GetGroups())
             {
                 string gs = g.ToString();
