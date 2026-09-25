@@ -1324,7 +1324,7 @@ equations come from. Everything sits behind one toggle so the old feel is one cl
 | Export | Default | Meaning |
 |---|---|---|
 | `UseSmsPhysics` | `true` | Master switch. Off = the previous hand-tuned physics, untouched. |
-| `SmsDebugPrint` | `false` | Prints launches, slide decisions, jump apexes, bonks and ground pounds to Output. Turn on in the inspector while tuning. |
+| `SmsDebugPrint` | `true` (while tuning) | Prints launches, slide decisions, jump apexes, bonks, wall hits, steps and ground pounds to Output. Turn off for release. |
 | `SmsRollJumpMinSpeed` | `20` | `catching()`: slide speed above which A is the big roll-jump. **Game value is 40**; 20 chosen by feel — a deliberate deviation. |
 | `KeepGroundPoundJump` | `false` | Restores the GP-jump (see Ground Pound section above). Off because Sunshine has no such move. |
 | `SmsLedgeSnap` | `true` | Step DOWN ledges up to 100 units (1.34 m) without leaving the ground: sets `floor_snap_length` to 1.343 m (Player.tscn ships 0.6). |
@@ -1478,7 +1478,8 @@ The old code froze 7 / 20 frames; the triple no longer locks you for a third of 
 | Situation | Rule |
 |---|---|
 | Jump hits a wall | < 16: stop against it, keep falling · 16–40: wall slide · > 40: knockdown |
-| Dive hits a wall | knockdown at **any** speed, mirrored path (`Bounce`), rising speed cut to 0 |
+| Dive (airborne) hits a wall | knockdown at **any** speed (`jumpCatch`), mirrored path (`Bounce`), rising speed cut to 0 |
+| Belly slide hits a wall | > 16: knockdown (`slippingBasic` → `CATCH_DOWN`, mirrored) · ≤ 16: stop dead, get up (`CATCH_LOST`) |
 | Running into a wall | > 40: knockdown with no hop (unreachable above the run cap 32 without borrowed speed) |
 | A during belly slide | > `SmsRollJumpMinSpeed` (20): roll-jump · otherwise the small roll |
 

@@ -231,7 +231,8 @@ public partial class Mario : CharacterBody3D
     private float _smsLandAccum = 0f;          // sub-tick accumulator for the landing window
     private float _smsBonkAccum = 0f;          // sub-tick accumulator for the bonk slide
     private int _smsNoLandFrames = 0;          // frames after ANY launch during which floor contact is the ground he just left
-    [Export] public bool SmsDebugPrint = false; // print launches, slide decisions, jump apexes, bonks and GP to the output (tuning aid)
+    [Export] public bool SmsDebugPrint = true;  // print launches, slide decisions, jump apexes, bonks, walls, steps and GP to the output (on while the port is tuned)
+    private const float SmsSlideKnockdownMinFwd = 16f; // slippingBasic(): a belly slide (CATCH) into a head-on wall above this -> CATCH_DOWN, else stop and get up
     [Export] public bool SmsLedgeSnap = true;   // checkGroundAtWalking: step DOWN ledges up to 100 units (1.34 m) without leaving the ground (floor_snap_length)
     [Export] public bool SmsStepUp = true;      // checkGroundAtWalking: step UP risers up to 30 units (0.40 m) without breaking stride
     private bool _smsSteppedUp = false;         // this frame's grounded MoveAndSlide hit a riser he has since stepped onto
@@ -5298,11 +5299,32 @@ public partial class Mario : CharacterBody3D
                 continue;
 
             normalXZ = normalXZ.Normalized();
-            if (travelDirection.Dot(-normalXZ) <= 0.25f)
+            // SMS: walkProcess()/checkGroundAtJumping() only count a wall hit outside the 60..120 deg band, i.e. an
+            // approach within 60 deg of head-on (dot >= 0.5); a glancing touch just pushes him along the wall.
+            if (travelDirection.Dot(-normalXZ) <= (UseSmsPhysics ? 0.5f : 0.25f))
                 continue;
 
             if (UseSmsPhysics)
-                SmsEnterBonk(travelDirection.Bounce(normalXZ), Mathf.Min(velocity.Y, 0f), "dive", SmsUnits.MpsToSpeed(speed));
+            {
+                float fwdSms = SmsUnits.MpsToSpeed(speed);
+                if (impactState == MarioState.bellySlidingFromDive)
+                {
+                    // slippingBasic() for the belly slide (CATCH): a head-on wall knocks him down only above 16
+                    // (playerRefrection(1) -> CATCH_DOWN); slower than that he stops dead and gets up (CATCH_LOST).
+                    // Only the airborne dive (jumpCatch()) knocks him down at any speed.
+                    if (fwdSms <= SmsSlideKnockdownMinFwd)
+                    {
+                        velocity.X = 0f;
+                        velocity.Z = 0f;
+                        if (SmsDebugPrint)
+                            GD.Print($"[SMS wall] belly slide into a wall at fwd {fwdSms:F1} (<= 16): stop, get up");
+                        return false;
+                    }
+                    SmsEnterBonk(travelDirection.Bounce(normalXZ), 0f, "belly slide into a wall", fwdSms);
+                    return true;
+                }
+                SmsEnterBonk(travelDirection.Bounce(normalXZ), Mathf.Min(velocity.Y, 0f), "dive", fwdSms);
+            }
             else
                 EnterBonk(normalXZ);
             return true;
