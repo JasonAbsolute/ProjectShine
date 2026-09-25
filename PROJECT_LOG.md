@@ -1617,7 +1617,8 @@ port's.
 
 **Hang** (`hanging`), each tick: B → `startHangLanding(WALL_SLIDE)`: out to the wall face, down 100 units (or to the ground),
 and he **wall-slides** down the wall (not a plain drop). A with 160 units of headroom → the vault. The stick counts after 40
-ticks: within 0x400 (5.6°) of the face, i.e. straight into the wall, with headroom → **climb**; beyond 0x71c7 (160°), pulling
+ticks: within 0x400 (5.6°) of the face, i.e. straight into the wall, with headroom → **climb** (the port uses 45°: the game
+has a hang camera that puts "up" exactly into the wall, ours does not — a deviation); beyond 0x71c7 (160°), pulling
 away → **let go** (`LAND_SAFE_DOWN`, a plain fall); anything else → **shimmy** along the ledge at `MoveSp 0.06 × mag`
 units/tick (3.1 m/s at full stick), following the wall round corners while the normals agree within `HangWallMovableAngle`
 (dot > 0.3) and the top stays within −100/+50, `ma_hmov_l/r` at `units moved × AnmRate 0.8`; the shimmy stops after
@@ -1630,6 +1631,13 @@ face the platform, `ma_hgdwn` plays (`MarioState.ledgeDescend`, the animation is
 he hangs. Run at it and he runs off as before.
 
 Debug lines: `[SMS ledge] grab / vault / let go / stick into the wall: climb / edge ahead: climb down`.
+
+Jumping out of the wall push (`doPushingAnimation` caps fwd at 6 along the face): the jump leaves along the push direction,
+into the wall, where the air wall hit stops it — a near-vertical hop. It used to inherit the lateral shuffle velocity.
+
+Gotcha: pinned states (hang, climb, descend) never call `MoveAndSlide`, so `IsOnFloor()` keeps the value of the last real
+step. A hang entered from the top therefore looked "on the floor" and the grounded branch stood him up. They run before
+the grounded / airborne split now, and the vault and the let-go refresh the floor state with a zero-velocity move.
 
 ### ⚠️ Gotcha: never hand `MoveAndSlide` an upward velocity while grounded
 

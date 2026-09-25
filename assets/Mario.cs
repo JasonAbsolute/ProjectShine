@@ -2474,6 +2474,23 @@ public partial class Mario : CharacterBody3D
             wasOnFloor = false;
             return;
         }
+        if (UseSmsPhysics && IsOnFloor() && (stateOfMario == MarioState.ledgeHang || stateOfMario == MarioState.ledgeClimb))
+        {
+            // Entered from the top (DESCEND): pinned states never call MoveAndSlide, so IsOnFloor() is still the stale true
+            // of the last step on the platform and the grounded branch would stand him up. Same handling as the airborne
+            // branch gives a hang that started in the air.
+            if (stateOfMario == MarioState.ledgeHang)
+            {
+                TickLedgeHang(delta, LstickVec);
+                Velocity = Vector3.Zero;
+                wasOnFloor = false;
+                return;
+            }
+            bool climbDone = TickLedgeClimb(delta);
+            Velocity = Vector3.Zero;
+            wasOnFloor = climbDone;
+            return;
+        }
 
         if (IsOnFloor() && !rollingUpwardOffGround) //This is the main logic loop for Player being on the ground
         {
@@ -6680,6 +6697,8 @@ public partial class Mario : CharacterBody3D
         ledgeRegrabCooldown = LEDGE_REGRAB_COOLDOWN_FRAMES;
         GlobalPosition = new Vector3(xz.X, y, xz.Z);
         velocity = Vector3.Zero;
+        Velocity = Vector3.Zero;
+        MoveAndSlide(); // refresh IsOnFloor() at the new spot (the pinned hang left it stale), zero motion
         _smsTrueVyValid = false;
         lastFacingDirection = -n;
         SmsLatchFace(-n, 2);
@@ -6708,9 +6727,16 @@ public partial class Mario : CharacterBody3D
         if (SmsDebugPrint)
             GD.Print($"[SMS ledge] vault ({why})");
         _smsHangMovingAnim = false;
+        animPlayer.SpeedScale = 1f;
         stateOfMario = MarioState.ledgeHopUp;
         SetMarioState(stateOfMario);
         Vector3 fwdOntoLedge = -ledgeWallNormal;
+        // start from the wall face, not the hang anchor 0.34 m inside the wall, or the depenetration shoves him; and refresh
+        // the floor state (stale while pinned) so the next frame runs the airborne branch
+        Vector3 outXZ = ledgeHangPos + ledgeWallNormal * (capRadiusWorld + 0.02f);
+        GlobalPosition = new Vector3(outXZ.X, ledgeHangPos.Y, outXZ.Z);
+        Velocity = Vector3.Zero;
+        MoveAndSlide();
         velocity = Vector3.Zero;
         velocity.Y = LEDGE_HOP_UP_VEL;
         velocity.X = fwdOntoLedge.X * LEDGE_HOP_FWD_SPEED;
@@ -6747,7 +6773,7 @@ public partial class Mario : CharacterBody3D
         {
             Vector3 stickDir = new Vector3(direction.X, 0f, direction.Z).Normalized();
             float diff = intoWall.SignedAngleTo(stickDir, Vector3.Up); // mIntendedYaw - mFaceAngle.y
-            float climbBand = SmsParams.Hanging.StickClimbBam * SmsUnits.BamToRad;
+            float climbBand = Mathf.DegToRad(SmsParams.Hanging.StickClimbDeg); // the game: 0x400 = 5.6 deg, behind its hang camera
             float dropBand = SmsParams.Hanging.StickDropBam * SmsUnits.BamToRad;
             if (Mathf.Abs(diff) <= climbBand && headroom)
             {
@@ -6764,9 +6790,10 @@ public partial class Mario : CharacterBody3D
                 SmsHangLetGo(false, "stick away");
                 return;
             }
-            if (_smsHangTicks < SmsParams.Hanging.RapidTime)
+            if (_smsHangTicks < SmsParams.Hanging.RapidTime && Mathf.Abs(diff) > climbBand)
             {
-                // shimmy along the wall the way the stick points, following the wall around corners
+                // shimmy along the wall the way the stick points, following the wall around corners (hanging(): only for a
+                // stick outside the climb band -- straight into the wall with no headroom does nothing)
                 Vector3 tangent = nXZ.Cross(Vector3.Up).Normalized();
                 if (tangent.Dot(stickDir) < 0f)
                     tangent = -tangent;
@@ -6811,10 +6838,10 @@ public partial class Mario : CharacterBody3D
                                 SmsLatchFace(-n2, 1);
                                 armature.Rotation = new Vector3(0f, BaseYawFromDir(-n2), 0f);
                                 moved = true;
-                                // ANIM_HMOV_L / R at units-per-frame * AnmRate (the game's frame is 4 ticks)
+                                // ANIM_HMOV_L / R at (units moved per tick) * AnmRate: 1.5 at full stick
                                 Vector3 left = Vector3.Up.Cross(intoWall).Normalized();
                                 string anim = tangent.Dot(left) > 0f ? "ma_hmov_l" : "ma_hmov_r";
-                                float rate = Mathf.Clamp(unitsPerTick * 4f * SmsParams.Hanging.AnmRate, 0.5f, 8f);
+                                float rate = Mathf.Clamp(unitsPerTick * SmsParams.Hanging.AnmRate, 0.3f, 2f);
                                 if (!_smsHangMovingAnim || animPlayer.CurrentAnimation != anim)
                                 {
                                     if (animTree != null)
@@ -7525,6 +7552,16 @@ public partial class Mario : CharacterBody3D
         Vector3 clearDir = (exitDir != Vector3.Zero) ? exitDir : lastFacingDirection;
         for (int i = 0; i < 4; i++)
             Last4FacingDirections.Add(clearDir);
+        if (UseSmsPhysics && exitDir != Vector3.Zero)
+        {
+            // doPushingAnimation(): while pushing, fwd is capped at 6 along the face. A jump out of the push launches along
+            // the face (into the wall, where the air wall hit stops it), not along the lateral shuffle velocity, which made
+            // the takeoff face point sideways along the wall.
+            float mps = SmsUnits.SpeedToMps(6f);
+            velocity.X = exitDir.X * mps;
+            velocity.Z = exitDir.Z * mps;
+            SmsLatchFace(exitDir, 1);
+        }
 
         if (stickStrength > DEADZONE)
         {

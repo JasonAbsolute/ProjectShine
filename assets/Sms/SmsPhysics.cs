@@ -174,7 +174,8 @@ public static class SmsParams
         public const float DropUnits = 100f;            // startHangLanding: down 100 unless the ground is nearer
         public const float AutoVaultBelowUnits = 100f;  // ground within this below (30 units behind) -> HANG_JUMPING by itself
         public const int StickDelayTicks = 40;          // mStatusTimer >= 0x28 before the stick does anything
-        public const int StickClimbBam = 0x400;         // stick within 5.6 deg of the face: climb
+        public const int StickClimbBam = 0x400;         // stick within 5.6 deg of the face: climb (the game; its hang camera puts 'up' into the wall)
+        public const float StickClimbDeg = 45f;         // the port's climb cone: no hang camera, so 'toward the wall' needs slack (deviation)
         public const int StickDropBam = 0x71c7;         // stick beyond 160 deg from the face: let go
         public const float DescentEdgeUnits = 10f;      // checkDescent: wall search radius at feet - 10
         public const float DescentDropUnits = 160f;     // ... and the ground beyond must be more than this below
