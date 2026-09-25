@@ -1586,14 +1586,25 @@ because wall planes are only tested at feet + 30 and feet + 60 and a lower riser
 
 - Ledge-down: Godot's `floor_snap_length` is the same mechanism, so SMS mode sets it to 1.343 m every frame
   (`SmsLedgeSnap`); the launch-frame override to 0 stays. Expect no `ledgeFall` on curbs, stairs and dock edges.
-- Step-up: the cylinder is stopped by any riser. `SmsTryStepUp` runs after a grounded `MoveAndSlide` that reported a
-  wall: it takes the blocked remainder of the requested horizontal motion, probes with `TestMove` from `remainder +
-  2 × 0.40 m` straight down, and if the body comes to rest 0.01–0.40 m above the feet on a floor-angled surface
-  (`SmsGroundContact.IsStep`, normal within `floor_max_angle`) belonging to a `StaticBody3D` / `AnimatableBody3D` /
-  `CsgShape3D`, it moves him there, `ApplyFloorSnap()`s, restores the horizontal speed the riser clipped, and sets
-  `_smsSteppedUp` so `CheckGroundWallEntry` and `SmsGroundWallBonk` skip that frame (the wall was the step).
+- Step-up: the cylinder is stopped by any riser. `SmsTryStepUp` runs after any `MoveAndSlide` that reported a wall
+  and asks the game's two questions with two rays anchored on the contact point Godot reported. (1) The feet + 30
+  wall check: a ray from the body centre at feet + 0.45 m toward the contact, 6 cm past the face; a hit means the
+  wall continues above the step limit and it stays a wall. (2) The feet + 30 ground lookup: a ray straight down from
+  feet + 0.45 m at a point 3 cm past the riser face. A rest 0.01–0.40 m above the feet on a floor-angled face
+  (normal within `floor_max_angle`) of a `StaticBody3D` / `AnimatableBody3D` / `CsgShape3D` is a step: he is moved by
+  the blocked remainder of the motion plus the rise, `ApplyFloorSnap()`ed, and given back the horizontal speed the
+  riser clipped. A rest *level* with the feet (or below) means the "wall" was a trimesh edge, a lip under a
+  centimetre or a knee-high rail: it is dismissed, speed kept, no move. Both outcomes set `_smsSteppedUp`, which
+  makes `TryEnterDiveBonkAfterMove`, `PostMoveWallCheck`, `CheckGroundWallEntry` and `SmsGroundWallBonk` skip the
+  frame. Rays, not a full-body `TestMove`: a 1.87 m cylinder raised above the step limit overlaps the next risers of
+  any staircase steeper than ~40° and was rejecting real stairs. Every rejection prints an `[SMS step] ... stays a
+  wall / rejected ...` line with the measured rise and collider.
   Allowed from the locomotion states and the belly slide (`SmsStepUpAllowed`): not while bonked, slipping, crouching
   or spinning. Debug line: `[SMS step] up 0.30 m (22 units) onto StaticBody3D 'Stairs' ...`.
+- Landing frame: a dive or jump that lands on a tread and touches the next riser in the same `MoveAndSlide` is on
+  the floor *after* the move but was airborne *before* it, so it was neither the ground case nor the air case and
+  fell through to the dive rule (knockdown at any speed: `logForLarry.txt`, `dive at fwd 48.3`, floorAngle 0.0 on
+  the plaza stairs). It is now the third case of the same probe.
 - Air step-up: `checkGroundAtJumping` uses the same feet + 30 lookup and only tests walls at feet + 30 / + 150, so a
   jump or dive that meets a riser lower than 30 units lands ON the step. `SmsTryStepUp` therefore also runs for
   launched air states (`SmsStateSteers`, not on the 3 launch frames, not from `ledgeFall`); a success is a landing

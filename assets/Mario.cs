@@ -10441,34 +10441,41 @@ public partial class Mario : CharacterBody3D
         || s == MarioState.singleJumpLanding || s == MarioState.doubleJumpLanding || s == MarioState.tripleJumpLanding
         || s == MarioState.bellySlidingFromDive; // the slide uses the same ground check: it climbs stairs
 
+    /// <summary>World Y of the bottom of the collision shape (the feet). ComputeFeetPosition() is the capsule-style value used by the FX.</summary>
+    private float SmsFeetY() => (bodyCol != null ? bodyCol.GlobalPosition.Y : GlobalPosition.Y) - capHalfHeightWorld;
+
     /// <summary>
-    /// checkGroundAtWalking(): the ground under the next position is looked up from feet + 30 units, so a floor up to
-    /// 30 units (0.40 m) above the feet is simply stepped onto; wall planes are only tested at feet + 30 and + 60, so a
-    /// lower riser is not a wall to the game at all. Godot's cylinder is stopped by any riser, so when a grounded
-    /// MoveAndSlide reported a wall, probe from above the blocked remainder of the motion: if the body comes to rest
-    /// within the step height on a floor-angled surface of level geometry, move onto it and keep the running speed the
-    /// riser clipped. Runs after MoveAndSlide; sets _smsSteppedUp so the wall-push / ground-bonk checks skip this frame.
+    /// checkGroundAtWalking() / checkGroundAtJumping(): the ground under the next position is looked up from feet + 30
+    /// units, so a floor up to 30 units (0.40 m) above the feet is simply stepped onto; wall planes are only tested at
+    /// feet + 30 and + 60 (+ 150 in the air), so a lower riser is not a wall to the game at all -- on the ground, in the
+    /// air, and on the frame a jump or dive lands on a tread while touching the next riser. Godot's cylinder is stopped by
+    /// any riser, so when MoveAndSlide reported a wall, ask the two questions the game asks, with two rays anchored on the
+    /// contact it reported: (1) is the wall still there just above the step limit (feet + 30)? then it is a wall, keep the
+    /// wall handling. (2) where is the ground just past the riser face, read from feet + 30? 0.01..0.40 m up on a floor-
+    /// angled face of level geometry: a step, move onto it; level with the feet: the "wall" was a trimesh edge or a lip,
+    /// dismiss it. Either way the wall never existed for the game: keep the clipped speed and set _smsSteppedUp so the
+    /// dive bonk / wall-push / ground-bonk / wall-slide checks skip this frame. Runs after MoveAndSlide.
     /// </summary>
     private void SmsTryStepUp(Vector3 preMoveVel, Vector3 preMovePos, double delta, MarioState preMoveState)
     {
         if (!IsOnWall())
             return;
-        bool grounded = IsOnFloor();
-        if (grounded)
+        bool onFloorNow = IsOnFloor();
+        bool fromGround = _smsGroundMoved;                  // on the floor at frame start (ground step, slope-scaled)
+        bool landingFrame = onFloorNow && !fromGround;      // airborne at frame start, on a floor now: tread + riser in one move
+        if (fromGround)
         {
-            if (!_smsGroundMoved || !SmsStepUpAllowed(preMoveState))
+            if (!SmsStepUpAllowed(preMoveState))
                 return;
         }
         else
         {
-            // Same lookup in the air: checkGroundAtJumping() tests walls at feet + 30 and + 150 and reads the ground from
-            // feet + 30, so a jump or dive that meets a riser lower than 30 units LANDS on the step rather than hitting a
-            // wall (a dive onto stairs belly-slides up them). Not on the launch frames (the riser may be the ground he
-            // just left) and not from ledgeFall, whose landing needs its own fall-speed proof.
+            // Airborne or landing this frame: launched air states only, not on the launch frames (the riser may be the
+            // ground he just left), not from ledgeFall (its landing needs its own fall-speed proof).
             if (_smsNoLandFrames > 0 || !SmsStateSteers(preMoveState) || preMoveState == MarioState.ledgeHopUp)
                 return;
         }
-        Vector3 want = new Vector3(preMoveVel.X, 0f, preMoveVel.Z) * (float)delta * (grounded ? _smsGroundStepScale : 1f); // what MoveAndSlide was asked to do
+        Vector3 want = new Vector3(preMoveVel.X, 0f, preMoveVel.Z) * (float)delta * (fromGround ? _smsGroundStepScale : 1f); // what MoveAndSlide was asked to do
         if (want.LengthSquared() < 1e-8f)
             return;
         Vector3 did = GlobalPosition - preMovePos;
@@ -10476,31 +10483,102 @@ public partial class Mario : CharacterBody3D
         Vector3 remaining = want - did;
         if (remaining.LengthSquared() < 1e-6f)
             return; // the wall did not take anything off the step
-        Vector3 n = GetWallNormal();
-        n.Y = 0f;
-        if (n.LengthSquared() < 1e-6f || want.Normalized().Dot(-n.Normalized()) < 0.3f)
+        Vector3 moveDir = want.Normalized();
+
+        // The wall he actually walked into: the steepest contact facing the motion (a floor or ceiling contact is not it).
+        bool found = false;
+        float bestDot = 0.3f;
+        Vector3 wallN = Vector3.Zero, contact = Vector3.Zero;
+        for (int i = 0; i < GetSlideCollisionCount(); i++)
+        {
+            KinematicCollision3D c = GetSlideCollision(i);
+            Vector3 cn = c.GetNormal();
+            if (cn.AngleTo(Vector3.Up) <= FloorMaxAngle)
+                continue;
+            Vector3 cnXZ = new Vector3(cn.X, 0f, cn.Z);
+            if (cnXZ.LengthSquared() < 1e-6f)
+                continue;
+            cnXZ = cnXZ.Normalized();
+            float dot = moveDir.Dot(-cnXZ);
+            if (dot < bestDot)
+                continue;
+            bestDot = dot;
+            wallN = cnXZ;
+            contact = c.GetPosition();
+            found = true;
+        }
+        if (!found)
             return; // brushing along it, not walking into it
-        float clearance = 2f * SmsGroundContact.StepUpMetres;
-        Transform3D from = GlobalTransform;
-        from.Origin += remaining + Vector3.Up * clearance;
-        var probe = new KinematicCollision3D();
-        if (!TestMove(from, Vector3.Down * clearance, probe))
-            return; // nothing within reach under the raised probe: a drop, not a step
-        Vector3 landing = from.Origin + probe.GetTravel();
-        float rise = landing.Y - GlobalPosition.Y;
-        if (!SmsGroundContact.IsStep(rise, probe.GetNormal().Y, FloorMaxAngle))
-            return; // too tall, the riser itself / a wall-steep slope, or no rise (the probe found the floor he is on)
-        GodotObject hit = probe.GetCollider();
-        if (hit is not StaticBody3D && hit is not AnimatableBody3D && hit is not CsgShape3D)
-            return; // level geometry only: never onto enemies, pickups or the thing he carries
-        GlobalPosition = landing;
+
+        Vector3 dir = -wallN; // into the wall, horizontal
+        float feetY = SmsFeetY();
+        float stepMax = SmsGroundContact.StepUpMetres;
+        float probeY = feetY + stepMax + 0.05f; // just above the step limit: the game's feet + 30
+        string where = fromGround ? "ground" : (landingFrame ? "landing frame" : "air");
+        var space = GetWorld3D().DirectSpaceState;
+        var exclude = new Godot.Collections.Array<Rid> { GetRid() };
+
+        // (1) Is the wall still there above the step limit? Ray from the body centre toward the contact, 6 cm past the face.
+        Vector3 toContactXZ = new Vector3(contact.X - GlobalPosition.X, 0f, contact.Z - GlobalPosition.Z);
+        Vector3 wallFrom = new Vector3(GlobalPosition.X, probeY, GlobalPosition.Z);
+        var qWall = PhysicsRayQueryParameters3D.Create(wallFrom, wallFrom + dir * (toContactXZ.Length() + 0.06f), CollisionMask);
+        qWall.CollideWithAreas = false;
+        qWall.Exclude = exclude;
+        var hWall = space.IntersectRay(qWall);
+        if (hWall.Count > 0)
+        {
+            if (SmsDebugPrint)
+            {
+                GodotObject wallHit = hWall["collider"].As<GodotObject>();
+                GD.Print($"[SMS step] {where} {preMoveState}: wall stays a wall (solid at feet + {SmsUnits.MetresToUnits(stepMax + 0.05f):F0} units: {wallHit?.GetType().Name} '{(wallHit as Node)?.Name}')");
+            }
+            return;
+        }
+
+        // (2) Where is the ground just past the riser face, read from the step limit down?
+        Vector3 groundFrom = new Vector3(contact.X, probeY, contact.Z) + dir * 0.03f;
+        var qGround = PhysicsRayQueryParameters3D.Create(groundFrom, groundFrom + Vector3.Down * (stepMax + 0.05f + 0.5f), CollisionMask);
+        qGround.CollideWithAreas = false;
+        qGround.Exclude = exclude;
+        var hGround = space.IntersectRay(qGround);
+        if (hGround.Count == 0)
+        {
+            if (SmsDebugPrint)
+                GD.Print($"[SMS step] {where} {preMoveState}: no ground within 0.5 m below the feet past the wall, wall stays a wall");
+            return;
+        }
+        Vector3 groundP = (Vector3)hGround["position"];
+        Vector3 groundN = (Vector3)hGround["normal"];
+        GodotObject hit = hGround["collider"].As<GodotObject>();
+        float rise = groundP.Y - feetY;
+        bool levelGeometry = hit is StaticBody3D || hit is AnimatableBody3D || hit is CsgShape3D;
+        if (!levelGeometry || groundN.AngleTo(Vector3.Up) > FloorMaxAngle || rise > stepMax)
+        {
+            if (SmsDebugPrint)
+                GD.Print($"[SMS step] {where} {preMoveState}: rejected, rise {rise:F3} m ({SmsUnits.MetresToUnits(rise):F0} units, limit {SmsUnits.MetresToUnits(stepMax):F0}), top normal.y {groundN.Y:F2}, onto {hit?.GetType().Name} '{(hit as Node)?.Name}' (level geometry {levelGeometry})");
+            return;
+        }
+        if (rise <= 0.01f)
+        {
+            // Level or lower beyond it and nothing above the step limit: a trimesh edge, a lip under a centimetre or a
+            // knee-high rail. Not a wall for the game: no knockdown, no push, no slide, speed kept.
+            velocity.X = preMoveVel.X;
+            velocity.Z = preMoveVel.Z;
+            if (onFloorNow)
+                velocity.Y = 0f;
+            _smsSteppedUp = true;
+            if (SmsDebugPrint)
+                GD.Print($"[SMS step] {where} {preMoveState}: not a wall (ground past it is level, rise {rise:F3} m), speed kept {new Vector2(velocity.X, velocity.Z).Length():F1} m/s");
+            return;
+        }
+        GlobalPosition += remaining + Vector3.Up * rise;
         ApplyFloorSnap();
         velocity.X = preMoveVel.X; // the riser clipped the horizontal speed; the game never saw a wall
         velocity.Z = preMoveVel.Z;
         velocity.Y = 0f;
         _smsSteppedUp = true;
         if (SmsDebugPrint)
-            GD.Print($"[SMS step] {(grounded ? "up" : "landed from " + preMoveState + " on a step")} {rise:F2} m ({SmsUnits.MetresToUnits(rise):F0} units) onto {hit.GetType().Name} '{(hit as Node)?.Name}', remaining {remaining.Length():F3} m, speed kept {new Vector2(velocity.X, velocity.Z).Length():F1} m/s");
+            GD.Print($"[SMS step] {where} {preMoveState}: up {rise:F2} m ({SmsUnits.MetresToUnits(rise):F0} units) onto {hit.GetType().Name} '{(hit as Node)?.Name}', remaining {remaining.Length():F3} m, speed kept {new Vector2(velocity.X, velocity.Z).Length():F1} m/s");
     }
 
     /// <summary>doRunning() + walkEnd() + the skid U-turn, for one physics frame (2 sub-ticks at 60 Hz).</summary>
