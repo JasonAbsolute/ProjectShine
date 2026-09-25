@@ -216,7 +216,7 @@ public partial class Mario : CharacterBody3D
     private float _smsTickAccum = 0f;          // 120 Hz sub-tick remainder
     private readonly SmsHipDrop _smsHipDrop = new SmsHipDrop(); // hipAttacking(): 60-tick hover with lift, then a constant -80/tick fall
     private bool _smsGroundMoved = false;      // this frame's MoveAndSlide was given the walkProcess() ground step (see EndFrame)
-    private float _smsGroundMoveNy = 1f;       // floor normal.y that step was scaled by
+    private float _smsGroundStepScale = 1f;    // factor the horizontal speed handed to MoveAndSlide was scaled by (SmsSlope.GroundStepScale)
     private float _smsFaceYaw = 0f;            // SMS mFaceAngle.y (radians, Godot yaw, world space)
     private bool _smsFaceValid = false;
     private int _smsFaceSource = 0;            // 1 = ground, 2 = air
@@ -3904,19 +3904,24 @@ public partial class Mario : CharacterBody3D
         // One-way leaf platform: pass through when moving upward
         SetCollisionMaskValue(3, velocity.Y <= 0.1f);
 
-        // walkProcess(): on a walkable floor Sunshine steps HORIZONTALLY by vel * normal.y and snaps y to the floor, so the
-        // distance covered along the surface is exactly fwd on any slope (horizontal speed is fwd * cos). Godot's
-        // floor_constant_speed gives that only uphill (it needs a collision with the floor); downhill it moves the full
-        // horizontal step and snaps, 1/cos too fast, and across a slope it is not scaled at all. Hand MoveAndSlide the
-        // scaled step lifted into the floor plane, then undo the scale on what it moved and drop the in-plane vertical
-        // part: SMS keeps mVel.y = 0 on the ground (so no ski-jump off an uphill lip either).
+        // walkProcess(): on a walkable floor Sunshine steps HORIZONTALLY by vel * normal.y and snaps y to the floor, so on
+        // a slope the horizontal speed is fwd * normal.y in EVERY direction: surface speed fwd along the gradient, fwd * ny
+        // across it. Godot's floor_constant_speed (Player.tscn) already keeps the SURFACE speed equal to the horizontal
+        // speed it is handed, uphill (collide, then slide along the floor) and downhill (snap within floor_snap_length,
+        // then redirect along the previous floor plane), so along the gradient it matches the game as is; across a slope
+        // it is 1/ny too fast. SmsSlope.GroundStepScale is that correction (1 along the gradient, ny across), applied to
+        // the horizontal speed only and undone on what Godot moved.
+        // The velocity handed to MoveAndSlide on the ground MUST stay horizontal (or point down). c173ccf lifted it into
+        // the floor plane, which points UP on an uphill: CharacterBody3D reads velocity.dot(up) > 0 as "leaving the
+        // floor" (vel_dir_facing_up) and skips both the floor snap and the constant-speed redirect, so every uphill lip
+        // and every steeper-to-shallower triangle launched him. SMS keeps mVel.y = 0 on the ground and so do we.
         _smsGroundMoved = UseSmsPhysics && IsOnFloor() && !inAirState && velocity.Y <= 0.01f
             && stateOfMario != MarioState.slipping && stateOfMario != MarioState.wallSlide;
         if (_smsGroundMoved)
         {
-            Vector3 floorN = GetFloorNormal();
-            _smsGroundMoveNy = Mathf.Max(floorN.Y, SmsParams.Mario.SlipStart);
-            Velocity = SmsSlope.GroundMoveVelocity(new Vector3(velocity.X, 0f, velocity.Z), floorN);
+            Vector3 hv = new Vector3(velocity.X, 0f, velocity.Z);
+            _smsGroundStepScale = SmsSlope.GroundStepScale(hv, GetFloorNormal());
+            Velocity = new Vector3(hv.X * _smsGroundStepScale, Mathf.Min(velocity.Y, 0f), hv.Z * _smsGroundStepScale);
         }
         else
         {
@@ -3926,8 +3931,8 @@ public partial class Mario : CharacterBody3D
         velocity = Velocity;
         if (_smsGroundMoved)
         {
-            velocity.X /= _smsGroundMoveNy; // a wall's clipping of the step survives the un-scale
-            velocity.Z /= _smsGroundMoveNy;
+            velocity.X /= _smsGroundStepScale; // a wall's clipping of the step survives the un-scale
+            velocity.Z /= _smsGroundStepScale;
             if (IsOnFloor())
                 velocity.Y = 0f;
         }

@@ -79,7 +79,7 @@ public static class SmsSlope
     /// Facing downhill: fwd += SlopeAccelUp * sin; facing uphill: fwd -= SlopeAccelDown * sin; clamp RunningMax.
     /// With the shipped normal-ground values this is a no-op except for the clamp. The velocity it writes is
     /// HORIZONTAL (mVel.y = 0) with magnitude fwd; walkProcess() then scales the step by normal.y and snaps to the
-    /// floor, see <see cref="GroundMoveVelocity"/>.
+    /// floor, see <see cref="GroundStepScale"/>.
     /// </summary>
     public static float RunSlopeTick(float fwd, Vector3 floorNormal, Vector3 faceDir, Surface s = Surface.Normal)
     {
@@ -127,29 +127,26 @@ public static class SmsSlope
     /// <summary>
     /// Ground-move model, from walkProcess():
     ///     next.x = pos.x + (vel.x / 4) * normal.y;   next.z = pos.z + (vel.z / 4) * normal.y;   then snap y to the floor.
-    /// So on a walkable slope the HORIZONTAL step is fwd * cos(slope) and the distance travelled along the surface is
-    /// exactly fwd, uphill, downhill or across (across is slower along the surface too: SMS scales every direction).
-    /// Godot's floor_constant_speed reproduces that only when the motion collides with the floor (going up); going down
-    /// it moves the full horizontal step and snaps, 1/cos too fast. Hand MoveAndSlide this vector instead: the scaled
-    /// horizontal step, lifted into the floor plane so it neither collides with nor leaves the surface. Its length is
-    /// |h| straight up/down the slope. The caller un-scales what Godot moved (divide X/Z by normal.y) and zeroes the
-    /// vertical part afterwards, because SMS keeps mVel.y = 0 on the ground. Only for floors you can stand on
-    /// (normal.y above SlipStart 0.4); flat ground (normal.y = 1) is the identity.
+    /// So on a walkable slope the HORIZONTAL speed is fwd * ny in every direction. Along the gradient that is a surface
+    /// speed of exactly fwd; across the slope the surface speed is fwd * ny (SMS scales every direction by ny).
+    /// Godot's CharacterBody3D with floor_constant_speed keeps the SURFACE speed equal to the horizontal speed handed to
+    /// MoveAndSlide, uphill (collision, slide along the floor, rescale) and downhill (snap within floor_snap_length, then
+    /// redirect along the previous floor plane). Along the gradient it therefore already matches the game; across a slope
+    /// it is 1/ny too fast. This returns the factor to multiply the horizontal speed by so Godot's surface distance equals
+    /// Sunshine's: sqrt(ny^2 + (n_h . dir)^2), which is 1 along the gradient (dir parallel to the horizontal part of the
+    /// normal) and ny across it (dir perpendicular). Flat ground is 1. The caller divides X/Z by it after MoveAndSlide.
+    /// NEVER hand MoveAndSlide a velocity with an upward component while on the ground: Godot reads velocity.dot(up) > 0
+    /// as leaving the floor and skips the floor snap, which launched Mario off every uphill lip (c173ccf).
     /// </summary>
-    public static Vector3 GroundMoveVelocity(Vector3 horizontalVelocity, Vector3 floorNormal)
+    public static float GroundStepScale(Vector3 horizontalVelocity, Vector3 floorNormal)
     {
         float ny = floorNormal.Y;
-        if (ny <= 1e-4f) return horizontalVelocity;
-        var h = new Vector3(horizontalVelocity.X * ny, 0f, horizontalVelocity.Z * ny);
-        return InFloorPlane(h, floorNormal);
-    }
-
-    /// <summary>Same horizontal part, vertical part chosen so the vector lies in the floor plane (dot(v, n) = 0).</summary>
-    public static Vector3 InFloorPlane(Vector3 horizontalVelocity, Vector3 floorNormal)
-    {
-        if (floorNormal.Y <= 1e-4f) return horizontalVelocity;
-        float vy = -(floorNormal.X * horizontalVelocity.X + floorNormal.Z * horizontalVelocity.Z) / floorNormal.Y;
-        return new Vector3(horizontalVelocity.X, vy, horizontalVelocity.Z);
+        if (ny <= 1e-4f || ny >= 1f - 1e-6f) return 1f;
+        var h = new Vector3(horizontalVelocity.X, 0f, horizontalVelocity.Z);
+        float len = h.Length();
+        if (len <= 1e-6f) return 1f;
+        float g = (floorNormal.X * h.X + floorNormal.Z * h.Z) / len; // n_h . dir: +-sin(slope) along the gradient, 0 across
+        return MathF.Sqrt(ny * ny + g * g);
     }
 }
 
@@ -236,13 +233,14 @@ public static class SmsSlopeSelfTest
         // Belly slide: uphill loses 1.5*sin = 0.75 per tick before friction; downhill gains nothing.
         Check("slide uphill delta", SmsSlope.SlideSlopeDeltaFwd(n30, Vector3.Right), -0.75f, 1e-4f);
         Check("slide downhill delta", SmsSlope.SlideSlopeDeltaFwd(n30, Vector3.Left), 0f, 1e-4f);
-        // Ground move: fwd 32 along +X up a 30 deg slope -> horizontal step 32 cos30 = 27.71, lifted into the plane -> |v| = 32.
-        var v = SmsSlope.GroundMoveVelocity(new Vector3(32f, 0f, 0f), n30);
-        Check("ground move horizontal (32 cos 30)", v.X, 27.713f, 0.01f);
-        Check("ground move vy uphill (32 sin 30)", v.Y, 16f, 0.01f);
-        Check("ground move surface speed", v.Length(), 32f, 0.01f);
-        Check("ground move lies in floor plane", v.Dot(n30), 0f, 1e-3f);
-        Check("ground move flat is identity", SmsSlope.GroundMoveVelocity(new Vector3(32f, 0f, 0f), Vector3.Up).X, 32f, 0f);
+        // Ground step vs Godot floor_constant_speed: SMS horizontal speed on the slope is fwd * ny in every direction.
+        // Along the gradient Godot's surface speed already equals fwd (scale 1); across it must drop to fwd * ny.
+        Check("ground step scale uphill (+X)", SmsSlope.GroundStepScale(new Vector3(32f, 0f, 0f), n30), 1f, 1e-4f);
+        Check("ground step scale downhill (-X)", SmsSlope.GroundStepScale(new Vector3(-32f, 0f, 0f), n30), 1f, 1e-4f);
+        Check("ground step scale across (Z) = cos 30", SmsSlope.GroundStepScale(new Vector3(0f, 0f, 32f), n30), 0.8660254f, 1e-4f);
+        Check("ground step scale diagonal", SmsSlope.GroundStepScale(new Vector3(1f, 0f, 1f), n30), 0.935414f, 1e-4f);
+        Check("ground step scale flat is 1", SmsSlope.GroundStepScale(new Vector3(32f, 0f, 0f), Vector3.Up), 1f, 0f);
+        Check("ground step scale stands still is 1", SmsSlope.GroundStepScale(Vector3.Zero, n30), 1f, 0f);
         // Slip threshold: 66.4 deg slips, 60 deg does not.
         Check("slip at n.y 0.39", SmsSlope.SlipStarts(new Vector3(0.92f, 0.39f, 0f)) ? 1f : 0f, 1f, 0f);
         Check("no slip at 60 deg", SmsSlope.SlipStarts(new Vector3(0.866f, 0.5f, 0f)) ? 1f : 0f, 0f, 0f);
