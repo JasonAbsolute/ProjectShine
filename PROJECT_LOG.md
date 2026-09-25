@@ -1479,7 +1479,7 @@ The old code froze 7 / 20 frames; the triple no longer locks you for a third of 
 
 | Situation | Rule |
 |---|---|
-| Jump hits a wall | < 16: stop against it, keep falling · 16–40: wall slide · > 40: knockdown |
+| Jump hits a wall | only when the wall is **in front of the face** (normal within ±65.9° of it, `checkGroundAtJumping`); then on the speed **along the face**: ≤ 16: stop against it, keep falling · 16–40: wall slide · > 40: knockdown. A wall behind or beside the face is not a hit: he presses against it and keeps falling |
 | Dive (airborne) hits a wall | knockdown at **any** speed (`jumpCatch`), mirrored path (`Bounce`), rising speed cut to 0 |
 | Belly slide hits a wall | > 16: knockdown (`slippingBasic` → `CATCH_DOWN`, mirrored) · ≤ 16: stop dead, get up (`CATCH_LOST`) |
 | Running into a wall | > 40: knockdown with no hop (unreachable above the run cap 32 without borrowed speed) |
@@ -1489,6 +1489,8 @@ Knockdown: 16/tick backwards (6.4 m/s), vertical speed left alone (no pop), no e
 its own on top of the general one — removed). On touchdown `SHORT_BACK_DOWN`: slide decays ×0.96/tick (~1.3 m)
 while `ma_sdown` plays to the end, uninterruptible, then get-up, then WAIT. Normal jumps cap at 32, so air knockdowns
 come from roll-jumps and dives, and ground knockdowns only from borrowed speed (roll-jump run-out, downhill).
+The face is fixed for the whole jump (`doJumping` never turns it; the back stick drives the forward speed negative instead,
+to −16), so pulling back toward a wall he just kicked, or drifting sideways into one he is flying past, never grabs it.
 Wall slide: velocity zeroed for the first **10** ticks (83 ms; `stayWall` advances its timer twice per pinned tick), then
 `vy = −0.5·timer` with the timer already at 21 — −10.5 (−4.2 m/s) at once — capped at −30 (−12.1 m/s) from tick 50; the
 position is nudged into the wall each tick (`WALL_STICK_SPEED`); the stick does nothing; the slide ends only by A (kick),

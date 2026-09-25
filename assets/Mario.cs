@@ -220,6 +220,7 @@ public partial class Mario : CharacterBody3D
     private float _smsFaceYaw = 0f;            // SMS mFaceAngle.y (radians, Godot yaw, world space)
     private bool _smsFaceValid = false;
     private int _smsFaceSource = 0;            // 1 = ground, 2 = air
+    private ulong _smsWallNoHitDbgFrame = 0;   // last physics frame the 'wall not in front of the face' line printed
     private Vector3 _smsLatchedFacing = Vector3.Zero;
     private float _smsTrueVy = 0f;             // post-gravity vertical speed (m/s); Godot moves with the sub-tick average
     private float _smsMoveVyMps = 0f;
@@ -6846,6 +6847,14 @@ public partial class Mario : CharacterBody3D
         // Store incoming horizontal direction for angled wall-kicks
         Vector3 vXZ = new Vector3(incomingVel.X, 0, incomingVel.Z);
         wallIncomingDirXZ = (vXZ.Length() > 0.001f) ? vXZ.Normalized() : Vector3.Zero;
+        if (UseSmsPhysics && _smsFaceValid)
+        {
+            // playerRefrection(0) mirrors the FACE across the wall normal (2*ang - face), not the velocity: he slides facing
+            // the mirror of the way he was facing, and the kick leaves along it.
+            Vector3 f = SmsMath.DirFromYaw(_smsFaceYaw);
+            if (f.LengthSquared() > 1e-6f)
+                wallIncomingDirXZ = f.Normalized();
+        }
 
         // Plan kick dir now (used for facing + jump)
         Vector3 nNow = GetWallNormal();
@@ -7070,15 +7079,30 @@ public partial class Mario : CharacterBody3D
             // jumpingBasic() case 2 (any jump state that really hits a wall): fwd > ClashSpeed (40) -> knocked down
             // (JUMP_SHORT_BACK_DOWN: 16/tick backwards, vertical speed untouched); 16 < fwd <= 40 -> wall slide;
             // fwd <= 16 -> he just stops against the wall and keeps falling.
-            // checkGroundAtJumping(): a wall hit needs the face within mClashAngle (12000 BAM = 65.9 deg) of head-on.
+            // checkGroundAtJumping(): the wall is HIT only when it is in front of the FACE -- its normal within mClashAngle
+            // (12000 BAM = 65.9 deg) of the face reversed. The velocity is never consulted, and doJumping() never turns the
+            // face in the air, so drifting backwards into the wall he just kicked (mForwardVel < 0) or sideways into a wall
+            // he is flying past (sideVel) is not a hit: he presses against it and keeps falling under normal air control.
+            Vector3 smsFace = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : new Vector3(lastFacingDirection.X, 0f, lastFacingDirection.Z);
+            if (smsFace.LengthSquared() < 1e-6f)
+                return;
+            smsFace = smsFace.Normalized();
             float smsApproachMin = MathF.Cos(SmsParams.Jump.ClashAngle * SmsUnits.BamToRad); // 0.41
-            bool smsHitWall = speed > 1e-4f && (vXZ / speed).Dot(-nXZ) >= smsApproachMin
+            float smsFaceDot = smsFace.Dot(-nXZ);
+            bool smsHitWall = smsFaceDot >= smsApproachMin
                 && stateOfMario != MarioState.bonk
                 && airStateAtContact != MarioState.groundPoundFalling
                 && airStateAtContact != MarioState.groundPoundStartup;
+            if (!smsHitWall && SmsDebugPrint && speed > 1e-4f && (vXZ / speed).Dot(-nXZ) >= smsApproachMin
+                && Engine.GetPhysicsFrames() - _smsWallNoHitDbgFrame > 30)
+            {
+                _smsWallNoHitDbgFrame = Engine.GetPhysicsFrames();
+                GD.Print($"[SMS wall] {airStateAtContact} pressing on a wall that is not in front of the face (face.-n {smsFaceDot:F2} < 0.41, fwd {SmsUnits.MpsToSpeed(vXZ.Dot(smsFace)):F1}): no hit, keeps falling");
+            }
             if (smsHitWall)
             {
-                float smsFwd = SmsUnits.MpsToSpeed(speed);
+                // jumpingBasic() case 2 tests mForwardVel: the signed speed ALONG the face, not the speed into the wall.
+                float smsFwd = SmsUnits.MpsToSpeed(vXZ.Dot(smsFace));
                 if (airStateAtContact == MarioState.bellyRollout)
                 {
                     // catchStop() case 2: the small roll into any wall just stops (setPlayerVelocity(0)) and lands.
@@ -7109,14 +7133,14 @@ public partial class Mario : CharacterBody3D
                 }
                 if (smsFwd > SmsParams.Mario.ClashSpeed)
                 {
-                    SmsEnterBonk(-(vXZ / speed), velocity.Y, "air wall hit", smsFwd);
+                    SmsEnterBonk(-smsFace, velocity.Y, "air wall hit", smsFwd);
                     return;
                 }
                 if (smsFwd <= SmsParams.Timing.AirWallSlideMinFwd)
                 {
                     velocity.X = 0f;
                     velocity.Z = 0f;
-                    if (SmsDebugPrint)
+                    if (SmsDebugPrint && Mathf.Abs(smsFwd) > 0.5f)
                         GD.Print($"[SMS wall] air hit at fwd {smsFwd:F1} (<= 16) from {airStateAtContact}: stop against the wall, keep falling");
                     return;
                 }
@@ -7128,7 +7152,7 @@ public partial class Mario : CharacterBody3D
                 EnterWallSlide(preSlideVelocity);
                 return;
             }
-            return; // glancing contact (the game's 60..120 deg band), a knockdown in progress or a ground pound: not a wall hit
+            return; // the wall is not in front of the face (beyond +-65.9 deg), a knockdown in progress or a ground pound: not a wall hit
         }
         if (speed < minSpeed)
             return;
