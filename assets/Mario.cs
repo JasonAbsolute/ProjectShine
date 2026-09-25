@@ -237,6 +237,7 @@ public partial class Mario : CharacterBody3D
     [Export] public bool SmsLedgeSnap = true;   // checkGroundAtWalking: step DOWN ledges up to 100 units (1.34 m) without leaving the ground (floor_snap_length)
     [Export] public bool SmsStepUp = true;      // checkGroundAtWalking: step UP risers up to 30 units (0.40 m) without breaking stride
     [Export] public int SmsWallSlidePinTicks = 4;     // stayWall(): 120 Hz ticks of zero velocity when the slide begins. Game value 10 (83 ms, felt sticky); 4 (33 ms) by request, playtested; 0 = slides at once
+    [Export] public bool SmsWallSlideDive = true;      // stayWall() -> checkBackTrig(): B during a wall slide dives along the face, INTO the wall, and bounces off into the knockdown. Off = B does nothing on a wall
     [Export] public bool SmsRollJumpKnockdown = false; // DEVIATION: decomp jumpingBasic() knocks the roll-jump (fwd 55 > ClashSpeed 40) down on a head-height wall; Jaysonn (2026-09-24) wants the wall slide he remembers from the game. true = the code's rule
     private bool _smsSteppedUp = false;         // this frame's grounded MoveAndSlide hit a riser he has since stepped onto
     [Export] public float SmsRollJumpMinSpeed = 20f; // catching(): slide speed (SMS units/tick) above which A is the big roll-jump. Game value: mario.prm mClashSpeed = 40 (big roll only within ~0.13 s of touchdown); 20 chosen by feel (Jaysonn, 2026-09-24) -- a deliberate deviation
@@ -3614,44 +3615,7 @@ public partial class Mario : CharacterBody3D
                 && stateOfMario != MarioState.ledgeHopUp
             )
             {
-                // Enter ground pound startup — freeze in air and play startup anim
-                stateOfMario = MarioState.groundPoundStartup;
-                // Play directly via AnimationPlayer (bypass SetMarioState to avoid
-                // the animTree.Active=true / animPlayer.Stop at the top of that method)
-                if (animTree != null)
-                    animTree.Active = false;
-                animPlayer.Play("ma_hipsr");
-                velocity = Vector3.Zero;
-                isJumping = false;
-                isSpining(false);
-
-                // Fix facing — sideflip and spin jump both have offset/spinning armature
-                // Always snap to the stored takeoff direction from whichever state we came from
-                Vector3 gpFaceDir = Vector3.Zero;
-                if (spinJumpDirLocked && spinJumpTakeoffDir != Vector3.Zero)
-                    gpFaceDir = spinJumpTakeoffDir;
-                else if (sideFlipDirLocked && sideFlipTakeoffDir != Vector3.Zero)
-                    gpFaceDir = sideFlipTakeoffDir;
-                else if (lastFacingDirection != Vector3.Zero)
-                    gpFaceDir = lastFacingDirection;
-                else
-                    gpFaceDir = Vector3.Forward;
-
-                gpFaceDir = gpFaceDir.Normalized();
-                lastFacingDirection = gpFaceDir;
-                armature.Rotation = new Vector3(0f, BaseYawFromDir(gpFaceDir), 0f);
-
-                sideFlipDirLocked = false;
-                sideFlipLockedYaw = 0f;
-                _sideFlipLanding = false;
-                spinJumpDirLocked = false;
-                _groundPoundStalling = false;
-                _groundPoundSlpedPlaying = false;
-                _smsHipDrop.Reset();
-                _smsTrueVyValid = false;
-                if (UseSmsPhysics && SmsDebugPrint)
-                    GD.Print($"[SMS gp] R pressed: hover {SmsParams.Timing.HipDropHangTicks / SmsUnits.TicksPerSecond:F2} s with a {SmsUnits.UnitsToMetres(102.5f):F2} m lift, then fall at {SmsUnits.SpeedToMps(SmsParams.Jump.HipAttackSpeedY):F1} m/s");
-
+                StartGroundPoundFromAir();
                 goto EndFrame;
             }
 
@@ -6826,6 +6790,49 @@ public partial class Mario : CharacterBody3D
         }
     }
 
+    /// <summary>Air ground pound startup (R): the hover, then the fall. Also HIP_DROP out of a wall slide (stayWall() ->
+    /// checkBackTrig()). Moved out of the main loop unchanged.</summary>
+    private void StartGroundPoundFromAir()
+    {
+        // Enter ground pound startup — freeze in air and play startup anim
+        stateOfMario = MarioState.groundPoundStartup;
+        // Play directly via AnimationPlayer (bypass SetMarioState to avoid
+        // the animTree.Active=true / animPlayer.Stop at the top of that method)
+        if (animTree != null)
+            animTree.Active = false;
+        animPlayer.Play("ma_hipsr");
+        velocity = Vector3.Zero;
+        isJumping = false;
+        isSpining(false);
+
+        // Fix facing — sideflip and spin jump both have offset/spinning armature
+        // Always snap to the stored takeoff direction from whichever state we came from
+        Vector3 gpFaceDir = Vector3.Zero;
+        if (spinJumpDirLocked && spinJumpTakeoffDir != Vector3.Zero)
+            gpFaceDir = spinJumpTakeoffDir;
+        else if (sideFlipDirLocked && sideFlipTakeoffDir != Vector3.Zero)
+            gpFaceDir = sideFlipTakeoffDir;
+        else if (lastFacingDirection != Vector3.Zero)
+            gpFaceDir = lastFacingDirection;
+        else
+            gpFaceDir = Vector3.Forward;
+
+        gpFaceDir = gpFaceDir.Normalized();
+        lastFacingDirection = gpFaceDir;
+        armature.Rotation = new Vector3(0f, BaseYawFromDir(gpFaceDir), 0f);
+
+        sideFlipDirLocked = false;
+        sideFlipLockedYaw = 0f;
+        _sideFlipLanding = false;
+        spinJumpDirLocked = false;
+        _groundPoundStalling = false;
+        _groundPoundSlpedPlaying = false;
+        _smsHipDrop.Reset();
+        _smsTrueVyValid = false;
+        if (UseSmsPhysics && SmsDebugPrint)
+            GD.Print($"[SMS gp] R pressed: hover {SmsParams.Timing.HipDropHangTicks / SmsUnits.TicksPerSecond:F2} s with a {SmsUnits.UnitsToMetres(102.5f):F2} m lift, then fall at {SmsUnits.SpeedToMps(SmsParams.Jump.HipAttackSpeedY):F1} m/s");
+    }
+
     private void EnterWallSlide(Vector3 incomingVel)
     {
         // Wall sliding takes over from every airborne move; spin visuals must not
@@ -6943,9 +6950,39 @@ public partial class Mario : CharacterBody3D
         if (!UseSmsPhysics && velocity.Y < WALL_SLIDE_MAX_FALL)
             velocity.Y = WALL_SLIDE_MAX_FALL;
 
-        // Only allowed action: wall kick
+        // stayWall(): A -> wall kick. Then checkBackTrig(): L -> HIP_DROP straight down the wall; B -> JUMP_CATCH along the
+        // face, which during the slide points INTO the wall (the approach mirrored across the normal), at fwd 48 with the
+        // slide's vy. Next frame the dive hits the wall (jumpCatch() case 2): playerRefrection(1) and JUMP_SHORT_BACK_DOWN, so
+        // he bounces off backwards into the knockdown. That is the game's B on a wall; SmsWallSlideDive turns it off.
         if (Input.IsActionJustPressed("button_a"))
+        {
             DoWallJump();
+            return;
+        }
+        if (UseSmsPhysics && Input.IsActionJustPressed("button_r"))
+        {
+            if (SmsDebugPrint)
+                GD.Print("[SMS wall] R during the slide: HIP_DROP down the wall");
+            StartGroundPoundFromAir();
+            return;
+        }
+        if (UseSmsPhysics && SmsWallSlideDive && Input.IsActionJustPressed("button_b"))
+        {
+            Vector3 into = -wallPlannedKickDir; // the slide face: the approach mirrored across the wall, pointing into it
+            if (into.LengthSquared() < 1e-6f)
+                into = -new Vector3(lastWallNormal.X, 0f, lastWallNormal.Z);
+            if (into.LengthSquared() < 1e-6f)
+                return;
+            into = into.Normalized();
+            stateOfMario = MarioState.diving;
+            SetMarioState(stateOfMario);
+            SmsLatchFace(into, 2);
+            SmsSetDiveVelocity(into, fromGround: false); // JumpCatchAir launch: fwd = min(15 + 80, 48), vy kept
+            wallSlideLostWallFrames = 0;
+            if (SmsDebugPrint)
+                GD.Print($"[SMS wall] B during the slide: dive along the face, into the wall at 48 ({SmsUnits.SpeedToMps(48f):F1} m/s); the wall hit bounces him off backwards (knockdown)");
+            return;
+        }
     }
 
     private void DoWallJump()
