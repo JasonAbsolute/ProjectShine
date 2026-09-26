@@ -1838,6 +1838,42 @@ Debug: `[SMS air] under: head … m below the surface, N air`, `[SMS air] N left
 `[SMS air] meter: air, N segments` / `meter: back to HP N`, `[SMS air] DROWNED after … s under; R respawns`,
 `[SMS damage] hit under water: -N AIR` / `hit in the water: -N HP`.
 
+### FLUDD (`TWaterGun`, `Watergun.cpp`; `MarioUpper.cpp`) — S1: the pack
+
+The port had no FLUDD; the rips do: `models/Koopa/mario/watergun2/` has the tank (`wg_mdl1`: joints `nozzle_center`,
+`waterline`, the handles; clips `wg_pump`, `wg_house`, `wg_hgpmp`, `wg_sqpmp`, `wg_fepmp`, `wg_rspmp`), the nozzles
+(`normal_wg`, `hover_wg`, `rocket_wg`, `back_wg` = the turbo, `yoshi_wg`, `dummy_wg`) each with its `null_G_muzzle` emitter
+(the hover has two) and `_change_start/end`, `_shooting`, `_shoot_start/end` clips, and Mario's `ma_pump`, `ma_turbo_dash`.
+**The game's numbers** (shipped prms; the whole reading in the repo notes): tanks spray/hover 10000, rocket/turbo 2100; a
+drop costs 1 (rocket 35); in water the tank refills `150 × R × SuckRate` a tick (spray 1.0, hover 0.5, rocket 0.2, turbo 0.1);
+a hit costs 250 (hover 0); a nozzle swap keeps the fill fraction. The trigger nozzles charge `+150 × R − bleed` a tick to a
+max, then spray for a set time, then are dead until R is released: hover bleed 0 / max 1 / 360 ticks (instant, 3 s), rocket
+105 / 8000 / 5 ticks (1.5 s of charge at full R, then 5 ticks of `vy += 35` = +175), turbo 100 / 4500 / endless. The hover's
+lift is Mario's own spring (`vy = (pressY + 230 − y) × 0.02`, `fwd × 0.985`, `ROCKET` status); the turbo's speed is Mario's
+dash (`mDashSpeed` ramps 0.5 a tick to 32 replacing the stick, then the run is forced to 80).
+
+**S1 (this commit).** The gun's base matrix is the `chn_chest` animated matrix (`calcAnim`: `setBaseTRMtx(getAnmMtx(
+mJointIdChnChest))`, with a small roll tweak from the chest tilt — not ported yet); the nozzle hangs off the tank's
+`nozzle_center`. Port: `BoneAttachment3D` "SmsFluddAttach" on `chn_chest` carrying `wg_mdl1.glb` (identity offset, the
+skeleton's scale), "SmsNozzleAttach" on the tank's `nozzle_center` carrying the four nozzle glbs, the current one visible.
+- **X** (`gunExec` → `changeBackup`): the swap tween runs 0 → 1 (to the second nozzle, the hover by default) or 1 → 0 (back to
+  the spray) at `ChangeSpeed` 0.1 a tick; crossing 0.5 swaps the model. The leaving nozzle scrubs its `_change_start` by the
+  tween, the arriving one its `_change_end` (the spray nozzle uses its `house_` variants while housed).
+- **R** (analog; `checkPumping` / `stateMachineUpper`): R > 0 → `PUMPING`; released → `HOLDING_PUMP` for `PumpWaitTime` 5
+  ticks → `IDLE`; `checkPumpEnable`: nothing carried, not switching nozzles, the clip allows it (ours: not hurt / dead /
+  talking / shine / the ledge climbs). The upper body plays the pump clip (`addUpper`, ping-pong) over the legs: the tree's
+  upper-body Blend2 (`CarryBlend`) with its `Animation 2` input pointed at `ma_pump` while pumping (`ma_carry_p` when carrying).
+- **The tank** (`calcAnimation`): pumping / holding deploys it 0.1 a tick (`wg_house` scrubbed by the progress), then plays
+  `wg_pump` (`wg_hgpmp` hanging) and resets a 360-tick hold; idle past the hold houses it again 0.005 a tick.
+- **The nozzle clips** (the BCK index order is the rip's alphabetical order): trigger nozzles `shoot_start` once → `shooting`
+  while spraying → `shoot_end` held; the spray nozzle `normal_wg_house` by the stow, `normal_wg_shooting` while spraying (its
+  shoot_start / shoot_end are 2 of the game's 8 clips the rip lacks; `wg_swpmp` is missing too → `wg_pump`).
+- S1 has no water, no spray, no hover / rocket / turbo: "spraying" for the clips = pumping with R down and the pack deployed.
+Debug: `[SMS fludd] pack on chn_chest: …` (setup), `upper Pumping (R 0.73), nozzle Hover, housed 0.00`, `X: -> Hover`,
+`nozzle -> Hover`, `deployed` / `housed`.
+Next: S2 tank + spray (drops from the muzzle's +X, the water, the refill, the waterline joint, a gauge), S3 hover, S4 rocket,
+S5 turbo (surf).
+
 ### Deliberate deviations from the game
 
 - `SmsRollJumpMinSpeed = 20` (game 40) — feel.
@@ -1938,6 +1974,7 @@ ground has to carry upward velocity (launches do) or exceed 1.34 m.
 - Surface types and the floor slip: done, see Surface types. Tagging the plaza's surfaces is editor work.
 - Ledge hang: done, see Ledge hang. Not ported: the fence catch (`FENCE_CATCH`), the hang-under-roof states
   (`HANG_ROOF` / `MOVE_ROOF`).
+- FLUDD: S1 (the pack, X swap, R pump, deploy / house) done, see FLUDD. Next S2 water + spray, S3 hover, S4 rocket, S5 turbo.
 - Swimming: done, see Swimming and Air. Needs the level's water Area3D (`sms_water`). Not ported: the FLUDD surf, the
   fence catch from water, the effects and sounds, the swimming camera, coins refilling air.
 - Damage: done, see Damage. Not ported: the type-3 upper-body damage run

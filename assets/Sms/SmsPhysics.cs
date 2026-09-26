@@ -181,6 +181,29 @@ public static class SmsParams
         public const float DescentDropUnits = 160f;     // ... and the ground beyond must be more than this below
     }
 
+    public static class Fludd // /mario/watergun.prm, upperbody.prm, the nozzle prms (shipped) + Watergun.cpp's constants
+    {
+        public const float ChangeSpeed = 0.1f;          // the nozzle swap tween a tick (10 ticks); PARAM_INIT (not in the shipped prm)
+        public const float DeployRate = 0.1f;           // unk1CEC -= a tick while pumping (housed 1 -> deployed 0)
+        public const float StowRate = 0.005f;           // unk1CF4: unk1CEC += a tick when idle (deployed -> housed in 200 ticks)
+        public const int StowHoldTicks = 360;           // unk1CF8: the pack stays out this long after the last pump
+        public const int PumpWaitTime = 5;              // upperbody.prm: the pump pose is held this long after R is released
+        public const float PumpAnmSpeed = 0.015f;       // upperbody.prm: the empty-tank pumping rate (x R)
+        public const float HoverHeight = 230f;          // watergun.prm: the hover's target above the press height (S3)
+        // the tanks, indexed spray, hover, rocket, turbo: capacity, water per drop, refill per pressure (0..150) a tick, lost on a hit
+        public static readonly int[] AmountMax = { 10000, 10000, 2100, 2100 };
+        public static readonly int[] DecRate = { 1, 1, 35, 1 };
+        public static readonly float[] SuckRate = { 1f, 0.5f, 0.2f, 0.1f };
+        public static readonly int[] DamageLoss = { 250, 0, 250, 250 };
+        // the trigger nozzles (hover, rocket, turbo): charge += 150 * R - Dec a tick, clamp Max -> ACTIVE for Time ticks -> DEAD until R = 0
+        public static readonly float[] TriggerDec = { 0f, 0f, 105f, 100f };
+        public static readonly float[] TriggerMax = { 0f, 1f, 8000f, 4500f };
+        public static readonly int[] TriggerTime = { 0, 360, 5, 32767 };
+        public static readonly float[] EmitPow = { 50f, 37.5f, 50f, 40f };       // the drop's launch speed at full pressure
+        public static readonly float[] ReactionY = { 0.043f, 0f, 0.7f, 0.002f };  // mVel.y += -dir.y * pow * this per emitting tick
+        public static readonly float[] ReactionPow = { 0.005f, 0.005f, 0f, 0.002f };
+    }
+
     public static class Swim // /mario/swim.prm (shipped) + run.prm's SwimDepth / InWaterBrake + doSwimming's constants
     {
         public const float StartSp = 8f;

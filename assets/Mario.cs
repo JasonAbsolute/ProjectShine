@@ -189,6 +189,33 @@ public partial class Mario : CharacterBody3D
     private bool _smsAirHudShown = false;
     private int _smsAirUnitsShown = -1;
     private bool _smsDrowned = false;              // SWIM_DOWN / SWIM_P_DOWN: only R gets him out
+    // FLUDD (TWaterGun): see SmsFluddSetup / SmsFluddTick
+    private enum SmsNozzle { Spray = 0, Hover = 1, Rocket = 2, Turbo = 3 }
+    private enum SmsUpper { Idle, Pumping, HoldingPump }         // mUpperState
+    private static readonly string[] SmsNozzleFolder = { "normal_wg", "hover_wg", "rocket_wg", "back_wg" };
+    private bool _fluddReady = false;
+    private BoneAttachment3D _fluddAttach;
+    private Node3D _fluddTank;
+    private Skeleton3D _fluddTankSkel;
+    private AnimationPlayer _fluddTankAnim;
+    private Node _fluddNozzleParent;
+    private readonly Node3D[] _fluddNozzleNode = new Node3D[4];
+    private readonly AnimationPlayer[] _fluddNozzleAnim = new AnimationPlayer[4];
+    private SmsNozzle _fluddNozzle = SmsNozzle.Spray;   // mCurrentNozzle
+    private SmsNozzle _fluddSecond = SmsNozzle.Hover;   // mSecondNozzle
+    private float _fluddSwitch = 0f;                    // mSwitchToSecondNozzleProgress: 0 spray .. 1 the second nozzle
+    private float _fluddSwitchSpeed = 0f;               // mSwitchToSecondNozzleSpeed (+-ChangeSpeed a tick, 0 at rest)
+    private float _fluddStow = 1f;                      // unk1CEC: 1 housed .. 0 deployed
+    private int _fluddStowHold = 0;                     // unk1CFA: ticks the pack stays deployed after the last pump
+    private SmsUpper _fluddUpper = SmsUpper.Idle;
+    private SmsUpper _fluddDbgUpper = SmsUpper.Idle;
+    private int _fluddPumpCooldown = 0;                 // mPumpCooldown
+    private float _fluddR = 0f;                         // the R analog, 0..1 (the game: mAnalogR, pressure = R * 150)
+    private int _fluddNozzleAnimState = 2;              // TNozzleBase::animation unk36C for the trigger nozzles
+    private int _fluddSprayAnimState = 0;               // TNozzleDeform::animation unk36C for the spray nozzle
+    private float _fluddTickAccum = 0f;
+    private string _fluddUpperAnim = "";
+    private bool SmsFluddUpperBlend => _fluddReady && _fluddUpper != SmsUpper.Idle && heldBody == null;
     // waiting(): mHealth <= 3 -> ANIM_DAMAGE_WAIT_START once, then ANIM_DAMAGE_WAIT (library-only clips, driven directly)
     private int _smsDamageWaitPhase = 0;      // 0 off, 1 ma_damage_wait_start playing, 2 ma_damage_wait looping
     private double _smsDamageWaitPos = 0.0;   // clip position to resume from when idle is re-entered mid-pant
@@ -1588,6 +1615,7 @@ public partial class Mario : CharacterBody3D
         _tree = GetNode<AnimationTree>("AnimationTree");
 
         ForceLoop("ma_pivot");
+        SmsFluddSetup(); // the pack on his back (FLUDD S1)
         ForceLoop("ma_sstep");
         ForceLoop("ma_wait");
         ForceLoop("ma_t_wait");
@@ -2101,6 +2129,7 @@ public partial class Mario : CharacterBody3D
         {
             SmsWaterCheck();      // playerControl(): the water surface at the feet, every tick
             SmsAirTick(delta);    // mAir drains with the head under, refills out; the meter turns to air after 2 s under
+            SmsFluddTick(delta);  // the R analog, X, the upper body, the nozzle swap, the pack's clips
             SmsWaterEntryCheck(); // deep water -> SWIM_START, from any status
             if (stateOfMario == MarioState.swimming)
             {
@@ -10794,7 +10823,7 @@ public partial class Mario : CharacterBody3D
         bool isCarrying = (heldBody != null);
 
         // Smooth blend transition
-        float targetBlend = isCarrying ? 1.0f : 0.0f;
+        float targetBlend = (isCarrying || SmsFluddUpperBlend) ? 1.0f : 0.0f; // the FLUDD pump rides the same upper-body blend
         carryBlend = Mathf.MoveToward(carryBlend, targetBlend, dt * CARRY_BLEND_SPEED);
 
         // Update the carry blend parameter if the tree is active
@@ -11791,6 +11820,400 @@ public partial class Mario : CharacterBody3D
         }
     }
 
+    // ---------------------------------------------------------------------------------------------------------------
+    // FLUDD (TWaterGun, Watergun.cpp; MarioUpper.cpp). S1: the pack on chn_chest, X swaps the nozzles with the change clips,
+    // R pumps the upper body (ma_pump through the tree's upper-body Blend2), the tank deploys and houses itself (wg_house),
+    // the nozzles' shoot clips. No water yet (S2), no hover / rocket / turbo (S3-S5).
+    // ---------------------------------------------------------------------------------------------------------------
+
+    private static PackedScene SmsLoadScene(string basePath)
+    {
+        foreach (string ext in new[] { ".glb", ".fbx" })
+        {
+            string p = basePath + ext;
+            if (ResourceLoader.Exists(p))
+                return ResourceLoader.Load<PackedScene>(p);
+        }
+        return null;
+    }
+
+    private static T SmsFindChild<T>(Node root) where T : Node
+    {
+        if (root is T t)
+            return t;
+        foreach (Node c in root.GetChildren())
+        {
+            var r = SmsFindChild<T>(c);
+            if (r != null)
+                return r;
+        }
+        return null;
+    }
+
+    /// <summary>The pack: the tank on the chn_chest bone, the nozzles on the tank's nozzle_center joint, all from the rips.</summary>
+    private void SmsFluddSetup()
+    {
+        if (skeleton == null || skeleton.FindBone("chn_chest") < 0)
+        {
+            GD.PushWarning("[SMS fludd] no chn_chest bone: no FLUDD");
+            return;
+        }
+        const string dir = "res://models/Koopa/mario/watergun2/";
+        var tankScene = SmsLoadScene(dir + "body/wg_mdl1/wg_mdl1");
+        if (tankScene == null)
+        {
+            GD.PushWarning("[SMS fludd] wg_mdl1 (the tank) not found under " + dir);
+            return;
+        }
+        _fluddAttach = new BoneAttachment3D { Name = "SmsFluddAttach", BoneName = "chn_chest" }; // setBaseTRMtx(getAnmMtx(chn_chest))
+        skeleton.AddChild(_fluddAttach);
+        _fluddTank = tankScene.Instantiate<Node3D>();
+        _fluddAttach.AddChild(_fluddTank);
+        _fluddTankSkel = SmsFindChild<Skeleton3D>(_fluddTank);
+        _fluddTankAnim = SmsFindChild<AnimationPlayer>(_fluddTank);
+        if (_fluddTankSkel != null && _fluddTankSkel.FindBone("nozzle_center") >= 0)
+        {
+            var na = new BoneAttachment3D { Name = "SmsNozzleAttach", BoneName = "nozzle_center" };
+            _fluddTankSkel.AddChild(na);
+            _fluddNozzleParent = na;
+        }
+        else
+        {
+            GD.PushWarning("[SMS fludd] the tank has no nozzle_center bone; the nozzles sit at its bind position");
+            var n = new Node3D { Name = "SmsNozzleAttach", Position = new Vector3(72.01f, -39.99f, 0f) };
+            _fluddTank.AddChild(n);
+            _fluddNozzleParent = n;
+        }
+        for (int i = 0; i < 4; i++)
+        {
+            string f = SmsNozzleFolder[i];
+            var sc = SmsLoadScene($"{dir}{f}/{f}/{f}");
+            if (sc == null)
+            {
+                GD.PushWarning($"[SMS fludd] nozzle model {f} not found");
+                continue;
+            }
+            var node = sc.Instantiate<Node3D>();
+            _fluddNozzleParent.AddChild(node);
+            _fluddNozzleNode[i] = node;
+            _fluddNozzleAnim[i] = SmsFindChild<AnimationPlayer>(node);
+            node.Visible = i == (int)_fluddNozzle;
+        }
+        // the pump clips ping-pong (addUpper: ATTR_PING_PONG_LOOP; the tank's are slaved to Mario's)
+        if (animPlayer.HasAnimation("ma_pump"))
+            animPlayer.GetAnimation("ma_pump").LoopMode = Animation.LoopModeEnum.Pingpong;
+        if (_fluddTankAnim != null)
+            foreach (string a in _fluddTankAnim.GetAnimationList())
+                if (a.Contains("pmp") || a.Contains("pump"))
+                    _fluddTankAnim.GetAnimation(a).LoopMode = Animation.LoopModeEnum.Pingpong;
+        for (int i = 0; i < 4; i++)
+            if (_fluddNozzleAnim[i] != null && _fluddNozzleAnim[i].HasAnimation(SmsNozzleFolder[i] + "_shooting"))
+                _fluddNozzleAnim[i].GetAnimation(SmsNozzleFolder[i] + "_shooting").LoopMode = Animation.LoopModeEnum.Linear;
+        _fluddReady = true;
+        SmsFluddPoseTank();
+        SmsFluddNozzleAnim();
+        if (SmsDebugPrint)
+        {
+            string tankClips = _fluddTankAnim == null ? "none" : string.Join(", ", _fluddTankAnim.GetAnimationList());
+            string hoverClips = _fluddNozzleAnim[1] == null ? "none" : string.Join(", ", _fluddNozzleAnim[1].GetAnimationList());
+            GD.Print($"[SMS fludd] pack on chn_chest: tank bones {_fluddTankSkel?.GetBoneCount() ?? 0}, nozzle_center {(_fluddNozzleParent is BoneAttachment3D ? "yes" : "NO")}, tank clips [{tankClips}], hover clips [{hoverClips}]; spray on, hover second, housed");
+        }
+    }
+
+    /// <summary>playerControl()'s FLUDD part for one physics frame: the R analog, X, the upper-body state, the swap tween,
+    /// the deploy / stow, the clips.</summary>
+    private void SmsFluddTick(double delta)
+    {
+        if (!_fluddReady)
+            return;
+        int n = SmsUnits.TicksFor(delta, ref _fluddTickAccum);
+        _fluddR = Input.GetActionStrength("button_r");
+        // gunExec(): X swaps to the second nozzle and back (changeBackup: only from a finished tween)
+        if (Input.IsActionJustPressed("button_x") && stateOfMario != MarioState.hurt && stateOfMario != MarioState.dead)
+        {
+            if (_fluddSwitch <= 0f)
+            {
+                _fluddSwitchSpeed = SmsParams.Fludd.ChangeSpeed;
+                if (SmsDebugPrint) GD.Print($"[SMS fludd] X: -> {_fluddSecond} (10 ticks)");
+            }
+            else if (_fluddSwitch >= 1f)
+            {
+                _fluddSwitchSpeed = -SmsParams.Fludd.ChangeSpeed;
+                if (SmsDebugPrint) GD.Print("[SMS fludd] X: -> Spray (10 ticks)");
+            }
+        }
+        for (int i = 0; i < n; i++)
+        {
+            SmsFluddUpperTick();
+            SmsFluddSwitchTick();
+            SmsFluddStowTick();
+        }
+        if (_fluddUpper != _fluddDbgUpper)
+        {
+            _fluddDbgUpper = _fluddUpper;
+            if (SmsDebugPrint) GD.Print($"[SMS fludd] upper {_fluddUpper} (R {_fluddR:F2}), nozzle {_fluddNozzle}, housed {_fluddStow:F2}");
+        }
+        SmsFluddPoseTank();
+        SmsFluddNozzleAnim();
+        SmsFluddUpperBody();
+    }
+
+    /// <summary>checkPumpEnable(): the clip allows the pump (isPumpOK), nothing carried, not switching nozzles, no demo.</summary>
+    private bool SmsFluddPumpEnabled()
+    {
+        if (heldBody != null || _smsDrowned || _fluddSwitchSpeed != 0f)
+            return false;
+        switch (stateOfMario)
+        {
+            case MarioState.hurt:
+            case MarioState.dead:
+            case MarioState.talking:
+            case MarioState.shineGet:
+            case MarioState.ledgeClimb:
+            case MarioState.ledgeHopUp:
+            case MarioState.ledgeDescend:
+                return false;
+        }
+        return true;
+    }
+
+    private void SmsFluddUpperTick()
+    {
+        // stateMachineUpper()
+        switch (_fluddUpper)
+        {
+            case SmsUpper.Pumping:
+                if (!SmsFluddPumpEnabled())
+                {
+                    _fluddUpper = SmsUpper.Idle;
+                    _fluddPumpCooldown = 0;
+                }
+                else if (_fluddR <= 0f)
+                {
+                    _fluddUpper = SmsUpper.HoldingPump;
+                    _fluddPumpCooldown = SmsParams.Fludd.PumpWaitTime;
+                }
+                break;
+            case SmsUpper.HoldingPump:
+                if (!SmsFluddPumpEnabled())
+                {
+                    _fluddUpper = SmsUpper.Idle;
+                    _fluddPumpCooldown = 0;
+                }
+                else if (_fluddPumpCooldown > 0)
+                    _fluddPumpCooldown--;
+                else
+                    _fluddUpper = SmsUpper.Idle;
+                break;
+        }
+        // checkPumping(): R down -> PUMPING
+        if (_fluddR > 0f && _fluddUpper != SmsUpper.Pumping && SmsFluddPumpEnabled())
+        {
+            _fluddUpper = SmsUpper.Pumping;
+            _fluddPumpCooldown = 0;
+        }
+    }
+
+    private void SmsFluddSwitchTick()
+    {
+        // TWaterGun::movement(): the swap tween; crossing 0.5 swaps the model
+        if (_fluddSwitchSpeed == 0f)
+            return;
+        float before = _fluddSwitch;
+        float after = before + _fluddSwitchSpeed;
+        if (before < 0.5f && after >= 0.5f)
+            SmsFluddChangeNozzle(_fluddSecond);
+        else if (before > 0.5f && after <= 0.5f)
+            SmsFluddChangeNozzle(SmsNozzle.Spray);
+        if (after >= 1f)
+        {
+            after = 1f;
+            _fluddSwitchSpeed = 0f;
+        }
+        if (after <= 0f)
+        {
+            after = 0f;
+            _fluddSwitchSpeed = 0f;
+        }
+        _fluddSwitch = after;
+    }
+
+    /// <summary>changeNozzle(): the model swaps; the water keeps its fraction (S2); the nozzle's own state restarts.</summary>
+    private void SmsFluddChangeNozzle(SmsNozzle to)
+    {
+        _fluddNozzle = to;
+        for (int i = 0; i < 4; i++)
+            if (_fluddNozzleNode[i] != null)
+                _fluddNozzleNode[i].Visible = i == (int)to;
+        _fluddNozzleAnimState = 4;
+        _fluddSprayAnimState = _fluddStow > 0.5f ? 5 : 7;
+        if (SmsDebugPrint) GD.Print($"[SMS fludd] nozzle -> {to}");
+    }
+
+    private void SmsFluddStowTick()
+    {
+        // calcAnimation(): pumping deploys the pack 0.1 a tick; idle houses it again 0.005 a tick after a 360-tick hold
+        if (_fluddUpper != SmsUpper.Idle)
+        {
+            if (_fluddStow > 0f)
+            {
+                _fluddStow = MathF.Max(_fluddStow - SmsParams.Fludd.DeployRate, 0f);
+                if (_fluddStow <= 0f && SmsDebugPrint) GD.Print("[SMS fludd] deployed");
+            }
+            else
+                _fluddStowHold = SmsParams.Fludd.StowHoldTicks;
+        }
+        else if (_fluddStowHold > 0)
+            _fluddStowHold--;
+        else if (_fluddStow < 1f)
+        {
+            _fluddStow = MathF.Min(_fluddStow + SmsParams.Fludd.StowRate, 1f);
+            if (_fluddStow >= 1f && SmsDebugPrint) GD.Print("[SMS fludd] housed");
+        }
+    }
+
+    /// <summary>S1's stand-in for "the nozzle sprays": pumping with R down and the pack deployed (the water and the trigger
+    /// states come with S2 / S3).</summary>
+    private bool SmsFluddSpraying() => _fluddUpper == SmsUpper.Pumping && _fluddR > 0f && _fluddStow <= 0f;
+
+    private static void SmsAnimScrub(AnimationPlayer ap, string name, float t)
+    {
+        if (ap == null || !ap.HasAnimation(name))
+            return;
+        if (ap.AssignedAnimation != name)
+            ap.Play(name);
+        ap.Seek(Mathf.Clamp(t, 0f, 1f) * ap.GetAnimation(name).Length, true);
+        ap.Pause();
+    }
+
+    private static void SmsAnimEnsure(AnimationPlayer ap, string name)
+    {
+        if (ap == null || !ap.HasAnimation(name))
+            return;
+        if (ap.AssignedAnimation != name)
+        {
+            ap.SpeedScale = 1f;
+            ap.Play(name);
+        }
+        else if (!ap.IsPlaying() && ap.GetAnimation(name).LoopMode != Animation.LoopModeEnum.None)
+        {
+            ap.SpeedScale = 1f;
+            ap.Play(name);
+        }
+    }
+
+    private static bool SmsAnimDone(AnimationPlayer ap, string name)
+        => ap == null || !ap.HasAnimation(name) || (ap.AssignedAnimation == name && !ap.IsPlaying());
+
+    /// <summary>TWaterGun::calcAnimation(): the tank's clip from the upper state and the stow progress.</summary>
+    private void SmsFluddPoseTank()
+    {
+        if (_fluddTankAnim == null)
+            return;
+        if (_fluddUpper != SmsUpper.Idle && _fluddStow <= 0f)
+        {
+            string clip = stateOfMario == MarioState.ledgeHang ? "wg_hgpmp" : (_smsInWater ? "wg_swpmp" : "wg_pump");
+            if (!_fluddTankAnim.HasAnimation(clip))
+                clip = "wg_pump";
+            SmsAnimEnsure(_fluddTankAnim, clip);
+        }
+        else
+            SmsAnimScrub(_fluddTankAnim, "wg_house", _fluddStow);
+    }
+
+    /// <summary>TNozzleBase::animation() for the current nozzle (the trigger nozzles' machine; the spray nozzle's own).</summary>
+    private void SmsFluddNozzleAnim()
+    {
+        var ap = _fluddNozzleAnim[(int)_fluddNozzle];
+        if (ap == null)
+            return;
+        bool spraying = SmsFluddSpraying();
+        if (_fluddNozzle == SmsNozzle.Spray)
+        {
+            SmsFluddSprayNozzleAnim(ap, spraying);
+            return;
+        }
+        string prefix = SmsNozzleFolder[(int)_fluddNozzle];
+        if (_fluddSwitchSpeed > 0f) _fluddNozzleAnimState = 4;
+        if (_fluddSwitchSpeed < 0f) _fluddNozzleAnimState = 3;
+        switch (_fluddNozzleAnimState)
+        {
+            case 0: // shoot_start once
+                SmsAnimEnsure(ap, prefix + "_shoot_start");
+                if (SmsAnimDone(ap, prefix + "_shoot_start"))
+                    _fluddNozzleAnimState = 1;
+                break;
+            case 1: // shooting while it sprays
+                SmsAnimEnsure(ap, prefix + "_shooting");
+                if (!spraying)
+                    _fluddNozzleAnimState = 2;
+                break;
+            case 2: // shoot_end, held; spraying again -> the start
+                SmsAnimEnsure(ap, prefix + "_shoot_end");
+                if (spraying)
+                    _fluddNozzleAnimState = 0;
+                break;
+            case 3: // going away: change_start scrubbed by the tween (1 -> 0.5)
+                SmsAnimScrub(ap, prefix + "_change_start", 2f - 2f * _fluddSwitch);
+                break;
+            case 4: // arriving: change_end scrubbed by the tween (0.5 -> 1)
+                SmsAnimScrub(ap, prefix + "_change_end", 2f * (_fluddSwitch - 0.5f));
+                if (_fluddSwitch >= 1f)
+                    _fluddNozzleAnimState = 0;
+                break;
+        }
+    }
+
+    /// <summary>TNozzleDeform::animation(): the spray nozzle houses with the pack (normal_wg_house), shoots
+    /// (normal_wg_shooting), and swaps with the house_ / normal_ change clips. Its shoot_start / shoot_end are not in the rip.</summary>
+    private void SmsFluddSprayNozzleAnim(AnimationPlayer ap, bool spraying)
+    {
+        if (_fluddSwitchSpeed > 0f)
+        {
+            if (_fluddSprayAnimState != 4 && _fluddSprayAnimState != 6)
+                _fluddSprayAnimState = _fluddStow > 0.5f ? 4 : 6;
+        }
+        else if (_fluddSwitchSpeed < 0f)
+        {
+            if (_fluddSprayAnimState != 5 && _fluddSprayAnimState != 7)
+                _fluddSprayAnimState = _fluddStow > 0.5f ? 5 : 7;
+        }
+        else
+        {
+            if (_fluddStow > 0f)
+                _fluddSprayAnimState = 0;
+            else if (_fluddSprayAnimState == 0 || _fluddSprayAnimState >= 4)
+                _fluddSprayAnimState = 8;
+        }
+        switch (_fluddSprayAnimState)
+        {
+            case 0: SmsAnimScrub(ap, "normal_wg_house", _fluddStow); break;                       // housed by the stow progress
+            case 3: SmsAnimEnsure(ap, "normal_wg_shooting"); if (!spraying) _fluddSprayAnimState = 8; break;
+            case 8: SmsAnimScrub(ap, "normal_wg_house", 0f); if (spraying) _fluddSprayAnimState = 3; break; // deployed, at rest
+            case 4: SmsAnimScrub(ap, "house_wg_change_start", 2f * _fluddSwitch); break;
+            case 6: SmsAnimScrub(ap, "normal_wg_change_start", 2f * _fluddSwitch); break;
+            case 5: SmsAnimScrub(ap, "house_wg_change_end", 1f - 2f * _fluddSwitch); break;
+            case 7: SmsAnimScrub(ap, "normal_wg_change_end", 1f - 2f * _fluddSwitch); break;
+        }
+    }
+
+    /// <summary>addUpper(): the upper body plays the pump clip over whatever the legs do. The tree's upper-body Blend2
+    /// (CarryBlend) does the layering; its "Animation 2" input is pointed at ma_pump while pumping, back at ma_carry_p when
+    /// he carries something.</summary>
+    private void SmsFluddUpperBody()
+    {
+        if (animTree == null || animTree.TreeRoot is not AnimationNodeBlendTree tree)
+            return;
+        string want = SmsFluddUpperBlend ? "ma_pump" : "ma_carry_p";
+        if (want == _fluddUpperAnim)
+            return;
+        if (tree.GetNode("Animation 2") is AnimationNodeAnimation an && animPlayer.HasAnimation(want))
+        {
+            an.Animation = want;
+            _fluddUpperAnim = want;
+        }
+    }
+
     /// <summary>The port's death (ma_die, R respawns); the game's loserExec.</summary>
     private void EnterDead()
     {
@@ -12180,7 +12603,7 @@ public partial class Mario : CharacterBody3D
         // Apply carry blend to ALL animations when holding an object (except diving)
         if (animTree != null && animTree.Active)
         {
-            if (heldBody != null && !isDiving)
+            if ((heldBody != null && !isDiving) || SmsFluddUpperBlend)
             {
                 animTree.Set(CARRY_BLEND_PATH, 1.0f); // Full carry blend
             }
