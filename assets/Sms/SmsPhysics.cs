@@ -333,9 +333,13 @@ public static class SmsRun
         if (fwd <= 0f)
             fwd += SmsParams.Run.VelMinusBrake;
         else if (fwd <= sp)
-            fwd += SmsParams.Run.AddBase - fwd * SmsParams.Run.AddVelDiv;
+            fwd = MathF.Min(fwd + SmsParams.Run.AddBase - fwd * SmsParams.Run.AddVelDiv, sp); // settle AT the target
         else if (floorNormalY >= SmsParams.Run.DecStartNrmY)
-            fwd -= SmsParams.Run.DecBrake;
+            fwd = MathF.Max(fwd - SmsParams.Run.DecBrake, sp); // brake down to it, never past it
+        // Deviation from the decomp's letter: taken literally, the +0.36 accelerate step at 32 overshoots the target and the
+        // shipped DecBrake of 5 yanks it back in one tick -- a 27..32 saw-tooth every ~12 ticks (10.9..12.9 m/s at ~9 Hz),
+        // measured in the port (b856f6a's `tick in -> out` log fields). SM64's identical structure brakes 1 (invisible);
+        // MarioRun.cpp is NonMatching, and the game's run is steady at top speed (Jaysonn), so the port settles at sp.
         if (fwd < 0f) fwd = 0f;
     }
 

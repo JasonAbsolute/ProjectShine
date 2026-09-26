@@ -1394,8 +1394,11 @@ through the same curve.
 
 ### Run (`SmsRun`, `doRunning`)
 
-- Accelerate toward `min(32, mag)`: `fwd += 1.1 − fwd/43` per tick (the SM64 lineage); above target on flat ground
-  brake 5/tick (`DecBrake`); stick released `−1/tick` (`walkEnd`); braking/skid `−4/tick`.
+- Accelerate toward `min(32, mag)`: `fwd += 1.1 − fwd/43` per tick (the SM64 lineage), **capped at the target**; above
+  target on flat ground brake 5/tick (`DecBrake`), **never below the target**; stick released `−1/tick` (`walkEnd`);
+  braking/skid `−4/tick`. The two clamps are ours (see the deviations): taken literally the accelerate step overshoots 32
+  by 0.36 and the brake of 5 yanks it back in one tick, a 27..32 saw-tooth (10.9..12.9 m/s) at ~9 Hz that the stairs
+  log made visible as a stutter. Sprint now holds 32 = 12.9 m/s.
 - Turning is speed-independent (`RunningRotSp` 1500 BAM/tick shipped min == max) and **preserves speed** — velocity
   always points along the face angle on the ground. A stick reversal of more than ~100° skids instead of turning.
 - Gait bands with hysteresis: soft step ↔ walk at 8 / 13 (`Walk2Soft` / `Soft2Walk`).
@@ -1714,6 +1717,11 @@ landing, `[SMS slide] A at fwd … -> CatchStop/RollJump …` on every slide pre
   no hit for it (ledge bit). Flip the toggle to get the code's rule back.
 - `doRunning` target uses `min(32, mag)`; the NonMatching decomp prints `max()`, which contradicts SM64 (this code's
   ancestor) and makes the shipped `Soft2Walk` / `Walk2Soft` thresholds meaningless.
+- `doRunning` settles **at** the target: the accelerate step is capped at `sp` and the `DecBrake` step never goes below
+  it. Read literally, the decomp's three branches with the shipped `DecBrake` 5 saw-tooth 27..32 every ~12 ticks at full
+  stick (SM64's identical code brakes 1, a wobble nobody sees). `MarioRun.cpp` is NonMatching, and the game's run is
+  steady at top speed (Jaysonn, 2026-09-25); the port had the pulse (b856f6a's `[SMS step] ... tick in -> out` fields,
+  10.9 / 12.9 m/s alternating) and it read as a slight stutter everywhere he sprinted.
 - `KeepGroundPoundJump` toggle (off) keeps the non-Sunshine GP-jump available.
 - The slip system, collision model (`MoveAndSlide`, cylinder) and animation timings are still ours.
 
