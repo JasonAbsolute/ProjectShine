@@ -1789,16 +1789,26 @@ ledge states), with `fwd *= 0.3` and `vy *= 2.0` (the plunge). Shallower is **wa
   Steady paddling is ≈10 units (4 m/s); a stroke bursts to ≈25 (10 m/s). Mario cannot stay under on his own: buoyancy brings
   him back up, so there is no air meter here.
 
+**Standing up and wading.** `WAIT` out of the water puts him on the floor at once (`waitProcess`: `mPosition.y =
+mFloorPosition.y`; `checkGroundAtWalking` snaps anything within 100 units), though he floated 35 units above it: no
+drop, no landing. Wading (`isRunningInWater`: the surface above his feet and less than 110 units deep) brakes the run
+`fwd *= 1 − depth/110 × 0.05` a tick (flat out ≈ 7.7 m/s in 1 m of water, 6.3 m/s in 1.4 m) and slows the run animation
+by the same factor × `InWaterAnmBrake` 0.8. Running on into water deeper than 110 units is the plunge into `SWIM_START`
+(`fwd × 0.3`, `vy × 2`). The A-jump's "wall ahead" is `mWallPlane`: any wall within his wall-check radius, whether or
+not he is pushing into it.
+
 Port notes: **SMS animation frame numbers are 60ths of a second** (the BCKs are authored at 60 fps: `SMSGetAnmFrameRate()`
 = 60 / 30 = 2 frames per game frame; the port's clips are real time), so `checkPass(16)` is 16/60 s into the clip, not
 16/30 (the first swim build had /30 and the dive barely dipped: 98 units deep instead of 173). All clips are driven
 directly (none is a tree state; `ma_swim_wait` and `ma_swim` force-looped), `SetMarioState` at the exit brings the tree
-back. While swimming the floor snap is 0, the ground step is off, `PostMoveWallCheck` and the
+back. The stand-up calls `ApplyFloorSnap()` itself (Godot's snap needs a grounded previous frame, and the swimmer's snap
+length is 0); the A-jump's wall is `IsOnWall()` or a 0.75 m ray along the face at waist height (fwd is zeroed on the
+wall, so `IsOnWall()` alone is off again the next frame). While swimming the floor snap is 0, the ground step is off, `PostMoveWallCheck` and the
 landing latch skip him, and the swim tick runs in the pre-split block like the knockdown (no other handler). Leaving the
 water volume's edge while swimming drops him into a fall (or a stand if there is ground). Not ported: `SWIM_P_DAMAGE` /
 `SWIM_DOWN` / `SWIM_P_DOWN` (drowning, damage in water), the FLUDD paddle (`DashMax` surf), the fence catch from water, the
 splash / ripple / bubble effects and sounds, the swimming camera, the air meter.
-Debug: `[SMS swim] in: surface y …, feet N units under the surface, floor … m down, fwd … vy …`, `[SMS swim] <status>: fwd …`,
+Debug: `[SMS swim] wading in: … m of water` / `wading out`, `[SMS swim] in: surface y …, feet N units under the surface, floor … m down, fwd … vy …`, `[SMS swim] <status>: fwd …`,
 `[SMS swim] A near the surface: jump out`, `[SMS swim] out (shallow | left the water) -> idle, deepest … m`.
 
 ### Deliberate deviations from the game

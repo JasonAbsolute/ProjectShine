@@ -205,6 +205,7 @@ public static class SmsParams
         public const float CanBreathDepth = 50f;       // isUnderWater(): the head this far under (air meter, not ported)
         public const float SwimDepth = 110f;           // run.prm: deeper than this under the feet = swimming, else wading
         public const float InWaterBrake = 0.95f;       // run.prm: the wading brake at full SwimDepth, a tick
+        public const float InWaterAnmBrake = 0.8f;     // run.prm: the wading run-animation rate factor (times the brake factor)
         public const float BottomClearance = 35f;      // doSwimming(): the feet stay this far above the floor
         public const float DiveSinkStartFrame = 16f;   // swimDive(): checkPass(16) of the dive clip; SMS animation frames are
                                                        // 60ths of a second (BCKs at 60 fps), the port's clips are real time: /60

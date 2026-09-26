@@ -178,6 +178,7 @@ public partial class Mario : CharacterBody3D
     private bool _smsSwimSinkArmed = false;    // ... armed once the dive clip passes frame 16
     private string _smsSwimAnim = "";
     private float _smsSwimDbgDeepest = 0f;
+    private bool _smsWadingDbg = false;
     // waiting(): mHealth <= 3 -> ANIM_DAMAGE_WAIT_START once, then ANIM_DAMAGE_WAIT (library-only clips, driven directly)
     private int _smsDamageWaitPhase = 0;      // 0 off, 1 ma_damage_wait_start playing, 2 ma_damage_wait looping
     private double _smsDamageWaitPos = 0.0;   // clip position to resume from when idle is re-entered mid-pant
@@ -10858,6 +10859,12 @@ public partial class Mario : CharacterBody3D
         }
 
         float s = GetRunAnimSpeedScale();
+        if (UseSmsPhysics && _smsInWater && IsOnFloor())
+        {
+            // isRunningInWater(): rate *= (1 - depth / SwimDepth * (1 - InWaterBrake)) * InWaterAnmBrake
+            float depthRatio = Mathf.Clamp(SmsUnits.MetresToUnits(_smsWaterSurfaceY - SmsFeetY()) / SmsParams.Swim.SwimDepth, 0f, 1f);
+            s *= (1f - depthRatio * (1f - SmsParams.Swim.InWaterBrake)) * SmsParams.Swim.InWaterAnmBrake;
+        }
         // If the carry AnimationTree is active, drive the TimeScale node.
         if (animTree != null && animTree.Active)
         {
@@ -11262,6 +11269,13 @@ public partial class Mario : CharacterBody3D
     /// wading, which only brakes the run (SmsGroundTick).</summary>
     private void SmsWaterEntryCheck()
     {
+        bool wading = _smsInWater && stateOfMario != MarioState.swimming && IsOnFloor();
+        if (wading != _smsWadingDbg)
+        {
+            _smsWadingDbg = wading;
+            if (SmsDebugPrint)
+                GD.Print(wading ? $"[SMS swim] wading in: {_smsWaterSurfaceY - SmsFeetY():F2} m of water" : "[SMS swim] wading out");
+        }
         if (!_smsInWater || stateOfMario == MarioState.swimming)
             return;
         float depthUnits = SmsUnits.MetresToUnits(_smsWaterSurfaceY - SmsFeetY());
@@ -11370,6 +11384,14 @@ public partial class Mario : CharacterBody3D
         animPlayer.SpeedScale = 1f;
         stateOfMario = to;
         SetMarioState(to); // the tree comes back on
+        if (to == MarioState.idle)
+        {
+            // waitProcess(): mPosition.y = mFloorPosition.y -- WAIT stands on the floor at once (checkGroundAtWalking snaps
+            // anything within 100 units) though he floated 35 units above it. Godot's own snap needs a grounded previous
+            // frame, and this frame's snap length is 0 for the swimmer, so snap explicitly.
+            FloorSnapLength = SmsGroundContact.LedgeDropMetres;
+            ApplyFloorSnap();
+        }
         if (SmsDebugPrint)
             GD.Print($"[SMS swim] out ({why}) -> {to}, deepest {_smsSwimDbgDeepest:F2} m under the surface");
     }
@@ -11391,6 +11413,21 @@ public partial class Mario : CharacterBody3D
         SetMarioState(MarioState.singleJump);
         if (SmsDebugPrint)
             GD.Print($"[SMS swim] A near the surface: jump out, deepest {_smsSwimDbgDeepest:F2} m");
+    }
+
+    /// <summary>checkSwimJump()'s mWallPlane: a wall within the wall-check radius, whether or not he moves into it (the port
+    /// zeroes fwd on the wall, so IsOnWall() alone is false again the next frame).</summary>
+    private bool SmsSwimWallAhead()
+    {
+        if (IsOnWall())
+            return true;
+        Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
+        Vector3 from = new Vector3(GlobalPosition.X, SmsFeetY() + 0.8f, GlobalPosition.Z);
+        var rq = PhysicsRayQueryParameters3D.Create(from, from + face * 0.75f, CollisionMask);
+        rq.CollideWithAreas = false;
+        rq.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+        var r = GetWorld3D().DirectSpaceState.IntersectRay(rq);
+        return r.Count > 0 && ((Vector3)r["normal"]).Y < 0.5f;
     }
 
     /// <summary>swimMain() for one physics frame: the jump check, the float limit, the status handler with doSwimming().</summary>
@@ -11417,7 +11454,7 @@ public partial class Mario : CharacterBody3D
         {
             if (SmsUnits.MetresToUnits(surface - feetY) < SmsParams.Swim.CanJumpDepth)
             {
-                bool doJump = !stick || IsOnWall();
+                bool doJump = !stick || SmsSwimWallAhead(); // mWallPlane: any wall within the wall-check radius
                 if (!doJump && Mathf.Abs(SmsMath.DirFromYaw(_smsFaceYaw).SignedAngleTo(stickDir, Vector3.Up)) > Mathf.DegToRad(120f))
                     doJump = true; // the stick more than 0x5555 from the model's face
                 if (doJump)
