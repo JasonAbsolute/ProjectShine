@@ -1766,8 +1766,8 @@ water, from the seabed up to the surface. Its surface is metadata `sms_water_sur
 tests the point at his feet every physics frame (`SmsWaterCheck`, `PhysicsPointQueryParameters3D` against areas) and rays
 down for the ground under the water (`mFloorPosition.y`).
 
-**Getting in** (`playerControl`): the surface at or above the feet is `MARIO_FLAG_IN_WATER`. More than `SwimDepth` **110
-units (1.48 m)** of water under the feet → `SWIM_START` from any status (ours excludes dead, talking, the shine-get and the
+**Getting in** (`playerControl`): the surface at or above the feet is `MARIO_FLAG_IN_WATER`. His feet more than
+`SwimDepth` **110 units (1.48 m)** under the surface → `SWIM_START` from any status (ours excludes dead, talking, the shine-get and the
 ledge states), with `fwd *= 0.3` and `vy *= 2.0` (the plunge). Shallower is **wading**: the run continues, braked by depth
 (`isRunningInWater`: `fwd *= 1 − depth/110 × 0.05` a tick).
 
@@ -1777,7 +1777,10 @@ ledge states), with `fwd *= 0.3` and `vy *= 2.0` (the plunge). Shallower is **wa
   `vy += 8` a tick), stick held → `SWIM_PADDLE_START` (`ma_paddle_start`, `fwd += 0.45`, `vy += 4` a tick, then `SWIM_PADDLE`).
 - **The float limit**: the feet never rise above `surface − FloatHeight 80` (he floats chest-deep, feet 1.07 m under).
 - **`doSwimming`**: **B** → `SWIM_DIVE` (`ma_swim_dive`; once the clip passes frame 16, `WaitSinkTime` 150 ticks of
-  `vy −= 8`; clip end → `PADDLE_END`). Water shallower than `EndDepth` 80 under him → `WAIT`: he stands up. `fwd += mag × 0.3
+  `vy −= 8`, but only while the dive clip plays; clip end → `PADDLE_END`). The clip is 36 frames = 0.6 s, so the sink
+  really lasts frames 16..36 = 0.33 s = 40 ticks: about 1.25 m below his float depth, back at the surface 1.8 s after
+  the press. `changePlayerStatus(.., false)` is a no-op for the status he is already in, so B while diving and A during
+  the stroke's start or the float-up do nothing (no restart, no extra boost). Water shallower than `EndDepth` 80 under him → `WAIT`: he stands up. `fwd += mag × 0.3
   / 32`, `fwd *= 0.97`; the face turns to the stick at 300 BAM a tick; `vy −= 0.05`, `vy += clamp((surface − feet)/80) × 2.0`
   (waiting / starting) or `× 1.8` (moving), `vy *= 0.6`; a wall zeroes `fwd` and `vy`; the feet stay 35 above the floor.
 - **The handlers**: `START` (`ma_swim_start` → `WAIT`), `WAIT` (`ma_swim_wait`; stick → `WAIT_TO_PADDLE`), `WAIT_TO_PADDLE`
@@ -1786,13 +1789,16 @@ ledge states), with `fwd *= 0.3` and `vy *= 2.0` (the plunge). Shallower is **wa
   Steady paddling is ≈10 units (4 m/s); a stroke bursts to ≈25 (10 m/s). Mario cannot stay under on his own: buoyancy brings
   him back up, so there is no air meter here.
 
-Port notes: all clips are driven directly (none is a tree state; `ma_swim_wait` and `ma_swim` force-looped), `SetMarioState`
-at the exit brings the tree back. While swimming the floor snap is 0, the ground step is off, `PostMoveWallCheck` and the
+Port notes: **SMS animation frame numbers are 60ths of a second** (the BCKs are authored at 60 fps: `SMSGetAnmFrameRate()`
+= 60 / 30 = 2 frames per game frame; the port's clips are real time), so `checkPass(16)` is 16/60 s into the clip, not
+16/30 (the first swim build had /30 and the dive barely dipped: 98 units deep instead of 173). All clips are driven
+directly (none is a tree state; `ma_swim_wait` and `ma_swim` force-looped), `SetMarioState` at the exit brings the tree
+back. While swimming the floor snap is 0, the ground step is off, `PostMoveWallCheck` and the
 landing latch skip him, and the swim tick runs in the pre-split block like the knockdown (no other handler). Leaving the
 water volume's edge while swimming drops him into a fall (or a stand if there is ground). Not ported: `SWIM_P_DAMAGE` /
 `SWIM_DOWN` / `SWIM_P_DOWN` (drowning, damage in water), the FLUDD paddle (`DashMax` surf), the fence catch from water, the
 splash / ripple / bubble effects and sounds, the swimming camera, the air meter.
-Debug: `[SMS swim] in: surface y …, N units of water under the feet, floor … m down, fwd … vy …`, `[SMS swim] <status>: fwd …`,
+Debug: `[SMS swim] in: surface y …, feet N units under the surface, floor … m down, fwd … vy …`, `[SMS swim] <status>: fwd …`,
 `[SMS swim] A near the surface: jump out`, `[SMS swim] out (shallow | left the water) -> idle, deepest … m`.
 
 ### Deliberate deviations from the game

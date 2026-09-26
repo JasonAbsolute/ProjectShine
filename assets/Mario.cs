@@ -11312,7 +11312,7 @@ public partial class Mario : CharacterBody3D
         SmsSwimSet(SmsSwim.Start);
         SmsSwimApplyVelocity();
         if (SmsDebugPrint)
-            GD.Print($"[SMS swim] in: surface y {_smsWaterSurfaceY:F2}, {depthUnits:F0} units of water under the feet, floor {(float.IsNegativeInfinity(_smsWaterFloorY) ? "none" : $"{_smsWaterSurfaceY - _smsWaterFloorY:F2} m down")}, fwd {_smsSwimFwd:F1} vy {_smsSwimVy:F1}");
+            GD.Print($"[SMS swim] in: surface y {_smsWaterSurfaceY:F2}, feet {depthUnits:F0} units under the surface, floor {(float.IsNegativeInfinity(_smsWaterFloorY) ? "none" : $"{_smsWaterSurfaceY - _smsWaterFloorY:F2} m down")}, fwd {_smsSwimFwd:F1} vy {_smsSwimVy:F1}");
     }
 
     private void SmsSwimSet(SmsSwim s)
@@ -11426,7 +11426,11 @@ public partial class Mario : CharacterBody3D
                     return;
                 }
             }
-            SmsSwimSet(stick ? SmsSwim.PaddleStart : SmsSwim.Up);
+            // changePlayerStatus(.., false) returns at once for the status he is already in: A during the stroke's start
+            // (or the float-up) neither restarts the clip nor prolongs its boost
+            SmsSwim want = stick ? SmsSwim.PaddleStart : SmsSwim.Up;
+            if (_smsSwim != want)
+                SmsSwimSet(want);
         }
 
         // the float limit: the feet never rise above surface - FloatHeight
@@ -11466,7 +11470,9 @@ public partial class Mario : CharacterBody3D
                     _smsSwimVy += SmsParams.Swim.FloatUp;
                     break;
                 case SmsSwim.Dive:
-                    if (!_smsSwimSinkArmed && clipPos >= SmsParams.Swim.DiveSinkStartFrame / 30.0)
+                    // checkPass(16): SMS animation frames are 60ths of a second (the clips are real time), so frame 16 of the
+                    // 36-frame dive clip is 0.267 s in; the sink then runs to the clip's end, 0.33 s = 40 ticks
+                    if (!_smsSwimSinkArmed && clipPos >= SmsParams.Swim.DiveSinkStartFrame / 60.0)
                     {
                         _smsSwimSinkArmed = true;
                         _smsSwimSinkTicks = SmsParams.Swim.WaitSinkTime;
@@ -11491,7 +11497,8 @@ public partial class Mario : CharacterBody3D
         // doSwimming(): B dives; water shallower than EndDepth under him: he stands up (WAIT)
         if (bPressed)
         {
-            SmsSwimSet(SmsSwim.Dive);
+            if (_smsSwim != SmsSwim.Dive) // same-status change is a no-op: B while diving does nothing (the clip runs on)
+                SmsSwimSet(SmsSwim.Dive);
         }
         else if (!float.IsNegativeInfinity(_smsWaterFloorY) && _smsWaterFloorY + SmsUnits.UnitsToMetres(SmsParams.Swim.EndDepth) > surface)
         {
