@@ -1742,8 +1742,12 @@ HP taken, down type, knockback `MinSpeed`, `InvincibleTime`).
   `waiting()` only counts the sleepy timer while the animation is `ANIM_WAIT`, so the port's idle wind-down (sit, sleep)
   is held off at 1..3 HP the way it is while carrying or on a slope.
 - **Eyes.** The game's clips carry eye texture patterns (BTP on `_mat_eye_L/R`); the rip has the open eye (`H_ma_eye1`)
-  and the shut variant only. Shut through the knockdown (as the game's knockdown clips do), open again as he gets up;
-  the pant keeps them open (the game squints there — that texture is not in the rip).
+  and the shut (sleep) variant only. Two more exist at runtime (`SmsSetupDamageEyeTextures`): **hurt** — eyes squeezed
+  shut in pain, through the knockdown clips — and **tired** — heavy-lidded, through the pant. Each is loaded from
+  `models/Mario/mario/bmd/ma_mdl1/H_ma_eye1_s3tc_hurt.png` / `_tired.png` when such a file exists (drop the real rips in
+  under those names; the editor imports them), else derived at startup from the two we have: tired = the open eye with
+  the upper lid brought down to half the eye's height plus a lash line; hurt = the shut eye with its relaxed lower-lid
+  curve erased and a squeezed arch drawn across. Open again as he gets up / heals above 3.
 - Gotcha: the running waist IK is `Start()`ed / `Stop()`ped every frame in the main path, which the `hurt` block skips
   (`goto EndFrame`). Hit while running, it kept bending the knockdown clip; `SmsDamageExec` stops it (`StopWaistIKHard`).
 - **No fall damage in Sunshine**: the strong landing (`vy <= -70` past `DamageFallHeight`) is `CATCH`, HP untouched.

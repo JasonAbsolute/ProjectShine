@@ -977,6 +977,8 @@ public partial class Mario : CharacterBody3D
     //EyeEffect
     private Texture2D awakeEyeTexture;
     private Texture2D sleepingEyeTexture;
+    private Texture2D hurtEyeTexture;   // eyes squeezed shut in pain: the knockdown clips (SmsSetupDamageEyeTextures)
+    private Texture2D tiredEyeTexture;  // heavy-lidded: the low-HP idle, waiting() at 1..3 HP
     private StandardMaterial3D leftEyeMaterial;
     private StandardMaterial3D rightEyeMaterial;
     private MeshInstance3D marioMesh;
@@ -4926,6 +4928,7 @@ public partial class Mario : CharacterBody3D
         }
 
         GD.Print("Eye materials successfully duplicated and assigned.");
+        SmsSetupDamageEyeTextures();
     }
 
     private void RotateSpinJump(double delta)
@@ -10971,7 +10974,7 @@ public partial class Mario : CharacterBody3D
             lastFacingDirection = face;
             armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
             StopWaistIKHard(); // the run's waist IK is started / stopped in the main path, which the hurt block skips: stop it here or it bends the clip
-            SleepStatus(true); // the knockdown clips close his eyes in the game (their eye texture patterns are not in the rip: open and shut only)
+            SetEyeTexture(hurtEyeTexture ?? sleepingEyeTexture); // the knockdown clips: eyes squeezed shut in pain (not the sleep eyes)
             stateOfMario = MarioState.hurt;
             SmsDownEnter(airborne, fwd);
             SpawnBonkStars(-attackDir); // PARTICLE_MS_DMG_A/B/C at calcDamagePos (toward the attacker); no camera shake / rumble / voice here
@@ -10994,6 +10997,132 @@ public partial class Mario : CharacterBody3D
             EnterDead(); // loserExec()
     }
 
+    private void SetEyeTexture(Texture2D t)
+    {
+        if (t == null || leftEyeMaterial == null || rightEyeMaterial == null)
+            return;
+        leftEyeMaterial.AlbedoTexture = t;
+        rightEyeMaterial.AlbedoTexture = t;
+    }
+
+    /// <summary>
+    /// The game's clips drive the eye textures (BTP patterns on _mat_eye_L/R); the rip has the open eye and the shut one.
+    /// Two more are needed: eyes squeezed shut in pain (the knockdown clips) and heavy-lidded tired eyes (waiting() at 1..3
+    /// HP). Each is loaded from the model folder when a file is there (H_ma_eye1_s3tc_hurt.png / _tired.png -- drop the real
+    /// rips in under those names), else derived from the two we have.
+    /// </summary>
+    private void SmsSetupDamageEyeTextures()
+    {
+        const string dir = "res://models/Mario/mario/bmd/ma_mdl1/";
+        hurtEyeTexture = SmsLoadTextureIfExists(dir + "H_ma_eye1_s3tc_hurt.png") ?? SmsDeriveEyeTexture(hurt: true);
+        tiredEyeTexture = SmsLoadTextureIfExists(dir + "H_ma_eye1_s3tc_tired.png") ?? SmsDeriveEyeTexture(hurt: false);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS damage] eye textures: hurt {(hurtEyeTexture != null ? "ok" : "none, using the shut eye")}, tired {(tiredEyeTexture != null ? "ok" : "none, using the open eye")}");
+    }
+
+    private static Texture2D SmsLoadTextureIfExists(string path)
+    {
+        if (!ResourceLoader.Exists(path))
+            return null;
+        return ResourceLoader.Load<Texture2D>(path);
+    }
+
+    private static bool SmsIsEyePixel(Color c) => (c.R > 0.7f && c.G > 0.7f && c.B > 0.7f) || c.B > c.R + 0.12f; // the white or the iris
+
+    /// <summary>
+    /// tired: the open eye with the upper lid brought down to half the eye's height, a lash line along its edge.
+    /// hurt: the shut eye with its relaxed lower-lid curve erased and a squeezed arch drawn across the eye.
+    /// The eye's extent comes from the open texture (white or blue pixels), column by column.
+    /// </summary>
+    private Texture2D SmsDeriveEyeTexture(bool hurt)
+    {
+        Image open = awakeEyeTexture?.GetImage();
+        if (open == null)
+            return null;
+        if (open.IsCompressed())
+            open.Decompress();
+        open.Convert(Image.Format.Rgba8);
+        Image img;
+        if (hurt)
+        {
+            Image shut = sleepingEyeTexture?.GetImage();
+            if (shut == null)
+                return null;
+            if (shut.IsCompressed())
+                shut.Decompress();
+            shut.Convert(Image.Format.Rgba8);
+            if (shut.GetWidth() != open.GetWidth() || shut.GetHeight() != open.GetHeight())
+                return null;
+            img = shut;
+        }
+        else
+        {
+            img = (Image)open.Duplicate();
+        }
+        int w = img.GetWidth(), h = img.GetHeight();
+        Color skin = img.GetPixel(0, 0);
+        Color dark = new Color(0.48f, 0.17f, 0.16f); // the lash colour of the shut texture
+        int[] top = new int[w], bot = new int[w];
+        int xMin = -1, xMax = -1, spanTop = h, spanBot = -1;
+        for (int x = 0; x < w; x++)
+        {
+            top[x] = -1;
+            bot[x] = -1;
+            for (int y = 0; y < h; y++)
+            {
+                if (!SmsIsEyePixel(open.GetPixel(x, y)))
+                    continue;
+                if (top[x] < 0)
+                    top[x] = y;
+                bot[x] = y;
+            }
+            if (top[x] < 0)
+                continue;
+            if (xMin < 0)
+                xMin = x;
+            xMax = x;
+            spanTop = Math.Min(spanTop, top[x]);
+            spanBot = Math.Max(spanBot, bot[x]);
+        }
+        if (xMin < 0)
+            return null;
+        if (!hurt)
+        {
+            for (int x = xMin; x <= xMax; x++)
+            {
+                if (top[x] < 0)
+                    continue;
+                int lid = top[x] + (int)MathF.Round((bot[x] - top[x]) * 0.5f);
+                for (int y = top[x]; y < lid && y < h; y++)
+                    img.SetPixel(x, y, skin);
+                for (int y = Math.Max(lid - 1, 0); y <= Math.Min(lid, h - 1); y++)
+                    img.SetPixel(x, y, dark);
+            }
+        }
+        else
+        {
+            for (int x = xMin; x <= xMax; x++)
+                for (int y = h / 2; y < h; y++)
+                {
+                    Color c = img.GetPixel(x, y);
+                    if ((c.R + c.G + c.B) / 3f < 0.65f)
+                        img.SetPixel(x, y, skin); // the relaxed lower lid of the shut eye
+                }
+            float xc = (xMin + xMax) * 0.5f, halfW = MathF.Max((xMax - xMin) * 0.5f, 1f);
+            float eyeH = MathF.Max(spanBot - spanTop, 4f);
+            float yPeak = spanTop + eyeH * 0.5f, amp = eyeH * 0.32f;
+            for (int x = xMin; x <= xMax; x++)
+            {
+                float t = (x - xc) / halfW;
+                int y = (int)MathF.Round(yPeak + amp * t * t); // the arch: highest in the middle, down to the corners
+                for (int k = 0; k < 2; k++)
+                    if (y + k >= 0 && y + k < h)
+                        img.SetPixel(x, y + k, dark);
+            }
+        }
+        return ImageTexture.CreateFromImage(img);
+    }
+
     /// <summary>waiting(): the low-HP idle plays while he stands at 1..3 HP with nothing in his hands.</summary>
     private bool SmsWantsDamageWait() => _health > 0 && _health <= 3 && heldBody == null;
 
@@ -11012,6 +11141,7 @@ public partial class Mario : CharacterBody3D
         if (!SmsWantsDamageWait())
         {
             _smsDamageWaitPhase = 0;
+            SetEyeTexture(awakeEyeTexture);
             SetMarioState(MarioState.idle); // healed above 3, or picked something up: ma_wait through the tree
             return;
         }
@@ -11450,6 +11580,7 @@ public partial class Mario : CharacterBody3D
                     if (animTree != null)
                         animTree.Active = false;
                     animPlayer.SpeedScale = 1f;
+                    SetEyeTexture(tiredEyeTexture ?? awakeEyeTexture); // heavy-lidded: he is tired
                     if (_smsDamageWaitPhase == 0)
                     {
                         animPlayer.Play("ma_damage_wait_start");
