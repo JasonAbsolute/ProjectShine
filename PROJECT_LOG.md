@@ -1955,9 +1955,13 @@ rocket nozzle; with the hover it is a **spring**, not a thrust.
 - **Entry** (`rocketCheck()`): the hover nozzle (`RocketType` 1), R down (`UPPER_STATE_PUMPING`) and the nozzle spraying
   (`canSpray()`: water, and the trigger ACTIVE — instant for the hover) → `ROCKET` with the target `unk314 = feet + HoverHeight`
   (230 units = 3.09 m). Who checks: every jump (`jumpingCommonEvents`: JUMP, SECOND_JUMP, U_TURN_JUMP, TRAMPLE; `ultraJumping`,
-  `backJumping`, `jumpWall`, `rotateJumping`), the fall (`landing()`: LANDING **and ROCKET_LANDING**, so letting go and pressing
-  again re-enters with a new target), `running()`, `waiting()`, `squating()` (when the nozzle emits). Not the dives, the broad
-  jumps, the rolls, the slides, the hang, the water. `setStatusToJumping(ROCKET)` writes `mVel.y = 10`, but `rocketing()` runs
+  `backJumping`, `jumpWall`, `rotateJumping`), the walk-off fall (`landing()` for LANDING), `running()`, `waiting()`,
+  `squating()` (when the nozzle emits). Not the dives, the broad jumps, the rolls, the slides, the hang, the water. **One hover
+  per airtime:** `rocketCheck()` returns 0 while the status is `ROCKET` or **`ROCKET_LANDING`**, and the fall after a hover keeps
+  `ROCKET_LANDING` through wall stops until the landing, a ledge grab (`HANGING`; a jump from the hang may hover again), a
+  knockdown or the water change it. The nozzle itself re-arms the moment R reads 0 (`TNozzleTrigger::movement`), so it is
+  Mario's status, not the nozzle, that rations the hover (first shipped as "a re-press re-enters"; Jaysonn's test caught it).
+  `setStatusToJumping(ROCKET)` writes `mVel.y = 10`, but `rocketing()` runs
   in the same tick (`stateMachine` loops on a status change) and assigns the spring before the move, so the 10 never moves
   him: a hover taken at the top of a jump drops the jump's rise and keeps its forward speed.
 - **Each tick** (`rocketing()`): `vy = (target − y) × AccelRate 0.02` — **assigned**, so `fallProcess`'s gravity after the move is
@@ -1992,6 +1996,11 @@ rocket nozzle; with the hover it is a **spring**, not a thrust.
   (`ReactionPow` 0.005 × `(−dir · face)` = 0 for a jet straight down, `ReactionY` 0).
 - Not ported: the hover rumble (every 8 ticks), the voices and `SE_PO_HOVER`, `HANG_ROOF`, the camera's hover mode, the
   `MARIO_STATUS_FLAG_UNK8000` 2.5× stick magnitude in `doJumping` (rocketing() has its own stick code and never calls it).
+- Playtest 1 (Jaysonn): the rise matches the model to the unit (+1.45 m at 1 s, 2.60 m at 3 s from the ground = 194 units;
+  192 from a jump); "feels really good". Fixed from it: the mid-air re-hover above, and the spin jump's ring / particles
+  staying on through a hover (the main air path switches `isSpining` every frame; the hover and the swim entries now switch
+  it off like the hang, the stomp and the bonk do). Pulling the stick back flies him backwards fast (`cos` −1 at the dive
+  rate against the 0.985 brake settles at ±42 units = 16.9 m/s either way, faster than the run's 32): the game's numbers.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

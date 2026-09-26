@@ -11422,6 +11422,7 @@ public partial class Mario : CharacterBody3D
         jumpBuffer = 0;
         _smsDownAnim = "";
         StopWaistIKHard();
+        isSpining(false); // the spin jump's ring and particles are switched by the main air path, which the swim skips
         SleepStatus(false);
         SmsLatchFace(face, 1);
         lastFacingDirection = face;
@@ -12742,24 +12743,26 @@ public partial class Mario : CharacterBody3D
         && (_fluddNozzle == SmsNozzle.Spray ? _fluddSprayStrength > 0f : _fluddTrigState == 1);
 
     /// <summary>Who calls rocketCheck(): jumpingCommonEvents (JUMP, SECOND_JUMP, U_TURN_JUMP, TRAMPLE), ultraJumping, backJumping,
-    /// jumpWall, rotateJumping, landing() (LANDING / ROCKET_LANDING -- a re-press re-enters; not LAND_SAFE_DOWN), running(),
-    /// waiting(); squating() takes the hover from the squat when the nozzle emits. Not the dives, the broad jumps, the rolls,
-    /// the slides, the hang, the water.</summary>
+    /// jumpWall, rotateJumping, landing() (LANDING -- a walk-off fall; not LAND_SAFE_DOWN), running(), waiting(); squating()
+    /// takes the hover from the squat when the nozzle emits. Not the dives, the broad jumps, the rolls, the slides, the hang,
+    /// the water. landing() also runs for ROCKET_LANDING, but rocketCheck() itself refuses that status (see below).</summary>
     private static bool SmsHoverEntryState(MarioState s) =>
         s == MarioState.singleJump || s == MarioState.doubleJump || s == MarioState.tripleJump || s == MarioState.SpinJump
         || s == MarioState.sideFlip || s == MarioState.backFlip || s == MarioState.wallJump || s == MarioState.stomping
         || s == MarioState.ledgeFall || s == MarioState.idle || s == MarioState.walking || s == MarioState.running
         || s == MarioState.sprinting || s == MarioState.sneak || s == MarioState.rolloutRun || s == MarioState.crouch;
 
-    /// <summary>rocketCheck(): HAS_FLUDD, the nozzle's RocketType 1 (the hover; the rocket nozzle is S4), UPPER_STATE_PUMPING (R
-    /// down), canSpray() -> ROCKET with the target 230 units over the feet. Runs before the state handlers, as the game's
-    /// stateMachine loop runs rocketing() in the tick that entered it.</summary>
+    /// <summary>rocketCheck(): not ROCKET, NOT ROCKET_LANDING (one hover per airtime: after it ends the fall keeps that status
+    /// through wall stops until the landing, a ledge grab, a knockdown or the water change it -- the nozzle re-arms on R = 0,
+    /// Mario's status is what rations it), HAS_FLUDD, the nozzle's RocketType 1 (the hover; the rocket nozzle is S4),
+    /// UPPER_STATE_PUMPING (R down), canSpray() -> ROCKET with the target 230 units over the feet. Runs before the state
+    /// handlers, as the game's stateMachine loop runs rocketing() in the tick that entered it.</summary>
     private void SmsFluddRocketCheck()
     {
         if (!_fluddReady || stateOfMario == MarioState.fluddHover || !SmsHoverEntryState(stateOfMario))
             return;
-        if (stateOfMario == MarioState.ledgeFall && _smsHangDropFall)
-            return; // LAND_SAFE_DOWN: landSafeDown() has no rocketCheck
+        if (stateOfMario == MarioState.ledgeFall && (_smsHangDropFall || _smsRocketLanding))
+            return; // LAND_SAFE_DOWN: landSafeDown() has no rocketCheck; ROCKET_LANDING: rocketCheck() returns 0 for it
         if (_fluddNozzle != SmsNozzle.Hover || _fluddUpper != SmsUpper.Pumping || !SmsFluddCanSpray())
             return;
         SmsEnterHover();
@@ -12788,6 +12791,7 @@ public partial class Mario : CharacterBody3D
         _smsRocketLanding = false;
         _smsTrueVyValid = false;
         StopWaistIKHard(); // the run's waist IK is started / stopped in the main path, which the hover skips
+        isSpining(false);  // so are the spin jump's ring and particles (the main air path switches them every frame)
         SleepStatus(false);
         lastFacingDirection = face;
         armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
