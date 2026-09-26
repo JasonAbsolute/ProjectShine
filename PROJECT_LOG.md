@@ -1329,7 +1329,7 @@ equations come from. Everything sits behind one toggle so the old feel is one cl
 | `KeepGroundPoundJump` | `false` | Restores the GP-jump (see Ground Pound section above). Off because Sunshine has no such move. |
 | `SmsLedgeSnap` | `true` | Step DOWN ledges up to 100 units (1.34 m) without leaving the ground: sets `floor_snap_length` to 1.343 m (Player.tscn ships 0.6). |
 | `SmsStepUp` | `true` | Step UP risers up to 30 units (0.40 m) without breaking stride (`SmsTryStepUp`, after MoveAndSlide). |
-| `SmsStepSmoothRate` | `35` | Visual only. The body pops up a riser instantly (the game does too); the rig starts that far below and eases back at this rate (1/s, about 4 frames), so the mesh glides up the step. 0 = the mesh pops with the body. `UpdateStepVisual` offsets Skeleton3D and WaistTarget together. |
+| `SmsStepSmoothRate` | `12` | Visual only. The body pops up or down a riser instantly (the game does too); the rig rides a virtual ramp through the staircase (one riser per tread of horizontal travel, see the stairs gotcha) and never settles slower than this standstill ease (1/s). 0 = the mesh pops with the body. `UpdateStepVisual` offsets Skeleton3D and WaistTarget together. |
 | `SmsWallSlidePinTicks` | `4` | Ticks (120 Hz) of zero velocity when a wall slide begins. The game's is 10 (`stayWall`, 83 ms; the state machine runs per 5 ms tick, verified in `TMarDirector::direct`), which playtested as "sticks to the wall"; 4 (33 ms) keeps a slight catch before the slide. Deviation by request. 0 = slides at once. |
 | `SmsRollJumpKnockdown` | `false` | **Deviation.** Off: the roll-jump wall-slides on a head-height wall. On: the decomp's rule (knockdown above 40; the roll-jump launches at 55 and never drops under 40 with the stick held). |
 
@@ -1650,6 +1650,12 @@ he re-grabbed the same ledge as soon as the 10-frame cooldown ran out: the drop 
 back inside the 100..150 grab band for the next 0.67 m of falling. B → wall slide and "platform gone" (the game's
 `LANDING`) are not affected.
 
+Gotcha: the library animations in `models/*.res` all ship with `loop_mode` None (the binary resources store no loop
+property at all), and the tree plays `ma_hang` as is, so the hang played its 1.65 s once and froze on the last frame —
+invisible until someone hangs for 17 s. `_Ready` now `ForceLoop`s `ma_hang`, `ma_hmov_l/r` and `ma_thrown`, as it
+already did for `ma_wait`, `ma_run1` and the tree-climb loops; `ma_hgdwn` / `ma_hgup` / `ma_hgjmp` stay one-shots
+(their end is a state exit).
+
 Jumping out of the wall push (`doPushingAnimation` caps fwd at 6 along the face): the jump leaves along the push direction,
 into the wall, where the air wall hit stops it — a near-vertical hop. It used to inherit the lateral shuffle velocity.
 
@@ -1760,11 +1766,22 @@ so a staircase steeper than its own diameter allows is a ~58° ramp to it. The g
 geometry the same way (one riser per tread crossed). If a particular staircase feels like a launch, the fix is the
 collision mesh (a ramp under the visual steps, as Nintendo did for many SMS stairs), not the physics.
 
-What *is* smoothed is the picture: `UpdateStepVisual` (in `_Process`) offsets the rig (Skeleton3D and WaistTarget
-together) down by each step's rise and eases it back at `SmsStepSmoothRate`, clamped to one riser, so the mesh glides
-up while the collision body pops. The camera's height pan already eases. Nothing else writes those two node positions
-(the run bob, the surface tilt and `LockArmatureVisualRoot` all write `armature.Position`); the offset is snapped to
-zero in the pinned ledge states.
+What *is* smoothed is the picture, both ways. Going **up**, `SmsTryStepUp` reports each riser (and the tread it
+measured); going **down**, the floor snap (`SmsLedgeSnap`, 100 units — the game's `checkGroundAtWalking` sets
+Mario onto the floor just the same) drops the body a riser per tread edge in one move, and `SmsStepVisualCheckSnap`
+spots it by comparing the body's vertical move with staying on the floor plane it set off on (more than 0.12 m of
+difference is a riser, not slope walking: 30° at 12 m/s is 0.115 m a frame). Either way the rig (Skeleton3D and
+WaistTarget together, `UpdateStepVisual` in `_Process`) stays where it was and rides a virtual **ramp** through the
+staircase: the offset is paid down at rise/tread per metre of horizontal travel — one riser per tread, whatever the
+speed — clamped to one riser, and never slower than the standstill ease `SmsStepSmoothRate` (12/s). The first cut
+(c71aa43) eased by time alone (35/s): at one riser a frame that sank the rig 0.45 m into the stairs and still
+saw-toothed, and it knew nothing about going down. The camera's height pan already eases. Nothing else writes those
+two node positions (the run bob, the surface tilt and `LockArmatureVisualRoot` all write `armature.Position`); the
+offset is snapped to zero in the pinned ledge states.
+
+Open (2026-09-26): the `[SMS step]` lines from the plaza stairs show the step-frame speed alternating 12.2 / 11.0 m/s
+frame to frame (and the frame's travel 0.203 / 0.183 m with it). Unexplained; the line now also prints the tread
+found, the frame's horizontal travel and the ground tick's in → out speed to place it.
 
 ### ⚠️ Gotcha: a long floor snap is also a long downhill redirect
 

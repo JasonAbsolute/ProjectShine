@@ -237,7 +237,7 @@ public partial class Mario : CharacterBody3D
     private const float SmsSlideKnockdownMinFwd = 16f; // slippingBasic(): a belly slide (CATCH) into a head-on wall above this -> CATCH_DOWN, else stop and get up
     [Export] public bool SmsLedgeSnap = true;   // checkGroundAtWalking: step DOWN ledges up to 100 units (1.34 m) without leaving the ground (floor_snap_length)
     [Export] public bool SmsStepUp = true;      // checkGroundAtWalking: step UP risers up to 30 units (0.40 m) without breaking stride
-    [Export] public float SmsStepSmoothRate = 35f; // visual only: how fast the rig eases up a stepped riser (1/s, ~4 frames); 0 = the mesh pops with the body
+    [Export] public float SmsStepSmoothRate = 12f; // visual only: the rig rides a virtual ramp through stairs (one riser per tread of travel) and never settles slower than this standstill ease (1/s); 0 = the mesh pops with the body
     [Export] public int SmsWallSlidePinTicks = 4;     // stayWall(): 120 Hz ticks of zero velocity when the slide begins. Game value 10 (83 ms, felt sticky); 4 (33 ms) by request, playtested; 0 = slides at once
     [Export] public bool SmsRollJumpKnockdown = false; // DEVIATION: decomp jumpingBasic() knocks the roll-jump (fwd 55 > ClashSpeed 40) down on a head-height wall; Jaysonn (2026-09-24) wants the wall slide he remembers from the game. true = the code's rule
     private bool _smsSteppedUp = false;         // this frame's grounded MoveAndSlide hit a riser he has since stepped onto
@@ -727,9 +727,18 @@ public partial class Mario : CharacterBody3D
     private const int SMS_LONG_FALL_TICKS = 240;
     private int _smsFallTicks = 0;
     private bool _smsLongFallAnim = false;
-    // Visual step smoothing: the body pops up a riser instantly (the game does too); the rig starts that far below it and
-    // eases back up, so the mesh glides where the collision popped. World metres, <= 0. See UpdateStepVisual.
+    // Visual step smoothing: the body pops up / down a riser instantly (the game does too); the rig starts that far below /
+    // above it and rides a virtual RAMP through the staircase: the offset is paid down at rise/tread per metre of horizontal
+    // travel (one riser per tread), never slower than the standstill ease SmsStepSmoothRate. World metres, mesh minus body.
+    // See UpdateStepVisual / SmsStepVisualEvent / SmsStepVisualCheckSnap.
     private float _smsStepVisualY = 0f;
+    private float _smsStepRampSlope = 1.5f;      // rise / tread of the stairs in hand (the plaza's 0.35 / 0.22 m ~ 1.6); refreshed by every riser whose tread is known
+    private Vector3 _smsStepVisualXZ;             // body XZ when the offset was last paid down
+    private Vector3 _smsStepLastEventXZ;          // body XZ at the last riser (two risers within half a second: their distance is the tread)
+    private double _smsStepLastEventTime = -10.0;
+    private const float SMS_STEP_VISUAL_MAX = 0.45f;      // one riser at most (the step limit is 0.40 m)
+    private const float SMS_STEP_VISUAL_MIN_JUMP = 0.12f; // a smaller vertical jump of the body is slope walking (30 deg at 12 m/s = 0.115 m a frame), not a riser
+    private float _smsDbgTickInMps = 0f;          // debug: horizontal speed entering SmsGroundTick (the [SMS step] line prints in -> out)
     private Vector3 _skeletonBaseLocalPos;
     private Vector3 _waistTargetBaseLocalPos;
 
@@ -1545,6 +1554,14 @@ public partial class Mario : CharacterBody3D
         ForceLoop("ma_t_wait");
         ForceLoop("ma_sleep_wait");
         ForceLoop("ma_demo_gate_out_rolling_get"); // Triple jump loops
+        // The library animations in models/*.res all ship with loop_mode None, and the tree plays ma_hang as is: the hang
+        // played its 1.65 s once and froze on the last frame (Jaysonn: "does not loop when hanging"). ANIM_HANG,
+        // ANIM_HMOV_L/R and ANIM_THROWN are loops in the game. ma_hgdwn / ma_hgup / ma_hgjmp stay one-shots: their end is a state exit.
+        foreach (string a in new[] { "ma_hang", "ma_hmov_l", "ma_hmov_r", "ma_thrown" })
+        {
+            if (animPlayer.HasAnimation(a))
+                ForceLoop(a);
+        }
 
         // Get the StateMachine playback from the AnimationTree
         _sm = (AnimationNodeStateMachinePlayback)_tree.Get("parameters/BaseSM/playback");
@@ -3993,6 +4010,7 @@ public partial class Mario : CharacterBody3D
             Velocity = velocity;
         }
         Vector3 preMovePos = GlobalPosition;
+        Vector3 preFloorN = _smsGroundMoved ? GetFloorNormal() : Vector3.Up; // the floor plane he set off on (SmsStepVisualCheckSnap)
         MoveAndSlide();
         velocity = Velocity;
         if (_smsGroundMoved)
@@ -4005,6 +4023,8 @@ public partial class Mario : CharacterBody3D
         _smsSteppedUp = false;
         if (UseSmsPhysics && SmsStepUp)
             SmsTryStepUp(preSlideVelocity, preMovePos, delta, preMoveState);
+        if (_smsGroundMoved && !_smsSteppedUp && IsOnFloor())
+            SmsStepVisualCheckSnap(preMovePos, preFloorN); // a riser the floor snap took (down a tread edge, mostly): the rig rides it
         if (UseSmsPhysics)
             SmsAfterMove();
 
@@ -9642,37 +9662,107 @@ public partial class Mario : CharacterBody3D
     }
 
     /// <summary>
-    /// Visual step smoothing. The body pops up a riser instantly (checkGroundAtWalking does the same), and the rig starts
-    /// that far below it and eases back up, so the mesh glides where the collision popped. Skeleton3D and WaistTarget move
-    /// together (the waist IK aims at the target, so the pose is untouched); the offset is expressed in the Armature's local
-    /// space, which is yawed 180 deg and tilted on slopes. Nothing else writes these two positions (the run bob, the
-    /// surface tilt and LockArmatureVisualRoot write armature.Position). Snapped to zero in the pinned ledge states, whose
-    /// hand alignment uses the rig as authored. The camera already eases its height (UpdateFollow's height pan).
+    /// Visual step smoothing. The body pops up or down a riser instantly (checkGroundAtWalking does the same: the ground is
+    /// looked up from feet + 30 and Mario is SET onto it), and the rig starts that far below or above it and rides a virtual
+    /// RAMP through the staircase: the offset is paid down at rise/tread per metre of horizontal travel, one riser per tread,
+    /// so a staircase crossed at any speed reads as the ramp Nintendo would have put under it, and never slower than the
+    /// standstill ease SmsStepSmoothRate. Skeleton3D and WaistTarget move together (the waist IK aims at the target, so the
+    /// pose is untouched); the offset is expressed in the Armature's local space, which is yawed 180 deg and tilted on slopes.
+    /// Nothing else writes these two positions (the run bob, the surface tilt and LockArmatureVisualRoot write
+    /// armature.Position). Snapped to zero in the pinned ledge states, whose hand alignment uses the rig as authored. The
+    /// camera already eases its height (UpdateFollow's height pan).
     /// </summary>
     private void UpdateStepVisual(float delta)
     {
         if (skeleton == null || armature == null)
             return;
-        if (_smsStepVisualY == 0f && skeleton.Position == _skeletonBaseLocalPos)
-            return;
         bool pinned = ledgePinned || stateOfMario == MarioState.ledgeHang || stateOfMario == MarioState.ledgeClimb
             || stateOfMario == MarioState.ledgeHopUp || stateOfMario == MarioState.ledgeDescend;
         if (pinned || SmsStepSmoothRate <= 0f)
-        {
             _smsStepVisualY = 0f;
-        }
-        else
+        float before = MathF.Abs(_smsStepVisualY);
+        SmsStepVisualPayDown(); // tracks the body XZ every frame; pays the ramp while an offset is pending
+        if (_smsStepVisualY != 0f)
         {
-            _smsStepVisualY *= MathF.Exp(-SmsStepSmoothRate * delta);
-            if (_smsStepVisualY > -0.001f)
+            float byTime = before * MathF.Exp(-SmsStepSmoothRate * delta); // the standstill ease: whichever pays more
+            if (MathF.Abs(_smsStepVisualY) > byTime)
+                _smsStepVisualY = MathF.Sign(_smsStepVisualY) * byTime;
+            if (MathF.Abs(_smsStepVisualY) < 0.002f)
                 _smsStepVisualY = 0f;
         }
+        if (_smsStepVisualY == 0f && skeleton.Position == _skeletonBaseLocalPos)
+            return;
         Vector3 local = _smsStepVisualY == 0f
             ? Vector3.Zero
             : armature.GlobalTransform.Basis.Inverse() * (Vector3.Up * _smsStepVisualY);
         skeleton.Position = _skeletonBaseLocalPos + local;
         if (targetWaist != null)
             targetWaist.Position = _waistTargetBaseLocalPos + local;
+    }
+
+    /// <summary>Pays the visual step offset down along the ramp: rise/tread per metre travelled since the last call.</summary>
+    private void SmsStepVisualPayDown()
+    {
+        Vector3 xz = new Vector3(GlobalPosition.X, 0f, GlobalPosition.Z);
+        float h = (xz - _smsStepVisualXZ).Length();
+        _smsStepVisualXZ = xz;
+        if (_smsStepVisualY == 0f)
+            return;
+        if (h > 2f)
+        {
+            _smsStepVisualY = 0f; // a teleport / respawn, not travel
+            return;
+        }
+        float mag = MathF.Abs(_smsStepVisualY) - _smsStepRampSlope * h;
+        _smsStepVisualY = mag <= 0.002f ? 0f : MathF.Sign(_smsStepVisualY) * mag;
+    }
+
+    /// <summary>
+    /// A riser was taken this frame: the body jumped bodyJumpY (up positive) in one move. The rig stays where it was and rides
+    /// the ramp. tread &lt;= 0 = unknown: two risers within half a second are a staircase, and the distance between them is the
+    /// tread; otherwise the last known slope stays.
+    /// </summary>
+    private void SmsStepVisualEvent(float bodyJumpY, float tread)
+    {
+        if (SmsStepSmoothRate <= 0f)
+            return;
+        Vector3 xz = new Vector3(GlobalPosition.X, 0f, GlobalPosition.Z);
+        double now = Time.GetTicksMsec() / 1000.0;
+        if (tread <= 0f && now - _smsStepLastEventTime < 0.5)
+        {
+            float d = (xz - _smsStepLastEventXZ).Length();
+            if (d > 0.05f && d < 1.5f)
+                tread = d;
+        }
+        if (tread > 0.02f)
+            _smsStepRampSlope = Mathf.Clamp(MathF.Abs(bodyJumpY) / tread, 0.25f, 4f);
+        _smsStepVisualY = Mathf.Clamp(_smsStepVisualY - bodyJumpY, -SMS_STEP_VISUAL_MAX, SMS_STEP_VISUAL_MAX);
+        _smsStepLastEventXZ = xz;
+        _smsStepLastEventTime = now;
+    }
+
+    /// <summary>
+    /// The riser Godot took by itself: on a grounded frame the floor snap (SmsLedgeSnap, 100 units: checkGroundAtWalking's
+    /// "set him onto the floor") drops the body down a tread edge in one move, and a lip under the cylinder's edge can lift
+    /// it. Compare the body's vertical move with staying on the floor plane it set off on: more than 0.12 m of difference is
+    /// a riser, not slope walking (30 deg at 12 m/s is 0.115 m a frame), and the rig rides it. Visual only.
+    /// </summary>
+    private void SmsStepVisualCheckSnap(Vector3 preMovePos, Vector3 preFloorN)
+    {
+        if (SmsStepSmoothRate <= 0f || preFloorN.Y < 0.5f)
+            return;
+        if (MathF.Abs(GetPlatformVelocity().Y) > 0.01f)
+            return; // riding a lift: the floor itself moved
+        Vector3 d = GlobalPosition - preMovePos;
+        float alongPlane = -(preFloorN.X * d.X + preFloorN.Z * d.Z) / preFloorN.Y;
+        float jump = d.Y - alongPlane;
+        float size = MathF.Abs(jump);
+        if (size < SMS_STEP_VISUAL_MIN_JUMP || size > SmsGroundContact.LedgeDropMetres + 0.1f)
+            return;
+        SmsStepVisualPayDown();
+        SmsStepVisualEvent(jump, -1f);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS step] ground {stateOfMario}: {(jump < 0f ? "down" : "up")} {size:F2} m ({SmsUnits.MetresToUnits(size):F0} units) by the floor snap, moved {new Vector2(d.X, d.Z).Length():F3} m this frame, rig rides the ramp at {_smsStepRampSlope:F2} rise/run, speed {new Vector2(velocity.X, velocity.Z).Length():F1} m/s (tick in {_smsDbgTickInMps:F1})");
     }
 
     private void LockArmatureVisualRoot()
@@ -11623,6 +11713,7 @@ public partial class Mario : CharacterBody3D
         // Godot's recovery pushes him back out next frame (the jitter). Find the next riser along the tread and stop the
         // front edge at it. On such stairs he still climbs one riser per frame -- that is the geometry -- but cleanly.
         Vector3 advance = remaining;
+        float treadDepth = -1f; // this riser's face to the next one, when there is one within 1.5 m (also the ramp's run)
         {
             Vector3 treadFrom = new Vector3(groundP.X, groundP.Y + 0.02f, groundP.Z) + dir * 0.005f;
             var qTread = PhysicsRayQueryParameters3D.Create(treadFrom, treadFrom + dir * 1.5f, CollisionMask);
@@ -11631,17 +11722,18 @@ public partial class Mario : CharacterBody3D
             var hTread = space.IntersectRay(qTread);
             if (hTread.Count > 0)
             {
-                float treadDepth = (((Vector3)hTread["position"]) - groundFrom).Dot(dir); // riser face to next riser face
-                float maxAdvance = MathF.Max(0f, treadDepth + 0.03f - 0.005f);            // front edge stops 5 mm short
+                treadDepth = (((Vector3)hTread["position"]) - groundFrom).Dot(dir) + 0.03f; // riser face to next riser face (groundFrom sits 3 cm past the face)
+                float maxAdvance = MathF.Max(0f, treadDepth - 0.005f);                    // front edge stops 5 mm short
                 float wantLen = remaining.Length();
                 if (wantLen > maxAdvance)
                     advance = remaining * (maxAdvance / wantLen);
             }
         }
+        SmsStepVisualPayDown(); // the travel up to this riser pays off the previous one
         GlobalPosition += advance + Vector3.Up * rise;
         ApplyFloorSnap();
-        if (SmsStepSmoothRate > 0f)
-            _smsStepVisualY = MathF.Max(_smsStepVisualY - rise, -0.45f); // the rig starts a riser lower and eases up (visual only; at most one riser behind)
+        SmsStepVisualEvent(rise, treadDepth); // the rig stays a riser lower and rides the ramp up (visual only)
+        SmsStepVisualPayDown();               // the advance onto the tread already pays part of it
         velocity.X = preMoveVel.X; // the riser clipped the horizontal speed; the game never saw a wall
         velocity.Z = preMoveVel.Z;
         velocity.Y = 0f;
@@ -11649,7 +11741,11 @@ public partial class Mario : CharacterBody3D
         if (!fromGround)
             _smsNoLandFrames = 0; // he is standing on the step: the landing rule takes it this frame (JUMP_END / belly slide), as checkGroundAtJumping does
         if (SmsDebugPrint)
-            GD.Print($"[SMS step] {where} {preMoveState}: up {rise:F2} m ({SmsUnits.MetresToUnits(rise):F0} units) onto {hit.GetType().Name} '{(hit as Node)?.Name}', remaining {remaining.Length():F3} m, speed kept {new Vector2(velocity.X, velocity.Z).Length():F1} m/s");
+        {
+            float frameMove = new Vector2(GlobalPosition.X - preMovePos.X, GlobalPosition.Z - preMovePos.Z).Length();
+            string tread = treadDepth > 0f ? $"{treadDepth:F2} m" : "none within 1.5 m";
+            GD.Print($"[SMS step] {where} {preMoveState}: up {rise:F2} m ({SmsUnits.MetresToUnits(rise):F0} units) onto {hit.GetType().Name} '{(hit as Node)?.Name}', remaining {remaining.Length():F3} m, moved {frameMove:F3} m this frame, tread {tread}, speed kept {new Vector2(velocity.X, velocity.Z).Length():F1} m/s (tick in {_smsDbgTickInMps:F1}), ramp {_smsStepRampSlope:F2}");
+        }
     }
 
     /// <summary>doRunning() + walkEnd() + the skid U-turn, for one physics frame (2 sub-ticks at 60 Hz).</summary>
@@ -11657,6 +11753,7 @@ public partial class Mario : CharacterBody3D
     {
         int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
         Vector3 velXZ = new Vector3(velocity.X, 0f, velocity.Z);
+        _smsDbgTickInMps = velXZ.Length();
         if (!_smsFaceValid || _smsFaceSource != 1 || velXZ.Length() < 0.5f)
         {
             // Arriving from the air / another system, or (nearly) standing still: face the way he is
