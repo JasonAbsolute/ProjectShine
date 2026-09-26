@@ -244,9 +244,25 @@ public partial class LifeMeter : Node2D
     private bool _airMode;
     public bool AirMode => _airMode;
 
-    private static readonly Vector3 AirWhite = new Vector3(0f, 1f, 1f);
-    private static readonly Vector3 AirWhiteLow = new Vector3(0f, 16f / 255f, 1f);
-    private static readonly Vector3 AirBlack = new Vector3(0f, 60f / 255f, 1f);
+    // The game's meter under water (ref/WaterLifeMeter.png): azure bodies #08C8F8, shading to #0898F8, highlights to
+    // #08F8F8, navy outlines #0C2C78. The port's art is yellow/orange with black outlines, so the remap keys on luminance,
+    // where its gradients live (outline 0.02, swirl 0.66-0.77, segments 0.82-0.87, highlights 0.97), through this ramp.
+    private static readonly Color[] AirRamp =
+    {
+        new Color(0.04f, 0.12f, 0.44f), // 0.00 outline (navy)
+        new Color(0.05f, 0.31f, 0.75f), // 0.35 edge
+        new Color(0.03f, 0.60f, 0.97f), // 0.66 shading
+        new Color(0.03f, 0.78f, 0.97f), // 0.80 body
+        new Color(0.03f, 0.91f, 0.97f), // 0.90 light side
+        new Color(0.38f, 0.97f, 1.00f), // 1.00 highlight
+    };
+    private static readonly float[] AirRampStops = { 0.00f, 0.35f, 0.66f, 0.80f, 0.90f, 1.00f };
+    private static readonly Color AirLowBlue = new Color(0.06f, 0.20f, 1.00f);     // the game's low-air "white" 0x0010FF
+    private static readonly Color AirBlobModulate = new Color(0.02f, 0.16f, 0.48f, 0.72f);
+    private TextureRect _lifeText;
+    private TextureRect _paintBlob;
+    private Color _paintBlobModulate;
+    private bool _paintBlobModulateSaved;
 
     private void SetAirTint(bool on, int units)
     {
@@ -255,26 +271,58 @@ public partial class LifeMeter : Node2D
             var shader = new Shader
             {
                 Code = "shader_type canvas_item;\n"
-                     + "uniform vec3 white_color = vec3(0.0, 1.0, 1.0);\n"
-                     + "uniform vec3 black_color = vec3(0.0, 0.235, 1.0);\n"
+                     + "uniform vec3 c0 = vec3(0.04, 0.12, 0.44);\n"
+                     + "uniform vec3 c1 = vec3(0.05, 0.31, 0.75);\n"
+                     + "uniform vec3 c2 = vec3(0.03, 0.60, 0.97);\n"
+                     + "uniform vec3 c3 = vec3(0.03, 0.78, 0.97);\n"
+                     + "uniform vec3 c4 = vec3(0.03, 0.91, 0.97);\n"
+                     + "uniform vec3 c5 = vec3(0.38, 0.97, 1.00);\n"
+                     + "uniform float s1 = 0.35;\n"
+                     + "uniform float s2 = 0.66;\n"
+                     + "uniform float s3 = 0.80;\n"
+                     + "uniform float s4 = 0.90;\n"
+                     + "uniform vec3 low_blue = vec3(0.06, 0.20, 1.0);\n"
+                     + "uniform float low = 0.0;\n"
                      + "void fragment() {\n"
                      + "    vec4 t = texture(TEXTURE, UV);\n"
-                     + "    float v = max(t.r, max(t.g, t.b));\n"
-                     + "    COLOR = vec4(mix(black_color, white_color, v), COLOR.a);\n"
+                     + "    float l = dot(t.rgb, vec3(0.299, 0.587, 0.114));\n"
+                     + "    vec3 c;\n"
+                     + "    if (l < s1) c = mix(c0, c1, l / s1);\n"
+                     + "    else if (l < s2) c = mix(c1, c2, (l - s1) / (s2 - s1));\n"
+                     + "    else if (l < s3) c = mix(c2, c3, (l - s2) / (s3 - s2));\n"
+                     + "    else if (l < s4) c = mix(c3, c4, (l - s3) / (s4 - s3));\n"
+                     + "    else c = mix(c4, c5, (l - s4) / (1.0 - s4));\n"
+                     + "    c = mix(c, low_blue, low * 0.6 * smoothstep(0.4, 0.6, l));\n"
+                     + "    COLOR = vec4(c, COLOR.a);\n"
                      + "}\n",
             };
             _airMaterial = new ShaderMaterial { Shader = shader };
+            for (int i = 0; i < AirRamp.Length; i++)
+                _airMaterial.SetShaderParameter($"c{i}", new Vector3(AirRamp[i].R, AirRamp[i].G, AirRamp[i].B));
+            for (int i = 1; i <= 4; i++)
+                _airMaterial.SetShaderParameter($"s{i}", AirRampStops[i]);
+            _airMaterial.SetShaderParameter("low_blue", new Vector3(AirLowBlue.R, AirLowBlue.G, AirLowBlue.B));
+            _lifeText = GetNodeOrNull<TextureRect>("LifeText");
+            _paintBlob = GetNodeOrNull<TextureRect>("PaintBlobBG");
         }
         _airMode = on;
         if (on)
-        {
-            _airMaterial.SetShaderParameter("white_color", units <= 3 ? AirWhiteLow : AirWhite);
-            _airMaterial.SetShaderParameter("black_color", AirBlack);
-        }
+            _airMaterial.SetShaderParameter("low", units <= 3 ? 1.0f : 0.0f); // 3 or less: the game's white becomes 0x0010FF
         Material m = on ? _airMaterial : null;
         _orangeSwirl.Material = m;
         for (int i = 0; i < 8; i++)
             _orangeSegments[i].Material = m;
+        if (_lifeText != null)
+            _lifeText.Material = m;
+        if (_paintBlob != null)
+        {
+            if (!_paintBlobModulateSaved)
+            {
+                _paintBlobModulate = _paintBlob.Modulate;
+                _paintBlobModulateSaved = true;
+            }
+            _paintBlob.Modulate = on ? AirBlobModulate : _paintBlobModulate;
+        }
     }
 
     /// <summary>The meter appears at its HUD place showing <paramref name="units"/> of air in blue (startAppearLife(1)).</summary>

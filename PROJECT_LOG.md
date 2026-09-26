@@ -1829,7 +1829,10 @@ frame); the attacker's invincibility; HP or air as above. Type 3 (the upper-body
 **HUD** (`GCConsole2::updateLifeMeterState`): the life meter switches to **air** 240 ticks (2 s) after he goes under, showing
 `(s16)air` segments (8 at 8.99), coloured J2D white `0x00FFFF` / black `0x003CFF` (cyan over blue), white `0x0010FF` at 3 or
 less; surfacing puts HP back (hidden when full). Port: `LifeMeter.ShowAir / SetAir / EndAir`, the blue as a runtime
-`canvas_item` shader remapping the orange art's intensity between the two colours (no scene change). Not ported: the low-air
+`canvas_item` shader (no scene change) remapping the yellow/orange art's **luminance** through a ramp sampled from
+`ref/WaterLifeMeter.png`: navy outline `#0A1F70` → azure body `#08C8F8` → highlight `#60F8FF`, the LIFE text and the paint
+blob included; at 3 units or less the body shifts toward the game's `0x0010FF`. (Keying on the art's value, as the first
+build did, gave one flat cyan: the port's art is 0.99 in value everywhere but its outlines.) Not ported: the low-air
 blink rates and beeps (the meter keeps its own pulse), the bubbles from the mouth, the helmet's `AirDecDive`.
 Debug: `[SMS air] under: head … m below the surface, N air`, `[SMS air] N left after … s under`, `[SMS air] surfaced after …`,
 `[SMS air] meter: air, N segments` / `meter: back to HP N`, `[SMS air] DROWNED after … s under; R respawns`,
