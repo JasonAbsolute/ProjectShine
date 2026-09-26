@@ -4945,7 +4945,7 @@ public partial class Mario : CharacterBody3D
                 armature.Rotation = new Vector3(0f, sideFlipLockedYaw, 0f);
             }
         }
-        else if (UseSmsPhysics && _smsFaceValid && _smsFaceSource == 2 && !IsOnFloor() && SmsStateSteers(stateOfMario))
+        else if (UseSmsPhysics && _smsFaceValid && _smsFaceSource == 2 && !IsOnFloor() && SmsAirSteers(stateOfMario))
         {
             // Sunshine: the model keeps facing mFaceAngle in the air; sideways stick drift does not turn him.
             armature.Rotation = armature.Rotation with { Y = BaseYawFromDir(SmsMath.DirFromYaw(_smsFaceYaw)) };
@@ -11134,6 +11134,15 @@ public partial class Mario : CharacterBody3D
         || s == MarioState.singleRollout || s == MarioState.bellyRollout
         || s == MarioState.stomping || s == MarioState.ledgeHopUp;
 
+    /// <summary>
+    /// Who gets doJumping()'s stick control in the air: the launched states, plus a plain fall off an edge. In the game
+    /// running() -> walkProcess() 0 -> LANDING, and landing() is jumpingBasic(LAND_SLIP, ANIM_LAND, 3): the same air control
+    /// as a jump, the ledge bit, B dives. Not the LAND_SAFE_DOWN drop after letting go of a ledge (jumpProcess(0): no stick).
+    /// The landing and step rules keep SmsStateSteers (ledgeFall's landing has its own fall-speed proof).
+    /// </summary>
+    private bool SmsAirSteers(MarioState s) =>
+        SmsStateSteers(s) || (s == MarioState.ledgeFall && !_smsHangDropFall);
+
     private static SmsAir.Launch SmsLaunchKindFor(MarioState s)
     {
         switch (s)
@@ -11614,7 +11623,7 @@ public partial class Mario : CharacterBody3D
         SmsAir.GravityMode gmode = stateOfMario == MarioState.SpinJump ? SmsAir.GravityMode.SpinJump : SmsAir.GravityMode.Normal;
         float sumMoveVy = 0f;
 
-        if (SmsStateSteers(stateOfMario))
+        if (SmsAirSteers(stateOfMario))
         {
             Vector3 velXZ = new Vector3(velocity.X, 0f, velocity.Z);
             if (!_smsFaceValid || _smsFaceSource != 2)

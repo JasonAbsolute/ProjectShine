@@ -1424,6 +1424,11 @@ Launch table (`setStatusToJumping`), all in SMS units, `fwd` = speed at the mome
   single jump keeps its cut and a ground spin jump never has one).
 - Air control is nearly committed: forward steer `0.008·mag·cos(Δ)` per tick, sideways drift `0.3·mag·sin(Δ)` applied as
   a transient offset (not accumulated, as in the game), horizontal air speed capped at 80, air brake 0.999/tick.
+  It applies to every launched state **and to a plain fall off an edge**: `running()` → `walkProcess` 0 → `LANDING`,
+  whose `landing()` is `jumpingBasic(LAND_SLIP, ANIM_LAND, 3)` — the same stick control as a jump, the ledge bit, B
+  dives, and the landing opens the double-jump window (`SmsAirSteers`; the face is latched from the velocity at the
+  edge). The `LAND_SAFE_DOWN` drop after letting go of a ledge has none. Not ported: the cry and `ANIM_THROWN` after
+  240 ticks of falling.
 - The face angle is latched **once** at launch, from the velocity direction (not the model, which the old code snaps to
   the stick — that snapped the takeoff direction and lost speed). The model holds it in the air; no per-frame yaw.
 - Jump chain window 16 ticks (0.133 s) after touchdown; A inside it = next chained jump, B = dive (vy 20).
@@ -1760,7 +1765,8 @@ ground has to carry upward velocity (launches do) or exceed 1.34 m.
 
 ### Not ported (next)
 
-- Not mechanics after all: `LAND_SAFE_DOWN` is only reached from invalid ground data (out-of-bounds recovery); the
+- Not mechanics after all: `LAND_SAFE_DOWN` *as a wall-hit outcome* is only reached from invalid ground data (out-of-bounds
+  recovery) — as a state it is the passive drop after letting go of a ledge, see Ledge hang; the
   skid-into-wall knockdown lives in `braking()`, entered only by releasing the stick during a U-turn skid, and needs
   the wall inside the 4-tick window above 16 — skipped; the "ground wall kick" in `running()` is dead code (A is
   consumed as a jump first).
