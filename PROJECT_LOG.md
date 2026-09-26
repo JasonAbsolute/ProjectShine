@@ -1738,7 +1738,12 @@ HP taken, down type, knockback `MinSpeed`, `InvincibleTime`).
 - **Low HP** (`waiting()`, MarioWait.cpp:175): at 1..3 HP, standing with nothing in his hands, `ma_damage_wait_start`
   plays once and `ma_damage_wait` loops instead of `ma_wait`. Both are library-only clips, driven directly from
   `SetMarioState(idle)` (which resumes the position if idle is re-entered mid-pant); `SmsDamageWaitTick` chains the two
-  and hands back to the tree when he heals above 3, picks something up, or moves; the sleep clips are left alone.
+  and hands back to the tree when he heals above 3, picks something up, or moves. He does **not** doze off meanwhile:
+  `waiting()` only counts the sleepy timer while the animation is `ANIM_WAIT`, so the port's idle wind-down (sit, sleep)
+  is held off at 1..3 HP the way it is while carrying or on a slope.
+- **Eyes.** The game's clips carry eye texture patterns (BTP on `_mat_eye_L/R`); the rip has the open eye (`H_ma_eye1`)
+  and the shut variant only. Shut through the knockdown (as the game's knockdown clips do), open again as he gets up;
+  the pant keeps them open (the game squints there — that texture is not in the rip).
 - Gotcha: the running waist IK is `Start()`ed / `Stop()`ped every frame in the main path, which the `hurt` block skips
   (`goto EndFrame`). Hit while running, it kept bending the knockdown clip; `SmsDamageExec` stops it (`StopWaistIKHard`).
 - **No fall damage in Sunshine**: the strong landing (`vy <= -70` past `DamageFallHeight`) is `CATCH`, HP untouched.

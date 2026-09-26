@@ -3349,6 +3349,13 @@ public partial class Mario : CharacterBody3D
                                             // as the carrying guard above: hold normal idle
                                             // and reset the wind-down so it starts fresh
                                             // once he's back on level ground.
+                                            // waiting(): the sleepy timer only counts while the animation is ANIM_WAIT;
+                                            // at 1..3 HP it is ANIM_DAMAGE_WAIT, so he never dozes off while hurt
+                                            else if (UseSmsPhysics && SmsWantsDamageWait())
+                                            {
+                                                SleepStatus(false); // eyes open, every sleep timer reset
+                                                SetMarioState(stateOfMario);
+                                            }
                                             else if (OnSleepBlockingSlope())
                                             {
                                                 SleepStatus(false); // also resets every sleep timer
@@ -10964,6 +10971,7 @@ public partial class Mario : CharacterBody3D
             lastFacingDirection = face;
             armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
             StopWaistIKHard(); // the run's waist IK is started / stopped in the main path, which the hurt block skips: stop it here or it bends the clip
+            SleepStatus(true); // the knockdown clips close his eyes in the game (their eye texture patterns are not in the rip: open and shut only)
             stateOfMario = MarioState.hurt;
             SmsDownEnter(airborne, fwd);
             SpawnBonkStars(-attackDir); // PARTICLE_MS_DMG_A/B/C at calcDamagePos (toward the attacker); no camera shake / rumble / voice here
@@ -11195,6 +11203,7 @@ public partial class Mario : CharacterBody3D
         {
             // isLast1AnimeFrame(): WAIT
             _smsDownAnim = "";
+            SleepStatus(false); // eyes open again (and the sleep timers start fresh)
             stateOfMario = MarioState.idle;
             SetMarioState(MarioState.idle); // the tree comes back on here
             if (SmsDebugPrint)
