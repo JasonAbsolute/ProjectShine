@@ -1947,7 +1947,57 @@ ReactionY are 0 — the 0.043 lift in the S1 table belongs to the unused prm). `
 Debug: `[SMS fludd] water 9500/10000 (Spray), drops 41` (every 5 %, and at empty / full), `spray strength 1.00 (R 0.98, ramp
 1250), stream -3 deg from level, housed 0.00` (on each quarter of strength), `hover: charged -> ACTIVE for 360 ticks`,
 `[SMS water] a drop hit Gooble (CharacterBody3D) -- spray hits are not wired to anything yet`, `hit: -N x 250 water`.
-Next: S2b the squat aim (needs `button_rclick`), S3 hover (Mario's spring), S4 rocket, S5 turbo (surf).
+Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
+
+**S3 — the hover** (`rocketCheck` / `rocketing`, MarioJump.cpp; `hhover.prm`; `MarioState.fluddHover`; files `Mario.cs`,
+`SmsPhysics.cs` (`SmsHover`), `assets/Sms/SmsBoneRotZ.cs` (new)). One status, `MARIO_STATUS_ROCKET`, serves the hover and the
+rocket nozzle; with the hover it is a **spring**, not a thrust.
+- **Entry** (`rocketCheck()`): the hover nozzle (`RocketType` 1), R down (`UPPER_STATE_PUMPING`) and the nozzle spraying
+  (`canSpray()`: water, and the trigger ACTIVE — instant for the hover) → `ROCKET` with the target `unk314 = feet + HoverHeight`
+  (230 units = 3.09 m). Who checks: every jump (`jumpingCommonEvents`: JUMP, SECOND_JUMP, U_TURN_JUMP, TRAMPLE; `ultraJumping`,
+  `backJumping`, `jumpWall`, `rotateJumping`), the fall (`landing()`: LANDING **and ROCKET_LANDING**, so letting go and pressing
+  again re-enters with a new target), `running()`, `waiting()`, `squating()` (when the nozzle emits). Not the dives, the broad
+  jumps, the rolls, the slides, the hang, the water. `setStatusToJumping(ROCKET)` writes `mVel.y = 10`, but `rocketing()` runs
+  in the same tick (`stateMachine` loops on a status change) and assigns the spring before the move, so the 10 never moves
+  him: a hover taken at the top of a jump drops the jump's rise and keeps its forward speed.
+- **Each tick** (`rocketing()`): `vy = (target − y) × AccelRate 0.02` — **assigned**, so `fallProcess`'s gravity after the move is
+  overwritten before the next one and never shows; `fwd × Brake 0.985`; `vel.xz = fwd` along the face. With the move at
+  `0.25 × vel` a tick the gap closes 0.5 % a tick: 45 % a second, **192 of the 230 units in the 3 s window** (104 after 1 s),
+  1.85 m/s at the start. **Stick:** within 30° of the face (`0x1555`) or beyond 150° (`0x6AAA`) it pushes along the face by
+  `mag × cos × DivingParams.AccelControl 0.02` a tick with **no turn**; between, the face turns toward it at `RotSp` 200 BAM a
+  tick (1.1°) with **no push** — to move sideways you turn first. No A, no B (`rocketing()` has neither). `ANIM_LAND` with the
+  pump on the upper body; the head turns `HoverHeadAngle` 5294 (29°) **down** while he can spray (MarioDraw.cpp; upperbody.prm's
+  FeelDeep +8192 looks down a cliff, FrontWall −8192 up a wall, so positive is down) — on the run's head-lock modifier, eased.
+- **The floor and walls** (`jumpProcess(2)` in `rocketing()`): case 1 (the floor) and case 2 (a wall) `break` — **he does not land
+  while R is held**; skimming over higher ground the spring lifts him off again, a wall just stops him. A roof (`checkGround
+  AtJumping`'s roof branch) clamps him under it, `setPlayerVelocity(0)`, `vy` 0: stuck pressing on it until R lifts (ported:
+  `IsOnCeiling` → fwd 0). Case 4 (a fence roof) → `HANG_ROOF`: not ported. No ledge bit (`jumpProcess(2)`, not 3): no ledge
+  grab while hovering — the grab is for the fall after.
+- **Exits** (checked first, before the move): R lifted (not PUMPING), the 360-tick window closed (the trigger DEAD → `canSpray`
+  false), the tank empty, the nozzle swapped (X → `checkPumpEnable` false while switching, then `RocketType` 0) → `ROCKET_
+  LANDING` = `landing()`: the plain fall (`jumpingBasic(LAND_SLIP, ANIM_LAND, 3)`: air control, the ledge bit, B dives) from
+  the last tick's velocity (the spring's `vy` less one tick of gravity). Port: `ledgeFall` flagged `_smsRocketLanding`; on the
+  floor at that instant he lands at once (case 1). One rule differs from a walk-off fall: `jumpingBasic` case 2 reads
+  `mForwardVel > 16 && mStatus != ROCKET_LANDING`, so after a hover a wall at 16..40 **neither wall-slides nor safe-downs** —
+  he stops against it and keeps falling (the knockdown above 40 still applies). Water: `SWIM_START` from any status, as before.
+- **The nozzles bank** (`TWaterGun::movement`, `WaterGunDivingCtrlL / R`): `rocketing()` asks `unk1CC2 / unk1CC4` = `0.03125 ×
+  −mag × SideAngleMax × cos | sin` (hover: Side 5000 = 27° opposite ways on a sideways stick, Front 0, Back 8000 = 44° together
+  when pulled back), `unk1CC8 / unk1CCC` chase them by `ChangeSpeed` 0.1 a tick (0 when not spraying), and the joint callbacks
+  concatenate `RotZ(−unk1CC8)` / `RotZ(−unk1CCC)` onto `jnt_nozzle_L / R` after the clip. Port: `SmsBoneRotZ`, a
+  `SkeletonModifier3D` child of the hover nozzle's skeleton (the rip's `hover_wg.glb`: `jnt_hover_neck` → `jnt_nozzle_L`
+  (`null_G_muzzle`), `jnt_nozzle_R` (`null_G_muzzle2`)); the emit follows the banked muzzles as in the game. The handedness of
+  the bank is the port's stick convention (`SmsAir.Tick`'s `sin(d)` = left); if it reads mirrored, flip one sign.
+- **Water**: `TWaterGun::emit()` calls the nozzle's emit once per emitter, so the hover's two muzzles cost **2 a tick** (the S3
+  plan table said 1; S2 had it right): 5000 ticks = 41.7 s of hovering in a full tank, about 14 full windows. No recoil
+  (`ReactionPow` 0.005 × `(−dir · face)` = 0 for a jet straight down, `ReactionY` 0).
+- Not ported: the hover rumble (every 8 ticks), the voices and `SE_PO_HOVER`, `HANG_ROOF`, the camera's hover mode, the
+  `MARIO_STATUS_FLAG_UNK8000` 2.5× stick magnitude in `doJumping` (rocketing() has its own stick code and never calls it).
+Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
+`1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
+rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
+at fwd 22.0 after a hover (ROCKET_LANDING): stop against the wall, no slide`; setup: `hover nozzle bank joints: jnt_nozzle_L
+yes, jnt_nozzle_R yes`. Self-test: `hover: first tick vy 4.6`, `rise after the 360-tick window 192.1`, `rise after 1 s 104.0`.
+Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
 
 ### Deliberate deviations from the game
 

@@ -217,6 +217,7 @@ public static class SmsParams
             public int LAngleBase = 4096, LAngleMin = -8192, LAngleMax = 8192; // calcGunAngle (BAM)
             public float LAngleChase = 0.1f;
             public float RButtonMult = 10000f;          // the squat aim: stick y x this a tick
+        public int SideAngleMaxSide = 0, SideAngleMaxFront = 0, SideAngleMaxBack = 0; // rocketing(): the hover nozzles' bank, 0.03125 x mag x this (BAM)
             public float EmitPowScale = 10f;            // TNozzleDeform: the strength x this, clamped 1
         }
 
@@ -246,6 +247,7 @@ public static class SmsParams
             DirTremble = 0f, DirTrembleMin = 0.01f, Size = 40f, SizeTremble = 10f, SizeMin = 40f, SizeMinPressure = 0f, SizeMaxPressure = 1f,
             ReactionPow = 0.005f, ReactionPowMin = 0f, ReactionY = 0f, TriggerRate = 0, TriggerDec = 0f, TriggerMax = 1f, TriggerTime = 360,
             Type = 15, LAngleBase = 0, LAngleMin = -8192, LAngleMax = 8192, LAngleChase = 0.5f,
+            SideAngleMaxSide = 5000, SideAngleMaxFront = 0, SideAngleMaxBack = 8000,
         };
         /// <summary>nozzletrgrocket.prm -- 1.48 s of charge at full R (+150 - 105 a tick to 8000), then 5 ticks of 35-water drops and vy += 35 each (S4).</summary>
         public static readonly Nozzle Rocket = new()
@@ -255,6 +257,7 @@ public static class SmsParams
             DirTremble = 0f, DirTrembleMin = 0f, Size = 30f, SizeTremble = 20f, SizeMin = 0f, SizeMinPressure = 0f, SizeMaxPressure = 1f,
             ReactionPow = 0f, ReactionPowMin = 0f, ReactionY = 0.7f, TriggerRate = 0, TriggerDec = 105f, TriggerMax = 8000f, TriggerTime = 5,
             Type = 0, LAngleBase = 4096, LAngleMin = -8192, LAngleMax = 8192, LAngleChase = 0.1f,
+            SideAngleMaxSide = 16384, SideAngleMaxFront = 16384, SideAngleMaxBack = 8192,
         };
         /// <summary>nozzletrgturbo.prm -- 0.75 s of charge (+150 - 100 a tick to 4500), then active while held; the dash is Mario's (S5).</summary>
         public static readonly Nozzle Turbo = new()
@@ -731,6 +734,35 @@ public static class SmsAir
     }
 }
 
+
+/// <summary>The hover (rocketing() with the hover nozzle, MarioJump.cpp; /mario/hhover.prm shipped; watergun.prm's HoverHeight).
+/// A spring to the press height plus HoverHeight: vy = (target - y) x AccelRate is ASSIGNED every tick and the move is 0.25 x vy,
+/// so the gap closes 0.5 % a tick (45 % a second; 192 of the 230 units in the 3 s window; 1.85 m/s at the start). Gravity never
+/// shows: fallProcess subtracts it after the move and the next tick's assignment overwrites it.</summary>
+public static class SmsHover
+{
+    public const int RotSp = 200;              // hhover.prm: BAM a tick the face turns toward a sideways stick (min == max)
+    public const float AccelRate = 0.02f;      // hhover.prm: vy = (target - y) x this
+    public const float Brake = 0.985f;         // hhover.prm: fwd x this a tick
+    public const float AccelControl = 0.02f;   // DivingParams.mAccelControl (shipped): fwd += mag x cos x this on a fore / aft stick
+    public const float EntryVy = 10f;          // setStatusToJumping(ROCKET): mVel.y = 10, overwritten by the spring before the first move
+    public const int FrontBandBam = 0x1555;    // a stick within 30 deg of the face pushes (no turn)
+    public const int BackBandBam = 0x6AAA;     // beyond 150 deg pulls back (no turn); between the two: the turn (no push)
+    public const int HeadAngleBam = 5294;      // upperbody.prm HoverHeadAngle: the head 29 deg down while he can spray
+
+    /// <summary>One tick's mVel.y (units a tick) at <paramref name="yUnits"/> for the target <paramref name="targetUnits"/>.</summary>
+    public static float SpringVy(float yUnits, float targetUnits) => (targetUnits - yUnits) * AccelRate;
+
+    /// <summary>The height gained (units) after <paramref name="ticks"/> ticks of hovering from a standstill, no roof, no exit.</summary>
+    public static float RiseAfter(int ticks)
+    {
+        float y = 0f;
+        for (int i = 0; i < ticks; i++)
+            y += 0.25f * SpringVy(y, SmsParams.Fludd.HoverHeight);
+        return y;
+    }
+}
+
 /// <summary>Numeric self-check against the values the real game produces. Prints to the Godot output.</summary>
 public static class SmsSelfTest
 {
@@ -800,6 +832,13 @@ public static class SmsSelfTest
             SmsAir.ApplyLaunch(SmsAir.Launch.JumpCatchAir, ref fwd, ref vy);
             Check("air dive fwd", fwd, 48f, 0f);
             Check("air dive keeps vy", vy, 10f, 0f);
+        }
+        // The hover: the first tick's spring vy (4.6), the 3 s window's rise (192 of 230 units), the half-way point (1.15 s).
+        {
+            Check("hover: first tick vy (units)", SmsHover.SpringVy(0f, SmsParams.Fludd.HoverHeight), 4.6f, 0.001f);
+            Check("hover: rise after the 360-tick window (units)", SmsHover.RiseAfter(360), 192.1f, 0.5f);
+            Check("hover: rise after 1 s (units)", SmsHover.RiseAfter(120), 104.0f, 0.5f);
+            Check("hover: 2 water a tick -> seconds in a full tank", SmsParams.Fludd.Hover.AmountMax / (float)(SmsParams.Fludd.Hover.Emitters * SmsParams.Fludd.Hover.DecRate) / SmsUnits.TicksPerSecond, 41.67f, 0.05f);
         }
         GD.Print(ok ? "[SMS selftest] ALL OK" : "[SMS selftest] FAILURES ABOVE");
         return ok;

@@ -67,6 +67,7 @@ public partial class Mario : CharacterBody3D
         talking,
         ledgeDescend, // SMS: climbing down over an edge into a hang (checkDescent -> DESCEND, ma_hgdwn)
         swimming,     // SMS: the SWIM_* statuses (MarioSwim.cpp), sub-status in _smsSwim
+        fluddHover,   // SMS: MARIO_STATUS_ROCKET with the hover nozzle (rocketing(): the spring to the press height + 230 units)
     }
 
     private struct AirControlProfile
@@ -236,6 +237,19 @@ public partial class Mario : CharacterBody3D
     private int _fluddDbgWater = -1;
     private float _fluddDbgStrength = -1f;
     private MeshInstance3D _fluddWaterLevel;                      // the water in the tank
+    // FLUDD S3: the hover (rocketing())
+    private float _fluddHoverTargetY = 0f;                        // unk314 (metres, feet): the press height + HoverHeight
+    private float _fluddHoverStartY = 0f;                         // the feet at the press (the debug lines' reference)
+    private float _fluddHoverFwd = 0f;                            // mForwardVel while hovering (units a tick)
+    private float _fluddHoverVy = 0f;                             // the spring's mVel.y of the last tick (units a tick)
+    private int _fluddHoverTicks = 0;
+    private int _fluddHoverDbgNext = 120;
+    private bool _fluddHoverRoofDbg = false;
+    private float _fluddTiltTargetL = 0f, _fluddTiltTargetR = 0f; // unk1CC2 / unk1CC4 (BAM): the bank rocketing() asks of the two nozzles
+    private float _fluddTiltL = 0f, _fluddTiltR = 0f;             // unk1CC8 / unk1CCC: chased at ChangeSpeed a tick
+    private SmsBoneRotZ _fluddTilt;                               // WaterGunDivingCtrlL / R on the hover nozzle's jnt_nozzle_L / R
+    private float _fluddHeadW = 0f;                               // the HoverHeadAngle head dip, eased like the run's head lock
+    private bool _smsRocketLanding = false;                       // the fall is ROCKET_LANDING (after a hover): no wall slide on a wall at 16..40
     // waiting(): mHealth <= 3 -> ANIM_DAMAGE_WAIT_START once, then ANIM_DAMAGE_WAIT (library-only clips, driven directly)
     private int _smsDamageWaitPhase = 0;      // 0 off, 1 ma_damage_wait_start playing, 2 ma_damage_wait looping
     private double _smsDamageWaitPos = 0.0;   // clip position to resume from when idle is re-entered mid-pant
@@ -1989,6 +2003,8 @@ public partial class Mario : CharacterBody3D
             SmsDamageWaitTick();
         if (_smsHangDropFall && stateOfMario != MarioState.ledgeFall)
             _smsHangDropFall = false; // the LAND_SAFE_DOWN drop ended (he landed, or something else took over)
+        if (_smsRocketLanding && stateOfMario != MarioState.ledgeFall)
+            _smsRocketLanding = false; // ROCKET_LANDING ended the same way
         if (stateOfMario != MarioState.ledgeFall)
         {
             _smsFallTicks = 0;
@@ -2154,6 +2170,12 @@ public partial class Mario : CharacterBody3D
             if (stateOfMario == MarioState.swimming)
             {
                 SmsTickSwim(delta, inputDirWorld); // swimMain(): no other handler runs
+                goto EndFrame;
+            }
+            SmsFluddRocketCheck(); // rocketCheck(): R down with the hover nozzle spraying -> ROCKET from the jumps, the fall, the run, the wait
+            if (stateOfMario == MarioState.fluddHover)
+            {
+                SmsTickHover(delta, inputDirWorld); // rocketing(): no other handler runs
                 goto EndFrame;
             }
         }
@@ -4093,7 +4115,7 @@ public partial class Mario : CharacterBody3D
         // That's the "gliding". Any upward velocity in an air state earns the
         // clearance; TryGetAirProfile is the existing "is this an air state"
         // test, so grounded locomotion (which sits at Y=0 anyway) is unaffected.
-        bool inAirState = TryGetAirProfile(stateOfMario, out _);
+        bool inAirState = TryGetAirProfile(stateOfMario, out _) || stateOfMario == MarioState.fluddHover;
         if (IsOnFloor() && (velocity.Y > 2f || (inAirState && velocity.Y > 0.01f)))
         {
             GlobalPosition += GetFloorNormal() * 0.12f;
@@ -4319,7 +4341,7 @@ public partial class Mario : CharacterBody3D
         // so justLanded stayed false, the landing block never ran, and he was
         // left stuck in singleJump ON the ground: gravity gated off, Y frozen at
         // 0, sliding up the slope in the jump animation until he stopped.
-        bool needsFallSpeedProof = preMoveState == MarioState.ledgeFall;
+        bool needsFallSpeedProof = preMoveState == MarioState.ledgeFall && !_smsRocketLanding; // ROCKET_LANDING came from the hover, not a flicker
 
         // The old `< -3` test was quietly doing TWO jobs, and dropping it
         // wholesale broke the second one. Direction is the real invariant: you
@@ -4443,6 +4465,7 @@ public partial class Mario : CharacterBody3D
             || stateOfMario == MarioState.groundPoundStartup
             || stateOfMario == MarioState.groundPoundFalling
             || stateOfMario == MarioState.groundPoundLanding
+            || stateOfMario == MarioState.fluddHover // rocketing(): jumpProcess case 1 is a no-op, the spring lifts him off again
         )
         {
             wasOnFloor = IsOnFloor();
@@ -8036,6 +8059,7 @@ public partial class Mario : CharacterBody3D
             || airStateAtContact == MarioState.doubleJumpDive
             || airStateAtContact == MarioState.tripleJumpDive
             || airStateAtContact == MarioState.bellySlidingFromDive
+            || airStateAtContact == MarioState.fluddHover // rocketing(): jumpProcess case 2 (a wall) does nothing, he presses on it
         )
             return;
 
@@ -8147,6 +8171,16 @@ public partial class Mario : CharacterBody3D
                     velocity.Z = 0f;
                     if (SmsDebugPrint && Mathf.Abs(smsFwd) > 0.5f)
                         GD.Print($"[SMS wall] air hit at fwd {smsFwd:F1} (<= 16) from {airStateAtContact}: stop against the wall, keep falling");
+                    return;
+                }
+                if (_smsRocketLanding && airStateAtContact == MarioState.ledgeFall)
+                {
+                    // jumpingBasic() case 2: `mForwardVel > 16 && mStatus != ROCKET_LANDING` -- the fall after a hover neither
+                    // wall-slides nor safe-downs, he stops against the wall and keeps falling (the knockdown above 40 still applies)
+                    velocity.X = 0f;
+                    velocity.Z = 0f;
+                    if (SmsDebugPrint)
+                        GD.Print($"[SMS wall] air hit at fwd {smsFwd:F1} after a hover (ROCKET_LANDING): stop against the wall, no slide");
                     return;
                 }
                 // 16 < fwd <= 40 into a real wall: MARIO_STATUS_WALL_SLIDE, unconditionally. jumpingBasic() case 2 has
@@ -9721,8 +9755,12 @@ public partial class Mario : CharacterBody3D
             (HeadLockEnabled && loco) ? 1f : 0f,
             HeadLockEaseSpeed * delta
         );
-        _headLock.Weight = _headLockWeight;
-        _headLock.LookUpDegrees = HeadLookUpDegrees;
+        // MarioDraw.cpp: in ROCKET while canSpray() the head joint gets RotZ(HoverHeadAngle) -- 29 deg down at the ground below
+        // (FeelDeep +45 looks down a cliff, FrontWall -45 looks up a wall: positive is down; the lock's -12 looks up). Eased like the lock.
+        bool hoverHead = UseSmsPhysics && stateOfMario == MarioState.fluddHover && SmsFluddCanSpray();
+        _fluddHeadW = Mathf.MoveToward(_fluddHeadW, hoverHead ? 1f : 0f, HeadLockEaseSpeed * delta);
+        _headLock.Weight = Mathf.Max(_headLockWeight, _fluddHeadW);
+        _headLock.LookUpDegrees = Mathf.Lerp(HeadLookUpDegrees, Mathf.RadToDeg(SmsHover.HeadAngleBam * SmsUnits.BamToRad), _fluddHeadW);
         _headLock.LookUpAxisLocal = HeadLookUpAxis;
     }
 
@@ -11930,6 +11968,7 @@ public partial class Mario : CharacterBody3D
             _fluddNozzleSkel[i] = SmsFindChild<Skeleton3D>(node); // the muzzle joints (null_G_muzzle) live here
         }
         SmsFluddSetupWater(); // S2: the drops, the water level in the tank, the muzzles
+        SmsFluddSetupHoverTilt(); // S3: the hover nozzles' bank joints
         // the pump clips ping-pong (addUpper: ATTR_PING_PONG_LOOP; the tank's are slaved to Mario's)
         if (animPlayer.HasAnimation("ma_pump"))
             animPlayer.GetAnimation("ma_pump").LoopMode = Animation.LoopModeEnum.Pingpong;
@@ -11984,7 +12023,9 @@ public partial class Mario : CharacterBody3D
             SmsFluddStowTick();
             SmsFluddGunExecTick(); // gunExec(): the pressure, the nozzle, the refill, the emit
             _fluddDrops?.Tick();   // TModelWaterManager::move()
+            SmsFluddTiltTick();    // TWaterGun::movement(): the hover nozzles' bank chases rocketing()'s targets
         }
+        SmsFluddApplyTilt();
         SmsFluddPoseWater();
         if (SmsDebugPrint)
         {
@@ -12686,6 +12727,228 @@ public partial class Mario : CharacterBody3D
         if (SmsDebugPrint) GD.Print($"[SMS fludd] hit: -{waterEmit} x {np.DamageLoss} water -> {_fluddWater}/{np.AmountMax}");
     }
 
+    // ---------------------------------------------------------------------------------------------------------------
+    // FLUDD S3: the hover (MARIO_STATUS_ROCKET with the hover nozzle -- rocketCheck / rocketing, MarioJump.cpp; hhover.prm).
+    // A JUMPING-type status of its own: vy = (pressY + 230 - y) x 0.02 ASSIGNED every tick (a spring to the press height plus
+    // HoverHeight; the gravity fallProcess adds after the move is overwritten before the next), fwd x 0.985, the stick pushes
+    // fore / aft or turns the face, ANIM_LAND with the pump on the upper body, the nozzles banking with the stick. It ends into
+    // ROCKET_LANDING (landing(): the port's ledgeFall with _smsRocketLanding) when R lifts, the 3 s window closes, the tank runs
+    // dry or the nozzle changes. Touching the floor does not land him (jumpProcess case 1 is a no-op in rocketing(): the spring
+    // lifts him off again); a roof stops him (fwd 0) and would hang him from a fence roof (HANG_ROOF, not ported).
+    // ---------------------------------------------------------------------------------------------------------------
+
+    /// <summary>TWaterGun::canSpray(): water in the tank and, for a trigger nozzle, its state ACTIVE (the spray: a strength).</summary>
+    private bool SmsFluddCanSpray() => _fluddReady && _fluddWater > 0
+        && (_fluddNozzle == SmsNozzle.Spray ? _fluddSprayStrength > 0f : _fluddTrigState == 1);
+
+    /// <summary>Who calls rocketCheck(): jumpingCommonEvents (JUMP, SECOND_JUMP, U_TURN_JUMP, TRAMPLE), ultraJumping, backJumping,
+    /// jumpWall, rotateJumping, landing() (LANDING / ROCKET_LANDING -- a re-press re-enters; not LAND_SAFE_DOWN), running(),
+    /// waiting(); squating() takes the hover from the squat when the nozzle emits. Not the dives, the broad jumps, the rolls,
+    /// the slides, the hang, the water.</summary>
+    private static bool SmsHoverEntryState(MarioState s) =>
+        s == MarioState.singleJump || s == MarioState.doubleJump || s == MarioState.tripleJump || s == MarioState.SpinJump
+        || s == MarioState.sideFlip || s == MarioState.backFlip || s == MarioState.wallJump || s == MarioState.stomping
+        || s == MarioState.ledgeFall || s == MarioState.idle || s == MarioState.walking || s == MarioState.running
+        || s == MarioState.sprinting || s == MarioState.sneak || s == MarioState.rolloutRun || s == MarioState.crouch;
+
+    /// <summary>rocketCheck(): HAS_FLUDD, the nozzle's RocketType 1 (the hover; the rocket nozzle is S4), UPPER_STATE_PUMPING (R
+    /// down), canSpray() -> ROCKET with the target 230 units over the feet. Runs before the state handlers, as the game's
+    /// stateMachine loop runs rocketing() in the tick that entered it.</summary>
+    private void SmsFluddRocketCheck()
+    {
+        if (!_fluddReady || stateOfMario == MarioState.fluddHover || !SmsHoverEntryState(stateOfMario))
+            return;
+        if (stateOfMario == MarioState.ledgeFall && _smsHangDropFall)
+            return; // LAND_SAFE_DOWN: landSafeDown() has no rocketCheck
+        if (_fluddNozzle != SmsNozzle.Hover || _fluddUpper != SmsUpper.Pumping || !SmsFluddCanSpray())
+            return;
+        SmsEnterHover();
+    }
+
+    private void SmsEnterHover()
+    {
+        MarioState from = stateOfMario;
+        Vector3 velXZ = new Vector3(velocity.X, 0f, velocity.Z);
+        // a launched jump keeps its latched face; from the ground (or a face that never latched) it is the way he moves, else looks
+        if (!_smsFaceValid || IsOnFloor())
+            SmsLatchFace(velXZ.LengthSquared() > 0.25f ? velXZ : new Vector3(lastFacingDirection.X, 0f, lastFacingDirection.Z), 2);
+        Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
+        _fluddHoverFwd = SmsUnits.MpsToSpeed(velXZ.Dot(face)); // mForwardVel: the jump's speed along the face carries on
+        _fluddHoverVy = SmsHover.EntryVy; // setStatusToJumping(ROCKET): mVel.y = 10 -- the spring overwrites it before the first move
+        // unk314 = mPosition.y + HoverHeight (running() / waiting() write mFloorPosition.y + HoverHeight: the same on the floor)
+        _fluddHoverStartY = SmsFeetY();
+        _fluddHoverTargetY = _fluddHoverStartY + SmsUnits.UnitsToMetres(SmsParams.Fludd.HoverHeight);
+        _fluddHoverTicks = 0;
+        _fluddHoverRoofDbg = false;
+        _fluddHoverDbgNext = 120;
+        isJumping = false;
+        jumpBuffer = 0;
+        _smsFallCancel = false;
+        _smsHangDropFall = false;
+        _smsRocketLanding = false;
+        _smsTrueVyValid = false;
+        StopWaistIKHard(); // the run's waist IK is started / stopped in the main path, which the hover skips
+        SleepStatus(false);
+        lastFacingDirection = face;
+        armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
+        stateOfMario = MarioState.fluddHover;
+        SetMarioState(MarioState.fluddHover); // ANIM_LAND; the pump rides the upper-body blend
+        if (SmsDebugPrint)
+            GD.Print($"[SMS hover] start from {from}: target +{SmsParams.Fludd.HoverHeight:F0} units ({SmsUnits.UnitsToMetres(SmsParams.Fludd.HoverHeight):F2} m) over feet y {_fluddHoverStartY:F2}, fwd {_fluddHoverFwd:F1} ({SmsUnits.SpeedToMps(_fluddHoverFwd):F1} m/s), water {_fluddWater}, R {_fluddR:F2}");
+    }
+
+    /// <summary>rocketing() for one physics frame: the exits, the stick, the spring, the brake; no other handler runs.</summary>
+    private void SmsTickHover(double delta, Vector3 inputDirWorld)
+    {
+        _smsTrueVyValid = false;
+        // the exits come first: !HAS_FLUDD / RocketType != 1 / !isUpperState(PUMPING) / !canSpray() -> ROCKET_LANDING
+        string why = null;
+        if (_fluddNozzle != SmsNozzle.Hover) why = "the nozzle changed";
+        else if (_fluddUpper != SmsUpper.Pumping) why = "R released";
+        else if (_fluddWater <= 0) why = "the tank ran dry";
+        else if (_fluddTrigState != 1) why = "the 3 s ran out";
+        if (why != null)
+        {
+            SmsExitHover(why);
+            return;
+        }
+        int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
+        var np = SmsParams.Fludd.Hover;
+        bool stick = inputDirWorld.LengthSquared() > 1e-6f && _smsIntendedMag > 0f;
+        float intendedYaw = stick ? SmsMath.YawFromDir(new Vector3(inputDirWorld.X, 0f, inputDirWorld.Z).Normalized()) : 0f;
+        float mag = stick ? _smsIntendedMag : 0f;
+        float y = SmsUnits.MetresToUnits(SmsFeetY());
+        float target = SmsUnits.MetresToUnits(_fluddHoverTargetY);
+        float fwd = _fluddHoverFwd, vy = _fluddHoverVy, sumVy = 0f;
+        float tiltL = 0f, tiltR = 0f;
+        bool roof = IsOnCeiling();
+        for (int i = 0; i < n; i++)
+        {
+            if (stick)
+            {
+                float d = SmsMath.WrapAngle(intendedYaw - _smsFaceYaw);
+                float ad = MathF.Abs(d);
+                if (ad < SmsHover.FrontBandBam * SmsUnits.BamToRad || ad > SmsHover.BackBandBam * SmsUnits.BamToRad)
+                {
+                    // within 30 deg of the face, or beyond 150: a push along the face at the dive's air-control rate, no turn;
+                    // the nozzles tip together by SideAngleMaxFront (0 for the hover) ahead, SideAngleMaxBack (8000) behind
+                    float maxTilt = ad <= MathF.PI * 0.5f ? np.SideAngleMaxFront : np.SideAngleMaxBack;
+                    tiltL = tiltR = 0.03125f * -mag * maxTilt * MathF.Cos(d);
+                    fwd += mag * MathF.Cos(d) * SmsHover.AccelControl;
+                }
+                else
+                {
+                    // sideways: the face turns toward the stick at RotSp (200 BAM a tick), no push; the nozzles bank opposite ways
+                    float t = 0.03125f * -mag * np.SideAngleMaxSide * MathF.Sin(d);
+                    tiltL = -t;
+                    tiltR = t;
+                    _smsFaceYaw = SmsMath.ConvergeAngle(_smsFaceYaw, intendedYaw, SmsHover.RotSp * SmsUnits.BamToRad);
+                }
+            }
+            if (roof)
+                fwd = 0f; // checkGroundAtJumping(): a roof overhead -> setPlayerVelocity(0), vy 0 (the spring restarts the climb)
+            // Hover: mVel.y = (unk314 - mPosition.y) x AccelRate, assigned; mForwardVel *= Brake; jumpProcess moves 0.25 x vel
+            vy = SmsHover.SpringVy(y, target);
+            fwd *= SmsHover.Brake;
+            y += 0.25f * vy;
+            sumVy += vy;
+        }
+        _fluddHoverTicks += n;
+        _fluddHoverFwd = fwd;
+        _fluddHoverVy = vy;
+        _fluddTiltTargetL = tiltL;
+        _fluddTiltTargetR = tiltR;
+        Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
+        float mps = SmsUnits.SpeedToMps(fwd);
+        velocity.X = face.X * mps;
+        velocity.Z = face.Z * mps;
+        velocity.Y = SmsUnits.SpeedToMps(sumVy / n);
+        lastFacingDirection = face;
+        armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
+        if (SmsDebugPrint)
+        {
+            if (roof && !_fluddHoverRoofDbg)
+            {
+                _fluddHoverRoofDbg = true;
+                GD.Print("[SMS hover] a roof overhead: speed 0 while he presses on it (the game would hang him from a fence roof; none here)");
+            }
+            if (_fluddHoverTicks >= _fluddHoverDbgNext)
+            {
+                _fluddHoverDbgNext += 120;
+                GD.Print($"[SMS hover] {_fluddHoverTicks / 120f:F1} s: +{SmsFeetY() - _fluddHoverStartY:F2} m of {SmsUnits.UnitsToMetres(SmsParams.Fludd.HoverHeight):F2}, vy {vy:F2}, fwd {fwd:F1} ({mps:F1} m/s), water {_fluddWater}");
+            }
+        }
+    }
+
+    /// <summary>changePlayerStatus(ROCKET_LANDING): landing() from the hover's last velocity -- the port's ledgeFall flagged
+    /// _smsRocketLanding (no wall slide on a wall at 16..40); on the floor at that moment he lands at once (jumpingBasic case 1).</summary>
+    private void SmsExitHover(string why)
+    {
+        Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
+        float mps = SmsUnits.SpeedToMps(_fluddHoverFwd);
+        velocity.X = face.X * mps;
+        velocity.Z = face.Z * mps;
+        // the last rocketing() tick's fallProcess ran after its move: ROCKET_LANDING starts from the spring's vy less one tick of gravity
+        float vy = _fluddHoverVy - SmsParams.Jump.Gravity;
+        velocity.Y = SmsUnits.SpeedToMps(vy);
+        _smsTrueVyValid = false;
+        _fluddTiltTargetL = 0f;
+        _fluddTiltTargetR = 0f;
+        isJumping = false;
+        _smsFallCancel = false;
+        _smsHangDropFall = false;
+        lastFacingDirection = face;
+        float rose = SmsFeetY() - _fluddHoverStartY;
+        if (SmsDebugPrint)
+            GD.Print($"[SMS hover] end ({why}) after {_fluddHoverTicks} ticks ({_fluddHoverTicks / 120f:F2} s): rose {rose:F2} m = {SmsUnits.MetresToUnits(rose):F0} units of the {SmsParams.Fludd.HoverHeight:F0}, fwd {_fluddHoverFwd:F1} ({mps:F1} m/s), vy {vy:F1}, water {_fluddWater}{(IsOnFloor() ? ", on the floor: lands" : "")}");
+        if (IsOnFloor())
+        {
+            // landing() on the floor at once (jumpingBasic() case 1 -> LAND_SLIP): his floor contact never counted as a landing
+            // while he hovered, so the landing rule would not fire on its own
+            velocity.Y = 0f;
+            landingEnteredThisContact = false;
+            _smsRocketLanding = false;
+            EnterLanding(MarioState.landing, "ma_laend");
+            return;
+        }
+        _smsRocketLanding = true;
+        stateOfMario = MarioState.ledgeFall;
+        SetMarioState(MarioState.ledgeFall);
+    }
+
+    /// <summary>TWaterGun::movement(): unk1CC8 / unk1CCC chase the bank rocketing() asked for (unk1CC2 / unk1CC4) by ChangeSpeed
+    /// a tick; nothing asked (not hovering, or not spraying) reads as 0.</summary>
+    private void SmsFluddTiltTick()
+    {
+        if (stateOfMario != MarioState.fluddHover || !SmsFluddCanSpray())
+        {
+            _fluddTiltTargetL = 0f;
+            _fluddTiltTargetR = 0f;
+        }
+        _fluddTiltL += (_fluddTiltTargetL - _fluddTiltL) * SmsParams.Fludd.ChangeSpeed;
+        _fluddTiltR += (_fluddTiltTargetR - _fluddTiltR) * SmsParams.Fludd.ChangeSpeed;
+    }
+
+    /// <summary>WaterGunDivingCtrlL / R: jnt_nozzle_L / R turned about their local Z by -unk1CC8 / -unk1CCC after the clip.</summary>
+    private void SmsFluddApplyTilt()
+    {
+        if (_fluddTilt == null)
+            return;
+        _fluddTilt.Angles[0] = -_fluddTiltL * SmsUnits.BamToRad;
+        _fluddTilt.Angles[1] = -_fluddTiltR * SmsUnits.BamToRad;
+    }
+
+    private void SmsFluddSetupHoverTilt()
+    {
+        var sk = _fluddNozzleSkel[(int)SmsNozzle.Hover];
+        if (sk == null)
+            return;
+        _fluddTilt = new SmsBoneRotZ { Name = "SmsHoverNozzleTilt", BoneNames = new[] { "jnt_nozzle_L", "jnt_nozzle_R" }, Angles = new float[2] };
+        sk.AddChild(_fluddTilt);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS fludd] hover nozzle bank joints: jnt_nozzle_L {(sk.FindBone("jnt_nozzle_L") >= 0 ? "yes" : "NO")}, jnt_nozzle_R {(sk.FindBone("jnt_nozzle_R") >= 0 ? "yes" : "NO")}");
+    }
+
     private void SmsFluddOnRespawn()
     {
         if (!_fluddReady)
@@ -13235,6 +13498,9 @@ public partial class Mario : CharacterBody3D
                 break;
             case MarioState.ledgeFall:
                 _sm.Travel("ma_land");
+                break;
+            case MarioState.fluddHover:
+                _sm.Travel("ma_land"); // rocketing(): setAnimation(ANIM_LAND); the pump is the upper-body blend
                 break;
             case MarioState.ledgeHang:
                 _sm.Travel("ma_hang");
