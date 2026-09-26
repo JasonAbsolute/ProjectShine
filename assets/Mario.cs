@@ -717,6 +717,10 @@ public partial class Mario : CharacterBody3D
 
     private const int LEDGE_REGRAB_COOLDOWN_FRAMES = 10;
     private int ledgeRegrabCooldown = 0;
+    // LAND_SAFE_DOWN: the fall after letting go of a ledge (stick away, the 20 s limit). landSafeDown() is
+    // jumpDownCommon() -> jumpProcess(0): no ledge bit, no doJumping, no checkBackTrig -- a passive drop until he lands.
+    // Without it the port's ledgeFall (the game's FALL, ledge bit set) re-grabbed the same ledge once the cooldown ran out.
+    private bool _smsHangDropFall = false;
 
     // --- TREE CLIMB ---
     private Node3D _treeNode; // root node of grabbed PalmTree (for instance validity)
@@ -1859,6 +1863,9 @@ public partial class Mario : CharacterBody3D
 
         if (ledgeRegrabCooldown > 0)
             ledgeRegrabCooldown--;
+
+        if (_smsHangDropFall && stateOfMario != MarioState.ledgeFall)
+            _smsHangDropFall = false; // the LAND_SAFE_DOWN drop ended (he landed, or something else took over)
 
         if (_treeRegrabCooldown > 0)
             _treeRegrabCooldown--;
@@ -3597,7 +3604,8 @@ public partial class Mario : CharacterBody3D
 
             if (stateOfMario == MarioState.ledgeFall)
             {
-                if (Input.IsActionJustPressed("button_b"))
+                // LAND_SAFE_DOWN (the fall after letting go of a ledge) takes no inputs at all until he lands
+                if (Input.IsActionJustPressed("button_b") && !_smsHangDropFall)
                 {
                     stateOfMario = MarioState.diving;
                     SetMarioState(stateOfMario);
@@ -6580,6 +6588,8 @@ public partial class Mario : CharacterBody3D
     {
         if (!SmsWallLedgeBit(stateOfMario))
             return false; // the triple, spin, backflip, dives and the hip drop never grab
+        if (stateOfMario == MarioState.ledgeFall && _smsHangDropFall)
+            return false; // LAND_SAFE_DOWN (the fall after a let-go) passes no ledge bit: he cannot re-grab the ledge he just left
         if (velocity.Y > 0f)
             return false;
         Vector3 velXZ = new Vector3(velocity.X, 0f, velocity.Z);
@@ -6682,7 +6692,7 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>startHangLanding(): let go. Out to the wall face, down 100 units (or to the ground if it is nearer), velocity 0,
     /// still facing the wall; then the wall slide (B) or a plain fall (stick away, the 20 s limit).</summary>
-    private void SmsHangLetGo(bool toWallSlide, string why)
+    private void SmsHangLetGo(bool toWallSlide, string why, bool landSafeDown = true)
     {
         Vector3 n = ledgeWallNormal;
         Vector3 xz = ledgeHangPos + n * (capRadiusWorld + 0.02f);
@@ -6702,8 +6712,9 @@ public partial class Mario : CharacterBody3D
         _smsTrueVyValid = false;
         lastFacingDirection = -n;
         SmsLatchFace(-n, 2);
+        _smsHangDropFall = !toWallSlide && landSafeDown;
         if (SmsDebugPrint)
-            GD.Print($"[SMS ledge] let go ({why}): {(toWallSlide ? "wall slide" : "fall")}, dropped {ledgeHangPos.Y - y:F2} m");
+            GD.Print($"[SMS ledge] let go ({why}): {(toWallSlide ? "wall slide" : _smsHangDropFall ? "LAND_SAFE_DOWN: passive fall, no grab / dive / steering until he lands" : "fall")}, dropped {ledgeHangPos.Y - y:F2} m");
         if (toWallSlide)
         {
             lastWallNormal = n;
@@ -6938,7 +6949,7 @@ public partial class Mario : CharacterBody3D
     {
         if (!UpdateLedgePlatformPositions())
         {
-            SmsHangLetGo(false, "platform gone");
+            SmsHangLetGo(false, "platform gone", landSafeDown: false); // hanging(): wall lost -> LANDING (ledge bit kept)
             return;
         }
         velocity = Vector3.Zero;

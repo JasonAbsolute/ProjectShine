@@ -1619,7 +1619,10 @@ port's.
 and he **wall-slides** down the wall (not a plain drop). A with 160 units of headroom → the vault. The stick counts after 40
 ticks: within 0x400 (5.6°) of the face, i.e. straight into the wall, with headroom → **climb** (the port uses 45°: the game
 has a hang camera that puts "up" exactly into the wall, ours does not — a deviation); beyond 0x71c7 (160°), pulling
-away → **let go** (`LAND_SAFE_DOWN`, a plain fall); anything else → **shimmy** along the ledge at `MoveSp 0.06 × mag`
+away → **let go** (`LAND_SAFE_DOWN`: a *passive* fall — `landSafeDown` is `jumpDownCommon` → `jumpProcess(0)`, so no
+ledge bit, no `doJumping`, no B; he drops straight down from the wall face and takes no input until he lands in
+`LAND_SLIP`, a double jump available — in particular he **cannot re-grab the ledge he just left**); anything else →
+**shimmy** along the ledge at `MoveSp 0.06 × mag`
 units/tick (3.1 m/s at full stick), following the wall round corners while the normals agree within `HangWallMovableAngle`
 (dot > 0.3) and the top stays within −100/+50, `ma_hmov_l/r` at `units moved × AnmRate 0.8`; the shimmy stops after
 `RapidTime` 2000 ticks (16.7 s) and at `LimitTime` **2400 ticks (20 s) he lets go by himself**. Ground within 100 units below
@@ -1631,6 +1634,12 @@ face the platform, `ma_hgdwn` plays (`MarioState.ledgeDescend`, the animation is
 he hangs. Run at it and he runs off as before.
 
 Debug lines: `[SMS ledge] grab / vault / let go / stick into the wall: climb / edge ahead: climb down`.
+
+Gotcha: the port's `ledgeFall` doubles as the game's FALL (walking off an edge), which *has* the ledge bit, so the let-go
+sets `_smsHangDropFall` (cleared when the state moves on) to suppress the grab and the B-dive for that fall. Without it
+he re-grabbed the same ledge as soon as the 10-frame cooldown ran out: the drop is exactly 100 units, so the top was
+back inside the 100..150 grab band for the next 0.67 m of falling. B → wall slide and "platform gone" (the game's
+`LANDING`) are not affected.
 
 Jumping out of the wall push (`doPushingAnimation` caps fwd at 6 along the face): the jump leaves along the push direction,
 into the wall, where the air wall hit stops it — a near-vertical hop. It used to inherit the lateral shuffle velocity.
