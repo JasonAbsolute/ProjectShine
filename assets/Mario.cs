@@ -167,7 +167,7 @@ public partial class Mario : CharacterBody3D
     private string _smsDownAnim = "";
     private const float SMS_DOWN_AIR_SPEED = 16f; // jumpDownCommon(): setPlayerVelocity(+-16) every tick
     // Swimming (MarioSwim.cpp). Water: Area3D in group "sms_water", surface = metadata sms_water_surface_y or its BoxShape3D's top.
-    private enum SmsSwim { Start, Wait, WaitToPaddle, PaddleStart, Paddle, PaddleEnd, PaddleEndToWait, Up, Dive }
+    private enum SmsSwim { Start, Wait, WaitToPaddle, PaddleStart, Paddle, PaddleEnd, PaddleEndToWait, Up, Dive, PDamage, Down, PDown }
     private SmsSwim _smsSwim = SmsSwim.Start;
     private bool _smsInWater = false;          // MARIO_FLAG_IN_WATER: a water surface at or above the feet this frame
     private float _smsWaterSurfaceY = 0f;      // mFloorPosition.z (world metres)
@@ -179,6 +179,16 @@ public partial class Mario : CharacterBody3D
     private string _smsSwimAnim = "";
     private float _smsSwimDbgDeepest = 0f;
     private bool _smsWadingDbg = false;
+    // Air (TMario::mAir): see SmsAirTick
+    private float _smsAir = 0f, _smsMaxAir = 0f;   // mAir / mMaxAir ((HP + 1) - 1e-5); the meter shows (int)air
+    private float _smsAirTickAccum = 0f;
+    private int _smsHeadBone = -2;                 // jnt_head, looked up once
+    private bool _smsUnderWater = false;           // isUnderWater() last frame
+    private float _smsUnderTime = 0f;
+    private int _smsAirHudTicks = 0;               // GCConsole2 unk268: the meter switches to air after 240 ticks under
+    private bool _smsAirHudShown = false;
+    private int _smsAirUnitsShown = -1;
+    private bool _smsDrowned = false;              // SWIM_DOWN / SWIM_P_DOWN: only R gets him out
     // waiting(): mHealth <= 3 -> ANIM_DAMAGE_WAIT_START once, then ANIM_DAMAGE_WAIT (library-only clips, driven directly)
     private int _smsDamageWaitPhase = 0;      // 0 off, 1 ma_damage_wait_start playing, 2 ma_damage_wait looping
     private double _smsDamageWaitPos = 0.0;   // clip position to resume from when idle is re-entered mid-pant
@@ -1269,6 +1279,7 @@ public partial class Mario : CharacterBody3D
         _lives = StartingLives;
         _lifeMeter = GetNodeOrNull<LifeMeter>("LifeMeter");
         _lifeMeter?.SetHealth(_health);
+        SmsAirReset();
         _lifeCounterHud = GetNodeOrNull<LifeCounterHud>("LifeCounterHud");
 
         _coins = 0;
@@ -2089,6 +2100,7 @@ public partial class Mario : CharacterBody3D
         if (UseSmsPhysics)
         {
             SmsWaterCheck();      // playerControl(): the water surface at the feet, every tick
+            SmsAirTick(delta);    // mAir drains with the head under, refills out; the meter turns to air after 2 s under
             SmsWaterEntryCheck(); // deep water -> SWIM_START, from any status
             if (stateOfMario == MarioState.swimming)
             {
@@ -10976,6 +10988,11 @@ public partial class Mario : CharacterBody3D
         // and dmgenemycommon.prm gives no invincibility), but ours keep touching him through the fall.
         if (stateOfMario == MarioState.hurt)
             return;
+        if (stateOfMario == MarioState.swimming)
+        {
+            SmsSwimDamageExec(attackerPos, p); // SWIM_P_DAMAGE; air instead of HP under water
+            return;
+        }
 
         bool airborne = !IsOnFloor() || TryGetAirProfile(stateOfMario, out _); // checkStatusType(MARIO_STATUS_FLAG_JUMPING)
         Vector3 oldFace = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
@@ -11342,6 +11359,9 @@ public partial class Mario : CharacterBody3D
             case SmsSwim.PaddleEnd: SmsSwimPlay("ma_paddle_end", 1f); break;        // ANIM_PADDLE_END
             case SmsSwim.PaddleEndToWait: SmsSwimPlay("ma_paddle_to_wait", 1f); break; // ANIM_PADDLE_TO_WAIT
             case SmsSwim.Up: SmsSwimPlay("ma_float", 1f); break;                    // ANIM_FLOAT
+            case SmsSwim.PDamage: SmsSwimPlay("ma_swim_p_damage", 1f); break;       // ANIM_SWIM_P_DAMAGE
+            case SmsSwim.Down: SmsSwimPlay("ma_swim_down", 1f); break;              // ANIM_SWIM_DOWN (drowned; holds its last frame)
+            case SmsSwim.PDown: SmsSwimPlay("ma_swim_p_down", 1f); break;           // ANIM_SWIM_P_DOWN (killed in the water)
             case SmsSwim.Dive:                                                      // ANIM_SWIM_DIVE
                 _smsSwimSinkArmed = false;
                 _smsSwimSinkTicks = 0;
@@ -11447,6 +11467,18 @@ public partial class Mario : CharacterBody3D
         Vector3 stickDir = stick ? new Vector3(inputDirWorld.X, 0f, inputDirWorld.Z).Normalized() : Vector3.Zero;
         bool aPressed = Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space");
         bool bPressed = Input.IsActionJustPressed("button_b");
+        if (_smsDrowned)
+        {
+            // swimDown() / swimPDown(): no control, speed 0, buoyancy only; the game's death demo -> here R respawns
+            if (Input.IsKeyPressed(Key.R))
+            {
+                Respawn();
+                return;
+            }
+            aPressed = false;
+            bPressed = false;
+            stick = false;
+        }
         _smsSwimDbgDeepest = MathF.Max(_smsSwimDbgDeepest, surface - feetY);
 
         // checkSwimJump()
@@ -11530,6 +11562,8 @@ public partial class Mario : CharacterBody3D
             _smsSwimVy += depthRatio * (waitBuoyancy ? SmsParams.Swim.WaitBuoyancy : SmsParams.Swim.MoveBuoyancy);
             _smsSwimVy *= SmsParams.Swim.UpDownBrake;
         }
+        if (_smsSwim == SmsSwim.PDamage || _smsDrowned)
+            _smsSwimFwd = 0f; // jumpingDemoCommon(.., 0.0f) after doSwimming()
 
         // doSwimming(): B dives; water shallower than EndDepth under him: he stands up (WAIT)
         if (bPressed)
@@ -11537,7 +11571,7 @@ public partial class Mario : CharacterBody3D
             if (_smsSwim != SmsSwim.Dive) // same-status change is a no-op: B while diving does nothing (the clip runs on)
                 SmsSwimSet(SmsSwim.Dive);
         }
-        else if (!float.IsNegativeInfinity(_smsWaterFloorY) && _smsWaterFloorY + SmsUnits.UnitsToMetres(SmsParams.Swim.EndDepth) > surface)
+        else if (!_smsDrowned && !float.IsNegativeInfinity(_smsWaterFloorY) && _smsWaterFloorY + SmsUnits.UnitsToMetres(SmsParams.Swim.EndDepth) > surface)
         {
             SmsExitSwimming(MarioState.idle, "shallow");
             return;
@@ -11555,6 +11589,7 @@ public partial class Mario : CharacterBody3D
                 case SmsSwim.PaddleEndToWait: if (clipDone) SmsSwimSet(SmsSwim.Wait); break;
                 case SmsSwim.Up: if (clipDone) SmsSwimSet(SmsSwim.Wait); break;
                 case SmsSwim.Dive: if (clipDone) SmsSwimSet(SmsSwim.PaddleEnd); break;
+                case SmsSwim.PDamage: if (clipDone) SmsSwimSet(SmsSwim.Wait); break; // swimPDamage(): isLast1AnimeFrame -> SWIM_WAIT
             }
         }
 
@@ -11570,6 +11605,190 @@ public partial class Mario : CharacterBody3D
             }
         }
         SmsSwimApplyVelocity();
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // Air (TMario::mAir): drains while the head is CanBreathDepth under the surface, refills out of it, drowns him at < 1.
+    // The life meter shows it (blue) after 240 ticks under. decHP() under water takes air instead of HP.
+    // ---------------------------------------------------------------------------------------------------------------
+
+    /// <summary>isUnderWater(): IN_ANY_WATER and the head joint more than CanBreathDepth under the surface.</summary>
+    private bool SmsIsUnderWater()
+    {
+        if (!_smsInWater)
+            return false;
+        return SmsHeadY() < _smsWaterSurfaceY - SmsUnits.UnitsToMetres(SmsParams.Swim.CanBreathDepth);
+    }
+
+    /// <summary>mHeadPos: the head joint's world position (setPositions reads the head bone's animated matrix).</summary>
+    private float SmsHeadY()
+    {
+        if (skeleton != null)
+        {
+            if (_smsHeadBone == -2)
+                _smsHeadBone = skeleton.FindBone("jnt_head");
+            if (_smsHeadBone >= 0)
+                return (skeleton.GlobalTransform * skeleton.GetBoneGlobalPose(_smsHeadBone).Origin).Y;
+        }
+        return SmsFeetY() + SmsUnits.UnitsToMetres(SmsUnits.MarioHeightUnits);
+    }
+
+    private void SmsAirReset()
+    {
+        _smsMaxAir = StartingHealth + 1f - 1e-5f; // mMaxAir = (mHealth + 1) - 1e-5
+        _smsAir = _smsMaxAir;
+        _smsDrowned = false;
+        _smsUnderWater = false;
+        _smsUnderTime = 0f;
+        _smsAirHudTicks = 0;
+        if (_smsAirHudShown)
+        {
+            _smsAirHudShown = false;
+            _lifeMeter?.EndAir(_health);
+        }
+    }
+
+    /// <summary>playerControl()'s air update, every tick, plus GCConsole2's life-meter switch to air.</summary>
+    private void SmsAirTick(double delta)
+    {
+        if (_smsMaxAir <= 0f)
+            SmsAirReset();
+        int n = SmsUnits.TicksFor(delta, ref _smsAirTickAccum);
+        bool under = SmsIsUnderWater() && stateOfMario != MarioState.dead;
+        if (under != _smsUnderWater)
+        {
+            _smsUnderWater = under;
+            if (SmsDebugPrint)
+                GD.Print(under
+                    ? $"[SMS air] under: head {_smsWaterSurfaceY - SmsHeadY():F2} m below the surface, {_smsAir:F2} air"
+                    : $"[SMS air] surfaced after {_smsUnderTime:F1} s with {_smsAir:F2} air, refilling");
+            if (!under)
+                _smsUnderTime = 0f;
+        }
+        if (under)
+        {
+            _smsUnderTime += (float)delta;
+            if (!_smsDrowned)
+            {
+                float prev = _smsAir;
+                _smsAir -= n * SmsParams.Swim.AirDec;
+                if ((int)prev != (int)MathF.Max(_smsAir, 0f))
+                {
+                    _smsInvincibleTicks = Math.Max(_smsInvincibleTicks, SmsParams.Swim.AirUnitFlashTicks); // the rumble + flash
+                    if (SmsDebugPrint)
+                        GD.Print($"[SMS air] {(int)MathF.Max(_smsAir, 0f)} left after {_smsUnderTime:F1} s under");
+                }
+                if (_smsAir < 1f)
+                {
+                    _smsAir = 0f;
+                    SmsLoseInWater(false);
+                }
+            }
+        }
+        else
+        {
+            _smsAir = MathF.Min(_smsAir + n * SmsParams.Swim.AirInc, _smsMaxAir);
+        }
+
+        // GCConsole2: the meter turns to air 240 ticks after he goes under and back to HP when he surfaces
+        if (under)
+        {
+            _smsAirHudTicks = Math.Min(_smsAirHudTicks + n, SmsParams.Swim.AirHudDelayTicks);
+            if (_smsAirHudTicks >= SmsParams.Swim.AirHudDelayTicks && !_smsAirHudShown)
+            {
+                _smsAirHudShown = true;
+                _smsAirUnitsShown = (int)_smsAir;
+                _lifeMeter?.ShowAir(_smsAirUnitsShown);
+                if (SmsDebugPrint)
+                    GD.Print($"[SMS air] meter: air, {_smsAirUnitsShown} segments");
+            }
+        }
+        else
+        {
+            _smsAirHudTicks = 0;
+            if (_smsAirHudShown)
+            {
+                _smsAirHudShown = false;
+                _lifeMeter?.EndAir(_health);
+                if (SmsDebugPrint)
+                    GD.Print($"[SMS air] meter: back to HP {_health}");
+            }
+        }
+        if (_smsAirHudShown && (int)_smsAir != _smsAirUnitsShown)
+        {
+            _smsAirUnitsShown = (int)_smsAir;
+            _lifeMeter?.SetAir(_smsAirUnitsShown);
+        }
+    }
+
+    /// <summary>loserExec() while swimming: no air -> SWIM_DOWN (drowned), else SWIM_P_DOWN (killed in the water). Speed 0,
+    /// the clip holds its last frame, buoyancy floats him up; R respawns (the game's death demo).</summary>
+    private void SmsLoseInWater(bool byDamage)
+    {
+        if (_smsDrowned)
+            return;
+        _smsDrowned = true;
+        _health = 0;
+        if (heldBody != null)
+            Anim_DetachPickup();
+        SleepStatus(true);
+        _smsSwimFwd = 0f;
+        if (_smsAirHudShown)
+            _lifeMeter?.SetAir(0);
+        else
+            _lifeMeter?.SetHealth(0);
+        SmsSwimSet(byDamage ? SmsSwim.PDown : SmsSwim.Down);
+        GD.Print($"[SMS air] {(byDamage ? "killed in the water" : "DROWNED")} after {_smsUnderTime:F1} s under; R respawns");
+    }
+
+    /// <summary>damageExec() on a swimmer: face the attacker, one tick of the knockdown status, then the water check makes it
+    /// SWIM_P_DAMAGE (fwd 0, ma_swim_p_damage, SWIM_WAIT at the last frame). decHP() takes air instead of HP while he is
+    /// under; no air -> SWIM_DOWN, no HP -> SWIM_P_DOWN.</summary>
+    private void SmsSwimDamageExec(Vector3 attackerPos, SmsDamageProfile p)
+    {
+        if (_smsDrowned || _smsSwim == SmsSwim.PDamage)
+            return;
+        Vector3 toAttacker = new Vector3(attackerPos.X - GlobalPosition.X, 0f, attackerPos.Z - GlobalPosition.Z);
+        if (toAttacker.LengthSquared() > 1e-6f)
+        {
+            Vector3 attackDir = toAttacker.Normalized();
+            Vector3 oldFace = SmsMath.DirFromYaw(_smsFaceYaw);
+            _smsFaceYaw = SmsMath.YawFromDir(oldFace.Dot(attackDir) >= 0f ? attackDir : -attackDir); // getAttackAngle(), +180 from behind
+            SpawnBonkStars(-attackDir);
+        }
+        _smsInvincibleTicks = p.InvincibleTicks;
+        _smsSwimFwd = 0f; // jumpingDemoCommon(.., 0.0f) from the next tick on
+        if (p.DownType != 3)
+            SmsSwimSet(SmsSwim.PDamage);
+        // decHP()
+        if (SmsIsUnderWater())
+        {
+            _smsAir = MathF.Max(_smsAir - p.Damage, 0f);
+            if (_smsAirHudShown)
+            {
+                _smsAirUnitsShown = (int)_smsAir;
+                _lifeMeter?.SetAir(_smsAirUnitsShown);
+            }
+            if (SmsDebugPrint)
+                GD.Print($"[SMS damage] hit under water: -{p.Damage} AIR -> {_smsAir:F2}; invincible {p.InvincibleTicks} ticks");
+            if (_smsAir < 1f)
+                SmsLoseInWater(false);
+        }
+        else
+        {
+            bool wasFullHealth = _health == StartingHealth;
+            _health = Math.Max(_health - p.Damage, 0);
+            _lifeMeter?.SetHealth(_health);
+            if (wasFullHealth && _lifeMeter != null && camera != null)
+            {
+                Vector2 screenPos = camera.UnprojectPosition(GlobalPosition + new Vector3(-3.1f, 2.5f, 0));
+                _lifeMeter.SpawnAtScreenPosition(screenPos);
+            }
+            if (SmsDebugPrint)
+                GD.Print($"[SMS damage] hit in the water: -{p.Damage} HP -> {_health}/{StartingHealth}; invincible {p.InvincibleTicks} ticks");
+            if (_health <= 0)
+                SmsLoseInWater(true);
+        }
     }
 
     /// <summary>The port's death (ma_die, R respawns); the game's loserExec.</summary>
@@ -11906,6 +12125,9 @@ public partial class Mario : CharacterBody3D
     private void Respawn()
     {
         _health = StartingHealth;
+        SmsAirReset();
+        _smsSwimAnim = "";
+        animPlayer.SpeedScale = 1f;
         _lifeMeter?.SetHealth(_health);
         _lifeMeter?.HideForFullHealth();
         velocity = Vector3.Zero;

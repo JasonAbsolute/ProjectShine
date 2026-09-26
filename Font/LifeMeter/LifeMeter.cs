@@ -236,4 +236,69 @@ public partial class LifeMeter : Node2D
     }
 
     public int GetHealth() => _currentHealth;
+
+    // ---- Air mode (SMS: under water the life meter shows Mario's air, in blue) ----
+    // GCConsole2 updateLifeMeterColors(): J2D white 0x00FFFF / black 0x003CFF; at 3 segments or less white 0x0010FF. The J2D
+    // picture maps the art's intensity between the two colours; here a canvas_item shader does the same with the orange art.
+    private ShaderMaterial _airMaterial;
+    private bool _airMode;
+    public bool AirMode => _airMode;
+
+    private static readonly Vector3 AirWhite = new Vector3(0f, 1f, 1f);
+    private static readonly Vector3 AirWhiteLow = new Vector3(0f, 16f / 255f, 1f);
+    private static readonly Vector3 AirBlack = new Vector3(0f, 60f / 255f, 1f);
+
+    private void SetAirTint(bool on, int units)
+    {
+        if (on && _airMaterial == null)
+        {
+            var shader = new Shader
+            {
+                Code = "shader_type canvas_item;\n"
+                     + "uniform vec3 white_color = vec3(0.0, 1.0, 1.0);\n"
+                     + "uniform vec3 black_color = vec3(0.0, 0.235, 1.0);\n"
+                     + "void fragment() {\n"
+                     + "    vec4 t = texture(TEXTURE, UV);\n"
+                     + "    float v = max(t.r, max(t.g, t.b));\n"
+                     + "    COLOR = vec4(mix(black_color, white_color, v), COLOR.a);\n"
+                     + "}\n",
+            };
+            _airMaterial = new ShaderMaterial { Shader = shader };
+        }
+        _airMode = on;
+        if (on)
+        {
+            _airMaterial.SetShaderParameter("white_color", units <= 3 ? AirWhiteLow : AirWhite);
+            _airMaterial.SetShaderParameter("black_color", AirBlack);
+        }
+        Material m = on ? _airMaterial : null;
+        _orangeSwirl.Material = m;
+        for (int i = 0; i < 8; i++)
+            _orangeSegments[i].Material = m;
+    }
+
+    /// <summary>The meter appears at its HUD place showing <paramref name="units"/> of air in blue (startAppearLife(1)).</summary>
+    public void ShowAir(int units)
+    {
+        _flyTween?.Kill();
+        GlobalPosition = HudPosition;
+        Visible = true;
+        SetAirTint(true, units);
+        SetHealth(units);
+    }
+
+    public void SetAir(int units)
+    {
+        SetAirTint(true, units);
+        SetHealth(units);
+    }
+
+    /// <summary>Back to HP when he surfaces: shown if it is not full, gone if it is.</summary>
+    public void EndAir(int hp)
+    {
+        SetAirTint(false, hp);
+        SetHealth(hp);
+        if (hp >= MaxHealth)
+            HideForFullHealth();
+    }
 }

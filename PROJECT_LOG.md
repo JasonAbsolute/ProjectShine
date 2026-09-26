@@ -1811,6 +1811,30 @@ splash / ripple / bubble effects and sounds, the swimming camera, the air meter.
 Debug: `[SMS swim] wading in: … m of water` / `wading out`, `[SMS swim] in: surface y …, feet N units under the surface, floor … m down, fwd … vy …`, `[SMS swim] <status>: fwd …`,
 `[SMS swim] A near the surface: jump out`, `[SMS swim] out (shallow | left the water) -> idle, deepest … m`.
 
+### Air, drowning, being hit in the water (`TMario::mAir`, `SWIM_P_DAMAGE`, `SWIM_DOWN`)
+
+`mMaxAir = (HP + 1) − 1e-5` (8.99999), full at the start. **Under water** = the head joint more than `CanBreathDepth` **50
+units (0.67 m)** below the surface (`isUnderWater`): floating keeps the head out, the dive puts it under. Every tick under,
+`air −= AirDec 0.002`; each time the whole part drops (every 500 ticks, 4.2 s) the game rumbles and gives 50 ticks of
+invincibility (the flash). `air < 1` → `air = 0`, `loserExec()`, `SWIM_DOWN`: **about 33 s of continuous submersion drowns
+him.** Out of the water `air += AirInc 0.03` a tick (empty to full in 2.5 s). `decHP()` while under takes **air instead of
+HP** (`incHP`, i.e. coins, gives air back — not wired here). `loserExec()` while swimming: no air → `SWIM_DOWN` (`ma_swim_down`,
+drowned), else `SWIM_P_DOWN` (`ma_swim_p_down`, killed in the water); both `doSwimming()` + `jumpingDemoCommon(.., 0)`: speed
+0, the clip holds its last frame, buoyancy floats him back up, then the death demo — here **R respawns**, as on land.
+
+**Hit while swimming** (`damageExec`): face the attacker (+180 from behind), the knockdown status for a tick, then the water
+check turns it into `SWIM_P_DAMAGE` (`swimPDamage`: `doSwimming()` then speed 0, `ma_swim_p_damage`, `SWIM_WAIT` at the last
+frame); the attacker's invincibility; HP or air as above. Type 3 (the upper-body damage run) only takes HP.
+
+**HUD** (`GCConsole2::updateLifeMeterState`): the life meter switches to **air** 240 ticks (2 s) after he goes under, showing
+`(s16)air` segments (8 at 8.99), coloured J2D white `0x00FFFF` / black `0x003CFF` (cyan over blue), white `0x0010FF` at 3 or
+less; surfacing puts HP back (hidden when full). Port: `LifeMeter.ShowAir / SetAir / EndAir`, the blue as a runtime
+`canvas_item` shader remapping the orange art's intensity between the two colours (no scene change). Not ported: the low-air
+blink rates and beeps (the meter keeps its own pulse), the bubbles from the mouth, the helmet's `AirDecDive`.
+Debug: `[SMS air] under: head … m below the surface, N air`, `[SMS air] N left after … s under`, `[SMS air] surfaced after …`,
+`[SMS air] meter: air, N segments` / `meter: back to HP N`, `[SMS air] DROWNED after … s under; R respawns`,
+`[SMS damage] hit under water: -N AIR` / `hit in the water: -N HP`.
+
 ### Deliberate deviations from the game
 
 - `SmsRollJumpMinSpeed = 20` (game 40) — feel.
@@ -1911,8 +1935,8 @@ ground has to carry upward velocity (launches do) or exceed 1.34 m.
 - Surface types and the floor slip: done, see Surface types. Tagging the plaza's surfaces is editor work.
 - Ledge hang: done, see Ledge hang. Not ported: the fence catch (`FENCE_CATCH`), the hang-under-roof states
   (`HANG_ROOF` / `MOVE_ROOF`).
-- Swimming: done, see Swimming. Needs the level's water Area3D (`sms_water`). Not ported: drowning / damage in water,
-  the FLUDD surf, the fence catch from water, the effects and sounds, the swimming camera, the air meter.
+- Swimming: done, see Swimming and Air. Needs the level's water Area3D (`sms_water`). Not ported: the FLUDD surf, the
+  fence catch from water, the effects and sounds, the swimming camera, coins refilling air.
 - Damage: done, see Damage. Not ported: the type-3 upper-body damage run
   (`ma_dgrun`), camera shake / rumble / voice, FLUDD water loss and goop on hit; fire (`FIRE_JUMP` / `FIRE_DOWN` /
   `ma_hot_wait`) and electricity (`ELECTRIC_DAMAGE` / `ma_shock`) are separate statuses with their own handlers, not

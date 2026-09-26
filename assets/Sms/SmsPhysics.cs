@@ -202,7 +202,12 @@ public static class SmsParams
         public const float WaterLevelCheckHeight = 10f;
         public const int WaitSinkTime = 150;           // SWIM_DIVE: ticks of sinking once the clip passes frame 16
         public const float WaitSinkSpeed = 8f;         // ... vy -= a tick
-        public const float CanBreathDepth = 50f;       // isUnderWater(): the head this far under (air meter, not ported)
+        public const float CanBreathDepth = 50f;       // isUnderWater(): the head joint this far under the surface
+        public const float AirDec = 0.002f;            // mAir -= a tick under water (500 ticks = 4.2 s a unit; 8 units = 33 s)
+        public const float AirDecDive = 0.00075f;      // ... with the Noki Bay helmet (not used)
+        public const float AirInc = 0.03f;             // mAir += a tick out of the water (empty -> full in 2.5 s)
+        public const int AirUnitFlashTicks = 50;       // unk55C: mInvincibilityFrames each time a whole unit of air goes
+        public const int AirHudDelayTicks = 240;       // GCConsole2 unk268: the life meter turns to air this long after he goes under
         public const float SwimDepth = 110f;           // run.prm: deeper than this under the feet = swimming, else wading
         public const float InWaterBrake = 0.95f;       // run.prm: the wading brake at full SwimDepth, a tick
         public const float InWaterAnmBrake = 0.8f;     // run.prm: the wading run-animation rate factor (times the brake factor)
