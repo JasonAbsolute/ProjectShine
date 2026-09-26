@@ -11853,9 +11853,9 @@ public partial class Mario : CharacterBody3D
     /// <summary>The pack: the tank on the chn_chest bone, the nozzles on the tank's nozzle_center joint, all from the rips.</summary>
     private void SmsFluddSetup()
     {
-        if (skeleton == null || skeleton.FindBone("chn_chest") < 0)
+        if (skeleton == null || skeleton.FindBone("jnt_chest") < 0)
         {
-            GD.PushWarning("[SMS fludd] no chn_chest bone: no FLUDD");
+            GD.PushWarning("[SMS fludd] no jnt_chest bone: no FLUDD");
             return;
         }
         const string dir = "res://models/Koopa/mario/watergun2/";
@@ -11865,11 +11865,14 @@ public partial class Mario : CharacterBody3D
             GD.PushWarning("[SMS fludd] wg_mdl1 (the tank) not found under " + dir);
             return;
         }
-        _fluddAttach = new BoneAttachment3D { Name = "SmsFluddAttach", BoneName = "chn_chest" }; // setBaseTRMtx(getAnmMtx(chn_chest))
+        // the spine bone: the game's tilt formula only reads on a joint whose X runs up the spine (chn_chest, the decomp's name
+        // for it, is the fixed upper-body root in every BCK and would put the tank below his feet -- see PROJECT_LOG)
+        _fluddAttach = new BoneAttachment3D { Name = "SmsFluddAttach", BoneName = "jnt_chest" };
         skeleton.AddChild(_fluddAttach);
         _fluddTank = tankScene.Instantiate<Node3D>();
         _fluddAttach.AddChild(_fluddTank);
-        _fluddTank.Transform = new Transform3D(SmsFluddBaseBasis(0f), Vector3.Zero); // the J3D chest frame -> the rip's bone frame
+        _fluddTank.Transform = new Transform3D(SmsFluddBaseBasis(0f), Vector3.Zero);
+        SmsFluddTankMaterials();
         _fluddTankSkel = SmsFindChild<Skeleton3D>(_fluddTank);
         _fluddTankAnim = SmsFindChild<AnimationPlayer>(_fluddTank);
         if (_fluddTankSkel != null && _fluddTankSkel.FindBone("nozzle_center") >= 0)
@@ -11899,7 +11902,7 @@ public partial class Mario : CharacterBody3D
             _fluddNozzleNode[i] = node;
             _fluddNozzleAnim[i] = SmsFindChild<AnimationPlayer>(node);
             node.Visible = i == (int)_fluddNozzle;
-            SmsFlatMaterial(node, SmsNozzleColor[i]); // the rip's nozzle materials only carry the toon ramp (white)
+            SmsFluddNozzleMaterial(node); // the rip kept the nozzles' H_watergun_main_dummy placeholder: give them the FLUDD atlas
         }
         // the pump clips ping-pong (addUpper: ATTR_PING_PONG_LOOP; the tank's are slaved to Mario's)
         if (animPlayer.HasAnimation("ma_pump"))
@@ -11918,7 +11921,7 @@ public partial class Mario : CharacterBody3D
         {
             string tankClips = _fluddTankAnim == null ? "none" : string.Join(", ", _fluddTankAnim.GetAnimationList());
             string hoverClips = _fluddNozzleAnim[1] == null ? "none" : string.Join(", ", _fluddNozzleAnim[1].GetAnimationList());
-            GD.Print($"[SMS fludd] pack on chn_chest: tank bones {_fluddTankSkel?.GetBoneCount() ?? 0}, nozzle_center {(_fluddNozzleParent is BoneAttachment3D ? "yes" : "NO")}, tank clips [{tankClips}], hover clips [{hoverClips}]; spray on, hover second, housed");
+            GD.Print($"[SMS fludd] pack on jnt_chest: tank bones {_fluddTankSkel?.GetBoneCount() ?? 0}, nozzle_center {(_fluddNozzleParent is BoneAttachment3D ? "yes" : "NO")}, tank clips [{tankClips}], hover clips [{hoverClips}]; spray on, hover second, housed");
         }
     }
 
@@ -11958,27 +11961,19 @@ public partial class Mario : CharacterBody3D
         SmsFluddPoseTank();
         SmsFluddNozzleAnim();
         SmsFluddUpperBody();
-        // setBaseTRMtx(): the pack turns about the chest's lateral axis by -0x1800 * (1 - |spine up|): none standing, -33.75 deg lying flat
+        // setBaseTRMtx(): angle = -0x1800 * (1 - |mtx[1][0]|), mtx[1][0] = the world-vertical component of the spine axis (the bone's X):
+        // none standing, the tank pitched 33.75 deg back off his belly when he lies flat
         if (_fluddAttach != null && _fluddTank != null)
         {
-            float upness = Mathf.Abs(_fluddAttach.GlobalTransform.Basis.Y.Normalized().Y);
+            float upness = Mathf.Abs(_fluddAttach.GlobalTransform.Basis.X.Normalized().Y);
             float lean = -0x1800 * SmsUnits.BamToRad * (1f - upness);
             _fluddTank.Transform = new Transform3D(SmsFluddBaseBasis(lean), Vector3.Zero);
         }
     }
 
-    /// <summary>The tank is authored in the game's chest joint frame (X up the spine, Y forward, Z left); the rip's chest bone
-    /// frame is Blender-style (Y up, X backward, Z left). X_j -> Y_g, Y_j -> -X_g, Z_j -> Z_g is a +90 deg turn about Z; the
-    /// game's lean tweak turns about the same Z.</summary>
-    private static Basis SmsFluddBaseBasis(float lean) => Basis.FromEuler(new Vector3(0f, 0f, Mathf.Pi * 0.5f + lean));
-
-    private static readonly Color[] SmsNozzleColor =
-    {
-        new Color(0.72f, 0.72f, 0.74f), // spray: grey
-        new Color(0.72f, 0.72f, 0.74f), // hover: grey
-        new Color(0.72f, 0.72f, 0.74f), // rocket: grey
-        new Color(0.80f, 0.16f, 0.10f), // turbo (back_wg): the red propeller unit
-    };
+    /// <summary>The tank is authored in the spine bone's frame (X up the spine = its height, Y forward = the straps, Z its left),
+    /// so its base is the identity plus the game's tilt about the lateral axis.</summary>
+    private static Basis SmsFluddBaseBasis(float lean) => Basis.FromEuler(new Vector3(0f, 0f, lean));
 
     private static void SmsCollect<T>(Node root, System.Collections.Generic.List<T> into) where T : Node
     {
@@ -11988,14 +11983,71 @@ public partial class Mario : CharacterBody3D
             SmsCollect(c, into);
     }
 
-    private static void SmsFlatMaterial(Node root, Color c)
+    private Material _fluddAtlasMaterial; // the tank frame's imported material: H_watergun_main (wg_mdl1_0.png) with the rip's shading
+
+    /// <summary>The tank's materials as the game's MAT3 has them: the shell (_mat_G_main_tank) is translucent, vertex-coloured,
+    /// blended (ONE, INVSRCALPHA) without a depth write; the waterline is additive; the frame keeps its atlas.</summary>
+    private void SmsFluddTankMaterials()
     {
-        var mat = new StandardMaterial3D { AlbedoColor = c, Roughness = 0.65f, Metallic = 0.05f };
+        var meshes = new System.Collections.Generic.List<MeshInstance3D>();
+        SmsCollect(_fluddTank, meshes);
+        foreach (var mi in meshes)
+        {
+            if (mi.Mesh == null)
+                continue;
+            for (int i = 0; i < mi.Mesh.GetSurfaceCount(); i++)
+            {
+                var src = mi.GetActiveMaterial(i);
+                string name = src?.ResourceName ?? "";
+                if (name.Length == 0 && mi.Mesh is ArrayMesh am)
+                    name = am.SurfaceGetName(i);
+                if (name == "_mat_G_main_tank")
+                {
+                    mi.SetSurfaceOverrideMaterial(i, new StandardMaterial3D
+                    {
+                        ResourceName = "_mat_G_main_tank (sms)",
+                        VertexColorUseAsAlbedo = true,
+                        Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                        BlendMode = BaseMaterial3D.BlendModeEnum.PremultAlpha,
+                        DepthDrawMode = BaseMaterial3D.DepthDrawModeEnum.Disabled,
+                        CullMode = BaseMaterial3D.CullModeEnum.Back,
+                        Roughness = 0.35f,
+                        Metallic = 0f,
+                    });
+                }
+                else if (name == "_mat_waterline" && src is StandardMaterial3D wl)
+                {
+                    var m = (StandardMaterial3D)wl.Duplicate();
+                    m.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+                    m.BlendMode = BaseMaterial3D.BlendModeEnum.Add;
+                    m.DepthDrawMode = BaseMaterial3D.DepthDrawModeEnum.Disabled;
+                    m.ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded;
+                    m.AlbedoColor = new Color(136f / 255f, 129f / 255f, 156f / 255f); // its material colour
+                    mi.SetSurfaceOverrideMaterial(i, m);
+                }
+                else if (_fluddAtlasMaterial == null && src is StandardMaterial3D sm && sm.AlbedoTexture != null)
+                    _fluddAtlasMaterial = sm; // the frame's atlas (H_watergun_main_s3tc): what the nozzles' dummy texture stands in for
+            }
+        }
+        if (_fluddAtlasMaterial == null)
+        {
+            var tex = ResourceLoader.Load<Texture2D>("res://models/Koopa/mario/watergun2/body/wg_mdl1/wg_mdl1_0.png");
+            if (tex != null)
+                _fluddAtlasMaterial = new StandardMaterial3D { ResourceName = "H_watergun_main (sms)", AlbedoTexture = tex, Roughness = 1f, Metallic = 0f };
+        }
+    }
+
+    /// <summary>The nozzle BMDs' texture 0 is H_watergun_main_dummy, an 8x8 placeholder the game swaps for the FLUDD atlas; the
+    /// nozzles' UVs span that atlas, so they get the tank frame's material.</summary>
+    private void SmsFluddNozzleMaterial(Node root)
+    {
+        if (_fluddAtlasMaterial == null)
+            return;
         var meshes = new System.Collections.Generic.List<MeshInstance3D>();
         SmsCollect(root, meshes);
         foreach (var mi in meshes)
             for (int i = 0; i < mi.GetSurfaceOverrideMaterialCount(); i++)
-                mi.SetSurfaceOverrideMaterial(i, mat);
+                mi.SetSurfaceOverrideMaterial(i, _fluddAtlasMaterial);
     }
 
     /// <summary>checkPumpEnable(): the clip allows the pump (isPumpOK), nothing carried, not switching nozzles, no demo.</summary>

@@ -1855,17 +1855,29 @@ dash (`mDashSpeed` ramps 0.5 a tick to 32 replacing the stick, then the run is f
 **S1 (this commit).** The gun's base matrix is the `chn_chest` animated matrix (`calcAnim`: `setBaseTRMtx(getAnmMtx(
 mJointIdChnChest))`, with a small roll tweak from the chest tilt — not ported yet); the nozzle hangs off the tank's
 `nozzle_center`. Port: `BoneAttachment3D` "SmsFluddAttach" on `chn_chest` carrying `wg_mdl1.glb` (the skeleton's scale),
-"SmsNozzleAttach" on the tank's `nozzle_center` carrying the four nozzle glbs, the current one visible. **Orientation:** the
-tank is authored in the game's chest joint frame (X up the spine — its 83-unit height runs along +X, `nozzle_center` at
-(72, −40, 0) is top / rear — Y forward, Z left), while the rip's `chn_chest` bone frame is Blender-style (bind pose +X → his
-back, +Y → up, +Z → his left), so the tank gets a +90° turn about Z (X_j → Y_g, Y_j → −X_g): the nozzle lands 40 units
-behind the spine and 130 units up, shoulder height. `setBaseTRMtx` adds the lean tweak about the same axis: `−0x1800 × (1 −
-|up component of the spine axis|)`, nothing standing, −33.75° with the chest flat, so the pack stays more upright than the
-leaning torso. The nozzle glbs are Y-up (the hover's muzzles at x = ±33 fire along −Y) and `nozzle_center`'s bone frame has
-Y = tank up, so they keep the identity. **Colour:** the nozzle glbs carry no colour texture (their one image is the 32×32 toon
-ramp; the game's colour was TEV register colours the rip kept only as unvalued GLSL uniforms), so a flat material per nozzle
-stands in — grey, the turbo prop red — until real textures exist. The tank has its texture (`wg_mdl1_0.png`, and
-`wg_mdl1_1.png` is the water level).
+"SmsNozzleAttach" on the tank's `nozzle_center` carrying the four nozzle glbs, the current one visible.
+**The bone (from the game's own files, his `aSms/` extraction).** The decomp hangs the gun on `mJointIdChnChest =
+getIndex("chn_chest")` and tilts it in `setBaseTRMtx`: `angle = −0x1800 × (1 − |mtx[1][0]|)`, `mtx[1][0]` being the
+world-vertical component of the joint's X axis, then `MTXConcat(anmMtx, RotZ(angle))`. But `chn_chest` is a fixed (0, 90°, 0)
+joint in every BCK (`ma_wait.bck`, `ma_pump.bck` read; the rip's 200 clips agree): X = his back, never rotating — it is the
+root the upper-body clips are grafted on (`M3UModelMario`'s second animation root), not the spine. On it the formula is a
+constant −33.75° and, applied to the tank's real vertices (height along +X, `nozzle_center` at (72, −40, 0), the water
+shell a 36-unit cylinder of radius 19 along X — all confirmed against the raw BMD), puts the pack from below his feet to his
+shoulders with the nozzle at y = −15. On the spine bone `jnt_chest` (X up the spine, Y forward, Z left, leaning with the
+chest: rotZ 99° idle, up to 28° forward in the jump) the same formula reads as designed: no tilt while upright, the tank
+pitched 33.75° back off his belly when he lies flat (`unk1D04` 0 at |X.y| = 1, `unk1D06` −0x1800 at 0), and the tank's own
+frame (X height, Y toward the straps, Z its left) is that bone frame, so the base is the identity plus the tilt. Port: the
+attachment is on `jnt_chest`, `upness = |bone X · world up|`, tank basis = RotZ(−0x1800 × (1 − upness)). Recorded as a
+reading discrepancy with the decomp's joint name; the test decides. The nozzle glbs are Y-up and `nozzle_center`'s frame has
+Y = tank up, so they keep the identity.
+**Colour (MAT3 of the BMDs).** The nozzles' texture 0 is `H_watergun_main_dummy` (8×8), a placeholder the game swaps for
+the FLUDD atlas `H_watergun_main` (= the tank's 64×128 `wg_mdl1_0.png`); their UVs span that atlas, the rip kept the dummy
+→ white. Port: the nozzles get the tank frame's imported material. The tank shell `_mat_G_main_tank` is XLU with no
+texture: colour and alpha from the vertex colours ((0.75, 0.89, 0.98) × 0.5–0.8), blend (ONE, INVSRCALPHA), z update
+off — Godot imported it opaque light blue. Port: transparency alpha, vertex colours as albedo, premultiplied blend, no
+depth write. `_mat_waterline`: XLU (SRCALPHA, ONE) = additive, material colour (136, 129, 156), the water texture
+`wg_mdl1_1.png` (`H_watergun_water`) scrolled by the fill (S2). The frame (`_mat_G_main`, `_mat_froater` ×3) keeps the
+rip's import (atlas + toon `H_toon_2_4i`; TEV C0 (194,178,206,161), C1 (157,161,169), konst (76,108,97) not reproduced).
 - **X** (`gunExec` → `changeBackup`): the swap tween runs 0 → 1 (to the second nozzle, the hover by default) or 1 → 0 (back to
   the spray) at `ChangeSpeed` 0.1 a tick; crossing 0.5 swaps the model. The leaving nozzle scrubs its `_change_start` by the
   tween, the arriving one its `_change_end` (the spray nozzle uses its `house_` variants while housed).
