@@ -165,6 +165,9 @@ public partial class Mario : CharacterBody3D
     private float _smsDownSlideUntil = 1f;    // downingCommon's frame limit as a fraction of the clip: he slides before it, holds still after
     private string _smsDownAnim = "";
     private const float SMS_DOWN_AIR_SPEED = 16f; // jumpDownCommon(): setPlayerVelocity(+-16) every tick
+    // waiting(): mHealth <= 3 -> ANIM_DAMAGE_WAIT_START once, then ANIM_DAMAGE_WAIT (library-only clips, driven directly)
+    private int _smsDamageWaitPhase = 0;      // 0 off, 1 ma_damage_wait_start playing, 2 ma_damage_wait looping
+    private double _smsDamageWaitPos = 0.0;   // clip position to resume from when idle is re-entered mid-pant
 
     // Stomp bounce
     private int _stompChain = 0;
@@ -1566,7 +1569,7 @@ public partial class Mario : CharacterBody3D
         // The library animations in models/*.res all ship with loop_mode None, and the tree plays ma_hang as is: the hang
         // played its 1.65 s once and froze on the last frame (Jaysonn: "does not loop when hanging"). ANIM_HANG,
         // ANIM_HMOV_L/R and ANIM_THROWN are loops in the game. ma_hgdwn / ma_hgup / ma_hgjmp stay one-shots: their end is a state exit.
-        foreach (string a in new[] { "ma_hang", "ma_hmov_l", "ma_hmov_r", "ma_thrown" })
+        foreach (string a in new[] { "ma_hang", "ma_hmov_l", "ma_hmov_r", "ma_thrown", "ma_damage_wait" })
         {
             if (animPlayer.HasAnimation(a))
                 ForceLoop(a);
@@ -1907,6 +1910,8 @@ public partial class Mario : CharacterBody3D
 
         if (_smsInvincibleTicks > 0)
             _smsInvincibleTicks = Math.Max(0, _smsInvincibleTicks - Mathf.RoundToInt((float)delta * 120f)); // thinkParams(): mInvincibilityFrames -= 1 a tick
+        if (_smsDamageWaitPhase != 0)
+            SmsDamageWaitTick();
         if (_smsHangDropFall && stateOfMario != MarioState.ledgeFall)
             _smsHangDropFall = false; // the LAND_SAFE_DOWN drop ended (he landed, or something else took over)
         if (stateOfMario != MarioState.ledgeFall)
@@ -10958,6 +10963,7 @@ public partial class Mario : CharacterBody3D
             SmsLatchFace(face, 1);
             lastFacingDirection = face;
             armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
+            StopWaistIKHard(); // the run's waist IK is started / stopped in the main path, which the hurt block skips: stop it here or it bends the clip
             stateOfMario = MarioState.hurt;
             SmsDownEnter(airborne, fwd);
             SpawnBonkStars(-attackDir); // PARTICLE_MS_DMG_A/B/C at calcDamagePos (toward the attacker); no camera shake / rumble / voice here
@@ -10978,6 +10984,55 @@ public partial class Mario : CharacterBody3D
             GD.Print($"[SMS damage] -{p.Damage} HP -> {_health}/{StartingHealth}: {what}; invincible {p.InvincibleTicks} ticks");
         if (_health <= 0)
             EnterDead(); // loserExec()
+    }
+
+    /// <summary>waiting(): the low-HP idle plays while he stands at 1..3 HP with nothing in his hands.</summary>
+    private bool SmsWantsDamageWait() => _health > 0 && _health <= 3 && heldBody == null;
+
+    /// <summary>
+    /// The panting idle, per frame: ANIM_DAMAGE_WAIT_START runs once, then ANIM_DAMAGE_WAIT loops; a healed, carrying, or
+    /// moved Mario goes back to the tree (SetMarioState(idle) picks ma_wait again); anything else that took the player
+    /// (the sleep clips) is left alone, and a direct ma_wait is replaced by the pant, as waiting() would.
+    /// </summary>
+    private void SmsDamageWaitTick()
+    {
+        if (stateOfMario != MarioState.idle || !UseSmsPhysics)
+        {
+            _smsDamageWaitPhase = 0; // the state change already went through SetMarioState (tree back on)
+            return;
+        }
+        if (!SmsWantsDamageWait())
+        {
+            _smsDamageWaitPhase = 0;
+            SetMarioState(MarioState.idle); // healed above 3, or picked something up: ma_wait through the tree
+            return;
+        }
+        string cur = animPlayer.CurrentAnimation;
+        if (_smsDamageWaitPhase == 1)
+        {
+            if (cur == "ma_damage_wait_start" && animPlayer.IsPlaying())
+                return;
+            if (cur == "ma_damage_wait_start" || cur == "ma_wait" || cur == "")
+            {
+                if (animTree != null)
+                    animTree.Active = false;
+                animPlayer.Play("ma_damage_wait");
+                _smsDamageWaitPhase = 2;
+                return;
+            }
+            _smsDamageWaitPhase = 0; // something else (sleep) has the player
+            return;
+        }
+        if (cur == "ma_damage_wait")
+            return;
+        if (cur == "ma_wait")
+        {
+            if (animTree != null)
+                animTree.Active = false;
+            animPlayer.Play("ma_damage_wait"); // a direct ma_wait from the idle code: waiting() would show the pant
+            return;
+        }
+        _smsDamageWaitPhase = 0; // something else has the player
     }
 
     /// <summary>The port's death (ma_die, R respawns); the game's loserExec.</summary>
@@ -11356,6 +11411,8 @@ public partial class Mario : CharacterBody3D
         // so this is safe — it also ensures we wake up correctly when movement starts.
         if (animTree != null)
         {
+            if (_smsDamageWaitPhase != 0 && animPlayer.IsPlaying())
+                _smsDamageWaitPos = animPlayer.CurrentAnimationPosition; // the pant resumes here if this is idle again
             animPlayer.Stop(false); // stop animPlayer so it doesn't fight animTree
             animTree.Active = true;
         }
@@ -11377,7 +11434,29 @@ public partial class Mario : CharacterBody3D
         switch (state)
         {
             case MarioState.idle:
-                _sm.Travel("ma_wait");
+                if (UseSmsPhysics && SmsWantsDamageWait())
+                {
+                    // waiting(): mHealth <= 3 -> ANIM_DAMAGE_WAIT_START once, then ANIM_DAMAGE_WAIT. Library-only clips, driven
+                    // directly like ma_t_wait below; SmsDamageWaitTick chains the two and lets go when something else takes over.
+                    if (animTree != null)
+                        animTree.Active = false;
+                    animPlayer.SpeedScale = 1f;
+                    if (_smsDamageWaitPhase == 0)
+                    {
+                        animPlayer.Play("ma_damage_wait_start");
+                        _smsDamageWaitPhase = 1;
+                    }
+                    else
+                    {
+                        animPlayer.Play(_smsDamageWaitPhase == 1 ? "ma_damage_wait_start" : "ma_damage_wait");
+                        animPlayer.Seek(_smsDamageWaitPos, true); // idle re-entered mid-pant: carry on, do not restart
+                    }
+                }
+                else
+                {
+                    _smsDamageWaitPhase = 0;
+                    _sm.Travel("ma_wait");
+                }
                 break;
             case MarioState.talking:
                 // ma_t_wait is present in the AnimationPlayer library but not as

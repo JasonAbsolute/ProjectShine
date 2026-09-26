@@ -1734,8 +1734,13 @@ HP taken, down type, knockback `MinSpeed`, `InvincibleTime`).
   the family, a wall mirrors the face (`playerRefrection`), zeroes a rising vy and switches to `bkdwn`; the ±16 along the
   mirrored face then carries him away from it. `PostMoveWallCheck` skips the `hurt` state for this.
 - **Then** HP −= damage (0 → the port's death, `ma_die`), the damage stars (the port's bonk particles) toward the attacker.
-  Not ported: camera shake, rumble, the voice, FLUDD water loss, goop; the low-HP idle (`waiting()`: `mHealth <= 3` →
-  `ma_damage_wait_start` then `ma_damage_wait` instead of `ma_wait`; both clips are in the library).
+  Not ported: camera shake, rumble, the voice, FLUDD water loss, goop.
+- **Low HP** (`waiting()`, MarioWait.cpp:175): at 1..3 HP, standing with nothing in his hands, `ma_damage_wait_start`
+  plays once and `ma_damage_wait` loops instead of `ma_wait`. Both are library-only clips, driven directly from
+  `SetMarioState(idle)` (which resumes the position if idle is re-entered mid-pant); `SmsDamageWaitTick` chains the two
+  and hands back to the tree when he heals above 3, picks something up, or moves; the sleep clips are left alone.
+- Gotcha: the running waist IK is `Start()`ed / `Stop()`ped every frame in the main path, which the `hurt` block skips
+  (`goto EndFrame`). Hit while running, it kept bending the knockdown clip; `SmsDamageExec` stops it (`StopWaistIKHard`).
 - **No fall damage in Sunshine**: the strong landing (`vy <= -70` past `DamageFallHeight`) is `CATCH`, HP untouched.
 
 The legacy path (`UseSmsPhysics` off) is unchanged: −1 HP, a 2 m/s shove, a 0.5 s `hurt` timer. All knockdown clips are
@@ -1843,7 +1848,7 @@ ground has to carry upward velocity (launches do) or exceed 1.34 m.
 - Surface types and the floor slip: done, see Surface types. Tagging the plaza's surfaces is editor work.
 - Ledge hang: done, see Ledge hang. Not ported: the fence catch (`FENCE_CATCH`), the hang-under-roof states
   (`HANG_ROOF` / `MOVE_ROOF`).
-- Damage: done, see Damage. Not ported: the low-HP idle (`ma_damage_wait`), the type-3 upper-body damage run
+- Damage: done, see Damage. Not ported: the type-3 upper-body damage run
   (`ma_dgrun`), camera shake / rumble / voice, FLUDD water loss and goop on hit; fire (`FIRE_JUMP` / `FIRE_DOWN` /
   `ma_hot_wait`) and electricity (`ELECTRIC_DAMAGE` / `ma_shock`) are separate statuses with their own handlers, not
   started.
