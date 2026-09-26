@@ -11869,6 +11869,7 @@ public partial class Mario : CharacterBody3D
         skeleton.AddChild(_fluddAttach);
         _fluddTank = tankScene.Instantiate<Node3D>();
         _fluddAttach.AddChild(_fluddTank);
+        _fluddTank.Transform = new Transform3D(SmsFluddBaseBasis(0f), Vector3.Zero); // the J3D chest frame -> the rip's bone frame
         _fluddTankSkel = SmsFindChild<Skeleton3D>(_fluddTank);
         _fluddTankAnim = SmsFindChild<AnimationPlayer>(_fluddTank);
         if (_fluddTankSkel != null && _fluddTankSkel.FindBone("nozzle_center") >= 0)
@@ -11898,6 +11899,7 @@ public partial class Mario : CharacterBody3D
             _fluddNozzleNode[i] = node;
             _fluddNozzleAnim[i] = SmsFindChild<AnimationPlayer>(node);
             node.Visible = i == (int)_fluddNozzle;
+            SmsFlatMaterial(node, SmsNozzleColor[i]); // the rip's nozzle materials only carry the toon ramp (white)
         }
         // the pump clips ping-pong (addUpper: ATTR_PING_PONG_LOOP; the tank's are slaved to Mario's)
         if (animPlayer.HasAnimation("ma_pump"))
@@ -11956,6 +11958,44 @@ public partial class Mario : CharacterBody3D
         SmsFluddPoseTank();
         SmsFluddNozzleAnim();
         SmsFluddUpperBody();
+        // setBaseTRMtx(): the pack turns about the chest's lateral axis by -0x1800 * (1 - |spine up|): none standing, -33.75 deg lying flat
+        if (_fluddAttach != null && _fluddTank != null)
+        {
+            float upness = Mathf.Abs(_fluddAttach.GlobalTransform.Basis.Y.Normalized().Y);
+            float lean = -0x1800 * SmsUnits.BamToRad * (1f - upness);
+            _fluddTank.Transform = new Transform3D(SmsFluddBaseBasis(lean), Vector3.Zero);
+        }
+    }
+
+    /// <summary>The tank is authored in the game's chest joint frame (X up the spine, Y forward, Z left); the rip's chest bone
+    /// frame is Blender-style (Y up, X backward, Z left). X_j -> Y_g, Y_j -> -X_g, Z_j -> Z_g is a +90 deg turn about Z; the
+    /// game's lean tweak turns about the same Z.</summary>
+    private static Basis SmsFluddBaseBasis(float lean) => Basis.FromEuler(new Vector3(0f, 0f, Mathf.Pi * 0.5f + lean));
+
+    private static readonly Color[] SmsNozzleColor =
+    {
+        new Color(0.72f, 0.72f, 0.74f), // spray: grey
+        new Color(0.72f, 0.72f, 0.74f), // hover: grey
+        new Color(0.72f, 0.72f, 0.74f), // rocket: grey
+        new Color(0.80f, 0.16f, 0.10f), // turbo (back_wg): the red propeller unit
+    };
+
+    private static void SmsCollect<T>(Node root, System.Collections.Generic.List<T> into) where T : Node
+    {
+        if (root is T t)
+            into.Add(t);
+        foreach (Node c in root.GetChildren())
+            SmsCollect(c, into);
+    }
+
+    private static void SmsFlatMaterial(Node root, Color c)
+    {
+        var mat = new StandardMaterial3D { AlbedoColor = c, Roughness = 0.65f, Metallic = 0.05f };
+        var meshes = new System.Collections.Generic.List<MeshInstance3D>();
+        SmsCollect(root, meshes);
+        foreach (var mi in meshes)
+            for (int i = 0; i < mi.GetSurfaceOverrideMaterialCount(); i++)
+                mi.SetSurfaceOverrideMaterial(i, mat);
     }
 
     /// <summary>checkPumpEnable(): the clip allows the pump (isPumpOK), nothing carried, not switching nozzles, no demo.</summary>

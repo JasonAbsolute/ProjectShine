@@ -1854,8 +1854,18 @@ dash (`mDashSpeed` ramps 0.5 a tick to 32 replacing the stick, then the run is f
 
 **S1 (this commit).** The gun's base matrix is the `chn_chest` animated matrix (`calcAnim`: `setBaseTRMtx(getAnmMtx(
 mJointIdChnChest))`, with a small roll tweak from the chest tilt — not ported yet); the nozzle hangs off the tank's
-`nozzle_center`. Port: `BoneAttachment3D` "SmsFluddAttach" on `chn_chest` carrying `wg_mdl1.glb` (identity offset, the
-skeleton's scale), "SmsNozzleAttach" on the tank's `nozzle_center` carrying the four nozzle glbs, the current one visible.
+`nozzle_center`. Port: `BoneAttachment3D` "SmsFluddAttach" on `chn_chest` carrying `wg_mdl1.glb` (the skeleton's scale),
+"SmsNozzleAttach" on the tank's `nozzle_center` carrying the four nozzle glbs, the current one visible. **Orientation:** the
+tank is authored in the game's chest joint frame (X up the spine — its 83-unit height runs along +X, `nozzle_center` at
+(72, −40, 0) is top / rear — Y forward, Z left), while the rip's `chn_chest` bone frame is Blender-style (bind pose +X → his
+back, +Y → up, +Z → his left), so the tank gets a +90° turn about Z (X_j → Y_g, Y_j → −X_g): the nozzle lands 40 units
+behind the spine and 130 units up, shoulder height. `setBaseTRMtx` adds the lean tweak about the same axis: `−0x1800 × (1 −
+|up component of the spine axis|)`, nothing standing, −33.75° with the chest flat, so the pack stays more upright than the
+leaning torso. The nozzle glbs are Y-up (the hover's muzzles at x = ±33 fire along −Y) and `nozzle_center`'s bone frame has
+Y = tank up, so they keep the identity. **Colour:** the nozzle glbs carry no colour texture (their one image is the 32×32 toon
+ramp; the game's colour was TEV register colours the rip kept only as unvalued GLSL uniforms), so a flat material per nozzle
+stands in — grey, the turbo prop red — until real textures exist. The tank has its texture (`wg_mdl1_0.png`, and
+`wg_mdl1_1.png` is the water level).
 - **X** (`gunExec` → `changeBackup`): the swap tween runs 0 → 1 (to the second nozzle, the hover by default) or 1 → 0 (back to
   the spray) at `ChangeSpeed` 0.1 a tick; crossing 0.5 swaps the model. The leaving nozzle scrubs its `_change_start` by the
   tween, the arriving one its `_change_end` (the spray nozzle uses its `house_` variants while housed).
