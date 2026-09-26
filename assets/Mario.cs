@@ -156,6 +156,15 @@ public partial class Mario : CharacterBody3D
     private const float HURT_KNOCKBACK = 2.0f;
     private bool _hitFromFront = false;
     private bool _hurtAirborne = false; // true if hit while not on floor
+    // SMS damage: damageExec() and the *_DOWN statuses (MarioCollision.cpp, MarioRun.cpp downingCommon, MarioJump.cpp jumpDownCommon)
+    private int _smsInvincibleTicks = 0;      // mInvincibilityFrames: 120 Hz ticks (thinkParams runs in playerControl), from the attacker's InvincibleTime
+    private bool _smsDownFore = false;        // FORE_DOWN family (hit from behind: faces away, falls on his face) vs BACK_DOWN (faces the attacker, on his back)
+    private int _smsDownType = 1;             // 0 SAFE, 1 SHORT, 2 the full DOWN
+    private bool _smsDownAir = false;         // JUMP_*_DOWN: falling, horizontal speed forced to +-16 along the face every tick
+    private float _smsDownFwd = 0f;           // signed forward speed (units) along the face while down (downingCommon's 0.96 decay)
+    private float _smsDownSlideUntil = 1f;    // downingCommon's frame limit as a fraction of the clip: he slides before it, holds still after
+    private string _smsDownAnim = "";
+    private const float SMS_DOWN_AIR_SPEED = 16f; // jumpDownCommon(): setPlayerVelocity(+-16) every tick
 
     // Stomp bounce
     private int _stompChain = 0;
@@ -1896,6 +1905,8 @@ public partial class Mario : CharacterBody3D
         if (ledgeRegrabCooldown > 0)
             ledgeRegrabCooldown--;
 
+        if (_smsInvincibleTicks > 0)
+            _smsInvincibleTicks = Math.Max(0, _smsInvincibleTicks - Mathf.RoundToInt((float)delta * 120f)); // thinkParams(): mInvincibilityFrames -= 1 a tick
         if (_smsHangDropFall && stateOfMario != MarioState.ledgeFall)
             _smsHangDropFall = false; // the LAND_SAFE_DOWN drop ended (he landed, or something else took over)
         if (stateOfMario != MarioState.ledgeFall)
@@ -2056,6 +2067,11 @@ public partial class Mario : CharacterBody3D
 
         if (stateOfMario == MarioState.hurt)
         {
+            if (UseSmsPhysics)
+            {
+                SmsTickHurt(delta); // downingCommon() / jumpDownCommon(): no inputs until he is up
+                goto EndFrame;
+            }
             if (!IsOnFloor())
                 velocity += GRAVITY * (float)delta;
 
@@ -7975,6 +7991,7 @@ public partial class Mario : CharacterBody3D
             float smsFaceDot = smsFace.Dot(-nXZ);
             bool smsHitWall = smsFaceDot >= smsApproachMin
                 && stateOfMario != MarioState.bonk
+                && stateOfMario != MarioState.hurt // JUMP_*_DOWN reflects off walls itself (jumpDownCommon case 2)
                 && airStateAtContact != MarioState.groundPoundFalling
                 && airStateAtContact != MarioState.groundPoundStartup;
             if (!smsHitWall && SmsDebugPrint && speed > 1e-4f && (vXZ / speed).Dot(-nXZ) >= smsApproachMin
@@ -10853,7 +10870,284 @@ public partial class Mario : CharacterBody3D
             _sm.Travel(stepAnim);
     }
 
-    public void TakeDamage(Vector3 hitSourcePosition)
+    // ---------------------------------------------------------------------------------------------------------------
+    // Damage: damageExec() (MarioCollision.cpp) and the knockdown statuses -- downingCommon() (MarioRun.cpp) on the ground,
+    // jumpDownCommon() (MarioJump.cpp) in the air. Sunshine has no fall damage: the strong landing goes to CATCH, not HP.
+    // ---------------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// One attacker's damage parameters, params/mario/dmg*.prm (TEParams): HP taken; DownType 0 SAFE / 1 SHORT / 2 the full
+    /// DOWN / 3 upper-body damage run only (no knockdown); MinSpeed = knockback in SMS units (he keeps his own forward speed
+    /// if it was higher); InvincibleTime in 120 Hz ticks. The shipped files, decoded.
+    /// </summary>
+    public readonly struct SmsDamageProfile
+    {
+        public readonly int Damage;
+        public readonly int DownType;
+        public readonly float MinSpeed;
+        public readonly int InvincibleTicks;
+
+        public SmsDamageProfile(int damage, int downType, float minSpeed, int invincibleTicks)
+        {
+            Damage = damage;
+            DownType = downType;
+            MinSpeed = minSpeed;
+            InvincibleTicks = invincibleTicks;
+        }
+
+        public static readonly SmsDamageProfile EnemyCommon = new SmsDamageProfile(1, 1, 30f, 0);   // dmgenemycommon.prm: the default (TakeDamage(pos))
+        public static readonly SmsDamageProfile Hamukuri = new SmsDamageProfile(1, 0, 30f, 0);      // dmghamukuri.prm: Strollin' Stu
+        public static readonly SmsDamageProfile Namekuri = new SmsDamageProfile(1, 0, 20f, 300);    // dmgnamekuri.prm: Swoopin' Stu (also 100 goop, not ported)
+        public static readonly SmsDamageProfile Poihana = new SmsDamageProfile(1, 1, 50f, 0);       // dmgpoihana.prm: Cataquack
+        public static readonly SmsDamageProfile Fire = new SmsDamageProfile(1, 1, 16f, 0);          // dmgfire.prm
+        public static readonly SmsDamageProfile Killer = new SmsDamageProfile(3, 1, 16f, 300);      // dmgkiller.prm: Bullet Bill
+        public static readonly SmsDamageProfile LampTrap = new SmsDamageProfile(3, 1, 16f, 20);     // dmglamptrapiron.prm / spike
+        public static readonly SmsDamageProfile MapCode0 = new SmsDamageProfile(1, 0, 16f, 100);    // dmgmapcode0.prm: damaging floors
+    }
+
+    /// <summary>Entry point for attackers (Gooble.cs: TakeDamage(GlobalPosition)). SMS mode: damageExec() with
+    /// dmgenemycommon.prm; use the overload for another attacker's profile.</summary>
+    public void TakeDamage(Vector3 hitSourcePosition) => TakeDamage(hitSourcePosition, SmsDamageProfile.EnemyCommon);
+
+    public void TakeDamage(Vector3 hitSourcePosition, SmsDamageProfile profile)
+    {
+        if (UseSmsPhysics)
+            SmsDamageExec(hitSourcePosition, profile);
+        else
+            LegacyTakeDamage(hitSourcePosition);
+    }
+
+    /// <summary>damageExec(hittingActor, damage, downType, waterEmit, knockbackSpeed, rumble, pollution, invincibleFrames).</summary>
+    private void SmsDamageExec(Vector3 attackerPos, SmsDamageProfile p)
+    {
+        // isInvincible(): mInvincibilityFrames > 0 (also talking / demo); mHealth == 0 and game over return as well
+        if (_smsInvincibleTicks > 0 || _health <= 0 || stateOfMario == MarioState.dead)
+            return;
+        // Port-side: no second hit while he is already down. The game has no such rule (its enemies recoil from the hit,
+        // and dmgenemycommon.prm gives no invincibility), but ours keep touching him through the fall.
+        if (stateOfMario == MarioState.hurt)
+            return;
+
+        bool airborne = !IsOnFloor() || TryGetAirProfile(stateOfMario, out _); // checkStatusType(MARIO_STATUS_FLAG_JUMPING)
+        Vector3 oldFace = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+        Vector3 toAttacker = new Vector3(attackerPos.X - GlobalPosition.X, 0f, attackerPos.Z - GlobalPosition.Z);
+        Vector3 attackDir = toAttacker.LengthSquared() > 1e-6f ? toAttacker.Normalized() : oldFace; // getAttackAngle()
+        string what = "HP only (type 3: the upper-body damage run is not ported)";
+        if (p.DownType != 3)
+        {
+            if (heldBody != null)
+                Anim_DetachPickup(); // changePlayerDropping(): dropObject()
+            float fwd = SmsUnits.MpsToSpeed(new Vector3(velocity.X, 0f, velocity.Z).Dot(oldFace)); // mForwardVel, signed along the face
+            if (fwd < p.MinSpeed)
+                fwd = p.MinSpeed;
+            // face the attacker. Hit from the front (within 90 deg of the old face): he goes backwards away from it and lands
+            // on his back (the BACK_DOWN family); from behind: face += 180, forwards away from it, on his face (FORE_DOWN)
+            bool inFront = oldFace.Dot(attackDir) >= 0f;
+            Vector3 face = inFront ? attackDir : -attackDir;
+            _smsDownFore = !inFront;
+            if (inFront)
+                fwd = -fwd;
+            _smsDownType = Math.Clamp(p.DownType, 0, 2);
+            // whatever he was doing is over
+            ledgePinned = false;
+            _smsHangMovingAnim = false;
+            _smsLongFallAnim = false;
+            _smsFallCancel = false;
+            isJumping = false;
+            jumpBuffer = 0;
+            SmsLatchFace(face, 1);
+            lastFacingDirection = face;
+            armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
+            stateOfMario = MarioState.hurt;
+            SmsDownEnter(airborne, fwd);
+            SpawnBonkStars(-attackDir); // PARTICLE_MS_DMG_A/B/C at calcDamagePos (toward the attacker); no camera shake / rumble / voice here
+            what = $"{(_smsDownFore ? "FORE" : "BACK")}_DOWN type {_smsDownType} {(airborne ? "in the air (+-16 along the face until he lands)" : $"on the ground, {_smsDownAnim} at fwd {fwd:F1} ({SmsUnits.SpeedToMps(MathF.Abs(fwd)):F1} m/s)")}";
+        }
+        _smsInvincibleTicks = p.InvincibleTicks;
+
+        // decHP()
+        bool wasFullHealth = _health == StartingHealth;
+        _health = Math.Max(_health - p.Damage, 0);
+        _lifeMeter?.SetHealth(_health);
+        if (wasFullHealth && _lifeMeter != null && camera != null)
+        {
+            Vector2 screenPos = camera.UnprojectPosition(GlobalPosition + new Vector3(-3.1f, 2.5f, 0));
+            _lifeMeter.SpawnAtScreenPosition(screenPos);
+        }
+        if (SmsDebugPrint)
+            GD.Print($"[SMS damage] -{p.Damage} HP -> {_health}/{StartingHealth}: {what}; invincible {p.InvincibleTicks} ticks");
+        if (_health <= 0)
+            EnterDead(); // loserExec()
+    }
+
+    /// <summary>The port's death (ma_die, R respawns); the game's loserExec.</summary>
+    private void EnterDead()
+    {
+        stateOfMario = MarioState.dead;
+        velocity = Vector3.Zero;
+        _smsDownAnim = "";
+        SleepStatus(true); // Close eyes
+        if (animTree != null)
+        {
+            animPlayer.Stop(false);
+            animTree.Active = true;
+        }
+        if (_sm != null)
+            _sm.Travel("ma_die");
+    }
+
+    private void SmsDownEnter(bool airborne, float fwd)
+    {
+        _smsDownAir = airborne;
+        _smsDownFwd = fwd;
+        if (airborne)
+        {
+            SmsDownPlay(_smsDownFore ? "ma_jfdwn" : "ma_bkdwn", 1f); // jumpDownCommon(): vy left as it was, +-16 from the next tick
+        }
+        else
+        {
+            velocity.Y = 0f;
+            SmsDownGroundAnim();
+        }
+        SmsDownApplyVelocity();
+    }
+
+    /// <summary>
+    /// The ground knockdown clip for the type and direction, with downingCommon()'s frame limit as the fraction of the clip
+    /// during which he still slides (the port's clips are 60 fps: bdwn 158 frames, sdwnf 58; the other four limits exceed
+    /// their clips, so those slide to the end).
+    /// </summary>
+    private void SmsDownGroundAnim()
+    {
+        string anim;
+        float limitFrames;
+        switch (_smsDownType)
+        {
+            case 0: anim = _smsDownFore ? "ma_sffdn" : "ma_sfbdn"; limitFrames = _smsDownFore ? 100f : 200f; break; // safeForeDown / safeBackDown
+            case 1: anim = _smsDownFore ? "ma_shfdn" : "ma_sdown"; limitFrames = _smsDownFore ? 80f : 88f; break;   // shortForeDown / shortBackDown
+            default: anim = _smsDownFore ? "ma_sdwnf" : "ma_bdwn"; limitFrames = _smsDownFore ? 42f : 86f; break;   // foreDown / backDown
+        }
+        float frames = animPlayer.HasAnimation(anim) ? (float)animPlayer.GetAnimation(anim).Length * 60f : 60f;
+        SmsDownPlay(anim, Mathf.Clamp(limitFrames / MathF.Max(frames, 1f), 0f, 1f));
+    }
+
+    private void SmsDownPlay(string anim, float slideUntil)
+    {
+        _smsDownAnim = anim;
+        _smsDownSlideUntil = slideUntil;
+        if (animTree != null)
+            animTree.Active = false; // driven directly, like the shimmy: SetMarioState(idle) at the end brings the tree back
+        animPlayer.SpeedScale = 1f;
+        if (animPlayer.HasAnimation(anim))
+            animPlayer.Play(anim);
+    }
+
+    private void SmsDownApplyVelocity()
+    {
+        Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
+        float mps = SmsUnits.SpeedToMps(_smsDownFwd);
+        velocity.X = face.X * mps;
+        velocity.Z = face.Z * mps;
+    }
+
+    /// <summary>
+    /// The knockdown, one physics frame. In the air (jumpDownCommon): +-16 along the face every tick, gravity, a wall
+    /// mirrors the face (playerRefrection) and ANIM_BKDWN, the floor hands over to the ground status of the family. On the
+    /// ground (downingCommon): the clip plays once; he slides at fwd *= 0.96 a tick until the clip's limit, then +-0.1; an
+    /// edge drops him into JUMP_SHORT_*_DOWN by the sign of fwd; the clip's end is WAIT. No inputs in either.
+    /// </summary>
+    private void SmsTickHurt(double delta)
+    {
+        if (_smsDownAir)
+        {
+            if (IsOnFloor() && velocity.Y <= 0.01f)
+            {
+                // jumpProcess() 1: landed. The ground status of the same family; the last +-16 decays from here.
+                _smsDownAir = false;
+                _smsDownFwd = _smsDownFore ? SMS_DOWN_AIR_SPEED : -SMS_DOWN_AIR_SPEED;
+                velocity.Y = 0f;
+                SmsDownGroundAnim();
+                SmsDownApplyVelocity();
+                if (SmsDebugPrint)
+                    GD.Print($"[SMS damage] landed: {_smsDownAnim}, slides for {_smsDownSlideUntil * 100f:F0}% of it");
+                return;
+            }
+            if (IsOnWall())
+            {
+                // jumpProcess() 2: playerRefrection(0) mirrors the face across the wall, vy <= 0, ANIM_BKDWN; the +-16 along the
+                // mirrored face carries him away from it
+                Vector3 wallN = GetWallNormal();
+                wallN.Y = 0f;
+                if (wallN.LengthSquared() > 1e-6f && new Vector3(velocity.X, 0f, velocity.Z).Dot(wallN) < 0f)
+                {
+                    wallN = wallN.Normalized();
+                    Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
+                    Vector3 mirrored = (face - 2f * face.Dot(wallN) * wallN).Normalized();
+                    SmsLatchFace(mirrored, 1);
+                    lastFacingDirection = mirrored;
+                    armature.Rotation = new Vector3(0f, YawFromDir(mirrored), 0f);
+                    if (velocity.Y > 0f)
+                        velocity.Y = 0f;
+                    if (_smsDownAnim != "ma_bkdwn")
+                        SmsDownPlay("ma_bkdwn", 1f);
+                    if (SmsDebugPrint)
+                        GD.Print("[SMS damage] wall: face mirrored, ma_bkdwn");
+                }
+            }
+            SmsAirTick(delta, Vector3.Zero); // jumpProcess(0): gravity only (hurt does not steer), the true-vy handoff
+            _smsDownFwd = _smsDownFore ? SMS_DOWN_AIR_SPEED : -SMS_DOWN_AIR_SPEED;
+            SmsDownApplyVelocity();
+            return;
+        }
+
+        if (!IsOnFloor())
+        {
+            // walkProcess() 0: off an edge -> JUMP_SHORT_FORE/BACK_DOWN by the sign of fwd (the type drops to SHORT)
+            _smsDownAir = true;
+            _smsDownType = Math.Min(_smsDownType, 1);
+            _smsDownFore = _smsDownFwd >= 0f;
+            SmsDownPlay(_smsDownFore ? "ma_jfdwn" : "ma_bkdwn", 1f);
+            SmsAirTick(delta, Vector3.Zero);
+            _smsDownFwd = _smsDownFore ? SMS_DOWN_AIR_SPEED : -SMS_DOWN_AIR_SPEED;
+            SmsDownApplyVelocity();
+            if (SmsDebugPrint)
+                GD.Print("[SMS damage] off the edge while down: JUMP_SHORT_" + (_smsDownFore ? "FORE" : "BACK") + "_DOWN");
+            return;
+        }
+
+        int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
+        bool playing = animPlayer.IsPlaying() && animPlayer.CurrentAnimation == _smsDownAnim;
+        float t = playing && animPlayer.CurrentAnimationLength > 0.0
+            ? (float)(animPlayer.CurrentAnimationPosition / animPlayer.CurrentAnimationLength)
+            : 1f;
+        if (t < _smsDownSlideUntil)
+        {
+            // slopeProcess() adds 0 on normal ground; the slide decays 4% a tick and stops under 1 unit
+            for (int i = 0; i < n; i++)
+            {
+                _smsDownFwd *= 0.96f;
+                if (_smsDownFwd * _smsDownFwd < 1f)
+                    _smsDownFwd = 0f;
+            }
+        }
+        else
+        {
+            _smsDownFwd = _smsDownFwd >= 0f ? 0.1f : -0.1f;
+        }
+        velocity.Y = 0f;
+        SmsDownApplyVelocity();
+        if (!playing)
+        {
+            // isLast1AnimeFrame(): WAIT
+            _smsDownAnim = "";
+            stateOfMario = MarioState.idle;
+            SetMarioState(MarioState.idle); // the tree comes back on here
+            if (SmsDebugPrint)
+                GD.Print("[SMS damage] up");
+        }
+    }
+
+    private void LegacyTakeDamage(Vector3 hitSourcePosition)
     {
         // Don't interrupt if already hurt or dead
         if (stateOfMario == MarioState.hurt || stateOfMario == MarioState.dead)

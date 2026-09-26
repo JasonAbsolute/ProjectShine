@@ -1708,6 +1708,41 @@ landing, `[SMS slide] A at fwd … -> CatchStop/RollJump …` on every slide pre
 `[SMS gp] …` for hover/lift/land, `[LAND_DBG]` around landing detection. Expected standing single: 1.41 heights /
 0.70 s airtime; double from a run ≈2.9 heights; triple ≈5; spin ≈3.9.
 
+### Damage (`damageExec`, the `*_DOWN` statuses)
+
+`TakeDamage(pos)` (what `Gooble.cs` calls) is `damageExec()` with `dmgenemycommon.prm`; `TakeDamage(pos, profile)` takes
+another attacker's parameters (`Mario.SmsDamageProfile`: `EnemyCommon`, `Hamukuri` = Strollin' Stu, `Namekuri` = Swoopin'
+Stu, `Poihana` = Cataquack, `Fire`, `Killer`, `LampTrap`, `MapCode0`, all decoded from the shipped `params/mario/dmg*.prm`:
+HP taken, down type, knockback `MinSpeed`, `InvincibleTime`).
+
+- **Nothing while invincible** (`mInvincibilityFrames`, a 120 Hz tick counter set from the attacker's `InvincibleTime` and
+  counted down in `thinkParams`; enemycommon gives **0**) or at 0 HP. Port-side rule: no second hit while he is already
+  down — the game's enemies recoil from the hit, ours keep touching him through the fall.
+- **Direction.** The face turns toward the attacker. Attacker within 90° of the *old* face (in front): `fwd *= -1`, he
+  goes backwards away from it and lands on his **back** (the `BACK_DOWN` family, `bkdwn` / `sdown` / `sfbdn` / `bdwn`);
+  from behind: face += 180°, forwards away from it, on his **face** (`FORE_DOWN`: `jfdwn` / `shfdn` / `sffdn` / `sdwnf`).
+  The knockback is `max(his forward speed, MinSpeed)` — a sprinting Mario is flung harder. He drops what he carries.
+- **Status table** `[type + 4 × airborne + 8 × fore]`: on the ground `SAFE` (type 0) / `SHORT` (1) / the full `DOWN` (2);
+  in the air `JUMP_SHORT_*_DOWN` (types 0 and 1) / `JUMP_*_DOWN` (2). Type 3 is the upper-body damage run
+  (`setUpperDamageRun`, `ma_dgrun`): HP only here, the animation is not ported.
+- **Ground** (`downingCommon`): the clip plays once; while its frame is under the handler's limit (bdwn 86, sdwnf 42, sdown
+  88, shfdn 80, sfbdn 200, sffdn 100 — of the port's 60 fps clips, so only bdwn and sdwnf stop sliding early) he slides at
+  `fwd *= 0.96` a tick (0 under 1 unit), after it ±0.1; an edge drops him into `JUMP_SHORT_FORE/BACK_DOWN` by the sign of
+  `fwd`; the clip's last frame is `WAIT`. No inputs.
+- **Air** (`jumpDownCommon`): `setPlayerVelocity(±16)` *every tick* (the knockback speed only matters on the ground; 6.4
+  m/s), `jumpProcess(0)` (gravity, no stick, vy left as it was at the hit), the floor hands over to the ground status of
+  the family, a wall mirrors the face (`playerRefrection`), zeroes a rising vy and switches to `bkdwn`; the ±16 along the
+  mirrored face then carries him away from it. `PostMoveWallCheck` skips the `hurt` state for this.
+- **Then** HP −= damage (0 → the port's death, `ma_die`), the damage stars (the port's bonk particles) toward the attacker.
+  Not ported: camera shake, rumble, the voice, FLUDD water loss, goop; the low-HP idle (`waiting()`: `mHealth <= 3` →
+  `ma_damage_wait_start` then `ma_damage_wait` instead of `ma_wait`; both clips are in the library).
+- **No fall damage in Sunshine**: the strong landing (`vy <= -70` past `DamageFallHeight`) is `CATCH`, HP untouched.
+
+The legacy path (`UseSmsPhysics` off) is unchanged: −1 HP, a 2 m/s shove, a 0.5 s `hurt` timer. All knockdown clips are
+driven directly (the tree lacks `bdwn` and `jfdwn`); `SetMarioState(idle)` at the end brings the tree back.
+Debug: `[SMS damage] -1 HP -> 7/8: BACK_DOWN type 1 on the ground, ma_sdown at fwd -30.0 (12.1 m/s); invincible 0 ticks`,
+`... landed: ma_sdown, slides for 100% of it`, `... wall: face mirrored`, `... up`.
+
 ### Deliberate deviations from the game
 
 - `SmsRollJumpMinSpeed = 20` (game 40) — feel.
@@ -1808,3 +1843,7 @@ ground has to carry upward velocity (launches do) or exceed 1.34 m.
 - Surface types and the floor slip: done, see Surface types. Tagging the plaza's surfaces is editor work.
 - Ledge hang: done, see Ledge hang. Not ported: the fence catch (`FENCE_CATCH`), the hang-under-roof states
   (`HANG_ROOF` / `MOVE_ROOF`).
+- Damage: done, see Damage. Not ported: the low-HP idle (`ma_damage_wait`), the type-3 upper-body damage run
+  (`ma_dgrun`), camera shake / rumble / voice, FLUDD water loss and goop on hit; fire (`FIRE_JUMP` / `FIRE_DOWN` /
+  `ma_hot_wait`) and electricity (`ELECTRIC_DAMAGE` / `ma_shock`) are separate statuses with their own handlers, not
+  started.
