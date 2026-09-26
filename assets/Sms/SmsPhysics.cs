@@ -181,6 +181,34 @@ public static class SmsParams
         public const float DescentDropUnits = 160f;     // ... and the ground beyond must be more than this below
     }
 
+    public static class Swim // /mario/swim.prm (shipped) + run.prm's SwimDepth / InWaterBrake + doSwimming's constants
+    {
+        public const float StartSp = 8f;
+        public const float MoveSp = 0.3f;              // fwd += mag * MoveSp / 32 a tick
+        public const float MoveBrake = 0.97f;          // fwd *= a tick
+        public const int RotSp = 300;                  // BAM a tick toward the stick (SwimmingRotSpMin == Max shipped)
+        public const float Gravity = 0.05f;            // vy -= a tick
+        public const float WaitBuoyancy = 2f;          // vy += depthRatio * this a tick while waiting / starting
+        public const float MoveBuoyancy = 1.8f;        // ... otherwise
+        public const float UpDownBrake = 0.6f;         // vy *= a tick
+        public const float CanJumpDepth = 100f;        // A with the feet within this of the surface can jump out
+        public const float EndDepth = 80f;             // water shallower than this under him: he stands up (WAIT)
+        public const float FloatHeight = 80f;          // the feet never rise above surface - this; also the buoyancy ramp
+        public const float StartVMult = 0.3f;          // entering: fwd *= this
+        public const float StartVYMult = 2f;           // entering: vy *= this
+        public const float PaddleSpeedUp = 0.45f;      // SWIM_PADDLE_START: fwd += a tick
+        public const float PaddleJumpUp = 4f;          // SWIM_PADDLE_START: vy += a tick
+        public const float FloatUp = 8f;               // SWIM_UP: vy += a tick
+        public const float WaterLevelCheckHeight = 10f;
+        public const int WaitSinkTime = 150;           // SWIM_DIVE: ticks of sinking once the clip passes frame 16
+        public const float WaitSinkSpeed = 8f;         // ... vy -= a tick
+        public const float CanBreathDepth = 50f;       // isUnderWater(): the head this far under (air meter, not ported)
+        public const float SwimDepth = 110f;           // run.prm: deeper than this under the feet = swimming, else wading
+        public const float InWaterBrake = 0.95f;       // run.prm: the wading brake at full SwimDepth, a tick
+        public const float BottomClearance = 35f;      // doSwimming(): the feet stay this far above the floor
+        public const float DiveSinkStartFrame = 16f;   // swimDive(): checkPass(16) of the dive clip, 30 fps frames
+    }
+
     public static class Timing
     {
         public const int JumpSlipWindowTicks = 16;      // JumpSlipRecord.mMaxTimer: landing window for the jump chain (0.133 s)

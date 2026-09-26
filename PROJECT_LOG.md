@@ -1757,6 +1757,44 @@ driven directly (the tree lacks `bdwn` and `jfdwn`); `SetMarioState(idle)` at th
 Debug: `[SMS damage] -1 HP -> 7/8: BACK_DOWN type 1 on the ground, ma_sdown at fwd -30.0 (12.1 m/s); invincible 0 ticks`,
 `... landed: ma_sdown, slides for 100% of it`, `... wall: face mirrored`, `... up`.
 
+### Swimming (`MarioSwim.cpp`, `MarioState.swimming`)
+
+**Water in the level.** The game reads the surface from the map's water triangles; the plaza rip has no water geometry at
+all, so the level marks it: an `Area3D` in the group **`sms_water`** (or with metadata `sms_water`) whose shape contains the
+water, from the seabed up to the surface. Its surface is metadata `sms_water_surface_y` when set, else the **top of its first
+`BoxShape3D`** child. Keep the area's Monitorable on (default). Several areas may overlap; the highest surface wins. Mario
+tests the point at his feet every physics frame (`SmsWaterCheck`, `PhysicsPointQueryParameters3D` against areas) and rays
+down for the ground under the water (`mFloorPosition.y`).
+
+**Getting in** (`playerControl`): the surface at or above the feet is `MARIO_FLAG_IN_WATER`. More than `SwimDepth` **110
+units (1.48 m)** of water under the feet → `SWIM_START` from any status (ours excludes dead, talking, the shine-get and the
+ledge states), with `fwd *= 0.3` and `vy *= 2.0` (the plunge). Shallower is **wading**: the run continues, braked by depth
+(`isRunningInWater`: `fwd *= 1 − depth/110 × 0.05` a tick).
+
+**In the water** (`swimMain` → the status handler → `doSwimming`, every tick):
+- **A** (`checkSwimJump`): with the feet within `CanJumpDepth` 100 of the surface, and the stick neutral, or a wall ahead, or
+  the stick more than 120° from his face → a normal **jump out** (`JUMP`). Otherwise stick neutral → `SWIM_UP` (`ma_float`,
+  `vy += 8` a tick), stick held → `SWIM_PADDLE_START` (`ma_paddle_start`, `fwd += 0.45`, `vy += 4` a tick, then `SWIM_PADDLE`).
+- **The float limit**: the feet never rise above `surface − FloatHeight 80` (he floats chest-deep, feet 1.07 m under).
+- **`doSwimming`**: **B** → `SWIM_DIVE` (`ma_swim_dive`; once the clip passes frame 16, `WaitSinkTime` 150 ticks of
+  `vy −= 8`; clip end → `PADDLE_END`). Water shallower than `EndDepth` 80 under him → `WAIT`: he stands up. `fwd += mag × 0.3
+  / 32`, `fwd *= 0.97`; the face turns to the stick at 300 BAM a tick; `vy −= 0.05`, `vy += clamp((surface − feet)/80) × 2.0`
+  (waiting / starting) or `× 1.8` (moving), `vy *= 0.6`; a wall zeroes `fwd` and `vy`; the feet stay 35 above the floor.
+- **The handlers**: `START` (`ma_swim_start` → `WAIT`), `WAIT` (`ma_swim_wait`; stick → `WAIT_TO_PADDLE`), `WAIT_TO_PADDLE`
+  (`ma_wait_to_paddle` → `PADDLE_START`), `PADDLE` (`ma_swim` at rate 0.5; stick neutral → `PADDLE_END`), `PADDLE_END`
+  (`ma_paddle_end` → `PADDLE_END_TO_WAIT`), `PADDLE_END_TO_WAIT` (`ma_paddle_to_wait` → `WAIT`), `UP` (→ `WAIT`), `DIVE`.
+  Steady paddling is ≈10 units (4 m/s); a stroke bursts to ≈25 (10 m/s). Mario cannot stay under on his own: buoyancy brings
+  him back up, so there is no air meter here.
+
+Port notes: all clips are driven directly (none is a tree state; `ma_swim_wait` and `ma_swim` force-looped), `SetMarioState`
+at the exit brings the tree back. While swimming the floor snap is 0, the ground step is off, `PostMoveWallCheck` and the
+landing latch skip him, and the swim tick runs in the pre-split block like the knockdown (no other handler). Leaving the
+water volume's edge while swimming drops him into a fall (or a stand if there is ground). Not ported: `SWIM_P_DAMAGE` /
+`SWIM_DOWN` / `SWIM_P_DOWN` (drowning, damage in water), the FLUDD paddle (`DashMax` surf), the fence catch from water, the
+splash / ripple / bubble effects and sounds, the swimming camera, the air meter.
+Debug: `[SMS swim] in: surface y …, N units of water under the feet, floor … m down, fwd … vy …`, `[SMS swim] <status>: fwd …`,
+`[SMS swim] A near the surface: jump out`, `[SMS swim] out (shallow | left the water) -> idle, deepest … m`.
+
 ### Deliberate deviations from the game
 
 - `SmsRollJumpMinSpeed = 20` (game 40) — feel.
@@ -1857,6 +1895,8 @@ ground has to carry upward velocity (launches do) or exceed 1.34 m.
 - Surface types and the floor slip: done, see Surface types. Tagging the plaza's surfaces is editor work.
 - Ledge hang: done, see Ledge hang. Not ported: the fence catch (`FENCE_CATCH`), the hang-under-roof states
   (`HANG_ROOF` / `MOVE_ROOF`).
+- Swimming: done, see Swimming. Needs the level's water Area3D (`sms_water`). Not ported: drowning / damage in water,
+  the FLUDD surf, the fence catch from water, the effects and sounds, the swimming camera, the air meter.
 - Damage: done, see Damage. Not ported: the type-3 upper-body damage run
   (`ma_dgrun`), camera shake / rumble / voice, FLUDD water loss and goop on hit; fire (`FIRE_JUMP` / `FIRE_DOWN` /
   `ma_hot_wait`) and electricity (`ELECTRIC_DAMAGE` / `ma_shock`) are separate statuses with their own handlers, not

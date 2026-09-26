@@ -66,6 +66,7 @@ public partial class Mario : CharacterBody3D
         dead,
         talking,
         ledgeDescend, // SMS: climbing down over an edge into a hang (checkDescent -> DESCEND, ma_hgdwn)
+        swimming,     // SMS: the SWIM_* statuses (MarioSwim.cpp), sub-status in _smsSwim
     }
 
     private struct AirControlProfile
@@ -165,6 +166,18 @@ public partial class Mario : CharacterBody3D
     private float _smsDownSlideUntil = 1f;    // downingCommon's frame limit as a fraction of the clip: he slides before it, holds still after
     private string _smsDownAnim = "";
     private const float SMS_DOWN_AIR_SPEED = 16f; // jumpDownCommon(): setPlayerVelocity(+-16) every tick
+    // Swimming (MarioSwim.cpp). Water: Area3D in group "sms_water", surface = metadata sms_water_surface_y or its BoxShape3D's top.
+    private enum SmsSwim { Start, Wait, WaitToPaddle, PaddleStart, Paddle, PaddleEnd, PaddleEndToWait, Up, Dive }
+    private SmsSwim _smsSwim = SmsSwim.Start;
+    private bool _smsInWater = false;          // MARIO_FLAG_IN_WATER: a water surface at or above the feet this frame
+    private float _smsWaterSurfaceY = 0f;      // mFloorPosition.z (world metres)
+    private float _smsWaterFloorY = float.NegativeInfinity; // mFloorPosition.y: the ground under the water; -inf = none within 30 m
+    private float _smsSwimFwd = 0f;            // mForwardVel (units) along the face
+    private float _smsSwimVy = 0f;             // mVel.y (units)
+    private int _smsSwimSinkTicks = 0;         // swimDive(): the WaitSinkTime countdown
+    private bool _smsSwimSinkArmed = false;    // ... armed once the dive clip passes frame 16
+    private string _smsSwimAnim = "";
+    private float _smsSwimDbgDeepest = 0f;
     // waiting(): mHealth <= 3 -> ANIM_DAMAGE_WAIT_START once, then ANIM_DAMAGE_WAIT (library-only clips, driven directly)
     private int _smsDamageWaitPhase = 0;      // 0 off, 1 ma_damage_wait_start playing, 2 ma_damage_wait looping
     private double _smsDamageWaitPos = 0.0;   // clip position to resume from when idle is re-entered mid-pant
@@ -1571,7 +1584,7 @@ public partial class Mario : CharacterBody3D
         // The library animations in models/*.res all ship with loop_mode None, and the tree plays ma_hang as is: the hang
         // played its 1.65 s once and froze on the last frame (Jaysonn: "does not loop when hanging"). ANIM_HANG,
         // ANIM_HMOV_L/R and ANIM_THROWN are loops in the game. ma_hgdwn / ma_hgup / ma_hgjmp stay one-shots: their end is a state exit.
-        foreach (string a in new[] { "ma_hang", "ma_hmov_l", "ma_hmov_r", "ma_thrown", "ma_damage_wait" })
+        foreach (string a in new[] { "ma_hang", "ma_hmov_l", "ma_hmov_r", "ma_thrown", "ma_damage_wait", "ma_swim_wait", "ma_swim" })
         {
             if (animPlayer.HasAnimation(a))
                 ForceLoop(a);
@@ -1720,7 +1733,7 @@ public partial class Mario : CharacterBody3D
         // only further than that does he fall. Godot's floor_snap_length is the same mechanism (Player.tscn ships 0.6 m),
         // and it also feeds the downhill constant-speed redirect. The launch-frame override stays.
         float baseSnap = (UseSmsPhysics && SmsLedgeSnap) ? SmsGroundContact.LedgeDropMetres : _baseFloorSnapLength;
-        FloorSnapLength = (inJumpLaunchState && IsOnFloor()) ? 0f : baseSnap;
+        FloorSnapLength = ((inJumpLaunchState && IsOnFloor()) || stateOfMario == MarioState.swimming) ? 0f : baseSnap;
 
         // Sample horizontal acceleration on the fixed physics step for the chest
         // jiggle. Uses last frame's resolved Velocity (post-MoveAndSlide) — clean,
@@ -2070,6 +2083,17 @@ public partial class Mario : CharacterBody3D
                 Respawn();
 
             goto EndFrame;
+        }
+
+        if (UseSmsPhysics)
+        {
+            SmsWaterCheck();      // playerControl(): the water surface at the feet, every tick
+            SmsWaterEntryCheck(); // deep water -> SWIM_START, from any status
+            if (stateOfMario == MarioState.swimming)
+            {
+                SmsTickSwim(delta, inputDirWorld); // swimMain(): no other handler runs
+                goto EndFrame;
+            }
         }
 
         if (stateOfMario == MarioState.hurt)
@@ -4028,7 +4052,8 @@ public partial class Mario : CharacterBody3D
         // floor" (vel_dir_facing_up) and skips both the floor snap and the constant-speed redirect, so every uphill lip
         // and every steeper-to-shallower triangle launched him. SMS keeps mVel.y = 0 on the ground and so do we.
         _smsGroundMoved = UseSmsPhysics && IsOnFloor() && !inAirState && velocity.Y <= 0.01f
-            && (stateOfMario != MarioState.slipping || _smsSurfaceSlip) && stateOfMario != MarioState.wallSlide;
+            && (stateOfMario != MarioState.slipping || _smsSurfaceSlip) && stateOfMario != MarioState.wallSlide
+            && stateOfMario != MarioState.swimming;
         if (_smsGroundMoved)
         {
             Vector3 hv = new Vector3(velocity.X, 0f, velocity.Z);
@@ -4350,6 +4375,7 @@ public partial class Mario : CharacterBody3D
             || stateOfMario == MarioState.carrying
             || stateOfMario == MarioState.pickupFail
             || stateOfMario == MarioState.hurt
+            || stateOfMario == MarioState.swimming
             || stateOfMario == MarioState.bonk
             || stateOfMario == MarioState.stomping
             || stateOfMario == MarioState.groundPoundStartup
@@ -8007,6 +8033,7 @@ public partial class Mario : CharacterBody3D
             bool smsHitWall = smsFaceDot >= smsApproachMin
                 && stateOfMario != MarioState.bonk
                 && stateOfMario != MarioState.hurt // JUMP_*_DOWN reflects off walls itself (jumpDownCommon case 2)
+                && stateOfMario != MarioState.swimming // doSwimming(): a wall just stops him
                 && airStateAtContact != MarioState.groundPoundFalling
                 && airStateAtContact != MarioState.groundPoundStartup;
             if (!smsHitWall && SmsDebugPrint && speed > 1e-4f && (vXZ / speed).Dot(-nXZ) >= smsApproachMin
@@ -11173,6 +11200,334 @@ public partial class Mario : CharacterBody3D
         _smsDamageWaitPhase = 0; // something else has the player
     }
 
+    // ---------------------------------------------------------------------------------------------------------------
+    // Swimming: MarioSwim.cpp (swimMain / doSwimming / the SWIM_* handlers) and playerControl()'s water check. Water is any
+    // Area3D in the group "sms_water" (or with metadata "sms_water") containing the feet; its surface is metadata
+    // "sms_water_surface_y" if set, else the top of its first BoxShape3D. The game reads the surface from the map's water
+    // triangles; the plaza rip has none, so the level places one Area3D over the sea.
+    // ---------------------------------------------------------------------------------------------------------------
+
+    /// <summary>playerControl(): the water surface at the feet this tick (MARIO_FLAG_IN_WATER when it is at or above them)
+    /// and the ground under the water (mFloorPosition.y).</summary>
+    private void SmsWaterCheck()
+    {
+        _smsInWater = false;
+        float feetY = SmsFeetY();
+        var space = GetWorld3D().DirectSpaceState;
+        var q = new PhysicsPointQueryParameters3D
+        {
+            Position = new Vector3(GlobalPosition.X, feetY + 0.01f, GlobalPosition.Z),
+            CollideWithAreas = true,
+            CollideWithBodies = false,
+            CollisionMask = uint.MaxValue,
+        };
+        foreach (var hit in space.IntersectPoint(q, 8))
+        {
+            if (hit["collider"].As<GodotObject>() is not Area3D area)
+                continue;
+            if (!area.IsInGroup("sms_water") && !area.HasMeta("sms_water"))
+                continue;
+            float surface = SmsWaterSurfaceOf(area);
+            if (surface < feetY)
+                continue;
+            if (!_smsInWater || surface > _smsWaterSurfaceY)
+            {
+                _smsInWater = true;
+                _smsWaterSurfaceY = surface;
+            }
+        }
+        if (!_smsInWater)
+            return;
+        Vector3 from = new Vector3(GlobalPosition.X, feetY + 0.05f, GlobalPosition.Z);
+        var rq = PhysicsRayQueryParameters3D.Create(from, from + Vector3.Down * 30f, CollisionMask);
+        rq.CollideWithAreas = false;
+        rq.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+        var r = space.IntersectRay(rq);
+        _smsWaterFloorY = r.Count > 0 ? ((Vector3)r["position"]).Y : float.NegativeInfinity;
+    }
+
+    private static float SmsWaterSurfaceOf(Area3D area)
+    {
+        if (area.HasMeta("sms_water_surface_y"))
+            return (float)area.GetMeta("sms_water_surface_y").AsDouble();
+        foreach (Node child in area.GetChildren())
+        {
+            if (child is CollisionShape3D cs && cs.Shape is BoxShape3D box)
+                return (cs.GlobalTransform * new Vector3(0f, box.Size.Y * 0.5f, 0f)).Y;
+        }
+        return area.GlobalPosition.Y;
+    }
+
+    /// <summary>playerControl(): deeper than SwimDepth under the feet is swimming, from (almost) any status; shallower is
+    /// wading, which only brakes the run (SmsGroundTick).</summary>
+    private void SmsWaterEntryCheck()
+    {
+        if (!_smsInWater || stateOfMario == MarioState.swimming)
+            return;
+        float depthUnits = SmsUnits.MetresToUnits(_smsWaterSurfaceY - SmsFeetY());
+        if (depthUnits <= SmsParams.Swim.SwimDepth)
+            return;
+        switch (stateOfMario)
+        {
+            case MarioState.dead:
+            case MarioState.talking:
+            case MarioState.shineGet:
+            case MarioState.ledgeHang:
+            case MarioState.ledgeClimb:
+            case MarioState.ledgeHopUp:
+            case MarioState.ledgeDescend:
+                return; // the game excludes its swimming, fence and demo statuses; these are ours of that kind
+        }
+        SmsEnterSwimming(depthUnits);
+    }
+
+    private void SmsEnterSwimming(float depthUnits)
+    {
+        // mForwardVel *= StartVMult, mVel.y *= StartVYMult, SWIM_START (the FLUDD and the in-water-damage variants aside)
+        Vector3 velXZ = new Vector3(velocity.X, 0f, velocity.Z);
+        Vector3 face = velXZ.Length() > 0.5f ? velXZ.Normalized() : SmsFacingOrVelocityDir();
+        if (face.LengthSquared() < 1e-6f)
+            face = Vector3.Forward;
+        _smsSwimFwd = SmsUnits.MpsToSpeed(velXZ.Length()) * SmsParams.Swim.StartVMult;
+        _smsSwimVy = SmsUnits.MpsToSpeed(velocity.Y) * SmsParams.Swim.StartVYMult;
+        if (heldBody != null)
+            Anim_DetachPickup();
+        ledgePinned = false;
+        _smsHangMovingAnim = false;
+        _smsLongFallAnim = false;
+        _smsFallCancel = false;
+        _smsHangDropFall = false;
+        isJumping = false;
+        jumpBuffer = 0;
+        _smsDownAnim = "";
+        StopWaistIKHard();
+        SleepStatus(false);
+        SmsLatchFace(face, 1);
+        lastFacingDirection = face;
+        armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
+        stateOfMario = MarioState.swimming;
+        _smsSwimSinkTicks = 0;
+        _smsSwimSinkArmed = false;
+        _smsSwimDbgDeepest = 0f;
+        SmsSwimSet(SmsSwim.Start);
+        SmsSwimApplyVelocity();
+        if (SmsDebugPrint)
+            GD.Print($"[SMS swim] in: surface y {_smsWaterSurfaceY:F2}, {depthUnits:F0} units of water under the feet, floor {(float.IsNegativeInfinity(_smsWaterFloorY) ? "none" : $"{_smsWaterSurfaceY - _smsWaterFloorY:F2} m down")}, fwd {_smsSwimFwd:F1} vy {_smsSwimVy:F1}");
+    }
+
+    private void SmsSwimSet(SmsSwim s)
+    {
+        _smsSwim = s;
+        switch (s)
+        {
+            case SmsSwim.Start: SmsSwimPlay("ma_swim_start", 1f); break;            // ANIM_PADDLE_SWIM_START
+            case SmsSwim.Wait: SmsSwimPlay("ma_swim_wait", 1f); break;              // ANIM_PADDLE_SWIM_WAIT (loop)
+            case SmsSwim.WaitToPaddle: SmsSwimPlay("ma_wait_to_paddle", 1f); break; // ANIM_WAIT_TO_PADDLE
+            case SmsSwim.PaddleStart: SmsSwimPlay("ma_paddle_start", 1f); break;    // ANIM_PADDLE_START
+            case SmsSwim.Paddle: SmsSwimPlay("ma_swim", 0.5f); break;               // ANIM_PADDLE_SWIM at 0.5 (loop)
+            case SmsSwim.PaddleEnd: SmsSwimPlay("ma_paddle_end", 1f); break;        // ANIM_PADDLE_END
+            case SmsSwim.PaddleEndToWait: SmsSwimPlay("ma_paddle_to_wait", 1f); break; // ANIM_PADDLE_TO_WAIT
+            case SmsSwim.Up: SmsSwimPlay("ma_float", 1f); break;                    // ANIM_FLOAT
+            case SmsSwim.Dive:                                                      // ANIM_SWIM_DIVE
+                _smsSwimSinkArmed = false;
+                _smsSwimSinkTicks = 0;
+                SmsSwimPlay("ma_swim_dive", 1f);
+                break;
+        }
+        if (SmsDebugPrint)
+            GD.Print($"[SMS swim] {s}: fwd {_smsSwimFwd:F1} ({SmsUnits.SpeedToMps(_smsSwimFwd):F1} m/s), feet {SmsUnits.MetresToUnits(_smsWaterSurfaceY - SmsFeetY()):F0} units under the surface");
+    }
+
+    private void SmsSwimPlay(string anim, float rate)
+    {
+        _smsSwimAnim = anim;
+        if (animTree != null)
+            animTree.Active = false; // driven directly (no swim clip is a tree state); SetMarioState at the exit brings the tree back
+        animPlayer.SpeedScale = rate;
+        if (animPlayer.HasAnimation(anim))
+            animPlayer.Play(anim);
+    }
+
+    private void SmsSwimApplyVelocity()
+    {
+        Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
+        float mps = SmsUnits.SpeedToMps(_smsSwimFwd);
+        velocity.X = face.X * mps;
+        velocity.Z = face.Z * mps;
+        velocity.Y = SmsUnits.SpeedToMps(_smsSwimVy);
+        lastFacingDirection = face;
+        armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
+    }
+
+    private void SmsExitSwimming(MarioState to, string why)
+    {
+        Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
+        float mps = SmsUnits.SpeedToMps(_smsSwimFwd);
+        velocity.X = face.X * mps;
+        velocity.Z = face.Z * mps;
+        velocity.Y = to == MarioState.idle ? 0f : SmsUnits.SpeedToMps(_smsSwimVy);
+        _smsSwimAnim = "";
+        animPlayer.SpeedScale = 1f;
+        stateOfMario = to;
+        SetMarioState(to); // the tree comes back on
+        if (SmsDebugPrint)
+            GD.Print($"[SMS swim] out ({why}) -> {to}, deepest {_smsSwimDbgDeepest:F2} m under the surface");
+    }
+
+    /// <summary>checkSwimJump(): a normal JUMP out of the water (inOutWaterEffect, changePlayerStatus(JUMP)).</summary>
+    private void SmsSwimJumpOut()
+    {
+        Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
+        float mps = SmsUnits.SpeedToMps(_smsSwimFwd);
+        velocity.X = face.X * mps;
+        velocity.Z = face.Z * mps;
+        velocity.Y = 0f;
+        lastFacingDirection = face;
+        _smsSwimAnim = "";
+        animPlayer.SpeedScale = 1f;
+        isJumping = true;
+        stateOfMario = MarioState.singleJump;
+        SmsLaunch(SmsAir.Launch.Jump);
+        SetMarioState(MarioState.singleJump);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS swim] A near the surface: jump out, deepest {_smsSwimDbgDeepest:F2} m");
+    }
+
+    /// <summary>swimMain() for one physics frame: the jump check, the float limit, the status handler with doSwimming().</summary>
+    private void SmsTickSwim(double delta, Vector3 inputDirWorld)
+    {
+        _smsTrueVyValid = false;
+        if (!_smsInWater)
+        {
+            // past the edge of the water volume: nothing holds him up
+            SmsExitSwimming(IsOnFloor() ? MarioState.idle : MarioState.ledgeFall, "left the water");
+            return;
+        }
+        int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
+        float surface = _smsWaterSurfaceY;
+        float feetY = SmsFeetY();
+        bool stick = inputDirWorld.LengthSquared() > 1e-6f && _smsIntendedMag > 0f;
+        Vector3 stickDir = stick ? new Vector3(inputDirWorld.X, 0f, inputDirWorld.Z).Normalized() : Vector3.Zero;
+        bool aPressed = Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space");
+        bool bPressed = Input.IsActionJustPressed("button_b");
+        _smsSwimDbgDeepest = MathF.Max(_smsSwimDbgDeepest, surface - feetY);
+
+        // checkSwimJump()
+        if (aPressed)
+        {
+            if (SmsUnits.MetresToUnits(surface - feetY) < SmsParams.Swim.CanJumpDepth)
+            {
+                bool doJump = !stick || IsOnWall();
+                if (!doJump && Mathf.Abs(SmsMath.DirFromYaw(_smsFaceYaw).SignedAngleTo(stickDir, Vector3.Up)) > Mathf.DegToRad(120f))
+                    doJump = true; // the stick more than 0x5555 from the model's face
+                if (doJump)
+                {
+                    SmsSwimJumpOut();
+                    return;
+                }
+            }
+            SmsSwimSet(stick ? SmsSwim.PaddleStart : SmsSwim.Up);
+        }
+
+        // the float limit: the feet never rise above surface - FloatHeight
+        float limit = surface - SmsUnits.UnitsToMetres(SmsParams.Swim.FloatHeight);
+        if (feetY > limit)
+        {
+            GlobalPosition += Vector3.Down * (feetY - limit);
+            feetY = limit;
+        }
+
+        // jumpProcess() 2 from the last move: a wall zeroes the speed (no FLUDD here)
+        if (IsOnWall())
+        {
+            Vector3 wn = GetWallNormal();
+            if (new Vector3(velocity.X, 0f, velocity.Z).Dot(wn) < 0f)
+            {
+                _smsSwimFwd = 0f;
+                _smsSwimVy = 0f;
+            }
+        }
+
+        bool waitBuoyancy = _smsSwim == SmsSwim.Wait || _smsSwim == SmsSwim.Start;
+        bool clipDone = !animPlayer.IsPlaying() || animPlayer.CurrentAnimation != _smsSwimAnim;
+        double clipPos = animPlayer.CurrentAnimation == _smsSwimAnim ? animPlayer.CurrentAnimationPosition : 0.0;
+        float depthRatio = Mathf.Clamp(SmsUnits.MetresToUnits(surface - feetY) / SmsParams.Swim.FloatHeight, 0f, 1f);
+        float intendedYaw = stick ? SmsMath.YawFromDir(stickDir) : _smsFaceYaw;
+        for (int i = 0; i < n; i++)
+        {
+            // the handler's own additions
+            switch (_smsSwim)
+            {
+                case SmsSwim.PaddleStart:
+                    _smsSwimFwd += SmsParams.Swim.PaddleSpeedUp;
+                    _smsSwimVy += SmsParams.Swim.PaddleJumpUp;
+                    break;
+                case SmsSwim.Up:
+                    _smsSwimVy += SmsParams.Swim.FloatUp;
+                    break;
+                case SmsSwim.Dive:
+                    if (!_smsSwimSinkArmed && clipPos >= SmsParams.Swim.DiveSinkStartFrame / 30.0)
+                    {
+                        _smsSwimSinkArmed = true;
+                        _smsSwimSinkTicks = SmsParams.Swim.WaitSinkTime;
+                    }
+                    if (_smsSwimSinkTicks > 0)
+                    {
+                        _smsSwimSinkTicks--;
+                        _smsSwimVy -= SmsParams.Swim.WaitSinkSpeed;
+                    }
+                    break;
+            }
+            // doSwimming()
+            _smsSwimFwd += _smsIntendedMag * SmsParams.Swim.MoveSp * 0.03125f;
+            _smsSwimFwd *= SmsParams.Swim.MoveBrake;
+            if (stick)
+                _smsFaceYaw = SmsMath.ConvergeAngle(_smsFaceYaw, intendedYaw, SmsParams.Swim.RotSp * SmsUnits.BamToRad);
+            _smsSwimVy -= SmsParams.Swim.Gravity;
+            _smsSwimVy += depthRatio * (waitBuoyancy ? SmsParams.Swim.WaitBuoyancy : SmsParams.Swim.MoveBuoyancy);
+            _smsSwimVy *= SmsParams.Swim.UpDownBrake;
+        }
+
+        // doSwimming(): B dives; water shallower than EndDepth under him: he stands up (WAIT)
+        if (bPressed)
+        {
+            SmsSwimSet(SmsSwim.Dive);
+        }
+        else if (!float.IsNegativeInfinity(_smsWaterFloorY) && _smsWaterFloorY + SmsUnits.UnitsToMetres(SmsParams.Swim.EndDepth) > surface)
+        {
+            SmsExitSwimming(MarioState.idle, "shallow");
+            return;
+        }
+        else
+        {
+            switch (_smsSwim)
+            {
+                case SmsSwim.Start: if (clipDone) SmsSwimSet(SmsSwim.Wait); break;
+                case SmsSwim.Wait: if (stick) SmsSwimSet(SmsSwim.WaitToPaddle); break;
+                case SmsSwim.WaitToPaddle: if (clipDone) SmsSwimSet(SmsSwim.PaddleStart); break;
+                case SmsSwim.PaddleStart: if (clipDone) SmsSwimSet(SmsSwim.Paddle); break;
+                case SmsSwim.Paddle: if (!stick) SmsSwimSet(SmsSwim.PaddleEnd); break;
+                case SmsSwim.PaddleEnd: if (clipDone) SmsSwimSet(SmsSwim.PaddleEndToWait); break;
+                case SmsSwim.PaddleEndToWait: if (clipDone) SmsSwimSet(SmsSwim.Wait); break;
+                case SmsSwim.Up: if (clipDone) SmsSwimSet(SmsSwim.Wait); break;
+                case SmsSwim.Dive: if (clipDone) SmsSwimSet(SmsSwim.PaddleEnd); break;
+            }
+        }
+
+        // the feet stay 35 units above the floor
+        if (!float.IsNegativeInfinity(_smsWaterFloorY))
+        {
+            float floorLimit = _smsWaterFloorY + SmsUnits.UnitsToMetres(SmsParams.Swim.BottomClearance);
+            if (feetY < floorLimit)
+            {
+                GlobalPosition += Vector3.Up * (floorLimit - feetY);
+                if (_smsSwimVy < 0f)
+                    _smsSwimVy = 0f;
+            }
+        }
+        SmsSwimApplyVelocity();
+    }
+
     /// <summary>The port's death (ma_die, R respawns); the game's loserExec.</summary>
     private void EnterDead()
     {
@@ -12305,6 +12660,12 @@ public partial class Mario : CharacterBody3D
             // slopeProcess(): slope accel by surface type (0/0 on normal ground, so slopes do not change running speed)
             // and the RunningMax clamp. The step itself is scaled by normal.y in the EndFrame block (walkProcess()).
             fwd = SmsSlope.RunSlopeTick(fwd, floorN, SmsMath.DirFromYaw(_smsFaceYaw), _smsSurface);
+            if (_smsInWater)
+            {
+                // isRunningInWater(): wading (water shallower than SwimDepth) brakes the run with depth, up to InWaterBrake a tick
+                float depthRatio = Mathf.Clamp(SmsUnits.MetresToUnits(_smsWaterSurfaceY - SmsFeetY()) / SmsParams.Swim.SwimDepth, 0f, 1f);
+                fwd *= 1f - depthRatio * (1f - SmsParams.Swim.InWaterBrake);
+            }
         }
         faceDir = SmsMath.DirFromYaw(_smsFaceYaw);
         float mps = SmsUnits.SpeedToMps(fwd);
