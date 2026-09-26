@@ -190,18 +190,100 @@ public static class SmsParams
         public const int PumpWaitTime = 5;              // upperbody.prm: the pump pose is held this long after R is released
         public const float PumpAnmSpeed = 0.015f;       // upperbody.prm: the empty-tank pumping rate (x R)
         public const float HoverHeight = 230f;          // watergun.prm: the hover's target above the press height (S3)
-        // the tanks, indexed spray, hover, rocket, turbo: capacity, water per drop, refill per pressure (0..150) a tick, lost on a hit
-        public static readonly int[] AmountMax = { 10000, 10000, 2100, 2100 };
-        public static readonly int[] DecRate = { 1, 1, 35, 1 };
-        public static readonly float[] SuckRate = { 1f, 0.5f, 0.2f, 0.1f };
-        public static readonly int[] DamageLoss = { 250, 0, 250, 250 };
-        // the trigger nozzles (hover, rocket, turbo): charge += 150 * R - Dec a tick, clamp Max -> ACTIVE for Time ticks -> DEAD until R = 0
-        public static readonly float[] TriggerDec = { 0f, 0f, 105f, 100f };
-        public static readonly float[] TriggerMax = { 0f, 1f, 8000f, 4500f };
-        public static readonly int[] TriggerTime = { 0, 360, 5, 32767 };
-        public static readonly float[] EmitPow = { 50f, 37.5f, 50f, 40f };       // the drop's launch speed at full pressure
-        public static readonly float[] ReactionY = { 0.043f, 0f, 0.7f, 0.002f };  // mVel.y += -dir.y * pow * this per emitting tick
-        public static readonly float[] ReactionPow = { 0.005f, 0.005f, 0f, 0.002f };
+        public const float PressureMax = 150f;          // mCurrentPressure = R x 150
+
+        /// <summary>TNozzleBase::TEmitParams of one nozzle: the shipped prm over the PARAM_INIT defaults. Speeds are units a
+        /// tick, sizes units, times ticks. The spray is TNozzleDeform (NozzleDeform.prm), the others TNozzleTrigger.</summary>
+        public sealed class Nozzle
+        {
+            public string Name = "";
+            public int Emitters = 1;                    // nozzleBmdData: muzzle joints (the hover has two)
+            public int AmountMax = 2100;                // the tank while this nozzle is on
+            public int DecRate = 0;                     // water per drop
+            public int DamageLoss = 250;                // water per hit x the attacker's WaterEmit
+            public float SuckRate = 0.1f;               // refill = pressure (0..150) x this a tick in water
+            public float Num = 1f, NumMin = 1f;         // drops a tick at full / zero pressure (fractions carry)
+            public int Attack = 1, AttackMin = 1;
+            public float EmitPow = 40f, EmitPowMin = 40f; // launch speed at full / zero pressure
+            public float PowTremble = 1f;
+            public float DirTremble = 0.01f, DirTrembleMin = 0.01f;
+            public float Size = 40f, SizeTremble = 16f, SizeMin = 1f, SizeMinPressure = 0f, SizeMaxPressure = 1f;
+            public float ReactionPow = 0f, ReactionPowMin = 0f, ReactionY = 0f;
+            public int TriggerRate = 256;               // TNozzleBase::movement: the pressure ramp a tick (the spray's strength)
+            public float TriggerDec = 100f, TriggerMax = 4500f; // TNozzleTrigger: the charge's bleed a tick / cap
+            public int TriggerTime = 1;                 // ACTIVE ticks once charged
+            public bool ManualFire = false;             // unk384: fires on A with R clicked, never at the cap (the burst)
+            public int Type = 0;                        // the water particle type (WTP)
+            public int LAngleBase = 4096, LAngleMin = -8192, LAngleMax = 8192; // calcGunAngle (BAM)
+            public float LAngleChase = 0.1f;
+            public float RButtonMult = 10000f;          // the squat aim: stick y x this a tick
+            public float EmitPowScale = 10f;            // TNozzleDeform: the strength x this, clamped 1
+        }
+
+        /// <summary>nozzledeform.prm -- the spray. No recoil, a jet of 40 x strength, 0.8 drops a tick, size 50.</summary>
+        public static readonly Nozzle Spray = new()
+        {
+            Name = "spray", Emitters = 1, AmountMax = 10000, DecRate = 1, DamageLoss = 250, SuckRate = 0.6f,
+            Num = 0.8f, NumMin = 1f, Attack = 1, AttackMin = 1, EmitPow = 40f, EmitPowMin = 0f, PowTremble = 0f,
+            DirTremble = 0.02f, DirTrembleMin = 0.8f, Size = 50f, SizeTremble = 0.03f, SizeMin = 1f, SizeMinPressure = 0f, SizeMaxPressure = 0.8f,
+            ReactionPow = 0f, ReactionPowMin = 0f, ReactionY = 0f, TriggerRate = 50, TriggerDec = 100f, TriggerMax = 4500f, TriggerTime = 1,
+            Type = 0, LAngleBase = 0, LAngleMin = -13000, LAngleMax = 8000, LAngleChase = 0.018f, RButtonMult = 10000f, EmitPowScale = 10f,
+        };
+        /// <summary>nozzledeformbomb.prm -- the spray's burst: A with R clicked -> 127 drops in one tick, 2 water each.</summary>
+        public static readonly Nozzle Bomb = new()
+        {
+            Name = "burst", Emitters = 1, AmountMax = 10000, DecRate = 2, DamageLoss = 250, SuckRate = 0.1f,
+            Num = 127f, NumMin = 127f, Attack = 1, AttackMin = 100, EmitPow = 35f, EmitPowMin = 35f, PowTremble = 0f,
+            DirTremble = 0.6f, DirTrembleMin = 0.8f, Size = 80f, SizeTremble = 30f, SizeMin = 1f, SizeMinPressure = 0f, SizeMaxPressure = 1f,
+            ReactionPow = 0f, ReactionPowMin = 0f, ReactionY = 0.03f, TriggerRate = 300, TriggerDec = 100f, TriggerMax = 100f, TriggerTime = 1,
+            ManualFire = true, Type = 2, LAngleBase = 14738, LAngleMin = -8192, LAngleMax = 8192, LAngleChase = 0.1f,
+        };
+        /// <summary>nozzletrghover.prm -- fires the instant R is pressed, 360 ticks (3 s), two muzzles, no recoil lift (Mario's spring is the hover).</summary>
+        public static readonly Nozzle Hover = new()
+        {
+            Name = "hover", Emitters = 2, AmountMax = 10000, DecRate = 1, DamageLoss = 0, SuckRate = 0.5f,
+            Num = 1f, NumMin = 1f, Attack = 1, AttackMin = 1, EmitPow = 37.5f, EmitPowMin = 40f, PowTremble = 0f,
+            DirTremble = 0f, DirTrembleMin = 0.01f, Size = 40f, SizeTremble = 10f, SizeMin = 40f, SizeMinPressure = 0f, SizeMaxPressure = 1f,
+            ReactionPow = 0.005f, ReactionPowMin = 0f, ReactionY = 0f, TriggerRate = 0, TriggerDec = 0f, TriggerMax = 1f, TriggerTime = 360,
+            Type = 15, LAngleBase = 0, LAngleMin = -8192, LAngleMax = 8192, LAngleChase = 0.5f,
+        };
+        /// <summary>nozzletrgrocket.prm -- 1.48 s of charge at full R (+150 - 105 a tick to 8000), then 5 ticks of 35-water drops and vy += 35 each (S4).</summary>
+        public static readonly Nozzle Rocket = new()
+        {
+            Name = "rocket", Emitters = 1, AmountMax = 2100, DecRate = 35, DamageLoss = 250, SuckRate = 0.2f,
+            Num = 1f, NumMin = 0f, Attack = 100, AttackMin = 0, EmitPow = 50f, EmitPowMin = 0f, PowTremble = 0f,
+            DirTremble = 0f, DirTrembleMin = 0f, Size = 30f, SizeTremble = 20f, SizeMin = 0f, SizeMinPressure = 0f, SizeMaxPressure = 1f,
+            ReactionPow = 0f, ReactionPowMin = 0f, ReactionY = 0.7f, TriggerRate = 0, TriggerDec = 105f, TriggerMax = 8000f, TriggerTime = 5,
+            Type = 0, LAngleBase = 4096, LAngleMin = -8192, LAngleMax = 8192, LAngleChase = 0.1f,
+        };
+        /// <summary>nozzletrgturbo.prm -- 0.75 s of charge (+150 - 100 a tick to 4500), then active while held; the dash is Mario's (S5).</summary>
+        public static readonly Nozzle Turbo = new()
+        {
+            Name = "turbo", Emitters = 1, AmountMax = 2100, DecRate = 1, DamageLoss = 250, SuckRate = 0.1f,
+            Num = 1f, NumMin = 1f, Attack = 1, AttackMin = 1, EmitPow = 40f, EmitPowMin = 40f, PowTremble = 1f,
+            DirTremble = 0.01f, DirTrembleMin = 0.01f, Size = 40f, SizeTremble = 16f, SizeMin = 40f, SizeMinPressure = 0f, SizeMaxPressure = 1f,
+            ReactionPow = 0.002f, ReactionPowMin = 0f, ReactionY = 0.002f, TriggerRate = 256, TriggerDec = 100f, TriggerMax = 4500f, TriggerTime = 32767,
+            Type = 0, LAngleBase = 4096, LAngleMin = -8192, LAngleMax = 8192, LAngleChase = 0.1f,
+        };
+
+        /// <summary>By the port's nozzle index: spray, hover, rocket, turbo.</summary>
+        public static Nozzle ForNozzle(int i) => i switch { 0 => Spray, 1 => Hover, 2 => Rocket, _ => Turbo };
+
+        /// <summary>TWaterParticleType (WTPxx.prm): how a drop flies once it leaves the nozzle. Gravity units a tick^2, Alive ticks;
+        /// Magnify / Extension are the game's draw scaling (the port's stand-in drop uses them the same way).</summary>
+        public sealed class WaterType
+        {
+            public float Gravity = -0.4f, Alive = 255f, Magnify = 0.3f, Extension = 0.5f, CleanSize = 12f;
+        }
+        public static readonly System.Collections.Generic.Dictionary<int, WaterType> Water = new()
+        {
+            [0] = new() { Gravity = -0.4f, Alive = 255f, Magnify = 0.4f, Extension = 0.7f, CleanSize = 18f },   // WTP00_Normal: the spray
+            [2] = new() { Gravity = -0.2f, Alive = 255f, Magnify = 0.3f, Extension = 0.8f, CleanSize = 24f },   // WTP02_Bomb: the burst
+            [3] = new() { Gravity = -10f, Alive = 255f, Magnify = 0.3f, Extension = 0.6f, CleanSize = 25f },    // WTP03_TrgRocket
+            [13] = new() { Gravity = 0f, Alive = 3f, Magnify = 0.3f, Extension = 1f, CleanSize = 10f },         // WTP13_Turbo
+            [15] = new() { Gravity = -1f, Alive = 255f, Magnify = 0.3f, Extension = 0.5f, CleanSize = 20f },    // WTP15_Hover
+        };
+        public static WaterType WaterOf(int type) => Water.TryGetValue(type, out var w) ? w : Water[0];
     }
 
     public static class Swim // /mario/swim.prm (shipped) + run.prm's SwimDepth / InWaterBrake + doSwimming's constants

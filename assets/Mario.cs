@@ -216,6 +216,26 @@ public partial class Mario : CharacterBody3D
     private float _fluddTickAccum = 0f;
     private string _fluddUpperAnim = "";
     private bool SmsFluddUpperBlend => _fluddReady && _fluddUpper != SmsUpper.Idle && heldBody == null;
+    // S2: the tank and the spray (see SmsFluddGunExecTick)
+    private SmsWaterDrops _fluddDrops;                             // TModelWaterManager
+    private readonly Skeleton3D[] _fluddNozzleSkel = new Skeleton3D[4];
+    private readonly int[][] _fluddMuzzleBone = new int[4][];     // null_G_muzzle (and the hover's null_G_muzzle2)
+    private int _fluddWater = SmsParams.Fludd.Spray.AmountMax;    // mCurrentWater
+    private int _fluddPressure = 0;                               // mCurrentPressure: R x 150
+    private int _fluddSprayRamp = 0;                              // TNozzleBase unk372: the u16 ramp under the pressure
+    private float _fluddSprayStrength = 0f;                       // unk378 after TNozzleDeform's x EmitPowScale, 0..1
+    private float _fluddEmitAccum = 0f;                           // unk37C: the fractional drop count
+    private float _fluddGunAngle = 0f;                            // unk36E (BAM): the aim; chases 0 until the squat aim (S2b)
+    private int _fluddTrigState = 0, _fluddTrigLeft = 0;          // TNozzleTrigger unk385 (0 INACTIVE 1 ACTIVE 2 DEAD) / unk386
+    private float _fluddTrigFill = 0f, _fluddTrigAccum = 0f;      // unk388 / unk37C of the current trigger nozzle
+    private int _fluddBombState = 0, _fluddBombLeft = 0;          // the spray nozzle's embedded burst (mBomb)
+    private float _fluddBombFill = 0f, _fluddBombAccum = 0f;
+    private bool _fluddAFrame = false;                            // mFrameInput & A, consumed by one tick
+    private bool _fluddEmitting = false;                          // the current nozzle's isEmitting()
+    private int _fluddEmittedTick = 0;                            // mIsEmitWater: drops spawned this tick
+    private int _fluddDbgWater = -1;
+    private float _fluddDbgStrength = -1f;
+    private MeshInstance3D _fluddWaterLevel;                      // the water in the tank
     // waiting(): mHealth <= 3 -> ANIM_DAMAGE_WAIT_START once, then ANIM_DAMAGE_WAIT (library-only clips, driven directly)
     private int _smsDamageWaitPhase = 0;      // 0 off, 1 ma_damage_wait_start playing, 2 ma_damage_wait looping
     private double _smsDamageWaitPos = 0.0;   // clip position to resume from when idle is re-entered mid-pant
@@ -10976,13 +10996,15 @@ public partial class Mario : CharacterBody3D
         public readonly int DownType;
         public readonly float MinSpeed;
         public readonly int InvincibleTicks;
+        public readonly int WaterEmit;   // mWaterEmit: FLUDD spills DamageLoss water this many times (0 for every plaza enemy; hinokuri 2)
 
-        public SmsDamageProfile(int damage, int downType, float minSpeed, int invincibleTicks)
+        public SmsDamageProfile(int damage, int downType, float minSpeed, int invincibleTicks, int waterEmit = 0)
         {
             Damage = damage;
             DownType = downType;
             MinSpeed = minSpeed;
             InvincibleTicks = invincibleTicks;
+            WaterEmit = waterEmit;
         }
 
         public static readonly SmsDamageProfile EnemyCommon = new SmsDamageProfile(1, 1, 30f, 0);   // dmgenemycommon.prm: the default (TakeDamage(pos))
@@ -11061,6 +11083,7 @@ public partial class Mario : CharacterBody3D
             what = $"{(_smsDownFore ? "FORE" : "BACK")}_DOWN type {_smsDownType} {(airborne ? "in the air (+-16 along the face until he lands)" : $"on the ground, {_smsDownAnim} at fwd {fwd:F1} ({SmsUnits.SpeedToMps(MathF.Abs(fwd)):F1} m/s)")}";
         }
         _smsInvincibleTicks = p.InvincibleTicks;
+        SmsFluddDamage(p.WaterEmit); // the tank spills (mWaterEmit x DamageLoss)
 
         // decHP()
         bool wasFullHealth = _health == StartingHealth;
@@ -11786,6 +11809,7 @@ public partial class Mario : CharacterBody3D
             SpawnBonkStars(-attackDir);
         }
         _smsInvincibleTicks = p.InvincibleTicks;
+        SmsFluddDamage(p.WaterEmit); // the tank spills (mWaterEmit x DamageLoss)
         _smsSwimFwd = 0f; // jumpingDemoCommon(.., 0.0f) from the next tick on
         if (p.DownType != 3)
             SmsSwimSet(SmsSwim.PDamage);
@@ -11903,7 +11927,9 @@ public partial class Mario : CharacterBody3D
             _fluddNozzleAnim[i] = SmsFindChild<AnimationPlayer>(node);
             node.Visible = i == (int)_fluddNozzle;
             SmsFluddNozzleMaterial(node); // the rip kept the nozzles' H_watergun_main_dummy placeholder: give them the FLUDD atlas
+            _fluddNozzleSkel[i] = SmsFindChild<Skeleton3D>(node); // the muzzle joints (null_G_muzzle) live here
         }
+        SmsFluddSetupWater(); // S2: the drops, the water level in the tank, the muzzles
         // the pump clips ping-pong (addUpper: ATTR_PING_PONG_LOOP; the tank's are slaved to Mario's)
         if (animPlayer.HasAnimation("ma_pump"))
             animPlayer.GetAnimation("ma_pump").LoopMode = Animation.LoopModeEnum.Pingpong;
@@ -11921,7 +11947,8 @@ public partial class Mario : CharacterBody3D
         {
             string tankClips = _fluddTankAnim == null ? "none" : string.Join(", ", _fluddTankAnim.GetAnimationList());
             string hoverClips = _fluddNozzleAnim[1] == null ? "none" : string.Join(", ", _fluddNozzleAnim[1].GetAnimationList());
-            GD.Print($"[SMS fludd] pack on jnt_chest: tank bones {_fluddTankSkel?.GetBoneCount() ?? 0}, nozzle_center {(_fluddNozzleParent is BoneAttachment3D ? "yes" : "NO")}, tank clips [{tankClips}], hover clips [{hoverClips}]; spray on, hover second, housed");
+            string muzzles = string.Join(", ", new[] { 0, 1, 2, 3 }.Select(i => $"{SmsNozzleFolder[i]}: {(_fluddMuzzleBone[i] == null ? "no skeleton" : string.Join("/", _fluddMuzzleBone[i]))}"));
+            GD.Print($"[SMS fludd] pack on jnt_chest: tank bones {_fluddTankSkel?.GetBoneCount() ?? 0}, nozzle_center {(_fluddNozzleParent is BoneAttachment3D ? "yes" : "NO")}, tank clips [{tankClips}], hover clips [{hoverClips}]; spray on, hover second, housed; water {_fluddWater}; muzzle bones [{muzzles}]; R click action {(InputMap.HasAction("button_rclick") ? "yes" : "NO (the A+R burst is off)")}");
         }
     }
 
@@ -11947,11 +11974,33 @@ public partial class Mario : CharacterBody3D
                 if (SmsDebugPrint) GD.Print("[SMS fludd] X: -> Spray (10 ticks)");
             }
         }
+        _fluddAFrame = Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space");
+        if (_fluddDrops != null)
+            _fluddDrops.MarioPos = GlobalPosition;
         for (int i = 0; i < n; i++)
         {
             SmsFluddUpperTick();
             SmsFluddSwitchTick();
             SmsFluddStowTick();
+            SmsFluddGunExecTick(); // gunExec(): the pressure, the nozzle, the refill, the emit
+            _fluddDrops?.Tick();   // TModelWaterManager::move()
+        }
+        SmsFluddPoseWater();
+        if (SmsDebugPrint)
+        {
+            int max = SmsFluddCurrent.AmountMax;
+            if (_fluddDbgWater < 0 || Math.Abs(_fluddWater - _fluddDbgWater) >= max / 20 || (_fluddWater == 0) != (_fluddDbgWater == 0) || (_fluddWater == max) != (_fluddDbgWater == max))
+            {
+                _fluddDbgWater = _fluddWater;
+                GD.Print($"[SMS fludd] water {_fluddWater}/{max} ({_fluddNozzle}){(_smsInWater ? " in water" : "")}, drops {_fluddDrops?.Count ?? 0}");
+            }
+            float sBucket = MathF.Round(_fluddSprayStrength * 4f) / 4f;
+            if (_fluddNozzle == SmsNozzle.Spray && sBucket != _fluddDbgStrength)
+            {
+                _fluddDbgStrength = sBucket;
+                if (SmsFluddMuzzle(0, out _, out Vector3 d))
+                    GD.Print($"[SMS fludd] spray strength {_fluddSprayStrength:F2} (R {_fluddR:F2}, ramp {_fluddSprayRamp}), stream {Mathf.RadToDeg(MathF.Asin(Mathf.Clamp(d.Y, -1f, 1f))):F0} deg from level, housed {_fluddStow:F2}");
+            }
         }
         if (_fluddUpper != _fluddDbgUpper)
         {
@@ -12133,7 +12182,14 @@ public partial class Mario : CharacterBody3D
     /// <summary>changeNozzle(): the model swaps; the water keeps its fraction (S2); the nozzle's own state restarts.</summary>
     private void SmsFluddChangeNozzle(SmsNozzle to)
     {
+        // changeNozzle(): usedWater = water / this tank's max -> the new tank at the same fraction; the nozzle's init()
+        float used = (float)_fluddWater / SmsParams.Fludd.ForNozzle((int)_fluddNozzle).AmountMax;
         _fluddNozzle = to;
+        _fluddWater = (int)(used * SmsFluddCurrent.AmountMax);
+        _fluddTrigState = 0; _fluddTrigLeft = 0; _fluddTrigFill = 0f; _fluddTrigAccum = 0f;
+        _fluddBombState = 0; _fluddBombLeft = 0; _fluddBombFill = 0f; _fluddBombAccum = 0f;
+        _fluddSprayRamp = 0; _fluddSprayStrength = 0f; _fluddEmitAccum = 0f; _fluddGunAngle = 0f;
+        _fluddEmitting = false;
         for (int i = 0; i < 4; i++)
             if (_fluddNozzleNode[i] != null)
                 _fluddNozzleNode[i].Visible = i == (int)to;
@@ -12166,7 +12222,7 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>S1's stand-in for "the nozzle sprays": pumping with R down and the pack deployed (the water and the trigger
     /// states come with S2 / S3).</summary>
-    private bool SmsFluddSpraying() => _fluddUpper == SmsUpper.Pumping && _fluddR > 0f && _fluddStow <= 0f;
+    private bool SmsFluddSpraying() => _fluddEmitting; // isEmitting(): the spray nozzle's strength > 0 with water; a trigger nozzle ACTIVE
 
     private static void SmsAnimScrub(AnimationPlayer ap, string name, float t)
     {
@@ -12304,6 +12360,342 @@ public partial class Mario : CharacterBody3D
             an.Animation = want;
             _fluddUpperAnim = want;
         }
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // FLUDD S2: the tank and the spray (TWaterGun::gunExec / suck / emit / damage, TNozzleDeform, TNozzleTrigger,
+    // TModelWaterManager -> SmsWaterDrops). One SMS tick = one call of SmsFluddGunExecTick.
+    // ---------------------------------------------------------------------------------------------------------------
+
+    private SmsParams.Fludd.Nozzle SmsFluddCurrent => SmsParams.Fludd.ForNozzle((int)_fluddNozzle);
+
+    /// <summary>The drops, the water level in the tank, the muzzle joints.</summary>
+    private void SmsFluddSetupWater()
+    {
+        _fluddDrops = new SmsWaterDrops { Name = "SmsWaterDrops", CollisionMask = CollisionMask, Exclude = GetRid(), DebugPrint = SmsDebugPrint };
+        AddChild(_fluddDrops);
+        for (int i = 0; i < 4; i++)
+        {
+            var sk = _fluddNozzleSkel[i];
+            if (sk == null)
+                continue;
+            int a = sk.FindBone("null_G_muzzle"), b = sk.FindBone("null_G_muzzle2");
+            _fluddMuzzleBone[i] = b >= 0 ? new[] { a, b } : new[] { a };
+        }
+        if (_fluddTankSkel != null)
+        {
+            // the water in the tank: the shell (_mat_G_main_tank) is a cylinder along the tank's X (its height), x -3.0..33.3,
+            // radius 18.9 about (y -40, z 0); the game shows the level on its waterline quad with a scrolled water texture
+            // (a BTK the rip lacks), so the port fills the shell with a blue cylinder cut at the fill instead
+            _fluddWaterLevel = new MeshInstance3D
+            {
+                Name = "SmsTankWater",
+                Mesh = new CylinderMesh { TopRadius = 17.6f, BottomRadius = 17.6f, Height = 1f, RadialSegments = 24, Rings = 1 },
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
+                MaterialOverride = new StandardMaterial3D
+                {
+                    ResourceName = "sms tank water",
+                    AlbedoColor = new Color(0.12f, 0.55f, 1.0f, 0.78f),
+                    Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+                    Roughness = 0.15f,
+                    Metallic = 0f,
+                    EmissionEnabled = true,
+                    Emission = new Color(0.02f, 0.12f, 0.35f),
+                    EmissionEnergyMultiplier = 0.5f,
+                },
+            };
+            _fluddTankSkel.AddChild(_fluddWaterLevel);
+            // the rip's waterline quad (additive, its level texture unscrolled) would double the level: hidden
+            var meshes = new System.Collections.Generic.List<MeshInstance3D>();
+            SmsCollect(_fluddTank, meshes);
+            foreach (var mi in meshes)
+            {
+                if (mi.Mesh == null) continue;
+                for (int i = 0; i < mi.Mesh.GetSurfaceCount(); i++)
+                {
+                    string name = mi.GetActiveMaterial(i)?.ResourceName ?? "";
+                    if (name.Length == 0 && mi.Mesh is ArrayMesh am) name = am.SurfaceGetName(i);
+                    if (name.StartsWith("_mat_waterline"))
+                        mi.SetSurfaceOverrideMaterial(i, new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, AlbedoColor = new Color(0f, 0f, 0f, 0f), ResourceName = "_mat_waterline (hidden)" });
+                }
+            }
+            SmsFluddPoseWater();
+        }
+    }
+
+    /// <summary>The water cylinder in the shell: from the shell's bottom (x -3.0) up to the fill.</summary>
+    private void SmsFluddPoseWater()
+    {
+        if (_fluddWaterLevel == null)
+            return;
+        float frac = Mathf.Clamp((float)_fluddWater / SmsFluddCurrent.AmountMax, 0f, 1f);
+        const float bottom = -2.96f, top = 33.33f;
+        float h = MathF.Max(0.05f, (top - bottom) * frac);
+        _fluddWaterLevel.Visible = frac > 0.002f;
+        // CylinderMesh stands along Y; the shell lies along the tank's X: rotate Y onto X
+        _fluddWaterLevel.Transform = new Transform3D(
+            Basis.FromEuler(new Vector3(0f, 0f, -Mathf.Pi * 0.5f)) * Basis.FromScale(new Vector3(1f, h, 1f)),
+            new Vector3(bottom + h * 0.5f, -40f, 0f));
+    }
+
+    /// <summary>getEmitPosDirSpeed(): emitter <paramref name="e"/>'s world position and its matrix's +X (the way the water
+    /// leaves), read from the nozzle's animated skeleton (the shooting clip poses the barrel; the aim callbacks are S2b).</summary>
+    private bool SmsFluddMuzzle(int e, out Vector3 pos, out Vector3 dir)
+    {
+        pos = Vector3.Zero;
+        dir = Vector3.Zero;
+        int ni = (int)_fluddNozzle;
+        var sk = _fluddNozzleSkel[ni];
+        var bones = _fluddMuzzleBone[ni];
+        if (sk == null || bones == null || e >= bones.Length || bones[e] < 0)
+        {
+            // no muzzle joint in the rip: from the nozzle node, along Mario's face
+            var node = _fluddNozzleNode[ni];
+            if (node == null)
+                return false;
+            pos = node.GlobalPosition;
+            dir = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+            return true;
+        }
+        Transform3D g = sk.GlobalTransform;
+        Transform3D b = sk.GetBoneGlobalPose(bones[e]);
+        pos = g * b.Origin;
+        dir = (g.Basis * b.Basis.X).Normalized();
+        return dir.LengthSquared() > 0.5f;
+    }
+
+    /// <summary>The emitter's own motion rides on the drops: mV = Mario's velocity x 0.125 (units a tick).</summary>
+    private Vector3 SmsFluddInheritVel() => new Vector3(SmsUnits.MpsToSpeed(velocity.X) * 0.125f, 0f, SmsUnits.MpsToSpeed(velocity.Z) * 0.125f);
+
+    private static bool SmsRClick() => InputMap.HasAction("button_rclick") && Input.IsActionPressed("button_rclick");
+
+    /// <summary>gunExec() for one tick: the pressure, the nozzle's movement, the refill in water, the emit.</summary>
+    private void SmsFluddGunExecTick()
+    {
+        var np = SmsFluddCurrent;
+        _fluddPressure = (int)(_fluddR * 150f); // triggerPressureMovement(): mCurrentPressure
+        if (_fluddNozzle == SmsNozzle.Spray)
+            SmsFluddSprayMovementTick(np);
+        else
+            SmsFluddTriggerMovementTick(np, ref _fluddTrigState, ref _fluddTrigLeft, ref _fluddTrigFill);
+        _fluddAFrame = false; // a frame press counts once
+        _fluddEmittedTick = 0;
+        if (_smsInWater)
+        {
+            // suck(): +pressure x SuckRate a tick to the cap; with the tank full and pumping he sprays for free
+            int rate = (int)(_fluddPressure * np.SuckRate);
+            if (rate > 0 && _fluddWater < np.AmountMax)
+                _fluddWater = Math.Min(_fluddWater + rate, np.AmountMax);
+            if (_fluddWater == np.AmountMax && _fluddUpper == SmsUpper.Pumping)
+            {
+                SmsFluddEmitTick(np);
+                _fluddWater = np.AmountMax; // resetWaterToFull()
+            }
+        }
+        else
+            SmsFluddEmitTick(np);
+        _fluddEmitting = _fluddNozzle == SmsNozzle.Spray ? (_fluddWater > 0 && _fluddSprayStrength > 0f) : _fluddTrigState == 1;
+    }
+
+    /// <summary>TNozzleDeform::movement(): TNozzleBase's pressure ramp, x EmitPowScale clamped to 1, the aim chase, the burst's machine.</summary>
+    private void SmsFluddSprayMovementTick(SmsParams.Fludd.Nozzle np)
+    {
+        if (_fluddWater <= 0)
+            return;
+        // TNozzleBase::movement(): the strength is the ramp's distance below the pressure; the ramp climbs TriggerRate a tick
+        int var1 = (int)(256f * _fluddR * 150f);
+        if (var1 > _fluddSprayRamp)
+        {
+            _fluddSprayStrength = (var1 - _fluddSprayRamp) / 65536f;
+            _fluddSprayRamp += np.TriggerRate;
+            if (var1 < _fluddSprayRamp)
+                _fluddSprayRamp = var1;
+        }
+        else
+        {
+            _fluddSprayStrength = 0f;
+            _fluddSprayRamp = var1;
+        }
+        // calcGunAngle(): angle = -LAngleBase (0 shipped) -> the stream leaves along the barrel; the squat aim and the L camera are S2b
+        float target = Mathf.Clamp(-np.LAngleBase, np.LAngleMin, np.LAngleMax);
+        _fluddGunAngle += (target - _fluddGunAngle) * np.LAngleChase;
+        _fluddSprayStrength = MathF.Min(_fluddSprayStrength * np.EmitPowScale, 1f);
+        // mBomb.movement(): the burst's trigger machine (manual fire: A while R is clicked)
+        SmsFluddTriggerMovementTick(SmsParams.Fludd.Bomb, ref _fluddBombState, ref _fluddBombLeft, ref _fluddBombFill);
+    }
+
+    /// <summary>TNozzleTrigger::movement(): the charge (+150 x R a tick while pumping, minus the bleed, capped) fires the nozzle
+    /// for TriggerTime ticks; then it is dead until R is released. A manual-fire nozzle (the burst) fires on A with R clicked
+    /// instead of at the cap.</summary>
+    private void SmsFluddTriggerMovementTick(SmsParams.Fludd.Nozzle p, ref int state, ref int left, ref float fill)
+    {
+        if (_fluddWater <= 0)
+        {
+            state = 0; left = 0; fill = 0f;
+            return;
+        }
+        if (state == 1)
+        {
+            left--;
+            if (_fluddUpper != SmsUpper.Pumping || left <= 0)
+            {
+                state = 2; fill = 0f; left = 0;
+            }
+        }
+        if (p.ManualFire && _fluddAFrame && SmsRClick() && state == 0)
+        {
+            state = 1;
+            left = p.TriggerTime;
+            if (SmsDebugPrint) GD.Print($"[SMS fludd] {p.Name}: A with R clicked -> fires ({p.Num:F0} drops)");
+        }
+        bool canSpray = _fluddUpper == SmsUpper.Pumping && !(_smsInWater && _fluddWater < p.AmountMax);
+        if (canSpray)
+            fill += 150f * _fluddR;
+        fill -= p.TriggerDec;
+        if (fill < 0f) fill = 0f;
+        if (fill > p.TriggerMax)
+        {
+            fill = p.TriggerMax;
+            if (!p.ManualFire && state == 0)
+            {
+                state = 1;
+                left = p.TriggerTime;
+                if (SmsDebugPrint) GD.Print($"[SMS fludd] {p.Name}: charged -> ACTIVE for {p.TriggerTime} ticks");
+            }
+        }
+        if (state == 2)
+        {
+            fill = 0f;
+            if (_fluddR <= 0f)
+                state = 0;
+        }
+    }
+
+    /// <summary>TWaterGun::emit(): nothing while the pack is housed or the muzzle is under the water; each emitter fires.</summary>
+    private void SmsFluddEmitTick(SmsParams.Fludd.Nozzle np)
+    {
+        if (_fluddStow > 0f || _fluddDrops == null)
+            return;
+        for (int e = 0; e < np.Emitters; e++)
+        {
+            if (!SmsFluddMuzzle(e, out Vector3 pos, out Vector3 dir))
+                continue;
+            if (_smsInWater && pos.Y < _smsWaterSurfaceY + SmsUnits.UnitsToMetres(20f))
+                continue;
+            if (_fluddNozzle == SmsNozzle.Spray)
+                SmsFluddSprayEmit(np, pos, dir);
+            else
+                SmsFluddTriggerEmit(np, pos, dir, ref _fluddTrigState, ref _fluddTrigFill, ref _fluddTrigAccum);
+        }
+    }
+
+    /// <summary>TNozzleDeform::emit(): the drops of one tick (0.8 a tick at full strength, the fraction carried), launched at
+    /// 40 x strength with the tremble / size of the moment; then the burst's own emit.</summary>
+    private void SmsFluddSprayEmit(SmsParams.Fludd.Nozzle np, Vector3 pos, Vector3 dir)
+    {
+        if (_fluddWater <= 0)
+            return;
+        if (_fluddBombState == 0 && _fluddSprayStrength > 0f)
+        {
+            float s = _fluddSprayStrength;
+            _fluddEmitAccum += s * (np.Num - np.NumMin) + np.NumMin;
+            int count = (int)_fluddEmitAccum;
+            if (count > 0)
+            {
+                _fluddEmitAccum -= count;
+                float pow = s * (np.EmitPow - np.EmitPowMin) + np.EmitPowMin;
+                float tremble = s * (np.DirTremble - np.DirTrembleMin) + np.DirTrembleMin;
+                // the decomp reads the size lerp as (minP - s) / (maxP - s), negative for 0 < s < maxP: taken as the plain lerp
+                float sizeLerp = np.SizeMaxPressure > np.SizeMinPressure ? Mathf.Clamp((s - np.SizeMinPressure) / (np.SizeMaxPressure - np.SizeMinPressure), 0f, 1f) : 1f;
+                float size = sizeLerp * (np.Size - np.SizeMin) + np.SizeMin;
+                int emitted = _fluddDrops.Emit(count, pos, dir, tremble, pow, np.PowTremble, size, np.SizeTremble, np.Type, SmsFluddInheritVel());
+                if (emitted > 0)
+                {
+                    _fluddWater = Math.Max(0, _fluddWater - emitted * np.DecRate);
+                    _fluddEmittedTick += emitted;
+                    SmsFluddRecoil(dir, pow, s * (np.ReactionPow - np.ReactionPowMin) + np.ReactionPowMin, np.ReactionY);
+                }
+            }
+        }
+        SmsFluddTriggerEmit(SmsParams.Fludd.Bomb, pos, dir, ref _fluddBombState, ref _fluddBombFill, ref _fluddBombAccum);
+    }
+
+    /// <summary>TNozzleTrigger::emit(): while ACTIVE, drops by the charge's pressure (count, launch speed), the tank charged
+    /// DecRate each, the recoil (the hover's and the burst's are in; the rocket's ReactionY 0.7 launch is S4).</summary>
+    private void SmsFluddTriggerEmit(SmsParams.Fludd.Nozzle p, Vector3 pos, Vector3 dir, ref int state, ref float fill, ref float accum)
+    {
+        if (_fluddWater <= 0 || state != 1)
+            return;
+        float pressure = p.TriggerMax > 0f ? fill / p.TriggerMax : 1f;
+        accum += pressure * (p.Num - p.NumMin) + p.NumMin;
+        int count = (int)accum;
+        if (count == 0)
+            return;
+        accum -= count;
+        float pow = pressure * (p.EmitPow - p.EmitPowMin) + p.EmitPowMin;
+        int emitted = _fluddDrops.Emit(count, pos, dir, p.DirTremble, pow, p.PowTremble, p.Size, p.SizeTremble, p.Type, SmsFluddInheritVel());
+        if (emitted > 0)
+        {
+            _fluddWater = Math.Max(0, _fluddWater - emitted * p.DecRate);
+            _fluddEmittedTick += emitted;
+            SmsFluddRecoil(dir, pow, pressure * (p.ReactionPow - p.ReactionPowMin) + p.ReactionPowMin, p.ReactionY);
+        }
+    }
+
+    /// <summary>The emit's kick on Mario: addVelocity(reaction x (-dir . face) x pow) along the face, mVel.y += -dir.y x pow x
+    /// ReactionY (in the air; on the ground the floor eats it, as the game's ground snap does).</summary>
+    private void SmsFluddRecoil(Vector3 dir, float pow, float reaction, float reactionY)
+    {
+        if (reaction != 0f)
+        {
+            Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+            float directionScale = -(dir.X * face.X + dir.Z * face.Z);
+            float dv = reaction * directionScale * pow;
+            if (dv != 0f)
+            {
+                float mps = SmsUnits.SpeedToMps(dv);
+                velocity.X += face.X * mps;
+                velocity.Z += face.Z * mps;
+            }
+        }
+        if (reactionY != 0f && !IsOnFloor())
+        {
+            float dvy = SmsUnits.SpeedToMps(-dir.Y * pow * reactionY);
+            if (_smsTrueVyValid)
+                _smsTrueVy += dvy;
+            else
+                velocity.Y += dvy;
+        }
+    }
+
+    /// <summary>damageExec(): each of the attacker's WaterEmit spills DamageLoss water (if there is any) as a 20-drop dribble
+    /// from the muzzle (damagewateremit.prm: no launch speed, size 17, it just falls).</summary>
+    private void SmsFluddDamage(int waterEmit)
+    {
+        if (!_fluddReady || waterEmit <= 0)
+            return;
+        var np = SmsFluddCurrent;
+        for (int i = 0; i < waterEmit; i++)
+        {
+            if (_fluddWater <= 0)
+                break;
+            _fluddWater = Math.Max(0, _fluddWater - np.DamageLoss);
+            if (_fluddDrops != null && SmsFluddMuzzle(0, out Vector3 pos, out _))
+                _fluddDrops.Emit(20, pos, Vector3.Up, 0f, 0f, 0f, 17f, 0f, 0, Vector3.Zero);
+        }
+        if (SmsDebugPrint) GD.Print($"[SMS fludd] hit: -{waterEmit} x {np.DamageLoss} water -> {_fluddWater}/{np.AmountMax}");
+    }
+
+    private void SmsFluddOnRespawn()
+    {
+        if (!_fluddReady)
+            return;
+        _fluddWater = SmsFluddCurrent.AmountMax;
+        _fluddTrigState = 0; _fluddTrigLeft = 0; _fluddTrigFill = 0f; _fluddTrigAccum = 0f;
+        _fluddBombState = 0; _fluddBombLeft = 0; _fluddBombFill = 0f; _fluddBombAccum = 0f;
+        _fluddSprayRamp = 0; _fluddSprayStrength = 0f; _fluddEmitAccum = 0f;
+        _fluddDrops?.Clear();
+        SmsFluddPoseWater();
     }
 
     /// <summary>The port's death (ma_die, R respawns); the game's loserExec.</summary>
@@ -12639,6 +13031,7 @@ public partial class Mario : CharacterBody3D
 
     private void Respawn()
     {
+        SmsFluddOnRespawn(); // a full tank, the drops gone
         _health = StartingHealth;
         SmsAirReset();
         _smsSwimAnim = "";

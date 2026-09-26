@@ -1893,8 +1893,61 @@ rip's import (atlas + toon `H_toon_2_4i`; TEV C0 (194,178,206,161), C1 (157,161,
 - S1 has no water, no spray, no hover / rocket / turbo: "spraying" for the clips = pumping with R down and the pack deployed.
 Debug: `[SMS fludd] pack on chn_chest: …` (setup), `upper Pumping (R 0.73), nozzle Hover, housed 0.00`, `X: -> Hover`,
 `nozzle -> Hover`, `deployed` / `housed`.
-Next: S2 tank + spray (drops from the muzzle's +X, the water, the refill, the waterline joint, a gauge), S3 hover, S4 rocket,
-S5 turbo (surf).
+
+**S2 — the tank and the spray** (`gunExec` / `TWaterGun::suck` / `emit` / `damage`, `TNozzleDeform`, `TNozzleTrigger`,
+`TModelWaterManager`; files `assets/Sms/SmsWaterDrops.cs` (new), `Mario.cs`, `SmsPhysics.cs`). A correction first: the spray
+nozzle is `TNozzleDeform("normal_wg", "/Mario/WaterGun/NozzleDeform.prm")`, so its numbers are **nozzledeform.prm** (the S1
+table above quoted nozzlenormal.prm, which nothing loads): tank 10000, 1 water a drop, refill `0.6 × pressure` a tick, 250 a
+hit, **0.8 drops a tick** at full strength (1.0 at none), launch speed `40 × strength` (units a tick), a tight jet (dir tremble
+0.02) that opens to 0.8 as the strength dies, drop size 50 (1..50 by the pressure), and **no recoil** at all (ReactionPow and
+ReactionY are 0 — the 0.043 lift in the S1 table belongs to the unused prm). `SmsParams.Fludd` now carries every nozzle as a
+`Nozzle` record (spray, burst, hover, rocket, turbo) and the water types (`WTP00` spray: gravity −0.4 a tick², alive 255;
+`WTP02` burst −0.2; `WTP15` hover −1.0; `WTP03` −10; `WTP13` turbo 0, alive 3).
+- **Strength** (`TNozzleBase::movement`, per tick): `var1 = 256 × R × 150`; a u16 ramp chases it by `TriggerRate` 50 a tick;
+  `strength = (var1 − ramp) / 65536 × EmitPowScale 10`, clamped 1. So a full hold is a full jet for 5.3 s, fades over 1.1 s,
+  then nothing until R is let off (the ramp snaps down to `var1` the moment R drops below it) — the game's "pump R again".
+- **gunExec()** per tick: pressure `R × 150`; the nozzle's movement; **in water** `suck()` (+`pressure × SuckRate`, capped) and
+  the emit only with a full tank while PUMPING (then the tank is reset to full — free spraying); **out of water** the emit.
+  `TWaterGun::emit()`: nothing while the pack is housed (`unk1CEC > 0`) or the muzzle is under the water surface (+20 units).
+- **The emit** (`TNozzleDeform::emit`): `count += s × (Num − NumMin) + NumMin` (the fraction carries); pow `s × 40`; dir tremble
+  `s × (0.02 − 0.8) + 0.8`; size by the pressure lerp (`(s − 0) / 0.8`, clamped — the decomp's `(min − s)/(max − s)` is
+  negative for 0 < s < 0.8 and is read as the plain lerp); the tank −1 per drop spawned; the recoil lines are ported but the
+  spray's are 0. Emit position and direction = the muzzle joint `null_G_muzzle`'s animated world matrix, its +X column, read
+  from the nozzle glb's skeleton (the shooting clip points the barrel level in the nozzle's frame; the aim is 0, see S2b).
+  Mario's own velocity × 0.125 rides on the drops (`getEmitPosDirSpeed`).
+- **The burst** (`TNozzleDeform::mBomb`, nozzledeformbomb.prm, `unk384 = true`): **A pressed while R is CLICKED** (`mInput & R`
+  is the digital trigger meaning) with the burst INACTIVE → ACTIVE for 1 tick → 127 drops (2 water each, size 80 ± 30, cone
+  0.6, pow 35, type 2) → DEAD until R is released; while it is not INACTIVE the normal spray does not emit. The port needs an
+  input action **`button_rclick`** for the trigger click (none exists yet → the burst is off; the setup line says so).
+- **The trigger machine** (`TNozzleTrigger::movement` / `emit`): charge `+150 × R` a tick while pumping (not while refilling),
+  `− TriggerDec`, capped at `TriggerMax` → ACTIVE for `TriggerTime` ticks (→ DEAD when the time is up or the pump stops; DEAD →
+  INACTIVE when R reads 0); while ACTIVE `pressure = fill / max` scales the drop count (`Num`/`NumMin`), the launch speed
+  (`EmitPow`/`EmitPowMin`), the recoil. In with S2: **the hover nozzle sprays** down from both `null_G_muzzle` joints for 3 s
+  when R is held (2 water a tick, `WTP15` drops, horizontal recoil `0.005 × pow × (−dir · face)` ≈ 0 for a downward jet); the
+  lift is S3. Rocket / turbo are not selectable yet.
+- **The drops** (`SmsWaterDrops`, `TModelWaterManager::move` per tick): `vel.y += gravity`; horizontal speed capped to the drop's
+  size a tick (no tunnelling); `pos += vel`; alive 255 ticks; culled 40 m from Mario. The manager sits in the scene's perform
+  list (the `.bin` scene data is not in the decomp); it is taken to move every tick like Mario (**assumption**: if the stream
+  looks 4× too fast, the manager runs once a frame and pow / gravity are per frame). A step that meets geometry lands the
+  drop: it sits, shrinks and dries over 40 ticks (a stand-in for the game's sliding case 2 / `getPlaneVanishSpeed`). Drawn as
+  one `MultiMesh` of spheres, diameter `size × Magnify`, stretched along the flight by `(1 + Extension)` so successive drops
+  read as a stream (the game draws a silhouette volume). Not wired: hits on enemies / goop (`HIT_MESSAGE_SPRAYED_BY_WATER`;
+  a debug line names what a drop hit), splashes, sound.
+- **The tank's level**: the shell `_mat_G_main_tank` is a cylinder along the tank's X (x −3.0..33.3, r 18.9 about y −40);
+  the game shows the level on its `waterline` quad by a scrolled water texture (a BTK the rip lacks), so the port fills the
+  shell with a blue cylinder cut at the fill (`SmsTankWater`) and hides the rip's quad.
+- **damageExec()**: for each of the attacker's `mWaterEmit`: `−DamageLoss` water and a 20-drop dribble from the muzzle
+  (damagewateremit.prm: no speed, size 17). `dmgenemycommon.prm` has **mWaterEmit 0** — the Gooble spills nothing; hinokuri
+  (the fire Stu) 2. `SmsDamageProfile` gained `WaterEmit`. `changeNozzle()` keeps the fill **fraction** (10000 ↔ 10000 for
+  the hover, so no visible change until the rocket / turbo come). A respawn refills the tank.
+- **S2b, not in**: the squat aim (R clicked: `canSquat` → `SQUAT`, stick y × `RButtonMult` 10000 a tick chased 0.018, clamped
+  −13000..8000 BAM; negative bends the **nozzle** up (`NozzleCtrl`, `RotZ` on `chn_muzzle_1`, only for < 0; the head turns by
+  half), positive bends **Mario's waist** forward (`MarioWaistCtrl`, only for > 0)), the L-camera aim (`unk36E` = the camera
+  pitch), the spray meter (`unk1C88`) and a HUD gauge, the empty-tank pump rate (`PumpAnmSpeed`), sounds, rumble.
+Debug: `[SMS fludd] water 9500/10000 (Spray), drops 41` (every 5 %, and at empty / full), `spray strength 1.00 (R 0.98, ramp
+1250), stream -3 deg from level, housed 0.00` (on each quarter of strength), `hover: charged -> ACTIVE for 360 ticks`,
+`[SMS water] a drop hit Gooble (CharacterBody3D) -- spray hits are not wired to anything yet`, `hit: -N x 250 water`.
+Next: S2b the squat aim (needs `button_rclick`), S3 hover (Mario's spring), S4 rocket, S5 turbo (surf).
 
 ### Deliberate deviations from the game
 
@@ -1996,7 +2049,8 @@ ground has to carry upward velocity (launches do) or exceed 1.34 m.
 - Surface types and the floor slip: done, see Surface types. Tagging the plaza's surfaces is editor work.
 - Ledge hang: done, see Ledge hang. Not ported: the fence catch (`FENCE_CATCH`), the hang-under-roof states
   (`HANG_ROOF` / `MOVE_ROOF`).
-- FLUDD: S1 (the pack, X swap, R pump, deploy / house) done, see FLUDD. Next S2 water + spray, S3 hover, S4 rocket, S5 turbo.
+- FLUDD: S1 (the pack) and S2 (the tank, the spray, the drops, the refill, the burst machine, the hover nozzle's spray) done,
+  see FLUDD. Next S2b squat aim, S3 hover lift, S4 rocket, S5 turbo.
 - Swimming: done, see Swimming and Air. Needs the level's water Area3D (`sms_water`). Not ported: the FLUDD surf, the
   fence catch from water, the effects and sounds, the swimming camera, coins refilling air.
 - Damage: done, see Damage. Not ported: the type-3 upper-body damage run
