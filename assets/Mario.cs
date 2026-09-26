@@ -237,6 +237,7 @@ public partial class Mario : CharacterBody3D
     private const float SmsSlideKnockdownMinFwd = 16f; // slippingBasic(): a belly slide (CATCH) into a head-on wall above this -> CATCH_DOWN, else stop and get up
     [Export] public bool SmsLedgeSnap = true;   // checkGroundAtWalking: step DOWN ledges up to 100 units (1.34 m) without leaving the ground (floor_snap_length)
     [Export] public bool SmsStepUp = true;      // checkGroundAtWalking: step UP risers up to 30 units (0.40 m) without breaking stride
+    [Export] public float SmsStepSmoothRate = 35f; // visual only: how fast the rig eases up a stepped riser (1/s, ~4 frames); 0 = the mesh pops with the body
     [Export] public int SmsWallSlidePinTicks = 4;     // stayWall(): 120 Hz ticks of zero velocity when the slide begins. Game value 10 (83 ms, felt sticky); 4 (33 ms) by request, playtested; 0 = slides at once
     [Export] public bool SmsRollJumpKnockdown = false; // DEVIATION: decomp jumpingBasic() knocks the roll-jump (fwd 55 > ClashSpeed 40) down on a head-height wall; Jaysonn (2026-09-24) wants the wall slide he remembers from the game. true = the code's rule
     private bool _smsSteppedUp = false;         // this frame's grounded MoveAndSlide hit a riser he has since stepped onto
@@ -721,6 +722,16 @@ public partial class Mario : CharacterBody3D
     // jumpDownCommon() -> jumpProcess(0): no ledge bit, no doJumping, no checkBackTrig -- a passive drop until he lands.
     // Without it the port's ledgeFall (the game's FALL, ledge bit set) re-grabbed the same ledge once the cooldown ran out.
     private bool _smsHangDropFall = false;
+    // landing(): mStatusTimer counts while vy < 0; past 240 ticks (2 s) the cry (MSD_SE_MV10B_CRY_JUMP_01, no voice assets
+    // in the port) and ANIM_THROWN until he lands. ma_thrown is in the library but not in the tree: driven directly.
+    private const int SMS_LONG_FALL_TICKS = 240;
+    private int _smsFallTicks = 0;
+    private bool _smsLongFallAnim = false;
+    // Visual step smoothing: the body pops up a riser instantly (the game does too); the rig starts that far below it and
+    // eases back up, so the mesh glides where the collision popped. World metres, <= 0. See UpdateStepVisual.
+    private float _smsStepVisualY = 0f;
+    private Vector3 _skeletonBaseLocalPos;
+    private Vector3 _waistTargetBaseLocalPos;
 
     // --- TREE CLIMB ---
     private Node3D _treeNode; // root node of grabbed PalmTree (for instance validity)
@@ -1481,6 +1492,10 @@ public partial class Mario : CharacterBody3D
 
         armatureBaseLocalPos = armature.Position;
         armatureBaseLocalScale = armature.Scale;
+        if (skeleton != null)
+            _skeletonBaseLocalPos = skeleton.Position;
+        if (targetWaist != null)
+            _waistTargetBaseLocalPos = targetWaist.Position;
 
         landingDustFx = GetNodeOrNull<LandingDustFx>("LandingDustFx");
         if (landingDustFx == null)
@@ -1866,6 +1881,11 @@ public partial class Mario : CharacterBody3D
 
         if (_smsHangDropFall && stateOfMario != MarioState.ledgeFall)
             _smsHangDropFall = false; // the LAND_SAFE_DOWN drop ended (he landed, or something else took over)
+        if (stateOfMario != MarioState.ledgeFall)
+        {
+            _smsFallTicks = 0;
+            _smsLongFallAnim = false; // the state change went through SetMarioState, which re-enabled the tree
+        }
 
         if (_treeRegrabCooldown > 0)
             _treeRegrabCooldown--;
@@ -3604,6 +3624,23 @@ public partial class Mario : CharacterBody3D
 
             if (stateOfMario == MarioState.ledgeFall)
             {
+                // landing(): past 240 ticks of falling the cry and ANIM_THROWN until he lands (the port has no voice; the animation only)
+                if (_smsFallTicks > SMS_LONG_FALL_TICKS && animTree != null)
+                {
+                    if (!_smsLongFallAnim)
+                    {
+                        if (SmsDebugPrint)
+                            GD.Print("[SMS fall] 2 s of falling: ma_thrown until he lands (the game also plays the cry)");
+                        animTree.Active = false;
+                        animPlayer.SpeedScale = 1f;
+                        animPlayer.Play("ma_thrown");
+                        _smsLongFallAnim = true;
+                    }
+                    else if (!animPlayer.IsPlaying() || animPlayer.CurrentAnimation != "ma_thrown")
+                    {
+                        animPlayer.Play("ma_thrown"); // keep it going for the rest of the fall
+                    }
+                }
                 // LAND_SAFE_DOWN (the fall after letting go of a ledge) takes no inputs at all until he lands
                 if (Input.IsActionJustPressed("button_b") && !_smsHangDropFall)
                 {
@@ -4471,6 +4508,7 @@ public partial class Mario : CharacterBody3D
 
     public override void _Process(double delta)
     {
+        UpdateStepVisual((float)delta);
         UpdateRunBob((float)delta);
         UpdateHeadLock((float)delta);
         UpdateFootIK((float)delta);
@@ -6704,6 +6742,7 @@ public partial class Mario : CharacterBody3D
         ledgePinned = false;
         _ledgePlatformBody = null;
         _smsHangMovingAnim = false;
+        animPlayer.SpeedScale = 1f;
         ledgeRegrabCooldown = LEDGE_REGRAB_COOLDOWN_FRAMES;
         GlobalPosition = new Vector3(xz.X, y, xz.Z);
         velocity = Vector3.Zero;
@@ -6791,6 +6830,7 @@ public partial class Mario : CharacterBody3D
                 if (SmsDebugPrint)
                     GD.Print("[SMS ledge] stick into the wall: climb (ASCEND)");
                 _smsHangMovingAnim = false;
+                animPlayer.SpeedScale = 1f;
                 stateOfMario = MarioState.ledgeClimb;
                 SetMarioState(stateOfMario);
                 ledgeClimbT = 0f;
@@ -6886,7 +6926,26 @@ public partial class Mario : CharacterBody3D
         }
         if (!moved)
         {
-            if (_smsHangMovingAnim || animPlayer.CurrentAnimation != "ma_hang")
+            if (_smsHangTicks >= SmsParams.Hanging.RapidTime)
+            {
+                // hanging(): past RapidTime (16.7 s) the shimmy is gone and ANIM_HANG plays at AnmRapid (8x) until the 20 s drop:
+                // he is losing his grip. Driven directly, like the shimmy (the tree has ma_hang at 1x only).
+                if (!_smsHangMovingAnim || animPlayer.CurrentAnimation != "ma_hang")
+                {
+                    if (SmsDebugPrint)
+                        GD.Print($"[SMS ledge] {_smsHangTicks} ticks hanging: ma_hang at AnmRapid {SmsParams.Hanging.AnmRapid:F0}x");
+                    if (animTree != null)
+                        animTree.Active = false;
+                    animPlayer.Play("ma_hang");
+                    _smsHangMovingAnim = true;
+                }
+                else if (!animPlayer.IsPlaying())
+                {
+                    animPlayer.Play("ma_hang");
+                }
+                animPlayer.SpeedScale = SmsParams.Hanging.AnmRapid;
+            }
+            else if (_smsHangMovingAnim || animPlayer.CurrentAnimation != "ma_hang")
             {
                 animPlayer.SpeedScale = 1f;
                 _smsHangMovingAnim = false;
@@ -9582,6 +9641,40 @@ public partial class Mario : CharacterBody3D
         }
     }
 
+    /// <summary>
+    /// Visual step smoothing. The body pops up a riser instantly (checkGroundAtWalking does the same), and the rig starts
+    /// that far below it and eases back up, so the mesh glides where the collision popped. Skeleton3D and WaistTarget move
+    /// together (the waist IK aims at the target, so the pose is untouched); the offset is expressed in the Armature's local
+    /// space, which is yawed 180 deg and tilted on slopes. Nothing else writes these two positions (the run bob, the
+    /// surface tilt and LockArmatureVisualRoot write armature.Position). Snapped to zero in the pinned ledge states, whose
+    /// hand alignment uses the rig as authored. The camera already eases its height (UpdateFollow's height pan).
+    /// </summary>
+    private void UpdateStepVisual(float delta)
+    {
+        if (skeleton == null || armature == null)
+            return;
+        if (_smsStepVisualY == 0f && skeleton.Position == _skeletonBaseLocalPos)
+            return;
+        bool pinned = ledgePinned || stateOfMario == MarioState.ledgeHang || stateOfMario == MarioState.ledgeClimb
+            || stateOfMario == MarioState.ledgeHopUp || stateOfMario == MarioState.ledgeDescend;
+        if (pinned || SmsStepSmoothRate <= 0f)
+        {
+            _smsStepVisualY = 0f;
+        }
+        else
+        {
+            _smsStepVisualY *= MathF.Exp(-SmsStepSmoothRate * delta);
+            if (_smsStepVisualY > -0.001f)
+                _smsStepVisualY = 0f;
+        }
+        Vector3 local = _smsStepVisualY == 0f
+            ? Vector3.Zero
+            : armature.GlobalTransform.Basis.Inverse() * (Vector3.Up * _smsStepVisualY);
+        skeleton.Position = _skeletonBaseLocalPos + local;
+        if (targetWaist != null)
+            targetWaist.Position = _waistTargetBaseLocalPos + local;
+    }
+
     private void LockArmatureVisualRoot()
     {
         if (armature == null)
@@ -11547,6 +11640,8 @@ public partial class Mario : CharacterBody3D
         }
         GlobalPosition += advance + Vector3.Up * rise;
         ApplyFloorSnap();
+        if (SmsStepSmoothRate > 0f)
+            _smsStepVisualY = MathF.Max(_smsStepVisualY - rise, -0.45f); // the rig starts a riser lower and eases up (visual only; at most one riser behind)
         velocity.X = preMoveVel.X; // the riser clipped the horizontal speed; the game never saw a wall
         velocity.Z = preMoveVel.Z;
         velocity.Y = 0f;
@@ -11618,6 +11713,9 @@ public partial class Mario : CharacterBody3D
         int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
         float vyMps = (_smsTrueVyValid && Mathf.Abs(velocity.Y - _smsMoveVyMps) < 1e-3f) ? _smsTrueVy : velocity.Y;
         float vy = SmsUnits.MpsToSpeed(vyMps);
+        // landing(): the fall timer runs while vy < 0 -- the plain fall only, the LAND_SAFE_DOWN drop has no timer
+        if (stateOfMario == MarioState.ledgeFall && !_smsHangDropFall && vy < 0f)
+            _smsFallTicks = Math.Min(_smsFallTicks + n, SMS_LONG_FALL_TICKS + 1);
         bool aHeld = Input.IsActionPressed("button_a") || Input.IsActionPressed("key_space");
         bool cancel = _smsFallCancel;
         SmsAir.GravityMode gmode = stateOfMario == MarioState.SpinJump ? SmsAir.GravityMode.SpinJump : SmsAir.GravityMode.Normal;

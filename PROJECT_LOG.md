@@ -1329,6 +1329,7 @@ equations come from. Everything sits behind one toggle so the old feel is one cl
 | `KeepGroundPoundJump` | `false` | Restores the GP-jump (see Ground Pound section above). Off because Sunshine has no such move. |
 | `SmsLedgeSnap` | `true` | Step DOWN ledges up to 100 units (1.34 m) without leaving the ground: sets `floor_snap_length` to 1.343 m (Player.tscn ships 0.6). |
 | `SmsStepUp` | `true` | Step UP risers up to 30 units (0.40 m) without breaking stride (`SmsTryStepUp`, after MoveAndSlide). |
+| `SmsStepSmoothRate` | `35` | Visual only. The body pops up a riser instantly (the game does too); the rig starts that far below and eases back at this rate (1/s, about 4 frames), so the mesh glides up the step. 0 = the mesh pops with the body. `UpdateStepVisual` offsets Skeleton3D and WaistTarget together. |
 | `SmsWallSlidePinTicks` | `4` | Ticks (120 Hz) of zero velocity when a wall slide begins. The game's is 10 (`stayWall`, 83 ms; the state machine runs per 5 ms tick, verified in `TMarDirector::direct`), which playtested as "sticks to the wall"; 4 (33 ms) keeps a slight catch before the slide. Deviation by request. 0 = slides at once. |
 | `SmsRollJumpKnockdown` | `false` | **Deviation.** Off: the roll-jump wall-slides on a head-height wall. On: the decomp's rule (knockdown above 40; the roll-jump launches at 55 and never drops under 40 with the stick held). |
 
@@ -1427,8 +1428,10 @@ Launch table (`setStatusToJumping`), all in SMS units, `fwd` = speed at the mome
   It applies to every launched state **and to a plain fall off an edge**: `running()` → `walkProcess` 0 → `LANDING`,
   whose `landing()` is `jumpingBasic(LAND_SLIP, ANIM_LAND, 3)` — the same stick control as a jump, the ledge bit, B
   dives, and the landing opens the double-jump window (`SmsAirSteers`; the face is latched from the velocity at the
-  edge). The `LAND_SAFE_DOWN` drop after letting go of a ledge has none. Not ported: the cry and `ANIM_THROWN` after
-  240 ticks of falling.
+  edge). The `LAND_SAFE_DOWN` drop after letting go of a ledge has none. After **240 ticks (2 s) of falling** the game
+  plays the cry (`MSD_SE_MV10B_CRY_JUMP_01`) and switches to `ANIM_THROWN` until he lands; the port drives `ma_thrown`
+  directly (it is in the library, not in the tree; `SetMarioState` re-enables the tree on landing). The port has no
+  voice assets, so no cry. Debug line: `[SMS fall] 2 s of falling: ma_thrown ...`.
 - The face angle is latched **once** at launch, from the velocity direction (not the model, which the old code snaps to
   the stick — that snapped the takeoff direction and lost speed). The model holds it in the air; no per-frame yaw.
 - Jump chain window 16 ticks (0.133 s) after touchdown; A inside it = next chained jump, B = dive (vy 20).
@@ -1630,7 +1633,8 @@ ledge bit, no `doJumping`, no B; he drops straight down from the wall face and t
 **shimmy** along the ledge at `MoveSp 0.06 × mag`
 units/tick (3.1 m/s at full stick), following the wall round corners while the normals agree within `HangWallMovableAngle`
 (dot > 0.3) and the top stays within −100/+50, `ma_hmov_l/r` at `units moved × AnmRate 0.8`; the shimmy stops after
-`RapidTime` 2000 ticks (16.7 s) and at `LimitTime` **2400 ticks (20 s) he lets go by himself**. Ground within 100 units below
+`RapidTime` 2000 ticks (16.7 s) — from then on `ma_hang` plays at `AnmRapid` **8×** (shipped `Hanging.prm`; he is losing his
+grip; driven directly like the shimmy) — and at `LimitTime` **2400 ticks (20 s) he lets go by himself**. Ground within 100 units below
 (30 behind) with headroom → he vaults up on his own.
 
 **Descend** (`checkDescent`, end of `running`): walking slowly (fwd < `DescentSp` 10 = 4 m/s) up to an edge whose wall is
@@ -1756,6 +1760,12 @@ so a staircase steeper than its own diameter allows is a ~58° ramp to it. The g
 geometry the same way (one riser per tread crossed). If a particular staircase feels like a launch, the fix is the
 collision mesh (a ramp under the visual steps, as Nintendo did for many SMS stairs), not the physics.
 
+What *is* smoothed is the picture: `UpdateStepVisual` (in `_Process`) offsets the rig (Skeleton3D and WaistTarget
+together) down by each step's rise and eases it back at `SmsStepSmoothRate`, clamped to one riser, so the mesh glides
+up while the collision body pops. The camera's height pan already eases. Nothing else writes those two node positions
+(the run bob, the surface tilt and `LockArmatureVisualRoot` all write `armature.Position`); the offset is snapped to
+zero in the pinned ledge states.
+
 ### ⚠️ Gotcha: a long floor snap is also a long downhill redirect
 
 `floor_snap_length` feeds `_on_floor_if_snapped`, the downhill constant-speed redirect. At 1.34 m a run off a
@@ -1772,4 +1782,4 @@ ground has to carry upward velocity (launches do) or exceed 1.34 m.
   consumed as a jump first).
 - Surface types and the floor slip: done, see Surface types. Tagging the plaza's surfaces is editor work.
 - Ledge hang: done, see Ledge hang. Not ported: the fence catch (`FENCE_CATCH`), the hang-under-roof states
-  (`HANG_ROOF` / `MOVE_ROOF`), `ANIM_HANG` at `AnmRapid` after 16.7 s.
+  (`HANG_ROOF` / `MOVE_ROOF`).
