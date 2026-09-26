@@ -2011,6 +2011,19 @@ rocket nozzle; with the hover it is a **spring**, not a thrust.
   down) the pump is off too — the arms relax the moment the hover sputters out, and only R at 0 re-enables them. Both ported
   in `SmsFluddPumpEnabled` (`Nozzle.RocketType` added). The exit line now names the window before the pump: `end (the 3 s ran
   out)`.
+- **Pumping while swimming** (Jaysonn: "he should hold the handles while still doing the swim animation"; `addUpper`,
+  MarioDraw.cpp). PUMPING / HOLDING_PUMP graft `gMarioAnimeData[mAnimationId].unk2` — the upper-body pump clip of the current
+  body clip — onto the joints from `chn_chest` down (M3UModelMario's second animation root; the rip: `mdl1 > center >
+  {chn_chest > jnt_chest > shoulders / arms / hands / head, jnt_waist > legs}`). The table maps every swim body clip to
+  **`swpmp`** (the hang to `hgpmp`, the fences to `fepmp`, the rest to `pump`); `swim_dive`, `swim_p_damage`, `swim_down`,
+  `swim_p_down` carry 0xC8 = no clip → `isPumpOK()` false → `checkPumpEnable()` forces IDLE: **no pumping in the dive or the
+  water knockdowns** (no refill either). The tank already took `wg_swpmp` in water. The tree is off while swimming (the
+  swim clips run on the AnimationPlayer), so the CarryBlend cannot layer the pump there; `SmsUpperPose`
+  (`assets/Sms/SmsUpperPose.cs`, a `SkeletonModifier3D`, first child of the skeleton so the head jiggle / lock add on top)
+  samples `ma_swpmp`'s rotation / position tracks for the 16 bones at and under `chn_chest` and writes them after the body
+  clip; Mario ping-pongs its time while PUMPING (`ATTR_PING_PONG_LOOP`), holds it while HOLDING_PUMP, resets it when IDLE.
+  Setup line: `[SMS fludd] swim pump: ma_swpmp (0.367 s) on 16 bones under chn_chest`. Not done: the hang's `hgpmp` and the
+  other per-clip variants on the tree's clips (the CarryBlend plays `ma_pump` for all of them).
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

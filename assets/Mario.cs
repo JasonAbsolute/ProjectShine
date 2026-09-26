@@ -249,6 +249,9 @@ public partial class Mario : CharacterBody3D
     private float _fluddTiltL = 0f, _fluddTiltR = 0f;             // unk1CC8 / unk1CCC: chased at ChangeSpeed a tick
     private SmsBoneRotZ _fluddTilt;                               // WaterGunDivingCtrlL / R on the hover nozzle's jnt_nozzle_L / R
     private float _fluddHeadW = 0f;                               // the HoverHeadAngle head dip, eased like the run's head lock
+    private SmsUpperPose _fluddSwimPump;                          // addUpper() for the swim clips: ma_swpmp on the chn_chest subtree
+    private double _fluddSwimPumpTime = 0.0, _fluddSwimPumpLen = 0.0; // the pump clip's ping-pong position / length (s)
+    private int _fluddSwimPumpDir = 1;
     private bool _smsRocketLanding = false;                       // the fall is ROCKET_LANDING (after a hover): no wall slide on a wall at 16..40
     // waiting(): mHealth <= 3 -> ANIM_DAMAGE_WAIT_START once, then ANIM_DAMAGE_WAIT (library-only clips, driven directly)
     private int _smsDamageWaitPhase = 0;      // 0 off, 1 ma_damage_wait_start playing, 2 ma_damage_wait looping
@@ -11970,6 +11973,7 @@ public partial class Mario : CharacterBody3D
         }
         SmsFluddSetupWater(); // S2: the drops, the water level in the tank, the muzzles
         SmsFluddSetupHoverTilt(); // S3: the hover nozzles' bank joints
+        SmsFluddSetupSwimPump();  // ma_swpmp on the upper body while the swim clips run outside the tree
         // the pump clips ping-pong (addUpper: ATTR_PING_PONG_LOOP; the tank's are slaved to Mario's)
         if (animPlayer.HasAnimation("ma_pump"))
             animPlayer.GetAnimation("ma_pump").LoopMode = Animation.LoopModeEnum.Pingpong;
@@ -12051,7 +12055,7 @@ public partial class Mario : CharacterBody3D
         }
         SmsFluddPoseTank();
         SmsFluddNozzleAnim();
-        SmsFluddUpperBody();
+        SmsFluddUpperBody(delta);
         // setBaseTRMtx(): angle = -0x1800 * (1 - |mtx[1][0]|), mtx[1][0] = the world-vertical component of the spine axis (the bone's X):
         // none standing, the tank pitched 33.75 deg back off his belly when he lies flat
         if (_fluddAttach != null && _fluddTank != null)
@@ -12153,6 +12157,10 @@ public partial class Mario : CharacterBody3D
         if (SmsFluddCurrent.RocketType == 1 && stateOfMario == MarioState.ledgeFall && _smsRocketLanding)
             return false;
         if (_fluddNozzle != SmsNozzle.Spray && _fluddTrigState == 2)
+            return false;
+        // gMarioAnimeData: swim_dive, swim_p_damage (and swim_down / swim_p_down, refused above through _smsDrowned) carry no
+        // pump clip (0xC8) -> isPumpOK() false: no pumping in the dive or the water knockdown; every other swim clip pumps ma_swpmp
+        if (stateOfMario == MarioState.swimming && (_smsSwim == SmsSwim.Dive || _smsSwim == SmsSwim.PDamage))
             return false;
         switch (stateOfMario)
         {
@@ -12398,8 +12406,40 @@ public partial class Mario : CharacterBody3D
     /// <summary>addUpper(): the upper body plays the pump clip over whatever the legs do. The tree's upper-body Blend2
     /// (CarryBlend) does the layering; its "Animation 2" input is pointed at ma_pump while pumping, back at ma_carry_p when
     /// he carries something.</summary>
-    private void SmsFluddUpperBody()
+    /// <summary>addUpper(): the upper-body pump clip over the body clip. Through the tree's CarryBlend (its "Animation 2" input
+    /// pointed at ma_pump) while the tree drives the body; while the swim clips run on the AnimationPlayer directly (the tree is
+    /// off) the SmsUpperPose modifier grafts ma_swpmp -- gMarioAnimeData maps every swim clip to it -- onto the chn_chest
+    /// subtree: ping-pong while PUMPING (ATTR_PING_PONG_LOOP), held while HOLDING_PUMP, off and reset when IDLE.</summary>
+    private void SmsFluddUpperBody(double delta)
     {
+        if (_fluddSwimPump != null)
+        {
+            if (stateOfMario == MarioState.swimming && SmsFluddUpperBlend)
+            {
+                if (_fluddUpper == SmsUpper.Pumping && _fluddSwimPumpLen > 0.0)
+                {
+                    _fluddSwimPumpTime += delta * _fluddSwimPumpDir;
+                    if (_fluddSwimPumpTime >= _fluddSwimPumpLen)
+                    {
+                        _fluddSwimPumpTime = 2.0 * _fluddSwimPumpLen - _fluddSwimPumpTime;
+                        _fluddSwimPumpDir = -1;
+                    }
+                    if (_fluddSwimPumpTime <= 0.0)
+                    {
+                        _fluddSwimPumpTime = -_fluddSwimPumpTime;
+                        _fluddSwimPumpDir = 1;
+                    }
+                }
+                _fluddSwimPump.Time = _fluddSwimPumpTime;
+                _fluddSwimPump.Weight = 1f;
+            }
+            else
+            {
+                _fluddSwimPump.Weight = 0f;
+                _fluddSwimPumpTime = 0.0; // stateMachineUpper(): IDLE resets the pump frame
+                _fluddSwimPumpDir = 1;
+            }
+        }
         if (animTree == null || animTree.TreeRoot is not AnimationNodeBlendTree tree)
             return;
         string want = SmsFluddUpperBlend ? "ma_pump" : "ma_carry_p";
@@ -12410,6 +12450,24 @@ public partial class Mario : CharacterBody3D
             an.Animation = want;
             _fluddUpperAnim = want;
         }
+    }
+
+    /// <summary>The swim pump: ma_swpmp on the chn_chest subtree (SmsUpperPose), for the frames the tree does not drive.</summary>
+    private void SmsFluddSetupSwimPump()
+    {
+        if (skeleton == null || animPlayer == null || !animPlayer.HasAnimation("ma_swpmp"))
+        {
+            if (SmsDebugPrint) GD.Print("[SMS fludd] no ma_swpmp clip: no pump pose while swimming");
+            return;
+        }
+        var clip = animPlayer.GetAnimation("ma_swpmp");
+        _fluddSwimPump = new SmsUpperPose { Name = "SmsSwimPump" };
+        skeleton.AddChild(_fluddSwimPump);
+        skeleton.MoveChild(_fluddSwimPump, 0); // before the head jiggle / head lock modifiers, which add their bit on top
+        _fluddSwimPump.Bind(skeleton, clip, "chn_chest");
+        _fluddSwimPumpLen = clip.Length;
+        if (SmsDebugPrint)
+            GD.Print($"[SMS fludd] swim pump: ma_swpmp ({clip.Length:F3} s) on {_fluddSwimPump.BoneCount} bones under chn_chest");
     }
 
     // ---------------------------------------------------------------------------------------------------------------
