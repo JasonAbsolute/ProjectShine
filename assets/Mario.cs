@@ -12146,6 +12146,14 @@ public partial class Mario : CharacterBody3D
     {
         if (heldBody != null || _smsDrowned || _fluddSwitchSpeed != 0f)
             return false;
+        // checkPumpEnable(): `mStatus != ROCKET_LANDING || !checkCurrentNozzleRocketType(1)` -- after a hover, a RocketType-1 nozzle
+        // (the hover, the rocket) cannot pump until he lands: R does nothing, no charge, no spray, no water; the spray nozzle
+        // (RocketType 0) may. And `!checkCurrentNozzleKind(trigger) || state != DEAD`: a trigger nozzle whose window has closed
+        // drops the pump (the arms relax as the hover sputters out) until R is let go (DEAD -> INACTIVE).
+        if (SmsFluddCurrent.RocketType == 1 && stateOfMario == MarioState.ledgeFall && _smsRocketLanding)
+            return false;
+        if (_fluddNozzle != SmsNozzle.Spray && _fluddTrigState == 2)
+            return false;
         switch (stateOfMario)
         {
             case MarioState.hurt:
@@ -12808,9 +12816,10 @@ public partial class Mario : CharacterBody3D
         // the exits come first: !HAS_FLUDD / RocketType != 1 / !isUpperState(PUMPING) / !canSpray() -> ROCKET_LANDING
         string why = null;
         if (_fluddNozzle != SmsNozzle.Hover) why = "the nozzle changed";
-        else if (_fluddUpper != SmsUpper.Pumping) why = "R released";
         else if (_fluddWater <= 0) why = "the tank ran dry";
-        else if (_fluddTrigState != 1) why = "the 3 s ran out";
+        else if (_fluddTrigState == 2) why = "the 3 s ran out"; // DEAD also drops the pump (checkPumpEnable), so it is tested first
+        else if (_fluddUpper != SmsUpper.Pumping) why = "R released";
+        else if (_fluddTrigState != 1) why = "the nozzle is not spraying";
         if (why != null)
         {
             SmsExitHover(why);

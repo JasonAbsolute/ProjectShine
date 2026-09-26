@@ -198,6 +198,7 @@ public static class SmsParams
         {
             public string Name = "";
             public int Emitters = 1;                    // nozzleBmdData: muzzle joints (the hover has two)
+            public int RocketType = 0;                  // mRocketType: 1 for the hover and the rocket (rocketCheck, canSquat, checkPumpEnable)
             public int AmountMax = 2100;                // the tank while this nozzle is on
             public int DecRate = 0;                     // water per drop
             public int DamageLoss = 250;                // water per hit x the attacker's WaterEmit
@@ -242,7 +243,7 @@ public static class SmsParams
         /// <summary>nozzletrghover.prm -- fires the instant R is pressed, 360 ticks (3 s), two muzzles, no recoil lift (Mario's spring is the hover).</summary>
         public static readonly Nozzle Hover = new()
         {
-            Name = "hover", Emitters = 2, AmountMax = 10000, DecRate = 1, DamageLoss = 0, SuckRate = 0.5f,
+            Name = "hover", Emitters = 2, RocketType = 1, AmountMax = 10000, DecRate = 1, DamageLoss = 0, SuckRate = 0.5f,
             Num = 1f, NumMin = 1f, Attack = 1, AttackMin = 1, EmitPow = 37.5f, EmitPowMin = 40f, PowTremble = 0f,
             DirTremble = 0f, DirTrembleMin = 0.01f, Size = 40f, SizeTremble = 10f, SizeMin = 40f, SizeMinPressure = 0f, SizeMaxPressure = 1f,
             ReactionPow = 0.005f, ReactionPowMin = 0f, ReactionY = 0f, TriggerRate = 0, TriggerDec = 0f, TriggerMax = 1f, TriggerTime = 360,
@@ -252,7 +253,7 @@ public static class SmsParams
         /// <summary>nozzletrgrocket.prm -- 1.48 s of charge at full R (+150 - 105 a tick to 8000), then 5 ticks of 35-water drops and vy += 35 each (S4).</summary>
         public static readonly Nozzle Rocket = new()
         {
-            Name = "rocket", Emitters = 1, AmountMax = 2100, DecRate = 35, DamageLoss = 250, SuckRate = 0.2f,
+            Name = "rocket", Emitters = 1, RocketType = 1, AmountMax = 2100, DecRate = 35, DamageLoss = 250, SuckRate = 0.2f,
             Num = 1f, NumMin = 0f, Attack = 100, AttackMin = 0, EmitPow = 50f, EmitPowMin = 0f, PowTremble = 0f,
             DirTremble = 0f, DirTrembleMin = 0f, Size = 30f, SizeTremble = 20f, SizeMin = 0f, SizeMinPressure = 0f, SizeMaxPressure = 1f,
             ReactionPow = 0f, ReactionPowMin = 0f, ReactionY = 0.7f, TriggerRate = 0, TriggerDec = 105f, TriggerMax = 8000f, TriggerTime = 5,

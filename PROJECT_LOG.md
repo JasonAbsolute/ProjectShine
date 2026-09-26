@@ -2001,6 +2001,16 @@ rocket nozzle; with the hover it is a **spring**, not a thrust.
   staying on through a hover (the main air path switches `isSpining` every frame; the hover and the swim entries now switch
   it off like the hang, the stomp and the bonk do). Pulling the stick back flies him backwards fast (`cos` −1 at the dive
   rate against the 0.985 brake settles at ±42 units = 16.9 m/s either way, faster than the run's 32): the game's numbers.
+- Playtest 2: "no upward motion now, but he still uses FLUDD after the hover expires; in the game you can't until you land,
+  unless you switch nozzles". `checkPumpEnable()` (MarioUpper.cpp) has two clauses S1 left out: `mStatus != ROCKET_LANDING ||
+  !checkCurrentNozzleRocketType(TWaterGun::Rocket)` — `TWaterGun::Rocket` is the enum value **1** and the check compares the
+  nozzle's **`mRocketType` param** (the fabricated name misleads): the hover and the rocket ship 1, the spray / burst / turbo 0.
+  So in `ROCKET_LANDING` a RocketType-1 nozzle cannot pump (`mUpperState = IDLE`): the trigger never charges, nothing sprays,
+  no water goes, the arms drop, the pack houses after its hold — and X to the spray frees the pump, as he remembered. The
+  other clause, `!checkCurrentNozzleKind(trigger) || state != DEAD`: while a trigger nozzle's window has closed (DEAD, R still
+  down) the pump is off too — the arms relax the moment the hover sputters out, and only R at 0 re-enables them. Both ported
+  in `SmsFluddPumpEnabled` (`Nozzle.RocketType` added). The exit line now names the window before the pump: `end (the 3 s ran
+  out)`.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
