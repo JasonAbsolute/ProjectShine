@@ -2196,7 +2196,8 @@ public partial class Mario : CharacterBody3D
                 goto EndFrame;
             }
             // running(): FLUDD_EMITTING && A && mForwardVel > DashMax - 1 -> BROAD_JUMP (before the ordinary jump reads A)
-            if (_fluddDashing && stateOfMario != MarioState.swimming && SmsDashState() && IsOnFloor()
+            // (changePlayerJumping() asks considerRotateJumpStart() first: a spun stick is the spin jump, not the broad jump)
+            if (_fluddDashing && stateOfMario != MarioState.swimming && SmsDashState() && IsOnFloor() && !SmsOrBufferedSpin()
                 && (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space")))
             {
                 Vector3 faceD = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
@@ -2598,7 +2599,7 @@ public partial class Mario : CharacterBody3D
         bool isRunning = stateOfMario == MarioState.running || stateOfMario == MarioState.sprinting;
         bool isCarrying = heldBody != null;
 
-        if (isRunning && !isCarrying)
+        if (isRunning && !isCarrying && !SmsFluddBusy()) // no lean while FLUDD is in use: the pump's upper clip owns the chest
         {
             float xzSpeed = new Vector2(velocity.X, velocity.Z).Length();
             float tilt = Mathf.Lerp(90f, 120f, Mathf.Clamp(xzSpeed / RUN_SPEED, 0f, 1f));
@@ -4609,6 +4610,21 @@ public partial class Mario : CharacterBody3D
                 // If jump was buffered while airborne, queue it for NEXT frame (pre-ground-logic)
                 if (jumpBuffer > 0)
                     queuedTouchdownJump = true;
+                wasOnFloor = onFloorNow;
+                return;
+            }
+            // BROAD_JUMP: jumpingBasic(MARIO_STATUS_RUN, ANIM_BROAD_JUMP, 1) -- the turbo's broad jump lands straight into RUN, no
+            // JUMP_SLIP window, so no double / triple off it (the rollouts above land the same way: ROTATE_BROAD_JUMP -> RUN)
+            if (UseSmsPhysics && _fluddBroadJump && airStateAtImpact == MarioState.singleJump)
+            {
+                _fluddBroadJump = false;
+                jumpChainStage = 0;
+                jumpChainTimer = 0;
+                EnterRolloutRun(inputDirWorld, stickStrength);
+                if (jumpBuffer > 0)
+                    queuedTouchdownJump = true; // running() with A on the landing tick: fwd 60 < 79, so the ordinary JUMP
+                if (SmsDebugPrint)
+                    GD.Print($"[SMS turbo] broad jump landed into the run at fwd {SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()):F1}, no jump chain{(_fluddDashing ? ", dash still on" : "")}");
                 wasOnFloor = onFloorNow;
                 return;
             }
@@ -11462,7 +11478,16 @@ public partial class Mario : CharacterBody3D
         _smsSwimSinkTicks = 0;
         _smsSwimSinkArmed = false;
         _smsSwimDbgDeepest = 0f;
-        SmsSwimSet(SmsSwim.Start);
+        if (_fluddDashing)
+        {
+            // FLUDD_EMITTING at the entry (a broad jump into the water): SWIM_PADDLE, mVel.y = 0, mPosition.y = the surface --
+            // the surf carries on (SE_MA_SURF_JUMP)
+            _smsSwimVy = 0f;
+            GlobalPosition += Vector3.Up * (_smsWaterSurfaceY - SmsFeetY());
+            SmsSwimSet(SmsSwim.Paddle);
+        }
+        else
+            SmsSwimSet(SmsSwim.Start);
         SmsSwimApplyVelocity();
         if (SmsDebugPrint)
             GD.Print($"[SMS swim] in: surface y {_smsWaterSurfaceY:F2}, feet {depthUnits:F0} units under the surface, floor {(float.IsNegativeInfinity(_smsWaterFloorY) ? "none" : $"{_smsWaterSurfaceY - _smsWaterFloorY:F2} m down")}, fwd {_smsSwimFwd:F1} vy {_smsSwimVy:F1}");
@@ -13157,7 +13182,12 @@ public partial class Mario : CharacterBody3D
     private bool SmsDashState() =>
         stateOfMario == MarioState.idle || stateOfMario == MarioState.walking || stateOfMario == MarioState.running
         || stateOfMario == MarioState.sprinting || stateOfMario == MarioState.sneak || stateOfMario == MarioState.rolloutRun
-        || (stateOfMario == MarioState.swimming && _smsSwim == SmsSwim.Paddle);
+        || (stateOfMario == MarioState.swimming && _smsSwim == SmsSwim.Paddle)
+        || (stateOfMario == MarioState.singleJump && _fluddBroadJump); // broadJumping(): onFlag(FLUDD_EMITTING) every tick
+
+    /// <summary>FLUDD in use: the upper body pumps or holds the pump, or the turbo dashes / ramps. No waist IK then (Jaysonn).</summary>
+    private bool SmsFluddBusy() =>
+        UseSmsPhysics && _fluddReady && (_fluddUpper != SmsUpper.Idle || _fluddDashing || _fluddDashSpeed > 0f);
 
     /// <summary>The input stage's dash block, one tick (after the gun, so the trigger's state is this tick's).</summary>
     private void SmsFluddDashTick()
@@ -13170,16 +13200,21 @@ public partial class Mario : CharacterBody3D
             {
                 _fluddDashSpeed = 32f;
                 // mDashTimer > DashStartTime (0): at once. The flag needs the trigger ACTIVE (the 0.75 s charge) and a status that keeps it.
+                bool wasOn = _fluddDashing;
                 if (!_fluddDashing && _fluddTrigState == 1)
                 {
+                    // onFlag + SE_PO_SNIPER_TRIGGER; the status check below takes it away again unless he runs or paddles. In the
+                    // air the game does this every tick -- the turbo's stutter is that SE. Nothing is heard here, so the print waits.
                     _fluddDashing = true;
                     _fluddDashDbgFrom = stateOfMario.ToString();
                     if (stateOfMario == MarioState.swimming && !_smsDrowned && _smsSwim != SmsSwim.PDamage)
                         SmsSwimSet(SmsSwim.Paddle); // changePlayerStatus(SWIM_PADDLE)
-                    if (SmsDebugPrint)
-                        GD.Print($"[SMS turbo] dash on (from {_fluddDashDbgFrom}): {SmsParams.Mario.DashMax:F0} a tick = {SmsUnits.SpeedToMps(SmsParams.Mario.DashMax):F1} m/s, water {_fluddWater}");
                 }
                 if (_fluddDashing && !SmsDashState())
+                    _fluddDashing = false; // mDashTimer = 0, offFlag: the status is not RUN (0x440) or SWIM_PADDLE
+                if (_fluddDashing && !wasOn && SmsDebugPrint)
+                    GD.Print($"[SMS turbo] dash on (from {_fluddDashDbgFrom}): {SmsParams.Mario.DashMax:F0} a tick = {SmsUnits.SpeedToMps(SmsParams.Mario.DashMax):F1} m/s, water {_fluddWater}");
+                else if (!_fluddDashing && wasOn)
                     SmsFluddDashOff("not running or paddling");
             }
         }

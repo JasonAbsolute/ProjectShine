@@ -2096,6 +2096,29 @@ BaseSM, ma_broad_jump in BaseSM`. Self-test: `turbo: dash ramp ticks to 32 64`, 
 621.25`.
 That closes the five FLUDD stages. Left on the FLUDD list: S2b the squat aim (needs `button_rclick`), the HUD gauge, the hang's
 `hgpmp` upper clip, sounds, particles, rumble, the camera modes.
+
+**S5 fix 1** (Jaysonn's turbo playtest: "feels great"; the dash, the charge and the water cost all read right in the log — one
+broad jump, the surf at 80 with the paddle at 5.0):
+- **No waist IK while FLUDD is in use** (his call): the run's forward / turn lean (`skeletonIK3DWaist`) is skipped while the upper
+  body pumps or holds the pump, and while the turbo dashes or ramps (`SmsFluddBusy`). The game has no waist IK; the pump's upper
+  clip owns the chest.
+- **"Mario can't double or triple jump in turbo, just spin."** The game: `broadJumping()` lands with `jumpingBasic(MARIO_STATUS_RUN,
+  ANIM_BROAD_JUMP, 1)` — straight into RUN, no `JUMP_SLIP` window, so no double / triple off a broad jump; and `changePlayerJumping()`
+  asks `considerRotateJumpStart()` before changing to `BROAD_JUMP`, so a spun stick is the spin jump. The port's broad jump was a
+  `singleJump` and took the ordinary landing window (`jumpChainStage` 1 — the log shows `doubleJump` / `tripleJump` states with the
+  turbo pumping). Now it lands through `EnterRolloutRun` (the port's RUN landing for the rollouts — `ROTATE_BROAD_JUMP → RUN` is
+  the same call) with the chain cleared, and the pre-split A check yields to `SmsOrBufferedSpin()`. Still the game, deliberately: a
+  spin jump lands in `SEC_JUMP_SLIP`, so A there is the triple; A on the very landing tick of a broad jump (fwd 60 < 79) is the
+  ordinary JUMP and opens its window — `jumpSlipEvents()` never looks at the flag.
+- **The flag rides through the broad jump** (`broadJumping(): onFlag(FLUDD_EMITTING)` every tick): `SmsDashState` includes the
+  broad jump, so the landing tick forces 80 at once, and a broad jump into water is the game's emitting entry (MarioMove.cpp 2119):
+  `SWIM_PADDLE`, `mVel.y = 0`, `mPosition.y = the surface` — the surf carries on.
+- The log's on / off flip-flop every tick in the air: the game literally does that (`onFlag` + `SE_PO_SNIPER_TRIGGER`, then
+  `offFlag` because the status is not RUN / SWIM_PADDLE — **the turbo's stutter in the air is that SE**); nothing is heard here, so
+  the print now waits for a flag that survives the tick.
+- Read on the way, for S2b: `canSquat()` is false with the turbo nozzle (index 5) and with any RocketType-1 nozzle (hover, rocket):
+  the squat aim is the spray nozzle's alone.
+Debug: `[SMS turbo] broad jump landed into the run at fwd 60.0, no jump chain, dash still on`.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
