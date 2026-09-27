@@ -2024,6 +2024,42 @@ rocket nozzle; with the hover it is a **spring**, not a thrust.
   clip; Mario ping-pongs its time while PUMPING (`ATTR_PING_PONG_LOOP`), holds it while HOLDING_PUMP, resets it when IDLE.
   Setup line: `[SMS fludd] swim pump: ma_swpmp (0.367 s) on 16 bones under chn_chest`. Not done: the hang's `hgpmp` and the
   other per-clip variants on the tree's clips (the CarryBlend plays `ma_pump` for all of them).
+
+**S4 — the rocket nozzle, and the nozzle key** (`rocketCheck` / `rocketing` again; `TNozzleTrigger::movement` / `emit`;
+`TWaterGun::changeNozzle`; `nozzletrgrocket.prm`; `SmsRocketNozzle`). `MarioState.fluddHover` is now **`fluddRocket`**: one
+status, `MARIO_STATUS_ROCKET`, the nozzle decides what it does.
+- **The charge** (`TNozzleTrigger::movement`, in the gun, not in Mario): `+150 × R − 105` a tick to 8000 → **1.48 s at full R**;
+  at R ≤ 0.7 the bleed wins and it never charges (a light press does nothing — squeeze the trigger). Mario keeps whatever he
+  was doing (standing, running, jumping) with the pump on the upper body; nothing on the nozzle model moves until it fires
+  (its clip machine keys on ACTIVE). Then **5 ACTIVE ticks**: one 35-water drop each (2100 / 175 = **12 launches** a tank) and
+  `mVel.y += 35` each (`−dir.y × EmitPow 50 × ReactionY 0.7`, the muzzle pointing down) — into whatever status Mario is in.
+- **The status.** `rocketCheck()` takes a RocketType-1 nozzle into `ROCKET` when PUMPING and `canSpray()`; for the rocket that is
+  ACTIVE, so it enters the tick **after** the first push, and `setStatusToJumping(ROCKET)` writes `mVel.y = 10` over that push.
+  Then per tick `rocketing()`: both its switches have only the Hover case → **no push, no turn, no bank, `mVel.y` left to
+  `fallProcess`, `fwd` not braked**; the emit adds 35 after the move: 10 → 44 → 78 → 112 → 146; the sixth movement turns the
+  nozzle DEAD (no emit), `rocketing()` sees `!canSpray` → `ROCKET_LANDING` with **145**. From there the plain fall: apex `0.25 ×
+  145 × 146 / 2` plus the launch ticks = **2744 units = 36.9 m = 17 Mario heights**, 1.2 s up, and **no cap** anywhere
+  (`fallProcess` only clamps −75). Believable: the plaza lighthouse is climbed with one rocket from its base. Port: the emit's
+  vertical push (`SmsFluddRecoil`) goes into the status's own vy while in `fluddRocket`; the first ACTIVE tick's push is dropped
+  (the game's entry wipes it); a push fired earlier in the same physics frame than the entry waits in `_fluddRocketVyPending`
+  and is added to the 10. The self-test checks 145 / 2743.75.
+- **The flight.** `ANIM_LAND` for the 5 ticks, then `ROCKET_LANDING`'s `ANIM_LAND` fall with air control, the ledge grab and B;
+  `checkPumpEnable` refuses the pump for a RocketType-1 nozzle in `ROCKET_LANDING`, so the arms drop and R does nothing until he
+  lands (the same rule as the hover, already in). No rocket pose clip exists in the game's table (`rspmp` in the rip is not
+  referenced by `gMarioAnimeData`). The roof: `fwd` 0 and a rising vy 0 (`checkGroundAtJumping`). Not ported: the launch
+  voice, `rocketEffectStart` (three particle bursts at the feet and three bound to the muzzle), the charge rumble that ramps
+  with the fill, the camera.
+- **The nozzle key.** `TWaterGun::changeNozzle(type, animate)` is what a nozzle box does: the fraction of water kept, the second
+  nozzle set (not for the spray), the swap progress put at 1 (0 for the spray), the nozzle equipped at once. **N** (keyboard)
+  does that for the next nozzle: Spray → Hover → Rocket → Turbo → Spray, so the rocket and the turbo are reachable before any
+  boxes exist; X keeps swapping the spray with whatever N picked last. Not mid-swap, not while pumping, hurt or dead. The turbo is
+  selectable but its dash is S5: it charges (0.75 s) and sprays only.
+Debug: `[SMS fludd] N: nozzle box -> Rocket (X now swaps Spray <-> Rocket); water 2100/2100`, `rocket: charged -> ACTIVE for 5
+ticks`, `[SMS rocket] launch from idle: vy 45 (the entry's 10 + a push of 35 already this frame), fwd 0.0 …`, `off (the 5 launch
+ticks are done) after 4 ticks: vy 145 from 4 pushes of 35 (apex about 35.6 m up from here), …`, then the fall's `[SMS jump]
+ledgeFall: apex …` line on landing. Self-test: `rocket: vy handed to ROCKET_LANDING 145`, `apex above the launch point 2743.75`,
+`charge ticks at full R 177.8`.
+Next: S5 turbo (the dash, the broad jump, the surf), S2b the squat aim (needs `button_rclick`), the HUD gauge.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

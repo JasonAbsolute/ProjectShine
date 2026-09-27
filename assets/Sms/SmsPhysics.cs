@@ -764,6 +764,40 @@ public static class SmsHover
     }
 }
 
+/// <summary>The rocket nozzle's launch (rocketing() with the rocket nozzle; TNozzleTrigger::emit; nozzletrgrocket.prm shipped).
+/// The charge: +150 x R - 105 a tick to 8000 (1.48 s at full R; R at or under 0.7 never charges). Then 5 ACTIVE ticks, each
+/// pushing mVel.y += 35 (pow 50 x ReactionY 0.7, the muzzle pointing down) into whatever status he is in; the ROCKET status is
+/// entered the tick after the first push and its entry writes mVel.y = 10 over that push, so four pushes count.</summary>
+public static class SmsRocketNozzle
+{
+    public const float Push = 50f * 0.7f;          // per ACTIVE tick: EmitPow x ReactionY
+    public const int Pushes = 5;                   // TriggerTime
+    public const float ChargeTicksFullR = 8000f / (150f - 105f); // 177.8 ticks = 1.48 s
+
+    /// <summary>The game's launch: entry 10, then per tick move 0.25 x vy, gravity, a push -- for the four pushes that count -- then the
+    /// dead tick, then the fall; returns the vy handed to ROCKET_LANDING and the total height above the launch point (units).</summary>
+    public static float LaunchVy(out float apexUnits)
+    {
+        float vy = 10f, y = 0f;
+        for (int i = 0; i < Pushes - 1; i++)
+        {
+            y += 0.25f * vy;
+            vy -= SmsParams.Jump.Gravity;
+            vy += Push;
+        }
+        y += 0.25f * vy;              // the dead tick: the move, the gravity, no push
+        vy -= SmsParams.Jump.Gravity;
+        float launch = vy;
+        while (vy > 0f)               // landing(): the fall from there
+        {
+            y += 0.25f * vy;
+            vy -= SmsParams.Jump.Gravity;
+        }
+        apexUnits = y;
+        return launch;
+    }
+}
+
 /// <summary>Numeric self-check against the values the real game produces. Prints to the Godot output.</summary>
 public static class SmsSelfTest
 {
@@ -840,6 +874,13 @@ public static class SmsSelfTest
             Check("hover: rise after the 360-tick window (units)", SmsHover.RiseAfter(360), 192.1f, 0.5f);
             Check("hover: rise after 1 s (units)", SmsHover.RiseAfter(120), 104.0f, 0.5f);
             Check("hover: 2 water a tick -> seconds in a full tank", SmsParams.Fludd.Hover.AmountMax / (float)(SmsParams.Fludd.Hover.Emitters * SmsParams.Fludd.Hover.DecRate) / SmsUnits.TicksPerSecond, 41.67f, 0.05f);
+        }
+        // The rocket: 10 + 4 x 35 - 5 = 145 handed to the fall; the apex 2744 units = 36.9 m = 17 Mario heights, no cap.
+        {
+            float vy = SmsRocketNozzle.LaunchVy(out float apex);
+            Check("rocket: vy handed to ROCKET_LANDING", vy, 145f, 0.01f);
+            Check("rocket: apex above the launch point (units)", apex, 2743.75f, 0.5f);
+            Check("rocket: charge ticks at full R", SmsRocketNozzle.ChargeTicksFullR, 177.8f, 0.1f);
         }
         GD.Print(ok ? "[SMS selftest] ALL OK" : "[SMS selftest] FAILURES ABOVE");
         return ok;
