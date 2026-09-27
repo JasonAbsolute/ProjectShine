@@ -2158,6 +2158,30 @@ the turbo's spray angle in the water is off; the turbo's steering on land").
 Debug: `[SMS turbo] dash on (...): ... jet −20.3 deg from level, −0.98 along the face (neck −4096 BAM)`; setup `turbo neck joint
 jnt_back_nozzle_neck yes: the gun angle −4096 BAM = 22.5 deg down`. Self-test: `pumping turn at fwd 32 (BAM) 600`, `at fwd 0 300`,
 `dash turn 1500`, `turbo neck: gun angle (deg) −22.5`.
+
+**The waist lean, ported** (Jaysonn: "port the game's waist lean exactly, replacing the IK"). `considerWaist()` (MarioDraw.cpp
+1461) runs every frame in every status: pitch target `WaistPitch × fwd`, roll target `WaistRoll × (this frame's yaw change, BAM) ×
+fwd` — `unk9C` is the face latched at the top of `playerControl()` (MarioMove.cpp 2443) — each clamped to its Max and chased at the
+set's rate. The set: while `fabricatedIsPumping()` (the pack on and the upper body PUMPING or HOLDING_PUMP) or `isHolding()`
+(carrying) the pitch takes `bodyanglewatergun.prm`; the roll takes it only while pumping; otherwise `bodyanglefree.prm`:
+- free: pitch 230 × fwd (7360 BAM = **40.4° forward at the run cap**, max 12000 = 66°), roll 0.5 × Δyaw × fwd (max 8442 = 46° — a
+  1500 BAM/tick turn at 32 asks 24000, so a full-rate turn saturates it), rate 0.07 (95 % of the run lean in 42 ticks = 0.35 s);
+- water gun: pitch −50 × fwd, max 2000 (**8.8° back at 32**, 11° cap), roll max 4000 (22°), rate 0.05.
+`MarioWaistCtrl` (470), the callback on **`jnt_chest`**: (1) the L-camera look-up bend — not ported; (2) `checkStatusType(0x8000)`,
+the **squat**, bends the chest by a positive gun angle — S2b; (3) else while `mAnimationId` is `ANIM_RUN1` or `ANIM_RUN2` (or the
+shell ride): `MTXConcat(anmMtx, MsMtxSetRotRPH(deg(roll), 0, deg(pitch)))` — with p = 0 that matrix (MathUtil.cpp 226) is
+`Rz(pitch) × Rx(roll)`: about the joint's local Z by the pitch, then about its local X by the roll. Any other animation shows no
+lean — the turbo dash (`ANIM_TURBO_DASH`), the sneak, the wait, every jump — while the values keep chasing, so a landing back into
+the run shows the lean at once and a stop hides it at once. Port: `SmsWaistLean` (`assets/Sms/SmsWaistLean.cs`, a
+`SkeletonModifier3D`, first among the skeleton's modifiers) on `jnt_chest`; `SmsWaistFrame(delta)` in the pre-split block chases
+`_smsWaistPitch / _smsWaistRoll` one tick per 1/120 s of the frame with the frame's speed and the previous frame's yaw change;
+`SmsWaistApply()` applies while the tree's node is `ma_run1` (walking, running) or `ma_run2` (sprinting, the rollout run). **The
+`SkeletonIK3D` waist lean is never started under SMS physics** (the legacy path keeps it, with fix 1's FLUDD switch-off). The pack on
+`jnt_chest`, the arms and the head follow the chest, as in the game (`HeadForwardLock` works on the head's local pose, so the order
+is safe). Not ported: the Gesso-surfing sets, the shell ride, the L-camera bend.
+Debug: `[SMS waist] on (ma_run2): pitch +38.1 deg, roll -3.2 deg, the free set`, then once a second `pitch +40.4 deg, roll +0.0 deg
+at 32.0 u/tick (free)`; setup `considerWaist on jnt_chest yes: ...`. Self-test: `waist: free pitch at fwd 32 (deg) 40.43`, `free
+roll, 1500 BAM/tick turn at 32 (deg) 46.37`, `pumping pitch at fwd 32 (deg) -8.79`, `ticks to 95% of the run lean 42`.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

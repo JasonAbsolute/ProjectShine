@@ -1175,6 +1175,12 @@ public partial class Mario : CharacterBody3D
     public Vector3 HeadLookUpAxis = new(0f, 0f, 1f);
 
     private HeadForwardLock _headLock;
+    private SmsWaistLean _smsWaist;                 // MarioWaistCtrl on jnt_chest (considerWaist's lean); replaces the waist IK under SMS
+    private float _smsWaistPitch = 0f, _smsWaistRoll = 0f; // mWaistPitch / mWaistRoll (BAM, floats like the game's)
+    private float _smsWaistPrevYaw = 0f;            // unk9C: the face at the top of the frame
+    private bool _smsWaistPrevYawValid = false;
+    private bool _smsWaistDbgOn = false;
+    private int _smsWaistDbgTicks = 0;
     private FootIK _footIK;
     private float _footIKWeight = 0f;
 
@@ -1447,6 +1453,8 @@ public partial class Mario : CharacterBody3D
         {
             _headLock = new HeadForwardLock { Name = "HeadForwardLock" };
             skeleton.AddChild(_headLock);
+            if (UseSmsPhysics)
+                SmsWaistSetup(); // the game's chest lean (considerWaist / MarioWaistCtrl) instead of the waist IK
 
             // Foot IK — plants each foot on a slope independently.
             //
@@ -2184,6 +2192,7 @@ public partial class Mario : CharacterBody3D
             SmsAirTick(delta);    // mAir drains with the head under, refills out; the meter turns to air after 2 s under
             SmsFluddTick(delta);  // the R analog, X, the upper body, the nozzle swap, the pack's clips
             SmsFluddDashOverride(ref inputDirWorld, ref stickStrength); // the turbo: mIntendedMag = mDashSpeed, a resting stick aims at the face
+            SmsWaistFrame(delta);  // considerWaist(): the chest lean chased every tick, applied on RUN1 / RUN2
             SmsWaterEntryCheck(); // deep water -> SWIM_START, from any status
             if (stateOfMario == MarioState.swimming)
             {
@@ -2600,7 +2609,11 @@ public partial class Mario : CharacterBody3D
         bool isRunning = stateOfMario == MarioState.running || stateOfMario == MarioState.sprinting;
         bool isCarrying = heldBody != null;
 
-        if (isRunning && !isCarrying && !SmsFluddBusy()) // no lean while FLUDD is in use: the pump's upper clip owns the chest
+        if (UseSmsPhysics)
+        {
+            skeletonIK3DWaist.Stop(); // the game's lean is SmsWaistLean on jnt_chest (considerWaist / MarioWaistCtrl), not this IK
+        }
+        else if (isRunning && !isCarrying && !SmsFluddBusy()) // legacy: no lean while FLUDD is in use
         {
             float xzSpeed = new Vector2(velocity.X, velocity.Z).Length();
             float tilt = Mathf.Lerp(90f, 120f, Mathf.Clamp(xzSpeed / RUN_SPEED, 0f, 1f));
@@ -13399,6 +13412,99 @@ public partial class Mario : CharacterBody3D
             GD.Print($"[SMS fludd] turbo clips: ma_turbo_dash {(sm.HasNode("ma_turbo_dash") ? "in BaseSM" : "MISSING")}, ma_broad_jump {(sm.HasNode("ma_broad_jump") ? "in BaseSM" : "MISSING")}");
     }
 
+    // ---------------------------------------------------------------------------------------------------------------
+    // The waist lean: considerWaist() (MarioDraw.cpp 1461) chased every tick, MarioWaistCtrl (470) applied on jnt_chest while the
+    // body animation is RUN1 / RUN2. Replaces the SkeletonIK3D lean under SMS physics.
+    // ---------------------------------------------------------------------------------------------------------------
+
+    /// <summary>considerWaist() for one game frame (a tick): the pitch target WaistPitch x fwd and the roll target WaistRoll x
+    /// (the frame's yaw change, BAM) x fwd, each clamped and chased at the set's rate. The pitch takes the water-gun set while the
+    /// upper body pumps or holds the pump (fabricatedIsPumping) or he carries something (isHolding); the roll only while pumping.</summary>
+    private void SmsWaistTick(float fwd, float dYawBam)
+    {
+        bool pumping = SmsPumpingStyle();
+        bool holding = heldBody != null;
+        float pitchTarget, pitchMax, pitchRate;
+        if (pumping || holding)
+        {
+            pitchTarget = SmsParams.Waist.GunPitch * fwd; pitchMax = SmsParams.Waist.GunPitchMax; pitchRate = SmsParams.Waist.GunRate;
+        }
+        else
+        {
+            pitchTarget = SmsParams.Waist.FreePitch * fwd; pitchMax = SmsParams.Waist.FreePitchMax; pitchRate = SmsParams.Waist.FreeRate;
+        }
+        pitchTarget = Mathf.Clamp(pitchTarget, -pitchMax, pitchMax);
+        _smsWaistPitch += pitchRate * (pitchTarget - _smsWaistPitch);
+
+        float rollTarget, rollMax, rollRate;
+        if (pumping)
+        {
+            rollTarget = SmsParams.Waist.GunRoll * dYawBam * fwd; rollMax = SmsParams.Waist.GunRollMax; rollRate = SmsParams.Waist.GunRate;
+        }
+        else
+        {
+            rollTarget = SmsParams.Waist.FreeRoll * dYawBam * fwd; rollMax = SmsParams.Waist.FreeRollMax; rollRate = SmsParams.Waist.FreeRate;
+        }
+        rollTarget = Mathf.Clamp(rollTarget, -rollMax, rollMax);
+        _smsWaistRoll += rollRate * (rollTarget - _smsWaistRoll);
+    }
+
+    /// <summary>One physics frame of considerWaist(): as many ticks as the frame holds (1/120 s each), with the frame's forward speed
+    /// and the previous frame's yaw change split over them (unk9C: the face latched at the top of the frame).</summary>
+    private void SmsWaistFrame(double delta)
+    {
+        if (!_smsWaistPrevYawValid)
+        {
+            _smsWaistPrevYaw = _smsFaceYaw;
+            _smsWaistPrevYawValid = true;
+        }
+        float dYawBam = _smsFaceValid ? SmsMath.WrapAngle(_smsFaceYaw - _smsWaistPrevYaw) / SmsUnits.BamToRad : 0f;
+        _smsWaistPrevYaw = _smsFaceYaw;
+        int n = Math.Max(1, (int)Math.Round(delta * 120.0));
+        float fwd = SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()); // mForwardVel, in every status
+        for (int i = 0; i < n; i++)
+            SmsWaistTick(fwd, dYawBam / n);
+        SmsWaistApply();
+    }
+
+    /// <summary>MarioWaistCtrl: the chest turned by the lean only while the body animation is RUN1 / RUN2 -- the port's ma_run1 (walking,
+    /// running) and ma_run2 (sprinting, the rollout run); not the dash (ma_turbo_dash), the sneak, the wait, any jump.</summary>
+    private void SmsWaistApply()
+    {
+        if (_smsWaist == null)
+            return;
+        string node = animTree != null && animTree.Active && _sm != null ? (string)_sm.GetCurrentNode() : "";
+        bool apply = node == "ma_run1" || node == "ma_run2";
+        _smsWaist.Apply = apply;
+        _smsWaist.Pitch = _smsWaistPitch * SmsUnits.BamToRad;
+        _smsWaist.Roll = _smsWaistRoll * SmsUnits.BamToRad;
+        if (SmsDebugPrint)
+        {
+            if (apply != _smsWaistDbgOn)
+            {
+                _smsWaistDbgOn = apply;
+                _smsWaistDbgTicks = 0;
+                GD.Print($"[SMS waist] {(apply ? "on" : "off")} ({(node.Length > 0 ? node : "no tree node")}): pitch {_smsWaistPitch * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0} deg, roll {_smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0} deg, {(SmsPumpingStyle() ? "the water-gun set" : "the free set")}");
+            }
+            else if (apply && ++_smsWaistDbgTicks >= 60)
+            {
+                _smsWaistDbgTicks = 0;
+                GD.Print($"[SMS waist] pitch {_smsWaistPitch * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0} deg, roll {_smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0} deg at {SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()):F1} u/tick ({(SmsPumpingStyle() ? "pumping" : "free")})");
+            }
+        }
+    }
+
+    private void SmsWaistSetup()
+    {
+        if (skeleton == null)
+            return;
+        _smsWaist = new SmsWaistLean { Name = "SmsWaistLean" };
+        skeleton.AddChild(_smsWaist);
+        skeleton.MoveChild(_smsWaist, 0); // the chest is a parent of everything the other modifiers touch: the game's callback order
+        if (SmsDebugPrint)
+            GD.Print($"[SMS waist] considerWaist on jnt_chest {(skeleton.FindBone("jnt_chest") >= 0 ? "yes" : "NO")}: free {SmsParams.Waist.FreePitch} x fwd (cap {SmsParams.Waist.FreePitchMax}) / roll {SmsParams.Waist.FreeRoll} (cap {SmsParams.Waist.FreeRollMax}) at {SmsParams.Waist.FreeRate}; pumping {SmsParams.Waist.GunPitch} x fwd (cap {SmsParams.Waist.GunPitchMax}) / roll cap {SmsParams.Waist.GunRollMax} at {SmsParams.Waist.GunRate}; the waist IK is retired under SMS");
+    }
+
     private void SmsFluddOnRespawn()
     {
         if (!_fluddReady)
@@ -13408,6 +13514,7 @@ public partial class Mario : CharacterBody3D
         _fluddBombState = 0; _fluddBombLeft = 0; _fluddBombFill = 0f; _fluddBombAccum = 0f;
         _fluddSprayRamp = 0; _fluddSprayStrength = 0f; _fluddEmitAccum = 0f;
         _fluddDashSpeed = 0f; _fluddDashing = false; _fluddDashAnimOn = false; _fluddBroadJump = false;
+        _smsWaistPitch = 0f; _smsWaistRoll = 0f; _smsWaistPrevYawValid = false;
         _fluddDrops?.Clear();
         SmsFluddPoseWater();
     }

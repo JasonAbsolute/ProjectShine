@@ -118,6 +118,24 @@ public static class SmsParams
         public const int DashRotSp = 60;                // BAM per tick
     }
 
+    /// <summary>bodyanglefree.prm / bodyanglewatergun.prm (TBodyAngleParams): considerWaist()'s chest lean, applied by
+    /// MarioWaistCtrl on jnt_chest while the body animation is RUN1 / RUN2. Pitch target = Pitch x fwd (BAM), roll target =
+    /// Roll x (the frame's yaw change in BAM) x fwd, each clamped to its Max and chased at Rate a tick. The water-gun set drives
+    /// the pitch while the upper body pumps or holds the pump, or he carries something; the roll only while pumping.</summary>
+    public static class Waist
+    {
+        public const float FreePitch = 230f;        // 7360 BAM = 40.4 deg forward at the run cap 32
+        public const int FreePitchMax = 12000;      // 66 deg
+        public const float FreeRoll = 0.5f;         // a 1500 BAM/tick turn at 32 asks 24000: a full-rate turn saturates the cap
+        public const int FreeRollMax = 8442;        // 46 deg
+        public const float FreeRate = 0.07f;
+        public const float GunPitch = -50f;         // -1600 at 32, capped: 11 deg BACK while pumping / holding the pump / carrying
+        public const int GunPitchMax = 2000;
+        public const float GunRoll = 0.5f;
+        public const int GunRollMax = 4000;         // 22 deg
+        public const float GunRate = 0.05f;
+    }
+
     public static class Mario // /mario/mario.prm  (TDeParams)
     {
         public const int WaitingRotSp = 220;            // BAM/tick, turning in place
@@ -914,6 +932,15 @@ public static class SmsSelfTest
             Check("pumping turn at fwd 0 (BAM)", SmsRun.PumpingTurnRateRad(0f) / SmsUnits.BamToRad, 300f, 0.01f);
             Check("dash turn (BAM)", SmsRun.DashTurnRateRad() / SmsUnits.BamToRad, 1500f, 0.01f);
             Check("turbo neck: gun angle (deg)", -SmsParams.Fludd.Turbo.LAngleBase * SmsUnits.BamToRad * 180f / MathF.PI, -22.5f, 0.01f);
+            // considerWaist(): the pitch at the run cap, the roll's saturation in a full-rate turn, the pumping pitch cap
+            Check("waist: free pitch at fwd 32 (deg)", MathF.Min(SmsParams.Waist.FreePitch * 32f, SmsParams.Waist.FreePitchMax) * SmsUnits.BamToRad * 180f / MathF.PI, 40.43f, 0.02f);
+            Check("waist: free roll, 1500 BAM/tick turn at 32 (deg)", MathF.Min(SmsParams.Waist.FreeRoll * 1500f * 32f, SmsParams.Waist.FreeRollMax) * SmsUnits.BamToRad * 180f / MathF.PI, 46.37f, 0.02f);
+            Check("waist: pumping pitch at fwd 32 (deg)", MathF.Max(SmsParams.Waist.GunPitch * 32f, -SmsParams.Waist.GunPitchMax) * SmsUnits.BamToRad * 180f / MathF.PI, -8.79f, 0.02f);
+            {
+                float p = 0f; int ticks = 0;
+                while (p < 7360f * 0.95f && ticks < 1000) { p += SmsParams.Waist.FreeRate * (7360f - p); ticks++; }
+                Check("waist: ticks to 95% of the run lean", ticks, 42f, 0.5f);
+            }
             Check("turbo: charge ticks at full R", SmsParams.Fludd.Turbo.TriggerMax / (150f - SmsParams.Fludd.Turbo.TriggerDec), 90f, 0.01f);
             float fwd = 80f, vy = 0f; SmsAir.ApplyLaunch(SmsAir.Launch.BroadJump, ref fwd, ref vy);
             Check("broad jump: launch fwd", fwd, 60f, 0.001f);
