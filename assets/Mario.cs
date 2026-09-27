@@ -13496,6 +13496,34 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>MarioWaistCtrl: the chest turned by the lean only while the body animation is RUN1 / RUN2 -- the port's ma_run1 (walking,
     /// running) and ma_run2 (sprinting, the rollout run); not the dash (ma_turbo_dash), the sneak, the wait, any jump.</summary>
+    /// <summary>What the rig showed at the last animation update: the chest bone's forward tilt (its local X is the spine), the
+    /// shoulders' forward tilt (the lean lands on them), the head's look elevation and its yaw off the body's facing (jnt_head's
+    /// local X is the face; the model faces +Z in the armature's frame).</summary>
+    private string SmsPostureDbg()
+    {
+        if (skeleton == null || armature == null)
+            return "";
+        int head = skeleton.FindBone("jnt_head"), chest = skeleton.FindBone("jnt_chest"), sldr = skeleton.FindBone("jnt_sldr_L");
+        if (head < 0 || chest < 0)
+            return "";
+        Basis skel = skeleton.GlobalTransform.Basis;
+        Vector3 bodyFwd = armature.GlobalTransform.Basis.Z.Normalized();
+        Vector3 headFwd = (skel * skeleton.GetBoneGlobalPose(head).Basis.X).Normalized();
+        Vector3 chestUp = (skel * skeleton.GetBoneGlobalPose(chest).Basis.X).Normalized();
+        float chestTilt = Mathf.RadToDeg(Mathf.Atan2(chestUp.Dot(bodyFwd), chestUp.Y));
+        string sh = "";
+        if (sldr >= 0)
+        {
+            // the shoulder joint's offset from the chest joint, tilted from vertical toward the front
+            Vector3 d = skel * (skeleton.GetBoneGlobalPose(sldr).Origin - skeleton.GetBoneGlobalPose(chest).Origin);
+            sh = $", shoulders {Mathf.RadToDeg(Mathf.Atan2(d.Dot(bodyFwd), d.Y)):+0;-0} deg forward";
+        }
+        float headElev = Mathf.RadToDeg(Mathf.Asin(Mathf.Clamp(headFwd.Y, -1f, 1f)));
+        Vector3 hf = new Vector3(headFwd.X, 0f, headFwd.Z);
+        float headYaw = hf.LengthSquared() > 1e-6f ? Mathf.RadToDeg(Mathf.Atan2(bodyFwd.Cross(hf.Normalized()).Y, bodyFwd.Dot(hf.Normalized()))) : 0f;
+        return $"; posture: chest {chestTilt:+0;-0} deg forward{sh}, head looking {headElev:+0;-0} deg ({headYaw:+0;-0} deg off the face, + = his left)";
+    }
+
     private void SmsWaistApply()
     {
         if (_smsWaist == null)
@@ -13517,7 +13545,7 @@ public partial class Mario : CharacterBody3D
             {
                 _smsWaistDbgOn = apply;
                 _smsWaistDbgTicks = 0;
-                GD.Print($"[SMS waist] {(apply ? "on" : "off")} ({(node.Length > 0 ? node : "no tree node")}): pitch {_smsWaistPitch * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg, roll {_smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg{SmsWaistTwistDbg()}, {(SmsPumpingStyle() ? "the water-gun set" : "the free set")}");
+                GD.Print($"[SMS waist] {(apply ? "on" : "off")} ({(node.Length > 0 ? node : "no tree node")}): pitch {_smsWaistPitch * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg, roll {_smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg{SmsWaistTwistDbg()}, {(SmsPumpingStyle() ? "the water-gun set" : "the free set")}{SmsPostureDbg()}");
             }
             else if (apply && ++_smsWaistDbgTicks >= 60)
             {
@@ -13525,7 +13553,7 @@ public partial class Mario : CharacterBody3D
                 float camYaw = springArmPivot != null ? springArmPivot.Rotation.Y : 0f;
                 float camDrift = _smsWaistDbgCamValid ? Mathf.RadToDeg(SmsMath.WrapAngle(camYaw - _smsWaistDbgCamYaw)) : 0f;
                 _smsWaistDbgCamYaw = camYaw; _smsWaistDbgCamValid = true;
-                GD.Print($"[SMS waist] pitch {_smsWaistPitch * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg, roll {_smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg{SmsWaistTwistDbg()} at {SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()):F1} u/tick ({(SmsPumpingStyle() ? "pumping" : "free")}); this second: yaw change up to {_smsWaistDbgMaxDYaw:F0} BAM a tick ({_smsWaistDbgMaxDYaw * SmsUnits.BamToRad * 180f / Mathf.Pi:F2} deg), camera yaw drift {camDrift:+0.0;-0.0} deg");
+                GD.Print($"[SMS waist] pitch {_smsWaistPitch * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg, roll {_smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg{SmsWaistTwistDbg()} at {SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()):F1} u/tick ({(SmsPumpingStyle() ? "pumping" : "free")}); this second: yaw change up to {_smsWaistDbgMaxDYaw:F0} BAM a tick ({_smsWaistDbgMaxDYaw * SmsUnits.BamToRad * 180f / Mathf.Pi:F2} deg), camera yaw drift {camDrift:+0.0;-0.0} deg{SmsPostureDbg()}");
                 _smsWaistDbgMaxDYaw = 0f;
             }
         }
@@ -13547,11 +13575,13 @@ public partial class Mario : CharacterBody3D
             Basis armInv = arm != null ? arm.GlobalTransform.Basis.Inverse() : Basis.Identity;
             Vector3 xw = (skeleton.GlobalTransform.Basis * skeleton.GetBoneGlobalRest(skeleton.FindBone("jnt_chest")).Basis.X).Normalized();
             Vector3 yw = (armInv * skeleton.GlobalTransform.Basis * skeleton.GetBoneGlobalRest(skeleton.FindBone("jnt_chest")).Basis.Y).Normalized();
-            GD.Print($"[SMS waist] jnt_chest local Y in the armature's frame: ({yw.X:F2}, {yw.Y:F2}, {yw.Z:F2}) -> a positive pitch tilts the spine {(yw.Z < -0.5f ? "FORWARD (the model's -Z)" : yw.Z > 0.5f ? "BACKWARD (+Z)" : "SIDEWAYS?")}");
+            GD.Print($"[SMS waist] jnt_chest local Y in the armature's frame: ({yw.X:F2}, {yw.Y:F2}, {yw.Z:F2}) -> {(yw.Z > 0.5f ? "+Z = the model's FRONT (the rig keeps the BMD's axes: the head binds at z -3 behind the chest joint, the left foot at +x): a positive pitch tilts him FORWARD" : yw.Z < -0.5f ? "-Z = his BACK: a positive pitch would tilt him BACKWARD" : "SIDEWAYS?")}");
             GD.Print($"[SMS waist] jnt_chest local X in world: ({xw.X:F2}, {xw.Y:F2}, {xw.Z:F2}) -> {(xw.Y > 0.5f ? "UP: a positive roll turns the shoulders counterclockwise seen from above (to his left) -- the game's sign, into a left turn" : xw.Y < -0.5f ? "DOWN: a positive roll turns the shoulders clockwise seen from above (to his right)" : "NOT along the spine: the roll would not be a twist")}");
         }
         if (SmsDebugPrint)
             GD.Print("[SMS waist] head lock off under SMS: MarioHeadCtrl is the identity in a run; ma_run2's head track holds the head within 4 deg while the chest swings 35 deg a stride");
+        if (SmsDebugPrint)
+            GD.Print($"[SMS waist] MarioWaistCtrl turns the CHILDREN of jnt_chest (J3D stores a joint's matrix before its callback): {(skeleton.FindBone("jnt_chest") >= 0 ? string.Join(", ", System.Array.ConvertAll(skeleton.GetBoneChildren(skeleton.FindBone("jnt_chest")), b => skeleton.GetBoneName(b))) : "NO jnt_chest")}; the chest's own skin keeps the clip");
         if (SmsDebugPrint)
             GD.Print($"[SMS waist] considerWaist on jnt_chest {(skeleton.FindBone("jnt_chest") >= 0 ? "yes" : "NO")}: free {SmsParams.Waist.FreePitch} x fwd (cap {SmsParams.Waist.FreePitchMax}) / roll {SmsParams.Waist.FreeRoll} (cap {SmsParams.Waist.FreeRollMax}) at {SmsParams.Waist.FreeRate}; pumping {SmsParams.Waist.GunPitch} x fwd (cap {SmsParams.Waist.GunPitchMax}) / roll cap {SmsParams.Waist.GunRollMax} at {SmsParams.Waist.GunRate}; the waist IK is retired under SMS");
     }

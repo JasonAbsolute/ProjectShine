@@ -2264,6 +2264,28 @@ Debug: setup `[SMS waist] head lock off under SMS: …`; `[SMS waist] off (ma_tu
 `SmsWaistSetup()` runs — a NullReferenceException inside `_Ready` skipped the rest of start-up (no `animPlayer`, no tree, no
 pack), and the first `_PhysicsProcess` after the level intro threw every frame (`UpdateRunAnimationSpeed`): one idle loop, then
 frozen. The print now resolves the node itself. Rule: a start-up helper may only read fields assigned above its call site.
+
+**The waist, fifth look: what the callback really moves** (Jaysonn, 2026-09-27 03:45: "starts fine now but mario still looks odd when
+running"). A headless run of cad5009 gave `jnt_chest local Y in the armature's frame: (0, 0, 1) -> BACKWARD (+Z)` — the *label* was
+wrong, not the lean: the rig keeps the BMD's axes (skin bind: `jnt_head` at z −3, behind the chest joint; the left foot at +x), so the
+model's FRONT is +Z in the armature's frame and a positive pitch tilts him forward. Then the real finding, in J3D itself.
+**The game's waist lean never rotates the chest's own skin.** `J3DMtxCalcBasic::recursiveCalc` (JSystem `J3DJoint.cpp` 56–82) runs
+`calcIn()` — `calcTransform()` concatenates the joint's TRS onto `mCurrentMtx` and *stores* it with `setAnmMtx` (a `MTXCopy`,
+`J3DModel.hpp` 252) — and only then the joint callback with 0, which `MarioWaistCtrl` uses to post-multiply `mCurrentMtx` by
+`Rz(pitch) × Rx(roll)`. The stored matrix is what `jnt_chest`'s vertices skin to (DRW1 rigid; EVP1 envelopes chest/waist 0.7/0.3 …
+0.2/0.8); the modified `mCurrentMtx` is what the **children** inherit: `jnt_head` (→ `M_head`, `M_head_cap1` — the head meshes hang on a
+zero-offset child joint for exactly this reason; `MarioHeadCtrl` works the same way), `jnt_sldr_L` / `R` (→ the arms, and the torso
+vertices weighted chest/shoulder 0.3/0.7, 0.5/0.5). No Mario callback re-stores its joint's matrix. The chest joint sits at the
+**pelvis** (bind (0, 58, 0)), the shoulders 30 and the head 39 units up its X: the game pivots the shoulder girdle, arms and head about
+the hips while the belly / chest skin keeps the clip's pose and the upper torso stretches after the shoulders — the hunched Sunshine
+sprint. The port turned `jnt_chest`'s own pose, so the whole torso bowed 40° from the pelvis and the pack bowed with it. `SmsWaistLean`
+now leaves `jnt_chest` alone and writes `pose_c = R × pose_c` (origin and rotation) for each child bone, R in `jnt_chest`'s frame —
+the game's arithmetic exactly. The head ends where it was (it is a child): at fwd 32 it looks 22–31° below level; that is the game.
+The waist prints now carry a posture readout: `posture: chest -4 deg forward, shoulders +36 deg forward, head looking -26 deg (+2 deg
+off the face, + = his left)`; setup `MarioWaistCtrl turns the CHILDREN of jnt_chest (...): jnt_sldr_R, jnt_sldr_L, jnt_head`.
+Open, noted: the game hangs the pack on `chn_chest` (`TMario::perform` → `setBaseTRMtx(getAnmMtx(mJointIdChnChest))`), whose X is
+horizontal, so `|mtx[1][0]|` is 0 and the tilt is the constant `unk1D06`; ours rides `jnt_chest` (the approved placement) and so
+twists with the clip's stride while the game's does not. Settling it needs `wg_mdl1.bmd`'s own vertex axes, not the rip's.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
