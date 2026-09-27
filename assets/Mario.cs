@@ -248,6 +248,7 @@ public partial class Mario : CharacterBody3D
     private float _fluddTiltTargetL = 0f, _fluddTiltTargetR = 0f; // unk1CC2 / unk1CC4 (BAM): the bank rocketing() asks of the two nozzles
     private float _fluddTiltL = 0f, _fluddTiltR = 0f;             // unk1CC8 / unk1CCC: chased at ChangeSpeed a tick
     private SmsBoneRotZ _fluddTilt;                               // WaterGunDivingCtrlL / R on the hover nozzle's jnt_nozzle_L / R
+    private SmsBoneRotZ _fluddNeckRot;                            // NozzleCtrl on the turbo's jnt_back_nozzle_neck: the gun angle
     private float _fluddHeadW = 0f;                               // the HoverHeadAngle head dip, eased like the run's head lock
     private SmsUpperPose _fluddSwimPump;                          // addUpper() for the swim clips: ma_swpmp on the chn_chest subtree
     private float _fluddRocketVyPending = 0f;                     // the rocket's pushes fired this frame before the status change (units a tick)
@@ -3309,6 +3310,7 @@ public partial class Mario : CharacterBody3D
                                             if (
                                                 walkingStrength > 0.7
                                                 && stateOfMario != MarioState.singleJump
+                                                && !SmsPumpingStyle() // isRunningTurnning(): no U-turn while the upper body pumps (the spray on the run, the turbo)
                                             )
                                             {
                                                 GD.Print("ENTER sideFlipTurning");
@@ -11729,8 +11731,8 @@ public partial class Mario : CharacterBody3D
             // doSwimming()
             _smsSwimFwd += _smsIntendedMag * SmsParams.Swim.MoveSp * 0.03125f;
             _smsSwimFwd *= SmsParams.Swim.MoveBrake;
-            if (stick)
-                _smsFaceYaw = SmsMath.ConvergeAngle(_smsFaceYaw, intendedYaw, SmsParams.Swim.RotSp * SmsUnits.BamToRad);
+            if (stick) // doSwimming(): SwimmingRotSp 300, PumpingRotSp 200 while the upper body pumps (min == max shipped: no speed term)
+                _smsFaceYaw = SmsMath.ConvergeAngle(_smsFaceYaw, intendedYaw, (SmsPumpingStyle() ? SmsParams.Swim.PumpingRotSp : SmsParams.Swim.RotSp) * SmsUnits.BamToRad);
             _smsSwimVy -= SmsParams.Swim.Gravity;
             _smsSwimVy += depthRatio * (waitBuoyancy ? SmsParams.Swim.WaitBuoyancy : SmsParams.Swim.MoveBuoyancy);
             _smsSwimVy *= SmsParams.Swim.UpDownBrake;
@@ -12054,6 +12056,7 @@ public partial class Mario : CharacterBody3D
         }
         SmsFluddSetupWater(); // S2: the drops, the water level in the tank, the muzzles
         SmsFluddSetupHoverTilt(); // S3: the hover nozzles' bank joints
+        SmsFluddSetupTurboNeck(); // S5 fix 2: NozzleCtrl on the turbo's jnt_back_nozzle_neck (the gun angle)
         SmsFluddSetupSwimPump();  // ma_swpmp on the upper body while the swim clips run outside the tree
         SmsFluddSetupTurboAnims(); // S5: ma_turbo_dash / ma_broad_jump as BaseSM states
         // the pump clips ping-pong (addUpper: ATTR_PING_PONG_LOOP; the tank's are slaved to Mario's)
@@ -12129,6 +12132,7 @@ public partial class Mario : CharacterBody3D
             SmsFluddDashTick();    // the input stage's turbo block: mDashSpeed, FLUDD_EMITTING
         }
         SmsFluddApplyTilt();
+        SmsFluddApplyGunAngle();
         SmsFluddPoseWater();
         if (SmsDebugPrint)
         {
@@ -12680,7 +12684,16 @@ public partial class Mario : CharacterBody3D
         if (_fluddNozzle == SmsNozzle.Spray)
             SmsFluddSprayMovementTick(np);
         else
+        {
             SmsFluddTriggerMovementTick(np, ref _fluddTrigState, ref _fluddTrigLeft, ref _fluddTrigFill);
+            if (_fluddWater > 0)
+            {
+                // TNozzleTrigger::movement() ends in calcGunAngle() (not without water): angle = -LAngleBase -- the turbo's 4096 = 22.5 deg,
+                // the hover's 0 -- clamped [LAngleMin, LAngleMax], chased at LAngleChase (0.1: from 0 after a change in ~30 ticks)
+                float target = Mathf.Clamp(-np.LAngleBase, np.LAngleMin, np.LAngleMax);
+                _fluddGunAngle += (target - _fluddGunAngle) * np.LAngleChase;
+            }
+        }
         _fluddAFrame = false; // a frame press counts once
         _fluddEmittedTick = 0;
         if (_smsInWater)
@@ -13159,6 +13172,28 @@ public partial class Mario : CharacterBody3D
         _fluddTilt.Angles[1] = -_fluddTiltR * SmsUnits.BamToRad;
     }
 
+    /// <summary>NozzleCtrl (WaterGun.cpp 126, bound to jnt_back_nozzle_neck): a gun angle below 0 turns the neck about its local Z
+    /// after the clip -- the turbo's head tilted 22.5 deg down (-LAngleBase) whenever it is selected with water. A gun angle above 0
+    /// bends the chest instead (MarioWaistCtrl: the squat aim up, S2b). The spray's callback joint (chn_muzzle_l) is not in
+    /// normal_wg and its LAngleBase is 0; rocket_wg has no neck.</summary>
+    private void SmsFluddApplyGunAngle()
+    {
+        if (_fluddNeckRot == null)
+            return;
+        _fluddNeckRot.Angles[0] = _fluddNozzle == SmsNozzle.Turbo && _fluddGunAngle < 0f ? _fluddGunAngle * SmsUnits.BamToRad : 0f;
+    }
+
+    private void SmsFluddSetupTurboNeck()
+    {
+        var sk = _fluddNozzleSkel[(int)SmsNozzle.Turbo];
+        if (sk == null)
+            return;
+        _fluddNeckRot = new SmsBoneRotZ { Name = "SmsTurboNeckAim", BoneNames = new[] { "jnt_back_nozzle_neck" }, Angles = new float[1] };
+        sk.AddChild(_fluddNeckRot);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS fludd] turbo neck joint jnt_back_nozzle_neck {(sk.FindBone("jnt_back_nozzle_neck") >= 0 ? "yes" : "NO")}: the gun angle -{SmsParams.Fludd.Turbo.LAngleBase} BAM = {SmsParams.Fludd.Turbo.LAngleBase * SmsUnits.BamToRad * 180f / Mathf.Pi:F1} deg down");
+    }
+
     private void SmsFluddSetupHoverTilt()
     {
         var sk = _fluddNozzleSkel[(int)SmsNozzle.Hover];
@@ -13187,7 +13222,11 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>FLUDD in use: the upper body pumps or holds the pump, or the turbo dashes / ramps. No waist IK then (Jaysonn).</summary>
     private bool SmsFluddBusy() =>
-        UseSmsPhysics && _fluddReady && (_fluddUpper != SmsUpper.Idle || _fluddDashing || _fluddDashSpeed > 0f);
+        SmsPumpingStyle() || (UseSmsPhysics && _fluddReady && (_fluddDashing || _fluddDashSpeed > 0f));
+
+    /// <summary>isUpperPumpingStyle(): the upper body is PUMPING or HOLDING_PUMP -- the run and the swim turn at the pumping rates,
+    /// no U-turn (isRunningTurnning() is false).</summary>
+    private bool SmsPumpingStyle() => UseSmsPhysics && _fluddReady && _fluddUpper != SmsUpper.Idle;
 
     /// <summary>The input stage's dash block, one tick (after the gun, so the trigger's state is this tick's).</summary>
     private void SmsFluddDashTick()
@@ -13213,7 +13252,7 @@ public partial class Mario : CharacterBody3D
                 if (_fluddDashing && !SmsDashState())
                     _fluddDashing = false; // mDashTimer = 0, offFlag: the status is not RUN (0x440) or SWIM_PADDLE
                 if (_fluddDashing && !wasOn && SmsDebugPrint)
-                    GD.Print($"[SMS turbo] dash on (from {_fluddDashDbgFrom}): {SmsParams.Mario.DashMax:F0} a tick = {SmsUnits.SpeedToMps(SmsParams.Mario.DashMax):F1} m/s, water {_fluddWater}");
+                    GD.Print($"[SMS turbo] dash on (from {_fluddDashDbgFrom}): {SmsParams.Mario.DashMax:F0} a tick = {SmsUnits.SpeedToMps(SmsParams.Mario.DashMax):F1} m/s, water {_fluddWater}, jet {SmsFluddJetDbg()}");
                 else if (!_fluddDashing && wasOn)
                     SmsFluddDashOff("not running or paddling");
             }
@@ -13227,6 +13266,17 @@ public partial class Mario : CharacterBody3D
             if (_fluddDashing)
                 SmsFluddDashOff(_fluddNozzle != SmsNozzle.Turbo ? "the nozzle changed" : _fluddWater <= 0 ? "the tank ran dry" : "R released");
         }
+    }
+
+    /// <summary>Where the turbo's jet leaves right now: its pitch from level and its heading against the face (-1 = straight back).</summary>
+    private string SmsFluddJetDbg()
+    {
+        if (!SmsFluddMuzzle(0, out _, out Vector3 d))
+            return "no muzzle";
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+        Vector3 flat = new Vector3(d.X, 0f, d.Z);
+        float along = flat.LengthSquared() > 1e-6f ? flat.Normalized().Dot(face) : 0f;
+        return $"{Mathf.RadToDeg(Mathf.Asin(Mathf.Clamp(d.Y, -1f, 1f))):+0.0} deg from level, {along:F2} along the face (neck {_fluddGunAngle:F0} BAM)";
     }
 
     private void SmsFluddDashOff(string why)
@@ -14474,6 +14524,7 @@ public partial class Mario : CharacterBody3D
         float fwd = SmsUnits.MpsToSpeed(velXZ.Dot(faceDir)); // signed forward speed along the facing
         bool stick = direction.LengthSquared() > 1e-6f && _smsIntendedMag > 0f;
         float intendedYaw = stick ? SmsMath.YawFromDir(direction.Normalized()) : _smsFaceYaw;
+        bool pumpingStyle = SmsPumpingStyle(); // isUpperPumpingStyle(): no U-turn, the PumpingRotSp turn
         Vector3 floorN = IsOnFloor() ? GetFloorNormal() : Vector3.Up;
         float floorNy = floorN.Y;
 
@@ -14483,9 +14534,9 @@ public partial class Mario : CharacterBody3D
             {
                 SmsRun.WalkEndTick(ref fwd); // stick released: 1/tick
             }
-            else if (SmsRun.IsTurnReversal(_smsFaceYaw, intendedYaw) && fwd >= SmsParams.Run.TurnNeedSp)
+            else if (!pumpingStyle && SmsRun.IsTurnReversal(_smsFaceYaw, intendedYaw) && fwd >= SmsParams.Run.TurnNeedSp)
             {
-                // turnning(): skid down at 4/tick, then TURN_END facing the stick at fwd 8.
+                // turnning(): skid down at 4/tick, then TURN_END facing the stick at fwd 8 (isRunningTurnning(): never while pumping).
                 SmsRun.BrakeTick(ref fwd);
                 if (fwd <= 0f)
                 {
@@ -14496,7 +14547,10 @@ public partial class Mario : CharacterBody3D
             else
             {
                 SmsRun.AccelTick(ref fwd, _smsIntendedMag, floorNy);
-                _smsFaceYaw = SmsMath.ConvergeAngle(_smsFaceYaw, intendedYaw, SmsRun.TurnRateRad(fwd));
+                // doRunning(): RunningRotSp (1500) free; PumpingRotSp 300..600 by speed while the upper body pumps or holds the pump;
+                // RunningRotSpMin (1500) while FLUDD_EMITTING -- the dash turns at the free run's rate, whatever the pumping says
+                float rate = _fluddDashing ? SmsRun.DashTurnRateRad() : pumpingStyle ? SmsRun.PumpingTurnRateRad(fwd) : SmsRun.TurnRateRad(fwd);
+                _smsFaceYaw = SmsMath.ConvergeAngle(_smsFaceYaw, intendedYaw, rate);
             }
             // slopeProcess(): slope accel by surface type (0/0 on normal ground, so slopes do not change running speed)
             // and the RunningMax clamp. The step itself is scaled by normal.y in the EndFrame block (walkProcess()).

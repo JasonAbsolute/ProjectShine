@@ -128,6 +128,8 @@ public static class SmsParams
         public const float DashAcc = 0.5f;              // mDashSpeed climbs this a tick to 32 while the turbo pumps
         public const float DashBrake = 0.1f;            // mDashSpeed x this a tick once the pumping stops
         public const int DashStartTime = 0;             // ticks at 32 before the flag (0: at once)
+        public const int PumpingRotSpMin = 300;         // BAM/tick turning while the upper body pumps or holds the pump, at fwd 0 ...
+        public const int PumpingRotSpMax = 600;         // ... and at the run cap 32 (0.03125 x fwd x (max - min) + min); defaults 0x100 / 0x200
         public const float DamageFallHeight = 1500f;    // fall further than this at vy <= -70 -> hard landing
         public const float FeelDeep = 800f;
         public const float TramplePowStep1 = 35f;       // stomp bounce vy (1st), + 0.25*fwd
@@ -302,6 +304,7 @@ public static class SmsParams
         public const float MoveSp = 0.3f;              // fwd += mag * MoveSp / 32 a tick
         public const float MoveBrake = 0.97f;          // fwd *= a tick
         public const int RotSp = 300;                  // BAM a tick toward the stick (SwimmingRotSpMin == Max shipped)
+        public const int PumpingRotSp = 200;           // ... while the upper body pumps or holds the pump (PumpingRotSpMin == Max shipped)
         public const float Gravity = 0.05f;            // vy -= a tick
         public const float PaddleAnmRate = 0.5f;       // swimPaddle(): ANIM_PADDLE_SWIM's rate
         public const float PaddleAnmRateSurf = 5f;     // ... with FLUDD_EMITTING (the turbo's surf)
@@ -502,6 +505,17 @@ public static class SmsRun
         float bam = 0.03125f * (fwd * (max - min)) + min;
         return bam * SmsUnits.BamToRad;
     }
+
+    /// <summary>doRunning() while isUpperPumpingStyle(): PumpingRotSpMin..Max by speed (300 standing, 600 at 32), radians per tick.</summary>
+    public static float PumpingTurnRateRad(float fwd)
+    {
+        float min = SmsParams.Mario.PumpingRotSpMin, max = SmsParams.Mario.PumpingRotSpMax;
+        float bam = 0.03125f * (fwd * (max - min)) + min;
+        return bam * SmsUnits.BamToRad;
+    }
+
+    /// <summary>doRunning() while FLUDD_EMITTING: RunningRotSpMin flat (1500 shipped), radians per tick.</summary>
+    public static float DashTurnRateRad() => SmsParams.Mario.RunningRotSpMin * SmsUnits.BamToRad;
 
     /// <summary>Turning in place (WaitingRotSp), radians per tick.</summary>
     public static float WaitTurnRateRad() => SmsParams.Mario.WaitingRotSp * SmsUnits.BamToRad;
@@ -896,6 +910,10 @@ public static class SmsSelfTest
         // The turbo: 32 / 0.5 = 64 ticks of ramp, 4500 / (150 - 100) = 90 ticks of charge at full R, the broad jump's apex.
         {
             Check("turbo: dash ramp ticks to 32", 32f / SmsParams.Mario.DashAcc, 64f, 0.01f);
+            Check("pumping turn at fwd 32 (BAM)", SmsRun.PumpingTurnRateRad(32f) / SmsUnits.BamToRad, 600f, 0.01f);
+            Check("pumping turn at fwd 0 (BAM)", SmsRun.PumpingTurnRateRad(0f) / SmsUnits.BamToRad, 300f, 0.01f);
+            Check("dash turn (BAM)", SmsRun.DashTurnRateRad() / SmsUnits.BamToRad, 1500f, 0.01f);
+            Check("turbo neck: gun angle (deg)", -SmsParams.Fludd.Turbo.LAngleBase * SmsUnits.BamToRad * 180f / MathF.PI, -22.5f, 0.01f);
             Check("turbo: charge ticks at full R", SmsParams.Fludd.Turbo.TriggerMax / (150f - SmsParams.Fludd.Turbo.TriggerDec), 90f, 0.01f);
             float fwd = 80f, vy = 0f; SmsAir.ApplyLaunch(SmsAir.Launch.BroadJump, ref fwd, ref vy);
             Check("broad jump: launch fwd", fwd, 60f, 0.001f);

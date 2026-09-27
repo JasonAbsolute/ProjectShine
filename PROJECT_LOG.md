@@ -2119,6 +2119,41 @@ broad jump, the surf at 80 with the paddle at 5.0):
 - Read on the way, for S2b: `canSquat()` is false with the turbo nozzle (index 5) and with any RocketType-1 nozzle (hover, rocket):
   the squat aim is the spray nozzle's alone.
 Debug: `[SMS turbo] broad jump landed into the run at fwd 60.0, no jump chain, dash still on`.
+
+**S5 fix 2 — the steering with FLUDD, the turbo's nozzle angle** (Jaysonn: "shouldn't be able to cut turns so hard with the spray;
+the turbo's spray angle in the water is off; the turbo's steering on land").
+- **`doRunning()`'s turn rate** (MarioRun.cpp 492): while `isUpperPumpingStyle()` (the upper body PUMPING or HOLDING_PUMP) it is
+  `0.03125 × fwd × (PumpingRotSpMax − Min) + Min` — `mario.prm` shipped **300 / 600** (300 standing, 600 at the run cap; the code
+  defaults 0x100 / 0x200 are not the game) against the free run's 1500 / 1500: spraying on the run turns 2.5 to 5 times slower.
+  Then `if FLUDD_EMITTING → rotSp = RunningRotSpMin` (1500): **the turbo dash turns at the free run's rate**, whatever the pumping
+  says. Port: `SmsRun.PumpingTurnRateRad(fwd)`, `SmsRun.DashTurnRateRad()`, picked in `SmsGroundTick`.
+- **`isRunningTurnning()` is false while pumping** (MarioRun.cpp 87): no U-turn — no skid, no `TURN_END`, no U-turn jump — while the
+  upper body pumps; a reversed stick is a plain turn at the pumping rate. The port's U-turn (`sideFlipTurning`, and the skid branch
+  in `SmsGroundTick`) was reachable from a spray on the run and from the dash — where the skid's brake fought the forced 80 and a
+  reversed stick did nothing at all. Both gated on `SmsPumpingStyle()`.
+- **The swim** (MarioSwim.cpp 29): `isUpperPumpingStyle()` → `swim.prm` `PumpingRotSp` **200** instead of `SwimmingRotSp` 300: the
+  paddle turns slower while pumping (the spray in the water, the surf).
+- **The turbo's nozzle angle.** `TNozzleBase::calcGunAngle()` runs every tick from the current nozzle's `movement()` (the trigger
+  nozzle's too, after its early return without water): not squatting → `angle = −LAngleBase`, clamped `[LAngleMin, LAngleMax]`,
+  chased at `LAngleChase`. `nozzletrgturbo.prm`: **LAngleBase 4096 = 22.5°**, chase 0.1 (the spray's and the hover's are 0).
+  `NozzleCtrl`, the callback on **`jnt_back_nozzle_neck`**: a gun angle below 0 concatenates `MsMtxSetRotRPH(0, 0, deg)` after the
+  clip — the standard right-hand Rz (MathUtil.cpp 226) about the joint's local Z. Measured on `back_wg.glb`'s shooting pose: −22.5°
+  at the neck pitches the muzzle **22.8° down**. So the turbo's head sits tilted 22.5° down whenever it is selected with water (from
+  0 after a nozzle change in ~30 ticks), on land and in the water alike — the port shot along the clip's level barrel, 22.5° too
+  high, which is the surf's wrong angle. Ported: `_fluddGunAngle` now chased for the trigger nozzles too, applied by a second
+  `SmsBoneRotZ` (`SmsTurboNeckAim`) on back_wg's neck. `rocket_wg` has no neck joint (its LAngleBase 4096 moves nothing); the
+  spray's callback joint `chn_muzzle_l` is not in `normal_wg` and its base is 0; a gun angle **above** 0 bends the chest instead
+  (`MarioWaistCtrl` — the squat aim up, S2b). The emit under the surface + 20 was already refused (WaterGun.cpp 1794).
+- **A correction to fix 1's note "the game has no waist lean"** — it has one. `considerWaist()` (MarioDraw.cpp 1461): pitch
+  `WaistPitch × fwd` (`bodyanglefree.prm` 230, max 12000) and roll `WaistRoll × turn × fwd` (0.5, max 8442), rate 0.07, applied by
+  `MarioWaistCtrl` on the **chest** joint for `ANIM_RUN1 / RUN2`. But that callback's `HAS_FLUDD` branch comes first: with the pack
+  on it only bends the chest for a positive gun angle, and the run-lean branch is never reached. **Mario leans on the run only
+  without FLUDD** (the secret courses, Yoshi). The pumping set (`bodyanglewatergun.prm`: −50 × fwd capped 2000 = 11° back, roll max
+  4000) is computed but unreachable in retail. So "no waist IK while using FLUDD" points the game's way; the game goes further —
+  none at all while he wears the pack.
+Debug: `[SMS turbo] dash on (...): ... jet −20.3 deg from level, −0.98 along the face (neck −4096 BAM)`; setup `turbo neck joint
+jnt_back_nozzle_neck yes: the gun angle −4096 BAM = 22.5 deg down`. Self-test: `pumping turn at fwd 32 (BAM) 600`, `at fwd 0 300`,
+`dash turn 1500`, `turbo neck: gun angle (deg) −22.5`.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
