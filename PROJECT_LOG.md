@@ -1968,7 +1968,7 @@ rocket nozzle; with the hover it is a **spring**, not a thrust.
   overwritten before the next one and never shows; `fwd × Brake 0.985`; `vel.xz = fwd` along the face. With the move at
   `0.25 × vel` a tick the gap closes 0.5 % a tick: 45 % a second, **192 of the 230 units in the 3 s window** (104 after 1 s),
   1.85 m/s at the start. **Stick:** within 30° of the face (`0x1555`) or beyond 150° (`0x6AAA`) it pushes along the face by
-  `mag × cos × DivingParams.AccelControl 0.02` a tick with **no turn**; between, the face turns toward it at `RotSp` 200 BAM a
+  `mag × cos × DivingParams.AccelControl` a tick — **shipped 0.01** (`/Mario/Diving.prm`; the code default 0.02 is what the S3 port carried until 2026-09-27, doubling the push: 21.3 units settled with the stick held, 8.6 m/s, not 42.7) with **no turn**; between, the face turns toward it at `RotSp` 200 BAM a
   tick (1.1°) with **no push** — to move sideways you turn first. No A, no B (`rocketing()` has neither). `ANIM_LAND` with the
   pump on the upper body; the head turns `HoverHeadAngle` 5294 (29°) **down** while he can spray (MarioDraw.cpp; upperbody.prm's
   FeelDeep +8192 looks down a cliff, FrontWall −8192 up a wall, so positive is down) — on the run's head-lock modifier, eased.
@@ -2001,6 +2001,8 @@ rocket nozzle; with the hover it is a **spring**, not a thrust.
   staying on through a hover (the main air path switches `isSpining` every frame; the hover and the swim entries now switch
   it off like the hang, the stomp and the bonk do). Pulling the stick back flies him backwards fast (`cos` −1 at the dive
   rate against the 0.985 brake settles at ±42 units = 16.9 m/s either way, faster than the run's 32): the game's numbers.
+  **Wrong — see "the hover's stick" under the waist's third look (2026-09-27): the shipped `Diving.prm` rate is 0.01, the
+  settled speed ±21.3 units (8.6 m/s); this build pushed twice the game.**
 - Playtest 2: "no upward motion now, but he still uses FLUDD after the hover expires; in the game you can't until you land,
   unless you switch nozzles". `checkPumpEnable()` (MarioUpper.cpp) has two clauses S1 left out: `mStatus != ROCKET_LANDING ||
   !checkCurrentNozzleRocketType(TWaterGun::Rocket)` — `TWaterGun::Rocket` is the enum value **1** and the check compares the
@@ -2202,6 +2204,31 @@ largest per-tick yaw change and the camera yaw drift, the roll's two drivers.
 Debug: `[SMS waist] on (ma_run2): pitch +38.1 deg, roll -3.2 deg, the free set`, then once a second `pitch +40.4 deg, roll +0.0 deg
 at 32.0 u/tick (free)`; setup `considerWaist on jnt_chest yes: ...`. Self-test: `waist: free pitch at fwd 32 (deg) 40.43`, `free
 roll, 1500 BAM/tick turn at 32 (deg) 46.37`, `pumping pitch at fwd 32 (deg) -8.79`, `ticks to 95% of the run lean 42`.
+
+**The waist, third look, and the hover's stick** (Jaysonn, 2026-09-27: "feeling good right now but steering feels off still"; his log:
+a session of running, jumps, U-turns and twelve hovers — no spray, no turbo). Two things in that path were not the game's.
+(1) **The hover pushed twice as hard as the game.** `rocketing()` adds `mag × cos(angleDiff) × mDivingParams.mAccelControl` a tick;
+`TDivingParams`'s code default is 0.02 (MarioInit.cpp 923) but the class loads `/Mario/Diving.prm` (45) and the shipped file says
+**0.01**. S3 had 0.02 and called it shipped. Full stick: +0.32 a tick, settling against the 0.985 brake at 21.3 units (8.6 m/s) —
+not 42.7 (17 m/s); pulling back reverses him half as hard (his log had +32 → −17 within a second). `SmsHover.AccelControl` 0.01,
+two self-test checks (`hover: full-stick push a tick 0.32`, `settled speed with the stick held 21.33`).
+(2) **The twist was turned the wrong way.** The setup line read `jnt_chest local X in world: (0.00, 1.00, 0.00) -> UP`, and the
+game's own model agrees: `ma_mdl1.bmd` JNT1 has `chn_chest` at rot (0, 90, 0) under `center` and `jnt_chest` at (0, 0, 90) under it,
+so the chest's bind frame is X → up the spine, Y → +Z (the front: the toes point +Z, the left limbs sit at +X), Z → +X (lateral) —
+the shoulders hang 29.9 along X. `MsMtxSetRotRPH(roll, 0, pitch)` = `Rz(pitch) × Rx(roll)` (MathUtil.cpp 226) concatenated onto that
+joint: `Rx(roll)` is a twist about the spine, and with the game's sign (a left turn is a positive yaw change — the face `(sin, 0, cos)`
+turns from +Z toward +X, his left) a positive roll turns the chest counterclockwise seen from above, **into the turn**. The flip
+(0e545b1) turned it away: steering left, his chest and head faced right. Reverted — `_smsWaist.Roll = +_smsWaistRoll`. What he read as
+"leans out" with the game's sign is the game's geometry: `Rz(pitch) × Rx(roll) × v` twists first and then pitches the twisted torso
+forward, so the shoulder that came forward drops by `asin(sin pitch × sin roll)` — 27° at the caps (40° / 46°) — and in a left turn
+the forward shoulder is the right one: **the outside shoulder dips while the chest and head look into the turn.** That is what the
+original does with these joints and these numbers; the inside-shoulder-down look would be a deliberate deviation.
+(3) The waist prints wrote negatives as `-+18.2` (`{x:+0.0}`: .NET takes the '+' literally); now `+0.0;-0.0`, and the on / once-a-second
+lines add `(shoulders 31 deg into the turn)` / `AWAY from` — the twist's sign against the frame's yaw change.
+Checked and left as the game: `RunningRotSp` 1500 / 1500, `PumpingRotSp` 300 / 600, swim 300 / 200, hover `RotSp` 200, `TurnNeedSp`
+10, `WaitingRotSp` 220, the U-turn gate 0x471C (100°), `mIntendedYaw = matan(−mStickV, mStickH)` from the s16 pad with the ±7 / 6 shift
+(the port's `PadVector`), the 120 Hz movement (`MarDirectorDirect.cpp` 85–150: the simulation-tick loop performs the movement list every
+tick, gates A / B only thin out other actors).
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

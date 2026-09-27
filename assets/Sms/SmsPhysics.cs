@@ -802,7 +802,9 @@ public static class SmsHover
     public const int RotSp = 200;              // hhover.prm: BAM a tick the face turns toward a sideways stick (min == max)
     public const float AccelRate = 0.02f;      // hhover.prm: vy = (target - y) x this
     public const float Brake = 0.985f;         // hhover.prm: fwd x this a tick
-    public const float AccelControl = 0.02f;   // DivingParams.mAccelControl (shipped): fwd += mag x cos x this on a fore / aft stick
+    public const float AccelControl = 0.01f;   // /Mario/Diving.prm SHIPPED mAccelControl 0.01 (the code default is 0.02, which the port
+                                               // wrongly carried): fwd += mag x cos x this a tick on a fore / aft stick (rocketing(),
+                                               // MarioJump.cpp 959). Held forward it settles at 32 x 0.01 / (1 - Brake) = 21.3 units.
     public const float EntryVy = 10f;          // setStatusToJumping(ROCKET): mVel.y = 10, overwritten by the spring before the first move
     public const int FrontBandBam = 0x1555;    // a stick within 30 deg of the face pushes (no turn)
     public const int BackBandBam = 0x6AAA;     // beyond 150 deg pulls back (no turn); between the two: the turn (no push)
@@ -931,6 +933,8 @@ public static class SmsSelfTest
             Check("hover: rise after the 360-tick window (units)", SmsHover.RiseAfter(360), 192.1f, 0.5f);
             Check("hover: rise after 1 s (units)", SmsHover.RiseAfter(120), 104.0f, 0.5f);
             Check("hover: 2 water a tick -> seconds in a full tank", SmsParams.Fludd.Hover.AmountMax / (float)(SmsParams.Fludd.Hover.Emitters * SmsParams.Fludd.Hover.DecRate) / SmsUnits.TicksPerSecond, 41.67f, 0.05f);
+            Check("hover: full-stick push a tick (units, Diving.prm 0.01)", 32f * SmsHover.AccelControl, 0.32f, 0.0001f);
+            Check("hover: settled speed with the stick held (units)", 32f * SmsHover.AccelControl / (1f - SmsHover.Brake), 21.33f, 0.05f);
         }
         // The rocket: 10 + 4 x 35 - 5 = 145 handed to the fall; the apex 2744 units = 36.9 m = 17 Mario heights, no cap.
         {

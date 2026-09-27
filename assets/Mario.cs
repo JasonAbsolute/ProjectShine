@@ -1178,6 +1178,7 @@ public partial class Mario : CharacterBody3D
     private SmsWaistLean _smsWaist;                 // MarioWaistCtrl on jnt_chest (considerWaist's lean); replaces the waist IK under SMS
     private float _smsWaistPitch = 0f, _smsWaistRoll = 0f; // mWaistPitch / mWaistRoll (BAM, floats like the game's)
     private float _smsWaistPrevYaw = 0f;            // unk9C: the face at the top of the frame
+    private float _smsWaistDbgLastDYaw = 0f;        // debug: the frame's yaw change (BAM), for the into / away readout
     private bool _smsWaistPrevYawValid = false;
     private bool _smsWaistDbgOn = false;
     private int _smsWaistDbgTicks = 0;
@@ -13467,12 +13468,24 @@ public partial class Mario : CharacterBody3D
         }
         float dYawBam = _smsFaceValid ? SmsMath.WrapAngle(_smsFaceYaw - _smsWaistPrevYaw) / SmsUnits.BamToRad : 0f;
         _smsWaistPrevYaw = _smsFaceYaw;
+        _smsWaistDbgLastDYaw = dYawBam;
         int n = Math.Max(1, (int)Math.Round(delta * 120.0));
         _smsWaistDbgMaxDYaw = MathF.Max(_smsWaistDbgMaxDYaw, MathF.Abs(dYawBam) / n);
         float fwd = SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()); // mForwardVel, in every status
         for (int i = 0; i < n; i++)
             SmsWaistTick(fwd, dYawBam / n);
         SmsWaistApply();
+    }
+
+    /// <summary>" (shoulders 12 deg into the turn)" / "away from" for the waist prints: the twist's sign against this frame's yaw change
+    /// (a left turn is a positive yaw change; the game's roll has the same sign). Empty while he runs straight or the twist is small.</summary>
+    private string SmsWaistTwistDbg()
+    {
+        float rollDeg = _smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi;
+        if (!_smsFaceValid || MathF.Abs(rollDeg) < 2f || MathF.Abs(_smsWaistDbgLastDYaw) < 1f)
+            return "";
+        bool into = MathF.Sign(rollDeg) == MathF.Sign(_smsWaistDbgLastDYaw);
+        return $" (shoulders {MathF.Abs(rollDeg):0} deg {(into ? "into" : "AWAY from")} the turn)";
     }
 
     /// <summary>MarioWaistCtrl: the chest turned by the lean only while the body animation is RUN1 / RUN2 -- the port's ma_run1 (walking,
@@ -13485,16 +13498,20 @@ public partial class Mario : CharacterBody3D
         bool apply = node == "ma_run1" || node == "ma_run2";
         _smsWaist.Apply = apply;
         _smsWaist.Pitch = _smsWaistPitch * SmsUnits.BamToRad;
-        // The value keeps the game's sign (a left turn is positive); the rig's jnt_chest X axis runs the other way from the BMD's,
-        // so the same rotation banked him OUT of the turn (Jaysonn, 22:05): negated at the joint to bank into it as the game does.
-        _smsWaist.Roll = -_smsWaistRoll * SmsUnits.BamToRad;
+        // The game's sign, applied as the game does: a left turn is a positive yaw change, so a positive roll, and Rx(roll) about
+        // jnt_chest's local X -- up the spine in the rig AND in ma_mdl1.bmd (JNT1: chn_chest (0, 90, 0), jnt_chest (0, 0, 90) -> X up,
+        // Y forward, Z lateral) -- turns the chest counterclockwise seen from above: INTO the turn, the torso leading the feet.
+        // 0e545b1 negated this after "he leans out": what he saw is the geometry, not the sign -- Rz(pitch) x Rx(roll) twists first
+        // and pitches the twisted torso forward, so the shoulder that came forward (the outside one) dips by asin(sin p x sin r).
+        // The flip turned his chest and head AWAY from the turn ("steering feels off", 2026-09-27). Reverted.
+        _smsWaist.Roll = _smsWaistRoll * SmsUnits.BamToRad;
         if (SmsDebugPrint)
         {
             if (apply != _smsWaistDbgOn)
             {
                 _smsWaistDbgOn = apply;
                 _smsWaistDbgTicks = 0;
-                GD.Print($"[SMS waist] {(apply ? "on" : "off")} ({(node.Length > 0 ? node : "no tree node")}): pitch {_smsWaistPitch * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0} deg, roll {_smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0} deg, {(SmsPumpingStyle() ? "the water-gun set" : "the free set")}");
+                GD.Print($"[SMS waist] {(apply ? "on" : "off")} ({(node.Length > 0 ? node : "no tree node")}): pitch {_smsWaistPitch * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg, roll {_smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg{SmsWaistTwistDbg()}, {(SmsPumpingStyle() ? "the water-gun set" : "the free set")}");
             }
             else if (apply && ++_smsWaistDbgTicks >= 60)
             {
@@ -13502,7 +13519,7 @@ public partial class Mario : CharacterBody3D
                 float camYaw = springArmPivot != null ? springArmPivot.Rotation.Y : 0f;
                 float camDrift = _smsWaistDbgCamValid ? Mathf.RadToDeg(SmsMath.WrapAngle(camYaw - _smsWaistDbgCamYaw)) : 0f;
                 _smsWaistDbgCamYaw = camYaw; _smsWaistDbgCamValid = true;
-                GD.Print($"[SMS waist] pitch {_smsWaistPitch * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0} deg, roll {_smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0} deg at {SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()):F1} u/tick ({(SmsPumpingStyle() ? "pumping" : "free")}); this second: yaw change up to {_smsWaistDbgMaxDYaw:F0} BAM a tick ({_smsWaistDbgMaxDYaw * SmsUnits.BamToRad * 180f / Mathf.Pi:F2} deg), camera yaw drift {camDrift:+0.0} deg");
+                GD.Print($"[SMS waist] pitch {_smsWaistPitch * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg, roll {_smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg{SmsWaistTwistDbg()} at {SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()):F1} u/tick ({(SmsPumpingStyle() ? "pumping" : "free")}); this second: yaw change up to {_smsWaistDbgMaxDYaw:F0} BAM a tick ({_smsWaistDbgMaxDYaw * SmsUnits.BamToRad * 180f / Mathf.Pi:F2} deg), camera yaw drift {camDrift:+0.0;-0.0} deg");
                 _smsWaistDbgMaxDYaw = 0f;
             }
         }
@@ -13519,7 +13536,9 @@ public partial class Mario : CharacterBody3D
         {
             // the game's roll is a twist about the chest's local X (up the spine in the BMD): report where the rig's X points
             Vector3 xw = (skeleton.GlobalTransform.Basis * skeleton.GetBoneGlobalRest(skeleton.FindBone("jnt_chest")).Basis.X).Normalized();
-            GD.Print($"[SMS waist] jnt_chest local X in world: ({xw.X:F2}, {xw.Y:F2}, {xw.Z:F2}) -> {(xw.Y > 0.5f ? "UP: a positive roll turns the shoulders counterclockwise seen from above (to his left)" : xw.Y < -0.5f ? "DOWN: a positive roll turns the shoulders clockwise seen from above (to his right)" : "NOT along the spine: the roll would not be a twist")}");
+            Vector3 yw = (armature.GlobalTransform.Basis.Inverse() * skeleton.GlobalTransform.Basis * skeleton.GetBoneGlobalRest(skeleton.FindBone("jnt_chest")).Basis.Y).Normalized();
+            GD.Print($"[SMS waist] jnt_chest local Y in the armature's frame: ({yw.X:F2}, {yw.Y:F2}, {yw.Z:F2}) -> a positive pitch tilts the spine {(yw.Z < -0.5f ? "FORWARD (the model's -Z)" : yw.Z > 0.5f ? "BACKWARD (+Z)" : "SIDEWAYS?")}");
+            GD.Print($"[SMS waist] jnt_chest local X in world: ({xw.X:F2}, {xw.Y:F2}, {xw.Z:F2}) -> {(xw.Y > 0.5f ? "UP: a positive roll turns the shoulders counterclockwise seen from above (to his left) -- the game's sign, into a left turn" : xw.Y < -0.5f ? "DOWN: a positive roll turns the shoulders clockwise seen from above (to his right)" : "NOT along the spine: the roll would not be a twist")}");
         }
         if (SmsDebugPrint)
             GD.Print($"[SMS waist] considerWaist on jnt_chest {(skeleton.FindBone("jnt_chest") >= 0 ? "yes" : "NO")}: free {SmsParams.Waist.FreePitch} x fwd (cap {SmsParams.Waist.FreePitchMax}) / roll {SmsParams.Waist.FreeRoll} (cap {SmsParams.Waist.FreeRollMax}) at {SmsParams.Waist.FreeRate}; pumping {SmsParams.Waist.GunPitch} x fwd (cap {SmsParams.Waist.GunPitchMax}) / roll cap {SmsParams.Waist.GunRollMax} at {SmsParams.Waist.GunRate}; the waist IK is retired under SMS");
