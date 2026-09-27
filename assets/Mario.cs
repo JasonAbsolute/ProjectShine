@@ -1181,6 +1181,9 @@ public partial class Mario : CharacterBody3D
     private bool _smsWaistPrevYawValid = false;
     private bool _smsWaistDbgOn = false;
     private int _smsWaistDbgTicks = 0;
+    private float _smsWaistDbgMaxDYaw = 0f;          // the second's largest per-tick yaw change (BAM): the roll's driver
+    private float _smsWaistDbgCamYaw = 0f;
+    private bool _smsWaistDbgCamValid = false;
     private FootIK _footIK;
     private float _footIKWeight = 0f;
 
@@ -1997,9 +2000,13 @@ public partial class Mario : CharacterBody3D
         float camYaw = (springArmPivot != null) ? springArmPivot.Rotation.Y : 0f;
         if (stickStrength > DEADZONE)
         {
-            // Build direction in local space, rotate by camera yaw, and scale by strength
+            // Build direction in local space, rotate by camera yaw, and scale by strength.
+            // SMS: mIntendedYaw = matan(-mStickV, mStickH) from the pad's s8 stick -- the yaw moves in ~0.6 deg steps and a held
+            // thumb reads the same integers frame after frame; the float vector's analog noise must not reach the face (and x16
+            // the waist twist). SmsStick.PadVector is the same truncated, deadzone-shifted integer pair the magnitude uses.
+            Vector2 stickForDir = UseSmsPhysics ? SmsStick.PadVector(LstickVec) : LstickVec;
             inputDirWorld = (
-                Transform.Basis * new Vector3(LstickVec.X, 0, LstickVec.Y)
+                Transform.Basis * new Vector3(stickForDir.X, 0, stickForDir.Y)
             ).Normalized();
             inputDirWorld = inputDirWorld.Rotated(Vector3.Up, camYaw);
             inputDirWorld *= stickStrength;
@@ -13461,6 +13468,7 @@ public partial class Mario : CharacterBody3D
         float dYawBam = _smsFaceValid ? SmsMath.WrapAngle(_smsFaceYaw - _smsWaistPrevYaw) / SmsUnits.BamToRad : 0f;
         _smsWaistPrevYaw = _smsFaceYaw;
         int n = Math.Max(1, (int)Math.Round(delta * 120.0));
+        _smsWaistDbgMaxDYaw = MathF.Max(_smsWaistDbgMaxDYaw, MathF.Abs(dYawBam) / n);
         float fwd = SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()); // mForwardVel, in every status
         for (int i = 0; i < n; i++)
             SmsWaistTick(fwd, dYawBam / n);
@@ -13491,7 +13499,11 @@ public partial class Mario : CharacterBody3D
             else if (apply && ++_smsWaistDbgTicks >= 60)
             {
                 _smsWaistDbgTicks = 0;
-                GD.Print($"[SMS waist] pitch {_smsWaistPitch * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0} deg, roll {_smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0} deg at {SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()):F1} u/tick ({(SmsPumpingStyle() ? "pumping" : "free")})");
+                float camYaw = springArmPivot != null ? springArmPivot.Rotation.Y : 0f;
+                float camDrift = _smsWaistDbgCamValid ? Mathf.RadToDeg(SmsMath.WrapAngle(camYaw - _smsWaistDbgCamYaw)) : 0f;
+                _smsWaistDbgCamYaw = camYaw; _smsWaistDbgCamValid = true;
+                GD.Print($"[SMS waist] pitch {_smsWaistPitch * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0} deg, roll {_smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0} deg at {SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()):F1} u/tick ({(SmsPumpingStyle() ? "pumping" : "free")}); this second: yaw change up to {_smsWaistDbgMaxDYaw:F0} BAM a tick ({_smsWaistDbgMaxDYaw * SmsUnits.BamToRad * 180f / Mathf.Pi:F2} deg), camera yaw drift {camDrift:+0.0} deg");
+                _smsWaistDbgMaxDYaw = 0f;
             }
         }
     }
@@ -13503,6 +13515,12 @@ public partial class Mario : CharacterBody3D
         _smsWaist = new SmsWaistLean { Name = "SmsWaistLean" };
         skeleton.AddChild(_smsWaist);
         skeleton.MoveChild(_smsWaist, 0); // the chest is a parent of everything the other modifiers touch: the game's callback order
+        if (SmsDebugPrint && skeleton.FindBone("jnt_chest") >= 0)
+        {
+            // the game's roll is a twist about the chest's local X (up the spine in the BMD): report where the rig's X points
+            Vector3 xw = (skeleton.GlobalTransform.Basis * skeleton.GetBoneGlobalRest(skeleton.FindBone("jnt_chest")).Basis.X).Normalized();
+            GD.Print($"[SMS waist] jnt_chest local X in world: ({xw.X:F2}, {xw.Y:F2}, {xw.Z:F2}) -> {(xw.Y > 0.5f ? "UP: a positive roll turns the shoulders counterclockwise seen from above (to his left)" : xw.Y < -0.5f ? "DOWN: a positive roll turns the shoulders clockwise seen from above (to his right)" : "NOT along the spine: the roll would not be a twist")}");
+        }
         if (SmsDebugPrint)
             GD.Print($"[SMS waist] considerWaist on jnt_chest {(skeleton.FindBone("jnt_chest") >= 0 ? "yes" : "NO")}: free {SmsParams.Waist.FreePitch} x fwd (cap {SmsParams.Waist.FreePitchMax}) / roll {SmsParams.Waist.FreeRoll} (cap {SmsParams.Waist.FreeRollMax}) at {SmsParams.Waist.FreeRate}; pumping {SmsParams.Waist.GunPitch} x fwd (cap {SmsParams.Waist.GunPitchMax}) / roll cap {SmsParams.Waist.GunRollMax} at {SmsParams.Waist.GunRate}; the waist IK is retired under SMS");
     }

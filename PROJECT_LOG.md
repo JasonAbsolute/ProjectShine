@@ -2182,6 +2182,23 @@ is safe). Not ported: the Gesso-surfing sets, the shell ride, the L-camera bend.
 First run: the pitch reads right, the roll banked him **out** of a turn — the rig's `jnt_chest` local X runs the other way from
 the BMD's (a converter artefact; the hover bank on `jnt_nozzle_L / R` is about Z and was unaffected). `_smsWaistRoll` keeps the
 game's sign (a left turn is positive) and is negated at the joint (`SmsWaistApply`).
+
+**The waist, second look** (Jaysonn: banks now, but "Mario's head is looking back and forth while running straight"). What the
+roll *is*: `jnt_chest`'s local X runs up the spine (`ma_mdl1.glb`: X → world (0, 0.99, 0.15), Z → (1, 0, 0) lateral), so the game's
+`Rz(pitch)` pitches the chest and **`Rx(roll)` twists the shoulders about the spine — toward the turn**: the torso leads a sharp
+turn; it is not a sideways bank. The target is `0.5 × (this tick's yaw change, BAM) × fwd`: at the run cap every BAM of yaw change
+asks 16 BAM of twist, so a 0.5° wobble of the intended yaw asks 8° of shoulders, chased at 0.07 a tick — and the head rides on the
+shoulders. Running straight in the game asks nothing: `mIntendedYaw = matan(−mStickV, mStickH)` (MarioMove.cpp 1494) comes from the
+pad's s8 stick, the yaw moves in ~0.6° steps and a held thumb reads the same integers frame after frame. The port built the
+direction from Godot's float stick vector — the adapter's analog noise and the camera pivot's sub-degree drift went straight into
+the face and ×16 into the shoulders. Now the SMS direction comes from `SmsStick.PadVector`, the same truncated, deadzone-shifted
+integer pair the magnitude already used: the game's quantised yaw. (Checked on the way: `considerWaist` runs every 120 Hz step —
+`TMario::perform` calls `calcAnim` on each `CUE_MOVE` (MarioMain.cpp 98) and the movement list gets `CUE_MOVE` on all four
+iterations (MarDirectorDirect.cpp 141); `unk9C` is latched at the top of each `playerControl`, so `diffAngle` is that step's change;
+the pad is read on the first step only (105–115). The per-tick chase is right.) The roll's sign: the rig's X reads UP in the glb, which
+makes the game's own sign turn the shoulders into the turn — yet he saw "out" with it, so the flip stays until the new setup line
+(`jnt_chest local X in world: (…) -> UP / DOWN`) says which way the rig really points; the once-a-second line now adds the second's
+largest per-tick yaw change and the camera yaw drift, the roll's two drivers.
 Debug: `[SMS waist] on (ma_run2): pitch +38.1 deg, roll -3.2 deg, the free set`, then once a second `pitch +40.4 deg, roll +0.0 deg
 at 32.0 u/tick (free)`; setup `considerWaist on jnt_chest yes: ...`. Self-test: `waist: free pitch at fwd 32 (deg) 40.43`, `free
 roll, 1500 BAM/tick turn at 32 (deg) 46.37`, `pumping pitch at fwd 32 (deg) -8.79`, `ticks to 95% of the run lean 42`.

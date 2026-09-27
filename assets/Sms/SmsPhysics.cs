@@ -406,6 +406,20 @@ public static class SmsStick
 
     /// <summary>Intended magnitude normalised to 0..1 (mag / 32).</summary>
     public static float Strength01(Vector2 axis) => IntendedMag(axis) / 32f;
+
+    /// <summary>The pad's stick as the game sees it for the direction: the same truncated s8 pair with the +-7 / 6 deadzone shift
+    /// that <see cref="IntendedMag"/> uses (mIntendedYaw = matan(-mStickV, mStickH)). The yaw moves in ~0.6 deg steps at full
+    /// tilt and a held thumb reads the same integers frame after frame -- Godot's float vector would feed the analog noise into
+    /// the face. Falls back to the float vector inside the game's deadzone (the caller's own deadzone decides whether to move).</summary>
+    public static Vector2 PadVector(Vector2 axis)
+    {
+        int rawH = (int)(128f * axis.X);
+        int rawV = (int)(128f * axis.Y);
+        float h = 0f, v = 0f;
+        if (rawH < -7) h = rawH + 6; else if (rawH > 7) h = rawH - 6;
+        if (rawV < -7) v = rawV + 6; else if (rawV > 7) v = rawV - 6;
+        return h == 0f && v == 0f ? axis : new Vector2(h, v);
+    }
 }
 
 /// <summary>
