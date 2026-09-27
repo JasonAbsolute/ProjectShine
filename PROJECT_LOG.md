@@ -2260,6 +2260,10 @@ again with the clip and the lean fixed.
 Not ported (noted): `MarioHeadCtrl`'s `gunAngle / 2` — with the turbo's −4096 gun angle the head gets `Rz(−2048)` (11.25°; the hover's
 +5294 is "down", so this is up) whenever the turbo is selected with water.
 Debug: setup `[SMS waist] head lock off under SMS: …`; `[SMS waist] off (ma_turbo_dash): …` as a dash starts.
+**Hotfix (03:45):** 63ebb3c's `jnt_chest local Y` setup print read the `armature` field, which `_Ready` assigns *after*
+`SmsWaistSetup()` runs — a NullReferenceException inside `_Ready` skipped the rest of start-up (no `animPlayer`, no tree, no
+pack), and the first `_PhysicsProcess` after the level intro threw every frame (`UpdateRunAnimationSpeed`): one idle loop, then
+frozen. The print now resolves the node itself. Rule: a start-up helper may only read fields assigned above its call site.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

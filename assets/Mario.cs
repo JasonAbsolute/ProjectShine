@@ -13540,9 +13540,13 @@ public partial class Mario : CharacterBody3D
         skeleton.MoveChild(_smsWaist, 0); // the chest is a parent of everything the other modifiers touch: the game's callback order
         if (SmsDebugPrint && skeleton.FindBone("jnt_chest") >= 0)
         {
-            // the game's roll is a twist about the chest's local X (up the spine in the BMD): report where the rig's X points
+            // the game's roll is a twist about the chest's local X (up the spine in the BMD): report where the rig's X points.
+            // NOTE: _Ready assigns the `armature` field AFTER this runs -- resolve the node here (63ebb3c read the field, threw a
+            // NullReferenceException inside _Ready and skipped the rest of start-up: no animPlayer, no tree, no pack).
+            Node3D arm = armature ?? GetNodeOrNull<Node3D>("Armature");
+            Basis armInv = arm != null ? arm.GlobalTransform.Basis.Inverse() : Basis.Identity;
             Vector3 xw = (skeleton.GlobalTransform.Basis * skeleton.GetBoneGlobalRest(skeleton.FindBone("jnt_chest")).Basis.X).Normalized();
-            Vector3 yw = (armature.GlobalTransform.Basis.Inverse() * skeleton.GlobalTransform.Basis * skeleton.GetBoneGlobalRest(skeleton.FindBone("jnt_chest")).Basis.Y).Normalized();
+            Vector3 yw = (armInv * skeleton.GlobalTransform.Basis * skeleton.GetBoneGlobalRest(skeleton.FindBone("jnt_chest")).Basis.Y).Normalized();
             GD.Print($"[SMS waist] jnt_chest local Y in the armature's frame: ({yw.X:F2}, {yw.Y:F2}, {yw.Z:F2}) -> a positive pitch tilts the spine {(yw.Z < -0.5f ? "FORWARD (the model's -Z)" : yw.Z > 0.5f ? "BACKWARD (+Z)" : "SIDEWAYS?")}");
             GD.Print($"[SMS waist] jnt_chest local X in world: ({xw.X:F2}, {xw.Y:F2}, {xw.Z:F2}) -> {(xw.Y > 0.5f ? "UP: a positive roll turns the shoulders counterclockwise seen from above (to his left) -- the game's sign, into a left turn" : xw.Y < -0.5f ? "DOWN: a positive roll turns the shoulders clockwise seen from above (to his right)" : "NOT along the spine: the roll would not be a twist")}");
         }
