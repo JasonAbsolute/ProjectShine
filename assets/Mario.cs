@@ -13477,7 +13477,9 @@ public partial class Mario : CharacterBody3D
         bool apply = node == "ma_run1" || node == "ma_run2";
         _smsWaist.Apply = apply;
         _smsWaist.Pitch = _smsWaistPitch * SmsUnits.BamToRad;
-        _smsWaist.Roll = _smsWaistRoll * SmsUnits.BamToRad;
+        // The value keeps the game's sign (a left turn is positive); the rig's jnt_chest X axis runs the other way from the BMD's,
+        // so the same rotation banked him OUT of the turn (Jaysonn, 22:05): negated at the joint to bank into it as the game does.
+        _smsWaist.Roll = -_smsWaistRoll * SmsUnits.BamToRad;
         if (SmsDebugPrint)
         {
             if (apply != _smsWaistDbgOn)

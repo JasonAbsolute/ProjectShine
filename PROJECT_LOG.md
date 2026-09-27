@@ -2179,6 +2179,9 @@ the run shows the lean at once and a stop hides it at once. Port: `SmsWaistLean`
 `SkeletonIK3D` waist lean is never started under SMS physics** (the legacy path keeps it, with fix 1's FLUDD switch-off). The pack on
 `jnt_chest`, the arms and the head follow the chest, as in the game (`HeadForwardLock` works on the head's local pose, so the order
 is safe). Not ported: the Gesso-surfing sets, the shell ride, the L-camera bend.
+First run: the pitch reads right, the roll banked him **out** of a turn — the rig's `jnt_chest` local X runs the other way from
+the BMD's (a converter artefact; the hover bank on `jnt_nozzle_L / R` is about Z and was unaffected). `_smsWaistRoll` keeps the
+game's sign (a left turn is positive) and is negated at the joint (`SmsWaistApply`).
 Debug: `[SMS waist] on (ma_run2): pitch +38.1 deg, roll -3.2 deg, the free set`, then once a second `pitch +40.4 deg, roll +0.0 deg
 at 32.0 u/tick (free)`; setup `considerWaist on jnt_chest yes: ...`. Self-test: `waist: free pitch at fwd 32 (deg) 40.43`, `free
 roll, 1500 BAM/tick turn at 32 (deg) 46.37`, `pumping pitch at fwd 32 (deg) -8.79`, `ticks to 95% of the run lean 42`.
