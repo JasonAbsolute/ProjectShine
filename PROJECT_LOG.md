@@ -2060,6 +2060,42 @@ ticks are done) after 4 ticks: vy 145 from 4 pushes of 35 (apex about 35.6 m up 
 ledgeFall: apex …` line on landing. Self-test: `rocket: vy handed to ROCKET_LANDING 145`, `apex above the launch point 2743.75`,
 `charge ticks at full R 177.8`.
 Next: S5 turbo (the dash, the broad jump, the surf), S2b the squat aim (needs `button_rclick`), the HUD gauge.
+
+**S5 — the turbo nozzle: the dash, the broad jump, the surf** (MarioMove.cpp's input stage 1499-1550, `running()`,
+`doRunningAnimation`, `broadJumping`, `swimPaddle` / `doSwimming` / `checkSwimJump`; `mario.prm` DashMax 80 / DashAcc 0.5 /
+DashBrake 0.1 / DashStartTime 0; `jump.prm` **BroadJumpForce 60 / BroadJumpForceY 70** — the code defaults 80 / 30 are not
+the game; `nozzletrgturbo.prm` bleed 100 / max 4500 → 0.75 s of charge at full R, then ACTIVE while held, 1 water a tick).
+- **The dash is not a status.** Every tick, with the turbo nozzle, PUMPING, R > 0 and water: a stick at rest aims where he faces;
+  `mDashSpeed += 0.5` to 32 (64 ticks); once at 32 the **`FLUDD_EMITTING`** flag goes on when the trigger is ACTIVE (the charge and
+  the ramp run side by side, so the flag arrives at 0.75 s) and stays only while the status is RUN or SWIM_PADDLE; and
+  **`mIntendedMag = mDashSpeed` — the dash replaces the stick's magnitude**: a standing Mario starts running by himself, a
+  running one first drops to the ramp's magnitude and climbs back. Not pumping: `mDashSpeed × 0.1` a tick to 0 (the magnitude
+  follows: the run brakes as if the stick were let go), flag off. Port: `SmsFluddDashTick` in the gun's loop,
+  `SmsFluddDashOverride` rewriting the frame's stick (`inputDirWorld`, `stickStrength`, `walkingStrength`, `_smsIntendedMag`).
+- **`running()` with the flag**: `setPlayerVelocity(DashMax 80)` at the end of every tick (32.2 m/s; the run's own brake above
+  32 is undone each tick — ported as `fwd = 80` after `SmsGroundTick`'s loop), the turn rate `RunningRotSpMin` (shipped min ==
+  max 1500: no change), **A with fwd > 79 → BROAD_JUMP** (vy 70, fwd 60, `ANIM_BROAD_JUMP`; the game lands it straight into
+  RUN, ours through the usual landing window; not fall-cancelable — `BROAD_JUMP` lacks the 0x2000000 flag `ROTATE_BROAD_JUMP`
+  has), a pushing wall clears the flag — but the knockdown above ClashSpeed 40 comes first (`SmsGroundWallBonk`): a dash into
+  a wall is `JUMP_SHORT_BACK_DOWN`. `doRunningAnimation` swaps `ANIM_RUN2` for **`ANIM_TURBO_DASH`** at fwd ≥ 79 and back below;
+  its rate `fwd × 0.06 + 1` is 5.8 against run2's 2.92 at 32, so the port plays it at twice the full run. Neither
+  `ma_turbo_dash` nor `ma_broad_jump` is a BaseSM state in the scene: `SmsFluddSetupTurboAnims` adds both to the state machine
+  in memory at start-up (`Travel` / `Start` teleport to them).
+- **The surf** (`swimPaddle` with the flag): the flag coming on in the water → `SWIM_PADDLE` at once (`doSwimming` keeps any other
+  swim status out of the way), `ANIM_PADDLE_SWIM` at **5.0** (0.5 without), `setPlayerVelocity(80)` every tick — under water too;
+  the wall: on the surface **`JUMP_BACK_DOWN` with fwd × −0.8 and vy 50** (thrown back out of the water — ported on the bonk with
+  its back speed raised to 64), under water `SWIM_P_DAMAGE`; `checkSwimJump()`: **A on the surface → y = surface + 1, BROAD_JUMP**.
+  `surfingEffect` (the spray) is not ported.
+- **The propeller** (`chn_back_nozzle_prop`, `RotateCtrl`): `rotateProp()` accumulates `strength × NozzleAngleYSpeed 100`, × 0.99,
+  **capped at HoverRotMax — shipped 0**, so the shipped game never spins it. Nothing to port.
+- Not ported: the sounds (`SE_PO_SNIPER_TRIGGER`, `SE_PO_SPREAD`, `SE_MA_SURF_*`), the surf spray, the flag's cosmetic hold through
+  the broad jump (`broadJumping` re-sets it each tick; ours turns it off in the air and back on at the landing if he still pumps).
+Debug: `[SMS turbo] dash on (from sprinting): 80 a tick = 32.2 m/s, water 2100`, `dash off (R released), water 1960`, `broad jump
+(A at dash speed): vy 70, fwd 60 (24.2 m/s)`, `[SMS bonk] the surf into a wall at fwd 80.0 …`; setup `turbo clips: ma_turbo_dash in
+BaseSM, ma_broad_jump in BaseSM`. Self-test: `turbo: dash ramp ticks to 32 64`, `charge ticks at full R 90`, `broad jump: apex
+621.25`.
+That closes the five FLUDD stages. Left on the FLUDD list: S2b the squat aim (needs `button_rclick`), the HUD gauge, the hang's
+`hgpmp` upper clip, sounds, particles, rumble, the camera modes.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

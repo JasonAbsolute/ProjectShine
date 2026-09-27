@@ -88,6 +88,8 @@ public static class SmsParams
         public const float UltraJumpXZMult = 1.0f;      // default 0.8
         public const float RotBroadJumpForce = 55f;     // default 60   (rollout out of a belly slide)
         public const float RotBroadJumpForceY = 38f;    // default 20
+        public const float BroadJumpForce = 60f;        // default 80   (the turbo's BROAD_JUMP: fwd)
+        public const float BroadJumpForceY = 70f;       // default 30   (vy)
         public const float RotBroadEnableV = 15f;
         public const float JumpJumpCatchSp = 80f;       // fwd set when diving from the air (then capped to 48)
         public const float FenceSpeed = 1.3f;
@@ -122,6 +124,10 @@ public static class SmsParams
         public const int RunningRotSpMin = 1500;        // BAM/tick (shipped min == max, so turning is speed independent)
         public const int RunningRotSpMax = 1500;
         public const float ClashSpeed = 40f;            // run into a wall faster than this -> bonk (SHORT_BACK_DOWN)
+        public const float DashMax = 80f;               // the turbo dash: running() / swimPaddle() force this every tick (32.2 m/s)
+        public const float DashAcc = 0.5f;              // mDashSpeed climbs this a tick to 32 while the turbo pumps
+        public const float DashBrake = 0.1f;            // mDashSpeed x this a tick once the pumping stops
+        public const int DashStartTime = 0;             // ticks at 32 before the flag (0: at once)
         public const float DamageFallHeight = 1500f;    // fall further than this at vy <= -70 -> hard landing
         public const float FeelDeep = 800f;
         public const float TramplePowStep1 = 35f;       // stomp bounce vy (1st), + 0.25*fwd
@@ -297,6 +303,8 @@ public static class SmsParams
         public const float MoveBrake = 0.97f;          // fwd *= a tick
         public const int RotSp = 300;                  // BAM a tick toward the stick (SwimmingRotSpMin == Max shipped)
         public const float Gravity = 0.05f;            // vy -= a tick
+        public const float PaddleAnmRate = 0.5f;       // swimPaddle(): ANIM_PADDLE_SWIM's rate
+        public const float PaddleAnmRateSurf = 5f;     // ... with FLUDD_EMITTING (the turbo's surf)
         public const float WaitBuoyancy = 2f;          // vy += depthRatio * this a tick while waiting / starting
         public const float MoveBuoyancy = 1.8f;        // ... otherwise
         public const float UpDownBrake = 0.6f;         // vy *= a tick
@@ -583,6 +591,7 @@ public static class SmsAir
         JumpCatchGround,  // MARIO_STATUS_JUMP_CATCH (B on ground, fwd > 15): vy = 20, fwd = min(15 + fwd, 48)
         HipDrop,          // MARIO_STATUS_HIP_DROP:        hang, then vy = -80 constant
         RotateBroadJump,  // MARIO_STATUS_ROTATE_BROAD_JUMP: vy = 38, fwd = 55 (rollout from a belly slide)
+        BroadJump,        // MARIO_STATUS_BROAD_JUMP: vy = 70, fwd = 60 (A during the turbo dash; from the surf too); no fall cancel (no 0x2000000 flag)
         CatchStop,        // MARIO_STATUS_CATCH_STOP (0x8A6): A during a belly slide at fwd <= ClashSpeed: vy = 30, fwd kept, roll to the feet
         Trample1,         // stomp bounce: vy = 0.25*fwd + 35, fwd *= 0.8
         Trample2,         // vy = 0.25*fwd + 45
@@ -622,6 +631,8 @@ public static class SmsAir
                 vy = 0f; fwd = 0f; break;
             case Launch.RotateBroadJump:
                 vy = SmsParams.Jump.RotBroadJumpForceY; fwd = SmsParams.Jump.RotBroadJumpForce; break;
+            case Launch.BroadJump:
+                vy = SmsParams.Jump.BroadJumpForceY; fwd = SmsParams.Jump.BroadJumpForce; break;
             case Launch.CatchStop:
                 vy = 30f; break;  // catchStop(): fwd is kept
             case Launch.Trample1:
@@ -881,6 +892,17 @@ public static class SmsSelfTest
             Check("rocket: vy handed to ROCKET_LANDING", vy, 145f, 0.01f);
             Check("rocket: apex above the launch point (units)", apex, 2743.75f, 0.5f);
             Check("rocket: charge ticks at full R", SmsRocketNozzle.ChargeTicksFullR, 177.8f, 0.1f);
+        }
+        // The turbo: 32 / 0.5 = 64 ticks of ramp, 4500 / (150 - 100) = 90 ticks of charge at full R, the broad jump's apex.
+        {
+            Check("turbo: dash ramp ticks to 32", 32f / SmsParams.Mario.DashAcc, 64f, 0.01f);
+            Check("turbo: charge ticks at full R", SmsParams.Fludd.Turbo.TriggerMax / (150f - SmsParams.Fludd.Turbo.TriggerDec), 90f, 0.01f);
+            float fwd = 80f, vy = 0f; SmsAir.ApplyLaunch(SmsAir.Launch.BroadJump, ref fwd, ref vy);
+            Check("broad jump: launch fwd", fwd, 60f, 0.001f);
+            Check("broad jump: launch vy", vy, 70f, 0.001f);
+            float y = 0f;
+            while (vy > 0f) { SmsAir.Tick(ref fwd, ref vy, out _, out float mv, 0f, 0f, 0f, true, false, SmsAir.GravityMode.Normal); y += 0.25f * mv; }
+            Check("broad jump: apex (units)", y, 621.25f, 0.5f);
         }
         GD.Print(ok ? "[SMS selftest] ALL OK" : "[SMS selftest] FAILURES ABOVE");
         return ok;

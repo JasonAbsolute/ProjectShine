@@ -253,6 +253,12 @@ public partial class Mario : CharacterBody3D
     private float _fluddRocketVyPending = 0f;                     // the rocket's pushes fired this frame before the status change (units a tick)
     private int _fluddRocketPushes = 0;                           // launch ticks that reached mVel.y (debug)
     private bool _fluddKeyN = false;                              // the nozzle-cycle key's last state
+    private float _fluddDashSpeed = 0f;                           // mDashSpeed: the turbo's stick magnitude, 0.5 a tick to 32
+    private bool _fluddDashing = false;                           // MARIO_FLAG_FLUDD_EMITTING: the run / paddle forced to DashMax
+    private bool _fluddDashAnimOn = false;                        // ma_turbo_dash is the tree's current state
+    private bool _fluddTurboAnimReady = false;                    // the ma_turbo_dash state was added to BaseSM
+    private bool _fluddBroadJump = false;                         // this singleJump is a BROAD_JUMP (ma_broad_jump)
+    private string _fluddDashDbgFrom = "";
     private double _fluddSwimPumpTime = 0.0, _fluddSwimPumpLen = 0.0; // the pump clip's ping-pong position / length (s)
     private int _fluddSwimPumpDir = 1;
     private bool _smsRocketLanding = false;                       // the fall is ROCKET_LANDING (after a hover): no wall slide on a wall at 16..40
@@ -2011,6 +2017,10 @@ public partial class Mario : CharacterBody3D
             _smsHangDropFall = false; // the LAND_SAFE_DOWN drop ended (he landed, or something else took over)
         if (_smsRocketLanding && stateOfMario != MarioState.ledgeFall)
             _smsRocketLanding = false; // ROCKET_LANDING ended the same way
+        if (_fluddBroadJump && stateOfMario != MarioState.singleJump)
+            _fluddBroadJump = false; // the BROAD_JUMP landed (or something else took over)
+        if (_fluddDashAnimOn && (stateOfMario == MarioState.swimming || !IsOnFloor()))
+            _fluddDashAnimOn = false; // ma_turbo_dash only plays on the ground; the next SetMarioState took the tree elsewhere
         if (stateOfMario != MarioState.ledgeFall)
         {
             _smsFallTicks = 0;
@@ -2172,6 +2182,7 @@ public partial class Mario : CharacterBody3D
             SmsWaterCheck();      // playerControl(): the water surface at the feet, every tick
             SmsAirTick(delta);    // mAir drains with the head under, refills out; the meter turns to air after 2 s under
             SmsFluddTick(delta);  // the R analog, X, the upper body, the nozzle swap, the pack's clips
+            SmsFluddDashOverride(ref inputDirWorld, ref stickStrength); // the turbo: mIntendedMag = mDashSpeed, a resting stick aims at the face
             SmsWaterEntryCheck(); // deep water -> SWIM_START, from any status
             if (stateOfMario == MarioState.swimming)
             {
@@ -2183,6 +2194,18 @@ public partial class Mario : CharacterBody3D
             {
                 SmsTickRocketStatus(delta, inputDirWorld); // rocketing(): no other handler runs
                 goto EndFrame;
+            }
+            // running(): FLUDD_EMITTING && A && mForwardVel > DashMax - 1 -> BROAD_JUMP (before the ordinary jump reads A)
+            if (_fluddDashing && stateOfMario != MarioState.swimming && SmsDashState() && IsOnFloor()
+                && (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space")))
+            {
+                Vector3 faceD = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+                float fwdNow = SmsUnits.MpsToSpeed(new Vector3(velocity.X, 0f, velocity.Z).Dot(faceD));
+                if (fwdNow > SmsParams.Mario.DashMax - 1f)
+                {
+                    SmsFluddBroadJump("A at dash speed");
+                    goto EndFrame;
+                }
             }
         }
 
@@ -10964,6 +10987,8 @@ public partial class Mario : CharacterBody3D
         }
 
         float s = GetRunAnimSpeedScale();
+        if (_fluddDashAnimOn)
+            s = 2f * Mathf.Lerp(RunAnimSpeedMin, RunAnimSpeedMax, 1f); // doRunningAnimation(): (80 x 0.06 + 1) / (32 x 0.06 + 1) = 2 x the full run
         if (UseSmsPhysics && _smsInWater && IsOnFloor())
         {
             // isRunningInWater(): rate *= (1 - depth / SwimDepth * (1 - InWaterBrake)) * InWaterAnmBrake
@@ -11578,6 +11603,22 @@ public partial class Mario : CharacterBody3D
         }
         _smsSwimDbgDeepest = MathF.Max(_smsSwimDbgDeepest, surface - feetY);
 
+        // the turbo's surf: the flag came on while swimming -> SWIM_PADDLE (the input stage); doSwimming() keeps any other swim
+        // status out of the way; swimPaddle(): ANIM_PADDLE_SWIM at 5.0 (0.5 without the flag); checkSwimJump(): A on the surface
+        // with the flag -> y = surface + 1, BROAD_JUMP
+        if (_fluddDashing && _smsSwim != SmsSwim.Paddle && !_smsDrowned && _smsSwim != SmsSwim.PDamage)
+            SmsSwimSet(SmsSwim.Paddle);
+        if (_smsSwim == SmsSwim.Paddle)
+        {
+            float paddleRate = _fluddDashing ? SmsParams.Swim.PaddleAnmRateSurf : SmsParams.Swim.PaddleAnmRate;
+            if (animPlayer.SpeedScale != paddleRate)
+                animPlayer.SpeedScale = paddleRate;
+            if (_fluddDashing && aPressed && !SmsIsUnderWater())
+            {
+                SmsFluddSurfJump(surface);
+                return;
+            }
+        }
         // checkSwimJump()
         if (aPressed)
         {
@@ -11607,14 +11648,24 @@ public partial class Mario : CharacterBody3D
             feetY = limit;
         }
 
-        // jumpProcess() 2 from the last move: a wall zeroes the speed (no FLUDD here)
+        // jumpProcess() 2 from the last move: a wall zeroes the speed; with FLUDD_EMITTING (the surf) it throws him back --
+        // JUMP_BACK_DOWN out of the water (fwd x -0.8, vy 50) on the surface, SWIM_P_DAMAGE under it
         if (IsOnWall())
         {
             Vector3 wn = GetWallNormal();
             if (new Vector3(velocity.X, 0f, velocity.Z).Dot(wn) < 0f)
             {
-                _smsSwimFwd = 0f;
-                _smsSwimVy = 0f;
+                if (_fluddDashing && _smsSwim == SmsSwim.Paddle && Mathf.Abs(wn.Y) < 0.5f)
+                {
+                    SmsFluddSurfWall(new Vector3(wn.X, 0f, wn.Z));
+                    if (stateOfMario != MarioState.swimming)
+                        return;
+                }
+                else
+                {
+                    _smsSwimFwd = 0f;
+                    _smsSwimVy = 0f;
+                }
             }
         }
 
@@ -11661,6 +11712,8 @@ public partial class Mario : CharacterBody3D
         }
         if (_smsSwim == SmsSwim.PDamage || _smsDrowned)
             _smsSwimFwd = 0f; // jumpingDemoCommon(.., 0.0f) after doSwimming()
+        if (_fluddDashing && _smsSwim == SmsSwim.Paddle)
+            _smsSwimFwd = SmsParams.Mario.DashMax; // swimPaddle(): setPlayerVelocity(DashMax) every tick while FLUDD_EMITTING
 
         // doSwimming(): B dives; water shallower than EndDepth under him: he stands up (WAIT)
         if (bPressed)
@@ -11977,6 +12030,7 @@ public partial class Mario : CharacterBody3D
         SmsFluddSetupWater(); // S2: the drops, the water level in the tank, the muzzles
         SmsFluddSetupHoverTilt(); // S3: the hover nozzles' bank joints
         SmsFluddSetupSwimPump();  // ma_swpmp on the upper body while the swim clips run outside the tree
+        SmsFluddSetupTurboAnims(); // S5: ma_turbo_dash / ma_broad_jump as BaseSM states
         // the pump clips ping-pong (addUpper: ATTR_PING_PONG_LOOP; the tank's are slaved to Mario's)
         if (animPlayer.HasAnimation("ma_pump"))
             animPlayer.GetAnimation("ma_pump").LoopMode = Animation.LoopModeEnum.Pingpong;
@@ -12047,6 +12101,7 @@ public partial class Mario : CharacterBody3D
             SmsFluddGunExecTick(); // gunExec(): the pressure, the nozzle, the refill, the emit
             _fluddDrops?.Tick();   // TModelWaterManager::move()
             SmsFluddTiltTick();    // TWaterGun::movement(): the hover nozzles' bank chases rocketing()'s targets
+            SmsFluddDashTick();    // the input stage's turbo block: mDashSpeed, FLUDD_EMITTING
         }
         SmsFluddApplyTilt();
         SmsFluddPoseWater();
@@ -13090,6 +13145,175 @@ public partial class Mario : CharacterBody3D
             GD.Print($"[SMS fludd] hover nozzle bank joints: jnt_nozzle_L {(sk.FindBone("jnt_nozzle_L") >= 0 ? "yes" : "NO")}, jnt_nozzle_R {(sk.FindBone("jnt_nozzle_R") >= 0 ? "yes" : "NO")}");
     }
 
+    // ---------------------------------------------------------------------------------------------------------------
+    // FLUDD S5: the turbo nozzle -- the dash (MarioMove.cpp's input stage + running()), the broad jump, the surf (swimPaddle).
+    // The dash is not a status: the input stage replaces the stick's magnitude with mDashSpeed (0.5 a tick to 32) while the
+    // turbo pumps, and the FLUDD_EMITTING flag -- on once the trigger is ACTIVE, only while running or paddling -- makes
+    // running() / swimPaddle() force the speed to DashMax 80 every tick.
+    // ---------------------------------------------------------------------------------------------------------------
+
+    /// <summary>The statuses that keep FLUDD_EMITTING: RUN (the port's ground locomotion; WAIT turns into RUN the same tick the
+    /// dash's magnitude arrives) and SWIM_PADDLE.</summary>
+    private bool SmsDashState() =>
+        stateOfMario == MarioState.idle || stateOfMario == MarioState.walking || stateOfMario == MarioState.running
+        || stateOfMario == MarioState.sprinting || stateOfMario == MarioState.sneak || stateOfMario == MarioState.rolloutRun
+        || (stateOfMario == MarioState.swimming && _smsSwim == SmsSwim.Paddle);
+
+    /// <summary>The input stage's dash block, one tick (after the gun, so the trigger's state is this tick's).</summary>
+    private void SmsFluddDashTick()
+    {
+        bool pumpingTurbo = _fluddReady && _fluddNozzle == SmsNozzle.Turbo && _fluddUpper == SmsUpper.Pumping && _fluddR > 0f && _fluddWater > 0;
+        if (pumpingTurbo)
+        {
+            _fluddDashSpeed += SmsParams.Mario.DashAcc;
+            if (_fluddDashSpeed >= 32f)
+            {
+                _fluddDashSpeed = 32f;
+                // mDashTimer > DashStartTime (0): at once. The flag needs the trigger ACTIVE (the 0.75 s charge) and a status that keeps it.
+                if (!_fluddDashing && _fluddTrigState == 1)
+                {
+                    _fluddDashing = true;
+                    _fluddDashDbgFrom = stateOfMario.ToString();
+                    if (stateOfMario == MarioState.swimming && !_smsDrowned && _smsSwim != SmsSwim.PDamage)
+                        SmsSwimSet(SmsSwim.Paddle); // changePlayerStatus(SWIM_PADDLE)
+                    if (SmsDebugPrint)
+                        GD.Print($"[SMS turbo] dash on (from {_fluddDashDbgFrom}): {SmsParams.Mario.DashMax:F0} a tick = {SmsUnits.SpeedToMps(SmsParams.Mario.DashMax):F1} m/s, water {_fluddWater}");
+                }
+                if (_fluddDashing && !SmsDashState())
+                    SmsFluddDashOff("not running or paddling");
+            }
+        }
+        else
+        {
+            if (_fluddDashSpeed > 0.1f)
+                _fluddDashSpeed *= SmsParams.Mario.DashBrake;
+            else
+                _fluddDashSpeed = 0f;
+            if (_fluddDashing)
+                SmsFluddDashOff(_fluddNozzle != SmsNozzle.Turbo ? "the nozzle changed" : _fluddWater <= 0 ? "the tank ran dry" : "R released");
+        }
+    }
+
+    private void SmsFluddDashOff(string why)
+    {
+        _fluddDashing = false;
+        if (SmsDebugPrint)
+            GD.Print($"[SMS turbo] dash off ({why}), water {_fluddWater}");
+    }
+
+    /// <summary>mIntendedMag = mDashSpeed, and a stick at rest aims where he faces: the dash replaces the stick for everything
+    /// downstream (the run's acceleration, its state, the swim's paddle).</summary>
+    private void SmsFluddDashOverride(ref Vector3 inputDirWorld, ref float stickStrength)
+    {
+        if (!_fluddReady || _fluddDashSpeed <= 0f)
+            return;
+        float strength = Mathf.Clamp(_fluddDashSpeed / 32f, 0f, 1f);
+        Vector3 dir = inputDirWorld.LengthSquared() > 1e-6f
+            ? new Vector3(inputDirWorld.X, 0f, inputDirWorld.Z).Normalized()
+            : (_smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir());
+        inputDirWorld = dir * strength;
+        stickStrength = strength;
+        walkingStrength = strength;
+        _smsIntendedMag = _fluddDashSpeed;
+    }
+
+    /// <summary>running(): FLUDD_EMITTING, A, fwd > DashMax - 1 -> changePlayerJumping(BROAD_JUMP): vy 70, fwd 60 (jump.prm shipped;
+    /// the code defaults 30 / 80 are not the game), ANIM_BROAD_JUMP, lands into RUN (ours: the usual landing window).</summary>
+    private void SmsFluddBroadJump(string why)
+    {
+        _fluddBroadJump = true;
+        isJumping = true;
+        initalJumpHold = true;
+        jumpHoldTime = 0f;
+        jumpBuffer = 0;
+        landingEnteredThisContact = false;
+        StopWaistIKHard();
+        _jumpChainStartDir = GetMoveDirOrFallback();
+        stateOfMario = MarioState.singleJump;
+        SmsLaunch(SmsAir.Launch.BroadJump);
+        SetMarioState(MarioState.singleJump); // ma_broad_jump while _fluddBroadJump
+        if (SmsDebugPrint)
+            GD.Print($"[SMS turbo] broad jump ({why}): vy {SmsParams.Jump.BroadJumpForceY:F0}, fwd {SmsParams.Jump.BroadJumpForce:F0} ({SmsUnits.SpeedToMps(SmsParams.Jump.BroadJumpForce):F1} m/s)");
+    }
+
+    /// <summary>checkSwimJump() with FLUDD_EMITTING on the surface: mPosition.y = surface + 1, BROAD_JUMP.</summary>
+    private void SmsFluddSurfJump(float surface)
+    {
+        Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
+        float mps = SmsUnits.SpeedToMps(_smsSwimFwd);
+        GlobalPosition += Vector3.Up * (surface + SmsUnits.UnitsToMetres(1f) - SmsFeetY());
+        velocity.X = face.X * mps;
+        velocity.Z = face.Z * mps;
+        velocity.Y = 0f;
+        lastFacingDirection = face;
+        _smsSwimAnim = "";
+        animPlayer.SpeedScale = 1f;
+        SmsFluddBroadJump("the surf, A near the surface");
+    }
+
+    /// <summary>The surf into a wall (swimming's jumpProcess case 2 with the flag): on the surface JUMP_BACK_DOWN with fwd x -0.8
+    /// and vy 50 -- he is thrown back out of the water; under water SWIM_P_DAMAGE.</summary>
+    private void SmsFluddSurfWall(Vector3 wallNormalXZ)
+    {
+        if (SmsIsUnderWater())
+        {
+            SmsSwimSet(SmsSwim.PDamage); // the port's rule zeroes fwd in P_DAMAGE
+            SmsFluddDashOff("the surf hit a wall under water");
+            return;
+        }
+        float fwd = _smsSwimFwd;
+        Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
+        _smsSwimAnim = "";
+        animPlayer.SpeedScale = 1f;
+        SmsFluddDashOff("the surf hit a wall");
+        SmsEnterBonk(-face, SmsUnits.SpeedToMps(50f), "the surf into a wall", fwd); // JUMP_BACK_DOWN, vy 50
+        float back = SmsUnits.SpeedToMps(0.8f * fwd); // mForwardVel = 0.8 x -fwd: 64 backwards, not the knockdown's 16
+        velocity.X = -face.X * back;
+        velocity.Z = -face.Z * back;
+    }
+
+    /// <summary>doRunningAnimation(): ANIM_TURBO_DASH at fwd >= DashMax - 1, ANIM_RUN2 again below it. The clip is not a tree state
+    /// in the scene: one is added to BaseSM at start-up and travelled to (no path: a teleport).</summary>
+    private void SmsFluddDashAnim(float fwd)
+    {
+        bool want = _fluddDashing && fwd >= SmsParams.Mario.DashMax - 1f && _fluddTurboAnimReady && _sm != null && animTree != null && animTree.Active;
+        if (want)
+        {
+            if ((string)_sm.GetCurrentNode() != "ma_turbo_dash")
+                _sm.Travel("ma_turbo_dash");
+            _fluddDashAnimOn = true;
+        }
+        else if (_fluddDashAnimOn)
+        {
+            _fluddDashAnimOn = false;
+            SetMarioState(stateOfMario); // ma_run2 (or whatever the state plays)
+        }
+    }
+
+    /// <summary>ma_turbo_dash and ma_broad_jump are in the library but not in BaseSM: add them as states (travel / start teleport
+    /// to them). The tree resource is only changed in memory.</summary>
+    private void SmsFluddSetupTurboAnims()
+    {
+        if (animTree == null || animTree.TreeRoot is not AnimationNodeBlendTree tree || tree.GetNode("BaseSM") is not AnimationNodeStateMachine sm)
+        {
+            if (SmsDebugPrint) GD.Print("[SMS fludd] no BaseSM state machine: the turbo dash / broad jump clips will not play");
+            return;
+        }
+        Vector2 at = new Vector2(2000f, 0f);
+        foreach (string clip in new[] { "ma_turbo_dash", "ma_broad_jump" })
+        {
+            if (!animPlayer.HasAnimation(clip) || sm.HasNode(clip))
+                continue;
+            sm.AddNode(clip, new AnimationNodeAnimation { Animation = clip }, at);
+            at += new Vector2(0f, 120f);
+        }
+        if (animPlayer.HasAnimation("ma_turbo_dash"))
+            ForceLoop("ma_turbo_dash");
+        _fluddTurboAnimReady = sm.HasNode("ma_turbo_dash");
+        if (SmsDebugPrint)
+            GD.Print($"[SMS fludd] turbo clips: ma_turbo_dash {(sm.HasNode("ma_turbo_dash") ? "in BaseSM" : "MISSING")}, ma_broad_jump {(sm.HasNode("ma_broad_jump") ? "in BaseSM" : "MISSING")}");
+    }
+
     private void SmsFluddOnRespawn()
     {
         if (!_fluddReady)
@@ -13098,6 +13322,7 @@ public partial class Mario : CharacterBody3D
         _fluddTrigState = 0; _fluddTrigLeft = 0; _fluddTrigFill = 0f; _fluddTrigAccum = 0f;
         _fluddBombState = 0; _fluddBombLeft = 0; _fluddBombFill = 0f; _fluddBombAccum = 0f;
         _fluddSprayRamp = 0; _fluddSprayStrength = 0f; _fluddEmitAccum = 0f;
+        _fluddDashSpeed = 0f; _fluddDashing = false; _fluddDashAnimOn = false; _fluddBroadJump = false;
         _fluddDrops?.Clear();
         SmsFluddPoseWater();
     }
@@ -13558,7 +13783,7 @@ public partial class Mario : CharacterBody3D
                 // Just left a slip for airborne (slid off the edge, or the
                 // escape hop) — ma_slpla plays for that beat instead of the
                 // normal jump pose.
-                _sm.Start(slipAirLaunchTimer > 0f ? "ma_slpla" : "ma_jump");
+                _sm.Start(_fluddBroadJump && _fluddTurboAnimReady ? "ma_broad_jump" : slipAirLaunchTimer > 0f ? "ma_slpla" : "ma_jump"); // BROAD_JUMP: ANIM_BROAD_JUMP
                 break;
             case MarioState.doubleJump:
                 // Double jump: ma_2jmp1 while rising, ma_2jmp2 while falling
@@ -14248,6 +14473,9 @@ public partial class Mario : CharacterBody3D
                 fwd *= 1f - depthRatio * (1f - SmsParams.Swim.InWaterBrake);
             }
         }
+        if (_fluddDashing)
+            fwd = SmsParams.Mario.DashMax; // running(): setPlayerVelocity(DashMax) at the end of every tick while FLUDD_EMITTING
+        SmsFluddDashAnim(fwd);
         faceDir = SmsMath.DirFromYaw(_smsFaceYaw);
         float mps = SmsUnits.SpeedToMps(fwd);
         velocity.X = faceDir.X * mps;
