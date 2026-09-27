@@ -2286,6 +2286,17 @@ off the face, + = his left)`; setup `MarioWaistCtrl turns the CHILDREN of jnt_ch
 Open, noted: the game hangs the pack on `chn_chest` (`TMario::perform` → `setBaseTRMtx(getAnmMtx(mJointIdChnChest))`), whose X is
 horizontal, so `|mtx[1][0]|` is 0 and the tilt is the constant `unk1D06`; ours rides `jnt_chest` (the approved placement) and so
 twists with the clip's stride while the game's does not. Settling it needs `wg_mdl1.bmd`'s own vertex axes, not the rip's.
+**Sixth look, 04:05** ("still odd … his head is just leaning and still moving right to left"). The children rotation was being
+half-undone: `JiggleBone` (ours, on `jnt_head`, `jnt_sldr_L`, `jnt_sldr_R`) runs in the modifier stage after `SmsWaistLean` and writes
+each bone's position as `rest + shift` every frame, so the lean kept only its *rotation*: the head tilted 40° in place on top of an
+upright torso while the game swings it 25 units forward and 9 down about the hips (bind: chest joint at y 58, head at 97, shoulders at
+88). Fix: `SmsWaistOrderLast()` at the end of `_Ready` moves the lean behind every other modifier; setup prints the order. Gotcha for
+anything that moves `jnt_head` / `jnt_sldr_*`: the jiggles own those bones' *positions* (rest + spring shift), not their rotations.
+What the game's own arithmetic gives the head at fwd 32 (BCK + `Rz(40.4°)` on the children, `bck.py`): yaw within ±5°, look 22–31°
+below level, a sideways **bank of −7..+14°** and a lateral sway of −7..+8 units, three times a second — the pitch is applied about the
+chest's lateral axis, which yaws ±20° with the stride. That rocking is in the game's numbers; if Dolphin shows a steadier head, the
+remaining candidates are the pitch magnitude (230 × fwd, `bodyanglefree.prm`) and nothing else in `MarioWaistCtrl` / `MarioHeadCtrl`
+(`unk100` is only ever zeroed, so the head callback is the identity in a run).
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

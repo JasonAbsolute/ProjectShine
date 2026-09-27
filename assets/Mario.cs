@@ -1675,6 +1675,7 @@ public partial class Mario : CharacterBody3D
 
         ForceLoop("ma_pivot");
         SmsFluddSetup(); // the pack on his back (FLUDD S1)
+        SmsWaistOrderLast(); // after every other modifier: the jiggles reset the children's positions the lean must move
         ForceLoop("ma_sstep");
         ForceLoop("ma_wait");
         ForceLoop("ma_t_wait");
@@ -13565,7 +13566,9 @@ public partial class Mario : CharacterBody3D
             return;
         _smsWaist = new SmsWaistLean { Name = "SmsWaistLean" };
         skeleton.AddChild(_smsWaist);
-        skeleton.MoveChild(_smsWaist, 0); // the chest is a parent of everything the other modifiers touch: the game's callback order
+        // Ordered LAST at the end of _Ready (SmsWaistOrderLast): the legacy JiggleBones on jnt_head / jnt_sldr_L / jnt_sldr_R write
+        // `rest position + shift` every frame, so a lean that ran before them kept only its rotation -- the head tilted in place
+        // on an upright body ("his head is just leaning", 2026-09-27 04:05) while the game swings it 25 units forward about the hips.
         if (SmsDebugPrint && skeleton.FindBone("jnt_chest") >= 0)
         {
             // the game's roll is a twist about the chest's local X (up the spine in the BMD): report where the rig's X points.
@@ -13584,6 +13587,24 @@ public partial class Mario : CharacterBody3D
             GD.Print($"[SMS waist] MarioWaistCtrl turns the CHILDREN of jnt_chest (J3D stores a joint's matrix before its callback): {(skeleton.FindBone("jnt_chest") >= 0 ? string.Join(", ", System.Array.ConvertAll(skeleton.GetBoneChildren(skeleton.FindBone("jnt_chest")), b => skeleton.GetBoneName(b))) : "NO jnt_chest")}; the chest's own skin keeps the clip");
         if (SmsDebugPrint)
             GD.Print($"[SMS waist] considerWaist on jnt_chest {(skeleton.FindBone("jnt_chest") >= 0 ? "yes" : "NO")}: free {SmsParams.Waist.FreePitch} x fwd (cap {SmsParams.Waist.FreePitchMax}) / roll {SmsParams.Waist.FreeRoll} (cap {SmsParams.Waist.FreeRollMax}) at {SmsParams.Waist.FreeRate}; pumping {SmsParams.Waist.GunPitch} x fwd (cap {SmsParams.Waist.GunPitchMax}) / roll cap {SmsParams.Waist.GunRollMax} at {SmsParams.Waist.GunRate}; the waist IK is retired under SMS");
+    }
+
+    /// <summary>The game's callback is the last thing that touches jnt_chest's children before skinning; here the JiggleBones
+    /// (jnt_head, jnt_sldr_L / R) run in the modifier stage too and overwrite those bones' positions with `rest + shift`, so the
+    /// lean goes last and rotates whatever they left.</summary>
+    private void SmsWaistOrderLast()
+    {
+        if (skeleton == null || _smsWaist == null)
+            return;
+        skeleton.MoveChild(_smsWaist, skeleton.GetChildCount() - 1);
+        if (SmsDebugPrint)
+        {
+            var mods = new System.Collections.Generic.List<string>();
+            foreach (Node c in skeleton.GetChildren())
+                if (c is SkeletonModifier3D)
+                    mods.Add(c.Name);
+            GD.Print($"[SMS waist] skeleton modifier order: {string.Join(" -> ", mods)} (the lean last: the jiggles reset jnt_head / jnt_sldr positions to rest + shift)");
+        }
     }
 
     private void SmsFluddOnRespawn()
