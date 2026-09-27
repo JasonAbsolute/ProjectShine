@@ -2144,13 +2144,17 @@ the turbo's spray angle in the water is off; the turbo's steering on land").
   `SmsBoneRotZ` (`SmsTurboNeckAim`) on back_wg's neck. `rocket_wg` has no neck joint (its LAngleBase 4096 moves nothing); the
   spray's callback joint `chn_muzzle_l` is not in `normal_wg` and its base is 0; a gun angle **above** 0 bends the chest instead
   (`MarioWaistCtrl` — the squat aim up, S2b). The emit under the surface + 20 was already refused (WaterGun.cpp 1794).
-- **A correction to fix 1's note "the game has no waist lean"** — it has one. `considerWaist()` (MarioDraw.cpp 1461): pitch
-  `WaistPitch × fwd` (`bodyanglefree.prm` 230, max 12000) and roll `WaistRoll × turn × fwd` (0.5, max 8442), rate 0.07, applied by
-  `MarioWaistCtrl` on the **chest** joint for `ANIM_RUN1 / RUN2`. But that callback's `HAS_FLUDD` branch comes first: with the pack
-  on it only bends the chest for a positive gun angle, and the run-lean branch is never reached. **Mario leans on the run only
-  without FLUDD** (the secret courses, Yoshi). The pumping set (`bodyanglewatergun.prm`: −50 × fwd capped 2000 = 11° back, roll max
-  4000) is computed but unreachable in retail. So "no waist IK while using FLUDD" points the game's way; the game goes further —
-  none at all while he wears the pack.
+- **The waist lean, read properly** (fix 1's note said the game has none; the first draft of this bullet said "only without
+  FLUDD" — both wrong. The decomp's `checkStatusType(MARIO_FLAG_HAS_FLUDD)` in `MarioWaistCtrl` tests the *status* word for bit
+  0x8000 — that bit is the **squat** (SQUAT / SQUAT_START / SQUAT_STANDUP / SQUAT_SLIP), not the has-FLUDD flag; the constant's name
+  is a value coincidence.) `considerWaist()` (MarioDraw.cpp 1461) and `MarioWaistCtrl` on the chest joint (470): **the lean applies
+  whenever the body animation is RUN1 / RUN2, pack or no pack.** Free: pitch `WaistPitch × fwd` (`bodyanglefree.prm` 230 → 7360 BAM =
+  40° forward at the run cap 32; max 12000 = 66°) and roll `WaistRoll × Δface × fwd` (0.5, max 8442 = 46° — a full-rate turn
+  saturates it), chased at 0.07 a tick. **While the upper body pumps or holds the pump** (`fabricatedIsPumping() || isHolding()`):
+  `bodyanglewatergun.prm` — pitch −50 × fwd capped 2000 = **11° back**, roll capped 4000 = 22°, rate 0.05. **Not during the turbo
+  dash** (its body animation is TURBO_DASH, not RUN1 / RUN2), nor in the squat, where the chest bends by a positive gun angle
+  instead. So the port's IK lean on the run is the game's in kind (the game's numbers: 40° / 46° caps 66° / 46°, vs the IK's 30°),
+  and fix 1's switch-off while pumping stands in for the game's small back-lean — exact for the dash, 11° short for the spray.
 Debug: `[SMS turbo] dash on (...): ... jet −20.3 deg from level, −0.98 along the face (neck −4096 BAM)`; setup `turbo neck joint
 jnt_back_nozzle_neck yes: the gun angle −4096 BAM = 22.5 deg down`. Self-test: `pumping turn at fwd 32 (BAM) 600`, `at fwd 0 300`,
 `dash turn 1500`, `turbo neck: gun angle (deg) −22.5`.
