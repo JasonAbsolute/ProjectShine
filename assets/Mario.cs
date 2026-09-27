@@ -13491,8 +13491,9 @@ public partial class Mario : CharacterBody3D
         float rollDeg = _smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi;
         if (!_smsFaceValid || MathF.Abs(rollDeg) < 2f || MathF.Abs(_smsWaistDbgLastDYaw) < 1f)
             return "";
-        bool into = MathF.Sign(rollDeg) == MathF.Sign(_smsWaistDbgLastDYaw);
-        return $" (shoulders {MathF.Abs(rollDeg):0} deg {(into ? "into" : "AWAY from")} the turn)";
+        // the APPLIED twist is the negated value (the deliberate deviation in SmsWaistApply): report what the rig shows
+        bool into = MathF.Sign(-rollDeg) == MathF.Sign(_smsWaistDbgLastDYaw);
+        return $" (chest {MathF.Abs(rollDeg):0} deg {(into ? "into" : "AWAY from")} the turn, the {(into ? "outside" : "inside")} shoulder low)";
     }
 
     /// <summary>MarioWaistCtrl: the chest turned by the lean only while the body animation is RUN1 / RUN2 -- the port's ma_run1 (walking,
@@ -13539,7 +13540,13 @@ public partial class Mario : CharacterBody3D
         // 0e545b1 negated this after "he leans out": what he saw is the geometry, not the sign -- Rz(pitch) x Rx(roll) twists first
         // and pitches the twisted torso forward, so the shoulder that came forward (the outside one) dips by asin(sin p x sin r).
         // The flip turned his chest and head AWAY from the turn ("steering feels off", 2026-09-27). Reverted.
-        _smsWaist.Roll = _smsWaistRoll * SmsUnits.BamToRad;
+        // DELIBERATE DEVIATION (Jaysonn, 2026-09-27 04:18, third report): the code's roll -- Rz(pitch) x Rx(roll), the twist applied
+        // before the forward pitch -- turns the chest INTO the turn and, because the forward shoulder is then pitched down, drops the
+        // OUTSIDE shoulder: from behind that reads as leaning out of every turn. He remembers the game leaning in. The applied sign is
+        // reversed: the inside shoulder drops, chest and head face out of the turn by the same angle. The value itself keeps the
+        // game's sign (the prints say which way it is applied). To settle it for real: Dolphin, tight circles at full speed -- which
+        // shoulder is low, and does the chest face the inside? If the inside, put the game's sign back (drop the minus).
+        _smsWaist.Roll = -_smsWaistRoll * SmsUnits.BamToRad;
         if (SmsDebugPrint)
         {
             if (apply != _smsWaistDbgOn)

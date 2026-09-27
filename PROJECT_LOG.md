@@ -2297,6 +2297,8 @@ below level, a sideways **bank of −7..+14°** and a lateral sway of −7..+8 u
 chest's lateral axis, which yaws ±20° with the stride. That rocking is in the game's numbers; if Dolphin shows a steadier head, the
 remaining candidates are the pitch magnitude (230 × fwd, `bodyanglefree.prm`) and nothing else in `MarioWaistCtrl` / `MarioHeadCtrl`
 (`unk100` is only ever zeroed, so the head callback is the identity in a run).
+**04:18** ("head is still looking off and leaning when turning is the wrong way still"): the twist's applied sign reversed as a
+deliberate deviation — see the deviations list; the reading itself is unchanged after a third pass through the decomp.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
@@ -2306,6 +2308,16 @@ Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
 
 ### Deliberate deviations from the game
 
+- **The waist twist's sign is reversed** (2026-09-27 04:18). `considerWaist` makes `mWaistRoll` positive for a left turn (`diffAngle`
+  = this tick's face change, +Y = counterclockwise = left), `MarioWaistCtrl` applies `MsMtxSetRotRPH(roll, 0, pitch)` =
+  `Rz(pitch) × Rx(roll)` on `jnt_chest` (X up the spine, Y the front, Z his left — verified in the BMD, the rig, and by the pack
+  sitting on his back), and the surf's body bank uses `mRoll = −0.45` with the same `delta`, so the code's intent is unambiguous:
+  the chest and head turn **into** the turn. Twisting before the forward pitch drops the shoulder that came forward — the *outside*
+  one — by `asin(sin roll × sin pitch)`, 27° at the caps, which from behind reads as leaning out. Jaysonn has reported that look as
+  the wrong way three times (e46bc07, 63ebb3c, a120537) against his memory of the game leaning in. Ported with the applied sign
+  negated (`SmsWaistApply`): the inside shoulder drops, chest and head face out of the turn by the same angle. The value keeps the
+  game's sign; the prints report the applied direction. **To settle it:** Dolphin, tight circles at full speed — which shoulder is
+  low, and does his chest face the inside of the circle? If the inside, drop the minus.
 - `SmsRollJumpMinSpeed = 20` (game 40) — feel.
 - `SmsRollJumpKnockdown = false`: the roll-jump into a wall that reaches head height wall-slides. `rotateBroadJumping()` →
   `jumpingBasic(…, 1)` case 2 knocks it down above 40, and it never drops under 40 with the stick held; Jaysonn's
