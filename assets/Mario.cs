@@ -13591,7 +13591,7 @@ public partial class Mario : CharacterBody3D
         if (SmsDebugPrint)
             GD.Print("[SMS waist] head lock off under SMS: MarioHeadCtrl is the identity in a run; ma_run2's head track holds the head within 4 deg while the chest swings 35 deg a stride");
         if (SmsDebugPrint)
-            GD.Print($"[SMS waist] MarioWaistCtrl turns the CHILDREN of jnt_chest (J3D stores a joint's matrix before its callback): {(skeleton.FindBone("jnt_chest") >= 0 ? string.Join(", ", System.Array.ConvertAll(skeleton.GetBoneChildren(skeleton.FindBone("jnt_chest")), b => skeleton.GetBoneName(b))) : "NO jnt_chest")}; the chest's own skin keeps the clip");
+            GD.Print($"[SMS waist] the game's callback turns jnt_chest's children ({(skeleton.FindBone("jnt_chest") >= 0 ? string.Join(", ", System.Array.ConvertAll(skeleton.GetBoneChildren(skeleton.FindBone("jnt_chest")), b => skeleton.GetBoneName(b))) : "NO jnt_chest")}) and leaves the chest's skin to the clip; here the chest BONE turns (same head / shoulder / arm placement, the rigid shirt leans with them -- deliberate deviation, 04:29)");
         if (SmsDebugPrint)
             GD.Print($"[SMS waist] considerWaist on jnt_chest {(skeleton.FindBone("jnt_chest") >= 0 ? "yes" : "NO")}: free {SmsParams.Waist.FreePitch} x fwd (cap {SmsParams.Waist.FreePitchMax}) / roll {SmsParams.Waist.FreeRoll} (cap {SmsParams.Waist.FreeRollMax}) at {SmsParams.Waist.FreeRate}; pumping {SmsParams.Waist.GunPitch} x fwd (cap {SmsParams.Waist.GunPitchMax}) / roll cap {SmsParams.Waist.GunRollMax} at {SmsParams.Waist.GunRate}; the waist IK is retired under SMS");
     }

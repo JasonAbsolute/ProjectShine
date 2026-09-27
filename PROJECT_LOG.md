@@ -2308,6 +2308,14 @@ Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
 
 ### Deliberate deviations from the game
 
+- **The waist lean rotates the chest bone, not only its children** (2026-09-27 04:29). J3D applies `MarioWaistCtrl`'s rotation
+  after the chest's own matrix is stored, so in the game only `jnt_head`, `jnt_sldr_L` / `R` and what hangs under them take the
+  lean; the chest's skin keeps the clip and the smooth chest/shoulder envelopes (`EVP1`: 0.3/0.7, 0.5/0.5, 0.15/0.7/0.15) bend
+  between. Our glb's shirt is rigid on `jnt_chest` (138 of 239 vertices; 2–4 chest/shoulder blends), so the literal port
+  (ad0ed9e–16ccd6d) pulled the shoulders 19 units off the chest into a hard hunch ("really off-putting"). `SmsWaistLean` now
+  post-multiplies the chest bone's pose by `Rz(pitch) × Rx(roll)`: head, shoulders and arms land exactly where the game's
+  arithmetic puts them; the torso skin leans with them as one piece. Skinning only; angles, chase and gating are the code's.
+  If the shirt ever gets the BMD's blends back, the children-only version is in git (ad0ed9e's `SmsWaistLean.cs`).
 - **The waist twist's sign is reversed** (2026-09-27 04:18). `considerWaist` makes `mWaistRoll` positive for a left turn (`diffAngle`
   = this tick's face change, +Y = counterclockwise = left), `MarioWaistCtrl` applies `MsMtxSetRotRPH(roll, 0, pitch)` =
   `Rz(pitch) × Rx(roll)` on `jnt_chest` (X up the spine, Y the front, Z his left — verified in the BMD, the rig, and by the pack
