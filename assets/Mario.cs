@@ -9818,9 +9818,15 @@ public partial class Mario : CharacterBody3D
             stateOfMario == MarioState.walking
             || stateOfMario == MarioState.running
             || stateOfMario == MarioState.sprinting;
+        // SMS: MarioHeadCtrl (MarioDraw.cpp 402) leaves the head to the clip in a run (its yaw term is unk100 x anmSpeed with unk100 = 0
+        // outside the L camera). ma_run1 / ma_run2's HEAD track counter-rotates the chest's stride twist -- the BCK has the chest
+        // yawing -14..+22 deg over a stride and the head's world yaw within 4 deg of the face -- so holding jnt_head at rest against
+        // jnt_chest (this lock) deletes that counter-rotation and swings the head with the shoulders, 35 deg peak to peak three times
+        // a second at fwd 32: "moving left and right with his head when running normally" (Jaysonn, 2026-09-27). The legacy waist IK
+        // used to overwrite the chest's twist, which is why the lock once looked right. No look-up either: the game has none.
         _headLockWeight = Mathf.MoveToward(
             _headLockWeight,
-            (HeadLockEnabled && loco) ? 1f : 0f,
+            (HeadLockEnabled && loco && !UseSmsPhysics) ? 1f : 0f,
             HeadLockEaseSpeed * delta
         );
         // MarioDraw.cpp: in ROCKET while canSpray() the head joint gets RotZ(HoverHeadAngle) -- 29 deg down at the ground below
@@ -13541,6 +13547,8 @@ public partial class Mario : CharacterBody3D
             GD.Print($"[SMS waist] jnt_chest local X in world: ({xw.X:F2}, {xw.Y:F2}, {xw.Z:F2}) -> {(xw.Y > 0.5f ? "UP: a positive roll turns the shoulders counterclockwise seen from above (to his left) -- the game's sign, into a left turn" : xw.Y < -0.5f ? "DOWN: a positive roll turns the shoulders clockwise seen from above (to his right)" : "NOT along the spine: the roll would not be a twist")}");
         }
         if (SmsDebugPrint)
+            GD.Print("[SMS waist] head lock off under SMS: MarioHeadCtrl is the identity in a run; ma_run2's head track holds the head within 4 deg while the chest swings 35 deg a stride");
+        if (SmsDebugPrint)
             GD.Print($"[SMS waist] considerWaist on jnt_chest {(skeleton.FindBone("jnt_chest") >= 0 ? "yes" : "NO")}: free {SmsParams.Waist.FreePitch} x fwd (cap {SmsParams.Waist.FreePitchMax}) / roll {SmsParams.Waist.FreeRoll} (cap {SmsParams.Waist.FreeRollMax}) at {SmsParams.Waist.FreeRate}; pumping {SmsParams.Waist.GunPitch} x fwd (cap {SmsParams.Waist.GunPitchMax}) / roll cap {SmsParams.Waist.GunRollMax} at {SmsParams.Waist.GunRate}; the waist IK is retired under SMS");
     }
 
@@ -14002,13 +14010,14 @@ public partial class Mario : CharacterBody3D
                 _sm.Travel("ma_sstep");
                 break;
             case MarioState.walking:
-                _sm.Travel("ma_run1");
-                break;
             case MarioState.running:
-                _sm.Travel("ma_run1");
-                break;
             case MarioState.sprinting:
-                _sm.Travel("ma_run2");
+                // doRunningAnimation(): ANIM_TURBO_DASH while mForwardVel >= DashMax - 1 (the dash), RUN1 / RUN2 otherwise. The grounded
+                // classification calls this EVERY frame while he runs, after SmsGroundTick's travel to ma_turbo_dash -- and the state
+                // machine honours only the last travel() of the frame, so until 2026-09-27 the dash clip never played: ma_run2 ran at
+                // the doubled rate with the water-gun waist lean on top (MarioWaistCtrl applies for RUN1 / RUN2, not TURBO_DASH), and
+                // any steering twisted the shoulders to the 22 deg cap (0.5 x dYaw x 80 saturates from 100 BAM a tick).
+                _sm.Travel(_fluddDashAnimOn && _fluddTurboAnimReady ? "ma_turbo_dash" : state == MarioState.sprinting ? "ma_run2" : "ma_run1");
                 break;
             case MarioState.singleJump:
                 // Just left a slip for airborne (slid off the edge, or the

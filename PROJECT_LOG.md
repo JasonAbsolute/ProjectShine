@@ -2080,7 +2080,8 @@ the game; `nozzletrgturbo.prm` bleed 100 / max 4500 → 0.75 s of charge at full
   RUN, ours through the usual landing window; not fall-cancelable — `BROAD_JUMP` lacks the 0x2000000 flag `ROTATE_BROAD_JUMP`
   has), a pushing wall clears the flag — but the knockdown above ClashSpeed 40 comes first (`SmsGroundWallBonk`): a dash into
   a wall is `JUMP_SHORT_BACK_DOWN`. `doRunningAnimation` swaps `ANIM_RUN2` for **`ANIM_TURBO_DASH`** at fwd ≥ 79 and back below;
-  its rate `fwd × 0.06 + 1` is 5.8 against run2's 2.92 at 32, so the port plays it at twice the full run. Neither
+  its rate `fwd × 0.06 + 1` is 5.8 against run2's 2.92 at 32, so the port plays it at twice the full run (**until 2026-09-27 the
+  clip itself never showed — see "the dash clip" under the waist's fourth look**). Neither
   `ma_turbo_dash` nor `ma_broad_jump` is a BaseSM state in the scene: `SmsFluddSetupTurboAnims` adds both to the state machine
   in memory at start-up (`Travel` / `Start` teleport to them).
 - **The surf** (`swimPaddle` with the flag): the flag coming on in the water → `SWIM_PADDLE` at once (`doSwimming` keeps any other
@@ -2229,6 +2230,36 @@ Checked and left as the game: `RunningRotSp` 1500 / 1500, `PumpingRotSp` 300 / 6
 10, `WaitingRotSp` 220, the U-turn gate 0x471C (100°), `mIntendedYaw = matan(−mStickV, mStickH)` from the s16 pad with the ±7 / 6 shift
 (the port's `PadVector`), the 120 Hz movement (`MarDirectorDirect.cpp` 85–150: the simulation-tick loop performs the movement list every
 tick, gates A / B only thin out other actors).
+
+**The waist and the head, fourth look; the dash clip** (Jaysonn, 2026-09-27 03:05: "hover feels fine: turbo steering feels off,
+mario is still moving left and right with his head when running normally"; his log). First: that log came from the **17764c4 binary**
+— its waist prints still read `-+18.2`, carry no `(shoulders … into the turn)` readout and lack the two `hover: full-stick push` /
+`settled speed` self-tests — so the third look's changes (the hover's 0.01, the twist's sign) had not been played; both are in this
+build with the two below.
+(1) **The head.** `MarioHeadCtrl` (MarioDraw.cpp 402) does nothing to the head in a run: its yaw term is `unk100 × anmSpeed` with
+`unk100` = 0 outside the L camera, and only a negative `gunAngle / 2` pitches it. The head is the clip's. `ma_run2.bck` read against
+`ma_mdl1.bmd` (`tools/projectshine/bck.py`): over a stride the chest yaws **−14° .. +22°** (35° peak to peak, a stride every 0.34 s at
+fwd 32) while the **head's baked track counter-rotates it**, holding the head's world yaw within ±4° (±5° with the 40° lean). The glb's
+`ma_run2` head track matches the BCK. `HeadForwardLock` (ours) holds `jnt_head` at REST against `jnt_chest` — which deletes exactly
+that counter-rotation. Under the legacy waist IK the chest's stride twist was overwritten, so the lock looked right; under SMS (IK
+retired, e46bc07) the chest twists as authored and the locked head swung 35° with the shoulders three times a second — the "head
+moving left and right". Fix: the lock's locomotion weight is 0 under SMS (the hover's head angle keeps the node). Its −12° look-up
+goes with it: the game has none — at fwd 32 the lean puts the head's look **22–31° below level** (the clip alone has it 12–18° above).
+(2) **The dash clip never played.** `SmsGroundTick` travels to `ma_turbo_dash`, then the grounded classification (`Mario.cs`
+~3447) calls `SetMarioState(sprinting)` **every frame** → `Travel("ma_run2")`; `AnimationNodeStateMachinePlayback` honours only the
+last `travel()` of the frame, so `ma_run2` stayed, at the doubled `RUN_TIMESCALE`. His log proves it: `[SMS waist] … roll -21.9 deg at
+80.1 u/tick (pumping)` for three seconds — that line prints only while the lean *applies*, and it applies for RUN1 / RUN2, never
+TURBO_DASH (MarioDraw.cpp 496). So the dash ran with the water-gun lean (−11° pitch) and a twist that saturates at the 22° cap on any
+steering (0.5 × dYaw × 80 ≥ 4000 from 100 BAM a tick) — and, with the 17764c4 flip, AWAY from the turn: chest and head 22° out of
+every dash turn. Fix: `SetMarioState`'s run cases travel to `ma_turbo_dash` while `_fluddDashAnimOn`; the dash now plays TURBO_DASH
+with no lean, as the game. (Also why S5's "at twice the run's rate" was seen on `ma_run2`.)
+(3) **The dash turn rate is left as the game's**: `doRunning()` `if (FLUDD_EMITTING) rotSp = RunningRotSpMin` (MarioRun.cpp 510) =
+1500 (`Mario.prm` shipped, min = max), the intended yaw the stick's direction at any deflection past the deadzone (`checkController`
+1494 takes the yaw, 1536 then overwrites `mIntendedMag` with `mDashSpeed`), the face converging 8.24° a tick, no U-turn. To be judged
+again with the clip and the lean fixed.
+Not ported (noted): `MarioHeadCtrl`'s `gunAngle / 2` — with the turbo's −4096 gun angle the head gets `Rz(−2048)` (11.25°; the hover's
++5294 is "down", so this is up) whenever the turbo is selected with water.
+Debug: setup `[SMS waist] head lock off under SMS: …`; `[SMS waist] off (ma_turbo_dash): …` as a dash starts.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
