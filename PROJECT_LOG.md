@@ -2456,6 +2456,31 @@ re-composes the chain with the callback rotations, and the emitter uses it (the 
 callbacks in it). The game's numbers, now ours: **land −11…−15°** (the spray splashes the ground behind him — that is the game),
 **surf +13…+14.5°** from a muzzle ~70 units over the water (the earlier "~25°" left out the pack tilt). No deviation needed. The
 readout now measures the drawn chest (the pack attachment, which follows the graft) and names the swim clip while swimming.
+
+**Pass 15 — the squat: `MARIO_STATUS_SQUAT` with the stick aim** (Jaysonn 02:03: "move on to … the squat aim (R-stick)"). From
+`MarioMove.cpp canSquat()` (44), `MarioWait.cpp squating()` (308) / `squatStandup()` (387), `WaterGun.cpp calcGunAngle()` (216),
+`MarioDraw.cpp MarioWaistCtrl` (486) / `MarioHeadCtrl` (457), `MarioUpper.cpp` (30):
+- **Entry** from WAIT and RUN (he stops dead): the FLUDD out, not a RocketType-1 nozzle (hover / rocket), and `mInput 0x200` = R or L
+  held while not `FLUDD_EMITTING`. `MEANING_R` is the GC trigger's **click**; the pad has none, so a pull ≥ 0.98 is the click
+  (`SmsParams.Squat.RClickPull`) — the analog is still the pressure, and easing off the click while keeping it pressed is how the
+  turbo's charge-then-go works (stand-up → the stick → RUN → the dash). The legacy Z stands in for L.
+- **R held**: the stick's left/right turns him in place at `WaitingRotSp` (220 BAM a tick) through the `SquatRotMid` curve (5 % of the
+  rate up to 70 % deflection, then to 100 %; compiled defaults 0.7 / 0.05 — controller.prm ships neither), truncated to whole BAM
+  like the game's s16 cast. `ma_sqwat` at rate 1 (its pump clip is `ma_pump`, index 0x44, like wait/run — not `ma_sqpmp`).
+- **The aim** (`calcGunAngle`'s SQUAT branch): target = the angle itself + stick-vertical × `RButtonMult` (10000), clamped
+  [LAngleMin, LAngleMax], chased at LAngleChase — any push pins the target at a limit and the chase does the moving; a resting stick
+  HOLDS the aim; leaving the squat drifts it back to −LAngleBase. A positive angle (stick forward) bends the whole upper body forward
+  by that angle (`MarioWaistCtrl`, status bit 0x8000, in place of the run lean) — the spray, which leaves forward over his head, goes
+  DOWN, to 44° (LAngleMax 8000). A negative angle (stick back) bends nothing and the water stays level: the spray nozzle's
+  `NozzleCtrl` is bound to `"chn_muzzle_l"` (letter l) and the model's joint is `chn_muzzle_1` (digit) — a retail typo, so the barrel
+  never tilts; only the head looks up by half the angle (`MarioHeadCtrl`) and the camera notes it. Aiming UP is the Y cam's job.
+  The head tilt is new for every nozzle: with the turbo out (−4096) Mario looks up 11.25°, as in the game.
+- **L held**: the sidestep — `side = mIntendedMag × sin(stick − face) × PumpingSlideSp` (0.12) units a tick along his left, `ma_swlkl` /
+  `ma_swlkr` at |side| × 0.5, `ma_sqwat` at rest. **A + R** with the spray nozzle: `BACK_JUMP` (the backflip; the legacy Z + A
+  backflip is replaced under SMS by the game's trigger). Squatting with the upper body idle → `HOLDING_PUMP` (hands on the grips).
+- **Release** (neither R nor L): `SQUAT_STANDUP`, `ma_sqend` (19 frames = 38 ticks) then WAIT; A → JUMP and the stick → RUN cut it.
+  `ma_sqend`, `ma_swlkl`, `ma_swlkr` are runtime BaseSM states (the scene has `ma_sqwat` only); the stand-up auto-advances to `ma_wait`.
+- Side effect, also the game's: the rocket's manual fire (A while R is clicked) now has a click to read.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

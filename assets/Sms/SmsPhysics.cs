@@ -158,6 +158,17 @@ public static class SmsParams
         public const float MaxShift = 15f;          // clamped to +-15
     }
 
+    /// <summary>MARIO_STATUS_SQUAT (MarioWait.cpp squating(), MarioMove.cpp canSquat()): the R click or L held with the FLUDD out.</summary>
+    public static class Squat
+    {
+        public const float RotMidAnalog = 0.7f;      // controller.prm SquatRotMidAnalog: compiled default (the shipped file has no entry)
+        public const float RotMidValue = 0.05f;      // SquatRotMidValue: the turn is 5 % of WaitingRotSp up to 70 % deflection, then to 100 %
+        public const float SlideSp = 0.12f;          // run.prm PumpingSlideSp: the L sidestep, units a tick per mIntendedMag x sin(diff)
+        public const float SlideAnmSp = 0.5f;        // run.prm PumpingSlideAnmSp: SWLKL / SWLKR at |side| x this
+        public const int EndTicks = 38;              // ma_sqend: 19 frames at 60 fps = 0.317 s (SQUAT_STANDUP ends on its last frame)
+        public const float RClickPull = 0.98f;       // the GC's R click stood in for by the pad's full pull when no button_rclick exists
+    }
+
     public static class Waist
     {
         public const float FreePitch = 230f;        // 7360 BAM = 40.4 deg forward at the run cap 32

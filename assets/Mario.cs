@@ -263,6 +263,12 @@ public partial class Mario : CharacterBody3D
     private float _fluddDashSpeed = 0f;                           // mDashSpeed: the turbo's stick magnitude, 0.5 a tick to 32
     private bool _fluddDashing = false;                           // MARIO_FLAG_FLUDD_EMITTING: the run / paddle forced to DashMax
     private int _fluddDashDbgTicks = 0;                           // the once-a-second [SMS turbo] readout while dashing
+    // MARIO_STATUS_SQUAT / SQUAT_STANDUP (MarioWait.cpp squating() / squatStandup()): the R click, or L, with the FLUDD out
+    private float _smsStickH = 0f, _smsStickV = 0f;               // mCompSPos[0] / [1]: the pad stick, -1..1, up positive (the squat's turn and aim)
+    private int _smsSquatEndTicks = 0;                            // SQUAT_STANDUP: ma_sqend's ticks left (19 frames = 38 ticks); 0 = SQUAT
+    private bool _smsSquatEndReady = false;                       // the runtime ma_sqend BaseSM state exists
+    private string _smsSquatClipNow = "";                         // the squat clip the BaseSM is on
+    private SmsBoneRotZ _smsHeadGunRot;                           // MarioHeadCtrl: Rz(gun angle / 2) on jnt_head while the angle is negative
     private bool _fluddDashAnimOn = false;                        // ma_turbo_dash is the tree's current state
     private bool _fluddTurboAnimReady = false;                    // the ma_turbo_dash state was added to BaseSM
     private bool _fluddBroadJump = false;                         // this singleJump is a BROAD_JUMP (ma_broad_jump)
@@ -1686,6 +1692,8 @@ public partial class Mario : CharacterBody3D
         ForceLoop("ma_pivot");
         SmsFluddSetup(); // the pack on his back (FLUDD S1)
         SmsSetupRunBlend(); // doRunningAnimation's run1 x run2 blend as a BaseSM state
+        SmsSetupSquatStates(); // ma_sqend / ma_swlkl / ma_swlkr for the squat
+        SmsSetupHeadGunRot(); // MarioHeadCtrl's gun-angle head tilt
         SmsWaistOrderLast(); // after every other modifier: the jiggles reset the children's positions the lean must move
         ForceLoop("ma_sstep");
         ForceLoop("ma_wait");
@@ -2008,6 +2016,8 @@ public partial class Mario : CharacterBody3D
         );
         float stickStrength = LstickVec.Length();
         _smsIntendedMag = SmsStick.IntendedMag(LstickVec);
+        _smsStickH = LstickVec.X;
+        _smsStickV = -LstickVec.Y; // the game's stick has up positive
 
         Vector3 inputDirWorld = Vector3.Zero;
         float camYaw = (springArmPivot != null) ? springArmPivot.Rotation.Y : 0f;
@@ -2802,29 +2812,40 @@ public partial class Mario : CharacterBody3D
             }
 
             // === CROUCH / BACKFLIP ===
-            // Holding Z on the ground puts Mario in a squat; A launches a backflip.
+            // Holding Z on the ground puts Mario in a squat; A launches a backflip. Under SMS this is the game's MARIO_STATUS_SQUAT:
+            // the R click (or L; Z stands in for L) with the FLUDD out -- SmsSquatFrame(): the turn in place, the stick aim, the
+            // L sidestep, A + R = the backflip, the ma_sqend stand-up.
             if (stateOfMario == MarioState.crouch)
             {
-                velocity.X = Mathf.MoveToward(velocity.X, 0f, 60f * (float)delta);
-                velocity.Z = Mathf.MoveToward(velocity.Z, 0f, 60f * (float)delta);
-                velocity.Y = -2f;
-
-                if (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space"))
+                if (UseSmsPhysics)
                 {
-                    StartBackflip();
+                    if (SmsSquatFrame(delta))
+                        goto EndFrame;
+                    // the stand-up was cut by A or the stick: he is idle now and this frame's ground logic runs (JUMP / RUN)
+                }
+                else
+                {
+                    velocity.X = Mathf.MoveToward(velocity.X, 0f, 60f * (float)delta);
+                    velocity.Z = Mathf.MoveToward(velocity.Z, 0f, 60f * (float)delta);
+                    velocity.Y = -2f;
+
+                    if (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space"))
+                    {
+                        StartBackflip();
+                        goto EndFrame;
+                    }
+                    if (!Input.IsActionPressed("button_z") && !Input.IsActionPressed("key_z"))
+                    {
+                        stateOfMario = MarioState.idle;
+                        SetMarioState(stateOfMario);
+                    }
                     goto EndFrame;
                 }
-                if (!Input.IsActionPressed("button_z") && !Input.IsActionPressed("key_z"))
-                {
-                    stateOfMario = MarioState.idle;
-                    SetMarioState(stateOfMario);
-                }
-                goto EndFrame;
             }
 
-            // Enter crouch stance: hold Z on the ground.
+            // Enter crouch stance: hold Z on the ground (SMS: canSquat() -- the R click or L, the FLUDD out, not dashing).
             if (
-                (Input.IsActionPressed("button_z") || Input.IsActionPressed("key_z"))
+                (UseSmsPhysics ? SmsCanSquat() : (Input.IsActionPressed("button_z") || Input.IsActionPressed("key_z")))
                 && CanEnterCrouch()
             )
             {
@@ -5559,7 +5580,15 @@ public partial class Mario : CharacterBody3D
 
     private void StartCrouch()
     {
-        GD.Print("[DBG] StartCrouch entered");
+        if (UseSmsPhysics)
+        {
+            _smsSquatEndTicks = 0;
+            _smsSquatClipNow = "ma_sqwat"; // SetMarioState travels there
+            if (SmsDebugPrint)
+                GD.Print($"[SMS squat] on ({(SmsRClick() ? "R click" : "L")}, {_fluddNozzle}, from {stateOfMario}): stick left/right turns, up/down aims (R), A + R = the backflip (spray)");
+        }
+        else
+            GD.Print("[DBG] StartCrouch entered");
         velocity.X = 0f;
         velocity.Z = 0f;
         stateOfMario = MarioState.crouch;
@@ -12364,6 +12393,12 @@ public partial class Mario : CharacterBody3D
                     _fluddUpper = SmsUpper.Idle;
                 break;
         }
+        // stateMachineUpper() (MarioUpper.cpp 30): MARIO_STATUS_SQUAT with the upper body IDLE -> HOLDING_PUMP, the hands on the grips
+        if (UseSmsPhysics && stateOfMario == MarioState.crouch && _smsSquatEndTicks == 0 && _fluddUpper == SmsUpper.Idle && SmsFluddPumpEnabled())
+        {
+            _fluddUpper = SmsUpper.HoldingPump;
+            _fluddPumpCooldown = 0;
+        }
         // checkPumping(): R down -> PUMPING
         if (_fluddR > 0f && _fluddUpper != SmsUpper.Pumping && SmsFluddPumpEnabled())
         {
@@ -12735,7 +12770,9 @@ public partial class Mario : CharacterBody3D
     /// <summary>The emitter's own motion rides on the drops: mV = Mario's velocity x 0.125 (units a tick).</summary>
     private Vector3 SmsFluddInheritVel() => new Vector3(SmsUnits.MpsToSpeed(velocity.X) * 0.125f, 0f, SmsUnits.MpsToSpeed(velocity.Z) * 0.125f);
 
-    private static bool SmsRClick() => InputMap.HasAction("button_rclick") && Input.IsActionPressed("button_rclick");
+    /// <summary>MEANING_R, the GC trigger's click at the end of its travel: the button_rclick action when the map has one, else the
+    /// pad's full pull (the analog is still the pressure; easing off the click keeps it -- the turbo's charge-then-go).</summary>
+    private bool SmsRClick() => InputMap.HasAction("button_rclick") ? Input.IsActionPressed("button_rclick") : _fluddR >= SmsParams.Squat.RClickPull;
 
     /// <summary>gunExec() for one tick: the pressure, the nozzle's movement, the refill in water, the emit.</summary>
     private void SmsFluddGunExecTick()
@@ -12750,9 +12787,9 @@ public partial class Mario : CharacterBody3D
             if (_fluddWater > 0)
             {
                 // TNozzleTrigger::movement() ends in calcGunAngle() (not without water): angle = -LAngleBase -- the turbo's 4096 = 22.5 deg,
-                // the hover's 0 -- clamped [LAngleMin, LAngleMax], chased at LAngleChase (0.1: from 0 after a change in ~30 ticks)
-                float target = Mathf.Clamp(-np.LAngleBase, np.LAngleMin, np.LAngleMax);
-                _fluddGunAngle += (target - _fluddGunAngle) * np.LAngleChase;
+                // the hover's 0 -- clamped [LAngleMin, LAngleMax], chased at LAngleChase (0.1: from 0 after a change in ~30 ticks); the
+                // squat aims it with the stick
+                SmsFluddCalcGunAngle(np);
             }
         }
         _fluddAFrame = false; // a frame press counts once
@@ -12793,9 +12830,9 @@ public partial class Mario : CharacterBody3D
             _fluddSprayStrength = 0f;
             _fluddSprayRamp = var1;
         }
-        // calcGunAngle(): angle = -LAngleBase (0 shipped) -> the stream leaves along the barrel; the squat aim and the L camera are S2b
-        float target = Mathf.Clamp(-np.LAngleBase, np.LAngleMin, np.LAngleMax);
-        _fluddGunAngle += (target - _fluddGunAngle) * np.LAngleChase;
+        // calcGunAngle(): angle = -LAngleBase (0 shipped) -> the stream leaves along the barrel; the squat aims it with the stick; the L
+        // camera is the Y cam pass
+        SmsFluddCalcGunAngle(np);
         _fluddSprayStrength = MathF.Min(_fluddSprayStrength * np.EmitPowScale, 1f);
         // mBomb.movement(): the burst's trigger machine (manual fire: A while R is clicked)
         SmsFluddTriggerMovementTick(SmsParams.Fludd.Bomb, ref _fluddBombState, ref _fluddBombLeft, ref _fluddBombFill);
@@ -13239,6 +13276,8 @@ public partial class Mario : CharacterBody3D
     /// normal_wg and its LAngleBase is 0; rocket_wg has no neck.</summary>
     private void SmsFluddApplyGunAngle()
     {
+        if (_smsHeadGunRot != null)
+            _smsHeadGunRot.Angles[0] = _fluddGunAngle < 0f ? 0.5f * _fluddGunAngle * SmsUnits.BamToRad : 0f; // MarioHeadCtrl: Rz(angle / 2)
         if (_fluddNeckRot == null)
             return;
         _fluddNeckRot.Angles[0] = _fluddNozzle == SmsNozzle.Turbo && _fluddGunAngle < 0f ? _fluddGunAngle * SmsUnits.BamToRad : 0f;
@@ -13343,6 +13382,200 @@ public partial class Mario : CharacterBody3D
             if (_fluddDashing)
                 SmsFluddDashOff(_fluddNozzle != SmsNozzle.Turbo ? "the nozzle changed" : _fluddWater <= 0 ? "the tank ran dry" : "R released");
         }
+    }
+
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // MARIO_STATUS_SQUAT / SQUAT_STANDUP (MarioWait.cpp squating() 308, squatStandup() 387; MarioMove.cpp canSquat() 44).
+    // ---------------------------------------------------------------------------------------------------------------
+
+    /// <summary>canSquat(): the FLUDD out, not a RocketType-1 nozzle (the hover, the rocket), not Yoshi, and mInput 0x200 -- R or L
+    /// held while not FLUDD_EMITTING (the dash). MEANING_R is the GC trigger's click at the end of its travel; without a
+    /// button_rclick action the pad's full pull stands in (SmsRClick). The legacy Z is an alias of L here.</summary>
+    private bool SmsCanSquat()
+    {
+        if (!_fluddReady || _fluddDashing || SmsFluddCurrent.RocketType == 1)
+            return false;
+        return SmsRClick() || SmsSquatLHeld();
+    }
+
+    private static bool SmsSquatLHeld() => Input.IsActionPressed("button_l") || Input.IsActionPressed("button_z") || Input.IsActionPressed("key_z");
+
+    /// <summary>squating() / squatStandup() for one physics frame. True: the frame is his (the caller ends it). False: the stand-up
+    /// was cut by A (JUMP) or the stick (RUN) and he is idle -- the ground logic runs on this frame.</summary>
+    private bool SmsSquatFrame(double delta)
+    {
+        int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
+        // waitProcess(): no velocity, on the floor
+        velocity.X = 0f;
+        velocity.Z = 0f;
+        velocity.Y = -2f;
+        bool aFrame = Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space");
+        bool stick = _smsIntendedMag > 0f;
+        if (_smsSquatEndTicks > 0)
+        {
+            // SQUAT_STANDUP: mInput 0x2 (A) -> JUMP, 0x1 (the stick) -> RUN, both cutting ma_sqend; else its last frame -> WAIT
+            if (aFrame || stick)
+            {
+                SmsSquatLeave("stand-up cut");
+                return false;
+            }
+            _smsSquatEndTicks -= n;
+            if (_smsSquatEndTicks <= 0)
+                SmsSquatLeave("stood up");
+            return true;
+        }
+        bool rHeld = SmsRClick();
+        bool lHeld = SmsSquatLHeld();
+        if (!rHeld && !lHeld)
+        {
+            // !(mInput & 0x4000) && !(mInput & 0x200): neither R nor L -> SQUAT_STANDUP, ma_sqend (19 frames)
+            _smsSquatEndTicks = SmsParams.Squat.EndTicks;
+            SmsSquatClip(_smsSquatEndReady ? "ma_sqend" : "ma_wait", 1f);
+            if (SmsDebugPrint)
+                GD.Print($"[SMS squat] stand-up: ma_sqend {SmsParams.Squat.EndTicks} ticks, gun angle {_fluddGunAngle:F0} BAM");
+            return true;
+        }
+        if (SmsFluddCurrent.RocketType == 1)
+        {
+            // the nozzle became the hover / rocket in the squat: squating() would go to ROCKET once it emits; the nozzle code owns that
+            SmsSquatLeave("hover / rocket nozzle");
+            return false;
+        }
+        if (aFrame && rHeld && _fluddNozzle == SmsNozzle.Spray)
+        {
+            // mInput 0x2 with MEANING_R and the spray nozzle: BACK_JUMP (rumble MotorHipDrop)
+            _smsSquatEndTicks = 0;
+            StartBackflip();
+            return true;
+        }
+        Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
+        if (lHeld)
+        {
+            // getSideWalkValues(): side = mIntendedMag x sin(intendedYaw - face) x PumpingSlideSp, units a TICK along his left (the
+            // status handler runs per tick and adds it to mPosition itself); SWLKL when the stick is to his left, SWLKR to his right,
+            // at |side| x PumpingSlideAnmSp; SQWAT at rate 1 when the stick rests
+            float diff = stick && direction.LengthSquared() > 1e-6f ? SmsMath.WrapAngle(SmsMath.YawFromDir(direction.Normalized()) - _smsFaceYaw) : 0f;
+            float side = stick ? _smsIntendedMag * MathF.Sin(diff) * SmsParams.Squat.SlideSp : 0f;
+            if (side == 0f)
+                SmsSquatClip("ma_sqwat", 1f);
+            else
+            {
+                SmsSquatClip(diff > 0f ? "ma_swlkl" : "ma_swlkr", MathF.Abs(side) * SmsParams.Squat.SlideAnmSp);
+                Vector3 left = Vector3.Up.Cross(face).Normalized();
+                float mps = side * SmsUnits.TicksPerSecond / SmsUnits.UnitsPerMetre;
+                velocity.X = left.X * mps;
+                velocity.Z = left.Z * mps;
+            }
+        }
+        else
+        {
+            // R held: |stick H| through the SquatRotMid curve (5 % of the rate to 70 % deflection, then up to all of it) x
+            // -WaitingRotSp (220 BAM) a tick, truncated to a whole BAM as the game's s16 cast does: stick right = a right turn
+            float absH = MathF.Abs(_smsStickH);
+            float mid = SmsParams.Squat.RotMidAnalog, midVal = SmsParams.Squat.RotMidValue;
+            float rotAmt = absH < mid ? midVal * (absH / mid) : midVal + (1f - midVal) * ((absH - mid) / (1f - mid));
+            if (_smsStickH < 0f)
+                rotAmt = -rotAmt;
+            float stepBam = MathF.Truncate(rotAmt * -SmsParams.Mario.WaitingRotSp);
+            if (stepBam != 0f)
+            {
+                for (int i = 0; i < n; i++)
+                    _smsFaceYaw = SmsMath.WrapAngle(_smsFaceYaw + stepBam * SmsUnits.BamToRad);
+                face = SmsMath.DirFromYaw(_smsFaceYaw);
+                lastFacingDirection = face;
+                _smsLatchedFacing = face;
+                armature.Rotation = armature.Rotation with { Y = BaseYawFromDir(face) };
+            }
+            SmsSquatClip("ma_sqwat", 1f);
+        }
+        return true;
+    }
+
+    private void SmsSquatLeave(string why)
+    {
+        _smsSquatEndTicks = 0;
+        _smsSquatClipNow = "";
+        if (animTree != null && animTree.Active)
+            animTree.Set(RUN_TIMESCALE_PATH, 1f);
+        stateOfMario = MarioState.idle;
+        SetMarioState(stateOfMario);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS squat] off ({why})");
+    }
+
+    /// <summary>The squat's clip on the BaseSM (ma_sqwat is a scene state; ma_sqend / ma_swlkl / ma_swlkr are added at start-up) at the
+    /// game's rate through the tree's RunTimeScale.</summary>
+    private void SmsSquatClip(string clip, float rate)
+    {
+        if (animTree == null || !animTree.Active || _sm == null)
+            return;
+        if (clip != _smsSquatClipNow)
+        {
+            _smsSquatClipNow = clip;
+            _sm.Travel(clip);
+        }
+        animTree.Set(RUN_TIMESCALE_PATH, MathF.Max(rate, 0.01f));
+    }
+
+    /// <summary>ma_sqend, ma_swlkl and ma_swlkr as BaseSM states (the scene has only ma_sqwat): the stand-up auto-advances to ma_wait at
+    /// its end; the sidesteps loop. Travel() teleports to a state with no path, as it does for ma_runblend.</summary>
+    private void SmsSetupSquatStates()
+    {
+        _smsSquatEndReady = false;
+        if (animTree == null || animPlayer == null || animTree.TreeRoot is not AnimationNodeBlendTree tree || tree.GetNode("BaseSM") is not AnimationNodeStateMachine sm)
+            return;
+        if (animPlayer.HasAnimation("ma_sqend") && sm.HasNode("ma_wait"))
+        {
+            if (!sm.HasNode("ma_sqend"))
+            {
+                sm.AddNode("ma_sqend", new AnimationNodeAnimation { Animation = "ma_sqend" }, new Vector2(2000f, 500f));
+                sm.AddTransition("ma_sqend", "ma_wait", new AnimationNodeStateMachineTransition
+                {
+                    AdvanceMode = AnimationNodeStateMachineTransition.AdvanceModeEnum.Auto,
+                    SwitchMode = AnimationNodeStateMachineTransition.SwitchModeEnum.AtEnd,
+                });
+            }
+            _smsSquatEndReady = true;
+        }
+        int y = 600;
+        foreach (string c in new[] { "ma_swlkl", "ma_swlkr" })
+        {
+            if (!animPlayer.HasAnimation(c))
+                continue;
+            animPlayer.GetAnimation(c).LoopMode = Animation.LoopModeEnum.Linear; // setAnimation() every tick keeps them going
+            if (!sm.HasNode(c))
+                sm.AddNode(c, new AnimationNodeAnimation { Animation = c }, new Vector2(2000f, y));
+            y += 100;
+        }
+        if (SmsDebugPrint)
+            GD.Print($"[SMS squat] BaseSM states: ma_sqend {(_smsSquatEndReady ? "yes" : "NO")}, sidesteps {(sm.HasNode("ma_swlkl") && sm.HasNode("ma_swlkr") ? "yes" : "NO")}");
+    }
+
+    /// <summary>MarioHeadCtrl (MarioDraw.cpp 457): Rz(gun angle / 2) on jnt_head while the angle is negative -- the head looks up: 11.25
+    /// deg with the turbo out, up to 35 deg at the spray squat's pull-back. An SmsBoneRotZ on Mario's skeleton, first in the modifier
+    /// order like the swim pump.</summary>
+    private void SmsSetupHeadGunRot()
+    {
+        if (skeleton == null || skeleton.FindBone("jnt_head") < 0)
+            return;
+        _smsHeadGunRot = new SmsBoneRotZ { Name = "SmsHeadGunAngle", BoneNames = new[] { "jnt_head" }, Angles = new float[1] };
+        skeleton.AddChild(_smsHeadGunRot);
+        skeleton.MoveChild(_smsHeadGunRot, 0);
+    }
+
+    /// <summary>calcGunAngle() (WaterGun.cpp 216) for this tick. In MARIO_STATUS_SQUAT the target is the angle itself plus the stick's
+    /// vertical x RButtonMult (10000: any push pins the target at a limit and the chase does the moving; a resting stick holds the
+    /// aim); elsewhere -LAngleBase. Clamped [LAngleMin, LAngleMax], chased at LAngleChase. Above 0 the chest bends forward by the
+    /// angle (the spray goes down, to 44 deg); below 0 only the head looks up. The L camera's branch (the aim = the camera pitch) is
+    /// the Y cam pass.</summary>
+    private void SmsFluddCalcGunAngle(SmsParams.Fludd.Nozzle np)
+    {
+        float target = UseSmsPhysics && stateOfMario == MarioState.crouch && _smsSquatEndTicks == 0
+            ? _fluddGunAngle + _smsStickV * np.RButtonMult
+            : -np.LAngleBase;
+        target = Mathf.Clamp(target, np.LAngleMin, np.LAngleMax);
+        _fluddGunAngle += (target - _fluddGunAngle) * np.LAngleChase;
     }
 
     /// <summary>Where the turbo's jet leaves right now: its pitch from level and its heading against the face (-1 = straight back).</summary>
@@ -13736,8 +13969,14 @@ public partial class Mario : CharacterBody3D
             return;
         string node = animTree != null && animTree.Active && _sm != null ? (string)_sm.GetCurrentNode() : "";
         bool apply = node == "ma_run1" || node == "ma_run2" || node == "ma_runblend";
+        // MarioWaistCtrl's first branch (MarioDraw.cpp 486): in the squat family (status bit 0x8000) a gun angle above 0 -- the R squat's
+        // forward aim -- bends the whole upper body forward by that angle in place of the run lean (Rz on chn_chest: the spray, which
+        // leaves forward over his head, goes down with it); a negative angle bends nothing (the head looks up instead)
+        bool squatAim = UseSmsPhysics && stateOfMario == MarioState.crouch && _fluddReady && _fluddGunAngle > 0f;
+        if (squatAim)
+            apply = true;
         _smsWaist.Apply = apply;
-        _smsWaist.Pitch = _smsWaistPitch * SmsUnits.BamToRad;
+        _smsWaist.Pitch = (squatAim ? _fluddGunAngle : _smsWaistPitch) * SmsUnits.BamToRad;
         // The game's sign, applied as the game does: a left turn is a positive yaw change, so a positive roll, and Rx(roll) about
         // jnt_chest's local X -- up the spine in the rig AND in ma_mdl1.bmd (JNT1: chn_chest (0, 90, 0), jnt_chest (0, 0, 90) -> X up,
         // Y forward, Z lateral) -- turns the chest counterclockwise seen from above: INTO the turn, the torso leading the feet.
@@ -13747,7 +13986,7 @@ public partial class Mario : CharacterBody3D
         // The game's sign. The callback sits on chn_chest (X = his back, Y up, Z his left), so Rx(roll) is a BANK about the front-back
         // axis: a positive roll (a left turn) tips the upper body toward Z, his left, into the turn. The 16ccd6d negation went with the
         // jnt_chest reading (where Rx was a spine twist and the geometry dropped the outside shoulder); it is gone.
-        _smsWaist.Roll = _smsWaistRoll * SmsUnits.BamToRad;
+        _smsWaist.Roll = squatAim ? 0f : _smsWaistRoll * SmsUnits.BamToRad;
         if (_smsTimeLag != null)
         {
             // TMario::addCallBack: the matrix effects write while gMarioAnimeData[anim].unk6 & 2 (the locomotion clips; off for hanging,
