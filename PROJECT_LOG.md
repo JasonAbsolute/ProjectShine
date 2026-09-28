@@ -2427,6 +2427,20 @@ first; both were already the game's numbers, so both changes are **deliberate de
   with `setPlayerVelocity(DashMax)`, `mVel.y = 0`, `mPosition.y = the surface`), aims the turbo neck at −22.5° from the pack in
   every status (`calcGunAngle`: `−LAngleBase`, no swimming case), and plays the paddle clip at 5×; in the prone paddle pose the
   pack's back faces up, so the jet does leave upward-back in the game too.
+
+**Pass 12 — the surf jet, measured before changed** (Jaysonn 2026-09-28 01:17: "while in water and in turbo the nozzle shoots more to
+the sky … otherwise the nozzle is angled correctly"). What the game does, from the data: the surf plays `ma_swim` (`ANIM_PADDLE_SWIM`
+→ BCK 0x8F is the same `ma_swim.bck` as `ANIM_SWIM`) with the base matrix yaw-only (`calcBaseMtx` zeroes `mFaceAngle.x` while
+swimming), the origin held 80 units under the surface (`FloatHeight`), the turbo neck at −22.5° in every status (`calcGunAngle` =
+`−LAngleBase`, no swimming case), and — because the dash only lives while R is held (`offFlag(FLUDD_EMITTING)` the tick the pump
+stops) — the upper body PUMPING, i.e. `ma_swpmp` grafted onto the chest subtree. Sampling the BCKs: `ma_swim` alone leans the spine
+64° from upright and puts the jet at **41.5° above level**; with the swim-pump upper body grafted (as in the surf) the spine is 46–48°
+from upright and the jet leaves at **23–26° above level**, from a nozzle ~51 units over the water. So the game's surf jet is a low
+backward spray; if ours points higher, the pump graft is not on the chest during the surf, or the body is deeper/shallower than 80.
+The code says the port does all of the above (graft on while `_fluddUpper` is PUMPING, which the dash requires; neck chased in water;
+80-unit float clamp every tick), so nothing was changed blind: a once-a-second `[SMS turbo] dashing: jet +N deg from level …` line
+now prints the jet's elevation, the spine's tilt, the upper state, R, the trigger, the swim sub-state, the depth and the graft weight.
+A water dash in the next log settles which of those is off; ~25° is the game.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

@@ -262,6 +262,7 @@ public partial class Mario : CharacterBody3D
     private bool _fluddKeyN = false;                              // the nozzle-cycle key's last state
     private float _fluddDashSpeed = 0f;                           // mDashSpeed: the turbo's stick magnitude, 0.5 a tick to 32
     private bool _fluddDashing = false;                           // MARIO_FLAG_FLUDD_EMITTING: the run / paddle forced to DashMax
+    private int _fluddDashDbgTicks = 0;                           // the once-a-second [SMS turbo] readout while dashing
     private bool _fluddDashAnimOn = false;                        // ma_turbo_dash is the tree's current state
     private bool _fluddTurboAnimReady = false;                    // the ma_turbo_dash state was added to BaseSM
     private bool _fluddBroadJump = false;                         // this singleJump is a BROAD_JUMP (ma_broad_jump)
@@ -13307,6 +13308,21 @@ public partial class Mario : CharacterBody3D
                 }
                 if (_fluddDashing && !SmsDashState())
                     _fluddDashing = false; // mDashTimer = 0, offFlag: the status is not RUN (0x440) or SWIM_PADDLE
+                if (_fluddDashing && SmsDebugPrint && ++_fluddDashDbgTicks >= 60)
+                {
+                    // the surf question (2026-09-28 01:17): where the jet leaves, and everything that decides it
+                    _fluddDashDbgTicks = 0;
+                    string spine = "?";
+                    if (skeleton != null && skeleton.FindBone("jnt_chest") >= 0)
+                    {
+                        Vector3 up = skeleton.GetBoneGlobalPose(skeleton.FindBone("jnt_chest")).Basis.X.Normalized(); // X = up the spine
+                        spine = $"{Mathf.RadToDeg(Mathf.Acos(Mathf.Clamp(up.Y, -1f, 1f))):0} deg from upright";
+                    }
+                    string water = stateOfMario == MarioState.swimming
+                        ? $", swim {_smsSwim}, feet {SmsUnits.MetresToUnits(_smsWaterSurfaceY - SmsFeetY()):0} u under the surface, pump graft {(_fluddSwimPump != null ? _fluddSwimPump.Weight.ToString("0.0") : "none")}"
+                        : $", {stateOfMario}";
+                    GD.Print($"[SMS turbo] dashing: jet {SmsFluddJetDbg()}; spine {spine}; upper {_fluddUpper}, R {_fluddR:0.00}, trigger {_fluddTrigState}{water}; anim {_smsGaitClip} rate {_smsRunRate:0.00}");
+                }
                 if (_fluddDashing && !wasOn && SmsDebugPrint)
                     GD.Print($"[SMS turbo] dash on (from {_fluddDashDbgFrom}): {SmsParams.Mario.DashMax:F0} a tick = {SmsUnits.SpeedToMps(SmsParams.Mario.DashMax):F1} m/s, water {_fluddWater}, jet {SmsFluddJetDbg()}");
                 else if (!_fluddDashing && wasOn)
