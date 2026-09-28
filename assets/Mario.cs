@@ -13653,7 +13653,9 @@ public partial class Mario : CharacterBody3D
         float rate;
         if (dash)
         {
-            rate = sp * SmsParams.Run.RunAnmSpeedMult + SmsParams.Run.RunAnmSpeedBase; // mIntendedMag = mDashSpeed there: ~5.4 at 80
+            // the game: sp = min(mIntendedMag, fwd) = mDashSpeed, capped at 32 -> 2.76, the run's tempo at 2.5x the ground speed.
+            // DELIBERATE DEVIATION (SmsParams.Fludd.DashAnimByForwardVel): paced by mForwardVel, 80 -> 5.4
+            rate = (SmsParams.Fludd.DashAnimByForwardVel ? fwd : sp) * SmsParams.Run.RunAnmSpeedMult + SmsParams.Run.RunAnmSpeedBase;
             _smsGaitClip = "ma_turbo_dash";
             _smsRunMix = 1f;
         }

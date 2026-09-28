@@ -2409,6 +2409,24 @@ glb a detached ankle would show, so Jaysonn's two-bone IK with the shared hip dr
 game's numbers where they translate — the ankle 10 units above the ground it finds (`FootOffset`, was a by-eye 13.2) and a ±15-unit
 cap on each foot's correction (`MaxCorrectionSkel`, new; past it the foot floats or sinks as in the game). The eased weight
 (`FootIKEaseSpeed`) stays: the game snaps, but its statuses change when the feet are already on the ground.
+
+**Pass 11 — the turbo dash on land, by request** (Jaysonn 2026-09-28 01:02: "going back to using turbo nozzle. the steering is
+still too sharp. and running animation looks slow … making sure the steering and animations match up"). Checked against the decomp
+first; both were already the game's numbers, so both changes are **deliberate deviations** (see the list):
+- **Steering.** `doRunning` (MarioRun.cpp 510): `if (FLUDD_EMITTING) rotSp = RunningRotSpMin` — 1500 BAM a tick, the free run's own
+  snap (shipped min = max = 1500), converged with `IConverge` onto the stick's camera-relative yaw. `run.prm` ships a `DashRotSp` of
+  60 but no code reads it. The port had 1500 since S5 fix 2; he has now called it too sharp twice. Now `SmsParams.Fludd.DashRotSp`
+  = 600 BAM a tick: a 90° turn in ~0.23 s at 32 m/s (radius ≈ 5 m) against the game's 0.09 s. One constant; 1500 restores the code.
+- **The dash clip.** `doRunningAnimation` paces `ANIM_TURBO_DASH` by `sp = min(mIntendedMag, mForwardVel)`, and in the dash
+  `mIntendedMag = mDashSpeed`, which ramps to and caps at 32 (MarioMove.cpp 1509) — so the game runs the dash legs at 2.76, the same
+  tempo as a full run, while he covers 2.5× the ground (the 60-frame `ma_turbo_dash.bck` is the glb's 60-key clip, so no import
+  scaling either). The pre-pass-8 build ran it at 4.2 (the old lerp × 1.5 × 2), which is what he remembers as right. Now paced by
+  `mForwardVel` (`DashAnimByForwardVel`): 80 → 5.4.
+- **The water surf** was not touched: "shooting too high into the air like it's angled wrong" needs one answer before I change
+  anything — is that Mario leaving the water, or the turbo's jet pointing at the sky? The game keeps him on the surface (`SWIM_PADDLE`
+  with `setPlayerVelocity(DashMax)`, `mVel.y = 0`, `mPosition.y = the surface`), aims the turbo neck at −22.5° from the pack in
+  every status (`calcGunAngle`: `−LAngleBase`, no swimming case), and plays the paddle clip at 5×; in the prone paddle pose the
+  pack's back faces up, so the jet does leave upward-back in the game too.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
@@ -2444,6 +2462,11 @@ Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
   wherever the last move left them. Now the shipped `MtxEffect10 / 12.prm` values, the only tuning ever written for it: acc
   (0, −4, 0), L 50, brake 0.7 (`SmsParams.MtxEffect.Handle*`). If Dolphin shows the retail grips frozen backwards, the defaults are
   one line away.
+- **The turbo dash turns at 600 BAM a tick, not 1500** (2026-09-28 01:02). `doRunning` uses `RunningRotSpMin` (1500) while
+  `FLUDD_EMITTING`; Jaysonn has called that too sharp twice. `SmsParams.Fludd.DashRotSp`.
+- **The turbo dash clip is paced by the actual speed** (2026-09-28 01:02). The game paces it by `mDashSpeed`, capped at 32 — the
+  run's tempo (2.76) at 2.5× the ground speed; he reads that as slow. Now `mForwardVel` × 0.055 + 1 = 5.4 at 80.
+  `SmsParams.Fludd.DashAnimByForwardVel`.
 - `SmsRollJumpMinSpeed = 20` (game 40) — feel.
 - `SmsRollJumpKnockdown = false`: the roll-jump into a wall that reaches head height wall-slides. `rotateBroadJumping()` →
   `jumpingBasic(…, 1)` case 2 knocks it down above 40, and it never drops under 40 with the stick held; Jaysonn's
