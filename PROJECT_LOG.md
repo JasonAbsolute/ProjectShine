@@ -2442,6 +2442,20 @@ The code says the port does all of the above (graft on while `_fluddUpper` is PU
 80-unit float clamp every tick), so nothing was changed blind: a once-a-second `[SMS turbo] dashing: jet +N deg from level …` line
 now prints the jet's elevation, the spine's tilt, the upper state, R, the trigger, the swim sub-state, the depth and the graft weight.
 A water dash in the next log settles which of those is off; ~25° is the game.
+
+**Pass 14 — the water leaves along the drawn barrel** (Jaysonn's water-dash log, 2026-09-28 01:48). The pass-12 readout said it
+all: surf jet **+33…+36°** with the pump graft at weight 1 and the feet 79 units under; land jet **+6…+10°** with the spine leaning
+7–12°. Modelling the whole chain (`jet_model.py`: chest pose × `setBaseTRMtx`'s pack tilt `−0x1800 × (1 − |spine·y|)` × nozzle_center
+× `back_wg` neck × `null_G_muzzle`) reproduces both numbers exactly **only with the neck's −22.5° left out**: land = lean − 0.5°,
+surf = 45.8–48.3° (the grafted spine) − 10–11° (the pack tilt) = 35.6–37.0°. Root cause: `SmsFluddMuzzle` read
+`GetBoneGlobalPose(null_G_muzzle)` in the physics tick, and since Godot 4.3 a `SkeletonModifier3D`'s changes are applied for the
+skin update and then **restored** — outside the modifier pass the poses are the clip's alone. The drawn turbo head is tilted
+(`SmsBoneRotZ` on `jnt_back_nozzle_neck`), so "the nozzle is angled correctly", but the drops left along the un-tilted barrel: level
+on land, 22.5° too high everywhere. Same for the hover's bank (`WaterGunDivingCtrlL/R`). Fix: `SmsBoneRotZ.DrawnGlobalPose()`
+re-composes the chain with the callback rotations, and the emitter uses it (the game's `getEmitMtx()` is the anm matrix with the
+callbacks in it). The game's numbers, now ours: **land −11…−15°** (the spray splashes the ground behind him — that is the game),
+**surf +13…+14.5°** from a muzzle ~70 units over the water (the earlier "~25°" left out the pack tilt). No deviation needed. The
+readout now measures the drawn chest (the pack attachment, which follows the graft) and names the swim clip while swimming.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

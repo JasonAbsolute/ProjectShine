@@ -12722,7 +12722,11 @@ public partial class Mario : CharacterBody3D
             return true;
         }
         Transform3D g = sk.GlobalTransform;
-        Transform3D b = sk.GetBoneGlobalPose(bones[e]);
+        // getEmitMtx() is the joint's ANM matrix, callbacks included: the turbo's neck aim (NozzleCtrl) and the hover's bank
+        // (WaterGunDivingCtrlL/R) are SmsBoneRotZ modifiers, and Godot puts the clip's poses back after each skin update, so a
+        // plain GetBoneGlobalPose() here is the barrel BEFORE the callback -- level on land, 22.5 deg too high in the surf
+        SmsBoneRotZ cb = _fluddNozzle == SmsNozzle.Turbo ? _fluddNeckRot : _fluddNozzle == SmsNozzle.Hover ? _fluddTilt : null;
+        Transform3D b = cb != null ? cb.DrawnGlobalPose(sk, bones[e]) : sk.GetBoneGlobalPose(bones[e]);
         pos = g * b.Origin;
         dir = (g.Basis * b.Basis.X).Normalized();
         return dir.LengthSquared() > 0.5f;
@@ -13313,15 +13317,16 @@ public partial class Mario : CharacterBody3D
                     // the surf question (2026-09-28 01:17): where the jet leaves, and everything that decides it
                     _fluddDashDbgTicks = 0;
                     string spine = "?";
-                    if (skeleton != null && skeleton.FindBone("jnt_chest") >= 0)
+                    if (_fluddAttach != null)
                     {
-                        Vector3 up = skeleton.GetBoneGlobalPose(skeleton.FindBone("jnt_chest")).Basis.X.Normalized(); // X = up the spine
+                        // the pack's attachment follows jnt_chest as DRAWN (graft, lean and all); the skeleton's own poses are the clip's
+                        Vector3 up = _fluddAttach.GlobalTransform.Basis.X.Normalized(); // X = up the spine
                         spine = $"{Mathf.RadToDeg(Mathf.Acos(Mathf.Clamp(up.Y, -1f, 1f))):0} deg from upright";
                     }
                     string water = stateOfMario == MarioState.swimming
                         ? $", swim {_smsSwim}, feet {SmsUnits.MetresToUnits(_smsWaterSurfaceY - SmsFeetY()):0} u under the surface, pump graft {(_fluddSwimPump != null ? _fluddSwimPump.Weight.ToString("0.0") : "none")}"
                         : $", {stateOfMario}";
-                    GD.Print($"[SMS turbo] dashing: jet {SmsFluddJetDbg()}; spine {spine}; upper {_fluddUpper}, R {_fluddR:0.00}, trigger {_fluddTrigState}{water}; anim {_smsGaitClip} rate {_smsRunRate:0.00}");
+                    GD.Print($"[SMS turbo] dashing: jet {SmsFluddJetDbg()}; spine {spine}; upper {_fluddUpper}, R {_fluddR:0.00}, trigger {_fluddTrigState}{water}; anim {(stateOfMario == MarioState.swimming ? _smsSwimAnim : _smsGaitClip)} rate {(stateOfMario == MarioState.swimming ? (animPlayer?.SpeedScale ?? 0f) : _smsRunRate):0.00}");
                 }
                 if (_fluddDashing && !wasOn && SmsDebugPrint)
                     GD.Print($"[SMS turbo] dash on (from {_fluddDashDbgFrom}): {SmsParams.Mario.DashMax:F0} a tick = {SmsUnits.SpeedToMps(SmsParams.Mario.DashMax):F1} m/s, water {_fluddWater}, jet {SmsFluddJetDbg()}");
