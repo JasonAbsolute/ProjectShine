@@ -1175,7 +1175,9 @@ public partial class Mario : CharacterBody3D
     public Vector3 HeadLookUpAxis = new(0f, 0f, 1f);
 
     private HeadForwardLock _headLock;
-    private SmsWaistLean _smsWaist;                 // MarioWaistCtrl on jnt_chest (considerWaist's lean); replaces the waist IK under SMS
+    private SmsWaistLean _smsWaist;                 // MarioWaistCtrl on chn_chest (considerWaist's lean of the whole upper body); replaces the waist IK under SMS
+    private SmsTimeLag _smsTimeLag;                 // TMultiMtxEffect: TMtxTimeLag on jnt_chest, jnt_arm_R1, jnt_arm_L1 -- the game's jiggle
+    private int _smsLevelTicks = 0;                 // gpMarDirector->mMoveTickCount: the time lag waits 0x4B0 ticks into the level
     private float _smsWaistPitch = 0f, _smsWaistRoll = 0f; // mWaistPitch / mWaistRoll (BAM, floats like the game's)
     private float _smsWaistPrevYaw = 0f;            // unk9C: the face at the top of the frame
     private float _smsWaistDbgLastDYaw = 0f;        // debug: the frame's yaw change (BAM), for the into / away readout
@@ -9871,7 +9873,7 @@ public partial class Mario : CharacterBody3D
     {
         if (_headJiggle != null)
         {
-            _headJiggle.Weight = HeadJiggleEnabled ? HeadJiggleWeight : 0f;
+            _headJiggle.Weight = HeadJiggleEnabled && !UseSmsPhysics ? HeadJiggleWeight : 0f; // SMS: TMtxTimeLag (SmsTimeLag) is the game's
             _headJiggle.Stiffness = HeadJiggleStiffness;
             _headJiggle.Damping = HeadJiggleDamping;
             _headJiggle.Response = HeadJiggleResponse;
@@ -9884,7 +9886,7 @@ public partial class Mario : CharacterBody3D
         {
             if (arm == null)
                 continue;
-            arm.Weight = ArmJiggleEnabled ? ArmJiggleWeight : 0f;
+            arm.Weight = ArmJiggleEnabled && !UseSmsPhysics ? ArmJiggleWeight : 0f; // SMS: TMtxTimeLag on the upper arms is the game's
             arm.Stiffness = ArmJiggleStiffness;
             arm.Damping = ArmJiggleDamping;
             arm.Response = ArmJiggleResponse;
@@ -13477,6 +13479,7 @@ public partial class Mario : CharacterBody3D
         _smsWaistPrevYaw = _smsFaceYaw;
         _smsWaistDbgLastDYaw = dYawBam;
         int n = Math.Max(1, (int)Math.Round(delta * 120.0));
+        _smsLevelTicks += n;
         _smsWaistDbgMaxDYaw = MathF.Max(_smsWaistDbgMaxDYaw, MathF.Abs(dYawBam) / n);
         float fwd = SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()); // mForwardVel, in every status
         for (int i = 0; i < n; i++)
@@ -13491,9 +13494,8 @@ public partial class Mario : CharacterBody3D
         float rollDeg = _smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi;
         if (!_smsFaceValid || MathF.Abs(rollDeg) < 2f || MathF.Abs(_smsWaistDbgLastDYaw) < 1f)
             return "";
-        // the APPLIED twist is the negated value (the deliberate deviation in SmsWaistApply): report what the rig shows
-        bool into = MathF.Sign(-rollDeg) == MathF.Sign(_smsWaistDbgLastDYaw);
-        return $" (chest {MathF.Abs(rollDeg):0} deg {(into ? "into" : "AWAY from")} the turn, the {(into ? "outside" : "inside")} shoulder low)";
+        bool into = MathF.Sign(rollDeg) == MathF.Sign(_smsWaistDbgLastDYaw);
+        return $" (banks {MathF.Abs(rollDeg):0} deg {(into ? "into" : "AWAY from")} the turn)";
     }
 
     /// <summary>MarioWaistCtrl: the chest turned by the lean only while the body animation is RUN1 / RUN2 -- the port's ma_run1 (walking,
@@ -13526,6 +13528,26 @@ public partial class Mario : CharacterBody3D
         return $"; posture: chest {chestTilt:+0;-0} deg forward{sh}, head looking {headElev:+0;-0} deg ({headYaw:+0;-0} deg off the face, + = his left)";
     }
 
+    /// <summary>gMarioAnimeData bit 2 by clip name: the matrix effects are off for hanging, climbing, ladders, ropes, fences, the squat,
+    /// doors and demos; on for everything else (run1, run2, wait, jump, land, sstep, turbo_dash, turn, the swim clips ...).</summary>
+    private static bool SmsAnimeHasMtxEffect(string clip)
+    {
+        if (string.IsNullOrEmpty(clip))
+            return false;
+        foreach (string off in new[] { "ma_hg", "ma_hang", "ma_tree", "ma_ladder", "ma_door", "ma_sq", "ma_demo", "ma_hmov", "ma_rope", "ma_spin_p", "ma_fence" })
+            if (clip.StartsWith(off))
+                return false;
+        return true;
+    }
+
+    private string SmsTimeLagDbg()
+    {
+        if (_smsTimeLag == null || _smsTimeLag.Entries.Length < 3)
+            return "";
+        var c = _smsTimeLag.Entries[0]; var r = _smsTimeLag.Entries[1];
+        return $"; lag {(_smsTimeLag.Enabled ? "on" : "off")}: chest {c.DbgLagUnits:0.0} u / {c.DbgLagDeg:0.0} deg, arm {r.DbgLagDeg:0.0} deg";
+    }
+
     private void SmsWaistApply()
     {
         if (_smsWaist == null)
@@ -13540,13 +13562,17 @@ public partial class Mario : CharacterBody3D
         // 0e545b1 negated this after "he leans out": what he saw is the geometry, not the sign -- Rz(pitch) x Rx(roll) twists first
         // and pitches the twisted torso forward, so the shoulder that came forward (the outside one) dips by asin(sin p x sin r).
         // The flip turned his chest and head AWAY from the turn ("steering feels off", 2026-09-27). Reverted.
-        // DELIBERATE DEVIATION (Jaysonn, 2026-09-27 04:18, third report): the code's roll -- Rz(pitch) x Rx(roll), the twist applied
-        // before the forward pitch -- turns the chest INTO the turn and, because the forward shoulder is then pitched down, drops the
-        // OUTSIDE shoulder: from behind that reads as leaning out of every turn. He remembers the game leaning in. The applied sign is
-        // reversed: the inside shoulder drops, chest and head face out of the turn by the same angle. The value itself keeps the
-        // game's sign (the prints say which way it is applied). To settle it for real: Dolphin, tight circles at full speed -- which
-        // shoulder is low, and does the chest face the inside? If the inside, put the game's sign back (drop the minus).
-        _smsWaist.Roll = -_smsWaistRoll * SmsUnits.BamToRad;
+        // The game's sign. The callback sits on chn_chest (X = his back, Y up, Z his left), so Rx(roll) is a BANK about the front-back
+        // axis: a positive roll (a left turn) tips the upper body toward Z, his left, into the turn. The 16ccd6d negation went with the
+        // jnt_chest reading (where Rx was a spine twist and the geometry dropped the outside shoulder); it is gone.
+        _smsWaist.Roll = _smsWaistRoll * SmsUnits.BamToRad;
+        if (_smsTimeLag != null)
+        {
+            // TMario::addCallBack: the matrix effects write while gMarioAnimeData[anim].unk6 & 2 (the locomotion clips; off for hanging,
+            // climbing, ladders, ropes, fences, the squat, doors, demos), the upper body is IDLE, and the level is 0x4B0 ticks old
+            _smsTimeLag.Enabled = UseSmsPhysics && _fluddUpper == SmsUpper.Idle && _smsLevelTicks >= SmsParams.MtxEffect.EnableAfterTicks
+                && SmsAnimeHasMtxEffect(node.Length > 0 ? node : (animPlayer != null ? animPlayer.CurrentAnimation : ""));
+        }
         if (SmsDebugPrint)
         {
             if (apply != _smsWaistDbgOn)
@@ -13561,7 +13587,7 @@ public partial class Mario : CharacterBody3D
                 float camYaw = springArmPivot != null ? springArmPivot.Rotation.Y : 0f;
                 float camDrift = _smsWaistDbgCamValid ? Mathf.RadToDeg(SmsMath.WrapAngle(camYaw - _smsWaistDbgCamYaw)) : 0f;
                 _smsWaistDbgCamYaw = camYaw; _smsWaistDbgCamValid = true;
-                GD.Print($"[SMS waist] pitch {_smsWaistPitch * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg, roll {_smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg{SmsWaistTwistDbg()} at {SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()):F1} u/tick ({(SmsPumpingStyle() ? "pumping" : "free")}); this second: yaw change up to {_smsWaistDbgMaxDYaw:F0} BAM a tick ({_smsWaistDbgMaxDYaw * SmsUnits.BamToRad * 180f / Mathf.Pi:F2} deg), camera yaw drift {camDrift:+0.0;-0.0} deg{SmsPostureDbg()}");
+                GD.Print($"[SMS waist] pitch {_smsWaistPitch * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg, roll {_smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg{SmsWaistTwistDbg()} at {SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()):F1} u/tick ({(SmsPumpingStyle() ? "pumping" : "free")}); this second: yaw change up to {_smsWaistDbgMaxDYaw:F0} BAM a tick ({_smsWaistDbgMaxDYaw * SmsUnits.BamToRad * 180f / Mathf.Pi:F2} deg), camera yaw drift {camDrift:+0.0;-0.0} deg{SmsPostureDbg()}{SmsTimeLagDbg()}");
                 _smsWaistDbgMaxDYaw = 0f;
             }
         }
@@ -13591,7 +13617,21 @@ public partial class Mario : CharacterBody3D
         if (SmsDebugPrint)
             GD.Print("[SMS waist] head lock off under SMS: MarioHeadCtrl is the identity in a run; ma_run2's head track holds the head within 4 deg while the chest swings 35 deg a stride");
         if (SmsDebugPrint)
-            GD.Print($"[SMS waist] the game's callback turns jnt_chest's children ({(skeleton.FindBone("jnt_chest") >= 0 ? string.Join(", ", System.Array.ConvertAll(skeleton.GetBoneChildren(skeleton.FindBone("jnt_chest")), b => skeleton.GetBoneName(b))) : "NO jnt_chest")}) and leaves the chest's skin to the clip; here the chest BONE turns (same head / shoulder / arm placement, the rigid shirt leans with them -- deliberate deviation, 04:29)");
+            GD.Print($"[SMS waist] MarioWaistCtrl sits on chn_chest (parent of jnt_chest: {(skeleton.FindBone("jnt_chest") >= 0 ? skeleton.GetBoneName(skeleton.GetBoneParent(skeleton.FindBone("jnt_chest"))) : "?")}): the whole upper body pitches forward by speed and BANKS into turns about the front-back axis; the shipped MtxEffect14/16/22 files and the pack's tilt formula put the decomp's chn/jnt names the other way round");
+        _smsTimeLag = new SmsTimeLag
+        {
+            Name = "SmsTimeLag",
+            UnitsPerMetre = SmsUnits.UnitsPerMetre,
+            Entries = new[]
+            {
+                new SmsTimeLag.Entry { BoneName = "jnt_chest", PosAccel = SmsParams.MtxEffect.ChestPosAccel, PosBrake = SmsParams.MtxEffect.ChestPosBrake, PosLimitUnits = SmsParams.MtxEffect.ChestPosLimit, QuatAccel = SmsParams.MtxEffect.ChestQuatAccel, QuatBrake = SmsParams.MtxEffect.ChestQuatBrake },
+                new SmsTimeLag.Entry { BoneName = "jnt_arm_R1", PosAccel = SmsParams.MtxEffect.ArmPosAccel, PosBrake = SmsParams.MtxEffect.ArmPosBrake, PosLimitUnits = SmsParams.MtxEffect.ArmPosLimit, QuatAccel = SmsParams.MtxEffect.ArmQuatAccel, QuatBrake = SmsParams.MtxEffect.ArmQuatBrake },
+                new SmsTimeLag.Entry { BoneName = "jnt_arm_L1", PosAccel = SmsParams.MtxEffect.ArmPosAccel, PosBrake = SmsParams.MtxEffect.ArmPosBrake, PosLimitUnits = SmsParams.MtxEffect.ArmPosLimit, QuatAccel = SmsParams.MtxEffect.ArmQuatAccel, QuatBrake = SmsParams.MtxEffect.ArmQuatBrake },
+            },
+        };
+        skeleton.AddChild(_smsTimeLag);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS jiggle] TMtxTimeLag on jnt_chest (shoulders + head trail it: pos {SmsParams.MtxEffect.ChestPosAccel}/{SmsParams.MtxEffect.ChestPosBrake} limit {SmsParams.MtxEffect.ChestPosLimit} u, quat {SmsParams.MtxEffect.ChestQuatAccel}/{SmsParams.MtxEffect.ChestQuatBrake}) and jnt_arm_R1 / L1 (forearms + hands: pos {SmsParams.MtxEffect.ArmPosAccel}/{SmsParams.MtxEffect.ArmPosBrake}, quat {SmsParams.MtxEffect.ArmQuatAccel}/{SmsParams.MtxEffect.ArmQuatBrake}); on after {SmsParams.MtxEffect.EnableAfterTicks} ticks, locomotion clips, upper body idle; the legacy head / arm JiggleBones are off under SMS");
         if (SmsDebugPrint)
             GD.Print($"[SMS waist] considerWaist on jnt_chest {(skeleton.FindBone("jnt_chest") >= 0 ? "yes" : "NO")}: free {SmsParams.Waist.FreePitch} x fwd (cap {SmsParams.Waist.FreePitchMax}) / roll {SmsParams.Waist.FreeRoll} (cap {SmsParams.Waist.FreeRollMax}) at {SmsParams.Waist.FreeRate}; pumping {SmsParams.Waist.GunPitch} x fwd (cap {SmsParams.Waist.GunPitchMax}) / roll cap {SmsParams.Waist.GunRollMax} at {SmsParams.Waist.GunRate}; the waist IK is retired under SMS");
     }
@@ -13604,6 +13644,8 @@ public partial class Mario : CharacterBody3D
         if (skeleton == null || _smsWaist == null)
             return;
         skeleton.MoveChild(_smsWaist, skeleton.GetChildCount() - 1);
+        if (_smsTimeLag != null)
+            skeleton.MoveChild(_smsTimeLag, skeleton.GetChildCount() - 1); // tree order: chn_chest's lean before jnt_chest's lag
         if (SmsDebugPrint)
         {
             var mods = new System.Collections.Generic.List<string>();
@@ -13624,6 +13666,7 @@ public partial class Mario : CharacterBody3D
         _fluddSprayRamp = 0; _fluddSprayStrength = 0f; _fluddEmitAccum = 0f;
         _fluddDashSpeed = 0f; _fluddDashing = false; _fluddDashAnimOn = false; _fluddBroadJump = false;
         _smsWaistPitch = 0f; _smsWaistRoll = 0f; _smsWaistPrevYawValid = false;
+        _smsTimeLag?.Reset();
         _fluddDrops?.Clear();
         SmsFluddPoseWater();
     }

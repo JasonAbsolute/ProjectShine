@@ -122,6 +122,18 @@ public static class SmsParams
     /// MarioWaistCtrl on jnt_chest while the body animation is RUN1 / RUN2. Pitch target = Pitch x fwd (BAM), roll target =
     /// Roll x (the frame's yaw change in BAM) x fwd, each clamped to its Max and chased at Rate a tick. The water-gun set drives
     /// the pitch while the upper body pumps or holds the pump, or he carries something; the roll only while pumping.</summary>
+    /// <summary>TMultiMtxEffect on Mario (MarioDraw.cpp 1402): TMtxTimeLag on jnt_chest, jnt_arm_R1, jnt_arm_L1 -- the shipped
+    /// /Mario/MtxEffect14.prm, 16, 22 (accel / brake per 120 Hz tick, the limit in units). addCallBack writes them while
+    /// gMarioAnimeData[anim].unk6 & 2, the upper body is idle, and mMoveTickCount >= 0x4B0.</summary>
+    public static class MtxEffect
+    {
+        public const float ChestPosAccel = 0.1f;   public const float ChestPosBrake = 0.9f;  public const float ChestPosLimit = 5f;
+        public const float ChestQuatAccel = 1.0f;  public const float ChestQuatBrake = 0.5f;
+        public const float ArmPosAccel = 0.1f;     public const float ArmPosBrake = 0.8f;    public const float ArmPosLimit = 5f;
+        public const float ArmQuatAccel = 0.05f;   public const float ArmQuatBrake = 0.8f;
+        public const int EnableAfterTicks = 0x4B0;  // 1200 ticks = 10 s into the level
+    }
+
     public static class Waist
     {
         public const float FreePitch = 230f;        // 7360 BAM = 40.4 deg forward at the run cap 32

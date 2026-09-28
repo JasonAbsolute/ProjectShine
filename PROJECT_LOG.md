@@ -2299,6 +2299,39 @@ remaining candidates are the pitch magnitude (230 × fwd, `bodyanglefree.prm`) a
 (`unk100` is only ever zeroed, so the head callback is the identity in a run).
 **04:18** ("head is still looking off and leaning when turning is the wrong way still"): the twist's applied sign reversed as a
 deliberate deviation — see the deviations list; the reading itself is unchanged after a third pass through the decomp.
+
+**Pass 6 — the joint the waist really bends, and the game's jiggle** (Jaysonn, 2026-09-27 20:40: "still not matching … maybe the
+bone jiggle physics might be a part here? … go thru that work and see how the jiggle on Mario's physics work and apply that").
+(1) **`MarioWaistCtrl` sits on `chn_chest`, not `jnt_chest`.** The decomp writes `mJointIdChnChest = getIndex("chn_chest")`,
+`mJointIdChest = getIndex("jnt_chest")` (MarioDraw.cpp 1136–1137), but the shipped data contradicts the field it uses for each: the
+FLUDD hangs on `mJointIdChnChest` and `setBaseTRMtx` tilts the pack by `|mtx[1][0]|` (how vertical the joint's X is) — meaningless on
+chn_chest (X = his back), right on jnt_chest (X up; and that is where the pack sits correctly in our build) — and the time-lag effect on
+`mJointIdChnChest` loads `/Mario/MtxEffect<id>.prm`, shipped as **14** (jnt_chest), 16 (jnt_arm_R1), 22 (jnt_arm_L1); no 13 exists. So
+the field the decomp calls chn is jnt, and the waist callback — on the other field — is on **chn_chest**: the constant, skinless,
+zero-offset joint above the pelvis whose only child is jnt_chest, i.e. the whole upper body (the `chn_*` pattern: chn_foot_L / R host
+the foot callbacks the same way). chn_chest's frame is X = back, Y = up, Z = left, so `Rz(pitch) × Rx(roll)` is a pitch about the
+lateral axis (forward by speed) and a **bank about the front-back axis** — a positive roll, a left turn, tips him toward Z = his left,
+**into the turn** — applied to the entire upper body, torso skin included, about an axis that never moves with the stride. Every
+report fits: a plain lean, into the turn, no head sway, no hunch. `SmsWaistLean` now pre-multiplies jnt_chest's local pose by R in
+chn_chest's frame; the 16ccd6d sign deviation and the 06702ea skinning deviation are both gone (removed from the list below).
+(2) **The game's jiggle is `TMtxTimeLag`** (MarioUtil/MtxUtil.cpp), `TMultiMtxEffect` on three bones, all TIME_LAG: jnt_chest,
+jnt_arm_R1, jnt_arm_L1 (MarioDraw.cpp 1402–1414). Per 120 Hz tick, in world space: `vel += accel × (target − lag); vel *= brake;
+lag += vel`, clamped to ±limit per axis around the target; the quaternion the same way (shorter arc, component-wise, `MTXQuat`
+normalises); written into the matrix the **children** inherit. Shipped: chest 0.1 / 0.9 / 5 units / 1.0 / 0.5 — the shoulders and head
+trail the chest by up to 5 units (a constant 5 behind at a run, a ~6 Hz bob after the hips) — arms 0.1 / 0.8 / 5 / 0.05 / 0.8 — the
+forearms and hands trail the upper arm's swing at ~4 Hz, the floppy Sunshine arms. Written only while `gMarioAnimeData[anim].unk6 & 2`
+(run1, run2, wait, jump, land, sstep, turbo_dash, turn, the slips … — not hang / tree / ladder / rope / fence / squat / door / demo),
+the upper body is IDLE (not pumping or holding), and `mMoveTickCount >= 0x4B0` (10 s into the level); the state integrates while off,
+so enabling never pops. Port: `assets/Sms/SmsTimeLag.cs`, after `SmsWaistLean` (tree order: chn_chest's callback, then jnt_chest's);
+our spring `JiggleBone`s (head, both arms) are off under SMS — they were the approximation of this.
+Not yet: the FLUDD's own table — the pack root TIME_LAG 0.05 / 0.95 / 5 / 0.1 / 0.93 (the tank lags and bobs) and the two handles as
+`SWING_RZ` pendulums (acc (0, −4, 0), L 50, brake 0.7), written while anime bit 4 and upper idle (`/Mario/WaterGun/MtxEffect0, 10, 12`).
+Also seen on the way, not this pass: `doRunningAnimation` blends RUN2 with RUN1 (the model's fixed "old" slot 0x41) by
+`mMotionBlendRatio = 1 − (rate − 1.5) / (2.5 − 1.5)` — a continuous walk↔run blend by speed where ours switches clips on the stick;
+`setAnimation` rates are `rate × 0.5` frames a tick = 60 × rate BCK frames a second; the foot callbacks (`MarioFootPos/DirCtrl`) are
+installed for every state, not idle / pivot only.
+Debug: setup `[SMS waist] MarioWaistCtrl sits on chn_chest …`, `[SMS jiggle] TMtxTimeLag on jnt_chest …`; once a second `… (banks 24 deg
+into the turn) …; lag on: chest 5.0 u / 3.1 deg, arm 12.4 deg`.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
@@ -2308,7 +2341,8 @@ Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
 
 ### Deliberate deviations from the game
 
-- **The waist lean rotates the chest bone, not only its children** (2026-09-27 04:29). J3D applies `MarioWaistCtrl`'s rotation
+- ~~**The waist lean rotates the chest bone, not only its children** (2026-09-27 04:29)~~ — WITHDRAWN in pass 6: on chn_chest the
+  game itself rotates jnt_chest and everything under it. J3D applies `MarioWaistCtrl`'s rotation
   after the chest's own matrix is stored, so in the game only `jnt_head`, `jnt_sldr_L` / `R` and what hangs under them take the
   lean; the chest's skin keeps the clip and the smooth chest/shoulder envelopes (`EVP1`: 0.3/0.7, 0.5/0.5, 0.15/0.7/0.15) bend
   between. Our glb's shirt is rigid on `jnt_chest` (138 of 239 vertices; 2–4 chest/shoulder blends), so the literal port
@@ -2316,7 +2350,8 @@ Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
   post-multiplies the chest bone's pose by `Rz(pitch) × Rx(roll)`: head, shoulders and arms land exactly where the game's
   arithmetic puts them; the torso skin leans with them as one piece. Skinning only; angles, chase and gating are the code's.
   If the shirt ever gets the BMD's blends back, the children-only version is in git (ad0ed9e's `SmsWaistLean.cs`).
-- **The waist twist's sign is reversed** (2026-09-27 04:18). `considerWaist` makes `mWaistRoll` positive for a left turn (`diffAngle`
+- ~~**The waist twist's sign is reversed** (2026-09-27 04:18)~~ — WITHDRAWN in pass 6: the callback is on chn_chest, where the
+  game's own sign banks into the turn. `considerWaist` makes `mWaistRoll` positive for a left turn (`diffAngle`
   = this tick's face change, +Y = counterclockwise = left), `MarioWaistCtrl` applies `MsMtxSetRotRPH(roll, 0, pitch)` =
   `Rz(pitch) × Rx(roll)` on `jnt_chest` (X up the spine, Y the front, Z his left — verified in the BMD, the rig, and by the pack
   sitting on his back), and the surf's body bank uses `mRoll = −0.45` with the same `delta`, so the code's intent is unambiguous:
