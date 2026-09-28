@@ -250,6 +250,11 @@ public partial class Mario : CharacterBody3D
     private SmsBoneRotZ _fluddTilt;                               // WaterGunDivingCtrlL / R on the hover nozzle's jnt_nozzle_L / R
     private SmsBoneRotZ _fluddNeckRot;                            // NozzleCtrl on the turbo's jnt_back_nozzle_neck: the gun angle
     private SmsSwingRZ _fluddHandleSwing;                         // TMtxSwingRZ on the tank's jnt_G_handle: the grips' pendulum
+    private bool _smsRunBlendReady;                               // BaseSM has ma_runblend: ma_run1 x ma_run2 by the rate, as the game blends them
+    private int _smsGaitBand = 1;                                 // doRunningAnimation: 0 = SSTEP, 1 = RUN2 (Walk2Soft / Soft2Walk hysteresis)
+    private string _smsGaitClip = "ma_runblend";                  // the clip doRunningAnimation would set this frame
+    private float _smsRunRate = 1f, _smsRunMix = 1f;              // its rate (BCK frames a tick x 2 = Godot speed) and the run2 share
+    private const string SMS_RUN_MIX_PATH = "parameters/BaseSM/ma_runblend/mix/blend_amount";
     private float _fluddHeadW = 0f;                               // the HoverHeadAngle head dip, eased like the run's head lock
     private SmsUpperPose _fluddSwimPump;                          // addUpper() for the swim clips: ma_swpmp on the chn_chest subtree
     private float _fluddRocketVyPending = 0f;                     // the rocket's pushes fired this frame before the status change (units a tick)
@@ -1678,6 +1683,7 @@ public partial class Mario : CharacterBody3D
 
         ForceLoop("ma_pivot");
         SmsFluddSetup(); // the pack on his back (FLUDD S1)
+        SmsSetupRunBlend(); // doRunningAnimation's run1 x run2 blend as a BaseSM state
         SmsWaistOrderLast(); // after every other modifier: the jiggles reset the children's positions the lean must move
         ForceLoop("ma_sstep");
         ForceLoop("ma_wait");
@@ -11002,6 +11008,12 @@ public partial class Mario : CharacterBody3D
 
     private void UpdateRunAnimationSpeed()
     {
+        if (UseSmsPhysics && _smsRunBlendReady && (stateOfMario == MarioState.sneak || stateOfMario == MarioState.walking
+            || stateOfMario == MarioState.running || stateOfMario == MarioState.sprinting))
+        {
+            SmsRunAnimTick(); // doRunningAnimation(): the clip, its rate and the run1 / run2 mix from the speed
+            return;
+        }
         // Sneak gets its own speed scaling based on stick strength
         if (stateOfMario == MarioState.sneak)
         {
@@ -13574,7 +13586,103 @@ public partial class Mario : CharacterBody3D
         };
         _fluddTankSkel.AddChild(_fluddHandleSwing);
         if (SmsDebugPrint)
-            GD.Print($"[SMS jiggle] FLUDD handle swing (TMtxSwingRZ) on jnt_G_handle -> {string.Join(", ", System.Array.ConvertAll(_fluddTankSkel.GetBoneChildren(_fluddTankSkel.FindBone("jnt_G_handle")), b => _fluddTankSkel.GetBoneName(b)))}: rope {SmsParams.MtxEffect.HandleL} u, acc {SmsParams.MtxEffect.HandleAcc}, brake {SmsParams.MtxEffect.HandleBrake} (the compiled-in defaults: MtxEffect7.prm does not ship); the tank root's time lag is never enabled in the game and is not ported");
+            GD.Print($"[SMS jiggle] FLUDD handle swing (TMtxSwingRZ) on jnt_G_handle -> {string.Join(", ", System.Array.ConvertAll(_fluddTankSkel.GetBoneChildren(_fluddTankSkel.FindBone("jnt_G_handle")), b => _fluddTankSkel.GetBoneName(b)))}: rope {SmsParams.MtxEffect.HandleL} u, acc {SmsParams.MtxEffect.HandleAcc}, brake {SmsParams.MtxEffect.HandleBrake} (MtxEffect10 / 12's tuning, a logged deviation: the shipped game runs the compiled-in defaults acc 0 / brake 0.9 because no MtxEffect7.prm ships); the tank root's time lag is never enabled in the game and is not ported");
+    }
+
+    /// <summary>The game blends RUN1 (the walk cycle) and RUN2 (the run) continuously by the run's rate (doRunningAnimation:
+    /// mMotionBlendRatio = 1 - (rate - MotBlendWalkSp) / (MotBlendRunSp - MotBlendWalkSp)), both clips at the same frame. Godot's
+    /// state machine has one clip per state, so the pair goes in as one state: a blend tree of the two AnimationNodeAnimations into
+    /// a Blend2 (0 = ma_run1, 1 = ma_run2), driven through SMS_RUN_MIX_PATH. Both clips are 60 frames, as the BCKs.</summary>
+    private void SmsSetupRunBlend()
+    {
+        _smsRunBlendReady = false;
+        if (animTree == null || animTree.TreeRoot is not AnimationNodeBlendTree tree || tree.GetNode("BaseSM") is not AnimationNodeStateMachine sm)
+            return;
+        if (!animPlayer.HasAnimation("ma_run1") || !animPlayer.HasAnimation("ma_run2"))
+            return;
+        if (!sm.HasNode("ma_runblend"))
+        {
+            var bt = new AnimationNodeBlendTree();
+            bt.AddNode("walk", new AnimationNodeAnimation { Animation = "ma_run1" }, new Vector2(0f, 0f));
+            bt.AddNode("run", new AnimationNodeAnimation { Animation = "ma_run2" }, new Vector2(0f, 160f));
+            bt.AddNode("mix", new AnimationNodeBlend2(), new Vector2(320f, 80f));
+            bt.ConnectNode("mix", 0, "walk");
+            bt.ConnectNode("mix", 1, "run");
+            bt.ConnectNode("output", 0, "mix");
+            sm.AddNode("ma_runblend", bt, new Vector2(2000f, 300f));
+        }
+        animTree.Set(SMS_RUN_MIX_PATH, 0.5f);
+        Variant back = animTree.Get(SMS_RUN_MIX_PATH);
+        _smsRunBlendReady = back.VariantType == Variant.Type.Float && Mathf.IsEqualApprox((float)back, 0.5f);
+        if (_smsRunBlendReady)
+            animTree.Set(SMS_RUN_MIX_PATH, 1f);
+        if (SmsDebugPrint)
+            GD.Print(_smsRunBlendReady
+                ? $"[SMS run] ma_runblend in BaseSM: ma_run1 x ma_run2 by the rate (walk below rate {SmsParams.Run.MotBlendWalkSp}, run above {SmsParams.Run.MotBlendRunSp}); rate = {SmsParams.Run.RunAnmSpeedMult} x min(intended, fwd) + {SmsParams.Run.RunAnmSpeedBase} (60 fps clips: Godot speed = the game's rate); SSTEP below {SmsParams.Run.Walk2Soft}, back above {SmsParams.Run.Soft2Walk}, at {SmsParams.Run.SoftStepAnmMult} x sp"
+                : $"[SMS run] ma_runblend NOT wired ({SMS_RUN_MIX_PATH} did not read back): the stick picks ma_run1 / ma_run2 as before");
+    }
+
+    /// <summary>doRunningAnimation() (MarioRun.cpp 116) for this frame: sp = min(mIntendedMag, mForwardVel), never below 4. At the dash
+    /// (mForwardVel >= DashMax - 1) TURBO_DASH at rate sp x RunAnmSpeedMult + RunAnmSpeedBase; below Walk2Soft SSTEP at max(sp, 0.1)
+    /// x SoftStepAnmMult (back to the run above Soft2Walk); else RUN2 at that rate -- scaled in water by (1 - depth / SwimDepth x
+    /// (1 - InWaterBrake)) x InWaterAnmBrake -- blended with RUN1 by (rate - MotBlendWalkSp) / (MotBlendRunSp - MotBlendWalkSp).
+    /// setAnimation gives the frame control rate x 0.5 BCK frames a tick = 60 x rate frames a second, and the glb's clips are the
+    /// BCKs at 60 fps, so the Godot time scale IS the game's rate.</summary>
+    private void SmsRunAnimTick()
+    {
+        float fwd = SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length());
+        float sp = MathF.Min(_smsIntendedMag, fwd);
+        if (sp < 4f)
+            sp = 4f;
+        bool dash = _fluddDashAnimOn && _fluddTurboAnimReady;
+        if (!dash)
+            _smsGaitBand = SmsRun.GaitBand(sp, _smsGaitBand);
+        float rate;
+        if (dash)
+        {
+            rate = sp * SmsParams.Run.RunAnmSpeedMult + SmsParams.Run.RunAnmSpeedBase; // mIntendedMag = mDashSpeed there: ~5.4 at 80
+            _smsGaitClip = "ma_turbo_dash";
+            _smsRunMix = 1f;
+        }
+        else if (_smsGaitBand == 0)
+        {
+            rate = MathF.Max(sp, 0.1f) * SmsParams.Run.SoftStepAnmMult;
+            _smsGaitClip = "ma_sstep";
+            _smsRunMix = 0f;
+        }
+        else
+        {
+            rate = sp * SmsParams.Run.RunAnmSpeedMult + SmsParams.Run.RunAnmSpeedBase;
+            if (_smsInWater && IsOnFloor())
+            {
+                float depthRatio = Mathf.Clamp(SmsUnits.MetresToUnits(_smsWaterSurfaceY - SmsFeetY()) / SmsParams.Swim.SwimDepth, 0f, 1f);
+                rate *= (1f - depthRatio * (1f - SmsParams.Swim.InWaterBrake)) * SmsParams.Swim.InWaterAnmBrake;
+            }
+            _smsGaitClip = "ma_runblend";
+            _smsRunMix = Mathf.Clamp((rate - SmsParams.Run.MotBlendWalkSp) / (SmsParams.Run.MotBlendRunSp - SmsParams.Run.MotBlendWalkSp), 0f, 1f);
+        }
+        _smsRunRate = rate;
+        if (animTree != null && animTree.Active)
+        {
+            animTree.Set(RUN_TIMESCALE_PATH, rate);
+            animTree.Set(SMS_RUN_MIX_PATH, _smsRunMix);
+        }
+        else
+            animPlayer.SpeedScale = rate;
+    }
+
+    /// <summary>The clip doRunningAnimation() picks now (SetMarioState's travel target for the gait states under SMS).</summary>
+    private string SmsGaitClip()
+    {
+        SmsRunAnimTick();
+        return _smsGaitClip;
+    }
+
+    private string SmsRunAnimDbg()
+    {
+        if (!UseSmsPhysics || !_smsRunBlendReady)
+            return "";
+        return $"; anim {_smsGaitClip} rate {_smsRunRate:0.00}{(_smsGaitClip == "ma_runblend" ? $" (run2 {_smsRunMix * 100f:0}%)" : "")}";
     }
 
     private string SmsTimeLagDbg()
@@ -13591,7 +13699,7 @@ public partial class Mario : CharacterBody3D
         if (_smsWaist == null)
             return;
         string node = animTree != null && animTree.Active && _sm != null ? (string)_sm.GetCurrentNode() : "";
-        bool apply = node == "ma_run1" || node == "ma_run2";
+        bool apply = node == "ma_run1" || node == "ma_run2" || node == "ma_runblend";
         _smsWaist.Apply = apply;
         _smsWaist.Pitch = _smsWaistPitch * SmsUnits.BamToRad;
         // The game's sign, applied as the game does: a left turn is a positive yaw change, so a positive roll, and Rx(roll) about
@@ -13632,7 +13740,7 @@ public partial class Mario : CharacterBody3D
                 float camYaw = springArmPivot != null ? springArmPivot.Rotation.Y : 0f;
                 float camDrift = _smsWaistDbgCamValid ? Mathf.RadToDeg(SmsMath.WrapAngle(camYaw - _smsWaistDbgCamYaw)) : 0f;
                 _smsWaistDbgCamYaw = camYaw; _smsWaistDbgCamValid = true;
-                GD.Print($"[SMS waist] pitch {_smsWaistPitch * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg, roll {_smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg{SmsWaistTwistDbg()} at {SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()):F1} u/tick ({(SmsPumpingStyle() ? "pumping" : "free")}); this second: yaw change up to {_smsWaistDbgMaxDYaw:F0} BAM a tick ({_smsWaistDbgMaxDYaw * SmsUnits.BamToRad * 180f / Mathf.Pi:F2} deg), camera yaw drift {camDrift:+0.0;-0.0} deg{SmsPostureDbg()}{SmsTimeLagDbg()}");
+                GD.Print($"[SMS waist] pitch {_smsWaistPitch * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg, roll {_smsWaistRoll * SmsUnits.BamToRad * 180f / Mathf.Pi:+0.0;-0.0} deg{SmsWaistTwistDbg()} at {SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()):F1} u/tick ({(SmsPumpingStyle() ? "pumping" : "free")}); this second: yaw change up to {_smsWaistDbgMaxDYaw:F0} BAM a tick ({_smsWaistDbgMaxDYaw * SmsUnits.BamToRad * 180f / Mathf.Pi:F2} deg), camera yaw drift {camDrift:+0.0;-0.0} deg{SmsPostureDbg()}{SmsTimeLagDbg()}{SmsRunAnimDbg()}");
                 _smsWaistDbgMaxDYaw = 0f;
             }
         }
@@ -14158,7 +14266,7 @@ public partial class Mario : CharacterBody3D
                 _sm.Travel("ma_pivot");
                 break;
             case MarioState.sneak:
-                _sm.Travel("ma_sstep");
+                _sm.Travel(UseSmsPhysics && _smsRunBlendReady ? SmsGaitClip() : "ma_sstep");
                 break;
             case MarioState.walking:
             case MarioState.running:
@@ -14168,7 +14276,10 @@ public partial class Mario : CharacterBody3D
                 // machine honours only the last travel() of the frame, so until 2026-09-27 the dash clip never played: ma_run2 ran at
                 // the doubled rate with the water-gun waist lean on top (MarioWaistCtrl applies for RUN1 / RUN2, not TURBO_DASH), and
                 // any steering twisted the shoulders to the 22 deg cap (0.5 x dYaw x 80 saturates from 100 BAM a tick).
-                _sm.Travel(_fluddDashAnimOn && _fluddTurboAnimReady ? "ma_turbo_dash" : state == MarioState.sprinting ? "ma_run2" : "ma_run1");
+                // Under SMS the clip follows the SPEED, not the stick: doRunningAnimation picks SSTEP below Walk2Soft (back to the run above
+                // Soft2Walk), TURBO_DASH at the dash, else RUN2 blended with RUN1 by its rate -- ma_runblend, a Blend2 of the two clips.
+                _sm.Travel(UseSmsPhysics && _smsRunBlendReady ? SmsGaitClip()
+                    : _fluddDashAnimOn && _fluddTurboAnimReady ? "ma_turbo_dash" : state == MarioState.sprinting ? "ma_run2" : "ma_run1");
                 break;
             case MarioState.singleJump:
                 // Just left a slip for airborne (slid off the edge, or the

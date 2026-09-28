@@ -2357,6 +2357,30 @@ our per-tick stepping of the waist filter, the time lag and the swing is right (
 three ticks of a frame, but Mario does not use that cue for its own calc).
 Debug: setup `[SMS jiggle] FLUDD handle swing (TMtxSwingRZ) on jnt_G_handle -> jnt_G_handle_R, jnt_G_handle_L …`; the once-a-second
 line ends `…, handles 88 deg back` (`(off)` while a spray or a squat holds it).
+
+**Pass 8 — the run, again, and the grips** (Jaysonn 2026-09-28 00:08: "marios head looks good now but flood is not. floods arms look
+like they are doing weird things like going upside down. can you also have it play the right speed and such? go thru all the running
+again since the speed feels off").
+**Grips**: the no-gravity defaults did exactly what the note predicted — after a run they trail back, after a U-turn they point
+forward, and they never come down. He wants them hanging: the shipped `MtxEffect10 / 12.prm` values go in as a deliberate
+deviation (see the list) — gravity 4 units a tick², brake 0.7, rope 50. At 120 Hz that is a stiff, quick pendulum: ~41° back at a
+full run (the pull `(v − 8, −4) × 0.7` balances at `atan(2.4 / 2.8)`), ~19° at a walk, hanging at rest, settled within ~10 ticks.
+**The run clip**: `doRunningAnimation` (MarioRun.cpp 116) was still Jaysonn's original mapping — clip by STICK (over 0.5 = `ma_run2`,
+under `SNEAK_MAX_INPUT` = `ma_sstep`, else `ma_run1`) and rate = `lerp(0.9, 1.4, speed / 11.55) × 1.5` on the tree — about 2.2 at a
+full run. The game: `sp = min(mIntendedMag, mForwardVel)`, never below 4; **SSTEP** below `Walk2Soft` 8 (back to the run above
+`Soft2Walk` 13) at `max(sp, 0.1) × SoftStepAnmMult` 0.15; **TURBO_DASH** at the dash; else **RUN2 at `sp × 0.055 + 1`** — 2.76 at 32,
+1.44 at 8, ~5.4 in the dash — scaled in water by `(1 − depth / SwimDepth × (1 − InWaterBrake)) × InWaterAnmBrake`, and **blended
+with RUN1** (the walk cycle, the model's fixed "old" slot) by `mMotionBlendRatio = 1 − (rate − 1.5) / (2.5 − 1.5)`: pure walk cycle
+below rate 1.5 (sp ≈ 9), pure run above 2.5 (sp ≈ 27), a continuous mix between. `setAnimation` gives the frame control `rate × 0.5`
+BCK frames a tick = 60 × rate frames a second (`SMSGetAnmFrameRate` = 60 / vsync for everything else: the BCKs are 60 fps), and the
+glb's clips are those BCKs at 60 fps (`ma_run2` 60 keys, 0.983 s), so **the Godot time scale is the game's rate, no factor**. Ported:
+`SmsSetupRunBlend` adds a `ma_runblend` state to BaseSM at start-up — a blend tree of `ma_run1` and `ma_run2` into a Blend2 driven
+by `parameters/BaseSM/ma_runblend/mix/blend_amount` (verified by a read-back at start-up; if it fails the old clips stay) — and
+`SmsRunAnimTick` picks the clip, the rate and the mix every frame under SMS; `SetMarioState`'s gait cases travel to what it picked.
+`MarioWaistCtrl` applies on `ma_runblend` too (it is RUN1 / RUN2). Transitions into `ma_runblend` teleport (no cross-fade) — as the
+game, whose `setAnimation` zeroes the blend ratio on every clip change.
+Debug: the once-a-second line ends `…; anim ma_runblend rate 2.76 (run2 100%)` / `anim ma_sstep rate 0.90`; setup `[SMS run]
+ma_runblend in BaseSM …`.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
@@ -2386,6 +2410,12 @@ Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
   negated (`SmsWaistApply`): the inside shoulder drops, chest and head face out of the turn by the same angle. The value keeps the
   game's sign; the prints report the applied direction. **To settle it:** Dolphin, tight circles at full speed — which shoulder is
   low, and does his chest face the inside of the circle? If the inside, drop the minus.
+- **The FLUDD grips' pendulum has gravity** (2026-09-28 00:08). The shipped game runs `TMtxSwingRZ` on `jnt_G_handle` with the
+  compiled-in defaults — acc (0, 0, 0), brake 0.9 — because the model's handle joint is 7 and no `MtxEffect7.prm` ships (pass 7).
+  Ported that way first; Jaysonn: "floods arms look like they are doing weird things like going upside down" — the grips stay
+  wherever the last move left them. Now the shipped `MtxEffect10 / 12.prm` values, the only tuning ever written for it: acc
+  (0, −4, 0), L 50, brake 0.7 (`SmsParams.MtxEffect.Handle*`). If Dolphin shows the retail grips frozen backwards, the defaults are
+  one line away.
 - `SmsRollJumpMinSpeed = 20` (game 40) — feel.
 - `SmsRollJumpKnockdown = false`: the roll-jump into a wall that reaches head height wall-slides. `rotateBroadJumping()` →
   `jumpingBasic(…, 1)` case 2 knocks it down above 40, and it never drops under 40 with the stick held; Jaysonn's

@@ -113,6 +113,7 @@ public static class SmsParams
         public const float RunAnmSpeedMult = 0.055f;    // run anim rate = base + fwd*mult
         public const float MotBlendWalkSp = 1.5f;
         public const float MotBlendRunSp = 2.5f;
+        public const float SoftStepAnmMult = 0.15f;     // SSTEP rate = max(sp, 0.1) x this
         public const float DoJumpCatchSp = 15f;         // min fwd to dive from a run
         public const float TurnNeedSp = 10f;            // min fwd for the skid U-turn
         public const int DashRotSp = 60;                // BAM per tick
@@ -136,9 +137,14 @@ public static class SmsParams
         // (0.05 / 0.95 / 5 / 0.1 / 0.93) but its flag 1 is never set, so the tank never lags: NOT PORTED. Entry 1 SWING_RZ on
         // jnt_G_handle: the model's jnt_G_handle is joint 7 and no MtxEffect7.prm ships (MtxEffect10 and 12 do, for an older rig:
         // acc (0, -4, 0), L 50, brake 0.7), so the shipped game runs TMtxSwingRZ's compiled-in defaults -- no gravity.
-        public static readonly Vector3 HandleAcc = Vector3.Zero;
+        // DELIBERATE DEVIATION (Jaysonn, 2026-09-28 00:08: "floods arms look like they are doing weird things like going upside down"):
+        // the compiled-in defaults (acc 0, brake 0.9) leave the grips wherever the last move put them -- backwards after a run, forwards
+        // after a U-turn -- and that is what he saw. The values below are the shipped MtxEffect10 / 12.prm, the only tuning ever written
+        // for this pendulum (for an older rig whose handle joints were 10 and 12): gravity 4 units a tick^2, brake 0.7. The grips hang,
+        // trail back by speed (~41 deg at a full run) and settle in a few ticks. The defaults are acc (0, 0, 0), brake 0.9.
+        public static readonly Vector3 HandleAcc = new Vector3(0f, -4f, 0f);
         public const float HandleL = 50f;
-        public const float HandleBrake = 0.9f;
+        public const float HandleBrake = 0.7f;
     }
 
     public static class Waist
