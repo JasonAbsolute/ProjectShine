@@ -249,6 +249,7 @@ public partial class Mario : CharacterBody3D
     private float _fluddTiltL = 0f, _fluddTiltR = 0f;             // unk1CC8 / unk1CCC: chased at ChangeSpeed a tick
     private SmsBoneRotZ _fluddTilt;                               // WaterGunDivingCtrlL / R on the hover nozzle's jnt_nozzle_L / R
     private SmsBoneRotZ _fluddNeckRot;                            // NozzleCtrl on the turbo's jnt_back_nozzle_neck: the gun angle
+    private SmsBoneRotZ _fluddSprayAim;                           // NozzleCtrl on the spray nozzle's chn_muzzle_1: a negative gun angle aims it up
     private SmsSwingRZ _fluddHandleSwing;                         // TMtxSwingRZ on the tank's jnt_G_handle: the grips' pendulum
     private bool _smsRunBlendReady;                               // BaseSM has ma_runblend: ma_run1 x ma_run2 by the rate, as the game blends them
     private int _smsGaitBand = 1;                                 // doRunningAnimation: 0 = SSTEP, 1 = RUN2 (Walk2Soft / Soft2Walk hysteresis)
@@ -12142,6 +12143,7 @@ public partial class Mario : CharacterBody3D
         SmsFluddSetupWater(); // S2: the drops, the water level in the tank, the muzzles
         SmsFluddSetupHoverTilt(); // S3: the hover nozzles' bank joints
         SmsFluddSetupTurboNeck(); // S5 fix 2: NozzleCtrl on the turbo's jnt_back_nozzle_neck (the gun angle)
+        SmsFluddSetupSprayAim();  // NozzleCtrl on the spray nozzle's chn_muzzle_1: the aim up
         SmsFluddSetupHandleSwing(); // the water gun's TMultiMtxEffect: the grips swing on jnt_G_handle
         SmsFluddSetupSwimPump();  // ma_swpmp on the upper body while the swim clips run outside the tree
         SmsFluddSetupTurboAnims(); // S5: ma_turbo_dash / ma_broad_jump as BaseSM states
@@ -12760,7 +12762,7 @@ public partial class Mario : CharacterBody3D
         // getEmitMtx() is the joint's ANM matrix, callbacks included: the turbo's neck aim (NozzleCtrl) and the hover's bank
         // (WaterGunDivingCtrlL/R) are SmsBoneRotZ modifiers, and Godot puts the clip's poses back after each skin update, so a
         // plain GetBoneGlobalPose() here is the barrel BEFORE the callback -- level on land, 22.5 deg too high in the surf
-        SmsBoneRotZ cb = _fluddNozzle == SmsNozzle.Turbo ? _fluddNeckRot : _fluddNozzle == SmsNozzle.Hover ? _fluddTilt : null;
+        SmsBoneRotZ cb = _fluddNozzle == SmsNozzle.Turbo ? _fluddNeckRot : _fluddNozzle == SmsNozzle.Hover ? _fluddTilt : _fluddNozzle == SmsNozzle.Spray ? _fluddSprayAim : null;
         Transform3D b = cb != null ? cb.DrawnGlobalPose(sk, bones[e]) : sk.GetBoneGlobalPose(bones[e]);
         pos = g * b.Origin;
         dir = (g.Basis * b.Basis.X).Normalized();
@@ -13278,6 +13280,8 @@ public partial class Mario : CharacterBody3D
     {
         if (_smsHeadGunRot != null)
             _smsHeadGunRot.Angles[0] = _fluddGunAngle < 0f ? 0.5f * _fluddGunAngle * SmsUnits.BamToRad : 0f; // MarioHeadCtrl: Rz(angle / 2)
+        if (_fluddSprayAim != null)
+            _fluddSprayAim.Angles[0] = _fluddNozzle == SmsNozzle.Spray && _fluddGunAngle < 0f ? _fluddGunAngle * SmsUnits.BamToRad : 0f;
         if (_fluddNeckRot == null)
             return;
         _fluddNeckRot.Angles[0] = _fluddNozzle == SmsNozzle.Turbo && _fluddGunAngle < 0f ? _fluddGunAngle * SmsUnits.BamToRad : 0f;
@@ -13292,6 +13296,21 @@ public partial class Mario : CharacterBody3D
         sk.AddChild(_fluddNeckRot);
         if (SmsDebugPrint)
             GD.Print($"[SMS fludd] turbo neck joint jnt_back_nozzle_neck {(sk.FindBone("jnt_back_nozzle_neck") >= 0 ? "yes" : "NO")}: the gun angle -{SmsParams.Fludd.Turbo.LAngleBase} BAM = {SmsParams.Fludd.Turbo.LAngleBase * SmsUnits.BamToRad * 180f / Mathf.Pi:F1} deg down");
+    }
+
+    /// <summary>NozzleCtrl's other binding (WaterGun.cpp 1357): the spray nozzle's muzzle chain root. A negative gun angle -- the
+    /// squat's pull-back, the Y cam looking up -- turns it about its local Z, which lifts the forward barrel: the aim UP, to
+    /// LAngleMin (-13000 = 71 deg); the aim down is the chest bend. The decomp's literal is "chn_muzzle_l" (a letter) while the
+    /// model's joint is chn_muzzle_1 (a digit): the design, the shipped range and the game as played say the binding works.</summary>
+    private void SmsFluddSetupSprayAim()
+    {
+        var sk = _fluddNozzleSkel[(int)SmsNozzle.Spray];
+        if (sk == null)
+            return;
+        _fluddSprayAim = new SmsBoneRotZ { Name = "SmsSprayNozzleAim", BoneNames = new[] { "chn_muzzle_1" }, Angles = new float[1] };
+        sk.AddChild(_fluddSprayAim);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS fludd] spray aim joint chn_muzzle_1 {(sk.FindBone("chn_muzzle_1") >= 0 ? "yes" : "NO")}: a negative gun angle lifts the barrel, to {-SmsParams.Fludd.Spray.LAngleMin * 180f / 32768f:F0} deg");
     }
 
     private void SmsFluddSetupHoverTilt()
