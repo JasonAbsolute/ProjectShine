@@ -84,6 +84,10 @@ public partial class FootIK : SkeletonModifier3D
     [Export]
     public float MaxHipDrop = 0.25f;
 
+    /// <summary>Largest vertical correction a foot takes, in skeleton units (0 = no limit). Sunshine's MarioFootPosCtrl clamps its
+    /// foot shift to +-15 units and lets the foot float or sink past that; Mario sets this under SMS physics.</summary>
+    public float MaxCorrectionSkel = 0f;
+
     /// <summary>How the correction is shared between the two legs.
     /// 0 = drop only to the AVERAGE of the two feet, so each leg takes half
     ///     (one extends, one folds) — neither foot lands exactly, but the pose
@@ -279,6 +283,12 @@ public partial class FootIK : SkeletonModifier3D
             // Same lift, but re-referenced to the ground under THIS foot.
             target[s] = hitSkel + upSkel * (footOffsetSkel + lift);
             drop[s] = (target[s] - ankleSkel).Dot(upSkel);
+            if (MaxCorrectionSkel > 0f && Mathf.Abs(drop[s]) > MaxCorrectionSkel)
+            {
+                // the game's clamp: past +-15 units the foot is left where the clip has it (plus the limit)
+                drop[s] = Mathf.Clamp(drop[s], -MaxCorrectionSkel, MaxCorrectionSkel);
+                target[s] = ankleSkel + upSkel * drop[s];
+            }
         }
 
         // NOTE: there is deliberately no "is this foot being lifted on purpose"

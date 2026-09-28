@@ -9814,7 +9814,18 @@ public partial class Mario : CharacterBody3D
             FootIKEnabled
             && IsOnFloor()
             && !sittingOrAsleep
-            && (stateOfMario == MarioState.idle || stateOfMario == MarioState.pivot);
+            && (stateOfMario == MarioState.idle || stateOfMario == MarioState.pivot
+                // SMS: the foot callbacks act in every WAITING-type status -- the squat, the landing recoveries (JUMP_END, SEC_JUMP_END,
+                // LAND_END, HIP_ATTACK_END), not only the idle; never while running, sleeping or in BRAKE_END (MarioDraw.cpp 524)
+                || (UseSmsPhysics && (stateOfMario == MarioState.crouch || stateOfMario == MarioState.singleJumpLanding
+                    || stateOfMario == MarioState.doubleJumpLanding || stateOfMario == MarioState.tripleJumpLanding
+                    || stateOfMario == MarioState.landing || stateOfMario == MarioState.groundPoundLanding)));
+        if (UseSmsPhysics)
+        {
+            // the game's numbers: the ankle 10 units over the ground it finds, corrections clamped to +-15 units
+            _footIK.FootOffset = SmsUnits.UnitsToMetres(SmsParams.Foot.AnkleAboveGround);
+            _footIK.MaxCorrectionSkel = SmsParams.Foot.MaxShift;
+        }
 
         _footIKWeight = Mathf.MoveToward(_footIKWeight, wants ? 1f : 0f, FootIKEaseSpeed * delta);
         _footIK.Weight = _footIKWeight;

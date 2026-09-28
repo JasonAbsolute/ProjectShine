@@ -147,6 +147,17 @@ public static class SmsParams
         public const float HandleBrake = 0.7f;
     }
 
+    /// <summary>MarioFootPosRCtrl / LCtrl and MarioFootDirRCtrl / LCtrl (MarioDraw.cpp 524-740), the joint callbacks on chn_foot_* and
+    /// jnt_foot_*: installed every frame (addCallBack) but acting only while the status is of the WAITING type (0x1C0 bits clear:
+    /// WAIT, SQUAT, the *_END recoveries -- JUMP_END, SEC_JUMP_END, LAND_END, U_TURN_JUMP_END, HIP_ATTACK_END, SLIP_END ...), not
+    /// BRAKE_END, not SLEEPY / SLEEP, not on Yoshi. Pos: the foot chain is moved to ground + 10 units, clamped to +-15. Dir: the
+    /// foot's frame is re-aimed so its Y runs into the ground normal, its forward projected onto the ground plane.</summary>
+    public static class Foot
+    {
+        public const float AnkleAboveGround = 10f;  // footMovement = dist - footY + 10
+        public const float MaxShift = 15f;          // clamped to +-15
+    }
+
     public static class Waist
     {
         public const float FreePitch = 230f;        // 7360 BAM = 40.4 deg forward at the run cap 32

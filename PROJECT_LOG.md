@@ -2394,6 +2394,21 @@ Both effects (`SmsTimeLag`, `SmsSwingRZ`) now have a `Step(ticks)` that Mario ca
 with that frame's tick count) against the bones' current global poses, storing each bone's offset in ITS OWN frame; the modifier pass
 only applies that offset to the children, so between physics frames it rides the animated bone smoothly. The FLUDD pendulum was
 stepped the same way and gets the same fix. The parameters are untouched.
+
+**Pass 10 — the foot callbacks, read properly** (2026-09-28 00:52, "do the walk-run stuff left over (foot planting in every
+state)"). My earlier note was wrong: `addCallBack` does INSTALL `MarioFootPosR/LCtrl` (on `chn_foot_*`) and `MarioFootDirR/LCtrl` (on
+`jnt_foot_*`) every frame whenever the graphics flag is set, but each callback checks Mario's status itself (MarioDraw.cpp 524–740)
+and acts only while it is of the **WAITING type** — `WAIT`, `SQUAT` (+ start / stand-up), and the `*_END` recoveries (`JUMP_END`,
+`SEC_JUMP_END`, `LAND_END`, `U_TURN_JUMP_END`, `HIP_ATTACK_END`, `SLIP_END`, `PULL_END`, `THROWN_END`) — and not `BRAKE_END`, not
+`SLEEPY` / `SLEEP`, not on Yoshi. **The game does not plant feet while walking or running.** So `FootIK`'s idle / pivot gate was
+already right in spirit; this pass widens it to the crouch, the three jump landings, `landing` and the ground-pound landing under SMS.
+The mechanism itself differs and stays different: the game has no IK — `PosCtrl` shifts the foot chain to `ground + 10` units,
+clamped to ±15, letting the ankle stretch (the BMD's envelopes hide it), and `DirCtrl` re-aims the foot's frame into the ground
+normal with the forward projected onto the plane, writing the foot's own stored matrix too (the one callback that does). On our rigid
+glb a detached ankle would show, so Jaysonn's two-bone IK with the shared hip drop stands as the deliberate substitute; it now uses the
+game's numbers where they translate — the ankle 10 units above the ground it finds (`FootOffset`, was a by-eye 13.2) and a ±15-unit
+cap on each foot's correction (`MaxCorrectionSkel`, new; past it the foot floats or sinks as in the game). The eased weight
+(`FootIKEaseSpeed`) stays: the game snaps, but its statuses change when the feet are already on the ground.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
