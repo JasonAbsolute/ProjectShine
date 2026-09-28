@@ -2,55 +2,96 @@ using System;
 using Godot;
 
 /// <summary>
-/// The Y camera -- the game's CAMERA_MODE_L_NORMAL, its "L button camera" (CPolarSubCamera: doLButtonCameraOn_ / Off_,
-/// CameraChange.cpp 469 / 479; ctrlLButtonCamera_, CameraNotice.cpp 207; rotateY_ByStickX_ / rotateX_ByStickY_, cameragc.cpp 332 /
-/// 344; calcPosAndAt_, cameragc.cpp 464), with the shipped /Camera/kindLNormal.prm (params.szs). Y from a normal camera on the
-/// ground enters it; Y, A or B leave it once the 60-frame lock has run out; leaving the ground, the water, a hit or the dash
-/// throw him out silently. The stick drives the camera, not Mario: yaw at 300 BAM a frame, the pitch as a 0..1 ratio at 0.01 a
-/// frame (stick up = the camera rises = it looks DOWN, the game's own inversion). The camera pivots about the nozzle top (30 units
-/// up the nozzle_center joint's Y; his origin + 150 without the FLUDD), 200 units from a look-at shifted 72 units to the side
-/// (the over-the-shoulder framing), its elevation the pitch + 12.7 deg, its bearing the yaw - 2.7 deg, and chases those at
-/// 0.1 / 0.08 a frame. Mario faces the look (mFaceAngle.y = yaw + 0x8000 - OffsetAngleY, MarioMove.cpp 2449), stands, holds the
-/// pump, sprays with R, and the gun angle IS the pitch (calcGunAngle's first branch): looking down bends the chest forward
-/// (MarioWaistCtrl), looking up lifts the nozzle and the head. The camera runs at the game's 30 fps.
+/// The Y camera -- the game's CAMERA_MODE_L_NORMAL, its "L button camera" (CameraChange.cpp: execCameraModeChangeProc_ 580-630,
+/// execFrontRotate_ 449, doLButtonCameraOn_ 469 / Off_ 479, setUpToLButtonCamera_ 256, changeCamModeSub_ 272; CameraNotice.cpp
+/// ctrlLButtonCamera_ 208; cameragc.cpp rotateX/Y_ByStick 333/346, calcPosAndAt_ 465, ctrlGameCamera_ 861; CameraNormal.cpp 79-86;
+/// CameraInbetween.cpp execCameraInbetween 57; cameralib.cpp CLBChaseAngleDecrease 61), with the shipped /Camera/kindLNormal.prm and
+/// camera_normal.prm (SmsParams.LCamera).
+///
+/// THE CAMERA RUNS AT 120 Hz. "camera 1" (the CPolarSubCamera) sits on "PerformList Movement" (data/PerformLists.bin), which the
+/// director performs with CUE_MOVE on every simulation tick -- four a 30 fps frame, like Mario -- and CPolarSubCamera::perform reads
+/// the first- and last-tick flags of TGraphics::unk0. So every "a frame" rate in the camera code is a TICK: the stick turns the L camera
+/// 300 BAM a tick (198 deg/s at full stick), the pitch ratio moves 0.01 a tick (the whole range in 0.83 s), the chase 0.1 / 0.08 a
+/// tick, the 60-tick lock is 0.5 s and the 16-tick inbetween 0.13 s. (Pass 16 had all of these at 30 Hz: four times too slow, a 2 s
+/// lock -- "no cam turning and its slow", Jaysonn 2026-09-28 03:00.)
+///
+/// THE Y PRESS is not a mode change. In a normal camera, Y with nothing to lock on to (execNoticeOnOffProc_(2) finds no boss) calls
+/// execFrontRotate_(): the normal camera's yaw chases "behind Mario" (unk274 = his face - 0x8000) halving its gap every tick
+/// (YButtonRotateChase 2: 180 deg in 16 ticks), the position following at once (chaseXZ = 1 under CAMERA_FLAG_UNK4), and a flag
+/// (UNK8 -> UNK10) turns the L camera on when the swing has settled: doLButtonCameraOn_ -> changeCamMode_(L_NORMAL) with the 16-tick
+/// inbetween (TCameraInbetween: the look-at sweeps around him and the camera around the look-at in polar coordinates, then the
+/// chase follows). The L camera's yaw is the one the swing left, so Mario -- who faces the camera's look in the mode -- keeps his facing.
+/// Mario is still his own during the swing (a 30 fps frame of the game); the port lets this frame run too.
+///
+/// IN THE MODE (MarioGamePad.cpp 70-88): the MAIN stick is the camera's (mCompSPos[4],[5]) and Mario's is zero; A and B are
+/// MEANING_CAM_AB, Y is Y, R sprays, X switches, L is MEANING_L. Y / A / B leave (doLButtonCameraOff_(false), a 16-tick sweep back)
+/// once unk282 == 0 and the inbetween is over; a knockdown (status bit 0x20000), the hover / rocket, the dash, the surf, sleeping,
+/// climbing cut it in one tick (Off_(true)). Mario faces the chased camera's bearing (MarioMove.cpp 2449: unk258 + 0x8000 -
+/// OffsetAngleY), holds the pump (MarioUpper.cpp 17), and the gun angle IS mCurrentTarget.mPitch (WaterGun.cpp 219): looking down
+/// bends the upper body forward (MarioWaistCtrl 476), looking up lifts the spray nozzle and the head. On the way out the normal camera
+/// resumes with the L camera's yaw -- behind the way he now faces (the rig is told so: SunshineCamera.SmsYCamExit).
+///
+/// Port shape: a second Camera3D ("SmsYCamera", TopLevel) made current from the Y press; the rig's SunshineCamera keeps following
+/// underneath and gets the view back after the sweep out. Its own Y-button mode is off under SMS (it froze Mario with CameraLocked
+/// underneath this one: no stick, no FLUDD, no way out -- the whole of the pass-16 report).
+/// Not ported: the notice lock-on (no bosses), the SEs (0x4824 / 0x4825), a Y in the air (the game allows it; his air steering would
+/// fight the mode's facing), the squat inside the mode (R clicked / L: canSquat holds in the mode too).
 /// </summary>
 public partial class Mario
 {
-    // /Camera/kindLNormal.prm as shipped (params.szs, params/camera/kindlnormal.prm) and camera_normal.prm
-    private const float YCamFovy = 60f;
-    private const float YCamNearClip = 10f;                             // units
-    private const float YCamDist = 200f;                                // DistMin = DistMax: units from the look-at
-    private const int YCamXAngleMin = -12800, YCamXAngleMax = 10000;   // the pitch (BAM): the camera 70.3 deg under the target .. 54.9 over
-    private const float YCamXRotRatioManualSpeed = 0.01f;              // the ratio a frame at full stick
-    private const int YCamYAngleManualSpeed = 300;                     // BAM a frame at full stick (XMin = XMax)
-    private const float YCamAtOffsetY = 150f;                          // no FLUDD: the target this far over his origin
-    private const int YCamOffsetAngleX = 2306, YCamOffsetAngleY = -489;   // 12.7 deg over the pitch; -2.7 deg on the bearing
-    private const float YCamOffsetLookatXZ = -72.021484f;              // the look-at's sideways shift (units)
-    private const float YCamPosChaseRateXZ = 0.1f, YCamPosChaseRateY = 0.08f; // PosChaseRate / AtChaseRate, a frame
-    private const int YCamInbetFrames = 16;                             // mSLInbetLNormal: the blend in and out
-    private const int YCamLockFrames = 60;                              // unk282: Y / A / B do nothing for 60 frames after a change
-    private const float YCamFps = 30f;                                  // the camera runs once a rendered frame
+    private enum YCamPhase { Off, FrontRotate, LNormal, BlendOut }
 
-    private bool _ycamOn = false;             // isLButtonCamera(): Mario's side of the mode
-    private float _ycamYaw = 0f;              // mCurrentTarget.mYaw (BAM): the camera's bearing from the target; unbounded
-    private float _ycamRatio = 0f;            // mCurrentTarget.unk28: the pitch as a 0..1 ratio
-    private int _ycamLock = 0;                // unk282 (30 fps frames)
-    private int _ycamInbet = 0;               // frames left of the blend in (physics side)
-    private float _ycamBlend = 1f;            // the render side's blend factor 0..1 (in or out)
-    private bool _ycamBlendOut = false;       // the camera is blending back to the normal camera
-    private float _ycamAccum = 0f;
+    private YCamPhase _ycamPhase = YCamPhase.Off;
+    private bool _ycamOn = false;                  // isLButtonCamera(): the L mode proper (not the swing before it): Mario's side of the mode
+    private int _ycamYawBam = 0;                   // mCurrentTarget.mYaw (s16): the camera's bearing from the look-at, the game's (sin, cos) convention
+    private int _ycamBehindBam = 0;                // unk274: behind him at the Y press
+    private float _ycamRatio = 0f;                 // mCurrentTarget.unk28: the pitch as a 0..1 ratio
+    private int _ycamLock = 0;                     // unk282 (ticks): Y / A / B do nothing, and Y cannot re-enter, for 60 ticks after a change
+    private int _ycamInbet = 0;                    // mInbetween->mFramesRemaining (ticks)
+    private float _ycamTickAccum = 0f;
+    private Vector2 _ycamStick = Vector2.Zero;     // the pad's main stick as the camera reads it (right / down positive here)
+    private bool _ycamCancelPressed = false;       // MEANING_Y | MEANING_CAM_AB this physics frame
     private Camera3D _ycamCamera;
-    private Vector3 _ycamPos, _ycamAt;        // the chased position and look-at (metres)
-    private Transform3D _ycamFrom;            // where a blend started
-    private bool _ycamPoseValid = false;
+    private Vector3 _ycamPos, _ycamAt;             // mPosition / mTarget: the chased camera (metres)
+    private Vector3 _ycamInbetPos, _ycamInbetAt;   // mInbetween->mPos / mAt
+    private float _ycamInbetAtR, _ycamInbetAtPitch, _ycamInbetAtYaw;    // TCameraInbetween unk10 / unk14 / unk16: the look-at about him
+    private float _ycamInbetPosR, _ycamInbetPosPitch, _ycamInbetPosYaw; // unk8 / unkC / unkE: the camera about the look-at
+    private float _ycamFrontR, _ycamFrontPitch;    // the rig's polar frame about its look-at at the Y press (the swing keeps them)
+    private Vector3 _ycamFrontAtOffset;            // the rig's look-at, relative to his origin
+    private float _ycamFov = 60f;
+    private Transform3D _ycamXform = Transform3D.Identity;
+    private float _ycamDbgTimer = 0f;
+    private int _ycamOffFloorFrames = 0;
+    private int _ycamNeutralTicks = 0;              // mNeutralKeyTimer (in ticks): his stick is dead, then fades in, after either end of the mode
+    private bool _ycamHoldThisFrame = false;       // the frame whose Y / A / B ended the mode: that press was the camera's (MEANING_CAM_AB), not a jump or a dive
 
-    private float YCamPitchBam => Mathf.Lerp(YCamXAngleMin, YCamXAngleMax, _ycamRatio);
+    private float YCamPitchBam => Mathf.Lerp(SmsParams.LCamera.XAngleMin, SmsParams.LCamera.XAngleMax, _ycamRatio);
 
-    /// <summary>The Y press that enters: a normal camera, the ground, not in water, not the dash, none of the frozen states, the
-    /// lock run out (unk282 == 0). The game keeps his status; here he stands (the stick starves him anyway).</summary>
+    // CLBPolarToCross / CLBCrossToPolar: bearing from +Z toward +X, elevation up
+    private static Vector3 YCamPolar(float r, float pitch, float yaw)
+        => new Vector3(r * MathF.Cos(pitch) * MathF.Sin(yaw), r * MathF.Sin(pitch), r * MathF.Cos(pitch) * MathF.Cos(yaw));
+
+    private static void YCamToPolar(Vector3 v, out float r, out float pitch, out float yaw)
+    {
+        r = v.Length();
+        pitch = r > 1e-6f ? MathF.Asin(Mathf.Clamp(v.Y / r, -1f, 1f)) : 0f;
+        yaw = MathF.Atan2(v.X, v.Z);
+    }
+
+    /// <summary>CLBChaseConstantSpecifyFrame: a constant-step chase that lands on the target at the last frame.</summary>
+    private static float YCamChaseConst(float value, float target, int rem) => rem <= 1 ? target : value + (target - value) / rem;
+    private static float YCamChaseConstAngle(float value, float target, int rem) => rem <= 1 ? target : value + SmsMath.WrapAngle(target - value) / rem;
+
+    /// <summary>A Y press that starts the sequence: a normal camera (the rig's Normal or L-hold mode), unk282 run out, and none of the
+    /// states the mode change refuses (asleep, the surf / water, the hover or rocket, the dash, climbing). The port also asks for the
+    /// ground and a standing / running / landing status (the game takes a Y in the air; not ported).</summary>
     private bool SmsYCamCanEnter()
     {
-        if (!UseSmsPhysics || _ycamOn || _ycamBlendOut || _ycamLock > 0 || camera == null || !IsOnFloor() || _smsInWater || _fluddDashing)
+        if (!UseSmsPhysics || _ycamPhase != YCamPhase.Off || _ycamLock > 0 || camera == null || _camera == null || armature == null)
+            return false;
+        if (_camera.Mode != SunshineCamera.CamMode.Normal && _camera.Mode != SunshineCamera.CamMode.LButton)
+            return false;
+        if (_smsInWater || _fluddDashing || CameraLocked || !IsOnFloor())
             return false;
         switch (stateOfMario)
         {
@@ -58,158 +99,388 @@ public partial class Mario
             case MarioState.walking:
             case MarioState.running:
             case MarioState.sprinting:
+            case MarioState.sneak:
             case MarioState.pivot:
             case MarioState.landing:
+            case MarioState.singleJumpLanding:
+            case MarioState.doubleJumpLanding:
+            case MarioState.tripleJumpLanding:
+            case MarioState.rolloutRun:
                 return true;
         }
         return false;
     }
 
-    /// <summary>doLButtonCameraOn_(): the lock, the blend, the mode. setUpToLButtonCamera_(): the pitch ratio starts where the
-    /// pitch is -OffsetAngleX (the camera level with the target); the yaw is the camera's current bearing (mCurrentTarget.mYaw
-    /// carries over). SE 0x4824.</summary>
+    /// <summary>execFrontRotate_(): the Y press. This camera takes the rig's place (same pose, so nothing cuts) and its yaw about the
+    /// rig's look-at starts halving its gap to "behind him" every tick (YButtonRotateChase 2); the L camera follows when it settles.
+    /// This frame is still Mario's (the game's mode is still the normal one during the swing).</summary>
     private void SmsYCamEnter()
     {
-        _ycamOn = true;
-        _ycamBlendOut = false;
-        _ycamLock = YCamLockFrames;
-        _ycamInbet = YCamInbetFrames;
-        _ycamBlend = 0f;
-        _ycamAccum = 0f;
-        Vector3 d = camera.GlobalPosition - GlobalPosition;
-        _ycamYaw = MathF.Atan2(d.X, d.Z) / SmsUnits.BamToRad;
-        _ycamRatio = Mathf.Clamp((float)(-YCamOffsetAngleX - YCamXAngleMin) / (YCamXAngleMax - YCamXAngleMin), 0f, 1f);
         if (_ycamCamera == null)
         {
-            _ycamCamera = new Camera3D { Name = "SmsYCamera", Fov = YCamFovy, Near = SmsUnits.UnitsToMetres(YCamNearClip), Far = camera.Far };
+            _ycamCamera = new Camera3D { Name = "SmsYCamera", TopLevel = true };
             AddChild(_ycamCamera);
         }
-        _ycamFrom = camera.GlobalTransform;
-        _ycamCamera.GlobalTransform = _ycamFrom;
-        SmsYCamTargets(out _ycamPos, out _ycamAt);
-        _ycamPoseValid = true;
+        _ycamCamera.Far = camera.Far;
+        _ycamCamera.KeepAspect = camera.KeepAspect;
+        Vector3 at0 = _camera.GlobalPosition;   // the rig's smoothed look-at (SunshineCamera sits on it: UpdateFollow)
+        Vector3 camPos = camera.GlobalPosition;
+        YCamToPolar(camPos - at0, out _ycamFrontR, out _ycamFrontPitch, out float yaw);
+        if (_ycamFrontR < 0.05f)
+            _ycamFrontR = 0.05f;
+        _ycamFrontAtOffset = at0 - GlobalPosition;
+        _ycamYawBam = (short)(int)MathF.Round(yaw / SmsUnits.BamToRad);
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw)
+            : (lastFacingDirection.LengthSquared() > 1e-4f ? lastFacingDirection.Normalized() : SmsMath.DirFromYaw(0f));
+        _ycamBehindBam = (short)(int)MathF.Round(MathF.Atan2(-face.X, -face.Z) / SmsUnits.BamToRad); // unk274 = mFaceAngle.y - 0x8000
+        _ycamPos = camPos;
+        _ycamAt = at0;
+        _ycamFov = camera.Fov;
+        _ycamXform = camera.GlobalTransform;
+        _ycamPhase = YCamPhase.FrontRotate;
+        _ycamOn = false;
+        _ycamOffFloorFrames = 0;
+        SmsYCamApplyTransform();
         _ycamCamera.MakeCurrent();
-        velocity.X = 0f;
-        velocity.Z = 0f;
-        if (stateOfMario != MarioState.idle)
-        {
-            stateOfMario = MarioState.idle;
-            SetMarioState(stateOfMario);
-        }
         if (SmsDebugPrint)
-            GD.Print($"[SMS ycam] on: bearing {_ycamYaw * SmsUnits.BamToRad * 180f / MathF.PI:F0} deg, pitch {YCamPitchBam * 180f / 32768f:F1} deg (ratio {_ycamRatio:F2}), target {(_fluddReady ? "the nozzle top" : "his origin + 150")}; stick: left/right turns, up = look down (the game's); Y / A / B leave after {YCamLockFrames} frames");
+        {
+            int gap = (short)(_ycamBehindBam - _ycamYawBam);
+            GD.Print($"[SMS ycam] Y: the camera swings behind him ({MathF.Abs(gap) * SmsUnits.BamToRad * 180f / MathF.PI:F0} deg to go, the gap halved each tick), then the L camera");
+        }
     }
 
-    /// <summary>doLButtonCameraOff_(): the lock again, the blend back to the normal camera (which kept running); Mario is his own at
-    /// once. SE 0x4825 on a cancel, none when a state threw him out.</summary>
-    private void SmsYCamLeave(string why)
+    /// <summary>doLButtonCameraOn_ + setUpToLButtonCamera_ + changeCamModeSub_: unk282 = 60 ticks, the pitch ratio where the pitch is
+    /// -OffsetAngleX (the camera level with its target), the 16-tick inbetween from where the swing left the camera, and Mario's side
+    /// of the mode from this tick.</summary>
+    private void SmsYCamModeOn()
+    {
+        _ycamPhase = YCamPhase.LNormal;
+        _ycamOn = true;
+        _ycamLock = SmsParams.LCamera.LockTicks;
+        _ycamRatio = Mathf.Clamp((float)(-SmsParams.LCamera.OffsetAngleX - SmsParams.LCamera.XAngleMin) / (SmsParams.LCamera.XAngleMax - SmsParams.LCamera.XAngleMin), 0f, 1f);
+        _ycamNeutralTicks = SmsParams.LCamera.NeutralKeyTicks; // onNeutralMarioKey()
+        SmsYCamInbetStart(SmsParams.LCamera.InbetLNormal);
+        _ycamDbgTimer = 0f;
+        if (SmsDebugPrint)
+            GD.Print($"[SMS ycam] on: bearing {_ycamYawBam * SmsUnits.BamToRad * 180f / MathF.PI:F0} deg (behind him), pitch {YCamPitchBam * 180f / 32768f:F1} deg (ratio {_ycamRatio:F2}), target {(_fluddReady ? "the nozzle top" : "his origin + 150")}; the stick turns {SmsParams.LCamera.YAngleManualSpeed * SmsUnits.TicksPerSecond * 360f / 65536f:F0} deg/s, tilts the range in {1f / (SmsParams.LCamera.XRotRatioManualSpeed * SmsUnits.TicksPerSecond):F2} s, up = look down (the game's); Y / A / B leave after {SmsParams.LCamera.LockTicks / SmsUnits.TicksPerSecond:F1} s; R sprays at the pitch");
+    }
+
+    /// <summary>doLButtonCameraOff_(): unk282 = 60 again; a cancel (Y / A / B) sweeps back over 16 ticks, a state cut takes one. The
+    /// normal camera resumes with this camera's yaw -- behind the way he faces now -- so the rig snaps its yaw there first and this
+    /// camera sweeps onto the rig's live pose. Mario is his own from this tick.</summary>
+    private void SmsYCamModeOff(bool cut, string why)
     {
         _ycamOn = false;
-        _ycamLock = YCamLockFrames;
-        _ycamBlendOut = true;
-        _ycamBlend = 0f;
-        _ycamFrom = _ycamCamera != null ? _ycamCamera.GlobalTransform : camera.GlobalTransform;
+        _ycamLock = SmsParams.LCamera.LockTicks;
+        _ycamPhase = YCamPhase.BlendOut;
+        _ycamInbet = cut ? 1 : SmsParams.LCamera.InbetLNormal;
+        _ycamNeutralTicks = SmsParams.LCamera.NeutralKeyTicks; // onNeutralMarioKey(): the stick that aimed the camera does not launch him
+        if (!cut)
+            _ycamHoldThisFrame = true; // the press that ended the mode was MEANING_CAM_AB / MEANING_Y: it does not reach his jump or dive this frame
+        _camera?.SmsYCamExit();
         if (SmsDebugPrint)
-            GD.Print($"[SMS ycam] off ({why})");
+            GD.Print($"[SMS ycam] off ({why}): {(cut ? "a cut" : $"the {SmsParams.LCamera.InbetLNormal}-tick sweep back")} to the normal camera, behind him; Y again after {SmsParams.LCamera.LockTicks / SmsUnits.TicksPerSecond:F1} s");
     }
 
-    /// <summary>One physics frame in the mode (Mario's side; the camera's 30 fps steps). He stands where he is, faces the look,
-    /// and the stick turns the camera. True while the frame is his (the caller ends it).</summary>
-    private bool SmsYCamFrame(double delta)
+    /// <summary>The sweep is over (or the cut is done): the rig's camera is current again.</summary>
+    private void SmsYCamFinish()
     {
-        // the camera's frames: unk282 and the blend count down, the stick turns the target angles (rotateY_ByStickX_ /
-        // rotateX_ByStickY_: stickX = -mCompSPos[4], stickY = -mCompSPos[5])
-        _ycamAccum += (float)(delta * YCamFps);
-        int n = (int)MathF.Floor(_ycamAccum + 1e-4f);
-        _ycamAccum -= n;
+        _ycamPhase = YCamPhase.Off;
+        _ycamOn = false;
+        if (camera != null)
+            camera.MakeCurrent();
+    }
+
+    /// <summary>Respawn / a hard reset: the rig's camera back at once, no lock.</summary>
+    private void SmsYCamReset()
+    {
+        bool wasCurrent = _ycamCamera != null && _ycamCamera.Current;
+        _ycamPhase = YCamPhase.Off;
+        _ycamOn = false;
+        _ycamLock = 0;
+        _ycamInbet = 0;
+        if (wasCurrent && camera != null)
+            camera.MakeCurrent();
+    }
+
+    /// <summary>Once a physics frame, at the top of the SMS block (so it runs whatever handler owns the frame): the camera's ticks, the
+    /// lock, the exits, the pose, and -- in the mode -- Mario's facing. The stick is the pad's main stick as the camera reads it
+    /// (mMainStick.mPosX / mPosY, -1..1); PADClamp's dead zone (15 of 72) is approximated by GetVector's 0.2 circular one.</summary>
+    private void SmsYCamFrame(double delta)
+    {
+        if (!UseSmsPhysics)
+            return;
+        _ycamHoldThisFrame = false;
+        if (_ycamPhase == YCamPhase.Off && _ycamLock == 0 && _ycamNeutralTicks == 0)
+            return;
+        _ycamStick = Input.GetVector("Lstick_left", "Lstick_right", "Lstick_up", "Lstick_down", 0.2f);
+        if (_ycamPhase == YCamPhase.LNormal)
+        {
+            // MEANING_Y | MEANING_CAM_AB, frame meanings: an edge this frame; the ticks below may act on it, then it is gone
+            _ycamCancelPressed = Input.IsActionJustPressed("button_y") || Input.IsActionJustPressed("button_a")
+                || Input.IsActionJustPressed("key_space") || Input.IsActionJustPressed("button_b");
+        }
+        int n = SmsUnits.TicksFor(delta, ref _ycamTickAccum);
         for (int i = 0; i < n; i++)
+            SmsYCamTick();
+        _ycamCancelPressed = false;
+        if (_ycamPhase != YCamPhase.Off)
+            SmsYCamApplyTransform();
+        if (_ycamOn)
         {
-            if (_ycamLock > 0)
-                _ycamLock--;
-            if (_ycamInbet > 0)
+            if (IsOnFloor())
+            {
+                _ycamOffFloorFrames = 0;
+                SmsYCamFaceLook();
+            }
+            else if (++_ycamOffFloorFrames > 3)
+                SmsYCamModeOff(true, "off the ground"); // port-only: the mode's facing and the hold need the ground (the game keeps it through a fall)
+            if (SmsDebugPrint && _ycamOn)
+            {
+                _ycamDbgTimer += (float)delta;
+                if (_ycamDbgTimer >= 1f)
+                {
+                    _ycamDbgTimer = 0f;
+                    Vector3 d = _ycamPos - _ycamAt;
+                    GD.Print($"[SMS ycam] yaw {SmsMath.WrapAngle(_ycamYawBam * SmsUnits.BamToRad) * 180f / MathF.PI:F0} deg, pitch {YCamPitchBam * 180f / 32768f:F1} deg (ratio {_ycamRatio:F2}), camera {SmsUnits.MetresToUnits(d.Length()):F0} u from the look-at, {MathF.Asin(Mathf.Clamp(d.Y / MathF.Max(d.Length(), 1e-4f), -1f, 1f)) * 180f / MathF.PI:F0} deg over it; stick ({_ycamStick.X:F2}, {-_ycamStick.Y:F2}); gun angle {_fluddGunAngle:F0} BAM, upper {_fluddUpper}, R {_fluddR:F2}; lock {_ycamLock} inbet {_ycamInbet}; face {_smsFaceYaw * 180f / MathF.PI:F0} deg");
+                }
+            }
+        }
+    }
+
+    /// <summary>One 120 Hz tick of CPolarSubCamera::ctrlGameCamera_ as far as this mode is concerned.</summary>
+    private void SmsYCamTick()
+    {
+        if (_ycamLock > 0)
+            _ycamLock--;
+        if (_ycamNeutralTicks > 0)
+            _ycamNeutralTicks--;
+        switch (_ycamPhase)
+        {
+            case YCamPhase.Off:
+                return;
+
+            case YCamPhase.FrontRotate:
+            {
+                // ctrlNormalOrTowerCamera_ under CAMERA_FLAG_UNK4: the target yaw halves its gap to unk274 each tick, the position follows at once
+                bool more = SmsMath.ChaseAngleDecreaseS16(ref _ycamYawBam, _ycamBehindBam, SmsParams.LCamera.YButtonRotateChase);
+                _ycamAt = GlobalPosition + _ycamFrontAtOffset;
+                _ycamPos = _ycamAt + YCamPolar(_ycamFrontR, _ycamFrontPitch, _ycamYawBam * SmsUnits.BamToRad);
+                if (!more)
+                    SmsYCamModeOn(); // UNK8 -> UNK10 -> doLButtonCameraOn_
+                return;
+            }
+
+            case YCamPhase.LNormal:
+            {
+                // execCameraModeChangeProc_: what ends the mode by itself -- knocked down / hurt / dead (status bit 0x20000), the hover
+                // or rocket (isMarioRocketing), the dash (FLUDD_EMITTING), the water / surf, a talk, the shine, a cutscene hold
+                bool cut = stateOfMario == MarioState.hurt || stateOfMario == MarioState.dead || stateOfMario == MarioState.talking
+                    || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.swimming || stateOfMario == MarioState.fluddRocket
+                    || _smsInWater || _fluddDashing || CameraLocked;
+                if (cut)
+                {
+                    SmsYCamModeOff(true, "the state");
+                    return;
+                }
+                // Y again, or A / B, once unk282 is out and the inbetween is over
+                if (_ycamCancelPressed && _ycamLock == 0 && _ycamInbet == 0)
+                {
+                    _ycamCancelPressed = false;
+                    SmsYCamModeOff(false, "Y / A / B");
+                    return;
+                }
+                int rem = _ycamInbet;
+                // the params blend over the inbetween (inbetweenData): the FOV from the rig's to 60
+                _ycamFov = rem > 0 ? YCamChaseConst(_ycamFov, SmsParams.LCamera.Fovy, rem) : SmsParams.LCamera.Fovy;
+                // ctrlLButtonCamera_: stickX = -mCompSPos[4], stickY = -mCompSPos[5] (the pad's main stick, up positive there)
+                float stickX = -_ycamStick.X;
+                float stickY = _ycamStick.Y;
+                _ycamYawBam = (short)(_ycamYawBam + (short)(stickX * SmsParams.LCamera.YAngleManualSpeed)); // s16 thing = stick x speed; mYaw += thing
+                _ycamRatio = Mathf.Clamp(_ycamRatio - stickY * SmsParams.LCamera.XRotRatioManualSpeed, 0f, 1f); // stick up -> the camera rises -> it looks down
+                SmsYCamTargets(out Vector3 pos, out Vector3 at);
+                SmsYCamInbetStep(pos, at);
+                // calcPosAndAt_'s tail: mPosition / mTarget chase the inbetween's pos / at at PosChaseRate / AtChaseRate a tick
+                _ycamPos = new Vector3(
+                    Mathf.Lerp(_ycamPos.X, _ycamInbetPos.X, SmsParams.LCamera.PosChaseRateXZ),
+                    Mathf.Lerp(_ycamPos.Y, _ycamInbetPos.Y, SmsParams.LCamera.PosChaseRateY),
+                    Mathf.Lerp(_ycamPos.Z, _ycamInbetPos.Z, SmsParams.LCamera.PosChaseRateXZ));
+                _ycamAt = new Vector3(
+                    Mathf.Lerp(_ycamAt.X, _ycamInbetAt.X, SmsParams.LCamera.AtChaseRateXZ),
+                    Mathf.Lerp(_ycamAt.Y, _ycamInbetAt.Y, SmsParams.LCamera.AtChaseRateY),
+                    Mathf.Lerp(_ycamAt.Z, _ycamInbetAt.Z, SmsParams.LCamera.AtChaseRateXZ));
+                return;
+            }
+
+            case YCamPhase.BlendOut:
+            {
+                // changeCamMode_(-1): the normal camera -- the rig, its yaw already behind him -- with the inbetween's constant steps;
+                // no chase lag here, the hand-over must land on the rig's live pose
+                if (camera == null)
+                {
+                    SmsYCamFinish();
+                    return;
+                }
+                int rem = _ycamInbet;
+                _ycamFov = YCamChaseConst(_ycamFov, camera.Fov, rem);
+                _ycamXform = rem <= 1 ? camera.GlobalTransform : _ycamXform.InterpolateWith(camera.GlobalTransform, 1f / rem);
+                _ycamPos = _ycamXform.Origin;
+                _ycamAt = _ycamPos - _ycamXform.Basis.Z;
                 _ycamInbet--;
-            float stickX = -_smsStickH, stickY = -_smsStickV;
-            _ycamYaw += stickX * YCamYAngleManualSpeed;
-            _ycamRatio = Mathf.Clamp(_ycamRatio - stickY * YCamXRotRatioManualSpeed, 0f, 1f);
+                if (_ycamInbet <= 0)
+                    SmsYCamFinish();
+                return;
+            }
         }
-        // waitProcess(): he stands
-        velocity.X = 0f;
-        velocity.Z = 0f;
-        velocity.Y = -2f;
-        // execCameraModeChangeProc_: the states that end it silently
-        bool thrown = !IsOnFloor() || _smsInWater || _fluddDashing || stateOfMario == MarioState.hurt || stateOfMario == MarioState.dead
-            || stateOfMario == MarioState.talking || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.swimming;
-        if (thrown)
+    }
+
+    /// <summary>The L camera's targets this tick (metres): the look-at 72 units to the side of the nozzle top (getNozzleTopPos_: the
+    /// nozzle matrix's origin + 30 units along its Y column; his origin + AtOffsetY 150 without the FLUDD), the position 200 units
+    /// from it at the pitch + OffsetAngleX over and the yaw + OffsetAngleY around (calcPosAndAt_ 594-614).</summary>
+    private void SmsYCamTargets(out Vector3 pos, out Vector3 at)
+    {
+        Vector3 target;
+        if (_fluddReady && _fluddNozzleParent is Node3D noz)
         {
-            SmsYCamLeave("the state");
-            return false;
+            Transform3D g = noz.GlobalTransform;
+            target = g.Origin + g.Basis.Y.Normalized() * SmsUnits.UnitsToMetres(30f);
         }
-        // Y again, or A / B (MEANING_CAM_AB), once the lock is out and the blend in is done
-        bool cancel = Input.IsActionJustPressed("button_y") || Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("button_b")
-            || Input.IsActionJustPressed("key_space");
-        if (cancel && _ycamLock == 0 && _ycamInbet == 0)
+        else
+            target = new Vector3(GlobalPosition.X, SmsFeetY(), GlobalPosition.Z) + Vector3.Up * SmsUnits.UnitsToMetres(SmsParams.LCamera.AtOffsetY);
+        float xA = (YCamPitchBam + SmsParams.LCamera.OffsetAngleX) * SmsUnits.BamToRad;
+        float yA = (_ycamYawBam + SmsParams.LCamera.OffsetAngleY) * SmsUnits.BamToRad;
+        // finalAt = target - OffsetLookatXZ x (sin(yA - 90), cos(yA - 90)) = target + OffsetLookatXZ x (cos yA, -sin yA)
+        at = target + SmsUnits.UnitsToMetres(SmsParams.LCamera.OffsetLookatXZ) * new Vector3(MathF.Cos(yA), 0f, -MathF.Sin(yA));
+        pos = at + YCamPolar(SmsUnits.UnitsToMetres(SmsParams.LCamera.Dist), xA, yA);
+    }
+
+    /// <summary>TCameraInbetween::startCameraInbetween + calcPolarData_: the sweep starts from the current pos / at.</summary>
+    private void SmsYCamInbetStart(int ticks)
+    {
+        _ycamInbet = ticks;
+        _ycamInbetPos = _ycamPos;
+        _ycamInbetAt = _ycamAt;
+        YCamToPolar(_ycamAt - GlobalPosition, out _ycamInbetAtR, out _ycamInbetAtPitch, out _ycamInbetAtYaw);
+        YCamToPolar(_ycamPos - _ycamAt, out _ycamInbetPosR, out _ycamInbetPosPitch, out _ycamInbetPosYaw);
+    }
+
+    /// <summary>TCameraInbetween::execCameraInbetween: while frames remain, the look-at's polar coordinates about him and the
+    /// camera's about the look-at each close 1/remaining of their gap a tick (the look-at's height is the target's at once); after
+    /// that the inbetween IS the target.</summary>
+    private void SmsYCamInbetStep(Vector3 targetPos, Vector3 targetAt)
+    {
+        if (_ycamInbet <= 0)
         {
-            SmsYCamLeave("cancelled");
-            return true; // this frame's A / B is the camera's, not a jump
+            _ycamInbetPos = targetPos;
+            _ycamInbetAt = targetAt;
+            return;
         }
-        // mFaceAngle.y = unk258 + 0x8000 - OffsetAngleY: he faces the look, 2.7 deg off the camera's axis
-        _smsFaceYaw = SmsMath.WrapAngle((_ycamYaw + YCamOffsetAngleY) * SmsUnits.BamToRad);
+        int rem = _ycamInbet;
+        Vector3 mario = GlobalPosition;
+        _ycamInbetAt = targetAt;
+        YCamToPolar(targetAt - mario, out float ar, out float ap, out float ay);
+        _ycamInbetAtR = YCamChaseConst(_ycamInbetAtR, ar, rem);
+        _ycamInbetAtPitch = YCamChaseConst(_ycamInbetAtPitch, ap, rem);
+        _ycamInbetAtYaw = YCamChaseConstAngle(_ycamInbetAtYaw, ay, rem);
+        float eps = SmsUnits.UnitsToMetres(0.1f);
+        if (MathF.Abs(targetAt.X - mario.X) > eps || MathF.Abs(targetAt.Z - mario.Z) > eps)
+        {
+            Vector3 tmp = mario + YCamPolar(_ycamInbetAtR, _ycamInbetAtPitch, _ycamInbetAtYaw);
+            _ycamInbetAt.X = tmp.X;
+            _ycamInbetAt.Z = tmp.Z;
+        }
+        YCamToPolar(targetPos - _ycamInbetAt, out float pr, out float pp, out float py);
+        _ycamInbetPosR = YCamChaseConst(_ycamInbetPosR, pr, rem);
+        _ycamInbetPosPitch = YCamChaseConst(_ycamInbetPosPitch, pp, rem);
+        _ycamInbetPosYaw = YCamChaseConstAngle(_ycamInbetPosYaw, py, rem);
+        _ycamInbetPos = _ycamInbetAt + YCamPolar(_ycamInbetPosR, _ycamInbetPosPitch, _ycamInbetPosYaw);
+        _ycamInbet--;
+    }
+
+    /// <summary>The camera node takes this frame's pose (on the physics clock, like Mario and the rig).</summary>
+    private void SmsYCamApplyTransform()
+    {
+        if (_ycamCamera == null)
+            return;
+        if (_ycamPhase != YCamPhase.BlendOut)
+        {
+            Vector3 dir = _ycamAt - _ycamPos;
+            if (dir.LengthSquared() > 1e-10f)
+            {
+                Vector3 up = MathF.Abs(dir.Normalized().Y) > 0.999f ? _ycamXform.Basis.Y : Vector3.Up;
+                _ycamXform = new Transform3D(Basis.LookingAt(dir, up), _ycamPos);
+            }
+        }
+        _ycamCamera.GlobalTransform = _ycamXform;
+        _ycamCamera.Fov = _ycamFov;
+        _ycamCamera.Near = _ycamPhase == YCamPhase.LNormal ? SmsUnits.UnitsToMetres(SmsParams.LCamera.NearClip) : camera.Near;
+    }
+
+    /// <summary>playerControl() (MarioMove.cpp 2449): mFaceAngle.y = unk258 + 0x8000 - OffsetAngleY, unk258 being the CHASED camera's
+    /// bearing from its look-at (Camera.hpp 167): he faces where the camera looks, 2.7 deg off its axis, and turns with it as it
+    /// swings. In the port's yaw convention (DirFromYaw = (-sin, -cos)) the + 0x8000 is absorbed.</summary>
+    private void SmsYCamFaceLook()
+    {
+        Vector3 d = _ycamPos - _ycamAt;
+        if (new Vector2(d.X, d.Z).LengthSquared() < 1e-8f)
+            return;
+        float bearing = MathF.Atan2(d.X, d.Z);
+        _smsFaceYaw = SmsMath.WrapAngle(bearing - SmsParams.LCamera.OffsetAngleY * SmsUnits.BamToRad);
         _smsFaceValid = true;
         _smsFaceSource = 1;
         Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
         lastFacingDirection = face;
         _smsLatchedFacing = face;
         armature.Rotation = armature.Rotation with { Y = BaseYawFromDir(face) };
-        return true;
     }
 
-    /// <summary>The camera's targets this frame (metres): the look-at 72 units to the side of the nozzle top, the position 200
-    /// units from it at the pitch + OffsetAngleX over, the yaw + OffsetAngleY around (calcPosAndAt_).</summary>
-    private void SmsYCamTargets(out Vector3 pos, out Vector3 at)
+    /// <summary>considerMarioStick() while mNeutralKeyTimer runs: Mario's stick is zero for the first 0x28 counts after a mode change and
+    /// ramps back to full over the remaining 0x14 (CLBCalcRatio(0x28, 0x3c, frame)).</summary>
+    private float SmsYCamMarioStickScale()
     {
-        Vector3 target;
-        if (_fluddReady && _fluddNozzleParent is Node3D noz)
-        {
-            // getNozzleTopPos_(): the nozzle_center matrix's origin, 30 units along its Y column
-            Transform3D g = noz.GlobalTransform;
-            target = g.Origin + g.Basis.Y.Normalized() * SmsUnits.UnitsToMetres(30f);
-        }
-        else
-            target = new Vector3(GlobalPosition.X, SmsFeetY(), GlobalPosition.Z) + Vector3.Up * SmsUnits.UnitsToMetres(YCamAtOffsetY);
-        float xA = (YCamPitchBam + YCamOffsetAngleX) * SmsUnits.BamToRad;
-        float yA = (_ycamYaw + YCamOffsetAngleY) * SmsUnits.BamToRad;
-        // finalAt = target - OffsetLookatXZ x (sin(yA - 90), cos(yA - 90)) = target + OffsetLookatXZ x (cos yA, -sin yA)
-        at = target + SmsUnits.UnitsToMetres(YCamOffsetLookatXZ) * new Vector3(MathF.Cos(yA), 0f, -MathF.Sin(yA));
-        // CLBPolarToCross(at, dist, xA, yA): (cos x sin y, sin x, cos x cos y)
-        pos = at + SmsUnits.UnitsToMetres(YCamDist) * new Vector3(MathF.Cos(xA) * MathF.Sin(yA), MathF.Sin(xA), MathF.Cos(xA) * MathF.Cos(yA));
+        if (_ycamNeutralTicks <= 0)
+            return 1f;
+        int elapsed = SmsParams.LCamera.NeutralKeyTicks - _ycamNeutralTicks;
+        if (elapsed <= SmsParams.LCamera.NeutralKeyDeadTicks)
+            return 0f;
+        return Mathf.Clamp((float)(elapsed - SmsParams.LCamera.NeutralKeyDeadTicks) / (SmsParams.LCamera.NeutralKeyTicks - SmsParams.LCamera.NeutralKeyDeadTicks), 0f, 1f);
     }
 
-    /// <summary>The render frame: chase the targets (PosChaseRate 0.1 XZ / 0.08 Y a 30 fps frame, rescaled to this frame), look at
-    /// them, and blend in from -- or out to -- the normal camera over 16 frames.</summary>
+    /// <summary>The ground block's side of the mode: his stick is the camera's (mCompSPos[0],[1] are never written in the mode) and A /
+    /// B / Y are its buttons, so he stands where the L camera found him -- the game's WAIT with a zero stick, which stops a run in
+    /// a handful of ticks anyway -- and nothing that reads A, B, R-tap or the stick runs this frame.</summary>
+    /// <summary>The ground block holds him while the mode is on, and through the frame whose A / B / Y ended it.</summary>
+    private bool SmsYCamHoldsMario() => _ycamOn || _ycamHoldThisFrame;
+
+    private void SmsYCamHoldMario()
+    {
+        velocity.X = 0f;
+        velocity.Z = 0f;
+        velocity.Y = -2f;
+        jumpBuffer = 0;
+        spinBuffer = 0;
+        if (stateOfMario != MarioState.idle)
+        {
+            isSpining(false);
+            if (footSparks != null)
+                footSparks.Emitting = false;
+            StopWaistIKHard();
+            stateOfMario = MarioState.idle;
+            SetMarioState(stateOfMario);
+        }
+    }
+
+    /// <summary>The render hook: a cutscene hold (CameraLocked), a talk, the shine or death takes the frame before the SMS block runs,
+    /// so the ticks above cannot end the mode -- cut straight back to the rig's camera here, never leave it behind this one.</summary>
     private void SmsYCamRender(double delta)
     {
-        if (_ycamCamera == null || (!_ycamOn && !_ycamBlendOut))
+        if (_ycamPhase == YCamPhase.Off)
             return;
-        float frames = (float)(delta * YCamFps);
-        _ycamBlend = Mathf.Min(1f, _ycamBlend + frames / YCamInbetFrames);
-        if (_ycamBlendOut)
+        if (CameraLocked || stateOfMario == MarioState.talking || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.dead)
         {
-            // back to the normal camera, which kept its own place
-            Transform3D live = camera.GlobalTransform;
-            _ycamCamera.GlobalTransform = _ycamFrom.InterpolateWith(live, _ycamBlend);
-            if (_ycamBlend >= 1f)
-            {
-                _ycamBlendOut = false;
-                camera.MakeCurrent();
-            }
-            return;
+            if (SmsDebugPrint)
+                GD.Print($"[SMS ycam] off (a cutscene hold, {stateOfMario}): a cut to the rig's camera");
+            SmsYCamReset();
         }
-        SmsYCamTargets(out Vector3 pos, out Vector3 at);
-        float kxz = 1f - MathF.Pow(1f - YCamPosChaseRateXZ, frames);
-        float ky = 1f - MathF.Pow(1f - YCamPosChaseRateY, frames);
-        _ycamPos = new Vector3(Mathf.Lerp(_ycamPos.X, pos.X, kxz), Mathf.Lerp(_ycamPos.Y, pos.Y, ky), Mathf.Lerp(_ycamPos.Z, pos.Z, kxz));
-        _ycamAt = new Vector3(Mathf.Lerp(_ycamAt.X, at.X, kxz), Mathf.Lerp(_ycamAt.Y, at.Y, ky), Mathf.Lerp(_ycamAt.Z, at.Z, kxz));
-        Transform3D want = new Transform3D(Basis.LookingAt(_ycamAt - _ycamPos, Vector3.Up), _ycamPos);
-        _ycamCamera.GlobalTransform = _ycamBlend < 1f ? _ycamFrom.InterpolateWith(want, _ycamBlend) : want;
     }
 }

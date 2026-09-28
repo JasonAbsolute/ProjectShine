@@ -169,6 +169,32 @@ public static class SmsParams
         public const float RClickPull = 0.98f;       // the GC's R click stood in for by the pad's full pull when no button_rclick exists
     }
 
+    /// <summary>The Y camera: CAMERA_MODE_L_NORMAL's /Camera/kindLNormal.prm (SHIPPED; params.szs -> params/camera/kindlnormal.prm) and
+    /// camera_normal.prm's YButtonRotateChase. The camera ("camera 1") is on PerformList Movement: it moves on every 120 Hz
+    /// simulation tick like Mario, so every per-"frame" value the camera code uses is per TICK.</summary>
+    public static class LCamera
+    {
+        public const float Fovy = 60f;
+        public const float NearClip = 10f;                  // units
+        public const float Dist = 200f;                     // DistMin = DistMax: units from the look-at
+        public const int XAngleMin = -12800, XAngleMax = 10000; // the pitch range (BAM): the camera 70 deg under its target .. 55 over
+        public const float XRotRatioManualSpeed = 0.01f;    // of the 0..1 pitch ratio a tick at full stick: the whole range in 0.83 s
+        public const int YAngleManualSpeed = 300;           // BAM a tick at full stick (XMin = XMax): 198 deg/s
+        public const float AtOffsetY = 150f;                // no FLUDD: the target this far over his origin (XRotRatioAtOffsetY 0)
+        public const int OffsetAngleX = 2306, OffsetAngleY = -489; // the camera 12.7 deg over the pitch, -2.7 deg on the bearing
+        public const float OffsetLookatXZ = -72.0215f;      // the look-at's sideways shift from the target (the over-the-shoulder framing)
+        public const float PosChaseRateXZ = 0.1f, PosChaseRateY = 0.08f; // mPosition -> the inbetween's pos, a tick
+        public const float AtChaseRateXZ = 0.1f, AtChaseRateY = 0.08f;   // mTarget -> the inbetween's at
+        public const int InbetLNormal = 16;                 // mSLInbetLNormal: the mode change's sweep, ticks (0.13 s)
+        public const int LockTicks = 60;                    // unk282: 0.5 s after a change before Y / A / B act, or Y re-enters
+        public const int YButtonRotateChase = 2;            // camera_normal.prm: the swing behind him halves its gap each tick (180 deg in 16)
+        // onNeutralMarioKey() at both ends of the mode (changeCamModeSub_): mNeutralKeyTimer = 0x3c, counted down by considerMarioStick
+        // on the pad's three updateMeaning calls a 30 fps frame -> 20 frames = 80 ticks; Mario's stick reads 0 for the first 0x28 counts
+        // (53 ticks, 0.44 s) and fades back in over the rest (0.22 s)
+        public const int NeutralKeyTicks = 80;
+        public const int NeutralKeyDeadTicks = 53;
+    }
+
     public static class Waist
     {
         public const float FreePitch = 230f;        // 7360 BAM = 40.4 deg forward at the run cap 32
@@ -550,6 +576,29 @@ public static class SmsMath
         float d = WrapAngle(target - current);
         if (MathF.Abs(d) <= step) return target;
         return current + MathF.Sign(d) * step;
+    }
+
+    /// <summary>CLBChaseAngleDecrease (cameralib.cpp 61): an s16 angle closes 1/ratio of its (wrapped) gap a call, in integer
+    /// arithmetic; false once it stops moving or has arrived. ratio 0 = arrive at once.</summary>
+    public static bool ChaseAngleDecreaseS16(ref int value, int desired, int ratio)
+    {
+        short v = (short)value, d = (short)desired;
+        if (ratio == 0)
+            v = d;
+        else
+        {
+            short nv = (short)(v - d);
+            nv = (short)(nv - nv / ratio);
+            nv = (short)(nv + d);
+            if (nv == v)
+            {
+                value = v;
+                return false;
+            }
+            v = nv;
+        }
+        value = v;
+        return v != d;
     }
 
     /// <summary>Godot yaw (rotation about +Y) of an XZ direction, matching Mario.cs's convention: forward = -Z.</summary>
@@ -1023,6 +1072,16 @@ public static class SmsSelfTest
             float y = 0f;
             while (vy > 0f) { SmsAir.Tick(ref fwd, ref vy, out _, out float mv, 0f, 0f, 0f, true, false, SmsAir.GravityMode.Normal); y += 0.25f * mv; }
             Check("broad jump: apex (units)", y, 621.25f, 0.5f);
+        }
+        // The Y camera at the camera's 120 Hz: the stick's yaw rate, the pitch range's sweep, the lock, the swing behind him
+        {
+            Check("ycam: stick yaw at full deflection (deg/s)", SmsParams.LCamera.YAngleManualSpeed * SmsUnits.TicksPerSecond * 360f / 65536f, 197.75f, 0.05f);
+            Check("ycam: pitch range end to end (s)", 1f / (SmsParams.LCamera.XRotRatioManualSpeed * SmsUnits.TicksPerSecond), 0.833f, 0.002f);
+            Check("ycam: lock after a change (s)", SmsParams.LCamera.LockTicks / SmsUnits.TicksPerSecond, 0.5f, 0.001f);
+            int yaw = 0, ticks = 0;
+            while (SmsMath.ChaseAngleDecreaseS16(ref yaw, -32768, SmsParams.LCamera.YButtonRotateChase) && ticks < 200) ticks++;
+            Check("ycam: swing behind from 180 deg (ticks)", ticks + 1, 16f, 0.5f);
+            Check("ycam: swing lands within a BAM", MathF.Abs((short)(yaw - (-32768))), 1f, 1f);
         }
         GD.Print(ok ? "[SMS selftest] ALL OK" : "[SMS selftest] FAILURES ABOVE");
         return ok;

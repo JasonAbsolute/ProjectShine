@@ -733,6 +733,10 @@ public partial class SunshineCamera : Node3D
     {
         if (string.IsNullOrEmpty(OverShoulderAction) || !InputMap.HasAction(OverShoulderAction))
             return;
+        // Under SMS physics the Y camera is Mario's (assets/Sms/MarioYCam.cs: the game's CAMERA_MODE_L_NORMAL on a second Camera3D).
+        // This mode's own Y toggle ran underneath it and froze him with CameraLocked: no stick, no FLUDD, no way out (2026-09-28).
+        if (_target is Mario smsMario && smsMario.UseSmsPhysics)
+            return;
 
         // Toggle: press Y to enter, press Y again to exit.
         if (Input.IsActionJustPressed(OverShoulderAction))
@@ -794,6 +798,27 @@ public partial class SunshineCamera : Node3D
             _bodyBonePoseCurrent = Quaternion.Identity;
             _marioSkeleton.SetBonePoseRotation(_bodyBoneIdx, Quaternion.Identity);
         }
+    }
+
+    /// <summary>The Y camera (MarioYCam.cs) is ending: the game's normal camera resumes with the L camera's yaw -- behind the way he
+    /// now faces -- so this rig snaps its yaw there (pitch and radius keep chasing their own targets) while the Y camera sweeps
+    /// onto this rig's live pose and hands the view back.</summary>
+    public void SmsYCamExit()
+    {
+        _tgtYaw = GetBehindYaw();
+        _curYaw = _tgtYaw;
+        if (LinkPitchToRadius)
+        {
+            _zoomT     = DefaultZoomT;
+            _tgtPitch  = ZoomTtoPitch(_zoomT);
+            _tgtRadius = ZoomTtoRadius(_zoomT);
+        }
+        else
+        {
+            _tgtPitch  = Mathf.DegToRad(DefaultPitchDeg);
+            _tgtRadius = BaseRadius * _rigScale;
+        }
+        ApplyTransform();
     }
 
     private void SetMarioLocked(bool locked)

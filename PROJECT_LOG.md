@@ -2492,6 +2492,8 @@ game's `CAMERA_MODE_L_NORMAL` — its "L button camera" — from `CameraChange.c
 `setUpToLButtonCamera_` 256), `CameraNotice.cpp ctrlLButtonCamera_` 207, `cameragc.cpp` (`rotateX/Y_ByStick` 332/344,
 `calcPosAndAt_` 464), `MarioGamePad.cpp` 69–88, and the SHIPPED `/Camera/kindLNormal.prm` (params.szs → `params/camera/kindlnormal.prm`;
 the research pass had only the compiled defaults, which differ: FOV 60 not 50, dist 200 not 450–2000, pitch −12800..10000):
+- *(Pass 17 corrects the rates below: the camera ticks at 120 Hz, so "a frame" is a tick — 198°/s, 0.83 s, a 0.5 s lock, a 0.13 s
+  blend — and the Y press swings the normal camera behind him before the mode starts.)*
 - **Y** on the ground (a normal camera, not in water, not the dash) enters; **Y, A or B** leave — but only after `unk282`, a 60-frame
   lock set on every change (2.0 s at the game's 30 fps), and the 16-frame blend (`mSLInbetLNormal`). Leaving the ground, the water,
   a hit or the dash ends it at once. The normal camera keeps running underneath and the view blends back to it.
@@ -2511,6 +2513,40 @@ the research pass had only the compiled defaults, which differ: FOV 60 not 50, d
   cancel, never a jump.
 - Not ported: the enter/leave SEs (0x4824/5), the notice lock-on (`calcNoticeTargetYrot_`), the water particles' first-person
   survival tweak (`ModelWaterManager.cpp 536`), the talk/take suppression (no NPC system to suppress).
+
+**Pass 17 — the Y camera, second pass** (Jaysonn 03:00: "y cam is very broken. no cam turning and its slow. flood does not work
+on y cam and just other little bugs"). Three things, all real:
+- **The rig's own Y mode was running underneath.** `SunshineCamera.UpdateOverShoulderState` toggles its OverShoulder mode on the same
+  `button_y` and sets `Mario.CameraLocked`, whose early return at the top of `_PhysicsProcess` skips the whole SMS block: the L
+  camera's stick never ticked (no turning), the lock never counted (no way out until Y toggled the rig's mode off again), the FLUDD tick
+  never ran (no spray), and the rig's `UpdateBodyTracking` bent `chn_chest`. His log ends on the `[SMS ycam] on:` line. The rig's Y
+  toggle is off under `UseSmsPhysics` (the Y camera is Mario's), and the rig gains `SmsYCamExit()` (below).
+- **The camera runs at 120 Hz, not 30.** `data/PerformLists.bin` puts `camera 1` (the `PolarSubCamera`, `dolpic0/map/scene.bin`) on
+  `PerformList Movement`, which the director performs with `CUE_MOVE` on every simulation tick — four a frame, like Mario (nothing sets
+  the movement-gate flags on it; `CPolarSubCamera::perform` reads the first/last-tick bits). Every "a frame" rate in pass 16 was
+  four times too slow: the stick turns **300 BAM a tick = 198°/s** (was 49), the pitch ratio 0.01 a tick (**the range in 0.83 s**, was
+  3.3), the chase 0.1/0.08 a tick, **the lock is 60 ticks = 0.5 s** (was 2 s), the inbetween 16 ticks = 0.13 s. (Corroboration: the
+  rig's own C-stick speed, tuned by feel, is 183°/s — the game's normal camera at 120 Hz is 250 BAM × 120 = 165°/s.)
+- **The Y press is a sequence, not a mode change** (`execCameraModeChangeProc_` 596–628, `execFrontRotate_` 449, `CameraNormal.cpp`
+  79–86): with no boss to lock on to, Y calls `execFrontRotate_`: the NORMAL camera's yaw halves its gap to "behind Mario" (`unk274 =
+  face − 0x8000`, `YButtonRotateChase 2`, 180° in 16 ticks, position following at once), and a flag (`UNK8 → UNK10`) turns the L camera
+  on when the swing settles — `changeCamMode_(L_NORMAL)` with the 16-tick `TCameraInbetween` (the look-at sweeps around him and the
+  camera around the look-at in polar coordinates, then the 0.1/0.08 chase follows). The L camera's yaw is the swing's, so Mario — who
+  faces the camera's look — keeps his facing; pass 16 started from the camera's current bearing and turned him to it. Mario is his own
+  during the swing (the port too). On the way out (`changeCamMode_(-1)`) the normal camera resumes with the L yaw: behind the way he
+  now faces — the rig snaps its yaw there (`SmsYCamExit`) while this camera sweeps onto its live pose over 16 ticks (1 for a cut).
+`MarioYCam.cs` rewritten around a tick machine (Off → FrontRotate → LNormal → BlendOut) run from the top of the SMS block
+(`SmsYCamFrame`, before any handler's `goto EndFrame`), so the hover / dash / hurt / water exits are seen whoever owns the frame; the
+ground block only holds him (`SmsYCamHoldMario`: zero stick, jump and spin buffers cleared, idle) and takes the Y press. Mario's facing
+is the game's `unk258 + 0x8000 − OffsetAngleY` from the CHASED camera (pass 16 used the target yaw + OffsetAngleY: 2.7° off).
+`SmsParams.LCamera` holds the shipped values per tick; `SmsMath.ChaseAngleDecreaseS16` is `CLBChaseAngleDecrease` in s16 arithmetic.
+Also ported: `onNeutralMarioKey()` at both ends of the mode (`changeCamModeSub_`): Mario's stick reads zero for 0.44 s and fades back in
+over 0.22 s (`considerMarioStick`, `mNeutralKeyTimer 0x3c` at three counts a frame), so the stick that was aiming the camera does not
+launch him when the mode ends. Self-test: `ycam: stick yaw at full deflection 197.75 deg/s`, `pitch range end to end 0.833 s`, `lock 0.5 s`, `swing behind from 180
+deg 16 ticks`. Still not ported: a Y in the air (the game allows it — `execFrontRotate_` runs in any non-hip-drop status and only
+sleeping / the surf / rocketing / the dash / climbing refuse; his air steering would fight the mode's facing), the squat inside the
+mode (`canSquat` holds there: an R click or L squats him in the game), the notice lock-on, the SEs. Port-only: a Y needs the ground and
+a standing / running / landing status; the mode cuts after 3 physics frames off the ground (the game keeps it through a fall).
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

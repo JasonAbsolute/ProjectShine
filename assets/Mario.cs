@@ -2015,12 +2015,12 @@ public partial class Mario : CharacterBody3D
             "Lstick_up",
             "Lstick_down"
         );
+        if (UseSmsPhysics && _ycamNeutralTicks > 0)
+            LstickVec *= SmsYCamMarioStickScale(); // onNeutralMarioKey() at the Y camera's ends: his stick is dead 0.44 s, then fades in over 0.22 s (the stick that was aiming does not launch him)
         float stickStrength = LstickVec.Length();
         _smsIntendedMag = SmsStick.IntendedMag(LstickVec);
         _smsStickH = LstickVec.X;
         _smsStickV = -LstickVec.Y; // the game's stick has up positive
-        if (_ycamOn && (!IsOnFloor() || _smsInWater))
-            SmsYCamLeave("off the ground"); // execCameraModeChangeProc_: the states that end the L camera at once
 
         Vector3 inputDirWorld = Vector3.Zero;
         float camYaw = (springArmPivot != null) ? springArmPivot.Rotation.Y : 0f;
@@ -2222,6 +2222,7 @@ public partial class Mario : CharacterBody3D
         if (UseSmsPhysics)
         {
             SmsWaterCheck();      // playerControl(): the water surface at the feet, every tick
+            SmsYCamFrame(delta);  // the Y camera (MarioYCam.cs): the swing behind him, the L camera's stick / lock / exits, its pose, his facing
             SmsAirTick(delta);    // mAir drains with the head under, refills out; the meter turns to air after 2 s under
             SmsFluddTick(delta);  // the R analog, X, the upper body, the nozzle swap, the pack's clips
             SmsFluddDashOverride(ref inputDirWorld, ref stickStrength); // the turbo: mIntendedMag = mDashSpeed, a resting stick aims at the face
@@ -2746,6 +2747,14 @@ public partial class Mario : CharacterBody3D
 
         if (IsOnFloor() && !rollingUpwardOffGround) //This is the main logic loop for Player being on the ground
         {
+            // === THE Y CAMERA (CAMERA_MODE_L_NORMAL, MarioYCam.cs) === ticked at the top of the frame (SmsYCamFrame). In the mode his
+            // stick is the camera's and A / B / Y are its buttons: he stands where the L camera found him, faces the look, holds the
+            // pump, sprays with R -- nothing below (the spin, the squat, the jumps, the run) sees this frame
+            if (SmsYCamHoldsMario())
+            {
+                SmsYCamHoldMario();
+                goto EndFrame;
+            }
             // SMS surface slip: isSlipStart() on a floor Godot lets him stand on (a slider, a "45" surface past 30 deg,
             // wet ground, force slip). The game's SLIP_FORE / SLIP_BACK owns the frame while it runs.
             if (UseSmsPhysics && SmsSurfaceSlipFrame(delta))
@@ -2814,21 +2823,10 @@ public partial class Mario : CharacterBody3D
                 goto EndFrame;
             }
 
-            // === THE Y CAMERA (CAMERA_MODE_L_NORMAL, MarioYCam.cs) === Y from the ground aims the camera; Mario stands, faces the
-            // look, holds the pump, sprays with R; the stick is the camera's; Y / A / B leave (A is the camera's, not a jump)
-            if (_ycamOn)
-            {
-                bool wasOn = _ycamOn;
-                SmsYCamFrame(delta);
-                if (wasOn)
-                    jumpBuffer = 0;
-                goto EndFrame;
-            }
+            // Y in a normal camera (execCameraModeChangeProc_ -> execFrontRotate_): the camera swings behind him first, then the L
+            // camera comes on (MarioYCam.cs); this frame, and the swing's, are still his
             if (Input.IsActionJustPressed("button_y") && SmsYCamCanEnter())
-            {
                 SmsYCamEnter();
-                goto EndFrame;
-            }
 
             // === CROUCH / BACKFLIP ===
             // Holding Z on the ground puts Mario in a squat; A launches a backflip. Under SMS this is the game's MARIO_STATUS_SQUAT:
@@ -4795,7 +4793,7 @@ public partial class Mario : CharacterBody3D
         UpdateFootIK((float)delta);
         UpdateHandPose();
         UpdateJiggle((float)delta);
-        SmsYCamRender(delta); // the Y camera's chase and blends, once a rendered frame
+        SmsYCamRender(delta); // the Y camera: a cutscene hold that took the frame before the SMS block ends the mode
 
         // Ground-pound streak effect: on only during the actual fall (not the air-stall).
         if (groundPoundFx != null)
@@ -14489,6 +14487,7 @@ public partial class Mario : CharacterBody3D
     private void Respawn()
     {
         SmsFluddOnRespawn(); // a full tank, the drops gone
+        SmsYCamReset();      // the rig's camera back, no lock
         _health = StartingHealth;
         SmsAirReset();
         _smsSwimAnim = "";
