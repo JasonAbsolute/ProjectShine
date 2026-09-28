@@ -2019,6 +2019,8 @@ public partial class Mario : CharacterBody3D
         _smsIntendedMag = SmsStick.IntendedMag(LstickVec);
         _smsStickH = LstickVec.X;
         _smsStickV = -LstickVec.Y; // the game's stick has up positive
+        if (_ycamOn && (!IsOnFloor() || _smsInWater))
+            SmsYCamLeave("off the ground"); // execCameraModeChangeProc_: the states that end the L camera at once
 
         Vector3 inputDirWorld = Vector3.Zero;
         float camYaw = (springArmPivot != null) ? springArmPivot.Rotation.Y : 0f;
@@ -2809,6 +2811,22 @@ public partial class Mario : CharacterBody3D
             if (spinBuffer > 0 && Input.IsActionJustPressed("button_r") && CanEnterGroundSpin())
             {
                 StartGroundSpin();
+                goto EndFrame;
+            }
+
+            // === THE Y CAMERA (CAMERA_MODE_L_NORMAL, MarioYCam.cs) === Y from the ground aims the camera; Mario stands, faces the
+            // look, holds the pump, sprays with R; the stick is the camera's; Y / A / B leave (A is the camera's, not a jump)
+            if (_ycamOn)
+            {
+                bool wasOn = _ycamOn;
+                SmsYCamFrame(delta);
+                if (wasOn)
+                    jumpBuffer = 0;
+                goto EndFrame;
+            }
+            if (Input.IsActionJustPressed("button_y") && SmsYCamCanEnter())
+            {
+                SmsYCamEnter();
                 goto EndFrame;
             }
 
@@ -4777,6 +4795,7 @@ public partial class Mario : CharacterBody3D
         UpdateFootIK((float)delta);
         UpdateHandPose();
         UpdateJiggle((float)delta);
+        SmsYCamRender(delta); // the Y camera's chase and blends, once a rendered frame
 
         // Ground-pound streak effect: on only during the actual fall (not the air-stall).
         if (groundPoundFx != null)
@@ -12395,8 +12414,9 @@ public partial class Mario : CharacterBody3D
                     _fluddUpper = SmsUpper.Idle;
                 break;
         }
-        // stateMachineUpper() (MarioUpper.cpp 30): MARIO_STATUS_SQUAT with the upper body IDLE -> HOLDING_PUMP, the hands on the grips
-        if (UseSmsPhysics && stateOfMario == MarioState.crouch && _smsSquatEndTicks == 0 && _fluddUpper == SmsUpper.Idle && SmsFluddPumpEnabled())
+        // stateMachineUpper() (MarioUpper.cpp 17 / 30): the L camera, or MARIO_STATUS_SQUAT, with the upper body IDLE -> HOLDING_PUMP,
+        // the hands on the grips
+        if (UseSmsPhysics && (_ycamOn || (stateOfMario == MarioState.crouch && _smsSquatEndTicks == 0)) && _fluddUpper == SmsUpper.Idle && SmsFluddPumpEnabled())
         {
             _fluddUpper = SmsUpper.HoldingPump;
             _fluddPumpCooldown = 0;
@@ -13590,6 +13610,12 @@ public partial class Mario : CharacterBody3D
     /// the Y cam pass.</summary>
     private void SmsFluddCalcGunAngle(SmsParams.Fludd.Nozzle np)
     {
+        if (_ycamOn)
+        {
+            // calcGunAngle()'s first branch: in the L camera the angle IS the camera pitch -- no clamp, no chase
+            _fluddGunAngle = YCamPitchBam;
+            return;
+        }
         float target = UseSmsPhysics && stateOfMario == MarioState.crouch && _smsSquatEndTicks == 0
             ? _fluddGunAngle + _smsStickV * np.RButtonMult
             : -np.LAngleBase;
@@ -13991,11 +14017,15 @@ public partial class Mario : CharacterBody3D
         // MarioWaistCtrl's first branch (MarioDraw.cpp 486): in the squat family (status bit 0x8000) a gun angle above 0 -- the R squat's
         // forward aim -- bends the whole upper body forward by that angle in place of the run lean (Rz on chn_chest: the spray, which
         // leaves forward over his head, goes down with it); a negative angle bends nothing (the head looks up instead)
-        bool squatAim = UseSmsPhysics && stateOfMario == MarioState.crouch && _fluddReady && _fluddGunAngle > 0f;
+        // MarioWaistCtrl's first branch (MarioDraw.cpp 476): the L camera looking down (its pitch above 0) bends the upper body forward
+        // by the pitch, FLUDD or not (Rz(pitch) x Rx(-unk100), unk100 = 0; canBendBody() only fails in hurt statuses, which end the
+        // mode)
+        float aimBam = _ycamOn ? YCamPitchBam : _fluddGunAngle;
+        bool squatAim = UseSmsPhysics && aimBam > 0f && (_ycamOn || (stateOfMario == MarioState.crouch && _fluddReady));
         if (squatAim)
             apply = true;
         _smsWaist.Apply = apply;
-        _smsWaist.Pitch = (squatAim ? _fluddGunAngle : _smsWaistPitch) * SmsUnits.BamToRad;
+        _smsWaist.Pitch = (squatAim ? aimBam : _smsWaistPitch) * SmsUnits.BamToRad;
         // The game's sign, applied as the game does: a left turn is a positive yaw change, so a positive roll, and Rx(roll) about
         // jnt_chest's local X -- up the spine in the rig AND in ma_mdl1.bmd (JNT1: chn_chest (0, 90, 0), jnt_chest (0, 0, 90) -> X up,
         // Y forward, Z lateral) -- turns the chest counterclockwise seen from above: INTO the turn, the torso leading the feet.

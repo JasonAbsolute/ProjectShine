@@ -2486,6 +2486,31 @@ readout now measures the drawn chest (the pack attachment, which follows the gra
 - Side effect, also the game's: the rocket's manual fire (A while R is clicked) now has a click to read.
 - **15b**: `SmsFluddSetupSprayAim()` — an `SmsBoneRotZ` on the spray nozzle's `chn_muzzle_1`, fed the gun angle when negative; the
   emitter reads it through `DrawnGlobalPose` like the turbo's neck, so the drops leave where the lifted barrel points.
+
+**Pass 16 — the Y camera** (Jaysonn 02:03: "lets move onto the Y cam"). New `assets/Sms/MarioYCam.cs` (a partial of Mario). The
+game's `CAMERA_MODE_L_NORMAL` — its "L button camera" — from `CameraChange.cpp` (`doLButtonCameraOn_` 469 / `Off_` 479,
+`setUpToLButtonCamera_` 256), `CameraNotice.cpp ctrlLButtonCamera_` 207, `cameragc.cpp` (`rotateX/Y_ByStick` 332/344,
+`calcPosAndAt_` 464), `MarioGamePad.cpp` 69–88, and the SHIPPED `/Camera/kindLNormal.prm` (params.szs → `params/camera/kindlnormal.prm`;
+the research pass had only the compiled defaults, which differ: FOV 60 not 50, dist 200 not 450–2000, pitch −12800..10000):
+- **Y** on the ground (a normal camera, not in water, not the dash) enters; **Y, A or B** leave — but only after `unk282`, a 60-frame
+  lock set on every change (2.0 s at the game's 30 fps), and the 16-frame blend (`mSLInbetLNormal`). Leaving the ground, the water,
+  a hit or the dash ends it at once. The normal camera keeps running underneath and the view blends back to it.
+- **The stick is the camera's** (`mCompSPos[4],[5]`; Mario's stick is starved — he stands): yaw at 300 BAM a frame (49°/s at full
+  stick, unbounded), the pitch as a **0..1 ratio** at 0.01 a frame (3.3 s end to end), pitch = lerp(−12800, 10000, ratio): the camera
+  from 70° UNDER the target (looking up at the sky) to 55° OVER it. **Stick up raises the camera, i.e. looks DOWN** — the game's own
+  inversion, kept.
+- **Placement** (`calcPosAndAt_`): the target is the nozzle top (30 units up `nozzle_center`'s Y; his origin + 150 without the FLUDD);
+  the look-at is 72 units to its side (`OffsetLookatXZ −72` — the over-the-shoulder framing); the camera 200 units from the look-at at
+  elevation pitch + 12.7° (`OffsetAngleX 2306`) and bearing yaw − 2.7° (`OffsetAngleY −489`); position and look-at chase at 0.1 (XZ)
+  / 0.08 (Y) a frame. On entry the ratio starts where the pitch is −OffsetAngleX (the camera level with the target) and the yaw is the
+  normal camera's bearing. FOV 60, near 10 units. No BG collision in the mode (the game turns its ground/roof/wall checks off).
+- **Mario** (`MarioMove.cpp 2449`, `MarioUpper.cpp 17`, `MarioDraw.cpp 476`, `WaterGun.cpp 216`): faces `yaw + 0x8000 − OffsetAngleY`
+  (2.7° off the camera's axis), holds the pump (R sprays, X switches), **the gun angle IS the camera pitch** — no clamp, no chase — so
+  looking down bends the upper body forward by the pitch (`MarioWaistCtrl`, FLUDD or not) and the spray goes down; looking up lifts
+  the spray nozzle (`chn_muzzle_1`, pass 15b), the turbo's neck, and the head by half the angle. A while in the mode is the camera's
+  cancel, never a jump.
+- Not ported: the enter/leave SEs (0x4824/5), the notice lock-on (`calcNoticeTargetYrot_`), the water particles' first-person
+  survival tweak (`ModelWaterManager.cpp 536`), the talk/take suppression (no NPC system to suppress).
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
