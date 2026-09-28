@@ -2332,6 +2332,31 @@ Also seen on the way, not this pass: `doRunningAnimation` blends RUN2 with RUN1 
 installed for every state, not idle / pivot only.
 Debug: setup `[SMS waist] MarioWaistCtrl sits on chn_chest …`, `[SMS jiggle] TMtxTimeLag on jnt_chest …`; once a second `… (banks 24 deg
 into the turn) …; lag on: chest 5.0 u / 3.1 deg, arm 12.4 deg`.
+
+**Pass 7 — the FLUDD's own matrix effects** (Jaysonn 20:58: "do the other jiggles and we can do it all at once for testing").
+The water gun's `TMultiMtxEffect` (WaterGun.cpp 1283) has two entries. **Entry 0, TIME_LAG on the tank root**: `/Mario/WaterGun/
+MtxEffect0.prm` ships (0.05 / 0.95 / 5 / 0.1 / 0.93) but nothing ever sets its flag 1 — `addCallBack` only touches
+`mMtxEffectTbl[1]` (MarioDraw.cpp 1801 / 1827 / 1830), the constructor starts at 0 and `setup` sets flag 2 only — so in the shipped
+game the tank never lags. Not ported. **Entry 1, SWING_RZ on `jnt_G_handle`**: a point mass on a rope of length L hangs from the
+joint in world space; per tick `vel += acc; vel *= brake; bob += vel`, the bob is put back on the sphere of radius L and that
+correction is added to its velocity; the joint's world X is aimed at the bob (Y = Z × X, Z — the hinge, Mario's lateral axis —
+untouched) and the children (`jnt_G_handle_R / L` → levers → grips) take the aimed frame. Written while anime bit 4 (everything but
+the squat, the rope, the spin and the shine demo), the upper body is idle and he has the FLUDD. **The parameters are the compiled-in
+defaults — acc (0, 0, 0), L 50, brake 0.9**: the shipped `wg_mdl1.bmd` (mario.szs and common.szs, identical) has `jnt_G_handle` at
+joint 7, and both params.szs copies hold `MtxEffect10.prm` and `12.prm` (acc (0, −4, 0), L 50, brake 0.7, written for an older
+rig) but no 7 — `TParams::load` finds nothing (the plaza's scene archive has no prm either) and leaves the defaults. With no gravity
+the grips have no rest direction: at a run they trail straight back and they stay wherever the last move left them; the rope's
+radial pull kills the velocity along the rope, so a stop does not swing them. Port: `assets/Sms/SmsSwingRZ.cs` on the tank
+skeleton. If Dolphin shows the grips falling back to hanging after a run, the retail build is finding parameters we cannot see and the
+10 / 12 values go in — one line in `SmsParams.MtxEffect`.
+Also checked: **the cap's TIME_LAG** (`TMarioCap`, `/Mario/MarioCap/MtxEffect1.prm` 0.5 / 0.3 / 5 / 0.5 / 0.3, bone 1 of ma_cap1 /
+ma_cap3) sits on `null_weight_B`, a LEAF joint — with J3D's store-then-callback order it changes nothing; and our cap is part of the
+head mesh anyway. Nothing to port. **Rates**: `TMario::perform` runs `calcAnim` inside the CUE_MOVE block (MarioMain.cpp 92), so
+`considerWaist`, `addCallBack`, the model calc with the joint callbacks and the water gun's calc all run on every 120 Hz move tick —
+our per-tick stepping of the waist filter, the time lag and the swing is right (the director blacklists CUE_CALC_ANIM on the first
+three ticks of a frame, but Mario does not use that cue for its own calc).
+Debug: setup `[SMS jiggle] FLUDD handle swing (TMtxSwingRZ) on jnt_G_handle -> jnt_G_handle_R, jnt_G_handle_L …`; the once-a-second
+line ends `…, handles 88 deg back` (`(off)` while a spray or a squat holds it).
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

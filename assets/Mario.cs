@@ -249,6 +249,7 @@ public partial class Mario : CharacterBody3D
     private float _fluddTiltL = 0f, _fluddTiltR = 0f;             // unk1CC8 / unk1CCC: chased at ChangeSpeed a tick
     private SmsBoneRotZ _fluddTilt;                               // WaterGunDivingCtrlL / R on the hover nozzle's jnt_nozzle_L / R
     private SmsBoneRotZ _fluddNeckRot;                            // NozzleCtrl on the turbo's jnt_back_nozzle_neck: the gun angle
+    private SmsSwingRZ _fluddHandleSwing;                         // TMtxSwingRZ on the tank's jnt_G_handle: the grips' pendulum
     private float _fluddHeadW = 0f;                               // the HoverHeadAngle head dip, eased like the run's head lock
     private SmsUpperPose _fluddSwimPump;                          // addUpper() for the swim clips: ma_swpmp on the chn_chest subtree
     private float _fluddRocketVyPending = 0f;                     // the rocket's pushes fired this frame before the status change (units a tick)
@@ -12087,6 +12088,7 @@ public partial class Mario : CharacterBody3D
         SmsFluddSetupWater(); // S2: the drops, the water level in the tank, the muzzles
         SmsFluddSetupHoverTilt(); // S3: the hover nozzles' bank joints
         SmsFluddSetupTurboNeck(); // S5 fix 2: NozzleCtrl on the turbo's jnt_back_nozzle_neck (the gun angle)
+        SmsFluddSetupHandleSwing(); // the water gun's TMultiMtxEffect: the grips swing on jnt_G_handle
         SmsFluddSetupSwimPump();  // ma_swpmp on the upper body while the swim clips run outside the tree
         SmsFluddSetupTurboAnims(); // S5: ma_turbo_dash / ma_broad_jump as BaseSM states
         // the pump clips ping-pong (addUpper: ATTR_PING_PONG_LOOP; the tank's are slaved to Mario's)
@@ -13540,12 +13542,48 @@ public partial class Mario : CharacterBody3D
         return true;
     }
 
+    /// <summary>gMarioAnimeData bit 4 by clip name: the handle swing is off only for the squat, the rope, the spin and the shine demo.</summary>
+    private static bool SmsAnimeHasHandleSwing(string clip)
+    {
+        if (string.IsNullOrEmpty(clip))
+            return false;
+        foreach (string off in new[] { "ma_sq", "ma_demo", "ma_rope", "ma_spin_p" })
+            if (clip.StartsWith(off))
+                return false;
+        return true;
+    }
+
+    /// <summary>The water gun's TMultiMtxEffect (WaterGun.cpp 1283). Entry 1, SWING_RZ on jnt_G_handle, is the grips' pendulum. Entry 0,
+    /// TIME_LAG on the tank root, is never enabled in the game (only entry 1's flag is ever set, MarioDraw.cpp 1801 / 1827 / 1830) and is
+    /// not ported. The pendulum's parameters are TMtxSwingRZ's compiled-in defaults: see SmsParams.MtxEffect.</summary>
+    private void SmsFluddSetupHandleSwing()
+    {
+        if (_fluddTankSkel == null || _fluddTankSkel.FindBone("jnt_G_handle") < 0)
+        {
+            GD.PushWarning("[SMS fludd] the tank has no jnt_G_handle bone: no handle swing");
+            return;
+        }
+        _fluddHandleSwing = new SmsSwingRZ
+        {
+            Name = "SmsHandleSwing",
+            BoneName = "jnt_G_handle",
+            AccUnits = SmsParams.MtxEffect.HandleAcc,
+            LUnits = SmsParams.MtxEffect.HandleL,
+            Brake = SmsParams.MtxEffect.HandleBrake,
+            UnitsPerMetre = SmsUnits.UnitsPerMetre,
+        };
+        _fluddTankSkel.AddChild(_fluddHandleSwing);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS jiggle] FLUDD handle swing (TMtxSwingRZ) on jnt_G_handle -> {string.Join(", ", System.Array.ConvertAll(_fluddTankSkel.GetBoneChildren(_fluddTankSkel.FindBone("jnt_G_handle")), b => _fluddTankSkel.GetBoneName(b)))}: rope {SmsParams.MtxEffect.HandleL} u, acc {SmsParams.MtxEffect.HandleAcc}, brake {SmsParams.MtxEffect.HandleBrake} (the compiled-in defaults: MtxEffect7.prm does not ship); the tank root's time lag is never enabled in the game and is not ported");
+    }
+
     private string SmsTimeLagDbg()
     {
         if (_smsTimeLag == null || _smsTimeLag.Entries.Length < 3)
             return "";
         var c = _smsTimeLag.Entries[0]; var r = _smsTimeLag.Entries[1];
-        return $"; lag {(_smsTimeLag.Enabled ? "on" : "off")}: chest {c.DbgLagUnits:0.0} u / {c.DbgLagDeg:0.0} deg, arm {r.DbgLagDeg:0.0} deg";
+        string handles = _fluddHandleSwing == null ? "" : $", handles {(_fluddHandleSwing.Enabled ? "" : "(off) ")}{MathF.Abs(_fluddHandleSwing.DbgAngleDeg):0} deg {(_fluddHandleSwing.DbgAngleDeg >= 0f ? "back" : "forward")}";
+        return $"; lag {(_smsTimeLag.Enabled ? "on" : "off")}: chest {c.DbgLagUnits:0.0} u / {c.DbgLagDeg:0.0} deg, arm {r.DbgLagDeg:0.0} deg{handles}";
     }
 
     private void SmsWaistApply()
@@ -13572,6 +13610,13 @@ public partial class Mario : CharacterBody3D
             // climbing, ladders, ropes, fences, the squat, doors, demos), the upper body is IDLE, and the level is 0x4B0 ticks old
             _smsTimeLag.Enabled = UseSmsPhysics && _fluddUpper == SmsUpper.Idle && _smsLevelTicks >= SmsParams.MtxEffect.EnableAfterTicks
                 && SmsAnimeHasMtxEffect(node.Length > 0 ? node : (animPlayer != null ? animPlayer.CurrentAnimation : ""));
+        }
+        if (_fluddHandleSwing != null)
+        {
+            // addCallBack's second block: the handle swing writes while gMarioAnimeData[anim].unk6 & 4 (everything but the squat, the
+            // rope, the spin and the shine demo), the upper body is IDLE and he has the FLUDD -- no level-age wait for this one
+            _fluddHandleSwing.Enabled = UseSmsPhysics && _fluddReady && _fluddUpper == SmsUpper.Idle
+                && SmsAnimeHasHandleSwing(node.Length > 0 ? node : (animPlayer != null ? animPlayer.CurrentAnimation : ""));
         }
         if (SmsDebugPrint)
         {
@@ -13667,6 +13712,7 @@ public partial class Mario : CharacterBody3D
         _fluddDashSpeed = 0f; _fluddDashing = false; _fluddDashAnimOn = false; _fluddBroadJump = false;
         _smsWaistPitch = 0f; _smsWaistRoll = 0f; _smsWaistPrevYawValid = false;
         _smsTimeLag?.Reset();
+        _fluddHandleSwing?.Reset();
         _fluddDrops?.Clear();
         SmsFluddPoseWater();
     }

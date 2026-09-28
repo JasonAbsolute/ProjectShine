@@ -132,6 +132,13 @@ public static class SmsParams
         public const float ArmPosAccel = 0.1f;     public const float ArmPosBrake = 0.8f;    public const float ArmPosLimit = 5f;
         public const float ArmQuatAccel = 0.05f;   public const float ArmQuatBrake = 0.8f;
         public const int EnableAfterTicks = 0x4B0;  // 1200 ticks = 10 s into the level
+        // The water gun's own table (WaterGun.cpp 1283): entry 0 TIME_LAG on the tank root -- /Mario/WaterGun/MtxEffect0.prm ships
+        // (0.05 / 0.95 / 5 / 0.1 / 0.93) but its flag 1 is never set, so the tank never lags: NOT PORTED. Entry 1 SWING_RZ on
+        // jnt_G_handle: the model's jnt_G_handle is joint 7 and no MtxEffect7.prm ships (MtxEffect10 and 12 do, for an older rig:
+        // acc (0, -4, 0), L 50, brake 0.7), so the shipped game runs TMtxSwingRZ's compiled-in defaults -- no gravity.
+        public static readonly Vector3 HandleAcc = Vector3.Zero;
+        public const float HandleL = 50f;
+        public const float HandleBrake = 0.9f;
     }
 
     public static class Waist
