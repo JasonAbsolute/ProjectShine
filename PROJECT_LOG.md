@@ -2417,6 +2417,7 @@ first; both were already the game's numbers, so both changes are **deliberate de
   snap (shipped min = max = 1500), converged with `IConverge` onto the stick's camera-relative yaw. `run.prm` ships a `DashRotSp` of
   60 but no code reads it. The port had 1500 since S5 fix 2; he has now called it too sharp twice. Now `SmsParams.Fludd.DashRotSp`
   = 600 BAM a tick: a 90° turn in ~0.23 s at 32 m/s (radius ≈ 5 m) against the game's 0.09 s. One constant; 1500 restores the code.
+  *(Pass 13, 01:40: at 600 he still wanted "bigger wider turns" → 300: 0.45 s, radius ≈ 9 m.)*
 - **The dash clip.** `doRunningAnimation` paces `ANIM_TURBO_DASH` by `sp = min(mIntendedMag, mForwardVel)`, and in the dash
   `mIntendedMag = mDashSpeed`, which ramps to and caps at 32 (MarioMove.cpp 1509) — so the game runs the dash legs at 2.76, the same
   tempo as a full run, while he covers 2.5× the ground (the 60-frame `ma_turbo_dash.bck` is the glb's 60-key clip, so no import
@@ -2476,8 +2477,9 @@ Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
   wherever the last move left them. Now the shipped `MtxEffect10 / 12.prm` values, the only tuning ever written for it: acc
   (0, −4, 0), L 50, brake 0.7 (`SmsParams.MtxEffect.Handle*`). If Dolphin shows the retail grips frozen backwards, the defaults are
   one line away.
-- **The turbo dash turns at 600 BAM a tick, not 1500** (2026-09-28 01:02). `doRunning` uses `RunningRotSpMin` (1500) while
-  `FLUDD_EMITTING`; Jaysonn has called that too sharp twice. `SmsParams.Fludd.DashRotSp`.
+- **The turbo dash turns at 300 BAM a tick, not 1500** (2026-09-28 01:02 → 600; 01:40 → 300). `doRunning` uses `RunningRotSpMin`
+  (1500) while `FLUDD_EMITTING` — a 90° turn in 0.09 s, a 2 m radius at 32 m/s. Jaysonn called that too sharp twice, and 600
+  (0.23 s, 5 m) still too sharp: "harder to steer … bigger wider turns". 300 is 0.45 s and a 9 m radius. `SmsParams.Fludd.DashRotSp`.
 - **The turbo dash clip is paced by the actual speed** (2026-09-28 01:02). The game paces it by `mDashSpeed`, capped at 32 — the
   run's tempo (2.76) at 2.5× the ground speed; he reads that as slow. Now `mForwardVel` × 0.055 + 1 = 5.4 at 80.
   `SmsParams.Fludd.DashAnimByForwardVel`.

@@ -249,7 +249,7 @@ public static class SmsParams
         // (1500 BAM a tick, the run's own snap) while FLUDD_EMITTING, and doRunningAnimation paces ANIM_TURBO_DASH by
         // min(mIntendedMag, mForwardVel) = mDashSpeed, which caps at 32 -- the run's tempo (2.76) while he covers 2.5x the ground.
         // He wants a gentler wheel and legs that keep up: 600 BAM a tick, and the clip paced by mForwardVel (80 -> 5.4).
-        public const int DashRotSp = 600;            // game 1500 (= Mario.RunningRotSpMin)
+        public const int DashRotSp = 300;            // game 1500 (= Mario.RunningRotSpMin); 600 until 2026-09-28 01:40
         public const bool DashAnimByForwardVel = true; // game: by min(intended, fwd) = 32
         public const float ChangeSpeed = 0.1f;          // the nozzle swap tween a tick (10 ticks); PARAM_INIT (not in the shipped prm)
         public const float DeployRate = 0.1f;           // unk1CEC -= a tick while pumping (housed 1 -> deployed 0)
@@ -589,9 +589,10 @@ public static class SmsRun
     }
 
     /// <summary>doRunning() while FLUDD_EMITTING: the game turns the dash at RunningRotSpMin, 1500 BAM a tick -- the free run's own
-    /// snap (MarioRun.cpp 510; run.prm's DashRotSp 60 is never read). DELIBERATE DEVIATION (Jaysonn, 2026-09-28 01:02, second
-    /// report: "the steering is still too sharp"): SmsParams.Fludd.DashRotSp, 600 BAM a tick -- a 90 degree turn in a quarter second at
-    /// 32 m/s, about a 5 m radius, against the game's 0.09 s. Put RunningRotSpMin back to get the code's rate.</summary>
+    /// snap (MarioRun.cpp 510; run.prm's DashRotSp 60 is never read). DELIBERATE DEVIATION (Jaysonn, 2026-09-28 01:02 "the steering
+    /// is still too sharp", then 01:40 at 600 "harder to steer ... bigger wider turns"): SmsParams.Fludd.DashRotSp, 300 BAM a tick -- a
+    /// 90 degree turn in 0.45 s at 32 m/s, about a 9 m radius, against the game's 0.09 s / 2 m. Put RunningRotSpMin back to get the
+    /// code's rate.</summary>
     public static float DashTurnRateRad() => SmsParams.Fludd.DashRotSp * SmsUnits.BamToRad;
 
     /// <summary>Turning in place (WaitingRotSp), radians per tick.</summary>
@@ -993,7 +994,7 @@ public static class SmsSelfTest
             Check("turbo: dash ramp ticks to 32", 32f / SmsParams.Mario.DashAcc, 64f, 0.01f);
             Check("pumping turn at fwd 32 (BAM)", SmsRun.PumpingTurnRateRad(32f) / SmsUnits.BamToRad, 600f, 0.01f);
             Check("pumping turn at fwd 0 (BAM)", SmsRun.PumpingTurnRateRad(0f) / SmsUnits.BamToRad, 300f, 0.01f);
-            Check("dash turn (BAM)", SmsRun.DashTurnRateRad() / SmsUnits.BamToRad, SmsParams.Fludd.DashRotSp, 0.01f); // 600: a logged deviation (game 1500)
+            Check("dash turn (BAM)", SmsRun.DashTurnRateRad() / SmsUnits.BamToRad, SmsParams.Fludd.DashRotSp, 0.01f); // 300: a logged deviation (game 1500)
             Check("turbo neck: gun angle (deg)", -SmsParams.Fludd.Turbo.LAngleBase * SmsUnits.BamToRad * 180f / MathF.PI, -22.5f, 0.01f);
             // considerWaist(): the pitch at the run cap, the roll's saturation in a full-rate turn, the pumping pitch cap
             Check("waist: free pitch at fwd 32 (deg)", MathF.Min(SmsParams.Waist.FreePitch * 32f, SmsParams.Waist.FreePitchMax) * SmsUnits.BamToRad * 180f / MathF.PI, 40.43f, 0.02f);
