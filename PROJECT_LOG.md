@@ -2381,6 +2381,19 @@ by `parameters/BaseSM/ma_runblend/mix/blend_amount` (verified by a read-back at 
 game, whose `setAnimation` zeroes the blend ratio on every clip change.
 Debug: the once-a-second line ends `…; anim ma_runblend rate 2.76 (run2 100%)` / `anim ma_sstep rate 0.90`; setup `[SMS run]
 ma_runblend in BaseSM …`.
+
+**Pass 9 — the head popping between two spots** (Jaysonn 2026-09-28 00:28: "marios head is frame then frame going back and forth …
+going to one spot then back to normal every other frame … a weird aftertrail effect … maybe the jiggle values are slight off?").
+Not the values — the clock. The game runs the matrix effects on every move tick, in lockstep with Mario's movement. The port moved
+Mario in the PHYSICS frame but stepped the time lag inside the skeleton's modifier pass, i.e. per RENDER frame, against a world-space
+target — the chest's world position — that only moves on physics frames. On a render frame with no physics step the chest stood
+still while the lag copy ran on (16 units a frame at a full run) and hit the +5 clamp ahead of it; on the next frame with a physics
+step the chest jumped 32 units and the copy sat at the −5 clamp behind. Head and shoulders swapped between ~+5 and −5 units around the
+chest on every frame the two clocks did not line up — every other frame on a display above 60 Hz, now and then at 60 from phase drift.
+Both effects (`SmsTimeLag`, `SmsSwingRZ`) now have a `Step(ticks)` that Mario calls from the physics frame (right after the waist,
+with that frame's tick count) against the bones' current global poses, storing each bone's offset in ITS OWN frame; the modifier pass
+only applies that offset to the children, so between physics frames it rides the animated bone smoothly. The FLUDD pendulum was
+stepped the same way and gets the same fix. The parameters are untouched.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

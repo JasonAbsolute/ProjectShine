@@ -10,10 +10,12 @@ using Godot;
 /// the grips swing about the hinge, the handle bar itself stays with the tank. In the bind pose the handle's X points straight down,
 /// so a bob hanging straight down is the clip's pose.
 /// The shipped game runs this with TMtxSwingRZ's compiled-in defaults -- acc (0, 0, 0), L 50, brake 0.9 -- because the model's
-/// jnt_G_handle is joint 7 and /Mario/WaterGun/MtxEffect7.prm does not ship (10 and 12 do, written for an older rig). With no
-/// gravity the grips have no rest direction: they trail his motion and stay where the last move left them (see SmsParams.MtxEffect).
+/// jnt_G_handle is joint 7 and /Mario/WaterGun/MtxEffect7.prm does not ship (10 and 12 do, written for an older rig). The values
+/// used are set by Mario from SmsParams.MtxEffect (the 10 / 12 tuning, a logged deviation).
 /// Written while the body animation carries gMarioAnimeData bit 4 (everything but the squat, the rope, the spin and the shine demo),
 /// the upper body is idle and he has the FLUDD; the state integrates regardless, so enabling never pops.
+/// TIMING as SmsTimeLag: <see cref="Step"/> runs from Mario's physics frame with that frame's tick count against the hinge's current
+/// global pose and stores the aimed frame relative to the hinge's own; the modifier pass only applies it to the children.
 /// Child of the tank's Skeleton3D; Mario sets <see cref="Enabled"/> each frame.
 /// </summary>
 public partial class SmsSwingRZ : SkeletonModifier3D
@@ -30,7 +32,8 @@ public partial class SmsSwingRZ : SkeletonModifier3D
     private int[] _children = System.Array.Empty<int>();
     private bool _init = true;              // flag 2: hang the bob straight down from the current joint position
     private Vector3 _bob, _vel;             // world units
-    private float _tickAccum;
+    private Transform3D _d = Transform3D.Identity; // the aimed frame relative to the hinge's own, in the hinge's frame
+    private bool _ready;
 
     public override void _Ready()
     {
@@ -41,40 +44,32 @@ public partial class SmsSwingRZ : SkeletonModifier3D
         _children = _bone >= 0 ? skel.GetBoneChildren(_bone) : System.Array.Empty<int>();
     }
 
-    public void Reset() => _init = true;
-
-    private static Transform3D GlobalOf(Skeleton3D skel, int bone)
+    public void Reset()
     {
-        var chain = new System.Collections.Generic.List<int>();
-        for (int b = bone; b >= 0; b = skel.GetBoneParent(b))
-            chain.Add(b);
-        Transform3D t = Transform3D.Identity;
-        for (int i = chain.Count - 1; i >= 0; i--)
-            t *= skel.GetBonePose(chain[i]);
-        return t;
+        _init = true;
+        _ready = false;
     }
 
-    public override void _ProcessModificationWithDelta(double delta)
+    /// <summary>TMtxSwingRZ::calcLocalXY for <paramref name="ticks"/> move ticks, from Mario's physics frame.</summary>
+    public void Step(int ticks)
     {
         var skel = GetSkeleton();
         if (skel == null || _bone < 0 || _children.Length == 0)
             return;
-        _tickAccum += (float)delta * 120f;
-        int ticks = (int)_tickAccum;
-        _tickAccum -= ticks;
         Transform3D skelW = skel.GlobalTransform;
         Basis skelRot = skelW.Basis.Orthonormalized();
-        Transform3D g = GlobalOf(skel, _bone);
+        Transform3D g = skel.GetBoneGlobalPose(_bone);
         Basis gRot = g.Basis.Orthonormalized();
         Basis w = skelRot * gRot;                                 // the joint's world axes (columns)
         Vector3 pos = (skelW * g.Origin) * UnitsPerMetre;         // the hinge, world units
         Vector3 zAxis = w.Z.Normalized();
         if (_init)
         {
-            // TMtxSwingRZ::calcLocalXY, flag 2: the bob hangs straight down, the axes are left as they are
+            // flag 2: the bob hangs straight down, the axes are left as they are
             _init = false;
             _vel = Vector3.Zero;
             _bob = pos + new Vector3(0f, -LUnits, 0f);
+            _d = Transform3D.Identity; _ready = false;
             DbgAngleDeg = 0f;
             return;
         }
@@ -92,21 +87,32 @@ public partial class SmsSwingRZ : SkeletonModifier3D
         Vector3 vecX = (_bob - pos).Normalized();
         Vector3 vecY = zAxis.Cross(vecX);
         if (vecY.LengthSquared() < 1e-8f)
-            return;                                               // the rope lies along the hinge: leave the frame alone
+        {
+            _ready = false;                                       // the rope lies along the hinge: leave the frame alone
+            return;
+        }
         vecY = vecY.Normalized();
         vecX = vecY.Cross(zAxis).Normalized();
         Vector3 down = new Vector3(0f, -1f, 0f);
         DbgAngleDeg = Mathf.RadToDeg(Mathf.Atan2(down.Cross(vecX).Dot(zAxis), down.Dot(vecX)));
-        if (!Enabled)
-            return;
-        // the aimed world frame, back in the joint's own frame: children take D x pose, the joint's own skin keeps the clip
+        // the aimed world frame, relative to the hinge's own: children take D x pose, the hinge's own skin keeps the clip
         Basis aimedSkel = skelRot.Inverse() * new Basis(vecX, vecY, zAxis);
         Transform3D gO = new Transform3D(gRot, g.Origin);
-        Transform3D d = gO.AffineInverse() * new Transform3D(aimedSkel, g.Origin);
+        _d = gO.AffineInverse() * new Transform3D(aimedSkel, g.Origin);
+        _ready = true;
+    }
+
+    public override void _ProcessModificationWithDelta(double delta)
+    {
+        if (!Enabled || !_ready)
+            return;
+        var skel = GetSkeleton();
+        if (skel == null || _bone < 0)
+            return;
         foreach (int c in _children)
         {
             Transform3D pc = skel.GetBonePose(c);
-            Transform3D npc = d * pc;
+            Transform3D npc = _d * pc;
             skel.SetBonePosePosition(c, npc.Origin);
             skel.SetBonePoseRotation(c, npc.Basis.Orthonormalized().GetRotationQuaternion());
         }

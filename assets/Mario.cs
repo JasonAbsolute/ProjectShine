@@ -1184,6 +1184,7 @@ public partial class Mario : CharacterBody3D
     private SmsWaistLean _smsWaist;                 // MarioWaistCtrl on chn_chest (considerWaist's lean of the whole upper body); replaces the waist IK under SMS
     private SmsTimeLag _smsTimeLag;                 // TMultiMtxEffect: TMtxTimeLag on jnt_chest, jnt_arm_R1, jnt_arm_L1 -- the game's jiggle
     private int _smsLevelTicks = 0;                 // gpMarDirector->mMoveTickCount: the time lag waits 0x4B0 ticks into the level
+    private int _smsFrameTicks = 2;                 // the move ticks this physics frame ran: the matrix effects step this many
     private float _smsWaistPitch = 0f, _smsWaistRoll = 0f; // mWaistPitch / mWaistRoll (BAM, floats like the game's)
     private float _smsWaistPrevYaw = 0f;            // unk9C: the face at the top of the frame
     private float _smsWaistDbgLastDYaw = 0f;        // debug: the frame's yaw change (BAM), for the into / away readout
@@ -13494,6 +13495,7 @@ public partial class Mario : CharacterBody3D
         _smsWaistDbgLastDYaw = dYawBam;
         int n = Math.Max(1, (int)Math.Round(delta * 120.0));
         _smsLevelTicks += n;
+        _smsFrameTicks = n;
         _smsWaistDbgMaxDYaw = MathF.Max(_smsWaistDbgMaxDYaw, MathF.Abs(dYawBam) / n);
         float fwd = SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()); // mForwardVel, in every status
         for (int i = 0; i < n; i++)
@@ -13718,6 +13720,11 @@ public partial class Mario : CharacterBody3D
             // climbing, ladders, ropes, fences, the squat, doors, demos), the upper body is IDLE, and the level is 0x4B0 ticks old
             _smsTimeLag.Enabled = UseSmsPhysics && _fluddUpper == SmsUpper.Idle && _smsLevelTicks >= SmsParams.MtxEffect.EnableAfterTicks
                 && SmsAnimeHasMtxEffect(node.Length > 0 ? node : (animPlayer != null ? animPlayer.CurrentAnimation : ""));
+            // The game runs the callback on every move tick, in lockstep with the movement. Stepping it per RENDER frame against a
+            // world target that only moves on PHYSICS frames popped the head and shoulders by the 5-unit clamp on every frame the two
+            // did not line up (Jaysonn, 2026-09-28 00:28: "one spot then back to normal every other frame"). Step here, in the
+            // physics frame, with this frame's tick count; the modifier pass only applies the stored bone-space offset.
+            _smsTimeLag.Step(_smsFrameTicks);
         }
         if (_fluddHandleSwing != null)
         {
@@ -13725,6 +13732,7 @@ public partial class Mario : CharacterBody3D
             // rope, the spin and the shine demo), the upper body is IDLE and he has the FLUDD -- no level-age wait for this one
             _fluddHandleSwing.Enabled = UseSmsPhysics && _fluddReady && _fluddUpper == SmsUpper.Idle
                 && SmsAnimeHasHandleSwing(node.Length > 0 ? node : (animPlayer != null ? animPlayer.CurrentAnimation : ""));
+            _fluddHandleSwing.Step(_smsFrameTicks); // as the time lag: stepped here, applied in the modifier pass
         }
         if (SmsDebugPrint)
         {
