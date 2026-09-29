@@ -282,6 +282,7 @@ public partial class Mario : CharacterBody3D
     private const string SMS_PUMP_SEEK_PATH = "parameters/PumpSeek/seek_request";
     private const string SMS_PUMP_SCALE_PATH = "parameters/PumpScale/scale";
     private SmsWaterHud _waterHud;                                // TGCConsole2's water gauge: the 'w_0' panes of standard_1.blo
+    private SmsStandardHud _stdHud;                               // TGCConsole2's counters and life meter: the rest of standard_1.blo
     private bool _smsRocketLanding = false;                       // the fall is ROCKET_LANDING (after a hover): no wall slide on a wall at 16..40
     // waiting(): mHealth <= 3 -> ANIM_DAMAGE_WAIT_START once, then ANIM_DAMAGE_WAIT (library-only clips, driven directly)
     private int _smsDamageWaitPhase = 0;      // 0 off, 1 ma_damage_wait_start playing, 2 ma_damage_wait looping
@@ -1404,6 +1405,7 @@ public partial class Mario : CharacterBody3D
         _shines = 0;
         _shineHud = GetNodeOrNull<ShineHud>("ShineHud");
         _shineHud?.SetCount(0);
+        SmsStandardHudSetup(); // the game's console draws the counters and the life meter under UseSmsPhysics; his nodes stand down
         _camera = GetNodeOrNull<SunshineCamera>("CamController");
 
         _shineGetCamRig = GetNodeOrNull<Node3D>("ShineGetCamRig");
@@ -1837,6 +1839,7 @@ public partial class Mario : CharacterBody3D
 
     public override void _PhysicsProcess(double delta)
     {
+        SmsStandardHudTick(); // the console reads the flag manager every frame; before any early return below
         if (slipAirLaunchTimer > 0f)
             slipAirLaunchTimer -= (float)delta;
 
@@ -12578,6 +12581,44 @@ public partial class Mario : CharacterBody3D
         _waterHud.Pressure = trigger && _fluddTrigFill > 0f && np.TriggerMax > 0f ? _fluddTrigFill / np.TriggerMax : -1f;
         _waterHud.Wanted = _fluddReady && !CameraLocked && stateOfMario != MarioState.talking && stateOfMario != MarioState.shineGet
             && stateOfMario != MarioState.dead;
+    }
+
+    /// <summary>TGCConsole2 for the counters and the life meter (SmsStandardHud): built with his counts so nothing rolls at the start;
+    /// his own HUD nodes (LifeMeter, LifeCounterHud, YellowCoinHud, RedCoinHud, BlueCoinHud, ShineHud) are hidden, their methods still
+    /// called harmlessly. Code only: the scene is his.</summary>
+    private void SmsStandardHudSetup()
+    {
+        if (!UseSmsPhysics || _stdHud != null)
+            return;
+        _stdHud = new SmsStandardHud { Name = "SmsStandardHud" };
+        SmsStandardHudFeed();
+        AddChild(_stdHud);
+        foreach (CanvasItem n in new CanvasItem[] { _lifeMeter, _lifeCounterHud, _yellowCoinHud, _redCoinHud, _blueCoinHud, _shineHud })
+            if (n != null)
+                n.Visible = false;
+        if (SmsDebugPrint)
+            GD.Print(_stdHud.Ready
+                ? "[SMS hud] the console's counters and life meter: the 38 textures loaded; the coins and the lives come in at the start, the shines and blue coins peek after 6.7 s idle, the life meter comes in at a hit"
+                : "[SMS hud] counters / life meter: textures missing under res://assets/Sms/hud -- they stay off");
+    }
+
+    /// <summary>What TGCConsole2::perform reads each frame: the flag manager's counts (his fields), mHealth / mAir, the meter's air switch
+    /// (SmsAirTick's 240-tick rule), MARIO_STATUS_WAIT, and whether a camera demo runs (the camera locked, a talk, the shine get, death).</summary>
+    private void SmsStandardHudFeed()
+    {
+        _stdHud.Coins = _coins; _stdHud.Lives = _lives; _stdHud.Shines = _shines; _stdHud.BlueCoins = _blueCoins; _stdHud.RedCoins = _redCoins;
+        _stdHud.Health = _health; _stdHud.AirMode = _smsAirHudShown; _stdHud.Air = _smsAirUnitsShown;
+        _stdHud.Idle = stateOfMario == MarioState.idle;
+        _stdHud.Dead = stateOfMario == MarioState.dead || _health <= 0;
+        _stdHud.ShineDemo = stateOfMario == MarioState.shineGet;
+        _stdHud.Demo = CameraLocked || stateOfMario == MarioState.talking || _stdHud.ShineDemo || _stdHud.Dead;
+    }
+
+    private void SmsStandardHudTick()
+    {
+        if (_stdHud == null || !_stdHud.Ready)
+            return;
+        SmsStandardHudFeed();
     }
 
     /// <summary>TMario::getNozzle (MarioReceiveMsg.cpp 18), the nozzle item touched: changeNozzle(type, animate = true) -- the second

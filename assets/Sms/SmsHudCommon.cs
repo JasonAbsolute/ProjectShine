@@ -1,0 +1,144 @@
+using Godot;
+using System;
+
+/// <summary>
+/// What the game's HUD console (TGCConsole2, GC2D/GCConsole2.cpp) builds its screens from -- shared by the water gauge
+/// (SmsWaterHud) and the standard panes (SmsStandardHud):
+///   the disc's textures (game_6/timg/*.bti decoded to assets/Sms/hud/*.png; the I4 ones white with the intensity as alpha, tinted per
+///   pane the way J2D's black / white colours do it),
+///   TBoundPane::setPanePosition (GC2D/BoundPane.cpp): a quadratic through three points over N frames, and the console's follow-up
+///   (updateDownPaneState / updateUpPaneState / updateCoinPaneState: once the first quadratic ends off the home spot a second one of
+///   30 frames brings the pane home) -- the "pop" of every icon, digit and back strip,
+///   TExPane::setPaneOffset (GC2D/ExPane.cpp, a TCoord2D chase at constant speed): the linear slide of a whole group,
+///   the console's three point triples: cDownTop (0, -100) / cDownMid (0, 30) for the counters dropping in from above, cUpTop (0, 50) /
+///   cUpMid (0, -30) for the tank and the red coins rising from below, cCoinMid (0, 45) for the coin counter stepping down a row.
+/// The console runs at the game's 30 frames a second; everything here takes a fractional frame count so the motion is evaluated at the
+/// display's own rate (the timings are the game's, the steps between them are not).
+/// </summary>
+public static class SmsHud
+{
+    public const string TexDir = "res://assets/Sms/hud/";
+    public const float ScreenW = 600f, ScreenH = 480f;   // the J2D screen of standard_1.blo
+    public const float Fps = 30f;
+    public const int Settle = 30;                          // the follow-up quadratic's frames
+
+    public static readonly Vector2 DownTop = new Vector2(0f, -100f), DownMid = new Vector2(0f, 30f);
+    public static readonly Vector2 UpTop = new Vector2(0f, 50f), UpMid = new Vector2(0f, -30f);
+    public static readonly Vector2 CoinMid = new Vector2(0f, 45f);
+
+    /// <summary>The PNGs: through the importer when the editor has seen them, else straight off the disk (a headless run before it has).</summary>
+    public static Texture2D Load(string name)
+    {
+        string path = TexDir + name + ".png";
+        if (ResourceLoader.Exists(path))
+            return ResourceLoader.Load<Texture2D>(path);
+        var img = Image.LoadFromFile(ProjectSettings.GlobalizePath(path));
+        return img == null || img.IsEmpty() ? null : ImageTexture.CreateFromImage(img);
+    }
+
+    /// <summary>J2DPicture's black / white colours on a coloured texture: out = black + tex x (white - black), each channel (the life
+    /// meter turned to air: black 003CFF00, white 00FFFFFF). Baked into a copy, the canvas has no such mapping.</summary>
+    public static Texture2D Recolor(Texture2D src, Color black, Color white)
+    {
+        if (src == null)
+            return null;
+        Image img = src.GetImage();
+        if (img == null)
+            return src;
+        img = (Image)img.Duplicate();
+        if (img.IsCompressed())
+            img.Decompress();
+        img.Convert(Image.Format.Rgba8);
+        int w = img.GetWidth(), h = img.GetHeight();
+        for (int y = 0; y < h; y++)
+            for (int x = 0; x < w; x++)
+            {
+                Color c = img.GetPixel(x, y);
+                img.SetPixel(x, y, new Color(
+                    black.R + c.R * (white.R - black.R), black.G + c.G * (white.G - black.G),
+                    black.B + c.B * (white.B - black.B), black.A + c.A * (white.A - black.A)));
+            }
+        return ImageTexture.CreateFromImage(img);
+    }
+
+    public static Vector2 Bezier(Vector2 p0, Vector2 p1, Vector2 p2, float t)
+    {
+        t = Mathf.Clamp(t, 0f, 1f);
+        float u = 1f - t;
+        return u * u * p0 + 2f * u * t * p1 + t * t * p2;
+    }
+
+    /// <summary>setPanePosition(frames, top, mid, mid) and, once that is done, setPanePosition(30, mid, mid, end): the pop, f frames in.</summary>
+    public static Vector2 Pop(float f, Vector2 top, Vector2 mid, int frames, Vector2 end)
+    {
+        if (f <= 0f)
+            return top;
+        if (f < frames)
+            return Bezier(top, mid, mid, f / frames);
+        f -= frames;
+        if (f < Settle)
+            return Bezier(mid, mid, end, f / Settle);
+        return end;
+    }
+
+    /// <summary>The TCoord2D chase: constant speed from one offset to the other over the frames.</summary>
+    public static float Slide(float f, int frames, float from, float to)
+        => frames <= 0 ? to : Mathf.Lerp(from, to, Mathf.Clamp(f / frames, 0f, 1f));
+}
+
+/// <summary>A TExPane's offset interpolator: one linear slide, retargetable from wherever it is (updatePaneOffset).</summary>
+public sealed class SmsHudSlide
+{
+    public float From, To, Start; public int Frames;
+    public SmsHudSlide(float at) { From = To = at; Frames = 0; Start = 0f; }
+    public void Set(float now, float from, float to, int frames) { Start = now; From = from; To = to; Frames = frames; }
+    public void Retarget(float now, float to, int frames) { From = At(now); Start = now; To = to; Frames = frames; }
+    public float At(float now) => SmsHud.Slide(now - Start, Frames, From, To);
+    public bool Done(float now) => now - Start >= Frames;
+    /// <summary>isInterpolatorAtZero: home, and got there.</summary>
+    public bool AtZero(float now) => To == 0f && Done(now);
+}
+
+/// <summary>A picture pane of the screen with its TBoundPane: the home rect inside its group, the texture, the tint, whether it is
+/// shown, and the pop it is riding (setPanePosition's three points and the console's 30-frame settle).</summary>
+public sealed class SmsHudPane
+{
+    public Rect2 Home;
+    public Texture2D Tex;
+    public Color Tint = Colors.White;
+    public bool Shown;                     // J2DPane::show / hide
+    public bool Used = true;               // a digit pane the count has no use for (the hundreds below 100)
+    public float Inset;                    // the life meter's heartbeat: pixels off every side
+    private float _popStart = float.NegativeInfinity;
+    private Vector2 _top, _mid, _end;
+    private int _frames;
+
+    public SmsHudPane(float x, float y, float w, float h, Texture2D tex) { Home = new Rect2(x, y, w, h); Tex = tex; }
+
+    /// <summary>setPanePosition(frames, top, mid, mid) at frame `at` (then the settle to `end`, (0, 0) unless told otherwise); shows the pane.</summary>
+    public void Pop(float at, Vector2 top, Vector2 mid, int frames, Vector2? end = null)
+    {
+        _popStart = at; _top = top; _mid = mid; _frames = frames; _end = end ?? Vector2.Zero; Shown = true;
+    }
+
+    /// <summary>Home again: no motion (setPanePosition(1, 0, 0, 0)).</summary>
+    public void Still() { _popStart = float.NegativeInfinity; }
+
+    public Vector2 Offset(float now) => float.IsNegativeInfinity(_popStart) ? Vector2.Zero : SmsHud.Pop(now - _popStart, _top, _mid, _frames, _end);
+    public bool PopDone(float now) => float.IsNegativeInfinity(_popStart) || now - _popStart >= _frames + SmsHud.Settle;
+
+    public Rect2 Rect(float now, Vector2 groupOffset)
+    {
+        Vector2 o = Offset(now) + groupOffset;
+        return new Rect2(Home.Position + o + new Vector2(Inset, Inset), Home.Size - new Vector2(2f * Inset, 2f * Inset));
+    }
+
+    public void Draw(CanvasItem c, float now, Vector2 groupOffset, float alpha = 1f)
+    {
+        if (!Shown || !Used || Tex == null)
+            return;
+        Color col = Tint;
+        col.A *= alpha;
+        c.DrawTextureRect(Tex, Rect(now, groupOffset), false, col);
+    }
+}

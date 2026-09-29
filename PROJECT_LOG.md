@@ -2675,6 +2675,35 @@ nozles boxes").
   with the swap at 1 and the tank refilled (`Mario.SmsGetNozzle`), and every dead box of that nozzle comes back at once
   (`TItemManager::resetNozzleBoxesModel`; a short scale-in stands in for the smoke puff). Not ported: the valid / shut boxes before
   the nozzle right, the hint balloons, the SEs, the get sparkle. Jaysonn places the boxes (the editor is his).
+
+**Pass 19 — the rest of the standard HUD, and the gauge smoothed** (Jaysonn 22:26: "nice when loading in however its a bit slow. can
+you make it more smooth and while were here might as well fix the other hud elemets like coins and health and lives").
+- The console's frames were stepped whole at 30 a second; on a 60+ Hz display that read as a stutter. `SmsHudCommon.cs` now carries
+  the console's primitives evaluated at fractional frames — `TBoundPane::setPanePosition` (a quadratic through three points) with the
+  console's 30-frame settle (`updateUpPaneState` / `updateDownPaneState`), `TExPane`'s linear slide — and the water gauge uses them.
+  Re-read against `endCameraDemo` (2125) / `processAppearTank` (3194): the text, icon and disc are detached from the group in
+  `loadAfter` and pop on their own (the tank alone rides the group's rise); each pop is 40 frames (the disc 50) from 50 / 100 below
+  through -30, then 30 frames home; the tank and icon are hidden until their pops; the X button's blink starts with its 70 dark
+  frames. The timings are the game's — the appear takes 96 frames (3.2 s) as it does on the disc; only the steps between them
+  are gone.
+- `assets/Sms/SmsStandardHud.cs`: the coin counter, the lives, the shine and blue coin counters, the red coin counter and the life
+  meter, from `standard_1.blo`'s panes (c_0 (13, 152), d_0 (13, 113), s_0 (13, 74), m_0 (223, 74), l_0 (500, 50), r_0 (13, 419))
+  and the disc's textures (38 more BTIs decoded into `assets/Sms/hud`), behaving as `TGCConsole2::perform` does: the coins and
+  the lives drop in at the start (the coins to the shine row, `unk26A`), the digits with leading zeros (`setCounterDigits`,
+  `setTwoDigits`), the coins rolling one per two frames; the shines and blue coins (the "star" HUD) drop in with the lives when
+  Mario has stood still 200 frames, when a blue coin or a shine is taken, and go back up once settled with
+  nothing on the clocks (`updateStarHudAutoHide`: 400 frames after a blue coin), the coin counter stepping down a row with them
+  (`processDownCoin`, the 45-px dip); the life meter hidden at 8, in at a hit at (-150, +180) from its corner for 100 frames then
+  curving home (`startAppearLife` / `processAppearLife`), the lit rays one a frame, the sun and "LIFE" dimmed to 7F below 4, the
+  heartbeat (`updateLifeMeterBlink`: 3 px in for half of 200 frames; 160 / 120 / 70 frames and 5 px at 3 / 2 / 1), 120 frames at 8
+  then up and away; the orange disc (FF4C00, alpha C8) behind it — the same `water_back.bti` as the gauge's blue one. Under water
+  (the 240-tick air switch) the disc goes blue and the lit pieces through black 003CFF00 / white 00FFFFFF (baked copies of the
+  textures: `SmsHud.Recolor`). A camera demo (the camera locked, a talk, the shine get, death) takes the lives, the coins and the
+  star HUD away (the shine get brings the star HUD in instead), the life meter out at once, the red coins off the bottom; its end
+  brings the coins back, the life meter from above at home (`startInsertLife`). His HUD nodes are hidden under UseSmsPhysics; the
+  counts stay his fields, read every frame as the console reads the flag manager. Not ported: the counter sparkles (0x1FC), the
+  SEs (0x4819 / 481A the moves, 0x4800 the heartbeat, 0x4801 / 4823 the segments), the pause fade, the telop, the timer, the
+  balloon counters, the death-restart lives demo (flag 0x30002).
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
@@ -2727,6 +2756,20 @@ Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
   y cam. lets not do my deviation do it how the game has it"): `checkPumping()` (`MarioUpper.cpp` 17) puts the upper body on the
   grips (`HOLDING_PUMP`, the pump clip's frame 0) the moment `isLButtonCamera` && `checkPumpEnable`, and so does the port again;
   `SmsParams.LCamera.HoldsPump` is removed.
+- **The hidden HUD strips park fully above the frame** (2026-09-28 22:50). `initHiddenPaneAbove` / `startAppearMario` /
+  `startAppearStar` park a group at -(y2 + 1) of its own 10 x 10 pane, which leaves 11 px of the 22-px strip inside the 480-line
+  frame (the CRT's overscan hid it; Dolphin shows the sliver). Here they park a strip's height further up; the slides are the
+  game's frames over the slightly longer way.
+- **The shine count flips when Mario's shine get hands it over** (2026-09-28 22:50). The game's flag changes as the shine is taken
+  and the console flips the digits 252 frames into the shine dance (`updateCounterState` 995); his shine get is his own length and
+  `AddShine` fires 2 s in, so the digits follow it. The star HUD then stays out for the blue coins' 400 frames (in the game the
+  level ends before `unk8A` — a u16 that never resets — would let it go).
+- **A lost life shows the counter too** (2026-09-28 22:50). The game shows the lives on a death through the restart demo (flag
+  0x30002, `startAppearMario(true)`: the old count 200 frames, then the new); his respawn is in place, so any change brings the
+  counter in with the new count (`updateMarioLifeCounter` does that for a gain).
+- **The life meter turns to air in place** (2026-09-28 22:50). The decomp's state 2 → 3 → 0 → 4 dance for a meter already on
+  screen when the air switch comes (a hide, a 120-frame wait, an appear in the air colours) is not reproduced; the colours and
+  the count switch where it stands, and a meter coming in for the air uses the hit's mid-screen appear.
 - `SmsRollJumpMinSpeed = 20` (game 40) — feel.
 - `SmsRollJumpKnockdown = false`: the roll-jump into a wall that reaches head height wall-slides. `rotateBroadJumping()` →
   `jumpingBasic(…, 1)` case 2 knocks it down above 40, and it never drops under 40 with the stick held; Jaysonn's

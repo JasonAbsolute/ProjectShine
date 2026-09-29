@@ -17,16 +17,19 @@ using System;
 /// the fill; the surface picture sits at y = tank.y + 47 x (1 - fill) - 0.5 + 1. drawWaterBack (2752): the disc is blue at alpha
 /// 0x78; while a trigger nozzle holds pressure (isPressureOn: the rocket / turbo charge) the disc fills from the bottom with FF3F3F at
 /// alpha 0xC8 by pressure / InsidePressureMax, and once full pulses red -> yellow -> red over 25 frames (getPressureFlashColor).
-/// startAppearTank (2180) / processAppearTank (3194): the group rises from 110 px below (465 - 355) over 20 frames; the disc, then at
-/// frame 6 the text, 14 the tank, 26 the icon pop in over 40 frames through (0, 50) -> (0, -30) -> (0, 0) (cUpTop / cUpMid / cUpBot,
-/// a quadratic through the three); the X button shows once the icon has settled. startDisappearTank (2201): 40 frames, 170 px down.
-/// updateWaterTankState (1371): the X button's alpha is 0 for 70 frames and 255 until 270, again and again. Frames are the game's
-/// 30 fps. The screen: the game's pixels scaled by the viewport height / 480, the group keeping its margins to the bottom-right
+/// endCameraDemo (2125) / startAppearTank (2180) / processAppearTank (3194): the group pane (the tank rides it; the text, the icon and
+/// the disc were detached from it in loadAfter and pop on their own) rises from 110 px below (465 - 355) over 20 frames; the disc pops
+/// from 100 below through -30 over 50 frames, then at frame 6 the text from 50 below over 40, at 14 the tank (inside the rising group)
+/// from 50, at 26 the icon from 100 -- each a setPanePosition quadratic (cUpTop / cUpMid, SmsHud.Pop) that the console follows with a
+/// 30-frame settle from -30 to home (updateUpPaneState); the X button shows once the icon is home, and the tank counts as up.
+/// startDisappearTank (2201): the group slides 170 px down over 40 frames, the pieces likewise (a quadratic whose middle is the
+/// half-way point: straight). updateWaterTankState (1371): once up, the X button's alpha is 0 for 70 frames and 255 until 270, again
+/// and again. The console's frames are the game's 30 a second; they are counted fractionally here so the motion is as smooth as the
+/// display. The screen: the game's pixels scaled by the viewport height / 480, the group keeping its margins to the bottom-right
 /// corner (the disc 19 px from the right edge, 39 px from the bottom).
 /// </summary>
 public partial class SmsWaterHud : Control
 {
-    private const string TexDir = "res://assets/Sms/hud/";
     private const float ScreenW = 600f, ScreenH = 480f;
     private const float GroupX = 493f, GroupY = 355f;
 
@@ -59,16 +62,18 @@ public partial class SmsWaterHud : Control
 
     private enum Phase { Hidden, Appearing, Shown, Disappearing }
     private Phase _phase = Phase.Hidden;
-    private int _frame;              // frames into the phase
+    private float _now;              // the console's frames (30 a second), fractional
+    private float _f0;               // when the phase began
     private int _shownIcon;          // unk310: the icon on screen (swapped only when settled)
-    private int _xBlink;             // unk7C while shown
-    private int _flash;              // unk30C
-    private float _frameAcc;
+    private float _xBlink;           // unk7C while shown
+    private float _flash;            // unk30C
     private float _groupOffset;      // the group's y offset (px), the TExPane interpolator
-    private float _groupFrom, _groupTo; private int _groupFrames;
+    private readonly SmsHudSlide _group = new SmsHudSlide(0f);
     private readonly float[] _pieceOffset = new float[4]; // disc, text, tank, icon
-    private readonly int[] _pieceStart = { 0, 6, 14, 26 };
-    private const int AppearFrames = 20, DisappearFrames = 40, PopFrames = 40;
+    private readonly bool[] _pieceShown = new bool[4];
+    private float _disappearFrom;    // the pieces' offset when the disappear began
+    private const int AppearFrames = 20, DisappearFrames = 40;
+    private const float RiseFrom = ScreenH - 15f - GroupY;   // 465 - 355: the group starts this far below
     private bool _xShown;
 
     public override void _Ready()
@@ -86,15 +91,7 @@ public partial class SmsWaterHud : Control
         GetViewport().SizeChanged += Layout;
     }
 
-    /// <summary>The PNGs: through the importer when the editor has seen them, else straight off the disk (a headless run before it has).</summary>
-    private static Texture2D Load(string name)
-    {
-        string path = TexDir + name + ".png";
-        if (ResourceLoader.Exists(path))
-            return ResourceLoader.Load<Texture2D>(path);
-        var img = Image.LoadFromFile(ProjectSettings.GlobalizePath(path));
-        return img == null || img.IsEmpty() ? null : ImageTexture.CreateFromImage(img);
-    }
+    private static Texture2D Load(string name) => SmsHud.Load(name);
 
     private void Layout()
     {
@@ -108,97 +105,95 @@ public partial class SmsWaterHud : Control
     {
         if (!Ready)
             return;
-        _frameAcc += (float)delta * 30f;
-        while (_frameAcc >= 1f)
-        {
-            _frameAcc -= 1f;
-            Tick();
-        }
+        float df = (float)delta * SmsHud.Fps;
+        _now += df;
+        Tick(df);
         QueueRedraw();
     }
 
-    private static float Quad(float p0, float p1, float p2, float t)
+    /// <summary>The console this frame: the tank's appear / disappear and the X button's blink, at fractional frames.</summary>
+    private void Tick(float df)
     {
-        float u = 1f - t;
-        return u * u * p0 + 2f * u * t * p1 + t * t * p2;
-    }
-
-    /// <summary>One 30 fps frame of the console: the tank's appear / disappear and the X button's blink.</summary>
-    private void Tick()
-    {
+        float f = _now - _f0;
         switch (_phase)
         {
             case Phase.Hidden:
                 if (Wanted)
-                {
-                    _phase = Phase.Appearing; _frame = 0; _xShown = false; _xBlink = 0;
-                    _groupFrom = ScreenH - 15f - GroupY; _groupTo = 0f; _groupFrames = AppearFrames; // 465 - 355
-                    _shownIcon = Nozzle;
-                    for (int i = 0; i < 4; i++) _pieceOffset[i] = 100f; // off, below
-                    Visible = true;
-                }
+                    StartAppear();
                 break;
             case Phase.Appearing:
             {
-                // startAppearTank: the disc (unk26C) rides 100 -> -30 -> 0 over 50 frames; processAppearTank pops the text (6), the
-                // tank (14) and the icon (26) in with 50 -> -30 -> 0 over 40 frames each, the X button once the icon is home
-                _groupOffset = Mathf.Lerp(_groupFrom, _groupTo, Mathf.Clamp(_frame / (float)_groupFrames, 0f, 1f));
-                _pieceOffset[0] = Quad(100f, -30f, 0f, Mathf.Clamp(_frame / 50f, 0f, 1f));
-                for (int i = 1; i < 4; i++)
+                // endCameraDemo / startAppearTank: the group rises 110 px over 20 frames with the tank inside it (hidden until its pop);
+                // the disc pops from 100 below over 50 frames; processAppearTank pops the text at 6 (from 50), the tank at 14 (from 50,
+                // inside the group), the icon at 26 (from 100), each over 40 frames and then the 30-frame settle from -30 to home
+                _groupOffset = _group.At(_now);
+                _pieceOffset[0] = SmsHud.Pop(f, new Vector2(0f, 100f), SmsHud.UpMid, 50, Vector2.Zero).Y;
+                _pieceShown[0] = true;
+                _pieceShown[1] = f >= 6f; _pieceOffset[1] = SmsHud.Pop(f - 6f, SmsHud.UpTop, SmsHud.UpMid, 40, Vector2.Zero).Y;
+                _pieceShown[2] = f >= 14f; _pieceOffset[2] = SmsHud.Pop(f - 14f, SmsHud.UpTop, SmsHud.UpMid, 40, Vector2.Zero).Y;
+                _pieceShown[3] = f >= 26f; _pieceOffset[3] = SmsHud.Pop(f - 26f, new Vector2(0f, 100f), SmsHud.UpMid, 40, Vector2.Zero).Y;
+                if (f >= 26f + 40f + SmsHud.Settle) // the icon home: unk288->show(), the appear done (unk45 -> unk46), the blink from 0
                 {
-                    int f = _frame - _pieceStart[i];
-                    _pieceOffset[i] = f < 0 ? 100f : Quad(50f, -30f, 0f, Mathf.Clamp(f / (float)PopFrames, 0f, 1f));
-                }
-                _frame++;
-                if (_frame > _pieceStart[3] + PopFrames)
-                {
-                    _phase = Phase.Shown; _frame = 0; _xShown = true; _xBlink = 70; // shown at once, then the cycle
+                    _phase = Phase.Shown; _f0 = _now; _xShown = false; _xBlink = 0f;
                     _groupOffset = 0f;
-                    for (int i = 0; i < 4; i++) _pieceOffset[i] = 0f;
+                    for (int i = 0; i < 4; i++) { _pieceOffset[i] = 0f; _pieceShown[i] = true; }
                 }
                 if (!Wanted)
                     StartDisappear();
                 break;
             }
             case Phase.Shown:
-                // updateWaterTankState: the X button hides for 70 frames of every 270
-                _xBlink++;
-                if (_xBlink >= 270) _xBlink = 0;
-                _xShown = _xBlink >= 70;
+                // updateWaterTankState: the X button's alpha is 0 below 70 frames, 255 below 270, then the count restarts
+                _xBlink += df;
+                if (_xBlink >= 270f) _xBlink -= 270f;
+                _xShown = _xBlink >= 70f;
                 if (_shownIcon != Nozzle)
                     _shownIcon = Nozzle; // updateWaterGaugeFill swaps the icon once the interpolator is at zero: settled, it is
                 if (!Wanted)
                     StartDisappear();
                 break;
             case Phase.Disappearing:
-                _groupOffset = Mathf.Lerp(_groupFrom, _groupTo, Mathf.Clamp(_frame / (float)_groupFrames, 0f, 1f));
+                // startDisappearTank: the group's offset chases 170 more over 40 frames; the pieces ride a straight quadratic to +170
+                _groupOffset = _group.At(_now);
                 for (int i = 0; i < 4; i++)
-                    _pieceOffset[i] = Mathf.Lerp(0f, 170f, Mathf.Clamp(_frame / (float)DisappearFrames, 0f, 1f)); // start 0, mid 85, end 170
-                _frame++;
-                if (_frame > DisappearFrames)
+                    _pieceOffset[i] = SmsHud.Bezier(new Vector2(0f, _disappearFrom), new Vector2(0f, (_disappearFrom + 170f) * 0.5f),
+                        new Vector2(0f, 170f), f / DisappearFrames).Y;
+                if (f >= DisappearFrames)
                 {
                     _phase = Phase.Hidden; Visible = false;
                 }
                 break;
         }
         // the pressure flash counter runs while the charge is full (drawWaterBack)
-        if (Pressure >= 1f) { _flash++; if (_flash >= 25) _flash = 0; }
-        else _flash = 0;
+        if (Pressure >= 1f) { _flash += df; if (_flash >= 25f) _flash -= 25f; }
+        else _flash = 0f;
+    }
+
+    private void StartAppear()
+    {
+        _phase = Phase.Appearing; _f0 = _now; _xShown = false; _xBlink = 0f;
+        _group.Set(_now, RiseFrom, 0f, AppearFrames);
+        _groupOffset = RiseFrom;
+        _shownIcon = Nozzle;
+        for (int i = 0; i < 4; i++) { _pieceOffset[i] = 100f; _pieceShown[i] = i == 0; }
+        Visible = true;
     }
 
     private void StartDisappear()
     {
-        _phase = Phase.Disappearing; _frame = 0; _xShown = false;
-        _groupFrom = _groupOffset; _groupTo = 170f + (ScreenH - 15f - GroupY); _groupFrames = DisappearFrames; // 465 - y1 + 60, then some
+        _phase = Phase.Disappearing; _f0 = _now; _xShown = false;
+        _group.Retarget(_now, 170f + RiseFrom, DisappearFrames); // 465 - y1 + 60, from wherever the rise had got to
+        _disappearFrom = _pieceOffset[0];
+        for (int i = 0; i < 4; i++) _pieceShown[i] = true;
     }
 
     /// <summary>getPressureFlashColor (97): FF3F3F -> FFFF00 over 10 frames, held 5, back over 10.</summary>
-    private static Color FlashColor(int frame)
+    private static Color FlashColor(float frame)
     {
         float g = 0x3F, b = 0x3F;
-        if (frame < 10) { g += frame * 19.2f; b -= frame * 6.3f; }
-        else if (frame < 15) { g = 255f; b = 0f; }
-        else { int fade = 25 - frame; g += fade * 19.2f; b -= fade * 6.3f; }
+        if (frame < 10f) { g += frame * 19.2f; b -= frame * 6.3f; }
+        else if (frame < 15f) { g = 255f; b = 0f; }
+        else { float fade = 25f - frame; g += fade * 19.2f; b -= fade * 6.3f; }
         return new Color(1f, Mathf.Clamp(g, 0f, 255f) / 255f, Mathf.Clamp(b, 0f, 255f) / 255f, 0xC8 / 255f);
     }
 
@@ -207,8 +202,8 @@ public partial class SmsWaterHud : Control
         if (!Ready || _phase == Phase.Hidden)
             return;
         Vector2 g = new Vector2(0f, _groupOffset);
-        // the disc, blue; the pressure gauge fills it from the bottom (drawWaterBack)
-        Rect2 back = new Rect2(BackRect.Position + g + new Vector2(0f, _pieceOffset[0]), BackRect.Size);
+        // the disc, blue (detached from the group: its own pop only); the pressure gauge fills it from the bottom (drawWaterBack)
+        Rect2 back = new Rect2(BackRect.Position + new Vector2(0f, _pieceOffset[0]), BackRect.Size);
         if (Pressure >= 0f)
         {
             float ratio = Mathf.Clamp(Pressure, 0f, 1f);
@@ -224,29 +219,34 @@ public partial class SmsWaterHud : Control
         }
         else
             DrawTextureRect(_back, back, false, BackColor);
-        // the tank with its water (the faces, the surface) -- they ride the tank's pop
+        // the tank with its water (the faces, the surface) -- inside the group, riding its rise and the tank's own pop
         Vector2 tankOff = g + new Vector2(0f, _pieceOffset[2]);
         float fill = Mathf.Clamp(Fill, 0f, 1f);
         float surfaceY = TankRect.Position.Y + MathF.Floor(SurfaceTravel * (1f - fill) - 0.5f) + 1f; // drawWater's y for the surface picture
         float waterLine = surfaceY + SurfaceRect.Size.Y * 0.5f;                                     // the water shows below the surface's middle
         // perform (3999): drawWaterBack, then the screen's own panes (the tank among them), then drawWaterOrJuice -- the water over the tank
-        DrawTextureRect(_tank, new Rect2(TankRect.Position + tankOff, TankRect.Size), false, Colors.White);
-        if (fill > 0f)
+        if (_pieceShown[2])
         {
-            DrawFace(_faceL, FaceLRect, waterLine, tankOff, FaceLColor);
-            DrawFace(_faceR, FaceRRect, waterLine, tankOff, FaceRColor);
+            DrawTextureRect(_tank, new Rect2(TankRect.Position + tankOff, TankRect.Size), false, Colors.White);
+            if (fill > 0f)
+            {
+                DrawFace(_faceL, FaceLRect, waterLine, tankOff, FaceLColor);
+                DrawFace(_faceR, FaceRRect, waterLine, tankOff, FaceRColor);
+            }
+            float surfaceAlpha = fill >= 1f ? 1f : fill <= 0f ? 0f : 0x50 / 255f; // updateWaterGaugeFill: unk2A0[0]->mAlpha
+            if (surfaceAlpha > 0f)
+                DrawTextureRect(_surface, new Rect2(new Vector2(SurfaceRect.Position.X, surfaceY) + tankOff, SurfaceRect.Size), false,
+                    new Color(SurfaceColor, surfaceAlpha));
         }
-        float surfaceAlpha = fill >= 1f ? 1f : fill <= 0f ? 0f : 0x50 / 255f; // updateWaterGaugeFill: unk2A0[0]->mAlpha
-        if (surfaceAlpha > 0f)
-            DrawTextureRect(_surface, new Rect2(new Vector2(SurfaceRect.Position.X, surfaceY) + tankOff, SurfaceRect.Size), false,
-                new Color(SurfaceColor, surfaceAlpha));
-        // "WATER"
-        DrawTextureRect(_text, new Rect2(TextRect.Position + g + new Vector2(0f, _pieceOffset[1]), TextRect.Size), false, Colors.White);
-        // the nozzle's icon and its X button
+        // "WATER" (detached: its own pop)
+        if (_pieceShown[1])
+            DrawTextureRect(_text, new Rect2(TextRect.Position + new Vector2(0f, _pieceOffset[1]), TextRect.Size), false, Colors.White);
+        // the nozzle's icon and its X button (detached)
         int n = Mathf.Clamp(_shownIcon, 0, 3);
-        Vector2 iconOff = g + new Vector2(0f, _pieceOffset[3]);
-        DrawTextureRect(_icons[n], new Rect2(IconRect[n].Position + iconOff, IconRect[n].Size), false, Colors.White);
-        if (_xShown)
+        Vector2 iconOff = new Vector2(0f, _pieceOffset[3]);
+        if (_pieceShown[3])
+            DrawTextureRect(_icons[n], new Rect2(IconRect[n].Position + iconOff, IconRect[n].Size), false, Colors.White);
+        if (_xShown && _pieceShown[3])
             DrawTextureRect(_xButton, new Rect2(IconRect[n].Position + XButtonOffset[n] + iconOff, XButtonSize), false, Colors.White);
     }
 
