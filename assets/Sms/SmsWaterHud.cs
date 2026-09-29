@@ -25,12 +25,12 @@ using System;
 /// startDisappearTank (2201): the group slides 170 px down over 40 frames, the pieces likewise (a quadratic whose middle is the
 /// half-way point: straight). updateWaterTankState (1371): once up, the X button's alpha is 0 for 70 frames and 255 until 270, again
 /// and again. The console's frames are the game's 30 a second; they are counted fractionally here so the motion is as smooth as the
-/// display. The screen: the game's pixels scaled by the viewport height / 480, the group keeping its margins to the bottom-right
-/// corner (the disc 19 px from the right edge, 39 px from the bottom).
+/// display, the motions at SmsParams.Hud.AnimSpeed times the pace. The screen is the game's 640 x 448 frame (SmsHud): the group keeps
+/// its margins to the bottom-right corner (the disc 59 px from the right edge, 7 px from the bottom; "WATER" ran 3 px past it on the
+/// disc, into the CRT's overscan), plus SmsParams.Hud.EdgeInset, all scaled by SmsHud.Scale.
 /// </summary>
 public partial class SmsWaterHud : Control
 {
-    private const float ScreenW = 600f, ScreenH = 480f;
     private const float GroupX = 493f, GroupY = 355f;
 
     // the panes: (x, y, w, h) in the group's pixels
@@ -73,7 +73,7 @@ public partial class SmsWaterHud : Control
     private readonly bool[] _pieceShown = new bool[4];
     private float _disappearFrom;    // the pieces' offset when the disappear began
     private const int AppearFrames = 20, DisappearFrames = 40;
-    private const float RiseFrom = ScreenH - 15f - GroupY;   // 465 - 355: the group starts this far below
+    private const float RiseFrom = 465f - GroupY;            // setPaneOffset from 465 - y1: the group starts this far below
     private bool _xShown;
 
     public override void _Ready()
@@ -96,9 +96,9 @@ public partial class SmsWaterHud : Control
     private void Layout()
     {
         Vector2 vp = GetViewportRect().Size;
-        float s = vp.Y / ScreenH;
+        float s = SmsHud.Scale(vp);
         Scale = new Vector2(s, s);
-        Position = new Vector2(vp.X - (ScreenW - GroupX) * s, vp.Y - (ScreenH - GroupY) * s);
+        Position = new Vector2(SmsHud.RightX(GroupX, s, vp), SmsHud.BottomY(GroupY, s, vp));
     }
 
     public override void _Process(double delta)
@@ -129,10 +129,11 @@ public partial class SmsWaterHud : Control
                 _groupOffset = _group.At(_now);
                 _pieceOffset[0] = SmsHud.Pop(f, new Vector2(0f, 100f), SmsHud.UpMid, 50, Vector2.Zero).Y;
                 _pieceShown[0] = true;
-                _pieceShown[1] = f >= 6f; _pieceOffset[1] = SmsHud.Pop(f - 6f, SmsHud.UpTop, SmsHud.UpMid, 40, Vector2.Zero).Y;
-                _pieceShown[2] = f >= 14f; _pieceOffset[2] = SmsHud.Pop(f - 14f, SmsHud.UpTop, SmsHud.UpMid, 40, Vector2.Zero).Y;
-                _pieceShown[3] = f >= 26f; _pieceOffset[3] = SmsHud.Pop(f - 26f, new Vector2(0f, 100f), SmsHud.UpMid, 40, Vector2.Zero).Y;
-                if (f >= 26f + 40f + SmsHud.Settle) // the icon home: unk288->show(), the appear done (unk45 -> unk46), the blink from 0
+                float t6 = SmsHud.Paced(6f), t14 = SmsHud.Paced(14f), t26 = SmsHud.Paced(26f);
+                _pieceShown[1] = f >= t6; _pieceOffset[1] = SmsHud.Pop(f - t6, SmsHud.UpTop, SmsHud.UpMid, 40, Vector2.Zero).Y;
+                _pieceShown[2] = f >= t14; _pieceOffset[2] = SmsHud.Pop(f - t14, SmsHud.UpTop, SmsHud.UpMid, 40, Vector2.Zero).Y;
+                _pieceShown[3] = f >= t26; _pieceOffset[3] = SmsHud.Pop(f - t26, new Vector2(0f, 100f), SmsHud.UpMid, 40, Vector2.Zero).Y;
+                if (f >= SmsHud.Paced(26f + 40f + SmsHud.Settle)) // the icon home: unk288->show(), the appear done (unk45 -> unk46), the blink from 0
                 {
                     _phase = Phase.Shown; _f0 = _now; _xShown = false; _xBlink = 0f;
                     _groupOffset = 0f;
@@ -157,8 +158,8 @@ public partial class SmsWaterHud : Control
                 _groupOffset = _group.At(_now);
                 for (int i = 0; i < 4; i++)
                     _pieceOffset[i] = SmsHud.Bezier(new Vector2(0f, _disappearFrom), new Vector2(0f, (_disappearFrom + 170f) * 0.5f),
-                        new Vector2(0f, 170f), f / DisappearFrames).Y;
-                if (f >= DisappearFrames)
+                        new Vector2(0f, 170f), f * SmsHud.Anim / DisappearFrames).Y;
+                if (f >= SmsHud.Paced(DisappearFrames))
                 {
                     _phase = Phase.Hidden; Visible = false;
                 }

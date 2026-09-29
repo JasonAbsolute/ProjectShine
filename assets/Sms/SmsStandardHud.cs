@@ -34,9 +34,11 @@ using System;
 /// (processAppearCoin 3236, processAppearStar 3055, processAppearMario 3275: icon 14, text and x 24, digits 24 / 30). A camera demo
 /// (startCameraDemo 2056: the camera locked, a talk, the shine get, a death) takes the lives, the coins and the star HUD away (the
 /// shine get brings the star HUD in instead) and endCameraDemo (2125) brings the coins back.
-/// Frames are the game's 30 a second, counted fractionally so the motion runs at the display's rate. Where the game parks a hidden
-/// strip 11 px into the frame (the CRT's overscan hid it: initHiddenPaneAbove) this parks it fully above the top edge. Left-hand groups
-/// keep their margin to the left edge, the life meter to the right, all scaled by the viewport height / 480.
+/// Frames are the game's 30 a second, counted fractionally so the motion runs at the display's rate; the motions (not the waits) go at
+/// SmsParams.Hud.AnimSpeed times the game's pace. Where the game parks a hidden strip 11 px into the frame (the CRT's overscan hid it:
+/// initHiddenPaneAbove) this parks it fully above the top edge. The screen is the game's 640 x 448 frame (SmsHud): left-hand groups
+/// keep their margin to the left edge, the life meter to the right, plus SmsParams.Hud.EdgeInset, all scaled by SmsHud.Scale; with
+/// SmsParams.Hud.IdleHold the star HUD and the lives stay while Mario stands still instead of the game's peek.
 /// </summary>
 public partial class SmsStandardHud : Control
 {
@@ -176,7 +178,7 @@ public partial class SmsStandardHud : Control
     private void Layout()
     {
         _viewport = GetViewportRect().Size;
-        _scale = _viewport.Y / SmsHud.ScreenH;
+        _scale = SmsHud.Scale(_viewport);
         Position = Vector2.Zero;
         Size = _viewport;
     }
@@ -196,6 +198,10 @@ public partial class SmsStandardHud : Control
         if (_frame < whole) _frame = whole;
         QueueRedraw();
     }
+
+    /// <summary>A process function's "param_1 == N": true on the first console frame at or past game frame N at the port's pace.</summary>
+    private static bool At(int f, int game) => f >= (int)MathF.Ceiling(game / SmsHud.Anim) && f - 1 < (int)MathF.Ceiling(game / SmsHud.Anim);
+    private static int Paced(int game) => (int)MathF.Ceiling(game / SmsHud.Anim);
 
     // ------------------------------------------------------------------------------------------------------------------ one frame
     private void Step()
@@ -399,22 +405,22 @@ public partial class SmsStandardHud : Control
         {
             // processAppearCoin (3236): the icon at 14, the x at 24, the digits at 28 / 34 / 40, dropping in
             int f = _frame - _coinF0;
-            if (f == 14) _cIcon.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
-            if (f == 24) _cX.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
+            if (At(f, 14)) _cIcon.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
+            if (At(f, 24)) _cX.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
             for (int i = 0; i < 3; i++)
-                if (f == 28 + 6 * i) _cDigit[i].Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
-            if (f >= 40 + 50 + SmsHud.Settle)
+                if (At(f, 28 + 6 * i)) _cDigit[i].Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
+            if (f >= Paced(40 + 50 + SmsHud.Settle))
                 _coinF0 = -1;
         }
         if (_coinDownF0 >= 0)
         {
             // processDownCoin (3148): stepping down a row with the star HUD, each piece dipping 45 past its new home
             int f = _frame - _coinDownF0;
-            if (f == 14) _cIcon.Pop(_frame, Vector2.Zero, SmsHud.CoinMid, 50);
-            if (f == 24) _cX.Pop(_frame, Vector2.Zero, SmsHud.CoinMid, 50);
+            if (At(f, 14)) _cIcon.Pop(_frame, Vector2.Zero, SmsHud.CoinMid, 50);
+            if (At(f, 24)) _cX.Pop(_frame, Vector2.Zero, SmsHud.CoinMid, 50);
             for (int i = 0; i < 3; i++)
-                if (f == 28 + 6 * i) _cDigit[i].Pop(_frame, new Vector2(0f, 6f * i), SmsHud.CoinMid, 50);
-            if (f >= 40 + 50 + SmsHud.Settle)
+                if (At(f, 28 + 6 * i)) _cDigit[i].Pop(_frame, new Vector2(0f, 6f * i), SmsHud.CoinMid, 50);
+            if (f >= Paced(40 + 50 + SmsHud.Settle))
                 _coinDownF0 = -1;
         }
         if (_coinSlide.To == CoinHidden && _coinSlide.Done(_now))
@@ -450,11 +456,11 @@ public partial class SmsStandardHud : Control
         {
             // processAppearMario (3275): the icon at 14, the text and the x at 24, the digits at 24 and 30
             int f = _frame - _marioF0;
-            if (f == 14) _mIcon.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
-            if (f == 24) { _mText.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50); _mX.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50); }
+            if (At(f, 14)) _mIcon.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
+            if (At(f, 24)) { _mText.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50); _mX.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50); }
             for (int i = 0; i < 2; i++)
-                if (f == 24 + 6 * i) _mDigit[i].Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
-            if (f >= 30 + 50 + SmsHud.Settle)
+                if (At(f, 24 + 6 * i)) _mDigit[i].Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
+            if (f >= Paced(30 + 50 + SmsHud.Settle))
                 _marioF0 = -1;
         }
         if (_marioLeaving && _marioSlide.Done(_now))
@@ -505,15 +511,17 @@ public partial class SmsStandardHud : Control
         {
             // processAppearStar (3055): the icons at 14, the x's at 24, the digits at 28 / 34 / 40 (the third only from 100)
             int f = _frame - _starF0;
-            if (f == 14) { _sIcon.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50); _dIcon.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50); }
-            if (f == 24) { _sX.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50); _dX.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50); }
+            if (At(f, 14)) { _sIcon.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50); _dIcon.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50); }
+            if (At(f, 24)) { _sX.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50); _dX.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50); }
             for (int i = 0; i < 3; i++)
-                if (f == 28 + 6 * i) { _sDigit[i].Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50); _dDigit[i].Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50); }
-            if (f >= 40 + 50 + SmsHud.Settle)
+                if (At(f, 28 + 6 * i)) { _sDigit[i].Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50); _dDigit[i].Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50); }
+            if (f >= Paced(40 + 50 + SmsHud.Settle))
                 _starAppearing = false;
         }
-        // updateStarHudAutoHide (1061): out, settled, nothing on the clocks, no demo: away again, the lives with it
-        if (_starVisible && !_starAppearing && !_starLeaving && _shineSlide.AtZero(_now) && !Demo && _blueTimer == 0 && _shineTimer == 0)
+        // updateStarHudAutoHide (1061): out, settled, nothing on the clocks, no demo: away again, the lives with it -- unless Jaysonn's
+        // IdleHold keeps them while he stands (the console's unk60 guard, never set in the game)
+        if (_starVisible && !_starAppearing && !_starLeaving && _shineSlide.AtZero(_now) && !Demo && _blueTimer == 0 && _shineTimer == 0
+            && !(SmsParams.Hud.IdleHold && Idle))
         {
             StartDisappearStar();
             StartDisappearMario();
@@ -539,12 +547,12 @@ public partial class SmsStandardHud : Control
             return;
         // processAppearRed (3472): the icon at 14, the x at 24, the count at 28, the slash at 32, the 8 at 34, all rising
         int f = _frame - _redF0;
-        if (f == 14) _rIcon.Pop(_frame, SmsHud.UpTop, SmsHud.UpMid, 50);
-        if (f == 24) _rX.Pop(_frame, SmsHud.UpTop, SmsHud.UpMid, 50);
-        if (f == 28) _rDigit.Pop(_frame, SmsHud.UpTop, SmsHud.UpMid, 50);
-        if (f == 32) _rSlash.Pop(_frame, SmsHud.UpTop, SmsHud.UpMid, 50);
-        if (f == 34) _rEight.Pop(_frame, SmsHud.UpTop, SmsHud.UpMid, 50);
-        if (f >= 34 + 50 + SmsHud.Settle)
+        if (At(f, 14)) _rIcon.Pop(_frame, SmsHud.UpTop, SmsHud.UpMid, 50);
+        if (At(f, 24)) _rX.Pop(_frame, SmsHud.UpTop, SmsHud.UpMid, 50);
+        if (At(f, 28)) _rDigit.Pop(_frame, SmsHud.UpTop, SmsHud.UpMid, 50);
+        if (At(f, 32)) _rSlash.Pop(_frame, SmsHud.UpTop, SmsHud.UpMid, 50);
+        if (At(f, 34)) _rEight.Pop(_frame, SmsHud.UpTop, SmsHud.UpMid, 50);
+        if (f >= Paced(34 + 50 + SmsHud.Settle))
             _redF0 = -1;
     }
 
@@ -588,12 +596,13 @@ public partial class SmsStandardHud : Control
         {
             case Life.Appear:
                 // held at (-150, +180) for 100 frames, then 40 frames through (-10, 10) home
+                f *= SmsHud.Anim;
                 return f < LifeAppearHold ? new Vector2(-150f, 180f)
                     : SmsHud.Bezier(new Vector2(-150f, 180f), new Vector2(-10f, 10f), Vector2.Zero, (f - LifeAppearHold) / 40f);
             case Life.Insert:
-                return SmsHud.Bezier(new Vector2(0f, LifeAbove), new Vector2(0f, LifeAbove * 0.5f), Vector2.Zero, f / 20f);
+                return SmsHud.Bezier(new Vector2(0f, LifeAbove), new Vector2(0f, LifeAbove * 0.5f), Vector2.Zero, f * SmsHud.Anim / 20f);
             case Life.Leave:
-                return SmsHud.Bezier(_lifeLeaveFrom, new Vector2(0f, LifeGone * 0.5f), new Vector2(0f, LifeGone), f / 40f);
+                return SmsHud.Bezier(_lifeLeaveFrom, new Vector2(0f, LifeGone * 0.5f), new Vector2(0f, LifeGone), f * SmsHud.Anim / 40f);
             default:
                 return Vector2.Zero;
         }
@@ -613,15 +622,15 @@ public partial class SmsStandardHud : Control
                 break;
             case Life.Appear:
                 if (Demo) StartLifeLeave();
-                else if (_frame - _lifeF0 >= LifeAppearHold + 40) { _life = Life.Shown; _lifeF0 = _frame; }
+                else if (_frame - _lifeF0 >= Paced(LifeAppearHold + 40)) { _life = Life.Shown; _lifeF0 = _frame; }
                 break;
             case Life.Insert:
             {
                 int f = _frame - _lifeF0;
-                if (f == 14) _lText.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
-                if (f == 24) _lSun.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
+                if (At(f, 14)) _lText.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
+                if (At(f, 24)) _lSun.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
                 if (Demo) StartLifeLeave();
-                else if (f >= 24 + 50 + SmsHud.Settle) { _life = Life.Shown; _lifeF0 = _frame; }
+                else if (f >= Paced(24 + 50 + SmsHud.Settle)) { _life = Life.Shown; _lifeF0 = _frame; }
                 break;
             }
             case Life.Shown:
@@ -633,7 +642,7 @@ public partial class SmsStandardHud : Control
                 else if (_frame - _lifeF0 > LifeHold) StartLifeLeave();
                 break;
             case Life.Leave:
-                if (_frame - _lifeF0 >= 40)
+                if (_frame - _lifeF0 >= Paced(40))
                     _life = Demo ? Life.DemoHidden : Life.Hidden;
                 break;
             case Life.DemoHidden:
@@ -679,8 +688,8 @@ public partial class SmsStandardHud : Control
     // ------------------------------------------------------------------------------------------------------------------ the draw
     private void Group(Vector2 pos, bool right)
     {
-        float x = right ? _viewport.X - (SmsHud.ScreenW - pos.X) * _scale : pos.X * _scale;
-        DrawSetTransform(new Vector2(x, pos.Y * _scale), 0f, new Vector2(_scale, _scale));
+        float x = right ? SmsHud.RightX(pos.X, _scale, _viewport) : SmsHud.LeftX(pos.X, _scale);
+        DrawSetTransform(new Vector2(x, SmsHud.TopY(pos.Y, _scale)), 0f, new Vector2(_scale, _scale));
     }
 
     public override void _Draw()

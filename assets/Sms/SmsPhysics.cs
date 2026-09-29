@@ -201,6 +201,26 @@ public static class SmsParams
         public const bool RocketExitSweeps = true;
     }
 
+    /// <summary>The HUD console (SmsWaterHud / SmsStandardHud). The game draws standard_1.blo 1:1 into its 640 x 448 frame
+    /// (J2DOrthoGraph over the render rect; SMSGetGameRenderWidth / Height), of which a CRT hid the outer 3-5 %.</summary>
+    public static class Hud
+    {
+        // DEVIATION (Jaysonn, 2026-09-28 23:21, "too big"): 1 = the game's frame height on the window's height (a coin digit is 8 % of
+        // the screen). His own HUD had the textures 1:1 in the 648-line canvas = 0.69 of that; 0.7 keeps his size.
+        public const float Size = 0.7f;
+        // DEVIATION (same): the CRT's overscan as a margin -- the console parks the coins 13 px from the left edge and lets "WATER"
+        // run 3 px past the bottom of the frame, which a TV never showed and a monitor does. Game pixels kept clear of every edge.
+        public const float EdgeInset = 16f;
+        // DEVIATION ("incredibly slow"): the console's motions -- setPanePosition's quadratics, the settles, the group slides, the
+        // staggers, the life meter's mid-screen hold -- run this many times the game's 30 fps pace. The waits stay the game's (the
+        // idle 200 frames, a blue coin's 400, the 120 at full health, the X blink, the heartbeat). 1 = the game.
+        public const float AnimSpeed = 2f;
+        // DEVIATION ("auto going away even when mario is idle"): updateStarHudAutoHide (GCConsole2.cpp 1061) takes the shine / blue
+        // coin counters and the lives away the moment they have settled, idle or not -- a peek every 320 frames while he stands.
+        // Here they hold while he stands still (the console's own unk60 guard, which the game never sets) and leave when he moves.
+        public const bool IdleHold = true;
+    }
+
     public static class Waist
     {
         public const float FreePitch = 230f;        // 7360 BAM = 40.4 deg forward at the run cap 32

@@ -2704,6 +2704,15 @@ you make it more smooth and while were here might as well fix the other hud elem
   counts stay his fields, read every frame as the console reads the flag manager. Not ported: the counter sparkles (0x1FC), the
   SEs (0x4819 / 481A the moves, 0x4800 the heartbeat, 0x4801 / 4823 the segments), the pause fade, the telop, the timer, the
   balloon counters, the death-restart lives demo (flag 0x30002).
+- 19b (Jaysonn 23:21: "all the uis are messed up now. too big and just not positioned correctly", "the animations of it are
+  incredibly slow still and they seem to be coming on screen then auto going away even when mario is idle"). The frame: the
+  console draws `standard_1.blo` 1:1 into the game's render rect — `J2DOrthoGraph(graphics->mViewportRect)` over
+  `SMSGetGameRenderWidth / Height` = 640 x 448 (Resolution.cpp), the .blo's 600 x 480 being nominal — so the panes were 7 % small
+  and the gauge anchored to the wrong edges (its disc sits 59 px from the right and 7 px from the bottom; "WATER" runs 3 px past
+  the frame, into what a CRT never showed). `SmsHud.ScreenW / ScreenH` are the frame now, `SmsHud.Scale / LeftX / TopY / RightX /
+  BottomY` place every group from its edge. His four asks are `SmsParams.Hud` (below): Size 0.7 (his own HUD had the game's
+  textures 1:1 in the 648-line canvas, 0.69 of the frame's scale), EdgeInset 16 (the overscan as a margin), AnimSpeed 2 (the
+  motions, not the waits), IdleHold (the peek stays while he stands). Headless drive re-run: the same states at half the frames.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
@@ -2767,6 +2776,21 @@ Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
 - **A lost life shows the counter too** (2026-09-28 22:50). The game shows the lives on a death through the restart demo (flag
   0x30002, `startAppearMario(true)`: the old count 200 frames, then the new); his respawn is in place, so any change brings the
   counter in with the new count (`updateMarioLifeCounter` does that for a gain).
+- **The HUD is 0.7 of the game's size** (2026-09-28 23:21, "too big"). At 1 the frame's 448 lines fill the window's height and a
+  coin digit is 8 % of the screen — the game on a TV. His own HUD had the disc's textures 1:1 in the 648-line canvas, 0.69 of
+  that. `SmsParams.Hud.Size`; 1 = the game.
+- **The HUD keeps 16 game pixels clear of every edge** (2026-09-28 23:21, "not positioned correctly"). The console parks the
+  coins 13 px from the left edge and the gauge 7 px from the bottom with "WATER" 3 px past it: the CRT's overscan (3-5 %) hid
+  the edges, a monitor shows them. `SmsParams.Hud.EdgeInset`; 0 = the game (Dolphin's look).
+- **The HUD's motions run at twice the game's pace** (2026-09-28 23:21, "incredibly slow"; 22:26 "a bit slow"). The console's
+  quadratics (50 / 40 frames), settles (30), slides (20 / 40 / 50), staggers (14 / 24 / 28 ...) and the life meter's 100-frame
+  mid-screen hold are the game's at 30 fps — a counter takes 4 s to settle on the disc. `SmsParams.Hud.AnimSpeed` (2) divides
+  them; the waits (the idle 200, a blue coin's 400, the 120 at full health, the X blink, the heartbeat, the coin roll) stay.
+- **The idle peek stays while Mario stands** (2026-09-28 23:21, "auto going away even when mario is idle").
+  `updateStarHudAutoHide` (1061) takes the shine / blue coin counters and the lives away the moment they have settled and
+  nothing is on the clocks, idle or not; `waitForStarHud` (934) then brings them back 200 frames later — a peek every 320
+  frames while he stands. The console has an `unk60` guard on that hide which the game never sets; `SmsParams.Hud.IdleHold`
+  sets it while he is MARIO_STATUS_WAIT, so they hold until he moves. false = the game's peek.
 - **The life meter turns to air in place** (2026-09-28 22:50). The decomp's state 2 → 3 → 0 → 4 dance for a meter already on
   screen when the air switch comes (a hide, a 120-frame wait, an appear in the air colours) is not reproduced; the colours and
   the count switch where it stands, and a meter coming in for the air uses the hit's mid-screen appear.
