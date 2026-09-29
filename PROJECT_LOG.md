@@ -2634,6 +2634,17 @@ all need to take another pass camera spazzes out"; "Make the hover exit sweep sm
 - The hover: the mode ENDS on `ROCKET` as the game's does (pass 17d's stay-on is withdrawn), but the exit takes the 16-tick sweep
   of a Y / A / B cancel instead of the game's one-frame cut — the deviation below. `isMarioRocketing` also covers `ROCKET_LANDING`,
   so a Y is refused during the fall after a hover too (`_smsRocketLanding`), which the port had let in.
+
+**Pass 17f — the squat end's flail** (Jaysonn 21:08, on 17e: "everything feels good! when mario does squat end tho he is kinda like
+flailing his arms and jerks left with his upper body"). A probe (temp, not committed) measured the upper-body rotation tracks at t=0:
+`ma_carry_p` vs `ma_pump` — jnt_arm_R1 176°, jnt_arm_L1 155°, jnt_hand_R 72°, jnt_head 36°, jnt_chest 22°; `ma_pump` vs `ma_sqend`
+— 0° on every upper joint (the stand-up starts from the grip pose). When the upper body went IDLE at the stand-up (`HOLDING_PUMP`
+→ `IDLE`, one frame into `ma_sqend`) the tree's `CarryBlend` faded 1 → 0 over 83 ms (`CARRY_BLEND_SPEED` 12) — but
+`SmsFluddUpperBody` switched the blend's clip (`Animation 2`) to `ma_carry_p` on that same frame, so for five frames the arms
+blended THROUGH the carrying pose: the flail, and the chest / head jerk. The game's `addUpper()` simply drops the upper mtx calc
+(`unk3 = -1`), the body clip continuing from the very pose the grips held. The clip now stays `ma_pump` unless he carries something
+(`heldBody != null`), so the fade runs from the grip pose into a clip that starts on it — nothing to see. The same fade ran after
+every R release; a moving body hid it.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

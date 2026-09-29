@@ -12692,7 +12692,11 @@ public partial class Mario : CharacterBody3D
         }
         if (animTree == null || animTree.TreeRoot is not AnimationNodeBlendTree tree)
             return;
-        string want = SmsFluddUpperBlend ? "ma_pump" : "ma_carry_p";
+        // the blend's clip: ma_carry_p only while he carries something. It used to flip back to ma_carry_p the frame the upper body
+        // went IDLE, while CarryBlend was still fading out (83 ms) -- five frames of the arms blending THROUGH the carrying pose
+        // (jnt_arm_R1 176 deg, jnt_arm_L1 155 deg, jnt_head 36 deg, jnt_chest 22 deg off the grips): the squat end's flail. ma_pump's
+        // frame 0 and ma_sqend's first frame are the same grip pose, so the fade from ma_pump is invisible, as the game's switch is.
+        string want = heldBody != null || !UseSmsPhysics ? "ma_carry_p" : "ma_pump";
         if (want != _fluddUpperAnim && tree.GetNode("Animation 2") is AnimationNodeAnimation an && animPlayer.HasAnimation(want))
         {
             an.Animation = want;
