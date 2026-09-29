@@ -188,15 +188,17 @@ public static class SmsParams
         public const int InbetLNormal = 16;                 // mSLInbetLNormal: the mode change's sweep, ticks (0.13 s)
         public const int LockTicks = 60;                    // unk282: 0.5 s after a change before Y / A / B act, or Y re-enters
         public const int YButtonRotateChase = 2;            // camera_normal.prm: the swing behind him halves its gap each tick (180 deg in 16)
+        public const int LButtonRotateChase = 10;           // camera_normal.prm: the L press's swing closes a tenth of its gap a tick (180 deg in ~0.4 s)
         // onNeutralMarioKey() at both ends of the mode (changeCamModeSub_): mNeutralKeyTimer = 0x3c, counted down by considerMarioStick
         // on the pad's three updateMeaning calls a 30 fps frame -> 20 frames = 80 ticks; Mario's stick reads 0 for the first 0x28 counts
         // (53 ticks, 0.44 s) and fades back in over the rest (0.22 s)
         public const int NeutralKeyTicks = 80;
         public const int NeutralKeyDeadTicks = 53;
-        // DEVIATION (Jaysonn, 2026-09-28 20:10): the game cuts the L camera in one frame the moment he is ROCKET / ROCKET_LANDING --
-        // the hover nozzle's hover included (rocketCheck: RocketType 1 is both nozzles) -- and refuses a Y while it lasts
-        // (execCameraModeChangeProc_ 588: isMarioRocketing -> doLButtonCameraOff_(true)). He wants to glide in the mode. false = the game.
-        public const bool StaysOnRocketing = true;
+        // DEVIATION (Jaysonn, 2026-09-28 20:45): the game cuts the L camera in ONE frame the moment he is ROCKET / ROCKET_LANDING -- the
+        // hover nozzle's hover included (rocketCheck: RocketType 1 is both nozzles): execCameraModeChangeProc_ 588, isMarioRocketing ->
+        // doLButtonCameraOff_(true) -> changeCamModeSpecifyFrame_(-1, 1). He wants that exit to sweep like a Y / A / B cancel's 16 ticks
+        // instead of snapping. The mode still ends, a Y is still refused while he hovers. false = the game's cut.
+        public const bool RocketExitSweeps = true;
     }
 
     public static class Waist

@@ -284,6 +284,11 @@ public partial class SunshineCamera : Node3D
     private float _lButtonHeldTime = -1f;   // -1 = not pressed
     private bool  _lButtonPressIgnored = false; // this press started in the air: it is the ground pound, not the camera
 
+    // SMS: execFrontRotate_'s yaw swing on the L press (CameraNormal.cpp 79: CLBChaseAngleDecrease a 120 Hz tick)
+    private bool  _smsFrontRotate = false;
+    private int   _smsFrontYawBam = 0, _smsFrontTargetBam = 0;
+    private float _smsCamTickAccum = 0f;
+
     private float _rigScale = 1f;
 
     // ============================================================
@@ -428,7 +433,8 @@ public partial class SunshineCamera : Node3D
     {
         if (camManual)
         {
-            _tgtYaw -= rstick.X * CStickYawSpeed * dt;
+            if (!_smsFrontRotate) // the game's L swing skips the stick rotate while it runs (CameraNormal.cpp 79 / 98)
+                _tgtYaw -= rstick.X * CStickYawSpeed * dt;
 
             if (LinkPitchToRadius)
             {
@@ -452,8 +458,8 @@ public partial class SunshineCamera : Node3D
             }
         }
 
-        // Auto-behind: only while actively moving AND no manual input recently
-        if (moving
+        // Auto-behind: only while actively moving AND no manual input recently (and not while the game's L swing runs)
+        if (!_smsFrontRotate && moving
             && _camManualTimer >= AutoBehindDelay
             && GetTargetSpeedXZ() >= AutoBehindMinSpeed
             && (!AutoBehindOnlyOnFloor || IsTargetOnFloor())
@@ -1031,6 +1037,11 @@ public partial class SunshineCamera : Node3D
     private void UpdateLButtonState(float dt)
     {
         if (string.IsNullOrEmpty(LButtonAction) || !InputMap.HasAction(LButtonAction)) return;
+        if (_target is Mario smsMario && smsMario.UseSmsPhysics)
+        {
+            SmsUpdateFrontRotate(dt, smsMario); // the game's L: a swing behind his face, nothing on the hold
+            return;
+        }
 
         if (Input.IsActionPressed(LButtonAction))
         {
@@ -1066,6 +1077,57 @@ public partial class SunshineCamera : Node3D
         }
     }
 
+    /// <summary>The game's L button (execFrontRotate_, CameraChange.cpp 447): the press -- MEANING_CAM_L's edge -- starts a yaw chase to
+    /// behind his face (*gpMarioAngleY - 0x8000) that ctrlNormalOrTowerCamera_ (CameraNormal.cpp 79) runs with CLBChaseAngleDecrease
+    /// at camera_normal.prm's LButtonRotateChase (10: a tenth of the gap a 120 Hz tick, 180 deg in about 0.4 s; the Y press uses 2),
+    /// skipping the stick rotate and the auto chase meanwhile. Nothing on the hold, nothing on the release, no pitch or zoom reset.
+    /// Refused when the Y camera owns the view (the L camera mode) and when the press is the hip drop (an air press). Under SMS this
+    /// replaces the rig's tap re-centre and held-L lock, which chased "behind" from his VELOCITY -- sideways in the squat's L
+    /// sidestep, so the camera swung to his flank and back with every stick move.</summary>
+    private void SmsUpdateFrontRotate(float dt, Mario mario)
+    {
+        bool pressed = Input.IsActionPressed(LButtonAction);
+        if (pressed)
+        {
+            if (_lButtonHeldTime < 0f)
+            {
+                _lButtonHeldTime = 0f;
+                _lButtonPressIgnored = !IsTargetOnGroundOrWall(); // the hip drop's press
+                if (!_lButtonPressIgnored && !mario.SmsYCamActive && Mode == CamMode.Normal)
+                {
+                    _smsFrontRotate = true;
+                    _smsFrontYawBam = SmsYawBam(_curYaw);
+                    _smsFrontTargetBam = SmsYawBam(GetBehindYaw());
+                    _smsCamTickAccum = 0f;
+                }
+            }
+            else
+                _lButtonHeldTime += dt;
+        }
+        else
+        {
+            _lButtonHeldTime = -1f;
+            _lButtonPressIgnored = false;
+        }
+        if (Mode == CamMode.LButton)
+            Mode = CamMode.Normal; // no held-L mode under SMS
+        if (!_smsFrontRotate)
+            return;
+        if (Mode != CamMode.Normal || mario.SmsYCamActive)
+        {
+            _smsFrontRotate = false; // another camera took the view: the swing is over
+            return;
+        }
+        int n = SmsUnits.TicksFor(dt, ref _smsCamTickAccum);
+        for (int i = 0; i < n && _smsFrontRotate; i++)
+            if (!SmsMath.ChaseAngleDecreaseS16(ref _smsFrontYawBam, _smsFrontTargetBam, SmsParams.LCamera.LButtonRotateChase))
+                _smsFrontRotate = false;
+        _tgtYaw = (short)_smsFrontYawBam * SmsUnits.BamToRad; // mCurrentTarget.mYaw IS the camera's yaw: no second chase on top of it
+        _curYaw = _tgtYaw;
+    }
+
+    private static int SmsYawBam(float yaw) => (short)Mathf.RoundToInt(Mathf.Wrap(yaw, -Mathf.Pi, Mathf.Pi) / SmsUnits.BamToRad);
+
     private void DoRecenter()
     {
         _tgtYaw = GetBehindYaw();
@@ -1091,6 +1153,10 @@ public partial class SunshineCamera : Node3D
     // ============================================================
     private float GetBehindYaw()
     {
+        // SMS: the game's "behind him" is *gpMarioAngleY - 0x8000, his FACE (mFaceAngle.y) -- never his velocity, which points to his
+        // flank in the squat's L sidestep and drifts in a jump (the held-L lock chased it: the camera swung 90 deg each way on the shimmy)
+        if (_target is Mario sms && sms.SmsBehindYaw(out float behind))
+            return behind;
         // Prefer VELOCITY (world coords — immune to model facing conventions).
         if (_target is CharacterBody3D cb)
         {

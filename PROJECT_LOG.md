@@ -2618,6 +2618,22 @@ next (R click or L)").
   hold (WAIT). The look-at (the nozzle top) lowers with him. Port: the ground block's hold takes the squat first (`SmsSquatFrame` /
   `StartCrouch` before `SmsYCamHoldMario`). His pad has no click: the full pull is the click (`SmsRClick`), so a full R in the mode
   squats him, as a GC trigger's click does in the game.
+
+**Pass 17e — the shimmy's camera, the hover exit as a sweep** (Jaysonn 20:42, on 17d: "the shimmy right and left dont work well at
+all need to take another pass camera spazzes out"; "Make the hover exit sweep smoothly instead of keeping the Y cam").
+- The shimmy: the squat's L sidestep (`getSideWalkValues`) moves him along his flank at `mIntendedMag × sin(diff) × PumpingSlideSp`
+  a tick with his face fixed — and the rig (`SunshineCamera`) answered L by locking "behind" him from his VELOCITY (`GetBehindYaw`:
+  velocity first, the armature only when still), so the camera swung 90° to his flank while the stick was held and back when it
+  rested, every move. The game's L is `execFrontRotate_` (CameraChange.cpp 447): the press edge (MEANING_CAM_L) starts a yaw chase
+  to `*gpMarioAngleY - 0x8000` — behind his FACE — that `ctrlNormalOrTowerCamera_` (CameraNormal.cpp 79) runs with
+  `CLBChaseAngleDecrease` at camera_normal.prm's `LButtonRotateChase` 10 a 120 Hz tick (180° in ~0.4 s; the Y press uses 2),
+  skipping the stick rotate and the auto chase meanwhile; nothing on the hold or the release, no pitch / zoom reset. Under SMS the
+  rig now does that (`SmsUpdateFrontRotate`, replacing its tap re-centre and held-L lock), and `GetBehindYaw()` is his face
+  (`Mario.SmsBehindYaw`) for the auto-behind and the Y camera's exit too. The sidestep itself is unchanged (0.12 × 32 = 3.84 units a
+  tick = 6.2 m/s at full stick, `ma_swlkl` / `ma_swlkr` at 0.5 × |side|).
+- The hover: the mode ENDS on `ROCKET` as the game's does (pass 17d's stay-on is withdrawn), but the exit takes the 16-tick sweep
+  of a Y / A / B cancel instead of the game's one-frame cut — the deviation below. `isMarioRocketing` also covers `ROCKET_LANDING`,
+  so a Y is refused during the fall after a hover too (`_smsRocketLanding`), which the port had let in.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
@@ -2659,11 +2675,13 @@ Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
 - **The turbo dash clip is paced by the actual speed** (2026-09-28 01:02). The game paces it by `mDashSpeed`, capped at 32 — the
   run's tempo (2.76) at 2.5× the ground speed; he reads that as slow. Now `mForwardVel` × 0.055 + 1 = 5.4 at 80.
   `SmsParams.Fludd.DashAnimByForwardVel`.
-- **The L camera survives the hover and the rocket** (2026-09-28 20:10). `execCameraModeChangeProc_` (CameraChange.cpp 588) cuts
-  the L camera in one frame (`doLButtonCameraOff_(true)`) the moment `isMarioRocketing()` — `MARIO_STATUS_ROCKET` or
-  `ROCKET_LANDING`, the hover nozzle's hover included — and refuses a Y while it lasts; the port did the same and Jaysonn saw the
-  snap ("it needs to glide and not snap back to normal like sms"). The mode now stays on through a hover / a launch and the fall
-  after, and a Y during a hover enters. `SmsParams.LCamera.StaysOnRocketing` (true; false = the game).
+- **The hover's exit from the L camera sweeps** (2026-09-28 20:45 → the mode stayed on; 20:55 → it ends with the sweep).
+  `execCameraModeChangeProc_` (CameraChange.cpp 588) cuts the L camera in ONE frame (`doLButtonCameraOff_(true)` →
+  `changeCamModeSpecifyFrame_(-1, 1)`) the moment `isMarioRocketing()` — `MARIO_STATUS_ROCKET` or `ROCKET_LANDING`, the hover
+  nozzle's hover included — and refuses a Y while it lasts; the port did the same and Jaysonn saw the snap ("it needs to glide and
+  not snap back to normal like sms"). Pass 17d kept the mode on through the hover; he chose the smaller change: the exit takes the
+  16-tick sweep of a Y / A / B cancel (`InbetLNormal`) instead of the frame cut. The mode still ends, a Y is still refused while he
+  hovers or falls out of one. `SmsParams.LCamera.RocketExitSweeps` (true; false = the game's cut).
 - ~~**Idle arms in the L camera until R** (2026-09-28 03:53)~~ — WITHDRAWN in pass 17c by Jaysonn ("mario does grab flod when hoding
   y cam. lets not do my deviation do it how the game has it"): `checkPumping()` (`MarioUpper.cpp` 17) puts the upper body on the
   grips (`HOLDING_PUMP`, the pump clip's frame 0) the moment `isLButtonCamera` && `checkPumpEnable`, and so does the port again;

@@ -25,9 +25,10 @@ using Godot;
 ///
 /// IN THE MODE (MarioGamePad.cpp 70-88): the MAIN stick is the camera's (mCompSPos[4],[5]) and Mario's is zero; A and B are
 /// MEANING_CAM_AB, Y is Y, R sprays, X switches, L is MEANING_L. Y / A / B leave (doLButtonCameraOff_(false), a 16-tick sweep back)
-/// once unk282 == 0 and the inbetween is over; a knockdown (status bit 0x20000), the hover / rocket (a logged deviation keeps the
-/// mode on through them: SmsParams.LCamera.StaysOnRocketing), the dash, the surf, sleeping, climbing cut it in one tick
-/// (Off_(true)). Mario faces the chased camera's bearing (MarioMove.cpp 2449: unk258 + 0x8000 -
+/// once unk282 == 0 and the inbetween is over; a knockdown (status bit 0x20000), the hover / rocket (isMarioRocketing: ROCKET and
+/// the ROCKET_LANDING fall after it), the dash, the surf, sleeping, climbing cut it in one tick (Off_(true)) -- the hover's cut takes
+/// the 16-tick sweep instead by a logged deviation (SmsParams.LCamera.RocketExitSweeps). Mario faces the chased camera's bearing
+/// (MarioMove.cpp 2449: unk258 + 0x8000 -
 /// OffsetAngleY), holds the pump (MarioUpper.cpp 17), and the gun angle IS mCurrentTarget.mPitch (WaterGun.cpp 219): looking down
 /// bends the upper body forward (MarioWaistCtrl 476), looking up lifts the spray nozzle and the head. On the way out the normal camera
 /// resumes with the L camera's yaw -- behind the way he now faces (the rig is told so: SunshineCamera.SmsYCamExit).
@@ -35,8 +36,8 @@ using Godot;
 /// Port shape: a second Camera3D ("SmsYCamera", TopLevel) made current from the Y press; the rig's SunshineCamera keeps following
 /// underneath and gets the view back after the sweep out. Its own Y-button mode is off under SMS (it froze Mario with CameraLocked
 /// underneath this one: no stick, no FLUDD, no way out -- the whole of the pass-16 report).
-/// A Y IN THE AIR works as in the game (execFrontRotate_ runs in any status but the hip drop; only sleeping, the surf, the dash and
-/// climbing refuse -- and the hover / rocket, unless StaysOnRocketing): the mode keeps his status, his stick is zero, A / B are eaten, and his facing is forced to
+/// A Y IN THE AIR works as in the game (execFrontRotate_ runs in any status but the hip drop; only sleeping, the surf, the hover /
+/// rocket and the fall after them, the dash and climbing refuse): the mode keeps his status, his stick is zero, A / B are eaten, and his facing is forced to
 /// the camera's look every tick -- mForwardVel runs along mFaceAngle, so the flight bends with the look (the port projects the
 /// velocity onto the forced face each frame: the same thing for a smooth turn). The landing inside the mode goes straight to WAIT.
 /// Not ported: the notice lock-on (no bosses), the SEs (0x4824 / 0x4825), the squat inside the mode (R clicked / L: canSquat holds
@@ -101,7 +102,7 @@ public partial class Mario
             return false;
         if (!IsOnFloor())
             return SmsAirSteers(stateOfMario) // the jumps, the flips, the dives, the rolls, a fall off an edge; not the hip drop, a wall slide, a hang
-                || (SmsParams.LCamera.StaysOnRocketing && stateOfMario == MarioState.fluddRocket); // the deviation: a Y while he hovers
+                && !_smsRocketLanding;           // isMarioRocketing (588): not the ROCKET_LANDING fall after a hover either
         switch (stateOfMario)
         {
             case MarioState.idle:
@@ -176,19 +177,32 @@ public partial class Mario
     /// <summary>doLButtonCameraOff_(): unk282 = 60 again; a cancel (Y / A / B) sweeps back over 16 ticks, a state cut takes one. The
     /// normal camera resumes with this camera's yaw -- behind the way he faces now -- so the rig snaps its yaw there first and this
     /// camera sweeps onto the rig's live pose. Mario is his own from this tick.</summary>
-    private void SmsYCamModeOff(bool cut, string why)
+    private void SmsYCamModeOff(bool cut, string why, bool sweepAnyway = false)
     {
         _ycamOn = false;
         _ycamLock = SmsParams.LCamera.LockTicks;
         _ycamPhase = YCamPhase.BlendOut;
-        _ycamInbet = cut ? 1 : SmsParams.LCamera.InbetLNormal;
+        bool sweep = !cut || sweepAnyway; // sweepAnyway: a state cut that a logged deviation lets sweep (the hover)
+        _ycamInbet = sweep ? SmsParams.LCamera.InbetLNormal : 1;
         _ycamNeutralTicks = SmsParams.LCamera.NeutralKeyTicks; // onNeutralMarioKey(): the stick that aimed the camera does not launch him
         if (!cut)
             _ycamHoldThisFrame = true; // the press that ended the mode was MEANING_CAM_AB / MEANING_Y: it does not reach his jump or dive this frame
         _camera?.SmsYCamExit();
         if (SmsDebugPrint)
-            GD.Print($"[SMS ycam] off ({why}): {(cut ? "a cut" : $"the {SmsParams.LCamera.InbetLNormal}-tick sweep back")} to the normal camera, behind him; Y again after {SmsParams.LCamera.LockTicks / SmsUnits.TicksPerSecond:F1} s");
+            GD.Print($"[SMS ycam] off ({why}): {(sweep ? $"the {SmsParams.LCamera.InbetLNormal}-tick sweep back" : "a cut")} to the normal camera, behind him; Y again after {SmsParams.LCamera.LockTicks / SmsUnits.TicksPerSecond:F1} s");
     }
+
+    /// <summary>For the rig: the camera yaw that sits behind him -- the game's *gpMarioAngleY - 0x8000, his FACE (mFaceAngle.y), never
+    /// his velocity (which points to his flank in the squat's sidestep). In the rig's convention (yaw = atan2(-d.x, -d.z) of the
+    /// direction the arm points away from) that is _smsFaceYaw itself.</summary>
+    public bool SmsBehindYaw(out float yaw)
+    {
+        yaw = _smsFaceYaw;
+        return UseSmsPhysics && _smsFaceValid;
+    }
+
+    /// <summary>The Y camera owns the view (any phase): the rig's L swing is refused, as execFrontRotate_ is in the L camera mode.</summary>
+    public bool SmsYCamActive => _ycamPhase != YCamPhase.Off;
 
     /// <summary>The sweep is over (or the cut is done): the rig's camera is current again.</summary>
     private void SmsYCamFinish()
@@ -290,13 +304,14 @@ public partial class Mario
             {
                 // execCameraModeChangeProc_: what ends the mode by itself -- knocked down / hurt / dead (status bit 0x20000), the hover
                 // or rocket (isMarioRocketing), the dash (FLUDD_EMITTING), the water / surf, a talk, the shine, a cutscene hold
+                bool rocket = stateOfMario == MarioState.fluddRocket || _smsRocketLanding; // isMarioRocketing: ROCKET, ROCKET_LANDING
                 bool cut = stateOfMario == MarioState.hurt || stateOfMario == MarioState.dead || stateOfMario == MarioState.talking
-                    || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.swimming
-                    || (!SmsParams.LCamera.StaysOnRocketing && stateOfMario == MarioState.fluddRocket) // DEVIATION: he glides in the mode
+                    || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.swimming || rocket
                     || _smsInWater || _fluddDashing || CameraLocked;
                 if (cut)
                 {
-                    SmsYCamModeOff(true, "the state");
+                    // DEVIATION (Jaysonn): the hover's one-frame cut takes the 16-tick sweep of a cancel instead (RocketExitSweeps)
+                    SmsYCamModeOff(true, rocket ? "the hover / rocket" : "the state", sweepAnyway: rocket && SmsParams.LCamera.RocketExitSweeps);
                     return;
                 }
                 // Y again, or A / B, once unk282 is out and the inbetween is over
