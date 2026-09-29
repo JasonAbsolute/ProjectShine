@@ -12408,9 +12408,9 @@ public partial class Mario : CharacterBody3D
                     _fluddUpper = SmsUpper.Idle;
                 break;
         }
-        // stateMachineUpper() (MarioUpper.cpp 17 / 30): the L camera, or MARIO_STATUS_SQUAT, with the upper body IDLE -> HOLDING_PUMP,
-        // the hands on the grips. DEVIATION (Jaysonn, 2026-09-28 03:53): not in the L camera -- idle arms until R (SmsParams.LCamera.HoldsPump)
-        if (UseSmsPhysics && ((SmsParams.LCamera.HoldsPump && _ycamOn) || (stateOfMario == MarioState.crouch && _smsSquatEndTicks == 0)) && _fluddUpper == SmsUpper.Idle && SmsFluddPumpEnabled())
+        // checkPumping() (MarioUpper.cpp 17 / 30): the L camera, or MARIO_STATUS_SQUAT, with the upper body IDLE -> HOLDING_PUMP, the hands
+        // on the grips (the pass-17b deviation -- idle arms in the mode until R -- was withdrawn by Jaysonn in pass 17c: the game's grips)
+        if (UseSmsPhysics && (_ycamOn || (stateOfMario == MarioState.crouch && _smsSquatEndTicks == 0)) && _fluddUpper == SmsUpper.Idle && SmsFluddPumpEnabled())
         {
             _fluddUpper = SmsUpper.HoldingPump;
             _fluddPumpCooldown = 0;

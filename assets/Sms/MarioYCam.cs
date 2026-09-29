@@ -39,8 +39,8 @@ using Godot;
 /// the camera's look every tick -- mForwardVel runs along mFaceAngle, so the flight bends with the look (the port projects the
 /// velocity onto the forced face each frame: the same thing for a smooth turn). The landing inside the mode goes straight to WAIT.
 /// Not ported: the notice lock-on (no bosses), the SEs (0x4824 / 0x4825), the squat inside the mode (R clicked / L: canSquat holds
-/// in the mode too). Deviation by request: the upper body stays IDLE in the mode until R (the game holds the grips: MarioUpper.cpp
-/// 17, HOLDING_PUMP at the pump clip's frame 0) -- SmsParams.LCamera.HoldsPump.
+/// in the mode too). The upper body holds the grips in the mode as the game's does (checkPumping(), MarioUpper.cpp 17: HOLDING_PUMP
+/// at the pump clip's frame 0); the pass-17b idle-arms deviation was withdrawn in pass 17c.
 /// </summary>
 public partial class Mario
 {
@@ -431,14 +431,22 @@ public partial class Mario
 
     /// <summary>playerControl() (MarioMove.cpp 2449): mFaceAngle.y = unk258 + 0x8000 - OffsetAngleY, unk258 being the CHASED camera's
     /// bearing from its look-at (Camera.hpp 167): he faces where the camera looks, 2.7 deg off its axis, and turns with it as it
-    /// swings, on the ground and in the air alike. In the port's yaw convention (DirFromYaw = (-sin, -cos)) the + 0x8000 is
-    /// absorbed.</summary>
+    /// swings, on the ground and in the air alike -- in every status but the hang family (mStatus & 0x1FF in HANGING .. HANG_JUMPING,
+    /// 2452). In the port's yaw convention (DirFromYaw = (-sin, -cos)) the + 0x8000 is absorbed. The MODEL turns with it: walkProcess()
+    /// and jumpProcess() end every ground and air tick with mModelFaceAngle = mFaceAngle.y (MarioPhysics.cpp 230 / 512), so the
+    /// armature follows the look through a jump too; rotateJumping() then writes the spin's own absolute angle over it (MarioJump.cpp
+    /// 1027: +-timer x 4096, the port's RotateSpinJump) and uTurnJumping() adds its 0x8000 (400: the side flip's offset is kept).</summary>
     private void SmsYCamFaceLook()
     {
+        if (stateOfMario == MarioState.ledgeHang || stateOfMario == MarioState.ledgeClimb || stateOfMario == MarioState.ledgeDescend
+            || stateOfMario == MarioState.ledgeHopUp)
+            return; // HANGING / ASCEND / DESCEND / HANG_JUMPING: playerControl leaves mFaceAngle.y alone
         Vector3 d = _ycamPos - _ycamAt;
         if (new Vector2(d.X, d.Z).LengthSquared() < 1e-8f)
             return;
         float bearing = MathF.Atan2(d.X, d.Z);
+        bool hadFace = _smsFaceValid;
+        float yawBefore = hadFace ? BaseYawFromDir(SmsMath.DirFromYaw(_smsFaceYaw)) : 0f;
         _smsFaceYaw = SmsMath.WrapAngle(bearing - SmsParams.LCamera.OffsetAngleY * SmsUnits.BamToRad);
         _smsFaceValid = true;
         // in the air the launch-latched source (2): SmsAirTick then keeps this face -- and projects the velocity onto it, the game's
@@ -447,8 +455,14 @@ public partial class Mario
         Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
         lastFacingDirection = face;
         _smsLatchedFacing = face;
-        if (IsOnFloor())
-            armature.Rotation = armature.Rotation with { Y = BaseYawFromDir(face) }; // in the air the armature yaw site reads _smsFaceYaw itself
+        // mModelFaceAngle = mFaceAngle.y: the armature turns with the look on the ground AND in the air (pass 17b wrote it on the
+        // ground only -- his velocity bent with the look, his body did not). Nothing in the air path rotates the armature otherwise.
+        if (stateOfMario == MarioState.SpinJump)
+            return; // rotateJumping(): the spin's own absolute model angle -- RotateSpinJump owns the armature
+        float yaw = BaseYawFromDir(face);
+        if (stateOfMario == MarioState.sideFlip && hadFace)
+            yaw += SmsMath.WrapAngle(armature.Rotation.Y - yawBefore); // uTurnJumping(): the model's 0x8000 (the port's own offset) rides on the face
+        armature.Rotation = armature.Rotation with { Y = yaw };
     }
 
     /// <summary>considerMarioStick() while mNeutralKeyTimer runs: Mario's stick is zero for the first 0x28 counts after a mode change and

@@ -2571,6 +2571,26 @@ that when i y cam mario should be idle then if i ress r he should be flood anima
   sweep back, the rig current 0.13 s later, the landing 0.7 s after that. A ground entry then: `upper Idle` through the lock, R →
   `Pumping` (R 1.00), release → `HoldingPump` → `Idle`, B → off. No errors.
 - Debug: the lines are unchanged; `[SMS ycam] Y:` / `on:` now fire mid-air too.
+
+**Pass 17c — his body turns with the look in the air; the grips are back in the mode** (Jaysonn 19:40, on 17b: "mario does grab
+flod when hoding y cam. lets not do my deviation do it how the game has it ... mario turns not turn with the y cam but his direction
+does. which is good but we need him to turn also to give him the y turn steer feel (just rotateing the armature in the air while
+juming?)").
+- The armature: pass 17b's `SmsYCamFaceLook` wrote the armature yaw on the ground only, trusting `RotateArmature()`'s face-source-2
+  branch for the air — but nothing calls `RotateArmature()` off the ground, so the forced face bent his velocity (`SmsAirTick`) while
+  his body kept its launch yaw. The game turns the model: `walkProcess()` and `jumpProcess()` end every ground and air tick with
+  `mModelFaceAngle = mFaceAngle.y` (`MarioPhysics.cpp` 230 / 512), and `playerControl` (2452) forces the face before the state machine
+  runs. Now the armature follows the look in every status but the hang family (`mStatus & 0x1FF` in `HANGING .. HANG_JUMPING`: the
+  port's `ledgeHang` / `ledgeClimb` / `ledgeDescend` / `ledgeHopUp`, where the face is not forced either), except the spin jump, whose
+  model angle is its own absolute spin (`rotateJumping()`: `mModelFaceAngle = ±timer × 4096`, `MarioJump.cpp` 1027 — `RotateSpinJump`
+  keeps the armature), and the side flip, whose `+0x8000` (`uTurnJumping()`, 400) is the port's own locked offset, kept over the
+  turning face. Not a deviation: 1:1.
+- The grips: the pass-17b deviation (idle arms in the mode until R) is withdrawn by Jaysonn. `SmsParams.LCamera.HoldsPump` is gone; the
+  upper body goes `HOLDING_PUMP` the moment the mode is on and `checkPumpEnable` holds (`checkPumping()`, `MarioUpper.cpp` 17), R
+  pumps, the release comes back to the grips through the cooldown — pass 17's behaviour, which he had tested.
+- Verified headless with the pass-17b scripted drive plus an armature readout (temp, not committed): the triple jump's Y, the stick
+  right turning the camera with his face AND his armature following it in the air, the exit A with no jump, the landing; the ground
+  entry with `upper HoldingPump` at once, R → `Pumping`, the release → `HoldingPump`, B → off.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
@@ -2612,10 +2632,10 @@ Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
 - **The turbo dash clip is paced by the actual speed** (2026-09-28 01:02). The game paces it by `mDashSpeed`, capped at 32 — the
   run's tempo (2.76) at 2.5× the ground speed; he reads that as slow. Now `mForwardVel` × 0.055 + 1 = 5.4 at 80.
   `SmsParams.Fludd.DashAnimByForwardVel`.
-- **Idle arms in the L camera until R** (2026-09-28 03:53). `stateMachineUpper()` (`MarioUpper.cpp` 17) puts the upper body on the
-  grips (`HOLDING_PUMP`, the pump clip's frame 0) the moment `isLButtonCamera` && `checkPumpEnable`. Jaysonn: "when i y cam mario
-  should be idle then if i ress r he should be flood animation". `SmsParams.LCamera.HoldsPump` (false; true = the game). The squat's
-  hold (MarioUpper.cpp 30) is untouched.
+- ~~**Idle arms in the L camera until R** (2026-09-28 03:53)~~ — WITHDRAWN in pass 17c by Jaysonn ("mario does grab flod when hoding
+  y cam. lets not do my deviation do it how the game has it"): `checkPumping()` (`MarioUpper.cpp` 17) puts the upper body on the
+  grips (`HOLDING_PUMP`, the pump clip's frame 0) the moment `isLButtonCamera` && `checkPumpEnable`, and so does the port again;
+  `SmsParams.LCamera.HoldsPump` is removed.
 - `SmsRollJumpMinSpeed = 20` (game 40) — feel.
 - `SmsRollJumpKnockdown = false`: the roll-jump into a wall that reaches head height wall-slides. `rotateBroadJumping()` →
   `jumpingBasic(…, 1)` case 2 knocks it down above 40, and it never drops under 40 with the stick held; Jaysonn's
