@@ -19,6 +19,9 @@ public partial class SmsNozzleItem : Node3D
     /// <summary>The scene's parts: the model that spins, the 40 x 100 unit touch cylinder.</summary>
     [Export] public Node3D Model;
     [Export] public Area3D Hit;
+    /// <summary>The map-object clock: 1 = the game's 30 fps frames (a floaty two-second arc on gravity 0.35), 3 = Jaysonn's -- a
+    /// logged deviation, like the HUD's pace: "the item coming out of the box is slow just like the hud menu was".</summary>
+    [Export] public float Speed = 3f;
     public SmsNozzleBox Box;
 
     private const float Gravity = 0.35f, Bounce = 0.5f, StopBelow = 5f, LandFriction = 0.8f, SpinDegPerFrame = 2f;
@@ -45,13 +48,13 @@ public partial class SmsNozzleItem : Node3D
     {
         if (_taken)
             return;
-        _frameAcc += (float)delta * 30f;
+        _frameAcc += (float)delta * 30f * Speed;
         int frames = (int)MathF.Floor(_frameAcc);
         _frameAcc -= frames;
         for (int i = 0; i < frames && !_taken; i++)
             Frame();
         if (_model != null)
-            _model.RotationDegrees = new Vector3(0f, _model.RotationDegrees.Y + SpinDegPerFrame * 30f * (float)delta, 0f);
+            _model.RotationDegrees = new Vector3(0f, _model.RotationDegrees.Y + SpinDegPerFrame * 30f * Speed * (float)delta, 0f);
         // TItem::appear sets HIT_FLAG_NO_COLLISION; TItemNozzle::appearing drops it once LIVE_FLAG_UNK10 -- the stop on the ground --
         // is up: the item cannot be taken in flight (nor inside the breaking box). Polled: he may already stand where it lands.
         if (!_airborne && !_taken && _hit != null)

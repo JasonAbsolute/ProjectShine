@@ -2757,6 +2757,16 @@ you make it more smooth and while were here might as well fix the other hud elem
   nozzle, the three item scenes as exports) and `models/Nozzles/{Hover,Rocket,Turbo}/*NozzleItem.tscn` (his textured model +
   the 40 x 100 unit Hit cylinder). The pass-20 editor previews are gone with them; `SmsFluddAttach.cs` only defaults the bone
   and shows a configuration warning until the scene is in.
+- 21b (Jaysonn 01:28: "the nozzle boxes have a wierd see through proptery ... at some angles its like transparent. and the
+  item comming out of the box is slow just like the hud menu was"; "items also dont have textures they are just white models.
+  and fludd also has materials attached to it so it looks oddly shiny"). The rips import with glTF's default metallic 1 --
+  that is the shine; every FLUDD surface now wears a scene material with metallic 0 and no specular: `FluddFrame.tres` (the
+  atlas x vertex colours) on the tank frame and floaters, the shell as before, `FluddAtlas.tres` on the nozzles. The items
+  were white because their BMDs carry no texture of their own -- texture 0 is the 8x8 H_watergun_main_dummy the game swaps
+  for the FLUDD atlas (nozzleitem.bmt) -- so the item scenes put `FluddAtlas.tres` on the model, as the game does; the box
+  face is drawn on both sides now (cull off) against the see-through. The item's motion is the game's (gravity 0.35 a frame,
+  bounce 0.5, the throw speeds level data we do not have) and floats for two seconds; `SmsNozzleItem.Speed` runs its clock
+  faster, 3 by default -- a deviation, logged below.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
@@ -2765,6 +2775,9 @@ yes, jnt_nozzle_R yes`. Self-test: `hover: first tick vy 4.6`, `rise after the 3
 Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
 
 ### Deliberate deviations from the game
+- The nozzle item's clock (`SmsNozzleItem.Speed`, an export on the item scenes) runs at 3; the game's map objects run at 1 --
+  the thrown nozzle floats down on gravity 0.35 a frame and bounces for about two seconds before it can be taken. Jaysonn
+  (01:28): "the item comming out of the box is slow just like the hud menu was".
 
 - ~~**The waist lean rotates the chest bone, not only its children** (2026-09-27 04:29)~~ — WITHDRAWN in pass 6: on chn_chest the
   game itself rotates jnt_chest and everything under it. J3D applies `MarioWaistCtrl`'s rotation

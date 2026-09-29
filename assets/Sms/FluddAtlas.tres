@@ -1,0 +1,8 @@
+[gd_resource type="StandardMaterial3D" load_steps=2 format=3 uid="uid://1q1uixg6qtr8g"]
+
+[ext_resource type="Texture2D" path="res://models/Koopa/mario/watergun2/body/wg_mdl1/wg_mdl1_0.png" id="1_atlas"]
+
+[resource]
+resource_name = "H_watergun_main (sms): the FLUDD atlas on the nozzles and the nozzle items -- flat like the game's, no specular"
+albedo_texture = ExtResource("1_atlas")
+metallic_specular = 0.0

@@ -1,27 +1,24 @@
-[gd_scene load_steps=11 format=3 uid="uid://jb8i87ogfqr3"]
+[gd_scene load_steps=12 format=3 uid="uid://jb8i87ogfqr3"]
 
 [ext_resource type="Script" path="res://assets/Sms/SmsFludd.cs" id="1_script"]
 [ext_resource type="PackedScene" path="res://models/Koopa/mario/watergun2/body/wg_mdl1/wg_mdl1.glb" id="2_tank"]
-[ext_resource type="Texture2D" path="res://models/Koopa/mario/watergun2/body/wg_mdl1/wg_mdl1_0.png" id="3_atlas"]
-[ext_resource type="PackedScene" path="res://models/Koopa/mario/watergun2/normal_wg/normal_wg/normal_wg.glb" id="4_spray"]
-[ext_resource type="PackedScene" path="res://models/Koopa/mario/watergun2/hover_wg/hover_wg/hover_wg.glb" id="5_hover"]
-[ext_resource type="PackedScene" path="res://models/Koopa/mario/watergun2/rocket_wg/rocket_wg/rocket_wg.glb" id="6_rocket"]
-[ext_resource type="PackedScene" path="res://models/Koopa/mario/watergun2/back_wg/back_wg/back_wg.glb" id="7_turbo"]
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_atlas"]
-resource_name = "H_watergun_main (sms: the tank frame's atlas, on the nozzles too)"
-albedo_texture = ExtResource("3_atlas")
+[ext_resource type="Material" path="res://assets/Sms/FluddAtlas.tres" id="3_atlas"]
+[ext_resource type="Material" path="res://assets/Sms/FluddFrame.tres" id="4_frame"]
+[ext_resource type="PackedScene" path="res://models/Koopa/mario/watergun2/normal_wg/normal_wg/normal_wg.glb" id="5_spray"]
+[ext_resource type="PackedScene" path="res://models/Koopa/mario/watergun2/hover_wg/hover_wg/hover_wg.glb" id="6_hover"]
+[ext_resource type="PackedScene" path="res://models/Koopa/mario/watergun2/rocket_wg/rocket_wg/rocket_wg.glb" id="7_rocket"]
+[ext_resource type="PackedScene" path="res://models/Koopa/mario/watergun2/back_wg/back_wg/back_wg.glb" id="8_turbo"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shell"]
-resource_name = "_mat_G_main_tank (sms: the game's translucent shell)"
+resource_name = "_mat_G_main_tank (sms): the game's translucent shell, vertex-coloured, no specular"
 transparency = 1
 blend_mode = 4
 depth_draw_mode = 2
 vertex_color_use_as_albedo = true
-roughness = 0.35
+metallic_specular = 0.0
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_waterline"]
-resource_name = "_mat_waterline (sms: hidden, Mario.cs draws the water level)"
+resource_name = "_mat_waterline (sms): hidden, Mario.cs draws the water level"
 transparency = 1
 albedo_color = Color(0, 0, 0, 0)
 
@@ -33,12 +30,16 @@ SprayNozzle = NodePath("NozzleSeat/Spray")
 HoverNozzle = NodePath("NozzleSeat/Hover")
 RocketNozzle = NodePath("NozzleSeat/Rocket")
 TurboNozzle = NodePath("NozzleSeat/Turbo")
-AtlasMaterial = SubResource("StandardMaterial3D_atlas")
+AtlasMaterial = ExtResource("3_atlas")
 
 [node name="Tank" parent="." instance=ExtResource("2_tank")]
 
 [node name="Mesh" parent="Tank/Node/Skeleton3D" index="0"]
+surface_material_override/0 = ExtResource("4_frame")
 surface_material_override/1 = SubResource("StandardMaterial3D_shell")
+surface_material_override/2 = ExtResource("4_frame")
+surface_material_override/3 = ExtResource("4_frame")
+surface_material_override/4 = ExtResource("4_frame")
 surface_material_override/5 = SubResource("StandardMaterial3D_waterline")
 
 [node name="NozzleSeat" type="BoneAttachment3D" parent="."]
@@ -47,28 +48,28 @@ bone_idx = 6
 use_external_skeleton = true
 external_skeleton = NodePath("../Tank/Node/Skeleton3D")
 
-[node name="Spray" parent="NozzleSeat" instance=ExtResource("4_spray")]
+[node name="Spray" parent="NozzleSeat" instance=ExtResource("5_spray")]
 
 [node name="Mesh" parent="NozzleSeat/Spray/Node/Skeleton3D" index="0"]
-surface_material_override/0 = SubResource("StandardMaterial3D_atlas")
+surface_material_override/0 = ExtResource("3_atlas")
 
-[node name="Hover" parent="NozzleSeat" instance=ExtResource("5_hover")]
+[node name="Hover" parent="NozzleSeat" instance=ExtResource("6_hover")]
 visible = false
 
 [node name="Mesh" parent="NozzleSeat/Hover/Node/Skeleton3D" index="0"]
-surface_material_override/0 = SubResource("StandardMaterial3D_atlas")
+surface_material_override/0 = ExtResource("3_atlas")
 
-[node name="Rocket" parent="NozzleSeat" instance=ExtResource("6_rocket")]
+[node name="Rocket" parent="NozzleSeat" instance=ExtResource("7_rocket")]
 visible = false
 
 [node name="Mesh" parent="NozzleSeat/Rocket/Node/Skeleton3D" index="0"]
-surface_material_override/0 = SubResource("StandardMaterial3D_atlas")
+surface_material_override/0 = ExtResource("3_atlas")
 
-[node name="Turbo" parent="NozzleSeat" instance=ExtResource("7_turbo")]
+[node name="Turbo" parent="NozzleSeat" instance=ExtResource("8_turbo")]
 visible = false
 
 [node name="Mesh" parent="NozzleSeat/Turbo/Node/Skeleton3D" index="0"]
-surface_material_override/0 = SubResource("StandardMaterial3D_atlas")
+surface_material_override/0 = ExtResource("3_atlas")
 
 [editable path="Tank"]
 [editable path="NozzleSeat/Spray"]

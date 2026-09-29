@@ -19,6 +19,8 @@ resource_local_to_scene = true
 resource_name = "nozzle box (J_nozzleBox x TEVREG1: the script tints it for the nozzle)"
 albedo_color = Color(0, 0, 1, 1)
 albedo_texture = ExtResource("4_face")
+metallic_specular = 0.0
+cull_mode = 2
 
 [node name="NozzleBox" type="StaticBody3D" node_paths=PackedStringArray("Model", "Crash", "Shape", "StompZone")]
 collision_mask = 0

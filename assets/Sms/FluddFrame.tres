@@ -1,0 +1,9 @@
+[gd_resource type="StandardMaterial3D" load_steps=2 format=3 uid="uid://whr8q8dj70cm"]
+
+[ext_resource type="Texture2D" path="res://models/Koopa/mario/watergun2/body/wg_mdl1/wg_mdl1_0.png" id="1_atlas"]
+
+[resource]
+resource_name = "_mat_G_main (sms): the tank frame and floaters, the atlas x the vertex colours -- flat, no specular"
+albedo_texture = ExtResource("1_atlas")
+metallic_specular = 0.0
+vertex_color_use_as_albedo = true
