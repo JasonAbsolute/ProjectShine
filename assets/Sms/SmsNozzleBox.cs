@@ -77,8 +77,9 @@ public partial class SmsNozzleBox : StaticBody3D
         _crashAnim = _crash == null ? null : SmsFluddModel.FindChild<AnimationPlayer>(_crash);
     }
 
-    /// <summary>GX_TEVREG1: the face material's colour for the nozzle, on the box and the crash (one material in the scene, local to
-    /// each instance, so every box has its own).</summary>
+    /// <summary>GX_TEVREG1: the nozzle's colour into the face material (NozzleBoxFace.gdshader: the panel stays white, the logo, the
+    /// screws and the frame take the colour) on the box and the crash -- one material in the scene, local to each instance, so
+    /// every box has its own.</summary>
     private void ApplyTint()
     {
         Color tint = TintFor(_nozzle);
@@ -90,8 +91,12 @@ public partial class SmsNozzleBox : StaticBody3D
             SmsFluddModel.Collect(root, meshes);
             foreach (var mi in meshes)
                 for (int i = 0; i < mi.GetSurfaceOverrideMaterialCount(); i++)
-                    if (mi.GetSurfaceOverrideMaterial(i) is StandardMaterial3D m)
+                {
+                    if (mi.GetSurfaceOverrideMaterial(i) is ShaderMaterial sm)
+                        sm.SetShaderParameter("tint", tint);
+                    else if (mi.GetSurfaceOverrideMaterial(i) is StandardMaterial3D m)
                         m.AlbedoColor = tint;
+                }
         }
     }
 

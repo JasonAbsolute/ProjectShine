@@ -13568,12 +13568,13 @@ public partial class Mario : CharacterBody3D
     // MARIO_STATUS_SQUAT / SQUAT_STANDUP (MarioWait.cpp squating() 308, squatStandup() 387; MarioMove.cpp canSquat() 44).
     // ---------------------------------------------------------------------------------------------------------------
 
-    /// <summary>canSquat(): the FLUDD out, not a RocketType-1 nozzle (the hover, the rocket), not Yoshi, and mInput 0x200 -- R or L
-    /// held while not FLUDD_EMITTING (the dash). MEANING_R is the GC trigger's click at the end of its travel; without a
-    /// button_rclick action the pad's full pull stands in (SmsRClick). The legacy Z is an alias of L here.</summary>
+    /// <summary>canSquat(): the FLUDD out, not a RocketType-1 nozzle (the hover, the rocket) and not the turbo (mCurrentNozzle != 5:
+    /// the click with the turbo is the dash's charge -- he keeps walking as mDashSpeed builds and runs into the dash), not Yoshi,
+    /// and mInput 0x200 -- R or L held while not FLUDD_EMITTING (the dash). MEANING_R is the GC trigger's click at the end of its
+    /// travel; without a button_rclick action the pad's full pull stands in (SmsRClick). The legacy Z is an alias of L here.</summary>
     private bool SmsCanSquat()
     {
-        if (!_fluddReady || _fluddDashing || SmsFluddCurrent.RocketType == 1)
+        if (!_fluddReady || _fluddDashing || SmsFluddCurrent.RocketType == 1 || _fluddNozzle == SmsNozzle.Turbo)
             return false;
         return SmsRClick() || SmsSquatLHeld();
     }

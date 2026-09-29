@@ -2767,6 +2767,14 @@ you make it more smooth and while were here might as well fix the other hud elem
   face is drawn on both sides now (cull off) against the see-through. The item's motion is the game's (gravity 0.35 a frame,
   bounce 0.5, the throw speeds level data we do not have) and floats for two seconds; `SmsNozzleItem.Speed` runs its clock
   faster, 3 by default -- a deviation, logged below.
+- 22 (Jaysonn 01:59, `Ref/NozzleBoxRef.png` against `Ref/real.png`: "the colors are off"; "when mario hard clicks with turbo he
+  should not sqaut he should do his foward walk when chagring turbo up"). The game's box is a white panel whose logo, screws and
+  frame take the nozzle's colour; the port had multiplied the whole face by it (a red panel with a black logo). nozzlebox.bmt's
+  TEV stage is C1 x (1 - tex) + tex -- `NozzleBoxFace.gdshader`, a ShaderMaterial in NozzleBox.tscn with `tint` and `face`
+  uniforms; the script sets `tint`. The see-through boxes in his capture were the editor's Debug > Visible Collision Shapes.
+  `canSquat()` (MarioMove.cpp 44) refuses the turbo outright (`mCurrentNozzle != 5`) besides the RocketType-1 nozzles; the port
+  had only the RocketType check, so the R click with the turbo squatted him instead of charging. Drive: the turbo on, R
+  clicked while he stands -- no squat, he walks then sprints as mDashSpeed climbs 30 -> 32, FLUDD_EMITTING at 32.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
