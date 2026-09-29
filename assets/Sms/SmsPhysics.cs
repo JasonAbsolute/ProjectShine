@@ -212,7 +212,7 @@ public static class SmsParams
         // toward the window's edges. The game has the top rows at y 74 (the CRT hid ~22 of them), the gauge 59 px from the right
         // and its "WATER" 3 px past the bottom. His own HUD had the strips 40 px from the top. 0 = the game's placement.
         public const float LeftShift = 0f;      // the coin / shine / blue / red strips toward the left edge (the game: 13 px in)
-        public const float TopShift = -34f;     // the top rows up (74 -> 40; the shine icon's top at 11, "MARIO" at 6)
+        public const float TopShift = -22f;     // the top rows up (74 -> 52; "a bit" down again from -34 at 00:03: "MARIO" at 18)
         public const float RightShift = 30f;    // the gauge and the life meter toward the right edge (59 / 61 -> 29 / 31)
         public const float BottomShift = -10f;  // the gauge and the red coins up off the bottom ("WATER" 13 px above it)
         // DEVIATION ("incredibly slow"): the console's motions -- setPanePosition's quadratics, the settles, the group slides, the

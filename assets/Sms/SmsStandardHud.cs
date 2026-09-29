@@ -27,7 +27,14 @@ using System;
 ///       00FFFFFF (the sun and text 0010FFFF below 4).
 ///   r_0 (13, 419) the red coins: coin_back tinted FF28FF, redcoin_icon at (19, -16), x at (41, -18), the count at (70, -38), balloon_slash
 ///       50 x 60 at (87, -41), the 8 (coin_number_8 28 x 28) at (113, -16); it rises from below when the first red coin is taken
-///       (startAppearRedCoin 2553) and drops off the bottom for a camera demo (startDownLeftBot 2366).
+///       (startAppearRedCoin 2553) and drops off the bottom for a camera demo (startDownLeftBot 2366); 73 px higher while the timer is out.
+///   t_0 (13, 419) the timer: "TIME" time_text 68 x 28 at (5, -37), coin_back 270 x 22 tinted FF28FF, and two layouts -- t_1 at (4, -11)
+///       mm:ss:cc (digits at (0, 0) (27, -5) (71, -17) (98, -22) (142, -34) (169, -39), coin_number_colon 18 x 36 at (60, -16) (131, -33))
+///       for a count-up or a countdown from 60 s or more, t_2 at (31, -16) ss:cc (digits at (0, 0) (27, -5) (71, -17) (98, -22), the colon
+///       at (60, -16)) for a shorter countdown (startAppearTimer 2451). It rises from below like the red coins (startInsertTimer 2483:
+///       the strip, "TIME" and the digits at 24 + 6i, the colons at 32 / 44; processAppearTimer 3513), shows the stopwatch every frame
+///       (setTimer 2920: centiseconds; the short layout's digits and colon turn FF82FF under 10 s), and leaves off the bottom
+///       (startDisappearTimer 2444: 525 - y).
 /// The pops are TBoundPane quadratics (SmsHud.Pop): the counters drop from (0, -100) through (0, 30) over 50 frames and settle over 30
 /// (cDownTop / cDownMid), the red coins rise from (0, 50) through (0, -30), the coin counter's row step goes through (0, 45); the
 /// groups slide linearly (TExPane): the coins 20 frames, the lives 50, the star HUD 40 (the shine group leading the blue one by
@@ -53,18 +60,23 @@ public partial class SmsStandardHud : Control
     public bool Demo;               // a camera demo runs: the camera locked, a talk, the shine get, death
     public bool ShineDemo;          // the demo is the shine get (DIRECTOR_FLAG_SHINE_TAKEN)
     public bool Dead;
+    public bool TimerRunning;       // his ShineTimer runs (the game's startMoveTimer)
+    public bool TimerReached;       // it stopped at its target (his TimerReachedTarget: the game's startDisappearTimer)
+    public bool TimerCountDown = true;
+    public float TimerSeconds, TimerStartSeconds;
     public bool Ready { get; private set; }
 
     private float _now;             // the console's frames, fractional
     private int _frame;             // the last whole frame stepped
 
     // ---- the textures ----
-    private Texture2D _strip, _coinIcon, _blueIcon, _redIcon, _shineIcon, _x, _slash, _marioIcon, _marioText, _lifeText, _lifeTextAir, _lifeTextAirLow, _disc;
+    private Texture2D _strip, _coinIcon, _blueIcon, _redIcon, _shineIcon, _x, _slash, _marioIcon, _marioText, _lifeText, _lifeTextAir, _lifeTextAirLow, _disc, _colon, _timeText;
     private readonly Texture2D[] _digit = new Texture2D[10];
     private readonly Texture2D[] _lifeOn = new Texture2D[9], _lifeOff = new Texture2D[9], _lifeAir = new Texture2D[9], _lifeAirLow = new Texture2D[9];
 
     private static readonly Color StripGreen = new Color(0f, 1f, 0f, 180f / 255f);
     private static readonly Color StripMagenta = new Color(1f, 0x28 / 255f, 1f, 180f / 255f);
+    private static readonly Color TimerLow = new Color(1f, 0x82 / 255f, 1f);        // t_n7's white: the short countdown under 10 s
     private static readonly Color DiscHealth = new Color(1f, 0x4C / 255f, 0f, (0xC8 / 255f) * (200f / 255f));
     private static readonly Color DiscAir = new Color(0f, 0f, 1f, (0x78 / 255f) * (200f / 255f));
     private static readonly Color Dim = new Color(0x7F / 255f, 0x7F / 255f, 0x7F / 255f);
@@ -72,13 +84,13 @@ public partial class SmsStandardHud : Control
 
     // ---- the groups ----
     private static readonly Vector2 CoinPos = new Vector2(13, 152), BluePos = new Vector2(13, 113), ShinePos = new Vector2(13, 74);
-    private static readonly Vector2 LifePos = new Vector2(500, 50), MarioPos = new Vector2(223, 74), RedPos = new Vector2(13, 419);
+    private static readonly Vector2 LifePos = new Vector2(500, 50), MarioPos = new Vector2(223, 74), RedPos = new Vector2(13, 419), TimerPos = new Vector2(13, 419);
     private const float CoinHome = 74f - 152f;          // unk26A: the coin counter's row while the star HUD is away
     private const float CoinHidden = -(152f + 10f + 1f) - 22f;  // startDisappearCoin: -(y2 + 1) less the strip
     private const float MarioHidden = -(74f + 10f + 1f) - 22f;
     private const float ShineHidden = -(74f + 10f + 1f) - 22f, ShineGone = -(74f + 10f + 1f) + CoinHome; // startDisappearStar's target
     private const float BlueHidden = -(113f + 10f + 1f) - 22f;
-    private const float RedBelow = 465f - 419f, RedGone = 525f - 419f;
+    private const float RedBelow = 465f - 419f, RedGone = 525f - 419f, RedOverTimer = -73f;
     private const float LifeAbove = -(50f + 10f + 1f);   // startInsertLife: -(unk4.y2 + 1)
     private const float LifeGone = LifeAbove - 71f - 22f; // startLifeMeterDisappear: on past the disc's height, fully out of the frame
     private const int IdleFrames = 200;                 // updateCounterState: 0xC8 frames of MARIO_STATUS_WAIT
@@ -106,6 +118,10 @@ public partial class SmsStandardHud : Control
     private bool _redVisible, _redParked; private int _redF0 = -1;
     private SmsHudPane _rStrip, _rIcon, _rX, _rDigit, _rSlash, _rEight;
     private int _redShown = -1;
+    // the timer
+    private readonly SmsHudSlide _timerSlide = new SmsHudSlide(RedBelow);
+    private bool _timerVisible, _timerParked, _timerLong, _timerWasRunning; private int _timerF0 = -1;
+    private SmsHudPane _tStrip, _tText; private readonly SmsHudPane[] _tLong = new SmsHudPane[6], _tShort = new SmsHudPane[4], _tColon = new SmsHudPane[3];
     // the life meter
     private enum Life { Hidden, Appear, Insert, Shown, Hold, Leave, DemoHidden }
     private Life _life = Life.Hidden; private int _lifeF0 = -1; private Vector2 _lifeLeaveFrom;
@@ -119,8 +135,9 @@ public partial class SmsStandardHud : Control
         _strip = SmsHud.Load("coin_back"); _coinIcon = SmsHud.Load("coin_icon"); _blueIcon = SmsHud.Load("bluecoin_icon"); _redIcon = SmsHud.Load("redcoin_icon");
         _shineIcon = SmsHud.Load("shine_icon"); _x = SmsHud.Load("coin_number_x"); _slash = SmsHud.Load("balloon_slash");
         _marioIcon = SmsHud.Load("mario_icon"); _marioText = SmsHud.Load("mario_text"); _lifeText = SmsHud.Load("life_text"); _disc = SmsHud.Load("water_back");
+        _colon = SmsHud.Load("coin_number_colon"); _timeText = SmsHud.Load("time_text");
         bool ok = _strip != null && _coinIcon != null && _blueIcon != null && _redIcon != null && _shineIcon != null && _x != null && _slash != null
-            && _marioIcon != null && _marioText != null && _lifeText != null && _disc != null;
+            && _marioIcon != null && _marioText != null && _lifeText != null && _disc != null && _colon != null && _timeText != null;
         for (int i = 0; i < 10; i++) { _digit[i] = SmsHud.Load($"coin_number_{i}"); ok &= _digit[i] != null; }
         for (int i = 0; i < 9; i++)
         {
@@ -161,6 +178,14 @@ public partial class SmsStandardHud : Control
         _mDigit[0] = new SmsHudPane(77, -26, 36, 36, _digit[0]) { Rot = Slant }; _mDigit[1] = new SmsHudPane(104, -31, 36, 36, _digit[0]) { Rot = Slant };
         _rStrip = new SmsHudPane(0, 0, 198, 22, _strip) { Tint = StripMagenta, Rot = Slant }; _rIcon = new SmsHudPane(19, -16, 30, 40, _redIcon); _rX = new SmsHudPane(41, -18, 36, 36, _x) { Rot = Slant };
         _rDigit = new SmsHudPane(70, -38, 36, 36, _digit[0]) { Rot = Slant }; _rSlash = new SmsHudPane(87, -41, 50, 60, _slash); _rEight = new SmsHudPane(113, -16, 28, 28, _digit[8]) { Rot = Slant };
+        // the timer: t_ba, t_tx (turned 13), t_1's six digits and two colons (turned 10), t_2's four and one
+        _tStrip = new SmsHudPane(0, 0, 270, 22, _strip) { Tint = StripMagenta, Rot = Slant }; _tText = new SmsHudPane(5, -37, 68, 28, _timeText) { Rot = 13f };
+        int[,] tl = { { 0, 0 }, { 27, -5 }, { 71, -17 }, { 98, -22 }, { 142, -34 }, { 169, -39 } };
+        for (int i = 0; i < 6; i++) _tLong[i] = new SmsHudPane(4 + tl[i, 0], -11 + tl[i, 1], 36, 36, _digit[0]) { Rot = Slant };
+        _tColon[0] = new SmsHudPane(4 + 60, -11 - 16, 18, 36, _colon) { Rot = 10f }; _tColon[1] = new SmsHudPane(4 + 131, -11 - 33, 18, 36, _colon) { Rot = 10f };
+        int[,] ts = { { 0, 0 }, { 27, -5 }, { 71, -17 }, { 98, -22 } };
+        for (int i = 0; i < 4; i++) _tShort[i] = new SmsHudPane(31 + ts[i, 0], -16 + ts[i, 1], 36, 36, _digit[0]) { Rot = Slant };
+        _tColon[2] = new SmsHudPane(31 + 60, -16 - 16, 18, 36, _colon) { Rot = 10f };
         _lDisc = new SmsHudPane(0, 0, 74, 71, _disc) { Tint = DiscHealth }; _lText = new SmsHudPane(7, -18, 60, 30, _lifeText);
         _lSun = new SmsHudPane(0, 0, 0, 0, null) { Shown = true }; // lm_0: the sun and rays ride its pop
         int[,] ray = { { 9, 11, 54, 58 }, { 53, 0, 26, 28 }, { 59, 23, 26, 24 }, { 57, 48, 26, 28 }, { 38, 61, 26, 28 }, { 13, 64, 24, 26 }, { -7, 49, 28, 28 }, { -12, 27, 24, 24 }, { -8, 2, 28, 28 } };
@@ -236,6 +261,7 @@ public partial class SmsStandardHud : Control
         StepCoins();
         StepMario();
         StepRed();
+        StepTimer();
     }
 
     // ------------------------------------------------------------------------------------------------------------------ the demo
@@ -246,9 +272,10 @@ public partial class SmsStandardHud : Control
         {
             // startCameraDemo with no health: everything off at once
             _coinVisible = false; _marioVisible = false; _marioLeaving = false; _starVisible = false; _starAppearing = false; _starLeaving = false;
-            _redVisible = false; _redParked = false; _life = Life.Hidden;
+            _redVisible = false; _redParked = false; _timerVisible = false; _timerParked = false; _life = Life.Hidden;
             _coinSlide.Set(_now, CoinHidden, CoinHidden, 0); _marioSlide.Set(_now, MarioHidden, MarioHidden, 0);
             _shineSlide.Set(_now, ShineHidden, ShineHidden, 0); _blueSlide.Set(_now, BlueHidden, BlueHidden, 0); _redSlide.Set(_now, RedBelow, RedBelow, 0);
+            _timerSlide.Set(_now, RedBelow, RedBelow, 0);
             return;
         }
         if (_life == Life.Appear || _life == Life.Insert || _life == Life.Shown || _life == Life.Hold)
@@ -256,6 +283,7 @@ public partial class SmsStandardHud : Control
         else if (_life == Life.Hidden)
             _life = Life.DemoHidden;
         if (_redVisible) { _redSlide.Retarget(_now, RedGone, 20); _redParked = true; } // startDownLeftBot
+        if (_timerVisible) { _timerSlide.Retarget(_now, RedGone, 20); _timerParked = true; _timerF0 = -1; }
         StartDisappearMario();
         if (ShineDemo)
             StartAppearStar();      // DIRECTOR_FLAG_SHINE_TAKEN: the counters come in for the shine
@@ -269,6 +297,11 @@ public partial class SmsStandardHud : Control
     private void EndCameraDemo()
     {
         _inDemo = false; _demoEndCount = 0;
+        if (_timerParked)
+        {
+            _timerParked = false; _timerVisible = false;
+            if (TimerRunning) StartInsertTimer(); // unk51C: back after the demo while it runs
+        }
         if (_redParked) { _redParked = false; StartAppearRedCoin(); }
         if (!_coinVisible)
             StartAppearCoin();
@@ -541,7 +574,7 @@ public partial class SmsStandardHud : Control
     private void StartAppearRedCoin()
     {
         _redVisible = true; _redParked = false; _redF0 = _frame;
-        _redSlide.Set(_now, RedBelow, 0f, 40);
+        _redSlide.Set(_now, RedBelow, _timerVisible ? RedOverTimer : 0f, 40); // 73 px up while the timer is out
         _rStrip.Pop(_frame, SmsHud.UpTop, SmsHud.UpMid, 50);
         _rIcon.Shown = false; _rX.Shown = false; _rDigit.Shown = false; _rSlash.Shown = false; _rEight.Shown = false;
     }
@@ -559,6 +592,89 @@ public partial class SmsStandardHud : Control
         if (At(f, 34)) _rEight.Pop(_frame, SmsHud.UpTop, SmsHud.UpMid, 50);
         if (f >= Paced(34 + 50 + SmsHud.Settle))
             _redF0 = -1;
+    }
+
+    // ------------------------------------------------------------------------------------------------------------------ the timer
+    private void StartInsertTimer()
+    {
+        // startAppearTimer (2451): the long layout for a count-up or a countdown from 60 s, the short one below; startInsertTimer (2483)
+        _timerLong = !TimerCountDown || TimerStartSeconds >= 60f;
+        _timerVisible = true; _timerParked = false; _timerF0 = _frame;
+        _timerSlide.Set(_now, RedBelow, 0f, 40);
+        _tStrip.Pop(_frame, SmsHud.UpTop, SmsHud.UpMid, 50);
+        _tText.Shown = false;
+        foreach (var d in _tLong) { d.Shown = false; d.Tint = Colors.White; }
+        foreach (var d in _tShort) { d.Shown = false; d.Tint = Colors.White; }
+        foreach (var c in _tColon) { c.Shown = false; c.Tint = Colors.White; }
+        SetTimerDigits();
+        if (_redVisible && !_redParked)
+            _redSlide.Retarget(_now, RedOverTimer, 40); // the red coins make room above it
+    }
+
+    private void StartDisappearTimer()
+    {
+        _timerSlide.Retarget(_now, RedGone, 40); _timerF0 = -1;
+        if (_redVisible && !_redParked)
+            _redSlide.Retarget(_now, 0f, 40);
+    }
+
+    /// <summary>setTimer (2920): the stopwatch in centiseconds, capped at 99:59.99; the short layout's pieces go FF82FF under 10 s.</summary>
+    private void SetTimerDigits()
+    {
+        int centis = Mathf.Clamp(Mathf.RoundToInt(TimerSeconds * 100f), 0, 599999);
+        int minutes = centis / 6000, rest = centis - minutes * 6000, seconds = rest / 100, cc = rest % 100;
+        if (_timerLong)
+        {
+            _tLong[0].Tex = _digit[minutes / 10]; _tLong[1].Tex = _digit[minutes % 10];
+            _tLong[2].Tex = _digit[seconds / 10]; _tLong[3].Tex = _digit[seconds % 10];
+            _tLong[4].Tex = _digit[cc / 10]; _tLong[5].Tex = _digit[cc % 10];
+        }
+        else
+        {
+            _tShort[0].Tex = _digit[seconds / 10]; _tShort[1].Tex = _digit[seconds % 10];
+            _tShort[2].Tex = _digit[cc / 10]; _tShort[3].Tex = _digit[cc % 10];
+            Color c = centis < 1000 ? TimerLow : Colors.White;
+            foreach (var d in _tShort) d.Tint = c;
+            _tColon[2].Tint = c;
+        }
+    }
+
+    private void StepTimer()
+    {
+        // his ShineTimer: a start brings the timer in (startAppearTimer + startMoveTimer), the target reached takes it away
+        // (startDisappearTimer); stopped early it stays frozen, as the game's does once stopMoveTimer is called
+        if (TimerRunning && !_timerWasRunning && !_timerVisible && !Demo)
+            StartInsertTimer();
+        if (!TimerRunning && _timerWasRunning && _timerVisible && TimerReached)
+            StartDisappearTimer();
+        _timerWasRunning = TimerRunning;
+        if (!_timerVisible)
+            return;
+        if (TimerRunning)
+            SetTimerDigits();
+        if (_timerF0 >= 0)
+        {
+            // processAppearTimer (3513): "TIME" at 24, the digits at 24 + 6i, the colons at 32 / 44 (the short layout's at 32), all rising
+            int f = _frame - _timerF0;
+            if (At(f, 24)) _tText.Pop(_frame, SmsHud.UpTop, SmsHud.UpMid, 50);
+            if (_timerLong)
+            {
+                for (int i = 0; i < 6; i++)
+                    if (At(f, 24 + 6 * i)) _tLong[i].Pop(_frame, SmsHud.UpTop, SmsHud.UpMid, 50);
+                for (int i = 0; i < 2; i++)
+                    if (At(f, 32 + 12 * i)) _tColon[i].Pop(_frame, SmsHud.UpTop, SmsHud.UpMid, 50);
+                if (f >= Paced(54 + 50 + SmsHud.Settle)) _timerF0 = -1;
+            }
+            else
+            {
+                for (int i = 0; i < 4; i++)
+                    if (At(f, 24 + 6 * i)) _tShort[i].Pop(_frame, SmsHud.UpTop, SmsHud.UpMid, 50);
+                if (At(f, 32)) _tColon[2].Pop(_frame, SmsHud.UpTop, SmsHud.UpMid, 50);
+                if (f >= Paced(42 + 50 + SmsHud.Settle)) _timerF0 = -1;
+            }
+        }
+        if (!_timerParked && _timerSlide.To == RedGone && _timerSlide.Done(_now))
+            _timerVisible = false;
     }
 
     // ------------------------------------------------------------------------------------------------------------------ the life meter
@@ -706,7 +822,7 @@ public partial class SmsStandardHud : Control
     {
         if (!Ready)
             return;
-        // the screen's pane order: c_0, d_0, s_0, l_0, (w_0), m_0, r_0
+        // the screen's pane order: c_0, d_0, s_0, l_0, (w_0), m_0, r_0, t_0
         if (_coinVisible)
         {
             Transform2D t = Group(CoinPos, Anchor.TopLeft);
@@ -762,6 +878,22 @@ public partial class SmsStandardHud : Control
             Vector2 g = new Vector2(0f, _redSlide.At(_now));
             _rStrip.Draw(this, _now, g, t); _rIcon.Draw(this, _now, g, t); _rX.Draw(this, _now, g, t);
             _rDigit.Draw(this, _now, g, t); _rSlash.Draw(this, _now, g, t); _rEight.Draw(this, _now, g, t);
+        }
+        if (_timerVisible)
+        {
+            Transform2D t = Group(TimerPos, Anchor.BottomLeft);
+            Vector2 g = new Vector2(0f, _timerSlide.At(_now));
+            _tText.Draw(this, _now, g, t); _tStrip.Draw(this, _now, g, t);
+            if (_timerLong)
+            {
+                foreach (var d in _tLong) d.Draw(this, _now, g, t);
+                _tColon[0].Draw(this, _now, g, t); _tColon[1].Draw(this, _now, g, t);
+            }
+            else
+            {
+                foreach (var d in _tShort) d.Draw(this, _now, g, t);
+                _tColon[2].Draw(this, _now, g, t);
+            }
         }
         DrawSetTransform(Vector2.Zero, 0f, Vector2.One);
     }

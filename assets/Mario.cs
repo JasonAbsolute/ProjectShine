@@ -283,6 +283,8 @@ public partial class Mario : CharacterBody3D
     private const string SMS_PUMP_SCALE_PATH = "parameters/PumpScale/scale";
     private SmsWaterHud _waterHud;                                // TGCConsole2's water gauge: the 'w_0' panes of standard_1.blo
     private SmsStandardHud _stdHud;                               // TGCConsole2's counters and life meter: the rest of standard_1.blo
+    private ShineTimer _stdHudTimer;                              // his level's stopwatch, the console's timer reads it
+    private int _stdHudTimerSearch;                               // ticks until the tree is searched for it again
     private bool _smsRocketLanding = false;                       // the fall is ROCKET_LANDING (after a hover): no wall slide on a wall at 16..40
     // waiting(): mHealth <= 3 -> ANIM_DAMAGE_WAIT_START once, then ANIM_DAMAGE_WAIT (library-only clips, driven directly)
     private int _smsDamageWaitPhase = 0;      // 0 off, 1 ma_damage_wait_start playing, 2 ma_damage_wait looping
@@ -12596,6 +12598,7 @@ public partial class Mario : CharacterBody3D
         foreach (CanvasItem n in new CanvasItem[] { _lifeMeter, _lifeCounterHud, _yellowCoinHud, _redCoinHud, _blueCoinHud, _shineHud })
             if (n != null)
                 n.Visible = false;
+        CallDeferred(nameof(SmsStandardHudFindLevelNodes)); // his TimerHud and ShineTimer live in the level scene
         if (SmsDebugPrint)
             GD.Print(_stdHud.Ready
                 ? "[SMS hud] the console's counters and life meter: the 38 textures loaded; the coins and the lives come in at the start, the shines and blue coins peek after 6.7 s idle, the life meter comes in at a hit"
@@ -12618,7 +12621,43 @@ public partial class Mario : CharacterBody3D
     {
         if (_stdHud == null || !_stdHud.Ready)
             return;
+        if ((_stdHudTimer == null || !IsInstanceValid(_stdHudTimer)) && --_stdHudTimerSearch <= 0)
+        {
+            SmsStandardHudFindLevelNodes();
+            _stdHudTimerSearch = 120;
+        }
         SmsStandardHudFeed();
+        if (_stdHudTimer != null && IsInstanceValid(_stdHudTimer))
+        {
+            // the console's timer: startAppearTimer(count-up / countdown, the start) as his ShineTimer starts, setTimer every frame,
+            // startDisappearTimer once it has reached its target; stopped early it stays frozen, as the game's does
+            var t = _stdHudTimer;
+            _stdHud.TimerRunning = t.IsRunning;
+            _stdHud.TimerSeconds = t.CurrentValue;
+            _stdHud.TimerCountDown = t.CountDown;
+            _stdHud.TimerStartSeconds = t.StartValue;
+            _stdHud.TimerReached = !t.IsRunning && (t.CountDown ? t.CurrentValue <= t.TargetValue : !t.Unbounded && t.CurrentValue >= t.TargetValue);
+        }
+    }
+
+    /// <summary>The level's ShineTimer (the stopwatch the console's timer shows) and his TimerHud nodes (hidden, the console draws
+    /// t_0 instead), wherever the level put them.</summary>
+    private void SmsStandardHudFindLevelNodes()
+    {
+        if (_stdHud == null || !IsInsideTree())
+            return;
+        var stack = new System.Collections.Generic.Stack<Node>();
+        stack.Push(GetTree().Root);
+        while (stack.Count > 0)
+        {
+            Node n = stack.Pop();
+            if (n is ShineTimer st && (_stdHudTimer == null || !IsInstanceValid(_stdHudTimer)))
+                _stdHudTimer = st;
+            else if (n is TimerHud th)
+                th.Visible = false;
+            foreach (Node c in n.GetChildren())
+                stack.Push(c);
+        }
     }
 
     /// <summary>TMario::getNozzle (MarioReceiveMsg.cpp 18), the nozzle item touched: changeNozzle(type, animate = true) -- the second

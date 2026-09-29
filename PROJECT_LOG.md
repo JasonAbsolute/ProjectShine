@@ -2724,6 +2724,14 @@ you make it more smooth and while were here might as well fix the other hud elem
   end up), the Mario head 355 (5° the other way), the icons upright, the gauge and the life meter unturned. That slant is the
   SMS look his own HUD had approximated with a -0.2 rad node rotation. `SmsHudPane.Rot`, drawn through the group's transform
   (`DrawSetTransformMatrix`). The dumper prints `ROT` now.
+- 19e (Jaysonn 00:03: "nice can we shift it down just a bit from the top? ... you updated the timer and red coin huds also right?").
+  TopShift -34 → -22. The red coins were in since 19; the timer was not — now `t_0`: "TIME" (time_text, turned 13), the 270-px
+  strip, the mm:ss:cc layout (`t_1`) for a count-up or a countdown from 60 s, ss:cc (`t_2`) below that (startAppearTimer 2451),
+  rising like the red coins with the digits at 24 + 6i and the colons at 32 / 44 (startInsertTimer 2483, processAppearTimer
+  3513), the stopwatch every frame in centiseconds (setTimer 2920; the short layout's digits and colon FF82FF under 10 s, the
+  tick SE not ported), away off the bottom (startDisappearTimer 2444) and parked for a demo (startDownLeftBot), the red coins 73
+  px above it while it is out. Fed from his `ShineTimer` (found in the level tree; his `TimerHud` nodes hidden): a start brings
+  it in, the target reached takes it away, a stop before that freezes it as `stopMoveTimer` does.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
