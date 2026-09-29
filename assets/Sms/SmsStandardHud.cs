@@ -36,9 +36,10 @@ using System;
 /// shine get brings the star HUD in instead) and endCameraDemo (2125) brings the coins back.
 /// Frames are the game's 30 a second, counted fractionally so the motion runs at the display's rate; the motions (not the waits) go at
 /// SmsParams.Hud.AnimSpeed times the game's pace. Where the game parks a hidden strip 11 px into the frame (the CRT's overscan hid it:
-/// initHiddenPaneAbove) this parks it fully above the top edge. The screen is the game's 640 x 448 frame (SmsHud): left-hand groups
-/// keep their margin to the left edge, the life meter to the right, plus SmsParams.Hud.EdgeInset, all scaled by SmsHud.Scale; with
-/// SmsParams.Hud.IdleHold the star HUD and the lives stay while Mario stands still instead of the game's peek.
+/// initHiddenPaneAbove) this parks it fully above the top edge. The screen is the game's 640 x 448 frame (SmsHud): the counters keep
+/// their margin to the left edge, the lives (centred on the frame) to the centre, the life meter to the right, the red coins to the
+/// bottom, moved by SmsParams.Hud's shifts and scaled by SmsHud.Scale; with SmsParams.Hud.IdleHold the star HUD and the lives stay
+/// while Mario stands still instead of the game's peek.
 /// </summary>
 public partial class SmsStandardHud : Control
 {
@@ -686,10 +687,14 @@ public partial class SmsStandardHud : Control
     }
 
     // ------------------------------------------------------------------------------------------------------------------ the draw
-    private void Group(Vector2 pos, bool right)
+    private enum Anchor { TopLeft, TopCenter, TopRight, BottomLeft }
+
+    private void Group(Vector2 pos, Anchor anchor)
     {
-        float x = right ? SmsHud.RightX(pos.X, _scale, _viewport) : SmsHud.LeftX(pos.X, _scale);
-        DrawSetTransform(new Vector2(x, SmsHud.TopY(pos.Y, _scale)), 0f, new Vector2(_scale, _scale));
+        float x = anchor == Anchor.TopRight ? SmsHud.RightX(pos.X, _scale, _viewport)
+            : anchor == Anchor.TopCenter ? SmsHud.CenterX(pos.X, _scale, _viewport) : SmsHud.LeftX(pos.X, _scale);
+        float y = anchor == Anchor.BottomLeft ? SmsHud.BottomY(pos.Y, _scale, _viewport) : SmsHud.TopY(pos.Y, _scale);
+        DrawSetTransform(new Vector2(x, y), 0f, new Vector2(_scale, _scale));
     }
 
     public override void _Draw()
@@ -699,25 +704,25 @@ public partial class SmsStandardHud : Control
         // the screen's pane order: c_0, d_0, s_0, l_0, (w_0), m_0, r_0
         if (_coinVisible)
         {
-            Group(CoinPos, false);
+            Group(CoinPos, Anchor.TopLeft);
             Vector2 g = new Vector2(0f, _coinSlide.At(_now));
             _cStrip.Draw(this, _now, g); _cIcon.Draw(this, _now, g); _cX.Draw(this, _now, g);
             foreach (var d in _cDigit) d.Draw(this, _now, g);
         }
         if (_starVisible)
         {
-            Group(BluePos, false);
+            Group(BluePos, Anchor.TopLeft);
             Vector2 g = new Vector2(0f, _blueSlide.At(_now));
             _dStrip.Draw(this, _now, g); _dIcon.Draw(this, _now, g); _dX.Draw(this, _now, g);
             foreach (var d in _dDigit) d.Draw(this, _now, g);
-            Group(ShinePos, false);
+            Group(ShinePos, Anchor.TopLeft);
             g = new Vector2(0f, _shineSlide.At(_now));
             _sStrip.Draw(this, _now, g); _sIcon.Draw(this, _now, g); _sX.Draw(this, _now, g);
             foreach (var d in _sDigit) d.Draw(this, _now, g);
         }
         if (LifeOnScreen)
         {
-            Group(LifePos, true);
+            Group(LifePos, Anchor.TopRight);
             Vector2 g = LifeGroupOffset(_now);
             bool air = _lifeAirShown, low = _lifeShown < 4;
             _lDisc.Tint = air ? DiscAir : DiscHealth;
@@ -741,14 +746,14 @@ public partial class SmsStandardHud : Control
         }
         if (_marioVisible)
         {
-            Group(MarioPos, false);
+            Group(MarioPos, Anchor.TopCenter); // m_0's strip (223..421) is centred on the frame's 320
             Vector2 g = new Vector2(0f, _marioSlide.At(_now));
             _mStrip.Draw(this, _now, g); _mIcon.Draw(this, _now, g); _mText.Draw(this, _now, g); _mX.Draw(this, _now, g);
             foreach (var d in _mDigit) d.Draw(this, _now, g);
         }
         if (_redVisible)
         {
-            Group(RedPos, false);
+            Group(RedPos, Anchor.BottomLeft);
             Vector2 g = new Vector2(0f, _redSlide.At(_now));
             _rStrip.Draw(this, _now, g); _rIcon.Draw(this, _now, g); _rX.Draw(this, _now, g);
             _rDigit.Draw(this, _now, g); _rSlash.Draw(this, _now, g); _rEight.Draw(this, _now, g);

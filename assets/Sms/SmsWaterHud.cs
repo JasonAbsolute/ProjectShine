@@ -27,7 +27,7 @@ using System;
 /// and again. The console's frames are the game's 30 a second; they are counted fractionally here so the motion is as smooth as the
 /// display, the motions at SmsParams.Hud.AnimSpeed times the pace. The screen is the game's 640 x 448 frame (SmsHud): the group keeps
 /// its margins to the bottom-right corner (the disc 59 px from the right edge, 7 px from the bottom; "WATER" ran 3 px past it on the
-/// disc, into the CRT's overscan), plus SmsParams.Hud.EdgeInset, all scaled by SmsHud.Scale.
+/// disc, into the CRT's overscan), moved by SmsParams.Hud's right / bottom shifts, all scaled by SmsHud.Scale.
 /// </summary>
 public partial class SmsWaterHud : Control
 {

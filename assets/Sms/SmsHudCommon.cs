@@ -14,9 +14,10 @@ using System;
 ///   cUpMid (0, -30) for the tank and the red coins rising from below, cCoinMid (0, 45) for the coin counter stepping down a row.
 /// The console runs at the game's 30 frames a second; everything here takes a fractional frame count so the motion is evaluated at the
 /// display's own rate. The screen is drawn 1:1 into the game's 640 x 448 frame (J2DOrthoGraph over the render rect, 1 unit = 1 EFB
-/// pixel; the .blo's 600 x 480 is nominal), of which a CRT hid the outer few per cent. Jaysonn's SmsParams.Hud: Size scales the whole
-/// console (1 = the frame's 448 lines on the window's height), EdgeInset keeps the game's edge-hugging panes clear of a monitor's
-/// edges, AnimSpeed runs the motions (not the waits) faster than the game's pace.
+/// pixel; the .blo's 600 x 480 is nominal), of which a CRT hid the outer few per cent. On a wide window the left-hand groups keep
+/// their margin to the left edge, the right-hand ones to the right, the lives (centred on the frame) to the centre, the bottom ones
+/// to the bottom. Jaysonn's SmsParams.Hud: Size scales the whole console (1 = the frame's 448 lines on the window's height), the
+/// Shifts move the rows toward the window's edges, AnimSpeed runs the motions (not the waits) faster than the game's pace.
 /// </summary>
 public static class SmsHud
 {
@@ -29,12 +30,14 @@ public static class SmsHud
 
     /// <summary>Game pixels to canvas pixels: the frame's 448 lines on the viewport's height, times SmsParams.Hud.Size.</summary>
     public static float Scale(Vector2 viewport) => viewport.Y / ScreenH * SmsParams.Hud.Size;
-    /// <summary>A left-anchored group's canvas x: its game x plus the edge inset, scaled.</summary>
-    public static float LeftX(float x, float s) => (x + SmsParams.Hud.EdgeInset) * s;
-    public static float TopY(float y, float s) => (y + SmsParams.Hud.EdgeInset) * s;
-    /// <summary>A right-anchored group's canvas x: the game's margin to the frame's right edge plus the inset, from the viewport's.</summary>
-    public static float RightX(float x, float s, Vector2 viewport) => viewport.X - (ScreenW - x + SmsParams.Hud.EdgeInset) * s;
-    public static float BottomY(float y, float s, Vector2 viewport) => viewport.Y - (ScreenH - y + SmsParams.Hud.EdgeInset) * s;
+    /// <summary>A left-anchored group's canvas x: its game x, shifted, scaled.</summary>
+    public static float LeftX(float x, float s) => (x + SmsParams.Hud.LeftShift) * s;
+    public static float TopY(float y, float s) => (y + SmsParams.Hud.TopShift) * s;
+    /// <summary>A right-anchored group's canvas x: the game's margin to the frame's right edge, shifted, from the viewport's.</summary>
+    public static float RightX(float x, float s, Vector2 viewport) => viewport.X - (ScreenW - x - SmsParams.Hud.RightShift) * s;
+    public static float BottomY(float y, float s, Vector2 viewport) => viewport.Y - (ScreenH - y - SmsParams.Hud.BottomShift) * s;
+    /// <summary>A group the game centres on its frame (the lives): centred on the viewport.</summary>
+    public static float CenterX(float x, float s, Vector2 viewport) => viewport.X * 0.5f + (x - ScreenW * 0.5f) * s;
 
     public static readonly Vector2 DownTop = new Vector2(0f, -100f), DownMid = new Vector2(0f, 30f);
     public static readonly Vector2 UpTop = new Vector2(0f, 50f), UpMid = new Vector2(0f, -30f);
