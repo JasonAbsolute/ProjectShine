@@ -12,9 +12,10 @@ using System;
 /// nozzle comes back at once with a smoke puff (TItemManager::resetNozzleBoxesModel 16) -- so a box can be used again.
 /// Not here: the "valid" flag (a rocket / turbo box stays shut until the nozzle right is won: every box is valid), the hint balloon,
 /// the SEs, the smoke puff (a short scale-in stands in). The throw speeds are level data in the game; here they are the node's.
-/// Place one in a level: a StaticBody3D with this script (models/Nozzles/NozzleBox.tscn), its Nozzle set; it builds its own
-/// collision, model and stomp zone when the game runs. A tool script: in the editor it shows the box's tinted model (a child the
-/// scene does not save) and retints it when Nozzle changes, so a level shows its boxes.
+/// The scene is models/Nozzles/NozzleBox.tscn: the body's collision box, the stomp zone over the lid, the box model and the crash
+/// model (their meshes wearing the face material), and the item scene thrown for each nozzle -- all nodes and exports, his to
+/// edit. Instance it in a level, set Nozzle; this script only drives it. A tool script for one thing: it tints the face material
+/// for the nozzle (the game's TEVREG1 colours) in the editor as in the game, so a rocket box is red the moment Nozzle says so.
 /// </summary>
 [Tool]
 public partial class SmsNozzleBox : StaticBody3D
@@ -28,18 +29,25 @@ public partial class SmsNozzleBox : StaticBody3D
         set
         {
             _nozzle = value;
-            if (Engine.IsEditorHint() && IsInsideTree())
-                EditorPreview(true);
+            if (IsInsideTree())
+                ApplyTint();
         }
     }
+    /// <summary>The scene's parts: the box model, the crash model (nozzleboxcrash, its BCK), the body's collision, the stomp zone.</summary>
+    [Export] public Node3D Model;
+    [Export] public Node3D Crash;
+    [Export] public CollisionShape3D Shape;
+    [Export] public Area3D StompZone;
+    /// <summary>The item scene thrown out of the box for each nozzle (its root an SmsNozzleItem).</summary>
+    [Export] public PackedScene HoverItem;
+    [Export] public PackedScene RocketItem;
+    [Export] public PackedScene TurboItem;
     /// <summary>throwObjToFront's speed along the box's front, units a 30 fps frame (the level's parameter x 0.02 in the game).</summary>
     [Export] public float ThrowSpeed = 2.0f;
     /// <summary>throwObjToFront's vertical speed, units a 30 fps frame (20 when the level leaves it unset; 10 arcs a metre or two).</summary>
     [Export] public float ThrowVerticalSpeed = 10.0f;
 
     public const float SizeUnits = 205.6f;
-    private const string ModelDir = "res://models/Koopa/scene/dolpic0/mapobj/";
-    private const string FacePng = "res://models/Koopa/scene/dolpic0/mapobj/nozzlebox/J_nozzleBox.png";
 
     private Node3D _model, _crash;
     private AnimationPlayer _crashAnim;
@@ -47,7 +55,6 @@ public partial class SmsNozzleBox : StaticBody3D
     private Area3D _stomp;
     private bool _broken;
     private float _respawnScale = 1f;
-    private static Texture2D _faceTex;
 
     public static Color TintFor(BoxNozzle n) => n switch
     {
@@ -58,79 +65,34 @@ public partial class SmsNozzleBox : StaticBody3D
 
     public override void _Ready()
     {
+        ApplyTint();
         if (Engine.IsEditorHint())
-        {
-            EditorPreview(false);
             return;
-        }
-        CollisionLayer = 1;
-        CollisionMask = 0;
-        float s = 1f / SmsUnits.UnitsPerMetre;
-        float size = SizeUnits * s;
-        _shape = new CollisionShape3D { Name = "Shape", Shape = new BoxShape3D { Size = new Vector3(size, size, size) }, Position = new Vector3(0f, size * 0.5f, 0f) };
-        AddChild(_shape);
-        // the trample: Mario's body coming down into the zone over the lid (Gooble.cs does the same with its StompZone)
-        _stomp = new Area3D { Name = "StompZone", Monitoring = true, Monitorable = false };
-        // a metre over the lid: he enters it a frame or more before he lands, while his fall is still a fall (a hip drop covers 0.7 m a frame)
-        _stomp.AddChild(new CollisionShape3D { Shape = new BoxShape3D { Size = new Vector3(size * 0.9f, 1.0f, size * 0.9f) }, Position = new Vector3(0f, size + 0.5f, 0f) });
-        AddChild(_stomp);
-        var mat = BoxMaterial(TintFor(Nozzle));
-        _model = SmsGlb.Instantiate(ModelDir + "nozzlebox/nozzlebox");
-        if (_model != null)
-        {
-            _model.Name = "Model";
-            _model.Scale = new Vector3(s, s, s);
-            AddChild(_model);
-            SmsGlb.OverrideMaterials(_model, mat);
-        }
-        else
-            GD.PushWarning("[SMS nozzle box] nozzlebox.glb not found under " + ModelDir);
-        _crash = SmsGlb.Instantiate(ModelDir + "nozzleboxcrash/nozzleboxcrash");
-        if (_crash != null)
-        {
-            _crash.Name = "Crash";
-            _crash.Scale = new Vector3(s, s, s);
-            _crash.Visible = false;
-            AddChild(_crash);
-            SmsGlb.OverrideMaterials(_crash, mat);
-            _crashAnim = SmsGlb.FindChild<AnimationPlayer>(_crash);
-        }
+        _model = Model;
+        _crash = Crash;
+        _shape = Shape;
+        _stomp = StompZone;
+        if (_model == null || _shape == null || _stomp == null)
+            GD.PushWarning($"[SMS nozzle box] {GetPath()}: the scene's Model / Shape / StompZone exports are not all set (see models/Nozzles/NozzleBox.tscn)");
+        _crashAnim = _crash == null ? null : SmsFluddModel.FindChild<AnimationPlayer>(_crash);
     }
 
-    /// <summary>The editor's stand-in for the model the game builds: the box, tinted for the nozzle, as an unsaved child.</summary>
-    private void EditorPreview(bool rebuild)
+    /// <summary>GX_TEVREG1: the face material's colour for the nozzle, on the box and the crash (one material in the scene, local to
+    /// each instance, so every box has its own).</summary>
+    private void ApplyTint()
     {
-        var old = GetNodeOrNull<Node3D>("EditorPreview");
-        if (old != null)
+        Color tint = TintFor(_nozzle);
+        foreach (var root in new[] { Model, Crash })
         {
-            if (!rebuild)
-                return;
-            RemoveChild(old);
-            old.QueueFree();
+            if (root == null)
+                continue;
+            var meshes = new System.Collections.Generic.List<MeshInstance3D>();
+            SmsFluddModel.Collect(root, meshes);
+            foreach (var mi in meshes)
+                for (int i = 0; i < mi.GetSurfaceOverrideMaterialCount(); i++)
+                    if (mi.GetSurfaceOverrideMaterial(i) is StandardMaterial3D m)
+                        m.AlbedoColor = tint;
         }
-        var model = SmsGlb.Instantiate(ModelDir + "nozzlebox/nozzlebox");
-        if (model == null)
-            return;
-        model.Name = "EditorPreview";
-        float s = 1f / SmsUnits.UnitsPerMetre;
-        model.Scale = new Vector3(s, s, s);
-        AddChild(model);
-        SmsGlb.OverrideMaterials(model, BoxMaterial(TintFor(_nozzle)));
-    }
-
-    private static StandardMaterial3D BoxMaterial(Color tint)
-    {
-        if (_faceTex == null)
-            _faceTex = SmsGlb.LoadTexture(FacePng);
-        return new StandardMaterial3D
-        {
-            ResourceName = "nozzle box (J_nozzleBox x TEVREG1)",
-            AlbedoTexture = _faceTex,
-            AlbedoColor = tint,
-            Roughness = 1f,
-            Metallic = 0f,
-            CullMode = BaseMaterial3D.CullModeEnum.Back,
-        };
     }
 
     private bool _respawnPending;
@@ -198,7 +160,14 @@ public partial class SmsNozzleBox : StaticBody3D
     /// <summary>throwObjToFront(item, 50, speed, vertical): from 50 units up the base, along the box's front (its +Z), the level's speeds.</summary>
     private void SpawnItem()
     {
-        var item = new SmsNozzleItem { Nozzle = Nozzle, Box = this };
+        var scene = Nozzle switch { BoxNozzle.Rocket => RocketItem, BoxNozzle.Turbo => TurboItem, _ => HoverItem };
+        if (scene?.Instantiate() is not SmsNozzleItem item)
+        {
+            GD.PushWarning($"[SMS nozzle box] {GetPath()}: no {Nozzle}Item scene with an SmsNozzleItem root -- the box breaks and throws nothing (set it in NozzleBox.tscn)");
+            return;
+        }
+        item.Nozzle = Nozzle;
+        item.Box = this;
         GetParent().AddChild(item);
         float s = 1f / SmsUnits.UnitsPerMetre;
         item.GlobalPosition = GlobalPosition + new Vector3(0f, 50f * s, 0f);
@@ -263,54 +232,5 @@ public partial class SmsNozzleBox : StaticBody3D
     {
         if (!Engine.IsEditorHint())
             AddToGroup("sms_nozzle_box");
-    }
-}
-
-/// <summary>Model files for the SMS objects: the editor's import when it has run, the glTF loader straight off the disk when it has not.</summary>
-public static class SmsGlb
-{
-    public static Node3D Instantiate(string basePath)
-    {
-        string p = basePath + ".glb";
-        if (ResourceLoader.Exists(p))
-            return ResourceLoader.Load<PackedScene>(p)?.Instantiate<Node3D>();
-        string abs = ProjectSettings.GlobalizePath(p);
-        if (!FileAccess.FileExists(abs))
-            return null;
-        var doc = new GltfDocument();
-        var state = new GltfState();
-        if (doc.AppendFromFile(abs, state) != Error.Ok)
-            return null;
-        return doc.GenerateScene(state) as Node3D;
-    }
-
-    public static Texture2D LoadTexture(string path)
-    {
-        if (ResourceLoader.Exists(path))
-            return ResourceLoader.Load<Texture2D>(path);
-        var img = Image.LoadFromFile(ProjectSettings.GlobalizePath(path));
-        return img == null || img.IsEmpty() ? null : ImageTexture.CreateFromImage(img);
-    }
-
-    public static T FindChild<T>(Node root) where T : Node
-    {
-        if (root is T t)
-            return t;
-        foreach (Node c in root.GetChildren())
-        {
-            var r = FindChild<T>(c);
-            if (r != null)
-                return r;
-        }
-        return null;
-    }
-
-    public static void OverrideMaterials(Node root, Material mat)
-    {
-        if (root is MeshInstance3D mi && mi.Mesh != null)
-            for (int i = 0; i < mi.Mesh.GetSurfaceCount(); i++)
-                mi.SetSurfaceOverrideMaterial(i, mat);
-        foreach (Node c in root.GetChildren())
-            OverrideMaterials(c, mat);
     }
 }

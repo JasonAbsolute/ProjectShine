@@ -10,16 +10,19 @@ using System;
 /// (MarioReceiveMsg.cpp 18): changeNozzle(type, animate) with the swap already at 1, the tank refilled, the get sparkle -- and every
 /// dead box of that nozzle comes back (resetNozzleBoxesModel). MAP_OBJ_FLAG_UNK10000000 (load 1168) spares it the item timer: it
 /// waits until taken.
+/// The scenes are models/Nozzles/{Hover,Rocket,Turbo}/*NozzleItem.tscn: the model (Jaysonn's textured exports) and the Hit cylinder
+/// as nodes, this script driving them. A box throws the scene its export names; one can also lie in a level on its own.
 /// </summary>
 public partial class SmsNozzleItem : Node3D
 {
-    public SmsNozzleBox.BoxNozzle Nozzle = SmsNozzleBox.BoxNozzle.Hover;
+    [Export] public SmsNozzleBox.BoxNozzle Nozzle = SmsNozzleBox.BoxNozzle.Hover;
+    /// <summary>The scene's parts: the model that spins, the 40 x 100 unit touch cylinder.</summary>
+    [Export] public Node3D Model;
+    [Export] public Area3D Hit;
     public SmsNozzleBox Box;
 
-    private const string ModelDir = "res://models/Koopa/scene/dolpic0/mapobj/";   // the disc export: dummy textures, the FLUDD atlas put on
-    private const string TexturedDir = "res://models/Nozzles/";                     // Jaysonn's export with the real textures (Hover / Rocket / Turbo)
     private const float Gravity = 0.35f, Bounce = 0.5f, StopBelow = 5f, LandFriction = 0.8f, SpinDegPerFrame = 2f;
-    private const float HitRadiusUnits = 40f, HitHeightUnits = 100f;
+    private const float BodyRadiusUnits = 40f; // mBodyRadius: the fall speed's clamp
 
     private Vector3 _velUnits;      // units a frame
     private bool _airborne = true;
@@ -28,47 +31,14 @@ public partial class SmsNozzleItem : Node3D
     private Area3D _hit;
     private bool _taken;
 
-    private static string ModelName(SmsNozzleBox.BoxNozzle n) => n switch
-    {
-        SmsNozzleBox.BoxNozzle.Rocket => "rocket_nozzle_item",
-        SmsNozzleBox.BoxNozzle.Turbo => "back_nozzle_item",
-        _ => "normal_nozzle_item",
-    };
-
-    private static string TexturedFolder(SmsNozzleBox.BoxNozzle n) => n switch
-    {
-        SmsNozzleBox.BoxNozzle.Rocket => "Rocket",
-        SmsNozzleBox.BoxNozzle.Turbo => "Turbo",
-        _ => "Hover",
-    };
-
     public void SetVelocityUnitsPerFrame(Vector3 v) => _velUnits = v;
 
     public override void _Ready()
     {
-        float s = 1f / SmsUnits.UnitsPerMetre;
-        string name = ModelName(Nozzle);
-        // his textured export first (models/Nozzles/<Hover|Rocket|Turbo>/<name>.glb, its own materials), the disc's rip otherwise
-        string textured = $"{TexturedDir}{TexturedFolder(Nozzle)}/{name}";
-        bool hisModel = ResourceLoader.Exists(textured + ".glb") || FileAccess.FileExists(ProjectSettings.GlobalizePath(textured + ".glb"));
-        _model = SmsGlb.Instantiate(hisModel ? textured : $"{ModelDir}{name}/{name}");
-        if (_model != null)
-        {
-            _model.Name = "Model";
-            _model.Scale = new Vector3(s, s, s);
-            AddChild(_model);
-            if (!hisModel && GetTree().GetFirstNodeInGroup("player") is Mario m)
-                m.SmsApplyFluddAtlas(_model); // nozzleitem.bmt: the FLUDD's own atlas in place of the rip's dummy texture
-        }
-        else
-            GD.PushWarning($"[SMS nozzle item] {name}.glb not found under {TexturedDir} or {ModelDir}");
-        _hit = new Area3D { Name = "Hit", Monitoring = true, Monitorable = false };
-        _hit.AddChild(new CollisionShape3D
-        {
-            Shape = new CylinderShape3D { Radius = HitRadiusUnits * s, Height = HitHeightUnits * s },
-            Position = new Vector3(0f, HitHeightUnits * 0.5f * s, 0f),
-        });
-        AddChild(_hit);
+        _model = Model;
+        _hit = Hit;
+        if (_model == null || _hit == null)
+            GD.PushWarning($"[SMS nozzle item] {GetPath()}: the scene's Model / Hit exports are not both set (see models/Nozzles/*/*NozzleItem.tscn)");
     }
 
     public override void _PhysicsProcess(double delta)
@@ -84,7 +54,7 @@ public partial class SmsNozzleItem : Node3D
             _model.RotationDegrees = new Vector3(0f, _model.RotationDegrees.Y + SpinDegPerFrame * 30f * (float)delta, 0f);
         // TItem::appear sets HIT_FLAG_NO_COLLISION; TItemNozzle::appearing drops it once LIVE_FLAG_UNK10 -- the stop on the ground --
         // is up: the item cannot be taken in flight (nor inside the breaking box). Polled: he may already stand where it lands.
-        if (!_airborne && !_taken)
+        if (!_airborne && !_taken && _hit != null)
             foreach (Node3D body in _hit.GetOverlappingBodies())
                 if (body is Mario mario)
                 {
@@ -100,7 +70,7 @@ public partial class SmsNozzleItem : Node3D
         if (_airborne)
         {
             _velUnits.Y -= Gravity;
-            _velUnits.Y = Mathf.Clamp(_velUnits.Y, -HitRadiusUnits, HitRadiusUnits); // clamped to +-mBodyRadius
+            _velUnits.Y = Mathf.Clamp(_velUnits.Y, -BodyRadiusUnits, BodyRadiusUnits); // clamped to +-mBodyRadius
         }
         else if (_velUnits.LengthSquared() < 1e-6f)
             return;

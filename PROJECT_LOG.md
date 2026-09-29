@@ -2745,6 +2745,18 @@ you make it more smooth and while were here might as well fix the other hud elem
   shows the box's tinted model and retints it when `Nozzle` changes; its gameplay (`_Ready` / `_PhysicsProcess` / the group)
   is gated on `Engine.IsEditorHint()`. The nozzle items wear his textured exports (`models/Nozzles/<Hover|Rocket|Turbo>/`)
   when present (18b). The HUD stays a run-time overlay, as the game's is.
+- 21 (Jaysonn 00:45: "i want everything we do to always use a scene so i can see it in the editor. i dont want code to
+  dominate how things are loaded in ... i want it to be built to be customizible"). A standing rule from here on: what the
+  port shows is a scene with exported knobs; scripts drive behaviour and read what the scene provides; the physics numbers stay
+  the game's in `SmsParams`. First conversions: `assets/Sms/Fludd.tscn` (`SmsFludd`: the tank glb with the MAT3 materials as
+  surface overrides on its mesh, `NozzleSeat` a BoneAttachment3D riding the tank skeleton's nozzle_center through
+  `external_skeleton`, the four nozzle glbs under it wearing the frame's atlas; exports Tank / NozzleSeat / the nozzles /
+  AtlasMaterial) -- instanced under Player.tscn's `SmsFluddAttach`, which `SmsFluddSetup` adopts; the FLUDD setup print is
+  byte-identical to the code-built pack, which stays as the fallback with a warning. `models/Nozzles/NozzleBox.tscn` (the
+  collision box, the stomp zone, the box and crash models with one local-to-scene face material the script tints for the
+  nozzle, the three item scenes as exports) and `models/Nozzles/{Hover,Rocket,Turbo}/*NozzleItem.tscn` (his textured model +
+  the 40 x 100 unit Hit cylinder). The pass-20 editor previews are gone with them; `SmsFluddAttach.cs` only defaults the bone
+  and shows a configuration warning until the scene is in.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

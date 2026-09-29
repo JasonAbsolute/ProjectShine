@@ -1,46 +1,32 @@
 using Godot;
 
 /// <summary>
-/// The FLUDD's seat on Mario's jnt_chest bone, for Player.tscn: a BoneAttachment3D named SmsFluddAttach under Armature/Skeleton3D
-/// with this script. In the game Mario.cs adopts the node (SmsFluddSetup) and hangs the pack on it exactly as it would on one it
-/// made itself -- the node carries nothing of its own. In the editor this script hangs the same pack on it (SmsFluddModel.Build),
-/// housed with the spray nozzle on, as children the scene does not save: the editor shows the pack on his back without owning a
-/// copy of it, and Mario.tscn / the levels that instance Player.tscn show it too. A preview only; nothing here runs in the game.
+/// The FLUDD's seat in Player.tscn: the BoneAttachment3D named SmsFluddAttach under Armature/Skeleton3D, on jnt_chest, with
+/// assets/Sms/Fludd.tscn instanced as its child -- the pack itself is that scene (SmsFludd), every part a node to edit. Mario.cs
+/// (SmsFluddSetup) adopts this node and reads the Fludd child; with no child it builds the pack from code and warns. This script
+/// only keeps the seat honest: the bone defaults to jnt_chest, and the editor shows a configuration warning until the scene is in.
 /// </summary>
 [Tool]
 public partial class SmsFluddAttach : BoneAttachment3D
 {
     public const string BoneOfThePack = "jnt_chest";
-    private const string PreviewName = "EditorPreview";
 
     public override void _EnterTree()
     {
-        if (!Engine.IsEditorHint())
-            return;
-        if (string.IsNullOrEmpty(BoneName))
+        if (Engine.IsEditorHint() && string.IsNullOrEmpty(BoneName))
             BoneName = BoneOfThePack;
     }
 
-    public override void _Ready()
+    public override string[] _GetConfigurationWarnings()
     {
-        if (!Engine.IsEditorHint())
-            return;
-        EnsurePreview();
+        if (SmsFluddModel.FindChild<SmsFludd>(this) == null)
+            return new[] { "No FLUDD here: instance res://assets/Sms/Fludd.tscn as a child of this node. Until then the game builds the pack from code." };
+        return System.Array.Empty<string>();
     }
 
-    /// <summary>The preview once: a rebuild of the assembly re-creates this script over the same children, so an existing
-    /// preview is kept, never doubled.</summary>
-    private void EnsurePreview()
+    public override void _Notification(int what)
     {
-        if (GetNodeOrNull<Node3D>(PreviewName) != null)
-            return;
-        var root = new Node3D { Name = PreviewName };
-        AddChild(root);
-        var parts = SmsFluddModel.Build(root, 0);
-        if (parts == null)
-            return;
-        // Mario starts with the pack housed and the spray nozzle on (SmsFluddPoseTank / SmsFluddSprayNozzleAnim at stow 1)
-        SmsFluddModel.Scrub(parts.TankAnim, "wg_house", 1f);
-        SmsFluddModel.Scrub(parts.NozzleAnim[0], "normal_wg_house", 1f);
+        if (Engine.IsEditorHint() && what == NotificationChildOrderChanged)
+            UpdateConfigurationWarnings();
     }
 }

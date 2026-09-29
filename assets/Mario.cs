@@ -12115,8 +12115,9 @@ public partial class Mario : CharacterBody3D
         }
         // the spine bone: the game's tilt formula only reads on a joint whose X runs up the spine (chn_chest, the decomp's name
         // for it, is the fixed upper-body root in every BCK and would put the tank below his feet -- see PROJECT_LOG).
-        // Player.tscn may carry the attachment itself -- a BoneAttachment3D named SmsFluddAttach under Armature/Skeleton3D with
-        // SmsFluddAttach.cs, whose editor preview is what lets the editor show the pack: adopted here, its bone forced; made otherwise
+        // The pack is a scene: Player.tscn carries a BoneAttachment3D named SmsFluddAttach under Armature/Skeleton3D with
+        // assets/Sms/Fludd.tscn instanced under it (the tank, the nozzle seat, the four nozzles, the materials -- all his to edit).
+        // Adopted here, its bone forced. Without the scene the same pack is built from code (SmsFluddModel.Build), with a warning.
         _fluddAttach = skeleton.GetNodeOrNull<BoneAttachment3D>("SmsFluddAttach");
         if (_fluddAttach == null)
         {
@@ -12124,19 +12125,50 @@ public partial class Mario : CharacterBody3D
             skeleton.AddChild(_fluddAttach);
         }
         _fluddAttach.BoneName = "jnt_chest";
-        var parts = SmsFluddModel.Build(_fluddAttach, (int)_fluddNozzle); // the tank, its materials, the nozzles on nozzle_center
-        if (parts == null)
-            return;
-        _fluddTank = parts.Tank;
-        _fluddAtlasMaterial = parts.Atlas;
-        _fluddTankSkel = parts.TankSkel;
-        _fluddTankAnim = parts.TankAnim;
-        _fluddNozzleParent = parts.NozzleParent;
-        for (int i = 0; i < 4; i++)
+        var fludd = SmsFluddModel.FindChild<SmsFludd>(_fluddAttach);
+        if (fludd != null)
         {
-            _fluddNozzleNode[i] = parts.NozzleNode[i];
-            _fluddNozzleAnim[i] = parts.NozzleAnim[i];
-            _fluddNozzleSkel[i] = parts.NozzleSkel[i]; // the muzzle joints (null_G_muzzle) live here
+            if (fludd.Tank == null || fludd.NozzleSeat == null)
+            {
+                GD.PushWarning("[SMS fludd] Fludd.tscn: the Tank / NozzleSeat exports are not set -- no FLUDD");
+                return;
+            }
+            _fluddTank = fludd.Tank;
+            _fluddAtlasMaterial = fludd.AtlasMaterial;
+            _fluddTankSkel = SmsFluddModel.FindChild<Skeleton3D>(fludd.Tank);
+            _fluddTankAnim = SmsFluddModel.FindChild<AnimationPlayer>(fludd.Tank);
+            _fluddNozzleParent = fludd.NozzleSeat;
+            for (int i = 0; i < 4; i++)
+            {
+                var node = fludd.Nozzle(i);
+                _fluddNozzleNode[i] = node;
+                if (node == null)
+                {
+                    GD.PushWarning($"[SMS fludd] Fludd.tscn has no {SmsNozzleFolder[i]} nozzle node");
+                    continue;
+                }
+                node.Visible = i == (int)_fluddNozzle;
+                _fluddNozzleAnim[i] = SmsFluddModel.FindChild<AnimationPlayer>(node);
+                _fluddNozzleSkel[i] = SmsFluddModel.FindChild<Skeleton3D>(node); // the muzzle joints (null_G_muzzle) live here
+            }
+        }
+        else
+        {
+            GD.PushWarning("[SMS fludd] Player.tscn has no Fludd scene under Armature/Skeleton3D/SmsFluddAttach: the pack is built from code -- instance res://assets/Sms/Fludd.tscn there to see and edit it in the editor");
+            var parts = SmsFluddModel.Build(_fluddAttach, (int)_fluddNozzle);
+            if (parts == null)
+                return;
+            _fluddTank = parts.Tank;
+            _fluddAtlasMaterial = parts.Atlas;
+            _fluddTankSkel = parts.TankSkel;
+            _fluddTankAnim = parts.TankAnim;
+            _fluddNozzleParent = parts.NozzleParent;
+            for (int i = 0; i < 4; i++)
+            {
+                _fluddNozzleNode[i] = parts.NozzleNode[i];
+                _fluddNozzleAnim[i] = parts.NozzleAnim[i];
+                _fluddNozzleSkel[i] = parts.NozzleSkel[i];
+            }
         }
         SmsFluddSetupWater(); // S2: the drops, the water level in the tank, the muzzles
         SmsFluddSetupHoverTilt(); // S3: the hover nozzles' bank joints

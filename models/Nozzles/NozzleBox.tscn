@@ -1,0 +1,64 @@
+[gd_scene load_steps=11 format=3 uid="uid://vjf8vmkgemkf"]
+
+[ext_resource type="Script" path="res://assets/Sms/SmsNozzleBox.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Koopa/scene/dolpic0/mapobj/nozzlebox/nozzlebox.glb" id="2_box"]
+[ext_resource type="PackedScene" path="res://models/Koopa/scene/dolpic0/mapobj/nozzleboxcrash/nozzleboxcrash.glb" id="3_crash"]
+[ext_resource type="Texture2D" path="res://models/Koopa/scene/dolpic0/mapobj/nozzlebox/J_nozzleBox.png" id="4_face"]
+[ext_resource type="PackedScene" path="res://models/Nozzles/Hover/HoverNozzleItem.tscn" id="5_hover"]
+[ext_resource type="PackedScene" path="res://models/Nozzles/Rocket/RocketNozzleItem.tscn" id="6_rocket"]
+[ext_resource type="PackedScene" path="res://models/Nozzles/Turbo/TurboNozzleItem.tscn" id="7_turbo"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body"]
+size = Vector3(2.761907, 2.761907, 2.761907)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_stomp"]
+size = Vector3(2.485716, 1, 2.485716)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_face"]
+resource_local_to_scene = true
+resource_name = "nozzle box (J_nozzleBox x TEVREG1: the script tints it for the nozzle)"
+albedo_color = Color(0, 0, 1, 1)
+albedo_texture = ExtResource("4_face")
+
+[node name="NozzleBox" type="StaticBody3D" node_paths=PackedStringArray("Model", "Crash", "Shape", "StompZone")]
+collision_mask = 0
+script = ExtResource("1_script")
+Nozzle = 1
+Model = NodePath("Model")
+Crash = NodePath("Crash")
+Shape = NodePath("Shape")
+StompZone = NodePath("StompZone")
+HoverItem = ExtResource("5_hover")
+RocketItem = ExtResource("6_rocket")
+TurboItem = ExtResource("7_turbo")
+
+[node name="Shape" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.380954, 0)
+shape = SubResource("BoxShape3D_body")
+
+[node name="StompZone" type="Area3D" parent="."]
+monitorable = false
+
+[node name="Shape" type="CollisionShape3D" parent="StompZone"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3.261907, 0)
+shape = SubResource("BoxShape3D_stomp")
+
+[node name="Model" parent="." instance=ExtResource("2_box")]
+transform = Transform3D(0.013433, 0, 0, 0, 0.013433, 0, 0, 0, 0.013433, 0, 0, 0)
+
+[node name="Mesh" parent="Model/Node/Skeleton3D" index="0"]
+surface_material_override/0 = SubResource("StandardMaterial3D_face")
+
+[node name="Crash" parent="." instance=ExtResource("3_crash")]
+transform = Transform3D(0.013433, 0, 0, 0, 0.013433, 0, 0, 0, 0.013433, 0, 0, 0)
+visible = false
+
+[node name="Mesh" parent="Crash/Node/Skeleton3D" index="0"]
+surface_material_override/0 = SubResource("StandardMaterial3D_face")
+surface_material_override/1 = SubResource("StandardMaterial3D_face")
+surface_material_override/2 = SubResource("StandardMaterial3D_face")
+surface_material_override/3 = SubResource("StandardMaterial3D_face")
+surface_material_override/4 = SubResource("StandardMaterial3D_face")
+
+[editable path="Model"]
+[editable path="Crash"]

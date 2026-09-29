@@ -2,11 +2,12 @@ using Godot;
 using System.Collections.Generic;
 
 /// <summary>
-/// The FLUDD's model assembly, shared by Mario.cs (the pack at run time, SmsFluddSetup) and SmsFluddAttach (the editor's preview
-/// of the same pack in Player.tscn): the tank (watergun2/body/wg_mdl1) under the jnt_chest attachment, the four nozzles (normal /
-/// hover / rocket / back) on the tank's nozzle_center joint, and the game's MAT3 material fixes -- the translucent vertex-coloured
-/// shell, the additive waterline, the nozzles' 8x8 H_watergun_main_dummy placeholder swapped for the tank frame's atlas. One place
-/// builds it so the editor shows exactly what the game attaches.
+/// The FLUDD's model assembly in code -- the FALLBACK. The pack proper is the scene assets/Sms/Fludd.tscn (SmsFludd), instanced
+/// under Player.tscn's SmsFluddAttach; Mario.cs reads that. When a Player scene has no Fludd instance, Build hangs the same pack
+/// from the rips so the game still runs (with a warning): the tank (watergun2/body/wg_mdl1) under the jnt_chest attachment, the
+/// four nozzles (normal / hover / rocket / back) on the tank's nozzle_center joint, the game's MAT3 material fixes -- the
+/// translucent vertex-coloured shell, the additive waterline, the nozzles' 8x8 H_watergun_main_dummy placeholder swapped for the
+/// tank frame's atlas. The helpers (FindChild, Collect, Scrub) serve the SMS scripts generally.
 /// </summary>
 public static class SmsFluddModel
 {
