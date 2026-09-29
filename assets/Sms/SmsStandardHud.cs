@@ -7,7 +7,8 @@ using System;
 ///   c_0 (13, 152) the coin counter: coin_back 198 x 22 (an I4 strip tinted 00FF00, alpha 180), coin_icon 30 x 40 at (9, -14), the x
 ///       (coin_number_x) 36 x 36 at (31, -16), the digits coin_number_0..9 36 x 36 at (60, -22) (87, -27) (114, -32) -- two digits below
 ///       100 (the tens shown even at 0), three from 100 (setCounterDigits 660). Its home is the shine counter's row (offset unk26A =
-///       74 - 152); it steps down to its own row while the shine and blue coin counters are out.
+///       74 - 152); it steps down to its own row while the shine and blue coin counters are out. The strip, the x and the digits are
+///       turned 15 degrees about their top-left corners (the .blo's rotation; the icon stays upright): the counters' slant.
 ///   d_0 (13, 113) the blue coins (bluecoin_icon), s_0 (13, 74) the shines (shine_icon 48 x 58 at (2, -29), x at (38, -18), digits at
 ///       (67, -24) (94, -29) (121, -34)) -- the "star" HUD, out for a while when a blue coin or a shine is taken and as a peek after
 ///       Mario has stood still (updateCounterState 934: 200 frames of MARIO_STATUS_WAIT; unk30 starts at -400 but the intro demo zeroes it).
@@ -146,17 +147,20 @@ public partial class SmsStandardHud : Control
 
     private void BuildPanes()
     {
-        _cStrip = new SmsHudPane(0, 0, 198, 22, _strip) { Tint = StripGreen }; _cIcon = new SmsHudPane(9, -14, 30, 40, _coinIcon); _cX = new SmsHudPane(31, -16, 36, 36, _x);
-        _cDigit[0] = new SmsHudPane(60, -22, 36, 36, _digit[0]); _cDigit[1] = new SmsHudPane(87, -27, 36, 36, _digit[0]); _cDigit[2] = new SmsHudPane(114, -32, 36, 36, _digit[0]);
-        _dStrip = new SmsHudPane(0, 0, 198, 22, _strip) { Tint = StripGreen }; _dIcon = new SmsHudPane(9, -14, 30, 40, _blueIcon); _dX = new SmsHudPane(31, -16, 36, 36, _x);
-        _dDigit[0] = new SmsHudPane(60, -22, 36, 36, _digit[0]); _dDigit[1] = new SmsHudPane(87, -27, 36, 36, _digit[0]); _dDigit[2] = new SmsHudPane(114, -32, 36, 36, _digit[0]);
-        _sStrip = new SmsHudPane(0, 0, 198, 22, _strip) { Tint = StripGreen }; _sIcon = new SmsHudPane(2, -29, 48, 58, _shineIcon); _sX = new SmsHudPane(38, -18, 36, 36, _x);
-        _sDigit[0] = new SmsHudPane(67, -24, 36, 36, _digit[0]); _sDigit[1] = new SmsHudPane(94, -29, 36, 36, _digit[0]); _sDigit[2] = new SmsHudPane(121, -34, 36, 36, _digit[0]);
-        _mStrip = new SmsHudPane(0, 0, 198, 22, _strip) { Tint = StripGreen }; _mIcon = new SmsHudPane(13, -23, 43, 47, _marioIcon);
-        _mText = new SmsHudPane(-12, -34, 72, 34, _marioText); _mX = new SmsHudPane(48, -20, 36, 36, _x);
-        _mDigit[0] = new SmsHudPane(77, -26, 36, 36, _digit[0]); _mDigit[1] = new SmsHudPane(104, -31, 36, 36, _digit[0]);
-        _rStrip = new SmsHudPane(0, 0, 198, 22, _strip) { Tint = StripMagenta }; _rIcon = new SmsHudPane(19, -16, 30, 40, _redIcon); _rX = new SmsHudPane(41, -18, 36, 36, _x);
-        _rDigit = new SmsHudPane(70, -38, 36, 36, _digit[0]); _rSlash = new SmsHudPane(87, -41, 50, 60, _slash); _rEight = new SmsHudPane(113, -16, 28, 28, _digit[8]);
+        // the .blo turns the strips, the x's, the digits and "MARIO" 15 degrees about their top-left corners (the icons stay upright,
+        // the Mario head leans 5 the other way): the counters' slant
+        const float Slant = 15f, HeadSlant = 355f;
+        _cStrip = new SmsHudPane(0, 0, 198, 22, _strip) { Tint = StripGreen, Rot = Slant }; _cIcon = new SmsHudPane(9, -14, 30, 40, _coinIcon); _cX = new SmsHudPane(31, -16, 36, 36, _x) { Rot = Slant };
+        _cDigit[0] = new SmsHudPane(60, -22, 36, 36, _digit[0]) { Rot = Slant }; _cDigit[1] = new SmsHudPane(87, -27, 36, 36, _digit[0]) { Rot = Slant }; _cDigit[2] = new SmsHudPane(114, -32, 36, 36, _digit[0]) { Rot = Slant };
+        _dStrip = new SmsHudPane(0, 0, 198, 22, _strip) { Tint = StripGreen, Rot = Slant }; _dIcon = new SmsHudPane(9, -14, 30, 40, _blueIcon); _dX = new SmsHudPane(31, -16, 36, 36, _x) { Rot = Slant };
+        _dDigit[0] = new SmsHudPane(60, -22, 36, 36, _digit[0]) { Rot = Slant }; _dDigit[1] = new SmsHudPane(87, -27, 36, 36, _digit[0]) { Rot = Slant }; _dDigit[2] = new SmsHudPane(114, -32, 36, 36, _digit[0]) { Rot = Slant };
+        _sStrip = new SmsHudPane(0, 0, 198, 22, _strip) { Tint = StripGreen, Rot = Slant }; _sIcon = new SmsHudPane(2, -29, 48, 58, _shineIcon); _sX = new SmsHudPane(38, -18, 36, 36, _x) { Rot = Slant };
+        _sDigit[0] = new SmsHudPane(67, -24, 36, 36, _digit[0]) { Rot = Slant }; _sDigit[1] = new SmsHudPane(94, -29, 36, 36, _digit[0]) { Rot = Slant }; _sDigit[2] = new SmsHudPane(121, -34, 36, 36, _digit[0]) { Rot = Slant };
+        _mStrip = new SmsHudPane(0, 0, 198, 22, _strip) { Tint = StripGreen, Rot = Slant }; _mIcon = new SmsHudPane(13, -23, 43, 47, _marioIcon) { Rot = HeadSlant };
+        _mText = new SmsHudPane(-12, -34, 72, 34, _marioText) { Rot = Slant }; _mX = new SmsHudPane(48, -20, 36, 36, _x) { Rot = Slant };
+        _mDigit[0] = new SmsHudPane(77, -26, 36, 36, _digit[0]) { Rot = Slant }; _mDigit[1] = new SmsHudPane(104, -31, 36, 36, _digit[0]) { Rot = Slant };
+        _rStrip = new SmsHudPane(0, 0, 198, 22, _strip) { Tint = StripMagenta, Rot = Slant }; _rIcon = new SmsHudPane(19, -16, 30, 40, _redIcon); _rX = new SmsHudPane(41, -18, 36, 36, _x) { Rot = Slant };
+        _rDigit = new SmsHudPane(70, -38, 36, 36, _digit[0]) { Rot = Slant }; _rSlash = new SmsHudPane(87, -41, 50, 60, _slash); _rEight = new SmsHudPane(113, -16, 28, 28, _digit[8]) { Rot = Slant };
         _lDisc = new SmsHudPane(0, 0, 74, 71, _disc) { Tint = DiscHealth }; _lText = new SmsHudPane(7, -18, 60, 30, _lifeText);
         _lSun = new SmsHudPane(0, 0, 0, 0, null) { Shown = true }; // lm_0: the sun and rays ride its pop
         int[,] ray = { { 9, 11, 54, 58 }, { 53, 0, 26, 28 }, { 59, 23, 26, 24 }, { 57, 48, 26, 28 }, { 38, 61, 26, 28 }, { 13, 64, 24, 26 }, { -7, 49, 28, 28 }, { -12, 27, 24, 24 }, { -8, 2, 28, 28 } };
@@ -689,12 +693,13 @@ public partial class SmsStandardHud : Control
     // ------------------------------------------------------------------------------------------------------------------ the draw
     private enum Anchor { TopLeft, TopCenter, TopRight, BottomLeft }
 
-    private void Group(Vector2 pos, Anchor anchor)
+    /// <summary>A group's canvas transform: its anchor on the window, the console's scale.</summary>
+    private Transform2D Group(Vector2 pos, Anchor anchor)
     {
         float x = anchor == Anchor.TopRight ? SmsHud.RightX(pos.X, _scale, _viewport)
             : anchor == Anchor.TopCenter ? SmsHud.CenterX(pos.X, _scale, _viewport) : SmsHud.LeftX(pos.X, _scale);
         float y = anchor == Anchor.BottomLeft ? SmsHud.BottomY(pos.Y, _scale, _viewport) : SmsHud.TopY(pos.Y, _scale);
-        DrawSetTransform(new Vector2(x, y), 0f, new Vector2(_scale, _scale));
+        return new Transform2D(0f, new Vector2(_scale, _scale), 0f, new Vector2(x, y));
     }
 
     public override void _Draw()
@@ -704,59 +709,59 @@ public partial class SmsStandardHud : Control
         // the screen's pane order: c_0, d_0, s_0, l_0, (w_0), m_0, r_0
         if (_coinVisible)
         {
-            Group(CoinPos, Anchor.TopLeft);
+            Transform2D t = Group(CoinPos, Anchor.TopLeft);
             Vector2 g = new Vector2(0f, _coinSlide.At(_now));
-            _cStrip.Draw(this, _now, g); _cIcon.Draw(this, _now, g); _cX.Draw(this, _now, g);
-            foreach (var d in _cDigit) d.Draw(this, _now, g);
+            _cStrip.Draw(this, _now, g, t); _cIcon.Draw(this, _now, g, t); _cX.Draw(this, _now, g, t);
+            foreach (var d in _cDigit) d.Draw(this, _now, g, t);
         }
         if (_starVisible)
         {
-            Group(BluePos, Anchor.TopLeft);
+            Transform2D t = Group(BluePos, Anchor.TopLeft);
             Vector2 g = new Vector2(0f, _blueSlide.At(_now));
-            _dStrip.Draw(this, _now, g); _dIcon.Draw(this, _now, g); _dX.Draw(this, _now, g);
-            foreach (var d in _dDigit) d.Draw(this, _now, g);
-            Group(ShinePos, Anchor.TopLeft);
+            _dStrip.Draw(this, _now, g, t); _dIcon.Draw(this, _now, g, t); _dX.Draw(this, _now, g, t);
+            foreach (var d in _dDigit) d.Draw(this, _now, g, t);
+            t = Group(ShinePos, Anchor.TopLeft);
             g = new Vector2(0f, _shineSlide.At(_now));
-            _sStrip.Draw(this, _now, g); _sIcon.Draw(this, _now, g); _sX.Draw(this, _now, g);
-            foreach (var d in _sDigit) d.Draw(this, _now, g);
+            _sStrip.Draw(this, _now, g, t); _sIcon.Draw(this, _now, g, t); _sX.Draw(this, _now, g, t);
+            foreach (var d in _sDigit) d.Draw(this, _now, g, t);
         }
         if (LifeOnScreen)
         {
-            Group(LifePos, Anchor.TopRight);
+            Transform2D t = Group(LifePos, Anchor.TopRight);
             Vector2 g = LifeGroupOffset(_now);
             bool air = _lifeAirShown, low = _lifeShown < 4;
             _lDisc.Tint = air ? DiscAir : DiscHealth;
-            _lDisc.Draw(this, _now, g);
+            _lDisc.Draw(this, _now, g, t);
             if (_lSun.Shown)
             {
                 Vector2 gs = g + _lSun.Offset(_now);
                 for (int i = 0; i < 9; i++)
                 {
-                    _lSocket[i].Draw(this, _now, gs);
+                    _lSocket[i].Draw(this, _now, gs, t);
                     if (!_lRay[i].Shown)
                         continue;
                     _lRay[i].Tex = air ? (i == 0 && low ? _lifeAirLow[i] : _lifeAir[i]) : _lifeOn[i];
                     _lRay[i].Tint = !air && low && i == 0 ? Dim : Colors.White;
-                    _lRay[i].Draw(this, _now, gs);
+                    _lRay[i].Draw(this, _now, gs, t);
                 }
             }
             _lText.Tex = air ? (low ? _lifeTextAirLow : _lifeTextAir) : _lifeText;
             _lText.Tint = !air && low ? Dim : Colors.White;
-            _lText.Draw(this, _now, g);
+            _lText.Draw(this, _now, g, t);
         }
         if (_marioVisible)
         {
-            Group(MarioPos, Anchor.TopCenter); // m_0's strip (223..421) is centred on the frame's 320
+            Transform2D t = Group(MarioPos, Anchor.TopCenter); // m_0's strip (223..421) is centred on the frame's 320
             Vector2 g = new Vector2(0f, _marioSlide.At(_now));
-            _mStrip.Draw(this, _now, g); _mIcon.Draw(this, _now, g); _mText.Draw(this, _now, g); _mX.Draw(this, _now, g);
-            foreach (var d in _mDigit) d.Draw(this, _now, g);
+            _mStrip.Draw(this, _now, g, t); _mIcon.Draw(this, _now, g, t); _mText.Draw(this, _now, g, t); _mX.Draw(this, _now, g, t);
+            foreach (var d in _mDigit) d.Draw(this, _now, g, t);
         }
         if (_redVisible)
         {
-            Group(RedPos, Anchor.BottomLeft);
+            Transform2D t = Group(RedPos, Anchor.BottomLeft);
             Vector2 g = new Vector2(0f, _redSlide.At(_now));
-            _rStrip.Draw(this, _now, g); _rIcon.Draw(this, _now, g); _rX.Draw(this, _now, g);
-            _rDigit.Draw(this, _now, g); _rSlash.Draw(this, _now, g); _rEight.Draw(this, _now, g);
+            _rStrip.Draw(this, _now, g, t); _rIcon.Draw(this, _now, g, t); _rX.Draw(this, _now, g, t);
+            _rDigit.Draw(this, _now, g, t); _rSlash.Draw(this, _now, g, t); _rEight.Draw(this, _now, g, t);
         }
         DrawSetTransform(Vector2.Zero, 0f, Vector2.One);
     }

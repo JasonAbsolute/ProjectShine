@@ -2717,6 +2717,13 @@ you make it more smooth and while were here might as well fix the other hud elem
   lives counters up to the top edge, from the gauge to the corner). The lives counter is now centred on the window as the game
   centres it on its frame (`SmsHud.CenterX`; his own sat at canvas x 481..701 of 1152), EdgeInset became the four shifts (top
   -34, right 30, bottom -10), AnimSpeed 4.
+- 19d (Jaysonn 23:51: "the speed is perfect now however we still have the allignemnt being off", the capture re-saved). Measured
+  in it, every group sat exactly where the code puts it — what was off was the panes themselves: `blo_dump.py` read each pane's
+  rotation and never printed it. In `standard_1.blo` the counters' strips, x's, digits and "MARIO" are turned 15° about their
+  top-left corners (`J2DPane::makeMatrix`: about z by -mRotation in a y-down space = counter-clockwise on the screen, the right
+  end up), the Mario head 355 (5° the other way), the icons upright, the gauge and the life meter unturned. That slant is the
+  SMS look his own HUD had approximated with a -0.2 rad node rotation. `SmsHudPane.Rot`, drawn through the group's transform
+  (`DrawSetTransformMatrix`). The dumper prints `ROT` now.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

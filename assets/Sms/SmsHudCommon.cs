@@ -121,13 +121,17 @@ public sealed class SmsHudSlide
     public bool AtZero(float now) => To == 0f && Done(now);
 }
 
-/// <summary>A picture pane of the screen with its TBoundPane: the home rect inside its group, the texture, the tint, whether it is
-/// shown, and the pop it is riding (setPanePosition's three points and the console's 30-frame settle).</summary>
+/// <summary>A picture pane of the screen with its TBoundPane: the home rect inside its group, the texture, the tint, its rotation,
+/// whether it is shown, and the pop it is riding (setPanePosition's three points and the console's 30-frame settle).</summary>
 public sealed class SmsHudPane
 {
     public Rect2 Home;
     public Texture2D Tex;
     public Color Tint = Colors.White;
+    /// <summary>The .blo's rotation in degrees about the pane's top-left corner (base position 0), counter-clockwise on the screen:
+    /// J2DPane::makeMatrix rotates about z by -mRotation in a y-down space. The counters' strips, x's, digits and "MARIO" are 15,
+    /// the Mario head 355 (5 the other way).</summary>
+    public float Rot;
     public bool Shown;                     // J2DPane::show / hide
     public bool Used = true;               // a digit pane the count has no use for (the hundreds below 100)
     public float Inset;                    // the life meter's heartbeat: pixels off every side
@@ -155,12 +159,16 @@ public sealed class SmsHudPane
         return new Rect2(Home.Position + o + new Vector2(Inset, Inset), Home.Size - new Vector2(2f * Inset, 2f * Inset));
     }
 
-    public void Draw(CanvasItem c, float now, Vector2 groupOffset, float alpha = 1f)
+    /// <summary>Draws the pane inside its group's transform (the group's canvas position and the console's scale), turned by its
+    /// own rotation about its top-left corner as J2D does.</summary>
+    public void Draw(CanvasItem c, float now, Vector2 groupOffset, Transform2D group, float alpha = 1f)
     {
         if (!Shown || !Used || Tex == null)
             return;
         Color col = Tint;
         col.A *= alpha;
-        c.DrawTextureRect(Tex, Rect(now, groupOffset), false, col);
+        Vector2 local = Home.Position + Offset(now) + groupOffset;
+        c.DrawSetTransformMatrix(group * new Transform2D(Mathf.DegToRad(-Rot), local));
+        c.DrawTextureRect(Tex, new Rect2(new Vector2(Inset, Inset), Home.Size - new Vector2(2f * Inset, 2f * Inset)), false, col);
     }
 }
