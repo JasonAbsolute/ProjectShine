@@ -2547,6 +2547,30 @@ deg 16 ticks`. Still not ported: a Y in the air (the game allows it — `execFro
 sleeping / the surf / rocketing / the dash / climbing refuse; his air steering would fight the mode's facing), the squat inside the
 mode (`canSquat` holds there: an R click or L squats him in the game), the notice lock-on, the SEs. Port-only: a Y needs the ground and
 a standing / running / landing status; the mode cuts after 3 physics frames off the ground (the game keeps it through a fall).
+
+**Pass 17b — a Y in the air, idle arms in the mode** (Jaysonn 03:50, on pass 17: "feels awesome just one bug i see right now is
+that when i y cam mario should be idle then if i ress r he should be flood animation and also y cam should work in the air also").
+- A Y in the air, as the game: `execCameraModeChangeProc_` starts the swing in any status but the hip drop (`execFrontRotate_` 453);
+  only asleep / the surf / the hover or rocket / the dash / climbing refuse (588). `SmsYCamCanEnter` off the ground takes any state
+  `doJumping()` steers (`SmsAirSteers`: the jumps, the flips, the dives, the rolls, a fall off an edge — not the hip drop, a wall
+  slide, a hang). The press is read at the top of the frame (`SmsYCamFrame`), no longer in the ground block, and the mode keeps his
+  status. In the mode A / B / space are the camera's (`MEANING_CAM_AB`): `Input.ActionRelease` on them after the tick — and on the
+  frame whose press ENDED the mode too (`_ycamHoldThisFrame`), with the `jumpBuffer` the input block had set from it dropped — so no
+  double jump, no dive, no A-held lift, on the ground or in the air (the first cut released only while `_ycamOn`, which the exit
+  tick had just cleared: the exit A in the air fell through to a jump). His facing follows the look every tick in the air as on the
+  ground (`playerControl` 2451: every status but the hang family): `SmsYCamFaceLook` latches the face as the launch source (2),
+  which `SmsAirTick` keeps and projects the velocity onto — `mForwardVel` runs along `mFaceAngle`, so the flight bends with the
+  look as the game's does. A landing inside the mode goes straight to the ground hold (WAIT). The port-only 3-frame off-the-ground
+  cut is gone.
+- Idle arms in the mode until R: deliberate deviation (below). `SmsParams.LCamera.HoldsPump = false`; R still pumps (`Pumping`) and
+  the arms come down through `HoldingPump` → `Idle` after the release as anywhere else. The squat's hold is untouched.
+- Verified headless with a scripted drive (temp, not committed): run → jump → double → triple, Y on the triple's first airborne
+  frame: the swing (0° to go, the camera already behind him), the L camera on (lock 60, inbetween 16), stick right turns it 9000 BAM
+  in 0.30 s (yaw −32115 → 22621 = 198°/s) with his face following (−176° → 129°) and the velocity bending with it (x 0.8 → −9.2 m/s,
+  12 m up); the exit A at lock 0 while airborne: `off (Y / A / B)`, state still `tripleJump`, `jumpBuffer 0`, no jump, the 16-tick
+  sweep back, the rig current 0.13 s later, the landing 0.7 s after that. A ground entry then: `upper Idle` through the lock, R →
+  `Pumping` (R 1.00), release → `HoldingPump` → `Idle`, B → off. No errors.
+- Debug: the lines are unchanged; `[SMS ycam] Y:` / `on:` now fire mid-air too.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
@@ -2588,6 +2612,10 @@ Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
 - **The turbo dash clip is paced by the actual speed** (2026-09-28 01:02). The game paces it by `mDashSpeed`, capped at 32 — the
   run's tempo (2.76) at 2.5× the ground speed; he reads that as slow. Now `mForwardVel` × 0.055 + 1 = 5.4 at 80.
   `SmsParams.Fludd.DashAnimByForwardVel`.
+- **Idle arms in the L camera until R** (2026-09-28 03:53). `stateMachineUpper()` (`MarioUpper.cpp` 17) puts the upper body on the
+  grips (`HOLDING_PUMP`, the pump clip's frame 0) the moment `isLButtonCamera` && `checkPumpEnable`. Jaysonn: "when i y cam mario
+  should be idle then if i ress r he should be flood animation". `SmsParams.LCamera.HoldsPump` (false; true = the game). The squat's
+  hold (MarioUpper.cpp 30) is untouched.
 - `SmsRollJumpMinSpeed = 20` (game 40) — feel.
 - `SmsRollJumpKnockdown = false`: the roll-jump into a wall that reaches head height wall-slides. `rotateBroadJumping()` →
   `jumpingBasic(…, 1)` case 2 knocks it down above 40, and it never drops under 40 with the stick held; Jaysonn's

@@ -193,6 +193,9 @@ public static class SmsParams
         // (53 ticks, 0.44 s) and fades back in over the rest (0.22 s)
         public const int NeutralKeyTicks = 80;
         public const int NeutralKeyDeadTicks = 53;
+        // DEVIATION (Jaysonn, 2026-09-28 03:53): the game holds the grips in the mode (MarioUpper.cpp 17: HOLDING_PUMP, the pump clip's
+        // frame 0, whenever isLButtonCamera && checkPumpEnable); he wants idle arms until R. true = the game.
+        public const bool HoldsPump = false;
     }
 
     public static class Waist

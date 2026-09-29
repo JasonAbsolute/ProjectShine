@@ -34,8 +34,13 @@ using Godot;
 /// Port shape: a second Camera3D ("SmsYCamera", TopLevel) made current from the Y press; the rig's SunshineCamera keeps following
 /// underneath and gets the view back after the sweep out. Its own Y-button mode is off under SMS (it froze Mario with CameraLocked
 /// underneath this one: no stick, no FLUDD, no way out -- the whole of the pass-16 report).
-/// Not ported: the notice lock-on (no bosses), the SEs (0x4824 / 0x4825), a Y in the air (the game allows it; his air steering would
-/// fight the mode's facing), the squat inside the mode (R clicked / L: canSquat holds in the mode too).
+/// A Y IN THE AIR works as in the game (execFrontRotate_ runs in any status but the hip drop; only sleeping, the surf, the hover /
+/// rocket, the dash and climbing refuse): the mode keeps his status, his stick is zero, A / B are eaten, and his facing is forced to
+/// the camera's look every tick -- mForwardVel runs along mFaceAngle, so the flight bends with the look (the port projects the
+/// velocity onto the forced face each frame: the same thing for a smooth turn). The landing inside the mode goes straight to WAIT.
+/// Not ported: the notice lock-on (no bosses), the SEs (0x4824 / 0x4825), the squat inside the mode (R clicked / L: canSquat holds
+/// in the mode too). Deviation by request: the upper body stays IDLE in the mode until R (the game holds the grips: MarioUpper.cpp
+/// 17, HOLDING_PUMP at the pump clip's frame 0) -- SmsParams.LCamera.HoldsPump.
 /// </summary>
 public partial class Mario
 {
@@ -61,7 +66,6 @@ public partial class Mario
     private float _ycamFov = 60f;
     private Transform3D _ycamXform = Transform3D.Identity;
     private float _ycamDbgTimer = 0f;
-    private int _ycamOffFloorFrames = 0;
     private int _ycamNeutralTicks = 0;              // mNeutralKeyTimer (in ticks): his stick is dead, then fades in, after either end of the mode
     private bool _ycamHoldThisFrame = false;       // the frame whose Y / A / B ended the mode: that press was the camera's (MEANING_CAM_AB), not a jump or a dive
 
@@ -83,16 +87,19 @@ public partial class Mario
     private static float YCamChaseConstAngle(float value, float target, int rem) => rem <= 1 ? target : value + SmsMath.WrapAngle(target - value) / rem;
 
     /// <summary>A Y press that starts the sequence: a normal camera (the rig's Normal or L-hold mode), unk282 run out, and none of the
-    /// states the mode change refuses (asleep, the surf / water, the hover or rocket, the dash, climbing). The port also asks for the
-    /// ground and a standing / running / landing status (the game takes a Y in the air; not ported).</summary>
+    /// states the mode change refuses (execCameraModeChangeProc_ 588: asleep, the surf / water, the hover or rocket, the dash,
+    /// climbing; execFrontRotate_ 453: not the hip drop). On the ground a standing / running / landing status; in the air any
+    /// launched or falling state that doJumping() steers (the game takes a Y in a jump too).</summary>
     private bool SmsYCamCanEnter()
     {
         if (!UseSmsPhysics || _ycamPhase != YCamPhase.Off || _ycamLock > 0 || camera == null || _camera == null || armature == null)
             return false;
         if (_camera.Mode != SunshineCamera.CamMode.Normal && _camera.Mode != SunshineCamera.CamMode.LButton)
             return false;
-        if (_smsInWater || _fluddDashing || CameraLocked || !IsOnFloor())
+        if (_smsInWater || _fluddDashing || CameraLocked)
             return false;
+        if (!IsOnFloor())
+            return SmsAirSteers(stateOfMario); // the jumps, the flips, the dives, the rolls, a fall off an edge; not the hip drop, a wall slide, a hang
         switch (stateOfMario)
         {
             case MarioState.idle:
@@ -139,7 +146,6 @@ public partial class Mario
         _ycamXform = camera.GlobalTransform;
         _ycamPhase = YCamPhase.FrontRotate;
         _ycamOn = false;
-        _ycamOffFloorFrames = 0;
         SmsYCamApplyTransform();
         _ycamCamera.MakeCurrent();
         if (SmsDebugPrint)
@@ -211,6 +217,9 @@ public partial class Mario
         if (!UseSmsPhysics)
             return;
         _ycamHoldThisFrame = false;
+        // execCameraModeChangeProc_: a Y in a normal camera starts the swing, whatever status he is in (execFrontRotate_)
+        if (_ycamPhase == YCamPhase.Off && Input.IsActionJustPressed("button_y") && SmsYCamCanEnter())
+            SmsYCamEnter();
         if (_ycamPhase == YCamPhase.Off && _ycamLock == 0 && _ycamNeutralTicks == 0)
             return;
         _ycamStick = Input.GetVector("Lstick_left", "Lstick_right", "Lstick_up", "Lstick_down", 0.2f);
@@ -224,17 +233,21 @@ public partial class Mario
         for (int i = 0; i < n; i++)
             SmsYCamTick();
         _ycamCancelPressed = false;
+        if (_ycamOn || _ycamHoldThisFrame)
+        {
+            // MEANING_CAM_AB: in the mode A and B are the camera's, not MEANING_A / MEANING_B -- nothing of Mario's sees them this frame
+            // (no jump, no dive, no A-held lift), and the frame whose press ENDED the mode is the camera's too; on the ground the hold
+            // below covers it, in the air this does. The input block already buffered that press as a jump: drop it.
+            Input.ActionRelease("button_a");
+            Input.ActionRelease("key_space");
+            Input.ActionRelease("button_b");
+            jumpBuffer = 0;
+        }
         if (_ycamPhase != YCamPhase.Off)
             SmsYCamApplyTransform();
         if (_ycamOn)
         {
-            if (IsOnFloor())
-            {
-                _ycamOffFloorFrames = 0;
-                SmsYCamFaceLook();
-            }
-            else if (++_ycamOffFloorFrames > 3)
-                SmsYCamModeOff(true, "off the ground"); // port-only: the mode's facing and the hold need the ground (the game keeps it through a fall)
+            SmsYCamFaceLook(); // in every status but the hang family (playerControl 2451): on the ground and through a jump
             if (SmsDebugPrint && _ycamOn)
             {
                 _ycamDbgTimer += (float)delta;
@@ -418,7 +431,8 @@ public partial class Mario
 
     /// <summary>playerControl() (MarioMove.cpp 2449): mFaceAngle.y = unk258 + 0x8000 - OffsetAngleY, unk258 being the CHASED camera's
     /// bearing from its look-at (Camera.hpp 167): he faces where the camera looks, 2.7 deg off its axis, and turns with it as it
-    /// swings. In the port's yaw convention (DirFromYaw = (-sin, -cos)) the + 0x8000 is absorbed.</summary>
+    /// swings, on the ground and in the air alike. In the port's yaw convention (DirFromYaw = (-sin, -cos)) the + 0x8000 is
+    /// absorbed.</summary>
     private void SmsYCamFaceLook()
     {
         Vector3 d = _ycamPos - _ycamAt;
@@ -427,11 +441,14 @@ public partial class Mario
         float bearing = MathF.Atan2(d.X, d.Z);
         _smsFaceYaw = SmsMath.WrapAngle(bearing - SmsParams.LCamera.OffsetAngleY * SmsUnits.BamToRad);
         _smsFaceValid = true;
-        _smsFaceSource = 1;
+        // in the air the launch-latched source (2): SmsAirTick then keeps this face -- and projects the velocity onto it, the game's
+        // mForwardVel along mFaceAngle -- instead of re-latching it from the velocity
+        _smsFaceSource = IsOnFloor() ? 1 : 2;
         Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
         lastFacingDirection = face;
         _smsLatchedFacing = face;
-        armature.Rotation = armature.Rotation with { Y = BaseYawFromDir(face) };
+        if (IsOnFloor())
+            armature.Rotation = armature.Rotation with { Y = BaseYawFromDir(face) }; // in the air the armature yaw site reads _smsFaceYaw itself
     }
 
     /// <summary>considerMarioStick() while mNeutralKeyTimer runs: Mario's stick is zero for the first 0x28 counts after a mode change and

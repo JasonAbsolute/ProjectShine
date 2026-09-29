@@ -2015,8 +2015,8 @@ public partial class Mario : CharacterBody3D
             "Lstick_up",
             "Lstick_down"
         );
-        if (UseSmsPhysics && _ycamNeutralTicks > 0)
-            LstickVec *= SmsYCamMarioStickScale(); // onNeutralMarioKey() at the Y camera's ends: his stick is dead 0.44 s, then fades in over 0.22 s (the stick that was aiming does not launch him)
+        if (UseSmsPhysics && (_ycamOn || _ycamNeutralTicks > 0))
+            LstickVec *= _ycamOn ? 0f : SmsYCamMarioStickScale(); // the L camera: his stick is the camera's (mCompSPos[0],[1] are never written); onNeutralMarioKey() at either end: dead 0.44 s, then fades in over 0.22 s
         float stickStrength = LstickVec.Length();
         _smsIntendedMag = SmsStick.IntendedMag(LstickVec);
         _smsStickH = LstickVec.X;
@@ -2823,10 +2823,6 @@ public partial class Mario : CharacterBody3D
                 goto EndFrame;
             }
 
-            // Y in a normal camera (execCameraModeChangeProc_ -> execFrontRotate_): the camera swings behind him first, then the L
-            // camera comes on (MarioYCam.cs); this frame, and the swing's, are still his
-            if (Input.IsActionJustPressed("button_y") && SmsYCamCanEnter())
-                SmsYCamEnter();
 
             // === CROUCH / BACKFLIP ===
             // Holding Z on the ground puts Mario in a squat; A launches a backflip. Under SMS this is the game's MARIO_STATUS_SQUAT:
@@ -12413,8 +12409,8 @@ public partial class Mario : CharacterBody3D
                 break;
         }
         // stateMachineUpper() (MarioUpper.cpp 17 / 30): the L camera, or MARIO_STATUS_SQUAT, with the upper body IDLE -> HOLDING_PUMP,
-        // the hands on the grips
-        if (UseSmsPhysics && (_ycamOn || (stateOfMario == MarioState.crouch && _smsSquatEndTicks == 0)) && _fluddUpper == SmsUpper.Idle && SmsFluddPumpEnabled())
+        // the hands on the grips. DEVIATION (Jaysonn, 2026-09-28 03:53): not in the L camera -- idle arms until R (SmsParams.LCamera.HoldsPump)
+        if (UseSmsPhysics && ((SmsParams.LCamera.HoldsPump && _ycamOn) || (stateOfMario == MarioState.crouch && _smsSquatEndTicks == 0)) && _fluddUpper == SmsUpper.Idle && SmsFluddPumpEnabled())
         {
             _fluddUpper = SmsUpper.HoldingPump;
             _fluddPumpCooldown = 0;
