@@ -2786,6 +2786,11 @@ you make it more smooth and while were here might as well fix the other hud elem
   loaded by code any more; `SmsParams.Hud` is gone. Mario finds the scene under himself (Player.tscn) and instances it from the
   file, with a warning, when it is not there. The HUD drives (the counters, the life meter, the demo park, the timer) run as
   before on the nodes.
+- 24 (Jaysonn 02:33: "if i disable fludd for lets say a screct stage it will take that hud away?"). MARIO_FLAG_HAS_FLUDD per
+  stage: `Level.HasFludd`, an export on his Level scene root (on by default; a secret course unticks it). `SmsFluddSetup` reads
+  the Level above Mario: off, the scene's Fludd stays hidden under its seat, `_fluddReady` never turns on -- so the gauge never
+  comes (its startAppearTank waits on the pack), R and X do nothing, the pump clips and the dash never start. Drive: HasFludd
+  off, the turbo forced on and R held -- he stands idle, nothing reads R, no gauge.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

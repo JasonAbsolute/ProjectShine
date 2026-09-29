@@ -12106,12 +12106,33 @@ public partial class Mario : CharacterBody3D
 
     private static T SmsFindChild<T>(Node root) where T : Node => SmsFluddModel.FindChild<T>(root);
 
+    /// <summary>The stage's MARIO_FLAG_HAS_FLUDD: the Level above him (his Level.cs, its HasFludd export); a Mario with no Level over
+    /// him (a test scene) has the pack.</summary>
+    private bool SmsLevelHasFludd()
+    {
+        for (Node n = GetParent(); n != null; n = n.GetParent())
+            if (n is Level level)
+                return level.HasFludd;
+        return true;
+    }
+
     /// <summary>The pack: the tank on the chn_chest bone, the nozzles on the tank's nozzle_center joint, all from the rips.</summary>
     private void SmsFluddSetup()
     {
         if (skeleton == null || skeleton.FindBone("jnt_chest") < 0)
         {
             GD.PushWarning("[SMS fludd] no jnt_chest bone: no FLUDD");
+            return;
+        }
+        // MARIO_FLAG_HAS_FLUDD: the stage's Level says whether he has the pack (Level.HasFludd; a secret course takes it). Without
+        // it the scene's Fludd stays hidden, the gauge never comes, R and X do nothing -- every FLUDD tick returns on !_fluddReady.
+        if (!SmsLevelHasFludd())
+        {
+            var seat = skeleton.GetNodeOrNull<BoneAttachment3D>("SmsFluddAttach");
+            if (seat != null)
+                seat.Visible = false;
+            if (SmsDebugPrint)
+                GD.Print("[SMS fludd] the stage's Level has HasFludd off: no pack, no gauge, no pump");
             return;
         }
         // the spine bone: the game's tilt formula only reads on a joint whose X runs up the spine (chn_chest, the decomp's name
