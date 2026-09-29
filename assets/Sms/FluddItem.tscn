@@ -1,0 +1,27 @@
+[gd_scene load_steps=4 format=3 uid="uid://5759fpvxx0tq"]
+
+[ext_resource type="Script" path="res://assets/Sms/SmsNozzleItem.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fludd.tscn" id="2_pack"]
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_hit"]
+height = 1.34334
+radius = 0.537336
+
+[node name="FluddItem" type="Node3D" node_paths=PackedStringArray("Model", "Hit")]
+script = ExtResource("1_script")
+Nozzle = 0
+Model = NodePath("Model")
+Hit = NodePath("Hit")
+
+[node name="Model" type="Node3D" parent="."]
+transform = Transform3D(0.013433, 0, 0, 0, 0.013433, 0, 0, 0, 0.013433, 0, 0, 0)
+
+[node name="Pack" parent="Model" instance=ExtResource("2_pack")]
+transform = Transform3D(0, 1, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0)
+
+[node name="Hit" type="Area3D" parent="."]
+monitorable = false
+
+[node name="Shape" type="CollisionShape3D" parent="Hit"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.67167, 0)
+shape = SubResource("CylinderShape3D_hit")

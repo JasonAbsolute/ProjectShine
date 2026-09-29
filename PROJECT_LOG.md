@@ -2791,6 +2791,16 @@ you make it more smooth and while were here might as well fix the other hud elem
   the Level above Mario: off, the scene's Fludd stays hidden under its seat, `_fluddReady` never turns on -- so the gauge never
   comes (its startAppearTank waits on the pack), R and X do nothing, the pump clips and the dash never start. Drive: HasFludd
   off, the turbo forced on and R held -- he stands idle, nothing reads R, no gauge.
+- 25 (Jaysonn 02:41: "mario should walk whichever way hes facing ... he kinda studdters if he was trying to start it. and if
+  stick is netural he just goes what seems to be a pre rgramed direction"; "we should have the option to pick up fludd when hes
+  placed on the ground ... think pianta3"). The turbo's resting stick (mIntendedYaw = mFaceAngle.y) now aims where the model
+  LOOKS -- the armature's yaw read back -- and latches it as the face and the legacy facing, where it had used the cached SMS
+  face: after a turn the two could differ, the charge set off along the cached one and the run's first ticks swung him round.
+  MARIO_FLAG_HAS_FLUDD is a run-time flag now: `getNozzle` turns it on (MarioReceiveMsg.cpp 22), so any nozzle item -- and
+  `assets/Sms/FluddItem.tscn`, the game's watergun_item (0x2000001F): the pack itself lying in the stage, Nozzle = Spray -- gives
+  the FLUDD back: the pack is built then, the seat shown, the gauge comes in on its own. SmsNozzleItem has its own
+  SmsNozzleKind (Spray included). Drives: no FLUDD, the item touched -> the pack, the gauge, the spray nozzle, the tank full;
+  the turbo from a stand after a run -> along the facing, no swing.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

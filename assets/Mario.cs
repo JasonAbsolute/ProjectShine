@@ -195,6 +195,7 @@ public partial class Mario : CharacterBody3D
     private enum SmsUpper { Idle, Pumping, HoldingPump }         // mUpperState
     private static readonly string[] SmsNozzleFolder = { "normal_wg", "hover_wg", "rocket_wg", "back_wg" };
     private bool _fluddReady = false;
+    private bool _smsHasFludd = true;                   // MARIO_FLAG_HAS_FLUDD: the stage's Level at the start, on again with getNozzle
     private BoneAttachment3D _fluddAttach;
     private Node3D _fluddTank;
     private Skeleton3D _fluddTankSkel;
@@ -12116,23 +12117,31 @@ public partial class Mario : CharacterBody3D
         return true;
     }
 
-    /// <summary>The pack: the tank on the chn_chest bone, the nozzles on the tank's nozzle_center joint, all from the rips.</summary>
+    /// <summary>The pack at his start: MARIO_FLAG_HAS_FLUDD from the stage's Level (Level.HasFludd; a secret course takes it), then the
+    /// build. Without the flag the scene's Fludd stays hidden under its seat, the gauge never comes, R and X do nothing -- every
+    /// FLUDD tick returns on !_fluddReady -- until getNozzle (a nozzle item, or the FLUDD itself lying in the stage) turns it on.</summary>
     private void SmsFluddSetup()
+    {
+        _smsHasFludd = SmsLevelHasFludd();
+        SmsFluddBuild();
+    }
+
+    /// <summary>The pack: the tank on the chn_chest bone, the nozzles on the tank's nozzle_center joint, all from the scene (or the
+    /// rips), when he has the FLUDD.</summary>
+    private void SmsFluddBuild()
     {
         if (skeleton == null || skeleton.FindBone("jnt_chest") < 0)
         {
             GD.PushWarning("[SMS fludd] no jnt_chest bone: no FLUDD");
             return;
         }
-        // MARIO_FLAG_HAS_FLUDD: the stage's Level says whether he has the pack (Level.HasFludd; a secret course takes it). Without
-        // it the scene's Fludd stays hidden, the gauge never comes, R and X do nothing -- every FLUDD tick returns on !_fluddReady.
-        if (!SmsLevelHasFludd())
+        if (!_smsHasFludd)
         {
             var seat = skeleton.GetNodeOrNull<BoneAttachment3D>("SmsFluddAttach");
             if (seat != null)
                 seat.Visible = false;
             if (SmsDebugPrint)
-                GD.Print("[SMS fludd] the stage's Level has HasFludd off: no pack, no gauge, no pump");
+                GD.Print("[SMS fludd] the stage's Level has HasFludd off: no pack, no gauge, no pump -- until a nozzle item or the FLUDD itself is touched");
             return;
         }
         // the spine bone: the game's tilt formula only reads on a joint whose X runs up the spine (chn_chest, the decomp's name
@@ -12147,6 +12156,7 @@ public partial class Mario : CharacterBody3D
             skeleton.AddChild(_fluddAttach);
         }
         _fluddAttach.BoneName = "jnt_chest";
+        _fluddAttach.Visible = true; // the seat hidden by a stage without the FLUDD
         var fludd = SmsFluddModel.FindChild<SmsFludd>(_fluddAttach);
         if (fludd != null)
         {
@@ -12630,8 +12640,19 @@ public partial class Mario : CharacterBody3D
     /// then resetWaterToFull(). The item's type is the port's SmsNozzle index (1 hover, 2 rocket, 3 turbo).</summary>
     public void SmsGetNozzle(int nozzle)
     {
-        if (!_fluddReady || nozzle < 0 || nozzle > 3)
+        if (nozzle < 0 || nozzle > 3)
             return;
+        if (!_fluddReady)
+        {
+            // getNozzle: onFlag(MARIO_FLAG_HAS_FLUDD) -- the watergun_item (the FLUDD lying in a stage that took it: Pianta 3) or any
+            // nozzle item gives him the pack back; it is built now, and the gauge's startAppearTank follows on its own
+            _smsHasFludd = true;
+            SmsFluddBuild();
+            if (!_fluddReady)
+                return;
+            if (SmsDebugPrint)
+                GD.Print("[SMS fludd] the pack is his again (MARIO_FLAG_HAS_FLUDD on): the gauge comes in");
+        }
         SmsNozzle n = (SmsNozzle)nozzle;
         if (n != SmsNozzle.Spray)
             _fluddSecond = n;
@@ -13839,9 +13860,20 @@ public partial class Mario : CharacterBody3D
         if (!_fluddReady || _fluddDashSpeed <= 0f)
             return;
         float strength = Mathf.Clamp(_fluddDashSpeed / 32f, 0f, 1f);
-        Vector3 dir = inputDirWorld.LengthSquared() > 1e-6f
-            ? new Vector3(inputDirWorld.X, 0f, inputDirWorld.Z).Normalized()
-            : (_smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir());
+        Vector3 dir;
+        if (inputDirWorld.LengthSquared() > 1e-6f)
+            dir = new Vector3(inputDirWorld.X, 0f, inputDirWorld.Z).Normalized();
+        else
+        {
+            // mIntendedYaw = mFaceAngle.y: a resting stick aims where he LOOKS -- the armature's yaw this frame, whatever last turned
+            // it (the SMS run, an air steer, a legacy pivot or landing turn), not a cached face. Latched as the face, and as the
+            // legacy facing SmsGroundTick re-latches from while he stands, so the walk that follows keeps the line: the cached
+            // face and the model's look could differ after a turn, and the run's first ticks then swung him round (the stutter).
+            dir = SmsModelFacing();
+            if (!_smsFaceValid || SmsMath.DirFromYaw(_smsFaceYaw).Dot(dir) < 0.9999f)
+                SmsLatchFace(dir, 1);
+            lastFacingDirection = dir;
+        }
         inputDirWorld = dir * strength;
         stickStrength = strength;
         walkingStrength = strength;
@@ -15055,6 +15087,10 @@ public partial class Mario : CharacterBody3D
             f = SmsMath.DirFromYaw(_smsFaceYaw);
         return f.Normalized();
     }
+
+    /// <summary>The way the model looks this frame: the armature's yaw read back through the convention every writer uses for it
+    /// (armature.Rotation.Y = YawFromDir(world direction)); the velocity, or the face, when there is no armature.</summary>
+    private Vector3 SmsModelFacing() => armature != null ? SmsMath.DirFromYaw(armature.Rotation.Y) : SmsFacingOrVelocityDir();
 
     /// <summary>Set the SMS face angle from a world XZ direction. source: 1 = ground, 2 = air.</summary>
     private void SmsLatchFace(Vector3 dir, int source)

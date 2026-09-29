@@ -49,7 +49,8 @@ public partial class Level : Node3D
     [Export] public string GoText = "GO!";
 
     /// <summary>MARIO_FLAG_HAS_FLUDD for this stage. Off in a secret course (Shadow Mario has the pack): Mario comes without
-    /// the FLUDD -- no pack on his back, no water gauge, R and X do nothing. Mario.cs reads it at his setup.</summary>
+    /// the FLUDD -- no pack on his back, no water gauge, R and X do nothing -- until he touches a FluddItem (assets/Sms/FluddItem.tscn,
+    /// the FLUDD lying in the stage, as Pianta 3 has it) or a nozzle item. Mario.cs reads it at his setup.</summary>
     [Export] public bool HasFludd = true;
 
     /// <summary>Delay after the spawn barn door finishes opening before GO!

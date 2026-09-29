@@ -11,11 +11,15 @@ using System;
 /// dead box of that nozzle comes back (resetNozzleBoxesModel). MAP_OBJ_FLAG_UNK10000000 (load 1168) spares it the item timer: it
 /// waits until taken.
 /// The scenes are models/Nozzles/{Hover,Rocket,Turbo}/*NozzleItem.tscn: the model (Jaysonn's textured exports) and the Hit cylinder
-/// as nodes, this script driving them. A box throws the scene its export names; one can also lie in a level on its own.
+/// as nodes, this script driving them. A box throws the scene its export names; one can also lie in a level on its own -- and
+/// assets/Sms/FluddItem.tscn is the game's watergun_item (0x2000001F, "pickup spray nozzle"): the FLUDD itself lying in a stage
+/// that took it (Pianta 3), Nozzle = Spray. getNozzle turns MARIO_FLAG_HAS_FLUDD on for any of them, so each gives the pack back.
 /// </summary>
 public partial class SmsNozzleItem : Node3D
 {
-    [Export] public SmsNozzleBox.BoxNozzle Nozzle = SmsNozzleBox.BoxNozzle.Hover;
+    public enum SmsNozzleKind { Spray = 0, Hover = 1, Rocket = 2, Turbo = 3 } // the port's SmsNozzle indices
+
+    [Export] public SmsNozzleKind Nozzle = SmsNozzleKind.Hover;
     /// <summary>The scene's parts: the model that spins, the 40 x 100 unit touch cylinder.</summary>
     [Export] public Node3D Model;
     [Export] public Area3D Hit;
@@ -118,7 +122,7 @@ public partial class SmsNozzleItem : Node3D
     {
         _taken = true;
         mario.SmsGetNozzle((int)Nozzle);
-        SmsNozzleBox.RespawnAll(this, Nozzle); // resetNozzleBoxesModel(kind)
+        SmsNozzleBox.RespawnAll(this, (SmsNozzleBox.BoxNozzle)(int)Nozzle); // resetNozzleBoxesModel(kind); no box holds the spray
         QueueFree();
     }
 }

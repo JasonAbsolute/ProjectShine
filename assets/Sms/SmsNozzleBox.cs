@@ -171,7 +171,7 @@ public partial class SmsNozzleBox : StaticBody3D
             GD.PushWarning($"[SMS nozzle box] {GetPath()}: no {Nozzle}Item scene with an SmsNozzleItem root -- the box breaks and throws nothing (set it in NozzleBox.tscn)");
             return;
         }
-        item.Nozzle = Nozzle;
+        item.Nozzle = (SmsNozzleItem.SmsNozzleKind)(int)Nozzle;
         item.Box = this;
         GetParent().AddChild(item);
         float s = 1f / SmsUnits.UnitsPerMetre;
