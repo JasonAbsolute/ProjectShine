@@ -2591,6 +2591,33 @@ juming?)").
 - Verified headless with the pass-17b scripted drive plus an armature readout (temp, not committed): the triple jump's Y, the stick
   right turning the camera with his face AND his armature following it in the air, the exit A with no jump, the landing; the ground
   entry with `upper HoldingPump` at once, R → `Pumping`, the release → `HoldingPump`, B → off.
+
+**Pass 17d — the hover in the mode, still hands on the grips, the squat in the mode** (Jaysonn 20:08, on 17c: "when mario uses
+the hover nozzle in the y cam it snaps back to the normal one. it needs to glide and not snap back to normal like sms"; "when in
+the y cam the pumping animation shouldnt play? it should be still and then when you press R it pumps"; "Squat inside the Y cam
+next (R click or L)").
+- The hover: deliberate deviation (below). The game cuts the L camera in one frame the moment he is `ROCKET` / `ROCKET_LANDING`
+  (`execCameraModeChangeProc_`, CameraChange.cpp 588: `isMarioRocketing()` → `doLButtonCameraOff_(true)`; the hover nozzle's
+  hover IS `MARIO_STATUS_ROCKET`, `rocketCheck` 897: RocketType 1 is both nozzles), and refuses a Y while they last — which is the
+  snap he saw. `SmsParams.LCamera.StaysOnRocketing`: the mode stays on through a hover / a launch and the fall after (his face and
+  body follow the look, the hover's speed runs along the face as `rocketing()`'s does), and a Y during a hover enters.
+- The pump clip: the tree in `Player.tscn` fed `CarryBlend`'s blend input straight from `Animation 2` (ma_pump), so the clip ran on
+  its own clock — through `RunTimeScale`, at the run's rate — whenever the upper body was on the grips: `HOLDING_PUMP` pumped
+  (unnoticed while the hold lasted only the PumpWaitTime cooldown; the L camera and the squat hold for as long as you like). The
+  game: `addUpper()` binds the pump clip for PUMPING / HOLDING_PUMP and `changeMtxCalcSIAnmBQAnmTransform` inits its J3DFrameCtrl at
+  frame 0, rate 1 (MarioBlend.cpp 11); with water in the tank the rate is never touched, so the clip ping-pongs at rate 1 while
+  PUMPING and through the cooldown; then `stateMachineUpper()` does `setFrame(0)` every tick (MarioUpper.cpp 117): still hands on
+  the grips until R. The tank's `wg_pump` is `setFrame(mMario->getPumpFrame())` at rate 0 (WaterGun.cpp 1594). Port: one clock
+  (`SmsFluddPumpClock`) feeds the tree — rewired at start-up as `CarryBlend 1 ← PumpScale (0) ← PumpSeek ← Animation 2`, a seek
+  every frame — the swim graft (`SmsUpperPose.Time`) and the tank (`SmsAnimScrub`). Not ported: the empty tank's `R × PumpAnmSpeed`
+  rate (`addUpper` 1892).
+- The squat in the mode: `canSquat()` (MarioMove.cpp 44) is `mInput & 0x200` = `MEANING_R` (the click) or `MEANING_L` held with the
+  FLUDD out and not a RocketType-1 nozzle — and the pad still produces both in the L camera (MarioGamePad.cpp 77-79), so the R
+  click or L squats him inside the mode. `squating()` there runs with Mario's stick zero and A as `MEANING_CAM_AB`: no turn, no
+  sidestep, no backflip; R sprays where the camera looks (the gun angle is the camera pitch); both released → `SQUAT_STANDUP` → the
+  hold (WAIT). The look-at (the nozzle top) lowers with him. Port: the ground block's hold takes the squat first (`SmsSquatFrame` /
+  `StartCrouch` before `SmsYCamHoldMario`). His pad has no click: the full pull is the click (`SmsRClick`), so a full R in the mode
+  squats him, as a GC trigger's click does in the game.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
@@ -2632,6 +2659,11 @@ Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
 - **The turbo dash clip is paced by the actual speed** (2026-09-28 01:02). The game paces it by `mDashSpeed`, capped at 32 — the
   run's tempo (2.76) at 2.5× the ground speed; he reads that as slow. Now `mForwardVel` × 0.055 + 1 = 5.4 at 80.
   `SmsParams.Fludd.DashAnimByForwardVel`.
+- **The L camera survives the hover and the rocket** (2026-09-28 20:10). `execCameraModeChangeProc_` (CameraChange.cpp 588) cuts
+  the L camera in one frame (`doLButtonCameraOff_(true)`) the moment `isMarioRocketing()` — `MARIO_STATUS_ROCKET` or
+  `ROCKET_LANDING`, the hover nozzle's hover included — and refuses a Y while it lasts; the port did the same and Jaysonn saw the
+  snap ("it needs to glide and not snap back to normal like sms"). The mode now stays on through a hover / a launch and the fall
+  after, and a Y during a hover enters. `SmsParams.LCamera.StaysOnRocketing` (true; false = the game).
 - ~~**Idle arms in the L camera until R** (2026-09-28 03:53)~~ — WITHDRAWN in pass 17c by Jaysonn ("mario does grab flod when hoding
   y cam. lets not do my deviation do it how the game has it"): `checkPumping()` (`MarioUpper.cpp` 17) puts the upper body on the
   grips (`HOLDING_PUMP`, the pump clip's frame 0) the moment `isLButtonCamera` && `checkPumpEnable`, and so does the port again;

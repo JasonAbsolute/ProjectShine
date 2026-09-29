@@ -193,6 +193,10 @@ public static class SmsParams
         // (53 ticks, 0.44 s) and fades back in over the rest (0.22 s)
         public const int NeutralKeyTicks = 80;
         public const int NeutralKeyDeadTicks = 53;
+        // DEVIATION (Jaysonn, 2026-09-28 20:10): the game cuts the L camera in one frame the moment he is ROCKET / ROCKET_LANDING --
+        // the hover nozzle's hover included (rocketCheck: RocketType 1 is both nozzles) -- and refuses a Y while it lasts
+        // (execCameraModeChangeProc_ 588: isMarioRocketing -> doLButtonCameraOff_(true)). He wants to glide in the mode. false = the game.
+        public const bool StaysOnRocketing = true;
     }
 
     public static class Waist

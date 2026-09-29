@@ -25,8 +25,9 @@ using Godot;
 ///
 /// IN THE MODE (MarioGamePad.cpp 70-88): the MAIN stick is the camera's (mCompSPos[4],[5]) and Mario's is zero; A and B are
 /// MEANING_CAM_AB, Y is Y, R sprays, X switches, L is MEANING_L. Y / A / B leave (doLButtonCameraOff_(false), a 16-tick sweep back)
-/// once unk282 == 0 and the inbetween is over; a knockdown (status bit 0x20000), the hover / rocket, the dash, the surf, sleeping,
-/// climbing cut it in one tick (Off_(true)). Mario faces the chased camera's bearing (MarioMove.cpp 2449: unk258 + 0x8000 -
+/// once unk282 == 0 and the inbetween is over; a knockdown (status bit 0x20000), the hover / rocket (a logged deviation keeps the
+/// mode on through them: SmsParams.LCamera.StaysOnRocketing), the dash, the surf, sleeping, climbing cut it in one tick
+/// (Off_(true)). Mario faces the chased camera's bearing (MarioMove.cpp 2449: unk258 + 0x8000 -
 /// OffsetAngleY), holds the pump (MarioUpper.cpp 17), and the gun angle IS mCurrentTarget.mPitch (WaterGun.cpp 219): looking down
 /// bends the upper body forward (MarioWaistCtrl 476), looking up lifts the spray nozzle and the head. On the way out the normal camera
 /// resumes with the L camera's yaw -- behind the way he now faces (the rig is told so: SunshineCamera.SmsYCamExit).
@@ -34,8 +35,8 @@ using Godot;
 /// Port shape: a second Camera3D ("SmsYCamera", TopLevel) made current from the Y press; the rig's SunshineCamera keeps following
 /// underneath and gets the view back after the sweep out. Its own Y-button mode is off under SMS (it froze Mario with CameraLocked
 /// underneath this one: no stick, no FLUDD, no way out -- the whole of the pass-16 report).
-/// A Y IN THE AIR works as in the game (execFrontRotate_ runs in any status but the hip drop; only sleeping, the surf, the hover /
-/// rocket, the dash and climbing refuse): the mode keeps his status, his stick is zero, A / B are eaten, and his facing is forced to
+/// A Y IN THE AIR works as in the game (execFrontRotate_ runs in any status but the hip drop; only sleeping, the surf, the dash and
+/// climbing refuse -- and the hover / rocket, unless StaysOnRocketing): the mode keeps his status, his stick is zero, A / B are eaten, and his facing is forced to
 /// the camera's look every tick -- mForwardVel runs along mFaceAngle, so the flight bends with the look (the port projects the
 /// velocity onto the forced face each frame: the same thing for a smooth turn). The landing inside the mode goes straight to WAIT.
 /// Not ported: the notice lock-on (no bosses), the SEs (0x4824 / 0x4825), the squat inside the mode (R clicked / L: canSquat holds
@@ -99,7 +100,8 @@ public partial class Mario
         if (_smsInWater || _fluddDashing || CameraLocked)
             return false;
         if (!IsOnFloor())
-            return SmsAirSteers(stateOfMario); // the jumps, the flips, the dives, the rolls, a fall off an edge; not the hip drop, a wall slide, a hang
+            return SmsAirSteers(stateOfMario) // the jumps, the flips, the dives, the rolls, a fall off an edge; not the hip drop, a wall slide, a hang
+                || (SmsParams.LCamera.StaysOnRocketing && stateOfMario == MarioState.fluddRocket); // the deviation: a Y while he hovers
         switch (stateOfMario)
         {
             case MarioState.idle:
@@ -289,7 +291,8 @@ public partial class Mario
                 // execCameraModeChangeProc_: what ends the mode by itself -- knocked down / hurt / dead (status bit 0x20000), the hover
                 // or rocket (isMarioRocketing), the dash (FLUDD_EMITTING), the water / surf, a talk, the shine, a cutscene hold
                 bool cut = stateOfMario == MarioState.hurt || stateOfMario == MarioState.dead || stateOfMario == MarioState.talking
-                    || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.swimming || stateOfMario == MarioState.fluddRocket
+                    || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.swimming
+                    || (!SmsParams.LCamera.StaysOnRocketing && stateOfMario == MarioState.fluddRocket) // DEVIATION: he glides in the mode
                     || _smsInWater || _fluddDashing || CameraLocked;
                 if (cut)
                 {
