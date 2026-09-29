@@ -2645,6 +2645,36 @@ blended THROUGH the carrying pose: the flail, and the chest / head jerk. The gam
 (`unk3 = -1`), the body clip continuing from the very pose the grips held. The clip now stays `ma_pump` unless he carries something
 (`heldBody != null`), so the fade runs from the grip pose into a clip that starts on it — nothing to see. The same fade ran after
 every R release; a moving body hid it.
+
+**Pass 18 — the HUD water gauge, the nozzle boxes** (Jaysonn 21:20: "lets move onto the HUD water gauge and hover, turbo and rocket
+nozles boxes").
+- The gauge (`assets/Sms/SmsWaterHud.cs`, a Control beside the other HUD nodes under Mario): `TGCConsole2` (GC2D/GCConsole2.cpp)
+  drawing the `w_0` panes of `game_6/scrn/standard_1.blo`, read from the disc's screen file with `tools/projectshine/blo_dump.py` —
+  a 600 x 480 screen, the group at (493, 355): `w_ba` water_back 88x86 alpha 120 tinted 0000FF (the disc), `w_t0` water_icon_0
+  44x70 at (22, 9) (the tank), `w_t2` / `w_t3` water_icon_2 / 3 at (23, 16) / (39, 19) in 64DCFF / 00B4F0 (the water's two faces),
+  `w_t1` water_icon_1 at (23, 10) in BEF0FF (the surface), `nz01..04` water_nozzle_01..04 with their `xb0N` X buttons (the current
+  nozzle's icon), `w_tx` water_text_0 "WATER" at (4, 66). The textures are the disc's BTIs (`game_6/timg`, decoded with
+  `tools/projectshine/bti2png.py`; the I4 ones exported white with the intensity as alpha, as the game's black / white colours use
+  them) in `assets/Sms/hud/`. Behaviour from the code: `updateWaterGaugeFill` (fill = water / AmountMax, the surface's alpha 255 /
+  0x50 / 0, the icon = mCurrentNozzle), `drawWater` (the faces up to the water line, the surface at tank.y + 47 x (1 - fill)),
+  `drawWaterBack` (the disc blue at 0x78; a rocket / turbo charge fills it red (FF3F3F, 0xC8) by pressure / InsidePressureMax,
+  pulsing red → yellow → red over 25 frames when full: `getPressureFlashColor`), `startAppearTank` / `processAppearTank` (the group
+  rises 110 px over 20 frames, the disc, text, tank, icon popping in through 50 → -30 → 0 at frames 0 / 6 / 14 / 26),
+  `startDisappearTank` (170 px down over 40 frames, in a cutscene hold), `updateWaterTankState` (the X button off 70 of every 270
+  frames). The game's pixels scale with the viewport height / 480 and keep the bottom-right margins. Not ported: the Yoshi juice
+  gauge, the tank SE at full (0x4807), the hint balloons.
+- The nozzle boxes (`assets/Sms/SmsNozzleBox.cs`, a StaticBody3D to place in a level with its Nozzle set; `SmsNozzleItem.cs`):
+  `TNozzleBox` (MoveBG/Item.cpp 1181-1338) — the dolpic0 `nozzlebox.bmd` (205.6 units a side; FinModelUtility's glb under
+  `models/Koopa/scene/dolpic0/mapobj/`) with `nozzlebox.bmt`'s `J_nozzleBox` face (the FLUDD logo and four screws) tinted through
+  TEVREG1: hover 0000FF, rocket FF0000, turbo 5A5A78. Mario landing on it (a TRAMPLE; not a belly slide) bounces him (`StompBounce`,
+  the HIT_MESSAGE_ATTACK back) and breaks it: the item is thrown out of the front (`throwObjToFront`: 50 units up the base, along
+  the box's +Z, the level's speeds — here the node's, 2 u/frame forward and 10 up), the crash model `nozzleboxcrash.bmd` plays its
+  BCK (49 frames), the box is dead. The item (`TItemNozzle` on `nozzle_normal_physical_data`: gravity 0.35 u/frame², bounce 0.5,
+  stop below 5, landing friction 0.8, no air drag; spinning 2° a frame as every item does; a 40 x 100 unit cylinder to touch; no
+  timer — it waits) gives Mario the nozzle on touch: `TMario::getNozzle` (MarioReceiveMsg.cpp 18) = `changeNozzle(type, animate)`
+  with the swap at 1 and the tank refilled (`Mario.SmsGetNozzle`), and every dead box of that nozzle comes back at once
+  (`TItemManager::resetNozzleBoxesModel`; a short scale-in stands in for the smoke puff). Not ported: the valid / shut boxes before
+  the nozzle right, the hint balloons, the SEs, the get sparkle. Jaysonn places the boxes (the editor is his).
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

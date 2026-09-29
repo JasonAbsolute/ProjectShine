@@ -281,6 +281,7 @@ public partial class Mario : CharacterBody3D
     private bool _fluddPumpSeekReady = false;                     // the tree's PumpSeek / PumpScale nodes answered
     private const string SMS_PUMP_SEEK_PATH = "parameters/PumpSeek/seek_request";
     private const string SMS_PUMP_SCALE_PATH = "parameters/PumpScale/scale";
+    private SmsWaterHud _waterHud;                                // TGCConsole2's water gauge: the 'w_0' panes of standard_1.blo
     private bool _smsRocketLanding = false;                       // the fall is ROCKET_LANDING (after a hover): no wall slide on a wall at 16..40
     // waiting(): mHealth <= 3 -> ANIM_DAMAGE_WAIT_START once, then ANIM_DAMAGE_WAIT (library-only clips, driven directly)
     private int _smsDamageWaitPhase = 0;      // 0 off, 1 ma_damage_wait_start playing, 2 ma_damage_wait looping
@@ -4212,6 +4213,7 @@ public partial class Mario : CharacterBody3D
         Last4FacingDirections.Add(lastFacingDirection);
         Vector3 preSlideVelocity = velocity;
         MarioState preMoveState = stateOfMario;
+        SmsPreMoveVelocity = velocity; // for the objects he lands on (the nozzle box's trample): MoveAndSlide zeroes the body's Y on the lid
 
         // A jump launching on a steep slope needs an explicit gap, not just
         // upward velocity — floor_max_angle=83° is so permissive that
@@ -12191,6 +12193,7 @@ public partial class Mario : CharacterBody3D
             if (_fluddNozzleAnim[i] != null && _fluddNozzleAnim[i].HasAnimation(SmsNozzleFolder[i] + "_shooting"))
                 _fluddNozzleAnim[i].GetAnimation(SmsNozzleFolder[i] + "_shooting").LoopMode = Animation.LoopModeEnum.Linear;
         _fluddReady = true;
+        SmsFluddSetupHud();       // the HUD's water gauge (startAppearTank once MARIO_FLAG_HAS_FLUDD)
         SmsFluddPoseTank();
         SmsFluddNozzleAnim();
         if (SmsDebugPrint)
@@ -12255,6 +12258,7 @@ public partial class Mario : CharacterBody3D
         SmsFluddApplyTilt();
         SmsFluddApplyGunAngle();
         SmsFluddPoseWater();
+        SmsFluddHudTick();       // updateWaterGaugeFill / drawWaterBack's inputs
         if (SmsDebugPrint)
         {
             int max = SmsFluddCurrent.AmountMax;
@@ -12541,6 +12545,68 @@ public partial class Mario : CharacterBody3D
 
     private static bool SmsAnimDone(AnimationPlayer ap, string name)
         => ap == null || !ap.HasAnimation(name) || (ap.AssignedAnimation == name && !ap.IsPlaying());
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // The HUD's water gauge (TGCConsole2, GC2D/GCConsole2.cpp) and the nozzle boxes' hand-off (TMario::getNozzle).
+    // ---------------------------------------------------------------------------------------------------------------
+
+    /// <summary>The gauge as a Control beside the other HUD elements (children of Mario, on the viewport's canvas): SmsWaterHud draws
+    /// the disc's own textures (assets/Sms/hud, from game_6/timg) at standard_1.blo's positions, bottom-right.</summary>
+    private void SmsFluddSetupHud()
+    {
+        if (!UseSmsPhysics || _waterHud != null)
+            return;
+        _waterHud = new SmsWaterHud { Name = "SmsWaterHud" };
+        AddChild(_waterHud);
+        if (SmsDebugPrint)
+            GD.Print(_waterHud.Ready
+                ? "[SMS hud] water gauge: the 12 textures loaded; the tank rises once the FLUDD is ready, the icon follows the nozzle, the disc fills red with a rocket / turbo charge"
+                : "[SMS hud] water gauge: textures missing under res://assets/Sms/hud -- the gauge stays off");
+    }
+
+    /// <summary>updateWaterGaugeFill: fill = mCurrentWater / AmountMax, the icon = mCurrentNozzle; drawWaterBack: isPressureOn() while a
+    /// trigger nozzle (the rocket, the turbo) holds a charge, pressure / InsidePressureMax; startAppearTank while he has the FLUDD and
+    /// no camera demo runs (startDisappearTank in one).</summary>
+    private void SmsFluddHudTick()
+    {
+        if (_waterHud == null || !_waterHud.Ready)
+            return;
+        var np = SmsFluddCurrent;
+        _waterHud.Fill = np.AmountMax > 0 ? Mathf.Clamp((float)_fluddWater / np.AmountMax, 0f, 1f) : 0f;
+        _waterHud.Nozzle = (int)_fluddNozzle;
+        bool trigger = _fluddNozzle == SmsNozzle.Rocket || _fluddNozzle == SmsNozzle.Turbo;
+        _waterHud.Pressure = trigger && _fluddTrigFill > 0f && np.TriggerMax > 0f ? _fluddTrigFill / np.TriggerMax : -1f;
+        _waterHud.Wanted = _fluddReady && !CameraLocked && stateOfMario != MarioState.talking && stateOfMario != MarioState.shineGet
+            && stateOfMario != MarioState.dead;
+    }
+
+    /// <summary>TMario::getNozzle (MarioReceiveMsg.cpp 18), the nozzle item touched: changeNozzle(type, animate = true) -- the second
+    /// nozzle set, the swap progress at 1 so the new nozzle is on the pack at once (0 for the spray), the tank's fraction carried over --
+    /// then resetWaterToFull(). The item's type is the port's SmsNozzle index (1 hover, 2 rocket, 3 turbo).</summary>
+    public void SmsGetNozzle(int nozzle)
+    {
+        if (!_fluddReady || nozzle < 0 || nozzle > 3)
+            return;
+        SmsNozzle n = (SmsNozzle)nozzle;
+        if (n != SmsNozzle.Spray)
+            _fluddSecond = n;
+        _fluddSwitchSpeed = 0f;
+        _fluddSwitch = n == SmsNozzle.Spray ? 0f : 1f;
+        SmsFluddChangeNozzle(n);
+        _fluddWater = SmsFluddCurrent.AmountMax; // resetWaterToFull()
+        if (SmsDebugPrint)
+            GD.Print($"[SMS fludd] nozzle item: -> {n} (X now swaps Spray <-> {_fluddSecond}), the tank full ({_fluddWater})");
+    }
+
+    /// <summary>His velocity before this frame's MoveAndSlide (the game's mSpeed as the objects he lands on see it).</summary>
+    public Vector3 SmsPreMoveVelocity { get; private set; }
+
+    /// <summary>TNozzleBox::receiveMessage: a TRAMPLE opens the box unless it is SMS_IsMarioHeadSlideAttack -- a belly slide / dive.</summary>
+    public bool SmsCanTrampleBox() => stateOfMario != MarioState.diving && stateOfMario != MarioState.bellySlidingFromDive
+        && stateOfMario != MarioState.singleJumpDive && stateOfMario != MarioState.doubleJumpDive && stateOfMario != MarioState.tripleJumpDive;
+
+    /// <summary>The FLUDD atlas (H_watergun_main) on a nozzle item's meshes, as nozzleitem.bmt puts it.</summary>
+    public void SmsApplyFluddAtlas(Node root) => SmsFluddNozzleMaterial(root);
 
     /// <summary>TWaterGun::calcAnimation(): the tank's clip from the upper state and the stow progress.</summary>
     private void SmsFluddPoseTank()
