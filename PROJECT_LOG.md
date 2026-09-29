@@ -2775,6 +2775,17 @@ you make it more smooth and while were here might as well fix the other hud elem
   `canSquat()` (MarioMove.cpp 44) refuses the turbo outright (`mCurrentNozzle != 5`) besides the RocketType-1 nozzles; the port
   had only the RocketType check, so the R click with the turbo squatted him instead of charging. Drive: the turbo on, R
   clicked while he stands -- no squat, he walks then sprints as mDashSpeed climbs 30 -> 32, FLUDD_EMITTING at 32.
+- 23 (Jaysonn 01:59: "Do the HUD as a scene next"). The console is `assets/Sms/Console/SmsHud.tscn`: a CanvasLayer (`SmsHudLayer`,
+  the knobs below as its exports) with the StandardHud and the WaterHud as Controls, every pane of standard_1.blo a TextureRect
+  laid out on the 640 x 448 frame as the .blo has it -- a `SmsHudGroup` per group (Coins, BlueCoins, Shines, LifeMeter, Lives,
+  RedCoins, Timer; its place in the scene its place on the frame, its `Anchor` the window edge it keeps to) with Strip / Icon / X /
+  Digit0..2 and the rest as children; the gauge's pieces as children of the WaterHud, the cut draws (the water's faces at the
+  water line, the pressure gauge's red) as clip Controls the code sizes. The digit pictures are the StandardHud's `Digits` export;
+  the air recolour is `J2DBlackWhite.gdshader` on the rays and "LIFE" (the TEV's black / white, set by the code) in place of the
+  baked copies. `SmsHudPane` wraps a node: the code reads the layout from the scene and moves the nodes -- nothing is drawn or
+  loaded by code any more; `SmsParams.Hud` is gone. Mario finds the scene under himself (Player.tscn) and instances it from the
+  file, with a warning, when it is not there. The HUD drives (the counters, the life meter, the demo park, the timer) run as
+  before on the nodes.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
@@ -2843,21 +2854,21 @@ Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
   counter in with the new count (`updateMarioLifeCounter` does that for a gain).
 - **The HUD is 0.7 of the game's size** (2026-09-28 23:21, "too big"). At 1 the frame's 448 lines fill the window's height and a
   coin digit is 8 % of the screen — the game on a TV. His own HUD had the disc's textures 1:1 in the 648-line canvas, 0.69 of
-  that. `SmsParams.Hud.Size`; 1 = the game.
+  that. `Size` on SmsHud.tscn's root (SmsHudLayer; `SmsParams.Hud` until pass 23); 1 = the game.
 - **The HUD's rows move toward the window's edges** (2026-09-28 23:21 → 23:42, "misplaced", `Ref/HudRef.png`: arrows from the
   counters to the top edge, from the gauge to the corner). The game's top rows sit at y 74 of 448 (a CRT hid ~22 of them), the
-  gauge 59 px from the right with "WATER" 3 px past the bottom; his own HUD had the strips 40 px from the top. `SmsParams.Hud`
+  gauge 59 px from the right with "WATER" 3 px past the bottom; his own HUD had the strips 40 px from the top. The scene root's
   `TopShift -34 / RightShift 30 / BottomShift -10 / LeftShift 0`, game pixels; 0 = the game (Dolphin's look). Not a deviation:
   the lives strip (223..421 of 640) is centred on the frame, so on a wide window it is centred on the window.
 - **The HUD's motions run at four times the game's pace** (2026-09-28 23:21 "incredibly slow" → 2; 23:42 "wayyyy to slow" → 4;
   22:26 "a bit slow"). The console's
   quadratics (50 / 40 frames), settles (30), slides (20 / 40 / 50), staggers (14 / 24 / 28 ...) and the life meter's 100-frame
-  mid-screen hold are the game's at 30 fps — a counter takes 4 s to settle on the disc. `SmsParams.Hud.AnimSpeed` (4) divides
+  mid-screen hold are the game's at 30 fps — a counter takes 4 s to settle on the disc. the root's `AnimSpeed` (4) divides
   them; the waits (the idle 200, a blue coin's 400, the 120 at full health, the X blink, the heartbeat, the coin roll) stay.
 - **The idle peek stays while Mario stands** (2026-09-28 23:21, "auto going away even when mario is idle").
   `updateStarHudAutoHide` (1061) takes the shine / blue coin counters and the lives away the moment they have settled and
   nothing is on the clocks, idle or not; `waitForStarHud` (934) then brings them back 200 frames later — a peek every 320
-  frames while he stands. The console has an `unk60` guard on that hide which the game never sets; `SmsParams.Hud.IdleHold`
+  frames while he stands. The console has an `unk60` guard on that hide which the game never sets; the root's `IdleHold`
   sets it while he is MARIO_STATUS_WAIT, so they hold until he moves. false = the game's peek.
 - **The life meter turns to air in place** (2026-09-28 22:50). The decomp's state 2 → 3 → 0 → 4 dance for a meter already on
   screen when the air switch comes (a hide, a 120-frame wait, an appear in the air colours) is not reproduced; the colours and

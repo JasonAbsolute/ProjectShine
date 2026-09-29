@@ -16,67 +16,50 @@ using System;
 /// display's own rate. The screen is drawn 1:1 into the game's 640 x 448 frame (J2DOrthoGraph over the render rect, 1 unit = 1 EFB
 /// pixel; the .blo's 600 x 480 is nominal), of which a CRT hid the outer few per cent. On a wide window the left-hand groups keep
 /// their margin to the left edge, the right-hand ones to the right, the lives (centred on the frame) to the centre, the bottom ones
-/// to the bottom. Jaysonn's SmsParams.Hud: Size scales the whole console (1 = the frame's 448 lines on the window's height), the
-/// Shifts move the rows toward the window's edges, AnimSpeed runs the motions (not the waits) faster than the game's pace.
+/// to the bottom. The console is a scene (assets/Sms/Console/SmsHud.tscn, SmsHudLayer): every pane a TextureRect in its group, laid out
+/// on the 640 x 448 frame as the .blo has it; the code here only moves them. Jaysonn's knobs live on that scene's root: Size scales
+/// the whole console (1 = the frame's 448 lines on the window's height), the Shifts move the rows toward the window's edges,
+/// AnimSpeed runs the motions (not the waits) faster than the game's pace, IdleHold keeps the star HUD and the lives while he idles.
 /// </summary>
 public static class SmsHud
 {
-    public const string TexDir = "res://assets/Sms/hud/";
     public const float ScreenW = 640f, ScreenH = 448f;   // the game's frame: SMSGetGameRenderWidth / Height, the J2D ortho over it
     public const float Fps = 30f;
     public const int Settle = 30;                          // the follow-up quadratic's frames
-    /// <summary>The motions' pace over the game's (SmsParams.Hud.AnimSpeed).</summary>
-    public static float Anim => SmsParams.Hud.AnimSpeed;
 
-    /// <summary>Game pixels to canvas pixels: the frame's 448 lines on the viewport's height, times SmsParams.Hud.Size.</summary>
-    public static float Scale(Vector2 viewport) => viewport.Y / ScreenH * SmsParams.Hud.Size;
+    // ---- the scene root's knobs (SmsHudLayer.Apply copies its exports here; these are its defaults: Jaysonn's -- the game's are
+    // 1 / 0 / 0 / 0 / 0 / 1 / false) ----
+    public static float Size = 0.7f;
+    public static float LeftShift = 0f, TopShift = -22f, RightShift = 30f, BottomShift = -10f;
+    public static float AnimSpeed = 4f;
+    public static bool IdleHold = true;
+    /// <summary>The motions' pace over the game's.</summary>
+    public static float Anim => AnimSpeed;
+
+    /// <summary>Game pixels to canvas pixels: the frame's 448 lines on the viewport's height, times Size.</summary>
+    public static float Scale(Vector2 viewport) => viewport.Y / ScreenH * Size;
     /// <summary>A left-anchored group's canvas x: its game x, shifted, scaled.</summary>
-    public static float LeftX(float x, float s) => (x + SmsParams.Hud.LeftShift) * s;
-    public static float TopY(float y, float s) => (y + SmsParams.Hud.TopShift) * s;
+    public static float LeftX(float x, float s) => (x + LeftShift) * s;
+    public static float TopY(float y, float s) => (y + TopShift) * s;
     /// <summary>A right-anchored group's canvas x: the game's margin to the frame's right edge, shifted, from the viewport's.</summary>
-    public static float RightX(float x, float s, Vector2 viewport) => viewport.X - (ScreenW - x - SmsParams.Hud.RightShift) * s;
-    public static float BottomY(float y, float s, Vector2 viewport) => viewport.Y - (ScreenH - y - SmsParams.Hud.BottomShift) * s;
+    public static float RightX(float x, float s, Vector2 viewport) => viewport.X - (ScreenW - x - RightShift) * s;
+    public static float BottomY(float y, float s, Vector2 viewport) => viewport.Y - (ScreenH - y - BottomShift) * s;
     /// <summary>A group the game centres on its frame (the lives): centred on the viewport.</summary>
     public static float CenterX(float x, float s, Vector2 viewport) => viewport.X * 0.5f + (x - ScreenW * 0.5f) * s;
+
+    /// <summary>A group's canvas position: its place on the game's frame through its anchor, at the console's scale.</summary>
+    public static Vector2 Anchored(Vector2 home, SmsHudGroup.HudAnchor anchor, float s, Vector2 viewport)
+    {
+        bool right = anchor == SmsHudGroup.HudAnchor.TopRight || anchor == SmsHudGroup.HudAnchor.BottomRight;
+        bool bottom = anchor == SmsHudGroup.HudAnchor.BottomLeft || anchor == SmsHudGroup.HudAnchor.BottomRight;
+        float x = right ? RightX(home.X, s, viewport) : anchor == SmsHudGroup.HudAnchor.TopCenter ? CenterX(home.X, s, viewport) : LeftX(home.X, s);
+        float y = bottom ? BottomY(home.Y, s, viewport) : TopY(home.Y, s);
+        return new Vector2(x, y);
+    }
 
     public static readonly Vector2 DownTop = new Vector2(0f, -100f), DownMid = new Vector2(0f, 30f);
     public static readonly Vector2 UpTop = new Vector2(0f, 50f), UpMid = new Vector2(0f, -30f);
     public static readonly Vector2 CoinMid = new Vector2(0f, 45f);
-
-    /// <summary>The PNGs: through the importer when the editor has seen them, else straight off the disk (a headless run before it has).</summary>
-    public static Texture2D Load(string name)
-    {
-        string path = TexDir + name + ".png";
-        if (ResourceLoader.Exists(path))
-            return ResourceLoader.Load<Texture2D>(path);
-        var img = Image.LoadFromFile(ProjectSettings.GlobalizePath(path));
-        return img == null || img.IsEmpty() ? null : ImageTexture.CreateFromImage(img);
-    }
-
-    /// <summary>J2DPicture's black / white colours on a coloured texture: out = black + tex x (white - black), each channel (the life
-    /// meter turned to air: black 003CFF00, white 00FFFFFF). Baked into a copy, the canvas has no such mapping.</summary>
-    public static Texture2D Recolor(Texture2D src, Color black, Color white)
-    {
-        if (src == null)
-            return null;
-        Image img = src.GetImage();
-        if (img == null)
-            return src;
-        img = (Image)img.Duplicate();
-        if (img.IsCompressed())
-            img.Decompress();
-        img.Convert(Image.Format.Rgba8);
-        int w = img.GetWidth(), h = img.GetHeight();
-        for (int y = 0; y < h; y++)
-            for (int x = 0; x < w; x++)
-            {
-                Color c = img.GetPixel(x, y);
-                img.SetPixel(x, y, new Color(
-                    black.R + c.R * (white.R - black.R), black.G + c.G * (white.G - black.G),
-                    black.B + c.B * (white.B - black.B), black.A + c.A * (white.A - black.A)));
-            }
-        return ImageTexture.CreateFromImage(img);
-    }
 
     public static Vector2 Bezier(Vector2 p0, Vector2 p1, Vector2 p2, float t)
     {
@@ -121,17 +104,16 @@ public sealed class SmsHudSlide
     public bool AtZero(float now) => To == 0f && Done(now);
 }
 
-/// <summary>A picture pane of the screen with its TBoundPane: the home rect inside its group, the texture, the tint, its rotation,
-/// whether it is shown, and the pop it is riding (setPanePosition's three points and the console's 30-frame settle).</summary>
+/// <summary>A picture pane of the screen with its TBoundPane: the scene's TextureRect (its home rect, texture, tint and rotation the
+/// scene's), whether J2D shows it, and the pop it is riding (setPanePosition's three points and the console's 30-frame settle). Apply
+/// puts the frame's result onto the node. A pane may instead carry a Control (the life meter's Sun, whose rays ride its pop).</summary>
 public sealed class SmsHudPane
 {
-    public Rect2 Home;
-    public Texture2D Tex;
-    public Color Tint = Colors.White;
-    /// <summary>The .blo's rotation in degrees about the pane's top-left corner (base position 0), counter-clockwise on the screen:
-    /// J2DPane::makeMatrix rotates about z by -mRotation in a y-down space. The counters' strips, x's, digits and "MARIO" are 15,
-    /// the Mario head 355 (5 the other way).</summary>
-    public float Rot;
+    public readonly TextureRect Node;
+    public readonly Control Carrier;
+    public Rect2 Home;                     // the scene's position and size inside the group
+    public Texture2D Tex;                  // the picture of the moment (a digit changes; the rest keep the scene's)
+    public Color Tint = Colors.White;      // the scene's modulate; the disc's changes with the air meter
     public bool Shown;                     // J2DPane::show / hide
     public bool Used = true;               // a digit pane the count has no use for (the hundreds below 100)
     public float Inset;                    // the life meter's heartbeat: pixels off every side
@@ -139,7 +121,19 @@ public sealed class SmsHudPane
     private Vector2 _top, _mid, _end;
     private int _frames;
 
-    public SmsHudPane(float x, float y, float w, float h, Texture2D tex) { Home = new Rect2(x, y, w, h); Tex = tex; }
+    public SmsHudPane(TextureRect node)
+    {
+        Node = node;
+        Home = new Rect2(node.Position, node.Size);
+        Tex = node.Texture;
+        Tint = node.Modulate;
+    }
+
+    public SmsHudPane(Control carrier)
+    {
+        Carrier = carrier;
+        Home = new Rect2(carrier.Position, Vector2.Zero);
+    }
 
     /// <summary>setPanePosition(frames, top, mid, mid) at frame `at` (then the settle to `end`, (0, 0) unless told otherwise); shows the pane.</summary>
     public void Pop(float at, Vector2 top, Vector2 mid, int frames, Vector2? end = null)
@@ -153,22 +147,25 @@ public sealed class SmsHudPane
     public Vector2 Offset(float now) => float.IsNegativeInfinity(_popStart) ? Vector2.Zero : SmsHud.Pop(now - _popStart, _top, _mid, _frames, _end);
     public bool PopDone(float now) => float.IsNegativeInfinity(_popStart) || (now - _popStart) * SmsHud.Anim >= _frames + SmsHud.Settle;
 
-    public Rect2 Rect(float now, Vector2 groupOffset)
+    /// <summary>The frame onto the node: shown or not, the picture, the colour, the pop's offset from home, the heartbeat's inset.</summary>
+    public void Apply(float now, Vector2 groupOffset, float alpha = 1f)
     {
-        Vector2 o = Offset(now) + groupOffset;
-        return new Rect2(Home.Position + o + new Vector2(Inset, Inset), Home.Size - new Vector2(2f * Inset, 2f * Inset));
-    }
-
-    /// <summary>Draws the pane inside its group's transform (the group's canvas position and the console's scale), turned by its
-    /// own rotation about its top-left corner as J2D does.</summary>
-    public void Draw(CanvasItem c, float now, Vector2 groupOffset, Transform2D group, float alpha = 1f)
-    {
-        if (!Shown || !Used || Tex == null)
+        if (Carrier != null)
+        {
+            Carrier.Visible = Shown;
+            Carrier.Position = Home.Position + Offset(now) + groupOffset;
             return;
+        }
+        bool on = Shown && Used && Tex != null;
+        Node.Visible = on;
+        if (!on)
+            return;
+        if (Node.Texture != Tex)
+            Node.Texture = Tex;
         Color col = Tint;
         col.A *= alpha;
-        Vector2 local = Home.Position + Offset(now) + groupOffset;
-        c.DrawSetTransformMatrix(group * new Transform2D(Mathf.DegToRad(-Rot), local));
-        c.DrawTextureRect(Tex, new Rect2(new Vector2(Inset, Inset), Home.Size - new Vector2(2f * Inset, 2f * Inset)), false, col);
+        Node.Modulate = col;
+        Node.Position = Home.Position + Offset(now) + groupOffset + new Vector2(Inset, Inset);
+        Node.Size = Home.Size - new Vector2(2f * Inset, 2f * Inset);
     }
 }

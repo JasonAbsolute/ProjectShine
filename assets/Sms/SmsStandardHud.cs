@@ -43,11 +43,17 @@ using System;
 /// (startCameraDemo 2056: the camera locked, a talk, the shine get, a death) takes the lives, the coins and the star HUD away (the
 /// shine get brings the star HUD in instead) and endCameraDemo (2125) brings the coins back.
 /// Frames are the game's 30 a second, counted fractionally so the motion runs at the display's rate; the motions (not the waits) go at
-/// SmsParams.Hud.AnimSpeed times the game's pace. Where the game parks a hidden strip 11 px into the frame (the CRT's overscan hid it:
-/// initHiddenPaneAbove) this parks it fully above the top edge. The screen is the game's 640 x 448 frame (SmsHud): the counters keep
-/// their margin to the left edge, the lives (centred on the frame) to the centre, the life meter to the right, the red coins to the
-/// bottom, moved by SmsParams.Hud's shifts and scaled by SmsHud.Scale; with SmsParams.Hud.IdleHold the star HUD and the lives stay
-/// while Mario stands still instead of the game's peek.
+/// the scene root's AnimSpeed times the game's pace. Where the game parks a hidden strip 11 px into the frame (the CRT's overscan hid
+/// it: initHiddenPaneAbove) this parks it fully above the top edge. The screen is the game's 640 x 448 frame (SmsHud): the counters
+/// keep their margin to the left edge, the lives (centred on the frame) to the centre, the life meter to the right, the red coins to
+/// the bottom, moved by the root's shifts and scaled by SmsHud.Scale; with its IdleHold the star HUD and the lives stay while Mario
+/// stands still instead of the game's peek.
+/// The screen is the scene assets/Sms/Console/SmsHud.tscn: this Control with a SmsHudGroup per group (Coins, BlueCoins, Shines, LifeMeter,
+/// Lives, RedCoins, Timer -- the *Group exports below), every pane a TextureRect child laid out as standard_1.blo has it -- a counter's
+/// Strip, Icon, X and Digit0..2 (the lives Digit0..1 and a Text), the red coins' Digit, Slash and Eight, the timer's Text, Strip,
+/// Long0..5 with LongColon0..1 and Short0..3 with ShortColon, the life meter's Disc, Text and a Sun carrying Socket0..8 and Ray0..8
+/// (the rays and the text wear J2DBlackWhite.gdshader for the air recolour). The code reads the layout from the nodes and moves them;
+/// the ten digit pictures are the Digits export.
 /// </summary>
 public partial class SmsStandardHud : Control
 {
@@ -69,10 +75,19 @@ public partial class SmsStandardHud : Control
     private float _now;             // the console's frames, fractional
     private int _frame;             // the last whole frame stepped
 
-    // ---- the textures ----
-    private Texture2D _strip, _coinIcon, _blueIcon, _redIcon, _shineIcon, _x, _slash, _marioIcon, _marioText, _lifeText, _lifeTextAir, _lifeTextAirLow, _disc, _colon, _timeText;
-    private readonly Texture2D[] _digit = new Texture2D[10];
-    private readonly Texture2D[] _lifeOn = new Texture2D[9], _lifeOff = new Texture2D[9], _lifeAir = new Texture2D[9], _lifeAirLow = new Texture2D[9];
+    // ---- the scene: the groups and the digit pictures ----
+    [Export] public SmsHudGroup CoinGroup;
+    [Export] public SmsHudGroup BlueCoinGroup;
+    [Export] public SmsHudGroup ShineGroup;
+    [Export] public SmsHudGroup LifeMeterGroup;
+    [Export] public SmsHudGroup LivesGroup;
+    [Export] public SmsHudGroup RedCoinGroup;
+    [Export] public SmsHudGroup TimerGroup;
+    /// <summary>coin_number_0 .. 9: what the counters' digit panes show.</summary>
+    [Export] public Texture2D[] Digits;
+    private Texture2D[] _digit;
+    private readonly ShaderMaterial[] _rayMat = new ShaderMaterial[9];
+    private ShaderMaterial _lifeTextMat;
 
     private static readonly Color StripGreen = new Color(0f, 1f, 0f, 180f / 255f);
     private static readonly Color StripMagenta = new Color(1f, 0x28 / 255f, 1f, 180f / 255f);
@@ -82,16 +97,15 @@ public partial class SmsStandardHud : Control
     private static readonly Color Dim = new Color(0x7F / 255f, 0x7F / 255f, 0x7F / 255f);
     private static readonly Color AirBlack = new Color(0f, 0x3C / 255f, 1f, 0f), AirWhite = new Color(0f, 1f, 1f, 1f), AirWhiteLow = new Color(0f, 0x10 / 255f, 1f, 1f);
 
-    // ---- the groups ----
-    private static readonly Vector2 CoinPos = new Vector2(13, 152), BluePos = new Vector2(13, 113), ShinePos = new Vector2(13, 74);
-    private static readonly Vector2 LifePos = new Vector2(500, 50), MarioPos = new Vector2(223, 74), RedPos = new Vector2(13, 419), TimerPos = new Vector2(13, 419);
-    private const float CoinHome = 74f - 152f;          // unk26A: the coin counter's row while the star HUD is away
-    private const float CoinHidden = -(152f + 10f + 1f) - 22f;  // startDisappearCoin: -(y2 + 1) less the strip
-    private const float MarioHidden = -(74f + 10f + 1f) - 22f;
-    private const float ShineHidden = -(74f + 10f + 1f) - 22f, ShineGone = -(74f + 10f + 1f) + CoinHome; // startDisappearStar's target
-    private const float BlueHidden = -(113f + 10f + 1f) - 22f;
-    private const float RedBelow = 465f - 419f, RedGone = 525f - 419f, RedOverTimer = -73f;
-    private const float LifeAbove = -(50f + 10f + 1f);   // startInsertLife: -(unk4.y2 + 1)
+    // ---- the groups' rows on the frame (the scene puts them there; these are the .blo's, for the hidden spots below) ----
+    private const float CoinRow = 152f, BlueRow = 113f, ShineRow = 74f, LifeRow = 50f, MarioRow = 74f, RedRow = 419f;
+    private const float CoinHome = ShineRow - CoinRow;          // unk26A: the coin counter's row while the star HUD is away
+    private const float CoinHidden = -(CoinRow + 10f + 1f) - 22f;  // startDisappearCoin: -(y2 + 1) less the strip
+    private const float MarioHidden = -(MarioRow + 10f + 1f) - 22f;
+    private const float ShineHidden = -(ShineRow + 10f + 1f) - 22f, ShineGone = -(ShineRow + 10f + 1f) + CoinHome; // startDisappearStar's target
+    private const float BlueHidden = -(BlueRow + 10f + 1f) - 22f;
+    private const float RedBelow = 465f - RedRow, RedGone = 525f - RedRow, RedOverTimer = -73f;
+    private const float LifeAbove = -(LifeRow + 10f + 1f);   // startInsertLife: -(unk4.y2 + 1)
     private const float LifeGone = LifeAbove - 71f - 22f; // startLifeMeterDisappear: on past the disc's height, fully out of the frame
     private const int IdleFrames = 200;                 // updateCounterState: 0xC8 frames of MARIO_STATUS_WAIT
     private const int BlueHold = 400;                   // unk16C: 0x190 frames after a blue coin
@@ -132,68 +146,64 @@ public partial class SmsStandardHud : Control
 
     public override void _Ready()
     {
-        _strip = SmsHud.Load("coin_back"); _coinIcon = SmsHud.Load("coin_icon"); _blueIcon = SmsHud.Load("bluecoin_icon"); _redIcon = SmsHud.Load("redcoin_icon");
-        _shineIcon = SmsHud.Load("shine_icon"); _x = SmsHud.Load("coin_number_x"); _slash = SmsHud.Load("balloon_slash");
-        _marioIcon = SmsHud.Load("mario_icon"); _marioText = SmsHud.Load("mario_text"); _lifeText = SmsHud.Load("life_text"); _disc = SmsHud.Load("water_back");
-        _colon = SmsHud.Load("coin_number_colon"); _timeText = SmsHud.Load("time_text");
-        bool ok = _strip != null && _coinIcon != null && _blueIcon != null && _redIcon != null && _shineIcon != null && _x != null && _slash != null
-            && _marioIcon != null && _marioText != null && _lifeText != null && _disc != null && _colon != null && _timeText != null;
-        for (int i = 0; i < 10; i++) { _digit[i] = SmsHud.Load($"coin_number_{i}"); ok &= _digit[i] != null; }
-        for (int i = 0; i < 9; i++)
+        MouseFilter = MouseFilterEnum.Ignore;
+        Ready = CoinGroup != null && BlueCoinGroup != null && ShineGroup != null && LifeMeterGroup != null && LivesGroup != null && RedCoinGroup != null && TimerGroup != null
+            && Digits != null && Digits.Length == 10 && System.Array.TrueForAll(Digits, d => d != null);
+        if (!Ready)
         {
-            _lifeOn[i] = SmsHud.Load($"life_icon_{i}_1"); _lifeOff[i] = SmsHud.Load($"life_icon_{i}_2");
-            ok &= _lifeOn[i] != null && _lifeOff[i] != null;
+            GD.PushWarning("[SMS hud] SmsHud.tscn: the StandardHud's seven group exports and its ten Digits are not all set -- the counters stay off");
+            return;
         }
-        Ready = ok;
-        if (Ready)
+        _digit = Digits;
+        try
         {
-            for (int i = 0; i < 9; i++)
-            {
-                _lifeAir[i] = SmsHud.Recolor(_lifeOn[i], AirBlack, AirWhite);
-                _lifeAirLow[i] = SmsHud.Recolor(_lifeOn[i], AirBlack, AirWhiteLow);
-            }
-            _lifeTextAir = SmsHud.Recolor(_lifeText, AirBlack, AirWhite);
-            _lifeTextAirLow = SmsHud.Recolor(_lifeText, AirBlack, AirWhiteLow);
             BuildPanes();
         }
-        MouseFilter = MouseFilterEnum.Ignore;
-        ZIndex = 10;
+        catch (System.Exception e)
+        {
+            GD.PushWarning($"[SMS hud] SmsHud.tscn: a pane is missing from its group ({e.Message}) -- the counters stay off");
+            Ready = false;
+            return;
+        }
         Layout();
         GetViewport().SizeChanged += Layout;
     }
 
+    private static TextureRect Pane(Control group, string name) => group.GetNode<TextureRect>(name);
+
     private void BuildPanes()
     {
-        // the .blo turns the strips, the x's, the digits and "MARIO" 15 degrees about their top-left corners (the icons stay upright,
-        // the Mario head leans 5 the other way): the counters' slant
-        const float Slant = 15f, HeadSlant = 355f;
-        _cStrip = new SmsHudPane(0, 0, 198, 22, _strip) { Tint = StripGreen, Rot = Slant }; _cIcon = new SmsHudPane(9, -14, 30, 40, _coinIcon); _cX = new SmsHudPane(31, -16, 36, 36, _x) { Rot = Slant };
-        _cDigit[0] = new SmsHudPane(60, -22, 36, 36, _digit[0]) { Rot = Slant }; _cDigit[1] = new SmsHudPane(87, -27, 36, 36, _digit[0]) { Rot = Slant }; _cDigit[2] = new SmsHudPane(114, -32, 36, 36, _digit[0]) { Rot = Slant };
-        _dStrip = new SmsHudPane(0, 0, 198, 22, _strip) { Tint = StripGreen, Rot = Slant }; _dIcon = new SmsHudPane(9, -14, 30, 40, _blueIcon); _dX = new SmsHudPane(31, -16, 36, 36, _x) { Rot = Slant };
-        _dDigit[0] = new SmsHudPane(60, -22, 36, 36, _digit[0]) { Rot = Slant }; _dDigit[1] = new SmsHudPane(87, -27, 36, 36, _digit[0]) { Rot = Slant }; _dDigit[2] = new SmsHudPane(114, -32, 36, 36, _digit[0]) { Rot = Slant };
-        _sStrip = new SmsHudPane(0, 0, 198, 22, _strip) { Tint = StripGreen, Rot = Slant }; _sIcon = new SmsHudPane(2, -29, 48, 58, _shineIcon); _sX = new SmsHudPane(38, -18, 36, 36, _x) { Rot = Slant };
-        _sDigit[0] = new SmsHudPane(67, -24, 36, 36, _digit[0]) { Rot = Slant }; _sDigit[1] = new SmsHudPane(94, -29, 36, 36, _digit[0]) { Rot = Slant }; _sDigit[2] = new SmsHudPane(121, -34, 36, 36, _digit[0]) { Rot = Slant };
-        _mStrip = new SmsHudPane(0, 0, 198, 22, _strip) { Tint = StripGreen, Rot = Slant }; _mIcon = new SmsHudPane(13, -23, 43, 47, _marioIcon) { Rot = HeadSlant };
-        _mText = new SmsHudPane(-12, -34, 72, 34, _marioText) { Rot = Slant }; _mX = new SmsHudPane(48, -20, 36, 36, _x) { Rot = Slant };
-        _mDigit[0] = new SmsHudPane(77, -26, 36, 36, _digit[0]) { Rot = Slant }; _mDigit[1] = new SmsHudPane(104, -31, 36, 36, _digit[0]) { Rot = Slant };
-        _rStrip = new SmsHudPane(0, 0, 198, 22, _strip) { Tint = StripMagenta, Rot = Slant }; _rIcon = new SmsHudPane(19, -16, 30, 40, _redIcon); _rX = new SmsHudPane(41, -18, 36, 36, _x) { Rot = Slant };
-        _rDigit = new SmsHudPane(70, -38, 36, 36, _digit[0]) { Rot = Slant }; _rSlash = new SmsHudPane(87, -41, 50, 60, _slash); _rEight = new SmsHudPane(113, -16, 28, 28, _digit[8]) { Rot = Slant };
+        // the .blo's layout -- the strips, the x's, the digits and "MARIO" turned 15 degrees about their top-left corners, the Mario
+        // head 5 the other way, the icons upright -- is the scene's; each pane keeps its node's rect, picture, tint and rotation
+        _cStrip = new SmsHudPane(Pane(CoinGroup, "Strip")); _cIcon = new SmsHudPane(Pane(CoinGroup, "Icon")); _cX = new SmsHudPane(Pane(CoinGroup, "X"));
+        _dStrip = new SmsHudPane(Pane(BlueCoinGroup, "Strip")); _dIcon = new SmsHudPane(Pane(BlueCoinGroup, "Icon")); _dX = new SmsHudPane(Pane(BlueCoinGroup, "X"));
+        _sStrip = new SmsHudPane(Pane(ShineGroup, "Strip")); _sIcon = new SmsHudPane(Pane(ShineGroup, "Icon")); _sX = new SmsHudPane(Pane(ShineGroup, "X"));
+        for (int i = 0; i < 3; i++)
+        {
+            _cDigit[i] = new SmsHudPane(Pane(CoinGroup, $"Digit{i}"));
+            _dDigit[i] = new SmsHudPane(Pane(BlueCoinGroup, $"Digit{i}"));
+            _sDigit[i] = new SmsHudPane(Pane(ShineGroup, $"Digit{i}"));
+        }
+        _mStrip = new SmsHudPane(Pane(LivesGroup, "Strip")); _mIcon = new SmsHudPane(Pane(LivesGroup, "Icon")); _mText = new SmsHudPane(Pane(LivesGroup, "Text")); _mX = new SmsHudPane(Pane(LivesGroup, "X"));
+        _mDigit[0] = new SmsHudPane(Pane(LivesGroup, "Digit0")); _mDigit[1] = new SmsHudPane(Pane(LivesGroup, "Digit1"));
+        _rStrip = new SmsHudPane(Pane(RedCoinGroup, "Strip")); _rIcon = new SmsHudPane(Pane(RedCoinGroup, "Icon")); _rX = new SmsHudPane(Pane(RedCoinGroup, "X"));
+        _rDigit = new SmsHudPane(Pane(RedCoinGroup, "Digit")); _rSlash = new SmsHudPane(Pane(RedCoinGroup, "Slash")); _rEight = new SmsHudPane(Pane(RedCoinGroup, "Eight"));
         // the timer: t_ba, t_tx (turned 13), t_1's six digits and two colons (turned 10), t_2's four and one
-        _tStrip = new SmsHudPane(0, 0, 270, 22, _strip) { Tint = StripMagenta, Rot = Slant }; _tText = new SmsHudPane(5, -37, 68, 28, _timeText) { Rot = 13f };
-        int[,] tl = { { 0, 0 }, { 27, -5 }, { 71, -17 }, { 98, -22 }, { 142, -34 }, { 169, -39 } };
-        for (int i = 0; i < 6; i++) _tLong[i] = new SmsHudPane(4 + tl[i, 0], -11 + tl[i, 1], 36, 36, _digit[0]) { Rot = Slant };
-        _tColon[0] = new SmsHudPane(4 + 60, -11 - 16, 18, 36, _colon) { Rot = 10f }; _tColon[1] = new SmsHudPane(4 + 131, -11 - 33, 18, 36, _colon) { Rot = 10f };
-        int[,] ts = { { 0, 0 }, { 27, -5 }, { 71, -17 }, { 98, -22 } };
-        for (int i = 0; i < 4; i++) _tShort[i] = new SmsHudPane(31 + ts[i, 0], -16 + ts[i, 1], 36, 36, _digit[0]) { Rot = Slant };
-        _tColon[2] = new SmsHudPane(31 + 60, -16 - 16, 18, 36, _colon) { Rot = 10f };
-        _lDisc = new SmsHudPane(0, 0, 74, 71, _disc) { Tint = DiscHealth }; _lText = new SmsHudPane(7, -18, 60, 30, _lifeText);
-        _lSun = new SmsHudPane(0, 0, 0, 0, null) { Shown = true }; // lm_0: the sun and rays ride its pop
-        int[,] ray = { { 9, 11, 54, 58 }, { 53, 0, 26, 28 }, { 59, 23, 26, 24 }, { 57, 48, 26, 28 }, { 38, 61, 26, 28 }, { 13, 64, 24, 26 }, { -7, 49, 28, 28 }, { -12, 27, 24, 24 }, { -8, 2, 28, 28 } };
+        _tStrip = new SmsHudPane(Pane(TimerGroup, "Strip")); _tText = new SmsHudPane(Pane(TimerGroup, "Text"));
+        for (int i = 0; i < 6; i++) _tLong[i] = new SmsHudPane(Pane(TimerGroup, $"Long{i}"));
+        for (int i = 0; i < 4; i++) _tShort[i] = new SmsHudPane(Pane(TimerGroup, $"Short{i}"));
+        _tColon[0] = new SmsHudPane(Pane(TimerGroup, "LongColon0")); _tColon[1] = new SmsHudPane(Pane(TimerGroup, "LongColon1")); _tColon[2] = new SmsHudPane(Pane(TimerGroup, "ShortColon"));
+        // the life meter: the disc, "LIFE", and lm_0 -- the Sun the rays and sockets ride
+        _lDisc = new SmsHudPane(Pane(LifeMeterGroup, "Disc")); _lText = new SmsHudPane(Pane(LifeMeterGroup, "Text"));
+        var sun = LifeMeterGroup.GetNode<Control>("Sun");
+        _lSun = new SmsHudPane(sun) { Shown = true };
         for (int i = 0; i < 9; i++)
         {
-            _lSocket[i] = new SmsHudPane(ray[i, 0], ray[i, 1], ray[i, 2], ray[i, 3], _lifeOff[i]) { Shown = true };
-            _lRay[i] = new SmsHudPane(ray[i, 0], ray[i, 1], ray[i, 2], ray[i, 3], _lifeOn[i]) { Shown = true };
+            _lSocket[i] = new SmsHudPane(Pane(sun, $"Socket{i}")) { Shown = true };
+            _lRay[i] = new SmsHudPane(Pane(sun, $"Ray{i}")) { Shown = true };
+            _rayMat[i] = _lRay[i].Node.Material as ShaderMaterial;
         }
+        _lifeTextMat = _lText.Node.Material as ShaderMaterial;
         _lifeShown = Mathf.Clamp(Health, 0, 8);
         for (int i = 0; i < 9; i++) _lRay[i].Shown = i <= _lifeShown;
         _coinShown = Mathf.Clamp(Coins, 0, 999); SetCounterDigits(_cDigit, _coinShown);
@@ -209,8 +219,6 @@ public partial class SmsStandardHud : Control
     {
         _viewport = GetViewportRect().Size;
         _scale = SmsHud.Scale(_viewport);
-        Position = Vector2.Zero;
-        Size = _viewport;
     }
 
     public override void _Process(double delta)
@@ -226,7 +234,7 @@ public partial class SmsStandardHud : Control
             Step();
         }
         if (_frame < whole) _frame = whole;
-        QueueRedraw();
+        Apply();
     }
 
     /// <summary>A process function's "param_1 == N": true on the first console frame at or past game frame N at the port's pace.</summary>
@@ -558,7 +566,7 @@ public partial class SmsStandardHud : Control
         // updateStarHudAutoHide (1061): out, settled, nothing on the clocks, no demo: away again, the lives with it -- unless Jaysonn's
         // IdleHold keeps them while he stands (the console's unk60 guard, never set in the game)
         if (_starVisible && !_starAppearing && !_starLeaving && _shineSlide.AtZero(_now) && !Demo && _blueTimer == 0 && _shineTimer == 0
-            && !(SmsParams.Hud.IdleHold && Idle))
+            && !(SmsHud.IdleHold && Idle))
         {
             StartDisappearStar();
             StartDisappearMario();
@@ -805,95 +813,84 @@ public partial class SmsStandardHud : Control
             _beat = 0;
     }
 
-    // ------------------------------------------------------------------------------------------------------------------ the draw
-    private enum Anchor { TopLeft, TopCenter, TopRight, BottomLeft }
-
-    /// <summary>A group's canvas transform: its anchor on the window, the console's scale.</summary>
-    private Transform2D Group(Vector2 pos, Anchor anchor)
-    {
-        float x = anchor == Anchor.TopRight ? SmsHud.RightX(pos.X, _scale, _viewport)
-            : anchor == Anchor.TopCenter ? SmsHud.CenterX(pos.X, _scale, _viewport) : SmsHud.LeftX(pos.X, _scale);
-        float y = anchor == Anchor.BottomLeft ? SmsHud.BottomY(pos.Y, _scale, _viewport) : SmsHud.TopY(pos.Y, _scale);
-        return new Transform2D(0f, new Vector2(_scale, _scale), 0f, new Vector2(x, y));
-    }
-
-    public override void _Draw()
+    // ------------------------------------------------------------------------------------------------------------------ the apply
+    /// <summary>The frame onto the scene: each group placed on the window (its anchor, the console's scale, its slide), each pane onto
+    /// its node. A group off screen is simply not shown.</summary>
+    private void Apply()
     {
         if (!Ready)
             return;
-        // the screen's pane order: c_0, d_0, s_0, l_0, (w_0), m_0, r_0, t_0
+        float n = _now;
+        CoinGroup.Visible = _coinVisible;
         if (_coinVisible)
         {
-            Transform2D t = Group(CoinPos, Anchor.TopLeft);
-            Vector2 g = new Vector2(0f, _coinSlide.At(_now));
-            _cStrip.Draw(this, _now, g, t); _cIcon.Draw(this, _now, g, t); _cX.Draw(this, _now, g, t);
-            foreach (var d in _cDigit) d.Draw(this, _now, g, t);
+            CoinGroup.Place(new Vector2(0f, _coinSlide.At(n)), _scale, _viewport);
+            _cStrip.Apply(n, Vector2.Zero); _cIcon.Apply(n, Vector2.Zero); _cX.Apply(n, Vector2.Zero);
+            foreach (var d in _cDigit) d.Apply(n, Vector2.Zero);
         }
+        BlueCoinGroup.Visible = _starVisible; ShineGroup.Visible = _starVisible;
         if (_starVisible)
         {
-            Transform2D t = Group(BluePos, Anchor.TopLeft);
-            Vector2 g = new Vector2(0f, _blueSlide.At(_now));
-            _dStrip.Draw(this, _now, g, t); _dIcon.Draw(this, _now, g, t); _dX.Draw(this, _now, g, t);
-            foreach (var d in _dDigit) d.Draw(this, _now, g, t);
-            t = Group(ShinePos, Anchor.TopLeft);
-            g = new Vector2(0f, _shineSlide.At(_now));
-            _sStrip.Draw(this, _now, g, t); _sIcon.Draw(this, _now, g, t); _sX.Draw(this, _now, g, t);
-            foreach (var d in _sDigit) d.Draw(this, _now, g, t);
+            BlueCoinGroup.Place(new Vector2(0f, _blueSlide.At(n)), _scale, _viewport);
+            _dStrip.Apply(n, Vector2.Zero); _dIcon.Apply(n, Vector2.Zero); _dX.Apply(n, Vector2.Zero);
+            foreach (var d in _dDigit) d.Apply(n, Vector2.Zero);
+            ShineGroup.Place(new Vector2(0f, _shineSlide.At(n)), _scale, _viewport);
+            _sStrip.Apply(n, Vector2.Zero); _sIcon.Apply(n, Vector2.Zero); _sX.Apply(n, Vector2.Zero);
+            foreach (var d in _sDigit) d.Apply(n, Vector2.Zero);
         }
+        LifeMeterGroup.Visible = LifeOnScreen;
         if (LifeOnScreen)
         {
-            Transform2D t = Group(LifePos, Anchor.TopRight);
-            Vector2 g = LifeGroupOffset(_now);
+            LifeMeterGroup.Place(LifeGroupOffset(n), _scale, _viewport);
             bool air = _lifeAirShown, low = _lifeShown < 4;
             _lDisc.Tint = air ? DiscAir : DiscHealth;
-            _lDisc.Draw(this, _now, g, t);
-            if (_lSun.Shown)
+            _lDisc.Apply(n, Vector2.Zero);
+            _lSun.Apply(n, Vector2.Zero);
+            for (int i = 0; i < 9; i++)
             {
-                Vector2 gs = g + _lSun.Offset(_now);
-                for (int i = 0; i < 9; i++)
-                {
-                    _lSocket[i].Draw(this, _now, gs, t);
-                    if (!_lRay[i].Shown)
-                        continue;
-                    _lRay[i].Tex = air ? (i == 0 && low ? _lifeAirLow[i] : _lifeAir[i]) : _lifeOn[i];
-                    _lRay[i].Tint = !air && low && i == 0 ? Dim : Colors.White;
-                    _lRay[i].Draw(this, _now, gs, t);
-                }
+                _lSocket[i].Apply(n, Vector2.Zero);
+                // J2DPicture's black / white: the air meter's blue on the orange rays (the lowest darker under 4), the dim at low health
+                BlackWhite(_rayMat[i], air, air && low && i == 0);
+                _lRay[i].Tint = !air && low && i == 0 ? Dim : Colors.White;
+                _lRay[i].Apply(n, Vector2.Zero);
             }
-            _lText.Tex = air ? (low ? _lifeTextAirLow : _lifeTextAir) : _lifeText;
+            BlackWhite(_lifeTextMat, air, air && low);
             _lText.Tint = !air && low ? Dim : Colors.White;
-            _lText.Draw(this, _now, g, t);
+            _lText.Apply(n, Vector2.Zero);
         }
+        LivesGroup.Visible = _marioVisible;
         if (_marioVisible)
         {
-            Transform2D t = Group(MarioPos, Anchor.TopCenter); // m_0's strip (223..421) is centred on the frame's 320
-            Vector2 g = new Vector2(0f, _marioSlide.At(_now));
-            _mStrip.Draw(this, _now, g, t); _mIcon.Draw(this, _now, g, t); _mText.Draw(this, _now, g, t); _mX.Draw(this, _now, g, t);
-            foreach (var d in _mDigit) d.Draw(this, _now, g, t);
+            LivesGroup.Place(new Vector2(0f, _marioSlide.At(n)), _scale, _viewport); // m_0's strip (223..421) is centred on the frame's 320
+            _mStrip.Apply(n, Vector2.Zero); _mIcon.Apply(n, Vector2.Zero); _mText.Apply(n, Vector2.Zero); _mX.Apply(n, Vector2.Zero);
+            foreach (var d in _mDigit) d.Apply(n, Vector2.Zero);
         }
+        RedCoinGroup.Visible = _redVisible;
         if (_redVisible)
         {
-            Transform2D t = Group(RedPos, Anchor.BottomLeft);
-            Vector2 g = new Vector2(0f, _redSlide.At(_now));
-            _rStrip.Draw(this, _now, g, t); _rIcon.Draw(this, _now, g, t); _rX.Draw(this, _now, g, t);
-            _rDigit.Draw(this, _now, g, t); _rSlash.Draw(this, _now, g, t); _rEight.Draw(this, _now, g, t);
+            RedCoinGroup.Place(new Vector2(0f, _redSlide.At(n)), _scale, _viewport);
+            _rStrip.Apply(n, Vector2.Zero); _rIcon.Apply(n, Vector2.Zero); _rX.Apply(n, Vector2.Zero);
+            _rDigit.Apply(n, Vector2.Zero); _rSlash.Apply(n, Vector2.Zero); _rEight.Apply(n, Vector2.Zero);
         }
+        TimerGroup.Visible = _timerVisible;
         if (_timerVisible)
         {
-            Transform2D t = Group(TimerPos, Anchor.BottomLeft);
-            Vector2 g = new Vector2(0f, _timerSlide.At(_now));
-            _tText.Draw(this, _now, g, t); _tStrip.Draw(this, _now, g, t);
-            if (_timerLong)
-            {
-                foreach (var d in _tLong) d.Draw(this, _now, g, t);
-                _tColon[0].Draw(this, _now, g, t); _tColon[1].Draw(this, _now, g, t);
-            }
-            else
-            {
-                foreach (var d in _tShort) d.Draw(this, _now, g, t);
-                _tColon[2].Draw(this, _now, g, t);
-            }
+            TimerGroup.Place(new Vector2(0f, _timerSlide.At(n)), _scale, _viewport);
+            _tText.Apply(n, Vector2.Zero); _tStrip.Apply(n, Vector2.Zero);
+            // the layout of the moment: t_1 (six digits, two colons) or t_2 (four and one); the other's nodes stay hidden
+            foreach (var d in _tLong) { d.Apply(n, Vector2.Zero); if (!_timerLong) d.Node.Visible = false; }
+            foreach (var d in _tShort) { d.Apply(n, Vector2.Zero); if (_timerLong) d.Node.Visible = false; }
+            for (int i = 0; i < 3; i++) { _tColon[i].Apply(n, Vector2.Zero); if ((i < 2) != _timerLong) _tColon[i].Node.Visible = false; }
         }
-        DrawSetTransform(Vector2.Zero, 0f, Vector2.One);
+    }
+
+    /// <summary>The black / white colours of a ray or "LIFE": the air meter's (black 003CFF00, white 00FFFFFF; the low white 0010FFFF),
+    /// or the identity that leaves the picture as painted.</summary>
+    private static void BlackWhite(ShaderMaterial m, bool air, bool low)
+    {
+        if (m == null)
+            return;
+        m.SetShaderParameter("black", air ? AirBlack : new Color(0f, 0f, 0f, 0f));
+        m.SetShaderParameter("white", air ? (low ? AirWhiteLow : AirWhite) : Colors.White);
     }
 }

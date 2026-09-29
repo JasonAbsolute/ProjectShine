@@ -25,24 +25,28 @@ using System;
 /// startDisappearTank (2201): the group slides 170 px down over 40 frames, the pieces likewise (a quadratic whose middle is the
 /// half-way point: straight). updateWaterTankState (1371): once up, the X button's alpha is 0 for 70 frames and 255 until 270, again
 /// and again. The console's frames are the game's 30 a second; they are counted fractionally here so the motion is as smooth as the
-/// display, the motions at SmsParams.Hud.AnimSpeed times the pace. The screen is the game's 640 x 448 frame (SmsHud): the group keeps
+/// display, the motions at the scene root's AnimSpeed times the pace. The screen is the game's 640 x 448 frame (SmsHud): the group keeps
 /// its margins to the bottom-right corner (the disc 59 px from the right edge, 7 px from the bottom; "WATER" ran 3 px past it on the
-/// disc, into the CRT's overscan), moved by SmsParams.Hud's right / bottom shifts, all scaled by SmsHud.Scale.
+/// disc, into the CRT's overscan), moved by the root's right / bottom shifts, all scaled by SmsHud.Scale.
+/// The gauge is the WaterHud Control of assets/Sms/Console/SmsHud.tscn -- its place in the scene its place on the frame, its Anchor the
+/// window corner it keeps to -- with the pieces as children laid out as the .blo has them: BlueClip/Disc and RedClip/DiscPressure
+/// (the disc and the pressure gauge's red, each in a clip Control the code sizes), Tank, FaceLClip/FaceL and FaceRClip/FaceR (the
+/// water's faces, clipped at the water line), Surface, Text ("WATER"), Icon0..3 (the nozzles' icons, each with its X button as a
+/// child). The code reads the layout from the nodes and moves them.
 /// </summary>
 public partial class SmsWaterHud : Control
 {
-    private const float GroupX = 493f, GroupY = 355f;
+    private const float GroupY = 355f;                        // the .blo's row (the rise below starts from 465)
+    /// <summary>The window corner the gauge keeps its frame distance from (the game: the bottom right).</summary>
+    [Export] public SmsHudGroup.HudAnchor Anchor = SmsHudGroup.HudAnchor.BottomRight;
 
-    // the panes: (x, y, w, h) in the group's pixels
-    private static readonly Rect2 BackRect = new Rect2(0, 0, 88, 86);
-    private static readonly Rect2 TankRect = new Rect2(22, 9, 44, 70);
-    private static readonly Rect2 FaceLRect = new Rect2(23, 16, 18, 56);
-    private static readonly Rect2 FaceRRect = new Rect2(39, 19, 24, 54);
-    private static readonly Rect2 SurfaceRect = new Rect2(23, 10, 40, 18);
-    private static readonly Rect2 TextRect = new Rect2(4, 66, 80, 32);
-    private static readonly Rect2[] IconRect = { new Rect2(6, -22, 56, 44), new Rect2(0, -11, 84, 41), new Rect2(22, -35, 42, 56), new Rect2(14, -28, 54, 54) };
-    private static readonly Vector2[] XButtonOffset = { new Vector2(47, -19), new Vector2(57, -35), new Vector2(32, -26), new Vector2(38, -32) };
-    private static readonly Vector2 XButtonSize = new Vector2(34, 44);
+    // the scene's pieces, and their rects in the group's pixels as the scene lays them out
+    private TextureRect _disc, _discPressure, _tank, _faceL, _faceR, _surface, _text;
+    private Control _blueClip, _redClip, _faceLClip, _faceRClip;
+    private readonly TextureRect[] _icons = new TextureRect[4], _xButtons = new TextureRect[4];
+    private Rect2 BackRect, TankRect, FaceLRect, FaceRRect, SurfaceRect, TextRect;
+    private readonly Rect2[] IconRect = new Rect2[4];
+    private Vector2 _home;
     private static readonly Color FaceLColor = new Color(0x64 / 255f, 0xDC / 255f, 1f);
     private static readonly Color FaceRColor = new Color(0f, 0xB4 / 255f, 0xF0 / 255f);
     private static readonly Color SurfaceColor = new Color(0xBE / 255f, 0xF0 / 255f, 1f);
@@ -50,8 +54,6 @@ public partial class SmsWaterHud : Control
     private static readonly Color PressureColor = new Color(1f, 0x3F / 255f, 0x3F / 255f, 0xC8 / 255f);
     private const float SurfaceTravel = 47f;
 
-    private Texture2D _back, _tank, _surface, _faceL, _faceR, _text, _xButton;
-    private readonly Texture2D[] _icons = new Texture2D[4];
     public bool Ready { get; private set; }
 
     // what Mario tells it every physics frame
@@ -78,27 +80,49 @@ public partial class SmsWaterHud : Control
 
     public override void _Ready()
     {
-        _back = Load("water_back"); _tank = Load("water_icon_0"); _surface = Load("water_icon_1");
-        _faceL = Load("water_icon_2"); _faceR = Load("water_icon_3"); _text = Load("water_text_0"); _xButton = Load("water_button_x");
-        for (int i = 0; i < 4; i++)
-            _icons[i] = Load($"water_nozzle_0{i + 1}");
-        Ready = _back != null && _tank != null && _surface != null && _faceL != null && _faceR != null && _text != null && _xButton != null
-            && _icons[0] != null && _icons[1] != null && _icons[2] != null && _icons[3] != null;
         MouseFilter = MouseFilterEnum.Ignore;
-        ZIndex = 10;
+        _home = Position;
+        try
+        {
+            _blueClip = GetNode<Control>("BlueClip"); _disc = GetNode<TextureRect>("BlueClip/Disc");
+            _redClip = GetNode<Control>("RedClip"); _discPressure = GetNode<TextureRect>("RedClip/DiscPressure");
+            _tank = GetNode<TextureRect>("Tank");
+            _faceLClip = GetNode<Control>("FaceLClip"); _faceL = GetNode<TextureRect>("FaceLClip/FaceL");
+            _faceRClip = GetNode<Control>("FaceRClip"); _faceR = GetNode<TextureRect>("FaceRClip/FaceR");
+            _surface = GetNode<TextureRect>("Surface"); _text = GetNode<TextureRect>("Text");
+            for (int i = 0; i < 4; i++)
+            {
+                _icons[i] = GetNode<TextureRect>($"Icon{i}");
+                _xButtons[i] = _icons[i].GetNode<TextureRect>("X");
+                IconRect[i] = new Rect2(_icons[i].Position, _icons[i].Size);
+            }
+            Ready = true;
+        }
+        catch (System.Exception e)
+        {
+            GD.PushWarning($"[SMS hud] SmsHud.tscn: a piece is missing from the WaterHud ({e.Message}) -- the gauge stays off");
+            Ready = false;
+            return;
+        }
+        BackRect = new Rect2(_blueClip.Position, _blueClip.Size);
+        TankRect = new Rect2(_tank.Position, _tank.Size);
+        FaceLRect = new Rect2(_faceLClip.Position, _faceLClip.Size);
+        FaceRRect = new Rect2(_faceRClip.Position, _faceRClip.Size);
+        SurfaceRect = new Rect2(_surface.Position, _surface.Size);
+        TextRect = new Rect2(_text.Position, _text.Size);
         Visible = false;
         Layout();
         GetViewport().SizeChanged += Layout;
     }
 
-    private static Texture2D Load(string name) => SmsHud.Load(name);
+    private float _s = 1f; private Vector2 _vp;
 
     private void Layout()
     {
-        Vector2 vp = GetViewportRect().Size;
-        float s = SmsHud.Scale(vp);
-        Scale = new Vector2(s, s);
-        Position = new Vector2(SmsHud.RightX(GroupX, s, vp), SmsHud.BottomY(GroupY, s, vp));
+        _vp = GetViewportRect().Size;
+        _s = SmsHud.Scale(_vp);
+        Scale = new Vector2(_s, _s);
+        Position = SmsHud.Anchored(_home, Anchor, _s, _vp);
     }
 
     public override void _Process(double delta)
@@ -108,7 +132,7 @@ public partial class SmsWaterHud : Control
         float df = (float)delta * SmsHud.Fps;
         _now += df;
         Tick(df);
-        QueueRedraw();
+        Apply();
     }
 
     /// <summary>The console this frame: the tank's appear / disappear and the X button's blink, at fractional frames.</summary>
@@ -198,67 +222,68 @@ public partial class SmsWaterHud : Control
         return new Color(1f, Mathf.Clamp(g, 0f, 255f) / 255f, Mathf.Clamp(b, 0f, 255f) / 255f, 0xC8 / 255f);
     }
 
-    public override void _Draw()
+    /// <summary>The frame onto the scene's pieces: the disc and the pressure gauge's red through their clips, the tank riding the
+    /// group's rise, the water's faces cut at the water line, the surface, "WATER", the nozzle's icon and its X.</summary>
+    private void Apply()
     {
         if (!Ready || _phase == Phase.Hidden)
             return;
         Vector2 g = new Vector2(0f, _groupOffset);
         // the disc, blue (detached from the group: its own pop only); the pressure gauge fills it from the bottom (drawWaterBack)
-        Rect2 back = new Rect2(BackRect.Position + new Vector2(0f, _pieceOffset[0]), BackRect.Size);
+        Vector2 discOff = new Vector2(0f, _pieceOffset[0]);
+        float fillTop = BackRect.Size.Y;
+        Color red = PressureColor;
         if (Pressure >= 0f)
         {
             float ratio = Mathf.Clamp(Pressure, 0f, 1f);
-            float fillTop = MathF.Floor((1f - ratio) * BackRect.Size.Y);
-            if (fillTop > 0f)
-                DrawTextureRectRegion(_back, new Rect2(back.Position, new Vector2(back.Size.X, fillTop)), new Rect2(0, 0, back.Size.X, fillTop), BackColor);
-            if (fillTop < back.Size.Y)
-            {
-                Color c = ratio >= 1f ? FlashColor(_flash) : PressureColor;
-                DrawTextureRectRegion(_back, new Rect2(back.Position + new Vector2(0f, fillTop), new Vector2(back.Size.X, back.Size.Y - fillTop)),
-                    new Rect2(0, fillTop, back.Size.X, back.Size.Y - fillTop), c);
-            }
+            fillTop = MathF.Floor((1f - ratio) * BackRect.Size.Y);
+            if (ratio >= 1f)
+                red = FlashColor(_flash);
         }
-        else
-            DrawTextureRect(_back, back, false, BackColor);
+        _blueClip.Position = BackRect.Position + discOff;
+        _blueClip.Size = new Vector2(BackRect.Size.X, fillTop);
+        _blueClip.Visible = fillTop > 0f;
+        _redClip.Visible = fillTop < BackRect.Size.Y;
+        _redClip.Position = BackRect.Position + discOff + new Vector2(0f, fillTop);
+        _redClip.Size = new Vector2(BackRect.Size.X, BackRect.Size.Y - fillTop);
+        _discPressure.Position = new Vector2(0f, -fillTop);
+        _discPressure.Modulate = red;
         // the tank with its water (the faces, the surface) -- inside the group, riding its rise and the tank's own pop
         Vector2 tankOff = g + new Vector2(0f, _pieceOffset[2]);
         float fill = Mathf.Clamp(Fill, 0f, 1f);
         float surfaceY = TankRect.Position.Y + MathF.Floor(SurfaceTravel * (1f - fill) - 0.5f) + 1f; // drawWater's y for the surface picture
         float waterLine = surfaceY + SurfaceRect.Size.Y * 0.5f;                                     // the water shows below the surface's middle
         // perform (3999): drawWaterBack, then the screen's own panes (the tank among them), then drawWaterOrJuice -- the water over the tank
-        if (_pieceShown[2])
-        {
-            DrawTextureRect(_tank, new Rect2(TankRect.Position + tankOff, TankRect.Size), false, Colors.White);
-            if (fill > 0f)
-            {
-                DrawFace(_faceL, FaceLRect, waterLine, tankOff, FaceLColor);
-                DrawFace(_faceR, FaceRRect, waterLine, tankOff, FaceRColor);
-            }
-            float surfaceAlpha = fill >= 1f ? 1f : fill <= 0f ? 0f : 0x50 / 255f; // updateWaterGaugeFill: unk2A0[0]->mAlpha
-            if (surfaceAlpha > 0f)
-                DrawTextureRect(_surface, new Rect2(new Vector2(SurfaceRect.Position.X, surfaceY) + tankOff, SurfaceRect.Size), false,
-                    new Color(SurfaceColor, surfaceAlpha));
-        }
+        _tank.Visible = _pieceShown[2];
+        _tank.Position = TankRect.Position + tankOff;
+        Face(_faceLClip, _faceL, FaceLRect, waterLine, tankOff, _pieceShown[2] && fill > 0f);
+        Face(_faceRClip, _faceR, FaceRRect, waterLine, tankOff, _pieceShown[2] && fill > 0f);
+        float surfaceAlpha = fill >= 1f ? 1f : fill <= 0f ? 0f : 0x50 / 255f; // updateWaterGaugeFill: unk2A0[0]->mAlpha
+        _surface.Visible = _pieceShown[2] && surfaceAlpha > 0f;
+        _surface.Position = new Vector2(SurfaceRect.Position.X, surfaceY) + tankOff;
+        _surface.Modulate = new Color(SurfaceColor, surfaceAlpha);
         // "WATER" (detached: its own pop)
-        if (_pieceShown[1])
-            DrawTextureRect(_text, new Rect2(TextRect.Position + new Vector2(0f, _pieceOffset[1]), TextRect.Size), false, Colors.White);
+        _text.Visible = _pieceShown[1];
+        _text.Position = TextRect.Position + new Vector2(0f, _pieceOffset[1]);
         // the nozzle's icon and its X button (detached)
         int n = Mathf.Clamp(_shownIcon, 0, 3);
         Vector2 iconOff = new Vector2(0f, _pieceOffset[3]);
-        if (_pieceShown[3])
-            DrawTextureRect(_icons[n], new Rect2(IconRect[n].Position + iconOff, IconRect[n].Size), false, Colors.White);
-        if (_xShown && _pieceShown[3])
-            DrawTextureRect(_xButton, new Rect2(IconRect[n].Position + XButtonOffset[n] + iconOff, XButtonSize), false, Colors.White);
+        for (int i = 0; i < 4; i++)
+        {
+            _icons[i].Visible = _pieceShown[3] && i == n;
+            _icons[i].Position = IconRect[i].Position + iconOff;
+            _xButtons[i].Visible = _xShown;
+        }
     }
 
-    /// <summary>A face of the water: the coloured mask from the water line down.</summary>
-    private void DrawFace(Texture2D tex, Rect2 pane, float waterLine, Vector2 off, Color color)
+    /// <summary>A face of the water: the coloured mask from the water line down -- the clip Control cut to that, the picture held still
+    /// inside it.</summary>
+    private static void Face(Control clip, TextureRect face, Rect2 pane, float waterLine, Vector2 off, bool shown)
     {
         float cut = Mathf.Clamp(waterLine - pane.Position.Y, 0f, pane.Size.Y);
-        if (cut >= pane.Size.Y)
-            return;
-        Rect2 dst = new Rect2(pane.Position + off + new Vector2(0f, cut), new Vector2(pane.Size.X, pane.Size.Y - cut));
-        Rect2 src = new Rect2(0f, cut, pane.Size.X, pane.Size.Y - cut);
-        DrawTextureRectRegion(tex, dst, src, color);
+        clip.Visible = shown && cut < pane.Size.Y;
+        clip.Position = pane.Position + off + new Vector2(0f, cut);
+        clip.Size = new Vector2(pane.Size.X, pane.Size.Y - cut);
+        face.Position = new Vector2(0f, -cut);
     }
 }

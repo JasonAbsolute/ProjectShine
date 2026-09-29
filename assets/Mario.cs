@@ -283,6 +283,7 @@ public partial class Mario : CharacterBody3D
     private const string SMS_PUMP_SCALE_PATH = "parameters/PumpScale/scale";
     private SmsWaterHud _waterHud;                                // TGCConsole2's water gauge: the 'w_0' panes of standard_1.blo
     private SmsStandardHud _stdHud;                               // TGCConsole2's counters and life meter: the rest of standard_1.blo
+    private SmsHudLayer _smsHudLayer;                             // the console scene (assets/Sms/Console/SmsHud.tscn) under Mario
     private ShineTimer _stdHudTimer;                              // his level's stopwatch, the console's timer reads it
     private int _stdHudTimerSearch;                               // ticks until the tree is searched for it again
     private bool _smsRocketLanding = false;                       // the fall is ROCKET_LANDING (after a hover): no wall slide on a wall at 16..40
@@ -12472,16 +12473,40 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>The gauge as a Control beside the other HUD elements (children of Mario, on the viewport's canvas): SmsWaterHud draws
     /// the disc's own textures (assets/Sms/hud, from game_6/timg) at standard_1.blo's positions, bottom-right.</summary>
+    /// <summary>The console scene (assets/Sms/Console/SmsHud.tscn), instanced under Mario in Player.tscn -- his to edit: every pane a node.
+    /// When the scene has none it is instanced from the file, with a warning naming the fix.</summary>
+    private SmsHudLayer SmsHudLayerGet()
+    {
+        if (_smsHudLayer != null)
+            return _smsHudLayer;
+        _smsHudLayer = SmsFluddModel.FindChild<SmsHudLayer>(this);
+        if (_smsHudLayer == null)
+        {
+            GD.PushWarning("[SMS hud] Player.tscn has no SmsHud scene under Mario: instanced from res://assets/Sms/Console/SmsHud.tscn -- instance it there to see and edit the console in the editor");
+            var scene = GD.Load<PackedScene>("res://assets/Sms/Console/SmsHud.tscn");
+            _smsHudLayer = scene?.Instantiate() as SmsHudLayer;
+            if (_smsHudLayer != null)
+                AddChild(_smsHudLayer);
+            else
+                GD.PushWarning("[SMS hud] res://assets/Sms/Console/SmsHud.tscn did not load -- no console");
+        }
+        return _smsHudLayer;
+    }
+
     private void SmsFluddSetupHud()
     {
         if (!UseSmsPhysics || _waterHud != null)
             return;
-        _waterHud = new SmsWaterHud { Name = "SmsWaterHud" };
-        AddChild(_waterHud);
+        _waterHud = SmsHudLayerGet()?.Water;
+        if (_waterHud == null)
+        {
+            GD.PushWarning("[SMS hud] SmsHud.tscn: the root's Water export is not set -- the gauge stays off");
+            return;
+        }
         if (SmsDebugPrint)
             GD.Print(_waterHud.Ready
-                ? "[SMS hud] water gauge: the 12 textures loaded; the tank rises once the FLUDD is ready, the icon follows the nozzle, the disc fills red with a rocket / turbo charge"
-                : "[SMS hud] water gauge: textures missing under res://assets/Sms/hud -- the gauge stays off");
+                ? "[SMS hud] water gauge: the scene's pieces found; the tank rises once the FLUDD is ready, the icon follows the nozzle, the disc fills red with a rocket / turbo charge"
+                : "[SMS hud] water gauge: a piece is missing from SmsHud.tscn's WaterHud -- the gauge stays off");
     }
 
     /// <summary>updateWaterGaugeFill: fill = mCurrentWater / AmountMax, the icon = mCurrentNozzle; drawWaterBack: isPressureOn() while a
@@ -12507,17 +12532,21 @@ public partial class Mario : CharacterBody3D
     {
         if (!UseSmsPhysics || _stdHud != null)
             return;
-        _stdHud = new SmsStandardHud { Name = "SmsStandardHud" };
+        _stdHud = SmsHudLayerGet()?.Standard;
+        if (_stdHud == null)
+        {
+            GD.PushWarning("[SMS hud] SmsHud.tscn: the root's Standard export is not set -- the counters stay off");
+            return;
+        }
         SmsStandardHudFeed();
-        AddChild(_stdHud);
         foreach (CanvasItem n in new CanvasItem[] { _lifeMeter, _lifeCounterHud, _yellowCoinHud, _redCoinHud, _blueCoinHud, _shineHud })
             if (n != null)
                 n.Visible = false;
         CallDeferred(nameof(SmsStandardHudFindLevelNodes)); // his TimerHud and ShineTimer live in the level scene
         if (SmsDebugPrint)
             GD.Print(_stdHud.Ready
-                ? "[SMS hud] the console's counters and life meter: the 38 textures loaded; the coins and the lives come in at the start, the shines and blue coins peek after 6.7 s idle, the life meter comes in at a hit"
-                : "[SMS hud] counters / life meter: textures missing under res://assets/Sms/hud -- they stay off");
+                ? "[SMS hud] the console's counters and life meter: the scene's panes found; the coins and the lives come in at the start, the shines and blue coins peek after 6.7 s idle, the life meter comes in at a hit"
+                : "[SMS hud] counters / life meter: a group or pane is missing from SmsHud.tscn -- they stay off");
     }
 
     /// <summary>What TGCConsole2::perform reads each frame: the flag manager's counts (his fields), mHealth / mAir, the meter's air switch

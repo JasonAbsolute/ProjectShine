@@ -1,0 +1,1118 @@
+[gd_scene load_steps=67 format=3 uid="uid://1dsewjz3vjt3j"]
+
+[ext_resource type="Script" path="res://assets/Sms/Console/SmsHudLayer.cs" id="s_layer"]
+[ext_resource type="Script" path="res://assets/Sms/SmsStandardHud.cs" id="s_std"]
+[ext_resource type="Script" path="res://assets/Sms/SmsWaterHud.cs" id="s_water"]
+[ext_resource type="Script" path="res://assets/Sms/Console/SmsHudGroup.cs" id="s_group"]
+[ext_resource type="Shader" path="res://assets/Sms/Console/J2DBlackWhite.gdshader" id="sh_bw"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_back.png" id="t_coin_back"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_icon.png" id="t_coin_icon"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_x.png" id="t_coin_number_x"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_0.png" id="t_coin_number_0"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/bluecoin_icon.png" id="t_bluecoin_icon"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/shine_icon.png" id="t_shine_icon"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/water_back.png" id="t_water_back"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_0_2.png" id="t_life_icon_0_2"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_0_1.png" id="t_life_icon_0_1"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_1_2.png" id="t_life_icon_1_2"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_1_1.png" id="t_life_icon_1_1"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_2_2.png" id="t_life_icon_2_2"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_2_1.png" id="t_life_icon_2_1"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_3_2.png" id="t_life_icon_3_2"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_3_1.png" id="t_life_icon_3_1"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_4_2.png" id="t_life_icon_4_2"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_4_1.png" id="t_life_icon_4_1"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_5_2.png" id="t_life_icon_5_2"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_5_1.png" id="t_life_icon_5_1"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_6_2.png" id="t_life_icon_6_2"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_6_1.png" id="t_life_icon_6_1"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_7_2.png" id="t_life_icon_7_2"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_7_1.png" id="t_life_icon_7_1"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_8_2.png" id="t_life_icon_8_2"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_8_1.png" id="t_life_icon_8_1"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_text.png" id="t_life_text"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/mario_icon.png" id="t_mario_icon"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/mario_text.png" id="t_mario_text"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/redcoin_icon.png" id="t_redcoin_icon"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/balloon_slash.png" id="t_balloon_slash"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_8.png" id="t_coin_number_8"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/time_text.png" id="t_time_text"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_colon.png" id="t_coin_number_colon"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/water_icon_0.png" id="t_water_icon_0"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/water_icon_2.png" id="t_water_icon_2"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/water_icon_3.png" id="t_water_icon_3"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/water_icon_1.png" id="t_water_icon_1"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/water_text_0.png" id="t_water_text_0"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/water_nozzle_01.png" id="t_water_nozzle_01"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/water_button_x.png" id="t_water_button_x"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/water_nozzle_02.png" id="t_water_nozzle_02"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/water_nozzle_03.png" id="t_water_nozzle_03"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/water_nozzle_04.png" id="t_water_nozzle_04"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_1.png" id="t_coin_number_1"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_2.png" id="t_coin_number_2"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_3.png" id="t_coin_number_3"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_4.png" id="t_coin_number_4"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_5.png" id="t_coin_number_5"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_6.png" id="t_coin_number_6"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_7.png" id="t_coin_number_7"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_9.png" id="t_coin_number_9"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ray0"]
+resource_name = "ray 0: J2D black / white (the air meter recolours it)"
+shader = ExtResource("sh_bw")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ray1"]
+resource_name = "ray 1: J2D black / white (the air meter recolours it)"
+shader = ExtResource("sh_bw")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ray2"]
+resource_name = "ray 2: J2D black / white (the air meter recolours it)"
+shader = ExtResource("sh_bw")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ray3"]
+resource_name = "ray 3: J2D black / white (the air meter recolours it)"
+shader = ExtResource("sh_bw")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ray4"]
+resource_name = "ray 4: J2D black / white (the air meter recolours it)"
+shader = ExtResource("sh_bw")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ray5"]
+resource_name = "ray 5: J2D black / white (the air meter recolours it)"
+shader = ExtResource("sh_bw")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ray6"]
+resource_name = "ray 6: J2D black / white (the air meter recolours it)"
+shader = ExtResource("sh_bw")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ray7"]
+resource_name = "ray 7: J2D black / white (the air meter recolours it)"
+shader = ExtResource("sh_bw")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ray8"]
+resource_name = "ray 8: J2D black / white (the air meter recolours it)"
+shader = ExtResource("sh_bw")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_lifetext"]
+resource_name = "LIFE: J2D black / white (the air meter recolours it)"
+shader = ExtResource("sh_bw")
+
+[node name="SmsHud" type="CanvasLayer" node_paths=PackedStringArray("Standard", "Water")]
+layer = 10
+script = ExtResource("s_layer")
+Standard = NodePath("StandardHud")
+Water = NodePath("WaterHud")
+Size = 0.7
+LeftShift = 0.0
+TopShift = -22.0
+RightShift = 30.0
+BottomShift = -10.0
+AnimSpeed = 4.0
+IdleHold = true
+
+[node name="StandardHud" type="Control" parent="." node_paths=PackedStringArray("CoinGroup", "BlueCoinGroup", "ShineGroup", "LifeMeterGroup", "LivesGroup", "RedCoinGroup", "TimerGroup")]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 640.0
+offset_bottom = 448.0
+mouse_filter = 2
+script = ExtResource("s_std")
+CoinGroup = NodePath("Coins")
+BlueCoinGroup = NodePath("BlueCoins")
+ShineGroup = NodePath("Shines")
+LifeMeterGroup = NodePath("LifeMeter")
+LivesGroup = NodePath("Lives")
+RedCoinGroup = NodePath("RedCoins")
+TimerGroup = NodePath("Timer")
+Digits = [ExtResource("t_coin_number_0"), ExtResource("t_coin_number_1"), ExtResource("t_coin_number_2"), ExtResource("t_coin_number_3"), ExtResource("t_coin_number_4"), ExtResource("t_coin_number_5"), ExtResource("t_coin_number_6"), ExtResource("t_coin_number_7"), ExtResource("t_coin_number_8"), ExtResource("t_coin_number_9")]
+
+[node name="Coins" type="Control" parent="StandardHud"]
+layout_mode = 0
+offset_left = 13
+offset_top = 152
+offset_right = 13
+offset_bottom = 152
+mouse_filter = 2
+script = ExtResource("s_group")
+Anchor = 0
+
+[node name="Strip" type="TextureRect" parent="StandardHud/Coins"]
+modulate = Color(0, 1, 0, 0.705882)
+layout_mode = 0
+offset_left = 0
+offset_top = 0
+offset_right = 198
+offset_bottom = 22
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_back")
+expand_mode = 1
+
+[node name="Icon" type="TextureRect" parent="StandardHud/Coins"]
+layout_mode = 0
+offset_left = 9
+offset_top = -14
+offset_right = 39
+offset_bottom = 26
+mouse_filter = 2
+texture = ExtResource("t_coin_icon")
+expand_mode = 1
+
+[node name="X" type="TextureRect" parent="StandardHud/Coins"]
+layout_mode = 0
+offset_left = 31
+offset_top = -16
+offset_right = 67
+offset_bottom = 20
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_x")
+expand_mode = 1
+
+[node name="Digit0" type="TextureRect" parent="StandardHud/Coins"]
+layout_mode = 0
+offset_left = 60
+offset_top = -22
+offset_right = 96
+offset_bottom = 14
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="Digit1" type="TextureRect" parent="StandardHud/Coins"]
+layout_mode = 0
+offset_left = 87
+offset_top = -27
+offset_right = 123
+offset_bottom = 9
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="Digit2" type="TextureRect" parent="StandardHud/Coins"]
+layout_mode = 0
+offset_left = 114
+offset_top = -32
+offset_right = 150
+offset_bottom = 4
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="BlueCoins" type="Control" parent="StandardHud"]
+layout_mode = 0
+offset_left = 13
+offset_top = 113
+offset_right = 13
+offset_bottom = 113
+mouse_filter = 2
+script = ExtResource("s_group")
+Anchor = 0
+
+[node name="Strip" type="TextureRect" parent="StandardHud/BlueCoins"]
+modulate = Color(0, 1, 0, 0.705882)
+layout_mode = 0
+offset_left = 0
+offset_top = 0
+offset_right = 198
+offset_bottom = 22
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_back")
+expand_mode = 1
+
+[node name="Icon" type="TextureRect" parent="StandardHud/BlueCoins"]
+layout_mode = 0
+offset_left = 9
+offset_top = -14
+offset_right = 39
+offset_bottom = 26
+mouse_filter = 2
+texture = ExtResource("t_bluecoin_icon")
+expand_mode = 1
+
+[node name="X" type="TextureRect" parent="StandardHud/BlueCoins"]
+layout_mode = 0
+offset_left = 31
+offset_top = -16
+offset_right = 67
+offset_bottom = 20
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_x")
+expand_mode = 1
+
+[node name="Digit0" type="TextureRect" parent="StandardHud/BlueCoins"]
+layout_mode = 0
+offset_left = 60
+offset_top = -22
+offset_right = 96
+offset_bottom = 14
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="Digit1" type="TextureRect" parent="StandardHud/BlueCoins"]
+layout_mode = 0
+offset_left = 87
+offset_top = -27
+offset_right = 123
+offset_bottom = 9
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="Digit2" type="TextureRect" parent="StandardHud/BlueCoins"]
+layout_mode = 0
+offset_left = 114
+offset_top = -32
+offset_right = 150
+offset_bottom = 4
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="Shines" type="Control" parent="StandardHud"]
+layout_mode = 0
+offset_left = 13
+offset_top = 74
+offset_right = 13
+offset_bottom = 74
+mouse_filter = 2
+script = ExtResource("s_group")
+Anchor = 0
+
+[node name="Strip" type="TextureRect" parent="StandardHud/Shines"]
+modulate = Color(0, 1, 0, 0.705882)
+layout_mode = 0
+offset_left = 0
+offset_top = 0
+offset_right = 198
+offset_bottom = 22
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_back")
+expand_mode = 1
+
+[node name="Icon" type="TextureRect" parent="StandardHud/Shines"]
+layout_mode = 0
+offset_left = 2
+offset_top = -29
+offset_right = 50
+offset_bottom = 29
+mouse_filter = 2
+texture = ExtResource("t_shine_icon")
+expand_mode = 1
+
+[node name="X" type="TextureRect" parent="StandardHud/Shines"]
+layout_mode = 0
+offset_left = 38
+offset_top = -18
+offset_right = 74
+offset_bottom = 18
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_x")
+expand_mode = 1
+
+[node name="Digit0" type="TextureRect" parent="StandardHud/Shines"]
+layout_mode = 0
+offset_left = 67
+offset_top = -24
+offset_right = 103
+offset_bottom = 12
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="Digit1" type="TextureRect" parent="StandardHud/Shines"]
+layout_mode = 0
+offset_left = 94
+offset_top = -29
+offset_right = 130
+offset_bottom = 7
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="Digit2" type="TextureRect" parent="StandardHud/Shines"]
+layout_mode = 0
+offset_left = 121
+offset_top = -34
+offset_right = 157
+offset_bottom = 2
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="LifeMeter" type="Control" parent="StandardHud"]
+layout_mode = 0
+offset_left = 500
+offset_top = 50
+offset_right = 500
+offset_bottom = 50
+mouse_filter = 2
+script = ExtResource("s_group")
+Anchor = 2
+
+[node name="Disc" type="TextureRect" parent="StandardHud/LifeMeter"]
+modulate = Color(1, 0.298039, 0, 0.615148)
+layout_mode = 0
+offset_left = 0
+offset_top = 0
+offset_right = 74
+offset_bottom = 71
+mouse_filter = 2
+texture = ExtResource("t_water_back")
+expand_mode = 1
+
+[node name="Sun" type="Control" parent="StandardHud/LifeMeter"]
+layout_mode = 0
+offset_left = 0
+offset_top = 0
+offset_right = 0
+offset_bottom = 0
+mouse_filter = 2
+
+[node name="Socket0" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
+layout_mode = 0
+offset_left = 9
+offset_top = 11
+offset_right = 63
+offset_bottom = 69
+mouse_filter = 2
+texture = ExtResource("t_life_icon_0_2")
+expand_mode = 1
+
+[node name="Ray0" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
+material = SubResource("ShaderMaterial_ray0")
+layout_mode = 0
+offset_left = 9
+offset_top = 11
+offset_right = 63
+offset_bottom = 69
+mouse_filter = 2
+texture = ExtResource("t_life_icon_0_1")
+expand_mode = 1
+
+[node name="Socket1" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
+layout_mode = 0
+offset_left = 53
+offset_top = 0
+offset_right = 79
+offset_bottom = 28
+mouse_filter = 2
+texture = ExtResource("t_life_icon_1_2")
+expand_mode = 1
+
+[node name="Ray1" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
+material = SubResource("ShaderMaterial_ray1")
+layout_mode = 0
+offset_left = 53
+offset_top = 0
+offset_right = 79
+offset_bottom = 28
+mouse_filter = 2
+texture = ExtResource("t_life_icon_1_1")
+expand_mode = 1
+
+[node name="Socket2" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
+layout_mode = 0
+offset_left = 59
+offset_top = 23
+offset_right = 85
+offset_bottom = 47
+mouse_filter = 2
+texture = ExtResource("t_life_icon_2_2")
+expand_mode = 1
+
+[node name="Ray2" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
+material = SubResource("ShaderMaterial_ray2")
+layout_mode = 0
+offset_left = 59
+offset_top = 23
+offset_right = 85
+offset_bottom = 47
+mouse_filter = 2
+texture = ExtResource("t_life_icon_2_1")
+expand_mode = 1
+
+[node name="Socket3" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
+layout_mode = 0
+offset_left = 57
+offset_top = 48
+offset_right = 83
+offset_bottom = 76
+mouse_filter = 2
+texture = ExtResource("t_life_icon_3_2")
+expand_mode = 1
+
+[node name="Ray3" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
+material = SubResource("ShaderMaterial_ray3")
+layout_mode = 0
+offset_left = 57
+offset_top = 48
+offset_right = 83
+offset_bottom = 76
+mouse_filter = 2
+texture = ExtResource("t_life_icon_3_1")
+expand_mode = 1
+
+[node name="Socket4" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
+layout_mode = 0
+offset_left = 38
+offset_top = 61
+offset_right = 64
+offset_bottom = 89
+mouse_filter = 2
+texture = ExtResource("t_life_icon_4_2")
+expand_mode = 1
+
+[node name="Ray4" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
+material = SubResource("ShaderMaterial_ray4")
+layout_mode = 0
+offset_left = 38
+offset_top = 61
+offset_right = 64
+offset_bottom = 89
+mouse_filter = 2
+texture = ExtResource("t_life_icon_4_1")
+expand_mode = 1
+
+[node name="Socket5" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
+layout_mode = 0
+offset_left = 13
+offset_top = 64
+offset_right = 37
+offset_bottom = 90
+mouse_filter = 2
+texture = ExtResource("t_life_icon_5_2")
+expand_mode = 1
+
+[node name="Ray5" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
+material = SubResource("ShaderMaterial_ray5")
+layout_mode = 0
+offset_left = 13
+offset_top = 64
+offset_right = 37
+offset_bottom = 90
+mouse_filter = 2
+texture = ExtResource("t_life_icon_5_1")
+expand_mode = 1
+
+[node name="Socket6" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
+layout_mode = 0
+offset_left = -7
+offset_top = 49
+offset_right = 21
+offset_bottom = 77
+mouse_filter = 2
+texture = ExtResource("t_life_icon_6_2")
+expand_mode = 1
+
+[node name="Ray6" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
+material = SubResource("ShaderMaterial_ray6")
+layout_mode = 0
+offset_left = -7
+offset_top = 49
+offset_right = 21
+offset_bottom = 77
+mouse_filter = 2
+texture = ExtResource("t_life_icon_6_1")
+expand_mode = 1
+
+[node name="Socket7" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
+layout_mode = 0
+offset_left = -12
+offset_top = 27
+offset_right = 12
+offset_bottom = 51
+mouse_filter = 2
+texture = ExtResource("t_life_icon_7_2")
+expand_mode = 1
+
+[node name="Ray7" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
+material = SubResource("ShaderMaterial_ray7")
+layout_mode = 0
+offset_left = -12
+offset_top = 27
+offset_right = 12
+offset_bottom = 51
+mouse_filter = 2
+texture = ExtResource("t_life_icon_7_1")
+expand_mode = 1
+
+[node name="Socket8" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
+layout_mode = 0
+offset_left = -8
+offset_top = 2
+offset_right = 20
+offset_bottom = 30
+mouse_filter = 2
+texture = ExtResource("t_life_icon_8_2")
+expand_mode = 1
+
+[node name="Ray8" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
+material = SubResource("ShaderMaterial_ray8")
+layout_mode = 0
+offset_left = -8
+offset_top = 2
+offset_right = 20
+offset_bottom = 30
+mouse_filter = 2
+texture = ExtResource("t_life_icon_8_1")
+expand_mode = 1
+
+[node name="Text" type="TextureRect" parent="StandardHud/LifeMeter"]
+material = SubResource("ShaderMaterial_lifetext")
+layout_mode = 0
+offset_left = 7
+offset_top = -18
+offset_right = 67
+offset_bottom = 12
+mouse_filter = 2
+texture = ExtResource("t_life_text")
+expand_mode = 1
+
+[node name="Lives" type="Control" parent="StandardHud"]
+layout_mode = 0
+offset_left = 223
+offset_top = 74
+offset_right = 223
+offset_bottom = 74
+mouse_filter = 2
+script = ExtResource("s_group")
+Anchor = 1
+
+[node name="Strip" type="TextureRect" parent="StandardHud/Lives"]
+modulate = Color(0, 1, 0, 0.705882)
+layout_mode = 0
+offset_left = 0
+offset_top = 0
+offset_right = 198
+offset_bottom = 22
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_back")
+expand_mode = 1
+
+[node name="Icon" type="TextureRect" parent="StandardHud/Lives"]
+layout_mode = 0
+offset_left = 13
+offset_top = -23
+offset_right = 56
+offset_bottom = 24
+rotation = 0.087266
+mouse_filter = 2
+texture = ExtResource("t_mario_icon")
+expand_mode = 1
+
+[node name="Text" type="TextureRect" parent="StandardHud/Lives"]
+layout_mode = 0
+offset_left = -12
+offset_top = -34
+offset_right = 60
+offset_bottom = 0
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_mario_text")
+expand_mode = 1
+
+[node name="X" type="TextureRect" parent="StandardHud/Lives"]
+layout_mode = 0
+offset_left = 48
+offset_top = -20
+offset_right = 84
+offset_bottom = 16
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_x")
+expand_mode = 1
+
+[node name="Digit0" type="TextureRect" parent="StandardHud/Lives"]
+layout_mode = 0
+offset_left = 77
+offset_top = -26
+offset_right = 113
+offset_bottom = 10
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="Digit1" type="TextureRect" parent="StandardHud/Lives"]
+layout_mode = 0
+offset_left = 104
+offset_top = -31
+offset_right = 140
+offset_bottom = 5
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="RedCoins" type="Control" parent="StandardHud"]
+layout_mode = 0
+offset_left = 13
+offset_top = 419
+offset_right = 13
+offset_bottom = 419
+mouse_filter = 2
+script = ExtResource("s_group")
+Anchor = 3
+
+[node name="Strip" type="TextureRect" parent="StandardHud/RedCoins"]
+modulate = Color(1, 0.156863, 1, 0.705882)
+layout_mode = 0
+offset_left = 0
+offset_top = 0
+offset_right = 198
+offset_bottom = 22
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_back")
+expand_mode = 1
+
+[node name="Icon" type="TextureRect" parent="StandardHud/RedCoins"]
+layout_mode = 0
+offset_left = 19
+offset_top = -16
+offset_right = 49
+offset_bottom = 24
+mouse_filter = 2
+texture = ExtResource("t_redcoin_icon")
+expand_mode = 1
+
+[node name="X" type="TextureRect" parent="StandardHud/RedCoins"]
+layout_mode = 0
+offset_left = 41
+offset_top = -18
+offset_right = 77
+offset_bottom = 18
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_x")
+expand_mode = 1
+
+[node name="Digit" type="TextureRect" parent="StandardHud/RedCoins"]
+layout_mode = 0
+offset_left = 70
+offset_top = -38
+offset_right = 106
+offset_bottom = -2
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="Slash" type="TextureRect" parent="StandardHud/RedCoins"]
+layout_mode = 0
+offset_left = 87
+offset_top = -41
+offset_right = 137
+offset_bottom = 19
+mouse_filter = 2
+texture = ExtResource("t_balloon_slash")
+expand_mode = 1
+
+[node name="Eight" type="TextureRect" parent="StandardHud/RedCoins"]
+layout_mode = 0
+offset_left = 113
+offset_top = -16
+offset_right = 141
+offset_bottom = 12
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_8")
+expand_mode = 1
+
+[node name="Timer" type="Control" parent="StandardHud"]
+layout_mode = 0
+offset_left = 13
+offset_top = 419
+offset_right = 13
+offset_bottom = 419
+mouse_filter = 2
+script = ExtResource("s_group")
+Anchor = 3
+
+[node name="Text" type="TextureRect" parent="StandardHud/Timer"]
+layout_mode = 0
+offset_left = 5
+offset_top = -37
+offset_right = 73
+offset_bottom = -9
+rotation = -0.226893
+mouse_filter = 2
+texture = ExtResource("t_time_text")
+expand_mode = 1
+
+[node name="Strip" type="TextureRect" parent="StandardHud/Timer"]
+modulate = Color(1, 0.156863, 1, 0.705882)
+layout_mode = 0
+offset_left = 0
+offset_top = 0
+offset_right = 270
+offset_bottom = 22
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_back")
+expand_mode = 1
+
+[node name="Long0" type="TextureRect" parent="StandardHud/Timer"]
+layout_mode = 0
+offset_left = 4
+offset_top = -11
+offset_right = 40
+offset_bottom = 25
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="Long1" type="TextureRect" parent="StandardHud/Timer"]
+layout_mode = 0
+offset_left = 31
+offset_top = -16
+offset_right = 67
+offset_bottom = 20
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="Long2" type="TextureRect" parent="StandardHud/Timer"]
+layout_mode = 0
+offset_left = 75
+offset_top = -28
+offset_right = 111
+offset_bottom = 8
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="Long3" type="TextureRect" parent="StandardHud/Timer"]
+layout_mode = 0
+offset_left = 102
+offset_top = -33
+offset_right = 138
+offset_bottom = 3
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="Long4" type="TextureRect" parent="StandardHud/Timer"]
+layout_mode = 0
+offset_left = 146
+offset_top = -45
+offset_right = 182
+offset_bottom = -9
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="Long5" type="TextureRect" parent="StandardHud/Timer"]
+layout_mode = 0
+offset_left = 173
+offset_top = -50
+offset_right = 209
+offset_bottom = -14
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="LongColon0" type="TextureRect" parent="StandardHud/Timer"]
+layout_mode = 0
+offset_left = 64
+offset_top = -27
+offset_right = 82
+offset_bottom = 9
+rotation = -0.174533
+mouse_filter = 2
+texture = ExtResource("t_coin_number_colon")
+expand_mode = 1
+
+[node name="LongColon1" type="TextureRect" parent="StandardHud/Timer"]
+layout_mode = 0
+offset_left = 135
+offset_top = -44
+offset_right = 153
+offset_bottom = -8
+rotation = -0.174533
+mouse_filter = 2
+texture = ExtResource("t_coin_number_colon")
+expand_mode = 1
+
+[node name="Short0" type="TextureRect" parent="StandardHud/Timer"]
+layout_mode = 0
+offset_left = 31
+offset_top = -16
+offset_right = 67
+offset_bottom = 20
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="Short1" type="TextureRect" parent="StandardHud/Timer"]
+layout_mode = 0
+offset_left = 58
+offset_top = -21
+offset_right = 94
+offset_bottom = 15
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="Short2" type="TextureRect" parent="StandardHud/Timer"]
+layout_mode = 0
+offset_left = 102
+offset_top = -33
+offset_right = 138
+offset_bottom = 3
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="Short3" type="TextureRect" parent="StandardHud/Timer"]
+layout_mode = 0
+offset_left = 129
+offset_top = -38
+offset_right = 165
+offset_bottom = -2
+rotation = -0.261799
+mouse_filter = 2
+texture = ExtResource("t_coin_number_0")
+expand_mode = 1
+
+[node name="ShortColon" type="TextureRect" parent="StandardHud/Timer"]
+layout_mode = 0
+offset_left = 91
+offset_top = -32
+offset_right = 109
+offset_bottom = 4
+rotation = -0.174533
+mouse_filter = 2
+texture = ExtResource("t_coin_number_colon")
+expand_mode = 1
+
+[node name="WaterHud" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 493.0
+offset_top = 355.0
+offset_right = 581.0
+offset_bottom = 441.0
+mouse_filter = 2
+script = ExtResource("s_water")
+Anchor = 4
+
+[node name="BlueClip" type="Control" parent="WaterHud"]
+clip_contents = true
+layout_mode = 0
+offset_left = 0
+offset_top = 0
+offset_right = 88
+offset_bottom = 86
+mouse_filter = 2
+
+[node name="Disc" type="TextureRect" parent="WaterHud/BlueClip"]
+modulate = Color(0, 0, 1, 0.470588)
+layout_mode = 0
+offset_left = 0
+offset_top = 0
+offset_right = 88
+offset_bottom = 86
+mouse_filter = 2
+texture = ExtResource("t_water_back")
+expand_mode = 1
+
+[node name="RedClip" type="Control" parent="WaterHud"]
+visible = false
+clip_contents = true
+layout_mode = 0
+offset_left = 0
+offset_top = 0
+offset_right = 88
+offset_bottom = 86
+mouse_filter = 2
+
+[node name="DiscPressure" type="TextureRect" parent="WaterHud/RedClip"]
+modulate = Color(1, 0.247059, 0.247059, 0.784314)
+layout_mode = 0
+offset_left = 0
+offset_top = 0
+offset_right = 88
+offset_bottom = 86
+mouse_filter = 2
+texture = ExtResource("t_water_back")
+expand_mode = 1
+
+[node name="Tank" type="TextureRect" parent="WaterHud"]
+layout_mode = 0
+offset_left = 22
+offset_top = 9
+offset_right = 66
+offset_bottom = 79
+mouse_filter = 2
+texture = ExtResource("t_water_icon_0")
+expand_mode = 1
+
+[node name="FaceLClip" type="Control" parent="WaterHud"]
+clip_contents = true
+layout_mode = 0
+offset_left = 23
+offset_top = 16
+offset_right = 41
+offset_bottom = 72
+mouse_filter = 2
+
+[node name="FaceL" type="TextureRect" parent="WaterHud/FaceLClip"]
+modulate = Color(0.392157, 0.862745, 1, 1)
+layout_mode = 0
+offset_left = 0
+offset_top = 0
+offset_right = 18
+offset_bottom = 56
+mouse_filter = 2
+texture = ExtResource("t_water_icon_2")
+expand_mode = 1
+
+[node name="FaceRClip" type="Control" parent="WaterHud"]
+clip_contents = true
+layout_mode = 0
+offset_left = 39
+offset_top = 19
+offset_right = 63
+offset_bottom = 73
+mouse_filter = 2
+
+[node name="FaceR" type="TextureRect" parent="WaterHud/FaceRClip"]
+modulate = Color(0, 0.705882, 0.941176, 1)
+layout_mode = 0
+offset_left = 0
+offset_top = 0
+offset_right = 24
+offset_bottom = 54
+mouse_filter = 2
+texture = ExtResource("t_water_icon_3")
+expand_mode = 1
+
+[node name="Surface" type="TextureRect" parent="WaterHud"]
+modulate = Color(0.745098, 0.941176, 1, 1)
+layout_mode = 0
+offset_left = 23
+offset_top = 10
+offset_right = 63
+offset_bottom = 28
+mouse_filter = 2
+texture = ExtResource("t_water_icon_1")
+expand_mode = 1
+
+[node name="Text" type="TextureRect" parent="WaterHud"]
+layout_mode = 0
+offset_left = 4
+offset_top = 66
+offset_right = 84
+offset_bottom = 98
+mouse_filter = 2
+texture = ExtResource("t_water_text_0")
+expand_mode = 1
+
+[node name="Icon0" type="TextureRect" parent="WaterHud"]
+layout_mode = 0
+offset_left = 6
+offset_top = -22
+offset_right = 62
+offset_bottom = 22
+mouse_filter = 2
+texture = ExtResource("t_water_nozzle_01")
+expand_mode = 1
+
+[node name="X" type="TextureRect" parent="WaterHud/Icon0"]
+layout_mode = 0
+offset_left = 47
+offset_top = -19
+offset_right = 81
+offset_bottom = 25
+mouse_filter = 2
+texture = ExtResource("t_water_button_x")
+expand_mode = 1
+
+[node name="Icon1" type="TextureRect" parent="WaterHud"]
+visible = false
+layout_mode = 0
+offset_left = 0
+offset_top = -11
+offset_right = 84
+offset_bottom = 30
+mouse_filter = 2
+texture = ExtResource("t_water_nozzle_02")
+expand_mode = 1
+
+[node name="X" type="TextureRect" parent="WaterHud/Icon1"]
+layout_mode = 0
+offset_left = 57
+offset_top = -35
+offset_right = 91
+offset_bottom = 9
+mouse_filter = 2
+texture = ExtResource("t_water_button_x")
+expand_mode = 1
+
+[node name="Icon2" type="TextureRect" parent="WaterHud"]
+visible = false
+layout_mode = 0
+offset_left = 22
+offset_top = -35
+offset_right = 64
+offset_bottom = 21
+mouse_filter = 2
+texture = ExtResource("t_water_nozzle_03")
+expand_mode = 1
+
+[node name="X" type="TextureRect" parent="WaterHud/Icon2"]
+layout_mode = 0
+offset_left = 32
+offset_top = -26
+offset_right = 66
+offset_bottom = 18
+mouse_filter = 2
+texture = ExtResource("t_water_button_x")
+expand_mode = 1
+
+[node name="Icon3" type="TextureRect" parent="WaterHud"]
+visible = false
+layout_mode = 0
+offset_left = 14
+offset_top = -28
+offset_right = 68
+offset_bottom = 26
+mouse_filter = 2
+texture = ExtResource("t_water_nozzle_04")
+expand_mode = 1
+
+[node name="X" type="TextureRect" parent="WaterHud/Icon3"]
+layout_mode = 0
+offset_left = 38
+offset_top = -32
+offset_right = 72
+offset_bottom = 12
+mouse_filter = 2
+texture = ExtResource("t_water_button_x")
+expand_mode = 1
