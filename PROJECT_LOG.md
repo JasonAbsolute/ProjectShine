@@ -2732,6 +2732,19 @@ you make it more smooth and while were here might as well fix the other hud elem
   tick SE not ported), away off the bottom (startDisappearTimer 2444) and parked for a demo (startDownLeftBot), the red coins 73
   px above it while it is out. Fed from his `ShineTimer` (found in the level tree; his `TimerHud` nodes hidden): a start brings
   it in, the target reached takes it away, a stop before that freezes it as `stopMoveTimer` does.
+- 19f: the timer came back after a demo only when the demo had parked it; a death hides every pane at once and left a running
+  timer off for good. `endCameraDemo` re-inserts it whenever the `ShineTimer` still runs. Centiseconds floored as the game's
+  `(u32)(ms * 0.1)`, not rounded.
+- 20 (Jaysonn 00:45: "have we been making all these changes without being able to see them in the editor? i wanna see fludd in
+  the player file and such"). Yes: everything the port shows was built by code when the game ran -- the pack, the nozzle boxes'
+  models, the HUD -- so the editor showed none of it. Now: the FLUDD's model assembly lives in `SmsFluddModel` (the tank on the
+  attachment, the nozzles on `nozzle_center`, the MAT3 fixes), used by `SmsFluddSetup` at run time and by `SmsFluddAttach.cs`,
+  a `[Tool]` BoneAttachment3D for Player.tscn (Armature/Skeleton3D/SmsFluddAttach, bone jnt_chest) that hangs the same pack,
+  housed, on the bone in the editor as unsaved children; `SmsFluddSetup` adopts that node when the scene has it (its bone
+  forced) and makes its own otherwise, so the game is unchanged either way. `SmsNozzleBox` is a `[Tool]` too: in the editor it
+  shows the box's tinted model and retints it when `Nozzle` changes; its gameplay (`_Ready` / `_PhysicsProcess` / the group)
+  is gated on `Engine.IsEditorHint()`. The nozzle items wear his textured exports (`models/Nozzles/<Hover|Rocket|Turbo>/`)
+  when present (18b). The HUD stays a run-time overlay, as the game's is.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit

@@ -12,13 +12,26 @@ using System;
 /// nozzle comes back at once with a smoke puff (TItemManager::resetNozzleBoxesModel 16) -- so a box can be used again.
 /// Not here: the "valid" flag (a rocket / turbo box stays shut until the nozzle right is won: every box is valid), the hint balloon,
 /// the SEs, the smoke puff (a short scale-in stands in). The throw speeds are level data in the game; here they are the node's.
-/// Place one in a level: a Node3D with this script, its Nozzle set; it builds its own collision, model and stomp zone.
+/// Place one in a level: a StaticBody3D with this script (models/Nozzles/NozzleBox.tscn), its Nozzle set; it builds its own
+/// collision, model and stomp zone when the game runs. A tool script: in the editor it shows the box's tinted model (a child the
+/// scene does not save) and retints it when Nozzle changes, so a level shows its boxes.
 /// </summary>
+[Tool]
 public partial class SmsNozzleBox : StaticBody3D
 {
     public enum BoxNozzle { Hover = 1, Rocket = 2, Turbo = 3 } // the port's SmsNozzle indices
 
-    [Export] public BoxNozzle Nozzle = BoxNozzle.Hover;
+    private BoxNozzle _nozzle = BoxNozzle.Hover;
+    [Export] public BoxNozzle Nozzle
+    {
+        get => _nozzle;
+        set
+        {
+            _nozzle = value;
+            if (Engine.IsEditorHint() && IsInsideTree())
+                EditorPreview(true);
+        }
+    }
     /// <summary>throwObjToFront's speed along the box's front, units a 30 fps frame (the level's parameter x 0.02 in the game).</summary>
     [Export] public float ThrowSpeed = 2.0f;
     /// <summary>throwObjToFront's vertical speed, units a 30 fps frame (20 when the level leaves it unset; 10 arcs a metre or two).</summary>
@@ -45,6 +58,11 @@ public partial class SmsNozzleBox : StaticBody3D
 
     public override void _Ready()
     {
+        if (Engine.IsEditorHint())
+        {
+            EditorPreview(false);
+            return;
+        }
         CollisionLayer = 1;
         CollisionMask = 0;
         float s = 1f / SmsUnits.UnitsPerMetre;
@@ -79,6 +97,27 @@ public partial class SmsNozzleBox : StaticBody3D
         }
     }
 
+    /// <summary>The editor's stand-in for the model the game builds: the box, tinted for the nozzle, as an unsaved child.</summary>
+    private void EditorPreview(bool rebuild)
+    {
+        var old = GetNodeOrNull<Node3D>("EditorPreview");
+        if (old != null)
+        {
+            if (!rebuild)
+                return;
+            RemoveChild(old);
+            old.QueueFree();
+        }
+        var model = SmsGlb.Instantiate(ModelDir + "nozzlebox/nozzlebox");
+        if (model == null)
+            return;
+        model.Name = "EditorPreview";
+        float s = 1f / SmsUnits.UnitsPerMetre;
+        model.Scale = new Vector3(s, s, s);
+        AddChild(model);
+        SmsGlb.OverrideMaterials(model, BoxMaterial(TintFor(_nozzle)));
+    }
+
     private static StandardMaterial3D BoxMaterial(Color tint)
     {
         if (_faceTex == null)
@@ -107,6 +146,8 @@ public partial class SmsNozzleBox : StaticBody3D
 
     public override void _PhysicsProcess(double delta)
     {
+        if (Engine.IsEditorHint())
+            return;
         if (_respawnPending)
         {
             Respawn();
@@ -218,7 +259,11 @@ public partial class SmsNozzleBox : StaticBody3D
                 b.Respawn();
     }
 
-    public override void _EnterTree() => AddToGroup("sms_nozzle_box");
+    public override void _EnterTree()
+    {
+        if (!Engine.IsEditorHint())
+            AddToGroup("sms_nozzle_box");
+    }
 }
 
 /// <summary>Model files for the SMS objects: the editor's import when it has run, the glTF loader straight off the disk when it has not.</summary>
