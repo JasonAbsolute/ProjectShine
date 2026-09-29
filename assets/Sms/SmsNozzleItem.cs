@@ -16,7 +16,8 @@ public partial class SmsNozzleItem : Node3D
     public SmsNozzleBox.BoxNozzle Nozzle = SmsNozzleBox.BoxNozzle.Hover;
     public SmsNozzleBox Box;
 
-    private const string ModelDir = "res://models/Koopa/scene/dolpic0/mapobj/";
+    private const string ModelDir = "res://models/Koopa/scene/dolpic0/mapobj/";   // the disc export: dummy textures, the FLUDD atlas put on
+    private const string TexturedDir = "res://models/Nozzles/";                     // Jaysonn's export with the real textures (Hover / Rocket / Turbo)
     private const float Gravity = 0.35f, Bounce = 0.5f, StopBelow = 5f, LandFriction = 0.8f, SpinDegPerFrame = 2f;
     private const float HitRadiusUnits = 40f, HitHeightUnits = 100f;
 
@@ -34,23 +35,33 @@ public partial class SmsNozzleItem : Node3D
         _ => "normal_nozzle_item",
     };
 
+    private static string TexturedFolder(SmsNozzleBox.BoxNozzle n) => n switch
+    {
+        SmsNozzleBox.BoxNozzle.Rocket => "Rocket",
+        SmsNozzleBox.BoxNozzle.Turbo => "Turbo",
+        _ => "Hover",
+    };
+
     public void SetVelocityUnitsPerFrame(Vector3 v) => _velUnits = v;
 
     public override void _Ready()
     {
         float s = 1f / SmsUnits.UnitsPerMetre;
         string name = ModelName(Nozzle);
-        _model = SmsGlb.Instantiate($"{ModelDir}{name}/{name}");
+        // his textured export first (models/Nozzles/<Hover|Rocket|Turbo>/<name>.glb, its own materials), the disc's rip otherwise
+        string textured = $"{TexturedDir}{TexturedFolder(Nozzle)}/{name}";
+        bool hisModel = ResourceLoader.Exists(textured + ".glb") || FileAccess.FileExists(ProjectSettings.GlobalizePath(textured + ".glb"));
+        _model = SmsGlb.Instantiate(hisModel ? textured : $"{ModelDir}{name}/{name}");
         if (_model != null)
         {
             _model.Name = "Model";
             _model.Scale = new Vector3(s, s, s);
             AddChild(_model);
-            if (GetTree().GetFirstNodeInGroup("player") is Mario m)
+            if (!hisModel && GetTree().GetFirstNodeInGroup("player") is Mario m)
                 m.SmsApplyFluddAtlas(_model); // nozzleitem.bmt: the FLUDD's own atlas in place of the rip's dummy texture
         }
         else
-            GD.PushWarning($"[SMS nozzle item] {name}.glb not found under {ModelDir}");
+            GD.PushWarning($"[SMS nozzle item] {name}.glb not found under {TexturedDir} or {ModelDir}");
         _hit = new Area3D { Name = "Hit", Monitoring = true, Monitorable = false };
         _hit.AddChild(new CollisionShape3D
         {
