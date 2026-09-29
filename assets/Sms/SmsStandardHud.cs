@@ -297,11 +297,10 @@ public partial class SmsStandardHud : Control
     private void EndCameraDemo()
     {
         _inDemo = false; _demoEndCount = 0;
-        if (_timerParked)
-        {
-            _timerParked = false; _timerVisible = false;
-            if (TimerRunning) StartInsertTimer(); // unk51C: back after the demo while it runs
-        }
+        // unk51C: the timer comes back after the demo while it still runs (parked by the demo, or gone with a death)
+        _timerParked = false; _timerVisible = false;
+        if (TimerRunning)
+            StartInsertTimer();
         if (_redParked) { _redParked = false; StartAppearRedCoin(); }
         if (!_coinVisible)
             StartAppearCoin();
@@ -621,7 +620,7 @@ public partial class SmsStandardHud : Control
     /// <summary>setTimer (2920): the stopwatch in centiseconds, capped at 99:59.99; the short layout's pieces go FF82FF under 10 s.</summary>
     private void SetTimerDigits()
     {
-        int centis = Mathf.Clamp(Mathf.RoundToInt(TimerSeconds * 100f), 0, 599999);
+        int centis = Mathf.Clamp((int)MathF.Floor(TimerSeconds * 100f + 1e-4f), 0, 599999); // the game's (u32)(ms * 0.1)
         int minutes = centis / 6000, rest = centis - minutes * 6000, seconds = rest / 100, cc = rest % 100;
         if (_timerLong)
         {
