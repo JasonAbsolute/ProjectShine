@@ -1,0 +1,323 @@
+[gd_scene load_steps=46 format=3 uid="uid://esphipdhit233"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsSuperHipDropLanding.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/shwave1_sp.png" id="2_shwave"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/kemuball3_sp.png" id="3_smoke"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/glow3_hit.png" id="4_flame"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/hoshi_hit.png" id="5_star"]
+
+[sub_resource type="Gradient" id="Gradient_shockwave"]
+resource_name = "ms_m_sphipd_hit_a: prm white -> (255,159,159) from frame 4 to 10 x ESP1 alpha 1 -> 0 from 37.5 %"
+offsets = PackedFloat32Array(0, 0.18, 0.375, 0.45, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 0.9, 0.9, 1, 1, 0.624, 0.624, 0.88, 1, 0.624, 0.624, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_shockwave"]
+gradient = SubResource("Gradient_shockwave")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_shockwave"]
+emission_shape = 0
+emission_shape_offset = Vector3(0, 0.094, 0)
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+gravity = Vector3(0, 0, 0)
+color_ramp = SubResource("GradientTexture1D_shockwave")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shockwave"]
+resource_name = "super hip drop shockwave (ms_m_sphipd_hit_a: P_msm_shwave1, prm animated (the ramp), env (255,207,144) -> (255,0,87) baked as (255,104,116), mix)"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_shwave")
+disable_receive_shadows = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_shockwave"]
+material = SubResource("StandardMaterial3D_shockwave")
+size = Vector2(3.358, 3.358)
+orientation = 1
+
+[sub_resource type="Curve" id="Curve_smoke_scale"]
+resource_name = "ms_m_sphipd_hit_b ESP1 scale 0.085 -> 1 by 32.7 %, -> 0.2 by the end"
+_data = [Vector2(0, 0.085), 0.0, 0.0, 1, 1, Vector2(0.3271, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.2), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_smoke_scale"]
+curve = SubResource("Curve_smoke_scale")
+
+[sub_resource type="Curve" id="Curve_smoke_radial"]
+resource_name = "the puff's outward speed: velOmni 34 u/f x airResist 0.94 a frame x the Drag field 0.92 (in 48 %, out 48 % to 87.5 %) (gen_fx_super.sim)"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.0333, 0.77), 0.0, 0.0, 1, 1, Vector2(0.0667, 0.5797), 0.0, 0.0, 1, 1, Vector2(0.1, 0.4268), 0.0, 0.0, 1, 1, Vector2(0.1333, 0.3072), 0.0, 0.0, 1, 1, Vector2(0.1667, 0.2161), 0.0, 0.0, 1, 1, Vector2(0.2, 0.1486), 0.0, 0.0, 1, 1, Vector2(0.2333, 0.0999), 0.0, 0.0, 1, 1, Vector2(0.2667, 0.0656), 0.0, 0.0, 1, 1, Vector2(0.3, 0.0421), 0.0, 0.0, 1, 1, Vector2(0.3333, 0.0264), 0.0, 0.0, 1, 1, Vector2(0.3667, 0.0161), 0.0, 0.0, 1, 1, Vector2(0.4, 0.0096), 0.0, 0.0, 1, 1, Vector2(0.4333, 0.0056), 0.0, 0.0, 1, 1, Vector2(0.4667, 0.0032), 0.0, 0.0, 1, 1, Vector2(0.5, 0.0019), 0.0, 0.0, 1, 1, Vector2(0.5333, 0.0012), 0.0, 0.0, 1, 1, Vector2(0.5667, 0.0007), 0.0, 0.0, 1, 1, Vector2(0.6, 0.0005), 0.0, 0.0, 1, 1, Vector2(0.6333, 0.0003), 0.0, 0.0, 1, 1, Vector2(0.6667, 0.0002), 0.0, 0.0, 1, 1, Vector2(0.7, 0.0001), 0.0, 0.0, 1, 1, Vector2(0.7333, 0.0001), 0.0, 0.0, 1, 1, Vector2(0.7667, 0.0001), 0.0, 0.0, 1, 1, Vector2(0.8, 0.0001), 0.0, 0.0, 1, 1, Vector2(0.8333, 0), 0.0, 0.0, 1, 1, Vector2(0.8667, 0), 0.0, 0.0, 1, 1, Vector2(0.9, 0), 0.0, 0.0, 1, 1, Vector2(0.9333, 0), 0.0, 0.0, 1, 1, Vector2(0.9667, 0), 0.0, 0.0, 1, 1, Vector2(1, 0), 0.0, 0.0, 1, 1]
+point_count = 31
+
+[sub_resource type="CurveTexture" id="CurveTexture_smoke_radial"]
+curve = SubResource("Curve_smoke_radial")
+
+[sub_resource type="Curve" id="Curve_smoke_rise"]
+resource_name = "the puff's rise: the +0.08 u/f^2 Gravity field (in over 49 %) under the same drag, peak 0.28 m/s"
+_data = [Vector2(0, 0), 0.0, 0.0, 1, 1, Vector2(0.0333, 0.0379), 0.0, 0.0, 1, 1, Vector2(0.0667, 0.1316), 0.0, 0.0, 1, 1, Vector2(0.1, 0.2688), 0.0, 0.0, 1, 1, Vector2(0.1333, 0.432), 0.0, 0.0, 1, 1, Vector2(0.1667, 0.6011), 0.0, 0.0, 1, 1, Vector2(0.2, 0.7563), 0.0, 0.0, 1, 1, Vector2(0.2333, 0.881), 0.0, 0.0, 1, 1, Vector2(0.2667, 0.9636), 0.0, 0.0, 1, 1, Vector2(0.3, 0.9987), 0.0, 0.0, 1, 1, Vector2(0.3333, 0.987), 0.0, 0.0, 1, 1, Vector2(0.3667, 0.9342), 0.0, 0.0, 1, 1, Vector2(0.4, 0.8496), 0.0, 0.0, 1, 1, Vector2(0.4333, 0.7443), 0.0, 0.0, 1, 1, Vector2(0.4667, 0.6292), 0.0, 0.0, 1, 1, Vector2(0.5, 0.5447), 0.0, 0.0, 1, 1, Vector2(0.5333, 0.4824), 0.0, 0.0, 1, 1, Vector2(0.5667, 0.4316), 0.0, 0.0, 1, 1, Vector2(0.6, 0.3912), 0.0, 0.0, 1, 1, Vector2(0.6333, 0.3597), 0.0, 0.0, 1, 1, Vector2(0.6667, 0.336), 0.0, 0.0, 1, 1, Vector2(0.7, 0.3192), 0.0, 0.0, 1, 1, Vector2(0.7333, 0.3086), 0.0, 0.0, 1, 1, Vector2(0.7667, 0.3038), 0.0, 0.0, 1, 1, Vector2(0.8, 0.3047), 0.0, 0.0, 1, 1, Vector2(0.8333, 0.3114), 0.0, 0.0, 1, 1, Vector2(0.8667, 0.3244), 0.0, 0.0, 1, 1, Vector2(0.9, 0.3418), 0.0, 0.0, 1, 1, Vector2(0.9333, 0.3591), 0.0, 0.0, 1, 1, Vector2(0.9667, 0.3765), 0.0, 0.0, 1, 1, Vector2(1, 0.3895), 0.0, 0.0, 1, 1]
+point_count = 31
+
+[sub_resource type="Curve" id="Curve_zero"]
+_data = [Vector2(0, 0), 0.0, 0.0, 1, 1, Vector2(1, 0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_smoke_rise"]
+curve_x = SubResource("Curve_zero")
+curve_y = SubResource("Curve_smoke_rise")
+curve_z = SubResource("Curve_zero")
+
+[sub_resource type="Gradient" id="Gradient_smoke"]
+resource_name = "ms_m_sphipd_hit_b ESP1 alpha 1 -> 0 from 41.4 %"
+offsets = PackedFloat32Array(0, 0.0167, 0.0333, 0.05, 0.0667, 0.0833, 0.1, 0.1167, 0.1333, 0.15, 0.1667, 0.1833, 0.2, 0.2167, 0.2333, 0.25, 0.2667, 0.2833, 0.3, 0.3167, 0.3333, 0.35, 0.3667, 0.3833, 0.4, 0.4167, 0.4333, 0.45, 0.4667, 0.4833, 0.5, 0.5167, 0.5333, 0.55, 0.5667, 0.5833, 0.6, 0.6167, 0.6333, 0.65, 0.6667, 0.6833, 0.7, 0.7167, 0.7333, 0.75, 0.7667, 0.7833, 0.8, 0.8167, 0.8333, 0.85, 0.8667, 0.8833, 0.9, 0.9167, 0.9333, 0.95, 0.9667, 0.9833, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.9956, 1, 1, 1, 0.9672, 1, 1, 1, 0.9387, 1, 1, 1, 0.9103, 1, 1, 1, 0.8818, 1, 1, 1, 0.8534, 1, 1, 1, 0.8249, 1, 1, 1, 0.7965, 1, 1, 1, 0.768, 1, 1, 1, 0.7396, 1, 1, 1, 0.7112, 1, 1, 1, 0.6827, 1, 1, 1, 0.6543, 1, 1, 1, 0.6258, 1, 1, 1, 0.5974, 1, 1, 1, 0.5689, 1, 1, 1, 0.5405, 1, 1, 1, 0.512, 1, 1, 1, 0.4836, 1, 1, 1, 0.4551, 1, 1, 1, 0.4267, 1, 1, 1, 0.3982, 1, 1, 1, 0.3698, 1, 1, 1, 0.3414, 1, 1, 1, 0.3129, 1, 1, 1, 0.2845, 1, 1, 1, 0.256, 1, 1, 1, 0.2276, 1, 1, 1, 0.1991, 1, 1, 1, 0.1707, 1, 1, 1, 0.1422, 1, 1, 1, 0.1138, 1, 1, 1, 0.0853, 1, 1, 1, 0.0569, 1, 1, 1, 0.0284, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_smoke"]
+gradient = SubResource("Gradient_smoke")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_smoke"]
+lifetime_randomness = 0.475
+emission_shape = 6
+emission_ring_axis = Vector3(0, 1, 0)
+emission_ring_height = 0.0
+emission_ring_radius = 0.242
+emission_ring_inner_radius = 0.242
+emission_shape_offset = Vector3(0, 1.343, 0)
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+velocity_pivot = Vector3(0, 1.343, 0)
+radial_velocity_min = 21.2382
+radial_velocity_max = 33.5701
+radial_velocity_curve = SubResource("CurveTexture_smoke_radial")
+directional_velocity_min = 0.2194
+directional_velocity_max = 0.3468
+directional_velocity_curve = SubResource("CurveXYZTexture_smoke_rise")
+gravity = Vector3(0, 0, 0)
+scale_min = 0.65
+scale_max = 1.35
+scale_curve = SubResource("CurveTexture_smoke_scale")
+color_ramp = SubResource("GradientTexture1D_smoke")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_smoke"]
+resource_name = "super hip drop smoke (ms_m_sphipd_hit_b: P_msm_kemuball3 lerp (50,50,26) -> (255,255,242), mix)"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("3_smoke")
+disable_receive_shadows = true
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_smoke"]
+material = SubResource("StandardMaterial3D_smoke")
+size = Vector2(2.351, 2.351)
+
+[sub_resource type="Image" id="Image_flame_points"]
+data = {
+"data": PackedByteArray(0, 0, 0, 0, 218, 142, 137, 61, 71, 86, 78, 62, 224, 235, 87, 60, 218, 142, 137, 61, 46, 229, 77, 62, 135, 117, 215, 60, 218, 142, 137, 61, 96, 146, 76, 62, 118, 4, 33, 61, 218, 142, 137, 61, 80, 95, 74, 62, 165, 157, 85, 61, 218, 142, 137, 61, 103, 78, 71, 62, 84, 166, 132, 61, 218, 142, 137, 61, 2, 99, 67, 62, 108, 236, 157, 61, 218, 142, 137, 61, 108, 161, 62, 62, 100, 133, 182, 61, 218, 142, 137, 61, 221, 14, 57, 62, 71, 86, 206, 61, 218, 142, 137, 61, 111, 177, 50, 62, 249, 68, 229, 61, 218, 142, 137, 61, 30, 144, 43, 62, 85, 56, 251, 61, 218, 142, 137, 61, 187, 178, 35, 62, 38, 12, 8, 62, 218, 142, 137, 61, 228, 33, 27, 62, 254, 230, 17, 62, 218, 142, 137, 61, 254, 230, 17, 62, 228, 33, 27, 62, 218, 142, 137, 61, 38, 12, 8, 62, 187, 178, 35, 62, 218, 142, 137, 61, 85, 56, 251, 61, 30, 144, 43, 62, 218, 142, 137, 61, 249, 68, 229, 61, 111, 177, 50, 62, 218, 142, 137, 61, 71, 86, 206, 61, 221, 14, 57, 62, 218, 142, 137, 61, 100, 133, 182, 61, 108, 161, 62, 62, 218, 142, 137, 61, 108, 236, 157, 61, 2, 99, 67, 62, 218, 142, 137, 61, 84, 166, 132, 61, 103, 78, 71, 62, 218, 142, 137, 61, 165, 157, 85, 61, 80, 95, 74, 62, 218, 142, 137, 61, 118, 4, 33, 61, 96, 146, 76, 62, 218, 142, 137, 61, 135, 117, 215, 60, 46, 229, 77, 62, 218, 142, 137, 61, 224, 235, 87, 60, 71, 86, 78, 62, 218, 142, 137, 61, 87, 154, 99, 35, 46, 229, 77, 62, 218, 142, 137, 61, 224, 235, 87, 188, 96, 146, 76, 62, 218, 142, 137, 61, 135, 117, 215, 188, 80, 95, 74, 62, 218, 142, 137, 61, 118, 4, 33, 189, 103, 78, 71, 62, 218, 142, 137, 61, 165, 157, 85, 189, 2, 99, 67, 62, 218, 142, 137, 61, 84, 166, 132, 189, 108, 161, 62, 62, 218, 142, 137, 61, 108, 236, 157, 189, 221, 14, 57, 62, 218, 142, 137, 61, 100, 133, 182, 189, 111, 177, 50, 62, 218, 142, 137, 61, 71, 86, 206, 189, 30, 144, 43, 62, 218, 142, 137, 61, 249, 68, 229, 189, 187, 178, 35, 62, 218, 142, 137, 61, 85, 56, 251, 189, 228, 33, 27, 62, 218, 142, 137, 61, 38, 12, 8, 190, 254, 230, 17, 62, 218, 142, 137, 61, 254, 230, 17, 190, 38, 12, 8, 62, 218, 142, 137, 61, 228, 33, 27, 190, 85, 56, 251, 61, 218, 142, 137, 61, 187, 178, 35, 190, 249, 68, 229, 61, 218, 142, 137, 61, 30, 144, 43, 190, 71, 86, 206, 61, 218, 142, 137, 61, 111, 177, 50, 190, 100, 133, 182, 61, 218, 142, 137, 61, 221, 14, 57, 190, 108, 236, 157, 61, 218, 142, 137, 61, 108, 161, 62, 190, 84, 166, 132, 61, 218, 142, 137, 61, 2, 99, 67, 190, 165, 157, 85, 61, 218, 142, 137, 61, 103, 78, 71, 190, 118, 4, 33, 61, 218, 142, 137, 61, 80, 95, 74, 190, 135, 117, 215, 60, 218, 142, 137, 61, 96, 146, 76, 190, 224, 235, 87, 60, 218, 142, 137, 61, 46, 229, 77, 190, 87, 154, 227, 35, 218, 142, 137, 61, 71, 86, 78, 190, 224, 235, 87, 188, 218, 142, 137, 61, 46, 229, 77, 190, 135, 117, 215, 188, 218, 142, 137, 61, 96, 146, 76, 190, 118, 4, 33, 189, 218, 142, 137, 61, 80, 95, 74, 190, 165, 157, 85, 189, 218, 142, 137, 61, 103, 78, 71, 190, 84, 166, 132, 189, 218, 142, 137, 61, 2, 99, 67, 190, 108, 236, 157, 189, 218, 142, 137, 61, 108, 161, 62, 190, 100, 133, 182, 189, 218, 142, 137, 61, 221, 14, 57, 190, 71, 86, 206, 189, 218, 142, 137, 61, 111, 177, 50, 190, 249, 68, 229, 189, 218, 142, 137, 61, 30, 144, 43, 190, 85, 56, 251, 189, 218, 142, 137, 61, 187, 178, 35, 190, 38, 12, 8, 190, 218, 142, 137, 61, 228, 33, 27, 190, 254, 230, 17, 190, 218, 142, 137, 61, 254, 230, 17, 190, 228, 33, 27, 190, 218, 142, 137, 61, 38, 12, 8, 190, 187, 178, 35, 190, 218, 142, 137, 61, 85, 56, 251, 189, 30, 144, 43, 190, 218, 142, 137, 61, 249, 68, 229, 189, 111, 177, 50, 190, 218, 142, 137, 61, 71, 86, 206, 189, 221, 14, 57, 190, 218, 142, 137, 61, 100, 133, 182, 189, 108, 161, 62, 190, 218, 142, 137, 61, 108, 236, 157, 189, 2, 99, 67, 190, 218, 142, 137, 61, 84, 166, 132, 189, 103, 78, 71, 190, 218, 142, 137, 61, 165, 157, 85, 189, 80, 95, 74, 190, 218, 142, 137, 61, 118, 4, 33, 189, 96, 146, 76, 190, 218, 142, 137, 61, 135, 117, 215, 188, 46, 229, 77, 190, 218, 142, 137, 61, 224, 235, 87, 188, 71, 86, 78, 190, 218, 142, 137, 61, 194, 179, 42, 164, 46, 229, 77, 190, 218, 142, 137, 61, 224, 235, 87, 60, 96, 146, 76, 190, 218, 142, 137, 61, 135, 117, 215, 60, 80, 95, 74, 190, 218, 142, 137, 61, 118, 4, 33, 61, 103, 78, 71, 190, 218, 142, 137, 61, 165, 157, 85, 61, 2, 99, 67, 190, 218, 142, 137, 61, 84, 166, 132, 61, 108, 161, 62, 190, 218, 142, 137, 61, 108, 236, 157, 61, 221, 14, 57, 190, 218, 142, 137, 61, 100, 133, 182, 61, 111, 177, 50, 190, 218, 142, 137, 61, 71, 86, 206, 61, 30, 144, 43, 190, 218, 142, 137, 61, 249, 68, 229, 61, 187, 178, 35, 190, 218, 142, 137, 61, 85, 56, 251, 61, 228, 33, 27, 190, 218, 142, 137, 61, 38, 12, 8, 62, 254, 230, 17, 190, 218, 142, 137, 61, 254, 230, 17, 62, 38, 12, 8, 190, 218, 142, 137, 61, 228, 33, 27, 62, 85, 56, 251, 189, 218, 142, 137, 61, 187, 178, 35, 62, 249, 68, 229, 189, 218, 142, 137, 61, 30, 144, 43, 62, 71, 86, 206, 189, 218, 142, 137, 61, 111, 177, 50, 62, 100, 133, 182, 189, 218, 142, 137, 61, 221, 14, 57, 62, 108, 236, 157, 189, 218, 142, 137, 61, 108, 161, 62, 62, 84, 166, 132, 189, 218, 142, 137, 61, 2, 99, 67, 62, 165, 157, 85, 189, 218, 142, 137, 61, 103, 78, 71, 62, 118, 4, 33, 189, 218, 142, 137, 61, 80, 95, 74, 62, 135, 117, 215, 188, 218, 142, 137, 61, 96, 146, 76, 62, 224, 235, 87, 188, 218, 142, 137, 61, 46, 229, 77, 62),
+"format": "RGBFloat",
+"height": 1,
+"mipmaps": false,
+"width": 96
+}
+
+[sub_resource type="ImageTexture" id="ImageTexture_flame_points"]
+image = SubResource("Image_flame_points")
+
+[sub_resource type="Image" id="Image_flame_normals"]
+data = {
+"data": PackedByteArray(0, 0, 0, 0, 121, 92, 37, 63, 73, 109, 67, 63, 38, 129, 76, 61, 121, 92, 37, 63, 43, 2, 67, 63, 14, 17, 204, 61, 121, 92, 37, 63, 71, 193, 65, 63, 235, 128, 24, 62, 121, 92, 37, 63, 252, 171, 63, 63, 32, 82, 74, 62, 121, 92, 37, 63, 148, 196, 60, 63, 139, 69, 123, 62, 121, 92, 37, 63, 60, 14, 57, 63, 194, 146, 149, 62, 121, 92, 37, 63, 8, 141, 52, 63, 198, 222, 172, 62, 121, 92, 37, 63, 231, 69, 47, 63, 73, 109, 195, 62, 121, 92, 37, 63, 161, 62, 41, 63, 144, 37, 217, 62, 121, 92, 37, 63, 212, 125, 34, 63, 204, 239, 237, 62, 121, 92, 37, 63, 230, 10, 27, 63, 153, 218, 0, 63, 121, 92, 37, 63, 2, 238, 18, 63, 12, 48, 10, 63, 121, 92, 37, 63, 12, 48, 10, 63, 2, 238, 18, 63, 121, 92, 37, 63, 153, 218, 0, 63, 230, 10, 27, 63, 121, 92, 37, 63, 204, 239, 237, 62, 212, 125, 34, 63, 121, 92, 37, 63, 144, 37, 217, 62, 161, 62, 41, 63, 121, 92, 37, 63, 73, 109, 195, 62, 231, 69, 47, 63, 121, 92, 37, 63, 198, 222, 172, 62, 8, 141, 52, 63, 121, 92, 37, 63, 194, 146, 149, 62, 60, 14, 57, 63, 121, 92, 37, 63, 139, 69, 123, 62, 148, 196, 60, 63, 121, 92, 37, 63, 32, 82, 74, 62, 252, 171, 63, 63, 121, 92, 37, 63, 235, 128, 24, 62, 71, 193, 65, 63, 121, 92, 37, 63, 14, 17, 204, 61, 43, 2, 67, 63, 121, 92, 37, 63, 38, 129, 76, 61, 73, 109, 67, 63, 121, 92, 37, 63, 126, 145, 87, 36, 43, 2, 67, 63, 121, 92, 37, 63, 38, 129, 76, 189, 71, 193, 65, 63, 121, 92, 37, 63, 14, 17, 204, 189, 252, 171, 63, 63, 121, 92, 37, 63, 235, 128, 24, 190, 148, 196, 60, 63, 121, 92, 37, 63, 32, 82, 74, 190, 60, 14, 57, 63, 121, 92, 37, 63, 139, 69, 123, 190, 8, 141, 52, 63, 121, 92, 37, 63, 194, 146, 149, 190, 231, 69, 47, 63, 121, 92, 37, 63, 198, 222, 172, 190, 161, 62, 41, 63, 121, 92, 37, 63, 73, 109, 195, 190, 212, 125, 34, 63, 121, 92, 37, 63, 144, 37, 217, 190, 230, 10, 27, 63, 121, 92, 37, 63, 204, 239, 237, 190, 2, 238, 18, 63, 121, 92, 37, 63, 153, 218, 0, 191, 12, 48, 10, 63, 121, 92, 37, 63, 12, 48, 10, 191, 153, 218, 0, 63, 121, 92, 37, 63, 2, 238, 18, 191, 204, 239, 237, 62, 121, 92, 37, 63, 230, 10, 27, 191, 144, 37, 217, 62, 121, 92, 37, 63, 212, 125, 34, 191, 73, 109, 195, 62, 121, 92, 37, 63, 161, 62, 41, 191, 198, 222, 172, 62, 121, 92, 37, 63, 231, 69, 47, 191, 194, 146, 149, 62, 121, 92, 37, 63, 8, 141, 52, 191, 139, 69, 123, 62, 121, 92, 37, 63, 60, 14, 57, 191, 32, 82, 74, 62, 121, 92, 37, 63, 148, 196, 60, 191, 235, 128, 24, 62, 121, 92, 37, 63, 252, 171, 63, 191, 14, 17, 204, 61, 121, 92, 37, 63, 71, 193, 65, 191, 38, 129, 76, 61, 121, 92, 37, 63, 43, 2, 67, 191, 126, 145, 215, 36, 121, 92, 37, 63, 73, 109, 67, 191, 38, 129, 76, 189, 121, 92, 37, 63, 43, 2, 67, 191, 14, 17, 204, 189, 121, 92, 37, 63, 71, 193, 65, 191, 235, 128, 24, 190, 121, 92, 37, 63, 252, 171, 63, 191, 32, 82, 74, 190, 121, 92, 37, 63, 148, 196, 60, 191, 139, 69, 123, 190, 121, 92, 37, 63, 60, 14, 57, 191, 194, 146, 149, 190, 121, 92, 37, 63, 8, 141, 52, 191, 198, 222, 172, 190, 121, 92, 37, 63, 231, 69, 47, 191, 73, 109, 195, 190, 121, 92, 37, 63, 161, 62, 41, 191, 144, 37, 217, 190, 121, 92, 37, 63, 212, 125, 34, 191, 204, 239, 237, 190, 121, 92, 37, 63, 230, 10, 27, 191, 153, 218, 0, 191, 121, 92, 37, 63, 2, 238, 18, 191, 12, 48, 10, 191, 121, 92, 37, 63, 12, 48, 10, 191, 2, 238, 18, 191, 121, 92, 37, 63, 153, 218, 0, 191, 230, 10, 27, 191, 121, 92, 37, 63, 204, 239, 237, 190, 212, 125, 34, 191, 121, 92, 37, 63, 144, 37, 217, 190, 161, 62, 41, 191, 121, 92, 37, 63, 73, 109, 195, 190, 231, 69, 47, 191, 121, 92, 37, 63, 198, 222, 172, 190, 8, 141, 52, 191, 121, 92, 37, 63, 194, 146, 149, 190, 60, 14, 57, 191, 121, 92, 37, 63, 139, 69, 123, 190, 148, 196, 60, 191, 121, 92, 37, 63, 32, 82, 74, 190, 252, 171, 63, 191, 121, 92, 37, 63, 235, 128, 24, 190, 71, 193, 65, 191, 121, 92, 37, 63, 14, 17, 204, 189, 43, 2, 67, 191, 121, 92, 37, 63, 38, 129, 76, 189, 73, 109, 67, 191, 121, 92, 37, 63, 30, 173, 33, 165, 43, 2, 67, 191, 121, 92, 37, 63, 38, 129, 76, 61, 71, 193, 65, 191, 121, 92, 37, 63, 14, 17, 204, 61, 252, 171, 63, 191, 121, 92, 37, 63, 235, 128, 24, 62, 148, 196, 60, 191, 121, 92, 37, 63, 32, 82, 74, 62, 60, 14, 57, 191, 121, 92, 37, 63, 139, 69, 123, 62, 8, 141, 52, 191, 121, 92, 37, 63, 194, 146, 149, 62, 231, 69, 47, 191, 121, 92, 37, 63, 198, 222, 172, 62, 161, 62, 41, 191, 121, 92, 37, 63, 73, 109, 195, 62, 212, 125, 34, 191, 121, 92, 37, 63, 144, 37, 217, 62, 230, 10, 27, 191, 121, 92, 37, 63, 204, 239, 237, 62, 2, 238, 18, 191, 121, 92, 37, 63, 153, 218, 0, 63, 12, 48, 10, 191, 121, 92, 37, 63, 12, 48, 10, 63, 153, 218, 0, 191, 121, 92, 37, 63, 2, 238, 18, 63, 204, 239, 237, 190, 121, 92, 37, 63, 230, 10, 27, 63, 144, 37, 217, 190, 121, 92, 37, 63, 212, 125, 34, 63, 73, 109, 195, 190, 121, 92, 37, 63, 161, 62, 41, 63, 198, 222, 172, 190, 121, 92, 37, 63, 231, 69, 47, 63, 194, 146, 149, 190, 121, 92, 37, 63, 8, 141, 52, 63, 139, 69, 123, 190, 121, 92, 37, 63, 60, 14, 57, 63, 32, 82, 74, 190, 121, 92, 37, 63, 148, 196, 60, 63, 235, 128, 24, 190, 121, 92, 37, 63, 252, 171, 63, 63, 14, 17, 204, 189, 121, 92, 37, 63, 71, 193, 65, 63, 38, 129, 76, 189, 121, 92, 37, 63, 43, 2, 67, 63),
+"format": "RGBFloat",
+"height": 1,
+"mipmaps": false,
+"width": 96
+}
+
+[sub_resource type="ImageTexture" id="ImageTexture_flame_normals"]
+image = SubResource("Image_flame_normals")
+
+[sub_resource type="Curve" id="Curve_flame_scale"]
+resource_name = "ms_m_sphipd_hit_c ESP1 scale 0.1 -> 1 by 16.75 %, -> 0.1 from 41.75 %"
+_data = [Vector2(0, 0.1), 0.0, 0.0, 1, 1, Vector2(0.1675, 1), 0.0, 0.0, 1, 1, Vector2(0.4175, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.1), 0.0, 0.0, 1, 1]
+point_count = 4
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_flame_scale"]
+curve_x = SubResource("Curve_flame_scale")
+curve_y = SubResource("Curve_flame_scale")
+curve_z = SubResource("Curve_flame_scale")
+
+[sub_resource type="Gradient" id="Gradient_flame"]
+resource_name = "ms_m_sphipd_hit_c ESP1 alpha 1 -> 0.45 by 8.6 %, -> 0 from 50 %"
+offsets = PackedFloat32Array(0, 0.0167, 0.0333, 0.05, 0.0667, 0.0833, 0.1, 0.1167, 0.1333, 0.15, 0.1667, 0.1833, 0.2, 0.2167, 0.2333, 0.25, 0.2667, 0.2833, 0.3, 0.3167, 0.3333, 0.35, 0.3667, 0.3833, 0.4, 0.4167, 0.4333, 0.45, 0.4667, 0.4833, 0.5, 0.5167, 0.5333, 0.55, 0.5667, 0.5833, 0.6, 0.6167, 0.6333, 0.65, 0.6667, 0.6833, 0.7, 0.7167, 0.7333, 0.75, 0.7667, 0.7833, 0.8, 0.8167, 0.8333, 0.85, 0.8667, 0.8833, 0.9, 0.9167, 0.9333, 0.95, 0.9667, 0.9833, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0.893, 1, 1, 1, 0.7861, 1, 1, 1, 0.6791, 1, 1, 1, 0.5722, 1, 1, 1, 0.4652, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0.435, 1, 1, 1, 0.42, 1, 1, 1, 0.405, 1, 1, 1, 0.39, 1, 1, 1, 0.375, 1, 1, 1, 0.36, 1, 1, 1, 0.345, 1, 1, 1, 0.33, 1, 1, 1, 0.315, 1, 1, 1, 0.3, 1, 1, 1, 0.285, 1, 1, 1, 0.27, 1, 1, 1, 0.255, 1, 1, 1, 0.24, 1, 1, 1, 0.225, 1, 1, 1, 0.21, 1, 1, 1, 0.195, 1, 1, 1, 0.18, 1, 1, 1, 0.165, 1, 1, 1, 0.15, 1, 1, 1, 0.135, 1, 1, 1, 0.12, 1, 1, 1, 0.105, 1, 1, 1, 0.09, 1, 1, 1, 0.075, 1, 1, 1, 0.06, 1, 1, 1, 0.045, 1, 1, 1, 0.03, 1, 1, 1, 0.015, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_flame"]
+gradient = SubResource("Gradient_flame")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_flames"]
+lifetime_randomness = 0.375
+particle_flag_align_y = true
+emission_shape = 5
+emission_point_texture = SubResource("ImageTexture_flame_points")
+emission_normal_texture = SubResource("ImageTexture_flame_normals")
+emission_point_count = 96
+direction = Vector3(0, 0, 1)
+spread = 47.0
+initial_velocity_min = 21.2777
+initial_velocity_max = 33.6254
+gravity = Vector3(0, 0, 0)
+scale_min = 0.35
+scale_max = 1.65
+scale_curve = SubResource("CurveXYZTexture_flame_scale")
+color_ramp = SubResource("GradientTexture1D_flame")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_flames"]
+resource_name = "super hip drop flame streaks (ms_m_sphipd_hit_c: P_msm_glow3 lerp (144,43,0) -> (255,144,0), additive)"
+transparency = 1
+blend_mode = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("4_flame")
+disable_receive_shadows = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_flames_a"]
+material = SubResource("StandardMaterial3D_flames")
+size = Vector2(1.008, 4.03)
+
+[sub_resource type="QuadMesh" id="QuadMesh_flames_b"]
+material = SubResource("StandardMaterial3D_flames")
+size = Vector2(1.008, 4.03)
+orientation = 0
+
+[sub_resource type="Curve" id="Curve_star_radial"]
+resource_name = "the star's outward speed: velAxis 32 u/f x airResist 0.94 a frame (gen_fx_super.sim)"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.0286, 0.7807), 0.0, 0.0, 1, 1, Vector2(0.0571, 0.6096), 0.0, 0.0, 1, 1, Vector2(0.0857, 0.4759), 0.0, 0.0, 1, 1, Vector2(0.1143, 0.3716), 0.0, 0.0, 1, 1, Vector2(0.1429, 0.2901), 0.0, 0.0, 1, 1, Vector2(0.1714, 0.2265), 0.0, 0.0, 1, 1, Vector2(0.2, 0.1768), 0.0, 0.0, 1, 1, Vector2(0.2286, 0.1381), 0.0, 0.0, 1, 1, Vector2(0.2571, 0.1078), 0.0, 0.0, 1, 1, Vector2(0.2857, 0.0842), 0.0, 0.0, 1, 1, Vector2(0.3143, 0.0657), 0.0, 0.0, 1, 1, Vector2(0.3429, 0.0513), 0.0, 0.0, 1, 1, Vector2(0.3714, 0.0401), 0.0, 0.0, 1, 1, Vector2(0.4, 0.0313), 0.0, 0.0, 1, 1, Vector2(0.4286, 0.0244), 0.0, 0.0, 1, 1, Vector2(0.4571, 0.0191), 0.0, 0.0, 1, 1, Vector2(0.4857, 0.0149), 0.0, 0.0, 1, 1, Vector2(0.5143, 0.0116), 0.0, 0.0, 1, 1, Vector2(0.5429, 0.0091), 0.0, 0.0, 1, 1, Vector2(0.5714, 0.0071), 0.0, 0.0, 1, 1, Vector2(0.6, 0.0055), 0.0, 0.0, 1, 1, Vector2(0.6286, 0.0043), 0.0, 0.0, 1, 1, Vector2(0.6571, 0.0034), 0.0, 0.0, 1, 1, Vector2(0.6857, 0.0026), 0.0, 0.0, 1, 1, Vector2(0.7143, 0.0021), 0.0, 0.0, 1, 1, Vector2(0.7429, 0.0016), 0.0, 0.0, 1, 1, Vector2(0.7714, 0.0013), 0.0, 0.0, 1, 1, Vector2(0.8, 0.001), 0.0, 0.0, 1, 1, Vector2(0.8286, 0.0008), 0.0, 0.0, 1, 1, Vector2(0.8571, 0.0006), 0.0, 0.0, 1, 1, Vector2(0.8857, 0.0005), 0.0, 0.0, 1, 1, Vector2(0.9143, 0.0004), 0.0, 0.0, 1, 1, Vector2(0.9429, 0.0003), 0.0, 0.0, 1, 1, Vector2(0.9714, 0.0002), 0.0, 0.0, 1, 1, Vector2(1, 0.0002), 0.0, 0.0, 1, 1]
+point_count = 36
+
+[sub_resource type="CurveTexture" id="CurveTexture_star_radial"]
+curve = SubResource("Curve_star_radial")
+
+[sub_resource type="Curve" id="Curve_star_rise"]
+resource_name = "the star's rise: velDir 35 u/f x airResist 0.94 plus the -0.05 u/f^2 Gravity field, peak 28.17 m/s"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.0286, 0.7747), 0.0, 0.0, 1, 1, Vector2(0.0571, 0.5976), 0.0, 0.0, 1, 1, Vector2(0.0857, 0.458), 0.0, 0.0, 1, 1, Vector2(0.1143, 0.3478), 0.0, 0.0, 1, 1, Vector2(0.1429, 0.2605), 0.0, 0.0, 1, 1, Vector2(0.1714, 0.1911), 0.0, 0.0, 1, 1, Vector2(0.2, 0.1356), 0.0, 0.0, 1, 1, Vector2(0.2286, 0.0911), 0.0, 0.0, 1, 1, Vector2(0.2571, 0.055), 0.0, 0.0, 1, 1, Vector2(0.2857, 0.0256), 0.0, 0.0, 1, 1, Vector2(0.3143, 0.0014), 0.0, 0.0, 1, 1, Vector2(0.3429, -0.0187), 0.0, 0.0, 1, 1, Vector2(0.3714, -0.0357), 0.0, 0.0, 1, 1, Vector2(0.4, -0.0502), 0.0, 0.0, 1, 1, Vector2(0.4286, -0.0628), 0.0, 0.0, 1, 1, Vector2(0.4571, -0.0739), 0.0, 0.0, 1, 1, Vector2(0.4857, -0.0838), 0.0, 0.0, 1, 1, Vector2(0.5143, -0.0928), 0.0, 0.0, 1, 1, Vector2(0.5429, -0.1011), 0.0, 0.0, 1, 1, Vector2(0.5714, -0.1088), 0.0, 0.0, 1, 1, Vector2(0.6, -0.1161), 0.0, 0.0, 1, 1, Vector2(0.6286, -0.123), 0.0, 0.0, 1, 1, Vector2(0.6571, -0.1297), 0.0, 0.0, 1, 1, Vector2(0.6857, -0.1361), 0.0, 0.0, 1, 1, Vector2(0.7143, -0.1424), 0.0, 0.0, 1, 1, Vector2(0.7429, -0.1486), 0.0, 0.0, 1, 1, Vector2(0.7714, -0.1547), 0.0, 0.0, 1, 1, Vector2(0.8, -0.1607), 0.0, 0.0, 1, 1, Vector2(0.8286, -0.1666), 0.0, 0.0, 1, 1, Vector2(0.8571, -0.1725), 0.0, 0.0, 1, 1, Vector2(0.8857, -0.1784), 0.0, 0.0, 1, 1, Vector2(0.9143, -0.1842), 0.0, 0.0, 1, 1, Vector2(0.9429, -0.19), 0.0, 0.0, 1, 1, Vector2(0.9714, -0.1958), 0.0, 0.0, 1, 1, Vector2(1, -0.2001), 0.0, 0.0, 1, 1]
+point_count = 36
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_star_rise"]
+curve_x = SubResource("Curve_zero")
+curve_y = SubResource("Curve_star_rise")
+curve_z = SubResource("Curve_zero")
+
+[sub_resource type="Gradient" id="Gradient_star_colours"]
+resource_name = "ms_m_sphipd_hit_d prm: (255,255,144) / (255,231,231) / (207,255,255) at a random phase, one per star"
+offsets = PackedFloat32Array(0, 0.5, 1)
+colors = PackedColorArray(1, 1, 0.5647, 1, 1, 0.9059, 0.9059, 1, 0.8118, 1, 1, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_star_colours"]
+gradient = SubResource("Gradient_star_colours")
+
+[sub_resource type="Gradient" id="Gradient_star_alpha"]
+resource_name = "ms_m_sphipd_hit_d ESP1 alpha 0 -> 1 by 12.5 %, -> 0 from 80 % x the (0.8528, 0, 0.625) twinkle"
+offsets = PackedFloat32Array(0, 0.0167, 0.0333, 0.05, 0.0667, 0.0833, 0.1, 0.1167, 0.1333, 0.15, 0.1667, 0.1833, 0.2, 0.2167, 0.2333, 0.25, 0.2667, 0.2833, 0.3, 0.3167, 0.3333, 0.35, 0.3667, 0.3833, 0.4, 0.4167, 0.4333, 0.45, 0.4667, 0.4833, 0.5, 0.5167, 0.5333, 0.55, 0.5667, 0.5833, 0.6, 0.6167, 0.6333, 0.65, 0.6667, 0.6833, 0.7, 0.7167, 0.7333, 0.75, 0.7667, 0.7833, 0.8, 0.8167, 0.8333, 0.85, 0.8667, 0.8833, 0.9, 0.9167, 0.9333, 0.95, 0.9667, 0.9833, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.0922, 1, 1, 1, 0.329, 1, 1, 1, 0.2749, 1, 1, 1, 0.6497, 1, 1, 1, 0.4437, 1, 1, 1, 0.5262, 1, 1, 1, 0.6145, 1, 1, 1, 0.1286, 1, 1, 1, 0.6907, 1, 1, 1, 0.1744, 1, 1, 1, 0.737, 1, 1, 1, 0.7468, 1, 1, 1, 0.7398, 1, 1, 1, 1, 1, 1, 1, 0.6786, 1, 1, 1, 1, 1, 1, 1, 0.6095, 1, 1, 1, 0.5992, 1, 1, 1, 0.614, 1, 1, 1, 0.1109, 1, 1, 1, 0.7048, 1, 1, 1, 0.2163, 1, 1, 1, 0.7947, 1, 1, 1, 0.804, 1, 1, 1, 0.7802, 1, 1, 1, 1, 1, 1, 1, 0.6591, 1, 1, 1, 1, 1, 1, 1, 0.5506, 1, 1, 1, 0.5439, 1, 1, 1, 0.578, 1, 1, 1, 0.1044, 1, 1, 1, 0.7296, 1, 1, 1, 0.2654, 1, 1, 1, 0.8542, 1, 1, 1, 0.8569, 1, 1, 1, 0.8115, 1, 1, 1, 1, 1, 1, 1, 0.6292, 1, 1, 1, 1, 1, 1, 1, 0.491, 1, 1, 1, 0.4938, 1, 1, 1, 0.5516, 1, 1, 1, 0.1092, 1, 1, 1, 0.7643, 1, 1, 1, 0.3201, 1, 1, 1, 0.9133, 1, 1, 1, 0.9037, 1, 1, 1, 0.7633, 1, 1, 1, 1, 1, 1, 1, 0.4425, 1, 1, 1, 0.6841, 1, 1, 1, 0.2525, 1, 1, 1, 0.2254, 1, 1, 1, 0.2233, 1, 1, 1, 0.0418, 1, 1, 1, 0.2019, 1, 1, 1, 0.063, 1, 1, 1, 0.0808, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_star_alpha"]
+gradient = SubResource("Gradient_star_alpha")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_stars"]
+lifetime_randomness = 0.35
+emission_shape = 6
+emission_ring_axis = Vector3(0, 1, 0)
+emission_ring_height = 0.0
+emission_ring_radius = 0.269
+emission_ring_inner_radius = 0.269
+emission_shape_offset = Vector3(0, 0.202, 0)
+angle_min = -135.0
+angle_max = 135.0
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+angular_velocity_min = -864.0
+angular_velocity_max = 864.0
+velocity_pivot = Vector3(0, 0.202, 0)
+radial_velocity_min = 19.3441
+radial_velocity_max = 32.2402
+radial_velocity_curve = SubResource("CurveTexture_star_radial")
+directional_velocity_min = 21.1274
+directional_velocity_max = 35.2123
+directional_velocity_curve = SubResource("CurveXYZTexture_star_rise")
+gravity = Vector3(0, 0, 0)
+color_ramp = SubResource("GradientTexture1D_star_alpha")
+color_initial_ramp = SubResource("GradientTexture1D_star_colours")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_stars"]
+resource_name = "super hip drop stars (ms_m_sphipd_hit_d: P_msm_hoshi, prm one of three per star (the initial ramp), env baked as (186,115,130), mix)"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("5_star")
+disable_receive_shadows = true
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_stars"]
+material = SubResource("StandardMaterial3D_stars")
+size = Vector2(0.806, 0.806)
+
+[node name="SuperHipDropLanding" type="Node3D" node_paths=PackedStringArray("Shockwave", "Smoke", "Flames", "Stars", "Sound")]
+script = ExtResource("1_script")
+Shockwave = NodePath("Shockwave")
+Smoke = NodePath("Smoke")
+Flames = NodePath("Flames")
+Stars = NodePath("Stars")
+Sound = NodePath("Sound")
+
+[node name="Shockwave" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.3667
+one_shot = true
+explosiveness = 1.0
+visibility_aabb = AABB(-3, -1, -3, 6, 2, 6)
+process_material = SubResource("ParticleProcessMaterial_shockwave")
+draw_pass_1 = SubResource("QuadMesh_shockwave")
+
+[node name="Smoke" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 30
+lifetime = 2
+one_shot = true
+explosiveness = 1.0
+visibility_aabb = AABB(-10, -1, -10, 20, 8, 20)
+process_material = SubResource("ParticleProcessMaterial_smoke")
+draw_pass_1 = SubResource("QuadMesh_smoke")
+
+[node name="Flames" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 16
+lifetime = 0.5833
+one_shot = true
+explosiveness = 1.0
+visibility_aabb = AABB(-14, -2, -14, 28, 14, 28)
+process_material = SubResource("ParticleProcessMaterial_flames")
+draw_passes = 2
+draw_pass_1 = SubResource("QuadMesh_flames_a")
+draw_pass_2 = SubResource("QuadMesh_flames_b")
+
+[node name="Stars" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 8
+lifetime = 2.3333
+one_shot = true
+explosiveness = 1.0
+visibility_aabb = AABB(-10, -2, -10, 20, 12, 20)
+process_material = SubResource("ParticleProcessMaterial_stars")
+draw_pass_1 = SubResource("QuadMesh_stars")
+
+[node name="Sound" type="AudioStreamPlayer3D" parent="."]

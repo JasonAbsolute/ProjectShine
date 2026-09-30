@@ -219,6 +219,9 @@
 [ext_resource type="PackedScene" uid="uid://bq5ntr8yh3wek" path="res://assets/Sms/Fx/SpinJumpBlur.tscn" id="226_od6ah"]
 [ext_resource type="PackedScene" uid="uid://dm7kq2xf4tcbs" path="res://assets/Sms/Fx/HipDropBlur.tscn" id="227_xnbyg"]
 [ext_resource type="PackedScene" uid="uid://ch8vwy3mp6qrd" path="res://assets/Sms/Fx/HipDropLanding.tscn" id="228_ahpw5"]
+[ext_resource type="PackedScene" uid="uid://dsphipdbl2r33" path="res://assets/Sms/Fx/SuperHipDropBlur.tscn" id="230_sphbl"]
+[ext_resource type="PackedScene" uid="uid://esphipdhit233" path="res://assets/Sms/Fx/SuperHipDropLanding.tscn" id="231_sphld"]
+[ext_resource type="PackedScene" uid="uid://fbonkstars233" path="res://assets/Sms/Fx/BonkStars.tscn" id="232_bnkst"]
 [ext_resource type="PackedScene" uid="uid://ydk4hvu1bqs2" path="res://assets/Sms/BodyLag.tscn" id="229_bdylg"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_fpjfl"]
@@ -2491,5 +2494,11 @@ script = ExtResource("222_fpjfl")
 [node name="HipDropBlur" parent="." unique_id=397030313 instance=ExtResource("227_xnbyg")]
 
 [node name="HipDropLanding" parent="." unique_id=1584372963 instance=ExtResource("228_ahpw5")]
+
+[node name="SuperHipDropBlur" parent="." instance=ExtResource("230_sphbl")]
+
+[node name="SuperHipDropLanding" parent="." instance=ExtResource("231_sphld")]
+
+[node name="BonkStars" parent="." instance=ExtResource("232_bnkst")]
 
 [editable path="Armature/Skeleton3D/RightHandBone/RightHandClosed/Model"]

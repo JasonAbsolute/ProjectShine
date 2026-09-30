@@ -3242,3 +3242,34 @@ ignores a saved property the script no longer has, and the line drops out the ne
 `HudCountBurst.cs`, `assets/SpinJumpEffects.{cs,tscn,gdshader}` (+ .uid), `assets/GroundPoundEffects.cs`, `assets/GroundPoundImpactFx.cs`
 (+ .uid). The HUD atlas art (`hud.png`, the `coin*.tres` / `marioHeadIcon.tres` / `marioTextHud.tres` / `shineHudElement.tres` atlas
 textures) stays: TimerHud.tscn still reads `coinBackground.tres` / `coin0.tres`, ShineGetPopup the letters.
+
+### Pass 33 -- the super hip drop; the game's bonk stars
+
+Jaysonn (2026-09-30 02:00): "you can also implement the super hip drop / can you also fix the bonking stars? we can make them a bit more
+like sunshines bonk effects."
+
+**The super hip drop** (MarioJump.cpp 1128-1198, hipAttacking() states 2 / 3). The fall counts `mStatusTimer`; past `mSuperHipAttackCt` it
+is state 3, the SUPER hip drop. The shipped `jump.prm` says: `mSuperHipAttackCt` 80 ticks (0.67 s, 21 m of fall at -80; the code default
+was 50), `mHipAttackSpeedY` -80 and `mSuperHipAttackSpeedY` -80 (the same speed -- the code defaults were -50 / -80; the port already ran the
+shipped -80). What changes in state 3: the fall effect is `emitBlurHipDropSuper()` (MarioParticle.cpp 552: ms_m_sphipd_a /
+b / c / d bound to the 'center' joint -- red flames riding with him, sparkles and dark orange glows left in the air, a fire streak) instead
+of the blur (ms_m_blur3); the landing rumbles harder and shakes the camera in mode 0x27 (neither exists in the port); what he lands on
+receives `HIT_MESSAGE_SUPER_HIP_DROP` as well as `HIT_MESSAGE_HIP_DROP` (the game's TSuperHipDropBlock breaks only to the former); and the
+landing burst is `MS_M_SPHIPD_HIT_A..D` (a shockwave going pink, 30 smoke puffs, 16 flame streaks, 8 spinning stars) instead of
+`MS_HIPDROP_A..C`. `SmsParams.Jump.SuperHipAttackCt = 80`; `Mario.IsSuperHipDrop` is true from the moment the fall passes it until the
+landing (HIP_ATTACK_END) ends -- Nail / RedCoinSwitch style objects that read `stateOfMario` can read it. Scenes: `SuperHipDropBlur.tscn`
+(SmsSuperHipDropBlur: an SmsHipDropBlur stripe with `stripe_blur_add.gdshader`, WidthUnits 150 / LifeFrames 20, plus three GPUParticles3D)
+and `SuperHipDropLanding.tscn` (SmsSuperHipDropLanding), both from the .jpa fields (gen_fx_super.py; textures jpa_bake.py). Both instanced
+under Mario; a missing one is an error.
+
+**The bonk stars.** In the game a jump or a dive that hits a wall above `mClashSpeed` (mario.prm: 40) emits `PARTICLE_MS_DMG_C` at
+mPosition and drops into JUMP_SHORT_BACK_DOWN (MarioJump.cpp 162-165, 462-465; the port already has that knock-back, SmsEnterBonk); the same
+dmg_c is one of the three effects of a hit (at calcDamagePos = mPosition + 50 units toward the attacker, MarioCollision.cpp 263). His
+code-built `BonkStars` GpuParticles3D (10 stars, 0.6 s, from the head toward the wall) is gone; `BonkStars.tscn` (SmsBonkStars, from
+ms_dmg_c.jpa) plays at the game's positions: 6 spinning P_msm_hoshi stars, 65 units, yellow / pink / peach, out at 10 and up at 18 units a
+tick under a 0.96 air resistance, flipping from a tall sliver to a flat one over 75 frames (+-46 %), in by 12.5 %, out from 80 %.
+
+**Approximations, named in the scenes' resource names:** the game's random-phase colour tables are an initial ramp (one colour per
+particle) over a texture baked with the env colours' mean; the Random jitter fields are dropped; the directional spread cones of hit_c /
+hit_d / dmg_c are the ring spread plus the moment spread; the MultSin twinkle of sphipd_b uses the AddSin form; the fire stripe's indirect
+stage is the blur shader's mask.

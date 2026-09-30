@@ -1,4 +1,4 @@
-[gd_scene load_steps=6 format=3 uid="uid://dm7kq2xf4tcbs"]
+[gd_scene format=3 uid="uid://dm7kq2xf4tcbs"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsHipDropBlur.cs" id="1_script"]
 [ext_resource type="Shader" path="res://assets/Sms/Fx/stripe_blur.gdshader" id="2_shader"]

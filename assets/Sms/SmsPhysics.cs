@@ -76,8 +76,8 @@ public static class SmsParams
         public const float BackJumpForceY = 70f;        // default 62
         public const float RotateJumpForceY = 70f;      // default 62   (spin jump)
         public const float HipAttackSpeedY = -80f;      // default -50  (ground pound fall speed)
-        public const float SuperHipAttackSpeedY = -80f;
-        public const int SuperHipAttackCt = 80;         // ticks of falling before "super" hip drop
+        public const float SuperHipAttackSpeedY = -80f; // jump.prm (shipped): the same -80 as the normal fall (the code default was -80 against a -50 normal)
+        public const int SuperHipAttackCt = 80;           // jump.prm (shipped): ticks of the fall (hipAttacking() mStatusTimer) before it is the SUPER hip drop (code default 50)
         public const float SecJumpEnableSp = 0f;        // default 20   (min fwd for double jump)
         public const float SecJumpForce = 52f;
         public const float SecJumpSpeedMult = 0.25f;    // default 0    (vy = fwd*mult + force)

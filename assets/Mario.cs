@@ -612,6 +612,14 @@ public partial class Mario : CharacterBody3D
     private SmsSpinJumpBlur _smsSpinBlur;      // SpinJumpBlur.tscn: ms_m_blur2 / blur2sp, the rings around the spin
     private SmsHipDropBlur _smsHipBlur;        // HipDropBlur.tscn: ms_m_blur3, the streak above the falling hip drop
     private SmsHipDropLanding _smsHipLanding;  // HipDropLanding.tscn: ms_hipdrop_a / b / c at the landing
+    private SmsSuperHipDropBlur _smsSuperHipBlur;       // SuperHipDropBlur.tscn: ms_m_sphipd_a / b / c / d, the super hip drop's fall (pass 33)
+    private SmsSuperHipDropLanding _smsSuperHipLanding; // SuperHipDropLanding.tscn: ms_m_sphipd_hit_a / b / c / d at its landing
+    private SmsBonkStars _smsBonkStars;                 // BonkStars.tscn: ms_dmg_c, the stars of a wall bonk and of a hit
+    private float _smsHipAttackTicks;                   // hipAttacking() mStatusTimer through the fall (120 Hz ticks); > SuperHipAttackCt = the super hip drop
+    /// <summary>hipAttacking() mStatusState == 3: this hip drop fell longer than jump.prm's mSuperHipAttackCt (80 ticks, 0.67 s), so it is the
+    /// SUPER hip drop -- the game sends HIT_MESSAGE_SUPER_HIP_DROP to what he lands on (TSuperHipDropBlock breaks) along with the normal
+    /// HIT_MESSAGE_HIP_DROP; an object reading his ground pound state reads this too. Set through the fall and the landing (HIP_ATTACK_END).</summary>
+    public bool IsSuperHipDrop { get; private set; }
 
     public double mouseSensitivity = 0.001;
     public double twistInput = 0.0;
@@ -783,7 +791,6 @@ public partial class Mario : CharacterBody3D
     private bool _bonkAirborne = false;
     private float _bonkTimer = 0f;
     private Vector3 _bonkAwayDirection = Vector3.Zero;
-    private GpuParticles3D bonkStars;
 
     // You already have these, keep them:
     private bool spinTracking = false;
@@ -1587,7 +1594,6 @@ public partial class Mario : CharacterBody3D
         setupHandSwaping();
 
         SetupFootSparks();
-        SetupBonkStars();
         SmsSetupFx();
         //ParticleEffects
 
@@ -2384,8 +2390,20 @@ public partial class Mario : CharacterBody3D
             }
 
             // Falling phase — straight down at fixed speed, no air control
-            // HipAttackSpeedY -80 (shipped jump.prm; the code default was -50) = -32.2 m/s, constant, no gravity.
-            velocity.Y = UseSmsPhysics ? SmsUnits.SpeedToMps(SmsParams.Jump.HipAttackSpeedY) : GROUND_POUND_FALL_SPEED;
+            // hipAttacking() states 2 / 3 (MarioJump.cpp 1128-1137): mStatusTimer counts the fall; past mSuperHipAttackCt (jump.prm 80 ticks)
+            // the state is 3 = the SUPER hip drop: mSuperHipAttackSpeedY (the same -80 in the shipped prm), emitBlurHipDropSuper instead of
+            // the blur, and its own landing (MS_M_SPHIPD_HIT_A..D, HIT_MESSAGE_SUPER_HIP_DROP). -80 = -32.2 m/s, constant, no gravity.
+            if (UseSmsPhysics)
+            {
+                _smsHipAttackTicks += (float)(delta * SmsUnits.TicksPerSecond);
+                if (!IsSuperHipDrop && _smsHipAttackTicks > SmsParams.Jump.SuperHipAttackCt)
+                {
+                    IsSuperHipDrop = true;
+                    if (SmsDebugPrint)
+                        GD.Print($"[SMS gp] super hip drop: the fall passed {SmsParams.Jump.SuperHipAttackCt} ticks ({SmsParams.Jump.SuperHipAttackCt / SmsUnits.TicksPerSecond:F2} s, {-SmsUnits.SpeedToMps(SmsParams.Jump.HipAttackSpeedY) * SmsParams.Jump.SuperHipAttackCt / SmsUnits.TicksPerSecond:F1} m of fall) -- the fire blur now, the super landing when he hits");
+                }
+            }
+            velocity.Y = UseSmsPhysics ? SmsUnits.SpeedToMps(IsSuperHipDrop ? SmsParams.Jump.SuperHipAttackSpeedY : SmsParams.Jump.HipAttackSpeedY) : GROUND_POUND_FALL_SPEED;
 
             if (IsOnFloor())
             {
@@ -2402,7 +2420,10 @@ public partial class Mario : CharacterBody3D
                     GD.Print($"[SMS gp] landed: ma_hiped {_groundPoundLandingTimer:F2} s with no inputs, then ma_slped (stick or A cancels it)"
                         + (KeepGroundPoundJump ? " [KeepGroundPoundJump on: A launches the GP-jump]" : ""));
 
-                _smsHipLanding?.Play(ComputeFeetPosition()); // MS_HIPDROP_C, B, A at mPosition (MarioJump.cpp 1184-1186)
+                if (IsSuperHipDrop)
+                    _smsSuperHipLanding?.Play(ComputeFeetPosition()); // MS_M_SPHIPD_HIT_A..D at mPosition (MarioJump.cpp 1188-1191); HIT_MESSAGE_SUPER_HIP_DROP + HIP_DROP to what he lands on -- IsSuperHipDrop for the objects
+                else
+                    _smsHipLanding?.Play(ComputeFeetPosition()); // MS_HIPDROP_C, B, A at mPosition (MarioJump.cpp 1184-1186)
             }
             goto EndFrame;
         }
@@ -2492,6 +2513,7 @@ public partial class Mario : CharacterBody3D
             _groundPoundLandingTimer -= (float)delta;
             if (_groundPoundLandingTimer <= 0f)
             {
+                IsSuperHipDrop = false; // HIP_ATTACK_END is over
                 // Landing animation done — check stick input
                 if (walkingStrength <= DEADZONE)
                 {
@@ -4797,7 +4819,9 @@ public partial class Mario : CharacterBody3D
         {
             bool fxOn = stateOfMario == MarioState.groundPoundFalling && !_groundPoundStalling;
             if (_smsHipBlur != null)
-                _smsHipBlur.Active = fxOn;     // emitBlurHipDrop every frame of the fall (MarioJump.cpp 1140)
+                _smsHipBlur.Active = fxOn && !IsSuperHipDrop;      // emitBlurHipDrop every tick of the fall (MarioJump.cpp 1140)
+            if (_smsSuperHipBlur != null)
+                _smsSuperHipBlur.Active = fxOn && IsSuperHipDrop;  // emitBlurHipDropSuper once the fall is the super one (1142)
         }
 
         // Ground-pound jump 360° spin while rising. Sweep from 0 → 2π * spinTurns.
@@ -5280,10 +5304,14 @@ public partial class Mario : CharacterBody3D
     private void SmsSetupFx()
     {
         _smsSpinBlur = SmsFluddModel.FindChild<SmsSpinJumpBlur>(this);
-        _smsHipBlur = SmsFluddModel.FindChild<SmsHipDropBlur>(this);
+        _smsHipBlur = SmsFindFx<SmsHipDropBlur>(this); // not the super blur's own SmsHipDropBlur stripe
         _smsHipLanding = SmsFluddModel.FindChild<SmsHipDropLanding>(this);
+        _smsSuperHipBlur = SmsFluddModel.FindChild<SmsSuperHipDropBlur>(this);
+        _smsSuperHipLanding = SmsFluddModel.FindChild<SmsSuperHipDropLanding>(this);
+        _smsBonkStars = SmsFluddModel.FindChild<SmsBonkStars>(this);
         _smsSpinBlur?.Bind(this);
         _smsHipBlur?.Bind(this);
+        _smsSuperHipBlur?.Bind(this);
         // pass 29: no fallback -- the scenes are the effects; a missing one is an error and that effect simply does not play
         if (_smsSpinBlur == null)
             GD.PushError("[SMS fx] Player.tscn has no SpinJumpBlur under Mario: instance res://assets/Sms/Fx/SpinJumpBlur.tscn there (the spin's rings, ms_m_blur2 / blur2sp)");
@@ -5291,8 +5319,31 @@ public partial class Mario : CharacterBody3D
             GD.PushError("[SMS fx] Player.tscn has no HipDropBlur under Mario: instance res://assets/Sms/Fx/HipDropBlur.tscn there (the hip drop's streak, ms_m_blur3)");
         if (_smsHipLanding == null)
             GD.PushError("[SMS fx] Player.tscn has no HipDropLanding under Mario: instance res://assets/Sms/Fx/HipDropLanding.tscn there (the landing's burst, ms_hipdrop_a / b / c)");
+        if (_smsSuperHipBlur == null)
+            GD.PushError("[SMS fx] Player.tscn has no SuperHipDropBlur under Mario: instance res://assets/Sms/Fx/SuperHipDropBlur.tscn there (the super hip drop's fall, ms_m_sphipd_a / b / c / d)");
+        if (_smsSuperHipLanding == null)
+            GD.PushError("[SMS fx] Player.tscn has no SuperHipDropLanding under Mario: instance res://assets/Sms/Fx/SuperHipDropLanding.tscn there (the super hip drop's landing, ms_m_sphipd_hit_a / b / c / d)");
+        if (_smsBonkStars == null)
+            GD.PushError("[SMS fx] Player.tscn has no BonkStars under Mario: instance res://assets/Sms/Fx/BonkStars.tscn there (the bonk's and a hit's stars, ms_dmg_c)");
         if (SmsDebugPrint)
-            GD.Print($"[SMS fx] spin rings {(_smsSpinBlur != null ? "from the scene" : "MISSING")}, hip drop streak {(_smsHipBlur != null ? "from the scene" : "MISSING")}, hip drop landing {(_smsHipLanding != null ? "from the scene" : "MISSING")}");
+            GD.Print($"[SMS fx] spin rings {(_smsSpinBlur != null ? "from the scene" : "MISSING")}, hip drop streak {(_smsHipBlur != null ? "from the scene" : "MISSING")}, hip drop landing {(_smsHipLanding != null ? "from the scene" : "MISSING")}, super hip drop fall {(_smsSuperHipBlur != null ? "from the scene" : "MISSING")} / landing {(_smsSuperHipLanding != null ? "from the scene" : "MISSING")}, bonk stars {(_smsBonkStars != null ? "from the scene" : "MISSING")}");
+    }
+
+    /// <summary>The first <typeparamref name="T"/> under <paramref name="root"/>, not looking inside another effect's scene (the super
+    /// hip drop blur nests an SmsHipDropBlur as its fire stripe).</summary>
+    private static T SmsFindFx<T>(Node root) where T : Node
+    {
+        foreach (Node c in root.GetChildren())
+        {
+            if (c is T t)
+                return t;
+            if (c is SmsSuperHipDropBlur)
+                continue;
+            var r = SmsFindFx<T>(c);
+            if (r != null)
+                return r;
+        }
+        return null;
     }
 
     private void SetupFootSparks()
@@ -5678,7 +5729,7 @@ public partial class Mario : CharacterBody3D
         }
 
         SetMarioState(stateOfMario); // -> ma_bkdwn
-        SpawnBonkStars(wallNormalXZ);
+        SpawnBonkStars(ComputeFeetPosition()); // PARTICLE_MS_DMG_C at mPosition
     }
 
     private void TickBonk(double delta)
@@ -5773,78 +5824,11 @@ public partial class Mario : CharacterBody3D
         return ImageTexture.CreateFromImage(image);
     }
 
-    /// <summary>Builds the one-shot star burst used when Mario bonks a wall.</summary>
-    private void SetupBonkStars()
+    /// <summary>The game's ms_dmg_c stars (BonkStars.tscn) at <paramref name="at"/>: emitParticle(PARTICLE_MS_DMG_C) at mPosition for a
+    /// wall bonk (MarioJump.cpp 164, 464), at calcDamagePos (mPosition + 50 units toward the attacker, MarioCollision.cpp 263) for a hit.</summary>
+    private void SpawnBonkStars(Vector3 at)
     {
-        bonkStars = new GpuParticles3D();
-        bonkStars.Name = "BonkStars";
-        bonkStars.Amount = 10;
-        bonkStars.Lifetime = 0.6;
-        bonkStars.OneShot = true;
-        bonkStars.Explosiveness = 1.0f; // pop all at once
-        bonkStars.Emitting = false;
-        bonkStars.LocalCoords = false;
-
-        var pm = new ParticleProcessMaterial();
-        pm.EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere;
-        pm.EmissionSphereRadius = 0.15f;
-        pm.Direction = new Vector3(0f, 1f, 0f);
-        pm.Spread = 180f;
-        pm.InitialVelocityMin = 3.0f;
-        pm.InitialVelocityMax = 6.0f;
-        pm.Gravity = new Vector3(0f, -12f, 0f);
-        pm.ScaleMin = 0.8f;
-        pm.ScaleMax = 1.4f;
-        pm.AngularVelocityMin = -720f;
-        pm.AngularVelocityMax = 720f;
-        pm.Color = new Color(1f, 0.9f, 0.2f, 1f); // bright yellow "stars"
-
-        var grad = new Gradient();
-        grad.Offsets = new float[] { 0f, 0.7f, 1f };
-        grad.Colors = new Color[]
-        {
-            new Color(1f, 1f, 0.5f, 1f),
-            new Color(1f, 0.85f, 0.2f, 1f),
-            new Color(1f, 0.8f, 0.15f, 0f),
-        };
-        var ramp = new GradientTexture1D();
-        ramp.Gradient = grad;
-        pm.ColorRamp = ramp;
-
-        bonkStars.ProcessMaterial = pm;
-
-        var quad = new QuadMesh();
-        quad.Size = new Vector2(0.28f, 0.28f);
-        var mat = new StandardMaterial3D();
-        var starTexture = CreateBonkStarTexture();
-        mat.ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded;
-        mat.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
-        mat.BlendMode = BaseMaterial3D.BlendModeEnum.Add;
-        mat.VertexColorUseAsAlbedo = true;
-        mat.AlbedoColor = new Color(1f, 0.9f, 0.3f, 1f);
-        mat.AlbedoTexture = starTexture;
-        mat.EmissionEnabled = true;
-        mat.Emission = new Color(1f, 0.85f, 0.25f);
-        mat.EmissionEnergyMultiplier = 5f;
-        mat.SetTexture(BaseMaterial3D.TextureParam.Emission, starTexture);
-        mat.BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles;
-        mat.CullMode = BaseMaterial3D.CullModeEnum.Disabled;
-        quad.Material = mat;
-        bonkStars.DrawPass1 = quad;
-
-        AddChild(bonkStars);
-        bonkStars.Position = new Vector3(0f, 1.2f, 0f);
-    }
-
-    private void SpawnBonkStars(Vector3 wallNormalXZ)
-    {
-        if (bonkStars == null)
-            return;
-        // Emit from around Mario's head, nudged toward the wall he hit.
-        Vector3 toward = -wallNormalXZ * 0.4f;
-        bonkStars.Position = new Vector3(toward.X, 1.2f, toward.Z);
-        bonkStars.Restart();
-        bonkStars.Emitting = true;
+        _smsBonkStars?.Play(at);
     }
 
     private void StartGroundSpin()
@@ -7929,6 +7913,8 @@ public partial class Mario : CharacterBody3D
         _groundPoundStalling = false;
         _groundPoundSlpedPlaying = false;
         _smsHipDrop.Reset();
+        _smsHipAttackTicks = 0f;
+        IsSuperHipDrop = false;
         _smsTrueVyValid = false;
         if (UseSmsPhysics && SmsDebugPrint)
             GD.Print($"[SMS gp] L pressed: hover {SmsParams.Timing.HipDropHangTicks / SmsUnits.TicksPerSecond:F2} s with a {SmsUnits.UnitsToMetres(102.5f):F2} m lift, then fall at {SmsUnits.SpeedToMps(SmsParams.Jump.HipAttackSpeedY):F1} m/s");
@@ -11225,7 +11211,7 @@ public partial class Mario : CharacterBody3D
             SetEyeTexture(hurtEyeTexture ?? sleepingEyeTexture); // the knockdown clips: eyes squeezed shut in pain (not the sleep eyes)
             stateOfMario = MarioState.hurt;
             SmsDownEnter(airborne, fwd);
-            SpawnBonkStars(-attackDir); // PARTICLE_MS_DMG_A/B/C at calcDamagePos (toward the attacker); no camera shake / rumble / voice here
+            SpawnBonkStars(ComputeFeetPosition() + attackDir * SmsUnits.UnitsToMetres(50f)); // PARTICLE_MS_DMG_A/B/C at calcDamagePos = mPosition + 50 units toward the attacker; no camera shake / rumble / voice here
             what = $"{(_smsDownFore ? "FORE" : "BACK")}_DOWN type {_smsDownType} {(airborne ? "in the air (+-16 along the face until he lands)" : $"on the ground, {_smsDownAnim} at fwd {fwd:F1} ({SmsUnits.SpeedToMps(MathF.Abs(fwd)):F1} m/s)")}";
         }
         _smsInvincibleTicks = p.InvincibleTicks;
@@ -11970,7 +11956,7 @@ public partial class Mario : CharacterBody3D
             Vector3 attackDir = toAttacker.Normalized();
             Vector3 oldFace = SmsMath.DirFromYaw(_smsFaceYaw);
             _smsFaceYaw = SmsMath.YawFromDir(oldFace.Dot(attackDir) >= 0f ? attackDir : -attackDir); // getAttackAngle(), +180 from behind
-            SpawnBonkStars(-attackDir);
+            SpawnBonkStars(ComputeFeetPosition() + attackDir * SmsUnits.UnitsToMetres(50f)); // calcDamagePos
         }
         _smsInvincibleTicks = p.InvincibleTicks;
         SmsFluddDamage(p.WaterEmit); // the tank spills (mWaterEmit x DamageLoss)
@@ -15213,7 +15199,7 @@ public partial class Mario : CharacterBody3D
         lastFacingDirection = faceWall;
         armature.Rotation = new Vector3(0f, YawFromDir(faceWall), 0f);
         SetMarioState(stateOfMario); // -> ma_bkdwn
-        SpawnBonkStars(faceWall);
+        SpawnBonkStars(ComputeFeetPosition()); // PARTICLE_MS_DMG_C at mPosition (MarioJump.cpp 164 / 464)
         if (SmsDebugPrint)
             GD.Print($"[SMS bonk] {why} at fwd {fwdAtHit:F1} (threshold {SmsParams.Mario.ClashSpeed:F0}) -> knocked back 16/tick, vy {SmsUnits.MpsToSpeed(vyMps):F1}");
     }

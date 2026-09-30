@@ -1,0 +1,114 @@
+[gd_scene load_steps=18 format=3 uid="uid://fbonkstars233"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsBonkStars.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/hoshi_dmg.png" id="2_star"]
+
+[sub_resource type="Curve" id="Curve_radial"]
+resource_name = "the star's outward speed: velAxis 10 u/f x airResist 0.96 a frame (gen_fx_super.sim)"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.04, 0.8847), 0.0, 0.0, 1, 1, Vector2(0.08, 0.7828), 0.0, 0.0, 1, 1, Vector2(0.12, 0.6925), 0.0, 0.0, 1, 1, Vector2(0.16, 0.6127), 0.0, 0.0, 1, 1, Vector2(0.2, 0.5421), 0.0, 0.0, 1, 1, Vector2(0.24, 0.4796), 0.0, 0.0, 1, 1, Vector2(0.28, 0.4243), 0.0, 0.0, 1, 1, Vector2(0.32, 0.3754), 0.0, 0.0, 1, 1, Vector2(0.36, 0.3321), 0.0, 0.0, 1, 1, Vector2(0.4, 0.2939), 0.0, 0.0, 1, 1, Vector2(0.44, 0.26), 0.0, 0.0, 1, 1, Vector2(0.48, 0.23), 0.0, 0.0, 1, 1, Vector2(0.52, 0.2035), 0.0, 0.0, 1, 1, Vector2(0.56, 0.18), 0.0, 0.0, 1, 1, Vector2(0.6, 0.1593), 0.0, 0.0, 1, 1, Vector2(0.64, 0.1409), 0.0, 0.0, 1, 1, Vector2(0.68, 0.1247), 0.0, 0.0, 1, 1, Vector2(0.72, 0.1103), 0.0, 0.0, 1, 1, Vector2(0.76, 0.0976), 0.0, 0.0, 1, 1, Vector2(0.8, 0.0864), 0.0, 0.0, 1, 1, Vector2(0.84, 0.0764), 0.0, 0.0, 1, 1, Vector2(0.88, 0.0676), 0.0, 0.0, 1, 1, Vector2(0.92, 0.0598), 0.0, 0.0, 1, 1, Vector2(0.96, 0.0529), 0.0, 0.0, 1, 1, Vector2(1, 0.0488), 0.0, 0.0, 1, 1]
+point_count = 26
+
+[sub_resource type="CurveTexture" id="CurveTexture_radial"]
+curve = SubResource("Curve_radial")
+
+[sub_resource type="Curve" id="Curve_rise"]
+resource_name = "the star's rise: velDir 18 u/f x airResist 0.96 a frame, peak 14.51 m/s"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.04, 0.8847), 0.0, 0.0, 1, 1, Vector2(0.08, 0.7828), 0.0, 0.0, 1, 1, Vector2(0.12, 0.6925), 0.0, 0.0, 1, 1, Vector2(0.16, 0.6127), 0.0, 0.0, 1, 1, Vector2(0.2, 0.5421), 0.0, 0.0, 1, 1, Vector2(0.24, 0.4796), 0.0, 0.0, 1, 1, Vector2(0.28, 0.4243), 0.0, 0.0, 1, 1, Vector2(0.32, 0.3754), 0.0, 0.0, 1, 1, Vector2(0.36, 0.3321), 0.0, 0.0, 1, 1, Vector2(0.4, 0.2939), 0.0, 0.0, 1, 1, Vector2(0.44, 0.26), 0.0, 0.0, 1, 1, Vector2(0.48, 0.23), 0.0, 0.0, 1, 1, Vector2(0.52, 0.2035), 0.0, 0.0, 1, 1, Vector2(0.56, 0.18), 0.0, 0.0, 1, 1, Vector2(0.6, 0.1593), 0.0, 0.0, 1, 1, Vector2(0.64, 0.1409), 0.0, 0.0, 1, 1, Vector2(0.68, 0.1247), 0.0, 0.0, 1, 1, Vector2(0.72, 0.1103), 0.0, 0.0, 1, 1, Vector2(0.76, 0.0976), 0.0, 0.0, 1, 1, Vector2(0.8, 0.0864), 0.0, 0.0, 1, 1, Vector2(0.84, 0.0764), 0.0, 0.0, 1, 1, Vector2(0.88, 0.0676), 0.0, 0.0, 1, 1, Vector2(0.92, 0.0598), 0.0, 0.0, 1, 1, Vector2(0.96, 0.0529), 0.0, 0.0, 1, 1, Vector2(1, 0.0488), 0.0, 0.0, 1, 1]
+point_count = 26
+
+[sub_resource type="Curve" id="Curve_zero"]
+_data = [Vector2(0, 0), 0.0, 0.0, 1, 1, Vector2(1, 0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_rise"]
+curve_x = SubResource("Curve_zero")
+curve_y = SubResource("Curve_rise")
+curve_z = SubResource("Curve_zero")
+
+[sub_resource type="Curve" id="Curve_scale_x"]
+resource_name = "ms_dmg_c ESP1 scale X: 0.03 -> 1 by 50 %, -> 0.14"
+_data = [Vector2(0, 0.03), 0.0, 0.0, 1, 1, Vector2(0.5, 1), 0.0, 0.0, 1, 1, Vector2(0.5, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.14), 0.0, 0.0, 1, 1]
+point_count = 4
+
+[sub_resource type="Curve" id="Curve_scale_y"]
+resource_name = "ms_dmg_c ESP1 scale Y: 0.14 -> 1 by 50 %, -> 0.03 (diffXY)"
+_data = [Vector2(0, 0.14), 0.0, 0.0, 1, 1, Vector2(0.5, 1), 0.0, 0.0, 1, 1, Vector2(0.5, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.03), 0.0, 0.0, 1, 1]
+point_count = 4
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_scale"]
+curve_x = SubResource("Curve_scale_x")
+curve_y = SubResource("Curve_scale_y")
+curve_z = SubResource("Curve_scale_x")
+
+[sub_resource type="Gradient" id="Gradient_colours"]
+resource_name = "ms_dmg_c prm: (255,255,120) / (255,200,239) / (255,216,187) at a random phase, one per star"
+offsets = PackedFloat32Array(0, 0.5, 1)
+colors = PackedColorArray(1, 1, 0.4706, 1, 1, 0.7843, 0.9373, 1, 1, 0.8471, 0.7333, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_colours"]
+gradient = SubResource("Gradient_colours")
+
+[sub_resource type="Gradient" id="Gradient_alpha"]
+resource_name = "ms_dmg_c ESP1 alpha 0 -> 1 by 12.5 %, -> 0 from 80 % x the (0.0239, 0.1797, 0.375) twinkle"
+offsets = PackedFloat32Array(0, 0.0167, 0.0333, 0.05, 0.0667, 0.0833, 0.1, 0.1167, 0.1333, 0.15, 0.1667, 0.1833, 0.2, 0.2167, 0.2333, 0.25, 0.2667, 0.2833, 0.3, 0.3167, 0.3333, 0.35, 0.3667, 0.3833, 0.4, 0.4167, 0.4333, 0.45, 0.4667, 0.4833, 0.5, 0.5167, 0.5333, 0.55, 0.5667, 0.5833, 0.6, 0.6167, 0.6333, 0.65, 0.6667, 0.6833, 0.7, 0.7167, 0.7333, 0.75, 0.7667, 0.7833, 0.8, 0.8167, 0.8333, 0.85, 0.8667, 0.8833, 0.9, 0.9167, 0.9333, 0.95, 0.9667, 0.9833, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.1568, 1, 1, 1, 0.1808, 1, 1, 1, 0.2124, 1, 1, 1, 0.5475, 1, 1, 1, 0.6445, 1, 1, 1, 0.4831, 1, 1, 1, 0.7215, 1, 1, 1, 0.94, 1, 1, 1, 0.8006, 1, 1, 1, 0.798, 1, 1, 1, 0.7906, 1, 1, 1, 0.7403, 1, 1, 1, 0.935, 1, 1, 1, 0.8992, 1, 1, 1, 0.5719, 1, 1, 1, 0.7962, 1, 1, 1, 1, 1, 1, 1, 0.7003, 1, 1, 1, 0.4964, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.4865, 1, 1, 1, 0.7169, 1, 1, 1, 1, 1, 1, 1, 0.7811, 1, 1, 1, 0.5722, 1, 1, 1, 0.9103, 1, 1, 1, 0.9333, 1, 1, 1, 0.7336, 1, 1, 1, 0.7904, 1, 1, 1, 0.802, 1, 1, 1, 0.8048, 1, 1, 1, 0.9355, 1, 1, 1, 0.7652, 1, 1, 1, 0.6121, 1, 1, 1, 0.9761, 1, 1, 1, 1, 1, 1, 1, 0.5236, 1, 1, 1, 0.6957, 1, 1, 1, 1, 1, 1, 1, 0.7932, 1, 1, 1, 0.4522, 1, 1, 1, 0.9644, 1, 1, 1, 1, 1, 1, 1, 0.5856, 1, 1, 1, 0.6682, 1, 1, 1, 1, 1, 1, 1, 0.8435, 1, 1, 1, 0.624, 1, 1, 1, 0.6908, 1, 1, 1, 0.6231, 1, 1, 1, 0.5558, 1, 1, 1, 0.5123, 1, 1, 1, 0.3445, 1, 1, 1, 0.307, 1, 1, 1, 0.3509, 1, 1, 1, 0.2035, 1, 1, 1, 0.0832, 1, 1, 1, 0.0784, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_alpha"]
+gradient = SubResource("Gradient_alpha")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_stars"]
+lifetime_randomness = 0.4578
+emission_shape = 2
+emission_sphere_radius = 0.134
+emission_shape_offset = Vector3(0, 0.067, 0)
+angle_min = -90.0
+angle_max = 90.0
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+angular_velocity_min = -864.0
+angular_velocity_max = 864.0
+velocity_pivot = Vector3(0, 0.067, 0)
+radial_velocity_min = 5.642
+radial_velocity_max = 10.4781
+radial_velocity_curve = SubResource("CurveTexture_radial")
+directional_velocity_min = 10.1557
+directional_velocity_max = 18.8605
+directional_velocity_curve = SubResource("CurveXYZTexture_rise")
+gravity = Vector3(0, 0, 0)
+scale_curve = SubResource("CurveXYZTexture_scale")
+color_ramp = SubResource("GradientTexture1D_alpha")
+color_initial_ramp = SubResource("GradientTexture1D_colours")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_stars"]
+resource_name = "bonk / damage stars (ms_dmg_c: P_msm_hoshi, prm one of three per star (the initial ramp), env baked as (255,65,47), mix)"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_star")
+disable_receive_shadows = true
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_stars"]
+material = SubResource("StandardMaterial3D_stars")
+size = Vector2(0.873, 0.873)
+
+[node name="BonkStars" type="Node3D" node_paths=PackedStringArray("Stars", "Sound")]
+script = ExtResource("1_script")
+Stars = NodePath("Stars")
+Sound = NodePath("Sound")
+
+[node name="Stars" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 6
+lifetime = 1.25
+one_shot = true
+explosiveness = 1.0
+visibility_aabb = AABB(-6, -1, -6, 12, 10, 12)
+process_material = SubResource("ParticleProcessMaterial_stars")
+draw_pass_1 = SubResource("QuadMesh_stars")
+
+[node name="Sound" type="AudioStreamPlayer3D" parent="."]

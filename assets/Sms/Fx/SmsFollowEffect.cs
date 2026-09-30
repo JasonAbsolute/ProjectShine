@@ -28,7 +28,7 @@ public partial class SmsFollowEffect : Node3D
     public bool IsBound => _owner != null;
 
     /// <summary>Bind to an actor: its Skeleton3D's joint is followed from now on.</summary>
-    public void Bind(Node3D owner)
+    public virtual void Bind(Node3D owner)
     {
         _owner = owner;
         _skeleton = owner as Skeleton3D ?? SmsFluddModel.FindChild<Skeleton3D>(owner);
