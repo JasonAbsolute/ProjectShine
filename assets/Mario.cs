@@ -263,6 +263,7 @@ public partial class Mario : CharacterBody3D
     private int _fluddRocketPushes = 0;                           // launch ticks that reached mVel.y (debug)
     private bool _fluddKeyN = false;                              // the nozzle-cycle key's last state
     private float _fluddDashSpeed = 0f;                           // mDashSpeed: the turbo's stick magnitude, 0.5 a tick to 32
+    private bool _fluddChargeTicked;                              // the dash block ran its charge branch last tick (a charge start is the first tick it did not)
     private bool _fluddDashing = false;                           // MARIO_FLAG_FLUDD_EMITTING: the run / paddle forced to DashMax
     private int _fluddDashDbgTicks = 0;                           // the once-a-second [SMS turbo] readout while dashing
     // MARIO_STATUS_SQUAT / SQUAT_STANDUP (MarioWait.cpp squating() / squatStandup()): the R click, or L, with the FLUDD out
@@ -13592,8 +13593,21 @@ public partial class Mario : CharacterBody3D
         bool pumpingTurbo = _fluddReady && _fluddNozzle == SmsNozzle.Turbo && _fluddUpper == SmsUpper.Pumping && _fluddR > 0f && _fluddWater > 0;
         if (pumpingTurbo)
         {
-            if (_fluddDashSpeed <= 0f && SmsDebugPrint)
-                GD.Print($"[SMS turbo] charge on (from {stateOfMario}): stick {_smsIntendedMag:F1} of 32, model {Mathf.RadToDeg(SmsMath.YawFromDir(SmsModelFacing())):F0} deg, face {Mathf.RadToDeg(_smsFaceYaw):F0} deg, fwd {SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()):F1}");
+            bool starting = !_fluddChargeTicked;
+            float fwdNow = SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length());
+            if (starting && SmsParams.Fludd.ChargeKeepsSpeed)
+            {
+                // DELIBERATE DEVIATION (SmsParams.Fludd.ChargeKeepsSpeed): the game's mDashSpeed starts at 0 whatever he was doing, and
+                // mIntendedMag = mDashSpeed then brakes a sprint to a crawl in 6 ticks (DecBrake 5) before the 0.53 s climb -- the
+                // turbo's wind-up. Jaysonn (2026-09-29 20:48): "he should[n't] have to stand still for a frame". The charge picks up at
+                // the forward speed he already carries along his face; from a stand nothing changes.
+                Vector3 velXZ = new Vector3(velocity.X, 0f, velocity.Z);
+                float along = _smsFaceValid ? MathF.Max(0f, SmsUnits.MpsToSpeed(velXZ.Dot(SmsMath.DirFromYaw(_smsFaceYaw)))) : fwdNow;
+                _fluddDashSpeed = Mathf.Clamp(MathF.Max(_fluddDashSpeed, along), 0f, 32f);
+            }
+            if (starting && SmsDebugPrint)
+                GD.Print($"[SMS turbo] charge on (from {stateOfMario}): stick {_smsIntendedMag:F1} of 32, model {Mathf.RadToDeg(SmsMath.YawFromDir(SmsModelFacing())):F0} deg, face {Mathf.RadToDeg(_smsFaceYaw):F0} deg, fwd {fwdNow:F1}, dash speed from {_fluddDashSpeed:F1}");
+            _fluddChargeTicked = true;
             _fluddDashSpeed += SmsParams.Mario.DashAcc;
             if (_fluddDashSpeed >= 32f)
             {
@@ -13635,6 +13649,7 @@ public partial class Mario : CharacterBody3D
         }
         else
         {
+            _fluddChargeTicked = false;
             if (_fluddDashSpeed > 0.1f)
                 _fluddDashSpeed *= SmsParams.Mario.DashBrake;
             else

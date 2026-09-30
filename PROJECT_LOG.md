@@ -2817,6 +2817,12 @@ you make it more smooth and while were here might as well fix the other hud elem
   no fall (`SmsNozzleItem.Spin` / `Falls` exports, both on for the nozzle items): watergun_item_data has no physics and the
   0x04000000 flag that keeps it out of the item manager's shared rotation. Drives: the charge with the drift -> no pivot,
   the run blend from the first frame, along the facing; the sitting item touched -> the pack, the gauge, the spray, full.
+- 26b (Jaysonn 20:48: "Still off ... when charging up he should have to stand still for a frame or whatever is happening";
+  his log: every charge `from sprinting: stick 32.0 of 32 ... fwd 32.0`). That stop is the game's own wind-up: mDashSpeed
+  starts at 0 and mIntendedMag = mDashSpeed, so doRunning brakes a full sprint to a crawl at DecBrake 5 a tick (6 ticks,
+  0.05 s) and the 0.53 s climb starts from there. Deviation (below): the charge picks up at the forward speed he already has
+  along his face -- a sprint keeps 32 until the trigger fills (0.75 s), then the dash; from a stand nothing changes. The
+  charge-on line now ends `dash speed from N`. Drive: R at a 32 sprint -> 32 held, no dip, the dash 0.75 s later.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
@@ -2825,6 +2831,10 @@ yes, jnt_nozzle_R yes`. Self-test: `hover: first tick vy 4.6`, `rise after the 3
 Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
 
 ### Deliberate deviations from the game
+- The turbo charge keeps his speed (`SmsParams.Fludd.ChargeKeepsSpeed`, true): the game's `mDashSpeed` starts at 0 whatever he
+  was doing, and `mIntendedMag = mDashSpeed` brakes a sprint to a crawl in 6 ticks (DecBrake 5) before the 0.53 s climb -- the
+  wind-up. Jaysonn (20:48): "when charging up he should have to stand still for a frame or whatever is happening". Here the
+  dash speed starts at the forward speed he already carries along his face. `false` = the game.
 - No tiptoe in the turbo charge (`SmsParams.Fludd.ChargeSoftStep`, false): `doRunningAnimation` picks SSTEP while
   min(mDashSpeed, mForwardVel) is under Walk2Soft (8) -- the first 26 ticks of a charge from a stand, back to the run above
   Soft2Walk (13). Jaysonn (01:59): "he should do his foward walk when chagring turbo up", (03:40) "looks like hes sqauting

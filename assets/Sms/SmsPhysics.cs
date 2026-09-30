@@ -299,6 +299,11 @@ public static class SmsParams
         // (8), the first 26 ticks of a charge from a stand (back to the run above Soft2Walk 13); here the charge walks the run blend
         // from its first tick. true = the game.
         public const bool ChargeSoftStep = false;
+        // DELIBERATE DEVIATION (Jaysonn, 2026-09-29 20:48, every charge in his log "from sprinting ... fwd 32.0": "when charging up he
+        // should have to stand still for a frame or whatever is happening"): the game's mDashSpeed starts at 0 and mIntendedMag =
+        // mDashSpeed brakes a sprint to a crawl in 6 ticks (DecBrake 5) before the 0.53 s climb -- the wind-up. Here the charge picks
+        // up at the forward speed he already has along his face (a sprint keeps 32 until the trigger fills). false = the game.
+        public const bool ChargeKeepsSpeed = true;
         public const float ChangeSpeed = 0.1f;          // the nozzle swap tween a tick (10 ticks); PARAM_INIT (not in the shipped prm)
         public const float DeployRate = 0.1f;           // unk1CEC -= a tick while pumping (housed 1 -> deployed 0)
         public const float StowRate = 0.005f;           // unk1CF4: unk1CEC += a tick when idle (deployed -> housed in 200 ticks)
