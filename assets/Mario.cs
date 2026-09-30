@@ -113,17 +113,12 @@ public partial class Mario : CharacterBody3D
     [Export]
     public int StartingHealth = 8;
     private int _health;
-    private LifeMeter _lifeMeter;
 
     // Coins
     private int _coins;
-    private YellowCoinHud _yellowCoinHud;
     private int _redCoins;
-    private RedCoinHud _redCoinHud;
     private int _blueCoins;
-    private BlueCoinHud _blueCoinHud;
     private int _shines;
-    private ShineHud _shineHud;
     private SunshineCamera _camera;
 
     // Hand-authored shine-get cutscene camera (a Camera3D + AnimationPlayer
@@ -141,12 +136,6 @@ public partial class Mario : CharacterBody3D
     [Export]
     public int StartingLives = 4;
     private int _lives;
-    private LifeCounterHud _lifeCounterHud;
-    private float _idleTimer = 0f;
-    private bool _lifeCounterShowing = false;
-    private float _blueCoinDisplayTimer = 0f;
-    private const float IdleShowDelay = 3f;
-    private const float BlueCoinDisplayDuration = 3f;
 
     // On a shine grab the HUD appears immediately but the count doesn't tick up
     // until this delay (mid-cutscene), per the reference footage.
@@ -1389,27 +1378,12 @@ public partial class Mario : CharacterBody3D
         // Health / Lives setup
         _health = StartingHealth;
         _lives = StartingLives;
-        _lifeMeter = GetNodeOrNull<LifeMeter>("LifeMeter");
-        _lifeMeter?.SetHealth(_health);
         SmsAirReset();
-        _lifeCounterHud = GetNodeOrNull<LifeCounterHud>("LifeCounterHud");
-
         _coins = 0;
-        _yellowCoinHud = GetNodeOrNull<YellowCoinHud>("YellowCoinHud");
-        _yellowCoinHud?.ShowHud();
-
         _redCoins = 0;
-        _redCoinHud = GetNodeOrNull<RedCoinHud>("RedCoinHud");
-        _redCoinHud?.SetCount(0);
-
         _blueCoins = GameData.Instance.BlueCoinCount;
-        _blueCoinHud = GetNodeOrNull<BlueCoinHud>("BlueCoinHud");
-        _blueCoinHud?.SetCount(_blueCoins);
-
         _shines = 0;
-        _shineHud = GetNodeOrNull<ShineHud>("ShineHud");
-        _shineHud?.SetCount(0);
-        SmsStandardHudSetup(); // the game's console draws the counters and the life meter under UseSmsPhysics; his nodes stand down
+        SmsStandardHudSetup(); // the console (assets/Sms/Console/SmsHud.tscn) draws the counters, the life meter and the gauge -- it reads the fields above
         _camera = GetNodeOrNull<SunshineCamera>("CamController");
 
         _shineGetCamRig = GetNodeOrNull<Node3D>("ShineGetCamRig");
@@ -2215,10 +2189,7 @@ public partial class Mario : CharacterBody3D
             if (_health < StartingHealth)
             {
                 _health = Mathf.Min(_health + 1, StartingHealth);
-                _lifeMeter?.SetHealth(_health);
                 GD.Print($"[DebugHeal] Health: {_health}/{StartingHealth}");
-                if (_health == StartingHealth)
-                    _lifeMeter?.HideForFullHealth();
             }
         }
 
@@ -4857,49 +4828,7 @@ public partial class Mario : CharacterBody3D
             //this will handle any influce the cam needs
         }
 
-        // Blue coin collect display timer
-        if (_blueCoinDisplayTimer > 0f)
-        {
-            _blueCoinDisplayTimer -= (float)delta;
-            if (
-                _blueCoinDisplayTimer <= 0f
-                && _lifeCounterShowing
-                && stateOfMario != MarioState.idle
-            )
-            {
-                _lifeCounterShowing = false;
-                _lifeCounterHud?.HideLives();
-                _blueCoinHud?.HideHud();
-                _shineHud?.HideHud();
-                _yellowCoinHud?.ReturnToNormal();
-            }
-        }
-
-        // Life counter idle display
-        if (stateOfMario == MarioState.idle)
-        {
-            _idleTimer += (float)delta;
-            if (!_lifeCounterShowing && _idleTimer >= IdleShowDelay)
-            {
-                _lifeCounterShowing = true;
-                _lifeCounterHud?.ShowLives(_lives);
-                _shineHud?.ShowHud();
-                _blueCoinHud?.ShowHud();
-                _yellowCoinHud?.NudgeDown();
-            }
-        }
-        else
-        {
-            _idleTimer = 0f;
-            if (_lifeCounterShowing && _blueCoinDisplayTimer <= 0f)
-            {
-                _lifeCounterShowing = false;
-                _lifeCounterHud?.HideLives();
-                _blueCoinHud?.HideHud();
-                _shineHud?.HideHud();
-                _yellowCoinHud?.ReturnToNormal();
-            }
-        }
+        // the counters' idle peek and the blue-coin hold are the console's (SmsStandardHud: updateStarHudAutoHide, the 13 s hold)
     }
 
     private Vector2 playerAimPoint()
@@ -10663,9 +10592,7 @@ public partial class Mario : CharacterBody3D
             );
         }
 
-        // Show the collectibles HUD right away (at the current count), then tick
-        // the shine count up a couple seconds later (mid-cutscene) with a flourish.
-        ShowCollectibleHud();
+        // the console brings the star HUD in for the shine demo (startCameraDemo with the shine get); the count ticks up mid-cutscene
         ScheduleShineCountUp();
         SpawnShineGetPopup();
     }
@@ -11304,15 +11231,8 @@ public partial class Mario : CharacterBody3D
         _smsInvincibleTicks = p.InvincibleTicks;
         SmsFluddDamage(p.WaterEmit); // the tank spills (mWaterEmit x DamageLoss)
 
-        // decHP()
-        bool wasFullHealth = _health == StartingHealth;
+        // decHP(); the console's life meter reads _health every frame (startAppearLife at the first hit from full)
         _health = Math.Max(_health - p.Damage, 0);
-        _lifeMeter?.SetHealth(_health);
-        if (wasFullHealth && _lifeMeter != null && camera != null)
-        {
-            Vector2 screenPos = camera.UnprojectPosition(GlobalPosition + new Vector3(-3.1f, 2.5f, 0));
-            _lifeMeter.SpawnAtScreenPosition(screenPos);
-        }
         if (SmsDebugPrint)
             GD.Print($"[SMS damage] -{p.Damage} HP -> {_health}/{StartingHealth}: {what}; invincible {p.InvincibleTicks} ticks");
         if (_health <= 0)
@@ -11950,11 +11870,7 @@ public partial class Mario : CharacterBody3D
         _smsUnderWater = false;
         _smsUnderTime = 0f;
         _smsAirHudTicks = 0;
-        if (_smsAirHudShown)
-        {
-            _smsAirHudShown = false;
-            _lifeMeter?.EndAir(_health);
-        }
+        _smsAirHudShown = false; // the console's meter is back on HP as soon as it reads this
     }
 
     /// <summary>playerControl()'s air update, every tick, plus GCConsole2's life-meter switch to air.</summary>
@@ -12007,7 +11923,6 @@ public partial class Mario : CharacterBody3D
             {
                 _smsAirHudShown = true;
                 _smsAirUnitsShown = (int)_smsAir;
-                _lifeMeter?.ShowAir(_smsAirUnitsShown);
                 if (SmsDebugPrint)
                     GD.Print($"[SMS air] meter: air, {_smsAirUnitsShown} segments");
             }
@@ -12018,16 +11933,12 @@ public partial class Mario : CharacterBody3D
             if (_smsAirHudShown)
             {
                 _smsAirHudShown = false;
-                _lifeMeter?.EndAir(_health);
                 if (SmsDebugPrint)
                     GD.Print($"[SMS air] meter: back to HP {_health}");
             }
         }
         if (_smsAirHudShown && (int)_smsAir != _smsAirUnitsShown)
-        {
             _smsAirUnitsShown = (int)_smsAir;
-            _lifeMeter?.SetAir(_smsAirUnitsShown);
-        }
     }
 
     /// <summary>loserExec() while swimming: no air -> SWIM_DOWN (drowned), else SWIM_P_DOWN (killed in the water). Speed 0,
@@ -12042,10 +11953,6 @@ public partial class Mario : CharacterBody3D
             Anim_DetachPickup();
         SleepStatus(true);
         _smsSwimFwd = 0f;
-        if (_smsAirHudShown)
-            _lifeMeter?.SetAir(0);
-        else
-            _lifeMeter?.SetHealth(0);
         SmsSwimSet(byDamage ? SmsSwim.PDown : SmsSwim.Down);
         GD.Print($"[SMS air] {(byDamage ? "killed in the water" : "DROWNED")} after {_smsUnderTime:F1} s under; R respawns");
     }
@@ -12075,10 +11982,7 @@ public partial class Mario : CharacterBody3D
         {
             _smsAir = MathF.Max(_smsAir - p.Damage, 0f);
             if (_smsAirHudShown)
-            {
                 _smsAirUnitsShown = (int)_smsAir;
-                _lifeMeter?.SetAir(_smsAirUnitsShown);
-            }
             if (SmsDebugPrint)
                 GD.Print($"[SMS damage] hit under water: -{p.Damage} AIR -> {_smsAir:F2}; invincible {p.InvincibleTicks} ticks");
             if (_smsAir < 1f)
@@ -12086,14 +11990,7 @@ public partial class Mario : CharacterBody3D
         }
         else
         {
-            bool wasFullHealth = _health == StartingHealth;
             _health = Math.Max(_health - p.Damage, 0);
-            _lifeMeter?.SetHealth(_health);
-            if (wasFullHealth && _lifeMeter != null && camera != null)
-            {
-                Vector2 screenPos = camera.UnprojectPosition(GlobalPosition + new Vector3(-3.1f, 2.5f, 0));
-                _lifeMeter.SpawnAtScreenPosition(screenPos);
-            }
             if (SmsDebugPrint)
                 GD.Print($"[SMS damage] hit in the water: -{p.Damage} HP -> {_health}/{StartingHealth}; invincible {p.InvincibleTicks} ticks");
             if (_health <= 0)
@@ -12574,9 +12471,16 @@ public partial class Mario : CharacterBody3D
             return;
         }
         SmsStandardHudFeed();
-        foreach (CanvasItem n in new CanvasItem[] { _lifeMeter, _lifeCounterHud, _yellowCoinHud, _redCoinHud, _blueCoinHud, _shineHud })
-            if (n != null)
+        // the legacy HUD nodes: nothing drives them any more (pass 31); while they are still in Player.tscn they are hidden here once
+        var legacy = new System.Collections.Generic.List<string>();
+        foreach (string name in new[] { "LifeMeter", "LifeCounterHud", "YellowCoinHud", "RedCoinHud", "BlueCoinHud", "ShineHud" })
+            if (GetNodeOrNull<CanvasItem>(name) is CanvasItem n)
+            {
                 n.Visible = false;
+                legacy.Add(name);
+            }
+        if (legacy.Count > 0)
+            GD.PushWarning($"[SMS hud] Player.tscn still carries the legacy HUD nodes {string.Join(", ", legacy)} -- the console draws all of it; delete them (hidden for now)");
         CallDeferred(nameof(SmsStandardHudFindLevelNodes)); // his TimerHud and ShineTimer live in the level scene
         if (SmsDebugPrint)
             GD.Print(_stdHud.Ready
@@ -14668,22 +14572,9 @@ public partial class Mario : CharacterBody3D
         if (stateOfMario == MarioState.hurt || stateOfMario == MarioState.dead)
             return;
 
-        // Reduce health and update life meter
-        bool wasFullHealth = _health == StartingHealth;
+        // Reduce health; the console's life meter reads _health every frame
         _health = Mathf.Max(_health - 1, 0);
-        GD.Print(
-            $"[TakeDamage] Health: {_health}/{StartingHealth} | LifeMeter found: {_lifeMeter != null}"
-        );
-        _lifeMeter?.SetHealth(_health);
-
-        // First hit from full health: spawn meter near Mario then fly to HUD corner
-        if (wasFullHealth && _lifeMeter != null && camera != null)
-        {
-            Vector2 screenPos = camera.UnprojectPosition(
-                GlobalPosition + new Vector3(-3.1f, 2.5f, 0)
-            );
-            _lifeMeter.SpawnAtScreenPosition(screenPos);
-        }
+        GD.Print($"[TakeDamage] Health: {_health}/{StartingHealth}");
 
         // Die if health is 0
         if (_health <= 0)
@@ -14756,7 +14647,6 @@ public partial class Mario : CharacterBody3D
             _coins = 0;
             GainExtraLife();
         }
-        _yellowCoinHud?.TickUp(_coins);
     }
 
     public void HealOneHP()
@@ -14764,49 +14654,18 @@ public partial class Mario : CharacterBody3D
         if (_health >= StartingHealth)
             return;
         _health = Mathf.Min(_health + 1, StartingHealth);
-        _lifeMeter?.SetHealth(_health);
-        if (_health == StartingHealth)
-            _lifeMeter?.HideForFullHealth();
     }
 
     public int AddRedCoin()
     {
         _redCoins++;
-        if (_redCoins == 1)
-            _redCoinHud?.ShowHud();
-        _redCoinHud?.TickUp(_redCoins);
         GD.Print($"[RedCoin] {_redCoins} collected");
         return _redCoins;
     }
 
     public void AddBlueCoin()
     {
-        _blueCoins++;
-        _blueCoinHud?.TickUp(_blueCoins);
-
-        _blueCoinDisplayTimer = BlueCoinDisplayDuration;
-        if (!_lifeCounterShowing)
-        {
-            _lifeCounterShowing = true;
-            _shineHud?.ShowHud();
-            _blueCoinHud?.ShowHud();
-            _yellowCoinHud?.NudgeDown();
-        }
-    }
-
-    /// <summary>Brings up the collectibles HUD (shine + blue coins + coins, like
-    /// the idle display but without lives) and keeps it up. Idempotent — only
-    /// slides in if it isn't already showing.</summary>
-    private void ShowCollectibleHud()
-    {
-        _blueCoinDisplayTimer = BlueCoinDisplayDuration;
-        if (!_lifeCounterShowing)
-        {
-            _lifeCounterShowing = true;
-            _shineHud?.ShowHud();
-            _blueCoinHud?.ShowHud();
-            _yellowCoinHud?.NudgeDown();
-        }
+        _blueCoins++; // the console holds the star HUD out for 13 s on the change (startBlueCoinGet)
     }
 
     /// <summary>Waits ShineCountDelay (so the count ticks up mid-cutscene), then
@@ -14820,9 +14679,7 @@ public partial class Mario : CharacterBody3D
 
     public void AddShine()
     {
-        _shines++;
-        _shineHud?.TickUp(_shines); // sets the count + flare-stars on the changed digit(s)
-        ShowCollectibleHud();
+        _shines++; // the console's shine digits flip on the change
     }
 
     private void Respawn()
@@ -14833,8 +14690,6 @@ public partial class Mario : CharacterBody3D
         SmsAirReset();
         _smsSwimAnim = "";
         animPlayer.SpeedScale = 1f;
-        _lifeMeter?.SetHealth(_health);
-        _lifeMeter?.HideForFullHealth();
         velocity = Vector3.Zero;
         SleepStatus(false); // Open eyes
         stateOfMario = MarioState.idle;
@@ -15160,6 +15015,12 @@ public partial class Mario : CharacterBody3D
     //  _smsTrueVy for the next frame.
     // ======================================================================================
 
+    /// <summary>The launched jumps (JUMP, the second and third, the rotate jumps, the back flip, the wall kick): the states the
+    /// LedgeLandWhileRising deviation applies to.</summary>
+    private static bool SmsIsJumpState(MarioState s) =>
+        s == MarioState.singleJump || s == MarioState.doubleJump || s == MarioState.tripleJump
+        || s == MarioState.SpinJump || s == MarioState.sideFlip || s == MarioState.backFlip || s == MarioState.wallJump;
+
     private static bool SmsStateSteers(MarioState s) =>
         s == MarioState.singleJump || s == MarioState.doubleJump || s == MarioState.tripleJump
         || s == MarioState.SpinJump || s == MarioState.sideFlip || s == MarioState.backFlip
@@ -15467,6 +15328,18 @@ public partial class Mario : CharacterBody3D
             // `dive at fwd 48.1` one frame after the launch).
             if (!SmsStateSteers(preMoveState) || preMoveState == MarioState.ledgeHopUp)
                 return;
+            // DEVIATION (Jaysonn, pass 31: "running into a wall then jumping ... if you can jump higher then the ledge mario will just snap
+            // to the ledge ... instead of doing the full jump"): jumpProcess -> checkGroundAtJumping(next) has no mVel.y test -- once the
+            // next position's feet are within 30 units below a ledge top the wall plane at feet + 30 is gone, the ground check from
+            // pos.y + 30 finds the top and mPosition.y is SET to it: the game lands a RISING jump on the ledge the moment his feet reach
+            // it (SMS's early ledge landing). He wants the arc: while a jump rises the riser stays a wall, he clears it by his own height
+            // and lands on the way down. The dives, rollouts and the stomp keep the game's rule (a dive onto a stair's first riser).
+            if (!SmsParams.Jump.LedgeLandWhileRising && preMoveVel.Y > 0f && SmsIsJumpState(preMoveState))
+            {
+                if (SmsDebugPrint)
+                    GD.Print($"[SMS step] air {preMoveState}: rising (vy {SmsUnits.MpsToSpeed(preMoveVel.Y):F1}) -- the riser stays a wall until he clears it (LedgeLandWhileRising off)");
+                return;
+            }
         }
         Vector3 want = new Vector3(preMoveVel.X, 0f, preMoveVel.Z) * (float)delta * (fromGround ? _smsGroundStepScale : 1f); // what MoveAndSlide was asked to do
         if (want.LengthSquared() < 1e-8f)

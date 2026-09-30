@@ -97,6 +97,11 @@ public static class SmsParams
         public const float ClashAngle = 12000f;         // BAM
         public const int JumpCatchRotXSp = 150;         // BAM per tick, dive body pitch rate
         public const int JumpCatchRotXMax = 10000;      // BAM, dive body pitch cap (~55 deg)
+        // DELIBERATE DEVIATION (Jaysonn, 2026-09-30 01:32 "running into a wall then jumping and if you can jump higher then the ledge
+        // mario will just snap to the ledge on the ground. instead of doing the full jump"): checkGroundAtJumping lands a rising jump on
+        // a floor within 30 units above the feet as soon as the next position is inside it (no mVel.y test). false = the port's arc:
+        // the riser stays a wall while he rises, he clears it and lands on the way down (SmsTryStepUp's air branch). true = the game.
+        public const bool LedgeLandWhileRising = false;
     }
 
     public static class Run // /mario/run.prm

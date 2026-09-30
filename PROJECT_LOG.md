@@ -3191,3 +3191,28 @@ out from the window's edges at the frame's full scale (SizeScale on vp.Y / 448) 
 30 / BottomShift -10: 1.4 times the gauge's size, mid-screen. SmsHintBalloon now takes the console's scale (x its own SizeScale, 1) and
 the game's offset from the gauge's frame home (SmsWaterHud.Home) through the gauge's anchor -- wherever the gauge is, the balloon sits over
 its tank; the `Anchor` export is gone. The text scales with the window (Delfino 20 px on the frame, as the game's 20 x 26 font).
+
+### Pass 31 -- the legacy HUD hooks out (the doubled life meter); a rising jump keeps its arc past a ledge
+
+Jaysonn (2026-09-30 01:32): "the health is doubleing up so i think my legacy one is stil being used can you remove it? otherwise everything
+looks good! new issue i found was that mario when running into a wall then jumping and if you can jump higher then the ledge mario will
+just snap to the ledge on the ground. instead of doing the full jump."
+
+THE DOUBLED METER: pass 30's console hid his Player.tscn LifeMeter node at start, but the legacy damage code still called its
+SpawnAtScreenPosition (which sets Visible = true) at the first hit -- two meters. Mario.cs no longer references any legacy HUD: the
+LifeMeter / LifeCounterHud / YellowCoinHud / RedCoinHud / BlueCoinHud / ShineHud fields, their lookups, ShowHud / TickUp / NudgeDown /
+ShowLives / HideLives / ReturnToNormal / SpawnAtScreenPosition / HideForFullHealth / ShowAir / SetAir / EndAir calls, the legacy idle
+peek (_idleTimer / _lifeCounterShowing / _blueCoinDisplayTimer / ShowCollectibleHud) are gone; the console reads _health, _coins, _lives,
+_shines, _blueCoins, _redCoins and the air state every frame and has the game's own idle peek and blue-coin hold. While the six legacy
+nodes are still in Player.tscn, SmsStandardHudSetup hides them once and warns with their names -- he deletes them, then the scripts
+under Font/HudElements and Font/LifeMeter/LifeMeter.tscn's node (the LifeMeter.tscn itself STAYS: it is the console's meter).
+
+THE LEDGE: jumpProcess (MarioPhysics.cpp 486) calls checkGroundAtJumping(next = pos + 0.25 vel) every tick with NO mVel.y test: the wall
+planes are tested at feet + 150 and + 30 (checkWallPlane pushes pos out of them), the ground from pos.y + 30 down, and `if (pos.y <=
+floor) mPosition.y = floor; groundCode = 1` -- a landing. So when a rising jump's feet come within 30 units (0.40 m) below a ledge top,
+the riser is no longer a wall to the game, the next position enters the ledge's footprint and Mario is SET onto it: SMS lands a rising
+jump on a ledge the moment his feet reach it. The port's SmsTryStepUp (air branch) did exactly this ("[SMS step] air singleJump: up 0.3x
+m" while rising) -- 1:1, and what he saw. DEVIATION: SmsParams.Jump.LedgeLandWhileRising = false -- in the launched jump states
+(single / double / triple, the rotate jumps, the back flip, the wall kick: SmsIsJumpState) a rising jump (preMoveVel.Y > 0) skips the
+step-up, so the riser stays a wall until he clears it and he lands on the way down as his arc says; the dives, rollouts and the stomp
+keep the game's rule (a dive from the foot of a staircase still lands on the first riser). true = the game.
