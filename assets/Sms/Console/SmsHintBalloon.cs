@@ -13,7 +13,7 @@ using Godot;
 /// The scene is assets/Sms/Console/HintBalloon.tscn, instanced in SmsHud.tscn (SmsHudLayer.Balloon): this Control is the window,
 /// the Frame a NinePatchRect of hud/help_window.png (the four disc pieces composed as J2DWindow draws them, the contents blue
 /// 0000FF at alpha 146 baked in), the Text a Label whose LabelSettings are the font, size, colour and shadow -- his to swap (the
-/// game's bitmap font is not decoded; a Godot font stands in). The appear / disappear motions follow SmsHud.AnimSpeed like every
+/// game's bitmap font is not decoded; Jaysonn's Delfino.ttf, the fan cut of it, stands in at 20 px on a 28 px line -- HintBalloonText.tres). The appear / disappear motions follow SmsHud.AnimSpeed like every
 /// other pane; the typing rate and the hold are the game's. Nothing here is drawn or laid out by code beyond moving what the scene
 /// provides.
 /// </summary>
@@ -34,8 +34,16 @@ public partial class SmsHintBalloon : Control
     /// <summary>The hold after the text is out: HoldBase + HoldPerChar x the text's length, frames (unk3E8 100, unk3EC 0.7).</summary>
     [Export] public float HoldBase = 100f;
     [Export] public float HoldPerChar = 0.7f;
-    /// <summary>The contents box inside the frame: left, top, right, bottom in frame pixels (he_w's contents bounds).</summary>
-    [Export] public Vector4 ContentInset = new Vector4(12f, 12f, 68f, 40f);
+    /// <summary>The text box inside the window: left, top, right, bottom in frame pixels -- he_2 sits at (415, 140) 164 x 166 in the
+    /// 194 x 216 window at (397, 128): 18 in from the left, 12 from the top, 12 from the right, 38 from the bottom. The tail corner
+    /// piece is 68 x 40, so the text runs over the frame's right column, as the game's does.</summary>
+    [Export] public Vector4 ContentInset = new Vector4(18f, 12f, 12f, 38f);
+    /// <summary>The balloon's own scale: 1 = the game's frame (448 lines on the window's height), as the game draws it; the console's
+    /// Size does not shrink it -- its text has to stay readable. Jaysonn's knob.</summary>
+    [Export] public float SizeScale = 1f;
+    /// <summary>Moves the window on the game's frame, frame pixels (the game: (397, 128), its right edge 49 in from the frame's).
+    /// Jaysonn's knob; the console's shifts do not apply here.</summary>
+    [Export] public Vector2 ShiftFrame = Vector2.Zero;
 
     private enum Phase { Hidden, Appear, Typing, Hold, Disappear }
     private Phase _phase = Phase.Hidden;
@@ -169,14 +177,20 @@ public partial class SmsHintBalloon : Control
         Layout();
     }
 
-    /// <summary>The window onto the screen: its frame place through the anchor at the console's scale, its bottom edge fixed while
-    /// it grows and shrinks; the frame and the text box follow.</summary>
+    /// <summary>The window onto the screen: the game's 640 x 448 frame fitted to the window's height (times SizeScale), the balloon's frame
+    /// place kept from the anchored edges (the right and the top: 49 px in, 128 px down on the frame) plus ShiftFrame -- the
+    /// console's Size and shifts are for the counters, not for a text window; its bottom edge fixed while it grows and shrinks; the
+    /// frame and the text box follow.</summary>
     private void Layout()
     {
         _vp = GetViewportRect().Size;
-        _s = SmsHud.Scale(_vp);
-        Vector2 top = new Vector2(_home.X, _home.Y + (_full.Y - _height));
-        Position = SmsHud.Anchored(top, Anchor, _s, _vp);
+        _s = _vp.Y / SmsHud.ScreenH * SizeScale;
+        Vector2 top = new Vector2(_home.X + ShiftFrame.X, _home.Y + ShiftFrame.Y + (_full.Y - _height));
+        bool right = Anchor == SmsHudGroup.HudAnchor.TopRight || Anchor == SmsHudGroup.HudAnchor.BottomRight;
+        bool bottom = Anchor == SmsHudGroup.HudAnchor.BottomLeft || Anchor == SmsHudGroup.HudAnchor.BottomRight;
+        float x = right ? _vp.X - (SmsHud.ScreenW - top.X) * _s : top.X * _s;
+        float y = bottom ? _vp.Y - (SmsHud.ScreenH - top.Y) * _s : top.Y * _s;
+        Position = new Vector2(x, y);
         Scale = new Vector2(_s, _s);
         Size = new Vector2(_full.X, _height);
         Modulate = new Color(1f, 1f, 1f, _alpha / 255f);

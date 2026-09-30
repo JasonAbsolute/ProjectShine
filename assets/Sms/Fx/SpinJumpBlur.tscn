@@ -1,0 +1,107 @@
+[gd_scene load_steps=14 format=3 uid="uid://bq5ntr8yh3wek"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsSpinJumpBlur.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/hamonring3_soft.png" id="2_soft"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/hamonring3_flat.png" id="3_flat"]
+
+[sub_resource type="Gradient" id="Gradient_rings"]
+offsets = PackedFloat32Array(0, 0.375, 0.625, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.624, 1, 1, 1, 0.624, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_rings"]
+gradient = SubResource("Gradient_rings")
+
+[sub_resource type="Gradient" id="Gradient_inner"]
+offsets = PackedFloat32Array(0, 0.167, 0.375, 0.625, 1)
+colors = PackedColorArray(1, 0.341, 0.282, 0, 0.247, 0.341, 1, 0.445, 0.247, 0.341, 1, 1, 0.247, 0.341, 1, 1, 0.247, 0.341, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_inner"]
+gradient = SubResource("Gradient_inner")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_rings"]
+lifetime_randomness = 0.0
+particle_flag_rotate_y = true
+emission_shape = 6
+emission_ring_axis = Vector3(0, 1, 0)
+emission_ring_height = 0.672
+emission_ring_radius = 0.0067
+emission_ring_inner_radius = 0.0
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+angular_velocity_min = -3240.0
+angular_velocity_max = -3240.0
+gravity = Vector3(0, 0, 0)
+color_ramp = SubResource("GradientTexture1D_rings")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_inner"]
+lifetime_randomness = 0.0
+particle_flag_rotate_y = true
+emission_shape = 6
+emission_ring_axis = Vector3(0, 1, 0)
+emission_ring_height = 1.343
+emission_ring_radius = 0.0067
+emission_ring_inner_radius = 0.0
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+angular_velocity_min = -3240.0
+angular_velocity_max = -3240.0
+gravity = Vector3(0, 0, 0)
+color_ramp = SubResource("GradientTexture1D_inner")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rings"]
+resource_name = "spin ring (ms_m_blur2: P_msm_hamonring3 lerp (183,231,255) -> white, alpha 159, mix)"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_soft")
+disable_receive_shadows = true
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_inner"]
+resource_name = "small spin ring (ms_m_blur2sp: P_msm_hamonring3 as alpha, flat prm (63,87,255), mix)"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("3_flat")
+disable_receive_shadows = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_rings"]
+material = SubResource("StandardMaterial3D_rings")
+size = Vector2(1.343, 1.343)
+orientation = 1
+
+[sub_resource type="QuadMesh" id="QuadMesh_inner"]
+material = SubResource("StandardMaterial3D_inner")
+size = Vector2(0.739, 0.739)
+orientation = 1
+
+[node name="SpinJumpBlur" type="Node3D" node_paths=PackedStringArray("Rings", "InnerRings")]
+script = ExtResource("1_script")
+Rings = NodePath("Rings")
+InnerRings = NodePath("InnerRings")
+BoneName = "center"
+OffsetUnits = Vector3(0, 15, 0)
+OffsetInOwnerFrame = true
+
+[node name="Rings" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 18
+lifetime = 0.2
+local_coords = true
+visibility_aabb = AABB(-2, -2, -2, 4, 4, 4)
+process_material = SubResource("ParticleProcessMaterial_rings")
+draw_pass_1 = SubResource("QuadMesh_rings")
+
+[node name="InnerRings" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 18
+lifetime = 0.2
+local_coords = true
+visibility_aabb = AABB(-2, -2, -2, 4, 4, 4)
+process_material = SubResource("ParticleProcessMaterial_inner")
+draw_pass_1 = SubResource("QuadMesh_inner")

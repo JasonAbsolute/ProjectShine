@@ -136,9 +136,13 @@ public partial class SmsNozzleItem : Node3D
         mario.SmsGetNozzle((int)Nozzle);
         if (GetEffect?.Instantiate() is Node3D fx)
         {
-            // emitAndBindToPosPtr(MS_ITEMGET1_A, &unk160): the burst around his middle; the level keeps it after this item is gone
+            // emitAndBindToPosPtr(MS_ITEMGET1_A, &unk160): bound to his centre joint, it rides along with him; the level keeps it after
+            // this item is gone
             GetParent().AddChild(fx);
-            fx.GlobalPosition = mario.GlobalPosition + Vector3.Up * 1.0f;
+            if (fx is SmsFollowEffect bound)
+                bound.Bind(mario);
+            else
+                fx.GlobalPosition = mario.GlobalPosition + Vector3.Up * 1.0f;
         }
         SmsNozzleBox.RespawnAll(this, (SmsNozzleBox.BoxNozzle)(int)Nozzle); // resetNozzleBoxesModel(kind); no box holds the spray
         QueueFree();

@@ -1,0 +1,29 @@
+[gd_scene load_steps=6 format=3 uid="uid://dm7kq2xf4tcbs"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsHipDropBlur.cs" id="1_script"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/stripe_blur.gdshader" id="2_shader"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/blur1.png" id="3_blur"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/blurmsk1.png" id="4_mask"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_stripe"]
+resource_name = "hip drop streak (ms_m_blur3: P_msm_blur1 lerp (39,63,255) -> (255,39,15), P_msm_blurmsk1 mask, scale 1.75 x 0.1, scroll 0.2/frame)"
+shader = ExtResource("2_shader")
+shader_parameter/blur_tex = ExtResource("3_blur")
+shader_parameter/mask_tex = ExtResource("4_mask")
+shader_parameter/tex_scale = Vector2(1.75, 0.1)
+shader_parameter/scroll_per_frame = 0.2
+shader_parameter/tint = Color(1, 1, 1, 1)
+
+[node name="HipDropBlur" type="Node3D" node_paths=PackedStringArray("Trail")]
+script = ExtResource("1_script")
+Trail = NodePath("Trail")
+WidthUnits = 100.0
+LifeFrames = 10
+BoneName = "center"
+OffsetUnits = Vector3(0, -20, 14.6484)
+OffsetInOwnerFrame = true
+
+[node name="Trail" type="MeshInstance3D" parent="."]
+top_level = true
+cast_shadow = 0
+material_override = SubResource("ShaderMaterial_stripe")

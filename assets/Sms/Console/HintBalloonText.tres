@@ -1,0 +1,13 @@
+[gd_resource type="LabelSettings" format=3 uid="uid://b3fjg7mrk2xtd"]
+
+[ext_resource type="FontFile" uid="uid://d2mk8l467fkuo" path="res://Font/Delfino.ttf" id="1_font"]
+
+[resource]
+resource_name = "the FLUDD balloon's text: the game's standard_font.bfn at 20 x 26 on a 28 px line, white over a black copy 2 right 3 down (he_1 over he_2, the shadow pane at alpha 0xA0); Delfino at 20 px is the stand-in"
+line_spacing = 4.0
+font = ExtResource("1_font")
+font_size = 20
+font_color = Color(1, 1, 1, 1)
+shadow_size = 0
+shadow_color = Color(0, 0, 0, 0.627451)
+shadow_offset = Vector2(2, 3)

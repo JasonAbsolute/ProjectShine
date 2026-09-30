@@ -618,6 +618,11 @@ public partial class Mario : CharacterBody3D
     public float rotation_angle = 0.0f;
 
     private SpinJumpEffects spinRingFx;
+    // Pass 28: the game's own Mario particles as scenes under Mario (assets/Sms/Fx), adopted in SmsSetupFx(); the legacy effects
+    // above stay only while a scene is missing
+    private SmsSpinJumpBlur _smsSpinBlur;      // SpinJumpBlur.tscn: ms_m_blur2 / blur2sp, the rings around the spin
+    private SmsHipDropBlur _smsHipBlur;        // HipDropBlur.tscn: ms_m_blur3, the streak above the falling hip drop
+    private SmsHipDropLanding _smsHipLanding;  // HipDropLanding.tscn: ms_hipdrop_a / b / c at the landing
 
     public double mouseSensitivity = 0.001;
     public double twistInput = 0.0;
@@ -1616,6 +1621,7 @@ public partial class Mario : CharacterBody3D
         setupHandSwaping();
 
         setupSpinJumpEffects();
+        SmsSetupFx();
         //ParticleEffects
 
         // --- LEDGE SENSORS (add this block in _Ready) ---
@@ -2431,10 +2437,15 @@ public partial class Mario : CharacterBody3D
                     GD.Print($"[SMS gp] landed: ma_hiped {_groundPoundLandingTimer:F2} s with no inputs, then ma_slped (stick or A cancels it)"
                         + (KeepGroundPoundJump ? " [KeepGroundPoundJump on: A launches the GP-jump]" : ""));
 
-                TriggerLandingDust();
+                if (_smsHipLanding != null)
+                    _smsHipLanding.Play(ComputeFeetPosition()); // MS_HIPDROP_C, B, A at mPosition (MarioJump.cpp 1184-1186)
+                else
+                {
+                    TriggerLandingDust();
 
-                // GP impact effects: the FX itself raycasts down to find the real floor.
-                groundPoundImpactFx?.Trigger(GlobalPosition);
+                    // GP impact effects: the FX itself raycasts down to find the real floor.
+                    groundPoundImpactFx?.Trigger(GlobalPosition);
+                }
             }
             goto EndFrame;
         }
@@ -4826,10 +4837,15 @@ public partial class Mario : CharacterBody3D
         SmsYCamRender(delta); // the Y camera: a cutscene hold that took the frame before the SMS block ends the mode
 
         // Ground-pound streak effect: on only during the actual fall (not the air-stall).
-        if (groundPoundFx != null)
         {
             bool fxOn = stateOfMario == MarioState.groundPoundFalling && !_groundPoundStalling;
-            groundPoundFx.SetActive(fxOn);
+            if (_smsHipBlur != null)
+            {
+                _smsHipBlur.Active = fxOn;     // emitBlurHipDrop every frame of the fall (MarioJump.cpp 1140)
+                groundPoundFx?.SetActive(false);
+            }
+            else
+                groundPoundFx?.SetActive(fxOn);
         }
 
         // Ground-pound jump 360° spin while rising. Sweep from 0 → 2π * spinTurns.
@@ -5348,6 +5364,26 @@ public partial class Mario : CharacterBody3D
         }
     }
 
+    /// <summary>Pass 28: the game's Mario particles as scenes under Mario (assets/Sms/Fx/*.tscn, the disc's .jpa data read into
+    /// GPUParticles3D) -- adopted from wherever he instanced them; the bound ones follow the 'center' joint like the game's
+    /// emitters. A missing scene keeps the legacy effect, with a warning naming the scene to instance.</summary>
+    private void SmsSetupFx()
+    {
+        _smsSpinBlur = SmsFluddModel.FindChild<SmsSpinJumpBlur>(this);
+        _smsHipBlur = SmsFluddModel.FindChild<SmsHipDropBlur>(this);
+        _smsHipLanding = SmsFluddModel.FindChild<SmsHipDropLanding>(this);
+        _smsSpinBlur?.Bind(this);
+        _smsHipBlur?.Bind(this);
+        if (_smsSpinBlur == null)
+            GD.PushWarning("[SMS fx] Player.tscn has no SpinJumpBlur under Mario: the legacy SpinJumpEffects rings stay -- instance res://assets/Sms/Fx/SpinJumpBlur.tscn there for the game's (ms_m_blur2 / blur2sp)");
+        if (_smsHipBlur == null)
+            GD.PushWarning("[SMS fx] Player.tscn has no HipDropBlur under Mario: the legacy GroundPoundEffects streaks stay -- instance res://assets/Sms/Fx/HipDropBlur.tscn there for the game's (ms_m_blur3)");
+        if (_smsHipLanding == null)
+            GD.PushWarning("[SMS fx] Player.tscn has no HipDropLanding under Mario: the legacy GroundPoundImpactFx / landing dust stay -- instance res://assets/Sms/Fx/HipDropLanding.tscn there for the game's (ms_hipdrop_a / b / c)");
+        if (SmsDebugPrint)
+            GD.Print($"[SMS fx] spin rings {(_smsSpinBlur != null ? "from the scene" : "legacy")}, hip drop streak {(_smsHipBlur != null ? "from the scene" : "legacy")}, hip drop landing {(_smsHipLanding != null ? "from the scene" : "legacy")}");
+    }
+
     private void setupSpinJumpEffects()
     {
         // Get the child node that has the SpinJumpEffects script
@@ -5451,7 +5487,12 @@ public partial class Mario : CharacterBody3D
 
     private void isSpining(bool isSpining)
     {
-        if (spinRingFx != null)
+        if (_smsSpinBlur != null)
+        {
+            _smsSpinBlur.Active = isSpining;   // emitBlurSpinJump every frame of the spin (MarioJump.cpp 1022): the rings run with it
+            spinRingFx?.SetSpinActive(false);  // the legacy rings stay off while the game's run
+        }
+        else if (spinRingFx != null)
             spinRingFx.SetSpinActive(isSpining);
 
         // keep your old particles if you still want them

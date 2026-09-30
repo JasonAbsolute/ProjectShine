@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://d2fd1bbs6u0ix"
-path="res://.godot/imported/sparkle_star.png-975cf798396d861908b1d0b40f5a4112.ctex"
+uid="uid://beubew1ofm0lt"
+path="res://.godot/imported/star4s.png-3a279f821811fcb38f4c96703a41eb8b.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/Sms/Fx/sparkle_star.png"
-dest_files=["res://.godot/imported/sparkle_star.png-975cf798396d861908b1d0b40f5a4112.ctex"]
+source_file="res://assets/Sms/Fx/tex/star4s.png"
+dest_files=["res://.godot/imported/star4s.png-3a279f821811fcb38f4c96703a41eb8b.ctex"]
 
 [params]
 

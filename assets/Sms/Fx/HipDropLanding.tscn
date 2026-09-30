@@ -1,0 +1,188 @@
+[gd_scene load_steps=26 format=3 uid="uid://ch8vwy3mp6qrd"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsHipDropLanding.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/radgrad.png" id="2_radgrad"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/kemuball3.png" id="3_smoke"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/shwave1.png" id="4_shwave"]
+
+[sub_resource type="Curve" id="Curve_sparks_across"]
+_data = [Vector2(0, 0.1), 0.0, 0.0, 0, 1, Vector2(0.2925, 1), 0.0, 0.0, 1, 1, Vector2(0.6675, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.1), 0.0, 0.0, 1, 0]
+point_count = 4
+
+[sub_resource type="Curve" id="Curve_sparks_along"]
+_data = [Vector2(0, 0.075), 0.0, 0.0, 0, 1, Vector2(0.2925, 1), 0.0, 0.0, 1, 1, Vector2(0.6675, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.05), 0.0, 0.0, 1, 0]
+point_count = 4
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_sparks"]
+curve_x = SubResource("Curve_sparks_across")
+curve_y = SubResource("Curve_sparks_along")
+curve_z = SubResource("Curve_sparks_across")
+
+[sub_resource type="Gradient" id="Gradient_sparks"]
+offsets = PackedFloat32Array(0, 0.125, 0.5, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0.45, 1, 1, 1, 0.45, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_sparks"]
+gradient = SubResource("Gradient_sparks")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_sparks"]
+lifetime_randomness = 0.25
+particle_flag_align_y = true
+emission_shape = 6
+emission_ring_axis = Vector3(0, 1, 0)
+emission_ring_height = 0.0
+emission_ring_radius = 0.067
+emission_ring_inner_radius = 0.067
+emission_shape_offset = Vector3(0, 0.067, 0)
+direction = Vector3(0, 1, 0)
+spread = 15.0
+initial_velocity_min = 3.8
+initial_velocity_max = 5.9
+gravity = Vector3(0, 0, 0)
+scale_curve = SubResource("CurveXYZTexture_sparks")
+color_ramp = SubResource("GradientTexture1D_sparks")
+velocity_pivot = Vector3(0, 0.067, 0)
+radial_velocity_min = 6.9
+radial_velocity_max = 10.8
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sparks"]
+resource_name = "hip drop streak (ms_hipdrop_a: P_msm_radgrad lerp (0,139,255) -> white, mix)"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_radgrad")
+disable_receive_shadows = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_sparks_a"]
+material = SubResource("StandardMaterial3D_sparks")
+size = Vector2(2.687, 0.448)
+
+[sub_resource type="QuadMesh" id="QuadMesh_sparks_b"]
+material = SubResource("StandardMaterial3D_sparks")
+size = Vector2(2.687, 0.448)
+orientation = 0
+
+[sub_resource type="Curve" id="Curve_smoke_scale"]
+_data = [Vector2(0, 0.085), 0.0, 0.0, 0, 1, Vector2(0.327, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.21), 0.0, 0.0, 1, 0]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_smoke_scale"]
+curve = SubResource("Curve_smoke_scale")
+
+[sub_resource type="Gradient" id="Gradient_smoke"]
+offsets = PackedFloat32Array(0, 0.0513, 0.4141, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_smoke"]
+gradient = SubResource("Gradient_smoke")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_smoke"]
+lifetime_randomness = 0.475
+emission_shape = 6
+emission_ring_axis = Vector3(0, 1, 0)
+emission_ring_height = 0.0
+emission_ring_radius = 0.242
+emission_ring_inner_radius = 0.242
+emission_shape_offset = Vector3(0, 1.075, 0)
+direction = Vector3(0, 1, 0)
+spread = 180.0
+initial_velocity_min = 0.6
+initial_velocity_max = 1.2
+gravity = Vector3(0, -0.3, 0)
+damping_min = 7.0
+damping_max = 9.0
+scale_min = 0.65
+scale_max = 1.35
+scale_curve = SubResource("CurveTexture_smoke_scale")
+color_ramp = SubResource("GradientTexture1D_smoke")
+velocity_pivot = Vector3(0, 1.075, 0)
+radial_velocity_min = 6.3
+radial_velocity_max = 8.1
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_smoke"]
+resource_name = "hip drop smoke (ms_hipdrop_b: P_msm_kemuball3 lerp (26,26,2) -> (255,255,242), mix)"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("3_smoke")
+billboard_mode = 3
+billboard_keep_scale = true
+disable_receive_shadows = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_smoke"]
+material = SubResource("StandardMaterial3D_smoke")
+size = Vector2(1.679, 1.679)
+
+[sub_resource type="Gradient" id="Gradient_shockwave"]
+offsets = PackedFloat32Array(0, 0.25, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_shockwave"]
+gradient = SubResource("Gradient_shockwave")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_shockwave"]
+emission_shape = 0
+emission_shape_offset = Vector3(0, 0.094, 0)
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+gravity = Vector3(0, 0, 0)
+color_ramp = SubResource("GradientTexture1D_shockwave")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shockwave"]
+resource_name = "hip drop shockwave (ms_hipdrop_c: P_msm_shwave1 lerp (255,144,0) -> white, mix)"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("4_shwave")
+disable_receive_shadows = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_shockwave"]
+material = SubResource("StandardMaterial3D_shockwave")
+size = Vector2(3.358, 3.358)
+orientation = 1
+
+[node name="HipDropLanding" type="Node3D" node_paths=PackedStringArray("Sparks", "Smoke", "Shockwave", "Sound")]
+script = ExtResource("1_script")
+Sparks = NodePath("Sparks")
+Smoke = NodePath("Smoke")
+Shockwave = NodePath("Shockwave")
+Sound = NodePath("Sound")
+
+[node name="Sparks" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 12
+lifetime = 0.667
+one_shot = true
+explosiveness = 1.0
+visibility_aabb = AABB(-8, -3, -8, 16, 8, 16)
+process_material = SubResource("ParticleProcessMaterial_sparks")
+draw_passes = 2
+draw_pass_1 = SubResource("QuadMesh_sparks_a")
+draw_pass_2 = SubResource("QuadMesh_sparks_b")
+
+[node name="Smoke" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 20
+lifetime = 2.5
+one_shot = true
+explosiveness = 1.0
+visibility_aabb = AABB(-8, -3, -8, 16, 8, 16)
+process_material = SubResource("ParticleProcessMaterial_smoke")
+draw_pass_1 = SubResource("QuadMesh_smoke")
+
+[node name="Shockwave" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.6
+one_shot = true
+explosiveness = 1.0
+visibility_aabb = AABB(-3, -1, -3, 6, 2, 6)
+process_material = SubResource("ParticleProcessMaterial_shockwave")
+draw_pass_1 = SubResource("QuadMesh_shockwave")
+
+[node name="Sound" type="AudioStreamPlayer3D" parent="."]

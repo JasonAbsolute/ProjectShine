@@ -2852,6 +2852,43 @@ you make it more smooth and while were here might as well fix the other hud elem
   higher-priority message replaces, a new one queues behind the close. (c) The get effect: emitGetEffect (MS_ITEMGET1_A + SE
   0x1989; the boxes' items also MSD_SE_SY_GET_NOZZLE) -- `assets/Sms/Fx/GetSparkle.tscn`, a one-shot star burst with a sound
   slot, the `GetEffect` export of every item scene, instanced at Mario's chest when an item is taken.
+- 28 (Jaysonn 22:16: the balloon "a bit high", the font "off", the sparkles "supposed to follow mario", "we can also just fix the
+  spin jump and ground pound effects. right?"). (a) THE BALLOON: it took the console's Size (0.7) and TopShift on its frame place,
+  so it sat at 17 % of the window's height where the game has it at 128 / 448 = 29 %; it now fits the 640 x 448 frame to the
+  window's height with its own `SizeScale` (1 = the game) and `ShiftFrame`, the console's knobs left to the counters. The text box
+  is he_2's: (415, 140) 164 x 166 in the window -- 18 in from the left, 12 from the top, 12 from the right, over the tail piece
+  (ContentInset (18, 12, 12, 38)); the font is his Delfino.ttf (the fan cut of the game's) at 20 px on the game's 28 px line
+  (`assets/Sms/Console/HintBalloonText.tres`: Delfino's height 24 + line_spacing 4; 'yet. It is only' fits the 164). (b) THE
+  PARTICLES FROM THE DISC: the .jpa files are JEFFjpa1 (tools/jpa_dump.py reads them after noclip's JPA.ts): BEM1 emitter, BSP1
+  shape (a quad is 50 x base size x scale game units, +-25 per side), ESP1 life curves, SSP1 children, FLD1 fields, KFA1 keys,
+  TEX1 textures (BTI; a mirror-wrapped texture at tiling 2 is a quarter picture -- the star). The TEV colour is baked into RGB
+  (lerp(env -> prm, I); flat prm), the intensity into the alpha (tools/jpa_bake.py -> assets/Sms/Fx/tex). Port units: 74.44 a
+  metre, 30 game frames a second. The get effect (ms_itemget1_a): emitAndBindToPosPtr(&unk160) -- unk160 is joint 1 'center''s
+  anim-matrix translation (MarioDraw.cpp 834), so the emitter rides on that joint (+15 units) and FollowEmitter moves the stars
+  with it: `SmsFollowEffect` (Bind(owner) -> the skeleton's 'center', process priority 100) is the base of every bound effect;
+  the item binds the sparkle to Mario instead of dropping it in place. The stars: 0.8 a frame for 120 frames, 35 +-12.5 % each,
+  from a cylinder r 15..60 h +-60 (directed emission points, the normals outward from the axis = 'vel axis' 2 units a frame), a
+  +0.2 unit/frame^2 lift field, a vortex of 7.5 (orbit velocity), 125 x 140-unit billboards of P_msm_star4s (additive), prm pink
+  -> yellow over the first 16 frames, alpha 0.4 -> 0.875 -> 0 from 62.5 %, one P_msm_stardust1 child every 20 frames (sub-emitter,
+  life 20, a 0.28 fall). (c) THE SPIN JUMP: emitBlurSpinJump each frame (MarioJump.cpp 1022) -> ms_m_blur2 + blur2sp bound to
+  getCenterAnmMtx() with the keep-alive flag (EmitterViewObj.cpp 352): flat Direction quads (the quad's up = the emitter's Z, its
+  width = the emitter's X, the plane the ground's) of 100 and 55 units on a vertical line +-25 / +-50 through the centre joint +15,
+  3 a frame living 6, P_msm_hamonring3 turning -0.3 turns a frame, alpha in by 37.5 % out from 62.5 %; the large ones lerp
+  (183,231,255) -> white at alpha 159, the small flat (63,87,255) after one frame of (255,87,72,183) --
+  `assets/Sms/Fx/SpinJumpBlur.tscn` (SmsSpinJumpBlur.Active = the spin). (d) THE HIP DROP: emitBlurHipDrop each frame of the fall
+  (MarioJump.cpp 1140) -> ms_m_blur3, a StripeCross: a point a frame at the centre joint (0, -20, 14.6), 10 frames of them threaded
+  into two crossed ribbons 100 units wide, P_msm_blur1 (lerp (39,63,255) -> (255,39,15), scaled 1.75 x 0.1, scrolling 0.2 a frame)
+  through P_msm_blurmsk1 -- `assets/Sms/Fx/HipDropBlur.tscn` (an ImmediateMesh ribbon under stripe_blur.gdshader). The landing
+  (MarioJump.cpp 1184): ms_hipdrop_a 12 DirectionCross streaks (P_msm_radgrad blue -> white) out at 22 and up at 12 units a frame
+  from a 5-unit circle, 200 x 33 units grown in by 29 % and out from 67 %, alpha 1 -> 0.45 by 12.5 %, gone from 50 %, 20 frames
+  +-25 %; ms_hipdrop_b 20 P_msm_kemuball3 puffs (lerp (26,26,2) -> (255,255,242)) from an 18-unit ring 80 up, out at 20 units a
+  frame under a 0.88/frame drag fading in over 23 % (a linear damping of 8 m/s^2 lands them at the game's 4.1 m), 125 units at full
+  size (0.085 -> 1 by 33 % -> 0.2, +-35 %), alpha in by 5 % out from 41 %, 75 frames +-47 %; ms_hipdrop_c one flat 250-unit
+  P_msm_shwave1 ring (lerp (255,144,0) -> white) 7 up for 18 frames, fading from 25 % -- `assets/Sms/Fx/HipDropLanding.tscn`
+  (SmsHipDropLanding.Play(feet)). Mario.cs adopts the three from under itself (SmsSetupFx) and turns the legacy SpinJumpEffects /
+  GroundPoundEffects / GroundPoundImpactFx + landing dust off where a scene is present; a missing scene keeps the legacy one with a
+  warning naming the scene to instance. Not carried: the stars' alpha sine flicker (ESP1 wave type 1), the blur3 stripe's indirect
+  warp (the mask multiplies instead), the vortex as a constant turn rate (the game's is a constant tangential speed).
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
@@ -2860,9 +2897,10 @@ yes, jnt_nozzle_R yes`. Self-test: `hover: first tick vy 4.6`, `rise after the 3
 Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
 
 ### Deliberate deviations from the game
-- The help balloon's text is a Godot font (the LabelSettings in HintBalloon.tscn), not the disc's standard_font.bfn, which is not
-  decoded; the sparkle is a GPUParticles3D stand-in for the JPA particle; the sounds are empty stream slots (no SE archive is
-  decoded). Each is a scene resource to swap.
+- The help balloon's text is Jaysonn's Delfino.ttf (`assets/Sms/Console/HintBalloonText.tres`), the fan cut of the game's
+  standard_font.bfn, which is not decoded; the Mario particles are GPUParticles3D built from the disc's .jpa numbers, with the
+  JPA fields approximated (the vortex as an orbit rate, the 0.88/frame drag as a linear damping, the alpha sine flicker and
+  the stripe's indirect warp dropped); the sounds are empty stream slots (no SE archive is decoded). Each is a scene resource.
 - The turbo charge keeps his speed (`SmsParams.Fludd.ChargeKeepsSpeed`, true): the game's `mDashSpeed` starts at 0 whatever he
   was doing, and `mIntendedMag = mDashSpeed` brakes a sprint to a crawl in 6 ticks (DecBrake 5) before the 0.53 s climb -- the
   wind-up. Jaysonn (20:48): "when charging up he should have to stand still for a frame or whatever is happening". Here the
