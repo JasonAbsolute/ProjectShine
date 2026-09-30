@@ -1,37 +1,17 @@
-[gd_scene load_steps=68 format=3 uid="uid://c6c6d7ilicljx"]
+[gd_scene load_steps=39 format=3 uid="uid://c6c6d7ilicljx"]
 
 [ext_resource type="Script" path="res://assets/Sms/Console/SmsHudLayer.cs" id="s_layer"]
 [ext_resource type="Script" path="res://assets/Sms/SmsStandardHud.cs" id="s_std"]
 [ext_resource type="Script" path="res://assets/Sms/SmsWaterHud.cs" id="s_water"]
 [ext_resource type="Script" path="res://assets/Sms/Console/SmsHudGroup.cs" id="s_group"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Console/HintBalloon.tscn" id="s_balloon"]
-[ext_resource type="Shader" path="res://assets/Sms/Console/J2DBlackWhite.gdshader" id="sh_bw"]
+[ext_resource type="PackedScene" uid="uid://b3sl0a4qttndu" path="res://Font/LifeMeter/LifeMeter.tscn" id="s_meter"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_back.png" id="t_coin_back"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_icon.png" id="t_coin_icon"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_x.png" id="t_coin_number_x"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_0.png" id="t_coin_number_0"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/bluecoin_icon.png" id="t_bluecoin_icon"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/shine_icon.png" id="t_shine_icon"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/water_back.png" id="t_water_back"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_0_2.png" id="t_life_icon_0_2"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_0_1.png" id="t_life_icon_0_1"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_1_2.png" id="t_life_icon_1_2"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_1_1.png" id="t_life_icon_1_1"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_2_2.png" id="t_life_icon_2_2"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_2_1.png" id="t_life_icon_2_1"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_3_2.png" id="t_life_icon_3_2"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_3_1.png" id="t_life_icon_3_1"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_4_2.png" id="t_life_icon_4_2"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_4_1.png" id="t_life_icon_4_1"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_5_2.png" id="t_life_icon_5_2"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_5_1.png" id="t_life_icon_5_1"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_6_2.png" id="t_life_icon_6_2"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_6_1.png" id="t_life_icon_6_1"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_7_2.png" id="t_life_icon_7_2"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_7_1.png" id="t_life_icon_7_1"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_8_2.png" id="t_life_icon_8_2"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_icon_8_1.png" id="t_life_icon_8_1"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/life_text.png" id="t_life_text"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/mario_icon.png" id="t_mario_icon"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/mario_text.png" id="t_mario_text"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/redcoin_icon.png" id="t_redcoin_icon"]
@@ -39,6 +19,7 @@
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_8.png" id="t_coin_number_8"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/time_text.png" id="t_time_text"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_colon.png" id="t_coin_number_colon"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/water_back.png" id="t_water_back"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/water_icon_0.png" id="t_water_icon_0"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/water_icon_2.png" id="t_water_icon_2"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/water_icon_3.png" id="t_water_icon_3"]
@@ -58,45 +39,6 @@
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_7.png" id="t_coin_number_7"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_9.png" id="t_coin_number_9"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_ray0"]
-resource_name = "ray 0: J2D black / white (the air meter recolours it)"
-shader = ExtResource("sh_bw")
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_ray1"]
-resource_name = "ray 1: J2D black / white (the air meter recolours it)"
-shader = ExtResource("sh_bw")
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_ray2"]
-resource_name = "ray 2: J2D black / white (the air meter recolours it)"
-shader = ExtResource("sh_bw")
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_ray3"]
-resource_name = "ray 3: J2D black / white (the air meter recolours it)"
-shader = ExtResource("sh_bw")
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_ray4"]
-resource_name = "ray 4: J2D black / white (the air meter recolours it)"
-shader = ExtResource("sh_bw")
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_ray5"]
-resource_name = "ray 5: J2D black / white (the air meter recolours it)"
-shader = ExtResource("sh_bw")
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_ray6"]
-resource_name = "ray 6: J2D black / white (the air meter recolours it)"
-shader = ExtResource("sh_bw")
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_ray7"]
-resource_name = "ray 7: J2D black / white (the air meter recolours it)"
-shader = ExtResource("sh_bw")
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_ray8"]
-resource_name = "ray 8: J2D black / white (the air meter recolours it)"
-shader = ExtResource("sh_bw")
-
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_lifetext"]
-resource_name = "LIFE: J2D black / white (the air meter recolours it)"
-shader = ExtResource("sh_bw")
 
 [node name="SmsHud" type="CanvasLayer" node_paths=PackedStringArray("Standard", "Water", "Balloon")]
 layer = 10
@@ -366,224 +308,8 @@ mouse_filter = 2
 script = ExtResource("s_group")
 Anchor = 2
 
-[node name="Disc" type="TextureRect" parent="StandardHud/LifeMeter"]
-modulate = Color(1, 0.298039, 0, 0.615148)
-layout_mode = 0
-offset_left = 0
-offset_top = 0
-offset_right = 74
-offset_bottom = 71
-mouse_filter = 2
-texture = ExtResource("t_water_back")
-expand_mode = 1
-
-[node name="Sun" type="Control" parent="StandardHud/LifeMeter"]
-layout_mode = 0
-offset_left = 0
-offset_top = 0
-offset_right = 0
-offset_bottom = 0
-mouse_filter = 2
-
-[node name="Socket0" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
-layout_mode = 0
-offset_left = 9
-offset_top = 11
-offset_right = 63
-offset_bottom = 69
-mouse_filter = 2
-texture = ExtResource("t_life_icon_0_2")
-expand_mode = 1
-
-[node name="Ray0" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
-material = SubResource("ShaderMaterial_ray0")
-layout_mode = 0
-offset_left = 9
-offset_top = 11
-offset_right = 63
-offset_bottom = 69
-mouse_filter = 2
-texture = ExtResource("t_life_icon_0_1")
-expand_mode = 1
-
-[node name="Socket1" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
-layout_mode = 0
-offset_left = 53
-offset_top = 0
-offset_right = 79
-offset_bottom = 28
-mouse_filter = 2
-texture = ExtResource("t_life_icon_1_2")
-expand_mode = 1
-
-[node name="Ray1" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
-material = SubResource("ShaderMaterial_ray1")
-layout_mode = 0
-offset_left = 53
-offset_top = 0
-offset_right = 79
-offset_bottom = 28
-mouse_filter = 2
-texture = ExtResource("t_life_icon_1_1")
-expand_mode = 1
-
-[node name="Socket2" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
-layout_mode = 0
-offset_left = 59
-offset_top = 23
-offset_right = 85
-offset_bottom = 47
-mouse_filter = 2
-texture = ExtResource("t_life_icon_2_2")
-expand_mode = 1
-
-[node name="Ray2" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
-material = SubResource("ShaderMaterial_ray2")
-layout_mode = 0
-offset_left = 59
-offset_top = 23
-offset_right = 85
-offset_bottom = 47
-mouse_filter = 2
-texture = ExtResource("t_life_icon_2_1")
-expand_mode = 1
-
-[node name="Socket3" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
-layout_mode = 0
-offset_left = 57
-offset_top = 48
-offset_right = 83
-offset_bottom = 76
-mouse_filter = 2
-texture = ExtResource("t_life_icon_3_2")
-expand_mode = 1
-
-[node name="Ray3" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
-material = SubResource("ShaderMaterial_ray3")
-layout_mode = 0
-offset_left = 57
-offset_top = 48
-offset_right = 83
-offset_bottom = 76
-mouse_filter = 2
-texture = ExtResource("t_life_icon_3_1")
-expand_mode = 1
-
-[node name="Socket4" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
-layout_mode = 0
-offset_left = 38
-offset_top = 61
-offset_right = 64
-offset_bottom = 89
-mouse_filter = 2
-texture = ExtResource("t_life_icon_4_2")
-expand_mode = 1
-
-[node name="Ray4" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
-material = SubResource("ShaderMaterial_ray4")
-layout_mode = 0
-offset_left = 38
-offset_top = 61
-offset_right = 64
-offset_bottom = 89
-mouse_filter = 2
-texture = ExtResource("t_life_icon_4_1")
-expand_mode = 1
-
-[node name="Socket5" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
-layout_mode = 0
-offset_left = 13
-offset_top = 64
-offset_right = 37
-offset_bottom = 90
-mouse_filter = 2
-texture = ExtResource("t_life_icon_5_2")
-expand_mode = 1
-
-[node name="Ray5" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
-material = SubResource("ShaderMaterial_ray5")
-layout_mode = 0
-offset_left = 13
-offset_top = 64
-offset_right = 37
-offset_bottom = 90
-mouse_filter = 2
-texture = ExtResource("t_life_icon_5_1")
-expand_mode = 1
-
-[node name="Socket6" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
-layout_mode = 0
-offset_left = -7
-offset_top = 49
-offset_right = 21
-offset_bottom = 77
-mouse_filter = 2
-texture = ExtResource("t_life_icon_6_2")
-expand_mode = 1
-
-[node name="Ray6" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
-material = SubResource("ShaderMaterial_ray6")
-layout_mode = 0
-offset_left = -7
-offset_top = 49
-offset_right = 21
-offset_bottom = 77
-mouse_filter = 2
-texture = ExtResource("t_life_icon_6_1")
-expand_mode = 1
-
-[node name="Socket7" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
-layout_mode = 0
-offset_left = -12
-offset_top = 27
-offset_right = 12
-offset_bottom = 51
-mouse_filter = 2
-texture = ExtResource("t_life_icon_7_2")
-expand_mode = 1
-
-[node name="Ray7" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
-material = SubResource("ShaderMaterial_ray7")
-layout_mode = 0
-offset_left = -12
-offset_top = 27
-offset_right = 12
-offset_bottom = 51
-mouse_filter = 2
-texture = ExtResource("t_life_icon_7_1")
-expand_mode = 1
-
-[node name="Socket8" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
-layout_mode = 0
-offset_left = -8
-offset_top = 2
-offset_right = 20
-offset_bottom = 30
-mouse_filter = 2
-texture = ExtResource("t_life_icon_8_2")
-expand_mode = 1
-
-[node name="Ray8" type="TextureRect" parent="StandardHud/LifeMeter/Sun"]
-material = SubResource("ShaderMaterial_ray8")
-layout_mode = 0
-offset_left = -8
-offset_top = 2
-offset_right = 20
-offset_bottom = 30
-mouse_filter = 2
-texture = ExtResource("t_life_icon_8_1")
-expand_mode = 1
-
-[node name="Text" type="TextureRect" parent="StandardHud/LifeMeter"]
-material = SubResource("ShaderMaterial_lifetext")
-layout_mode = 0
-offset_left = 7
-offset_top = -18
-offset_right = 67
-offset_bottom = 12
-mouse_filter = 2
-texture = ExtResource("t_life_text")
-expand_mode = 1
+[node name="Meter" parent="StandardHud/LifeMeter" instance=ExtResource("s_meter")]
+position = Vector2(-20, -16)
 
 [node name="Lives" type="Control" parent="StandardHud"]
 layout_mode = 0
@@ -1118,5 +844,6 @@ offset_bottom = 12
 mouse_filter = 2
 texture = ExtResource("t_water_button_x")
 expand_mode = 1
+
 
 [node name="HintBalloon" parent="." instance=ExtResource("s_balloon")]

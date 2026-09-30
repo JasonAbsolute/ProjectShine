@@ -47,6 +47,8 @@ public partial class SmsWaterHud : Control
     private Rect2 BackRect, TankRect, FaceLRect, FaceRRect, SurfaceRect, TextRect;
     private readonly Rect2[] IconRect = new Rect2[4];
     private Vector2 _home;
+    /// <summary>Where the scene puts the gauge on the game's frame (w_0: (493, 355)); the help balloon lays itself out over it.</summary>
+    public Vector2 Home => _home;
     private static readonly Color FaceLColor = new Color(0x64 / 255f, 0xDC / 255f, 1f);
     private static readonly Color FaceRColor = new Color(0f, 0xB4 / 255f, 0xF0 / 255f);
     private static readonly Color SurfaceColor = new Color(0xBE / 255f, 0xF0 / 255f, 1f);

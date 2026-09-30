@@ -6432,6 +6432,11 @@ public partial class Mario : CharacterBody3D
     /// whichever hand was actually selected.</summary>
     private void UpdateHandPose()
     {
+        if (UseSmsPhysics)
+        {
+            ApplyHandPose(SmsHandPose());   // the game's hand for the clip he is showing (gMarioAnimeData's hand column)
+            return;
+        }
         bool clenched =
             stateOfMario == MarioState.sprinting
             || stateOfMario == MarioState.singleJump
@@ -6456,6 +6461,8 @@ public partial class Mario : CharacterBody3D
         if (_handPose == pose)
             return;
         _handPose = pose;
+        if (UseSmsPhysics && SmsDebugPrint)
+            GD.Print($"[SMS hand] {pose} for {SmsCurrentClip()}{(heldBody != null ? " (carrying)" : "")}");
 
         bool openVisible = pose == HandPose.Open;
         Color openAlbedoR = openVisible ? _rightHandOpenAlbedo : new Color(0, 0, 0, 0);
@@ -13968,6 +13975,57 @@ public partial class Mario : CharacterBody3D
             _fluddDashAnimOn = false;
             SetMarioState(stateOfMario); // ma_run2 (or whatever the state plays)
         }
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------- the hands
+    /// <summary>gMarioAnimeData's hand column (MarioDraw.cpp 39..375, unk5) for every clip that is not the body's own hands. TMario::setAnimation
+    /// calls changeHand(hand) on a clip change (MarioDraw.cpp 1068) and changeHand (907) flags three hand meshes; the flag it sets is J3D's
+    /// SKIP bit (J3DJoint::entryIn draws a shape whose bit is CLEAR -- the decomp's J3DShpFlag_Visible name is inverted), so hand 0 shows the
+    /// body's shapes 5 / 6 (M_hand1_L / R: the OPEN hands -- wait, walk, the soft step, the landings, the double jump, the wall jump), hand 1
+    /// ma_hnd2l / r (the GRIP: hanging, ladders, fences, holding and throwing, the squat, the turn, jmped, the slow RUN1), hand 2 ma_hnd3l / r
+    /// (the FIST: the hip drop's hipsr / hipat / hiped, the single and triple jumps, RUN2 -- doRunningAnimation sets RUN2 for every run above
+    /// the soft step with RUN1 only blended in, so a run's hands are fists -- the rolls, the kicks, the steps, the turbo dash); ma_hnd4r is
+    /// never shown. His scene's RightHandClosed / LeftHandClosed are ma_hnd3 (Closed = 2), RightHandSlightyOpen / LeftHandSlightyOpen ma_hnd2
+    /// (SlightlyOpen = 1); the body mesh's hand surfaces are hand 0 (Open). Rows the game gives two hands (land 0x56 / 0xD6: 0 / 1;
+    /// jump_rolling 0xC1 / 0xF7: 2 / 0; ride_shell: 0 / 1) take the first. His own states (ma_pivot, ma_sit, ma_sleep_*, ma_tree_stand,
+    /// ma_carry_p) are not the game's: hand 0 unless he carries.</summary>
+    private static readonly System.Collections.Generic.Dictionary<string, int> SmsHandTable = new()
+    {
+        ["ma_hgup"] = 1, ["ma_tree_climb"] = 1, ["ma_tree_catch"] = 1, ["ma_tree_wait"] = 1, ["ma_hgdwn"] = 1, ["ma_hang"] = 1,
+        ["ma_hgjmp"] = 1, ["ma_ladder_hang_catch"] = 1, ["ma_run1"] = 1, ["ma_jmped"] = 1, ["ma_ladder_hang_move_l"] = 1, ["ma_ladder_hang_move_r"] = 1,
+        ["ma_throw"] = 1, ["ma_raise"] = 1, ["ma_put"] = 1, ["ma_slped"] = 1, ["ma_slpla"] = 1, ["ma_slip"] = 1,
+        ["ma_sqend"] = 1, ["ma_sqsta"] = 1, ["ma_sqwat"] = 1, ["ma_turn"] = 1, ["ma_trned"] = 1, ["ma_ladder_hang_wait_l"] = 1,
+        ["ma_ladder_hang_wait_r"] = 1, ["ma_hmov_l"] = 1, ["ma_hmov_r"] = 1, ["ma_rope_hmovr"] = 1, ["ma_rope_hmovl"] = 1, ["ma_door_kick"] = 1,
+        ["ma_hold"] = 1, ["ma_hold_wait"] = 1, ["ma_hold_back"] = 1, ["ma_hold_move_r"] = 1, ["ma_hold_move_l"] = 1, ["ma_hold_drag"] = 1,
+        ["ma_hold_to_hang"] = 1, ["ma_hold_hang"] = 1, ["ma_hang_to_hold"] = 1, ["ma_hold_return"] = 1, ["ma_fence_catch"] = 1, ["ma_fence_jcatch"] = 1,
+        ["ma_fence_wait"] = 1, ["ma_fence_move_l"] = 1, ["ma_fence_move_r"] = 1, ["ma_fence_move_up"] = 1, ["ma_fence_move_down"] = 1, ["ma_fence_punch"] = 1,
+        ["ma_ladder_hang_kick"] = 1, ["ma_ladder_roll_up"] = 1, ["ma_ladder_roll_down"] = 1,
+        ["ma_hiped"] = 2, ["ma_hipsr"] = 2, ["ma_hipat"] = 2, ["ma_jump"] = 2, ["ma_roll"] = 2, ["ma_run2"] = 2,
+        ["ma_tjmp2"] = 2, ["ma_tjmp1"] = 2, ["ma_jump_rolling"] = 2, ["ma_step1"] = 2, ["ma_step2"] = 2, ["ma_step3"] = 2,
+        ["ma_jkick"] = 2, ["ma_dgrun"] = 2, ["ma_turbo_dash"] = 2, ["ma_giant_rolling"] = 2, ["ma_monteman_wait"] = 2, ["ma_demo_gate_out_appear_get"] = 2
+    };
+
+    private static readonly System.Text.RegularExpressions.Regex SmsClipSuffix = new(@" \d+$");
+
+    /// <summary>The clip he is showing: BaseSM's state while the tree runs (his duplicate states -- "ma_tjmp1 2" -- folded onto their clip),
+    /// the AnimationPlayer's clip while the tree is off.</summary>
+    private string SmsCurrentClip()
+    {
+        string clip = animTree != null && animTree.Active && _sm != null ? (string)_sm.GetCurrentNode() : animPlayer?.CurrentAnimation ?? "";
+        return SmsClipSuffix.Replace(clip, "");
+    }
+
+    /// <summary>changeHand for the clip of the moment: the table's hand; a carried object the grip (hold_*: the carry blend rides the base
+    /// clip here); the run blend RUN2's fist (doRunningAnimation: setAnimation(ANIM_RUN2, rate), RUN1 is the blend partner).</summary>
+    private HandPose SmsHandPose()
+    {
+        string clip = SmsCurrentClip();
+        int hand;
+        if (heldBody != null)
+            hand = 1;
+        else if (!SmsHandTable.TryGetValue(clip, out hand))
+            hand = clip == "ma_runblend" ? 2 : 0;
+        return hand == 2 ? HandPose.Closed : hand == 1 ? HandPose.SlightlyOpen : HandPose.Open;
     }
 
     /// <summary>ma_hipsr (the hip drop's start) is in the library but not in BaseSM: added as a state (Travel with no path = a teleport),

@@ -19,8 +19,6 @@ using Godot;
 /// </summary>
 public partial class SmsHintBalloon : Control
 {
-    /// <summary>The window edge this balloon keeps its frame distance from (the game's console: the right).</summary>
-    [Export] public SmsHudGroup.HudAnchor Anchor = SmsHudGroup.HudAnchor.TopRight;
     [Export] public NinePatchRect Frame;
     [Export] public Label Text;
     /// <summary>The message's FLUDD voice (scNozzleSoundList by the message's sound index); an empty stream is silent.</summary>
@@ -38,11 +36,11 @@ public partial class SmsHintBalloon : Control
     /// 194 x 216 window at (397, 128): 18 in from the left, 12 from the top, 12 from the right, 38 from the bottom. The tail corner
     /// piece is 68 x 40, so the text runs over the frame's right column, as the game's does.</summary>
     [Export] public Vector4 ContentInset = new Vector4(18f, 12f, 12f, 38f);
-    /// <summary>The balloon's own scale: 1 = the game's frame (448 lines on the window's height), as the game draws it; the console's
-    /// Size does not shrink it -- its text has to stay readable. Jaysonn's knob.</summary>
+    /// <summary>The balloon's size on top of the console's scale (the gauge's): 1 = the game's proportion to the water gauge (the 194 x 216
+    /// window is 2.2 gauge discs wide). Jaysonn's knob; the text scales with the window.</summary>
     [Export] public float SizeScale = 1f;
-    /// <summary>Moves the window on the game's frame, frame pixels (the game: (397, 128), its right edge 49 in from the frame's).
-    /// Jaysonn's knob; the console's shifts do not apply here.</summary>
+    /// <summary>Moves the window relative to the gauge, frame pixels (the game: its bottom-right corner 98 right of and 11 above the
+    /// gauge's top-left; the tail piece over the tank). Jaysonn's knob.</summary>
     [Export] public Vector2 ShiftFrame = Vector2.Zero;
 
     private enum Phase { Hidden, Appear, Typing, Hold, Disappear }
@@ -177,20 +175,22 @@ public partial class SmsHintBalloon : Control
         Layout();
     }
 
-    /// <summary>The window onto the screen: the game's 640 x 448 frame fitted to the window's height (times SizeScale), the balloon's frame
-    /// place kept from the anchored edges (the right and the top: 49 px in, 128 px down on the frame) plus ShiftFrame -- the
-    /// console's Size and shifts are for the counters, not for a text window; its bottom edge fixed while it grows and shrinks; the
-    /// frame and the text box follow.</summary>
+    /// <summary>The window onto the screen. In standard_1.blo the he_w window (397, 128) 194 x 216 ends at y 344, eleven frame pixels above
+    /// the water gauge w_0 (493, 355), its 68 x 40 tail piece (x 523..591) over the tank (x 515..559): the console draws the FLUDD's
+    /// balloon above the FLUDD's tank. So the balloon rides the gauge: the console's scale (SmsHud.Size on the frame, the gauge's own),
+    /// times SizeScale; its place the game's offset from the gauge's frame home, through the gauge's anchor and the console's shifts --
+    /// wherever Jaysonn puts the gauge, the balloon sits over it (pass 28's window-edge anchoring at the frame's full scale left it
+    /// mid-screen, 1.4 times the gauge's size). Its bottom edge is fixed while it grows and shrinks; the frame and the text box follow.</summary>
     private void Layout()
     {
         _vp = GetViewportRect().Size;
-        _s = _vp.Y / SmsHud.ScreenH * SizeScale;
-        Vector2 top = new Vector2(_home.X + ShiftFrame.X, _home.Y + ShiftFrame.Y + (_full.Y - _height));
-        bool right = Anchor == SmsHudGroup.HudAnchor.TopRight || Anchor == SmsHudGroup.HudAnchor.BottomRight;
-        bool bottom = Anchor == SmsHudGroup.HudAnchor.BottomLeft || Anchor == SmsHudGroup.HudAnchor.BottomRight;
-        float x = right ? _vp.X - (SmsHud.ScreenW - top.X) * _s : top.X * _s;
-        float y = bottom ? _vp.Y - (SmsHud.ScreenH - top.Y) * _s : top.Y * _s;
-        Position = new Vector2(x, y);
+        _s = SmsHud.Scale(_vp) * SizeScale;
+        SmsWaterHud water = (GetParent() as SmsHudLayer)?.Water;
+        Vector2 gaugeHome = water != null && water.Home != Vector2.Zero ? water.Home : new Vector2(493f, 355f);
+        SmsHudGroup.HudAnchor gaugeAnchor = water != null ? water.Anchor : SmsHudGroup.HudAnchor.BottomRight;
+        Vector2 gauge = SmsHud.Anchored(gaugeHome, gaugeAnchor, _s, _vp);   // the gauge's top-left on the window
+        Vector2 top = new Vector2(_home.X - gaugeHome.X + ShiftFrame.X, _home.Y - gaugeHome.Y + ShiftFrame.Y + (_full.Y - _height));
+        Position = gauge + top * _s;
         Scale = new Vector2(_s, _s);
         Size = new Vector2(_full.X, _height);
         Modulate = new Color(1f, 1f, 1f, _alpha / 255f);

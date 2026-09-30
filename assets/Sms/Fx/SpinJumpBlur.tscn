@@ -99,6 +99,7 @@ orientation = 1
 script = ExtResource("1_script")
 Rings = NodePath("Rings")
 InnerRings = NodePath("InnerRings")
+SizeScale = 1.5
 BoneName = "center"
 OffsetUnits = Vector3(0, 15, 0)
 OffsetInOwnerFrame = true

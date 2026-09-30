@@ -3143,3 +3143,51 @@ Idle, carry 0). One thing the port did differently from the game: ma_hipsr playe
 60-tick hover, so a held R (the spray nozzle pumps through hipsr and hipat: gMarioAnimeData 0x3C / 0x3D upper 0x44) showed no pump arms
 during the hover and snapped them in at the fall. ma_hipsr is a BaseSM state now (added at start-up like ma_turbo_dash) and the start
 travels to it with the tree on; the clip holds its last frame for the rest of the hover, as the game's setAnimation(ANIM_HIPSR) does.
+
+### Pass 30 -- the landing streaks along their flight, the spin rings bigger and coloured, his life meter in the console, the hands by the game's table, the balloon over the tank
+
+Jaysonn (2026-09-30): "the ground pound streak effects are going to the side seems like they need to be rotated. other wise the spin jump
+needs to be slightly bigger (like they are too close to mario) and still are only showing white: should be red, blue and white. also i
+notcied the health was changed my legacy one looks way better then the one you made so either do another pass on it or combine mine with
+the new hud. arms are fixed. but should be using the fist closed model. otherwise i updated hud ref for the text box and it is not right
+still. the text is perfect but the size is a bit big for my liking and not above fludds tank ... also the sparkle is like perfect".
+
+THE STREAKS (ms_hipdrop_a): Godot's directed-point emission (particle_process_material.cpp, RESTART_VELOCITY) multiplies the velocity
+built from `direction` + spread by mat3(tangent, bitangent, normal): the point's normal is that basis' +Z. Pass 29 set `direction` (0, 1, 0)
+-- the bitangent -- so every streak flew perpendicular to its normal, sideways round the ring instead of out and up along it; gen_fx.py
+now emits (0, 0, 1). Nothing else about them changed (96 directed points at 28.6 deg, 15.7..24.7 m/s, align_y, the crossed 33 x 200 quads).
+
+THE SPIN RINGS (ms_m_blur2 / blur2sp): the port's sizes were the disc's -- 100 and 55 units -- and P_msm_hamonring3's ring fills 90 % of its
+quad (radii 45 and 25 units). The small RED / BLUE rings at 25 units (0.34 m) sat inside his torso, hidden by the depth test: that is why he
+saw white only. DEVIATION: `SizeScale` on the SpinJumpBlur node (SmsSpinJumpBlur scales the two ring quads at ready; the line the rings
+are born on stays the game's +-25 / +-50 units), 1.5 in the scene -- the white rings 150 units (2 m, about his height), the coloured 82
+units (1.1 m), clear of the body; 1 = the disc.
+
+HIS LIFE METER: the console's LifeMeter group now carries his Font/LifeMeter/LifeMeter.tscn (the Meter node in SmsHud.tscn, at (-20, -16)
+so its right edge lands where his legacy HUD kept it) in place of the disc's panes: SmsStandardHud moves his PaintBlobBG as l_ba, LifeText
+as l_tx and his Gray / Orange layers as lm_0 (the appear at a hit from (-150, +180), the curve to the corner, the insert pops at 0 / 14 /
+24, the leave, the demo hide -- the game's states and timing), calls his SetHealth as the count steps one a frame and his SetAirTint (now
+public) when the meter switches to air. DEVIATION: the game's 3 / 5 px inset heartbeat (updateLifeMeterBlink) is replaced by his meter's
+own scale pulse (LifeMeter.ScaleMultiplier / ToggleInterval); the dim below 4 (updateLifeMeterColors) is not applied to his art. Gone:
+assets/Sms/hud/life_icon_*.png, life_text.png, Console/J2DBlackWhite.gdshader (nothing else drew them). His Player.tscn's own LifeMeter
+node is the legacy one (hidden under SMS physics): he deletes it.
+
+THE HANDS: TMario::setAnimation calls changeHand(gMarioAnimeData[anm].unk5) on every clip change (MarioDraw.cpp 1068); changeHand (907)
+sets / clears the shape flag J3D's J3DJoint::entryIn reads as SKIP (a shape whose bit is clear is drawn -- the decomp's J3DShpFlag_Visible
+is named backwards), so: hand 0 = the body's shapes 5 / 6 (M_hand1_L / R, the open hands), hand 1 = ma_hnd2 (the grip), hand 2 = ma_hnd3
+(the fist), ma_hnd4r never drawn. The table (198 rows, 191 clips): 0 for wait / walk / sstep / land / laend / brake / 2jmp1 / 2jmp2 /
+wjmp / wsld and the demos; 1 for hgup / hang / hgdwn / hgjmp, the ladders, fences and ropes, hold_* / throw / raise / put, sqsta / sqwat /
+sqend, turn / trned, slip / slped / slpla, jmped, run1; 2 for hipsr / hipat / hiped, jump, tjmp1 / tjmp2, jump_rolling, roll, run2,
+step1..3, jkick, dgrun, turbo_dash. doRunningAnimation (MarioRun.cpp 131) sets ANIM_RUN2 for every run above the soft step (RUN1 is the
+motion-blend partner, unk414.z), so a run's hands are fists. Mario.cs: SmsHandTable (the column, as `ma_<clip>`), SmsCurrentClip (BaseSM's
+state, "ma_tjmp1 2" folded onto ma_tjmp1; the AnimationPlayer's clip with the tree off), SmsHandPose (a carried object: the grip, as the
+hold_* clips; ma_runblend: RUN2's fist); UpdateHandPose uses it under UseSmsPhysics. The port's legacy list (fists for the sprint and
+every jump) had the double jump and the wall jump clenched (the game: open) and the hip drop open (the game: fists); the grip hand
+(RightHandSlightyOpen / LeftHandSlightyOpen = ma_hnd2) was never shown.
+
+THE BALLOON: standard_1.blo's he_w window (397, 128) 194 x 216 ends at y 344, eleven frame pixels above the water gauge w_0 (493, 355),
+its 68 x 40 tail piece (x 523..591) over the tank (x 515..559): the game draws the FLUDD's balloon above the FLUDD's tank. Pass 28 laid it
+out from the window's edges at the frame's full scale (SizeScale on vp.Y / 448) while the gauge sits at the console's 0.7 with RightShift
+30 / BottomShift -10: 1.4 times the gauge's size, mid-screen. SmsHintBalloon now takes the console's scale (x its own SizeScale, 1) and
+the game's offset from the gauge's frame home (SmsWaterHud.Home) through the gauge's anchor -- wherever the gauge is, the balloon sits over
+its tank; the `Anchor` export is gone. The text scales with the window (Delfino 20 px on the frame, as the game's 20 x 26 font).

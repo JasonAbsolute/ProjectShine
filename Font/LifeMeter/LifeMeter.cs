@@ -264,7 +264,8 @@ public partial class LifeMeter : Node2D
     private Color _paintBlobModulate;
     private bool _paintBlobModulateSaved;
 
-    private void SetAirTint(bool on, int units)
+    /// <summary>The console (SmsStandardHud) calls this for the meter it carries: the game's under-water recolour, on or off.</summary>
+    public void SetAirTint(bool on, int units)
     {
         if (on && _airMaterial == null)
         {

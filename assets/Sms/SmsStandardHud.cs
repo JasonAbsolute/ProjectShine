@@ -25,6 +25,10 @@ using System;
 ///       side for half of a 200-frame cycle, 160 / 120 / 70 frames and 5 px at 3 / 2 / 1. Under water (the meter shows air, Mario's
 ///       240-tick rule) the disc is the water gauge's blue (0000FF, alpha 78) and the lit pieces go through black 003CFF00 / white
 ///       00FFFFFF (the sun and text 0010FFFF below 4).
+///       THE ART IS JAYSONN'S (pass 30: "my legacy one looks way better then the one you made so either do another pass on it or combine
+///       mine with the new hud"): the group carries his Font/LifeMeter/LifeMeter.tscn (the Meter) in place of the disc's panes -- its
+///       PaintBlobBG is the disc, LifeText the text, its Gray and Orange layers the sun; his script keeps the segments (SetHealth), the
+///       air recolour (SetAirTint) and its own scale pulse (the beat); the console keeps the game's states, motions and timing above.
 ///   r_0 (13, 419) the red coins: coin_back tinted FF28FF, redcoin_icon at (19, -16), x at (41, -18), the count at (70, -38), balloon_slash
 ///       50 x 60 at (87, -41), the 8 (coin_number_8 28 x 28) at (113, -16); it rises from below when the first red coin is taken
 ///       (startAppearRedCoin 2553) and drops off the bottom for a camera demo (startDownLeftBot 2366); 73 px higher while the timer is out.
@@ -51,9 +55,8 @@ using System;
 /// The screen is the scene assets/Sms/Console/SmsHud.tscn: this Control with a SmsHudGroup per group (Coins, BlueCoins, Shines, LifeMeter,
 /// Lives, RedCoins, Timer -- the *Group exports below), every pane a TextureRect child laid out as standard_1.blo has it -- a counter's
 /// Strip, Icon, X and Digit0..2 (the lives Digit0..1 and a Text), the red coins' Digit, Slash and Eight, the timer's Text, Strip,
-/// Long0..5 with LongColon0..1 and Short0..3 with ShortColon, the life meter's Disc, Text and a Sun carrying Socket0..8 and Ray0..8
-/// (the rays and the text wear J2DBlackWhite.gdshader for the air recolour). The code reads the layout from the nodes and moves them;
-/// the ten digit pictures are the Digits export.
+/// Long0..5 with LongColon0..1 and Short0..3 with ShortColon, the life meter's Meter (his LifeMeter.tscn: PaintBlobBG, LifeText,
+/// GrayLayer, OrangeLayer). The code reads the layout from the nodes and moves them; the ten digit pictures are the Digits export.
 /// </summary>
 public partial class SmsStandardHud : Control
 {
@@ -86,16 +89,10 @@ public partial class SmsStandardHud : Control
     /// <summary>coin_number_0 .. 9: what the counters' digit panes show.</summary>
     [Export] public Texture2D[] Digits;
     private Texture2D[] _digit;
-    private readonly ShaderMaterial[] _rayMat = new ShaderMaterial[9];
-    private ShaderMaterial _lifeTextMat;
 
     private static readonly Color StripGreen = new Color(0f, 1f, 0f, 180f / 255f);
     private static readonly Color StripMagenta = new Color(1f, 0x28 / 255f, 1f, 180f / 255f);
     private static readonly Color TimerLow = new Color(1f, 0x82 / 255f, 1f);        // t_n7's white: the short countdown under 10 s
-    private static readonly Color DiscHealth = new Color(1f, 0x4C / 255f, 0f, (0xC8 / 255f) * (200f / 255f));
-    private static readonly Color DiscAir = new Color(0f, 0f, 1f, (0x78 / 255f) * (200f / 255f));
-    private static readonly Color Dim = new Color(0x7F / 255f, 0x7F / 255f, 0x7F / 255f);
-    private static readonly Color AirBlack = new Color(0f, 0x3C / 255f, 1f, 0f), AirWhite = new Color(0f, 1f, 1f, 1f), AirWhiteLow = new Color(0f, 0x10 / 255f, 1f, 1f);
 
     // ---- the groups' rows on the frame (the scene puts them there; these are the .blo's, for the hidden spots below) ----
     private const float CoinRow = 152f, BlueRow = 113f, ShineRow = 74f, LifeRow = 50f, MarioRow = 74f, RedRow = 419f;
@@ -139,8 +136,9 @@ public partial class SmsStandardHud : Control
     // the life meter
     private enum Life { Hidden, Appear, Insert, Shown, Hold, Leave, DemoHidden }
     private Life _life = Life.Hidden; private int _lifeF0 = -1; private Vector2 _lifeLeaveFrom;
-    private SmsHudPane _lDisc, _lText, _lSun; private readonly SmsHudPane[] _lRay = new SmsHudPane[9], _lSocket = new SmsHudPane[9];
-    private int _lifeShown = 8; private bool _lifeAirShown; private int _beat;
+    private SmsHudPane _lDisc, _lText, _lSun, _lSunB;  // his PaintBlobBG, LifeText, GrayLayer and OrangeLayer (the sun is two layers)
+    private LifeMeter _lMeter;                          // his Font/LifeMeter/LifeMeter.tscn: the segments, the air recolour, the pulse
+    private int _lifeShown = 8; private bool _lifeAirShown; private bool _lifeAirApplied, _lifeAirLowApplied;
     // the demo
     private bool _inDemo, _started; private int _demoEndCount;
 
@@ -193,19 +191,15 @@ public partial class SmsStandardHud : Control
         for (int i = 0; i < 6; i++) _tLong[i] = new SmsHudPane(Pane(TimerGroup, $"Long{i}"));
         for (int i = 0; i < 4; i++) _tShort[i] = new SmsHudPane(Pane(TimerGroup, $"Short{i}"));
         _tColon[0] = new SmsHudPane(Pane(TimerGroup, "LongColon0")); _tColon[1] = new SmsHudPane(Pane(TimerGroup, "LongColon1")); _tColon[2] = new SmsHudPane(Pane(TimerGroup, "ShortColon"));
-        // the life meter: the disc, "LIFE", and lm_0 -- the Sun the rays and sockets ride
-        _lDisc = new SmsHudPane(Pane(LifeMeterGroup, "Disc")); _lText = new SmsHudPane(Pane(LifeMeterGroup, "Text"));
-        var sun = LifeMeterGroup.GetNode<Control>("Sun");
-        _lSun = new SmsHudPane(sun) { Shown = true };
-        for (int i = 0; i < 9; i++)
-        {
-            _lSocket[i] = new SmsHudPane(Pane(sun, $"Socket{i}")) { Shown = true };
-            _lRay[i] = new SmsHudPane(Pane(sun, $"Ray{i}")) { Shown = true };
-            _rayMat[i] = _lRay[i].Node.Material as ShaderMaterial;
-        }
-        _lifeTextMat = _lText.Node.Material as ShaderMaterial;
+        // the life meter: Jaysonn's Meter -- its PaintBlobBG is l_ba (the disc), LifeText l_tx, its two layers lm_0 (the sun the rays
+        // ride); carriers only: his script owns their pictures, tints and the segments' pulse
+        _lMeter = LifeMeterGroup.GetNodeOrNull<LifeMeter>("Meter") ?? throw new System.Exception("LifeMeter/Meter (Font/LifeMeter/LifeMeter.tscn) is not in the group");
+        _lDisc = new SmsHudPane(_lMeter.GetNode<Control>("PaintBlobBG")); _lText = new SmsHudPane(_lMeter.GetNode<Control>("LifeText"));
+        _lSun = new SmsHudPane(_lMeter.GetNode<Control>("GrayLayer")) { Shown = true };
+        _lSunB = new SmsHudPane(_lMeter.GetNode<Control>("OrangeLayer")) { Shown = true };
+        _lMeter.Visible = true;                       // his _Ready hides it; the group's visibility is the meter's from here on
         _lifeShown = Mathf.Clamp(Health, 0, 8);
-        for (int i = 0; i < 9; i++) _lRay[i].Shown = i <= _lifeShown;
+        _lMeter.SetHealth(_lifeShown);
         _coinShown = Mathf.Clamp(Coins, 0, 999); SetCounterDigits(_cDigit, _coinShown);
         _shineShown = Mathf.Clamp(Shines, 0, 999); SetCounterDigits(_sDigit, _shineShown);
         _blueShown = Mathf.Clamp(BlueCoins, 0, 999); SetCounterDigits(_dDigit, _blueShown);
@@ -691,7 +685,7 @@ public partial class SmsStandardHud : Control
     {
         // startAppearLife (2323): the colours, the lit pieces per the health, the pane +(-150, 180) from home; processAppearLife (3008)
         _life = Life.Appear; _lifeF0 = _frame;
-        _lDisc.Shown = true; _lDisc.Still(); _lText.Shown = true; _lText.Still(); _lSun.Shown = true; _lSun.Still();
+        _lDisc.Shown = true; _lDisc.Still(); _lText.Shown = true; _lText.Still(); SunShown(true); SunStill();
         ResetLifePieces();
     }
 
@@ -700,7 +694,7 @@ public partial class SmsStandardHud : Control
         // startInsertLife (2260): from above at home over 20 frames, the disc popping, "LIFE" at 14, the sun at 24 (processInsertLife 3030)
         _life = Life.Insert; _lifeF0 = _frame;
         _lDisc.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
-        _lText.Shown = false; _lSun.Shown = false;
+        _lText.Shown = false; SunShown(false);
         ResetLifePieces();
     }
 
@@ -708,13 +702,18 @@ public partial class SmsStandardHud : Control
     {
         _lifeLeaveFrom = LifeGroupOffset(_now);
         _life = Life.Leave; _lifeF0 = _frame;
-        _lDisc.Still(); _lText.Still(); _lSun.Still(); _lDisc.Shown = true; _lText.Shown = true; _lSun.Shown = true;
+        _lDisc.Still(); _lText.Still(); SunStill(); _lDisc.Shown = true; _lText.Shown = true; SunShown(true);
     }
+
+    // his sun is two layers (the grey sockets, the orange rays): both ride lm_0's motions
+    private void SunShown(bool on) { _lSun.Shown = on; _lSunB.Shown = on; }
+    private void SunStill() { _lSun.Still(); _lSunB.Still(); }
+    private void SunPop(float at) { _lSun.Pop(at, SmsHud.DownTop, SmsHud.DownMid, 50); _lSunB.Pop(at, SmsHud.DownTop, SmsHud.DownMid, 50); }
 
     private void ResetLifePieces()
     {
-        // resetLife (2302): the lit pieces as the count says, every bounds back to its own
-        for (int i = 0; i < 9; i++) { _lRay[i].Shown = i <= _lifeShown; _lRay[i].Inset = 0f; _lSocket[i].Inset = 0f; }
+        // resetLife (2302): the lit pieces as the count says, every bounds back to its own -- his SetHealth lights the segments
+        _lMeter.SetHealth(_lifeShown);
     }
 
     private Vector2 LifeGroupOffset(float now)
@@ -756,7 +755,7 @@ public partial class SmsStandardHud : Control
             {
                 int f = _frame - _lifeF0;
                 if (At(f, 14)) _lText.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
-                if (At(f, 24)) _lSun.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
+                if (At(f, 24)) SunPop(_frame);
                 if (Demo) StartLifeLeave();
                 else if (f >= Paced(24 + 50 + SmsHud.Settle)) { _life = Life.Shown; _lifeF0 = _frame; }
                 break;
@@ -777,40 +776,18 @@ public partial class SmsStandardHud : Control
                 break;
         }
 
-        // the count, one a frame, the lost piece's bounds back to its own (updateLifeMeterState 556)
+        // the count, one a frame (updateLifeMeterState 556): his SetHealth lights the segment (and pulses it)
         if (amount != _lifeShown && _life != Life.DemoHidden)
         {
             if (_lifeShown < amount)
-            {
                 _lifeShown++;
-                _lRay[_lifeShown].Shown = true;
-            }
             else if (_lifeShown > 0)
-            {
-                _lRay[_lifeShown].Shown = false; _lRay[_lifeShown].Inset = 0f; _lSocket[_lifeShown].Inset = 0f;
                 _lifeShown--;
-            }
+            _lMeter.SetHealth(_lifeShown);
         }
         _lifeAirShown = AirMode;
-
-        // updateLifeMeterBlink (1085): the lit pieces beat while the meter is on screen
-        if (LifeOnScreen)
-        {
-            float rate = _lifeShown == 3 ? 80f : _lifeShown == 2 ? 60f : _lifeShown == 1 ? 35f : 100f;
-            if (_beat < rate * 2f)
-            {
-                float diff = MathF.Abs(_beat - rate);
-                int delta = (int)(0.5f + diff / rate);
-                float inset = delta * (_lifeShown > 3 ? 3f : 5f);
-                for (int i = 0; i < 9; i++)
-                    if (_lRay[i].Shown) { _lRay[i].Inset = inset; _lSocket[i].Inset = inset; }
-                _beat++;
-            }
-            else
-                _beat = 0;
-        }
-        else
-            _beat = 0;
+        // updateLifeMeterBlink (1085), the lit pieces' 3 / 5 px beat: his meter's own scale pulse (LifeMeter.ScaleMultiplier / ToggleInterval)
+        // stands in for it while the meter is on screen -- a deviation logged in PROJECT_LOG (pass 30)
     }
 
     // ------------------------------------------------------------------------------------------------------------------ the apply
@@ -842,21 +819,17 @@ public partial class SmsStandardHud : Control
         if (LifeOnScreen)
         {
             LifeMeterGroup.Place(LifeGroupOffset(n), _scale, _viewport);
-            bool air = _lifeAirShown, low = _lifeShown < 4;
-            _lDisc.Tint = air ? DiscAir : DiscHealth;
             _lDisc.Apply(n, Vector2.Zero);
-            _lSun.Apply(n, Vector2.Zero);
-            for (int i = 0; i < 9; i++)
-            {
-                _lSocket[i].Apply(n, Vector2.Zero);
-                // J2DPicture's black / white: the air meter's blue on the orange rays (the lowest darker under 4), the dim at low health
-                BlackWhite(_rayMat[i], air, air && low && i == 0);
-                _lRay[i].Tint = !air && low && i == 0 ? Dim : Colors.White;
-                _lRay[i].Apply(n, Vector2.Zero);
-            }
-            BlackWhite(_lifeTextMat, air, air && low);
-            _lText.Tint = !air && low ? Dim : Colors.White;
+            _lSun.Apply(n, Vector2.Zero); _lSunB.Apply(n, Vector2.Zero);
             _lText.Apply(n, Vector2.Zero);
+            // updateLifeMeterColors (366): under water the meter is blue (the lowest darker under 4) -- his SetAirTint's remap; applied
+            // on a change only (it swaps materials)
+            bool air = _lifeAirShown, low = _lifeShown < 4;
+            if (air != _lifeAirApplied || (air && low != _lifeAirLowApplied))
+            {
+                _lMeter.SetAirTint(air, _lifeShown);
+                _lifeAirApplied = air; _lifeAirLowApplied = low;
+            }
         }
         LivesGroup.Visible = _marioVisible;
         if (_marioVisible)
@@ -882,15 +855,5 @@ public partial class SmsStandardHud : Control
             foreach (var d in _tShort) { d.Apply(n, Vector2.Zero); if (_timerLong) d.Node.Visible = false; }
             for (int i = 0; i < 3; i++) { _tColon[i].Apply(n, Vector2.Zero); if ((i < 2) != _timerLong) _tColon[i].Node.Visible = false; }
         }
-    }
-
-    /// <summary>The black / white colours of a ray or "LIFE": the air meter's (black 003CFF00, white 00FFFFFF; the low white 0010FFFF),
-    /// or the identity that leaves the picture as painted.</summary>
-    private static void BlackWhite(ShaderMaterial m, bool air, bool low)
-    {
-        if (m == null)
-            return;
-        m.SetShaderParameter("black", air ? AirBlack : new Color(0f, 0f, 0f, 0f));
-        m.SetShaderParameter("white", air ? (low ? AirWhiteLow : AirWhite) : Colors.White);
     }
 }

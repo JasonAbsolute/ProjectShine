@@ -13,7 +13,6 @@ offset_right = 591.0
 offset_bottom = 344.0
 mouse_filter = 2
 script = ExtResource("1_script")
-Anchor = 2
 Frame = NodePath("Frame")
 Text = NodePath("Text")
 Voice = NodePath("Voice")
