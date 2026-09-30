@@ -294,6 +294,11 @@ public static class SmsParams
         // He wants a gentler wheel and legs that keep up: 600 BAM a tick, and the clip paced by mForwardVel (80 -> 5.4).
         public const int DashRotSp = 300;            // game 1500 (= Mario.RunningRotSpMin); 600 until 2026-09-28 01:40
         public const bool DashAnimByForwardVel = true; // game: by min(intended, fwd) = 32
+        // DELIBERATE DEVIATION (Jaysonn, 2026-09-29 01:59 "he should do his foward walk when chagring turbo up", 03:40 "looks like hes
+        // sqauting before using turbo"): doRunningAnimation picks SSTEP -- the tiptoe -- while min(mDashSpeed, fwd) is under Walk2Soft
+        // (8), the first 26 ticks of a charge from a stand (back to the run above Soft2Walk 13); here the charge walks the run blend
+        // from its first tick. true = the game.
+        public const bool ChargeSoftStep = false;
         public const float ChangeSpeed = 0.1f;          // the nozzle swap tween a tick (10 ticks); PARAM_INIT (not in the shipped prm)
         public const float DeployRate = 0.1f;           // unk1CEC -= a tick while pumping (housed 1 -> deployed 0)
         public const float StowRate = 0.005f;           // unk1CF4: unk1CEC += a tick when idle (deployed -> housed in 200 ticks)

@@ -2985,8 +2985,12 @@ public partial class Mario : CharacterBody3D
                 }
             }
 
-            // Pivot: tiny stick input -> face direction, don't move
-            if (HandlePivot(delta, aimDirWorld, stickStrength))
+            // Pivot: tiny stick input -> face direction, don't move. NOT while the turbo's dash speed is the stick (SmsFluddDashOverride):
+            // the game synthesises mIntendedMag = mDashSpeed, so WAIT goes straight to RUN (mInput |= 1) -- there is no turn-in-place
+            // in a charge. The legacy pivot read the overridden strength (2..6 of 32 sits in its 0.06..0.2 band) with aimDirWorld still
+            // the pad's rest drift: five frames of it killing his speed and swinging the armature toward the drift, then the charge set
+            // off along it -- "a pre-programmed direction" and the stutter (pass 26; an exactly-zero stick never showed it headless).
+            if (!(UseSmsPhysics && _fluddDashSpeed > 0f) && HandlePivot(delta, aimDirWorld, stickStrength))
                 goto EndFrame;
 
             //This keeps it so player is not able to do double jump when pressing A twice in the air
@@ -13578,12 +13582,18 @@ public partial class Mario : CharacterBody3D
     /// no U-turn (isRunningTurnning() is false).</summary>
     private bool SmsPumpingStyle() => UseSmsPhysics && _fluddReady && _fluddUpper != SmsUpper.Idle;
 
+    /// <summary>The turbo's charge: mDashSpeed climbing under a pumping turbo with water, before FLUDD_EMITTING.</summary>
+    private bool SmsTurboCharging() => _fluddReady && !_fluddDashing && _fluddDashSpeed > 0f && _fluddNozzle == SmsNozzle.Turbo
+        && _fluddUpper == SmsUpper.Pumping && _fluddR > 0f && _fluddWater > 0;
+
     /// <summary>The input stage's dash block, one tick (after the gun, so the trigger's state is this tick's).</summary>
     private void SmsFluddDashTick()
     {
         bool pumpingTurbo = _fluddReady && _fluddNozzle == SmsNozzle.Turbo && _fluddUpper == SmsUpper.Pumping && _fluddR > 0f && _fluddWater > 0;
         if (pumpingTurbo)
         {
+            if (_fluddDashSpeed <= 0f && SmsDebugPrint)
+                GD.Print($"[SMS turbo] charge on (from {stateOfMario}): stick {_smsIntendedMag:F1} of 32, model {Mathf.RadToDeg(SmsMath.YawFromDir(SmsModelFacing())):F0} deg, face {Mathf.RadToDeg(_smsFaceYaw):F0} deg, fwd {SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length()):F1}");
             _fluddDashSpeed += SmsParams.Mario.DashAcc;
             if (_fluddDashSpeed >= 32f)
             {
@@ -14171,7 +14181,11 @@ public partial class Mario : CharacterBody3D
             sp = 4f;
         bool dash = _fluddDashAnimOn && _fluddTurboAnimReady;
         if (!dash)
-            _smsGaitBand = SmsRun.GaitBand(sp, _smsGaitBand);
+        {
+            // DELIBERATE DEVIATION (SmsParams.Fludd.ChargeSoftStep): the game tiptoes (SSTEP) while min(mDashSpeed, fwd) < Walk2Soft --
+            // the first 26 ticks of a charge from a stand; Jaysonn wants "his forward walk" there, so the charge holds the run blend.
+            _smsGaitBand = !SmsParams.Fludd.ChargeSoftStep && SmsTurboCharging() ? 1 : SmsRun.GaitBand(sp, _smsGaitBand);
+        }
         float rate;
         if (dash)
         {

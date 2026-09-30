@@ -2801,6 +2801,22 @@ you make it more smooth and while were here might as well fix the other hud elem
   the FLUDD back: the pack is built then, the seat shown, the gauge comes in on its own. SmsNozzleItem has its own
   SmsNozzleKind (Spray included). Drives: no FLUDD, the item touched -> the pack, the gauge, the spray nozzle, the tank full;
   the turbo from a stand after a run -> along the facing, no swing.
+- 26 (Jaysonn 03:40: "it feels like neither thing about the turbo was fixed. looks like hes sqauting before using turbo still
+  and when netrual he is still going not the direction hes facing"; "rocket doesnt studder if that helps"). Found with a
+  telemetry drive and a 4 percent stick drift -- a real pad at rest, under every deadzone: the LEGACY PIVOT (turn in place on
+  a stick between 0.06 and 0.2) fired for five frames of every charge. SmsFluddDashOverride makes the dash speed the stick
+  (mIntendedMag = mDashSpeed, the game's rule), and 2..6 of 32 sits in the pivot's band while aimDirWorld still held the pad's
+  drift: the pivot killed his speed, swung the armature toward the drift (camera-relative, so always the same way), and the
+  charge then set off along the turned model -- the "pre-programmed direction"; the five dead frames, ma_pivot and the snap
+  were the "squat" / stutter. The rocket never moves, so it never reached the pivot. An exactly-zero (headless) stick never
+  showed it. The pivot is skipped while the dash speed drives the stick (the game: WAIT -> RUN at once, no turn-in-place).
+  Also, a deviation (below): no SSTEP tiptoe during the charge -- the run blend from the first tick. `[SMS turbo] charge on
+  (from idle): stick 0.0 of 32, model 109 deg, face 109 deg, fwd 0.0` prints at every charge start. The FLUDD item is the
+  game's own sitting model now: `models/Koopa/scene/monte2/mapobj/watergun_item/` (Pianta 3 / the airstrip, one file on the
+  disc) in `FluddItem.tscn`, its bake as `assets/Sms/WatergunItem.tres`, the tank shell translucent as on the pack; no spin,
+  no fall (`SmsNozzleItem.Spin` / `Falls` exports, both on for the nozzle items): watergun_item_data has no physics and the
+  0x04000000 flag that keeps it out of the item manager's shared rotation. Drives: the charge with the drift -> no pivot,
+  the run blend from the first frame, along the facing; the sitting item touched -> the pack, the gauge, the spray, full.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
@@ -2809,6 +2825,10 @@ yes, jnt_nozzle_R yes`. Self-test: `hover: first tick vy 4.6`, `rise after the 3
 Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
 
 ### Deliberate deviations from the game
+- No tiptoe in the turbo charge (`SmsParams.Fludd.ChargeSoftStep`, false): `doRunningAnimation` picks SSTEP while
+  min(mDashSpeed, mForwardVel) is under Walk2Soft (8) -- the first 26 ticks of a charge from a stand, back to the run above
+  Soft2Walk (13). Jaysonn (01:59): "he should do his foward walk when chagring turbo up", (03:40) "looks like hes sqauting
+  before using turbo". The charge holds the walk / run blend from its first tick; the speeds are the game's. `true` = the game.
 - The nozzle item's clock (`SmsNozzleItem.Speed`, an export on the item scenes) runs at 3; the game's map objects run at 1 --
   the thrown nozzle floats down on gravity 0.35 a frame and bounces for about two seconds before it can be taken. Jaysonn
   (01:28): "the item comming out of the box is slow just like the hud menu was".

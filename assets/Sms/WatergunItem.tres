@@ -1,0 +1,8 @@
+[gd_resource type="StandardMaterial3D" load_steps=2 format=3 uid="uid://n0p6yyv43xoo"]
+
+[ext_resource type="Texture2D" path="res://models/Koopa/scene/monte2/mapobj/watergun_item/watergun_item.png" id="1_tex"]
+
+[resource]
+resource_name = "_mat_G_pump (sms): the watergun_item's own H_watergun_main bake -- the sitting FLUDD's frame, pump and nozzle; flat like the game's, no specular"
+albedo_texture = ExtResource("1_tex")
+metallic_specular = 0.0
