@@ -1,0 +1,50 @@
+[gd_scene load_steps=4 format=3 uid="uid://rulr57pidc3c"]
+
+[ext_resource type="Script" path="res://assets/Sms/Console/SmsHintBalloon.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/help_window.png" id="2_frame"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_text"]
+resource_name = "the balloon's text (sms): standard_font.bfn 20 x 26, line space 28, white over a black copy 2 right 3 down -- a Godot font stands in"
+line_spacing = 2.0
+font_size = 22
+font_color = Color(1, 1, 1, 1)
+shadow_size = 0
+shadow_color = Color(0, 0, 0, 0.627451)
+shadow_offset = Vector2(2, 3)
+
+[node name="HintBalloon" type="Control" node_paths=PackedStringArray("Frame", "Text", "Voice")]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 397.0
+offset_top = 128.0
+offset_right = 591.0
+offset_bottom = 344.0
+mouse_filter = 2
+script = ExtResource("1_script")
+Anchor = 2
+Frame = NodePath("Frame")
+Text = NodePath("Text")
+Voice = NodePath("Voice")
+
+[node name="Frame" type="NinePatchRect" parent="."]
+layout_mode = 0
+offset_right = 194.0
+offset_bottom = 216.0
+mouse_filter = 2
+texture = ExtResource("2_frame")
+patch_margin_left = 12
+patch_margin_top = 12
+patch_margin_right = 68
+patch_margin_bottom = 40
+
+[node name="Text" type="Label" parent="."]
+layout_mode = 0
+offset_left = 12.0
+offset_top = 12.0
+offset_right = 126.0
+offset_bottom = 176.0
+mouse_filter = 2
+label_settings = SubResource("LabelSettings_text")
+vertical_alignment = 0
+
+[node name="Voice" type="AudioStreamPlayer" parent="."]

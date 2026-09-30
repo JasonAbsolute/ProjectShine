@@ -2823,6 +2823,35 @@ you make it more smooth and while were here might as well fix the other hud elem
   0.05 s) and the 0.53 s climb starts from there. Deviation (below): the charge picks up at the forward speed he already has
   along his face -- a sprint keeps 32 until the trigger fills (0.75 s), then the dash; from a stand nothing changes. The
   charge-on line now ends `dash speed from N`. Drive: R at a 32 sprint -> 32 held, no dip, the dash 0.75 s later.
+- 27 (Jaysonn 21:18: "lets do 1 and 2. make them secenes so they ccan be easily iterated on later"). THE TWO SECONDARY-MOTION
+  SYSTEMS AS SCENES. `Fludd.tscn` carries `Tank/Node/Skeleton3D/HandleSwing` (SmsSwingRZ, `SmsFludd.HandleSwing`): the grips'
+  pendulum with its acceleration, rope and brake as exports. What the data says: TMultiMtxEffect::setup names the prm by the
+  JOINT index (`/Mario/WaterGun/MtxEffect%d.prm`, MtxUtil.cpp 308), jnt_G_handle is joint 7, and no MtxEffect7.prm ships -- retail
+  runs TMtxSwingRZ's compiled-in defaults, acc (0, 0, 0) / brake 0.9: no gravity, the grips stay where the last move left them.
+  The scene ships (0, -4, 0) / 0.7 -- the disc's MtxEffect10 / 12 for an older rig -- the deviation logged in pass 7 (Jaysonn:
+  "floods arms look like they are doing weird things"). Zero the acceleration in the scene for retail's look. `assets/Sms/
+  BodyLag.tscn` is the body's TMtxTimeLag (SmsTimeLag) with one SmsTimeLagEntry resource per bone -- jnt_chest MtxEffect14
+  0.1 / 0.9 / 5 / 1.0 / 0.5, jnt_arm_R1 and L1 MtxEffect16 / 22 0.1 / 0.8 / 5 / 0.05 / 0.8, the shipped values -- for him to
+  instance under `Armature/Skeleton3D` in Player.tscn; Mario adopts it there (moved after SmsWaistLean) and builds a copy with a
+  warning naming the scene when it is missing. The forearm lag (13-47 deg at a run) is those shipped numbers; the knobs are now
+  in the editor for the Dolphin comparison. `[SMS jiggle] ... (from the scene)` says which was used.
+  THE BOX PACKAGE. (a) The shut box: TNozzleBox's "valid" (unk15C) -- a rocket / turbo box is a HOLOGRAM until the nozzle right
+  is won: anim 3 is the model nozzleboxalpha.bmd (MapObjInit.cpp NozzleBox_anim_data), drawn translucent in the nozzle's colour at
+  alpha 100 (unk15E.a 0x64); HIT_FLAG_CANNOT_GET_HIT -- no trample and nothing to stand on. `NozzleBox.tscn`: the Hologram model
+  (models/Koopa/scene/dolpic0/mapobj/nozzleboxalpha, its material the scene's), `Valid` (the level data; off = the hologram until
+  `SmsNozzleBox.GrantRight(node, nozzle)` -- TFlagManager::setNozzleRight, his progression's call; a hover box is always valid, as
+  loadAfter has it), `BreakSound` (SE 0x3801, an empty stream slot). (b) The balloons: touching the hologram brings the FLUDD's
+  help balloon with balloon.bmg 0x59 "This is one of my nozzles, the... Oh, you cannot use it yet. It is only a hologram."; a
+  hover box before any nozzle right, 0x5A "This is one of my nozzles, the Gadd Science, Inc., Hover Nozzle!" (the decomp's ids
+  0xE0056 / 57 are three entries off the US disc's) -- both texts exports on the box. `assets/Sms/Console/HintBalloon.tscn`
+  (SmsHintBalloon, instanced in SmsHud.tscn, `SmsHudLayer.Balloon`, `SmsHudLayer.Current.ShowBalloon(text)`): the 'he_w' window
+  at (397, 128) 194 x 216 with the four help_window pieces composed as J2DWindow draws them into hud/help_window.png (a NinePatch,
+  the contents blue 0000FF at alpha 146 baked in), the Label's LabelSettings the text (20 x 26, white over a black copy 2 right,
+  3 down), the FLUDD's voice a stream slot. The motion is GCConsole2.cpp 2630 / 3581 / 3610: alpha +0x30 a frame, then 30 px a
+  frame from the bottom edge, the text typed 2 characters a frame, held 0.7 x length + 100 frames, then down and out; a
+  higher-priority message replaces, a new one queues behind the close. (c) The get effect: emitGetEffect (MS_ITEMGET1_A + SE
+  0x1989; the boxes' items also MSD_SE_SY_GET_NOZZLE) -- `assets/Sms/Fx/GetSparkle.tscn`, a one-shot star burst with a sound
+  slot, the `GetEffect` export of every item scene, instanced at Mario's chest when an item is taken.
 Debug: `[SMS hover] start from singleJump: target +230 units (3.09 m) over feet y 1.53, fwd 12.0 (4.8 m/s), water 9800, R 0.61`,
 `1.0 s: +1.39 m of 3.09, vy 2.53, fwd 8.9 (3.6 m/s), water 9560` (each second), `end (R released) after 212 ticks (1.77 s):
 rose 1.98 m = 147 units of the 230, fwd 7.1 (2.9 m/s), vy 0.6, water 9376`, `a roof overhead: speed 0 …`, `[SMS wall] air hit
@@ -2831,6 +2860,9 @@ yes, jnt_nozzle_R yes`. Self-test: `hover: first tick vy 4.6`, `rise after the 3
 Next: S2b the squat aim (needs `button_rclick`), S4 rocket, S5 turbo (surf).
 
 ### Deliberate deviations from the game
+- The help balloon's text is a Godot font (the LabelSettings in HintBalloon.tscn), not the disc's standard_font.bfn, which is not
+  decoded; the sparkle is a GPUParticles3D stand-in for the JPA particle; the sounds are empty stream slots (no SE archive is
+  decoded). Each is a scene resource to swap.
 - The turbo charge keeps his speed (`SmsParams.Fludd.ChargeKeepsSpeed`, true): the game's `mDashSpeed` starts at 0 whatever he
   was doing, and `mIntendedMag = mDashSpeed` brakes a sprint to a crawl in 6 ticks (DecBrake 5) before the 0.53 s climb -- the
   wind-up. Jaysonn (20:48): "when charging up he should have to stand still for a frame or whatever is happening". Here the

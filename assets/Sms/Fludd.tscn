@@ -1,6 +1,7 @@
-[gd_scene load_steps=12 format=3 uid="uid://jb8i87ogfqr3"]
+[gd_scene load_steps=13 format=3 uid="uid://jb8i87ogfqr3"]
 
 [ext_resource type="Script" path="res://assets/Sms/SmsFludd.cs" id="1_script"]
+[ext_resource type="Script" path="res://assets/Sms/SmsSwingRZ.cs" id="9_swing"]
 [ext_resource type="PackedScene" path="res://models/Koopa/mario/watergun2/body/wg_mdl1/wg_mdl1.glb" id="2_tank"]
 [ext_resource type="Material" path="res://assets/Sms/FluddAtlas.tres" id="3_atlas"]
 [ext_resource type="Material" path="res://assets/Sms/FluddFrame.tres" id="4_frame"]
@@ -22,7 +23,7 @@ resource_name = "_mat_waterline (sms): hidden, Mario.cs draws the water level"
 transparency = 1
 albedo_color = Color(0, 0, 0, 0)
 
-[node name="Fludd" type="Node3D" node_paths=PackedStringArray("Tank", "NozzleSeat", "SprayNozzle", "HoverNozzle", "RocketNozzle", "TurboNozzle")]
+[node name="Fludd" type="Node3D" node_paths=PackedStringArray("Tank", "NozzleSeat", "SprayNozzle", "HoverNozzle", "RocketNozzle", "TurboNozzle", "HandleSwing")]
 script = ExtResource("1_script")
 Tank = NodePath("Tank")
 NozzleSeat = NodePath("NozzleSeat")
@@ -30,6 +31,7 @@ SprayNozzle = NodePath("NozzleSeat/Spray")
 HoverNozzle = NodePath("NozzleSeat/Hover")
 RocketNozzle = NodePath("NozzleSeat/Rocket")
 TurboNozzle = NodePath("NozzleSeat/Turbo")
+HandleSwing = NodePath("Tank/Node/Skeleton3D/HandleSwing")
 AtlasMaterial = ExtResource("3_atlas")
 
 [node name="Tank" parent="." instance=ExtResource("2_tank")]
@@ -41,6 +43,13 @@ surface_material_override/2 = ExtResource("4_frame")
 surface_material_override/3 = ExtResource("4_frame")
 surface_material_override/4 = ExtResource("4_frame")
 surface_material_override/5 = SubResource("StandardMaterial3D_waterline")
+
+[node name="HandleSwing" type="SkeletonModifier3D" parent="Tank/Node/Skeleton3D"]
+script = ExtResource("9_swing")
+BoneName = "jnt_G_handle"
+AccUnits = Vector3(0, -4, 0)
+LUnits = 50.0
+Brake = 0.7
 
 [node name="NozzleSeat" type="BoneAttachment3D" parent="."]
 bone_name = "nozzle_center"

@@ -14135,18 +14135,27 @@ public partial class Mario : CharacterBody3D
             GD.PushWarning("[SMS fludd] the tank has no jnt_G_handle bone: no handle swing");
             return;
         }
-        _fluddHandleSwing = new SmsSwingRZ
+        // the scene's node (Fludd.tscn: Tank/Node/Skeleton3D/HandleSwing, its exports the tuning) -- or a code-built copy with a warning
+        var fluddRoot = SmsFluddModel.FindChild<SmsFludd>(_fluddAttach);
+        _fluddHandleSwing = fluddRoot?.HandleSwing ?? SmsFluddModel.FindChild<SmsSwingRZ>(_fluddTankSkel);
+        string swingFrom = "the scene";
+        if (_fluddHandleSwing == null)
         {
-            Name = "SmsHandleSwing",
-            BoneName = "jnt_G_handle",
-            AccUnits = SmsParams.MtxEffect.HandleAcc,
-            LUnits = SmsParams.MtxEffect.HandleL,
-            Brake = SmsParams.MtxEffect.HandleBrake,
-            UnitsPerMetre = SmsUnits.UnitsPerMetre,
-        };
-        _fluddTankSkel.AddChild(_fluddHandleSwing);
+            GD.PushWarning("[SMS fludd] Fludd.tscn has no HandleSwing (SmsSwingRZ under the tank's Skeleton3D): the grips' pendulum is built from code -- add the node to the scene to tune it in the editor");
+            _fluddHandleSwing = new SmsSwingRZ
+            {
+                Name = "SmsHandleSwing",
+                BoneName = "jnt_G_handle",
+                AccUnits = SmsParams.MtxEffect.HandleAcc,
+                LUnits = SmsParams.MtxEffect.HandleL,
+                Brake = SmsParams.MtxEffect.HandleBrake,
+            };
+            _fluddTankSkel.AddChild(_fluddHandleSwing);
+            swingFrom = "code";
+        }
+        _fluddHandleSwing.UnitsPerMetre = SmsUnits.UnitsPerMetre;
         if (SmsDebugPrint)
-            GD.Print($"[SMS jiggle] FLUDD handle swing (TMtxSwingRZ) on jnt_G_handle -> {string.Join(", ", System.Array.ConvertAll(_fluddTankSkel.GetBoneChildren(_fluddTankSkel.FindBone("jnt_G_handle")), b => _fluddTankSkel.GetBoneName(b)))}: rope {SmsParams.MtxEffect.HandleL} u, acc {SmsParams.MtxEffect.HandleAcc}, brake {SmsParams.MtxEffect.HandleBrake} (MtxEffect10 / 12's tuning, a logged deviation: the shipped game runs the compiled-in defaults acc 0 / brake 0.9 because no MtxEffect7.prm ships); the tank root's time lag is never enabled in the game and is not ported");
+            GD.Print($"[SMS jiggle] FLUDD handle swing (TMtxSwingRZ, from {swingFrom}) on {_fluddHandleSwing.BoneName} -> {string.Join(", ", System.Array.ConvertAll(_fluddTankSkel.GetBoneChildren(_fluddTankSkel.FindBone("jnt_G_handle")), b => _fluddTankSkel.GetBoneName(b)))}: rope {_fluddHandleSwing.LUnits} u, acc {_fluddHandleSwing.AccUnits}, brake {_fluddHandleSwing.Brake} (retail runs the compiled-in defaults acc 0 / brake 0.9 -- no MtxEffect7.prm ships; (0, -4, 0) / 0.7 are the disc's MtxEffect10 / 12, a logged deviation); the tank root's time lag is never enabled in the game and is not ported");
     }
 
     /// <summary>The game blends RUN1 (the walk cycle) and RUN2 (the run) continuously by the run's rate (doRunningAnimation:
@@ -14353,20 +14362,33 @@ public partial class Mario : CharacterBody3D
             GD.Print("[SMS waist] head lock off under SMS: MarioHeadCtrl is the identity in a run; ma_run2's head track holds the head within 4 deg while the chest swings 35 deg a stride");
         if (SmsDebugPrint)
             GD.Print($"[SMS waist] MarioWaistCtrl sits on chn_chest (parent of jnt_chest: {(skeleton.FindBone("jnt_chest") >= 0 ? skeleton.GetBoneName(skeleton.GetBoneParent(skeleton.FindBone("jnt_chest"))) : "?")}): the whole upper body pitches forward by speed and BANKS into turns about the front-back axis; the shipped MtxEffect14/16/22 files and the pack's tilt formula put the decomp's chn/jnt names the other way round");
-        _smsTimeLag = new SmsTimeLag
+        // the scene's node (assets/Sms/BodyLag.tscn instanced under Armature/Skeleton3D: its Bones the MtxEffect14 / 16 / 22 fields,
+        // editable) -- or a code-built copy with a warning
+        _smsTimeLag = SmsFluddModel.FindChild<SmsTimeLag>(skeleton);
+        string lagFrom = "the scene";
+        if (_smsTimeLag == null)
         {
-            Name = "SmsTimeLag",
-            UnitsPerMetre = SmsUnits.UnitsPerMetre,
-            Entries = new[]
+            GD.PushWarning("[SMS jiggle] Player.tscn has no BodyLag under Armature/Skeleton3D: the body's time lag is built from code -- instance res://assets/Sms/BodyLag.tscn there to tune it in the editor");
+            _smsTimeLag = new SmsTimeLag
             {
-                new SmsTimeLag.Entry { BoneName = "jnt_chest", PosAccel = SmsParams.MtxEffect.ChestPosAccel, PosBrake = SmsParams.MtxEffect.ChestPosBrake, PosLimitUnits = SmsParams.MtxEffect.ChestPosLimit, QuatAccel = SmsParams.MtxEffect.ChestQuatAccel, QuatBrake = SmsParams.MtxEffect.ChestQuatBrake },
-                new SmsTimeLag.Entry { BoneName = "jnt_arm_R1", PosAccel = SmsParams.MtxEffect.ArmPosAccel, PosBrake = SmsParams.MtxEffect.ArmPosBrake, PosLimitUnits = SmsParams.MtxEffect.ArmPosLimit, QuatAccel = SmsParams.MtxEffect.ArmQuatAccel, QuatBrake = SmsParams.MtxEffect.ArmQuatBrake },
-                new SmsTimeLag.Entry { BoneName = "jnt_arm_L1", PosAccel = SmsParams.MtxEffect.ArmPosAccel, PosBrake = SmsParams.MtxEffect.ArmPosBrake, PosLimitUnits = SmsParams.MtxEffect.ArmPosLimit, QuatAccel = SmsParams.MtxEffect.ArmQuatAccel, QuatBrake = SmsParams.MtxEffect.ArmQuatBrake },
-            },
-        };
-        skeleton.AddChild(_smsTimeLag);
+                Name = "SmsTimeLag",
+                Bones = new[]
+                {
+                    new SmsTimeLagEntry { BoneName = "jnt_chest", PosAccel = SmsParams.MtxEffect.ChestPosAccel, PosBrake = SmsParams.MtxEffect.ChestPosBrake, PosLimitUnits = SmsParams.MtxEffect.ChestPosLimit, QuatAccel = SmsParams.MtxEffect.ChestQuatAccel, QuatBrake = SmsParams.MtxEffect.ChestQuatBrake },
+                    new SmsTimeLagEntry { BoneName = "jnt_arm_R1", PosAccel = SmsParams.MtxEffect.ArmPosAccel, PosBrake = SmsParams.MtxEffect.ArmPosBrake, PosLimitUnits = SmsParams.MtxEffect.ArmPosLimit, QuatAccel = SmsParams.MtxEffect.ArmQuatAccel, QuatBrake = SmsParams.MtxEffect.ArmQuatBrake },
+                    new SmsTimeLagEntry { BoneName = "jnt_arm_L1", PosAccel = SmsParams.MtxEffect.ArmPosAccel, PosBrake = SmsParams.MtxEffect.ArmPosBrake, PosLimitUnits = SmsParams.MtxEffect.ArmPosLimit, QuatAccel = SmsParams.MtxEffect.ArmQuatAccel, QuatBrake = SmsParams.MtxEffect.ArmQuatBrake },
+                },
+            };
+            skeleton.AddChild(_smsTimeLag);
+            lagFrom = "code";
+        }
+        _smsTimeLag.UnitsPerMetre = SmsUnits.UnitsPerMetre;
+        skeleton.MoveChild(_smsTimeLag, -1); // after SmsWaistLean: the game's chn_chest callback runs before the chest's
         if (SmsDebugPrint)
-            GD.Print($"[SMS jiggle] TMtxTimeLag on jnt_chest (shoulders + head trail it: pos {SmsParams.MtxEffect.ChestPosAccel}/{SmsParams.MtxEffect.ChestPosBrake} limit {SmsParams.MtxEffect.ChestPosLimit} u, quat {SmsParams.MtxEffect.ChestQuatAccel}/{SmsParams.MtxEffect.ChestQuatBrake}) and jnt_arm_R1 / L1 (forearms + hands: pos {SmsParams.MtxEffect.ArmPosAccel}/{SmsParams.MtxEffect.ArmPosBrake}, quat {SmsParams.MtxEffect.ArmQuatAccel}/{SmsParams.MtxEffect.ArmQuatBrake}); on after {SmsParams.MtxEffect.EnableAfterTicks} ticks, locomotion clips, upper body idle; the legacy head / arm JiggleBones are off under SMS");
+        {
+            string bones = string.Join("; ", System.Array.ConvertAll(_smsTimeLag.Bones, b => b == null ? "?" : $"{b.BoneName} pos {b.PosAccel}/{b.PosBrake} limit {b.PosLimitUnits} u, quat {b.QuatAccel}/{b.QuatBrake}"));
+            GD.Print($"[SMS jiggle] TMtxTimeLag (from {lagFrom}): {bones}; on after {SmsParams.MtxEffect.EnableAfterTicks} ticks, locomotion clips, upper body idle; the legacy head / arm JiggleBones are off under SMS");
+        }
         if (SmsDebugPrint)
             GD.Print($"[SMS waist] considerWaist on jnt_chest {(skeleton.FindBone("jnt_chest") >= 0 ? "yes" : "NO")}: free {SmsParams.Waist.FreePitch} x fwd (cap {SmsParams.Waist.FreePitchMax}) / roll {SmsParams.Waist.FreeRoll} (cap {SmsParams.Waist.FreeRollMax}) at {SmsParams.Waist.FreeRate}; pumping {SmsParams.Waist.GunPitch} x fwd (cap {SmsParams.Waist.GunPitchMax}) / roll cap {SmsParams.Waist.GunRollMax} at {SmsParams.Waist.GunRate}; the waist IK is retired under SMS");
     }

@@ -1,4 +1,4 @@
-[gd_scene load_steps=12 format=3 uid="uid://vjf8vmkgemkf"]
+[gd_scene load_steps=14 format=3 uid="uid://vjf8vmkgemkf"]
 
 [ext_resource type="Script" path="res://assets/Sms/SmsNozzleBox.cs" id="1_script"]
 [ext_resource type="PackedScene" path="res://models/Koopa/scene/dolpic0/mapobj/nozzlebox/nozzlebox.glb" id="2_box"]
@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" path="res://models/Nozzles/Rocket/RocketNozzleItem.tscn" id="6_rocket"]
 [ext_resource type="PackedScene" path="res://models/Nozzles/Turbo/TurboNozzleItem.tscn" id="7_turbo"]
 [ext_resource type="Shader" path="res://assets/Sms/NozzleBoxFace.gdshader" id="8_shader"]
+[ext_resource type="PackedScene" path="res://models/Koopa/scene/dolpic0/mapobj/nozzleboxalpha/nozzleboxalpha.glb" id="9_holo"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_body"]
 size = Vector3(2.761907, 2.761907, 2.761907)
@@ -22,17 +23,31 @@ shader = ExtResource("8_shader")
 shader_parameter/tint = Color(0, 0, 1, 1)
 shader_parameter/face = ExtResource("4_face")
 
-[node name="NozzleBox" type="StaticBody3D" node_paths=PackedStringArray("Model", "Crash", "Shape", "StompZone")]
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hologram"]
+resource_local_to_scene = true
+resource_name = "nozzle box hologram (nozzleboxalpha through TEVREG1: the nozzle's colour at alpha 100 -- the shut box you cannot use yet)"
+transparency = 1
+cull_mode = 2
+albedo_color = Color(0, 0, 1, 0.392157)
+metallic_specular = 0.0
+vertex_color_use_as_albedo = true
+
+[node name="NozzleBox" type="StaticBody3D" node_paths=PackedStringArray("Model", "Crash", "Hologram", "Shape", "StompZone", "BreakSound")]
 collision_mask = 0
 script = ExtResource("1_script")
 Nozzle = 1
+Valid = true
 Model = NodePath("Model")
 Crash = NodePath("Crash")
+Hologram = NodePath("Hologram")
 Shape = NodePath("Shape")
 StompZone = NodePath("StompZone")
+BreakSound = NodePath("BreakSound")
 HoverItem = ExtResource("5_hover")
 RocketItem = ExtResource("6_rocket")
 TurboItem = ExtResource("7_turbo")
+HologramMessage = "This is one of\nmy nozzles,\nthe... Oh, you\ncannot use it\nyet. It is only\na hologram."
+HoverMessage = "This is one of\nmy nozzles,\nthe Gadd\nScience, Inc.,\nHover Nozzle!"
 
 [node name="Shape" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.380954, 0)
@@ -62,5 +77,16 @@ surface_material_override/2 = SubResource("ShaderMaterial_face")
 surface_material_override/3 = SubResource("ShaderMaterial_face")
 surface_material_override/4 = SubResource("ShaderMaterial_face")
 
+[node name="Hologram" parent="." instance=ExtResource("9_holo")]
+transform = Transform3D(0.013433, 0, 0, 0, 0.013433, 0, 0, 0, 0.013433, 0, 0, 0)
+visible = false
+
+[node name="Mesh" parent="Hologram/Node/Skeleton3D" index="0"]
+surface_material_override/0 = SubResource("StandardMaterial3D_hologram")
+
+[node name="BreakSound" type="AudioStreamPlayer3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.380954, 0)
+
 [editable path="Model"]
 [editable path="Crash"]
+[editable path="Hologram"]

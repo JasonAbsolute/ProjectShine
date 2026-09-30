@@ -11,7 +11,8 @@ using Godot;
 /// so a bob hanging straight down is the clip's pose.
 /// The shipped game runs this with TMtxSwingRZ's compiled-in defaults -- acc (0, 0, 0), L 50, brake 0.9 -- because the model's
 /// jnt_G_handle is joint 7 and /Mario/WaterGun/MtxEffect7.prm does not ship (10 and 12 do, written for an older rig). The values
-/// used are set by Mario from SmsParams.MtxEffect (the 10 / 12 tuning, a logged deviation).
+/// used are the scene's exports below: assets/Sms/Fludd.tscn carries this node as Tank/Node/Skeleton3D/HandleSwing (SmsFludd.HandleSwing)
+/// with the 10 / 12 tuning (a logged deviation); Mario adopts it, or builds one with a warning when the scene has none.
 /// Written while the body animation carries gMarioAnimeData bit 4 (everything but the squat, the rope, the spin and the shine demo),
 /// the upper body is idle and he has the FLUDD; the state integrates regardless, so enabling never pops.
 /// TIMING as SmsTimeLag: <see cref="Step"/> runs from Mario's physics frame with that frame's tick count against the hinge's current
@@ -20,12 +21,18 @@ using Godot;
 /// </summary>
 public partial class SmsSwingRZ : SkeletonModifier3D
 {
-    public string BoneName = "jnt_G_handle";
-    public Vector3 AccUnits = Vector3.Zero; // mAcc: world units a tick^2 (the game's Y is up, as Godot's)
-    public float LUnits = 50f;              // mL
-    public float Brake = 0.9f;              // mBrake
-    public bool Enabled;                    // flag 1: aim the children's frame (the state always runs)
-    public float UnitsPerMetre = 74.44f;
+    /// <summary>The hinge joint (jnt_G_handle: the handle bar; its children -- the levers and grips -- take the swing).</summary>
+    [Export] public string BoneName = "jnt_G_handle";
+    /// <summary>mAcc: the bob's acceleration, world units a tick^2 (Y up). RETAIL: (0, 0, 0) -- the compiled-in default, no gravity, the
+    /// grips stay wherever the last move left them. The disc's MtxEffect10 / 12.prm (an older rig): (0, -4, 0) -- the grips hang and
+    /// trail by speed. The scene ships the disc tuning (a logged deviation); set it to zero for retail's look.</summary>
+    [Export] public Vector3 AccUnits = new Vector3(0f, -4f, 0f);
+    /// <summary>mL: the rope, world units (both value sets: 50).</summary>
+    [Export] public float LUnits = 50f;
+    /// <summary>mBrake: the bob's velocity kept each tick. RETAIL 0.9 (the default); the disc's 10 / 12 files 0.7.</summary>
+    [Export] public float Brake = 0.7f;
+    public bool Enabled;                    // flag 1: aim the children's frame (the state always runs); Mario sets it each frame
+    public float UnitsPerMetre = 74.44f;    // Mario sets it (SmsUnits.UnitsPerMetre)
     public float DbgAngleDeg;               // the rope's angle from straight down about the hinge: positive = swung toward his back
 
     private int _bone = -1;

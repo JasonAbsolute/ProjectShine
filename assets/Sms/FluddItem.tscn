@@ -1,6 +1,7 @@
-[gd_scene load_steps=6 format=3 uid="uid://576afpvxx0tq"]
+[gd_scene load_steps=7 format=3 uid="uid://576afpvxx0tq"]
 
 [ext_resource type="Script" path="res://assets/Sms/SmsNozzleItem.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/GetSparkle.tscn" id="9_fx"]
 [ext_resource type="PackedScene" path="res://models/Koopa/scene/monte2/mapobj/watergun_item/watergun_item.glb" id="2_model"]
 [ext_resource type="Material" path="res://assets/Sms/WatergunItem.tres" id="3_body"]
 
@@ -21,6 +22,7 @@ script = ExtResource("1_script")
 Nozzle = 0
 Model = NodePath("Model")
 Hit = NodePath("Hit")
+GetEffect = ExtResource("9_fx")
 Spin = false
 Falls = false
 

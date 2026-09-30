@@ -2,14 +2,17 @@ using Godot;
 
 /// <summary>
 /// The console as a scene: assets/Sms/Console/SmsHud.tscn is this CanvasLayer with the StandardHud (the counters, the life meter, the
-/// timer) and the WaterHud (the gauge) as children, every pane a TextureRect laid out on the game's 640 x 448 frame -- his to move
-/// and re-texture. Instance it under Mario in Player.tscn: Mario.cs (SmsHudLayerGet) finds it there and feeds both. The knobs are
-/// Jaysonn's deviations from the game's console (PROJECT_LOG); the game's own values are 1 / 0 / 0 / 0 / 0 / 1 / false.
+/// timer), the WaterHud (the gauge) and the HintBalloon (the FLUDD's help window) as children, every pane a TextureRect laid out on
+/// the game's 640 x 448 frame -- his to move and re-texture. Instance it under Mario in Player.tscn: Mario.cs (SmsHudLayerGet) finds
+/// it there and feeds both HUDs; map objects reach the balloon through <see cref="Current"/>. The knobs are Jaysonn's deviations
+/// from the game's console (PROJECT_LOG); the game's own values are 1 / 0 / 0 / 0 / 0 / 1 / false.
 /// </summary>
 public partial class SmsHudLayer : CanvasLayer
 {
     [Export] public SmsStandardHud Standard;
     [Export] public SmsWaterHud Water;
+    /// <summary>TGCConsole2's help balloon (he_w): startAppearBalloon / startDisappearBalloon.</summary>
+    [Export] public SmsHintBalloon Balloon;
     /// <summary>1 = the frame's 448 lines on the window's height (a coin digit is 8 % of the screen); 0.7 keeps his own HUD's size.</summary>
     [Export] public float Size = 0.7f;
     /// <summary>Game pixels the left-hand rows move toward the left edge (the game has them 13 px in).</summary>
@@ -26,7 +29,21 @@ public partial class SmsHudLayer : CanvasLayer
     /// <summary>The star HUD and the lives stay while he stands idle, instead of leaving after the idle count.</summary>
     [Export] public bool IdleHold = true;
 
-    public override void _EnterTree() => Apply();
+    /// <summary>The console in the tree (gpMarDirector->getConsole()); null before Mario's HUD is up.</summary>
+    public static SmsHudLayer Current { get; private set; }
+
+    public override void _EnterTree()
+    {
+        Apply();
+        Current = this;
+    }
+
+    public override void _ExitTree()
+    {
+        if (Current == this)
+            Current = null;
+    }
+
     public override void _Ready() => Apply();
 
     /// <summary>The knobs into SmsHud, which every pane's motion reads.</summary>
@@ -36,5 +53,17 @@ public partial class SmsHudLayer : CanvasLayer
         SmsHud.LeftShift = LeftShift; SmsHud.TopShift = TopShift; SmsHud.RightShift = RightShift; SmsHud.BottomShift = BottomShift;
         SmsHud.AnimSpeed = AnimSpeed;
         SmsHud.IdleHold = IdleHold;
+    }
+
+    /// <summary>getConsole()->startAppearBalloon(message, autoClose): false without a balloon in the scene or when a higher-priority
+    /// message is up.</summary>
+    public bool ShowBalloon(string text, int priority = 1, bool autoClose = true)
+    {
+        if (Balloon == null)
+        {
+            GD.PushWarning("[SMS balloon] the console has no HintBalloon (instance assets/Sms/Console/HintBalloon.tscn under SmsHud.tscn and set Balloon)");
+            return false;
+        }
+        return Balloon.Show(text, priority, autoClose);
     }
 }

@@ -18,9 +18,14 @@ using Godot;
 /// targets, and stores each bone's offset in ITS OWN frame; the modifier pass only applies the stored offset to the children --
 /// an offset that rides the animated bone smoothly between physics frames.
 /// Child of Mario's Skeleton3D, after SmsWaistLean (the game's chn_chest callback runs before the chest's in tree order).
+/// THE SCENE: assets/Sms/BodyLag.tscn is this node with its <see cref="Bones"/> -- one SmsTimeLagEntry per bone, the shipped values --
+/// to instance under Armature/Skeleton3D in Player.tscn; Mario adopts it there (and builds one with a warning when it is missing).
 /// </summary>
 public partial class SmsTimeLag : SkeletonModifier3D
 {
+    /// <summary>The bones and their MtxEffect fields (the scene's list; the editor edits them).</summary>
+    [Export] public SmsTimeLagEntry[] Bones = System.Array.Empty<SmsTimeLagEntry>();
+
     public sealed class Entry
     {
         public string BoneName = "";
@@ -36,6 +41,7 @@ public partial class SmsTimeLag : SkeletonModifier3D
         public float DbgLagUnits, DbgLagDeg;     // how far the children sit from where the clip puts them
     }
 
+    /// <summary>The running state, one per entry of <see cref="Bones"/> (built in _Ready).</summary>
     public Entry[] Entries = System.Array.Empty<Entry>();
     public bool Enabled;        // flag 1: write the lag into the children (the state always runs)
     public float UnitsPerMetre = 74.44f;
@@ -45,6 +51,14 @@ public partial class SmsTimeLag : SkeletonModifier3D
         var skel = GetSkeleton();
         if (skel == null)
             return;
+        if (Entries.Length == 0)
+        {
+            var list = new System.Collections.Generic.List<Entry>();
+            foreach (var b in Bones)
+                if (b != null && !string.IsNullOrEmpty(b.BoneName))
+                    list.Add(new Entry { BoneName = b.BoneName, PosAccel = b.PosAccel, PosBrake = b.PosBrake, PosLimitUnits = b.PosLimitUnits, QuatAccel = b.QuatAccel, QuatBrake = b.QuatBrake });
+            Entries = list.ToArray();
+        }
         foreach (var e in Entries)
         {
             e.Bone = skel.FindBone(e.BoneName);

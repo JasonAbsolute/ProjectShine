@@ -1,9 +1,10 @@
-[gd_scene load_steps=67 format=3 uid="uid://1dsewjz3vjt3j"]
+[gd_scene load_steps=68 format=3 uid="uid://c6c6d7ilicljx"]
 
 [ext_resource type="Script" path="res://assets/Sms/Console/SmsHudLayer.cs" id="s_layer"]
 [ext_resource type="Script" path="res://assets/Sms/SmsStandardHud.cs" id="s_std"]
 [ext_resource type="Script" path="res://assets/Sms/SmsWaterHud.cs" id="s_water"]
 [ext_resource type="Script" path="res://assets/Sms/Console/SmsHudGroup.cs" id="s_group"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Console/HintBalloon.tscn" id="s_balloon"]
 [ext_resource type="Shader" path="res://assets/Sms/Console/J2DBlackWhite.gdshader" id="sh_bw"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_back.png" id="t_coin_back"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_icon.png" id="t_coin_icon"]
@@ -97,11 +98,12 @@ shader = ExtResource("sh_bw")
 resource_name = "LIFE: J2D black / white (the air meter recolours it)"
 shader = ExtResource("sh_bw")
 
-[node name="SmsHud" type="CanvasLayer" node_paths=PackedStringArray("Standard", "Water")]
+[node name="SmsHud" type="CanvasLayer" node_paths=PackedStringArray("Standard", "Water", "Balloon")]
 layer = 10
 script = ExtResource("s_layer")
 Standard = NodePath("StandardHud")
 Water = NodePath("WaterHud")
+Balloon = NodePath("HintBalloon")
 Size = 0.7
 LeftShift = 0.0
 TopShift = -22.0
@@ -1116,3 +1118,5 @@ offset_bottom = 12
 mouse_filter = 2
 texture = ExtResource("t_water_button_x")
 expand_mode = 1
+
+[node name="HintBalloon" parent="." instance=ExtResource("s_balloon")]

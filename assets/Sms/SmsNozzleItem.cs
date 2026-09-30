@@ -33,6 +33,9 @@ public partial class SmsNozzleItem : Node3D
     [Export] public bool Spin = true;
     /// <summary>The map-object physics (gravity 0.35, the bounce, the stop); off for an item with no physical data: it rests where placed.</summary>
     [Export] public bool Falls = true;
+    /// <summary>emitGetEffect: the pickup sparkle and its chime, a scene instanced at Mario's chest when the item is taken
+    /// (assets/Sms/Fx/GetSparkle.tscn; empty = nothing).</summary>
+    [Export] public PackedScene GetEffect;
     public SmsNozzleBox Box;
 
     private const float Gravity = 0.35f, Bounce = 0.5f, StopBelow = 5f, LandFriction = 0.8f, SpinDegPerFrame = 2f;
@@ -131,6 +134,12 @@ public partial class SmsNozzleItem : Node3D
     {
         _taken = true;
         mario.SmsGetNozzle((int)Nozzle);
+        if (GetEffect?.Instantiate() is Node3D fx)
+        {
+            // emitAndBindToPosPtr(MS_ITEMGET1_A, &unk160): the burst around his middle; the level keeps it after this item is gone
+            GetParent().AddChild(fx);
+            fx.GlobalPosition = mario.GlobalPosition + Vector3.Up * 1.0f;
+        }
         SmsNozzleBox.RespawnAll(this, (SmsNozzleBox.BoxNozzle)(int)Nozzle); // resetNozzleBoxesModel(kind); no box holds the spray
         QueueFree();
     }

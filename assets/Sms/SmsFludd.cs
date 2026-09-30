@@ -19,6 +19,9 @@ public partial class SmsFludd : Node3D
     [Export] public Node3D TurboNozzle;
     /// <summary>The tank frame's atlas (H_watergun_main): what the nozzles' dummy texture stands in for.</summary>
     [Export] public Material AtlasMaterial;
+    /// <summary>TMtxSwingRZ on the tank's jnt_G_handle -- the grips' pendulum -- a SkeletonModifier3D under the tank's Skeleton3D; its
+    /// acceleration, rope and brake are its exports.</summary>
+    [Export] public SmsSwingRZ HandleSwing;
 
     /// <summary>The nozzle node by the port's SmsNozzle index (0 spray, 1 hover, 2 rocket, 3 turbo).</summary>
     public Node3D Nozzle(int i) => i switch { 1 => HoverNozzle, 2 => RocketNozzle, 3 => TurboNozzle, _ => SprayNozzle };

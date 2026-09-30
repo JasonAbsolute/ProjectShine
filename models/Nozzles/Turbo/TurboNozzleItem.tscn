@@ -1,6 +1,7 @@
-[gd_scene load_steps=5 format=3 uid="uid://17eg3z1t2duyo"]
+[gd_scene load_steps=6 format=3 uid="uid://d5fw2onh7kub"]
 
 [ext_resource type="Script" path="res://assets/Sms/SmsNozzleItem.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/GetSparkle.tscn" id="9_fx"]
 [ext_resource type="PackedScene" path="res://models/Nozzles/Turbo/back_nozzle_item.glb" id="2_model"]
 [ext_resource type="Material" path="res://assets/Sms/FluddAtlas.tres" id="3_atlas"]
 
@@ -13,6 +14,7 @@ script = ExtResource("1_script")
 Nozzle = 3
 Model = NodePath("Model")
 Hit = NodePath("Hit")
+GetEffect = ExtResource("9_fx")
 
 [node name="Model" parent="." instance=ExtResource("2_model")]
 transform = Transform3D(0.013433, 0, 0, 0, 0.013433, 0, 0, 0, 0.013433, 0, 0, 0)

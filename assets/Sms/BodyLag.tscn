@@ -1,0 +1,38 @@
+[gd_scene load_steps=6 format=3 uid="uid://ydk4hvu1bqs2"]
+
+[ext_resource type="Script" path="res://assets/Sms/SmsTimeLag.cs" id="1_script"]
+[ext_resource type="Script" path="res://assets/Sms/SmsTimeLagEntry.cs" id="2_entry"]
+
+[sub_resource type="Resource" id="Resource_chest"]
+script = ExtResource("2_entry")
+resource_name = "jnt_chest: /Mario/MtxEffect14.prm -- the shoulders and head trail the chest"
+BoneName = "jnt_chest"
+PosAccel = 0.1
+PosBrake = 0.9
+PosLimitUnits = 5.0
+QuatAccel = 1.0
+QuatBrake = 0.5
+
+[sub_resource type="Resource" id="Resource_armR"]
+script = ExtResource("2_entry")
+resource_name = "jnt_arm_R1: /Mario/MtxEffect16.prm -- the right forearm and hand trail the swing"
+BoneName = "jnt_arm_R1"
+PosAccel = 0.1
+PosBrake = 0.8
+PosLimitUnits = 5.0
+QuatAccel = 0.05
+QuatBrake = 0.8
+
+[sub_resource type="Resource" id="Resource_armL"]
+script = ExtResource("2_entry")
+resource_name = "jnt_arm_L1: /Mario/MtxEffect22.prm -- the left forearm and hand trail the swing"
+BoneName = "jnt_arm_L1"
+PosAccel = 0.1
+PosBrake = 0.8
+PosLimitUnits = 5.0
+QuatAccel = 0.05
+QuatBrake = 0.8
+
+[node name="BodyLag" type="SkeletonModifier3D"]
+script = ExtResource("1_script")
+Bones = [SubResource("Resource_chest"), SubResource("Resource_armR"), SubResource("Resource_armL")]
