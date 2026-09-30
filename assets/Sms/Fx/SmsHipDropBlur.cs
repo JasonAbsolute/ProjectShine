@@ -7,7 +7,7 @@ using Godot;
 /// (ms_m_blur3.jpa, tools jpa_dump.py) is a StripeCross: one point a frame at the emitter (the centre joint, 20 units down and 14.6
 /// forward), each living 10 frames, the points threaded into two crossed ribbons 100 units wide (BSP1 base 2.0 x 50) -- the game's
 /// speed lines above the plummeting Mario; P_msm_blur1 (lerp (39,63,255) -> (255,39,15) by its intensity, repeat, scaled 1.75 x 0.1
-/// and scrolling 0.2 a frame along the stripe) shaped by the second texture P_msm_blurmsk1 (an indirect stage; here the stripe shader's
+/// and scrolling 0.2 a 60 Hz frame along the stripe) shaped by the second texture P_msm_blurmsk1 (an indirect stage; here the stripe shader's
 /// mask). The scene assets/Sms/Fx/HipDropBlur.tscn carries the Trail mesh instance with its ShaderMaterial (stripe_blur.gdshader, both
 /// textures, the scale and the scroll); this script only threads the recorded points into that mesh each frame. The points are kept in
 /// world space (the ribbon does not move with him -- the game's particles are not FollowEmitter). Mario.cs turns the legacy
@@ -21,7 +21,7 @@ public partial class SmsHipDropBlur : SmsFollowEffect
     /// <summary>BSP1 base size X times the quad's 50: the ribbon's width in game units.</summary>
     [Export] public float WidthUnits = 100f;
 
-    /// <summary>BEM1 life: how many game frames (30 Hz) a point stays in the ribbon.</summary>
+    /// <summary>BEM1 life: how many particle frames (60 Hz: the JPA manager is calc'd twice a rendered frame) a point stays in the ribbon.</summary>
     [Export] public int LifeFrames = 10;
 
     private readonly List<(Vector3 pos, float time)> _points = new();
@@ -54,7 +54,7 @@ public partial class SmsHipDropBlur : SmsFollowEffect
         if (_mesh == null)
             return;
         _clock += (float)delta;
-        float life = LifeFrames / 30f;
+        float life = LifeFrames / 60f;
         if (_active)
             _points.Add((GlobalPosition, _clock));
         _points.RemoveAll(p => _clock - p.time > life);

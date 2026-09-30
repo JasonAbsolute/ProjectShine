@@ -253,6 +253,7 @@ public partial class Mario : CharacterBody3D
     private SmsBoneRotZ _fluddSprayAim;                           // NozzleCtrl on the spray nozzle's chn_muzzle_1: a negative gun angle aims it up
     private SmsSwingRZ _fluddHandleSwing;                         // TMtxSwingRZ on the tank's jnt_G_handle: the grips' pendulum
     private bool _smsRunBlendReady;                               // BaseSM has ma_runblend: ma_run1 x ma_run2 by the rate, as the game blends them
+    private bool _smsHipsrInTree;                                 // BaseSM has ma_hipsr (pass 29): the hip drop's start plays through the tree
     private int _smsGaitBand = 1;                                 // doRunningAnimation: 0 = SSTEP, 1 = RUN2 (Walk2Soft / Soft2Walk hysteresis)
     private string _smsGaitClip = "ma_runblend";                  // the clip doRunningAnimation would set this frame
     private float _smsRunRate = 1f, _smsRunMix = 1f;              // its rate (BCK frames a tick x 2 = Godot speed) and the run2 share
@@ -617,8 +618,7 @@ public partial class Mario : CharacterBody3D
 
     public float rotation_angle = 0.0f;
 
-    private SpinJumpEffects spinRingFx;
-    // Pass 28: the game's own Mario particles as scenes under Mario (assets/Sms/Fx), adopted in SmsSetupFx(); the legacy effects
+    // Pass 28: the game's own Mario particles as scenes under Mario (assets/Sms/Fx), adopted in SmsSetupFx() -- required since pass 29
     // above stay only while a scene is missing
     private SmsSpinJumpBlur _smsSpinBlur;      // SpinJumpBlur.tscn: ms_m_blur2 / blur2sp, the rings around the spin
     private SmsHipDropBlur _smsHipBlur;        // HipDropBlur.tscn: ms_m_blur3, the streak above the falling hip drop
@@ -1157,13 +1157,7 @@ public partial class Mario : CharacterBody3D
 
     private float walkingStrength;
 
-    private Node3D SpinJumpEffects;
-    private GpuParticles3D blueSpinEffects;
-    private GpuParticles3D redSpinEffects;
-    private GpuParticles3D whiteSpinEffects;
     private GpuParticles3D footSparks;
-    private GroundPoundEffects groundPoundFx;
-    private GroundPoundImpactFx groundPoundImpactFx;
     private Node3D camControl;
     private Node3D hangAnchor;
 
@@ -1561,8 +1555,6 @@ public partial class Mario : CharacterBody3D
         _lastArmatureYaw = armature.Rotation.Y; // avoid a false turn-rate spike on the first frame
         animPlayer = GetNode<AnimationPlayer>("AnimationPlayer");
         hangAnchor = GetNodeOrNull<Node3D>("Armature/HangAnchor");
-        groundPoundFx = GetNodeOrNull<GroundPoundEffects>("GroundPoundEffects");
-        groundPoundImpactFx = GetNodeOrNull<GroundPoundImpactFx>("GroundPoundImpactFx");
 
         // Tree-climb anims that should loop while in-state.
         foreach (
@@ -1620,7 +1612,8 @@ public partial class Mario : CharacterBody3D
         //Setting up Hands
         setupHandSwaping();
 
-        setupSpinJumpEffects();
+        SetupFootSparks();
+        SetupBonkStars();
         SmsSetupFx();
         //ParticleEffects
 
@@ -1732,6 +1725,7 @@ public partial class Mario : CharacterBody3D
 
         // Get the StateMachine playback from the AnimationTree
         _sm = (AnimationNodeStateMachinePlayback)_tree.Get("parameters/BaseSM/playback");
+        SmsSetupHipsrState(); // pass 29: ma_hipsr as a BaseSM state, so the hip drop's start runs with the tree on
 
         if (_sm == null)
         {
@@ -2437,15 +2431,7 @@ public partial class Mario : CharacterBody3D
                     GD.Print($"[SMS gp] landed: ma_hiped {_groundPoundLandingTimer:F2} s with no inputs, then ma_slped (stick or A cancels it)"
                         + (KeepGroundPoundJump ? " [KeepGroundPoundJump on: A launches the GP-jump]" : ""));
 
-                if (_smsHipLanding != null)
-                    _smsHipLanding.Play(ComputeFeetPosition()); // MS_HIPDROP_C, B, A at mPosition (MarioJump.cpp 1184-1186)
-                else
-                {
-                    TriggerLandingDust();
-
-                    // GP impact effects: the FX itself raycasts down to find the real floor.
-                    groundPoundImpactFx?.Trigger(GlobalPosition);
-                }
+                _smsHipLanding?.Play(ComputeFeetPosition()); // MS_HIPDROP_C, B, A at mPosition (MarioJump.cpp 1184-1186)
             }
             goto EndFrame;
         }
@@ -4840,12 +4826,7 @@ public partial class Mario : CharacterBody3D
         {
             bool fxOn = stateOfMario == MarioState.groundPoundFalling && !_groundPoundStalling;
             if (_smsHipBlur != null)
-            {
                 _smsHipBlur.Active = fxOn;     // emitBlurHipDrop every frame of the fall (MarioJump.cpp 1140)
-                groundPoundFx?.SetActive(false);
-            }
-            else
-                groundPoundFx?.SetActive(fxOn);
         }
 
         // Ground-pound jump 360° spin while rising. Sweep from 0 → 2π * spinTurns.
@@ -5374,34 +5355,15 @@ public partial class Mario : CharacterBody3D
         _smsHipLanding = SmsFluddModel.FindChild<SmsHipDropLanding>(this);
         _smsSpinBlur?.Bind(this);
         _smsHipBlur?.Bind(this);
+        // pass 29: no fallback -- the scenes are the effects; a missing one is an error and that effect simply does not play
         if (_smsSpinBlur == null)
-            GD.PushWarning("[SMS fx] Player.tscn has no SpinJumpBlur under Mario: the legacy SpinJumpEffects rings stay -- instance res://assets/Sms/Fx/SpinJumpBlur.tscn there for the game's (ms_m_blur2 / blur2sp)");
+            GD.PushError("[SMS fx] Player.tscn has no SpinJumpBlur under Mario: instance res://assets/Sms/Fx/SpinJumpBlur.tscn there (the spin's rings, ms_m_blur2 / blur2sp)");
         if (_smsHipBlur == null)
-            GD.PushWarning("[SMS fx] Player.tscn has no HipDropBlur under Mario: the legacy GroundPoundEffects streaks stay -- instance res://assets/Sms/Fx/HipDropBlur.tscn there for the game's (ms_m_blur3)");
+            GD.PushError("[SMS fx] Player.tscn has no HipDropBlur under Mario: instance res://assets/Sms/Fx/HipDropBlur.tscn there (the hip drop's streak, ms_m_blur3)");
         if (_smsHipLanding == null)
-            GD.PushWarning("[SMS fx] Player.tscn has no HipDropLanding under Mario: the legacy GroundPoundImpactFx / landing dust stay -- instance res://assets/Sms/Fx/HipDropLanding.tscn there for the game's (ms_hipdrop_a / b / c)");
+            GD.PushError("[SMS fx] Player.tscn has no HipDropLanding under Mario: instance res://assets/Sms/Fx/HipDropLanding.tscn there (the landing's burst, ms_hipdrop_a / b / c)");
         if (SmsDebugPrint)
-            GD.Print($"[SMS fx] spin rings {(_smsSpinBlur != null ? "from the scene" : "legacy")}, hip drop streak {(_smsHipBlur != null ? "from the scene" : "legacy")}, hip drop landing {(_smsHipLanding != null ? "from the scene" : "legacy")}");
-    }
-
-    private void setupSpinJumpEffects()
-    {
-        // Get the child node that has the SpinJumpEffects script
-        spinRingFx = GetNodeOrNull<SpinJumpEffects>("SpinJumpEffects");
-        if (spinRingFx == null)
-        {
-            GD.PushError(
-                "SpinJumpEffects node is missing OR does not have SpinJumpEffects.cs attached."
-            );
-            return;
-        }
-
-        // No Target / FollowYaw anymore (child of Mario handles positioning)
-        spinRingFx.SetSpinActive(false);
-
-        SetupFootSparks();
-        SetupBonkStars();
-        GD.Print("SpinJumpEffects hooked up OK.");
+            GD.Print($"[SMS fx] spin rings {(_smsSpinBlur != null ? "from the scene" : "MISSING")}, hip drop streak {(_smsHipBlur != null ? "from the scene" : "MISSING")}, hip drop landing {(_smsHipLanding != null ? "from the scene" : "MISSING")}");
     }
 
     private void SetupFootSparks()
@@ -5488,23 +5450,7 @@ public partial class Mario : CharacterBody3D
     private void isSpining(bool isSpining)
     {
         if (_smsSpinBlur != null)
-        {
             _smsSpinBlur.Active = isSpining;   // emitBlurSpinJump every frame of the spin (MarioJump.cpp 1022): the rings run with it
-            spinRingFx?.SetSpinActive(false);  // the legacy rings stay off while the game's run
-        }
-        else if (spinRingFx != null)
-            spinRingFx.SetSpinActive(isSpining);
-
-        // keep your old particles if you still want them
-        if (SpinJumpEffects != null)
-            SpinJumpEffects.Visible = isSpining;
-
-        if (blueSpinEffects != null)
-            blueSpinEffects.Emitting = isSpining;
-        if (whiteSpinEffects != null)
-            whiteSpinEffects.Emitting = isSpining;
-        if (redSpinEffects != null)
-            redSpinEffects.Emitting = isSpining;
     }
 
     private static bool TurnExceedsAngle(Vector3 from, Vector3 to, float angleDeg)
@@ -8010,11 +7956,16 @@ public partial class Mario : CharacterBody3D
     {
         // Enter ground pound startup — freeze in air and play startup anim
         stateOfMario = MarioState.groundPoundStartup;
-        // Play directly via AnimationPlayer (bypass SetMarioState to avoid
-        // the animTree.Active=true / animPlayer.Stop at the top of that method)
-        if (animTree != null)
-            animTree.Active = false;
-        animPlayer.Play("ma_hipsr");
+        if (UseSmsPhysics && _smsHipsrInTree)
+            SetMarioState(MarioState.groundPoundStartup); // pass 29: hipsr through the tree -- the pump / carry blend stays live through the hover (gMarioAnimeData: hipsr and hipat pump, 0x44)
+        else
+        {
+            // Play directly via AnimationPlayer (bypass SetMarioState to avoid
+            // the animTree.Active=true / animPlayer.Stop at the top of that method)
+            if (animTree != null)
+                animTree.Active = false;
+            animPlayer.Play("ma_hipsr");
+        }
         velocity = Vector3.Zero;
         isJumping = false;
         isSpining(false);
@@ -14019,6 +13970,21 @@ public partial class Mario : CharacterBody3D
         }
     }
 
+    /// <summary>ma_hipsr (the hip drop's start) is in the library but not in BaseSM: added as a state (Travel with no path = a teleport),
+    /// so the start plays with the tree ON and the upper body -- the pump / carry blend -- stays live through the 60-tick hover, as the
+    /// game's hipsr allows (gMarioAnimeData 0x3C: upper 0x44). The tree resource is only changed in memory. Without it the legacy
+    /// AnimationPlayer path is used.</summary>
+    private void SmsSetupHipsrState()
+    {
+        if (!UseSmsPhysics || animTree == null || animTree.TreeRoot is not AnimationNodeBlendTree tree || tree.GetNode("BaseSM") is not AnimationNodeStateMachine sm)
+            return;
+        if (!sm.HasNode("ma_hipsr") && animPlayer.HasAnimation("ma_hipsr"))
+            sm.AddNode("ma_hipsr", new AnimationNodeAnimation { Animation = "ma_hipsr" }, new Vector2(2000f, -120f));
+        _smsHipsrInTree = sm.HasNode("ma_hipsr");
+        if (SmsDebugPrint)
+            GD.Print($"[SMS gp] ma_hipsr {(_smsHipsrInTree ? "in BaseSM: the hip drop's start plays through the tree" : "MISSING from the library: the start plays on the AnimationPlayer")}");
+    }
+
     /// <summary>ma_turbo_dash and ma_broad_jump are in the library but not in BaseSM: add them as states (travel / start teleport
     /// to them). The tree resource is only changed in memory.</summary>
     private void SmsFluddSetupTurboAnims()
@@ -15072,9 +15038,14 @@ public partial class Mario : CharacterBody3D
                     animTree.Active = false;
                 break;
             case MarioState.groundPoundStartup:
-                if (animTree != null)
-                    animTree.Active = false;
-                animPlayer.Play("ma_hipsr");
+                if (UseSmsPhysics && _smsHipsrInTree)
+                    _sm.Travel("ma_hipsr"); // no path to it: a teleport; the clip holds its last frame for the rest of the hover, as setAnimation(ANIM_HIPSR) does
+                else
+                {
+                    if (animTree != null)
+                        animTree.Active = false;
+                    animPlayer.Play("ma_hipsr");
+                }
                 break;
             case MarioState.groundPoundFalling:
                 _sm.Travel("ma_hipat");

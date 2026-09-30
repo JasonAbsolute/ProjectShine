@@ -1,22 +1,33 @@
-[gd_scene load_steps=14 format=3 uid="uid://bq5ntr8yh3wek"]
+[gd_scene load_steps=16 format=3 uid="uid://bq5ntr8yh3wek"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsSpinJumpBlur.cs" id="1_script"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/hamonring3_soft.png" id="2_soft"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/hamonring3_flat.png" id="3_flat"]
 
 [sub_resource type="Gradient" id="Gradient_rings"]
+resource_name = "ms_m_blur2 ESP1 alpha 0 -> 1 by 37.5 %, -> 0 from 62.5 %, x prm alpha 159"
 offsets = PackedFloat32Array(0, 0.375, 0.625, 1)
-colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.624, 1, 1, 1, 0.624, 1, 1, 1, 0)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.6235, 1, 1, 1, 0.6235, 1, 1, 1, 0)
 
 [sub_resource type="GradientTexture1D" id="GradientTexture1D_rings"]
 gradient = SubResource("Gradient_rings")
 
 [sub_resource type="Gradient" id="Gradient_inner"]
-offsets = PackedFloat32Array(0, 0.167, 0.375, 0.625, 1)
-colors = PackedColorArray(1, 0.341, 0.282, 0, 0.247, 0.341, 1, 0.445, 0.247, 0.341, 1, 1, 0.247, 0.341, 1, 1, 0.247, 0.341, 1, 0)
+resource_name = "ms_m_blur2sp ESP1 alpha 0 -> 1 by 37.5 %, -> 0 from 62.5 %"
+offsets = PackedFloat32Array(0, 0.375, 0.625, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
 
 [sub_resource type="GradientTexture1D" id="GradientTexture1D_inner"]
 gradient = SubResource("Gradient_inner")
+
+[sub_resource type="Gradient" id="Gradient_inner_colours"]
+resource_name = "ms_m_blur2sp prm: (255,87,72,183) or (63,87,255,255), one picked per ring (calc type Random over a 2-entry table)"
+offsets = PackedFloat32Array(0, 0.5)
+colors = PackedColorArray(1, 0.3412, 0.2824, 0.7176, 0.2471, 0.3412, 1, 1)
+interpolation_mode = 1
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_inner_colours"]
+gradient = SubResource("Gradient_inner_colours")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_rings"]
 lifetime_randomness = 0.0
@@ -26,12 +37,14 @@ emission_ring_axis = Vector3(0, 1, 0)
 emission_ring_height = 0.672
 emission_ring_radius = 0.0067
 emission_ring_inner_radius = 0.0
+angle_min = 0.0
+angle_max = 360.0
 direction = Vector3(0, 1, 0)
 spread = 0.0
 initial_velocity_min = 0.0
 initial_velocity_max = 0.0
-angular_velocity_min = -3240.0
-angular_velocity_max = -3240.0
+angular_velocity_min = -3234.6
+angular_velocity_max = -3234.6
 gravity = Vector3(0, 0, 0)
 color_ramp = SubResource("GradientTexture1D_rings")
 
@@ -43,17 +56,19 @@ emission_ring_axis = Vector3(0, 1, 0)
 emission_ring_height = 1.343
 emission_ring_radius = 0.0067
 emission_ring_inner_radius = 0.0
+angle_min = 0.0
+angle_max = 360.0
 direction = Vector3(0, 1, 0)
 spread = 0.0
 initial_velocity_min = 0.0
 initial_velocity_max = 0.0
-angular_velocity_min = -3240.0
-angular_velocity_max = -3240.0
+angular_velocity_min = -3234.6
+angular_velocity_max = -3234.6
 gravity = Vector3(0, 0, 0)
 color_ramp = SubResource("GradientTexture1D_inner")
-
+color_initial_ramp = SubResource("GradientTexture1D_inner_colours")
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_rings"]
-resource_name = "spin ring (ms_m_blur2: P_msm_hamonring3 lerp (183,231,255) -> white, alpha 159, mix)"
+resource_name = "spin ring (ms_m_blur2: P_msm_hamonring3 lerp (183,231,255) -> white, mix)"
 transparency = 1
 cull_mode = 2
 shading_mode = 0
@@ -62,7 +77,7 @@ albedo_texture = ExtResource("2_soft")
 disable_receive_shadows = true
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_inner"]
-resource_name = "small spin ring (ms_m_blur2sp: P_msm_hamonring3 as alpha, flat prm (63,87,255), mix)"
+resource_name = "small spin ring (ms_m_blur2sp: P_msm_hamonring3 as alpha, flat prm red or blue, mix)"
 transparency = 1
 cull_mode = 2
 shading_mode = 0
@@ -91,7 +106,7 @@ OffsetInOwnerFrame = true
 [node name="Rings" type="GPUParticles3D" parent="."]
 emitting = false
 amount = 18
-lifetime = 0.2
+lifetime = 0.1
 local_coords = true
 visibility_aabb = AABB(-2, -2, -2, 4, 4, 4)
 process_material = SubResource("ParticleProcessMaterial_rings")
@@ -100,7 +115,7 @@ draw_pass_1 = SubResource("QuadMesh_rings")
 [node name="InnerRings" type="GPUParticles3D" parent="."]
 emitting = false
 amount = 18
-lifetime = 0.2
+lifetime = 0.1
 local_coords = true
 visibility_aabb = AABB(-2, -2, -2, 4, 4, 4)
 process_material = SubResource("ParticleProcessMaterial_inner")
