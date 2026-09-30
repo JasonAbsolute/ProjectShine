@@ -21,10 +21,6 @@
 [node name="Koopa" unique_id=1979298595 instance=ExtResource("1_base")]
 Profile = ExtResource("4_profile")
 
-[node name="SpinJumpEffects" parent="." index="10" unique_id=821645171]
-UpperRingColor = Color(1, 0.8, 0.15, 1)
-LowerRingColor = Color(0.25, 0.85, 0.3, 1)
-
 [node name="Mesh_0" parent="Armature/Skeleton3D" parent_id_path=PackedInt32Array(1267083812) index="0" unique_id=1070017404]
 mesh = ExtResource("2_mesh")
 skin = ExtResource("3_skin")

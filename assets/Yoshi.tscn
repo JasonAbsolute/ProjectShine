@@ -13,10 +13,6 @@
 [node name="Yoshi" unique_id=1500100003 instance=ExtResource("1_base")]
 Profile = ExtResource("4_profile")
 
-[node name="SpinJumpEffects" parent="." index="10" unique_id=821645171]
-UpperRingColor = Color(0.55, 0.95, 0.45, 1)
-LowerRingColor = Color(0.31, 0.76, 0.31, 1)
-
 [node name="Mesh_0" parent="Armature/Skeleton3D" parent_id_path=PackedInt32Array(1267083812) index="0" unique_id=1070017404]
 mesh = ExtResource("2_mesh")
 skin = ExtResource("3_skin")

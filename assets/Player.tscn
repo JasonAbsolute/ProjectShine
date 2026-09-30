@@ -2,24 +2,16 @@
 
 [ext_resource type="Texture2D" uid="uid://bksq71eu8uv6j" path="res://models/Mario/NewestMario/untitled_ma_mdl1_0.png" id="1_j5888"]
 [ext_resource type="Script" uid="uid://busehiq6d11sc" path="res://assets/Mario.cs" id="1_yvioq"]
-[ext_resource type="PackedScene" uid="uid://g3g83bjl2d8k" path="res://Font/HudElements/YellowCoinHud.tscn" id="2_0eldc"]
 [ext_resource type="PackedScene" uid="uid://dih7m3fgfluex" path="res://assets/ZEffectSpawner.tscn" id="2_fspsy"]
-[ext_resource type="PackedScene" uid="uid://b3sl0a4qttndu" path="res://Font/LifeMeter/LifeMeter.tscn" id="2_fvtel"]
 [ext_resource type="Texture2D" uid="uid://l836sqjv2hyj" path="res://models/Mario/NewestMario/untitled_ma_mdl1_1.png" id="2_yvioq"]
-[ext_resource type="PackedScene" uid="uid://dqohgxy44rds2" path="res://assets/SpinJumpEffects.tscn" id="3_k1plj"]
 [ext_resource type="Texture2D" uid="uid://m1hfmw0snv70" path="res://models/Mario/NewestMario/untitled_ma_mdl1_2.png" id="3_kapf1"]
 [ext_resource type="Animation" uid="uid://dulif6xi10410" path="res://models/ma_2jmp1.res" id="4_baiqo"]
-[ext_resource type="PackedScene" uid="uid://cis4mujjvm0ym" path="res://Font/HudElements/BlueCoinHud.tscn" id="5_40wi0"]
 [ext_resource type="Animation" uid="uid://g6g6gtqqg4to" path="res://models/ma_2jmp2.res" id="5_ec4k7"]
 [ext_resource type="Animation" uid="uid://dam3ygce2xapg" path="res://models/ma_bdwn.res" id="6_l6cxq"]
-[ext_resource type="PackedScene" uid="uid://j2vnciyq44f8" path="res://Font/HudElements/LifeCounterHud.tscn" id="6_oqidx"]
-[ext_resource type="PackedScene" path="res://Font/HudElements/ShineHud.tscn" id="7_shine"]
 [ext_resource type="Animation" uid="uid://bup47aorsfnre" path="res://models/ma_belt_up.res" id="7_ts6f3"]
 [ext_resource type="Animation" uid="uid://c0jn3q7trdy0a" path="res://models/ma_bkdwn.res" id="8_1qsuo"]
-[ext_resource type="Script" uid="uid://bqdv5f5ty7phx" path="res://assets/GroundPoundImpactFx.cs" id="8_e34sd"]
 [ext_resource type="PackedScene" uid="uid://koh46o6nupbd" path="res://models/Mario/Godot/LeftHandClosed.glb" id="8_uiq8p"]
 [ext_resource type="PackedScene" uid="uid://c40eyg4jepfu" path="res://models/Mario/Godot/LeftHandSlightyOpen.glb" id="9_fvtel"]
-[ext_resource type="Script" uid="uid://dc6ubvwr2ovq" path="res://assets/GroundPoundEffects.cs" id="9_n16kq"]
 [ext_resource type="Animation" uid="uid://ddqx8ox8tt8ef" path="res://models/ma_bottle_in.res" id="9_uiq8p"]
 [ext_resource type="PackedScene" uid="uid://c8snb30tfiflq" path="res://models/Mario/Godot/RightHandClosed.glb" id="10_0eldc"]
 [ext_resource type="Animation" uid="uid://dpk1e3bxn24a5" path="res://models/ma_brake.res" id="10_fvtel"]
@@ -40,6 +32,7 @@
 [ext_resource type="Animation" uid="uid://c3i426ae5olga" path="res://models/ma_demo_gate_out_get.res" id="21_xfjw6"]
 [ext_resource type="Script" uid="uid://6vwrqqicp7v2" path="res://assets/FootIK.cs" id="22_2gwog"]
 [ext_resource type="Animation" uid="uid://cn5jppgxx2uya" path="res://models/ma_demo_gate_out_rolling.res" id="22_ho2cb"]
+[ext_resource type="PackedScene" uid="uid://jb8i87ogfqr3" path="res://assets/Sms/Fludd.tscn" id="23_41jf1"]
 [ext_resource type="Animation" uid="uid://cswfpoqowlmnf" path="res://models/ma_demo_gate_out_rolling_get.res" id="23_qxi35"]
 [ext_resource type="Animation" uid="uid://bgm36xc24n621" path="res://models/ma_demo_shine_get.res" id="24_o4vgg"]
 [ext_resource type="Animation" uid="uid://clfia211imc6w" path="res://models/ma_demo_shine_get_yo.res" id="25_1tj8b"]
@@ -220,9 +213,13 @@
 [ext_resource type="Animation" uid="uid://bd45rn3wiut4" path="res://models/ma_yo_slide_start.res" id="200_lwrd4"]
 [ext_resource type="Animation" uid="uid://dhaw53r18uxpo" path="res://models/ma_yo_wait.res" id="201_ssp55"]
 [ext_resource type="Animation" uid="uid://c2ftru1qe8eu" path="res://models/ma_yo_walk.res" id="202_rtmdj"]
-[ext_resource type="PackedScene" uid="uid://bqwg6es2jda63" path="res://Font/HudElements/RedCoinHud.tscn" id="216_odpnk"]
 [ext_resource type="Script" uid="uid://dianny6rkb58v" path="res://assets/LandingDustFx.cs" id="221_e34sd"]
 [ext_resource type="Script" uid="uid://du4jonomstobn" path="res://assets/SlideDustFx.cs" id="222_fpjfl"]
+[ext_resource type="PackedScene" uid="uid://c6c6d7ilicljx" path="res://assets/Sms/Console/SmsHud.tscn" id="225_gifgd"]
+[ext_resource type="PackedScene" uid="uid://bq5ntr8yh3wek" path="res://assets/Sms/Fx/SpinJumpBlur.tscn" id="226_od6ah"]
+[ext_resource type="PackedScene" uid="uid://dm7kq2xf4tcbs" path="res://assets/Sms/Fx/HipDropBlur.tscn" id="227_xnbyg"]
+[ext_resource type="PackedScene" uid="uid://ch8vwy3mp6qrd" path="res://assets/Sms/Fx/HipDropLanding.tscn" id="228_ahpw5"]
+[ext_resource type="PackedScene" uid="uid://ydk4hvu1bqs2" path="res://assets/Sms/BodyLag.tscn" id="229_bdylg"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_fpjfl"]
 height = 1.8701391
@@ -1258,6 +1255,9 @@ animation = &"ma_get_fail"
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_1epy6"]
 animation = &"ma_hang"
 
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_254f5"]
+animation = &"ma_hgup"
+
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_jifwe"]
 animation = &"ma_hipat"
 
@@ -1378,6 +1378,9 @@ animation = &"ma_swlkl"
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_o0rd8"]
 animation = &"ma_swlkr"
 
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_41jf1"]
+animation = &"ma_throw"
+
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_bp5tr"]
 animation = &"ma_throw"
 
@@ -1452,6 +1455,8 @@ states/ma_get_fail/node = SubResource("AnimationNodeAnimation_d1r44")
 states/ma_get_fail/position = Vector2(993, 128)
 states/ma_hang/node = SubResource("AnimationNodeAnimation_1epy6")
 states/ma_hang/position = Vector2(534, 326)
+states/ma_hgup/node = SubResource("AnimationNodeAnimation_254f5")
+states/ma_hgup/position = Vector2(666, 524)
 states/ma_hipat/node = SubResource("AnimationNodeAnimation_jifwe")
 states/ma_hipat/position = Vector2(1143, 155)
 states/ma_hiped/node = SubResource("AnimationNodeAnimation_cptog")
@@ -1534,6 +1539,8 @@ states/ma_swlkr/node = SubResource("AnimationNodeAnimation_o0rd8")
 states/ma_swlkr/position = Vector2(801, 190)
 states/ma_throw/node = SubResource("AnimationNodeAnimation_bp5tr")
 states/ma_throw/position = Vector2(-111, 161)
+"states/ma_throw 2/node" = SubResource("AnimationNodeAnimation_41jf1")
+"states/ma_throw 2/position" = Vector2(51, 451)
 states/ma_tjmp1/node = SubResource("AnimationNodeAnimation_ecv1e")
 states/ma_tjmp1/position = Vector2(11, 188)
 "states/ma_tjmp1 2/node" = SubResource("AnimationNodeAnimation_ystjr")
@@ -2107,51 +2114,12 @@ HeadJiggleDamping = 10.5
 ArmJiggleStiffness = 310.0
 ArmJiggleDamping = 10.0
 
-[node name="YellowCoinHud" parent="." unique_id=1424122957 instance=ExtResource("2_0eldc")]
-position = Vector2(17, 27)
-rotation = -0.20629
-
-[node name="RedCoinHud" parent="." unique_id=2010012293 instance=ExtResource("216_odpnk")]
-position = Vector2(20, 573)
-rotation = -0.293949
-
-[node name="LifeMeter" parent="." unique_id=870871546 instance=ExtResource("2_fvtel")]
-position = Vector2(1028, 6)
-
-[node name="BlueCoinHud" parent="." unique_id=367753629 instance=ExtResource("5_40wi0")]
-position = Vector2(18, 29)
-rotation = -0.218227
-
-[node name="LifeCounterHud" parent="." unique_id=599146510 instance=ExtResource("6_oqidx")]
-position = Vector2(481, 2)
-
-[node name="ShineHud" parent="." unique_id=757802094 instance=ExtResource("7_shine")]
-position = Vector2(17, 26)
-rotation = -0.199859
-
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1722564732]
 transform = Transform3D(0.994345, 0, 0.106195, 0, 1, 0, -0.106195, 0, 0.994345, 0, 0.9410591, 0.115657)
 shape = SubResource("CylinderShape3D_fpjfl")
 debug_color = Color(0, 0.6, 0.701961, 0.964706)
 
-[node name="GroundPoundImpactFx" type="Node3D" parent="." unique_id=1364110676]
-script = ExtResource("8_e34sd")
-BurstTiltFromVerticalDeg = 53.713
-BlueStreakSpeed = 19.0
-BlueStreakLifetime = 0.15
-
 [node name="ZEffectSpawner" parent="." unique_id=808108222 instance=ExtResource("2_fspsy")]
-
-[node name="GroundPoundEffects" type="Node3D" parent="." unique_id=2021272853]
-script = ExtResource("9_n16kq")
-StreakLifetime = 0.15
-AmountPerColor = 24
-StreakSize = Vector2(0.25, 0.8)
-MaxAlpha = 0.093
-WhiteAmountMul = 0.0
-
-[node name="SpinJumpEffects" parent="." unique_id=821645171 instance=ExtResource("3_k1plj")]
-transform = Transform3D(1.495, 0, 0, 0, 1.495, 0, 0, 0, 1.495, 0, 1.01732, 0)
 
 [node name="CamController" type="Node3D" parent="." unique_id=325679756]
 script = ExtResource("12_e34sd")
@@ -2471,6 +2439,15 @@ script = ExtResource("22_2gwog")
 FootOffset = 0.165
 HipDropToLowest = 1.0
 
+[node name="BodyLag" parent="Armature/Skeleton3D" instance=ExtResource("229_bdylg")]
+
+[node name="SmsFluddAttach" type="BoneAttachment3D" parent="Armature/Skeleton3D" unique_id=160108726]
+transform = Transform3D(-2.958005e-05, 0.0005775978, 0.99999976, 0.9880221, -0.15431309, 0.000118356606, 0.15431307, 0.9880219, -0.0005661148, 0.0140279755, 53.62667, -0.371227)
+bone_name = "jnt_chest"
+bone_idx = 14
+
+[node name="Fludd" parent="Armature/Skeleton3D/SmsFluddAttach" unique_id=1544978701 instance=ExtResource("23_41jf1")]
+
 [node name="WaistTarget" type="Marker3D" parent="Armature" unique_id=1533033907]
 transform = Transform3D(-0.000108465, 0, 2481.38, 0, 2481.38, 0, -2481.38, 0, -0.000108465, 0, 0, 0)
 
@@ -2506,5 +2483,13 @@ script = ExtResource("221_e34sd")
 
 [node name="SlideDustFx" type="Node3D" parent="." unique_id=1401822925]
 script = ExtResource("222_fpjfl")
+
+[node name="SmsHud" parent="." unique_id=888263540 instance=ExtResource("225_gifgd")]
+
+[node name="SpinJumpBlur" parent="." unique_id=2082751866 instance=ExtResource("226_od6ah")]
+
+[node name="HipDropBlur" parent="." unique_id=397030313 instance=ExtResource("227_xnbyg")]
+
+[node name="HipDropLanding" parent="." unique_id=1584372963 instance=ExtResource("228_ahpw5")]
 
 [editable path="Armature/Skeleton3D/RightHandBone/RightHandClosed/Model"]

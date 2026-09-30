@@ -3216,3 +3216,29 @@ m" while rising) -- 1:1, and what he saw. DEVIATION: SmsParams.Jump.LedgeLandWhi
 (single / double / triple, the rotate jumps, the back flip, the wall kick: SmsIsJumpState) a rising jump (preMoveVel.Y > 0) skips the
 step-up, so the riser stays a wall until he clears it and he lands on the way down as his arc says; the dives, rollouts and the stomp
 keep the game's rule (a dive from the foot of a staircase still lands on the first riser). true = the game.
+
+### Pass 32 -- the legacy HUD and effect nodes and their files out of the project
+
+Jaysonn (2026-09-30 01:58): "cant you remove the legacy files?" -- pass 31 left his six legacy HUD nodes and the three legacy effect
+nodes in Player.tscn for him to delete (hidden by name, with a warning). Done here instead, with the editor closed.
+
+**Player.tscn.** The nine nodes and their ext_resources are gone: `YellowCoinHud`, `RedCoinHud`, `LifeMeter`, `BlueCoinHud`,
+`LifeCounterHud`, `ShineHud` (the console -- SmsHud.tscn -- draws every one of them from Mario's fields), `GroundPoundImpactFx`,
+`GroundPoundEffects`, `SpinJumpEffects` (the Fx scenes HipDropLanding / HipDropBlur / SpinJumpBlur replaced them in pass 29). The
+`Font/LifeMeter/LifeMeter.tscn` FILE stays: it is the console's life meter (pass 30). `assets/Sms/BodyLag.tscn` is now instanced as
+`BodyLag` under `Armature/Skeleton3D` (the body's time lag from the scene's exports, as the run log had been asking since pass 27). His
+pending Player.tscn edits (the FLUDD attach, SmsHud, the three Fx instances, two AnimationTree states) are committed with it.
+
+**The six inherited character scenes** (Koopa, Luigi, Piantissimo, Waluigi, Wario, Yoshi) overrode the ring colours of the removed
+`SpinJumpEffects` node; the override blocks are gone (a node override on a node the base no longer has). The spin blur is the game's
+disc now (SpinJumpBlur.tscn) with the .jpa's colours; a per-character tint would be an export on that scene if wanted.
+
+**Code.** `SmsStandardHudSetup` no longer looks for or hides the legacy nodes. `TimerHud` no longer nudges the legacy `RedCoinHud`
+(field, `RedCoinHudPath` export, lookup and the two `SetTimerActive` calls removed -- the console lays the red coins out). The two
+level scenes (Rico4Secret.tscn, secrect_level.tscn) still carry a saved `RedCoinHudPath = NodePath(...)` value for that export; Godot
+ignores a saved property the script no longer has, and the line drops out the next time those levels are saved.
+
+**Deleted.** `Font/HudElements/{LifeCounterHud,YellowCoinHud,RedCoinHud,BlueCoinHud,ShineHud}.{cs,tscn}` (+ .uid), their
+`HudCountBurst.cs`, `assets/SpinJumpEffects.{cs,tscn,gdshader}` (+ .uid), `assets/GroundPoundEffects.cs`, `assets/GroundPoundImpactFx.cs`
+(+ .uid). The HUD atlas art (`hud.png`, the `coin*.tres` / `marioHeadIcon.tres` / `marioTextHud.tres` / `shineHudElement.tres` atlas
+textures) stays: TimerHud.tscn still reads `coinBackground.tres` / `coin0.tres`, ShineGetPopup the letters.

@@ -12457,9 +12457,8 @@ public partial class Mario : CharacterBody3D
             && stateOfMario != MarioState.dead;
     }
 
-    /// <summary>TGCConsole2 for the counters and the life meter (SmsStandardHud): built with his counts so nothing rolls at the start;
-    /// his own HUD nodes (LifeMeter, LifeCounterHud, YellowCoinHud, RedCoinHud, BlueCoinHud, ShineHud) are hidden, their methods still
-    /// called harmlessly. Code only: the scene is his.</summary>
+    /// <summary>TGCConsole2 for the counters and the life meter (SmsStandardHud): built with his counts so nothing rolls at the start.
+    /// Code only: the scene is his.</summary>
     private void SmsStandardHudSetup()
     {
         if (!UseSmsPhysics || _stdHud != null)
@@ -12471,16 +12470,6 @@ public partial class Mario : CharacterBody3D
             return;
         }
         SmsStandardHudFeed();
-        // the legacy HUD nodes: nothing drives them any more (pass 31); while they are still in Player.tscn they are hidden here once
-        var legacy = new System.Collections.Generic.List<string>();
-        foreach (string name in new[] { "LifeMeter", "LifeCounterHud", "YellowCoinHud", "RedCoinHud", "BlueCoinHud", "ShineHud" })
-            if (GetNodeOrNull<CanvasItem>(name) is CanvasItem n)
-            {
-                n.Visible = false;
-                legacy.Add(name);
-            }
-        if (legacy.Count > 0)
-            GD.PushWarning($"[SMS hud] Player.tscn still carries the legacy HUD nodes {string.Join(", ", legacy)} -- the console draws all of it; delete them (hidden for now)");
         CallDeferred(nameof(SmsStandardHudFindLevelNodes)); // his TimerHud and ShineTimer live in the level scene
         if (SmsDebugPrint)
             GD.Print(_stdHud.Ready

@@ -5,20 +5,12 @@ using Godot;
 /// assets/ShineTimer.cs) — MM:SS:CC (minutes:seconds:centiseconds), matching
 /// the real game's precision rather than whole seconds. Purely a presenter —
 /// reads the timer's value off TimerTick and formats it; has no opinion on
-/// what starting/stopping/reaching-target means for gameplay. Same wave-in/out
-/// show/hide animation as RedCoinHud/BlueCoinHud/YellowCoinHud.
-///
-/// Also nudges RedCoinHud (see RedCoinHud.SetTimerActive) up out of the way
-/// while this is showing, so the two stack instead of overlapping — matches
-/// the reference layout (red coin count on top, timer directly below it).
+/// what starting/stopping/reaching-target means for gameplay. Wave-in/out
+/// show/hide animation.
 /// </summary>
 public partial class TimerHud : Node2D
 {
     [Export] public NodePath TimerPath;
-
-    /// <summary>Optional — if set, this HUD is told to shift up while the timer
-    /// is visible (see RedCoinHud.SetTimerActive) so the two stack cleanly.</summary>
-    [Export] public NodePath RedCoinHudPath;
 
     /// <summary>Below this many seconds remaining (CountDown timers only), the
     /// digits flash red to signal urgency.</summary>
@@ -32,7 +24,6 @@ public partial class TimerHud : Node2D
     [Export] public float HiddenOffsetY = 200f;
 
     private ShineTimer _timer;
-    private RedCoinHud _redCoinHud;
 
     private TextureRect _minTens;
     private TextureRect _minOnes;
@@ -92,8 +83,6 @@ public partial class TimerHud : Node2D
         _offScreenPos = new Vector2(Position.X, Position.Y + HiddenOffsetY);
         Position = _offScreenPos;
         ResetElements();
-
-        _redCoinHud = GetNodeOrNull<RedCoinHud>(RedCoinHudPath);
 
         _timer = GetNodeOrNull<ShineTimer>(TimerPath);
         if (_timer == null)
@@ -168,8 +157,6 @@ public partial class TimerHud : Node2D
                 .SetEase(Tween.EaseType.Out)
                 .SetTrans(Tween.TransitionType.Back);
         }
-
-        _redCoinHud?.SetTimerActive(true);
     }
 
     public void HideHud()
@@ -179,8 +166,6 @@ public partial class TimerHud : Node2D
         _posTween.TweenProperty(this, "position", _offScreenPos, 0.2f)
             .SetEase(Tween.EaseType.In)
             .SetTrans(Tween.TransitionType.Quad);
-
-        _redCoinHud?.SetTimerActive(false);
     }
 
     private void ResetElements()
