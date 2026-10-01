@@ -3446,3 +3446,8 @@ off and done including with the air health meter also for swimming". TGCConsole2
   export, on); the beep is a `LifeBeep` AudioStreamPlayer slot on the console's StandardHud (SmsHud.tscn), his to fill.
 - Already there: the air mode's cyan remap and its low-air blue (pass 29), the meter appearing at a hit mid-screen and curving home, the
   air meter after 240 frames under water, the fade in the pause menu is not ported (no pause menu yet).
+
+### Pass 41 -- CameraShake.tscn instanced
+
+`res://assets/Sms/CameraShake.tscn` is instanced under Mario in `Player.tscn` (the pass-39 to-do), so the hip drop, super hip drop
+and damage shakes play and the boot no longer errors about the missing node. The `[SMS fx]` debug line names it with the other scenes.

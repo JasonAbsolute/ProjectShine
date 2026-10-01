@@ -5336,7 +5336,7 @@ public partial class Mario : CharacterBody3D
         if (_smsCameraShake == null)
             GD.PushError("[SMS camera] Player.tscn has no CameraShake under Mario: instance res://assets/Sms/CameraShake.tscn there (gpCameraShake: the hip drop, super hip drop and damage shakes)");
         if (SmsDebugPrint)
-            GD.Print($"[SMS fx] spin rings {(_smsSpinBlur != null ? "from the scene" : "MISSING")}, hip drop streak {(_smsHipBlur != null ? "from the scene" : "MISSING")}, hip drop landing {(_smsHipLanding != null ? "from the scene" : "MISSING")}, super hip drop fall {(_smsSuperHipBlur != null ? "from the scene" : "MISSING")} / landing {(_smsSuperHipLanding != null ? "from the scene" : "MISSING")}, bonk stars {(_smsBonkStars != null ? "from the scene" : "MISSING")}");
+            GD.Print($"[SMS fx] spin rings {(_smsSpinBlur != null ? "from the scene" : "MISSING")}, hip drop streak {(_smsHipBlur != null ? "from the scene" : "MISSING")}, hip drop landing {(_smsHipLanding != null ? "from the scene" : "MISSING")}, super hip drop fall {(_smsSuperHipBlur != null ? "from the scene" : "MISSING")} / landing {(_smsSuperHipLanding != null ? "from the scene" : "MISSING")}, bonk stars {(_smsBonkStars != null ? "from the scene" : "MISSING")}, camera shake {(_smsCameraShake != null ? "from the scene" : "MISSING")}");
     }
 
     /// <summary>The first <typeparamref name="T"/> under <paramref name="root"/>, not looking inside another effect's scene (the super
