@@ -3571,3 +3571,10 @@ they seem to load later but this should not happen."
   0.015 as a rate on its own and called it too slow -- the multiplier is the raw 0..150 analog.)
 - Checked and already in, nothing changed: setBaseTRMtx's roll tweak (-0x1800 x (1 - |mtx[1][0]|) about the spine, the tank pitched
   33.75 deg off his belly when he lies flat).
+
+### Pass 47 -- water: a heal under water refills the air
+- **incHP() under water (a port gap).** TMario::incHP (MarioCollision.cpp 25): while isUnderWater() (the pass-42 rule: head below the
+  surface less CanBreathDepth) a heal goes to mAir -- capped at mMaxAir -- not to mHealth, so a coin taken while submerged puts a
+  unit of air back (the blue meter steps up, LifeUp); on land it goes to the health as before. MSD_SE_SY_HP_RECOVER plays either way
+  when the heal was not already full: the `Mario.HpRecover` slot (an AudioStreamPlayer -- a system SE, not positional). The coins call
+  HealOneHP (a red coin twice), which is now incHP(1).

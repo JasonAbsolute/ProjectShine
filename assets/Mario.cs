@@ -14711,11 +14711,34 @@ public partial class Mario : CharacterBody3D
         }
     }
 
-    public void HealOneHP()
+    /// <summary>The coins' heal: TMario::incHP(1) (a red coin calls it twice).</summary>
+    public void HealOneHP() => SmsIncHP(1);
+
+    /// <summary>MSD_SE_SY_HP_RECOVER (incHP: a heal that was not already full): an AudioStreamPlayer anywhere under Mario with the
+    /// sound in its Stream; empty = silent.</summary>
+    [Export] public AudioStreamPlayer HpRecover;
+
+    /// <summary>TMario::incHP (MarioCollision.cpp 25): under water (isUnderWater(): head below the surface less CanBreathDepth) the
+    /// heal goes to the AIR, capped at mMaxAir -- a coin taken while submerged refills a unit of air and the meter steps back up --
+    /// otherwise to the health, capped at HPMax; MSD_SE_SY_HP_RECOVER either way when it was not already full (pass 47).</summary>
+    public void SmsIncHP(int hp)
     {
+        if (UseSmsPhysics && SmsIsUnderWater())
+        {
+            if (_smsAir >= _smsMaxAir)
+                return;
+            _smsAir = MathF.Min(_smsAir + hp, _smsMaxAir);
+            if (HpRecover != null && HpRecover.Stream != null)
+                HpRecover.Play();
+            if (SmsDebugPrint)
+                GD.Print($"[SMS air] +{hp} air from a heal under water -> {_smsAir:F2}");
+            return;
+        }
         if (_health >= StartingHealth)
             return;
-        _health = Mathf.Min(_health + 1, StartingHealth);
+        _health = Mathf.Min(_health + hp, StartingHealth);
+        if (HpRecover != null && HpRecover.Stream != null)
+            HpRecover.Play();
     }
 
     public int AddRedCoin()
