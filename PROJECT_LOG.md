@@ -3353,3 +3353,21 @@ game). `SmsBonkStars.PlayHit(at)` spawns the hit variant through `SmsUnboundBurs
 copy before it emits); Mario.cs routes the two damage sites (ground / swim damageExec) and `SmsDownGroundAnim()` (the knockdown status's
 own burst: a ground hit's second, an air knockdown's landing) through `SpawnHitStars`. The bonk at the wall and its own landing
 (TickBonk -> SHORT_BACK_DOWN) keep the full burst, which he approved.
+
+### Pass 37 -- the last stand-ins become errors
+
+The no-legacy rule (pass 29 on: modify or replace, no fallbacks): four places still quietly built a stand-in when a scene node was
+missing. They now log one `PushError` naming the node to instance and leave that feature off, like the Fx scenes since pass 29:
+
+- the FLUDD pack: `SmsFluddSetup` no longer creates the `SmsFluddAttach` BoneAttachment3D nor hangs the pack from the rips
+  (`SmsFluddModel.Build`); without the attachment or the Fludd scene under it there is no FLUDD. `SmsFluddModel.Build`, `Parts`,
+  `LoadScene`, `TankMaterials` (the code-built tank's MAT3 fixes, with a texture-file fallback of its own; the scene's .tres
+  materials do this since pass 19), `Dir`, `NozzleFolder`, `NozzleBindPosition` and Mario.cs's unused `SmsLoadScene` /
+  `SmsFindChild` wrappers are deleted; the class keeps NozzleMaterial (the nozzle items' atlas) and the shared node helpers.
+- the grips' pendulum: `SmsFluddSetupHandleSwing` no longer builds an SmsSwingRZ when Fludd.tscn lacks its `HandleSwing` node.
+- the body's time lag: `SmsWaistSetup` no longer builds an SmsTimeLag when Player.tscn lacks `BodyLag` under Armature/Skeleton3D.
+- the console: `SmsHudLayerGet` no longer instances SmsHud.tscn from the file when Player.tscn lacks the `SmsHud` node (the error
+  once; the counters, life meter, gauge and balloon stay off).
+
+`SmsParams.MtxEffect` keeps the shipped MtxEffect numbers as reference (the scenes carry them as exports). Player.tscn has every node
+(pass 32), so nothing changes for the game as it is; the errors are for a Player scene that loses one.

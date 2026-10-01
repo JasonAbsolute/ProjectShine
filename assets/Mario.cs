@@ -12003,10 +12003,6 @@ public partial class Mario : CharacterBody3D
     // the nozzles' shoot clips. No water yet (S2), no hover / rocket / turbo (S3-S5).
     // ---------------------------------------------------------------------------------------------------------------
 
-    private static PackedScene SmsLoadScene(string basePath) => SmsFluddModel.LoadScene(basePath);
-
-    private static T SmsFindChild<T>(Node root) where T : Node => SmsFluddModel.FindChild<T>(root);
-
     /// <summary>The stage's MARIO_FLAG_HAS_FLUDD: the Level above him (his Level.cs, its HasFludd export); a Mario with no Level over
     /// him (a test scene) has the pack.</summary>
     private bool SmsLevelHasFludd()
@@ -12048,12 +12044,13 @@ public partial class Mario : CharacterBody3D
         // for it, is the fixed upper-body root in every BCK and would put the tank below his feet -- see PROJECT_LOG).
         // The pack is a scene: Player.tscn carries a BoneAttachment3D named SmsFluddAttach under Armature/Skeleton3D with
         // assets/Sms/Fludd.tscn instanced under it (the tank, the nozzle seat, the four nozzles, the materials -- all his to edit).
-        // Adopted here, its bone forced. Without the scene the same pack is built from code (SmsFluddModel.Build), with a warning.
+        // Adopted here, its bone forced. No stand-in (pass 37): a Player scene without the attachment or the Fludd scene has no FLUDD,
+        // and one error names what to instance.
         _fluddAttach = skeleton.GetNodeOrNull<BoneAttachment3D>("SmsFluddAttach");
         if (_fluddAttach == null)
         {
-            _fluddAttach = new BoneAttachment3D { Name = "SmsFluddAttach" };
-            skeleton.AddChild(_fluddAttach);
+            GD.PushError("[SMS fludd] Player.tscn has no SmsFluddAttach (BoneAttachment3D) under Armature/Skeleton3D: no FLUDD -- add it there with res://assets/Sms/Fludd.tscn instanced under it");
+            return;
         }
         _fluddAttach.BoneName = "jnt_chest";
         _fluddAttach.Visible = true; // the seat hidden by a stage without the FLUDD
@@ -12062,7 +12059,7 @@ public partial class Mario : CharacterBody3D
         {
             if (fludd.Tank == null || fludd.NozzleSeat == null)
             {
-                GD.PushWarning("[SMS fludd] Fludd.tscn: the Tank / NozzleSeat exports are not set -- no FLUDD");
+                GD.PushError("[SMS fludd] Fludd.tscn: the Tank / NozzleSeat exports are not set -- no FLUDD");
                 return;
             }
             _fluddTank = fludd.Tank;
@@ -12086,21 +12083,8 @@ public partial class Mario : CharacterBody3D
         }
         else
         {
-            GD.PushWarning("[SMS fludd] Player.tscn has no Fludd scene under Armature/Skeleton3D/SmsFluddAttach: the pack is built from code -- instance res://assets/Sms/Fludd.tscn there to see and edit it in the editor");
-            var parts = SmsFluddModel.Build(_fluddAttach, (int)_fluddNozzle);
-            if (parts == null)
-                return;
-            _fluddTank = parts.Tank;
-            _fluddAtlasMaterial = parts.Atlas;
-            _fluddTankSkel = parts.TankSkel;
-            _fluddTankAnim = parts.TankAnim;
-            _fluddNozzleParent = parts.NozzleParent;
-            for (int i = 0; i < 4; i++)
-            {
-                _fluddNozzleNode[i] = parts.NozzleNode[i];
-                _fluddNozzleAnim[i] = parts.NozzleAnim[i];
-                _fluddNozzleSkel[i] = parts.NozzleSkel[i];
-            }
+            GD.PushError("[SMS fludd] Player.tscn has no Fludd scene under Armature/Skeleton3D/SmsFluddAttach: no FLUDD -- instance res://assets/Sms/Fludd.tscn there");
+            return;
         }
         SmsFluddSetupWater(); // S2: the drops, the water level in the tank, the muzzles
         SmsFluddSetupHoverTilt(); // S3: the hover nozzles' bank joints
@@ -12227,10 +12211,10 @@ public partial class Mario : CharacterBody3D
 
     private static void SmsCollect<T>(Node root, System.Collections.Generic.List<T> into) where T : Node => SmsFluddModel.Collect(root, into);
 
-    private Material _fluddAtlasMaterial; // the tank frame's imported material: H_watergun_main (wg_mdl1_0.png) with the rip's shading
+    private Material _fluddAtlasMaterial; // the pack's atlas: Fludd.tscn's AtlasMaterial export (assets/Sms/FluddAtlas.tres, H_watergun_main)
 
     /// <summary>The nozzle BMDs' texture 0 is H_watergun_main_dummy, an 8x8 placeholder the game swaps for the FLUDD atlas: the
-    /// tank frame's material, SmsFluddModel.TankMaterials' find (the nozzle items wear it too through SmsApplyFluddAtlas).</summary>
+    /// scene's AtlasMaterial (the nozzle items wear it too through SmsApplyFluddAtlas).</summary>
     private void SmsFluddNozzleMaterial(Node root) => SmsFluddModel.NozzleMaterial(root, _fluddAtlasMaterial);
 
     /// <summary>checkPumpEnable(): the clip allows the pump (isPumpOK), nothing carried, not switching nozzles, no demo.</summary>
@@ -12405,30 +12389,30 @@ public partial class Mario : CharacterBody3D
     /// <summary>The gauge as a Control beside the other HUD elements (children of Mario, on the viewport's canvas): SmsWaterHud draws
     /// the disc's own textures (assets/Sms/hud, from game_6/timg) at standard_1.blo's positions, bottom-right.</summary>
     /// <summary>The console scene (assets/Sms/Console/SmsHud.tscn), instanced under Mario in Player.tscn -- his to edit: every pane a node.
-    /// When the scene has none it is instanced from the file, with a warning naming the fix.</summary>
+    /// No stand-in (pass 37): a Player scene without it has no console, and one error says so.</summary>
     private SmsHudLayer SmsHudLayerGet()
     {
-        if (_smsHudLayer != null)
+        if (_smsHudLayer != null || _smsHudMissing)
             return _smsHudLayer;
         _smsHudLayer = SmsFluddModel.FindChild<SmsHudLayer>(this);
         if (_smsHudLayer == null)
         {
-            GD.PushWarning("[SMS hud] Player.tscn has no SmsHud scene under Mario: instanced from res://assets/Sms/Console/SmsHud.tscn -- instance it there to see and edit the console in the editor");
-            var scene = GD.Load<PackedScene>("res://assets/Sms/Console/SmsHud.tscn");
-            _smsHudLayer = scene?.Instantiate() as SmsHudLayer;
-            if (_smsHudLayer != null)
-                AddChild(_smsHudLayer);
-            else
-                GD.PushWarning("[SMS hud] res://assets/Sms/Console/SmsHud.tscn did not load -- no console");
+            _smsHudMissing = true;
+            GD.PushError("[SMS hud] Player.tscn has no SmsHud scene under Mario: no console (counters, life meter, water gauge, hint balloon) -- instance res://assets/Sms/Console/SmsHud.tscn under Mario");
         }
         return _smsHudLayer;
     }
+
+    private bool _smsHudMissing; // the console error is logged once
 
     private void SmsFluddSetupHud()
     {
         if (!UseSmsPhysics || _waterHud != null)
             return;
-        _waterHud = SmsHudLayerGet()?.Water;
+        var hudLayer = SmsHudLayerGet();
+        if (hudLayer == null)
+            return; // no console: SmsHudLayerGet logged the error
+        _waterHud = hudLayer.Water;
         if (_waterHud == null)
         {
             GD.PushWarning("[SMS hud] SmsHud.tscn: the root's Water export is not set -- the gauge stays off");
@@ -12462,7 +12446,10 @@ public partial class Mario : CharacterBody3D
     {
         if (!UseSmsPhysics || _stdHud != null)
             return;
-        _stdHud = SmsHudLayerGet()?.Standard;
+        var hudLayer = SmsHudLayerGet();
+        if (hudLayer == null)
+            return; // no console: SmsHudLayerGet logged the error
+        _stdHud = hudLayer.Standard;
         if (_stdHud == null)
         {
             GD.PushWarning("[SMS hud] SmsHud.tscn: the root's Standard export is not set -- the counters stay off");
@@ -14092,27 +14079,17 @@ public partial class Mario : CharacterBody3D
             GD.PushWarning("[SMS fludd] the tank has no jnt_G_handle bone: no handle swing");
             return;
         }
-        // the scene's node (Fludd.tscn: Tank/Node/Skeleton3D/HandleSwing, its exports the tuning) -- or a code-built copy with a warning
+        // the scene's node (Fludd.tscn: Tank/Node/Skeleton3D/HandleSwing, its exports the tuning); no stand-in (pass 37)
         var fluddRoot = SmsFluddModel.FindChild<SmsFludd>(_fluddAttach);
         _fluddHandleSwing = fluddRoot?.HandleSwing ?? SmsFluddModel.FindChild<SmsSwingRZ>(_fluddTankSkel);
-        string swingFrom = "the scene";
         if (_fluddHandleSwing == null)
         {
-            GD.PushWarning("[SMS fludd] Fludd.tscn has no HandleSwing (SmsSwingRZ under the tank's Skeleton3D): the grips' pendulum is built from code -- add the node to the scene to tune it in the editor");
-            _fluddHandleSwing = new SmsSwingRZ
-            {
-                Name = "SmsHandleSwing",
-                BoneName = "jnt_G_handle",
-                AccUnits = SmsParams.MtxEffect.HandleAcc,
-                LUnits = SmsParams.MtxEffect.HandleL,
-                Brake = SmsParams.MtxEffect.HandleBrake,
-            };
-            _fluddTankSkel.AddChild(_fluddHandleSwing);
-            swingFrom = "code";
+            GD.PushError("[SMS fludd] Fludd.tscn has no HandleSwing (SmsSwingRZ under the tank's Skeleton3D): the grips do not swing -- add the node to the scene (AccUnits / LUnits / Brake are its exports)");
+            return;
         }
         _fluddHandleSwing.UnitsPerMetre = SmsUnits.UnitsPerMetre;
         if (SmsDebugPrint)
-            GD.Print($"[SMS jiggle] FLUDD handle swing (TMtxSwingRZ, from {swingFrom}) on {_fluddHandleSwing.BoneName} -> {string.Join(", ", System.Array.ConvertAll(_fluddTankSkel.GetBoneChildren(_fluddTankSkel.FindBone("jnt_G_handle")), b => _fluddTankSkel.GetBoneName(b)))}: rope {_fluddHandleSwing.LUnits} u, acc {_fluddHandleSwing.AccUnits}, brake {_fluddHandleSwing.Brake} (retail runs the compiled-in defaults acc 0 / brake 0.9 -- no MtxEffect7.prm ships; (0, -4, 0) / 0.7 are the disc's MtxEffect10 / 12, a logged deviation); the tank root's time lag is never enabled in the game and is not ported");
+            GD.Print($"[SMS jiggle] FLUDD handle swing (TMtxSwingRZ, from the scene) on {_fluddHandleSwing.BoneName} -> {string.Join(", ", System.Array.ConvertAll(_fluddTankSkel.GetBoneChildren(_fluddTankSkel.FindBone("jnt_G_handle")), b => _fluddTankSkel.GetBoneName(b)))}: rope {_fluddHandleSwing.LUnits} u, acc {_fluddHandleSwing.AccUnits}, brake {_fluddHandleSwing.Brake} (retail runs the compiled-in defaults acc 0 / brake 0.9 -- no MtxEffect7.prm ships; (0, -4, 0) / 0.7 are the disc's MtxEffect10 / 12, a logged deviation); the tank root's time lag is never enabled in the game and is not ported");
     }
 
     /// <summary>The game blends RUN1 (the walk cycle) and RUN2 (the run) continuously by the run's rate (doRunningAnimation:
@@ -14320,31 +14297,19 @@ public partial class Mario : CharacterBody3D
         if (SmsDebugPrint)
             GD.Print($"[SMS waist] MarioWaistCtrl sits on chn_chest (parent of jnt_chest: {(skeleton.FindBone("jnt_chest") >= 0 ? skeleton.GetBoneName(skeleton.GetBoneParent(skeleton.FindBone("jnt_chest"))) : "?")}): the whole upper body pitches forward by speed and BANKS into turns about the front-back axis; the shipped MtxEffect14/16/22 files and the pack's tilt formula put the decomp's chn/jnt names the other way round");
         // the scene's node (assets/Sms/BodyLag.tscn instanced under Armature/Skeleton3D: its Bones the MtxEffect14 / 16 / 22 fields,
-        // editable) -- or a code-built copy with a warning
+        // editable); no stand-in (pass 37): without it the body has no time lag, and one error says so
         _smsTimeLag = SmsFluddModel.FindChild<SmsTimeLag>(skeleton);
-        string lagFrom = "the scene";
         if (_smsTimeLag == null)
+            GD.PushError("[SMS jiggle] Player.tscn has no BodyLag under Armature/Skeleton3D: no body time lag -- instance res://assets/Sms/BodyLag.tscn there");
+        else
         {
-            GD.PushWarning("[SMS jiggle] Player.tscn has no BodyLag under Armature/Skeleton3D: the body's time lag is built from code -- instance res://assets/Sms/BodyLag.tscn there to tune it in the editor");
-            _smsTimeLag = new SmsTimeLag
-            {
-                Name = "SmsTimeLag",
-                Bones = new[]
-                {
-                    new SmsTimeLagEntry { BoneName = "jnt_chest", PosAccel = SmsParams.MtxEffect.ChestPosAccel, PosBrake = SmsParams.MtxEffect.ChestPosBrake, PosLimitUnits = SmsParams.MtxEffect.ChestPosLimit, QuatAccel = SmsParams.MtxEffect.ChestQuatAccel, QuatBrake = SmsParams.MtxEffect.ChestQuatBrake },
-                    new SmsTimeLagEntry { BoneName = "jnt_arm_R1", PosAccel = SmsParams.MtxEffect.ArmPosAccel, PosBrake = SmsParams.MtxEffect.ArmPosBrake, PosLimitUnits = SmsParams.MtxEffect.ArmPosLimit, QuatAccel = SmsParams.MtxEffect.ArmQuatAccel, QuatBrake = SmsParams.MtxEffect.ArmQuatBrake },
-                    new SmsTimeLagEntry { BoneName = "jnt_arm_L1", PosAccel = SmsParams.MtxEffect.ArmPosAccel, PosBrake = SmsParams.MtxEffect.ArmPosBrake, PosLimitUnits = SmsParams.MtxEffect.ArmPosLimit, QuatAccel = SmsParams.MtxEffect.ArmQuatAccel, QuatBrake = SmsParams.MtxEffect.ArmQuatBrake },
-                },
-            };
-            skeleton.AddChild(_smsTimeLag);
-            lagFrom = "code";
+            _smsTimeLag.UnitsPerMetre = SmsUnits.UnitsPerMetre;
+            skeleton.MoveChild(_smsTimeLag, -1); // after SmsWaistLean: the game's chn_chest callback runs before the chest's
         }
-        _smsTimeLag.UnitsPerMetre = SmsUnits.UnitsPerMetre;
-        skeleton.MoveChild(_smsTimeLag, -1); // after SmsWaistLean: the game's chn_chest callback runs before the chest's
-        if (SmsDebugPrint)
+        if (SmsDebugPrint && _smsTimeLag != null)
         {
             string bones = string.Join("; ", System.Array.ConvertAll(_smsTimeLag.Bones, b => b == null ? "?" : $"{b.BoneName} pos {b.PosAccel}/{b.PosBrake} limit {b.PosLimitUnits} u, quat {b.QuatAccel}/{b.QuatBrake}"));
-            GD.Print($"[SMS jiggle] TMtxTimeLag (from {lagFrom}): {bones}; on after {SmsParams.MtxEffect.EnableAfterTicks} ticks, locomotion clips, upper body idle; the legacy head / arm JiggleBones are off under SMS");
+            GD.Print($"[SMS jiggle] TMtxTimeLag (from the scene): {bones}; on after {SmsParams.MtxEffect.EnableAfterTicks} ticks, locomotion clips, upper body idle; the legacy head / arm JiggleBones are off under SMS");
         }
         if (SmsDebugPrint)
             GD.Print($"[SMS waist] considerWaist on jnt_chest {(skeleton.FindBone("jnt_chest") >= 0 ? "yes" : "NO")}: free {SmsParams.Waist.FreePitch} x fwd (cap {SmsParams.Waist.FreePitchMax}) / roll {SmsParams.Waist.FreeRoll} (cap {SmsParams.Waist.FreeRollMax}) at {SmsParams.Waist.FreeRate}; pumping {SmsParams.Waist.GunPitch} x fwd (cap {SmsParams.Waist.GunPitchMax}) / roll cap {SmsParams.Waist.GunRollMax} at {SmsParams.Waist.GunRate}; the waist IK is retired under SMS");
