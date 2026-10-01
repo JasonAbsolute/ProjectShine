@@ -618,6 +618,8 @@ public partial class Mario : CharacterBody3D
     private SmsSuperHipDropLanding _smsSuperHipLanding; // SuperHipDropLanding.tscn: ms_m_sphipd_hit_a / b / c / d at its landing
     private SmsBonkStars _smsBonkStars;                 // BonkStars.tscn: ms_dmg_c, the stars of a wall bonk and of a hit
     private SmsCameraShake _smsCameraShake;             // CameraShake.tscn: gpCameraShake -- the hip drop, super hip drop and damage shakes
+    private SmsBubbles _smsBubbles;                     // Fx/SmsBubbles.tscn: ms_m_awa / ms_m_awa_s / ms_m_awahamon -- the bubbles under water (pass 48)
+    private int _smsCenterBone = -2;                    // the 'center' joint (getCenterAnmMtx)
     private float _smsHipAttackTicks;                   // hipAttacking() mStatusTimer through the fall (120 Hz ticks); > SuperHipAttackCt = the super hip drop
     /// <summary>hipAttacking() mStatusState == 3: this hip drop fell longer than jump.prm's mSuperHipAttackCt (80 ticks, 0.67 s), so it is the
     /// SUPER hip drop -- the game sends HIT_MESSAGE_SUPER_HIP_DROP to what he lands on (TSuperHipDropBlock breaks) along with the normal
@@ -2223,6 +2225,7 @@ public partial class Mario : CharacterBody3D
         if (UseSmsPhysics)
         {
             SmsWaterCheck();      // playerControl(): the water surface at the feet, every tick
+            SmsBubblesFrame();    // the bubbles under water (pass 48): one particle frame a physics frame
             SmsYCamFrame(delta);  // the Y camera (MarioYCam.cs): the swing behind him, the L camera's stick / lock / exits, its pose, his facing
             SmsAirTick(delta);    // mAir drains with the head under, refills out; the meter turns to air after 2 s under
             SmsFluddTick(delta);  // the R analog, X, the upper body, the nozzle swap, the pack's clips
@@ -5326,6 +5329,7 @@ public partial class Mario : CharacterBody3D
         _smsSuperHipLanding = SmsFluddModel.FindChild<SmsSuperHipDropLanding>(this);
         _smsBonkStars = SmsFluddModel.FindChild<SmsBonkStars>(this);
         _smsCameraShake = SmsFluddModel.FindChild<SmsCameraShake>(this);
+        _smsBubbles = SmsFluddModel.FindChild<SmsBubbles>(this);
         _smsSpinBlur?.Bind(this);
         _smsHipBlur?.Bind(this);
         _smsSuperHipBlur?.Bind(this);
@@ -5344,8 +5348,10 @@ public partial class Mario : CharacterBody3D
             GD.PushError("[SMS fx] Player.tscn has no BonkStars under Mario: instance res://assets/Sms/Fx/BonkStars.tscn there (the bonk's and a hit's stars, ms_dmg_c)");
         if (_smsCameraShake == null)
             GD.PushError("[SMS camera] Player.tscn has no CameraShake under Mario: instance res://assets/Sms/CameraShake.tscn there (gpCameraShake: the hip drop, super hip drop and damage shakes)");
+        if (_smsBubbles == null)
+            GD.PushError("[SMS fx] Player.tscn has no SmsBubbles under Mario: instance res://assets/Sms/Fx/SmsBubbles.tscn there (the bubbles under water and their pop rings, ms_m_awa / ms_m_awa_s / ms_m_awahamon)");
         if (SmsDebugPrint)
-            GD.Print($"[SMS fx] spin rings {(_smsSpinBlur != null ? "from the scene" : "MISSING")}, hip drop streak {(_smsHipBlur != null ? "from the scene" : "MISSING")}, hip drop landing {(_smsHipLanding != null ? "from the scene" : "MISSING")}, super hip drop fall {(_smsSuperHipBlur != null ? "from the scene" : "MISSING")} / landing {(_smsSuperHipLanding != null ? "from the scene" : "MISSING")}, bonk stars {(_smsBonkStars != null ? "from the scene" : "MISSING")}, camera shake {(_smsCameraShake != null ? "from the scene" : "MISSING")}");
+            GD.Print($"[SMS fx] spin rings {(_smsSpinBlur != null ? "from the scene" : "MISSING")}, hip drop streak {(_smsHipBlur != null ? "from the scene" : "MISSING")}, hip drop landing {(_smsHipLanding != null ? "from the scene" : "MISSING")}, super hip drop fall {(_smsSuperHipBlur != null ? "from the scene" : "MISSING")} / landing {(_smsSuperHipLanding != null ? "from the scene" : "MISSING")}, bonk stars {(_smsBonkStars != null ? "from the scene" : "MISSING")}, camera shake {(_smsCameraShake != null ? "from the scene" : "MISSING")}, bubbles {(_smsBubbles != null ? "from the scene" : "MISSING")}");
     }
 
     /// <summary>The first <typeparamref name="T"/> under <paramref name="root"/>, not looking inside another effect's scene (the super
@@ -11881,6 +11887,49 @@ public partial class Mario : CharacterBody3D
         return SmsFeetY() + SmsUnits.UnitsToMetres(SmsUnits.MarioHeightUnits);
     }
 
+    /// <summary>mHeadMtx: the head joint's world transform (the bubbles' emitter frame; the animated pose, as setPositions reads it).</summary>
+    private Transform3D SmsHeadTransform()
+    {
+        if (skeleton != null)
+        {
+            if (_smsHeadBone == -2)
+                _smsHeadBone = skeleton.FindBone("jnt_head");
+            if (_smsHeadBone >= 0)
+                return skeleton.GlobalTransform * skeleton.GetBoneGlobalPose(_smsHeadBone);
+        }
+        return new Transform3D(GlobalBasis, new Vector3(GlobalPosition.X, SmsHeadY(), GlobalPosition.Z));
+    }
+
+    /// <summary>getCenterAnmMtx(): the 'center' joint's world transform.</summary>
+    private Transform3D SmsCenterTransform()
+    {
+        if (skeleton != null)
+        {
+            if (_smsCenterBone == -2)
+                _smsCenterBone = skeleton.FindBone("center");
+            if (_smsCenterBone >= 0)
+                return skeleton.GlobalTransform * skeleton.GetBoneGlobalPose(_smsCenterBone);
+        }
+        return GlobalTransform;
+    }
+
+    /// <summary>swimmingBubbleEffect() (MarioMove.cpp 2097, every tick in the water, not game over): the mouth's emitter while the
+    /// head is mBubbleDepth under the surface, the body's while the 'center' joint is, its rate from mForwardVel; the effect steps
+    /// one particle frame (1/60 s) a physics frame and pops its bubbles at the surface (TBubbleCallBack).</summary>
+    private void SmsBubblesFrame()
+    {
+        if (_smsBubbles == null)
+            return;
+        Transform3D head = SmsHeadTransform();
+        Transform3D center = SmsCenterTransform();
+        bool inWater = _smsInWater && stateOfMario != MarioState.dead;
+        float depth = SmsUnits.UnitsToMetres(_smsBubbles.BubbleDepthUnits);
+        bool mouth = inWater && head.Origin.Y + depth < _smsWaterSurfaceY;
+        bool body = inWater && center.Origin.Y + depth < _smsWaterSurfaceY;
+        float fwd = stateOfMario == MarioState.swimming ? _smsSwimFwd : SmsUnits.MpsToSpeed(new Vector3(velocity.X, 0f, velocity.Z).Length());
+        _smsBubbles.Step(head, mouth, center, fwd, body, _smsWaterSurfaceY);
+    }
+
     private void SmsAirReset()
     {
         _smsMaxAir = StartingHealth + 1f - 1e-5f; // mMaxAir = (mHealth + 1) - 1e-5
@@ -11976,6 +12025,7 @@ public partial class Mario : CharacterBody3D
         if (SmsIsUnderWater())
         {
             _smsAir = MathF.Max(_smsAir - p.Damage, 0f);
+            _smsBubbles?.BurstMouth(SmsHeadTransform()); // bubbleFromMouth(i), i = 0..9: ten emitters for the one frame
             if (SmsDebugPrint)
                 GD.Print($"[SMS damage] hit under water: -{p.Damage} AIR -> {_smsAir:F2}; invincible {p.InvincibleTicks} ticks");
             if (_smsAir < 1f)

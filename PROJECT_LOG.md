@@ -3578,3 +3578,22 @@ they seem to load later but this should not happen."
   unit of air back (the blue meter steps up, LifeUp); on land it goes to the health as before. MSD_SE_SY_HP_RECOVER plays either way
   when the heal was not already full: the `Mario.HpRecover` slot (an AudioStreamPlayer -- a system SE, not positional). The coins call
   HealOneHP (a red coin twice), which is now incHP(1).
+
+### Pass 48 -- water: the bubbles
+- **The bubbles under water (not in the port).** swimmingBubbleEffect() (MarioMove.cpp 2097, every tick in the water): with the head
+  mBubbleDepth (10 u) under the surface the mouth bubbles (PARTICLE_MS_M_AWA in the head joint's matrix: a point at (22, 5, 0) -- the
+  mouth -- 0.1 a frame, 2 u/f along (1, 0.25, 0) in a 45 deg cone, life 130, the Gravity field +0.06 u/f^2 under airResist 0.98 = a
+  2.4 m/s rise, a +-4 u shimmer every 2 frames and a +-1 u/f drift every 8, quad 10 u wobbling on an 8-frame loop, alpha 0.625 fading
+  from 92.5 %, lerp((135,183,231) -> white) additive); with the 'center' joint 10 u under, bubbleFromBody() (PARTICLE_MS_M_AWA_S: a
+  shell 25..50 u about the centre, the rate lerp(0, 0.5, mForwardVel / 40) a frame -- none at rest -- life 90 -25 %, Gravity +0.04,
+  quad 6.5 u). TBubbleCallBack: a bubble that rises past the surface dies there and leaves PARTICLE_MS_M_AWAHAMON, a flat 45-u ring,
+  30 frames, alpha 0.5 -> 0, its texture matrix 1.5 shrinking 0.0099 a frame (the ring grows). decHP() under water (a hit): ten
+  bubbleFromMouth emitters for the one frame -- a new JPA emitter always puts out a particle on its first frame (FIRST_EMISSION), so a
+  gulp of ten; the game's emitters live while called and stop (their bubbles finishing) the frame they are not
+  (TMarioParticleManager::perform). All as
+  `assets/Sms/Fx/SmsBubbles.tscn` + SmsBubbles.cs: the three emitters simulated particle for particle (the pop into a ripple needs the
+  CPU) on the 60 Hz particle clock, one frame a physics frame, drawn as two MultiMeshes (billboard quads + flat planes, the I8
+  textures P_msm_mizutama1_i / P_msm_hamonring2, bubble_add / ring_add shaders); every field an export. INSTANCE it under Mario in
+  Player.tscn (like the other Fx); until then one error at boot and no bubbles. Not ported: the bubbles' own spin (+-0.25 turns a
+  frame on a round texture). Reading of the Gravity field: world up, as the hip-drop smoke's (pass 29) -- the bubbles rise whatever
+  the head does; the mouth offset and the exhale direction are in the head joint's own frame.

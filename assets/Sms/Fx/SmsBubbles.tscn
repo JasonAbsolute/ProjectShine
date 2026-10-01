@@ -1,0 +1,54 @@
+[gd_scene load_steps=11 format=3 uid="uid://fbubbles0048"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsBubbles.cs" id="1_script"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/bubble_add.gdshader" id="2_bubble_shader"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/ring_add.gdshader" id="3_ring_shader"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/mizutama1_i.png" id="4_mizutama"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/hamonring2.png" id="5_hamonring"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_bubble"]
+resource_name = "ms_m_awa / ms_m_awa_s: P_msm_mizutama1_i, lerp((135,183,231) -> white), additive"
+shader = ExtResource("2_bubble_shader")
+shader_parameter/tex = ExtResource("4_mizutama")
+shader_parameter/env_color = Color(0.529412, 0.717647, 0.905882, 1)
+shader_parameter/prm_color = Color(1, 1, 1, 1)
+
+[sub_resource type="QuadMesh" id="QuadMesh_bubble"]
+resource_name = "a bubble: the instance transform carries the quad's size (baseSize x 50 units, the ESP1 scale)"
+material = SubResource("ShaderMaterial_bubble")
+size = Vector2(1, 1)
+
+[sub_resource type="MultiMesh" id="MultiMesh_bubbles"]
+transform_format = 1
+use_colors = true
+mesh = SubResource("QuadMesh_bubble")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ring"]
+resource_name = "ms_m_awahamon: P_msm_hamonring2, flat on the surface, additive, the texture matrix shrinking"
+shader = ExtResource("3_ring_shader")
+shader_parameter/tex = ExtResource("5_hamonring")
+shader_parameter/prm_color = Color(1, 1, 1, 1)
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_ring"]
+resource_name = "a pop ring: 0.9 x 50 = 45 units across, lying on the water"
+material = SubResource("ShaderMaterial_ring")
+size = Vector2(1, 1)
+
+[sub_resource type="MultiMesh" id="MultiMesh_rings"]
+transform_format = 1
+use_colors = true
+use_custom_data = true
+mesh = SubResource("PlaneMesh_ring")
+
+[node name="SmsBubbles" type="Node3D" node_paths=PackedStringArray("Bubbles", "Rings")]
+script = ExtResource("1_script")
+Bubbles = NodePath("Bubbles")
+Rings = NodePath("Rings")
+
+[node name="Bubbles" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("MultiMesh_bubbles")
+cast_shadow = 0
+
+[node name="Rings" type="MultiMeshInstance3D" parent="."]
+multimesh = SubResource("MultiMesh_rings")
+cast_shadow = 0
