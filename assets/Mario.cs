@@ -5729,7 +5729,7 @@ public partial class Mario : CharacterBody3D
         }
 
         SetMarioState(stateOfMario); // -> ma_bkdwn
-        SpawnBonkStars(ComputeFeetPosition()); // PARTICLE_MS_DMG_C at mPosition
+        SpawnBonkStars(ComputeFeetPosition(), wallNormalXZ); // PARTICLE_MS_DMG_C at mPosition, aimed off the wall
     }
 
     private void TickBonk(double delta)
@@ -5825,10 +5825,12 @@ public partial class Mario : CharacterBody3D
     }
 
     /// <summary>The game's ms_dmg_c stars (BonkStars.tscn) at <paramref name="at"/>: emitParticle(PARTICLE_MS_DMG_C) at mPosition for a
-    /// wall bonk (MarioJump.cpp 164, 464), at calcDamagePos (mPosition + 50 units toward the attacker, MarioCollision.cpp 263) for a hit.</summary>
-    private void SpawnBonkStars(Vector3 at)
+    /// wall bonk (MarioJump.cpp 164, 464), at calcDamagePos (mPosition + 50 units toward the attacker, MarioCollision.cpp 263) for a hit.
+    /// <paramref name="impact"/>: a bonk's knock-back direction (the wall's normal) -- the scene's AimAlongImpact turns the burst that way
+    /// (DEVIATION, pass 34; the game's emitter axis is up); a hit passes Vector3.Up.</summary>
+    private void SpawnBonkStars(Vector3 at, Vector3 impact)
     {
-        _smsBonkStars?.Play(at);
+        _smsBonkStars?.Play(at, impact);
     }
 
     private void StartGroundSpin()
@@ -11211,7 +11213,7 @@ public partial class Mario : CharacterBody3D
             SetEyeTexture(hurtEyeTexture ?? sleepingEyeTexture); // the knockdown clips: eyes squeezed shut in pain (not the sleep eyes)
             stateOfMario = MarioState.hurt;
             SmsDownEnter(airborne, fwd);
-            SpawnBonkStars(ComputeFeetPosition() + attackDir * SmsUnits.UnitsToMetres(50f)); // PARTICLE_MS_DMG_A/B/C at calcDamagePos = mPosition + 50 units toward the attacker; no camera shake / rumble / voice here
+            SpawnBonkStars(ComputeFeetPosition() + attackDir * SmsUnits.UnitsToMetres(50f), Vector3.Up); // PARTICLE_MS_DMG_A/B/C at calcDamagePos = mPosition + 50 units toward the attacker; no camera shake / rumble / voice here
             what = $"{(_smsDownFore ? "FORE" : "BACK")}_DOWN type {_smsDownType} {(airborne ? "in the air (+-16 along the face until he lands)" : $"on the ground, {_smsDownAnim} at fwd {fwd:F1} ({SmsUnits.SpeedToMps(MathF.Abs(fwd)):F1} m/s)")}";
         }
         _smsInvincibleTicks = p.InvincibleTicks;
@@ -11956,7 +11958,7 @@ public partial class Mario : CharacterBody3D
             Vector3 attackDir = toAttacker.Normalized();
             Vector3 oldFace = SmsMath.DirFromYaw(_smsFaceYaw);
             _smsFaceYaw = SmsMath.YawFromDir(oldFace.Dot(attackDir) >= 0f ? attackDir : -attackDir); // getAttackAngle(), +180 from behind
-            SpawnBonkStars(ComputeFeetPosition() + attackDir * SmsUnits.UnitsToMetres(50f)); // calcDamagePos
+            SpawnBonkStars(ComputeFeetPosition() + attackDir * SmsUnits.UnitsToMetres(50f), Vector3.Up); // calcDamagePos
         }
         _smsInvincibleTicks = p.InvincibleTicks;
         SmsFluddDamage(p.WaterEmit); // the tank spills (mWaterEmit x DamageLoss)
@@ -15199,7 +15201,7 @@ public partial class Mario : CharacterBody3D
         lastFacingDirection = faceWall;
         armature.Rotation = new Vector3(0f, YawFromDir(faceWall), 0f);
         SetMarioState(stateOfMario); // -> ma_bkdwn
-        SpawnBonkStars(ComputeFeetPosition()); // PARTICLE_MS_DMG_C at mPosition (MarioJump.cpp 164 / 464)
+        SpawnBonkStars(ComputeFeetPosition(), backDir); // PARTICLE_MS_DMG_C at mPosition (MarioJump.cpp 164 / 464), aimed along the knock-back
         if (SmsDebugPrint)
             GD.Print($"[SMS bonk] {why} at fwd {fwdAtHit:F1} (threshold {SmsParams.Mario.ClashSpeed:F0}) -> knocked back 16/tick, vy {SmsUnits.MpsToSpeed(vyMps):F1}");
     }

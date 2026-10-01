@@ -166,7 +166,7 @@ emission_point_texture = SubResource("ImageTexture_flame_points")
 emission_normal_texture = SubResource("ImageTexture_flame_normals")
 emission_point_count = 96
 direction = Vector3(0, 0, 1)
-spread = 47.0
+spread = 18.0
 initial_velocity_min = 21.2777
 initial_velocity_max = 33.6254
 gravity = Vector3(0, 0, 0)
@@ -277,6 +277,9 @@ Smoke = NodePath("Smoke")
 Flames = NodePath("Flames")
 Stars = NodePath("Stars")
 Sound = NodePath("Sound")
+StarCount = 16
+FlameOutSpeed = 26.0
+FlameUpSpeed = 22.0
 
 [node name="Shockwave" type="GPUParticles3D" parent="."]
 emitting = false

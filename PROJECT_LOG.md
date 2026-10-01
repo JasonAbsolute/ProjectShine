@@ -3273,3 +3273,22 @@ tick under a 0.96 air resistance, flipping from a tall sliver to a flat one over
 particle) over a texture baked with the env colours' mean; the Random jitter fields are dropped; the directional spread cones of hit_c /
 hit_d / dmg_c are the ring spread plus the moment spread; the MultSin twinkle of sphipd_b uses the AddSin form; the fire stripe's indirect
 stage is the blur shader's mask.
+
+### Pass 34 -- the bonk stars along the impact; more stars; the super landing's flame cone
+
+Jaysonn (2026-09-30 02:59): "the stars look good! they just always go up instead of like an impact when bonking and maybe add a few more
+stars? we can make that editable with how many stars get launched. also the impact with super hip drop look good just same issue not as
+many stars and the red impact lines go to upwards. should shoot out a bit more."
+
+**Bonk stars.** The game does throw them upward: `emitParticle(PARTICLE_MS_DMG_C)` emits at mPosition with the emitter unrotated, and
+ms_dmg_c's velocities are 18 along the axis (up) against 10 out from it. DEVIATION `SmsBonkStars.AimAlongImpact = true` (a scene export):
+for a bonk the emitter's axis is turned from up to the knock-back direction (the wall's normal), so the same numbers spray away from the
+wall like a hit; a damage hit keeps the game's up. DEVIATION `SmsBonkStars.Count = 10` (export; the game emits 6). `SpawnBonkStars(at,
+impact)` passes the knock-back for the two bonk entries and up for the two hit entries.
+
+**Super landing.** DEVIATION `SmsSuperHipDropLanding.StarCount = 16` (export; the game's hit_d emits 8). The flame streaks: a TRANSCRIPTION
+FIX, not a deviation -- JPA's spread randomises only the velDir component (22 up) within a cone of acos(1 - 0.32) = 47 degrees while the
+velAxis component (26 out) stays level, so the game's streaks leave between about 20 and 56 degrees of elevation around 40; pass 33 put a
+47-degree Godot cone on the whole velocity and sent some of them nearly vertical ("the red impact lines go upwards"). The scene's cone is
+now 18 degrees around the 40-degree direction. The speeds are exports (`FlameOutSpeed` 26, `FlameUpSpeed` 22 -- the game's; lower the up
+speed for flatter streaks): the script rebuilds the emitter's directed normals and speed from them at ready.

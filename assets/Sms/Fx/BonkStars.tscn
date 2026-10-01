@@ -100,6 +100,8 @@ size = Vector2(0.873, 0.873)
 script = ExtResource("1_script")
 Stars = NodePath("Stars")
 Sound = NodePath("Sound")
+Count = 10
+AimAlongImpact = true
 
 [node name="Stars" type="GPUParticles3D" parent="."]
 emitting = false
