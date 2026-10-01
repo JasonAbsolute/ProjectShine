@@ -857,9 +857,13 @@ public partial class Mario : CharacterBody3D
     // jumpDownCommon() -> jumpProcess(0): no ledge bit, no doJumping, no checkBackTrig -- a passive drop until he lands.
     // Without it the port's ledgeFall (the game's FALL, ledge bit set) re-grabbed the same ledge once the cooldown ran out.
     private bool _smsHangDropFall = false;
-    // landing(): mStatusTimer counts while vy < 0; past 240 ticks (2 s) the cry (MSD_SE_MV10B_CRY_JUMP_01, no voice assets
-    // in the port) and ANIM_THROWN until he lands. ma_thrown is in the library but not in the tree: driven directly.
+    // landing(): mStatusTimer counts while vy < 0; past 240 ticks (2 s) the cry (MSD_SE_MV10B_CRY_JUMP_01: the FallCry slot, once
+    // per fall) and ANIM_THROWN until he lands. ma_thrown is in the library but not in the tree: driven directly.
     private const int SMS_LONG_FALL_TICKS = 240;
+    /// <summary>The long fall's cry (MSD_SE_MV10B_CRY_JUMP_01): an AudioStreamPlayer3D under Mario with the voice in its Stream;
+    /// empty = silent. Played once when the fall passes 240 ticks (the game re-issues the SE every other tick and the sound system
+    /// keeps the one playing).</summary>
+    [Export] public AudioStreamPlayer3D FallCry;
     private int _smsFallTicks = 0;
     private bool _smsLongFallAnim = false;
     // Visual step smoothing: the body pops up / down a riser instantly (the game does too); the rig starts that far below /
@@ -2008,6 +2012,8 @@ public partial class Mario : CharacterBody3D
             "Lstick_up",
             "Lstick_down"
         );
+        if (UseSmsPhysics)
+            LstickVec = SmsStick.PadStick(LstickVec); // the pad library (PADClamp 15 / 72 / 40, JUTGamePad / 54): mMainStick.mPosX / mPosY, what every stage below reads -- the 15 % dead zone is the game's, a pad's rest drift never reaches the wait's turn (pass 44)
         if (UseSmsPhysics && (_ycamOn || _ycamNeutralTicks > 0))
             LstickVec *= _ycamOn ? 0f : SmsYCamMarioStickScale(); // the L camera: his stick is the camera's (mCompSPos[0],[1] are never written); onNeutralMarioKey() at either end: dead 0.44 s, then fades in over 0.22 s
         float stickStrength = LstickVec.Length();
@@ -2284,9 +2290,8 @@ public partial class Mario : CharacterBody3D
                 velocity += GRAVITY * (float)delta;
 
             // Run spin input detection so it works during stomp
-            UpdateSpinInput(
-                Input.GetVector("Lstick_left", "Lstick_right", "Lstick_up", "Lstick_down")
-            );
+            Vector2 stompStick = Input.GetVector("Lstick_left", "Lstick_right", "Lstick_up", "Lstick_down");
+            UpdateSpinInput(UseSmsPhysics ? SmsStick.PadStick(stompStick) : stompStick);
             if (spinBuffer > 0)
                 spinBuffer--;
             spinInput = (spinBuffer > 0);
@@ -3905,13 +3910,15 @@ public partial class Mario : CharacterBody3D
 
             if (stateOfMario == MarioState.ledgeFall)
             {
-                // landing(): past 240 ticks of falling the cry and ANIM_THROWN until he lands (the port has no voice; the animation only)
+                // landing(): past 240 ticks of falling the cry (FallCry) and ANIM_THROWN until he lands
                 if (_smsFallTicks > SMS_LONG_FALL_TICKS && animTree != null)
                 {
                     if (!_smsLongFallAnim)
                     {
                         if (SmsDebugPrint)
-                            GD.Print("[SMS fall] 2 s of falling: ma_thrown until he lands (the game also plays the cry)");
+                            GD.Print($"[SMS fall] 2 s of falling: ma_thrown until he lands, the cry {(FallCry != null && FallCry.Stream != null ? "played" : "(FallCry slot empty)")}");
+                        if (FallCry != null && FallCry.Stream != null)
+                            FallCry.Play();
                         animTree.Active = false;
                         animPlayer.SpeedScale = 1f;
                         animPlayer.Play("ma_thrown");

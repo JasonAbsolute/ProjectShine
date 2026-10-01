@@ -3519,3 +3519,26 @@ they seem to load later but this should not happen."
   (export, on): the bar centred on the canvas, the game's bottom margin and width kept, ShiftFrame still applied; off = the game's place.
   At his Size 0.7 on the 1152 x 648 canvas: x 351.7 (was 37.5), y 589.3, 448.5 x 42.5 px.
 - The boot line said the star HUD peeks "after 6.7 s idle" -- 200 frames at the 30 fps clock of passes 19-37; at 120 Hz it is 1.7 s.
+
+### Pass 44 -- the pad library's stick clamp (the idle turn); the long fall's cry slot
+- **The stick, 1:1 from the pad up (a port gap).** The game's stick reaches Mario through three stages and the port had the last one
+  only: PADClamp (dolphin/pad/Padclamp.c: each axis of the raw s8 loses a 15-count dead zone -- subtracted, not just zeroed -- and the
+  pair is squeezed into the 72 / 40 octagon), JUTGamePad::CStick::update (the main stick / 54, a length past 1 normalised), then
+  TMario::checkController (128 x, the +-7 / 6 band, x 0.78^2, clamp 64, 32 (len/64)^2 -- `SmsStick.IntendedMag`, pass 7). Godot's
+  -1..1 axis went in as mPosX directly, so a pad's rest drift reached the wait's turn-in-place (the legacy pivot band 0.06..0.2 on the
+  vector length; the game's own waiting() turn is the same band at WaitingRotSp) and Mario slowly turned toward the drift while
+  standing (pass 26b: `[LAND_DBG] state=pivot` with no stick). `SmsStick.PadStick` is the two missing stages, integer for integer,
+  and every stick read in Mario.cs goes through it (`SmsParams.Controller.PadClampMin / Max / XY = 15 / 72 / 40, PadStickDiv 54`).
+  The one mapping constant: a modern pad's full tilt is raw 100 (`PadGateRaw`, Dolphin's GCPadStatus::MAIN_STICK_RADIUS -- how every
+  pad reaches the game; a GameCube stick's gate reads about the same). So: dead zone 15 % of the tilt (checkController's own band
+  then sits at 18 %), the run full at 63 % (was 82 %), a full diagonal = the octagon's corner (40, 40) = a full run. Godot's own
+  deadzone on the Lstick_* actions stays 0.0 -- this is the dead zone. Self-test: 6 % -> 0, 15 % -> 0, 16 % -> 1/54, 72 % saturated,
+  the diagonal 0.7071, 50 % -> mag 16.7, 63 % -> 32. Not touched: the legacy camera scripts and the L camera's own stick read
+  (MarioYCam: Godot's 0.2 deadzone); the C stick's clamp (59 / 31 / 15, / 42) has no SMS consumer yet.
+- **The long fall's cry (a slot).** landing(): past 240 ticks (2 s) of falling the cry MSD_SE_MV10B_CRY_JUMP_01 and ANIM_THROWN to
+  the ground were in since the fall pass; the cry is now `Mario.FallCry` (an AudioStreamPlayer3D under Mario, the voice in its
+  Stream), played once when the fall passes 240 -- the game re-issues the SE every other tick (`mStatusTimer++ > 240` with the reset
+  to 240) and its sound system keeps the one playing. Empty slot = silent, as before.
+- Checked and already 1:1, nothing changed: the ledge fatigue (Hanging.prm as shipped: RapidTime 2000 ticks = 16.7 s -> ANIM_HANG at
+  AnmRapid 8x and no shimmy; LimitTime 2400 = 20 s -> LAND_SAFE_DOWN; MoveSp 0.06, AnmRate 0.8 -- the shipped file, not the code
+  defaults 0.1 / 0.5), and the long fall's 240 ticks in LANDING / ROCKET_LANDING only (a jump never flails: jumping() has no timer).

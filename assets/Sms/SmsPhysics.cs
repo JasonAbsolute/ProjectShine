@@ -268,6 +268,18 @@ public static class SmsParams
         public const int StickRotateTime = 40;          // ticks of yaw history for spin-jump detection
         public const int LengthMultTimes = 2;
         public const float LengthMult = 0.78f;          // stick length *= 0.78^2 = 0.6084
+        // The pad library, ahead of checkController (pass 44). PADClamp (dolphin/pad/Padclamp.c, ClampRegion {.., minStick 15,
+        // maxStick 72, xyStick 40, ..}): the raw s8 stick loses a 15-count dead zone on each axis (subtracted, not just zeroed) and
+        // is clamped to the 72 / 40 octagon; JUTGamePad::CStick::update: the main stick / 54 (the C stick / 42), a length past 1
+        // normalised (EStickMode1). TMarioGamePad::considerMarioStick hands that mPosX / mPosY to Mario unchanged.
+        public const int PadClampMin = 15;
+        public const int PadClampMax = 72;
+        public const int PadClampXY = 40;
+        public const float PadStickDiv = 54f;
+        // A modern pad's full tilt as the GameCube raw: Dolphin's GCPadStatus::MAIN_STICK_RADIUS -- every pad reaches the game
+        // through it as raw 100 at the gate (a GameCube stick's own gate reads about the same). The one mapping constant in the
+        // pipeline; the dead zone is then 15 % of the tilt and the run is full at 63 %.
+        public const int PadGateRaw = 100;
     }
 
     public static class Hanging // /mario/hanging.prm + the constants in hangonCheck / hanging / checkDescent
@@ -488,9 +500,57 @@ public static class SmsParams
 public static class SmsStick
 {
     /// <summary>
-    /// Returns the SMS intended magnitude (0..32). <paramref name="axis"/> is a -1..1 stick vector
-    /// (Godot's Input.GetVector output). Curve: raw = 128*axis (truncated to s16); deadzone +-7 with 6
-    /// subtracted; length *= 0.78^2; clamp 64; mag = 32 * (len/64)^2. Full magnitude at ~82% tilt.
+    /// PADClamp + JUTGamePad::CStick::update (pass 44): Godot's -1..1 stick vector -> the game's mMainStick.mPosX / mPosY, -1..1.
+    /// raw = floor(axis * PadGateRaw) as the s8 the pad library sees (Dolphin's u8 cast floors); ClampStick(72, 40, 15): each axis
+    /// at or under 15 is 0, past it 15 is taken off; the pair is squeezed into the octagon (xy 40 of max 72); then / 54 and a length
+    /// past 1 is normalised. So a rest drift under 15 % reads 0 (his pad's 6 %: the pass-26 idle turn), the game's +-7 dead band of
+    /// <see cref="IntendedMag"/> sits at 18 %, and the run is full at 63 % of the tilt (a diagonal: full at the octagon's corner).
+    /// Godot's own deadzone on the Lstick_* actions must stay 0 (project.godot) -- this is the dead zone.
+    /// </summary>
+    public static Vector2 PadStick(Vector2 axis)
+    {
+        int x = Math.Clamp((int)MathF.Floor(axis.X * SmsParams.Controller.PadGateRaw), -128, 127);
+        int y = Math.Clamp((int)MathF.Floor(axis.Y * SmsParams.Controller.PadGateRaw), -128, 127);
+        ClampStick(ref x, ref y, SmsParams.Controller.PadClampMax, SmsParams.Controller.PadClampXY, SmsParams.Controller.PadClampMin);
+        float px = x / SmsParams.Controller.PadStickDiv;
+        float py = y / SmsParams.Controller.PadStickDiv;
+        float len = MathF.Sqrt(px * px + py * py);
+        if (len > 1f)
+        {
+            px /= len;
+            py /= len;
+        }
+        return new Vector2(px, py);
+    }
+
+    /// <summary>Padclamp.c ClampStick, integer for integer (the s8 casts truncate the divisions).</summary>
+    private static void ClampStick(ref int px, ref int py, int max, int xy, int min)
+    {
+        int x = px, y = py, signX = 1, signY = 1;
+        if (x < 0) { signX = -1; x = -x; }
+        if (y < 0) { signY = -1; y = -y; }
+        x = x <= min ? 0 : x - min;
+        y = y <= min ? 0 : y - min;
+        if (x == 0 && y == 0) { px = 0; py = 0; return; }
+        if (xy * y <= xy * x)
+        {
+            int d = xy * x + y * (max - xy);
+            if (xy * max < d) { x = xy * max * x / d; y = xy * max * y / d; }
+        }
+        else
+        {
+            int d = xy * y + x * (max - xy);
+            if (xy * max < d) { x = xy * max * x / d; y = xy * max * y / d; }
+        }
+        px = signX * x;
+        py = signY * y;
+    }
+
+    /// <summary>
+    /// Returns the SMS intended magnitude (0..32). <paramref name="axis"/> is the game's mPosX / mPosY pair -- Godot's -1..1
+    /// vector after <see cref="PadStick"/> (Mario.cs runs every stick read through it). Curve (checkController): raw = 128*axis
+    /// (truncated to s16); deadzone +-7 with 6 subtracted; length *= 0.78^2; clamp 64; mag = 32 * (len/64)^2. Full magnitude at
+    /// ~82% of mPos = 63% of a modern pad's tilt.
     /// </summary>
     public static float IntendedMag(Vector2 axis)
     {
@@ -1038,6 +1098,17 @@ public static class SmsSelfTest
         Check("stick full tilt -> mag", SmsStick.IntendedMag(new Vector2(1f, 0f)), 32f, 0.001f);
         Check("stick half tilt -> mag", SmsStick.IntendedMag(new Vector2(0.5f, 0f)), 9.73f, 0.1f);
         Check("stick 5% tilt -> mag (deadzone)", SmsStick.IntendedMag(new Vector2(0.05f, 0f)), 0f, 0.001f);
+        // The pad library ahead of it (pass 44): PADClamp 15 / 72 / 40 then / 54 -- a 6 % rest drift is 0, 15 % is still 0, 16 % is
+        // the first count (1/54), 72 % saturates, a full diagonal is the octagon's corner (40, 40) normalised; the run is full at 63 %.
+        Check("pad 6% drift -> mPos", SmsStick.PadStick(new Vector2(0.06f, 0f)).Length(), 0f, 0f);
+        Check("pad 15% -> mPos (dead zone edge)", SmsStick.PadStick(new Vector2(0.15f, 0f)).Length(), 0f, 0f);
+        Check("pad 16% -> mPos (first count)", SmsStick.PadStick(new Vector2(0.16f, 0f)).X, 1f / 54f, 0.0005f);
+        Check("pad 72% -> mPos (saturated)", SmsStick.PadStick(new Vector2(0.72f, 0f)).X, 1f, 0.0005f);
+        Check("pad full diagonal -> mPos x", SmsStick.PadStick(new Vector2(1f, 1f)).X, 0.7071f, 0.0005f);
+        Check("pad 6% drift -> mag", SmsStick.IntendedMag(SmsStick.PadStick(new Vector2(0.06f, 0f))), 0f, 0f);
+        Check("pad 50% -> mag", SmsStick.IntendedMag(SmsStick.PadStick(new Vector2(0.5f, 0f))), 16.70f, 0.05f);
+        Check("pad 63% -> mag (full run)", SmsStick.IntendedMag(SmsStick.PadStick(new Vector2(0.63f, 0f))), 32f, 0.001f);
+        Check("pad full diagonal -> mag", SmsStick.IntendedMag(SmsStick.PadStick(new Vector2(1f, 1f))), 32f, 0.001f);
         // Spin detection: a clockwise circle in 12 samples is a spin (sign -1), a half turn is not, release clears.
         {
             var det = new SmsStickRotate();
