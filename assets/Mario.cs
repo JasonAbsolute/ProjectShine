@@ -5750,6 +5750,7 @@ public partial class Mario : CharacterBody3D
                 }
                 // SMS (SHORT_BACK_DOWN): the 16/tick knockback carries into the slide and decays below.
                 _sm.Travel("ma_sdown");
+                SpawnBonkStars(ComputeFeetPosition(), Vector3.Up); // shortBackDown() at mStatusTimer 0 (MarioRun.cpp 1421): PARTICLE_MS_DMG_C at mPosition again; its rumble (0x15, mMotorWall) is not ported
                 TriggerLandingDust();
             }
             return;
@@ -5825,9 +5826,11 @@ public partial class Mario : CharacterBody3D
     }
 
     /// <summary>The game's ms_dmg_c stars (BonkStars.tscn) at <paramref name="at"/>: emitParticle(PARTICLE_MS_DMG_C) at mPosition for a
-    /// wall bonk (MarioJump.cpp 164, 464), at calcDamagePos (mPosition + 50 units toward the attacker, MarioCollision.cpp 263) for a hit.
-    /// <paramref name="impact"/>: a bonk's knock-back direction (the wall's normal) -- the scene's AimAlongImpact turns the burst that way
-    /// (DEVIATION, pass 34; the game's emitter axis is up); a hit passes Vector3.Up.</summary>
+    /// wall bonk (MarioJump.cpp 164, 464, MarioPhysics.cpp 53) and on the first tick of every ground knockdown status (MarioRun.cpp
+    /// backDown .. catchDown: the landing after a bonk or an air knockdown, the second burst of a ground hit), at calcDamagePos
+    /// (mPosition + 50 units toward the attacker, MarioCollision.cpp 263) for a hit. <paramref name="impact"/>: a bonk's knock-back
+    /// direction (the wall's normal) for the scene's AimAlongImpact knob (off since pass 35 -- the game's axis is up, and Jaysonn
+    /// confirmed that look); hits and landings pass Vector3.Up.</summary>
     private void SpawnBonkStars(Vector3 at, Vector3 impact)
     {
         _smsBonkStars?.Play(at, impact);
@@ -14424,6 +14427,9 @@ public partial class Mario : CharacterBody3D
         }
         float frames = animPlayer.HasAnimation(anim) ? (float)animPlayer.GetAnimation(anim).Length * 60f : 60f;
         SmsDownPlay(anim, Mathf.Clamp(limitFrames / MathF.Max(frames, 1f), 0f, 1f));
+        // every ground knockdown status emits PARTICLE_MS_DMG_C at mPosition on its first tick (backDown .. catchDown, MarioRun.cpp
+        // 1399-1470) -- the second burst of a hit taken on the ground, the landing burst of an air knockdown; the rumble is not ported
+        SpawnBonkStars(ComputeFeetPosition(), Vector3.Up);
     }
 
     private void SmsDownPlay(string anim, float slideUntil)

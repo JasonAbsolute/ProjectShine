@@ -3292,3 +3292,38 @@ velAxis component (26 out) stays level, so the game's streaks leave between abou
 47-degree Godot cone on the whole velocity and sent some of them nearly vertical ("the red impact lines go upwards"). The scene's cone is
 now 18 degrees around the 40-degree direction. The speeds are exports (`FlameOutSpeed` 26, `FlameUpSpeed` 22 -- the game's; lower the up
 speed for flatter streaks): the script rebuilds the emitter's directed normals and speed from them at ready.
+
+### Pass 35 -- the bonk stars' real launch; the stars again on the knockdown landing; the flames' clock
+
+Jaysonn (2026-09-30 20:18): "just the bonk stars i was wrong they do go up but they go too far up and should be dispersed a bit better.
+also when mario lands on the ground from bonking the stars should also shoot out".
+
+**The launch.** He is right on both counts and both are the game's data. ms_dmg_c (BEM1): volume Sphere size 10 sweep 0.5 at (0, 5, 0),
+velAxis 10 + velDir 18, velRatio 0.3, spread 0.4, airResist 0.96. In JPA (noclip JPA.ts init_p / calcVolumeSphere, the reference for
+pass 28 on) a star spawns on the UPPER HALF of the shell, gets velAxis straight out from the up axis along its spawn point's horizontal
+direction, plus velDir along the axis TILTED by `computeModelMatrixR(0, spread x randY x pi, randZ x pi)` -- a tilt uniform in
+[-spread, spread] x 180 degrees = up to 72 degrees at a random azimuth -- the sum x (1 +- 0.3). Sampled: elevation 12..90 degrees
+(median 48, mean 47), speeds 7..36 units a frame (p5 11.6, p95 29.4), a median full-life rise of 4.3 m. The port (pass 33) had every
+star rising straight up at 18 x the decay (5.8 m) with only the 10 out: "too far up, not dispersed".
+
+CORRECTION to the pass-34 text: JPA's spread is NOT acos(1 - spread); it is spread x 180 degrees, uniform in angle. The super landing's
+flame cone (ms_m_sphipd_hit_c spread 0.32) is therefore up to 57.6 degrees of tilt on the 22-up component, i.e. elevations of about
+15..58 degrees around 37; the scene's 18-degree Godot cone about 40 (pass 34) stays as a close stand-in Jaysonn approved.
+
+Godot's ParticleProcessMaterial cannot give each particle its own direction AND the shared decay curve, so the launch is SAMPLED:
+`SmsBonkStars.ApplyLaunch` (and `gen_fx_super.points_launch` for the baked scene) draws 256 stars by the game's rule, puts each one's
+direction on the shell around the pivot as an emission POINT, and the material's radial velocity from the pivot (the 0.96 decay curve)
+flies it along that line; the radial min / max are the sampled speeds' 5th / 95th percentile (9.17 / 23.35 m/s). Lost: the pairing of a
+star's direction with its speed (uniform instead), the +-1.8 jitter field (as before), and the decay stays relative to each star's life
+(as every effect since pass 28). Exports on the BonkStars node with the game's values: `UpSpeed` 18, `OutSpeed` 10, `SpreadDeg` 72,
+`SpeedRandom` 0.3 (and `Count` 10 -- DEVIATION, pass 34). `AimAlongImpact` is now OFF (the game's up; he confirmed) and stays a knob.
+
+**The landing.** Every ground knockdown status -- backDown, foreDown, shortBackDown, shortForeDown, safeBackDown, safeForeDown,
+catchDown (MarioRun.cpp 1399-1470) -- emits PARTICLE_MS_DMG_C at mPosition on its first tick and rumbles (0x15, mMotorWall). The bonk's
+JUMP_SHORT_BACK_DOWN lands into SHORT_BACK_DOWN (jumpDownCommon, MarioJump.cpp 522), so the game bursts twice: at the wall and on the
+ground. `TickBonk`'s landing and `SmsDownGroundAnim()` (the start of every ground *_DOWN: a hit taken on the ground, an air knockdown
+landing) now call `SpawnBonkStars(feet, up)`. The rumble is not ported (no rumble system).
+
+**The flames (pass-34 bug).** `SmsSuperHipDropLanding.ApplyFlameSpeeds` converted the streaks' 34 units a frame with `SmsUnits.SpeedToMps`
+(the 30 fps MOVEMENT convention) and set 10.6..16.8 m/s where the scene's baked data (and the game) say 21.3..33.6: pass 34 ran the
+flames at half speed. `SmsUnits.FxSpeedToMps` (x 60 / 74.44, the particle clock) replaces it, with a self-test check.

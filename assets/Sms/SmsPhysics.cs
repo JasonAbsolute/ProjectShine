@@ -40,6 +40,10 @@ public static class SmsUnits
     /// <summary>SMS per-tick delta-v -> metres/second^2.</summary>
     public static float AccelToMps2(float dvPerTick) => dvPerTick * 3600f / UnitsPerMetre;
 
+    /// <summary>A particle (JPA) speed, game units a frame on the 60 Hz effect clock (SMSGetAnmFrameRate = 2 steps per 30 fps frame)
+    /// -> metres/second. NOT SpeedToMps: that is the 30 fps movement convention and gives half of this.</summary>
+    public static float FxSpeedToMps(float unitsPerFrame) => unitsPerFrame * 60f / UnitsPerMetre;
+
     public static float UnitsToMetres(float u) => u / UnitsPerMetre;
     public static float MetresToUnits(float m) => m * UnitsPerMetre;
 
@@ -1031,6 +1035,7 @@ public static class SmsSelfTest
         // Unit conversions.
         Check("32 units/tick*4 -> m/s", SmsUnits.SpeedToMps(32f), 12.896f, 0.01f);
         Check("gravity 1.0 -> m/s^2", SmsUnits.AccelToMps2(1f), 48.36f, 0.05f);
+        Check("fx 34.06 u/f at 60 Hz -> m/s", SmsUnits.FxSpeedToMps(34.06f), 27.45f, 0.05f);
         Check("stick full tilt -> mag", SmsStick.IntendedMag(new Vector2(1f, 0f)), 32f, 0.001f);
         Check("stick half tilt -> mag", SmsStick.IntendedMag(new Vector2(0.5f, 0f)), 9.73f, 0.1f);
         Check("stick 5% tilt -> mag (deadzone)", SmsStick.IntendedMag(new Vector2(0.05f, 0f)), 0f, 0.001f);

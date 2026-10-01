@@ -71,7 +71,8 @@ public partial class SmsSuperHipDropLanding : Node3D
             img.SetPixel(i, 0, new Color(d.X, d.Y, d.Z));
         }
         mat.EmissionNormalTexture = ImageTexture.CreateFromImage(img);
-        float speed = SmsUnits.SpeedToMps(Mathf.Sqrt(FlameOutSpeed * FlameOutSpeed + FlameUpSpeed * FlameUpSpeed));
+        // particles run at 60 Hz (SMSGetAnmFrameRate = 2 per 30 fps frame): units a frame x 60 / 74.44 -- NOT the movement clock's SpeedToMps
+        float speed = SmsUnits.FxSpeedToMps(Mathf.Sqrt(FlameOutSpeed * FlameOutSpeed + FlameUpSpeed * FlameUpSpeed));
         mat.InitialVelocityMin = speed * (1f - FlameSpeedRatio);
         mat.InitialVelocityMax = speed * (1f + FlameSpeedRatio);
     }
