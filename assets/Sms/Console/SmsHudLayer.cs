@@ -13,6 +13,9 @@ public partial class SmsHudLayer : CanvasLayer
     [Export] public SmsWaterHud Water;
     /// <summary>TGCConsole2's help balloon (he_w): startAppearBalloon / startDisappearBalloon.</summary>
     [Export] public SmsHintBalloon Balloon;
+    /// <summary>TGCConsole2's telop (te_0): the Dolpic News ticker -- startAppearTelop / processDrawTelop. Its Messages are the stage's
+    /// Level.News.</summary>
+    [Export] public SmsTelop Telop;
     /// <summary>1 = the frame's 448 lines on the window's height (a coin digit is 8 % of the screen); 0.7 keeps his own HUD's size.</summary>
     [Export] public float Size = 0.7f;
     /// <summary>Game pixels the left-hand rows move toward the left edge (the game has them 13 px in).</summary>
@@ -24,8 +27,9 @@ public partial class SmsHudLayer : CanvasLayer
     /// <summary>Game pixels the gauge and the red coins move up off the bottom (the game has "WATER" 3 px past it).</summary>
     [Export] public float BottomShift = -10f;
     /// <summary>The motions -- the pops, the settles, the slides, the staggers, the meter's mid-screen hold -- at this many times the
-    /// game's 30 fps pace; the waits (the idle 200 frames, a blue coin's 400, the 120 at full health, the blinks) stay the game's.</summary>
-    [Export] public float AnimSpeed = 4f;
+    /// game's pace; the waits (the idle 200 frames, a blue coin's 400, the 120 at full health, the blinks) stay the game's. 1 = the
+    /// game: its console frames are 120 Hz ticks (pass 38) -- the 4 he set over the old 30 fps reading was that factor.</summary>
+    [Export] public float AnimSpeed = 1f;
     /// <summary>The star HUD and the lives stay while he stands idle, instead of leaving after the idle count.</summary>
     [Export] public bool IdleHold = true;
 

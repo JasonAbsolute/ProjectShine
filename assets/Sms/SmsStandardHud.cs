@@ -229,6 +229,13 @@ public partial class SmsStandardHud : Control
         }
         if (_frame < whole) _frame = whole;
         Apply();
+        // the telop (updateTelopState): news only while he stands in WAIT with no camera demo and no timer out; the count holds in a pause
+        var telop = SmsHudLayer.Current?.Telop;
+        if (telop != null)
+        {
+            telop.MarioWaiting = Idle && !Demo && !_timerVisible;
+            telop.Paused = GetTree().Paused;
+        }
     }
 
     /// <summary>A process function's "param_1 == N": true on the first console frame at or past game frame N at the port's pace.</summary>

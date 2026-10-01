@@ -1,10 +1,11 @@
-[gd_scene load_steps=39 format=3 uid="uid://c6c6d7ilicljx"]
+[gd_scene load_steps=40 format=3 uid="uid://c6c6d7ilicljx"]
 
 [ext_resource type="Script" path="res://assets/Sms/Console/SmsHudLayer.cs" id="s_layer"]
 [ext_resource type="Script" path="res://assets/Sms/SmsStandardHud.cs" id="s_std"]
 [ext_resource type="Script" path="res://assets/Sms/SmsWaterHud.cs" id="s_water"]
 [ext_resource type="Script" path="res://assets/Sms/Console/SmsHudGroup.cs" id="s_group"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Console/HintBalloon.tscn" id="s_balloon"]
+[ext_resource type="PackedScene" uid="uid://pxikt1k5ifgx" path="res://assets/Sms/Console/Telop.tscn" id="s_telop"]
 [ext_resource type="PackedScene" uid="uid://b3sl0a4qttndu" path="res://Font/LifeMeter/LifeMeter.tscn" id="s_meter"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_back.png" id="t_coin_back"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_icon.png" id="t_coin_icon"]
@@ -40,18 +41,19 @@
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/coin_number_9.png" id="t_coin_number_9"]
 
 
-[node name="SmsHud" type="CanvasLayer" node_paths=PackedStringArray("Standard", "Water", "Balloon")]
+[node name="SmsHud" type="CanvasLayer" node_paths=PackedStringArray("Standard", "Water", "Balloon", "Telop")]
 layer = 10
 script = ExtResource("s_layer")
 Standard = NodePath("StandardHud")
 Water = NodePath("WaterHud")
 Balloon = NodePath("HintBalloon")
+Telop = NodePath("Telop")
 Size = 0.7
 LeftShift = 0.0
 TopShift = -22.0
 RightShift = 30.0
 BottomShift = -10.0
-AnimSpeed = 4.0
+AnimSpeed = 1.0
 IdleHold = true
 
 [node name="StandardHud" type="Control" parent="." node_paths=PackedStringArray("CoinGroup", "BlueCoinGroup", "ShineGroup", "LifeMeterGroup", "LivesGroup", "RedCoinGroup", "TimerGroup")]
@@ -847,3 +849,5 @@ expand_mode = 1
 
 
 [node name="HintBalloon" parent="." instance=ExtResource("s_balloon")]
+
+[node name="Telop" parent="." instance=ExtResource("s_telop")]

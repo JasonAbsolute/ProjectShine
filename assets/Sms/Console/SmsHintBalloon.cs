@@ -118,8 +118,8 @@ public partial class SmsHintBalloon : Control
     {
         if (_phase == Phase.Hidden)
             return;
-        float motion = (float)delta * 30f * SmsHud.Anim; // the pops' pace, as every other pane
-        float game = (float)delta * 30f;                   // the game's own frames: the typing and the hold
+        float motion = (float)delta * SmsHud.Fps * SmsHud.Anim; // the pops' pace, as every other pane
+        float game = (float)delta * SmsHud.Fps;                   // the game's own frames (120 Hz ticks): the typing and the hold
         switch (_phase)
         {
             case Phase.Appear:

@@ -53,6 +53,11 @@ public partial class Level : Node3D
     /// the FLUDD lying in the stage, as Pianta 3 has it) or a nozzle item. Mario.cs reads it at his setup.</summary>
     [Export] public bool HasFludd = true;
 
+    /// <summary>The stage's Dolpic News (the console's telop, TGCConsole2 checkChangeTelopArray): the lines the ticker scrolls when Mario
+    /// stands still -- the first after 5 s, then one a minute, stepping through the list. Empty = no ticker, as every stage but Delfino
+    /// Plaza has it. The 20 D.E.B.S. ALERT lines and the game's per-episode picks are in assets/Sms/Console/dolpic_news.txt.</summary>
+    [Export] public string[] News = System.Array.Empty<string>();
+
     /// <summary>Delay after the spawn barn door finishes opening before GO!
     /// starts rising — matched to the reference clip's gap between the reveal
     /// completing and GO! first appearing.</summary>

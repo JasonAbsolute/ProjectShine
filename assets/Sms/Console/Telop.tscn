@@ -1,0 +1,59 @@
+[gd_scene load_steps=4 format=3 uid="uid://pxikt1k5ifgx"]
+
+[ext_resource type="Script" path="res://assets/Sms/Console/SmsTelop.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/telop_window.png" id="2_frame"]
+[ext_resource type="LabelSettings" path="res://assets/Sms/Console/TelopText.tres" id="3_text"]
+
+[node name="Telop" type="Control" node_paths=PackedStringArray("Frame", "Clip", "Text", "Sound")]
+layout_mode = 3
+anchors_preset = 0
+offset_left = 37.0
+offset_top = 400.0
+offset_right = 480.0
+offset_bottom = 442.0
+mouse_filter = 2
+script = ExtResource("1_script")
+Frame = NodePath("Frame")
+Clip = NodePath("Clip")
+Text = NodePath("Clip/Text")
+Sound = NodePath("Sound")
+Messages = PackedStringArray()
+FirstWaitSeconds = 5.0
+WaitSeconds = 60.0
+SlideFrames = 80.0
+ScrollPerFrame = 0.7
+WidthFrame = 443.0
+SizeScale = 1.0
+ShiftFrame = Vector2(0, 0)
+
+[node name="Frame" type="NinePatchRect" parent="."]
+layout_mode = 0
+offset_right = 443.0
+offset_bottom = 42.0
+mouse_filter = 2
+texture = ExtResource("2_frame")
+patch_margin_left = 8
+patch_margin_top = 8
+patch_margin_right = 8
+patch_margin_bottom = 8
+
+[node name="Clip" type="Control" parent="."]
+layout_mode = 0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = 435.0
+offset_bottom = 34.0
+mouse_filter = 2
+clip_contents = true
+
+[node name="Text" type="Label" parent="Clip"]
+layout_mode = 0
+offset_left = 427.0
+offset_right = 900.0
+offset_bottom = 26.0
+mouse_filter = 2
+text = "...D.E.B.S. ALERT..."
+label_settings = ExtResource("3_text")
+vertical_alignment = 1
+
+[node name="Sound" type="AudioStreamPlayer" parent="."]

@@ -3371,3 +3371,36 @@ missing. They now log one `PushError` naming the node to instance and leave that
 
 `SmsParams.MtxEffect` keeps the shipped MtxEffect numbers as reference (the scenes carry them as exports). Player.tscn has every node
 (pass 32), so nothing changes for the game as it is; the errors are for a Player scene that loses one.
+
+### Pass 38 -- the telop (Dolpic News) as a scene; the console's clock is the 120 Hz tick
+
+**The clock (a transcription fix).** TGCConsole2 is a view object in "Group 2D", which TMarDirector::setupPerformList_console pushes
+into its `unk30` list with CUE_MOVE | CUE_CALC_ANIM (MarDirectorInitECT.cpp 236); `unk30->perform(unk30Cue)` runs INSIDE the simulation
+loop (MarDirectorDirect.cpp 149), once per 120 Hz tick with the MOVE cue (CALC_ANIM only on the frame's last tick). So every console
+"frame" -- the TExPane slides, the pops, the balloon's typing and hold, the gauge's X blink, the idle counts, the telop's waits
+(`telopWait * 120` = seconds) -- is a 120 Hz tick, not a 30 fps frame as passes 19-37 took it. `SmsHud.Fps` 30 -> 120; the pops,
+settles and slides already ran at AnimSpeed 4 at Jaysonn's request, which is exactly the missing factor, so `AnimSpeed` is now 1 with the
+same motion, and the parts that stayed "the game's" (the balloon's typing and hold, the X blink, the idle peeks) are now 4x faster --
+the game's. The AnimSpeed knob keeps working on top.
+
+**The telop.** The Dolpic News ticker of Delfino Plaza (GCConsole2.cpp updateTelopState 1313, startAppearTelop 2396, processDrawTelop
+3323, the draw 4016; standard_1.blo 'te_0' at (294, 53): the 'te_w' window at (37, 400) 443 x 42 with contents (8, 8) 427 x 26 and the
+telop_window_1..4 I4 pieces -- black at alpha 136, a flat 136 top-left so the bar is one dark band, the right and bottom pieces fading
+out as a soft shadow (compose_telop_window.py -> hud/telop_window.png, a NinePatch) -- and the 'tet2' text, standard_font 20 x 26 white,
+over 'tet1' black 2 px right and down). The rule: while Mario's status is MARIO_STATUS_WAIT (standing), no camera demo (unk50) and no
+timer out (unk44C), a count runs (held in the pause menu); at `unk562` = 5 s the first time (unk56C) and `unk560` = 60 s after each news
+(the count restarts when one ends), the next line of the stage's list is picked -- `++unk558` BEFORE the pick, wrapping at the end, so a
+two-line list opens on its second -- MSD_SE_SY_NEWS plays and the group rises from 465 (off the bottom) over 80 frames; the text then
+scrolls right to left at `unk564` 0.7 frame pixels a frame (84 px/s) scissored to the contents, until it is past the window's left edge
+by its own width; the group drops back over 80 frames. Only Delfino Plaza has lists (checkChangeTelopArray: per episode and flags);
+infomess.bmg's 20 D.E.B.S. ALERT lines (group 0x0E) are decoded into assets/Sms/Console/dolpic_news.txt with the episode picks.
+
+The port: `assets/Sms/Console/Telop.tscn` (SmsTelop, instanced in SmsHud.tscn as SmsHudLayer.Telop): a Control laid out in frame pixels
+and scaled like the balloon -- Frame (NinePatchRect of telop_window.png), Clip (the contents, clip_contents), Clip/Text (a Label on
+TelopText.tres: Delfino 20 px white, shadow black (2, 2) -- his to swap), Sound (an AudioStreamPlayer slot for the jingle). Exports with
+the game's values: FirstWaitSeconds 5, WaitSeconds 60, SlideFrames 80, ScrollPerFrame 0.7, WidthFrame 443 (widen it toward the gauge on
+a wide canvas), SizeScale, ShiftFrame. The rise and drop follow AnimSpeed like every pane; the waits and the scroll are the game's. The
+stage's lines come from a new `News` export on his Level (Mario.SmsLevelNews at the console setup); SmsStandardHud feeds MarioWaiting =
+Idle && !Demo && !timer out, and the pause. Not resolved: the game's scissor is 16/15 wider than the contents and 16 px higher (a
+J2DPrint origin detail); the port clips to the band and centres the text in it. The bar sits bottom-left at the game's (37, 400) through
+the console's shifts.

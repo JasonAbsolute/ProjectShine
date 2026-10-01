@@ -12,8 +12,10 @@ using System;
 ///   TExPane::setPaneOffset (GC2D/ExPane.cpp, a TCoord2D chase at constant speed): the linear slide of a whole group,
 ///   the console's three point triples: cDownTop (0, -100) / cDownMid (0, 30) for the counters dropping in from above, cUpTop (0, 50) /
 ///   cUpMid (0, -30) for the tank and the red coins rising from below, cCoinMid (0, 45) for the coin counter stepping down a row.
-/// The console runs at the game's 30 frames a second; everything here takes a fractional frame count so the motion is evaluated at the
-/// display's own rate. The screen is drawn 1:1 into the game's 640 x 448 frame (J2DOrthoGraph over the render rect, 1 unit = 1 EFB
+/// The console's frames are the game's SIMULATION TICKS: TGCConsole2 sits in "Group 2D" on the director's unk30 list, performed with
+/// CUE_MOVE inside the 120 Hz simulation loop (MarDirectorInitECT.cpp 236, MarDirectorDirect.cpp 149) -- four frames per 30 fps
+/// picture (pass 38; passes 19-37 took them as 30 fps frames, which is why his AnimSpeed 4 looked right). Everything here takes a
+/// fractional frame count so the motion is evaluated at the display's own rate. The screen is drawn 1:1 into the game's 640 x 448 frame (J2DOrthoGraph over the render rect, 1 unit = 1 EFB
 /// pixel; the .blo's 600 x 480 is nominal), of which a CRT hid the outer few per cent. On a wide window the left-hand groups keep
 /// their margin to the left edge, the right-hand ones to the right, the lives (centred on the frame) to the centre, the bottom ones
 /// to the bottom. The console is a scene (assets/Sms/Console/SmsHud.tscn, SmsHudLayer): every pane a TextureRect in its group, laid out
@@ -24,7 +26,7 @@ using System;
 public static class SmsHud
 {
     public const float ScreenW = 640f, ScreenH = 448f;   // the game's frame: SMSGetGameRenderWidth / Height, the J2D ortho over it
-    public const float Fps = 30f;
+    public const float Fps = 120f;                        // console frames a second: the simulation tick (pass 38; was 30)
     public const int Settle = 30;                          // the follow-up quadratic's frames
 
     // ---- the scene root's knobs (SmsHudLayer.Apply copies its exports here; these are its defaults: Jaysonn's -- the game's are

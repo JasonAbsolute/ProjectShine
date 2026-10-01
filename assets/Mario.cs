@@ -12013,6 +12013,15 @@ public partial class Mario : CharacterBody3D
         return true;
     }
 
+    /// <summary>The stage's Dolpic News for the console's telop: the Level above him (Level.News); none without a Level.</summary>
+    private string[] SmsLevelNews()
+    {
+        for (Node n = GetParent(); n != null; n = n.GetParent())
+            if (n is Level level)
+                return level.News ?? System.Array.Empty<string>();
+        return System.Array.Empty<string>();
+    }
+
     /// <summary>The pack at his start: MARIO_FLAG_HAS_FLUDD from the stage's Level (Level.HasFludd; a secret course takes it), then the
     /// build. Without the flag the scene's Fludd stays hidden under its seat, the gauge never comes, R and X do nothing -- every
     /// FLUDD tick returns on !_fluddReady -- until getNozzle (a nozzle item, or the FLUDD itself lying in the stage) turns it on.</summary>
@@ -12449,6 +12458,8 @@ public partial class Mario : CharacterBody3D
         var hudLayer = SmsHudLayerGet();
         if (hudLayer == null)
             return; // no console: SmsHudLayerGet logged the error
+        if (hudLayer.Telop != null)
+            hudLayer.Telop.Messages = SmsLevelNews(); // checkChangeTelopArray: the stage's news, by its Level
         _stdHud = hudLayer.Standard;
         if (_stdHud == null)
         {
