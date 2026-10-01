@@ -3404,3 +3404,25 @@ stage's lines come from a new `News` export on his Level (Mario.SmsLevelNews at 
 Idle && !Demo && !timer out, and the pause. Not resolved: the game's scissor is 16/15 wider than the contents and 16 px higher (a
 J2DPrint origin detail); the port clips to the band and centres the text in it. The bar sits bottom-left at the game's (37, 400) through
 the console's shifts.
+
+### Pass 39 -- the camera shake as a scene
+
+gpCameraShake (TCameraShake, Camera/camerashake.cpp): four slots; `startShake(mode, scale)` loads a mode's /Camera/shake*.prm
+(TCamSaveShake: mShakeTime, Amp / Vel for X, Y, Z) into a free slot (or the decreasing one with the least left), amp x scale, mDec =
+amp / time. `execShake` runs LAST in CPolarSubCamera::calcFinalPosAndAt_ (cameragc.cpp 832) on the final eye and up, at the camera's
+120 Hz: each tick every active slot adds Amp x JMASSin(Vel x frame) (BAM) to the eye's vertical and horizontal polar angles about the
+camera's target (CLBCrossToPolar / CLBPolarToCross) and to a roll of the up vector, then decays its amplitudes by mDec and ends at
+frame >= time. Mario's: the hip drop's landing startShake(0, 1.0) = shakeHipDrop.prm (25 ticks, pitch 296.9 BAM = 1.6 deg at 7008 a
+tick = 12.8 Hz); the super hip drop's startShake(0x27, 1.0) = shakeKoopaHipdrop.prm (200 ticks: pitch 200 at 1644, yaw 250 at 1715,
+roll 700 = 3.8 deg at 3653); damage startShake(2, 1.0) = shakeDamage.prm (60 ticks, roll 900 = 4.9 deg at 5000 = 9.2 Hz) for every
+damage type but the upper-body 3 (MarioCollision.cpp 380, before the swim branch). The wall slide's startShake(1) = shakeWallJump.prm
+ships with time 0: nothing. The files sit in data/params/camera/ (lower-case) on the disc.
+
+The port: `assets/Sms/CameraShake.tscn` (SmsCameraShake, a Node under Mario; `SmsCameraShake.Current` for objects) with the three shakes
+as inline `SmsCameraShakeMode` resources (TimeTicks, AmpX..Z, VelX..Z -- the prm fields, his to tune) and a `Strength` knob. The camera
+scripts are never touched: while a shake runs the node's own `ShakeCamera` copies whichever camera is current (SunshineCamera, the Y
+camera, a demo or reward camera -- whatever made itself current becomes the source), orbits the eye about the view axis at Mario's
+distance by the slot sum of vertical / horizontal angles, rolls the up vector about the view direction, and is the current camera;
+when the last slot ends it hands current back to its source. Ticks at 120 Hz; the per-tick integer truncation of the BAM sums is kept.
+Not resolved: the decomp's execShake rolls the up vector about the eye's displacement direction (zero for a pure roll such as the
+damage shake, which would do nothing) -- the port rolls about the view direction. Not ported beside them: the rumbles.

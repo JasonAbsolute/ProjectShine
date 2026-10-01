@@ -615,6 +615,7 @@ public partial class Mario : CharacterBody3D
     private SmsSuperHipDropBlur _smsSuperHipBlur;       // SuperHipDropBlur.tscn: ms_m_sphipd_a / b / c / d, the super hip drop's fall (pass 33)
     private SmsSuperHipDropLanding _smsSuperHipLanding; // SuperHipDropLanding.tscn: ms_m_sphipd_hit_a / b / c / d at its landing
     private SmsBonkStars _smsBonkStars;                 // BonkStars.tscn: ms_dmg_c, the stars of a wall bonk and of a hit
+    private SmsCameraShake _smsCameraShake;             // CameraShake.tscn: gpCameraShake -- the hip drop, super hip drop and damage shakes
     private float _smsHipAttackTicks;                   // hipAttacking() mStatusTimer through the fall (120 Hz ticks); > SuperHipAttackCt = the super hip drop
     /// <summary>hipAttacking() mStatusState == 3: this hip drop fell longer than jump.prm's mSuperHipAttackCt (80 ticks, 0.67 s), so it is the
     /// SUPER hip drop -- the game sends HIT_MESSAGE_SUPER_HIP_DROP to what he lands on (TSuperHipDropBlock breaks) along with the normal
@@ -2421,9 +2422,15 @@ public partial class Mario : CharacterBody3D
                         + (KeepGroundPoundJump ? " [KeepGroundPoundJump on: A launches the GP-jump]" : ""));
 
                 if (IsSuperHipDrop)
+                {
                     _smsSuperHipLanding?.Play(ComputeFeetPosition()); // MS_M_SPHIPD_HIT_A..D at mPosition (MarioJump.cpp 1188-1191); HIT_MESSAGE_SUPER_HIP_DROP + HIP_DROP to what he lands on -- IsSuperHipDrop for the objects
+                    _smsCameraShake?.Start(SmsCameraShake.Kind.SuperHipDrop); // startShake(0x27 shakeKoopaHipdrop, 1.0) (MarioJump.cpp 1156); its rumbleStart(0x15, 0x1E) is not ported
+                }
                 else
+                {
                     _smsHipLanding?.Play(ComputeFeetPosition()); // MS_HIPDROP_C, B, A at mPosition (MarioJump.cpp 1184-1186)
+                    _smsCameraShake?.Start(SmsCameraShake.Kind.HipDrop); // startShake(0 shakeHipDrop, 1.0) (MarioJump.cpp 1153); SMSRumbleMgr->start(0) is not ported
+                }
             }
             goto EndFrame;
         }
@@ -5309,6 +5316,7 @@ public partial class Mario : CharacterBody3D
         _smsSuperHipBlur = SmsFluddModel.FindChild<SmsSuperHipDropBlur>(this);
         _smsSuperHipLanding = SmsFluddModel.FindChild<SmsSuperHipDropLanding>(this);
         _smsBonkStars = SmsFluddModel.FindChild<SmsBonkStars>(this);
+        _smsCameraShake = SmsFluddModel.FindChild<SmsCameraShake>(this);
         _smsSpinBlur?.Bind(this);
         _smsHipBlur?.Bind(this);
         _smsSuperHipBlur?.Bind(this);
@@ -5325,6 +5333,8 @@ public partial class Mario : CharacterBody3D
             GD.PushError("[SMS fx] Player.tscn has no SuperHipDropLanding under Mario: instance res://assets/Sms/Fx/SuperHipDropLanding.tscn there (the super hip drop's landing, ms_m_sphipd_hit_a / b / c / d)");
         if (_smsBonkStars == null)
             GD.PushError("[SMS fx] Player.tscn has no BonkStars under Mario: instance res://assets/Sms/Fx/BonkStars.tscn there (the bonk's and a hit's stars, ms_dmg_c)");
+        if (_smsCameraShake == null)
+            GD.PushError("[SMS camera] Player.tscn has no CameraShake under Mario: instance res://assets/Sms/CameraShake.tscn there (gpCameraShake: the hip drop, super hip drop and damage shakes)");
         if (SmsDebugPrint)
             GD.Print($"[SMS fx] spin rings {(_smsSpinBlur != null ? "from the scene" : "MISSING")}, hip drop streak {(_smsHipBlur != null ? "from the scene" : "MISSING")}, hip drop landing {(_smsHipLanding != null ? "from the scene" : "MISSING")}, super hip drop fall {(_smsSuperHipBlur != null ? "from the scene" : "MISSING")} / landing {(_smsSuperHipLanding != null ? "from the scene" : "MISSING")}, bonk stars {(_smsBonkStars != null ? "from the scene" : "MISSING")}");
     }
@@ -11224,7 +11234,8 @@ public partial class Mario : CharacterBody3D
             SetEyeTexture(hurtEyeTexture ?? sleepingEyeTexture); // the knockdown clips: eyes squeezed shut in pain (not the sleep eyes)
             stateOfMario = MarioState.hurt;
             SmsDownEnter(airborne, fwd);
-            SpawnHitStars(ComputeFeetPosition() + attackDir * SmsUnits.UnitsToMetres(50f)); // PARTICLE_MS_DMG_A/B/C at calcDamagePos = mPosition + 50 units toward the attacker; no camera shake / rumble / voice here
+            SpawnHitStars(ComputeFeetPosition() + attackDir * SmsUnits.UnitsToMetres(50f)); // PARTICLE_MS_DMG_A/B/C at calcDamagePos = mPosition + 50 units toward the attacker; the rumble and voice are not ported
+            _smsCameraShake?.Start(SmsCameraShake.Kind.Damage); // gpCameraShake->startShake(CAM_SHAKE_MODE_UNK2 shakeDamage, 1.0) for every type but 3 (MarioCollision.cpp 380)
             what = $"{(_smsDownFore ? "FORE" : "BACK")}_DOWN type {_smsDownType} {(airborne ? "in the air (+-16 along the face until he lands)" : $"on the ground, {_smsDownAnim} at fwd {fwd:F1} ({SmsUnits.SpeedToMps(MathF.Abs(fwd)):F1} m/s)")}";
         }
         _smsInvincibleTicks = p.InvincibleTicks;
@@ -11975,7 +11986,10 @@ public partial class Mario : CharacterBody3D
         SmsFluddDamage(p.WaterEmit); // the tank spills (mWaterEmit x DamageLoss)
         _smsSwimFwd = 0f; // jumpingDemoCommon(.., 0.0f) from the next tick on
         if (p.DownType != 3)
+        {
             SmsSwimSet(SmsSwim.PDamage);
+            _smsCameraShake?.Start(SmsCameraShake.Kind.Damage); // damageExec's shake is before the swim branch: shakeDamage for a type but 3
+        }
         // decHP()
         if (SmsIsUnderWater())
         {

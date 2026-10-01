@@ -1,0 +1,49 @@
+[gd_scene load_steps=6 format=3 uid="uid://cshake120h01"]
+
+[ext_resource type="Script" path="res://assets/Sms/SmsCameraShake.cs" id="1_script"]
+[ext_resource type="Script" path="res://assets/Sms/SmsCameraShakeMode.cs" id="2_mode"]
+
+[sub_resource type="Resource" id="Resource_hipdrop"]
+script = ExtResource("2_mode")
+resource_name = "/Camera/shakeHipDrop.prm -- the ground pound's landing: 25 ticks, a 1.6-degree pitch at 12.8 Hz"
+TimeTicks = 25
+AmpX = 296.9
+VelX = 7008
+AmpY = 0.0
+VelY = 0
+AmpZ = 0.0
+VelZ = 0
+
+[sub_resource type="Resource" id="Resource_damage"]
+script = ExtResource("2_mode")
+resource_name = "/Camera/shakeDamage.prm -- a hit: 60 ticks, a 4.9-degree roll at 9.2 Hz"
+TimeTicks = 60
+AmpX = 0.0
+VelX = 0
+AmpY = 0.0
+VelY = 0
+AmpZ = 900.0
+VelZ = 5000
+
+[sub_resource type="Resource" id="Resource_superhipdrop"]
+script = ExtResource("2_mode")
+resource_name = "/Camera/shakeKoopaHipdrop.prm -- the super hip drop's landing (startShake(0x27)): 200 ticks, pitch 1.1 deg at 3 Hz, yaw 1.4 deg at 3.1 Hz, roll 3.8 deg at 6.7 Hz"
+TimeTicks = 200
+AmpX = 200.0
+VelX = 1644
+AmpY = 250.0
+VelY = 1715
+AmpZ = 700.0
+VelZ = 3653
+
+[node name="CameraShake" type="Node" node_paths=PackedStringArray("Camera")]
+script = ExtResource("1_script")
+Camera = NodePath("ShakeCamera")
+HipDrop = SubResource("Resource_hipdrop")
+Damage = SubResource("Resource_damage")
+SuperHipDrop = SubResource("Resource_superhipdrop")
+Strength = 1.0
+Enabled = true
+
+[node name="ShakeCamera" type="Camera3D" parent="."]
+current = false
