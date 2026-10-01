@@ -12,7 +12,8 @@ using Godot;
 /// </summary>
 public static class SmsUnboundBurst
 {
-    public static GpuParticles3D Spawn(GpuParticles3D template, Node parent, Transform3D at)
+    /// <summary><paramref name="configure"/> runs on the copy before it emits -- for a variant of the template (fewer stars, a shorter life).</summary>
+    public static GpuParticles3D Spawn(GpuParticles3D template, Node parent, Transform3D at, System.Action<GpuParticles3D> configure = null)
     {
         if (template == null || parent == null)
             return null;
@@ -20,6 +21,7 @@ public static class SmsUnboundBurst
         burst.TopLevel = true;
         burst.OneShot = true;
         burst.Emitting = false;
+        configure?.Invoke(burst);
         parent.AddChild(burst);
         burst.GlobalTransform = at;
         burst.Finished += burst.QueueFree;
@@ -28,5 +30,5 @@ public static class SmsUnboundBurst
     }
 
     /// <summary>A world-aligned burst at <paramref name="at"/> (the usual case: the game's emitters here are unrotated).</summary>
-    public static GpuParticles3D Spawn(GpuParticles3D template, Node parent, Vector3 at) => Spawn(template, parent, new Transform3D(Basis.Identity, at));
+    public static GpuParticles3D Spawn(GpuParticles3D template, Node parent, Vector3 at, System.Action<GpuParticles3D> configure = null) => Spawn(template, parent, new Transform3D(Basis.Identity, at), configure);
 }

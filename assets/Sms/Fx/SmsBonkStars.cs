@@ -48,6 +48,15 @@ public partial class SmsBonkStars : Node3D
     /// <summary>velRatio: each star's speed x (1 +- this). The game: 0.3.</summary>
     [Export(PropertyHint.Range, "0,1,0.01")] public float SpeedRandom = 0.3f;
 
+    /// <summary>How many stars a HIT throws -- the damage burst at calcDamagePos and the knockdown's own burst at his feet (a ground hit
+    /// fires both). DEVIATION (Jaysonn, 2026-09-30: "a little less on the bonk stars for when mario gets hit ... not as many stars"): 6,
+    /// which is the game's own dmg_c count; the bonk keeps <see cref="Count"/>.</summary>
+    [Export(PropertyHint.Range, "1,64,1")] public int HitCount = 6;
+
+    /// <summary>A hit's stars live this fraction of the bonk's 1.25 s (the fade, the flip and the flight compress with it). DEVIATION
+    /// (Jaysonn, 2026-09-30: "just shorter effect"): 0.7; the game fires the same emitter for a hit and a bonk (1.0).</summary>
+    [Export(PropertyHint.Range, "0.1,1,0.05")] public float HitLifeScale = 0.7f;
+
     private const int Directions = 256;              // sampled launch directions baked into the emission points
     private const float ShellUnits = 10f;            // volume Sphere size 10
     private const float PivotUnits = 5f;             // emitter trs (0, 5, 0)
@@ -117,6 +126,16 @@ public partial class SmsBonkStars : Node3D
         Vector3 x = Mathf.Abs(axis.Dot(Vector3.Up)) > 0.999f ? Vector3.Right : Vector3.Up.Cross(axis).Normalized();
         Vector3 z = x.Cross(axis);
         SmsUnboundBurst.Spawn(Stars, this, new Transform3D(new Basis(x, axis, z), at));
+        if (Sound != null && Sound.Stream != null)
+            Sound.Play();
+    }
+
+    /// <summary>A HIT's burst at <paramref name="at"/> (calcDamagePos for the damage itself, his feet for the knockdown status that
+    /// follows): the game's upward dmg_c spray with <see cref="HitCount"/> stars living <see cref="HitLifeScale"/> of the bonk's life.</summary>
+    public void PlayHit(Vector3 at)
+    {
+        float life = (float)(Stars?.Lifetime ?? 1.25) * Mathf.Clamp(HitLifeScale, 0.1f, 1f);
+        SmsUnboundBurst.Spawn(Stars, this, at, b => { b.Amount = Mathf.Max(1, HitCount); b.Lifetime = life; });
         if (Sound != null && Sound.Stream != null)
             Sound.Play();
     }

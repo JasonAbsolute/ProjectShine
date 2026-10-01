@@ -3339,3 +3339,17 @@ UNBOUND (emitParticle(id, &pos) with no bind), so `SmsUnboundBurst.Spawn` (new, 
 one-shot at the spot, frees it on `finished`, and the scene's node is only the template: BonkStars, HipDropLanding and SuperHipDropLanding
 all go through it (the landings' smoke and stars have radial pivots too and would have followed him off the landing spot; the material
 and its ready-time edits are shared by the copies). A second burst no longer cuts the first short either (the bonk's wall + landing pair).
+
+### Pass 36 -- a hit's stars: fewer and shorter
+
+Jaysonn (2026-09-30 21:34): "maybe just a little less on the bonk stars for when mario gets hit. just shorter effect and not as many
+stars. otherwise looks great."
+
+The game fires the identical ms_dmg_c emitter (6 stars, 75 frames) for a wall bonk, for the damage burst at calcDamagePos AND for the
+first tick of every knockdown status -- so a hit taken on the ground is two bursts at once, and with the pass-34 Count of 10 that was 20
+stars where the game shows 12. DEVIATION, two exports on the BonkStars node: `HitCount` 6 (the game's own count; the bonk keeps `Count`
+10) and `HitLifeScale` 0.7 (a hit's stars live 0.875 s of the bonk's 1.25; the flight, the flip and the fade compress with it; 1.0 = the
+game). `SmsBonkStars.PlayHit(at)` spawns the hit variant through `SmsUnboundBurst.Spawn`'s configure step (amount and lifetime set on the
+copy before it emits); Mario.cs routes the two damage sites (ground / swim damageExec) and `SmsDownGroundAnim()` (the knockdown status's
+own burst: a ground hit's second, an air knockdown's landing) through `SpawnHitStars`. The bonk at the wall and its own landing
+(TickBonk -> SHORT_BACK_DOWN) keep the full burst, which he approved.
