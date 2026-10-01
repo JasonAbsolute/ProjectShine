@@ -175,9 +175,6 @@ public partial class Mario : CharacterBody3D
     private int _smsHeadBone = -2;                 // jnt_head, looked up once
     private bool _smsUnderWater = false;           // isUnderWater() last frame
     private float _smsUnderTime = 0f;
-    private int _smsAirHudTicks = 0;               // GCConsole2 unk268: the meter switches to air after 240 ticks under
-    private bool _smsAirHudShown = false;
-    private int _smsAirUnitsShown = -1;
     private bool _smsDrowned = false;              // SWIM_DOWN / SWIM_P_DOWN: only R gets him out
     // FLUDD (TWaterGun): see SmsFluddSetup / SmsFluddTick
     private enum SmsNozzle { Spray = 0, Hover = 1, Rocket = 2, Turbo = 3 }
@@ -11879,11 +11876,9 @@ public partial class Mario : CharacterBody3D
         _smsDrowned = false;
         _smsUnderWater = false;
         _smsUnderTime = 0f;
-        _smsAirHudTicks = 0;
-        _smsAirHudShown = false; // the console's meter is back on HP as soon as it reads this
     }
 
-    /// <summary>playerControl()'s air update, every tick, plus GCConsole2's life-meter switch to air.</summary>
+    /// <summary>playerControl()'s air update, every tick (the console's meter reads isUnderWater and mAir itself).</summary>
     private void SmsAirTick(double delta)
     {
         if (_smsMaxAir <= 0f)
@@ -11924,31 +11919,6 @@ public partial class Mario : CharacterBody3D
         {
             _smsAir = MathF.Min(_smsAir + n * SmsParams.Swim.AirInc, _smsMaxAir);
         }
-
-        // GCConsole2: the meter turns to air 240 ticks after he goes under and back to HP when he surfaces
-        if (under)
-        {
-            _smsAirHudTicks = Math.Min(_smsAirHudTicks + n, SmsParams.Swim.AirHudDelayTicks);
-            if (_smsAirHudTicks >= SmsParams.Swim.AirHudDelayTicks && !_smsAirHudShown)
-            {
-                _smsAirHudShown = true;
-                _smsAirUnitsShown = (int)_smsAir;
-                if (SmsDebugPrint)
-                    GD.Print($"[SMS air] meter: air, {_smsAirUnitsShown} segments");
-            }
-        }
-        else
-        {
-            _smsAirHudTicks = 0;
-            if (_smsAirHudShown)
-            {
-                _smsAirHudShown = false;
-                if (SmsDebugPrint)
-                    GD.Print($"[SMS air] meter: back to HP {_health}");
-            }
-        }
-        if (_smsAirHudShown && (int)_smsAir != _smsAirUnitsShown)
-            _smsAirUnitsShown = (int)_smsAir;
     }
 
     /// <summary>loserExec() while swimming: no air -> SWIM_DOWN (drowned), else SWIM_P_DOWN (killed in the water). Speed 0,
@@ -11994,8 +11964,6 @@ public partial class Mario : CharacterBody3D
         if (SmsIsUnderWater())
         {
             _smsAir = MathF.Max(_smsAir - p.Damage, 0f);
-            if (_smsAirHudShown)
-                _smsAirUnitsShown = (int)_smsAir;
             if (SmsDebugPrint)
                 GD.Print($"[SMS damage] hit under water: -{p.Damage} AIR -> {_smsAir:F2}; invincible {p.InvincibleTicks} ticks");
             if (_smsAir < 1f)
@@ -12488,12 +12456,13 @@ public partial class Mario : CharacterBody3D
                 : "[SMS hud] counters / life meter: a group or pane is missing from SmsHud.tscn -- they stay off");
     }
 
-    /// <summary>What TGCConsole2::perform reads each frame: the flag manager's counts (his fields), mHealth / mAir, the meter's air switch
-    /// (SmsAirTick's 240-tick rule), MARIO_STATUS_WAIT, and whether a camera demo runs (the camera locked, a talk, the shine get, death).</summary>
+    /// <summary>What TGCConsole2::perform reads each frame: the flag manager's counts (his fields), mHealth, (int)mAir, isUnderWater()
+    /// (the console's own 240-frame timer turns its meter to air), MARIO_STATUS_WAIT, and whether a camera demo runs (the camera locked, a
+    /// talk, the shine get, death).</summary>
     private void SmsStandardHudFeed()
     {
         _stdHud.Coins = _coins; _stdHud.Lives = _lives; _stdHud.Shines = _shines; _stdHud.BlueCoins = _blueCoins; _stdHud.RedCoins = _redCoins;
-        _stdHud.Health = _health; _stdHud.AirMode = _smsAirHudShown; _stdHud.Air = _smsAirUnitsShown;
+        _stdHud.Health = _health; _stdHud.Air = (int)MathF.Max(_smsAir, 0f); _stdHud.UnderWater = _smsUnderWater; _stdHud.DebugPrint = SmsDebugPrint;
         _stdHud.Idle = stateOfMario == MarioState.idle;
         _stdHud.Dead = stateOfMario == MarioState.dead || _health <= 0;
         _stdHud.ShineDemo = stateOfMario == MarioState.shineGet;

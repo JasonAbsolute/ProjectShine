@@ -33,7 +33,7 @@ public static class SmsHud
     // 1 / 0 / 0 / 0 / 0 / 1 / false) ----
     public static float Size = 0.7f;
     public static float LeftShift = 0f, TopShift = -22f, RightShift = 30f, BottomShift = -10f;
-    public static float AnimSpeed = 4f;
+    public static float AnimSpeed = 1f;                  // the scene root (SmsHudLayer) writes its export here; 1 = the game's pace
     public static bool IdleHold = true;
     /// <summary>The motions' pace over the game's.</summary>
     public static float Anim => AnimSpeed;

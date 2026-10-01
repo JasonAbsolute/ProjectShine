@@ -449,7 +449,6 @@ public static class SmsParams
         public const float AirDecDive = 0.00075f;      // ... with the Noki Bay helmet (not used)
         public const float AirInc = 0.03f;             // mAir += a tick out of the water (empty -> full in 2.5 s)
         public const int AirUnitFlashTicks = 50;       // unk55C: mInvincibilityFrames each time a whole unit of air goes
-        public const int AirHudDelayTicks = 240;       // GCConsole2 unk268: the life meter turns to air this long after he goes under
         public const float SwimDepth = 110f;           // run.prm: deeper than this under the feet = swimming, else wading
         public const float InWaterBrake = 0.95f;       // run.prm: the wading brake at full SwimDepth, a tick
         public const float InWaterAnmBrake = 0.8f;     // run.prm: the wading run-animation rate factor (times the brake factor)

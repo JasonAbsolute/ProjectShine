@@ -16,15 +16,26 @@ using System;
 ///       at (77, -26) (104, -31) (setTwoDigits: the tens even at 0). Out at the level's start and with the star HUD's peek, away with it.
 ///   l_0 (500, 50) the life meter: water_back 74 x 71 as an orange disc (FF4C00, alpha C8 x the pane's 200), the sun life_icon_0 54 x 58
 ///       at (9, 11) and the eight rays life_icon_1..8 at (53, 0) (59, 23) (57, 48) (38, 61) (13, 64) (-7, 49) (-12, 27) (-8, 2), each a lit
-///       picture (_1) over its grey socket (_2), "LIFE" life_text 60 x 30 at (7, -18). Hidden at 8; a hit brings it in at
-///       (-150, +180) from home (startAppearLife 2323: the middle-right of the screen), held 100 frames, then a 40-frame curve through
-///       (-10, 10) to the corner (processAppearLife 3008); back at 8 it holds 120 frames and slides up and away (startLifeMeterDisappear
-///       339, state 3); a camera demo slides it out at once and it comes back from above at home (startInsertLife 2260: the disc, then
-///       "LIFE" at 14, the sun at 24, popping). The segments follow mHealth one a frame (updateLifeMeterState 556), the sun and the
-///       text dim to 7F below 4 (updateLifeMeterColors 366), and the lit pieces beat (updateLifeMeterBlink 1085): 3 px in from every
-///       side for half of a 200-frame cycle, 160 / 120 / 70 frames and 5 px at 3 / 2 / 1. Under water (the meter shows air, Mario's
-///       240-tick rule) the disc is the water gauge's blue (0000FF, alpha 78) and the lit pieces go through black 003CFF00 / white
-///       00FFFFFF (the sun and text 0010FFFF below 4).
+///       picture (_1) over its grey socket (_2), "LIFE" life_text 60 x 30 at (7, -18). The game runs it as a state machine
+///       (updateLifeMeterState 397, unk18; the frames are the console's 120 Hz ticks): 0 hidden -- a hit brings it in at (-150, +180)
+///       from home (startAppearLife 2323: the middle-right of the screen), held 100 frames, then a 40-frame curve through (-10, 10) to
+///       the corner (processAppearLife 3008; state 1) -- 2 shown; back at 8 it holds 120 frames and slides up and away
+///       (startLifeMeterDisappear 339; state 3). WATER: once Mario's head has been under for 240 frames (isUnderWater: IN_ANY_WATER and
+///       the head below the surface less CanBreathDepth; unk268) a shown health meter holds its 120 frames and slides away too, and the
+///       hidden meter comes back as the AIR meter (startAppearLife(1): blue, the pieces lit per (int)mAir) at the same (-150, +180),
+///       where it SITS while his air is still 8 and his head under (state 4 holds processAppearLife at frame 0), then the 100-frame hold
+///       and the curve home; 5 shown as air, the pieces following mAir. Surfaced, the air refills (0.03 a frame) and once the shown
+///       count is 8 the air meter holds 120 and slides up (state 6); then the HEALTH meter drops in from above if mHealth is not 8
+///       (startInsertLife(0) 2260: the disc first, "LIFE" at 14, the sun at 24, popping; state 7 -> 2), else nothing. A camera demo
+///       slides whatever shows out at once (state 10) and, when it ends, drops the health meter in if mHealth is not 8, the air meter if
+///       his head is under water, else stays hidden. The three helmet stages (SMS_isDivingMap: the air meter inserted at the start,
+///       standing in state 9) have no counterpart here. The segments follow the count one a frame (SE 0x4801 up / 0x4823 down), the
+///       sun and the text dim to 7F below 4 (updateLifeMeterColors 366), and the lit pieces beat (updateLifeMeterBlink 1085): 3 px in
+///       from every side for half of a 200-frame cycle, 160 / 120 / 70 frames and 5 px at 3 / 2 / 1. As the air meter the disc is the
+///       water gauge's blue (0000FF, alpha 78) and the lit pieces go through black 003CFF00 / white 00FFFFFF (the sun and text 0010FFFF
+///       below 4). NOTE the decomp's case labels for states 4..8 are wrong (the compiler laid the blocks out in source order 0 1 2 3 7 8
+///       4 5 6 10; its updateLifeMeterState names them 4 5 6 7 8 in that order): the numbering above is the jump table's, checked
+///       against the disassembly and the only one under which the machine is consistent (the air states 4 5 6 8 9 read mAir).
 ///       THE ART IS JAYSONN'S (pass 30: "my legacy one looks way better then the one you made so either do another pass on it or combine
 ///       mine with the new hud"): the group carries his Font/LifeMeter/LifeMeter.tscn (the Meter) in place of the disc's panes -- its
 ///       PaintBlobBG is the disc, LifeText the text, its Gray and Orange layers the sun; his script keeps the segments (SetHealth), the
@@ -63,8 +74,9 @@ public partial class SmsStandardHud : Control
     // ---- what Mario tells it every physics frame (the flag manager's counts, his status) ----
     public int Coins, Lives = 4, Shines, BlueCoins, RedCoins;
     public int Health = 8;          // mHealth, 0..8
-    public int Air = 8;             // (int)mAir, 0..8, while the meter shows air
-    public bool AirMode;            // GCConsole2's meter switched to air (Mario's 240-tick rule)
+    public int Air = 8;             // (int)mAir, 0..8: what the meter shows in its air states
+    public bool UnderWater;         // TMario::isUnderWater(): the console counts his frames under (unk268) and switches to air after 240
+    public bool DebugPrint;         // the life meter's state changes to the output (Mario's SmsDebugPrint)
     public bool Idle;               // MARIO_STATUS_WAIT
     public bool Demo;               // a camera demo runs: the camera locked, a talk, the shine get, death
     public bool ShineDemo;          // the demo is the shine get (DIRECTOR_FLAG_SHINE_TAKEN)
@@ -88,6 +100,8 @@ public partial class SmsStandardHud : Control
     [Export] public SmsHudGroup TimerGroup;
     /// <summary>updateLifeMeterBlink's heartbeat SE (0x4800), once a beat while the shown count is 1..3; his to fill.</summary>
     [Export] public AudioStreamPlayer LifeBeep;
+    /// <summary>The count's step SEs (updateLifeMeterState 556): 0x4801 as a piece lights, 0x4823 as one goes out; his to fill.</summary>
+    [Export] public AudioStreamPlayer LifeUp, LifeDown;
     /// <summary>The meter's beat at the game's cadence: a 2 x rate period, rate 100 frames at 4 or more, 80 / 60 / 35 at 3 / 2 / 1
     /// (updateLifeMeterBlink) -- written into his LifeMeter.ToggleInterval. Off: his own ToggleInterval stays.</summary>
     [Export] public bool HeartbeatRates = true;
@@ -111,8 +125,11 @@ public partial class SmsStandardHud : Control
     private const float LifeGone = LifeAbove - 71f - 22f; // startLifeMeterDisappear: on past the disc's height, fully out of the frame
     private const int IdleFrames = 200;                 // updateCounterState: 0xC8 frames of MARIO_STATUS_WAIT
     private const int BlueHold = 400;                   // unk16C: 0x190 frames after a blue coin
-    private const int LifeHold = 120;                   // state 3: 0x78 frames at 8 before the meter leaves
-    private const int LifeAppearHold = 100;             // processAppearLife: the frames in the middle of the screen
+    private const int LifeLeaveHold = 120;              // states 3 / 6: 0x78 frames before the meter slides away
+    private const int LifeAppearHold = 100;             // processAppearLife: the frames in the middle of the screen before the curve home
+    private const int LifeAirTimeout = 240;             // unk268: 0xF0 frames of isUnderWater() before the meter turns to air
+    private const int LifeAppearFrames = 40, LifeInsertFrames = 20, LifeLeaveFrames = 40; // the group's three moves (unk98 = 20 the drop)
+    private static readonly Vector2 LifeAppearAt = new Vector2(-150f, 180f); // unk1C8 / unk1CA: where the meter appears, from home
 
     // coins
     private readonly SmsHudSlide _coinSlide = new SmsHudSlide(CoinHidden);
@@ -138,12 +155,20 @@ public partial class SmsStandardHud : Control
     private readonly SmsHudSlide _timerSlide = new SmsHudSlide(RedBelow);
     private bool _timerVisible, _timerParked, _timerLong, _timerWasRunning; private int _timerF0 = -1;
     private SmsHudPane _tStrip, _tText; private readonly SmsHudPane[] _tLong = new SmsHudPane[6], _tShort = new SmsHudPane[4], _tColon = new SmsHudPane[3];
-    // the life meter
-    private enum Life { Hidden, Appear, Insert, Shown, Hold, Leave, DemoHidden }
-    private Life _life = Life.Hidden; private int _lifeF0 = -1; private Vector2 _lifeLeaveFrom;
+    // the life meter: the game's states (unk18), numbered as its jump table has them -- see the summary above
+    private enum Life { Hidden = 0, Appear = 1, Shown = 2, Leave = 3, AirAppear = 4, AirShown = 5, AirLeave = 6, Insert = 7, AirInsert = 8, AirStand = 9, Demo = 10 }
+    private Life _life = Life.Hidden;
+    private int _lifeF;                                 // unk84: the state's frame counter (processAppearLife / processInsertLife's frame, the hold before a slide)
+    private bool _lifeAppearing, _lifeLeaving;          // unk38 / unk4C: an appear or a slide-away is under way (a second is refused)
+    private int _lifeUnder;                             // unk268: his frames under water, 0 the frame he is not
+    private bool _lifeVisible;                          // the group pane's show / hide (unk1C4)
+    private readonly LifeMove _lifeMove = new LifeMove(); // the group's TBoundPane: setPanePosition / update
     private SmsHudPane _lDisc, _lText, _lSun, _lSunB;  // his PaintBlobBG, LifeText, GrayLayer and OrangeLayer (the sun is two layers)
     private LifeMeter _lMeter;                          // his Font/LifeMeter/LifeMeter.tscn: the segments, the air recolour, the pulse
-    private int _lifeShown = 8; private bool _lifeAirShown; private bool _lifeAirApplied, _lifeAirLowApplied, _lifeLowApplied;
+    private int _lifeShown = 8;                         // unk1CC[0]: the count the meter has reached, one step a frame
+    private int _lifeLast = 8;                          // unk1C: the count after its last step
+    private int _lifeLit = 8;                           // the pieces his meter has lit (the game lights them per the target in start*Life, the count catches up)
+    private bool _lifeAirApplied, _lifeAirLowApplied, _lifeLowApplied;
     private int _lifeBeat;                              // unk86: the beat's frame, 0 .. 2 x rate
     // the demo
     private bool _inDemo, _started; private int _demoEndCount;
@@ -204,8 +229,8 @@ public partial class SmsStandardHud : Control
         _lSun = new SmsHudPane(_lMeter.GetNode<Control>("GrayLayer")) { Shown = true };
         _lSunB = new SmsHudPane(_lMeter.GetNode<Control>("OrangeLayer")) { Shown = true };
         _lMeter.Visible = true;                       // his _Ready hides it; the group's visibility is the meter's from here on
-        _lifeShown = Mathf.Clamp(Health, 0, 8);
-        _lMeter.SetHealth(_lifeShown);
+        _lifeShown = _lifeLast = _lifeLit = Mathf.Clamp(Health, 0, 8); // loadAfter (1906): the group hidden, the pieces lit per mHealth, unk1CC = unk1C = mHealth
+        _lMeter.SetHealth(_lifeLit);
         _coinShown = Mathf.Clamp(Coins, 0, 999); SetCounterDigits(_cDigit, _coinShown);
         _shineShown = Mathf.Clamp(Shines, 0, 999); SetCounterDigits(_sDigit, _shineShown);
         _blueShown = Mathf.Clamp(BlueCoins, 0, 999); SetCounterDigits(_dDigit, _blueShown);
@@ -287,16 +312,17 @@ public partial class SmsStandardHud : Control
         {
             // startCameraDemo with no health: everything off at once
             _coinVisible = false; _marioVisible = false; _marioLeaving = false; _starVisible = false; _starAppearing = false; _starLeaving = false;
-            _redVisible = false; _redParked = false; _timerVisible = false; _timerParked = false; _life = Life.Hidden;
+            _redVisible = false; _redParked = false; _timerVisible = false; _timerParked = false;
+            _lifeVisible = false; _lifeAppearing = false; _lifeLeaving = false; GoLife(Life.Demo); // the tail of updateLifeMeterState hides the group at amount 0
             _coinSlide.Set(_now, CoinHidden, CoinHidden, 0); _marioSlide.Set(_now, MarioHidden, MarioHidden, 0);
             _shineSlide.Set(_now, ShineHidden, ShineHidden, 0); _blueSlide.Set(_now, BlueHidden, BlueHidden, 0); _redSlide.Set(_now, RedBelow, RedBelow, 0);
             _timerSlide.Set(_now, RedBelow, RedBelow, 0);
             return;
         }
-        if (_life == Life.Appear || _life == Life.Insert || _life == Life.Shown || _life == Life.Hold)
-            StartLifeLeave(); // startLifeMeterDisappear(this, 120): out now, state 10 until the demo ends
-        else if (_life == Life.Hidden)
-            _life = Life.DemoHidden;
+        // startLifeMeterDisappear(this, 120): the slide away runs during the demo (state 10 updates it every frame, no hold); refused while
+        // an appear or a slide is under way, in which case state 10 finishes that move instead
+        StartLifeMeterDisappear(120);
+        GoLife(Life.Demo);
         if (_redVisible) { _redSlide.Retarget(_now, RedGone, 20); _redParked = true; } // startDownLeftBot
         if (_timerVisible) { _timerSlide.Retarget(_now, RedGone, 20); _timerParked = true; _timerF0 = -1; }
         StartDisappearMario();
@@ -319,16 +345,7 @@ public partial class SmsStandardHud : Control
         if (_redParked) { _redParked = false; StartAppearRedCoin(); }
         if (!_coinVisible)
             StartAppearCoin();
-        if (_life == Life.DemoHidden)
-        {
-            // state 10: back from above if there is anything to show
-            if (AirMode || Mathf.Clamp(Health, 0, 8) != 8)
-                StartLifeInsert();
-            else
-            {
-                _life = Life.Hidden; _lifeShown = 8; ResetLifePieces(); // unk1CC = 8: the count caught up while it was away
-            }
-        }
+        // the life meter: state 10 brings it back itself the frame after (updateLifeMeterState, case 10)
     }
 
     // ------------------------------------------------------------------------------------------------------------------ counters
@@ -692,30 +709,126 @@ public partial class SmsStandardHud : Control
     }
 
     // ------------------------------------------------------------------------------------------------------------------ the life meter
-    private bool LifeOnScreen => _life == Life.Appear || _life == Life.Insert || _life == Life.Shown || _life == Life.Hold || _life == Life.Leave;
-
-    private void StartLifeAppear()
+    /// <summary>The group's TBoundPane (unk1C4): setPanePosition arms a quadratic through three points over N frames and update() moves it
+    /// one frame on -- only on the frames the game's state calls update, so an armed slide waits out the 120-frame hold and the appear's
+    /// curve waits out the 100 frames in the middle of the screen. The motion runs at the console's pace (SmsHud.Anim).</summary>
+    private sealed class LifeMove
     {
-        // startAppearLife (2323): the colours, the lit pieces per the health, the pane +(-150, 180) from home; processAppearLife (3008)
-        _life = Life.Appear; _lifeF0 = _frame;
-        _lDisc.Shown = true; _lDisc.Still(); _lText.Shown = true; _lText.Still(); SunShown(true); SunStill();
-        ResetLifePieces();
+        private Vector2 _p0, _p1, _p2; private float _t, _step; private bool _pending;
+        /// <summary>The pane's offset from home as of its last update (the pane stays put between updates).</summary>
+        public Vector2 At { get; private set; }
+        public void Set(Vector2 p0, Vector2 p1, Vector2 p2, int frames) { _p0 = p0; _p1 = p1; _p2 = p2; _t = 0f; _step = SmsHud.Anim / frames; _pending = true; }
+        /// <summary>TBoundPane::update: one frame of the move; true once nothing is pending.</summary>
+        public bool Update()
+        {
+            if (!_pending)
+                return true;
+            if (_t > 1f) { _t = 1f; _pending = false; }
+            At = SmsHud.Bezier(_p0, _p1, _p2, _t);
+            _t += _step;
+            return !_pending;
+        }
     }
 
-    private void StartLifeInsert()
+    /// <summary>The first switch of updateLifeMeterState: the states that read (int)mAir -- 4 5 6 8 9; the rest read mHealth.</summary>
+    private bool LifeAirMode => _life == Life.AirAppear || _life == Life.AirShown || _life == Life.AirLeave || _life == Life.AirInsert || _life == Life.AirStand;
+    private bool _lifeAirColours;                       // the colours the pieces carry: set by start*Life's mode, then by the state at every step
+
+    private void GoLife(Life to)
     {
-        // startInsertLife (2260): from above at home over 20 frames, the disc popping, "LIFE" at 14, the sun at 24 (processInsertLife 3030)
-        _life = Life.Insert; _lifeF0 = _frame;
+        if (to == _life)
+            return;
+        if (DebugPrint)
+            GD.Print($"[SMS hud] life meter {(int)_life} {_life} -> {(int)to} {to} at frame {_frame}: f {_lifeF} count {_lifeShown} lit {_lifeLit} health {Health} air {Air} under {_lifeUnder} off ({_lifeMove.At.X:F0}, {_lifeMove.At.Y:F0}) {(_lifeVisible ? "shown" : "hidden")}");
+        _life = to;
+    }
+
+    /// <summary>startAppearLife (2325): the colours and the lit pieces per mHealth (0) or (int)mAir (1), the appear flag, frame 0; the pane's
+    /// +(-150, 180) comes with processAppearLife's frame 0 here. Refused while an appear runs, in a demo, or with no health -- the callers
+    /// move to their next state regardless, as the game's do.</summary>
+    private bool StartAppearLife(int mode)
+    {
+        if (_lifeAppearing || _inDemo || Mathf.Clamp(Health, 0, 8) == 0)
+            return false;
+        SetLifeLit(mode == 1 ? Air : Health);
+        _lifeAirColours = mode == 1;
+        _lifeAppearing = true; _lifeF = 0;
+        return true;
+    }
+
+    /// <summary>processAppearLife (3010): frame 0 arms the 40-frame curve from (-150, 180) through (-10, 10) home, shows the pane and lands
+    /// it on the first point; frames 1..99 leave it there; from 100 the curve runs. True at once with no health or no air.</summary>
+    private bool ProcessAppearLife(int frame)
+    {
+        if (Mathf.Clamp(Health, 0, 8) == 0 || Air == 0)
+            return true;
+        if (frame == 0)
+        {
+            _lifeMove.Set(LifeAppearAt, new Vector2(-10f, 10f), Vector2.Zero, LifeAppearFrames);
+            _lifeVisible = true;
+            _lDisc.Shown = true; _lDisc.Still(); _lText.Shown = true; _lText.Still(); SunShown(true); SunStill(); // whole, wherever an insert left them
+            _lifeMove.Update();
+            return false;
+        }
+        if (frame < LifeAppearHold)
+            return false;
+        return _lifeMove.Update();
+    }
+
+    /// <summary>startInsertLife (2262): the colours and the lit pieces per mHealth (0) / (int)mAir (1), frame 0, the group shown and armed
+    /// to drop from above over 20 frames (unk98), the disc popping (50), "LIFE" and the sun hidden until processInsertLife shows them.</summary>
+    private void StartInsertLife(int mode)
+    {
+        SetLifeLit(mode == 1 ? Air : Health);
+        _lifeAirColours = mode == 1;
+        _lifeF = 0;
+        _lifeVisible = true;
+        _lifeMove.Set(new Vector2(0f, LifeAbove), new Vector2(0f, MathF.Floor(LifeAbove * 0.5f)), Vector2.Zero, LifeInsertFrames);
         _lDisc.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
-        _lText.Shown = false; SunShown(false);
-        ResetLifePieces();
+        _lText.Shown = false; _lText.Still(); SunShown(false); SunStill();
     }
 
-    private void StartLifeLeave()
+    /// <summary>processInsertLife (3032): the group's drop, "LIFE" shown and popping at 14, the sun at 24; done when the drop and the three
+    /// pops (each with its 30-frame settle: updateDownPaneState) are over.</summary>
+    private bool ProcessInsertLife(int frame)
     {
-        _lifeLeaveFrom = LifeGroupOffset(_now);
-        _life = Life.Leave; _lifeF0 = _frame;
-        _lDisc.Still(); _lText.Still(); SunStill(); _lDisc.Shown = true; _lText.Shown = true; SunShown(true);
+        bool done = _lifeMove.Update();
+        if (At(frame, 14)) _lText.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
+        if (At(frame, 24)) SunPop(_frame);
+        done &= _lDisc.PopDone(_now) && _lText.PopDone(_now) && _lSun.PopDone(_now) && _lSunB.PopDone(_now);
+        return done;
+    }
+
+    /// <summary>startLifeMeterDisappear (340): the 40-frame slide from home up past the top, the hold counter at `frame` (0: the full 120
+    /// before it moves; 120: at once, the camera demo). Refused while an appear or a slide runs.</summary>
+    private bool StartLifeMeterDisappear(int frame)
+    {
+        if (_lifeAppearing || _lifeLeaving)
+            return false;
+        _lifeLeaving = true;
+        _lifeMove.Set(Vector2.Zero, new Vector2(0f, MathF.Floor(LifeGone * 0.5f)), new Vector2(0f, LifeGone), LifeLeaveFrames);
+        _lifeF = frame;
+        return true;
+    }
+
+    /// <summary>resetLife (2304): the pieces lit per the count, every piece's bounds its own again (the beat's inset undone -- his pulse
+    /// has none to undo).</summary>
+    private void ResetLife(int count) => SetLifeLit(count);
+
+    private void SetLifeLit(int count)
+    {
+        count = Mathf.Clamp(count, 0, 8);
+        if (count == _lifeLit)
+            return;
+        _lifeLit = count;
+        _lMeter.SetHealth(count);
+    }
+
+    private void PlayLifeStep(AudioStreamPlayer se)
+    {
+        // playLifeChangeSound: in play only (the director's state 4), not through a demo
+        if (!_inDemo && se != null && se.Stream != null)
+            se.Play();
     }
 
     // his sun is two layers (the grey sockets, the orange rays): both ride lm_0's motions
@@ -723,87 +836,141 @@ public partial class SmsStandardHud : Control
     private void SunStill() { _lSun.Still(); _lSunB.Still(); }
     private void SunPop(float at) { _lSun.Pop(at, SmsHud.DownTop, SmsHud.DownMid, 50); _lSunB.Pop(at, SmsHud.DownTop, SmsHud.DownMid, 50); }
 
-    private void ResetLifePieces()
-    {
-        // resetLife (2302): the lit pieces as the count says, every bounds back to its own -- his SetHealth lights the segments
-        _lMeter.SetHealth(_lifeShown);
-    }
-
-    private Vector2 LifeGroupOffset(float now)
-    {
-        float f = now - _lifeF0;
-        switch (_life)
-        {
-            case Life.Appear:
-                // held at (-150, +180) for 100 frames, then 40 frames through (-10, 10) home
-                f *= SmsHud.Anim;
-                return f < LifeAppearHold ? new Vector2(-150f, 180f)
-                    : SmsHud.Bezier(new Vector2(-150f, 180f), new Vector2(-10f, 10f), Vector2.Zero, (f - LifeAppearHold) / 40f);
-            case Life.Insert:
-                return SmsHud.Bezier(new Vector2(0f, LifeAbove), new Vector2(0f, LifeAbove * 0.5f), Vector2.Zero, f * SmsHud.Anim / 20f);
-            case Life.Leave:
-                return SmsHud.Bezier(_lifeLeaveFrom, new Vector2(0f, LifeGone * 0.5f), new Vector2(0f, LifeGone), f * SmsHud.Anim / 40f);
-            default:
-                return Vector2.Zero;
-        }
-    }
-
+    /// <summary>updateLifeMeterState (397), state by state as the game's jump table orders them, then the count's step and the beat.</summary>
     private void StepLife()
     {
-        int amount = Mathf.Clamp(AirMode ? Air : Health, 0, 8);
-        // the states (updateLifeMeterState 408), health and air alike
+        // the first switch: which count this state follows
+        bool airMode = LifeAirMode;
+        int amount = Mathf.Clamp(airMode ? Air : Health, 0, 8);
+        // unk268: his frames under water; past 0xF0 the air timeout holds, and it is gone the frame he is not under
+        bool airTimeout = false;
+        if (UnderWater)
+        {
+            if (_lifeUnder < LifeAirTimeout) _lifeUnder++;
+            else airTimeout = true;
+        }
+        else
+            _lifeUnder = 0;
+
         switch (_life)
         {
             case Life.Hidden:
-                if (Demo)
-                    _life = Life.DemoHidden;
-                else if ((_lifeShown < 8 || AirMode) && amount != 0)
-                    StartLifeAppear();
+                _lifeVisible = false;
+                // SMS_isDivingMap(): the helmet stages insert the air meter here (startInsertLife(1) -> 8); none in the port
+                if (airTimeout)
+                {
+                    // under for 240 frames: the AIR meter appears in the middle of the screen (the pieces reset to the health first, as the game has it)
+                    ResetLife(amount);
+                    StartAppearLife(1);
+                    amount = Mathf.Clamp(Air, 0, 8);
+                    _lifeShown = amount;
+                    GoLife(Life.AirAppear);
+                }
+                if (_lifeShown < 8 && !_lifeVisible && amount != 0)
+                {
+                    // hurt: the health meter appears (the game runs this check after the air one too: an air count under 8 at the timeout
+                    // -- a quick re-dive -- turns that appear into a health one, its pieces still per the air)
+                    StartAppearLife(0);
+                    GoLife(Life.Appear);
+                }
                 break;
             case Life.Appear:
-                if (Demo) StartLifeLeave();
-                else if (_frame - _lifeF0 >= Paced(LifeAppearHold + 40)) { _life = Life.Shown; _lifeF0 = _frame; }
+                if (ProcessAppearLife(_lifeF++)) { GoLife(Life.Shown); _lifeAppearing = false; }
+                if (airTimeout && StartLifeMeterDisappear(1)) GoLife(Life.Leave); // never granted: the appear flag holds until it is done
                 break;
-            case Life.Insert:
-            {
-                int f = _frame - _lifeF0;
-                if (At(f, 14)) _lText.Pop(_frame, SmsHud.DownTop, SmsHud.DownMid, 50);
-                if (At(f, 24)) SunPop(_frame);
-                if (Demo) StartLifeLeave();
-                else if (f >= Paced(24 + 50 + SmsHud.Settle)) { _life = Life.Shown; _lifeF0 = _frame; }
-                break;
-            }
             case Life.Shown:
-                if (Demo) StartLifeLeave();
-                else if (!AirMode && _lifeShown == 8) { _life = Life.Hold; _lifeF0 = _frame; }
-                break;
-            case Life.Hold:
-                if (Demo) StartLifeLeave();
-                else if (_frame - _lifeF0 > LifeHold) StartLifeLeave();
+                if (_lifeShown == 8) { StartLifeMeterDisappear(0); GoLife(Life.Leave); }      // full again: away (state 3 even when the slide was refused)
+                else if (airTimeout && StartLifeMeterDisappear(0)) GoLife(Life.Leave);      // under water: away, the air meter follows from 0
                 break;
             case Life.Leave:
-                if (_frame - _lifeF0 >= Paced(40))
-                    _life = Demo ? Life.DemoHidden : Life.Hidden;
+                if (_lifeF > LifeLeaveHold) { if (_lifeMove.Update()) { _lifeLeaving = false; GoLife(Life.Hidden); } }
+                else _lifeF++;
                 break;
-            case Life.DemoHidden:
+            case Life.AirAppear:
+                if (ProcessAppearLife(_lifeF)) { GoLife(Life.AirShown); _lifeAppearing = false; }
+                if (!UnderWater && _lifeF == 0) _lifeF = 1;                      // surfaced during the hold: the appear goes on
+                if (!(amount >= 8 && _lifeF == 0) && _lifeF < 1000) _lifeF++;    // the hold in the middle of the screen lasts while his air is still 8
+                break;
+            case Life.AirShown:
+                if (!UnderWater)
+                {
+                    if (_lifeShown == 8) { StartLifeMeterDisappear(0); GoLife(Life.AirLeave); } // the air back to 8: away (state 6 regardless)
+                    else if (_lifeShown != _lifeLast)
+                    {
+                        // a count that never stepped since it was set straight: the game restarts it as a health appear in air colours
+                        StartAppearLife(1);
+                        amount = Mathf.Clamp(Health, 0, 8);
+                        _lifeShown = amount;
+                        ResetLife(amount);
+                        GoLife(Life.Appear);
+                    }
+                }
+                break;
+            case Life.AirLeave:
+                if (_lifeF > LifeLeaveHold)
+                {
+                    if (_lifeMove.Update())
+                    {
+                        _lifeLeaving = false;
+                        if (Mathf.Clamp(Health, 0, 8) == 8)
+                            GoLife(Life.Hidden);
+                        else
+                        {
+                            // hurt before he went under: the health meter drops in from above
+                            amount = Mathf.Clamp(Health, 0, 8);
+                            _lifeShown = amount;
+                            StartInsertLife(0);
+                            ResetLife(amount);
+                            GoLife(Life.Insert);
+                        }
+                    }
+                }
+                else _lifeF++;
+                break;
+            case Life.Insert:
+                if (ProcessInsertLife(_lifeF++)) GoLife(Life.Shown);
+                break;
+            case Life.AirInsert:
+                if (ProcessInsertLife(_lifeF++)) GoLife(Life.AirShown); // SMS_isDivingMap() ? 9 : 5
+                break;
+            case Life.AirStand:
+                break;
+            case Life.Demo:
+                if (_inDemo)
+                {
+                    if (_lifeMove.Update()) _lifeLeaving = false;          // the slide away (or a refused one's pending move) runs through the demo
+                }
+                else if (Mathf.Clamp(Health, 0, 8) != 8) { StartInsertLife(0); GoLife(Life.Insert); }   // over: back from above as health,
+                else if (UnderWater) { StartInsertLife(1); GoLife(Life.AirInsert); }                    // as air with his head under (or on a helmet stage),
+                else { _lifeShown = 8; GoLife(Life.Hidden); }                                          // or not at all
                 break;
         }
 
-        // the count, one a frame (updateLifeMeterState 556): his SetHealth lights the segment (and pulses it)
-        if (amount != _lifeShown && _life != Life.DemoHidden)
+        // the count, one a frame (556): a piece lights with SE 0x4801, goes out with 0x4823 -- not in state 10. The game shows or hides
+        // the one piece the step reaches; start*Life having lit them per the target already, his meter's lit count only moves when a
+        // step passes it. The colours (updateLifeMeterColors) follow the state's mode from here on
+        if (amount != _lifeShown && _life != Life.Demo)
         {
             if (_lifeShown < amount)
+            {
                 _lifeShown++;
+                if (_lifeLit < _lifeShown) SetLifeLit(_lifeShown);
+                PlayLifeStep(LifeUp);
+            }
             else if (_lifeShown > 0)
+            {
+                if (_lifeLit >= _lifeShown) SetLifeLit(_lifeShown - 1);
                 _lifeShown--;
-            _lMeter.SetHealth(_lifeShown);
+                PlayLifeStep(LifeDown);
+            }
+            _lifeLast = _lifeShown;
+            _lifeAirColours = airMode;
         }
-        _lifeAirShown = AirMode;
         // updateLifeMeterBlink (1086): while the meter is on screen the lit pieces beat -- 3 px at 4 or more, 5 at 1..3 -- with a period of
         // 2 x rate frames (rate 100 / 80 / 60 / 35 for 4+ / 3 / 2 / 1) and the heartbeat SE 0x4800 at 1.5 x rate per cycle while the count
         // is 1..3 (not in a demo). His meter's own scale pulse (ScaleMultiplier) is the beat's look -- a deviation logged in pass 30 -- and
         // runs at the game's cadence through its ToggleInterval (HeartbeatRates); the beep is the console's (LifeBeep).
-        if (LifeOnScreen)
+        if (_lifeVisible)
         {
             float rate = _lifeShown == 3 ? 80f : _lifeShown == 2 ? 60f : _lifeShown == 1 ? 35f : 100f;
             if (HeartbeatRates && _lMeter != null)
@@ -844,16 +1011,16 @@ public partial class SmsStandardHud : Control
             _sStrip.Apply(n, Vector2.Zero); _sIcon.Apply(n, Vector2.Zero); _sX.Apply(n, Vector2.Zero);
             foreach (var d in _sDigit) d.Apply(n, Vector2.Zero);
         }
-        LifeMeterGroup.Visible = LifeOnScreen;
-        if (LifeOnScreen)
+        LifeMeterGroup.Visible = _lifeVisible;
+        if (_lifeVisible)
         {
-            LifeMeterGroup.Place(LifeGroupOffset(n), _scale, _viewport);
+            LifeMeterGroup.Place(_lifeMove.At, _scale, _viewport);
             _lDisc.Apply(n, Vector2.Zero);
             _lSun.Apply(n, Vector2.Zero); _lSunB.Apply(n, Vector2.Zero);
             _lText.Apply(n, Vector2.Zero);
-            // updateLifeMeterColors (366): under water the meter is blue (the lowest darker under 4) -- his SetAirTint's remap; applied
+            // updateLifeMeterColors (366): as the air meter the pieces are blue (the lowest darker under 4) -- his SetAirTint's remap; applied
             // on a change only (it swaps materials)
-            bool air = _lifeAirShown, low = _lifeShown < 4;
+            bool air = _lifeAirColours, low = _lifeShown < 4;
             if (air != _lifeAirApplied || (air && low != _lifeAirLowApplied))
             {
                 _lMeter.SetAirTint(air, _lifeShown);

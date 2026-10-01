@@ -3451,3 +3451,43 @@ off and done including with the air health meter also for swimming". TGCConsole2
 
 `res://assets/Sms/CameraShake.tscn` is instanced under Mario in `Player.tscn` (the pass-39 to-do), so the hip drop, super hip drop
 and damage shakes play and the boot no longer errors about the missing node. The `[SMS fx]` debug line names it with the other scenes.
+
+### Pass 42 -- the life meter around water, 1:1
+
+Jaysonn: "when jumping in the water it goes away but sliding up then water covers it and when you go out of the water it slides up and
+swaps back to the normal one. also the water health shows up near the middle of the screen (or mario you need to check how it spawns in)
+then goes where health is supposed to go. basically you need to cover the cases of the health spawning in and going away and what should
+be showing when mario is swimming or just on land."
+
+- **The source.** `TGCConsole2::perform`'s life-meter block (GCConsole2.cpp 397-640, updateLifeMeterState) is NonMatching in the decomp and
+  its case labels for states 4..8 are WRONG: read against the original disassembly (QbeRoot/sms asm/GC2D/GCConsole2.s, 80202788-80202F74),
+  the compiler laid the case blocks out in the source order 0 1 2 3 7 8 4 5 6 10 and the decomp names them 4 5 6 7 8 in block order. The
+  jump table's numbering is the only one under which the machine is consistent (the first switch reads mAir in 4 5 6 8 9): 0 hidden,
+  1 health appearing, 2 health shown, 3 health leaving, 4 AIR appearing, 5 air shown, 6 air leaving, 7 health inserting (from above),
+  8 air inserting, 9 air standing (helmet stages), 10 camera demo. The helpers (startAppearLife 2325, processAppearLife 3010,
+  startInsertLife 2262, processInsertLife 3032, resetLife 2304, startLifeMeterDisappear 340) match the asm and were already ported.
+- **What the game does (120 Hz frames).** `isUnderWater()` = in water and the head joint deeper than CanBreathDepth 50 under the surface;
+  the console counts his frames under (unk268) and the air timeout holds from frame 240 on, gone the frame he is not under. Health meter
+  shown (state 2) + timeout -> it holds 120 frames and slides up off the top (3) -> hidden (0) -> still under: the AIR meter (blue, the
+  pieces per (int)mAir) appears at (-150, +180) from its home -- the middle-right of the screen -- and SITS there while his air is still
+  8 and his head under (state 4 holds processAppearLife at frame 0; the first unit goes 500 frames after he went under), then holds 100
+  frames and curves home over 40 (through (-10, 10)) -> 5, the pieces following mAir. Surfaced: the air refills 0.03 a frame; once the
+  shown count is 8 the air meter holds 120 and slides up (6); then the HEALTH meter drops in from above over 20 frames (the disc first,
+  "LIFE" popping at 14, the sun at 24: startInsertLife(0) -> 7 -> 2) if mHealth is not 8, else nothing. Hidden + timeout (full health):
+  the air meter appears as above (0 -> 4). A camera demo slides whatever shows out at once (10, no hold) and, over, drops the health
+  meter in if mHealth is not 8, the air meter if his head is under, else stays hidden. Quirks kept: a count under 8 at the timeout
+  (a quick re-dive) turns the air appear into a health appear with the pieces per the air (the state-0 check after the air one), and
+  the state-5 "count never stepped" restart.
+- **PORT.** `SmsStandardHud.cs`: the eleven states as an enum numbered the game's way, unk84 / unk38 / unk4C / unk268 / unk1C as fields,
+  the group's TBoundPane as `LifeMove` (setPanePosition + update: the pane only moves on the frames the state updates it, which is what
+  holds a slide through the 120-frame wait and the appear through its 100), startAppearLife / processAppearLife / startInsertLife /
+  processInsertLife / resetLife / startLifeMeterDisappear as methods, the count stepping with `LifeUp` / `LifeDown` AudioStreamPlayer
+  slots (SE 0x4801 / 0x4823, his to fill), the state-10 return in the machine itself. The pieces his meter lights follow the game's
+  start*Life targets (`_lifeLit`), the count catches up as the game's does. The console reads `UnderWater` (isUnderWater) and `Air`
+  ((int)mAir) from Mario and runs the 240-frame timer itself; `Mario.cs` loses its `_smsAirHudTicks` / `_smsAirHudShown` /
+  `_smsAirUnitsShown` switch and `SmsParams.Swim.AirHudDelayTicks` goes. `DebugPrint` (Mario's SmsDebugPrint) logs every state change
+  as `[SMS hud] life meter N -> M`. The pass-30 deviation "the meter turns to air in place" is WITHDRAWN. `SmsHud.AnimSpeed`'s code
+  default is 1 (the scene's value; it read 4 from before pass 38).
+- Not ported: the three helmet stages (SMS_isDivingMap: the air meter inserted at the start, state 9), the pause menu's alpha fade.
+- Drive (patch_smoke26.py, removed): a hit at 1 s (7 HP), under water 3-12 s, a unit of air taken at 10 s, HP to 8 at 16 s, under 18-24 s,
+  under from 26.5 s with a camera demo 27-29 s; every state change and the group's position printed and compared with the numbers above.
