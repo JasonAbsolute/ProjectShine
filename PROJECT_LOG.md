@@ -3597,3 +3597,9 @@ they seem to load later but this should not happen."
   Player.tscn (like the other Fx); until then one error at boot and no bubbles. Not ported: the bubbles' own spin (+-0.25 turns a
   frame on a round texture). Reading of the Gravity field: world up, as the hip-drop smoke's (pass 29) -- the bubbles rise whatever
   the head does; the mouth offset and the exhale direction are in the head joint's own frame.
+
+### Pass 49 -- SmsBubbles.tscn instanced
+
+`res://assets/Sms/Fx/SmsBubbles.tscn` is instanced under Mario in `Player.tscn` (the pass-48 to-do), so the bubbles from the mouth,
+the stream off the body while swimming, the gulp on a hit under water and the pop rings at the surface play, and the boot no longer
+errors about the missing node. The `[SMS fx]` debug line already named it with the other scenes.

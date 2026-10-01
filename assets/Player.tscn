@@ -224,6 +224,7 @@
 [ext_resource type="PackedScene" uid="uid://fbonkstars233" path="res://assets/Sms/Fx/BonkStars.tscn" id="232_bnkst"]
 [ext_resource type="PackedScene" uid="uid://ydk4hvu1bqs2" path="res://assets/Sms/BodyLag.tscn" id="229_bdylg"]
 [ext_resource type="PackedScene" uid="uid://cshake120h01" path="res://assets/Sms/CameraShake.tscn" id="233_cshak"]
+[ext_resource type="PackedScene" uid="uid://fbubbles0048" path="res://assets/Sms/Fx/SmsBubbles.tscn" id="234_bubbl"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_fpjfl"]
 height = 1.8701391
@@ -2503,5 +2504,7 @@ script = ExtResource("222_fpjfl")
 [node name="BonkStars" parent="." instance=ExtResource("232_bnkst")]
 
 [node name="CameraShake" parent="." instance=ExtResource("233_cshak")]
+
+[node name="SmsBubbles" parent="." instance=ExtResource("234_bubbl")]
 
 [editable path="Armature/Skeleton3D/RightHandBone/RightHandClosed/Model"]
