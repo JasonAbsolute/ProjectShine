@@ -3327,3 +3327,15 @@ landing) now call `SpawnBonkStars(feet, up)`. The rumble is not ported (no rumbl
 **The flames (pass-34 bug).** `SmsSuperHipDropLanding.ApplyFlameSpeeds` converted the streaks' 34 units a frame with `SmsUnits.SpeedToMps`
 (the 30 fps MOVEMENT convention) and set 10.6..16.8 m/s where the scene's baked data (and the game) say 21.3..33.6: pass 34 ran the
 flames at half speed. `SmsUnits.FxSpeedToMps` (x 60 / 74.44, the particle clock) replaces it, with a self-test check.
+
+**Follow-up (20:54): "when mario gets hit from an enemy the stars spawn too far away from him. almost like the offset is wrong".** The
+offset is the game's (calcDamagePos: mPosition + 50 units toward the attacker, MarioCollision.cpp 263-271) -- the drift came from the
+node. The Fx scenes are instanced under Mario, and `Play` moved the BonkStars node to the spot and restarted its emitter in place; the
+particles are world space, but Godot's ParticleProcessMaterial reads the node's CURRENT transform every frame for the radial pivot
+(`process_radial_displacement`: normalize(pos - emission_transform x velocity_pivot)), so as he was knocked back the pivot receded with him
+and every star was steered away from his position: the burst ran off toward the attacker instead of rising over the hit. Pass 33/34 only
+had the 10-out radial part on the pivot, pass 35 put the whole launch on it, which is why it showed now. The game's emitters here are
+UNBOUND (emitParticle(id, &pos) with no bind), so `SmsUnboundBurst.Spawn` (new, assets/Sms/Fx) duplicates the emitter as a top-level
+one-shot at the spot, frees it on `finished`, and the scene's node is only the template: BonkStars, HipDropLanding and SuperHipDropLanding
+all go through it (the landings' smoke and stars have radial pivots too and would have followed him off the landing spot; the material
+and its ready-time edits are shared by the copies). A second burst no longer cuts the first short either (the bonk's wall + landing pair).

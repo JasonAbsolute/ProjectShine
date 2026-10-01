@@ -77,13 +77,13 @@ public partial class SmsSuperHipDropLanding : Node3D
         mat.InitialVelocityMax = speed * (1f + FlameSpeedRatio);
     }
 
-    /// <summary>The landing: the bursts at his feet, world-aligned like the game's unbound emitters.</summary>
+    /// <summary>The landing: the bursts at his feet, world-aligned and world-FIXED like the game's unbound emitters -- each a one-shot copy
+    /// (<see cref="SmsUnboundBurst"/>) that stays put when he runs off; the smoke's and the stars' radial pivots would otherwise follow
+    /// him. The nodes here are templates and never emit in the game (the flames' ready-time material edits are shared by the copies).</summary>
     public void Play(Vector3 feet)
     {
-        GlobalPosition = feet;
-        GlobalRotation = Vector3.Zero;
         foreach (var p in new[] { Shockwave, Smoke, Flames, Stars })
-            p?.Restart();
+            SmsUnboundBurst.Spawn(p, this, feet);
         if (Sound != null && Sound.Stream != null)
             Sound.Play();
     }

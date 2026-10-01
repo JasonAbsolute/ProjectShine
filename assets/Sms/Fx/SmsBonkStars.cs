@@ -108,14 +108,15 @@ public partial class SmsBonkStars : Node3D
 
     /// <summary>The burst at <paramref name="at"/> (the game's mPosition / calcDamagePos). <paramref name="impact"/> is the way he is
     /// thrown by a bonk (the wall's normal) -- with AimAlongImpact the emitter's axis follows it; Vector3.Up (or zero) keeps the game's
-    /// upward spray.</summary>
+    /// upward spray. Each call is its own world-fixed one-shot copy of <see cref="Stars"/> (<see cref="SmsUnboundBurst"/>): the game's
+    /// emitter is unbound, so the stars stay where they were emitted while he is knocked back, and a second burst (the landing, a ground
+    /// hit's second one) leaves the first alone. The Stars node is the template and never emits in the game.</summary>
     public void Play(Vector3 at, Vector3 impact)
     {
         Vector3 axis = AimAlongImpact && impact.LengthSquared() > 1e-6f ? impact.Normalized() : Vector3.Up;
         Vector3 x = Mathf.Abs(axis.Dot(Vector3.Up)) > 0.999f ? Vector3.Right : Vector3.Up.Cross(axis).Normalized();
         Vector3 z = x.Cross(axis);
-        GlobalTransform = new Transform3D(new Basis(x, axis, z), at);
-        Stars?.Restart();
+        SmsUnboundBurst.Spawn(Stars, this, new Transform3D(new Basis(x, axis, z), at));
         if (Sound != null && Sound.Stream != null)
             Sound.Play();
     }

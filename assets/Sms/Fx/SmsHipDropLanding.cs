@@ -38,13 +38,13 @@ public partial class SmsHipDropLanding : Node3D
             }
     }
 
-    /// <summary>The landing: the bursts at his feet, world-aligned like the game's unbound emitters.</summary>
+    /// <summary>The landing: the bursts at his feet, world-aligned and world-FIXED like the game's unbound emitters -- each a one-shot copy
+    /// (<see cref="SmsUnboundBurst"/>) that stays put when he runs off; the smoke's radial pivot would otherwise follow him for its two
+    /// seconds. The nodes here are templates and never emit in the game.</summary>
     public void Play(Vector3 feet)
     {
-        GlobalPosition = feet;
-        GlobalRotation = Vector3.Zero;
         foreach (var p in new[] { Sparks, Smoke, Shockwave })
-            p?.Restart();
+            SmsUnboundBurst.Spawn(p, this, feet);
         if (Sound != null && Sound.Stream != null)
             Sound.Play();
     }
