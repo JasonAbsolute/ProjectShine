@@ -245,7 +245,8 @@ public partial class Mario : CharacterBody3D
     private float _smsRunRate = 1f, _smsRunMix = 1f;              // its rate (BCK frames a tick x 2 = Godot speed) and the run2 share
     private const string SMS_RUN_MIX_PATH = "parameters/BaseSM/ma_runblend/mix/blend_amount";
     private float _fluddHeadW = 0f;                               // the HoverHeadAngle head dip, eased like the run's head lock
-    private SmsUpperPose _fluddSwimPump;                          // addUpper() for the swim clips: ma_swpmp on the chn_chest subtree
+    private readonly System.Collections.Generic.Dictionary<int, SmsUpperPose> _fluddUpperGraft = new(); // addUpper() outside the tree: the upper clip (ma_swpmp / ma_hgpmp / ma_fepmp) by gMarioAnimeData id on the chn_chest subtree
+    private readonly System.Collections.Generic.Dictionary<int, double> _fluddUpperClipLen = new();              // the upper clips' lengths (s) by id
     private float _fluddRocketVyPending = 0f;                     // the rocket's pushes fired this frame before the status change (units a tick)
     private int _fluddRocketPushes = 0;                           // launch ticks that reached mVel.y (debug)
     private bool _fluddKeyN = false;                              // the nozzle-cycle key's last state
@@ -265,8 +266,12 @@ public partial class Mario : CharacterBody3D
     private string _fluddDashDbgFrom = "";
     private double _fluddPumpTime = 0.0;                          // the upper clip's J3DFrameCtrl (slot 1): its frame as seconds of the clip
     private int _fluddPumpDir = 1;                                // the ping-pong's direction
-    private double _fluddPumpLen = 0.0, _fluddSwimPumpLen = 0.0;  // ma_pump / ma_swpmp lengths (s)
-    private bool _fluddPumpSwimClip = false;                      // which of the two the frame ctrl is bound to
+    private double _fluddPumpLen = 0.0;                           // ma_pump's length (s)
+    private int _fluddPumpBound = SmsParams.Fludd.UpperPump;      // the upper clip the frame ctrl is bound to (gMarioAnimeData id; a change = J3DFrameCtrl::init)
+    private float _fluddPumpRate = 1f;                            // the frame ctrl's rate: 1 at the bind; mAnalogR x PumpAnmSpeed while pumping an empty tank (pass 46)
+    /// <summary>The empty tank's pump squeaks (MSD_SE_PO_POMPING1 as the stroke passes frame 8 forward, POMPING2 frame 13 back):
+    /// AudioStreamPlayer3Ds under Mario with the sounds in their Streams; empty = silent.</summary>
+    [Export] public AudioStreamPlayer3D PumpSqueakIn, PumpSqueakOut;
     private bool _fluddPumpSeekReady = false;                     // the tree's PumpSeek / PumpScale nodes answered
     private const string SMS_PUMP_SEEK_PATH = "parameters/PumpSeek/seek_request";
     private const string SMS_PUMP_SCALE_PATH = "parameters/PumpScale/scale";
@@ -12089,7 +12094,7 @@ public partial class Mario : CharacterBody3D
         SmsFluddSetupTurboNeck(); // S5 fix 2: NozzleCtrl on the turbo's jnt_back_nozzle_neck (the gun angle)
         SmsFluddSetupSprayAim();  // NozzleCtrl on the spray nozzle's chn_muzzle_1: the aim up
         SmsFluddSetupHandleSwing(); // the water gun's TMultiMtxEffect: the grips swing on jnt_G_handle
-        SmsFluddSetupSwimPump();  // ma_swpmp on the upper body while the swim clips run outside the tree
+        SmsFluddSetupUpperGrafts(); // ma_swpmp / ma_hgpmp / ma_fepmp on the upper body while the body clip runs outside the tree
         SmsFluddSetupTurboAnims(); // S5: ma_turbo_dash / ma_broad_jump as BaseSM states
         // the pump clips ping-pong (addUpper: ATTR_PING_PONG_LOOP; the tank's are slaved to Mario's)
         if (animPlayer.HasAnimation("ma_pump"))
@@ -12228,9 +12233,10 @@ public partial class Mario : CharacterBody3D
             return false;
         if (_fluddNozzle != SmsNozzle.Spray && _fluddTrigState == 2)
             return false;
-        // gMarioAnimeData: swim_dive, swim_p_damage (and swim_down / swim_p_down, refused above through _smsDrowned) carry no
-        // pump clip (0xC8) -> isPumpOK() false: no pumping in the dive or the water knockdown; every other swim clip pumps ma_swpmp
-        if (stateOfMario == MarioState.swimming && (_smsSwim == SmsSwim.Dive || _smsSwim == SmsSwim.PDamage))
+        // gMarioAnimeData[mAnimationId].isPumpOK(): the body clip's upper column is not 0xC8 (pass 46: the whole column by clip --
+        // swim_dive / swim_p_damage / swim_p_down, the slips, hiped, wsld, the shimmy, thrown, jkick, dgrun, sit / sleep / yawn, the
+        // holds ...; the state list below is the same rows read as states, kept)
+        if (SmsUpperPumpFor(SmsCurrentClip()) == SmsParams.Fludd.UpperNone)
             return false;
         switch (stateOfMario)
         {
@@ -12569,7 +12575,7 @@ public partial class Mario : CharacterBody3D
             if (!_fluddTankAnim.HasAnimation(clip))
                 clip = "wg_pump";
             // rate 0, setFrame(mMario->getPumpFrame()) (WaterGun.cpp 1594): the tank's pump is Mario's upper clip, frame for frame
-            double len = _fluddPumpSwimClip ? _fluddSwimPumpLen : _fluddPumpLen;
+            double len = _fluddUpperClipLen.TryGetValue(_fluddPumpBound, out double gl) ? gl : _fluddPumpLen;
             SmsAnimScrub(_fluddTankAnim, clip, len > 0.0 ? (float)(_fluddPumpTime / len) : 0f);
         }
         else
@@ -12660,22 +12666,42 @@ public partial class Mario : CharacterBody3D
     /// clip's frame 0, still -- and IDLE unbinds it. (The empty tank's R x PumpAnmSpeed rate is not ported.)</summary>
     private void SmsFluddPumpClock(double delta)
     {
-        bool swimClip = stateOfMario == MarioState.swimming && SmsFluddUpperBlend && _fluddSwimPump != null;
-        if (swimClip != _fluddPumpSwimClip)
+        // changeMtxCalcSIAnmBQAnmTransform(1, 0, gMarioAnimeData[anim].unk2): the upper clip is the body clip's column; a graft takes a
+        // variant the tree does not carry (ma_swpmp / ma_hgpmp / ma_fepmp) while the body clip runs outside the tree
+        int id = SmsFluddUpperBlend ? SmsFluddBindId() : SmsParams.Fludd.UpperPump;
+        if (id != _fluddPumpBound)
         {
-            _fluddPumpSwimClip = swimClip; // another clip bound: J3DFrameCtrl::init
+            _fluddPumpBound = id; // another clip bound: J3DFrameCtrl::init -- frame 0, rate 1
             _fluddPumpTime = 0.0;
             _fluddPumpDir = 1;
+            _fluddPumpRate = 1f;
         }
-        double len = swimClip ? _fluddSwimPumpLen : _fluddPumpLen;
+        double len = _fluddUpperClipLen.TryGetValue(id, out double gl) ? gl : _fluddPumpLen;
         if (_fluddUpper == SmsUpper.Idle || (_fluddUpper == SmsUpper.HoldingPump && _fluddPumpCooldown == 0) || len <= 0.0)
         {
-            _fluddPumpTime = 0.0; // IDLE: unbound (the next bind inits at 0); HOLDING_PUMP past the cooldown: setFrame(0) every tick
+            _fluddPumpTime = 0.0; // IDLE: unbound (the next bind inits at 0, rate 1); HOLDING_PUMP past the cooldown: setFrame(0) every tick
             _fluddPumpDir = 1;
+            if (_fluddUpper == SmsUpper.Idle)
+                _fluddPumpRate = 1f;
             return;
         }
-        // PUMPING, or HOLDING_PUMP's cooldown: rate 1 -- the clips are 60 fps, a second of Godot time is the game's rate 1 -- ping-pong
-        _fluddPumpTime += delta * _fluddPumpDir;
+        // addUpper(): PUMPING with the tank empty -> the frame ctrl's rate is mAnalogR x PumpAnmSpeed (2.25 at full R); the rate is the
+        // ctrl's and stays until the next bind. Otherwise the bind's 1 -- the clips are 60 fps, a second of Godot time is the game's
+        // rate 1 -- ping-pong.
+        if (_fluddUpper == SmsUpper.Pumping && _fluddWater <= 0)
+            _fluddPumpRate = _fluddR * SmsParams.Fludd.PressureMax * SmsParams.Fludd.PumpAnmSpeed;
+        double before = _fluddPumpTime * 60.0; // the clip's frame
+        int dirBefore = _fluddPumpDir;
+        _fluddPumpTime += delta * _fluddPumpRate * _fluddPumpDir;
+        if (_fluddUpper == SmsUpper.Pumping && _fluddWater <= 0)
+        {
+            // checkPass(8) on the forward stroke, checkPass(13) on the back stroke
+            double after = _fluddPumpTime * 60.0;
+            if (dirBefore > 0 && before < SmsParams.Fludd.PumpSqueakInFrame && after >= SmsParams.Fludd.PumpSqueakInFrame)
+                SmsPlaySlot(PumpSqueakIn);
+            else if (dirBefore < 0 && before > SmsParams.Fludd.PumpSqueakOutFrame && after <= SmsParams.Fludd.PumpSqueakOutFrame)
+                SmsPlaySlot(PumpSqueakOut);
+        }
         if (_fluddPumpTime >= len)
         {
             _fluddPumpTime = 2.0 * len - _fluddPumpTime;
@@ -12696,15 +12722,13 @@ public partial class Mario : CharacterBody3D
     /// subtree at the same frame.</summary>
     private void SmsFluddUpperBody(double delta)
     {
-        if (_fluddSwimPump != null)
+        bool treeOn = animTree != null && animTree.Active;
+        foreach (var kv in _fluddUpperGraft)
         {
-            if (_fluddPumpSwimClip)
-            {
-                _fluddSwimPump.Time = _fluddPumpTime;
-                _fluddSwimPump.Weight = 1f;
-            }
-            else
-                _fluddSwimPump.Weight = 0f;
+            bool on = kv.Key == _fluddPumpBound && SmsFluddUpperBlend && !treeOn; // the tree carries the variant itself (below)
+            kv.Value.Weight = on ? 1f : 0f;
+            if (on)
+                kv.Value.Time = _fluddPumpTime;
         }
         if (animTree == null || animTree.TreeRoot is not AnimationNodeBlendTree tree)
             return;
@@ -12712,7 +12736,7 @@ public partial class Mario : CharacterBody3D
         // went IDLE, while CarryBlend was still fading out (83 ms) -- five frames of the arms blending THROUGH the carrying pose
         // (jnt_arm_R1 176 deg, jnt_arm_L1 155 deg, jnt_head 36 deg, jnt_chest 22 deg off the grips): the squat end's flail. ma_pump's
         // frame 0 and ma_sqend's first frame are the same grip pose, so the fade from ma_pump is invisible, as the game's switch is.
-        string want = heldBody != null || !UseSmsPhysics ? "ma_carry_p" : "ma_pump";
+        string want = heldBody != null || !UseSmsPhysics ? "ma_carry_p" : SmsFluddUpperClipName(_fluddPumpBound); // the column's clip (pass 46)
         if (want != _fluddUpperAnim && tree.GetNode("Animation 2") is AnimationNodeAnimation an && animPlayer.HasAnimation(want))
         {
             an.Animation = want;
@@ -12720,8 +12744,9 @@ public partial class Mario : CharacterBody3D
         }
         if (_fluddPumpSeekReady && animTree.Active)
         {
-            // ma_pump: the frame is the clock's (scale 0, a seek every frame); ma_carry_p (his carry pose) plays as it always did
-            bool pump = _fluddUpperAnim == "ma_pump";
+            // the pump clip (ma_pump or the column's variant): the frame is the clock's (scale 0, a seek every frame); ma_carry_p (his carry
+            // pose) plays as it always did
+            bool pump = _fluddUpperAnim != "ma_carry_p" && _fluddUpperAnim != "";
             animTree.Set(SMS_PUMP_SCALE_PATH, pump ? 0f : 1f);
             if (pump)
                 animTree.Set(SMS_PUMP_SEEK_PATH, (float)_fluddPumpTime);
@@ -12760,22 +12785,101 @@ public partial class Mario : CharacterBody3D
                 : $"[SMS fludd] pump clip NOT under control ({SMS_PUMP_SCALE_PATH} did not read back): ma_pump runs on its own clock as before");
     }
 
-    /// <summary>The swim pump: ma_swpmp on the chn_chest subtree (SmsUpperPose), for the frames the tree does not drive.</summary>
-    private void SmsFluddSetupSwimPump()
+    /// <summary>gMarioAnimeData's upper-body column (MarioDraw.cpp 39..375, unk2) by clip name: the upper clip addUpper() binds over the
+    /// body clip while PUMPING / HOLDING_PUMP -- 0x44 ma_pump, 0x45 ma_hgpmp, 0x94 ma_fepmp, 0x95 ma_swpmp -- or 0xC8, no pump at all
+    /// (isPumpOK false). Every named row; the unnamed slots have no clip. His own states not in the game's table (ma_runblend, ma_carry_p,
+    /// ma_tree_stand ...) take 0x44, the column's value for the locomotion they stand in for.</summary>
+    private static readonly System.Collections.Generic.Dictionary<string, int> SmsUpperPumpTable = new()
     {
-        if (skeleton == null || animPlayer == null || !animPlayer.HasAnimation("ma_swpmp"))
-        {
-            if (SmsDebugPrint) GD.Print("[SMS fludd] no ma_swpmp clip: no pump pose while swimming");
+        ["ma_2jmed"] = 0x44, ["ma_2jmp1"] = 0x44, ["ma_2jmp2"] = 0x44, ["ma_brake"] = 0x44, ["ma_brend"] = 0x44, ["ma_broad_jump"] = 0x44,
+        ["ma_damage_wait"] = 0x44, ["ma_damage_wait_start"] = 0x44, ["ma_dive_land"] = 0x44, ["ma_dive_wait"] = 0x44, ["ma_fepmp"] = 0x44,
+        ["ma_giant_rolling"] = 0x44, ["ma_hipat"] = 0x44, ["ma_hipsr"] = 0x44, ["ma_hot_wait"] = 0x44, ["ma_jmped"] = 0x44, ["ma_jump"] = 0x44,
+        ["ma_jump_rolling"] = 0x44, ["ma_laend"] = 0x44, ["ma_land"] = 0x44, ["ma_pivot"] = 0x44, ["ma_ride_shell_wait"] = 0x44, ["ma_roll"] = 0x44,
+        ["ma_roll_jump"] = 0x44, ["ma_rope_run"] = 0x44, ["ma_rope_swait"] = 0x44, ["ma_rope_wait"] = 0x44, ["ma_rope_walk"] = 0x44,
+        ["ma_rope_wtosw"] = 0x44, ["ma_rope_wtosw_r"] = 0x44, ["ma_run1"] = 0x44, ["ma_run2"] = 0x44, ["ma_sink_down"] = 0x44, ["ma_sinking"] = 0x44,
+        ["ma_spin_p"] = 0x44, ["ma_sqend"] = 0x44, ["ma_sqsta"] = 0x44, ["ma_sqwat"] = 0x44, ["ma_sstep"] = 0x44, ["ma_step1"] = 0x44,
+        ["ma_step2"] = 0x44, ["ma_step3"] = 0x44, ["ma_swait"] = 0x44, ["ma_swlkl"] = 0x44, ["ma_swlkr"] = 0x44, ["ma_swpmp"] = 0x44,
+        ["ma_t_wait"] = 0x44, ["ma_tjmp1"] = 0x44, ["ma_tjmp2"] = 0x44, ["ma_trned"] = 0x44, ["ma_turbo_dash"] = 0x44, ["ma_turn"] = 0x44,
+        ["ma_wait"] = 0x44, ["ma_walk"] = 0x44, ["ma_wjmp"] = 0x44,
+        ["ma_hang"] = 0x45, ["ma_fence_move_down"] = 0x45, ["ma_rope_hgwat"] = 0x45,
+        ["ma_fence_wait"] = 0x94, ["ma_fence_move_l"] = 0x94, ["ma_fence_move_r"] = 0x94, ["ma_fence_move_up"] = 0x94,
+        ["ma_float"] = 0x95, ["ma_paddle_end"] = 0x95, ["ma_paddle_start"] = 0x95, ["ma_paddle_to_wait"] = 0x95, ["ma_swim"] = 0x95,
+        ["ma_swim_damage"] = 0x95, ["ma_swim_down"] = 0x95, ["ma_swim_start"] = 0x95, ["ma_swim_to_wait"] = 0x95, ["ma_swim_wait"] = 0x95,
+        ["ma_wait_to_paddle"] = 0x95, ["ma_wait_to_swim"] = 0x95,
+        ["ma_bdwn"] = 0xC8, ["ma_belt_up"] = 0xC8, ["ma_bkdwn"] = 0xC8, ["ma_bottle_in"] = 0xC8, ["ma_demo_gate_in"] = 0xC8, ["ma_demo_gate_out"] = 0xC8,
+        ["ma_demo_gate_out_appear"] = 0xC8, ["ma_demo_gate_out_appear_get"] = 0xC8, ["ma_demo_gate_out_get2"] = 0xC8, ["ma_demo_gate_out_rolling"] = 0xC8,
+        ["ma_demo_gate_out_rolling_get"] = 0xC8, ["ma_demo_shine_get"] = 0xC8, ["ma_demo_shine_get_yo"] = 0xC8, ["ma_dgrun"] = 0xC8, ["ma_die"] = 0xC8,
+        ["ma_door_gacha_l"] = 0xC8, ["ma_door_gacha_r"] = 0xC8, ["ma_door_kick"] = 0xC8, ["ma_door_openl"] = 0xC8, ["ma_door_openr"] = 0xC8, ["ma_draw"] = 0xC8,
+        ["ma_fall_down_wait"] = 0xC8, ["ma_fence_catch"] = 0xC8, ["ma_fence_jcatch"] = 0xC8, ["ma_fence_punch"] = 0xC8, ["ma_firejmp"] = 0xC8,
+        ["ma_fjpend"] = 0xC8, ["ma_get_fail"] = 0xC8, ["ma_hang_to_hold"] = 0xC8, ["ma_hgdwn"] = 0xC8, ["ma_hgjmp"] = 0xC8, ["ma_hgup"] = 0xC8,
+        ["ma_hiped"] = 0xC8, ["ma_hmov_l"] = 0xC8, ["ma_hmov_r"] = 0xC8, ["ma_hold"] = 0xC8, ["ma_hold_back"] = 0xC8, ["ma_hold_drag"] = 0xC8,
+        ["ma_hold_hang"] = 0xC8, ["ma_hold_move_l"] = 0xC8, ["ma_hold_move_r"] = 0xC8, ["ma_hold_return"] = 0xC8, ["ma_hold_to_hang"] = 0xC8,
+        ["ma_hold_wait"] = 0xC8, ["ma_jfdwn"] = 0xC8, ["ma_jkick"] = 0xC8, ["ma_ladder_hang_catch"] = 0xC8, ["ma_ladder_hang_kick"] = 0xC8,
+        ["ma_ladder_hang_move_l"] = 0xC8, ["ma_ladder_hang_move_r"] = 0xC8, ["ma_ladder_hang_wait_l"] = 0xC8, ["ma_ladder_hang_wait_r"] = 0xC8,
+        ["ma_ladder_roll_down"] = 0xC8, ["ma_ladder_roll_up"] = 0xC8, ["ma_lost"] = 0xC8, ["ma_monteman_wait"] = 0xC8, ["ma_push"] = 0xC8, ["ma_put"] = 0xC8,
+        ["ma_raise"] = 0xC8, ["ma_ride_shell"] = 0xC8, ["ma_rope_hmovl"] = 0xC8, ["ma_rope_hmovr"] = 0xC8, ["ma_rope_return"] = 0xC8, ["ma_rope_swhg"] = 0xC8,
+        ["ma_rope_whg"] = 0xC8, ["ma_sand_fill_head"] = 0xC8, ["ma_sand_fill_head_end"] = 0xC8, ["ma_sandfill_leg"] = 0xC8, ["ma_sandfill_leg_end"] = 0xC8,
+        ["ma_sdown"] = 0xC8, ["ma_sdwnf"] = 0xC8, ["ma_sfbdn"] = 0xC8, ["ma_sffdn"] = 0xC8, ["ma_shfdn"] = 0xC8, ["ma_shock"] = 0xC8, ["ma_shock_down"] = 0xC8,
+        ["ma_sit"] = 0xC8, ["ma_sit_end"] = 0xC8, ["ma_sit_wait"] = 0xC8, ["ma_sldct"] = 0xC8, ["ma_sldwn"] = 0xC8, ["ma_sleep"] = 0xC8, ["ma_sleep_end"] = 0xC8,
+        ["ma_sleep_wait"] = 0xC8, ["ma_slip"] = 0xC8, ["ma_slpbk"] = 0xC8, ["ma_slped"] = 0xC8, ["ma_slpla"] = 0xC8, ["ma_swim_dive"] = 0xC8,
+        ["ma_swim_p_damage"] = 0xC8, ["ma_swim_p_down"] = 0xC8, ["ma_throw"] = 0xC8, ["ma_thrown"] = 0xC8, ["ma_thrown_end"] = 0xC8, ["ma_tree_catch"] = 0xC8,
+        ["ma_tree_climb"] = 0xC8, ["ma_tree_move_l"] = 0xC8, ["ma_tree_move_r"] = 0xC8, ["ma_tree_wait"] = 0xC8, ["ma_wsld"] = 0xC8, ["ma_yawn"] = 0xC8,
+        ["ma_yo_damage"] = 0xC8, ["ma_yo_eat"] = 0xC8, ["ma_yo_eat_end"] = 0xC8, ["ma_yo_hip_end"] = 0xC8, ["ma_yo_hip_pose"] = 0xC8, ["ma_yo_hip_start"] = 0xC8,
+        ["ma_yo_hold_jump"] = 0xC8, ["ma_yo_jump"] = 0xC8, ["ma_yo_jump_end"] = 0xC8, ["ma_yo_jump_fall"] = 0xC8, ["ma_yo_ride"] = 0xC8, ["ma_yo_run"] = 0xC8,
+        ["ma_yo_slide_end"] = 0xC8, ["ma_yo_slide_pose"] = 0xC8, ["ma_yo_wait"] = 0xC8, ["ma_yo_walk"] = 0xC8
+    };
+
+    private static int SmsUpperPumpFor(string clip) =>
+        !string.IsNullOrEmpty(clip) && SmsUpperPumpTable.TryGetValue(clip, out int id) ? id : SmsParams.Fludd.UpperPump;
+
+    /// <summary>The upper clip to bind now: the body clip's column when that clip is in the library (else the tree's ma_pump stands,
+    /// as the game stands on its default when a clip is missing). With the tree on it goes in at CarryBlend's "Animation 2"; with the
+    /// tree off (the swim clips, the struggling hang) its graft is weighted in.</summary>
+    private int SmsFluddBindId()
+    {
+        int id = SmsUpperPumpFor(SmsCurrentClip());
+        if (id == SmsParams.Fludd.UpperNone || id == SmsParams.Fludd.UpperPump)
+            return SmsParams.Fludd.UpperPump;
+        return _fluddUpperClipLen.ContainsKey(id) ? id : SmsParams.Fludd.UpperPump;
+    }
+
+    private static string SmsFluddUpperClipName(int id) => id switch
+    {
+        SmsParams.Fludd.UpperHgPmp => "ma_hgpmp",
+        SmsParams.Fludd.UpperFePmp => "ma_fepmp",
+        SmsParams.Fludd.UpperSwPmp => "ma_swpmp",
+        _ => "ma_pump"
+    };
+
+    private static void SmsPlaySlot(AudioStreamPlayer3D p)
+    {
+        if (p != null && p.Stream != null)
+            p.Play();
+    }
+
+    /// <summary>The upper clips the tree does not carry -- ma_swpmp (0x95), ma_hgpmp (0x45), ma_fepmp (0x94) -- each on the chn_chest subtree
+    /// (SmsUpperPose), for the frames the tree does not drive; the one the body clip's column names is weighted in.</summary>
+    private void SmsFluddSetupUpperGrafts()
+    {
+        if (skeleton == null || animPlayer == null)
             return;
+        foreach (var (id, name) in new[] { (SmsParams.Fludd.UpperSwPmp, "ma_swpmp"), (SmsParams.Fludd.UpperHgPmp, "ma_hgpmp"), (SmsParams.Fludd.UpperFePmp, "ma_fepmp") })
+        {
+            if (!animPlayer.HasAnimation(name))
+            {
+                if (SmsDebugPrint) GD.Print($"[SMS fludd] no {name} clip in the library: the tree's ma_pump stands where the game grafts it");
+                continue;
+            }
+            var clip = animPlayer.GetAnimation(name);
+            var graft = new SmsUpperPose { Name = "SmsUpper_" + name };
+            skeleton.AddChild(graft);
+            skeleton.MoveChild(graft, 0); // before the head jiggle / head lock modifiers, which add their bit on top
+            graft.Bind(skeleton, clip, "chn_chest");
+            _fluddUpperGraft[id] = graft;
+            _fluddUpperClipLen[id] = clip.Length;
+            if (SmsDebugPrint)
+                GD.Print($"[SMS fludd] upper graft: {name} ({clip.Length:F3} s) on {graft.BoneCount} bones under chn_chest");
         }
-        var clip = animPlayer.GetAnimation("ma_swpmp");
-        _fluddSwimPump = new SmsUpperPose { Name = "SmsSwimPump" };
-        skeleton.AddChild(_fluddSwimPump);
-        skeleton.MoveChild(_fluddSwimPump, 0); // before the head jiggle / head lock modifiers, which add their bit on top
-        _fluddSwimPump.Bind(skeleton, clip, "chn_chest");
-        _fluddSwimPumpLen = clip.Length;
-        if (SmsDebugPrint)
-            GD.Print($"[SMS fludd] swim pump: ma_swpmp ({clip.Length:F3} s) on {_fluddSwimPump.BoneCount} bones under chn_chest");
     }
 
     // ---------------------------------------------------------------------------------------------------------------
@@ -13516,7 +13620,7 @@ public partial class Mario : CharacterBody3D
                         spine = $"{Mathf.RadToDeg(Mathf.Acos(Mathf.Clamp(up.Y, -1f, 1f))):0} deg from upright";
                     }
                     string water = stateOfMario == MarioState.swimming
-                        ? $", swim {_smsSwim}, feet {SmsUnits.MetresToUnits(_smsWaterSurfaceY - SmsFeetY()):0} u under the surface, pump graft {(_fluddSwimPump != null ? _fluddSwimPump.Weight.ToString("0.0") : "none")}"
+                        ? $", swim {_smsSwim}, feet {SmsUnits.MetresToUnits(_smsWaterSurfaceY - SmsFeetY()):0} u under the surface, pump graft {(_fluddUpperGraft.TryGetValue(SmsParams.Fludd.UpperSwPmp, out var sg) ? sg.Weight.ToString("0.0") : "none")}"
                         : $", {stateOfMario}";
                     GD.Print($"[SMS turbo] dashing: jet {SmsFluddJetDbg()}; spine {spine}; upper {_fluddUpper}, R {_fluddR:0.00}, trigger {_fluddTrigState}{water}; anim {(stateOfMario == MarioState.swimming ? _smsSwimAnim : _smsGaitClip)} rate {(stateOfMario == MarioState.swimming ? (animPlayer?.SpeedScale ?? 0f) : _smsRunRate):0.00}");
                 }

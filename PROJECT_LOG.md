@@ -3553,3 +3553,21 @@ they seem to load later but this should not happen."
 - Checked and already 1:1: a Y in the air. execCameraModeChangeProc_ (CameraChange.cpp 588) refuses only asleep / SURF / ROCKET and
   ROCKET_LANDING / FLUDD_EMITTING (the turbo's) / the pole climbs, and execFrontRotate_ the hip drop; SmsYCamCanEnter takes any
   doJumping()-steered air state -- the drive's Y at the top of a jump swung the camera and had the L camera on while still airborne.
+
+### Pass 46 -- FLUDD: the upper-body column of the animation table; the empty tank's pumping rate
+- **gMarioAnimeData's upper column (unk2), by clip (a port gap).** addUpper() binds over the body clip the upper clip the table names
+  for it -- 0x44 ma_pump, 0x45 ma_hgpmp (hang, fence_move_down, rope_hgwat), 0x94 ma_fepmp (the fence set), 0x95 ma_swpmp (the swim set)
+  -- or 0xC8, none, which is checkPumpEnable()'s isPumpOK(): no pump over that clip. The port chose by state (hang / water / else) and
+  refused by a short state list. Now `SmsUpperPumpTable` carries every named row; the pump is refused over a 0xC8 clip -- which adds the
+  game's refusals the states missed: the slips (slip, slped, slpla, sldct, slpbk, sldwn), hiped, wsld, the shimmy (hmov_l / r), thrown
+  (the long fall), jkick, dgrun, sit / sleep / yawn, the holds -- and the upper clip is the column's: one SmsUpperPose graft per variant
+  in the library (ma_swpmp existed; ma_hgpmp and ma_fepmp join when the clips are there, else the tree's ma_pump stands), weighted in
+  while the body clip runs outside the tree. The frame ctrl re-inits (frame 0, rate 1) when the bound clip changes, as J3DFrameCtrl does.
+- **The empty tank's pumping (a port gap).** addUpper(): while PUMPING with mCurrentWater <= 0 the upper clip's rate is mAnalogR (the R
+  trigger after PADClamp, 0..150) x UpperBody.prm PumpAnmSpeed 0.015 -- 2.25 at full R, 0.75 at a third -- and the squeaks
+  MSD_SE_PO_POMPING1 / 2 fire as the frame passes 8 forward / 13 backward: slots `Mario.PumpSqueakIn / PumpSqueakOut`
+  (AudioStreamPlayer3Ds under Mario). The rate belongs to the frame ctrl: it stays until the next bind (IDLE), so a tank refilled
+  mid-pump keeps the last empty rate until R is let go, as the game's does; with water the rate is the bind's 1. (The pass-7 note read the
+  0.015 as a rate on its own and called it too slow -- the multiplier is the raw 0..150 analog.)
+- Checked and already in, nothing changed: setBaseTRMtx's roll tweak (-0x1800 x (1 - |mtx[1][0]|) about the spine, the tank pitched
+  33.75 deg off his belly when he lies flat).

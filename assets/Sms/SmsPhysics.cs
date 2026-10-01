@@ -330,7 +330,15 @@ public static class SmsParams
         public const float StowRate = 0.005f;           // unk1CF4: unk1CEC += a tick when idle (deployed -> housed in 200 ticks)
         public const int StowHoldTicks = 360;           // unk1CF8: the pack stays out this long after the last pump
         public const int PumpWaitTime = 5;              // upperbody.prm: the pump pose is held this long after R is released
-        public const float PumpAnmSpeed = 0.015f;       // upperbody.prm: the empty-tank pumping rate (x R)
+        public const float PumpAnmSpeed = 0.015f;       // upperbody.prm: the empty-tank pumping rate x mAnalogR (0..150): 2.25 at full R (pass 46)
+        public const float PumpSqueakInFrame = 8f;      // addUpper(): MSD_SE_PO_POMPING1 as the empty pump's frame passes 8 forward ...
+        public const float PumpSqueakOutFrame = 13f;    // ... POMPING2 as it passes 13 backward
+        // gMarioAnimeData's upper-body column (unk2): the clip addUpper() grafts over the body clip while PUMPING / HOLDING_PUMP
+        public const int UpperPump = 0x44;              // ma_pump (and the tank's wg_pump)
+        public const int UpperHgPmp = 0x45;             // ma_hgpmp: hang, fence_move_down, rope_hgwat
+        public const int UpperFePmp = 0x94;             // ma_fepmp: fence_wait, fence_move_l / r / up
+        public const int UpperSwPmp = 0x95;             // ma_swpmp: the swim set
+        public const int UpperNone = 0xC8;              // isPumpOK() false: no pump over this clip
         public const float HoverHeight = 230f;          // watergun.prm: the hover's target above the press height (S3)
         public const float PressureMax = 150f;          // mCurrentPressure = R x 150
 
