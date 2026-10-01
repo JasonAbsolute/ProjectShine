@@ -3426,3 +3426,23 @@ distance by the slot sum of vertical / horizontal angles, rolls the up vector ab
 when the last slot ends it hands current back to its source. Ticks at 120 Hz; the per-tick integer truncation of the BAM sums is kept.
 Not resolved: the decomp's execShake rolls the up vector about the eye's displacement direction (zero for a pure roll such as the
 damage shake, which would do nothing) -- the port rolls about the view direction. Not ported beside them: the rumbles.
+
+### Pass 40 -- the life meter at low health and low air, checked against the console
+
+Jaysonn: "when mario is low health the center piece and the text life gets darker i want you to make sure anything like that is checked
+off and done including with the air health meter also for swimming". TGCConsole2's life meter, read in full:
+
+- **Colours (updateLifeMeterColors 358 / updateLifeMeterState 597).** When the SHOWN count changes (one a frame toward Mario's HP or
+  air), the 'l_tx' text (unk178) and the 'lm01' centre (unk17C[0]) are re-coloured: at 4..8 white 0xFFFFFF (health) / 0x00FFFF over
+  black 0x003CFF (air); at 1..3 white 0x7F7F7F -- half-bright, "darker" -- (health) / 0x0010FF over 0x003CFF (air). The eight
+  segments ('lm11'..'lm81') keep their colour in both modes. The 'l_ba' disc behind is 0xFF4C00 at alpha 0xC8 in health mode.
+  PORT: his LifeMeter gets `SetLow(bool)` -- OrangeSwirl (the centre) and LifeText modulated by 0.5 grey under 4, restored at 4 --
+  called by the console on a change in health mode; `SetAirTint`'s low variant (the mix toward 0x0010FF) now applies to the centre and
+  the text only (a second material), the segments keep the plain remap -- it used to darken every piece.
+- **The beat (updateLifeMeterBlink 1086).** While the meter is on screen the lit pieces shrink by 3 px (5 at 1..3) for half of a cycle of
+  2 x rate frames, rate 100 at 4 or more, 80 at 3, 60 at 2, 35 at 1 (120 Hz: 1.67 / 1.33 / 1.0 / 0.58 s), and at frame 1.5 x rate the
+  heartbeat SE 0x4800 plays while the count is 1..3 (not in a demo). PORT: his meter's scale pulse (ScaleMultiplier 1.1 -- the look is
+  his, logged in pass 30) now runs at the game's cadence: the console writes rate / 120 into his ToggleInterval (`HeartbeatRates`
+  export, on); the beep is a `LifeBeep` AudioStreamPlayer slot on the console's StandardHud (SmsHud.tscn), his to fill.
+- Already there: the air mode's cyan remap and its low-air blue (pass 29), the meter appearing at a hit mid-screen and curving home, the
+  air meter after 240 frames under water, the fade in the pause menu is not ported (no pause menu yet).

@@ -56,7 +56,7 @@ BottomShift = -10.0
 AnimSpeed = 1.0
 IdleHold = true
 
-[node name="StandardHud" type="Control" parent="." node_paths=PackedStringArray("CoinGroup", "BlueCoinGroup", "ShineGroup", "LifeMeterGroup", "LivesGroup", "RedCoinGroup", "TimerGroup")]
+[node name="StandardHud" type="Control" parent="." node_paths=PackedStringArray("CoinGroup", "BlueCoinGroup", "ShineGroup", "LifeMeterGroup", "LivesGroup", "RedCoinGroup", "TimerGroup", "LifeBeep")]
 layout_mode = 3
 anchors_preset = 0
 offset_right = 640.0
@@ -70,6 +70,7 @@ LifeMeterGroup = NodePath("LifeMeter")
 LivesGroup = NodePath("Lives")
 RedCoinGroup = NodePath("RedCoins")
 TimerGroup = NodePath("Timer")
+LifeBeep = NodePath("LifeBeep")
 Digits = [ExtResource("t_coin_number_0"), ExtResource("t_coin_number_1"), ExtResource("t_coin_number_2"), ExtResource("t_coin_number_3"), ExtResource("t_coin_number_4"), ExtResource("t_coin_number_5"), ExtResource("t_coin_number_6"), ExtResource("t_coin_number_7"), ExtResource("t_coin_number_8"), ExtResource("t_coin_number_9")]
 
 [node name="Coins" type="Control" parent="StandardHud"]
@@ -640,6 +641,8 @@ rotation = -0.174533
 mouse_filter = 2
 texture = ExtResource("t_coin_number_colon")
 expand_mode = 1
+
+[node name="LifeBeep" type="AudioStreamPlayer" parent="StandardHud"]
 
 [node name="WaterHud" type="Control" parent="."]
 layout_mode = 3

@@ -259,8 +259,13 @@ public partial class LifeMeter : Node2D
     private static readonly float[] AirRampStops = { 0.00f, 0.35f, 0.66f, 0.80f, 0.90f, 1.00f };
     private static readonly Color AirLowBlue = new Color(0.06f, 0.20f, 1.00f);     // the game's low-air "white" 0x0010FF
     private static readonly Color AirBlobModulate = new Color(0.02f, 0.16f, 0.48f, 0.72f);
+    private ShaderMaterial _airMaterialCentre;   // the same remap with the low-air blue: the game changes only the centre and the text
     private TextureRect _lifeText;
     private TextureRect _paintBlob;
+    private bool _low;
+    private Color _swirlModulate = Colors.White, _textModulate = Colors.White;
+    private bool _lowModulateSaved;
+    private static readonly Color LowGrey = new Color(0.5f, 0.5f, 0.5f, 1f); // the game's low-health "white" 0x7F7F7F
     private Color _paintBlobModulate;
     private bool _paintBlobModulateSaved;
 
@@ -303,18 +308,26 @@ public partial class LifeMeter : Node2D
             for (int i = 1; i <= 4; i++)
                 _airMaterial.SetShaderParameter($"s{i}", AirRampStops[i]);
             _airMaterial.SetShaderParameter("low_blue", new Vector3(AirLowBlue.R, AirLowBlue.G, AirLowBlue.B));
+            _airMaterialCentre = (ShaderMaterial)_airMaterial.Duplicate();
             _lifeText = GetNodeOrNull<TextureRect>("LifeText");
             _paintBlob = GetNodeOrNull<TextureRect>("PaintBlobBG");
         }
         _airMode = on;
         if (on)
-            _airMaterial.SetShaderParameter("low", units <= 3 ? 1.0f : 0.0f); // 3 or less: the game's white becomes 0x0010FF
+        {
+            // updateLifeMeterColors: at 3 or less the game's white becomes 0x0010FF on the 'lm01' centre and the 'l_tx' text ONLY; the
+            // segments ('lm11'..'lm81') stay 0x00FFFF (pass 40: the low variant was on every piece)
+            _airMaterial.SetShaderParameter("low", 0.0f);
+            _airMaterialCentre.SetShaderParameter("low", units <= 3 ? 1.0f : 0.0f);
+            SetLow(false); // the air tint carries the low look; the health-mode grey must not stack on it
+        }
         Material m = on ? _airMaterial : null;
-        _orangeSwirl.Material = m;
+        Material mc = on ? _airMaterialCentre : null;
+        _orangeSwirl.Material = mc;
         for (int i = 0; i < 8; i++)
             _orangeSegments[i].Material = m;
         if (_lifeText != null)
-            _lifeText.Material = m;
+            _lifeText.Material = mc;
         if (_paintBlob != null)
         {
             if (!_paintBlobModulateSaved)
@@ -324,6 +337,28 @@ public partial class LifeMeter : Node2D
             }
             _paintBlob.Modulate = on ? AirBlobModulate : _paintBlobModulate;
         }
+    }
+
+    /// <summary>The console (SmsStandardHud) calls this in HEALTH mode when the shown count crosses 4: TGCConsole2 updateLifeMeterColors --
+    /// at 1..3 the 'lm01' centre and the 'l_tx' text draw with white 0x7F7F7F (half-bright), the segments unchanged; at 4..8 full. In air
+    /// mode the blue remap carries the low look (SetAirTint), so this is a no-op there.</summary>
+    public void SetLow(bool low)
+    {
+        if (_airMode)
+            low = false;
+        if (low == _low)
+            return;
+        _lifeText ??= GetNodeOrNull<TextureRect>("LifeText");
+        if (!_lowModulateSaved)
+        {
+            _swirlModulate = _orangeSwirl.Modulate;
+            _textModulate = _lifeText != null ? _lifeText.Modulate : Colors.White;
+            _lowModulateSaved = true;
+        }
+        _low = low;
+        _orangeSwirl.Modulate = low ? _swirlModulate * LowGrey : _swirlModulate;
+        if (_lifeText != null)
+            _lifeText.Modulate = low ? _textModulate * LowGrey : _textModulate;
     }
 
     /// <summary>The meter appears at its HUD place showing <paramref name="units"/> of air in blue (startAppearLife(1)).</summary>

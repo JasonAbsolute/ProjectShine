@@ -86,6 +86,11 @@ public partial class SmsStandardHud : Control
     [Export] public SmsHudGroup LivesGroup;
     [Export] public SmsHudGroup RedCoinGroup;
     [Export] public SmsHudGroup TimerGroup;
+    /// <summary>updateLifeMeterBlink's heartbeat SE (0x4800), once a beat while the shown count is 1..3; his to fill.</summary>
+    [Export] public AudioStreamPlayer LifeBeep;
+    /// <summary>The meter's beat at the game's cadence: a 2 x rate period, rate 100 frames at 4 or more, 80 / 60 / 35 at 3 / 2 / 1
+    /// (updateLifeMeterBlink) -- written into his LifeMeter.ToggleInterval. Off: his own ToggleInterval stays.</summary>
+    [Export] public bool HeartbeatRates = true;
     /// <summary>coin_number_0 .. 9: what the counters' digit panes show.</summary>
     [Export] public Texture2D[] Digits;
     private Texture2D[] _digit;
@@ -138,7 +143,8 @@ public partial class SmsStandardHud : Control
     private Life _life = Life.Hidden; private int _lifeF0 = -1; private Vector2 _lifeLeaveFrom;
     private SmsHudPane _lDisc, _lText, _lSun, _lSunB;  // his PaintBlobBG, LifeText, GrayLayer and OrangeLayer (the sun is two layers)
     private LifeMeter _lMeter;                          // his Font/LifeMeter/LifeMeter.tscn: the segments, the air recolour, the pulse
-    private int _lifeShown = 8; private bool _lifeAirShown; private bool _lifeAirApplied, _lifeAirLowApplied;
+    private int _lifeShown = 8; private bool _lifeAirShown; private bool _lifeAirApplied, _lifeAirLowApplied, _lifeLowApplied;
+    private int _lifeBeat;                              // unk86: the beat's frame, 0 .. 2 x rate
     // the demo
     private bool _inDemo, _started; private int _demoEndCount;
 
@@ -793,8 +799,24 @@ public partial class SmsStandardHud : Control
             _lMeter.SetHealth(_lifeShown);
         }
         _lifeAirShown = AirMode;
-        // updateLifeMeterBlink (1085), the lit pieces' 3 / 5 px beat: his meter's own scale pulse (LifeMeter.ScaleMultiplier / ToggleInterval)
-        // stands in for it while the meter is on screen -- a deviation logged in PROJECT_LOG (pass 30)
+        // updateLifeMeterBlink (1086): while the meter is on screen the lit pieces beat -- 3 px at 4 or more, 5 at 1..3 -- with a period of
+        // 2 x rate frames (rate 100 / 80 / 60 / 35 for 4+ / 3 / 2 / 1) and the heartbeat SE 0x4800 at 1.5 x rate per cycle while the count
+        // is 1..3 (not in a demo). His meter's own scale pulse (ScaleMultiplier) is the beat's look -- a deviation logged in pass 30 -- and
+        // runs at the game's cadence through its ToggleInterval (HeartbeatRates); the beep is the console's (LifeBeep).
+        if (LifeOnScreen)
+        {
+            float rate = _lifeShown == 3 ? 80f : _lifeShown == 2 ? 60f : _lifeShown == 1 ? 35f : 100f;
+            if (HeartbeatRates && _lMeter != null)
+                _lMeter.ToggleInterval = rate / SmsHud.Fps;
+            if (_lifeBeat < (int)(rate * 2f))
+            {
+                if (_lifeShown >= 1 && _lifeShown <= 3 && _lifeBeat == (int)(1.5f * rate) && !Demo && LifeBeep != null && LifeBeep.Stream != null)
+                    LifeBeep.Play();
+                _lifeBeat++;
+            }
+            else
+                _lifeBeat = 0;
+        }
     }
 
     // ------------------------------------------------------------------------------------------------------------------ the apply
@@ -836,6 +858,14 @@ public partial class SmsStandardHud : Control
             {
                 _lMeter.SetAirTint(air, _lifeShown);
                 _lifeAirApplied = air; _lifeAirLowApplied = low;
+                _lifeLowApplied = false; // the health-mode grey is re-applied below after a mode change
+            }
+            // updateLifeMeterColors (health mode): under 4 the centre and the text are half-bright (white 0x7F7F7F), the segments not
+            bool lowHealth = !air && low;
+            if (lowHealth != _lifeLowApplied)
+            {
+                _lMeter.SetLow(lowHealth);
+                _lifeLowApplied = lowHealth;
             }
         }
         LivesGroup.Visible = _marioVisible;
