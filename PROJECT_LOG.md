@@ -3542,3 +3542,14 @@ they seem to load later but this should not happen."
 - Checked and already 1:1, nothing changed: the ledge fatigue (Hanging.prm as shipped: RapidTime 2000 ticks = 16.7 s -> ANIM_HANG at
   AnmRapid 8x and no shimmy; LimitTime 2400 = 20 s -> LAND_SAFE_DOWN; MoveSp 0.06, AnmRate 0.8 -- the shipped file, not the code
   defaults 0.1 / 0.5), and the long fall's 240 ticks in LANDING / ROCKET_LANDING only (a jump never flails: jumping() has no timer).
+
+### Pass 45 -- the Y camera's stick through the pad library
+- **The L camera's stick (a port approximation made exact).** ctrlLButtonCamera_ reads mCompSPos[4],[5] = mMainStick.mPosX / mPosY --
+  the same PADClamp + JUTGamePad pair Mario reads (pass 44). MarioYCam read Godot's vector with a 0.2 circular deadzone standing in for
+  PADClamp's 15 of 72; GetVector also rescales what is left, so a half stick came out 0.375 and turned the camera at 112 BAM a tick
+  (YAngleManualSpeed 300) where the game's mPos 0.648 gives 194, and full speed needed a full tilt where the game has it at 72 %. Now
+  `SmsStick.PadStick` -- the dead zone 15 %, the rates the game's. Drive: a 6 % drift in the mode moved the yaw 0 BAM before and after;
+  a half stick moved it 3584 BAM per 32 ticks before, 6208 after (194 a tick).
+- Checked and already 1:1: a Y in the air. execCameraModeChangeProc_ (CameraChange.cpp 588) refuses only asleep / SURF / ROCKET and
+  ROCKET_LANDING / FLUDD_EMITTING (the turbo's) / the pole climbs, and execFrontRotate_ the hip drop; SmsYCamCanEnter takes any
+  doJumping()-steered air state -- the drive's Y at the top of a jump swung the camera and had the L camera on while still airborne.

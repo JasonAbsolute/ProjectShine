@@ -227,7 +227,9 @@ public partial class Mario
 
     /// <summary>Once a physics frame, at the top of the SMS block (so it runs whatever handler owns the frame): the camera's ticks, the
     /// lock, the exits, the pose, and -- in the mode -- Mario's facing. The stick is the pad's main stick as the camera reads it
-    /// (mMainStick.mPosX / mPosY, -1..1); PADClamp's dead zone (15 of 72) is approximated by GetVector's 0.2 circular one.</summary>
+    /// (mCompSPos[4],[5] = mMainStick.mPosX / mPosY, -1..1): the same PADClamp + JUTGamePad pair Mario reads, SmsStick.PadStick
+    /// (pass 45; passes 16-44 stood in with GetVector's 0.2 circular deadzone, which also rescaled the rest -- a half stick turned
+    /// the camera at 112 BAM a tick where the game's 0.648 gives 194).</summary>
     private void SmsYCamFrame(double delta)
     {
         if (!UseSmsPhysics)
@@ -238,7 +240,7 @@ public partial class Mario
             SmsYCamEnter();
         if (_ycamPhase == YCamPhase.Off && _ycamLock == 0 && _ycamNeutralTicks == 0)
             return;
-        _ycamStick = Input.GetVector("Lstick_left", "Lstick_right", "Lstick_up", "Lstick_down", 0.2f);
+        _ycamStick = SmsStick.PadStick(Input.GetVector("Lstick_left", "Lstick_right", "Lstick_up", "Lstick_down"));
         if (_ycamPhase == YCamPhase.LNormal)
         {
             // MEANING_Y | MEANING_CAM_AB, frame meanings: an edge this frame; the ticks below may act on it, then it is gone
