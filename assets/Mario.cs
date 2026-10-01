@@ -12452,7 +12452,7 @@ public partial class Mario : CharacterBody3D
         CallDeferred(nameof(SmsStandardHudFindLevelNodes)); // his TimerHud and ShineTimer live in the level scene
         if (SmsDebugPrint)
             GD.Print(_stdHud.Ready
-                ? "[SMS hud] the console's counters and life meter: the scene's panes found; the coins and the lives come in at the start, the shines and blue coins peek after 6.7 s idle, the life meter comes in at a hit"
+                ? "[SMS hud] the console's counters and life meter: the scene's panes found; the coins and the lives come in at the start, the shines and blue coins peek after 1.7 s idle, the life meter comes in at a hit"
                 : "[SMS hud] counters / life meter: a group or pane is missing from SmsHud.tscn -- they stay off");
     }
 

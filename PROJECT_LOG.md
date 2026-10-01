@@ -3491,3 +3491,31 @@ be showing when mario is swimming or just on land."
 - Not ported: the three helmet stages (SMS_isDivingMap: the air meter inserted at the start, state 9), the pause menu's alpha fade.
 - Drive (patch_smoke26.py, removed): a hit at 1 s (7 HP), under water 3-12 s, a unit of air taken at 10 s, HP to 8 at 16 s, under 18-24 s,
   under from 26.5 s with a camera demo 27-29 s; every state change and the group's position printed and compared with the numbers above.
+
+### Pass 43 -- the console's clock never skips a tick; the telop centred
+
+Jaysonn: "i got it to show but its off to the left. as shown in hudref.png ... also some UI hud elements are missing on first load.
+they seem to load later but this should not happen."
+
+- **The missing pieces (a port bug).** `SmsStandardHud._Process` stepped at most 8 console frames a display frame and JUMPED the rest
+  (`_frame = whole`). Godot caps a display frame at max_physics_steps_per_frame (8) of the 60 Hz physics = 133 ms = 16 console frames
+  (main.cpp 4951: the process step is shortened with the dropped physics steps), so a frame past 67 ms lost console frames. Every pane's
+  pop is armed on a single frame (`At(f, 14)`: the icon, 24 the x, 28 / 34 / 40 the digits -- the game's processAppear* `param_1 == N`),
+  and a frame jumped over left its pane hidden (Shown false) until the group's next appear. A level's first frame is the load, 133 ms
+  capped: frames 9-16 went, the coin and Mario icons due at 15 with them, the x's (25) and digits (29+) came; a hitch at the star HUD's
+  idle peek did the same to the shine and blue coin icons -- his HudRef.png: every strip, x and digit home, no icons, "back later" =
+  the next appear (the peek, a coin step-down, a lives change). The game's console never skips a tick (CUE_MOVE, every simulation tick).
+  FIX: every owed frame is stepped (`MaxCatchUp` 240 = 2 s a display frame; past that the rest of the stall comes off the clock, not off
+  the ticks -- the console runs late, as the game under lag shows every tick late and none missing). The drive (patch_smoke27.py,
+  removed) logged every display frame that owed 9+ console frames and forced two 220 ms stalls: the level's own first frame (150 ms,
+  console 0 -> 18) was enough -- before, every icon stayed OFF with everything else on (his picture); after, all on.
+- **The star HUD at boot (a port bug).** The console took the game's loadAfter snapshot (the counts the digits start at) in the scene's
+  _Ready, which runs before Mario's with every field 0; Mario then fed his save (GameData.BlueCoinCount: 2) and at frame 1 the blue coins
+  rolled 0 -> 2, which brings the star HUD out -- so a boot showed the shines and blue coins with the coins and the lives (his picture's
+  three rows), where the game's start brings in the coins and the lives only (perform 3854). `LoadCounts()` now runs on the console's
+  first frame, after his setup's feed: no roll, no star HUD until the idle peek or a take.
+- **The telop's place (DEVIATION).** The port had the game's te_w at x 37 of its 640 frame, left-anchored like the other left-hand groups
+  -- right on the 4:3 screen, parked at the left of the 16:9 canvas (his HudRef.png: 61 of 1929 window px, 746 wide). `SmsTelop.Centered`
+  (export, on): the bar centred on the canvas, the game's bottom margin and width kept, ShiftFrame still applied; off = the game's place.
+  At his Size 0.7 on the 1152 x 648 canvas: x 351.7 (was 37.5), y 589.3, 448.5 x 42.5 px.
+- The boot line said the star HUD peeks "after 6.7 s idle" -- 200 frames at the 30 fps clock of passes 19-37; at 120 Hz it is 1.7 s.

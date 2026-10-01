@@ -16,7 +16,8 @@ using Godot;
 /// LabelSettings (TelopText.tres) are the font, size, colour and shadow -- his to swap; the Sound an AudioStreamPlayer slot for the
 /// news jingle. The rise and the drop follow SmsHud.AnimSpeed like every other pane; the waits and the scroll are the game's.
 /// The game's scissor is 16/15 wider than the contents and 16 px higher (a J2DPrint origin detail not resolved); the port clips the
-/// text to the contents band and centres it there.
+/// text to the contents band and centres it there. DEVIATION (Jaysonn, pass 43): the bar is centred on the canvas (Centered) -- the
+/// game's x 37 is a 4:3 frame's margin, and left-anchored on the 16:9 canvas the bar parked at the left; off = the game's place.
 /// </summary>
 public partial class SmsTelop : Control
 {
@@ -42,8 +43,11 @@ public partial class SmsTelop : Control
     [Export] public float WidthFrame = 443f;
     /// <summary>The bar's size on top of the console's scale. Jaysonn's knob; the text scales with the bar.</summary>
     [Export] public float SizeScale = 1f;
-    /// <summary>Moves the bar from the game's place, frame pixels. Jaysonn's knob.</summary>
+    /// <summary>Moves the bar from its place, frame pixels. Jaysonn's knob.</summary>
     [Export] public Vector2 ShiftFrame = Vector2.Zero;
+    /// <summary>DEVIATION (Jaysonn, pass 43): the bar centred on the canvas, the game's bottom margin kept. The game's te_w sits at x 37 of
+    /// its 640-wide frame -- a 4:3 margin that parks the bar at the left of the 16:9 canvas (his HudRef.png). Off = the game's place.</summary>
+    [Export] public bool Centered = true;
 
     // the game's layout, frame pixels
     private const float HomeX = 37f, HomeY = 400f, HeightFrame = 42f, Inset = 8f, ContentH = 26f;
@@ -148,7 +152,8 @@ public partial class SmsTelop : Control
             Sound.Play();
     }
 
-    /// <summary>The group's place: the game's (37, 400) through the console's bottom-left anchoring, the rise / drop offset, the text.
+    /// <summary>The group's place: the game's (37, 400) through the console's bottom-left anchoring -- or centred (Centered) -- the rise /
+    /// drop offset, the text.
     /// Everything inside is laid out in frame pixels and the Control is scaled, as the balloon is, so his LabelSettings stay the source.</summary>
     private void Layout()
     {
@@ -157,7 +162,8 @@ public partial class SmsTelop : Control
                     : _phase == Phase.Drop ? Mathf.Clamp(_f / Mathf.Max(SlideFrames, 1f), 0f, 1f)
                     : _phase == Phase.Hidden ? 1f : 0f;
         float dy = (OffBottomY - HomeY) * slide;             // TCoord2D: linear from +412 to 0 and back
-        Position = new Vector2(SmsHud.LeftX(HomeX + ShiftFrame.X, s), SmsHud.BottomY(HomeY + ShiftFrame.Y + dy, s, _vp));
+        float x = Centered ? (_vp.X - WidthFrame * s) * 0.5f + ShiftFrame.X * s : SmsHud.LeftX(HomeX + ShiftFrame.X, s);
+        Position = new Vector2(x, SmsHud.BottomY(HomeY + ShiftFrame.Y + dy, s, _vp));
         Scale = new Vector2(s, s);
         Size = new Vector2(WidthFrame, HeightFrame);
         Frame.Position = Vector2.Zero;

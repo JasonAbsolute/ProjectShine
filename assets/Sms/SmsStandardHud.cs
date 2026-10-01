@@ -171,7 +171,7 @@ public partial class SmsStandardHud : Control
     private bool _lifeAirApplied, _lifeAirLowApplied, _lifeLowApplied;
     private int _lifeBeat;                              // unk86: the beat's frame, 0 .. 2 x rate
     // the demo
-    private bool _inDemo, _started; private int _demoEndCount;
+    private bool _inDemo, _started, _loaded; private int _demoEndCount;
 
     public override void _Ready()
     {
@@ -229,7 +229,15 @@ public partial class SmsStandardHud : Control
         _lSun = new SmsHudPane(_lMeter.GetNode<Control>("GrayLayer")) { Shown = true };
         _lSunB = new SmsHudPane(_lMeter.GetNode<Control>("OrangeLayer")) { Shown = true };
         _lMeter.Visible = true;                       // his _Ready hides it; the group's visibility is the meter's from here on
-        _lifeShown = _lifeLast = _lifeLit = Mathf.Clamp(Health, 0, 8); // loadAfter (1906): the group hidden, the pieces lit per mHealth, unk1CC = unk1C = mHealth
+    }
+
+    /// <summary>loadAfter (1906): the counts as the flag manager holds them when the console comes up -- the group hidden, the pieces
+    /// lit per mHealth, unk1CC = unk1C = mHealth, every counter's digits at its count. Taken on the console's FIRST frame: the scene's
+    /// _Ready runs before Mario's with every field 0, and a snapshot there (passes 19-42) had the blue coins roll up from 0 at frame 1
+    /// and bring the star HUD out with them -- not the game's start, which brings in the coins and the lives only.</summary>
+    private void LoadCounts()
+    {
+        _lifeShown = _lifeLast = _lifeLit = Mathf.Clamp(Health, 0, 8);
         _lMeter.SetHealth(_lifeLit);
         _coinShown = Mathf.Clamp(Coins, 0, 999); SetCounterDigits(_cDigit, _coinShown);
         _shineShown = Mathf.Clamp(Shines, 0, 999); SetCounterDigits(_sDigit, _shineShown);
@@ -246,19 +254,31 @@ public partial class SmsStandardHud : Control
         _scale = SmsHud.Scale(_viewport);
     }
 
+    /// <summary>The most console frames one display frame steps (2 s). Past it the console runs LATE -- the rest of the stall comes
+    /// off its clock, never off its ticks -- as the game under lag shows every tick late and none missing. A tick is never skipped:
+    /// the pops are armed on single frames (At(f, 14): the icons) and a frame jumped over leaves its pane hidden until the group's
+    /// next appear. (Passes 19-42 stepped 8 and jumped the rest of a long display frame. Godot caps a frame at
+    /// max_physics_steps_per_frame (8) of the 60 Hz physics = 133 ms = 16 console frames, so a level's first frame -- the load --
+    /// dropped frames 9-16, the coin and Mario icons due at 15, and a hitch at the star HUD's peek its icons: Jaysonn's first-load
+    /// HudRef.png, every strip, x and digit home and no icons, back at the next appear.)</summary>
+    private const int MaxCatchUp = 240;
+
     public override void _Process(double delta)
     {
         if (!Ready)
             return;
         _now += (float)delta * SmsHud.Fps;
-        int whole = (int)MathF.Floor(_now);
-        int guard = 0;
-        while (_frame < whole && guard++ < 8) // a stall skips frames rather than replaying a second's worth of logic
+        int owed = (int)MathF.Floor(_now) - _frame;
+        if (owed > MaxCatchUp)
+        {
+            _now -= owed - MaxCatchUp;
+            owed = MaxCatchUp;
+        }
+        for (int i = 0; i < owed; i++)
         {
             _frame++;
             Step();
         }
-        if (_frame < whole) _frame = whole;
         Apply();
         // the telop (updateTelopState): news only while he stands in WAIT with no camera demo and no timer out; the count holds in a pause
         var telop = SmsHudLayer.Current?.Telop;
@@ -276,6 +296,11 @@ public partial class SmsStandardHud : Control
     // ------------------------------------------------------------------------------------------------------------------ one frame
     private void Step()
     {
+        if (!_loaded)
+        {
+            _loaded = true;
+            LoadCounts(); // the first frame: Mario's setup has fed the fields by now
+        }
         // the camera demo (startCameraDemo / endCameraDemo)
         if (Demo && !_inDemo)
             StartCameraDemo();
