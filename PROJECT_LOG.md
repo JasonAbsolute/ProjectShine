@@ -1591,6 +1591,12 @@ pose (A jumps out): tilt it.
 | `slider` | `isSlider` (the slide courses) | always, never stops | friction 0.975, slide accel 4.5 / 2, stop 3, stick 0.025, yaw 512 |
 | `forceslip` | `isUnk1` / goop | always, never stops, **no jump out** | friction 0.95, run slope accel 4.5 / 2, slide accel 4 / 5 |
 | `wet` | `isWetGround` | as normal (66°) | flat (n.y > 0.99): friction 0.985, slide accel 5 / 2, stop 5 · sloped: friction 0.98, stick 0.1 |
+
+**Pollution (the hazards).** The game's hot and electric ground is the goop layer (`gpPollution`, a map sampled at the floor point
+under Mario every tick), not a collision class, so it is a second tag, independent of `sms_surface`: metadata **`sms_pollution`** =
+`fire` (`POLLUTION_TYPE_FIRE`) or `electric` (`POLLUTION_TYPE_ELECTRIC`) on the floor body or a parent up to three levels up. A
+tagged body is polluted all over (the game's per-cell goop needs every sample of a 5-point box polluted for the fire; the port's sample
+is the body under the feet). See Fire and electricity.
 | `noslip` | `isUnk3` | never | normal |
 
 What the class changes, all in `Mario.cs` (`SmsUpdateSurface` after the move, `SmsSurfaceSlipFrame` at the top of the
@@ -1716,7 +1722,9 @@ Stu, `Poihana` = Cataquack, `Fire`, `Killer`, `LampTrap`, `MapCode0`, all decode
 HP taken, down type, knockback `MinSpeed`, `InvincibleTime`).
 
 - **Nothing while invincible** (`mInvincibilityFrames`, a 120 Hz tick counter set from the attacker's `InvincibleTime` and
-  counted down in `thinkParams`; enemycommon gives **0**) or at 0 HP. Port-side rule: no second hit while he is already
+  counted down in `thinkParams`; enemycommon gives **300** = 2.5 s: a `dmg*.prm` that leaves `mInvincibleTime` out keeps
+  `TEParams`' default of 300 (MarioInit.cpp 941) -- enemycommon, hamukuri, poihana and fire all do; passes 25-49 read the
+  absent field as 0) or at 0 HP. Port-side rule: no second hit while he is already
   down — the game's enemies recoil from the hit, ours keep touching him through the fall.
 - **Direction.** The face turns toward the attacker. Attacker within 90° of the *old* face (in front): `fwd *= -1`, he
   goes backwards away from it and lands on his **back** (the `BACK_DOWN` family, `bkdwn` / `sdown` / `sfbdn` / `bdwn`);
@@ -1756,6 +1764,62 @@ The legacy path (`UseSmsPhysics` off) is unchanged: −1 HP, a 2 m/s shove, a 0.
 driven directly (the tree lacks `bdwn` and `jfdwn`); `SetMarioState(idle)` at the end brings the tree back.
 Debug: `[SMS damage] -1 HP -> 7/8: BACK_DOWN type 1 on the ground, ma_sdown at fwd -30.0 (12.1 m/s); invincible 0 ticks`,
 `... landed: ma_sdown, slides for 100% of it`, `... wall: face mirrored`, `... up`.
+
+### Fire and electricity (`checkGraffitoFire` / `checkGraffitoElec`, `FIRE_DOWN` / `FIRE_JUMP_END`, `ELECTRIC_DAMAGE` / `ELEC_DOWN`)
+
+Pass 50. The two hazards live in the pollution layer (see Surface types: `sms_pollution` = `fire` | `electric` on the floor body) and
+run after the status exec and the move every tick (`checkGraffito`, MarioMove.cpp 953 -> `SmsCheckGraffito` in `SmsAfterMove`). The
+`hurt` state carries them as kinds (`SmsDownKind.Fire` / `FireEnd` / `Electric`), so every "not while down" gate holds.
+
+- **The hot floor** (`checkGraffitoFire`, MarioMove.cpp 830): standing on it (within `FireHeight` 5 units of the floor -- `graffito.prm`;
+  the code default is 1000) and not invincible: already burning, the face turns 180 first (he bounces back the way he came);
+  `makeGraffitoDamage(dmggraffitofire)` = the full `damageExec` with the floor as the attacker (1 HP, type 0, no knockback, the
+  stars 50 units in front, the camera shake, 50 ticks invincible -- `FireInvincibleTime` is 50 too); his forward speed is restored
+  (`unk55C` is a constant 50, the restore always runs), what he holds is dropped, then **`FIRE_DOWN(1)`**: straight up at
+  `FireDownForce` **50** (`jump.prm`; the code default is 80), fwd kept. Standing still that is up and down in place: the flight
+  is ~100 ticks and the invincibility 50, so a hot floor burns him again at every landing -- the game's hurt loop; there is no
+  steering (below). `FireDamageSound` is the slot for `MSD_SE_MA_DAMAGE_FIRE`. The burst (particle 6, `ms_firedmg_a`) is the next pass.
+- **Fire enemies** (`MarioReceiveMsg.cpp` 454 / 555-571 / 580-599 / 665-685): `damageExec(dmgfire)` -- 1 HP, type 1, knockback 16,
+  **300 ticks** invincible, the face toward the attacker -- then `changePlayerStatus(FIRE_DOWN, 1)` replaces the knockdown before
+  it ticks: up at 50 with the knockback speed kept (negative: backwards, facing the attacker). `SmsDamageProfile.Fire` and
+  `.Killer` (Bullet Bill, 3 HP) carry `FireDown`; `TakeDamage(pos, SmsDamageProfile.Fire)` is the call. The hinokuri class does not
+  (its hit is a plain knockdown). Swimmers keep the swim damage path (the game would launch them burning).
+- **`FIRE_DOWN`** (`fireDowning`, MarioJump.cpp 698): `ma_firejmp` at 1.0 every tick. The stick: `fwd += 0.03125 x mag x
+  FireDownControl` along it and the face turns by its sine -- **`FireDownControl` ships as 0**, so the stick steers nothing; it still
+  trims a fwd over 32 by 2 a tick. At rest `FConverge(fwd, 0, 0.35)`. `jumpProcess(0)`: gravity; a wall mirrors the face
+  (`playerRefrection`, the clip stays); the floor, under two bounces and falling: `vy = 0.4 x -vy`, fwd halves (`mStatusState++`);
+  else the reaction voice (not ported) and `FIRE_JUMP_END`. Launched from a hot floor he never gets to bounce (the re-burn comes
+  first); knocked onto clean ground he bounces twice (vy 50 -> 20 -> 8) and gets up.
+- **`FIRE_JUMP_END`** (`fireJumpEnd`, MarioWait.cpp 504): `jumpEndCommon(ANIM_FJPEND, WAIT)` -- `waitProcess()` (standing still on the
+  floor), `ma_fjpend` once, its last frame is WAIT; `jumpEndEvents()` first: A is a jump (the jump buffer carries the press), the
+  stick is RUN. Eyes squeezed shut through both clips (the game's `ma_fjpend_tx.btp`).
+- **The burning run is unreachable.** `FIRE_DASH` (`fireDashing`, MarioRun.cpp 1052: 160 ticks of forced run between 8 and 48, water puts
+  it out), `FIRE_JUMP` (the hop, vy 31.5 / fwd 8) and `FIRE_LAND` form a loop that only they enter -- every fire source in the game
+  forces `FIRE_DOWN` (a whole-tree grep). Not ported, logged as dead code; `ma_hot_wait` has no handler in the game either.
+- **The electric floor** (`checkGraffitoElec`, MarioMove.cpp 924): not standing on goop the tick before, the grace timer is set to
+  `GraffitoNoDmgTime` 10 (`mario.prm`) and only counts down while it runs; then, not invincible and in a **WAITING or RUNNING type**
+  status (standing, running, squatting, a landing, a slip, a turn -- never in the air, never swimming or hanging) and no goop
+  footprints (none here): **`ELECTRIC_DAMAGE`**, `MSD_SE_MA_DAMAGE_ELEC` + `MSD_SE_EF_LIGHTNING` (the `ElectricDamageSound` slot). The
+  port's grace starts at the landing (the game's flag follows the floor under him in the air too: a jump onto goop could shock at once).
+- **Electric enemies** (`MarioReceiveMsg.cpp` 419-448: the electro-koopas' message 9, not while invincible): `elecEffect()` and
+  `ELECTRIC_DAMAGE` directly, no `damageExec`. `TakeShock()` is the call (port-side: not while already down or shocked).
+- **`ELECTRIC_DAMAGE`** (`electricDamage`, MarioAutodemo.cpp 437): a **DEMO-type** status -- control locked, nothing moves him. Tick 1:
+  the shock voice (not ported), `ma_shock` at 1.0, `decHP(1)` (`dmggraffitoelec`), the rumble (not ported); every tick the sparks
+  (`ms_m_biri_a / b / c`, next pass); past 0x78 = **120 ticks**: the reaction voice, `tremble(5, 2, 0.99, 600)` and the closing puff
+  (`ms_moe_fire_off`, next pass), `damageExec(the floor, 0 HP, type 3, ..., 0x3C)` = **60 ticks invincible**, then WAIT. Standing on
+  the goop he is shocked again 60 ticks later (the flag stays set, no new grace). The game's blue shimmer is a second draw pass of
+  the model (`drawLogic`, MarioDraw.cpp 2060), a material for the next pass.
+- **`ELEC_DOWN`** (`loserExec`, MarioCollision.cpp 225): the shock taking the last HP is the death in the electric pose
+  (`ma_shock_down`, holding) instead of `ma_die`; R respawns.
+- Not ported: the voices, the rumbles, the goop map itself (a tagged body is polluted all over), `checkGraffitoLava` (empty in the
+  game) and the lava / poison profiles (3 HP; no source calls them), the pause-menu interplay.
+
+Shipped values beat the decomp's defaults throughout: `FireDownForce` 50 (not 80), `FireDownControl` 0 (not 1), `FireBackVelocity` 8
+(not 1), `FireHeight` 5 (not 1000), `FireInvincibleTime` 50 (not 150); `SmsParams.Jump` / `.Mario` / `.Graffito`.
+Debug: `[SMS surface] pollution Fire ('SecrectPlatform2')`, `[SMS fire] hot floor '...': -1 HP -> 7/8; invincible 50 ticks`, `...
+FIRE_DOWN(1) from the hot floor: vy 50 (20.1 m/s), fwd 0.0 along the face, ma_firejmp`, `... bounce 1: vy 20.0`, `... landed after 2
+bounce(s), 157 ticks burning: FIRE_JUMP_END`, `... up`; `[SMS elec] ELECTRIC_DAMAGE from electric goop '...'`, `... -1 HP -> 6/8`,
+`... 121 ticks: WAIT, invincible 60 ticks`, `... ELEC_DOWN (ma_shock_down)`.
 
 ### Swimming (`MarioSwim.cpp`, `MarioState.swimming`)
 
@@ -3090,10 +3154,9 @@ ground has to carry upward velocity (launches do) or exceed 1.34 m.
   see FLUDD. Next S2b squat aim, S3 hover lift, S4 rocket, S5 turbo.
 - Swimming: done, see Swimming and Air. Needs the level's water Area3D (`sms_water`). Not ported: the FLUDD surf, the
   fence catch from water, the effects and sounds, the swimming camera, coins refilling air.
-- Damage: done, see Damage. Not ported: the type-3 upper-body damage run
-  (`ma_dgrun`), camera shake / rumble / voice, FLUDD water loss and goop on hit; fire (`FIRE_JUMP` / `FIRE_DOWN` /
-  `ma_hot_wait`) and electricity (`ELECTRIC_DAMAGE` / `ma_shock`) are separate statuses with their own handlers, not
-  started.
+- Damage: done, see Damage. Not ported: the type-3 upper-body damage run (`ma_dgrun`), rumble, the voices, goop on hit.
+- Fire and electricity: done, see Fire and electricity (pass 50). Needs the level's `sms_pollution` tags. Next: the burn's
+  burst, the shock's sparks and puff, the model tremble and the blue shimmer (the effects pass).
 
 ### Pass 29 -- the Mario particles at the game's 60 Hz particle clock; the legacy effects out; ma_hipsr through the tree
 
@@ -3603,3 +3666,22 @@ they seem to load later but this should not happen."
 `res://assets/Sms/Fx/SmsBubbles.tscn` is instanced under Mario in `Player.tscn` (the pass-48 to-do), so the bubbles from the mouth,
 the stream off the body while swimming, the gulp on a hit under water and the pop rings at the surface play, and the boot no longer
 errors about the missing node. The `[SMS fx]` debug line already named it with the other scenes.
+
+### Pass 50 -- fire and electricity: the hot floor, the electric floor, FIRE_DOWN / FIRE_JUMP_END, ELECTRIC_DAMAGE / ELEC_DOWN
+
+Jaysonn (2026-10-01): "yes lets do fire and shock". The two hazards as a pollution tag on the floor body (`sms_pollution` = `fire` |
+`electric`, independent of `sms_surface`), the statuses they put him in as kinds of the `hurt` state, fire enemies' hits forcing
+`FIRE_DOWN`, `TakeShock()` for electric enemies -- see Fire and electricity for the whole machine and the shipped values (the decomp's
+defaults were wrong on five of them). Two sound slots on Mario: `FireDamageSound`, `ElectricDamageSound`. The effects (the burn's burst,
+the sparks, the puff, the tremble, the shimmer) are the next pass.
+
+A correction that came out of reading the damage files again: a `dmg*.prm` that leaves `mInvincibleTime` out keeps `TEParams`' default of
+**300 ticks** (2.5 s), not 0 -- enemycommon, hamukuri, poihana and fire all leave it out. A Gooble's hit now gives 2.5 s during which
+nothing hurts him, as in the game; the port-side "no second hit while down" rule stays.
+
+Verified headless (a drive tagging the floor under him at run time): the burn launches at vy 50 (apex 4.4 m) and lands 100 ticks
+later; the hot floor burns him again at every landing with the face turned 180 (invincible 50 < the 100-tick flight: -1 HP every 0.84 s);
+a full stick held through a flight turns the face by 0.00 deg and moves him by nothing; on clean ground the landing bounces at vy 20.8
+then 10.1 (0.4 x the landing speed) with fwd halved, then `ma_fjpend` (0.5 s) and WAIT; A three frames into `ma_fjpend` is a jump the
+next frame. The electric floor shocks on the 11th tick (10 of grace), holds him 121 ticks, 1 HP on the first, 60 ticks invincible after,
+shocks again 60 ticks later with no new grace; at 1 HP the shock ends in `ELEC_DOWN` (`ma_shock_down`), R respawns.

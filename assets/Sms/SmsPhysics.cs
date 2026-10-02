@@ -97,6 +97,9 @@ public static class SmsParams
         public const float RotBroadEnableV = 15f;
         public const float JumpJumpCatchSp = 80f;       // fwd set when diving from the air (then capped to 48)
         public const float FenceSpeed = 1.3f;
+        public const float FireDownForce = 50f;         // jump.prm (shipped): FIRE_DOWN's launch vy (the code default 80)
+        public const float FireDownControl = 0f;        // jump.prm (shipped): the stick's steer while burning, 0.03125 x mag x this -- none ships (the code default 1.0)
+        public const float FireBackVelocity = 8f;       // jump.prm (shipped): FIRE_DOWN arg 0's backward kick (the code default 1.0); the live sources use arg 1
         public const float ValleyDepth = 500f;
         public const float ClashAngle = 12000f;         // BAM
         public const int JumpCatchRotXSp = 150;         // BAM per tick, dive body pitch rate
@@ -252,6 +255,13 @@ public static class SmsParams
         public const float HipdropRadius = 100f;
         public const int InvincibleTime = 300;          // ticks
         public const int RecoverTimer = 60;
+        public const int GraffitoNoDmgTime = 10;        // ticks of grace on electric goop before the first shock (checkGraffitoElec)
+    }
+
+    public static class Graffito // /mario/graffito.prm (shipped) -- the pollution layer's hazards
+    {
+        public const float FireHeight = 5f;             // the hot floor burns within this height of the floor (the code default 1000)
+        public const int FireInvincibleTime = 50;       // ticks after a burn (the code default 150); dmggraffitofire.prm says 50 as well
     }
 
     public static class SlipNormal // /mario/slipparamnormal.prm

@@ -156,6 +156,20 @@ public partial class Mario : CharacterBody3D
     private float _smsDownSlideUntil = 1f;    // downingCommon's frame limit as a fraction of the clip: he slides before it, holds still after
     private string _smsDownAnim = "";
     private const float SMS_DOWN_AIR_SPEED = 16f; // jumpDownCommon(): setPlayerVelocity(+-16) every tick
+    // FIRE_DOWN / FIRE_JUMP_END (MarioJump.cpp fireDowning, MarioWait.cpp fireJumpEnd) and ELECTRIC_DAMAGE (MarioAutodemo.cpp
+    // electricDamage): the hurt state's other kinds (pass 50). The pollution layer (checkGraffito, MarioMove.cpp 953): the port has no
+    // goop map; a floor body tagged with metadata sms_pollution = fire | electric is polluted all over, the floor under his feet is the sample.
+    private enum SmsDownKind { Knockdown, Fire, FireEnd, Electric }
+    private SmsDownKind _smsDownKind = SmsDownKind.Knockdown;
+    private int _smsFireBounces = 0;          // fireDowning() mStatusState: landings bounced so far (two, then FIRE_JUMP_END)
+    private int _smsFireTicks = 0;            // mStatusTimer of FIRE_DOWN
+    private float _smsFireVy = 0f;            // mVel.y (units a frame) while burning, for the bounce's 0.4 x -vy
+    private int _smsElecTicks = 0;            // mStatusTimer of ELECTRIC_DAMAGE (ends once past 0x78 = 120)
+    private int _smsGraffitoTimer = 0;        // mStandingOnGraffitoTimer: the electric goop's grace, GraffitoNoDmgTime ticks
+    private float _smsGraffitoAccum = 0f;
+    private bool _smsDirty = false;           // MARIO_FLAG_DIRTY: the floor under him last tick was polluted
+    private enum SmsPollution { None, Fire, Electric }
+    private SmsPollution _smsPollution = SmsPollution.None; // mPollutionTypeStandingOn: the floor body's sms_pollution tag (None off the floor)
     // Swimming (MarioSwim.cpp). Water: Area3D in group "sms_water", surface = metadata sms_water_surface_y or its BoxShape3D's top.
     private enum SmsSwim { Start, Wait, WaitToPaddle, PaddleStart, Paddle, PaddleEnd, PaddleEndToWait, Up, Dive, PDamage, Down, PDown }
     private SmsSwim _smsSwim = SmsSwim.Start;
@@ -871,6 +885,11 @@ public partial class Mario : CharacterBody3D
     /// empty = silent. Played once when the fall passes 240 ticks (the game re-issues the SE every other tick and the sound system
     /// keeps the one playing).</summary>
     [Export] public AudioStreamPlayer3D FallCry;
+    /// <summary>The fire hit's sound (MSD_SE_MA_DAMAGE_FIRE, every burn by a hot floor or a fire enemy) and the electric floor's
+    /// (MSD_SE_MA_DAMAGE_ELEC with MSD_SE_EF_LIGHTNING, as the shock starts): AudioStreamPlayer3Ds under Mario, empty = silent. The
+    /// voices (MV05 the fire cry, MV04 the shock, MV07 the reaction) are not ported.</summary>
+    [Export] public AudioStreamPlayer3D FireDamageSound;
+    [Export] public AudioStreamPlayer3D ElectricDamageSound;
     private int _smsFallTicks = 0;
     private bool _smsLongFallAnim = false;
     // Visual step smoothing: the body pops up / down a riser instantly (the game does too); the rig starts that far below /
@@ -2262,7 +2281,7 @@ public partial class Mario : CharacterBody3D
         {
             if (UseSmsPhysics)
             {
-                SmsTickHurt(delta); // downingCommon() / jumpDownCommon(): no inputs until he is up
+                SmsTickHurt(delta, inputDirWorld); // downingCommon() / jumpDownCommon(): no inputs until he is up; fireDowning() / fireJumpEnd() / electricDamage()
                 goto EndFrame;
             }
             if (!IsOnFloor())
@@ -6557,7 +6576,7 @@ public partial class Mario : CharacterBody3D
             {
                 // the group spelling used as a metadata key also works: sms_slider = anything
                 string ms = m.ToString();
-                if (ms.StartsWith("sms_") && ms != "sms_surface")
+                if (ms.StartsWith("sms_") && ms != "sms_surface" && ms != "sms_pollution")
                     return ms.Substring(4);
             }
             foreach (StringName g in n.GetGroups())
@@ -6574,7 +6593,10 @@ public partial class Mario : CharacterBody3D
     private void SmsUpdateSurface()
     {
         if (!IsOnFloor())
+        {
+            _smsPollution = SmsPollution.None; // the pollution is sampled under his feet only (the fire's FireHeight band, the shock's grounded types)
             return;
+        }
         Node hit = null;
         float cosMax = MathF.Cos(FloorMaxAngle);
         for (int i = 0; i < GetSlideCollisionCount(); i++)
@@ -6626,6 +6648,29 @@ public partial class Mario : CharacterBody3D
         _smsSurfaceNoSlip = noSlip;
         _smsSurfaceNode = hit.Name;
         _smsSurfaceTag = tag;
+        SmsPollution pol = SmsPollutionOf(hit);
+        if (SmsDebugPrint && pol != _smsPollution)
+            GD.Print($"[SMS surface] pollution {pol} ('{hit.Name}')");
+        _smsPollution = pol;
+    }
+
+    /// <summary>The goop layer's type under a floor body (gpPollution->getPollutionType): metadata sms_pollution = fire (POLLUTION_TYPE_FIRE)
+    /// | electric (POLLUTION_TYPE_ELECTRIC) on the body or a parent up to three levels up; anything else is clean.</summary>
+    private static SmsPollution SmsPollutionOf(Node start)
+    {
+        Node n = start;
+        for (int depth = 0; n != null && depth < 3; depth++, n = n.GetParent())
+        {
+            if (!n.HasMeta("sms_pollution"))
+                continue;
+            switch (n.GetMeta("sms_pollution").AsString().Trim().ToLowerInvariant())
+            {
+                case "fire": case "hot": return SmsPollution.Fire;
+                case "electric": case "elec": case "shock": return SmsPollution.Electric;
+                default: return SmsPollution.None;
+            }
+        }
+        return SmsPollution.None;
     }
 
     private bool SmsSurfaceSlipStarts(Vector3 floorN) => !_smsSurfaceNoSlip && SmsSlope.SlipStarts(floorN, _smsSurface);
@@ -11167,9 +11212,11 @@ public partial class Mario : CharacterBody3D
         public readonly float MinSpeed;
         public readonly int InvincibleTicks;
         public readonly int WaterEmit;   // mWaterEmit: FLUDD spills DamageLoss water this many times (0 for every plaza enemy; hinokuri 2)
+        public readonly bool FireDown;   // MarioReceiveMsg.cpp: changePlayerStatus(MARIO_STATUS_FIRE_DOWN, 1) right after the damageExec (fire enemies, Bullet Bills)
 
-        public SmsDamageProfile(int damage, int downType, float minSpeed, int invincibleTicks, int waterEmit = 0)
+        public SmsDamageProfile(int damage, int downType, float minSpeed, int invincibleTicks, int waterEmit = 0, bool fireDown = false)
         {
+            FireDown = fireDown;
             Damage = damage;
             DownType = downType;
             MinSpeed = minSpeed;
@@ -11177,14 +11224,18 @@ public partial class Mario : CharacterBody3D
             WaterEmit = waterEmit;
         }
 
-        public static readonly SmsDamageProfile EnemyCommon = new SmsDamageProfile(1, 1, 30f, 0);   // dmgenemycommon.prm: the default (TakeDamage(pos))
-        public static readonly SmsDamageProfile Hamukuri = new SmsDamageProfile(1, 0, 30f, 0);      // dmghamukuri.prm: Strollin' Stu
+        // A file that leaves mInvincibleTime out keeps TEParams' default, 300 ticks = 2.5 s (MarioInit.cpp 941) -- enemycommon, hamukuri,
+        // poihana and fire all do; passes 25-49 had read the absent field as 0.
+        public static readonly SmsDamageProfile EnemyCommon = new SmsDamageProfile(1, 1, 30f, 300); // dmgenemycommon.prm: the default (TakeDamage(pos))
+        public static readonly SmsDamageProfile Hamukuri = new SmsDamageProfile(1, 0, 30f, 300);    // dmghamukuri.prm: Strollin' Stu
         public static readonly SmsDamageProfile Namekuri = new SmsDamageProfile(1, 0, 20f, 300);    // dmgnamekuri.prm: Swoopin' Stu (also 100 goop, not ported)
-        public static readonly SmsDamageProfile Poihana = new SmsDamageProfile(1, 1, 50f, 0);       // dmgpoihana.prm: Cataquack
-        public static readonly SmsDamageProfile Fire = new SmsDamageProfile(1, 1, 16f, 0);          // dmgfire.prm
-        public static readonly SmsDamageProfile Killer = new SmsDamageProfile(3, 1, 16f, 300);      // dmgkiller.prm: Bullet Bill
+        public static readonly SmsDamageProfile Poihana = new SmsDamageProfile(1, 1, 50f, 300);     // dmgpoihana.prm: Cataquack
+        public static readonly SmsDamageProfile Fire = new SmsDamageProfile(1, 1, 16f, 300, 0, true);   // dmgfire.prm: fire enemies and their shots -> FIRE_DOWN
+        public static readonly SmsDamageProfile Killer = new SmsDamageProfile(3, 1, 16f, 300, 0, true); // dmgkiller.prm: Bullet Bill -> FIRE_DOWN
         public static readonly SmsDamageProfile LampTrap = new SmsDamageProfile(3, 1, 16f, 20);     // dmglamptrapiron.prm / spike
         public static readonly SmsDamageProfile MapCode0 = new SmsDamageProfile(1, 0, 16f, 100);    // dmgmapcode0.prm: damaging floors
+        public static readonly SmsDamageProfile GraffitoFire = new SmsDamageProfile(1, 0, 0f, 50);  // dmggraffitofire.prm: the hot floor (makeGraffitoDamage, then FIRE_DOWN)
+        public static readonly SmsDamageProfile GraffitoElec = new SmsDamageProfile(1, 0, 16f, 300); // dmggraffitoelec.prm: the shock's HP (electricDamage's first tick); its end sets 60 ticks itself
     }
 
     /// <summary>Entry point for attackers (Gooble.cs: TakeDamage(GlobalPosition)). SMS mode: damageExec() with
@@ -11248,10 +11299,15 @@ public partial class Mario : CharacterBody3D
             StopWaistIKHard(); // the run's waist IK is started / stopped in the main path, which the hurt block skips: stop it here or it bends the clip
             SetEyeTexture(hurtEyeTexture ?? sleepingEyeTexture); // the knockdown clips: eyes squeezed shut in pain (not the sleep eyes)
             stateOfMario = MarioState.hurt;
-            SmsDownEnter(airborne, fwd);
+            if (p.FireDown)
+                SmsFireDownEnter(1, fwd, face, "the fire hit"); // ReceiveMsg: changePlayerStatus(FIRE_DOWN, 1, false) right after damageExec -- the knockdown status it set is replaced before it ticks
+            else
+                SmsDownEnter(airborne, fwd);
             SpawnHitStars(ComputeFeetPosition() + attackDir * SmsUnits.UnitsToMetres(50f)); // PARTICLE_MS_DMG_A/B/C at calcDamagePos = mPosition + 50 units toward the attacker; the rumble and voice are not ported
             _smsCameraShake?.Start(SmsCameraShake.Kind.Damage); // gpCameraShake->startShake(CAM_SHAKE_MODE_UNK2 shakeDamage, 1.0) for every type but 3 (MarioCollision.cpp 380)
             what = $"{(_smsDownFore ? "FORE" : "BACK")}_DOWN type {_smsDownType} {(airborne ? "in the air (+-16 along the face until he lands)" : $"on the ground, {_smsDownAnim} at fwd {fwd:F1} ({SmsUnits.SpeedToMps(MathF.Abs(fwd)):F1} m/s)")}";
+            if (p.FireDown)
+                what = $"FIRE_DOWN (the fire hit): up at {SmsParams.Jump.FireDownForce:F0}, fwd {fwd:F1} along the face{(airborne ? " from the air" : "")}";
         }
         _smsInvincibleTicks = p.InvincibleTicks;
         SmsFluddDamage(p.WaterEmit); // the tank spills (mWaterEmit x DamageLoss)
@@ -14524,6 +14580,7 @@ public partial class Mario : CharacterBody3D
 
     private void SmsDownEnter(bool airborne, float fwd)
     {
+        _smsDownKind = SmsDownKind.Knockdown;
         _smsDownAir = airborne;
         _smsDownFwd = fwd;
         if (airborne)
@@ -14586,8 +14643,14 @@ public partial class Mario : CharacterBody3D
     /// ground (downingCommon): the clip plays once; he slides at fwd *= 0.96 a tick until the clip's limit, then +-0.1; an
     /// edge drops him into JUMP_SHORT_*_DOWN by the sign of fwd; the clip's end is WAIT. No inputs in either.
     /// </summary>
-    private void SmsTickHurt(double delta)
+    private void SmsTickHurt(double delta, Vector3 stickDir)
     {
+        switch (_smsDownKind)
+        {
+            case SmsDownKind.Fire: SmsTickFireDown(delta, stickDir); return;
+            case SmsDownKind.FireEnd: SmsTickFireEnd(stickDir); return;
+            case SmsDownKind.Electric: SmsTickElectric(delta); return;
+        }
         if (_smsDownAir)
         {
             if (IsOnFloor() && velocity.Y <= 0.01f)
@@ -14602,28 +14665,7 @@ public partial class Mario : CharacterBody3D
                     GD.Print($"[SMS damage] landed: {_smsDownAnim}, slides for {_smsDownSlideUntil * 100f:F0}% of it");
                 return;
             }
-            if (IsOnWall())
-            {
-                // jumpProcess() 2: playerRefrection(0) mirrors the face across the wall, vy <= 0, ANIM_BKDWN; the +-16 along the
-                // mirrored face carries him away from it
-                Vector3 wallN = GetWallNormal();
-                wallN.Y = 0f;
-                if (wallN.LengthSquared() > 1e-6f && new Vector3(velocity.X, 0f, velocity.Z).Dot(wallN) < 0f)
-                {
-                    wallN = wallN.Normalized();
-                    Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
-                    Vector3 mirrored = (face - 2f * face.Dot(wallN) * wallN).Normalized();
-                    SmsLatchFace(mirrored, 1);
-                    lastFacingDirection = mirrored;
-                    armature.Rotation = new Vector3(0f, YawFromDir(mirrored), 0f);
-                    if (velocity.Y > 0f)
-                        velocity.Y = 0f;
-                    if (_smsDownAnim != "ma_bkdwn")
-                        SmsDownPlay("ma_bkdwn", 1f);
-                    if (SmsDebugPrint)
-                        GD.Print("[SMS damage] wall: face mirrored, ma_bkdwn");
-                }
-            }
+            SmsHurtWallMirror(true); // jumpProcess() 2: playerRefrection(0) mirrors the face across the wall, vy <= 0, ANIM_BKDWN; the +-16 along the mirrored face carries him away from it
             SmsAirTick(delta, Vector3.Zero); // jumpProcess(0): gravity only (hurt does not steer), the true-vy handoff
             _smsDownFwd = _smsDownFore ? SMS_DOWN_AIR_SPEED : -SMS_DOWN_AIR_SPEED;
             SmsDownApplyVelocity();
@@ -14676,6 +14718,417 @@ public partial class Mario : CharacterBody3D
             if (SmsDebugPrint)
                 GD.Print("[SMS damage] up");
         }
+    }
+
+    /// <summary>jumpProcess() 2 while down: playerRefrection(0) mirrors the face across the wall he is moving into and kills a rising vy;
+    /// the knockdown switches to ANIM_BKDWN (<paramref name="bkdwn"/>), the fire keeps ma_firejmp. True when a wall was hit.</summary>
+    private bool SmsHurtWallMirror(bool bkdwn)
+    {
+        if (!IsOnWall())
+            return false;
+        Vector3 wallN = GetWallNormal();
+        wallN.Y = 0f;
+        if (wallN.LengthSquared() <= 1e-6f || new Vector3(velocity.X, 0f, velocity.Z).Dot(wallN) >= 0f)
+            return false;
+        wallN = wallN.Normalized();
+        Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
+        Vector3 mirrored = (face - 2f * face.Dot(wallN) * wallN).Normalized();
+        SmsLatchFace(mirrored, 1);
+        lastFacingDirection = mirrored;
+        armature.Rotation = new Vector3(0f, YawFromDir(mirrored), 0f);
+        if (velocity.Y > 0f)
+            velocity.Y = 0f;
+        if (bkdwn && _smsDownAnim != "ma_bkdwn")
+            SmsDownPlay("ma_bkdwn", 1f);
+        if (SmsDebugPrint)
+            GD.Print(bkdwn ? "[SMS damage] wall: face mirrored, ma_bkdwn" : "[SMS fire] wall: face mirrored (playerRefrection)");
+        return true;
+    }
+
+    /// <summary>The knockdown's end (isLast1AnimeFrame -> WAIT) and the fire's / the shock's: eyes open, idle, the tree back on.</summary>
+    private void SmsHurtStandUp(string message)
+    {
+        _smsDownAnim = "";
+        _smsDownAir = false;
+        _smsDownKind = SmsDownKind.Knockdown;
+        SleepStatus(false); // eyes open again (and the sleep timers start fresh)
+        stateOfMario = MarioState.idle;
+        SetMarioState(MarioState.idle); // the tree comes back on here
+        if (SmsDebugPrint)
+            GD.Print(message);
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // Fire and electricity (pass 50): the pollution layer's hazards (checkGraffito, MarioMove.cpp 953 -- the game's goop map, sampled at
+    // the floor point under him every tick) and the statuses they put him in. The effects -- the burn's burst (particle 6, ms_firedmg_a),
+    // the shock's sparks every tick (ms_m_biri_a / b / c) and its closing puff (ms_moe_fire_off), the model's tremble -- are the next
+    // pass; the slots here are the sounds.
+    // ---------------------------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// checkGraffito(): the pollution under his feet, once a tick after the move. The game samples its goop map at the floor point
+    /// (five points 32 units apart for the fire, the centre for the electricity) and calls the hazard when every sample is polluted;
+    /// the port's tagged floor body is polluted all over, so the body under the feet is the sample (none in the air). MARIO_FLAG_DIRTY
+    /// is set after the dispatch, so the electric grace reads the previous tick's flag, as in the game.
+    /// </summary>
+    private void SmsCheckGraffito()
+    {
+        int n = SmsUnits.TicksFor(GetPhysicsProcessDeltaTime(), ref _smsGraffitoAccum);
+        bool dirty = IsOnFloor() && _smsPollution != SmsPollution.None;
+        for (int i = 0; i < n; i++)
+        {
+            if (dirty && stateOfMario != MarioState.dead)
+            {
+                if (_smsPollution == SmsPollution.Electric)
+                    SmsGraffitoElec();
+                else
+                    SmsGraffitoFire();
+            }
+            _smsDirty = dirty; // onFlag / offFlag(MARIO_FLAG_DIRTY)
+        }
+    }
+
+    /// <summary>
+    /// checkGraffitoFire() (MarioMove.cpp 830): on a hot floor within FireHeight (5 units: IsOnFloor() stands in for the band) and not
+    /// invincible. Already burning (FIRE_DOWN / FIRE_JUMP_END), the face turns 180 first, so he goes back the way he came.
+    /// makeGraffitoDamage(dmggraffitofire): damageExec() with the floor as the attacker, 1 unit in front of him -- the face stays, the
+    /// stars 50 units in front, the camera shake, 1 HP, the tank's spill (0), 50 ticks invincible -- and the knockdown status it sets is
+    /// replaced by FIRE_DOWN(1) with his forward speed restored (unk55C is 50 in MarioInit.cpp: the restore always runs). What he holds
+    /// is dropped. The burst (particle 6, ms_firedmg_a) is the next pass; MSD_SE_MA_DAMAGE_FIRE is the FireDamageSound slot.
+    /// </summary>
+    private void SmsGraffitoFire()
+    {
+        if (_smsInvincibleTicks > 0 || _health <= 0 || stateOfMario == MarioState.dead || stateOfMario == MarioState.swimming)
+            return;
+        bool burning = stateOfMario == MarioState.hurt && (_smsDownKind == SmsDownKind.Fire || _smsDownKind == SmsDownKind.FireEnd);
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+        float fwd = burning ? _smsDownFwd : SmsUnits.MpsToSpeed(new Vector3(velocity.X, 0f, velocity.Z).Dot(face)); // mForwardVel, saved
+        if (burning)
+            face = -face; // mFaceAngle.y += 0x8000: the same fwd along the turned face sends him back the way he came
+        SmsDamageProfile p = SmsDamageProfile.GraffitoFire;
+        if (heldBody != null)
+            Anim_DetachPickup(); // changePlayerDropping() + dropObject()
+        _smsInvincibleTicks = Math.Max(p.InvincibleTicks, SmsParams.Graffito.FireInvincibleTime); // both 50 as shipped
+        SmsFluddDamage(p.WaterEmit);
+        _health = Math.Max(_health - p.Damage, 0); // decHP()
+        SpawnHitStars(ComputeFeetPosition() + face * SmsUnits.UnitsToMetres(50f)); // calcDamagePos: 50 units toward the floor actor = in front
+        _smsCameraShake?.Start(SmsCameraShake.Kind.Damage); // damageExec: every type but 3 shakes
+        if (FireDamageSound != null && FireDamageSound.Stream != null)
+            FireDamageSound.Play();
+        if (SmsDebugPrint)
+            GD.Print($"[SMS fire] hot floor '{_smsSurfaceNode}': -{p.Damage} HP -> {_health}/{StartingHealth}{(burning ? ", already burning: face turned 180" : "")}; invincible {_smsInvincibleTicks} ticks");
+        if (_health <= 0)
+        {
+            EnterDead(); // decHP -> loserExec(): the game-over status wins over the FIRE_DOWN that would follow
+            return;
+        }
+        SmsFireDownEnter(1, fwd, face, "the hot floor");
+    }
+
+    /// <summary>
+    /// changePlayerStatus(MARIO_STATUS_FIRE_DOWN, arg) (MarioMove.cpp 539): arg 1 (every live source) launches at FireDownForce with fwd
+    /// kept; arg 0 adds the -FireBackVelocity kick; arg 2 launches nothing. ma_firejmp at 1.0, the eyes squeezed shut (ma_fjpend_tx).
+    /// <paramref name="fwd"/> is signed along <paramref name="face"/> (a hit from the front leaves it negative: backwards, facing the attacker).
+    /// </summary>
+    private void SmsFireDownEnter(int arg, float fwd, Vector3 face, string from)
+    {
+        ledgePinned = false;
+        _smsHangMovingAnim = false;
+        _smsLongFallAnim = false;
+        _smsFallCancel = false;
+        isJumping = false;
+        jumpBuffer = 0;
+        SmsLatchFace(face, 1);
+        lastFacingDirection = face;
+        armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
+        StopWaistIKHard();
+        SetEyeTexture(hurtEyeTexture ?? sleepingEyeTexture);
+        stateOfMario = MarioState.hurt;
+        _smsDownKind = SmsDownKind.Fire;
+        _smsDownAir = true;
+        _smsDownFore = false;
+        _smsFireBounces = 0;
+        _smsFireTicks = 0;
+        _smsDownFwd = fwd;
+        if (arg != 2)
+        {
+            _smsFireVy = SmsParams.Jump.FireDownForce;
+            velocity.Y = SmsUnits.SpeedToMps(_smsFireVy);
+            _smsTrueVyValid = false;
+            _smsNoLandFrames = 3; // floor snapping still reports the ground for a frame or two after the launch
+            if (arg == 0)
+                _smsDownFwd = -SmsParams.Jump.FireBackVelocity;
+        }
+        else
+        {
+            _smsFireVy = SmsUnits.MpsToSpeed(velocity.Y);
+        }
+        SmsDownApplyVelocity();
+        SmsDownPlay("ma_firejmp", 1f);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS fire] FIRE_DOWN({arg}) from {from}: vy {_smsFireVy:F0} ({SmsUnits.SpeedToMps(_smsFireVy):F1} m/s), fwd {_smsDownFwd:F1} along the face, ma_firejmp");
+    }
+
+    /// <summary>
+    /// fireDowning() (MarioJump.cpp 698), one physics frame. Tick 1 the fire cry (not ported). The stick: fwd += 0.03125 x mag x
+    /// FireDownControl along it and the face turns by its sine -- the shipped jump.prm has FireDownControl 0, so the stick steers
+    /// nothing; what it still does is trim a fwd over 32 by 2 a tick. The stick at rest: fwd converges to 0 by 0.35 a tick. Then
+    /// jumpProcess(0): gravity, a wall mirrors the face (playerRefrection), the floor -- under two bounces and falling: vy = 0.4 x -vy, fwd
+    /// halves; else the reaction voice (not ported) and FIRE_JUMP_END. setAnimation(ANIM_FIREJMP) every tick: the clip keeps going.
+    /// </summary>
+    private void SmsTickFireDown(double delta, Vector3 stickDir)
+    {
+        if (IsOnFloor() && velocity.Y <= 0.01f && _smsNoLandFrames <= 0)
+        {
+            if (_smsFireBounces < 2 && _smsFireVy < 0f)
+            {
+                _smsFireVy = 0.4f * -_smsFireVy;
+                _smsDownFwd *= 0.5f; // setPlayerVelocity(0.5 x fwd)
+                _smsFireBounces++;
+                velocity.Y = SmsUnits.SpeedToMps(_smsFireVy);
+                _smsTrueVyValid = false;
+                _smsNoLandFrames = 3;
+                SmsDownApplyVelocity();
+                if (SmsDebugPrint)
+                    GD.Print($"[SMS fire] bounce {_smsFireBounces}: vy {_smsFireVy:F1} ({SmsUnits.SpeedToMps(_smsFireVy):F1} m/s), fwd {_smsDownFwd:F1}");
+                return;
+            }
+            SmsFireJumpEndEnter();
+            return;
+        }
+        SmsHurtWallMirror(false); // jumpProcess() 2
+        int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
+        bool stick = stickDir.LengthSquared() > 1e-6f && _smsIntendedMag > 0f; // mInput & 1
+        Vector3 faceDir = SmsMath.DirFromYaw(_smsFaceYaw);
+        float d = stick ? faceDir.SignedAngleTo(new Vector3(stickDir.X, 0f, stickDir.Z).Normalized(), Vector3.Up) : 0f;
+        float yaw = _smsFaceYaw;
+        float fwd = _smsDownFwd;
+        float vyMps = (_smsTrueVyValid && Mathf.Abs(velocity.Y - _smsMoveVyMps) < 1e-3f) ? _smsTrueVy : velocity.Y;
+        float vy = SmsUnits.MpsToSpeed(vyMps);
+        float sumMv = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            _smsFireTicks++;
+            if (!stick)
+            {
+                fwd = SmsMath.Converge(fwd, 0f, 0.35f); // FConverge(fwd, 0, 0.35, 0.35)
+            }
+            else
+            {
+                float velInc = 0.03125f * _smsIntendedMag * SmsParams.Jump.FireDownControl; // 0 as shipped
+                fwd += velInc * MathF.Cos(d);
+                yaw += 1024f * (velInc * MathF.Sin(d)) * SmsUnits.BamToRad;
+                if (fwd < 0f)
+                {
+                    yaw += MathF.PI; // mFaceAngle.y += 0x8000
+                    fwd = -fwd;
+                }
+                if (fwd > 32f)
+                    fwd -= 2f;
+            }
+            SmsAir.GravityOnlyTick(ref vy, out float mv);
+            sumMv += mv;
+        }
+        if (yaw != _smsFaceYaw)
+        {
+            Vector3 nf = SmsMath.DirFromYaw(yaw);
+            SmsLatchFace(nf, 1);
+            lastFacingDirection = nf;
+            armature.Rotation = new Vector3(0f, YawFromDir(nf), 0f);
+        }
+        velocity.Y = SmsUnits.SpeedToMps(sumMv / n);
+        _smsMoveVyMps = velocity.Y;
+        _smsTrueVy = SmsUnits.SpeedToMps(vy);
+        _smsTrueVyValid = true;
+        _smsFireVy = vy;
+        _smsDownFwd = fwd;
+        SmsDownApplyVelocity();
+        if (!animPlayer.IsPlaying() || animPlayer.CurrentAnimation != "ma_firejmp")
+            SmsDownPlay("ma_firejmp", 1f);
+    }
+
+    /// <summary>FIRE_JUMP_END (fireJumpEnd, MarioWait.cpp 504): jumpEndCommon(ANIM_FJPEND, WAIT) -- waitProcess() stands him still on the
+    /// floor, ma_fjpend plays once, its last frame is WAIT; jumpEndEvents() first: A is a jump, the stick is RUN (checkAllMotions).</summary>
+    private void SmsFireJumpEndEnter()
+    {
+        _smsDownKind = SmsDownKind.FireEnd;
+        _smsDownAir = false;
+        _smsDownFwd = 0f;
+        velocity = Vector3.Zero;
+        SmsDownPlay("ma_fjpend", 1f);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS fire] landed after {_smsFireBounces} bounce(s), {_smsFireTicks} ticks burning: FIRE_JUMP_END, ma_fjpend (the reaction voice is not ported)");
+    }
+
+    private void SmsTickFireEnd(Vector3 stickDir)
+    {
+        velocity = Vector3.Zero; // waitProcess(): setPlayerVelocity(0), on the floor
+        bool aPressed = Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space"); // mInput & 2
+        bool stick = stickDir.LengthSquared() > 1e-6f && _smsIntendedMag > 0f;                          // mInput & 1
+        if (aPressed || stick)
+        {
+            // jumpEndEvents(): A -> changePlayerTriJump (the jump buffer carries this frame's press to the idle path), the stick ->
+            // checkAllMotions (RUN on the next frame)
+            SmsHurtStandUp(aPressed ? "[SMS fire] A during ma_fjpend: up, the jump follows" : "[SMS fire] the stick during ma_fjpend: up, RUN follows");
+            return;
+        }
+        if (!IsOnFloor())
+        {
+            SmsHurtStandUp("[SMS fire] the floor went while ma_fjpend played: up"); // waitProcess() snaps him to the floor below; the main path's fall does here
+            return;
+        }
+        if (!(animPlayer.IsPlaying() && animPlayer.CurrentAnimation == "ma_fjpend"))
+            SmsHurtStandUp("[SMS fire] up"); // isLast1AnimeFrame(): WAIT
+    }
+
+    /// <summary>The grounded families: MARIO_STATUS_TYPE_WAITING (WAIT, SQUAT, the *_END recoveries, SLEEPY / SLEEP) and
+    /// MARIO_STATUS_TYPE_RUNNING (RUN, TURN, BRAKE, the SLIPs, the JUMP_SLIP landings, ROTATE_L / R, CATCH), as the port has them.</summary>
+    private bool SmsWaitingOrRunningType(MarioState s)
+    {
+        if (!IsOnFloor())
+            return false;
+        switch (s)
+        {
+            case MarioState.idle:
+            case MarioState.pivot:
+            case MarioState.sneak:
+            case MarioState.walking:
+            case MarioState.running:
+            case MarioState.sprinting:
+            case MarioState.crouch:
+            case MarioState.landing:
+            case MarioState.singleJumpLanding:
+            case MarioState.doubleJumpLanding:
+            case MarioState.tripleJumpLanding:
+            case MarioState.rolloutRun:
+            case MarioState.wallPush:
+            case MarioState.wallShuffle:
+            case MarioState.carrying:
+            case MarioState.groundSpin:
+            case MarioState.sideFlipTurning:
+            case MarioState.gettingUpFromSliding:
+            case MarioState.bellySlidingFromDive:
+                return true;
+            case MarioState.slipping:
+                return _smsSurfaceSlip; // the game's SLIP_FORE / SLIP_BACK, not the legacy steep-band slide
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>
+    /// checkGraffitoElec() (MarioMove.cpp 924): on electric goop. Not standing on goop the tick before: the grace timer is set to
+    /// GraffitoNoDmgTime (10); while it runs it only counts down. Then, not invincible, standing or running (a WAITING or RUNNING type
+    /// status -- never in the air) and no goop footprints (none in the port): ELECTRIC_DAMAGE, with MSD_SE_MA_DAMAGE_ELEC and
+    /// MSD_SE_EF_LIGHTNING (the ElectricDamageSound slot).
+    /// </summary>
+    private void SmsGraffitoElec()
+    {
+        if (!_smsDirty)
+            _smsGraffitoTimer = SmsParams.Mario.GraffitoNoDmgTime;
+        if (_smsGraffitoTimer != 0)
+        {
+            _smsGraffitoTimer--;
+            return;
+        }
+        if (_smsInvincibleTicks > 0 || _health <= 0 || stateOfMario == MarioState.dead)
+            return;
+        if (!SmsWaitingOrRunningType(stateOfMario))
+            return;
+        SmsElectricDamageEnter($"electric goop '{_smsSurfaceNode}'");
+        if (ElectricDamageSound != null && ElectricDamageSound.Stream != null)
+            ElectricDamageSound.Play();
+    }
+
+    /// <summary>An electric attacker's hit (MarioReceiveMsg.cpp 419-448: the electro-koopas' message 9, not while invincible):
+    /// elecEffect() and MARIO_STATUS_ELECTRIC_DAMAGE. The sparks are the next pass. For the enemies to call.</summary>
+    public void TakeShock()
+    {
+        if (!UseSmsPhysics || _smsInvincibleTicks > 0 || _health <= 0 || stateOfMario == MarioState.dead || stateOfMario == MarioState.swimming)
+            return;
+        if (stateOfMario == MarioState.hurt)
+            return; // port-side, as for the knockdowns: not while he is down or already shocked
+        SmsElectricDamageEnter("an electric hit");
+    }
+
+    /// <summary>changePlayerStatus(MARIO_STATUS_ELECTRIC_DAMAGE, 0): a DEMO-type status -- control locked, nothing moves him. The exec
+    /// (electricDamage) does the rest on its first tick.</summary>
+    private void SmsElectricDamageEnter(string from)
+    {
+        if (heldBody != null)
+            Anim_DetachPickup();
+        ledgePinned = false;
+        _smsHangMovingAnim = false;
+        _smsLongFallAnim = false;
+        _smsFallCancel = false;
+        isJumping = false;
+        jumpBuffer = 0;
+        StopWaistIKHard();
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+        SmsLatchFace(face, 1);
+        velocity = Vector3.Zero;
+        stateOfMario = MarioState.hurt;
+        _smsDownKind = SmsDownKind.Electric;
+        _smsDownAir = false;
+        _smsDownFwd = 0f;
+        _smsElecTicks = 0;
+        _smsDownAnim = "";
+        if (SmsDebugPrint)
+            GD.Print($"[SMS elec] ELECTRIC_DAMAGE from {from}: locked for 120 ticks, ma_shock (the sparks every tick are the next pass)");
+    }
+
+    /// <summary>
+    /// electricDamage() (MarioAutodemo.cpp 437), one physics frame. The first tick: the shock voice (not ported), ma_shock at 1.0, decHP
+    /// (dmggraffitoelec: 1), the rumble (not ported); every tick the sparks (next pass) and the timer; past 0x78 = 120 ticks: the frame
+    /// counter reset, the reaction voice, tremble(5, 2, 0.99, 600) and the closing puff (next pass), damageExec(the floor, 0 HP, type 3,
+    /// ..., 0x3C) = 60 ticks invincible, then WAIT. The HP going means loserExec: ELEC_DOWN, the death in the electric pose.
+    /// </summary>
+    private void SmsTickElectric(double delta)
+    {
+        velocity = Vector3.Zero; // a DEMO status: no process moves him
+        if (_smsElecTicks == 0)
+        {
+            SmsDownPlay("ma_shock", 1f);
+            SetEyeTexture(hurtEyeTexture ?? sleepingEyeTexture); // ma_shock_tx
+            _health = Math.Max(_health - SmsDamageProfile.GraffitoElec.Damage, 0); // decHP(mDmgParamsGraffitoElec.mDamage)
+            if (SmsDebugPrint)
+                GD.Print($"[SMS elec] -{SmsDamageProfile.GraffitoElec.Damage} HP -> {_health}/{StartingHealth}");
+            if (_health <= 0)
+            {
+                SmsElecDownDeath();
+                return;
+            }
+        }
+        int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
+        for (int i = 0; i < n; i++)
+        {
+            _smsElecTicks++; // elecEffect() every tick: the sparks (next pass); mStatusTimer++
+            if (_smsElecTicks > 120)
+            {
+                _smsInvincibleTicks = 0x3C; // damageExec(&mFloorHitActor, 0, 3, ..., 0x3C): 0 HP, no knockdown, 60 ticks invincible
+                SmsHurtStandUp($"[SMS elec] {_smsElecTicks} ticks: WAIT, invincible 60 ticks (the puff, the tremble and the reaction voice are the next pass)");
+                return;
+            }
+        }
+        if (!animPlayer.IsPlaying() || animPlayer.CurrentAnimation != "ma_shock")
+            SmsDownPlay("ma_shock", 1f);
+    }
+
+    /// <summary>loserExec() during ELECTRIC_DAMAGE (MarioCollision.cpp 225): MARIO_STATUS_ELEC_DOWN -- the death in the electric pose
+    /// (elecDowning: ma_shock_down, holding) instead of DOWN_LOSER's ma_die. R respawns as ever.</summary>
+    private void SmsElecDownDeath()
+    {
+        stateOfMario = MarioState.dead;
+        velocity = Vector3.Zero;
+        _smsDownAnim = "";
+        _smsDownKind = SmsDownKind.Knockdown;
+        if (animTree != null)
+            animTree.Active = false;
+        animPlayer.SpeedScale = 1f;
+        if (animPlayer.HasAnimation("ma_shock_down"))
+            animPlayer.Play("ma_shock_down");
+        if (SmsDebugPrint)
+            GD.Print("[SMS elec] the shock took the last HP: ELEC_DOWN (ma_shock_down)");
     }
 
     private void LegacyTakeDamage(Vector3 hitSourcePosition)
@@ -15791,6 +16244,7 @@ public partial class Mario : CharacterBody3D
     private void SmsAfterMove()
     {
         SmsUpdateSurface();
+        SmsCheckGraffito(); // checkGraffito(): after the status exec and the move, every tick
         if (_smsNoLandFrames > 0)
             _smsNoLandFrames--;
         if (SmsDebugPrint && _smsDbgAirborne && IsOnFloor())
