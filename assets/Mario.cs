@@ -633,6 +633,9 @@ public partial class Mario : CharacterBody3D
     private SmsBonkStars _smsBonkStars;                 // BonkStars.tscn: ms_dmg_c, the stars of a wall bonk and of a hit
     private SmsCameraShake _smsCameraShake;             // CameraShake.tscn: gpCameraShake -- the hip drop, super hip drop and damage shakes
     private SmsBubbles _smsBubbles;                     // Fx/SmsBubbles.tscn: ms_m_awa / ms_m_awa_s / ms_m_awahamon -- the bubbles under water (pass 48)
+    private SmsFireDamageFx _smsFireFx;                 // Fx/FireDamage.tscn: ms_firedmg_a -- the burn's cloud, a bound copy per burn (pass 51)
+    private SmsShockSparks _smsShockSparks;             // Fx/ShockSparks.tscn: ms_m_biri_a / b / c -- the shock's sparks, on while ELECTRIC_DAMAGE ticks (pass 51)
+    private SmsShockPuff _smsShockPuff;                 // Fx/ShockPuff.tscn: ms_moe_fire_off -- the shock's closing puff (pass 51)
     private int _smsCenterBone = -2;                    // the 'center' joint (getCenterAnmMtx)
     private float _smsHipAttackTicks;                   // hipAttacking() mStatusTimer through the fall (120 Hz ticks); > SuperHipAttackCt = the super hip drop
     /// <summary>hipAttacking() mStatusState == 3: this hip drop fell longer than jump.prm's mSuperHipAttackCt (80 ticks, 0.67 s), so it is the
@@ -5349,7 +5352,12 @@ public partial class Mario : CharacterBody3D
         _smsBonkStars = SmsFluddModel.FindChild<SmsBonkStars>(this);
         _smsCameraShake = SmsFluddModel.FindChild<SmsCameraShake>(this);
         _smsBubbles = SmsFluddModel.FindChild<SmsBubbles>(this);
+        _smsFireFx = SmsFluddModel.FindChild<SmsFireDamageFx>(this);
+        _smsShockSparks = SmsFluddModel.FindChild<SmsShockSparks>(this);
+        _smsShockPuff = SmsFluddModel.FindChild<SmsShockPuff>(this);
         _smsSpinBlur?.Bind(this);
+        _smsShockSparks?.Bind(this);
+        _smsShockPuff?.Bind(this);
         _smsHipBlur?.Bind(this);
         _smsSuperHipBlur?.Bind(this);
         // pass 29: no fallback -- the scenes are the effects; a missing one is an error and that effect simply does not play
@@ -5369,8 +5377,14 @@ public partial class Mario : CharacterBody3D
             GD.PushError("[SMS camera] Player.tscn has no CameraShake under Mario: instance res://assets/Sms/CameraShake.tscn there (gpCameraShake: the hip drop, super hip drop and damage shakes)");
         if (_smsBubbles == null)
             GD.PushError("[SMS fx] Player.tscn has no SmsBubbles under Mario: instance res://assets/Sms/Fx/SmsBubbles.tscn there (the bubbles under water and their pop rings, ms_m_awa / ms_m_awa_s / ms_m_awahamon)");
+        if (_smsFireFx == null)
+            GD.PushError("[SMS fx] Player.tscn has no FireDamage under Mario: instance res://assets/Sms/Fx/FireDamage.tscn there (the burn's cloud, ms_firedmg_a)");
+        if (_smsShockSparks == null)
+            GD.PushError("[SMS fx] Player.tscn has no ShockSparks under Mario: instance res://assets/Sms/Fx/ShockSparks.tscn there (the shock's sparks, ms_m_biri_a / b / c)");
+        if (_smsShockPuff == null)
+            GD.PushError("[SMS fx] Player.tscn has no ShockPuff under Mario: instance res://assets/Sms/Fx/ShockPuff.tscn there (the shock's closing puff, ms_moe_fire_off)");
         if (SmsDebugPrint)
-            GD.Print($"[SMS fx] spin rings {(_smsSpinBlur != null ? "from the scene" : "MISSING")}, hip drop streak {(_smsHipBlur != null ? "from the scene" : "MISSING")}, hip drop landing {(_smsHipLanding != null ? "from the scene" : "MISSING")}, super hip drop fall {(_smsSuperHipBlur != null ? "from the scene" : "MISSING")} / landing {(_smsSuperHipLanding != null ? "from the scene" : "MISSING")}, bonk stars {(_smsBonkStars != null ? "from the scene" : "MISSING")}, camera shake {(_smsCameraShake != null ? "from the scene" : "MISSING")}, bubbles {(_smsBubbles != null ? "from the scene" : "MISSING")}");
+            GD.Print($"[SMS fx] spin rings {(_smsSpinBlur != null ? "from the scene" : "MISSING")}, hip drop streak {(_smsHipBlur != null ? "from the scene" : "MISSING")}, hip drop landing {(_smsHipLanding != null ? "from the scene" : "MISSING")}, super hip drop fall {(_smsSuperHipBlur != null ? "from the scene" : "MISSING")} / landing {(_smsSuperHipLanding != null ? "from the scene" : "MISSING")}, bonk stars {(_smsBonkStars != null ? "from the scene" : "MISSING")}, camera shake {(_smsCameraShake != null ? "from the scene" : "MISSING")}, bubbles {(_smsBubbles != null ? "from the scene" : "MISSING")}, burn cloud {(_smsFireFx != null ? "from the scene" : "MISSING")}, shock sparks {(_smsShockSparks != null ? "from the scene" : "MISSING")} / puff {(_smsShockPuff != null ? "from the scene" : "MISSING")}");
     }
 
     /// <summary>The first <typeparamref name="T"/> under <paramref name="root"/>, not looking inside another effect's scene (the super
@@ -14760,9 +14774,10 @@ public partial class Mario : CharacterBody3D
 
     // ---------------------------------------------------------------------------------------------------------------
     // Fire and electricity (pass 50): the pollution layer's hazards (checkGraffito, MarioMove.cpp 953 -- the game's goop map, sampled at
-    // the floor point under him every tick) and the statuses they put him in. The effects -- the burn's burst (particle 6, ms_firedmg_a),
-    // the shock's sparks every tick (ms_m_biri_a / b / c) and its closing puff (ms_moe_fire_off), the model's tremble -- are the next
-    // pass; the slots here are the sounds.
+    // the floor point under him every tick) and the statuses they put him in. The effects are scenes under Mario (pass 51): the burn's
+    // cloud (particle 6, ms_firedmg_a: Fx/FireDamage.tscn), the shock's sparks every tick (ms_m_biri_a / b / c: Fx/ShockSparks.tscn) and
+    // its closing puff (ms_moe_fire_off: Fx/ShockPuff.tscn). Not ported: the model's tremble (TTrembleModelEffect: every vertex kicked
+    // +-5 units and springing back, 600 frames), the shock's second draw pass (drawLogic, the blue shimmer), the voices, the rumbles.
     // ---------------------------------------------------------------------------------------------------------------
 
     /// <summary>
@@ -14794,7 +14809,7 @@ public partial class Mario : CharacterBody3D
     /// makeGraffitoDamage(dmggraffitofire): damageExec() with the floor as the attacker, 1 unit in front of him -- the face stays, the
     /// stars 50 units in front, the camera shake, 1 HP, the tank's spill (0), 50 ticks invincible -- and the knockdown status it sets is
     /// replaced by FIRE_DOWN(1) with his forward speed restored (unk55C is 50 in MarioInit.cpp: the restore always runs). What he holds
-    /// is dropped. The burst (particle 6, ms_firedmg_a) is the next pass; MSD_SE_MA_DAMAGE_FIRE is the FireDamageSound slot.
+    /// is dropped. The cloud (particle 6, ms_firedmg_a) plays from FIRE_DOWN's entry; MSD_SE_MA_DAMAGE_FIRE is the FireDamageSound slot.
     /// </summary>
     private void SmsGraffitoFire()
     {
@@ -14865,8 +14880,14 @@ public partial class Mario : CharacterBody3D
         }
         SmsDownApplyVelocity();
         SmsDownPlay("ma_firejmp", 1f);
+        if (_smsFireFx != null)
+        {
+            // emitAndBindToPosPtr(6, &mPosition, 0): the cloud's emitter rides at his feet, its puffs stay where they were born
+            _smsFireFx.GlobalPosition = ComputeFeetPosition();
+            _smsFireFx.Play();
+        }
         if (SmsDebugPrint)
-            GD.Print($"[SMS fire] FIRE_DOWN({arg}) from {from}: vy {_smsFireVy:F0} ({SmsUnits.SpeedToMps(_smsFireVy):F1} m/s), fwd {_smsDownFwd:F1} along the face, ma_firejmp");
+            GD.Print($"[SMS fire] FIRE_DOWN({arg}) from {from}: vy {_smsFireVy:F0} ({SmsUnits.SpeedToMps(_smsFireVy):F1} m/s), fwd {_smsDownFwd:F1} along the face, ma_firejmp, the cloud {(_smsFireFx != null ? "from the scene" : "MISSING")}");
     }
 
     /// <summary>
@@ -15041,7 +15062,7 @@ public partial class Mario : CharacterBody3D
     }
 
     /// <summary>An electric attacker's hit (MarioReceiveMsg.cpp 419-448: the electro-koopas' message 9, not while invincible):
-    /// elecEffect() and MARIO_STATUS_ELECTRIC_DAMAGE. The sparks are the next pass. For the enemies to call.</summary>
+    /// elecEffect() and MARIO_STATUS_ELECTRIC_DAMAGE. For the enemies to call.</summary>
     public void TakeShock()
     {
         if (!UseSmsPhysics || _smsInvincibleTicks > 0 || _health <= 0 || stateOfMario == MarioState.dead || stateOfMario == MarioState.swimming)
@@ -15073,14 +15094,16 @@ public partial class Mario : CharacterBody3D
         _smsDownFwd = 0f;
         _smsElecTicks = 0;
         _smsDownAnim = "";
+        if (_smsShockSparks != null)
+            _smsShockSparks.Active = true; // elecEffect() every tick: the three emitters live while the ticks come (bind 1)
         if (SmsDebugPrint)
-            GD.Print($"[SMS elec] ELECTRIC_DAMAGE from {from}: locked for 120 ticks, ma_shock (the sparks every tick are the next pass)");
+            GD.Print($"[SMS elec] ELECTRIC_DAMAGE from {from}: locked for 120 ticks, ma_shock, the sparks {(_smsShockSparks != null ? "from the scene" : "MISSING")}");
     }
 
     /// <summary>
     /// electricDamage() (MarioAutodemo.cpp 437), one physics frame. The first tick: the shock voice (not ported), ma_shock at 1.0, decHP
-    /// (dmggraffitoelec: 1), the rumble (not ported); every tick the sparks (next pass) and the timer; past 0x78 = 120 ticks: the frame
-    /// counter reset, the reaction voice, tremble(5, 2, 0.99, 600) and the closing puff (next pass), damageExec(the floor, 0 HP, type 3,
+    /// (dmggraffitoelec: 1), the rumble (not ported); every tick the sparks and the timer; past 0x78 = 120 ticks: the frame
+    /// counter reset, the reaction voice, tremble(5, 2, 0.99, 600) (not ported) and the closing puff, damageExec(the floor, 0 HP, type 3,
     /// ..., 0x3C) = 60 ticks invincible, then WAIT. The HP going means loserExec: ELEC_DOWN, the death in the electric pose.
     /// </summary>
     private void SmsTickElectric(double delta)
@@ -15102,11 +15125,14 @@ public partial class Mario : CharacterBody3D
         int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
         for (int i = 0; i < n; i++)
         {
-            _smsElecTicks++; // elecEffect() every tick: the sparks (next pass); mStatusTimer++
+            _smsElecTicks++; // elecEffect() every tick: the sparks run; mStatusTimer++
             if (_smsElecTicks > 120)
             {
+                if (_smsShockSparks != null)
+                    _smsShockSparks.Active = false; // the calls stop: the emitters are invalidated, the live sparks finish
+                _smsShockPuff?.Play(); // elecEndEffect(): ms_moe_fire_off at the centre + 30
                 _smsInvincibleTicks = 0x3C; // damageExec(&mFloorHitActor, 0, 3, ..., 0x3C): 0 HP, no knockdown, 60 ticks invincible
-                SmsHurtStandUp($"[SMS elec] {_smsElecTicks} ticks: WAIT, invincible 60 ticks (the puff, the tremble and the reaction voice are the next pass)");
+                SmsHurtStandUp($"[SMS elec] {_smsElecTicks} ticks: WAIT, invincible 60 ticks, the puff {(_smsShockPuff != null ? "from the scene" : "MISSING")} (the tremble and the reaction voice are not ported)");
                 return;
             }
         }
@@ -15118,6 +15144,8 @@ public partial class Mario : CharacterBody3D
     /// (elecDowning: ma_shock_down, holding) instead of DOWN_LOSER's ma_die. R respawns as ever.</summary>
     private void SmsElecDownDeath()
     {
+        if (_smsShockSparks != null)
+            _smsShockSparks.Active = false; // elecEffect() is no longer called; elecEndEffect() never is
         stateOfMario = MarioState.dead;
         velocity = Vector3.Zero;
         _smsDownAnim = "";
@@ -16245,6 +16273,8 @@ public partial class Mario : CharacterBody3D
     {
         SmsUpdateSurface();
         SmsCheckGraffito(); // checkGraffito(): after the status exec and the move, every tick
+        if (_smsShockSparks != null && _smsShockSparks.Active && !(stateOfMario == MarioState.hurt && _smsDownKind == SmsDownKind.Electric))
+            _smsShockSparks.Active = false; // whatever ended the shock (a respawn): no elecEffect() call this tick, the emitters go
         if (_smsNoLandFrames > 0)
             _smsNoLandFrames--;
         if (SmsDebugPrint && _smsDbgAirborne && IsOnFloor())

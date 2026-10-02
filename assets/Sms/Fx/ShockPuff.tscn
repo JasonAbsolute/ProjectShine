@@ -1,0 +1,75 @@
+[gd_scene load_steps=11 format=3 uid="uid://cshockpuff051"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsShockPuff.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/kemuball3_dark.png" id="2_smoke"]
+
+[sub_resource type="Curve" id="Curve_rise"]
+resource_name = "ms_moe_fire_off: the puff's rise -- 2.5 u/f up, the Gravity field +0.05 u/f^2 from 25 % (peak 3.506 m/s, 2.15 m in all)"
+_data = [Vector2(0, 0.5747), 0.0, 0.0, 1, 1, Vector2(0.08, 0.5747), 0.0, 0.0, 1, 1, Vector2(0.16, 0.5747), 0.0, 0.0, 1, 1, Vector2(0.24, 0.5747), 0.0, 0.0, 1, 1, Vector2(0.32, 0.6207), 0.0, 0.0, 1, 1, Vector2(0.4, 0.6667), 0.0, 0.0, 1, 1, Vector2(0.48, 0.7126), 0.0, 0.0, 1, 1, Vector2(0.56, 0.7586), 0.0, 0.0, 1, 1, Vector2(0.64, 0.8046), 0.0, 0.0, 1, 1, Vector2(0.72, 0.8506), 0.0, 0.0, 1, 1, Vector2(0.8, 0.8966), 0.0, 0.0, 1, 1, Vector2(0.88, 0.9425), 0.0, 0.0, 1, 1, Vector2(0.96, 0.9885), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 14
+
+[sub_resource type="Curve" id="Curve_zero"]
+_data = [Vector2(0, 0), 0.0, 0.0, 1, 1, Vector2(1, 0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_rise"]
+curve_x = SubResource("Curve_zero")
+curve_y = SubResource("Curve_rise")
+curve_z = SubResource("Curve_zero")
+
+[sub_resource type="Gradient" id="Gradient_smoke"]
+resource_name = "ms_moe_fire_off prm 80 -> 120 grey over frames 2..15 of 20 (Merge), env (24,24,24); alpha 0.9 -> 0 from 62.5 %"
+offsets = PackedFloat32Array(0, 0.1, 0.625, 0.75, 1)
+colors = PackedColorArray(0.3137, 0.3137, 0.3137, 0.9, 0.3137, 0.3137, 0.3137, 0.9, 0.4431, 0.4431, 0.4431, 0.9, 0.4706, 0.4706, 0.4706, 0.6, 0.4706, 0.4706, 0.4706, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_smoke"]
+gradient = SubResource("Gradient_smoke")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_smoke"]
+lifetime_randomness = 0.3
+emission_shape = 2
+emission_sphere_radius = 0.0672
+angle_min = 0.0
+angle_max = 360.0
+direction = Vector3(0, 1, 0)
+spread = 18.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+angular_velocity_min = -2700
+angular_velocity_max = 2700
+directional_velocity_min = 2.8049
+directional_velocity_max = 4.2073
+directional_velocity_curve = SubResource("CurveXYZTexture_rise")
+gravity = Vector3(0, 0, 0)
+color_ramp = SubResource("GradientTexture1D_smoke")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_smoke"]
+resource_name = "shock's closing puff (ms_moe_fire_off: P_msm_kemuball3 lerp (24,24,24) -> the ramp, mix)"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+disable_receive_shadows = true
+albedo_texture = ExtResource("2_smoke")
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_smoke"]
+material = SubResource("StandardMaterial3D_smoke")
+size = Vector2(0.403, 0.403)
+
+[node name="ShockPuff" type="Node3D" node_paths=PackedStringArray("Smoke")]
+script = ExtResource("1_script")
+Smoke = NodePath("Smoke")
+BoneName = "center"
+OffsetUnits = Vector3(0, 30, 0)
+
+[node name="Smoke" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 30
+lifetime = 0.8333
+one_shot = true
+explosiveness = 0.0
+visibility_aabb = AABB(-2, -1, -2, 4, 5, 4)
+process_material = SubResource("ParticleProcessMaterial_smoke")
+draw_pass_1 = SubResource("QuadMesh_smoke")

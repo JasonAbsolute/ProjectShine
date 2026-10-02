@@ -29,6 +29,26 @@ public static class SmsUnboundBurst
         return burst;
     }
 
+    /// <summary>The game's BOUND one-shots -- emitAndBindToPosPtr(id, &amp;pos, 0): a simple emitter whose position follows the pointer every
+    /// frame while its particles stay where they were born (not FollowEmitter). A one-shot copy of the template as a CHILD of
+    /// <paramref name="parent"/> at its origin, so it rides along; its particles are world space (local_coords off in the template). Freed
+    /// when its particles are gone; a second call while the first copy still plays starts another, as createSimpleEmitterID does.</summary>
+    public static GpuParticles3D SpawnBound(GpuParticles3D template, Node3D parent, System.Action<GpuParticles3D> configure = null)
+    {
+        if (template == null || parent == null)
+            return null;
+        var burst = (GpuParticles3D)template.Duplicate();
+        burst.TopLevel = false;
+        burst.OneShot = true;
+        burst.Emitting = false;
+        configure?.Invoke(burst);
+        parent.AddChild(burst);
+        burst.Transform = Transform3D.Identity;
+        burst.Finished += burst.QueueFree;
+        burst.Restart();
+        return burst;
+    }
+
     /// <summary>A world-aligned burst at <paramref name="at"/> (the usual case: the game's emitters here are unrotated).</summary>
     public static GpuParticles3D Spawn(GpuParticles3D template, Node parent, Vector3 at, System.Action<GpuParticles3D> configure = null) => Spawn(template, parent, new Transform3D(Basis.Identity, at), configure);
 }

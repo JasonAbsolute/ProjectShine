@@ -1778,7 +1778,9 @@ run after the status exec and the move every tick (`checkGraffito`, MarioMove.cp
   (`unk55C` is a constant 50, the restore always runs), what he holds is dropped, then **`FIRE_DOWN(1)`**: straight up at
   `FireDownForce` **50** (`jump.prm`; the code default is 80), fwd kept. Standing still that is up and down in place: the flight
   is ~100 ticks and the invincibility 50, so a hot floor burns him again at every landing -- the game's hurt loop; there is no
-  steering (below). `FireDamageSound` is the slot for `MSD_SE_MA_DAMAGE_FIRE`. The burst (particle 6, `ms_firedmg_a`) is the next pass.
+  steering (below). `FireDamageSound` is the slot for `MSD_SE_MA_DAMAGE_FIRE`. The cloud (particle 6, `ms_firedmg_a`) is
+  `Fx/FireDamage.tscn`: a bound copy per burn at his feet (`emitAndBindToPosPtr(6, &mPosition, 0)`), 50 orange-then-grey puffs over
+  100 frames living 100 +-35 %, rising half a metre under the 0.88 drag, 70 units wide, spinning (pass 51).
 - **Fire enemies** (`MarioReceiveMsg.cpp` 454 / 555-571 / 580-599 / 665-685): `damageExec(dmgfire)` -- 1 HP, type 1, knockback 16,
   **300 ticks** invincible, the face toward the attacker -- then `changePlayerStatus(FIRE_DOWN, 1)` replaces the knockdown before
   it ticks: up at 50 with the knockback speed kept (negative: backwards, facing the attacker). `SmsDamageProfile.Fire` and
@@ -1805,10 +1807,15 @@ run after the status exec and the move every tick (`checkGraffito`, MarioMove.cp
   `ELECTRIC_DAMAGE` directly, no `damageExec`. `TakeShock()` is the call (port-side: not while already down or shocked).
 - **`ELECTRIC_DAMAGE`** (`electricDamage`, MarioAutodemo.cpp 437): a **DEMO-type** status -- control locked, nothing moves him. Tick 1:
   the shock voice (not ported), `ma_shock` at 1.0, `decHP(1)` (`dmggraffitoelec`), the rumble (not ported); every tick the sparks
-  (`ms_m_biri_a / b / c`, next pass); past 0x78 = **120 ticks**: the reaction voice, `tremble(5, 2, 0.99, 600)` and the closing puff
-  (`ms_moe_fire_off`, next pass), `damageExec(the floor, 0 HP, type 3, ..., 0x3C)` = **60 ticks invincible**, then WAIT. Standing on
-  the goop he is shocked again 60 ticks later (the flag stays set, no new grace). The game's blue shimmer is a second draw pass of
-  the model (`drawLogic`, MarioDraw.cpp 2060), a material for the next pass.
+  (`ms_m_biri_a / b / c`: `Fx/ShockSparks.tscn`, bound to the centre joint -- one emitter each kept alive while the ticks come, as
+  `emitAndBindToPosPtr(..., 1)` does: 120 lightning streaks a second from a 10-unit shell, 200 x 50 units along the line from the
+  centre, cyan going blue; 60 arcs a second from a 50 x 72-unit shell, 100-unit billboards; 24 flashes a second within 45..90 units,
+  each throwing six white 20 x 5-unit sparks out at 7 units a frame that fall at 0.44 -- pass 51); past 0x78 = **120 ticks**: the
+  reaction voice, `tremble(5, 2, 0.99, 600)` (not ported: every vertex of the model kicked +-5 units and springing back for 600
+  frames) and the closing puff (`ms_moe_fire_off`: `Fx/ShockPuff.tscn`, 30 dark puffs over 60 frames from the centre + 30 units,
+  rising 2 m), `damageExec(the floor, 0 HP, type 3, ..., 0x3C)` = **60 ticks invincible**, then WAIT. Standing on the goop he is
+  shocked again 60 ticks later (the flag stays set, no new grace). Not ported: the game's blue shimmer, a second draw pass of the
+  model (`drawLogic`, MarioDraw.cpp 2060).
 - **`ELEC_DOWN`** (`loserExec`, MarioCollision.cpp 225): the shock taking the last HP is the death in the electric pose
   (`ma_shock_down`, holding) instead of `ma_die`; R respawns.
 - Not ported: the voices, the rumbles, the goop map itself (a tagged body is polluted all over), `checkGraffitoLava` (empty in the
@@ -3155,8 +3162,8 @@ ground has to carry upward velocity (launches do) or exceed 1.34 m.
 - Swimming: done, see Swimming and Air. Needs the level's water Area3D (`sms_water`). Not ported: the FLUDD surf, the
   fence catch from water, the effects and sounds, the swimming camera, coins refilling air.
 - Damage: done, see Damage. Not ported: the type-3 upper-body damage run (`ma_dgrun`), rumble, the voices, goop on hit.
-- Fire and electricity: done, see Fire and electricity (pass 50). Needs the level's `sms_pollution` tags. Next: the burn's
-  burst, the shock's sparks and puff, the model tremble and the blue shimmer (the effects pass).
+- Fire and electricity: done, see Fire and electricity (passes 50-51, the effects included). Needs the level's `sms_pollution`
+  tags. Not ported: the model tremble after a shock, the blue shimmer during it, the voices, the rumbles.
 
 ### Pass 29 -- the Mario particles at the game's 60 Hz particle clock; the legacy effects out; ma_hipsr through the tree
 
@@ -3685,3 +3692,17 @@ a full stick held through a flight turns the face by 0.00 deg and moves him by n
 then 10.1 (0.4 x the landing speed) with fwd halved, then `ma_fjpend` (0.5 s) and WAIT; A three frames into `ma_fjpend` is a jump the
 next frame. The electric floor shocks on the 11th tick (10 of grace), holds him 121 ticks, 1 HP on the first, 60 ticks invincible after,
 shocks again 60 ticks later with no new grace; at 1 HP the shock ends in `ELEC_DOWN` (`ma_shock_down`), R respawns.
+
+### Pass 51 -- the fire and shock effects: FireDamage.tscn, ShockSparks.tscn, ShockPuff.tscn
+
+The three effects of pass 50 as scenes under Mario, generated from the disc's `.jpa` files by `tools/projectshine/gen_fx_fire.py`
+(every number derived from the data; the field maths per noclip's JPA.ts, the colour keys stretched over the life as calc type Merge
+does): `Fx/FireDamage.tscn` -- the burn's cloud, `ms_firedmg_a`, a bound one-shot copy per burn at his feet (`SmsUnboundBurst.SpawnBound`:
+a child of the node, so the emitter rides along while the born puffs stay in the world, as a pos-ptr bind does); `Fx/ShockSparks.tscn`
+-- `ms_m_biri_a / b / c` and c's spark children, four GPUParticles3D bound to the centre joint, emitting while `ELECTRIC_DAMAGE` ticks
+and stopped the frame it ends (the game's bind-1 lifetime); `Fx/ShockPuff.tscn` -- `ms_moe_fire_off` at the centre + 30 units as the
+shock ends. Textures baked from the files into `Fx/tex/` (kemuball3_fire, kemuball3_dark, biri_l1, biri_r (two frames), hitmrk1,
+shikaku). Adopted in `SmsSetupFx` with the pass-29 rule (a missing scene is an error, the effect simply does not play); instanced in
+`Player.tscn` after `SmsBubbles` with his editor closed. See Fire and electricity for what each shows and what was approximated
+(the sine-wave flicker and the fast spin of the sparks, the sideways drift of the clouds, the children spawning in the same sphere as
+their flash). The look is for his eyes: the headless run proves the scenes load, bind and switch with the statuses.

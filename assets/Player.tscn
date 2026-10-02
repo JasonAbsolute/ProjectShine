@@ -225,6 +225,9 @@
 [ext_resource type="PackedScene" uid="uid://ydk4hvu1bqs2" path="res://assets/Sms/BodyLag.tscn" id="229_bdylg"]
 [ext_resource type="PackedScene" uid="uid://cshake120h01" path="res://assets/Sms/CameraShake.tscn" id="233_cshak"]
 [ext_resource type="PackedScene" uid="uid://fbubbles0048" path="res://assets/Sms/Fx/SmsBubbles.tscn" id="234_bubbl"]
+[ext_resource type="PackedScene" uid="uid://cfiredmg00051" path="res://assets/Sms/Fx/FireDamage.tscn" id="235_firdm"]
+[ext_resource type="PackedScene" uid="uid://cshocksprk051" path="res://assets/Sms/Fx/ShockSparks.tscn" id="236_shspk"]
+[ext_resource type="PackedScene" uid="uid://cshockpuff051" path="res://assets/Sms/Fx/ShockPuff.tscn" id="237_shpuf"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_fpjfl"]
 height = 1.8701391
@@ -2506,5 +2509,11 @@ script = ExtResource("222_fpjfl")
 [node name="CameraShake" parent="." instance=ExtResource("233_cshak")]
 
 [node name="SmsBubbles" parent="." instance=ExtResource("234_bubbl")]
+
+[node name="FireDamage" parent="." instance=ExtResource("235_firdm")]
+
+[node name="ShockSparks" parent="." instance=ExtResource("236_shspk")]
+
+[node name="ShockPuff" parent="." instance=ExtResource("237_shpuf")]
 
 [editable path="Armature/Skeleton3D/RightHandBone/RightHandClosed/Model"]
