@@ -1,0 +1,74 @@
+[gd_scene load_steps=9 format=3 uid="uid://cwallslide060"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsWallSlideDust.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/kemuball3.png" id="2_smoke"]
+
+[sub_resource type="Curve" id="Curve_rise"]
+resource_name = "ms_mariwallsl1: 2 u/f up, the Gravity field +0.7 u/f^2 from 25 %, the Drag 0.88 fading in over 34 % (peak 1.612 m/s, 0.77 m in all)"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.0667, 0.9419), 0.0, 0.0, 1, 1, Vector2(0.1333, 0.8049), 0.0, 0.0, 1, 1, Vector2(0.2, 0.6224), 0.0, 0.0, 1, 1, Vector2(0.2667, 0.7385), 0.0, 0.0, 1, 1, Vector2(0.3333, 0.8461), 0.0, 0.0, 1, 1, Vector2(0.4, 0.7365), 0.0, 0.0, 1, 1, Vector2(0.4667, 0.5791), 0.0, 0.0, 1, 1, Vector2(0.5333, 0.4297), 0.0, 0.0, 1, 1, Vector2(0.6, 0.3071), 0.0, 0.0, 1, 1, Vector2(0.6667, 0.2138), 0.0, 0.0, 1, 1, Vector2(0.7333, 0.146), 0.0, 0.0, 1, 1, Vector2(0.8, 0.0982), 0.0, 0.0, 1, 1, Vector2(0.8667, 0.0653), 0.0, 0.0, 1, 1, Vector2(0.9333, 0.043), 0.0, 0.0, 1, 1, Vector2(1, 0.0313), 0.0, 0.0, 1, 1]
+point_count = 16
+
+[sub_resource type="Curve" id="Curve_zero"]
+_data = [Vector2(0, 0), 0.0, 0.0, 1, 1, Vector2(1, 0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_rise"]
+curve_x = SubResource("Curve_zero")
+curve_y = SubResource("Curve_rise")
+curve_z = SubResource("Curve_zero")
+
+[sub_resource type="Gradient" id="Gradient_dust"]
+resource_name = "ms_mariwallsl1: alpha 0.875 -> 0 from 50 %"
+offsets = PackedFloat32Array(0, 0.5, 1)
+colors = PackedColorArray(1, 1, 1, 0.875, 1, 1, 1, 0.875, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_dust"]
+gradient = SubResource("Gradient_dust")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_dust"]
+lifetime_randomness = 0.35
+emission_shape = 1
+emission_sphere_radius = 0.2687
+direction = Vector3(0, 1, 0)
+spread = 63.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+angular_velocity_min = -2700
+angular_velocity_max = 2700
+directional_velocity_min = 1.1284
+directional_velocity_max = 2.0956
+directional_velocity_curve = SubResource("CurveXYZTexture_rise")
+gravity = Vector3(0, 0, 0)
+color_ramp = SubResource("GradientTexture1D_dust")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dust"]
+resource_name = "wall slide dust (ms_mariwallsl1: P_msm_kemuball3 lerp (26,26,2) -> (255,255,242), mix)"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+disable_receive_shadows = true
+albedo_texture = ExtResource("2_smoke")
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_dust"]
+resource_name = "the game's 1.2 billboard (60 units)"
+material = SubResource("StandardMaterial3D_dust")
+size = Vector2(0.806, 0.806)
+
+[node name="WallSlideDust" type="Node3D" node_paths=PackedStringArray("Dust")]
+script = ExtResource("1_script")
+Dust = NodePath("Dust")
+BoneName = ""
+AtFeet = true
+OffsetUnits = Vector3(0, 0, 0)
+
+[node name="Dust" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 64
+lifetime = 1
+explosiveness = 0.0
+visibility_aabb = AABB(-2, -1, -2, 4, 5, 4)
+process_material = SubResource("ParticleProcessMaterial_dust")
+draw_pass_1 = SubResource("QuadMesh_dust")

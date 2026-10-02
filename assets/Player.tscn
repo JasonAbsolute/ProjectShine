@@ -214,7 +214,6 @@
 [ext_resource type="Animation" uid="uid://dhaw53r18uxpo" path="res://models/ma_yo_wait.res" id="201_ssp55"]
 [ext_resource type="Animation" uid="uid://c2ftru1qe8eu" path="res://models/ma_yo_walk.res" id="202_rtmdj"]
 [ext_resource type="Script" uid="uid://dianny6rkb58v" path="res://assets/LandingDustFx.cs" id="221_e34sd"]
-[ext_resource type="Script" uid="uid://du4jonomstobn" path="res://assets/SlideDustFx.cs" id="222_fpjfl"]
 [ext_resource type="PackedScene" uid="uid://c6c6d7ilicljx" path="res://assets/Sms/Console/SmsHud.tscn" id="225_gifgd"]
 [ext_resource type="PackedScene" uid="uid://bq5ntr8yh3wek" path="res://assets/Sms/Fx/SpinJumpBlur.tscn" id="226_od6ah"]
 [ext_resource type="PackedScene" uid="uid://dm7kq2xf4tcbs" path="res://assets/Sms/Fx/HipDropBlur.tscn" id="227_xnbyg"]
@@ -232,6 +231,9 @@
 [ext_resource type="PackedScene" uid="uid://cconstr000058" path="res://assets/Sms/Console/ConsoleStr.tscn" id="239_cnstr"]
 [ext_resource type="PackedScene" uid="uid://cfader0000058" path="res://assets/Sms/Console/Fader.tscn" id="240_fader"]
 [ext_resource type="PackedScene" uid="uid://cpausemn00059" path="res://assets/Sms/Console/PauseMenu.tscn" id="241_pause"]
+[ext_resource type="PackedScene" uid="uid://cwallkick0060" path="res://assets/Sms/Fx/WallKickDust.tscn" id="242_wkick"]
+[ext_resource type="PackedScene" uid="uid://cwallslide060" path="res://assets/Sms/Fx/WallSlideDust.tscn" id="243_wslid"]
+[ext_resource type="PackedScene" uid="uid://cslipsmoke060" path="res://assets/Sms/Fx/SlipSmoke.tscn" id="244_slips"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_fpjfl"]
 height = 1.8701391
@@ -2494,9 +2496,6 @@ libraries/ = SubResource("AnimationLibrary_7sah2")
 [node name="LandingDustFx" type="Node3D" parent="." unique_id=1870974040]
 script = ExtResource("221_e34sd")
 
-[node name="SlideDustFx" type="Node3D" parent="." unique_id=1401822925]
-script = ExtResource("222_fpjfl")
-
 [node name="SmsHud" parent="." unique_id=888263540 instance=ExtResource("225_gifgd")]
 
 [node name="SpinJumpBlur" parent="." unique_id=2082751866 instance=ExtResource("226_od6ah")]
@@ -2528,5 +2527,11 @@ script = ExtResource("222_fpjfl")
 [node name="Fader" parent="." instance=ExtResource("240_fader")]
 
 [node name="PauseMenu" parent="." instance=ExtResource("241_pause")]
+
+[node name="WallKickDust" parent="." instance=ExtResource("242_wkick")]
+
+[node name="WallSlideDust" parent="." instance=ExtResource("243_wslid")]
+
+[node name="SlipSmoke" parent="." instance=ExtResource("244_slips")]
 
 [editable path="Armature/Skeleton3D/RightHandBone/RightHandClosed/Model"]

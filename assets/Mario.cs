@@ -686,7 +686,9 @@ public partial class Mario : CharacterBody3D
     private Camera3D camera;
 
     private LandingDustFx landingDustFx;
-    private SlideDustFx slideDustFx;
+    private SmsWallKickDust _smsWallKickDust;           // Fx/WallKickDust.tscn: ms_wallkick_a / b at the kick (pass 60)
+    private SmsWallSlideDust _smsWallSlideDust;         // Fx/WallSlideDust.tscn: ms_mariwallsl1 while the wall slide falls fast (pass 60)
+    private SmsSlipSmoke _smsSlipSmoke;                 // Fx/SlipSmoke.tscn: ms_m_slipsmoke behind him while he slips (pass 60)
 
     // --- Air takeoff dir lock (used to restrict wall-slide to a cone) ---
     private Vector3 airTakeoffDirXZ = Vector3.Zero; // normalized XZ
@@ -1715,9 +1717,6 @@ public partial class Mario : CharacterBody3D
         if (landingDustFx == null)
             GD.PushError("Missing LandingDustFx (Node3D) as a child of Mario.");
 
-        slideDustFx = GetNodeOrNull<SlideDustFx>("SlideDustFx");
-        if (slideDustFx == null)
-            GD.PushError("Missing SlideDustFx (Node3D) as a child of Mario.");
         GD.Print(Scale);
         pickupCast = GetNodeOrNull<ShapeCast3D>("pickupCast");
         if (pickupCast == null)
@@ -3345,9 +3344,8 @@ public partial class Mario : CharacterBody3D
                             velocity.Z = Mathf.Lerp(velocity.Z, 0, .05f);
                         }
 
-                        // Dust trail behind him as he slides along the ground.
-                        Vector3 floorN = IsOnFloor() ? GetFloorNormal().Normalized() : Vector3.Up;
-                        slideDustFx?.Emit(ComputeFeetPosition(), floorN);
+                        if (_smsSlipSmoke != null)
+                            _smsSlipSmoke.Active = true; // frontSlipEffect(): ms_m_slipsmoke behind him each slipping frame
                         if (
                             velocity.X < 0.1
                             && velocity.Z < 0.1
@@ -4293,12 +4291,10 @@ public partial class Mario : CharacterBody3D
         }
 
         EndFrame:
-        if (
-            stateOfMario != MarioState.wallSlide
-            && stateOfMario != MarioState.bellySlidingFromDive
-            && stateOfMario != MarioState.slipping
-        )
-            slideDustFx?.Stop();
+        if (_smsSlipSmoke != null && _smsSlipSmoke.Active && stateOfMario != MarioState.bellySlidingFromDive && stateOfMario != MarioState.slipping)
+            _smsSlipSmoke.Active = false; // no frontSlipEffect() call this frame: the emitter is invalidated, its puffs finish
+        if (_smsWallSlideDust != null && _smsWallSlideDust.Active && stateOfMario != MarioState.wallSlide)
+            _smsWallSlideDust.Active = false; // no wallSlipEffect() call: the same
 
         if (stateOfMario != lastRecordedState)
         {
@@ -5411,6 +5407,11 @@ public partial class Mario : CharacterBody3D
         _smsBodyOverlay = SmsFluddModel.FindChild<SmsBodyOverlay>(this);
         _smsConsoleStr = SmsFluddModel.FindChild<SmsConsoleStr>(this);
         _smsFader = SmsFluddModel.FindChild<SmsFader>(this);
+        _smsWallKickDust = SmsFluddModel.FindChild<SmsWallKickDust>(this);
+        _smsWallSlideDust = SmsFluddModel.FindChild<SmsWallSlideDust>(this);
+        _smsSlipSmoke = SmsFluddModel.FindChild<SmsSlipSmoke>(this);
+        _smsWallSlideDust?.Bind(this);
+        _smsSlipSmoke?.Bind(this);
         _smsSpinBlur?.Bind(this);
         _smsShockSparks?.Bind(this);
         _smsShockPuff?.Bind(this);
@@ -5446,6 +5447,12 @@ public partial class Mario : CharacterBody3D
             GD.PushError("[SMS console] Player.tscn has no ConsoleStr under Mario: instance res://assets/Sms/Console/ConsoleStr.tscn there (the big text: TOO BAD!)");
         if (_smsFader == null)
             GD.PushError("[SMS fader] Player.tscn has no Fader under Mario: instance res://assets/Sms/Console/Fader.tscn there (the death wipe, the fades)");
+        if (_smsWallKickDust == null)
+            GD.PushError("[SMS fx] Player.tscn has no WallKickDust under Mario: instance res://assets/Sms/Fx/WallKickDust.tscn there (the kick's puff and marks, ms_wallkick_a / b)");
+        if (_smsWallSlideDust == null)
+            GD.PushError("[SMS fx] Player.tscn has no WallSlideDust under Mario: instance res://assets/Sms/Fx/WallSlideDust.tscn there (the wall slide's dust, ms_mariwallsl1)");
+        if (_smsSlipSmoke == null)
+            GD.PushError("[SMS fx] Player.tscn has no SlipSmoke under Mario: instance res://assets/Sms/Fx/SlipSmoke.tscn there (the slide's smoke, ms_m_slipsmoke)");
         if (SmsDebugPrint)
             GD.Print($"[SMS fx] spin rings {(_smsSpinBlur != null ? "from the scene" : "MISSING")}, hip drop streak {(_smsHipBlur != null ? "from the scene" : "MISSING")}, hip drop landing {(_smsHipLanding != null ? "from the scene" : "MISSING")}, super hip drop fall {(_smsSuperHipBlur != null ? "from the scene" : "MISSING")} / landing {(_smsSuperHipLanding != null ? "from the scene" : "MISSING")}, bonk stars {(_smsBonkStars != null ? "from the scene" : "MISSING")}, camera shake {(_smsCameraShake != null ? "from the scene" : "MISSING")}, bubbles {(_smsBubbles != null ? "from the scene" : "MISSING")}, burn cloud {(_smsFireFx != null ? "from the scene" : "MISSING")}, shock sparks {(_smsShockSparks != null ? "from the scene" : "MISSING")} / puff {(_smsShockPuff != null ? "from the scene" : "MISSING")}");
     }
@@ -7465,7 +7472,8 @@ public partial class Mario : CharacterBody3D
             nXZ = new Vector3(lastSlipNormal.X, 0, lastSlipNormal.Z);
         Vector3 downhillXZ = (nXZ.Length() > 0.001f) ? nXZ.Normalized() : Vector3.Zero;
 
-        slideDustFx?.Emit(GlobalPosition - n.Normalized() * capRadiusWorld, Vector3.Up);
+        if (_smsSlipSmoke != null)
+            _smsSlipSmoke.Active = true; // frontSlipEffect(): the slip's smoke behind him
 
         // Slide DOWN the slope, along its actual surface — a fixed
         // horizontal speed plus separately-clamped vertical fall doesn't
@@ -8155,8 +8163,8 @@ public partial class Mario : CharacterBody3D
         if (nXZ.Length() > 0.001f)
             nXZ = nXZ.Normalized();
 
-        // Dust trail at the wall contact point, kicked up as he scrapes down.
-        slideDustFx?.Emit(GlobalPosition - n.Normalized() * capRadiusWorld, Vector3.Up);
+        if (_smsWallSlideDust != null)
+            _smsWallSlideDust.Active = SmsUnits.MpsToSpeed(velocity.Y) < -10f; // wallSlipEffect(): while mVel.y < -10 (MarioJump.cpp 623)
 
         // Keep planned kick dir updated in case normal changes slightly
         Vector3 nFull = (IsOnWall() ? GetWallNormal() : lastWallNormal);
@@ -8224,6 +8232,7 @@ public partial class Mario : CharacterBody3D
             return;
 
         Vector3 n = GetWallNormal();
+        _smsWallKickDust?.Play(SmsFeetWorld(), SmsMath.YawFromDir(new Vector3(-n.X, 0f, -n.Z))); // startJumpWall(): WALLKICK_A / B at mPosition, facing into the wall
         if (n == Vector3.Zero)
             n = lastWallNormal;
         if (n == Vector3.Zero)
@@ -14648,6 +14657,9 @@ public partial class Mario : CharacterBody3D
     }
 
     /// <summary>The port's death (ma_die, R respawns); the game's loserExec.</summary>
+    /// <summary>mPosition for the effects bound to it (the true bottom of the capsule).</summary>
+    public Vector3 SmsFeetWorld() => SmsFeet();
+
     /// <summary>TMario::checkActionThing3 (Mario.hpp 1214) as the director reads it before a pause (MarDirectorDirect.cpp 810): not in a
     /// jumping status; and the director must be in play -- not the Miss, a death, the shine demo or a talk.</summary>
     public bool SmsCanPause()
@@ -15510,6 +15522,7 @@ public partial class Mario : CharacterBody3D
     private void SmsFenceJumpOff(string from)
     {
         Vector3 outDir = _smsFenceNormal;
+        _smsWallKickDust?.Play(SmsFeetWorld(), SmsMath.YawFromDir(new Vector3(-outDir.X, 0f, -outDir.Z))); // startJumpWall(): the kick's dust off the fence too
         _smsFenceAnim = "";
         animPlayer.SpeedScale = 1f;
         if (FencePunchSound != null && FencePunchSound.Stream != null)

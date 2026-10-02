@@ -1,0 +1,81 @@
+[gd_scene load_steps=10 format=3 uid="uid://cslipsmoke060"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsSlipSmoke.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/kemuball3.png" id="2_smoke"]
+
+[sub_resource type="Curve" id="Curve_back"]
+resource_name = "ms_m_slipsmoke: 6 u/f behind him under the Drag 0.88 fading in over 34 % (1.22 m back in all)"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.08, 0.9306), 0.0, 0.0, 1, 1, Vector2(0.16, 0.77), 0.0, 0.0, 1, 1, Vector2(0.24, 0.5644), 0.0, 0.0, 1, 1, Vector2(0.32, 0.3651), 0.0, 0.0, 1, 1, Vector2(0.4, 0.2189), 0.0, 0.0, 1, 1, Vector2(0.48, 0.1313), 0.0, 0.0, 1, 1, Vector2(0.56, 0.0787), 0.0, 0.0, 1, 1, Vector2(0.64, 0.0472), 0.0, 0.0, 1, 1, Vector2(0.72, 0.0283), 0.0, 0.0, 1, 1, Vector2(0.8, 0.017), 0.0, 0.0, 1, 1, Vector2(0.88, 0.0102), 0.0, 0.0, 1, 1, Vector2(0.96, 0.0061), 0.0, 0.0, 1, 1, Vector2(1, 0.0054), 0.0, 0.0, 1, 1]
+point_count = 14
+
+[sub_resource type="Curve" id="Curve_up"]
+resource_name = "ms_m_slipsmoke: 2.5 u/f up, the Gravity field +0.7 u/f^2 fading in over 52 %, the same Drag (peak 4.836 m/s)"
+_data = [Vector2(0, 0.4167), 0.0, 0.0, 1, 1, Vector2(0.08, 0.4291), 0.0, 0.0, 1, 1, Vector2(0.16, 0.444), 0.0, 0.0, 1, 1, Vector2(0.24, 0.4308), 0.0, 0.0, 1, 1, Vector2(0.32, 0.3728), 0.0, 0.0, 1, 1, Vector2(0.4, 0.2956), 0.0, 0.0, 1, 1, Vector2(0.48, 0.2298), 0.0, 0.0, 1, 1, Vector2(0.56, 0.174), 0.0, 0.0, 1, 1, Vector2(0.64, 0.1264), 0.0, 0.0, 1, 1, Vector2(0.72, 0.089), 0.0, 0.0, 1, 1, Vector2(0.8, 0.0613), 0.0, 0.0, 1, 1, Vector2(0.88, 0.0415), 0.0, 0.0, 1, 1, Vector2(0.96, 0.0277), 0.0, 0.0, 1, 1, Vector2(1, 0.025), 0.0, 0.0, 1, 1]
+point_count = 14
+
+[sub_resource type="Curve" id="Curve_zero"]
+_data = [Vector2(0, 0), 0.0, 0.0, 1, 1, Vector2(1, 0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_throw"]
+curve_x = SubResource("Curve_zero")
+curve_y = SubResource("Curve_up")
+curve_z = SubResource("Curve_back")
+
+[sub_resource type="Gradient" id="Gradient_smoke"]
+resource_name = "ms_m_slipsmoke: alpha 0 -> 0.8 by 10 %, -> 0 from 50 %"
+offsets = PackedFloat32Array(0, 0.1, 0.5, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.8, 1, 1, 1, 0.8, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_smoke"]
+gradient = SubResource("Gradient_smoke")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_smoke"]
+lifetime_randomness = 0.35
+emission_shape = 1
+emission_sphere_radius = 0.2015
+direction = Vector3(0, 0, 1)
+spread = 31.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+angular_velocity_min = -2700
+angular_velocity_max = 2700
+directional_velocity_min = 3.3852
+directional_velocity_max = 6.2868
+directional_velocity_curve = SubResource("CurveXYZTexture_throw")
+gravity = Vector3(0, 0, 0)
+color_ramp = SubResource("GradientTexture1D_smoke")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_smoke"]
+resource_name = "slide smoke (ms_m_slipsmoke: P_msm_kemuball3 lerp (26,26,2) -> (255,255,242), mix)"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+disable_receive_shadows = true
+albedo_texture = ExtResource("2_smoke")
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_smoke"]
+resource_name = "the game's 1.2 billboard (60 units)"
+material = SubResource("StandardMaterial3D_smoke")
+size = Vector2(0.806, 0.806)
+
+[node name="SlipSmoke" type="Node3D" node_paths=PackedStringArray("Smoke")]
+script = ExtResource("1_script")
+Smoke = NodePath("Smoke")
+BoneName = ""
+AtFeet = true
+OffsetUnits = Vector3(0, 15, 0)
+OffsetInOwnerFrame = true
+TurnWithOwner = true
+
+[node name="Smoke" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 101
+lifetime = 0.8333
+explosiveness = 0.0
+visibility_aabb = AABB(-2, -1, -2, 4, 4, 4)
+process_material = SubResource("ParticleProcessMaterial_smoke")
+draw_pass_1 = SubResource("QuadMesh_smoke")

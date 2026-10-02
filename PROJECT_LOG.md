@@ -3945,3 +3945,26 @@ centre; PauseAction "button_start" -- Escape and the joypad's Start stand in at 
 the bar. The console frames are this port's 120 Hz ticks (pass 38): the clock runs 60 units a second x SmsHud.Anim. NOT PORTED: the
 card-save dialog (SAVE writes GameData and the menu dips 40 units), the sparks, the console's pauseIn / pauseOut, the letters' drift
 on the way out (a uniform 2 % shrink), the shadow copies of the two text lines, the system font (a Label).
+
+### Pass 60 -- the wall kick's dust, the wall slide's dust, the slide's smoke
+TMario::startJumpWall (MarioJump.cpp 16): emitParticle(PARTICLE_MS_WALLKICK_A, angle) and (_B, angle) at mPosition, angle = the wall
+normal's bearing + 0x8000 (facing into the wall). ms_wallkick_a.jpa: a 15-unit circle, one puff (rate 1 for one frame), omni 13 u/f
+x (1 +- 0.125), airResist 0.9 a frame (130 units in all), life 35 +- 50 %, Billboard 1.8 (90 units) kemuball3 lerp (26,26,2) ->
+(255,255,242), alpha 0.875 out over the last eighth, spin +- 0.125 turns/frame; the 3 u/f downward component is dropped.
+ms_wallkick_b.jpa: a 20-unit circle, eight (rate 8 for one frame), life 6, DirectionCross 0.9 x 1.0 (45 x 50 units) with scale
+X 0.09 -> 0.125, Y 0.07 -> 0.5 over the life, rotation random +- 1 turn and 0.072 +- 1 turns/frame, hitmrk1 lerp (207,207,183) ->
+white, alpha 0.875 (the texture's half-tiling and scroll dropped). TMario::wallSlipEffect (MarioParticle.cpp 309): emitAndBindToPosPtr
+(MARIWALLSL1, &mPosition, 1) each WALL_SLIDE tick with mVel.y < -10 (MarioJump.cpp 623). ms_mariwallsl1.jpa: a 20-unit shell, 0.8 a
+frame, life 60 +- 35 %, up 2 u/f (+- 30 %, spread 0.35), Gravity +0.7 up from 25 %, Drag 0.88 fading in over 34 %, Billboard 1.2 (60
+units), alpha 0.875 -> 0 from 50 %. TMario::frontSlipEffect (326) from the slipping walkProcess (MarioRun.cpp 1102): plain ground ->
+emitAndBindToMtxPtr(SLIPSMOKE, the root joint's matrix, 1). ms_m_slipsmoke.jpa: a 15-unit shell (minRad 0.75) 15 up, 1.5 a frame, life
+50 +- 35 %, thrown 6 u/f behind him (the emitter's (0,0,-1): the game's -Z is his back) and 2.5 up, spread 0.175, Gravity +0.7 up
+fading in over 52 %, Drag 0.88, Billboard 1.2, alpha 0 -> 0.8 by 10 % -> 0 from 50 %. PORT (gen_fx_dust.py -> assets/Sms/Fx/
+WallKickDust.tscn + SmsWallKickDust.cs (a top-level one-shot pair, Play(feet, yaw)), WallSlideDust.tscn + SmsWallSlideDust.cs and
+SlipSmoke.tscn + SmsSlipSmoke.cs (SmsFollowEffect, AtFeet; the smoke TurnWithOwner so it flies behind him), the existing kemuball3 and
+hitmrk1 bakes): DoWallJump and the fence's jump-off play the kick at the feet facing into the wall; TickWallSlide sets the dust's
+Active by the vy rule; the belly slide and the slope slip set the smoke's; the frame's end clears either when its status is gone (the
+emitter invalidated). Jaysonn's SlideDustFx (node + assets/SlideDustFx.cs) is REPLACED. SmsFollowEffect: the owner-frame offsets and
+the new turning follow the ARMATURE (his facing) -- the body never turns since pass 54 -- and AtFeet follows mPosition. NOT PORTED:
+the wet ground's spray (ms_m_watslide_a/b/c), the sand's (ms_m_slidesand_a/b), the puff's downward 3 u/f, the hit marks' texture
+scroll; the airResist brake is a linear one over the same distance.

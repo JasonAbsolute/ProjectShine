@@ -20,8 +20,13 @@ public partial class SmsFollowEffect : Node3D
     /// <summary>False: a pos-ptr bind, the offset in world axes (emitAndBindToPosPtr). True: a matrix bind, the offset in the owner's
     /// frame -- it turns with Mario's yaw (emitAndBindToMtxPtr: the emitter sits in the joint's matrix).</summary>
     [Export] public bool OffsetInOwnerFrame = false;
+    /// <summary>Follow Mario's feet (the game's mPosition) instead of a joint or the body's origin.</summary>
+    [Export] public bool AtFeet = false;
+    /// <summary>Turn this node with his facing (a matrix bind's frame): the emitters' directions follow him.</summary>
+    [Export] public bool TurnWithOwner = false;
 
     private Node3D _owner;
+    private Node3D _frame; // his facing: the Armature (the body stands unrotated since pass 54)
     private Skeleton3D _skeleton;
     private int _bone = -1;
 
@@ -31,9 +36,10 @@ public partial class SmsFollowEffect : Node3D
     public virtual void Bind(Node3D owner)
     {
         _owner = owner;
+        _frame = owner.GetNodeOrNull<Node3D>("Armature") ?? owner;
         _skeleton = owner as Skeleton3D ?? SmsFluddModel.FindChild<Skeleton3D>(owner);
         _bone = _skeleton != null && BoneName != "" ? _skeleton.FindBone(BoneName) : -1;
-        if (_bone < 0)
+        if (_bone < 0 && BoneName != "")
             GD.PushWarning($"[SMS fx] {GetPath()}: no joint '{BoneName}' under {owner.Name} -- following its origin instead (set BoneName on the scene, {SceneFilePath})");
         ProcessPriority = 100; // after the AnimationPlayer and the skeleton modifiers
         Follow();
@@ -47,10 +53,12 @@ public partial class SmsFollowEffect : Node3D
             return;
         Vector3 at = _bone >= 0
             ? _skeleton.GlobalTransform * _skeleton.GetBoneGlobalPose(_bone).Origin
-            : _owner.GlobalPosition;
+            : AtFeet && _owner is Mario feetOf ? feetOf.SmsFeetWorld() : _owner.GlobalPosition;
         Vector3 offset = OffsetUnits * SmsUnits.UnitsToMetres(1f);
         if (OffsetInOwnerFrame)
-            offset = _owner.GlobalBasis.Orthonormalized() * offset;
+            offset = _frame.GlobalBasis.Orthonormalized() * offset;
         GlobalPosition = at + offset;
+        if (TurnWithOwner)
+            GlobalRotation = new Vector3(0f, _frame.GlobalRotation.Y, 0f);
     }
 }
