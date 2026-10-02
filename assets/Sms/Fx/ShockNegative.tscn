@@ -8,7 +8,7 @@ resource_name = "the body's overlay: the damage fog (addDamageFog, (255,0,128) p
 render_priority = 1
 shader = ExtResource("2_shader")
 shader_parameter/fog = 0.0
-shader_parameter/fog_color = Color(1, 0, 0.501961, 1)
+shader_parameter/fog_color = Vector3(1, 0, 0.5)
 shader_parameter/negative = false
 
 [node name="BodyOverlay" type="Node"]
