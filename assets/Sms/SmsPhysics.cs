@@ -100,6 +100,12 @@ public static class SmsParams
         public const float FireDownForce = 50f;         // jump.prm (shipped): FIRE_DOWN's launch vy (the code default 80)
         public const float FireDownControl = 0f;        // jump.prm (shipped): the stick's steer while burning, 0.03125 x mag x this -- none ships (the code default 1.0)
         public const float FireBackVelocity = 8f;       // jump.prm (shipped): FIRE_DOWN arg 0's backward kick (the code default 1.0); the live sources use arg 1
+        // DELIBERATE DEVIATION (Jaysonn, 2026-10-01 21:20 "mario should not be going the direction he's facing, he should go back the way
+        // he was coming from" / "the bounce he takes should be not as much, he travels too much"): the hot floor enters FIRE_DOWN with
+        // the status arg no shipped caller passes -- 0: the -FireBackVelocity kick (8 a tick back along the face, facing the fire, ~1.2 m)
+        // instead of 1's kept run speed (checkGraffitoFire restores mForwardVel after damageExec, MarioMove.cpp 847-854: up to 32 a tick
+        // onward, ~20 m at a sprint; a landing in the fire turns the face and sends him back). The game's value is 1; fire enemies keep it.
+        public const int GraffitoFireStatusArg = 0;
         public const float ValleyDepth = 500f;
         public const float ClashAngle = 12000f;         // BAM
         public const int JumpCatchRotXSp = 150;         // BAM per tick, dive body pitch rate

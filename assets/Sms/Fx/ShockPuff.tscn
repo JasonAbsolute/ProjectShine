@@ -55,8 +55,9 @@ billboard_mode = 3
 billboard_keep_scale = true
 
 [sub_resource type="QuadMesh" id="QuadMesh_smoke"]
+resource_name = "the game's 0.6 billboard (30 units) x 1.25 (SHOCK_PUFF_SCALE: Jaysonn 2026-10-01, slightly bigger; pass 55)"
 material = SubResource("StandardMaterial3D_smoke")
-size = Vector2(0.403, 0.403)
+size = Vector2(0.504, 0.504)
 
 [node name="ShockPuff" type="Node3D" node_paths=PackedStringArray("Smoke")]
 script = ExtResource("1_script")

@@ -3845,3 +3845,22 @@ a level now turns his start facing instead of inverting the controls; the spawne
 Also in this pass: the camera (pass 53) wrote the eye's bearing into the pivot's LOCAL yaw; Mario.cs composes the stick as
 (body basis) x (pivot yaw), so under the 180 the stick ran him toward the camera -- the pivot's yaw is global again (76e19d7).
 Headless: stick up -> velocity . camera-forward +1.00, mesh facing . velocity +1.00, armature -Z . velocity +1.00, body yaw 0.
+
+### Pass 55 -- the fire and the shock after his playtest
+FIRE: the game keeps his run speed through a burn -- checkGraffitoFire saves mForwardVel and mVel.y, makeGraffitoDamage's damageExec
+reverses the speed (the floor actor sits 1 unit in front), then `if (unk55C > 0)` (a constant 50) puts the saved speed back and
+changePlayerStatus(FIRE_DOWN, 1) only sets vy = FireDownForce 50 (MarioMove.cpp 827-856, verified in the asm: the 0xB0 / 0xA8 stores
+after the call); in flight fireDowning() only decays it 0.35 a tick (FConverge is linear), so a sprint (32 a tick) carries ~1460 units,
+~20 m, before the two 0.4x bounces -- the speedrunners' fire boost. A landing back in the fire while still burning turns the face 180
+and sends him back the way he came, which is the "bounce back" of a wide goop patch. Jaysonn wants the first touch to send him back,
+and not far: DEVIATION SmsParams.Jump.GraffitoFireStatusArg = 0 (the game: 1) -- the hot floor enters FIRE_DOWN with the status arg
+no shipped caller passes, whose kick is the designers' own -FireBackVelocity (jump.prm 8): 8 a tick back along the face, facing the
+fire, about 1.2 m, the same vy 50. Fire enemies (ReceiveMsg) keep arg 1 as in the game. FireDamage.tscn: the cloud's ramp x0.8
+(FIRE_SMOKE_DARKEN, "a little darker"). SHOCK: ShockPuff.tscn's quad x1.25 (SHOCK_PUFF_SCALE, "slightly bigger"). THE NEGATIVE: the
+game's TMario::drawSpecial -> drawLogic() (MarioDraw.cpp 2058-2108) draws the body model's two draw buffers again during
+MARIO_STATUS_ELECTRIC_DAMAGE with GX_BM_LOGIC and mBlendLogicOp = 10 = GX_LO_INV (MarioInit.cpp 420) after a colour-off depth pass:
+every pixel the body covers becomes its own inverse, every frame, no flicker (Ref/Electric.png). Ported as assets/Sms/Fx/ShockNegative
+(.tscn + SmsShockNegative.cs + ShockNegative.gdshader): a material overlay on the meshes under Armature (the water gun's subtree
+excluded -- TWaterGun draws its own model) whose shader writes 1 - screen at its pixels; reading the screen puts it in the transparent
+pass over the shaded body at its own depth. On with ELECTRIC_DAMAGE, off at its end, at ELEC_DOWN and at a respawn. The earlier log
+called this "a blue shimmer": wrong -- it is a logic-op inversion.

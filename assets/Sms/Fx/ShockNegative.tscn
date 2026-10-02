@@ -1,0 +1,14 @@
+[gd_scene load_steps=4 format=3 uid="uid://cshockneg00055"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsShockNegative.cs" id="1_script"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/ShockNegative.gdshader" id="2_shader"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_negative"]
+resource_name = "shock's negative (drawLogic: GX_LO_INV over the body model's pixels, every frame of ELECTRIC_DAMAGE)"
+render_priority = 1
+shader = ExtResource("2_shader")
+
+[node name="ShockNegative" type="Node"]
+script = ExtResource("1_script")
+Negative = SubResource("ShaderMaterial_negative")
+ExcludedSubtrees = PackedStringArray("SmsFluddAttach")
