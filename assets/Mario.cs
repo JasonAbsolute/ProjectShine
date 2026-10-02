@@ -1869,6 +1869,7 @@ public partial class Mario : CharacterBody3D
         SetPhysicsProcess(true);
         _camera?.SetProcess(true);
         _camera?.SetPhysicsProcess(true);
+        SmsCameraWarpBehind(); // the game's camera: behind him at the spawn (pass 53)
 
         camera?.MakeCurrent();
     }
@@ -16022,6 +16023,7 @@ public partial class Mario : CharacterBody3D
     {
         SmsFluddOnRespawn(); // a full tank, the drops gone
         SmsYCamReset();      // the rig's camera back, no lock
+        SmsCameraWarpBehind(); // the game's camera starts behind him as a stage load's does (pass 53)
         _health = StartingHealth;
         SmsAirReset();
         _smsSwimAnim = "";

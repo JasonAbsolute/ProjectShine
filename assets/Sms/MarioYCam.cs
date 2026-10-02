@@ -96,7 +96,7 @@ public partial class Mario
     {
         if (!UseSmsPhysics || _ycamPhase != YCamPhase.Off || _ycamLock > 0 || camera == null || _camera == null || armature == null)
             return false;
-        if (_camera.Mode != SunshineCamera.CamMode.Normal && _camera.Mode != SunshineCamera.CamMode.LButton)
+        if (_camera.Mode != SunshineCamera.CamMode.Normal)
             return false;
         if (_smsInWater || _fluddDashing || CameraLocked)
             return false;
@@ -187,7 +187,7 @@ public partial class Mario
         _ycamNeutralTicks = SmsParams.LCamera.NeutralKeyTicks; // onNeutralMarioKey(): the stick that aimed the camera does not launch him
         if (!cut)
             _ycamHoldThisFrame = true; // the press that ended the mode was MEANING_CAM_AB / MEANING_Y: it does not reach his jump or dive this frame
-        _camera?.SmsYCamExit();
+        _camera?.SmsYCamExit(_ycamPos, _ycamAt); // the game's camera blends into its kind from this camera's pose (pass 53)
         if (SmsDebugPrint)
             GD.Print($"[SMS ycam] off ({why}): {(sweep ? $"the {SmsParams.LCamera.InbetLNormal}-tick sweep back" : "a cut")} to the normal camera, behind him; Y again after {SmsParams.LCamera.LockTicks / SmsUnits.TicksPerSecond:F1} s");
     }

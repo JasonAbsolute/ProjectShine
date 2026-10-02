@@ -1,1266 +1,1250 @@
+using System;
 using Godot;
+using Godot.Collections;
 
 /// <summary>
-/// SMS-style follow camera. Polar coordinates around Mario (yaw, pitch, radius)
-/// chased toward per-mode targets each frame. Mirrors the architecture of
-/// CPolarSubCamera in the SMS decomp: mode-based dispatch, separate chase rates
-/// per axis, height pan as its own subsystem, L-button as a sustained mode.
+/// The game's camera: CPolarSubCamera's NORMAL follow camera (pass 53), driven by the disc's kind records (assets/Sms/SmsCameraKinds.cs:
+/// /Camera/kind*.prm and camera_normal.prm). Sources, doldecomp/sms: cameragc.cpp ctrlGameCamera_ 868 / calcPosAndAt_ 464 /
+/// calcFinalPosAndAt_ 828 / calcExternalData_ 857 / rotateX_ByStickY_ 333 / rotateY_ByStickX_ 346 / isMarioReadyGun_ 372 /
+/// calcSlopeAngleX_ 408 / loadAfter 134; CameraNormal.cpp ctrlNormalOrTowerCamera_ 68; CameraHeightPan.cpp; CameraBGCheck.cpp;
+/// CameraInbetween.cpp; CameraKindParam.cpp; CameraSecureView.cpp; CameraChange.cpp execCameraModeChangeProc_ 568 / changeCamModeSub_ 272 /
+/// execFrontRotate_ 447; CameraMarioData.cpp; cameralib.cpp. The decomp's calcPosAndAt_ is NonMatching: against the original asm
+/// (QbeRoot/sms asm/Camera/cameragc.s) the polar solve's stores go to mCurrentTarget.unk18 (the DESIRED eye), mCurrentTarget.mPosition
+/// is the height-PANNED eye whose x / z are copied from unk18 just before execHeightPan_, finalAt.y is mCurrentTarget.mTarget.y
+/// (0x90, after the pan offset -- not unk18.y), and the ratio restored after a wall push is mPreviousTarget.unk28 (0xDC), not unk30.
 ///
-/// Scene hierarchy expected:
-///   SunshineCamera (Node3D, TopLevel = true)  ← this script
-///     SpringArmPivot (Node3D)                  ← rotated for yaw
-///       SpringArm3D                            ← handles wall collision
-///         Camera3D                             ← the actual viewport camera
+/// THE CAMERA RUNS AT 120 Hz (PerformList Movement, CUE_MOVE every simulation tick): every "a frame" rate here is a tick. Mario moves
+/// once a 30 fps frame (CUE_MOVEMENT_GATE_A | B), so the move distances the camera reads are his per-FRAME displacement squared,
+/// clamped 100 (CameraMarioData.cpp 23-45) -- SmsCamMarioData carries them so. Angles are s16 BAM (CLBPolarToCross: the eye at
+/// origin + r (cos v sin h, sin v, cos v cos h); the yaw is the bearing of the eye about the look-at, +Z toward +X, the same convention
+/// MarioYCam.cs validated), distances game units (74.44 a metre) until the apply step.
 ///
-/// Mario is referenced by NodePath. The Armature child is used to read his
-/// facing direction for the auto-behind logic.
+/// The polar rig about the look-at: each tick the look point is Mario's origin + AtOffsetY (+ ratio x XRotRatioAtOffsetY; no head joint);
+/// the pitch ratio unk28 (0..1, the C-stick's Y at 0.01 a tick) picks the pitch, the distance and the look height along the kind's min..max;
+/// the yaw is the C-stick's X at YAngleManualSpeedX a tick, or chases "behind him" (his face - 0x8000) at FollowSpeedX x how far off x the
+/// obstruct / L magnifiers x his move distance; the desired eye is solved about the look point with the cushion rule (a Follow kind keeps
+/// its exact distance; a cushioned kind lets him approach), pulled in by the squat aim's HoldAddDistXZ, panned in Y (the eye rides a slower
+/// Y chase while he is airborne and rising), pushed out of walls (150 u) and up off the ground (144 u, 30 u when squat-aiming), then the
+/// actual eye and look-at chase it at the kind's PosChaseRate / AtChaseRate a tick, the look-at's pitch clamped to +-15872. A kind change
+/// (status -> kind, CameraChange.cpp 656-826) blends the record and sweeps eye and look-at in polar coordinates over the current kind's
+/// Inbet<new> ticks (16 mostly). Not ported, logged: the in-house (OOB) magnifier, the roof check (Monte village only: a dummy roof
+/// everywhere else), the camera cubes / fixed cameras (pass 54: an area's kind by a tag), the notice camera (no bosses), the 0x8000
+/// camera-clip surface flag (every static body clips the camera; the metadata `sms_camera_pass` on a body opts it out), SE 0x4826.
+///
+/// The Y camera (assets/Sms/MarioYCam.cs) is this class's L_NORMAL half on a second Camera3D and keeps its contract: this node sits ON the
+/// look-at (mTarget), the pivot's yaw is the eye's bearing (Mario's stick and MarioYCam read both), and SmsYCamExit hands the pose back
+/// with the game's 16-tick blend from the L camera's record. The scene rig (CamController > SpringArmPivot > SpringArm3D > Camera3D) is
+/// kept; the SpringArm3D no longer processes (it would re-place the camera each physics frame) and the Camera3D is posed directly.
+/// Mode TalkingPOV is Jaysonn's sign-dialogue framing (RedCoinSwitch.cs) and stays his.
 /// </summary>
 public partial class SunshineCamera : Node3D
 {
-    // ============================================================
-    //                       Modes
-    // ============================================================
     public enum CamMode
     {
-        Normal,        // default behind-Mario follower; player has control
-        LButton,       // holding L: strong lock behind Mario, no manual orbit
-        OverShoulder,  // Y button: Mario frozen, tight OTS view, free 360° look
-        Free,          // no auto-behind ever; player owns the camera fully (e.g. cutscene staging)
-        ShineGet,      // shine sprite collect cutscene: fixed low-angle hero shot, no player input
-        TalkingPOV,    // reading a sign / switch dialogue: Mario frozen, held side-on medium shot
+        Normal,      // the game's camera
+        TalkingPOV,  // reading a sign / switch dialogue: Mario frozen, held side-on medium shot (his)
     }
 
     [Export] public CamMode Mode { get; set; } = CamMode.Normal;
 
-    // ============================================================
-    //                       Wiring
-    // ============================================================
+    // ============================================================ wiring (Player.tscn's paths)
     [Export] public NodePath TargetPath = new("..");                    // Mario
-    [Export] public NodePath ArmaturePath = new("../Armature");         // his facing
+    [Export] public NodePath ArmaturePath = new("../Armature");         // his facing, for the TalkingPOV shot
     [Export] public NodePath PivotPath = new("SpringArmPivot");
     [Export] public NodePath SpringArmPath = new("SpringArmPivot/SpringArm3D");
     [Export] public NodePath CameraPath = new("SpringArmPivot/SpringArm3D/Camera3D");
 
-    // ============================================================
-    //                       Input actions
-    // ============================================================
-    [Export] public string RStickLeft  = "Rstick_left";
+    // ============================================================ inputs
+    [Export] public string RStickLeft = "Rstick_left";
     [Export] public string RStickRight = "Rstick_right";
-    [Export] public string RStickUp    = "Rstick_up";
-    [Export] public string RStickDown  = "Rstick_down";
-    [Export] public string LStickLeft  = "Lstick_left";
-    [Export] public string LStickRight = "Lstick_right";
-    [Export] public string LStickUp    = "Lstick_up";
-    [Export] public string LStickDown  = "Lstick_down";
-    [Export] public string LButtonAction = "button_l";   // L (sustained press) → LButton mode
-    [Export] public string CenterAction  = "button_l";   // L tap → also re-centers (SMS dual-purpose)
-    [Export] public string OverShoulderAction = "button_y"; // Y (sustained press) → over-the-shoulder mode
+    [Export] public string RStickUp = "Rstick_up";
+    [Export] public string RStickDown = "Rstick_down";
+    [Export] public string LButtonAction = "button_l";   // MEANING_CAM_L: the press swings the camera behind him (execFrontRotate_)
 
-    // ============================================================
-    //                       Follow / Offset
-    // ============================================================
-    [Export] public Vector3 TargetOffset = new(0f, 1.8f, 0f);   // look-at point above feet (Mario's chest)
-    [Export] public float FollowSmooth = 8f;                     // how fast we lerp toward Mario's world position
+    // ============================================================ the game's camera
+    /// <summary>The stage area's kind (what a camera cube would assign; CameraCodeControl.cpp). FOLLOW is the game's default when no cube
+    /// applies (CameraChange.cpp 823); a Delfino Plaza stage uses DELFINO. Pass 54 will let an Area3D tag override it per area.</summary>
+    [Export] public SmsCamKind DefaultKind = SmsCamKind.Follow;
+    /// <summary>Delfino Plaza (map 7) rules: no SWIMMING / AQUATIC_TURBO kinds there (CameraChange.cpp 675-683).</summary>
+    [Export] public bool DelfinoPlazaRules = false;
+    /// <summary>If your Mario model is authored with a 180 deg forward offset (this one is), so the armature-based facing reads right.</summary>
+    [Export] public bool ArmatureForwardIsFlipped = true;
 
-    // ============================================================
-    //                       Polar limits
-    // ============================================================
-    [Export] public float MinRadius = 3.5f;
-    [Export] public float MaxRadius = 11.0f;
-    [Export] public float BaseRadius = 6.0f;
-
-    [Export] public float MinPitchDeg = -55f;     // looking down at Mario (camera high)
-    /// <summary>Positive = camera below pivot. SMS-style max zoom-in puts the camera at Mario's chest, not below — keep this ~10° to prevent under-Mario framing.</summary>
-    [Export] public float MaxPitchDeg =  10f;
-    [Export] public float DefaultPitchDeg = -18f; // SMS resting angle
-
-    // OverShoulder-only: wider pitch range and tighter radius
-    [Export] public float OverShoulderRadius = 1.4f;
-    [Export] public float OverShoulderMinPitchDeg = -75f;
-    [Export] public float OverShoulderMaxPitchDeg =  70f;
-    /// <summary>Starting pitch when entering OS. Slightly positive = camera at shoulder height looking slightly up. Negative would tilt it down like Normal mode.</summary>
-    [Export] public float OverShoulderDefaultPitchDeg = 5f;
-    /// <summary>Offset relative to Mario's VISUAL local frame: +X = his right, +Y = up, +Z = behind. This keeps the framing consistent as he rotates.</summary>
-    [Export] public Vector3 OverShoulderLocalOffset = new(-0.55f, 1.75f, 0f); // negative X = over LEFT shoulder, Y at shoulder height
-
-    /// <summary>L-stick X rotation speed for turning Mario in place during OS mode (rad/sec at full deflection).</summary>
-    [Export] public float OverShoulderTurnSpeed = 2.4f;
-    /// <summary>L-stick Y pitch speed for OS look up/down.</summary>
-    [Export] public float OverShoulderPitchSpeed = 2.0f;
-
-    // ============================================================
-    //                       ShineGet rail (Path3D)
-    // ============================================================
-    // Choreography mapped frame-by-frame from a full video capture of the
-    // real cutscene (GMSE04_2026-07-21_21-11-35_0.avi, ~10s @60fps):
-    //   1. On grab the camera CUTS to a low shot in front of Mario, roughly
-    //      chest height, close — he reaches out and takes the shine.
-    //   2. It then CRANES UP continuously for the rest of the celebration:
-    //      rising in front of him as he swings the shine and lifts it
-    //      overhead, ending high above, looking down steeply (~40°) with
-    //      Mario small in frame, his shadow below him.
-    //   3. Big "SHINE!" letters slide in from the lower-left ~1.2s after the
-    //      grab and fade before the sequence ends (handled by ShineGetPopup).
-    // Built on Path3D + PathFollow3D: the camera rides a PathFollow3D along
-    // a Curve3D re-authored each grab in Mario-local space, so the same arc
-    // plays out relative to wherever he's standing/facing. The camera is
-    // physically detached from the SpringArm chain for the duration (see
-    // EnterShineGetShot) so nothing fights the rail.
-    //
-    // Frame-by-frame of the video shows the shot STARTS BEHIND Mario:
-    // camera low behind his shoulder, aimed UP over his head at the sky
-    // (Mario is just a corner element in frame), then it swings around his
-    // side to the front — lowering its aim from the sky down to his chest —
-    // landing in the front-low grab shot, and only THEN cranes up.
-    /// <summary>How long the opening behind-the-shoulder shot holds before the swing to front.</summary>
-    [Export] public float ShineGetBehindHoldDuration = 1.2f;
-    /// <summary>How long the swing from behind Mario around to his front takes.</summary>
-    [Export] public float ShineGetSwingDuration = 1.2f;
-    /// <summary>How long the camera holds at the front-low point (the grab beat) before the crane-up.</summary>
-    [Export] public float ShineGetFrontHoldDuration = 0.5f;
-    /// <summary>How long the crane-up from the low front shot to the elevated hero shot takes.</summary>
-    [Export] public float ShineGetRiseDuration = 2.0f;
-    // Rail points in Mario-local space (+X his right, -Z in FRONT of him —
-    // see EnterShineGetShot for why -Z), scaled by _rigScale at build time.
-    // Behind → side → front is the swing; front → mid → end is the crane.
-    // The front/crane points deliberately STAY ~30° off his facing axis on
-    // his left — the reference never squares up dead-front: the grab and the
-    // whole celebration are shot at an angle (Mario three-quarter view,
-    // slightly right of frame center), continuing the direction the swing
-    // came around. He reaches ACROSS with his right hand toward the
-    // camera-side shine, which is why the grab reads so clearly in f0270.
-    // Heights sit at head level for the low beats (user feedback: the low
-    // shots were reading too low/floor-hugging), rising to the overhead end.
-    // Retuned to the video hero pose (f0348/f0420): the camera holds an
-    // ELEVATED FRONT shot looking DOWN ~20° at Mario, moderate distance —
-    // Mario centered ~a third of frame height, floating above the platform
-    // with his shadow, shine up-left. NOT a steep overhead crane.
-    [Export] public Vector3 ShineGetCamBehind = new(-0.35f, 1.05f, 1.9f);
-    [Export] public Vector3 ShineGetCamSide   = new(-1.4f, 1.05f, -0.6f);
-    [Export] public Vector3 ShineGetCamStart  = new(-0.58f, 1.6f, -1.4f);
-    [Export] public Vector3 ShineGetCamMid    = new(-0.5f, 2.15f, -1.5f);
-    [Export] public Vector3 ShineGetCamEnd    = new(-0.45f, 2.7f, -1.6f);
-    /// <summary>Aim point once the camera is in front (and for the whole crane): Mario's chest/upper body, biased slightly to his left so he sits right-of-center in frame (the SHINE! banner owns the lower-left) like the reference.</summary>
-    [Export] public Vector3 ShineGetLookAtOffset = new(-0.15f, 1.3f, 0f);
-    /// <summary>Aim point for the opening behind shot: high, forward, and off to his left so Mario sits in the bottom-RIGHT corner of frame (matches the video) while the camera looks up over his head.</summary>
-    [Export] public Vector3 ShineGetLookAtHighOffset = new(-0.7f, 2.5f, -2.0f);
-    [Export] public float ShineGetEntryDuration = 0.4f;
-    /// <summary>Dutch-tilt roll (degrees) held during the hero pose — the SMS
-    /// shot slopes the horizon up to the right. Ramps in over the crane.</summary>
-    [Export] public float ShineGetRollDeg = 9f;
-
-    // ============================================================
-    //                       TalkingPOV (sign / switch dialogue)
-    // ============================================================
-    // Locked dialogue framing based on the reference: camera sits low on
-    // Mario's left side, looking across him rather than straight at his back.
-    // The negative local Z translation shifts Mario out from behind the banner
-    // into the lower-right of frame while the panel owns the center-left.
+    // ============================================================ TalkingPOV (sign / switch dialogue) -- his shot
     [Export] public Vector3 TalkingPOVLocalOffset = new(-0.60f, 1.20f, -0.10f);
-    /// <summary>Orbit from directly behind Mario toward his left side.</summary>
     [Export] public float TalkingPOVYawOffsetDeg = -32f;
     [Export] public float TalkingPOVPitchDeg = 0f;
     [Export] public float TalkingPOVRadius = 1.0f;
-    /// <summary>Glide duration, in and out — matches OverShoulderEntryDuration's role.</summary>
     [Export] public float TalkingPOVEntryDuration = 0.45f;
+    [Export] public float FollowSmooth = 8f;        // the shot's look-at follow (per second)
+    [Export] public float YawChaseRate = 6f;        // the shot's settled chase rates (per second)
+    [Export] public float PitchChaseRate = 5f;
+    [Export] public float RadiusChaseRate = 6f;
+    [Export] public float YawSnapRate = 18f;        // the shot's entry rates
+    [Export] public float PitchSnapRate = 14f;
+    [Export] public bool AutoScaleToTargetHeight = true;
+    [Export] public float ReferenceTargetHeight = 1.80f;
 
-    private Path3D _shineRail;
-    private PathFollow3D _shineRailFollow;
-    private Vector3 _railLookLow, _railLookHigh;
-    private float _railFrontRatio;
-    private float _shineShotTime;
-    private Node3D _railShineTrack; // the descending shine — aimed at during the behind/swing beats
-
-    /// <summary>Mario's visual facing yaw, exposed so gameplay code (the shine's
-    /// scripted descent) can share the rail's exact facing convention.</summary>
-    public float CurrentVisualYaw => GetVisualYaw();
-
-    /// <summary>How far (radians, signed) the settled front shot sits off Mario's
-    /// ORIGINAL facing — i.e. how much he must turn during the grab beat to end
-    /// up looking straight into the camera for the pose (the reference has him
-    /// facing the lens for the whole celebration). Derived from the rail's
-    /// front point so tuning ShineGetCamStart keeps the turn in sync.</summary>
-    public float ShineGetFrontYawOffset => Mathf.Atan2(-ShineGetCamStart.X, -ShineGetCamStart.Z);
-
-    // Mario body / waist bend while looking down at him (SMS: when the camera goes overhead, Mario tilts his upper body back to look up at it)
-    [Export] public bool   BodyTrackingEnabled = true;
-    [Export] public string BodyBoneName = "chn_chest";     // matches this project's Mario skeleton
-    [Export] public float  BodyBendMaxDeg = 35f;           // how far back he tilts at max look-down
-    /// <summary>Pitch (in degrees, negative = looking down) at which the waist bend STARTS. Below this, Mario bends progressively.</summary>
-    [Export] public float  BodyBendStartPitchDeg = -25f;
-    /// <summary>Pitch at which the bend reaches its maximum. Should be more negative than BodyBendStartPitchDeg.</summary>
-    [Export] public float  BodyBendFullPitchDeg = -65f;
-    [Export] public float  BodyTrackResponse = 10f;
-
-    // ============================================================
-    //                       Chase rates (lerp ratios per second)
-    // ============================================================
-    // current = lerp(current, target, 1 - exp(-rate * dt))
-    [Export] public float YawChaseRate     = 6f;
-    [Export] public float PitchChaseRate   = 5f;
-    [Export] public float RadiusChaseRate  = 6f;
-    [Export] public float YawSnapRate      = 18f; // L-button mode uses a faster chase
-    [Export] public float PitchSnapRate    = 14f;
-    // Over-shoulder mode steady-state rates (faster than Normal so L-stick feels responsive)
-    [Export] public float OverShoulderYawRate    = 8f;
-    [Export] public float OverShoulderPitchRate  = 7f;
-    [Export] public float OverShoulderRadiusRate = 8f;
-    /// <summary>Duration of the entry "swing behind" transition. Snap rates are used during this window.</summary>
-    [Export] public float OverShoulderEntryDuration = 0.35f;
-
-    // ============================================================
-    //                       Input mapping
-    // ============================================================
-    [Export] public float CStickYawSpeed    = 3.2f;   // rad/sec at full deflection
-    [Export] public float CStickPitchSpeed  = 2.4f;   // rad/sec at full deflection (only used when LinkPitchToRadius is OFF)
-    [Export] public float CStickZoomSpeed   = 4.0f;   // radius/sec at full deflection (only used when LinkPitchToRadius is OFF)
-    [Export] public float CStickDeadzone    = 0.18f;
-    /// <summary>SMS-style: stick UP = closer + camera lower (toward Mario's level). Default true matches SMS.</summary>
-    [Export] public bool  CStickYInvertedPitch = true;
-    /// <summary>SMS-style linked zoom: pitch and radius share one "zoom level" curve. Stick Y moves both together. Disable for independent pitch/radius control.</summary>
-    [Export] public bool  LinkPitchToRadius = true;
-    /// <summary>Speed at which the zoom level (0=closest, 1=farthest) changes with full stick Y deflection.</summary>
-    [Export] public float CStickLinkedZoomSpeed = 0.6f;
-
-    // ============================================================
-    //                       Auto-behind
-    // ============================================================
-    [Export] public float AutoBehindDelay         = 0.55f; // seconds of no manual input before auto-behind kicks in
-    [Export] public float AutoBehindMinSpeed      = 0.6f;  // target XZ speed required
-    [Export] public float AutoBehindRate          = 0.8f;  // chase rate toward behind-yaw (gentle)
-    [Export] public float AutoBehindMaxDegPerSec  = 25f;   // hard cap on auto-rotation speed
-    [Export] public bool  AutoBehindOnlyOnFloor   = true;
-
-    /// <summary>Suppress auto-behind when Mario is moving toward the camera. Prevents the camera from flipping around to "follow" backward motion.</summary>
-    [Export] public bool  SuppressWhenApproaching = true;
-    /// <summary>Cone half-angle (degrees) around the camera direction that counts as "approaching".</summary>
-    [Export] public float ApproachConeDeg         = 25f;
-
-    /// <summary>If your Mario model is authored with a 180° forward offset, set true so behind-Mario reads correctly from the armature fallback.</summary>
-    [Export] public bool  ArmatureForwardIsFlipped = true;
-
-    // ============================================================
-    //                       Height pan (separate Y subsystem)
-    // ============================================================
-    [Export] public float HeightPanRate           = 7f;    // how fast the look-at point's Y follows Mario
-    [Export] public float HeightPanLeashUp        = 1.2f;  // tolerated Y offset above before correction speeds up
-    [Export] public float HeightPanLeashDown      = 2.5f;  // tolerated Y offset below
-
-    // ============================================================
-    //                       Recenter (tap L)
-    // ============================================================
-    [Export] public float TapMaxDuration          = 0.18f; // <= this many seconds counts as a tap
-    [Export] public float RecenterRate            = 14f;   // snap-behind speed when tap fires
-
-    // ============================================================
-    //                       Auto-scale to target height
-    // ============================================================
-    [Export] public bool  AutoScaleToTargetHeight = true;
-    [Export] public float ReferenceTargetHeight   = 1.80f;
-
-    // ============================================================
-    //                       Runtime state
-    // ============================================================
+    // ============================================================ nodes
     private Node3D _target;
+    private Mario _mario;
     private Node3D _armature;
     private Node3D _pivot;
     private SpringArm3D _springArm;
     private Camera3D _camera;
-
-    // Polar state (yaw is around Y, pitch is local X on the arm)
-    private float _curYaw, _tgtYaw;
-    private float _curPitch, _tgtPitch;
-    private float _curRadius, _tgtRadius;
-
-    // Look-at world position (lerped follow target). Height is panned separately.
-    private Vector3 _lookAtXZ;
-    private float _lookAtY;
-
-    // Mode bookkeeping
-    private float _camManualTimer = 999f;   // time since last camera (R-stick) input
-    private float _moveNeutralTimer = 999f; // time since last L-stick (movement) input
-
-    // L-button tap detection
-    private float _lButtonHeldTime = -1f;   // -1 = not pressed
-    private bool  _lButtonPressIgnored = false; // this press started in the air: it is the ground pound, not the camera
-
-    // SMS: execFrontRotate_'s yaw swing on the L press (CameraNormal.cpp 79: CLBChaseAngleDecrease a 120 Hz tick)
-    private bool  _smsFrontRotate = false;
-    private int   _smsFrontYawBam = 0, _smsFrontTargetBam = 0;
-    private float _smsCamTickAccum = 0f;
-
     private float _rigScale = 1f;
+    private uint _mask = 1;
+    private Rid _marioRid;
+    private bool _hasMarioRid = false;
+    private readonly CylinderShape3D _wallShape = new CylinderShape3D();
 
-    // ============================================================
-    //                       Setup
-    // ============================================================
+    // ============================================================ the game's state (units, BAM)
+    /// <summary>TTargetCamera (Camera.hpp 26): Pos = mPosition (the panned eye), At = mTarget (the look point), Desired = unk18 (the polar
+    /// solve's eye), Pitch / Yaw = mPitch / mYaw, Ratio = unk28, SavedRatio = unk30.</summary>
+    private struct TargetCam
+    {
+        public Vector3 Pos, At, Desired;
+        public int Pitch, Yaw;
+        public float Ratio, SavedRatio;
+    }
+
+    private TargetCam _cur, _prev;                       // mCurrentTarget / mPreviousTarget
+    private Vector3 _posU, _atU;                         // mPosition / mTarget: the chased camera
+    private Vector3 _viewPosU, _viewAtU;                 // unk124 / unk148: the view after calcFinalPosAndAt_
+    private Vector3 _lookPoint;                          // gpCameraMario->unk0: his origin + the look height
+    private readonly SmsCamKindParam _p = new SmsCamKindParam(); // mCurrentParams
+    private SmsCamKind _mode = SmsCamKind.Follow, _prevMode = SmsCamKind.Follow;
+    private int _flags = 0;                              // unk64
+    private const int FlagPanA = 0x1, FlagPanB = 0x2, FlagFrontRotate = 0x4, FlagFrontY = 0x8, FlagFrontDone = 0x10, FlagFreeze = 0x40, FlagStickYaw = 0x80, FlagCushionFar = 0x100;
+    private int _frontYaw = 0, _frontChase = 0;          // unk274 / unk276
+    private int _groundSkip = 0, _roofSkip = 0, _autoChaseOff = 0; // unk278 / unk27A / unk284
+    private float _autoChase = 1f;                       // unk288
+    private int _slopeX = 0, _addY = 0;                  // unk28C / unk28E
+    private float _secureX = 0f, _secureZ = 0f;          // unk294 / unk298
+    private int _holdAngle = 0;                          // unk2AC->unk0: the squat aim's pitch offset
+    private float _holdDist = 0f, _holdRatio = 0f, _holdTarget = 0f; // unk2AC->unk4 / unk8 / unkC
+    private float _followSpeed = 0f;                     // unk250
+    private int _finalPitch = 0, _finalYaw = 0;          // unk256 / unk258: the actual camera's polar angles
+    private float _finalRatio = 0f;                      // unk270
+    private float _panOffset = 0f;                       // mHeightPanOffset
+    private int _posFreeze = 0, _targetFreeze = 0;       // mPosFreezeFrames / mTargetFreezeFrames
+    private bool _occluded = false;                      // MARIO_FLAG_OCCLUDED: the game peeks the framebuffer at his screen point; here an eye -> Mario ray
+    // TCameraInbetween
+    private int _ibFrames = 0;                           // mFramesRemaining
+    private float _ibPosR = 0f, _ibAtR = 0f;             // unk8 / unk10
+    private int _ibPosPitch = 0, _ibPosYaw = 0, _ibAtPitch = 0, _ibAtYaw = 0; // unkC / unkE / unk14 / unk16
+    private Vector3 _ibPos, _ibAt, _ibMario;             // mPos / mAt / unk30
+    private float _ibApproach = 0f;                      // unk44: the move-approach distance (FIX_G only; always 0 here)
+    // the frame
+    private float _tickAccum = 0f;
+    private float _cx = 0f, _cy = 0f;                    // the C-stick as the game reads it (mCompSPos[6], [7]: right and UP positive)
+    private bool _started = false;
+    private bool _warpRequested = false;
+    private SmsCamMarioData _md;
+    private float _dbgTimer = 0f;
+    // TalkingPOV
+    private float _tkYaw, _tkPitch, _tkRadius, _tkCurYaw, _tkCurPitch, _tkCurRadius, _tkTransition;
+    private Vector3 _tkLookAt;
+
+    private static float U(float m) => m * SmsUnits.UnitsPerMetre;
+    private static Vector3 U(Vector3 m) => m * SmsUnits.UnitsPerMetre;
+    private static float M(float u) => u / SmsUnits.UnitsPerMetre;
+    private static Vector3 M(Vector3 u) => u / SmsUnits.UnitsPerMetre;
+
+    /// <summary>Mario's visual facing yaw (the armature's, with the rig's 180 deg offset): the shine demo and the TalkingPOV shot use it.</summary>
+    public float CurrentVisualYaw => GetVisualYaw();
+
+    // ============================================================ setup
     public override void _Ready()
     {
         TopLevel = true;
-
-        _target    = GetNodeOrNull<Node3D>(TargetPath);
-        _armature  = GetNodeOrNull<Node3D>(ArmaturePath);
-        _pivot     = GetNodeOrNull<Node3D>(PivotPath);
+        _target = GetNodeOrNull<Node3D>(TargetPath);
+        _mario = _target as Mario;
+        _armature = GetNodeOrNull<Node3D>(ArmaturePath);
+        _pivot = GetNodeOrNull<Node3D>(PivotPath);
         _springArm = GetNodeOrNull<SpringArm3D>(SpringArmPath);
-        _camera    = GetNodeOrNull<Camera3D>(CameraPath);
-
-        if (_target == null)    GD.PushError("[SunshineCamera] Target not found.");
-        if (_pivot == null)     GD.PushError("[SunshineCamera] Pivot not found.");
-        if (_springArm == null) GD.PushError("[SunshineCamera] SpringArm not found.");
-
-        if (_springArm != null && _target is CollisionObject3D co)
-            _springArm.AddExcludedObject(co.GetRid());
-
-        // Zero out any stale local transforms on the child rig — they'd offset the
-        // computed camera position weirdly. Pivot/SpringArm/Camera all need to be at
-        // local origin so the polar math is in the same frame.
-        if (_pivot != null)     _pivot.Position = Vector3.Zero;
-        if (_springArm != null) _springArm.Position = Vector3.Zero;
-        if (_camera != null)    _camera.Position = Vector3.Zero;
-
+        _camera = GetNodeOrNull<Camera3D>(CameraPath);
+        if (_target == null) GD.PushError("[SMS camera] Target not found.");
+        if (_mario == null) GD.PushError("[SMS camera] The target is not Mario: the game's camera reads his status.");
+        if (_pivot == null) GD.PushError("[SMS camera] Pivot not found.");
+        if (_springArm == null) GD.PushError("[SMS camera] SpringArm not found.");
+        if (_camera == null) GD.PushError("[SMS camera] Camera3D not found.");
+        if (_springArm != null)
+        {
+            // the arm's own physics step re-placed its children every frame (process_spring); the game's camera is posed here instead
+            _springArm.SetPhysicsProcessInternal(false);
+            _mask = _springArm.CollisionMask;
+            _springArm.Position = Vector3.Zero;
+            _springArm.Rotation = Vector3.Zero;
+        }
+        if (_pivot != null) _pivot.Position = Vector3.Zero;
+        if (_camera != null) { _camera.Position = Vector3.Zero; _camera.Rotation = Vector3.Zero; }
+        if (_target is CollisionObject3D co) { _marioRid = co.GetRid(); _hasMarioRid = true; }
         if (AutoScaleToTargetHeight) RecomputeRigScale();
-
-        GD.Print($"[SunshineCamera] rigScale={_rigScale:F2}  base={BaseRadius * _rigScale:F2}  min={MinRadius * _rigScale:F2}  max={MaxRadius * _rigScale:F2}  targetOffsetY={TargetOffset.Y * _rigScale:F2}");
-
-        // Initialize polar state
-        _curYaw = _tgtYaw = (_pivot != null) ? _pivot.GlobalRotation.Y : 0f;
-        // When linking is on, BaseRadius is the authoritative default — derive pitch from it.
-        // When linking is off, use DefaultPitchDeg + BaseRadius independently.
-        _zoomT = DefaultZoomT;
-        if (LinkPitchToRadius)
-        {
-            _curPitch  = _tgtPitch  = ZoomTtoPitch(_zoomT);
-            _curRadius = _tgtRadius = ZoomTtoRadius(_zoomT);
-        }
-        else
-        {
-            _curPitch  = _tgtPitch  = Mathf.DegToRad(DefaultPitchDeg);
-            _curRadius = _tgtRadius = BaseRadius * _rigScale;
-        }
-
-        // Initialize look-at to Mario's current position so we don't snap in
-        if (_target != null)
-        {
-            Vector3 mp = _target.GlobalPosition + TargetOffset * _rigScale;
-            _lookAtXZ = new Vector3(mp.X, 0f, mp.Z);
-            _lookAtY = mp.Y;
-        }
-
-        ApplyTransform();
-        if (_springArm != null) _springArm.SpringLength = _curRadius;
+        _wallShape.Radius = M(SmsCamNormal.WallCheckRadius);
+        _wallShape.Height = M(20f); // the game's wall record is a horizontal probe at the eye's XZ: a thin disc keeps the floor (144 u down) out of it
+        // the initial pose (loadAfter) is taken on the first physics frame: Mario's own _Ready runs AFTER his children's
     }
 
-    // ============================================================
-    //                       Main update
-    // ============================================================
-    // The ShineGet rail runs at RENDER rate — a hand-authored camera pan
-    // stepped at 60Hz physics reads as stutter on a high-refresh display,
-    // and nothing about the rail needs physics (Mario is frozen and the
-    // descent/turn tweens are idle-processed, so everything advances on the
-    // same clock).
-    public override void _Process(double delta)
-    {
-        if (Mode == CamMode.ShineGet)
-            TickShineGetRail((float)delta);
-    }
-
+    // ============================================================ the frame
     public override void _PhysicsProcess(double delta)
     {
-        if (_target == null || _pivot == null || _springArm == null) return;
-
+        if (_target == null || _camera == null || _pivot == null || _mario == null) return;
         float dt = (float)delta;
-
-        // ShineGet is a rail, not a polar orbit — the camera is physically
-        // detached from the SpringArm chain for this mode (see
-        // EnterShineGetShot), so none of the normal follow/chase/apply
-        // machinery below applies. It's ticked from _Process (render rate)
-        // instead of here: the 60Hz physics step made the authored pans
-        // visibly stutter on high-refresh displays ("rough"), and nothing
-        // about the rail is physics-coupled — Mario is frozen for the
-        // duration. Just bail out so the normal machinery stays off.
-        if (Mode == CamMode.ShineGet)
+        _md = _mario.SmsCameraData(delta);
+        if (!_started)
+        {
+            LoadAfter();
+            _started = true;
+        }
+        if (Mode == CamMode.TalkingPOV)
+        {
+            TickTalking(dt);
             return;
-
-        // 1) Read inputs and update timers
-        Vector2 rstick = ApplyDeadzone(Input.GetVector(RStickLeft, RStickRight, RStickUp, RStickDown), CStickDeadzone);
-        Vector2 lstick = ApplyDeadzone(Input.GetVector(LStickLeft, LStickRight, LStickUp, LStickDown), 0.18f);
-        bool camManual = rstick != Vector2.Zero;
-        bool moving = lstick != Vector2.Zero;
-
-        if (camManual)  _camManualTimer = 0f;   else _camManualTimer  += dt;
-        if (moving)     _moveNeutralTimer = 0f; else _moveNeutralTimer += dt;
-
-        // 2) L-button: detect press/release + tap vs hold
-        UpdateLButtonState(dt);
-
-        // 3) Follow Mario (smoothed look-at)
-        UpdateFollow(dt);
-
-        // 2.5) Y button: enter/exit over-the-shoulder mode (held)
-        UpdateOverShoulderState();
-
-        // 4) Mode dispatch — sets _targetYaw/Pitch/Radius
-        switch (Mode)
-        {
-            case CamMode.Normal:       TickNormal(dt, rstick, lstick, camManual, moving); break;
-            case CamMode.LButton:      TickLButton(dt, lstick, moving);                   break;
-            case CamMode.OverShoulder: TickOverShoulder(dt, rstick, camManual);           break;
-            case CamMode.Free:         TickFree(dt, rstick, camManual);                   break;
-            case CamMode.TalkingPOV:
-                // Refresh exported framing every frame so Remote Inspector tuning
-                // applies immediately while the sign is still open.
-                _tgtYaw    = GetVisualYaw() + Mathf.DegToRad(TalkingPOVYawOffsetDeg);
-                _tgtPitch  = Mathf.DegToRad(TalkingPOVPitchDeg);
-                _tgtRadius = TalkingPOVRadius * _rigScale;
-                break;
-            // ShineGet handled earlier via early-return — never reached here.
         }
-
-        // 5) Chase: advance current toward target
-        ChaseToTargets(dt);
-
-        // 6) Apply
-        ApplyTransform();
-
-        // 7) Mario waist bend (only while looking down at him in OverShoulder)
-        UpdateBodyTracking(dt);
-    }
-
-    // ============================================================
-    //                       Mode: Normal
-    // ============================================================
-    private void TickNormal(float dt, Vector2 rstick, Vector2 lstick, bool camManual, bool moving)
-    {
-        if (camManual)
+        if (_warpRequested || _md.Teleported)
+            WarpBehind();
+        // the C-stick through the pad library (PADClamp's sub-stick region 59 / 31 / 15 and JUTGamePad's 42): mCompSPos[6] = x, [7] = y (up +)
+        Vector2 sub = SmsStick.PadSubStick(Input.GetVector(RStickLeft, RStickRight, RStickUp, RStickDown));
+        _cx = sub.X;
+        _cy = -sub.Y;
+        bool lEdge = InputMap.HasAction(LButtonAction) && Input.IsActionJustPressed(LButtonAction);
+        int n = SmsUnits.TicksFor(delta, ref _tickAccum);
+        for (int i = 0; i < n; i++)
+            Tick(lEdge && i == 0);
+        Apply();
+        if (_md.Debug)
         {
-            if (!_smsFrontRotate) // the game's L swing skips the stick rotate while it runs (CameraNormal.cpp 79 / 98)
-                _tgtYaw -= rstick.X * CStickYawSpeed * dt;
-
-            if (LinkPitchToRadius)
+            _dbgTimer += dt;
+            if (_dbgTimer >= 1f)
             {
-                // SMS-linked zoom: ONE input controls a single zoom level (0..1) that
-                // drives BOTH pitch and radius along a fixed curve. Each pitch has a
-                // matching radius, no drift possible.
-                // Stick UP (rstick.Y < 0) zooms IN → t decreases.
-                _zoomT = Mathf.Clamp(_zoomT + rstick.Y * CStickLinkedZoomSpeed * dt, 0f, 1f);
-                _tgtPitch  = ZoomTtoPitch(_zoomT);
-                _tgtRadius = ZoomTtoRadius(_zoomT);
-            }
-            else
-            {
-                // Independent control (legacy / advanced).
-                float pitchDelta = (CStickYInvertedPitch ? -rstick.Y : rstick.Y);
-                _tgtPitch += pitchDelta * CStickPitchSpeed * dt;
-                _tgtPitch = Mathf.Clamp(_tgtPitch, Mathf.DegToRad(MinPitchDeg), Mathf.DegToRad(MaxPitchDeg));
-
-                _tgtRadius += rstick.Y * CStickZoomSpeed * dt;
-                _tgtRadius = Mathf.Clamp(_tgtRadius, MinRadius * _rigScale, MaxRadius * _rigScale);
+                _dbgTimer = 0f;
+                GD.Print($"[SMS camera] {_mode}{(_ibFrames > 0 ? $" (blend {_ibFrames})" : "")}: yaw {SmsMath.WrapAngle(_finalYaw * SmsUnits.BamToRad) * 180f / MathF.PI:F0} deg, pitch {_finalPitch * 180f / 32768f:F1} deg (ratio {_cur.Ratio:F2}), {(_posU - _atU).Length():F0} u off the look-at, look {_atU.Y - _md.PosU.Y:F0} u over his feet, eye {_posU.Y - _md.PosU.Y:F0} u; fov {_p.Fovy:F0}; stick ({_cx:F2}, {_cy:F2}){(_occluded ? ", occluded" : "")}{((_flags & FlagFrontRotate) != 0 ? ", L swing" : "")}{(_md.ReadyGun ? $", squat aim {_md.AimRatio:F2} hold {_holdDist:F0} u" : "")}");
             }
         }
-
-        // Auto-behind: only while actively moving AND no manual input recently (and not while the game's L swing runs)
-        if (!_smsFrontRotate && moving
-            && _camManualTimer >= AutoBehindDelay
-            && GetTargetSpeedXZ() >= AutoBehindMinSpeed
-            && (!AutoBehindOnlyOnFloor || IsTargetOnFloor())
-            && (!SuppressWhenApproaching || !IsApproachingCamera(lstick)))
-        {
-            float behindYaw = GetBehindYaw();
-            float a = 1f - Mathf.Exp(-AutoBehindRate * dt);
-            float blended = Mathf.LerpAngle(_tgtYaw, behindYaw, a);
-            float maxStep = Mathf.DegToRad(AutoBehindMaxDegPerSec) * dt;
-            _tgtYaw = StepAngle(_tgtYaw, blended, maxStep);
-        }
     }
 
-    // ============================================================
-    //                       Mode: LButton (sustained L hold)
-    // ============================================================
-    private void TickLButton(float dt, Vector2 lstick, bool moving)
+    /// <summary>CPolarSubCamera::loadAfter (cameragc.cpp 134): the kind record, the ratio at XRotStart, the yaw behind him, the eye at
+    /// the kind's near distance about the look point, everything else parked there.</summary>
+    private void LoadAfter()
     {
-        // While L is held, the camera locks behind Mario aggressively.
-        // No manual orbit input is read here — releasing L returns to Normal.
-        float behindYaw = GetBehindYaw();
-        _tgtYaw = behindYaw;
-
-        // Pitch eases back to default and radius eases back to base.
-        _tgtPitch  = Mathf.DegToRad(DefaultPitchDeg);
-        _tgtRadius = BaseRadius * _rigScale;
+        _mode = _prevMode = DefaultKind == SmsCamKind.LNormal ? SmsCamKind.Follow : DefaultKind;
+        _p.CopyFrom(SmsCamKinds.Get(_mode));
+        _cur = default;
+        _cur.Ratio = Mathf.Clamp(SmsCamNormal.XRotStart, 0f, 1f);
+        _cur.SavedRatio = _cur.Ratio;
+        _cur.Yaw = (short)(_md.AngleY - 0x8000);
+        PlaceBehind();
+        if (_md.Debug)
+            GD.Print($"[SMS camera] the game's normal camera: kind {_mode} (/Camera/kind{_mode.ToString().ToLower()}.prm), {SmsCamKinds.Count} kinds carried; {_p.DistMin:F0}..{_p.DistMax:F0} u off the look-at, pitch {_p.XAngleMin * 180f / 32768f:F1}..{_p.XAngleMax * 180f / 32768f:F1} deg, look {_p.AtOffsetY:F0}+{_p.XRotRatioAtOffsetY:F0} u over his feet, fov {_p.Fovy:F0}; the stick turns {_p.YAngleManualSpeedXMin * SmsUnits.TicksPerSecond * 360f / 65536f:F0} deg/s, tilts the range in {1f / (_p.XRotRatioManualSpeed * SmsUnits.TicksPerSecond):F2} s; eye and look-at chase at {_p.PosChaseRateXZ:F2} / {_p.AtChaseRateXZ:F2} a tick");
     }
 
-    // ============================================================
-    //                       Mode: OverShoulder (Y toggled)
-    // ============================================================
-    /// <summary>
-    /// Mario's VISUAL facing yaw (his model's facing direction in world). Accounts
-    /// for the 180° offset some imported rigs have. Use this everywhere instead of
-    /// reading armature.Rotation.Y directly.
-    /// </summary>
+    /// <summary>The eye parked at the kind's polar position about the look point, no lag anywhere (loadAfter's tail; a stage load).</summary>
+    private void PlaceBehind()
+    {
+        _finalRatio = _cur.Ratio;
+        _cur.Pitch = LerpS(_p.XAngleMin, _p.XAngleMax, _cur.Ratio);
+        float yOff = _cur.Ratio * _p.XRotRatioAtOffsetY + _p.AtOffsetY;
+        _lookPoint = _md.PosU + new Vector3(0f, yOff, 0f);
+        _cur.At = _lookPoint;
+        float dist = LerpF(_p.DistMin, _p.DistMax, _cur.Ratio);
+        Vector3 pos = PolarToCross(_cur.At, dist, _cur.Pitch, _cur.Yaw);
+        CalcSecureViewTarget(_cur.Yaw, out _secureX, out _secureZ);
+        pos.X += _secureX; pos.Z += _secureZ;
+        _cur.At.X += _secureX; _cur.At.Z += _secureZ;
+        _cur.Pos = _cur.Desired = pos;
+        _posU = _viewPosU = pos;
+        _atU = _viewAtU = _cur.At;
+        _finalPitch = _cur.Pitch;
+        _finalYaw = _cur.Yaw;
+        _prev = _cur;
+        _ibFrames = 0;
+        _ibApproach = 0f;
+        _ibPos = pos;
+        _ibAt = _cur.At;
+        _ibMario = _md.PosU;
+        IbCalcPolar();
+        _flags = 0;
+        _groundSkip = _roofSkip = _autoChaseOff = 0;
+        _autoChase = 1f;
+        _slopeX = _addY = 0;
+        _panOffset = 0f;
+        _posFreeze = _targetFreeze = 0;
+        HoldReset();
+        _occluded = false;
+        Apply();
+    }
+
+    /// <summary>A respawn / the intro's spawn / a teleport: the game reloads the stage and the camera starts behind him (loadAfter); the
+    /// kind and the ratio are kept.</summary>
+    private void WarpBehind()
+    {
+        _warpRequested = false;
+        _cur.Yaw = (short)(_md.AngleY - 0x8000);
+        PlaceBehind();
+        if (_md.Debug)
+            GD.Print("[SMS camera] warped behind him (a stage load's start)");
+    }
+
+    /// <summary>For Mario: Respawn / RevealFromIntro -- the camera starts behind him as a stage load's does.</summary>
+    public void SmsWarpBehind() => _warpRequested = true;
+
+    /// <summary>The scene takes the frame: this node on the look-at, the pivot's yaw the eye's bearing (Mario's stick direction), the
+    /// Camera3D posed on the view with the kind's fov and near clip.</summary>
+    private void Apply()
+    {
+        Vector3 eyeM = M(_viewPosU), atM = M(_viewAtU);
+        GlobalPosition = M(_atU);
+        _pivot.Rotation = new Vector3(0f, _finalYaw * SmsUnits.BamToRad, 0f);
+        Vector3 dir = atM - eyeM;
+        if (dir.LengthSquared() > 1e-10f)
+        {
+            Vector3 up = MathF.Abs(dir.Normalized().Y) > 0.999f ? _camera.GlobalBasis.Y : Vector3.Up;
+            _camera.GlobalTransform = new Transform3D(Basis.LookingAt(dir, up), eyeM);
+        }
+        _camera.Fov = _p.Fovy;
+        _camera.Near = M(_p.NearClip);
+    }
+
+    // ============================================================ cameralib
+    private static float Sin(int bam) => MathF.Sin(bam * SmsUnits.BamToRad);
+    private static float Cos(int bam) => MathF.Cos(bam * SmsUnits.BamToRad);
+    /// <summary>matan(a, b): the s16 BAM angle whose adjacent is a and opposite b (the decomp's matan(dz, dx) is the bearing from +Z toward +X).</summary>
+    private static int Matan(float a, float b) => (short)(int)MathF.Round(MathF.Atan2(b, a) / SmsUnits.BamToRad);
+    private static int RoundS16(float v) => (short)(int)(v + (v > 0f ? 0.5f : -0.5f)); // CLBRoundf<s16>
+    private static float LerpF(float a, float b, float f) => a + f * (b - a);        // CLBLinearInbetween<f32>
+    private static int LerpS(int a, int b, float f) => (short)(int)(a + f * (b - a)); // CLBLinearInbetween<s16>: the cast truncates
+    private static float CalcRatio(float a, float b, float c) => a != b ? (c - a) / (b - a) : 0f;
+    private static float EaseIn(float a, float b, float t) => a + (b - a) * t * t;   // CLBEaseInInbetween = CLBTwoDegreeGeneralInbetween(a, b, t, b - a)
+
+    /// <summary>CLBPolarToCross: origin + r (cos v sin h, sin v, cos v cos h).</summary>
+    private static Vector3 PolarToCross(Vector3 o, float r, int v, int h)
+        => o + new Vector3(r * Cos(v) * Sin(h), r * Sin(v), r * Cos(v) * Cos(h));
+
+    /// <summary>CLBCrossToPolar: the radius, the elevation and the bearing of p about o.</summary>
+    private static void CrossToPolar(Vector3 o, Vector3 p, out float r, out int pitch, out int yaw)
+    {
+        Vector3 d = p - o;
+        r = d.Length();
+        pitch = Matan(MathF.Sqrt(d.X * d.X + d.Z * d.Z), d.Y);
+        yaw = Matan(d.Z, d.X);
+    }
+
+    /// <summary>CLBChaseDecrease: value closes ratio (at most 1) of its gap; true while more than threshold remains.</summary>
+    private static bool ChaseDecrease(ref float v, float desired, float ratio, float threshold = 0f)
+    {
+        if (ratio > 1f) ratio = 1f;
+        v += ratio * (desired - v);
+        return MathF.Abs(v - desired) > MathF.Abs(threshold);
+    }
+
+    /// <summary>CLBChaseGeneralConstantSpecifySpeed&lt;f32&gt;: a constant step, landing exactly; true while more is needed.</summary>
+    private static bool ChaseConstSpeed(ref float v, float desired, float speed)
+    {
+        float delta = desired - v;
+        if (speed < 0f) speed = -speed;
+        if (delta > 0f) { delta -= speed; v = delta > 0f ? desired - delta : desired; }
+        else { delta += speed; v = delta < 0f ? desired - delta : desired; }
+        return v != desired;
+    }
+
+    /// <summary>CLBChaseGeneralConstantSpecifySpeed&lt;s16&gt;: the same in s16 arithmetic -- the gap wraps, so an angle takes the short way round.</summary>
+    private static bool ChaseConstSpeed(ref int v, int desired, int speed)
+    {
+        int delta = (short)(desired - v);
+        if (speed < 0) speed = -speed;
+        if (delta > 0) { delta -= speed; v = delta > 0 ? (short)(desired - delta) : (short)desired; }
+        else { delta += speed; v = delta < 0 ? (short)(desired - delta) : (short)desired; }
+        return v != (short)desired;
+    }
+
+    /// <summary>CLBChaseSpecialDecrease: a proportional step, never slower than speed.</summary>
+    private static bool ChaseSpecialDecrease(ref float v, float desired, float ratio, float speed)
+    {
+        if (ratio > 1f) ratio = 1f;
+        float actual = ratio * (desired - v);
+        if (MathF.Abs(actual) < MathF.Abs(speed)) actual = speed;
+        return ChaseConstSpeed(ref v, desired, actual);
+    }
+
+    /// <summary>CLBChaseConstantSpecifyFrame&lt;f32&gt;: 1/frames of the gap a call, the last call landing.</summary>
+    private static void ChaseFrame(ref float v, float desired, float frames)
+    {
+        if (frames < 0.001f) { v = desired; return; }
+        v += (1f / frames) * (desired - v);
+    }
+
+    /// <summary>CLBChaseConstantSpecifyFrame(s16*): the same on an angle, rounded, the gap wrapped.</summary>
+    private static void ChaseFrame(ref int v, int desired, float frames)
+    {
+        if (frames < 0.001f) { v = (short)desired; return; }
+        int delta = (short)(desired - v);
+        v = (short)(v + RoundS16((1f / frames) * delta));
+    }
+
+    /// <summary>CLBRevisionLookatByAngleX: the look-at moved so its elevation from the eye stays within the limits.</summary>
+    private static void RevisionLookatByAngleX(int vMin, int vMax, Vector3 origin, ref Vector3 inOut)
+    {
+        CrossToPolar(origin, inOut, out float r, out int v, out int h);
+        v = Mathf.Clamp(v, vMin, vMax);
+        inOut = PolarToCross(origin, r, v, h);
+    }
+
     private float GetVisualYaw()
     {
-        if (_armature == null) return _curYaw;
+        if (_armature == null) return _finalYaw * SmsUnits.BamToRad;
         float y = _armature.GlobalRotation.Y;
         if (ArmatureForwardIsFlipped) y += Mathf.Pi;
         return y;
-    }
-
-    private void TickOverShoulder(float dt, Vector2 rstick, bool camManual)
-    {
-        // OS mode reads the L-stick (movement stick), NOT the R-stick.
-        Vector2 lstick = ApplyDeadzone(
-            Input.GetVector(LStickLeft, LStickRight, LStickUp, LStickDown),
-            0.18f);
-
-        // L-stick X turns Mario's body in place. Direction depends on rig flip:
-        // increasing armature.Y rotates the model one way for an unflipped rig and
-        // the opposite for a flipped one — so the input sign flips too.
-        if (_armature != null && Mathf.Abs(lstick.X) > 0.0001f)
-        {
-            float sign = ArmatureForwardIsFlipped ? +1f : -1f;
-            float dYaw = sign * lstick.X * OverShoulderTurnSpeed * dt;
-            Vector3 r = _armature.Rotation;
-            r.Y += dYaw;
-            _armature.Rotation = r;
-        }
-
-        // L-stick Y tilts the camera pitch (up = look up, down = look down).
-        if (Mathf.Abs(lstick.Y) > 0.0001f)
-        {
-            float pitchDelta = -lstick.Y * OverShoulderPitchSpeed * dt;
-            _tgtPitch += pitchDelta;
-            _tgtPitch = Mathf.Clamp(_tgtPitch,
-                Mathf.DegToRad(OverShoulderMinPitchDeg),
-                Mathf.DegToRad(OverShoulderMaxPitchDeg));
-        }
-
-        // Camera is always locked behind Mario (his current visual facing).
-        _tgtYaw = GetVisualYaw();
-        _tgtRadius = OverShoulderRadius * _rigScale;
-    }
-
-    // ============================================================
-    //                       Mode: ShineGet
-    // ============================================================
-    /// <summary>
-    /// Rides the PathFollow3D along the rail authored in EnterShineGetShot(),
-    /// in four beats matched to the reference video:
-    ///   1. hold BEHIND Mario, aimed high over his head (behind beat);
-    ///   2. swing around his side to the front, aim easing down to his chest;
-    ///   3. hold at the front-low point (grab beat);
-    ///   4. crane up to the high look-down and hold there until the cutscene
-    ///      ends.
-    /// _railFrontRatio marks where the front-low point sits along the curve,
-    /// so the swing sweeps [0.._railFrontRatio] and the crane sweeps the rest.
-    /// </summary>
-    private void TickShineGetRail(float dt)
-    {
-        if (_camera == null || _shineRailFollow == null) return;
-
-        _shineShotTime += dt;
-        float t = _shineShotTime;
-
-        float progress;
-        float aimT; // 0 = high sky aim (behind beat), 1 = chest aim
-        if (t < ShineGetBehindHoldDuration)
-        {
-            progress = 0f;
-            aimT = 0f;
-        }
-        else if (t < ShineGetBehindHoldDuration + ShineGetSwingDuration)
-        {
-            float u = (t - ShineGetBehindHoldDuration) / ShineGetSwingDuration;
-            float e = u * u * (3f - 2f * u);
-            progress = _railFrontRatio * e;
-            aimT = e;
-        }
-        else if (t < ShineGetBehindHoldDuration + ShineGetSwingDuration + ShineGetFrontHoldDuration)
-        {
-            progress = _railFrontRatio;
-            aimT = 1f;
-        }
-        else
-        {
-            float u = Mathf.Clamp(
-                (t - ShineGetBehindHoldDuration - ShineGetSwingDuration - ShineGetFrontHoldDuration) / ShineGetRiseDuration,
-                0f, 1f);
-            float e = u * u * (3f - 2f * u);
-            progress = _railFrontRatio + (1f - _railFrontRatio) * e;
-            aimT = 1f;
-        }
-
-        _shineRailFollow.ProgressRatio = progress;
-        _camera.Position = Vector3.Zero; // stay glued to the follower
-
-        // While the shine is descending (behind + swing beats), aim at IT —
-        // the video's camera visibly tracks the shine down the sky. The lerp
-        // toward the chest aim converges naturally: the shine's descent ends
-        // at his hand right as aimT reaches 1. Falls back to the fixed high
-        // aim if there's no shine to track (or it's already been freed).
-        Vector3 highAim = (_railShineTrack != null && IsInstanceValid(_railShineTrack))
-            ? _railShineTrack.GlobalPosition
-            : _railLookHigh;
-        _camera.LookAt(highAim.Lerp(_railLookLow, aimT), Vector3.Up);
-
-        // Dutch tilt (camera roll) — the SMS shine-get holds a slight roll so
-        // the platform/horizon slopes up to the right, giving it the dynamic
-        // hero feel. Ramp it in with aimT so the behind/swing beats stay level
-        // and the roll is full by the time we're in the front hero shot.
-        if (Mathf.Abs(ShineGetRollDeg) > 0.01f)
-            _camera.RotateObjectLocal(Vector3.Forward, Mathf.DegToRad(ShineGetRollDeg) * aimT);
-    }
-
-    // ============================================================
-    //                       Mode: Free
-    // ============================================================
-    private void TickFree(float dt, Vector2 rstick, bool camManual)
-    {
-        if (camManual)
-        {
-            _tgtYaw   -= rstick.X * CStickYawSpeed * dt;
-            float pitchDelta = (CStickYInvertedPitch ? -rstick.Y : rstick.Y);
-            _tgtPitch += pitchDelta * CStickPitchSpeed * dt;
-            _tgtPitch  = Mathf.Clamp(_tgtPitch, Mathf.DegToRad(MinPitchDeg), Mathf.DegToRad(MaxPitchDeg));
-            _tgtRadius += rstick.Y * CStickZoomSpeed * dt;
-            _tgtRadius  = Mathf.Clamp(_tgtRadius, MinRadius * _rigScale, MaxRadius * _rigScale);
-        }
-    }
-
-    // ============================================================
-    //                       Follow (look-at point)
-    // ============================================================
-    private void UpdateFollow(float dt)
-    {
-        Vector3 offset;
-        if (Mode == CamMode.OverShoulder)
-        {
-            // Mario-LOCAL offset rotated by his VISUAL facing so the shoulder framing
-            // tracks him cleanly as he turns. Uses GetVisualYaw() to handle flipped rigs.
-            offset = OverShoulderLocalOffset.Rotated(Vector3.Up, GetVisualYaw()) * _rigScale;
-        }
-        else if (Mode == CamMode.TalkingPOV)
-        {
-            // Same local-offset-rotated-by-facing treatment as OverShoulder.
-            offset = TalkingPOVLocalOffset.Rotated(Vector3.Up, GetVisualYaw()) * _rigScale;
-        }
-        else
-        {
-            offset = TargetOffset * _rigScale;
-        }
-        Vector3 marioP = _target.GlobalPosition + offset;
-
-        // XZ tracking — smooth follow (Mario can lead briefly when sprinting)
-        float aXZ = 1f - Mathf.Exp(-FollowSmooth * dt);
-        _lookAtXZ = _lookAtXZ.Lerp(new Vector3(marioP.X, 0f, marioP.Z), aXZ);
-
-        // Height pan — separate subsystem with leash-based rate.
-        // When Mario is within the leash, follow gently. When outside, ramp up fast.
-        float dy = marioP.Y - _lookAtY;
-        float leash = dy >= 0f ? HeightPanLeashUp * _rigScale : HeightPanLeashDown * _rigScale;
-        float urgency = Mathf.Clamp(Mathf.Abs(dy) / Mathf.Max(0.01f, leash), 0f, 4f);
-        float effRate = HeightPanRate * (0.5f + 0.5f * urgency);  // double rate at full leash
-        float aY = 1f - Mathf.Exp(-effRate * dt);
-        _lookAtY = Mathf.Lerp(_lookAtY, marioP.Y, aY);
-
-        GlobalPosition = new Vector3(_lookAtXZ.X, _lookAtY, _lookAtXZ.Z);
-    }
-
-    // ============================================================
-    //                       Chase (toward targets)
-    // ============================================================
-    private void ChaseToTargets(float dt)
-    {
-        // Mode transitions (entering OR exiting OS) get a brief snap-rate window
-        // for a graceful sweep into the new framing.
-        bool transitioning = _modeTransitionTimer > 0f;
-        if (transitioning) _modeTransitionTimer -= dt;
-
-        float yawRate, pitchRate, radiusRate;
-        if (transitioning)
-        {
-            yawRate    = YawSnapRate;
-            pitchRate  = PitchSnapRate;
-            radiusRate = PitchSnapRate;
-        }
-        else if (Mode == CamMode.LButton)
-        {
-            yawRate    = YawSnapRate;
-            pitchRate  = PitchSnapRate;
-            radiusRate = RadiusChaseRate;
-        }
-        else if (Mode == CamMode.OverShoulder)
-        {
-            yawRate    = OverShoulderYawRate;
-            pitchRate  = OverShoulderPitchRate;
-            radiusRate = OverShoulderRadiusRate;
-        }
-        else
-        {
-            yawRate    = YawChaseRate;
-            pitchRate  = PitchChaseRate;
-            radiusRate = RadiusChaseRate;
-        }
-
-        _curYaw    = Mathf.LerpAngle(_curYaw, _tgtYaw,   1f - Mathf.Exp(-yawRate    * dt));
-        _curPitch  = Mathf.Lerp     (_curPitch, _tgtPitch, 1f - Mathf.Exp(-pitchRate * dt));
-        _curRadius = Mathf.Lerp     (_curRadius, _tgtRadius, 1f - Mathf.Exp(-radiusRate * dt));
-    }
-
-    // ============================================================
-    //                       Transform application
-    // ============================================================
-    private void ApplyTransform()
-    {
-        _pivot.GlobalRotation = new Vector3(0f, _curYaw, 0f);
-        _springArm.Rotation   = new Vector3(_curPitch, 0f, 0f);
-        _springArm.SpringLength = _curRadius;
-    }
-
-    // ============================================================
-    //                       Y-button over-the-shoulder mode
-    // ============================================================
-    private Skeleton3D _marioSkeleton;
-    private int _bodyBoneIdx = -1;
-    private Quaternion _bodyBonePoseTarget = Quaternion.Identity;
-    private Quaternion _bodyBonePoseCurrent = Quaternion.Identity;
-
-    // Counts down each frame after entering or leaving OS. While > 0, chase uses
-    // snap rates for a graceful sweep. Once 0, the active mode's normal rates resume.
-    private float _modeTransitionTimer = 0f;
-
-    // Normalized 0..1 zoom level — 0 = closest (MinRadius, MaxPitchDeg = level/slight up),
-    // 1 = farthest (MaxRadius, MinPitchDeg = overhead). Used when LinkPitchToRadius is on.
-    private float _zoomT = 0.4f;
-
-    private float ZoomTtoPitch(float t)  => Mathf.Lerp(Mathf.DegToRad(MaxPitchDeg), Mathf.DegToRad(MinPitchDeg), t);
-    private float ZoomTtoRadius(float t) => Mathf.Lerp(MinRadius, MaxRadius, t) * _rigScale;
-    private float DefaultZoomT => Mathf.Clamp(Mathf.InverseLerp(MinRadius, MaxRadius, BaseRadius), 0f, 1f);
-
-    private void UpdateOverShoulderState()
-    {
-        if (string.IsNullOrEmpty(OverShoulderAction) || !InputMap.HasAction(OverShoulderAction))
-            return;
-        // Under SMS physics the Y camera is Mario's (assets/Sms/MarioYCam.cs: the game's CAMERA_MODE_L_NORMAL on a second Camera3D).
-        // This mode's own Y toggle ran underneath it and froze him with CameraLocked: no stick, no FLUDD, no way out (2026-09-28).
-        if (_target is Mario smsMario && smsMario.UseSmsPhysics)
-            return;
-
-        // Toggle: press Y to enter, press Y again to exit.
-        if (Input.IsActionJustPressed(OverShoulderAction))
-        {
-            if (Mode == CamMode.OverShoulder) ExitOverShoulder();
-            else                              EnterOverShoulder();
-        }
-    }
-
-    private void EnterOverShoulder()
-    {
-        Mode = CamMode.OverShoulder;
-        SetMarioLocked(true);
-
-        // Set targets but DO NOT snap _cur values — the chase functions sweep the
-        // camera smoothly behind Mario over the entry duration.
-        _tgtYaw    = GetVisualYaw();
-        _tgtPitch  = Mathf.DegToRad(OverShoulderDefaultPitchDeg);
-        _tgtRadius = OverShoulderRadius * _rigScale;
-        _modeTransitionTimer = OverShoulderEntryDuration;
-
-        // Lazy-resolve the skeleton/waist bone the first time we enter OS mode.
-        if (BodyTrackingEnabled && _marioSkeleton == null && _armature != null)
-        {
-            _marioSkeleton = _armature.GetNodeOrNull<Skeleton3D>("Skeleton3D");
-            if (_marioSkeleton != null)
-            {
-                _bodyBoneIdx = _marioSkeleton.FindBone(BodyBoneName);
-                if (_bodyBoneIdx < 0)
-                    GD.PushWarning($"[SunshineCamera] Waist bone '{BodyBoneName}' not found on Mario skeleton — body tracking disabled. Adjust BodyBoneName in the Inspector.");
-            }
-        }
-    }
-
-    private void ExitOverShoulder()
-    {
-        Mode = CamMode.Normal;
-        SetMarioLocked(false);
-
-        // Reset targets to Normal-mode defaults so the camera sweeps back to a
-        // proper third-person framing (behind Mario, default zoom level).
-        _tgtYaw = GetBehindYaw();
-        if (LinkPitchToRadius)
-        {
-            _zoomT     = DefaultZoomT;
-            _tgtPitch  = ZoomTtoPitch(_zoomT);
-            _tgtRadius = ZoomTtoRadius(_zoomT);
-        }
-        else
-        {
-            _tgtPitch  = Mathf.DegToRad(DefaultPitchDeg);
-            _tgtRadius = BaseRadius * _rigScale;
-        }
-        _modeTransitionTimer = OverShoulderEntryDuration;
-
-        if (_marioSkeleton != null && _bodyBoneIdx >= 0)
-        {
-            _bodyBonePoseTarget  = Quaternion.Identity;
-            _bodyBonePoseCurrent = Quaternion.Identity;
-            _marioSkeleton.SetBonePoseRotation(_bodyBoneIdx, Quaternion.Identity);
-        }
-    }
-
-    /// <summary>The Y camera (MarioYCam.cs) is ending: the game's normal camera resumes with the L camera's yaw -- behind the way he
-    /// now faces -- so this rig snaps its yaw there (pitch and radius keep chasing their own targets) while the Y camera sweeps
-    /// onto this rig's live pose and hands the view back.</summary>
-    public void SmsYCamExit()
-    {
-        _tgtYaw = GetBehindYaw();
-        _curYaw = _tgtYaw;
-        if (LinkPitchToRadius)
-        {
-            _zoomT     = DefaultZoomT;
-            _tgtPitch  = ZoomTtoPitch(_zoomT);
-            _tgtRadius = ZoomTtoRadius(_zoomT);
-        }
-        else
-        {
-            _tgtPitch  = Mathf.DegToRad(DefaultPitchDeg);
-            _tgtRadius = BaseRadius * _rigScale;
-        }
-        ApplyTransform();
-    }
-
-    private void SetMarioLocked(bool locked)
-    {
-        if (_target is Mario mario)
-            mario.CameraLocked = locked;
-    }
-
-    // ============================================================
-    //                       TalkingPOV (sign / switch dialogue)
-    // ============================================================
-    // Driven by gameplay events (e.g. RedCoinSwitch showing its sign), same
-    // calling convention as EnterShineGetShot — not input-detected here.
-    public void EnterTalkingPOV()
-    {
-        Mode = CamMode.TalkingPOV;
-        SetMarioLocked(true);
-
-        // Dialogue owns a dedicated non-controllable Mario state and animation.
-        if (_target is Mario mario)
-            mario.EnterTalkingState();
-
-        _tgtYaw    = GetVisualYaw() + Mathf.DegToRad(TalkingPOVYawOffsetDeg);
-        _tgtPitch  = Mathf.DegToRad(TalkingPOVPitchDeg);
-        _tgtRadius = TalkingPOVRadius * _rigScale;
-        _modeTransitionTimer = TalkingPOVEntryDuration;
-    }
-
-    public void ExitTalkingPOV()
-    {
-        if (Mode != CamMode.TalkingPOV) return;
-        Mode = CamMode.Normal;
-        if (_target is Mario mario)
-            mario.ExitTalkingState();
-        SetMarioLocked(false);
-
-        // Same "return to Normal" reset as ExitOverShoulder — sweep back to a
-        // proper third-person framing behind Mario at the default zoom level.
-        _tgtYaw = GetBehindYaw();
-        if (LinkPitchToRadius)
-        {
-            _zoomT     = DefaultZoomT;
-            _tgtPitch  = ZoomTtoPitch(_zoomT);
-            _tgtRadius = ZoomTtoRadius(_zoomT);
-        }
-        else
-        {
-            _tgtPitch  = Mathf.DegToRad(DefaultPitchDeg);
-            _tgtRadius = BaseRadius * _rigScale;
-        }
-        _modeTransitionTimer = TalkingPOVEntryDuration;
-    }
-
-    // ============================================================
-    //                       Shine Get hero shot
-    // ============================================================
-    // Triggered by Mario.cs (StartShineGet/OnAnimationFinished), not by input
-    // detected here — unlike OverShoulder, this mode is driven by a gameplay
-    // event, not a button. Mario.cs owns CameraLocked for this sequence; this
-    // class only owns the camera's own framing/mode.
-    /// <param name="shineToTrack">The descending shine sprite — the behind/swing
-    /// beats aim at it as it falls (the video's camera visibly follows the
-    /// shine down the sky). Null-safe: falls back to a fixed high aim.</param>
-    public void EnterShineGetShot(Node3D shineToTrack = null)
-    {
-        Mode = CamMode.ShineGet;
-        _shineShotTime = 0f;
-        _railShineTrack = shineToTrack;
-
-        if (_target == null || _camera == null) return;
-
-        // Lazily build the Path3D + PathFollow3D rail nodes. RotationMode is
-        // None because the camera aims itself via LookAt every tick — the
-        // follower only supplies position along the curve.
-        if (_shineRail == null)
-        {
-            _shineRail = new Path3D { Name = "ShineGetRail" };
-            AddChild(_shineRail);
-            _shineRailFollow = new PathFollow3D
-            {
-                Name = "ShineGetRailFollow",
-                RotationMode = PathFollow3D.RotationModeEnum.None,
-                Loop = false,
-            };
-            _shineRail.AddChild(_shineRailFollow);
-        }
-
-        // Pin the rail at Mario's feet, rotated to his visual facing at this
-        // instant — the curve points below are authored in that local space,
-        // so the node's transform does the local→world work for us.
-        // NOTE: -Z is "in front of Mario" in this space, not +Z — empirically
-        // verified: this rig's SpringArm3D pushes the normal follow camera to
-        // local +Z, which GetBehindYaw() confirms sits BEHIND Mario. Positive
-        // Z rail points end up clipped into the back of his head (this bit us
-        // once already — caught via rendered screenshot, not reasoning).
-        float yaw = GetVisualYaw();
-        _shineRail.GlobalTransform = new Transform3D(new Basis(Vector3.Up, yaw), _target.GlobalPosition);
-
-        // Author the full rail fresh each grab: behind → side → front (the
-        // swing around Mario), then front → mid → end (the crane-up). Gentle
-        // in/out handles on the interior points keep the corners smooth as
-        // the follower sweeps through them.
-        Vector3 pBehind = ShineGetCamBehind * _rigScale;
-        Vector3 pSide   = ShineGetCamSide * _rigScale;
-        Vector3 pFront  = ShineGetCamStart * _rigScale;
-        Vector3 pMid    = ShineGetCamMid * _rigScale;
-        Vector3 pEnd    = ShineGetCamEnd * _rigScale;
-        var curve = new Curve3D();
-        curve.AddPoint(pBehind);
-        curve.AddPoint(pSide, (pBehind - pFront) * 0.2f, (pFront - pBehind) * 0.2f);
-        curve.AddPoint(pFront);
-        curve.AddPoint(pMid, (pFront - pEnd) * 0.15f, (pEnd - pFront) * 0.15f);
-        curve.AddPoint(pEnd);
-        _shineRail.Curve = curve;
-
-        // Where along the curve the front-low point sits (0..1) — the swing
-        // phase sweeps up to here, the crane phase covers the rest.
-        float baked = curve.GetBakedLength();
-        _railFrontRatio = baked > 0.001f ? curve.GetClosestOffset(pFront) / baked : 0.5f;
-
-        // Rotated by yaw — the offset has a lateral component now (Mario sits
-        // right-of-center in frame), which is only correct in his local space.
-        _railLookLow  = _target.GlobalPosition + (ShineGetLookAtOffset * _rigScale).Rotated(Vector3.Up, yaw);
-        Vector3 highLocal = new Vector3(ShineGetLookAtHighOffset.X, ShineGetLookAtHighOffset.Y, ShineGetLookAtHighOffset.Z) * _rigScale;
-        _railLookHigh = _target.GlobalPosition + highLocal.Rotated(Vector3.Up, yaw);
-
-        // Detach the camera from the SpringArm chain and put it on the rail.
-        // SpringArm3D does its own internal positioning of what's beneath it
-        // every physics step; leaving the camera parented there while the
-        // rail drives it would fight itself. Reparent(keepGlobal: false)
-        // keeps the OLD local transform, so explicitly zero it to sit
-        // exactly on the follower.
-        _shineRailFollow.ProgressRatio = 0f;
-        _camera.Reparent(_shineRailFollow, false);
-        _camera.Position = Vector3.Zero;
-        // Behind beat aims at the descending shine (already teleported to its
-        // sky start by BeginCollectSequence, which runs before this).
-        Vector3 initialAim = (_railShineTrack != null && IsInstanceValid(_railShineTrack))
-            ? _railShineTrack.GlobalPosition
-            : _railLookHigh;
-        _camera.LookAt(initialAim, Vector3.Up);
-    }
-
-    public void ExitShineGetShot()
-    {
-        if (Mode != CamMode.ShineGet) return;
-        Mode = CamMode.Normal;
-
-        // Re-attach to the SpringArm chain and reset local transform — the
-        // normal polar update resumes driving it from here.
-        if (_camera != null && _springArm != null)
-        {
-            _camera.Reparent(_springArm, false);
-            _camera.Position = Vector3.Zero;
-            _camera.Rotation = Vector3.Zero;
-        }
-
-        // Same "return to Normal" reset as ExitOverShoulder — sweep back to a
-        // proper third-person framing behind Mario at the default zoom level.
-        _tgtYaw = GetBehindYaw();
-        if (LinkPitchToRadius)
-        {
-            _zoomT     = DefaultZoomT;
-            _tgtPitch  = ZoomTtoPitch(_zoomT);
-            _tgtRadius = ZoomTtoRadius(_zoomT);
-        }
-        else
-        {
-            _tgtPitch  = Mathf.DegToRad(DefaultPitchDeg);
-            _tgtRadius = BaseRadius * _rigScale;
-        }
-        _modeTransitionTimer = ShineGetEntryDuration;
-    }
-
-    /// <summary>
-    /// While in OverShoulder mode AND looking down at Mario, bend his waist
-    /// backward so he tilts to look up at the camera. No effect when looking
-    /// forward or up.
-    /// </summary>
-    private void UpdateBodyTracking(float dt)
-    {
-        if (!BodyTrackingEnabled || _marioSkeleton == null || _bodyBoneIdx < 0) return;
-
-        bool osActive = (Mode == CamMode.OverShoulder);
-
-        if (osActive)
-        {
-            // _curPitch < 0 means the camera is ABOVE Mario looking DOWN.
-            float pitchDeg = Mathf.RadToDeg(_curPitch);
-            float t = Mathf.Clamp(
-                Mathf.InverseLerp(BodyBendStartPitchDeg, BodyBendFullPitchDeg, pitchDeg),
-                0f, 1f);
-            float bendDeg = t * BodyBendMaxDeg;
-            // Negative X rotation tilts the upper body BACKWARD (looking up).
-            _bodyBonePoseTarget = new Quaternion(Vector3.Right, Mathf.DegToRad(-bendDeg));
-        }
-        else
-        {
-            _bodyBonePoseTarget = Quaternion.Identity;
-        }
-
-        float a = 1f - Mathf.Exp(-BodyTrackResponse * dt);
-        _bodyBonePoseCurrent = _bodyBonePoseCurrent.Slerp(_bodyBonePoseTarget, a);
-        _marioSkeleton.SetBonePoseRotation(_bodyBoneIdx, _bodyBonePoseCurrent);
-    }
-
-    // ============================================================
-    //                       L-button tap vs hold
-    // ============================================================
-    private void UpdateLButtonState(float dt)
-    {
-        if (string.IsNullOrEmpty(LButtonAction) || !InputMap.HasAction(LButtonAction)) return;
-        if (_target is Mario smsMario && smsMario.UseSmsPhysics)
-        {
-            SmsUpdateFrontRotate(dt, smsMario); // the game's L: a swing behind his face, nothing on the hold
-            return;
-        }
-
-        if (Input.IsActionPressed(LButtonAction))
-        {
-            // Pressed this frame? Start the held timer
-            if (_lButtonHeldTime < 0f)
-            {
-                _lButtonHeldTime = 0f;
-                // L is also the ground pound. A press that starts in the air belongs to the pound, not the camera:
-                // ignore it for the whole press (no tap re-centre on release, no hold mode). Ground or wall: camera.
-                _lButtonPressIgnored = !IsTargetOnGroundOrWall();
-            }
-            else _lButtonHeldTime += dt;
-
-            if (_lButtonPressIgnored) return;
-
-            // If held past tap window, enter LButton mode
-            if (Mode == CamMode.Normal && _lButtonHeldTime > TapMaxDuration)
-                Mode = CamMode.LButton;
-        }
-        else
-        {
-            // Released
-            if (!_lButtonPressIgnored && _lButtonHeldTime >= 0f && _lButtonHeldTime <= TapMaxDuration)
-            {
-                // It was a TAP — instant recenter (snap behind Mario)
-                DoRecenter();
-            }
-            _lButtonHeldTime = -1f;
-            _lButtonPressIgnored = false;
-
-            // Always return to Normal once L is released
-            if (Mode == CamMode.LButton) Mode = CamMode.Normal;
-        }
-    }
-
-    /// <summary>The game's L button (execFrontRotate_, CameraChange.cpp 447): the press -- MEANING_CAM_L's edge -- starts a yaw chase to
-    /// behind his face (*gpMarioAngleY - 0x8000) that ctrlNormalOrTowerCamera_ (CameraNormal.cpp 79) runs with CLBChaseAngleDecrease
-    /// at camera_normal.prm's LButtonRotateChase (10: a tenth of the gap a 120 Hz tick, 180 deg in about 0.4 s; the Y press uses 2),
-    /// skipping the stick rotate and the auto chase meanwhile. Nothing on the hold, nothing on the release, no pitch or zoom reset.
-    /// Refused when the Y camera owns the view (the L camera mode) and when the press is the hip drop (an air press). Under SMS this
-    /// replaces the rig's tap re-centre and held-L lock, which chased "behind" from his VELOCITY -- sideways in the squat's L
-    /// sidestep, so the camera swung to his flank and back with every stick move.</summary>
-    private void SmsUpdateFrontRotate(float dt, Mario mario)
-    {
-        bool pressed = Input.IsActionPressed(LButtonAction);
-        if (pressed)
-        {
-            if (_lButtonHeldTime < 0f)
-            {
-                _lButtonHeldTime = 0f;
-                _lButtonPressIgnored = !IsTargetOnGroundOrWall(); // the hip drop's press
-                if (!_lButtonPressIgnored && !mario.SmsYCamActive && Mode == CamMode.Normal)
-                {
-                    _smsFrontRotate = true;
-                    _smsFrontYawBam = SmsYawBam(_curYaw);
-                    _smsFrontTargetBam = SmsYawBam(GetBehindYaw());
-                    _smsCamTickAccum = 0f;
-                }
-            }
-            else
-                _lButtonHeldTime += dt;
-        }
-        else
-        {
-            _lButtonHeldTime = -1f;
-            _lButtonPressIgnored = false;
-        }
-        if (Mode == CamMode.LButton)
-            Mode = CamMode.Normal; // no held-L mode under SMS
-        if (!_smsFrontRotate)
-            return;
-        if (Mode != CamMode.Normal || mario.SmsYCamActive)
-        {
-            _smsFrontRotate = false; // another camera took the view: the swing is over
-            return;
-        }
-        int n = SmsUnits.TicksFor(dt, ref _smsCamTickAccum);
-        for (int i = 0; i < n && _smsFrontRotate; i++)
-            if (!SmsMath.ChaseAngleDecreaseS16(ref _smsFrontYawBam, _smsFrontTargetBam, SmsParams.LCamera.LButtonRotateChase))
-                _smsFrontRotate = false;
-        _tgtYaw = (short)_smsFrontYawBam * SmsUnits.BamToRad; // mCurrentTarget.mYaw IS the camera's yaw: no second chase on top of it
-        _curYaw = _tgtYaw;
-    }
-
-    private static int SmsYawBam(float yaw) => (short)Mathf.RoundToInt(Mathf.Wrap(yaw, -Mathf.Pi, Mathf.Pi) / SmsUnits.BamToRad);
-
-    private void DoRecenter()
-    {
-        _tgtYaw = GetBehindYaw();
-        if (LinkPitchToRadius)
-        {
-            _zoomT     = DefaultZoomT;
-            _tgtPitch  = ZoomTtoPitch(_zoomT);
-            _tgtRadius = ZoomTtoRadius(_zoomT);
-        }
-        else
-        {
-            _tgtPitch  = Mathf.DegToRad(DefaultPitchDeg);
-            _tgtRadius = BaseRadius * _rigScale;
-        }
-        // Force a fast chase for one frame by overwriting current toward target.
-        _curYaw    = Mathf.LerpAngle(_curYaw,    _tgtYaw,    0.6f);
-        _curPitch  = Mathf.Lerp     (_curPitch,  _tgtPitch,  0.6f);
-        _curRadius = Mathf.Lerp     (_curRadius, _tgtRadius, 0.4f);
-    }
-
-    // ============================================================
-    //                       Helpers
-    // ============================================================
-    private float GetBehindYaw()
-    {
-        // SMS: the game's "behind him" is *gpMarioAngleY - 0x8000, his FACE (mFaceAngle.y) -- never his velocity, which points to his
-        // flank in the squat's L sidestep and drifts in a jump (the held-L lock chased it: the camera swung 90 deg each way on the shimmy)
-        if (_target is Mario sms && sms.SmsBehindYaw(out float behind))
-            return behind;
-        // Prefer VELOCITY (world coords — immune to model facing conventions).
-        if (_target is CharacterBody3D cb)
-        {
-            Vector3 v = cb.Velocity;
-            v.Y = 0f;
-            if (v.LengthSquared() > 0.04f)
-            {
-                v = v.Normalized();
-                // Camera should sit OPPOSITE to where Mario is moving.
-                // Pivot yaw such that SpringArm extends toward -v in world.
-                return Mathf.Atan2(-v.X, -v.Z);
-            }
-        }
-        // Stationary fallback: read armature facing.
-        if (_armature != null)
-        {
-            Vector3 fwd = -_armature.GlobalTransform.Basis.Z;
-            fwd.Y = 0f;
-            if (fwd.LengthSquared() > 0.0001f)
-            {
-                fwd = fwd.Normalized();
-                // Apply 180° correction if the rig was authored with opposite forward.
-                float yaw = Mathf.Atan2(-fwd.X, -fwd.Z);
-                if (ArmatureForwardIsFlipped) yaw += Mathf.Pi;
-                return yaw;
-            }
-        }
-        return _curYaw;
-    }
-
-    /// <summary>
-    /// True if Mario's L-stick input is pushing roughly toward the camera (within
-    /// ApproachConeDeg of the camera-to-Mario direction). Auto-behind is suppressed
-    /// in this case so the camera doesn't spin to chase backward motion.
-    /// </summary>
-    private bool IsApproachingCamera(Vector2 stick)
-    {
-        if (_camera == null || _target == null) return false;
-        if (stick == Vector2.Zero) return false;
-
-        // Convert camera-relative stick to world dir using current yaw.
-        Vector3 stickDirWorld = new Vector3(stick.X, 0f, stick.Y).Rotated(Vector3.Up, _curYaw);
-        stickDirWorld.Y = 0f;
-        if (stickDirWorld.LengthSquared() < 1e-4f) return false;
-        stickDirWorld = stickDirWorld.Normalized();
-
-        // Direction from Mario toward the camera.
-        Vector3 toCam = _camera.GlobalPosition - _target.GlobalPosition;
-        toCam.Y = 0f;
-        if (toCam.LengthSquared() < 1e-4f) return false;
-        toCam = toCam.Normalized();
-
-        return stickDirWorld.Dot(toCam) >= Mathf.Cos(Mathf.DegToRad(ApproachConeDeg));
-    }
-
-    private float GetTargetSpeedXZ()
-    {
-        if (_target is CharacterBody3D cb)
-        {
-            Vector3 v = cb.Velocity;
-            return new Vector2(v.X, v.Z).Length();
-        }
-        return 0f;
-    }
-
-    private bool IsTargetOnFloor()
-        => _target is CharacterBody3D cb && cb.IsOnFloor();
-
-    /// <summary>Where the L button means the camera: on the ground, or pressed against a wall in the wall slide.</summary>
-    private bool IsTargetOnGroundOrWall()
-        => IsTargetOnFloor() || (_target is Mario m && m.stateOfMario == Mario.MarioState.wallSlide);
-
-    private static Vector2 ApplyDeadzone(Vector2 v, float dz)
-    {
-        float len = v.Length();
-        if (len <= dz) return Vector2.Zero;
-        float scaled = (len - dz) / (1f - dz);
-        return (v / len) * scaled;
-    }
-
-    private static float StepAngle(float current, float target, float maxRadStep)
-    {
-        float diff = Mathf.AngleDifference(current, target);
-        diff = Mathf.Clamp(diff, -maxRadStep, maxRadStep);
-        return current + diff;
     }
 
     private void RecomputeRigScale()
     {
         _rigScale = 1f;
         if (_target == null) return;
-
         var cs = _target.GetNodeOrNull<CollisionShape3D>("CollisionShape3D");
         float total = 0f;
-        if (cs?.Shape is CapsuleShape3D cap)
-            total = cap.Height + 2f * cap.Radius; // Height excludes the hemispherical caps
-        else if (cs?.Shape is CylinderShape3D cyl)
-            total = cyl.Height; // flat caps — Height is already the full extent
-
+        if (cs?.Shape is CapsuleShape3D cap) total = cap.Height + 2f * cap.Radius;
+        else if (cs?.Shape is CylinderShape3D cyl) total = cyl.Height;
         if (total > 0.01f)
         {
             float sy = _target.GlobalTransform.Basis.Scale.Y;
-            float h = total * Mathf.Max(0.01f, sy);
-            _rigScale = h / Mathf.Max(0.01f, ReferenceTargetHeight);
+            _rigScale = total * Mathf.Max(0.01f, sy) / Mathf.Max(0.01f, ReferenceTargetHeight);
         }
     }
+
+    // ============================================================ one 120 Hz tick: ctrlGameCamera_ + calcFinalPosAndAt_ + calcExternalData_
+    private void Tick(bool lEdge)
+    {
+        if ((_flags & FlagStickYaw) == 0 && _autoChaseOff > 0) _autoChaseOff--;
+        if (_groundSkip != 0) _groundSkip--;
+        if (_roofSkip != 0) _roofSkip--;
+        // setMarioLookat_ (cameragc.cpp 269): his origin + the kind's look height (+260 on KICK_ROOF_ROLL_UP)
+        float yOff = _cur.Ratio * _p.XRotRatioAtOffsetY + _p.AtOffsetY;
+        if (_md.KickRoofRollUp) yOff += 260f;
+        _lookPoint = _md.PosU + new Vector3(0f, yOff, 0f);
+        _prev = _cur;
+        // controlByCameraCode_ + execCameraModeChangeProc_: only while the game is in play (director state 4), never under a demo's hold
+        if (!_md.Locked)
+            ModeChangeProc(lEdge);
+        // the kind record: the mode's, blended over the inbetween (inbetweenData with the frames remaining)
+        SmsCamKindParam target = SmsCamKinds.Get(_mode);
+        if (_ibFrames > 0) _p.Inbetween(target, _ibFrames);
+        else _p.CopyFrom(target);
+        if (_autoChaseOff > _p.AutoChaseCompleteFrame) _autoChaseOff = _p.AutoChaseCompleteFrame;
+        // occlusion (MARIO_FLAG_OCCLUDED): the game reads the framebuffer at his screen point; a ray from the eye to his waist stands in
+        _occluded = RayHits(M(_posU), M(_md.PosU + new Vector3(0f, 80f, 0f)));
+        CtrlNormal();
+        // calcFinalPosAndAt_ (828): the shake is SmsCameraShake's own pass; the look-at's elevation from the eye clamped to the limits
+        _viewPosU = _posU;
+        _viewAtU = _atU;
+        RevisionLookatByAngleX(SmsCamNormal.LimitMinAngleX, SmsCamNormal.LimitMaxAngleX, _viewPosU, ref _viewAtU);
+        // calcExternalData_ (857): the actual camera's polar angles (unk256 / unk258) and ratio (unk270)
+        CrossToPolar(_atU, _posU, out _, out _finalPitch, out _finalYaw);
+        _finalRatio = Mathf.Clamp(CalcRatio(_p.XAngleMin, _p.XAngleMax, _finalPitch), 0f, 1f);
+    }
+
+    /// <summary>execCameraModeChangeProc_ (CameraChange.cpp 568) as far as the normal camera goes: the L press is execFrontRotate_ (the Y
+    /// press is MarioYCam's: it swings its own camera and runs the L mode); in the L mode the ladder returns; otherwise the status ladder
+    /// (656-826) names the kind and changeCamMode_ blends into it.</summary>
+    private void ModeChangeProc(bool lEdge)
+    {
+        if (lEdge && !_md.YCamActive && !_md.HipDrop && (_md.TouchGround || _md.WallJumpOrSlide))
+            ExecFrontRotate();   // execFrontRotate_ 447: refused in the L camera and the hip drop; an air press is the hip drop's (pass 17's rule)
+        if (_md.YCamActive)
+            return;              // isLButtonCameraSpecifyMode(mMode): the L camera's own exits, the kind holds
+        ChangeMode(SelectKind());
+    }
+
+    /// <summary>The ladder (CameraChange.cpp 656-826) with the stage's area kind as param_1. Of the game's branches, the port has no
+    /// helmet / underground maps, wires, surf, rails, slider / mirror / indoor ground types, bars (CLIMB), held objects, platforms or
+    /// force jumps; those fall through as they would with their flags clear.</summary>
+    private SmsCamKind SelectKind()
+    {
+        bool delfino = DelfinoPlazaRules; // currentMap == 7
+        SmsCamKind area = DefaultKind == SmsCamKind.LNormal ? SmsCamKind.Follow : DefaultKind;
+        if (_md.Dashing)
+            return !delfino && (_md.Swimming || _md.SwimJump) ? SmsCamKind.AquaticTurbo : SmsCamKind.Turbo;
+        if (!delfino && _md.Swimming)
+            return SmsCamKind.Swimming;
+        if (_md.FenceFamily)
+            return SmsCamKind.Fence;
+        if (_md.Rocketing)
+            return _md.HoverNozzle ? SmsCamKind.Hovering : SmsCamKind.RocketJump;
+        if (_md.RoofFamily && !_md.KickRoofRollUp)
+            return SmsCamKind.Hang;
+        if (_md.HipDrop)
+            return IsOverHipAttackKind(area) ? area : SmsCamKind.HipAttack;
+        if (area != SmsCamKind.Follow)
+            return area;   // a valid non-follow area kind beats the wall jump and the climb (785-787)
+        if (_md.WallJumpOrSlide)
+            return SmsCamKind.WallJump;
+        return SmsCamKind.Follow;
+    }
+
+    /// <summary>isOverHipAttackSpecifyMode: the area kinds that keep showing through a hip drop (of the kinds carried: Indoor, Delfino, LookDown).</summary>
+    private static bool IsOverHipAttackKind(SmsCamKind k) => k == SmsCamKind.Indoor || k == SmsCamKind.Delfino || k == SmsCamKind.LookDown;
+
+    /// <summary>changeCamMode_ -> changeCamModeSpecifyFrame_ -> changeCamModeSub_ (CameraChange.cpp 272): the blend's length is the CURRENT
+    /// kind's Inbet&lt;new&gt; (0 -> 1), the inbetween starts from the current pose, the freeze counters and the move approach clear, the height
+    /// pan dies for the kinds without one (and leaving HANG), the squat-aim hold resets.</summary>
+    private void ChangeMode(SmsCamKind to)
+    {
+        if (to == _mode) return;
+        int frames = SmsCamKinds.InbetFrames(_mode, to);
+        if (frames < 0) return;
+        if (frames == 0) frames = 1;
+        _prevMode = _mode;
+        IbStart(frames);
+        _mode = to;
+        _posFreeze = _targetFreeze = 0;
+        _ibApproach = 0f;   // offMoveApproach_ (the FIX_G exception has no fixed cameras to come from here)
+        KillHeightPanWhenChangeCamMode();
+        HoldReset();
+        if (_md.Debug)
+            GD.Print($"[SMS camera] kind {_prevMode} -> {_mode} over {frames} ticks");
+    }
+
+    /// <summary>execFrontRotate_ (CameraChange.cpp 447) for MEANING_CAM_L: the yaw chases behind his face at LButtonRotateChase (10: a tenth
+    /// of the gap a tick) with the eye following at once (chaseXZ 1 under the flag), the stick and the auto chase skipped meanwhile. The Y
+    /// variant (chase 2 then the L camera) is MarioYCam's. SE 0x4826 not ported.</summary>
+    private void ExecFrontRotate()
+    {
+        _flags &= ~FlagFrontDone;
+        _flags |= FlagFrontRotate;
+        _flags &= ~FlagFrontY;
+        _frontYaw = (short)(_md.AngleY - 0x8000);
+        _frontChase = SmsCamNormal.LButtonRotateChase;
+    }
+
+    private void HoldReset()
+    {
+        _holdAngle = 0;
+        _holdDist = _holdRatio = _holdTarget = 0f;
+    }
+
+    // ============================================================ TCameraInbetween (CameraInbetween.cpp)
+    private void IbCalcPolar()
+    {
+        CrossToPolar(_ibAt, _ibPos, out _ibPosR, out _ibPosPitch, out _ibPosYaw);
+        CrossToPolar(_ibMario, _ibAt, out _ibAtR, out _ibAtPitch, out _ibAtYaw);
+    }
+
+    /// <summary>startCameraInbetween: the sweep starts from the current inbetween pose.</summary>
+    private void IbStart(int frames)
+    {
+        _ibFrames = frames;
+        IbCalcPolar();
+    }
+
+    /// <summary>warpPosAndAt.</summary>
+    private void IbWarp(Vector3 pos, Vector3 at)
+    {
+        _ibPos = pos;
+        _ibAt = at;
+        IbCalcPolar();
+    }
+
+    /// <summary>execCameraInbetween: the pose IS the target; while frames remain, the look-at's polar coordinates about Mario and the eye's
+    /// about the look-at each close 1/remaining of their gap a tick (the look-at's height is the target's at once).</summary>
+    private void IbExec(Vector3 pos, Vector3 at, Vector3 mario)
+    {
+        _ibPos = pos;
+        _ibAt = at;
+        if (_ibFrames > 0)
+        {
+            float rem = _ibFrames;
+            if (_ibApproach != 0f)
+                ChaseFrame(ref _ibApproach, 0f, rem);
+            CrossToPolar(mario, at, out float ar, out int ap, out int ay);
+            ChaseFrame(ref _ibAtR, ar, rem);
+            ChaseFrame(ref _ibAtPitch, ap, rem);
+            ChaseFrame(ref _ibAtYaw, ay, rem);
+            if (MathF.Abs(mario.X - at.X) > 0.1f || MathF.Abs(mario.Z - at.Z) > 0.1f)
+            {
+                Vector3 tmp = PolarToCross(mario, _ibAtR, _ibAtPitch, _ibAtYaw);
+                _ibAt.X = tmp.X;
+                _ibAt.Z = tmp.Z;
+            }
+            CrossToPolar(_ibAt, pos, out float pr, out int pp, out int py);
+            ChaseFrame(ref _ibPosR, pr, rem);
+            ChaseFrame(ref _ibPosPitch, pp, rem);
+            ChaseFrame(ref _ibPosYaw, py, rem);
+            _ibPos = PolarToCross(_ibAt, _ibPosR, _ibPosPitch, _ibPosYaw);
+            _ibFrames--;
+        }
+        _ibMario = mario;
+    }
+
+    private bool IsNormalCompletely() => SmsCamKinds.IsNormalClass(_mode) && (_ibFrames == 0 || SmsCamKinds.IsNormalClass(_prevMode));
+
+    /// <summary>isNotHeightPanCamMode_ (Camera.hpp 215) for the kinds carried.</summary>
+    private static bool IsNotHeightPanKind(SmsCamKind k)
+        => k == SmsCamKind.LNormal || k == SmsCamKind.Hang || k == SmsCamKind.Hovering || k == SmsCamKind.Swimming || k == SmsCamKind.LookDown;
+
+    /// <summary>isSlopeCameraMode (CameraMode.cpp 307) for the kinds carried.</summary>
+    private static bool IsSlopeKind(SmsCamKind k)
+        => k == SmsCamKind.Follow || k == SmsCamKind.HipAttack || k == SmsCamKind.Indoor || k == SmsCamKind.Delfino || k == SmsCamKind.Turbo;
+
+    // ============================================================ ctrlNormalOrTowerCamera_ (CameraNormal.cpp 68)
+    private void CtrlNormal()
+    {
+        float cx = _cx, cy = _cy;
+        _followSpeed = 0f;
+        if (_targetFreeze == 0)
+            _cur.At = _lookPoint;
+        if (_posFreeze == 0)
+        {
+            if ((_flags & FlagFrontRotate) != 0)
+            {
+                // the L (or Y) swing: the yaw closes 1/chase of its gap to behind him each tick; done -> the Y path arms the L camera (not here)
+                if (!SmsMath.ChaseAngleDecreaseS16(ref _cur.Yaw, _frontYaw, _frontChase))
+                {
+                    _flags &= ~FlagFrontRotate;
+                    if ((_flags & FlagFrontY) != 0) { _flags &= ~FlagFrontY; _flags |= FlagFrontDone; }
+                }
+            }
+            else if (cx != 0f)
+            {
+                RotateYByStickX(cx);
+                _autoChaseOff = _p.AutoChaseCompleteFrame; // execInvalidAutoChase_
+            }
+            else
+            {
+                _followSpeed = _md.TouchGround
+                    ? LerpF(_p.FollowSpeedXmin, _p.FollowSpeedXmax, _cur.Ratio)
+                    : LerpF(_p.JumpFollowSpeedXmin, _p.JumpFollowSpeedXmax, _cur.Ratio);
+                if (IsMomentDefinite())
+                {
+                    // a cushioned kind while he approaches: the eye holds its place, the yaw is wherever it already sits about the new look point
+                    _cur.Yaw = Matan(_prev.Pos.Z - _cur.At.Z, _prev.Pos.X - _cur.At.X);
+                }
+                else if ((_flags & FlagStickYaw) == 0 && !(_md.ReadyGun && _md.CamL)) // isMarioCrabWalk_: the squat's L sidestep holds the yaw
+                {
+                    int behind = (short)(_md.AngleY - 0x8000);
+                    if (_md.ReadyGun && _md.AimR)
+                    {
+                        // isMarioAimWithGun_: the squat aim chases behind him at a rate eased from AimAngleYChaseMin (60) at ratio 0
+                        if (_autoChase != 0f)
+                        {
+                            float f = EaseIn(0f, 1f, _cur.Ratio);
+                            int speed = (short)(int)EaseIn(SmsCamNormal.AimAngleYChaseMin, SmsCamNormal.AimAngleYChaseMax, f);
+                            SmsMath.ChaseAngleDecreaseS16(ref _cur.Yaw, behind, speed);
+                        }
+                    }
+                    else
+                    {
+                        // the auto follow: speed x how far off (HOVERING: linear; else (1 - cos 2d) / 2) x the magnifiers x his move x the ramp
+                        float f30 = _mode == SmsCamKind.Hovering
+                            ? MathF.Abs((short)(behind - _finalYaw)) * (2f / 65536f)
+                            : (1f - Cos((short)((behind - _finalYaw) * 2))) * 0.5f;
+                        float f29 = 1f; // the in-house (OOB) magnifier is not modelled: unk2CA stays -1
+                        if (_occluded)
+                            f29 = LerpF(_p.ObstructMaginfXmin, _p.ObstructMaginfXmax, _cur.Ratio);
+                        if (_md.CamL)
+                            f29 *= LerpF(_p.LFollowMaginfXmin, _p.LFollowMaginfXmax, _cur.Ratio);
+                        float f4 = _mode == SmsCamKind.Hovering ? 100f : _md.MoveH;
+                        float kek = _followSpeed * f30 * f29 * f4 * _autoChase;
+                        if (kek > 32766.998f) kek = 32766.998f;
+                        ChaseConstSpeed(ref _cur.Yaw, behind, RoundS16(kek));
+                    }
+                }
+            }
+            RotateXByStickY(cy);
+        }
+        CalcPosAndAt();
+    }
+
+    /// <summary>rotateY_ByStickX_ (cameragc.cpp 346): the stick times the kind's manual yaw speed, as an s16.</summary>
+    private void RotateYByStickX(float stickX)
+    {
+        int thing = (short)(int)(stickX * LerpS(_p.YAngleManualSpeedXMin, _p.YAngleManualSpeedXMax, _cur.Ratio));
+        _cur.Yaw = (short)(_cur.Yaw + thing);
+    }
+
+    /// <summary>rotateX_ByStickY_ (333): the ratio moves against the stick (up = a lower, nearer camera), clamped 0..1.</summary>
+    private void RotateXByStickY(float stickY)
+    {
+        _cur.Ratio = Mathf.Clamp(_cur.Ratio - stickY * _p.XRotRatioManualSpeed, 0f, 1f);
+    }
+
+    /// <summary>isMomentDefinite_ (396): a cushioned kind, auto-following, with the eye not already beyond its distance.</summary>
+    private bool IsMomentDefinite()
+        => (_flags & FlagCushionFar) == 0 && IsNormalCompletely() && _followSpeed > 0.001f
+           && LerpF(_p.CushionMin, _p.CushionMax, _cur.Ratio) > 0.001f;
+
+    // ============================================================ calcPosAndAt_ (cameragc.cpp 464), the normal-class branch
+    private void CalcPosAndAt()
+    {
+        if (_md.MoveH >= 0.05f) _flags &= ~FlagStickYaw;
+        if ((_flags & FlagStickYaw) == 0)
+        {
+            if (_autoChaseOff > 0)
+            {
+                int acf = _p.AutoChaseCompleteFrame, acs = _p.AutoChaseStartFrame;
+                int delta = acf - _autoChaseOff + 1;
+                _autoChase = delta <= acs ? 0f : CalcRatio(acs, acf, delta);
+            }
+            else _autoChase = 1f;
+        }
+        // the squat aim's hold: a pitch offset (unk0) and an extra distance (unk4) both chased toward the aim ratio's share of the kind's
+        // manual yaw speed and HoldAddDistXZ; unk8 is the smoothed 0..1 "how much aim" the ground check reads
+        int yawDelta = 0;
+        float distDelta = 0f;
+        int yawSpeed = LerpS(_p.YAngleManualSpeedXMin, _p.YAngleManualSpeedXMax, _cur.Ratio);
+        float distSpeed = LerpF(_p.HoldAddDistXZMin, _p.HoldAddDistXZMax, _cur.Ratio);
+        if (SmsCamKinds.IsNormalClass(_mode) && _md.ReadyGun)
+        {
+            float mag = _md.AimRatio;
+            distDelta = mag * distSpeed;
+            yawDelta = (short)(int)(mag * yawSpeed);
+        }
+        SmsMath.ChaseAngleDecreaseS16(ref _holdAngle, yawDelta, SmsCamNormal.AimAngleYChaseMin);
+        ChaseDecrease(ref _holdDist, distDelta, SmsCamNormal.HoldDistChase);
+        if (distSpeed < 0.001f)
+        {
+            if (yawSpeed != 0)
+                _holdTarget = Mathf.Clamp(MathF.Abs(yawDelta) / (float)MathF.Abs(yawSpeed), 0f, 1f);
+        }
+        else _holdTarget = Mathf.Clamp(distDelta / distSpeed, 0f, 1f);
+        ChaseDecrease(ref _holdRatio, _holdTarget, SmsCamNormal.HoldDistChase);
+
+        _flags &= ~FlagCushionFar;
+        if (_posFreeze != 0) _posFreeze--;
+        if (_targetFreeze != 0) _targetFreeze--;
+        bool moving = _md.MoveH >= 0.05f || _md.MoveV >= 0.05f;
+        bool inputActive = true;
+        if (!_md.ReadyGun && (_flags & FlagFrontRotate) == 0)
+            inputActive = _cx != 0f || _cy != 0f;
+        if ((_flags & FlagFreeze) != 0)
+        {
+            if (_posFreeze == 0) _posFreeze = 1;
+            if (_targetFreeze == 0) _targetFreeze = 1;
+        }
+        else if (moving || inputActive)
+        {
+            _targetFreeze = 0;
+            _posFreeze = 0;
+        }
+
+        if (_posFreeze == 0 || _targetFreeze == 0)
+        {
+            if (_posFreeze == 0 && _targetFreeze == 0) _flags &= ~FlagFreeze;
+            if (_ibApproach == 0f || moving || inputActive)
+            {
+                _cur.Pitch = LerpS(_p.XAngleMin, _p.XAngleMax, _cur.Ratio);
+                int xAngle = (short)(_cur.Pitch + _p.OffsetAngleX + _holdAngle);
+                int yAngle = (short)(_cur.Yaw + _p.OffsetAngleY);
+                if (_md.MoveH >= 0.05f)
+                {
+                    // MaxAddAngleY: the extra swing toward his facing while he moves (0 in every kind carried)
+                    int mAngle = (short)(_md.AngleY - 0x8000);
+                    float m = Mathf.Clamp(_p.MaxAddAngleY * (0.5f * (1f - Cos((short)((mAngle - _finalYaw) * 2)))), -32766.998f, 32766.998f);
+                    if ((short)(mAngle - yAngle) < 0) m = -m;
+                    ChaseConstSpeed(ref _addY, RoundS16(m), SmsCamNormal.AddAngleYSpeed);
+                }
+                yAngle = (short)(yAngle + _addY);
+                CalcSlopeAngleX(ref xAngle);
+                Vector3 finalAt = new Vector3(
+                    -(_p.OffsetLookatXZ * Sin((short)(yAngle - 0x4000)) - _cur.At.X),
+                    _cur.At.Y,
+                    -(_p.OffsetLookatXZ * Cos((short)(yAngle - 0x4000)) - _cur.At.Z));
+                ExecSecureView(yAngle, ref finalAt);
+                Vector3 saveAt = finalAt;
+                float dist = LerpF(_p.DistMin, _p.DistMax, _cur.Ratio);
+                int cushAng = LerpS(_p.XAngleMin, _p.XAngleMax, _cur.Ratio);
+                float cushion = Cos(cushAng);
+                Vector3 newPos = PolarToCross(saveAt, dist + _ibApproach, xAngle, yAngle);
+                if (IsNormalCompletely())
+                {
+                    // the cushion rule about the previous (panned) eye with the previous DESIRED height
+                    Vector3 bas = _prev.Pos;
+                    bas.Y = _prev.Desired.Y;
+                    CrossToPolar(saveAt, bas, out float nDist, out int nVA, out int nHA);
+                    float cushDist = cushion * nDist;
+                    if (cushDist > cushion * dist)
+                    {
+                        _flags |= FlagCushionFar;   // farther than the kind's distance: snap to it
+                        _cur.Desired = newPos;
+                    }
+                    else
+                    {
+                        float minDist = cushion * (dist - LerpF(_p.CushionMin, _p.CushionMax, _cur.Ratio));
+                        if (minDist < SmsCamNormal.MinCushionXZ) minDist = SmsCamNormal.MinCushionXZ;
+                        if (cushDist < minDist)
+                        {
+                            float diff = minDist - cushDist;
+                            bas.X += diff * Sin(nHA);
+                            bas.Z += diff * Cos(nHA);
+                            CrossToPolar(saveAt, bas, out nDist, out nVA, out nHA);
+                        }
+                        bool useMid = (_flags & FlagCushionFar) == 0 && IsNormalCompletely() && _followSpeed > 0.001f
+                                      && LerpF(_p.CushionMin, _p.CushionMax, _cur.Ratio) > 0.001f;
+                        _cur.Desired = useMid ? bas : PolarToCross(saveAt, nDist, nVA, yAngle);
+                        _cur.Desired.Y = newPos.Y;
+                    }
+                }
+                else _cur.Desired = newPos;
+                float sY = Sin(yAngle), cY = Cos(yAngle);
+                {
+                    // never nearer his origin (horizontally) than the kind's distance, nor MinCushionXZ (300)
+                    float dx = _md.PosU.X - _cur.Desired.X, dz = _md.PosU.Z - _cur.Desired.Z;
+                    float d = MathF.Sqrt(dx * dx + dz * dz);
+                    float mD2 = SmsCamNormal.MinCushionXZ < dist * cushion ? dist * cushion : SmsCamNormal.MinCushionXZ;
+                    if (d < mD2)
+                    {
+                        float add = mD2 - d;
+                        _cur.Desired.X += sY * add;
+                        _cur.Desired.Z += cY * add;
+                    }
+                }
+                // the squat aim's hold distance pulls the eye in along the bearing (not under ground)
+                _cur.Desired.X = -(_holdDist * sY - _cur.Desired.X);
+                _cur.Desired.Z = -(_holdDist * cY - _cur.Desired.Z);
+                if (_ibApproach != 0f && inputActive)
+                    IbWarp(PolarToCross(_ibAt, LerpF(_p.DistMin, _p.DistMax, _cur.Ratio) + _ibApproach, xAngle, yAngle), _ibAt);
+                // mCurrentTarget.mPosition.xz = unk18.xz (asm: 0x98 -> 0x80, 0xA0 -> 0x88); its y is the height pan's
+                _cur.Pos.X = _cur.Desired.X;
+                _cur.Pos.Z = _cur.Desired.Z;
+                ExecHeightPan();
+                finalAt.Y = _cur.At.Y;   // asm: lfs 0x90 = mCurrentTarget.mTarget.y after the pan offset (the decomp's unk18.y is a mislabel)
+                Vector3 posCpy = _cur.Pos;
+                if (NeedWallCheck() && ExecWallCheck(ref posCpy))
+                {
+                    CrossToPolar(_cur.At, _cur.Pos, out _, out _cur.Pitch, out _cur.Yaw);
+                    _cur.Ratio = _prev.Ratio;   // asm: 0xDC = mPreviousTarget.unk28 (the decomp's unk30 is a mislabel)
+                }
+                // isNeedRoofCheck_ / execRoofCheck_: Monte village only -- everywhere else the game uses a dummy roof and skips; not ported
+                if (NeedGroundCheck())
+                    ExecGroundCheck(posCpy);
+                IbExec(_cur.Pos, finalAt, _md.PosU);
+            }
+        }
+
+        // the chase tail: the actual camera toward the inbetween's pose
+        if (_posFreeze == 0)
+        {
+            float chaseXZ = _p.PosChaseRateXZ, chaseY = _p.PosChaseRateY;
+            if ((_flags & FlagFrontRotate) != 0)
+                chaseXZ = 1f;
+            else if (_cx != 0f || _cy != 0f)
+            {
+                float v = MathF.Min(_md.MoveH, 20f);
+                chaseXZ = EaseIn(_p.PosChaseRateXZ, _p.PosChaseRateXZ_C, CalcRatio(20f, 0f, v));
+            }
+            if (_cx != 0f)
+            {
+                float v = MathF.Min(_md.MoveV, 20f);
+                chaseY = EaseIn(_p.PosChaseRateY, _p.PosChaseRateY_C, CalcRatio(20f, 0f, v));
+            }
+            ChaseDecrease(ref _posU.X, _ibPos.X, chaseXZ);
+            ChaseDecrease(ref _posU.Y, _ibPos.Y, chaseY);
+            ChaseDecrease(ref _posU.Z, _ibPos.Z, chaseXZ);
+        }
+        if (_targetFreeze == 0)
+        {
+            ChaseDecrease(ref _atU.X, _ibAt.X, _p.AtChaseRateXZ);
+            ChaseDecrease(ref _atU.Y, _ibAt.Y, _p.AtChaseRateY);
+            ChaseDecrease(ref _atU.Z, _ibAt.Z, _p.AtChaseRateXZ);
+        }
+    }
+
+    // ============================================================ the height pan (CameraHeightPan.cpp)
+    /// <summary>fabricatedInline (Camera.hpp 245): pan while airborne and rising in a kind that pans (not on a wire, not the roof roll-up).</summary>
+    private bool PanMode()
+        => !IsNotHeightPanKind(_mode) && !_md.TouchGround && !_md.GoDown && !_md.KickRoofRollUp;
+
+    /// <summary>execHeightPan_ (26): the look-at gets the jump offset (chased at AtJumpOffsetSpeed), and the eye's height either pans
+    /// (chases the desired height at HeightPanChaseRateY from last tick's) or, settling after a pan, closes in at PanAfterMagnif but at
+    /// least PanAfterMinHeight a tick; a JUMP_CODE / ROCKET_JUMP eye below PanWarpAngleX warps. Otherwise the eye is at its desired height.</summary>
+    private void ExecHeightPan()
+    {
+        bool airborne = !_md.TouchGround;
+        float offset = airborne ? _p.TargetAtJumpOffsetY : 0f;
+        ChaseConstSpeed(ref _panOffset, offset, _p.AtJumpOffsetSpeed);
+        _cur.At.Y += _panOffset;
+        float deltaDesiredY = _cur.Desired.Y - _prev.Desired.Y;
+        if (PanMode())
+        {
+            _flags |= FlagPanA;
+            _flags &= ~FlagPanB;
+            _cur.Pos.Y = _prev.Pos.Y;
+            ChaseDecrease(ref _cur.Pos.Y, _cur.Desired.Y, _p.HeightPanChaseRateY);
+            if (_cur.Ratio != _prev.Ratio)
+                _cur.Pos.Y += deltaDesiredY;
+        }
+        else if ((_flags & (FlagPanA | FlagPanB)) != 0)
+        {
+            if (_cur.Ratio != _prev.Ratio)
+                _cur.Pos.Y += deltaDesiredY;
+            if ((_flags & FlagPanA) != 0)
+            {
+                _flags &= ~FlagPanA;
+                bool warp = _mode == SmsCamKind.RocketJump && _finalPitch < SmsCamNormal.PanWarpAngleX;
+                if (warp)
+                {
+                    _posU.Y = _cur.Pos.Y = _cur.Desired.Y;
+                    _flags &= ~FlagPanB;
+                }
+                else _flags |= FlagPanB;
+            }
+            if (_cur.Pos.Y != _cur.Desired.Y)
+            {
+                bool still = ChaseSpecialDecrease(ref _cur.Pos.Y, _cur.Desired.Y, SmsCamNormal.PanAfterMagnif, SmsCamNormal.PanAfterMinHeight);
+                if (!still && !airborne) _flags &= ~FlagPanB;
+            }
+            else if (!airborne) _flags &= ~FlagPanB;
+        }
+        else _cur.Pos.Y = _cur.Desired.Y;
+    }
+
+    private void KillHeightPan()
+    {
+        _flags &= ~(FlagPanA | FlagPanB);
+        _cur.Pos.Y = _cur.Desired.Y;
+        _panOffset = 0f;
+    }
+
+    /// <summary>killHeightPanWhenChangeCamMode_ (8): into a kind without a pan, or out of HANG.</summary>
+    private void KillHeightPanWhenChangeCamMode()
+    {
+        if (IsNotHeightPanKind(_mode) || _prevMode == SmsCamKind.Hang)
+            KillHeightPan();
+    }
+
+    // ============================================================ the slope aim (cameragc.cpp 408)
+    /// <summary>calcSlopeAngleX_: in a slope kind, standing on camera-solid ground and not squat-aiming, the ground SlopeForwardDistXZ (300 u)
+    /// ahead of him (away from the eye) raises an angle up to SlopeMaxAngleX (45 deg; steeper = none) that the pitch chases at
+    /// SlopeSpeedAngleX a tick and the pitch is lowered by, then the pitch is clamped to the limits.</summary>
+    private void CalcSlopeAngleX(ref int xAngle)
+    {
+        int result = 0;
+        if (!_md.ReadyGun && _md.TouchGround && IsSlopeKind(_mode))
+        {
+            Vector3 diff = new Vector3(_md.PosU.X - _posU.X, 0f, _md.PosU.Z - _posU.Z);
+            if (diff.LengthSquared() > 1e-6f)
+            {
+                float grLevel = _md.PosU.Y; // SMS_GetMarioGrLevel: his ground height (the feet, standing)
+                int maxAng = SmsCamNormal.SlopeMaxAngleX;
+                float fwd = SmsCamNormal.SlopeForwardDistXZ;
+                Vector3 sample = _md.PosU + diff.Normalized() * fwd;
+                float probeY = fwd * MathF.Tan(maxAng * SmsUnits.BamToRad) + 10f + _md.PosU.Y;
+                if (GroundBelow(sample.X, probeY, sample.Z, out float gy))
+                {
+                    float height = gy - grLevel;
+                    int angle = 0;
+                    if (height > 0f) angle = Matan(fwd, height);
+                    result = angle > maxAng ? 0 : angle;
+                }
+            }
+        }
+        ChaseConstSpeed(ref _slopeX, result, SmsCamNormal.SlopeSpeedAngleX);
+        xAngle = (short)(xAngle - _slopeX);
+        xAngle = Mathf.Clamp(xAngle, SmsCamNormal.LimitMinAngleX, SmsCamNormal.LimitMaxAngleX);
+    }
+
+    // ============================================================ the secure view (CameraSecureView.cpp)
+    /// <summary>calcSecureViewTarget_: a sideways look-at shift from the kind's SecureViewDist fields -- 0 in every kind carried.</summary>
+    private void CalcSecureViewTarget(int angle, out float outX, out float outZ)
+    {
+        int bas = (short)(_md.AngleY - 0x8000);
+        int diff = (short)(angle - bas);
+        float first = LerpF(_p.SecureViewDistXMin, _p.SecureViewDistXMax, _cur.Ratio);
+        float cosD = Cos(diff);
+        float second = cosD >= 0f ? 0f : LerpF(_p.SecureViewDistZMin, _p.SecureViewDistZMax, _cur.Ratio);
+        float mag = -MathF.Abs(first * Sin(diff) + second * cosD);
+        outX = mag * Sin(bas);
+        outZ = mag * Cos(bas);
+    }
+
+    /// <summary>execSecureView_: the shift chased at SecureViewChase (the game slows it by his turn rate, unk9C; a no-op at 0 anyway).</summary>
+    private void ExecSecureView(int angle, ref Vector3 at)
+    {
+        CalcSecureViewTarget(angle, out float px, out float pz);
+        float v = Mathf.Clamp(_p.SecureViewChase, 0f, 1f);
+        ChaseDecrease(ref _secureX, px, v);
+        ChaseDecrease(ref _secureZ, pz, v);
+        at.X += _secureX;
+        at.Z += _secureZ;
+    }
+
+    // ============================================================ the BG checks (CameraBGCheck.cpp) in Godot physics
+    /// <summary>isNeedWallCheck_ (118): not during the L / talk cameras (other nodes here), never under the front-rotate swing.</summary>
+    private bool NeedWallCheck() => (_flags & FlagFrontRotate) == 0;
+
+    /// <summary>isNeedGroundCheck_ (78): skipped for 120 ticks once the eye sits more than 1.25 x the kind's highest reach over the look-at.</summary>
+    private bool NeedGroundCheck()
+    {
+        if (_groundSkip != 0) return false;
+        if (SmsCamKinds.IsNormalClass(_mode))
+        {
+            float a = _p.DistMin * Sin(_p.XAngleMin);
+            float b = _p.DistMax * Sin(_p.XAngleMax);
+            if (a > b) b = a;
+            float distY = _posU.Y - _atU.Y;
+            if (distY > 1.25f * b)
+            {
+                if (_groundSkip < 120) _groundSkip = 120;
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /// <summary>execWallCheck_ (141): the walls within WallCheckRadius (150 u) of the eye's XZ at last tick's eye height + 10 push it out
+    /// along their normal by the overlap (x WallRevisionRatio). The game walks the map's wall planes (up to 4); here a thin disc rests
+    /// against the world and the deepest wall-ish contact is taken up to four times.</summary>
+    private bool ExecWallCheck(ref Vector3 posCpy)
+    {
+        float radius = SmsCamNormal.WallCheckRadius;
+        if (radius <= 0f) return false;
+        var space = GetWorld3D()?.DirectSpaceState;
+        if (space == null) return false;
+        bool moved = false;
+        var exclude = new Array<Rid>();
+        if (_hasMarioRid) exclude.Add(_marioRid);
+        for (int k = 0; k < 4; k++)
+        {
+            Vector3 centreU = new Vector3(_cur.Pos.X, _prev.Pos.Y + 10f, _cur.Pos.Z);
+            var q = new PhysicsShapeQueryParameters3D
+            {
+                Shape = _wallShape,
+                Transform = new Transform3D(Basis.Identity, M(centreU)),
+                CollisionMask = _mask,
+                Exclude = exclude,
+            };
+            Dictionary info = space.GetRestInfo(q);
+            if (info.Count == 0) break;
+            Vector3 n = (Vector3)info["normal"];
+            Vector3 point = (Vector3)info["point"];
+            Rid rid = (Rid)info["rid"];
+            if (CameraPasses((ulong)info["collider_id"]))
+            {
+                exclude.Add(rid);
+                continue;
+            }
+            if (MathF.Abs(n.Y) > 0.6f)
+                break; // a floor or ceiling under the disc, not a wall
+            Vector3 nXZ = new Vector3(n.X, 0f, n.Z);
+            if (nXZ.LengthSquared() < 1e-6f) break;
+            nXZ = nXZ.Normalized();
+            float sd = (M(centreU) - point).Dot(nXZ) * SmsUnits.UnitsPerMetre; // the eye's signed distance off the wall plane, units
+            if (sd >= radius) break;
+            moved = true;
+            float push = (radius - sd) * SmsCamNormal.WallRevisionRatio;
+            _cur.Pos.X += push * nXZ.X;
+            _cur.Pos.Z += push * nXZ.Z;
+            posCpy.X += (radius - sd) * nXZ.X;
+            posCpy.Z += (radius - sd) * nXZ.Z;
+            exclude.Add(rid); // that body is done; another wall may still touch
+        }
+        return moved;
+    }
+
+    /// <summary>execGroundCheck_ (210): the ground under the eye's XZ probed from last tick's eye height + GroundChangeY (20 u); the eye kept
+    /// GroundHeightNormal (144 u) over it, GroundHeightReadyGun (30 u) when squat-aiming (by the smoothed aim share).</summary>
+    private void ExecGroundCheck(Vector3 posCpy)
+    {
+        float groundOff = LerpF(SmsCamNormal.GroundHeightNormal, SmsCamNormal.GroundHeightReadyGun, _holdRatio);
+        if (GroundBelow(posCpy.X, _prev.Pos.Y + SmsCamNormal.GroundChangeY, posCpy.Z, out float groundY))
+        {
+            if (_cur.Pos.Y < groundY + groundOff)
+                _cur.Pos.Y = groundY + groundOff;
+        }
+    }
+
+    /// <summary>checkGroundIgnoreWaterSurface stand-in: the first camera-solid body straight below (x, y, z) in units, within 100000 u
+    /// (water is an Area3D here and never answers a ray).</summary>
+    private bool GroundBelow(float xU, float yU, float zU, out float groundYU)
+    {
+        groundYU = 0f;
+        var space = GetWorld3D()?.DirectSpaceState;
+        if (space == null) return false;
+        Vector3 from = M(new Vector3(xU, yU, zU));
+        Vector3 to = from + Vector3.Down * M(100000f);
+        var exclude = new Array<Rid>();
+        if (_hasMarioRid) exclude.Add(_marioRid);
+        for (int k = 0; k < 4; k++)
+        {
+            var q = PhysicsRayQueryParameters3D.Create(from, to, _mask, exclude);
+            Dictionary hit = space.IntersectRay(q);
+            if (hit.Count == 0) return false;
+            if (CameraPasses((ulong)hit["collider_id"]))
+            {
+                exclude.Add((Rid)hit["rid"]);
+                continue;
+            }
+            groundYU = U(((Vector3)hit["position"]).Y);
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>A ray from the eye to a point on Mario meets camera-solid world: he is occluded.</summary>
+    private bool RayHits(Vector3 fromM, Vector3 toM)
+    {
+        var space = GetWorld3D()?.DirectSpaceState;
+        if (space == null) return false;
+        var exclude = new Array<Rid>();
+        if (_hasMarioRid) exclude.Add(_marioRid);
+        for (int k = 0; k < 4; k++)
+        {
+            var q = PhysicsRayQueryParameters3D.Create(fromM, toM, _mask, exclude);
+            Dictionary hit = space.IntersectRay(q);
+            if (hit.Count == 0) return false;
+            if (CameraPasses((ulong)hit["collider_id"]))
+            {
+                exclude.Add((Rid)hit["rid"]);
+                continue;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>The game's camera checks only surfaces flagged CAMERA_WONT_CLIP (0x8000); here every static body clips, and a body (or a
+    /// parent up to three levels) carrying the metadata `sms_camera_pass` opts out.</summary>
+    private static bool CameraPasses(ulong colliderId)
+    {
+        if (GodotObject.InstanceFromId(colliderId) is not Node node) return false;
+        for (int i = 0; i < 4 && node != null; i++)
+        {
+            if (node.HasMeta("sms_camera_pass")) return true;
+            node = node.GetParent();
+        }
+        return false;
+    }
+
+    // ============================================================ the Y (L) camera's hand-back
+    /// <summary>MarioYCam.cs ending its mode: the game's changeCamMode_(-1) pops L_NORMAL and blends into the kind over the L record's
+    /// Inbet (16 ticks) from the L camera's pose, the ratio restored (setUpFromLButtonCamera_ -- this rig kept its own all along) and the
+    /// yaw where the L camera left it: behind the way he now faces, since he faced its look. The actual eye and look-at start at the L
+    /// camera's so the Y camera's own blend lands on this one every tick.</summary>
+    public void SmsYCamExit(Vector3 ycamPosM, Vector3 ycamAtM)
+    {
+        if (!_started) return;
+        _prevMode = SmsCamKind.LNormal;
+        _p.CopyFrom(SmsCamKinds.Get(SmsCamKind.LNormal));
+        _posU = U(ycamPosM);
+        _atU = U(ycamAtM);
+        _cur.Pos = _cur.Desired = _posU;
+        _cur.At = _atU;
+        _cur.Yaw = (short)(_md.AngleY - 0x8000);
+        _cur.Pitch = LerpS(_p.XAngleMin, _p.XAngleMax, _cur.Ratio);
+        _prev = _cur;
+        _ibPos = _posU;
+        _ibAt = _atU;
+        _ibMario = _md.PosU;
+        IbStart(SmsCamKinds.InbetFrames(SmsCamKind.LNormal, _mode));
+        _ibApproach = 0f;
+        _posFreeze = _targetFreeze = 0;
+        _flags &= ~(FlagFrontRotate | FlagFrontY | FlagFrontDone);
+        KillHeightPan();
+        HoldReset();
+        _viewPosU = _posU;
+        _viewAtU = _atU;
+        CrossToPolar(_atU, _posU, out _, out _finalPitch, out _finalYaw);
+        Apply();
+        if (_md.Debug)
+            GD.Print($"[SMS camera] the L camera hands back: {_ibFrames}-tick blend into {_mode} from its pose, yaw behind him");
+    }
+
+    /// <summary>calcNowTargetFromPosAndAt_ (cameragc.cpp 310): the camera resumes its polar state from a pose it did not solve (a demo /
+    /// talk camera's end): the ratio from the pose's pitch within the kind's range, the yaw its bearing, everything parked on it.</summary>
+    private void ResumeFromView(Vector3 posU, Vector3 atU, int blendFrames)
+    {
+        CrossToPolar(atU, posU, out _, out int xAngle, out int yAngle);
+        _cur.Ratio = Mathf.Clamp(CalcRatio(_p.XAngleMin, _p.XAngleMax, xAngle), 0f, 1f);
+        _cur.Pitch = LerpS(_p.XAngleMin, _p.XAngleMax, _cur.Ratio);
+        _cur.Yaw = yAngle;
+        _cur.Pos = _cur.Desired = posU;
+        _cur.At = atU;
+        _prev = _cur;
+        _posU = _viewPosU = posU;
+        _atU = _viewAtU = atU;
+        _finalPitch = xAngle;
+        _finalYaw = yAngle;
+        _ibPos = posU;
+        _ibAt = atU;
+        _ibMario = _md.PosU;
+        IbStart(blendFrames);
+        _ibApproach = 0f;
+        _posFreeze = _targetFreeze = 0;
+        _flags &= ~(FlagFrontRotate | FlagFrontY | FlagFrontDone);
+        KillHeightPan();
+        HoldReset();
+    }
+
+    // ============================================================ TalkingPOV (sign / switch dialogue) -- Jaysonn's shot (RedCoinSwitch.cs)
+    /// <summary>The dialogue framing: the camera low on Mario's left, looking across him, Mario frozen in his talking state.</summary>
+    public void EnterTalkingPOV()
+    {
+        if (_camera == null) return;
+        Mode = CamMode.TalkingPOV;
+        SetMarioLocked(true);
+        _mario?.EnterTalkingState();
+        _tkYaw = GetVisualYaw() + Mathf.DegToRad(TalkingPOVYawOffsetDeg);
+        _tkPitch = Mathf.DegToRad(TalkingPOVPitchDeg);
+        _tkRadius = TalkingPOVRadius * _rigScale;
+        _tkTransition = TalkingPOVEntryDuration;
+        // the chase starts from the live view: the eye's bearing and elevation about the look-at in the shot's convention (pitch < 0 = above)
+        _tkLookAt = M(_atU);
+        Vector3 d = M(_posU) - _tkLookAt;
+        float r = MathF.Max(d.Length(), 0.01f);
+        _tkCurYaw = MathF.Atan2(d.X, d.Z);
+        _tkCurPitch = -MathF.Asin(Mathf.Clamp(d.Y / r, -1f, 1f));
+        _tkCurRadius = r;
+    }
+
+    public void ExitTalkingPOV()
+    {
+        if (Mode != CamMode.TalkingPOV) return;
+        Mode = CamMode.Normal;
+        _mario?.ExitTalkingState();
+        SetMarioLocked(false);
+        // the game's talk camera ends with changeCamMode_(mInitialMode): the normal camera resumes from the talk pose with its blend
+        Vector3 eyeM = _camera != null ? _camera.GlobalPosition : M(_posU);
+        ResumeFromView(U(eyeM), U(_tkLookAt), 16);
+        Apply();
+    }
+
+    private void TickTalking(float dt)
+    {
+        Vector3 offset = TalkingPOVLocalOffset.Rotated(Vector3.Up, GetVisualYaw()) * _rigScale;
+        Vector3 marioP = _target.GlobalPosition + offset;
+        _tkLookAt = _tkLookAt.Lerp(marioP, 1f - MathF.Exp(-FollowSmooth * dt));
+        _tkYaw = GetVisualYaw() + Mathf.DegToRad(TalkingPOVYawOffsetDeg);
+        _tkPitch = Mathf.DegToRad(TalkingPOVPitchDeg);
+        _tkRadius = TalkingPOVRadius * _rigScale;
+        bool transitioning = _tkTransition > 0f;
+        if (transitioning) _tkTransition -= dt;
+        float yawRate = transitioning ? YawSnapRate : YawChaseRate;
+        float pitchRate = transitioning ? PitchSnapRate : PitchChaseRate;
+        float radiusRate = transitioning ? PitchSnapRate : RadiusChaseRate;
+        _tkCurYaw = Mathf.LerpAngle(_tkCurYaw, _tkYaw, 1f - MathF.Exp(-yawRate * dt));
+        _tkCurPitch = Mathf.Lerp(_tkCurPitch, _tkPitch, 1f - MathF.Exp(-pitchRate * dt));
+        _tkCurRadius = Mathf.Lerp(_tkCurRadius, _tkRadius, 1f - MathF.Exp(-radiusRate * dt));
+        float cp = MathF.Cos(_tkCurPitch);
+        Vector3 eye = _tkLookAt + _tkCurRadius * new Vector3(MathF.Sin(_tkCurYaw) * cp, -MathF.Sin(_tkCurPitch), MathF.Cos(_tkCurYaw) * cp);
+        GlobalPosition = _tkLookAt;
+        _pivot.Rotation = new Vector3(0f, _tkCurYaw, 0f);
+        Vector3 dir = _tkLookAt - eye;
+        if (dir.LengthSquared() > 1e-10f)
+            _camera.GlobalTransform = new Transform3D(Basis.LookingAt(dir, Vector3.Up), eye);
+        // the game's state rides along so the exit resumes from here without a jump
+        _posU = _viewPosU = U(eye);
+        _atU = _viewAtU = U(_tkLookAt);
+    }
+
+    private void SetMarioLocked(bool locked)
+    {
+        if (_mario != null)
+            _mario.CameraLocked = locked;
+    }
+
+    /// <summary>For drives and tests: the camera's state this frame -- the kind, the actual yaw / pitch (unk258 / unk256), the target yaw
+    /// (mYaw), the ratio, the kind's distance at that ratio and the actual one, the eye and look-at (units), the blend ticks left, the
+    /// occlusion and the squat aim's hold distance.</summary>
+    public (SmsCamKind kind, int yaw, int pitch, int targetYaw, float ratio, float wantDist, float dist, Vector3 eyeU, Vector3 atU, int blend, bool occluded, float holdDist, float moveH, bool ground) SmsProbe()
+        => (_mode, _finalYaw, _finalPitch, _cur.Yaw, _cur.Ratio, LerpF(_p.DistMin, _p.DistMax, _cur.Ratio), (_posU - _atU).Length(), _posU, _atU, _ibFrames, _occluded, _holdDist, _md.MoveH, _md.TouchGround);
 }

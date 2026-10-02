@@ -3769,3 +3769,63 @@ Verified headless (a drive spawning a 6 x 4 x 1.2 m tagged wall and a 4 x 0.3 x 
 top 149 units above the feet is `ASCEND` and he stands on the fence's top. A jump under the slab is `HANG_ROOF` with the feet 160 units
 under it (26 above the floor), `WAIT_ROOF` after the catch clip, the stick is `MOVE_ROOF` at 4.0 units a tick (`ma_ladder_hang_move_r`),
 the slab's edge is `LANDING`; hand-over-hand into a fence wall is `FENCE_CATCH`. The kick is built, not driven.
+
+### Pass 53 -- the normal camera: CPolarSubCamera's follow camera and its kind records
+
+`assets/SunshineCamera.cs` is now the game's camera (cameragc.cpp ctrlGameCamera_ / calcPosAndAt_ / calcFinalPosAndAt_, CameraNormal.cpp
+ctrlNormalOrTowerCamera_, CameraHeightPan.cpp, CameraBGCheck.cpp, CameraInbetween.cpp, CameraKindParam.cpp, CameraSecureView.cpp,
+CameraChange.cpp's status ladder and mode change, CameraMarioData.cpp), on the same node and rig as before: the spring arm's own
+processing is off and the Camera3D is posed each 120 Hz tick; this node sits on the look-at and the pivot's yaw is the eye's bearing, as
+Mario's stick and the Y camera read them. The legacy spring-arm follow, its held-L lock, its own Y over-the-shoulder mode and the unused
+ShineGet rail are gone (NO LEGACY); the TalkingPOV shot (RedCoinSwitch) stays and hands back through the game's resume
+(calcNowTargetFromPosAndAt_ + a 16-tick blend).
+
+`assets/Sms/SmsCameraKinds.cs` is GENERATED (tools/projectshine/gen_camera_kinds.py) from the disc's /Camera/kind*.prm and
+camera_normal.prm: 14 kinds (Follow, Delfino, Indoor, Swimming, AquaticTurbo, Turbo, Hang, Fence, WallJump, HipAttack, Hovering,
+RocketJump, LookDown, LNormal), the 46 runtime fields each, a field a .prm lacks at the camerasave.cpp default (kindRocketJump.prm has 92
+fields), the Inbet table (the CURRENT kind's mSLInbet<new> is the blend into the new kind: 16 mostly, Follow->Hang 0 -> 1, Turbo->Follow 30,
+AquaticTurbo->Swimming 300), and camera_normal.prm's 23 shipped globals + 3 defaults. `assets/Sms/MarioCamData.cs` (partial Mario) is what
+the camera reads off him each frame: his origin, his face (*gpMarioAngleY: the port's face yaw is "behind him" in the camera's bearing
+convention, so the face is that + 0x8000), the move distances (his displacement per 30 fps frame SQUARED, clamped 100 -- the camera ticks
+at 120 Hz but Mario moves on CUE_MOVEMENT_GATE_A | B, once a frame, so every tick sees the frame's move; HANGING / ASCEND read 0), the
+status bits the ladder tests, isMarioReadyGun_ (the FLUDD and a SQUAT status: the only statuses with type bit 0x8000), the aim ratio unk1C
+(the gun angle over the current nozzle's LAngleMin).
+
+Per tick, the game's order: the look point (his origin + AtOffsetY + ratio x XRotRatioAtOffsetY; +260 on KICK_ROOF_ROLL_UP); the status ->
+kind ladder (dash -> TURBO / AQUATIC_TURBO; swimming -> SWIMMING, neither on a Delfino Plaza stage; fence; ROCKET / ROCKET_LANDING ->
+HOVERING with the hover nozzle, else ROCKET_JUMP; the ROOF family -> HANG (the ledge hang is FOLLOW: HANGING carries no 0x200000); HIP_DROP
+-> HIP_ATTACK unless the area kind shows through it; a non-follow area kind; WALL_JUMP / WALL_SLIDE; FOLLOW); the kind record blended
+over the inbetween (inbetweenData: 1/remaining of each gap a tick, OffsetAngle and the AutoChase frames at once); the stick (the C-stick
+through PADClamp's sub-stick region 59 / 31 / 15 and JUTGamePad's 42: yaw += x * YAngleManualSpeedX a tick, ratio -= y * 0.01 a tick, up =
+lower and nearer); without a stick the auto follow toward behind him at FollowSpeedX (JumpFollowSpeedX airborne) x how far off ((1 - cos
+2d) / 2; linear for HOVERING, with the move fixed at 100) x the obstruct magnifier when a ray from the eye to his waist meets the world
+(MARIO_FLAG_OCCLUDED is a framebuffer peek in the game) x the L-held magnifier x his move distance x the auto-chase ramp, clamped; the
+squat aim's hold (unk2AC: the pitch offset and the extra distance chased toward the aim ratio's share of the kind's manual yaw speed and
+HoldAddDistXZ at AimAngleYChaseMin 60 / HoldDistChase 0.02); the squat aim's yaw chase behind him eased from 60; the polar solve of the
+DESIRED eye (unk18) about the look point with the cushion rule (a kind with CushionMin 0 keeps its exact distance; a cushioned kind lets
+him approach and holds the eye), the MinCushionXZ 300 floor and the hold pull-in; the height pan (the eye rides last tick's height toward
+the desired at HeightPanChaseRateY while airborne and rising, then settles at PanAfterMagnif 0.01 but at least 1.5 u a tick; the look-at
+gets TargetAtJumpOffsetY -100 airborne at 20 a tick); the wall check (the walls within 150 u of the eye's XZ at last tick's eye height + 10
+push it out by the overlap; a push recomputes pitch / yaw from the pushed eye and restores LAST tick's ratio) and the ground check (the eye
+kept 144 u over the ground under it, 30 u when squat-aiming, probed from last tick's eye height + 20; skipped 120 ticks when the eye sits
+over 1.25 x the kind's highest reach); the inbetween's polar sweep of eye and look-at; the actual eye chasing the inbetween's at
+PosChaseRateXZ / Y (the _C variants eased in while the stick moves and he stands still; 1 under the L swing) and the look-at at
+AtChaseRateXZ / Y; the look-at's elevation from the eye clamped to +-15872. The L press (MEANING_CAM_L) is execFrontRotate_: the yaw closes
+a tenth of its gap to behind him each tick with the eye following at once, no wall check meanwhile (as before, now inside the same rig).
+The Y camera (MarioYCam.cs) hands back the way the game pops L_NORMAL: a 16-tick blend from the L camera's pose and record into the kind,
+the yaw where the L camera left it. A respawn / the intro's spawn / a teleport (20 m in a frame) starts the camera behind him as a stage
+load does (loadAfter: ratio XRotStart 0, the kind's near distance, no lag anywhere).
+
+The decomp's calcPosAndAt_ is NonMatching and mislabels one field: against the original asm (QbeRoot/sms asm/Camera/cameragc.s) the
+polar solve stores to mCurrentTarget.unk18 (the desired eye), mCurrentTarget.mPosition is the panned eye whose x / z are copied from unk18
+just before execHeightPan_ (stfs 0x98 -> 0x80, 0xA0 -> 0x88), finalAt.y is mCurrentTarget.mTarget.y (lfs 0x90), and the ratio restored
+after a wall push is mPreviousTarget.unk28 (lfs 0xDC), not unk30. mHoldOffsetAngleX* and mSLHoldAngleXChase are dead data (never read).
+
+Not ported, logged: the in-house (OOB) magnifier (no OOB data), the roof check (Monte village only -- a dummy roof at -512.5 everywhere
+else, so the game skips it), the camera cubes / fixed and definite cameras / the camera map tools (pass 54: an area's kind by a tag;
+`DefaultKind` on the CamController node is the stage's area kind meanwhile, `DelfinoPlazaRules` the map-7 exceptions), the notice camera
+(no bosses), the tower / parallel / rail / wire / underground / diving / jet-coaster kinds, the 0x8000 CAMERA_WONT_CLIP surface flag (every
+static body clips the camera; metadata `sms_camera_pass` on a body or a parent opts it out), the secure view's turn-rate slowdown (unk9C;
+every carried kind ships SecureViewDist 0 so it is a no-op), SE 0x4826 on the L press. CLIMB is unreachable (the BAR statuses: no bars).
+DEVIATION kept from pass 17: an L press in the air is the hip drop's, never the camera's (the game's execFrontRotate_ refuses only while
+the status is already HIP_DROP).

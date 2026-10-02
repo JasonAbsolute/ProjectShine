@@ -560,6 +560,25 @@ public static class SmsStick
         return new Vector2(px, py);
     }
 
+    /// <summary>The C-stick the same way (pass 53, the camera): PADClamp's sub-stick region -- Padclamp.c's ClampRegion { 15, 72, 40, 15, 59, 31 }:
+    /// 59 max, 31 xy, 15 min -- then JUTGamePad::CStick::update's 42 (JUTGamePad.cpp 349; the main stick's is 54). Right and DOWN
+    /// positive here (Godot's GetVector); the game's mSubStick.mPosY is up positive, so the camera negates Y.</summary>
+    public static Vector2 PadSubStick(Vector2 axis)
+    {
+        int x = Math.Clamp((int)MathF.Floor(axis.X * SmsParams.Controller.PadGateRaw), -128, 127);
+        int y = Math.Clamp((int)MathF.Floor(axis.Y * SmsParams.Controller.PadGateRaw), -128, 127);
+        ClampStick(ref x, ref y, 59, 31, 15);
+        float px = x / 42f;
+        float py = y / 42f;
+        float len = MathF.Sqrt(px * px + py * py);
+        if (len > 1f)
+        {
+            px /= len;
+            py /= len;
+        }
+        return new Vector2(px, py);
+    }
+
     /// <summary>Padclamp.c ClampStick, integer for integer (the s8 casts truncate the divisions).</summary>
     private static void ClampStick(ref int px, ref int py, int max, int xy, int min)
     {
