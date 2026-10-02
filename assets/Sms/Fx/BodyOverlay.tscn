@@ -1,4 +1,4 @@
-[gd_scene load_steps=4 format=3 uid="uid://cshockneg00055"]
+[gd_scene load_steps=4 format=3 uid="uid://cbodyovl00056"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsBodyOverlay.cs" id="1_script"]
 [ext_resource type="Shader" path="res://assets/Sms/Fx/BodyOverlay.gdshader" id="2_shader"]
