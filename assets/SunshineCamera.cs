@@ -295,7 +295,7 @@ public partial class SunshineCamera : Node3D
     {
         Vector3 eyeM = M(_viewPosU), atM = M(_viewAtU);
         GlobalPosition = M(_atU);
-        _pivot.Rotation = new Vector3(0f, _finalYaw * SmsUnits.BamToRad, 0f);
+        _pivot.GlobalRotation = new Vector3(0f, _finalYaw * SmsUnits.BamToRad, 0f); // global: Mario.cs rotates the stick by the body's basis and then by this yaw
         Vector3 dir = atM - eyeM;
         if (dir.LengthSquared() > 1e-10f)
         {
@@ -1227,7 +1227,7 @@ public partial class SunshineCamera : Node3D
         float cp = MathF.Cos(_tkCurPitch);
         Vector3 eye = _tkLookAt + _tkCurRadius * new Vector3(MathF.Sin(_tkCurYaw) * cp, -MathF.Sin(_tkCurPitch), MathF.Cos(_tkCurYaw) * cp);
         GlobalPosition = _tkLookAt;
-        _pivot.Rotation = new Vector3(0f, _tkCurYaw, 0f);
+        _pivot.GlobalRotation = new Vector3(0f, _tkCurYaw, 0f);
         Vector3 dir = _tkLookAt - eye;
         if (dir.LengthSquared() > 1e-10f)
             _camera.GlobalTransform = new Transform3D(Basis.LookingAt(dir, Vector3.Up), eye);
