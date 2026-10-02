@@ -111,6 +111,8 @@ public partial class SunshineCamera : Node3D
     private Vector3 _lookPoint;                          // gpCameraMario->unk0: his origin + the look height
     private readonly SmsCamKindParam _p = new SmsCamKindParam(); // mCurrentParams
     private SmsCamKind _mode = SmsCamKind.Follow, _prevMode = SmsCamKind.Follow;
+    private SmsCamKind? _areaKind;                       // controlByCameraCode_: the camera cube Mario + 75 u stands in, if any (pass 57)
+    private PhysicsPointQueryParameters3D _areaQuery;
     private int _flags = 0;                              // unk64
     private const int FlagPanA = 0x1, FlagPanB = 0x2, FlagFrontRotate = 0x4, FlagFrontY = 0x8, FlagFrontDone = 0x10, FlagFreeze = 0x40, FlagStickYaw = 0x80, FlagCushionFar = 0x100;
     private int _frontYaw = 0, _frontChase = 0;          // unk274 / unk276
@@ -216,7 +218,7 @@ public partial class SunshineCamera : Node3D
             if (_dbgTimer >= 1f)
             {
                 _dbgTimer = 0f;
-                GD.Print($"[SMS camera] {_mode}{(_ibFrames > 0 ? $" (blend {_ibFrames})" : "")}: yaw {SmsMath.WrapAngle(_finalYaw * SmsUnits.BamToRad) * 180f / MathF.PI:F0} deg, pitch {_finalPitch * 180f / 32768f:F1} deg (ratio {_cur.Ratio:F2}), {(_posU - _atU).Length():F0} u off the look-at, look {_atU.Y - _md.PosU.Y:F0} u over his feet, eye {_posU.Y - _md.PosU.Y:F0} u; fov {_p.Fovy:F0}; stick ({_cx:F2}, {_cy:F2}){(_occluded ? ", occluded" : "")}{((_flags & FlagFrontRotate) != 0 ? ", L swing" : "")}{(_md.ReadyGun ? $", squat aim {_md.AimRatio:F2} hold {_holdDist:F0} u" : "")}");
+                GD.Print($"[SMS camera] {_mode}{(_ibFrames > 0 ? $" (blend {_ibFrames})" : "")}: yaw {SmsMath.WrapAngle(_finalYaw * SmsUnits.BamToRad) * 180f / MathF.PI:F0} deg, pitch {_finalPitch * 180f / 32768f:F1} deg (ratio {_cur.Ratio:F2}), {(_posU - _atU).Length():F0} u off the look-at, look {_atU.Y - _md.PosU.Y:F0} u over his feet, eye {_posU.Y - _md.PosU.Y:F0} u; fov {_p.Fovy:F0}; stick ({_cx:F2}, {_cy:F2}){(_areaKind != null ? $", area {_areaKind}" : "")}{(_occluded ? ", occluded" : "")}{((_flags & FlagFrontRotate) != 0 ? ", L swing" : "")}{(_md.ReadyGun ? $", squat aim {_md.AimRatio:F2} hold {_holdDist:F0} u" : "")}");
             }
         }
     }
@@ -420,6 +422,7 @@ public partial class SunshineCamera : Node3D
         _lookPoint = _md.PosU + new Vector3(0f, yOff, 0f);
         _prev = _cur;
         // controlByCameraCode_ + execCameraModeChangeProc_: only while the game is in play (director state 4), never under a demo's hold
+        _areaKind = SampleAreaKind();
         if (!_md.Locked)
             ModeChangeProc(lEdge);
         // the kind record: the mode's, blended over the inbetween (inbetweenData with the frames remaining)
@@ -451,13 +454,40 @@ public partial class SunshineCamera : Node3D
         ChangeMode(SelectKind());
     }
 
+    /// <summary>controlByCameraCode_ (CameraCodeControl.cpp 9): Mario's position + 75 units against the stage's camera cubes, the first hit's
+    /// code. Here the Area3Ds at that point: an SmsCameraArea's Kind (the highest Priority where they overlap), else any Area3D's metadata
+    /// `sms_camera_kind` (a kind's name). A cube's camera map tool (a fixed / definite camera) is not ported.</summary>
+    private SmsCamKind? SampleAreaKind()
+    {
+        _areaQuery ??= new PhysicsPointQueryParameters3D { CollideWithAreas = true, CollideWithBodies = false, CollisionMask = uint.MaxValue };
+        _areaQuery.Position = M(_md.PosU + new Vector3(0f, 75f, 0f));
+        var hits = GetWorld3D().DirectSpaceState.IntersectPoint(_areaQuery, 8);
+        SmsCameraArea best = null;
+        SmsCamKind? tagged = null;
+        foreach (Dictionary h in hits)
+        {
+            if (h["collider"].AsGodotObject() is not Node n)
+                continue;
+            if (n is SmsCameraArea a)
+            {
+                if (best == null || a.Priority > best.Priority)
+                    best = a;
+            }
+            else if (tagged == null && n.HasMeta("sms_camera_kind") && System.Enum.TryParse(n.GetMeta("sms_camera_kind").AsString(), true, out SmsCamKind k))
+                tagged = k;
+        }
+        return best != null ? best.Kind : tagged;
+    }
+
     /// <summary>The ladder (CameraChange.cpp 656-826) with the stage's area kind as param_1. Of the game's branches, the port has no
     /// helmet / underground maps, wires, surf, rails, slider / mirror / indoor ground types, bars (CLIMB), held objects, platforms or
     /// force jumps; those fall through as they would with their flags clear.</summary>
     private SmsCamKind SelectKind()
     {
         bool delfino = DelfinoPlazaRules; // currentMap == 7
-        SmsCamKind area = DefaultKind == SmsCamKind.LNormal ? SmsCamKind.Follow : DefaultKind;
+        SmsCamKind area = _areaKind ?? DefaultKind; // the cube's code, else the stage's own kind (code -1 -> mInitialMode)
+        if (area == SmsCamKind.LNormal)
+            area = SmsCamKind.Follow;
         if (_md.Dashing)
             return !delfino && (_md.Swimming || _md.SwimJump) ? SmsCamKind.AquaticTurbo : SmsCamKind.Turbo;
         if (!delfino && _md.Swimming)
@@ -1240,6 +1270,6 @@ public partial class SunshineCamera : Node3D
     /// <summary>For drives and tests: the camera's state this frame -- the kind, the actual yaw / pitch (unk258 / unk256), the target yaw
     /// (mYaw), the ratio, the kind's distance at that ratio and the actual one, the eye and look-at (units), the blend ticks left, the
     /// occlusion and the squat aim's hold distance.</summary>
-    public (SmsCamKind kind, int yaw, int pitch, int targetYaw, float ratio, float wantDist, float dist, Vector3 eyeU, Vector3 atU, int blend, bool occluded, float holdDist, float moveH, bool ground) SmsProbe()
-        => (_mode, _finalYaw, _finalPitch, _cur.Yaw, _cur.Ratio, LerpF(_p.DistMin, _p.DistMax, _cur.Ratio), (_posU - _atU).Length(), _posU, _atU, _ibFrames, _occluded, _holdDist, _md.MoveH, _md.TouchGround);
+    public (SmsCamKind kind, int yaw, int pitch, int targetYaw, float ratio, float wantDist, float dist, Vector3 eyeU, Vector3 atU, int blend, bool occluded, float holdDist, float moveH, bool ground, SmsCamKind? area) SmsProbe()
+        => (_mode, _finalYaw, _finalPitch, _cur.Yaw, _cur.Ratio, LerpF(_p.DistMin, _p.DistMax, _cur.Ratio), (_posU - _atU).Length(), _posU, _atU, _ibFrames, _occluded, _holdDist, _md.MoveH, _md.TouchGround, _areaKind);
 }

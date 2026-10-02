@@ -3888,3 +3888,16 @@ stage reload). The port has no stage reload: the fire jump lands and the landing
 no bounces. EnterDead() is now loserExec()'s pair: airborne -> ma_land down to the floor -> ma_die; grounded -> ma_die at once (as
 the game). _smsGameOver blocks re-burns and hits (the decHP guards); Respawn clears it. The reaction voices (MV08A / MV08B) are not
 ported.
+
+### Pass 57 -- camera areas
+The game's stage carries camera cubes (TCubeCameraInfo, CubeMapTool.cpp: an oriented box and a camera code, or a camera map tool for a
+fixed / definite camera). Every tick CPolarSubCamera::controlByCameraCode_ (CameraCodeControl.cpp 9) tests Mario's position + 75 units
+against the cubes in list order; the first hit's code is the param_1 of execCameraModeChangeProc_'s ladder (CameraChange.cpp 568):
+the kind the area asks for, which the status kinds (dash, swim, fence, rocket, roof, hip drop) override as the ladder says, and which
+itself beats the wall jump and the climb unless it is FOLLOW; no cube -> code -1 -> the stage's initial mode. PORT: assets/Sms/
+SmsCameraArea.tscn (+ SmsCameraArea.cs, [GlobalClass]): an Area3D with a box, Kind (the kind dropdown) and Priority (overlaps). Drop
+it into a level and size it; or put metadata `sms_camera_kind` = a kind's name on any Area3D. SunshineCamera samples the point
+(feet + 75 u) with a PhysicsPointQueryParameters3D (areas only) each tick before the mode change; outside every area the ladder starts
+from CamController.DefaultKind as before. Entering / leaving an area blends over the kinds' inbetween as any kind change. NOT PORTED:
+the camera map tools (fixed cameras that hold a position and a pitch/yaw, definite cameras that hold a position and watch him), the
+area cubes' Delfino hotel floor rule, the door-opening hold.
