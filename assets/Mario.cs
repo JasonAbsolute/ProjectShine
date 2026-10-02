@@ -14648,6 +14648,17 @@ public partial class Mario : CharacterBody3D
     }
 
     /// <summary>The port's death (ma_die, R respawns); the game's loserExec.</summary>
+    /// <summary>TMario::checkActionThing3 (Mario.hpp 1214) as the director reads it before a pause (MarDirectorDirect.cpp 810): not in a
+    /// jumping status; and the director must be in play -- not the Miss, a death, the shine demo or a talk.</summary>
+    public bool SmsCanPause()
+    {
+        if (_smsGameOver || stateOfMario == MarioState.dead || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.talking)
+            return false;
+        if (TryGetAirProfile(stateOfMario, out _) || !IsOnFloor())
+            return false; // MARIO_STATUS_FLAG_JUMPING
+        return true;
+    }
+
     /// <summary>
     /// The director's Miss state (MarDirectorDirect.cpp 798-822, 769-787, 408-430). The tick MARIO_FLAG_GAME_OVER is seen it goes
     /// GAME_OVER_PENDING; the next tick STATE_UNK7 begins: the lives flag (0x20001) down one, the console's TOO BAD! (startAppearMiss), the

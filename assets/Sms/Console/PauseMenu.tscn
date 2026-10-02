@@ -1,0 +1,185 @@
+[gd_scene load_steps=10 format=3 uid="uid://cpausemn00059"]
+
+[ext_resource type="Script" path="res://assets/Sms/Console/SmsPauseMenu.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/big_tx_p.png" id="t_p"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/big_tx_a.png" id="t_a"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/big_tx_u.png" id="t_u"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/big_tx_s.png" id="t_s"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/big_tx_e.png" id="t_e"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/pause_tx_1.png" id="t_tx1"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/pause_tx_2.png" id="t_tx2"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/pause_tx_3.png" id="t_tx3"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/pause_bar.png" id="t_bar"]
+
+[node name="PauseMenu" type="CanvasLayer" node_paths=PackedStringArray("Root", "Mask", "Menu", "Letters", "Items", "Stage", "StageName", "ScenarioName")]
+process_mode = 3
+layer = 50
+script = ExtResource("1_script")
+Root = NodePath("Root")
+Mask = NodePath("Mask")
+Menu = NodePath("Root/Menu")
+Letters = [NodePath("Root/Menu/pa00"), NodePath("Root/Menu/pa01"), NodePath("Root/Menu/pa02"), NodePath("Root/Menu/pa03"), NodePath("Root/Menu/pa04")]
+Items = [NodePath("Root/Menu/tx_1"), NodePath("Root/Menu/tx_2"), NodePath("Root/Menu/tx_3")]
+Stage = NodePath("Root/Stage")
+StageName = NodePath("Root/Stage/map")
+ScenarioName = NodePath("Root/Stage/task")
+ItemColor = Color(0.235294, 1, 0.235294, 1)
+PauseAction = "button_start"
+ExitAreaScene = ""
+Size = 1.0
+
+[node name="Mask" type="ColorRect" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 0.705882)
+
+[node name="Root" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 0
+offset_right = 600.0
+offset_bottom = 480.0
+mouse_filter = 2
+
+[node name="Menu" type="Control" parent="Root"]
+layout_mode = 0
+offset_left = 296.0
+offset_top = 258.0
+offset_right = 306.0
+offset_bottom = 268.0
+mouse_filter = 2
+
+[node name="pa00" type="TextureRect" parent="Root/Menu"]
+layout_mode = 0
+offset_left = -153.0
+offset_top = -111.0
+offset_right = -75.0
+offset_bottom = -33.0
+rotation = -0.20944
+mouse_filter = 2
+texture = ExtResource("t_p")
+expand_mode = 1
+
+[node name="pa01" type="TextureRect" parent="Root/Menu"]
+layout_mode = 0
+offset_left = -102.0
+offset_top = -100.0
+offset_right = -24.0
+offset_bottom = -22.0
+rotation = -0.20944
+mouse_filter = 2
+texture = ExtResource("t_a")
+expand_mode = 1
+
+[node name="pa02" type="TextureRect" parent="Root/Menu"]
+layout_mode = 0
+offset_left = -52.0
+offset_top = -141.0
+offset_right = 26.0
+offset_bottom = -63.0
+rotation = -0.20944
+mouse_filter = 2
+texture = ExtResource("t_u")
+expand_mode = 1
+
+[node name="pa03" type="TextureRect" parent="Root/Menu"]
+layout_mode = 0
+offset_left = 13.0
+offset_top = -116.0
+offset_right = 91.0
+offset_bottom = -38.0
+rotation = -0.20944
+mouse_filter = 2
+texture = ExtResource("t_s")
+expand_mode = 1
+
+[node name="pa04" type="TextureRect" parent="Root/Menu"]
+layout_mode = 0
+offset_left = 86.0
+offset_top = -116.0
+offset_right = 164.0
+offset_bottom = -38.0
+rotation = -0.20944
+mouse_filter = 2
+texture = ExtResource("t_e")
+expand_mode = 1
+
+[node name="tx_1" type="TextureRect" parent="Root/Menu"]
+layout_mode = 0
+offset_left = -91.0
+offset_top = -23.0
+offset_right = 91.0
+offset_bottom = 19.0
+rotation = -0.20944
+mouse_filter = 2
+texture = ExtResource("t_tx1")
+expand_mode = 1
+
+[node name="tx_2" type="TextureRect" parent="Root/Menu"]
+layout_mode = 0
+offset_left = -50.0
+offset_top = 17.0
+offset_right = 64.0
+offset_bottom = 59.0
+rotation = -0.20944
+mouse_filter = 2
+texture = ExtResource("t_tx2")
+expand_mode = 1
+
+[node name="tx_3" type="TextureRect" parent="Root/Menu"]
+layout_mode = 0
+offset_left = -80.0
+offset_top = 56.0
+offset_right = 110.0
+offset_bottom = 98.0
+rotation = -0.20944
+mouse_filter = 2
+texture = ExtResource("t_tx3")
+expand_mode = 1
+
+[node name="Stage" type="Control" parent="Root"]
+layout_mode = 0
+offset_left = 296.0
+offset_top = 412.0
+offset_right = 306.0
+offset_bottom = 422.0
+mouse_filter = 2
+
+[node name="back" type="TextureRect" parent="Root/Stage"]
+modulate = Color(1, 1, 1, 0.705882)
+layout_mode = 0
+offset_left = -141.0
+offset_top = -9.0
+offset_right = 152.0
+offset_bottom = 25.0
+mouse_filter = 2
+texture = ExtResource("t_bar")
+expand_mode = 1
+
+[node name="map" type="Label" parent="Root/Stage"]
+layout_mode = 0
+offset_left = -190.0
+offset_top = -19.0
+offset_right = 200.0
+offset_bottom = 5.0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 18
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="task" type="Label" parent="Root/Stage"]
+layout_mode = 0
+offset_left = -190.0
+offset_top = 5.0
+offset_right = 200.0
+offset_bottom = 31.0
+mouse_filter = 2
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+vertical_alignment = 1

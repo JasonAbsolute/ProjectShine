@@ -54,6 +54,9 @@ public partial class GameData : Node
     /// <summary>The game's flag 0x30002: the next stage load follows a miss -- no intro, a plain fade in. Level.cs clears it.</summary>
     public bool CameFromMiss;
 
+    /// <summary>The pause menu's SAVE (the game's card save): write the save file now.</summary>
+    public void SaveNow() => Save();
+
     public override void _Input(InputEvent @event)
     {
         if (@event is InputEventKey key && key.Pressed && key.Keycode == Key.F8)

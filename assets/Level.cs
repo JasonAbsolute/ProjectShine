@@ -71,6 +71,11 @@ public partial class Level : Node3D
     /// follows exactly as it would have anyway.</summary>
     [Export] public bool AllowIntroSkip = true;
 
+    /// <summary>The pause menu's bar (pause_1.blo 'map' / 'task'): the stage's name and the episode's, as stagename.bmg and
+    /// scenarioname.bmg give them in the game. Empty: the bar shows no text.</summary>
+    [Export] public string StageName = "";
+    [Export] public string ScenarioName = "";
+
     /// <summary>Fallback only, used if a BarnDoorVertical track can't be found on
     /// IntroAnimationName to read its authored close speed from — the skip path's
     /// independent wipe then closes over this many seconds instead.</summary>

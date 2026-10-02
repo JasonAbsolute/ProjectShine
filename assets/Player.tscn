@@ -231,6 +231,7 @@
 [ext_resource type="PackedScene" uid="uid://cbodyovl00056" path="res://assets/Sms/Fx/BodyOverlay.tscn" id="238_bdyov"]
 [ext_resource type="PackedScene" uid="uid://cconstr000058" path="res://assets/Sms/Console/ConsoleStr.tscn" id="239_cnstr"]
 [ext_resource type="PackedScene" uid="uid://cfader0000058" path="res://assets/Sms/Console/Fader.tscn" id="240_fader"]
+[ext_resource type="PackedScene" uid="uid://cpausemn00059" path="res://assets/Sms/Console/PauseMenu.tscn" id="241_pause"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_fpjfl"]
 height = 1.8701391
@@ -2525,5 +2526,7 @@ script = ExtResource("222_fpjfl")
 [node name="ConsoleStr" parent="." instance=ExtResource("239_cnstr")]
 
 [node name="Fader" parent="." instance=ExtResource("240_fader")]
+
+[node name="PauseMenu" parent="." instance=ExtResource("241_pause")]
 
 [editable path="Armature/Skeleton3D/RightHandBone/RightHandClosed/Model"]

@@ -3923,3 +3923,25 @@ lives in GameData.Lives across the reload, GameData.CameFromMiss for Level.cs: n
 (empty: the stage again, lives reset), Mario.MissJingle (a slot). The dead state's R key is gone: the sequence moves the stage. NOT
 PORTED: the Hx_GameOver wipe (a texture the port does not have: a plain 1 s fade stands in), the save / title flow after a game over,
 the letters' sparkle (emitter 0x1F9), the miss BGM, the hell death's trigger (no death plane here yet), the camera's dead demo.
+
+### Pass 59 -- the pause menu
+TPauseMenu2 (GC2D/PauseMenu2.cpp) on pause_1.blo: 'mask' (juice_mask, black at alpha 180 -- a flat texture), 't_0' at (296, 258)
+with the PAUSE letters pa00..pa04 (big_tx p/a/u/s/e, 78 x 78, tilted 12) and the items tx_1 CONTINUE (182 x 42, white 3cff3c = the
+selected colour), tx_2 SAVE, tx_3 EXIT AREA, 'brek' at (296, 412) with the water_back bar (293 x 34, 8200b4, alpha 180) and the
+'map' / 'task' text boxes (the stage's and the episode's names from stagename.bmg / scenarioname.bmg). Two items where the stage is
+Delfino Plaza (mNumItems 2). The director (MarDirectorDirect.cpp 805-816): Start in play with checkActionThing3 (not a jumping status)
+-> STATE_PAUSE_MENU, else SY_NOT_COLLECT; the game pauses (pauseOn, startPause); the console's pauseIn brings the star HUD and the
+lives in and the telop out. appearWindow (175): a 0.5-a-frame clock; letter i from 5 i over 20 units: inset 0.75 (19 - a), hop
+2 n (1 - n) 80, rotation 180 + orig - 9 a, alpha 12.8 a; the mask to its alpha by 30; the items from 30: +-3 / 1.5 px a unit through
+40 and back by 45, alpha 26 a unit, tx_1's tilt turning in; open at 46. Open (301): Start / A confirms, B closes, up / down move the
+cursor (no wrap with two items, SY_CURSOR); the selected item pulses +1 px a unit to 18 and back by 35 with its red channel +10 a unit
+(toward white); sparks 0x1FA at the key frame. disappearWindow (246): 10 units -- the pane alpha -12 a frame, the mask and bar following,
+every letter and item shrinking 2 % a frame with a drift, the menu pane turning 2 degrees a unit. getNextState (514): CONTINUE -> play,
+SAVE -> the card save then back, EXIT AREA -> decideNextStage + moveStage with unkE4 = 2 (the iris). PORT: assets/Sms/Console/
+PauseMenu.tscn + SmsPauseMenu.cs (CanvasLayer 50, process mode Always; the tree paused while open; Root placed about the blo's
+centre; PauseAction "button_start" -- Escape and the joypad's Start stand in at run time when the Input Map lacks it; ExitAreaScene
+(empty: two items, as the plaza); ItemColor; PauseOn / CursorMove / NotNow sound slots), under Mario in Player.tscn. Mario.SmsCanPause
+(the pausable rule + not during the Miss / a death / the shine demo / a talk), GameData.SaveNow, Level.StageName / ScenarioName for
+the bar. The console frames are this port's 120 Hz ticks (pass 38): the clock runs 60 units a second x SmsHud.Anim. NOT PORTED: the
+card-save dialog (SAVE writes GameData and the menu dips 40 units), the sparks, the console's pauseIn / pauseOut, the letters' drift
+on the way out (a uniform 2 % shrink), the shadow copies of the two text lines, the system font (a Label).
