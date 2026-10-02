@@ -63,13 +63,10 @@ public partial class SunshineCamera : Node3D
 
     // ============================================================ the game's camera
     /// <summary>The stage area's kind (what a camera cube would assign; CameraCodeControl.cpp). FOLLOW is the game's default when no cube
-    /// applies (CameraChange.cpp 823); a Delfino Plaza stage uses DELFINO. Pass 54 will let an Area3D tag override it per area.</summary>
+    /// applies (CameraChange.cpp 823); a Delfino Plaza stage uses DELFINO. A later pass will let an Area3D tag override it per area.</summary>
     [Export] public SmsCamKind DefaultKind = SmsCamKind.Follow;
     /// <summary>Delfino Plaza (map 7) rules: no SWIMMING / AQUATIC_TURBO kinds there (CameraChange.cpp 675-683).</summary>
     [Export] public bool DelfinoPlazaRules = false;
-    /// <summary>If your Mario model is authored with a 180 deg forward offset (this one is), so the armature-based facing reads right.</summary>
-    [Export] public bool ArmatureForwardIsFlipped = true;
-
     // ============================================================ TalkingPOV (sign / switch dialogue) -- his shot
     [Export] public Vector3 TalkingPOVLocalOffset = new(-0.60f, 1.20f, -0.10f);
     [Export] public float TalkingPOVYawOffsetDeg = -32f;
@@ -151,7 +148,7 @@ public partial class SunshineCamera : Node3D
     private static float M(float u) => u / SmsUnits.UnitsPerMetre;
     private static Vector3 M(Vector3 u) => u / SmsUnits.UnitsPerMetre;
 
-    /// <summary>Mario's visual facing yaw (the armature's, with the rig's 180 deg offset): the shine demo and the TalkingPOV shot use it.</summary>
+    /// <summary>Mario's visual facing yaw (the armature's): the shine demo and the TalkingPOV shot use it.</summary>
     public float CurrentVisualYaw => GetVisualYaw();
 
     // ============================================================ setup
@@ -393,9 +390,7 @@ public partial class SunshineCamera : Node3D
     private float GetVisualYaw()
     {
         if (_armature == null) return _finalYaw * SmsUnits.BamToRad;
-        float y = _armature.GlobalRotation.Y;
-        if (ArmatureForwardIsFlipped) y += Mathf.Pi;
-        return y;
+        return _armature.GlobalRotation.Y; // the model faces the armature's -Z (pass 54)
     }
 
     private void RecomputeRigScale()

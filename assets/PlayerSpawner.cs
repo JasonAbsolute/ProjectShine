@@ -72,20 +72,11 @@ public partial class PlayerSpawner : Node3D
         // handover list and we try to reparent it into itself.
         var handover = new List<Node>(GetChildren());
 
-        AddChild(player);
-
-        // Hand our authored rotation down to the character and keep only the
-        // position ourselves — reproducing the node graph levels had before
-        // spawners existed, where the Mario instance sat directly under the level
-        // root carrying its own rotation.
-        //
-        // This matters because Mario.cs composes movement as
-        //     Transform.Basis * stick, then .Rotated(Up, springArmPivot.Rotation.Y)
-        // (Mario.cs:1777). That is the character's LOCAL basis plus the camera's
-        // LOCAL yaw, and the two only add up to the camera's world yaw while the
-        // character's parent is unrotated. Any rotation left on this node leaks
-        // in as a constant offset, which is why a 180 here comes out as inverted
-        // controls rather than as a turned character.
+        // Hand our authored rotation down to the character BEFORE adding it and keep
+        // only the position ourselves: Mario._Ready reads the node's yaw once as his
+        // START FACING (the way the game's Mario-set-position entry carries one) and
+        // then stands the body unrotated, so this node must be identity by the time
+        // he enters the tree. Rotation 0 here = facing -Z, Godot's forward.
         Basis authored = Transform.Basis;
         Transform = new Transform3D(Basis.Identity, Transform.Origin);
 
@@ -93,6 +84,8 @@ public partial class PlayerSpawner : Node3D
             authored *= Basis.FromEuler(new Vector3(0f, Mathf.DegToRad(ExtraFacingDegrees), 0f));
 
         player.Transform = new Transform3D(authored, Vector3.Zero);
+
+        AddChild(player);
 
         // Hand over anything parented to the spawner in the editor. Only do this
         // for nodes that don't resolve NodePaths in their own _Ready — those run

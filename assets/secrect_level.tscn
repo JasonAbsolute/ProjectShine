@@ -346,7 +346,7 @@ transform = Transform3D(1.1106, 0, 0, 0, 1.1106, 0, 0, 0, 1.1106, -1.75821, 13.9
 Waypoints = PackedVector3Array(0, 6, 0)
 
 [node name="Mario" parent="." unique_id=731191351 instance=ExtResource("2_c15bh")]
-transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 5.652491e-05, 5.689038, 2.9386635)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.652491e-05, 5.689038, 2.9386635)
 
 [node name="ShineTimer" type="Node" parent="Mario" unique_id=1953780351]
 script = ExtResource("8_5ivlt")

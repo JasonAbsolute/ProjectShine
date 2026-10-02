@@ -1584,6 +1584,16 @@ public partial class Mario : CharacterBody3D
             skeleton.AddChild(_armJiggleL);
         }
         armature = GetNode<Node3D>("Armature");
+        // His START FACING is the node's authored yaw -- the game's stage carries one in its Mario-set-position entry
+        // (MarDirectorDirect.cpp 538: getUnk70(i).y goes with the position into rollingStart / the warp) -- read once, then
+        // the body stands unrotated: its children (the armature's yaw, the camera pivot, the sensors) are posed in its frame
+        // as the world's. A level or a PlayerSpawner at rotation 0 starts him facing -Z, Godot's forward; the model's rest
+        // pose faces -Z too (Player.tscn's Skeleton3D, pass 54).
+        float startYaw = GlobalRotation.Y;
+        GlobalRotation = Vector3.Zero;
+        _smsFaceYaw = startYaw;
+        lastFacingDirection = SmsMath.DirFromYaw(startYaw);
+        armature.Rotation = new Vector3(0f, startYaw, 0f);
         _lastArmatureYaw = armature.Rotation.Y; // avoid a false turn-rate spike on the first frame
         animPlayer = GetNode<AnimationPlayer>("AnimationPlayer");
         hangAnchor = GetNodeOrNull<Node3D>("Armature/HangAnchor");
@@ -8456,11 +8466,6 @@ public partial class Mario : CharacterBody3D
         return outDir;
     }
 
-    // If Mario faces BACKWARDS relative to movement, set this to Mathf.Pi.
-    // If he faces correctly, set it to 0.
-    // (This is the main "flip 180°" knob.)
-    private const float MODEL_YAW_OFFSET = 0f;
-
     private float BaseYawFromDir(Vector3 dir)
     {
         if (dir == Vector3.Zero)
@@ -8468,9 +8473,6 @@ public partial class Mario : CharacterBody3D
 
         // Your current convention (forward = -Z)
         float yaw = Mathf.Atan2(-dir.X, -dir.Z);
-
-        // Apply model correction
-        yaw += MODEL_YAW_OFFSET;
 
         return WrapAnglePi(yaw);
     }
@@ -14302,7 +14304,7 @@ public partial class Mario : CharacterBody3D
         if (head < 0 || chest < 0)
             return "";
         Basis skel = skeleton.GlobalTransform.Basis;
-        Vector3 bodyFwd = armature.GlobalTransform.Basis.Z.Normalized();
+        Vector3 bodyFwd = -armature.GlobalTransform.Basis.Z.Normalized(); // the model faces the armature's -Z (pass 54)
         Vector3 headFwd = (skel * skeleton.GetBoneGlobalPose(head).Basis.X).Normalized();
         Vector3 chestUp = (skel * skeleton.GetBoneGlobalPose(chest).Basis.X).Normalized();
         float chestTilt = Mathf.RadToDeg(Mathf.Atan2(chestUp.Dot(bodyFwd), chestUp.Y));

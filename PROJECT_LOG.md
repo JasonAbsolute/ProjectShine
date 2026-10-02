@@ -3829,3 +3829,19 @@ static body clips the camera; metadata `sms_camera_pass` on a body or a parent o
 every carried kind ships SecureViewDist 0 so it is a no-op), SE 0x4826 on the L press. CLIMB is unreachable (the BAR statuses: no bars).
 DEVIATION kept from pass 17: an L press in the air is the hip drop's, never the camera's (the game's execFrontRotate_ refuses only while
 the status is already HIP_DROP).
+
+### Pass 54 -- the model's rest facing (he faced +Z)
+Since the project's first day Mario had to be placed at rotation 180 in every level: the imported model's rest pose faces +Z
+(every Sunshine model does), while Mario.cs and Godot take -Z as forward (YawFromDir = atan2(-x, -z), Vector3.Forward,
+Camera3D). The armature's yaw is set from world directions in the body's frame, so with the body unrotated the mesh ran
+backwards; the 180 on the body flipped it right, and the camera carried an ArmatureForwardIsFlipped (+180) to read the facing.
+FIX (scene-first): Player.tscn's Armature/Skeleton3D is rotated 180 about Y, so the mesh faces the armature's -Z; the siblings
+fitted to the mesh in the body's frame mirror with it (WaistTarget's basis, HangAnchor, pickupCast at -Z, the collision cylinder's
+offset). Level.tscn, secrect_level.tscn and Rico4Secret.tscn's PlayerSpawner go back to rotation 0 -- he still starts facing -Z.
+The camera's ArmatureForwardIsFlipped, Mario.cs's MODEL_YAW_OFFSET knob and the one +Z read (the head-look debug summary) are
+gone. START FACING: Mario._Ready reads the node's authored yaw once (the game's stage carries one in its Mario-set-position entry,
+MarDirectorDirect.cpp 538) into the face angle and the armature, then zeroes the body -- so rotating Mario or a PlayerSpawner in
+a level now turns his start facing instead of inverting the controls; the spawner hands its yaw over before the add.
+Also in this pass: the camera (pass 53) wrote the eye's bearing into the pivot's LOCAL yaw; Mario.cs composes the stick as
+(body basis) x (pivot yaw), so under the 180 the stick ran him toward the camera -- the pivot's yaw is global again (76e19d7).
+Headless: stick up -> velocity . camera-forward +1.00, mesh facing . velocity +1.00, armature -Z . velocity +1.00, body yaw 0.
