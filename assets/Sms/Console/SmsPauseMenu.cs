@@ -21,7 +21,25 @@ public partial class SmsPauseMenu : CanvasLayer
     [Export] public Control Root;          // the blo's 600 x 480 screen, placed about its centre
     [Export] public ColorRect Mask;        // 'mask': black, alpha 180
     [Export] public Control Menu;          // 't_0' at (296, 258)
-    [Export] public TextureRect[] Letters = System.Array.Empty<TextureRect>(); // 'pa00'..'pa04'
+    /// <summary>The title (the game: PAUSE), built from the big letters by <see cref="SmsBigText"/> about the blo's word (its five
+    /// panes 'pa00'..'pa04' at x -153..86, y -111..-141 off 't_0', each turned 12 degrees); a Level's PauseTitle, when set, wins.
+    /// DEVIATION (Jaysonn's): the game's word is fixed and white -- the letters are tinted from <see cref="Palette"/> in turn.</summary>
+    [Export] public string TitleText = "PAUSE";
+    /// <summary>Where the letters come from; {0} = the letter (lower-case, "ex" for !) -- or a ShineLetter{0}.tres style set.</summary>
+    [Export] public string GlyphPathFormat = "res://assets/Sms/hud/big_tx_{0}.png";
+    [Export] public bool Colored = true;
+    [Export] public Color[] Palette = SmsBigText.DefaultPalette();
+    [Export] public float GlyphHeight = 78f;
+    [Export] public float LetterGap = -8f;
+    [Export] public float SpaceWidth = 28f;
+    /// <summary>The blo's PAUSE: pane centres averaging (-3, -78) off 't_0', on its hand-laid wave (+6, +17, -24, +1, +1), tilted -12.</summary>
+    [Export] public Vector2 TitleCenter = new Vector2(-3f, -78f);
+    [Export] public float[] TitleWave = { 5.8f, 16.8f, -24.2f, 0.8f, 0.8f };
+    [Export] public float TitleTilt = -12f;
+    /// <summary>A longer title is built smaller to fit this many blo px (760 fills a 16:9 window). 0 = never.</summary>
+    [Export] public float MaxWidth = 760f;
+    private TextureRect[] Letters = System.Array.Empty<TextureRect>(); // the title's letters, built under Menu
+    private string _builtTitle;
     [Export] public TextureRect[] Items = System.Array.Empty<TextureRect>();   // 'tx_1'..'tx_3'
     [Export] public Control Stage;         // 'brek' at (296, 412)
     [Export] public Label StageName, ScenarioName;
@@ -66,12 +84,7 @@ public partial class SmsPauseMenu : CanvasLayer
     {
         ProcessMode = ProcessModeEnum.Always;
         _mario = GetParent() as Mario;
-        _letterHome = new Vector2[Letters.Length]; _letterSize = new Vector2[Letters.Length]; _letterRot = new float[Letters.Length];
-        for (int i = 0; i < Letters.Length; i++)
-        {
-            _letterHome[i] = Letters[i].Position; _letterSize[i] = Letters[i].Size; _letterRot[i] = Letters[i].Rotation;
-            Letters[i].PivotOffset = Letters[i].Size * 0.5f;
-        }
+        BuildTitle(CurrentTitle());
         _itemHome = new Vector2[Items.Length]; _itemSize = new Vector2[Items.Length];
         for (int i = 0; i < Items.Length; i++)
         {
@@ -93,6 +106,33 @@ public partial class SmsPauseMenu : CanvasLayer
             Root.Visible = false;
         if (Mask != null)
             Mask.Visible = false;
+    }
+
+    private string CurrentTitle()
+    {
+        var level = GetTree()?.CurrentScene as Level;
+        return !string.IsNullOrEmpty(level?.PauseTitle) ? level.PauseTitle : TitleText;
+    }
+
+    /// <summary>(Re)builds the title's letters under <see cref="Menu"/> and takes their rest places; the old ones are freed.</summary>
+    private void BuildTitle(string text)
+    {
+        foreach (TextureRect t in Letters)
+            if (IsInstanceValid(t))
+            {
+                t.GetParent()?.RemoveChild(t); // out of the tree now: the new letters may take the names
+                t.QueueFree();
+            }
+        Letters = Menu != null
+            ? SmsBigText.Build(Menu, text, GlyphPathFormat, TitleCenter, GlyphHeight, LetterGap, SpaceWidth, Palette, Colored, TitleWave, TitleTilt, MaxWidth).ToArray()
+            : System.Array.Empty<TextureRect>();
+        _letterHome = new Vector2[Letters.Length]; _letterSize = new Vector2[Letters.Length]; _letterRot = new float[Letters.Length];
+        for (int i = 0; i < Letters.Length; i++)
+        {
+            _letterHome[i] = Letters[i].Position; _letterSize[i] = Letters[i].Size; _letterRot[i] = Letters[i].Rotation;
+            Letters[i].Visible = false;
+        }
+        _builtTitle = text;
     }
 
     public override void _Process(double delta)
@@ -151,6 +191,9 @@ public partial class SmsPauseMenu : CanvasLayer
             Items[i].Position = _itemHome[i]; Items[i].Size = _itemSize[i];
             Items[i].Rotation = i == 0 ? 0f : _firstItemRot; // the first item's tilt turns in during the appear
         }
+        string title = CurrentTitle();
+        if (title != _builtTitle)
+            BuildTitle(title);
         for (int i = 0; i < Letters.Length; i++)
         {
             Letters[i].Visible = false;

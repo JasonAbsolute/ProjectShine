@@ -75,6 +75,9 @@ public partial class Level : Node3D
     /// scenarioname.bmg give them in the game. Empty: the bar shows no text.</summary>
     [Export] public string StageName = "";
     [Export] public string ScenarioName = "";
+    /// <summary>What a miss says here (empty: the console's own MissText, TOO BAD!) and the pause menu's title (empty: PAUSE).</summary>
+    [Export] public string MissText = "";
+    [Export] public string PauseTitle = "";
 
     /// <summary>Fallback only, used if a BarnDoorVertical track can't be found on
     /// IntroAnimationName to read its authored close speed from — the skip path's

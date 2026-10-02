@@ -3968,3 +3968,21 @@ emitter invalidated). Jaysonn's SlideDustFx (node + assets/SlideDustFx.cs) is RE
 the new turning follow the ARMATURE (his facing) -- the body never turns since pass 54 -- and AtFeet follows mPosition. NOT PORTED:
 the wet ground's spray (ms_m_watslide_a/b/c), the sand's (ms_m_slidesand_a/b), the puff's downward 3 u/f, the hit marks' texture
 scroll; the airResist brake is a linear one over the same distance.
+
+### Pass 61 -- the big letters coloured and free, the death wipe's frame
+The console's big letters (big_tx_*.bti, 64 x 64 CMPR: white glyphs with a black outline) are laid out by hand in big_tx_1.blo /
+pause_1.blo as 78 x 78 panes, white (PIC1 white ffffffff; TConsoleStr and TPauseMenu2 never tint them): TOO BAD! at x 76 / 133 / 186 /
+274 / 335 / 400 / 463, y 338 (advances 57, 53, 88 across the space, 61, 65, 63); PAUSE off 't_0' at (-153,-111) (-102,-100) (-52,-141)
+(13,-116) (86,-116), each ROT 12. The disc has 17 letters (a b d e g h i m n o p r s t u y, !); Font/sms_alphabet_textures (a fan pack)
+adds c f j k l q v w x z -- the whole alphabet is now assets/Sms/hud/big_tx_{letter}.png. PORT: assets/Sms/Console/SmsBigText.cs builds
+a word from a string (a glyph's pane from the texture's aspect, advancing by its opaque width + gap (-8, the blo's mean hand spacing, a
+space 28; a word wider than MaxWidth (760 = a 16:9 window) is built smaller to fit), centred on a point, an optional vertical wave and tilt, SelfModulate from a palette in turn; {0} in the path format = the
+letter, "ex" for !, or a ShineLetter{0}.tres style token). SmsConsoleStr: MissText (TOO BAD!) built about the blo's word centre
+(308.5, 377), rebuilt when a Level's MissText differs; SmsPauseMenu: TitleText (PAUSE) under 't_0' at centre (-3, -78) on the game's
+wave (+5.8, +16.8, -24.2, +0.8, +0.8), tilt -12, a Level's PauseTitle winning; both Colored with Jaysonn's Shine Get palette (green,
+pink, yellow, teal, orange, pink-red) -- DEVIATION, his: the game's words are fixed and white (Colored off = the game). Level.cs:
+MissText / PauseTitle exports. The scenes' hand-placed panes are gone. THE WIPE: the Hx wiper's frame is the game's RENDER size,
+640 x 448 (TSMSFader::setDisplaySize(SMSGetGameRenderWidth/Height), Resolution.cpp 61-63; Hx_ResetWipe), and Hxs1_Test2 skips rows
+off that frame without spending its count; the port stretched a 640 x 480 frame, whose bottom 30 rows the four rings do not cover (a
+wedge at x 215-222 on rows 478-480, Jaysonn's Ref/screenWipe.png) -- Fader.gdshader now works in 640 x 448 (the iris centre (320, 224)).
+NOT PORTED: the letters' sparkle (0x1F9) still; the items (CONTINUE / SAVE / EXIT AREA) keep the game's white + selected green.
