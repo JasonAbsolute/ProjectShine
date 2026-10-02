@@ -4666,6 +4666,7 @@ public partial class Mario : CharacterBody3D
             || stateOfMario == MarioState.carrying
             || stateOfMario == MarioState.pickupFail
             || stateOfMario == MarioState.hurt
+            || stateOfMario == MarioState.dead // loserExec(): the game-over status is final -- a lethal hit taken on the landing frame (the re-burn of a hot floor he lands back in) must not land him as idle (pass 55 fix)
             || stateOfMario == MarioState.swimming
             || stateOfMario == MarioState.bonk
             || stateOfMario == MarioState.stomping

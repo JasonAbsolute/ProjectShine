@@ -3864,3 +3864,7 @@ every pixel the body covers becomes its own inverse, every frame, no flicker (Re
 excluded -- TWaterGun draws its own model) whose shader writes 1 - screen at its pixels; reading the screen puts it in the transparent
 pass over the shaded body at its own depth. On with ELECTRIC_DAMAGE, off at its end, at ELEC_DOWN and at a respawn. The earlier log
 called this "a blue shimmer": wrong -- it is a logic-op inversion.
+FIX (his playtest, 23:13): a lethal burn taken as he landed back in the fire left him standing at 0 HP -- EnterDead() ran inside the
+surface checks after the move, and the frame's tail landing block (airborne -> floor) skipped `hurt` but not `dead`, so it re-landed him as
+idle. `dead` joins the skip list: loserExec()'s status is final. Drive: HP 1 standing -> dead; HP 2, floor kept hot -> burn, the landing's
+re-burn -> dead and stays.
