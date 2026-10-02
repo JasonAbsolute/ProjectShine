@@ -151,6 +151,8 @@ public partial class Mario : CharacterBody3D
     private bool _hurtAirborne = false; // true if hit while not on floor
     // SMS damage: damageExec() and the *_DOWN statuses (MarioCollision.cpp, MarioRun.cpp downingCommon, MarioJump.cpp jumpDownCommon)
     private int _smsInvincibleTicks = 0;      // mInvincibilityFrames: 120 Hz ticks (thinkParams runs in playerControl), from the attacker's InvincibleTime
+    private bool _smsGameOver;                // MARIO_FLAG_GAME_OVER: loserExec() set it; a FIRE_DOWN may still fly with it (pass 56)
+    private bool _smsLoserFalling;            // DOWN_LOSER: dropping in ANIM_LAND until the floor, then LOSER_DOWN's ma_die
     private bool _smsDownFore = false;        // FORE_DOWN family (hit from behind: faces away, falls on his face) vs BACK_DOWN (faces the attacker, on his back)
     private int _smsDownType = 1;             // 0 SAFE, 1 SHORT, 2 the full DOWN
     private bool _smsDownAir = false;         // JUMP_*_DOWN: falling, horizontal speed forced to +-16 along the face every tick
@@ -656,7 +658,7 @@ public partial class Mario : CharacterBody3D
     private SmsFireDamageFx _smsFireFx;                 // Fx/FireDamage.tscn: ms_firedmg_a -- the burn's cloud, a bound copy per burn (pass 51)
     private SmsShockSparks _smsShockSparks;             // Fx/ShockSparks.tscn: ms_m_biri_a / b / c -- the shock's sparks, on while ELECTRIC_DAMAGE ticks (pass 51)
     private SmsShockPuff _smsShockPuff;                 // Fx/ShockPuff.tscn: ms_moe_fire_off -- the shock's closing puff (pass 51)
-    private SmsShockNegative _smsShockNegative;         // Fx/ShockNegative.tscn: drawLogic()'s GX_LO_INV -- the body drawn as its negative while shocked (pass 55)
+    private SmsBodyOverlay _smsBodyOverlay;             // Fx/BodyOverlay.tscn: the damage fog (addDamageFog) and the shock's negative (drawLogic) over the body (pass 56)
     private int _smsCenterBone = -2;                    // the 'center' joint (getCenterAnmMtx)
     private float _smsHipAttackTicks;                   // hipAttacking() mStatusTimer through the fall (120 Hz ticks); > SuperHipAttackCt = the super hip drop
     /// <summary>hipAttacking() mStatusState == 3: this hip drop fell longer than jump.prm's mSuperHipAttackCt (80 ticks, 0.67 s), so it is the
@@ -2269,6 +2271,8 @@ public partial class Mario : CharacterBody3D
         {
             if (!IsOnFloor())
                 velocity += GRAVITY * (float)delta;
+            else if (_smsLoserFalling)
+                SmsLoserDown(); // downLoser(): jumpProcess() has landed -> LOSER_DOWN
 
             // Press R to respawn
             if (Input.IsKeyPressed(Key.R))
@@ -5399,11 +5403,11 @@ public partial class Mario : CharacterBody3D
         _smsFireFx = SmsFluddModel.FindChild<SmsFireDamageFx>(this);
         _smsShockSparks = SmsFluddModel.FindChild<SmsShockSparks>(this);
         _smsShockPuff = SmsFluddModel.FindChild<SmsShockPuff>(this);
-        _smsShockNegative = SmsFluddModel.FindChild<SmsShockNegative>(this);
+        _smsBodyOverlay = SmsFluddModel.FindChild<SmsBodyOverlay>(this);
         _smsSpinBlur?.Bind(this);
         _smsShockSparks?.Bind(this);
         _smsShockPuff?.Bind(this);
-        _smsShockNegative?.Bind(this);
+        _smsBodyOverlay?.Bind(this);
         _smsHipBlur?.Bind(this);
         _smsSuperHipBlur?.Bind(this);
         // pass 29: no fallback -- the scenes are the effects; a missing one is an error and that effect simply does not play
@@ -5429,8 +5433,8 @@ public partial class Mario : CharacterBody3D
             GD.PushError("[SMS fx] Player.tscn has no ShockSparks under Mario: instance res://assets/Sms/Fx/ShockSparks.tscn there (the shock's sparks, ms_m_biri_a / b / c)");
         if (_smsShockPuff == null)
             GD.PushError("[SMS fx] Player.tscn has no ShockPuff under Mario: instance res://assets/Sms/Fx/ShockPuff.tscn there (the shock's closing puff, ms_moe_fire_off)");
-        if (_smsShockNegative == null)
-            GD.PushError("[SMS fx] Player.tscn has no ShockNegative under Mario: instance res://assets/Sms/Fx/ShockNegative.tscn there (the shock's negative, drawLogic)");
+        if (_smsBodyOverlay == null)
+            GD.PushError("[SMS fx] Player.tscn has no BodyOverlay under Mario: instance res://assets/Sms/Fx/BodyOverlay.tscn there (the damage fog and the shock's negative)");
         if (SmsDebugPrint)
             GD.Print($"[SMS fx] spin rings {(_smsSpinBlur != null ? "from the scene" : "MISSING")}, hip drop streak {(_smsHipBlur != null ? "from the scene" : "MISSING")}, hip drop landing {(_smsHipLanding != null ? "from the scene" : "MISSING")}, super hip drop fall {(_smsSuperHipBlur != null ? "from the scene" : "MISSING")} / landing {(_smsSuperHipLanding != null ? "from the scene" : "MISSING")}, bonk stars {(_smsBonkStars != null ? "from the scene" : "MISSING")}, camera shake {(_smsCameraShake != null ? "from the scene" : "MISSING")}, bubbles {(_smsBubbles != null ? "from the scene" : "MISSING")}, burn cloud {(_smsFireFx != null ? "from the scene" : "MISSING")}, shock sparks {(_smsShockSparks != null ? "from the scene" : "MISSING")} / puff {(_smsShockPuff != null ? "from the scene" : "MISSING")}");
     }
@@ -14633,12 +14637,36 @@ public partial class Mario : CharacterBody3D
     }
 
     /// <summary>The port's death (ma_die, R respawns); the game's loserExec.</summary>
+    /// <summary>
+    /// loserExec() (MarioCollision.cpp 202): MARIO_FLAG_GAME_OVER, HP 0, MARIO_STATUS_DOWN_LOSER. downLoser() (MarioAutodemo.cpp 148) drops
+    /// him straight down in ANIM_LAND -- setPlayerVelocity(0) each tick, the fall keeps its vy -- until jumpProcess() lands, then LOSER_DOWN:
+    /// loserDown() (MarioRun.cpp 1474), ANIM_DIE and the voice, the slide out at 0.9 a tick. On the ground the landing is immediate. The
+    /// game's director fades the stage out two ticks after the flag; the port has no stage reload, so the pose holds until R.
+    /// </summary>
     private void EnterDead()
     {
+        _smsGameOver = true;
         stateOfMario = MarioState.dead;
-        velocity = Vector3.Zero;
         _smsDownAnim = "";
         SleepStatus(true); // Close eyes
+        velocity = new Vector3(0f, velocity.Y, 0f); // downLoser(): setPlayerVelocity(0.0f)
+        if (!IsOnFloor())
+        {
+            _smsLoserFalling = true;
+            SmsDownPlay("ma_land", 1f); // setAnimation(ANIM_LAND, 1.0f) while he drops
+            return;
+        }
+        SmsLoserDown();
+    }
+
+    /// <summary>LOSER_DOWN (loserDown(), MarioRun.cpp 1474): ANIM_DIE on the ground; the reaction voices are not ported.</summary>
+    private void SmsLoserDown()
+    {
+        _smsLoserFalling = false;
+        _smsGameOver = true;
+        stateOfMario = MarioState.dead;
+        velocity = Vector3.Zero;
+        SleepStatus(true);
         if (animTree != null)
         {
             animPlayer.Stop(false);
@@ -14889,10 +14917,7 @@ public partial class Mario : CharacterBody3D
         if (SmsDebugPrint)
             GD.Print($"[SMS fire] hot floor '{_smsSurfaceNode}': -{p.Damage} HP -> {_health}/{StartingHealth}{(burning ? ", already burning: face turned 180" : "")}; invincible {_smsInvincibleTicks} ticks");
         if (_health <= 0)
-        {
-            EnterDead(); // decHP -> loserExec(): the game-over status wins over the FIRE_DOWN that would follow
-            return;
-        }
+            _smsGameOver = true; // decHP() -> loserExec(): MARIO_FLAG_GAME_OVER and DOWN_LOSER -- which the FIRE_DOWN below replaces (changePlayerStatus refuses only from LOSER_DOWN): the jump flies at 0 HP and its landing is the loser pose (SmsTickFireDown)
         SmsFireDownEnter(SmsParams.Jump.GraffitoFireStatusArg, fwd, face, "the hot floor"); // the game passes 1 (fwd kept); 0 = his backward kick (SmsParams.Jump.GraffitoFireStatusArg)
     }
 
@@ -14957,6 +14982,11 @@ public partial class Mario : CharacterBody3D
     {
         if (IsOnFloor() && velocity.Y <= 0.01f && _smsNoLandFrames <= 0)
         {
+            if (_smsGameOver)
+            {
+                SmsLoserDown(); // loserExec() had set DOWN_LOSER before the FIRE_DOWN replaced it: the game's director fades the stage out meanwhile; here the landing takes the loser pose
+                return;
+            }
             if (_smsFireBounces < 2 && _smsFireVy < 0f)
             {
                 _smsFireVy = 0.4f * -_smsFireVy;
@@ -15152,8 +15182,8 @@ public partial class Mario : CharacterBody3D
         _smsDownAnim = "";
         if (_smsShockSparks != null)
             _smsShockSparks.Active = true; // elecEffect() every tick: the three emitters live while the ticks come (bind 1)
-        if (_smsShockNegative != null)
-            _smsShockNegative.Active = true; // drawSpecial(): drawLogic() every frame of ELECTRIC_DAMAGE -- the body drawn as its negative
+        if (_smsBodyOverlay != null)
+            _smsBodyOverlay.Negative = true; // drawSpecial(): drawLogic() every frame of ELECTRIC_DAMAGE -- the body drawn as its negative
         if (SmsDebugPrint)
             GD.Print($"[SMS elec] ELECTRIC_DAMAGE from {from}: locked for 120 ticks, ma_shock, the sparks {(_smsShockSparks != null ? "from the scene" : "MISSING")}");
     }
@@ -15188,8 +15218,8 @@ public partial class Mario : CharacterBody3D
             {
                 if (_smsShockSparks != null)
                     _smsShockSparks.Active = false; // the calls stop: the emitters are invalidated, the live sparks finish
-                if (_smsShockNegative != null)
-                    _smsShockNegative.Active = false; // drawSpecial(): the status leaves ELECTRIC_DAMAGE, the logic pass stops
+                if (_smsBodyOverlay != null)
+                    _smsBodyOverlay.Negative = false; // drawSpecial(): the status leaves ELECTRIC_DAMAGE, the logic pass stops
                 _smsShockPuff?.Play(); // elecEndEffect(): ms_moe_fire_off at the centre + 30
                 _smsInvincibleTicks = 0x3C; // damageExec(&mFloorHitActor, 0, 3, ..., 0x3C): 0 HP, no knockdown, 60 ticks invincible
                 SmsHurtStandUp($"[SMS elec] {_smsElecTicks} ticks: WAIT, invincible 60 ticks, the puff {(_smsShockPuff != null ? "from the scene" : "MISSING")} (the tremble and the reaction voice are not ported)");
@@ -15206,8 +15236,8 @@ public partial class Mario : CharacterBody3D
     {
         if (_smsShockSparks != null)
             _smsShockSparks.Active = false; // elecEffect() is no longer called; elecEndEffect() never is
-        if (_smsShockNegative != null)
-            _smsShockNegative.Active = false; // drawSpecial(): ELEC_DOWN is not ELECTRIC_DAMAGE -- no logic pass
+        if (_smsBodyOverlay != null)
+            _smsBodyOverlay.Negative = false; // drawSpecial(): ELEC_DOWN is not ELECTRIC_DAMAGE -- no logic pass
         stateOfMario = MarioState.dead;
         velocity = Vector3.Zero;
         _smsDownAnim = "";
@@ -16039,6 +16069,8 @@ public partial class Mario : CharacterBody3D
         SmsYCamReset();      // the rig's camera back, no lock
         SmsCameraWarpBehind(); // the game's camera starts behind him as a stage load's does (pass 53)
         _health = StartingHealth;
+        _smsGameOver = false;
+        _smsLoserFalling = false;
         SmsAirReset();
         _smsSwimAnim = "";
         animPlayer.SpeedScale = 1f;
@@ -17011,8 +17043,9 @@ public partial class Mario : CharacterBody3D
         SmsCheckGraffito(); // checkGraffito(): after the status exec and the move, every tick
         if (_smsShockSparks != null && _smsShockSparks.Active && !(stateOfMario == MarioState.hurt && _smsDownKind == SmsDownKind.Electric))
             _smsShockSparks.Active = false; // whatever ended the shock (a respawn): no elecEffect() call this tick, the emitters go
-        if (_smsShockNegative != null && _smsShockNegative.Active && !(stateOfMario == MarioState.hurt && _smsDownKind == SmsDownKind.Electric))
-            _smsShockNegative.Active = false; // drawSpecial() reads the status each frame: no ELECTRIC_DAMAGE, no logic pass
+        if (_smsBodyOverlay != null && _smsBodyOverlay.Negative && !(stateOfMario == MarioState.hurt && _smsDownKind == SmsDownKind.Electric))
+            _smsBodyOverlay.Negative = false; // drawSpecial() reads the status each frame: no ELECTRIC_DAMAGE, no logic pass
+        _smsBodyOverlay?.SetDamageFog(_smsInvincibleTicks > 0 && stateOfMario != MarioState.talking); // addDamageFog(): the pink fog pulses while mInvincibilityFrames > 0, never while talking
         SmsRoofHangCheck(); // jumpProcess() roofCode 4: a fence roof met by the head while rising, hands empty -> HANG_ROOF
         if (_smsNoLandFrames > 0)
             _smsNoLandFrames--;

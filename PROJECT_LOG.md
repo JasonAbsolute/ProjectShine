@@ -3868,3 +3868,23 @@ FIX (his playtest, 23:13): a lethal burn taken as he landed back in the fire lef
 surface checks after the move, and the frame's tail landing block (airborne -> floor) skipped `hurt` but not `dead`, so it re-landed him as
 idle. `dead` joins the skip list: loserExec()'s status is final. Drive: HP 1 standing -> dead; HP 2, floor kept hot -> burn, the landing's
 re-burn -> dead and stays.
+
+### Pass 56 -- the damage fog and the loser statuses (his playtest, 23:23)
+"MARIO SHOULD PULSE RED WHEN HE'S HIT": the game's TMario::addDamageFog (MarioDraw.cpp 2185, from perform's draw): while
+mInvincibilityFrames > 0 and he is not talking, every material of the body, the cap and the hands gets a fog of colour (0xFF, 0x00,
+0x80); SMS_AddDamageFogEffect (DrawUtil.cpp) sets its range about his view depth d -- start = d - 700 + 300 s, end = d + 500 + 300 s,
+s = sin(moveTick x 0x888), a 30-tick (1 s) pulse free-running on the director's tick -- so the linear fog factor at his depth is
+(700 - 300 s) / 1200 = 7/12 - s/4: he blends 33..83 % toward the pink. (The fog type is taken as linear; the BMD's fog block was not
+read.) PORT: assets/Sms/Fx/BodyOverlay (.tscn, SmsBodyOverlay.cs, BodyOverlay.gdshader) REPLACES ShockNegative: one overlay on the
+meshes under Armature (the water gun's subtree excluded) whose shader does the game's two draws in the game's order -- mix(screen,
+(1, 0, 0.5), fog) then, when negative, 1 - c. Mario pushes addDamageFog's condition each tick (invincible and not talking); the node
+runs the pulse in _Process. The shock's negative is the same node's Negative. THE LOSER STATUSES ("the final hit still sends him
+straight up and then he lands then plays the animation"): loserExec() (MarioCollision.cpp 202) sets MARIO_FLAG_GAME_OVER and
+DOWN_LOSER; downLoser() (MarioAutodemo.cpp 148) drops him straight down in ANIM_LAND (setPlayerVelocity(0) each tick) until the floor,
+then LOSER_DOWN (loserDown(), MarioRun.cpp 1474): ANIM_DIE + the voice. For the hot floor, checkGraffitoFire's changePlayerStatus(
+FIRE_DOWN, 1) then REPLACES DOWN_LOSER (changePlayerStatus refuses only from LOSER_DOWN), so the fire jump flies at 0 HP; the game's
+director takes the GAME_OVER flag two ticks later and fades the stage out mid-flight (STATE_UNK7: the Miss screen, a 2 s wipe, the
+stage reload). The port has no stage reload: the fire jump lands and the landing takes the loser pose (SmsTickFireDown -> SmsLoserDown),
+no bounces. EnterDead() is now loserExec()'s pair: airborne -> ma_land down to the floor -> ma_die; grounded -> ma_die at once (as
+the game). _smsGameOver blocks re-burns and hits (the decHP guards); Respawn clears it. The reaction voices (MV08A / MV08B) are not
+ported.

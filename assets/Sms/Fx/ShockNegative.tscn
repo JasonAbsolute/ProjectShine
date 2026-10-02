@@ -1,14 +1,18 @@
 [gd_scene load_steps=4 format=3 uid="uid://cshockneg00055"]
 
-[ext_resource type="Script" path="res://assets/Sms/Fx/SmsShockNegative.cs" id="1_script"]
-[ext_resource type="Shader" path="res://assets/Sms/Fx/ShockNegative.gdshader" id="2_shader"]
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsBodyOverlay.cs" id="1_script"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/BodyOverlay.gdshader" id="2_shader"]
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_negative"]
-resource_name = "shock's negative (drawLogic: GX_LO_INV over the body model's pixels, every frame of ELECTRIC_DAMAGE)"
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_overlay"]
+resource_name = "the body's overlay: the damage fog (addDamageFog, (255,0,128) pulsing 0.33..0.83 at 1 Hz while invincible) and the shock's negative (drawLogic, GX_LO_INV)"
 render_priority = 1
 shader = ExtResource("2_shader")
+shader_parameter/fog = 0.0
+shader_parameter/fog_color = Color(1, 0, 0.501961, 1)
+shader_parameter/negative = false
 
-[node name="ShockNegative" type="Node"]
+[node name="BodyOverlay" type="Node"]
 script = ExtResource("1_script")
-Negative = SubResource("ShaderMaterial_negative")
+Overlay = SubResource("ShaderMaterial_overlay")
 ExcludedSubtrees = PackedStringArray("SmsFluddAttach")
+FogPeriodSeconds = 1.0
