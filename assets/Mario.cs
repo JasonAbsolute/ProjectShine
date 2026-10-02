@@ -68,6 +68,8 @@ public partial class Mario : CharacterBody3D
         ledgeDescend, // SMS: climbing down over an edge into a hang (checkDescent -> DESCEND, ma_hgdwn)
         swimming,     // SMS: the SWIM_* statuses (MarioSwim.cpp), sub-status in _smsSwim
         fluddRocket,  // SMS: MARIO_STATUS_ROCKET -- the hover nozzle's spring to the press height + 230 units, or the rocket nozzle's launch (rocketing())
+        fence,        // SMS: the FENCE_* statuses (MarioSpecial.cpp 1294-1535), sub-status in _smsFence (pass 52)
+        roofHang,     // SMS: HANG_ROOF / WAIT_ROOF / MOVE_ROOF / KICK_ROOF (MarioSpecial.cpp 199-410), sub-status in _smsRoof (pass 52)
     }
 
     private struct AirControlProfile
@@ -170,6 +172,24 @@ public partial class Mario : CharacterBody3D
     private bool _smsDirty = false;           // MARIO_FLAG_DIRTY: the floor under him last tick was polluted
     private enum SmsPollution { None, Fire, Electric }
     private SmsPollution _smsPollution = SmsPollution.None; // mPollutionTypeStandingOn: the floor body's sms_pollution tag (None off the floor)
+    // Fences and the roof hang (pass 52): metadata sms_fence (any value) or the group sms_fence on the body (or a parent up to three up)
+    private enum SmsFence { Catch, JumpCatch, Move, Punch }
+    private enum SmsRoof { Hang, Wait, Move, Kick }
+    private SmsFence _smsFence = SmsFence.Catch;
+    private SmsRoof _smsRoof = SmsRoof.Hang;
+    private Vector3 _smsFenceNormal = Vector3.Back;    // the fence plane's outward normal (he faces -normal, pressed on it)
+    private Node _smsFenceBody;                         // the fence (or roof) body he is on
+    private string _smsFenceAnim = "";
+    private bool _smsFencePunchHit = false;             // fencePunch(): checkPass(5) fired
+    private int _smsRoofTicks = 0;                      // hangRoof() mStatusTimer
+    private int _smsRoofArg = 0;                        // mStatusArg bit 0: the hand (the L / R clips)
+    private float _smsRoofFwd = 0f;                     // mForwardVel under the roof (doRoofMovingProcess: + 1 a tick to 4.0)
+    private float _smsRoofY = 0f;                       // mFloorPosition.x: the roof's Y, world metres
+    private float _smsRoofNormalY = -1f;                // the roof plane's normal.y (the step is scaled by it)
+    /// <summary>MSD_SE_MA_FENCE_PUNCH (A off the fence, B's punch) and MSD_SE_MA_FENCE_CATCH (the grab; the game plays it from its status sound
+    /// table): AudioStreamPlayer3Ds under Mario, empty = silent.</summary>
+    [Export] public AudioStreamPlayer3D FencePunchSound;
+    [Export] public AudioStreamPlayer3D FenceCatchSound;
     // Swimming (MarioSwim.cpp). Water: Area3D in group "sms_water", surface = metadata sms_water_surface_y or its BoxShape3D's top.
     private enum SmsSwim { Start, Wait, WaitToPaddle, PaddleStart, Paddle, PaddleEnd, PaddleEndToWait, Up, Dive, PDamage, Down, PDown }
     private SmsSwim _smsSwim = SmsSwim.Start;
@@ -1879,7 +1899,8 @@ public partial class Mario : CharacterBody3D
         // only further than that does he fall. Godot's floor_snap_length is the same mechanism (Player.tscn ships 0.6 m),
         // and it also feeds the downhill constant-speed redirect. The launch-frame override stays.
         float baseSnap = (UseSmsPhysics && SmsLedgeSnap) ? SmsGroundContact.LedgeDropMetres : _baseFloorSnapLength;
-        FloorSnapLength = ((inJumpLaunchState && IsOnFloor()) || stateOfMario == MarioState.swimming) ? 0f : baseSnap;
+        FloorSnapLength = ((inJumpLaunchState && IsOnFloor()) || stateOfMario == MarioState.swimming
+            || stateOfMario == MarioState.fence || stateOfMario == MarioState.roofHang) ? 0f : baseSnap; // pinned to the plane / the roof: no snap to the floor
 
         // Sample horizontal acceleration on the fixed physics step for the chest
         // jiggle. Uses last frame's resolved Velocity (post-MoveAndSlide) — clean,
@@ -2263,6 +2284,16 @@ public partial class Mario : CharacterBody3D
             if (stateOfMario == MarioState.fluddRocket)
             {
                 SmsTickRocketStatus(delta, inputDirWorld); // rocketing(): no other handler runs
+                goto EndFrame;
+            }
+            if (stateOfMario == MarioState.fence)
+            {
+                SmsTickFence(delta, LstickVec, camYaw, inputDirWorld); // fenceCatch() / fenceJumpCatch() / fenceMove() / fencePunch(): no other handler runs
+                goto EndFrame;
+            }
+            if (stateOfMario == MarioState.roofHang)
+            {
+                SmsTickRoof(delta, inputDirWorld); // hangRoof() / waitRoof() / moveRoof() / kickRoof(): no other handler runs
                 goto EndFrame;
             }
             // running(): FLUDD_EMITTING && A && mForwardVel > DashMax - 1 -> BROAD_JUMP (before the ordinary jump reads A)
@@ -7778,6 +7809,12 @@ public partial class Mario : CharacterBody3D
         if (wallNXZ.Length() < 0.001f)
             return;
         wallNXZ = wallNXZ.Normalized();
+        if (UseSmsPhysics && SmsIsFenceBody(SmsWallColliderNode()))
+        {
+            // running(): a wall he is pushed against that isFence() -> FENCE_CATCH (the bonk above ClashSpeed never got here)
+            SmsFenceCatchEnter(false, wallNXZ, SmsWallColliderNode(), "the run");
+            return;
+        }
 
         // Movement direction (normalized, XZ only)
         Vector3 moveDir = new Vector3(inputDirWorld.X, 0, inputDirWorld.Z);
@@ -8300,6 +8337,12 @@ public partial class Mario : CharacterBody3D
             {
                 // jumpingBasic() case 2 tests mForwardVel: the signed speed ALONG the face, not the speed into the wall.
                 float smsFwd = SmsUnits.MpsToSpeed(vXZ.Dot(smsFace));
+                if (SmsIsFenceBody(SmsWallColliderNode()) && heldBody == null && airStateAtContact != MarioState.ledgeHopUp && airStateAtContact != MarioState.ledgeClimb && airStateAtContact != MarioState.ledgeDescend)
+                {
+                    // jumpingBasic() case 2: mWallPlane->isFence() -> the face into it, rumble, FENCE_JUMP_CATCH -- before the 16 / 40 speed branches
+                    SmsFenceCatchEnter(true, nXZ, SmsWallColliderNode(), $"{airStateAtContact} at fwd {smsFwd:F1}");
+                    return;
+                }
                 if (airStateAtContact == MarioState.bellyRollout)
                 {
                     // catchStop() case 2: the small roll into any wall just stops (setPlayerVelocity(0)) and lands.
@@ -11593,6 +11636,8 @@ public partial class Mario : CharacterBody3D
             case MarioState.ledgeClimb:
             case MarioState.ledgeHopUp:
             case MarioState.ledgeDescend:
+            case MarioState.fence:
+            case MarioState.roofHang:
                 return; // the game excludes its swimming, fence and demo statuses; these are ours of that kind
         }
         SmsEnterSwimming(depthUnits);
@@ -11829,6 +11874,8 @@ public partial class Mario : CharacterBody3D
             Vector3 wn = GetWallNormal();
             if (new Vector3(velocity.X, 0f, velocity.Z).Dot(wn) < 0f)
             {
+                if (SmsFenceTryCatchSwim(wn))
+                    return; // checkSwimToHangFence(): the stick pushed, the wall a fence, facing into it -> 100 units up, FENCE_CATCH
                 if (_fluddDashing && _smsSwim == SmsSwim.Paddle && Mathf.Abs(wn.Y) < 0.5f)
                 {
                     SmsFluddSurfWall(new Vector3(wn.X, 0f, wn.Z));
@@ -15159,6 +15206,679 @@ public partial class Mario : CharacterBody3D
             GD.Print("[SMS elec] the shock took the last HP: ELEC_DOWN (ma_shock_down)");
     }
 
+    // =====================================================================================
+    //  SMS FENCES (FENCE_CATCH / FENCE_JUMP_CATCH / FENCE_MOVE / FENCE_PUNCH, MarioSpecial.cpp 1294-1535) and the ROOF HANG (HANG_ROOF /
+    //  WAIT_ROOF / MOVE_ROOF / KICK_ROOF, MarioSpecial.cpp 199-410). Pass 52. One surface attribute does both in the game
+    //  (BG_TYPE_CLIMBABLE_FENCE 0x10A, TBGCheckData::isFence): met as a WALL plane it is climbed, met as a ROOF plane it is hung under.
+    //  Here the collision body (or a parent up to three levels up) carries metadata sms_fence (any value) or the group sms_fence; the
+    //  game's checkWallPlane(pos, yOff, radius) probes (a wall within radius of a point ahead of him, at yOff) are rays along the face
+    //  from a little behind him to that reach. Positions are the FEET (the game's mPosition); the body is pinned to the plane each
+    //  frame (no MoveAndSlide velocity, no floor snap). The game's objects (the Boo net 0x4000006A: a punch flips him to the far side, a
+    //  kick rolls him onto the net; moving fences) are not ported: a plain static fence. Not ported either: the rumbles, the voices, the
+    //  wall-kick dust of the jump-off, the fence camera kind.
+    // =====================================================================================
+    private static bool SmsIsFenceBody(Node start)
+    {
+        Node n = start;
+        for (int depth = 0; n != null && depth < 3; depth++, n = n.GetParent())
+            if (n.HasMeta("sms_fence") || n.IsInGroup("sms_fence"))
+                return true;
+        return false;
+    }
+
+    /// <summary>The body of this frame's wall contact (the slide collision whose normal is a wall's), or null.</summary>
+    private Node SmsWallColliderNode()
+    {
+        float cosMax = MathF.Cos(FloorMaxAngle);
+        for (int i = 0; i < GetSlideCollisionCount(); i++)
+        {
+            KinematicCollision3D c = GetSlideCollision(i);
+            Vector3 cn = c.GetNormal();
+            if (cn.Y < cosMax - 1e-3f && cn.Y > -0.5f)
+                return c.GetCollider() as Node;
+        }
+        return null;
+    }
+
+    /// <summary>checkWallPlane(pos + front along the face, yOff, radius): the fence wall the probe would find -- a ray at feet + yOff from 5
+    /// units behind him to front + radius along <paramref name="face"/>. The body, or null when there is no fence there.</summary>
+    private Node SmsFenceProbe(Vector3 feet, Vector3 face, float frontUnits, float yOffUnits, float radiusUnits, out Vector3 point, out Vector3 normal)
+    {
+        point = feet;
+        normal = -face;
+        Vector3 at = feet + Vector3.Up * SmsUnits.UnitsToMetres(yOffUnits);
+        Vector3 from = at - face * SmsUnits.UnitsToMetres(5f);
+        Vector3 to = at + face * SmsUnits.UnitsToMetres(frontUnits + radiusUnits);
+        if (!SmsRay(from, to, out var h))
+            return null;
+        Node body = h["collider"].AsGodotObject() as Node;
+        if (!SmsIsFenceBody(body))
+            return null;
+        point = (Vector3)h["position"];
+        normal = (Vector3)h["normal"];
+        return body;
+    }
+
+    private float SmsFeetOffset() => GlobalPosition.Y - SmsFeetY();
+    private Vector3 SmsFeet() => new Vector3(GlobalPosition.X, SmsFeetY(), GlobalPosition.Z); // the game's mPosition: the ground point under him
+
+    /// <summary>Pressed on the plane: the feet at <paramref name="feet"/>'s height, the body a capsule radius off the plane through
+    /// <paramref name="planePoint"/> along <paramref name="n"/> (the game adds 25 units into the wall every tick and the wall pushes him out).</summary>
+    private void SmsFencePin(Vector3 feet, Vector3 planePoint, Vector3 n)
+    {
+        Vector3 nxz = new Vector3(n.X, 0f, n.Z);
+        if (nxz.LengthSquared() < 1e-6f)
+            nxz = _smsFenceNormal;
+        nxz = nxz.Normalized();
+        // the point of the plane at his XZ: slide the probe's hit point along the plane to his position
+        Vector3 d = feet - planePoint;
+        Vector3 onPlane = feet - nxz * d.Dot(nxz);
+        Vector3 xz = onPlane + nxz * (capRadiusWorld + 0.02f);
+        GlobalPosition = new Vector3(xz.X, feet.Y + SmsFeetOffset(), xz.Z);
+        velocity = Vector3.Zero;
+        Velocity = Vector3.Zero;
+        _smsTrueVyValid = false;
+    }
+
+    /// <summary>setAnimation(clip, rate): the clip, driven directly. A clip already set is left running; a looping one (the waits, the
+    /// moves) is started again when it ends, a one-shot (the catches, the punch, the kick) is left finished for SmsFenceClipDone().</summary>
+    private void SmsFencePlay(string anim, float rate, bool loop = true)
+    {
+        if (animTree != null)
+            animTree.Active = false; // the fence and ladder clips are library-only: driven directly, the tree comes back with the next SetMarioState
+        animPlayer.SpeedScale = MathF.Max(rate, 0f);
+        if (_smsFenceAnim != anim || (loop && !animPlayer.IsPlaying()))
+        {
+            _smsFenceAnim = anim;
+            if (animPlayer.HasAnimation(anim))
+                animPlayer.Play(anim);
+        }
+    }
+
+    private bool SmsFenceClipDone() => !(animPlayer.IsPlaying() && animPlayer.CurrentAnimation == _smsFenceAnim);
+
+    /// <summary>changePlayerStatus(FENCE_CATCH | FENCE_JUMP_CATCH): the face into the wall (matan(n.z, n.x) + 0x8000), pressed on it,
+    /// velocity 0, the catch clip. The grab sound is the FenceCatchSound slot.</summary>
+    private void SmsFenceCatchEnter(bool jump, Vector3 wallNormalXZ, Node body, string from)
+    {
+        Vector3 n = new Vector3(wallNormalXZ.X, 0f, wallNormalXZ.Z);
+        if (n.LengthSquared() < 1e-6f)
+            return;
+        n = n.Normalized();
+        if (heldBody != null)
+            Anim_DetachPickup();
+        Vector3 face = -n;
+        _smsFenceNormal = n;
+        _smsFenceBody = body;
+        ledgePinned = false;
+        _smsHangMovingAnim = false;
+        _smsLongFallAnim = false;
+        _smsFallCancel = false;
+        _fluddDashAnimOn = false;
+        isJumping = false;
+        jumpBuffer = 0;
+        StopWaistIKHard();
+        SmsLatchFace(face, 1);
+        lastFacingDirection = face;
+        armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
+        Vector3 feet = SmsFeet();
+        Node probe = SmsFenceProbe(feet, face, 25f, 50f, 80f, out Vector3 pt, out Vector3 pn);
+        SmsFencePin(feet, probe != null ? pt : feet + face * capRadiusWorld, probe != null ? pn : n);
+        stateOfMario = MarioState.fence;
+        _smsFence = jump ? SmsFence.JumpCatch : SmsFence.Catch;
+        _smsFenceAnim = "";
+        SmsFencePlay(jump ? "ma_fence_jcatch" : "ma_fence_catch", 1f, false);
+        if (FenceCatchSound != null && FenceCatchSound.Stream != null)
+            FenceCatchSound.Play();
+        if (SmsDebugPrint)
+            GD.Print($"[SMS fence] {(jump ? "FENCE_JUMP_CATCH" : "FENCE_CATCH")} from {from} on '{body?.Name}', normal ({n.X:F2}, {n.Z:F2})");
+    }
+
+    /// <summary>checkSwimToHangFence() (MarioSwim.cpp 126): the stick pushed, the wall he swims into a fence, his face within 60 deg of
+    /// into it (|face - wallAngle| > 0x5555): 100 units up and FENCE_CATCH.</summary>
+    private bool SmsFenceTryCatchSwim(Vector3 wallNormal)
+    {
+        if (_smsIntendedMag <= 0f)
+            return false;
+        Node body = SmsWallColliderNode();
+        if (!SmsIsFenceBody(body))
+            return false;
+        Vector3 n = new Vector3(wallNormal.X, 0f, wallNormal.Z);
+        if (n.LengthSquared() < 1e-6f)
+            return false;
+        n = n.Normalized();
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+        if (face.Dot(-n) < MathF.Cos(MathF.PI / 3f)) // diff from the wall's angle beyond 0x5555 = within 60 deg of facing into it
+            return false;
+        GlobalPosition += Vector3.Up * SmsUnits.UnitsToMetres(100f);
+        _smsInWater = false;
+        SmsFenceCatchEnter(false, n, body, "the swim");
+        return true;
+    }
+
+    /// <summary>The fence ended (fenceFootCheck / fenceMove's probe) or the floor met his feet: he turns around (+0x8000), velocity 0, and
+    /// falls -- LAND_SAFE_DOWN (passive) from the catch, LANDING (the steerable fall) from the rest.</summary>
+    private void SmsFenceLetGo(bool landSafeDown, string why)
+    {
+        Vector3 away = _smsFenceNormal;
+        _smsFenceAnim = "";
+        animPlayer.SpeedScale = 1f;
+        velocity = Vector3.Zero;
+        _smsTrueVyValid = false;
+        lastFacingDirection = away;
+        SmsLatchFace(away, 2);
+        armature.Rotation = new Vector3(0f, YawFromDir(away), 0f);
+        _smsHangDropFall = landSafeDown;
+        stateOfMario = MarioState.ledgeFall;
+        SetMarioState(stateOfMario);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS fence] let go ({why}): turned around, {(landSafeDown ? "LAND_SAFE_DOWN" : "LANDING")}");
+    }
+
+    /// <summary>startJumpWall() + changePlayerStatus(WALL_JUMP): the face turned away, vy 62 (1 if the roof is within reach), 24 out, the
+    /// wall-kick state; MSD_SE_MA_FENCE_PUNCH is the FencePunchSound slot.</summary>
+    private void SmsFenceJumpOff(string from)
+    {
+        Vector3 outDir = _smsFenceNormal;
+        _smsFenceAnim = "";
+        animPlayer.SpeedScale = 1f;
+        if (FencePunchSound != null && FencePunchSound.Stream != null)
+            FencePunchSound.Play();
+        float vy = 62f;
+        Vector3 feet = SmsFeet();
+        if (SmsRay(feet + Vector3.Up * SmsUnits.UnitsToMetres(80f), feet + Vector3.Up * SmsUnits.UnitsToMetres(160f + 62f), out _))
+            vy = 1f; // mVel.y + 160 + y >= roofY: the roof is in the way
+        LockAirTakeoffDir(outDir);
+        float kickOut = SmsUnits.SpeedToMps(24f);
+        velocity.X = outDir.X * kickOut;
+        velocity.Z = outDir.Z * kickOut;
+        velocity.Y = SmsUnits.SpeedToMps(vy);
+        GlobalPosition += outDir * 0.05f; // off the plane he was pressed on
+        SmsLatchFace(outDir, 2);
+        _smsTrueVyValid = false;
+        _smsNoLandFrames = 3;
+        _smsFallCancel = SmsAir.FallCancelEligible(SmsAir.Launch.WallJump);
+        stateOfMario = MarioState.wallJump;
+        wallJumpAnimPlayed = true;
+        wallJumpAnimFrozen = false;
+        SetMarioState(MarioState.wallJump);
+        lastFacingDirection = outDir;
+        armature.Rotation = new Vector3(0f, WallJumpYawFromDir(outDir), 0f);
+        lastWallNormal = outDir;
+        wallKickDir = outDir;
+        wallKickLock = 0;
+        wallRegrabCooldown = 0;
+        wallJumpHoldActive = true;
+        wallJumpHoldTime = 0f;
+        isJumping = true;
+        initalJumpHold = true;
+        jumpHoldTime = 0f;
+        if (SmsDebugPrint)
+            GD.Print($"[SMS fence] A ({from}): startJumpWall -- WALL_JUMP vy {vy:F0}, 24 away from the fence");
+    }
+
+    /// <summary>The game's stick as fenceMove() reads it: mStickHS16 = 128 x the pad library's axis, 0 within +-7, else 6 taken off.</summary>
+    private static float SmsFenceStickCounts(float axis)
+    {
+        float s16 = MathF.Truncate(128f * axis);
+        if (s16 > 7f) return s16 - 6f;
+        if (s16 < -7f) return s16 + 6f;
+        return 0f;
+    }
+
+    /// <summary>jumpProcess(1) case 3 on the fence: hangonCheck() -- the fence wall is there at feet + 30 and gone at feet + 150, the top
+    /// (the ground 60 units inside the plane, looked up from feet + 160) is over 100 above the feet: ASCEND (ANIM_HGUP), the climb-up onto it.</summary>
+    private bool SmsFenceTryTop(Vector3 feet, Vector3 face)
+    {
+        if (SmsFenceProbe(feet, face, 25f, SmsParams.Hanging.WallHighUnits, 20f, out _, out _) != null)
+            return false; // the fence still reaches past his hands
+        if (SmsFenceProbe(feet, face, 25f, SmsParams.Hanging.WallLowUnits, 20f, out Vector3 pt, out Vector3 pn) == null)
+            return false;
+        Vector3 inside = new Vector3(feet.X, 0f, feet.Z) + face * SmsUnits.UnitsToMetres(60f);
+        Vector3 from = new Vector3(inside.X, feet.Y + SmsUnits.UnitsToMetres(160f), inside.Z);
+        if (!SmsRay(from, from + Vector3.Down * SmsUnits.UnitsToMetres(160f), out var g))
+            return false;
+        float topY = ((Vector3)g["position"]).Y;
+        if (topY - feet.Y <= SmsUnits.UnitsToMetres(100f))
+            return false;
+        Vector3 roofFrom = new Vector3(inside.X, topY + 0.02f, inside.Z);
+        if (SmsRay(roofFrom, roofFrom + Vector3.Up * SmsUnits.UnitsToMetres(SmsParams.Hanging.HeadroomUnits), out _))
+            return false; // no room over the top
+        // changePlayerDropping(ASCEND): the ascend from a hang -- the port's hang anchor at the top, then its vault (ma_hgup / the hop)
+        Vector3 nxz = new Vector3(_smsFenceNormal.X, 0f, _smsFenceNormal.Z).Normalized();
+        _smsFenceAnim = "";
+        animPlayer.SpeedScale = 1f;
+        SmsEnterLedgeHang(pt, nxz, topY, g["collider"].AsGodotObject());
+        _smsHangMovingAnim = false;
+        stateOfMario = MarioState.ledgeClimb; // ASCEND = the hang's climb-up (ANIM_HGUP): onto the top
+        SetMarioState(stateOfMario);
+        ledgeClimbT = 0f;
+        if (SmsDebugPrint)
+            GD.Print($"[SMS fence] the top is {SmsUnits.MetresToUnits(topY - feet.Y):F0} units above the feet: ASCEND (ma_hgup, the climb-up onto it)");
+        return true;
+    }
+
+    /// <summary>One physics frame of FENCE_CATCH / FENCE_JUMP_CATCH / FENCE_MOVE / FENCE_PUNCH (fenceCatch / fenceJumpCatch / fenceMove /
+    /// fencePunch, MarioSpecial.cpp 1294-1535).</summary>
+    private void SmsTickFence(double delta, Vector2 lstick, float camYaw, Vector3 stickDir)
+    {
+        int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
+        Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
+        Vector3 feet = SmsFeet();
+        bool aPressed = Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space");
+        bool bPressed = Input.IsActionJustPressed("button_b");
+        bool stick = stickDir.LengthSquared() > 1e-6f && _smsIntendedMag > 0f; // mInput & 1
+        switch (_smsFence)
+        {
+            case SmsFence.Catch:
+            case SmsFence.JumpCatch:
+            {
+                // fenceFootCheck(): the wall 40 ahead (radius 20) at feet + 50 -- gone: turn around, LAND_SAFE_DOWN
+                Node w = SmsFenceProbe(feet, face, 40f, 50f, 20f, out Vector3 pt, out Vector3 pn);
+                if (w == null)
+                {
+                    SmsFenceLetGo(true, "fenceFootCheck: no fence 40 units ahead");
+                    return;
+                }
+                SmsFencePin(feet, pt, pn);
+                if (SmsFenceClipDone())
+                {
+                    // the +-5 settle onto the plane is the pin's business here
+                    _smsFence = SmsFence.Move;
+                    SmsFencePlay("ma_fence_wait", 1f);
+                    if (SmsDebugPrint)
+                        GD.Print("[SMS fence] caught: FENCE_MOVE (ma_fence_wait)");
+                }
+                return;
+            }
+            case SmsFence.Punch:
+            {
+                if (aPressed)
+                {
+                    SmsFenceJumpOff("during the punch");
+                    return;
+                }
+                Node w = SmsFenceProbe(feet, face, 25f, 50f, 80f, out Vector3 pt, out Vector3 pn);
+                if (w == null)
+                {
+                    SmsFenceLetGo(false, "fencePunch: the fence is gone");
+                    return;
+                }
+                SmsFencePin(feet, pt, pn);
+                // setAttackRadius(250) / Height(200): the hit lands at clip frame 5 (checkPass(5)) -- the body's method, if it has one
+                if (!_smsFencePunchHit && animPlayer.CurrentAnimation == "ma_fence_punch" && animPlayer.CurrentAnimationPosition * 60.0 >= 5.0)
+                {
+                    _smsFencePunchHit = true;
+                    if (_smsFenceBody != null && _smsFenceBody.HasMethod("sms_fence_punched"))
+                        _smsFenceBody.Call("sms_fence_punched", this);
+                    if (SmsDebugPrint)
+                        GD.Print($"[SMS fence] punch lands (frame 5): radius 250, height 200{(_smsFenceBody != null && _smsFenceBody.HasMethod("sms_fence_punched") ? ", the body told" : "")}");
+                }
+                if (SmsFenceClipDone())
+                {
+                    _smsFence = SmsFence.Move;
+                    SmsFencePlay("ma_fence_wait", 1f);
+                }
+                return;
+            }
+            case SmsFence.Move:
+            default:
+            {
+                // the wall 25 ahead, radius 80, at feet + 50 -- gone: turn around, LANDING
+                Node w = SmsFenceProbe(feet, face, 25f, 50f, 80f, out Vector3 pt, out Vector3 pn);
+                if (w == null)
+                {
+                    SmsFenceLetGo(false, "fenceMove: no fence 25 units ahead");
+                    return;
+                }
+                _smsFenceBody = w;
+                Vector3 nxz = new Vector3(pn.X, 0f, pn.Z);
+                if (nxz.LengthSquared() > 1e-6f)
+                {
+                    _smsFenceNormal = nxz.Normalized();
+                    face = -_smsFenceNormal; // mFaceAngle.y = matan(n.z, n.x) + 0x8000 every tick
+                    SmsLatchFace(face, 1);
+                    lastFacingDirection = face;
+                    armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
+                }
+                Vector3 newFeet = feet;
+                bool moved = false;
+                float dv = 0f, dh = 0f;
+                if (stick)
+                {
+                    // 0.015625 x the raw counts x FenceSpeed a tick, up the plane and along the camera's right on it
+                    Vector2 pad = SmsStick.PadStick(lstick);
+                    float sv = SmsFenceStickCounts(-pad.Y); // Godot's stick Y is down-positive; the game's mStickV is up-positive
+                    float sh = SmsFenceStickCounts(pad.X);
+                    dv = 0.015625f * sv * SmsParams.Jump.FenceSpeed * n;
+                    dh = 0.015625f * sh * SmsParams.Jump.FenceSpeed * n;
+                    Vector3 camRight = new Vector3(MathF.Cos(camYaw), 0f, -MathF.Sin(camYaw));
+                    Vector3 tangent = camRight - _smsFenceNormal * camRight.Dot(_smsFenceNormal);
+                    if (tangent.LengthSquared() < 1e-4f)
+                        tangent = Vector3.Up.Cross(face);
+                    tangent = tangent.Normalized();
+                    Vector3 cand = feet + Vector3.Up * SmsUnits.UnitsToMetres(dv) + tangent * SmsUnits.UnitsToMetres(dh);
+                    // the step holds only where the two deeper probes (radius 20 and 140, 25 ahead) still find a fence
+                    if (SmsFenceProbe(cand, face, 25f, 50f, 20f, out _, out _) != null && SmsFenceProbe(cand, face, 25f, 50f, 140f, out _, out _) != null)
+                    {
+                        newFeet = cand;
+                        moved = true;
+                    }
+                }
+                else
+                {
+                    SmsFencePlay("ma_fence_wait", 1f);
+                }
+                // jumpProcess(1): the floor under the new feet -> LANDING; the top -> ASCEND; a roof within 160 -> clamped under it
+                if (dv < 0f && SmsRay(newFeet + Vector3.Up * SmsUnits.UnitsToMetres(10f), newFeet + Vector3.Down * SmsUnits.UnitsToMetres(2f), out var gnd))
+                {
+                    GlobalPosition = new Vector3(GlobalPosition.X, ((Vector3)gnd["position"]).Y + SmsFeetOffset(), GlobalPosition.Z);
+                    SmsFenceLetGo(false, "the floor under his feet (jumpProcess case 1)");
+                    return;
+                }
+                if (dv > 0f && SmsFenceTryTop(newFeet, face))
+                    return;
+                if (SmsRay(newFeet + Vector3.Up * SmsUnits.UnitsToMetres(80f), newFeet + Vector3.Up * SmsUnits.UnitsToMetres(160f), out var roof))
+                {
+                    float roofY = ((Vector3)roof["position"]).Y;
+                    if (roofY < newFeet.Y + SmsUnits.UnitsToMetres(160f))
+                        newFeet.Y = roofY - SmsUnits.UnitsToMetres(160f);
+                }
+                SmsFencePin(newFeet, pt, pn);
+                if (aPressed)
+                {
+                    SmsFenceJumpOff("on the fence");
+                    return;
+                }
+                if (bPressed)
+                {
+                    _smsFence = SmsFence.Punch;
+                    _smsFencePunchHit = false;
+                    SmsFencePlay("ma_fence_punch", 1f, false);
+                    if (SmsDebugPrint)
+                        GD.Print("[SMS fence] B: FENCE_PUNCH (ma_fence_punch)");
+                    return;
+                }
+                if (stick && moved)
+                {
+                    // the clip from the displacement a tick: |v| > 5 |h| -> up / down, else left / right (his left = up x face), at rate = the distance
+                    Vector3 disp = (newFeet - feet) / n;
+                    float v = SmsUnits.MetresToUnits(disp.Y);
+                    float h = SmsUnits.MetresToUnits(disp.Dot(Vector3.Up.Cross(face)));
+                    float dist = SmsUnits.MetresToUnits(disp.Length());
+                    string clip = MathF.Abs(v) > 5f * MathF.Abs(h) ? (v > 0f ? "ma_fence_move_up" : "ma_fence_move_down") : (h > 0f ? "ma_fence_move_l" : "ma_fence_move_r");
+                    SmsFencePlay(clip, dist);
+                }
+                else if (stick)
+                {
+                    SmsFencePlay("ma_fence_wait", 1f); // pushed against the fence's edge: no step, the wait pose
+                }
+                return;
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------------------------------------- the roof hang
+    /// <summary>jumpProcess() roofCode 4 (doHorizontalPhysics, MarioPhysics.cpp 376): a roof plane that is a fence met by the head
+    /// (160 + y > roofY) while rising or level (mVel.y >= 0), the caller's roof bit (the jumps, the hover), hands empty, not on Yoshi ->
+    /// HANG_ROOF. Checked after the move: this frame's ceiling contact.</summary>
+    private void SmsRoofHangCheck()
+    {
+        if (!IsOnCeiling() || heldBody != null)
+            return;
+        if (!(TryGetAirProfile(stateOfMario, out _) || stateOfMario == MarioState.fluddRocket) || stateOfMario == MarioState.hurt || stateOfMario == MarioState.bonk)
+            return;
+        if (SmsPreMoveVelocity.Y < -0.01f)
+            return;
+        for (int i = 0; i < GetSlideCollisionCount(); i++)
+        {
+            KinematicCollision3D c = GetSlideCollision(i);
+            Vector3 cn = c.GetNormal();
+            if (cn.Y > -0.5f)
+                continue;
+            Node body = c.GetCollider() as Node;
+            if (!SmsIsFenceBody(body))
+                continue;
+            SmsRoofHangEnter(c.GetPosition().Y, cn, body, stateOfMario.ToString());
+            return;
+        }
+    }
+
+    private void SmsRoofHangEnter(float roofY, Vector3 roofNormal, Node body, string from)
+    {
+        _smsFenceBody = body;
+        _smsRoofY = roofY;
+        _smsRoofNormalY = roofNormal.Y;
+        _smsRoofTicks = 0;
+        _smsRoofArg = 0;
+        _smsRoofFwd = 0f;
+        ledgePinned = false;
+        _smsHangMovingAnim = false;
+        _smsLongFallAnim = false;
+        _smsFallCancel = false;
+        isJumping = false;
+        jumpBuffer = 0;
+        StopWaistIKHard();
+        if (_smsSpinBlur != null)
+            _smsSpinBlur.Active = false;
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+        SmsLatchFace(face, 1);
+        stateOfMario = MarioState.roofHang;
+        _smsRoof = SmsRoof.Hang;
+        _smsFenceAnim = "";
+        SmsRoofPin();
+        SmsFencePlay("ma_ladder_hang_catch", 1f, false);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS roof] HANG_ROOF from {from} under '{body?.Name}': the head 160 units under the roof at y {SmsUnits.MetresToUnits(roofY):F0}");
+    }
+
+    /// <summary>doRoofWaitingProcess(): the feet at roofY - 160, velocity 0.</summary>
+    private void SmsRoofPin()
+    {
+        float feetY = _smsRoofY - SmsUnits.UnitsToMetres(160f);
+        GlobalPosition = new Vector3(GlobalPosition.X, feetY + SmsFeetOffset(), GlobalPosition.Z);
+        velocity = Vector3.Zero;
+        Velocity = Vector3.Zero;
+        _smsTrueVyValid = false;
+    }
+
+    /// <summary>roofCommonEvents(): B lets go (LANDING, the face kept), A kicks the roof (KICK_ROOF; the Boo net's roll is not ported).</summary>
+    private bool SmsRoofCommonEvents(bool aPressed, bool bPressed)
+    {
+        if (bPressed)
+        {
+            SmsRoofLetGo("B");
+            return true;
+        }
+        if (aPressed)
+        {
+            _smsRoof = SmsRoof.Kick;
+            SmsFencePlay("ma_ladder_hang_kick", 1f, false);
+            if (_smsFenceBody != null && _smsFenceBody.HasMethod("sms_roof_kicked"))
+                _smsFenceBody.Call("sms_roof_kicked", this); // receiveMessage(this, 3) to the roof's actor
+            if (SmsDebugPrint)
+                GD.Print("[SMS roof] A: KICK_ROOF (ma_ladder_hang_kick, radius 200 / height 250)");
+            return true;
+        }
+        return false;
+    }
+
+    private void SmsRoofLetGo(string why)
+    {
+        _smsFenceAnim = "";
+        animPlayer.SpeedScale = 1f;
+        velocity = Vector3.Zero;
+        _smsTrueVyValid = false;
+        _smsHangDropFall = false;
+        stateOfMario = MarioState.ledgeFall;
+        SetMarioState(stateOfMario);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS roof] let go ({why}): LANDING");
+    }
+
+    /// <summary>hangingCheckRoof(pos): 3 = a fence WALL within 50 ahead (-> FENCE_CATCH), 1 = no ground / the gap under 160 / the head
+    /// 30 past the roof (he stays, moved), 2 = no roof, not a fence, or the roof 30 above the head (-> LANDING), 0 = in range (pinned).</summary>
+    private int SmsHangingCheckRoof(ref Vector3 feet, Vector3 face)
+    {
+        Node wall = SmsFenceProbe(feet, face, 0f, 50f, 50f, out _, out Vector3 wn);
+        if (wall != null)
+        {
+            Vector3 nxz = new Vector3(wn.X, 0f, wn.Z);
+            if (nxz.LengthSquared() > 1e-6f)
+                _smsFenceNormal = nxz.Normalized();
+            _smsFenceBody = wall;
+            return 3;
+        }
+        float groundY = float.NegativeInfinity;
+        if (SmsRay(feet + Vector3.Up * 0.05f, feet + Vector3.Down * 60f, out var g))
+            groundY = ((Vector3)g["position"]).Y;
+        else
+            return 1;
+        Vector3 from = new Vector3(feet.X, groundY + SmsUnits.UnitsToMetres(80f), feet.Z);
+        if (!SmsRay(from, from + Vector3.Up * 60f, out var r))
+            return 2;
+        Node roofBody = r["collider"].AsGodotObject() as Node;
+        if (!SmsIsFenceBody(roofBody))
+            return 2;
+        float roofY = ((Vector3)r["position"]).Y;
+        if (roofY - groundY <= SmsUnits.UnitsToMetres(160f))
+            return 1;
+        float space = roofY - (SmsUnits.UnitsToMetres(160f) + feet.Y);
+        if (space < -SmsUnits.UnitsToMetres(30f))
+            return 1;
+        if (space > SmsUnits.UnitsToMetres(30f))
+            return 2;
+        _smsRoofY = roofY;
+        _smsRoofNormalY = ((Vector3)r["normal"]).Y;
+        _smsFenceBody = roofBody;
+        feet.Y = roofY - SmsUnits.UnitsToMetres(160f);
+        return 0;
+    }
+
+    /// <summary>One physics frame of HANG_ROOF / WAIT_ROOF / MOVE_ROOF / KICK_ROOF (hangRoof / waitRoof / moveRoof / kickRoof).</summary>
+    private void SmsTickRoof(double delta, Vector3 stickDir)
+    {
+        int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
+        bool aPressed = Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space");
+        bool bPressed = Input.IsActionJustPressed("button_b");
+        bool stick = stickDir.LengthSquared() > 1e-6f && _smsIntendedMag > 0f; // mInput & 1 (0x20 = its absence)
+        Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
+        switch (_smsRoof)
+        {
+            case SmsRoof.Hang:
+            {
+                // the roof re-found from feet + 80 (checkRoof); mStatusTimer; the stick after 120 ticks -> WAIT_ROOF; the events; the catch clip; pinned
+                Vector3 feet = SmsFeet();
+                if (SmsRay(feet + Vector3.Up * SmsUnits.UnitsToMetres(80f), feet + Vector3.Up * 60f, out var r))
+                    _smsRoofY = ((Vector3)r["position"]).Y;
+                _smsRoofTicks += n;
+                if (stick && _smsRoofTicks > 120)
+                {
+                    _smsRoof = SmsRoof.Wait;
+                    if (SmsDebugPrint)
+                        GD.Print($"[SMS roof] the stick after {_smsRoofTicks} ticks: WAIT_ROOF");
+                    return;
+                }
+                if (SmsRoofCommonEvents(aPressed, bPressed))
+                    return;
+                SmsFencePlay("ma_ladder_hang_catch", 1f, false);
+                SmsRoofPin();
+                if (SmsFenceClipDone())
+                {
+                    _smsRoof = SmsRoof.Wait;
+                    if (SmsDebugPrint)
+                        GD.Print("[SMS roof] caught: WAIT_ROOF");
+                }
+                return;
+            }
+            case SmsRoof.Wait:
+            {
+                if (SmsRoofCommonEvents(aPressed, bPressed))
+                    return;
+                if (stick)
+                {
+                    _smsRoof = SmsRoof.Move;
+                    _smsRoofFwd = 0f;
+                    goto case SmsRoof.Move;
+                }
+                SmsFencePlay((_smsRoofArg & 1) != 0 ? "ma_ladder_hang_wait_l" : "ma_ladder_hang_wait_r", 1f);
+                SmsRoofPin();
+                return;
+            }
+            case SmsRoof.Move:
+            {
+                if (SmsRoofCommonEvents(aPressed, bPressed))
+                    return;
+                Vector3 feet = SmsFeet();
+                Vector3 before = feet;
+                if (stick)
+                {
+                    // doRoofMovingProcess(): fwd + 1 a tick to 4.0; the face toward the stick by IConverge(diff, 0, 0x800, 0x800) a tick; the step
+                    // -vel x the roof normal's y (down-facing: along the face)
+                    Vector3 sd = new Vector3(stickDir.X, 0f, stickDir.Z).Normalized();
+                    float yaw = _smsFaceYaw;
+                    float want = SmsMath.YawFromDir(sd);
+                    for (int i = 0; i < n; i++)
+                    {
+                        _smsRoofFwd = MathF.Min(_smsRoofFwd + 1f, 4f);
+                        yaw = SmsMath.ConvergeAngle(yaw, want, 0x800 * SmsUnits.BamToRad);
+                    }
+                    face = SmsMath.DirFromYaw(yaw);
+                    SmsLatchFace(face, 1);
+                    lastFacingDirection = face;
+                    armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
+                    Vector3 step = face * SmsUnits.UnitsToMetres(_smsRoofFwd) * (-_smsRoofNormalY) * n;
+                    Vector3 cand = feet + new Vector3(step.X, 0f, step.Z);
+                    int code = SmsHangingCheckRoof(ref cand, face);
+                    if (code != 2)
+                        feet = cand;
+                    switch (code)
+                    {
+                        case 2:
+                            SmsRoofLetGo("the roof ended / is not a fence / slipped 30 units above the head (hangingCheckRoof 2)");
+                            return;
+                        case 3:
+                            GlobalPosition = new Vector3(feet.X, feet.Y + SmsFeetOffset(), feet.Z);
+                            SmsFenceCatchEnter(false, _smsFenceNormal, _smsFenceBody, "the roof met a fence wall (hangingCheckRoof 3)");
+                            return;
+                    }
+                    GlobalPosition = new Vector3(feet.X, feet.Y + SmsFeetOffset(), feet.Z);
+                    velocity = Vector3.Zero;
+                    Velocity = Vector3.Zero;
+                    _smsTrueVyValid = false;
+                }
+                else
+                {
+                    _smsRoof = SmsRoof.Wait; // mInput & 0x20: the stick at rest
+                    SmsFencePlay((_smsRoofArg & 1) != 0 ? "ma_ladder_hang_wait_l" : "ma_ladder_hang_wait_r", 1f);
+                    SmsRoofPin();
+                    return;
+                }
+                float dist = SmsUnits.MetresToUnits((feet - before).Length()) / n * SmsParams.HangRoof.AnmMult;
+                string clip = (_smsRoofArg & 1) != 0 ? "ma_ladder_hang_move_l" : "ma_ladder_hang_move_r";
+                if (_smsFenceAnim == clip && SmsFenceClipDone())
+                {
+                    _smsRoofArg = 1 - _smsRoofArg; // the other hand as the clip ends
+                    clip = (_smsRoofArg & 1) != 0 ? "ma_ladder_hang_move_l" : "ma_ladder_hang_move_r";
+                }
+                SmsFencePlay(clip, dist);
+                return;
+            }
+            case SmsRoof.Kick:
+            default:
+            {
+                SmsFencePlay("ma_ladder_hang_kick", 1f, false);
+                SmsRoofPin();
+                if (SmsFenceClipDone())
+                {
+                    _smsRoof = SmsRoof.Wait;
+                    _smsRoofArg = 0;
+                }
+                return;
+            }
+        }
+    }
+
     private void LegacyTakeDamage(Vector3 hitSourcePosition)
     {
         // Don't interrupt if already hurt or dead
@@ -16275,6 +16995,7 @@ public partial class Mario : CharacterBody3D
         SmsCheckGraffito(); // checkGraffito(): after the status exec and the move, every tick
         if (_smsShockSparks != null && _smsShockSparks.Active && !(stateOfMario == MarioState.hurt && _smsDownKind == SmsDownKind.Electric))
             _smsShockSparks.Active = false; // whatever ended the shock (a respawn): no elecEffect() call this tick, the emitters go
+        SmsRoofHangCheck(); // jumpProcess() roofCode 4: a fence roof met by the head while rising, hands empty -> HANG_ROOF
         if (_smsNoLandFrames > 0)
             _smsNoLandFrames--;
         if (SmsDebugPrint && _smsDbgAirborne && IsOnFloor())

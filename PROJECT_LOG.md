@@ -1828,6 +1828,54 @@ FIRE_DOWN(1) from the hot floor: vy 50 (20.1 m/s), fwd 0.0 along the face, ma_fi
 bounce(s), 157 ticks burning: FIRE_JUMP_END`, `... up`; `[SMS elec] ELECTRIC_DAMAGE from electric goop '...'`, `... -1 HP -> 6/8`,
 `... 121 ticks: WAIT, invincible 60 ticks`, `... ELEC_DOWN (ma_shock_down)`.
 
+### Fences and the roof hang (`FENCE_CATCH` / `FENCE_JUMP_CATCH` / `FENCE_MOVE` / `FENCE_PUNCH`, `HANG_ROOF` / `WAIT_ROOF` / `MOVE_ROOF` / `KICK_ROOF`)
+
+Pass 52 (MarioSpecial.cpp 199-410 and 1294-1535). **One tag does both.** The game has a single surface attribute, `BG_TYPE_CLIMBABLE_FENCE`
+(0x10A, `TBGCheckData::isFence`): met as a WALL plane it is climbed, met as a ROOF plane it is hung under. In Godot the collision body
+(`StaticBody3D`, or a parent up to three levels up) carries metadata **`sms_fence`** (any value) or the node group `sms_fence`. The whole
+body is a fence; its vertical faces climb, its underside hangs. A fence should be at least a Mario wide (the step along it needs a fence
+25 units ahead within 20 and within 140 units), and a hangable underside at least 160 units (2.15 m) above the floor.
+
+- **Catching a fence.** Running into it under `ClashSpeed` (`MarioRun.cpp` 745: the bonk above 40 comes first) -> `FENCE_CATCH`
+  (`ma_fence_catch`); any jump's wall hit on it, at any speed (`jumpingBasic` case 2 tests `isFence` before the 16 / 40 branches) ->
+  `FENCE_JUMP_CATCH` (`ma_fence_jcatch`); swimming into it with the stick pushed and his face within 60 deg of into it
+  (`checkSwimToHangFence`) -> 100 units up and `FENCE_CATCH`. He faces into the plane (`matan(n.z, n.x) + 0x8000`) and is pressed on it
+  (the game adds 25 units into the wall every tick and the wall pushes him out; here he is pinned a capsule radius off it). Through the
+  catch clip `fenceFootCheck` wants a fence 40 units ahead at feet + 50 -- gone, he turns around and drops passively (`LAND_SAFE_DOWN`).
+  The clip's end is `FENCE_MOVE`. `FenceCatchSound` is the slot for `MSD_SE_MA_FENCE_CATCH`.
+- **`FENCE_MOVE`** (`fenceMove`): the fence 25 units ahead within 80 -- gone, he turns around and falls (`LANDING`, the steerable fall).
+  The stick: `0.015625 x the raw counts x FenceSpeed 1.3` a tick, where the counts are 128 x the pad library's axis with 7 dead and 6
+  taken off (full tilt 122: **2.5 units a tick, 4.0 m/s**), the vertical axis up the plane, the horizontal along the camera's right on
+  the plane (the game picks `(-n.x, n.z)` or `(n.x, -n.z)` by the camera's side); the step holds only where two deeper probes (radius 20
+  and 140, 25 ahead of the new spot) still find a fence -- so he stops at a fence's edge. Then `jumpProcess(1)`: the floor under the new
+  feet -> `LANDING`; the top -- `hangonCheck`: the fence there at feet + 30, gone at feet + 150, the ground 60 units inside more than 100
+  above the feet -> `ASCEND` (`ma_hgup`, the hang's climb-up onto the top); a roof within 160 above -> clamped under it. **A** = `startJumpWall`: the
+  face turned away, `WALL_JUMP` at vy 62 (1 if the roof is in reach) and 24 away (`FencePunchSound` plays `MSD_SE_MA_FENCE_PUNCH` here
+  too, as the game does). **B** = `FENCE_PUNCH`. The clip is picked from the displacement a tick: `|v| > 5 |h|` -> `ma_fence_move_up` /
+  `_down`, else `ma_fence_move_l` / `_r` (his left = up x face), at **rate = the distance a tick**; the stick at rest is `ma_fence_wait`.
+  No fatigue timer on a fence.
+- **`FENCE_PUNCH`** (`fencePunch`, `ma_fence_punch`): A still jumps off; the fence gone -> `LANDING`; the hit lands at clip frame 5 with
+  radius 250 / height 200 (`attackfencepunch.prm`): the fence body's `sms_fence_punched(mario)` is called if it has one (the game sends
+  `receiveMessage(3)` to the fence's actor); the clip's end is `FENCE_MOVE`. FLUDD on the fence is the animation table's business (pass
+  46): `fence_wait` / `move_l` / `move_r` / `move_up` pump with `ma_fepmp`, `move_down` with `ma_hgpmp`, the catches and the punch not at all.
+- **The roof hang.** `jumpProcess` roofCode 4 (`doHorizontalPhysics`): a roof plane that is a fence met by his head (160 + y > roofY)
+  while rising or level, from a jump or the hover, hands empty -> `HANG_ROOF` (`ma_ladder_hang_catch`): the feet **160 units under the
+  roof**, the stick honoured after **120 ticks** (or the clip's end) -> `WAIT_ROOF` (`ma_ladder_hang_wait_l` / `_r`, the hand by
+  `mStatusArg`). **The stick** -> `MOVE_ROOF`: `mForwardVel + 1` a tick to **4.0**, the face toward the stick by **0x800 BAM** a tick,
+  the step `-vel x the roof normal's y` (horizontal only); `hangingCheckRoof` at the new spot: a fence WALL within 50 ahead ->
+  `FENCE_CATCH` (hand-over-hand onto a vertical fence); no roof there, or not a fence, or the roof slipped **30 units** above the head ->
+  `LANDING`; the gap under 160 or the head 30 past the roof -> he stays (moved); in range -> pinned. The clip (`ma_ladder_hang_move_l` /
+  `_r`) at **rate = the distance a tick x 0.3** (`hangroof.prm AnmMult`), the hand swapping as each clip ends; the stick at rest ->
+  `WAIT_ROOF`. **B** lets go (`LANDING`, the face kept). **A** = `KICK_ROOF` (`ma_ladder_hang_kick`, radius 200 / height 250,
+  `attackkickroof.prm`; the roof body's `sms_roof_kicked(mario)` if it has one) -> `WAIT_ROOF`.
+- Not ported: the Boo net (`mActorType 0x4000006A`: the punch clamps him into the object and flips him to the far side, the kick rolls him
+  up onto the net -- `KICK_ROOF_ROLL_UP` / `_DOWN`), moving fences, letting go of a ledge whose wall is a fence onto the fence (hanging(),
+  -40 / -160), the fence camera kinds (`kindfence` = `kindhang`), the rumbles, the voices, the wall-kick dust of the jump-off.
+Debug: `[SMS fence] FENCE_CATCH from the run on 'Fence', normal (...)`, `... caught: FENCE_MOVE`, `... the top is 149 units above the
+feet: ASCEND`, `... B: FENCE_PUNCH`, `... punch lands (frame 5)`, `... A (on the fence): startJumpWall`, `... let go (...)`;
+`[SMS roof] HANG_ROOF from singleJump under 'Roof': the head 160 units under the roof`, `... caught: WAIT_ROOF`, `... A: KICK_ROOF`,
+`... let go (B): LANDING`.
+
 ### Swimming (`MarioSwim.cpp`, `MarioState.swimming`)
 
 **Water in the level.** The game reads the surface from the map's water triangles; the plaza rip has no water geometry at
@@ -3155,8 +3203,8 @@ ground has to carry upward velocity (launches do) or exceed 1.34 m.
   the wall inside the 4-tick window above 16 — skipped; the "ground wall kick" in `running()` is dead code (A is
   consumed as a jump first).
 - Surface types and the floor slip: done, see Surface types. Tagging the plaza's surfaces is editor work.
-- Ledge hang: done, see Ledge hang. Not ported: the fence catch (`FENCE_CATCH`), the hang-under-roof states
-  (`HANG_ROOF` / `MOVE_ROOF`).
+- Ledge hang: done, see Ledge hang. Fences and the roof hang: done, see Fences and the roof hang (pass 52). Needs the level's
+  `sms_fence` tags.
 - FLUDD: S1 (the pack) and S2 (the tank, the spray, the drops, the refill, the burst machine, the hover nozzle's spray) done,
   see FLUDD. Next S2b squat aim, S3 hover lift, S4 rocket, S5 turbo.
 - Swimming: done, see Swimming and Air. Needs the level's water Area3D (`sms_water`). Not ported: the FLUDD surf, the
@@ -3706,3 +3754,18 @@ shikaku). Adopted in `SmsSetupFx` with the pass-29 rule (a missing scene is an e
 `Player.tscn` after `SmsBubbles` with his editor closed. See Fire and electricity for what each shows and what was approximated
 (the sine-wave flicker and the fast spin of the sparks, the sideways drift of the clouds, the children spawning in the same sphere as
 their flash). The look is for his eyes: the headless run proves the scenes load, bind and switch with the statuses.
+
+### Pass 52 -- fences and the roof hang
+
+Jaysonn (2026-10-01): "might as well get the code done for the hanging and fences". The four fence statuses and the four roof statuses
+as two new states (`MarioState.fence` / `roofHang`) off the one `sms_fence` tag, with the catches hooked where the game has them: the
+run's wall contact, every jump's wall hit, the swim's wall, and the ceiling met while rising -- see Fences and the roof hang. The
+clips (`ma_fence_*`, `ma_ladder_hang_*`, `ma_hgup`) are library-only and driven directly; `SmsParams.HangRoof` / `.Fence` hold the
+shipped and code constants. Two sound slots on Mario: `FencePunchSound`, `FenceCatchSound`.
+
+Verified headless (a drive spawning a 6 x 4 x 1.2 m tagged wall and a 4 x 0.3 x 4 m tagged slab 2.5 m up): the run into the wall is
+`FENCE_CATCH`, the catch clip 0.31 s then `FENCE_MOVE`; a full stick up climbs at 3.9 m/s (`ma_fence_move_up`), right sidesteps at 4.0 m/s
+(`ma_fence_move_l`, the camera's right); B is the punch with the hit at frame 5; A is `WALL_JUMP` at vy 62 away from it; climbing on, the
+top 149 units above the feet is `ASCEND` and he stands on the fence's top. A jump under the slab is `HANG_ROOF` with the feet 160 units
+under it (26 above the floor), `WAIT_ROOF` after the catch clip, the stick is `MOVE_ROOF` at 4.0 units a tick (`ma_ladder_hang_move_r`),
+the slab's edge is `LANDING`; hand-over-hand into a fence wall is `FENCE_CATCH`. The kick is built, not driven.

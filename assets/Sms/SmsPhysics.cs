@@ -264,6 +264,25 @@ public static class SmsParams
         public const int FireInvincibleTime = 50;       // ticks after a burn (the code default 150); dmggraffitofire.prm says 50 as well
     }
 
+    public static class HangRoof // /mario/hangroof.prm (shipped) + doRoofMovingProcess's constants
+    {
+        public const float AnmMult = 0.3f;              // the move clip's rate = the distance a tick x this
+        public const float MoveCap = 4f;                // mForwardVel + 1 a tick, capped here (units a tick)
+        public const int TurnRate = 0x800;              // BAM a tick toward the stick's yaw
+        public const float HeadUnits = 160f;            // the feet hang this far under the roof; the ground-to-roof gap must exceed it
+        public const float ToleranceUnits = 30f;        // hangingCheckRoof: the head may be this far off the roof - 160 plane
+    }
+
+    public static class Fence // fenceMove() / fencePunch() constants; FenceSpeed is Jump.FenceSpeed (jump.prm)
+    {
+        public const float FrontUnits = 25f;            // 0.5 x 50: the probe point ahead and the push into the plane a tick
+        public const float FootProbeUnits = 40f;        // 0.8 x 50: fenceFootCheck's probe
+        public const float PunchRadius = 250f;          // attackfencepunch.prm
+        public const float PunchHeight = 200f;
+        public const float KickRoofRadius = 200f;       // attackkickroof.prm
+        public const float KickRoofHeight = 250f;
+    }
+
     public static class SlipNormal // /mario/slipparamnormal.prm
     {
         public const float SlipFriction = 0.97f;        // default 0.9   (belly slide: fwd *= friction per tick)
