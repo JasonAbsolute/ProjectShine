@@ -122,6 +122,19 @@ public partial class Level : Node3D
         SizeTransitionRects();
         OpenTransitionRects();
 
+        // After a miss the game brings the same stage back from its start with no intro, black, and a plain 0.4 s fade in
+        // (TMarDirector: unkE4 = 0xF on the miss, startWipe(unkE4, 0.4f) at the next stage's start; flag 0x30002).
+        if (GameData.Instance != null && GameData.Instance.CameFromMiss)
+        {
+            GameData.Instance.CameFromMiss = false;
+            PreviewShot = false;
+            if (SmsFader.Current != null)
+            {
+                SmsFader.Current.SetBlack();
+                SmsFader.Current.FadeIn(0.4f);
+            }
+        }
+
         // An intro is about to run, so pre-cover the screen. OpenTransitionRects
         // leaves everything open and StartIntro is deferred, which means the
         // level renders in full for a frame or two before intro_pan's t=0 Iris

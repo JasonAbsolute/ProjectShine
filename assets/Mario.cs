@@ -138,6 +138,10 @@ public partial class Mario : CharacterBody3D
     [Export]
     public int StartingLives = 4;
     private int _lives;
+    /// <summary>Where a miss with no life left goes (the game: the save / title flow). Empty: the stage reloads with the lives reset.</summary>
+    [Export] public string GameOverScene = "";
+    /// <summary>The miss jingle's slot (the game starts a BGM as the Miss state begins and waits for it before the stage moves).</summary>
+    [Export] public AudioStreamPlayer MissJingle;
 
     // On a shine grab the HUD appears immediately but the count doesn't tick up
     // until this delay (mid-cutscene), per the reference footage.
@@ -659,6 +663,9 @@ public partial class Mario : CharacterBody3D
     private SmsShockSparks _smsShockSparks;             // Fx/ShockSparks.tscn: ms_m_biri_a / b / c -- the shock's sparks, on while ELECTRIC_DAMAGE ticks (pass 51)
     private SmsShockPuff _smsShockPuff;                 // Fx/ShockPuff.tscn: ms_moe_fire_off -- the shock's closing puff (pass 51)
     private SmsBodyOverlay _smsBodyOverlay;             // Fx/BodyOverlay.tscn: the damage fog (addDamageFog) and the shock's negative (drawLogic) over the body (pass 56)
+    private SmsConsoleStr _smsConsoleStr;               // Console/ConsoleStr.tscn: the console's big text -- TOO BAD! (pass 58)
+    private SmsFader _smsFader;                         // Console/Fader.tscn: TSMSFader + the Hx wiper -- the death wipe, the fades (pass 58)
+    private int _smsMissTicks = -1;                     // the director's Miss state: -1 idle, 0 the pending tick, then counting; MinValue once the stage moved
     private int _smsCenterBone = -2;                    // the 'center' joint (getCenterAnmMtx)
     private float _smsHipAttackTicks;                   // hipAttacking() mStatusTimer through the fall (120 Hz ticks); > SuperHipAttackCt = the super hip drop
     /// <summary>hipAttacking() mStatusState == 3: this hip drop fell longer than jump.prm's mSuperHipAttackCt (80 ticks, 0.67 s), so it is the
@@ -1438,7 +1445,7 @@ public partial class Mario : CharacterBody3D
 
         // Health / Lives setup
         _health = StartingHealth;
-        _lives = StartingLives;
+        _lives = GameData.Instance != null && GameData.Instance.Lives >= 0 ? GameData.Instance.Lives : StartingLives; // the lives outlive a stage reload (TFlagManager 0x20001)
         SmsAirReset();
         _coins = 0;
         _redCoins = 0;
@@ -2274,9 +2281,7 @@ public partial class Mario : CharacterBody3D
             else if (_smsLoserFalling)
                 SmsLoserDown(); // downLoser(): jumpProcess() has landed -> LOSER_DOWN
 
-            // Press R to respawn
-            if (Input.IsKeyPressed(Key.R))
-                Respawn();
+            // the stage moves on through the Miss sequence (SmsMissTick, from SmsAfterMove); the game has no key here
 
             goto EndFrame;
         }
@@ -5404,6 +5409,8 @@ public partial class Mario : CharacterBody3D
         _smsShockSparks = SmsFluddModel.FindChild<SmsShockSparks>(this);
         _smsShockPuff = SmsFluddModel.FindChild<SmsShockPuff>(this);
         _smsBodyOverlay = SmsFluddModel.FindChild<SmsBodyOverlay>(this);
+        _smsConsoleStr = SmsFluddModel.FindChild<SmsConsoleStr>(this);
+        _smsFader = SmsFluddModel.FindChild<SmsFader>(this);
         _smsSpinBlur?.Bind(this);
         _smsShockSparks?.Bind(this);
         _smsShockPuff?.Bind(this);
@@ -5435,6 +5442,10 @@ public partial class Mario : CharacterBody3D
             GD.PushError("[SMS fx] Player.tscn has no ShockPuff under Mario: instance res://assets/Sms/Fx/ShockPuff.tscn there (the shock's closing puff, ms_moe_fire_off)");
         if (_smsBodyOverlay == null)
             GD.PushError("[SMS fx] Player.tscn has no BodyOverlay under Mario: instance res://assets/Sms/Fx/BodyOverlay.tscn there (the damage fog and the shock's negative)");
+        if (_smsConsoleStr == null)
+            GD.PushError("[SMS console] Player.tscn has no ConsoleStr under Mario: instance res://assets/Sms/Console/ConsoleStr.tscn there (the big text: TOO BAD!)");
+        if (_smsFader == null)
+            GD.PushError("[SMS fader] Player.tscn has no Fader under Mario: instance res://assets/Sms/Console/Fader.tscn there (the death wipe, the fades)");
         if (SmsDebugPrint)
             GD.Print($"[SMS fx] spin rings {(_smsSpinBlur != null ? "from the scene" : "MISSING")}, hip drop streak {(_smsHipBlur != null ? "from the scene" : "MISSING")}, hip drop landing {(_smsHipLanding != null ? "from the scene" : "MISSING")}, super hip drop fall {(_smsSuperHipBlur != null ? "from the scene" : "MISSING")} / landing {(_smsSuperHipLanding != null ? "from the scene" : "MISSING")}, bonk stars {(_smsBonkStars != null ? "from the scene" : "MISSING")}, camera shake {(_smsCameraShake != null ? "from the scene" : "MISSING")}, bubbles {(_smsBubbles != null ? "from the scene" : "MISSING")}, burn cloud {(_smsFireFx != null ? "from the scene" : "MISSING")}, shock sparks {(_smsShockSparks != null ? "from the scene" : "MISSING")} / puff {(_smsShockPuff != null ? "from the scene" : "MISSING")}");
     }
@@ -14638,6 +14649,69 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>The port's death (ma_die, R respawns); the game's loserExec.</summary>
     /// <summary>
+    /// The director's Miss state (MarDirectorDirect.cpp 798-822, 769-787, 408-430). The tick MARIO_FLAG_GAME_OVER is seen it goes
+    /// GAME_OVER_PENDING; the next tick STATE_UNK7 begins: the lives flag (0x20001) down one, the console's TOO BAD! (startAppearMiss), the
+    /// miss BGM, and the fader's request -- the death wipe (10, Hx_Test2) 2.2 s on, the iris (2) 2.0 s on for a hell death, or with no
+    /// life left the game-over wipe (0xD) 2.0 s on. Once the fader is fully out and the BGM has ended (or 1200 of its frames have passed)
+    /// the stage moves: lives left -> the miss flag (0x30002) and decideNextStageOfMiss + moveStage, the same stage from its start with no
+    /// intro and a plain 0.4 s fade in (Level.cs); none left -> the save / title flow (GameOverScene; empty: this stage again, lives
+    /// reset). Mario keeps flying his FIRE_DOWN or lying in his pose meanwhile, as in the game.
+    /// </summary>
+    private void SmsMissTick()
+    {
+        if (!_smsGameOver || _smsMissTicks == int.MinValue)
+            return;
+        if (_smsMissTicks < 0)
+        {
+            _smsMissTicks = 0; // DIRECTOR_FLAG_GAME_OVER_PENDING: acted on next tick
+            return;
+        }
+        if (_smsMissTicks == 0)
+        {
+            _lives--; // TFlagManager::decFlag(0x20001, 1)
+            if (GameData.Instance != null)
+                GameData.Instance.Lives = _lives;
+            _smsConsoleStr?.StartAppearMiss();
+            if (MissJingle != null && MissJingle.Stream != null)
+                MissJingle.Play();
+            if (_smsFader != null)
+            {
+                if (_lives >= 0)
+                    _smsFader.StartWipe(SmsFader.Wipe.Arcs, 2.2f); // startWipe(10, 0.0f, 2.2f): Hx_Test2 -- the four curved bands
+                else
+                    _smsFader.StartWipe(SmsFader.Wipe.FadeOut, 2.0f, 1.0f); // startWipe(0xD, 0.0f, 2.0f): Hx_GameOver draws a texture the port lacks -- a plain fade
+            }
+            if (SmsDebugPrint)
+                GD.Print($"[SMS miss] TOO BAD! lives {_lives} ({(_lives >= 0 ? "the stage reloads after the wipe" : "game over")}), the wipe in {(_lives >= 0 ? 2.2f : 2.0f):F1} s");
+            _smsMissTicks = 1;
+            return;
+        }
+        _smsMissTicks++;
+        bool faded = _smsFader != null ? _smsFader.IsFullyFadedOut : _smsMissTicks > 120 * 4; // no fader: four seconds
+        bool bgmDone = MissJingle == null || !MissJingle.Playing || _smsMissTicks >= 1200 * 4; // MSBgm::getHandle(2) == 0 || 1200 frames
+        if (!(faded && bgmDone))
+            return;
+        _smsMissTicks = int.MinValue;
+        if (_lives >= 0)
+        {
+            if (GameData.Instance != null)
+                GameData.Instance.CameFromMiss = true; // TFlagManager 0x30002: the next load is a miss's
+            if (SmsDebugPrint)
+                GD.Print("[SMS miss] moveStage: the stage from its start");
+            GetTree().ReloadCurrentScene(); // decideNextStageOfMiss + moveStage
+            return;
+        }
+        if (GameData.Instance != null)
+            GameData.Instance.Lives = -1; // a new game's lives next time
+        if (SmsDebugPrint)
+            GD.Print($"[SMS miss] game over -> {(GameOverScene != "" ? GameOverScene : "this stage, lives reset")}");
+        if (GameOverScene != "")
+            GetTree().ChangeSceneToFile(GameOverScene);
+        else
+            GetTree().ReloadCurrentScene();
+    }
+
+    /// <summary>
     /// loserExec() (MarioCollision.cpp 202): MARIO_FLAG_GAME_OVER, HP 0, MARIO_STATUS_DOWN_LOSER. downLoser() (MarioAutodemo.cpp 148) drops
     /// him straight down in ANIM_LAND -- setPlayerVelocity(0) each tick, the fall keeps its vy -- until jumpProcess() lands, then LOSER_DOWN:
     /// loserDown() (MarioRun.cpp 1474), ANIM_DIE and the voice, the slide out at 0.9 a tick. On the ground the landing is immediate. The
@@ -15995,6 +16069,8 @@ public partial class Mario : CharacterBody3D
     public void GainExtraLife()
     {
         _lives++;
+        if (GameData.Instance != null)
+            GameData.Instance.Lives = _lives;
     }
 
     public void AddCoin()
@@ -17046,6 +17122,7 @@ public partial class Mario : CharacterBody3D
         if (_smsBodyOverlay != null && _smsBodyOverlay.Negative && !(stateOfMario == MarioState.hurt && _smsDownKind == SmsDownKind.Electric))
             _smsBodyOverlay.Negative = false; // drawSpecial() reads the status each frame: no ELECTRIC_DAMAGE, no logic pass
         _smsBodyOverlay?.SetDamageFog(_smsInvincibleTicks > 0 && stateOfMario != MarioState.talking); // addDamageFog(): the pink fog pulses while mInvincibilityFrames > 0, never while talking
+        SmsMissTick(); // TMarDirector: MARIO_FLAG_GAME_OVER -> the Miss state
         SmsRoofHangCheck(); // jumpProcess() roofCode 4: a fence roof met by the head while rising, hands empty -> HANG_ROOF
         if (_smsNoLandFrames > 0)
             _smsNoLandFrames--;

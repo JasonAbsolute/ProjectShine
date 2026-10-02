@@ -3901,3 +3901,25 @@ it into a level and size it; or put metadata `sms_camera_kind` = a kind's name o
 from CamController.DefaultKind as before. Entering / leaving an area blends over the kinds' inbetween as any kind change. NOT PORTED:
 the camera map tools (fixed cameras that hold a position and a pitch/yaw, definite cameras that hold a position and watch him), the
 area cubes' Delfino hotel floor rule, the door-opening hold.
+
+### Pass 58 -- the miss sequence
+The game after loserExec(): TMarDirector (MarDirectorDirect.cpp 798-822) sees MARIO_FLAG_GAME_OVER, sets GAME_OVER_PENDING, and the next
+tick enters STATE_UNK7 (769-787): the lives flag 0x20001 down one, the console's startAppearMiss, a BGM, and the fader's request -- with
+a life left startWipe(10, 0, 2.2) (the hell death: startWipe(2, 0, 2.0), the iris), with none startWipe(0xD, 0, 2.0). The wipe runs
+after its delay; when the fader is fully out and the BGM has ended (or 1200 frames passed) (408-430): lives left -> flag 0x30002,
+decideNextStageOfMiss + moveStage (the stage from its start, no intro, unkE4 = 0xF: a plain 0.4 s fade in at the next start), the fader
+black meanwhile; none -> the save / title flow. Mario keeps flying his FIRE_DOWN or lying in LOSER_DOWN while this runs. TOO BAD!:
+TConsoleStr (ConsoleStr.cpp 315 / 554): big_tx_1.blo's ms00..ms06 (78 x 78 at y 338 on its 600 x 480 screen; textures big_tx_t/o/o/
+b/a/d/ex), letter i from frame i x 10: a quadratic drop from 270 above to 30 below over 60 frames with a full turn and alpha +12 a
+frame, a bounce 110 up over 40 at +60, back over 40 at +100, out over 30 at +300 (never reached: the stage has moved). The death wipe
+(hx_wiper.c Hx_Test2 / Hxs1_Test2): four black bands, each the part of a ring about a centre 200 / 250 px off the right edge --
+(840,300) 650..900 from the bottom up, (840,150) 450..700 from the top down, (890,370) 400..650 up, (890,300) 200..420 down --
+revealed row by row along an Hx motion of 500 rows (2 frames in, 8 / 8 / 7 / 9 cruising, 1 braking; timers 11 / 11 / 10 / 12), the
+earlier bands held: curved stripes filling the screen from the left in ~1.5 s at the wiper's 30 frames a second. PORT: assets/Sms/
+Console/ConsoleStr.tscn + SmsConsoleStr.cs (CanvasLayer 15; the letters placed about the blo's centre, 120 Hz console frames x
+SmsHud.Anim), Fader.tscn + SmsFader.cs + Fader.gdshader (CanvasLayer 100: StartWipe(type, delay), SetBlack, FadeIn; Arcs, Circle,
+FadeOut, FadeIn; FrameRate 30), both under Mario in Player.tscn; Mario.SmsMissTick from SmsAfterMove runs the director's state (the
+lives in GameData.Lives across the reload, GameData.CameFromMiss for Level.cs: no intro, black, a 0.4 s fade in); Mario.GameOverScene
+(empty: the stage again, lives reset), Mario.MissJingle (a slot). The dead state's R key is gone: the sequence moves the stage. NOT
+PORTED: the Hx_GameOver wipe (a texture the port does not have: a plain 1 s fade stands in), the save / title flow after a game over,
+the letters' sparkle (emitter 0x1F9), the miss BGM, the hell death's trigger (no death plane here yet), the camera's dead demo.

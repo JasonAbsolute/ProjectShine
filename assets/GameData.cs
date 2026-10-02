@@ -45,6 +45,15 @@ public partial class GameData : Node
     /// <summary>Display name of the current pick, or "None" if a level was run directly.</summary>
     public string SelectedCharacterName => SelectedCharacter?.DisplayName ?? "None";
 
+    // ----------------------------------------------------------------- the run --
+
+    /// <summary>The lives (the game's TFlagManager flag 0x20001): they outlive a stage reload after a miss. -1 = not started (Mario takes
+    /// his StartingLives). Not saved to disk -- lives belong to the run, as in the game.</summary>
+    public int Lives = -1;
+
+    /// <summary>The game's flag 0x30002: the next stage load follows a miss -- no intro, a plain fade in. Level.cs clears it.</summary>
+    public bool CameFromMiss;
+
     public override void _Input(InputEvent @event)
     {
         if (@event is InputEventKey key && key.Pressed && key.Keycode == Key.F8)

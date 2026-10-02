@@ -1,0 +1,32 @@
+[gd_scene load_steps=4 format=3 uid="uid://cfader0000058"]
+
+[ext_resource type="Script" path="res://assets/Sms/Console/SmsFader.cs" id="1_script"]
+[ext_resource type="Shader" path="res://assets/Sms/Console/Fader.gdshader" id="2_shader"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_fader"]
+resource_name = "TSMSFader + the Hx wiper: the death's four curved bands, the iris, the plain fades"
+shader = ExtResource("2_shader")
+shader_parameter/mode = 0
+shader_parameter/alpha = 1.0
+shader_parameter/rows = Vector4(0, 0, 0, 0)
+shader_parameter/radius = 400.0
+shader_parameter/viewport = Vector2(640, 480)
+
+[node name="Fader" type="CanvasLayer" node_paths=PackedStringArray("Rect")]
+layer = 100
+script = ExtResource("1_script")
+Rect = NodePath("Rect")
+FrameRate = 30.0
+PlainFadeSeconds = 0.3
+
+[node name="Rect" type="ColorRect" parent="."]
+visible = false
+material = SubResource("ShaderMaterial_fader")
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 1)

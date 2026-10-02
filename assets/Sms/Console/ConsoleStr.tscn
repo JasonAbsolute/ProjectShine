@@ -1,0 +1,93 @@
+[gd_scene load_steps=8 format=3 uid="uid://cconstr000058"]
+
+[ext_resource type="Script" path="res://assets/Sms/Console/SmsConsoleStr.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/big_tx_t.png" id="t_t"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/big_tx_o.png" id="t_o"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/big_tx_b.png" id="t_b"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/big_tx_a.png" id="t_a"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/big_tx_d.png" id="t_d"]
+[ext_resource type="Texture2D" path="res://assets/Sms/hud/big_tx_ex.png" id="t_ex"]
+
+[node name="ConsoleStr" type="CanvasLayer" node_paths=PackedStringArray("Miss")]
+layer = 15
+script = ExtResource("1_script")
+Miss = NodePath("Miss")
+LayoutCenter = Vector2(300, 240)
+Size = 1.0
+
+[node name="Miss" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 600.0
+offset_bottom = 480.0
+mouse_filter = 2
+
+[node name="ms00" type="TextureRect" parent="Miss"]
+layout_mode = 0
+offset_left = 76.0
+offset_top = 338.0
+offset_right = 154.0
+offset_bottom = 416.0
+mouse_filter = 2
+texture = ExtResource("t_t")
+expand_mode = 1
+
+[node name="ms01" type="TextureRect" parent="Miss"]
+layout_mode = 0
+offset_left = 133.0
+offset_top = 338.0
+offset_right = 211.0
+offset_bottom = 416.0
+mouse_filter = 2
+texture = ExtResource("t_o")
+expand_mode = 1
+
+[node name="ms02" type="TextureRect" parent="Miss"]
+layout_mode = 0
+offset_left = 186.0
+offset_top = 338.0
+offset_right = 264.0
+offset_bottom = 416.0
+mouse_filter = 2
+texture = ExtResource("t_o")
+expand_mode = 1
+
+[node name="ms03" type="TextureRect" parent="Miss"]
+layout_mode = 0
+offset_left = 274.0
+offset_top = 338.0
+offset_right = 352.0
+offset_bottom = 416.0
+mouse_filter = 2
+texture = ExtResource("t_b")
+expand_mode = 1
+
+[node name="ms04" type="TextureRect" parent="Miss"]
+layout_mode = 0
+offset_left = 335.0
+offset_top = 338.0
+offset_right = 413.0
+offset_bottom = 416.0
+mouse_filter = 2
+texture = ExtResource("t_a")
+expand_mode = 1
+
+[node name="ms05" type="TextureRect" parent="Miss"]
+layout_mode = 0
+offset_left = 400.0
+offset_top = 338.0
+offset_right = 478.0
+offset_bottom = 416.0
+mouse_filter = 2
+texture = ExtResource("t_d")
+expand_mode = 1
+
+[node name="ms06" type="TextureRect" parent="Miss"]
+layout_mode = 0
+offset_left = 463.0
+offset_top = 338.0
+offset_right = 541.0
+offset_bottom = 416.0
+mouse_filter = 2
+texture = ExtResource("t_ex")
+expand_mode = 1
