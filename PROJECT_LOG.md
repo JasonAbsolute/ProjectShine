@@ -4086,3 +4086,27 @@ the flight, his profile handed back at rest (Fruit.ApplyPhysicsProfile still rul
 (contacts + impulse), LaunchAsDrop, the red pepper's rotation lock, the Anim_AttachPickup carry socket (and its three GD.Print scale
 lines, which print on every pickup). LEGACY RETIRED BY PASS 63: Godot's CharacterBody3D platform carry (PlatformFloorLayers /
 PlatformWallLayers / PlatformOnLeave = add velocity) and SmsStepVisualCheckSnap's GetPlatformVelocity test -> SmsRideApply / SmsRideReCalc.
+
+### Pass 62c -- the retired carry / throw legacy removed; the standing fail pose on; throw-feel knobs
+REMOVED (his ask: "remove anything that's not used anymore" -- the SMS take / throw of pass 62 had left these as fallbacks; the port's
+rule is replace, not fall back): Mario.cs -- the pickup cast (the pickupCast / pickupCastInitialLocalPos fields and their _Ready setup,
+UpdatePickupCastFacing, TryFindPickable), the belly-slide pickup block that used the cast (the SMS held-B take already covers a slide:
+SmsCanTakeNow allows diving / bellySlidingFromDive on the floor, as the game's isTakeSituation does), the B-press fallbacks (the 45-degree
+instant throw / gentle put: StartThrow, StartPutDown, ThrowHeldInstant, Anim_FinishThrow, THROW_FORWARD_BOOST 9 / THROW_UP_BOOST 3 /
+THROW_UP_VELOCITY 39 / THROW_FORWARD_VELOCITY 28, _queuedThrowFacing, Anim_DetachPickup's legacy tail), TryStartFruitPickup (no caller
+since the PickupZone auto-pickup went), the GD.Print(Scale) in _Ready and the three scale prints in Anim_AttachPickup, the "[Throw]
+Airborne intercept fired" print. Fruit.cs -- ThrowSpeedMultiplier (the game has per-type rates in the physical table instead). KEPT:
+Anim_AttachPickup (the carry socket attach, scale reset to 1), Anim_DetachPickup (= SmsReleaseHeld), StartPickupRaise, _isThrowQueued
+(PITCHING vs PUTTING), _aerialThrowLockTimer (the SMS jump throw uses the guard), OnAnimationFinished's putDown branch as a safety net,
+the fruit's own physics profile (rules a fruit nobody threw), the durian kick, LaunchAsDrop. NOT REMOVED (scenes, his editor open): the
+`pickupCast` ShapeCast3D node in assets/Player.tscn and the `PickupZone` Area3D in the six fruit scenes -- both unused; delete them in
+the editor or say when it is closed. With UseSmsPhysics off the take / throw now has no path (by the rule).
+STANDING FAIL POSE: TakePoseStanding defaults ON (his ask) -- a DEVIATION: the shipped game does nothing on B while standing (waiting()'s
+0x10000 input bit is never set); off = the game.
+THROW FEEL (his "too light and slow", twice): DEVIATION knobs on Mario, with the game at 1 / false: ThrowPowerScale 1.8 (the forward
+launch: the game's mThrowPower 2.8 x the type's rate -- coconut 5.6 u/f = 2.3 m/s, now 4.1), ThrowVyScale 1.15 (the type's vy -- coconut
+15 = 6.0 m/s, now 7.0), ThrowGravityScale 1.6 (the type's gravity -- coconut 0.3 = 14.5 m/s2, now 23: a 0.60 s, 1.0 m high arc instead
+of 0.83 s and 1.3 m), ThrowKeepsRunSpeed true (0.5 x the speed he had when B was pressed goes into the object; the game's ground throw
+adds nothing because stopCommon's waitProcess zeroes mVel before the frame-4 release -- at a 32 u/f run that is +6.5 m/s). The flight
+numbers reach the object through SmsTakeData.WithGravity; _smsThrowRunVel is sampled in SmsThrowOrPut before the stop. The game's own
+feel: try a papaya (rate 5: 5.6 m/s forward even at the game's values).

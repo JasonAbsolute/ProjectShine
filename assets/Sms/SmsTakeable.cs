@@ -142,6 +142,10 @@ public readonly struct SmsTakeData
     public SmsTakeData Scaled(float s) => s > 0f && !Mathf.IsEqualApprox(s, 1f)
         ? new SmsTakeData(Kind, HitRadius * s, HitHeight * s, ThrowRate, ThrowVy, Gravity, Bounce, BounceMinVy, BounceFriction, WallReflect, Name)
         : this;
+
+    /// <summary>The row with another gravity (Mario's ThrowGravityScale deviation knob).</summary>
+    public SmsTakeData WithGravity(float g) => Mathf.IsEqualApprox(g, Gravity) ? this
+        : new SmsTakeData(Kind, HitRadius, HitHeight, ThrowRate, ThrowVy, g, Bounce, BounceMinVy, BounceFriction, WallReflect, Name);
 }
 
 /// <summary>

@@ -4,8 +4,8 @@ using Godot;
 /// Unified script for all Super Mario Sunshine fruits (Banana, Coconut, Papaya,
 /// Pineapple, Red Pepper, Durian). The carryable variants integrate with Mario's
 /// existing RigidBody3D pickup system (group "pickable" + carrySocket attach).
-/// Pickup is B-press only — Mario's pickupCast ShapeCast looks for "pickable"
-/// bodies in front of him when the player presses B. No auto-pickup on contact.
+/// Pickup is B only: Mario's SmsFindTakeTarget (the game's canTake: the hit cylinders overlap within 80 + the fruit's radius,
+/// within 60 degrees of his face) looks through the "pickable" group while B is held. No auto-pickup on contact.
 /// Durian is the exception — it cannot be carried, only kicked.
 ///
 /// Scene structure expected:
@@ -77,30 +77,12 @@ public partial class Fruit : RigidBody3D
 
 	private float _kickTimer = 0f;
 
-	/// <summary>
-	/// Per-fruit throw-speed multiplier read by Mario.cs when launching. Heavy fruits
-	/// (pineapple, durian) don't fly as far as light ones (banana, red pepper).
-	/// 1.0 == default throw speed.
-	/// </summary>
-	public float ThrowSpeedMultiplier =>
-		Type switch
-		{
-			FruitType.Banana => 1.15f,    // light, throws far and flat
-			FruitType.Coconut => 1.00f,   // medium
-			FruitType.Papaya => 0.95f,    // medium-soft
-			FruitType.Pineapple => 0.75f, // heaviest carryable, short throw
-			FruitType.RedPepper => 1.10f, // light + floaty = travels far
-			FruitType.Durian => 1.00f,    // n/a (can't throw — only kicked)
-			_ => 1.0f,
-		};
-
 	public override void _Ready()
 	{
 		ApplySize();
 		if (CanBePickedUp)
 		{
-			// Pickup happens via B-press only. Mario's pickupCast (ShapeCast3D) looks
-			// for RigidBody3D's in this group when the player presses B near them.
+			// Pickup happens via B only: Mario's SmsFindTakeTarget looks through this group while B is held.
 			// No auto-pickup-on-walk-into — that's reserved for things like coins.
 			AddToGroup("pickable");
 		}

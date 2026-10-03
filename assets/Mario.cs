@@ -1383,8 +1383,6 @@ public partial class Mario : CharacterBody3D
     private Vector3 _lastPhysHorizVel;
     private Vector3 _marioHorizAccel;
 
-    private ShapeCast3D pickupCast;
-    private Vector3 pickupCastInitialLocalPos; // Store initial offset for rotation
     private Node3D carrySocket;
 
     private RigidBody3D heldBody;
@@ -1398,8 +1396,19 @@ public partial class Mario : CharacterBody3D
     /// <summary>DEVIATION knob (off = the shipped game): B while standing still with nothing to take plays the fail grab (TAKE_POSE,
     /// ma_get_fail). waiting() has that branch (MarioWait.cpp 115: mInput & 0x10000) but no input ever sets the bit (MarioMove.cpp
     /// 1487-1515 set 1, 2, 4, 8, 0x20, 0x80, 0x100, 0x200, 0x2000, 0x4000, 0x8000), so in the game only a MOVING Mario (running()
-    /// 668, landing() 1005) does it; standing still, B does nothing.</summary>
-    [Export] public bool TakePoseStanding = false;
+    /// 668, landing() 1005) does it; standing still, B does nothing. ON at his ask (10-02 21:42).</summary>
+    [Export] public bool TakePoseStanding = true;
+    /// <summary>DEVIATION knobs for the throw's feel (1 / false = the shipped game, which he found too light and slow). The game's
+    /// ground throw is a short lob: the object leaves at mThrowPower 2.8 x the type's rate along his face (coconut 2.0 -> 5.6 units a
+    /// frame = 2.3 m/s; papaya 5.0 -> 5.6 m/s), rises at the type's vy (coconut 15 -> 6 m/s) under the type's gravity (0.3 -> 14.5
+    /// m/s2: a 1.3 m high, 1.9 m long arc), and his run adds NOTHING on the ground (stopCommon's waitProcess zeroes mVel before the
+    /// frame-4 release; only the jump throw adds 0.5 x his air speed). ThrowPowerScale multiplies the forward launch, ThrowVyScale the
+    /// rise, ThrowGravityScale the fall, ThrowKeepsRunSpeed adds 0.5 x the speed he had when B was pressed (as the jump throw does).</summary>
+    [Export] public float ThrowPowerScale = 1.8f;
+    [Export] public float ThrowVyScale = 1.15f;
+    [Export] public float ThrowGravityScale = 1.6f;
+    [Export] public bool ThrowKeepsRunSpeed = true;
+    private Vector3 _smsThrowRunVel; // his horizontal speed when B was pressed (ThrowKeepsRunSpeed)
     private SmsTakeData _smsTakeData;                 // the pending / held object's game numbers (an SmsTakeable child, his Fruit.Type, or the generic fruit)
     private bool _smsTakeAttached = false;            // taking(): the object is in the hand from raise frame 11 (the legacy attached at the clip's end)
     private bool _smsActReleased = false;             // pitching() / putting() / jumpingThrow(): the release already fired on this clip
@@ -1731,24 +1740,10 @@ public partial class Mario : CharacterBody3D
         if (landingDustFx == null)
             GD.PushError("Missing LandingDustFx (Node3D) as a child of Mario.");
 
-        GD.Print(Scale);
-        pickupCast = GetNodeOrNull<ShapeCast3D>("pickupCast");
-        if (pickupCast == null)
-            GD.PushError("Missing PickupCast (ShapeCast3D) under Mario.");
-        else
-            pickupCastInitialLocalPos = pickupCast.Position; // Store initial local position
-
         carrySocket = GetNodeOrNull<Node3D>("Armature/Skeleton3D/RightHandBone/CarrySocket");
         if (carrySocket == null)
             GD.PushError("Missing CarrySocket under RightHandBone. Move it there.");
 
-        if (pickupCast != null)
-        {
-            pickupCast.Enabled = true;
-            pickupCast.CollideWithBodies = true;
-            pickupCast.CollideWithAreas = false;
-            pickupCast.AddException(this);
-        }
         animPlayer.AnimationFinished += OnAnimationFinished;
 
         animTree = GetNodeOrNull<AnimationTree>("AnimationTree");
@@ -2205,38 +2200,13 @@ public partial class Mario : CharacterBody3D
             goto EndFrame;
         }
 
-        // SMS quirk: while belly-sliding ON THE GROUND from a dive with B HELD,
-        // hitting a carryable fruit picks it up instead of bonking. Durian's
-        // CanBePickedUp is false so it's automatically excluded. Airborne dive
-        // does NOT trigger this — Mario must be on the floor.
-        if (
-            heldBody == null
-            && (
-                stateOfMario == MarioState.diving || stateOfMario == MarioState.bellySlidingFromDive
-            )
-            && IsOnFloor()
-            && Input.IsActionPressed("button_b")
-            && pickupCast != null
-        )
-        {
-            UpdatePickupCastFacing();
-            if (TryFindPickable(out var diveFruit) && diveFruit is Fruit f && f.CanBePickedUp)
-            {
-                velocity = Vector3.Zero;
-                Velocity = Vector3.Zero;
-                StartPickupRaise(diveFruit);
-                goto EndFrame;
-            }
-        }
-
         if (stateOfMario == MarioState.putDown)
         {
             if (animTree != null)
                 animTree.Active = false;
             velocity = Vector3.Zero;
 
-            // Keep whichever animation StartThrow / StartPutDown started — ma_throw
-            // when throwing, ma_put when setting down. Don't overwrite it.
+            // Keep the clip SmsThrowOrPut started -- ma_throw when PITCHING, ma_put when PUTTING. Don't overwrite it.
             string desiredAnim = _isThrowQueued ? "ma_throw" : "ma_put";
             if (!animPlayer.HasAnimation(desiredAnim))
                 desiredAnim = "ma_put";
@@ -3118,40 +3088,18 @@ public partial class Mario : CharacterBody3D
                 {
                     if (heldBody != null && stateOfMario != MarioState.putDown)
                     {
-                        if (UseSmsPhysics)
-                        {
-                            SmsThrowOrPut(); // isThrowStart(): an enemy is pitched; a map object pitched past fwd 16, else put down (canPut), else kept
-                            goto EndFrame;
-                        }
-                        // SMS-style: running/intending-to-move B = instant throw (fruit
-                        // leaves hand at 45°, Mario keeps running unaffected);
-                        // standing-still B = gentle put-down.
-                        float horizSpeed = new Vector2(velocity.X, velocity.Z).Length();
-                        bool wantsThrow = horizSpeed > 3.0f || stickStrength > 0.4f;
-                        if (wantsThrow)
-                            StartThrow(inputDirWorld);
-                        else
-                            StartPutDown();
+                        SmsThrowOrPut(); // isThrowStart(): an enemy is pitched; a map object pitched past fwd 16, else put down (canPut), else kept
                         goto EndFrame;
                     }
 
                     if (heldBody == null && stateOfMario != MarioState.pickupRaise)
                     {
-                        if (UseSmsPhysics)
-                        {
-                            // the held-B take above found nothing. running() 668 / landing() 1005: B with nothing to take -> TAKE_POSE
-                            // (ma_get_fail); waiting() tests a bit (mInput & 0x10000) nothing sets -- standing still, B does nothing
-                            // (TakePoseStanding is the deviation that plays it anyway); no other status has the entry (a squat, a slide: nothing)
-                            bool smsRunOrLand = stateOfMario is MarioState.sneak or MarioState.walking or MarioState.running or MarioState.sprinting
-                                or MarioState.singleJumpLanding or MarioState.doubleJumpLanding or MarioState.tripleJumpLanding or MarioState.landing;
-                            if (smsRunOrLand || (TakePoseStanding && stateOfMario == MarioState.idle))
-                                EnterPickupFail();
-                            goto EndFrame;
-                        }
-                        UpdatePickupCastFacing(); // Rotate pickup cast with Mario
-                        if (TryFindPickable(out var rb))
-                            StartPickupRaise(rb);
-                        else
+                        // the held-B take above found nothing. running() 668 / landing() 1005: B with nothing to take -> TAKE_POSE
+                        // (ma_get_fail); waiting() tests a bit (mInput & 0x10000) nothing sets -- standing still, B does nothing in the
+                        // game (TakePoseStanding, ON at his ask, plays it anyway); no other status has the entry (a squat, a slide: nothing)
+                        bool smsRunOrLand = stateOfMario is MarioState.sneak or MarioState.walking or MarioState.running or MarioState.sprinting
+                            or MarioState.singleJumpLanding or MarioState.doubleJumpLanding or MarioState.tripleJumpLanding or MarioState.landing;
+                        if (smsRunOrLand || (TakePoseStanding && stateOfMario == MarioState.idle))
                             EnterPickupFail();
                         goto EndFrame;
                     }
@@ -3938,13 +3886,7 @@ public partial class Mario : CharacterBody3D
             // object. This runs before any dive triggers downstream check button_b.
             if (heldBody != null && Input.IsActionJustPressed("button_b"))
             {
-                GD.Print(
-                    $"[Throw] Airborne intercept fired — state={stateOfMario}, vel={velocity}"
-                );
-                if (UseSmsPhysics)
-                    SmsStartJumpThrow(); // checkJumpingThrowStart(): MARIO_STATUS_JUMP_THROW
-                else
-                    ThrowHeldInstant(inputDirWorld);
+                SmsStartJumpThrow(); // checkJumpingThrowStart(): MARIO_STATUS_JUMP_THROW
                 goto EndFrame;
             }
 
@@ -9873,30 +9815,6 @@ public partial class Mario : CharacterBody3D
         ledgeSensors.GlobalRotation = r;
     }
 
-    private void UpdatePickupCastFacing()
-    {
-        if (pickupCast == null || armature == null)
-            return;
-
-        // Get Mario's facing direction
-        Vector3 facing =
-            lastFacingDirection != Vector3.Zero ? lastFacingDirection : Vector3.Forward;
-        facing = facing.Normalized();
-
-        // Calculate yaw rotation
-        float yaw = YawFromDir(facing);
-
-        // Rotate the pickup cast's initial local position around Mario
-        // This makes it orbit around Mario as he rotates
-        Vector3 rotatedLocalPos = pickupCastInitialLocalPos.Rotated(Vector3.Up, yaw);
-
-        // Set the rotated local position (relative to Mario)
-        pickupCast.Position = rotatedLocalPos;
-
-        // Also rotate the cast itself to face the same direction as Mario
-        pickupCast.Rotation = new Vector3(0, yaw, 0);
-    }
-
     private void CacheCapsuleWorldMetrics()
     {
         bodyCol = GetNodeOrNull<CollisionShape3D>("CollisionShape3D");
@@ -10386,34 +10304,8 @@ public partial class Mario : CharacterBody3D
         return true; // still owning the frame
     }
 
-    private bool TryFindPickable(out RigidBody3D body)
-    {
-        body = null;
-        if (pickupCast == null)
-            return false;
-
-        pickupCast.ForceShapecastUpdate();
-        if (!pickupCast.IsColliding())
-            return false;
-
-        int count = pickupCast.GetCollisionCount();
-        for (int i = 0; i < count; i++)
-        {
-            var obj = pickupCast.GetCollider(i);
-            if (obj is RigidBody3D rb && rb.IsInGroup("pickable"))
-            {
-                body = rb;
-                return true;
-            }
-        }
-        return false;
-    }
-
     public void Anim_AttachPickup()
     {
-        GD.Print($"carrySocket gscale = {carrySocket.GlobalTransform.Basis.Scale}");
-        GD.Print($"held pre-attach gscale = {pendingPickup.GlobalTransform.Basis.Scale}");
-
         if (pendingPickup == null || heldBody != null || carrySocket == null)
             return;
 
@@ -10453,252 +10345,18 @@ public partial class Mario : CharacterBody3D
     {
         if (heldBody == null)
             return;
-        if (UseSmsPhysics)
-        {
-            // every drop is dropObject() -> HIT_MESSAGE_THROWN, except putting()'s HIT_MESSAGE_PUT
-            SmsReleaseHeld(put: stateOfMario == MarioState.putDown && !_isThrowQueued && !_smsJumpThrow);
-            return;
-        }
-
-        var rb = heldBody;
-        heldBody = null;
-
-        rb.TopLevel = false;
-        rb.Freeze = false;
-
-        rb.CollisionLayer = heldLayer;
-        rb.CollisionMask = heldMask;
-
-        // If a throw was queued (StartThrow), use the captured throw facing — even
-        // if the ma_throw animation didn't play and ma_put fired instead, we still
-        // honor the throw arc.
-        if (_isThrowQueued)
-        {
-            rb.LinearVelocity =
-                _queuedThrowFacing * THROW_FORWARD_BOOST + Vector3.Up * THROW_UP_BOOST;
-            _isThrowQueued = false;
-            GD.Print(
-                $"[Throw] Detached with arc — facing={_queuedThrowFacing}, vel={rb.LinearVelocity}"
-            );
-            return;
-        }
-
-        // Regular put-down or pickup-cancel: apply Mario's current velocity (slight
-        // throw if he's moving, zero if stationary).
-        Vector3 horizVel = new Vector3(velocity.X, 0f, velocity.Z);
-        if (horizVel.LengthSquared() > 1.0f)
-        {
-            Vector3 facing = horizVel.Normalized();
-            rb.LinearVelocity =
-                horizVel + facing * THROW_FORWARD_BOOST + Vector3.Up * THROW_UP_BOOST;
-        }
-        else
-        {
-            rb.LinearVelocity = Vector3.Zero;
-        }
+        // every drop is dropObject() -> HIT_MESSAGE_THROWN, except putting()'s HIT_MESSAGE_PUT
+        SmsReleaseHeld(put: stateOfMario == MarioState.putDown && !_isThrowQueued && !_smsJumpThrow);
     }
 
-    // Throw state — Mario stops mid-action, plays ma_throw, then releases fruit on anim finish.
+    // PITCHING (true) vs PUTTING (false) for the putDown state's clip and release (SmsThrowOrPut)
     private bool _isThrowQueued = false;
-    private Vector3 _queuedThrowFacing = Vector3.Forward;
 
     // Blocks airborne dive triggers while the aerial throw anim is playing — otherwise
     // a B-press release (IsActionPressed stays true the frame after JustPressed fires)
     // would tip Mario into a dive and replace ma_throw with ma_sldct.
     private float _aerialThrowLockTimer = 0f;
     private const float AERIAL_THROW_LOCK_DURATION = 0.45f;
-
-    /// <summary>
-    /// Ground throw: Mario stops + plays ma_throw, and the fruit is released
-    /// IMMEDIATELY (this frame) at a 45° launch — not on animation finish.
-    /// Mario returns to idle when ma_throw completes; if the player is still
-    /// holding the stick he re-accelerates from there.
-    /// </summary>
-    private void StartThrow(Vector3 stickDirWorld)
-    {
-        if (heldBody == null)
-            return;
-
-        // Pick the throw direction from Mario's intent: stick > running velocity >
-        // last-facing > armature forward.
-        Vector3 facing;
-        Vector3 stickHoriz = new Vector3(stickDirWorld.X, 0f, stickDirWorld.Z);
-        Vector3 horizVel = new Vector3(velocity.X, 0f, velocity.Z);
-        if (stickHoriz.LengthSquared() > 0.04f)
-            facing = stickHoriz.Normalized();
-        else if (horizVel.LengthSquared() > 0.25f)
-            facing = horizVel.Normalized();
-        else if (lastFacingDirection.LengthSquared() > 0.01f)
-            facing = new Vector3(lastFacingDirection.X, 0f, lastFacingDirection.Z).Normalized();
-        else
-            facing = -armature.GlobalTransform.Basis.Z.Normalized();
-
-        // Snap Mario's facing toward the throw direction (visual cohesion with the anim)
-        lastFacingDirection = facing;
-        armature.Rotation = new Vector3(0f, BaseYawFromDir(facing), 0f);
-
-        // Stop Mario for the throw stance.
-        velocity = Vector3.Zero;
-        Velocity = Vector3.Zero;
-        stateOfMario = MarioState.putDown; // reuse the state-lock semantics of putDown
-        // Flag stays TRUE for the duration of the anim so the per-frame putDown
-        // handler at the top of _PhysicsProcess picks ma_throw (not ma_put).
-        // Anim_DetachPickup is a no-op since heldBody is already null below.
-        _isThrowQueued = true;
-        if (animTree != null)
-            animTree.Active = false;
-
-        // Detach the fruit immediately at 45°.
-        var rb = heldBody;
-        heldBody = null;
-        rb.TopLevel = false;
-        rb.Freeze = false;
-        rb.CollisionLayer = heldLayer;
-        rb.CollisionMask = heldMask;
-
-        // Per-fruit throw-speed multiplier (heavy fruits don't fly as far).
-        float speedMul = (rb is Fruit fruitGround) ? fruitGround.ThrowSpeedMultiplier : 1.0f;
-        Vector3 throwVel =
-            facing * (THROW_FORWARD_VELOCITY * speedMul)
-            + Vector3.Up * (THROW_UP_VELOCITY * speedMul);
-        // Snap the fruit to a point in FRONT of Mario's center (not relative to
-        // its current carry-socket position, which is at his right hand and
-        // would leave the fruit brushing his right side and pushing him left
-        // via MoveAndSlide ejection).
-        rb.GlobalPosition = GlobalPosition + facing * 1.2f + Vector3.Up * 1.0f;
-        rb.Sleeping = false;
-        rb.SetDeferred("linear_velocity", throwVel);
-        rb.SetDeferred("angular_velocity", Vector3.Zero);
-
-        // Hard guarantee Mario can't be shoved by this fruit ever — physics
-        // server-level exclusion. Cleared shortly after via a timer so the
-        // thrown fruit can hit Mario later if it comes back around.
-        rb.AddCollisionExceptionWith(this);
-        var clearExc = GetTree().CreateTimer(0.6);
-        clearExc.Timeout += () =>
-        {
-            if (IsInstanceValid(rb))
-                rb.RemoveCollisionExceptionWith(this);
-        };
-
-        // VERY slight backwards recoil — one-shot position offset (velocity gets
-        // zeroed every frame while in putDown state, so we can't use velocity).
-        GlobalPosition -= facing * 0.08f;
-
-        // Clear carry blend so Mario instantly drops the holding pose.
-        if (animTree != null && animTree.Active)
-            animTree.Set(CARRY_BLEND_PATH, 0.0f);
-
-        string animName = animPlayer.HasAnimation("ma_throw") ? "ma_throw" : "ma_put";
-        animPlayer.Play(animName);
-        GD.Print(
-            $"[Throw] StartThrow — playing '{animName}', facing={facing}, throwVel={throwVel}"
-        );
-    }
-
-    /// <summary>
-    /// Instant throw — both ground and air paths. Fruit leaves Mario's hand at
-    /// a 45° launch angle in his facing direction with NO velocity inheritance
-    /// and NO effect on Mario himself. Mario continues whatever he was doing
-    /// (running, jumping, etc) without state lock or velocity zero.
-    /// </summary>
-    private void ThrowHeldInstant(Vector3 stickDirWorld = default)
-    {
-        if (heldBody == null)
-        {
-            GD.Print("[Throw] ThrowHeldInstant: heldBody is null, aborting");
-            return;
-        }
-
-        var rb = heldBody;
-        heldBody = null;
-        rb.TopLevel = false;
-        rb.Freeze = false;
-        rb.CollisionLayer = heldLayer;
-        rb.CollisionMask = heldMask;
-
-        // Pick the throw direction from Mario's intent: stick > running velocity >
-        // last-facing > armature forward. This is purely the horizontal direction;
-        // we do NOT add Mario's current velocity into the throw (the user wants the
-        // throw to be 45° regardless of how fast Mario is moving).
-        Vector3 facing;
-        Vector3 stickHoriz = new Vector3(stickDirWorld.X, 0f, stickDirWorld.Z);
-        Vector3 horizVel = new Vector3(velocity.X, 0f, velocity.Z);
-        if (stickHoriz.LengthSquared() > 0.04f)
-            facing = stickHoriz.Normalized();
-        else if (horizVel.LengthSquared() > 0.25f)
-            facing = horizVel.Normalized();
-        else if (lastFacingDirection.LengthSquared() > 0.01f)
-            facing = new Vector3(lastFacingDirection.X, 0f, lastFacingDirection.Z).Normalized();
-        else
-            facing = -armature.GlobalTransform.Basis.Z.Normalized();
-
-        // SMS steep-arc launch — same as ground throw. Per-fruit multiplier scales
-        // both axes (heavy fruits don't fly as far OR as high).
-        float speedMul = (rb is Fruit fruitAir) ? fruitAir.ThrowSpeedMultiplier : 1.0f;
-        Vector3 throwVel =
-            facing * (THROW_FORWARD_VELOCITY * speedMul)
-            + Vector3.Up * (THROW_UP_VELOCITY * speedMul);
-
-        // Snap the fruit to Mario's center + forward, same as ground throw, so
-        // it can't brush his right side (carrySocket is on RightHandBone).
-        rb.GlobalPosition = GlobalPosition + facing * 1.2f + Vector3.Up * 1.0f;
-
-        // Physics-server exclusion so the thrown fruit cannot push Mario at all,
-        // regardless of overlap. Cleared after 0.6s so the fruit can hit him later.
-        rb.AddCollisionExceptionWith(this);
-        var clearExc = GetTree().CreateTimer(0.6);
-        clearExc.Timeout += () =>
-        {
-            if (IsInstanceValid(rb))
-                rb.RemoveCollisionExceptionWith(this);
-        };
-
-        // Apply velocity DEFERRED — setting LinearVelocity during _PhysicsProcess
-        // on a body just unfrozen this same frame gets clobbered by the engine's
-        // first integration. Deferring lets the new velocity stick cleanly.
-        rb.Sleeping = false;
-        rb.SetDeferred("linear_velocity", throwVel);
-        rb.SetDeferred("angular_velocity", Vector3.Zero);
-        GD.Print($"[Throw] Instant detach — rb={rb.Name}, facing={facing}, throwVel={throwVel}");
-
-        // Clear the carry blend so Mario instantly drops the holding pose.
-        if (animTree != null && animTree.Active)
-            animTree.Set(CARRY_BLEND_PATH, 0.0f);
-
-        // Only swap to ma_throw if Mario is airborne — on the ground he should
-        // keep running without an animation hiccup. The dive-lock prevents the
-        // airborne B-press from being re-read as a dive on the next frame.
-        if (!IsOnFloor() && animPlayer != null && animPlayer.HasAnimation("ma_throw"))
-        {
-            if (animTree != null)
-                animTree.Active = false;
-            animPlayer.Play("ma_throw");
-            _aerialThrowLockTimer = AERIAL_THROW_LOCK_DURATION;
-        }
-    }
-
-    /// <summary>Called from OnAnimationFinished when ma_throw completes — actually releases the held body with the throw arc.</summary>
-    private void Anim_FinishThrow()
-    {
-        if (heldBody == null)
-            return;
-        var rb = heldBody;
-        heldBody = null;
-        rb.TopLevel = false;
-        rb.Freeze = false;
-        rb.CollisionLayer = heldLayer;
-        rb.CollisionMask = heldMask;
-        rb.LinearVelocity = _queuedThrowFacing * THROW_FORWARD_BOOST + Vector3.Up * THROW_UP_BOOST;
-    }
-
-    private const float THROW_FORWARD_BOOST = 9f;
-    private const float THROW_UP_BOOST = 3f;
-
-    // SMS-style steep arc — fruit lobs up far more than it travels forward.
-    // Up:forward ratio ≈ 2.2:1, launch angle ≈ 65° from horizontal.
-    private const float THROW_UP_VELOCITY = 39f;
-    private const float THROW_FORWARD_VELOCITY = 28f;
 
     private void StartPickupRaise(RigidBody3D target)
     {
@@ -10711,52 +10369,6 @@ public partial class Mario : CharacterBody3D
 
         stateOfMario = MarioState.pickupRaise;
         animPlayer.Play("ma_raise");
-    }
-
-    /// <summary>
-    /// Public entry for auto-pickup from items like fruit. Called by Fruit.cs when
-    /// Mario enters the fruit's PickupZone Area3D. Returns true if pickup started.
-    /// </summary>
-    public bool TryStartFruitPickup(RigidBody3D target)
-    {
-        if (target == null)
-            return false;
-        if (heldBody != null)
-            return false;
-        if (pendingPickup != null)
-            return false;
-        if (CameraLocked)
-            return false;
-        if (!IsOnFloor())
-            return false; // SMS lets you pick up only on ground
-
-        // Block during inappropriate states
-        switch (stateOfMario)
-        {
-            case MarioState.pickupRaise:
-            case MarioState.putDown:
-            case MarioState.carrying:
-            case MarioState.pickupFail:
-            case MarioState.diving:
-            case MarioState.bellySlidingFromDive:
-            case MarioState.groundPoundStartup:
-            case MarioState.groundPoundFalling:
-            case MarioState.groundPoundLanding:
-            case MarioState.hurt:
-            case MarioState.dead:
-            case MarioState.ledgeHang:
-            case MarioState.ledgeClimb:
-            case MarioState.ledgeHopUp:
-            case MarioState.treeGrab:
-            case MarioState.treeWait:
-            case MarioState.treeClimb:
-            case MarioState.treeMoveL:
-            case MarioState.treeMoveR:
-                return false;
-        }
-
-        StartPickupRaise(target);
-        return true;
     }
 
     private ShineSprite _pendingShine;
@@ -10900,13 +10512,6 @@ public partial class Mario : CharacterBody3D
         AddChild(layer);
     }
 
-    private void StartPutDown()
-    {
-        velocity = Vector3.Zero;
-        stateOfMario = MarioState.putDown;
-        animPlayer.Play("ma_put");
-    }
-
     private void OnAnimationFinished(StringName animName)
     {
         // PICKUP RAISE finished
@@ -10937,7 +10542,7 @@ public partial class Mario : CharacterBody3D
         if (stateOfMario == MarioState.putDown && (animName == "ma_put" || animName == "ma_throw"))
         {
             GD.Print($"[Throw] Anim finished '{animName}', _isThrowQueued={_isThrowQueued}");
-            Anim_DetachPickup(); // applies throw arc if _isThrowQueued, else gentle drop
+            Anim_DetachPickup(); // the tick released at frame 4 (throw) / 20 (put) already; a safety net for a clip that ended first
             _isThrowQueued = false; // clear so the next put-down plays ma_put correctly
             stateOfMario = MarioState.idle;
             animPlayer.Play("ma_wait");
@@ -16405,6 +16010,7 @@ public partial class Mario : CharacterBody3D
             if (SmsDebugPrint) GD.Print($"[SMS take] B at fwd {fwd:F1}: canPut() false (a wall within {_smsTakeData.HitRadius:F0} units ahead or at his feet) -- kept");
             return;
         }
+        _smsThrowRunVel = new Vector3(velocity.X, 0f, velocity.Z);
         velocity = Vector3.Zero;
         Velocity = Vector3.Zero;
         _isThrowQueued = pitch;
@@ -16546,14 +16152,15 @@ public partial class Mario : CharacterBody3D
         }
         else
         {
-            float power = SmsParams.Take.ThrowPower * _smsTakeData.ThrowRate;
-            Vector3 vUnits = face * power + new Vector3(SmsUnits.MpsToSpeed(velocity.X), 0f, SmsUnits.MpsToSpeed(velocity.Z)) * SmsParams.Take.NormalThrowSpeedRate;
-            Vector3 vel = new Vector3(SmsUnits.SpeedToMps(vUnits.X), SmsUnits.SpeedToMps(_smsTakeData.ThrowVy), SmsUnits.SpeedToMps(vUnits.Z));
+            float power = SmsParams.Take.ThrowPower * _smsTakeData.ThrowRate * ThrowPowerScale; // the game: 2.8 x rate (ThrowPowerScale 1)
+            Vector3 run = (ThrowKeepsRunSpeed && !_smsJumpThrow) ? _smsThrowRunVel : new Vector3(velocity.X, 0f, velocity.Z); // the game: mVel (0 after waitProcess on the ground)
+            Vector3 vUnits = face * power + new Vector3(SmsUnits.MpsToSpeed(run.X), 0f, SmsUnits.MpsToSpeed(run.Z)) * SmsParams.Take.NormalThrowSpeedRate;
+            Vector3 vel = new Vector3(SmsUnits.SpeedToMps(vUnits.X), SmsUnits.SpeedToMps(_smsTakeData.ThrowVy * ThrowVyScale), SmsUnits.SpeedToMps(vUnits.Z));
             rb.GlobalPosition = GlobalPosition + Vector3.Up * halfH + vel / 30f; // mPosition = his; mPosition += vel (one 30 fps movement frame)
             rb.Sleeping = false;
             rb.SetDeferred("linear_velocity", vel);
             rb.SetDeferred("angular_velocity", Vector3.Zero);
-            SmsThrownFlight.Begin(rb, _smsTakeData);
+            SmsThrownFlight.Begin(rb, _smsTakeData.WithGravity(_smsTakeData.Gravity * ThrowGravityScale)); // the game: the type's gravity (ThrowGravityScale 1)
             // it starts inside his cylinder: no shoving him for the first moments (his legacy's guard, kept)
             rb.AddCollisionExceptionWith(this);
             var clearExc = GetTree().CreateTimer(0.6);
@@ -16563,7 +16170,7 @@ public partial class Mario : CharacterBody3D
                     rb.RemoveCollisionExceptionWith(this);
             };
             if (SmsDebugPrint)
-                GD.Print($"[SMS take] THROWN the {_smsTakeData.Name}: {power:F1} forward + {SmsParams.Take.NormalThrowSpeedRate} x his ({SmsUnits.MpsToSpeed(velocity.X):F1}, {SmsUnits.MpsToSpeed(velocity.Z):F1}), vy {_smsTakeData.ThrowVy} -> {vel.Length():F2} m/s; gravity {SmsUnits.AccelToMps2(_smsTakeData.Gravity):F1} m/s2, bounce {_smsTakeData.Bounce}");
+                GD.Print($"[SMS take] THROWN the {_smsTakeData.Name}: {power:F1} forward (x{ThrowPowerScale}) + {SmsParams.Take.NormalThrowSpeedRate} x his ({SmsUnits.MpsToSpeed(run.X):F1}, {SmsUnits.MpsToSpeed(run.Z):F1}), vy {_smsTakeData.ThrowVy * ThrowVyScale:F1} (x{ThrowVyScale}) -> {vel.Length():F2} m/s; gravity {SmsUnits.AccelToMps2(_smsTakeData.Gravity * ThrowGravityScale):F1} m/s2 (x{ThrowGravityScale}), bounce {_smsTakeData.Bounce}");
         }
         if (animTree != null && animTree.Active)
             animTree.Set(CARRY_BLEND_PATH, 0.0f);
