@@ -62,7 +62,6 @@ public partial class SmsPollutionLayer : MeshInstance3D
     [Export] public bool Bubbles = true;
     /// <summary>DEVIATION knob: movement ticks between bubbles while paint is near Mario. The game's RAKU_INDAWA fires every 16; the port's
     /// stand-in reads as whack-a-mole at that rate on a big painted floor, so 48 (2.5 a second) is the default.</summary>
-    [Export] public int BubbleEveryTicks = 48;
     [Export] public float BubbleSize = 0.26f;      // the dome's radius at full swell (metres)
     [Export] public float BubbleLife = 2.4f;       // seconds from forming to gone: a slow swell for 70 %, a quiver, the pop at 85 %, the fade and ripple after
     [Export] public int BubbleMax = 32;
@@ -71,22 +70,28 @@ public partial class SmsPollutionLayer : MeshInstance3D
     [Export] public float RingBrighten = 0.25f;    // how much lighter than the paint the ripple is (0 = the paint's colour exactly)
     [Export] public Shader BubbleShader;           // default res://assets/Sms/Fx/GoopBubble.gdshader
     [Export] public Shader RingShader;             // default res://assets/Sms/Fx/GoopRing.gdshader
-    /// <summary>TPollutionLayer::fire(): on a Fire / FireRegrow layer with paint within 1600 units of Mario, every 21st tick a flame (the game:
-    /// MS_NEWFIRE_A + _B at x1.5 and SE_EF_FIRE) at a painted spot. A procedural flame billboard stands in (GoopFlame.gdshader).</summary>
+    /// <summary>action()'s one effect timer (mEffectTimer), shared by the bubble, the bolt and the flame as in the game: the RAKU_INDAWA bubble
+    /// and electric()'s bolt fire when it passes this (the game's literal 15 in both), fire() when it passes FlameWaitFrames. Counted in the
+    /// game's 30 fps FRAMES (action() runs once a frame). On an electric layer both blocks advance the one timer, so a bolt comes about every 8
+    /// frames and the bubble hardly ever -- the game's own arithmetic.</summary>
+    [Export] public int EffectWaitFrames = 15;
+    /// <summary>TPollutionLayer::fire(): on a Fire / FireRegrow layer with paint within 1600 units of Mario, when the timer passes
+    /// mFireEffectWaitTime (20: every 21st frame) a fire at a painted spot -- the game emits MS_NEWFIRE_B and _A there at setGlobalScale(1.5)
+    /// with SE_EF_FIRE. The port's fire is FlameScene (assets/Sms/Fx/GoopFire.tscn: tongues of the game's firestripe sprite, glow3_flame
+    /// cores, embers) placed there at FlameSize, emitting for FlameClusterLife seconds, then let burn out.</summary>
     [Export] public bool Flames = true;
-    [Export] public int FlameEveryTicks = 20;      // mFireEffectWaitTime: the timer must pass this (a flame every 21 ticks)
-    [Export] public float FlameSize = 1.5f;        // the game's setGlobalScale(1.5) on both emitters: x a 0.5 x 0.9 m tongue
-    [Export] public float FlameLife = 0.7f;
-    [Export] public Shader FlameShader;            // default res://assets/Sms/Fx/GoopFlame.gdshader
-    /// <summary>TPollutionLayer::electric(): on an Electric layer with paint within 1000 units of Mario, every 16th tick a bolt (the game:
-    /// MS_THUNDER_S and SE_EF_ELEC) at a painted spot -- a jagged lightning bolt climbing up from the goop, as in the game. An upright
-    /// billboard stands in (GoopSpark.gdshader).</summary>
+    [Export] public int FlameWaitFrames = 20;      // mFireEffectWaitTime
+    [Export] public float FlameSize = 1.5f;        // the game's setGlobalScale(1.5): the scene's scale
+    [Export] public float FlameClusterLife = 1.2f; // seconds a fire keeps producing tongues (the game's emitter lives are in the jpa, not read)
+    [Export] public PackedScene FlameScene;        // default res://assets/Sms/Fx/GoopFire.tscn
+    /// <summary>TPollutionLayer::electric(): on an Electric layer with paint within 1000 units of Mario, a bolt (the game: MS_THUNDER_S and
+    /// SE_EF_ELEC) at a painted spot when the timer passes EffectWaitFrames -- a jagged lightning bolt climbing up from the goop, as in the
+    /// game. An upright billboard stands in (GoopSpark.gdshader).</summary>
     [Export] public bool Sparks = true;
-    [Export] public int SparkEveryTicks = 16;      // the game's `mEffectTimer > 15`
-    [Export] public float SparkSize = 1.6f;        // the bolt's height (metres); the quad is a quarter as wide
-    [Export] public float SparkLife = 0.45f;       // seconds: it climbs for the first 45 %, flickers, fades
+    [Export] public float SparkSize = 1.6f;        // the bolt's height (metres); the quad is 0.3 x as wide
+    [Export] public float SparkLife = 0.25f;       // seconds: a quick strike -- it climbs for the first 35 %, flickers, fades
     [Export] public Shader SparkShader;            // default res://assets/Sms/Fx/GoopSpark.gdshader
-    [Export] public int FxMax = 24;                // flames / sparks alive at once
+    [Export] public int FxMax = 24;                // bolts / fires alive at once
     [Export] public bool DebugPrint = false;
 
     /// <summary>TPollutionLayer::cleaned: a spot over 100 was being erased -- the game plays MSD_SE_ERASE_SCRAWL and PARTICLE_MS_RAKU_KIE here.</summary>
@@ -149,11 +154,13 @@ public partial class SmsPollutionLayer : MeshInstance3D
     private float[] _dropAge;     // < 0 = free
     private float[] _dropFloor;
     private int _dropNext;
-    private FxPool _flames;
     private FxPool _sparks;
-    private int _fireTimer;       // fire()'s share of mEffectTimer (the game's single timer is split: the port's bubbles have their own cadence)
-    private int _sparkTimer;      // electric()'s
-    public int FlamesEmitted => _flames?.Emitted ?? 0;
+    private readonly System.Collections.Generic.List<(Node3D node, float born)> _fires = new();
+    private float _fireClock;     // seconds, for the fires' ages
+    private int _frameSub;        // ticks into the current 30 fps frame
+    private const float FlameTail = 1.0f; // seconds after the emitting stops for the last tongues / embers to die (the scene's longest lifetime)
+    public int FlamesEmitted { get; private set; }
+    public int ActiveFires => _fires.Count;
     public int SparksEmitted => _sparks?.Emitted ?? 0;
     private double _settleAccum;
     private float _tickAccum;
@@ -395,8 +402,6 @@ public partial class SmsPollutionLayer : MeshInstance3D
         }
         if (Bubbles && _bubbleMmi == null)
             SetupBubbles();
-        if (Flames && _flames == null && (Type == SmsPollutionType.Fire || Type == SmsPollutionType.FireRegrow))
-            _flames = new FxPool(this, "GoopFlames", FlameShader ?? GD.Load<Shader>("res://assets/Sms/Fx/GoopFlame.gdshader"), Math.Max(1, FxMax), 0.25f);
         if (Sparks && _sparks == null && Type == SmsPollutionType.Electric)
             _sparks = new FxPool(this, "GoopSparks", SparkShader ?? GD.Load<Shader>("res://assets/Sms/Fx/GoopSpark.gdshader"), Math.Max(1, FxMax), 0f);
         Built = true;
@@ -603,7 +608,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
             TickBubbles(delta);
             TickPops(delta);
         }
-        _flames?.Tick((float)delta);
+        TickFires((float)delta);
         _sparks?.Tick((float)delta);
         if (_texDirty)
         {
@@ -662,15 +667,22 @@ public partial class SmsPollutionLayer : MeshInstance3D
                 BuildFromBody(ImplicitBody);
             return;
         }
-        // TPollutionLayer::perform(CUE_MOVE) -> action(), once a movement tick
+        // TPollutionLayer::perform(CUE_MOVE) -> action(), once a game FRAME (30 fps): the port's tick is a quarter of one, and action()'s
+        // counters (the effect timer, spread()'s every-fourth) are frame counts
         int n = SmsUnits.TicksFor(delta, ref _tickAccum);
         for (int i = 0; i < n; i++)
+        {
+            if (++_frameSub < SmsUnits.TicksPerFrame)
+                continue;
+            _frameSub = 0;
             Action();
+        }
     }
 
-    /// <summary>TPollutionLayer::action (PollutionAction.cpp 139): the type's effects (fire / thunder / glass: particles and sounds, not
-    /// ported), then with paint within mSpreadArea of Mario (getPollutedPos: five tries) the RAKU_INDAWA bubble on a non-fire layer every
-    /// BubbleEveryTicks (the game: 16) and, flagged CanSpread, spread(): every fourth tick a 128-unit stamp at a painted spot near Mario.</summary>
+    /// <summary>TPollutionLayer::action (PollutionAction.cpp 139), once a frame: the type's effect first (fire() / electric(); glassWall() is a
+    /// counter), then with paint within mSpreadArea of Mario (getPollutedPos: five tries) the RAKU_INDAWA bubble on a non-fire layer when the
+    /// shared timer has passed EffectWaitFrames (checked BEFORE this block's increment, as the game orders it) and, flagged CanSpread, spread():
+    /// every fourth frame a 128-unit stamp at a painted spot near Mario. The sounds (SE_EF_FIRE / SE_EF_ELEC) are not ported.</summary>
     private void Action()
     {
         switch (Type)
@@ -689,7 +701,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
             return;
         if (Type != SmsPollutionType.Fire && Type != SmsPollutionType.FireRegrow)
         {
-            if (_effectTimer >= Math.Max(1, BubbleEveryTicks))
+            if (_effectTimer > EffectWaitFrames)
             {
                 if (Bubbles && _bubbleMmi != null)
                     EmitBubble(at);
@@ -702,36 +714,84 @@ public partial class SmsPollutionLayer : MeshInstance3D
     }
 
     // ---------------------------------------------------------------------------------------------------- fire and electric
-    /// <summary>fire() (PollutionAction.cpp 112): a painted spot near Mario (getPollutedPosNear(mFireArea 1600)) advances the timer; past
-    /// mFireEffectWaitTime (20) a flame there: MS_NEWFIRE_B and _A at x1.5 with SE_EF_FIRE in the game.</summary>
+    /// <summary>fire() (PollutionAction.cpp 112): a painted spot near Mario (getPollutedPosNear(mFireArea 1600)) advances the shared timer;
+    /// past mFireEffectWaitTime (20) a fire there: MS_NEWFIRE_B and _A at x1.5 with SE_EF_FIRE in the game.</summary>
     private void FireEffect()
     {
         if (!GetPollutedPosNear(SmsParams.Pollution.FireArea, out Vector3 at))
             return;
-        _fireTimer += 1;
-        if (_fireTimer > FlameEveryTicks)
+        _effectTimer += 1;
+        if (_effectTimer > FlameWaitFrames)
         {
-            _flames?.Spawn(at + Vector3.Up * 0.01f, 0.5f * FlameSize, 0.9f * FlameSize, FlameLife);
-            _fireTimer = 0;
+            if (Flames)
+                SpawnFire(at + Vector3.Up * 0.01f);
+            _effectTimer = 0;
         }
     }
 
-    /// <summary>electric() (79): a painted spot near Mario (getPollutedPosNear(mThunderArea 1000)) advances the timer; past 15 a spark there:
-    /// MS_THUNDER_S with SE_EF_ELEC in the game.</summary>
+    /// <summary>electric() (79): a painted spot near Mario (getPollutedPosNear(mThunderArea 1000)) advances the shared timer; past 15 a bolt
+    /// there: MS_THUNDER_S with SE_EF_ELEC in the game.</summary>
     private void ElectricEffect()
     {
         if (!GetPollutedPosNear(SmsParams.Pollution.ThunderArea, out Vector3 at))
             return;
-        _sparkTimer += 1;
-        if (_sparkTimer >= Math.Max(1, SparkEveryTicks))
+        _effectTimer += 1;
+        if (_effectTimer > EffectWaitFrames)
         {
             _sparks?.Spawn(at + Vector3.Up * 0.01f, SparkSize * 0.3f, SparkSize, SparkLife); // the bolt stands on the paint
-            _sparkTimer = 0;
+            _effectTimer = 0;
         }
     }
 
-    /// <summary>A pool of billboard quads in world space (a MultiMesh under the layer): position, size and age per instance; the shader reads
-    /// the instance's scale as its size and INSTANCE_CUSTOM.x as its age.</summary>
+    /// <summary>A fire at a painted spot: the scene placed there in world space at FlameSize (the game's setGlobalScale(1.5)), its emitters on
+    /// for FlameClusterLife, then off and freed once the last particles are gone. Over FxMax fires the oldest goes.</summary>
+    private void SpawnFire(Vector3 at)
+    {
+        var scene = FlameScene ?? GD.Load<PackedScene>("res://assets/Sms/Fx/GoopFire.tscn");
+        if (scene == null)
+            return;
+        if (_fires.Count >= Math.Max(1, FxMax))
+        {
+            _fires[0].node.QueueFree();
+            _fires.RemoveAt(0);
+        }
+        var fire = scene.Instantiate<Node3D>();
+        fire.TopLevel = true;
+        AddChild(fire);
+        fire.GlobalTransform = new Transform3D(Basis.Identity.Scaled(Vector3.One * FlameSize), at);
+        foreach (Node c in fire.GetChildren())
+            if (c is GpuParticles3D p)
+                p.Emitting = true;
+        _fires.Add((fire, _fireClock));
+        FlamesEmitted++;
+    }
+
+    private void TickFires(float dt)
+    {
+        _fireClock += dt;
+        for (int i = _fires.Count - 1; i >= 0; i--)
+        {
+            (Node3D node, float born) = _fires[i];
+            if (!IsInstanceValid(node))
+            {
+                _fires.RemoveAt(i);
+                continue;
+            }
+            float age = _fireClock - born;
+            if (age >= FlameClusterLife)
+                foreach (Node c in node.GetChildren())
+                    if (c is GpuParticles3D p && p.Emitting)
+                        p.Emitting = false;
+            if (age >= FlameClusterLife + FlameTail)
+            {
+                node.QueueFree();
+                _fires.RemoveAt(i);
+            }
+        }
+    }
+
+    /// <summary>A pool of billboard quads in world space (a MultiMesh under the layer; the bolts): position, size and age per instance; the
+    /// shader reads the instance's scale as its size and INSTANCE_CUSTOM.x as its age.</summary>
     private sealed class FxPool
     {
         private readonly MultiMesh _mm;

@@ -1,0 +1,175 @@
+[gd_scene load_steps=23 format=3 uid="uid://cgoopfire0065r"]
+
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/firestripe.png" id="1_tongue"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/glow3_flame.png" id="2_core"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/firecolor.png" id="3_ember"]
+
+[sub_resource type="Curve" id="Curve_tongue_x"]
+resource_name = "a tongue narrows as it rises"
+_data = [Vector2(0, 0.55), 0.0, 0.0, 0, 0, Vector2(0.2, 1.0), 0.0, 0.0, 0, 0, Vector2(0.65, 0.85), 0.0, 0.0, 0, 0, Vector2(1, 0.35), 0.0, 0.0, 0, 0]
+point_count = 4
+
+[sub_resource type="Curve" id="Curve_tongue_y"]
+resource_name = "a tongue stretches up, then thins to a wisp"
+max_value = 1.5
+_data = [Vector2(0, 0.45), 0.0, 0.0, 0, 0, Vector2(0.3, 1.0), 0.0, 0.0, 0, 0, Vector2(0.7, 1.25), 0.0, 0.0, 0, 0, Vector2(1, 0.9), 0.0, 0.0, 0, 0]
+point_count = 4
+
+[sub_resource type="Curve" id="Curve_one"]
+_data = [Vector2(0, 1), 0.0, 0.0, 0, 0, Vector2(1, 1), 0.0, 0.0, 0, 0]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_tongue"]
+curve_x = SubResource("Curve_tongue_x")
+curve_y = SubResource("Curve_tongue_y")
+curve_z = SubResource("Curve_one")
+
+[sub_resource type="Gradient" id="Gradient_tongue"]
+resource_name = "a tongue's tint over the firestripe sprite: yellow-white at birth, orange, red, gone"
+offsets = PackedFloat32Array(0, 0.1, 0.45, 0.8, 1)
+colors = PackedColorArray(1, 1, 0.8, 0, 1, 0.98, 0.7, 1, 1, 0.75, 0.35, 1, 0.95, 0.32, 0.08, 0.8, 0.5, 0.08, 0.02, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_tongue"]
+gradient = SubResource("Gradient_tongue")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_tongue"]
+lifetime_randomness = 0.3
+emission_shape = 3
+emission_box_extents = Vector3(0.28, 0.02, 0.28)
+angle_min = -12.0
+angle_max = 12.0
+direction = Vector3(0, 1, 0)
+spread = 8.0
+initial_velocity_min = 0.55
+initial_velocity_max = 0.95
+gravity = Vector3(0, -0.5, 0)
+scale_min = 0.8
+scale_max = 1.2
+scale_curve = SubResource("CurveXYZTexture_tongue")
+color_ramp = SubResource("GradientTexture1D_tongue")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_tongue"]
+resource_name = "flame tongue (the game's firestripe sprite, tinted over its life)"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+disable_receive_shadows = true
+albedo_texture = ExtResource("1_tongue")
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_tongue"]
+material = SubResource("StandardMaterial3D_tongue")
+size = Vector2(0.42, 0.56)
+center_offset = Vector3(0, 0.22, 0)
+
+[sub_resource type="Gradient" id="Gradient_core"]
+resource_name = "the glow3_flame core: orange, additive, in and out"
+offsets = PackedFloat32Array(0, 0.2, 0.7, 1)
+colors = PackedColorArray(1, 0.6, 0.2, 0, 1, 0.6, 0.2, 0.7, 1, 0.45, 0.12, 0.4, 1, 0.4, 0.1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_core"]
+gradient = SubResource("Gradient_core")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_core"]
+lifetime_randomness = 0.25
+emission_shape = 3
+emission_box_extents = Vector3(0.2, 0.02, 0.2)
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 0.15
+initial_velocity_max = 0.3
+gravity = Vector3(0, 0, 0)
+scale_min = 0.85
+scale_max = 1.15
+color_ramp = SubResource("GradientTexture1D_core")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_core"]
+resource_name = "flame core (the game's glow3_flame: a bright slit in a glow), additive"
+transparency = 1
+blend_mode = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+disable_receive_shadows = true
+albedo_texture = ExtResource("2_core")
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_core"]
+material = SubResource("StandardMaterial3D_core")
+size = Vector2(0.3, 0.44)
+center_offset = Vector3(0, 0.16, 0)
+
+[sub_resource type="Gradient" id="Gradient_ember"]
+resource_name = "an ember: yellow to red, additive"
+offsets = PackedFloat32Array(0, 0.6, 1)
+colors = PackedColorArray(1, 0.9, 0.5, 1, 1, 0.45, 0.1, 0.8, 0.6, 0.1, 0, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_ember"]
+gradient = SubResource("Gradient_ember")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_ember"]
+lifetime_randomness = 0.4
+emission_shape = 3
+emission_box_extents = Vector3(0.25, 0.05, 0.25)
+direction = Vector3(0, 1, 0)
+spread = 22.0
+initial_velocity_min = 1.0
+initial_velocity_max = 1.9
+gravity = Vector3(0, -1.2, 0)
+scale_min = 0.6
+scale_max = 1.0
+color_ramp = SubResource("GradientTexture1D_ember")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ember"]
+resource_name = "ember (firecolor), additive"
+transparency = 1
+blend_mode = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+disable_receive_shadows = true
+albedo_texture = ExtResource("3_ember")
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_ember"]
+material = SubResource("StandardMaterial3D_ember")
+size = Vector2(0.07, 0.07)
+
+[node name="GoopFire" type="Node3D"]
+
+[node name="Tongues" type="GPUParticles3D" parent="."]
+emitting = true
+amount = 10
+lifetime = 0.55
+randomness = 0.3
+fixed_fps = 60
+local_coords = true
+visibility_aabb = AABB(-1.5, -0.5, -1.5, 3, 3, 3)
+process_material = SubResource("ParticleProcessMaterial_tongue")
+draw_pass_1 = SubResource("QuadMesh_tongue")
+
+[node name="Cores" type="GPUParticles3D" parent="."]
+emitting = true
+amount = 4
+lifetime = 0.7
+randomness = 0.3
+fixed_fps = 60
+local_coords = true
+visibility_aabb = AABB(-1.5, -0.5, -1.5, 3, 3, 3)
+process_material = SubResource("ParticleProcessMaterial_core")
+draw_pass_1 = SubResource("QuadMesh_core")
+
+[node name="Embers" type="GPUParticles3D" parent="."]
+emitting = true
+amount = 8
+lifetime = 0.9
+randomness = 0.4
+fixed_fps = 60
+local_coords = true
+visibility_aabb = AABB(-1.5, -0.5, -1.5, 3, 4, 3)
+process_material = SubResource("ParticleProcessMaterial_ember")
+draw_pass_1 = SubResource("QuadMesh_ember")

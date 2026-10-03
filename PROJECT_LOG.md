@@ -4297,3 +4297,22 @@ reads its table by the clip SHOWING, and the port's triple jump shows ma_demo_ga
 row = 0xC8 = no pump. The game's ultraJumping plays ANIM_ROLL (MarioJump.cpp: jumpingBasic(MARIO_STATUS_ULTRA_JUMP, ANIM_ROLL, 0)),
 whose row is 0x44 = pump OK. FIX: SmsPumpClip() = "ma_roll" while stateOfMario == tripleJump, else the clip showing; used by
 SmsFluddPumpEnabled and SmsFluddBindId. No legacy retired (a data-row lookup corrected).
+
+### Pass 65r -- the layer effects at the game's frame rate, Sunshine fire, the bolt quicker, and the fire goop's height gate
+THE GAME: TPollutionLayer::perform(CUE_MOVE) -> action() runs once a FRAME (30 fps); its counters are frame counts: the one mEffectTimer
+(electric() `> 15`, the RAKU_INDAWA block `> 15` checked before its own increment, fire() `> mFireEffectWaitTime 20`) and spread()'s
+every-fourth. On an electric layer both electric() and the bubble block advance the one timer each frame, so a bolt comes about every 8
+frames and the bubble almost never; on other goop a bubble every 16 frames (0.53 s); on fire goop a fire every 21 frames (0.7 s).
+checkGraffitoFire (MarioMove.cpp 830): `mPosition.y - mFloorPosition.y > mFireHeight` -> no burn; graffito.prm ships mFireHeight 5.
+PORT -- LEGACY RETIRED: (1) the layer ran action() once per 120 Hz TICK -> once per frame (SmsUnits.TicksPerFrame 4): every cadence was
+4x the game's (why the bubbles read "too many" at the game's own 16). (2) BubbleEveryTicks 48 (the deviation knob from 65g) -> gone: the
+game's `> EffectWaitFrames 15` at the frame rate is sparser than his pick (0.53 s vs 0.4 s). (3) The split _fireTimer / _sparkTimer ->
+the game's one shared _effectTimer with its exact ordering. (4) The FxPool flame + Fx/GoopFlame.gdshader -> Fx/GoopFire.tscn: a fire
+cluster placed at the painted spot at FlameSize 1.5 (the game's setGlobalScale) -- tongues of the game's own firestripe sprite (per-axis
+scale curve: they stretch up and thin, tinted yellow-white -> orange -> red over 0.55 s, rising), glow3_flame cores additive, embers
+(firecolor) -- emitting FlameClusterLife 1.2 s then burning out; FlameWaitFrames 20 = mFireEffectWaitTime; FlameScene a knob; the
+scene is editor-tweakable like FireDamage.tscn. (5) The fire burn's missing height gate (lost when 65 moved isDirty to the layer sample,
+which reads the floor's Y under him, so a jump over fire goop burned in the air; electric needs WAITING / RUNNING so it was fine) ->
+`SmsFloorWithin(SmsParams.Graffito.FireHeight)` in SmsGraffitoFire = the game's mFireHeight test.
+BOLT (his ask: a little thicker, a shorter burst): GoopSpark thickness 2.0 (was 1.5), SparkLife 0.25 s (was 0.45), climb_time 0.35.
+NOT PORTED: SE_EF_FIRE / SE_EF_ELEC, the real jpa emitters (GoopFire.tscn / the bolt pool stand in).

@@ -15172,7 +15172,7 @@ public partial class Mario : CharacterBody3D
     }
 
     /// <summary>
-    /// checkGraffitoFire() (MarioMove.cpp 830): on a hot floor within FireHeight (5 units: IsOnFloor() stands in for the band) and not
+    /// checkGraffitoFire() (MarioMove.cpp 830): on a hot floor within FireHeight (graffito.prm 5 units of the floor under him) and not
     /// invincible. Already burning (FIRE_DOWN / FIRE_JUMP_END), the face turns 180 first, so he goes back the way he came.
     /// makeGraffitoDamage(dmggraffitofire): damageExec() with the floor as the attacker, 1 unit in front of him -- the face stays, the
     /// stars 50 units in front, the camera shake, 1 HP, the tank's spill (0), 50 ticks invincible -- and the knockdown status it sets is
@@ -15183,6 +15183,8 @@ public partial class Mario : CharacterBody3D
     {
         if (_smsInvincibleTicks > 0 || _health <= 0 || stateOfMario == MarioState.dead || stateOfMario == MarioState.swimming)
             return;
+        if (!SmsFloorWithin(SmsParams.Graffito.FireHeight))
+            return; // mPosition.y - mFloorPosition.y > mFireHeight: the fire goop burns on its floor, not the air over it (a jump clears it)
         bool burning = stateOfMario == MarioState.hurt && (_smsDownKind == SmsDownKind.Fire || _smsDownKind == SmsDownKind.FireEnd);
         Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
         float fwd = burning ? _smsDownFwd : SmsUnits.MpsToSpeed(new Vector3(velocity.X, 0f, velocity.Z).Dot(face)); // mForwardVel, saved

@@ -8,10 +8,10 @@ render_mode blend_add, depth_draw_never, cull_disabled, unshaded;
 uniform vec4 glow_color : source_color = vec4(0.45, 0.85, 1.0, 1.0);
 uniform vec4 core_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform float intensity = 1.8;
-uniform float climb_time : hint_range(0.1, 1.0) = 0.45;   // the fraction of the life the bolt takes to reach the top
+uniform float climb_time : hint_range(0.1, 1.0) = 0.35;   // the fraction of the life the bolt takes to reach the top
 uniform float jag : hint_range(0.0, 1.0) = 0.35;          // how far the bolt wanders sideways (fraction of the quad's half width)
 uniform float flicker_rate = 30.0;
-uniform float thickness : hint_range(0.5, 3.0) = 1.5;    // the core's width (1 = the first, hair-thin bolt)
+uniform float thickness : hint_range(0.5, 3.0) = 2.0;    // the core's width (1 = the first, hair-thin bolt)
 
 varying float age;
 varying float inst; // INSTANCE_ID is a vertex built-in: carried over for the per-instance variety

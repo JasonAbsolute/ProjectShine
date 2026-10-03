@@ -29,6 +29,7 @@ public static class SmsUnits
 
     public const float TicksPerSecond = 120f;
     public const float TickDt = 1f / TicksPerSecond;
+    public const int TicksPerFrame = 4;             // the game's 30 fps frame in ticks: its per-frame counters are frame counts
     public const float MarioHeightUnits = 160f;
 
     /// <summary>SMS velocity value -> metres/second.</summary>
