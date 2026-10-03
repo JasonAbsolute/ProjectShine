@@ -78,12 +78,13 @@ public partial class SmsPollutionLayer : MeshInstance3D
     [Export] public float FlameSize = 1.5f;        // the game's setGlobalScale(1.5) on both emitters: x a 0.5 x 0.9 m tongue
     [Export] public float FlameLife = 0.7f;
     [Export] public Shader FlameShader;            // default res://assets/Sms/Fx/GoopFlame.gdshader
-    /// <summary>TPollutionLayer::electric(): on an Electric layer with paint within 1000 units of Mario, every 16th tick a spark (the game:
-    /// MS_THUNDER_S and SE_EF_ELEC) at a painted spot. A flickering crackle billboard stands in (GoopSpark.gdshader).</summary>
+    /// <summary>TPollutionLayer::electric(): on an Electric layer with paint within 1000 units of Mario, every 16th tick a bolt (the game:
+    /// MS_THUNDER_S and SE_EF_ELEC) at a painted spot -- a jagged lightning bolt climbing up from the goop, as in the game. An upright
+    /// billboard stands in (GoopSpark.gdshader).</summary>
     [Export] public bool Sparks = true;
     [Export] public int SparkEveryTicks = 16;      // the game's `mEffectTimer > 15`
-    [Export] public float SparkSize = 0.6f;        // metres across
-    [Export] public float SparkLife = 0.25f;
+    [Export] public float SparkSize = 1.6f;        // the bolt's height (metres); the quad is a quarter as wide
+    [Export] public float SparkLife = 0.45f;       // seconds: it climbs for the first 45 %, flickers, fades
     [Export] public Shader SparkShader;            // default res://assets/Sms/Fx/GoopSpark.gdshader
     [Export] public int FxMax = 24;                // flames / sparks alive at once
     [Export] public bool DebugPrint = false;
@@ -397,7 +398,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
         if (Flames && _flames == null && (Type == SmsPollutionType.Fire || Type == SmsPollutionType.FireRegrow))
             _flames = new FxPool(this, "GoopFlames", FlameShader ?? GD.Load<Shader>("res://assets/Sms/Fx/GoopFlame.gdshader"), Math.Max(1, FxMax), 0.25f);
         if (Sparks && _sparks == null && Type == SmsPollutionType.Electric)
-            _sparks = new FxPool(this, "GoopSparks", SparkShader ?? GD.Load<Shader>("res://assets/Sms/Fx/GoopSpark.gdshader"), Math.Max(1, FxMax), 0.05f);
+            _sparks = new FxPool(this, "GoopSparks", SparkShader ?? GD.Load<Shader>("res://assets/Sms/Fx/GoopSpark.gdshader"), Math.Max(1, FxMax), 0f);
         Built = true;
         if (DebugPrint)
             GD.Print($"[SMS goop] layer '{Name}' {Type}: {Width} x {Height} texels of {TexelSize} u over x {MinX:F2}..{MaxX:F2} z {MinZ:F2}..{MaxZ:F2} m (its frame), " +
@@ -724,7 +725,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
         _sparkTimer += 1;
         if (_sparkTimer >= Math.Max(1, SparkEveryTicks))
         {
-            _sparks?.Spawn(at + Vector3.Up * (SparkSize * 0.35f), SparkSize, SparkSize, SparkLife);
+            _sparks?.Spawn(at + Vector3.Up * 0.01f, SparkSize * 0.25f, SparkSize, SparkLife); // the bolt stands on the paint
             _sparkTimer = 0;
         }
     }
