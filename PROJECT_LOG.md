@@ -4046,3 +4046,43 @@ turned by the body's Euler-Y delta) and SmsRideReCalc after MoveAndSlide (the fl
 DEVIATION knob that adds the platform's point velocity back when he leaves, as the engine used to. NOT PORTED: the fence / roof hang
 on a moving object (the port's ledge tracking is already the game's rule; the fence pin is not), the rail ride (TOROCCO is its own
 path), the camera's response to a turntable (none in checkRideMovement).
+
+### Pass 62b -- fruit size, the ball's roll-out, the fail-pose knob, and what the legacy lost in 62 / 63
+SIZE: the game scales an object by its stage-data mScaling: the model is drawn at it and TMapObjBase::setObjHitData (MapObjBase.cpp 70)
+makes the hit cylinder radius x max(scale.x, scale.z), height x scale.y; MapObjInit.cpp 10985 scales the body radius / head height the
+same; the flight numbers (throw rate, vy, gravity, bounce) are per TYPE, never per scale. Port: Fruit.Size (export, per instance) and
+SmsTakeable.Size scale the model root(s), every collision shape (a duplicate of the shared shape, so one big coconut does not resize
+every coconut), an Area3D's shapes, and -- through SmsTakeable.SizeOf / SmsTakeData.Scaled -- Mario's take reach and put spacing. The
+RigidBody3D itself stays at scale 1 (Godot's bodies must; his Anim_AttachPickup resets a body's scale to 1 anyway, which is why a scaled
+fruit root used to shrink the moment it was picked up). HIT ROWS corrected against the *_hit_data_tables (MapObjInit.cpp 1536-1700):
+fruit {60, 60, 80, 90} (RedPepper_data points at fruit_obj_hit_info), coconut / papaya {40, 60, 50, 80}, pine {80, 60, 50, 80}, banana
+{80, 60, 60, 90}, durian {150, 60, 60, 90} -- the pass-62 rows had 40 for the banana, durian, red pepper and generic fruit.
+THE FRUIT IS A BALL: TResetFruit : TMapObjBall : TMapObjGeneral. TResetFruit::thrown (asm 801BAFF4) = TMapObjGeneral::thrown + state 0xB,
+so the LAUNCH stays as pass 62 ported it: the object is placed at HIS position (the feet) + one frame of velocity, vel = 2.8
+(mThrowPower) x the type's rate along his face + 0.5 x his mVel, vy = the type's -- and a GROUND throw is a stopCommon state whose
+waitProcess (MarioPhysics.cpp 202) zeroes mVel at once, so his run adds NOTHING on the ground (only a jump throw adds 0.5 x his air
+speed); the coconut (rate 2.0, vy 15, g 0.3) is a 1.3 m high, 1.9 m long lob, the papaya (rate 5, vy 20) flies 6 m. TMapObjBall overrides
+touchGround / rebound / touchWall / touchRoof / checkWallCollision / calcCurrentMtx (the rolling), none decompiled: read in the asm
+(QbeRoot MapObjBall.s): touchGround (801BCC64) lands when vy > -(0x188) (vy = 0, y = ground) else rebound (801BCFBC: velocity reflected
+off the GROUND normal with 1 + unk4 (Bounce), y = ground, airborne), then on every ground contact vx, vz *= unk10 (BounceFriction 0.97)
+plus a slope term (0x180) x the ground normal's x / z while resting; calcVelocity (MapObjGeneral.cpp 490) zeroes a component under unkC
+on a flat floor. The two per-fruit numbers (0x180, 0x188) and the roll's visual rate are float literals TMapObjBall::initMapObj loads by
+object id from the DOL's pool (.incbin baserom.dol) -- UNKNOWN until his dump has sys/main.dol (the US DOL; the same file unlocks the
+sound index). PORTED NOW: the ground roll-out (SmsThrownFlight.RollOut: on a map floor vx, vz and the spin decay by BounceFriction a 60 Hz
+tick -- the port's per-frame-decay clock since pass 50 -- and stop under BounceMinVy on a flat floor), so a thrown coconut rolls ~2.5 m and
+stops instead of rolling off on Godot's friction. PENDING THE DOL: the ball's own landing threshold / slope acceleration / spin; Godot's
+restitution and rolling stand in.
+FAIL POSE: TakePoseStanding (Mario export, off = the game) plays TAKE_POSE (ma_get_fail) on B while standing still. The shipped game does
+not: waiting() (MarioWait.cpp 115) tests mInput & 0x10000, and no code sets that bit (MarioMove.cpp 1487-1515 set 1, 2, 4, 8, 0x20, 0x80,
+0x100, 0x200, 0x2000, 0x4000, 0x8000); running() 668 and landing() 1005 are the live TAKE_POSE entries -- a walking / running / landing
+B with nothing to take and no dive.
+LEGACY RETIRED BY PASS 62 (recorded at his request -- every pass lists what it replaced from here on): the pickup cast (Mario's pickupCast
+ShapeCast3D, UpdatePickupCastFacing / TryFindPickable -- the fruit's PickupZone Area3D was already unused) -> SmsFindTakeTarget over the
+"pickable" group with the game's test (hit cylinders overlapping, 80 + the object's radius, +-0x2aaa of his face); the legacy throw
+(THROW_FORWARD_BOOST / THROW_UP_BOOST, Fruit.ThrowSpeedMultiplier, the X-button throw) -> SmsThrowOrPut / SmsReleaseHeld with the game's
+thrown(); the gentle drop on Anim_DetachPickup -> every drop is dropObject() (THROWN), the put is HIT_MESSAGE_PUT only; the swim-entry drop
+-> removed (the game keeps the object in water); the fruit's own GravityScale / LinearDamp / bounce during a throw -> the type's numbers for
+the flight, his profile handed back at rest (Fruit.ApplyPhysicsProfile still rules a fruit nobody threw). STILL HIS: the durian kick
+(contacts + impulse), LaunchAsDrop, the red pepper's rotation lock, the Anim_AttachPickup carry socket (and its three GD.Print scale
+lines, which print on every pickup). LEGACY RETIRED BY PASS 63: Godot's CharacterBody3D platform carry (PlatformFloorLayers /
+PlatformWallLayers / PlatformOnLeave = add velocity) and SmsStepVisualCheckSnap's GetPlatformVelocity test -> SmsRideApply / SmsRideReCalc.

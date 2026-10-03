@@ -1395,6 +1395,11 @@ public partial class Mario : CharacterBody3D
     private RigidBody3D pendingPickup;
     // SMS TTakeActor (pass 62): the hold / carry / throw rules 1:1 -- see the SmsTake* methods and SmsTakeable.cs
     [Export] public AudioStreamPlayer3D ExertVoice;   // MSD_SE_MV15_EXERT_INST_01: the grunt at the take (raise frame 11) and at the throw (frame 4)
+    /// <summary>DEVIATION knob (off = the shipped game): B while standing still with nothing to take plays the fail grab (TAKE_POSE,
+    /// ma_get_fail). waiting() has that branch (MarioWait.cpp 115: mInput & 0x10000) but no input ever sets the bit (MarioMove.cpp
+    /// 1487-1515 set 1, 2, 4, 8, 0x20, 0x80, 0x100, 0x200, 0x2000, 0x4000, 0x8000), so in the game only a MOVING Mario (running()
+    /// 668, landing() 1005) does it; standing still, B does nothing.</summary>
+    [Export] public bool TakePoseStanding = false;
     private SmsTakeData _smsTakeData;                 // the pending / held object's game numbers (an SmsTakeable child, his Fruit.Type, or the generic fruit)
     private bool _smsTakeAttached = false;            // taking(): the object is in the hand from raise frame 11 (the legacy attached at the clip's end)
     private bool _smsActReleased = false;             // pitching() / putting() / jumpingThrow(): the release already fired on this clip
@@ -3136,7 +3141,10 @@ public partial class Mario : CharacterBody3D
                         {
                             // the held-B take above found nothing. running() 668 / landing() 1005: B with nothing to take -> TAKE_POSE
                             // (ma_get_fail); waiting() tests a bit (mInput & 0x10000) nothing sets -- standing still, B does nothing
-                            if (stateOfMario != MarioState.idle)
+                            // (TakePoseStanding is the deviation that plays it anyway); no other status has the entry (a squat, a slide: nothing)
+                            bool smsRunOrLand = stateOfMario is MarioState.sneak or MarioState.walking or MarioState.running or MarioState.sprinting
+                                or MarioState.singleJumpLanding or MarioState.doubleJumpLanding or MarioState.tripleJumpLanding or MarioState.landing;
+                            if (smsRunOrLand || (TakePoseStanding && stateOfMario == MarioState.idle))
                                 EnterPickupFail();
                             goto EndFrame;
                         }

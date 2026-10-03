@@ -41,6 +41,14 @@ public partial class Fruit : RigidBody3D
 	[Export]
 	public bool CanBePickedUp { get; set; } = true;
 
+	/// <summary>The game's object scale (TMapObjBase::mScaling), uniform: the model is drawn at it, the hit cylinder is radius x
+	/// max(sx, sz) and height x sy (setObjHitData, MapObjBase.cpp 70), the body radius / head height the same (MapObjInit.cpp 10985).
+	/// 1 = the scene as authored. Applied once when the fruit enters the tree: the model and every collision shape under this body
+	/// are scaled by it (the RigidBody3D itself stays at scale 1 -- Godot's bodies must; Mario's attach resets a body's scale to 1
+	/// anyway), and Mario's take reach / put spacing read it through SmsTakeable.SizeOf. Set it per instance in a level.</summary>
+	[Export]
+	public float Size { get; set; } = 1f;
+
 	/// <summary>Speed Mario must be running at for a Durian kick to fire.</summary>
 	[Export]
 	public float KickMinSpeed { get; set; } = 3.5f;
@@ -88,6 +96,7 @@ public partial class Fruit : RigidBody3D
 
 	public override void _Ready()
 	{
+		ApplySize();
 		if (CanBePickedUp)
 		{
 			// Pickup happens via B-press only. Mario's pickupCast (ShapeCast3D) looks
@@ -112,6 +121,54 @@ public partial class Fruit : RigidBody3D
 		}
 
 		ApplyPhysicsProfile();
+	}
+
+	/// <summary>mScaling applied to the children: the model root(s) by their transform, a collision shape by its own dimensions (a
+	/// duplicate of the shared sub-resource, so one big coconut does not resize every coconut), an Area3D's shapes the same.</summary>
+	private void ApplySize()
+	{
+		if (Size <= 0f || Mathf.IsEqualApprox(Size, 1f))
+			return;
+		foreach (Node c in GetChildren())
+			ScaleChild(c, Size);
+	}
+
+	private static void ScaleChild(Node c, float s)
+	{
+		switch (c)
+		{
+			case CollisionShape3D cs:
+				cs.Position *= s;
+				if (cs.Shape == null)
+					break;
+				var shape = (Shape3D)cs.Shape.Duplicate();
+				switch (shape)
+				{
+					case SphereShape3D sp: sp.Radius *= s; break;
+					case BoxShape3D bx: bx.Size *= s; break;
+					case CapsuleShape3D cap: cap.Radius *= s; cap.Height *= s; break;
+					case CylinderShape3D cyl: cyl.Radius *= s; cyl.Height *= s; break;
+					case ConvexPolygonShape3D cv:
+					{
+						var pts = cv.Points;
+						for (int i = 0; i < pts.Length; i++)
+							pts[i] *= s;
+						cv.Points = pts;
+						break;
+					}
+					default: cs.Scale *= s; break; // a mesh shape: the node's (uniform) scale
+				}
+				cs.Shape = shape;
+				break;
+			case CollisionObject3D area: // a PickupZone-style Area3D: its shapes by the same rule
+				foreach (Node g in area.GetChildren())
+					ScaleChild(g, s);
+				break;
+			case Node3D model:
+				model.Scale *= s;
+				model.Position *= s;
+				break;
+		}
 	}
 
 	/// <summary>
