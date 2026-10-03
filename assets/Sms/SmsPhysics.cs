@@ -264,6 +264,25 @@ public static class SmsParams
         public const int GraffitoNoDmgTime = 10;        // ticks of grace on electric goop before the first shock (checkGraffitoElec)
     }
 
+    /// <summary>TTakeActor -- holding, carrying and throwing (pass 62): MarioCollision.cpp isTakeSituation / canTake / considerTake /
+    /// dropObject, MarioAction.cpp taking / putting / pitching, MarioRun.cpp isThrowStart, MarioWait.cpp canPut, MarioJump.cpp
+    /// checkJumpingThrowStart / jumpingThrow, MarioMove.cpp checkThrowObject; the object's side TMapObjGeneral::thrown / put
+    /// (MapObjGeneral.cpp 91-134) with the compiled-in physical tables (MapObjInit.cpp) -- see SmsTakeable.</summary>
+    public static class Take
+    {
+        public const float ThrowPower = 2.8f;           // mario.prm mThrowPower (gpMarioThrowPower): a thrown object's vx / vz = this x its ThrowRate along his face
+        public const float NormalThrowSpeedRate = 0.5f; // TMapObjGeneral::mNormalThrowSpeedRate: + this x his mVel -- 0 on a ground throw (stopCommon's waitProcess zeroed it), live in the air and on a hit
+        public const int ConeBam = 0x2aaa;              // isTakeSituation: the object within +-60 degrees of mFaceAngle.y
+        public const float TakeFrame = 11f;             // taking(): HIT_MESSAGE_TAKE as ANIM_RAISE passes frame 11 (60 fps clip frames)
+        public const float ThrowFrame = 4f;             // checkThrowObject(): dropObject() as ANIM_THROW passes frame 4 -- on the ground and in the air
+        public const float PutFrame = 20f;              // putting(): HIT_MESSAGE_PUT as ANIM_PUT passes frame 20
+        public const float PitchMinFwd = 16f;           // isThrowStart(): a map object is PITCHED when mForwardVel > 16, else PUT down (canPut) -- an enemy (actor type 0x10000000) is always pitched
+        public const float PutProbeUnits = 100f;        // canPut(): no wall within the object's radius 100 units ahead of him (y + 10) nor at his own spot
+        public const float PutProbeUp = 10f;
+        public const float PutGapUnits = 10f;           // TMapObjGeneral::put(): set down objRadius + his DamageRadius + 10 ahead along his face, at his feet
+        public const float FloorLossUnits = 100f;       // mInput & 4 (MarioMove.cpp 1699): the floor more than 100 units under his feet turns TAKE / PUTTING / PITCHING into a LANDING fall
+    }
+
     public static class Graffito // /mario/graffito.prm (shipped) -- the pollution layer's hazards
     {
         public const float FireHeight = 5f;             // the hot floor burns within this height of the floor (the code default 1000)

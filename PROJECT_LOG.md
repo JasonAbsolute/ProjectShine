@@ -3986,3 +3986,40 @@ MissText / PauseTitle exports. The scenes' hand-placed panes are gone. THE WIPE:
 off that frame without spending its count; the port stretched a 640 x 480 frame, whose bottom 30 rows the four rings do not cover (a
 wedge at x 215-222 on rows 478-480, Jaysonn's Ref/screenWipe.png) -- Fader.gdshader now works in 640 x 448 (the iris centre (320, 224)).
 NOT PORTED: the letters' sparkle (0x1F9) still; the items (CONTINUE / SAVE / EXIT AREA) keep the game's white + selected green.
+
+### Pass 62 -- holding, carrying and throwing (TTakeActor)
+The carry is a mutual TTakeActor link (mHeldObject / mHolder, include/Strategic/TakeActor.hpp 35) validated every tick by considerTake
+(MarioCollision.cpp 406). THE TAKE is a collision event: hitWantToTake (MarioCheckCol.cpp 101) -> canTake = B HELD (MEANING_B) &&
+isTakeSituation (86): no invincibility frames, not in a status flagged 0x80000000 / 0x10000000 nor CATCH, not on Yoshi, the upper state
+IDLE, not holding or held, the object within +-0x2aaa (60 deg) of mFaceAngle.y and within mAttackRadius + its damage radius -- and
+mAttackRadius IS mario.prm HoldRadius 80 (setNormalAttackArea, MarioMove.cpp 228). The collision check runs before the status machine,
+so a B press against a fruit takes it before running() can dive. taking() (MarioAction.cpp 8): ANIM_RAISE at 1.0, waitProcess (standing);
+HIT_MESSAGE_TAKE as the clip passes frame 11 (the object snaps to getTakingMtx = the RIGHT HAND joint, MarioDraw.cpp 866; the exert voice),
+UPPER_STATE_HOLDING_OBJECT + WAIT at the last frame; mInput & 4 (the floor > 100 units under him) -> changePlayerDropping(LANDING).
+THE CARRY is only the upper state: bck 0x4B = ma_carry_p grafted on the second root over whatever the body plays (MarioDraw.cpp 1880);
+no run speed change; it blocks the ledge / fence / roof / wire catches (mHeldObject == nullptr gates) and the pump (checkPumpEnable);
+jumping is allowed; the WATER keeps the hold (no dropObject in MarioSwim.cpp -- he swims with it; the port's own drop at the swim entry
+is gone). Sweat while running > 20 (not ported). THE THROW: isThrowStart (MarioRun.cpp 50, the run / brake / turn ticks; MarioWait.cpp 566
+standing) on mInput & 0x2000 = B's frame press (TMarioGamePad B = 0x200 -- the spec's 'X' was wrong): an enemy (actor type bit 0x10000000)
+-> PITCHING always; a map object -> PITCHING when mForwardVel > 16, else PUTTING if canPut() (MarioWait.cpp 65: no wall within the
+object's radius 100 units ahead at y + 10 nor at his feet), else kept. pitching() / putting() are stopCommon: waitProcess zeroes his speed
+at once, the clip at 1.0, WAIT at its end; checkThrowObject (MarioMove.cpp 1282) -> dropObject at ANIM_THROW frame 4 (+ the voice),
+HIT_MESSAGE_PUT at ANIM_PUT frame 20. In the air checkJumpingThrowStart (MarioJump.cpp 33) -> JUMP_THROW: ANIM_THROW over the ordinary
+jump physics, the release at frame 4, JUMP_THROW_END on landing (jumpThrowEnd: the clip finishes standing). Every other drop is dropObject
+= THROWN: changePlayerDropping on a knockdown (damageExec, MarioCollision.cpp 274 -- plus a type-3 hit while running, via setUpperDamageRun's
+FIXED_ANIMATION upper state and considerTake), the bonk, the fire, the catch. THE OBJECT computes its own launch (TMapObjGeneral::thrown,
+MapObjGeneral.cpp 109): position = HIS position (the feet), vel = gpMarioThrowPower 2.8 x physical.unk2C x (sin, cos)(his yaw) +
+mNormalThrowSpeedRate 0.5 x his mVel (zero on a ground throw, live in the air and on a hit), vy = unk30, += vel once; then gravity unk0
+a tick with no air drag (calcVelocity 477), the ground bounce vy *= -unk4 while |vy| > unkC (touchGround 437). The numbers are compiled in
+(MapObjInit.cpp; no .prm): coconut 2.0 / 15, papaya 5.0 / 20, pine 2.0 / 22 (hit radius 80), durian 0.01 / 5 (kicked, never carried),
+banana 2.5 / 14 (bounce 0.4), red pepper 5.0 / 12, watermelon 0 / 0 (rolled), barrel 3.5 / 20, gravity 0.3 and bounce 0.6 unless noted.
+put(): objRadius + 42 + 10 ahead of him at his feet. PORT: SmsParams.Take; assets/Sms/SmsTakeable.cs = the per-object numbers (an
+optional child node with a Preset dropdown; without one the port reads his Fruit.Type -- Banana / Coconut / Papaya / Pineapple / RedPepper /
+Durian -- else the generic fruit) and SmsThrownFlight (a thrown RigidBody3D gets the game's gravity (0.3 x 3600 / 74.44 = 14.5 m/s2 against
+the project's 19) and restitution for the flight, his own back once asleep or re-taken; the bounce friction and wall reflection stay his
+material). Mario.cs: SmsFindTakeTarget over the "pickable" group (his Fruit.CanBePickedUp / SmsTakeable.CanTake respected), the raise's
+frame-11 attach, SmsThrowOrPut, SmsCanPut (eight horizontal rays stand in for isTouchedOneWall), SmsStartJumpThrow + the landing's
+JUMP_THROW_END, SmsReleaseHeld (THROWN / PUT), the ma_carry_p graft (SmsUpperPose) for the tree-off frames; B with nothing in reach:
+TAKE_POSE (ma_get_fail) only while moving / landing (running() 668, landing() 1005) -- waiting() tests mInput & 0x10000, which nothing
+sets, so standing still B does nothing (the legacy's swipe is gone). ExertVoice is the slot. NOT PORTED: the sweat, the per-fruit
+rotation handed to the thrown object, the object's own startSound(5) / startAnim(5), TAKEN (Mario carried by an enemy) and THROWN_DOWN.

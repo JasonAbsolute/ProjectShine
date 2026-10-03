@@ -1393,6 +1393,15 @@ public partial class Mario : CharacterBody3D
     private uint heldLayer;
     private uint heldMask;
     private RigidBody3D pendingPickup;
+    // SMS TTakeActor (pass 62): the hold / carry / throw rules 1:1 -- see the SmsTake* methods and SmsTakeable.cs
+    [Export] public AudioStreamPlayer3D ExertVoice;   // MSD_SE_MV15_EXERT_INST_01: the grunt at the take (raise frame 11) and at the throw (frame 4)
+    private SmsTakeData _smsTakeData;                 // the pending / held object's game numbers (an SmsTakeable child, his Fruit.Type, or the generic fruit)
+    private bool _smsTakeAttached = false;            // taking(): the object is in the hand from raise frame 11 (the legacy attached at the clip's end)
+    private bool _smsActReleased = false;             // pitching() / putting() / jumpingThrow(): the release already fired on this clip
+    private bool _smsJumpThrow = false;               // MARIO_STATUS_JUMP_THROW: ma_throw over the air physics, the release at frame 4, JUMP_THROW_END on landing
+    private double _smsJumpThrowT = 0.0;
+    private SmsUpperPose _smsCarryGraft;              // ma_carry_p on chn_chest for the tree-off frames (UPPER_STATE_HOLDING_OBJECT)
+    private double _smsCarryGraftT = 0.0, _smsCarryGraftLen = 0.0;
 
     private AnimationTree animTree;
 
@@ -2043,6 +2052,8 @@ public partial class Mario : CharacterBody3D
             // optional: enforce local scale too (helps if anything else touches it)
             heldBody.Scale = Vector3.One;
         }
+        if (UseSmsPhysics)
+            SmsTakeTick(delta);
         UpdateCarryRunBlend((float)delta);
         UpdateRunAnimationSpeed();
         if (Input.IsActionJustPressed("button_z") || Input.IsActionJustPressed("key_z"))
@@ -2160,6 +2171,29 @@ public partial class Mario : CharacterBody3D
             if (animPlayer.CurrentAnimation != "ma_raise")
                 animPlayer.Play("ma_raise");
 
+            if (UseSmsPhysics)
+            {
+                if (!SmsFloorWithin(SmsParams.Take.FloorLossUnits))
+                {
+                    // taking(): mInput & 4 -> changePlayerDropping(LANDING): the take is off (the object dropped if it was already in the hand)
+                    if (heldBody != null)
+                        Anim_DetachPickup();
+                    pendingPickup = null;
+                    _smsTakeAttached = false;
+                    stateOfMario = MarioState.idle; // the walk-off detector makes it the fall
+                    SetMarioState(stateOfMario);
+                    if (SmsDebugPrint) GD.Print("[SMS take] the floor went: the take dropped into a LANDING fall");
+                }
+                else if (!_smsTakeAttached && heldBody == null && pendingPickup != null && animPlayer.CurrentAnimationPosition >= SmsParams.Take.TakeFrame / 60.0)
+                {
+                    _smsTakeData = SmsTakeable.For(pendingPickup);
+                    Anim_AttachPickup(); // HIT_MESSAGE_TAKE at frame 11: in the hand from here, the carry state at the clip's end
+                    _smsTakeAttached = heldBody != null;
+                    SmsPlaySlot(ExertVoice);
+                    if (SmsDebugPrint && heldBody != null) GD.Print($"[SMS take] TAKE at raise frame {animPlayer.CurrentAnimationPosition * 60.0:F1}: the {_smsTakeData.Name} ({_smsTakeData.Kind}, hit {_smsTakeData.HitRadius:F0} x {_smsTakeData.HitHeight:F0}, throw {_smsTakeData.ThrowRate} / {_smsTakeData.ThrowVy})");
+                }
+            }
+
             goto EndFrame;
         }
 
@@ -2200,6 +2234,31 @@ public partial class Mario : CharacterBody3D
                 desiredAnim = "ma_put";
             if (animPlayer.CurrentAnimation != desiredAnim)
                 animPlayer.Play(desiredAnim);
+
+            if (UseSmsPhysics)
+            {
+                if (!SmsFloorWithin(SmsParams.Take.FloorLossUnits))
+                {
+                    // putting() / pitching(): mInput & 4 -> changePlayerDropping(LANDING): dropObject() and the fall
+                    if (heldBody != null)
+                        Anim_DetachPickup();
+                    _isThrowQueued = false;
+                    stateOfMario = MarioState.idle;
+                    SetMarioState(stateOfMario);
+                    goto EndFrame;
+                }
+                if (heldBody != null && !_smsActReleased)
+                {
+                    double pos = animPlayer.CurrentAnimationPosition;
+                    if (_isThrowQueued ? pos >= SmsParams.Take.ThrowFrame / 60.0 : pos >= SmsParams.Take.PutFrame / 60.0)
+                    {
+                        _smsActReleased = true;
+                        Anim_DetachPickup(); // checkThrowObject() at frame 4 / HIT_MESSAGE_PUT at frame 20
+                        if (_isThrowQueued)
+                            SmsPlaySlot(ExertVoice);
+                    }
+                }
+            }
 
             goto EndFrame;
         }
@@ -3003,6 +3062,15 @@ public partial class Mario : CharacterBody3D
                     goto EndFrame;
             }
 
+            // hitWantToTake / canTake (MarioCheckCol.cpp 101, MarioCollision.cpp 130): touching a takeable with B HELD takes it -- from the
+            // collision check, which runs before the status machine, so the take beats the dive (pass 62)
+            if (UseSmsPhysics && heldBody == null && pendingPickup == null && Input.IsActionPressed("button_b") && SmsFindTakeTarget(out RigidBody3D smsTake))
+            {
+                _smsTakeAttached = false;
+                StartPickupRaise(smsTake);
+                goto EndFrame;
+            }
+
             if (Input.IsActionJustPressed("button_b"))
             {
                 Console.WriteLine(
@@ -3042,6 +3110,11 @@ public partial class Mario : CharacterBody3D
                 {
                     if (heldBody != null && stateOfMario != MarioState.putDown)
                     {
+                        if (UseSmsPhysics)
+                        {
+                            SmsThrowOrPut(); // isThrowStart(): an enemy is pitched; a map object pitched past fwd 16, else put down (canPut), else kept
+                            goto EndFrame;
+                        }
                         // SMS-style: running/intending-to-move B = instant throw (fruit
                         // leaves hand at 45°, Mario keeps running unaffected);
                         // standing-still B = gentle put-down.
@@ -3056,6 +3129,14 @@ public partial class Mario : CharacterBody3D
 
                     if (heldBody == null && stateOfMario != MarioState.pickupRaise)
                     {
+                        if (UseSmsPhysics)
+                        {
+                            // the held-B take above found nothing. running() 668 / landing() 1005: B with nothing to take -> TAKE_POSE
+                            // (ma_get_fail); waiting() tests a bit (mInput & 0x10000) nothing sets -- standing still, B does nothing
+                            if (stateOfMario != MarioState.idle)
+                                EnterPickupFail();
+                            goto EndFrame;
+                        }
                         UpdatePickupCastFacing(); // Rotate pickup cast with Mario
                         if (TryFindPickable(out var rb))
                             StartPickupRaise(rb);
@@ -3849,7 +3930,10 @@ public partial class Mario : CharacterBody3D
                 GD.Print(
                     $"[Throw] Airborne intercept fired — state={stateOfMario}, vel={velocity}"
                 );
-                ThrowHeldInstant(inputDirWorld);
+                if (UseSmsPhysics)
+                    SmsStartJumpThrow(); // checkJumpingThrowStart(): MARIO_STATUS_JUMP_THROW
+                else
+                    ThrowHeldInstant(inputDirWorld);
                 goto EndFrame;
             }
 
@@ -4688,6 +4772,25 @@ public partial class Mario : CharacterBody3D
         if (justLanded)
         {
             ClearAirTakeoffDir();
+
+            if (UseSmsPhysics && _smsJumpThrow)
+            {
+                // jumpProcess() case 1 -> MARIO_STATUS_JUMP_THROW_END: jumpThrowEnd() (MarioWait.cpp 497) lets ANIM_THROW finish standing
+                // (jumpEndCommon(ANIM_THROW, WAIT)), checkThrowObject() still releasing at frame 4 if the clip is not there yet; a clip
+                // already over is WAIT at once -- the ordinary landing below
+                _smsJumpThrow = false;
+                if (animPlayer != null && animPlayer.IsPlaying() && animPlayer.CurrentAnimation == "ma_throw")
+                {
+                    velocity = Vector3.Zero;
+                    stateOfMario = MarioState.putDown;
+                    _isThrowQueued = true;
+                    landingEnteredThisContact = true;
+                    wasOnFloor = onFloorNow;
+                    if (SmsDebugPrint) GD.Print($"[SMS take] JUMP_THROW_END: ma_throw finishes standing from frame {animPlayer.CurrentAnimationPosition * 60.0:F1}");
+                    return;
+                }
+                _isThrowQueued = false;
+            }
 
             // If we landed from a ledge get-up, skip landing dust and ma_laend.
             if (
@@ -10302,6 +10405,8 @@ public partial class Mario : CharacterBody3D
 
         heldBody = pendingPickup;
         pendingPickup = null;
+        if (UseSmsPhysics)
+            SmsThrownFlight.End(heldBody);
 
         heldLayer = heldBody.CollisionLayer;
         heldMask = heldBody.CollisionMask;
@@ -10334,6 +10439,12 @@ public partial class Mario : CharacterBody3D
     {
         if (heldBody == null)
             return;
+        if (UseSmsPhysics)
+        {
+            // every drop is dropObject() -> HIT_MESSAGE_THROWN, except putting()'s HIT_MESSAGE_PUT
+            SmsReleaseHeld(put: stateOfMario == MarioState.putDown && !_isThrowQueued && !_smsJumpThrow);
+            return;
+        }
 
         var rb = heldBody;
         heldBody = null;
@@ -11361,10 +11472,13 @@ public partial class Mario : CharacterBody3D
         Vector3 toAttacker = new Vector3(attackerPos.X - GlobalPosition.X, 0f, attackerPos.Z - GlobalPosition.Z);
         Vector3 attackDir = toAttacker.LengthSquared() > 1e-6f ? toAttacker.Normalized() : oldFace; // getAttackAngle()
         string what = "HP only (type 3: the upper-body damage run is not ported)";
+        // changePlayerDropping(statusIdx): a knockdown drops the held object (dropObject -> THROWN); a type-3 hit while RUNNING sets the upper
+        // damage run (setUpperDamageRun, MarioDraw.cpp 1851: UPPER_STATE_FIXED_ANIMATION), which considerTake (MarioCollision.cpp 406) reads as
+        // 'not holding' -> THROWN the next tick: dropped too. A type-3 hit standing still keeps it (pass 62)
+        if (heldBody != null && (p.DownType != 3 || stateOfMario == MarioState.running || stateOfMario == MarioState.sprinting || stateOfMario == MarioState.walking))
+            Anim_DetachPickup();
         if (p.DownType != 3)
         {
-            if (heldBody != null)
-                Anim_DetachPickup(); // changePlayerDropping(): dropObject()
             float fwd = SmsUnits.MpsToSpeed(new Vector3(velocity.X, 0f, velocity.Z).Dot(oldFace)); // mForwardVel, signed along the face
             if (fwd < p.MinSpeed)
                 fwd = p.MinSpeed;
@@ -11685,8 +11799,8 @@ public partial class Mario : CharacterBody3D
             face = Vector3.Forward;
         _smsSwimFwd = SmsUnits.MpsToSpeed(velXZ.Length()) * SmsParams.Swim.StartVMult;
         _smsSwimVy = SmsUnits.MpsToSpeed(velocity.Y) * SmsParams.Swim.StartVYMult;
-        if (heldBody != null)
-            Anim_DetachPickup();
+        // the hold survives the water: no dropObject in MarioSwim.cpp, and considerTake's check stays true while the upper state is
+        // HOLDING_OBJECT -- he swims with it (ma_carry_p over the swim set, SmsTakeTick). The port used to drop it here (pass 62)
         ledgePinned = false;
         _smsHangMovingAnim = false;
         _smsLongFallAnim = false;
@@ -12295,6 +12409,7 @@ public partial class Mario : CharacterBody3D
         SmsFluddSetupSprayAim();  // NozzleCtrl on the spray nozzle's chn_muzzle_1: the aim up
         SmsFluddSetupHandleSwing(); // the water gun's TMultiMtxEffect: the grips swing on jnt_G_handle
         SmsFluddSetupUpperGrafts(); // ma_swpmp / ma_hgpmp / ma_fepmp on the upper body while the body clip runs outside the tree
+        SmsTakeSetupGraft(); // ma_carry_p the same way while he holds something (pass 62)
         SmsFluddSetupTurboAnims(); // S5: ma_turbo_dash / ma_broad_jump as BaseSM states
         // the pump clips ping-pong (addUpper: ATTR_PING_PONG_LOOP; the tank's are slaved to Mario's)
         if (animPlayer.HasAnimation("ma_pump"))
@@ -16161,6 +16276,297 @@ public partial class Mario : CharacterBody3D
     public void AddShine()
     {
         _shines++; // the console's shine digits flip on the change
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // TTakeActor (pass 62): holding, carrying and throwing, 1:1. Mario's mHeldObject is heldBody; the object's mHolder is implied.
+    // The take comes from the collision check (hitWantToTake, MarioCheckCol.cpp 101): B HELD against a takeable in reach, before the
+    // status machine runs, so it beats the dive. The carry is an UPPER state (HOLDING_OBJECT): ma_carry_p over whatever the body does
+    // -- the tree's CarryBlend for its clips, SmsUpperPose for the swim set and the other tree-off frames. B again: isThrowStart.
+    // ---------------------------------------------------------------------------------------------------------------
+
+    /// <summary>isTakeSituation() (MarioCollision.cpp 86) less the per-object part: no invincibility frames, not airborne / in an action
+    /// or special status (the 0x80000000 / 0x10000000 flags, CATCH), hands idle (UPPER_STATE_IDLE), not holding, not held, not in a demo.</summary>
+    private bool SmsCanTakeNow()
+    {
+        if (heldBody != null || pendingPickup != null || CameraLocked || !IsOnFloor())
+            return false;
+        if (_smsInvincibleTicks > 0)
+            return false;
+        if (_fluddUpper != SmsUpper.Idle)
+            return false;
+        switch (stateOfMario)
+        {
+            case MarioState.idle: case MarioState.walking: case MarioState.running: case MarioState.sprinting: case MarioState.sneak:
+            case MarioState.pivot: case MarioState.landing: case MarioState.singleJumpLanding: case MarioState.doubleJumpLanding:
+            case MarioState.tripleJumpLanding: case MarioState.rolloutRun: case MarioState.crouch: case MarioState.diving:
+            case MarioState.bellySlidingFromDive: case MarioState.gettingUpFromSliding:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>The nearest takeable he is touching: the two receive cylinders overlap (THitActor: his DamageRadius 42 x 160 high against the
+    /// object's hit radius x height), within mAttackRadius (= HoldRadius 80, setNormalAttackArea) + the object's damage radius of his
+    /// position, and within +-60 degrees (0x2aaa) of his face (isTakeSituation 120-128). Bodies in the group "pickable" (his), skipped
+    /// when his Fruit says CanBePickedUp false or an SmsTakeable child says CanTake false.</summary>
+    private bool SmsFindTakeTarget(out RigidBody3D best)
+    {
+        best = null;
+        if (!SmsCanTakeNow())
+            return false;
+        Vector3 feet = GlobalPosition;
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+        float cosCone = Mathf.Cos(SmsParams.Take.ConeBam * SmsUnits.BamToRad);
+        float marioH = SmsUnits.UnitsToMetres(SmsUnits.MarioHeightUnits);
+        float bestD = float.MaxValue;
+        foreach (Node n in GetTree().GetNodesInGroup("pickable"))
+        {
+            if (n is not RigidBody3D rb || !IsInstanceValid(rb) || rb == heldBody || !rb.IsInsideTree() || !SmsTakeable.MayTake(rb))
+                continue;
+            SmsTakeData d = SmsTakeable.For(rb);
+            Vector3 bottom = rb.GlobalPosition - Vector3.Up * SmsBodyHalfHeight(rb, d); // the game's mPosition is the object's ground point
+            Vector3 rel = bottom - feet;
+            float dxz = new Vector2(rel.X, rel.Z).Length();
+            if (dxz > SmsUnits.UnitsToMetres(SmsParams.Mario.DamageRadius + d.HitRadius))
+                continue;
+            float objH = SmsUnits.UnitsToMetres(d.HitHeight);
+            if (rel.Y + objH < 0f || rel.Y > marioH)
+                continue;
+            float dist = rel.Length();
+            if (dist > SmsUnits.UnitsToMetres(SmsParams.Mario.HoldRadius + d.HitRadius))
+                continue;
+            if (dxz > 1e-4f && new Vector3(rel.X, 0f, rel.Z).Normalized().Dot(face) < cosCone)
+                continue;
+            if (dist < bestD)
+            {
+                bestD = dist;
+                best = rb;
+            }
+        }
+        return best != null;
+    }
+
+    /// <summary>The body's half height off its first CollisionShape3D (his fruit are centred RigidBody3Ds; the game's object origin is its
+    /// ground point), else half the game's hit height.</summary>
+    private static float SmsBodyHalfHeight(RigidBody3D rb, SmsTakeData d)
+    {
+        foreach (Node c in rb.GetChildren())
+        {
+            if (c is not CollisionShape3D cs || cs.Shape == null)
+                continue;
+            float sy = Mathf.Abs(cs.GlobalTransform.Basis.Scale.Y);
+            switch (cs.Shape)
+            {
+                case SphereShape3D s: return s.Radius * sy;
+                case BoxShape3D b: return b.Size.Y * 0.5f * sy;
+                case CapsuleShape3D cap: return cap.Height * 0.5f * sy;
+                case CylinderShape3D cyl: return cyl.Height * 0.5f * sy;
+            }
+        }
+        return SmsUnits.UnitsToMetres(d.HitHeight) * 0.5f;
+    }
+
+    /// <summary>mInput &amp; 4 is clear: the floor within this many units under his feet (he is on it, or a ray finds it).</summary>
+    private bool SmsFloorWithin(float units)
+    {
+        if (IsOnFloor())
+            return true;
+        var q = PhysicsRayQueryParameters3D.Create(GlobalPosition + Vector3.Up * 0.02f, GlobalPosition - Vector3.Up * SmsUnits.UnitsToMetres(units), CollisionMask,
+            new Godot.Collections.Array<Rid> { GetRid() });
+        return GetWorld3D().DirectSpaceState.IntersectRay(q).Count > 0;
+    }
+
+    /// <summary>isThrowStart() (MarioRun.cpp 50; the run, brake and turn ticks) and the wait side (MarioWait.cpp 566): B pressed while holding.
+    /// An enemy (actor type bit 0x10000000) is always PITCHED; a map object is pitched when mForwardVel > 16, else PUT down if canPut() allows,
+    /// else kept. Both are stopCommon states: waitProcess() zeroes his speed at once, the clip plays at 1.0, WAIT at its last frame.</summary>
+    private void SmsThrowOrPut()
+    {
+        float fwd = SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length());
+        bool pitch = _smsTakeData.Kind == SmsTakeable.TakeKind.Enemy || fwd > SmsParams.Take.PitchMinFwd;
+        if (!pitch && !SmsCanPut())
+        {
+            if (SmsDebugPrint) GD.Print($"[SMS take] B at fwd {fwd:F1}: canPut() false (a wall within {_smsTakeData.HitRadius:F0} units ahead or at his feet) -- kept");
+            return;
+        }
+        velocity = Vector3.Zero;
+        Velocity = Vector3.Zero;
+        _isThrowQueued = pitch;
+        _smsActReleased = false;
+        _smsJumpThrow = false;
+        stateOfMario = MarioState.putDown;
+        if (animTree != null)
+            animTree.Active = false;
+        string clip = pitch ? "ma_throw" : "ma_put";
+        if (animPlayer.HasAnimation(clip))
+            animPlayer.Play(clip);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS take] {(pitch ? "PITCHING" : "PUTTING")} the {_smsTakeData.Name} ({_smsTakeData.Kind}) at fwd {fwd:F1}: {(pitch ? "dropObject() at frame 4" : "HIT_MESSAGE_PUT at frame 20")}");
+    }
+
+    /// <summary>canPut() (MarioWait.cpp 65): isTouchedOneWall with the object's damage radius 100 units ahead (y + 10) and at his own spot.
+    /// The port stands eight horizontal rays of that radius in for the wall-plane test; a static body counts, a body or an area does not.</summary>
+    private bool SmsCanPut()
+    {
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+        float r = SmsUnits.UnitsToMetres(_smsTakeData.HitRadius);
+        Vector3 up = Vector3.Up * SmsUnits.UnitsToMetres(SmsParams.Take.PutProbeUp);
+        return !SmsWallWithin(GlobalPosition + face * SmsUnits.UnitsToMetres(SmsParams.Take.PutProbeUnits) + up, r) && !SmsWallWithin(GlobalPosition + up, r);
+    }
+
+    private bool SmsWallWithin(Vector3 p, float r)
+    {
+        var space = GetWorld3D().DirectSpaceState;
+        var excl = new Godot.Collections.Array<Rid> { GetRid() };
+        if (heldBody != null)
+            excl.Add(heldBody.GetRid());
+        for (int i = 0; i < 8; i++)
+        {
+            float a = i * Mathf.Tau / 8f;
+            var q = PhysicsRayQueryParameters3D.Create(p, p + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * r, CollisionMask, excl);
+            q.HitFromInside = true; // isTouchedOneWall counts a point already behind a wall plane within the radius: a ray starting inside the solid reports it
+            var hit = space.IntersectRay(q);
+            if (hit.Count == 0)
+                continue;
+            if (hit["collider"].AsGodotObject() is Node col && col is not RigidBody3D && col is not CharacterBody3D && col is not Area3D)
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>checkJumpingThrowStart() (MarioJump.cpp 33) -> MARIO_STATUS_JUMP_THROW: jumpingThrow() (495) plays ANIM_THROW over the ordinary
+    /// air physics (doJumping, jumpProcess), checkThrowObject() releases at frame 4; the landing is JUMP_THROW_END (see the landing code).</summary>
+    private void SmsStartJumpThrow()
+    {
+        _smsJumpThrow = true;
+        _smsJumpThrowT = 0.0;
+        _smsActReleased = false;
+        _isThrowQueued = true;
+        if (animTree != null)
+            animTree.Active = false;
+        if (animPlayer.HasAnimation("ma_throw"))
+            animPlayer.Play("ma_throw");
+        _aerialThrowLockTimer = AERIAL_THROW_LOCK_DURATION; // B's held frame must not read as a dive (the legacy guard)
+        if (SmsDebugPrint)
+            GD.Print($"[SMS take] JUMP_THROW: the {_smsTakeData.Name} leaves at frame 4 with his air speed x {SmsParams.Take.NormalThrowSpeedRate} added");
+    }
+
+    /// <summary>Once a physics frame: the thrown bodies' numbers, the carry pose for the tree-off frames, the jump throw's clock.</summary>
+    private void SmsTakeTick(double delta)
+    {
+        SmsThrownFlight.Tick(delta);
+        if (_smsCarryGraft != null)
+        {
+            // UPPER_STATE_HOLDING_OBJECT (MarioDraw.cpp 1880): bck 0x4B, ma_carry_p, on the second root over whatever the body plays -- the
+            // swim set, a knockdown, the throw until frame 4 (the state clears when PUTTING starts or the object is gone, MarioUpper.cpp 122)
+            bool treeOn = animTree != null && animTree.Active;
+            bool on = heldBody != null && !treeOn && stateOfMario != MarioState.pickupRaise && !(stateOfMario == MarioState.putDown && !_isThrowQueued);
+            _smsCarryGraft.Weight = on ? 1f : 0f;
+            if (on)
+            {
+                _smsCarryGraftT += delta;
+                if (_smsCarryGraftLen > 0.0 && _smsCarryGraftT >= _smsCarryGraftLen)
+                    _smsCarryGraftT -= _smsCarryGraftLen;
+                _smsCarryGraft.Time = _smsCarryGraftT;
+            }
+        }
+        if (_smsJumpThrow)
+        {
+            _smsJumpThrowT += delta;
+            if (!_smsActReleased && heldBody != null && _smsJumpThrowT >= SmsParams.Take.ThrowFrame / 60.0)
+            {
+                _smsActReleased = true;
+                Anim_DetachPickup(); // checkThrowObject(): dropObject()
+                SmsPlaySlot(ExertVoice);
+            }
+            if (stateOfMario == MarioState.swimming)
+            {
+                _smsJumpThrow = false; // the swim took the body; the object stays held (no dropObject in MarioSwim.cpp)
+                _isThrowQueued = false;
+            }
+            else if (!IsOnFloor() && animPlayer != null && animPlayer.HasAnimation("ma_throw") && animPlayer.CurrentAnimation != "ma_throw"
+                     && _smsJumpThrowT < animPlayer.GetAnimation("ma_throw").Length)
+            {
+                // jumpingThrow(): setAnimation(ANIM_THROW) every tick -- the clip is the body's until he lands
+                if (animTree != null)
+                    animTree.Active = false;
+                animPlayer.Play("ma_throw");
+                animPlayer.Seek(_smsJumpThrowT, true);
+            }
+            else if (IsOnFloor() && stateOfMario != MarioState.putDown)
+            {
+                _smsJumpThrow = false; // landed through a path the landing code did not see (a ledge, a slope): the clip is whatever the state wants
+                _isThrowQueued = false;
+            }
+        }
+    }
+
+    /// <summary>dropObject() (MarioCollision.cpp 78) -> the object's HIT_MESSAGE_THROWN -- TMapObjGeneral::thrown (MapObjGeneral.cpp 109): it leaves
+    /// from HIS position (the feet) with ThrowPower x ThrowRate along his face + NormalThrowSpeedRate x his mVel, vy = ThrowVy, one movement
+    /// frame of lead, and flies on its own gravity and bounce (SmsThrownFlight). Or putting()'s HIT_MESSAGE_PUT -- put() (91): set down
+    /// objRadius + 42 + 10 ahead of him at his feet, no velocity. Every drop in the game is one of these two.</summary>
+    private void SmsReleaseHeld(bool put)
+    {
+        var rb = heldBody;
+        heldBody = null;
+        _smsTakeAttached = false;
+        rb.TopLevel = false;
+        rb.Freeze = false;
+        rb.CollisionLayer = heldLayer;
+        rb.CollisionMask = heldMask;
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+        face = new Vector3(face.X, 0f, face.Z);
+        face = face.LengthSquared() > 1e-6f ? face.Normalized() : Vector3.Forward;
+        float halfH = SmsBodyHalfHeight(rb, _smsTakeData);
+        if (put)
+        {
+            float ahead = SmsUnits.UnitsToMetres(_smsTakeData.HitRadius + SmsParams.Mario.DamageRadius + SmsParams.Take.PutGapUnits);
+            rb.GlobalPosition = GlobalPosition + face * ahead + Vector3.Up * halfH;
+            rb.Sleeping = false;
+            rb.SetDeferred("linear_velocity", Vector3.Zero);
+            rb.SetDeferred("angular_velocity", Vector3.Zero);
+            if (SmsDebugPrint)
+                GD.Print($"[SMS take] PUT the {_smsTakeData.Name}: {SmsUnits.MetresToUnits(ahead):F0} units ahead at his feet");
+        }
+        else
+        {
+            float power = SmsParams.Take.ThrowPower * _smsTakeData.ThrowRate;
+            Vector3 vUnits = face * power + new Vector3(SmsUnits.MpsToSpeed(velocity.X), 0f, SmsUnits.MpsToSpeed(velocity.Z)) * SmsParams.Take.NormalThrowSpeedRate;
+            Vector3 vel = new Vector3(SmsUnits.SpeedToMps(vUnits.X), SmsUnits.SpeedToMps(_smsTakeData.ThrowVy), SmsUnits.SpeedToMps(vUnits.Z));
+            rb.GlobalPosition = GlobalPosition + Vector3.Up * halfH + vel / 30f; // mPosition = his; mPosition += vel (one 30 fps movement frame)
+            rb.Sleeping = false;
+            rb.SetDeferred("linear_velocity", vel);
+            rb.SetDeferred("angular_velocity", Vector3.Zero);
+            SmsThrownFlight.Begin(rb, _smsTakeData);
+            // it starts inside his cylinder: no shoving him for the first moments (his legacy's guard, kept)
+            rb.AddCollisionExceptionWith(this);
+            var clearExc = GetTree().CreateTimer(0.6);
+            clearExc.Timeout += () =>
+            {
+                if (IsInstanceValid(rb) && IsInstanceValid(this))
+                    rb.RemoveCollisionExceptionWith(this);
+            };
+            if (SmsDebugPrint)
+                GD.Print($"[SMS take] THROWN the {_smsTakeData.Name}: {power:F1} forward + {SmsParams.Take.NormalThrowSpeedRate} x his ({SmsUnits.MpsToSpeed(velocity.X):F1}, {SmsUnits.MpsToSpeed(velocity.Z):F1}), vy {_smsTakeData.ThrowVy} -> {vel.Length():F2} m/s; gravity {SmsUnits.AccelToMps2(_smsTakeData.Gravity):F1} m/s2, bounce {_smsTakeData.Bounce}");
+        }
+        if (animTree != null && animTree.Active)
+            animTree.Set(CARRY_BLEND_PATH, 0.0f);
+    }
+
+    /// <summary>ma_carry_p (the HOLDING_OBJECT upper clip, bck 0x4B) on the chn_chest subtree for the frames the tree does not run.</summary>
+    private void SmsTakeSetupGraft()
+    {
+        if (skeleton == null || animPlayer == null || !animPlayer.HasAnimation("ma_carry_p"))
+            return;
+        var clip = animPlayer.GetAnimation("ma_carry_p");
+        _smsCarryGraft = new SmsUpperPose { Name = "SmsUpper_ma_carry_p" };
+        skeleton.AddChild(_smsCarryGraft);
+        skeleton.MoveChild(_smsCarryGraft, 0);
+        _smsCarryGraft.Bind(skeleton, clip, "chn_chest");
+        _smsCarryGraftLen = clip.Length;
+        if (SmsDebugPrint)
+            GD.Print($"[SMS take] upper graft: ma_carry_p ({clip.Length:F3} s) on {_smsCarryGraft.BoneCount} bones under chn_chest");
     }
 
     private void Respawn()
