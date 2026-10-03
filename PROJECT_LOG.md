@@ -4316,3 +4316,18 @@ which reads the floor's Y under him, so a jump over fire goop burned in the air;
 `SmsFloorWithin(SmsParams.Graffito.FireHeight)` in SmsGraffitoFire = the game's mFireHeight test.
 BOLT (his ask: a little thicker, a shorter burst): GoopSpark thickness 2.0 (was 1.5), SparkLife 0.25 s (was 0.45), climb_time 0.35.
 NOT PORTED: SE_EF_FIRE / SE_EF_ELEC, the real jpa emitters (GoopFire.tscn / the bolt pool stand in).
+
+### Pass 65s -- the fire from his reference (tall pale wisps), the bolts at random angles
+HIS REFERENCE (Ref/fireRef.png, Pianta Village, The Goopy Inferno): the fire goop's flames are tall, thin, pale yellow-white TRANSLUCENT
+wisps -- columns of fire standing on the goop, about Mario's height, wavering a little, their tops dissolving; several visible at once.
+Not cartoon tongues. "The electric should shoot up at random angles, not just straight up."
+PORT -- LEGACY RETIRED: the 65r fire cluster scene (Fx/GoopFire.tscn: firestripe tongues / glow3_flame cores / embers as GPUParticles3D,
+"does not look good") -> one wisp per fire(), as the game emits one fire per fire(): the GoopFlames pool (the same FxPool as the bolts) of
+upright billboards FlameWidth 0.32 x FlameHeight 1.2 m x FlameSize 1.5 (the game's setGlobalScale), living FlameLife 2.0 s, drawn by
+Fx/GoopFlame.gdshader: the game's glow3_flame sprite (a bright vertical slit in a soft glow) stretched tall, ADDITIVE at opacity 0.75,
+pale yellow (near white at the slit), wavering with height (wave 0.07, 2.4 Hz), its body rippling upward (ripple_speed 1.6), a second
+narrower out-of-phase sample for the flicker, the top dissolving from 70 %, growing up out of the goop over the first 18 % of its life,
+fading from 65 %. DEVIATION knob FlamesPerFire 1 (the game's one; extras go to other painted spots near him). FlameTexture / FlameShader
+knobs. The FxPool now carries a per-instance random in INSTANCE_CUSTOM.y and exposes its ShaderMaterial (flame_tex / lean_max are set
+there). BOLT: GoopSpark.gdshader lean_max (radians) -- each bolt turns a random angle up to it off vertical, in the billboard's plane
+about its base; the layer's SparkLean 32 degrees sets it. NOT PORTED: the sounds, the real jpa emitters (these stand in).

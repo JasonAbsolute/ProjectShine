@@ -11,6 +11,7 @@ uniform float intensity = 1.8;
 uniform float climb_time : hint_range(0.1, 1.0) = 0.35;   // the fraction of the life the bolt takes to reach the top
 uniform float jag : hint_range(0.0, 1.0) = 0.35;          // how far the bolt wanders sideways (fraction of the quad's half width)
 uniform float flicker_rate = 30.0;
+uniform float lean_max : hint_range(0.0, 1.2) = 0.56;      // radians: each bolt leans a random angle up to this off vertical (the layer sets it from SparkLean)
 uniform float thickness : hint_range(0.5, 3.0) = 2.0;    // the core's width (1 = the first, hair-thin bolt)
 
 varying float age;
@@ -45,11 +46,16 @@ void vertex() {
     vec3 to_cam = INV_VIEW_MATRIX[3].xyz - pos;
     vec3 fwd = normalize(vec3(to_cam.x, 0.0, to_cam.z) + vec3(0.0, 0.0, 1e-4));
     vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), fwd));
-    mat4 m = mat4(vec4(right * w, 0.0), vec4(0.0, h, 0.0, 0.0), vec4(fwd, 0.0), vec4(pos, 1.0));
+    // the bolt leans a random angle off vertical, turning in the billboard's plane about its base (his ask: random angles, not straight up)
+    float lean = (INSTANCE_CUSTOM.y * 2.0 - 1.0) * lean_max;
+    vec3 up = vec3(0.0, 1.0, 0.0);
+    vec3 r2 = right * cos(lean) + up * sin(lean);
+    vec3 u2 = up * cos(lean) - right * sin(lean);
+    mat4 m = mat4(vec4(r2 * w, 0.0), vec4(u2 * h, 0.0), vec4(fwd, 0.0), vec4(pos, 1.0));
     MODELVIEW_MATRIX = VIEW_MATRIX * m;
     MODELVIEW_NORMAL_MATRIX = mat3(MODELVIEW_MATRIX);
     age = INSTANCE_CUSTOM.x;
-    inst = float(INSTANCE_ID);
+    inst = float(INSTANCE_ID) + INSTANCE_CUSTOM.y * 31.0;
     VERTEX.y += 0.5; // the quad's base on the paint
 }
 

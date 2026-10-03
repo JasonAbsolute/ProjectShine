@@ -77,19 +77,26 @@ public partial class SmsPollutionLayer : MeshInstance3D
     [Export] public int EffectWaitFrames = 15;
     /// <summary>TPollutionLayer::fire(): on a Fire / FireRegrow layer with paint within 1600 units of Mario, when the timer passes
     /// mFireEffectWaitTime (20: every 21st frame) a fire at a painted spot -- the game emits MS_NEWFIRE_B and _A there at setGlobalScale(1.5)
-    /// with SE_EF_FIRE. The port's fire is FlameScene (assets/Sms/Fx/GoopFire.tscn: tongues of the game's firestripe sprite, glow3_flame
-    /// cores, embers) placed there at FlameSize, emitting for FlameClusterLife seconds, then let burn out.</summary>
+    /// with SE_EF_FIRE. The port's fire (from his reference, Pianta Village): one tall, thin, pale wisp standing on the goop -- the game's
+    /// glow3_flame sprite stretched to FlameWidth x FlameHeight (x FlameSize), additive, wavering, living FlameLife seconds
+    /// (Fx/GoopFlame.gdshader).</summary>
     [Export] public bool Flames = true;
     [Export] public int FlameWaitFrames = 20;      // mFireEffectWaitTime
-    [Export] public float FlameSize = 1.5f;        // the game's setGlobalScale(1.5): the scene's scale
-    [Export] public float FlameClusterLife = 1.2f; // seconds a fire keeps producing tongues (the game's emitter lives are in the jpa, not read)
-    [Export] public PackedScene FlameScene;        // default res://assets/Sms/Fx/GoopFire.tscn
+    [Export] public float FlameSize = 1.5f;        // the game's setGlobalScale(1.5)
+    [Export] public float FlameWidth = 0.32f;      // metres at scale 1
+    [Export] public float FlameHeight = 1.2f;      // metres at scale 1
+    [Export] public float FlameLife = 2.0f;        // seconds (the jpa emitter's life is not read)
+    /// <summary>DEVIATION knob: wisps per fire(). The game emits ONE fire per fire() (1); more scatters extras at other painted spots nearby.</summary>
+    [Export] public int FlamesPerFire = 1;
+    [Export] public Texture2D FlameTexture;        // default res://assets/Sms/Fx/tex/glow3_flame.png
+    [Export] public Shader FlameShader;            // default res://assets/Sms/Fx/GoopFlame.gdshader
     /// <summary>TPollutionLayer::electric(): on an Electric layer with paint within 1000 units of Mario, a bolt (the game: MS_THUNDER_S and
     /// SE_EF_ELEC) at a painted spot when the timer passes EffectWaitFrames -- a jagged lightning bolt climbing up from the goop, as in the
     /// game. An upright billboard stands in (GoopSpark.gdshader).</summary>
     [Export] public bool Sparks = true;
     [Export] public float SparkSize = 1.6f;        // the bolt's height (metres); the quad is 0.3 x as wide
     [Export] public float SparkLife = 0.25f;       // seconds: a quick strike -- it climbs for the first 35 %, flickers, fades
+    [Export] public float SparkLean = 32f;         // degrees: each bolt leans a random angle up to this off vertical (his ask: not just straight up)
     [Export] public Shader SparkShader;            // default res://assets/Sms/Fx/GoopSpark.gdshader
     [Export] public int FxMax = 24;                // bolts / fires alive at once
     [Export] public bool DebugPrint = false;
@@ -155,12 +162,10 @@ public partial class SmsPollutionLayer : MeshInstance3D
     private float[] _dropFloor;
     private int _dropNext;
     private FxPool _sparks;
-    private readonly System.Collections.Generic.List<(Node3D node, float born)> _fires = new();
-    private float _fireClock;     // seconds, for the fires' ages
+    private FxPool _flames;
     private int _frameSub;        // ticks into the current 30 fps frame
-    private const float FlameTail = 1.0f; // seconds after the emitting stops for the last tongues / embers to die (the scene's longest lifetime)
-    public int FlamesEmitted { get; private set; }
-    public int ActiveFires => _fires.Count;
+    public int FlamesEmitted => _flames?.Emitted ?? 0;
+    public int ActiveFires => _flames?.Active ?? 0;
     public int SparksEmitted => _sparks?.Emitted ?? 0;
     private double _settleAccum;
     private float _tickAccum;
@@ -403,7 +408,15 @@ public partial class SmsPollutionLayer : MeshInstance3D
         if (Bubbles && _bubbleMmi == null)
             SetupBubbles();
         if (Sparks && _sparks == null && Type == SmsPollutionType.Electric)
+        {
             _sparks = new FxPool(this, "GoopSparks", SparkShader ?? GD.Load<Shader>("res://assets/Sms/Fx/GoopSpark.gdshader"), Math.Max(1, FxMax), 0f);
+            _sparks.Material.SetShaderParameter("lean_max", Mathf.DegToRad(SparkLean));
+        }
+        if (Flames && _flames == null && (Type == SmsPollutionType.Fire || Type == SmsPollutionType.FireRegrow))
+        {
+            _flames = new FxPool(this, "GoopFlames", FlameShader ?? GD.Load<Shader>("res://assets/Sms/Fx/GoopFlame.gdshader"), Math.Max(1, FxMax), 0f);
+            _flames.Material.SetShaderParameter("flame_tex", FlameTexture ?? GD.Load<Texture2D>("res://assets/Sms/Fx/tex/glow3_flame.png"));
+        }
         Built = true;
         if (DebugPrint)
             GD.Print($"[SMS goop] layer '{Name}' {Type}: {Width} x {Height} texels of {TexelSize} u over x {MinX:F2}..{MaxX:F2} z {MinZ:F2}..{MaxZ:F2} m (its frame), " +
@@ -608,7 +621,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
             TickBubbles(delta);
             TickPops(delta);
         }
-        TickFires((float)delta);
+        _flames?.Tick((float)delta);
         _sparks?.Tick((float)delta);
         if (_texDirty)
         {
@@ -723,8 +736,13 @@ public partial class SmsPollutionLayer : MeshInstance3D
         _effectTimer += 1;
         if (_effectTimer > FlameWaitFrames)
         {
-            if (Flames)
-                SpawnFire(at + Vector3.Up * 0.01f);
+            if (_flames != null)
+            {
+                _flames.Spawn(at + Vector3.Up * 0.01f, FlameWidth * FlameSize, FlameHeight * FlameSize, FlameLife);
+                for (int i = 1; i < FlamesPerFire; i++) // the deviation's extras, each at another painted spot near him
+                    if (GetPollutedPosNear(SmsParams.Pollution.FireArea, out Vector3 more))
+                        _flames.Spawn(more + Vector3.Up * 0.01f, FlameWidth * FlameSize, FlameHeight * FlameSize, FlameLife * (0.8f + 0.4f * GD.Randf()));
+            }
             _effectTimer = 0;
         }
     }
@@ -743,63 +761,17 @@ public partial class SmsPollutionLayer : MeshInstance3D
         }
     }
 
-    /// <summary>A fire at a painted spot: the scene placed there in world space at FlameSize (the game's setGlobalScale(1.5)), its emitters on
-    /// for FlameClusterLife, then off and freed once the last particles are gone. Over FxMax fires the oldest goes.</summary>
-    private void SpawnFire(Vector3 at)
-    {
-        var scene = FlameScene ?? GD.Load<PackedScene>("res://assets/Sms/Fx/GoopFire.tscn");
-        if (scene == null)
-            return;
-        if (_fires.Count >= Math.Max(1, FxMax))
-        {
-            _fires[0].node.QueueFree();
-            _fires.RemoveAt(0);
-        }
-        var fire = scene.Instantiate<Node3D>();
-        fire.TopLevel = true;
-        AddChild(fire);
-        fire.GlobalTransform = new Transform3D(Basis.Identity.Scaled(Vector3.One * FlameSize), at);
-        foreach (Node c in fire.GetChildren())
-            if (c is GpuParticles3D p)
-                p.Emitting = true;
-        _fires.Add((fire, _fireClock));
-        FlamesEmitted++;
-    }
-
-    private void TickFires(float dt)
-    {
-        _fireClock += dt;
-        for (int i = _fires.Count - 1; i >= 0; i--)
-        {
-            (Node3D node, float born) = _fires[i];
-            if (!IsInstanceValid(node))
-            {
-                _fires.RemoveAt(i);
-                continue;
-            }
-            float age = _fireClock - born;
-            if (age >= FlameClusterLife)
-                foreach (Node c in node.GetChildren())
-                    if (c is GpuParticles3D p && p.Emitting)
-                        p.Emitting = false;
-            if (age >= FlameClusterLife + FlameTail)
-            {
-                node.QueueFree();
-                _fires.RemoveAt(i);
-            }
-        }
-    }
-
-    /// <summary>A pool of billboard quads in world space (a MultiMesh under the layer; the bolts): position, size and age per instance; the
-    /// shader reads the instance's scale as its size and INSTANCE_CUSTOM.x as its age.</summary>
+    /// <summary>A pool of billboard quads in world space (a MultiMesh under the layer; the bolts and the flames): position, size and age per
+    /// instance; the shader reads the instance's scale as its size, INSTANCE_CUSTOM.x as its age 0..1 and .y as a per-instance random.</summary>
     private sealed class FxPool
     {
         private readonly MultiMesh _mm;
         private readonly Vector3[] _pos;
-        private readonly float[] _age, _life, _w, _h;
+        private readonly float[] _age, _life, _w, _h, _rnd;
         private readonly float _rise;
         private int _next;
         public int Emitted { get; private set; }
+        public ShaderMaterial Material { get; }
 
         public FxPool(Node3D parent, string name, Shader shader, int n, float rise)
         {
@@ -809,11 +781,13 @@ public partial class SmsPollutionLayer : MeshInstance3D
             _life = new float[n];
             _w = new float[n];
             _h = new float[n];
+            _rnd = new float[n];
             Array.Fill(_age, -1f);
             _mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseCustomData = true, Mesh = new QuadMesh { Size = Vector2.One }, InstanceCount = n };
             for (int i = 0; i < n; i++)
                 _mm.SetInstanceTransform(i, ZeroXf);
-            var mmi = new MultiMeshInstance3D { Name = name, Multimesh = _mm, MaterialOverride = new ShaderMaterial { Shader = shader }, TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+            Material = new ShaderMaterial { Shader = shader };
+            var mmi = new MultiMeshInstance3D { Name = name, Multimesh = _mm, MaterialOverride = Material, TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
             parent.AddChild(mmi);
             mmi.GlobalTransform = Transform3D.Identity;
         }
@@ -828,6 +802,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
             _w[i] = w;
             _h[i] = h;
             _life[i] = MathF.Max(0.05f, life);
+            _rnd[i] = GD.Randf();
             _age[i] = 0f;
             Emitted++;
         }
@@ -847,7 +822,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
                     continue;
                 }
                 _mm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(new Vector3(_w[i], _h[i], 1f)), _pos[i] + Vector3.Up * (_rise * t)));
-                _mm.SetInstanceCustomData(i, new Color(t, 0f, 0f, 0f));
+                _mm.SetInstanceCustomData(i, new Color(t, _rnd[i], 0f, 0f));
             }
         }
     }
