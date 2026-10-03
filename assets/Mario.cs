@@ -73,6 +73,7 @@ public partial class Mario : CharacterBody3D
         roofHang,     // SMS: HANG_ROOF / WAIT_ROOF / MOVE_ROOF / KICK_ROOF (MarioSpecial.cpp 199-410), sub-status in _smsRoof (pass 52)
         oilRun,       // SMS: MARIO_STATUS_OIL_RUN -- the run on the oily goop (oilRun(), MarioRun.cpp 1238) (pass 64)
         oilSlip,      // SMS: MARIO_STATUS_OIL_SLIP -- the belly skid on it (oilSlip(), 1306); OIL_SLOPE is the surface slip with _smsOilSlopeSlide (pass 64)
+        wire,         // SMS: the WIRE_* statuses (MarioSpecial.cpp 649-1167: on top, hanging, the swing) on a tightrope (SmsWire.cs), sub-status in _smsWire (pass 66)
     }
 
     private struct AirControlProfile
@@ -188,6 +189,21 @@ public partial class Mario : CharacterBody3D
     private Vector3 _smsFenceNormal = Vector3.Back;    // the fence plane's outward normal (he faces -normal, pressed on it)
     private Node _smsFenceBody;                         // the fence (or roof) body he is on
     private string _smsFenceAnim = "";
+    // --- the wire (pass 66) ---
+    private enum SmsWireState { Wait, SWait, WaitToSWaitL, WaitToSWaitR, SWaitToWaitL, SWaitToWaitR, WaitToHang, SWaitToHang, Hanging, Rolling, Return }
+    private enum SmsWireAir { None, Jump, RollJump, SafeDown } // the jumping-type wire statuses: WIRE_JUMP, WIRE_ROLL_JUMP, WIRE_HANG_LAND_SAFE_DOWN
+    private SmsWireState _smsWire = SmsWireState.Wait;
+    private SmsWireAir _smsWireAir = SmsWireAir.None;
+    private SmsWire _smsWireNode;                        // mHolder: the wire actor he is held by (null off the wire)
+    private Vector3 _smsWireStart, _smsWireEnd;          // mWireStartPos / mWireEndPos (world metres; swapped to agree with his travel)
+    private float _smsWirePosRatio;                      // mWirePosRatio: where he is along the chord, 0..1
+    private float _smsWireBounceVel, _smsWireBounceVelPrev; // mWireBounceVel (units a frame) and its previous: the rope spring's velocity
+    private float _smsWireSag;                           // mWireSag (units): the spring's displacement, + = below the chord point
+    private float _smsWireAngVel;                        // unkF6: the swing's angular velocity (BAM a frame)
+    private float _smsWirePitch;                         // mFaceAngle.x while rolling: the swing angle (BAM; 0 = hanging straight down)
+    private int _smsWireRollState;                       // mStatusState while rolling: 1 = A armed, 2 = over the top
+    private bool _smsWireJumpLatch;                      // MARIO_FLAG_UNK100: A on the rope, kept until the rope lets the jump go
+    private string _smsWireAnim = "";
     private bool _smsFencePunchHit = false;             // fencePunch(): checkPass(5) fired
     private int _smsRoofTicks = 0;                      // hangRoof() mStatusTimer
     private int _smsRoofArg = 0;                        // mStatusArg bit 0: the hand (the L / R clips)
@@ -2341,6 +2357,7 @@ public partial class Mario : CharacterBody3D
             SmsFluddDashOverride(ref inputDirWorld, ref stickStrength); // the turbo: mIntendedMag = mDashSpeed, a resting stick aims at the face
             SmsWaistFrame(delta);  // considerWaist(): the chest lean chased every tick, applied on RUN1 / RUN2
             SmsWaterEntryCheck(); // deep water -> SWIM_START, from any status
+            SmsWireCheck();       // the wire actor's hit: his position in a wire's cube -> on top or hanging; the held wire's V follows him (pass 66)
             if (stateOfMario == MarioState.swimming)
             {
                 SmsTickSwim(delta, inputDirWorld); // swimMain(): no other handler runs
@@ -2350,6 +2367,11 @@ public partial class Mario : CharacterBody3D
             if (stateOfMario == MarioState.fluddRocket)
             {
                 SmsTickRocketStatus(delta, inputDirWorld); // rocketing(): no other handler runs
+                goto EndFrame;
+            }
+            if (stateOfMario == MarioState.wire)
+            {
+                SmsTickWire(delta, inputDirWorld); // specMain() + wireWait() / wireHanging() / wireRolling() ...: no other handler runs (pass 66)
                 goto EndFrame;
             }
             if (stateOfMario == MarioState.fence)
@@ -4907,6 +4929,12 @@ public partial class Mario : CharacterBody3D
             {
                 // Landing from ledge fall allows a double jump next
                 jumpChainStage = 1;
+                jumpChainTimer = JumpChainWindowFrames;
+            }
+            else if (UseSmsPhysics && (_smsWireAir == SmsWireAir.Jump || _smsWireAir == SmsWireAir.RollJump))
+            {
+                // wireJumping(): jumpingBasic(MARIO_STATUS_SEC_JUMP_SLIP): a wire jump lands as the second jump does -- a triple is next (pass 66)
+                jumpChainStage = 2;
                 jumpChainTimer = JumpChainWindowFrames;
             }
             else if (airStateAtImpact == MarioState.singleJump)
@@ -8475,7 +8503,7 @@ public partial class Mario : CharacterBody3D
                     EnterWallSlide(preSlideVelocity);
                     return;
                 }
-                if (smsFwd > SmsParams.Mario.ClashSpeed)
+                if (smsFwd > SmsParams.Mario.ClashSpeed && _smsWireAir != SmsWireAir.RollJump) // jumpingCommonEvents case 2: WIRE_ROLL_JUMP never clash-crashes (pass 66)
                 {
                     SmsEnterBonk(-smsFace, velocity.Y, "air wall hit", smsFwd);
                     return;
@@ -11100,7 +11128,13 @@ public partial class Mario : CharacterBody3D
         // 'not holding' -> THROWN the next tick: dropped too. A type-3 hit standing still keeps it (pass 62)
         if (heldBody != null && (p.DownType != 3 || stateOfMario == MarioState.running || stateOfMario == MarioState.sprinting || stateOfMario == MarioState.walking))
             Anim_DetachPickup();
-        if (p.DownType != 3)
+        if (stateOfMario == MarioState.wire)
+        {
+            // MarioCollision.cpp 356: hit while held by a wire -> changePlayerDropping(WIRE_HANG_LAND_SAFE_DOWN): knocked off into the safe fall, no knockdown (pass 66)
+            SmsWireLetGo(true, "the hit");
+            what = "knocked off the wire into the safe fall";
+        }
+        else if (p.DownType != 3)
         {
             float fwd = SmsUnits.MpsToSpeed(new Vector3(velocity.X, 0f, velocity.Z).Dot(oldFace)); // mForwardVel, signed along the face
             if (fwd < p.MinSpeed)
@@ -11408,6 +11442,7 @@ public partial class Mario : CharacterBody3D
             case MarioState.ledgeDescend:
             case MarioState.fence:
             case MarioState.roofHang:
+            case MarioState.wire:
                 return; // the game excludes its swimming, fence and demo statuses; these are ours of that kind
         }
         SmsEnterSwimming(depthUnits);
@@ -16713,7 +16748,7 @@ public partial class Mario : CharacterBody3D
             case MarioState.bellyRollout: case MarioState.singleRollout: case MarioState.stomping: case MarioState.bonk:
             case MarioState.groundPoundStartup: case MarioState.groundPoundFalling:
             case MarioState.ledgeHang: case MarioState.ledgeClimb: case MarioState.ledgeHopUp: case MarioState.ledgeDescend: case MarioState.ledgeFall:
-            case MarioState.fence: case MarioState.roofHang: case MarioState.swimming: case MarioState.wallSlide: case MarioState.wallJump:
+            case MarioState.fence: case MarioState.roofHang: case MarioState.swimming: case MarioState.wallSlide: case MarioState.wallJump: case MarioState.wire:
             case MarioState.fluddRocket: case MarioState.treeGrab: case MarioState.treeWait: case MarioState.treeClimb: case MarioState.treeMoveL:
             case MarioState.treeMoveR: case MarioState.treeTopReach: case MarioState.shineGet: case MarioState.dead: case MarioState.talking:
                 return false;
@@ -16833,6 +16868,650 @@ public partial class Mario : CharacterBody3D
         }
         _smsRideApplied = false;
         _smsRideLocal = xf.AffineInverse() * GlobalPosition;
+    }
+
+    // ------------------------------------------------------------------------------------------------------------------------
+    // WIRE (pass 66): the tightropes. TMapWire / TMapWireActor live in SmsWire.cs; here Mario's WIRE_* statuses (MarioSpecial.cpp
+    // 649-1167: getOnWirePosAngle, wireMove, wireWait, wireSWait, the turns, changeWireHanging, the drops, wireReturn, wireHanging,
+    // wireRolling), the grab (MarioReceiveMsg.cpp 319-371), the jumps (MarioMove.cpp 608-642, MarioJump.cpp 1022-1035), the rope
+    // spring (specMain, 1532-1545). The game's per-frame quantities run per 120 Hz tick at a quarter (SmsUnits.TicksPerFrame); the
+    // angles stay in the game's BAM (32768 = a half turn). Sounds (ROPE_JUMP_A/B/C, the swing's, the creaks) are not ported.
+    // ------------------------------------------------------------------------------------------------------------------------
+    private const float SmsBamPerRad = 32768f / MathF.PI;
+
+    private static float SmsWrapBam(float bam)
+    {
+        bam %= 65536f;
+        if (bam >= 32768f) bam -= 65536f;
+        if (bam < -32768f) bam += 65536f;
+        return bam;
+    }
+
+    private Vector3 SmsWireAlong()
+    {
+        Vector3 d = new Vector3(_smsWireEnd.X - _smsWireStart.X, 0f, _smsWireEnd.Z - _smsWireStart.Z);
+        return d.LengthSquared() > 1e-10f ? d.Normalized() : Vector3.Forward;
+    }
+
+    /// <summary>The heading + 0x4000: the game's forward is (sin a, cos a), so a quarter turn on is (cos a, -sin a) = (along.z, -along.x).</summary>
+    private static Vector3 SmsWirePerp(Vector3 along) => new Vector3(along.Z, 0f, -along.X);
+
+    /// <summary>The wire actor's hit (MarioReceiveMsg.cpp 319-371), run every frame like the manager's doActorToWire: his position inside a
+    /// wire's cube, not held, and not WIRE_JUMP / WIRE_ROLL_JUMP going up nor the let-go fall -> the grab: the tips copied, his ratio,
+    /// bounceVel = 0.2 x -vy, sag 0; falling onto it -> WIRE_WAIT on top; rising into it, or from a roll jump or a dive (JUMP_CATCH) ->
+    /// hanging under; the ends swapped so his facing agrees with his travel. While held, the wire's hang point is his root every frame
+    /// (the V under his feet / at his hands); a stick drop keeps the holder until his position leaves the cube.</summary>
+    private void SmsWireCheck()
+    {
+        if (!UseSmsPhysics)
+            return;
+        if (_smsWireAir != SmsWireAir.None && stateOfMario != MarioState.wire && IsOnFloor() && stateOfMario != MarioState.singleJump)
+            _smsWireAir = SmsWireAir.None; // the jumping-type wire statuses end with the landing
+        Vector3 root = SmsFeet();
+        if (stateOfMario == MarioState.wire)
+        {
+            if (_smsWireNode != null && IsInstanceValid(_smsWireNode))
+                _smsWireNode.SetHang(root);
+            return;
+        }
+        if (_smsWireNode != null)
+        {
+            // startHangLanding's stick drop sends no message 8: the actor keeps him until his position leaves the cube (doActorToWire)
+            if (!IsInstanceValid(_smsWireNode) || !_smsWireNode.InCube(root) || IsOnFloor())
+                SmsWireReleaseHolder("left the cube");
+            else
+                _smsWireNode.SetHang(root);
+            return;
+        }
+        if (stateOfMario == MarioState.dead || stateOfMario == MarioState.talking || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.swimming)
+            return;
+        SmsWire w = SmsWireMap.InCube(root);
+        if (w == null)
+            return;
+        float vy = SmsUnits.MpsToSpeed(velocity.Y);
+        if (_smsWireAir == SmsWireAir.Jump && vy > 0f)
+            return;
+        if (_smsWireAir == SmsWireAir.RollJump && vy > 0f)
+            return;
+        if (_smsWireAir == SmsWireAir.SafeDown)
+            return;
+        bool dive = stateOfMario == MarioState.diving || stateOfMario == MarioState.singleJumpDive || stateOfMario == MarioState.doubleJumpDive || stateOfMario == MarioState.tripleJumpDive;
+        bool flipDir = _smsWireAir == SmsWireAir.RollJump || dive || vy >= 0f;
+        if (flipDir && heldBody != null)
+            return; // changeWireHanging() with a held object -> LANDING: he does not hang on (the holder it leaves set is not modelled)
+        _smsWireNode = w;
+        _smsWireStart = w.StartPoint;
+        _smsWireEnd = w.EndPoint;
+        _smsWirePosRatio = w.PosInWire(root);
+        SmsWireMove(0f);
+        _smsWireJumpLatch = false;
+        Vector3 along = SmsWireAlong();
+        float faceYaw = _smsFaceValid ? _smsFaceYaw : SmsMath.YawFromDir(SmsFacingOrVelocityDir());
+        float dirToEnd = SmsMath.WrapAngle(SmsMath.YawFromDir(along) - faceYaw); // (s16)(matan(span.z, span.x) - mFaceAngle.y)
+        _smsWireBounceVel = SmsParams.Wire.GrabBounceSeed * -vy;
+        _smsWireSag = 0f;
+        _smsWireAir = SmsWireAir.None;
+        if (flipDir)
+        {
+            if (dirToEnd > 0f)
+                SmsWireSwapEnds();
+            SmsWireEnter(SmsWireState.Hanging, $"rising into it (vy {vy:F1}): hanging under");
+        }
+        else
+        {
+            if (dirToEnd <= -MathF.PI * 0.5f || dirToEnd > MathF.PI * 0.5f)
+                SmsWireSwapEnds();
+            SmsWireEnter(SmsWireState.Wait, $"falling onto it (vy {vy:F1}): on top, bounce charge {_smsWireBounceVel:F1}");
+        }
+    }
+
+    private void SmsWireSwapEnds()
+    {
+        (_smsWireStart, _smsWireEnd) = (_smsWireEnd, _smsWireStart);
+        _smsWirePosRatio = 1f - _smsWirePosRatio;
+    }
+
+    /// <summary>message 8 to the holder then mHolder = nullptr: the wire releases with his velocity (its bounce's amplitude).</summary>
+    private void SmsWireReleaseHolder(string why)
+    {
+        if (_smsWireNode != null && IsInstanceValid(_smsWireNode))
+            _smsWireNode.Release(SmsUnits.MpsToSpeed(1f) * velocity);
+        _smsWireNode = null;
+        if (SmsDebugPrint)
+            GD.Print($"[SMS wire] let go of the wire ({why})");
+    }
+
+    /// <summary>wireMove(dist): his ratio on by dist / the chord's length, no closer than 100 units to a tip; false when it clamped.</summary>
+    private bool SmsWireMove(float units)
+    {
+        float len = SmsUnits.MetresToUnits((_smsWireEnd - _smsWireStart).Length());
+        if (len < 1f)
+            return false;
+        float delta = units / len, margin = SmsParams.Wire.EndMargin / len;
+        bool clean = true;
+        if (_smsWirePosRatio + delta > 1f - margin)
+        {
+            _smsWirePosRatio = 1f - margin;
+            clean = false;
+        }
+        if (_smsWirePosRatio + delta < margin)
+        {
+            _smsWirePosRatio = margin;
+            clean = false;
+        }
+        if (clean)
+            _smsWirePosRatio += delta;
+        return clean;
+    }
+
+    /// <summary>changePlayerStatus(a WIRE status) from off the wire: everything else over, velocity 0, the sub-status, the first pose.</summary>
+    private void SmsWireEnter(SmsWireState st, string why)
+    {
+        if (heldBody != null && st == SmsWireState.Hanging)
+            Anim_DetachPickup();
+        ledgePinned = false;
+        _smsHangMovingAnim = false;
+        _smsLongFallAnim = false;
+        _smsFallCancel = false;
+        _fluddDashAnimOn = false;
+        isJumping = false;
+        jumpBuffer = 0;
+        StopWaistIKHard();
+        isSpining(false);
+        velocity = Vector3.Zero;
+        Velocity = Vector3.Zero;
+        _smsTrueVyValid = false;
+        _smsWireAngVel = 0f;
+        _smsWirePitch = 0f;
+        _smsWireRollState = 0;
+        _smsWireAnim = "";
+        stateOfMario = MarioState.wire;
+        _smsWire = st;
+        Vector3 along = SmsWireAlong();
+        if (st == SmsWireState.Hanging)
+            SmsWirePose(SmsWirePerp(along), along, 0f);
+        else
+            SmsWirePose(along, along, 0f);
+        _smsWireNode?.SetHang(SmsFeet()); // the V under him from this frame
+        if (SmsDebugPrint)
+            GD.Print($"[SMS wire] on the wire: {st} -- {why}; ratio {_smsWirePosRatio:F3}");
+    }
+
+    /// <summary>getOnWirePosAngle: his root = the chord point at his ratio, StandHeight (160) under it, plus (0, -mWireSag, 0) turned by
+    /// his pitch (the swing) then his control yaw: -sag cos(pitch) up, -sag sin(pitch) along the face. The model faces modelDir, pitched by
+    /// the swing about its own X (the game's forward is +Z, the port's -Z: the Godot pitch is the negative).</summary>
+    private void SmsWirePose(Vector3 faceDir, Vector3 modelDir, float pitchBam)
+    {
+        Vector3 p = _smsWireStart + (_smsWireEnd - _smsWireStart) * _smsWirePosRatio;
+        p.Y -= SmsUnits.UnitsToMetres(SmsParams.Wire.StandHeight);
+        float pitch = pitchBam / SmsBamPerRad;
+        float sag = SmsUnits.UnitsToMetres(_smsWireSag);
+        p += Vector3.Up * (-sag * MathF.Cos(pitch)) + faceDir * (-sag * MathF.Sin(pitch));
+        GlobalPosition = new Vector3(p.X, p.Y + SmsFeetOffset(), p.Z);
+        velocity = Vector3.Zero;
+        Velocity = Vector3.Zero;
+        _smsTrueVyValid = false;
+        SmsLatchFace(faceDir, 1);
+        lastFacingDirection = modelDir;
+        armature.Rotation = new Vector3(-pitch, YawFromDir(modelDir), 0f);
+    }
+
+    /// <summary>setAnimation(clip, rate) for the rope clips (library-only, like the fence's): driven directly, the tree back with the next
+    /// SetMarioState. A one-shot is left finished for SmsWireClipDone(); reverse plays the clip backwards (setReverseAnimation).</summary>
+    private void SmsWirePlay(string anim, float rate, bool loop, bool reverse = false)
+    {
+        if (animTree != null)
+            animTree.Active = false;
+        animPlayer.SpeedScale = MathF.Max(rate, 0f);
+        if (_smsWireAnim != anim || (loop && !animPlayer.IsPlaying()))
+        {
+            _smsWireAnim = anim;
+            if (animPlayer.HasAnimation(anim))
+            {
+                Animation a = animPlayer.GetAnimation(anim);
+                if (a != null)
+                    a.LoopMode = loop ? Animation.LoopModeEnum.Linear : Animation.LoopModeEnum.None;
+                if (reverse)
+                    animPlayer.PlayBackwards(anim);
+                else
+                    animPlayer.Play(anim);
+            }
+        }
+    }
+
+    private bool SmsWireClipDone() => !(animPlayer.IsPlaying() && animPlayer.CurrentAnimation == _smsWireAnim);
+
+    /// <summary>roof - floor >= 160 (wireHanging's b, mFloorPosition.x - .y): room to stand back up on the rope.</summary>
+    private bool SmsWireHeadroom()
+    {
+        Vector3 feet = SmsFeet();
+        float floorY = SmsFloorYBelow(4000f, out float fy) ? fy : feet.Y - SmsUnits.UnitsToMetres(4000f);
+        float roofY = SmsRay(feet + Vector3.Up * 0.02f, feet + Vector3.Up * SmsUnits.UnitsToMetres(4000f), out var hit) ? ((Vector3)hit["position"]).Y : feet.Y + SmsUnits.UnitsToMetres(4000f);
+        return SmsUnits.MetresToUnits(roofY - floorY) >= SmsParams.Wire.ReturnHeadroom;
+    }
+
+    /// <summary>The swing impulse of the nozzle he is pumping (wireHanging / wireRolling): rocket / turbo 1400, hover 8, the spray -8 (BAM a frame).</summary>
+    private float SmsWireRotSpeed() => _fluddNozzle switch
+    {
+        SmsNozzle.Rocket => SmsParams.Wire.RotSpeedTrgRocket,
+        SmsNozzle.Hover => SmsParams.Wire.RotSpeedTrgHover,
+        SmsNozzle.Turbo => SmsParams.Wire.RotSpeedTrgTurbo,
+        _ => SmsParams.Wire.RotSpeed,
+    };
+
+    private bool SmsWirePumping() => _fluddUpper == SmsUpper.Pumping && SmsFluddCanSpray();
+
+    /// <summary>specMain() + the WIRE status of the moment, once a frame (per tick at a quarter): the rope spring first -- bounceVelPrev =
+    /// bounceVel; bounceVel -= sag x SwingRate; sag += bounceVel; sag x= SwingBrake; |sag| <= SwingMax -- then the status.</summary>
+    private void SmsTickWire(double delta, Vector3 stickDir)
+    {
+        if (_smsWireNode == null || !IsInstanceValid(_smsWireNode))
+        {
+            SmsWireLetGo(false, "the wire is gone");
+            return;
+        }
+        int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
+        bool aPressed = Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space");
+        bool bPressed = Input.IsActionJustPressed("button_b");
+        bool rHeld = Input.IsActionPressed("button_r");
+        bool stick = stickDir.LengthSquared() > 1e-6f && _smsIntendedMag > 0f; // mInput & 1
+        float intendedYaw = stick ? SmsMath.YawFromDir(stickDir) : 0f;
+        float q = 1f / SmsUnits.TicksPerFrame;
+        for (int i = 0; i < n; i++)
+        {
+            // specMain(): the rope spring under him (per tick at a quarter: the velocity's step and the sag's; the damping's root)
+            _smsWireBounceVelPrev = _smsWireBounceVel;
+            _smsWireBounceVel -= _smsWireSag * SmsParams.Wire.SwingRate * q;
+            _smsWireSag += _smsWireBounceVel * q;
+            _smsWireSag *= MathF.Pow(SmsParams.Wire.SwingBrake, q);
+            _smsWireSag = Mathf.Clamp(_smsWireSag, -SmsParams.Wire.SwingMax, SmsParams.Wire.SwingMax);
+            bool first = i == 0;
+            Vector3 along = SmsWireAlong();
+            float alongYaw = SmsMath.YawFromDir(along);
+            Vector3 perp = SmsWirePerp(along);
+            switch (_smsWire)
+            {
+                case SmsWireState.Wait:
+                {
+                    // wireWait: A latches; the jump goes when the rope is at or above its rest (sag <= 0); B drops to the hang; the stick
+                    // within 45 deg of the heading walks (0.1 x the counts a frame; ROPE_RUN above 16 counts, else ROPE_WALK, at 0.05 x
+                    // the counts), beyond it turns sideways (L / R); no stick: ROPE_WAIT
+                    SmsWirePose(along, along, 0f);
+                    if (first && aPressed)
+                        _smsWireJumpLatch = true;
+                    if (_smsWireJumpLatch && _smsWireSag <= 0f)
+                    {
+                        SmsWireJumpOff(false);
+                        return;
+                    }
+                    if (first && bPressed)
+                    {
+                        _smsWireBounceVel = SmsParams.Wire.DropBounceVel;
+                        _smsWire = SmsWireState.WaitToHang;
+                        _smsWireAnim = "";
+                        break;
+                    }
+                    if (stick)
+                    {
+                        float diff = SmsMath.WrapAngle(alongYaw - intendedYaw);
+                        if (diff > -MathF.PI * 0.25f && diff < MathF.PI * 0.25f)
+                        {
+                            float rate = SmsParams.Wire.WalkAnimRatePerMag * _smsIntendedMag;
+                            if (SmsWireMove(SmsParams.Wire.WalkSpeedPerMag * _smsIntendedMag * q))
+                                SmsWirePlay(_smsIntendedMag > SmsParams.Wire.RunMagThreshold ? "ma_rope_run" : "ma_rope_walk", rate, true);
+                            else
+                                SmsWirePlay("ma_rope_wait", 1f, true);
+                        }
+                        if (diff < -MathF.PI * 0.25f)
+                        {
+                            _smsWire = SmsWireState.WaitToSWaitL;
+                            _smsWireAnim = "";
+                            break;
+                        }
+                        if (diff > MathF.PI * 0.25f)
+                        {
+                            _smsWire = SmsWireState.WaitToSWaitR;
+                            _smsWireAnim = "";
+                            break;
+                        }
+                    }
+                    else
+                        SmsWirePlay("ma_rope_wait", 1f, true);
+                    break;
+                }
+                case SmsWireState.SWait:
+                {
+                    // wireSWait: sideways on the rope -- the model along it, the control face a quarter turn on; A latches, the jump
+                    // needs sag < 0 and adds 5 x -bounceVelPrev (no base: the game's quirk); the stick within 90 deg of the heading
+                    // turns back (L), beyond it swaps the ends and turns back (R); the drop's input bit (0x10000) is never set by the pad
+                    SmsWirePose(perp, along, 0f);
+                    if (first && aPressed)
+                        _smsWireJumpLatch = true;
+                    if (_smsWireJumpLatch && _smsWireSag < 0f)
+                    {
+                        SmsWireJumpOff(true);
+                        return;
+                    }
+                    if (stick)
+                    {
+                        float diff = SmsMath.WrapAngle(intendedYaw - alongYaw);
+                        if (diff > -MathF.PI * 0.5f && diff < MathF.PI * 0.5f)
+                            _smsWire = SmsWireState.SWaitToWaitL;
+                        else
+                        {
+                            SmsWireSwapEnds();
+                            _smsWire = SmsWireState.SWaitToWaitR;
+                        }
+                        _smsWireAnim = "";
+                        break;
+                    }
+                    SmsWirePlay("ma_rope_swait", 1f, true);
+                    break;
+                }
+                case SmsWireState.WaitToSWaitL:
+                case SmsWireState.WaitToSWaitR:
+                {
+                    bool right = _smsWire == SmsWireState.WaitToSWaitR;
+                    SmsWirePose(right ? -perp : perp, along, 0f);
+                    SmsWirePlay(right ? "ma_rope_wtosw_r" : "ma_rope_wtosw", 1f, false);
+                    if (SmsWireClipDone())
+                    {
+                        _smsWire = SmsWireState.SWait;
+                        _smsWireAnim = "";
+                        if (right)
+                            SmsWireSwapEnds(); // wireWaitToSWaitR: the ends swapped as the turn lands
+                    }
+                    break;
+                }
+                case SmsWireState.SWaitToWaitL:
+                case SmsWireState.SWaitToWaitR:
+                {
+                    bool right = _smsWire == SmsWireState.SWaitToWaitR;
+                    SmsWirePose(right ? -perp : perp, along, 0f);
+                    SmsWirePlay(right ? "ma_rope_wtosw_r" : "ma_rope_wtosw", 1f, false, reverse: true); // setReverseAnimation
+                    if (SmsWireClipDone())
+                    {
+                        _smsWire = SmsWireState.Wait;
+                        _smsWireAnim = "";
+                    }
+                    break;
+                }
+                case SmsWireState.WaitToHang:
+                case SmsWireState.SWaitToHang:
+                {
+                    // the drop clip (ROPE_WHG / ROPE_SWHG) carries the body from above the root to below it; at its end: hanging (or a
+                    // plain fall with a held object)
+                    bool side = _smsWire == SmsWireState.SWaitToHang;
+                    if (side)
+                        SmsWirePose(along, along, 0f);
+                    else
+                        SmsWirePose(perp, along, 0f);
+                    SmsWirePlay(side ? "ma_rope_swhg" : "ma_rope_whg", 1f, false);
+                    if (SmsWireClipDone())
+                    {
+                        if (heldBody == null)
+                        {
+                            _smsWire = SmsWireState.Hanging;
+                            _smsWireAnim = "";
+                        }
+                        else
+                        {
+                            SmsWireLetGo(false, "drop to hang with a held object: LANDING");
+                            return;
+                        }
+                    }
+                    break;
+                }
+                case SmsWireState.Return:
+                {
+                    SmsWirePose(along, along, 0f);
+                    SmsWirePlay("ma_rope_return", 1f, false);
+                    if (SmsWireClipDone())
+                    {
+                        _smsWire = SmsWireState.Wait;
+                        _smsWireAnim = "";
+                    }
+                    break;
+                }
+                case SmsWireState.Hanging:
+                {
+                    // wireHanging: A with headroom -> the climb (bounceVel 5); B -> let go (message 8, the safe fall); the stick: toward the
+                    // end (within -45 .. +75 deg of the heading) 3 units a frame hand over hand (ROPE_HMOVR), toward the start (beyond
+                    // -135 / +105) ROPE_HMOVL, across one way (-135 .. -45) the climb, across the other (75 .. 105) the drop; no stick and
+                    // the pump spraying -> the swing: angVel kicked 2 x RotStop toward the nozzle's impulse, plus the impulse -> ROLLING
+                    _smsWireAngVel = 0f;
+                    _smsWirePitch = 0f;
+                    SmsWirePose(perp, along, 0f);
+                    if (first && aPressed && SmsWireHeadroom())
+                    {
+                        _smsWireBounceVel = SmsParams.Wire.DropBounceVel;
+                        _smsWire = SmsWireState.Return;
+                        _smsWireAnim = "";
+                        break;
+                    }
+                    if (first && bPressed)
+                    {
+                        SmsWireReleaseHolder("B: let go");
+                        SmsWireStartHangLanding("B while hanging");
+                        return;
+                    }
+                    if (stick)
+                    {
+                        float diff = SmsMath.WrapAngle(alongYaw - intendedYaw);
+                        float d45 = MathF.PI * 0.25f, d75 = MathF.PI * 0x3555 / 32768f, d105 = MathF.PI * 0x4AAA / 32768f, d135 = MathF.PI * 0.75f;
+                        if (diff > -d45 && diff < d75)
+                            SmsWirePlay(SmsWireMove(SmsParams.Wire.HandMoveSpeed * q) ? "ma_rope_hmovr" : "ma_rope_hgwat", 1f, true);
+                        if (diff < -d135 || diff > d105)
+                            SmsWirePlay(SmsWireMove(-SmsParams.Wire.HandMoveSpeed * q) ? "ma_rope_hmovl" : "ma_rope_hgwat", 1f, true);
+                        if (diff >= -d135 && diff <= -d45)
+                        {
+                            _smsWireBounceVel = SmsParams.Wire.DropBounceVel;
+                            _smsWire = SmsWireState.Return;
+                            _smsWireAnim = "";
+                            break;
+                        }
+                        if (diff >= d75 && diff <= d105)
+                        {
+                            SmsWireStartHangLanding("the stick across: the drop (the holder stays until he leaves the cube)");
+                            return;
+                        }
+                        break;
+                    }
+                    if (SmsWirePumping())
+                    {
+                        float rotSp = SmsWireRotSpeed();
+                        _smsWireAngVel += (rotSp > 0f ? 2f : -2f) * SmsParams.Wire.RotStop;
+                        _smsWireAngVel += rotSp;
+                        _smsWire = SmsWireState.Rolling;
+                        _smsWireAnim = "";
+                        if (SmsDebugPrint)
+                            GD.Print($"[SMS wire] the pump swings him: ROLLING, angular speed {_smsWireAngVel:F0} BAM a frame ({_fluddNozzle})");
+                        break;
+                    }
+                    SmsWirePlay("ma_rope_hgwat", 1f, true);
+                    break;
+                }
+                case SmsWireState.Rolling:
+                {
+                    // wireRolling: the pendulum. A arms the release: swinging one way (angVel < 0) through (-0x2000, max - 0x2000] ->
+                    // ROLL_JUMP 0, the other (angVel > 0) through [0x6000 - max, 0x6000) -> ROLL_JUMP 1. The stick still moves him along.
+                    // The pump adds its impulse; gravity -RotGravity x sin(angle); R held brakes x RotBrake; |angVel| <= RotSpeedMax;
+                    // angle += angVel; sag = 0.1 x |angVel|, bounceVel 0. Settled (|angle| < 0x200, |angVel| < RotStop) -> hanging. The
+                    // model faces a quarter turn on (ANIM_HANG, the ledge hang's two-handed grip) and pitches with the swing.
+                    float initial = _smsWirePitch;
+                    if (first && aPressed)
+                        _smsWireRollState |= 1;
+                    float max = SmsParams.Wire.RotSpeedMax;
+                    if ((_smsWireRollState & 1) != 0 && _smsWireAngVel < 0f && _smsWirePitch > -SmsParams.Wire.RollReleaseWindow && _smsWirePitch <= max - SmsParams.Wire.RollReleaseWindow)
+                    {
+                        SmsWireRollJumpOff(0);
+                        return;
+                    }
+                    if ((_smsWireRollState & 1) != 0 && _smsWireAngVel > 0f && _smsWirePitch >= SmsParams.Wire.RollJumpAngleBack - max && _smsWirePitch < SmsParams.Wire.RollJumpAngleBack)
+                    {
+                        SmsWireRollJumpOff(1);
+                        return;
+                    }
+                    if (stick)
+                    {
+                        float diff = SmsMath.WrapAngle(alongYaw - intendedYaw);
+                        float d45 = MathF.PI * 0.25f, d75 = MathF.PI * 0x3555 / 32768f, d105 = MathF.PI * 0x4AAA / 32768f, d135 = MathF.PI * 0.75f;
+                        if (diff > -d45 && diff < d75)
+                            SmsWireMove(SmsParams.Wire.HandMoveSpeed * q);
+                        if (diff < -d135 || diff > d105)
+                            SmsWireMove(-SmsParams.Wire.HandMoveSpeed * q);
+                    }
+                    if (SmsWirePumping())
+                        _smsWireAngVel += SmsWireRotSpeed() * q;
+                    _smsWireAngVel -= SmsParams.Wire.RotGravity * MathF.Sin(_smsWirePitch / SmsBamPerRad) * q;
+                    if (rHeld)
+                        _smsWireAngVel *= MathF.Pow(SmsParams.Wire.RotBrake, q);
+                    _smsWireAngVel = Mathf.Clamp(_smsWireAngVel, -max, max);
+                    _smsWirePitch = SmsWrapBam(_smsWirePitch + _smsWireAngVel * q);
+                    _smsWireSag = 0.1f * MathF.Abs(_smsWireAngVel);
+                    _smsWireBounceVel = 0f;
+                    if (initial < -0x4000 && _smsWirePitch > 0x4000)
+                        _smsWireRollState |= 2; // over the top (the full-loop sounds' flag)
+                    else if (initial < _smsWirePitch)
+                        _smsWireRollState &= ~2;
+                    if (_smsWirePitch > -SmsParams.Wire.SettleAngle && _smsWirePitch < SmsParams.Wire.SettleAngle
+                        && _smsWireAngVel > -SmsParams.Wire.RotStop && _smsWireAngVel < SmsParams.Wire.RotStop)
+                    {
+                        _smsWirePitch = 0f;
+                        _smsWireAngVel = 0f;
+                        _smsWireBounceVel = 0f;
+                        _smsWireSag = 0f;
+                        _smsWireRollState = 0;
+                        if (heldBody == null)
+                        {
+                            _smsWire = SmsWireState.Hanging;
+                            _smsWireAnim = "";
+                            SmsWirePose(perp, along, 0f);
+                            break;
+                        }
+                        SmsWireLetGo(false, "the swing settled with a held object: LANDING");
+                        return;
+                    }
+                    SmsWirePose(perp, perp, _smsWirePitch);
+                    SmsWirePlay("ma_hang", 1f, true);
+                    break;
+                }
+            }
+        }
+    }
+
+    /// <summary>wireWait's jump (wireSWait's for the sideways stance): message 8, WIRE_JUMP -- setPlayerJumpSpeed(0.25, 42) with fwd 0 then
+    /// setPlayerVelocity(0), vy += JumpMult x -bounceVel when the rope is moving up, + JumpBase 25 (the sideways jump: 5 x -bounceVelPrev,
+    /// no base); the clip ANIM_JUMP, weak air steering (0.01), no fall cancel; it lands in SEC_JUMP_SLIP (a triple is next).</summary>
+    private void SmsWireJumpOff(bool fromSWait)
+    {
+        Vector3 along = SmsWireAlong();
+        Vector3 face = fromSWait ? SmsWirePerp(along) : along;
+        float vy = SmsParams.Wire.WireJumpVy;
+        if (!fromSWait)
+        {
+            if (_smsWireBounceVel < 0f)
+                vy -= SmsParams.Wire.JumpMult * _smsWireBounceVel;
+            vy += SmsParams.Wire.JumpBase;
+        }
+        else if (_smsWireBounceVelPrev < 0f)
+            vy -= 5f * _smsWireBounceVelPrev;
+        _smsWireJumpLatch = false;
+        SmsWireExit();
+        velocity = new Vector3(0f, SmsUnits.SpeedToMps(vy), 0f);
+        SmsLatchFace(face, 2);
+        lastFacingDirection = face;
+        armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
+        _smsTrueVyValid = false;
+        _smsNoLandFrames = 3;
+        _smsFallCancel = false;
+        _smsWireAir = SmsWireAir.Jump;
+        stateOfMario = MarioState.singleJump;
+        SetMarioState(stateOfMario);
+        SmsWireReleaseHolder($"the jump: vy {vy:F1} (bounce {_smsWireBounceVel:F1}, prev {_smsWireBounceVelPrev:F1})");
+    }
+
+    /// <summary>WIRE_ROLL_JUMP (MarioMove.cpp 620-642): power = angVel x JumpRate; arg 0: vy = power sin(0xE000), fwd = power -cos(0xE000)
+    /// along the control face (a quarter turn on from the rope); arg 1 the same at 0x6000. The clip: ANIM_GIANT_ROLLING (0) / ANIM_ROLL (1)
+    /// -- the port's ma_roll for both (no giant rolling clip in the library); it lands in SEC_JUMP_SLIP and never clash-crashes.</summary>
+    private void SmsWireRollJumpOff(int arg)
+    {
+        Vector3 along = SmsWireAlong();
+        Vector3 face = SmsWirePerp(along);
+        float power = _smsWireAngVel * SmsParams.Wire.JumpRate;
+        float ang = (arg == 0 ? SmsParams.Wire.RollJumpAngleFwd : SmsParams.Wire.RollJumpAngleBack) / SmsBamPerRad;
+        float vy = power * MathF.Sin(ang);
+        float fwd = power * -MathF.Cos(ang);
+        SmsWireExit();
+        float mps = SmsUnits.SpeedToMps(fwd);
+        velocity = new Vector3(face.X * mps, SmsUnits.SpeedToMps(vy), face.Z * mps);
+        SmsLatchFace(face, 2);
+        lastFacingDirection = face;
+        armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
+        _smsTrueVyValid = false;
+        _smsNoLandFrames = 3;
+        _smsFallCancel = false;
+        _smsWireAir = SmsWireAir.RollJump;
+        stateOfMario = MarioState.singleJump;
+        SetMarioState(stateOfMario);
+        if (_sm != null && animTree != null && animPlayer.HasAnimation("ma_roll"))
+            _sm.Travel("ma_roll");
+        SmsWireReleaseHolder($"the roll jump {arg}: power {power:F1} -> vy {vy:F1} fwd {fwd:F1}");
+    }
+
+    /// <summary>startHangLanding(WIRE_HANG_LAND_SAFE_DOWN): velocity 0, 60 units back along the face, onto the ground within 100 units or
+    /// 100 down, then the let-go fall (landSafeDown: ANIM_LAND into LAND_SLIP). The port's LAND_SAFE_DOWN is the ledgeFall with
+    /// _smsHangDropFall; the wire's own flag keeps it from re-grabbing on the way down.</summary>
+    private void SmsWireStartHangLanding(string why)
+    {
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+        SmsWireExit();
+        Vector3 feet = SmsFeet() - face * SmsUnits.UnitsToMetres(60f);
+        float y = feet.Y;
+        if (SmsFloorYBelow(4000f, out float groundY) && groundY >= feet.Y - SmsUnits.UnitsToMetres(100f))
+            y = groundY;
+        else
+            y -= SmsUnits.UnitsToMetres(100f);
+        GlobalPosition = new Vector3(feet.X, y + SmsFeetOffset(), feet.Z);
+        velocity = Vector3.Zero;
+        _smsTrueVyValid = false;
+        lastFacingDirection = face;
+        SmsLatchFace(face, 2);
+        armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
+        _smsHangDropFall = true;
+        _smsWireAir = SmsWireAir.SafeDown;
+        stateOfMario = MarioState.ledgeFall;
+        SetMarioState(stateOfMario);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS wire] off the wire into the safe fall ({why})");
+    }
+
+    /// <summary>Off the wire into a plain fall (changePlayerStatus(LANDING) in the game's held-object branches, or the wire vanishing).</summary>
+    private void SmsWireLetGo(bool landSafeDown, string why)
+    {
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+        SmsWireExit();
+        SmsWireReleaseHolder(why);
+        velocity = Vector3.Zero;
+        _smsTrueVyValid = false;
+        _smsHangDropFall = landSafeDown;
+        _smsWireAir = landSafeDown ? SmsWireAir.SafeDown : SmsWireAir.None;
+        lastFacingDirection = face;
+        SmsLatchFace(face, 2);
+        armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
+        stateOfMario = MarioState.ledgeFall;
+        SetMarioState(stateOfMario);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS wire] off the wire ({why}): {(landSafeDown ? "LAND_SAFE_DOWN" : "LANDING")}");
+    }
+
+    private void SmsWireExit()
+    {
+        _smsWireAnim = "";
+        animPlayer.SpeedScale = 1f;
+        _smsWirePitch = 0f;
+        _smsWireAngVel = 0f;
+        _smsWireRollState = 0;
     }
 
     private void Respawn()
@@ -17761,7 +18440,8 @@ public partial class Mario : CharacterBody3D
             float sumSide = 0f;
             for (int i = 0; i < n; i++)
             {
-                SmsAir.Tick(ref fwd, ref vy, out float side, out float mv, 0f, d, stick ? _smsIntendedMag : 0f, aHeld, cancel, gmode);
+                SmsAir.Tick(ref fwd, ref vy, out float side, out float mv, 0f, d, stick ? _smsIntendedMag : 0f, aHeld, cancel, gmode,
+                    _smsWireAir == SmsWireAir.Jump ? SmsParams.Wire.JumpAccelControl : SmsParams.Jump.JumpAccelControl); // getJumpAccelControl() (pass 66)
                 sumSide += side;
                 sumMoveVy += mv;
             }

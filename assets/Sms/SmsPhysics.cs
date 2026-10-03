@@ -328,6 +328,51 @@ public static class SmsParams
         public const int FogTimeRed = 360;              // the fog is the damage pink below; 1 HP as the timer passes this mark; the cycle is Yellow + Red = 600
     }
 
+    public static class Wire // /mario/wire.prm (shipped) + TMapWire's statics (MapWire.cpp 30-38) + the literals of the WIRE execs (pass 66)
+    {
+        public const float RotSpeed = -8f;              // mRotSpeed: the spray nozzle's swing impulse (BAM a frame) while hanging
+        public const float RotSpeedTrgHover = 8f;       // mRotSpeedTrgHover
+        public const float RotSpeedTrgTurbo = 1400f;    // mRotSpeedTrgTurbo (default 1000)
+        public const float RotSpeedTrgRocket = 1400f;   // mRotSpeedTrgRocket (default 1000)
+        public const float RotSpeedMax = 1400f;         // mRotSpeedMax: the swing's angular speed cap (BAM a frame; 0x578)
+        public const float RotStop = 100f;              // mRotStop: the settle window; 2x it is the entry kick
+        public const float RotGravity = 20f;            // mRotGravity: the restoring torque x sin(angle) (BAM a frame^2)
+        public const float RotBrake = 0.98f;            // mRotBrake: R held multiplies the angular speed a frame
+        public const float JumpRate = 0.09f;            // mJumpRate: roll jump power = angular speed x this
+        public const float SwingRate = 0.005f;          // mSwingRate: the rope spring's stiffness (specMain: bounceVel -= sag x this a frame)
+        public const float JumpAccelControl = 0.01f;    // mWireJumpAccelControl: the WIRE_JUMP's air steering
+        public const float JumpSlideControl = 0.3f;     // mWireJumpSlideControl
+        public const float JumpMult = 3.0f;             // mWireJumpMult (default 5): vy += this x -bounceVel when the rope is moving up
+        public const float JumpBase = 25f;              // mWireJumpBase (default 20): added to the WIRE_JUMP's 42
+        public const float SwingBrake = 0.99f;          // mWireSwingBrake: the spring's damping a frame
+        public const float SwingMax = 200f;             // mWireSwingMax: the sag's clamp (units)
+        public const float StandHeight = 160f;          // getOnWirePosAngle: his root this far under the chord point (the rope's give under him)
+        public const float EndMargin = 100f;            // wireMove: no closer than this to a tip (units)
+        public const float WalkSpeedPerMag = 0.1f;      // wireWait: units a frame per stick count
+        public const float WalkAnimRatePerMag = 0.05f;  // wireWait: the walk / run clip rate per stick count
+        public const float RunMagThreshold = 16f;       // wireWait: ROPE_RUN above this stick magnitude, ROPE_WALK below
+        public const float GrabBounceSeed = 0.2f;       // receiveMessage: bounceVel = this x -vy at the grab
+        public const float HandMoveSpeed = 3f;          // wireHanging: units a frame hand over hand
+        public const float DropBounceVel = 5f;          // the bounce charge set by the drop / the climb
+        public const float ReturnHeadroom = 160f;       // wireHanging: roof - floor must be at least this for the climb back up
+        public const float WireJumpVy = 42f;            // changePlayerStatus(WIRE_JUMP): setPlayerJumpSpeed(0.25, 42) with fwd 0
+        public const float RollJumpAngleFwd = 0xE000;   // WIRE_ROLL_JUMP arg 0: launch angle (BAM)
+        public const float RollJumpAngleBack = 0x6000;  // arg 1
+        public const float RollReleaseWindow = 0x2000;  // wireRolling: the release windows about -0x2000 / 0x6000
+        public const float SettleAngle = 0x200;         // wireRolling: |angle| under this and |speed| under RotStop -> hanging again
+        // TMapWire statics
+        public const float MoveTimerSpeed = 0.03f;      // the released bounce's phase a frame (cos(timer x pi))
+        public const float DownRateMax = 0.003f;        // its decay base
+        public const float EndRate = 0.001f;            // it ends under this power
+        public const float StretchRate = 2.0f;          // decay = DownRateMax x this x |hangPos - 0.5|
+        public const float HeightRate = 1.3f;           // amplitude = this x his launch speed (going up)
+        public const float ReleaseHeight = 100f;        // amplitude when he left going down
+        public const float FootLength = 26f;            // the flat bit each side of him (units)
+        public const float DrawWidth = 5f;              // the ribbon's half width
+        public const float DrawHeight = 6f;             // the lower face this far under the upper
+        public const float PointSpacing = 50f;          // one render point per this
+    }
+
     public static class Pollution // TPollutionLayer / TPollutionManager / TPollutionPos constants (code; no .prm) -- the goop layer (pass 65)
     {
         public const int ThresholdNormal = 30;          // mPollutedThreshold: paint above this is "polluted" (initLayerInfo)
@@ -1047,14 +1092,21 @@ public static class SmsAir
     public static void Tick(
         ref float fwd, ref float vy, out float sideVel, out float vyBeforeGravity,
         float faceYaw, float intendedYaw, float intendedMag, bool aHeld,
-        bool fallCancelEligible, GravityMode gravity)
+        bool fallCancelEligible, GravityMode gravity) =>
+        Tick(ref fwd, ref vy, out sideVel, out vyBeforeGravity, faceYaw, intendedYaw, intendedMag, aHeld, fallCancelEligible, gravity, SmsParams.Jump.JumpAccelControl);
+
+    /// <summary>The same with getJumpAccelControl(): mWireJumpAccelControl (0.01) in WIRE_JUMP, mJumpAccelControl otherwise (MarioMove.cpp 26-30).</summary>
+    public static void Tick(
+        ref float fwd, ref float vy, out float sideVel, out float vyBeforeGravity,
+        float faceYaw, float intendedYaw, float intendedMag, bool aHeld,
+        bool fallCancelEligible, GravityMode gravity, float accelControl)
     {
         sideVel = 0f;
         fwd *= SmsParams.Jump.JumpSpeedBrake;
         if (intendedMag > 0f)
         {
             float d = SmsMath.WrapAngle(intendedYaw - faceYaw);
-            fwd += intendedMag * MathF.Cos(d) * SmsParams.Jump.JumpAccelControl;
+            fwd += intendedMag * MathF.Cos(d) * accelControl;
             sideVel = intendedMag * MathF.Sin(d) * SmsParams.Jump.JumpSlideControl;
         }
         if (fwd > 32f) fwd -= 0.2f;

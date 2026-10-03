@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/SmsWire.cs" id="1_wire"]
+
+[node name="Wire" type="Node3D"]
+script = ExtResource("1_wire")
+LengthUnits = 1500.0
+CubeHeightUnits = 320.0
+WidthUnits = 100.0
+Posts = true

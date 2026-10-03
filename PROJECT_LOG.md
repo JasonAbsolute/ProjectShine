@@ -4358,3 +4358,34 @@ out from a wide footprint: xo x (base_spread + 0.4 hh)), a fatter base shape (0.
 slow noise), a whole-streak jitter in the sway, wave 0.4, ripple contrast 0.35 + 0.65, tear 0.4 with the top from 0.6, a whole-wisp
 flicker 0.82-1.0, the foot glow wider (0.3), anim_speed 4.0, opacity 0.75, an edge fade at the quad's sides. Layer: FlameWidth 0.48,
 FlameHeight 1.3 (0.72 x 1.95 m at the game's x1.5). No legacy retired (tuning).
+
+### Pass 66 -- WIRES: the tightropes (TMapWire + Mario's WIRE statuses)
+THE GAME (verified in source; the spec on file got three things wrong, see NOTES): a wire is a cube (centre = its bottom face's centre, x / z
+half extents, y running UP from it: CLBIsPointInCube) with the tips at its TOP (initTipPoints: centre +- length/2, + size.y), the idle
+rope a half-sine sag of size.y/2 under the chord, one render point per 50 units. Mario's position inside the cube IS the grab (the
+manager's doActorToWire + the helper actor's hit). receiveMessage(0x40000098): refused in WIRE_JUMP / ROLL_JUMP going up and in the
+let-go fall; else bounceVel = 0.2 x -vy, falling onto it -> WIRE_WAIT on top, rising into it (or a roll jump / a dive) -> hanging; the
+ends swapped to his facing. Every frame he is held the wire is HANGING with its hang point at his model ROOT (setFootPointsAtHanged
+(getTakenMtx)): a V pinned at his feet on top, at his hands under -- the rope clips are authored that way (ma_rope_wait centre +55, the
+hang clips -64), so getOnWirePosAngle's `y -= 160` puts his root 160 under the chord in every wire status: the rope's give. specMain
+runs the ROPE SPRING every frame: bounceVel -= sag x 0.005; sag += bounceVel; sag x= 0.99; |sag| <= 200. wireWait: A latches, the jump
+goes when sag <= 0 (the rope back up): WIRE_JUMP = 42 (+ 3 x -bounceVel when it is moving up) + 25 -> the trampoline; B drops to the
+hang; the stick within 45 deg walks 0.1 x counts a frame (ROPE_RUN over 16, rate 0.05 x counts), beyond turns sideways. wireHanging:
+A climbs (ROPE_RETURN) with roof - floor >= 160; B lets go (startHangLanding: 60 back, ground within 100 or 100 down, LAND_SAFE_DOWN);
+the stick moves hand over hand 3 a frame / climbs / drops by its quadrant; the FLUDD pump spraying kicks the swing (2 x RotStop + the
+nozzle's impulse: rocket / turbo 1400, hover 8, spray -8). wireRolling: angVel -= 20 sin(angle), R brakes 0.98, cap 1400, sag = 0.1
+|angVel|, A releases ROLL_JUMP in the windows about -0x2000 / 0x6000 with power = angVel x 0.09 at 0xE000 / 0x6000; settled -> hanging;
+the model faces a quarter turn on (ANIM_HANG) and pitches. The wire's release(): a damped cosine, amplitude 1.3 x his speed (100 going
+down), decay 0.003 x 2|hangPos - 0.5| (none from the exact middle), phase 0.03 a frame. The input bits: 0x2 = A, 0x8000 = B, 0x4000 = R
+(0x10000, the sideways drop, is never set).
+PORT: assets/Sms/SmsWire.cs ([GlobalClass] Node3D = the cube: LengthUnits, CubeHeightUnits 320 (tips, sag/2, grab height), WidthUnits
+100; the ribbon (ImmediateMesh, upper / lower faces + sides), the posts (StaticBody3D cylinders), InCube / PosInWire / SetHang / Release
+/ PointOnWire; SmsWireMap.InCube) + assets/Sms/Wire.tscn. Mario.cs: MarioState.wire + SmsWireState (Wait, SWait, the four turns, the
+two drops, Hanging, Rolling, Return) + SmsWireAir (Jump, RollJump, SafeDown); SmsWireCheck every frame; SmsTickWire (no other handler
+runs); the pose SmsWirePose (root = chord - 160 + the sag turned by pitch then yaw; the model's Godot pitch is the negative: the port's
+forward is -Z); the jumps into singleJump with the wire air flags (the landing chain = the second jump's; the roll jump never
+clash-crashes; getJumpAccelControl 0.01 via a SmsAir.Tick overload); the drops into ledgeFall with _smsHangDropFall; damage on the wire
+-> the safe fall. SmsParams.Wire = wire.prm shipped + MapWire statics + the literals. Per-frame values run per tick at a quarter.
+LEGACY RETIRED: none (new mechanic). NOT PORTED: the sounds, kindWire / kindWireHang camera params, the stale mForwardVel in
+setPlayerJumpSpeed(0.25, 42) (fwd taken as 0), ANIM_GIANT_ROLLING (ma_roll stands in), the LANDING-with-a-held-object branch's dangling
+holder. DEVIATION knobs: SmsWire.DrawSides (the game draws two faces).
