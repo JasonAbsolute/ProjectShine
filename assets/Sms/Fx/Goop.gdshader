@@ -1,6 +1,7 @@
 // The goop surface of an SmsPollutionLayer (TPollutionLayer's model: its I8 texture is the paint map). The layer sets pollution_map,
 // layer_min, layer_inv_size and threshold; the look is yours -- the colours, an albedo texture, the flow. The paint is read by WORLD XZ
-// (as the game samples it), so any mesh shape over the floor works, and the goop appears exactly where Mario's feet find it.
+// (as the game samples it), so any mesh shape over the floor works, and the goop appears exactly where Mario's feet find it. The game's
+// goop textures (assets/Sms/Fx/Goop: Brown = the ordinary goop, Oil, Electric, Fire, Pink, Beta) tile by world XZ as well.
 shader_type spatial;
 render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_burley, specular_schlick_ggx;
 
@@ -11,8 +12,9 @@ uniform float threshold = 0.1176;                     // set by SmsPollutionLaye
 uniform float edge_softness : hint_range(0.0, 1.0) = 0.3; // how far above the threshold the goop reaches full opacity
 uniform vec4 goop_color : source_color = vec4(0.20, 0.12, 0.05, 1.0);
 uniform vec4 goop_color_dark : source_color = vec4(0.06, 0.035, 0.015, 1.0);
-uniform sampler2D goop_albedo : source_color, hint_default_white, filter_linear_mipmap, repeat_enable; // optional: the game's goop texture
-uniform float albedo_tiles_per_metre = 0.25;
+uniform sampler2D goop_albedo : source_color, hint_default_white, filter_linear_mipmap, repeat_enable; // the goop texture (SmsPollutionLayer sets the type's default from assets/Sms/Fx/Goop)
+uniform float albedo_tiles_per_metre = 0.5;         // the 250 px swirl repeats every 2 m
+uniform float blotch_mix : hint_range(0.0, 1.0) = 1.0; // 0 = the texture as painted (set by the layer when it has one), 1 = tinted by the procedural blotches
 uniform float noise_scale = 0.6;                      // the blotches, per metre
 uniform float flow_speed = 0.04;                      // the slow crawl of the blotches
 uniform float roughness : hint_range(0.0, 1.0) = 0.22;
@@ -62,7 +64,9 @@ void fragment() {
     }
     vec2 flow = world_pos.xz * noise_scale + vec2(TIME * flow_speed, -TIME * flow_speed * 0.7);
     float n = fbm(flow);
-    vec3 col = mix(goop_color_dark.rgb, goop_color.rgb, n) * texture(goop_albedo, world_pos.xz * albedo_tiles_per_metre).rgb;
+    vec3 albedo = texture(goop_albedo, world_pos.xz * albedo_tiles_per_metre).rgb;
+    vec3 blotch = mix(goop_color_dark.rgb, goop_color.rgb, n);
+    vec3 col = mix(albedo, albedo * blotch, blotch_mix);
     float rim = smoothstep(threshold, min(1.0, threshold + 2.0 * edge_softness), m);
     col *= mix(1.0 - rim_darken, 1.0, rim);
     ALBEDO = col;

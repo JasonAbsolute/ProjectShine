@@ -4265,3 +4265,15 @@ the sounds (ERASE_SCRAWL, EF_FIRE, EF_ELEC), the footprints' particle, the sink-
 DEVIATIONS (logged, not knobs): getPollutedPosNear reads the z texel by z (the decomp uses the x mapping for z -- a game bug); the
 initial paint's edge rule clamps at 0 where the game's u8 wraps; stamps exclude no-surface texels outright (the game's height compare
 lets 0xFF through only for a stamp 253+ units up).
+
+### Pass 65b -- the game's goop textures (assets/Sms/Fx/Goop) on the layer
+He dropped the six goop surface textures (250 x 250, from the game's BTIs) in assets/Sms/Fx/Goop: BrownGoop (the ordinary paint),
+OilGoop (the dark glossy one), ElectricGoop (teal + yellow), FireGoop (orange), PinkGoop (pink + yellow + orange), BetaGoop (the demo's,
+with alpha). SmsPollutionLayer: [Export] Texture2D GoopTexture; empty = DefaultGoopTexture(Type) -- FireGoop for Fire / FireRegrow,
+ElectricGoop for Electric, BrownGoop for everything else (Oil / Pink / Beta are picks). When the layer made the material itself it sets
+goop_albedo and blotch_mix 0 (the texture as painted); a ShaderMaterial of yours only gets the map uniforms. Goop.gdshader:
+blotch_mix (0 = the texture, 1 = tinted by the procedural blotches -- the default for a layer with no texture), albedo_tiles_per_metre
+0.5 (the swirl repeats every 2 m), the texture tiles by world XZ like the paint. RETIRED AS THE DEFAULT LOOK: the procedural blotches
+(kept behind blotch_mix for a layer without a texture). The .import files are the editor's defaults (detect_3d/compress_to=1: the
+editor re-imports them VRAM-compressed with mipmaps on their first 3D use). NOTE: the game's layer models carry their own UVs; the port
+tiles by world distance -- albedo_tiles_per_metre is the knob if the swirl should be larger / smaller.

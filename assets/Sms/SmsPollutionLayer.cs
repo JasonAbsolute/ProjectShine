@@ -50,6 +50,9 @@ public partial class SmsPollutionLayer : MeshInstance3D
     [Export] public bool CanSpread = false;
     /// <summary>The goop look when the mesh has no material override of its own (default res://assets/Sms/Fx/Goop.gdshader).</summary>
     [Export] public Shader GoopShader;
+    /// <summary>The goop's surface texture (goop_albedo). Empty = the type's default from assets/Sms/Fx/Goop: FireGoop for Fire / FireRegrow,
+    /// ElectricGoop for Electric, BrownGoop for everything else; OilGoop, PinkGoop and BetaGoop are there to pick.</summary>
+    [Export] public Texture2D GoopTexture;
     [Export] public bool DebugPrint = false;
 
     /// <summary>TPollutionLayer::cleaned: a spot over 100 was being erased -- the game plays MSD_SE_ERASE_SCRAWL and PARTICLE_MS_RAKU_KIE here.</summary>
@@ -84,6 +87,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
     private ImageTexture _tex;
     private bool _texDirty;
     private ShaderMaterial _mat;
+    private bool _ownMaterial;    // the layer made the material (it may set the look); a material of yours only gets the map uniforms
     private double _settleAccum;
     private float _tickAccum;
     private int _spreadTimer;
@@ -280,16 +284,40 @@ public partial class SmsPollutionLayer : MeshInstance3D
                 Shader sh = GoopShader ?? GD.Load<Shader>("res://assets/Sms/Fx/Goop.gdshader");
                 _mat = new ShaderMaterial { Shader = sh };
                 MaterialOverride = _mat;
+                _ownMaterial = true;
             }
             _mat.SetShaderParameter("pollution_map", _tex);
             _mat.SetShaderParameter("layer_min", new Vector2(MinX, MinZ));
             _mat.SetShaderParameter("layer_inv_size", new Vector2(1f / (Width * _texelM), 1f / (Height * _texelM)));
             _mat.SetShaderParameter("threshold", PollutedThreshold / 255f);
+            if (_ownMaterial)
+            {
+                Texture2D goop = GoopTexture ?? DefaultGoopTexture(Type);
+                if (goop != null)
+                {
+                    _mat.SetShaderParameter("goop_albedo", goop);
+                    _mat.SetShaderParameter("blotch_mix", 0f); // the game's texture as painted; no texture -> the procedural blotches (1)
+                }
+            }
         }
         Built = true;
         if (DebugPrint)
             GD.Print($"[SMS goop] layer '{Name}' {Type}: {Width} x {Height} texels of {TexelSize} u over x {MinX:F2}..{MaxX:F2} z {MinZ:F2}..{MaxZ:F2} m, " +
                      $"{Degree} painted, threshold {PollutedThreshold}{(Implicit ? $" (implicit, body '{ImplicitBody?.Name}')" : "")}");
+    }
+
+    /// <summary>The game's goop textures (assets/Sms/Fx/Goop) by type: the fire layers burn orange, the electric one is the teal swirl, the rest
+    /// wear the brown paint. Null when the file is not there.</summary>
+    public static Texture2D DefaultGoopTexture(SmsPollutionType type)
+    {
+        string name = type switch
+        {
+            SmsPollutionType.Fire or SmsPollutionType.FireRegrow => "FireGoop",
+            SmsPollutionType.Electric => "ElectricGoop",
+            _ => "BrownGoop",
+        };
+        string path = $"res://assets/Sms/Fx/Goop/{name}.png";
+        return ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;
     }
 
     private int EdgeDegree(int x, int z)
