@@ -13,10 +13,13 @@ uniform float edge_softness : hint_range(0.0, 1.0) = 0.3; // how far above the t
 uniform vec4 goop_color : source_color = vec4(0.20, 0.12, 0.05, 1.0);
 uniform vec4 goop_color_dark : source_color = vec4(0.06, 0.035, 0.015, 1.0);
 uniform sampler2D goop_albedo : source_color, hint_default_white, filter_linear_mipmap, repeat_enable; // the goop texture (SmsPollutionLayer sets the type's default from assets/Sms/Fx/Goop)
-uniform float albedo_tiles_per_metre = 0.5;         // the 250 px swirl repeats every 2 m
+uniform float albedo_tiles_per_metre = 0.15;        // one repeat of the 250 px swirl every ~7 m (smaller = bigger swirls); 0.5 looked like wallpaper
+uniform float detail_mix : hint_range(0.0, 1.0) = 0.3; // a second sample, 2.7 x larger and turned, blended in so the repeat never reads as a grid
+uniform float warp_amount = 0.25;                     // metres the surface wobbles (the game's goop crawls and ripples); 0 = still
+uniform float warp_speed = 0.12;
 uniform float blotch_mix : hint_range(0.0, 1.0) = 1.0; // 0 = the texture as painted (set by the layer when it has one), 1 = tinted by the procedural blotches
 uniform float noise_scale = 0.6;                      // the blotches, per metre
-uniform float flow_speed = 0.04;                      // the slow crawl of the blotches
+uniform float flow_speed = 0.03;                      // the slow crawl of the surface (metres a second)
 uniform float roughness : hint_range(0.0, 1.0) = 0.22;
 uniform float specular : hint_range(0.0, 1.0) = 0.6;
 uniform float rim_darken : hint_range(0.0, 1.0) = 0.45; // the thin paint at the edge is darker
@@ -62,11 +65,19 @@ void fragment() {
     if (a <= 0.003) {
         discard;
     }
-    vec2 flow = world_pos.xz * noise_scale + vec2(TIME * flow_speed, -TIME * flow_speed * 0.7);
-    float n = fbm(flow);
-    vec3 albedo = texture(goop_albedo, world_pos.xz * albedo_tiles_per_metre).rgb;
-    vec3 blotch = mix(goop_color_dark.rgb, goop_color.rgb, n);
-    vec3 col = mix(albedo, albedo * blotch, blotch_mix);
+    vec2 base = world_pos.xz;
+    vec2 wobble = vec2(fbm(base * 0.3 + vec2(TIME * warp_speed, 0.0)), fbm(base * 0.3 + vec2(3.7, -TIME * warp_speed))) - vec2(0.5);
+    vec2 drift = vec2(TIME * flow_speed, -TIME * flow_speed * 0.6);
+    vec2 uv_a = (base + wobble * warp_amount + drift) * albedo_tiles_per_metre;
+    vec2 p_b = base * 0.37 + wobble * warp_amount * 1.6 - drift;
+    vec2 uv_b = vec2(p_b.y, -p_b.x) * albedo_tiles_per_metre; // turned a quarter so the two copies never line up
+    vec3 albedo = mix(texture(goop_albedo, uv_a).rgb, texture(goop_albedo, uv_b).rgb, detail_mix);
+    vec3 col = albedo;
+    if (blotch_mix > 0.0) {
+        float n = fbm(base * noise_scale + drift * 1.3);
+        vec3 blotch = mix(goop_color_dark.rgb, goop_color.rgb, n);
+        col = mix(albedo, albedo * blotch, blotch_mix);
+    }
     float rim = smoothstep(threshold, min(1.0, threshold + 2.0 * edge_softness), m);
     col *= mix(1.0 - rim_darken, 1.0, rim);
     ALBEDO = col;
