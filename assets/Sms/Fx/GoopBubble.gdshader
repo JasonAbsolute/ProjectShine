@@ -1,5 +1,5 @@
 // A goop bubble (SmsPollutionLayer's PARTICLE_MS_RAKU_INDAWA stand-in): a half-sphere dome on the paint, wearing the goop texture under
-// it by world XZ (the same tiling as Goop.gdshader), a wet rim highlight, a brightening as it is about to pop. INSTANCE_CUSTOM.x = age 0..1.
+// it by world XZ (the same tiling as Goop.gdshader), a wet rim highlight. INSTANCE_CUSTOM.x = age 0..1, .y = the pop's fade 0..1 (ALPHA = 1 - y).
 shader_type spatial;
 render_mode blend_mix, depth_draw_opaque, cull_back, diffuse_burley, specular_schlick_ggx;
 
@@ -15,10 +15,12 @@ uniform float specular : hint_range(0.0, 1.0) = 0.8;
 
 varying vec3 world_pos;
 varying float age;
+varying float fade;
 
 void vertex() {
     world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
     age = INSTANCE_CUSTOM.x;
+    fade = INSTANCE_CUSTOM.y;
 }
 
 void fragment() {
@@ -26,6 +28,7 @@ void fragment() {
     float fresnel = pow(1.0 - clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0), rim_power);
     float flash = smoothstep(0.88, 1.0, age) * pop_flash;
     ALBEDO = mix(albedo, rim_color.rgb, fresnel * rim_strength) + vec3(flash);
+    ALPHA = 1.0 - fade;
     ROUGHNESS = roughness;
     SPECULAR = specular;
 }

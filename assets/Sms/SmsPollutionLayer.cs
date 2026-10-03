@@ -42,8 +42,8 @@ public partial class SmsPollutionLayer : MeshInstance3D
     [Export] public float TexelSize = 32f;
     [Export] public Paint InitialPaint = Paint.Full;
     /// <summary>The layer's /scene/map/pollution/&lt;name&gt;.bmp -- the SHAPE of the goop at the start: red = the paint (0 clean .. 255), the image
-    /// stretched over the texel grid, x along +X, y along +Z from the layer's -X / -Z corner; the edge rule (-50 a neighbouring empty texel)
-    /// is applied as the game's initTexImage does. Only read with InitialPaint = Texture.</summary>
+    /// stretched over the MESH (its local X / Z extent: it fills the quad and turns with the node), image x along the mesh's +X, image y along
+    /// its +Z; the edge rule (-50 a neighbouring empty texel) is applied as the game's initTexImage does. Only read with InitialPaint = Texture.</summary>
     [Export] public Texture2D InitialPaintTexture;
     /// <summary>FLAG_DECAY: every texel loses 2 a frame (a layer that dies on its own).</summary>
     [Export] public bool Decay = false;
@@ -64,7 +64,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
     [Export] public float BubbleLife = 2.4f;       // seconds from forming to gone: a slow swell for 70 %, a quiver, the pop at 85 %, the ripple after
     [Export] public int BubbleMax = 32;
     [Export] public bool BubblePop = true;         // the pop throws a ripple ring and a few goop droplets
-    [Export] public Color RingTint = new Color(0.1f, 0.07f, 0.04f, 0.55f); // the ripple's colour and starting opacity: a translucent dark shadow, never white
+    [Export] public Color RingTint = new Color(0.95f, 0.97f, 1.0f, 0.5f); // the ripple's colour and starting opacity: a soft white ring, alpha-blended (not additive)
     [Export] public Shader BubbleShader;           // default res://assets/Sms/Fx/GoopBubble.gdshader
     [Export] public bool DebugPrint = false;
 
@@ -104,6 +104,9 @@ public partial class SmsPollutionLayer : MeshInstance3D
     private bool _texDirty;
     private ShaderMaterial _mat;
     private bool _ownMaterial;    // the layer made the material (it may set the look); a material of yours only gets the map uniforms
+    private bool _paintFrame;     // the paint layout maps through the mesh's local frame (a rotated / scaled node turns its layout with it)
+    private Transform3D _paintInv;
+    private Aabb _paintAabb;
     private MultiMeshInstance3D _bubbleMmi;
     private MultiMesh _bubbleMm;
     private Vector3[] _bubblePos;
@@ -167,6 +170,9 @@ public partial class SmsPollutionLayer : MeshInstance3D
             if (p.Y < minY) minY = p.Y;
         }
         SetupGrid(minX, minZ, maxX, maxZ, minY);
+        _paintInv = xf.AffineInverse();
+        _paintAabb = Mesh.GetAabb();
+        _paintFrame = _paintAabb.Size.X > 1e-4f && _paintAabb.Size.Z > 1e-4f;
         // the height map from the triangles (barycentric in XZ), the highest surface where several cover a texel
         for (int t = 0; t + 2 < world.Length; t += 3)
         {
@@ -299,9 +305,25 @@ public partial class SmsPollutionLayer : MeshInstance3D
                 int depth = 255;
                 if (src != null)
                 {
-                    // the game's bmp is one pixel per texel; here any size is stretched over the grid (pixel x = texel x * image width / grid width)
-                    int px = (int)((long)sx * src.GetWidth() / Width), py = (int)((long)tz * src.GetHeight() / Height);
-                    depth = src.GetPixel(px, py).R8;
+                    // the game's bmp is one pixel per texel of its layer; here the image is stretched over the MESH (its local X / Z extent), so it
+                    // fills the quad you placed and turns and scales with the node -- the texel's centre is taken back into the mesh's frame
+                    float u, v;
+                    if (_paintFrame)
+                    {
+                        Vector3 world = new Vector3(MinX + (sx + 0.5f) * _texelM, SmsUnits.UnitsToMetres(_height[idx] / SmsParams.Pollution.DepthScale + VerticalOffsetUnits), MinZ + (tz + 0.5f) * _texelM);
+                        Vector3 local = _paintInv * world;
+                        u = (local.X - _paintAabb.Position.X) / _paintAabb.Size.X;
+                        v = (local.Z - _paintAabb.Position.Z) / _paintAabb.Size.Z;
+                    }
+                    else
+                    {
+                        u = (sx + 0.5f) * _texelM / (MaxX - MinX);
+                        v = (tz + 0.5f) * _texelM / (MaxZ - MinZ);
+                    }
+                    if (u < 0f || u >= 1f || v < 0f || v >= 1f)
+                        depth = 0;
+                    else
+                        depth = src.GetPixel(Math.Min(src.GetWidth() - 1, (int)(u * src.GetWidth())), Math.Min(src.GetHeight() - 1, (int)(v * src.GetHeight()))).R8;
                 }
                 if (depth == 0)
                 {
@@ -778,12 +800,13 @@ public partial class SmsPollutionLayer : MeshInstance3D
             float radius = BubbleSize * _bubbleScale[i];
             if (t >= 0.85f)
             {
-                if (before < 0.85f)
-                {
-                    _bubbleMm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(Vector3.Zero), Vector3.Zero));
-                    if (BubblePop)
-                        SpawnPop(_bubblePos[i], radius);
-                }
+                // the pop: the dome swells a last 40 % and fades to transparent over the final 15 % of the life; the ripple and droplets start with it
+                if (before < 0.85f && BubblePop)
+                    SpawnPop(_bubblePos[i], radius);
+                float k = (t - 0.85f) / 0.15f;
+                float dp = radius * (1f + 0.4f * k) * 2f;
+                _bubbleMm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(new Vector3(dp, dp * 0.75f * (1f - 0.5f * k), dp)), _bubblePos[i]));
+                _bubbleMm.SetInstanceCustomData(i, new Color(1f, k, 0f, 0f)); // .y = the fade (GoopBubble.gdshader: ALPHA = 1 - y)
                 continue;
             }
             float swell = t < 0.7f ? Mathf.SmoothStep(0f, 1f, t / 0.7f) : 1f + 0.06f * MathF.Sin(_bubbleAge[i] * 28f);
