@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/SmsPollutionLayer.cs" id="1_goop"]
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_goop"]
+size = Vector2(10, 10)
+
+[node name="Goop" type="MeshInstance3D"]
+mesh = SubResource("PlaneMesh_goop")
+script = ExtResource("1_goop")
+Type = 2
+TexelSize = 32.0
+InitialPaint = 1
+Decay = false
+CanSpread = false

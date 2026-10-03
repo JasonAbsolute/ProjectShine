@@ -327,6 +327,28 @@ public static class SmsParams
         public const int FogTimeRed = 360;              // the fog is the damage pink below; 1 HP as the timer passes this mark; the cycle is Yellow + Red = 600
     }
 
+    public static class Pollution // TPollutionLayer / TPollutionManager / TPollutionPos constants (code; no .prm) -- the goop layer (pass 65)
+    {
+        public const int ThresholdNormal = 30;          // mPollutedThreshold: paint above this is "polluted" (initLayerInfo)
+        public const int ThresholdFire = 128;           // ... a FIRE layer
+        public const int ThresholdRegrow = 200;         // ... a UNK7 (regrowing fire) layer
+        public const int PerFrameThresholdNormal = 50;  // mPerFrameChangeThreshold: paint under this fades 8 a frame (the counter pass)
+        public const int PerFrameThresholdFire = 128;
+        public const int PerFrameThresholdRegrow = 160; // a UNK7 layer: paint ABOVE this grows 8 a frame
+        public const int PerFrameDelta = 8;             // mPerFrameChangeDelta
+        public const int DecayDelta = 2;                // FLAG_DECAY: every texel loses this a frame
+        public const int DepthTolerance = 2;            // unk48: a sample / a stamp must be within this many depth units (x 40 units) of the surface
+        public const float DepthScale = 0.025f;         // worldToDepth: (y - offset) x this -- one depth unit = 40 units of height
+        public const int EdgeAlpha = 50;                // mEdgeAlpha: the initial paint loses this per neighbouring texel off the surface
+        public const int FlushTime = 200;               // mFlushTime (the erase sound's hold; the sound is not ported)
+        public const float SpreadArea = 2000f;          // mSpreadArea: the probes around Mario (units)
+        public const int SpreadFrequency = 3;           // mSpreadFrequency: a spread stamp every 4th movement tick
+        public const float SpreadStampSize = 128f;      // spread(): pollute(..., 128)
+        public const float AreaMinRate = 0.7f;          // mAreaMinRate: getPollutedPosNear's radius factor
+        public const float CleanGroundScale = 10f;      // splashGround: clean(mCleanSize x 10) -- the spray's 18 -> a 180-unit stamp
+        public const float CleanWallScale = 32f;        // splashWall: clean(mCleanSize x 32)
+    }
+
     public static class HangRoof // /mario/hangroof.prm (shipped) + doRoofMovingProcess's constants
     {
         public const float AnmMult = 0.3f;              // the move clip's rate = the distance a tick x this

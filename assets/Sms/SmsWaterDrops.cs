@@ -8,7 +8,8 @@ using System;
 /// spheres (a stand-in for the game's silhouette / water-volume rendering). Positions are world metres, velocities
 /// metres a tick; the game's numbers (units a tick) are converted on the way in.
 /// Not ported: the ground / wall sliding (case 2 / 3: a hit drop sits, shrinks and dries instead), splashes, the
-/// spray hit messages (HIT_MESSAGE_SPRAYED_BY_WATER), goop cleaning, sound.
+/// spray hit messages (HIT_MESSAGE_SPRAYED_BY_WATER), sound. A drop that lands cleans the goop layers (splashGround / splashWall ->
+/// gpPollution->clean(pos, mCleanSize x 10 on a floor, x 32 on a wall)) the tick it lands and every tick it sits there (pass 65).
 /// </summary>
 public partial class SmsWaterDrops : Node3D
 {
@@ -27,6 +28,8 @@ public partial class SmsWaterDrops : Node3D
     private readonly float[] _life = new float[MaxDrops];       // ticks left
     private readonly byte[] _type = new byte[MaxDrops];         // the water particle type (WTP index)
     private readonly byte[] _state = new byte[MaxDrops];        // 1 flying, 2 landed
+    private readonly Vector3[] _hit = new Vector3[MaxDrops];    // where a landed drop touched the map (the clean stamp's centre)
+    private readonly bool[] _wall = new bool[MaxDrops];         // landed on a wall (splashWall's x 32) rather than a floor (splashGround's x 10)
     private int _count;
     private MultiMeshInstance3D _mmi;
     private MultiMesh _mm;
@@ -140,9 +143,12 @@ public partial class SmsWaterDrops : Node3D
                 if (hit.Count > 0)
                 {
                     Vector3 n = (Vector3)hit["normal"];
-                    _pos[i] = (Vector3)hit["position"] + n * (size * 0.25f);
+                    _hit[i] = (Vector3)hit["position"];
+                    _wall[i] = n.Y < 0.5f; // the game asks the polygon's class (floor / wall); the port splits at 60 degrees
+                    _pos[i] = _hit[i] + n * (size * 0.25f);
                     _vel[i] = Vector3.Zero;
                     _state[i] = 2;
+                    CleanAt(i);
                     _life[i] = MathF.Min(_life[i], GroundLifeTicks);
                     if (DebugPrint && (++_dbgHits % 120) == 1 && hit["collider"].As<GodotObject>() is Node col && col is not StaticBody3D && col is not CsgShape3D)
                         GD.Print($"[SMS water] a drop hit {col.Name} ({col.GetType().Name}) -- spray hits are not wired to anything yet");
@@ -153,6 +159,8 @@ public partial class SmsWaterDrops : Node3D
                     _vel[i] = v;
                 }
             }
+            else if (_state[i] == 2)
+                CleanAt(i); // splashGround / splashWall run every frame a landed drop lives
             _life[i] -= 1f;
         }
         // garbageCollect()
@@ -164,10 +172,19 @@ public partial class SmsWaterDrops : Node3D
             if (w != i)
             {
                 _pos[w] = _pos[i]; _vel[w] = _vel[i]; _size[w] = _size[i]; _life[w] = _life[i]; _type[w] = _type[i]; _state[w] = _state[i];
+                _hit[w] = _hit[i]; _wall[w] = _wall[i];
             }
             w++;
         }
         _count = w;
+    }
+
+    /// <summary>TModelWaterManager::splashGround / splashWall: the drop's water particle type's mCleanSize x 10 (a floor) or x 32 (a wall) as the
+    /// clean stamp's width at the spot it touched -- the spray's 18 cleans a 180-unit disc a drop a tick.</summary>
+    private void CleanAt(int i)
+    {
+        float scale = _wall[i] ? SmsParams.Pollution.CleanWallScale : SmsParams.Pollution.CleanGroundScale;
+        SmsPollutionMap.Clean(_hit[i], SmsParams.Fludd.WaterOf(_type[i]).CleanSize * scale);
     }
 
     /// <summary>Everything gone (a respawn).</summary>

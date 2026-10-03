@@ -4200,3 +4200,68 @@ SQWAT variant of the OIL_RUN idle, the OIL_SLIP frame clamp, the water decrement
 the port's 120 Hz movement tick (SmsUnits.TicksFor), as the fire's 50 invincible ticks are.
 ALSO: the step-up's sub-centimetre branch now puts him ON a real lip (rise > 2 mm) with the frame's remaining motion -- a goop slab
 authored as a thin StaticBody3D on top of a floor used to stop a sprint dead (speed kept, position blocked every frame).
+
+### Pass 65 -- the goop layer: the paint map Mario samples, spreads and FLUDD cleans (TPollutionLayer)
+THE GAME: goop is a LAYER (TPollutionLayer, Map/PollutionLayer.cpp): a joint model whose I8 texture IS the paint map -- one byte a
+texel (0 clean .. 255), texels of info->mTexelSize units over the layer's rectangle (mLeft / mTop / mRight / mBottom), a power-of-two
+grid (log2 width / height) -- plus a HEIGHT MAP (TPollutionPos::mHeightMap, one depth unit = 40 units: worldToDepth = (y - offset) x
+0.025; 0xFF = no surface). isPolluted(x, y, z) (249): inside the rectangle, the texel's surface within +-2 depth units (unk48 = 2 ->
+80 units) of y (TPollutionPos::isSame), paint above mPollutedThreshold (30; FIRE 128; UNK7 200). The initial paint (initTexImage) is
+the layer's /scene/map/pollution/<name>.bmp, each surface texel losing mEdgeAlpha 50 per neighbouring non-surface texel. STAMPS
+(stamp 233 -> the GPU pass PollutionCount.cpp doTask / initGXforStamp): a quad of worldToTexSize(size) texels (size is the FULL width;
+under two texels the quad has no area and paints nothing), each texel whose height is within +-2 of the stamp's blended toward 255
+(type 1, pollute: GX_CC_ONE) or toward the stamp texture's colour (type 0, clean: black) by the stamp texture's alpha (SRCALPHA /
+INVSRCALPHA); the default clean / pollute stamps are textures (registerTexStamp(0 / 1, 0xff, tex) -- not in the decomp). THE SETTLE
+(countTexDegree -> drawPollutionLayer, a draw-sync pass at the 30 fps render rate): paint UNDER mPerFrameChangeThreshold (50; FIRE 128)
+loses mPerFrameChangeDelta 8 a frame ("clean-ish stuff gets cleaner" -- the half-cleaned rim of a splash is gone in a quarter second);
+a UNK7 layer's paint ABOVE 160 GAINS 8 ("dirty stuff gets dirtier": the regrowing fire goop); FLAG_DECAY: every texel loses 2. The
+count = texels passing alpha > 0 -> getPollutionDegree sums the layers; cleanedAll = degree < TMapEventSink::mCleanedDegree (per stage;
+Mare's wall events use 42 / 50). action() (PollutionAction.cpp 139, a CUE_MOVE tick): the type's effects (fire: MS_NEWFIRE_A/B + SE_EF_FIRE
+at polluted spots near Mario; electric: MS_THUNDER_S + SE_EF_ELEC; glass: a counter), then with paint within mSpreadArea 2000 of Mario
+(getPollutedPos: five random points at his height) PARTICLE_MS_RAKU_INDAWA and, FLAG_CAN_SPREAD, spread(): every 4th tick
+(mSpreadFrequency 3) pollute(a painted texel near Mario no higher than him (getPollutedPosNear: (rnd - 0.5)(0.7 + rnd) x 2000), 128).
+cleaned() (170): every 6th clean call probes one spot from two offset tables (x 32 units); polluted and over 100 there ->
+MSD_SE_ERASE_SCRAWL + PARTICLE_MS_RAKU_KIE (MAPOBJ_SANDSTEAM on map 5). TPollutionManager (gpPollution): getPollutionType = the FIRST
+layer whose rectangle holds the point (no height asked); isPolluted = any layer; stamp = every layer; clean(x, y, z, size) = stamp(0)
+(Delfino's sea floor below -10 excepted); pollute = stamp(1); stampGround = plane-type-0 layers (the floors; TPollutionLayerWallPlusX /
+PlusZ project along an axis). MARIO: checkGraffito (MarioMove.cpp 953): illegal ground / Yoshi / Shadow Mario -> out;
+mPollutionTypeStandingOn = getPollutionType(mPosition); isDirty = SLIP / INSTAKILL / SAFE: all NINE points of a 3 x 3 ring 32 units
+apart at mPosition.y painted; SINK / FIRE / GLASS_WALL / UNK7: the FIVE points of a cross at mFloorPosition.y; ELECTRIC: the one point
+at the floor; UNK8 / UNK10: clean. Then the dispatch (pass 64), the DIRTY flag, and on isTouchGround4cm: the sink-in effect, the
+footprint timer (520 set in checkGraffitoSlip's grounded branch and in checkSink's mud branch; down a grounded tick; footprints
+(emitDirtyFootPrint -> MAP_POLLUTION_MS_M_ASHIOS, a particle, mPolSizeFootPrint 0: they paint nothing) while above 260; zeroed in water
+and in a spin jump). oilRun / oilSlip / oilSlope call pollute(mPosition, 70 / 130 / 130) every move tick; setStatusToJumping (432)
+stamps pollute(mPosition, mPolSizeJump 250) when the footprint timer is above 260 -- the goop he tracks on a jump. checkGraffitoSlip's
+airborne branch (918): OIL_SLIP / OIL_SLOPE off the ground keep mBrakeSlipNoPollute 0.998 and the 60-tick timer. FLUDD:
+TModelWaterManager::splashGround / splashWall (ModelWaterManager.cpp 316 / 328): a landed drop calls gpPollution->clean(pos, mCleanSize
+x 10 (floor) / x 32 (wall)) every frame it lives on the plane -- wtp00 normal 18, 15 hover 20, 14 rocket 12, 13 turbo 10, 10 back 5, 02
+bomb 24, 03 trgrocket 25 (the shipped wtp .prm).
+PORT: assets/Sms/SmsPollutionLayer.cs = a [GlobalClass] MeshInstance3D (TPollutionLayer): Type, TexelSize 32, InitialPaint (Empty /
+Full / Texture: red = paint, pixel (x, y) = texel from the -X / -Z corner), Decay, CanSpread, GoopShader. Build(): the mesh's world AABB
+in XZ is the rectangle, the texel count the next power of two (<= 1024), the height map rasterised from the mesh's triangles (the
+highest surface), VerticalOffset = the lowest vertex. The paint, the R8 Image / ImageTexture uploaded once a frame when changed, the
+material: the mesh's own ShaderMaterial or a new one on assets/Sms/Fx/Goop.gdshader (world-XZ lookup of pollution_map by layer_min /
+layer_inv_size; alpha = smoothstep over the layer's threshold; procedural blotches + an optional albedo -- no goop textures in the
+assets). IsPolluted / Stamp (the quad, the height mask, a soft disc for the stamp textures: full to 60 % of the radius) / the 30 Hz
+Settle (threshold / delta / decay / regrow as the game; Degree = texels above 0) / Action every movement tick (the spread; no effects) /
+Cleaned signal (the game's effect rule, your sound + particle hook) / PaintAt / SurfaceYAt. SmsPollutionMap (TPollutionManager, static):
+Layers in tree order, GetPollutionType (first rectangle), IsPolluted, Stamp / Pollute / Clean, PollutionDegree, CleanedAll(n), MarioPos
+(the spread probes), EnsureImplicitLayers: a StaticBody3D / CSG with metadata sms_pollution (on it or a parent up to three up) gets an
+SmsPollutionLayer over its collision AABB, the height map from a ray per texel onto that body, painted full, drawn by nothing -- the
+pass-56 / 64 tags keep working as layers (his Level.tscn's electric floor). assets/Sms/Goop.tscn: a 10 x 10 m slip layer to instance.
+MARIO: SmsPollutionSample(feet) = the 9 / 5 / 1-point rings (SmsFloorYBelow(2000) for mFloorPosition; none -> illegal -> clean);
+SmsPollutionMap.MarioPos each frame; _smsGround4cm = on the floor or within 4 units; SmsPolluteTick (70 in oilRun, 130 in oilSlip and
+the goop slope) each move tick; _smsFootPrintTimer (520 on paint / mud, down a grounded tick, 0 in water / a spin jump) and the jump
+stamp (250) in SmsLaunch while it is above 260; SmsGraffitoSlip's airborne branch. WATER: SmsWaterDrops cleans at the hit point the tick
+a drop lands and every tick it sits (CleanSize x 10 / x 32; wall = normal.y < 0.5 -- the game asks the polygon's class).
+LEGACY RETIRED: (1) the floor BODY's sms_pollution tag as the sampled thing -- SmsUpdateSurface's `_smsPollution = SmsPollutionOf(hit)`
+and SmsPollutionOf (passes 56 / 64: "the tagged floor is painted all over", no paint, no cleaning) -> the layer sampling; the tag itself
+survives only as EnsureImplicitLayers' shorthand for a full layer over the body; (2) `IsOnFloor() && type != None` as isDirty -> the
+game's rings (a hop over goop is dirty, a bridge over it is not); (3) the `sms_surface = goop` alias of ForceSlip (the slope-slip
+surface class) -- goop is the layer now; forceslip / all remain.
+NOT PORTED: the wall layers, the stamp textures (soft discs stand in), the joint-object / model stamps (enemies painting), the prohibit
+areas and revival stamps, the layer effects (fire / thunder / wave particles, RAKU_INDAWA, RAKU_KIE: the Cleaned signal is the hook),
+the sounds (ERASE_SCRAWL, EF_FIRE, EF_ELEC), the footprints' particle, the sink-in splash, Delfino's sea-floor exception, stampModel.
+DEVIATIONS (logged, not knobs): getPollutedPosNear reads the z texel by z (the decomp uses the x mapping for z -- a game bug); the
+initial paint's edge rule clamps at 0 where the game's u8 wraps; stamps exclude no-surface texels outright (the game's height compare
+lets 0xFF through only for a stamp 253+ units up).

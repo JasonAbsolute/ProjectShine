@@ -4,6 +4,7 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using Godot;
+using SmsPollution = SmsPollutionType; // the goop layer's EPollutionType (SmsPollutionLayer.cs, pass 65)
 
 public partial class Mario : CharacterBody3D
 {
@@ -178,8 +179,7 @@ public partial class Mario : CharacterBody3D
     private int _smsGraffitoTimer = 0;        // mStandingOnGraffitoTimer: the electric goop's grace, GraffitoNoDmgTime ticks
     private float _smsGraffitoAccum = 0f;
     private bool _smsDirty = false;           // MARIO_FLAG_DIRTY: the floor under him last tick was polluted
-    private enum SmsPollution { None, Fire, Electric, Slip, Sink, Instakill, GlassWall, Safe } // EPollutionType (PollutionLayer.hpp 14): 10/8 none, 1, 4, 2, 0, 5, 3, 6; 7 = a fire alias
-    private SmsPollution _smsPollution = SmsPollution.None; // mPollutionTypeStandingOn: the floor body's sms_pollution tag (None off the floor)
+    private SmsPollution _smsPollution = SmsPollution.None; // mPollutionTypeStandingOn: the goop layer whose extent holds him (SmsPollutionMap, pass 65)
     // Fences and the roof hang (pass 52): metadata sms_fence (any value) or the group sms_fence on the body (or a parent up to three up)
     private enum SmsFence { Catch, JumpCatch, Move, Punch }
     private enum SmsRoof { Hang, Wait, Move, Kick }
@@ -6765,10 +6765,7 @@ public partial class Mario : CharacterBody3D
     private void SmsUpdateSurface()
     {
         if (!IsOnFloor())
-        {
-            _smsPollution = SmsPollution.None; // the pollution is sampled under his feet only (the fire's FireHeight band, the shock's grounded types)
             return;
-        }
         Node hit = null;
         float cosMax = MathF.Cos(FloorMaxAngle);
         for (int i = 0; i < GetSlideCollisionCount(); i++)
@@ -6802,7 +6799,7 @@ public partial class Mario : CharacterBody3D
         {
             case "slider": s = SmsSlope.Surface.Slider; break;
             case "45": case "fortyfive": case "slip45": s = SmsSlope.Surface.FortyFive; break;
-            case "forceslip": case "goop": case "all": s = SmsSlope.Surface.ForceSlip; break;
+            case "forceslip": case "all": s = SmsSlope.Surface.ForceSlip; break;
             case "wet": case "water": case "waterground": case "waterslope":
                 // isWetGround(): the flat set when n.y > 0.99, the slope set otherwise (re-picked every frame)
                 s = GetFloorNormal().Y > 0.99f ? SmsSlope.Surface.WaterGround : SmsSlope.Surface.WaterSlope;
@@ -6820,34 +6817,6 @@ public partial class Mario : CharacterBody3D
         _smsSurfaceNoSlip = noSlip;
         _smsSurfaceNode = hit.Name;
         _smsSurfaceTag = tag;
-        SmsPollution pol = SmsPollutionOf(hit);
-        if (SmsDebugPrint && pol != _smsPollution)
-            GD.Print($"[SMS surface] pollution {pol} ('{hit.Name}')");
-        _smsPollution = pol;
-    }
-
-    /// <summary>The goop layer's type under a floor body (gpPollution->getPollutionType): metadata sms_pollution = fire (POLLUTION_TYPE_FIRE)
-    /// | electric (POLLUTION_TYPE_ELECTRIC) on the body or a parent up to three levels up; anything else is clean.</summary>
-    private static SmsPollution SmsPollutionOf(Node start)
-    {
-        Node n = start;
-        for (int depth = 0; n != null && depth < 3; depth++, n = n.GetParent())
-        {
-            if (!n.HasMeta("sms_pollution"))
-                continue;
-            switch (n.GetMeta("sms_pollution").AsString().Trim().ToLowerInvariant())
-            {
-                case "fire": case "hot": case "fire2": case "unk7": return SmsPollution.Fire;
-                case "electric": case "elec": case "shock": return SmsPollution.Electric;
-                case "slip": case "oil": case "goop": case "paint": case "normal": return SmsPollution.Slip;   // POLLUTION_TYPE_SLIP: the ordinary goop
-                case "sink": case "mud": return SmsPollution.Sink;                                          // POLLUTION_TYPE_SINK
-                case "instakill": case "kill": case "lethal": return SmsPollution.Instakill;               // POLLUTION_TYPE_INSTAKILL
-                case "glasswall": case "glass": case "wall": return SmsPollution.GlassWall;                 // POLLUTION_TYPE_GLASS_WALL
-                case "safe": case "clean": case "harmless": return SmsPollution.Safe;                       // POLLUTION_TYPE_SAFE
-                default: return SmsPollution.None;
-            }
-        }
-        return SmsPollution.None;
     }
 
     private bool SmsSurfaceSlipStarts(Vector3 floorN) => !_smsSurfaceNoSlip && SmsSlope.SlipStarts(floorN, _smsSurface);
@@ -14740,16 +14709,21 @@ public partial class Mario : CharacterBody3D
     private void SmsCheckGraffito()
     {
         int n = SmsUnits.TicksFor(GetPhysicsProcessDeltaTime(), ref _smsGraffitoAccum);
-        bool dirty = IsOnFloor() && _smsPollution != SmsPollution.None; // isDirty: the port's tagged floor is painted all over
+        SmsPollutionMap.EnsureImplicitLayers(GetTree());
+        Vector3 feet = new Vector3(GlobalPosition.X, SmsFeetY(), GlobalPosition.Z); // mPosition
+        SmsPollutionMap.MarioPos = feet;
+        _smsGround4cm = IsOnFloor() || SmsFloorWithin(4f);
+        bool dirty = SmsPollutionSample(feet); // isDirty: the layers' paint under the sampling ring (pass 65)
         for (int i = 0; i < n; i++)
         {
             _smsMoveTick++;
+            SmsPolluteTick(feet);
             if (dirty && stateOfMario != MarioState.dead)
             {
                 switch (_smsPollution)
                 {
                     case SmsPollution.Electric: SmsGraffitoElec(); break;
-                    case SmsPollution.Fire: SmsGraffitoFire(); break;
+                    case SmsPollution.Fire: case SmsPollution.FireRegrow: SmsGraffitoFire(); break;
                     case SmsPollution.Slip: SmsGraffitoSlip(); break;
                     case SmsPollution.GlassWall:
                         // checkGraffito 1080: mPosition.x / z = mPrevPosition -- the painted spot is a wall he cannot cross
@@ -14759,6 +14733,7 @@ public partial class Mario : CharacterBody3D
                 }
             }
             _smsDirty = dirty; // onFlag / offFlag(MARIO_FLAG_DIRTY)
+            SmsFootPrintTick();
             SmsThinkDirty();
             SmsCheckSink();
         }
@@ -14787,6 +14762,70 @@ public partial class Mario : CharacterBody3D
     private Vector3 _smsTickStartPos;    // mPrevPosition: his position before this tick's move (the glass-wall revert)
     private uint _smsMoveTick;           // gpMarDirector->mMoveTickCount: the sink's damage cadence
     private float _smsSinkDrawY;         // the sink offset on the armature now (metres)
+    private int _smsFootPrintTimer;      // mFootPrintTimer: 520 the tick he stands on paint / mud, down a grounded tick; footprints and the jump stamp while above 260 (pass 65)
+    private bool _smsGround4cm;          // isTouchGround4cm() this frame
+
+    /// <summary>checkGraffito's isDirty (MarioMove.cpp 962-1046) against the goop layers: SLIP / INSTAKILL / SAFE want all nine points of a 3 x 3
+    /// ring 32 units apart at his height painted; SINK / FIRE / GLASS_WALL / UNK7 the five points of a cross at the floor's height; ELECTRIC the
+    /// one point under him. The type is the layer's whose XZ extent holds him (getPollutionType). A layer's isPolluted wants the point within
+    /// 80 units of its surface, so a hop over goop is still dirty and a bridge over it is not.</summary>
+    private bool SmsPollutionSample(Vector3 feet)
+    {
+        _smsPollution = SmsPollutionMap.GetPollutionType(feet);
+        if (_smsPollution == SmsPollution.None)
+            return false;
+        float step = SmsUnits.UnitsToMetres(32f);
+        switch (_smsPollution)
+        {
+            case SmsPollution.Slip:
+            case SmsPollution.Instakill:
+            case SmsPollution.Safe:
+                for (int dz = -1; dz <= 1; dz++)
+                    for (int dx = -1; dx <= 1; dx++)
+                        if (!SmsPollutionMap.IsPolluted(new Vector3(feet.X + dx * step, feet.Y, feet.Z + dz * step)))
+                            return false;
+                return true;
+            case SmsPollution.Sink:
+            case SmsPollution.Fire:
+            case SmsPollution.GlassWall:
+            case SmsPollution.FireRegrow:
+            {
+                if (!SmsFloorYBelow(2000f, out float floorY))
+                    return false; // mGroundPlane->isIllegalData(): nothing under him
+                Vector3 p = new Vector3(feet.X, floorY, feet.Z); // mFloorPosition
+                return SmsPollutionMap.IsPolluted(p + new Vector3(0f, 0f, -step)) && SmsPollutionMap.IsPolluted(p + new Vector3(step, 0f, 0f))
+                    && SmsPollutionMap.IsPolluted(p) && SmsPollutionMap.IsPolluted(p + new Vector3(-step, 0f, 0f))
+                    && SmsPollutionMap.IsPolluted(p + new Vector3(0f, 0f, step));
+            }
+            case SmsPollution.Electric:
+            {
+                if (!SmsFloorYBelow(2000f, out float floorY))
+                    return false;
+                return SmsPollutionMap.IsPolluted(new Vector3(feet.X, floorY, feet.Z));
+            }
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>oilRun / oilSlip / oilSlope paint under him every move tick: pollute(mPolSizeRun 70) in OIL_RUN, pollute(mPolSizeSlip 130) in
+    /// OIL_SLIP and OIL_SLOPE (MarioRun.cpp 1262 / 1324 / 1360) -- the goop he carries along the floor.</summary>
+    private void SmsPolluteTick(Vector3 feet)
+    {
+        if (stateOfMario == MarioState.oilRun)
+            SmsPollutionMap.Pollute(feet, SmsParams.Dirty.PolSizeRun);
+        else if (stateOfMario == MarioState.oilSlip || (stateOfMario == MarioState.slipping && _smsOilSlopeSlide))
+            SmsPollutionMap.Pollute(feet, SmsParams.Dirty.PolSizeSlip);
+    }
+
+    /// <summary>checkGraffito's tail (MarioMove.cpp 1104-1118): on the ground within 4 cm the footprint timer runs down; through its upper half
+    /// (the first 260 ticks off the paint) he leaves footprints -- MAP_POLLUTION_MS_M_ASHIOS, a particle, not ported -- and a jump stamps goop.</summary>
+    private void SmsFootPrintTick()
+    {
+        if (!_smsGround4cm || _smsFootPrintTimer <= 0)
+            return;
+        _smsFootPrintTimer -= 1;
+    }
 
     /// <summary>The sink lerps: (Max - Min)(1 - t) + Min with t = depth / SinkTime (flat 0.3 / 0.5 as shipped).</summary>
     private float SmsSinkScale(float min, float max) => (max - min) * (1f - _smsSinkTimer / SmsParams.Graffito.SinkTime) + min;
@@ -14799,6 +14838,17 @@ public partial class Mario : CharacterBody3D
     private void SmsGraffitoSlip()
     {
         bool slipState = stateOfMario == MarioState.oilSlip || (stateOfMario == MarioState.slipping && _smsOilSlopeSlide);
+        if (!_smsGround4cm)
+        {
+            // the airborne branch (MarioMove.cpp 918): a hop over the paint in OIL_SLIP / OIL_SLOPE keeps a 0.998 brake and the 60-tick skid timer
+            if (slipState)
+            {
+                _smsOilBrake = SmsParams.Dirty.BrakeSlipNoPollute;
+                _smsDirtyTimer = SmsParams.Dirty.DirtyTimeSlip;
+            }
+            return;
+        }
+        _smsFootPrintTimer = SmsParams.Graffito.FootPrintTimerMax; // mFootPrintTimer = mFootPrintTimerMax: the footprint window opens (and the jump stamp's)
         if (slipState)
         {
             _smsOilBrake = SmsParams.Dirty.BrakeStartValSlip;
@@ -14881,7 +14931,7 @@ public partial class Mario : CharacterBody3D
             _smsOilAnimRate = 0f;
             animPlayer.Play("ma_slpbk"); // the belly slide's clip (CATCH), as the port's bellySlidingFromDive
         }
-        if (SmsDebugPrint)
+        if (SmsDebugPrint && !(s == MarioState.oilRun && was == MarioState.idle)) // (standing in goop is the game's WAIT <-> OIL_RUN every tick: not worth a line)
             GD.Print($"[SMS goop] {s} from {was} on '{_smsSurfaceNode}': brake {_smsOilBrake}, skid timer {_smsDirtyTimer}, fwd {_smsOilFwd:F1}");
     }
 
@@ -15041,9 +15091,15 @@ public partial class Mario : CharacterBody3D
                 _smsDirtyAmount += SmsParams.Dirty.IncSlipping;
         }
         if (stateOfMario == MarioState.swimming)
+        {
             _smsDirtyAmount -= SmsParams.Dirty.DecSwimming;
+            _smsFootPrintTimer = 0; // the water takes the footprints
+        }
         if (stateOfMario == MarioState.SpinJump)
+        {
             _smsDirtyAmount -= SmsParams.Dirty.DecRotJump;
+            _smsFootPrintTimer = 0;
+        }
         _smsDirtyAmount = Mathf.Clamp(_smsDirtyAmount, 0f, SmsParams.Dirty.DirtyMax); // dirtyLimitCheck()
     }
 
@@ -15062,6 +15118,7 @@ public partial class Mario : CharacterBody3D
         if (_smsPollution == SmsPollution.Sink && _smsDirty)
         {
             _smsSinkTimer += 1f;
+            _smsFootPrintTimer = SmsParams.Graffito.FootPrintTimerMax; // checkSink: the mud leaves footprints too
             float hold = SmsParams.Graffito.SinkTime * SmsParams.Graffito.SinkDmgDepth;
             if (_health > 0 && _smsSinkTimer > hold)
                 _smsSinkTimer = hold;
@@ -17196,6 +17253,11 @@ public partial class Mario : CharacterBody3D
         float fwd = SmsUnits.MpsToSpeed(sign * speed);
         float vy = SmsUnits.MpsToSpeed(velocity.Y);
         SmsAir.ApplyLaunch(kind, ref fwd, ref vy);
+        if (_smsFootPrintTimer > SmsParams.Graffito.FootPrintTimerMax / 2)
+        {
+            // setStatusToJumping (MarioMove.cpp 432): fresh off the paint (the footprint window's first half) a takeoff stamps a 250-unit goop disc
+            SmsPollutionMap.Pollute(new Vector3(GlobalPosition.X, SmsFeetY(), GlobalPosition.Z), SmsParams.Dirty.PolSizeJump);
+        }
         if (_smsSinkTimer > 0f)
         {
             // setStatusToJumping() (MarioMove.cpp 657): isSinking() -> vy and fwd x the sink jump rate (0.5 flat as shipped); the depth bleeds (1 - t) x SinkTime x SinkRecover
