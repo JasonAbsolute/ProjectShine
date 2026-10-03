@@ -4144,3 +4144,12 @@ pass 62 replaced and 62c unreferenced); fruit_coconut / fruitpapaya / fruit_bana
 load_steps recounted (8 -> 7). Text surgery (tscn_strip.py), not an editor re-save, so nothing else in the files moved; Player.tscn was
 staged as HEAD + this hunk through the index, his uncommitted editor edits (the uid fixes, the BodyLag expansion, ThrowPowerScale 5.03 /
 ThrowVyScale 3.645) stay his. Checked headless: all seven scenes load and instantiate with no stale pickup node; the boot is clean.
+
+### Pass 62f -- the ma_hgjmp state and the button_start action (his two editor to-dos)
+With the editor still closed (10-02 22:35): assets/Player.tscn's BaseSM state machine gets `ma_hgjmp` (AnimationNodeAnimation_hgjmp on the
+clip the AnimationPlayer library already held -- SetMarioState(ledgeHopUp) travels to it; every vault used to log 'not found' and play
+nothing). The machine has only the Start -> ma_wait transition: the port's Travel() calls teleport (Godot's reset_on_teleport), so a state
+needs no transitions, as every other state here. project.godot gets `button_start` = joypad button 6 (Start / Xbox Menu / Nintendo +) +
+the Enter key, the action SmsPauseMenu.PauseAction reads (Escape stays the separate key_esc action). Both files carry his uncommitted
+editor edits: staged as HEAD + these hunks through the index, his stay his. Checked headless (a SceneTree script): BaseSM.has_node
+("ma_hgjmp") true and a travel to it accepted; InputMap.action_get_events("button_start") = the two events; the boot is clean.
