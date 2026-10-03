@@ -85,9 +85,10 @@ public partial class SmsPollutionLayer : MeshInstance3D
     [Export] public float FlameSize = 1.5f;        // the game's setGlobalScale(1.5)
     [Export] public float FlameWidth = 0.34f;      // metres at scale 1
     [Export] public float FlameHeight = 1.2f;      // metres at scale 1
-    [Export] public float FlameLife = 2.0f;        // seconds (the jpa emitter's life is not read)
-    /// <summary>DEVIATION knob: wisps per fire(). The game emits ONE fire per fire() (1); more scatters extras at other painted spots nearby.</summary>
-    [Export] public int FlamesPerFire = 1;
+    [Export] public float FlameLife = 1.5f;        // seconds (the jpa emitter's life is not read)
+    /// <summary>DEVIATION knob (his "spread the fire out"): wisps per fire(). The game emits ONE fire per fire() (1); the extras go to other
+    /// painted spots within the fire area (1600 units) around Mario.</summary>
+    [Export] public int FlamesPerFire = 3;
     [Export] public Shader FlameShader;            // default res://assets/Sms/Fx/GoopFlame.gdshader
     /// <summary>TPollutionLayer::electric(): on an Electric layer with paint within 1000 units of Mario, a bolt (the game: MS_THUNDER_S and
     /// SE_EF_ELEC) at a painted spot when the timer passes EffectWaitFrames -- a jagged lightning bolt climbing up from the goop, as in the

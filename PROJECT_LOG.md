@@ -4343,3 +4343,10 @@ a centre that sways (two sines + noise) more toward the tip and diverges a littl
 top, pale orange-yellow edges to near-white centres, a soft foot glow (0.22); additive at opacity 0.7; it grows up out of the goop over
 the first 18 % of its life and fades from 65 %. FlameWidth 0.34 (the quad 0.51 x 1.8 m at the game's x1.5). Knobs on the material:
 opacity, wave, wave_speed, ripple_speed, foot_glow, outer_color, core_color, intensity, grow_time, die_from.
+
+### Pass 65u -- the fire spread out, more streaks, the animation much faster (his tuning)
+"Spread the fire out, add some streaks and make the animation much faster." Previewed again (wisp_preview.py) for the streaks. DEVIATION
+(his ask, the game's values stated): FlamesPerFire 3 -- the game emits ONE fire per fire(); the two extras go to other painted spots
+within mFireArea (1600 units) around Mario, with lives 0.8-1.2 x. GoopFlame.gdshader: five streaks (the column, two tongues, two short
+outer ones; half-widths 0.46 / 0.36 / 0.33 / 0.26 / 0.28), more spread between them (xo x (0.35 + 0.5 hh)), anim_speed 2.6 multiplying
+all the motion (sway, ripple, tear), grow_time 0.1. FlameLife 1.5 s (was 2). No legacy retired (tuning).
