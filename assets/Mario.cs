@@ -2053,7 +2053,10 @@ public partial class Mario : CharacterBody3D
             heldBody.Scale = Vector3.One;
         }
         if (UseSmsPhysics)
+        {
             SmsTakeTick(delta);
+            SmsRideApply(); // checkRideMovement: the actor's matrix carries him before his own move (pass 63)
+        }
         UpdateCarryRunBlend((float)delta);
         UpdateRunAnimationSpeed();
         if (Input.IsActionJustPressed("button_z") || Input.IsActionJustPressed("key_z"))
@@ -4461,7 +4464,10 @@ public partial class Mario : CharacterBody3D
         if (_smsGroundMoved && !_smsSteppedUp && IsOnFloor())
             SmsStepVisualCheckSnap(preMovePos, preFloorN); // a riser the floor snap took (down a tread edge, mostly): the rig rides it
         if (UseSmsPhysics)
+        {
             SmsAfterMove();
+            SmsRideReCalc(); // checkRideReCalc: his settled position re-measured in the actor's local space (pass 63)
+        }
 
         if (stateOfMario != _lastDbgState || IsOnFloor() != _lastDbgOnFloor || _jumpDbgFrames > 0)
         {
@@ -10274,8 +10280,8 @@ public partial class Mario : CharacterBody3D
     {
         if (SmsStepSmoothRate <= 0f || preFloorN.Y < 0.5f)
             return;
-        if (MathF.Abs(GetPlatformVelocity().Y) > 0.01f)
-            return; // riding a lift: the floor itself moved
+        if (_smsRideBody != null)
+            return; // riding a lift: the floor itself moved (the ride carry, pass 63; the engine's platform velocity is off)
         Vector3 d = GlobalPosition - preMovePos;
         float alongPlane = -(preFloorN.X * d.X + preFloorN.Z * d.Z) / preFloorN.Y;
         float jump = d.Y - alongPlane;
@@ -12410,6 +12416,7 @@ public partial class Mario : CharacterBody3D
         SmsFluddSetupHandleSwing(); // the water gun's TMultiMtxEffect: the grips swing on jnt_G_handle
         SmsFluddSetupUpperGrafts(); // ma_swpmp / ma_hgpmp / ma_fepmp on the upper body while the body clip runs outside the tree
         SmsTakeSetupGraft(); // ma_carry_p the same way while he holds something (pass 62)
+        SmsRideSetup(); // the engine's platform carry off: checkRideMovement's own (pass 63)
         SmsFluddSetupTurboAnims(); // S5: ma_turbo_dash / ma_broad_jump as BaseSM states
         // the pump clips ping-pong (addUpper: ATTR_PING_PONG_LOOP; the tank's are slaved to Mario's)
         if (animPlayer.HasAnimation("ma_pump"))
@@ -16567,6 +16574,173 @@ public partial class Mario : CharacterBody3D
         _smsCarryGraftLen = clip.Length;
         if (SmsDebugPrint)
             GD.Print($"[SMS take] upper graft: ma_carry_p ({clip.Length:F3} s) on {_smsCarryGraft.BoneCount} bones under chn_chest");
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // RIDING (pass 63): TMario::checkRideMovement (MarioMove.cpp 1706) at the top of the tick, checkRideReCalc (1750) at the bottom.
+    // The game carries a rider by the owner's MATRIX: his position is kept as a point in the actor's local space (unk2F4), put
+    // through the actor's current transform every tick (translation and the turn about its origin at once), and his face is turned
+    // by the actor's yaw delta; his own move happens in world space after, and the local point is re-measured at the end of the
+    // tick. Nothing goes into his velocity, and leaving the actor keeps nothing. The original assembly (QbeRoot asm/Player/
+    // MarioMove.s, checkRideMovement) attaches on groundActor != null && !JUMPING && isTouchGround4cm -- the decomp's 'wall !=
+    // nullptr' in that test is wrong (r5 = mGroundPlane->mActor is what is compared). The engine's own carry (contact-point
+    // velocity, nothing about the pivot, the platform's velocity ADDED on leaving) is switched off.
+    // ---------------------------------------------------------------------------------------------------------------
+
+    /// <summary>DEVIATION knob (off = the game): keep the platform's velocity when he leaves it, as Godot's CharacterBody3D did by
+    /// default. checkRideMovement sets unk2C0 = null and adds nothing to mVel -- a jump off a moving lift is his own jump.</summary>
+    [Export] public bool RideKeepVelocityOnLeave = false;
+    private Node3D _smsRideBody;            // unk2C0: the actor he rides (the floor's owner), null = none
+    private Vector3 _smsRideLocal;          // unk2F4: his position in the actor's local space
+    private float _smsRideYawRef;           // unk30C: the actor's yaw last tick
+    private Transform3D _smsRideLastXf;     // the actor's matrix at the last carry (the knob's leave velocity)
+    private Vector3 _smsRideVel;            // the platform's velocity at his point over the last tick (the knob only)
+    private Transform3D _smsRideXf;         // the matrix this tick's carry used (the bottom re-measures against the same one)
+    private Transform3D _smsRideSrvPrev;    // the actor's server transform at the last tick: the motion to extrapolate
+    private bool _smsRideSrvValid, _smsRideApplied;
+
+    private void SmsRideSetup()
+    {
+        PlatformFloorLayers = 0;  // the engine's platform carry off: checkRideMovement's own carry below
+        PlatformWallLayers = 0;
+        PlatformOnLeave = PlatformOnLeaveEnum.DoNothing; // the game keeps nothing; RideKeepVelocityOnLeave adds it back by hand
+    }
+
+    /// <summary>A floor whose owner is an actor: an AnimatableBody3D (a lift, a turntable, anything moved by code or an animation with
+    /// sync_to_physics), or any body in the group "sms_ride".</summary>
+    private static bool SmsIsRideBody(Node n) => n is AnimatableBody3D || (n is PhysicsBody3D && n.IsInGroup("sms_ride"));
+
+    /// <summary>!checkStatusType(MARIO_STATUS_FLAG_JUMPING), plus the states the port pins itself (the ledge and fence tracking is theirs).</summary>
+    private bool SmsRideStateOk()
+    {
+        switch (stateOfMario)
+        {
+            // the JUMPING-type statuses (a launch frame still reads grounded) and the air dives / rollouts
+            case MarioState.singleJump: case MarioState.doubleJump: case MarioState.tripleJump: case MarioState.sideFlip: case MarioState.SpinJump:
+            case MarioState.backFlip: case MarioState.diving: case MarioState.singleJumpDive: case MarioState.doubleJumpDive: case MarioState.tripleJumpDive:
+            case MarioState.bellyRollout: case MarioState.singleRollout: case MarioState.stomping: case MarioState.bonk:
+            case MarioState.groundPoundStartup: case MarioState.groundPoundFalling:
+            case MarioState.ledgeHang: case MarioState.ledgeClimb: case MarioState.ledgeHopUp: case MarioState.ledgeDescend: case MarioState.ledgeFall:
+            case MarioState.fence: case MarioState.roofHang: case MarioState.swimming: case MarioState.wallSlide: case MarioState.wallJump:
+            case MarioState.fluddRocket: case MarioState.treeGrab: case MarioState.treeWait: case MarioState.treeClimb: case MarioState.treeMoveL:
+            case MarioState.treeMoveR: case MarioState.treeTopReach: case MarioState.shineGet: case MarioState.dead: case MarioState.talking:
+                return false;
+            default:
+                return true;
+        }
+    }
+
+    /// <summary>The actor's matrix as the collision world has it: a kinematic body's server transform (one step behind the node when its
+    /// script ran first this frame; the node when it runs after), else the node's.</summary>
+    private static Transform3D SmsRideServerXf(Node3D body)
+    {
+        if (body is AnimatableBody3D ab)
+        {
+            var st = PhysicsServer3D.BodyGetDirectState(ab.GetRid());
+            if (st != null)
+                return st.Transform;
+        }
+        return body.GlobalTransform;
+    }
+
+    /// <summary>One step ahead of <paramref name="cur"/> along the motion from <paramref name="prev"/>: the matrix the world will have at the
+    /// END of this step, so the carry puts him where the deck is about to be. (The server's own velocity is not used: a kinematic body
+    /// reports its spawn / teleport as one step's motion, 70 m/s for a lift placed 1.2 m up.)</summary>
+    private static Transform3D SmsRideExtrapolate(Transform3D prev, Transform3D cur)
+    {
+        Vector3 dp = cur.Origin - prev.Origin;
+        Basis d = cur.Basis * prev.Basis.Inverse();
+        if (dp.LengthSquared() > 1f || d.GetRotationQuaternion().GetAngle() > 0.5f)
+            return cur; // a metre or 30 degrees in one step is a teleport (a reset, a respawn), not a motion to continue
+        return new Transform3D((d * cur.Basis).Orthonormalized(), cur.Origin + dp);
+    }
+
+    /// <summary>checkRideMovement's riding branch, at the top of the tick: mPosition = ridingMtx x unk2F4; mFaceAngle.y += the actor's yaw
+    /// delta (unk30C). The mount tick (checkRideReCalc only) moves nothing -- that is the bottom's job.</summary>
+    private void SmsRideApply()
+    {
+        if (_smsRideBody == null)
+            return;
+        if (!IsInstanceValid(_smsRideBody) || !_smsRideBody.IsInsideTree())
+        {
+            _smsRideBody = null;
+            return;
+        }
+        Transform3D cur = SmsRideServerXf(_smsRideBody);
+        Transform3D xf = _smsRideSrvValid ? SmsRideExtrapolate(_smsRideSrvPrev, cur) : cur;
+        _smsRideSrvPrev = cur;
+        _smsRideSrvValid = true;
+        _smsRideXf = xf;
+        _smsRideApplied = true;
+        GlobalPosition = xf * _smsRideLocal;
+        float dt = (float)GetPhysicsProcessDeltaTime();
+        _smsRideVel = dt > 0f ? (GlobalPosition - _smsRideLastXf * _smsRideLocal) / dt : Vector3.Zero;
+        _smsRideLastXf = xf;
+        float yaw = xf.Basis.GetEuler().Y;
+        float d = SmsMath.WrapAngle(yaw - _smsRideYawRef);
+        _smsRideYawRef = yaw;
+        if (MathF.Abs(d) > 1e-6f)
+        {
+            if (_smsFaceValid)
+                _smsFaceYaw = SmsMath.WrapAngle(_smsFaceYaw + d);
+            lastFacingDirection = lastFacingDirection.Rotated(Vector3.Up, d);
+            if (armature != null)
+                armature.Rotation = new Vector3(armature.Rotation.X, armature.Rotation.Y + d, armature.Rotation.Z);
+        }
+    }
+
+    /// <summary>checkRideReCalc at the bottom of the tick (playerControl 2392): on an actor's floor, grounded, not in a jump status -> ride
+    /// it (a new actor: mount -- unk2C0, unk30C seeded, no displacement); unk2F4 = inverse(ridingMtx) x mPosition, so his own walking
+    /// this tick is folded into the local point. Off the actor -> unk2C0 = null, nothing kept (the knob adds the engine's old carry-over).</summary>
+    private void SmsRideReCalc()
+    {
+        Node3D body = null;
+        if (IsOnFloor() && SmsRideStateOk())
+        {
+            for (int i = 0; i < GetSlideCollisionCount(); i++)
+            {
+                var c = GetSlideCollision(i);
+                if (c.GetNormal().Dot(UpDirection) > 0.5f && c.GetCollider() is Node3D n && SmsIsRideBody(n))
+                {
+                    body = n;
+                    break;
+                }
+            }
+            if (body == null && SmsRay(GlobalPosition + Vector3.Up * 0.05f, GlobalPosition - Vector3.Up * 0.15f, out var hit)
+                && hit["collider"].AsGodotObject() is Node3D fn && SmsIsRideBody(fn))
+                body = fn;
+        }
+        if (body == null)
+        {
+            if (_smsRideBody != null)
+            {
+                if (RideKeepVelocityOnLeave)
+                    velocity += _smsRideVel; // DEVIATION: the engine's old carry-over
+                if (SmsDebugPrint)
+                    GD.Print($"[SMS ride] off {_smsRideBody.Name}{(RideKeepVelocityOnLeave ? $" (+ its {_smsRideVel.Length():F2} m/s, the knob)" : " (nothing kept)")}: state {stateOfMario}, floor {IsOnFloor()}");
+                _smsRideBody = null;
+                _smsRideSrvValid = false;
+                _smsRideApplied = false;
+            }
+            return;
+        }
+        Transform3D xf;
+        if (body == _smsRideBody && _smsRideApplied)
+            xf = _smsRideXf; // the matrix this tick's carry used: his own walking is what changed in between
+        else
+        {
+            xf = SmsRideServerXf(body);
+            _smsRideBody = body;
+            _smsRideSrvPrev = xf;
+            _smsRideSrvValid = true;
+            _smsRideLastXf = xf;
+            _smsRideYawRef = xf.Basis.GetEuler().Y;
+            _smsRideVel = Vector3.Zero;
+            if (SmsDebugPrint)
+                GD.Print($"[SMS ride] on {body.Name}: his point kept in its local space, turned with it; nothing on leaving (node {body.GlobalPosition}, world {xf.Origin}, his {GlobalPosition})");
+        }
+        _smsRideApplied = false;
+        _smsRideLocal = xf.AffineInverse() * GlobalPosition;
     }
 
     private void Respawn()

@@ -4023,3 +4023,26 @@ JUMP_THROW_END, SmsReleaseHeld (THROWN / PUT), the ma_carry_p graft (SmsUpperPos
 TAKE_POSE (ma_get_fail) only while moving / landing (running() 668, landing() 1005) -- waiting() tests mInput & 0x10000, which nothing
 sets, so standing still B does nothing (the legacy's swipe is gone). ExertVoice is the slot. NOT PORTED: the sweat, the per-fruit
 rotation handed to the thrown object, the object's own startSound(5) / startAnim(5), TAKEN (Mario carried by an enemy) and THROWN_DOWN.
+
+### Pass 63 -- riding moving and rotating objects
+TMario::checkRideMovement (MarioMove.cpp 1706) runs at the TOP of the tick (playerControl 2381: checkPlayerAction, before his own move and
+the BG check) and checkRideReCalc (1750) at the BOTTOM (2392). The game carries a rider by the owner's MATRIX, not by a velocity: his
+position is kept as a point in the ride actor's local space (unk2F4) and put through the actor's CURRENT transform each tick
+(getRidingMtx: SMS_GetActorMtx = TRS of mPosition / mRotation / mScaling, or the root joint's matrix for a bone-driven object) --
+translation and the turn about the origin in one multiply -- and mFaceAngle.y is turned by the actor's yaw delta (mRotation.y - unk30C,
+degrees x 32768 / 180). His own move then happens in world space and the local point is re-measured at the bottom, so walking on a
+turntable composes exactly; standing still he orbits the origin and turns with it. ATTACH (read against the original assembly, QbeRoot
+asm/Player/MarioMove.s: the decomp's 'wall != nullptr' is wrong -- r5 = mGroundPlane->mActor is what is tested): the floor triangle's
+owner exists, not a JUMPING-type status, isTouchGround4cm; or the hip drop's sit phases (state 2 / 3); or a 0x20000000 status (the
+fences, ascend / descend) with a wall of an actor near the 40-unit probe -> that actor. The mount tick seeds unk30C and the local
+point and moves nothing. LEAVING: actor null -> unk2C0 = null, NOTHING added to mVel -- a jump off a moving lift is his own jump, the
+lift goes on without him. A descending deck keeps him (position-driven) while he reads grounded. No ride .prm; the constants (0.8 x 50
+probe, 50 / unk15C wall check, 4 cm) are compiled in. PORT: the engine's CharacterBody3D carry is OFF (PlatformFloorLayers /
+PlatformWallLayers 0, PlatformOnLeave DoNothing -- it moved him by the contact point's velocity, knew nothing of the pivot (a tangent
+step a frame: an outward drift on a fast turntable), never turned his face, and ADDED the platform's velocity on leaving). SmsRideApply
+at the top of _PhysicsProcess (GlobalPosition = body.GlobalTransform x _smsRideLocal; _smsFaceYaw / lastFacingDirection / the armature
+turned by the body's Euler-Y delta) and SmsRideReCalc after MoveAndSlide (the floor collider that is an AnimatableBody3D or in the group
+"sms_ride", grounded, not an air / pinned state -> mount or re-measure; else off). RideKeepVelocityOnLeave (Mario export, off) is the
+DEVIATION knob that adds the platform's point velocity back when he leaves, as the engine used to. NOT PORTED: the fence / roof hang
+on a moving object (the port's ledge tracking is already the game's rule; the fence pin is not), the rail ride (TOROCCO is its own
+path), the camera's response to a turntable (none in checkRideMovement).
