@@ -1,21 +1,22 @@
-// A flame on fire goop (SmsPollutionLayer's GoopFlames, standing in for MAP_POLLUTION_MS_NEWFIRE_B / _A). From the reference (Pianta Village, The
-// Goopy Inferno): tall, thin, pale yellow-white wisps -- translucent columns of fire standing on the goop, wavering a little, their tops
-// dissolving. The game's glow3_flame sprite (a bright vertical slit in a soft glow) on an upright billboard stretched tall (the instance's x
-// scale = width, y scale = height), additive, its texture rippling upward, sampled twice out of phase so it flickers. INSTANCE_CUSTOM.x = the
-// flame's age 0..1 (it grows up out of the goop, burns, fades), .y = a per-flame random 0..1.
+// A flame on fire goop (SmsPollutionLayer's GoopFlames, standing in for MAP_POLLUTION_MS_NEWFIRE_B / _A). From his reference (Pianta Village,
+// The Goopy Inferno): tall, thin, pale yellow-white TRANSLUCENT wisps standing on the goop -- a wavering column with a secondary tongue,
+// their tips dissolving. Procedural, on an upright billboard (the instance's x scale = width, y scale = height): three thin soft streaks
+// rising from one spot, swaying more toward their tips and rippling upward, a ragged torn top, a soft warm glow at the foot; additive.
+// INSTANCE_CUSTOM.x = the wisp's age 0..1 (it grows up out of the goop, burns, fades), .y = a per-wisp random 0..1.
+// tools/projectshine/wisp_preview.py renders this same math to a PNG for a look without the game.
 shader_type spatial;
 render_mode blend_add, depth_draw_never, cull_disabled, unshaded;
 
-uniform sampler2D flame_tex : source_color, filter_linear, repeat_disable;
-uniform vec4 flame_color : source_color = vec4(1.0, 0.93, 0.62, 1.0);   // the wisp: pale yellow
-uniform vec4 core_color : source_color = vec4(1.0, 1.0, 0.9, 1.0);      // its centre: near white
-uniform float intensity = 1.15;
-uniform float opacity : hint_range(0.0, 1.0) = 0.75;
-uniform float wave : hint_range(0.0, 0.3) = 0.07;        // sideways wavering (UV), growing with height
+uniform vec4 outer_color : source_color = vec4(1.0, 0.8, 0.42, 1.0);   // the streaks' edges: pale orange-yellow
+uniform vec4 core_color : source_color = vec4(1.0, 0.98, 0.85, 1.0);   // their centres: near white
+uniform float intensity = 1.0;
+uniform float opacity : hint_range(0.0, 1.0) = 0.7;
+uniform float wave : hint_range(0.0, 0.6) = 0.3;          // sideways swaying of the streaks (fraction of the width), growing with height
 uniform float wave_speed = 2.4;
-uniform float ripple_speed = 1.6;                        // the upward ripple of the body
-uniform float grow_time : hint_range(0.02, 0.5) = 0.18;  // fraction of the life to grow up out of the goop
-uniform float die_from : hint_range(0.3, 1.0) = 0.65;    // fraction of the life where it starts fading
+uniform float ripple_speed = 1.6;                         // the upward ripple of the bodies
+uniform float foot_glow : hint_range(0.0, 0.6) = 0.22;    // the soft glow where the wisp meets the goop
+uniform float grow_time : hint_range(0.02, 0.5) = 0.18;   // fraction of the life to grow up out of the goop
+uniform float die_from : hint_range(0.3, 1.0) = 0.65;     // fraction of the life where it starts fading
 
 varying float age;
 varying float inst;
@@ -34,6 +35,28 @@ float vnoise(vec2 p) {
     return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
+// one streak: its contribution to the colour sum and the value sum
+void streak(float x, float h, float xo, float hs, float wgt, float ph, float thin, float lobe, inout vec3 col, inout float vt) {
+    float hh = h / hs;
+    if (hh > 1.0) {
+        return;
+    }
+    float shape = pow(1.0 - hh, 0.8) * smoothstep(0.0, 0.05, hh) * (0.6 + 0.4 * sin(3.14159265 * pow(hh, 0.9)));
+    float hw = max(0.5 * shape * thin, 1e-3);
+    float n = vnoise(vec2(inst + lobe * 7.0, hh * 2.5 - TIME * ripple_speed)) - 0.5;
+    float sway = (sin(TIME * wave_speed + hh * 4.0 + inst + ph) * 0.6 + n * 1.2 + sin(hh * 9.0 + TIME * 1.1 + ph) * 0.25) * wave * pow(hh, 1.2);
+    float xc = xo * (0.3 + 0.45 * hh) + sway;
+    float d = abs(x - xc) / hw;
+    float body = exp(-d * d * 1.3) * smoothstep(1.8, 0.9, d);
+    float ripple = 0.5 + 0.5 * vnoise(vec2(inst + 3.0 + lobe, hh * 5.0 - TIME * ripple_speed * 1.3));
+    float tear = (vnoise(vec2(inst + 11.0 + lobe * 3.0, hh * 6.0 - TIME * 2.0)) - 0.5) * 0.25;
+    float top = smoothstep(1.0, 0.65, hh + tear);
+    float v = body * ripple * top * wgt;
+    float core = exp(-d * d * 5.0);
+    col += mix(outer_color.rgb, core_color.rgb, core) * v;
+    vt += v;
+}
+
 void vertex() {
     // a cylindrical billboard: upright, turned to face the camera, keeping the instance's width (x scale) and height (y scale)
     float w = length(MODEL_MATRIX[0].xyz);
@@ -47,33 +70,36 @@ void vertex() {
     MODELVIEW_NORMAL_MATRIX = mat3(MODELVIEW_MATRIX);
     age = INSTANCE_CUSTOM.x;
     inst = INSTANCE_CUSTOM.y * 17.0;
-    // it grows up out of the goop, then stands; a slow breathing of the height
-    float grow = smoothstep(0.0, grow_time, age);
-    float breathe = 1.0 + 0.06 * sin(TIME * 3.1 + inst);
-    VERTEX.y = (VERTEX.y + 0.5) * grow * breathe; // the base on the paint
+    VERTEX.y += 0.5; // the base on the paint
 }
 
 void fragment() {
-    vec2 uv = UV;
-    float hgt = 1.0 - uv.y;          // 0 at the base, 1 at the top
-    float n = vnoise(vec2(inst, hgt * 2.5 - TIME * ripple_speed)) - 0.5;
-    uv.x += (sin(TIME * wave_speed + hgt * 3.5 + inst) * 0.6 + n * 0.8) * wave * hgt;
-    vec4 c1 = texture(flame_tex, clamp(uv, 0.0, 1.0));
-    // a second sample, narrower and out of phase: the body flickers
-    vec2 uv2 = vec2((uv.x - 0.5) * 1.25 + 0.5 + n * 0.05, uv.y + 0.04 * sin(TIME * 5.3 + inst + 1.7));
-    vec4 c2 = texture(flame_tex, clamp(uv2, 0.0, 1.0));
-    float a = max(c1.a, c2.a * 0.8);
-    float lum = max(dot(c1.rgb, vec3(0.333)), dot(c2.rgb, vec3(0.333)) * 0.8);
-    // the body ripples upward; the top dissolves
-    float ripple = 0.75 + 0.25 * vnoise(vec2(inst + 3.0, hgt * 4.0 - TIME * ripple_speed * 1.3));
-    float top = 1.0 - smoothstep(0.7, 1.0, hgt) * 0.6;
+    float x = UV.x - 0.5;            // -0.5 .. 0.5 across
+    float hgt = 1.0 - UV.y;          // 0 at the base, 1 at the top
+    float grow = smoothstep(0.0, grow_time, age);
     float fade = 1.0 - smoothstep(die_from, 1.0, age);
-    float v = a * lum * ripple * top * fade * opacity;
-    if (v <= 0.01) {
+    float h = hgt / max(grow, 1e-3); // it grows up out of the goop
+    if (h > 1.0) {
         discard;
     }
-    // the slit (the brightest part of the sprite) reads near white, the glow pale yellow
-    vec3 col = mix(flame_color.rgb, core_color.rgb, smoothstep(0.55, 1.0, lum));
+    vec3 col = vec3(0.0);
+    float vt = 0.0;
+    // three thin streaks rising from one spot: the column, and two shorter tongues beside it, out of phase
+    streak(x, h, 0.0, 1.0, 1.0, 0.0, 0.5, 0.0, col, vt);
+    streak(x, h, -0.16 + 0.1 * sin(inst), 0.78, 0.65, 2.1, 0.42, 1.0, col, vt);
+    streak(x, h, 0.17 + 0.08 * cos(inst * 1.3), 0.58, 0.5, 4.0, 0.38, 2.0, col, vt);
+    // the soft warm glow at the foot
+    float g = exp(-((x / 0.5) * (x / 0.5) * 3.0 + ((hgt - 0.1) / 0.22) * ((hgt - 0.1) / 0.22))) * foot_glow * smoothstep(0.0, 0.02, hgt) * grow;
+    col += outer_color.rgb * g;
+    vt += g;
+    if (vt <= 1e-4) {
+        discard;
+    }
+    col /= vt;
+    float v = min(1.0, vt) * fade * opacity;
+    if (v <= 0.005) {
+        discard;
+    }
     ALBEDO = col * intensity * v;
     ALPHA = v;
 }

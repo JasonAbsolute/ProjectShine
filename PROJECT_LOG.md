@@ -4331,3 +4331,15 @@ fading from 65 %. DEVIATION knob FlamesPerFire 1 (the game's one; extras go to o
 knobs. The FxPool now carries a per-instance random in INSTANCE_CUSTOM.y and exposes its ShaderMaterial (flame_tex / lean_max are set
 there). BOLT: GoopSpark.gdshader lean_max (radians) -- each bolt turns a random angle up to it off vertical, in the billboard's plane
 about its base; the layer's SparkLean 32 degrees sets it. NOT PORTED: the sounds, the real jpa emitters (these stand in).
+
+### Pass 65t -- the fire wisp redone against his reference, previewed before shipping
+"Again the fire looks nothing like the ref -- it just looks like a line." The 65s wisp stretched the game's glow3_flame sprite (a slit in a
+soft glow) tall and weighted it by luminance: the glow vanished over the bright goop and only the slit read -- a line. This time the look
+was PREVIEWED: tools/projectshine/wisp_preview.py renders the fragment math (pure Python) additively over goop orange next to his
+Ref/fireRef.png, three rounds until it read as the reference's wisps -- thin, wavering, translucent columns with a secondary tongue.
+PORT -- LEGACY RETIRED: the textured 65s wisp -> a PROCEDURAL wisp (Fx/GoopFlame.gdshader, no texture; FlameTexture export gone): three
+thin soft streaks rising from one spot (the column; two shorter tongues beside it, out of phase), each a Gaussian body exp(-d^2 1.3) about
+a centre that sways (two sines + noise) more toward the tip and diverges a little, rippling upward (0.5 + 0.5 noise), a torn dissolving
+top, pale orange-yellow edges to near-white centres, a soft foot glow (0.22); additive at opacity 0.7; it grows up out of the goop over
+the first 18 % of its life and fades from 65 %. FlameWidth 0.34 (the quad 0.51 x 1.8 m at the game's x1.5). Knobs on the material:
+opacity, wave, wave_speed, ripple_speed, foot_glow, outer_color, core_color, intensity, grow_time, die_from.
