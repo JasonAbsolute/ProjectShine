@@ -725,7 +725,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
         _sparkTimer += 1;
         if (_sparkTimer >= Math.Max(1, SparkEveryTicks))
         {
-            _sparks?.Spawn(at + Vector3.Up * 0.01f, SparkSize * 0.25f, SparkSize, SparkLife); // the bolt stands on the paint
+            _sparks?.Spawn(at + Vector3.Up * 0.01f, SparkSize * 0.3f, SparkSize, SparkLife); // the bolt stands on the paint
             _sparkTimer = 0;
         }
     }

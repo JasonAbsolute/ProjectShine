@@ -11,6 +11,7 @@ uniform float intensity = 1.8;
 uniform float climb_time : hint_range(0.1, 1.0) = 0.45;   // the fraction of the life the bolt takes to reach the top
 uniform float jag : hint_range(0.0, 1.0) = 0.35;          // how far the bolt wanders sideways (fraction of the quad's half width)
 uniform float flicker_rate = 30.0;
+uniform float thickness : hint_range(0.5, 3.0) = 1.5;    // the core's width (1 = the first, hair-thin bolt)
 
 varying float age;
 varying float inst; // INSTANCE_ID is a vertex built-in: carried over for the per-instance variety
@@ -64,8 +65,9 @@ void fragment() {
     // the main bolt
     float bx = bolt_x(hgt, seed);
     float d = abs(x - bx);
-    float core = exp(-d * d / (2.0 * 0.014 * 0.014));
-    float glow = exp(-d / 0.055) * 0.55;
+    float sig = 0.014 * thickness;
+    float core = exp(-d * d / (2.0 * sig * sig));
+    float glow = exp(-d / (0.055 * sqrt(thickness))) * 0.55;
     float v = (core + glow) * reveal;
 
     // a fork leaving the main bolt partway up, thinner and dimmer
@@ -74,7 +76,8 @@ void fragment() {
         float side = hash21(vec2(inst, 9.0)) < 0.5 ? -1.0 : 1.0;
         float fx = bolt_x(fork_from, seed) + side * (hgt - fork_from) * 0.9 + (lnoise(vec2(hgt * 23.0 + seed, 11.0)) - 0.5) * 0.08;
         float fd = abs(x - fx);
-        float fork = (exp(-fd * fd / (2.0 * 0.01 * 0.01)) + exp(-fd / 0.04) * 0.4) * 0.7;
+        float fsig = 0.01 * thickness;
+        float fork = (exp(-fd * fd / (2.0 * fsig * fsig)) + exp(-fd / (0.04 * sqrt(thickness))) * 0.4) * 0.7;
         v += fork * smoothstep(fork_from + 0.5, fork_from, hgt) * reveal;
     }
 
