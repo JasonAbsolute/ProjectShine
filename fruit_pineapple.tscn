@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=4 uid="uid://b2km1ecb3arua"]
+[gd_scene load_steps=7 format=4 uid="uid://b2km1ecb3arua"]
 
 [ext_resource type="Texture2D" uid="uid://dxyr1bqf7m5j6" path="res://models/Fruits/FruitPineapple_J_pine.png" id="1_va8h8"]
 [ext_resource type="Script" uid="uid://cdr4d5rbgs0kg" path="res://assets/Fruit.cs" id="1_vc6xf"]
@@ -39,9 +39,6 @@ bind/0/pose = Transform3D(150.19, 0, 0, 0, 150.19, -1.13391e-05, 0, 1.13391e-05,
 [sub_resource type="SphereShape3D" id="SphereShape3D_va8h8"]
 radius = 0.33218
 
-[sub_resource type="SphereShape3D" id="SphereShape3D_vc6xf"]
-radius = 0.34685
-
 [node name="FruitPineapple" type="RigidBody3D"]
 script = ExtResource("1_vc6xf")
 Type = 3
@@ -66,9 +63,3 @@ skin = SubResource("Skin_mkhfl")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.00801942, 0)
 shape = SubResource("SphereShape3D_va8h8")
 
-[node name="PickupZone" type="Area3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.291786, 0)
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupZone"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.307263, 0)
-shape = SubResource("SphereShape3D_vc6xf")

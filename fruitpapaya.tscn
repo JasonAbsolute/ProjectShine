@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=4 uid="uid://b2vhs6b6h0x6v"]
+[gd_scene load_steps=7 format=4 uid="uid://b2vhs6b6h0x6v"]
 
 [ext_resource type="Texture2D" uid="uid://coroa177nlhfu" path="res://models/Fruits/Fruitpapaya_J_papaya.png" id="1_x2g8u"]
 [ext_resource type="Script" uid="uid://cdr4d5rbgs0kg" path="res://assets/Fruit.cs" id="1_xilvv"]
@@ -40,9 +40,6 @@ bind/0/pose = Transform3D(137.766, 0, 0, 0, 137.766, -1.04011e-05, 0, 1.04011e-0
 [sub_resource type="SphereShape3D" id="SphereShape3D_x2g8u"]
 radius = 0.570306
 
-[sub_resource type="SphereShape3D" id="SphereShape3D_xilvv"]
-radius = 0.648852
-
 [node name="Fruitpapaya" type="RigidBody3D"]
 script = ExtResource("1_xilvv")
 Type = 2
@@ -67,7 +64,3 @@ skin = SubResource("Skin_6tbdc")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.120307, 0)
 shape = SubResource("SphereShape3D_x2g8u")
 
-[node name="PickupZone" type="Area3D" parent="."]
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupZone"]
-shape = SubResource("SphereShape3D_xilvv")

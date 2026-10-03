@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=4 uid="uid://be5x3l2l8uh2b"]
+[gd_scene load_steps=7 format=4 uid="uid://be5x3l2l8uh2b"]
 
 [ext_resource type="Script" uid="uid://cdr4d5rbgs0kg" path="res://assets/Fruit.cs" id="1_2x4e3"]
 [ext_resource type="Texture2D" uid="uid://b2j2qem1adkxl" path="res://models/Fruits/FruitBanana_J_banana.png" id="1_imdhs"]
@@ -40,9 +40,6 @@ bind/0/pose = Transform3D(224.404, 0, 0, 0, 224.404, -1.6942e-05, 0, 1.6942e-05,
 [sub_resource type="SphereShape3D" id="SphereShape3D_2x4e3"]
 radius = 0.26249
 
-[sub_resource type="SphereShape3D" id="SphereShape3D_2h0qv"]
-radius = 0.262796
-
 [node name="FruitBanana" type="RigidBody3D"]
 script = ExtResource("1_2x4e3")
 
@@ -66,9 +63,3 @@ skin = SubResource("Skin_hltwn")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.262426, 0)
 shape = SubResource("SphereShape3D_2x4e3")
 
-[node name="PickupZone" type="Area3D" parent="."]
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupZone"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.243911, 0)
-shape = SubResource("SphereShape3D_2h0qv")
-debug_color = Color(0.856466, 0.313585, 0.495249, 0.42)

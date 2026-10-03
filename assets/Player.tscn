@@ -1229,8 +1229,6 @@ _data = {
 &"ma_yo_walk": ExtResource("202_rtmdj")
 }
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_uiq8p"]
-
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_uiq8p"]
 animation = &"ma_carry_p"
 
@@ -2471,12 +2469,6 @@ transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, -5.40932, 5.26633, 9.46787)
 
 [node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=623963602]
 libraries/ = SubResource("AnimationLibrary_lux1s")
-
-[node name="pickupCast" type="ShapeCast3D" parent="." unique_id=1551668971]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.921875, -0.690529)
-shape = SubResource("BoxShape3D_uiq8p")
-target_position = Vector3(0, 0, 0)
-debug_shape_custom_color = Color(0, 0.854902, 0, 1)
 
 [node name="AnimationTree" type="AnimationTree" parent="." unique_id=127178929]
 tree_root = SubResource("AnimationNodeBlendTree_odpnk")

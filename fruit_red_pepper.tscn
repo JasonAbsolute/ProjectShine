@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=4 uid="uid://dexm07kfwte52"]
+[gd_scene load_steps=7 format=4 uid="uid://dexm07kfwte52"]
 
 [ext_resource type="Script" uid="uid://cdr4d5rbgs0kg" path="res://assets/Fruit.cs" id="1_tubav"]
 [ext_resource type="Texture2D" uid="uid://c01dahhhn3hu0" path="res://models/Fruits/FruitRedPepper_N_btelesa_togarasi.png" id="1_vmo8g"]
@@ -38,9 +38,6 @@ bind/0/pose = Transform3D(100.811, 0, 0, 0, 100.811, -7.61098e-06, 0, 7.61098e-0
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_tubav"]
 
-[sub_resource type="SphereShape3D" id="SphereShape3D_vmo8g"]
-radius = 0.551745
-
 [node name="FruitRedPepper" type="RigidBody3D"]
 script = ExtResource("1_tubav")
 Type = 4
@@ -65,8 +62,3 @@ skin = SubResource("Skin_g1d0p")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.393641, 0)
 shape = SubResource("SphereShape3D_tubav")
 
-[node name="PickupZone" type="Area3D" parent="."]
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupZone"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.397381, 0)
-shape = SubResource("SphereShape3D_vmo8g")

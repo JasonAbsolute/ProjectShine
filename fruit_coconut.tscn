@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=4 uid="uid://duike4wtbxsen"]
+[gd_scene load_steps=7 format=4 uid="uid://duike4wtbxsen"]
 
 [ext_resource type="Texture2D" uid="uid://cx53n6h4xfjc6" path="res://models/Fruits/FruitCoconut_J_coconuts.png" id="1_xxix4"]
 [ext_resource type="Script" uid="uid://cdr4d5rbgs0kg" path="res://assets/Fruit.cs" id="2_kyx6o"]
@@ -40,9 +40,6 @@ bind/0/pose = Transform3D(129.815, 0, 0, 0, 129.815, -9.80079e-06, 0, 9.80079e-0
 [sub_resource type="SphereShape3D" id="SphereShape3D_kyx6o"]
 radius = 0.316563
 
-[sub_resource type="SphereShape3D" id="SphereShape3D_xxix4"]
-radius = 0.335049
-
 [node name="FruitCoconut" type="RigidBody3D"]
 script = ExtResource("2_kyx6o")
 Type = 1
@@ -66,7 +63,3 @@ skin = SubResource("Skin_roebw")
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("SphereShape3D_kyx6o")
 
-[node name="PickupZone" type="Area3D" parent="."]
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="PickupZone"]
-shape = SubResource("SphereShape3D_xxix4")
