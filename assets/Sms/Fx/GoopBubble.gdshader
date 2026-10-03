@@ -9,7 +9,7 @@ uniform vec4 tint : source_color = vec4(0.9, 0.9, 0.9, 1.0);   // the dome is a 
 uniform vec4 rim_color : source_color = vec4(1.0, 0.97, 0.9, 1.0);
 uniform float rim_power = 3.0;
 uniform float rim_strength = 0.55;
-uniform float pop_flash = 0.6;                                   // how much it brightens in the last tenth of its life
+uniform float pop_flash = 0.0;                                   // a brightening before the pop; 0 = none (it read as turning white)
 uniform float roughness : hint_range(0.0, 1.0) = 0.12;
 uniform float specular : hint_range(0.0, 1.0) = 0.8;
 

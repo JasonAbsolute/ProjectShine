@@ -64,6 +64,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
     [Export] public float BubbleLife = 2.4f;       // seconds from forming to gone: a slow swell for 70 %, a quiver, the pop at 85 %, the ripple after
     [Export] public int BubbleMax = 32;
     [Export] public bool BubblePop = true;         // the pop throws a ripple ring and a few goop droplets
+    [Export] public Color RingTint = new Color(0.1f, 0.07f, 0.04f, 0.55f); // the ripple's colour and starting opacity: a translucent dark shadow, never white
     [Export] public Shader BubbleShader;           // default res://assets/Sms/Fx/GoopBubble.gdshader
     [Export] public bool DebugPrint = false;
 
@@ -634,7 +635,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
         _bubbleMmi.GlobalTransform = Transform3D.Identity; // the instances are placed in world space
         if (!BubblePop)
             return;
-        // the pop: a ripple ring (the port's hamonring2, additive, fading) and up to four goop droplets a bubble
+        // the pop: a ripple ring (the port's hamonring2 as the alpha, tinted a dark translucent goop shadow, fading) and up to four goop droplets a bubble
         _ringAge = new float[n];
         _ringPos = new Vector3[n];
         _ringSize = new float[n];
@@ -644,7 +645,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
         {
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
             Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-            BlendMode = BaseMaterial3D.BlendModeEnum.Add,
+            BlendMode = BaseMaterial3D.BlendModeEnum.Mix, // a translucent dark ripple on the paint (additive read as a white flash)
             VertexColorUseAsAlbedo = true,
             CullMode = BaseMaterial3D.CullModeEnum.Disabled,
             NoDepthTest = false,
@@ -721,7 +722,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
             }
             float size = _ringSize[i] * (1f + 2f * t);
             _ringMm.SetInstanceTransform(i, new Transform3D(flat.Scaled(new Vector3(size, size, size)), _ringPos[i]));
-            _ringMm.SetInstanceColor(i, new Color(1f, 0.95f, 0.85f, 0.8f * (1f - t)));
+            _ringMm.SetInstanceColor(i, new Color(RingTint.R, RingTint.G, RingTint.B, RingTint.A * (1f - t)));
         }
         for (int i = 0; i < _dropAge.Length; i++)
         {
