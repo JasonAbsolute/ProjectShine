@@ -18,19 +18,20 @@ public enum SmsPollutionType
 
 /// <summary>
 /// A goop layer, after TPollutionLayer (Map/PollutionLayer.cpp, PollutionPos.cpp, PollutionAction.cpp, PollutionCount.cpp): a byte
-/// map (0 clean .. 255) over a grid of TexelSize-unit texels covering this mesh's XZ extent, with a height map (one depth unit = 40
-/// units of height, 0xFF = no surface) so a sample only counts within +-2 depth units (80 units) of the surface. The game's I8 texture
-/// of the layer's model IS the map; here the map is uploaded to the goop material's pollution_map uniform (assets/Sms/Fx/Goop.gdshader
-/// reads it by world XZ). Stamps (pollute = toward 255, clean = toward 0, a soft disc of the given size, through the height mask), the
-/// 30 Hz settle pass (paint under 50 fades 8 a frame; a FireRegrow layer grows paint above 160; a Decay layer loses 2 everywhere), the
-/// spread (a layer flagged CanSpread paints 128-unit stamps near Mario every 4th movement tick), the degree (texels above 0) and the
-/// Cleaned signal (TPollutionLayer::cleaned: the erase sound + the cleaned-goop particle, your hooks) are the port's.
-/// Author one as a MeshInstance3D over the floor (a PlaneMesh 1 cm above a flat floor, or a copy of the terrain mesh): the mesh is
-/// both the surface the height map is baked from and what the goop is drawn on. A StaticBody3D / CSG tagged metadata sms_pollution
+/// map (0 clean .. 255) over a grid of TexelSize-unit texels covering this mesh, with a height map (one depth unit = 40 units of
+/// height, 0xFF = no surface) so a sample only counts within +-2 depth units (80 units) of the surface. The game's I8 texture of the
+/// layer's model IS the map; here the map is uploaded to the goop material's pollution_map uniform (assets/Sms/Fx/Goop.gdshader).
+/// The grid lives in the LAYER'S OWN FRAME (the node's rotation and position; its scale is folded into the geometry), so a turned or
+/// scaled quad carries its paint, its layout and its swirl with it -- the game's layers are world-axis rectangles, which never turn.
+/// Stamps (pollute = toward 255, clean = toward 0, a soft disc of the given size, through the height mask), the 30 Hz settle pass
+/// (paint under 50 fades 8 a frame; a FireRegrow layer grows paint above 160; a Decay layer loses 2 everywhere), the spread (a layer
+/// flagged CanSpread paints 128-unit stamps near Mario every 4th movement tick), the degree (texels above 0), the Cleaned signal
+/// (TPollutionLayer::cleaned: the erase sound + the cleaned-goop particle, your hooks) and the bubbles (action()'s RAKU_INDAWA) are the
+/// port's. Author one as a MeshInstance3D over the floor (a PlaneMesh 1 cm above a flat floor, or a copy of the terrain mesh): the mesh
+/// is both the surface the height map is baked from and what the goop is drawn on. A StaticBody3D / CSG tagged metadata sms_pollution
 /// gets an implicit layer over its collision (SmsPollutionMap.EnsureImplicitLayers), painted full, drawn by nothing.
-/// Not ported: the wall layers (TPollutionLayerWallPlusX / PlusZ: the paint projected along X / Z), the layer's own particles (the fire /
-/// thunder / wave effects, PARTICLE_MS_RAKU_INDAWA), the stamp textures (the default clean / pollute stamps are soft discs here), the
-/// joint-object and model stamps (enemies painting with their models), the prohibit areas and the revival stamps.
+/// Not ported: the wall layers (TPollutionLayerWallPlusX / PlusZ), the layer's own particles (fire / thunder / wave), the stamp
+/// textures (soft discs here), the joint-object and model stamps (enemies painting), the prohibit areas and the revival stamps.
 /// </summary>
 [GlobalClass]
 public partial class SmsPollutionLayer : MeshInstance3D
@@ -38,12 +39,14 @@ public partial class SmsPollutionLayer : MeshInstance3D
     public enum Paint { Empty = 0, Full = 1, Texture = 2 }
 
     [Export] public SmsPollutionType Type = SmsPollutionType.Slip;
-    /// <summary>info->mTexelSize: units of floor per texel (the sampling ring is 32 units; a 20 m pond at 32 is a 64 x 64 map).</summary>
+    /// <summary>info->mTexelSize: units of floor per texel (the sampling ring is 32 units; a 20 m pond at 32 is a 64 x 64 map). Lettering
+    /// layouts want 16: Mario is dirty only with all nine ring points (0.86 m) on paint, so a stroke must span about three texels.</summary>
     [Export] public float TexelSize = 32f;
     [Export] public Paint InitialPaint = Paint.Full;
     /// <summary>The layer's /scene/map/pollution/&lt;name&gt;.bmp -- the SHAPE of the goop at the start: red = the paint (0 clean .. 255), the image
-    /// stretched over the MESH (its local X / Z extent: it fills the quad and turns with the node), image x along the mesh's +X, image y along
-    /// its +Z; the edge rule (-50 a neighbouring empty texel) is applied as the game's initTexImage does. Only read with InitialPaint = Texture.</summary>
+    /// stretched over the mesh (image x along the layer's +X, image y along its +Z) and turning with the node; sampled 3 x 3 per texel so
+    /// a diagonal edge comes in graded; the edge rule (-50 a neighbouring empty texel) applies as the game's initTexImage does. Only read
+    /// with InitialPaint = Texture.</summary>
     [Export] public Texture2D InitialPaintTexture;
     /// <summary>FLAG_DECAY: every texel loses 2 a frame (a layer that dies on its own).</summary>
     [Export] public bool Decay = false;
@@ -54,18 +57,20 @@ public partial class SmsPollutionLayer : MeshInstance3D
     /// <summary>The goop's surface texture (goop_albedo). Empty = the type's default from assets/Sms/Fx/Goop: FireGoop for Fire / FireRegrow,
     /// ElectricGoop for Electric, BrownGoop for everything else; OilGoop, PinkGoop and BetaGoop are there to pick.</summary>
     [Export] public Texture2D GoopTexture;
-    /// <summary>TPollutionLayer::action's PARTICLE_MS_RAKU_INDAWA: every 16 movement ticks a bubble swells and pops at a random painted spot near
-    /// Mario (not on fire layers). The game's particle is not here; a dome in the goop's own texture stands in.</summary>
+    /// <summary>TPollutionLayer::action's PARTICLE_MS_RAKU_INDAWA: a bubble swells and pops at a random painted spot near Mario (not on fire
+    /// layers). The game's particle is not here; a dome in the goop's own texture stands in.</summary>
     [Export] public bool Bubbles = true;
     /// <summary>DEVIATION knob: movement ticks between bubbles while paint is near Mario. The game's RAKU_INDAWA fires every 16; the port's
     /// stand-in reads as whack-a-mole at that rate on a big painted floor, so 48 (2.5 a second) is the default.</summary>
     [Export] public int BubbleEveryTicks = 48;
     [Export] public float BubbleSize = 0.26f;      // the dome's radius at full swell (metres)
-    [Export] public float BubbleLife = 2.4f;       // seconds from forming to gone: a slow swell for 70 %, a quiver, the pop at 85 %, the ripple after
+    [Export] public float BubbleLife = 2.4f;       // seconds from forming to gone: a slow swell for 70 %, a quiver, the pop at 85 %, the fade and ripple after
     [Export] public int BubbleMax = 32;
     [Export] public bool BubblePop = true;         // the pop throws a ripple ring and a few goop droplets
-    [Export] public Color RingTint = new Color(0.95f, 0.97f, 1.0f, 0.5f); // the ripple's colour and starting opacity: a soft white ring, alpha-blended (not additive)
+    [Export] public float RingOpacity = 0.6f;      // the ripple's starting opacity (it wears the goop's own colour, a little lightened)
+    [Export] public float RingBrighten = 0.25f;    // how much lighter than the paint the ripple is (0 = the paint's colour exactly)
     [Export] public Shader BubbleShader;           // default res://assets/Sms/Fx/GoopBubble.gdshader
+    [Export] public Shader RingShader;             // default res://assets/Sms/Fx/GoopRing.gdshader
     [Export] public bool DebugPrint = false;
 
     /// <summary>TPollutionLayer::cleaned: a spot over 100 was being erased -- the game plays MSD_SE_ERASE_SCRAWL and PARTICLE_MS_RAKU_KIE here.</summary>
@@ -73,11 +78,12 @@ public partial class SmsPollutionLayer : MeshInstance3D
 
     public int Width { get; private set; }
     public int Height { get; private set; }
-    public float MinX { get; private set; }   // the layer's XZ extent (world metres) = TPollutionLayerInfo mLeft / mTop / mRight / mBottom
+    /// <summary>The layer's extent in ITS OWN frame (metres): TPollutionLayerInfo mLeft / mTop / mRight / mBottom. World points go through ToLocal.</summary>
+    public float MinX { get; private set; }
     public float MinZ { get; private set; }
     public float MaxX { get; private set; }
     public float MaxZ { get; private set; }
-    public float VerticalOffsetUnits { get; private set; } // info->mVerticalOffset: depth 0 (units)
+    public float VerticalOffsetUnits { get; private set; } // info->mVerticalOffset: depth 0 (units, in the layer's frame)
     public bool Built { get; private set; }
     /// <summary>Texels above 0 at the last settle pass (the counter the GPU pass counts; TPollutionManager::getPollutionDegree sums them).</summary>
     public int Degree { get; private set; }
@@ -89,6 +95,9 @@ public partial class SmsPollutionLayer : MeshInstance3D
     /// <summary>A layer SmsPollutionMap made for a tagged body: no mesh, the height map from rays onto that body.</summary>
     public bool Implicit;
     public Node3D ImplicitBody;
+    /// <summary>World -> the layer's frame (the node's rotation and origin; metres stay metres).</summary>
+    public Transform3D ToLocal => _toLocal;
+    public Transform3D ToWorld => _toWorld;
 
     public int PollutedThreshold => Type == SmsPollutionType.FireRegrow ? SmsParams.Pollution.ThresholdRegrow
                                   : Type == SmsPollutionType.Fire ? SmsParams.Pollution.ThresholdFire : SmsParams.Pollution.ThresholdNormal;
@@ -99,14 +108,13 @@ public partial class SmsPollutionLayer : MeshInstance3D
     private byte[] _height;       // TPollutionPos::mHeightMap (0xFF = no surface)
     private float _texelM;        // metres per texel
     private float _invTexelM;
+    private Transform3D _toLocal = Transform3D.Identity;
+    private Transform3D _toWorld = Transform3D.Identity;
     private Image _image;
     private ImageTexture _tex;
     private bool _texDirty;
     private ShaderMaterial _mat;
     private bool _ownMaterial;    // the layer made the material (it may set the look); a material of yours only gets the map uniforms
-    private bool _paintFrame;     // the paint layout maps through the mesh's local frame (a rotated / scaled node turns its layout with it)
-    private Transform3D _paintInv;
-    private Aabb _paintAabb;
     private MultiMeshInstance3D _bubbleMmi;
     private MultiMesh _bubbleMm;
     private Vector3[] _bubblePos;
@@ -135,6 +143,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
     private static readonly int[] CleanOffX = { -1, 0, 2, 4, 1, -1, -2, 0, 3, -3 };
     private static readonly int[] CleanOffZ = { -1, -1, 0, 2, -2, -3, 0, 3, 0, 1 };
     private static readonly Random Rng = new Random(0x600D);
+    private static readonly Transform3D ZeroXf = new Transform3D(Basis.Identity.Scaled(Vector3.Zero), Vector3.Zero);
 
     public override void _Ready()
     {
@@ -146,8 +155,9 @@ public partial class SmsPollutionLayer : MeshInstance3D
     public override void _ExitTree() => SmsPollutionMap.Unregister(this);
 
     // ---------------------------------------------------------------------------------------------------------------- build
-    /// <summary>The grid over this mesh: its world AABB in XZ, a power-of-two texel count (the game's log2 width / height), the height map
-    /// rasterised from the mesh's triangles (the top surface where they overlap), the paint, the texture and the material.</summary>
+    /// <summary>The grid over this mesh in the layer's frame: the node's rotation and origin make the frame (its scale goes into the geometry),
+    /// the mesh's extent in that frame is the rectangle, a power-of-two texel count (the game's log2 width / height), the height map
+    /// rasterised from the triangles (the top surface where they overlap), then the paint, the texture and the material.</summary>
     public void Build()
     {
         var faces = Mesh.GetFaces();
@@ -156,13 +166,15 @@ public partial class SmsPollutionLayer : MeshInstance3D
             GD.PushWarning($"SmsPollutionLayer '{Name}': the mesh has no faces -- no layer");
             return;
         }
-        Transform3D xf = GlobalTransform;
-        var world = new Vector3[faces.Length];
+        Transform3D g = GlobalTransform;
+        _toWorld = new Transform3D(g.Basis.Orthonormalized(), g.Origin);
+        _toLocal = _toWorld.AffineInverse();
+        var local = new Vector3[faces.Length];
         float minX = float.MaxValue, minZ = float.MaxValue, maxX = float.MinValue, maxZ = float.MinValue, minY = float.MaxValue;
         for (int i = 0; i < faces.Length; i++)
         {
-            Vector3 p = xf * faces[i];
-            world[i] = p;
+            Vector3 p = _toLocal * (g * faces[i]); // world, then into the frame: the scale survives, the rotation is taken out
+            local[i] = p;
             if (p.X < minX) minX = p.X;
             if (p.X > maxX) maxX = p.X;
             if (p.Z < minZ) minZ = p.Z;
@@ -170,13 +182,10 @@ public partial class SmsPollutionLayer : MeshInstance3D
             if (p.Y < minY) minY = p.Y;
         }
         SetupGrid(minX, minZ, maxX, maxZ, minY);
-        _paintInv = xf.AffineInverse();
-        _paintAabb = Mesh.GetAabb();
-        _paintFrame = _paintAabb.Size.X > 1e-4f && _paintAabb.Size.Z > 1e-4f;
         // the height map from the triangles (barycentric in XZ), the highest surface where several cover a texel
-        for (int t = 0; t + 2 < world.Length; t += 3)
+        for (int t = 0; t + 2 < local.Length; t += 3)
         {
-            Vector3 a = world[t], b = world[t + 1], c = world[t + 2];
+            Vector3 a = local[t], b = local[t + 1], c = local[t + 2];
             float det = (b.X - a.X) * (c.Z - a.Z) - (c.X - a.X) * (b.Z - a.Z);
             if (MathF.Abs(det) < 1e-9f)
                 continue; // a wall or a sliver seen from above
@@ -206,10 +215,12 @@ public partial class SmsPollutionLayer : MeshInstance3D
         FinishBuild();
     }
 
-    /// <summary>The implicit layer of a tagged body: the grid over its collision shapes' world AABB, the height map from a ray a texel
-    /// down onto that body (its upward faces), painted full.</summary>
+    /// <summary>The implicit layer of a tagged body: the frame is the world's, the grid over its collision shapes' AABB, the height map from a
+    /// ray a texel down onto that body (its upward faces), painted full.</summary>
     public void BuildFromBody(Node3D body)
     {
+        _toWorld = Transform3D.Identity;
+        _toLocal = Transform3D.Identity;
         float minX = float.MaxValue, minZ = float.MaxValue, maxX = float.MinValue, maxZ = float.MinValue, minY = float.MaxValue, maxY = float.MinValue;
         bool any = false;
         void Grow(Aabb box, Transform3D xf)
@@ -293,6 +304,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
             if (src != null && src.IsCompressed())
                 src.Decompress(); // a VRAM-compressed import (the editor's detect_3d) cannot be read per pixel as is
         }
+        float spanX = MathF.Max(1e-6f, MaxX - MinX), spanZ = MathF.Max(1e-6f, MaxZ - MinZ);
         for (int tz = 0; tz < Height; tz++)
             for (int sx = 0; sx < Width; sx++)
             {
@@ -305,25 +317,19 @@ public partial class SmsPollutionLayer : MeshInstance3D
                 int depth = 255;
                 if (src != null)
                 {
-                    // the game's bmp is one pixel per texel of its layer; here the image is stretched over the MESH (its local X / Z extent), so it
-                    // fills the quad you placed and turns and scales with the node -- the texel's centre is taken back into the mesh's frame
-                    float u, v;
-                    if (_paintFrame)
-                    {
-                        Vector3 world = new Vector3(MinX + (sx + 0.5f) * _texelM, SmsUnits.UnitsToMetres(_height[idx] / SmsParams.Pollution.DepthScale + VerticalOffsetUnits), MinZ + (tz + 0.5f) * _texelM);
-                        Vector3 local = _paintInv * world;
-                        u = (local.X - _paintAabb.Position.X) / _paintAabb.Size.X;
-                        v = (local.Z - _paintAabb.Position.Z) / _paintAabb.Size.Z;
-                    }
-                    else
-                    {
-                        u = (sx + 0.5f) * _texelM / (MaxX - MinX);
-                        v = (tz + 0.5f) * _texelM / (MaxZ - MinZ);
-                    }
-                    if (u < 0f || u >= 1f || v < 0f || v >= 1f)
-                        depth = 0;
-                    else
-                        depth = src.GetPixel(Math.Min(src.GetWidth() - 1, (int)(u * src.GetWidth())), Math.Min(src.GetHeight() - 1, (int)(v * src.GetHeight()))).R8;
+                    // the game's bmp is one pixel per texel of its layer; here the image is stretched over the mesh's extent in the layer's frame
+                    // (it fills the quad and turns with the node), nine samples a texel so a slanted edge comes in graded
+                    int sum = 0;
+                    for (int oy = -1; oy <= 1; oy++)
+                        for (int ox = -1; ox <= 1; ox++)
+                        {
+                            float u = (sx + 0.5f + ox / 3f) * _texelM / spanX;
+                            float v = (tz + 0.5f + oy / 3f) * _texelM / spanZ;
+                            if (u < 0f || u >= 1f || v < 0f || v >= 1f)
+                                continue;
+                            sum += src.GetPixel(Math.Min(src.GetWidth() - 1, (int)(u * src.GetWidth())), Math.Min(src.GetHeight() - 1, (int)(v * src.GetHeight()))).R8;
+                        }
+                    depth = sum / 9;
                 }
                 if (depth == 0)
                 {
@@ -351,6 +357,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
                 _ownMaterial = true;
             }
             _mat.SetShaderParameter("pollution_map", _tex);
+            _mat.SetShaderParameter("layer_to_local", _toLocal);
             _mat.SetShaderParameter("layer_min", new Vector2(MinX, MinZ));
             _mat.SetShaderParameter("layer_inv_size", new Vector2(1f / (Width * _texelM), 1f / (Height * _texelM)));
             _mat.SetShaderParameter("threshold", PollutedThreshold / 255f);
@@ -368,7 +375,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
             SetupBubbles();
         Built = true;
         if (DebugPrint)
-            GD.Print($"[SMS goop] layer '{Name}' {Type}: {Width} x {Height} texels of {TexelSize} u over x {MinX:F2}..{MaxX:F2} z {MinZ:F2}..{MaxZ:F2} m, " +
+            GD.Print($"[SMS goop] layer '{Name}' {Type}: {Width} x {Height} texels of {TexelSize} u over x {MinX:F2}..{MaxX:F2} z {MinZ:F2}..{MaxZ:F2} m (its frame), " +
                      $"{Degree} painted, threshold {PollutedThreshold}{(Implicit ? $" (implicit, body '{ImplicitBody?.Name}')" : "")}");
     }
 
@@ -403,16 +410,35 @@ public partial class SmsPollutionLayer : MeshInstance3D
     // ------------------------------------------------------------------------------------------------------------- mapping
     /// <summary>TPollutionPos::worldToDepth: (y - offset) x 0.025 -- one depth unit is 40 units of height; 0xFF is kept for "no surface".</summary>
     private int DepthOf(float yMetres) => Math.Clamp((int)((SmsUnits.MetresToUnits(yMetres) - VerticalOffsetUnits) * SmsParams.Pollution.DepthScale), 0, 254);
+    private float HeightMetres(int h) => SmsUnits.UnitsToMetres(h / SmsParams.Pollution.DepthScale + VerticalOffsetUnits);
     private int TexS(float x) => (int)((x - MinX) * _invTexelM); // getTexPosS: worldToTexSize(x - mMinX)
     private int TexT(float z) => (int)((z - MinZ) * _invTexelM);
     private bool InGrid(int s, int t) => s >= 0 && s < Width && t >= 0 && t < Height;
-    public bool IsInArea(float x, float z) => !(x < MinX || MaxX < x || z < MinZ || MaxZ < z);
-    public bool IsInAreaSize(float x, float z, float sMetres) => !(x < MinX - sMetres || MaxX + sMetres < x || z < MinZ - sMetres || MaxZ + sMetres < z);
+    private bool InAreaLocal(float x, float z) => !(x < MinX || MaxX < x || z < MinZ || MaxZ < z);
+
+    /// <summary>isInArea: the world point lies over the layer's rectangle (its height is not asked -- getPollutionType's rule).</summary>
+    public bool IsInArea(Vector3 world)
+    {
+        if (!Built) return false;
+        Vector3 l = _toLocal * world;
+        return InAreaLocal(l.X, l.Z);
+    }
+
+    /// <summary>isInAreaSize: within a stamp's width of the rectangle.</summary>
+    public bool IsInAreaSize(Vector3 world, float sMetres)
+    {
+        if (!Built) return false;
+        Vector3 l = _toLocal * world;
+        return !(l.X < MinX - sMetres || MaxX + sMetres < l.X || l.Z < MinZ - sMetres || MaxZ + sMetres < l.Z);
+    }
 
     /// <summary>TPollutionLayer::isPolluted(x, y, z): inside the extent, the texel's surface within +-2 depth units of y, the paint above the threshold.</summary>
-    public bool IsPolluted(Vector3 p)
+    public bool IsPolluted(Vector3 world)
     {
-        if (!Built || !IsInArea(p.X, p.Z))
+        if (!Built)
+            return false;
+        Vector3 p = _toLocal * world;
+        if (!InAreaLocal(p.X, p.Z))
             return false;
         int s = TexS(p.X), t = TexT(p.Z);
         if (!InGrid(s, t))
@@ -428,33 +454,40 @@ public partial class SmsPollutionLayer : MeshInstance3D
     }
 
     /// <summary>The paint at a world point (0..255; -1 off the layer), for tools and tests.</summary>
-    public int PaintAt(Vector3 p)
+    public int PaintAt(Vector3 world)
     {
-        if (!Built || !IsInArea(p.X, p.Z)) return -1;
+        if (!Built) return -1;
+        Vector3 p = _toLocal * world;
+        if (!InAreaLocal(p.X, p.Z)) return -1;
         int s = TexS(p.X), t = TexT(p.Z);
         return InGrid(s, t) ? _map[t * Width + s] : -1;
     }
 
-    /// <summary>The surface height (world metres) the layer knows at a world XZ, or NaN where it has none.</summary>
-    public float SurfaceYAt(float x, float z)
+    /// <summary>The surface height (world metres) the layer knows under a world point, or NaN where it has none.</summary>
+    public float SurfaceYAt(Vector3 world)
     {
-        if (!Built || !IsInArea(x, z)) return float.NaN;
-        int s = TexS(x), t = TexT(z);
+        if (!Built) return float.NaN;
+        Vector3 p = _toLocal * world;
+        if (!InAreaLocal(p.X, p.Z)) return float.NaN;
+        int s = TexS(p.X), t = TexT(p.Z);
         if (!InGrid(s, t) || _height[t * Width + s] == 0xFF) return float.NaN;
-        return SmsUnits.UnitsToMetres(_height[t * Width + s] / SmsParams.Pollution.DepthScale + VerticalOffsetUnits);
+        return (_toWorld * new Vector3(p.X, HeightMetres(_height[t * Width + s]), p.Z)).Y;
     }
+
+    public float SurfaceYAt(float x, float z) => SurfaceYAt(new Vector3(x, 0f, z));
 
     // -------------------------------------------------------------------------------------------------------------- stamps
     /// <summary>TPollutionLayer::stamp + the GPU stamp (PollutionCount.cpp doTask / initGXforStamp): a quad of (size / texel) texels centred
     /// on the point, each texel within +-2 depth units of the stamp's height blended toward 255 (pollute, type 1) or toward 0 (clean, type
     /// 0) by the stamp's alpha -- a soft disc standing in for the stamp textures. A stamp under two texels wide draws nothing, as the
     /// game's zero-area quad does. Clean stamps run the cleaned() effect rule.</summary>
-    public void Stamp(int stampType, Vector3 p, float sizeUnits)
+    public void Stamp(int stampType, Vector3 world, float sizeUnits)
     {
         if (!Built)
             return;
-        if (!IsInAreaSize(p.X, p.Z, SmsUnits.UnitsToMetres(sizeUnits)))
+        if (!IsInAreaSize(world, SmsUnits.UnitsToMetres(sizeUnits)))
             return;
+        Vector3 p = _toLocal * world;
         int size = (int)(sizeUnits / TexelSize); // worldToTexSize
         int half = size / 2;
         if (half <= 0)
@@ -491,7 +524,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
         if (changed)
             _texDirty = true;
         if (clean)
-            CleanedEffect(p, sizeUnits);
+            CleanedEffect(world, sizeUnits);
     }
 
     /// <summary>The stamp texture's alpha at (u, v) in the quad: a disc, full to 60 % of the radius, fading to the edge.</summary>
@@ -505,13 +538,13 @@ public partial class SmsPollutionLayer : MeshInstance3D
 
     /// <summary>TPollutionLayer::cleaned (PollutionLayer.cpp 170): every sixth clean call probes one spot from its offset tables (x 32 units); a
     /// polluted spot over 100 there is "being erased": the Cleaned signal (the game's MSD_SE_ERASE_SCRAWL + PARTICLE_MS_RAKU_KIE).</summary>
-    private void CleanedEffect(Vector3 p, float sizeUnits)
+    private void CleanedEffect(Vector3 world, float sizeUnits)
     {
         _cleanEffectCounter += 1;
         if (_cleanEffectCounter <= 5)
             return;
         _cleanEffectCounter = 0;
-        Vector3 pos = p + new Vector3(SmsUnits.UnitsToMetres(32f * CleanOffX[_cleanCounterX]), 0f, SmsUnits.UnitsToMetres(32f * CleanOffZ[_cleanCounterZ]));
+        Vector3 pos = world + new Vector3(SmsUnits.UnitsToMetres(32f * CleanOffX[_cleanCounterX]), 0f, SmsUnits.UnitsToMetres(32f * CleanOffZ[_cleanCounterZ]));
         _cleanCounterX += 1;
         _cleanCounterZ += 3;
         if (_cleanCounterX >= 10) _cleanCounterX -= 10;
@@ -608,15 +641,14 @@ public partial class SmsPollutionLayer : MeshInstance3D
     }
 
     /// <summary>TPollutionLayer::action (PollutionAction.cpp 139): the type's effects (fire / thunder / glass: particles and sounds, not
-    /// ported), then with paint within mSpreadArea of Mario (getPollutedPos: five tries) the RAKU_INDAWA effect (not ported) and, flagged
-    /// CanSpread, spread(): every fourth tick a 128-unit stamp at a painted spot near Mario (getPollutedPosNear).</summary>
+    /// ported), then with paint within mSpreadArea of Mario (getPollutedPos: five tries) the RAKU_INDAWA bubble on a non-fire layer every
+    /// BubbleEveryTicks (the game: 16) and, flagged CanSpread, spread(): every fourth tick a 128-unit stamp at a painted spot near Mario.</summary>
     private void Action()
     {
         if (!GetPollutedPos(SmsParams.Pollution.SpreadArea, out Vector3 at))
             return;
         if (Type != SmsPollutionType.Fire && Type != SmsPollutionType.FireRegrow)
         {
-            // gpMarioParticleManager->emitWithRotate(PARTICLE_MS_RAKU_INDAWA, pos, ...) every 16th tick (the game: `> 15`): the goop's bubble
             if (_effectTimer >= Math.Max(1, BubbleEveryTicks))
             {
                 if (Bubbles && _bubbleMmi != null)
@@ -645,41 +677,33 @@ public partial class SmsPollutionLayer : MeshInstance3D
             InstanceCount = n,
         };
         for (int i = 0; i < n; i++)
-            _bubbleMm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(Vector3.Zero), Vector3.Zero));
-        var mat = new ShaderMaterial { Shader = BubbleShader ?? GD.Load<Shader>("res://assets/Sms/Fx/GoopBubble.gdshader") };
+            _bubbleMm.SetInstanceTransform(i, ZeroXf);
         Texture2D goop = GoopTexture ?? DefaultGoopTexture(Type);
+        Variant tiles = _ownMaterial && _mat != null ? _mat.GetShaderParameter("albedo_tiles_per_metre") : 0.07f;
+        var mat = new ShaderMaterial { Shader = BubbleShader ?? GD.Load<Shader>("res://assets/Sms/Fx/GoopBubble.gdshader") };
         if (goop != null)
             mat.SetShaderParameter("goop_albedo", goop);
-        if (_ownMaterial && _mat != null)
-            mat.SetShaderParameter("albedo_tiles_per_metre", _mat.GetShaderParameter("albedo_tiles_per_metre"));
+        mat.SetShaderParameter("albedo_tiles_per_metre", tiles);
         _bubbleMmi = new MultiMeshInstance3D { Name = "GoopBubbles", Multimesh = _bubbleMm, MaterialOverride = mat, TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
         AddChild(_bubbleMmi);
         _bubbleMmi.GlobalTransform = Transform3D.Identity; // the instances are placed in world space
         if (!BubblePop)
             return;
-        // the pop: a ripple ring (the port's hamonring2 as the alpha, tinted a dark translucent goop shadow, fading) and up to four goop droplets a bubble
+        // the pop: a ripple ring drawn by GoopRing.gdshader (a procedural band in the goop's own colour: no texture quad to show) and up to
+        // four goop droplets a bubble
         _ringAge = new float[n];
         _ringPos = new Vector3[n];
         _ringSize = new float[n];
         Array.Fill(_ringAge, -1f);
-        _ringMm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true, Mesh = new QuadMesh { Size = Vector2.One }, InstanceCount = n };
-        var ringMat = new StandardMaterial3D
-        {
-            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
-            BlendMode = BaseMaterial3D.BlendModeEnum.Mix, // a translucent dark ripple on the paint (additive read as a white flash)
-            VertexColorUseAsAlbedo = true,
-            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-            NoDepthTest = false,
-        };
-        const string ringTex = "res://assets/Sms/Fx/tex/hamonring2.png";
-        if (ResourceLoader.Exists(ringTex))
-            ringMat.AlbedoTexture = GD.Load<Texture2D>(ringTex);
+        _ringMm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseCustomData = true, Mesh = new QuadMesh { Size = Vector2.One }, InstanceCount = n };
+        var ringMat = new ShaderMaterial { Shader = RingShader ?? GD.Load<Shader>("res://assets/Sms/Fx/GoopRing.gdshader") };
+        if (goop != null)
+            ringMat.SetShaderParameter("goop_albedo", goop);
+        ringMat.SetShaderParameter("albedo_tiles_per_metre", tiles);
+        ringMat.SetShaderParameter("opacity", RingOpacity);
+        ringMat.SetShaderParameter("brighten", RingBrighten);
         for (int i = 0; i < n; i++)
-        {
-            _ringMm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(Vector3.Zero), Vector3.Zero));
-            _ringMm.SetInstanceColor(i, new Color(1f, 1f, 1f, 0f));
-        }
+            _ringMm.SetInstanceTransform(i, ZeroXf);
         _ringMmi = new MultiMeshInstance3D { Name = "GoopRings", Multimesh = _ringMm, MaterialOverride = ringMat, TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
         AddChild(_ringMmi);
         _ringMmi.GlobalTransform = Transform3D.Identity;
@@ -691,10 +715,24 @@ public partial class SmsPollutionLayer : MeshInstance3D
         Array.Fill(_dropAge, -1f);
         _dropMm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseCustomData = true, Mesh = new SphereMesh { Radius = 0.5f, Height = 1f, RadialSegments = 8, Rings = 4 }, InstanceCount = nd };
         for (int i = 0; i < nd; i++)
-            _dropMm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(Vector3.Zero), Vector3.Zero));
+            _dropMm.SetInstanceTransform(i, ZeroXf);
         _dropMmi = new MultiMeshInstance3D { Name = "GoopDrops", Multimesh = _dropMm, MaterialOverride = mat, TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
         AddChild(_dropMmi);
         _dropMmi.GlobalTransform = Transform3D.Identity;
+    }
+
+    /// <summary>A bubble forms at a painted spot: the dome sits on the layer's surface there.</summary>
+    private void EmitBubble(Vector3 at)
+    {
+        float y = SurfaceYAt(at);
+        if (float.IsNaN(y))
+            return;
+        int i = _bubbleNext;
+        _bubbleNext = (_bubbleNext + 1) % _bubblePos.Length;
+        _bubblePos[i] = new Vector3(at.X, y + 0.004f, at.Z);
+        _bubbleAge[i] = 0f;
+        _bubbleScale[i] = 0.7f + 0.6f * (float)Rng.NextDouble();
+        BubblesEmitted++;
     }
 
     /// <summary>The pop: the ring starts at the dome's width and spreads to three times it while fading; three or four droplets go up and out
@@ -738,13 +776,12 @@ public partial class SmsPollutionLayer : MeshInstance3D
             if (t >= 1f)
             {
                 _ringAge[i] = -1f;
-                _ringMm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(Vector3.Zero), Vector3.Zero));
-                _ringMm.SetInstanceColor(i, new Color(1f, 1f, 1f, 0f));
+                _ringMm.SetInstanceTransform(i, ZeroXf);
                 continue;
             }
             float size = _ringSize[i] * (1f + 2f * t);
             _ringMm.SetInstanceTransform(i, new Transform3D(flat.Scaled(new Vector3(size, size, size)), _ringPos[i]));
-            _ringMm.SetInstanceColor(i, new Color(RingTint.R, RingTint.G, RingTint.B, RingTint.A * (1f - t)));
+            _ringMm.SetInstanceCustomData(i, new Color(t, 0f, 0f, 0f)); // .x = the ring's age 0..1 (GoopRing.gdshader fades on it)
         }
         for (int i = 0; i < _dropAge.Length; i++)
         {
@@ -756,7 +793,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
             if (_dropAge[i] > 1.2f || (_dropVel[i].Y < 0f && _dropPos[i].Y <= _dropFloor[i]))
             {
                 _dropAge[i] = -1f;
-                _dropMm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(Vector3.Zero), Vector3.Zero));
+                _dropMm.SetInstanceTransform(i, ZeroXf);
                 continue;
             }
             float d = 0.07f + 0.03f * MathF.Min(1f, _dropAge[i] * 4f);
@@ -765,22 +802,8 @@ public partial class SmsPollutionLayer : MeshInstance3D
         }
     }
 
-    /// <summary>A bubble forms at a painted spot: the dome sits on the layer's surface there.</summary>
-    private void EmitBubble(Vector3 at)
-    {
-        float y = SurfaceYAt(at.X, at.Z);
-        if (float.IsNaN(y))
-            return;
-        int i = _bubbleNext;
-        _bubbleNext = (_bubbleNext + 1) % _bubblePos.Length;
-        _bubblePos[i] = new Vector3(at.X, y + 0.004f, at.Z);
-        _bubbleAge[i] = 0f;
-        _bubbleScale[i] = 0.7f + 0.6f * (float)Rng.NextDouble();
-        BubblesEmitted++;
-    }
-
-    /// <summary>The dome swells slowly over the first 70 % of its life, quivers at full size to 85 %, then pops: it is gone at once and the
-    /// ring + droplets take over (SpawnPop); the slot frees at 100 % so a popped spot stays quiet a moment.</summary>
+    /// <summary>The dome swells slowly over the first 70 % of its life, quivers at full size to 85 %, then pops: a last swell while it fades to
+    /// transparent, the ring and droplets starting with it (SpawnPop); the slot frees at 100 % so a popped spot stays quiet a moment.</summary>
     private void TickBubbles(double delta)
     {
         float life = MathF.Max(0.1f, BubbleLife);
@@ -794,13 +817,12 @@ public partial class SmsPollutionLayer : MeshInstance3D
             if (t >= 1f)
             {
                 _bubbleAge[i] = -1f;
-                _bubbleMm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(Vector3.Zero), Vector3.Zero));
+                _bubbleMm.SetInstanceTransform(i, ZeroXf);
                 continue;
             }
             float radius = BubbleSize * _bubbleScale[i];
             if (t >= 0.85f)
             {
-                // the pop: the dome swells a last 40 % and fades to transparent over the final 15 % of the life; the ripple and droplets start with it
                 if (before < 0.85f && BubblePop)
                     SpawnPop(_bubblePos[i], radius);
                 float k = (t - 0.85f) / 0.15f;
@@ -811,12 +833,12 @@ public partial class SmsPollutionLayer : MeshInstance3D
             }
             float swell = t < 0.7f ? Mathf.SmoothStep(0f, 1f, t / 0.7f) : 1f + 0.06f * MathF.Sin(_bubbleAge[i] * 28f);
             float d = radius * swell * 2f; // the mesh is a unit sphere (radius 0.5): scale = diameter
-            var xf = new Transform3D(Basis.Identity.Scaled(new Vector3(d, d * 0.75f, d)), _bubblePos[i]);
-            _bubbleMm.SetInstanceTransform(i, xf);
+            _bubbleMm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(new Vector3(d, d * 0.75f, d)), _bubblePos[i]));
             _bubbleMm.SetInstanceCustomData(i, new Color(t / 0.85f, 0f, 0f, 0f));
         }
     }
 
+    // -------------------------------------------------------------------------------------------------------------- spread
     private void Spread()
     {
         if (_spreadTimer < SmsParams.Pollution.SpreadFrequency)
@@ -845,28 +867,30 @@ public partial class SmsPollutionLayer : MeshInstance3D
     }
 
     /// <summary>getPollutedPosNear: five tries at (rnd - 0.5)(0.7 + rnd) x range from Mario; the texel there must be of the layer, its surface
-    /// no higher than Mario (else the whole probe fails; a depth-unit comparison here), its paint non-zero. (The decomp reads the z texel
-    /// with getTexPosS -- the x mapping -- a game bug; the port maps z by z.)</summary>
+    /// no higher than Mario (else the whole probe fails; compared in depth units, since a port layer sits a hair above the floor his feet
+    /// are on), its paint non-zero. (The decomp reads the z texel with getTexPosS -- the x mapping -- a game bug; the port maps z by z.)</summary>
     private bool GetPollutedPosNear(float rangeUnits, out Vector3 pos)
     {
         float range = SmsUnits.UnitsToMetres(rangeUnits);
         Vector3 mario = SmsPollutionMap.MarioPos;
+        int marioDepth = DepthOf((_toLocal * mario).Y);
         for (int i = 0; i < 5; i++)
         {
             float x = ((float)Rng.NextDouble() - 0.5f) * (SmsParams.Pollution.AreaMinRate + (float)Rng.NextDouble());
             float z = ((float)Rng.NextDouble() - 0.5f) * (SmsParams.Pollution.AreaMinRate + (float)Rng.NextDouble());
-            pos = new Vector3(x * range + mario.X, 0f, z * range + mario.Z);
-            if (!IsInArea(pos.X, pos.Z))
+            pos = new Vector3(x * range + mario.X, mario.Y, z * range + mario.Z);
+            Vector3 l = _toLocal * pos;
+            if (!InAreaLocal(l.X, l.Z))
                 continue;
-            int s = TexS(pos.X), t = TexT(pos.Z);
+            int s = TexS(l.X), t = TexT(l.Z);
             if (!InGrid(s, t))
                 continue;
             int idx = t * Width + s;
             if (_height[idx] == 0xFF)
                 continue;
-            pos.Y = SmsUnits.UnitsToMetres(_height[idx] / SmsParams.Pollution.DepthScale + VerticalOffsetUnits);
-            if (_height[idx] > DepthOf(mario.Y))
-                return false; // the game: dest->y > Mario's y with the texel's quantised height -- compared in depth units here, since a port layer sits a hair above the floor his feet are on
+            if (_height[idx] > marioDepth)
+                return false;
+            pos = _toWorld * new Vector3(l.X, HeightMetres(_height[idx]), l.Z);
             if (_map[idx] != 0)
                 return true;
         }
@@ -907,11 +931,11 @@ public static class SmsPollutionMap
     public static void Register(SmsPollutionLayer l) { if (!Layers.Contains(l)) Layers.Add(l); }
     public static void Unregister(SmsPollutionLayer l) => Layers.Remove(l);
 
-    /// <summary>getPollutionType: the first layer whose XZ extent holds the point (its height is not asked).</summary>
+    /// <summary>getPollutionType: the first layer whose rectangle holds the point (its height is not asked).</summary>
     public static SmsPollutionType GetPollutionType(Vector3 p)
     {
         foreach (var l in Layers)
-            if (l.Built && l.IsInArea(p.X, p.Z))
+            if (l.IsInArea(p))
                 return l.Type;
         return SmsPollutionType.None;
     }
@@ -919,7 +943,7 @@ public static class SmsPollutionMap
     public static SmsPollutionLayer LayerAt(Vector3 p)
     {
         foreach (var l in Layers)
-            if (l.Built && l.IsInArea(p.X, p.Z))
+            if (l.IsInArea(p))
                 return l;
         return null;
     }
