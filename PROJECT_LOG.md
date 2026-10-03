@@ -4136,3 +4136,11 @@ modelled: unk14 (0.98 / banana 0.5), unk20 0.5, unk24 0.72, unk28 0 -- their rea
 in the game: the papaya flies fast and far (rate 5, vy 20), the red pepper fast and low (5 / 12), the coconut a short lob (2 / 15), the
 pineapple a high short lob (2 / 22), the banana medium (2.5 / 14) and dead on landing (bounce 0.4, friction 0.4 a tick, rest under 1.0),
 the durian is kicked (0.01 / 5). The throw knobs (62c) scale all types alike, so the differences stay.
+
+### Pass 62e -- the unused pickup nodes out of the scenes
+With his editor closed (10-02 22:26): assets/Player.tscn loses the `pickupCast` ShapeCast3D and its BoxShape3D_uiq8p (the legacy grab probe
+pass 62 replaced and 62c unreferenced); fruit_coconut / fruitpapaya / fruit_banana / fruit_pineapple / fruit_red_pepper lose the
+`PickupZone` Area3D with its CollisionShape3D and SphereShape3D (the auto-pickup zone Fruit.cs stopped using; the durian never had one);
+load_steps recounted (8 -> 7). Text surgery (tscn_strip.py), not an editor re-save, so nothing else in the files moved; Player.tscn was
+staged as HEAD + this hunk through the index, his uncommitted editor edits (the uid fixes, the BodyLag expansion, ThrowPowerScale 5.03 /
+ThrowVyScale 3.645) stay his. Checked headless: all seven scenes load and instantiate with no stale pickup node; the boot is clean.
