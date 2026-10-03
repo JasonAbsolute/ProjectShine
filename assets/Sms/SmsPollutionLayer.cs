@@ -57,9 +57,13 @@ public partial class SmsPollutionLayer : MeshInstance3D
     /// <summary>TPollutionLayer::action's PARTICLE_MS_RAKU_INDAWA: every 16 movement ticks a bubble swells and pops at a random painted spot near
     /// Mario (not on fire layers). The game's particle is not here; a dome in the goop's own texture stands in.</summary>
     [Export] public bool Bubbles = true;
-    [Export] public float BubbleSize = 0.22f;      // the dome's radius at full swell (metres)
-    [Export] public float BubbleLife = 0.8f;       // seconds from forming to the pop
+    /// <summary>DEVIATION knob: movement ticks between bubbles while paint is near Mario. The game's RAKU_INDAWA fires every 16; the port's
+    /// stand-in reads as whack-a-mole at that rate on a big painted floor, so 48 (2.5 a second) is the default.</summary>
+    [Export] public int BubbleEveryTicks = 48;
+    [Export] public float BubbleSize = 0.26f;      // the dome's radius at full swell (metres)
+    [Export] public float BubbleLife = 2.4f;       // seconds from forming to gone: a slow swell for 70 %, a quiver, the pop at 85 %, the ripple after
     [Export] public int BubbleMax = 32;
+    [Export] public bool BubblePop = true;         // the pop throws a ripple ring and a few goop droplets
     [Export] public Shader BubbleShader;           // default res://assets/Sms/Fx/GoopBubble.gdshader
     [Export] public bool DebugPrint = false;
 
@@ -105,6 +109,18 @@ public partial class SmsPollutionLayer : MeshInstance3D
     private float[] _bubbleAge;   // seconds since forming; < 0 = free
     private float[] _bubbleScale; // a little variety in size
     private int _bubbleNext;
+    private MultiMeshInstance3D _ringMmi;
+    private MultiMesh _ringMm;
+    private float[] _ringAge;     // < 0 = free
+    private Vector3[] _ringPos;
+    private float[] _ringSize;
+    private int _ringNext;
+    private MultiMeshInstance3D _dropMmi;
+    private MultiMesh _dropMm;
+    private Vector3[] _dropPos, _dropVel;
+    private float[] _dropAge;     // < 0 = free
+    private float[] _dropFloor;
+    private int _dropNext;
     private double _settleAccum;
     private float _tickAccum;
     private int _spreadTimer;
@@ -501,7 +517,10 @@ public partial class SmsPollutionLayer : MeshInstance3D
         if (frames > 0)
             Settle(frames);
         if (_bubbleMmi != null)
+        {
             TickBubbles(delta);
+            TickPops(delta);
+        }
         if (_texDirty)
         {
             _image.SetData(Width, Height, false, Image.Format.R8, _map);
@@ -574,8 +593,8 @@ public partial class SmsPollutionLayer : MeshInstance3D
             return;
         if (Type != SmsPollutionType.Fire && Type != SmsPollutionType.FireRegrow)
         {
-            // gpMarioParticleManager->emitWithRotate(PARTICLE_MS_RAKU_INDAWA, pos, ...) every 16th tick: the goop's bubble
-            if (_effectTimer > 15)
+            // gpMarioParticleManager->emitWithRotate(PARTICLE_MS_RAKU_INDAWA, pos, ...) every 16th tick (the game: `> 15`): the goop's bubble
+            if (_effectTimer >= Math.Max(1, BubbleEveryTicks))
             {
                 if (Bubbles && _bubbleMmi != null)
                     EmitBubble(at);
@@ -613,6 +632,114 @@ public partial class SmsPollutionLayer : MeshInstance3D
         _bubbleMmi = new MultiMeshInstance3D { Name = "GoopBubbles", Multimesh = _bubbleMm, MaterialOverride = mat, TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
         AddChild(_bubbleMmi);
         _bubbleMmi.GlobalTransform = Transform3D.Identity; // the instances are placed in world space
+        if (!BubblePop)
+            return;
+        // the pop: a ripple ring (the port's hamonring2, additive, fading) and up to four goop droplets a bubble
+        _ringAge = new float[n];
+        _ringPos = new Vector3[n];
+        _ringSize = new float[n];
+        Array.Fill(_ringAge, -1f);
+        _ringMm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true, Mesh = new QuadMesh { Size = Vector2.One }, InstanceCount = n };
+        var ringMat = new StandardMaterial3D
+        {
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha,
+            BlendMode = BaseMaterial3D.BlendModeEnum.Add,
+            VertexColorUseAsAlbedo = true,
+            CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+            NoDepthTest = false,
+        };
+        const string ringTex = "res://assets/Sms/Fx/tex/hamonring2.png";
+        if (ResourceLoader.Exists(ringTex))
+            ringMat.AlbedoTexture = GD.Load<Texture2D>(ringTex);
+        for (int i = 0; i < n; i++)
+        {
+            _ringMm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(Vector3.Zero), Vector3.Zero));
+            _ringMm.SetInstanceColor(i, new Color(1f, 1f, 1f, 0f));
+        }
+        _ringMmi = new MultiMeshInstance3D { Name = "GoopRings", Multimesh = _ringMm, MaterialOverride = ringMat, TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        AddChild(_ringMmi);
+        _ringMmi.GlobalTransform = Transform3D.Identity;
+        int nd = n * 4;
+        _dropPos = new Vector3[nd];
+        _dropVel = new Vector3[nd];
+        _dropAge = new float[nd];
+        _dropFloor = new float[nd];
+        Array.Fill(_dropAge, -1f);
+        _dropMm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseCustomData = true, Mesh = new SphereMesh { Radius = 0.5f, Height = 1f, RadialSegments = 8, Rings = 4 }, InstanceCount = nd };
+        for (int i = 0; i < nd; i++)
+            _dropMm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(Vector3.Zero), Vector3.Zero));
+        _dropMmi = new MultiMeshInstance3D { Name = "GoopDrops", Multimesh = _dropMm, MaterialOverride = mat, TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        AddChild(_dropMmi);
+        _dropMmi.GlobalTransform = Transform3D.Identity;
+    }
+
+    /// <summary>The pop: the ring starts at the dome's width and spreads to three times it while fading; three or four droplets go up and out
+    /// and fall back onto the paint.</summary>
+    private void SpawnPop(Vector3 at, float radius)
+    {
+        if (_ringMm == null)
+            return;
+        int r = _ringNext;
+        _ringNext = (_ringNext + 1) % _ringAge.Length;
+        _ringAge[r] = 0f;
+        _ringPos[r] = at + Vector3.Up * 0.01f;
+        _ringSize[r] = radius * 2f;
+        int count = 3 + (Rng.NextDouble() < 0.5 ? 1 : 0);
+        for (int k = 0; k < count; k++)
+        {
+            int i = _dropNext;
+            _dropNext = (_dropNext + 1) % _dropAge.Length;
+            float ang = (float)(Rng.NextDouble() * Math.PI * 2.0);
+            float side = 0.6f + 0.9f * (float)Rng.NextDouble();
+            _dropPos[i] = at + Vector3.Up * (radius * 0.6f);
+            _dropVel[i] = new Vector3(MathF.Cos(ang) * side, 1.6f + 1.2f * (float)Rng.NextDouble(), MathF.Sin(ang) * side);
+            _dropAge[i] = 0f;
+            _dropFloor[i] = at.Y;
+        }
+    }
+
+    private void TickPops(double delta)
+    {
+        if (_ringMm == null)
+            return;
+        float dt = (float)delta;
+        const float ringLife = 0.55f;
+        var flat = Basis.FromEuler(new Vector3(-Mathf.Pi / 2f, 0f, 0f)); // the quad faces +Z: lay it on the paint
+        for (int i = 0; i < _ringAge.Length; i++)
+        {
+            if (_ringAge[i] < 0f)
+                continue;
+            _ringAge[i] += dt;
+            float t = _ringAge[i] / ringLife;
+            if (t >= 1f)
+            {
+                _ringAge[i] = -1f;
+                _ringMm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(Vector3.Zero), Vector3.Zero));
+                _ringMm.SetInstanceColor(i, new Color(1f, 1f, 1f, 0f));
+                continue;
+            }
+            float size = _ringSize[i] * (1f + 2f * t);
+            _ringMm.SetInstanceTransform(i, new Transform3D(flat.Scaled(new Vector3(size, size, size)), _ringPos[i]));
+            _ringMm.SetInstanceColor(i, new Color(1f, 0.95f, 0.85f, 0.8f * (1f - t)));
+        }
+        for (int i = 0; i < _dropAge.Length; i++)
+        {
+            if (_dropAge[i] < 0f)
+                continue;
+            _dropAge[i] += dt;
+            _dropVel[i] += Vector3.Down * (9.8f * 1.6f) * dt;
+            _dropPos[i] += _dropVel[i] * dt;
+            if (_dropAge[i] > 1.2f || (_dropVel[i].Y < 0f && _dropPos[i].Y <= _dropFloor[i]))
+            {
+                _dropAge[i] = -1f;
+                _dropMm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(Vector3.Zero), Vector3.Zero));
+                continue;
+            }
+            float d = 0.07f + 0.03f * MathF.Min(1f, _dropAge[i] * 4f);
+            _dropMm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(new Vector3(d, d, d)), _dropPos[i]));
+            _dropMm.SetInstanceCustomData(i, new Color(0f, 0f, 0f, 0f));
+        }
     }
 
     /// <summary>A bubble forms at a painted spot: the dome sits on the layer's surface there.</summary>
@@ -629,7 +756,8 @@ public partial class SmsPollutionLayer : MeshInstance3D
         BubblesEmitted++;
     }
 
-    /// <summary>The domes swell over the first three quarters of their life, hold, then pop (a quick squash to nothing).</summary>
+    /// <summary>The dome swells slowly over the first 70 % of its life, quivers at full size to 85 %, then pops: it is gone at once and the
+    /// ring + droplets take over (SpawnPop); the slot frees at 100 % so a popped spot stays quiet a moment.</summary>
     private void TickBubbles(double delta)
     {
         float life = MathF.Max(0.1f, BubbleLife);
@@ -637,6 +765,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
         {
             if (_bubbleAge[i] < 0f)
                 continue;
+            float before = _bubbleAge[i] / life;
             _bubbleAge[i] += (float)delta;
             float t = _bubbleAge[i] / life;
             if (t >= 1f)
@@ -645,11 +774,22 @@ public partial class SmsPollutionLayer : MeshInstance3D
                 _bubbleMm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(Vector3.Zero), Vector3.Zero));
                 continue;
             }
-            float swell = t < 0.75f ? Mathf.SmoothStep(0f, 1f, t / 0.75f) : (t < 0.9f ? 1f : 1f - (t - 0.9f) / 0.1f);
-            float r = BubbleSize * _bubbleScale[i] * swell * 2f; // the mesh is a unit sphere (radius 0.5): scale = diameter
-            var xf = new Transform3D(Basis.Identity.Scaled(new Vector3(r, r * 0.75f, r)), _bubblePos[i]);
+            float radius = BubbleSize * _bubbleScale[i];
+            if (t >= 0.85f)
+            {
+                if (before < 0.85f)
+                {
+                    _bubbleMm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(Vector3.Zero), Vector3.Zero));
+                    if (BubblePop)
+                        SpawnPop(_bubblePos[i], radius);
+                }
+                continue;
+            }
+            float swell = t < 0.7f ? Mathf.SmoothStep(0f, 1f, t / 0.7f) : 1f + 0.06f * MathF.Sin(_bubbleAge[i] * 28f);
+            float d = radius * swell * 2f; // the mesh is a unit sphere (radius 0.5): scale = diameter
+            var xf = new Transform3D(Basis.Identity.Scaled(new Vector3(d, d * 0.75f, d)), _bubblePos[i]);
             _bubbleMm.SetInstanceTransform(i, xf);
-            _bubbleMm.SetInstanceCustomData(i, new Color(t, 0f, 0f, 0f));
+            _bubbleMm.SetInstanceCustomData(i, new Color(t / 0.85f, 0f, 0f, 0f));
         }
     }
 
