@@ -41,8 +41,9 @@ public partial class SmsPollutionLayer : MeshInstance3D
     /// <summary>info->mTexelSize: units of floor per texel (the sampling ring is 32 units; a 20 m pond at 32 is a 64 x 64 map).</summary>
     [Export] public float TexelSize = 32f;
     [Export] public Paint InitialPaint = Paint.Full;
-    /// <summary>The layer's /scene/map/pollution/&lt;name&gt;.bmp: red = the paint (0 clean .. 255), pixel (x, y) = texel (x, y) from the layer's
-    /// -X / -Z corner; the edge rule (-50 a neighbouring empty texel) is applied as the game's initTexImage does.</summary>
+    /// <summary>The layer's /scene/map/pollution/&lt;name&gt;.bmp -- the SHAPE of the goop at the start: red = the paint (0 clean .. 255), the image
+    /// stretched over the texel grid, x along +X, y along +Z from the layer's -X / -Z corner; the edge rule (-50 a neighbouring empty texel)
+    /// is applied as the game's initTexImage does. Only read with InitialPaint = Texture.</summary>
     [Export] public Texture2D InitialPaintTexture;
     /// <summary>FLAG_DECAY: every texel loses 2 a frame (a layer that dies on its own).</summary>
     [Export] public bool Decay = false;
@@ -248,7 +249,11 @@ public partial class SmsPollutionLayer : MeshInstance3D
         // clamped at 0 (the game's u8 arithmetic wraps there)
         Image src = null;
         if (InitialPaint == Paint.Texture && InitialPaintTexture != null)
+        {
             src = InitialPaintTexture.GetImage();
+            if (src != null && src.IsCompressed())
+                src.Decompress(); // a VRAM-compressed import (the editor's detect_3d) cannot be read per pixel as is
+        }
         for (int tz = 0; tz < Height; tz++)
             for (int sx = 0; sx < Width; sx++)
             {
@@ -260,7 +265,11 @@ public partial class SmsPollutionLayer : MeshInstance3D
                 }
                 int depth = 255;
                 if (src != null)
-                    depth = (sx < src.GetWidth() && tz < src.GetHeight()) ? src.GetPixel(sx, tz).R8 : 0;
+                {
+                    // the game's bmp is one pixel per texel; here any size is stretched over the grid (pixel x = texel x * image width / grid width)
+                    int px = (int)((long)sx * src.GetWidth() / Width), py = (int)((long)tz * src.GetHeight() / Height);
+                    depth = src.GetPixel(px, py).R8;
+                }
                 if (depth == 0)
                 {
                     _map[idx] = 0;
