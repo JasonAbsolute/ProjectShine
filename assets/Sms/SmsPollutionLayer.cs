@@ -54,6 +54,13 @@ public partial class SmsPollutionLayer : MeshInstance3D
     /// <summary>The goop's surface texture (goop_albedo). Empty = the type's default from assets/Sms/Fx/Goop: FireGoop for Fire / FireRegrow,
     /// ElectricGoop for Electric, BrownGoop for everything else; OilGoop, PinkGoop and BetaGoop are there to pick.</summary>
     [Export] public Texture2D GoopTexture;
+    /// <summary>TPollutionLayer::action's PARTICLE_MS_RAKU_INDAWA: every 16 movement ticks a bubble swells and pops at a random painted spot near
+    /// Mario (not on fire layers). The game's particle is not here; a dome in the goop's own texture stands in.</summary>
+    [Export] public bool Bubbles = true;
+    [Export] public float BubbleSize = 0.22f;      // the dome's radius at full swell (metres)
+    [Export] public float BubbleLife = 0.8f;       // seconds from forming to the pop
+    [Export] public int BubbleMax = 32;
+    [Export] public Shader BubbleShader;           // default res://assets/Sms/Fx/GoopBubble.gdshader
     [Export] public bool DebugPrint = false;
 
     /// <summary>TPollutionLayer::cleaned: a spot over 100 was being erased -- the game plays MSD_SE_ERASE_SCRAWL and PARTICLE_MS_RAKU_KIE here.</summary>
@@ -71,6 +78,9 @@ public partial class SmsPollutionLayer : MeshInstance3D
     public int Degree { get; private set; }
     /// <summary>Texels above 0 right after the build (the whole paint).</summary>
     public int InitialDegree { get; private set; }
+    /// <summary>Bubbles alive right now (for tools and tests).</summary>
+    public int ActiveBubbles { get { int n = 0; if (_bubbleAge != null) foreach (float a in _bubbleAge) if (a >= 0f) n++; return n; } }
+    public int BubblesEmitted { get; private set; }
     /// <summary>A layer SmsPollutionMap made for a tagged body: no mesh, the height map from rays onto that body.</summary>
     public bool Implicit;
     public Node3D ImplicitBody;
@@ -89,6 +99,12 @@ public partial class SmsPollutionLayer : MeshInstance3D
     private bool _texDirty;
     private ShaderMaterial _mat;
     private bool _ownMaterial;    // the layer made the material (it may set the look); a material of yours only gets the map uniforms
+    private MultiMeshInstance3D _bubbleMmi;
+    private MultiMesh _bubbleMm;
+    private Vector3[] _bubblePos;
+    private float[] _bubbleAge;   // seconds since forming; < 0 = free
+    private float[] _bubbleScale; // a little variety in size
+    private int _bubbleNext;
     private double _settleAccum;
     private float _tickAccum;
     private int _spreadTimer;
@@ -309,6 +325,8 @@ public partial class SmsPollutionLayer : MeshInstance3D
                 }
             }
         }
+        if (Bubbles && _bubbleMmi == null)
+            SetupBubbles();
         Built = true;
         if (DebugPrint)
             GD.Print($"[SMS goop] layer '{Name}' {Type}: {Width} x {Height} texels of {TexelSize} u over x {MinX:F2}..{MaxX:F2} z {MinZ:F2}..{MaxZ:F2} m, " +
@@ -482,6 +500,8 @@ public partial class SmsPollutionLayer : MeshInstance3D
         }
         if (frames > 0)
             Settle(frames);
+        if (_bubbleMmi != null)
+            TickBubbles(delta);
         if (_texDirty)
         {
             _image.SetData(Width, Height, false, Image.Format.R8, _map);
@@ -550,13 +570,87 @@ public partial class SmsPollutionLayer : MeshInstance3D
     /// CanSpread, spread(): every fourth tick a 128-unit stamp at a painted spot near Mario (getPollutedPosNear).</summary>
     private void Action()
     {
-        if (!GetPollutedPos(SmsParams.Pollution.SpreadArea, out _))
+        if (!GetPollutedPos(SmsParams.Pollution.SpreadArea, out Vector3 at))
             return;
-        _effectTimer += 1;
-        if (_effectTimer > 15)
-            _effectTimer = 0;
+        if (Type != SmsPollutionType.Fire && Type != SmsPollutionType.FireRegrow)
+        {
+            // gpMarioParticleManager->emitWithRotate(PARTICLE_MS_RAKU_INDAWA, pos, ...) every 16th tick: the goop's bubble
+            if (_effectTimer > 15)
+            {
+                if (Bubbles && _bubbleMmi != null)
+                    EmitBubble(at);
+                _effectTimer = 0;
+            }
+            _effectTimer += 1;
+        }
         if (CanSpread)
             Spread();
+    }
+
+    // ------------------------------------------------------------------------------------------------------------- bubbles
+    private void SetupBubbles()
+    {
+        int n = Math.Max(1, BubbleMax);
+        _bubblePos = new Vector3[n];
+        _bubbleAge = new float[n];
+        _bubbleScale = new float[n];
+        Array.Fill(_bubbleAge, -1f);
+        _bubbleMm = new MultiMesh
+        {
+            TransformFormat = MultiMesh.TransformFormatEnum.Transform3D,
+            UseCustomData = true,
+            Mesh = new SphereMesh { Radius = 0.5f, Height = 1f, RadialSegments = 14, Rings = 7 },
+            InstanceCount = n,
+        };
+        for (int i = 0; i < n; i++)
+            _bubbleMm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(Vector3.Zero), Vector3.Zero));
+        var mat = new ShaderMaterial { Shader = BubbleShader ?? GD.Load<Shader>("res://assets/Sms/Fx/GoopBubble.gdshader") };
+        Texture2D goop = GoopTexture ?? DefaultGoopTexture(Type);
+        if (goop != null)
+            mat.SetShaderParameter("goop_albedo", goop);
+        if (_ownMaterial && _mat != null)
+            mat.SetShaderParameter("albedo_tiles_per_metre", _mat.GetShaderParameter("albedo_tiles_per_metre"));
+        _bubbleMmi = new MultiMeshInstance3D { Name = "GoopBubbles", Multimesh = _bubbleMm, MaterialOverride = mat, TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        AddChild(_bubbleMmi);
+        _bubbleMmi.GlobalTransform = Transform3D.Identity; // the instances are placed in world space
+    }
+
+    /// <summary>A bubble forms at a painted spot: the dome sits on the layer's surface there.</summary>
+    private void EmitBubble(Vector3 at)
+    {
+        float y = SurfaceYAt(at.X, at.Z);
+        if (float.IsNaN(y))
+            return;
+        int i = _bubbleNext;
+        _bubbleNext = (_bubbleNext + 1) % _bubblePos.Length;
+        _bubblePos[i] = new Vector3(at.X, y + 0.004f, at.Z);
+        _bubbleAge[i] = 0f;
+        _bubbleScale[i] = 0.7f + 0.6f * (float)Rng.NextDouble();
+        BubblesEmitted++;
+    }
+
+    /// <summary>The domes swell over the first three quarters of their life, hold, then pop (a quick squash to nothing).</summary>
+    private void TickBubbles(double delta)
+    {
+        float life = MathF.Max(0.1f, BubbleLife);
+        for (int i = 0; i < _bubblePos.Length; i++)
+        {
+            if (_bubbleAge[i] < 0f)
+                continue;
+            _bubbleAge[i] += (float)delta;
+            float t = _bubbleAge[i] / life;
+            if (t >= 1f)
+            {
+                _bubbleAge[i] = -1f;
+                _bubbleMm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(Vector3.Zero), Vector3.Zero));
+                continue;
+            }
+            float swell = t < 0.75f ? Mathf.SmoothStep(0f, 1f, t / 0.75f) : (t < 0.9f ? 1f : 1f - (t - 0.9f) / 0.1f);
+            float r = BubbleSize * _bubbleScale[i] * swell * 2f; // the mesh is a unit sphere (radius 0.5): scale = diameter
+            var xf = new Transform3D(Basis.Identity.Scaled(new Vector3(r, r * 0.75f, r)), _bubblePos[i]);
+            _bubbleMm.SetInstanceTransform(i, xf);
+            _bubbleMm.SetInstanceCustomData(i, new Color(t, 0f, 0f, 0f));
+        }
     }
 
     private void Spread()
