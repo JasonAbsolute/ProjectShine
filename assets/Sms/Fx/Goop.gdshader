@@ -93,7 +93,7 @@ vec3 flowing_albedo(vec2 p, vec2 dir, vec2 wobble) {
     float slide = flow_speed * flow_cycle;                // metres one phase travels before it resets
     vec2 off1 = dir * (ph1 - 0.5) * slide;
     vec2 off2 = dir * (ph2 - 0.5) * slide;
-    float w = smoothstep(0.45, 1.0, abs(2.0 * ph1 - 1.0));  // phase 1 pure for 45 % of its cycle, then faded into phase 2 before it resets (a short blend keeps the swirl crisp)
+    float w = abs(2.0 * ph1 - 1.0);                        // the constant cross-fade: 0 when phase 1 is centred, 1 when it resets (hidden behind phase 2). A shorter fade window read as a periodic wipe -- keep it linear
     vec2 q1 = p + off1 + wobble;
     vec2 q2 = p + off2 + wobble * 0.7;
     vec2 uv_a1 = q1 * albedo_tiles_per_metre;
