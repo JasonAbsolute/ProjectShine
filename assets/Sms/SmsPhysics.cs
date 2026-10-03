@@ -347,6 +347,10 @@ public static class SmsParams
         public const float AreaMinRate = 0.7f;          // mAreaMinRate: getPollutedPosNear's radius factor
         public const float CleanGroundScale = 10f;      // splashGround: clean(mCleanSize x 10) -- the spray's 18 -> a 180-unit stamp
         public const float CleanWallScale = 32f;        // splashWall: clean(mCleanSize x 32)
+        public const float FireArea = 1600f;            // mFireArea: fire()'s probe around Mario (units)
+        public const int FireEffectWaitTime = 20;       // mFireEffectWaitTime: a flame when the timer passes this
+        public const float ThunderArea = 1000f;         // mThunderArea: electric()'s probe around Mario (units); its timer passes 15
+        public const float GlassWallArea = 1000f;       // mGlassWallArea / mGlassWallEffectTime 120: glassWall() counts and does nothing visible
     }
 
     public static class HangRoof // /mario/hangroof.prm (shipped) + doRoofMovingProcess's constants

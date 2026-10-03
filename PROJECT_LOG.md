@@ -4277,3 +4277,23 @@ blotch_mix (0 = the texture, 1 = tinted by the procedural blotches -- the defaul
 (kept behind blotch_mix for a layer without a texture). The .import files are the editor's defaults (detect_3d/compress_to=1: the
 editor re-imports them VRAM-compressed with mipmaps on their first 3D use). NOTE: the game's layer models carry their own UVs; the port
 tiles by world distance -- albedo_tiles_per_metre is the knob if the swirl should be larger / smaller.
+
+### Pass 65o -- fire flames, electric sparks (the layer's own effects), and FLUDD through the triple jump
+THE GAME (PollutionAction.cpp 79 / 112, action() 139): a layer's action() runs its type's effect before the goop probe: fire() -- with a
+painted spot near Mario (getPollutedPosNear(mFireArea 1600)) the effect timer advances; past mFireEffectWaitTime (20) it plays
+SE_EF_FIRE and emits MAP_POLLUTION_MS_NEWFIRE_B then _A at that spot, both setGlobalScale(1.5); electric() -- the same with
+mThunderArea 1000, `> 15`, SE_EF_ELEC and MS_THUNDER_S; glassWall() -- a counter only. The electric layer also gets the RAKU_INDAWA
+bubble (the non-fire block) -- in the game both share mEffectTimer.
+PORT: SmsPollutionLayer: FireEffect / ElectricEffect per the game's probes and timers (FlameEveryTicks 20 = mFireEffectWaitTime, `>`;
+SparkEveryTicks 16 = `> 15`; their own timers -- the port's bubbles run on BubbleEveryTicks, so the game's shared timer is split);
+FxPool = a MultiMesh of billboard quads in world space (size = the instance scale, age = INSTANCE_CUSTOM.x): GoopFlames (Fx/GoopFlame
+.gdshader: an upright cylindrical billboard, a noise-torn tongue, yellow core -> orange -> red edge, additive, growing in and fading;
+0.5 x 0.9 m x FlameSize 1.5 = the game's scale; FlameLife 0.7 s, a 0.25 m rise) and GoopSparks (Fx/GoopSpark.gdshader: a camera
+billboard, 6 jagged spokes gated per flicker frame around a bright core, cyan-white, additive; SparkSize 0.6 m, SparkLife 0.25 s).
+Exports Flames / Sparks / FxMax 24 / the shaders. SmsParams.Pollution: FireArea, FireEffectWaitTime, ThunderArea, GlassWallArea. NOT
+PORTED: the sounds (SE_EF_FIRE / SE_EF_ELEC), the real jpa particles (drop them in when extracted: the pools are the hook).
+FLUDD BUG: "Mario can't use FLUDD while triple jumping". Cause: checkPumpEnable reads gMarioAnimeData[mAnimationId].isPumpOK(); the port
+reads its table by the clip SHOWING, and the port's triple jump shows ma_demo_gate_out_rolling_get (his stand-in for the flip), a demo
+row = 0xC8 = no pump. The game's ultraJumping plays ANIM_ROLL (MarioJump.cpp: jumpingBasic(MARIO_STATUS_ULTRA_JUMP, ANIM_ROLL, 0)),
+whose row is 0x44 = pump OK. FIX: SmsPumpClip() = "ma_roll" while stateOfMario == tripleJump, else the clip showing; used by
+SmsFluddPumpEnabled and SmsFluddBindId. No legacy retired (a data-row lookup corrected).

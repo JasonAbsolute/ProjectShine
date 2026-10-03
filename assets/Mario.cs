@@ -12175,7 +12175,7 @@ public partial class Mario : CharacterBody3D
         // gMarioAnimeData[mAnimationId].isPumpOK(): the body clip's upper column is not 0xC8 (pass 46: the whole column by clip --
         // swim_dive / swim_p_damage / swim_p_down, the slips, hiped, wsld, the shimmy, thrown, jkick, dgrun, sit / sleep / yawn, the
         // holds ...; the state list below is the same rows read as states, kept)
-        if (SmsUpperPumpFor(SmsCurrentClip()) == SmsParams.Fludd.UpperNone)
+        if (SmsUpperPumpFor(SmsPumpClip()) == SmsParams.Fludd.UpperNone)
             return false;
         switch (stateOfMario)
         {
@@ -12768,6 +12768,11 @@ public partial class Mario : CharacterBody3D
         ["ma_yo_slide_end"] = 0xC8, ["ma_yo_slide_pose"] = 0xC8, ["ma_yo_wait"] = 0xC8, ["ma_yo_walk"] = 0xC8
     };
 
+    /// <summary>The clip whose gMarioAnimeData row decides the pump: the body clip, except where the port shows a stand-in whose row is not
+    /// the game's -- the triple jump plays ma_demo_gate_out_rolling_get (a demo row, no pump) where the game's ultraJumping plays ANIM_ROLL
+    /// (MarioJump.cpp: jumpingBasic(ULTRA_JUMP, ANIM_ROLL)), whose row pumps; so FLUDD works through a triple jump as it does in the game.</summary>
+    private string SmsPumpClip() => stateOfMario == MarioState.tripleJump ? "ma_roll" : SmsCurrentClip();
+
     private static int SmsUpperPumpFor(string clip) =>
         !string.IsNullOrEmpty(clip) && SmsUpperPumpTable.TryGetValue(clip, out int id) ? id : SmsParams.Fludd.UpperPump;
 
@@ -12776,7 +12781,7 @@ public partial class Mario : CharacterBody3D
     /// tree off (the swim clips, the struggling hang) its graft is weighted in.</summary>
     private int SmsFluddBindId()
     {
-        int id = SmsUpperPumpFor(SmsCurrentClip());
+        int id = SmsUpperPumpFor(SmsPumpClip());
         if (id == SmsParams.Fludd.UpperNone || id == SmsParams.Fludd.UpperPump)
             return SmsParams.Fludd.UpperPump;
         return _fluddUpperClipLen.ContainsKey(id) ? id : SmsParams.Fludd.UpperPump;

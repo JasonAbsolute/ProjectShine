@@ -71,6 +71,21 @@ public partial class SmsPollutionLayer : MeshInstance3D
     [Export] public float RingBrighten = 0.25f;    // how much lighter than the paint the ripple is (0 = the paint's colour exactly)
     [Export] public Shader BubbleShader;           // default res://assets/Sms/Fx/GoopBubble.gdshader
     [Export] public Shader RingShader;             // default res://assets/Sms/Fx/GoopRing.gdshader
+    /// <summary>TPollutionLayer::fire(): on a Fire / FireRegrow layer with paint within 1600 units of Mario, every 21st tick a flame (the game:
+    /// MS_NEWFIRE_A + _B at x1.5 and SE_EF_FIRE) at a painted spot. A procedural flame billboard stands in (GoopFlame.gdshader).</summary>
+    [Export] public bool Flames = true;
+    [Export] public int FlameEveryTicks = 20;      // mFireEffectWaitTime: the timer must pass this (a flame every 21 ticks)
+    [Export] public float FlameSize = 1.5f;        // the game's setGlobalScale(1.5) on both emitters: x a 0.5 x 0.9 m tongue
+    [Export] public float FlameLife = 0.7f;
+    [Export] public Shader FlameShader;            // default res://assets/Sms/Fx/GoopFlame.gdshader
+    /// <summary>TPollutionLayer::electric(): on an Electric layer with paint within 1000 units of Mario, every 16th tick a spark (the game:
+    /// MS_THUNDER_S and SE_EF_ELEC) at a painted spot. A flickering crackle billboard stands in (GoopSpark.gdshader).</summary>
+    [Export] public bool Sparks = true;
+    [Export] public int SparkEveryTicks = 16;      // the game's `mEffectTimer > 15`
+    [Export] public float SparkSize = 0.6f;        // metres across
+    [Export] public float SparkLife = 0.25f;
+    [Export] public Shader SparkShader;            // default res://assets/Sms/Fx/GoopSpark.gdshader
+    [Export] public int FxMax = 24;                // flames / sparks alive at once
     [Export] public bool DebugPrint = false;
 
     /// <summary>TPollutionLayer::cleaned: a spot over 100 was being erased -- the game plays MSD_SE_ERASE_SCRAWL and PARTICLE_MS_RAKU_KIE here.</summary>
@@ -133,6 +148,12 @@ public partial class SmsPollutionLayer : MeshInstance3D
     private float[] _dropAge;     // < 0 = free
     private float[] _dropFloor;
     private int _dropNext;
+    private FxPool _flames;
+    private FxPool _sparks;
+    private int _fireTimer;       // fire()'s share of mEffectTimer (the game's single timer is split: the port's bubbles have their own cadence)
+    private int _sparkTimer;      // electric()'s
+    public int FlamesEmitted => _flames?.Emitted ?? 0;
+    public int SparksEmitted => _sparks?.Emitted ?? 0;
     private double _settleAccum;
     private float _tickAccum;
     private int _spreadTimer;
@@ -373,6 +394,10 @@ public partial class SmsPollutionLayer : MeshInstance3D
         }
         if (Bubbles && _bubbleMmi == null)
             SetupBubbles();
+        if (Flames && _flames == null && (Type == SmsPollutionType.Fire || Type == SmsPollutionType.FireRegrow))
+            _flames = new FxPool(this, "GoopFlames", FlameShader ?? GD.Load<Shader>("res://assets/Sms/Fx/GoopFlame.gdshader"), Math.Max(1, FxMax), 0.25f);
+        if (Sparks && _sparks == null && Type == SmsPollutionType.Electric)
+            _sparks = new FxPool(this, "GoopSparks", SparkShader ?? GD.Load<Shader>("res://assets/Sms/Fx/GoopSpark.gdshader"), Math.Max(1, FxMax), 0.05f);
         Built = true;
         if (DebugPrint)
             GD.Print($"[SMS goop] layer '{Name}' {Type}: {Width} x {Height} texels of {TexelSize} u over x {MinX:F2}..{MaxX:F2} z {MinZ:F2}..{MaxZ:F2} m (its frame), " +
@@ -577,6 +602,8 @@ public partial class SmsPollutionLayer : MeshInstance3D
             TickBubbles(delta);
             TickPops(delta);
         }
+        _flames?.Tick((float)delta);
+        _sparks?.Tick((float)delta);
         if (_texDirty)
         {
             _image.SetData(Width, Height, false, Image.Format.R8, _map);
@@ -645,6 +672,18 @@ public partial class SmsPollutionLayer : MeshInstance3D
     /// BubbleEveryTicks (the game: 16) and, flagged CanSpread, spread(): every fourth tick a 128-unit stamp at a painted spot near Mario.</summary>
     private void Action()
     {
+        switch (Type)
+        {
+            case SmsPollutionType.Fire:
+            case SmsPollutionType.FireRegrow:
+                FireEffect();
+                break;
+            case SmsPollutionType.Electric:
+                ElectricEffect();
+                break;
+            default:
+                break; // glassWall(): a counter and nothing else
+        }
         if (!GetPollutedPos(SmsParams.Pollution.SpreadArea, out Vector3 at))
             return;
         if (Type != SmsPollutionType.Fire && Type != SmsPollutionType.FireRegrow)
@@ -659,6 +698,97 @@ public partial class SmsPollutionLayer : MeshInstance3D
         }
         if (CanSpread)
             Spread();
+    }
+
+    // ---------------------------------------------------------------------------------------------------- fire and electric
+    /// <summary>fire() (PollutionAction.cpp 112): a painted spot near Mario (getPollutedPosNear(mFireArea 1600)) advances the timer; past
+    /// mFireEffectWaitTime (20) a flame there: MS_NEWFIRE_B and _A at x1.5 with SE_EF_FIRE in the game.</summary>
+    private void FireEffect()
+    {
+        if (!GetPollutedPosNear(SmsParams.Pollution.FireArea, out Vector3 at))
+            return;
+        _fireTimer += 1;
+        if (_fireTimer > FlameEveryTicks)
+        {
+            _flames?.Spawn(at + Vector3.Up * 0.01f, 0.5f * FlameSize, 0.9f * FlameSize, FlameLife);
+            _fireTimer = 0;
+        }
+    }
+
+    /// <summary>electric() (79): a painted spot near Mario (getPollutedPosNear(mThunderArea 1000)) advances the timer; past 15 a spark there:
+    /// MS_THUNDER_S with SE_EF_ELEC in the game.</summary>
+    private void ElectricEffect()
+    {
+        if (!GetPollutedPosNear(SmsParams.Pollution.ThunderArea, out Vector3 at))
+            return;
+        _sparkTimer += 1;
+        if (_sparkTimer >= Math.Max(1, SparkEveryTicks))
+        {
+            _sparks?.Spawn(at + Vector3.Up * (SparkSize * 0.35f), SparkSize, SparkSize, SparkLife);
+            _sparkTimer = 0;
+        }
+    }
+
+    /// <summary>A pool of billboard quads in world space (a MultiMesh under the layer): position, size and age per instance; the shader reads
+    /// the instance's scale as its size and INSTANCE_CUSTOM.x as its age.</summary>
+    private sealed class FxPool
+    {
+        private readonly MultiMesh _mm;
+        private readonly Vector3[] _pos;
+        private readonly float[] _age, _life, _w, _h;
+        private readonly float _rise;
+        private int _next;
+        public int Emitted { get; private set; }
+
+        public FxPool(Node3D parent, string name, Shader shader, int n, float rise)
+        {
+            _rise = rise;
+            _pos = new Vector3[n];
+            _age = new float[n];
+            _life = new float[n];
+            _w = new float[n];
+            _h = new float[n];
+            Array.Fill(_age, -1f);
+            _mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseCustomData = true, Mesh = new QuadMesh { Size = Vector2.One }, InstanceCount = n };
+            for (int i = 0; i < n; i++)
+                _mm.SetInstanceTransform(i, ZeroXf);
+            var mmi = new MultiMeshInstance3D { Name = name, Multimesh = _mm, MaterialOverride = new ShaderMaterial { Shader = shader }, TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+            parent.AddChild(mmi);
+            mmi.GlobalTransform = Transform3D.Identity;
+        }
+
+        public int Active { get { int c = 0; foreach (float a in _age) if (a >= 0f) c++; return c; } }
+
+        public void Spawn(Vector3 pos, float w, float h, float life)
+        {
+            int i = _next;
+            _next = (_next + 1) % _pos.Length;
+            _pos[i] = pos;
+            _w[i] = w;
+            _h[i] = h;
+            _life[i] = MathF.Max(0.05f, life);
+            _age[i] = 0f;
+            Emitted++;
+        }
+
+        public void Tick(float dt)
+        {
+            for (int i = 0; i < _pos.Length; i++)
+            {
+                if (_age[i] < 0f)
+                    continue;
+                _age[i] += dt;
+                float t = _age[i] / _life[i];
+                if (t >= 1f)
+                {
+                    _age[i] = -1f;
+                    _mm.SetInstanceTransform(i, ZeroXf);
+                    continue;
+                }
+                _mm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(new Vector3(_w[i], _h[i], 1f)), _pos[i] + Vector3.Up * (_rise * t)));
+                _mm.SetInstanceCustomData(i, new Color(t, 0f, 0f, 0f));
+            }
+        }
     }
 
     // ------------------------------------------------------------------------------------------------------------- bubbles
