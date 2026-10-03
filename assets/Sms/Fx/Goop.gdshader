@@ -31,14 +31,19 @@ uniform float blotch_mix : hint_range(0.0, 1.0) = 1.0; // 0 = the texture as pai
 uniform float noise_scale = 0.6;                      // the blotches, per metre
 uniform vec4 goop_color : source_color = vec4(0.20, 0.12, 0.05, 1.0);
 uniform vec4 goop_color_dark : source_color = vec4(0.06, 0.035, 0.015, 1.0);
+// the texture's tone: the flow blends two copies of the swirl, which averages its tones toward the middle and reads light and washed;
+// these put the body back (the game's goop sits dark and saturated under its flat lighting)
+uniform float brightness : hint_range(0.2, 1.5) = 0.78;
+uniform float contrast : hint_range(0.5, 2.0) = 1.25;
+uniform float saturation : hint_range(0.0, 2.0) = 1.15;
 
 // the surface: glossy paint; the ripple normals and the sheen are the "water on top" -- small by default, yours to raise
 uniform float ripple_strength : hint_range(0.0, 2.0) = 0.2;
 uniform float ripple_scale = 1.6;                            // ripples per metre
 uniform float ripple_speed = 0.35;
 uniform float roughness : hint_range(0.0, 1.0) = 0.18;
-uniform float specular : hint_range(0.0, 1.0) = 0.6;
-uniform float sheen : hint_range(0.0, 1.0) = 0.06;           // the pale gloss at grazing angles
+uniform float specular : hint_range(0.0, 1.0) = 0.4;
+uniform float sheen : hint_range(0.0, 1.0) = 0.0;            // the pale gloss at grazing angles (off: it lightened the paint)
 uniform vec4 sheen_color : source_color = vec4(0.9, 0.95, 1.0, 1.0);
 uniform float rim_darken : hint_range(0.0, 1.0) = 0.45;     // the thin paint at the goop's edge is darker
 
@@ -88,7 +93,7 @@ vec3 flowing_albedo(vec2 p, vec2 dir, vec2 wobble) {
     float slide = flow_speed * flow_cycle;                // metres one phase travels before it resets
     vec2 off1 = dir * (ph1 - 0.5) * slide;
     vec2 off2 = dir * (ph2 - 0.5) * slide;
-    float w = abs(2.0 * ph1 - 1.0);                        // 0 when phase 1 is centred (clean), 1 when it resets (hidden behind phase 2)
+    float w = smoothstep(0.45, 1.0, abs(2.0 * ph1 - 1.0));  // phase 1 pure for 45 % of its cycle, then faded into phase 2 before it resets (a short blend keeps the swirl crisp)
     vec2 q1 = p + off1 + wobble;
     vec2 q2 = p + off2 + wobble * 0.7;
     vec2 uv_a1 = q1 * albedo_tiles_per_metre;
@@ -115,6 +120,9 @@ void fragment() {
     vec2 dir = normalize(vec2(fbm(base * flow_dir_scale + TIME * 0.01) - 0.5, fbm(base * flow_dir_scale + vec2(31.7, 12.9) - TIME * 0.008) - 0.5) + vec2(1e-3, 0.0));
     vec2 wobble = (vec2(fbm(base * 0.3 + vec2(TIME * warp_speed, 0.0)), fbm(base * 0.3 + vec2(3.7, -TIME * warp_speed))) - vec2(0.5)) * warp_amount;
     vec3 albedo = flowing_albedo(base, dir, wobble);
+    float lum = dot(albedo, vec3(0.299, 0.587, 0.114));
+    albedo = mix(vec3(lum), albedo, saturation);
+    albedo = clamp(((albedo - 0.5) * contrast + 0.5) * brightness, 0.0, 1.0);
     vec3 col = albedo;
     if (blotch_mix > 0.0) {
         float n = fbm(base * noise_scale + wobble * 0.5);
