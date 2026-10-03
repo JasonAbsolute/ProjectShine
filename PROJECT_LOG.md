@@ -4110,3 +4110,29 @@ of 0.83 s and 1.3 m), ThrowKeepsRunSpeed true (0.5 x the speed he had when B was
 adds nothing because stopCommon's waitProcess zeroes mVel before the frame-4 release -- at a 32 u/f run that is +6.5 m/s). The flight
 numbers reach the object through SmsTakeData.WithGravity; _smsThrowRunVel is sampled in SmsThrowOrPut before the stop. The game's own
 feel: try a papaya (rate 5: 5.6 m/s forward even at the game's values).
+
+### Pass 62d -- the dive takes a fruit with B held (no bonk); the belly slide does not
+His 22:05 ("when you dive into a fruit and hold B Mario will still grab the fruit and won't bonk"), checked in the source: the take is a
+collision event (hitWantToTake -> canTake = MEANING_B held && isTakeSituation, MarioCollision.cpp 86). isTakeSituation excludes: invincibility,
+the 0x80000000 statuses (PITCHING 0x80000588, PUTTING 0x80000387, JUMP_THROW 0x820008ab -- the decomp's '// Airborn?' comment is a wrong
+guess: JUMP is 0x2000880 and DIVE 0x891, neither carries the bit), the 0x10000000 family (BAR_*, WIRE_*, FENCE_*, HANGING, ASCEND / DESCEND,
+TAKEN, READ_BILLBOARD, the SINK / DOWN losers), CATCH (0x800456 -- the belly slide the dive lands into, MarioJump.cpp 475), Yoshi, busy hands,
+holding / held; then the face cone and 80 + radius. taking() (MarioAction.cpp 8) first tests mInput & 4 (MarioMove.cpp 1699: his feet more
+than 100 units above the floor) -> changePlayerDropping(LANDING), else waitProcess puts his feet on the floor while the raise plays. So:
+a DIVE with B held into a fruit within 100 units of the floor TAKES it (he lands and raises -- no bonk: the dive's wall check is against
+the map, a fruit is a hit actor that boundByActor bounces), a jump with B held does the same near the floor, a BELLY SLIDE into one does
+not (CATCH is excluded). PORT: SmsCanTakeNow -- the floor within 100 units (was IsOnFloor), the dive family (diving, *JumpDive) and the
+plain jumps allowed, bellySlidingFromDive dropped; the held-B take runs in the airborne branch too, with waitProcess's floor snap (also
+every raise tick while he is off the floor -- SmsFloorYBelow); TryEnterDiveBonkAfterMove and the run's wall push ignore a collider that is a
+RigidBody3D / CharacterBody3D / Area3D (SmsIsNonMapBody: the dive / slide bonk and the wall push only against the map; running into a
+coconut shoves it, as boundByActor does, instead of the wallPush stance the port fell into). His legacy had the dive-slide pickup by the cast (removed in 62c)
+and the slide take (62's SmsCanTakeNow, now the game's no). NOT PORTED: boundByActor (the fruit bounced by Mario's dive: TMapObjBall
+asm with DOL literals -- Godot's push stands in), the take from water (the same 100-unit rule applies; shallow water would take).
+FRUIT ATTRIBUTES, re-checked against MapObjInit.cpp 1543-1716 (his 22:05 "does all the fruit have the right attributes"): every port
+column matches -- {gravity, bounce, wallReflect, minVy, groundFriction, ., airDrag, wallCheckUp, ., ., ., throwRate, throwVy}: coconut
+{0.3, 0.6, 0.3, 0.3, 0.97, 0.98, 1.0, 5.0, 0.5, 0.72, 0, 2.0, 15}, papaya the same with 5.0 / 20, pine 2.0 / 22, red pepper 5.0 / 12,
+durian {0.3, 0.6, 0.2, 0.2, 0.97, ..., 0.01, 5} (kicked), banana {0.3, 0.4, 0.2, 1.0, 0.4, 0.5, 1.0, 5.0, 0.5, 0.72, 0, 2.5, 14}. Not
+modelled: unk14 (0.98 / banana 0.5), unk20 0.5, unk24 0.72, unk28 0 -- their readers are in the asm. So every fruit DOES throw differently
+in the game: the papaya flies fast and far (rate 5, vy 20), the red pepper fast and low (5 / 12), the coconut a short lob (2 / 15), the
+pineapple a high short lob (2 / 22), the banana medium (2.5 / 14) and dead on landing (bounce 0.4, friction 0.4 a tick, rest under 1.0),
+the durian is kicked (0.01 / 5). The throw knobs (62c) scale all types alike, so the differences stay.

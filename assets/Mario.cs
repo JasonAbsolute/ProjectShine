@@ -2187,7 +2187,11 @@ public partial class Mario : CharacterBody3D
                     SetMarioState(stateOfMario);
                     if (SmsDebugPrint) GD.Print("[SMS take] the floor went: the take dropped into a LANDING fall");
                 }
-                else if (!_smsTakeAttached && heldBody == null && pendingPickup != null && animPlayer.CurrentAnimationPosition >= SmsParams.Take.TakeFrame / 60.0)
+                else if (!IsOnFloor() && SmsFloorYBelow(SmsParams.Take.FloorLossUnits, out float smsRaiseFloorY))
+                {
+                    GlobalPosition = new Vector3(GlobalPosition.X, smsRaiseFloorY, GlobalPosition.Z); // taking() -> waitProcess(): mPosition.y = mFloorPosition.y (the take from a dive lands him)
+                }
+                if (!_smsTakeAttached && heldBody == null && pendingPickup != null && animPlayer.CurrentAnimationPosition >= SmsParams.Take.TakeFrame / 60.0)
                 {
                     _smsTakeData = SmsTakeable.For(pendingPickup);
                     Anim_AttachPickup(); // HIT_MESSAGE_TAKE at frame 11: in the hand from here, the carry state at the clip's end
@@ -3887,6 +3891,19 @@ public partial class Mario : CharacterBody3D
             if (heldBody != null && Input.IsActionJustPressed("button_b"))
             {
                 SmsStartJumpThrow(); // checkJumpingThrowStart(): MARIO_STATUS_JUMP_THROW
+                goto EndFrame;
+            }
+
+            // hitWantToTake / canTake in the air (pass 62d): isTakeSituation does not exclude the DIVE or the jumps, only the throwing
+            // statuses, the hang family and CATCH; taking() lands him (waitProcess) when the floor is within 100 units. So a dive with B
+            // held into a fruit near the floor takes it -- and never bonks: a fruit is a hit actor, not a wall.
+            if (UseSmsPhysics && heldBody == null && pendingPickup == null && Input.IsActionPressed("button_b") && SmsFindTakeTarget(out RigidBody3D smsTakeAir))
+            {
+                if (SmsFloorYBelow(SmsParams.Take.FloorLossUnits, out float smsTakeFloorY))
+                    GlobalPosition = new Vector3(GlobalPosition.X, smsTakeFloorY, GlobalPosition.Z); // waitProcess: his feet to the floor
+                _smsTakeAttached = false;
+                if (SmsDebugPrint) GD.Print($"[SMS take] canTake in the air ({stateOfMario}): the raise starts on the floor");
+                StartPickupRaise(smsTakeAir);
                 goto EndFrame;
             }
 
@@ -5846,7 +5863,10 @@ public partial class Mario : CharacterBody3D
         Vector3 travelDirection = velocityXZ / speed;
         for (int i = 0; i < GetSlideCollisionCount(); i++)
         {
-            Vector3 normal = GetSlideCollision(i).GetNormal();
+            KinematicCollision3D kc = GetSlideCollision(i);
+            if (UseSmsPhysics && SmsIsNonMapBody(kc.GetCollider() as Node))
+                continue; // the game's wall is the map (checkGroundAtJumping -> the BG walls); a fruit, a coin, another body is a hit actor -- no bonk
+            Vector3 normal = kc.GetNormal();
 
             // Ignore floors, ceilings, and slopes too shallow to be a real
             // wall — same 75° cutoff as wall-slide/slip (WALL_TRUE_VERTICAL_MIN_ANGLE_DEG),
@@ -7872,9 +7892,9 @@ public partial class Mario : CharacterBody3D
         float stickStrength
     )
     {
-        if (!IsOnFloor() || !IsOnWall())
+        if (!IsOnFloor() || !IsOnWall() || (UseSmsPhysics && SmsIsNonMapBody(SmsWallColliderNode())))
         {
-            // Lost the wall — exit back to running/idle
+            // Lost the wall (or the "wall" is a body, not the map: a fruit he runs into is shoved, never pushed against) -- exit back to running/idle
             if (stateOfMario == MarioState.wallPush || stateOfMario == MarioState.wallShuffle)
             {
                 ExitGroundWall(stickStrength, inputDirWorld);
@@ -15104,6 +15124,10 @@ public partial class Mario : CharacterBody3D
     }
 
     /// <summary>The body of this frame's wall contact (the slide collision whose normal is a wall's), or null.</summary>
+    /// <summary>A collider that is a body or an area, not the map: the game's wall checks (checkWallPlane, checkGroundAtJumping) see only
+    /// the BG; anything else is a hit actor Mario shoves or bounces. Null (no collider known) is NOT a non-map body.</summary>
+    private static bool SmsIsNonMapBody(Node n) => n is RigidBody3D || n is CharacterBody3D || n is Area3D;
+
     private Node SmsWallColliderNode()
     {
         float cosMax = MathF.Cos(FloorMaxAngle);
@@ -15905,11 +15929,15 @@ public partial class Mario : CharacterBody3D
     // -- the tree's CarryBlend for its clips, SmsUpperPose for the swim set and the other tree-off frames. B again: isThrowStart.
     // ---------------------------------------------------------------------------------------------------------------
 
-    /// <summary>isTakeSituation() (MarioCollision.cpp 86) less the per-object part: no invincibility frames, not airborne / in an action
-    /// or special status (the 0x80000000 / 0x10000000 flags, CATCH), hands idle (UPPER_STATE_IDLE), not holding, not held, not in a demo.</summary>
+    /// <summary>isTakeSituation() (MarioCollision.cpp 86) less the per-object part: no invincibility frames, not a throwing status (the
+    /// 0x80000000 flag: PITCHING / PUTTING / JUMP_THROW -- the decomp's '// Airborn?' is a wrong guess, JUMP 0x2000880 and DIVE 0x891
+    /// have no such bit), not the 0x10000000 family (bars, wires, fences, hangs, TAKEN, the losers), not CATCH (the belly slide),
+    /// hands idle (UPPER_STATE_IDLE), not holding, not held, not in a demo. Plus taking()'s own first line (MarioAction.cpp 8): the
+    /// floor within 100 units (mInput & 4, MarioMove.cpp 1699) or the take is a LANDING fall -- so a DIVE with B held into a fruit
+    /// near the floor takes it (waitProcess puts his feet on the floor), a belly slide into one does not.</summary>
     private bool SmsCanTakeNow()
     {
-        if (heldBody != null || pendingPickup != null || CameraLocked || !IsOnFloor())
+        if (heldBody != null || pendingPickup != null || CameraLocked || !SmsFloorWithin(SmsParams.Take.FloorLossUnits))
             return false;
         if (_smsInvincibleTicks > 0)
             return false;
@@ -15919,9 +15947,11 @@ public partial class Mario : CharacterBody3D
         {
             case MarioState.idle: case MarioState.walking: case MarioState.running: case MarioState.sprinting: case MarioState.sneak:
             case MarioState.pivot: case MarioState.landing: case MarioState.singleJumpLanding: case MarioState.doubleJumpLanding:
-            case MarioState.tripleJumpLanding: case MarioState.rolloutRun: case MarioState.crouch: case MarioState.diving:
-            case MarioState.bellySlidingFromDive: case MarioState.gettingUpFromSliding:
+            case MarioState.tripleJumpLanding: case MarioState.rolloutRun: case MarioState.crouch: case MarioState.gettingUpFromSliding:
+            case MarioState.diving: case MarioState.singleJumpDive: case MarioState.doubleJumpDive: case MarioState.tripleJumpDive: // DIVE 0x891
+            case MarioState.singleJump: case MarioState.doubleJump: case MarioState.tripleJump: // JUMP 0x2000880 .. (no 0x80000000 either)
                 return true;
+            // bellySlidingFromDive = CATCH (0x800456): excluded by name in isTakeSituation
             default:
                 return false;
         }
@@ -15989,6 +16019,19 @@ public partial class Mario : CharacterBody3D
     }
 
     /// <summary>mInput &amp; 4 is clear: the floor within this many units under his feet (he is on it, or a ray finds it).</summary>
+    /// <summary>The floor within <paramref name="units"/> below his feet, with its height (waitProcess: mPosition.y = mFloorPosition.y).</summary>
+    private bool SmsFloorYBelow(float units, out float y)
+    {
+        y = GlobalPosition.Y;
+        var q = PhysicsRayQueryParameters3D.Create(GlobalPosition + Vector3.Up * 0.02f, GlobalPosition - Vector3.Up * SmsUnits.UnitsToMetres(units), CollisionMask,
+            new Godot.Collections.Array<Rid> { GetRid() });
+        var hit = GetWorld3D().DirectSpaceState.IntersectRay(q);
+        if (hit.Count == 0)
+            return IsOnFloor();
+        y = ((Vector3)hit["position"]).Y;
+        return true;
+    }
+
     private bool SmsFloorWithin(float units)
     {
         if (IsOnFloor())
