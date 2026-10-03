@@ -1270,6 +1270,9 @@ animation = &"ma_hang"
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_254f5"]
 animation = &"ma_hgup"
 
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_hgjmp"]
+animation = &"ma_hgjmp"
+
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_jifwe"]
 animation = &"ma_hipat"
 
@@ -1467,6 +1470,8 @@ states/ma_get_fail/node = SubResource("AnimationNodeAnimation_d1r44")
 states/ma_get_fail/position = Vector2(993, 128)
 states/ma_hang/node = SubResource("AnimationNodeAnimation_1epy6")
 states/ma_hang/position = Vector2(534, 326)
+states/ma_hgjmp/node = SubResource("AnimationNodeAnimation_hgjmp")
+states/ma_hgjmp/position = Vector2(805, 524)
 states/ma_hgup/node = SubResource("AnimationNodeAnimation_254f5")
 states/ma_hgup/position = Vector2(666, 524)
 states/ma_hipat/node = SubResource("AnimationNodeAnimation_jifwe")
