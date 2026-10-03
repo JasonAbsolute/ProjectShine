@@ -4153,3 +4153,50 @@ needs no transitions, as every other state here. project.godot gets `button_star
 the Enter key, the action SmsPauseMenu.PauseAction reads (Escape stays the separate key_esc action). Both files carry his uncommitted
 editor edits: staged as HEAD + these hunks through the index, his stay his. Checked headless (a SceneTree script): BaseSM.has_node
 ("ma_hgjmp") true and a travel to it accepted; InputMap.action_get_events("button_start") = the two events; the boot is clean.
+
+### Pass 64 -- ordinary goop by the sms_pollution tag (SLIP, SINK, INSTAKILL, GLASS_WALL, SAFE)
+THE GAME: a goop LAYER (TPollutionLayer) has a type (EPollutionType: 0 SINK, 1 FIRE, 2 SLIP, 3 GLASS_WALL, 4 ELECTRIC, 5 INSTAKILL, 6
+SAFE, 7 = FIRE again, 8 / 10 none) and a painted map; checkGraffito (MarioMove.cpp 953), once a tick after the move, reads the type under
+his feet and "isDirty" = a ring of isPolluted samples 32 units apart (3 x 3 at his height for SLIP / INSTAKILL / SAFE, 5 at the floor for
+SINK / FIRE / GLASS_WALL, 1 for ELECTRIC) all painted; then the dispatch (ELECTRIC / FIRE already ported; SLIP -> checkGraffitoSlip;
+GLASS_WALL -> mPosition.x / z = mPrevPosition: a wall; SINK / INSTAKILL / SAFE nothing here), MARIO_FLAG_DIRTY, the footprint stamps
+(MAP_POLLUTION_MS_M_ASHIOS in the top half of a 520-tick window) and the sink splash; then thinkDirty (1129) and checkSink (1183).
+SLIP (checkGraffitoSlip 862, on the ground): the brake and skid timer for the status he is in (OIL_SLIP / OIL_SLOPE: 1.0 / 60; OIL_RUN /
+OIL_PULLING: 0.98 / 10), then: floor normal.y <= 0.95 -> OIL_SLOPE (brake 1, 60); JUMP_CATCH / CATCH / OIL_SLIP / OIL_SLOPE -> OIL_SLIP
+(1, 60); anything else but CATCH_LOST -> OIL_RUN (0.98, 10; PULLING -> OIL_PULLING). The fog clock: 600 (240 yellow + 360 red) set while
+not yet DIRTY, down a tick, floorDamageExec(1, 3, 0, mMotorReturn) as it passes 360, 600 again at 0 -- 1 HP every 600 ticks standing in
+plain goop (5 s at the 120 Hz movement tick), the fog yellow-green (0x82, 0x96, 0x00) above 240 and the damage pink below (addDamageFog,
+MarioDraw.cpp 2184). Off the ground, OIL_SLIP / OIL_SLOPE keep brake 0.998 / 60. oilRun (MarioRun.cpp 1238): A -> speed 0, JUMP; B ->
+mVel.y 20, JUMP_CATCH(1); |vx|, |vz| < 1 -> WAIT; pollute(70); the face to the stick at 256 BAM a tick; mVel += mag x face x 0.01; the
+timer down, 0 -> brake 0; mVel x brake (v = 0.98(v + 0.32) -> 15.7 u/f at a full stick, half the run); ANIM_RUN2 at 0.5 x mag x 0.25
+(ANIM_WAIT 0.5 / ANIM_SQWAT with no stick), the slip SE 0x1001; walkProcess 0 -> LANDING. oilSlip (1306): A jumps; face at 150 BAM;
+timer 0 -> brake 0 and CATCH; pollute(130), SE 0x1141; mForwardVel += mag x cos(face - stick) x 0.0001, x brake, setPlayerVelocity;
+|fwd| < 1 -> CATCH_LOST; the clip's frame clamped at 50. oilSlope (1355): the timer, pollute(130), slipBackCommon(CATCH_LOST, LANDING).
+thinkDirty: mDirty += 0.15 (RUN / OIL_RUN) / 1.5 (CATCH / OIL_SLIP / OIL_SLOPE) / 0.5 (SLIP) while DIRTY, -= 0.3 in water (+ the melt
+particles), 0.5 in a spin jump, 0.2 the tick he leaves water, clamped 0..150 -- it feeds the melt effect only. SINK (checkSink): not
+invincible, the floor within 100 units, DIRTY on SINK: mSinkTimer += 1, HELD at 240 x 0.6 = 144 while HP > 0 (so the drown past 240 is
+reached only at 0 HP), floorDamageExec(1) every 90 move ticks (gpMarDirector->mMoveTickCount), MSD_SE_MA_SINK_IN_MUD, past 240 ->
+loserExec + SINK_LOSER (0x10001123), the sink splash, the cry; the model is drawn (timer / 240) x 150 units lower (MarioDraw.cpp 1760);
+the stick x ((0.3 - 0.3)(1 - t) + 0.3) = 0.3 (checkController 1327); a jump's vy and fwd x 0.5 and the depth bleeds (1 - t) x 120
+(setStatusToJumping 657). Off the paint the depth is 0 at once. INSTAKILL: speed 0, loserExec, SINK_LOSER the tick it confirms.
+GLASS_WALL: the revert only. SAFE: DIRTY (+ footprints) and nothing else. POISON is not a pollution type (a WATER type; dmggraffitopoison
+3 HP is applied by the water side -- not this pass). DIZZY is dead code (mDizzyTimer never set; DizzyPower 0 shipped).
+PORT: sms_pollution = fire | electric (as before) | slip / oil / goop / paint / normal | sink / mud | instakill / kill / lethal | glasswall /
+glass / wall | safe / clean / harmless (fire2 / unk7 = fire), on the floor body or a parent up to three levels. isDirty = on the floor with
+a type (the tagged floor is painted all over: NO paint map -- nothing spread or stamped, FLUDD cannot clean it, SAFE is invisible).
+SmsCheckGraffito dispatches per 120 Hz tick, then SmsThinkDirty and SmsCheckSink. New MarioState oilRun / oilSlip; OIL_SLOPE = the
+surface slip (SmsEnterSurfaceSlip) flagged _smsOilSlopeSlide, re-asserted every tick on the steep paint. SmsOilFrame owns the ground
+frame in OIL_RUN / OIL_SLIP (the tree off, ma_run2 at the slip rate via the AnimationPlayer's SpeedScale, ma_wait 0.5 with no stick,
+ma_slpbk for the skid; the rate reset the tick the state is left any other way). OIL_RUN enters from his ground statuses only (idle,
+pivot, sneak, walk, run, sprint, the landings, rolloutRun, carrying, crouch, wallPush / Shuffle, pickupFail, the surface slip) -- the game
+converts any status but CATCH_LOST; the knockdowns, deaths, pinned and demo states keep theirs here. SmsGoopFloorDamage = SmsDamageExec
+(the floor actor 1 unit ahead, 1 HP, type 3, min speed 16, 60 ticks invincible). SmsBodyOverlay.SetFogColor (fog_color uniform):
+GoopYellow while dirty on SLIP paint with the clock above 240, DamagePink otherwise; the fog is on while invincible OR dirty on SLIP.
+SmsCheckSink as the game, EnterDead for SINK_LOSER (the port's loser pose; ma_sink_down is in the library, not wired); SmsSinkDraw
+offsets the armature by (depth / 240) x 150 units and restores it; the stick scale in the stick read, the jump scale in SmsLaunch.
+GlassWall: GlobalPosition.x / z back to _smsTickStartPos (sampled after the ride carry). NOT PORTED: the paint map and everything on it
+(pollute, the footprints, the sink / melt / goop splash particles, FLUDD cleaning), the slip / mud sounds and voices, OIL_PULLING, the
+SQWAT variant of the OIL_RUN idle, the OIL_SLIP frame clamp, the water decrements of mDirty beyond swimming. CLOCK: every "tick" above is
+the port's 120 Hz movement tick (SmsUnits.TicksFor), as the fire's 50 invincible ticks are.
+ALSO: the step-up's sub-centimetre branch now puts him ON a real lip (rise > 2 mm) with the frame's remaining motion -- a goop slab
+authored as a thin StaticBody3D on top of a floor used to stop a sprint dead (speed kept, position blocked every frame).

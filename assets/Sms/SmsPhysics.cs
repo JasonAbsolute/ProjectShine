@@ -287,6 +287,44 @@ public static class SmsParams
     {
         public const float FireHeight = 5f;             // the hot floor burns within this height of the floor (the code default 1000)
         public const int FireInvincibleTime = 50;       // ticks after a burn (the code default 150); dmggraffitofire.prm says 50 as well
+        // the SINK goop (POLLUTION_TYPE_SINK): checkSink (MarioMove.cpp 1183)
+        public const float SinkTime = 240f;             // mSinkTimer ticks to the bottom; the drown (SINK_LOSER) past it -- reachable only at 0 HP (the clamp below)
+        public const int SinkDmgTime = 90;              // 1 HP every this many move ticks while sunk
+        public const float SinkDmgDepth = 0.6f;         // the timer is held at SinkTime x this (144) while HP > 0
+        public const float SinkHeight = 150f;           // the model is drawn this far down at the bottom (x timer / SinkTime), MarioDraw.cpp 1760
+        public const float SinkMoveMin = 0.3f;          // the stick x ((Max - Min)(1 - t) + Min): flat 0.3 as shipped
+        public const float SinkMoveMax = 0.3f;
+        public const float SinkJumpRateMin = 0.5f;      // the jump's vy and fwd x the same form: flat 0.5 as shipped
+        public const float SinkJumpRateMax = 0.5f;
+        public const float SinkRecover = 0.5f;          // a jump bleeds the depth by (1 - t) x SinkTime x this
+        public const int FootPrintTimerMax = 520;       // mFootPrintTimerMax, the code default 0x208 (not in any .prm): the footprint window
+    }
+
+    public static class Dirty // /mario/dirty.prm (shipped) -- the oily goop (POLLUTION_TYPE_SLIP) and the dirt on him
+    {
+        public const float IncRunning = 0.15f;          // mDirty a tick in RUN / OIL_RUN while on paint
+        public const float IncCatching = 1.5f;          // ... in CATCH / OIL_SLIP / OIL_SLOPE
+        public const float IncSlipping = 0.5f;          // ... in SLIP
+        public const float DecSwimming = 0.3f;          // mDirty off a tick in water
+        public const float DecWaterHit = 0.2f;          // ... the tick he leaves water
+        public const float DecRotJump = 0.5f;           // ... in a spin jump
+        public const float BrakeStartValSlip = 1.0f;    // mOilBrake entering / in OIL_SLIP and OIL_SLOPE: no bleed on the paint
+        public const float BrakeStartValRun = 0.98f;    // mOilBrake in OIL_RUN: v = 0.98 (v + 0.01 mag) -> a 15.7 u/f run at a full stick
+        public const float BrakeSlipNoPollute = 0.998f; // OIL_SLIP / OIL_SLOPE briefly off the paint
+        public const int DirtyTimeSlip = 60;            // the skid outlives the paint this long (OIL_SLIP / OIL_SLOPE), then the brake is 0
+        public const int DirtyTimeRun = 10;             // ... OIL_RUN
+        public const float PolSizeSlip = 130f;          // the paint he spreads a tick (units) in OIL_SLIP / OIL_SLOPE -- no paint map in the port
+        public const float PolSizeRun = 70f;            // ... in OIL_RUN
+        public const float PolSizeJump = 250f;          // ... a jump stamp
+        public const float SlopeAngle = 0.95f;          // floor normal.y <= this on paint -> OIL_SLOPE
+        public const float DirtyMax = 150f;             // mDirty's cap
+        public const float SlipAnmSpeed = 0.25f;        // ANIM_RUN2 at 0.5 x mag x this in OIL_RUN (up to 4.0: the legs pedal)
+        public const float SlipRunSp = 0.01f;           // mVel += mag x face x this a tick in OIL_RUN
+        public const float SlipCatchSp = 0.0001f;       // mForwardVel += mag x cos(face - stick) x this a tick in OIL_SLIP
+        public const int SlipRotate = 256;              // the face toward the stick, BAM a tick, in OIL_RUN
+        public const int SlipCatchRotate = 150;         // ... in OIL_SLIP
+        public const int FogTimeYellow = 240;           // mStandingOnGraffitoTimer above this: the yellow-green fog
+        public const int FogTimeRed = 360;              // the fog is the damage pink below; 1 HP as the timer passes this mark; the cycle is Yellow + Red = 600
     }
 
     public static class HangRoof // /mario/hangroof.prm (shipped) + doRoofMovingProcess's constants

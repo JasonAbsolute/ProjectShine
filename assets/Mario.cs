@@ -70,6 +70,8 @@ public partial class Mario : CharacterBody3D
         fluddRocket,  // SMS: MARIO_STATUS_ROCKET -- the hover nozzle's spring to the press height + 230 units, or the rocket nozzle's launch (rocketing())
         fence,        // SMS: the FENCE_* statuses (MarioSpecial.cpp 1294-1535), sub-status in _smsFence (pass 52)
         roofHang,     // SMS: HANG_ROOF / WAIT_ROOF / MOVE_ROOF / KICK_ROOF (MarioSpecial.cpp 199-410), sub-status in _smsRoof (pass 52)
+        oilRun,       // SMS: MARIO_STATUS_OIL_RUN -- the run on the oily goop (oilRun(), MarioRun.cpp 1238) (pass 64)
+        oilSlip,      // SMS: MARIO_STATUS_OIL_SLIP -- the belly skid on it (oilSlip(), 1306); OIL_SLOPE is the surface slip with _smsOilSlopeSlide (pass 64)
     }
 
     private struct AirControlProfile
@@ -176,7 +178,7 @@ public partial class Mario : CharacterBody3D
     private int _smsGraffitoTimer = 0;        // mStandingOnGraffitoTimer: the electric goop's grace, GraffitoNoDmgTime ticks
     private float _smsGraffitoAccum = 0f;
     private bool _smsDirty = false;           // MARIO_FLAG_DIRTY: the floor under him last tick was polluted
-    private enum SmsPollution { None, Fire, Electric }
+    private enum SmsPollution { None, Fire, Electric, Slip, Sink, Instakill, GlassWall, Safe } // EPollutionType (PollutionLayer.hpp 14): 10/8 none, 1, 4, 2, 0, 5, 3, 6; 7 = a fire alias
     private SmsPollution _smsPollution = SmsPollution.None; // mPollutionTypeStandingOn: the floor body's sms_pollution tag (None off the floor)
     // Fences and the roof hang (pass 52): metadata sms_fence (any value) or the group sms_fence on the body (or a parent up to three up)
     private enum SmsFence { Catch, JumpCatch, Move, Punch }
@@ -2056,6 +2058,7 @@ public partial class Mario : CharacterBody3D
         {
             SmsTakeTick(delta);
             SmsRideApply(); // checkRideMovement: the actor's matrix carries him before his own move (pass 63)
+            _smsTickStartPos = GlobalPosition; // mPrevPosition: the glass-wall goop's revert (pass 64)
         }
         UpdateCarryRunBlend((float)delta);
         UpdateRunAnimationSpeed();
@@ -2100,6 +2103,8 @@ public partial class Mario : CharacterBody3D
             LstickVec = SmsStick.PadStick(LstickVec); // the pad library (PADClamp 15 / 72 / 40, JUTGamePad / 54): mMainStick.mPosX / mPosY, what every stage below reads -- the 15 % dead zone is the game's, a pad's rest drift never reaches the wait's turn (pass 44)
         if (UseSmsPhysics && (_ycamOn || _ycamNeutralTicks > 0))
             LstickVec *= _ycamOn ? 0f : SmsYCamMarioStickScale(); // the L camera: his stick is the camera's (mCompSPos[0],[1] are never written); onNeutralMarioKey() at either end: dead 0.44 s, then fades in over 0.22 s
+        if (UseSmsPhysics && _smsSinkTimer > 0f)
+            LstickVec *= SmsSinkScale(SmsParams.Graffito.SinkMoveMin, SmsParams.Graffito.SinkMoveMax); // checkController (MarioMove.cpp 1327): isSinking() -> the stick x the sink scale (0.3 flat as shipped)
         float stickStrength = LstickVec.Length();
         _smsIntendedMag = SmsStick.IntendedMag(LstickVec);
         _smsStickH = LstickVec.X;
@@ -2696,6 +2701,7 @@ public partial class Mario : CharacterBody3D
                 // didn't jump, he must have walked off an edge.
                 bool isGroundedLocoState =
                     stateOfMario == MarioState.idle
+                    || stateOfMario == MarioState.oilRun || stateOfMario == MarioState.oilSlip // the goop skids walk off an edge like a run (oilRun: walkProcess 0 -> LANDING)
                     || stateOfMario == MarioState.sneak
                     || stateOfMario == MarioState.walking
                     || stateOfMario == MarioState.running
@@ -2907,6 +2913,9 @@ public partial class Mario : CharacterBody3D
             }
             // SMS surface slip: isSlipStart() on a floor Godot lets him stand on (a slider, a "45" surface past 30 deg,
             // wet ground, force slip). The game's SLIP_FORE / SLIP_BACK owns the frame while it runs.
+            // the oily goop's OIL_RUN / OIL_SLIP (pass 64): oilRun() / oilSlip() own the frame while checkGraffitoSlip keeps him in them
+            if (UseSmsPhysics && SmsOilFrame(delta))
+                goto EndFrame;
             if (UseSmsPhysics && SmsSurfaceSlipFrame(delta))
                 goto EndFrame;
             // checkDescent(): walking slowly up to a drop of more than 160 units, he climbs down and hangs from the edge
@@ -6828,8 +6837,13 @@ public partial class Mario : CharacterBody3D
                 continue;
             switch (n.GetMeta("sms_pollution").AsString().Trim().ToLowerInvariant())
             {
-                case "fire": case "hot": return SmsPollution.Fire;
+                case "fire": case "hot": case "fire2": case "unk7": return SmsPollution.Fire;
                 case "electric": case "elec": case "shock": return SmsPollution.Electric;
+                case "slip": case "oil": case "goop": case "paint": case "normal": return SmsPollution.Slip;   // POLLUTION_TYPE_SLIP: the ordinary goop
+                case "sink": case "mud": return SmsPollution.Sink;                                          // POLLUTION_TYPE_SINK
+                case "instakill": case "kill": case "lethal": return SmsPollution.Instakill;               // POLLUTION_TYPE_INSTAKILL
+                case "glasswall": case "glass": case "wall": return SmsPollution.GlassWall;                 // POLLUTION_TYPE_GLASS_WALL
+                case "safe": case "clean": case "harmless": return SmsPollution.Safe;                       // POLLUTION_TYPE_SAFE
                 default: return SmsPollution.None;
             }
         }
@@ -6921,6 +6935,7 @@ public partial class Mario : CharacterBody3D
     private void SmsExitSurfaceSlip(string why)
     {
         _smsSurfaceSlip = false;
+        _smsOilSlopeSlide = false;
         if (SmsDebugPrint)
             GD.Print($"[SMS slip] end: {why} (fwd {_smsSlipVel.Length():F1}, {_smsSlipTicks} ticks)");
     }
@@ -14725,18 +14740,373 @@ public partial class Mario : CharacterBody3D
     private void SmsCheckGraffito()
     {
         int n = SmsUnits.TicksFor(GetPhysicsProcessDeltaTime(), ref _smsGraffitoAccum);
-        bool dirty = IsOnFloor() && _smsPollution != SmsPollution.None;
+        bool dirty = IsOnFloor() && _smsPollution != SmsPollution.None; // isDirty: the port's tagged floor is painted all over
         for (int i = 0; i < n; i++)
         {
+            _smsMoveTick++;
             if (dirty && stateOfMario != MarioState.dead)
             {
-                if (_smsPollution == SmsPollution.Electric)
-                    SmsGraffitoElec();
-                else
-                    SmsGraffitoFire();
+                switch (_smsPollution)
+                {
+                    case SmsPollution.Electric: SmsGraffitoElec(); break;
+                    case SmsPollution.Fire: SmsGraffitoFire(); break;
+                    case SmsPollution.Slip: SmsGraffitoSlip(); break;
+                    case SmsPollution.GlassWall:
+                        // checkGraffito 1080: mPosition.x / z = mPrevPosition -- the painted spot is a wall he cannot cross
+                        GlobalPosition = new Vector3(_smsTickStartPos.X, GlobalPosition.Y, _smsTickStartPos.Z);
+                        break;
+                    default: break; // SINK / INSTAKILL / SAFE: nothing here (checkSink below)
+                }
             }
             _smsDirty = dirty; // onFlag / offFlag(MARIO_FLAG_DIRTY)
+            SmsThinkDirty();
+            SmsCheckSink();
         }
+        if (stateOfMario != MarioState.oilRun && stateOfMario != MarioState.oilSlip && _smsOilAnimRate != 0f)
+        {
+            animPlayer.SpeedScale = 1f; // the skid's clip rate, left behind by an exit the frame did not see (a walk-off)
+            _smsOilAnimRate = 0f;
+        }
+        SmsSinkDraw();
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // GOOP (pass 64): the pollution types beyond fire / electric. checkGraffito (MarioMove.cpp 953) -> thinkDirty (1129) -> checkSink
+    // (1183), once a tick after the move. The game's goop is a painted map read as a boolean under his feet ("isDirty": every point of a
+    // 3 x 3 or 5-point ring 32 units apart painted); the port's floor body carries the type (metadata sms_pollution) and counts as
+    // painted all over -- no paint map, so nothing is spread (pollute) or stamped (footprints), and FLUDD cannot clean it.
+    // ---------------------------------------------------------------------------------------------------------------
+    private float _smsOilBrake;          // mOilBrake: 0.98 (OIL_RUN) / 1.0 (OIL_SLIP, OIL_SLOPE) on the paint, 0 once the skid timer runs out
+    private int _smsDirtyTimer;          // mDirtyTimer: the skid's life off the paint (reset to 10 / 60 every tick on it)
+    private int _smsFogTimer;            // mStandingOnGraffitoTimer: 600 -> 0 on SLIP paint; yellow above 240, pink below, 1 HP at 360
+    private float _smsDirtyAmount;       // mDirty 0..150 (thinkDirty): the goop on him; no reader in the port yet (the melt-in-water particles are not ported)
+    private float _smsSinkTimer;         // mSinkTimer: ticks sunk in SINK goop, held at 144 while HP > 0
+    private float _smsOilFwd;            // mForwardVel in OIL_SLIP
+    private float _smsOilAnimRate;       // the OIL_RUN clip rate the port put on the AnimationPlayer (0 = none)
+    private bool _smsOilSlopeSlide;      // OIL_SLOPE: the surface slip is running slipBackCommon for the goop slope
+    private Vector3 _smsTickStartPos;    // mPrevPosition: his position before this tick's move (the glass-wall revert)
+    private uint _smsMoveTick;           // gpMarDirector->mMoveTickCount: the sink's damage cadence
+    private float _smsSinkDrawY;         // the sink offset on the armature now (metres)
+
+    /// <summary>The sink lerps: (Max - Min)(1 - t) + Min with t = depth / SinkTime (flat 0.3 / 0.5 as shipped).</summary>
+    private float SmsSinkScale(float min, float max) => (max - min) * (1f - _smsSinkTimer / SmsParams.Graffito.SinkTime) + min;
+
+    /// <summary>checkGraffitoSlip() (MarioMove.cpp 862), the grounded branch -- every tick he stands on SLIP paint: the brake and the skid
+    /// timer for the status he is in, the status he goes to (a steep floor: OIL_SLOPE; a dive or belly slide or an OIL_SLIP: OIL_SLIP; anything
+    /// but CATCH_LOST: OIL_RUN), then the fog's clock: 600 while not yet dirty, down a tick, 1 HP (floorDamageExec) as it passes 360, back
+    /// to 600 at 0. (The airborne branch -- OIL_SLIP / OIL_SLOPE off the ground keep a 0.998 brake -- is not reached in the port: isDirty
+    /// is off the floor; the walk-off makes the fall.)</summary>
+    private void SmsGraffitoSlip()
+    {
+        bool slipState = stateOfMario == MarioState.oilSlip || (stateOfMario == MarioState.slipping && _smsOilSlopeSlide);
+        if (slipState)
+        {
+            _smsOilBrake = SmsParams.Dirty.BrakeStartValSlip;
+            _smsDirtyTimer = SmsParams.Dirty.DirtyTimeSlip;
+        }
+        if (stateOfMario == MarioState.oilRun)
+        {
+            _smsOilBrake = SmsParams.Dirty.BrakeStartValRun;
+            _smsDirtyTimer = SmsParams.Dirty.DirtyTimeRun;
+        }
+        Vector3 floorN = GetFloorNormal();
+        if (floorN.Y <= SmsParams.Dirty.SlopeAngle)
+        {
+            _smsOilBrake = SmsParams.Dirty.BrakeStartValSlip;
+            _smsDirtyTimer = SmsParams.Dirty.DirtyTimeSlip;
+            SmsOilSlopeEnter(floorN); // OIL_SLOPE (+ MSD_SE_MV28_SPRISE_SMALL_01, not ported)
+        }
+        else if (slipState || stateOfMario is MarioState.diving or MarioState.singleJumpDive or MarioState.doubleJumpDive or MarioState.tripleJumpDive
+                 or MarioState.bellySlidingFromDive)
+        {
+            _smsOilBrake = SmsParams.Dirty.BrakeStartValSlip;
+            _smsDirtyTimer = SmsParams.Dirty.DirtyTimeSlip;
+            if (stateOfMario != MarioState.oilSlip)
+                SmsOilEnter(MarioState.oilSlip); // JUMP_CATCH / CATCH / OIL_SLOPE -> OIL_SLIP
+        }
+        else if (stateOfMario != MarioState.gettingUpFromSliding && SmsOilRunCanEnter())
+        {
+            _smsOilBrake = SmsParams.Dirty.BrakeStartValRun;
+            _smsDirtyTimer = SmsParams.Dirty.DirtyTimeRun;
+            if (stateOfMario != MarioState.oilRun)
+                SmsOilEnter(MarioState.oilRun); // (PULLING -> OIL_PULLING: no pulling in the port)
+        }
+        if (!_smsDirty)
+            _smsFogTimer = SmsParams.Dirty.FogTimeYellow + SmsParams.Dirty.FogTimeRed;
+        _smsFogTimer -= 1;
+        if (_smsFogTimer != 0)
+        {
+            if (_smsFogTimer == SmsParams.Dirty.FogTimeRed)
+                SmsGoopFloorDamage("the goop's fog gone red");
+        }
+        else
+            _smsFogTimer = SmsParams.Dirty.FogTimeYellow + SmsParams.Dirty.FogTimeRed;
+    }
+
+    /// <summary>checkGraffitoSlip's "else if (mStatus != CATCH_LOST)": the game turns ANY other status into OIL_RUN (changePlayerStatus refuses
+    /// only from a loser). The port limits it to his ground statuses -- the knockdowns, the deaths, the pinned and demo states keep theirs.</summary>
+    private bool SmsOilRunCanEnter()
+    {
+        switch (stateOfMario)
+        {
+            case MarioState.idle: case MarioState.pivot: case MarioState.sneak: case MarioState.walking: case MarioState.running:
+            case MarioState.sprinting: case MarioState.landing: case MarioState.singleJumpLanding: case MarioState.doubleJumpLanding:
+            case MarioState.tripleJumpLanding: case MarioState.rolloutRun: case MarioState.carrying: case MarioState.crouch:
+            case MarioState.wallPush: case MarioState.wallShuffle: case MarioState.pickupFail: case MarioState.oilRun:
+                return true;
+            case MarioState.slipping:
+                return !_smsOilSlopeSlide; // SLIP (the surface slip) -> OIL_RUN; the goop slope's own slide stays
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>changePlayerStatus(OIL_RUN / OIL_SLIP): the tree goes off (the skid drives its own clip and rate), the slide speed is kept.</summary>
+    private void SmsOilEnter(MarioState s)
+    {
+        MarioState was = stateOfMario;
+        isJumping = false;
+        isSpining(false);
+        if (_smsSurfaceSlip)
+            SmsExitSurfaceSlip($"the goop: {s}");
+        stateOfMario = s;
+        if (animTree != null)
+            animTree.Active = false;
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+        Vector3 v = new Vector3(SmsUnits.MpsToSpeed(velocity.X), 0f, SmsUnits.MpsToSpeed(velocity.Z));
+        _smsOilFwd = v.Dot(new Vector3(face.X, 0f, face.Z).Normalized()); // catching()'s mForwardVel carries into oilSlip
+        if (s == MarioState.oilSlip)
+        {
+            animPlayer.SpeedScale = 1f;
+            _smsOilAnimRate = 0f;
+            animPlayer.Play("ma_slpbk"); // the belly slide's clip (CATCH), as the port's bellySlidingFromDive
+        }
+        if (SmsDebugPrint)
+            GD.Print($"[SMS goop] {s} from {was} on '{_smsSurfaceNode}': brake {_smsOilBrake}, skid timer {_smsDirtyTimer}, fwd {_smsOilFwd:F1}");
+    }
+
+    /// <summary>OIL_SLOPE: oilSlope() is the skid timer + slipBackCommon(CATCH_LOST, LANDING) -- the surface slip's slide down the floor. The
+    /// port starts its surface slip on the goop slope and marks it; checkGraffitoSlip re-asserts it every tick he is still on the paint.</summary>
+    private void SmsOilSlopeEnter(Vector3 floorN)
+    {
+        if (stateOfMario == MarioState.slipping && _smsSurfaceSlip && _smsOilSlopeSlide)
+            return;
+        if (stateOfMario == MarioState.oilRun || stateOfMario == MarioState.oilSlip)
+            SmsOilExit();
+        SmsEnterSurfaceSlip(floorN);
+        _smsOilSlopeSlide = true;
+        if (SmsDebugPrint)
+            GD.Print($"[SMS goop] OIL_SLOPE on '{_smsSurfaceNode}' (floor normal.y {floorN.Y:F3} <= {SmsParams.Dirty.SlopeAngle}): the slide down the goop");
+    }
+
+    private void SmsOilExit()
+    {
+        _smsOilBrake = 0f;
+        _smsDirtyTimer = 0;
+        if (_smsOilAnimRate != 0f)
+        {
+            animPlayer.SpeedScale = 1f;
+            _smsOilAnimRate = 0f;
+        }
+    }
+
+    /// <summary>oilRun() / oilSlip() (MarioRun.cpp 1238 / 1306), owning the ground frame in OIL_RUN / OIL_SLIP. OIL_RUN: A jumps (speed 0 first),
+    /// B dives (JUMP_CATCH, vy 20), nearly still -> WAIT; the face turns to the stick at 256 BAM a tick, mVel += mag x face x 0.01, the skid
+    /// timer down (0 -> the brake is 0), mVel x the brake; the clip is RUN2 at 0.5 x mag x 0.25 (WAIT at 0.5 with no stick). OIL_SLIP: A jumps;
+    /// the face turns at 150; the timer down (0 -> brake 0 and CATCH); mForwardVel += mag x cos(face - stick) x 0.0001, x the brake, along the
+    /// face; under 1 -> CATCH_LOST. The paint spreading (pollute 70 / 130 units) and the slip sounds (0x1001 / 0x1141) are not ported.</summary>
+    private bool SmsOilFrame(double delta)
+    {
+        if (stateOfMario != MarioState.oilRun && stateOfMario != MarioState.oilSlip)
+            return false;
+        bool stick = direction.LengthSquared() > 1e-6f && _smsIntendedMag > 0f;
+        float intendedYaw = stick ? SmsMath.YawFromDir(direction.Normalized()) : _smsFaceYaw;
+        float mag = stick ? _smsIntendedMag : 0f;
+        Vector3 v = new Vector3(SmsUnits.MpsToSpeed(velocity.X), 0f, SmsUnits.MpsToSpeed(velocity.Z));
+        if (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space"))
+        {
+            // mInput & 2: setPlayerVelocity(0) and the jump -- a goop jump leaves with no run speed
+            SmsOilExit();
+            velocity.X = 0f;
+            velocity.Z = 0f;
+            jumpChainStage = 0;
+            jumpChainTimer = 0;
+            isJumping = true;
+            stateOfMario = MarioState.singleJump;
+            SmsLaunch(SmsAir.Launch.Jump);
+            SetMarioState(stateOfMario);
+            return true;
+        }
+        if (stateOfMario == MarioState.oilRun && Input.IsActionJustPressed("button_b") && heldBody == null)
+        {
+            // mInput & 0x8000: mVel.y = 20, JUMP_CATCH(1) -- the dive off the goop
+            Vector3 dir = v.LengthSquared() > 1e-6f ? v.Normalized() : SmsMath.DirFromYaw(_smsFaceYaw);
+            SmsOilExit();
+            stateOfMario = MarioState.diving;
+            SetMarioState(stateOfMario);
+            SmsSetDiveVelocity(dir, fromGround: true);
+            return true;
+        }
+        int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
+        for (int i = 0; i < n; i++)
+        {
+            if (stateOfMario == MarioState.oilRun)
+            {
+                if (v.X > -1f && v.X < 1f && v.Z > -1f && v.Z < 1f)
+                {
+                    v = Vector3.Zero;
+                    SmsOilExit();
+                    stateOfMario = MarioState.idle; // WAIT (checkGraffitoSlip puts him back in OIL_RUN next tick while he stands on the paint)
+                    SetMarioState(stateOfMario);
+                    break;
+                }
+                _smsFaceYaw = SmsMath.ConvergeAngle(_smsFaceYaw, intendedYaw, SmsParams.Dirty.SlipRotate * SmsUnits.BamToRad);
+                _smsFaceValid = true;
+                Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
+                v.X += mag * face.X * SmsParams.Dirty.SlipRunSp;
+                v.Z += mag * face.Z * SmsParams.Dirty.SlipRunSp;
+                _smsDirtyTimer--;
+                if (_smsDirtyTimer <= 0)
+                {
+                    _smsDirtyTimer = 0;
+                    _smsOilBrake = 0f;
+                }
+                v.X *= _smsOilBrake;
+                v.Z *= _smsOilBrake;
+            }
+            else
+            {
+                _smsFaceYaw = SmsMath.ConvergeAngle(_smsFaceYaw, intendedYaw, SmsParams.Dirty.SlipCatchRotate * SmsUnits.BamToRad);
+                _smsFaceValid = true;
+                _smsDirtyTimer--;
+                bool toCatch = false;
+                if (_smsDirtyTimer <= 0)
+                {
+                    _smsDirtyTimer = 0;
+                    _smsOilBrake = 0f;
+                    toCatch = true; // changePlayerStatus(CATCH): the plain belly slide carries on (it stops as its own rules say)
+                }
+                _smsOilFwd += mag * Mathf.Cos(_smsFaceYaw - intendedYaw) * SmsParams.Dirty.SlipCatchSp;
+                _smsOilFwd *= _smsOilBrake;
+                Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
+                v = new Vector3(face.X, 0f, face.Z) * _smsOilFwd;
+                if (_smsOilFwd > -1f && _smsOilFwd < 1f)
+                {
+                    v = Vector3.Zero;
+                    SmsOilExit();
+                    stateOfMario = MarioState.gettingUpFromSliding; // CATCH_LOST
+                    SetMarioState(stateOfMario);
+                    break;
+                }
+                if (toCatch)
+                {
+                    SmsOilExit();
+                    stateOfMario = MarioState.bellySlidingFromDive;
+                    SetMarioState(stateOfMario);
+                    break;
+                }
+            }
+        }
+        velocity.X = SmsUnits.SpeedToMps(v.X);
+        velocity.Z = SmsUnits.SpeedToMps(v.Z);
+        Vector3 f = SmsMath.DirFromYaw(_smsFaceYaw);
+        lastFacingDirection = f;
+        armature.Rotation = new Vector3(0f, YawFromDir(f), 0f);
+        if (stateOfMario == MarioState.oilRun)
+        {
+            // ANIM_RUN2 at 0.5 x mag x mSlipAnmSpeed (the legs pedal, up to 4.0); no stick: ANIM_WAIT at 0.5 (ANIM_SQWAT with the squat held: not ported)
+            string clip = mag > 0f ? "ma_run2" : "ma_wait";
+            float rate = mag > 0f ? 0.5f * mag * SmsParams.Dirty.SlipAnmSpeed : 0.5f;
+            if (animTree != null)
+                animTree.Active = false;
+            if (animPlayer.CurrentAnimation != clip)
+                animPlayer.Play(clip);
+            animPlayer.SpeedScale = rate;
+            _smsOilAnimRate = rate;
+        }
+        return true;
+    }
+
+    /// <summary>thinkDirty() (MarioMove.cpp 1129): the goop on him, 0..150 -- up on paint by the status (0.15 running, 1.5 catching / skidding,
+    /// 0.5 slipping), down in water (0.3 a tick), in a spin jump (0.5), the tick he leaves water (0.2, not tracked). No port reads it yet.</summary>
+    private void SmsThinkDirty()
+    {
+        if (_smsDirty)
+        {
+            if (stateOfMario is MarioState.walking or MarioState.running or MarioState.sprinting or MarioState.oilRun)
+                _smsDirtyAmount += SmsParams.Dirty.IncRunning;
+            if (stateOfMario == MarioState.bellySlidingFromDive || stateOfMario == MarioState.oilSlip || (stateOfMario == MarioState.slipping && _smsOilSlopeSlide))
+                _smsDirtyAmount += SmsParams.Dirty.IncCatching;
+            if (stateOfMario == MarioState.slipping && !_smsOilSlopeSlide)
+                _smsDirtyAmount += SmsParams.Dirty.IncSlipping;
+        }
+        if (stateOfMario == MarioState.swimming)
+            _smsDirtyAmount -= SmsParams.Dirty.DecSwimming;
+        if (stateOfMario == MarioState.SpinJump)
+            _smsDirtyAmount -= SmsParams.Dirty.DecRotJump;
+        _smsDirtyAmount = Mathf.Clamp(_smsDirtyAmount, 0f, SmsParams.Dirty.DirtyMax); // dirtyLimitCheck()
+    }
+
+    /// <summary>checkSink() (MarioMove.cpp 1183): not invincible, the floor within 100 units. On SINK paint: the depth up a tick, held at 144
+    /// while HP > 0, 1 HP every 90 move ticks (floorDamageExec 1 / type 3), the drown (loserExec + SINK_LOSER) past 240 -- so the mud costs HP
+    /// until he has none, then takes him. INSTAKILL paint: speed 0, loserExec, SINK_LOSER at once. Off either: the depth is 0.</summary>
+    private void SmsCheckSink()
+    {
+        if (_smsInvincibleTicks > 0 || stateOfMario == MarioState.dead)
+            return;
+        if (!SmsFloorWithin(100f))
+        {
+            _smsSinkTimer = 0f;
+            return;
+        }
+        if (_smsPollution == SmsPollution.Sink && _smsDirty)
+        {
+            _smsSinkTimer += 1f;
+            float hold = SmsParams.Graffito.SinkTime * SmsParams.Graffito.SinkDmgDepth;
+            if (_health > 0 && _smsSinkTimer > hold)
+                _smsSinkTimer = hold;
+            if (_smsMoveTick % (uint)SmsParams.Graffito.SinkDmgTime == 0)
+                SmsGoopFloorDamage("the mud");
+            // MSD_SE_MA_SINK_IN_MUD, the sinking splash, MSD_SE_MV10A_CRY_SHORT_01: not ported
+            if (_smsSinkTimer > SmsParams.Graffito.SinkTime)
+            {
+                if (SmsDebugPrint) GD.Print("[SMS goop] sunk: loserExec -> SINK_LOSER");
+                velocity = Vector3.Zero;
+                EnterDead(); // SINK_LOSER (ma_sink_down is not wired: the port's loser pose)
+            }
+            return;
+        }
+        if (_smsPollution == SmsPollution.Instakill && _smsDirty)
+        {
+            if (SmsDebugPrint) GD.Print("[SMS goop] instakill paint: loserExec -> SINK_LOSER");
+            velocity = Vector3.Zero;
+            EnterDead();
+            return;
+        }
+        _smsSinkTimer = 0f;
+    }
+
+    /// <summary>floorDamageExec(1, 3, 0, mMotorReturn) (MarioCollision.cpp 235): damageExec with the floor actor 1 unit ahead -- 1 HP, type 3 (no
+    /// knockdown; the upper damage run while running), min speed 16, 60 ticks invincible.</summary>
+    private void SmsGoopFloorDamage(string why)
+    {
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+        if (SmsDebugPrint) GD.Print($"[SMS goop] floorDamageExec: {why} -> HP {_health} - 1");
+        SmsDamageExec(GlobalPosition + face * SmsUnits.UnitsToMetres(1f), new SmsDamageProfile(1, 3, 16f, 60));
+    }
+
+    /// <summary>MarioDraw.cpp 1760: isSinking() -> the model drawn (depth / SinkTime) x SinkHeight lower. The port offsets the armature while
+    /// sinking and puts it back the tick the depth is 0.</summary>
+    private void SmsSinkDraw()
+    {
+        if (armature == null)
+            return;
+        float want = _smsSinkTimer > 0f ? SmsUnits.UnitsToMetres(_smsSinkTimer / SmsParams.Graffito.SinkTime * SmsParams.Graffito.SinkHeight) : 0f;
+        if (Mathf.IsEqualApprox(want, _smsSinkDrawY))
+            return;
+        Vector3 p = armature.Position;
+        armature.Position = new Vector3(p.X, p.Y + _smsSinkDrawY - want, p.Z);
+        _smsSinkDrawY = want;
     }
 
     /// <summary>
@@ -16826,6 +17196,16 @@ public partial class Mario : CharacterBody3D
         float fwd = SmsUnits.MpsToSpeed(sign * speed);
         float vy = SmsUnits.MpsToSpeed(velocity.Y);
         SmsAir.ApplyLaunch(kind, ref fwd, ref vy);
+        if (_smsSinkTimer > 0f)
+        {
+            // setStatusToJumping() (MarioMove.cpp 657): isSinking() -> vy and fwd x the sink jump rate (0.5 flat as shipped); the depth bleeds (1 - t) x SinkTime x SinkRecover
+            float sinkScale = SmsSinkScale(SmsParams.Graffito.SinkJumpRateMin, SmsParams.Graffito.SinkJumpRateMax);
+            vy *= sinkScale;
+            fwd *= sinkScale;
+            _smsSinkTimer -= (1f - _smsSinkTimer / SmsParams.Graffito.SinkTime) * (SmsParams.Graffito.SinkTime * SmsParams.Graffito.SinkRecover);
+            if (_smsSinkTimer < 0f)
+                _smsSinkTimer = 0f;
+        }
         _smsFallCancel = SmsAir.FallCancelEligible(kind);
         if (SmsDebugPrint)
             GD.Print($"[SMS launch] {kind}: fwd {fwd:F1} ({SmsUnits.SpeedToMps(fwd):F1} m/s) vy {vy:F1} cancel {_smsFallCancel}");
@@ -17154,9 +17534,14 @@ public partial class Mario : CharacterBody3D
             velocity.Z = preMoveVel.Z;
             if (onFloorNow)
                 velocity.Y = 0f;
+            if (rise > 0.002f)
+            {
+                GlobalPosition += remaining + Vector3.Up * rise; // a real lip under a centimetre (a goop slab on a floor): onto it, the frame's motion kept (pass 64)
+                ApplyFloorSnap();
+            }
             _smsSteppedUp = true;
             if (SmsDebugPrint)
-                GD.Print($"[SMS step] {where} {preMoveState}: not a wall (ground past it is level, rise {rise:F3} m), speed kept {new Vector2(velocity.X, velocity.Z).Length():F1} m/s");
+                GD.Print($"[SMS step] {where} {preMoveState}: not a wall (ground past it is level, rise {rise:F3} m), speed kept {new Vector2(velocity.X, velocity.Z).Length():F1} m/s{(rise > 0.002f ? ", onto the lip" : "")}");
             return;
         }
         // Treads shorter than the body radius: moving by the whole remainder puts the cylinder INTO the next riser and
@@ -17383,7 +17768,11 @@ public partial class Mario : CharacterBody3D
             _smsShockSparks.Active = false; // whatever ended the shock (a respawn): no elecEffect() call this tick, the emitters go
         if (_smsBodyOverlay != null && _smsBodyOverlay.Negative && !(stateOfMario == MarioState.hurt && _smsDownKind == SmsDownKind.Electric))
             _smsBodyOverlay.Negative = false; // drawSpecial() reads the status each frame: no ELECTRIC_DAMAGE, no logic pass
-        _smsBodyOverlay?.SetDamageFog(_smsInvincibleTicks > 0 && stateOfMario != MarioState.talking); // addDamageFog(): the pink fog pulses while mInvincibilityFrames > 0, never while talking
+        // addDamageFog() (MarioDraw.cpp 2184): the fog while mInvincibilityFrames > 0, OR while DIRTY on SLIP paint -- yellow-green (0x82, 0x96, 0x00)
+        // while mStandingOnGraffitoTimer > 240, the damage pink (0xFF, 0x00, 0x80) below it (the HP tick comes at 360); never while talking
+        bool smsSlipDirty = _smsDirty && _smsPollution == SmsPollution.Slip;
+        _smsBodyOverlay?.SetFogColor(smsSlipDirty && _smsFogTimer > SmsParams.Dirty.FogTimeYellow ? SmsBodyOverlay.GoopYellow : SmsBodyOverlay.DamagePink);
+        _smsBodyOverlay?.SetDamageFog((_smsInvincibleTicks > 0 || smsSlipDirty) && stateOfMario != MarioState.talking);
         SmsMissTick(); // TMarDirector: MARIO_FLAG_GAME_OVER -> the Miss state
         SmsRoofHangCheck(); // jumpProcess() roofCode 4: a fence roof met by the head while rising, hands empty -> HANG_ROOF
         if (_smsNoLandFrames > 0)

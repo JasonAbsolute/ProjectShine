@@ -70,6 +70,22 @@ public partial class SmsBodyOverlay : Node
         }
     }
 
+    /// <summary>The fog's two colours (addDamageFog, MarioDraw.cpp 2188 / 2195): the damage pink (0xFF, 0x00, 0x80) and the goop's yellow-green
+    /// (0x82, 0x96, 0x00) -- framebuffer (gamma-space) values, as the shader expects.</summary>
+    public static readonly Color DamagePink = new Color(1f, 0f, 0.5f);
+    public static readonly Color GoopYellow = new Color(0x82 / 255f, 0x96 / 255f, 0f);
+    private Color _fogColor = new Color(1f, 0f, 0.5f);
+    public Color FogColorNow => _fogColor;
+
+    /// <summary>The fog's colour (fog_color): the pink, or the goop's yellow-green while he stands dirty on SLIP paint.</summary>
+    public void SetFogColor(Color c)
+    {
+        if (c == _fogColor)
+            return;
+        _fogColor = c;
+        Overlay?.SetShaderParameter("fog_color", new Vector3(c.R, c.G, c.B));
+    }
+
     /// <summary>addDamageFog()'s condition, told each tick: invincible and not talking. The factor follows in _Process.</summary>
     public void SetDamageFog(bool on)
     {
