@@ -83,8 +83,8 @@ public partial class SmsPollutionLayer : MeshInstance3D
     [Export] public bool Flames = true;
     [Export] public int FlameWaitFrames = 20;      // mFireEffectWaitTime
     [Export] public float FlameSize = 1.5f;        // the game's setGlobalScale(1.5)
-    [Export] public float FlameWidth = 0.34f;      // metres at scale 1
-    [Export] public float FlameHeight = 1.2f;      // metres at scale 1
+    [Export] public float FlameWidth = 0.48f;      // metres at scale 1 (the streaks fan out from a wide base)
+    [Export] public float FlameHeight = 1.3f;      // metres at scale 1
     [Export] public float FlameLife = 1.5f;        // seconds (the jpa emitter's life is not read)
     /// <summary>DEVIATION knob (his "spread the fire out"): wisps per fire(). The game emits ONE fire per fire() (1); the extras go to other
     /// painted spots within the fire area (1600 units) around Mario.</summary>

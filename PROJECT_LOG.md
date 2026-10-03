@@ -4350,3 +4350,11 @@ opacity, wave, wave_speed, ripple_speed, foot_glow, outer_color, core_color, int
 within mFireArea (1600 units) around Mario, with lives 0.8-1.2 x. GoopFlame.gdshader: five streaks (the column, two tongues, two short
 outer ones; half-widths 0.46 / 0.36 / 0.33 / 0.26 / 0.28), more spread between them (xo x (0.35 + 0.5 hh)), anim_speed 2.6 multiplying
 all the motion (sway, ripple, tear), grow_time 0.1. FlameLife 1.5 s (was 2). No legacy retired (tuning).
+
+### Pass 65v -- the fire more aggressive: a wider base, licking, jittering, flickering (his tuning)
+"More aggressive looking; a wider base so a bigger circle it spawns from; the animations need to be aggressive." Previewed (wisp_preview.py,
+two rounds: the outer streaks hit the quad's sides as a hard cut -> an edge fade). GoopFlame.gdshader: base_spread 0.9 (the streaks fan
+out from a wide footprint: xo x (base_spread + 0.4 hh)), a fatter base shape (0.8 + 0.2 sin), each streak's height LICKS (x 0.78-1.1 by a
+slow noise), a whole-streak jitter in the sway, wave 0.4, ripple contrast 0.35 + 0.65, tear 0.4 with the top from 0.6, a whole-wisp
+flicker 0.82-1.0, the foot glow wider (0.3), anim_speed 4.0, opacity 0.75, an edge fade at the quad's sides. Layer: FlameWidth 0.48,
+FlameHeight 1.3 (0.72 x 1.95 m at the game's x1.5). No legacy retired (tuning).
