@@ -334,11 +334,11 @@ public static class SmsParams
         public const float RotSpeedTrgHover = 56f;       // DEVIATION (game mRotSpeedTrgHover 8): hover, aggressive loop with timed pumping
         public const float RotSpeedTrgTurbo = 1400f;    // mRotSpeedTrgTurbo (default 1000)
         public const float RotSpeedTrgRocket = 1400f;   // mRotSpeedTrgRocket (default 1000)
-        public const float RotSpeedMax = 2800f;         // DEVIATION (game mRotSpeedMax 1400 = 0x578): aggressive loop (~0.87 s/rev at the cap)
-        public const float GiantSustainSpeed = 500f;    // DEVIATION: once the loop is at least this fast the R-brake stops biting, so a giant swing conserves and WON'T STOP (the game keeps looping) until he jumps off or lets go
+        public const float RotSpeedMax = 1400f;         // mRotSpeedMax (0x578): the loop/launch cap. The roll-jump WINDOW WIDTH equals this and the launch = angVel x JumpRate, so inflating it both widens the release window (jump fires over a wider swing-speed range -> variable launch) AND over-scales the launch. Keep the game's value so the launch is consistent
+        public const float FallOffSpeed = 300f;         // holding B winds the swing down (x RotBrake a frame); once it is this slow he falls off the rope. Without B the loop conserves (gravity is conservative) and won't stop on its own
         public const float SwingBlurSpeed = 150f;       // the trailing streak shows once the swing is at least this fast (low, so it shows through most of a swing)
         public const int TrailLifeFrames = 32;           // how many frames a point stays in the swing streak (the hip-drop blur's own is 10; the wire runs it longer for a longer trail)
-        public const float SwingRadiusCoeff = 0.032f;   // DEVIATION (game mWireSag 0.1 x |angVel|): the loop's radius per unit angular speed -- small so the circle is tight (~0.032 x 2800 ~ 90 u = 1.2 m) at the raised cap
+        public const float SwingRadiusCoeff = 0.064f;   // DEVIATION (game mWireSag 0.1 x |angVel|): the loop's radius per unit angular speed -- tuned so the circle stays ~90 u / 1.2 m at the (now 1400) cap, the size he was happy with
         public const float RotStop = 100f;              // mRotStop: the settle window; 2x it is the entry kick
         public const float RotGravity = 20f;            // mRotGravity: the restoring torque x sin(angle) (BAM a frame^2)
         public const float RotBrake = 0.98f;            // mRotBrake: R held multiplies the angular speed a frame
@@ -348,9 +348,7 @@ public static class SmsParams
         public const float JumpSlideControl = 0.3f;     // mWireJumpSlideControl
         public const float JumpMult = 3.0f;             // mWireJumpMult (default 5): vy += this x -bounceVel when the rope is moving up
         public const float JumpBase = 20f;              // the game's mWireJumpBase (dropped the deviation -- he said the inflated jump was too much; plain wire jump vy 62)
-        public const float RollJumpBase = 85f;          // roll-jump launch FLOOR (power units): a solid dismount even off a slow loop, so it doesn't hinge on nailing a fast loop
-        public const float RollJumpBonus = 42f;         // extra launch power at/above RollJumpSpeedRef: a faster loop rewards a little, but the spread is tight (vy ~60..90 vs a 42 normal jump)
-        public const float RollJumpSpeedRef = 1400f;    // the swing speed (BAM/frame, the game's spin cap) at which the launch bonus is full
+        // roll-jump launch is the decomp's jumpPower = angVel x JumpRate (above), capped by RotSpeedMax via the swing clamp -- no base/bonus
         public const float SwingBrake = 0.99f;          // mWireSwingBrake: the spring's damping a frame
         public const float SwingMax = 200f;             // mWireSwingMax: the sag's clamp (units)
         public const float StandHeight = 160f;          // getOnWirePosAngle: his root this far under the chord point (the rope's give under him)

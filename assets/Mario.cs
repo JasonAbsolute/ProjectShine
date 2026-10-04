@@ -17092,10 +17092,13 @@ public partial class Mario : CharacterBody3D
                 Animation a = animPlayer.GetAnimation(anim);
                 if (a != null)
                     a.LoopMode = loop ? Animation.LoopModeEnum.Linear : Animation.LoopModeEnum.None;
+                // the crossfade is processed in SCALED time, so a fast clip (high SpeedScale -- the rope walk/run) collapses a fixed
+                // blend to almost nothing and snaps. Scale the blend by the rate so it stays ~AnimBlend seconds of REAL time.
+                float blend = SmsParams.Wire.AnimBlend * MathF.Max(rate, 1f);
                 if (reverse)
-                    animPlayer.PlayBackwards(anim, SmsParams.Wire.AnimBlend);
+                    animPlayer.PlayBackwards(anim, blend);
                 else
-                    animPlayer.Play(anim, SmsParams.Wire.AnimBlend); // blend from the previous clip so rope transitions don't snap
+                    animPlayer.Play(anim, blend); // blend from the previous clip so rope transitions don't snap
             }
         }
         SmsWireFluddGraft(anim); // keep the one-hand grab/spray upper pose over the hang clips while he sprays
@@ -17149,6 +17152,7 @@ public partial class Mario : CharacterBody3D
         bool aPressed = Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space");
         bool bPressed = Input.IsActionJustPressed("button_b");
         bool rHeld = Input.IsActionPressed("button_r");
+        bool bHeld = Input.IsActionPressed("button_b");
         bool stick = stickDir.LengthSquared() > 1e-6f && _smsIntendedMag > 0f; // mInput & 1
         float intendedYaw = stick ? SmsMath.YawFromDir(stickDir) : 0f;
         float q = 1f / SmsUnits.TicksPerFrame;
@@ -17377,15 +17381,6 @@ public partial class Mario : CharacterBody3D
                     float initial = _smsWirePitch;
                     if (first && aPressed)
                         _smsWireRollState |= 1;
-                    if (first && bPressed)
-                    {
-                        // ANTI-SOFTLOCK: a weak (hover/spray, impulse +-8) swing never reaches the settle window (|vel| < RotStop 100 at the
-                        // bottom, but the entry kick alone is 208) and, with the brake only applied while R is held, never decays on its own --
-                        // so without this B he can be stuck swinging forever with no way back to Hanging (where B drops off). B bails here too.
-                        SmsWireReleaseHolder("B: let go mid-swing");
-                        SmsWireStartHangLanding("B while swinging");
-                        return;
-                    }
                     float max = SmsParams.Wire.RotSpeedMax * sc;
                     if ((_smsWireRollState & 1) != 0 && _smsWireAngVel < 0f && _smsWirePitch > -SmsParams.Wire.RollReleaseWindow && _smsWirePitch <= max - SmsParams.Wire.RollReleaseWindow)
                     {
@@ -17409,8 +17404,18 @@ public partial class Mario : CharacterBody3D
                     if (SmsWirePumping())
                         _smsWireAngVel += SmsWireRotSpeed() * q * sc;
                     _smsWireAngVel -= SmsParams.Wire.RotGravity * MathF.Sin(_smsWirePitch / SmsBamPerRad) * q;
-                    if (rHeld && MathF.Abs(_smsWireAngVel) < SmsParams.Wire.GiantSustainSpeed)
-                        _smsWireAngVel *= MathF.Pow(SmsParams.Wire.RotBrake, q); // the brake only bites a SLOW swing: a full-speed loop conserves and won't stop (the game keeps looping) until he jumps off or lets go
+                    if (bHeld)
+                    {
+                        // Hold B to wind the swing down; once it's below the fall-off speed he drops off the rope (his way off a giant swing).
+                        // Without B the loop conserves (gravity is conservative) and keeps going -- it won't stop on its own.
+                        _smsWireAngVel *= MathF.Pow(SmsParams.Wire.RotBrake, q);
+                        if (MathF.Abs(_smsWireAngVel) < SmsParams.Wire.FallOffSpeed)
+                        {
+                            SmsWireReleaseHolder("B wound the swing down -> falls off");
+                            SmsWireStartHangLanding("B braked the swing below the fall-off speed");
+                            return;
+                        }
+                    }
                     _smsWireAngVel = Mathf.Clamp(_smsWireAngVel, -max, max);
                     _smsWirePitch = SmsWrapBam(_smsWirePitch + _smsWireAngVel * q);
                     _smsWireSag = SmsParams.Wire.SwingRadiusCoeff * MathF.Abs(_smsWireAngVel); // the loop's radius (DEVIATION coeff so the circle isn't huge at the raised speed cap)
@@ -17485,11 +17490,7 @@ public partial class Mario : CharacterBody3D
     {
         Vector3 along = SmsWireAlong();
         Vector3 face = SmsWirePerp(along);
-        // DEVIATION (game power = angVel x JumpRate): the pure-angVel launch made the dismount hinge on the exact loop speed at release
-        // (vy ~19 off a weak swing to ~89 off a capped one -- a 4.5x spread he found inconsistent). A solid floor + a tight speed bonus
-        // keeps the roll jump consistent (vy ~60..90) while still rewarding a faster loop a little. The swing direction still sets which way.
-        float mag = SmsParams.Wire.RollJumpBase + Mathf.Clamp(MathF.Abs(_smsWireAngVel) / SmsParams.Wire.RollJumpSpeedRef, 0f, 1f) * SmsParams.Wire.RollJumpBonus;
-        float power = MathF.Sign(_smsWireAngVel) * mag;
+        float power = _smsWireAngVel * SmsParams.Wire.JumpRate; // jumpPower = unkF6 x mJumpRate (MarioMove.cpp 620). angVel is already capped to RotSpeedMax, and the release window (width = RotSpeedMax) only opens near the top of a real loop, so this lands consistently near the cap
         float ang = (arg == 0 ? SmsParams.Wire.RollJumpAngleFwd : SmsParams.Wire.RollJumpAngleBack) / SmsBamPerRad;
         float vy = power * MathF.Sin(ang);
         float fwd = power * -MathF.Cos(ang);
