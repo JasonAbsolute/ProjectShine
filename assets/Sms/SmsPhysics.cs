@@ -343,7 +343,7 @@ public static class SmsParams
         public const float JumpAccelControl = 0.01f;    // mWireJumpAccelControl: the WIRE_JUMP's air steering
         public const float JumpSlideControl = 0.3f;     // mWireJumpSlideControl
         public const float JumpMult = 3.0f;             // mWireJumpMult (default 5): vy += this x -bounceVel when the rope is moving up
-        public const float JumpBase = 50f;              // DEVIATION (game mWireJumpBase 20, was 25): a punchier rope jump, added to the WIRE_JUMP's 42 (plain jump vy 92)
+        public const float JumpBase = 30f;              // DEVIATION (game mWireJumpBase 20): a springy rope jump (plain vy 72 ~ 9 m; a normal jump is 3 m). Higher vy = MORE airtime, so going bigger reads as floatier/slower, not snappier
         public const float SwingBrake = 0.99f;          // mWireSwingBrake: the spring's damping a frame
         public const float SwingMax = 200f;             // mWireSwingMax: the sag's clamp (units)
         public const float StandHeight = 160f;          // getOnWirePosAngle: his root this far under the chord point (the rope's give under him)
@@ -1377,6 +1377,7 @@ public static class SmsSelfTest
             Check("ycam: swing behind from 180 deg (ticks)", ticks + 1, 16f, 0.5f);
             Check("ycam: swing lands within a BAM", MathF.Abs((short)(yaw - (-32768))), 1f, 1f);
         }
+        GD.Print($"[SMS wire feel] walk {SmsParams.Wire.WalkSpeedPerMag} hand {SmsParams.Wire.HandMoveSpeed} jumpBase {SmsParams.Wire.JumpBase} spring {SmsParams.Wire.SwingRate} hoverSwing {SmsParams.Wire.RotSpeedTrgHover} spraySwing {SmsParams.Wire.RotSpeed} -- if these look OLD (0.1/3/25/0.005/8/-8) the editor is running STALE C#: click the editor Build (hammer) or restart it (C# does NOT hot-reload like shaders)");
         GD.Print(ok ? "[SMS selftest] ALL OK" : "[SMS selftest] FAILURES ABOVE");
         return ok;
     }
