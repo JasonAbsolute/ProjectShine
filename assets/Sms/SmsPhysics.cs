@@ -335,6 +335,8 @@ public static class SmsParams
         public const float RotSpeedTrgTurbo = 1400f;    // mRotSpeedTrgTurbo (default 1000)
         public const float RotSpeedTrgRocket = 1400f;   // mRotSpeedTrgRocket (default 1000)
         public const float RotSpeedMax = 2200f;         // DEVIATION (game mRotSpeedMax 1400 = 0x578): raised so the loop whips faster (~1.1 s/rev at the cap vs 1.56 s)
+        public const float GiantSustainSpeed = 500f;    // DEVIATION: once the loop is at least this fast the R-brake stops biting, so a giant swing conserves and WON'T STOP (the game keeps looping) until he jumps off or lets go
+        public const float SwingBlurSpeed = 300f;       // the spin-blur rings (the game's blurEffect) show once the swing is at least this fast
         public const float RotStop = 100f;              // mRotStop: the settle window; 2x it is the entry kick
         public const float RotGravity = 20f;            // mRotGravity: the restoring torque x sin(angle) (BAM a frame^2)
         public const float RotBrake = 0.98f;            // mRotBrake: R held multiplies the angular speed a frame

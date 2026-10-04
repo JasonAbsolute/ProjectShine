@@ -203,6 +203,8 @@ public partial class Mario : CharacterBody3D
     private float _smsWirePitch;                         // mFaceAngle.x while rolling: the swing angle (BAM; 0 = hanging straight down)
     private int _smsWireRollState;                       // mStatusState while rolling: 1 = A armed, 2 = over the top
     private bool _smsWireJumpLatch;                      // MARIO_FLAG_UNK100: A on the rope, kept until the rope lets the jump go
+    private bool _smsRollJumpSpin;                       // WIRE_ROLL_JUMP: drive the roll clip (ANIM_ROLL) through the dismount's airtime, not the plain jump pose
+    private string _smsRollJumpClip = "";                // the library roll clip chosen for the dismount spin
     private string _smsWireAnim = "";
     private bool _smsFencePunchHit = false;             // fencePunch(): checkPass(5) fired
     private int _smsRoofTicks = 0;                      // hangRoof() mStatusTimer
@@ -16905,6 +16907,23 @@ public partial class Mario : CharacterBody3D
     {
         if (!UseSmsPhysics)
             return;
+        if (_smsRollJumpSpin)
+        {
+            // keep the roll-jump dismount spinning (ANIM_ROLL, tree off) until he lands or the state changes, then hand back to the tree
+            if (IsOnFloor() || stateOfMario != MarioState.singleJump)
+            {
+                _smsRollJumpSpin = false;
+                _smsWireAnim = "";
+                if (animTree != null)
+                    animTree.Active = true; // the landing SetMarioState also does this; belt-and-suspenders so the clip can't stick on
+                isSpining(false);
+            }
+            else
+            {
+                SmsWirePlay(_smsRollJumpClip, 1f, true);
+                isSpining(true);
+            }
+        }
         if (_smsWireAir != SmsWireAir.None && stateOfMario != MarioState.wire && IsOnFloor() && stateOfMario != MarioState.singleJump)
             _smsWireAir = SmsWireAir.None; // the jumping-type wire statuses end with the landing
         Vector3 root = SmsFeet();
@@ -17374,12 +17393,13 @@ public partial class Mario : CharacterBody3D
                     if (SmsWirePumping())
                         _smsWireAngVel += SmsWireRotSpeed() * q * sc;
                     _smsWireAngVel -= SmsParams.Wire.RotGravity * MathF.Sin(_smsWirePitch / SmsBamPerRad) * q;
-                    if (rHeld)
-                        _smsWireAngVel *= MathF.Pow(SmsParams.Wire.RotBrake, q);
+                    if (rHeld && MathF.Abs(_smsWireAngVel) < SmsParams.Wire.GiantSustainSpeed)
+                        _smsWireAngVel *= MathF.Pow(SmsParams.Wire.RotBrake, q); // the brake only bites a SLOW swing: a full-speed loop conserves and won't stop (the game keeps looping) until he jumps off or lets go
                     _smsWireAngVel = Mathf.Clamp(_smsWireAngVel, -max, max);
                     _smsWirePitch = SmsWrapBam(_smsWirePitch + _smsWireAngVel * q);
                     _smsWireSag = 0.1f * MathF.Abs(_smsWireAngVel);
                     _smsWireBounceVel = 0f;
+                    isSpining(MathF.Abs(_smsWireAngVel) > SmsParams.Wire.SwingBlurSpeed); // the speed-blur rings during a fast swing / loop (the game's blurEffect)
                     if (initial < -0x4000 && _smsWirePitch > 0x4000)
                         _smsWireRollState |= 2; // over the top (the full-loop sounds' flag)
                     else if (initial < _smsWirePitch)
@@ -17392,6 +17412,7 @@ public partial class Mario : CharacterBody3D
                         _smsWireBounceVel = 0f;
                         _smsWireSag = 0f;
                         _smsWireRollState = 0;
+                        isSpining(false);
                         if (heldBody == null)
                         {
                             _smsWire = SmsWireState.Hanging;
@@ -17464,9 +17485,17 @@ public partial class Mario : CharacterBody3D
         _smsWireAir = SmsWireAir.RollJump;
         stateOfMario = MarioState.singleJump;
         SetMarioState(stateOfMario);
-        if (_sm != null && animTree != null && animPlayer.HasAnimation("ma_roll"))
-            _sm.Travel("ma_roll");
-        SmsWireReleaseHolder($"the roll jump {arg}: power {power:F1} -> vy {vy:F1} fwd {fwd:F1}");
+        // The giant-roll dismount spins through the air (ANIM_ROLL). The tree has no ma_roll node, so _sm.Travel fell through to the plain
+        // jump (ma_tjmp1); drive the library clip directly (tree off), looped, and keep it going until he lands (SmsWireCheck).
+        string[] rollClips = { "ma_roll", "ma_jump_rolling", "ma_roll_jump" };
+        _smsRollJumpClip = System.Array.Find(rollClips, c => animPlayer.HasAnimation(c));
+        _smsRollJumpSpin = _smsRollJumpClip != null;
+        if (_smsRollJumpSpin)
+        {
+            SmsWirePlay(_smsRollJumpClip, 1f, true);
+            isSpining(true); // the giant-roll's speed blur carries into the dismount
+        }
+        SmsWireReleaseHolder($"the roll jump {arg}: power {power:F1} -> vy {vy:F1} fwd {fwd:F1}, spin {(_smsRollJumpSpin ? _smsRollJumpClip : "none (no roll clip)")}");
     }
 
     /// <summary>startHangLanding(WIRE_HANG_LAND_SAFE_DOWN): velocity 0, 60 units back along the face, onto the ground within 100 units or
@@ -17522,6 +17551,7 @@ public partial class Mario : CharacterBody3D
         _smsWirePitch = 0f;
         _smsWireAngVel = 0f;
         _smsWireRollState = 0;
+        isSpining(false); // drop the swing blur (the roll-jump re-enables it for the dismount spin)
     }
 
     private void Respawn()
