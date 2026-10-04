@@ -17559,8 +17559,10 @@ public partial class Mario : CharacterBody3D
     /// <summary>The giant-swing trail: the hip-drop / ground-pound blur streak (ms_m_blur3), NOT the spin-jump rings.</summary>
     private void SmsWireSwingBlur(bool on)
     {
-        if (_smsHipBlur != null)
-            _smsHipBlur.Active = on;
+        if (_smsHipBlur == null)
+            return;
+        _smsHipBlur.Active = on;
+        _smsHipBlur.LifeFrames = on ? SmsParams.Wire.TrailLifeFrames : 10; // longer streak on the wire; back to the hip-drop's own length (BEM1 life 10) when off
     }
 
     private void Respawn()

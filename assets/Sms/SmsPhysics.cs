@@ -337,6 +337,7 @@ public static class SmsParams
         public const float RotSpeedMax = 2800f;         // DEVIATION (game mRotSpeedMax 1400 = 0x578): aggressive loop (~0.87 s/rev at the cap)
         public const float GiantSustainSpeed = 500f;    // DEVIATION: once the loop is at least this fast the R-brake stops biting, so a giant swing conserves and WON'T STOP (the game keeps looping) until he jumps off or lets go
         public const float SwingBlurSpeed = 150f;       // the trailing streak shows once the swing is at least this fast (low, so it shows through most of a swing)
+        public const int TrailLifeFrames = 20;           // how many frames a point stays in the swing streak (the hip-drop blur's own is 10; the wire runs it longer for a longer trail)
         public const float SwingRadiusCoeff = 0.032f;   // DEVIATION (game mWireSag 0.1 x |angVel|): the loop's radius per unit angular speed -- small so the circle is tight (~0.032 x 2800 ~ 90 u = 1.2 m) at the raised cap
         public const float RotStop = 100f;              // mRotStop: the settle window; 2x it is the entry kick
         public const float RotGravity = 20f;            // mRotGravity: the restoring torque x sin(angle) (BAM a frame^2)
@@ -354,7 +355,7 @@ public static class SmsParams
         public const float EndMargin = 100f;            // wireMove: no closer than this to a tip (units)
         public const float WalkSpeedPerMag = 0.2f;      // DEVIATION (game 0.1): aggressive rope walk ~2.6 m/s (units a frame per stick count)
         public const float WalkAnimRatePerMag = 0.1f;   // DEVIATION (game 0.05): the walk/run clip plays fast to match the quick walk
-        public const float AnimBlend = 0.12f;           // cross-fade between rope clips so transitions blend instead of snapping (the game blends)
+        public const float AnimBlend = 0.2f;            // cross-fade between rope clips so transitions blend instead of snapping (longer so the big FLUDD hang<->swing pose change blends too)
         public const float RunMagThreshold = 16f;       // wireWait: ROPE_RUN above this stick magnitude, ROPE_WALK below
         public const float GrabBounceSeed = 0.2f;       // receiveMessage: bounceVel = this x -vy at the grab
         public const float HandMoveSpeed = 6f;          // DEVIATION (game 3): aggressive hand-over-hand (units a frame)
