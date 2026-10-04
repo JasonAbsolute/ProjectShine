@@ -22,20 +22,36 @@ using System.Collections.Generic;
 /// one mDrawHeight 6 below, unlit flat colours. DrawSides adds the two side faces (a visual deviation: the open gap reads wrong edge-on).
 /// The fittings (WireFitting.bmd / .col) are solid posts at the tips: Posts stands two cylinders from the node's base to the tips.
 /// </summary>
+[Tool]
 [GlobalClass]
 public partial class SmsWire : Node3D
 {
     public enum WireState { Idle, Hanging, Released }
 
-    [Export] public float LengthUnits = 1500f;     // size.z: the chord's length (the game's mWireLength)
-    [Export] public float CubeHeightUnits = 320f;  // size.y: the tips this far above the node; the idle sag is half of it; the grab box's height
-    [Export] public float WidthUnits = 100f;       // size.x: the grab box's width (the level data's; not in the decomp)
-    [Export] public bool Posts = true;
-    [Export] public float PostRadiusUnits = 12f;
-    [Export] public Color UpperColor = new Color(0.32f, 0.25f, 0.17f);
-    [Export] public Color LowerColor = new Color(0.17f, 0.13f, 0.08f);
-    [Export] public bool DrawSides = true;         // DEVIATION (visual): the game draws the upper and lower faces only
+    private float _lengthUnits = 1500f;
+    [Export] public float LengthUnits { get => _lengthUnits; set { _lengthUnits = value; EditorRebuild(); } }     // size.z: the chord's length (the game's mWireLength)
+    private float _cubeHeightUnits = 320f;
+    [Export] public float CubeHeightUnits { get => _cubeHeightUnits; set { _cubeHeightUnits = value; EditorRebuild(); } }  // size.y: the tips this far above the node; the idle sag is half of it; the grab box's height
+    private float _widthUnits = 100f;
+    [Export] public float WidthUnits { get => _widthUnits; set { _widthUnits = value; EditorRebuild(); } }       // size.x: the grab box's width (the level data's; not in the decomp)
+    private bool _posts = true;
+    [Export] public bool Posts { get => _posts; set { _posts = value; EditorRebuild(); } }
+    private float _postRadiusUnits = 12f;
+    [Export] public float PostRadiusUnits { get => _postRadiusUnits; set { _postRadiusUnits = value; EditorRebuild(); } }
+    private Color _upperColor = new Color(0.32f, 0.25f, 0.17f);
+    [Export] public Color UpperColor { get => _upperColor; set { _upperColor = value; EditorRebuild(); } }
+    private Color _lowerColor = new Color(0.17f, 0.13f, 0.08f);
+    [Export] public Color LowerColor { get => _lowerColor; set { _lowerColor = value; EditorRebuild(); } }
+    private bool _drawSides = true;
+    [Export] public bool DrawSides { get => _drawSides; set { _drawSides = value; EditorRebuild(); } }         // DEVIATION (visual): the game draws the upper and lower faces only
     [Export] public bool DebugPrint = false;
+
+    /// <summary>In the editor only, rebuild the preview when an export or the node's transform changes, so he sees the rope he is placing.</summary>
+    private void EditorRebuild()
+    {
+        if (Engine.IsEditorHint() && IsInsideTree())
+            Build();
+    }
 
     public WireState State { get; private set; } = WireState.Idle;
     /// <summary>The tips (world, metres): mStartPoint / mEndPoint.</summary>
@@ -63,12 +79,29 @@ public partial class SmsWire : Node3D
     private bool _dirty = true;
     private float _sagM => SmsUnits.UnitsToMetres(CubeHeightUnits * 0.5f);
 
-    public override void _EnterTree() => SmsWireMap.Wires.Add(this);
-    public override void _ExitTree() => SmsWireMap.Wires.Remove(this);
+    public override void _EnterTree()
+    {
+        if (Engine.IsEditorHint())
+            SetNotifyTransform(true);   // moving / rotating the node in the editor fires NotificationTransformChanged -> rebuild
+        else
+            SmsWireMap.Wires.Add(this); // the gameplay map: editor instances must not join it
+    }
+
+    public override void _ExitTree()
+    {
+        if (!Engine.IsEditorHint())
+            SmsWireMap.Wires.Remove(this);
+    }
 
     public override void _Ready()
     {
         Build();
+    }
+
+    public override void _Notification(int what)
+    {
+        if (what == (int)NotificationTransformChanged && Engine.IsEditorHint() && Built)
+            Build(); // he dragged or turned the node: re-place the tips, posts and ribbon
     }
 
     /// <summary>TMapWire::init: the tips, the sag, the render points at their default spots; the posts and the ribbon.</summary>
@@ -92,41 +125,62 @@ public partial class SmsWire : Node3D
         State = WireState.Idle;
         _bouncePower = 0f;
         _hangOrBounce = Vector3.Zero;
+        _ribbon = GetNodeOrNull<MeshInstance3D>("Ribbon"); // find-or-create by name: a tool reload keeps the child but nulls the field
         if (_ribbon == null)
         {
-            _mesh = new ImmediateMesh();
-            _ribbon = new MeshInstance3D
-            {
-                Name = "Ribbon", Mesh = _mesh, TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-                MaterialOverride = new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, CullMode = BaseMaterial3D.CullModeEnum.Disabled },
-            };
-            AddChild(_ribbon);
-            _ribbon.GlobalTransform = Transform3D.Identity;
+            _ribbon = new MeshInstance3D { Name = "Ribbon", TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+            AddChild(_ribbon); // no Owner set: an unsaved preview child, so it is never written into his scene
         }
-        if (Posts && GetNodeOrNull("PostStart") == null)
+        _mesh = _ribbon.Mesh as ImmediateMesh;
+        if (_mesh == null)
         {
-            MakePost("PostStart", StartPoint);
-            MakePost("PostEnd", EndPoint);
+            _mesh = new ImmediateMesh();
+            _ribbon.Mesh = _mesh;
         }
+        _ribbon.MaterialOverride ??= new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
+        _ribbon.GlobalTransform = Transform3D.Identity;
+        RebuildPosts();
         _dirty = true;
         Built = true;
+        Redraw(); // draw now, so the editor shows the rope without waiting on a physics frame
         if (DebugPrint)
             GD.Print($"[SMS wire] {Name}: length {LengthUnits} units, {n} points, tips {StartPoint} -> {EndPoint}, sag {CubeHeightUnits * 0.5f} units");
+    }
+
+    private void RebuildPosts()
+    {
+        if (!Posts)
+        {
+            GetNodeOrNull("PostStart")?.QueueFree();
+            GetNodeOrNull("PostEnd")?.QueueFree();
+            return;
+        }
+        MakePost("PostStart", StartPoint);
+        MakePost("PostEnd", EndPoint);
     }
 
     private void MakePost(string name, Vector3 tip)
     {
         float h = SmsUnits.UnitsToMetres(CubeHeightUnits);
         float r = SmsUnits.UnitsToMetres(PostRadiusUnits);
-        var body = new StaticBody3D { Name = name, TopLevel = true };
-        AddChild(body);
-        body.GlobalTransform = new Transform3D(Basis.Identity, new Vector3(tip.X, tip.Y - h * 0.5f, tip.Z));
-        body.AddChild(new CollisionShape3D { Shape = new CylinderShape3D { Radius = r, Height = h } });
-        body.AddChild(new MeshInstance3D
+        var body = GetNodeOrNull<StaticBody3D>(name); // find-or-create: reposition on a drag, resize on an inspector change, never duplicate
+        if (body == null)
         {
-            Mesh = new CylinderMesh { TopRadius = r, BottomRadius = r, Height = h, RadialSegments = 10 },
-            MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.25f, 0.22f, 0.2f) },
-        });
+            body = new StaticBody3D { Name = name, TopLevel = true };
+            AddChild(body);
+            body.AddChild(new CollisionShape3D { Shape = new CylinderShape3D { Radius = r, Height = h } });
+            body.AddChild(new MeshInstance3D
+            {
+                Mesh = new CylinderMesh { TopRadius = r, BottomRadius = r, Height = h, RadialSegments = 10 },
+                MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0.25f, 0.22f, 0.2f) },
+            });
+        }
+        else
+        {
+            if (body.GetChildOrNull<CollisionShape3D>(0)?.Shape is CylinderShape3D cs) { cs.Radius = r; cs.Height = h; }
+            if (body.GetChildOrNull<MeshInstance3D>(1)?.Mesh is CylinderMesh cm) { cm.TopRadius = r; cm.BottomRadius = r; cm.Height = h; }
+        }
+        body.GlobalTransform = new Transform3D(Basis.Identity, new Vector3(tip.X, tip.Y - h * 0.5f, tip.Z));
     }
 
     // ------------------------------------------------------------------------------------------------------- the cube and the ratio
@@ -279,6 +333,15 @@ public partial class SmsWire : Node3D
     {
         if (!Built)
             return;
+        if (Engine.IsEditorHint())
+        {
+            if (_dirty)
+            {
+                Redraw();
+                _dirty = false;
+            }
+            return; // no gameplay bounce in the editor -- just show the rope
+        }
         int n = SmsUnits.TicksFor(delta, ref _tickAccum);
         if (State == WireState.Released)
         {
