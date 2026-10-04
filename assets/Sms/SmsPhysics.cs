@@ -337,7 +337,7 @@ public static class SmsParams
         public const float RotSpeedMax = 2800f;         // DEVIATION (game mRotSpeedMax 1400 = 0x578): aggressive loop (~0.87 s/rev at the cap)
         public const float GiantSustainSpeed = 500f;    // DEVIATION: once the loop is at least this fast the R-brake stops biting, so a giant swing conserves and WON'T STOP (the game keeps looping) until he jumps off or lets go
         public const float SwingBlurSpeed = 150f;       // the trailing streak shows once the swing is at least this fast (low, so it shows through most of a swing)
-        public const int TrailLifeFrames = 20;           // how many frames a point stays in the swing streak (the hip-drop blur's own is 10; the wire runs it longer for a longer trail)
+        public const int TrailLifeFrames = 32;           // how many frames a point stays in the swing streak (the hip-drop blur's own is 10; the wire runs it longer for a longer trail)
         public const float SwingRadiusCoeff = 0.032f;   // DEVIATION (game mWireSag 0.1 x |angVel|): the loop's radius per unit angular speed -- small so the circle is tight (~0.032 x 2800 ~ 90 u = 1.2 m) at the raised cap
         public const float RotStop = 100f;              // mRotStop: the settle window; 2x it is the entry kick
         public const float RotGravity = 20f;            // mRotGravity: the restoring torque x sin(angle) (BAM a frame^2)

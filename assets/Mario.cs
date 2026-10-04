@@ -17098,6 +17098,20 @@ public partial class Mario : CharacterBody3D
                     animPlayer.Play(anim, SmsParams.Wire.AnimBlend); // blend from the previous clip so rope transitions don't snap
             }
         }
+        SmsWireFluddGraft(anim); // keep the one-hand grab/spray upper pose over the hang clips while he sprays
+    }
+
+    /// <summary>FLUDD on the wire: the one-hand grab + spray is the hang-pump upper graft (ma_hgpmp) over the hang clip. The wire runs
+    /// with the tree OFF, where the normal per-frame pump bind can race the tree-active check, so force the graft here while he sprays
+    /// on a hang clip (SmsFluddUpperBody turns it back off the moment he stops spraying).</summary>
+    private void SmsWireFluddGraft(string anim)
+    {
+        if ((anim != "ma_hang" && anim != "ma_rope_hgwat") || !SmsFluddUpperBlend
+            || !_fluddUpperGraft.TryGetValue(SmsParams.Fludd.UpperHgPmp, out var hg))
+            return;
+        foreach (var kv in _fluddUpperGraft)
+            kv.Value.Weight = kv.Key == SmsParams.Fludd.UpperHgPmp ? 1f : 0f;
+        hg.Time = _fluddPumpTime;
     }
 
     private bool SmsWireClipDone() => !(animPlayer.IsPlaying() && animPlayer.CurrentAnimation == _smsWireAnim);
@@ -17168,6 +17182,14 @@ public partial class Mario : CharacterBody3D
                     }
                     if (first && bPressed)
                     {
+                        _smsWireBounceVel = SmsParams.Wire.DropBounceVel;
+                        _smsWire = SmsWireState.WaitToHang;
+                        _smsWireAnim = "";
+                        break;
+                    }
+                    if (SmsFluddSpraying())
+                    {
+                        // FLUDD on the wire grabs the rope and hangs to spray (the game sprays from the hang; the top has no spray/grab pose)
                         _smsWireBounceVel = SmsParams.Wire.DropBounceVel;
                         _smsWire = SmsWireState.WaitToHang;
                         _smsWireAnim = "";
