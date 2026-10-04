@@ -17187,14 +17187,6 @@ public partial class Mario : CharacterBody3D
                         _smsWireAnim = "";
                         break;
                     }
-                    if (SmsFluddSpraying())
-                    {
-                        // FLUDD on the wire grabs the rope and hangs to spray (the game sprays from the hang; the top has no spray/grab pose)
-                        _smsWireBounceVel = SmsParams.Wire.DropBounceVel;
-                        _smsWire = SmsWireState.WaitToHang;
-                        _smsWireAnim = "";
-                        break;
-                    }
                     if (stick)
                     {
                         float diff = SmsMath.WrapAngle(alongYaw - intendedYaw);
@@ -17493,7 +17485,11 @@ public partial class Mario : CharacterBody3D
     {
         Vector3 along = SmsWireAlong();
         Vector3 face = SmsWirePerp(along);
-        float power = Mathf.Clamp(_smsWireAngVel, -SmsParams.Wire.LaunchSpeedCap, SmsParams.Wire.LaunchSpeedCap) * SmsParams.Wire.JumpRate; // cap the launch at the game's spin cap so the raised RotSpeedMax (fast spin) doesn't over-rocket the dismount
+        // DEVIATION (game power = angVel x JumpRate): the pure-angVel launch made the dismount hinge on the exact loop speed at release
+        // (vy ~19 off a weak swing to ~89 off a capped one -- a 4.5x spread he found inconsistent). A solid floor + a tight speed bonus
+        // keeps the roll jump consistent (vy ~60..90) while still rewarding a faster loop a little. The swing direction still sets which way.
+        float mag = SmsParams.Wire.RollJumpBase + Mathf.Clamp(MathF.Abs(_smsWireAngVel) / SmsParams.Wire.RollJumpSpeedRef, 0f, 1f) * SmsParams.Wire.RollJumpBonus;
+        float power = MathF.Sign(_smsWireAngVel) * mag;
         float ang = (arg == 0 ? SmsParams.Wire.RollJumpAngleFwd : SmsParams.Wire.RollJumpAngleBack) / SmsBamPerRad;
         float vy = power * MathF.Sin(ang);
         float fwd = power * -MathF.Cos(ang);

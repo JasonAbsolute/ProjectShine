@@ -348,7 +348,9 @@ public static class SmsParams
         public const float JumpSlideControl = 0.3f;     // mWireJumpSlideControl
         public const float JumpMult = 3.0f;             // mWireJumpMult (default 5): vy += this x -bounceVel when the rope is moving up
         public const float JumpBase = 20f;              // the game's mWireJumpBase (dropped the deviation -- he said the inflated jump was too much; plain wire jump vy 62)
-        public const float LaunchSpeedCap = 1400f;      // the roll-jump's power uses the swing speed clamped to the GAME's spin cap, so the raised RotSpeedMax (fast spin) doesn't over-rocket the dismount
+        public const float RollJumpBase = 85f;          // roll-jump launch FLOOR (power units): a solid dismount even off a slow loop, so it doesn't hinge on nailing a fast loop
+        public const float RollJumpBonus = 42f;         // extra launch power at/above RollJumpSpeedRef: a faster loop rewards a little, but the spread is tight (vy ~60..90 vs a 42 normal jump)
+        public const float RollJumpSpeedRef = 1400f;    // the swing speed (BAM/frame, the game's spin cap) at which the launch bonus is full
         public const float SwingBrake = 0.99f;          // mWireSwingBrake: the spring's damping a frame
         public const float SwingMax = 200f;             // mWireSwingMax: the sag's clamp (units)
         public const float StandHeight = 160f;          // getOnWirePosAngle: his root this far under the chord point (the rope's give under him)
