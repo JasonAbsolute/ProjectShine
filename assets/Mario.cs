@@ -17122,7 +17122,7 @@ public partial class Mario : CharacterBody3D
         {
             // specMain(): the rope spring under him (per tick at a quarter: the velocity's step and the sag's; the damping's root)
             _smsWireBounceVelPrev = _smsWireBounceVel;
-            _smsWireBounceVel -= _smsWireSag * SmsParams.Wire.SwingRate * q;
+            _smsWireBounceVel -= _smsWireSag * SmsParams.Wire.SwingRate * sc * q; // sc stiffens the rope spring -> the bounce/jump fires sooner and higher (his "jumping is slow")
             _smsWireSag += _smsWireBounceVel * q;
             _smsWireSag *= MathF.Pow(SmsParams.Wire.SwingBrake, q);
             _smsWireSag = Mathf.Clamp(_smsWireSag, -SmsParams.Wire.SwingMax, SmsParams.Wire.SwingMax);
@@ -17342,6 +17342,15 @@ public partial class Mario : CharacterBody3D
                     float initial = _smsWirePitch;
                     if (first && aPressed)
                         _smsWireRollState |= 1;
+                    if (first && bPressed)
+                    {
+                        // ANTI-SOFTLOCK: a weak (hover/spray, impulse +-8) swing never reaches the settle window (|vel| < RotStop 100 at the
+                        // bottom, but the entry kick alone is 208) and, with the brake only applied while R is held, never decays on its own --
+                        // so without this B he can be stuck swinging forever with no way back to Hanging (where B drops off). B bails here too.
+                        SmsWireReleaseHolder("B: let go mid-swing");
+                        SmsWireStartHangLanding("B while swinging");
+                        return;
+                    }
                     float max = SmsParams.Wire.RotSpeedMax * sc;
                     if ((_smsWireRollState & 1) != 0 && _smsWireAngVel < 0f && _smsWirePitch > -SmsParams.Wire.RollReleaseWindow && _smsWirePitch <= max - SmsParams.Wire.RollReleaseWindow)
                     {
