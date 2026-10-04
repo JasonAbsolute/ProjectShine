@@ -330,8 +330,8 @@ public static class SmsParams
 
     public static class Wire // /mario/wire.prm (shipped) + TMapWire's statics (MapWire.cpp 30-38) + the literals of the WIRE execs (pass 66)
     {
-        public const float RotSpeed = -8f;              // mRotSpeed: the spray nozzle's swing impulse (BAM a frame) while hanging
-        public const float RotSpeedTrgHover = 8f;       // mRotSpeedTrgHover
+        public const float RotSpeed = -24f;             // DEVIATION (game mRotSpeed -8): spray's swing impulse, raised so SPRAY can loop the rope with timed pumping -- gravity is 20, so 8 can never climb over the top
+        public const float RotSpeedTrgHover = 8f * 3f;   // DEVIATION (game mRotSpeedTrgHover 8): = 24, raised so HOVER can loop the rope with timed pumping
         public const float RotSpeedTrgTurbo = 1400f;    // mRotSpeedTrgTurbo (default 1000)
         public const float RotSpeedTrgRocket = 1400f;   // mRotSpeedTrgRocket (default 1000)
         public const float RotSpeedMax = 1400f;         // mRotSpeedMax: the swing's angular speed cap (BAM a frame; 0x578)
@@ -339,20 +339,20 @@ public static class SmsParams
         public const float RotGravity = 20f;            // mRotGravity: the restoring torque x sin(angle) (BAM a frame^2)
         public const float RotBrake = 0.98f;            // mRotBrake: R held multiplies the angular speed a frame
         public const float JumpRate = 0.09f;            // mJumpRate: roll jump power = angular speed x this
-        public const float SwingRate = 0.005f;          // mSwingRate: the rope spring's stiffness (specMain: bounceVel -= sag x this a frame)
+        public const float SwingRate = 0.01f;           // DEVIATION (game mSwingRate 0.005): stiffer rope spring so the jump fires sooner and bounces higher (his "jumping is slow")
         public const float JumpAccelControl = 0.01f;    // mWireJumpAccelControl: the WIRE_JUMP's air steering
         public const float JumpSlideControl = 0.3f;     // mWireJumpSlideControl
         public const float JumpMult = 3.0f;             // mWireJumpMult (default 5): vy += this x -bounceVel when the rope is moving up
-        public const float JumpBase = 25f;              // mWireJumpBase (default 20): added to the WIRE_JUMP's 42
+        public const float JumpBase = 50f;              // DEVIATION (game mWireJumpBase 20, was 25): a punchier rope jump, added to the WIRE_JUMP's 42 (plain jump vy 92)
         public const float SwingBrake = 0.99f;          // mWireSwingBrake: the spring's damping a frame
         public const float SwingMax = 200f;             // mWireSwingMax: the sag's clamp (units)
         public const float StandHeight = 160f;          // getOnWirePosAngle: his root this far under the chord point (the rope's give under him)
         public const float EndMargin = 100f;            // wireMove: no closer than this to a tip (units)
-        public const float WalkSpeedPerMag = 0.1f;      // wireWait: units a frame per stick count
-        public const float WalkAnimRatePerMag = 0.05f;  // wireWait: the walk / run clip rate per stick count
+        public const float WalkSpeedPerMag = 0.16f;     // DEVIATION (game 0.1): faster rope walk (units a frame per stick count)
+        public const float WalkAnimRatePerMag = 0.08f;  // DEVIATION (game 0.05): matched to the faster walk so the feet don't slide
         public const float RunMagThreshold = 16f;       // wireWait: ROPE_RUN above this stick magnitude, ROPE_WALK below
         public const float GrabBounceSeed = 0.2f;       // receiveMessage: bounceVel = this x -vy at the grab
-        public const float HandMoveSpeed = 3f;          // wireHanging: units a frame hand over hand
+        public const float HandMoveSpeed = 4.5f;        // DEVIATION (game 3): faster hand-over-hand (units a frame)
         public const float DropBounceVel = 5f;          // the bounce charge set by the drop / the climb
         public const float ReturnHeadroom = 160f;       // wireHanging: roof - floor must be at least this for the climb back up
         public const float WireJumpVy = 42f;            // changePlayerStatus(WIRE_JUMP): setPlayerJumpSpeed(0.25, 42) with fwd 0
