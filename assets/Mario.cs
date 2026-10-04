@@ -16925,7 +16925,7 @@ public partial class Mario : CharacterBody3D
         }
         if (stateOfMario == MarioState.dead || stateOfMario == MarioState.talking || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.swimming)
             return;
-        SmsWire w = SmsWireMap.InCube(root);
+        SmsWire w = SmsWireMap.CatchAt(root);
         if (w == null)
             return;
         float vy = SmsUnits.MpsToSpeed(velocity.Y);
@@ -17117,6 +17117,7 @@ public partial class Mario : CharacterBody3D
         bool stick = stickDir.LengthSquared() > 1e-6f && _smsIntendedMag > 0f; // mInput & 1
         float intendedYaw = stick ? SmsMath.YawFromDir(stickDir) : 0f;
         float q = 1f / SmsUnits.TicksPerFrame;
+        float sc = _smsWireNode.RopeSpeedScale; // DEVIATION: his rope-speed dial (1 = the game) scales the walk, hand-over-hand and the swing
         for (int i = 0; i < n; i++)
         {
             // specMain(): the rope spring under him (per tick at a quarter: the velocity's step and the sag's; the damping's root)
@@ -17156,8 +17157,8 @@ public partial class Mario : CharacterBody3D
                         float diff = SmsMath.WrapAngle(alongYaw - intendedYaw);
                         if (diff > -MathF.PI * 0.25f && diff < MathF.PI * 0.25f)
                         {
-                            float rate = SmsParams.Wire.WalkAnimRatePerMag * _smsIntendedMag;
-                            if (SmsWireMove(SmsParams.Wire.WalkSpeedPerMag * _smsIntendedMag * q))
+                            float rate = SmsParams.Wire.WalkAnimRatePerMag * _smsIntendedMag * sc;
+                            if (SmsWireMove(SmsParams.Wire.WalkSpeedPerMag * _smsIntendedMag * q * sc))
                                 SmsWirePlay(_smsIntendedMag > SmsParams.Wire.RunMagThreshold ? "ma_rope_run" : "ma_rope_walk", rate, true);
                             else
                                 SmsWirePlay("ma_rope_wait", 1f, true);
@@ -17300,9 +17301,9 @@ public partial class Mario : CharacterBody3D
                         float diff = SmsMath.WrapAngle(alongYaw - intendedYaw);
                         float d45 = MathF.PI * 0.25f, d75 = MathF.PI * 0x3555 / 32768f, d105 = MathF.PI * 0x4AAA / 32768f, d135 = MathF.PI * 0.75f;
                         if (diff > -d45 && diff < d75)
-                            SmsWirePlay(SmsWireMove(SmsParams.Wire.HandMoveSpeed * q) ? "ma_rope_hmovr" : "ma_rope_hgwat", 1f, true);
+                            SmsWirePlay(SmsWireMove(SmsParams.Wire.HandMoveSpeed * q * sc) ? "ma_rope_hmovr" : "ma_rope_hgwat", 1f, true);
                         if (diff < -d135 || diff > d105)
-                            SmsWirePlay(SmsWireMove(-SmsParams.Wire.HandMoveSpeed * q) ? "ma_rope_hmovl" : "ma_rope_hgwat", 1f, true);
+                            SmsWirePlay(SmsWireMove(-SmsParams.Wire.HandMoveSpeed * q * sc) ? "ma_rope_hmovl" : "ma_rope_hgwat", 1f, true);
                         if (diff >= -d135 && diff <= -d45)
                         {
                             _smsWireBounceVel = SmsParams.Wire.DropBounceVel;
@@ -17321,7 +17322,7 @@ public partial class Mario : CharacterBody3D
                     {
                         float rotSp = SmsWireRotSpeed();
                         _smsWireAngVel += (rotSp > 0f ? 2f : -2f) * SmsParams.Wire.RotStop;
-                        _smsWireAngVel += rotSp;
+                        _smsWireAngVel += rotSp * sc;
                         _smsWire = SmsWireState.Rolling;
                         _smsWireAnim = "";
                         if (SmsDebugPrint)
@@ -17341,7 +17342,7 @@ public partial class Mario : CharacterBody3D
                     float initial = _smsWirePitch;
                     if (first && aPressed)
                         _smsWireRollState |= 1;
-                    float max = SmsParams.Wire.RotSpeedMax;
+                    float max = SmsParams.Wire.RotSpeedMax * sc;
                     if ((_smsWireRollState & 1) != 0 && _smsWireAngVel < 0f && _smsWirePitch > -SmsParams.Wire.RollReleaseWindow && _smsWirePitch <= max - SmsParams.Wire.RollReleaseWindow)
                     {
                         SmsWireRollJumpOff(0);
@@ -17357,12 +17358,12 @@ public partial class Mario : CharacterBody3D
                         float diff = SmsMath.WrapAngle(alongYaw - intendedYaw);
                         float d45 = MathF.PI * 0.25f, d75 = MathF.PI * 0x3555 / 32768f, d105 = MathF.PI * 0x4AAA / 32768f, d135 = MathF.PI * 0.75f;
                         if (diff > -d45 && diff < d75)
-                            SmsWireMove(SmsParams.Wire.HandMoveSpeed * q);
+                            SmsWireMove(SmsParams.Wire.HandMoveSpeed * q * sc);
                         if (diff < -d135 || diff > d105)
-                            SmsWireMove(-SmsParams.Wire.HandMoveSpeed * q);
+                            SmsWireMove(-SmsParams.Wire.HandMoveSpeed * q * sc);
                     }
                     if (SmsWirePumping())
-                        _smsWireAngVel += SmsWireRotSpeed() * q;
+                        _smsWireAngVel += SmsWireRotSpeed() * q * sc;
                     _smsWireAngVel -= SmsParams.Wire.RotGravity * MathF.Sin(_smsWirePitch / SmsBamPerRad) * q;
                     if (rHeld)
                         _smsWireAngVel *= MathF.Pow(SmsParams.Wire.RotBrake, q);

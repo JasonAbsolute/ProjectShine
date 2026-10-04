@@ -44,6 +44,8 @@ public partial class SmsWire : Node3D
     [Export] public Color LowerColor { get => _lowerColor; set { _lowerColor = value; EditorRebuild(); } }
     private bool _drawSides = true;
     [Export] public bool DrawSides { get => _drawSides; set { _drawSides = value; EditorRebuild(); } }         // DEVIATION (visual): the game draws the upper and lower faces only
+    [Export] public float CatchReachUnits = 130f;  // how far above/below the rope LINE a jump or fall catches it (units); independent of CubeHeight, so a taller box no longer grabs from thin air
+    [Export] public float RopeSpeedScale = 1f;      // DEVIATION knob: scales ALL rope motion -- the walk, hand-over-hand, the FLUDD swing; 1 = the game, raise it if the rope feels sluggish
     [Export] public bool DebugPrint = false;
 
     /// <summary>In the editor only, rebuild the preview when an export or the node's transform changes, so he sees the rope he is placing.</summary>
@@ -191,6 +193,22 @@ public partial class SmsWire : Node3D
         Vector3 l = GlobalBasis.Orthonormalized().Inverse() * (world - GlobalPosition);
         float hx = SmsUnits.UnitsToMetres(WidthUnits) * 0.5f, hz = SmsUnits.UnitsToMetres(LengthUnits) * 0.5f, hy = SmsUnits.UnitsToMetres(CubeHeightUnits);
         return -hx < l.X && l.X < hx && 0f < l.Y && l.Y < hy && -hz < l.Z && l.Z < hz;
+    }
+
+    /// <summary>The CATCH test (a NEW grab only): within the width/length, and within CatchReachUnits above or below the ROPE LINE at that
+    /// spot -- NOT the whole cube. So a jump or a fall catches the rope near where it is drawn, and raising CubeHeight (a taller box / taller
+    /// posts) no longer makes him grab from thin air far below it. Holding on afterwards still uses the full cube (InCube), so standing at the
+    /// ends -- where his feet sit below the chord -- never drops him.</summary>
+    public bool InCatchBand(Vector3 world)
+    {
+        Vector3 l = GlobalBasis.Orthonormalized().Inverse() * (world - GlobalPosition);
+        float hx = SmsUnits.UnitsToMetres(WidthUnits) * 0.5f, hz = SmsUnits.UnitsToMetres(LengthUnits) * 0.5f;
+        if (l.X <= -hx || l.X >= hx || l.Z <= -hz || l.Z >= hz)
+            return false;
+        float along = (l.Z + hz) / (2f * hz);
+        float ropeY = SmsUnits.UnitsToMetres(CubeHeightUnits) - _sagM * MathF.Sin(along * MathF.PI);
+        float reach = SmsUnits.UnitsToMetres(CatchReachUnits);
+        return l.Y > ropeY - reach && l.Y < ropeY + reach;
     }
 
     /// <summary>getPosInWire (275-289): the point projected onto the chord in the XZ plane, as 0..1 from the start.</summary>
@@ -430,10 +448,10 @@ public static class SmsWireMap
 {
     public static readonly List<SmsWire> Wires = new();
 
-    public static SmsWire InCube(Vector3 world)
+    public static SmsWire CatchAt(Vector3 world)
     {
         foreach (SmsWire w in Wires)
-            if (w != null && GodotObject.IsInstanceValid(w) && w.Built && w.InCube(world))
+            if (w != null && GodotObject.IsInstanceValid(w) && w.Built && w.InCatchBand(world))
                 return w;
         return null;
     }
