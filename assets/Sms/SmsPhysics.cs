@@ -330,11 +330,11 @@ public static class SmsParams
 
     public static class Wire // /mario/wire.prm (shipped) + TMapWire's statics (MapWire.cpp 30-38) + the literals of the WIRE execs (pass 66)
     {
-        public const float RotSpeed = -24f;             // DEVIATION (game mRotSpeed -8): spray's swing impulse, raised so SPRAY can loop the rope with timed pumping -- gravity is 20, so 8 can never climb over the top
-        public const float RotSpeedTrgHover = 8f * 3f;   // DEVIATION (game mRotSpeedTrgHover 8): = 24, raised so HOVER can loop the rope with timed pumping
+        public const float RotSpeed = -48f;             // DEVIATION (game mRotSpeed -8): spray's swing impulse, raised so SPRAY loops FAST with timed pumping (gravity 20 means 8 could never climb over the top)
+        public const float RotSpeedTrgHover = 48f;       // DEVIATION (game mRotSpeedTrgHover 8): hover raised to loop the rope fast with timed pumping
         public const float RotSpeedTrgTurbo = 1400f;    // mRotSpeedTrgTurbo (default 1000)
         public const float RotSpeedTrgRocket = 1400f;   // mRotSpeedTrgRocket (default 1000)
-        public const float RotSpeedMax = 1400f;         // mRotSpeedMax: the swing's angular speed cap (BAM a frame; 0x578)
+        public const float RotSpeedMax = 2200f;         // DEVIATION (game mRotSpeedMax 1400 = 0x578): raised so the loop whips faster (~1.1 s/rev at the cap vs 1.56 s)
         public const float RotStop = 100f;              // mRotStop: the settle window; 2x it is the entry kick
         public const float RotGravity = 20f;            // mRotGravity: the restoring torque x sin(angle) (BAM a frame^2)
         public const float RotBrake = 0.98f;            // mRotBrake: R held multiplies the angular speed a frame
