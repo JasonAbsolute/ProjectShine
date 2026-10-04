@@ -5023,7 +5023,9 @@ public partial class Mario : CharacterBody3D
         // Ground-pound streak effect: on only during the actual fall (not the air-stall).
         {
             bool fxOn = stateOfMario == MarioState.groundPoundFalling && !_groundPoundStalling;
-            if (_smsHipBlur != null)
+            // the wire owns the hip-drop streak during a swing / roll-jump dismount (it is the swing's trail) -- don't clobber it here
+            bool wireTrail = (stateOfMario == MarioState.wire && _smsWire == SmsWireState.Rolling) || _smsRollJumpSpin;
+            if (_smsHipBlur != null && !wireTrail)
                 _smsHipBlur.Active = fxOn && !IsSuperHipDrop;      // emitBlurHipDrop every tick of the fall (MarioJump.cpp 1140)
             if (_smsSuperHipBlur != null)
                 _smsSuperHipBlur.Active = fxOn && IsSuperHipDrop;  // emitBlurHipDropSuper once the fall is the super one (1142)
@@ -17469,7 +17471,7 @@ public partial class Mario : CharacterBody3D
     {
         Vector3 along = SmsWireAlong();
         Vector3 face = SmsWirePerp(along);
-        float power = _smsWireAngVel * SmsParams.Wire.JumpRate;
+        float power = Mathf.Clamp(_smsWireAngVel, -SmsParams.Wire.LaunchSpeedCap, SmsParams.Wire.LaunchSpeedCap) * SmsParams.Wire.JumpRate; // cap the launch at the game's spin cap so the raised RotSpeedMax (fast spin) doesn't over-rocket the dismount
         float ang = (arg == 0 ? SmsParams.Wire.RollJumpAngleFwd : SmsParams.Wire.RollJumpAngleBack) / SmsBamPerRad;
         float vy = power * MathF.Sin(ang);
         float fwd = power * -MathF.Cos(ang);

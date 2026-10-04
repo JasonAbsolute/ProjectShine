@@ -336,7 +336,7 @@ public static class SmsParams
         public const float RotSpeedTrgRocket = 1400f;   // mRotSpeedTrgRocket (default 1000)
         public const float RotSpeedMax = 2800f;         // DEVIATION (game mRotSpeedMax 1400 = 0x578): aggressive loop (~0.87 s/rev at the cap)
         public const float GiantSustainSpeed = 500f;    // DEVIATION: once the loop is at least this fast the R-brake stops biting, so a giant swing conserves and WON'T STOP (the game keeps looping) until he jumps off or lets go
-        public const float SwingBlurSpeed = 300f;       // the trailing blur shows once the swing is at least this fast
+        public const float SwingBlurSpeed = 150f;       // the trailing streak shows once the swing is at least this fast (low, so it shows through most of a swing)
         public const float SwingRadiusCoeff = 0.032f;   // DEVIATION (game mWireSag 0.1 x |angVel|): the loop's radius per unit angular speed -- small so the circle is tight (~0.032 x 2800 ~ 90 u = 1.2 m) at the raised cap
         public const float RotStop = 100f;              // mRotStop: the settle window; 2x it is the entry kick
         public const float RotGravity = 20f;            // mRotGravity: the restoring torque x sin(angle) (BAM a frame^2)
@@ -346,7 +346,8 @@ public static class SmsParams
         public const float JumpAccelControl = 0.01f;    // mWireJumpAccelControl: the WIRE_JUMP's air steering
         public const float JumpSlideControl = 0.3f;     // mWireJumpSlideControl
         public const float JumpMult = 3.0f;             // mWireJumpMult (default 5): vy += this x -bounceVel when the rope is moving up
-        public const float JumpBase = 30f;              // DEVIATION (game mWireJumpBase 20): a springy rope jump (plain vy 72 ~ 9 m; a normal jump is 3 m). Higher vy = MORE airtime, so going bigger reads as floatier/slower, not snappier
+        public const float JumpBase = 20f;              // the game's mWireJumpBase (dropped the deviation -- he said the inflated jump was too much; plain wire jump vy 62)
+        public const float LaunchSpeedCap = 1400f;      // the roll-jump's power uses the swing speed clamped to the GAME's spin cap, so the raised RotSpeedMax (fast spin) doesn't over-rocket the dismount
         public const float SwingBrake = 0.99f;          // mWireSwingBrake: the spring's damping a frame
         public const float SwingMax = 200f;             // mWireSwingMax: the sag's clamp (units)
         public const float StandHeight = 160f;          // getOnWirePosAngle: his root this far under the chord point (the rope's give under him)
