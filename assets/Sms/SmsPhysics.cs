@@ -330,13 +330,14 @@ public static class SmsParams
 
     public static class Wire // /mario/wire.prm (shipped) + TMapWire's statics (MapWire.cpp 30-38) + the literals of the WIRE execs (pass 66)
     {
-        public const float RotSpeed = -48f;             // DEVIATION (game mRotSpeed -8): spray's swing impulse, raised so SPRAY loops FAST with timed pumping (gravity 20 means 8 could never climb over the top)
-        public const float RotSpeedTrgHover = 48f;       // DEVIATION (game mRotSpeedTrgHover 8): hover raised to loop the rope fast with timed pumping
+        public const float RotSpeed = -56f;             // DEVIATION (game mRotSpeed -8): spray's swing impulse, aggressive so SPRAY loops fast with timed pumping
+        public const float RotSpeedTrgHover = 56f;       // DEVIATION (game mRotSpeedTrgHover 8): hover, aggressive loop with timed pumping
         public const float RotSpeedTrgTurbo = 1400f;    // mRotSpeedTrgTurbo (default 1000)
         public const float RotSpeedTrgRocket = 1400f;   // mRotSpeedTrgRocket (default 1000)
-        public const float RotSpeedMax = 2200f;         // DEVIATION (game mRotSpeedMax 1400 = 0x578): raised so the loop whips faster (~1.1 s/rev at the cap vs 1.56 s)
+        public const float RotSpeedMax = 2800f;         // DEVIATION (game mRotSpeedMax 1400 = 0x578): aggressive loop (~0.87 s/rev at the cap)
         public const float GiantSustainSpeed = 500f;    // DEVIATION: once the loop is at least this fast the R-brake stops biting, so a giant swing conserves and WON'T STOP (the game keeps looping) until he jumps off or lets go
-        public const float SwingBlurSpeed = 300f;       // the spin-blur rings (the game's blurEffect) show once the swing is at least this fast
+        public const float SwingBlurSpeed = 300f;       // the trailing blur shows once the swing is at least this fast
+        public const float SwingRadiusCoeff = 0.032f;   // DEVIATION (game mWireSag 0.1 x |angVel|): the loop's radius per unit angular speed -- small so the circle is tight (~0.032 x 2800 ~ 90 u = 1.2 m) at the raised cap
         public const float RotStop = 100f;              // mRotStop: the settle window; 2x it is the entry kick
         public const float RotGravity = 20f;            // mRotGravity: the restoring torque x sin(angle) (BAM a frame^2)
         public const float RotBrake = 0.98f;            // mRotBrake: R held multiplies the angular speed a frame
@@ -350,11 +351,12 @@ public static class SmsParams
         public const float SwingMax = 200f;             // mWireSwingMax: the sag's clamp (units)
         public const float StandHeight = 160f;          // getOnWirePosAngle: his root this far under the chord point (the rope's give under him)
         public const float EndMargin = 100f;            // wireMove: no closer than this to a tip (units)
-        public const float WalkSpeedPerMag = 0.16f;     // DEVIATION (game 0.1): faster rope walk (units a frame per stick count)
-        public const float WalkAnimRatePerMag = 0.08f;  // DEVIATION (game 0.05): matched to the faster walk so the feet don't slide
+        public const float WalkSpeedPerMag = 0.2f;      // DEVIATION (game 0.1): aggressive rope walk ~2.6 m/s (units a frame per stick count)
+        public const float WalkAnimRatePerMag = 0.1f;   // DEVIATION (game 0.05): the walk/run clip plays fast to match the quick walk
+        public const float AnimBlend = 0.12f;           // cross-fade between rope clips so transitions blend instead of snapping (the game blends)
         public const float RunMagThreshold = 16f;       // wireWait: ROPE_RUN above this stick magnitude, ROPE_WALK below
         public const float GrabBounceSeed = 0.2f;       // receiveMessage: bounceVel = this x -vy at the grab
-        public const float HandMoveSpeed = 4.5f;        // DEVIATION (game 3): faster hand-over-hand (units a frame)
+        public const float HandMoveSpeed = 6f;          // DEVIATION (game 3): aggressive hand-over-hand (units a frame)
         public const float DropBounceVel = 5f;          // the bounce charge set by the drop / the climb
         public const float ReturnHeadroom = 160f;       // wireHanging: roof - floor must be at least this for the climb back up
         public const float WireJumpVy = 42f;            // changePlayerStatus(WIRE_JUMP): setPlayerJumpSpeed(0.25, 42) with fwd 0

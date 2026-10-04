@@ -16916,12 +16916,12 @@ public partial class Mario : CharacterBody3D
                 _smsWireAnim = "";
                 if (animTree != null)
                     animTree.Active = true; // the landing SetMarioState also does this; belt-and-suspenders so the clip can't stick on
-                isSpining(false);
+                SmsWireSwingBlur(false);
             }
             else
             {
                 SmsWirePlay(_smsRollJumpClip, 1f, true);
-                isSpining(true);
+                SmsWireSwingBlur(true);
             }
         }
         if (_smsWireAir != SmsWireAir.None && stateOfMario != MarioState.wire && IsOnFloor() && stateOfMario != MarioState.singleJump)
@@ -17091,9 +17091,9 @@ public partial class Mario : CharacterBody3D
                 if (a != null)
                     a.LoopMode = loop ? Animation.LoopModeEnum.Linear : Animation.LoopModeEnum.None;
                 if (reverse)
-                    animPlayer.PlayBackwards(anim);
+                    animPlayer.PlayBackwards(anim, SmsParams.Wire.AnimBlend);
                 else
-                    animPlayer.Play(anim);
+                    animPlayer.Play(anim, SmsParams.Wire.AnimBlend); // blend from the previous clip so rope transitions don't snap
             }
         }
     }
@@ -17397,9 +17397,9 @@ public partial class Mario : CharacterBody3D
                         _smsWireAngVel *= MathF.Pow(SmsParams.Wire.RotBrake, q); // the brake only bites a SLOW swing: a full-speed loop conserves and won't stop (the game keeps looping) until he jumps off or lets go
                     _smsWireAngVel = Mathf.Clamp(_smsWireAngVel, -max, max);
                     _smsWirePitch = SmsWrapBam(_smsWirePitch + _smsWireAngVel * q);
-                    _smsWireSag = 0.1f * MathF.Abs(_smsWireAngVel);
+                    _smsWireSag = SmsParams.Wire.SwingRadiusCoeff * MathF.Abs(_smsWireAngVel); // the loop's radius (DEVIATION coeff so the circle isn't huge at the raised speed cap)
                     _smsWireBounceVel = 0f;
-                    isSpining(MathF.Abs(_smsWireAngVel) > SmsParams.Wire.SwingBlurSpeed); // the speed-blur rings during a fast swing / loop (the game's blurEffect)
+                    SmsWireSwingBlur(MathF.Abs(_smsWireAngVel) > SmsParams.Wire.SwingBlurSpeed); // the trailing streak during a fast swing / loop (hip-drop blur, not the spin-jump rings)
                     if (initial < -0x4000 && _smsWirePitch > 0x4000)
                         _smsWireRollState |= 2; // over the top (the full-loop sounds' flag)
                     else if (initial < _smsWirePitch)
@@ -17412,7 +17412,7 @@ public partial class Mario : CharacterBody3D
                         _smsWireBounceVel = 0f;
                         _smsWireSag = 0f;
                         _smsWireRollState = 0;
-                        isSpining(false);
+                        SmsWireSwingBlur(false);
                         if (heldBody == null)
                         {
                             _smsWire = SmsWireState.Hanging;
@@ -17551,7 +17551,14 @@ public partial class Mario : CharacterBody3D
         _smsWirePitch = 0f;
         _smsWireAngVel = 0f;
         _smsWireRollState = 0;
-        isSpining(false); // drop the swing blur (the roll-jump re-enables it for the dismount spin)
+        SmsWireSwingBlur(false); // drop the swing trail (the roll-jump re-enables it for the dismount spin)
+    }
+
+    /// <summary>The giant-swing trail: the hip-drop / ground-pound blur streak (ms_m_blur3), NOT the spin-jump rings.</summary>
+    private void SmsWireSwingBlur(bool on)
+    {
+        if (_smsHipBlur != null)
+            _smsHipBlur.Active = on;
     }
 
     private void Respawn()
