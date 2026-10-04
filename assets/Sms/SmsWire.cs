@@ -109,7 +109,7 @@ public partial class SmsWire : Node3D
     {
         Basis b = GlobalBasis.Orthonormalized();
         Vector3 half = b * new Vector3(0f, 0f, SmsUnits.UnitsToMetres(LengthUnits) * 0.5f);
-        Vector3 raise = Vector3.Up * SmsUnits.UnitsToMetres(CubeHeightUnits);
+        Vector3 raise = b * (Vector3.Up * SmsUnits.UnitsToMetres(CubeHeightUnits)); // the cube's OWN up, not world up: level by default (yaw-only = unchanged), but pitch the node and the rope slopes with the grab box, tips and ribbon all agreeing
         StartPoint = GlobalPosition - half + raise;
         EndPoint = GlobalPosition + half + raise;
         int n = Math.Max(0, (int)(LengthUnits / 50f + 1f - 2f));
