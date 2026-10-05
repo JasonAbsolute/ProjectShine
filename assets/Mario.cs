@@ -17482,7 +17482,7 @@ public partial class Mario : CharacterBody3D
     {
         Vector3 along = SmsWireAlong();
         Vector3 face = SmsWirePerp(along);
-        float power = Mathf.Clamp(_smsWireAngVel, -SmsParams.Wire.LaunchSpeedCap, SmsParams.Wire.LaunchSpeedCap) * SmsParams.Wire.JumpRate; // jumpPower = unkF6 x mJumpRate (MarioMove.cpp 620), but the swing speed is clamped to the game's cap (1400) first, DECOUPLED from the faster visual loop cap -- so a full loop launches at the game's magnitude (~126 vy), not 2x it
+        float power = _smsWireAngVel * SmsParams.Wire.JumpRate; // decomp jumpPower = unkF6 x mJumpRate: the launch is PROPORTIONAL to the built-up spin (momentum), so the more you whirl the farther you fly. Bounded only by the spin's own cap (RotSpeedMax), not a separate clamp
         float ang = (arg == 0 ? SmsParams.Wire.RollJumpAngleFwd : SmsParams.Wire.RollJumpAngleBack) / SmsBamPerRad;
         float vy = power * MathF.Sin(ang);
         float fwd = power * -MathF.Cos(ang);
