@@ -20,9 +20,9 @@ using System.Collections.Generic;
 /// re-seeded half each side of the hang point, drift back to their default spots at (default - pos) / 1000 a frame.
 /// DRAW (drawUpper / drawLower 40-128): two flat faces through the points, mDrawWidth 5 each side of the chord's perpendicular, the lower
 /// one mDrawHeight 6 below, unlit flat colours. DrawSides adds the two side faces (a visual deviation: the open gap reads wrong edge-on).
-/// The fittings (WireFitting.bmd / .col) are solid posts at the tips: FittingStart / FittingEnd are the ripped SMS wirefitting
-/// (res://assets/Sms/models/wirefitting/) authored as real child nodes in Wire.tscn -- select and gizmo each (tilt / scale)
-/// independently; Build only snaps each to its tip so they track the length / sag. Posts hides/shows the pair.
+/// The fittings (WireFitting.bmd / .col) are solid posts at the tips: FittingStart / FittingEnd are MeshInstance3D nodes authored in
+/// Wire.tscn (mesh = wirefitting_mesh.res, the ripped SMS wirefitting mesh extracted from the glb) -- select and gizmo each
+/// (tilt / scale) independently; Build only snaps each to its tip so they track the length / sag. Posts hides/shows the pair.
 /// </summary>
 [Tool]
 [GlobalClass]
@@ -149,10 +149,10 @@ public partial class SmsWire : Node3D
             GD.Print($"[SMS wire] {Name}: length {LengthUnits} units, {n} points, tips {StartPoint} -> {EndPoint}, sag {CubeHeightUnits * 0.5f} units");
     }
 
-    /// <summary>Snap the authored end fittings to the tips. FittingStart / FittingEnd are REAL nodes authored in Wire.tscn (instances
-    /// of the ripped wirefitting) that you place and gizmo -- tilt and scale -- in the editor; this only moves each to its tip so the
-    /// pair tracks the wire's length and sag, never touching your rotation or scale. Posts toggles their visibility. Nothing is
-    /// generated in code here (the ribbon still is, being dynamic geometry; the fittings are static, so they are proper scene nodes).</summary>
+    /// <summary>Snap the authored end fittings to the tips. FittingStart / FittingEnd are REAL MeshInstance3D nodes authored in
+    /// Wire.tscn (mesh = wirefitting_mesh.res) that you place and gizmo -- tilt and scale -- in the editor; this only moves each to its
+    /// tip so the pair tracks the wire's length and sag, never touching your rotation or scale. Posts toggles their visibility. Nothing
+    /// is generated in code here (the ribbon still is, being dynamic geometry; the fittings are static, so they are proper scene nodes).</summary>
     private void SnapFittings()
     {
         GetNodeOrNull("PostStart")?.QueueFree();      // retire the pass-66s..u code-generated fittings if a prior session left them in the tree
