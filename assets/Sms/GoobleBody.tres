@@ -1,0 +1,15 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://cgooblebdy71"]
+
+[ext_resource type="Shader" path="res://assets/Sms/GoobleBody.gdshader" id="1_shader"]
+
+[resource]
+resource_name = "_mat_body (name.bmd): the see-through goop body, its register colour and the charge flash set by Gooble.cs"
+shader = ExtResource("1_shader")
+shader_parameter/body_color = Color(0.392, 0, 0.039, 1)
+shader_parameter/flash_color = Color(0, 0, 0, 1)
+shader_parameter/sun_dir = Vector3(0, 1, 0)
+shader_parameter/sun_color = Color(1, 1, 1, 1)
+shader_parameter/ambient = 0.502
+shader_parameter/konst_a = 0.3137
+shader_parameter/toon_shadow = 0.533
+shader_parameter/spec_power = 24.0

@@ -21,9 +21,10 @@ using Godot;
 /// anim), the death stamps goop (stamp range 15 x 32 u) and may drop a coin (GenItemRate 50 %, DropScene). ALIVE TIME: 2000 ticks, the
 /// body inflating from 1900 (x 1.01 a tick to twice its scale), then it pops. Dead: freed, or re-launched from its placed point after
 /// RelaunchTicks like TNameKuriLauncher (vy 4, the set anim) -- a placed Gooble is its own launcher (DEVIATION: the game pools them
-/// behind goop launchers). Body scale 0.6..1.0 per life. The charge flash is the body material's emission; the 7 TEV register-0
-/// colours the game cycles per instance are NOT applied (TintBody, off): multiplied into the albedo they made flat colour blobs of
-/// the model -- what the _mat_body TEV stages do with that register is unread (name.bmd MAT3).
+/// behind goop launchers). Body scale 0.6..1.0 per life. THE LOOK: the glb's _mat_body surface gets GoobleBody.gdshader (BodyMaterial,
+/// duplicated per instance) -- name.bmd's TEV read with bmd_mat_dump.py: the body is 69 % the screen behind it (TScreenTexture through
+/// the camera projection) and 31 % goop coloured by GX_TEVREG0 (nameKuriTevColorData: 7 colours cycling per instance, doubled by the
+/// stage-2 scale, fading in along the body's V) plus the sun's specular, with GX_TEVREG1 (the charge flash) added on top.
 ///
 /// THE SCENE (his assets/Gooble.tscn, unchanged): Model (the glb: name_down / hit / jump_end / jump_start / land / set / wait / walk) with
 /// Model/AnimationPlayer, the CollisionShape3D for the world. The game's hit cylinders (attack 50 x 30, damage 40 x 90, x the body scale)
@@ -45,10 +46,10 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
     [Export] public PackedScene DropScene;
     /// <summary>MSD_SE_EN_NAMEKURI_WALK (looping, while it walks), _DOWN (the death), _DOWN_WT (melting). Unset = silent.</summary>
     [Export] public AudioStreamPlayer3D WalkSound, DownSound, MeltSound;
-    /// <summary>The 7 TEV register-0 body colours (nameKuriTevColorData), one per instance in turn, multiplied into the body material's
-    /// albedo. OFF: the TEV stage that uses the register is unread, and the plain multiply makes flat colour blobs of the model (pass
-    /// 71b). The charge flash (register 1) is the material's emission regardless.</summary>
-    [Export] public bool TintBody = false;
+    /// <summary>_mat_body's material: assets/Sms/GoobleBody.tres (GoobleBody.gdshader) unless another is set; duplicated per instance,
+    /// body_color (GX_TEVREG0) / flash_color (GX_TEVREG1) / sun_dir / sun_color fed each frame.</summary>
+    [Export] public ShaderMaterial BodyMaterial;
+    public const string BodyMaterialPath = "res://assets/Sms/GoobleBody.tres";
     [Export] public bool DebugPrint;
 
     // ------------------------------------------------------------------------------------------------------------------ the game's data
@@ -95,7 +96,8 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
     private float _flash;                      // unk1BC.r = g = b: the charge's white pulse, 0..255
     private float _scaleKeep;                  // unk1B0
     private int _colorIdx;
-    private StandardMaterial3D _bodyMat;
+    private ShaderMaterial _bodyMat;
+    private DirectionalLight3D _sun;             // the object sun ("太陽（オブジェクト）"): the scene's DirectionalLight3D
     private float _groundY;                    // mGroundHeight, units (the floor below while falling)
 
     public override void _Ready()
@@ -113,7 +115,8 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         _spawnYaw = Mathf.RadToDeg(Rotation.Y);
         MotionMode = MotionModeEnum.Grounded;
         CallDeferred(nameof(SetupCollisionExceptions)); // the game pushes Mario and enemies apart by messages, not bodies
-        FindBodyMaterial();
+        SetupBodyMaterial();
+        _sun = FindSun(GetTree().CurrentScene);
         Reset();
     }
 
@@ -124,8 +127,20 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
                 AddCollisionExceptionWith(body);
     }
 
-    /// <summary>The body's material ("_mat_body" in the game's name.bmd), duplicated per instance for the tint and the flash.</summary>
-    private void FindBodyMaterial()
+    private static DirectionalLight3D FindSun(Node n)
+    {
+        if (n == null) return null;
+        if (n is DirectionalLight3D d) return d;
+        foreach (Node c in n.GetChildren())
+        {
+            var r = FindSun(c);
+            if (r != null) return r;
+        }
+        return null;
+    }
+
+    /// <summary>The glb's "_mat_body" surface (name.bmd's material 0) takes a per-instance copy of GoobleBody.tres.</summary>
+    private void SetupBodyMaterial()
     {
         if (_model == null)
             return;
@@ -141,12 +156,18 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
             if (pick != null) break;
             if (pick == null && mi.Mesh.GetSurfaceCount() > 0) { pick = mi; surf = 0; } // the first surface stands in for the body
         }
-        if (pick == null || pick.GetActiveMaterial(surf) is not StandardMaterial3D sm)
+        if (pick == null)
         {
-            GD.PushWarning($"[SMS gooble] {GetPath()}: no StandardMaterial3D on the model: no body tint / flash");
+            GD.PushWarning($"[SMS gooble] {GetPath()}: no mesh surface for the body: no goop material");
             return;
         }
-        _bodyMat = (StandardMaterial3D)sm.Duplicate();
+        ShaderMaterial src = BodyMaterial ?? GD.Load<ShaderMaterial>(BodyMaterialPath);
+        if (src == null)
+        {
+            GD.PushWarning($"[SMS gooble] {GetPath()}: {BodyMaterialPath} did not load: no goop material");
+            return;
+        }
+        _bodyMat = (ShaderMaterial)src.Duplicate();
         pick.SetSurfaceOverrideMaterial(surf, _bodyMat);
     }
 
@@ -357,10 +378,14 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         }
         if (_bodyMat != null)
         {
-            _bodyMat.AlbedoColor = TintBody ? BodyColors[_colorIdx] : Colors.White; // the register's raw value when asked for; the model's own look otherwise
+            _bodyMat.SetShaderParameter("body_color", BodyColors[_colorIdx]);                 // GX_TEVREG0
             float f = _flash / 255f;
-            _bodyMat.EmissionEnabled = f > 0f;
-            _bodyMat.Emission = new Color(f, f, f);
+            _bodyMat.SetShaderParameter("flash_color", new Color(f, f, f));                   // GX_TEVREG1
+            if (_sun != null && IsInstanceValid(_sun))
+            {
+                _bodyMat.SetShaderParameter("sun_dir", _sun.GlobalTransform.Basis.Z);          // toward the light
+                _bodyMat.SetShaderParameter("sun_color", _sun.LightColor * _sun.LightEnergy);
+            }
         }
     }
 

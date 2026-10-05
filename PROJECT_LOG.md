@@ -4610,3 +4610,36 @@ stages do with REG0 (its alpha is 169; the body also refracts the screen texture
 PORT: TintBody is a knob, default OFF: the model keeps its own look; the body material is still duplicated per instance so the charge flash
 (REG1 -> emission) plays. On, the register's raw value multiplies the albedo (no brightness scaling). NOT PORTED: the TEV stages of
 _mat_body (the per-instance colour, the screen-texture goop) -- a bmd MAT3 read would settle it. Build 0 err, boot ALL OK.
+
+### Pass 71c -- the real Gooble colouring: _mat_body's TEV from name.bmd
+HIS ASK: "Read the bmd material and do the real Gooble colouring".
+THE GAME (tools/projectshine/bmd_mat_dump.py, new: a J3D MAT3 / TEX1 reader after JSystem's J3DMaterialBlock + J3DMaterialInitData, run on
+his extract's scene/bianco2/namekuri2/name.bmd and brain.bmd): name.bmd has _mat_body and _mat_eye; joints root / center / jnt_brain /
+jnt_body / body. _mat_body: opaque (blend NONE, z EQUAL + write, zCompLoc 1), 4 texgens, 5 TEV stages, 2 colour channels. Textures:
+K_new_name (8 x 8 IA4: intensity 255, ALPHA = the V coordinate 0 -> 255 by rows), P_msm_indwp2_ia (a 32 x 32 ripple -- bound to texmap 1
+but used by no stage; no indirect block), H_ma_rak_dummy (the 8 x 8 placeholder TNameKuri::init swaps for the SCREEN TEXTURE), H_toon_2_4i
+(a 32 x 32 toon ramp: 136 everywhere but the far corner, 153 on its edge, 238..255 past it). Texgens: TEX0 (the model UVs), TEX0 x 0.869
+(unused), POS through TEXMTX2 (ViewProjmap 0x09 with a perspective effect matrix, replaced each frame by SMS_GetLightPerspectiveForEffectMtx:
+the camera projection -> the fragment's own screen position), SRTG from COLOR0 (the toon lookup at u = R, v = G). Channels: COLOR0 lit
+(ambient 128,128,128 + the object sun "太陽（オブジェクト）", GX_DF_CLAMP), COLOR1 lit by light 2 with ambient 0, GX_AF_SPEC / GX_DF_SIGN =
+the sun's specular. Registers: PREV (0,0,0), REG0 (0,0,0) <- the per-instance colour (nameKuriTevColorData), REG1 (255,255,255) <- the flash
+(unk1BC, reset to black, rising to white before the leap), REG2 computed; konst0 = (255,255,255,80). Stages (out = d + (1-c)a + cb):
+  0: REG2 = SCREEN x lit0 (alpha SCREEN.a x 1)
+  1: PREV = REG0 + mix(toon, lit0, 5/8) - 1/2 (bias SUBHALF): the colour, lifted by the light (+0.19 lit, +0.01 in shadow)
+  2: PREV = 2 x (spec + K_new_name.A x PREV) (scale x2): the colour DOUBLED toward the top of the body (why the registers are ~100/255)
+  3: PREV = REG1 + mix(REG2, PREV, 80/255): 69 % the stage behind the body, 31 % the coloured goop, plus the flash
+  4: PREV = PREV + REG0 x K_new_name.A: the colour again along V; alpha = RASA0 = 1 -> opaque
+=> a see-through jelly, most transparent at its bottom, tinted its register colour toward the top, a wet specular, the white flash on the
+charge. _mat_eye: 2 stages (the toon-lit eye texture) -- his glb's StandardMaterial3D stays. brain.bmd (_mat_brain): 1 stage, RASC x TEXC
+of K_name_dummy = the goop texture H_ma_rak the game swaps in (SMS_ChangeTextureAll) -- the dark goop core seen through the body, attached
+to jnt_brain (TSharedParts(this, 2, brainModel, 3)); his Gooble.glb has no brain mesh.
+PORT: assets/Sms/GoobleBody.gdshader (the five stages as written; SCREEN_UV on hint_screen_texture for the screen copy, the toon ramp by
+its texel rule, K_new_name's alpha = clamp(UV.y), COLOR0 from the scene's DirectionalLight3D + the 128 ambient, COLOR1 as a Blinn-Phong lobe
+(spec_power 24: TLightCommon's shininess coefficients unread) -- unshaded, depth_draw_always, cull_back) + assets/Sms/GoobleBody.tres (the
+ShaderMaterial, uid cgooblebdy71, the game's constants as parameters). Gooble.cs: BodyMaterial export (default the .tres), duplicated per
+instance onto the "_mat_body" surface; body_color / flash_color / sun_dir (Basis.Z, toward the light) / sun_color fed in ApplyLook; the
+TintBody knob and the StandardMaterial3D tint / emission path are gone.
+LEGACY RETIRED: 71b's TintBody / albedo-emission stand-in. DEVIATION: the specular lobe's shape. NOT PORTED: the brain part (export brain.bmd
+with FinModelUtility and hang it on jnt_brain with the goop texture -- next), the ripple texture (bound, unused by the bmd's stages), the eye
+material's TEV (his StandardMaterial3D eye stays), the 0.869 second UV set. Build 0 err; boot ALL OK; the look is his to confirm (headless
+compiles no shaders). --import run for the shader's .uid (committed).
