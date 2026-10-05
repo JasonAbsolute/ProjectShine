@@ -21,8 +21,8 @@ using System.Collections.Generic;
 /// DRAW (drawUpper / drawLower 40-128): two flat faces through the points, mDrawWidth 5 each side of the chord's perpendicular, the lower
 /// one mDrawHeight 6 below, unlit flat colours. DrawSides adds the two side faces (a visual deviation: the open gap reads wrong edge-on).
 /// The fittings (WireFitting.bmd / .col) are solid posts at the tips: FittingStart / FittingEnd are MeshInstance3D nodes authored in
-/// Wire.tscn (mesh = wirefitting_mesh.res, the ripped SMS wirefitting mesh extracted from the glb) -- select and gizmo each
-/// (tilt / scale) independently; Build only snaps each to its tip so they track the length / sag. Posts hides/shows the pair.
+/// Wire.tscn (mesh = wirefitting_mesh.res, the ripped SMS wirefitting mesh extracted from the glb). Build snaps each to its tip and
+/// sizes / angles it from the per-end exports (PostStart/PostEnd Scale + RotationDegrees). Posts hides/shows the pair.
 /// </summary>
 [Tool]
 [GlobalClass]
@@ -37,7 +37,15 @@ public partial class SmsWire : Node3D
     private float _widthUnits = 100f;
     [Export] public float WidthUnits { get => _widthUnits; set { _widthUnits = value; EditorRebuild(); } }       // size.x: the grab box's width (the level data's; not in the decomp)
     private bool _posts = true;
-    [Export] public bool Posts { get => _posts; set { _posts = value; EditorRebuild(); } }  // show/hide both end fittings (the FittingStart / FittingEnd nodes authored in Wire.tscn)
+    [Export] public bool Posts { get => _posts; set { _posts = value; EditorRebuild(); } }  // show/hide both end fittings (the FittingStart / FittingEnd MeshInstance3D nodes in Wire.tscn)
+    private Vector3 _postStartScale = Vector3.One;
+    [Export] public Vector3 PostStartScale { get => _postStartScale; set { _postStartScale = value; EditorRebuild(); } }  // size of the START fitting (1 = native), independent of the end
+    private Vector3 _postStartRotDeg = Vector3.Zero;
+    [Export] public Vector3 PostStartRotationDegrees { get => _postStartRotDeg; set { _postStartRotDeg = value; EditorRebuild(); } } // rotation (deg) of the START fitting
+    private Vector3 _postEndScale = Vector3.One;
+    [Export] public Vector3 PostEndScale { get => _postEndScale; set { _postEndScale = value; EditorRebuild(); } }        // size of the END fitting (1 = native), independent of the start
+    private Vector3 _postEndRotDeg = Vector3.Zero;
+    [Export] public Vector3 PostEndRotationDegrees { get => _postEndRotDeg; set { _postEndRotDeg = value; EditorRebuild(); } }   // rotation (deg) of the END fitting
     private Color _upperColor = new Color(0.32f, 0.25f, 0.17f);
     [Export] public Color UpperColor { get => _upperColor; set { _upperColor = value; EditorRebuild(); } }
     private Color _lowerColor = new Color(0.17f, 0.13f, 0.08f);
@@ -149,25 +157,30 @@ public partial class SmsWire : Node3D
             GD.Print($"[SMS wire] {Name}: length {LengthUnits} units, {n} points, tips {StartPoint} -> {EndPoint}, sag {CubeHeightUnits * 0.5f} units");
     }
 
-    /// <summary>Snap the authored end fittings to the tips. FittingStart / FittingEnd are REAL MeshInstance3D nodes authored in
-    /// Wire.tscn (mesh = wirefitting_mesh.res) that you place and gizmo -- tilt and scale -- in the editor; this only moves each to its
-    /// tip so the pair tracks the wire's length and sag, never touching your rotation or scale. Posts toggles their visibility. Nothing
-    /// is generated in code here (the ribbon still is, being dynamic geometry; the fittings are static, so they are proper scene nodes).</summary>
+    /// <summary>Place the authored end fittings. FittingStart / FittingEnd are REAL MeshInstance3D nodes authored in Wire.tscn
+    /// (mesh = wirefitting_mesh.res); this drives their LOCAL transform each build -- position snapped to the tip (so the pair tracks
+    /// the wire's length and sag) and size + angle from the per-end exports (PostStart/PostEnd Scale + RotationDegrees). Posts toggles
+    /// their visibility. Only the fittings are managed here; the ribbon is the one piece of code-generated (dynamic) geometry.</summary>
     private void SnapFittings()
     {
-        GetNodeOrNull("PostStart")?.QueueFree();      // retire the pass-66s..u code-generated fittings if a prior session left them in the tree
+        GetNodeOrNull("PostStart")?.QueueFree();      // retire any pass-66s..u code-generated fittings a prior session left in the tree
         GetNodeOrNull("PostEnd")?.QueueFree();
         GetNodeOrNull("PostStartModel")?.QueueFree();
         GetNodeOrNull("PostEndModel")?.QueueFree();
-        SnapFitting("FittingStart", StartPoint);
-        SnapFitting("FittingEnd", EndPoint);
+        float hM = SmsUnits.UnitsToMetres(CubeHeightUnits);
+        float halfM = SmsUnits.UnitsToMetres(LengthUnits) * 0.5f;
+        SnapFitting("FittingStart", new Vector3(0f, hM, -halfM), _postStartScale, _postStartRotDeg);
+        SnapFitting("FittingEnd", new Vector3(0f, hM, halfM), _postEndScale, _postEndRotDeg);
     }
 
-    private void SnapFitting(string name, Vector3 tip)
+    private void SnapFitting(string name, Vector3 localTip, Vector3 scaleMul, Vector3 rotDeg)
     {
         if (GetNodeOrNull<Node3D>(name) is Node3D fitting)
         {
-            fitting.GlobalPosition = tip; // the tip is the wire's, not a free parameter: the designer owns rotation + scale, Build owns position
+            // authored MeshInstance3D CHILD: drive its LOCAL transform so it tracks the wire. Position is the tip (the wire's, not a
+            // free parameter); size + angle are the per-end exports. UnitsToMetres bakes the game-units model to metres, so scale 1 = native.
+            Basis basis = Basis.FromEuler(rotDeg * (MathF.PI / 180f)).Scaled(scaleMul * SmsUnits.UnitsToMetres(1f));
+            fitting.Transform = new Transform3D(basis, localTip);
             fitting.Visible = Posts;
         }
     }
