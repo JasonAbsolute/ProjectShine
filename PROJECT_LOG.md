@@ -4689,3 +4689,48 @@ stage. bmd_mat_dump.py fixed: GXCompare order (LEQUAL is 3, GEQUAL 6), tevColor[
 ALL OK (both surfaces' ShaderMaterials with their textures, the body colours cycling 6 distinct, BrainAttach on bone idx 2 with the
 unlit goop-mark brain 0.32..0.49 m up inside each body, ShadowCaster shadows-only on the same mesh / skeleton) and removed; boot ALL OK.
 The look is his to confirm (headless renders nothing).
+
+### Pass 72 -- the Gooble's death particles: ms_deadnamekli_o / _n
+HIS ASK: "Looks right, move on to the death particles -- they look great!!!!" (71d confirmed in-engine).
+THE GAME: TNameKuri::setDeadAnm (the stomp) and setMeltAnm (the spray) both emitAndBindToMtxPtr(PARTICLE_MS_DEADNAMEKLI_O, getAnmMtx(2))
+and (_N, the same) with emitter->setGlobalScale(mScaling) (namekuri.cpp 490-545): the emitters ride joint 2 = jnt_brain, whose frame is
+rotated (90, 0.5, 90) -- its X is up, Y forward, Z right -- and TMarioEmitterCallBackBindToMtxPtr keeps setGlobalRTMatrix(mtx), so the
+emission volumes and launch velocities are in that frame (JPAEmitter.cpp calcEmitterGlobalParams: the emitter axes = mGlobalRotation x the
+emitter's own rotation). The fields are not: JPAField.cpp's status bit 0x02 is STATUS_USE_GLOBAL_COORDS (noclip's JPA.ts names it
+LocalSpace -- backwards), and both files set it: gravity straight down in the world. The engine as SMS built it (libs/JSystem/src/JParticle):
+life = base x (1 - rndm x rand) (shortening only = Godot's lifetime_randomness); baseVel = (velDir + velRndm + velOmni + velAxis) x
+(1 + ratio x rand(-1..1)); each frame velocity = drag x (baseVel x airResist^age + the fields' summed acceleration) x moment, moment =
+base x (1 - rndm x rand); Circle with FixedDensity: r = size x lerp(minRad, 1, sqrt(rand)) (uniform in area); Sphere minRad 1 = its surface;
+velDir's spread: a tilt uniform in +-spread x 180 deg about Y then a random roll (JPAGetYZRotateMtx).
+  ms_deadnamekli_o (jpa_dump.py): Circle r 25 minRad 0.75, rate 8 for 2 frames = 16, life 34 +-0.5, vel axis 12 (out from the axis) + dir 6
+  (along it), ratio 0.4, airResist 0.98, moment 1 +-0.375, Gravity 0.6 u/f^2 FieldAccel fading in over the first half; DirBillboard (dir
+  Vel) 0.8 = 40 u, ESP1 scale X 0.05 -> 1 by 74 % / Y 0.2 -> 1, 0.03 at the end, alpha enabled but constant (out timing 1.0), rotate
+  speed 0 (x 1 +- 1 = none); P_msm_osenball_ia IA4 (a mottled disc, alpha 255 inside r 12 of 16), lerp(env black -> prm (111,111,111)),
+  blend, alpha compare GEQUAL 190, z write.
+  ms_deadnamekli_n: Sphere r 50 on its surface, rate 7 for 4 frames = 28, life 55 +-0.5, vel axis 12 + dir 12 within 36 deg of the axis
+  (spread 0.2), ratio 0.3, airResist 0.98, Gravity 0.3 u/f^2, a Random field 14 u/f (FieldVelocity, re-rolled every 3 frames) enabled from
+  25 % of the life and fading in to full; DirBillboard 0.7 = 35 u, scale X 0.08 -> 1 by 62.5 % / Y 0.325 -> 1, 0.03 from 79 %; P_msm_
+  mizutama1_ia IA8 (a water drop: dark centre, bright rim), lerp(env -> white) with the env a 7-key rainbow table over 28 frames from a
+  random phase per drop (colour calc flag bit 0), alpha compare GREATER 193, no z write.
+PORT: assets/Sms/Fx/GoobleDeath.tscn (tools/projectshine/gen_fx_gooble.py -- every number derived from the fields): Goop + Drops
+GPUParticles3D in LOCAL coordinates, DirectedPoints (256 baked points with the launch direction as the normal: ring r 18.75..25 u in the
+XZ plane with normals (radial x 12 + Y x 6); sphere r 50 u with normals (horizontal radial x 12 + a 36-degree cone x 12)), initial_velocity
+13.42 u/f x 0.375..1.4 (the ratio x the moment) / the sphere's mean 16.8 u/f x 0.7..1.3, the airResist as the linear brake covering the
+same distance (9.1 / 11.5 m/s^2), gravity 15.3 m/s^2 (0.6 u/f^2 x 0.65 for the fade-in's equal fall x the mean moment) / 14.5 (0.3 u/f^2),
+lifetime 34 / 55 frames with randomness 0.5, 16 / 28 one-shot at explosiveness 0.941 / 0.927 (the 2 / 4 emitting frames), fixed_fps 60,
+scale CurveXYZ per axis as the ESP1 says, anim_offset 0..1 = the colour table's random phase, the Random field as turbulence (influence
+0.15 following the field's 25 %-to-full fade). assets/Sms/Fx/JpaDirBillboard.gdshader (new, reusable): a GPUParticles3D quad whose Y
+runs along the velocity on screen (JPADrawVisitor DirBillboard: the view-space velocity with z dropped) and X across, each side scaled by
+the particle's axis scale (particle_flag_align_y puts the velocity in the transform's Y column), colour lerp(env, prm, I) with the env a
+constant or a GradientTexture1D table cycling over the life from INSTANCE_CUSTOM.z (the anim_offset), display-referred maths put to
+linear, the GX alpha compare as ALPHA_SCISSOR_THRESHOLD. tex/osenball_ia.png + mizutama1_ia.png from the .jpa (pin_fx_imports.py:
+lossless, no detect_3d). SmsGoobleDeath.cs: Play(jointFrame, bodyScale) puts the top-level node in the brain bone's frame at the body
+scale and turns each emitter's authored gravity into that frame (its own ParticleProcessMaterial copy) so it stays world-down.
+Gooble.cs: DeathFxScene export (instanced per Gooble), PlayDeathFx() from SetDeadAnm and SetMeltAnm with the BrainAttach's transform and
+_scale; Dead() hides the Model (not the whole node) so the splash under it lives on; Reset shows it again.
+DEVIATION: the moment (0.625..1) scales the game's whole motion including the fall -- folded into the velocity range and a mean gravity;
+the airResist on the base velocity only -> a linear brake on all of it; the Random field's per-particle kicks -> a turbulence field
+steering the direction; the colour table phase runs on the normalised life (a short-lived drop cycles faster than the game's); the
+drops write depth (one shader for both). Build 0 err; drive 58 ALL OK (spray gooby2: Model hidden, node visible; the splash at the
+brain 0.00 m off, uniform scale 0.72 = the body's, the frame's X up / Y level, both gravities -> world-down 15.3 / 14.5, own materials,
+one-shot local amounts 16 / 28) and removed; boot ALL OK. The look is his to confirm (headless renders nothing).

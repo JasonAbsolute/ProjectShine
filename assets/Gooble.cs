@@ -34,8 +34,9 @@ using Godot;
 /// THE SCENE (his assets/Gooble.tscn, unchanged): Model (the glb: name_down / hit / jump_end / jump_start / land / set / wait / walk) with
 /// Model/AnimationPlayer, the CollisionShape3D for the world. The game's hit cylinders (attack 50 x 30, damage 40 x 90, x the body scale)
 /// and sight cones are code: the scene's DetectionZone / AttackZone / Hurtbox / StompZone are not read any more (delete them when the
-/// scene is next open). NOT PORTED: the death particles (ms_deadnamekli_o / n), the water bottle drop (bottle_short when his tank is
-/// under half), the sounds without players (the exports),
+/// scene is next open). THE DEATH: setDeadAnm / setMeltAnm emit ms_deadnamekli_o (16 goop blobs) and _n (28 rainbow drops) bound to
+/// joint 2's matrix at the body scale -- DeathFxScene (assets/Sms/Fx/GoobleDeath.tscn, gen_fx_gooble.py) played in the brain bone's
+/// frame. NOT PORTED: the water bottle drop (bottle_short when his tank is under half), the sounds without players (the exports),
 /// the oil-slip / catch kill (PUNCH), TWalker's slope blend (the Gooble leaps from any floor), the pollution launchers.
 /// </summary>
 public partial class Gooble : CharacterBody3D, ISmsSprayTarget
@@ -64,6 +65,9 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
     public const string BrainScenePath = "res://assets/Sms/models/gooble_brain.glb";
     public const string BrainMaterialPath = "res://assets/Sms/GoobleBrain.tres";
     public const string BrainBone = "jnt_brain";
+    /// <summary>The death splash (SmsGoobleDeath): assets/Sms/Fx/GoobleDeath.tscn unless another is set; one instance per Gooble.</summary>
+    [Export] public PackedScene DeathFxScene;
+    public const string DeathFxScenePath = "res://assets/Sms/Fx/GoobleDeath.tscn";
     [Export] public bool DebugPrint;
 
     // ------------------------------------------------------------------------------------------------------------------ the game's data
@@ -113,6 +117,7 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
     private ShaderMaterial _bodyMat;
     private Material _eyeMat;
     private Node3D _brain;
+    private SmsGoobleDeath _deathFx;
     private static Material _shadowMat;        // the shadow-only copy's opaque stand-in (shared)
     private float _groundY;                    // mGroundHeight, units (the floor below while falling)
 
@@ -132,6 +137,7 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         MotionMode = MotionModeEnum.Grounded;
         CallDeferred(nameof(SetupCollisionExceptions)); // the game pushes Mario and enemies apart by messages, not bodies
         SetupLook();
+        SetupDeathFx();
         Reset();
     }
 
@@ -235,6 +241,29 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
                 mi.SetSurfaceOverrideMaterial(s, brainMat);
     }
 
+    /// <summary>GoobleDeath.tscn as a child (top-level: the splash stays where the body died).</summary>
+    private void SetupDeathFx()
+    {
+        PackedScene scene = DeathFxScene ?? GD.Load<PackedScene>(DeathFxScenePath);
+        if (scene == null || scene.Instantiate() is not SmsGoobleDeath fx)
+        {
+            GD.PushWarning($"[SMS gooble] {GetPath()}: {DeathFxScenePath} did not load as SmsGoobleDeath: no death splash");
+            return;
+        }
+        fx.Name = "DeathFx";
+        _deathFx = fx;
+        AddChild(fx);
+    }
+
+    /// <summary>emitAndBindToMtxPtr(PARTICLE_MS_DEADNAMEKLI_O / _N, getAnmMtx(2)) + setGlobalScale(mScaling): the splash in the brain
+    /// bone's frame at the body scale.</summary>
+    private void PlayDeathFx()
+    {
+        if (_deathFx == null) return;
+        Transform3D frame = _brain != null && IsInstanceValid(_brain) ? _brain.GlobalTransform : (_model != null ? _model.GlobalTransform : GlobalTransform);
+        _deathFx.Play(frame, _scale);
+    }
+
     /// <summary>The materials' sun (their default is the game's "太陽（オブジェクト）") replaced by the scene's DirectionalLight3D: its
     /// +Z basis points toward the light, its colour x energy is the light colour.</summary>
     private static void SetSun(ShaderMaterial m, DirectionalLight3D sun)
@@ -280,7 +309,7 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         _stack.Clear(); _cur = Nerve.None; _prev = Nerve.None; _time = 0;
         PushAfterCurrent(Nerve.Generate);          // mSpine->pushAfterCurrent(mSpine->getDefault())
         _goalIsMario = true;                       // setGoalPath(TPathNode(gpMarioAddress))
-        Visible = true;
+        if (_model != null) _model.Visible = true;
         SetCollisionLayerValue(1, true);
         ApplyLook();
     }
@@ -814,18 +843,20 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         }
     }
 
-    /// <summary>setDeadAnm: the down anim, MSD_SE_EN_NAMEKURI_DOWN, still, LIVE_FLAG_UNK10 (no bind). (ms_deadnamekli_o / n not ported.)</summary>
+    /// <summary>setDeadAnm: the down anim, MSD_SE_EN_NAMEKURI_DOWN, ms_deadnamekli_o / n on joint 2, still, LIVE_FLAG_UNK10 (no bind).</summary>
     private void SetDeadAnm()
     {
         SetBck(BckDown);
         if (DownSound != null && DownSound.Stream != null) DownSound.Play();
+        PlayDeathFx();
         _vel = Vector3.Zero; _lin = Vector3.Zero; _noBind = true;
     }
 
-    /// <summary>setMeltAnm: the hit anim, still, LIVE_FLAG_UNK10, MSD_SE_EN_NAMEKURI_DOWN_WT.</summary>
+    /// <summary>setMeltAnm: the hit anim, ms_deadnamekli_o / n on joint 2, still, LIVE_FLAG_UNK10, MSD_SE_EN_NAMEKURI_DOWN_WT.</summary>
     private void SetMeltAnm()
     {
         SetBck(BckHit);
+        PlayDeathFx();
         _vel = Vector3.Zero; _lin = Vector3.Zero; _noBind = true;
         if (MeltSound != null && MeltSound.Stream != null) MeltSound.Play();
     }
@@ -847,7 +878,7 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
     private void Dead()
     {
         _dead = true; _relaunch = 0;
-        Visible = false;
+        if (_model != null) _model.Visible = false;              // the body goes; the splash (a top-level child) stays
         if (WalkSound != null && WalkSound.Playing) WalkSound.Stop();
         _stack.Clear(); _cur = Nerve.None;
         if (RelaunchTicks < 0)
