@@ -41,6 +41,13 @@ public static class SmsUnits
     /// <summary>SMS per-tick delta-v -> metres/second^2.</summary>
     public static float AccelToMps2(float dvPerTick) => dvPerTick * 3600f / UnitsPerMetre;
 
+    /// <summary>A LIVE ACTOR's speed, game units a 120 Hz tick: TLiveActor::bind moves the actor by its full mVelocity + mLinearVelocity
+    /// every CUE_MOVE (liveactor.cpp 192-194), 4 ticks a 30 fps frame -- unlike Mario's pos + vel / 4 (SpeedToMps). Enemy .prm values
+    /// (march speeds, jump velocities) are these.</summary>
+    public static float TickSpeedToMps(float unitsPerTick) => unitsPerTick * 120f / UnitsPerMetre;
+    /// <summary>A live actor's acceleration, game units a tick a tick (its mGravity, the .prm gravities) -> metres/second^2.</summary>
+    public static float TickAccelToMps2(float unitsPerTick2) => unitsPerTick2 * 14400f / UnitsPerMetre;
+
     /// <summary>A particle (JPA) speed, game units a frame on the 60 Hz effect clock (SMSGetAnmFrameRate = 2 steps per 30 fps frame)
     /// -> metres/second. NOT SpeedToMps: that is the 30 fps movement convention and gives half of this.</summary>
     public static float FxSpeedToMps(float unitsPerFrame) => unitsPerFrame * 60f / UnitsPerMetre;
@@ -223,6 +230,36 @@ public static class SmsParams
         public const float GunRoll = 0.5f;
         public const int GunRollMax = 4000;         // 22 deg
         public const float GunRate = 0.05f;
+    }
+
+    /// <summary>/enemy/namekuri.prm (TNameKuriSaveLoadParams on TWalkerEnemyParams on TSmallEnemyParams), the shipped values; the code
+    /// defaults in the comments where they differ. Units a 120 Hz tick, degrees a tick, ticks. The Gooble (Swoopin' Stu): Gooble.cs.</summary>
+    public static class NameKuri
+    {
+        public const float HeadHeight = 30f, BodyRadius = 5f, WallRadius = 20f;
+        public const int HitPointMax = 1;
+        public const float JumpForce = 2.2f;             // the wall hop's vy x the body scale
+        public const float SearchLength = 800f, SearchHeight = 300f, SearchAware = 10f, SearchAngle = 360f;
+        public const float GiveUpLength = 450f, GiveUpHeight = 6f;
+        public const int AttackWait = 0, FreezeWait = 300;
+        public const float DamageRadius = 40f, DamageHeight = 90f, AttackRadius = 50f, AttackHeight = 30f; // x the body scale
+        public const float TurnSpeedLow = 0.2f, TurnSpeedHigh = 0.2f;      // deg a tick on the wander
+        public const float BodyScaleLow = 0.6f, BodyScaleHigh = 1.0f;
+        public const float GenItemRate = 50f, GenEggRate = 0f;           // % : a coin at death (not after its own leap or water)
+        public const int StampRange = 15;                                // x 32 u: the death's goop stamp
+        public const int WaitTime = 100;
+        public const float ZigzagCycle = 200f, ZigzagAngle = 60f;        // defaults 1000 / 30 (the graph wander's weave; no graph here)
+        public const float MarchSpeedLow = 1f, MarchSpeedHigh = 1.5f;   // defaults 0.8 / 1.5
+        public const int AliveTime = 2000;                               // ticks: 16.7 s, inflating over the last 100
+        public const float LandHeight = 100f;                            // default 500: a fall past this plays the land anim
+        public const float JumpAttackGravity = 0.135f;                   // default 0.1
+        public const float JumpAttackSp = 6f;                            // default 20: the leap's vy (SMSCalcJumpVelocityY)
+        public const float JumpAttackTurnSp = 1f;                        // default 2: deg a tick while it lines him up
+        public const int JumpPrepareFrame = 600;                         // default 100 (unused by the nerves)
+        public const float JumpMaxFrame = 10f, JumpMaxAngle = 45f, JumpMaxScale = 0.5f; // defaults 30 / 30 / 0.2 (the landing tilt clamp; the rest unused)
+        public const int ColorChangeRate = 5;                            // default 25: the charge flash |sin(rate x t)| and its fade a tick
+        public const float JumpAttackRadius = 350f, JumpAttackAngle = 180f; // default 400: in sight within this -> the attack
+        public const float Gravity = 0.15f;                              // TLiveActor's mGravity (liveactor.cpp 52): the fall, u a tick a tick
     }
 
     public static class Mario // /mario/mario.prm  (TDeParams)
@@ -1290,6 +1327,8 @@ public static class SmsSelfTest
         Check("32 units/tick*4 -> m/s", SmsUnits.SpeedToMps(32f), 12.896f, 0.01f);
         Check("gravity 1.0 -> m/s^2", SmsUnits.AccelToMps2(1f), 48.36f, 0.05f);
         Check("fx 34.06 u/f at 60 Hz -> m/s", SmsUnits.FxSpeedToMps(34.06f), 27.45f, 0.05f);
+        Check("live actor 6 u/tick -> m/s", SmsUnits.TickSpeedToMps(6f), 9.672f, 0.01f);
+        Check("live actor 0.135 u/tick^2 -> m/s^2", SmsUnits.TickAccelToMps2(0.135f), 26.11f, 0.05f);
         Check("stick full tilt -> mag", SmsStick.IntendedMag(new Vector2(1f, 0f)), 32f, 0.001f);
         Check("stick half tilt -> mag", SmsStick.IntendedMag(new Vector2(0.5f, 0f)), 9.73f, 0.1f);
         Check("stick 5% tilt -> mag (deadzone)", SmsStick.IntendedMag(new Vector2(0.05f, 0f)), 0f, 0.001f);

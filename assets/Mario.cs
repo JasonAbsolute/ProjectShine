@@ -11098,6 +11098,13 @@ public partial class Mario : CharacterBody3D
     /// dmgenemycommon.prm; use the overload for another attacker's profile.</summary>
     public void TakeDamage(Vector3 hitSourcePosition) => TakeDamage(hitSourcePosition, SmsDamageProfile.EnemyCommon);
 
+    /// <summary>TSmallEnemy::isMarioInWater: in water, in shallow water, on a water surface or swimming -- the small enemies do not look
+    /// for him then (isFindMario).</summary>
+    public bool SmsInWaterForEnemies => _smsInWater || stateOfMario == MarioState.swimming;
+    /// <summary>TMario::hitNormal's close-range spray: the hose nozzle (0) emitting water this tick (mIsEmitWater) sprays an actor in
+    /// his attack area (HIT_MESSAGE_SPRAYED_BY_WATER from TModelWaterManager::mStaticHitActor).</summary>
+    public bool SmsHoseSpraying => _fluddNozzle == SmsNozzle.Spray && _fluddEmittedTick > 0;
+
     public void TakeDamage(Vector3 hitSourcePosition, SmsDamageProfile profile)
     {
         if (UseSmsPhysics)

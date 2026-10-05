@@ -4548,3 +4548,56 @@ not tellable apart), and the drag is linear where the game's is 0.98 a frame (th
 sparks (ms_2d_pause_sel, 0x1FA at bounce 3: 140 yellow-to-red DirBillboard sparks along the emitter's z).
 OPEN CHECK (not this pass): the shipped Fx that spin (SlipSmoke's +-2700 deg/s) read "speed 0 +-0.125 turns/frame" -- in JPA the random is a
 ratio of the speed, so a speed of 0 does not spin; re-read their ESP1 rotate blocks before the next Fx pass.
+
+### Pass 71 -- the Gooble: TNameKuri (the Swoopin' Stu) 1:1
+HIS ASK: "can we fix the gooble enemy next?" -- his Gooble.cs was a from-scratch wander / chase / charge / jump / land / die with hand-tuned
+seconds and metres; Gooble.glb carries the game's name.bmd clips (name_down / hit / jump_end / jump_start / land / set / wait / walk).
+THE GAME: Enemy/namekuri.cpp (TNameKuri : TWalkerEnemy : TSmallEnemy : TSpineEnemy), the nerves on Strategic/Spine.hpp (a stack:
+pushNerve suspends the current, pushAfterCurrent queues, a nerve returning true pops the top), /enemy/namekuri.prm from his disc extract
+(prm_dump: the shipped values differ from the code defaults -- JumpAttackSp 6 not 20, gravity 0.135 not 0.1, radius 350 not 400,
+ColorChangeRate 5 not 25, LandHeight 100 not 500, march 1..1.5). THE CLOCK (settled this pass, the enemy half of the frame / tick rule):
+TMarDirector::direct runs 4 ticks a 30 fps frame with NO gate on the movement list (TPerformList::load sets GATE_A|B on every CUE_MOVE
+link, but testPerform only honours an object's own unkC gate bits and nothing sets them) -> every live actor's perform(CUE_MOVE) runs at
+120 Hz; TLiveActor::bind moves the actor by its FULL mVelocity + mLinearVelocity each tick (liveactor.cpp 192-194) while Mario's
+jumpProcess / walkProcess step pos + vel / 4 (MarioPhysics.cpp 226 / 500). So enemy .prm values are units a 120 Hz tick:
+SmsUnits.TickSpeedToMps (x 120 / 74.44) and TickAccelToMps2 (x 14400 / 74.44), NOT Mario's SpeedToMps (x 30). The leap: vy 6 = 9.7 m/s,
+gravity 0.135 = 26 m/s^2, 1.8 m high, 0.74 s to Mario's height; the walk 1..1.5 u = 1.6..2.4 m/s; the fall 0.15 = 29 m/s^2, terminal 40.
+PORT (assets/Gooble.cs rewritten; the scene untouched): one 120 Hz tick = TNameKuri::moveObject. Generate (set anim) -> WalkerGraphWander
+(walk anim, random goals -- an optional Graph node's children are the graph "main", else random points within WanderRadiusUnits 600
+of the placed point: DEVIATION, his levels carry no graph; the zigzag weave needs the graph's factor and is the plain walk) -> isFindMario
+(not airborne, Mario not in water / swimming, |dy| < 300, within 800 u, 360 deg, aware 10) -> NKFollowMario (march, 3 deg a tick; no
+give-up) -> in sight within 350 u / 180 deg -> JumpAttackPrepare (wait anim, 1 deg a tick until within 15 deg) -> JumpAttack (jump_start;
+the flash |sin(5 t)| x 255 on the body material's emission, fading 5 a tick after frame 62; at bck frame 62 SMSCalcJumpVelocityY to
+Mario's point (the goal becomes that point), +2 u, airborne, 6 deg a tick; landed + clip done -> jump_end -> SmallEnemyDie, no reward).
+walkToCurPathNode / calcTurnSpeedToReach / MsIsInSight / MsAngleDiff ported in degrees, units. Land nerve (a fall past 100 u while
+wandering). The wall hop (TWalker's blocked flag = IsOnWall against the world, not another Gooble): vy 2.2 x scale, MarchSpeedHigh ahead,
++5 deg. Enemy-enemy contact: isCollidMove's push apart at march x 3. HITS: TObjHitCheck::checkDistance with the .prm cylinders (attack
+50 x 30, damage 40 x 90, x the body scale 0.6..1.0; Mario TrampleRadius 100 x AttackHeight 50 / DamageRadius 42 x 130): the Gooble's
+collision -> TNameKuri::attackToMario = his TakeDamage(DmgNamekuri) (+ a leaping one stops, no reward, dies); Mario's collision ->
+TMario::hitNormal: falling in a jump with the Gooble below -> TRAMPLE (kill + his StompBounce), a ground pound -> HIP_DROP (kill), the
+hose spraying -> SPRAYED_BY_WATER. WATER: ISmsSprayTarget (new, SmsWaterDrops.cs: a flying drop's ray hit on such a body sends it;
+Mario.SmsHoseSpraying for the close-range hit) -> receiveMessage: 30-tick cooldown, HP 1 -> 0, behaveToWater: Die, melting (hit anim,
+gravity 0.01) when on the ground, no reward. DIE: decHitPoints, the collision layer off, the death's goop stamp (unk150 & 0x20: stamp
+range 15 x 32 u, SmsPollutionMap.Pollute) unless melting, down anim + sound export; done when the anim ends (or 360 ticks): genRandomItem
+-> 50 % the DropScene export (his coin; none set = no drop) unless no-reward; DEAD. ALIVE TIME 2000 ticks, x 1.01 a tick from 1900 to twice
+the scale, then kill. DEAD -> re-launched from the placed point after RelaunchTicks 180 (TLauncher's period; -1 frees it): resetSRTV with
+velocity (0, 4, 0) that control() zeroes at once as in the game (setGenerateAnm), airborne, the Generate nerve -- DEVIATION: a placed Gooble
+is its own launcher (the game pools 2 behind goop launchers). Body scale, turn 0.2, march 1..1.5 random per life; the 7 TEV register-0
+colours cycle per instance on a duplicated "_mat_body" (his glb has _mat_body / _mat_eye) -- DEVIATION: scaled to full brightness, the TEV
+stage's scale unread. SmsParams.NameKuri (all the .prm values, defaults noted). Mario.cs: SmsInWaterForEnemies, SmsHoseSpraying.
+SmsPhysics selftests: 6 u/tick -> 9.672 m/s, 0.135 -> 26.11 m/s^2.
+DRIVE 56 (patch_smoke56.py, removed): Mario set 3 m in front of gooby; gooby Wander -> Prepare (turning 280 -> 358 at 1 deg a tick) ->
+JumpAttack (flash 87..180) -> the leap (vel (0.03, 6 -> -5, 2.48) u/tick, apex dy 1.74 m = the 133 u, landing 0.8 s on, at the point Mario
+stood on -- another Gooble's hit had knocked him back 1.5 m, as in the game) -> jump_end -> Die (down) -> dead -> re-launched 1.5 s later
+(Generate / set) -> again; Mario HP 8 -> 7 (hurt) from a leap; gooby2 sprayed directly: Die / hit (melt), gone, re-launched. Caught: the
+collision exception with Mario raced his spawn (now set when he is first found); a Gooble bumping another counted as a wall (hopped).
+Clips: his glb is 60 fps-timed (jump_start 1.458 s for the bck's 89 frames; SetBck scales each clip to its bck frame count).
+ALL OK; build 0 err; boot ALL OK (+2 selftests).
+LEGACY RETIRED: his Gooble.cs behaviour (MoveSpeed / ChaseSpeed / ChargeTime 1.09 s / JumpForwardSpeed 12 / JumpUpForce 10 / LandingTime,
+the zone-driven detection and hurt / stomp) -- the scene's DetectionZone / AttackZone / Hurtbox / StompZone are no longer read: delete them
+from Gooble.tscn when it is next open. DEVIATIONS: the random-point wander without a graph (+ WanderRadiusUnits), the self-relaunch
+(RelaunchTicks), the colours at full brightness, the enemy push by physics contact rather than the hit cylinders. NOT PORTED: the goop
+body (the screen texture) and the brain part, ms_deadnamekli_o / n and the WATHIT particles, the water bottle (bottle_short when his tank
+is under half), the sounds (exports WalkSound / DownSound / MeltSound, unset = silent), the oil-slip / catch PUNCH kill, TWalker's slope
+blend (unk1A8: it leaps from any floor), the coin id (genEventCoin), the pollution launchers. OPEN CHECK (not this pass): other live
+actors ported with SpeedToMps (the coconut lob, pass 52-ish) may be 4x slow by the same rule -- re-read their integration.

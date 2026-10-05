@@ -7,10 +7,18 @@ using System;
 /// horizontal speed cap of one drop-size a tick, a lifetime in ticks -- and drawn as one MultiMesh of stretched
 /// spheres (a stand-in for the game's silhouette / water-volume rendering). Positions are world metres, velocities
 /// metres a tick; the game's numbers (units a tick) are converted on the way in.
-/// Not ported: the ground / wall sliding (case 2 / 3: a hit drop sits, shrinks and dries instead), splashes, the
-/// spray hit messages (HIT_MESSAGE_SPRAYED_BY_WATER), sound. A drop that lands cleans the goop layers (splashGround / splashWall ->
+/// Not ported: the ground / wall sliding (case 2 / 3: a hit drop sits, shrinks and dries instead), splashes, sound. A drop whose
+/// ray hits a body that is an <see cref="ISmsSprayTarget"/> (the enemies: Gooble.cs) sends it HIT_MESSAGE_SPRAYED_BY_WATER (pass 71;
+/// the game's water hit actors against the actors' damage cylinders). A drop that lands cleans the goop layers (splashGround / splashWall ->
 /// gpPollution->clean(pos, mCleanSize x 10 on a floor, x 32 on a wall)) the tick it lands and every tick it sits there (pass 65).
 /// </summary>
+/// <summary>An actor FLUDD's water hurts: TSmallEnemy::receiveMessage(HIT_MESSAGE_SPRAYED_BY_WATER) and the like.</summary>
+public interface ISmsSprayTarget
+{
+    /// <summary>A drop (or the hose at close range) hit the actor at <paramref name="hitPos"/> (world metres).</summary>
+    void SmsSprayedByWater(Vector3 hitPos);
+}
+
 public partial class SmsWaterDrops : Node3D
 {
     public const int MaxDrops = 512;             // the manager's pool size (unk10) is not in the decomp; 255 alive x 0.8 a tick plus a 127-drop burst fits
@@ -150,8 +158,10 @@ public partial class SmsWaterDrops : Node3D
                     _state[i] = 2;
                     CleanAt(i);
                     _life[i] = MathF.Min(_life[i], GroundLifeTicks);
-                    if (DebugPrint && (++_dbgHits % 120) == 1 && hit["collider"].As<GodotObject>() is Node col && col is not StaticBody3D && col is not CsgShape3D)
-                        GD.Print($"[SMS water] a drop hit {col.Name} ({col.GetType().Name}) -- spray hits are not wired to anything yet");
+                    if (hit["collider"].As<GodotObject>() is ISmsSprayTarget target)
+                        target.SmsSprayedByWater(_hit[i]); // HIT_MESSAGE_SPRAYED_BY_WATER
+                    else if (DebugPrint && (++_dbgHits % 120) == 1 && hit["collider"].As<GodotObject>() is Node col && col is not StaticBody3D && col is not CsgShape3D)
+                        GD.Print($"[SMS water] a drop hit {col.Name} ({col.GetType().Name}): not a spray target");
                 }
                 else
                 {
