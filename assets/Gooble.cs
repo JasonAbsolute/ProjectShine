@@ -35,8 +35,8 @@ using Godot;
 /// Model/AnimationPlayer, the CollisionShape3D for the world. The game's hit cylinders (attack 50 x 30, damage 40 x 90, x the body scale)
 /// and sight cones are code: the scene's DetectionZone / AttackZone / Hurtbox / StompZone are not read any more (delete them when the
 /// scene is next open). THE DEATH: setDeadAnm / setMeltAnm emit ms_deadnamekli_o (16 goop blobs) and _n (28 rainbow drops) bound to
-/// joint 2's matrix at the body scale -- DeathFxScene (assets/Sms/Fx/GoobleDeath.tscn, gen_fx_gooble.py) played in the brain bone's
-/// frame. NOT PORTED: the water bottle drop (bottle_short when his tank is under half), the sounds without players (the exports),
+/// joint 2's matrix at the body scale -- DeathFxScene (assets/Sms/Fx/GoobleDeath.tscn, gen_fx_gooble.py) played at the brain joint
+/// in the body's upright frame (DeathFxUpright). NOT PORTED: the water bottle drop (bottle_short when his tank is under half), the sounds without players (the exports),
 /// the oil-slip / catch kill (PUNCH), TWalker's slope blend (the Gooble leaps from any floor), the pollution launchers.
 /// </summary>
 public partial class Gooble : CharacterBody3D, ISmsSprayTarget
@@ -255,14 +255,20 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         AddChild(fx);
     }
 
-    /// <summary>emitAndBindToMtxPtr(PARTICLE_MS_DEADNAMEKLI_O / _N, getAnmMtx(2)) + setGlobalScale(mScaling): the splash in the brain
-    /// bone's frame at the body scale.</summary>
+    /// <summary>emitAndBindToMtxPtr(PARTICLE_MS_DEADNAMEKLI_O / _N, getAnmMtx(2)) + setGlobalScale(mScaling): the splash at the brain
+    /// joint, at the body scale, in the body's upright frame (joint 1 'center': the heading and the ground tilt, as TNameIndParCallback
+    /// binds the Gooble's other emitter) -- DEVIATION DeathFxUpright: the code binds to joint 2, whose matrix is rotated (90, 0.5, 90)
+    /// (X up, Y forward), which would fan the goop sideways along the heading; he knows the game's splash goes up toward the sky.</summary>
+    public const bool DeathFxUpright = true;
     private void PlayDeathFx()
     {
         if (_deathFx == null) return;
-        Transform3D frame = _brain != null && IsInstanceValid(_brain) ? _brain.GlobalTransform : (_model != null ? _model.GlobalTransform : GlobalTransform);
+        Transform3D model = _model != null ? _model.GlobalTransform : GlobalTransform;
+        Vector3 origin = _brain != null && IsInstanceValid(_brain) ? _brain.GlobalPosition : model.Origin + model.Basis.Y.Normalized() * (BrainRestHeightUnits * _scale / U);
+        Transform3D frame = DeathFxUpright || _brain == null || !IsInstanceValid(_brain) ? new Transform3D(model.Basis, origin) : _brain.GlobalTransform;
         _deathFx.Play(frame, _scale);
     }
+    private const float BrainRestHeightUnits = 62f - 5.92f;     // JNT1: center (0, 62, 0) + jnt_brain (0, -5.92, 0.43)
 
     /// <summary>The materials' sun (their default is the game's "太陽（オブジェクト）") replaced by the scene's DirectionalLight3D: its
     /// +Z basis points toward the light, its colour x energy is the light colour.</summary>

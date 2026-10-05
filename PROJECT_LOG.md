@@ -4734,3 +4734,14 @@ steering the direction; the colour table phase runs on the normalised life (a sh
 drops write depth (one shader for both). Build 0 err; drive 58 ALL OK (spray gooby2: Model hidden, node visible; the splash at the
 brain 0.00 m off, uniform scale 0.72 = the body's, the frame's X up / Y level, both gravities -> world-down 15.3 / 14.5, own materials,
 one-shot local amounts 16 / 28) and removed; boot ALL OK. The look is his to confirm (headless renders nothing).
+
+### Pass 72b -- the death splash upright
+HIS REVIEW of 72: "the effects are like shooting to the side, they should be going up ... rotated 90 degrees ... seems random angle ...
+it needs to go up towards the sky". That is exactly what binding to joint 2 gives: jnt_brain's matrix is rotated (90, 0.5, 90) (JNT1 and
+every bck frame: its X is up, its Y forward), the JNT1 remap is identity, no joint is a billboard (JNT1 kind 2/2/1/1/0 all have mtxType
+0), and JPABaseEmitter::calc runs the bind callback (setGlobalRTMatrix, the full normalised rotation) before calcEmitterGlobalParams, so
+the volumes and velocities are composed in that frame -- a vertical fan along the heading, hence a different direction per Gooble. He
+knows the game's splash goes up, so the port binds the splash to the body's upright frame (joint 1 'center' = the heading + the ground
+tilt, the frame TNameIndParCallback uses for the Gooble's other emitter) at the brain joint's position: Gooble.DeathFxUpright (DEVIATION,
+named). The gravity rotation in SmsGoobleDeath.Play stays (the ground tilt). Drive 58 re-run: the frame's Y is up, X level, the splash at
+the brain 0.00 m off, both gravities world-down; removed. Build 0 err; boot ALL OK.
