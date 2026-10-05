@@ -21,7 +21,7 @@ public struct SmsCamMarioData
     public bool RoofFamily;             // status & 0x200000: HANG_ROOF / WAIT_ROOF / MOVE_ROOF / KICK_ROOF (the roof hang; the ledge hang is NOT this)
     public bool KickRoofRollUp;         // MARIO_STATUS_KICK_ROOF_ROLL_UP: +260 on the look height, no HANG kind
     public bool FenceFamily;            // FENCE_MOVE / PUNCH / CATCH / JUMP_CATCH
-    public bool HipDrop;                // MARIO_STATUS_HIP_DROP
+    public bool HipDrop;                // MARIO_STATUS_HIP_DROP: the airborne hip drop (the hover + the fall), not its landing (HIP_ATTACK_END)
     public bool WallJumpOrSlide;        // WALL_JUMP / WALL_SLIDE
     public bool OnWireTop;              // MarioState.wire on TOP (WIRE_WAIT / WALK / the Wait<->SWait turns / Return): kindWire
     public bool OnWireHang;             // MarioState.wire hanging or rolling under it (WIRE_HANG family): kindWireHang
@@ -93,7 +93,11 @@ public partial class Mario
         d.RoofFamily = stateOfMario == MarioState.roofHang;
         d.KickRoofRollUp = false; // KICK_ROOF_ROLL_UP / ROLL_DOWN (the kick's roll onto a roof) are not in the port's roof hang (pass 52)
         d.FenceFamily = stateOfMario == MarioState.fence;
-        d.HipDrop = stateOfMario == MarioState.groundPoundStartup || stateOfMario == MarioState.groundPoundFalling || stateOfMario == MarioState.groundPoundLanding;
+        // MARIO_STATUS_HIP_DROP (0x8008A9) is the AIRBORNE hip drop only -- the hover and the fall; the landing is HIP_ATTACK_END, then SLIP_END
+        // (hipAttackEnd -> jumpEndCommon(ANIM_HIPED, SLIP_END)): WAITING-type statuses the camera's ladder sees as the normal kind. The port's
+        // groundPoundLanding (ma_hiped, then ma_slped) is that landing, so it is NOT the hip drop here (pass 69: it kept the HipAttack kind
+        // through the landing pose -- the look-at frozen 100 u under his feet, the eye sunk to the ground check's 144 u for ~0.9 s)
+        d.HipDrop = stateOfMario == MarioState.groundPoundStartup || stateOfMario == MarioState.groundPoundFalling;
         d.WallJumpOrSlide = stateOfMario == MarioState.wallJump || stateOfMario == MarioState.wallSlide;
         bool onWire = stateOfMario == MarioState.wire;
         d.OnWireHang = onWire && (_smsWire == SmsWireState.Hanging || _smsWire == SmsWireState.Rolling || _smsWire == SmsWireState.WaitToHang || _smsWire == SmsWireState.SWaitToHang);

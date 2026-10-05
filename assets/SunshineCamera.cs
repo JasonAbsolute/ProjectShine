@@ -694,6 +694,9 @@ public partial class SunshineCamera : Node3D
     // ============================================================ what Mario's half of the L camera reads (MarioYCam.cs)
     /// <summary>isLButtonCamera(): the mode proper, from the tick it turns on (through its inbetween) to the tick it leaves.</summary>
     public bool IsLCamera => _mode == SmsCamKind.LNormal;
+    /// <summary>mMode: the kind in force (the inbetween into it may still be running: InbetweenTicks).</summary>
+    public SmsCamKind CurrentKind => _mode;
+    public int InbetweenTicks => _ibFrames;
     /// <summary>unk258: the actual eye's bearing about the look-at (calcExternalData_), what playerControl faces him by (MarioMove.cpp 2449).</summary>
     public int FinalYawBam => _finalYaw;
     /// <summary>mCurrentTarget.mPitch: the L camera's pitch, the FLUDD gun angle in the mode (WaterGun.cpp 219).</summary>

@@ -4470,3 +4470,25 @@ PORT: SunshineCamera.CalcPosAndAt applies the MinCushionXZ push only for the nor
 Nothing else of pass 68 changes. Drive 52 again: the eye 231 u out from his origin in the mode (the nozzle top ~25 u behind him + the 72-u
 shift + 200), every other step as before -- ALL OK; build 0 err; boot ALL OK.
 LEGACY RETIRED: none. DEVIATION: none logged -- this matches the game as observed; the open question is the decomp's reading, noted above.
+
+### Pass 69 -- the hip drop's camera: the landing is not the hip drop (the camera sank to the floor through the landing pose)
+HIS REPORT: "when mario ground pounds the camera sinks low. the framing is not right."
+THE GAME: MARIO_STATUS_HIP_DROP (0x8008A9, MarioStatus.hpp 175) is the AIRBORNE hip drop only -- hipAttacking()'s hover and fall. Touching
+down is changePlayerStatus(HIP_ATTACK_END) (MarioJump.cpp 1078) -> hipAttackEnd() -> jumpEndCommon(ANIM_HIPED, SLIP_END) -> slipEnd ->
+WAIT: WAITING-type statuses. The camera's ladder (CameraChange.cpp 744) gives CAMERA_MODE_HIP_ATTACK for `status == MARIO_STATUS_HIP_DROP`
+and nothing else, so the moment he lands the kind is the normal one again (the current kind's Inbet 16). kindhipattack.prm (faithful in the
+record): dist 800..2000, pitch -1000..6504, AtOffsetY 0 + ratio x 400 (the look-at at his FEET at ratio 0), TargetAtJumpOffsetY -100 with
+AtJumpOffsetSpeed 0 -- the height-pan offset cannot move in this kind, so whatever a jump left in it (-100 after 5 ticks airborne in Follow)
+stays: in the air the look-at sits 100 u under his feet with the eye 5.5 deg under THAT, 800 u out, held 144 u over the ground by the ground
+check. That is the game's hip-drop camera, and it lasts exactly as long as the airborne hip drop.
+THE BUG (port, pass 53): SmsCamMarioData.HipDrop counted groundPoundLanding too, so the HipAttack kind ran on through the landing pose
+(ma_hiped, then ma_slped: ~0.9 s): the frozen -100 offset kept the look-at 100 u under his feet while he stood on them and the eye sank to the
+ground check's 144 u -- the camera on the floor, looking at the ground under Mario, for most of a second after every ground pound.
+DRIVE 53 (patch_smoke53.py: a jump, L, the camera sampled every 0.1 s; removed before the commit). BEFORE: landing at t=1.9 -> kind HipAttack
+through t=2.7, look-at -100 u, eye 244 -> 144 u over his feet; Follow only at t=2.8, the eye back at 313 by t=3.5. AFTER: at the landing
+"kind HipAttack -> Follow over 16 ticks", the look-at 23 -> 150 u and the eye 246 -> 309 u within the landing pose, 313 / 157 (the Follow
+pose) by t=2.8. The airborne dip (the hover's eye 233 -> 72 u over his rising feet, the look-at -100) is unchanged: the game's.
+PORT: MarioCamData.cs d.HipDrop = groundPoundStartup || groundPoundFalling (the landing is HIP_ATTACK_END / SLIP_END: normal kind). The L / Y
+refusal in the hip drop (execFrontRotate_ 454) follows the same flag and is likewise the game's. SunshineCamera: CurrentKind / InbetweenTicks
+getters (drives and Mario's half may read the kind). Build 0 err, boot ALL OK.
+LEGACY RETIRED: none. DEVIATION: none. If the airborne dip itself reads wrong to him, a Dolphin reference of a ground pound decides it.
