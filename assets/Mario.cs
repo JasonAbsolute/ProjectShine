@@ -12846,7 +12846,7 @@ public partial class Mario : CharacterBody3D
     {
         if (skeleton == null || animPlayer == null)
             return;
-        foreach (var (id, name) in new[] { (SmsParams.Fludd.UpperSwPmp, "ma_swpmp"), (SmsParams.Fludd.UpperHgPmp, "ma_hgpmp"), (SmsParams.Fludd.UpperFePmp, "ma_fepmp") })
+        foreach (var (id, name) in new[] { (SmsParams.Fludd.UpperPump, "ma_pump"), (SmsParams.Fludd.UpperSwPmp, "ma_swpmp"), (SmsParams.Fludd.UpperHgPmp, "ma_hgpmp"), (SmsParams.Fludd.UpperFePmp, "ma_fepmp") })
         {
             if (!animPlayer.HasAnimation(name))
             {
@@ -17101,20 +17101,20 @@ public partial class Mario : CharacterBody3D
                     animPlayer.Play(anim, blend); // blend from the previous clip so rope transitions don't snap
             }
         }
-        SmsWireFluddGraft(anim); // keep the one-hand grab/spray upper pose over the hang clips while he sprays
+        SmsWireFluddGraft(); // keep the FLUDD pump pose (grab/spray) over the wire clip while he sprays -- top walk or hang
     }
 
-    /// <summary>FLUDD on the wire: the one-hand grab + spray is the hang-pump upper graft (ma_hgpmp) over the hang clip. The wire runs
-    /// with the tree OFF, where the normal per-frame pump bind can race the tree-active check, so force the graft here while he sprays
-    /// on a hang clip (SmsFluddUpperBody turns it back off the moment he stops spraying).</summary>
-    private void SmsWireFluddGraft(string anim)
+    /// <summary>FLUDD on the wire runs with the anim tree OFF, so the upper-body pump pose must come from a graft, not the tree's clip.
+    /// Force the graft matching the current pump bind -- ma_hgpmp while hanging/swinging (hang clips), ma_pump while walking the top --
+    /// so the grab/spray pose blends over the wire's lower body in BOTH stances. SmsFluddUpperBody turns it off when he stops.</summary>
+    private void SmsWireFluddGraft()
     {
-        if ((anim != "ma_hang" && anim != "ma_rope_hgwat") || !SmsFluddUpperBlend
-            || !_fluddUpperGraft.TryGetValue(SmsParams.Fludd.UpperHgPmp, out var hg))
+        if (!SmsFluddUpperBlend)
             return;
         foreach (var kv in _fluddUpperGraft)
-            kv.Value.Weight = kv.Key == SmsParams.Fludd.UpperHgPmp ? 1f : 0f;
-        hg.Time = _fluddPumpTime;
+            kv.Value.Weight = kv.Key == _fluddPumpBound ? 1f : 0f;
+        if (_fluddUpperGraft.TryGetValue(_fluddPumpBound, out var g))
+            g.Time = _fluddPumpTime;
     }
 
     private bool SmsWireClipDone() => !(animPlayer.IsPlaying() && animPlayer.CurrentAnimation == _smsWireAnim);
@@ -17405,17 +17405,9 @@ public partial class Mario : CharacterBody3D
                         _smsWireAngVel += SmsWireRotSpeed() * q * sc;
                     _smsWireAngVel -= SmsParams.Wire.RotGravity * MathF.Sin(_smsWirePitch / SmsBamPerRad) * q;
                     if (bHeld)
-                    {
-                        // Hold B to wind the swing down; once it's below the fall-off speed he drops off the rope (his way off a giant swing).
-                        // Without B the loop conserves (gravity is conservative) and keeps going -- it won't stop on its own.
+                        // Hold B to wind the swing down (Super Whirl Jump: "hold B to stop swinging before he jumps"). The settle check
+                        // below returns him to HANGING once he's slow near the bottom -- he STAYS on the rope. Without B the loop conserves.
                         _smsWireAngVel *= MathF.Pow(SmsParams.Wire.RotBrake, q);
-                        if (MathF.Abs(_smsWireAngVel) < SmsParams.Wire.FallOffSpeed)
-                        {
-                            SmsWireReleaseHolder("B wound the swing down -> falls off");
-                            SmsWireStartHangLanding("B braked the swing below the fall-off speed");
-                            return;
-                        }
-                    }
                     _smsWireAngVel = Mathf.Clamp(_smsWireAngVel, -max, max);
                     _smsWirePitch = SmsWrapBam(_smsWirePitch + _smsWireAngVel * q);
                     _smsWireSag = SmsParams.Wire.SwingRadiusCoeff * MathF.Abs(_smsWireAngVel); // the loop's radius (DEVIATION coeff so the circle isn't huge at the raised speed cap)
