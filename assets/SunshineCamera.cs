@@ -480,14 +480,18 @@ public partial class SunshineCamera : Node3D
     }
 
     /// <summary>The ladder (CameraChange.cpp 656-826) with the stage's area kind as param_1. Of the game's branches, the port has no
-    /// helmet / underground maps, wires, surf, rails, slider / mirror / indoor ground types, bars (CLIMB), held objects, platforms or
-    /// force jumps; those fall through as they would with their flags clear.</summary>
+    /// helmet / underground maps, surf, rails, slider / mirror / indoor ground types, bars (CLIMB), held objects, platforms or
+    /// force jumps; those fall through as they would with their flags clear. Wires (kindWire / kindWireHang) ARE ported (pass 66y).</summary>
     private SmsCamKind SelectKind()
     {
         bool delfino = DelfinoPlazaRules; // currentMap == 7
         SmsCamKind area = _areaKind ?? DefaultKind; // the cube's code, else the stage's own kind (code -1 -> mInitialMode)
         if (area == SmsCamKind.LNormal)
             area = SmsCamKind.Follow;
+        if (_md.OnWireTop)
+            return SmsCamKind.Wire;      // on a wire overrides the rest: he cannot dash/swim/fence/etc. while on it, and a stage camera cube must not steal the wire view
+        if (_md.OnWireHang)
+            return SmsCamKind.WireHang;
         if (_md.Dashing)
             return !delfino && (_md.Swimming || _md.SwimJump) ? SmsCamKind.AquaticTurbo : SmsCamKind.Turbo;
         if (!delfino && _md.Swimming)
@@ -605,7 +609,7 @@ public partial class SunshineCamera : Node3D
 
     /// <summary>isNotHeightPanCamMode_ (Camera.hpp 215) for the kinds carried.</summary>
     private static bool IsNotHeightPanKind(SmsCamKind k)
-        => k == SmsCamKind.LNormal || k == SmsCamKind.Hang || k == SmsCamKind.Hovering || k == SmsCamKind.Swimming || k == SmsCamKind.LookDown;
+        => k == SmsCamKind.LNormal || k == SmsCamKind.Hang || k == SmsCamKind.Hovering || k == SmsCamKind.Swimming || k == SmsCamKind.LookDown || k == SmsCamKind.WireHang;
 
     /// <summary>isSlopeCameraMode (CameraMode.cpp 307) for the kinds carried.</summary>
     private static bool IsSlopeKind(SmsCamKind k)

@@ -22,6 +22,8 @@ public struct SmsCamMarioData
     public bool FenceFamily;            // FENCE_MOVE / PUNCH / CATCH / JUMP_CATCH
     public bool HipDrop;                // MARIO_STATUS_HIP_DROP
     public bool WallJumpOrSlide;        // WALL_JUMP / WALL_SLIDE
+    public bool OnWireTop;              // MarioState.wire on TOP (WIRE_WAIT / WALK / the Wait<->SWait turns / Return): kindWire
+    public bool OnWireHang;             // MarioState.wire hanging or rolling under it (WIRE_HANG family): kindWireHang
     public bool HangOrAscend;           // HANGING / ASCEND: calcAndSetMarioData zeroes the move distances
     public bool ReadyGun;               // isMarioReadyGun_: has the FLUDD and a SQUAT status (the only statuses with type bit 0x8000)
     public bool AimR;                   // MEANING_R held: with ReadyGun, isMarioAimWithGun_
@@ -84,6 +86,9 @@ public partial class Mario
         d.FenceFamily = stateOfMario == MarioState.fence;
         d.HipDrop = stateOfMario == MarioState.groundPoundStartup || stateOfMario == MarioState.groundPoundFalling || stateOfMario == MarioState.groundPoundLanding;
         d.WallJumpOrSlide = stateOfMario == MarioState.wallJump || stateOfMario == MarioState.wallSlide;
+        bool onWire = stateOfMario == MarioState.wire;
+        d.OnWireHang = onWire && (_smsWire == SmsWireState.Hanging || _smsWire == SmsWireState.Rolling || _smsWire == SmsWireState.WaitToHang || _smsWire == SmsWireState.SWaitToHang);
+        d.OnWireTop = onWire && !d.OnWireHang; // on the wire but not hanging/rolling = on top (WIRE_WAIT / WALK / the turns / Return)
         d.ReadyGun = _smsHasFludd && stateOfMario == MarioState.crouch;
         d.AimR = Input.IsActionPressed("button_r");
         d.CamL = Input.IsActionPressed("button_l");

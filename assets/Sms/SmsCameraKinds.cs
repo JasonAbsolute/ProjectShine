@@ -23,6 +23,8 @@ public enum SmsCamKind
     RocketJump,    // CAMERA_MODE 0x05, /Camera/kindrocketjump.prm: ROCKET / ROCKET_LANDING with any other nozzle
     LookDown,      // CAMERA_MODE 0x2D, /Camera/kindlookdown.prm: an area kind (a cube asks for it)
     LNormal,       // CAMERA_MODE 0x07, /Camera/kindlnormal.prm: the L (Y) camera: MarioYCam.cs owns it; here for the blend lengths
+    Wire,          // CAMERA_MODE 0x06, /Camera/kindwire.prm: on top of a wire (TMapWire): WIRE_WAIT / WALK / ROLL
+    WireHang,      // CAMERA_MODE 0x10, /Camera/kindwirehang.prm: hanging or rolling under a wire: WIRE_HANG family
 }
 
 /// <summary>TCameraKindParam: the kind record the normal camera reads every tick (CameraKindParam.hpp).</summary>
@@ -189,7 +191,7 @@ public sealed class SmsCamKindParam
 
 public static class SmsCamKinds
 {
-    public const int Count = 14;
+    public const int Count = 16;
 
     /// <summary>The shipped record of each kind, in <see cref="SmsCamKind"/> order.</summary>
     public static readonly SmsCamKindParam[] Shipped =
@@ -404,26 +406,58 @@ public static class SmsCamKinds
             LFollowMaginfXmax = 1.5f, PosChaseRateXZ = 0.1f, PosChaseRateXZ_C = 0.3f, PosChaseRateY = 0.08f,
             PosChaseRateY_C = 0.08f, AtChaseRateXZ = 0.1f, AtChaseRateY = 0.08f,
         },
+        // Wire (/Camera/kindwire.prm)
+        new SmsCamKindParam {
+            Fovy = 50f, NearClip = 10f, DistMin = 1000f, DistMax = 2500f,
+            CushionMin = 0f, CushionMax = 0f, XAngleMin = 1000, XAngleMax = 12000,
+            XRotRatioManualSpeed = 0.01f, YAngleManualSpeedXMin = 250, YAngleManualSpeedXMax = 250, AtOffsetY = 200f,
+            XRotRatioAtOffsetY = 0f, TargetAtJumpOffsetY = -100f, AtJumpOffsetSpeed = 0f, HeightPanChaseRateY = 0f,
+            SecureViewChase = 0.01f, SecureViewDistXMin = 0f, SecureViewDistZMin = 0f, SecureViewDistXMax = 0f,
+            SecureViewDistZMax = 0f, HoldAddDistXZMin = 350f, HoldAddDistXZMax = 0f, HoldOffsetAngleXMin = 0,
+            HoldOffsetAngleXMax = 0, OffsetAngleX = 0, OffsetAngleY = 0, OffsetLookatXZ = 0f,
+            MaxAddAngleY = 0, AutoChaseStartFrame = 0, AutoChaseCompleteFrame = 0, FollowSpeedXmin = 0f,
+            FollowSpeedXmax = 0f, JumpFollowSpeedXmin = 0f, JumpFollowSpeedXmax = 0f, ObstructMaginfXmin = 1f,
+            ObstructMaginfXmax = 1f, InHouseMaginfXmin = 1f, InHouseMaginfXmax = 1f, LFollowMaginfXmin = 4f,
+            LFollowMaginfXmax = 1.5f, PosChaseRateXZ = 0.05f, PosChaseRateXZ_C = 0.05f, PosChaseRateY = 0.01f,
+            PosChaseRateY_C = 0.05f, AtChaseRateXZ = 0.08f, AtChaseRateY = 0.01f,
+        },
+        // WireHang (/Camera/kindwirehang.prm)
+        new SmsCamKindParam {
+            Fovy = 50f, NearClip = 10f, DistMin = 800f, DistMax = 1500f,
+            CushionMin = 0f, CushionMax = 0f, XAngleMin = 1000, XAngleMax = 6000,
+            XRotRatioManualSpeed = 0.01f, YAngleManualSpeedXMin = 250, YAngleManualSpeedXMax = 250, AtOffsetY = 100f,
+            XRotRatioAtOffsetY = 450f, TargetAtJumpOffsetY = -100f, AtJumpOffsetSpeed = 0f, HeightPanChaseRateY = 0f,
+            SecureViewChase = 0.01f, SecureViewDistXMin = 0f, SecureViewDistZMin = 0f, SecureViewDistXMax = 0f,
+            SecureViewDistZMax = 0f, HoldAddDistXZMin = 350f, HoldAddDistXZMax = 0f, HoldOffsetAngleXMin = 0,
+            HoldOffsetAngleXMax = 0, OffsetAngleX = 0, OffsetAngleY = 0, OffsetLookatXZ = 0f,
+            MaxAddAngleY = 0, AutoChaseStartFrame = 0, AutoChaseCompleteFrame = 0, FollowSpeedXmin = 0f,
+            FollowSpeedXmax = 0f, JumpFollowSpeedXmin = 0f, JumpFollowSpeedXmax = 0f, ObstructMaginfXmin = 1.5f,
+            ObstructMaginfXmax = 1.2f, InHouseMaginfXmin = 1.7f, InHouseMaginfXmax = 1.3f, LFollowMaginfXmin = 4f,
+            LFollowMaginfXmax = 1.5f, PosChaseRateXZ = 0.1f, PosChaseRateXZ_C = 0.3f, PosChaseRateY = 0.005f,
+            PosChaseRateY_C = 0.3f, AtChaseRateXZ = 0.03f, AtChaseRateY = 0.005f,
+        },
     };
 
     /// <summary>getCameraInbetweenFrame_ (CameraChange.cpp 22): [from][to] = the current kind's mSLInbet&lt;to&gt;, the tick count of the
     /// blend into the new kind (changeCamModeSub_ makes a 0 into 1).</summary>
     public static readonly short[][] Inbet =
     {
-        new short[] { 16, 16, 16, 16, 16, 16, 0, 16, 16, 16, 16, 16, 16, 16 }, // from Follow
-        new short[] { 16, 16, 16, 16, 16, 16, 0, 16, 16, 16, 16, 16, 16, 16 }, // from Delfino
-        new short[] { 1, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from Indoor
-        new short[] { 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from Swimming
-        new short[] { 30, 16, 16, 300, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from AquaticTurbo
-        new short[] { 30, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from Turbo
-        new short[] { 16, 16, 16, 16, 16, 16, 0, 16, 16, 16, 16, 16, 16, 16 }, // from Hang
-        new short[] { 16, 16, 16, 16, 16, 16, 0, 16, 16, 16, 16, 16, 16, 16 }, // from Fence
-        new short[] { 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from WallJump
-        new short[] { 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from HipAttack
-        new short[] { 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from Hovering
-        new short[] { 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from RocketJump
-        new short[] { 16, 16, 16, 16, 16, 16, 1, 16, 16, 16, 16, 16, 16, 16 }, // from LookDown
-        new short[] { 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from LNormal
+        new short[] { 16, 16, 16, 16, 16, 16, 0, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from Follow
+        new short[] { 16, 16, 16, 16, 16, 16, 0, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from Delfino
+        new short[] { 1, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from Indoor
+        new short[] { 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from Swimming
+        new short[] { 30, 16, 16, 300, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 60, 16 }, // from AquaticTurbo
+        new short[] { 30, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 60, 16 }, // from Turbo
+        new short[] { 16, 16, 16, 16, 16, 16, 0, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from Hang
+        new short[] { 16, 16, 16, 16, 16, 16, 0, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from Fence
+        new short[] { 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from WallJump
+        new short[] { 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from HipAttack
+        new short[] { 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from Hovering
+        new short[] { 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from RocketJump
+        new short[] { 16, 16, 16, 16, 16, 16, 1, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from LookDown
+        new short[] { 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from LNormal
+        new short[] { 60, 16, 16, 16, 16, 16, 16, 16, 16, 60, 16, 16, 16, 16, 16, 16 }, // from Wire
+        new short[] { 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16 }, // from WireHang
     };
 
     public static SmsCamKindParam Get(SmsCamKind k) => Shipped[(int)k];
