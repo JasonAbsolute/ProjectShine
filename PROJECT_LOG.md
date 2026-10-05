@@ -4745,3 +4745,13 @@ knows the game's splash goes up, so the port binds the splash to the body's upri
 tilt, the frame TNameIndParCallback uses for the Gooble's other emitter) at the brain joint's position: Gooble.DeathFxUpright (DEVIATION,
 named). The gravity rotation in SmsGoobleDeath.Play stays (the ground tilt). Drive 58 re-run: the frame's Y is up, X level, the splash at
 the brain 0.00 m off, both gravities world-down; removed. Build 0 err; boot ALL OK.
+
+### Pass 72c -- the death splash's launch direction
+HIS REVIEW of 72b: "the effects don't go up, seems nothing changed". Right: the frame was not the bug. Godot's DirectedPoints emission
+rotates the material's `direction` into each point's normal frame WITH THE NORMAL AS Z (particle_process_material.cpp: VELOCITY =
+mat3(tangent, bitangent, normal) * VELOCITY), so `direction` must be (0, 0, 1) for the launch to follow the baked normal -- pass 72 wrote
+(0, 1, 0), which sends every particle along the bitangent: sideways along one axis of the node whatever the frame, the same in 72 and
+72b. GoobleDeath.tscn regenerated with direction (0, 0, 1) on both emitters (gen_fx_gooble.py; the HipDropLanding sparks, the fire streaks
+and the super flames already had it right). OPEN CHECK: GetSparkle's stars use directed points with (0, 1, 0) too -- their 0.4..0.8 u/f
+radial drift runs tangentially; invisible under the orbit, to fix when that scene is next touched. The upright frame (72b) stays. Boot
+ALL OK; the scene reloads without a build.
