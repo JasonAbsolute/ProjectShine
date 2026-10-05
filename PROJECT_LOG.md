@@ -4643,3 +4643,49 @@ LEGACY RETIRED: 71b's TintBody / albedo-emission stand-in. DEVIATION: the specul
 with FinModelUtility and hang it on jnt_brain with the goop texture -- next), the ripple texture (bound, unused by the bmd's stages), the eye
 material's TEV (his StandardMaterial3D eye stays), the 0.869 second UV set. Build 0 err; boot ALL OK; the look is his to confirm (headless
 compiles no shaders). --import run for the shader's .uid (committed).
+
+### Pass 71d -- the Gooble look complete: eyes, brain, the lights of the Light Group, the body shader fed its textures
+HIS ASK: "updated goobleRef ... SuperBMD in my downloads, put it all together ... their eyes are still not working". Ref/goobleRef.png
+(01:15) = his 71c build: white, near-opaque blobs, no eyes. No SuperBMD anywhere; FinModelUtility (his, Documents) had already exported
+every model of the disc: cli/out/.../bianco0/namekuri2/{name,brain}/*.glb + its own TEV-as-GLSL (_mat_body.fragment.glsl: an independent
+reading that agrees with mine stage for stage). Against the real game (Super Mario Wiki's in-game Gooble screenshots: a clear dome
+showing the grass / stone behind it with a glossy white highlight, the colour saturated in the skirt and the tufts, a dark red-brown goop
+core with cream swirls inside, a white oval eye with a dark pupil) the 71c build was wrong in four places, all found in the data:
+1. THE LIGHTS: the ambient is the bmd's (128,128,128) (J3DColorBlockLightOn::load sets it from the material; SMS never overrides it),
+   the sun is scene.bin's Light Group "太陽（オブジェクト）" = (255,255,255) from (200000, 500000, 200000) (tools/projectshine/scene_lights.py:
+   bianco2 has 15 lights x 3 sets player / object / enemy, 6 ambients), loaded by TLightCommon::setLight as GX_LIGHT0 (no attenuation)
+   AND GX_LIGHT2 = the same sun as a specular light: GXInitSpecularDir(-L), GXInitLightShininess(50) -> attn = c^2 / (25 - 24 c^2), c = N.H
+   with H = normalize(L + (0,0,1)) in view space, gated N.L >= 0; J3D forces GX_DF_NONE on a spec channel, so no N.L factor (Dolphin's
+   LightingShaderGen is the reference). GX lights the VERTICES: both shaders light in vertex() and interpolate (the game's soft
+   highlights). 71c's Blinn-Phong pow 24 is gone.
+2. THE TEXTURES: the glb carries the wrong ones -- FinModelUtility gave _mat_body the 8 x 8 H_ma_rak_dummy (the screen placeholder) and
+   _mat_eye the 32 x 32 toon ramp, which is why the eyes were white smears. Shipped from the bmd via bti2png (assets/Sms/models/):
+   gooble_body.png (K_new_name, IA4 8 x 8: alpha = the V ramp), gooble_eye.png (K_new_name_eye, IA4 64 x 64: I = white + dark pupil,
+   A = the eye's shape), toon_2_4i.png (H_toon_2_4i I4 32 x 32), goop_mark_bianco.png (H_ma_rak.bti CMPR 128 x 128, Bianco's goop).
+   Imports pinned (pin_gooble_imports.py): the ramps lossless, no mipmaps, detect_3d off (the editor would VRAM-compress them on first
+   use); the goop mark VRAM + mipmaps like the game's 5 mips. The body UVs put v ~0.95 on the skirt and the tufts and ~0.45 on the
+   dome: the game's gradient (checked against the glb's TEXCOORD_0).
+3. THE MATHS' SPACE: GX TEV is 8-bit display-referred; Godot is linear. The shaders take the screen copy to sRGB, run the stages, and
+   put the result back to linear (71c ran the stages on linear values: 69 % of a linear screen is much lighter than the game's 69 %).
+   The register colours are raw vec3 uniforms (no source_color decode).
+4. THE EYES: GoobleEye.gdshader / .tres on the glb's _mat_eye surface -- COLOR0 lit GX_DF_SIGN (the back darkens below the ambient),
+   ALPHA0 lit (ambColor0.a = 50 + the sun's alpha), stage 0 PREV = (C0 (400,404,424)/255 + mix(toon, lit, 3/4) - 1/2) / 2 (1.0 lit, ~0.8
+   in shadow), stage 1 PREV = mix(spec, EYE, PREV), alpha = 4 x EYE.A x ALPHA0, alpha compare GEQUAL 128 AND LEQUAL 255 -> discard;
+   render_priority 1 so it draws after the body (the game's material order) and wins the depth tie on the dome.
+THE BRAIN: brain.bmd (one joint "brain"; _mat_brain = one stage RASC x TEXC with lighting off = the texture, K_name_dummy swapped for
+the stage's H_ma_rak by TNameKuriManager::initSetEnemies) is TSharedParts(this, 2, brainModel, 3): its base matrix = the body's joint 2
+(jnt_brain) every frame. assets/Sms/models/gooble_brain.glb (FinModelUtility's brain.glb with the dangling brain.png reference stripped
+from the JSON chunk) instanced under a BoneAttachment3D "jnt_brain" on the glb's Skeleton3D, its surface GoobleBrain.tres
+(StandardMaterial3D unshaded + the goop mark). It inherits his Armature scale: a brain of ~0.8 m inside a 1.2 m dome at body scale 1.
+Gooble.cs: SetupLook() (body per instance, eye shared, brain, a ShadowsOnly copy of the mesh -- the screen-reading body is in the
+transparent pass and casts nothing on its own; the game draws the Gooble into the インダイレクト影 buffer), SetSun() once from the
+scene's DirectionalLight3D (direction = its +Z, colour x energy; the materials' defaults are the game's sun); ApplyLook sets body_color
+/ flash_color only. Exports: BodyMaterial, EyeMaterial, BrainScene, BrainMaterial.
+DEVIATION: the stage's goop mark is Bianco's for every stage (the game swaps the current stage's); the scene's light direction stands in
+for the game's sun direction (his DirectionalLight3D is at rotation (-60, 150, 0); the game's object sun is (-60.5, 45, 0)); the brain's
+joint scale (0.9, 1, 0.965) applied twice by the game (jnt_brain's and the brain's own) is applied as the glb has it. NOT PORTED: the
+ripple texture P_msm_indwp2_ia (bound, unused by any stage), the 0.869 second UV set, the pollution launchers / brain re-texturing per
+stage. bmd_mat_dump.py fixed: GXCompare order (LEQUAL is 3, GEQUAL 6), tevColor[i] -> GX_TEVREG i (slot 3 unused). Build 0 err; drive 57
+ALL OK (both surfaces' ShaderMaterials with their textures, the body colours cycling 6 distinct, BrainAttach on bone idx 2 with the
+unlit goop-mark brain 0.32..0.49 m up inside each body, ShadowCaster shadows-only on the same mesh / skeleton) and removed; boot ALL OK.
+The look is his to confirm (headless renders nothing).

@@ -21,16 +21,21 @@ using Godot;
 /// anim), the death stamps goop (stamp range 15 x 32 u) and may drop a coin (GenItemRate 50 %, DropScene). ALIVE TIME: 2000 ticks, the
 /// body inflating from 1900 (x 1.01 a tick to twice its scale), then it pops. Dead: freed, or re-launched from its placed point after
 /// RelaunchTicks like TNameKuriLauncher (vy 4, the set anim) -- a placed Gooble is its own launcher (DEVIATION: the game pools them
-/// behind goop launchers). Body scale 0.6..1.0 per life. THE LOOK: the glb's _mat_body surface gets GoobleBody.gdshader (BodyMaterial,
-/// duplicated per instance) -- name.bmd's TEV read with bmd_mat_dump.py: the body is 69 % the screen behind it (TScreenTexture through
-/// the camera projection) and 31 % goop coloured by GX_TEVREG0 (nameKuriTevColorData: 7 colours cycling per instance, doubled by the
-/// stage-2 scale, fading in along the body's V) plus the sun's specular, with GX_TEVREG1 (the charge flash) added on top.
+/// behind goop launchers). Body scale 0.6..1.0 per life. THE LOOK (name.bmd / brain.bmd read with tools/projectshine/bmd_mat_dump.py):
+/// the glb's _mat_body surface gets GoobleBody.gdshader (BodyMaterial, duplicated per instance: the body is 69 % the screen behind it
+/// -- TScreenTexture through the camera projection -- and 31 % goop coloured by GX_TEVREG0, nameKuriTevColorData's 7 colours cycling
+/// per instance, doubled by the stage-2 scale along K_new_name's alpha ramp, the skirt and the tufts full, the dome half, plus the
+/// sun's specular, with GX_TEVREG1, the charge flash, added on top); _mat_eye gets GoobleEye.tres (K_new_name_eye cut out, lit); the
+/// brain (TSharedParts on joint 2 = jnt_brain: brain.bmd with the stage's goop mark H_ma_rak swapped into K_name_dummy) hangs on the
+/// bone as BrainScene with BrainMaterial; a shadow-only copy of the mesh casts the shadow the game's 影 draw buffer gives it. The
+/// lights are the materials' (bianco2 scene.bin: the sun (255,255,255) from (200000, 500000, 200000), ambient (128,128,128), spec
+/// shininess 50); a DirectionalLight3D in the scene replaces the sun's direction and colour.
 ///
 /// THE SCENE (his assets/Gooble.tscn, unchanged): Model (the glb: name_down / hit / jump_end / jump_start / land / set / wait / walk) with
 /// Model/AnimationPlayer, the CollisionShape3D for the world. The game's hit cylinders (attack 50 x 30, damage 40 x 90, x the body scale)
 /// and sight cones are code: the scene's DetectionZone / AttackZone / Hurtbox / StompZone are not read any more (delete them when the
-/// scene is next open). NOT PORTED: the goop-refracting body (the screen texture) and the brain part, the death particles
-/// (ms_deadnamekli_o / n), the water bottle drop (bottle_short when his tank is under half), the sounds without players (the exports),
+/// scene is next open). NOT PORTED: the death particles (ms_deadnamekli_o / n), the water bottle drop (bottle_short when his tank is
+/// under half), the sounds without players (the exports),
 /// the oil-slip / catch kill (PUNCH), TWalker's slope blend (the Gooble leaps from any floor), the pollution launchers.
 /// </summary>
 public partial class Gooble : CharacterBody3D, ISmsSprayTarget
@@ -50,6 +55,15 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
     /// body_color (GX_TEVREG0) / flash_color (GX_TEVREG1) / sun_dir / sun_color fed each frame.</summary>
     [Export] public ShaderMaterial BodyMaterial;
     public const string BodyMaterialPath = "res://assets/Sms/GoobleBody.tres";
+    /// <summary>_mat_eye's material: assets/Sms/GoobleEye.tres unless another is set (shared: nothing per instance in it).</summary>
+    [Export] public Material EyeMaterial;
+    public const string EyeMaterialPath = "res://assets/Sms/GoobleEye.tres";
+    /// <summary>The brain (brain.bmd as a glb) hung on the jnt_brain bone, its surface in BrainMaterial (the goop mark, unlit).</summary>
+    [Export] public PackedScene BrainScene;
+    [Export] public Material BrainMaterial;
+    public const string BrainScenePath = "res://assets/Sms/models/gooble_brain.glb";
+    public const string BrainMaterialPath = "res://assets/Sms/GoobleBrain.tres";
+    public const string BrainBone = "jnt_brain";
     [Export] public bool DebugPrint;
 
     // ------------------------------------------------------------------------------------------------------------------ the game's data
@@ -97,7 +111,9 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
     private float _scaleKeep;                  // unk1B0
     private int _colorIdx;
     private ShaderMaterial _bodyMat;
-    private DirectionalLight3D _sun;             // the object sun ("太陽（オブジェクト）"): the scene's DirectionalLight3D
+    private Material _eyeMat;
+    private Node3D _brain;
+    private static Material _shadowMat;        // the shadow-only copy's opaque stand-in (shared)
     private float _groundY;                    // mGroundHeight, units (the floor below while falling)
 
     public override void _Ready()
@@ -115,8 +131,7 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         _spawnYaw = Mathf.RadToDeg(Rotation.Y);
         MotionMode = MotionModeEnum.Grounded;
         CallDeferred(nameof(SetupCollisionExceptions)); // the game pushes Mario and enemies apart by messages, not bodies
-        SetupBodyMaterial();
-        _sun = FindSun(GetTree().CurrentScene);
+        SetupLook();
         Reset();
     }
 
@@ -139,36 +154,106 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         return null;
     }
 
-    /// <summary>The glb's "_mat_body" surface (name.bmd's material 0) takes a per-instance copy of GoobleBody.tres.</summary>
-    private void SetupBodyMaterial()
+    /// <summary>The model's surfaces by the glb's material names: "_mat_body" (name.bmd's material 0) takes a per-instance copy of
+    /// GoobleBody.tres, "_mat_eye" (material 1) the shared GoobleEye.tres; the brain scene goes on the jnt_brain bone (TSharedParts(this,
+    /// 2, brainModel, 3)); a shadow-only copy of the mesh casts the shadow; the scene's DirectionalLight3D is the sun of both
+    /// materials (set once: it does not move).</summary>
+    private void SetupLook()
     {
         if (_model == null)
             return;
-        MeshInstance3D pick = null; int surf = 0;
+        MeshInstance3D mesh = null; int bodySurf = -1, eyeSurf = -1;
         foreach (MeshInstance3D mi in FindMeshes(_model))
         {
-            if (mi.Mesh == null) continue;
+            if (mi.Mesh == null || mi.Mesh.GetSurfaceCount() == 0) continue;
+            mesh = mi;
             for (int s = 0; s < mi.Mesh.GetSurfaceCount(); s++)
             {
-                var m = mi.GetActiveMaterial(s);
-                if (m != null && m.ResourceName.ToLowerInvariant().Contains("body")) { pick = mi; surf = s; break; }
+                string name = mi.GetActiveMaterial(s)?.ResourceName.ToLowerInvariant() ?? "";
+                if (name.Contains("body")) bodySurf = s;
+                else if (name.Contains("eye")) eyeSurf = s;
             }
-            if (pick != null) break;
-            if (pick == null && mi.Mesh.GetSurfaceCount() > 0) { pick = mi; surf = 0; } // the first surface stands in for the body
+            break;
         }
-        if (pick == null)
+        if (mesh == null)
         {
-            GD.PushWarning($"[SMS gooble] {GetPath()}: no mesh surface for the body: no goop material");
+            GD.PushWarning($"[SMS gooble] {GetPath()}: no mesh under Model: no goop look");
             return;
         }
-        ShaderMaterial src = BodyMaterial ?? GD.Load<ShaderMaterial>(BodyMaterialPath);
-        if (src == null)
+        if (bodySurf < 0) bodySurf = 0;                               // one unnamed surface: the body
+        var sun = FindSun(GetTree().CurrentScene);
+        ShaderMaterial body = BodyMaterial ?? GD.Load<ShaderMaterial>(BodyMaterialPath);
+        if (body == null)
+            GD.PushWarning($"[SMS gooble] {GetPath()}: {BodyMaterialPath} did not load: no goop body");
+        else
         {
-            GD.PushWarning($"[SMS gooble] {GetPath()}: {BodyMaterialPath} did not load: no goop material");
+            _bodyMat = (ShaderMaterial)body.Duplicate();
+            SetSun(_bodyMat, sun);
+            mesh.SetSurfaceOverrideMaterial(bodySurf, _bodyMat);
+        }
+        if (eyeSurf >= 0)
+        {
+            _eyeMat = EyeMaterial ?? GD.Load<Material>(EyeMaterialPath);
+            if (_eyeMat == null)
+                GD.PushWarning($"[SMS gooble] {GetPath()}: {EyeMaterialPath} did not load: the glb's eye material stays");
+            else
+            {
+                if (_eyeMat is ShaderMaterial em) SetSun(em, sun);
+                mesh.SetSurfaceOverrideMaterial(eyeSurf, _eyeMat);
+            }
+        }
+        // the shadow: the body reads the screen (the transparent pass casts nothing), so a copy of the mesh casts it (the game draws the
+        // Gooble into the インダイレクト影 buffer)
+        _shadowMat ??= new StandardMaterial3D { ResourceName = "Gooble shadow caster" };
+        var caster = new MeshInstance3D { Name = "ShadowCaster", Mesh = mesh.Mesh, Skin = mesh.Skin, Skeleton = mesh.Skeleton,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.ShadowsOnly, Transform = mesh.Transform };
+        for (int s = 0; s < mesh.Mesh.GetSurfaceCount(); s++)
+            caster.SetSurfaceOverrideMaterial(s, _shadowMat);
+        mesh.AddSibling(caster);
+        // the brain on the jnt_brain bone
+        var skel = FindSkeleton(_model);
+        if (skel == null || skel.FindBone(BrainBone) < 0)
+        {
+            GD.PushWarning($"[SMS gooble] {GetPath()}: no Skeleton3D with the bone {BrainBone} under Model: no brain");
             return;
         }
-        _bodyMat = (ShaderMaterial)src.Duplicate();
-        pick.SetSurfaceOverrideMaterial(surf, _bodyMat);
+        PackedScene brainScene = BrainScene ?? GD.Load<PackedScene>(BrainScenePath);
+        Material brainMat = BrainMaterial ?? GD.Load<Material>(BrainMaterialPath);
+        if (brainScene == null || brainMat == null)
+        {
+            GD.PushWarning($"[SMS gooble] {GetPath()}: {BrainScenePath} / {BrainMaterialPath} did not load: no brain");
+            return;
+        }
+        var att = new BoneAttachment3D { Name = "BrainAttach" };
+        skel.AddChild(att);
+        att.BoneName = BrainBone;
+        _brain = brainScene.Instantiate<Node3D>();
+        _brain.Name = "Brain";
+        att.AddChild(_brain);
+        foreach (MeshInstance3D mi in FindMeshes(_brain))
+            for (int s = 0; s < (mi.Mesh?.GetSurfaceCount() ?? 0); s++)
+                mi.SetSurfaceOverrideMaterial(s, brainMat);
+    }
+
+    /// <summary>The materials' sun (their default is the game's "太陽（オブジェクト）") replaced by the scene's DirectionalLight3D: its
+    /// +Z basis points toward the light, its colour x energy is the light colour.</summary>
+    private static void SetSun(ShaderMaterial m, DirectionalLight3D sun)
+    {
+        if (sun == null) return;
+        m.SetShaderParameter("sun_dir", sun.GlobalTransform.Basis.Z.Normalized());
+        Color c = sun.LightColor * sun.LightEnergy;
+        m.SetShaderParameter("sun_color", new Vector3(c.R, c.G, c.B));
+    }
+
+    private static Skeleton3D FindSkeleton(Node n)
+    {
+        if (n is Skeleton3D s) return s;
+        foreach (Node c in n.GetChildren())
+        {
+            var r = FindSkeleton(c);
+            if (r != null) return r;
+        }
+        return null;
     }
 
     private static IEnumerable<MeshInstance3D> FindMeshes(Node n)
@@ -378,14 +463,10 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         }
         if (_bodyMat != null)
         {
-            _bodyMat.SetShaderParameter("body_color", BodyColors[_colorIdx]);                 // GX_TEVREG0
+            Color c = BodyColors[_colorIdx];
+            _bodyMat.SetShaderParameter("body_color", new Vector3(c.R, c.G, c.B));            // GX_TEVREG0, the raw register value
             float f = _flash / 255f;
-            _bodyMat.SetShaderParameter("flash_color", new Color(f, f, f));                   // GX_TEVREG1
-            if (_sun != null && IsInstanceValid(_sun))
-            {
-                _bodyMat.SetShaderParameter("sun_dir", _sun.GlobalTransform.Basis.Z);          // toward the light
-                _bodyMat.SetShaderParameter("sun_color", _sun.LightColor * _sun.LightEnergy);
-            }
+            _bodyMat.SetShaderParameter("flash_color", new Vector3(f, f, f));                 // GX_TEVREG1
         }
     }
 

@@ -1,15 +1,18 @@
-[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://cgooblebdy71"]
+[gd_resource type="ShaderMaterial" load_steps=4 format=3 uid="uid://cgooblebdy71"]
 
 [ext_resource type="Shader" path="res://assets/Sms/GoobleBody.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" uid="uid://dw3h03y3rmosm" path="res://assets/Sms/models/gooble_body.png" id="2_body"]
+[ext_resource type="Texture2D" uid="uid://c7qc8aqne083g" path="res://assets/Sms/models/toon_2_4i.png" id="3_toon"]
 
 [resource]
-resource_name = "_mat_body (name.bmd): the see-through goop body, its register colour and the charge flash set by Gooble.cs"
+resource_name = "_mat_body (name.bmd): the see-through goop body; Gooble.cs duplicates it per instance for body_color (GX_TEVREG0) and flash_color (GX_TEVREG1)"
 shader = ExtResource("1_shader")
-shader_parameter/body_color = Color(0.392, 0, 0.039, 1)
-shader_parameter/flash_color = Color(0, 0, 0, 1)
-shader_parameter/sun_dir = Vector3(0, 1, 0)
-shader_parameter/sun_color = Color(1, 1, 1, 1)
-shader_parameter/ambient = 0.502
+shader_parameter/body_color = Vector3(0.392, 0, 0.039)
+shader_parameter/flash_color = Vector3(0, 0, 0)
+shader_parameter/sun_dir = Vector3(0.348, 0.87, 0.348)
+shader_parameter/sun_color = Vector3(1, 1, 1)
+shader_parameter/ambient = Vector3(0.502, 0.502, 0.502)
+shader_parameter/shininess = 50.0
 shader_parameter/konst_a = 0.3137
-shader_parameter/toon_shadow = 0.533
-shader_parameter/spec_power = 24.0
+shader_parameter/body_tex = ExtResource("2_body")
+shader_parameter/toon_tex = ExtResource("3_toon")
