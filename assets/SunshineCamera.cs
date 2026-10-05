@@ -31,11 +31,23 @@ using Godot.Collections;
 /// everywhere else), the camera cubes / fixed cameras (pass 54: an area's kind by a tag), the notice camera (no bosses), the 0x8000
 /// camera-clip surface flag (every static body clips the camera; the metadata `sms_camera_pass` on a body opts it out), SE 0x4826.
 ///
-/// The Y camera (assets/Sms/MarioYCam.cs) is this class's L_NORMAL half on a second Camera3D and keeps its contract: this node sits ON the
-/// look-at (mTarget), the pivot's yaw is the eye's bearing (Mario's stick and MarioYCam read both), and SmsYCamExit hands the pose back
-/// with the game's 16-tick blend from the L camera's record. The scene rig (CamController > SpringArmPivot > SpringArm3D > Camera3D) is
-/// kept; the SpringArm3D no longer processes (it would re-place the camera each physics frame) and the Camera3D is posed directly.
-/// Mode TalkingPOV is Jaysonn's sign-dialogue framing (RedCoinSwitch.cs) and stays his.
+/// THE L (Y) CAMERA, CAMERA_MODE_L_NORMAL, is a mode of this same camera (pass 68 folded assets/Sms/MarioYCam.cs's second Camera3D into
+/// the rig, as CPolarSubCamera has it): a Y in a normal kind starts execFrontRotate_'s swing behind him (the gap halved a tick,
+/// YButtonRotateChase 2; the L press's variant closes a tenth, LButtonRotateChase 10); when it settles (CAMERA_FLAG_UNK8 -> UNK10)
+/// doLButtonCameraOn_ changes the kind to LNormal with the current kind's Inbet (16 ticks), unk282 = 60 and the pitch ratio where the
+/// camera is level with its target (setUpToLButtonCamera_). In the mode ctrlLButtonCamera_ (CameraNotice.cpp 208) runs instead of
+/// ctrlNormalOrTowerCamera_: the look target is the nozzle top (his look point without the FLUDD), the MAIN stick turns the yaw (300 BAM
+/// a tick) and tilts the ratio (0.01 a tick), then the SAME calcPosAndAt_ -- the kind record's 200 u, OffsetLookatXZ -72 over the
+/// shoulder, the eye kept MinCushionXZ (300 u) out from his origin, no cushion rule (not a normal kind), no slope aim, no wall check, no
+/// ground check, the inbetween, the chase -- and the record's fov 60 / near 10 blend in with the rest. Y / A / B (the pad's
+/// MEANING_Y | MEANING_CAM_AB, once unk282 is out and the inbetween over) sweep back over the L record's Inbet (16) into the kind the
+/// L camera came from (changeCamMode_(-1) pops it; the saved ratio comes back); a knockdown, the water, the hover / rocket, the dash, a
+/// climb or a demo's hold cut it in one tick (the hover's cut sweeps by Jaysonn's logged deviation, SmsParams.LCamera.RocketExitSweeps).
+/// Mario's half of the mode stays in MarioYCam.cs and reads IsLCamera / FinalYawBam / CurPitchBam here: his stick is the camera's, A / B / Y
+/// its buttons, his face the eye's bearing (playerControl 2449), the gun angle its pitch (WaterGun.cpp 219). This node sits ON the
+/// look-at (mTarget) and the pivot's yaw is the eye's bearing (Mario's stick reads both). The scene rig (CamController > SpringArmPivot >
+/// SpringArm3D > Camera3D) is kept; the SpringArm3D no longer processes (it would re-place the camera each physics frame) and the
+/// Camera3D is posed directly. Mode TalkingPOV is Jaysonn's sign-dialogue framing (RedCoinSwitch.cs) and stays his.
 /// </summary>
 public partial class SunshineCamera : Node3D
 {
@@ -116,6 +128,8 @@ public partial class SunshineCamera : Node3D
     private int _flags = 0;                              // unk64
     private const int FlagPanA = 0x1, FlagPanB = 0x2, FlagFrontRotate = 0x4, FlagFrontY = 0x8, FlagFrontDone = 0x10, FlagFreeze = 0x40, FlagStickYaw = 0x80, FlagCushionFar = 0x100;
     private int _frontYaw = 0, _frontChase = 0;          // unk274 / unk276
+    private int _lLock = 0;                              // unk282: ticks after an L camera change before Y / A / B act or a Y re-enters (60)
+    private SmsCamKind _lModeBefore = SmsCamKind.Follow; // unk60's stack: the kind the L camera came from (changeCamMode_(-1) pops it)
     private int _groundSkip = 0, _roofSkip = 0, _autoChaseOff = 0; // unk278 / unk27A / unk284
     private float _autoChase = 1f;                       // unk288
     private int _slopeX = 0, _addY = 0;                  // unk28C / unk28E
@@ -218,7 +232,7 @@ public partial class SunshineCamera : Node3D
             if (_dbgTimer >= 1f)
             {
                 _dbgTimer = 0f;
-                GD.Print($"[SMS camera] {_mode}{(_ibFrames > 0 ? $" (blend {_ibFrames})" : "")}: yaw {SmsMath.WrapAngle(_finalYaw * SmsUnits.BamToRad) * 180f / MathF.PI:F0} deg, pitch {_finalPitch * 180f / 32768f:F1} deg (ratio {_cur.Ratio:F2}), {(_posU - _atU).Length():F0} u off the look-at, look {_atU.Y - _md.PosU.Y:F0} u over his feet, eye {_posU.Y - _md.PosU.Y:F0} u; fov {_p.Fovy:F0}; stick ({_cx:F2}, {_cy:F2}){(_areaKind != null ? $", area {_areaKind}" : "")}{(_occluded ? ", occluded" : "")}{((_flags & FlagFrontRotate) != 0 ? ", L swing" : "")}{(_md.ReadyGun ? $", squat aim {_md.AimRatio:F2} hold {_holdDist:F0} u" : "")}");
+                GD.Print($"[SMS camera] {_mode}{(_ibFrames > 0 ? $" (blend {_ibFrames})" : "")}: yaw {SmsMath.WrapAngle(_finalYaw * SmsUnits.BamToRad) * 180f / MathF.PI:F0} deg, pitch {_finalPitch * 180f / 32768f:F1} deg (ratio {_cur.Ratio:F2}), {(_posU - _atU).Length():F0} u off the look-at, look {_atU.Y - _md.PosU.Y:F0} u over his feet, eye {_posU.Y - _md.PosU.Y:F0} u; fov {_p.Fovy:F0}; stick ({_cx:F2}, {_cy:F2}){(_areaKind != null ? $", area {_areaKind}" : "")}{(_occluded ? ", occluded" : "")}{((_flags & FlagFrontRotate) != 0 ? ((_flags & FlagFrontY) != 0 ? ", the Y swing" : ", L swing") : "")}{(_lLock > 0 ? $", L lock {_lLock}" : "")}{(_md.ReadyGun ? $", squat aim {_md.AimRatio:F2} hold {_holdDist:F0} u" : "")}");
             }
         }
     }
@@ -279,6 +293,7 @@ public partial class SunshineCamera : Node3D
     private void WarpBehind()
     {
         _warpRequested = false;
+        DropLCamera(); // a stage load's camera is the normal one, no lock
         _cur.Yaw = (short)(_md.AngleY - 0x8000);
         PlaceBehind();
         if (_md.Debug)
@@ -416,6 +431,7 @@ public partial class SunshineCamera : Node3D
         if ((_flags & FlagStickYaw) == 0 && _autoChaseOff > 0) _autoChaseOff--;
         if (_groundSkip != 0) _groundSkip--;
         if (_roofSkip != 0) _roofSkip--;
+        if (_lLock != 0) _lLock--;             // unk282
         // setMarioLookat_ (cameragc.cpp 269): his origin + the kind's look height (+260 on KICK_ROOF_ROLL_UP)
         float yOff = _cur.Ratio * _p.XRotRatioAtOffsetY + _p.AtOffsetY;
         if (_md.KickRoofRollUp) yOff += 260f;
@@ -423,8 +439,14 @@ public partial class SunshineCamera : Node3D
         _prev = _cur;
         // controlByCameraCode_ + execCameraModeChangeProc_: only while the game is in play (director state 4), never under a demo's hold
         _areaKind = SampleAreaKind();
-        if (!_md.Locked)
-            ModeChangeProc(lEdge);
+        if (_md.Locked)
+        {
+            // a demo's hold (the talk, the shine, a death, CameraLocked): the game never reaches execCameraModeChangeProc_ under one and
+            // its demo camera takes the view; here the one camera keeps the frame, so an open L camera is cut and a Y swing dropped
+            if (_mode == SmsCamKind.LNormal) LCameraOff(true, "a demo hold", force: true);
+            _flags &= ~(FlagFrontRotate | FlagFrontY | FlagFrontDone);
+        }
+        else ModeChangeProc(lEdge);
         // the kind record: the mode's, blended over the inbetween (inbetweenData with the frames remaining)
         SmsCamKindParam target = SmsCamKinds.Get(_mode);
         if (_ibFrames > 0) _p.Inbetween(target, _ibFrames);
@@ -432,7 +454,8 @@ public partial class SunshineCamera : Node3D
         if (_autoChaseOff > _p.AutoChaseCompleteFrame) _autoChaseOff = _p.AutoChaseCompleteFrame;
         // occlusion (MARIO_FLAG_OCCLUDED): the game reads the framebuffer at his screen point; a ray from the eye to his waist stands in
         _occluded = RayHits(M(_posU), M(_md.PosU + new Vector3(0f, 80f, 0f)));
-        CtrlNormal();
+        if (_mode == SmsCamKind.LNormal) CtrlL();
+        else CtrlNormal();
         // calcFinalPosAndAt_ (828): the shake is SmsCameraShake's own pass; the look-at's elevation from the eye clamped to the limits
         _viewPosU = _posU;
         _viewAtU = _atU;
@@ -442,15 +465,55 @@ public partial class SunshineCamera : Node3D
         _finalRatio = Mathf.Clamp(CalcRatio(_p.XAngleMin, _p.XAngleMax, _finalPitch), 0f, 1f);
     }
 
-    /// <summary>execCameraModeChangeProc_ (CameraChange.cpp 568) as far as the normal camera goes: the L press is execFrontRotate_ (the Y
-    /// press is MarioYCam's: it swings its own camera and runs the L mode); in the L mode the ladder returns; otherwise the status ladder
-    /// (656-826) names the kind and changeCamMode_ blends into it.</summary>
+    /// <summary>execCameraModeChangeProc_ (CameraChange.cpp 568) for the kinds carried. The refusing states (asleep, the water, the hover /
+    /// rocket, the dash, a climb; 588) cut an open L camera in a tick and let only the L press swing; in the L camera a knockdown (status bit
+    /// 0x20000) cuts it and Y / A / B (MEANING_Y | MEANING_CAM_AB, unk282 out, the inbetween over) sweep out of it; in a normal kind a settled
+    /// Y swing (CAMERA_FLAG_UNK10) turns the L camera on, and a Y (unk282 out, his status allowing) or an L press starts execFrontRotate_'s
+    /// swing (never in the hip drop). Then, unless the kind changed here or the L camera holds, the status ladder (656-826) names the
+    /// kind and changeCamMode_ blends into it. The notice camera (execNoticeOnOffProc_: a boss to lock on to) is not ported.</summary>
     private void ModeChangeProc(bool lEdge)
     {
-        if (lEdge && !_md.YCamActive && !_md.HipDrop && (_md.TouchGround || _md.WallJumpOrSlide))
-            ExecFrontRotate();   // execFrontRotate_ 447: refused in the L camera and the hip drop; an air press is the hip drop's (pass 17's rule)
-        if (_md.YCamActive)
-            return;              // isLButtonCameraSpecifyMode(mMode): the L camera's own exits, the kind holds
+        SmsCamKind before = _mode;
+        bool inL = _mode == SmsCamKind.LNormal;
+        bool refuses = _md.InWater || _md.Swimming || _md.Rocketing || _md.Dashing || _md.Climbing;
+        if (refuses)
+        {
+            if (inL)
+                LCameraOff(true, _md.Rocketing ? "the hover / rocket" : "the water / the dash / a climb", sweepAnyway: _md.Rocketing && SmsParams.LCamera.RocketExitSweeps);
+            if (lEdge && !_md.HipDrop && (_md.TouchGround || _md.WallJumpOrSlide))
+                ExecFrontRotate(false);
+        }
+        else if (inL)
+        {
+            if (_md.Downed)
+                LCameraOff(true, "knocked down");
+            else if (!IsLInbetween() && _md.CamCancelPressed && _lLock == 0)
+                LCameraOff(false, "Y / A / B");
+        }
+        else if (SmsCamKinds.IsNormalClass(_mode))
+        {
+            if ((_flags & FlagFrontDone) != 0)
+            {
+                _flags &= ~FlagFrontDone;
+                LCameraOn(); // the Y swing has settled behind him
+            }
+            else if (_md.YPressed || lEdge)
+            {
+                bool doCheck = true;
+                if (_md.YPressed && (_lLock != 0 || !_md.YCamCanEnter))
+                    doCheck = false; // unk282 running, or a status of his the port keeps the Y out of (MarioYCam.SmsYCamCanEnter)
+                if (doCheck && !IsLInbetween() && !_md.HipDrop)
+                {
+                    // execFrontRotate_ 447: refused in the hip drop; an air L press is the hip drop's input (pass 17's rule), a Y in the air is the game's
+                    if (_md.YPressed)
+                        ExecFrontRotate(true);
+                    else if (_md.TouchGround || _md.WallJumpOrSlide)
+                        ExecFrontRotate(false);
+                }
+            }
+        }
+        if (_mode != before || _mode == SmsCamKind.LNormal)
+            return; // prevMode != mMode -> return; isLButtonCameraSpecifyMode(mMode) -> return: the L camera's own exits, the kind holds
         ChangeMode(SelectKind());
     }
 
@@ -516,11 +579,12 @@ public partial class SunshineCamera : Node3D
 
     /// <summary>changeCamMode_ -> changeCamModeSpecifyFrame_ -> changeCamModeSub_ (CameraChange.cpp 272): the blend's length is the CURRENT
     /// kind's Inbet&lt;new&gt; (0 -> 1), the inbetween starts from the current pose, the freeze counters and the move approach clear, the height
-    /// pan dies for the kinds without one (and leaving HANG), the squat-aim hold resets.</summary>
-    private void ChangeMode(SmsCamKind to)
+    /// pan dies for the kinds without one (and leaving HANG), the squat-aim hold resets. frames &lt; 0 = the table's (changeCamMode_);
+    /// given = changeCamModeSpecifyFrame_'s.</summary>
+    private void ChangeMode(SmsCamKind to, int frames = -1)
     {
         if (to == _mode) return;
-        int frames = SmsCamKinds.InbetFrames(_mode, to);
+        if (frames < 0) frames = SmsCamKinds.InbetFrames(_mode, to);
         if (frames < 0) return;
         if (frames == 0) frames = 1;
         _prevMode = _mode;
@@ -534,17 +598,106 @@ public partial class SunshineCamera : Node3D
             GD.Print($"[SMS camera] kind {_prevMode} -> {_mode} over {frames} ticks");
     }
 
-    /// <summary>execFrontRotate_ (CameraChange.cpp 447) for MEANING_CAM_L: the yaw chases behind his face at LButtonRotateChase (10: a tenth
-    /// of the gap a tick) with the eye following at once (chaseXZ 1 under the flag), the stick and the auto chase skipped meanwhile. The Y
-    /// variant (chase 2 then the L camera) is MarioYCam's. SE 0x4826 not ported.</summary>
-    private void ExecFrontRotate()
+    /// <summary>execFrontRotate_ (CameraChange.cpp 447): the yaw chases behind his face (unk274 = mFaceAngle.y - 0x8000) with the eye
+    /// following at once (chaseXZ 1 under CAMERA_FLAG_UNK4), the stick and the auto chase skipped meanwhile. MEANING_Y: YButtonRotateChase
+    /// (2: the gap halved a tick, 180 deg in 16) and CAMERA_FLAG_UNK8, so the settled swing turns the L camera on; MEANING_CAM_L:
+    /// LButtonRotateChase (10: a tenth a tick) and no more. SE 0x4826 not ported.</summary>
+    private void ExecFrontRotate(bool yPress)
     {
+        bool fresh = (_flags & FlagFrontRotate) == 0; // the pad's frame meaning holds for every tick of its frame (the game re-arms the swing each; one line is enough)
         _flags &= ~FlagFrontDone;
         _flags |= FlagFrontRotate;
-        _flags &= ~FlagFrontY;
         _frontYaw = (short)(_md.AngleY - 0x8000);
-        _frontChase = SmsCamNormal.LButtonRotateChase;
+        if (yPress)
+        {
+            _frontChase = SmsCamNormal.YButtonRotateChase;
+            _flags |= FlagFrontY;
+            if (_md.Debug && fresh)
+                GD.Print($"[SMS camera] Y: the camera swings behind him ({MathF.Abs((short)(_frontYaw - _cur.Yaw)) * 360f / 65536f:F0} deg to go, the gap halved each tick), then the L camera");
+        }
+        else
+        {
+            _frontChase = SmsCamNormal.LButtonRotateChase;
+            _flags &= ~FlagFrontY;
+        }
     }
+
+    // ============================================================ the L (Y) camera: CAMERA_MODE_L_NORMAL as a mode of this camera (pass 68)
+    /// <summary>isLButtonCameraInbetween: the blend into or out of the L camera is running.</summary>
+    private bool IsLInbetween() => _ibFrames > 0 && (_mode == SmsCamKind.LNormal || _prevMode == SmsCamKind.LNormal);
+
+    /// <summary>doLButtonCameraOn_ (CameraChange.cpp 469) -> changeCamMode_(L_NORMAL) -> changeCamModeSub_ (272) with setUpToLButtonCamera_
+    /// (256): unk282 = 60; the kind is pushed (unk60); the ratio is saved (unk30) and set where the pitch is -OffsetAngleX, the camera
+    /// level with its target; the current kind's Inbet&lt;LNormal&gt; (16) sweeps from the swing's pose. SE 0x4824 not ported. Mario's half
+    /// sees IsLCamera from this tick (onNeutralMarioKey is his: MarioYCam.cs).</summary>
+    private void LCameraOn()
+    {
+        if (_mode == SmsCamKind.LNormal || IsLInbetween()) return;
+        _lLock = SmsParams.LCamera.LockTicks;
+        _lModeBefore = _mode;
+        SmsCamKindParam lp = SmsCamKinds.Get(SmsCamKind.LNormal);
+        _cur.SavedRatio = _cur.Ratio;
+        _cur.Ratio = _prev.Ratio = Mathf.Clamp(CalcRatio(lp.XAngleMin, lp.XAngleMax, -lp.OffsetAngleX), 0f, 1f);
+        ChangeMode(SmsCamKind.LNormal);
+        if (_md.Debug)
+            GD.Print($"[SMS camera] the L camera on: bearing {SmsMath.WrapAngle(_cur.Yaw * SmsUnits.BamToRad) * 180f / MathF.PI:F0} deg (behind him), pitch {LerpS(lp.XAngleMin, lp.XAngleMax, _cur.Ratio) * 180f / 32768f:F1} deg (ratio {_cur.Ratio:F2}), target {(_md.HasFludd ? "the nozzle top" : "his look point")}; the main stick turns {lp.YAngleManualSpeedXMin * SmsUnits.TicksPerSecond * 360f / 65536f:F0} deg/s, tilts the range in {1f / (lp.XRotRatioManualSpeed * SmsUnits.TicksPerSecond):F2} s; Y / A / B leave after {SmsParams.LCamera.LockTicks / SmsUnits.TicksPerSecond:F1} s");
+    }
+
+    /// <summary>doLButtonCameraOff_ (479), only with the L camera on and its inbetween over (isThing2): unk282 = 60; a cancel is
+    /// changeCamMode_(-1) -- the pushed kind pops back with the L record's Inbet (16) -- a cut changeCamModeSpecifyFrame_(-1, 1);
+    /// setUpFromLButtonCamera_ restores the saved ratio. The yaw stays the L camera's, which IS behind the way he now faces. SE 0x4825 not
+    /// ported. force: a demo's hold cuts it whatever the inbetween (the one camera must not stay in the mode under a demo).</summary>
+    private void LCameraOff(bool cut, string why, bool sweepAnyway = false, bool force = false)
+    {
+        if (_mode != SmsCamKind.LNormal) return;
+        if (_ibFrames > 0 && !force) return;
+        _lLock = SmsParams.LCamera.LockTicks;
+        _cur.Ratio = _prev.Ratio = _cur.SavedRatio;
+        SmsCamKind to = _lModeBefore;
+        int frames = (!cut || sweepAnyway) ? SmsCamKinds.InbetFrames(SmsCamKind.LNormal, to) : 1; // sweepAnyway: the hover's cut sweeps by a logged deviation
+        ChangeMode(to, frames);
+        if (_md.Debug)
+            GD.Print($"[SMS camera] the L camera off ({why}): {(frames > 1 ? $"the {frames}-tick sweep back" : "a cut")} into {to}, behind him; Y again after {SmsParams.LCamera.LockTicks / SmsUnits.TicksPerSecond:F1} s");
+    }
+
+    /// <summary>A stage load (the warp) or the talk shot taking the view: the L camera is simply gone, no blend, no lock.</summary>
+    private void DropLCamera()
+    {
+        _lLock = 0;
+        _flags &= ~(FlagFrontRotate | FlagFrontY | FlagFrontDone);
+        if (_mode != SmsCamKind.LNormal) return;
+        _prevMode = SmsCamKind.LNormal;
+        _mode = _lModeBefore;
+        _cur.Ratio = _prev.Ratio = _cur.SavedRatio;
+        _ibFrames = 0;
+    }
+
+    /// <summary>ctrlLButtonCamera_ (CameraNotice.cpp 208), the L camera's tick: the look target is the nozzle top (getNozzleTopPos_: the
+    /// nozzle matrix's origin + 30 units up its Y column) or, without the FLUDD, his look point (gpCameraMario->unk0); the MAIN stick turns
+    /// the yaw (rotateY_ByStickX_ with -mCompSPos[4]) and tilts the ratio (rotateX_ByStickY_ with -mCompSPos[5]: up = the camera rises and
+    /// looks down); then the same calcPosAndAt_ as the normal camera. The notice camera's branch (a boss) is not ported.</summary>
+    private void CtrlL()
+    {
+        _followSpeed = 0f;
+        if (_targetFreeze == 0)
+            _cur.At = _md.HasFludd ? _md.NozzleTopU : _lookPoint;
+        if (_posFreeze == 0)
+        {
+            RotateYByStickX(-_md.MainStick.X); // stickX = -mCompSPos[4] (the pad's main stick, right positive)
+            RotateXByStickY(_md.MainStick.Y);  // stickY = -mCompSPos[5] (up positive in the pad; the port's vector is down positive)
+        }
+        CalcPosAndAt();
+    }
+
+    // ============================================================ what Mario's half of the L camera reads (MarioYCam.cs)
+    /// <summary>isLButtonCamera(): the mode proper, from the tick it turns on (through its inbetween) to the tick it leaves.</summary>
+    public bool IsLCamera => _mode == SmsCamKind.LNormal;
+    /// <summary>unk258: the actual eye's bearing about the look-at (calcExternalData_), what playerControl faces him by (MarioMove.cpp 2449).</summary>
+    public int FinalYawBam => _finalYaw;
+    /// <summary>mCurrentTarget.mPitch: the L camera's pitch, the FLUDD gun angle in the mode (WaterGun.cpp 219).</summary>
+    public int CurPitchBam => _cur.Pitch;
+    /// <summary>getOffsetAngleY(): the current (blended) record's.</summary>
+    public int OffsetAngleYBam => _p.OffsetAngleY;
 
     private void HoldReset()
     {
@@ -998,13 +1151,16 @@ public partial class SunshineCamera : Node3D
     }
 
     // ============================================================ the BG checks (CameraBGCheck.cpp) in Godot physics
-    /// <summary>isNeedWallCheck_ (118): not during the L / talk cameras (other nodes here), never under the front-rotate swing.</summary>
-    private bool NeedWallCheck() => (_flags & FlagFrontRotate) == 0;
+    /// <summary>isNeedWallCheck_ (118): not in the L camera nor its inbetween, not the talk camera (Mode TalkingPOV takes the frame), never
+    /// under the front-rotate swing (CAMERA_FLAG_UNK4).</summary>
+    private bool NeedWallCheck() => (_flags & FlagFrontRotate) == 0 && _mode != SmsCamKind.LNormal && !IsLInbetween();
 
-    /// <summary>isNeedGroundCheck_ (78): skipped for 120 ticks once the eye sits more than 1.25 x the kind's highest reach over the look-at.</summary>
+    /// <summary>isNeedGroundCheck_ (78): not in the L camera once its inbetween is over; skipped for 120 ticks once the eye sits more than
+    /// 1.25 x the kind's highest reach over the look-at.</summary>
     private bool NeedGroundCheck()
     {
         if (_groundSkip != 0) return false;
+        if (_mode == SmsCamKind.LNormal && _ibFrames == 0) return false;
         if (SmsCamKinds.IsNormalClass(_mode))
         {
             float a = _p.DistMin * Sin(_p.XAngleMin);
@@ -1144,40 +1300,6 @@ public partial class SunshineCamera : Node3D
         return false;
     }
 
-    // ============================================================ the Y (L) camera's hand-back
-    /// <summary>MarioYCam.cs ending its mode: the game's changeCamMode_(-1) pops L_NORMAL and blends into the kind over the L record's
-    /// Inbet (16 ticks) from the L camera's pose, the ratio restored (setUpFromLButtonCamera_ -- this rig kept its own all along) and the
-    /// yaw where the L camera left it: behind the way he now faces, since he faced its look. The actual eye and look-at start at the L
-    /// camera's so the Y camera's own blend lands on this one every tick.</summary>
-    public void SmsYCamExit(Vector3 ycamPosM, Vector3 ycamAtM)
-    {
-        if (!_started) return;
-        _prevMode = SmsCamKind.LNormal;
-        _p.CopyFrom(SmsCamKinds.Get(SmsCamKind.LNormal));
-        _posU = U(ycamPosM);
-        _atU = U(ycamAtM);
-        _cur.Pos = _cur.Desired = _posU;
-        _cur.At = _atU;
-        _cur.Yaw = (short)(_md.AngleY - 0x8000);
-        _cur.Pitch = LerpS(_p.XAngleMin, _p.XAngleMax, _cur.Ratio);
-        _prev = _cur;
-        _ibPos = _posU;
-        _ibAt = _atU;
-        _ibMario = _md.PosU;
-        IbStart(SmsCamKinds.InbetFrames(SmsCamKind.LNormal, _mode));
-        _ibApproach = 0f;
-        _posFreeze = _targetFreeze = 0;
-        _flags &= ~(FlagFrontRotate | FlagFrontY | FlagFrontDone);
-        KillHeightPan();
-        HoldReset();
-        _viewPosU = _posU;
-        _viewAtU = _atU;
-        CrossToPolar(_atU, _posU, out _, out _finalPitch, out _finalYaw);
-        Apply();
-        if (_md.Debug)
-            GD.Print($"[SMS camera] the L camera hands back: {_ibFrames}-tick blend into {_mode} from its pose, yaw behind him");
-    }
-
     /// <summary>calcNowTargetFromPosAndAt_ (cameragc.cpp 310): the camera resumes its polar state from a pose it did not solve (a demo /
     /// talk camera's end): the ratio from the pose's pitch within the kind's range, the yaw its bearing, everything parked on it.</summary>
     private void ResumeFromView(Vector3 posU, Vector3 atU, int blendFrames)
@@ -1209,6 +1331,7 @@ public partial class SunshineCamera : Node3D
     public void EnterTalkingPOV()
     {
         if (_camera == null) return;
+        DropLCamera(); // the game's talk camera pushes its own mode; the L camera does not survive it
         Mode = CamMode.TalkingPOV;
         SetMarioLocked(true);
         _mario?.EnterTalkingState();

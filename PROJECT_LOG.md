@@ -4416,3 +4416,43 @@ and mInvincibilityFrames count ticks and the game's literals were already right 
 1 s). 65r's "thinkParams decrements once a frame" had nothing behind it; the dmg*.prm mInvincibleTime family, FireInvincibleTime,
 AirUnitFlashTicks, SuperHipAttackCt and WaitSinkTime stay 1:1 as tick counts -- the "pending sign-off" is withdrawn.
 LEGACY RETIRED: none (a port fix). NOT PORTED: unchanged. DEVIATION: none added (the lock was a bug, not the game's behaviour).
+
+### Pass 68 -- the Y (L) camera folded into the rig: CAMERA_MODE_L_NORMAL is a mode of SunshineCamera
+THE GAME: the L button camera is not a second camera. CPolarSubCamera's execCameraModeChangeProc_ (CameraChange.cpp 568) takes MEANING_Y in
+a normal kind (unk282 out) into execFrontRotate_ (447): the yaw chases behind him with YButtonRotateChase (2: the gap halved a tick) under
+CAMERA_FLAG_UNK4 | UNK8; when it settles (CameraNormal.cpp 79-86) UNK10 is set and the next proc's doLButtonCameraOn_ (469) runs
+changeCamMode_(L_NORMAL): unk282 = 60, the kind pushed (unk60), setUpToLButtonCamera_ (256) saves the ratio (unk30) and sets it where the pitch
+is -OffsetAngleX (the camera level with its target), the current kind's Inbet<LNormal> (16) sweeps from the swing's pose. In the mode
+ctrlGameCamera_ (cameragc.cpp 929) runs ctrlLButtonCamera_ (CameraNotice.cpp 208) instead of ctrlNormalOrTowerCamera_: the look target is
+the nozzle top (getNozzleTopPos_: the nozzle matrix's origin + 30 up its Y) or his look point, the MAIN stick (-mCompSPos[4] / -mCompSPos[5])
+turns the yaw (rotateY_ByStickX_, 300 BAM a tick) and the ratio (rotateX_ByStickY_, 0.01 a tick), then the SAME calcPosAndAt_ -- for a kind
+that is not isNormalCameraSpecifyMode the cushion rule is skipped, but the MinCushionXZ push (704: the eye at least 300 u out from his
+origin, fabricatedInline3) applies, the slope aim is 0 (not a slope kind), no wall check (isNeedWallCheck_ 121: the L camera or its inbetween)
+and no ground check once the inbetween is over (isNeedGroundCheck_ 82), the inbetween and the chase as ever, the record's fov 60 / near 10
+blended in with the rest (inbetweenData). Y / A / B (MEANING_Y | MEANING_CAM_AB, unk282 out, the inbetween over) -> doLButtonCameraOff_(false):
+unk282 = 60, changeCamMode_(-1) pops the pushed kind with the L record's Inbet (16), setUpFromLButtonCamera_ restores the ratio; a knockdown
+(status bit 0x20000), the water, the hover / rocket, the dash, a climb -> Off_(true): one tick. Mario's side (MarioGamePad.cpp 70-88,
+playerControl 2449, checkPumping, WaterGun.cpp 219) is unchanged from pass 16-17c.
+BEFORE: assets/Sms/MarioYCam.cs ran all of that on a SECOND TopLevel Camera3D made current from the Y press (its own polar inbetween, FOV
+blend, the hand-back SmsYCamExit onto the rig), the rig following underneath. One camera too many, and its eye sat 200 u off the shifted
+look-at (~213 u from his origin): the game's calcPosAndAt_ pushes the L eye out to 300 u.
+PORT: SunshineCamera.cs -- ExecFrontRotate(yPress) (the Y variant sets FlagFrontY; the settled swing sets FlagFrontDone, already there since
+pass 53), ModeChangeProc rewritten on the game's structure (the refusing states, the L camera's own exits, the normal kind's Y / L
+presses, then the ladder), LCameraOn() / LCameraOff(cut, sweepAnyway, force) / DropLCamera() (a warp, the talk shot), CtrlL() (the target,
+the main stick, CalcPosAndAt), _lLock (unk282) / _lModeBefore (unk60), ChangeMode(to, frames) (changeCamModeSpecifyFrame_), the BG checks' L
+rules, a demo's hold cuts an open L camera; public IsLCamera / FinalYawBam / CurPitchBam / OffsetAngleYBam for Mario. MarioYCam.cs is
+Mario's half only: the pad's frame meanings for the camera captured BEFORE the mode eats A / B (SmsCamMarioData.YPressed /
+CamCancelPressed / MainStick -- the rig is his child and ticks after him; a released action is no longer "just pressed"), onNeutralMarioKey
+on the mode's edges, A / B eaten and the buffered jump dropped in the mode, his face from FinalYawBam - OffsetAngleY, the hold, the status
+gate (SmsYCamCanEnter, now with OIL_RUN: standing on goop is WAIT <-> OIL_RUN). MarioCamData.cs: Downed / InWater / Climbing / HasFludd /
+NozzleTopU / MainStick / YPressed / CamCancelPressed / YCamCanEnter; YCamActive gone. Mario.cs: _ycamOn -> SmsYCamOn (the rig's IsLCamera),
+SmsYCamRender / SmsYCamReset gone (the rig cuts under a demo hold and drops the L camera on a warp). SmsPhysics.cs: SmsParams.LCamera keeps
+only LockTicks, the neutral key and RocketExitSweeps (the rest IS the LNormal kind record / SmsCamNormal); the selftest reads the record.
+SmsCameraKinds.cs regenerated (the LNormal note). The eye in the mode is now the game's ~300 u out (was ~213): tell me if it reads far.
+DRIVE 52 (patch_smoke52.py, removed before the commit): Y -> swing -> "kind Follow -> LNormal over 16 ticks" -> IsLCamera, Mario held,
+grips held, eye 297 u out, fov 60; the main stick right 0.5 s -> the camera -84 deg and his face -81 deg with his speed 0; up 0.4 s -> the
+pitch +60 deg and the gun angle on it (one frame behind while it moves); R -> Pumping; A -> the 16-tick sweep back, no jump, fov 50; Y 0.4
+s later refused (the lock), 1.0 s later taken; B -> off, no dive. ALL OK; build 0 err; boot ALL OK, 16 kinds.
+LEGACY RETIRED: the second Camera3D "SmsYCamera" (TopLevel, MakeCurrent) and MarioYCam.cs's own camera model (phases FrontRotate /
+LNormal / BlendOut, its polar inbetween, FOV blend, SmsYCamExit's hand-back, SmsYCamRender's cut, SmsYCamReset) -> the rig's L mode.
+DEVIATION kept: SmsParams.LCamera.RocketExitSweeps (the hover's cut sweeps). NOT PORTED: the notice lock-on, the SEs 0x4824-0x4826.

@@ -3,7 +3,8 @@ using Godot;
 
 /// <summary>What the game's camera reads off Mario each tick (TCameraMarioData, CameraMarioData.cpp; the status bits of
 /// execCameraModeChangeProc_, CameraChange.cpp 568-826; isMarioReadyGun_ / isMarioAimWithGun_ / isMarioCrabWalk_, cameragc.cpp
-/// 372-389), filled once a physics frame by <see cref="Mario.SmsCameraData"/> for assets/SunshineCamera.cs (pass 53).
+/// 372-389; the pad's frame meanings and main stick the L camera reads, MarioGamePad.cpp / CameraNotice.cpp 208), filled once a
+/// physics frame by <see cref="Mario.SmsCameraData"/> for assets/SunshineCamera.cs (pass 53; the L camera's fields pass 68).
 /// Distances are game units, angles s16 BAM, in the camera's conventions.</summary>
 public struct SmsCamMarioData
 {
@@ -29,7 +30,15 @@ public struct SmsCamMarioData
     public bool AimR;                   // MEANING_R held: with ReadyGun, isMarioAimWithGun_
     public bool CamL;                   // MEANING_CAM_L / the L trigger held: isMarioCrabWalk_ with ReadyGun, the LFollow magnifier otherwise
     public float AimRatio;              // unk1C: the nozzle's gun angle over its LAngleMin, 0..1 (how far the squat aim is lifted)
-    public bool YCamActive;             // the L (Y) camera owns the view: the kind ladder returns as in isLButtonCameraSpecifyMode(mMode)
+    public bool Downed;                 // status bit 0x20000: knocked down / hurt / dead -- the L camera's one-tick cut (CameraChange.cpp 599)
+    public bool InWater;                // MARIO_FLAG_IN_WATER (SMS_CheckMarioFlag(2)): a refusing state for the L camera (588)
+    public bool Climbing;               // isMarioClimb: the fence and the wire statuses -- a refusing state for the L camera
+    public bool HasFludd;               // MARIO_FLAG_HAS_FLUDD and the pack on him: ctrlLButtonCamera_ targets the nozzle top
+    public Vector3 NozzleTopU;          // getNozzleTopPos_: the nozzle matrix's origin + 30 units up its Y column, units
+    public Vector2 MainStick;           // the pad's main stick (mCompSPos[4],[5] after PADClamp / JUTGamePad), right / down positive here: the L camera's stick
+    public bool YPressed;               // MEANING_Y this frame (a frame meaning: the press's edge)
+    public bool CamCancelPressed;       // MEANING_Y | MEANING_CAM_AB this frame: what leaves the L camera (read before Mario's half eats A / B)
+    public bool YCamCanEnter;           // Mario's status gate for the Y press (MarioYCam.SmsYCamCanEnter): the rig's lock and inbetween checks are its own
     public bool Locked;                 // CameraLocked / talking / the shine demo / dead: a demo holds him
     public bool Teleported;             // the frame jumped him (a respawn, the intro's spawn): the camera warps behind him as a stage load does
     public bool Debug;                  // SmsDebugPrint
@@ -94,7 +103,19 @@ public partial class Mario
         d.CamL = Input.IsActionPressed("button_l");
         float lMin = SmsFluddCurrent.LAngleMin;
         d.AimRatio = lMin != 0f ? Mathf.Clamp(_fluddGunAngle / lMin, 0f, 1f) : 0f; // CLBCalcRatio<s16>(0, mLAngleMin, angle), clamped
-        d.YCamActive = SmsYCamActive;
+        d.Downed = stateOfMario == MarioState.hurt || stateOfMario == MarioState.dead;
+        d.InWater = _smsInWater;
+        d.Climbing = d.FenceFamily || onWire;
+        d.HasFludd = _fluddReady && _fluddNozzleParent is Node3D;
+        if (d.HasFludd && _fluddNozzleParent is Node3D noz)
+        {
+            Transform3D g = noz.GlobalTransform;
+            d.NozzleTopU = (g.Origin + g.Basis.Y.Normalized() * SmsUnits.UnitsToMetres(30f)) * SmsUnits.UnitsPerMetre;
+        }
+        d.MainStick = _camMainStick;
+        d.YPressed = _camYPressed;
+        d.CamCancelPressed = _camCancelPressed;
+        d.YCamCanEnter = SmsYCamCanEnter();
         d.Locked = CameraLocked || stateOfMario == MarioState.talking || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.dead;
         d.Debug = SmsDebugPrint;
         return d;

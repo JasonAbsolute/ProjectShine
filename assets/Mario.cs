@@ -2119,8 +2119,9 @@ public partial class Mario : CharacterBody3D
         );
         if (UseSmsPhysics)
             LstickVec = SmsStick.PadStick(LstickVec); // the pad library (PADClamp 15 / 72 / 40, JUTGamePad / 54): mMainStick.mPosX / mPosY, what every stage below reads -- the 15 % dead zone is the game's, a pad's rest drift never reaches the wait's turn (pass 44)
-        if (UseSmsPhysics && (_ycamOn || _ycamNeutralTicks > 0))
-            LstickVec *= _ycamOn ? 0f : SmsYCamMarioStickScale(); // the L camera: his stick is the camera's (mCompSPos[0],[1] are never written); onNeutralMarioKey() at either end: dead 0.44 s, then fades in over 0.22 s
+        _camMainStick = LstickVec; // mCompSPos[4],[5]: the pad's main stick as the L camera reads it (SmsCamMarioData.MainStick), before his own scaling
+        if (UseSmsPhysics && (SmsYCamOn || _ycamNeutralTicks > 0))
+            LstickVec *= SmsYCamOn ? 0f : SmsYCamMarioStickScale(); // the L camera: his stick is the camera's (mCompSPos[0],[1] are never written); onNeutralMarioKey() at either end: dead 0.44 s, then fades in over 0.22 s
         if (UseSmsPhysics && _smsSinkTimer > 0f)
             LstickVec *= SmsSinkScale(SmsParams.Graffito.SinkMoveMin, SmsParams.Graffito.SinkMoveMax); // checkController (MarioMove.cpp 1327): isSinking() -> the stick x the sink scale (0.3 flat as shipped)
         float stickStrength = LstickVec.Length();
@@ -2353,7 +2354,7 @@ public partial class Mario : CharacterBody3D
         {
             SmsWaterCheck();      // playerControl(): the water surface at the feet, every tick
             SmsBubblesFrame();    // the bubbles under water (pass 48): one particle frame a physics frame
-            SmsYCamFrame(delta);  // the Y camera (MarioYCam.cs): the swing behind him, the L camera's stick / lock / exits, its pose, his facing
+            SmsYCamFrame(delta);  // the L (Y) camera's Mario half (MarioYCam.cs): the pad's meanings for the rig, his dead stick, A / B eaten, his facing -- the camera itself is the rig's mode (pass 68)
             SmsAirTick(delta);    // mAir drains with the head under, refills out; the meter turns to air after 2 s under
             SmsFluddTick(delta);  // the R analog, X, the upper body, the nozzle swap, the pack's clips
             SmsFluddDashOverride(ref inputDirWorld, ref stickStrength); // the turbo: mIntendedMag = mDashSpeed, a resting stick aims at the face
@@ -2913,9 +2914,9 @@ public partial class Mario : CharacterBody3D
 
         if (IsOnFloor() && !rollingUpwardOffGround) //This is the main logic loop for Player being on the ground
         {
-            // === THE Y CAMERA (CAMERA_MODE_L_NORMAL, MarioYCam.cs) === ticked at the top of the frame (SmsYCamFrame). In the mode his
-            // stick is the camera's and A / B / Y are its buttons: he stands where the L camera found him, faces the look, holds the
-            // pump, sprays with R -- nothing below (the spin, the squat, the jumps, the run) sees this frame
+            // === THE L (Y) CAMERA (CAMERA_MODE_L_NORMAL: the rig's mode, Mario's half in MarioYCam.cs) === his side ran at the top of the
+            // frame (SmsYCamFrame). In the mode his stick is the camera's and A / B / Y are its buttons: he stands where the L camera found
+            // him, faces the look, holds the pump, sprays with R -- nothing below (the spin, the squat, the jumps, the run) sees this frame
             if (SmsYCamHoldsMario())
             {
                 // canSquat() holds in the mode (MarioMove.cpp 44; the pad still gives MEANING_R / MEANING_L there, MarioGamePad.cpp 77-79):
@@ -2927,7 +2928,7 @@ public partial class Mario : CharacterBody3D
                     if (SmsSquatFrame(delta))
                         goto EndFrame;
                 }
-                else if (_ycamOn && SmsCanSquat() && CanEnterCrouch())
+                else if (SmsYCamOn && SmsCanSquat() && CanEnterCrouch())
                 {
                     StartCrouch();
                     goto EndFrame;
@@ -5018,7 +5019,6 @@ public partial class Mario : CharacterBody3D
         UpdateFootIK((float)delta);
         UpdateHandPose();
         UpdateJiggle((float)delta);
-        SmsYCamRender(delta); // the Y camera: a cutscene hold that took the frame before the SMS block ends the mode
 
         // Ground-pound streak effect: on only during the actual fall (not the air-stall).
         {
@@ -12261,7 +12261,7 @@ public partial class Mario : CharacterBody3D
         }
         // checkPumping() (MarioUpper.cpp 17 / 30): the L camera, or MARIO_STATUS_SQUAT, with the upper body IDLE -> HOLDING_PUMP, the hands
         // on the grips (the pass-17b deviation -- idle arms in the mode until R -- was withdrawn by Jaysonn in pass 17c: the game's grips)
-        if (UseSmsPhysics && (_ycamOn || (stateOfMario == MarioState.crouch && _smsSquatEndTicks == 0)) && _fluddUpper == SmsUpper.Idle && SmsFluddPumpEnabled())
+        if (UseSmsPhysics && (SmsYCamOn || (stateOfMario == MarioState.crouch && _smsSquatEndTicks == 0)) && _fluddUpper == SmsUpper.Idle && SmsFluddPumpEnabled())
         {
             _fluddUpper = SmsUpper.HoldingPump;
             _fluddPumpCooldown = 0;
@@ -13813,9 +13813,9 @@ public partial class Mario : CharacterBody3D
     /// the Y cam pass.</summary>
     private void SmsFluddCalcGunAngle(SmsParams.Fludd.Nozzle np)
     {
-        if (_ycamOn)
+        if (SmsYCamOn)
         {
-            // calcGunAngle()'s first branch: in the L camera the angle IS the camera pitch -- no clamp, no chase
+            // calcGunAngle()'s first branch: in the L camera the angle IS the camera pitch (the rig's mCurrentTarget.mPitch) -- no clamp, no chase
             _fluddGunAngle = YCamPitchBam;
             return;
         }
@@ -14303,8 +14303,8 @@ public partial class Mario : CharacterBody3D
         // MarioWaistCtrl's first branch (MarioDraw.cpp 476): the L camera looking down (its pitch above 0) bends the upper body forward
         // by the pitch, FLUDD or not (Rz(pitch) x Rx(-unk100), unk100 = 0; canBendBody() only fails in hurt statuses, which end the
         // mode)
-        float aimBam = _ycamOn ? YCamPitchBam : _fluddGunAngle;
-        bool squatAim = UseSmsPhysics && aimBam > 0f && (_ycamOn || (stateOfMario == MarioState.crouch && _fluddReady));
+        float aimBam = SmsYCamOn ? YCamPitchBam : _fluddGunAngle;
+        bool squatAim = UseSmsPhysics && aimBam > 0f && (SmsYCamOn || (stateOfMario == MarioState.crouch && _fluddReady));
         if (squatAim)
             apply = true;
         _smsWaist.Apply = apply;
@@ -17588,8 +17588,7 @@ public partial class Mario : CharacterBody3D
     private void Respawn()
     {
         SmsFluddOnRespawn(); // a full tank, the drops gone
-        SmsYCamReset();      // the rig's camera back, no lock
-        SmsCameraWarpBehind(); // the game's camera starts behind him as a stage load's does (pass 53)
+        SmsCameraWarpBehind(); // the game's camera starts behind him as a stage load's does (pass 53); an open L camera is dropped with it (pass 68)
         _health = StartingHealth;
         _smsGameOver = false;
         _smsLoserFalling = false;

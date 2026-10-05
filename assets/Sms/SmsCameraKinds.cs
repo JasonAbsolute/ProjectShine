@@ -22,7 +22,7 @@ public enum SmsCamKind
     Hovering,      // CAMERA_MODE 0x12, /Camera/kindhovering.prm: ROCKET / ROCKET_LANDING with the hover nozzle (4)
     RocketJump,    // CAMERA_MODE 0x05, /Camera/kindrocketjump.prm: ROCKET / ROCKET_LANDING with any other nozzle
     LookDown,      // CAMERA_MODE 0x2D, /Camera/kindlookdown.prm: an area kind (a cube asks for it)
-    LNormal,       // CAMERA_MODE 0x07, /Camera/kindlnormal.prm: the L (Y) camera: MarioYCam.cs owns it; here for the blend lengths
+    LNormal,       // CAMERA_MODE 0x07, /Camera/kindlnormal.prm: the L (Y) camera (pass 68: a mode of SunshineCamera, ctrlLButtonCamera_; Mario's half in MarioYCam.cs)
     Wire,          // CAMERA_MODE 0x06, /Camera/kindwire.prm: on top of a wire (TMapWire): WIRE_WAIT / WALK / ROLL
     WireHang,      // CAMERA_MODE 0x10, /Camera/kindwirehang.prm: hanging or rolling under a wire: WIRE_HANG family
 }
