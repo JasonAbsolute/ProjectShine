@@ -17482,7 +17482,7 @@ public partial class Mario : CharacterBody3D
     {
         Vector3 along = SmsWireAlong();
         Vector3 face = SmsWirePerp(along);
-        float power = _smsWireAngVel * SmsParams.Wire.JumpRate; // jumpPower = unkF6 x mJumpRate (MarioMove.cpp 620). angVel is already capped to RotSpeedMax, and the release window (width = RotSpeedMax) only opens near the top of a real loop, so this lands consistently near the cap
+        float power = Mathf.Clamp(_smsWireAngVel, -SmsParams.Wire.LaunchSpeedCap, SmsParams.Wire.LaunchSpeedCap) * SmsParams.Wire.JumpRate; // jumpPower = unkF6 x mJumpRate (MarioMove.cpp 620), but the swing speed is clamped to the game's cap (1400) first, DECOUPLED from the faster visual loop cap -- so a full loop launches at the game's magnitude (~126 vy), not 2x it
         float ang = (arg == 0 ? SmsParams.Wire.RollJumpAngleFwd : SmsParams.Wire.RollJumpAngleBack) / SmsBamPerRad;
         float vy = power * MathF.Sin(ang);
         float fwd = power * -MathF.Cos(ang);

@@ -330,15 +330,16 @@ public static class SmsParams
 
     public static class Wire // /mario/wire.prm (shipped) + TMapWire's statics (MapWire.cpp 30-38) + the literals of the WIRE execs (pass 66)
     {
-        public const float RotSpeed = -8f;              // mRotSpeed: the spray nozzle's swing impulse per pump (gentle, negative; a real loop wants hover 8 or turbo/rocket 1400)
-        public const float RotSpeedTrgHover = 8f;        // mRotSpeedTrgHover: the hover nozzle's swing impulse per pump (gentle; the Super Whirl Jump is BUILT by timed repeated pumping, not one big shove)
+        public const float RotSpeed = -24f;             // DEVIATION (game mRotSpeed -8): spray's swing impulse, bumped for a snappier/more aggressive build-up (still below the 56 that snapped straight to full speed with no spin-up feel)
+        public const float RotSpeedTrgHover = 24f;       // DEVIATION (game mRotSpeedTrgHover 8): hover's swing impulse, bumped for a snappier aggressive build (24 > gravity 20, so a held pump keeps winding the loop up; still spins up over several frames rather than snapping to the cap)
         public const float RotSpeedTrgTurbo = 1400f;    // mRotSpeedTrgTurbo (default 1000)
         public const float RotSpeedTrgRocket = 1400f;   // mRotSpeedTrgRocket (default 1000)
-        public const float RotSpeedMax = 1400f;         // mRotSpeedMax (0x578): the loop/launch cap. The roll-jump WINDOW WIDTH equals this and the launch = angVel x JumpRate, so inflating it both widens the release window (jump fires over a wider swing-speed range -> variable launch) AND over-scales the launch. Keep the game's value so the launch is consistent
+        public const float RotSpeedMax = 2800f;         // DEVIATION (game mRotSpeedMax 1400 = 0x578): the loop's VISUAL spin cap, raised for a faster giant swing (the faithful 1400 felt too slow). The roll-jump release-window width tracks this so it stays hittable at speed; the LAUNCH is clamped to LaunchSpeedCap (the game's 1400) separately, so a faster spin does NOT over-scale the jump
+        public const float LaunchSpeedCap = 1400f;       // the roll-jump launch uses the swing speed clamped to this (the game's mRotSpeedMax) first, DECOUPLED from the raised loop cap -- so a full loop always launches at the game's magnitude (~126 vy) however fast the visual spin
         // B held winds the swing down (x RotBrake a frame); the settle check (|angle| < SettleAngle, |speed| < RotStop) then returns him to HANGING -- he stays on the rope (Super Whirl Jump: "hold B to stop swinging before he jumps"). Without B the loop conserves (gravity is conservative) and won't stop
         public const float SwingBlurSpeed = 150f;       // the trailing streak shows once the swing is at least this fast (low, so it shows through most of a swing)
         public const int TrailLifeFrames = 32;           // how many frames a point stays in the swing streak (the hip-drop blur's own is 10; the wire runs it longer for a longer trail)
-        public const float SwingRadiusCoeff = 0.1f;     // mWireSag: the loop's radius = this x |angVel| (the game's 0.1); at the 1400 cap the sag is ~140 u
+        public const float SwingRadiusCoeff = 0.032f;   // DEVIATION (game mWireSag 0.1): the loop circle is ~90 u / 1.2 m at the raised 2800 cap (0.1 would be a huge ~280 u circle there) -- the size he liked
         public const float RotStop = 100f;              // mRotStop: the settle window; 2x it is the entry kick
         public const float RotGravity = 20f;            // mRotGravity: the restoring torque x sin(angle) (BAM a frame^2)
         public const float RotBrake = 0.98f;            // mRotBrake: R held multiplies the angular speed a frame
@@ -353,12 +354,12 @@ public static class SmsParams
         public const float SwingMax = 200f;             // mWireSwingMax: the sag's clamp (units)
         public const float StandHeight = 160f;          // getOnWirePosAngle: his root this far under the chord point (the rope's give under him)
         public const float EndMargin = 100f;            // wireMove: no closer than this to a tip (units)
-        public const float WalkSpeedPerMag = 0.1f;      // the game's rope-walk speed: wireMove(0.1 x stick counts) units a frame
-        public const float WalkAnimRatePerMag = 0.05f;  // the game's walk/run clip rate (0.05 x counts). This was 0.1 -- the clip played ~2x too fast, which is why the top walk animation looked wrong
-        public const float AnimBlend = 0.2f;            // cross-fade between rope clips so transitions blend instead of snapping (longer so the big FLUDD hang<->swing pose change blends too)
+        public const float WalkSpeedPerMag = 0.14f;     // DEVIATION (game 0.1): snappier rope-walk traversal (units a frame per stick count)
+        public const float WalkAnimRatePerMag = 0.07f;  // DEVIATION (game 0.05): clip rate kept at the game's 2:1 move:anim ratio (0.14 : 0.07) so the stride matches the snappier walk -- ~2.2x at full stick (brisk), well under the 3.2x that blurred before
+        public const float AnimBlend = 0.15f;           // cross-fade between rope clips -- shorter than 0.2 for a snappier feel while still blending (not snapping)
         public const float RunMagThreshold = 16f;       // wireWait: ROPE_RUN above this stick magnitude, ROPE_WALK below
         public const float GrabBounceSeed = 0.2f;       // receiveMessage: bounceVel = this x -vy at the grab
-        public const float HandMoveSpeed = 3f;          // the game's hand-over-hand speed (units a frame): wireMove(3.0)
+        public const float HandMoveSpeed = 5f;          // DEVIATION (game 3): snappier hand-over-hand (units a frame)
         public const float DropBounceVel = 5f;          // the bounce charge set by the drop / the climb
         public const float ReturnHeadroom = 160f;       // wireHanging: roof - floor must be at least this for the climb back up
         public const float WireJumpVy = 42f;            // changePlayerStatus(WIRE_JUMP): setPlayerJumpSpeed(0.25, 42) with fwd 0
