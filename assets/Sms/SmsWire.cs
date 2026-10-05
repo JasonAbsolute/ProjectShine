@@ -20,9 +20,9 @@ using System.Collections.Generic;
 /// re-seeded half each side of the hang point, drift back to their default spots at (default - pos) / 1000 a frame.
 /// DRAW (drawUpper / drawLower 40-128): two flat faces through the points, mDrawWidth 5 each side of the chord's perpendicular, the lower
 /// one mDrawHeight 6 below, unlit flat colours. DrawSides adds the two side faces (a visual deviation: the open gap reads wrong edge-on).
-/// The fittings (WireFitting.bmd / .col) are solid posts at the tips: Posts stands the ripped SMS wirefitting MODEL at each tip
-/// (res://assets/Sms/models/wirefitting/, auto-loaded; PostModel overrides it) as a REAL child node (PostStart / PostEnd) you select
-/// and gizmo -- tilt and scale each independently; Build only snaps it to the tip, keeping your edits. Posts hides/shows the pair.
+/// The fittings (WireFitting.bmd / .col) are solid posts at the tips: FittingStart / FittingEnd are the ripped SMS wirefitting
+/// (res://assets/Sms/models/wirefitting/) authored as real child nodes in Wire.tscn -- select and gizmo each (tilt / scale)
+/// independently; Build only snaps each to its tip so they track the length / sag. Posts hides/shows the pair.
 /// </summary>
 [Tool]
 [GlobalClass]
@@ -37,9 +37,7 @@ public partial class SmsWire : Node3D
     private float _widthUnits = 100f;
     [Export] public float WidthUnits { get => _widthUnits; set { _widthUnits = value; EditorRebuild(); } }       // size.x: the grab box's width (the level data's; not in the decomp)
     private bool _posts = true;
-    [Export] public bool Posts { get => _posts; set { _posts = value; EditorRebuild(); } }
-    private PackedScene _postModel;
-    [Export] public PackedScene PostModel { get => _postModel; set { _postModel = value; EditorRebuild(); } }   // which model to stand at each tip; null auto-loads the ripped SMS wirefitting. Each fitting is its OWN child node (PostStart / PostEnd) you select and gizmo (tilt / scale) independently; Build only snaps it to the tip
+    [Export] public bool Posts { get => _posts; set { _posts = value; EditorRebuild(); } }  // show/hide both end fittings (the FittingStart / FittingEnd nodes authored in Wire.tscn)
     private Color _upperColor = new Color(0.32f, 0.25f, 0.17f);
     [Export] public Color UpperColor { get => _upperColor; set { _upperColor = value; EditorRebuild(); } }
     private Color _lowerColor = new Color(0.17f, 0.13f, 0.08f);
@@ -143,7 +141,7 @@ public partial class SmsWire : Node3D
         }
         _ribbon.MaterialOverride ??= new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
         _ribbon.GlobalTransform = Transform3D.Identity;
-        RebuildPosts();
+        SnapFittings();
         _dirty = true;
         Built = true;
         Redraw(); // draw now, so the editor shows the rope without waiting on a physics frame
@@ -151,71 +149,27 @@ public partial class SmsWire : Node3D
             GD.Print($"[SMS wire] {Name}: length {LengthUnits} units, {n} points, tips {StartPoint} -> {EndPoint}, sag {CubeHeightUnits * 0.5f} units");
     }
 
-    private const string DefaultPostModelPath = "res://assets/Sms/models/wirefitting/wirefitting.glb";
-
-    /// <summary>The fitting model for each tip: the inspector's PostModel, else the ripped SMS wirefitting if it was imported into the
-    /// project (res://assets/Sms/models/wirefitting/), else null -> the stand-in cylinder.</summary>
-    private PackedScene PostScene()
+    /// <summary>Snap the authored end fittings to the tips. FittingStart / FittingEnd are REAL nodes authored in Wire.tscn (instances
+    /// of the ripped wirefitting) that you place and gizmo -- tilt and scale -- in the editor; this only moves each to its tip so the
+    /// pair tracks the wire's length and sag, never touching your rotation or scale. Posts toggles their visibility. Nothing is
+    /// generated in code here (the ribbon still is, being dynamic geometry; the fittings are static, so they are proper scene nodes).</summary>
+    private void SnapFittings()
     {
-        if (_postModel != null)
-            return _postModel;
-        return ResourceLoader.Exists(DefaultPostModelPath) ? ResourceLoader.Load<PackedScene>(DefaultPostModelPath) : null;
-    }
-
-    private void RebuildPosts()
-    {
-        GetNodeOrNull("PostStartModel")?.QueueFree(); // retire the old pass-66s/t preview-model nodes if a prior session left them
+        GetNodeOrNull("PostStart")?.QueueFree();      // retire the pass-66s..u code-generated fittings if a prior session left them in the tree
+        GetNodeOrNull("PostEnd")?.QueueFree();
+        GetNodeOrNull("PostStartModel")?.QueueFree();
         GetNodeOrNull("PostEndModel")?.QueueFree();
-        Vector3 dir = Span.LengthSquared() > 1e-8f ? Span.Normalized() : Vector3.Right;
-        PlaceFitting("PostStart", StartPoint, -dir); // each fitting is its OWN gizmo-able node, pointing outward along the wire
-        PlaceFitting("PostEnd", EndPoint, dir);
+        SnapFitting("FittingStart", StartPoint);
+        SnapFitting("FittingEnd", EndPoint);
     }
 
-    /// <summary>Stand ONE end's fitting as a REAL, user-owned child node you can select and gizmo (tilt / scale) independently.
-    /// Created once -- instanced from PostModel (the ripped wirefitting by default), SAVED into the edited scene via its Owner, and
-    /// aligned -Z outward along the wire at native size -- after which Build only SNAPS it to the tip, preserving your gizmo'd
-    /// rotation + scale. Posts toggles visibility without destroying it, so hiding then showing keeps your edits. At runtime it is
-    /// created fresh (no Owner), or loaded from the scene with your edits if you saved them.</summary>
-    private void PlaceFitting(string name, Vector3 tip, Vector3 outward)
+    private void SnapFitting(string name, Vector3 tip)
     {
-        var inst = GetNodeOrNull<Node3D>(name);
-        if (!Posts)
+        if (GetNodeOrNull<Node3D>(name) is Node3D fitting)
         {
-            if (inst != null)
-                inst.Visible = false;
-            return;
+            fitting.GlobalPosition = tip; // the tip is the wire's, not a free parameter: the designer owns rotation + scale, Build owns position
+            fitting.Visible = Posts;
         }
-        PackedScene model = PostScene();
-        if (model == null) // no fitting model in the project (wirefitting not imported) and no PostModel set
-        {
-            inst?.QueueFree();
-            return;
-        }
-        string want = model.ResourcePath;
-        if (inst != null && inst.GetMeta("src", "").AsString() != want)
-        {
-            inst.Free(); // PostModel changed: drop the old instance (its gizmo edits go with it) and re-stand the new model
-            inst = null;
-        }
-        if (inst == null)
-        {
-            inst = model.Instantiate<Node3D>();
-            inst.Name = name;
-            inst.SetMeta("src", want);
-            inst.TopLevel = true; // world transform: ignores the wire node's own scale, like the ribbon and the tips
-            AddChild(inst);
-            if (Engine.IsEditorHint() && GetTree()?.EditedSceneRoot is Node root)
-                inst.Owner = root; // SAVE it into the edited scene so your gizmo edits persist -- NOT a throwaway preview child
-            bool vertical = outward.LengthSquared() < 1e-6f || MathF.Abs(outward.Normalized().Dot(Vector3.Up)) > 0.99f;
-            Basis look = vertical ? Basis.Identity : Basis.LookingAt(outward, Vector3.Up);
-            // first placement ONLY: aligned outward at native size (game units -> metres). From here the tilt + scale are YOURS via the gizmo
-            inst.GlobalTransform = new Transform3D(look.Scaled(Vector3.One * SmsUnits.UnitsToMetres(1f)), tip);
-        }
-        else
-        {
-            inst.GlobalPosition = tip; // already placed (or loaded from your saved scene): snap ONLY position, keep your tilt + scale
-        }
-        inst.Visible = true;
     }
 
     // ------------------------------------------------------------------------------------------------------- the cube and the ratio
