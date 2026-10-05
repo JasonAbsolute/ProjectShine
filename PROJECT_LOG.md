@@ -4389,3 +4389,30 @@ clash-crashes; getJumpAccelControl 0.01 via a SmsAir.Tick overload); the drops i
 LEGACY RETIRED: none (new mechanic). NOT PORTED: the sounds, kindWire / kindWireHang camera params, the stale mForwardVel in
 setPlayerJumpSpeed(0.25, 42) (fwd taken as 0), ANIM_GIANT_ROLLING (ma_roll stands in), the LANDING-with-a-held-object branch's dangling
 holder. DEVIATION knobs: SmsWire.DrawSides (the game draws two faces).
+
+### Pass 67 -- the goop STANDING LOCK (oilRun's WAIT re-dispatch), and pass 66z reverted
+HIS REPORT: "if mario stands still on goop he can't move at all and is softlocked until he jumps" (he asked for an auto-recover deviation).
+THE GAME: oilRun() (MarioRun.cpp 1238) turns a nearly-still Mario (|vx| < 1 and |vz| < 1) into WAIT after zeroing the velocity, and
+checkGraffitoSlip (MarioMove.cpp 862) turns any status but CATCH_LOST back into OIL_RUN at the tick's end -- so standing on the paint is a
+WAIT <-> OIL_RUN flip every tick. It does not lock because TMario::stateMachine() (MarioMove.cpp 1772) LOOPS while a status change returns
+true: the WAIT runs in the same tick, waitingCommonEvents turns a pushed stick into RUN, running()/doRunning() gives the first 1.1 of speed,
+and the next tick's oilRun is past the near-still gate and accelerates (0.01 x mag a tick under the 0.98 brake, toward 15.7).
+THE BUG (port, pass 64): SmsOilFrame ended the frame at the WAIT change (goto EndFrame), so from a standstill every frame went OIL_RUN ->
+WAIT -> OIL_RUN with the stick never reaching the ground code: speed 0 for as long as the stick was held, a jump the only way out. Not a
+deviation case -- verified faithful by a headless drive (patch_smoke51.py: a 16 m slip layer under him, stand 0.6 s, stick 1.5 s, release
+1.5 s, A): BEFORE max speed 0.00 u/f over 90 frames, state oilRun, the AnimationTree off (a frozen pose); AFTER 3.2 / 6.2 / 10.4 u/f at
+frames 3 / 10 / 30, 12.1 at 1.5 s on ma_run2, the release settles to 0 with the tree on, A jumps out. Drive removed before the commit.
+PORT: SmsOilFrame checks the near-still exit ONCE A FRAME before the ticks and returns false (the rest of the frame runs as WAIT = the
+game's loop; the ground code then gets the frame's ticks exactly once). SmsOilEnter no longer takes the AnimationTree down for OIL_RUN
+(OIL_SLIP still does, for its ma_slpbk): the OIL_RUN clip block in SmsOilFrame takes it down each frame it plays RUN2 / WAIT, so the
+standing flip keeps the idle clip playing -- the game's waiting() anim; before, the tree was off during every render while he stood on
+goop. OIL_SLIP's constant-speed slide on the paint (dirty.prm mBrakeStartValSlip 1.0, walkProcess does not brake, exits = a jump or off
+the paint) is UNCHANGED: that is the game, and it was not his lock.
+PASS 66z REVERTED (8189c88, an exact restore of Mario.cs from 5e2d7d6): the x4 on _smsElecTicks (120 -> 480), the end-of-shock i-frames
+(0x3C -> 240) and _smsRoofTicks (120 -> 480) was wrong. Mario's exec runs every 120 Hz simulation tick (TMarDirector::direct: 4 steps of 5
+a 30 fps frame, mPerformListMovement->perform(CUE_MOVE) each -> TMario::perform -> playerControl -> stateMachine + thinkParams +
+checkGraffito, no frame gate: TViewObj::testPerform gates only an object whose own unkC carries CUE_MOVEMENT_GATE_A/B), so mStatusTimer
+and mInvincibilityFrames count ticks and the game's literals were already right (the electric lock 1 s, its i-frames 0.5 s, the roof hang
+1 s). 65r's "thinkParams decrements once a frame" had nothing behind it; the dmg*.prm mInvincibleTime family, FireInvincibleTime,
+AirUnitFlashTicks, SuperHipAttackCt and WaitSinkTime stay 1:1 as tick counts -- the "pending sign-off" is withdrawn.
+LEGACY RETIRED: none (a port fix). NOT PORTED: unchanged. DEVIATION: none added (the lock was a bug, not the game's behaviour).

@@ -14955,7 +14955,9 @@ public partial class Mario : CharacterBody3D
         }
     }
 
-    /// <summary>changePlayerStatus(OIL_RUN / OIL_SLIP): the tree goes off (the skid drives its own clip and rate), the slide speed is kept.</summary>
+    /// <summary>changePlayerStatus(OIL_RUN / OIL_SLIP): the slide speed is kept. OIL_SLIP takes the tree down for its skid clip; OIL_RUN's clip
+    /// block in SmsOilFrame takes it down each frame it runs, so the standing WAIT <-> OIL_RUN flip (every frame on the paint) keeps the idle
+    /// clip playing, as the game's waiting() does (pass 67).</summary>
     private void SmsOilEnter(MarioState s)
     {
         MarioState was = stateOfMario;
@@ -14964,7 +14966,7 @@ public partial class Mario : CharacterBody3D
         if (_smsSurfaceSlip)
             SmsExitSurfaceSlip($"the goop: {s}");
         stateOfMario = s;
-        if (animTree != null)
+        if (s == MarioState.oilSlip && animTree != null)
             animTree.Active = false;
         Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
         Vector3 v = new Vector3(SmsUnits.MpsToSpeed(velocity.X), 0f, SmsUnits.MpsToSpeed(velocity.Z));
@@ -15005,7 +15007,7 @@ public partial class Mario : CharacterBody3D
     }
 
     /// <summary>oilRun() / oilSlip() (MarioRun.cpp 1238 / 1306), owning the ground frame in OIL_RUN / OIL_SLIP. OIL_RUN: A jumps (speed 0 first),
-    /// B dives (JUMP_CATCH, vy 20), nearly still -> WAIT; the face turns to the stick at 256 BAM a tick, mVel += mag x face x 0.01, the skid
+    /// B dives (JUMP_CATCH, vy 20), nearly still -> WAIT and the frame goes on as WAIT (the re-dispatch); the face turns to the stick at 256 BAM a tick, mVel += mag x face x 0.01, the skid
     /// timer down (0 -> the brake is 0), mVel x the brake; the clip is RUN2 at 0.5 x mag x 0.25 (WAIT at 0.5 with no stick). OIL_SLIP: A jumps;
     /// the face turns at 150; the timer down (0 -> brake 0 and CATCH); mForwardVel += mag x cos(face - stick) x 0.0001, x the brake, along the
     /// face; under 1 -> CATCH_LOST. The paint spreading (pollute 70 / 130 units) and the slip sounds (0x1001 / 0x1141) are not ported.</summary>
@@ -15041,19 +15043,26 @@ public partial class Mario : CharacterBody3D
             SmsSetDiveVelocity(dir, fromGround: true);
             return true;
         }
+        if (stateOfMario == MarioState.oilRun && v.X > -1f && v.X < 1f && v.Z > -1f && v.Z < 1f)
+        {
+            // oilRun() (MarioRun.cpp 1249): nearly still -> setPlayerVelocity(0), changePlayerStatus(WAIT). The game's stateMachine()
+            // (MarioMove.cpp 1772) loops while a status changes, so WAIT runs in the SAME tick: waitingCommonEvents turns a pushed stick
+            // into RUN, doRunning gives the first 1.1, and checkGraffitoSlip makes it OIL_RUN again at the tick's end -- now moving. The
+            // port ended the frame here, so from a standstill every frame went OIL_RUN -> WAIT -> OIL_RUN with the stick never reaching
+            // doRunning: he stood softlocked on the paint until a jump (pass 67). Returning false hands the rest of the frame to the
+            // ground code = the game's loop. (Checked once a frame, before the ticks, so the ground code gets the frame's ticks once.)
+            velocity.X = 0f;
+            velocity.Z = 0f;
+            SmsOilExit();
+            stateOfMario = MarioState.idle; // WAIT (checkGraffitoSlip puts him back in OIL_RUN at the frame's end while he stands on the paint)
+            SetMarioState(stateOfMario);
+            return false;
+        }
         int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
         for (int i = 0; i < n; i++)
         {
             if (stateOfMario == MarioState.oilRun)
             {
-                if (v.X > -1f && v.X < 1f && v.Z > -1f && v.Z < 1f)
-                {
-                    v = Vector3.Zero;
-                    SmsOilExit();
-                    stateOfMario = MarioState.idle; // WAIT (checkGraffitoSlip puts him back in OIL_RUN next tick while he stands on the paint)
-                    SetMarioState(stateOfMario);
-                    break;
-                }
                 _smsFaceYaw = SmsMath.ConvergeAngle(_smsFaceYaw, intendedYaw, SmsParams.Dirty.SlipRotate * SmsUnits.BamToRad);
                 _smsFaceValid = true;
                 Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
