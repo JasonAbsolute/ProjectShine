@@ -38,7 +38,8 @@ using Godot.Collections;
 /// camera is level with its target (setUpToLButtonCamera_). In the mode ctrlLButtonCamera_ (CameraNotice.cpp 208) runs instead of
 /// ctrlNormalOrTowerCamera_: the look target is the nozzle top (his look point without the FLUDD), the MAIN stick turns the yaw (300 BAM
 /// a tick) and tilts the ratio (0.01 a tick), then the SAME calcPosAndAt_ -- the kind record's 200 u, OffsetLookatXZ -72 over the
-/// shoulder, the eye kept MinCushionXZ (300 u) out from his origin, no cushion rule (not a normal kind), no slope aim, no wall check, no
+/// shoulder, no cushion rule and no MinCushionXZ push (not a normal kind -- the push would put the eye at 300 u; the game keeps the record's
+/// 200, see CalcPosAndAt), no slope aim, no wall check, no
 /// ground check, the inbetween, the chase -- and the record's fov 60 / near 10 blend in with the rest. Y / A / B (the pad's
 /// MEANING_Y | MEANING_CAM_AB, once unk282 is out and the inbetween over) sweep back over the L record's Inbet (16) into the kind the
 /// L camera came from (changeCamMode_(-1) pops it; the saved ratio comes back); a knockdown, the water, the hover / rocket, the dash, a
@@ -675,7 +676,8 @@ public partial class SunshineCamera : Node3D
     /// <summary>ctrlLButtonCamera_ (CameraNotice.cpp 208), the L camera's tick: the look target is the nozzle top (getNozzleTopPos_: the
     /// nozzle matrix's origin + 30 units up its Y column) or, without the FLUDD, his look point (gpCameraMario->unk0); the MAIN stick turns
     /// the yaw (rotateY_ByStickX_ with -mCompSPos[4]) and tilts the ratio (rotateX_ByStickY_ with -mCompSPos[5]: up = the camera rises and
-    /// looks down); then the same calcPosAndAt_ as the normal camera. The notice camera's branch (a boss) is not ported.</summary>
+    /// looks down); then the same calcPosAndAt_ as the normal camera (the eye at the record's 200 u off the shifted look-at: no MinCushionXZ
+    /// push for this kind, see there). The notice camera's branch (a boss) is not ported.</summary>
     private void CtrlL()
     {
         _followSpeed = 0f;
@@ -968,8 +970,13 @@ public partial class SunshineCamera : Node3D
                 }
                 else _cur.Desired = newPos;
                 float sY = Sin(yAngle), cY = Cos(yAngle);
+                if (SmsCamKinds.IsNormalClass(_mode))
                 {
-                    // never nearer his origin (horizontally) than the kind's distance, nor MinCushionXZ (300)
+                    // never nearer his origin (horizontally) than the kind's distance, nor MinCushionXZ (300). NOT for the L camera: the
+                    // decomp's guard (cameragc.cpp 704, fabricatedInline3 = "not UNDER_GROUND") reads as every kind, which would push the
+                    // L eye from its record's 200 u out to 300 -- but the game as played keeps it at 200 (Jaysonn's Ref/yCAMrEF.png vs
+                    // Dolphin: the nozzle top at the frame's centre 72 u off the look-at measures the eye ~205 u out; pass 68b). The asm
+                    // of that NonMatching function has not been read for this branch; the game's own framing wins until it is.
                     float dx = _md.PosU.X - _cur.Desired.X, dz = _md.PosU.Z - _cur.Desired.Z;
                     float d = MathF.Sqrt(dx * dx + dz * dz);
                     float mD2 = SmsCamNormal.MinCushionXZ < dist * cushion ? dist * cushion : SmsCamNormal.MinCushionXZ;

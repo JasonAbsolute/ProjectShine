@@ -4456,3 +4456,17 @@ s later refused (the lock), 1.0 s later taken; B -> off, no dive. ALL OK; build 
 LEGACY RETIRED: the second Camera3D "SmsYCamera" (TopLevel, MakeCurrent) and MarioYCam.cs's own camera model (phases FrontRotate /
 LNormal / BlendOut, its polar inbetween, FOV blend, SmsYCamExit's hand-back, SmsYCamRender's cut, SmsYCamReset) -> the rig's L mode.
 DEVIATION kept: SmsParams.LCamera.RocketExitSweeps (the hover's cut sweeps). NOT PORTED: the notice lock-on, the SEs 0x4824-0x4826.
+
+### Pass 68b -- the L camera's eye back at the record's 200 u (his Ref/yCAMrEF.png against Dolphin)
+HIS REPORT: "it was better before your change" with Ref/yCAMrEF.png -- Dolphin's Y camera (left) beside the pass-68 port (right). READ: the
+game's L eye sits ~2.9 m behind over his right shoulder, the nozzle top at the frame's centre (the 72-u look-at shift), Mario filling about
+two thirds of the height; that is the record's 200 u off the look-at, what the pre-68 second camera did -- NOT the 300 u pass 68 produced.
+WHY 68 PUSHED IT: calcPosAndAt_'s MinCushionXZ clause (cameragc.cpp 704: the eye at least mSLMinCushionXZ 300 out from his origin, under
+fabricatedInline3 = "not UNDER_GROUND") reads as applying to every kind, the L camera included, and the fold-in routed the L camera through
+the shared CalcPosAndAt as the game does -- the push came with it. The game as played does not show it. The function is NonMatching and
+the asm of that branch has not been read: the real guard may be narrower (isNormalCameraSpecifyMode, say), or the inline's reconstruction
+wrong. Until it is read, the game's own framing wins.
+PORT: SunshineCamera.CalcPosAndAt applies the MinCushionXZ push only for the normal kinds (IsNormalClass), as the cushion rule already is.
+Nothing else of pass 68 changes. Drive 52 again: the eye 231 u out from his origin in the mode (the nozzle top ~25 u behind him + the 72-u
+shift + 200), every other step as before -- ALL OK; build 0 err; boot ALL OK.
+LEGACY RETIRED: none. DEVIATION: none logged -- this matches the game as observed; the open question is the decomp's reading, noted above.
