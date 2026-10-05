@@ -15510,14 +15510,14 @@ public partial class Mario : CharacterBody3D
         if (_smsBodyOverlay != null)
             _smsBodyOverlay.Negative = true; // drawSpecial(): drawLogic() every frame of ELECTRIC_DAMAGE -- the body drawn as its negative
         if (SmsDebugPrint)
-            GD.Print($"[SMS elec] ELECTRIC_DAMAGE from {from}: locked for 120 ticks, ma_shock, the sparks {(_smsShockSparks != null ? "from the scene" : "MISSING")}");
+            GD.Print($"[SMS elec] ELECTRIC_DAMAGE from {from}: locked for 480 ticks (4 s), ma_shock, the sparks {(_smsShockSparks != null ? "from the scene" : "MISSING")}");
     }
 
     /// <summary>
     /// electricDamage() (MarioAutodemo.cpp 437), one physics frame. The first tick: the shock voice (not ported), ma_shock at 1.0, decHP
-    /// (dmggraffitoelec: 1), the rumble (not ported); every tick the sparks and the timer; past 0x78 = 120 ticks: the frame
+    /// (dmggraffitoelec: 1), the rumble (not ported); every tick the sparks and the timer; past 0x78 = 120 frames (480 ticks @120Hz, 4 s): the frame
     /// counter reset, the reaction voice, tremble(5, 2, 0.99, 600) (not ported) and the closing puff, damageExec(the floor, 0 HP, type 3,
-    /// ..., 0x3C) = 60 ticks invincible, then WAIT. The HP going means loserExec: ELEC_DOWN, the death in the electric pose.
+    /// ..., 0x3C) = 60 frames (240 ticks, 2 s) invincible, then WAIT. The HP going means loserExec: ELEC_DOWN, the death in the electric pose.
     /// </summary>
     private void SmsTickElectric(double delta)
     {
@@ -15539,15 +15539,15 @@ public partial class Mario : CharacterBody3D
         for (int i = 0; i < n; i++)
         {
             _smsElecTicks++; // elecEffect() every tick: the sparks run; mStatusTimer++
-            if (_smsElecTicks > 120)
+            if (_smsElecTicks > 480) // decomp mStatusTimer > 0x78 = 120 frames @30fps -> 480 ticks @120Hz (4 s)
             {
                 if (_smsShockSparks != null)
                     _smsShockSparks.Active = false; // the calls stop: the emitters are invalidated, the live sparks finish
                 if (_smsBodyOverlay != null)
                     _smsBodyOverlay.Negative = false; // drawSpecial(): the status leaves ELECTRIC_DAMAGE, the logic pass stops
                 _smsShockPuff?.Play(); // elecEndEffect(): ms_moe_fire_off at the centre + 30
-                _smsInvincibleTicks = 0x3C; // damageExec(&mFloorHitActor, 0, 3, ..., 0x3C): 0 HP, no knockdown, 60 ticks invincible
-                SmsHurtStandUp($"[SMS elec] {_smsElecTicks} ticks: WAIT, invincible 60 ticks, the puff {(_smsShockPuff != null ? "from the scene" : "MISSING")} (the tremble and the reaction voice are not ported)");
+                _smsInvincibleTicks = 240; // damageExec(&mFloorHitActor, 0, 3, ..., 0x3C): 0 HP, no knockdown, 0x3C = 60 frames @30fps -> 240 ticks (2 s) invincible
+                SmsHurtStandUp($"[SMS elec] {_smsElecTicks} ticks: WAIT, invincible 240 ticks, the puff {(_smsShockPuff != null ? "from the scene" : "MISSING")} (the tremble and the reaction voice are not ported)");
                 return;
             }
         }
@@ -16142,12 +16142,12 @@ public partial class Mario : CharacterBody3D
         {
             case SmsRoof.Hang:
             {
-                // the roof re-found from feet + 80 (checkRoof); mStatusTimer; the stick after 120 ticks -> WAIT_ROOF; the events; the catch clip; pinned
+                // the roof re-found from feet + 80 (checkRoof); mStatusTimer; the stick after 480 ticks -> WAIT_ROOF; the events; the catch clip; pinned
                 Vector3 feet = SmsFeet();
                 if (SmsRay(feet + Vector3.Up * SmsUnits.UnitsToMetres(80f), feet + Vector3.Up * 60f, out var r))
                     _smsRoofY = ((Vector3)r["position"]).Y;
                 _smsRoofTicks += n;
-                if (stick && _smsRoofTicks > 120)
+                if (stick && _smsRoofTicks > 480) // decomp mStatusTimer > 120 frames @30fps -> 480 ticks (4 s)
                 {
                     _smsRoof = SmsRoof.Wait;
                     if (SmsDebugPrint)
