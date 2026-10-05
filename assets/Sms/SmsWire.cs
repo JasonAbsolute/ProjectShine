@@ -22,7 +22,7 @@ using System.Collections.Generic;
 /// one mDrawHeight 6 below, unlit flat colours. DrawSides adds the two side faces (a visual deviation: the open gap reads wrong edge-on).
 /// The fittings (WireFitting.bmd / .col) are solid posts at the tips: Posts stands the ripped SMS wirefitting MODEL at each tip
 /// (res://assets/Sms/models/wirefitting/, auto-loaded; a stand-in cylinder if it is not in the project), aligned outward along the wire;
-/// PostModel overrides the model, PostScale / PostTiltDegrees size and angle it, Posts hides/shows the pair.
+/// PostModel overrides the model; PostStart/PostEndScale and PostStart/PostEndTiltDegrees size and angle EACH end independently; Posts hides/shows the pair.
 /// </summary>
 [Tool]
 [GlobalClass]
@@ -42,10 +42,14 @@ public partial class SmsWire : Node3D
     [Export] public float PostRadiusUnits { get => _postRadiusUnits; set { _postRadiusUnits = value; EditorRebuild(); } }
     private PackedScene _postModel;
     [Export] public PackedScene PostModel { get => _postModel; set { _postModel = value; EditorRebuild(); } }   // the end-fitting model at each tip; null auto-loads the ripped SMS wirefitting if it is in the project, else the stand-in cylinder
-    private Vector3 _postScale = Vector3.One;
-    [Export] public Vector3 PostScale { get => _postScale; set { _postScale = value; EditorRebuild(); } }         // size of the fitting model (1 = native)
-    private Vector3 _postTiltDeg = Vector3.Zero;
-    [Export] public Vector3 PostTiltDegrees { get => _postTiltDeg; set { _postTiltDeg = value; EditorRebuild(); } } // extra angle (deg) on the fitting, on top of the auto align-to-wire
+    private Vector3 _postStartScale = Vector3.One;
+    [Export] public Vector3 PostStartScale { get => _postStartScale; set { _postStartScale = value; EditorRebuild(); } }  // size of the START fitting (1 = native), independent of the end
+    private Vector3 _postStartTiltDeg = Vector3.Zero;
+    [Export] public Vector3 PostStartTiltDegrees { get => _postStartTiltDeg; set { _postStartTiltDeg = value; EditorRebuild(); } } // angle (deg) of the START fitting, on top of the auto align-to-wire
+    private Vector3 _postEndScale = Vector3.One;
+    [Export] public Vector3 PostEndScale { get => _postEndScale; set { _postEndScale = value; EditorRebuild(); } }        // size of the END fitting (1 = native), independent of the start
+    private Vector3 _postEndTiltDeg = Vector3.Zero;
+    [Export] public Vector3 PostEndTiltDegrees { get => _postEndTiltDeg; set { _postEndTiltDeg = value; EditorRebuild(); } }   // angle (deg) of the END fitting, on top of the auto align-to-wire
     private Color _upperColor = new Color(0.32f, 0.25f, 0.17f);
     [Export] public Color UpperColor { get => _upperColor; set { _upperColor = value; EditorRebuild(); } }
     private Color _lowerColor = new Color(0.17f, 0.13f, 0.08f);
@@ -179,11 +183,11 @@ public partial class SmsWire : Node3D
             return;
         }
         Vector3 dir = Span.LengthSquared() > 1e-8f ? Span.Normalized() : Vector3.Right;
-        MakePost("PostStart", StartPoint, -dir); // the fittings point OUTWARD along the wire at each end
-        MakePost("PostEnd", EndPoint, dir);
+        MakePost("PostStart", StartPoint, -dir, _postStartScale, _postStartTiltDeg); // each end is its OWN node with its OWN size + angle
+        MakePost("PostEnd", EndPoint, dir, _postEndScale, _postEndTiltDeg);
     }
 
-    private void MakePost(string name, Vector3 tip, Vector3 outward)
+    private void MakePost(string name, Vector3 tip, Vector3 outward, Vector3 scaleMul, Vector3 tiltDeg)
     {
         float h = SmsUnits.UnitsToMetres(CubeHeightUnits);
         float r = SmsUnits.UnitsToMetres(PostRadiusUnits);
@@ -209,12 +213,13 @@ public partial class SmsWire : Node3D
         PackedScene model = PostScene();
         if (body.GetChildOrNull<MeshInstance3D>(1) is MeshInstance3D cylVis)
             cylVis.Visible = model == null; // hide the stand-in cylinder when a real fitting model shows (its collision stays)
-        PlacePostModel(name + "Model", model, tip, outward);
+        PlacePostModel(name + "Model", model, tip, outward, scaleMul, tiltDeg);
     }
 
-    /// <summary>Stand the fitting model at a tip, its -Z aligned OUTWARD along the wire, with the inspector's PostScale and PostTiltDegrees
-    /// on top. Find-or-reinstance by the model's path, so a drag/resize only re-places it.</summary>
-    private void PlacePostModel(string name, PackedScene model, Vector3 tip, Vector3 outward)
+    /// <summary>Stand ONE end's fitting model at its tip (its own node), -Z aligned OUTWARD along the wire, with THAT end's size
+    /// (PostStart/PostEndScale) and angle (PostStart/PostEndTiltDegrees) on top, so the two ends tilt and scale independently.
+    /// Find-or-reinstance by the model's path, so a drag/resize only re-places it.</summary>
+    private void PlacePostModel(string name, PackedScene model, Vector3 tip, Vector3 outward, Vector3 scaleMul, Vector3 tiltDeg)
     {
         var inst = GetNodeOrNull<Node3D>(name);
         if (model == null)
@@ -238,9 +243,9 @@ public partial class SmsWire : Node3D
         }
         bool vertical = outward.LengthSquared() < 1e-6f || MathF.Abs(outward.Normalized().Dot(Vector3.Up)) > 0.99f;
         Basis look = vertical ? Basis.Identity : Basis.LookingAt(outward, Vector3.Up);
-        Basis tilt = Basis.FromEuler(_postTiltDeg * (MathF.PI / 180f));
-        // the fitting model's verts are in SMS game units (~74/m), so bake units->metres in; PostScale is then an intuitive multiplier (1 = native)
-        Vector3 scale = _postScale * SmsUnits.UnitsToMetres(1f);
+        Basis tilt = Basis.FromEuler(tiltDeg * (MathF.PI / 180f));
+        // the fitting model's verts are in SMS game units (~74/m), so bake units->metres in; the per-end scale is then an intuitive multiplier (1 = native)
+        Vector3 scale = scaleMul * SmsUnits.UnitsToMetres(1f);
         inst.GlobalTransform = new Transform3D((look * tilt).Scaled(scale), tip);
     }
 
