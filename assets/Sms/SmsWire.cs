@@ -20,7 +20,9 @@ using System.Collections.Generic;
 /// re-seeded half each side of the hang point, drift back to their default spots at (default - pos) / 1000 a frame.
 /// DRAW (drawUpper / drawLower 40-128): two flat faces through the points, mDrawWidth 5 each side of the chord's perpendicular, the lower
 /// one mDrawHeight 6 below, unlit flat colours. DrawSides adds the two side faces (a visual deviation: the open gap reads wrong edge-on).
-/// The fittings (WireFitting.bmd / .col) are solid posts at the tips: Posts stands two cylinders from the node's base to the tips.
+/// The fittings (WireFitting.bmd / .col) are solid posts at the tips: Posts stands the ripped SMS wirefitting MODEL at each tip
+/// (res://assets/Sms/models/wirefitting/, auto-loaded; a stand-in cylinder if it is not in the project), aligned outward along the wire;
+/// PostModel overrides the model, PostScale / PostTiltDegrees size and angle it, Posts hides/shows the pair.
 /// </summary>
 [Tool]
 [GlobalClass]
@@ -38,6 +40,12 @@ public partial class SmsWire : Node3D
     [Export] public bool Posts { get => _posts; set { _posts = value; EditorRebuild(); } }
     private float _postRadiusUnits = 12f;
     [Export] public float PostRadiusUnits { get => _postRadiusUnits; set { _postRadiusUnits = value; EditorRebuild(); } }
+    private PackedScene _postModel;
+    [Export] public PackedScene PostModel { get => _postModel; set { _postModel = value; EditorRebuild(); } }   // the end-fitting model at each tip; null auto-loads the ripped SMS wirefitting if it is in the project, else the stand-in cylinder
+    private Vector3 _postScale = Vector3.One;
+    [Export] public Vector3 PostScale { get => _postScale; set { _postScale = value; EditorRebuild(); } }         // size of the fitting model (1 = native)
+    private Vector3 _postTiltDeg = Vector3.Zero;
+    [Export] public Vector3 PostTiltDegrees { get => _postTiltDeg; set { _postTiltDeg = value; EditorRebuild(); } } // extra angle (deg) on the fitting, on top of the auto align-to-wire
     private Color _upperColor = new Color(0.32f, 0.25f, 0.17f);
     [Export] public Color UpperColor { get => _upperColor; set { _upperColor = value; EditorRebuild(); } }
     private Color _lowerColor = new Color(0.17f, 0.13f, 0.08f);
@@ -149,19 +157,33 @@ public partial class SmsWire : Node3D
             GD.Print($"[SMS wire] {Name}: length {LengthUnits} units, {n} points, tips {StartPoint} -> {EndPoint}, sag {CubeHeightUnits * 0.5f} units");
     }
 
+    private const string DefaultPostModelPath = "res://assets/Sms/models/wirefitting/wirefitting.glb";
+
+    /// <summary>The fitting model for each tip: the inspector's PostModel, else the ripped SMS wirefitting if it was imported into the
+    /// project (res://assets/Sms/models/wirefitting/), else null -> the stand-in cylinder.</summary>
+    private PackedScene PostScene()
+    {
+        if (_postModel != null)
+            return _postModel;
+        return ResourceLoader.Exists(DefaultPostModelPath) ? ResourceLoader.Load<PackedScene>(DefaultPostModelPath) : null;
+    }
+
     private void RebuildPosts()
     {
         if (!Posts)
         {
             GetNodeOrNull("PostStart")?.QueueFree();
             GetNodeOrNull("PostEnd")?.QueueFree();
+            GetNodeOrNull("PostStartModel")?.QueueFree();
+            GetNodeOrNull("PostEndModel")?.QueueFree();
             return;
         }
-        MakePost("PostStart", StartPoint);
-        MakePost("PostEnd", EndPoint);
+        Vector3 dir = Span.LengthSquared() > 1e-8f ? Span.Normalized() : Vector3.Right;
+        MakePost("PostStart", StartPoint, -dir); // the fittings point OUTWARD along the wire at each end
+        MakePost("PostEnd", EndPoint, dir);
     }
 
-    private void MakePost(string name, Vector3 tip)
+    private void MakePost(string name, Vector3 tip, Vector3 outward)
     {
         float h = SmsUnits.UnitsToMetres(CubeHeightUnits);
         float r = SmsUnits.UnitsToMetres(PostRadiusUnits);
@@ -183,6 +205,43 @@ public partial class SmsWire : Node3D
             if (body.GetChildOrNull<MeshInstance3D>(1)?.Mesh is CylinderMesh cm) { cm.TopRadius = r; cm.BottomRadius = r; cm.Height = h; }
         }
         body.GlobalTransform = new Transform3D(Basis.Identity, new Vector3(tip.X, tip.Y - h * 0.5f, tip.Z));
+
+        PackedScene model = PostScene();
+        if (body.GetChildOrNull<MeshInstance3D>(1) is MeshInstance3D cylVis)
+            cylVis.Visible = model == null; // hide the stand-in cylinder when a real fitting model shows (its collision stays)
+        PlacePostModel(name + "Model", model, tip, outward);
+    }
+
+    /// <summary>Stand the fitting model at a tip, its -Z aligned OUTWARD along the wire, with the inspector's PostScale and PostTiltDegrees
+    /// on top. Find-or-reinstance by the model's path, so a drag/resize only re-places it.</summary>
+    private void PlacePostModel(string name, PackedScene model, Vector3 tip, Vector3 outward)
+    {
+        var inst = GetNodeOrNull<Node3D>(name);
+        if (model == null)
+        {
+            inst?.QueueFree();
+            return;
+        }
+        string want = model.ResourcePath;
+        if (inst != null && inst.GetMeta("src", "").AsString() != want)
+        {
+            inst.Free(); // the model export changed: drop the old instance now so the name is free to reuse this call
+            inst = null;
+        }
+        if (inst == null)
+        {
+            inst = model.Instantiate<Node3D>();
+            inst.Name = name;
+            inst.SetMeta("src", want);
+            inst.TopLevel = true; // a world-placed preview child (no Owner): regenerated by Build, never written into his scene
+            AddChild(inst);
+        }
+        bool vertical = outward.LengthSquared() < 1e-6f || MathF.Abs(outward.Normalized().Dot(Vector3.Up)) > 0.99f;
+        Basis look = vertical ? Basis.Identity : Basis.LookingAt(outward, Vector3.Up);
+        Basis tilt = Basis.FromEuler(_postTiltDeg * (MathF.PI / 180f));
+        // the fitting model's verts are in SMS game units (~74/m), so bake units->metres in; PostScale is then an intuitive multiplier (1 = native)
+        Vector3 scale = _postScale * SmsUnits.UnitsToMetres(1f);
+        inst.GlobalTransform = new Transform3D((look * tilt).Scaled(scale), tip);
     }
 
     // ------------------------------------------------------------------------------------------------------- the cube and the ratio
