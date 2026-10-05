@@ -4516,3 +4516,35 @@ DRIVE 54 (patch_smoke54.py, removed): the mask's layer 8 under the HUD's 10, the
 pauseOut sends the lives and the star HUD away. ALL OK; build 0 err; boot ALL OK.
 LEGACY RETIRED: none. DEVIATION: none (his IdleHold still brings the star HUD back while he stands after the resume, as before). NOT PORTED:
 the item sparks, the card dialog.
+
+### Pass 70b -- the pause menu's smoke (ms_2d_pause_smo)
+HIS REPORT: "smoke should appear when pause is spawning in! last touch to the pause screen for now".
+THE GAME: TPauseMenu2::drawAppearPane (PauseMenu2.cpp 597): when a PAUSE letter's appear anim reaches 2.0 (mFadeAnim 2, 7, 12, 17, 22 for
+the five), gpEmitterManager4D2->createEmitter(the pane's global bounds centre, 0x1F9) -- ms_2d_pause_smo.jpa (MarDirectorLoadResource.cpp 262;
+his disc extract data\particle\). Dumped (jpa_dump.py) and read with noclip's JPA.ts: a Circle volume of size 25, minRad 0.25, FixedInterval
+div 10, rate 1, maxFrame 1 = ONE burst of 10 puffs at 36-degree steps on radii 6.25..25 px (sizeXZ = 25 x lerp(0.25, 1, rand)); velOmni 2.0 px/frame
+away from the centre x (1 +- 0.125 velRatio) x moment (1 - 0.125 rand); airResist 0.98 a frame on the base velocity; one Gravity field, mag 0.07,
+dir (0,-1,0) = screen UP, FieldAccel (the field velocity grows 0.07 px/f each frame: ~25 px of rise over a full life); life 26 x (1 - 0.5 rand) =
+13..26 frames; Billboard 1.0 x 1.0 = a 50 px quad, no scale anim, alpha 1.0 until 25 % of the life then to 0, rotate speed 0 (rotateSpeedRandom
+is a RATIO of the speed in JPA: no spin); colour lerp(env (50,183,255) -> prm white, I) of P_ms_kemuball3_ia (IA8 64 x 64), SRCALPHA /
+INVSRCALPHA. The 2D emitter manager is a TEmitterViewObj at the END of "Group 2D" (MarDirectorInitECT.cpp 234, insert = push_back): the smoke
+draws OVER the menu's panes; it calcs SMSGetAnmFrameRate() = 2 x a rendered frame = 60 Hz like the Mario particles, and runs under the pause
+(unk30's CUE_CALC_ANIM).
+PORT: assets/Sms/Fx/tex/pause_smoke.png (jpa_bake.py job pause_smoke: the TEV colour folded in, the IA alpha); assets/Sms/Console/PauseSmoke.tscn:
+a one-shot GPUParticles2D -- amount 10, explosiveness 1, lifetime 26/60 s, lifetime_randomness 0.5 (Godot's lifetime x (1 - rand x r) = JPA's),
+fixed_fps 60, local_coords; ParticleProcessMaterial: Ring emission 6.25..25 px (axis z, height 0), radial_velocity 91.875..135 px/s (2 x 60 x the
+ratio and moment spreads), gravity (0, -252) px/s^2 (0.07 x 3600), damping 117 px/s^2 (the linear fit of 0.98^n over 26 frames: the same 41 px of
+travel and 70 px/s at the end), scale 0.78125 (50 / 64), colour ramp alpha 1 / 1 at 0.25 / 0 at 1. PauseMenu.tscn: Root/Smoke (Node2D) as Root's
+LAST child + the SmokeRoot / SmokeScene exports. SmsPauseMenu: BuildTitle instances one puff a letter under Smoke (freed with the letters);
+AppearWindow fires letter i's puff once when its anim crosses 2.0, at the letter's rotation centre (= J2D's bounds centre, as set the tick
+before), SpeedScale = the menu's pace knob; Restart(). Getters SmokeFired / SmokeLog / SmokePuffs.
+DRIVE 55 (patch_smoke55.py, removed): 5 puff nodes for the 5 letters, Smoke the last child of Root over Menu, the scene's numbers as above
+(it caught emission_shape 5 = DirectedPoints; Ring is 6), Start -> paused, puffs at fade 2.6 / 7.3 / 12.2 / 17.2 / 22.1 (the tick after
+2 / 7 / 12 / 17 / 22) at the letters' centres (12 px up: the appear's hop at anim ~2, as the game's getGlobalBounds), the first processing
+and emitting under the pause; B -> closed. ALL OK; build 0 err; boot ALL OK. The headless dummy renderer does not simulate GPU particles:
+the look is his to confirm in the editor.
+LEGACY RETIRED: none. DEVIATION: none -- the ring's angles are random where the game's are fixed 36-degree steps (10 overlapping 50 px puffs:
+not tellable apart), and the drag is linear where the game's is 0.98 a frame (the same travel and end speed). NOT PORTED: the selected item's
+sparks (ms_2d_pause_sel, 0x1FA at bounce 3: 140 yellow-to-red DirBillboard sparks along the emitter's z).
+OPEN CHECK (not this pass): the shipped Fx that spin (SlipSmoke's +-2700 deg/s) read "speed 0 +-0.125 turns/frame" -- in JPA the random is a
+ratio of the speed, so a speed of 0 does not spin; re-read their ESP1 rotate blocks before the next Fx pass.

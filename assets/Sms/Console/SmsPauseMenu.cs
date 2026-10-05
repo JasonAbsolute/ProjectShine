@@ -16,7 +16,10 @@ using Godot;
 /// telop away, the timer and the red coins parked down, no auto-hide while paused), the resume its pauseOut (2588: the telop back, the
 /// timer and the red coins back, the lives and the star HUD away) -- here the mask sits on its own CanvasLayer (8) under the HUD (10) and
 /// Open / Close call SmsStandardHud.PauseIn / PauseOut; the console's layer processes while the tree is paused, as the game performs it
-/// under STATE_PAUSE_MENU. The item sparks (emitters 0x1F9 / 0x1FA) are not ported. The scene: assets/Sms/Console/PauseMenu.tscn under Mario.
+/// under STATE_PAUSE_MENU. THE SMOKE (pass 70b): drawAppearPane (597) creates ms_2d_pause_smo (emitter 0x1F9) at a letter's centre when its
+/// appear anim reaches 2.0 -- here one PauseSmoke.tscn (GPUParticles2D, the .jpa's numbers) per letter under Root/Smoke, Root's last child
+/// (the 2D emitter manager is the last of Group 2D: over the letters), restarted at the crossing. The selected item's sparks (0x1FA,
+/// ms_2d_pause_sel at bounce 3) are not ported. The scene: assets/Sms/Console/PauseMenu.tscn under Mario.
 /// </summary>
 public partial class SmsPauseMenu : CanvasLayer
 {
@@ -46,6 +49,10 @@ public partial class SmsPauseMenu : CanvasLayer
     private string _builtTitle;
     [Export] public TextureRect[] Items = System.Array.Empty<TextureRect>();   // 'tx_1'..'tx_3'
     [Export] public Control Stage;         // 'brek' at (296, 412)
+    /// <summary>Root's last child: the letters' smoke puffs (gpEmitterManager4D2's draw, after the panes) are instanced here.</summary>
+    [Export] public Node2D SmokeRoot;
+    /// <summary>assets/Sms/Console/PauseSmoke.tscn: ms_2d_pause_smo as a one-shot GPUParticles2D; one instance a letter.</summary>
+    [Export] public PackedScene SmokeScene;
     [Export] public Label StageName, ScenarioName;
     /// <summary>The selected item's colour (tx_1's white: 3cff3c).</summary>
     [Export] public Color ItemColor = new Color(0x3c / 255f, 1f, 0x3c / 255f);
@@ -64,6 +71,9 @@ public partial class SmsPauseMenu : CanvasLayer
     private float _maskAlpha, _barAlpha;
     private Vector2[] _letterHome = System.Array.Empty<Vector2>(), _letterSize = System.Array.Empty<Vector2>();
     private float[] _letterRot = System.Array.Empty<float>();
+    private GpuParticles2D[] _smoke = System.Array.Empty<GpuParticles2D>(); // one puff a letter, under SmokeRoot
+    private bool[] _smoked = System.Array.Empty<bool>();                      // the letter's puff went this appear
+    private int _smokeFired; private string _smokeLog = "";
     private Vector2[] _itemHome = System.Array.Empty<Vector2>(), _itemSize = System.Array.Empty<Vector2>();
     private float _firstItemRot;
     private Mario _mario;
@@ -82,6 +92,10 @@ public partial class SmsPauseMenu : CanvasLayer
     /// <summary>The cursor's item (the headless drive reads it).</summary>
     public int Selected => _selected;
     public int LettersShown { get { int n = 0; foreach (TextureRect t in Letters) if (t.IsVisibleInTree()) n++; return n; } }
+    /// <summary>For the drives: puffs started since Open, and "i@fade(x,y)" per puff.</summary>
+    public int SmokeFired => _smokeFired;
+    public string SmokeLog => _smokeLog;
+    public GpuParticles2D[] SmokePuffs => _smoke;
     public float MaskAlpha => Mask != null && Mask.Visible ? Mask.Color.A : 0f;
 
     public override void _Ready()
@@ -110,6 +124,8 @@ public partial class SmsPauseMenu : CanvasLayer
             Root.Visible = false;
         if (Mask != null)
             Mask.Visible = false;
+        if (SmokeRoot == null || SmokeScene == null)
+            GD.PushWarning($"[SMS pause] {GetPath()}: the scene's SmokeRoot / SmokeScene exports are not both set (see assets/Sms/Console/PauseMenu.tscn): no smoke");
     }
 
     private string CurrentTitle()
@@ -127,10 +143,24 @@ public partial class SmsPauseMenu : CanvasLayer
                 t.GetParent()?.RemoveChild(t); // out of the tree now: the new letters may take the names
                 t.QueueFree();
             }
+        foreach (GpuParticles2D g in _smoke)
+            if (IsInstanceValid(g))
+            {
+                g.GetParent()?.RemoveChild(g);
+                g.QueueFree();
+            }
         Letters = Menu != null
             ? SmsBigText.Build(Menu, text, GlyphPathFormat, TitleCenter, GlyphHeight, LetterGap, SpaceWidth, Palette, Colored, TitleWave, TitleTilt, MaxWidth).ToArray()
             : System.Array.Empty<TextureRect>();
         _letterHome = new Vector2[Letters.Length]; _letterSize = new Vector2[Letters.Length]; _letterRot = new float[Letters.Length];
+        _smoke = new GpuParticles2D[Letters.Length]; _smoked = new bool[Letters.Length];
+        for (int i = 0; i < Letters.Length && SmokeRoot != null && SmokeScene != null; i++)
+        {
+            _smoke[i] = SmokeScene.Instantiate<GpuParticles2D>();
+            _smoke[i].Name = $"Smoke{i}";
+            _smoke[i].Emitting = false;
+            SmokeRoot.AddChild(_smoke[i]);
+        }
         for (int i = 0; i < Letters.Length; i++)
         {
             _letterHome[i] = Letters[i].Position; _letterSize[i] = Letters[i].Size; _letterRot[i] = Letters[i].Rotation;
@@ -203,6 +233,7 @@ public partial class SmsPauseMenu : CanvasLayer
             Letters[i].Visible = false;
             Letters[i].Rotation = _letterRot[i] + Mathf.Pi;
         }
+        System.Array.Fill(_smoked, false); _smokeFired = 0; _smokeLog = "";
         if (Menu != null) { Menu.Modulate = Colors.White; Menu.Rotation = 0f; }
         if (Mask != null) { Mask.Visible = true; Mask.Color = new Color(0f, 0f, 0f, 0f); }
         if (Stage != null) Stage.Modulate = new Color(1f, 1f, 1f, 0f);
@@ -235,12 +266,34 @@ public partial class SmsPauseMenu : CanvasLayer
         pic.Modulate = new Color(1f, 1f, 1f, Mathf.Min(1f, anim * 12.8f / 255f));
     }
 
+    /// <summary>gpEmitterManager4D2->createEmitter(the pane's global centre, 0x1F9): letter i's smoke puff, once an appear. Its position is the
+    /// letter's rotation centre (J2D's bounds are the unrotated rect; the Control's pivot is its middle), in SmokeRoot's frame.</summary>
+    private void Smoke(int i)
+    {
+        _smoked[i] = true;
+        GpuParticles2D g = _smoke[i];
+        if (g == null || SmokeRoot == null)
+            return;
+        TextureRect t = Letters[i];
+        Vector2 c = SmokeRoot.ToLocal(t.GetGlobalTransform() * (t.Size * 0.5f));
+        g.Position = c;
+        g.SpeedScale = SmsHud.Anim; // the menu's pace knob (the game: 1)
+        g.Restart();
+        _smokeFired++;
+        _smokeLog += $"{i}@{_fade:F1}({c.X:F0},{c.Y:F0}) ";
+    }
+
     private void AppearWindow(float units)
     {
         if (_fade <= 45f)
         {
             for (int i = 0; i < Letters.Length; i++)
-                AppearPane(Letters[i], _fade - 5f * i, _letterHome[i], _letterSize[i], _letterRot[i]);
+            {
+                float anim = _fade - 5f * i;
+                if (anim >= 2f && i < _smoked.Length && !_smoked[i])
+                    Smoke(i); // drawAppearPane (597): anim == 2.0 -> ms_2d_pause_smo at the pane's bounds centre (as set last tick)
+                AppearPane(Letters[i], anim, _letterHome[i], _letterSize[i], _letterRot[i]);
+            }
             float a = Mathf.Min(_maskAlpha, _maskAlpha / 45f * _fade * 1.5f);
             if (Mask != null) Mask.Color = new Color(0f, 0f, 0f, a);
         }

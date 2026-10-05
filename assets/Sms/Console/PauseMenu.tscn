@@ -1,12 +1,13 @@
-[gd_scene load_steps=6 format=3 uid="uid://cpausemn00059"]
+[gd_scene load_steps=7 format=3 uid="uid://cpausemn00059"]
 
 [ext_resource type="Script" path="res://assets/Sms/Console/SmsPauseMenu.cs" id="1_script"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/pause_tx_1.png" id="t_tx1"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/pause_tx_2.png" id="t_tx2"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/pause_tx_3.png" id="t_tx3"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/pause_bar.png" id="t_bar"]
+[ext_resource type="PackedScene" uid="uid://cpausesmk070" path="res://assets/Sms/Console/PauseSmoke.tscn" id="s_smoke"]
 
-[node name="PauseMenu" type="CanvasLayer" node_paths=PackedStringArray("Root", "Mask", "Menu", "Items", "Stage", "StageName", "ScenarioName")]
+[node name="PauseMenu" type="CanvasLayer" node_paths=PackedStringArray("Root", "Mask", "Menu", "Items", "Stage", "StageName", "ScenarioName", "SmokeRoot")]
 process_mode = 3
 layer = 50
 script = ExtResource("1_script")
@@ -17,6 +18,8 @@ Items = [NodePath("Root/Menu/tx_1"), NodePath("Root/Menu/tx_2"), NodePath("Root/
 Stage = NodePath("Root/Stage")
 StageName = NodePath("Root/Stage/map")
 ScenarioName = NodePath("Root/Stage/task")
+SmokeRoot = NodePath("Root/Smoke")
+SmokeScene = ExtResource("s_smoke")
 ItemColor = Color(0.235294, 1, 0.235294, 1)
 PauseAction = "button_start"
 ExitAreaScene = ""
@@ -125,3 +128,5 @@ mouse_filter = 2
 theme_override_font_sizes/font_size = 16
 horizontal_alignment = 1
 vertical_alignment = 1
+
+[node name="Smoke" type="Node2D" parent="Root"]
