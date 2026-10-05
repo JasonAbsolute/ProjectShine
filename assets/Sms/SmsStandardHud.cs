@@ -360,6 +360,37 @@ public partial class SmsStandardHud : Control
         }
     }
 
+    /// <summary>TGCConsole2::pauseIn (GCConsole2.cpp 2578), the director's pause entry (MarDirectorDirect.cpp 732): the help balloon away
+    /// (startDisappearBalloon forced), the lives in (startAppearMario), the star HUD in (startAppearStar), the telop away
+    /// (startDisappearTelop), the timer and the red coins parked off the bottom (startDownLeftBot: 20 frames to 525 - y1). The pause
+    /// menu's mask sits under the console, so these show bright over it; the auto-hide waits for the resume.</summary>
+    public void PauseIn()
+    {
+        var layer = SmsHudLayer.Current;
+        layer?.Balloon?.Hide();
+        StartAppearMario();
+        StartAppearStar();
+        layer?.Telop?.Disappear();
+        if (_redVisible && !_redParked) { _redSlide.Retarget(_now, RedGone, 20); _redParked = true; }
+        if (_timerVisible && !_timerParked) { _timerSlide.Retarget(_now, RedGone, 20); _timerParked = true; _timerF0 = -1; }
+    }
+
+    /// <summary>TGCConsole2::pauseOut (2588), the resume: the telop may come back on its own clock (startAppearTelop(false)), the timer
+    /// (unk51C) and the red coins (unk448) parked by the pause come back, the lives and the star HUD go (startDisappearMario / Star --
+    /// Jaysonn's IdleHold brings them back at once while he stands, as it would have anyway).</summary>
+    public void PauseOut()
+    {
+        if (_timerParked && TimerRunning) { _timerParked = false; StartInsertTimer(); }
+        if (_redParked) { _redParked = false; StartAppearRedCoin(); }
+        StartDisappearMario();
+        StartDisappearStar();
+    }
+
+    /// <summary>For the drives: the console frame, the star HUD and the lives in view.</summary>
+    public int Frame => _frame;
+    public bool StarShown => _starVisible && !_starLeaving;
+    public bool LivesShown => _marioVisible && !_marioLeaving;
+
     private void EndCameraDemo()
     {
         _inDemo = false; _demoEndCount = 0;
@@ -615,6 +646,7 @@ public partial class SmsStandardHud : Control
         // updateStarHudAutoHide (1061): out, settled, nothing on the clocks, no demo: away again, the lives with it -- unless Jaysonn's
         // IdleHold keeps them while he stands (the console's unk60 guard, never set in the game)
         if (_starVisible && !_starAppearing && !_starLeaving && _shineSlide.AtZero(_now) && !Demo && _blueTimer == 0 && _shineTimer == 0
+            && !GetTree().Paused // updateStarHudAutoHide (1070): not under STATE_PAUSE_MENU / STATE_CARD_SAVE -- the pause brought them in to stay
             && !(SmsHud.IdleHold && Idle))
         {
             StartDisappearStar();

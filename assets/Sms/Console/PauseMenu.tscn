@@ -11,7 +11,7 @@ process_mode = 3
 layer = 50
 script = ExtResource("1_script")
 Root = NodePath("Root")
-Mask = NodePath("Mask")
+Mask = NodePath("MaskLayer/Mask")
 Menu = NodePath("Root/Menu")
 Items = [NodePath("Root/Menu/tx_1"), NodePath("Root/Menu/tx_2"), NodePath("Root/Menu/tx_3")]
 Stage = NodePath("Root/Stage")
@@ -22,7 +22,10 @@ PauseAction = "button_start"
 ExitAreaScene = ""
 Size = 1.0
 
-[node name="Mask" type="ColorRect" parent="."]
+[node name="MaskLayer" type="CanvasLayer" parent="."]
+layer = 8
+
+[node name="Mask" type="ColorRect" parent="MaskLayer"]
 visible = false
 layout_mode = 3
 anchors_preset = 15

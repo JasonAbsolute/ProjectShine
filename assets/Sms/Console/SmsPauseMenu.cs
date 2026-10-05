@@ -11,15 +11,19 @@ using Godot;
 /// wrap with two items); the selected item pulses -- +1 px a unit to 18, back to 35 -- and shifts toward white, the others plain.
 /// disappearWindow (246): over 10 units the panes fade 12 a frame, the letters and items shrink 2 % a frame and the menu pane turns
 /// 2 degrees a unit. CONTINUE resumes; SAVE saves (the card dialog is not ported: the menu dips while GameData saves); EXIT AREA leaves
-/// the stage (ExitAreaScene) behind the fader's iris. The item sparks (emitters 0x1F9 / 0x1FA) and the console's pauseIn / pauseOut
-/// (the star HUD and the lives brought in, the telop away) are not ported. The scene: assets/Sms/Console/PauseMenu.tscn under Mario.
+/// the stage (ExitAreaScene) behind the fader's iris. THE HUD STAYS, BRIGHT (pass 70): the game draws its mask under the console's panes
+/// and the director's pause entry runs the console's pauseIn (GCConsole2.cpp 2578: the balloon away, the lives and the star HUD in, the
+/// telop away, the timer and the red coins parked down, no auto-hide while paused), the resume its pauseOut (2588: the telop back, the
+/// timer and the red coins back, the lives and the star HUD away) -- here the mask sits on its own CanvasLayer (8) under the HUD (10) and
+/// Open / Close call SmsStandardHud.PauseIn / PauseOut; the console's layer processes while the tree is paused, as the game performs it
+/// under STATE_PAUSE_MENU. The item sparks (emitters 0x1F9 / 0x1FA) are not ported. The scene: assets/Sms/Console/PauseMenu.tscn under Mario.
 /// </summary>
 public partial class SmsPauseMenu : CanvasLayer
 {
     private enum State { Closed, Appearing, Open, Saving, Disappearing }
 
     [Export] public Control Root;          // the blo's 600 x 480 screen, placed about its centre
-    [Export] public ColorRect Mask;        // 'mask': black, alpha 180
+    [Export] public ColorRect Mask;        // 'mask': black, alpha 180 -- on MaskLayer (CanvasLayer 8): under the HUD, over the world
     [Export] public Control Menu;          // 't_0' at (296, 258)
     /// <summary>The title (the game: PAUSE), built from the big letters by <see cref="SmsBigText"/> about the blo's word (its five
     /// panes 'pa00'..'pa04' at x -153..86, y -111..-141 off 't_0', each turned 12 degrees); a Level's PauseTitle, when set, wins.
@@ -208,6 +212,7 @@ public partial class SmsPauseMenu : CanvasLayer
         if (ScenarioName != null) ScenarioName.Text = level?.ScenarioName ?? "";
         if (PauseOn != null && PauseOn.Stream != null)
             PauseOn.Play(); // MSD_SE_SY_PAUSE_ON
+        SmsHudLayer.Current?.Standard?.PauseIn(); // the director's pause entry (MarDirectorDirect.cpp 732): the console's pauseIn
     }
 
     /// <summary>drawAppearPane (584): a letter's inset, hop, spin and fade over 20 units.</summary>
@@ -377,6 +382,7 @@ public partial class SmsPauseMenu : CanvasLayer
         if (Root != null) Root.Visible = false;
         if (Mask != null) Mask.Visible = false;
         GetTree().Paused = false;
+        SmsHudLayer.Current?.Standard?.PauseOut(); // the director's resume: the console's pauseOut
         if (_confirmed && _selected == 2 && ExitAreaScene != "")
         {
             SmsFader.Current?.StartWipe(SmsFader.Wipe.Circle, 0f); // unkE4 = 2: the iris

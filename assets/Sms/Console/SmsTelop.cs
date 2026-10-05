@@ -137,6 +137,18 @@ public partial class SmsTelop : Control
         Layout();
     }
 
+    /// <summary>startDisappearTelop (GCConsole2.cpp 2434): a showing bar drops off the bottom now (the pause, a camera demo); its count
+    /// restarts when the drop is done, as after a scroll.</summary>
+    public void Disappear()
+    {
+        if (_phase == Phase.Hidden || _phase == Phase.Drop)
+            return;
+        _count = 0f;
+        _phase = Phase.Drop;
+        _f = 0f;
+        Text.Visible = false;
+    }
+
     /// <summary>startAppearTelop(true): the next message, the width, the jingle, the rise.</summary>
     private void Appear()
     {

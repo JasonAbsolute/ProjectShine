@@ -4492,3 +4492,27 @@ PORT: MarioCamData.cs d.HipDrop = groundPoundStartup || groundPoundFalling (the 
 refusal in the hip drop (execFrontRotate_ 454) follows the same flag and is likewise the game's. SunshineCamera: CurrentKind / InbetweenTicks
 getters (drives and Mario's half may read the kind). Build 0 err, boot ALL OK.
 LEGACY RETIRED: none. DEVIATION: none. If the airborne dip itself reads wrong to him, a Dolphin reference of a ground pound decides it.
+
+### Pass 70 -- the pause screen keeps the HUD, bright (the console's pauseIn / pauseOut)
+HIS REPORT: "the pause screen should be showing the hud elements and they shouldn't be faded out" (his PauseScrenRef had not reached Ref/ when
+this was built; done from the console's source).
+THE GAME: the pause mask (pause_1.blo 'mask', alpha 180) darkens the stage, not the console: TGCConsole2's panes draw over it, and the
+director's pause entry (MarDirectorDirect.cpp 732) runs pauseIn (GCConsole2.cpp 2578) -- startDisappearBalloon forced, startAppearMario (the
+lives in), startAppearStar (the shine / coin / blue-coin counters in), startDisappearTelop, startDownLeftBot (the timer and the red coins
+parked off the bottom over 20 frames, flagged unk51C / unk448); updateStarHudAutoHide (1070) does nothing under STATE_PAUSE_MENU /
+STATE_CARD_SAVE, so they stay; the resume runs pauseOut (2588): the telop may return, the parked timer and red coins come back, the lives and
+the star HUD go. The console keeps performing while paused: the director blacklists CUE_MOVE for the Movement list only (MarDirectorDirect.cpp
+94-99); unk30 (the console) gets its cue every tick.
+THE PORT BEFORE: PauseMenu.tscn's Mask on the menu's own CanvasLayer 50 lay over the HUD (CanvasLayer 10) -- the counters dimmed to 30 %; and
+the HUD layer inherited the tree's pause, so nothing of pauseIn could have moved anyway.
+PORT: PauseMenu.tscn -- the Mask moves to its own MaskLayer (CanvasLayer 8: over the world, under the HUD 10 and the console strings 15); the
+PAUSE letters, items and stage bar stay on 50. SmsPauseMenu.Open -> SmsStandardHud.PauseIn, Close -> PauseOut. SmsStandardHud.PauseIn /
+PauseOut as above (the parking reuses the camera demo's startDownLeftBot code; the auto-hide gated on GetTree().Paused); SmsTelop.Disappear
+(startDisappearTelop: the bar drops now, its count restarts); SmsHud.tscn regenerated with process_mode Always on the console's layer
+(gen_hud_scene.py) so its moves play while the tree is paused -- the telop's count already held under Paused, the Level's clock feeds the
+timer, Mario's fields are still: nothing of the game advances. Getters Frame / StarShown / LivesShown for the drives.
+DRIVE 54 (patch_smoke54.py, removed): the mask's layer 8 under the HUD's 10, the panes' 50 over it; Start -> paused, 5 letters, mask 0.71,
+118 console frames in 1 s of pause, the star HUD (out before the pause) and the lives IN and staying, the telop and balloon away; B -> unpaused,
+pauseOut sends the lives and the star HUD away. ALL OK; build 0 err; boot ALL OK.
+LEGACY RETIRED: none. DEVIATION: none (his IdleHold still brings the star HUD back while he stands after the resume, as before). NOT PORTED:
+the item sparks, the card dialog.
