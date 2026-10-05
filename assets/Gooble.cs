@@ -21,7 +21,9 @@ using Godot;
 /// anim), the death stamps goop (stamp range 15 x 32 u) and may drop a coin (GenItemRate 50 %, DropScene). ALIVE TIME: 2000 ticks, the
 /// body inflating from 1900 (x 1.01 a tick to twice its scale), then it pops. Dead: freed, or re-launched from its placed point after
 /// RelaunchTicks like TNameKuriLauncher (vy 4, the set anim) -- a placed Gooble is its own launcher (DEVIATION: the game pools them
-/// behind goop launchers). Body scale 0.6..1.0 and the 7 TEV body colours cycle per instance (TintBody).
+/// behind goop launchers). Body scale 0.6..1.0 per life. The charge flash is the body material's emission; the 7 TEV register-0
+/// colours the game cycles per instance are NOT applied (TintBody, off): multiplied into the albedo they made flat colour blobs of
+/// the model -- what the _mat_body TEV stages do with that register is unread (name.bmd MAT3).
 ///
 /// THE SCENE (his assets/Gooble.tscn, unchanged): Model (the glb: name_down / hit / jump_end / jump_start / land / set / wait / walk) with
 /// Model/AnimationPlayer, the CollisionShape3D for the world. The game's hit cylinders (attack 50 x 30, damage 40 x 90, x the body scale)
@@ -43,9 +45,10 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
     [Export] public PackedScene DropScene;
     /// <summary>MSD_SE_EN_NAMEKURI_WALK (looping, while it walks), _DOWN (the death), _DOWN_WT (melting). Unset = silent.</summary>
     [Export] public AudioStreamPlayer3D WalkSound, DownSound, MeltSound;
-    /// <summary>The 7 TEV register-0 body colours (nameKuriTevColorData), one per instance in turn, as the body material's albedo
-    /// tint; the charge flash (register 1) as its emission.</summary>
-    [Export] public bool TintBody = true;
+    /// <summary>The 7 TEV register-0 body colours (nameKuriTevColorData), one per instance in turn, multiplied into the body material's
+    /// albedo. OFF: the TEV stage that uses the register is unread, and the plain multiply makes flat colour blobs of the model (pass
+    /// 71b). The charge flash (register 1) is the material's emission regardless.</summary>
+    [Export] public bool TintBody = false;
     [Export] public bool DebugPrint;
 
     // ------------------------------------------------------------------------------------------------------------------ the game's data
@@ -110,8 +113,7 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         _spawnYaw = Mathf.RadToDeg(Rotation.Y);
         MotionMode = MotionModeEnum.Grounded;
         CallDeferred(nameof(SetupCollisionExceptions)); // the game pushes Mario and enemies apart by messages, not bodies
-        if (TintBody)
-            FindBodyMaterial();
+        FindBodyMaterial();
         Reset();
     }
 
@@ -355,9 +357,7 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         }
         if (_bodyMat != null)
         {
-            Color c = BodyColors[_colorIdx];
-            float peak = MathF.Max(c.R, MathF.Max(c.G, c.B));
-            _bodyMat.AlbedoColor = peak > 0f ? new Color(c.R / peak, c.G / peak, c.B / peak) : Colors.White; // DEVIATION: the TEV stage's scale is unread -- the register at full brightness
+            _bodyMat.AlbedoColor = TintBody ? BodyColors[_colorIdx] : Colors.White; // the register's raw value when asked for; the model's own look otherwise
             float f = _flash / 255f;
             _bodyMat.EmissionEnabled = f > 0f;
             _bodyMat.Emission = new Color(f, f, f);

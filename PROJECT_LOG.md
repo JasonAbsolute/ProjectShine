@@ -4601,3 +4601,12 @@ body (the screen texture) and the brain part, ms_deadnamekli_o / n and the WATHI
 is under half), the sounds (exports WalkSound / DownSound / MeltSound, unset = silent), the oil-slip / catch PUNCH kill, TWalker's slope
 blend (unk1A8: it leaps from any floor), the coin id (genEventCoin), the pollution launchers. OPEN CHECK (not this pass): other live
 actors ported with SpeedToMps (the coconut lob, pass 52-ish) may be 4x slow by the same rule -- re-read their integration.
+
+### Pass 71b -- the Gooble's body tint off
+HIS REPORT (his screenshot, 00:46): "they don't look right, they kinda just have blobs of colors" -- the 7 TEV register-0 colours I multiplied
+into _mat_body's albedo (scaled to full brightness) flattened the model into coloured blobs.
+THE GAME: SMS_InitPacket_TwoTevColor puts the colour in GX_TEVREG0 and the flash in GX_TEVREG1 of _mat_body; what the material's TEV
+stages do with REG0 (its alpha is 169; the body also refracts the screen texture) is in name.bmd's MAT3, unread -- a plain multiply is NOT it.
+PORT: TintBody is a knob, default OFF: the model keeps its own look; the body material is still duplicated per instance so the charge flash
+(REG1 -> emission) plays. On, the register's raw value multiplies the albedo (no brightness scaling). NOT PORTED: the TEV stages of
+_mat_body (the per-instance colour, the screen-texture goop) -- a bmd MAT3 read would settle it. Build 0 err, boot ALL OK.
