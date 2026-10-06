@@ -4954,3 +4954,32 @@ particle at the node's origin, so since pass 60 the kick's puff (ms_wallkick_a: 
 20-unit circle) have all come out of one point. FIX: emission_shape = 6 in the scene and in gen_fx_dust.py (both emitters). The other
 ring emitters (the super hip drop's smoke and stars) already had 6. VERIFIED headless (ring_check.gd, removed): both emitters RING with
 their radii 0.201 / 0.269 m. The scene hot-reloads.
+
+### Pass 77 -- the water bottle's shaders compiled in play; the Gooble scene carries its resources; the particle textures pinned
+HIS REVIEW of 76: the water-get sparkle "looked great" but "lagged the game for a second when I picked it up". The cause is in the
+game's own shader cache: user://shader_cache gained exactly three entries at 23:47:33 during his session -- the two ParticlesShaderRD
+programs of GetWater.tscn's process materials and the SceneForwardClustered program of GetWaterStreak.gdshader. A shader's FIRST load
+runs every variant through glslang on the main thread (around a second for a new spatial shader); the cache makes every later load
+instant. The three compiled mid-play because of WHEN they loaded: Gooble.SetAfterDeadEffect resolved BottleScene with GD.Load at the
+first stomp (the scene was never set in assets/Gooble.tscn), and WaterBottle.tscn carries GetWater.tscn (its GetEffect) and so the
+shaders. Everything else of the kind already loads with the level (Player.tscn instances its effects, Gooble._Ready loads the death
+splash, the pollution layer builds its pools at _Ready) -- the bottle was the one lazy load left.
+FIX (1:1 in spirit: TNameKuriManager::loadAfter registers the stage's bottle at load): Gooble._Ready resolves BottleScene
+(`BottleScene ??= GD.Load(...)`, a warning if it fails) and setAfterDeadEffect only spawns it; assets/Gooble.tscn now sets BottleScene,
+DeathFxScene, BodyMaterial, EyeMaterial, BrainScene and BrainMaterial to their default resources (the code paths stay as fallbacks),
+so the scene brings every resource -- and every shader -- in with the level. The four inert Area3D zones (DetectionZone, AttackZone,
+Hurtbox, StompZone, unread since pass 71) and their shapes are gone from the scene. His cache already holds the three programs, so
+the hitch would not have come back on this machine either way; it would have on any other machine, and for every new effect loaded
+the same lazy way. LEGACY RETIRED: the zone nodes and the at-death GD.Load.
+ALSO (his editor closed, at his word): the two throw overrides left in assets/Player.tscn from the pass-62 lob (ThrowPowerScale 5.03,
+ThrowVyScale 3.645 -- his tuning around the 4x-short throw pass 75 fixed) are removed from the working tree, nothing else of his in
+that file touched (uncommitted, as the file was). AND the particle textures: the editor's detect_3d had re-imported 18 of
+assets/Sms/Fx/tex's textures VRAM-compressed (S3TC) in the working tree, uncommitted -- the game's particle textures are I8 / IA8
+intensity maps, and block compression bands a 32 x 32 glow -- so all 30 .import files there are pinned compress/mode 0 (lossless),
+mipmaps on, detect_3d off (fx_tex_imports77.py, then `--import`). The goop albedo tiles and the model textures are left as they are
+(CMPR on the disc; compression is their native state).
+VERIFIED: gooble_preload_check.gd (a SceneTree script, removed) instanced Level.tscn headless: WaterBottle.tscn, GetWater.tscn,
+GetWaterStreak.gdshader and GoobleDeath.tscn were not cached before the level and all four were two frames after it; the six
+Goobles carry BottleScene / DeathFxScene / BodyMaterial and no zone node. Build 0 errors; boot [SMS selftest] ALL OK + slope/hipdrop
+ALL OK, no errors; the re-import wrote lossless .ctex files (glow3_hit: vram_texture false, compress/mode 0). He builds the hammer
+(Gooble.cs); Gooble.tscn reloads.

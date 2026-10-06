@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bgr71833jfp1m"
-path.s3tc="res://.godot/imported/radgrad.png-886e77aa3f223fb3033a235c5e7b0ac1.s3tc.ctex"
+path="res://.godot/imported/radgrad.png-886e77aa3f223fb3033a235c5e7b0ac1.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/Sms/Fx/tex/radgrad.png"
-dest_files=["res://.godot/imported/radgrad.png-886e77aa3f223fb3033a235c5e7b0ac1.s3tc.ctex"]
+dest_files=["res://.godot/imported/radgrad.png-886e77aa3f223fb3033a235c5e7b0ac1.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

@@ -34,13 +34,16 @@ using Godot;
 /// lights are the materials' (bianco2 scene.bin: the sun (255,255,255) from (200000, 500000, 200000), ambient (128,128,128), spec
 /// shininess 50); a DirectionalLight3D in the scene replaces the sun's direction and colour.
 ///
-/// THE SCENE (his assets/Gooble.tscn, unchanged): Model (the glb: name_down / hit / jump_end / jump_start / land / set / wait / walk) with
-/// Model/AnimationPlayer, the CollisionShape3D for the world. The game's hit cylinders (attack 50 x 30, damage 40 x 90, x the body scale)
-/// and sight cones are code: the scene's DetectionZone / AttackZone / Hurtbox / StompZone are not read any more (delete them when the
-/// scene is next open). THE DEATH: setDeadAnm / setMeltAnm emit ms_deadnamekli_o (16 goop blobs) and _n (28 rainbow drops) bound to
+/// THE SCENE (assets/Gooble.tscn): Model (the glb: name_down / hit / jump_end / jump_start / land / set / wait / walk) with
+/// Model/AnimationPlayer, the CollisionShape3D for the world, and the exports below set to their default resources (the bottle and death
+/// scenes, the three materials, the brain) so they load WITH the level -- a scene loaded for the first time compiles its shaders then
+/// and there (every variant through glslang, synchronous, around a second for a new one; cached in user://shader_cache after), and that
+/// belongs in the load, not in play (pass 77: the bottle scene used to load at the first death, so GetWater's three shaders compiled
+/// mid-play). The game's hit cylinders (attack 50 x 30, damage 40 x 90, x the body scale) and sight cones are code (the old
+/// DetectionZone / AttackZone / Hurtbox / StompZone areas were deleted in pass 77). THE DEATH: setDeadAnm / setMeltAnm emit ms_deadnamekli_o (16 goop blobs) and _n (28 rainbow drops) bound to
 /// joint 2's matrix at the body scale -- DeathFxScene (assets/Sms/Fx/GoobleDeath.tscn, gen_fx_gooble.py) played at the brain joint
-/// in the body's upright frame (DeathFxUpright). NOT PORTED: the water bottle drop (bottle_short when his tank is under half), the sounds without players (the exports),
-/// the oil-slip / catch kill (PUNCH), TWalker's slope blend (the Gooble leaps from any floor), the pollution launchers.
+/// in the body's upright frame (DeathFxUpright). THE BOTTLE: setAfterDeadEffect -> BottleScene (pass 73). NOT PORTED: the sounds without
+/// players (the exports), the oil-slip / catch kill (PUNCH), TWalker's slope blend (the Gooble leaps from any floor), the pollution launchers.
 /// </summary>
 public partial class Gooble : CharacterBody3D, ISmsSprayTarget
 {
@@ -56,7 +59,8 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
     /// scene (his coin) to drop one at the death point half the time anyway. None: the game's nothing.</summary>
     [Export] public PackedScene DropScene;
     /// <summary>TNameKuri::setAfterDeadEffect (namekuri.cpp 511): the water bottle a stomped Gooble leaves when Mario's tank is under
-    /// half -- assets/Sms/Items/WaterBottle.tscn (SmsWaterBottle: bottle_short, half a tank) unless another is set.</summary>
+    /// half -- assets/Sms/Items/WaterBottle.tscn (SmsWaterBottle: bottle_short, half a tank) unless another is set. Resolved at _Ready
+    /// (not at the death): the scene brings GetWater.tscn and its shaders in with the level (see the header).</summary>
     [Export] public PackedScene BottleScene;
     public const string BottleScenePath = "res://assets/Sms/Items/WaterBottle.tscn";
     /// <summary>MSD_SE_EN_NAMEKURI_WALK (looping, while it walks), _DOWN (the death), _DOWN_WT (melting). Unset = silent.</summary>
@@ -148,6 +152,11 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         CallDeferred(nameof(SetupCollisionExceptions)); // the game pushes Mario and enemies apart by messages, not bodies
         SetupLook();
         SetupDeathFx();
+        // the bottle scene (and GetWater.tscn inside it) loads here, with the level: its shaders' first compile is a load-time cost, not a
+        // hitch at the first stomp (pass 77; TNameKuriManager::loadAfter registers the stage's bottle at load too)
+        BottleScene ??= GD.Load<PackedScene>(BottleScenePath);
+        if (BottleScene == null)
+            GD.PushWarning($"[SMS gooble] {GetPath()}: {BottleScenePath} did not load: no water bottle drop");
         Reset();
     }
 
@@ -910,8 +919,7 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
         var hit = space.IntersectRay(q);
         if (hit.Count == 0) return;                               // BG_CHECK_FLAG_ILLEGAL: no bottle
-        PackedScene scene = BottleScene ?? GD.Load<PackedScene>(BottleScenePath);
-        var bottle = SmsWaterBottle.Spawn(scene, GetParent(), (Vector3)hit["position"]);
+        var bottle = SmsWaterBottle.Spawn(BottleScene, GetParent(), (Vector3)hit["position"]);  // loaded at _Ready
         if (DebugPrint) GD.Print($"[SMS gooble] {Name}: the water bottle {(bottle != null ? "dropped at " + bottle.GlobalPosition : "did not load")} (water {_mario.SmsWaterNow}/{_mario.SmsWaterMax})");
     }
 

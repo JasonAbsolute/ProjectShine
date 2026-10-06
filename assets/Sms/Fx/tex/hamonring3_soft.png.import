@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bvvqe8cl58fhv"
-path.s3tc="res://.godot/imported/hamonring3_soft.png-d596d5d5cb0dace6093ac1255653f6bd.s3tc.ctex"
+path="res://.godot/imported/hamonring3_soft.png-d596d5d5cb0dace6093ac1255653f6bd.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/Sms/Fx/tex/hamonring3_soft.png"
-dest_files=["res://.godot/imported/hamonring3_soft.png-d596d5d5cb0dace6093ac1255653f6bd.s3tc.ctex"]
+dest_files=["res://.godot/imported/hamonring3_soft.png-d596d5d5cb0dace6093ac1255653f6bd.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0

@@ -1,51 +1,28 @@
-[gd_scene format=3 uid="uid://delxpxy0gt873"]
+[gd_scene load_steps=10 format=3 uid="uid://delxpxy0gt873"]
 
 [ext_resource type="Script" uid="uid://do5oxl8fyy7ow" path="res://assets/Gooble.cs" id="1_610nq"]
 [ext_resource type="PackedScene" uid="uid://btn6akvyop415" path="res://models/Eniemes/Gooby/Gooble.glb" id="1_xcf38"]
+[ext_resource type="PackedScene" uid="uid://cwbottlesc073" path="res://assets/Sms/Items/WaterBottle.tscn" id="2_bottle"]
+[ext_resource type="PackedScene" uid="uid://cgoobledeath72" path="res://assets/Sms/Fx/GoobleDeath.tscn" id="3_death"]
+[ext_resource type="Material" uid="uid://cgooblebdy71" path="res://assets/Sms/GoobleBody.tres" id="4_body"]
+[ext_resource type="Material" uid="uid://cgoobleeye71" path="res://assets/Sms/GoobleEye.tres" id="5_eye"]
+[ext_resource type="PackedScene" path="res://assets/Sms/models/gooble_brain.glb" id="6_brain"]
+[ext_resource type="Material" uid="uid://cgooblebrn71" path="res://assets/Sms/GoobleBrain.tres" id="7_brainmat"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_cy8ll"]
 radius = 0.596495
 
-[sub_resource type="SphereShape3D" id="SphereShape3D_610nq"]
-radius = 8.292
-
-[sub_resource type="SphereShape3D" id="SphereShape3D_reh70"]
-radius = 3.617
-
-[sub_resource type="SphereShape3D" id="SphereShape3D_38oju"]
-radius = 0.617311
-
-[sub_resource type="BoxShape3D" id="BoxShape3D_610nq"]
-size = Vector3(1, 0.050354, 1)
-
 [node name="Gooble" type="CharacterBody3D" unique_id=974490050]
 script = ExtResource("1_610nq")
+BottleScene = ExtResource("2_bottle")
+BodyMaterial = ExtResource("4_body")
+EyeMaterial = ExtResource("5_eye")
+BrainScene = ExtResource("6_brain")
+BrainMaterial = ExtResource("7_brainmat")
+DeathFxScene = ExtResource("3_death")
 
 [node name="Model" parent="." unique_id=304011591 instance=ExtResource("1_xcf38")]
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=2116325851]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.593348, 0)
 shape = SubResource("SphereShape3D_cy8ll")
-
-[node name="DetectionZone" type="Area3D" parent="." unique_id=618388214]
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="DetectionZone" unique_id=23327789]
-shape = SubResource("SphereShape3D_610nq")
-
-[node name="AttackZone" type="Area3D" parent="." unique_id=885128099]
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="AttackZone" unique_id=1522358294]
-shape = SubResource("SphereShape3D_reh70")
-
-[node name="Hurtbox" type="Area3D" parent="." unique_id=707428479]
-monitoring = false
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Hurtbox" unique_id=1737552593]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.445975, 0)
-shape = SubResource("SphereShape3D_38oju")
-
-[node name="StompZone" type="Area3D" parent="." unique_id=939932443]
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="StompZone" unique_id=642987786]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0914, 0)
-shape = SubResource("BoxShape3D_610nq")

@@ -3,20 +3,19 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dntlu8v7jpg0k"
-path.s3tc="res://.godot/imported/shwave1.png-ba9e30203325c2fd2bf2db8cdc9c967f.s3tc.ctex"
+path="res://.godot/imported/shwave1.png-ba9e30203325c2fd2bf2db8cdc9c967f.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
-"vram_texture": true
+"vram_texture": false
 }
 
 [deps]
 
 source_file="res://assets/Sms/Fx/tex/shwave1.png"
-dest_files=["res://.godot/imported/shwave1.png-ba9e30203325c2fd2bf2db8cdc9c967f.s3tc.ctex"]
+dest_files=["res://.godot/imported/shwave1.png-ba9e30203325c2fd2bf2db8cdc9c967f.ctex"]
 
 [params]
 
-compress/mode=2
+compress/mode=0
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
