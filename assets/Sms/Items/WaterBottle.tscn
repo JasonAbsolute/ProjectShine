@@ -4,7 +4,7 @@
 [ext_resource type="ArrayMesh" path="res://assets/Sms/models/bottle_short/bottle_short_mesh.res" id="2_mesh"]
 [ext_resource type="Material" path="res://assets/Sms/Items/BottleLabel.tres" id="3_label"]
 [ext_resource type="Material" path="res://assets/Sms/Items/BottleGlass.tres" id="4_glass"]
-[ext_resource type="PackedScene" path="res://assets/Sms/Fx/GetSparkle.tscn" id="5_fx"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/GetWater.tscn" id="5_fx"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_hit"]
 resource_name = "item_hit_data_table (MapObjInit.cpp 992): 40 x 40 units at the item's appeared scale 2 = 80 x 80, the touch cylinder off the ground"

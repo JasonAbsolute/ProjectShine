@@ -38,8 +38,8 @@ public partial class SmsWaterBottle : Node3D
     /// 40 x 40 units at the item's mScaling).</summary>
     [Export] public Node3D Model;
     [Export] public Area3D Hit;
-    /// <summary>emitGetWaterEffect: ms_itemget1_b is not baked yet, so the get sparkle (ms_itemget1_a, assets/Sms/Fx/GetSparkle.tscn)
-    /// stands in -- its Sound slot is MSD_SE_MA_GET_ITEM's. Empty = nothing.</summary>
+    /// <summary>emitGetWaterEffect: the water-get sparkle, ms_itemget1_b (assets/Sms/Fx/GetWater.tscn, pass 76: the streaks converging on
+    /// him and their glow puffs), bound to his centre joint. Its Sound slot is the water-get chime's. Empty = nothing.</summary>
     [Export] public PackedScene GetEffect;
     /// <summary>bottle_short (0x20000001) refills half the nozzle's tank; bottle_large / WaterRecoverObj (0x20000002) fill it.</summary>
     [Export] public bool FullRefill = false;

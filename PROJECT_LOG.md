@@ -4909,3 +4909,40 @@ scenes/Fx mirror had missed -- the md5 check caught it; the mirror is current no
 60 and the dumper's wrong labels (jpa_dump.py fixed and commented with the engine lines).
 VERIFIED: fx_spin_check.gd (a SceneTree script, removed): the seven scenes load, 8 emitters at the wanted angle / spin ranges -- ALL OK.
 Scenes hot-reload; no build needed.
+
+### Pass 76 -- the water-get sparkle (ms_itemget1_b)
+HIS PICK: "bake the bottle's real water sparkle". TMario::emitGetWaterEffect: emitAndBindToPosPtr(MS_ITEMGET1_B, &unk160), bound to his
+centre joint, when a water bottle refills the tank (MarioReceiveMsg.cpp 150 / 159). The disc's ms_itemget1_b.jpa, read with the fixed
+dumper and the JPA engine source (libs/JSystem/src/JParticle):
+  BEM1: a sphere SHELL of r 330 units around the joint (minRad 1.0), FollowEmitter; 1.2 streaks a frame for 80 frames (96 over 1.33 s),
+        life 25; vel omni -12 = 12 units a frame INWARD -- 300 units in the life, from r 330 to 30: water streaking into Mario.
+  BSP1: DirectionCross (two quads crossed about the velocity), X 0.1848 x Y 1.3354 -> 9.2 wide x 66.8 units LONG along the flight
+        (JPABaseShape.cpp 102-103: 0x18 is mBaseSizeY -- THE DUMPER PRINTED Y x X AS "X x Y"; fixed); P_msm_glow3_i; additive (SRCALPHA /
+        ONE), z test, no z write; colour lerp(env -> prm, TEXC), alpha TEXA x prmA; prm (135,255,255,155) -> (183,255,255,179), env
+        (0,183,255) -> (0,127,135) over a 10-frame table sampled at a random phase per streak (calc Random).
+  ESP1: alpha 0 -> 1 by 37.5 %, -> 0 from 87.5 %. Scale in by 75 %: X from 1.0, Y from 0.0 -- THE FIXED-POINT SCALE VALUES ARE x10 IN
+        THE ENGINE (JPAExtraShape.cpp 32-39: mScaleInValueX/Y, unk44/unk4C = fx x 10.0); the dumper printed them raw (0.1 / 0.0), so
+        the streak keeps its width and stretches from nothing to 67 units along its flight. No scale-out, no rotation.
+  SSP1: one child per streak at its death (timing 1.0, rate 1): Billboard, life 16, no velocity, moment -0.3285 -> 0.3285 u/f^2 UP
+        (createChildParticle: unk68 = (0,-1,0), baseVel += moment x unk68 a frame), scale2D X 1.5 x Y 2.0 = 75 wide x 100 tall
+        (JPASweepShape.cpp 24-25: 0x4C is Y; the dumper had these swapped too), shrinking linearly to 0 (JPADrawCalcChildScaleOut), alpha
+        1 (no alphaOut), prm white, env (0,0,255): lerp(blue -> white, I) of P_msm_glow2_i.
+THE SCENE, assets/Sms/Fx/GetWater.tscn (gen_fx_water.py, Godot-native): Streaks = GPUParticles3D, local_coords, amount 30 (72 a second over
+the 0.4167 s life; the script stops emitting after 80 frames), EMISSION_SHAPE_SPHERE_SURFACE r 4.433 m, radial_velocity -9.672 m/s,
+particle_flag_align_y, two PlaneMesh draw passes 0.124 x 0.897 m (FACE_Z + FACE_X = the cross, Y the long axis on both) on
+GetWaterStreak.gdshader (the TEV lerp; COLOR.r = the random phase from color_initial_ramp, COLOR.a = the ESP1 alpha from color_ramp;
+GX colours raw, the result to linear), scale_curve Y 0 -> 1 by 75 %; sub_emitter_mode AT_END x1 -> Puffs: a billboard QuadMesh 1.007 x
+1.343 m, StandardMaterial3D additive on tex/glow2_water.png (lerp(blue -> white, I) baked, alpha I), gravity (0, +15.886, 0), scale 1 -> 0,
+lifetime 0.2667. SmsGetWater.cs : SmsGetSparkle (the same bind / emit-N-frames / free lifecycle; EmitFrames 80 in the scene). Textures
+tex/glow3_i.png (the intensity, read as r) and tex/glow2_water.png, imports pinned lossless (water_imports.py). WaterBottle.tscn's GetEffect
+-> GetWater.tscn (the ms_itemget1_a stand-in retired for the bottle; GetSparkle stays for the nozzle items). Sound slot for him.
+APPROXIMATIONS: GX adds in display space, Godot in linear (the glow sums differ); the Direction quad's roll about the velocity axis
+(JPA: from the emitter's Y) is Godot's own frame.
+TWO SYSTEMIC FINDINGS for the backlog (the dumper is fixed; the shipped scenes are not re-audited here): (a) every ESP1 scale-in / out
+value the earlier passes baked is 10x too small (the wall-kick marks' 0.09 -> 0.125 / 0.07 -> 0.5 are really 0.9 -> 1.25 / 0.7 -> 5.0; the
+bonk and super-hip-drop stars' "0.03 -> 1 -> 0.14" slivers are really 0.3 -> 1 -> 1.4; the Gooble drops, the hip drop, the fire goop
+scales likewise); (b) every asymmetric Direction / DirectionCross quad baked from the dumper (ms_m_biri_a 4.0 x 1.0, ms_m_sphipd_a /
+hit_a / hit_c, the hip drop streaks) may have X and Y swapped. Both need a scene-by-scene re-read.
+VERIFIED: getwater_check.gd (a SceneTree script, removed): the scene loads with every number above (18 checks ALL OK), both bars' AABB
+long axis is Y, the bottle's GetEffect resolves to GetWater.tscn; boot [SMS selftest] ALL OK + slope/hipdrop ALL OK; build 0 errors. The
+look is his to judge (headless cannot draw GPU particles). He builds the hammer (SmsGetWater.cs, SmsWaterBottle.cs); the scenes reload.

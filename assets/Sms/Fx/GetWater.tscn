@@ -1,0 +1,143 @@
+[gd_scene load_steps=21 format=3 uid="uid://cgetwater76b"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsGetWater.cs" id="1_script"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/GetWaterStreak.gdshader" id="2_shader"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/glow3_i.png" id="3_glow3"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/glow2_water.png" id="4_glow2"]
+
+[sub_resource type="Curve" id="Curve_one"]
+resource_name = "the bar's width: ESP1 scale X in 1.0 (raw 0.1 x 10) -- constant"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_stretch"]
+resource_name = "the bar's length along the motion: ESP1 scale Y in 0.0 -> 1 by 75 %, held (no scale-out)"
+_data = [Vector2(0, 0), 0.0, 0.0, 1, 1, Vector2(0.75, 1), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_streak"]
+curve_x = SubResource("Curve_one")
+curve_y = SubResource("Curve_stretch")
+curve_z = SubResource("Curve_one")
+
+[sub_resource type="Gradient" id="Gradient_streak_alpha"]
+resource_name = "ms_itemget1_b ESP1 alpha: 0 -> 1 by 37.5 %, -> 0 from 87.5 % (COLOR.a for the shader)"
+offsets = PackedFloat32Array(0, 0.025, 0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25, 0.275, 0.3, 0.325, 0.35, 0.375, 0.4, 0.425, 0.45, 0.475, 0.5, 0.525, 0.55, 0.575, 0.6, 0.625, 0.65, 0.675, 0.7, 0.725, 0.75, 0.775, 0.8, 0.825, 0.85, 0.875, 0.9, 0.925, 0.95, 0.975, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.0667, 1, 1, 1, 0.1333, 1, 1, 1, 0.2, 1, 1, 1, 0.2667, 1, 1, 1, 0.3333, 1, 1, 1, 0.4, 1, 1, 1, 0.4667, 1, 1, 1, 0.5333, 1, 1, 1, 0.6, 1, 1, 1, 0.6667, 1, 1, 1, 0.7333, 1, 1, 1, 0.8, 1, 1, 1, 0.8667, 1, 1, 1, 0.9333, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.8, 1, 1, 1, 0.6, 1, 1, 1, 0.4, 1, 1, 1, 0.2, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_streak_alpha"]
+gradient = SubResource("Gradient_streak_alpha")
+
+[sub_resource type="Gradient" id="Gradient_phase"]
+resource_name = "the colour table's random phase per streak (calc Random over the 10-frame prm / env keys): COLOR.r = 0..1 for the shader"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(0, 1, 1, 1, 1, 1, 1, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_phase"]
+gradient = SubResource("Gradient_phase")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_streaks"]
+lifetime_randomness = 0.0
+particle_flag_align_y = true
+emission_shape = 2
+emission_sphere_radius = 4.433
+direction = Vector3(0, 0, 1)
+spread = 0.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+gravity = Vector3(0, 0, 0)
+radial_velocity_min = -9.672
+radial_velocity_max = -9.672
+scale_curve = SubResource("CurveXYZTexture_streak")
+color_ramp = SubResource("GradientTexture1D_streak_alpha")
+color_initial_ramp = SubResource("GradientTexture1D_phase")
+sub_emitter_mode = 2
+sub_emitter_amount_at_end = 1
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_streak"]
+resource_name = "water-get streak (ms_itemget1_b: lerp(env -> prm, I) of P_msm_glow3_i, alpha I x prmA, additive; prm / env at a random phase of the 10-frame table)"
+render_priority = 1
+shader = ExtResource("2_shader")
+shader_parameter/prm0 = Vector4(0.5294, 1, 1, 0.6078)
+shader_parameter/prm1 = Vector4(0.7176, 1, 1, 0.702)
+shader_parameter/env0 = Vector3(0, 0.7176, 1)
+shader_parameter/env1 = Vector3(0, 0.498, 0.5294)
+shader_parameter/glow = ExtResource("3_glow3")
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_bar_z"]
+resource_name = "the cross's first bar: 9.2 across x 66.8 along the velocity (units), in the XY plane (Y = the velocity)"
+material = SubResource("ShaderMaterial_streak")
+size = Vector2(0.1241, 0.8969)
+orientation = 2
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_bar_x"]
+resource_name = "the cross's second bar, the same in the ZY plane (DirectionCross: the two quads share the velocity axis)"
+material = SubResource("ShaderMaterial_streak")
+size = Vector2(0.1241, 0.8969)
+orientation = 0
+
+[sub_resource type="Curve" id="Curve_shrink"]
+resource_name = "the child puff: scaleOut, 1 -> 0 over its 16 frames"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_puff"]
+curve_x = SubResource("Curve_shrink")
+curve_y = SubResource("Curve_shrink")
+curve_z = SubResource("Curve_shrink")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_puffs"]
+lifetime_randomness = 0.0
+emission_shape = 0
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+gravity = Vector3(0, 15.886, 0)
+scale_curve = SubResource("CurveXYZTexture_puff")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_puff"]
+resource_name = "water-get puff (ms_itemget1_b SSP1: P_msm_glow2_i, lerp(env (0,0,255) -> prm white, I) baked, alpha I, additive)"
+transparency = 1
+blend_mode = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("4_glow2")
+disable_receive_shadows = true
+billboard_mode = 3
+billboard_keep_scale = true
+render_priority = 2
+
+[sub_resource type="QuadMesh" id="QuadMesh_puff"]
+material = SubResource("StandardMaterial3D_puff")
+size = Vector2(1.0075, 1.3433)
+
+[node name="GetWater" type="Node3D" node_paths=PackedStringArray("Particles", "Sound")]
+script = ExtResource("1_script")
+Particles = NodePath("Streaks")
+Sound = NodePath("Sound")
+EmitFrames = 80
+
+[node name="Streaks" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 30
+sub_emitter = NodePath("../Puffs")
+lifetime = 0.4167
+local_coords = true
+visibility_aabb = AABB(-5, -5, -5, 10, 10, 10)
+process_material = SubResource("ParticleProcessMaterial_streaks")
+draw_passes = 2
+draw_pass_1 = SubResource("PlaneMesh_bar_z")
+draw_pass_2 = SubResource("PlaneMesh_bar_x")
+
+[node name="Puffs" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 48
+lifetime = 0.2667
+local_coords = true
+visibility_aabb = AABB(-2, -2, -2, 4, 4, 4)
+process_material = SubResource("ParticleProcessMaterial_puffs")
+draw_pass_1 = SubResource("QuadMesh_puff")
+
+[node name="Sound" type="AudioStreamPlayer3D" parent="."]
