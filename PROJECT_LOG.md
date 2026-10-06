@@ -5061,3 +5061,22 @@ VERIFIED: pause_sparks_check.gd (removed; Level.tscn under a --script tree with 
 first pulse (bounce 3.3) at item 0's centre to 0.0 px with the shape scale 4 x 188 / 129; a second burst one pulse later; a stick-down move
 hides it at once and item 1's burst follows 7 frames later at its centre (width 120 -> scale 3.72). Build 0 errors; boot ALL OK. The look
 is his (headless draws no particle). He builds the hammer (SmsPauseMenu.cs); PauseMenu.tscn reloads.
+
+### Pass 81 -- the ride's one-step hover (pass 63's residue)
+MEASURED (patch_smoke81.py, removed: the pass-63 lift, an AnimatableBody3D moved by code before the carry, Mario on it; down 3 m/s, up 3
+m/s, +X 1.5 m/s with a 90 deg/s turn, the gap between his feet and the deck's drawn top sampled every 0.1 s before the lift's move):
+BEFORE -- 5 cm over a deck going down and 5 cm into one going up while they moved, 5 cm left in his local point (0.245 instead of 0.195)
+after the descent stopped; the turn exact. WHY: at his tick the collision world holds a kinematic deck TWO steps behind its node (a
+transform set in a script is flushed to the server after that frame's step and moved in the next; readable two ticks later), so the
+carry's one-step extrapolation of the server matrix still placed him a step behind the drawn deck, MoveAndSlide then settled him against
+the lagging collision (pushed up on a descent, snapped down on a climb), and checkRideReCalc measured that settled position against the
+carry's matrix -- the step baked into unk2F4 for good.
+FIX (Mario.cs SmsRideApply / SmsRideReCalc): the carry puts him on the deck the COLLISION world knows (the server's matrix, no
+extrapolation), so his own move runs consistent with the floor he touches; the step from that deck to the DRAWN one (node x local -
+server x local, _smsRideShift) is added after MoveAndSlide when he still rides the same actor, and his point is re-measured against the
+drawn matrix; the mount still measures against the collision's (the deck he landed on); the facing turn and the knob's leave velocity read
+the drawn matrix. SmsRideExtrapolate and its teleport guard are gone (a teleport is just a bigger shift). A lift whose script runs before
+his (tree order, or a lower process priority) is exact; one that runs after is one step behind at render, as the engine's own carry is.
+The game's matrix is its own collision, so this is checkRideMovement's result in Godot's terms. LEGACY RETIRED: the extrapolated carry.
+VERIFIED: the same drive after the fix -- all three legs mean gap -0.49 cm (the resting contact, the same at a standstill), worst -0.49,
+floor True throughout, the local point 0.195 steady, no hover left after either stop; build 0 errors; boot ALL OK. He builds the hammer.

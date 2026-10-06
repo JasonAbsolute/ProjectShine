@@ -16764,6 +16764,12 @@ public partial class Mario : CharacterBody3D
     // MarioMove.s, checkRideMovement) attaches on groundActor != null && !JUMPING && isTouchGround4cm -- the decomp's 'wall !=
     // nullptr' in that test is wrong (r5 = mGroundPlane->mActor is what is compared). The engine's own carry (contact-point
     // velocity, nothing about the pivot, the platform's velocity ADDED on leaving) is switched off.
+    // GODOT'S LAG (pass 81, measured): the collision world holds a kinematic deck TWO steps behind its node at his tick (a transform
+    // set in a script is flushed to the server after that frame's step and moved in the next), and MoveAndSlide settles him against
+    // that -- so the carry puts him on the deck the COLLISION knows (the server's matrix), his move runs consistent with it, and the
+    // step from that deck to the DRAWN one (node x local - server x local) is added after the move: he ends the tick where the deck
+    // is drawn, his point re-measured against the drawn matrix. A lift whose script runs before his is exact; one that runs after is
+    // one step behind at render (as the engine's own carry is).
     // ---------------------------------------------------------------------------------------------------------------
 
     /// <summary>DEVIATION knob (off = the game): keep the platform's velocity when he leaves it, as Godot's CharacterBody3D did by
@@ -16774,9 +16780,9 @@ public partial class Mario : CharacterBody3D
     private float _smsRideYawRef;           // unk30C: the actor's yaw last tick
     private Transform3D _smsRideLastXf;     // the actor's matrix at the last carry (the knob's leave velocity)
     private Vector3 _smsRideVel;            // the platform's velocity at his point over the last tick (the knob only)
-    private Transform3D _smsRideXf;         // the matrix this tick's carry used (the bottom re-measures against the same one)
-    private Transform3D _smsRideSrvPrev;    // the actor's server transform at the last tick: the motion to extrapolate
-    private bool _smsRideSrvValid, _smsRideApplied;
+    private Transform3D _smsRideXf;         // the collision world's matrix this tick's carry placed him by
+    private Vector3 _smsRideShift;          // drawn x local - collision x local: the deck's lag, added after his move (pass 81)
+    private bool _smsRideApplied;
 
     private void SmsRideSetup()
     {
@@ -16809,8 +16815,8 @@ public partial class Mario : CharacterBody3D
         }
     }
 
-    /// <summary>The actor's matrix as the collision world has it: a kinematic body's server transform (one step behind the node when its
-    /// script ran first this frame; the node when it runs after), else the node's.</summary>
+    /// <summary>The actor's matrix as the collision world has it: a kinematic body's server transform (two steps behind the node when its
+    /// script ran first this frame, one when it runs after -- pass 81's measurement), else the node's.</summary>
     private static Transform3D SmsRideServerXf(Node3D body)
     {
         if (body is AnimatableBody3D ab)
@@ -16822,20 +16828,9 @@ public partial class Mario : CharacterBody3D
         return body.GlobalTransform;
     }
 
-    /// <summary>One step ahead of <paramref name="cur"/> along the motion from <paramref name="prev"/>: the matrix the world will have at the
-    /// END of this step, so the carry puts him where the deck is about to be. (The server's own velocity is not used: a kinematic body
-    /// reports its spawn / teleport as one step's motion, 70 m/s for a lift placed 1.2 m up.)</summary>
-    private static Transform3D SmsRideExtrapolate(Transform3D prev, Transform3D cur)
-    {
-        Vector3 dp = cur.Origin - prev.Origin;
-        Basis d = cur.Basis * prev.Basis.Inverse();
-        if (dp.LengthSquared() > 1f || d.GetRotationQuaternion().GetAngle() > 0.5f)
-            return cur; // a metre or 30 degrees in one step is a teleport (a reset, a respawn), not a motion to continue
-        return new Transform3D((d * cur.Basis).Orthonormalized(), cur.Origin + dp);
-    }
-
     /// <summary>checkRideMovement's riding branch, at the top of the tick: mPosition = ridingMtx x unk2F4; mFaceAngle.y += the actor's yaw
-    /// delta (unk30C). The mount tick (checkRideReCalc only) moves nothing -- that is the bottom's job.</summary>
+    /// delta (unk30C). The mount tick (checkRideReCalc only) moves nothing -- that is the bottom's job. Here by the COLLISION world's
+    /// matrix, the drawn deck's lead kept aside for after his move (pass 81; see the header).</summary>
     private void SmsRideApply()
     {
         if (_smsRideBody == null)
@@ -16845,17 +16840,17 @@ public partial class Mario : CharacterBody3D
             _smsRideBody = null;
             return;
         }
-        Transform3D cur = SmsRideServerXf(_smsRideBody);
-        Transform3D xf = _smsRideSrvValid ? SmsRideExtrapolate(_smsRideSrvPrev, cur) : cur;
-        _smsRideSrvPrev = cur;
-        _smsRideSrvValid = true;
-        _smsRideXf = xf;
+        Transform3D col = SmsRideServerXf(_smsRideBody);     // the deck the collision world knows: what MoveAndSlide will touch
+        Transform3D drawn = _smsRideBody.GlobalTransform;    // the deck as it is drawn this frame (already moved when its script ran first)
+        _smsRideXf = col;
         _smsRideApplied = true;
-        GlobalPosition = xf * _smsRideLocal;
+        GlobalPosition = col * _smsRideLocal;                // on the collision's deck: his own move stays consistent with the floor
+        Vector3 onDrawn = drawn * _smsRideLocal;
+        _smsRideShift = onDrawn - GlobalPosition;            // the deck's lag, put back after his move (SmsRideReCalc)
         float dt = (float)GetPhysicsProcessDeltaTime();
-        _smsRideVel = dt > 0f ? (GlobalPosition - _smsRideLastXf * _smsRideLocal) / dt : Vector3.Zero;
-        _smsRideLastXf = xf;
-        float yaw = xf.Basis.GetEuler().Y;
+        _smsRideVel = dt > 0f ? (onDrawn - _smsRideLastXf * _smsRideLocal) / dt : Vector3.Zero;
+        _smsRideLastXf = drawn;
+        float yaw = drawn.Basis.GetEuler().Y;
         float d = SmsMath.WrapAngle(yaw - _smsRideYawRef);
         _smsRideYawRef = yaw;
         if (MathF.Abs(d) > 1e-6f)
@@ -16870,7 +16865,9 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>checkRideReCalc at the bottom of the tick (playerControl 2392): on an actor's floor, grounded, not in a jump status -> ride
     /// it (a new actor: mount -- unk2C0, unk30C seeded, no displacement); unk2F4 = inverse(ridingMtx) x mPosition, so his own walking
-    /// this tick is folded into the local point. Off the actor -> unk2C0 = null, nothing kept (the knob adds the engine's old carry-over).</summary>
+    /// this tick is folded into the local point. Off the actor -> unk2C0 = null, nothing kept (the knob adds the engine's old carry-over).
+    /// A tick that rode in: the deck's lag (SmsRideApply's shift) is added first, so he stands where the deck is drawn and his point is
+    /// measured against the drawn matrix (pass 81). The mount measures against the collision's matrix: that is the deck he landed on.</summary>
     private void SmsRideReCalc()
     {
         Node3D body = null;
@@ -16898,20 +16895,20 @@ public partial class Mario : CharacterBody3D
                 if (SmsDebugPrint)
                     GD.Print($"[SMS ride] off {_smsRideBody.Name}{(RideKeepVelocityOnLeave ? $" (+ its {_smsRideVel.Length():F2} m/s, the knob)" : " (nothing kept)")}: state {stateOfMario}, floor {IsOnFloor()}");
                 _smsRideBody = null;
-                _smsRideSrvValid = false;
                 _smsRideApplied = false;
             }
             return;
         }
         Transform3D xf;
         if (body == _smsRideBody && _smsRideApplied)
-            xf = _smsRideXf; // the matrix this tick's carry used: his own walking is what changed in between
+        {
+            GlobalPosition += _smsRideShift;   // from the collision's deck to the drawn one: the hover was this step, left in (pass 81)
+            xf = body.GlobalTransform;         // the drawn matrix: his own walking is what changed in between
+        }
         else
         {
-            xf = SmsRideServerXf(body);
+            xf = SmsRideServerXf(body);        // the mount: the deck he landed on, as the collision world had it
             _smsRideBody = body;
-            _smsRideSrvPrev = xf;
-            _smsRideSrvValid = true;
             _smsRideLastXf = xf;
             _smsRideYawRef = xf.Basis.GetEuler().Y;
             _smsRideVel = Vector3.Zero;
