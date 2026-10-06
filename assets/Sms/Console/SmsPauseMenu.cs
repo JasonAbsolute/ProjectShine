@@ -19,7 +19,11 @@ using Godot;
 /// under STATE_PAUSE_MENU. THE SMOKE (pass 70b): drawAppearPane (597) creates ms_2d_pause_smo (emitter 0x1F9) at a letter's centre when its
 /// appear anim reaches 2.0 -- here one PauseSmoke.tscn (GPUParticles2D, the .jpa's numbers) per letter under Root/Smoke, Root's last child
 /// (the 2D emitter manager is the last of Group 2D: over the letters), restarted at the crossing. The selected item's sparks (0x1FA,
-/// ms_2d_pause_sel at bounce 3) are not ported. The scene: assets/Sms/Console/PauseMenu.tscn under Mario.
+/// ms_2d_pause_sel at bounce 3) -- THE SPARKS (pass 80): TPauseMenu2 (441-457) creates emitter 0x1FA at the selected item's global
+/// bounds centre when its bounce clock hits mEffectKeyFrame (3: 6 frames into every 71-frame pulse), scaled (4 x width / 129, 1, 1) so
+/// the 14 sparks spawn along the item's width, and force-deletes it when the cursor moves (402-408, 431-434) -- here one
+/// PauseSparks.tscn (GPUParticles2D, the .jpa's numbers) under SmokeRoot, restarted at the item's centre with emission_shape_scale.x
+/// = 4 x width / 129, hidden on a move. The scene: assets/Sms/Console/PauseMenu.tscn under Mario.
 /// </summary>
 public partial class SmsPauseMenu : CanvasLayer
 {
@@ -53,6 +57,12 @@ public partial class SmsPauseMenu : CanvasLayer
     [Export] public Node2D SmokeRoot;
     /// <summary>assets/Sms/Console/PauseSmoke.tscn: ms_2d_pause_smo as a one-shot GPUParticles2D; one instance a letter.</summary>
     [Export] public PackedScene SmokeScene;
+    /// <summary>assets/Sms/Console/PauseSparks.tscn: ms_2d_pause_sel as a one-shot GPUParticles2D -- the selected item's sparks (pass 80), one
+    /// instance under SmokeRoot, restarted at bounce <see cref="SparkBounce"/> of every pulse. Empty = no sparks.</summary>
+    [Export] public PackedScene SparksScene;
+    /// <summary>TPauseMenu2::mEffectKeyFrame (3) and mEffectStretch (129): the bounce clock's value that fires the sparks, and the item
+    /// width the emitter's (4, 1, 1) scale is drawn for -- setEmitterScale(4 x width / mEffectStretch, 1, 1).</summary>
+    public const float SparkBounce = 3f, SparkStretch = 129f;
     [Export] public Label StageName, ScenarioName;
     /// <summary>The selected item's colour (tx_1's white: 3cff3c).</summary>
     [Export] public Color ItemColor = new Color(0x3c / 255f, 1f, 0x3c / 255f);
@@ -74,6 +84,8 @@ public partial class SmsPauseMenu : CanvasLayer
     private GpuParticles2D[] _smoke = System.Array.Empty<GpuParticles2D>(); // one puff a letter, under SmokeRoot
     private bool[] _smoked = System.Array.Empty<bool>();                      // the letter's puff went this appear
     private int _smokeFired; private string _smokeLog = "";
+    private GpuParticles2D _sparks;                                            // the one selection-sparks emitter (mEmitter)
+    private int _sparksFired; private string _sparksLog = "";
     private Vector2[] _itemHome = System.Array.Empty<Vector2>(), _itemSize = System.Array.Empty<Vector2>();
     private float _firstItemRot;
     private Mario _mario;
@@ -96,6 +108,10 @@ public partial class SmsPauseMenu : CanvasLayer
     public int SmokeFired => _smokeFired;
     public string SmokeLog => _smokeLog;
     public GpuParticles2D[] SmokePuffs => _smoke;
+    /// <summary>For the drives: sparks bursts since Open, "item@bounce(x,y)w" per burst, and the emitter.</summary>
+    public int SparksFired => _sparksFired;
+    public string SparksLog => _sparksLog;
+    public GpuParticles2D Sparks => _sparks;
     public float MaskAlpha => Mask != null && Mask.Visible ? Mask.Color.A : 0f;
 
     public override void _Ready()
@@ -234,6 +250,8 @@ public partial class SmsPauseMenu : CanvasLayer
             Letters[i].Rotation = _letterRot[i] + Mathf.Pi;
         }
         System.Array.Fill(_smoked, false); _smokeFired = 0; _smokeLog = "";
+        _sparksFired = 0; _sparksLog = "";
+        SparksOff();
         if (Menu != null) { Menu.Modulate = Colors.White; Menu.Rotation = 0f; }
         if (Mask != null) { Mask.Visible = true; Mask.Color = new Color(0f, 0f, 0f, 0f); }
         if (Stage != null) Stage.Modulate = new Color(1f, 1f, 1f, 0f);
@@ -281,6 +299,44 @@ public partial class SmsPauseMenu : CanvasLayer
         g.Restart();
         _smokeFired++;
         _smokeLog += $"{i}@{_fade:F1}({c.X:F0},{c.Y:F0}) ";
+    }
+
+    /// <summary>TPauseMenu2 441-457: createEmitter(the item's global bounds centre, 0x1FA) + setEmitterScale(4 x width / 129, 1, 1): the
+    /// sparks along the item's width. One emitter: a restart at the new place (the game keeps only the latest, mEmitter).</summary>
+    private void SparksAt(int i)
+    {
+        if (SparksScene == null || SmokeRoot == null || i < 0 || i >= Items.Length)
+            return;
+        if (_sparks == null || !IsInstanceValid(_sparks))
+        {
+            _sparks = SparksScene.Instantiate<GpuParticles2D>();
+            _sparks.Name = "Sparks";
+            _sparks.Emitting = false;
+            if (_sparks.ProcessMaterial != null)
+                _sparks.ProcessMaterial = (Material)_sparks.ProcessMaterial.Duplicate(); // the width scale is set per item
+            SmokeRoot.AddChild(_sparks);
+        }
+        TextureRect it = Items[i];
+        Vector2 c = SmokeRoot.ToLocal(it.GetGlobalTransform() * (it.Size * 0.5f));  // getGlobalBounds's centre (the bounce keeps it)
+        float width = it.Size.X;                                                     // getWidth(): the pane's bounds as reformed last tick (the bounce's +hw each side)
+        if (_sparks.ProcessMaterial is ParticleProcessMaterial pm)
+            pm.EmissionShapeScale = new Vector3(4f * width / SparkStretch, 1f, 1f);
+        _sparks.Position = c;
+        _sparks.Visible = true;
+        _sparks.SpeedScale = SmsHud.Anim;
+        _sparks.Restart();
+        _sparksFired++;
+        _sparksLog += $"{i}@{_bounce:F1}({c.X:F0},{c.Y:F0})w{width:F0} ";
+    }
+
+    /// <summary>forceDeleteEmitter: the sparks vanish at once (a one-shot keeps its particles, so the node is hidden until the next burst).</summary>
+    private void SparksOff()
+    {
+        if (_sparks != null && IsInstanceValid(_sparks))
+        {
+            _sparks.Emitting = false;
+            _sparks.Visible = false;
+        }
     }
 
     private void AppearWindow(float units)
@@ -378,7 +434,11 @@ public partial class SmsPauseMenu : CanvasLayer
             Reform(Items[cur], _itemHome[cur], _itemSize[cur], 0f, 0f);
             Items[_selected].Modulate = ItemColor;
             _bounce = 0f;
+            SparksOff(); // gpEmitterManager4D2->forceDeleteEmitter(mEmitter): the old item's sparks go at once
         }
+        // mBounceAnim == mEffectKeyFrame (441): the clock steps 0.5 a frame in the game and lands on 3 exactly; here it crosses it
+        if (_bounce >= SparkBounce && _bounce - units < SparkBounce)
+            SparksAt(_selected);
         // the selected item's pulse: +1 px a unit to 18, back by 35, the colour shifting toward white
         TextureRect sel = Items[_selected];
         float shift;
@@ -432,6 +492,7 @@ public partial class SmsPauseMenu : CanvasLayer
     private void Close()
     {
         _state = State.Closed;
+        SparksOff();
         if (Root != null) Root.Visible = false;
         if (Mask != null) Mask.Visible = false;
         GetTree().Paused = false;

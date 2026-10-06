@@ -5035,3 +5035,29 @@ gen_fx_fire.py writes the shader with the scenes. LEGACY RETIRED: the fixed-Y bi
 VERIFIED: twist_check.gd (removed) -- the loaded scene's streak material is the ShaderMaterial on ShockStreak.gdshader with its texture, the
 process material carries angle +-180 / angular velocity 540..1620 with align_y on and rotate_y off; boot ALL OK with no shader error
 (headless cannot compile GLSL: the render_mode list is GetWaterStreak's, which compiled on his machine in pass 76). The scene hot-reloads.
+
+### Pass 80 -- the pause menu's selection sparks (ms_2d_pause_sel)
+THE GAME (GC2D/PauseMenu2.cpp 441-457): on every pulse of the selected item, when its bounce clock equals mEffectKeyFrame (3 -- the clock
+steps 0.5 a frame, so 6 frames into each 71-frame pulse) TPauseMenu2 creates emitter 0x1FA (ms_2d_pause_sel) at the item's global bounds
+centre and setEmitterScale(4 x getWidth() / mEffectStretch (129), 1, 1); a cursor move forceDeleteEmitters the last one (402-408, 431-434).
+THE EFFECT (jpa_dump.py): a 2D emitter whose Circle (r 15, the rim, FixedInterval: 14 evenly spaced for one frame = one burst of 14) lies
+in XZ -- on the screen (XY) a horizontal line, denser at the ends; vel axis 10 u/f along the point's own XZ direction (JPAEmitter.cpp 554:
+the emitter scale touches the position, not the velocity), so each spark flies sideways at 10 x cos(angle) px/f -- the end ones fast, the
+middle ones barely -- under airResist 0.85/f, 25 frames; DirBillboard 0.2 x 0.5 (10 px across, 25 along the velocity) of P_msm_shikaku_i
+(I4 16 x 16), TEXC x prm additive, prm keys (255,255,72) at frame 5 -> (255,39,0) at 30, calc 3 = Merge (JPADrawVisitor.cpp 1673: the
+31-frame table stretched over the particle's life: yellow to 16 %, red by 97 %); alpha 1 to 50 % -> 0; scale X 1, Y 1 -> 0.2 (the streak
+shortens to 5 px); no rotation.
+GODOT: assets/Sms/Console/PauseSparks.tscn (gen_fx_pause.py): GPUParticles2D, one shot, explosiveness 1, 14 x 25/60 s, fixed 60 fps, with
+particle_flag_disable_z + DIRECTED POINTS on the rim (64 points (x, 0, z), 'normals' (cos, 0, sin)): in 2D the normal's XY rotates the
+(speed, 0) velocity, so the non-unit (cos, 0) gives speed x cos and the Z drops -- the game's projection exactly; emission_shape_scale.x
+= 4 x width / 129 set per burst; the exponential drag as a linear brake over the same 65.5 px; align_y for the quad along the velocity;
+the 16 px texture scaled (10/16, 25/16 -> 5/16) by a CurveXYZTexture; the ramp as above; a CanvasItemMaterial additive. The texture:
+jpa_bake.py's new 'pause_spark' job (flat: white, the I4 intensity as alpha), pinned lossless. SmsPauseMenu.cs: SparksScene export (set in
+PauseMenu.tscn), one GPUParticles2D under SmokeRoot (over the panes, as gpEmitterManager4D2 draws); SparksAt(item) at the tick the bounce
+clock has just reached 3 (the game's == 3 at the top of the tick), at the item's global-transform centre with the pane's bounds width (as
+reformed last tick, getWidth()); SparksOff() (hidden, a one-shot keeps its particles) on a cursor move, on Open and on Close. LEGACY
+RETIRED: the "not ported" note. The ShockStreak.gdshader.uid the import wrote for pass 79 rides along.
+VERIFIED: pause_sparks_check.gd (removed; Level.tscn under a --script tree with GameData added by hand): the first burst 6 frames into the
+first pulse (bounce 3.3) at item 0's centre to 0.0 px with the shape scale 4 x 188 / 129; a second burst one pulse later; a stick-down move
+hides it at once and item 1's burst follows 7 frames later at its centre (width 120 -> scale 3.72). Build 0 errors; boot ALL OK. The look
+is his (headless draws no particle). He builds the hammer (SmsPauseMenu.cs); PauseMenu.tscn reloads.

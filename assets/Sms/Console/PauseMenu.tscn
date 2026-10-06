@@ -6,6 +6,7 @@
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/pause_tx_3.png" id="t_tx3"]
 [ext_resource type="Texture2D" path="res://assets/Sms/hud/pause_bar.png" id="t_bar"]
 [ext_resource type="PackedScene" uid="uid://cpausesmk070" path="res://assets/Sms/Console/PauseSmoke.tscn" id="s_smoke"]
+[ext_resource type="PackedScene" uid="uid://cpausesprk080" path="res://assets/Sms/Console/PauseSparks.tscn" id="s_sparks"]
 
 [node name="PauseMenu" type="CanvasLayer" node_paths=PackedStringArray("Root", "Mask", "Menu", "Items", "Stage", "StageName", "ScenarioName", "SmokeRoot")]
 process_mode = 3
@@ -20,6 +21,7 @@ StageName = NodePath("Root/Stage/map")
 ScenarioName = NodePath("Root/Stage/task")
 SmokeRoot = NodePath("Root/Smoke")
 SmokeScene = ExtResource("s_smoke")
+SparksScene = ExtResource("s_sparks")
 ItemColor = Color(0.235294, 1, 0.235294, 1)
 PauseAction = "button_start"
 ExitAreaScene = ""
