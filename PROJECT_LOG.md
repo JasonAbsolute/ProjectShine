@@ -4823,3 +4823,30 @@ VERIFIED headless (bottle_scale_check.gd, a SceneTree script, removed): two drop
 10-tick slots from 1.5 s and time out together at 4.47 s ("timed out"). Build 0 errors; boot [SMS selftest] ALL OK + slope/hipdrop ALL OK.
 He builds the hammer (SmsWaterBottle.cs) and reloads WaterBottle.tscn.
 LESSON: a decomp field that is animated is not necessarily drawn -- trace it to the matrix the renderer reads before porting it as a look.
+
+### Pass 74 -- three small fixes: the spawn's floor normal, the roll jump's clip, the Get Sparkle's launch axis
+HIS PICK from the verified backlog ("Do the three small fixes first"). Each re-checked in the code and the source before the edit.
+1. THE SPAWN'S ONE-FRAME OIL_SLOPE. Every boot logged "[SMS goop] OIL_SLOPE on '' (floor normal.y 0.000 <= 0.95)" on the goop under
+the spawn, then "oilRun from landing". Cause: checkGraffitoSlip (Mario.cs ~14928) read Godot's GetFloorNormal(), which is ZERO until
+MoveAndSlide has registered the floor, and the first tick after a spawn is grounded only by the 4-unit ray (_smsGround4cm = IsOnFloor()
+|| SmsFloorWithin(4)); a zero normal passed `y <= SlopeAngle` as a steep slope. The game reads mFloorTriangle->getNormal(), the floor under
+him, always valid when grounded (MarioMove.cpp 862). FIX: SmsFloorNormal4cm() -- GetFloorNormal() when IsOnFloor(), else the 4-unit
+ray's own normal, else Up. Only this call site changed; the other GetFloorNormal() readers already sit under IsOnFloor() gates.
+2. THE WIRE ROLL JUMP'S CLIP. wireJumping (MarioJump.cpp 1023-1028): from WIRE_ROLLING, mStatusArg 0 (the spin with unkF6 < 0, released
+through (-0x2000, RotSpeedMax - 0x2000]) plays ANIM_GIANT_ROLLING, arg 1 (unkF6 > 0, through [0x6000 - RotSpeedMax, 0x6000)) plays ANIM_ROLL
+-- the two rolls turn opposite ways, each with the spin that launched it. Pass 66 played ma_roll for both with the comment "no giant
+rolling clip in the library"; wrong -- his imported Mario.glb carries ma_giant_rolling (0.317 s, the same length as ma_roll; gMarioAnimeData
+0xF8 and 0x6F are both row-kind 0x02). FIX: SmsWireRollJumpOff(arg) picks ma_giant_rolling first for arg 0 and ma_roll first for arg 1,
+the other roll as the fallback, the jump_rolling clips after. Legacy retired: the one-clip stand-in.
+3. THE GET SPARKLE'S LAUNCH AXIS. assets/Sms/Fx/GetSparkle.tscn's Stars material is EMISSION_SHAPE_DIRECTED_POINTS with direction
+(0, 1, 0) -- the pass-72c bug (Godot rotates `direction` into each point's frame with the baked normal as +Z, so (0, 1, 0) sent the
+1.612 m/s drift along one node axis instead of out along the normals). Hidden under the orbit motion, still wrong. FIX: (0, 0, 1) in the
+scene and in gen_fx.py, the generator that writes it (tools/projectshine, not in the repo). The Stardust node is a point emitter (shape
+0): `direction` is world-up there and stays.
+VERIFIED: (1) boot before / after: the OIL_SLOPE line is gone, he goes "oilRun from landing" straight away; [SMS selftest] ALL OK +
+slope/hipdrop ALL OK, no ERROR. (2) drive 60 (removed before the commit): the library has ma_giant_rolling and ma_roll (0.317 s each); a wire
+built over him, A -> Hanging; SmsWireRollJumpOff(0) with a -2000 spin -> clip ma_giant_rolling, current animation ma_giant_rolling, tree
+off, vy 51.3 m/s, the spin ended at touchdown after 108 frames with the tree back on; back under the wire, Hanging, SmsWireRollJumpOff(1)
+with +2000 -> ma_roll the same way. [F60] ALL OK, 17 checks. (3) sparkle_dir_check.gd (a SceneTree script, removed): GetSparkle.tscn
+loads, Stars shape 5 direction (0, 0, 1), Stardust shape 0 -- ALL OK. Build 0 errors. He builds the hammer (Mario.cs); GetSparkle.tscn
+reloads from disk.

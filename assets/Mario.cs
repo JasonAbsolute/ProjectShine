@@ -14925,7 +14925,7 @@ public partial class Mario : CharacterBody3D
             _smsOilBrake = SmsParams.Dirty.BrakeStartValRun;
             _smsDirtyTimer = SmsParams.Dirty.DirtyTimeRun;
         }
-        Vector3 floorN = GetFloorNormal();
+        Vector3 floorN = SmsFloorNormal4cm(); // mFloorTriangle->getNormal(): Godot's GetFloorNormal() is zero on the ray-grounded first tick (a spawn)
         if (floorN.Y <= SmsParams.Dirty.SlopeAngle)
         {
             _smsOilBrake = SmsParams.Dirty.BrakeStartValSlip;
@@ -16545,6 +16545,19 @@ public partial class Mario : CharacterBody3D
         return GetWorld3D().DirectSpaceState.IntersectRay(q).Count > 0;
     }
 
+    /// <summary>mFloorTriangle->getNormal() for a tick grounded within 4 units: Godot's GetFloorNormal() is zero until MoveAndSlide has
+    /// registered the floor -- the first tick after a spawn or a teleport, when only the 4-unit ray (_smsGround4cm) says "floor" -- and a
+    /// zero normal reads as a steep slope (a one-frame OIL_SLOPE on goop under the spawn). The ray's own normal stands in; no floor = flat.</summary>
+    private Vector3 SmsFloorNormal4cm()
+    {
+        if (IsOnFloor())
+            return GetFloorNormal();
+        var q = PhysicsRayQueryParameters3D.Create(GlobalPosition + Vector3.Up * 0.02f, GlobalPosition - Vector3.Up * SmsUnits.UnitsToMetres(4f), CollisionMask,
+            new Godot.Collections.Array<Rid> { GetRid() });
+        var hit = GetWorld3D().DirectSpaceState.IntersectRay(q);
+        return hit.Count > 0 ? ((Vector3)hit["normal"]).Normalized() : Vector3.Up;
+    }
+
     /// <summary>isThrowStart() (MarioRun.cpp 50; the run, brake and turn ticks) and the wait side (MarioWait.cpp 566): B pressed while holding.
     /// An enemy (actor type bit 0x10000000) is always PITCHED; a map object is pitched when mForwardVel > 16, else PUT down if canPut() allows,
     /// else kept. Both are stopCommon states: waitProcess() zeroes his speed at once, the clip plays at 1.0, WAIT at its last frame.</summary>
@@ -17507,8 +17520,9 @@ public partial class Mario : CharacterBody3D
     }
 
     /// <summary>WIRE_ROLL_JUMP (MarioMove.cpp 620-642): power = angVel x JumpRate; arg 0: vy = power sin(0xE000), fwd = power -cos(0xE000)
-    /// along the control face (a quarter turn on from the rope); arg 1 the same at 0x6000. The clip: ANIM_GIANT_ROLLING (0) / ANIM_ROLL (1)
-    /// -- the port's ma_roll for both (no giant rolling clip in the library); it lands in SEC_JUMP_SLIP and never clash-crashes.</summary>
+    /// along the control face (a quarter turn on from the rope); arg 1 the same at 0x6000. The clip (wireJumping, MarioJump.cpp 1023-1028):
+    /// ANIM_GIANT_ROLLING for arg 0, ANIM_ROLL for arg 1 -- the two rolls turn opposite ways, each with the spin that launched it; it lands
+    /// in SEC_JUMP_SLIP and never clash-crashes.</summary>
     private void SmsWireRollJumpOff(int arg)
     {
         Vector3 along = SmsWireAlong();
@@ -17529,9 +17543,11 @@ public partial class Mario : CharacterBody3D
         _smsWireAir = SmsWireAir.RollJump;
         stateOfMario = MarioState.singleJump;
         SetMarioState(stateOfMario);
-        // The giant-roll dismount spins through the air (ANIM_ROLL). The tree has no ma_roll node, so _sm.Travel fell through to the plain
-        // jump (ma_tjmp1); drive the library clip directly (tree off), looped, and keep it going until he lands (SmsWireCheck).
-        string[] rollClips = { "ma_roll", "ma_jump_rolling", "ma_roll_jump" };
+        // The dismount spins through the air: ma_giant_rolling (arg 0) / ma_roll (arg 1), as wireJumping sets them. The tree has no roll
+        // nodes, so _sm.Travel fell through to the plain jump (ma_tjmp1); drive the library clip directly (tree off), looped, and keep it
+        // going until he lands (SmsWireCheck). The other roll is the fallback for a library without one.
+        string[] rollClips = arg == 0 ? new[] { "ma_giant_rolling", "ma_roll", "ma_jump_rolling", "ma_roll_jump" }
+                                      : new[] { "ma_roll", "ma_giant_rolling", "ma_jump_rolling", "ma_roll_jump" };
         _smsRollJumpClip = System.Array.Find(rollClips, c => animPlayer.HasAnimation(c));
         _smsRollJumpSpin = _smsRollJumpClip != null;
         if (_smsRollJumpSpin)
