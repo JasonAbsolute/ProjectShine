@@ -9,13 +9,16 @@ using System;
 ///               (setGlobalRTMatrix(mHeadMtx)): a point at (22, 5, 0) -- the mouth -- rate 0.1 a frame (x 1 +- 1.0), life 130, 2 u/f along
 ///               (1, 0.25, 0) in a 45 deg cone (spread 0.25), airResist 0.98, moment 1 +- 0.25, a Gravity field +0.06 u/f^2 (the rise:
 ///               terminal 3 u/f = 2.4 m/s), a Random field +-4 u/f on the frame every 2 frames (the shimmer), another +-1 u/f into the
-///               velocity every 8 (the drift); quad 0.2 x 50 = 10 u, scale X 0.06 -> 1 -> 0.14, Y 0.14 -> 1 -> 0.06 on an 8-frame loop
-///               (the wobble), alpha 0.625 fading from 92.5 %; colour lerp((135,183,231) -> white, tex), additive.
+///               velocity every 8 (the drift); quad 0.2 x 50 = 10 u, scale X 0.6 -> 1 -> 1.4 and Y 1.4 -> 1 -> 0.6, BOTH ping-ponged on an
+///               8-frame cycle (anm type 1 on X and Y: the wobble; pass 78 -- the values are x10 and the old dumper's flag bits were one high),
+///               x (1 +- 0.4) a bubble; alpha 0.625 fading from 92.5 %; colour lerp((135,183,231) -> white, tex), additive.
 ///   ms_m_awa_s  bubbleFromBody(): while the 'center' joint is 10 u under, one emitter in that joint's frame: a shell 25..50 u around it
 ///               (sphere 50, minRad 0.5, the emitter scaled (0.75, 1, 1)), its rate = lerp(0, 0.5, fwd / 40) a frame (mBodyBubble*),
-///               life 90 (-25 %), no launch, Gravity +0.04, Random +-2.5 / 2 frames and +-0.5 / 8, quad 6.5 u, scale 0.07 / 0.13.
+///               life 90 (-25 %), no launch, Gravity +0.04, Random +-2.5 / 2 frames and +-0.5 / 8, quad 6.5 u, scale X 0.7 -> 1 -> 1.3 /
+///               Y 1.3 -> 1 -> 0.7, the same 8-frame ping-pong, x (1 +- 0.4).
 ///   ms_m_awahamon  the pop: a flat ring 45 u wide at the surface (+3 u), 30 frames, alpha 0.5 -> 0, the texture matrix 1.5 shrinking
-///               0.0099 a frame (the ring grows), one per bubble that crosses the surface (mBubbleToRipple 0.3 != 0).
+///               0.0099 a frame AND the quad's ESP1 scale 0.3 -> 1 by 37.33 %, -> 1.8 at the end, x (1 +- 0.3) (pass 78: the ring grows both
+///               ways), one per bubble that crosses the surface (mBubbleToRipple 0.3 != 0).
 ///   decHP() under water: ten bubbleFromMouth emitters for one frame -- each a new emitter whose first frame always puts out a particle
 ///               (JPABaseEmitter's FIRST_EMISSION rule), so a gulp of ten; the continuous emitters start with one the same way.
 /// A frame is 1/60 s (the particle clock); Mario steps this once a physics frame. Emitters not called a frame stop (the manager's
@@ -40,7 +43,7 @@ public partial class SmsBubbles : Node3D
     [Export] public float MouthJitter = 8f;
     [Export] public float MouthWalk = 2f;
     [Export] public float MouthSize = 0.2f;
-    [Export] public float MouthScaleInX = 0.06f, MouthScaleOutX = 0.14f, MouthScaleInY = 0.14f, MouthScaleOutY = 0.06f;
+    [Export] public float MouthScaleInX = 0.6f, MouthScaleOutX = 1.4f, MouthScaleInY = 1.4f, MouthScaleOutY = 0.6f; // pass 78: x10 (JPAExtraShape.cpp 32-39)
 
     [ExportGroup("ms_m_awa_s (the body)")]
     [Export] public float BodyRadiusUnits = 50f;
@@ -52,7 +55,7 @@ public partial class SmsBubbles : Node3D
     [Export] public float BodyJitter = 5f;
     [Export] public float BodyWalk = 1f;
     [Export] public float BodySize = 0.13f;
-    [Export] public float BodyScaleInX = 0.07f, BodyScaleOutX = 0.13f, BodyScaleInY = 0.13f, BodyScaleOutY = 0.07f;
+    [Export] public float BodyScaleInX = 0.7f, BodyScaleOutX = 1.3f, BodyScaleInY = 1.3f, BodyScaleOutY = 0.7f; // pass 78: x10
     [Export] public float BodySpeedMin = 0f, BodySpeedMax = 40f;    // mBodyBubbleSpMin / Max (units a tick)
     [Export] public float BodyEmitMin = 0f, BodyEmitMax = 0.5f;     // mBodyBubbleEmitMin / Max (particles a frame)
 
@@ -61,7 +64,7 @@ public partial class SmsBubbles : Node3D
     [Export] public float MomentRndm = 0.25f;
     [Export] public float Alpha = 0.625f;
     [Export] public float AlphaOutTiming = 0.925f;
-    [Export] public float ScaleInTiming = 0.375f, ScaleOutTiming = 0.625f, ScaleOutRndm = 0.4f;
+    [Export] public float ScaleInTiming = 0.375f, ScaleOutTiming = 0.625f, ScaleOutRndm = 0.4f; // ScaleOutRndm: JPADraw.cpp 242 -- the WHOLE scale x (1 +- 0.4), not the out value (pass 78)
     [Export] public int JitterCycle = 2, WalkCycle = 8, WobbleFrames = 8;
     [Export] public float BubbleDepthUnits = 10f;                    // mBubbleDepth: the head / the centre this far under before they bubble
 
@@ -69,6 +72,8 @@ public partial class SmsBubbles : Node3D
     [Export] public int RippleLife = 30;
     [Export] public float RippleSize = 0.9f;
     [Export] public float RippleAlpha = 0.5f;
+    /// <summary>ms_m_awahamon ESP1 scale (pass 78): 0.3 -> 1 by 37.33 %, -> 1.8 at the end, x (1 +- 0.3) a ring -- on top of the texture matrix's shrink.</summary>
+    [Export] public float RippleScaleIn = 0.3f, RippleScaleOut = 1.8f, RippleScaleTiming = 0.3733f, RippleScaleRndm = 0.3f;
     [Export] public float RippleUvScale = 1.4999f, RippleUvStep = -0.0099f;
     [Export] public float RippleUpUnits = 3f;
 
@@ -79,7 +84,7 @@ public partial class SmsBubbles : Node3D
         public bool Alive;
         public Vector3 Pos, BaseVel;     // metres, metres a frame
         public float Moment, Gravity, Jitter, Walk;   // gravity u/f^2, the random fields' mags (u/f)
-        public float Size, ScaleInX, ScaleOutX, ScaleInY, ScaleOutY;
+        public float Size, ScaleInX, ScaleOutX, ScaleInY, ScaleOutY, ScaleRnd;   // ScaleRnd: JPADraw.cpp 242, 1 + RF x rndm on the whole scale
         public int Age, Life;
     }
 
@@ -88,6 +93,7 @@ public partial class SmsBubbles : Node3D
         public bool Alive;
         public Vector3 Pos;
         public int Age;
+        public float ScaleRnd;
     }
 
     private Bubble[] _b = Array.Empty<Bubble>();
@@ -181,8 +187,8 @@ public partial class SmsBubbles : Node3D
         {
             Alive = true, Pos = pos, BaseVel = vel * U2M(1f), Moment = 1f + MomentRndm * RndPm(),
             Gravity = MouthGravity, Jitter = MouthJitter, Walk = MouthWalk, Size = MouthSize,
-            ScaleInX = MouthScaleInX, ScaleOutX = MouthScaleOutX * (1f + ScaleOutRndm * RndPm()),
-            ScaleInY = MouthScaleInY, ScaleOutY = MouthScaleOutY * (1f + ScaleOutRndm * RndPm()),
+            ScaleInX = MouthScaleInX, ScaleOutX = MouthScaleOutX, ScaleInY = MouthScaleInY, ScaleOutY = MouthScaleOutY,
+            ScaleRnd = 1f + ScaleOutRndm * RndPm(),
             Age = -1, Life = MouthLife
         };
         Spawned++;
@@ -203,8 +209,8 @@ public partial class SmsBubbles : Node3D
         {
             Alive = true, Pos = pos, BaseVel = Vector3.Zero, Moment = 1f + MomentRndm * RndPm(),
             Gravity = BodyGravity, Jitter = BodyJitter, Walk = BodyWalk, Size = BodySize,
-            ScaleInX = BodyScaleInX, ScaleOutX = BodyScaleOutX * (1f + ScaleOutRndm * RndPm()),
-            ScaleInY = BodyScaleInY, ScaleOutY = BodyScaleOutY * (1f + ScaleOutRndm * RndPm()),
+            ScaleInX = BodyScaleInX, ScaleOutX = BodyScaleOutX, ScaleInY = BodyScaleInY, ScaleOutY = BodyScaleOutY,
+            ScaleRnd = 1f + ScaleOutRndm * RndPm(),
             Age = -1, Life = Math.Max(1, (int)(BodyLife * (1f - BodyLifeRndm * Rnd())))
         };
         Spawned++;
@@ -267,7 +273,7 @@ public partial class SmsBubbles : Node3D
         for (int i = 0; i < _r.Length; i++)
         {
             if (_r[i].Alive) continue;
-            _r[i] = new Ring { Alive = true, Pos = at, Age = 0 };
+            _r[i] = new Ring { Alive = true, Pos = at, Age = 0, ScaleRnd = 1f + RippleScaleRndm * RndPm() };
             return;
         }
     }
@@ -287,9 +293,16 @@ public partial class SmsBubbles : Node3D
                 }
                 float t = p.Age / (float)p.Life;
                 float alpha = t < AlphaOutTiming ? Alpha : Alpha * (1f - (t - AlphaOutTiming) / MathF.Max(1e-4f, 1f - AlphaOutTiming));
-                float sx = ScaleFade(t, p.ScaleInX, p.ScaleOutX);
-                float ty = WobbleFrames > 0 ? (p.Age % WobbleFrames) / (float)WobbleFrames : t; // scaleAnmTypeY on an 8-frame loop
-                float sy = ScaleFade(ty, p.ScaleInY, p.ScaleOutY);
+                // JPADrawVisitor.cpp 1600-1617 (anm type 1 on X and Y, cycle 8): the curve's timer ping-pongs 0 -> 1 -> 0 over 16 frames of age
+                float tw = t;
+                if (WobbleFrames > 0)
+                {
+                    float fr = (p.Age % WobbleFrames) / (float)WobbleFrames;
+                    int odd = (p.Age / WobbleFrames) & 1;
+                    tw = odd + (fr - odd * 2f * fr);
+                }
+                float sx = p.ScaleRnd * ScaleFade(tw, p.ScaleInX, p.ScaleOutX);
+                float sy = p.ScaleRnd * ScaleFade(tw, p.ScaleInY, p.ScaleOutY);
                 float quad = U2M(p.Size * Quad);
                 mm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(new Vector3(quad * sx, quad * sy, 1f)), p.Pos));
                 mm.SetInstanceColor(i, new Color(1f, 1f, 1f, alpha));
@@ -307,7 +320,9 @@ public partial class SmsBubbles : Node3D
                     continue;
                 }
                 float t = r.Age / (float)RippleLife;
-                float size = U2M(RippleSize * Quad);
+                float grow = t < RippleScaleTiming ? Mathf.Lerp(RippleScaleIn, 1f, RippleScaleTiming > 0f ? t / RippleScaleTiming : 1f)
+                    : Mathf.Lerp(1f, RippleScaleOut, RippleScaleTiming < 1f ? (t - RippleScaleTiming) / (1f - RippleScaleTiming) : 1f); // in == out: no flat part
+                float size = U2M(RippleSize * Quad) * grow * r.ScaleRnd;
                 rm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(new Vector3(size, 1f, size)), r.Pos));
                 rm.SetInstanceColor(i, new Color(1f, 1f, 1f, RippleAlpha * (1f - t)));
                 rm.SetInstanceCustomData(i, new Color(RippleUvScale + RippleUvStep * r.Age, 0f, 0f, 0f));

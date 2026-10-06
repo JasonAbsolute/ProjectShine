@@ -1,4 +1,4 @@
-[gd_scene load_steps=29 format=3 uid="uid://cgoobledeath72"]
+[gd_scene load_steps=30 format=3 uid="uid://cgoobledeath72"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsGoobleDeath.cs" id="1_script"]
 [ext_resource type="Shader" path="res://assets/Sms/Fx/JpaDirBillboard.gdshader" id="2_shader"]
@@ -30,13 +30,14 @@ data = {
 image = SubResource("Image_goop_normals")
 
 [sub_resource type="Curve" id="Curve_goop_x"]
-resource_name = "ms_deadnamekli_o ESP1 scale X 0.05 -> 1 by 74 %, 0.03 at the end"
-_data = [Vector2(0, 0.05), 0.0, 0.0, 1, 1, Vector2(0.7397, 1), 0.0, 0.0, 1, 1, Vector2(0.7534, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.03), 0.0, 0.0, 1, 1]
+resource_name = "ms_deadnamekli_o ESP1 scale X 0.5 -> 1 by 74 %, 0.3 at the end (pass 78: x10)"
+_data = [Vector2(0, 0.5), 0.0, 0.0, 1, 1, Vector2(0.7397, 1), 0.0, 0.0, 1, 1, Vector2(0.7534, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.3), 0.0, 0.0, 1, 1]
 point_count = 4
 
 [sub_resource type="Curve" id="Curve_goop_y"]
-resource_name = "ms_deadnamekli_o ESP1 scale Y 0.2 -> 1 by 74 %, 0.03 at the end"
-_data = [Vector2(0, 0.2), 0.0, 0.0, 1, 1, Vector2(0.7397, 1), 0.0, 0.0, 1, 1, Vector2(0.7534, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.03), 0.0, 0.0, 1, 1]
+resource_name = "ms_deadnamekli_o ESP1 scale Y 2.0 -> 1 by 74 %, 0.3 at the end (the blob lands long, along its flight)"
+max_value = 2
+_data = [Vector2(0, 2), 0.0, 0.0, 1, 1, Vector2(0.7397, 1), 0.0, 0.0, 1, 1, Vector2(0.7534, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.3), 0.0, 0.0, 1, 1]
 point_count = 4
 
 [sub_resource type="Curve" id="Curve_one"]
@@ -63,6 +64,8 @@ initial_velocity_max = 15.139
 gravity = Vector3(0, -15.324, 0)
 damping_min = 9.122
 damping_max = 9.122
+scale_min = 0.6
+scale_max = 1.4
 scale_curve = SubResource("CurveXYZTexture_goop")
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_goop"]
@@ -105,13 +108,14 @@ data = {
 image = SubResource("Image_drop_normals")
 
 [sub_resource type="Curve" id="Curve_drop_x"]
-resource_name = "ms_deadnamekli_n ESP1 scale X 0.08 -> 1 by 62.5 %, 0.03 from 79 %"
-_data = [Vector2(0, 0.08), 0.0, 0.0, 1, 1, Vector2(0.625, 1), 0.0, 0.0, 1, 1, Vector2(0.791, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.03), 0.0, 0.0, 1, 1]
+resource_name = "ms_deadnamekli_n ESP1 scale X 0.8 -> 1 by 62.5 %, 0.3 from 79 % (pass 78: x10)"
+_data = [Vector2(0, 0.8), 0.0, 0.0, 1, 1, Vector2(0.625, 1), 0.0, 0.0, 1, 1, Vector2(0.791, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.3), 0.0, 0.0, 1, 1]
 point_count = 4
 
 [sub_resource type="Curve" id="Curve_drop_y"]
-resource_name = "ms_deadnamekli_n ESP1 scale Y 0.325 -> 1 by 62.5 %, 0.03 from 79 %"
-_data = [Vector2(0, 0.325), 0.0, 0.0, 1, 1, Vector2(0.625, 1), 0.0, 0.0, 1, 1, Vector2(0.791, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.03), 0.0, 0.0, 1, 1]
+resource_name = "ms_deadnamekli_n ESP1 scale Y 3.25 -> 1 by 62.5 %, 0.3 from 79 % (a long drop that rounds off)"
+max_value = 3.25
+_data = [Vector2(0, 3.25), 0.0, 0.0, 1, 1, Vector2(0.625, 1), 0.0, 0.0, 1, 1, Vector2(0.791, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.3), 0.0, 0.0, 1, 1]
 point_count = 4
 
 [sub_resource type="CurveXYZTexture" id="CurveXYZTexture_drop"]
@@ -150,6 +154,8 @@ initial_velocity_max = 17.608
 gravity = Vector3(0, -14.508, 0)
 damping_min = 11.53
 damping_max = 11.53
+scale_min = 0.4
+scale_max = 1.6
 scale_curve = SubResource("CurveXYZTexture_drop")
 anim_offset_min = 0.0
 anim_offset_max = 1.0

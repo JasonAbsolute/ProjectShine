@@ -1,4 +1,4 @@
-[gd_scene load_steps=46 format=3 uid="uid://esphipdhit233"]
+[gd_scene load_steps=50 format=3 uid="uid://esphipdhit233"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsSuperHipDropLanding.cs" id="1_script"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/shwave1_sp.png" id="2_shwave"]
@@ -14,6 +14,15 @@ colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 0.9, 0.9, 1, 1, 0.624, 0.62
 [sub_resource type="GradientTexture1D" id="GradientTexture1D_shockwave"]
 gradient = SubResource("Gradient_shockwave")
 
+[sub_resource type="Curve" id="Curve_shockwave_scale"]
+resource_name = "ms_m_sphipd_hit_a ESP1 scale: 1 -> 8.0 over the life (pass 78: in 0 / out 0 -> a straight run; 250 -> 2000 units)"
+max_value = 8
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 8), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_shockwave_scale"]
+curve = SubResource("Curve_shockwave_scale")
+
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_shockwave"]
 emission_shape = 0
 emission_shape_offset = Vector3(0, 0.094, 0)
@@ -22,6 +31,7 @@ spread = 0.0
 initial_velocity_min = 0.0
 initial_velocity_max = 0.0
 gravity = Vector3(0, 0, 0)
+scale_curve = SubResource("CurveTexture_shockwave_scale")
 color_ramp = SubResource("GradientTexture1D_shockwave")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shockwave"]
@@ -39,12 +49,21 @@ size = Vector2(3.358, 3.358)
 orientation = 1
 
 [sub_resource type="Curve" id="Curve_smoke_scale"]
-resource_name = "ms_m_sphipd_hit_b ESP1 scale 0.085 -> 1 by 32.7 %, -> 0.2 by the end"
-_data = [Vector2(0, 0.085), 0.0, 0.0, 1, 1, Vector2(0.3271, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.2), 0.0, 0.0, 1, 1]
+resource_name = "ms_m_sphipd_hit_b ESP1 scale X: 1 to 32.7 %, -> 2.0 by the end (pass 78: x10, diffXY, no in phase)"
+max_value = 2
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.3271, 1), 0.0, 0.0, 1, 1, Vector2(1, 2), 0.0, 0.0, 1, 1]
 point_count = 3
 
-[sub_resource type="CurveTexture" id="CurveTexture_smoke_scale"]
-curve = SubResource("Curve_smoke_scale")
+[sub_resource type="Curve" id="Curve_smoke_scale_y"]
+resource_name = "ms_m_sphipd_hit_b ESP1 scale Y: 1 to 32.7 %, -> 2.2 by the end"
+max_value = 2.2
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.3271, 1), 0.0, 0.0, 1, 1, Vector2(1, 2.2), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveXYZTexture" id="CurveTexture_smoke_scale"]
+curve_x = SubResource("Curve_smoke_scale")
+curve_y = SubResource("Curve_smoke_scale_y")
+curve_z = SubResource("Curve_smoke_scale")
 
 [sub_resource type="Curve" id="Curve_smoke_radial"]
 resource_name = "the puff's outward speed: velOmni 34 u/f x airResist 0.94 a frame x the Drag field 0.92 (in 48 %, out 48 % to 87.5 %) (gen_fx_super.sim)"
@@ -141,13 +160,18 @@ data = {
 image = SubResource("Image_flame_normals")
 
 [sub_resource type="Curve" id="Curve_flame_scale"]
-resource_name = "ms_m_sphipd_hit_c ESP1 scale 0.1 -> 1 by 16.75 %, -> 0.1 from 41.75 %"
-_data = [Vector2(0, 0.1), 0.0, 0.0, 1, 1, Vector2(0.1675, 1), 0.0, 0.0, 1, 1, Vector2(0.4175, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.1), 0.0, 0.0, 1, 1]
+resource_name = "ms_m_sphipd_hit_c ESP1 scale X: 1 throughout (pass 78: x10, diffXY)"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.1675, 1), 0.0, 0.0, 1, 1, Vector2(0.4175, 1), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 4
+
+[sub_resource type="Curve" id="Curve_flame_scale_y"]
+resource_name = "ms_m_sphipd_hit_c ESP1 scale Y (along the flame): 0.75 -> 1 by 16.75 %, -> 0.5 from 41.75 %"
+_data = [Vector2(0, 0.75), 0.0, 0.0, 1, 1, Vector2(0.1675, 1), 0.0, 0.0, 1, 1, Vector2(0.4175, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.5), 0.0, 0.0, 1, 1]
 point_count = 4
 
 [sub_resource type="CurveXYZTexture" id="CurveXYZTexture_flame_scale"]
 curve_x = SubResource("Curve_flame_scale")
-curve_y = SubResource("Curve_flame_scale")
+curve_y = SubResource("Curve_flame_scale_y")
 curve_z = SubResource("Curve_flame_scale")
 
 [sub_resource type="Gradient" id="Gradient_flame"]
@@ -204,6 +228,7 @@ curve = SubResource("Curve_star_radial")
 
 [sub_resource type="Curve" id="Curve_star_rise"]
 resource_name = "the star's rise: velDir 35 u/f x airResist 0.94 plus the -0.05 u/f^2 Gravity field, peak 28.17 m/s"
+min_value = -0.2001
 _data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.0286, 0.7747), 0.0, 0.0, 1, 1, Vector2(0.0571, 0.5976), 0.0, 0.0, 1, 1, Vector2(0.0857, 0.458), 0.0, 0.0, 1, 1, Vector2(0.1143, 0.3478), 0.0, 0.0, 1, 1, Vector2(0.1429, 0.2605), 0.0, 0.0, 1, 1, Vector2(0.1714, 0.1911), 0.0, 0.0, 1, 1, Vector2(0.2, 0.1356), 0.0, 0.0, 1, 1, Vector2(0.2286, 0.0911), 0.0, 0.0, 1, 1, Vector2(0.2571, 0.055), 0.0, 0.0, 1, 1, Vector2(0.2857, 0.0256), 0.0, 0.0, 1, 1, Vector2(0.3143, 0.0014), 0.0, 0.0, 1, 1, Vector2(0.3429, -0.0187), 0.0, 0.0, 1, 1, Vector2(0.3714, -0.0357), 0.0, 0.0, 1, 1, Vector2(0.4, -0.0502), 0.0, 0.0, 1, 1, Vector2(0.4286, -0.0628), 0.0, 0.0, 1, 1, Vector2(0.4571, -0.0739), 0.0, 0.0, 1, 1, Vector2(0.4857, -0.0838), 0.0, 0.0, 1, 1, Vector2(0.5143, -0.0928), 0.0, 0.0, 1, 1, Vector2(0.5429, -0.1011), 0.0, 0.0, 1, 1, Vector2(0.5714, -0.1088), 0.0, 0.0, 1, 1, Vector2(0.6, -0.1161), 0.0, 0.0, 1, 1, Vector2(0.6286, -0.123), 0.0, 0.0, 1, 1, Vector2(0.6571, -0.1297), 0.0, 0.0, 1, 1, Vector2(0.6857, -0.1361), 0.0, 0.0, 1, 1, Vector2(0.7143, -0.1424), 0.0, 0.0, 1, 1, Vector2(0.7429, -0.1486), 0.0, 0.0, 1, 1, Vector2(0.7714, -0.1547), 0.0, 0.0, 1, 1, Vector2(0.8, -0.1607), 0.0, 0.0, 1, 1, Vector2(0.8286, -0.1666), 0.0, 0.0, 1, 1, Vector2(0.8571, -0.1725), 0.0, 0.0, 1, 1, Vector2(0.8857, -0.1784), 0.0, 0.0, 1, 1, Vector2(0.9143, -0.1842), 0.0, 0.0, 1, 1, Vector2(0.9429, -0.19), 0.0, 0.0, 1, 1, Vector2(0.9714, -0.1958), 0.0, 0.0, 1, 1, Vector2(1, -0.2001), 0.0, 0.0, 1, 1]
 point_count = 36
 
@@ -244,6 +269,8 @@ initial_velocity_min = 0.0
 initial_velocity_max = 0.0
 angular_velocity_min = -297.0
 angular_velocity_max = 297.0
+scale_min = 0.625
+scale_max = 1.375
 velocity_pivot = Vector3(0, 0.202, 0)
 radial_velocity_min = 19.3441
 radial_velocity_max = 32.2402

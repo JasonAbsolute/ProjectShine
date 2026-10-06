@@ -50,6 +50,8 @@ spread = 0.0
 initial_velocity_min = 0.0806
 initial_velocity_max = 0.3224
 gravity = Vector3(0, 0, 0)
+scale_min = 0.5
+scale_max = 1.5
 color_ramp = SubResource("GradientTexture1D_streaks")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_streaks"]
@@ -89,6 +91,8 @@ initial_velocity_max = 1.612
 gravity = Vector3(0, 0, 0)
 anim_offset_min = 0.0
 anim_offset_max = 1.0
+scale_min = 0.5
+scale_max = 1.5
 color_ramp = SubResource("GradientTexture1D_arcs")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_arcs"]

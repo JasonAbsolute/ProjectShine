@@ -1,4 +1,4 @@
-[gd_scene load_steps=32 format=3 uid="uid://dsphipdbl2r33"]
+[gd_scene load_steps=35 format=3 uid="uid://dsphipdbl2r33"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsSuperHipDropBlur.cs" id="1_script"]
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsHipDropBlur.cs" id="2_stripe_script"]
@@ -41,12 +41,21 @@ curve_y = SubResource("Curve_flame_rise")
 curve_z = SubResource("Curve_zero")
 
 [sub_resource type="Curve" id="Curve_flame_scale"]
-resource_name = "ms_m_sphipd_a ESP1 scale 0.4 -> 1 by 37.5 %, -> 0.1 from 62.5 %"
-_data = [Vector2(0, 0.4), 0.0, 0.0, 1, 1, Vector2(0.375, 1), 0.0, 0.0, 1, 1, Vector2(0.625, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.1), 0.0, 0.0, 1, 1]
-point_count = 4
+resource_name = "ms_m_sphipd_a ESP1 scale X: 4.0 -> 1 by 37.5 %, flat after (pass 78: x10, diffXY)"
+max_value = 4
+_data = [Vector2(0, 4), 0.0, 0.0, 1, 1, Vector2(0.375, 1), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 3
 
-[sub_resource type="CurveTexture" id="CurveTexture_flame_scale"]
-curve = SubResource("Curve_flame_scale")
+[sub_resource type="Curve" id="Curve_flame_scale_y"]
+resource_name = "ms_m_sphipd_a ESP1 scale Y (along the flame): 1 to 37.5 %, -> 1.5 at the end"
+max_value = 1.5
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.375, 1), 0.0, 0.0, 1, 1, Vector2(1, 1.5), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveXYZTexture" id="CurveTexture_flame_scale"]
+curve_x = SubResource("Curve_flame_scale")
+curve_y = SubResource("Curve_flame_scale_y")
+curve_z = SubResource("Curve_flame_scale")
 
 [sub_resource type="Gradient" id="Gradient_flame"]
 resource_name = "ms_m_sphipd_a: prm (255,63,159) -> (255,24,0) over the life x ESP1 alpha 0 -> 1 by 25 %, -> 0 from 62.5 %"
@@ -103,6 +112,14 @@ colors = PackedColorArray(1, 1, 1, 0.55, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.7378
 [sub_resource type="GradientTexture1D" id="GradientTexture1D_sparkles"]
 gradient = SubResource("Gradient_sparkles")
 
+[sub_resource type="Curve" id="Curve_sparkle_scale"]
+resource_name = "ms_m_sphipd_b ESP1 scale: 1 to 50 %, -> 0.1 at the end (pass 78); x (1 +- 0.5) a sparkle"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.5, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.1), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_sparkle_scale"]
+curve = SubResource("Curve_sparkle_scale")
+
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_sparkles"]
 lifetime_randomness = 0.375
 emission_shape = 2
@@ -113,6 +130,9 @@ spread = 0.0
 initial_velocity_min = 0.0
 initial_velocity_max = 0.0
 gravity = Vector3(0, 0, 0)
+scale_min = 0.5
+scale_max = 1.5
+scale_curve = SubResource("CurveTexture_sparkle_scale")
 color_ramp = SubResource("GradientTexture1D_sparkles")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_sparkles"]

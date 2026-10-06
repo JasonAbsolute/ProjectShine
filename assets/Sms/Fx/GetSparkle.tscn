@@ -1,4 +1,4 @@
-[gd_scene load_steps=23 format=3 uid="uid://l324drcv1nbr"]
+[gd_scene load_steps=25 format=3 uid="uid://l324drcv1nbr"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsGetSparkle.cs" id="1_script"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/star4s.png" id="2_star"]
@@ -57,6 +57,15 @@ curve_x = SubResource("Curve_zero")
 curve_y = SubResource("Curve_orbit")
 curve_z = SubResource("Curve_zero")
 
+[sub_resource type="Curve" id="Curve_star_scale"]
+resource_name = "ms_itemget1_a ESP1 scale: 1.5 -> 1 by 6 %, -> 0.1 at the end (pass 78: x10 and the enable bit read from the engine)"
+max_value = 1.5
+_data = [Vector2(0, 1.5), 0.0, 0.0, 1, 1, Vector2(0.06, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.1), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_star_scale"]
+curve = SubResource("Curve_star_scale")
+
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_stars"]
 lifetime_randomness = 0.125
 emission_shape = 5
@@ -71,6 +80,9 @@ orbit_velocity_min = -2.7488
 orbit_velocity_max = -1.2026
 orbit_velocity_curve = SubResource("CurveXYZTexture_orbit")
 gravity = Vector3(0, 9.672, 0)
+scale_min = 0.5
+scale_max = 1.5
+scale_curve = SubResource("CurveTexture_star_scale")
 color_ramp = SubResource("GradientTexture1D_star_alpha")
 color_initial_ramp = SubResource("GradientTexture1D_star_colours")
 sub_emitter_mode = 1
@@ -89,8 +101,9 @@ billboard_keep_scale = true
 disable_receive_shadows = true
 
 [sub_resource type="QuadMesh" id="QuadMesh_stars"]
+resource_name = "the game's 2.8 x 2.5 billboard (140 x 125 units; pass 78: X is 0x1C, Y 0x18)"
 material = SubResource("StandardMaterial3D_stars")
-size = Vector2(1.679, 1.881)
+size = Vector2(1.881, 1.679)
 
 [sub_resource type="Gradient" id="Gradient_dust"]
 resource_name = "SSP1 alphaOut: 200/255 -> 0; the parent's pastel (inheritRGB)"

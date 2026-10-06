@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://cwallslide060"]
+[gd_scene load_steps=13 format=3 uid="uid://cwallslide060"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsWallSlideDust.cs" id="1_script"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/kemuball3.png" id="2_smoke"]
@@ -25,6 +25,15 @@ colors = PackedColorArray(1, 1, 1, 0.875, 1, 1, 1, 0.875, 1, 1, 1, 0)
 [sub_resource type="GradientTexture1D" id="GradientTexture1D_dust"]
 gradient = SubResource("Gradient_dust")
 
+[sub_resource type="Curve" id="Curve_dust_scale"]
+resource_name = "ms_mariwallsl1 ESP1 scale: 0.7 -> 1 by 50 %, -> 1.6 at the end (pass 78); x (1 +- 0.5)"
+max_value = 1.6
+_data = [Vector2(0, 0.7), 0.0, 0.0, 1, 1, Vector2(0.5, 1), 0.0, 0.0, 1, 1, Vector2(1, 1.6), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_dust_scale"]
+curve = SubResource("Curve_dust_scale")
+
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_dust"]
 lifetime_randomness = 0.35
 emission_shape = 1
@@ -39,6 +48,9 @@ directional_velocity_min = 1.1284
 directional_velocity_max = 2.0956
 directional_velocity_curve = SubResource("CurveXYZTexture_rise")
 gravity = Vector3(0, 0, 0)
+scale_min = 0.5
+scale_max = 1.5
+scale_curve = SubResource("CurveTexture_dust_scale")
 color_ramp = SubResource("GradientTexture1D_dust")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_dust"]

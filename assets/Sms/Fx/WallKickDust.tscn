@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://cwallkick0060"]
+[gd_scene load_steps=20 format=3 uid="uid://cwallkick0060"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsWallKickDust.cs" id="1_script"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/kemuball3.png" id="2_smoke"]
@@ -11,6 +11,15 @@ colors = PackedColorArray(1, 1, 1, 0.875, 1, 1, 1, 0.875, 1, 1, 1, 0)
 
 [sub_resource type="GradientTexture1D" id="GradientTexture1D_puff"]
 gradient = SubResource("Gradient_puff")
+
+[sub_resource type="Curve" id="Curve_puff_scale"]
+resource_name = "ms_wallkick_a ESP1 scale: 0.75 -> 1 by 50 %, -> 1.7 at the end (pass 78); x (1 +- 0.375)"
+max_value = 1.7
+_data = [Vector2(0, 0.75), 0.0, 0.0, 1, 1, Vector2(0.5, 1), 0.0, 0.0, 1, 1, Vector2(1, 1.7), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_puff_scale"]
+curve = SubResource("Curve_puff_scale")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_puff"]
 lifetime_randomness = 0.5
@@ -28,6 +37,9 @@ angle_max = 22.5
 gravity = Vector3(0, 0, 0)
 damping_min = 32.241
 damping_max = 32.241
+scale_min = 0.625
+scale_max = 1.375
+scale_curve = SubResource("CurveTexture_puff_scale")
 color_ramp = SubResource("GradientTexture1D_puff")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_puff"]
@@ -47,13 +59,15 @@ material = SubResource("StandardMaterial3D_puff")
 size = Vector2(1.209, 1.209)
 
 [sub_resource type="Curve" id="Curve_marks_x"]
-resource_name = "ms_wallkick_b ESP1 scale X 0.09 -> 0.125"
-_data = [Vector2(0, 0.09), 0.0, 0.0, 1, 1, Vector2(1, 0.125), 0.0, 0.0, 1, 1]
+resource_name = "ms_wallkick_b ESP1 scale X: 1 -> 1.25 over the life (pass 78: x10, and in 0 / out 0 starts at 1)"
+max_value = 1.25
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 1.25), 0.0, 0.0, 1, 1]
 point_count = 2
 
 [sub_resource type="Curve" id="Curve_marks_y"]
-resource_name = "ms_wallkick_b ESP1 scale Y 0.07 -> 0.5 (the streak drawn out over 6 frames)"
-_data = [Vector2(0, 0.07), 0.0, 0.0, 1, 1, Vector2(1, 0.5), 0.0, 0.0, 1, 1]
+resource_name = "ms_wallkick_b ESP1 scale Y: 1 -> 5.0 over the life (the streak drawn out five times over 6 frames)"
+max_value = 5
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 5), 0.0, 0.0, 1, 1]
 point_count = 2
 
 [sub_resource type="Curve" id="Curve_one"]
@@ -84,6 +98,8 @@ angle_max = 180.0
 initial_velocity_min = 0.0
 initial_velocity_max = 0.0
 gravity = Vector3(0, 0, 0)
+scale_min = 0.5
+scale_max = 1.5
 scale_curve = SubResource("CurveXYZTexture_marks")
 color_ramp = SubResource("GradientTexture1D_marks")
 
@@ -99,9 +115,9 @@ billboard_mode = 3
 billboard_keep_scale = true
 
 [sub_resource type="QuadMesh" id="QuadMesh_marks"]
-resource_name = "the game's 0.9 x 1.0 DirectionCross (45 x 50 units) before its scale curve"
+resource_name = "the game's 1.0 x 0.9 DirectionCross (50 x 45 units; pass 78: X is 0x1C, Y 0x18) before its scale curve"
 material = SubResource("StandardMaterial3D_marks")
-size = Vector2(0.605, 0.672)
+size = Vector2(0.672, 0.605)
 
 [node name="WallKickDust" type="Node3D" node_paths=PackedStringArray("Puff", "Marks")]
 script = ExtResource("1_script")

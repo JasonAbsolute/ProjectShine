@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://cfiredmg00051"]
+[gd_scene load_steps=13 format=3 uid="uid://cfiredmg00051"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsFireDamageFx.cs" id="1_script"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/kemuball3_fire.png" id="2_cloud"]
@@ -25,6 +25,15 @@ colors = PackedColorArray(0.6275, 0.251, 0, 0.9, 0.6275, 0.251, 0, 0.9, 0.2478, 
 [sub_resource type="GradientTexture1D" id="GradientTexture1D_cloud"]
 gradient = SubResource("Gradient_cloud")
 
+[sub_resource type="Curve" id="Curve_cloud_scale"]
+resource_name = "ms_firedmg_a ESP1 scale: 1 -> 2.7 over the life (pass 78: in 0 / out 0 -> a straight run); x (1 +- 0.4) a puff"
+max_value = 2.7
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 2.7), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_cloud_scale"]
+curve = SubResource("Curve_cloud_scale")
+
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_cloud"]
 lifetime_randomness = 0.35
 emission_shape = 2
@@ -39,6 +48,9 @@ directional_velocity_min = 0.8463
 directional_velocity_max = 1.5717
 directional_velocity_curve = SubResource("CurveXYZTexture_rise")
 gravity = Vector3(0, 0, 0)
+scale_min = 0.6
+scale_max = 1.4
+scale_curve = SubResource("CurveTexture_cloud_scale")
 color_ramp = SubResource("GradientTexture1D_cloud")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cloud"]

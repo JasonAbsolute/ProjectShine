@@ -1,4 +1,4 @@
-[gd_scene load_steps=5 format=3 uid="uid://cpausesmk070"]
+[gd_scene load_steps=7 format=3 uid="uid://cpausesmk070"]
 
 [ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/pause_smoke.png" id="t_smoke"]
 
@@ -10,8 +10,17 @@ colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
 [sub_resource type="GradientTexture1D" id="GradientTexture1D_alpha"]
 gradient = SubResource("Gradient_alpha")
 
+[sub_resource type="Curve" id="Curve_scale"]
+resource_name = "ms_2d_pause_smo ESP1 scale: 0.75 -> 1 by 23.29 %, -> 1.4 at the end (pass 78: the engine's x10 values); x (1 +- 0.4) a puff"
+max_value = 1.4
+_data = [Vector2(0, 0.75), 0.0, 0.0, 1, 1, Vector2(0.2329, 1), 0.0, 0.0, 1, 1, Vector2(1, 1.4), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_scale"]
+curve = SubResource("Curve_scale")
+
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_smoke"]
-resource_name = "ms_2d_pause_smo: 10 puffs on a 6.25..25 px ring, 2 px/f (+-12.5 %, moment 0.875..1) away from the letter under air resist 0.98/f (-117 px/s^2), Gravity 0.07 px/f^2 up, 13..26 frames, 50 px quads, no spin"
+resource_name = "ms_2d_pause_smo: 10 puffs on a 6.25..25 px ring, 2 px/f (+-12.5 %, moment 0.875..1) away from the letter under air resist 0.98/f (-117 px/s^2), Gravity 0.07 px/f^2 up, 13..26 frames, 50 px quads growing 0.75 -> 1 -> 1.4 (x 1 +- 0.4), no spin"
 lifetime_randomness = 0.5
 emission_shape = 6
 emission_ring_axis = Vector3(0, 0, 1)
@@ -26,8 +35,9 @@ radial_velocity_max = 135.0
 gravity = Vector3(0, -252, 0)
 damping_min = 117.0
 damping_max = 117.0
-scale_min = 0.78125
-scale_max = 0.78125
+scale_min = 0.46875
+scale_max = 1.09375
+scale_curve = SubResource("CurveTexture_scale")
 color_ramp = SubResource("GradientTexture1D_alpha")
 
 [node name="PauseSmoke" type="GPUParticles2D"]

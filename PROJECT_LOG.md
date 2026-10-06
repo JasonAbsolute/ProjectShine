@@ -4983,3 +4983,39 @@ GetWaterStreak.gdshader and GoobleDeath.tscn were not cached before the level an
 Goobles carry BottleScene / DeathFxScene / BodyMaterial and no zone node. Build 0 errors; boot [SMS selftest] ALL OK + slope/hipdrop
 ALL OK, no errors; the re-import wrote lossless .ctex files (glow3_hit: vram_texture false, compress/mode 0). He builds the hammer
 (Gooble.cs); Gooble.tscn reloads.
+
+### Pass 78 -- the particle scale audit: every baked effect re-read against the engine's own loader
+THE DUMPER HAD TWO MORE BUGS (jpa_dump.py, fixed): (1) the ESP1 scale flags byte (data[0x4E] = JPAExtraShape::unk7E) was read one bit high
+-- JPAExtraShape.hpp 18-30 has 0x01 isEnableScale, 0x02 isDiffXY, 0x04 anmY, 0x08 anmX, 0x10 bySpeedY, 0x20 bySpeedX -- so the enable bit
+was never printed, "scale True/False" was really diffXY, and the anm (cycle) flags sat one place off; (2) with pass 76's x10 on the in /
+out values. Re-dumped all 31 .jpa the Fx scenes were baked from (tools/projectshine/audit_dump.py). THE ENGINE'S CURVE (JPADrawVisitor.cpp
+1478-1617): t < in -> v_in + (1 - v_in) t / in; t > out -> 1 + (v_out - 1)(t - out) / (1 - out); else 1 -- an in of 0 has NO in phase (the
+start is 1, whatever the file's in value), an out of 1 no out phase; with an anm flag the timer is not the life but (age % cycle) / cycle,
+run backwards on the odd cycles when the anm type is not 0 (a ping-pong); and JPADraw.cpp 242 multiplies EVERY particle's scale by
+(1 + RF[-1,1) x rndm) whether or not a curve is enabled.
+WHAT THE SCENES HAD vs THE GAME (all enabled; the random factor was missing almost everywhere): wall kick puff -- no curve (should grow
+0.75 -> 1 -> 1.7, x 1 +- 0.375); wall kick marks -- 0.09 -> 0.125 / 0.07 -> 0.5 (really 1 -> 1.25 across, 1 -> 5.0 along: drawn out
+five times; quad 1.0 x 0.9, was 0.9 x 1.0); wall slide dust -- none (0.7 -> 1 -> 1.6, +-0.5); slide smoke -- none (0.75 -> 1 -> 2.2,
++-0.35); bonk / damage stars -- 0.03 -> 1 -> 0.14 over the life (really X 0.3 -> 1 -> 1.4 and Y 1.4 -> 1 -> 0.3 ping-ponged every 12
+frames over the 75: the star squashes and stretches, +-0.25); fire cloud -- none (1 -> 2.7, +-0.4); shock puff -- none (1 -> 2.2, +-0.5,
+his x 1.25 kept); shock streaks / arcs -- no random (+-0.5); spin jump rings -- no random (+-1.0 / +-0.875: rings from nothing to double);
+get sparkle stars -- none (1.5 -> 1 by 6 %, -> 0.1 at the end, +-0.5; quad 2.8 x 2.5, was 2.5 x 2.8); hip drop sparks -- 0.1 -> 1 -> 0.1
+on both axes (really X flat, Y 0.75 -> 1 -> 0.5); hip drop smoke -- 0.085 -> 1 -> 0.2 (really 0.85 -> 1 -> 2.0 / 2.2: it GROWS);
+hip drop shockwave -- none (1 -> 5.0: 250 -> 1250 units); super flames -- 0.4 -> 1 -> 0.1 (really X 4.0 -> 1 then flat, Y flat then
+-> 1.5); super sparkles -- none (1 to 50 %, -> 0.1, +-0.5); super shockwave -- none (1 -> 8.0); super smoke -- 0.085 -> 1 -> 0.2 (really
+1 to 32.7 % then -> 2.0 / 2.2); super flames at the landing -- 0.1 -> 1 -> 0.1 (X flat, Y 0.75 -> 1 -> 0.5); super stars -- no random
+(+-0.375); Gooble goop -- 0.05 / 0.2 -> 1 -> 0.03 (really 0.5 / 2.0 -> 1 -> 0.3, +-0.4); Gooble drops -- 0.08 / 0.325 -> 1 -> 0.03
+(really 0.8 / 3.25 -> 1 -> 0.3, +-0.6); the swim bubbles (SmsBubbles.cs) -- 0.06 / 0.14 and 0.07 / 0.13 (really 0.6 / 1.4 and 0.7 /
+1.3, BOTH axes ping-ponged on the 8-frame cycle -- the code looped Y only, as a sawtooth -- and the +-0.4 on the whole scale, not
+the out value), the pop ring -- no quad scale (0.3 -> 1 -> 1.8, +-0.3, on top of the texture matrix's shrink); the pause smoke -- none
+(0.75 -> 1 -> 1.4, +-0.4). Already right: every base quad but the two swapped ones, the GetWater streaks (pass 76).
+HOW: gen_fx.py gained esp1_scale_at / esp1_scale / esp1_scale_anm (the engine's formulas; the anm loop baked over the life -- Godot
+samples a scale curve by life fraction, so a shorter random life compresses the loop: the knowing approximation) and curve() now writes a
+Curve's max_value when a point exceeds 1 (a Godot Curve's range defaults to 0..1); every generator takes its numbers from them
+(gen_fx_super.esp_scale, gen_fx_gooble.xyz_scale rewritten on top); the 13 scenes regenerated (the pre-patch generators reproduced the
+shipped scenes byte for byte first -- they are the source of truth); PauseSmoke.tscn and SmsBubbles.cs edited by hand. LEGACY RETIRED:
+the hand-rolled curve point lists in the generators.
+VERIFIED: fx_scale_check.gd (removed) loaded all 14 scenes and read the curves / ranges / quads back from the resources -- 86 checks ALL
+OK, the values above 1 intact (5.0, 8.0; the max_value matters); build 0 errors; boot [SMS selftest] ALL OK + slope/hipdrop ALL OK. The
+look is his (headless draws no particle): effects he approved will change toward the game -- the stars twinkle in shape, the smokes
+grow, the shockwaves spread, the kick marks streak. He builds the hammer (SmsBubbles.cs); the scenes reload.

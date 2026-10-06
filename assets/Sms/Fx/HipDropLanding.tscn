@@ -1,4 +1,4 @@
-[gd_scene load_steps=34 format=3 uid="uid://ch8vwy3mp6qrd"]
+[gd_scene load_steps=38 format=3 uid="uid://ch8vwy3mp6qrd"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsHipDropLanding.cs" id="1_script"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/radgrad.png" id="2_radgrad"]
@@ -29,15 +29,20 @@ data = {
 [sub_resource type="ImageTexture" id="ImageTexture_spark_normals"]
 image = SubResource("Image_spark_normals")
 
-[sub_resource type="Curve" id="Curve_sparks_scale"]
-resource_name = "ms_hipdrop_a ESP1 scale: 0.1 -> 1 by 29.25 %, -> 0.1 from 66.75 %"
-_data = [Vector2(0, 0.1), 0.0, 0.0, 1, 1, Vector2(0.2925, 1), 0.0, 0.0, 1, 1, Vector2(0.6675, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.1), 0.0, 0.0, 1, 1]
+[sub_resource type="Curve" id="Curve_sparks_scale_x"]
+resource_name = "ms_hipdrop_a ESP1 scale X: 1 throughout (pass 78: the engine's x10 values, diffXY)"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.2925, 1), 0.0, 0.0, 1, 1, Vector2(0.6675, 1), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 4
+
+[sub_resource type="Curve" id="Curve_sparks_scale_y"]
+resource_name = "ms_hipdrop_a ESP1 scale Y (along the streak): 0.75 -> 1 by 29.25 %, -> 0.5 from 66.75 %"
+_data = [Vector2(0, 0.75), 0.0, 0.0, 1, 1, Vector2(0.2925, 1), 0.0, 0.0, 1, 1, Vector2(0.6675, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.5), 0.0, 0.0, 1, 1]
 point_count = 4
 
 [sub_resource type="CurveXYZTexture" id="CurveXYZTexture_sparks"]
-curve_x = SubResource("Curve_sparks_scale")
-curve_y = SubResource("Curve_sparks_scale")
-curve_z = SubResource("Curve_sparks_scale")
+curve_x = SubResource("Curve_sparks_scale_x")
+curve_y = SubResource("Curve_sparks_scale_y")
+curve_z = SubResource("Curve_sparks_scale_x")
 
 [sub_resource type="Gradient" id="Gradient_sparks"]
 resource_name = "ms_hipdrop_a ESP1 alpha 1 -> 0.45 by 12.5 %, -> 0 from 50 %"
@@ -82,13 +87,22 @@ material = SubResource("StandardMaterial3D_sparks")
 size = Vector2(0.448, 2.687)
 orientation = 0
 
-[sub_resource type="Curve" id="Curve_smoke_scale"]
-resource_name = "ms_hipdrop_b ESP1 scale: 0.085 -> 1 by 32.7 %, -> 0.2 by the end"
-_data = [Vector2(0, 0.085), 0.0, 0.0, 1, 1, Vector2(0.3271, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.2), 0.0, 0.0, 1, 1]
+[sub_resource type="Curve" id="Curve_smoke_scale_x"]
+resource_name = "ms_hipdrop_b ESP1 scale X: 0.85 -> 1 by 32.7 %, -> 2.0 by the end (pass 78: x10, diffXY)"
+max_value = 2
+_data = [Vector2(0, 0.85), 0.0, 0.0, 1, 1, Vector2(0.3271, 1), 0.0, 0.0, 1, 1, Vector2(1, 2), 0.0, 0.0, 1, 1]
 point_count = 3
 
-[sub_resource type="CurveTexture" id="CurveTexture_smoke_scale"]
-curve = SubResource("Curve_smoke_scale")
+[sub_resource type="Curve" id="Curve_smoke_scale_y"]
+resource_name = "ms_hipdrop_b ESP1 scale Y: 0.85 -> 1 by 32.7 %, -> 2.2 by the end"
+max_value = 2.2
+_data = [Vector2(0, 0.85), 0.0, 0.0, 1, 1, Vector2(0.3271, 1), 0.0, 0.0, 1, 1, Vector2(1, 2.2), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_smoke_scale"]
+curve_x = SubResource("Curve_smoke_scale_x")
+curve_y = SubResource("Curve_smoke_scale_y")
+curve_z = SubResource("Curve_smoke_scale_x")
 
 [sub_resource type="Curve" id="Curve_smoke_radial"]
 resource_name = "the puff's outward speed over its life: velOmni 20 u/f under the Drag field 0.88/frame fading in over 23 % (jpa_sim_smoke.py)"
@@ -142,7 +156,7 @@ directional_velocity_curve = SubResource("CurveXYZTexture_smoke_rise")
 gravity = Vector3(0, 0, 0)
 scale_min = 0.65
 scale_max = 1.35
-scale_curve = SubResource("CurveTexture_smoke_scale")
+scale_curve = SubResource("CurveXYZTexture_smoke_scale")
 color_ramp = SubResource("GradientTexture1D_smoke")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_smoke"]
@@ -168,6 +182,15 @@ colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
 [sub_resource type="GradientTexture1D" id="GradientTexture1D_shockwave"]
 gradient = SubResource("Gradient_shockwave")
 
+[sub_resource type="Curve" id="Curve_shockwave_scale"]
+resource_name = "ms_hipdrop_c ESP1 scale: 1 -> 5.0 over the life (pass 78: in 0 / out 0 -> a straight run; 250 -> 1250 units)"
+max_value = 5
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 5), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_shockwave_scale"]
+curve = SubResource("Curve_shockwave_scale")
+
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_shockwave"]
 emission_shape = 0
 emission_shape_offset = Vector3(0, 0.094, 0)
@@ -176,6 +199,7 @@ spread = 0.0
 initial_velocity_min = 0.0
 initial_velocity_max = 0.0
 gravity = Vector3(0, 0, 0)
+scale_curve = SubResource("CurveTexture_shockwave_scale")
 color_ramp = SubResource("GradientTexture1D_shockwave")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_shockwave"]

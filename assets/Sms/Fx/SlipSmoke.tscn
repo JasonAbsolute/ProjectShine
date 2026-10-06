@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://cslipsmoke060"]
+[gd_scene load_steps=14 format=3 uid="uid://cslipsmoke060"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsSlipSmoke.cs" id="1_script"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/kemuball3.png" id="2_smoke"]
@@ -30,6 +30,15 @@ colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.8, 1, 1, 1, 0.8, 1, 1, 1, 0)
 [sub_resource type="GradientTexture1D" id="GradientTexture1D_smoke"]
 gradient = SubResource("Gradient_smoke")
 
+[sub_resource type="Curve" id="Curve_smoke_scale"]
+resource_name = "ms_m_slipsmoke ESP1 scale: 0.75 -> 1 by 37.5 %, -> 2.2 at the end (pass 78); x (1 +- 0.35)"
+max_value = 2.2
+_data = [Vector2(0, 0.75), 0.0, 0.0, 1, 1, Vector2(0.375, 1), 0.0, 0.0, 1, 1, Vector2(1, 2.2), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_smoke_scale"]
+curve = SubResource("Curve_smoke_scale")
+
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_smoke"]
 lifetime_randomness = 0.35
 emission_shape = 1
@@ -44,6 +53,9 @@ directional_velocity_min = 3.3852
 directional_velocity_max = 6.2868
 directional_velocity_curve = SubResource("CurveXYZTexture_throw")
 gravity = Vector3(0, 0, 0)
+scale_min = 0.65
+scale_max = 1.35
+scale_curve = SubResource("CurveTexture_smoke_scale")
 color_ramp = SubResource("GradientTexture1D_smoke")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_smoke"]
