@@ -1,7 +1,8 @@
-[gd_scene load_steps=29 format=3 uid="uid://cshocksprk051"]
+[gd_scene load_steps=30 format=3 uid="uid://cshocksprk051"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsShockSparks.cs" id="1_script"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/biri_l1.png" id="2_streak"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/ShockStreak.gdshader" id="2_streak_shader"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/biri_r.png" id="3_arc"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/hitmrk1.png" id="4_flash"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/shikaku.png" id="5_spark"]
@@ -49,24 +50,22 @@ direction = Vector3(0, 0, 1)
 spread = 0.0
 initial_velocity_min = 0.0806
 initial_velocity_max = 0.3224
+angle_min = -180.0
+angle_max = 180.0
+angular_velocity_min = 540.0
+angular_velocity_max = 1620.0
 gravity = Vector3(0, 0, 0)
 scale_min = 0.5
 scale_max = 1.5
 color_ramp = SubResource("GradientTexture1D_streaks")
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_streaks"]
-resource_name = "shock streak (ms_m_biri_a: P_ms_biri_l1 as alpha, the ramp's cyan + blue, additive, a Y-billboard along its direction)"
-transparency = 1
-cull_mode = 2
-shading_mode = 0
-vertex_color_use_as_albedo = true
-disable_receive_shadows = true
-blend_mode = 1
-albedo_texture = ExtResource("2_streak")
-billboard_mode = 2
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_streaks"]
+resource_name = "shock streak (ms_m_biri_a: P_ms_biri_l1 as alpha, the ramp's cyan + blue, additive; a Direction quad -- Y along its direction, twisting about it at 540..1620 deg/s: ShockStreak.gdshader)"
+shader = ExtResource("2_streak_shader")
+shader_parameter/streak = ExtResource("2_streak")
 
 [sub_resource type="QuadMesh" id="QuadMesh_streaks"]
-material = SubResource("StandardMaterial3D_streaks")
+material = SubResource("ShaderMaterial_streaks")
 size = Vector2(0.672, 2.687)
 
 [sub_resource type="Gradient" id="Gradient_arcs"]

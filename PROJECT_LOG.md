@@ -5019,3 +5019,19 @@ VERIFIED: fx_scale_check.gd (removed) loaded all 14 scenes and read the curves /
 OK, the values above 1 intact (5.0, 8.0; the max_value matters); build 0 errors; boot [SMS selftest] ALL OK + slope/hipdrop ALL OK. The
 look is his (headless draws no particle): effects he approved will change toward the game -- the stars twinkle in shape, the smokes
 grow, the shockwaves spread, the kick marks streak. He builds the hammer (SmsBubbles.cs); the scenes reload.
+
+### Pass 79 -- the shock streak twists about its own axis
+ms_m_biri_a's ESP1 has rotation on (the briefing's "shader job"): angle 0 +- 0.5 turn at birth, speed 0.1 half-turn a frame x (1 +- 0.5) =
+540..1620 deg/s, sign 50/50, rot type Y. WHAT THAT MEANS for a Direction quad (JPADrawExecRotDirectional, JPADrawVisitor.cpp 674-752): the
+quad is no billboard -- its Y is the direction, its X the perpendicular closest to the previous X (seeded by the emitter's up), and the
+rotation matrix is applied to the quad's offsets about its own Y BEFORE the frame: the streak twists about the line it lies on, showing
+edge-on and flat in turn. The port drew it as a fixed-Y StandardMaterial3D billboard (the camera-facing baseline, no twist). GODOT 4.4
+CANNOT do this with flags: particle_flag_rotate_y REPLACES the particle's transform with a world-Y spin after the align (particle_process_
+material.cpp), so the twist lives in a spatial shader: ShockStreak.gdshader reads INSTANCE_CUSTOM.x (the process material's angle_min /
+max +-180 and angular_velocity 540..1620 deg/s, accumulated by Godot) and rotates the quad's vertices about local Y; colour / alpha / blend
+as the StandardMaterial3D had them (COLOR x the texture, additive, unshaded). The random birth angle makes the baseline frame's seed
+invisible; the random sign is invisible on a symmetric quad (|cos| is even), so one positive range stands in for the two-sided one.
+gen_fx_fire.py writes the shader with the scenes. LEGACY RETIRED: the fixed-Y billboard stand-in for the Direction type.
+VERIFIED: twist_check.gd (removed) -- the loaded scene's streak material is the ShaderMaterial on ShockStreak.gdshader with its texture, the
+process material carries angle +-180 / angular velocity 540..1620 with align_y on and rotate_y off; boot ALL OK with no shader error
+(headless cannot compile GLSL: the render_mode list is GetWaterStreak's, which compiled on his machine in pass 76). The scene hot-reloads.
