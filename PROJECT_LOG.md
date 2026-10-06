@@ -4946,3 +4946,11 @@ hit_a / hit_c, the hip drop streaks) may have X and Y swapped. Both need a scene
 VERIFIED: getwater_check.gd (a SceneTree script, removed): the scene loads with every number above (18 checks ALL OK), both bars' AABB
 long axis is Y, the bottle's GetEffect resolves to GetWater.tscn; boot [SMS selftest] ALL OK + slope/hipdrop ALL OK; build 0 errors. The
 look is his to judge (headless cannot draw GPU particles). He builds the hammer (SmsGetWater.cs, SmsWaterBottle.cs); the scenes reload.
+
+### Pass 76b -- the wall kick's emitters were points, not rings
+FOUND while checking the Fx scenes' enums for pass 76: WallKickDust.tscn's two emitters carried emission_shape = 4 with ring parameters.
+4 is EMISSION_SHAPE_POINTS (RING is 6; checked against the engine's constants headless); with no point texture Godot emits every
+particle at the node's origin, so since pass 60 the kick's puff (ms_wallkick_a: a 15-unit circle) and its eight marks (ms_wallkick_b: a
+20-unit circle) have all come out of one point. FIX: emission_shape = 6 in the scene and in gen_fx_dust.py (both emitters). The other
+ring emitters (the super hip drop's smoke and stars) already had 6. VERIFIED headless (ring_check.gd, removed): both emitters RING with
+their radii 0.201 / 0.269 m. The scene hot-reloads.
