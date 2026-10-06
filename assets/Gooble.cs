@@ -18,7 +18,10 @@ using Godot;
 /// wandering -> Land (the land anim). A wall while walking -> the hop (SmallEnemyJump: vy 2.2 x scale, 1.5 u a tick forward, +5 deg).
 /// WATER (HIT_MESSAGE_SPRAYED_BY_WATER, from SmsWaterDrops or the hose at close range): behaveToWater -> Die, melting (the hit anim,
 /// gravity 0.01) when on the ground, no reward. STOMP / GROUND POUND (TMario::hitNormal -> TRAMPLE / HIP_DROP): kill -> Die (the down
-/// anim), the death stamps goop (stamp range 15 x 32 u) and may drop a coin (GenItemRate 50 %, DropScene). ALIVE TIME: 2000 ticks, the
+/// anim), the death stamps goop (stamp range 15 x 32 u) and, with FLUDD's tank under half, puts the stage's water bottle (bottle_short,
+/// TNameKuri::setAfterDeadEffect -> assets/Sms/Items/WaterBottle.tscn, SmsWaterBottle) on the ground under the body. generateItem's
+/// GenItemRate 50 % asks for an item type (0x20000008) no shipped object carries -- the game drops nothing there; DropScene is an
+/// opt-in deviation. ALIVE TIME: 2000 ticks, the
 /// body inflating from 1900 (x 1.01 a tick to twice its scale), then it pops. Dead: freed, or re-launched from its placed point after
 /// RelaunchTicks like TNameKuriLauncher (vy 4, the set anim) -- a placed Gooble is its own launcher (DEVIATION: the game pools them
 /// behind goop launchers). Body scale 0.6..1.0 per life. THE LOOK (name.bmd / brain.bmd read with tools/projectshine/bmd_mat_dump.py):
@@ -48,8 +51,14 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
     /// <summary>TLauncher's launch period (launcher.prm default 180 ticks): a dead Gooble re-launches from its placed point after this
     /// many ticks; below 0 it is freed instead.</summary>
     [Export] public int RelaunchTicks = 180;
-    /// <summary>generateItem (0x20000008, GenItemRate 50 %): the scene to drop at the death point -- his coin. None: no drop.</summary>
+    /// <summary>DEVIATION, off by default: TSmallEnemy::generateItem (GenItemRate 50 %) asks the map-object manager for actor type
+    /// 0x20000008 and no TMapObjData in the shipped game carries that type (MapObjInit.cpp), so the real game drops nothing here. Set a
+    /// scene (his coin) to drop one at the death point half the time anyway. None: the game's nothing.</summary>
     [Export] public PackedScene DropScene;
+    /// <summary>TNameKuri::setAfterDeadEffect (namekuri.cpp 511): the water bottle a stomped Gooble leaves when Mario's tank is under
+    /// half -- assets/Sms/Items/WaterBottle.tscn (SmsWaterBottle: bottle_short, half a tank) unless another is set.</summary>
+    [Export] public PackedScene BottleScene;
+    public const string BottleScenePath = "res://assets/Sms/Items/WaterBottle.tscn";
     /// <summary>MSD_SE_EN_NAMEKURI_WALK (looping, while it walks), _DOWN (the death), _DOWN_WT (melting). Unset = silent.</summary>
     [Export] public AudioStreamPlayer3D WalkSound, DownSound, MeltSound;
     /// <summary>_mat_body's material: assets/Sms/GoobleBody.tres (GoobleBody.gdshader) unless another is set; duplicated per instance,
@@ -104,6 +113,7 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
     private Vector3 _disp;                     // the ticks' displacement this physics frame, units
     private float _yaw;                        // mRotation.y, degrees: 0 = +Z, growing toward +X (MsGetRotFromZaxisY)
     private bool _airborne, _onWall, _noBind, _dead, _melt, _noReward;
+    private bool _hitValid;                    // unk198: TNameKuri::isHitValid -- killed by a hit message other than water (the bottle's gate)
     private Vector3 _floorNormal = Vector3.Up;
     private readonly List<Vector3> _touching = new();  // other live actors' ground points (units) this frame: isCollidMove's push
     private float _bodyScale = 1f, _scale = 1f, _marchSpeed = 1f, _turnSpeed = 0.2f;
@@ -308,7 +318,7 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         _marchSpeed = Lerp(SmsParams.NameKuri.MarchSpeedLow, SmsParams.NameKuri.MarchSpeedHigh, Rand());
         _scale = _bodyScale; _scaleKeep = 1f;
         _hp = SmsParams.NameKuri.HitPointMax;
-        _dead = false; _noReward = false; _melt = false; _noBind = false;
+        _dead = false; _noReward = false; _melt = false; _noBind = false; _hitValid = false;
         _sprayCooldown = 0; _alive = 0; _flash = 0f;
         _vel = Vector3.Zero; _lin = Vector3.Zero;
         _colorIdx = _nextColor; _nextColor = (_nextColor + 1) % BodyColors.Length;
@@ -790,11 +800,13 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
                 || st == Mario.MarioState.treeGrab || st == Mario.MarioState.treeClimb || st == Mario.MarioState.hurt || st == Mario.MarioState.dead;
             if (falling && st == Mario.MarioState.groundPoundFalling)
             {
-                Kill(); return;                                  // HIT_MESSAGE_HIP_DROP -> isHitValid -> kill (unk198, the bottle: not ported)
+                _hitValid = true;                                // isHitValid(HIP_DROP): unk198 = 1 -- the bottle may follow
+                Kill(); return;                                  // HIT_MESSAGE_HIP_DROP -> kill
             }
             if (falling && !dive)
             {
-                // trampleExec: HIT_MESSAGE_TRAMPLE -> kill; Mario -> MARIO_STATUS_TRAMPLE
+                // trampleExec: HIT_MESSAGE_TRAMPLE -> isHitValid (unk198 = 1) -> kill; Mario -> MARIO_STATUS_TRAMPLE
+                _hitValid = true;
                 Kill();
                 _mario.StompBounce();
                 return;
@@ -867,10 +879,13 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         if (MeltSound != null && MeltSound.Stream != null) MeltSound.Play();
     }
 
-    /// <summary>genRandomItem: setAfterDeadEffect (the water bottle: not ported), genEventCoin (none placed), generateItem (no reward
-    /// after its own leap or water): rand < GenItemRate + GenEggRate -> the drop at the ground point.</summary>
+    /// <summary>TSmallEnemy::genRandomItem (smallEnemy.cpp 334) at the Die nerve's end: setAfterDeadEffect (TNameKuri's own: the bottle),
+    /// genEventCoin (no coin placed with it), then generateItem unless LIVE_FLAG_UNK20000 (its own leap) or DEAD: rand < GenItemRate +
+    /// GenEggRate -> makeObjAppear(ground point, 0x20000008) -- a type no shipped TMapObjData carries, so the game drops nothing; DropScene
+    /// is the opt-in deviation that drops a scene there anyway.</summary>
     private void GenRandomItem()
     {
+        SetAfterDeadEffect();
         if (_noReward || DropScene == null) return;
         if (Rand() * 100f < SmsParams.NameKuri.GenItemRate + SmsParams.NameKuri.GenEggRate)
         {
@@ -878,6 +893,26 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
             GetParent().AddChild(drop);
             drop.GlobalPosition = GlobalPosition;
         }
+    }
+
+    /// <summary>TNameKuri::setAfterDeadEffect (namekuri.cpp 511; no disappearance smoke -- TSmallEnemy's is overridden away): killed by a
+    /// hit (unk198) with SMS_GetMarioWaterGun()->getCurrentWater() x 2 &lt; getMaxWater() -> gpItemManager->makeObjAppear(mPosition,
+    /// 0x20000001, true): the stage's one bottle_short put on the ground found from 5 units over the body (checkGround; illegal ground or
+    /// the bottle already out -> nothing).</summary>
+    private void SetAfterDeadEffect()
+    {
+        if (!_hitValid || _mario == null) return;
+        if (_mario.SmsWaterNow * 2 >= _mario.SmsWaterMax) return;
+        if (!SmsWaterBottle.PoolFree) return;
+        var space = GetWorld3D().DirectSpaceState;
+        Vector3 from = GlobalPosition + Vector3.Up * (5f / U);
+        var q = PhysicsRayQueryParameters3D.Create(from, from + Vector3.Down * 200f, CollisionMask);
+        q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+        var hit = space.IntersectRay(q);
+        if (hit.Count == 0) return;                               // BG_CHECK_FLAG_ILLEGAL: no bottle
+        PackedScene scene = BottleScene ?? GD.Load<PackedScene>(BottleScenePath);
+        var bottle = SmsWaterBottle.Spawn(scene, GetParent(), (Vector3)hit["position"]);
+        if (DebugPrint) GD.Print($"[SMS gooble] {Name}: the water bottle {(bottle != null ? "dropped at " + bottle.GlobalPosition : "did not load")} (water {_mario.SmsWaterNow}/{_mario.SmsWaterMax})");
     }
 
     /// <summary>LIVE_FLAG_DEAD: out of the world until the launcher brings it back (or freed).</summary>

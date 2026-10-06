@@ -11104,6 +11104,21 @@ public partial class Mario : CharacterBody3D
     /// <summary>TMario::hitNormal's close-range spray: the hose nozzle (0) emitting water this tick (mIsEmitWater) sprays an actor in
     /// his attack area (HIT_MESSAGE_SPRAYED_BY_WATER from TModelWaterManager::mStaticHitActor).</summary>
     public bool SmsHoseSpraying => _fluddNozzle == SmsNozzle.Spray && _fluddEmittedTick > 0;
+    /// <summary>SMS_GetMarioWaterGun()->getCurrentWater(): the tank now (mCurrentWater), and getMaxWater(): the current nozzle's full
+    /// tank (mEmitParams.mAmountMax) -- TNameKuri's bottle test reads both.</summary>
+    public int SmsWaterNow => _fluddWater;
+    public int SmsWaterMax => SmsFluddCurrent.AmountMax;
+    /// <summary>TMario::receiveMessage (MarioReceiveMsg.cpp 150 / 159): a water bottle taken (HIT_MESSAGE_ATTACK from bottle_short
+    /// 0x20000001 or bottle_large / WaterRecoverObj 0x20000002) -> addWater(getMaxWater() / 2), or the whole tank, only with the pack
+    /// (MARIO_FLAG_HAS_FLUDD); the item plays the chime and emitGetWaterEffect itself.</summary>
+    public void SmsGetWaterBottle(bool full)
+    {
+        if (!_smsHasFludd) return;
+        int max = SmsFluddCurrent.AmountMax;
+        int before = _fluddWater;
+        _fluddWater = Math.Min(_fluddWater + (full ? max : max / 2), max);
+        if (SmsDebugPrint) GD.Print($"[SMS fludd] water bottle ({(full ? "full" : "half")}): water {before} -> {_fluddWater}/{max}");
+    }
 
     public void TakeDamage(Vector3 hitSourcePosition, SmsDamageProfile profile)
     {

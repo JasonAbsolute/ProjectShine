@@ -4755,3 +4755,48 @@ mat3(tangent, bitangent, normal) * VELOCITY), so `direction` must be (0, 0, 1) f
 and the super flames already had it right). OPEN CHECK: GetSparkle's stars use directed points with (0, 1, 0) too -- their 0.4..0.8 u/f
 radial drift runs tangentially; invisible under the orbit, to fix when that scene is next touched. The upright frame (72b) stays. Boot
 ALL OK; the scene reloads without a build.
+
+### Pass 73 -- the Gooble's water bottle
+HIS CALL after 72c: "Goes up now, do the water bottle drop". THE GAME: TSmallEnemy::genRandomItem (smallEnemy.cpp 334) runs at the end
+of TNerveSmallEnemyDie -- setAfterDeadEffect, genEventCoin, generateItem. TNameKuri OVERRIDES setAfterDeadEffect (namekuri.cpp 511; no
+disappearance smoke): `if (unk198 && getCurrentWater() * 2 < getMaxWater()) gpItemManager->makeObjAppear(mPosition, 0x20000001, true)`.
+unk198 is TNameKuri::isHitValid (618): 1 for any hit message except HIT_MESSAGE_SPRAYED_BY_WATER -- TSmallEnemy::receiveMessage (531)
+only calls it for TRAMPLE / HIP_DROP / SUPER_HIP_DROP / UNKB, so a stomped Gooble may leave a bottle, a sprayed one or one that died on
+its own leap (attackToMario: kill without it) never does; reset() zeroes it. 0x20000001 = "bottle_short" (MapObjInit.cpp 1017: a TItem,
+item_hit_data_table 40 x 40, flags 0x0A040100; 0x20000002 = bottle_large / WaterRecoverObj): TNameKuriManager::loadAfter (110)
+registers ONE per stage, so canAppear fails while it is out. makeObjAppear(x, y, z, id, true) (MapObjManager.cpp 213) puts it on the
+ground found from y + 5 (nothing on illegal ground). THE ITEM (120 Hz movement ticks, like every map object): TItem::appear (Item.cpp
+151): still on the ground (LIVE_FLAG_UNK10, no physics), HIT_FLAG_NO_COLLISION, the timer 120 (unk150); TItem::appearing (124,
+MAP_OBJ_FLAG_UNK2000000) grows the scale 0.02 a tick (mAppearedScaleSpeed x 2) from 1 to 2 -- the bottle is drawn at TWICE its bmd --
+then makeObjAppeared (the timer zeroed) + NO_COLLISION on + DISAPPEARING off; the next tick TItem::perform (163) drops NO_COLLISION
+and, for a spawned item (not MAP_OBJ_FLAG_UNK10000000 = TItem::load's placed ones), arms DISAPPEARING with 480 ticks (unk14C);
+TMapObjGeneral::perform (592) skips the draw on the odd 10-tick slots under 360 (mNormalFlushTime / mNormalFlushInterval);
+TMapObjGeneral::appeared (240) makes it dead at 0. TItemManager::perform (112) spins one shared matrix 2 degrees a tick, TItem::calc
+(93) copies it (MAP_OBJ_FLAG_UNK8000000). Taken: TItem::touchPlayer (67) -> taken (57) -> Mario receiveMessage HIT_MESSAGE_ATTACK
+(MarioReceiveMsg.cpp 150): addWater(getMaxWater() / 2) with MARIO_FLAG_HAS_FLUDD (the large one: the tank, 159), emitGetWaterEffect
+(ms_itemget1_b bound to unk160), MSD_SE_MA_GET_ITEM (98); kill -> breaking (no anim) -> makeObjDead at once. THE 50 % COIN IS NOT THE
+GAME: generateItem (414) asks for actor type 0x20000008 and no TMapObjData in MapObjInit.cpp carries it (the whole 0x200000xx table:
+bottles 1/2, mushrooms 5-7, egg 9, coins E/F/10, hide objs 11, shine 13, nozzles 1F/22/25/26/2A, cap 3C, box 68) -> the shipped game
+drops nothing there; Gooble.DropScene is now documented as an opt-in DEVIATION, off by default.
+PORT: assets/Sms/Items/WaterBottle.tscn (uid cwbottlesc073; Node3D + SmsWaterBottle.cs, Model = MeshInstance3D of
+assets/Sms/models/bottle_short/bottle_short_mesh.res at 2 / 74.44 with surface overrides BottleLabel.tres (_mat_label4: StandardMaterial3D
+unshaded, vertex colour x texture, cull disabled) and BottleGlass.tres (_suimen1: BottleGlass.gdshader -- blend_add, cull_back,
+depth_draw_always, unshaded; TEV stage 0 TEX x COLOR0 + 1/2 / A = vcA, stage 1 + the GX_LIGHT2 specular (shininess 50, the GoobleBody
+maths) / A = vcA + 1/4 - 1/2; display-referred), Hit = Area3D with the 80 x 80 unit cylinder, GetEffect = GetSparkle.tscn). The mesh:
+FinModelUtility's bottle_short.glb (cli/out .../bianco2/mapobj, the real J_bottle_s 128 x 64 CMPR beside it; bottle_short.bmd read with
+bmd_mat_dump.py: label 1 stage opaque no-cull unlit, glass 2 stages SRCALPHA + ONE z-write, vertex alpha 0.24 .. 1) imported headless,
+the glb's .import stripped of the 11.6 MB scene defaults (bottle_imports.py), the png pinned lossless + mipmaps + no detect_3d, the
+ArrayMesh pulled out by a one-off extract_bottle_mesh.gd (materials nulled; 2 surfaces in the bmd's order, colours kept). SmsWaterBottle:
+Placed (editor) vs Spawn(scene, parent, groundPos) (the pool: ONE live dropped bottle, PoolFree); the tick machine above (AppearedScale
+2, 0.02 a tick, LifeTicks 480, FlushTicks 360 / 10, 2 deg a tick); Take -> Mario.SmsGetWaterBottle(FullRefill) + the GetEffect bound to
+him; the glass's sun from the scene's DirectionalLight3D. Gooble.cs: _hitValid (set before the two stomp kills), SetAfterDeadEffect
+(the water test, PoolFree, the ground ray from 5 u up, Spawn under the Gooble's parent), BottleScene export (default the scene).
+Mario.cs: SmsWaterNow / SmsWaterMax (getCurrentWater / getMaxWater = the current nozzle's AmountMax), SmsGetWaterBottle(full).
+NOT PORTED: ms_itemget1_b (the water sparkle: a 330 u sphere of DirectionCross streaks converging on him, 80 frames -- GetSparkle stands
+in), the appear / taken sounds, bottle_large's model (the script takes it: FullRefill). DEVIATION (small): each drop grows in from 1;
+the game's pooled object keeps its scale, so its second appearance pops at 2 at once. OPEN: SmsNozzleItem runs its TItem clock at
+"30 fps x Speed 3" -- the real clock is the 120 Hz tick (x4), so Speed 4 = the game; his 3 stays as his taste. Drive 59 (patch_smoke59.py,
+removed): tank 1000 / 10000 -> Mario dropped 3.5 m onto gooby -> ONE bottle 0.47 s later on the floor under it (0.000 m off), under
+Level, MeshInstance3D + both overrides, the 80 x 80 Area, scale 1 -> 2 then takeable with 479 of 480 ticks armed; stepping on it: water
+1000 -> 6000, gone in a frame, the sparkle up, the pool free; tank 0 -> gooby2 -> the bottle flickers 90 shown / 90 hidden and times
+out at 4.47 s; tank full -> gooby dies, no bottle. ALL OK. Build 0 err; boot ALL OK. The look is his to confirm (headless renders nothing).

@@ -1,0 +1,13 @@
+[gd_resource type="ShaderMaterial" load_steps=3 format=3 uid="uid://cwbottlegl073"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Items/BottleGlass.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://assets/Sms/models/bottle_short/bottle_short.png" id="2_tex"]
+
+[resource]
+resource_name = "_suimen1 (bottle_short.bmd): the additive glass shell, its alpha the vertex alpha - 1/4 plus the sun's specular; SmsWaterBottle.cs sets sun_dir / sun_color from the scene's DirectionalLight3D"
+shader = ExtResource("1_shader")
+shader_parameter/sun_dir = Vector3(0.348, 0.87, 0.348)
+shader_parameter/sun_color = Vector3(1, 1, 1)
+shader_parameter/shininess = 50.0
+shader_parameter/konst_a = 0.25
+shader_parameter/glass_tex = ExtResource("2_tex")

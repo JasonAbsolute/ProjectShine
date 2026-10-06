@@ -1,0 +1,31 @@
+[gd_scene load_steps=7 format=3 uid="uid://cwbottlesc073"]
+
+[ext_resource type="Script" path="res://assets/Sms/Items/SmsWaterBottle.cs" id="1_script"]
+[ext_resource type="ArrayMesh" path="res://assets/Sms/models/bottle_short/bottle_short_mesh.res" id="2_mesh"]
+[ext_resource type="Material" path="res://assets/Sms/Items/BottleLabel.tres" id="3_label"]
+[ext_resource type="Material" path="res://assets/Sms/Items/BottleGlass.tres" id="4_glass"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/GetSparkle.tscn" id="5_fx"]
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_hit"]
+resource_name = "item_hit_data_table (MapObjInit.cpp 992): 40 x 40 units at the item's appeared scale 2 = 80 x 80, the touch cylinder off the ground"
+height = 1.07467
+radius = 1.07467
+
+[node name="WaterBottle" type="Node3D" node_paths=PackedStringArray("Model", "Hit")]
+script = ExtResource("1_script")
+Model = NodePath("Model")
+Hit = NodePath("Hit")
+GetEffect = ExtResource("5_fx")
+
+[node name="Model" type="MeshInstance3D" parent="."]
+transform = Transform3D(0.0268668, 0, 0, 0, 0.0268668, 0, 0, 0, 0.0268668, 0, 0, 0)
+mesh = ExtResource("2_mesh")
+surface_material_override/0 = ExtResource("3_label")
+surface_material_override/1 = ExtResource("4_glass")
+
+[node name="Hit" type="Area3D" parent="."]
+monitorable = false
+
+[node name="Shape" type="CollisionShape3D" parent="Hit"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.537336, 0)
+shape = SubResource("CylinderShape3D_hit")
