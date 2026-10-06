@@ -11,8 +11,12 @@ using Godot;
 ///
 /// THE ITEM'S LIFE, in 120 Hz movement ticks (every map object performs all four ticks a frame, like the enemies):
 ///  - TItem::appear (151): on the ground, still (LIVE_FLAG_UNK10: no physics), untouchable (HIT_FLAG_NO_COLLISION), STATE_APPEARING;
-///    TItem::appearing (124, MAP_OBJ_FLAG_UNK2000000): the scale grows 0.02 a tick (mAppearedScaleSpeed x 2) from 1 to 2 -- the bottle is
-///    drawn at TWICE its bmd -- then makeObjAppeared (the state timer zeroed) with NO_COLLISION back on;
+///    TItem::appearing (124, MAP_OBJ_FLAG_UNK2000000): mScaling grows 0.02 a tick (mAppearedScaleSpeed x 2) from 1 to 2, then
+///    makeObjAppeared (the state timer zeroed; setObjHitData(0): the touch cylinder at 40 x mScaling = 80) with NO_COLLISION back on.
+///    THAT SCALE IS NEVER DRAWN: the bottle's flags (0x0A040100) carry MAP_OBJ_FLAG_UNK8000000, so TItem::calcRootMatrix (87) -- the one
+///    path to model->setBaseScale(mScaling) (TMapObjBase::calcRootMatrix 613) -- is a no-op for it, and TItem::calc (93) writes the root
+///    matrix straight from the item manager's spin matrix + mPosition, no scale; J3DModel's base scale stays its initial (1, 1, 1)
+///    (J3DModel.cpp 494). The bottle stands at its bmd's size (78 units = 1.05 m) from the first tick; the growth is 50 untouchable ticks;
 ///  - the next tick TItem::perform (163) drops NO_COLLISION (takeable) and arms the item timer: MAP_OBJ_FLAG_DISAPPEARING, 480 ticks
 ///    (TItem::initMapObj unk14C); TMapObjGeneral::perform (592) skips the draw on the odd 10-tick slots once the timer is under 360
 ///    (mNormalFlushTime / mNormalFlushInterval); TMapObjGeneral::appeared (240) makes it dead at 0. A PLACED bottle (TItem::load:
@@ -21,15 +25,17 @@ using Godot;
 ///  - touched by Mario (TItem::touchPlayer 67 -> taken 57: HIT_MESSAGE_ATTACK to him): TMario::receiveMessage (MarioReceiveMsg.cpp 150 /
 ///    159) addWater(getMaxWater() / 2) -- the whole tank for the large one -- when he has the pack, emitGetWaterEffect (ms_itemget1_b)
 ///    and MSD_SE_MA_GET_ITEM (98); then kill -> breaking -> makeObjDead at once (no break anim): the pool is free again.
-/// The game's pooled quirk (a second appearance pops at 2 at once, the scale never reset) is not kept: each drop grows in.
-/// The scene (assets/Sms/Items/WaterBottle.tscn): Model = a MeshInstance3D of the bmd's mesh at 2 / 74.44 with BottleLabel.tres
-/// (_mat_label4) and BottleGlass.tres (_suimen1), Hit = the 80 x 80 unit cylinder (the touch data at scale 2). Drop one in a level as is
+/// The game's pooled quirk (a second appearance starts with mScaling already 2, so its 50-tick appearing state ends at once) is not kept:
+/// each drop runs the full state. The scene (assets/Sms/Items/WaterBottle.tscn): Model = a MeshInstance3D of the bmd's mesh at 1 / 74.44
+/// (the bmd's own size) with BottleLabel.tres (_mat_label4) and BottleGlass.tres (_suimen1), Hit = the 80 x 80 unit cylinder (the touch
+/// data at mScaling 2). Drop one in a level as is
 /// (Placed); Spawn() makes a dropped one. SmsNozzleItem is the same TItem family (the nozzle items keep their own timing).
 /// </summary>
 [GlobalClass]
 public partial class SmsWaterBottle : Node3D
 {
-    /// <summary>The scene's parts: the model (spun, scaled), the touch cylinder (item_hit_data_table: 40 x 40 units at the item's scale).</summary>
+    /// <summary>The scene's parts: the model (spun; drawn at the bmd's size -- see the header), the touch cylinder (item_hit_data_table:
+    /// 40 x 40 units at the item's mScaling).</summary>
     [Export] public Node3D Model;
     [Export] public Area3D Hit;
     /// <summary>emitGetWaterEffect: ms_itemget1_b is not baked yet, so the get sparkle (ms_itemget1_a, assets/Sms/Fx/GetSparkle.tscn)
@@ -37,9 +43,10 @@ public partial class SmsWaterBottle : Node3D
     [Export] public PackedScene GetEffect;
     /// <summary>bottle_short (0x20000001) refills half the nozzle's tank; bottle_large / WaterRecoverObj (0x20000002) fill it.</summary>
     [Export] public bool FullRefill = false;
-    /// <summary>TItem::appearing's target (MAP_OBJ_FLAG_UNK2000000): the bottle is drawn at this multiple of its bmd. The Model's scale in
-    /// the scene IS this look; a dropped bottle grows into it from 1 at 0.02 a tick.</summary>
-    [Export] public float AppearedScale = 2f;
+    /// <summary>DEVIATION, off = the game: draw mScaling / AppearedScale on the Model during the appearing state, so a dropped bottle pops
+    /// in from half its size over the 50 ticks. The game animates mScaling but never draws it (see the header); pass 73 shipped it drawn,
+    /// which left the bottle at twice its size.</summary>
+    [Export] public bool GrowIn = false;
     /// <summary>A bottle placed in the editor (TItem::load: MAP_OBJ_FLAG_UNK10000000): no item timer, takeable at once, at AppearedScale.
     /// Spawn() clears it for a dropped one.</summary>
     [Export] public bool Placed = true;
@@ -52,6 +59,7 @@ public partial class SmsWaterBottle : Node3D
     public const int FlushTicks = 360;       // TMapObjGeneral::mNormalFlushTime: the flicker starts under this
     public const int FlushInterval = 10;     // TMapObjGeneral::mNormalFlushInterval: hidden on the odd slots
     public const float ScaleStep = 0.02f;    // TItem::mAppearedScaleSpeed (0.01) x 2
+    public const float AppearedScale = 2f;   // TItem::appearing's mScaling target (MAP_OBJ_FLAG_UNK2000000): the hit size's multiplier, never drawn
     public const float SpinDegPerTick = 2f;  // TItemManager unk70: every item's shared spin
     public const int Pool = 1;               // TNameKuriManager::loadAfter: ONE bottle_short per stage
 
@@ -60,7 +68,7 @@ public partial class SmsWaterBottle : Node3D
     public static bool PoolFree => _pooledLive < Pool;
     public static int PooledLive => _pooledLive;
 
-    private Vector3 _modelBase = Vector3.One; // the Model's scale in the scene = the look at AppearedScale
+    private Vector3 _modelBase = Vector3.One; // the Model's scale in the scene = the bmd at 1 / 74.44
     private float _scale;                     // mScaling
     private int _timer;                       // mStateTimer, ticks
     private bool _noCollision;                // HIT_FLAG_NO_COLLISION
@@ -175,10 +183,11 @@ public partial class SmsWaterBottle : Node3D
             Vanish();                                                  // appeared(): DISAPPEARING and the timer out -> makeObjDead
     }
 
+    /// <summary>The draw: the bmd's own size (TItem::calc writes the root matrix with no scale) -- unless GrowIn draws mScaling / 2.</summary>
     private void ApplyScale()
     {
-        if (Model != null && AppearedScale > 0f)
-            Model.Scale = _modelBase * (_scale / AppearedScale);
+        if (Model == null) return;
+        Model.Scale = GrowIn ? _modelBase * (_scale / AppearedScale) : _modelBase;
     }
 
     /// <summary>taken (57): HIT_MESSAGE_ATTACK to Mario -- the water, the effect at his centre (bound to him), the chime -- then kill:

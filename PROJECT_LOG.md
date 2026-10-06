@@ -4800,3 +4800,26 @@ removed): tank 1000 / 10000 -> Mario dropped 3.5 m onto gooby -> ONE bottle 0.47
 Level, MeshInstance3D + both overrides, the 80 x 80 Area, scale 1 -> 2 then takeable with 479 of 480 ticks armed; stepping on it: water
 1000 -> 6000, gone in a frame, the sparkle up, the pool free; tank 0 -> gooby2 -> the bottle flickers 90 shown / 90 hidden and times
 out at 4.47 s; tank full -> gooby dies, no bottle. ALL OK. Build 0 err; boot ALL OK. The look is his to confirm (headless renders nothing).
+
+### Pass 73b -- the bottle's size: the item's scale is never drawn
+HIS REVIEW of 73: "functionally it looks great! however the bottle is too big i would say should be half the size". He is right, and
+the source says why: pass 73 read TItem::appearing (Item.cpp 124: with MAP_OBJ_FLAG_UNK2000000, mScaling grows 0.02 a tick from 1 to 2)
+as the DRAWN size and put the model in the scene at 2 / 74.44. But the draw never sees mScaling for this item. The only path to
+model->setBaseScale(mScaling) is TMapObjBase::calcRootMatrix (MapObjBase.cpp 613); TItem::calcRootMatrix (Item.cpp 87) is
+`if (!checkMapObjFlag(MAP_OBJ_FLAG_UNK8000000)) TMapObjGeneral::calcRootMatrix()`, and bottle_short_data's flag word 0x0A040100
+(MapObjInit.cpp 1017, copied to the object at 11143) carries 0x08000000 -- a no-op. TItem::calc (Item.cpp 93) then writes the root
+matrix itself: the item manager's spin matrix (unk40, a pure rotation) for the 3x3 and mPosition for the translation, no scale, into
+getAnmMtx(0) (the flags also carry MAP_OBJ_FLAG_UNK100, so joint 0 keeps the written matrix: setMtxCalc at MapObjBase.cpp 255). J3DModel's
+base scale stays its initial (1, 1, 1) (J3DModel.cpp 494), and TSmJ3DAct::perform's setBaseScale is not on TLiveActor's perform chain.
+So the bottle stands at its bmd's size from the first tick -- 78 units = 1.05 m tall (the glb: y 0..78), exactly half of what 73 drew.
+What mScaling 1 -> 2 DOES do: it is the 50-tick appearing state (untouchable), and at makeObjAppeared setObjHitData(0) scales the touch
+cylinder by it -- item_hit_data_table's 40 x 40 becomes 80 x 80 (MapObjBase.cpp 81). Both stay as they were.
+THE FIX: assets/Sms/Items/WaterBottle.tscn: Model at 1 / 74.44 (0.0134336). SmsWaterBottle.cs: AppearedScale is a const (the hit size's
+multiplier), ApplyScale leaves the Model at the scene's scale; the growth still runs for the state and the hit. DEVIATION knob (off = the
+game): `GrowIn` draws mScaling / 2 on the Model during the appearing state, i.e. the pass-73 pop-in from half size -- for his eye only.
+No legacy retired (73's own 2x is what goes).
+VERIFIED headless (bottle_scale_check.gd, a SceneTree script, removed): two dropped bottles, A = the game, B = GrowIn. A's Model scale
+0.0134336 (1.048 m tall) at every sample from t 0.02 to 4.42 s; B 0.0067168 -> 0.0134336 over 0.52 s, then level. Both flicker on the odd
+10-tick slots from 1.5 s and time out together at 4.47 s ("timed out"). Build 0 errors; boot [SMS selftest] ALL OK + slope/hipdrop ALL OK.
+He builds the hammer (SmsWaterBottle.cs) and reloads WaterBottle.tscn.
+LESSON: a decomp field that is animated is not necessarily drawn -- trace it to the matrix the renderer reads before porting it as a look.

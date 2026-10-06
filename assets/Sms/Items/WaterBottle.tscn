@@ -18,7 +18,7 @@ Hit = NodePath("Hit")
 GetEffect = ExtResource("5_fx")
 
 [node name="Model" type="MeshInstance3D" parent="."]
-transform = Transform3D(0.0268668, 0, 0, 0, 0.0268668, 0, 0, 0, 0.0268668, 0, 0, 0)
+transform = Transform3D(0.0134336, 0, 0, 0, 0.0134336, 0, 0, 0, 0.0134336, 0, 0, 0)
 mesh = ExtResource("2_mesh")
 surface_material_override/0 = ExtResource("3_label")
 surface_material_override/1 = ExtResource("4_glass")
