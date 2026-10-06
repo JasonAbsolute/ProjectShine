@@ -4880,3 +4880,32 @@ THROWN at frame 4: launch 9.03 m/s forward, 23.21 up on the first 60 Hz sample (
 apex 4.45 m over the first sample and the return 7.07 m out, both exactly Godot's semi-implicit Euler arc for that launch (the continuous
 4.64 / 7.22 less half a step) -- the game's full arc from the release point is 5.04 / 7.53. 10 checks ALL OK. Build 0 errors; boot
 [SMS selftest] ALL OK + slope/hipdrop ALL OK. He builds the hammer (Mario.cs, SmsTakeable.cs) and resets the two Player.tscn knobs.
+
+### Pass 75b -- the particle spins (the spin check)
+HIS PICK: "run the spin check". THE FINDING: tools/projectshine/jpa_dump.py's ESP1 rotate line had the fields crossed -- it printed 0x5E
+(rotateRandomSpeed) as the random ANGLE, 0x60 (rotateRandomAngle) as the random SPEED, and read the direction at 0x52 (it is 0x62). The
+engine (JPAExtraShape.cpp 61-65; JPADraw.cpp 216-236): start angle = rotateAngle (0x5A, half-turns) x 180 deg + SF[-0.5, 0.5) x
+rotateRandomAngle (0x60) x 360 deg; speed per frame = +-rotateSpeed (0x5C, half-turns) x (1 + rotateRandomSpeed (0x5E) x RF[-1, 1)) x
+180 deg, + when RF < rotateDirection (0x62: 1 = always +, 0 = 50/50). rotateSpeed 0 is NO spin whatever the random says. Re-read:
+  ms_wallkick_a, ms_mariwallsl1, ms_m_slipsmoke, ms_firedmg_a, ms_moe_fire_off, ms_2d_pause_smo: start +-22.5 deg, speed 0 (no spin).
+      The port spun the first five at +-2700 deg/s (the 0.125 random ANGLE read as a speed in turns/frame) and started the fire / shock
+      clouds at a full random angle.
+  ms_wallkick_b (the kick marks, a DirectionCross): rotate DISABLED. The port spun them -20045..23155 deg/s.
+  ms_dmg_c (bonk / damage stars): start +-180 deg, 0.02 x (1 +- 0.25) half-turns/frame = 162..270 deg/s, sign 50/50. The port: +-90 deg,
+      +-864 deg/s (0.02 read as turns, 1.0 read as its random).
+  ms_m_sphipd_hit_d (super hip drop stars): +-180 deg, 135..297 deg/s, sign 50/50. The port: +-135 deg, +-864.
+  Correct already: ms_m_biri_b arcs (+-180 random, no spin), ms_m_biri_c (no ESP1), ms_m_blur2sp (its -3234.6 is texIncRot, a different
+  field), the hip drop / super hip drop clouds and shockwaves (fixed angles, no spin), ms_itemget1_a (angle 45 deg fixed).
+THE FIX (assets/Sms/Fx: WallKickDust, WallSlideDust, SlipSmoke, FireDamage, ShockPuff, BonkStars, SuperHipDropLanding + the three generators
+gen_fx_dust / gen_fx_fire / gen_fx_super in tools/projectshine): the five smokes angle_min / max +-22.5, no angular velocity; the kick marks no
+angular velocity (their +-180 start angle KEPT as the stand-in for the cross's orientation along a ~0 velocity -- not a rotation the game
+draws; approximation); the stars angle +-180 and angular velocity +-270 / +-297 (Godot's angular_velocity is ONE uniform range: the
+game's two-sided 162..270 / 135..297 magnitude band cannot be expressed, so slow stars occur that the game has not -- approximation,
+named in the generators). PauseSmoke.tscn's +-22.5 deg start on a symmetric puff is invisible and the file carries his uncommitted
+edits: left alone. NOT ported, found here: ms_m_biri_a's shock streaks twist about their own axis at 540..1620 deg/s
+(JPADrawExecRotDirectional applies the rot-Y matrix in the quad's own frame = a width flicker); a shader job for the ShockSparks streaks.
+FireDamage.tscn / ShockPuff.tscn were patched from HIS files (they carry the pass-55 FIRE_SMOKE_DARKEN / SHOCK_PUFF_SCALE tweaks my
+scenes/Fx mirror had missed -- the md5 check caught it; the mirror is current now). Legacy retired: the misread spins of passes 33 / 51 /
+60 and the dumper's wrong labels (jpa_dump.py fixed and commented with the engine lines).
+VERIFIED: fx_spin_check.gd (a SceneTree script, removed): the seven scenes load, 8 emitters at the wanted angle / spin ranges -- ALL OK.
+Scenes hot-reload; no build needed.
