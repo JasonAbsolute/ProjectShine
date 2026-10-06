@@ -9,8 +9,9 @@ using System.Collections.Generic;
 /// units: the hit cylinder in units (74.44 a metre; a *_hit_data_table row = receive radius, height, attack radius, height: fruit
 /// {60, 60, 80, 90} (the red pepper uses it), coconut / papaya {40, 60, 50, 80}, pine {80, 60, 50, 80}, banana {80, 60, 60, 90},
 /// durian {150, 60, 60, 90}; MapObjBase.cpp setObjHitData multiplies radius by max(scale.x, scale.z) and height by scale.y --
-/// Size below / Fruit.Size is that scale), ThrowRate x ThrowPower 2.8 = the launch speed forward in units a 30 fps frame (TMapObjGeneral::
-/// thrown, MapObjGeneral.cpp 109: physical unk2C), ThrowVy the same up (unk30), Gravity units a tick^2 (unk0, getGravityY), Bounce the
+/// Size below / Fruit.Size is that scale), ThrowRate x ThrowPower 2.8 = the launch speed forward in units a 120 Hz TICK (TMapObjGeneral::
+/// thrown, MapObjGeneral.cpp 109: physical unk2C; TLiveActor::bind adds mVelocity whole every CUE_MOVE, 4 a 30 fps frame -- SmsUnits.
+/// TickSpeedToMps, never Mario's SpeedToMps: pass 75), ThrowVy the same up (unk30), Gravity units a tick^2 (unk0, getGravityY), Bounce the
 /// ground restitution (unk4: vy *= -Bounce while |vy| > BounceMinVy (unkC), touchGround 437), BounceFriction on vx / vz every tick
 /// the object touches the ground (unk10: a fruit is a TMapObjBall, whose touchGround -- asm only, QbeRoot MapObjBall.s 801BCC64 --
 /// multiplies by it on every ground contact, bounce or roll, so a coconut rolls out ~190 units from a 5.6 u/f landing), WallReflect
@@ -150,11 +151,12 @@ public readonly struct SmsTakeData
 
 /// <summary>
 /// A thrown body flies on the game's numbers, not his: TMapObjGeneral::calcVelocity (MapObjGeneral.cpp 477) takes Gravity off vy every
-/// tick with no air drag (unk18 = 1.0), touchGround (437) bounces at -Bounce while |vy| > BounceMinVy. The port keeps his RigidBody3D
-/// and gives it the game's gravity (AccelToMps2(Gravity) / the project's) and restitution for the flight, then hands his own numbers
+/// 120 Hz tick with no air drag (unk18 = 1.0), touchGround (437) bounces at -Bounce while |vy| > BounceMinVy. The port keeps his RigidBody3D
+/// and gives it the game's gravity (TickAccelToMps2(Gravity) / the project's) and restitution for the flight, then hands his own numbers
 /// back once it has come to rest (asleep) or is picked up again. The ground friction at a bounce (BounceFriction) and the wall
 /// reflection (WallReflect) stay the body's own material -- noted, not modelled. The ground ROLL-OUT is the game's (pass 62b): while the
-/// body touches the ground its vx / vz (and spin) decay by BounceFriction a 60 Hz tick (TMapObjBall::touchGround, asm) and stop below
+/// body touches the ground its vx / vz (and spin) decay by BounceFriction a 120 Hz tick (TMapObjBall::touchGround, asm, from control()
+/// every CUE_MOVE -- pass 75; 62b had guessed 60 Hz) and stop below
 /// BounceMinVy on a flat floor (calcVelocity, MapObjGeneral.cpp 490). PENDING the US main.dol: the ball's own landing threshold and
 /// slope acceleration (TMapObjBall 0x188 / 0x180, per fruit id in initMapObj) and its visual spin (calcCurrentMtx) are literals the
 /// asm pulls from the DOL's float pool -- Godot's bounce / rolling stand in until the file is here.
@@ -165,6 +167,7 @@ public static class SmsThrownFlight
     {
         public RigidBody3D Body;
         public float GravityScale, LinearDamp;
+        public RigidBody3D.DampMode DampMode;
         public PhysicsMaterial Material;
         public double T;
         public SmsTakeData Data;
@@ -179,8 +182,9 @@ public static class SmsThrownFlight
             return;
         End(rb);
         float g = (float)ProjectSettings.GetSetting("physics/3d/default_gravity", 9.8f);
-        var e = new Entry { Body = rb, GravityScale = rb.GravityScale, LinearDamp = rb.LinearDamp, Material = rb.PhysicsMaterialOverride, Data = d, HalfH = HalfHeight(rb) };
-        rb.GravityScale = g > 0f ? SmsUnits.AccelToMps2(d.Gravity) / g : rb.GravityScale;
+        var e = new Entry { Body = rb, GravityScale = rb.GravityScale, LinearDamp = rb.LinearDamp, DampMode = rb.LinearDampMode, Material = rb.PhysicsMaterialOverride, Data = d, HalfH = HalfHeight(rb) };
+        rb.GravityScale = g > 0f ? SmsUnits.TickAccelToMps2(d.Gravity) / g : rb.GravityScale; // units a tick^2 (pass 75)
+        rb.LinearDampMode = RigidBody3D.DampMode.Replace; // not Combine: the world's default 0.1 damp would be an air drag the game's object has not (unk18 = 1.0)
         rb.LinearDamp = 0f;
         var mat = new PhysicsMaterial { Bounce = d.Bounce, Friction = e.Material != null ? e.Material.Friction : 1f };
         rb.PhysicsMaterialOverride = mat;
@@ -220,9 +224,9 @@ public static class SmsThrownFlight
         }
     }
 
-    /// <summary>TMapObjBall::touchGround's ground tick (asm 801BCC64): on a map floor vx, vz *= unk10 (BounceFriction) -- a 60 Hz tick,
-    /// the port's clock for a per-frame decay -- then calcVelocity (MapObjGeneral.cpp 490): on a flat floor (normal.y == 1) a component
-    /// under unkC (BounceMinVy) is 0. The spin follows (the ball's visual roll is its velocity's).</summary>
+    /// <summary>TMapObjBall::touchGround's ground tick (asm 801BCC64): on a map floor vx, vz *= unk10 (BounceFriction) -- once a 120 Hz
+    /// tick, control() running every CUE_MOVE (pass 75) -- then calcVelocity (MapObjGeneral.cpp 490): on a flat floor (normal.y == 1) a
+    /// component under unkC (BounceMinVy, units a tick) is 0. The spin follows (the ball's visual roll is its velocity's).</summary>
     private static void RollOut(Entry e, double delta)
     {
         RigidBody3D rb = e.Body;
@@ -237,13 +241,13 @@ public static class SmsThrownFlight
         if (hit["collider"].AsGodotObject() is not Node col || col is RigidBody3D || col is CharacterBody3D || col is Area3D)
             return; // the game's object collides with the map (BG) only
         Vector3 n = (Vector3)hit["normal"];
-        float k = Mathf.Pow(Mathf.Clamp(e.Data.BounceFriction, 0f, 1f), 60f * (float)delta);
+        float k = Mathf.Pow(Mathf.Clamp(e.Data.BounceFriction, 0f, 1f), SmsUnits.TicksPerSecond * (float)delta);
         Vector3 v = rb.LinearVelocity;
         v.X *= k;
         v.Z *= k;
         if (n.Y > 0.999f)
         {
-            float minV = SmsUnits.SpeedToMps(e.Data.BounceMinVy);
+            float minV = SmsUnits.TickSpeedToMps(e.Data.BounceMinVy);
             if (Mathf.Abs(v.X) < minV) v.X = 0f;
             if (Mathf.Abs(v.Z) < minV) v.Z = 0f;
         }
@@ -275,6 +279,7 @@ public static class SmsThrownFlight
         if (!GodotObject.IsInstanceValid(e.Body))
             return;
         e.Body.GravityScale = e.GravityScale;
+        e.Body.LinearDampMode = e.DampMode;
         e.Body.LinearDamp = e.LinearDamp;
         e.Body.PhysicsMaterialOverride = e.Material;
     }

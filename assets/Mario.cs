@@ -1418,16 +1418,19 @@ public partial class Mario : CharacterBody3D
     /// 1487-1515 set 1, 2, 4, 8, 0x20, 0x80, 0x100, 0x200, 0x2000, 0x4000, 0x8000), so in the game only a MOVING Mario (running()
     /// 668, landing() 1005) does it; standing still, B does nothing. ON at his ask (10-02 21:42).</summary>
     [Export] public bool TakePoseStanding = true;
-    /// <summary>DEVIATION knobs for the throw's feel (1 / false = the shipped game, which he found too light and slow). The game's
-    /// ground throw is a short lob: the object leaves at mThrowPower 2.8 x the type's rate along his face (coconut 2.0 -> 5.6 units a
-    /// frame = 2.3 m/s; papaya 5.0 -> 5.6 m/s), rises at the type's vy (coconut 15 -> 6 m/s) under the type's gravity (0.3 -> 14.5
-    /// m/s2: a 1.3 m high, 1.9 m long arc), and his run adds NOTHING on the ground (stopCommon's waitProcess zeroes mVel before the
-    /// frame-4 release; only the jump throw adds 0.5 x his air speed). ThrowPowerScale multiplies the forward launch, ThrowVyScale the
-    /// rise, ThrowGravityScale the fall, ThrowKeepsRunSpeed adds 0.5 x the speed he had when B was pressed (as the jump throw does).</summary>
-    [Export] public float ThrowPowerScale = 1.8f;
-    [Export] public float ThrowVyScale = 1.15f;
-    [Export] public float ThrowGravityScale = 1.6f;
-    [Export] public bool ThrowKeepsRunSpeed = true;
+    /// <summary>DEVIATION knobs for the throw's feel (1 / false = the shipped game). The game's ground throw, on the map object's 120 Hz
+    /// tick (TMapObjGeneral::thrown sets mVelocity, TLiveActor::bind adds it whole every CUE_MOVE, 4 a 30 fps frame -- pass 75): the
+    /// object leaves at mThrowPower 2.8 x the type's rate along his face (coconut 2.0 -> 5.6 units a tick = 9.0 m/s; papaya 5.0 -> 22.6
+    /// m/s), rises at the type's vy (coconut 15 -> 24.2 m/s) under the type's gravity (0.3 u/tick2 -> 58 m/s2: a 5.0 m high, 7.5 m long
+    /// arc in 0.83 s), and his run adds NOTHING on the ground (stopCommon's waitProcess zeroes mVel before the frame-4 release; only the
+    /// jump throw adds 0.5 x his air speed). Before pass 75 the port had these on Mario's 30 fps clock -- 4x slow, 4x weak gravity, a
+    /// 1.3 m lob -- which is what the old defaults (1.8 / 1.15 / 1.6 / true) and his Player.tscn values (5.03 / 3.645) were making up
+    /// for. ThrowPowerScale multiplies the forward launch, ThrowVyScale the rise, ThrowGravityScale the fall, ThrowKeepsRunSpeed adds
+    /// 0.5 x the speed he had when B was pressed (as the jump throw does).</summary>
+    [Export] public float ThrowPowerScale = 1f;
+    [Export] public float ThrowVyScale = 1f;
+    [Export] public float ThrowGravityScale = 1f;
+    [Export] public bool ThrowKeepsRunSpeed = false;
     private Vector3 _smsThrowRunVel; // his horizontal speed when B was pressed (ThrowKeepsRunSpeed)
     private SmsTakeData _smsTakeData;                 // the pending / held object's game numbers (an SmsTakeable child, his Fruit.Type, or the generic fruit)
     private bool _smsTakeAttached = false;            // taking(): the object is in the hand from raise frame 11 (the legacy attached at the clip's end)
@@ -16684,8 +16687,9 @@ public partial class Mario : CharacterBody3D
     }
 
     /// <summary>dropObject() (MarioCollision.cpp 78) -> the object's HIT_MESSAGE_THROWN -- TMapObjGeneral::thrown (MapObjGeneral.cpp 109): it leaves
-    /// from HIS position (the feet) with ThrowPower x ThrowRate along his face + NormalThrowSpeedRate x his mVel, vy = ThrowVy, one movement
-    /// frame of lead, and flies on its own gravity and bounce (SmsThrownFlight). Or putting()'s HIT_MESSAGE_PUT -- put() (91): set down
+    /// from HIS position (the feet) with ThrowPower x ThrowRate along his face + NormalThrowSpeedRate x his mVel, vy = ThrowVy -- all per 120 Hz
+    /// tick (TLiveActor::bind adds mVelocity whole every CUE_MOVE; his mVel, in units a frame, is mixed in raw, as the game does) -- one tick
+    /// of lead, and flies on its own gravity and bounce (SmsThrownFlight). Or putting()'s HIT_MESSAGE_PUT -- put() (91): set down
     /// objRadius + 42 + 10 ahead of him at his feet, no velocity. Every drop in the game is one of these two.</summary>
     private void SmsReleaseHeld(bool put)
     {
@@ -16715,8 +16719,8 @@ public partial class Mario : CharacterBody3D
             float power = SmsParams.Take.ThrowPower * _smsTakeData.ThrowRate * ThrowPowerScale; // the game: 2.8 x rate (ThrowPowerScale 1)
             Vector3 run = (ThrowKeepsRunSpeed && !_smsJumpThrow) ? _smsThrowRunVel : new Vector3(velocity.X, 0f, velocity.Z); // the game: mVel (0 after waitProcess on the ground)
             Vector3 vUnits = face * power + new Vector3(SmsUnits.MpsToSpeed(run.X), 0f, SmsUnits.MpsToSpeed(run.Z)) * SmsParams.Take.NormalThrowSpeedRate;
-            Vector3 vel = new Vector3(SmsUnits.SpeedToMps(vUnits.X), SmsUnits.SpeedToMps(_smsTakeData.ThrowVy * ThrowVyScale), SmsUnits.SpeedToMps(vUnits.Z));
-            rb.GlobalPosition = GlobalPosition + Vector3.Up * halfH + vel / 30f; // mPosition = his; mPosition += vel (one 30 fps movement frame)
+            Vector3 vel = new Vector3(SmsUnits.TickSpeedToMps(vUnits.X), SmsUnits.TickSpeedToMps(_smsTakeData.ThrowVy * ThrowVyScale), SmsUnits.TickSpeedToMps(vUnits.Z)); // per tick, not Mario's SpeedToMps (pass 75)
+            rb.GlobalPosition = GlobalPosition + Vector3.Up * halfH + vel / SmsUnits.TicksPerSecond; // mPosition = his; mPosition.add(vel): one tick of lead
             rb.Sleeping = false;
             rb.SetDeferred("linear_velocity", vel);
             rb.SetDeferred("angular_velocity", Vector3.Zero);
@@ -16730,7 +16734,7 @@ public partial class Mario : CharacterBody3D
                     rb.RemoveCollisionExceptionWith(this);
             };
             if (SmsDebugPrint)
-                GD.Print($"[SMS take] THROWN the {_smsTakeData.Name}: {power:F1} forward (x{ThrowPowerScale}) + {SmsParams.Take.NormalThrowSpeedRate} x his ({SmsUnits.MpsToSpeed(run.X):F1}, {SmsUnits.MpsToSpeed(run.Z):F1}), vy {_smsTakeData.ThrowVy * ThrowVyScale:F1} (x{ThrowVyScale}) -> {vel.Length():F2} m/s; gravity {SmsUnits.AccelToMps2(_smsTakeData.Gravity * ThrowGravityScale):F1} m/s2 (x{ThrowGravityScale}), bounce {_smsTakeData.Bounce}");
+                GD.Print($"[SMS take] THROWN the {_smsTakeData.Name}: {power:F1} forward (x{ThrowPowerScale}) + {SmsParams.Take.NormalThrowSpeedRate} x his ({SmsUnits.MpsToSpeed(run.X):F1}, {SmsUnits.MpsToSpeed(run.Z):F1}), vy {_smsTakeData.ThrowVy * ThrowVyScale:F1} (x{ThrowVyScale}) -> {vel.Length():F2} m/s; gravity {SmsUnits.TickAccelToMps2(_smsTakeData.Gravity * ThrowGravityScale):F1} m/s2 (x{ThrowGravityScale}), bounce {_smsTakeData.Bounce}");
         }
         if (animTree != null && animTree.Active)
             animTree.Set(CARRY_BLEND_PATH, 0.0f);

@@ -4850,3 +4850,33 @@ off, vy 51.3 m/s, the spin ended at touchdown after 108 frames with the tree bac
 with +2000 -> ma_roll the same way. [F60] ALL OK, 17 checks. (3) sparkle_dir_check.gd (a SceneTree script, removed): GetSparkle.tscn
 loads, Stars shape 5 direction (0, 0, 1), Stardust shape 0 -- ALL OK. Build 0 errors. He builds the hammer (Mario.cs); GetSparkle.tscn
 reloads from disk.
+
+### Pass 75 -- the thrown object's clock (the coconut check)
+HIS PICK: "run the coconut check". THE SOURCE: TMapObjGeneral::thrown (MapObjGeneral.cpp 109) sets mVelocity = gpMarioThrowPower x
+physical unk2C (the type's rate) along his face + mNormalThrowSpeedRate x his mVel, vy = unk30, then mPosition.add(vel) once (one tick
+of lead). The object then moves through TLiveActor::perform(CUE_MOVE) -> moveObject -> bind (LiveActor.cpp 182): nextPos += mVelocity
+WHOLE and mVelocity.y -= gravity, every CUE_MOVE -- the Gooble's path. MarDirectorDirect.cpp 65-144: the Movement perform list runs
+once per 5-unit simulation tick, 4 a 30 fps frame; the only gate (TViewObj::testPerform, JDRViewObj.cpp 5-10, via the GATE_A/B cue
+bits the loader adds to every CUE_MOVE link) needs the object's OWN unkC gate flags, and no object class sets them. So a map object's
+velocity is per 120 Hz tick (SmsUnits.TickSpeedToMps = x 120 / 74.44), its gravity per tick^2 (TickAccelToMps2 = x 14400 / 74.44),
+its friction / stop threshold per tick. Mario alone steps mVel / 4 a tick (MarioPhysics.cpp 226 / 499), which is why HIS values read
+per 30 fps frame (SpeedToMps = x 30 / 74.44).
+THE BUG: pass 62 converted the throw on Mario's clock -- SpeedToMps for the launch and the stop threshold, AccelToMps2 for the gravity, a
+60 Hz guess for the roll-out decay -- 4x slow, 4x weak gravity: a coconut left at 2.3 m/s and 6 m/s up and arced 1.3 m high, 1.9 m long.
+The game's coconut: 5.6 u/tick = 9.03 m/s forward, 15 u/tick = 24.18 m/s up, 0.3 u/tick^2 = 58.03 m/s^2 -> 5.04 m high, 7.53 m long,
+the same 0.83 s airtime (the ratio v/g is clock-free). He had found the old lob "too light and slow" and compensated with the DEVIATION
+knobs: 1.8 / 1.15 / 1.6 / true in code and ThrowPowerScale 5.03, ThrowVyScale 3.645 in Player.tscn -- his eye landing near the 4x.
+A SECOND, OLDER DEVIATION found by the drive: the flight's RigidBody3D kept Godot's default_linear_damp 0.1 (LinearDampMode Combine), an
+air drag the game's object has not (physical unk18 = 1.0): the arc fell 7-9 % short of its own launch velocity.
+THE FIX (Mario.cs SmsReleaseHeld, SmsTakeable.cs SmsThrownFlight): TickSpeedToMps for the launch (forward + vy; his mVel is mixed in RAW,
+units a frame into units a tick, as the game does), vel / 120 for the one-tick lead, TickAccelToMps2 for the flight's gravity, LinearDamp
+0 in Replace mode for the flight (restored after), TickSpeedToMps for BounceMinVy, the roll-out decay per 120 Hz tick (touchGround /
+calcVelocity run from control() every CUE_MOVE). The knobs' defaults are the game's (1 / 1 / 1 / false). HIS Player.tscn still carries
+5.03 / 3.645 (his scene, his uncommitted edits, his editor open -- not touched): until he resets them the throw is 5x the game's.
+Legacy retired: the Mario-clock conversions of pass 62 and the 60 Hz decay guess of 62b.
+VERIFIED (drive 61, removed): a coconut body (SmsTakeable Coconut) taken on clean floor (the spawn stands on his goop test area, where
+OIL_RUN caps the run under the pitch's 16 u/f and B does not throw), his run speed set to 24 u/f for a few frames, B -> PITCHING ->
+THROWN at frame 4: launch 9.03 m/s forward, 23.21 up on the first 60 Hz sample (24.18 less one step of g), g 58.03, damp 0 Replace; the
+apex 4.45 m over the first sample and the return 7.07 m out, both exactly Godot's semi-implicit Euler arc for that launch (the continuous
+4.64 / 7.22 less half a step) -- the game's full arc from the release point is 5.04 / 7.53. 10 checks ALL OK. Build 0 errors; boot
+[SMS selftest] ALL OK + slope/hipdrop ALL OK. He builds the hammer (Mario.cs, SmsTakeable.cs) and resets the two Player.tscn knobs.
