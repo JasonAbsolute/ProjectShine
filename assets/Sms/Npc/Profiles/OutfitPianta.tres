@@ -1,0 +1,55 @@
+[gd_resource type="Resource" script_class="SmsNpcOutfitCatalog" load_steps=20 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcOutfitCatalog.cs" id="1_cat"]
+[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcOutfitSlot.cs" id="2_slot"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Parts/Pianta/GlassesA.tscn" id="p_Pianta_GlassesA"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Parts/Pianta/GlassesB.tscn" id="p_Pianta_GlassesB"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Parts/Pianta/HatA.tscn" id="p_Pianta_HatA"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Parts/Pianta/HatB.tscn" id="p_Pianta_HatB"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Parts/Pianta/HatD.tscn" id="p_Pianta_HatD"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Parts/Pianta/HatE.tscn" id="p_Pianta_HatE"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Parts/Pianta/HatF.tscn" id="p_Pianta_HatF"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Parts/Pianta/HatG.tscn" id="p_Pianta_HatG"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Parts/Pianta/LapelA.tscn" id="p_Pianta_LapelA"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Parts/Pianta/Luggage.tscn" id="p_Pianta_Luggage"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Parts/Pianta/MustacheA.tscn" id="p_Pianta_MustacheA"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Parts/Pianta/TieB.tscn" id="p_Pianta_TieB"]
+
+[sub_resource type="Resource" id="Slot_Hat"]
+script = ExtResource("2_slot")
+Name = "Hat"
+Odds = 0.6
+Parts = Array[PackedScene]([ExtResource("p_Pianta_HatA"), ExtResource("p_Pianta_HatB"), ExtResource("p_Pianta_HatD"), ExtResource("p_Pianta_HatE"), ExtResource("p_Pianta_HatF"), ExtResource("p_Pianta_HatG")])
+Together = false
+
+[sub_resource type="Resource" id="Slot_Moustache"]
+script = ExtResource("2_slot")
+Name = "Moustache"
+Odds = 0.35
+Parts = Array[PackedScene]([ExtResource("p_Pianta_MustacheA")])
+Together = false
+
+[sub_resource type="Resource" id="Slot_Glasses"]
+script = ExtResource("2_slot")
+Name = "Glasses"
+Odds = 0.25
+Parts = Array[PackedScene]([ExtResource("p_Pianta_GlassesA"), ExtResource("p_Pianta_GlassesB")])
+Together = false
+
+[sub_resource type="Resource" id="Slot_Neck"]
+script = ExtResource("2_slot")
+Name = "Neck"
+Odds = 0.3
+Parts = Array[PackedScene]([ExtResource("p_Pianta_LapelA"), ExtResource("p_Pianta_TieB")])
+Together = false
+
+[sub_resource type="Resource" id="Slot_Hand"]
+script = ExtResource("2_slot")
+Name = "Hand"
+Odds = 0.1
+Parts = Array[PackedScene]([ExtResource("p_Pianta_Luggage")])
+Together = false
+
+[resource]
+script = ExtResource("1_cat")
+Slots = Array[ExtResource("2_slot")]([SubResource("Slot_Hat"), SubResource("Slot_Moustache"), SubResource("Slot_Glasses"), SubResource("Slot_Neck"), SubResource("Slot_Hand")])

@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpc.cs" id="1_npc"]
 [ext_resource type="PackedScene" path="res://models/NPC/Toad/kinopio_body.glb" id="2_glb"]
 [ext_resource type="Resource" path="res://assets/Sms/Npc/Profiles/Toad.tres" id="3_prof"]
+[ext_resource type="Resource" path="res://assets/Sms/Npc/Profiles/OutfitToad.tres" id="4_outfit"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_hit"]
 radius = 0.53735
@@ -12,6 +13,7 @@ height = 1.47770
 script = ExtResource("1_npc")
 Profile = ExtResource("3_prof")
 ColorIndex = -1
+Outfit = ExtResource("4_outfit")
 Lines = PackedStringArray("Welcome to Isle Delfino!", "Enjoy your stay.")
 
 [node name="Model" parent="." instance=ExtResource("2_glb")]

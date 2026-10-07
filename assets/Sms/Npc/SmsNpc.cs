@@ -32,6 +32,7 @@ using System.Collections.Generic;
 ///    (-1 = random), the model's materials are replaced per instance, the scene's DirectionalLight3D is the sun.
 /// NOT ported (logged): the pollution (dirty / sink / wash), the Pianta that throws Mario (TNpcThrow), the balloon messages, sounds
 /// (slots below), the talk camera, trampleExec's PARTICLE_MS_FUMI_B / C at half scale (no stomp dust is baked yet).</summary>
+[Tool]
 public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
 {
     private const float U = SmsUnits.UnitsPerMetre;
@@ -43,17 +44,27 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     [Export] public SmsNpcProfile Profile;
     /// <summary>Which entry of the profile's colour table; -1 = a random one per instance (the game numbers them from the stage data).</summary>
     [Export] public int ColorIndex = -1;
-    /// <summary>The placement's three PART colour indices (setIndividualDifference_: the second colour triple): x = hats, y = moustache /
-    /// belts / lapel / the W's flower centre, z = glasses (TNpcModelData's colour channel). -1 = random. Parts are the SmsNpcPart scenes
-    /// (assets/Sms/Npc/Parts/*) you drop under this node: each is hung on its joint and coloured from NpcInitData.cpp's tables.</summary>
-    [Export] public Vector3I PartColorIndices = new Vector3I(-1, -1, -1);
-    /// <summary>DEVIATION (his ask, pass 85): roll a set of parts at _Ready from SmsNpcOutfit's groups (one hat, one pair of glasses, ...) --
-    /// the game has no random parts, each NPC's come from its placement word. Parts placed by hand under this node keep their group out of
-    /// the roll. Off = the game: only what the scene carries.</summary>
-    [Export] public bool RandomOutfit = false;
-    /// <summary>Scales every group's odds: 0.5 = the table's (a hat 60 %, a moustache 35 %, glasses 25 %, a lapel or tie 30 %, the luggage 10 %).</summary>
-    [Export(PropertyHint.Range, "0,1")] public float RandomOutfitDensity = 0.5f;
     [Export] public IdleStyle Idle = IdleStyle.Wait;
+    [ExportGroup("Outfit")]
+    /// <summary>The species' wardrobe (pass 88): its slots appear below as dropdowns -- None / Random / a part -- and are saved per instance
+    /// (TNpcParts: the game's placement word picks the slots the same way). Profiles/Outfit*.tres; swap or extend it for your own parts.
+    /// In the editor a chosen part shows on the model at once (a preview, not saved into the scene).</summary>
+    [Export] public SmsNpcOutfitCatalog Outfit { get => _outfit; set { _outfit = value; NotifyPropertyListChanged(); if (Engine.IsEditorHint() && IsInsideTree()) CallDeferred(nameof(EditorPreviewOutfit)); } }
+    private SmsNpcOutfitCatalog _outfit;
+    /// <summary>Any extra part scenes (an SmsNpcPart root with its Joint: 'kubi' head, 'body_jnt' chest, 'handR_jnt' the right hand ...):
+    /// things held, badges, your own models -- always worn, on top of the slots.</summary>
+    [Export] public Godot.Collections.Array<PackedScene> ExtraParts = new();
+    /// <summary>DEVIATION (his ask, pass 85): every slot left at None is rolled at _Ready like a Random one. A part placed by hand under this
+    /// node keeps its slot out of the roll. Off = the game: only what the slots and the scene carry.</summary>
+    [Export] public bool RandomOutfit = false;
+    /// <summary>Scales every slot's odds: 0.5 = the catalog's (a Pianta's hat 60 %, moustache 35 %, glasses 25 %, lapel or tie 30 %, luggage 10 %).</summary>
+    [Export(PropertyHint.Range, "0,1")] public float RandomOutfitDensity = 0.5f;
+    /// <summary>The placement's three PART colour indices (setIndividualDifference_: the second colour triple): x = hats, y = moustache /
+    /// belts / lapel / the W's flower centre, z = glasses (TNpcModelData's colour channel). -1 = random. Every part -- a slot's, an extra, or
+    /// an SmsNpcPart scene dropped under this node by hand -- is hung on its joint and coloured from NpcInitData.cpp's tables.</summary>
+    [Export] public Vector3I PartColorIndices = new Vector3I(-1, -1, -1);
+    private readonly Dictionary<string, int> _outfitChoice = new();            // OutfitHat -> None 0 / Random 1 / a part 2+ (the dynamic properties)
+    private readonly List<Node> _outfitPreview = new();                        // the editor's preview nodes (no owner: never saved)
     [ExportGroup("Talk")]
     /// <summary>The pages the window shows, one entry each; a page is up to three lines -- Enter in the inspector breaks a line (the game's
     /// .bmg pages are hand-broken the same way), and a long line wraps by words (the balloon's AutoWrap). Empty = this NPC cannot be
@@ -159,6 +170,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
 
     public override void _Ready()
     {
+        if (Engine.IsEditorHint()) { CallDeferred(nameof(EditorPreviewOutfit)); return; }   // [Tool]: the outfit preview, nothing else runs here
         All.Add(this);
         _mario = GetTree().GetFirstNodeInGroup("player") as Mario;
         Profile ??= new SmsNpcProfile();
@@ -174,7 +186,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         _damageRadiusNow = Profile.DamageRadius;
         ExceptMario();
         SetupLook();
-        if (RandomOutfit) SetupRandomOutfit();
+        SetupOutfit();
         SetupParts();
         SetupNeck();
         SetupCursor();
@@ -185,7 +197,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (DebugPrint) GD.Print($"[SMS npc] {Name}: {Profile.Kind} colour {_colorIdx}, clips {(_anim != null ? _anim.GetAnimationList().Length : 0)}, neck {(_neck != null ? "on" : "off")}");
     }
 
-    public override void _ExitTree() { All.Remove(this); }
+    public override void _ExitTree() { if (Engine.IsEditorHint()) return; All.Remove(this); }
 
     /// <summary>The THitActor side of Mario vs an NPC: his body never collides with our capsule (an NPC is not map collision -- he cannot
     /// stand on one, he is kept off by keepDistance in HitCheckMario); the capsule still stands on the map and meets other bodies.</summary>
@@ -196,23 +208,123 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         _marioExcepted = true;
     }
 
-    /// <summary>The random outfit (DEVIATION): SmsNpcOutfit.Roll over the groups no hand-placed part fills, each pick instanced under the
-    /// Parts node (or this node) before SetupParts hangs and colours it like any other.</summary>
-    private void SetupRandomOutfit()
+    // ---- the outfit (pass 88): the catalog's slots as inspector dropdowns, saved per instance as OutfitHat / OutfitGlasses / ... ----
+    public int OutfitChoice(SmsNpcOutfitSlot slot) => slot != null && _outfitChoice.TryGetValue(SmsNpcOutfitCatalog.PropertyFor(slot), out int v) ? v : SmsNpcOutfitSlot.None;
+    public void SetOutfitChoice(SmsNpcOutfitSlot slot, int choice) { if (slot != null) _outfitChoice[SmsNpcOutfitCatalog.PropertyFor(slot)] = choice; }
+
+    public override Godot.Collections.Array<Godot.Collections.Dictionary> _GetPropertyList()
     {
-        var placed = new List<string>();
+        var list = new Godot.Collections.Array<Godot.Collections.Dictionary>();
+        if (_outfit == null) return list;
+        // a group of its own (prefix "Outfit" stripped from the names): the dynamic properties come after every static export
+        list.Add(new Godot.Collections.Dictionary { { "name", "Outfit Slots" }, { "type", (int)Variant.Type.Nil }, { "hint_string", "Outfit" }, { "usage", (int)PropertyUsageFlags.Group } });
+        foreach (var slot in _outfit.Slots)
+        {
+            if (slot == null || string.IsNullOrEmpty(slot.Name)) continue;
+            list.Add(new Godot.Collections.Dictionary
+            {
+                { "name", SmsNpcOutfitCatalog.PropertyFor(slot) },
+                { "type", (int)Variant.Type.Int },
+                { "hint", (int)PropertyHint.Enum },
+                { "hint_string", slot.OptionHint() },
+                { "usage", (int)PropertyUsageFlags.Default },
+            });
+        }
+        return list;
+    }
+
+    private static bool IsOutfitProperty(string name) => name.Length > 6 && name.StartsWith("Outfit") && name != "Outfit";
+
+    public override Variant _Get(StringName property)
+    {
+        string n = property;
+        if (!IsOutfitProperty(n)) return default;
+        return _outfitChoice.TryGetValue(n, out int v) ? v : SmsNpcOutfitSlot.None;
+    }
+
+    public override bool _Set(StringName property, Variant value)
+    {
+        string n = property;
+        if (!IsOutfitProperty(n)) return false;
+        _outfitChoice[n] = value.AsInt32();          // taken even before the catalog has loaded (a scene file lists the properties in its own order)
+        if (Engine.IsEditorHint() && IsInsideTree()) CallDeferred(nameof(EditorPreviewOutfit));
+        return true;
+    }
+
+    public override bool _PropertyCanRevert(StringName property) => IsOutfitProperty(property) && _outfitChoice.TryGetValue(property, out int v) && v != SmsNpcOutfitSlot.None;
+    public override Variant _PropertyGetRevert(StringName property) => SmsNpcOutfitSlot.None;
+
+    /// <summary>The part scenes this instance wears from its choices: each slot's pick (Random -- or None with RandomOutfit on -- rolled at the
+    /// slot's odds unless a hand-placed part already fills the slot), then the ExtraParts. <paramref name="preview"/> leaves the rolls out.</summary>
+    private List<PackedScene> OutfitScenes(bool preview)
+    {
+        var picks = new List<PackedScene>();
+        var placed = new HashSet<string>();
         var existing = new List<SmsNpcPart>();
         CollectParts(this, existing);
         foreach (var part in existing) if (!string.IsNullOrEmpty(part.SceneFilePath)) placed.Add(part.SceneFilePath);
+        if (_outfit != null)
+            foreach (var slot in _outfit.Slots)
+            {
+                if (slot == null) continue;
+                int choice = OutfitChoice(slot);
+                if (choice >= SmsNpcOutfitSlot.FirstPart) { picks.AddRange(slot.ScenesFor(choice)); continue; }
+                bool roll = choice == SmsNpcOutfitSlot.Random || (choice == SmsNpcOutfitSlot.None && RandomOutfit);
+                if (!roll || preview) continue;
+                bool filled = false;
+                foreach (var path in placed) if (slot.Holds(path)) { filled = true; break; }
+                if (!filled) picks.AddRange(slot.Roll(_rng, RandomOutfitDensity));
+            }
+        foreach (var extra in ExtraParts) if (extra != null) picks.Add(extra);
+        return picks;
+    }
+
+    /// <summary>At _Ready: the outfit's scenes instanced under the Parts node (or this node); SetupParts then hangs and colours them with any
+    /// part placed by hand. TNpcParts' twelve slots, chosen in the inspector instead of the placement word.</summary>
+    private void SetupOutfit()
+    {
         Node holder = GetNodeOrNull<Node3D>("Parts") ?? (Node)this;
-        foreach (var path in SmsNpcOutfit.Roll(Profile.Kind, RandomOutfitDensity, placed, _rng))
+        int n = 0;
+        foreach (var scene in OutfitScenes(false))
         {
-            var scene = GD.Load<PackedScene>(path);
-            if (scene == null) { GD.PushWarning($"[SMS npc] {Name}: outfit scene missing: {path}"); continue; }
-            var part = scene.Instantiate<SmsNpcPart>();
-            holder.AddChild(part);
+            var part = scene.Instantiate() as SmsNpcPart;
+            if (part == null) { GD.PushWarning($"[SMS npc] {Name}: {scene.ResourcePath} is not an SmsNpcPart scene"); continue; }
+            holder.AddChild(part); n++;
         }
-        if (DebugPrint) GD.Print($"[SMS npc] {Name}: random outfit rolled {existing.Count} hand-placed + {CountParts()} total");
+        if (DebugPrint) GD.Print($"[SMS npc] {Name}: outfit: {n} part(s) from the slots / extras, {CountParts()} total");
+    }
+
+    /// <summary>[Tool]: the chosen parts shown on the model in the editor -- instanced with no owner (never saved), hung on the skeleton's joints
+    /// and coloured like the game's, redone on every change of a slot, the catalog or the extras. Random slots show nothing until play.</summary>
+    private void EditorPreviewOutfit()
+    {
+        if (!Engine.IsEditorHint() || !IsInsideTree()) return;
+        foreach (var n in _outfitPreview) if (IsInstanceValid(n)) { n.GetParent()?.RemoveChild(n); n.QueueFree(); }
+        _outfitPreview.Clear();
+        var model = GetNodeOrNull<Node3D>(ModelPath);
+        var skel = model != null ? FindChild<Skeleton3D>(model) : null;
+        if (model == null) return;
+        var toon = ToonTexture ?? GD.Load<Texture2D>(ToonPath);
+        foreach (var scene in OutfitScenes(true))
+        {
+            var part = scene.Instantiate() as SmsNpcPart;
+            if (part == null) continue;
+            Node holder = model;
+            if (skel != null && part.Joint != SmsNpcPart.RootJoint && skel.FindBone(part.Joint) >= 0)
+            {
+                var att = new BoneAttachment3D { Name = "PreviewPart_" + part.Name };
+                skel.AddChild(att);
+                att.BoneName = part.Joint;
+                _outfitPreview.Add(att);
+                holder = att;
+            }
+            holder.AddChild(part);
+            part.Transform = Transform3D.Identity;
+            if (holder == model) _outfitPreview.Add(part);
+            int ch = Mathf.Clamp(part.ColorChannel, 0, 2);
+            int idx = ch == 0 ? PartColorIndices.X : ch == 1 ? PartColorIndices.Y : PartColorIndices.Z;
+            part.Apply(Mathf.Max(idx, 0), toon, null);
+        }
     }
     private int CountParts() { var l = new List<SmsNpcPart>(); CollectParts(this, l); return l.Count; }
 
@@ -462,7 +574,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
 
     public override void _PhysicsProcess(double delta)
     {
-        if (Profile == null) return;
+        if (Engine.IsEditorHint() || Profile == null) return;
         if (_mario == null) { _mario = GetTree().GetFirstNodeInGroup("player") as Mario; ExceptMario(); }
         int n = SmsUnits.TicksFor(delta, ref _tickAccum);              // TLiveActor: every 120 Hz tick of the frame (pass 83; 82 ran one a frame)
         if (_holder != null) { for (int i = 0; i < n; i++) TickHeldClocks(); TickHeld(); return; }   // perform with mHolder: no bind

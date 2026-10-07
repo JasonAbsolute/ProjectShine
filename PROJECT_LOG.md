@@ -5381,3 +5381,25 @@ Build 0 errors, boot ALL OK.
 - Tools: pngio.py (PNG in / out without PIL), gen_talk_hires.py, preview_talk_font.py (the shader's math on the sheet, next to the 1x
   bilinear look). jpa_dump.py: the BEM1 emitter ROTATION is three DEGREE shorts (JPAEmitter.cpp 204: x182 -> BAM), not BAM -- the pass-80
   reading of ms_2d_pause_sel's (90, 0, -12) as (0.49, 0, -0.07) is why the pause sparks lie on a line (pass 89 fixes them).
+
+## SMS pass 88 -- the outfit as inspector options (Jaysonn: "make outfits like options, items they hold, really customizable")
+
+- **Per-slot dropdowns on every NPC.** SmsNpc is a `[Tool]` script now: with a wardrobe (`Outfit`, an SmsNpcOutfitCatalog) assigned, the
+  inspector grows an "Outfit Slots" section with one dropdown per slot -- None / Random / each part -- saved per instance as OutfitHat,
+  OutfitGlasses, OutfitNeck, OutfitHand, OutfitMoustache (the W: OutfitFlower / Hat / Glasses / Arrows; the Toad: OutfitGlasses). That is
+  TNpcParts' placement word (bit i picks slot i of NpcInitData's twelve), chosen in the editor instead of the stage data; "Random" keeps pass
+  85's DEVIATION per slot. A chosen part shows on the model in the editor at once (EditorPreviewOutfit: instanced with no owner, hung on the
+  joint, coloured; never saved into the scene; Random slots show at play).
+- **The wardrobes are resources**: Profiles/OutfitPianta.tres (Hat x6 0.6, Moustache 0.35, Glasses x2 0.25, Neck: lapel / tie 0.3, Hand:
+  luggage 0.1), OutfitPiantaFemale.tres (Flower 0.5, Hat 0.3, Glasses 0.2, Arrows 0.1 -- a Together slot: both at once), OutfitToad.tres
+  (Glasses 0.3). SmsNpcOutfitSlot (Name, Odds, Parts, Together) and SmsNpcOutfitCatalog (Slots) are [GlobalClass] resources: add a part scene
+  of your own to a slot (any Node3D with SmsNpcPart and its Joint -- 'kubi' head, 'body_jnt' chest, 'handR_jnt' the right hand, 'yashi_jnt'
+  the W's hair) and it is a choice, named from its file (HatA.tscn -> "Hat A"); duplicate a catalog for a new wardrobe.
+- **ExtraParts** (Array of PackedScene): always-worn parts on top of the slots -- things held, badges, your own models. **RandomOutfit** keeps
+  its pass-85 meaning (every slot still at None is rolled; a part placed by hand under the node fills its slot), RandomOutfitDensity scales
+  the odds (0.5 = the catalog's), PartColorIndices the three colour rows.
+- LEGACY RETIRED: SmsNpcOutfit.cs (the static group table of pass 85, deleted); the "drop a scene under Parts" workflow stays as the hand-placed path.
+- Drive 88 (11/11, removed): the five slot properties with their enum hints under the group, Get / revert, Hat B + Glasses A on kubi and the
+  Luggage + Tie on body_jnt from the choices, the W's Together arrows on handR_jnt with a certain Random flower, the Toad's sunglasses, an
+  ExtraPart of another species on the shared joint with a hand-placed Hat G keeping its slot out of the roll, 15 / 30 moustaches at 0.35,
+  RandomOutfit dressing 20 / 20 with 15 hats and never two, the nerves running under the [Tool] script. Build 0 errors, boot ALL OK.

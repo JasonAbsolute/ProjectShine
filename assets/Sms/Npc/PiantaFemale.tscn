@@ -1,8 +1,9 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpc.cs" id="1_npc"]
 [ext_resource type="PackedScene" path="res://models/NPC/PiantaFemale/mow_model.glb" id="2_glb"]
 [ext_resource type="Resource" path="res://assets/Sms/Npc/Profiles/PiantaFemale.tres" id="3_prof"]
+[ext_resource type="Resource" path="res://assets/Sms/Npc/Profiles/OutfitPiantaFemale.tres" id="4_outfit"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_hit"]
 radius = 1.47770
@@ -12,6 +13,7 @@ height = 2.95540
 script = ExtResource("1_npc")
 Profile = ExtResource("3_prof")
 ColorIndex = -1
+Outfit = ExtResource("4_outfit")
 Lines = PackedStringArray("Welcome to Isle Delfino!", "Enjoy your stay.")
 
 [node name="Model" parent="." instance=ExtResource("2_glb")]

@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="SmsNpcOutfitCatalog" load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcOutfitCatalog.cs" id="1_cat"]
+[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcOutfitSlot.cs" id="2_slot"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Parts/PiantaFemale/ArrowL.tscn" id="p_PiantaFemale_ArrowL"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Parts/PiantaFemale/ArrowR.tscn" id="p_PiantaFemale_ArrowR"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Parts/PiantaFemale/Flower.tscn" id="p_PiantaFemale_Flower"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Parts/PiantaFemale/GlassesB.tscn" id="p_PiantaFemale_GlassesB"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Parts/PiantaFemale/HatA.tscn" id="p_PiantaFemale_HatA"]
+
+[sub_resource type="Resource" id="Slot_Flower"]
+script = ExtResource("2_slot")
+Name = "Flower"
+Odds = 0.5
+Parts = Array[PackedScene]([ExtResource("p_PiantaFemale_Flower")])
+Together = false
+
+[sub_resource type="Resource" id="Slot_Hat"]
+script = ExtResource("2_slot")
+Name = "Hat"
+Odds = 0.3
+Parts = Array[PackedScene]([ExtResource("p_PiantaFemale_HatA")])
+Together = false
+
+[sub_resource type="Resource" id="Slot_Glasses"]
+script = ExtResource("2_slot")
+Name = "Glasses"
+Odds = 0.2
+Parts = Array[PackedScene]([ExtResource("p_PiantaFemale_GlassesB")])
+Together = false
+
+[sub_resource type="Resource" id="Slot_Arrows"]
+script = ExtResource("2_slot")
+Name = "Arrows"
+Odds = 0.1
+Parts = Array[PackedScene]([ExtResource("p_PiantaFemale_ArrowL"), ExtResource("p_PiantaFemale_ArrowR")])
+Together = true
+
+[resource]
+script = ExtResource("1_cat")
+Slots = Array[ExtResource("2_slot")]([SubResource("Slot_Flower"), SubResource("Slot_Hat"), SubResource("Slot_Glasses"), SubResource("Slot_Arrows")])
