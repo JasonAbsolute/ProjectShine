@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://cwve1f1kpa2pf"]
 
-[ext_resource type="PackedScene" uid="uid://chxfxlmk4gvks" path="res://assets/PiantaMaleNormal.tscn" id="2_i3ws1"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Pianta.tscn" id="2_i3ws1"]
 [ext_resource type="PackedScene" uid="uid://7exkcbpcjut8" path="res://assets/marioHUD.tscn" id="2_w7srv"]
 [ext_resource type="PackedScene" uid="uid://lxisv6iyx202" path="res://assets/SleepyBoo.tscn" id="4_fjm2c"]
 [ext_resource type="PackedScene" uid="uid://doqjj0ahoycbe" path="res://assets/plaza.tscn" id="4_i3ws1"]
@@ -48,8 +48,8 @@ environment = SubResource("Environment_g6m7q")
 transform = Transform3D(-0.866023, -0.433016, 0.250001, 0, 0.499998, 0.866027, -0.500003, 0.749999, -0.43301, 0, 0, 0)
 shadow_enabled = true
 
-[node name="PiantaMaleNormal" parent="." unique_id=1113589533 instance=ExtResource("2_i3ws1")]
-transform = Transform3D(0.03, 0, 0, 0, 0.03, 0, 0, 0, 0.03, -94.983, -9.27239, -72.2841)
+[node name="Pianta" parent="." unique_id=1113589533 instance=ExtResource("2_i3ws1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -94.983, -28.4903, -72.2841)
 
 [node name="StaticBody3D" type="StaticBody3D" parent="." unique_id=889397817]
 transform = Transform3D(99.9779, 0, 2.10297, 0, 1, 0, -2.10297, 0, 99.9779, 0.15142, 0.0386906, -0.301396)

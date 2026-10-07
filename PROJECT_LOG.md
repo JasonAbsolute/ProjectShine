@@ -5129,3 +5129,14 @@ changeNerveFromTalk_ resumes the interrupted nerve and TNerveNPCWaitMarioApproac
 250 u body-turn search (a Pianta there only turns back to its placed yaw) -- then talk forbidden 60 ticks and talkable again; a spray
 -> Wet (mom_wet) -> Mad -> back to waiting; Mario dropped onto the Toad: squashed to scale.y 0.44 and no Mad (isMadNpc false); the
 female walked 14.2 m in 19 s on mow_walk at the 1.2 u/tick cap. Build 0 errors, boot ALL OK.
+
+### Pass 82b -- the Level's Pianta placeholder retired
+LEGACY RETIRED: assets/PiantaMaleNormal.tscn (the script-less baked import: StandardMaterials, a 0.03 uniform scale = a 7.4 m Pianta,
+no behaviour) -- deleted; its instance in assets/Level.tscn is now assets/Sms/Npc/Pianta.tscn (node "Pianta", identity basis: the NPC
+scene carries the 1/74.44 model scale itself). Only this swap and the deletion are in the commit; his other uncommitted Level edits stay his.
+PLACEMENT: his placeholder stood at local y -9.27239, which is 19.2 m of open air above the plaza's floor at that x/z (headless down-ray
+from 50 m up: the Plaza collision at global y -28.4572; nothing else within 150 m below; outside the Sea area). A physics Pianta fell 19 m
+at every boot, so the Level node is at local y -28.4903 (= the floor; the Level root carries an origin of (3.09137, 0.032806, -2.65286)),
+same x/z. If the spot was meant differently, drag the node in the editor -- the old y is the one above.
+CHECK (npc_level_check.gd, removed): the main scene headless, the Pianta the only SmsNpc, no PiantaMaleNormal node, standing on the Plaza
+with 0.000 m of drift over 240 ticks, profile on, model scale 0.013434, nerve WaitMarioApproach on mom_wait; boot ALL OK.
