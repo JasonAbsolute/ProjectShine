@@ -84,6 +84,7 @@ OffsetInOwnerFrame = true
 TurnWithOwner = true
 
 [node name="Smoke" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.978148, 0.207912, 0, -0.207912, 0.978148, 0, 0, 0)
 emitting = false
 amount = 101
 lifetime = 0.8333

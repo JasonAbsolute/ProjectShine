@@ -5429,3 +5429,31 @@ Build 0 errors, boot ALL OK.
   a full push down again; START on SAVE closed the menu and unpaused with nothing confirmed, the sparks hidden. Build 0 errors, boot ALL OK.
   Not touched: PauseSmoke.tscn (ms_2d_pause_smo has the same (90, 0, 0) rotation -- its one puff per letter would spawn anywhere on a
   circle around the letter instead of on a line; the file carries his edits).
+
+## SMS pass 90 -- the emitter-rotation audit (the fourth jpa_dump.py bug, found by the pause sparks)
+
+- **The bug**: BEM1's emitter rotation is three s16 DEGREES; JPAEmitter.cpp 204 multiplies them by 182 (-> BAM) and JPAGetXYZRotateMtx
+  (JPAMath.cpp 16) builds Rz Ry Rx, applied to the volume positions (with the emitter scale, unkFC) and to every velocity (unkCC) in
+  calcEmitterGlobalParams. jpa_dump.py had divided the shorts by 0x7FFF x 180 (as if BAM): a 90-degree emitter printed as 0.49, so every
+  bake since pass 33 took the emitters as unrotated. Fixed in the dumper (10-07); every shipped effect re-read:
+    ms_2d_pause_sel (90, 0, -12) -> pass 89 (the sunburst);
+    ms_wallkick_a / b (90, 0, 0): the kick's Circle r 15 ring and the marks' r 20 ring stand up ON THE WALL (the emitter's frame is
+      emitWithRotate(yaw facing into the wall); Rx(90) turns the XZ circle into the wall plane) and the puff's dir 3 along (0, -1, 0)
+      comes OFF the wall -- the port had both rings flat on the floor at the wall's foot since pass 60. FIXED HERE: WallKickDust.tscn, the
+      Puff and Marks nodes turned Rx(-90) in the port's frame (its -Z faces the wall, the mirror of the game's +Z): the same ring on the wall,
+      the same puff off it;
+    ms_m_slipsmoke (12, 0, 0): the slide smoke's 6 u/f backward throw leans 12 degrees UP. FIXED HERE: SlipSmoke.tscn, the Smoke node Rx(-12)
+      in the port's frame;
+    ms_m_blur3 (-79, 0, 0) and ms_m_sphipd_c (-79, 0, 0): the hip-drop ribbons' points drift 2 u/f mostly UP (0, 0.98, 0.19) instead of
+      forward -- 20 u over a point's 10 frames against the 800 u fall; the port threads the ribbon through the emitter's path without the
+      drift at all. NOT changed (documented; a 2.5 % effect);
+    ms_m_sphipd_a (11, 0, 0): the super hip drop's flame ring tilts 11 degrees -- NOT changed (minor; sphipd_b / d are a sphere and a point:
+      the rotation is moot);
+    ms_deadnamekli_n / o (0, 0, -90): the Gooble's death splash velocities turn Rz(-90) in the bound joint's frame: the dir (0, 1, 0) launch
+      is the joint's +X. The shipped splash (72c) goes up and Jaysonn confirmed it; whether the joint's +X IS up has not been re-read -- open;
+    ms_2d_pause_smo (90, 0, 0): the letters' one puff each would spawn anywhere on a 6..25 px circle around the letter instead of on a line;
+      PauseSmoke.tscn carries his edits -- left alone.
+- The spin jump's ms_m_blur2 / blur2sp carry no emitter rotation (0, 0, 0): his "spin jump effects look off" is something else -- his
+  screenshot is needed.
+- Verified: both scenes load in the headless boot (ALL OK, no scene / shader errors); the look is his to judge (the dust ring should now
+  sit on the wall he kicked, not on the floor).
