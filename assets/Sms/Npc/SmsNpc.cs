@@ -13,9 +13,11 @@ using System.Collections.Generic;
 ///    inside the NPC's TalkAcceptDegree cone and Mario facing it within MarioTalkAcceptDegree -> LIVE_FLAG_UNK20000 "talkable"; the
 ///    DIRECTOR (Mario's tick, before any actor moves) finds the nearest talkable NPC while he stands (MARIO_STATUS_WAIT), not holding,
 ///    not in the L camera -> the cursor over its head, B's meaning TALK_B -> StartTalk: the NPC turns to him (isTurnToMarioWhenTalk,
-///    the talk clip), Mario is set 100 units off and turns at ReadRotSp; when he faces it the window opens on Lines; A pages; closing =
-///    npcTalkOut: talk forbidden 60 ticks, walking 120 (pass 85: pass 82 read B in the NPC's own tick, so an NPC after him in the tree
-///    only saw his B after waiting() had made it a TAKE_POSE -- it never talked);
+///    the talk clip), Mario is set 100 units off and turns at ReadRotSp; when he faces it the director opens TTalk2D2 (SmsTalkBalloon,
+///    pass 86: the talk camera, the blue bands rolling out, the glyphs fading in along the curve) on Lines; A pages; closing =
+///    makeMtxForPrevTalk's npcTalkOut on EVERY NPC: talk forbidden 60 ticks, the talking one's walking 120 and its nerve resumed
+///    (pass 85: pass 82 read B in the NPC's own tick, so an NPC after him in the tree only saw his B after waiting() had made it a
+///    TAKE_POSE -- it never talked);
 ///  * the neck (NPCNeckCallBack): the head follows Mario within NeckTurnSearchDist -- SmsNpcNeck on the skeleton;
 ///  * the water (behaveToHitObject_): a spray -> TNerveNPCWet: the wet clip (50 % the alternate) to its end, then a Pianta in
 ///    MadSearchRange goes Mad (step to face him at MadTurnSpeed, the mad clip), else back to what it was doing;
@@ -71,7 +73,6 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     [Export] public float WanderRadiusUnits = 600f;
     [ExportGroup("Scene")]
     [Export] public NodePath ModelPath = "Model";
-    [Export] public PackedScene TalkWindowScene;
     [Export] public PackedScene CursorScene;
     [Export] public Shader SkinShader;
     [Export] public Shader EyeShader;
@@ -83,13 +84,11 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     public const string SkinShaderPath = "res://assets/Sms/Npc/NpcSkin.gdshader";
     public const string EyeShaderPath = "res://assets/Sms/Npc/NpcEye.gdshader";
     public const string ToonPath = "res://assets/Sms/models/toon_2_4i.png";
-    public const string TalkWindowPath = "res://assets/Sms/Npc/TalkWindow.tscn";
     public const string CursorPath = "res://assets/Sms/Npc/TalkCursor.tscn";
 
     // ---- state ----
     private static readonly List<SmsNpc> All = new();
     public static IReadOnlyList<SmsNpc> Everyone => All;     // Mario's take search (hitNpc) reads the stage's NPCs here
-    private static SmsTalkWindow _window;                // one window for the stage (the director's)
     private Mario _mario;
     private Node3D _model; private AnimationPlayer _anim; private Skeleton3D _skel; private SmsNpcNeck _neck;
     private SmsTalkCursor _cursor;
@@ -124,6 +123,10 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     public Nerve CurrentNerve => _cur;
     public bool Talkable => _talkable;
     public bool IsTalking => _talking;
+    /// <summary>TBaseNPC::isSmallNpc (NpcBase.cpp 250): a Toad (KINOPIO / KINOJII), a child, a Noki -- the talk camera's TALK_B and the balloon's other park.</summary>
+    public bool IsSmallNpc => Profile != null && Profile.Kind == SmsNpcProfile.NpcKind.Toad;
+    /// <summary>The talk balloon's opening on this NPC (the director's unk124 == 2 for it).</summary>
+    public bool TalkWindowOpen => _windowOpen;
     public bool IsHeld => _holder != null;
     public bool IsThrown => _thrown;
     /// <summary>The receive cylinder Mario's take test reads (isTakeSituation: his DamageRadius against the object's).</summary>
@@ -365,6 +368,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
 
     private void SetupCursor()
     {
+        SmsTalkBalloon.Ensure(this);   // the stage's balloon loads (and its shader compiles) with the level, not at the first talk
         var scene = CursorScene ?? GD.Load<PackedScene>(CursorPath);
         if (scene == null) return;
         _cursor = scene.Instantiate<SmsTalkCursor>();
@@ -750,34 +754,48 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (!_talking) TalkOut();
     }
 
-    /// <summary>readBillboard reached its facing (gpMarDirector->unk126 = 2): the window opens.</summary>
+    /// <summary>readBillboard reached its facing (gpMarDirector->unk126 = 2 -> TTalk2D2::openTalkWindow): the balloon opens on Lines -- the
+    /// talk camera first, the bands once it has landed.</summary>
     public void MarioFacesYou()
     {
         if (!_talking || _windowOpen) return;
         _windowOpen = true;
-        var w = Window();
-        if (w == null) { EndTalk(); return; }
-        w.Open(Lines, this, (Profile.BodyHeight + Profile.CursorHeight) / U, EndTalk);
+        var balloon = SmsTalkBalloon.Ensure(this);
+        if (balloon == null) { EndTalk(); return; }
+        balloon.Open(this, _mario, Lines);
     }
 
-    private SmsTalkWindow Window()
-    {
-        if (_window != null && IsInstanceValid(_window)) return _window;
-        var scene = TalkWindowScene ?? GD.Load<PackedScene>(TalkWindowPath);
-        if (scene == null) return null;
-        _window = scene.Instantiate<SmsTalkWindow>();
-        GetTree().Root.AddChild(_window);
-        return _window;
-    }
-
+    /// <summary>The talk ended from this side (hurt, taken, sprayed): the game's forceCloseTalk when the balloon is up -- the camera and the HUD
+    /// back, every NPC's npcTalkOut, the fade, then Mario freed; before it opened, the talk is simply dropped and Mario freed now.</summary>
     private void EndTalk()
     {
         if (!_talking) return;
-        _talking = false; _windowOpen = false;
+        var balloon = SmsTalkBalloon.Instance;
+        if (_windowOpen && balloon != null && balloon.IsOpenOn(this)) { balloon.ForceClose(); return; }   // -> TalkWindowClosing on every NPC, SmsTalkEnd at the fade
+        TalkWindowClosing();
         if (_mario != null) _mario.SmsTalkEnd();
     }
 
-    /// <summary>npcTalkOut: talk forbidden 60 ticks, walking 120; changeNerveFromTalk_: back to what it was doing.</summary>
+    /// <summary>TBaseNPC::npcTalkOut (NpcAnm.cpp 509), on EVERY NPC from makeMtxForPrevTalk (the balloon's close / forced close): talk forbidden
+    /// 60 ticks for all; the one in its talk (LIVE_FLAG_UNK80000) also stops walking 120 ticks and changeNerveFromTalk_ resumes what the
+    /// talk interrupted. Mario is freed later, when the balloon's fade is done (the director's unk126 = 0).</summary>
+    public void TalkWindowClosing()
+    {
+        _talkForbid = SmsParams.Npc.TalkForbidTicksAfterTalk;
+        if (!_talking) return;
+        _talking = false; _windowOpen = false;
+        _walkForbid = SmsParams.Npc.WalkForbidTicksAfterTalk;
+        if (_cur == Nerve.Talk) Pop();
+    }
+
+    /// <summary>makeMtxForPrevTalk's loop over gpMarDirector->unk88: npcTalkOut on every NPC of the stage.</summary>
+    public static void NpcTalkOutAll()
+    {
+        foreach (var n in All)
+            if (n != null && IsInstanceValid(n)) n.TalkWindowClosing();
+    }
+
+    /// <summary>The talk nerve's tail when the talk flag dropped without npcTalkOut (an NPC that lost its Mario): forbid, walk hold, back.</summary>
     private void TalkOut()
     {
         _talkForbid = SmsParams.Npc.TalkForbidTicksAfterTalk;
@@ -874,7 +892,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (!can) return;
         if (_cur == Nerve.Talk)
         {
-            if (_window != null && IsInstanceValid(_window) && _window.IsOpen) _window.Close(); else EndTalk();   // the close callback ends the talk
+            EndTalk();   // forceCloseTalk when the balloon is up: the camera back, every NPC's npcTalkOut (this one's Pop), Mario freed at the fade
             _talkForbid = SmsParams.Npc.TalkForbidTicksAfterTalk;
             Enter(Nerve.Wet);
             return;

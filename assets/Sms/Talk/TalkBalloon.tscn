@@ -1,0 +1,246 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/Talk/SmsTalkBalloon.cs" id="1_talk"]
+[ext_resource type="Resource" path="res://assets/Sms/Talk/TalkFont.tres" id="2_font"]
+[ext_resource type="Shader" path="res://assets/Sms/Talk/TalkBand.gdshader" id="3_bandsh"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Talk/tex/talk_band.png" id="4_band"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Talk/tex/talk_band_ramp.png" id="5_ramp"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Talk/tex/talk_cursor_mark.png" id="6_cc"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Talk/tex/talk_return_mark.png" id="7_cr"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_band1"]
+shader = ExtResource("3_bandsh")
+shader_parameter/ramp = ExtResource("5_ramp")
+shader_parameter/roll = 1.0
+shader_parameter/band_color = Color(0, 0, 1, 1)
+shader_parameter/band_alpha = 0.627451
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_band2"]
+shader = ExtResource("3_bandsh")
+shader_parameter/ramp = ExtResource("5_ramp")
+shader_parameter/roll = 1.0
+shader_parameter/band_color = Color(0, 0, 1, 1)
+shader_parameter/band_alpha = 0.627451
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_band3"]
+shader = ExtResource("3_bandsh")
+shader_parameter/ramp = ExtResource("5_ramp")
+shader_parameter/roll = 1.0
+shader_parameter/band_color = Color(0, 0, 1, 1)
+shader_parameter/band_alpha = 0.627451
+
+[node name="TalkBalloon" type="CanvasLayer"]
+layer = 20
+script = ExtResource("1_talk")
+Font = ExtResource("2_font")
+
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 10.0
+offset_bottom = 10.0
+pivot_offset = Vector2(5, 5)
+mouse_filter = 2
+
+[node name="Line1" type="Control" parent="Root"]
+layout_mode = 0
+offset_top = -33.0
+offset_right = 10.0
+offset_bottom = -23.0
+mouse_filter = 2
+
+[node name="Band" type="TextureRect" parent="Root/Line1"]
+visible = false
+material = SubResource("ShaderMaterial_band1")
+layout_mode = 0
+offset_left = -141.0
+offset_top = -25.0
+offset_right = 151.0
+offset_bottom = 33.0
+rotation = -0.0174533
+pivot_offset = Vector2(146, 29)
+mouse_filter = 2
+texture = ExtResource("4_band")
+expand_mode = 1
+
+[node name="Mark" type="Control" parent="Root/Line1"]
+visible = false
+layout_mode = 0
+offset_left = 159.0
+offset_top = 24.0
+offset_right = 169.0
+offset_bottom = 34.0
+mouse_filter = 2
+
+[node name="Base" type="TextureRect" parent="Root/Line1/Mark"]
+modulate = Color(0, 0, 1, 0.627451)
+layout_mode = 0
+offset_left = -8.0
+offset_top = -8.0
+offset_right = 18.0
+offset_bottom = 18.0
+mouse_filter = 2
+texture = ExtResource("7_cr")
+expand_mode = 1
+
+[node name="Arrow" type="TextureRect" parent="Root/Line1/Mark"]
+layout_mode = 0
+offset_left = -2.0
+offset_top = -3.0
+offset_right = 16.0
+offset_bottom = 15.0
+rotation = -1.22173
+pivot_offset = Vector2(9, 9)
+mouse_filter = 2
+texture = ExtResource("6_cc")
+expand_mode = 1
+
+[node name="Dot" type="TextureRect" parent="Root/Line1/Mark"]
+visible = false
+layout_mode = 0
+offset_left = -3.0
+offset_top = -3.0
+offset_right = 13.0
+offset_bottom = 13.0
+mouse_filter = 2
+texture = ExtResource("7_cr")
+expand_mode = 1
+
+[node name="Line2" type="Control" parent="Root"]
+layout_mode = 0
+offset_right = 10.0
+offset_bottom = 10.0
+mouse_filter = 2
+
+[node name="Band" type="TextureRect" parent="Root/Line2"]
+visible = false
+material = SubResource("ShaderMaterial_band2")
+layout_mode = 0
+offset_left = -141.0
+offset_top = -25.0
+offset_right = 151.0
+offset_bottom = 33.0
+rotation = -0.0174533
+pivot_offset = Vector2(146, 29)
+mouse_filter = 2
+texture = ExtResource("4_band")
+expand_mode = 1
+
+[node name="Mark" type="Control" parent="Root/Line2"]
+visible = false
+layout_mode = 0
+offset_left = 159.0
+offset_top = 24.0
+offset_right = 169.0
+offset_bottom = 34.0
+mouse_filter = 2
+
+[node name="Base" type="TextureRect" parent="Root/Line2/Mark"]
+modulate = Color(0, 0, 1, 0.627451)
+layout_mode = 0
+offset_left = -8.0
+offset_top = -8.0
+offset_right = 18.0
+offset_bottom = 18.0
+mouse_filter = 2
+texture = ExtResource("7_cr")
+expand_mode = 1
+
+[node name="Arrow" type="TextureRect" parent="Root/Line2/Mark"]
+layout_mode = 0
+offset_left = -2.0
+offset_top = -3.0
+offset_right = 16.0
+offset_bottom = 15.0
+rotation = -1.22173
+pivot_offset = Vector2(9, 9)
+mouse_filter = 2
+texture = ExtResource("6_cc")
+expand_mode = 1
+
+[node name="Dot" type="TextureRect" parent="Root/Line2/Mark"]
+visible = false
+layout_mode = 0
+offset_left = -3.0
+offset_top = -3.0
+offset_right = 13.0
+offset_bottom = 13.0
+mouse_filter = 2
+texture = ExtResource("7_cr")
+expand_mode = 1
+
+[node name="Line3" type="Control" parent="Root"]
+layout_mode = 0
+offset_top = 33.0
+offset_right = 10.0
+offset_bottom = 43.0
+mouse_filter = 2
+
+[node name="Band" type="TextureRect" parent="Root/Line3"]
+visible = false
+material = SubResource("ShaderMaterial_band3")
+layout_mode = 0
+offset_left = -141.0
+offset_top = -25.0
+offset_right = 151.0
+offset_bottom = 33.0
+rotation = -0.0174533
+pivot_offset = Vector2(146, 29)
+mouse_filter = 2
+texture = ExtResource("4_band")
+expand_mode = 1
+
+[node name="Mark" type="Control" parent="Root/Line3"]
+visible = false
+layout_mode = 0
+offset_left = 159.0
+offset_top = 24.0
+offset_right = 169.0
+offset_bottom = 34.0
+mouse_filter = 2
+
+[node name="Base" type="TextureRect" parent="Root/Line3/Mark"]
+modulate = Color(0, 0, 1, 0.627451)
+layout_mode = 0
+offset_left = -8.0
+offset_top = -8.0
+offset_right = 18.0
+offset_bottom = 18.0
+mouse_filter = 2
+texture = ExtResource("7_cr")
+expand_mode = 1
+
+[node name="Arrow" type="TextureRect" parent="Root/Line3/Mark"]
+layout_mode = 0
+offset_left = -2.0
+offset_top = -3.0
+offset_right = 16.0
+offset_bottom = 15.0
+rotation = -1.22173
+pivot_offset = Vector2(9, 9)
+mouse_filter = 2
+texture = ExtResource("6_cc")
+expand_mode = 1
+
+[node name="Dot" type="TextureRect" parent="Root/Line3/Mark"]
+visible = false
+layout_mode = 0
+offset_left = -3.0
+offset_top = -3.0
+offset_right = 13.0
+offset_bottom = 13.0
+mouse_filter = 2
+texture = ExtResource("7_cr")
+expand_mode = 1
+
+[node name="Glyphs" type="Control" parent="Root"]
+layout_mode = 0
+offset_right = 10.0
+offset_bottom = 10.0
+mouse_filter = 2
+
+[node name="Sfx" type="Node" parent="."]
+
+[node name="Obi" type="AudioStreamPlayer" parent="Sfx"]
+
+[node name="Select" type="AudioStreamPlayer" parent="Sfx"]

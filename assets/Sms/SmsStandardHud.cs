@@ -386,6 +386,11 @@ public partial class SmsStandardHud : Control
         StartDisappearStar();
     }
 
+    /// <summary>TTalk2D2::openTalkWindow (Talk2D2.cpp 467): startDisappearMario -- the lives slide away for the talk (the telop and the help
+    /// balloon go through the layer's own Disappear / Hide). They come back as they would anyway: the game's console leaves them off until
+    /// the next lives change or idle peek; here Jaysonn's IdleHold brings them back once he stands in WAIT again.</summary>
+    public void TalkIn() => StartDisappearMario();
+
     /// <summary>For the drives: the console frame, the star HUD and the lives in view.</summary>
     public int Frame => _frame;
     public bool StarShown => _starVisible && !_starLeaving;

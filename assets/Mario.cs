@@ -11028,6 +11028,8 @@ public partial class Mario : CharacterBody3D
     // ---- NPC talk (pass 82): TMario::startTalking (MarioWait.cpp 14) -> MARIO_STATUS_READ_BILLBOARD, readBillboard (MarioAutodemo.cpp 43) ----
     private SmsNpc _smsTalkNpc; private bool _smsTalking; private int _smsTalkPhase;
     public bool SmsIsTalking => _smsTalking;
+    /// <summary>gpCamera for the talk balloon (makeMtxForTalk / makeMtxForPrevTalk / isThing).</summary>
+    public SunshineCamera SmsCamera => _camera;
     /// <summary>findNearestTalkNPC: MARIO_STATUS_WAIT; movement_game: not holding, not the L camera; and not already talking.</summary>
     public bool SmsCanStartTalk => UseSmsPhysics && !_smsTalking && IsOnFloor() && stateOfMario == MarioState.idle && heldBody == null && pendingPickup == null && !SmsYCamOn;
     private bool _smsTalkPadFlag, _smsTalkPadFlagPrev;   // TMarioGamePad::PAD_FLAG_TALK_NPC this frame / as the pad read it (set last frame)
@@ -11052,8 +11054,8 @@ public partial class Mario : CharacterBody3D
         SmsTalkTargetNpc = null;
         if (_smsTalking || !SmsCanStartTalk)
             return;
-        if (SmsNpcTakeOffered())
-            return;
+        SmsNpc take = SmsNpcTakeOffered();
+        if (take != null) { SmsTalkTargetNpc = take; return; }   // unk84->associateNPC(takeNpc): the cursor over the liftable one, B stays his take
         SmsNpc npc = SmsNpc.FindNearestTalk(this);
         if (npc == null)
             return;
@@ -11068,15 +11070,15 @@ public partial class Mario : CharacterBody3D
     }
 
     /// <summary>findNearestTakeNPC (MarDirectorEvent.cpp 61): a liftable NPC (isNowCanTaken) in his isTakeSituation.</summary>
-    private bool SmsNpcTakeOffered()
+    private SmsNpc SmsNpcTakeOffered()
     {
         if (!SmsCanTakeNow())
-            return false;
+            return null;
         Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
         float cosCone = Mathf.Cos(SmsParams.Take.ConeBam * SmsUnits.BamToRad);
         float marioH = SmsUnits.UnitsToMetres(SmsUnits.MarioHeightUnits);
         float bestD = float.MaxValue;
-        return SmsFindTakeNpc(GlobalPosition, marioH, face, cosCone, ref bestD) != null;
+        return SmsFindTakeNpc(GlobalPosition, marioH, face, cosCone, ref bestD);
     }
 
     /// <summary>TMario::hitNpc (MarioCheckCol.cpp 95) + trampleExec (MarioCollision.cpp 136), from the NPC's hit check: a JUMPING-type status
@@ -12657,7 +12659,7 @@ public partial class Mario : CharacterBody3D
     {
         _stdHud.Coins = _coins; _stdHud.Lives = _lives; _stdHud.Shines = _shines; _stdHud.BlueCoins = _blueCoins; _stdHud.RedCoins = _redCoins;
         _stdHud.Health = _health; _stdHud.Air = (int)MathF.Max(_smsAir, 0f); _stdHud.UnderWater = _smsUnderWater; _stdHud.DebugPrint = SmsDebugPrint;
-        _stdHud.Idle = stateOfMario == MarioState.idle;
+        _stdHud.Idle = stateOfMario == MarioState.idle && !_smsTalking;   // MARIO_STATUS_WAIT: READ_BILLBOARD (the NPC talk) is not it
         _stdHud.Dead = stateOfMario == MarioState.dead || _health <= 0;
         _stdHud.ShineDemo = stateOfMario == MarioState.shineGet;
         _stdHud.Demo = CameraLocked || stateOfMario == MarioState.talking || _stdHud.ShineDemo || _stdHud.Dead;

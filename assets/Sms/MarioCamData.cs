@@ -39,7 +39,8 @@ public struct SmsCamMarioData
     public bool YPressed;               // MEANING_Y this frame (a frame meaning: the press's edge)
     public bool CamCancelPressed;       // MEANING_Y | MEANING_CAM_AB this frame: what leaves the L camera (read before Mario's half eats A / B)
     public bool YCamCanEnter;           // Mario's status gate for the Y press (MarioYCam.SmsYCamCanEnter): the rig's lock and inbetween checks are its own
-    public bool Locked;                 // CameraLocked / talking / the shine demo / dead: a demo holds him
+    public bool Locked;                 // CameraLocked / the sign talk / the shine demo / dead: a demo holds him
+    public bool Talking;                // isTalkModeNow: the NPC talk from the B press to the balloon's fade (the talk kind holds the camera meanwhile; pass 86)
     public bool Teleported;             // the frame jumped him (a respawn, the intro's spawn): the camera warps behind him as a stage load does
     public bool Debug;                  // SmsDebugPrint
 }
@@ -81,8 +82,7 @@ public partial class Mario
         d.TouchGround = IsOnFloor();
         // *gpMarioAngleY: his face as the game has it; the port's _smsFaceYaw IS "behind him" in the camera's bearing convention
         // (SmsBehindYaw: atan2 of the direction the camera sits off him), so the face is that + 0x8000
-        float behind = SmsBehindYaw(out float by) ? by : (lastFacingDirection.LengthSquared() > 1e-4f ? SmsMath.YawFromDir(lastFacingDirection.Normalized()) : 0f);
-        d.AngleY = (short)((short)(int)MathF.Round(behind / SmsUnits.BamToRad) + 0x8000);
+        d.AngleY = SmsCamFaceAngleBam();
         d.Rocketing = stateOfMario == MarioState.fluddRocket || _smsRocketLanding;
         d.HoverNozzle = _fluddNozzle == SmsNozzle.Hover;
         d.Dashing = _fluddDashing;
@@ -121,8 +121,18 @@ public partial class Mario
         d.CamCancelPressed = _camCancelPressed;
         d.YCamCanEnter = SmsYCamCanEnter();
         d.Locked = CameraLocked || stateOfMario == MarioState.talking || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.dead;
+        d.Talking = _smsTalking;
         d.Debug = SmsDebugPrint;
         return d;
+    }
+
+    /// <summary>*gpMarioAngleY as the camera reads it: his face as the game has it. The port's _smsFaceYaw IS "behind him" in the camera's bearing
+    /// convention (SmsBehindYaw: atan2 of the direction the camera sits off him), so the face is that + 0x8000. The talk camera reads it fresh
+    /// at makeMtxForTalk (the camera's own copy is a frame old then).</summary>
+    public int SmsCamFaceAngleBam()
+    {
+        float behind = SmsBehindYaw(out float by) ? by : (lastFacingDirection.LengthSquared() > 1e-4f ? SmsMath.YawFromDir(lastFacingDirection.Normalized()) : 0f);
+        return (short)((short)(int)MathF.Round(behind / SmsUnits.BamToRad) + 0x8000);
     }
 
     /// <summary>Respawn / the intro's spawn: the game reloads the stage and its camera starts behind him (CPolarSubCamera::loadAfter).</summary>

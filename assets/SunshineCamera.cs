@@ -131,6 +131,8 @@ public partial class SunshineCamera : Node3D
     private int _frontYaw = 0, _frontChase = 0;          // unk274 / unk276
     private int _lLock = 0;                              // unk282: ticks after an L camera change before Y / A / B act or a Y re-enters (60)
     private SmsCamKind _lModeBefore = SmsCamKind.Follow; // unk60's stack: the kind the L camera came from (changeCamMode_(-1) pops it)
+    private SmsCamKind _modeBeforeTalk = SmsCamKind.Follow; // mSavedModeBeforeTalk: the kind makeMtxForTalk replaced (pass 86)
+    private int _yawBeforeTalk;                          // mCurrentTarget.unk2C: the yaw makeMtxForTalk replaced
     private int _groundSkip = 0, _roofSkip = 0, _autoChaseOff = 0; // unk278 / unk27A / unk284
     private float _autoChase = 1f;                       // unk288
     private int _slopeX = 0, _addY = 0;                  // unk28C / unk28E
@@ -440,9 +442,15 @@ public partial class SunshineCamera : Node3D
         _prev = _cur;
         // controlByCameraCode_ + execCameraModeChangeProc_: only while the game is in play (director state 4), never under a demo's hold
         _areaKind = SampleAreaKind();
-        if (_md.Locked)
+        if (SmsCamKinds.IsTalkKind(_mode))
         {
-            // a demo's hold (the talk, the shine, a death, CameraLocked): the game never reaches execCameraModeChangeProc_ under one and
+            // ctrlGameCamera_ (cameragc.cpp 891): under a talk kind the mode ladder never runs; the talk mode over without makeMtxForPrevTalk
+            // (an event ended it) -> changeCamMode_(mInitialMode)
+            if (!_md.Talking) ChangeMode(DefaultKind == SmsCamKind.LNormal ? SmsCamKind.Follow : DefaultKind);
+        }
+        else if (_md.Locked)
+        {
+            // a demo's hold (the sign talk, the shine, a death, CameraLocked): the game never reaches execCameraModeChangeProc_ under one and
             // its demo camera takes the view; here the one camera keeps the frame, so an open L camera is cut and a Y swing dropped
             if (_mode == SmsCamKind.LNormal) LCameraOff(true, "a demo hold", force: true);
             _flags &= ~(FlagFrontRotate | FlagFrontY | FlagFrontDone);
@@ -456,6 +464,7 @@ public partial class SunshineCamera : Node3D
         // occlusion (MARIO_FLAG_OCCLUDED): the game reads the framebuffer at his screen point; a ray from the eye to his waist stands in
         _occluded = RayHits(M(_posU), M(_md.PosU + new Vector3(0f, 80f, 0f)));
         if (_mode == SmsCamKind.LNormal) CtrlL();
+        else if (SmsCamKinds.IsTalkKind(_mode)) CtrlTalk();
         else CtrlNormal();
         // calcFinalPosAndAt_ (828): the shake is SmsCameraShake's own pass; the look-at's elevation from the eye clamped to the limits
         _viewPosU = _posU;
@@ -690,6 +699,54 @@ public partial class SunshineCamera : Node3D
         }
         CalcPosAndAt();
     }
+
+    // ============================================================ the talk camera (CameraTalk.cpp; pass 86): CAMERA_MODE_TALK_A / TALK_B as kinds of this camera
+    /// <summary>ctrlTalkCamera_ (CameraTalk.cpp 49): the look-at his look point (the target freeze allowing), then the same calcPosAndAt_ with
+    /// the talk kind's record -- a fixed 230 u off the look point (TALK_B: 270), level (XAngle 0; TALK_B 2500), the bearing makeMtxForTalk set
+    /// behind his face swung by OffsetAngleY -44.8 deg (-33.8) and the look point OffsetLookatXZ -67.6 u (-60) aside: Mario on one side of the
+    /// frame, the NPC he faces on the other. No cushion (not a normal kind), no wall check, no ladder while it holds.</summary>
+    private void CtrlTalk()
+    {
+        _followSpeed = 0f;
+        if (_targetFreeze == 0)
+            _cur.At = _lookPoint;
+        CalcPosAndAt();
+    }
+
+    /// <summary>makeMtxForTalk (CameraTalk.cpp 8), from TTalk2D2::openTalkWindow once readBillboard has him facing the NPC: the height pan
+    /// killed, the yaw saved (unk2C) and set behind his face (SMS_GetMarioAngleY() - 0x8000), the kind saved (mSavedModeBeforeTalk), then
+    /// changeCamMode_(TALK_A) -- TALK_B for a small NPC (isSmallNpc: a Toad). The Sunflowers' TALK_C / D and the Noki elder's TALK_E are not
+    /// carried. marioAngleYBam = his face this tick (the camera's own copy is a frame old at this call).</summary>
+    public void MakeMtxForTalk(bool smallNpc, int marioAngleYBam)
+    {
+        if (SmsCamKinds.IsTalkKind(_mode)) return;
+        KillHeightPan();
+        _yawBeforeTalk = _cur.Yaw;
+        _cur.Yaw = (short)(marioAngleYBam - 0x8000);
+        _modeBeforeTalk = _mode;
+        ChangeMode(smallNpc ? SmsCamKind.TalkB : SmsCamKind.TalkA);
+        if (_md.Debug)
+            GD.Print($"[SMS camera] the talk camera: {_mode} from {_modeBeforeTalk}, the eye swung behind his face then {SmsCamKinds.Get(_mode).OffsetAngleY * 360f / 65536f:F1} deg round, {SmsCamKinds.Get(_mode).DistMin:F0} u off the look point");
+    }
+
+    /// <summary>makeMtxForPrevTalk (37), from closeTalkWindow / forceCloseTalk: in a talk kind, the saved yaw back and changeCamMode_ to the
+    /// kind before the talk (the normal camera resumes with the record's 16-tick blend). Its onNeutralMarioKey and every NPC's npcTalkOut are
+    /// the caller's (SmsTalkBalloon).</summary>
+    public void MakeMtxForPrevTalk()
+    {
+        if (!SmsCamKinds.IsTalkKind(_mode)) return;
+        _cur.Yaw = (short)_yawBeforeTalk;
+        ChangeMode(_modeBeforeTalk);
+        if (_md.Debug)
+            GD.Print($"[SMS camera] the talk camera done: back to {_modeBeforeTalk}");
+    }
+
+    /// <summary>isTalkCameraSpecifyMode(mMode): a talk kind holds the frame (through its inbetween).</summary>
+    public bool IsTalkCamera => SmsCamKinds.IsTalkKind(_mode);
+    /// <summary>CAMERA_MODE_TALK_B (the small NPC's): TTalk2D2 parks its root at (160, 135) turned 20 deg for it, else (388, 115) at -18.</summary>
+    public bool IsTalkCameraSmall => _mode == SmsCamKind.TalkB;
+    /// <summary>isThing (Camera.hpp 115): a talk kind with its inbetween over -- TTalk2D2's state 2 waits for it before the 20-frame pause.</summary>
+    public bool TalkCameraSettled => SmsCamKinds.IsTalkKind(_mode) && _ibFrames == 0;
 
     // ============================================================ what Mario's half of the L camera reads (MarioYCam.cs)
     /// <summary>isLButtonCamera(): the mode proper, from the tick it turns on (through its inbetween) to the tick it leaves.</summary>
@@ -1163,7 +1220,9 @@ public partial class SunshineCamera : Node3D
     // ============================================================ the BG checks (CameraBGCheck.cpp) in Godot physics
     /// <summary>isNeedWallCheck_ (118): not in the L camera nor its inbetween, not the talk camera (Mode TalkingPOV takes the frame), never
     /// under the front-rotate swing (CAMERA_FLAG_UNK4).</summary>
-    private bool NeedWallCheck() => (_flags & FlagFrontRotate) == 0 && _mode != SmsCamKind.LNormal && !IsLInbetween();
+    private bool NeedWallCheck() => (_flags & FlagFrontRotate) == 0 && _mode != SmsCamKind.LNormal && !IsLInbetween() && !SmsCamKinds.IsTalkKind(_mode) && !IsTalkInbetween();
+    /// <summary>isTalkCameraInbetween (CameraMode.cpp 129): the blend into or out of a talk kind is running.</summary>
+    private bool IsTalkInbetween() => _ibFrames > 0 && (SmsCamKinds.IsTalkKind(_mode) || SmsCamKinds.IsTalkKind(_prevMode));
 
     /// <summary>isNeedGroundCheck_ (78): not in the L camera once its inbetween is over; skipped for 120 ticks once the eye sits more than
     /// 1.25 x the kind's highest reach over the look-at.</summary>

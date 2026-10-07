@@ -5276,3 +5276,75 @@ WAIT again, cursor on the Pianta he stopped before, the talk; D -- a drop onto a
 contact above its feet; E -- standing 1.0 m from the axis -> 2.015 m (150 u); H -- 22 frames beside it: no trample; F -- a fall 1.6 m off the
 axis: no trample (110 u reach), lands, pushed to 150 u; G -- 14 random outfits: hung, coloured, never two hats. Drives 82 (31/31) and 83
 (33/33, its reach expectation corrected to 180 u) re-run green. Build 0 errors, boot ALL OK.
+
+### Pass 86 -- the talk balloon (TTalk2D2), the talk camera (TALK_A / TALK_B), the talk cursor model (TTalkCursor): the game's, 1:1
+SOURCE: GC2D/Talk2D2.cpp (the constructor 56-99: unk220 26, unk338 0.04, unk33C 1.0, cColorTable; loadAfter 220-281: the curve's length in
+100 f32 steps -> unk94, 90 one-glyph 20 x 20 J2DTextBox panes with setBlackWhite(col & ~0xFF, col), the root parked (393, 115) -18; setMessageID
+282-392: unk280 / unk26C / unk27C / unk340 0x40 reset per message, the first page laid out; openTalkWindow 432-483: makeMtxForTalk, the root
+at (388, 115) -18 for TALK_A else (160, 135) 20 for TALK_B, startDisappearTelop / Balloon / Mario, talkModeIn, state 2; makeBoxLine 485-550:
+w += unk94 x (0.7 width + 4), pos = R(ang) p, box = (round x, -0x25 - round y), mRotation = ang, the glyph laid past 1.1 is the line's last;
+openNormalWindow 575-643: unk234[i] -= 0.04 to -0.109, held at 1 while the line above's last glyph is not visible, the band sound and the
+first glyph shown at < 1.0, the fade loop (0x40 a tick; A held past unk2DE 2 -> 0x80 and unk2DC 0), unk3C 'bac' shown when every band has
+landed; moveTalkWindow 704-790: one fade step a line, the last line's mark group fades 0x10, cc / cs by unk26A, the pulse 255 -> 60 by 4 /
+back by 2; checkControler 792-844: MEANING_SELECT_A | B -> state 7 or closeTalkWindow; closeNormalWindow / eraseNormalWindow 846-912: the
+root 0x10 a tick (the erase again once a frame), the next page's setupTextBox; perform 945-1062: CUE_MOVE = the states, CUE_CALC_ANIM = the
+20-frame pause (unk251 0x14) and the erase's extra step, CUE_DRAW = openWindow's ramp quads in state 4; setupTextBox 1126-1221: 0x0A breaks
+the line, 0x00 ends the message (unk26A), the colour per glyph (mCharColor / mGradColor), unk281[unk2DE] = unk280 per glyph; setTagParam
+1223-1437: the wait tag -> unk280 (kept), the colour tag -> cColorTable[n]; openWindow 1439-1512: the band quad under the root's -rotation
+about (x1 + 5, y1 + 5), TEXMAP0 = message_back_1 translated by unk234 with GX_CLAMP, C0 0000ff00 / C1 0000ffa0, x TEXMAP1 = the 'bac' picture's
+alpha), game_6/scrn/message_2.blo (me_0 10 x 10 base 4; me_1..3 at y -33 / 0 / 33; bacN 292 x 58 at (-141, -25) alpha 160 ROT 1 black 0000ff00
+white 0000ffff; f_1 (-128, 4) / f_2 (-5, -16) / f_3 (118, 4) 20 x 20; cuN at (159, 24): cr 26 x 26 at (-8, -8) alpha 160 blue, cc 18 x 18 at
+(-2, -3) ROT 70, cs 16 x 16 at (-3, -3)), nintendo/font/standard_fontex.bfn (JUTResFont: 20 x 20 cells on one 512 x 256 I4 sheet, WID1 kern /
+advance per code, INF1 ascent 20), JSystem J2DPane::makeMatrix (T(pos + pivot) R(-mRotation) T(-pivot)), System/MarDirectorDirect.cpp 973-1043
+(unk124 1 -> 2: openTalkWindow; 2 -> 0 when unk248 == 0: PAD_FLAG_TALK_SELECT off), Player/MarioAutodemo.cpp 43-91 (readBillboard: facing ->
+unk126 = 2; unk124 0 -> WAIT), Camera/CameraTalk.cpp (makeMtxForTalk: killHeightPan_, unk2C = mYaw, mYaw = MarioAngleY - 0x8000, mSavedModeBeforeTalk,
+changeCamMode_(TALK_A, or TALK_B for isSmallNpc); makeMtxForPrevTalk: the yaw back, changeCamMode_(saved), onNeutralMarioKey, npcTalkOut on every
+NPC of unk88; ctrlTalkCamera_: the target = the look point, calcPosAndAt_), Camera.hpp 115 (isThing: a talk kind and no inbetween), CameraMode.cpp
+114 / 140 (isTalkCameraSpecifyMode; the talk kinds are not normal class), CameraBGCheck.cpp 118 (no wall check in a talk kind or its inbetween),
+cameragc.cpp 891 (under a talk kind the mode ladder never runs; the talk over -> mInitialMode), /Camera/kindtalka.prm (dist 230, XAngle 0,
+AtOffsetY 141.8, OffsetAngleX -769, OffsetAngleY -8157, OffsetLookatXZ -67.6, chase 0.1 / 0.08) and kindtalkb.prm (270, XAngle 2500, 115.7,
+-1188, -6153, -60), NpcBase.cpp 250 (isSmallNpc: the Toads, children, Nokis) / 418 (getCursorPos: y + BodyHeight x scale + CursorHeight),
+NpcAnm.cpp 509 (npcTalkOut: mTalkForbidCount 60 for every NPC; the talking one's walk forbid 120 and changeNerveFromTalk_), System/TalkCursor.cpp
+(/common/cursor_b/default.bmd with icon_rot.bck and icon_flash.brk, the base matrix at getCursorPos, GX_ALWAYS on draw), the bmd (joint 0 kind 2
+Y-billboard; joint 1 at y 20.04 -> shape 1 / _mat7: the chevron 54 x 25 x 17.5 units, texgen NRM through TEXMTX0 (0.919, (0.62, 0.37)) over
+H_soap_ref_ia8, colour 4 x (TEXA + C0 (210, 40, 40) x TEXC); joint 2 at y 75 -> shape 0 / _mat6: the 80.27-unit icon quad, matrix type 1
+billboard, lerp(C0 (240, 68, 68), C1 (246, 234, 234), icon I) + K0 x icon_b, alpha icon A + icon_b I), icon_rot.bck (100 frames, loop: joint 1
+rot y 0 -> 720, trans y 20.04 <-> 8.76 every 20 frames), icon_flash.brk (_mat6 K0 (200, 44, 44) -> (255, 255, 255) at 49 -> back at 100), MActor
+(frameUpdate once a CUE_CALC_ANIM at rate 1.0: TTalkCursor never sets SMSGetAnmFrameRate, so one bck frame a 30 fps frame), GCConsole2.cpp
+startDisappearTelop / startDisappearMario.
+WHY: his review of pass 85: "talking works but looks nothing like it does in Mario Sunshine. complete redo ... follow the decomp ... should be a blue
+text with 3 lines where the text spawns in and should kinda roll out the text". Pass 82's SmsTalkWindow was a cream StyleBox at the bottom of the
+screen with Godot labels, no camera, and a cone for a cursor -- none of it the game's.
+WHAT: assets/Sms/Talk/ (new) -- SmsTalkBalloon.cs (TTalk2D2's normal window: the states 2 -> 3 -> 4 -> 5 -> 7 / 6 on the 120 Hz tick with the
+once-a-frame half, openNormalWindow / moveTalkWindow / checkControler / close / erase as the source has them, makeBoxLine's f32 arithmetic, the
+pages from the NPC's Lines, the tags <c0>..<c5> and <w=N> as the .bmg's, the root parked by the camera's mode and placed as J2DPane::makeMatrix
+with the (5, 5) pivot, the glyphs drawn as the font's 20 x 20 cells coloured with the sheet's intensity as alpha, the telop / help balloon / lives
+away at the open, Mario freed when the fade is done), TalkBalloon.tscn (message_2.blo as Controls: Root / Line1..3 / Band + Mark { Base cr, Arrow
+cc, Dot cs } / Glyphs, the two sound slots), TalkBand.gdshader (openWindow's ramp wipe: the band shape x the ramp at (s + roll) clamped, blue,
+alpha 160; roll <= -1 IS the 'bac' pane), SmsTalkFont.cs + TalkFont.tres (the bfn's cells, kern and advance per ASCII code, from gen_talk_assets.py),
+tex/ (the sheet, the band, the ramp, the two marks: intensity as alpha on white, pinned lossless). assets/Sms/Npc/ -- TalkCursor.tscn (generated by
+gen_talk_cursor.py: Spin -> Chevron (TalkCursorArrow.obj from the bmd, TalkCursorArrow.gdshader), Icon (a 1.078 m QuadMesh, TalkCursorIcon.gdshader),
+Anim: icon_rot + the brk's K0 as one 100-frame looping Animation at 30 fps), SmsTalkCursor.cs (the Y-billboard root), tex/talk_cursor_*.png (pinned
+lossless, mipmapped). SmsNpc.cs -- MarioFacesYou opens the balloon (Ensure'd at _Ready so it loads with the level), TalkWindowClosing = npcTalkOut
+(every NPC: NpcTalkOutAll from the balloon's close), EndTalk = forceCloseTalk when the balloon is up, IsSmallNpc (Kind == Toad), the window exports
+gone. SunshineCamera.cs -- the kinds TalkA / TalkB (gen_camera_kinds.py: kindtalka / kindtalkb, LookDown's id corrected to 0x33, IsTalkKind, the
+talk kinds out of IsNormalClass), MakeMtxForTalk(small, marioAngleY) / MakeMtxForPrevTalk / CtrlTalk / IsTalkCamera / IsTalkCameraSmall /
+TalkCameraSettled, no ladder and no wall check under a talk kind, the talk over without PrevTalk -> the stage's kind. MarioCamData.cs -- Talking,
+SmsCamFaceAngleBam (his face fresh at the open). Mario.cs -- SmsCamera, the HUD's WAIT off during READ_BILLBOARD, the cursor over a liftable NPC
+in his take situation too (findNearestTakeNPC -> associateNPC). SmsStandardHud.cs -- TalkIn (startDisappearMario).
+DEVIATIONS: AutoWrap (on; off = the game's hand-broken lines): a line the curve cannot hold breaks by words where makeBoxLine would truncate it
+and a fourth line spills into a new page; the balloon's Size knob (1 = the game's; the console's own 0.7 is separate); the telop comes back on
+the port's own clock (startAppearTelop(false) is a permission). NOT ported: the choice window (me_4), the board window, the Sunflowers' TALK_C / D
+and the elder's TALK_E, the sounds (MSD_SE_SY_TALK_OBI / SELECT_COMMON slots exist; talkModeIn / Out's BGM duck has no BGM), onNeutralMarioKey
+(his stick is not latched across the talk).
+LEGACY RETIRED: assets/Sms/Npc/TalkWindow.tscn + SmsTalkWindow.cs (pass 82's cream window), the cone cursor (pass 82's TalkCursor.tscn body),
+SmsNpc.TalkWindowScene / TalkWindowPath.
+CHECK: drive 86 (removed; 40/40): the balloon preloaded; the cursor model over PA (Spin / Icon / Anim playing, the icon 75 u up, 216 deg/s, the bob
+8.76..20.04 u, K0 at the brk's frame 40 / 55 values); B -> the talk -> WaitCamera / Pause / Opening / Open; TALK_A, the root park (388, 115) -18, the
+cursor away; 24 glyphs fading one by one after the 0.04-a-tick roll (1.0 -> -0.109); 'W' at (-123, 0) 18.5 deg and '!' at (138, 10) -22.9 deg =
+the game's f32 arithmetic; the first glyph at 255; the camera 229.4 u off a look point 141.8 u up, the bearing exactly behind his face - 44.8 deg;
+the lives away for the whole talk, the HUD's WAIT off; the arrow mark then A -> erase -> page 1 (16 glyphs) -> the dot mark -> A -> the camera back
+at once, the root fading, Mario freed after 16 ticks with PA talk-forbidden; a spray mid-talk = forceCloseTalk (camera back, PB wet, Mario freed);
+a Toad: TALK_B and the (160, 135) 20 park; <c3> / <c4> colours on the right glyphs and <w=8> slowing page 1 to 6 of 14 glyphs 40 frames in; a
+52-char line wrapped 24 / 23 / 3 with line 2's band held until line 1's last glyph; B closes. Drive 83 re-run 33/33 (the take cursor path moved).
+Build 0 errors, boot ALL OK.
