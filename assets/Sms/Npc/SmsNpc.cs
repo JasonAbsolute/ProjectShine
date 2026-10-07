@@ -35,6 +35,10 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     [Export] public SmsNpcProfile Profile;
     /// <summary>Which entry of the profile's colour table; -1 = a random one per instance (the game numbers them from the stage data).</summary>
     [Export] public int ColorIndex = -1;
+    /// <summary>The placement's three PART colour indices (setIndividualDifference_: the second colour triple): x = hats, y = moustache /
+    /// belts / lapel / the W's flower centre, z = glasses (TNpcModelData's colour channel). -1 = random. Parts are the SmsNpcPart scenes
+    /// (assets/Sms/Npc/Parts/*) you drop under this node: each is hung on its joint and coloured from NpcInitData.cpp's tables.</summary>
+    [Export] public Vector3I PartColorIndices = new Vector3I(-1, -1, -1);
     [Export] public IdleStyle Idle = IdleStyle.Wait;
     [ExportGroup("Talk")]
     /// <summary>The pages the window shows, one string each (\n breaks a line). Empty = this NPC cannot be talked to (no cursor).</summary>
@@ -90,6 +94,8 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private float _trampleAmp; private int _trampleShake, _trampleToMad; private float _trampleDec; // TNpcTrample
     private bool _marioStompLatch;
     private int _colorIdx;
+    private readonly int[] _partColorIdx = { -1, -1, -1 };     // the three part colour indices once drawn
+    private readonly List<SmsNpcPart> _parts = new();
     private bool _talkable;                              // LIVE_FLAG_UNK20000
     private bool _talking, _windowOpen;
     private Mario _holder; private SmsNpcHoldProxy _holdProxy;      // mHolder / unk158 (TTakeActor)
@@ -117,6 +123,8 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     public string CurrentClip => _clip;
     public float MarchSpeed => _marchSpeed;
     public int ColorIdx => _colorIdx;
+    public int PartColorIdx(int channel) => _partColorIdx[Mathf.Clamp(channel, 0, 2)];
+    public IReadOnlyList<SmsNpcPart> Parts => _parts;
     public SmsNpcNeck Neck => _neck;
     public bool NeckAllowed => true;   // isNeedNeckStraight: only the throw / sunflower / board NPCs hold the head straight
 
@@ -142,6 +150,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         }
         _colorIdx = ColorIndex >= 0 ? ColorIndex % Profile.ColorCount : _rng.Next(Profile.ColorCount);
         SetupLook();
+        SetupParts();
         SetupNeck();
         SetupCursor();
         MarkLoops();
@@ -250,6 +259,56 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (sun == null) return;
         m.SetShaderParameter("sun_dir", -sun.GlobalTransform.Basis.Z.Normalized());
         m.SetShaderParameter("sun_color", new Vector3(sun.LightColor.R, sun.LightColor.G, sun.LightColor.B) * sun.LightEnergy);
+    }
+
+    /// <summary>TNpcParts: every SmsNpcPart found under this node (not inside the model) is a TSharedParts on the joint its data names --
+    /// a BoneAttachment3D on the NPC's skeleton carries it with no offset (the part is authored in the joint's space); "__ROOT_JOINT__" or
+    /// a joint the skeleton lacks puts it on the model root. Its colour row is the NPC's index for the part's channel (PartColorIndices,
+    /// -1 = drawn once per channel from the parts' table lengths), the toon ramp and the sun are the body's.</summary>
+    private void SetupParts()
+    {
+        _parts.Clear();
+        CollectParts(this, _parts);
+        if (_parts.Count == 0) return;
+        var toon = ToonTexture ?? GD.Load<Texture2D>(ToonPath);
+        var sun = FindSun(GetTree().CurrentScene);
+        for (int ch = 0; ch < 3; ch++)
+        {
+            int set = ch == 0 ? PartColorIndices.X : ch == 1 ? PartColorIndices.Y : PartColorIndices.Z;
+            if (set >= 0) { _partColorIdx[ch] = set; continue; }
+            int rows = 0;
+            foreach (var part in _parts) if (part.ColorChannel == ch) rows = Mathf.Max(rows, part.ColorRows);
+            _partColorIdx[ch] = rows > 0 ? _rng.Next(rows) : 0;
+        }
+        foreach (var part in _parts)
+        {
+            Node holder = _model;
+            if (_skel != null && part.Joint != SmsNpcPart.RootJoint && _skel.FindBone(part.Joint) >= 0)
+            {
+                var att = new BoneAttachment3D { Name = "Part_" + part.Name };
+                _skel.AddChild(att);
+                att.BoneName = part.Joint;
+                holder = att;
+            }
+            if (holder != null && part.GetParent() != holder)
+            {
+                part.GetParent()?.RemoveChild(part);
+                holder.AddChild(part);
+            }
+            part.Transform = Transform3D.Identity;
+            part.Apply(_partColorIdx[Mathf.Clamp(part.ColorChannel, 0, 2)], toon, sun);
+        }
+        if (DebugPrint) GD.Print($"[SMS npc] {Name}: {_parts.Count} part(s), colours {_partColorIdx[0]} / {_partColorIdx[1]} / {_partColorIdx[2]}");
+    }
+
+    private void CollectParts(Node n, List<SmsNpcPart> into)
+    {
+        foreach (var c in n.GetChildren())
+        {
+            if (c == _model) continue;                         // the model's own meshes are not parts
+            if (c is SmsNpcPart part) { into.Add(part); continue; }
+            CollectParts(c, into);
+        }
     }
 
     private void SetupNeck()

@@ -1,0 +1,67 @@
+[gd_scene load_steps=12 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcPart.cs" id="part"]
+[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcPartMaterial.cs" id="pm"]
+[ext_resource type="PackedScene" path="res://models/NPC/Parts/hatb_model/hatb_model.glb" id="glb"]
+[ext_resource type="Texture2D" path="res://assets/Sms/models/toon_2_4i.png" id="toon"]
+[ext_resource type="Shader" path="res://assets/Sms/Npc/NpcPartCutout.gdshader" id="sh_NpcPartCutout"]
+[ext_resource type="Texture2D" path="res://models/NPC/Parts/hatb_model/I_hatB_IA8.png" id="tex_0"]
+[ext_resource type="Shader" path="res://assets/Sms/Npc/NpcPart.gdshader" id="sh_NpcPart"]
+
+[sub_resource type="ShaderMaterial" id="mat_0"]
+shader = ExtResource("sh_NpcPartCutout")
+shader_parameter/s0_form = 0
+shader_parameter/s0_k = 0.625
+shader_parameter/s0_d_mode = 0
+shader_parameter/s0_const = 0
+shader_parameter/s0_scale = 1
+shader_parameter/s0_bias = 0
+shader_parameter/s1_form = 2
+shader_parameter/c0 = Vector3(1, 1, 1)
+shader_parameter/c1 = Vector3(1, 1, 1)
+shader_parameter/c2 = Vector3(1, 1, 1)
+shader_parameter/mat_color = Vector3(1, 1, 1)
+shader_parameter/use_vertex_color = false
+shader_parameter/has_tex = true
+shader_parameter/toon_tex = ExtResource("toon")
+shader_parameter/base_tex = ExtResource("tex_0")
+
+[sub_resource type="Resource" id="pm_0"]
+script = ExtResource("pm")
+MaterialName = "_boushi_mat"
+Material = SubResource("mat_0")
+ColorKind = 0
+Table0 = PackedVector3Array(1, 1, 0.235294, 1, 0.509804, 0, 1, 1, 0)
+
+[sub_resource type="ShaderMaterial" id="mat_1"]
+shader = ExtResource("sh_NpcPart")
+shader_parameter/s0_form = 0
+shader_parameter/s0_k = 0.625
+shader_parameter/s0_d_mode = 1
+shader_parameter/s0_const = 0
+shader_parameter/s0_scale = 0.5
+shader_parameter/s0_bias = -0.5
+shader_parameter/s1_form = 1
+shader_parameter/c0 = Vector3(1, 1, 1)
+shader_parameter/c1 = Vector3(1, 1, 1)
+shader_parameter/c2 = Vector3(1, 1, 1)
+shader_parameter/mat_color = Vector3(1, 1, 1)
+shader_parameter/use_vertex_color = true
+shader_parameter/has_tex = false
+shader_parameter/toon_tex = ExtResource("toon")
+
+[sub_resource type="Resource" id="pm_1"]
+script = ExtResource("pm")
+MaterialName = "_obi_mat"
+Material = SubResource("mat_1")
+ColorKind = 1
+Table0 = PackedVector3Array(0.392157, 0.27451, 0.196078, 0.392157, 0.27451, 0.196078, 0, 0.392157, 1)
+
+[node name="HatB" type="Node3D"]
+script = ExtResource("part")
+Joint = "kubi"
+ColorChannel = 0
+Mat0 = SubResource("pm_0")
+Mat1 = SubResource("pm_1")
+
+[node name="Model" parent="." instance=ExtResource("glb")]

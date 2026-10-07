@@ -1,0 +1,42 @@
+[gd_scene load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcPart.cs" id="part"]
+[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcPartMaterial.cs" id="pm"]
+[ext_resource type="PackedScene" path="res://models/NPC/Parts/hatf_model/hatf_model.glb" id="glb"]
+[ext_resource type="Texture2D" path="res://assets/Sms/models/toon_2_4i.png" id="toon"]
+[ext_resource type="Shader" path="res://assets/Sms/Npc/NpcPart.gdshader" id="sh_NpcPart"]
+[ext_resource type="Texture2D" path="res://models/NPC/Parts/hatf_model/I_line_I4.png" id="tex_0"]
+
+[sub_resource type="ShaderMaterial" id="mat_0"]
+shader = ExtResource("sh_NpcPart")
+shader_parameter/s0_form = 0
+shader_parameter/s0_k = 0.625
+shader_parameter/s0_d_mode = 2
+shader_parameter/s0_const = 0.625
+shader_parameter/s0_scale = 0.5
+shader_parameter/s0_bias = -0.5
+shader_parameter/s1_form = 0
+shader_parameter/c0 = Vector3(1, 1, 1)
+shader_parameter/c1 = Vector3(1, 1, 1)
+shader_parameter/c2 = Vector3(1, 1, 1)
+shader_parameter/mat_color = Vector3(1, 1, 1)
+shader_parameter/use_vertex_color = true
+shader_parameter/has_tex = true
+shader_parameter/toon_tex = ExtResource("toon")
+shader_parameter/base_tex = ExtResource("tex_0")
+
+[sub_resource type="Resource" id="pm_0"]
+script = ExtResource("pm")
+MaterialName = "_boushi_mat"
+Material = SubResource("mat_0")
+ColorKind = 2
+Table0 = PackedVector3Array(0.196078, 0.588235, 0.509804, 0.235294, 0.156863, 0)
+Table1 = PackedVector3Array(0.901961, 0.901961, 0.823529, 0.627451, 0.588235, 0.235294)
+
+[node name="HatF" type="Node3D"]
+script = ExtResource("part")
+Joint = "kubi"
+ColorChannel = 0
+Mat0 = SubResource("pm_0")
+
+[node name="Model" parent="." instance=ExtResource("glb")]

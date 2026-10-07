@@ -1,0 +1,38 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcPart.cs" id="part"]
+[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcPartMaterial.cs" id="pm"]
+[ext_resource type="PackedScene" path="res://models/NPC/Parts/arrowr_model/arrowr_model.glb" id="glb"]
+[ext_resource type="Texture2D" path="res://assets/Sms/models/toon_2_4i.png" id="toon"]
+[ext_resource type="Shader" path="res://assets/Sms/Npc/NpcPart.gdshader" id="sh_NpcPart"]
+
+[sub_resource type="ShaderMaterial" id="mat_0"]
+shader = ExtResource("sh_NpcPart")
+shader_parameter/s0_form = 1
+shader_parameter/s0_k = 0.625
+shader_parameter/s0_d_mode = 0
+shader_parameter/s0_const = 0
+shader_parameter/s0_scale = 1
+shader_parameter/s0_bias = 0
+shader_parameter/s1_form = 1
+shader_parameter/c0 = Vector3(1, 1, 1)
+shader_parameter/c1 = Vector3(1, 1, 1)
+shader_parameter/c2 = Vector3(1, 1, 1)
+shader_parameter/mat_color = Vector3(1, 1, 1)
+shader_parameter/use_vertex_color = true
+shader_parameter/has_tex = false
+shader_parameter/toon_tex = ExtResource("toon")
+
+[sub_resource type="Resource" id="pm_0"]
+script = ExtResource("pm")
+MaterialName = "_arrowR_mat"
+Material = SubResource("mat_0")
+ColorKind = -1
+
+[node name="ArrowR" type="Node3D"]
+script = ExtResource("part")
+Joint = "handR_jnt"
+ColorChannel = 0
+Mat0 = SubResource("pm_0")
+
+[node name="Model" parent="." instance=ExtResource("glb")]
