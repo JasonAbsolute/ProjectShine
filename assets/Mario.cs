@@ -10382,6 +10382,8 @@ public partial class Mario : CharacterBody3D
         heldBody.Scale = Vector3.One; // optional but usually fine
 
         heldBody.Visible = true;
+        if (heldBody is SmsNpcHoldProxy smsNpcProxy)
+            smsNpcProxy.OnAttached(this); // the NPC's behaveToBeTaken_: in his hands from here (pass 83)
         GD.Print($"held post-attach gscale = {heldBody.GlobalTransform.Basis.Scale}");
         GD.Print($"held local scale = {heldBody.Scale}");
     }
@@ -16551,8 +16553,37 @@ public partial class Mario : CharacterBody3D
                 best = rb;
             }
         }
+        // hitNpc (MarioCheckCol.cpp 95): an NPC carrying LIVE_FLAG_UNK100000 is offered to wantToTakeActor on contact -- the same canTake /
+        // isTakeSituation geometry (pass 83). The NPC's origin is its ground point; its hit cylinder is the profile's damage cylinder.
+        SmsNpc bestNpc = null;
+        foreach (SmsNpc npc in SmsNpc.Everyone)
+        {
+            if (npc == null || !IsInstanceValid(npc) || !npc.IsInsideTree() || !npc.IsNowCanTaken())
+                continue;
+            Vector3 rel = npc.GlobalPosition - feet;
+            float dxz = new Vector2(rel.X, rel.Z).Length();
+            if (dxz > SmsUnits.UnitsToMetres(SmsParams.Mario.DamageRadius + npc.HitRadiusUnits))
+                continue;
+            if (rel.Y + SmsUnits.UnitsToMetres(npc.HitHeightUnits) < 0f || rel.Y > marioH)
+                continue;
+            float dist = rel.Length();
+            if (dist > SmsUnits.UnitsToMetres(SmsParams.Mario.HoldRadius + npc.HitRadiusUnits))
+                continue;
+            if (dxz > 1e-4f && new Vector3(rel.X, 0f, rel.Z).Normalized().Dot(face) < cosCone)
+                continue;
+            if (dist < bestD)
+            {
+                bestD = dist;
+                bestNpc = npc;
+            }
+        }
+        if (bestNpc != null)
+            best = SmsNpcHoldProxy.Create(bestNpc, this); // the frozen stand-in his RigidBody-typed hold carries; the NPC rides it (getTakingMtx)
         return best != null;
     }
+
+    /// <summary>TTakeActor::ensureTakeSituation from the held side: is this body what he pends or holds.</summary>
+    public bool SmsHoldsOrPends(Node body) => body != null && (heldBody == body || pendingPickup == body);
 
     /// <summary>The body's half height off its first CollisionShape3D (his fruit are centred RigidBody3Ds; the game's object origin is its
     /// ground point), else half the game's hit height.</summary>
@@ -16745,6 +16776,13 @@ public partial class Mario : CharacterBody3D
         var rb = heldBody;
         heldBody = null;
         _smsTakeAttached = false;
+        if (rb is SmsNpcHoldProxy smsNpcProxy)
+        {
+            // TBaseNPC ignores THROWN and PUT: its ensureTakeSituation sees the hold end and releaseTaken_ launches it on its own numbers
+            if (SmsDebugPrint) GD.Print($"[SMS take] {(put ? "PUT" : "THROWN")} the NPC {smsNpcProxy.Npc?.Name}: its own releaseTaken_ (ThrowSpeedXZ {SmsParams.Npc.ThrowSpeedXZ} / Y {SmsParams.Npc.ThrowSpeedY} a tick along my facing)");
+            smsNpcProxy.Release();
+            return;
+        }
         rb.TopLevel = false;
         rb.Freeze = false;
         rb.CollisionLayer = heldLayer;

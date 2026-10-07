@@ -252,7 +252,8 @@ public static class SmsParams
         public const float MoveWalkAnmRateChase = 0.9f, StopWalkAnmRateChase = 0.01f;
         public const int StopWalkAnmRateFrame = 10, MotionBlendFrame = 20, PosInbetweenFrame = 6;
         public const float DanceAnmOffDist = 6500f;
-        public const float ThrowSpeedXZ = 3f, ThrowSpeedY = 2.5f; // releaseTaken_: a carried NPC let go flies with this (unported)
+        public const float ThrowSpeedXZ = 3f, ThrowSpeedY = 2.5f; // releaseTaken_: a carried NPC let go flies with this (pass 83)
+        public const int ReleaseNoCollisionFrames = 15;      // releaseTaken_: unk1DC = CLBPalFrame(15), the hit filter stays NO_COLLISION this many frames
         public const int GraphWanderMinFrame = 300, GraphWanderMaxFrame = 3000; // a wander leg's length before a wait
         public const int GraphWaitMinFrame = 100, GraphWaitMaxFrame = 1200;     // the wait between legs
         public const float ToSweatProbability = 0.2f, CleanEffectScale = 1.65f;

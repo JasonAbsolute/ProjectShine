@@ -5140,3 +5140,42 @@ at every boot, so the Level node is at local y -28.4903 (= the floor; the Level 
 same x/z. If the spot was meant differently, drag the node in the editor -- the old y is the one above.
 CHECK (npc_level_check.gd, removed): the main scene headless, the Pianta the only SmsNpc, no PiantaMaleNormal node, standing on the Plaza
 with 0.000 m of drift over 240 ticks, profile on, model scale 0.013434, nerve WaitMarioApproach on mom_wait; boot ALL OK.
+
+### Pass 83 -- liftable / throwable NPCs (TBaseNPC as a TTakeActor) + the NPC clock at 120 Hz
+SOURCE: NPC/NpcChange.cpp (behaveToBeTaken_ 240, releaseTaken_ 216, isNowCanTaken 433, isNerveCanGoToTaken 127), NpcBase.cpp (receiveMessage
+447: HIT_MESSAGE_TAKE needs LIVE_FLAG_UNK100000 and no holder; perform 555-580: mPosition = mHolder->getTakingMtx() translation, mRotation.y =
+his yaw - mAngleYDiffWhenTaken; moveObject 492: ensureTakeSituation -> releaseTaken_ when the holder no longer holds us; 689-713: the once-a-
+frame block = DIRECTOR_FLAG_LAST_SIMULATION_TICK (MarDirectorDirect.cpp 119-124) decrements unk1DC), NpcNerve.cpp (TNerveNPCWaitContinue 93:
+holder -> npcTakenIn), NpcAnm.cpp 534 (TAKEN clip = NpcInitAnmData kind 9: mom_wait for the M), NpcCollision.cpp bind 113-150 (gravity a tick,
+the ground zeroes mVelocity), NpcInbetween.cpp (execPosInbetween: 6 frames), Player/MarioCheckCol.cpp 81-96 (hitNpc: the flag -> wantToTakeActor
+-> canTake = B && isTakeSituation), System/MarDirectorEvent.cpp 44 (findNearestTalkNPC SKIPS the flag), System/EventWatcher.cpp 320
+(evSetFlagNPCCanTaken: the stage script sets the flag per NPC -- it is not a type default). Strategic/TakeActor.hpp.
+WHAT: SmsNpc.cs -- `CanBeTaken` export (off = the game's default; on = B lifts, never talks: no cursor), IsNowCanTaken (the flag, no holder,
+the hit filter on, not talking, the wander / wait / approach / turn / wet nerves), SmsTaken (behaveToBeTaken_: the yaw difference kept, a
+6-frame position blend into his hands, HIT_FILTER_NO_COLLISION = the capsule leaves its layer + his body excepted, the Taken nerve ->
+ClipTaken), TickHeld (perform with mHolder: origin = his taking matrix, yaw = his yaw - the difference), ReleaseTaken (releaseTaken_: velocity
+ThrowSpeedXZ 3 / ThrowSpeedY 2.5 u/tick along HIS facing -- the same for a throw and a put-down, TBaseNPC ignores THROWN and PUT -- 15 frames
+of no collision, the nerve set to WaitMarioApproach whose time 0 turns a Pianta back to its placed yaw in the air), Move: the thrown velocity
+rides whole until the ground zeroes it. SmsNpcHoldProxy.cs (new) -- the frozen, shapeless RigidBody3D his RigidBody-typed hold code carries in
+place of the CharacterBody3D NPC (an SmsTakeable child with the profile's damage cylinder: Kind Object -> pitched past fwd 16, else put if
+canPut, else kept), freed the tick he stops pending / holding it. Mario.cs -- SmsFindTakeTarget offers NPCs with the flag on the fruit's
+isTakeSituation geometry (his DamageRadius 42 + the NPC's 100 in XZ, HoldRadius 80 + 100 in 3D, the 60-degree cone), Anim_AttachPickup
+sends the take at raise frame 11, SmsReleaseHeld hands an NPC proxy to its own releaseTaken_, SmsHoldsOrPends. SmsPhysics.cs --
+SmsParams.Npc.ReleaseNoCollisionFrames 15.
+THE CLOCK FIX: pass 82 ran ONE NPC tick per 60 Hz physics frame while every npc*.prm value is per 120 Hz tick (TLiveActor) -- turn speeds,
+the march's anim rate, the talk / walk forbids, the trample and wander timers all ran at half speed (the march in m/s was right). The NPC now
+sub-steps like Mario and the Gooble (SmsUnits.TicksFor: two ticks a frame); the once-a-frame game block (the pos blend, unk1DC) steps on
+TicksPerFrame. Drive 82 re-run under it: 31 / 31 (the forbid check moved to its real 30-frame window).
+CUSTOMIZE: tick `CanBeTaken` on the Piantas you want liftable (per instance; the game decides per NPC from the stage script). A liftable NPC
+cannot be talked to -- that is the game's rule (findNearestTalkNPC), not a limitation.
+DEVIATIONS: none in the values. NOT PORTED (logged): mInbetweenCtrl's motion blend on the TAKEN clip, Peach's carried balloon lines, the
+thrown-NPC wall slide (isTouchedOneWallAndMoveXZ 150 u -- MoveAndSlide's own wall response stands in), sounds.
+LEGACY RETIRED: the "(unported)" tag on SmsParams.Npc.ThrowSpeedXZ / Y; the pass-82 one-tick-a-frame NPC clock.
+DRIVE 83 (patch_smoke83.py, removed; 33 / 33): a liftable Pianta 2 m ahead is never talkable; B at 2.0 m (dxz past 142 u) does not take; at
+1.8 m facing it the raise starts with the proxy pending; at raise frame 11.5 it is held (Taken nerve, mom_wait, layer 0, not takeable
+again); the hold is the upper-body state over his WAIT; after the 6-frame blend its origin is on his taking matrix (0.2 cm) 1.16 m over
+his feet; it faced him (-180 deg) and kept that difference through a 168-degree turn; B standing = PUTTING (ma_put): released at frame 20
+with exactly 4.84 / 4.03 m/s (3 / 2.5 u/tick) along his facing, landed 1.05 m ahead 14 frames later on the floor, TurnToMario (he stands
+inside its 250 u) turning back to its placed yaw; the capsule's layer off and not takeable for the 30 frames, back and takeable after; taken
+again, run to fwd 32, B = PITCHING (ma_throw): the SAME 4.84 / 4.03 release (TBaseNPC ignores HIT_MESSAGE_THROWN), landed 2.02 m ahead.
+Build 0 errors, boot ALL OK.

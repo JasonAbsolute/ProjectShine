@@ -29,7 +29,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private const float U = SmsUnits.UnitsPerMetre;
 
     public enum IdleStyle { Wait, WaitA, WaitB, Talking, Angry, Dance, Sit, SitTalk }   // the placement's NPC_ACTION flags -> getNpcWaitAnmBase_ / UNK1 sit
-    public enum Nerve { GraphWander, UTurn, GraphWait, WaitMarioApproach, TurnToMario, Talk, Wet, Mad }
+    public enum Nerve { GraphWander, UTurn, GraphWait, WaitMarioApproach, TurnToMario, Talk, Wet, Mad, Taken }
 
     [ExportGroup("Who")]
     [Export] public SmsNpcProfile Profile;
@@ -40,6 +40,13 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// <summary>The pages the window shows, one string each (\n breaks a line). Empty = this NPC cannot be talked to (no cursor).</summary>
     [Export(PropertyHint.MultilineText)] public string[] Lines = { "Welcome to Isle Delfino!", "Enjoy your stay." };
     [Export] public bool CanTalk = true;
+    [ExportGroup("Take")]
+    /// <summary>LIVE_FLAG_UNK100000 -- in the game the stage script sets it per NPC (evSetFlagNPCCanTaken): Mario touching this NPC with B
+    /// lifts it (TMario::hitNpc -> canTake, the same isTakeSituation geometry as a fruit), carries it on his hands (its feet at his taking
+    /// matrix, its facing offset to his kept), and a throw or a put-down both end as the NPC's own releaseTaken_: ThrowSpeedXZ 3 / Y 2.5
+    /// units a tick along his facing, 15 frames of no collision, then it stands (WaitMarioApproach). findNearestTalkNPC skips a liftable
+    /// NPC: B lifts, it never talks (no cursor). Off = the game's default.</summary>
+    [Export] public bool CanBeTaken = false;
     [ExportGroup("Wander")]
     /// <summary>Walk between points (the game's graph "main"). Off = stands where placed (an NPC without a graph).</summary>
     [Export] public bool Wander = false;
@@ -65,6 +72,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
 
     // ---- state ----
     private static readonly List<SmsNpc> All = new();
+    public static IReadOnlyList<SmsNpc> Everyone => All;     // Mario's take search (hitNpc) reads the stage's NPCs here
     private static SmsTalkWindow _window;                // one window for the stage (the director's)
     private Mario _mario;
     private Node3D _model; private AnimationPlayer _anim; private Skeleton3D _skel; private SmsNpcNeck _neck;
@@ -84,6 +92,12 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private int _colorIdx;
     private bool _talkable;                              // LIVE_FLAG_UNK20000
     private bool _talking, _windowOpen;
+    private Mario _holder; private SmsNpcHoldProxy _holdProxy;      // mHolder / unk158 (TTakeActor)
+    private float _angleDiffWhenTaken;                              // mAngleYDiffWhenTaken (radians): his yaw - ours at the take
+    private int _posBlendTicks; private Vector3 _posBlendFrom;      // TNpcInbetween::startPosBlend: PosInbetweenFrame frames (x4 ticks) into his hands
+    private int _noCollisionTicks;                                  // unk1DC: HIT_FILTER_NO_COLLISION for 15 frames after the release
+    private bool _collisionOff; private uint _layerSaved;           // the hit filter: the capsule's layer off (he is not pushed), his body excepted
+    private bool _thrown; private Vector3 _thrownVel; private int _thrownMoves;   // LIVE_FLAG_UNK10000000 + mVelocity from releaseTaken_, until the landing zeroes it
     private Vector3 _modelBaseScale = Vector3.One;
     private int _needTurnToFirst;
     private readonly Random _rng = new();
@@ -91,6 +105,15 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     public Nerve CurrentNerve => _cur;
     public bool Talkable => _talkable;
     public bool IsTalking => _talking;
+    public bool IsHeld => _holder != null;
+    public bool IsThrown => _thrown;
+    /// <summary>The receive cylinder Mario's take test reads (isTakeSituation: his DamageRadius against the object's).</summary>
+    public float HitRadiusUnits => Profile != null ? Profile.DamageRadius : 100f;
+    public float HitHeightUnits => Profile != null ? Profile.DamageHeight : 200f;
+    /// <summary>isNowCanTaken: the flag, no holder, collision on (not the 15 frames after a release), not talking, a nerve the take may
+    /// interrupt (isNerveCanGoToTaken: the wander / wait / approach / turn / wet family -- not Talk, not Mad).</summary>
+    public bool IsNowCanTaken() => CanBeTaken && Profile != null && _holder == null && !_collisionOff && !_talking && IsInsideTree()
+        && (_cur == Nerve.GraphWander || _cur == Nerve.UTurn || _cur == Nerve.GraphWait || _cur == Nerve.WaitMarioApproach || _cur == Nerve.TurnToMario || _cur == Nerve.Wet);
     public string CurrentClip => _clip;
     public float MarchSpeed => _marchSpeed;
     public int ColorIdx => _colorIdx;
@@ -307,6 +330,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
             case Nerve.Talk: TalkIn(); break;
             case Nerve.Wet: WetIn(); break;
             case Nerve.Mad: MadIn(); break;
+            case Nerve.Taken: TakenIn(); break;      // TNerveNPCWaitContinue at time 0 with a holder: npcTakenIn
         }
     }
 
@@ -320,15 +344,31 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (back == Nerve.WaitMarioApproach || back == Nerve.GraphWait || back == Nerve.TurnToMario) WaitIn();
     }
 
+    private float _tickAccum;                                       // SmsUnits.TicksFor: two 120 Hz ticks a 60 Hz physics frame
+
     public override void _PhysicsProcess(double delta)
     {
         if (Profile == null) return;
         if (_mario == null) _mario = GetTree().GetFirstNodeInGroup("player") as Mario;
-        // updateForbidCount_
+        int n = SmsUnits.TicksFor(delta, ref _tickAccum);              // TLiveActor: every 120 Hz tick of the frame (pass 83; 82 ran one a frame)
+        if (_holder != null) { for (int i = 0; i < n; i++) TickHeldClocks(); TickHeld(); return; }   // perform with mHolder: no bind
+        for (int i = 0; i < n; i++)
+        {
+            Tick();
+            if (_holder != null) { TickHeld(); return; }               // taken inside the frame: the held path owns the rest of it
+        }
+        Move();
+        if (_cursor != null) _cursor.Visible = _talkable && !_talking && NearestTalkable() == this;
+    }
+
+    /// <summary>One 120 Hz tick: moveObject (updateForbidCount_, the trample, the hit checks, changeNerveProc_'s talk accept) and the spine.</summary>
+    private void Tick()
+    {
         if (_talkForbid > 0) _talkForbid--;
         if (_walkForbid > 0) _walkForbid--;
+        if (_noCollisionTicks > 0 && --_noCollisionTicks == 0) SetCollisionOff(false);   // unk1DC ran out: the hit filter back on
         UpdateTrample();
-        HitCheckMario();
+        if (!_collisionOff) HitCheckMario();                           // HIT_FILTER_NO_COLLISION: his hit checks skip us
         TalkCheck();
         _nerveTime++;
         switch (_cur)
@@ -341,16 +381,17 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
             case Nerve.Talk: TickTalk(); break;
             case Nerve.Wet: TickWet(); break;
             case Nerve.Mad: TickMad(); break;
+            case Nerve.Taken: break;
         }
-        Move();
-        if (_cursor != null) _cursor.Visible = _talkable && !_talking && NearestTalkable() == this;
     }
 
     /// <summary>TLiveActor::bind for an NPC: the march along the facing (units/tick -> m/s), gravity when airborne, the floor otherwise.</summary>
     private void Move()
     {
         Vector3 v = Velocity;
-        Vector3 f = DirOf(YawRad) * SmsUnits.TickSpeedToMps(_marchSpeed);
+        if (_thrown && _thrownMoves > 0 && IsOnFloor()) { _thrown = false; v = Vector3.Zero; _thrownVel = Vector3.Zero; }   // bind: on the ground mVelocity.set(0,0,0)
+        if (_thrown) _thrownMoves++;
+        Vector3 f = _thrown ? _thrownVel : DirOf(YawRad) * SmsUnits.TickSpeedToMps(_marchSpeed);
         v.X = f.X; v.Z = f.Z;
         if (!IsOnFloor()) v.Y -= SmsUnits.TickAccelToMps2(SmsParams.Npc.GravityY) * (float)GetPhysicsProcessDeltaTime();
         else v.Y = Mathf.Max(v.Y, -0.01f);
@@ -530,7 +571,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// <summary>changeNerveProc_'s accept test (+ findNearestTalkNPC's Mario conditions): sets LIVE_FLAG_UNK20000 "talkable".</summary>
     private void TalkCheck()
     {
-        bool can = CanTalk && Lines != null && Lines.Length > 0 && _talkForbid == 0 && !_talking && _mario != null
+        bool can = CanTalk && !CanBeTaken && Lines != null && Lines.Length > 0 && _talkForbid == 0 && !_talking && _mario != null
             && (_cur == Nerve.GraphWander || _cur == Nerve.UTurn || _cur == Nerve.GraphWait || _cur == Nerve.TurnToMario || _cur == Nerve.Wet || _cur == Nerve.Mad || _cur == Nerve.WaitMarioApproach);
         if (can)
         {
@@ -633,8 +674,86 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         Pop();
     }
 
+    // ------------------------------------------------------------------ taken (TTakeActor: Mario's HIT_MESSAGE_TAKE)
+    /// <summary>behaveToBeTaken_ (NpcChange.cpp 240): the yaw difference to him is kept (mAngleYDiffWhenTaken), the position blends into his
+    /// hands (startPosBlend, PosInbetweenFrame 6 frames), the hit filter goes NO_COLLISION (his body is not pushed by the capsule), the
+    /// walk / talk flags clear, the nerve is set to WaitContinue -> with a holder: npcTakenIn (the TAKEN clip, resetToWait).</summary>
+    public void SmsTaken(Mario holder, SmsNpcHoldProxy proxy)
+    {
+        if (holder == null || _holder != null) return;
+        if (_talking) EndTalk();
+        _mario = holder; _holder = holder; _holdProxy = proxy;
+        _angleDiffWhenTaken = Mathf.Wrap(YawOf(holder.SmsFacingDir()) - YawRad, -Mathf.Pi, Mathf.Pi);
+        _posBlendFrom = GlobalPosition; _posBlendTicks = SmsParams.Npc.PosInbetweenFrame * SmsUnits.TicksPerFrame;
+        _thrown = false; _thrownVel = Vector3.Zero; Velocity = Vector3.Zero; _marchSpeed = 0f;
+        _trampleAmp = 0f; _trampleShake = 0; _trampleToMad = 0; if (_model != null) _model.Scale = _modelBaseScale;
+        _noCollisionTicks = 0;
+        SetCollisionOff(true);
+        _stack.Clear();
+        Enter(Nerve.Taken);
+        if (DebugPrint) GD.Print($"[SMS npc] {Name}: taken (yaw diff {Mathf.RadToDeg(_angleDiffWhenTaken):F0} deg)");
+    }
+
+    private void TakenIn()
+    {
+        Play(Profile.ClipTaken);
+        ResetToWait();
+    }
+
+    /// <summary>TBaseNPC::perform with mHolder: mPosition = the taking matrix's translation, mRotation.y = his yaw - the difference at the
+    /// take; execPosInbetween (once a frame) eases the first 6 frames from the spot he lifted us at. No bind, no hit checks.</summary>
+    private void TickHeldClocks()
+    {
+        _nerveTime++;
+        if (_posBlendTicks > 0) _posBlendTicks--;
+    }
+
+    private void TickHeld()
+    {
+        if (!IsInstanceValid(_holder) || _holdProxy == null || !IsInstanceValid(_holdProxy)) { ReleaseTaken(); return; }
+        Vector3 hand = _holdProxy.GlobalPosition;
+        Vector3 pos = hand;
+        int frames = _posBlendTicks / SmsUnits.TicksPerFrame;         // the frame the game's blend is on (it steps on the frame's last tick)
+        if (frames >= 1) pos = hand + (_posBlendFrom - hand) * (frames / (float)SmsParams.Npc.PosInbetweenFrame);
+        GlobalPosition = pos;
+        Rotation = new Vector3(0f, Mathf.Wrap(YawOf(_holder.SmsFacingDir()) - _angleDiffWhenTaken, -Mathf.Pi, Mathf.Pi), 0f);
+        Velocity = Vector3.Zero;
+        if (_cursor != null) _cursor.Visible = false;
+    }
+
+    /// <summary>His hold ended (ensureTakeSituation / the proxy's release): releaseTaken_.</summary>
+    public void SmsReleased() => ReleaseTaken();
+
+    /// <summary>releaseTaken_ (NpcChange.cpp 216): mVelocity = (ThrowSpeedXZ sin, ThrowSpeedY, ThrowSpeedXZ cos) of HIS yaw -- the same for a
+    /// throw and a put-down -- LIVE_FLAG_UNK10000000 on, unk1DC = 15 frames of no collision, the nerve set to WaitMarioApproach (its time 0:
+    /// npcWaitIn). The flight is bind's: gravity a tick, the velocity kept whole until the ground zeroes it.</summary>
+    private void ReleaseTaken()
+    {
+        Mario holder = _holder;
+        _holder = null; _holdProxy = null; _posBlendTicks = 0;
+        Vector3 f = holder != null && IsInstanceValid(holder) ? holder.SmsFacingDir() : DirOf(YawRad);
+        f.Y = 0f; f = f.LengthSquared() > 1e-6f ? f.Normalized() : DirOf(YawRad);
+        _thrownVel = f * SmsUnits.TickSpeedToMps(SmsParams.Npc.ThrowSpeedXZ) + Vector3.Up * SmsUnits.TickSpeedToMps(SmsParams.Npc.ThrowSpeedY);
+        _thrown = true; _thrownMoves = 0;
+        Velocity = _thrownVel;
+        _noCollisionTicks = SmsParams.Npc.ReleaseNoCollisionFrames * SmsUnits.TicksPerFrame;
+        _stack.Clear();
+        Enter(Nerve.WaitMarioApproach);                               // its time 0 turns a Pianta back to its placed yaw, in the air as the game does
+        if (DebugPrint) GD.Print($"[SMS npc] {Name}: released -- flies {SmsParams.Npc.ThrowSpeedXZ} / {SmsParams.Npc.ThrowSpeedY} u/tick along his facing");
+    }
+
+    /// <summary>HIT_FILTER_NO_COLLISION in Godot terms: the capsule leaves its layer (nothing is pushed by it, Mario's hit checks skip it) and
+    /// Mario's body is excepted from its own MoveAndSlide; the mask stays so it still stands on the map.</summary>
+    private void SetCollisionOff(bool off)
+    {
+        if (off == _collisionOff) return;
+        _collisionOff = off;
+        if (off) { _layerSaved = CollisionLayer; CollisionLayer = 0; if (_mario != null) AddCollisionExceptionWith(_mario); }
+        else { CollisionLayer = _layerSaved; if (_mario != null) RemoveCollisionExceptionWith(_mario); }
+    }
+
     // ------------------------------------------------------------------ water
-    public void SmsSprayedByWater(Vector3 hitPos) => Sprayed();
+    public void SmsSprayedByWater(Vector3 hitPos) { if (!_collisionOff) Sprayed(); }   // HIT_FILTER_NO_COLLISION: no hit pairs while held / just released
 
     /// <summary>behaveToHitObject_(WATER_SPRAY): isNerveCanGoToWet (not already wet, not in a talk's first 4 ticks) -> pushNerve(Wet).</summary>
     private void Sprayed()
