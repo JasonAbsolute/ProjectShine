@@ -173,7 +173,12 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (Engine.IsEditorHint()) { CallDeferred(nameof(EditorPreviewOutfit)); return; }   // [Tool]: the outfit preview, nothing else runs here
         All.Add(this);
         _mario = GetTree().GetFirstNodeInGroup("player") as Mario;
-        Profile ??= new SmsNpcProfile();
+        if (Profile == null)
+        {
+            // pass 91: his Level carried 'Profile = null' overrides the editor wrote while the cast failed; the default is a male Pianta's
+            GD.PushError($"[SMS npc] {Name}: Profile is null (an instance override? revert it in the inspector) -- running on the default profile, whose clips are a male Pianta's");
+            Profile = new SmsNpcProfile();
+        }
         _firstYaw = Rotation.Y;
         _model = GetNodeOrNull<Node3D>(ModelPath);
         if (_model != null)
@@ -513,7 +518,12 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// <summary>requestNpcAnm_ with NPC_STOP_MOTION_BLEND_ON = a MotionBlendFrame (20 frame = 0.33 s) blend; OFF = a cut.</summary>
     private void Play(string clip, bool blend = true, float rate = 1f)
     {
-        if (_anim == null || string.IsNullOrEmpty(clip) || !_anim.HasAnimation(clip)) { _clip = clip ?? ""; return; }
+        if (_anim == null || string.IsNullOrEmpty(clip) || !_anim.HasAnimation(clip))
+        {
+            if (_anim != null && !string.IsNullOrEmpty(clip) && _warnedClips.Add(clip))   // pass 91: the female on a male profile stood in her rest pose with no word
+                GD.PushWarning($"[SMS npc] {Name}: no clip '{clip}' in {_model?.Name} (profile {Profile?.ResourceName}) -- the model keeps its pose");
+            _clip = clip ?? ""; return;
+        }
         if (_clip == clip && _anim.IsPlaying()) { _anim.SpeedScale = rate; return; }
         _clip = clip;
         _anim.Play(clip, blend ? SmsParams.Npc.MotionBlendFrame / 60f : 0f, rate);
@@ -571,6 +581,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     }
 
     private float _tickAccum;                                       // SmsUnits.TicksFor: two 120 Hz ticks a 60 Hz physics frame
+    private readonly HashSet<string> _warnedClips = new();          // pass 91: one warning per missing clip name
 
     public override void _PhysicsProcess(double delta)
     {

@@ -5457,3 +5457,43 @@ Build 0 errors, boot ALL OK.
   screenshot is needed.
 - Verified: both scenes load in the headless boot (ALL OK, no scene / shader errors); the look is his to judge (the dust ring should now
   sit on the wall he kicked, not on the floor).
+
+## SMS pass 91: the editor's InvalidCastException on every NPC, the female's T-pose, the spin rings compounding
+
+- THE CAST ERRORS (his output: `Unable to cast object of type 'Godot.Resource' to type 'SmsNpcOutfitCatalog'` at SmsNpc.SetGodotClassPropertyValue,
+  once per NPC, again on every inspector edit): pass 88 made SmsNpc a [Tool] script, and its two typed resource exports (Profile: SmsNpcProfile,
+  Outfit: SmsNpcOutfitCatalog) point at C# Resource classes that were NOT [Tool]. In the editor a non-tool C# script gets only a placeholder
+  instance (csharp_script.cpp instance_create: `!tool && !is_scripting_enabled` -> PlaceHolderScriptInstance), so the loaded .tres comes back to
+  managed code as a plain Godot.Resource and the generated setter's cast throws (godotengine/godot #119603, open). The game process never sees
+  it (the headless boot was clean), the editor does on every scene load and every "Set Outfit".
+  FIX: [Tool] on SmsNpcProfile, SmsNpcOutfitCatalog, SmsNpcOutfitSlot (the catalog's typed Slots array casts each element), SmsNpcPart and
+  SmsNpcPartMaterial (EditorPreviewOutfit instances part scenes: a non-tool part came back as a plain Node3D, so the pass-88 preview showed
+  nothing). All five are data classes with no _Ready / _Process of their own -- nothing new runs in the editor.
+- THE FEMALE'S T-POSE ("T posing but still looks at Mario"): a consequence of the above. While the casts failed, the editor's SmsNpc instances
+  held Profile = null and Outfit = null, and when he saved the Level it wrote those as instance overrides on all three NPCs (Level.tscn lines
+  75 / 76, 301 / 303, 308 / 309: `Profile = null`, `Outfit = null`). At run time `Profile ??= new SmsNpcProfile()` fell back to the class
+  defaults -- a male Pianta's clip names -- so the female asked her player for 'mom_wait', which mow_model lacks, and Play() returned without a
+  word: rest pose. Her neck tracking is a separate modifier on a bone both models have, so she still looked at him. The two males happen to
+  equal the default profile and looked fine; all three lost their outfit catalog (no dropdowns, no rolls).
+  The Level is HIS file with his editor open: the six override lines are for him to revert (select each NPC, the revert arrow on Profile and
+  Outfit) or for me once the editor is closed. Verified: PiantaFemale.tscn instanced on its own plays mow_wait (probe); the Level's three
+  NPCs now report the null Profile as an error naming the fix, and the female's missing clip as a warning (both new, below).
+- Guards in SmsNpc (pass 91): a null Profile is a GD.PushError naming the node and the inspector revert (then the old fallback); Play() of a
+  clip the model lacks warns once per clip name (`no clip 'mom_wait' in Model (profile ...)`) instead of silently keeping the pose.
+- THE SPIN JUMP RINGS ("looks off", his spinJumpRef.png = the game): two things. (1) SmsSpinJumpBlur.ScaleQuads did `q.Size *= SizeScale` on
+  the scene's QuadMesh sub-resources, which are SHARED through the cached PackedScene -- every re-instance (a death's ReloadCurrentScene,
+  Mario.cs 14732 / 14742) multiplied the same mesh again: measured 1.343 -> 2.01 -> 3.02 -> 4.53 m over three instances (x1.5 each). After a
+  few deaths the rings were several metres across. FIX: the two QuadMeshes are resource_local_to_scene (gen_fx.py + SpinJumpBlur.tscn) and
+  ScaleQuads sets size = (base captured once) x SizeScale -- idempotent; measured 1.343 / 0.739 on all three instances. (2) SizeScale's
+  default returns to 1.0 = the game's quads (100 / 55 units, then x 0..2 per ring at random as ms_m_blur2's ESP1 says -- rndm 0x7FFF, JPADraw.cpp
+  242 `mScaleOut * (RF * randomScale + 1)`, RF in [-1, 1)). The 1.5 was pass 30's deviation at his word when the rings were a FIXED 100 units
+  (radius 45 u, inside his torso); the random size has done that job since pass 78, and 1.5 on top made the biggest rings 3x the game's.
+  The knob stays on Player.tscn's SpinJumpBlur instance (DEVIATION, his to set). Re-read for this: ms_m_blur2 / blur2sp carry no scale curve
+  (in 0 / out 1: flat), rotation 90 deg fixed, no spin; the bound matrix is RT only (TMarioParticleManager::emitAndBindToMtxPtr, param 1:
+  INFO_FLAG_BIND_TO_RT_MTX) -- no scale from Mario's matrix.
+- Also committed: the editor's rewrite of OutfitPianta.tres / OutfitPiantaFemale.tres / PiantaMale.tres (uids added, default-valued fields
+  dropped -- value-identical) and the two .cs.uid sidecars it generated for the pass-88 scripts, so the .tres uids resolve on a fresh clone.
+- TELL HIM: build the hammer, then CLOSE AND REOPEN the project once (the editor's already-loaded placeholder resources do not become real on
+  an assembly reload); then revert the six null overrides in the Level. The outfit dropdowns and the hat preview appear after that.
+- Verified: build 0 errors; boot [SMS selftest] ALL OK (the three new NPC errors are the Level's overrides, by design); probes: the female
+  alone on mow_wait, blur sizes constant over three instances; probes and logs removed before the commit.

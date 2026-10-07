@@ -5,7 +5,7 @@ using Godot;
 /// (<c>mat_color</c>); 1 = GX_TEVREG0 (<c>c0</c>); 2 = GX_TEVREG1 / REG2 (<c>c1</c> from <see cref="Table0"/>, <c>c2</c> from
 /// <see cref="Table1"/>); -1 = no colour change. The NPC's part colour index (one of three, by the part's channel) picks the row.
 /// Values are GX S10 / 255 and may exceed 1, as the game's do.</summary>
-[GlobalClass]
+[Tool, GlobalClass]   // [Tool] (pass 91): see SmsNpcProfile
 public partial class SmsNpcPartMaterial : Resource
 {
     [Export] public string MaterialName = "";

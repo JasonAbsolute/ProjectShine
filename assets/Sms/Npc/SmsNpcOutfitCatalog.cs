@@ -6,7 +6,7 @@ using Godot;
 /// from its placement word (TNpcParts: bit i of the stage data picks slot i) -- these dropdowns ARE that word, per instance, and "Random"
 /// is the DEVIATION of pass 85 kept per slot. Joints the parts hang on: 'kubi' (the head: hats, glasses, the moustache), 'body_jnt' (the
 /// neck / chest: lapel, tie, the luggage), 'handR_jnt' (the W's arrows -- a thing held), 'yashi_jnt' (the W's flower).</summary>
-[GlobalClass]
+[Tool, GlobalClass]   // [Tool] (pass 91): see SmsNpcProfile
 public partial class SmsNpcOutfitCatalog : Resource
 {
     [Export] public Godot.Collections.Array<SmsNpcOutfitSlot> Slots = new();

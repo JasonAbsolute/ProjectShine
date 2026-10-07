@@ -6,7 +6,7 @@ using System.Collections.Generic;
 /// None / Random / each part here (named from its scene file: HatA.tscn -> "Hat A"). Add your own part scene (any Node3D with
 /// SmsNpcPart and a Joint) to <see cref="Parts"/> and it is a choice. <see cref="Odds"/> is the chance a Random slot gets something
 /// (scaled by the NPC's RandomOutfitDensity / 0.5); <see cref="Together"/> hands out every part of the slot at once (the W's two arrows).</summary>
-[GlobalClass]
+[Tool, GlobalClass]   // [Tool] (pass 91): see SmsNpcProfile
 public partial class SmsNpcOutfitSlot : Resource
 {
     [Export] public string Name = "Hat";

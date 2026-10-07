@@ -1,81 +1,13 @@
-[gd_resource type="Resource" script_class="SmsNpcProfile" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="SmsNpcProfile" format=3 uid="uid://3wuso3tbylaw"]
 
-[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcProfile.cs" id="1_prof"]
+[ext_resource type="Script" uid="uid://8k1ifx6lo5lh" path="res://assets/Sms/Npc/SmsNpcProfile.cs" id="1_prof"]
 
 [resource]
 resource_name = "PiantaMale"
 script = ExtResource("1_prof")
-Kind = 0
-Trampled = true
-GetsMad = true
-ReactsToWater = true
-TurnsToMarioOnApproach = false
-TurnsToMarioWhenTalking = true
-AttackRadius = 100.0
-AttackHeight = 200.0
-DamageRadius = 100.0
-DamageHeight = 200.0
-BodyHeight = 230.0
-CursorHeight = 30.0
-LookatHeight = 40.0
-CircleShadowSize = 120.0
 MinWalkAnmRate = 0.1
-MaxWalkAnmRate = 1.5
-MaxRunAnmRate = 3.0
 MinMarchSpeed = 0.2
 MaxMarchSpeed = 1.2
-MaxRunSpeed = 5.0
 RunAccel = 0.08
 MarchAccel = 0.02
 MarchDecrease = 0.1
-WalkTurnSpeed = 1.5
-WaitTurnSpeed = 1.0
-NeckTurnSearchDist = 1000.0
-NeckTurnSearchHeight = 600.0
-BodyTurnSearchDist = 250.0
-BodyTurnSearchHeight = 250.0
-BodyTurnSearchDegree = 90.0
-BodyTurnSearchAware = 300.0
-MadSearchDist = 800.0
-MadSearchHeight = 800.0
-MadSearchDegree = 240.0
-MadSearchAware = 500.0
-MadTurnSpeed = 20.0
-FirstStateTurnSpeed = 0.5
-UTurnSpeed = 3.0
-NeckMinAngleX = -3640
-NeckMaxAngleX = 0
-NeckMaxAngleY = 5460
-NeckAngleXSpeed = 500
-NeckAngleYSpeed = 700
-ClipWalk = "mom_walk"
-ClipWait = "mom_wait"
-ClipFall = "mom_fall"
-ClipRecover = "mom_recover"
-ClipStep = "mom_step"
-ClipWet = "mom_wet"
-ClipTalk = "mom_talk"
-ClipRun = "mom_run"
-ClipTaken = "mom_wait"
-ClipMad = "mom_mad"
-ClipWetAlt = "mom_wet_a"
-ClipWaitA = "mom_wait_a"
-ClipThrow = "mom_throw"
-ClipDirty = "mom_wait_yogore"
-ClipWaitFall = "mom_wait_fall"
-ClipHappy = "mom_happy"
-ClipSit = "mom_sit"
-ClipSitTalk = "mom_sittalk"
-ClipSitWet = "mom_sitwet"
-ClipWaitB = "mom_wait_b"
-ClipDance = "mom_dance"
-ClipMadLoop = "mom_madloop"
-ClipWash = "mom_wet_yogore"
-ClipAppear = "mom_appear"
-NeckBone = "kubi"
-BodyMaterial = "_hand_mat"
-BodyColors = PackedVector3Array(100, 255, 300, 120, 120, 300, 350, 300, 0, 200, 70, 0, 300, 130, 255, 255, 350, 0, 400, 255, 255, 320, 140, 0, 200, 255, 400, 400, 250, 100)
-BodyColors2 = PackedVector3Array()
-ClothMaterial = ""
-ClothColors = PackedVector3Array()
-ClothColors2 = PackedVector3Array()

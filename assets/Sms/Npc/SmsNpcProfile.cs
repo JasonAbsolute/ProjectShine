@@ -7,7 +7,7 @@ using Godot;
 /// hit cylinders (NpcInitData.cpp TNpcInitInfo) and the colour tables (NpcInitData.cpp sMonteM_BodyColorBuf and friends --
 /// GX S10 values, so a channel may exceed 255: the TEV register brightens the skin texture). Duplicate a .tres, change a number,
 /// assign it to an NPC's Profile: that is the whole customization path.</summary>
-[GlobalClass]
+[Tool, GlobalClass]   // [Tool] (pass 91): a [Tool] SmsNpc exports this type; a non-tool C# Resource is only a placeholder in the editor
 public partial class SmsNpcProfile : Resource
 {
     public enum NpcKind { PiantaMale, PiantaFemale, Toad, Other }

@@ -90,11 +90,13 @@ albedo_texture = ExtResource("3_flat")
 disable_receive_shadows = true
 
 [sub_resource type="QuadMesh" id="QuadMesh_rings"]
+resource_local_to_scene = true
 material = SubResource("StandardMaterial3D_rings")
 size = Vector2(1.343, 1.343)
 orientation = 1
 
 [sub_resource type="QuadMesh" id="QuadMesh_inner"]
+resource_local_to_scene = true
 material = SubResource("StandardMaterial3D_inner")
 size = Vector2(0.739, 0.739)
 orientation = 1
@@ -103,7 +105,7 @@ orientation = 1
 script = ExtResource("1_script")
 Rings = NodePath("Rings")
 InnerRings = NodePath("InnerRings")
-SizeScale = 1.5
+SizeScale = 1.0
 BoneName = "center"
 OffsetUnits = Vector3(0, 15, 0)
 OffsetInOwnerFrame = true

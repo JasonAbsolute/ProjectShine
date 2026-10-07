@@ -7,7 +7,7 @@ using System.Collections.Generic;
 /// colours it with the NPC's part colour index for its <see cref="ColorChannel"/> (the placement's three indices: 0 hats, 1 moustache /
 /// belts / lapel, 2 glasses -- TNpcModelData's unk28). The per-material forms and tables are baked into the scene by gen_npc_parts.py
 /// from the bmds and NpcInitData.cpp.</summary>
-[GlobalClass]
+[Tool, GlobalClass]   // [Tool] (pass 91): the editor preview instances part scenes -- a non-tool node comes back as a plain Node3D
 public partial class SmsNpcPart : Node3D
 {
     [Export] public string Joint = "kubi";
