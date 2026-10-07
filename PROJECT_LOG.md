@@ -5403,3 +5403,29 @@ Build 0 errors, boot ALL OK.
   Luggage + Tie on body_jnt from the choices, the W's Together arrows on handR_jnt with a certain Random flower, the Toad's sunglasses, an
   ExtraPart of another species on the shared joint with a hand-placed Hat G keeping its slot out of the roll, 15 / 30 moustaches at 0.35,
   RandomOutfit dressing 20 / 20 with 15 hats and never two, the nerves running under the [Tool] script. Build 0 errors, boot ALL OK.
+
+## SMS pass 89 -- the pause menu (Jaysonn: the sparks "not exploding", the stick, START)
+
+- **The sparks explode now, like the game's.** jpa_dump.py had printed every emitter's ROTATION as if the three shorts were BAM; they are
+  DEGREES (JPAEmitter.cpp 204: mRot x 182 -> BAM, Rz Ry Rx on the positions with the scale and on the velocities, calcEmitterGlobalParams).
+  ms_2d_pause_sel's emitter is rotated (90, 0, -12): its Circle r 15, authored in XZ, stands up into the 2D screen's XY plane and tilts
+  like the menu pane, so the 14 sparks (FixedInterval: i x 65536 / 14) fly OUT radially at 10 px/f under 0.85/f drag for 25 frames -- the
+  sunburst of his pauseRef.png. Pass 80 had read the rotation as 0.49 degrees and laid the circle edge-on: a line of sparks sliding sideways.
+  The scale (4 x width / 129, 1, 1) applies before the rotation and to the positions only (unkFC vs unkCC): an ellipse along the item. ESP1's
+  scale is DISABLED (isEnableScale false): the 10 x 25 px streak (DirBillboard along the flight) keeps its size; alpha 1 to 50 % then -> 0;
+  colour (255, 255, 72) -> (255, 39, 0) over the life. PauseSparks.gdshader (new, a particles shader: the fixed angles, the radial launch, the
+  exponential drag integrated at 60 Hz, the quad along the velocity) on PauseSparks.tscn (GPUParticles2D, local coords); SmsPauseMenu sets
+  rim_scale_x per burst and the node's rotation to the item's (-12 deg).
+- **The cursor's stick** (DEVIATION, his ask): the stick is a menu button once past MenuStickOn (0.3; the game's JUTGamePad CStick::getButton
+  uses 0.5, JUTGamePad.cpp 372) and released again below MenuStickOff (0.15), one move per press (the pad's trigger; the game sets no repeat
+  mask for the main stick) -- read from the actions' RAW strength, so the InputMap's deadzone no longer decides and a D-pad bound to them reads 1.
+- **START resumes** (DEVIATION, his ask, `StartResumes` on the menu, default on): START in the open menu leaves it like B whatever the cursor
+  is on. The game's START is MENU_A -- it confirms the item (PauseMenu2.cpp 342), which on SAVE ran the save and the menu's dip (his "the menu
+  kinda reloads"). Off = the game. A still confirms.
+- LEGACY RETIRED: the ParticleProcessMaterial sparks with the rim / normal point textures (the directed-points trick of pass 80).
+- Drive 89 (13/13, removed; the checks ran from a PhysicsFrame handler since the open menu pauses Mario's tick): START opened the menu with
+  the tree paused, the first burst with the shader material and rim_scale_x 5.82 = 4 x 188 / 129 at the item's tilt -12 with 14 one-shot
+  particles; 0.2 did not move the cursor, 0.35 did once, held 80 frames no second move, eased to 0.2 still held, released then up 0.35 back,
+  a full push down again; START on SAVE closed the menu and unpaused with nothing confirmed, the sparks hidden. Build 0 errors, boot ALL OK.
+  Not touched: PauseSmoke.tscn (ms_2d_pause_smo has the same (90, 0, 0) rotation -- its one puff per letter would spawn anywhere on a
+  circle around the letter instead of on a line; the file carries his edits).

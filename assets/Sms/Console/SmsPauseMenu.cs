@@ -22,8 +22,10 @@ using Godot;
 /// ms_2d_pause_sel at bounce 3) -- THE SPARKS (pass 80): TPauseMenu2 (441-457) creates emitter 0x1FA at the selected item's global
 /// bounds centre when its bounce clock hits mEffectKeyFrame (3: 6 frames into every 71-frame pulse), scaled (4 x width / 129, 1, 1) so
 /// the 14 sparks spawn along the item's width, and force-deletes it when the cursor moves (402-408, 431-434) -- here one
-/// PauseSparks.tscn (GPUParticles2D, the .jpa's numbers) under SmokeRoot, restarted at the item's centre with emission_shape_scale.x
-/// = 4 x width / 129, hidden on a move. The scene: assets/Sms/Console/PauseMenu.tscn under Mario.
+/// PauseSparks.tscn (GPUParticles2D with PauseSparks.gdshader, the .jpa's numbers; pass 89: the emitter is rotated (90, 0, -12) degrees,
+/// so its circle stands in the screen and the 14 sparks fly OUT radially, a sunburst tilted like the pane -- pass 80 had read the rotation
+/// as 0.49 degrees and laid them on a line) under SmokeRoot, restarted at the item's centre with rim_scale_x = 4 x width / 129 and the
+/// item's tilt, hidden on a move. The scene: assets/Sms/Console/PauseMenu.tscn under Mario.
 /// </summary>
 public partial class SmsPauseMenu : CanvasLayer
 {
@@ -63,6 +65,15 @@ public partial class SmsPauseMenu : CanvasLayer
     /// <summary>TPauseMenu2::mEffectKeyFrame (3) and mEffectStretch (129): the bounce clock's value that fires the sparks, and the item
     /// width the emitter's (4, 1, 1) scale is drawn for -- setEmitterScale(4 x width / mEffectStretch, 1, 1).</summary>
     public const float SparkBounce = 3f, SparkStretch = 129f;
+    /// <summary>DEVIATION (his ask, pass 89): the stick moves the cursor once it passes this (the game's JUTGamePad CStick::getButton makes the
+    /// stick a button at |pos| >= 0.5, JUTGamePad.cpp 372; one move per press, mRepeat with no repeat mask = the trigger) and is released
+    /// again below <see cref="MenuStickOff"/>. 0.5 / 0.25 would be the game's feel; he asked for 0.3.</summary>
+    [Export(PropertyHint.Range, "0.05,1")] public float MenuStickOn = 0.3f;
+    [Export(PropertyHint.Range, "0,1")] public float MenuStickOff = 0.15f;
+    /// <summary>DEVIATION (his ask, pass 89): START in the open menu resumes play whatever the cursor is on. The game's START is MENU_A: it
+    /// confirms the item (MarDirectorDirect / PauseMenu2.cpp 342: MEANING_START | MEANING_MENU_A), so START on SAVE saved. Off = the game.</summary>
+    [Export] public bool StartResumes = true;
+    private int _stickDir;                                                     // the stick as a button: -1 up, 0, +1 down (CStick::getButton)
     [Export] public Label StageName, ScenarioName;
     /// <summary>The selected item's colour (tx_1's white: 3cff3c).</summary>
     [Export] public Color ItemColor = new Color(0x3c / 255f, 1f, 0x3c / 255f);
@@ -202,8 +213,11 @@ public partial class SmsPauseMenu : CanvasLayer
             return;
         }
         if (_state != State.Open)
-            foreach (string act in new[] { PauseAction, "button_a", "button_b", "Lstick_down", "Lstick_up" })
+        {
+            foreach (string act in new[] { PauseAction, "button_a", "button_b" })
                 Pressed(act); // keep the edges current while the menu moves
+            MenuStickEdge();  // and the stick's button state (a stick held through the opening is no move)
+        }
         float units = (float)delta * 60f * SmsHud.Anim; // mFadeAnim += 0.5 a console frame (120 Hz ticks here)
         switch (_state)
         {
@@ -315,15 +329,16 @@ public partial class SmsPauseMenu : CanvasLayer
             _sparks.Name = "Sparks";
             _sparks.Emitting = false;
             if (_sparks.ProcessMaterial != null)
-                _sparks.ProcessMaterial = (Material)_sparks.ProcessMaterial.Duplicate(); // the width scale is set per item
+                _sparks.ProcessMaterial = (Material)_sparks.ProcessMaterial.Duplicate(); // rim_scale_x is set per item
             SmokeRoot.AddChild(_sparks);
         }
         TextureRect it = Items[i];
         Vector2 c = SmokeRoot.ToLocal(it.GetGlobalTransform() * (it.Size * 0.5f));  // getGlobalBounds's centre (the bounce keeps it)
         float width = it.Size.X;                                                     // getWidth(): the pane's bounds as reformed last tick (the bounce's +hw each side)
-        if (_sparks.ProcessMaterial is ParticleProcessMaterial pm)
-            pm.EmissionShapeScale = new Vector3(4f * width / SparkStretch, 1f, 1f);
+        if (_sparks.ProcessMaterial is ShaderMaterial sm)
+            sm.SetShaderParameter("rim_scale_x", 4f * width / SparkStretch);   // setEmitterScale(4 x width / 129, 1, 1): the rim along the item
         _sparks.Position = c;
+        _sparks.Rotation = it.Rotation;                                       // the emitter's Rz(-12): the 2D screen's tilt of the menu pane (the item's)
         _sparks.Visible = true;
         _sparks.SpeedScale = SmsHud.Anim;
         _sparks.Restart();
@@ -397,10 +412,34 @@ public partial class SmsPauseMenu : CanvasLayer
         it.PivotOffset = it.Size * 0.5f;
     }
 
+    /// <summary>The stick as a menu button (JUTGamePad::CStick::getButton + the pad's mTrigger): pressed once past MenuStickOn, released below
+    /// MenuStickOff, one move per press -- the raw strength of the two actions (the InputMap's deadzone does not decide; a D-pad bound to
+    /// them reads 1). Returns -1 up / +1 down on the press edge, else 0.</summary>
+    private int MenuStickEdge()
+    {
+        float v = (InputMap.HasAction("Lstick_down") ? Input.GetActionRawStrength("Lstick_down") : 0f) - (InputMap.HasAction("Lstick_up") ? Input.GetActionRawStrength("Lstick_up") : 0f);
+        int now = _stickDir;
+        if (now == 0) { if (v >= MenuStickOn) now = 1; else if (v <= -MenuStickOn) now = -1; }
+        else if (Mathf.Abs(v) < MenuStickOff || Mathf.Sign(v) != now) now = 0;   // let go (or flipped: through the centre first)
+        int edge = now != 0 && now != _stickDir ? now : 0;
+        _stickDir = now;
+        return edge;
+    }
+
     private void OpenTick(float units)
     {
         int cur = _selected;
-        bool start = Pressed(PauseAction), a = Pressed("button_a"), b = Pressed("button_b"), down = Pressed("Lstick_down"), up = Pressed("Lstick_up");
+        bool start = Pressed(PauseAction), a = Pressed("button_a"), b = Pressed("button_b");
+        int stick = MenuStickEdge();
+        bool down = stick > 0, up = stick < 0;
+        if (start && StartResumes)
+        {
+            // DEVIATION: START leaves the menu like B (setDrawEnd with nothing confirmed), whatever the cursor is on
+            _pressedB = true;
+            _fade = 0f;
+            _state = State.Disappearing;
+            return;
+        }
         if (start || a)
         {
             _confirmed = true;
