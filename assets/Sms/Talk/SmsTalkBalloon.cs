@@ -33,6 +33,9 @@ public partial class SmsTalkBalloon : CanvasLayer
     [Export] public SmsTalkFont Font;
     /// <summary>The frame's 448 lines on the window's height, times this (1 = the game's size; the console's own Size knob is separate).</summary>
     [Export] public float Size = 1f;
+    /// <summary>DEVIATION knob (pass 87, his "might need to be shifted up a bit" for three lines): frame units added to the game's park --
+    /// (388, 115) for TALK_A, (160, 135) for TALK_B (openTalkWindow). (0, 0) = the game; (0, -25) lifts the balloon 25 of the frame's 448.</summary>
+    [Export] public Vector2 ParkOffset = Vector2.Zero;
     [Export] public bool AutoWrap = true;                   // DEVIATION: the game's lines are pre-broken in the message data
     [Export] public string AdvanceActionA = "button_a", AdvanceActionB = "button_b";
     [Export] public bool DebugPrint = false;
@@ -443,7 +446,8 @@ public partial class SmsTalkBalloon : CanvasLayer
         float s = vp.Y / SmsHud.ScreenH * Size;
         _root.Scale = new Vector2(s, s);
         _root.PivotOffset = RootPivot;
-        Vector2 pivotOnScreen = new(SmsHud.CenterX(_rootPos.X + RootPivot.X, s, vp), (_rootPos.Y + RootPivot.Y) * s);
+        Vector2 park = _rootPos + ParkOffset;
+        Vector2 pivotOnScreen = new(SmsHud.CenterX(park.X + RootPivot.X, s, vp), (park.Y + RootPivot.Y) * s);
         _root.Position = pivotOnScreen - RootPivot;      // Godot puts the pivot at Position + PivotOffset (unscaled)
         _root.Rotation = -Mathf.DegToRad(_rootRot);
     }

@@ -11027,6 +11027,10 @@ public partial class Mario : CharacterBody3D
 
     // ---- NPC talk (pass 82): TMario::startTalking (MarioWait.cpp 14) -> MARIO_STATUS_READ_BILLBOARD, readBillboard (MarioAutodemo.cpp 43) ----
     private SmsNpc _smsTalkNpc; private bool _smsTalking; private int _smsTalkPhase;
+    private float _smsHeadTalkAngle;                     // MarioHeadCtrl's READ_BILLBOARD term (radians, negative = up), pass 87
+    /// <summary>TMarDirector's unk124 == 0 for his pad: START is read only then (MarDirectorDirect.cpp 804-822) -- during a talk the pause
+    /// menu does not open and nothing sounds (pass 87). The legacy talking state and the shine demo count as out of play too.</summary>
+    public bool SmsDirectorInPlay => !_smsTalking && stateOfMario != MarioState.talking && stateOfMario != MarioState.shineGet;
     public bool SmsIsTalking => _smsTalking;
     /// <summary>gpCamera for the talk balloon (makeMtxForTalk / makeMtxForPrevTalk / isThing).</summary>
     public SunshineCamera SmsCamera => _camera;
@@ -11153,7 +11157,14 @@ public partial class Mario : CharacterBody3D
     /// <summary>mFaceAngle.y as a direction, for the NPCs' "Mario faces me" cone (MsIsInSight with *gpMarioAngleY).</summary>
     public Vector3 SmsFacingDir() => _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : (lastFacingDirection.LengthSquared() > 1e-6f ? lastFacingDirection.Normalized() : -armature.GlobalTransform.Basis.Z);
     public void SmsTalkStart(SmsNpc npc) { _smsTalkNpc = npc; _smsTalking = true; _smsTalkPhase = 0; }
-    public void SmsTalkEnd() { _smsTalking = false; _smsTalkNpc = null; _smsTalkPhase = 0; _smsTalkSwallowA = true; }
+    public void SmsTalkEnd()
+    {
+        _smsTalking = false; _smsTalkNpc = null; _smsTalkPhase = 0; _smsTalkSwallowA = true;
+        _smsHeadTalkAngle = 0f;
+        if (_smsHeadGunRot != null) _smsHeadGunRot.Angles[0] = 0f;
+        if (animTree != null && !animTree.Active) { animPlayer.Stop(false); animTree.Active = true; }   // ma_t_wait was played directly
+        if (stateOfMario == MarioState.idle) SetMarioState(MarioState.idle);                           // readBillboard state 2: MARIO_STATUS_WAIT
+    }
     /// <summary>PAD_FLAG_TALK_SELECT (MarDirectorDirect.cpp 999 / 978): during the talk A and B belong to the window, and the pad's frame meaning is
     /// mMeaning & ~prevMeaning -- the A that closed the window is still down when his input comes back and is no new press. Here: no jump
     /// buffer from an A held over from the talk; it is his again once released.</summary>
@@ -11173,7 +11184,7 @@ public partial class Mario : CharacterBody3D
             if (dx == 0f && dz == 0f) dx += SmsUnits.UnitsToMetres(1f);
             float dist = Mathf.Sqrt(dx * dx + dz * dz), read = SmsUnits.UnitsToMetres(SmsParams.Npc.MarioReadDist);
             if (dist < read) GlobalPosition = new Vector3(np.X + dx / dist * read, me.Y, np.Z + dz / dist * read); // moveRequest
-            ForceLoop("ma_wait"); // ANIM_T_WAIT
+            SetMarioState(MarioState.idle); // ANIM_T_WAIT: the idle case plays ma_t_wait while _smsTalking (pass 87)
             _smsTalkPhase = 1;
         }
         Vector3 to = np - GlobalPosition; to.Y = 0f;
@@ -11189,6 +11200,15 @@ public partial class Mario : CharacterBody3D
             lastFacingDirection = face; _smsLatchedFacing = face;
             armature.Rotation = armature.Rotation with { Y = BaseYawFromDir(face) };   // mModelFaceAngle = mFaceAngle.y
             if (facing && _smsTalkPhase == 1) { _smsTalkPhase = 2; _smsTalkNpc.MarioFacesYou(); }
+        }
+        // MarioHeadCtrl (MarioDraw.cpp 405-418): in READ_BILLBOARD jnt_head gets Rz(-matan(horizontal, dy)) toward the NPC's focal point
+        // (getFocalPoint: its position + BodyHeight - LookatHeight) from his eye line 112 u up -- the same Rz as the gun-angle term, negative
+        // = up (mFeelDeepHeadAngle +45 looks down a drop, mFrontWallHeadAngle -45 looks up a wall). The body's yaw is readBillboard's above.
+        if (_smsHeadGunRot != null)
+        {
+            Vector3 d = _smsTalkNpc.FocalPoint - (GlobalPosition + Vector3.Up * SmsUnits.UnitsToMetres(SmsParams.Npc.MarioEyeHeight));
+            _smsHeadTalkAngle = -Mathf.Atan2(d.Y, Mathf.Sqrt(d.X * d.X + d.Z * d.Z));
+            _smsHeadGunRot.Angles[0] = _smsHeadTalkAngle;
         }
     }
 
@@ -13685,7 +13705,7 @@ public partial class Mario : CharacterBody3D
     /// normal_wg and its LAngleBase is 0; rocket_wg has no neck.</summary>
     private void SmsFluddApplyGunAngle()
     {
-        if (_smsHeadGunRot != null)
+        if (_smsHeadGunRot != null && !_smsTalking)   // MarioHeadCtrl's READ_BILLBOARD branch owns the head during a talk (SmsTalkTick)
             _smsHeadGunRot.Angles[0] = _fluddGunAngle < 0f ? 0.5f * _fluddGunAngle * SmsUnits.BamToRad : 0f; // MarioHeadCtrl: Rz(angle / 2)
         if (_fluddSprayAim != null)
             _fluddSprayAim.Angles[0] = _fluddNozzle == SmsNozzle.Spray && _fluddGunAngle < 0f ? _fluddGunAngle * SmsUnits.BamToRad : 0f;
@@ -14652,7 +14672,7 @@ public partial class Mario : CharacterBody3D
     /// jumping status; and the director must be in play -- not the Miss, a death, the shine demo or a talk.</summary>
     public bool SmsCanPause()
     {
-        if (_smsGameOver || stateOfMario == MarioState.dead || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.talking)
+        if (_smsGameOver || stateOfMario == MarioState.dead || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.talking || _smsTalking)
             return false;
         if (TryGetAirProfile(stateOfMario, out _) || !IsOnFloor())
             return false; // MARIO_STATUS_FLAG_JUMPING
@@ -17921,7 +17941,17 @@ public partial class Mario : CharacterBody3D
         switch (state)
         {
             case MarioState.idle:
-                if (UseSmsPhysics && SmsWantsDamageWait())
+                if (UseSmsPhysics && _smsTalking)
+                {
+                    // readBillboard (MarioAutodemo.cpp 63): setAnimation(ANIM_T_WAIT, 1.0) -- the talk wait, a library-only clip like the
+                    // damage wait below (pass 87; 82-86 left the WAIT clip on). SmsTalkEnd puts the tree back.
+                    if (animTree != null)
+                        animTree.Active = false;
+                    animPlayer.SpeedScale = 1f;
+                    if (animPlayer.CurrentAnimation != "ma_t_wait")
+                        animPlayer.Play("ma_t_wait");
+                }
+                else if (UseSmsPhysics && SmsWantsDamageWait())
                 {
                     // waiting(): mHealth <= 3 -> ANIM_DAMAGE_WAIT_START once, then ANIM_DAMAGE_WAIT. Library-only clips, driven
                     // directly like ma_t_wait below; SmsDamageWaitTick chains the two and lets go when something else takes over.

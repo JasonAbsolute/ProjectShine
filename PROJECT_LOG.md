@@ -5348,3 +5348,36 @@ at once, the root fading, Mario freed after 16 ticks with PA talk-forbidden; a s
 a Toad: TALK_B and the (160, 135) 20 park; <c3> / <c4> colours on the right glyphs and <w=8> slowing page 1 to 6 of 14 glyphs 40 frames in; a
 52-char line wrapped 24 / 23 / 3 with line 2's band held until line 1's last glyph; B closes. Drive 83 re-run 33/33 (the take cursor path moved).
 Build 0 errors, boot ALL OK.
+
+## SMS pass 87 -- the talk, round 2 (Jaysonn's look at 86)
+
+- **Mario talks like the game.** readBillboard (MarioAutodemo.cpp 63) plays ANIM_T_WAIT: the talk wait `ma_t_wait` now runs for the
+  whole talk (the idle case of SetMarioState plays it directly, tree off, while `_smsTalking`; passes 82-86 left `ma_wait` on). MarioHeadCtrl's
+  READ_BILLBOARD branch (MarioDraw.cpp 405-418): jnt_head gets Rz(-matan(horizontal, dy)) toward the NPC's focal point (TBaseNPC::getFocalPoint,
+  NpcBase.cpp 427: its position + BodyHeight - LookatHeight = 190 u for a Pianta) from his eye line 112 u up (`SmsParams.Npc.MarioEyeHeight`) --
+  -27.6 deg (up) at the 150 u he stands from a Pianta. Same SmsBoneRotZ as the gun-angle term, which stands aside during a talk; the end of
+  the talk puts the tree back and the head to 0.
+- **No pause during a talk.** The director reads START in its case 0 only (MarDirectorDirect.cpp 804-822): with the talk running (unk124
+  1 / 2) nothing happens, no sound either. `Mario.SmsDirectorInPlay` (a talk, the legacy talking state or the shine demo = out of play);
+  SmsPauseMenu returns before the open; SmsCanPause also refuses while `_smsTalking`.
+- **The balloon in high resolution** (his "looks blurry and kinda bad"). The game draws the 20 x 20 glyph cells and the 292 x 58 band 1:1
+  on its 640 x 448 frame; scaled x2.4 to a 1080p window every one-texel edge is a 2.4 px blur. gen_talk_hires.py resamples the disc's
+  sheets x4 with a Catmull-Rom bicubic (tex/talk_font_0_x4.png 2048 x 1024, talk_band_x4.png, talk_cursor_mark_x4.png, talk_return_mark_x4.png;
+  lossless, mipmaps on) and TalkGlyph.gdshader (new; on the glyph canvas and the nine marks) + TalkBand.gdshader sharpen the coverage back to
+  a one-pixel edge: a = smoothstep(0.5 -/+ 0.75 fwidth(c), c) -- crisp at any Size, the soft bilinear look again once minified. The shapes
+  are the disc's; `sharpness` (1) / `edge` (0.75) on both shaders. SmsTalkFont.PageScale (4): Cell() answers in texels, the drawn box stays
+  the game's 20.
+- **Three-line pages from the inspector.** `Lines` carries the MultilineText hint on its ELEMENTS now (TypeString "4/18:"): Enter in a page
+  breaks a line (the game's .bmg pages are hand-broken the same way; AutoWrap still wraps a long one). Pass 82's array-level hint left
+  every page a single-line field.
+- **ParkOffset** (DEVIATION knob, TalkBalloon.tscn root; default (0, 0) = the game's (388, 115) / (160, 135)): frame units added to the
+  park, for his "might need to be shifted up a bit".
+- LEGACY RETIRED: the WAIT clip standing in for ANIM_T_WAIT during a talk; the 1x sheets as the drawn textures (kept as the sources).
+- Drive 87 (16/16, removed): PageScale 4 on the 2048 x 1024 page, Cell('W') 80 x 80 texels, the glyph shader on the canvas and marks, the
+  x4 band / marks in their panes, ParkOffset (0, 0); ma_t_wait with the tree off and looping through the talk; the focal point 190 u; the head
+  Rz -0.4816 rad = -atan2(78.4, 150.0) exactly; a three-line page laid; START mid-talk opened nothing (the pad step on PhysicsFrame watched
+  the menu while Mario's tick would have been frozen); after the talk START opened the menu (100 frames seen open), B closed it. Build 0
+  errors, boot ALL OK.
+- Tools: pngio.py (PNG in / out without PIL), gen_talk_hires.py, preview_talk_font.py (the shader's math on the sheet, next to the 1x
+  bilinear look). jpa_dump.py: the BEM1 emitter ROTATION is three DEGREE shorts (JPAEmitter.cpp 204: x182 -> BAM), not BAM -- the pass-80
+  reading of ms_2d_pause_sel's (90, 0, -12) as (0.49, 0, -0.07) is why the pause sparks lie on a line (pass 89 fixes them).

@@ -1,11 +1,12 @@
 [gd_resource type="Resource" script_class="SmsTalkFont" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://assets/Sms/Talk/SmsTalkFont.cs" id="1_font"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Talk/tex/talk_font_0.png" id="2_page"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Talk/tex/talk_font_0_x4.png" id="2_page"]
 
 [resource]
 script = ExtResource("1_font")
 Page = ExtResource("2_page")
+PageScale = 4.0
 CellWidth = 20
 CellHeight = 20
 Width = 20

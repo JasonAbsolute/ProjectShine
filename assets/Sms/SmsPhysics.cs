@@ -264,6 +264,7 @@ public static class SmsParams
         public const float ArriveDist = 100f, ArriveDistOneWay = 50f; // TNerveNPCGraphWander: a node counts as reached inside this
         public const int MarioReadRotSp = 1024;             // autodemo.prm mReadRotSp: Mario turns to the speaker at this BAM / tick
         public const float MarioReadDist = 100f;            // readBillboard: nearer than this he is set back to this distance
+        public const float MarioEyeHeight = 112f;           // MarioHeadCtrl (MarioDraw.cpp 411): his head looks from mPosition.y + 112 at the NPC's focal point
     }
 
     public static class NameKuri

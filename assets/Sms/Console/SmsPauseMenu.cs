@@ -192,6 +192,8 @@ public partial class SmsPauseMenu : CanvasLayer
         {
             if (!GetTree().Paused && Pressed(PauseAction))
             {
+                if (_mario != null && !_mario.SmsDirectorInPlay)
+                    return; // MarDirectorDirect.cpp 804: START is read in case 0 only -- a talk (unk124 1 / 2) ignores it, silently (pass 87)
                 if (_mario == null || _mario.SmsCanPause())
                     Open();
                 else if (NotNow != null && NotNow.Stream != null)

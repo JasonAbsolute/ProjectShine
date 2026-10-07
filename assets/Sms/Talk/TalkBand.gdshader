@@ -12,6 +12,8 @@ uniform sampler2D ramp : repeat_disable, filter_linear;   // talk_band_ramp.png:
 uniform float roll = 1.0;                                  // unk234[line]
 uniform vec4 band_color : source_color = vec4(0.0, 0.0, 1.0, 1.0);   // C0 / C1 = 0000ff; the 'bac' tint 0000ff
 uniform float band_alpha = 0.6274510;                      // 0xA0 / 255 (the pane: 160 / 255, the same)
+uniform float sharpness : hint_range(0.0, 1.0) = 1.0;      // pass 87: the x4 band sheet's edge sharpened to a pixel (TalkGlyph.gdshader's trick); 0 = as sampled
+uniform float edge = 0.75;
 
 varying vec4 modulate;   // the pane's colour alpha (the root's fade reaches it through the tree), before the texture
 
@@ -20,7 +22,9 @@ void vertex() {
 }
 
 void fragment() {
-    float shape = texture(TEXTURE, UV).a;                                // message_back_0's intensity (TEXMAP1 alpha)
+    float c = texture(TEXTURE, UV).a;                                    // message_back_0's intensity (TEXMAP1 alpha), the x4 coverage
+    float w = max(fwidth(c) * edge, 0.005);
+    float shape = mix(c, smoothstep(0.5 - w, 0.5 + w, c), sharpness);
     float r = texture(ramp, vec2(clamp(UV.x + roll, 0.0, 1.0), 0.5)).a; // GX_CLAMP: past the end the last texel (0) holds
     COLOR = vec4(band_color.rgb, r * shape * band_alpha * modulate.a);
 }

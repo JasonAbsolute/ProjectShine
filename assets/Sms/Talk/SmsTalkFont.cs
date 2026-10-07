@@ -9,6 +9,9 @@ using Godot;
 public partial class SmsTalkFont : Resource
 {
     [Export] public Texture2D Page;
+    /// <summary>Texels per frame unit on <see cref="Page"/>: 1 = the disc's 20 x 20 cells as they are, 4 = the x4 Catmull-Rom sheet
+    /// (pass 87, gen_talk_hires.py) the glyph shader sharpens back to a one-pixel edge. The cell sizes and positions below stay in frame units.</summary>
+    [Export] public float PageScale = 1f;
     [Export] public int CellWidth = 20, CellHeight = 20;
     [Export] public int Width = 20, Ascent = 20, Descent = 0, Leading = 20;   // INF1
     [Export] public int FirstCode = 32;
@@ -31,11 +34,12 @@ public partial class SmsTalkFont : Resource
         kern = Kern[i]; advance = Advance[i];
     }
 
-    /// <summary>The glyph's cell on the sheet (loadImage).</summary>
+    /// <summary>The glyph's cell on the sheet (loadImage), in the page's texels (the frame-unit cell x PageScale).</summary>
     public Rect2 Cell(char c)
     {
         int i = c - FirstCode;
         if (i < 0 || i >= CellX.Length) i = 0;
-        return new Rect2(CellX[i], CellY[i], CellWidth, CellHeight);
+        float s = PageScale > 0f ? PageScale : 1f;
+        return new Rect2(CellX[i] * s, CellY[i] * s, CellWidth * s, CellHeight * s);
     }
 }

@@ -55,8 +55,11 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     [Export(PropertyHint.Range, "0,1")] public float RandomOutfitDensity = 0.5f;
     [Export] public IdleStyle Idle = IdleStyle.Wait;
     [ExportGroup("Talk")]
-    /// <summary>The pages the window shows, one string each (\n breaks a line). Empty = this NPC cannot be talked to (no cursor).</summary>
-    [Export(PropertyHint.MultilineText)] public string[] Lines = { "Welcome to Isle Delfino!", "Enjoy your stay." };
+    /// <summary>The pages the window shows, one entry each; a page is up to three lines -- Enter in the inspector breaks a line (the game's
+    /// .bmg pages are hand-broken the same way), and a long line wraps by words (the balloon's AutoWrap). Empty = this NPC cannot be
+    /// talked to (no cursor). Pass 87: the hint moved onto the ELEMENTS (TypeString "4/18:") -- the array-level MultilineText of 82 left
+    /// every page a single-line field, so no three-line page could be typed.</summary>
+    [Export(PropertyHint.TypeString, "4/18:")] public string[] Lines = { "Welcome to Isle Delfino!", "Enjoy your stay." };
     [Export] public bool CanTalk = true;
     [ExportGroup("Take")]
     /// <summary>LIVE_FLAG_UNK100000 -- in the game the stage script sets it per NPC (evSetFlagNPCCanTaken): Mario touching this NPC with B
@@ -125,6 +128,9 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     public bool IsTalking => _talking;
     /// <summary>TBaseNPC::isSmallNpc (NpcBase.cpp 250): a Toad (KINOPIO / KINOJII), a child, a Noki -- the talk camera's TALK_B and the balloon's other park.</summary>
     public bool IsSmallNpc => Profile != null && Profile.Kind == SmsNpcProfile.NpcKind.Toad;
+    /// <summary>TBaseNPC::getFocalPoint (NpcBase.cpp 427): mPosition + scale.y x (mSLBodyHeight - mSLLookatHeight) -- what Mario's head looks at
+    /// during the talk (MarioHeadCtrl) and the talk camera's look point.</summary>
+    public Vector3 FocalPoint => GlobalPosition + Vector3.Up * (Scale.Y * (Profile.BodyHeight - Profile.LookatHeight) / SmsUnits.UnitsPerMetre);
     /// <summary>The talk balloon's opening on this NPC (the director's unk124 == 2 for it).</summary>
     public bool TalkWindowOpen => _windowOpen;
     public bool IsHeld => _holder != null;
