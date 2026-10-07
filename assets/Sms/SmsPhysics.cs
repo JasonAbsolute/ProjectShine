@@ -242,6 +242,8 @@ public static class SmsParams
         public const float SitTalkAcceptDegree = 100f;
         public const float ThrowTalkAcceptDist = 200f, ThrowTalkAcceptHeight = 150f;
         public const int ThrowStartFrame = 40;
+        public const float TrampleFeetMargin = 5f;          // hitNpc's 'his feet above ours': the game's NPC rests 1 u over its ground (bind), Godot's Mario ~1.4 u over a Pianta on one floor -- a same-floor Mario is not above it
+        public const float DamageRadiusSmall = 10f;         // mSLDamageRadiusSmall (npcmontem / montew / kinopio.prm): the damage radius while Mario is airborne above the NPC (setVariableDamageRadius_)
         public const int TrampleShakeFrames = 40;           // mSLTrampleShakeFrames: the squash wobble's length
         public const float TrampleAmplitude = 0.75f;        // mSLTrampleAmplitude
         public const int TrampleVelocity = 1500;            // mSLTrampleVelocity: BAM per tick of the wobble's phase
@@ -317,6 +319,9 @@ public static class SmsParams
         public const float DamageHeight = 130f;
         public const float AttackHeight = 50f;
         public const float TrampleRadius = 100f;
+        public const float PushupRadius = 60f, PushupHeight = 180f; // setJumpingAttackArea: his attack cylinder while rising (TrampleRadius / AttackHeight falling, HoldRadius standing)
+        public const float KeepDistanceRadius = 50f;    // unk15C: his wall-check radius -- keepDistance holds him at an actor's DamageRadius + this (80 on Yoshi)
+        public const float KeepDistanceStepMax = 50f;   // keepDistance: the push is at most this many units a tick
         public const float HipdropRadius = 100f;
         public const int InvincibleTime = 300;          // ticks
         public const int RecoverTimer = 60;

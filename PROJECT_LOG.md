@@ -5214,3 +5214,65 @@ handR_jnt) under the NPC's skeleton at identity, 2.36 m over the Pianta's feet, 
 tables' row 3, the belt's c0 = its row 3, the glasses' mat_color = row 2, the moustache's c0 = row 1 with the spec form, the petals'
 mat_color = the FlowerOut row of the drawn index inside 3, the arrow on the raw lit colour, the sunglasses on the blend shader with
 their texture; the female's random indices inside 4 / 3 / 3; shaders compile (0 errors); boot ALL OK, build 0 errors.
+
+### Pass 85 -- the talk is the director's, the NPC is no floor (trample / keepDistance as TMario::hitNpc), the random outfit (DEVIATION)
+SOURCE: System/MarDirectorEvent.cpp 34-104 (findNearestTalkNPC: MARIO_STATUS_WAIT, the nearest NPC with LIVE_FLAG_UNK20000 and without
+UNK100000; findNearestTakeNPC first; movement_game: not holding, not the L camera -> TTalkCursor::associateNPC, PAD_FLAG_TALK_NPC,
+unk128 bit 1 this frame / bit 2 "last frame too", MEANING_TALK_B just pressed -> unk126 = 1), System/MarioGamePad.cpp 100 (with
+PAD_FLAG_TALK_NPC on, B's meaning is TALK_B, else MEANING_B: his own B never sees a press by a talkable NPC), MarDirectorDirect.cpp
+973-1043 (the talk state machine; PAD_FLAG_TALK_SELECT during the talk; mEnabledFrameMeaning = mMeaning & ~prevMeaning: the A that
+closed the window is no new press), NPC/NpcChange.cpp 447-540 (changeNerveProc_: the talkable flag, UNK40000 from the director ->
+pushNerve(Talk)), Player/MarioCheckCol.cpp 15-110 (hitNormal / hitNpc: a JUMPING-type status, not HIP_DROP, mVel.y < 0, the NPC's
+position below his, isBeTrampledNpc -> trampleExec, else keepDistance(actor, 0) and wantToTakeActor for a liftable one), MarioCollision.cpp
+86-175 (isTakeSituation: 3D distance <= mAttackRadius + the object's damage radius inside the 60-degree cone; trampleExec: not DIVE,
+HIT_MESSAGE_TRAMPLE -> MARIO_STATUS_TRAMPLE, ANIM_STEP1/2/3, FUMI_B / C at 0.5 for an NPC), MarioPhysics.cpp 27-94 (keepDistance: inside
+radius + unk15C he is set out to that distance along the line from the actor, at most 50 units a tick, after a wall check; mForwardVel or
+the XZ speed above mClashSpeed 40 -> PARTICLE_MS_DMG_C + changePlayerDropping(JUMP_SHORT_BACK_DOWN)), MarioMove.cpp 1615-1626 (unk15C = 50,
+80 on Yoshi), MarioInit.cpp 426 / MarioMove.cpp 225 / MarioJump.cpp 65 (his attack cylinder: HoldRadius 80 x AttackHeight 50 standing,
+TrampleRadius 100 x 50 falling, PushupRadius 60 x PushupHeight 180 rising; damage 42 x 130), Strategic/ObjHitCheck.cpp 10-67 (the pair
+test: attacker's attack cylinder vs sufferer's damage cylinder; the sufferer lands in the ATTACKER's list -- so his checkCollision sees
+an NPC through HIS attack area), NPC/NpcCollision.cpp 9-114 (initNpcObjCollision_: the NPC's cylinders from the init data; execNpcObjCollision_:
+a WALKING NPC moves itself out of what it overlaps by the overlap depth, a standing one does not; setVariableDamageRadius_: a trampled NPC's
+damage radius is mSLDamageRadiusSmall while Mario is airborne above it within 3 R; bind: mGroundHeight + 1 -- the NPC stands one unit over
+its ground), NpcBase.cpp 285-303 (isBeTrampledNpc: Piantas, Nokis, the Toads), the shipped npcmontem / montew / kinopio.prm
+(mSLDamageRadiusSmall 10) and mario.prm (mClashSpeed 40, the radii). NpcParts.cpp 47-60 (TNpcParts: slot i of twelve for bit i of the
+placement word -- the parts are the stage data's, never random).
+WHY: his report after passes 82-84: "talking to them is not working" and "when I jump directly on them I don't jump off them, Mario stands
+on their head", plus the ask for a random-outfit toggle. (1) Pass 82 read B in the NPC's own tick with Mario's SmsCanStartTalk (WAIT): the
+Level's own Pianta sits before Mario in the tree and talked, but his Pianta2 / PiantaFemale (and any NPC spawned at runtime) come after
+him -- their tick saw his B only after waiting() had turned it into TAKE_POSE (stateOfMario pickupFail), so the talk never started. Drive 85
+reproduces a human press (the SceneTree's PhysicsFrame signal, before every node) and the fix: the DIRECTOR runs at the top of HIS tick,
+before any actor, finds the cursor's NPC and starts the talk; B is TALK_B while the flag is on, so his own B sites (the held-B take, the
+standing B) are off -- order in the tree no longer matters. (2) The NPC's capsule was a Godot floor: he landed on it before his feet ever
+entered the damage cylinder, and the trample test (pass 82: his feet above HALF the NPC's height) never ran. The game has no NPC floor at
+all: THitActor cylinders, trampleExec on a jumping status falling with his feet above the NPC's, keepDistance for every other overlap.
+(3) The parts are placement data in the game; a random roll is his convenience.
+WHAT: Mario.cs -- SmsDirectorTalkCheck (movement_game at the top of the SMS block, before the READ_BILLBOARD gate: findNearestTakeNPC first,
+SmsNpc.FindNearestTalk, SmsTalkTargetNpc = the cursor's NPC, _smsTalkPadFlag / Prev = PAD_FLAG_TALK_NPC this frame / as the pad read it, a
+B just pressed with the flag already on -> npc.StartTalk()), SmsBIsTalkB gating the held-B take and the standing B (TAKE_POSE), SmsHitNpcTrample
+(hitNpc + trampleExec from the NPC's hit check: TryGetAirProfile / FALL / the knock-downs / the airborne bonk = FLAG_JUMPING, not the hip drop,
+velocity.Y < 0, feet above the NPC's + TrampleFeetMargin, not a dive -> StompBounce), SmsKeepDistance (keepDistance(actor, 0): radius +
+KeepDistanceRadius 50, at most KeepDistanceStepMax 50 a tick through MoveAndCollide; above ClashSpeed the bonk entry with dropObject),
+SmsTouchGround4cm, _smsTalkSwallowA (PAD_FLAG_TALK_SELECT: the A that closed the window sets no jump buffer until released -- drive 85 saw a
+hop after every talk without it), SmsFindTakeNpc shared by the take and the director, and the take's XZ pre-filter corrected to his STANDING
+attack radius 80 + the object's (the Mario-as-attacker pair; pass 83 had 42 + R, which keepDistance's 150 u sits outside -- a liftable Pianta
+could no longer be taken). SmsPhysics.cs -- SmsParams.Mario PushupRadius 60 / PushupHeight 180 / KeepDistanceRadius 50 / KeepDistanceStepMax 50,
+SmsParams.Npc DamageRadiusSmall 10 / TrampleFeetMargin 5. SmsNpc.cs -- ExceptMario (his body excepted from the capsule for good; SetCollisionOff
+now only drops the layer), HitCheckMario as the TObjHitCheck pair (his attack cylinder by state against our damage cylinder, DamageRadiusNow =
+setVariableDamageRadius_) -> SmsHitNpcTrample or SmsKeepDistance, no hit pairs while he reads a billboard (FLAG_UNK1000), a walking NPC
+stepping out of its overlap with him (execNpcObjCollision_), TalkCheck sets the flag only, FindNearestTalk public, the cursor = the director's
+association (SmsTalkTargetNpc: no cursor while he walks, as findNearestTalkNPC wants WAIT), RandomOutfit / RandomOutfitDensity exports +
+SetupRandomOutfit before SetupParts. SmsNpcOutfit.cs (new) -- the groups (Pianta: one of six hats 60 %, the moustache 35 %, one of two glasses
+25 %, lapel or tie 30 %, the luggage 10 %; W: flower 50 %, hat 30 %, glasses 20 %, both arrows 10 %; Toad: sunglasses 30 %), hand-placed
+parts keep their group out of the roll, density scales the odds.
+DEVIATIONS: RandomOutfit (off = the game); TrampleFeetMargin 5 u stands in for the game's +1 unit NPC ground lift (Godot's Mario rests ~1.4 u
+over a Pianta on one floor, so "his feet above the NPC's" needs the margin to exclude a same-floor WAIT); keepDistance does not check the
+ground at the new spot (the game skips the push when it is not legal). NOT ported: trampleExec's FUMI_B / C at half scale (no stomp dust is
+baked), MSD_SE_MA_KICK_ENEMY, keepDistance's checkWallPlane (MoveAndCollide stops at the walls instead).
+LEGACY RETIRED: the NPC's own B read (pass 82's TalkCheck), its stomp latch, the capsule as a floor for Mario.
+CHECK: drive 85 (removed; 32/32): A -- an NPC after him in the tree: cursor on it, a human B (pad before every node) starts the talk, no TAKE_POSE,
+the window pages, the forbid, talkable again, no jump after the closing A; B -- the Level's own Pianta (before him) the same; C -- a 40-frame run,
+WAIT again, cursor on the Pianta he stopped before, the talk; D -- a drop onto a Pianta: MARIO_STATUS_TRAMPLE, the squash (0.44), never a floor
+contact above its feet; E -- standing 1.0 m from the axis -> 2.015 m (150 u); H -- 22 frames beside it: no trample; F -- a fall 1.6 m off the
+axis: no trample (110 u reach), lands, pushed to 150 u; G -- 14 random outfits: hung, coloured, never two hats. Drives 82 (31/31) and 83
+(33/33, its reach expectation corrected to 180 u) re-run green. Build 0 errors, boot ALL OK.

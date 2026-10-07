@@ -9,21 +9,27 @@ using System.Collections.Generic;
 ///    standing) between the points of a Graph (any Node3D's children) or random points in WanderRadius -- or, with Wander off,
 ///    WaitMarioApproach standing where placed; TurnToMario when Mario is inside BodyTurnSearchDist / Height / Degree (the Toads:
 ///    isTurnToMarioWhenApproach is true only for 0x4000016..18; a Pianta turns back to its placed facing at FirstStateTurnSpeed);
-///  * the talk (TMarDirector::movement_game + changeNerveProc_ + readBillboard): Mario standing (MARIO_STATUS_WAIT), not holding,
-///    not in the L camera, within TalkAcceptDist / Height, inside the NPC's TalkAcceptDegree cone and facing it within
-///    MarioTalkAcceptDegree -> the cursor over its head -> B: the NPC turns to him (isTurnToMarioWhenTalk, the talk clip), Mario
-///    is set 100 units off and turns at ReadRotSp; when he faces it the window opens on Lines; A pages; closing = npcTalkOut:
-///    talk forbidden 60 ticks, walking 120;
+///  * the talk (changeNerveProc_ here, TMarDirector::movement_game in Mario.SmsDirectorTalkCheck): within TalkAcceptDist / Height,
+///    inside the NPC's TalkAcceptDegree cone and Mario facing it within MarioTalkAcceptDegree -> LIVE_FLAG_UNK20000 "talkable"; the
+///    DIRECTOR (Mario's tick, before any actor moves) finds the nearest talkable NPC while he stands (MARIO_STATUS_WAIT), not holding,
+///    not in the L camera -> the cursor over its head, B's meaning TALK_B -> StartTalk: the NPC turns to him (isTurnToMarioWhenTalk,
+///    the talk clip), Mario is set 100 units off and turns at ReadRotSp; when he faces it the window opens on Lines; A pages; closing =
+///    npcTalkOut: talk forbidden 60 ticks, walking 120 (pass 85: pass 82 read B in the NPC's own tick, so an NPC after him in the tree
+///    only saw his B after waiting() had made it a TAKE_POSE -- it never talked);
 ///  * the neck (NPCNeckCallBack): the head follows Mario within NeckTurnSearchDist -- SmsNpcNeck on the skeleton;
 ///  * the water (behaveToHitObject_): a spray -> TNerveNPCWet: the wet clip (50 % the alternate) to its end, then a Pianta in
 ///    MadSearchRange goes Mad (step to face him at MadTurnSpeed, the mad clip), else back to what it was doing;
-///  * the trample (behaveToBeTrampled_ + TNpcTrample): Mario landing on it -> StompBounce for him, a 40-tick squash wobble on it
-///    (scale.y x (1 - amp sin), amp 0.75 -> 0), then after 60 ticks the Pianta goes Mad if Mario is in range;
+///  * the hit (TMario::hitNpc, pass 85): his attack cylinder (HoldRadius 80 standing, TrampleRadius 100 falling, PushupRadius 60 rising)
+///    against our damage cylinder (DamageRadius, shrunk to DamageRadiusSmall 10 while he is airborne above us within 3 R --
+///    setVariableDamageRadius_) -> a jumping status falling with his feet above ours = trampleExec: MARIO_STATUS_TRAMPLE for him
+///    (StompBounce), behaveToBeTrampled_ + TNpcTrample for us: a 40-tick squash wobble (scale.y x (1 - amp sin), amp 0.75 -> 0), then
+///    after 60 ticks the Pianta goes Mad if Mario is in range; any other overlap = keepDistance: he is pushed out to DamageRadius + 50
+///    (his wall radius) at most 50 units a tick, knocked down above ClashSpeed. The capsule excepts his body: an NPC is no floor (it was
+///    one through pass 84 -- he stood on heads), its collision is this cylinder maths, as in the game;
 ///  * the look (NpcInitData.cpp colour tables + the bmd TEV, NpcSkin / NpcEye.gdshader): ColorIndex picks the register colour
 ///    (-1 = random), the model's materials are replaced per instance, the scene's DirectionalLight3D is the sun.
-/// NOT ported (logged): being carried / thrown by Mario (LIVE_FLAG_UNK100000 Piantas: the take system is RigidBody-only), the
-/// pollution (dirty / sink / wash), the Pianta that throws Mario (TNpcThrow), the balloon messages, sounds (slots below), the
-/// talk camera, the accessory parts (hats / glasses / moustaches: TNpcParts) and their colour tables.</summary>
+/// NOT ported (logged): the pollution (dirty / sink / wash), the Pianta that throws Mario (TNpcThrow), the balloon messages, sounds
+/// (slots below), the talk camera, trampleExec's PARTICLE_MS_FUMI_B / C at half scale (no stomp dust is baked yet).</summary>
 public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
 {
     private const float U = SmsUnits.UnitsPerMetre;
@@ -39,6 +45,12 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// belts / lapel / the W's flower centre, z = glasses (TNpcModelData's colour channel). -1 = random. Parts are the SmsNpcPart scenes
     /// (assets/Sms/Npc/Parts/*) you drop under this node: each is hung on its joint and coloured from NpcInitData.cpp's tables.</summary>
     [Export] public Vector3I PartColorIndices = new Vector3I(-1, -1, -1);
+    /// <summary>DEVIATION (his ask, pass 85): roll a set of parts at _Ready from SmsNpcOutfit's groups (one hat, one pair of glasses, ...) --
+    /// the game has no random parts, each NPC's come from its placement word. Parts placed by hand under this node keep their group out of
+    /// the roll. Off = the game: only what the scene carries.</summary>
+    [Export] public bool RandomOutfit = false;
+    /// <summary>Scales every group's odds: 0.5 = the table's (a hat 60 %, a moustache 35 %, glasses 25 %, a lapel or tie 30 %, the luggage 10 %).</summary>
+    [Export(PropertyHint.Range, "0,1")] public float RandomOutfitDensity = 0.5f;
     [Export] public IdleStyle Idle = IdleStyle.Wait;
     [ExportGroup("Talk")]
     /// <summary>The pages the window shows, one string each (\n breaks a line). Empty = this NPC cannot be talked to (no cursor).</summary>
@@ -92,7 +104,8 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private int _graphIndex = -1;
     private string _clip = ""; private bool _clipLoops;
     private float _trampleAmp; private int _trampleShake, _trampleToMad; private float _trampleDec; // TNpcTrample
-    private bool _marioStompLatch;
+    private bool _marioExcepted;                         // his body is excepted from the capsule: the hit check below is our collision with him
+    private float _damageRadiusNow;                      // mDamageRadius after setVariableDamageRadius_ (units)
     private int _colorIdx;
     private readonly int[] _partColorIdx = { -1, -1, -1 };     // the three part colour indices once drawn
     private readonly List<SmsNpcPart> _parts = new();
@@ -149,7 +162,10 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
             _skel = FindChild<Skeleton3D>(_model);
         }
         _colorIdx = ColorIndex >= 0 ? ColorIndex % Profile.ColorCount : _rng.Next(Profile.ColorCount);
+        _damageRadiusNow = Profile.DamageRadius;
+        ExceptMario();
         SetupLook();
+        if (RandomOutfit) SetupRandomOutfit();
         SetupParts();
         SetupNeck();
         SetupCursor();
@@ -161,6 +177,35 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     }
 
     public override void _ExitTree() { All.Remove(this); }
+
+    /// <summary>The THitActor side of Mario vs an NPC: his body never collides with our capsule (an NPC is not map collision -- he cannot
+    /// stand on one, he is kept off by keepDistance in HitCheckMario); the capsule still stands on the map and meets other bodies.</summary>
+    private void ExceptMario()
+    {
+        if (_marioExcepted || _mario == null) return;
+        AddCollisionExceptionWith(_mario);
+        _marioExcepted = true;
+    }
+
+    /// <summary>The random outfit (DEVIATION): SmsNpcOutfit.Roll over the groups no hand-placed part fills, each pick instanced under the
+    /// Parts node (or this node) before SetupParts hangs and colours it like any other.</summary>
+    private void SetupRandomOutfit()
+    {
+        var placed = new List<string>();
+        var existing = new List<SmsNpcPart>();
+        CollectParts(this, existing);
+        foreach (var part in existing) if (!string.IsNullOrEmpty(part.SceneFilePath)) placed.Add(part.SceneFilePath);
+        Node holder = GetNodeOrNull<Node3D>("Parts") ?? (Node)this;
+        foreach (var path in SmsNpcOutfit.Roll(Profile.Kind, RandomOutfitDensity, placed, _rng))
+        {
+            var scene = GD.Load<PackedScene>(path);
+            if (scene == null) { GD.PushWarning($"[SMS npc] {Name}: outfit scene missing: {path}"); continue; }
+            var part = scene.Instantiate<SmsNpcPart>();
+            holder.AddChild(part);
+        }
+        if (DebugPrint) GD.Print($"[SMS npc] {Name}: random outfit rolled {existing.Count} hand-placed + {CountParts()} total");
+    }
+    private int CountParts() { var l = new List<SmsNpcPart>(); CollectParts(this, l); return l.Count; }
 
     private static T FindChild<T>(Node n) where T : Node
     {
@@ -408,7 +453,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     public override void _PhysicsProcess(double delta)
     {
         if (Profile == null) return;
-        if (_mario == null) _mario = GetTree().GetFirstNodeInGroup("player") as Mario;
+        if (_mario == null) { _mario = GetTree().GetFirstNodeInGroup("player") as Mario; ExceptMario(); }
         int n = SmsUnits.TicksFor(delta, ref _tickAccum);              // TLiveActor: every 120 Hz tick of the frame (pass 83; 82 ran one a frame)
         if (_holder != null) { for (int i = 0; i < n; i++) TickHeldClocks(); TickHeld(); return; }   // perform with mHolder: no bind
         for (int i = 0; i < n; i++)
@@ -417,7 +462,8 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
             if (_holder != null) { TickHeld(); return; }               // taken inside the frame: the held path owns the rest of it
         }
         Move();
-        if (_cursor != null) _cursor.Visible = _talkable && !_talking && NearestTalkable() == this;
+        // TTalkCursor::associateNPC: the director's cursor sits on the NPC it found this frame (none while he walks: findNearestTalkNPC wants WAIT)
+        if (_cursor != null) _cursor.Visible = !_talking && _mario != null && _mario.SmsTalkTargetNpc == this;
     }
 
     /// <summary>One 120 Hz tick: moveObject (updateForbidCount_, the trample, the hit checks, changeNerveProc_'s talk accept) and the spine.</summary>
@@ -427,7 +473,8 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (_walkForbid > 0) _walkForbid--;
         if (_noCollisionTicks > 0 && --_noCollisionTicks == 0) SetCollisionOff(false);   // unk1DC ran out: the hit filter back on
         UpdateTrample();
-        if (!_collisionOff) HitCheckMario();                           // HIT_FILTER_NO_COLLISION: his hit checks skip us
+        if (!_collisionOff && _mario != null && !_mario.SmsIsTalking) HitCheckMario();   // HIT_FILTER_NO_COLLISION / READ_BILLBOARD (FLAG_UNK1000): no hit pairs
+        else _marioHits = false;
         TalkCheck();
         _nerveTime++;
         switch (_cur)
@@ -452,6 +499,16 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (_thrown) _thrownMoves++;
         Vector3 f = _thrown ? _thrownVel : DirOf(YawRad) * SmsUnits.TickSpeedToMps(_marchSpeed);
         v.X = f.X; v.Z = f.Z;
+        if (_marioHits && (_cur == Nerve.GraphWander || _cur == Nerve.UTurn) && _mario != null)
+        {
+            // execNpcObjCollision_ (NpcCollision.cpp 37): a WALKING NPC moves itself out of whatever it overlaps by the overlap depth
+            // (mAttackRadius + the other's DamageRadius - the distance), a standing one does not -- Mario is kept off by his own keepDistance
+            Vector3 d = GlobalPosition - _mario.GlobalPosition; d.Y = 0f;
+            float dist = d.Length() * U;
+            float depth = Mathf.Max(Profile.AttackRadius + SmsParams.Mario.DamageRadius - dist, 0.001f);
+            Vector3 push = (dist > 1e-3f ? d / (dist / U) : Vector3.Right) * (depth / U);
+            GlobalPosition += push;                                     // mPositionDelta += local_4C (units a tick)
+        }
         if (!IsOnFloor()) v.Y -= SmsUnits.TickAccelToMps2(SmsParams.Npc.GravityY) * (float)GetPhysicsProcessDeltaTime();
         else v.Y = Mathf.Max(v.Y, -0.01f);
         Velocity = v;
@@ -640,16 +697,8 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
                 && InSight(m, SmsParams.Npc.TalkAcceptDist, SmsParams.Npc.TalkAcceptHeight, degree)
                 && MarioFacesUs(SmsParams.Npc.TalkAcceptDist, SmsParams.Npc.MarioTalkAcceptDegree);
         }
-        bool bNow = Input.IsActionPressed("button_b");
-        bool bJust = bNow && !_bLast;                 // edge-detected here: Mario's tick may run before or after ours (pass 59)
-        _bLast = bNow;
-        _talkable = can;
-        if (!can) return;
-        // TMarDirector::movement_game: MARIO_STATUS_WAIT, not holding, not the L camera, the nearest such NPC, MEANING_TALK_B
-        if (_mario.SmsCanStartTalk && NearestTalkable() == this && bJust)
-            StartTalk();
+        _talkable = can;                             // LIVE_FLAG_UNK20000; the director (Mario.SmsDirectorTalkCheck) reads it and B
     }
-    private bool _bLast;
 
     /// <summary>MsIsInSight(marioPos, marioAngleY, npcPos, dist, MarioTalkAcceptDegree): Mario's facing cone holds the NPC.</summary>
     private bool MarioFacesUs(float dist, float degree)
@@ -661,13 +710,16 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         return f.Dot(d.Normalized()) >= Mathf.Cos(Mathf.DegToRad(degree * 0.5f));
     }
 
-    private static SmsNpc NearestTalkable()
+    /// <summary>TMarDirector::findNearestTalkNPC (MarDirectorEvent.cpp 34): the talkable NPC nearest Mario in full 3D, never a liftable one
+    /// (LIVE_FLAG_UNK100000); the caller supplies MARIO_STATUS_WAIT.</summary>
+    public static SmsNpc FindNearestTalk(Mario mario)
     {
+        if (mario == null) return null;
         SmsNpc best = null; float bestD = float.MaxValue;
         foreach (var n in All)
         {
-            if (!n._talkable || n._mario == null) continue;
-            float d = n.GlobalPosition.DistanceSquaredTo(n._mario.GlobalPosition);
+            if (n == null || !IsInstanceValid(n) || !n._talkable || n.CanBeTaken || n._talking) continue;
+            float d = n.GlobalPosition.DistanceSquaredTo(mario.GlobalPosition);
             if (d < bestD) { bestD = d; best = n; }
         }
         return best;
@@ -801,14 +853,14 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (DebugPrint) GD.Print($"[SMS npc] {Name}: released -- flies {SmsParams.Npc.ThrowSpeedXZ} / {SmsParams.Npc.ThrowSpeedY} u/tick along his facing");
     }
 
-    /// <summary>HIT_FILTER_NO_COLLISION in Godot terms: the capsule leaves its layer (nothing is pushed by it, Mario's hit checks skip it) and
-    /// Mario's body is excepted from its own MoveAndSlide; the mask stays so it still stands on the map.</summary>
+    /// <summary>HIT_FILTER_NO_COLLISION in Godot terms: the capsule leaves its layer (nothing is pushed by it, his hit checks skip it: Tick);
+    /// the mask stays so it still stands on the map. His body is excepted from the capsule at all times (ExceptMario).</summary>
     private void SetCollisionOff(bool off)
     {
         if (off == _collisionOff) return;
         _collisionOff = off;
-        if (off) { _layerSaved = CollisionLayer; CollisionLayer = 0; if (_mario != null) AddCollisionExceptionWith(_mario); }
-        else { CollisionLayer = _layerSaved; if (_mario != null) RemoveCollisionExceptionWith(_mario); }
+        if (off) { _layerSaved = CollisionLayer; CollisionLayer = 0; }
+        else CollisionLayer = _layerSaved;
     }
 
     // ------------------------------------------------------------------ water
@@ -848,26 +900,39 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     }
 
     // ------------------------------------------------------------------ trample + mad
-    /// <summary>TMario::hitNormal on the NPC's damage cylinder: falling onto it (not a dive) = HIT_MESSAGE_TRAMPLE -> behaveToBeTrampled_;
-    /// the hose at close range = SPRAYED_BY_WATER (the Gooble's shortcut, the drops' ISmsSprayTarget hits also land here).</summary>
+    private bool _marioHits;                             // this tick's TObjHitCheck pair with him (execNpcObjCollision_ reads it)
+
+    /// <summary>setVariableDamageRadius_ (NpcCollision.cpp 101): a trampled NPC's damage radius is DamageRadiusSmall (10) while Mario is
+    /// airborne (not isTouchGround4cm) above our feet within 3 x the radius -- he lands INTO us rather than being kept off the rim.</summary>
+    private float DamageRadiusNow(Vector3 m, Vector3 g)
+    {
+        float r = Profile.DamageRadius;
+        if (Profile.Trampled && !_mario.SmsTouchGround4cm && m.Y > g.Y)
+        {
+            float dx = m.X - g.X, dz = m.Z - g.Z;
+            if (dx * dx + dz * dz < 9f * r * r) r = SmsParams.Npc.DamageRadiusSmall;
+        }
+        return r;
+    }
+
+    /// <summary>TMario::hitNpc (MarioCheckCol.cpp 95) from our side, on TObjHitCheck's pair: his attack cylinder (setNormalAttackArea /
+    /// setJumpingAttackArea) against our damage cylinder. A jumping status, not the hip drop, falling (mVel.y < 0), his feet above ours
+    /// and isBeTrampledNpc -> trampleExec (not a dive): MARIO_STATUS_TRAMPLE for him, behaveToBeTrampled_ for us. Else keepDistance(us, 0):
+    /// he is pushed out to our radius + 50. The hose at close range = SPRAYED_BY_WATER (the drops' ISmsSprayTarget hits also land here).</summary>
     private void HitCheckMario()
     {
-        if (_mario == null) return;
+        _marioHits = false;
+        if (_mario == null || _holder != null) return;
         Vector3 g = PosU(), m = MarioU();
-        bool hits = CheckDistance(m, SmsParams.Mario.TrampleRadius, SmsParams.Mario.AttackHeight, g, Profile.DamageRadius, Profile.DamageHeight);
-        if (!hits) { _marioStompLatch = false; return; }
-        // the velocity BEFORE his MoveAndSlide: landing on the NPC's own capsule zeroes Velocity.Y and sets the floor in the same tick (pass 64);
-        // his feet above half the NPC's height: a grounded Mario beside it carries a floor-stick velocity that is not a landing
-        bool falling = (_mario.SmsPreMoveVelocity.Y < -0.5f || (!_mario.IsOnFloor() && _mario.Velocity.Y < 0f)) && m.Y > g.Y + Profile.DamageHeight * 0.5f;
-        var st = _mario.stateOfMario;
-        bool dive = st == Mario.MarioState.diving || st == Mario.MarioState.singleJumpDive || st == Mario.MarioState.doubleJumpDive || st == Mario.MarioState.tripleJumpDive
-            || st == Mario.MarioState.bellySlidingFromDive || st == Mario.MarioState.swimming || st == Mario.MarioState.hurt || st == Mario.MarioState.dead;
-        if (falling && !dive && !_marioStompLatch && Profile.Trampled)
-        {
-            _marioStompLatch = true;
-            Trampled();
-            _mario.StompBounce();
-        }
+        _damageRadiusNow = DamageRadiusNow(m, g);
+        bool onGround = _mario.IsOnFloor();
+        bool rising = !onGround && _mario.Velocity.Y > 0f;
+        float ar = onGround ? SmsParams.Mario.HoldRadius : (rising ? SmsParams.Mario.PushupRadius : SmsParams.Mario.TrampleRadius);
+        float ah = onGround ? SmsParams.Mario.AttackHeight : (rising ? SmsParams.Mario.PushupHeight : SmsParams.Mario.AttackHeight);
+        if (!CheckDistance(m, ar, ah, g, _damageRadiusNow, Profile.DamageHeight)) return;
+        _marioHits = true;
+        if (Profile.Trampled && _mario.SmsHitNpcTrample(g)) { Trampled(); return; }
+        _mario.SmsKeepDistance(g, _damageRadiusNow);
         if (_mario.SmsHoseSpraying) Sprayed();
     }
 

@@ -2163,6 +2163,8 @@ public partial class Mario : CharacterBody3D
 
         if (_smsInvincibleTicks > 0)
             _smsInvincibleTicks = Math.Max(0, _smsInvincibleTicks - Mathf.RoundToInt((float)delta * 120f)); // thinkParams(): mInvincibilityFrames -= 1 a tick
+        if (UseSmsPhysics)
+            SmsDirectorTalkCheck(); // TMarDirector::movement_game: the cursor / the talk start are the director's, before any actor moves (pass 85)
         if (UseSmsPhysics && _smsTalking)
         {
             SmsTalkTick(); // MARIO_STATUS_READ_BILLBOARD: set 100 u off the speaker, turn to it at ReadRotSp, stand until the window closes (pass 82)
@@ -2189,7 +2191,9 @@ public partial class Mario : CharacterBody3D
             _treeRegrabCooldown--;
 
         // Update jump buffer (works in air + on ground)
-        if (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space"))
+        if (_smsTalkSwallowA && !Input.IsActionPressed("button_a") && !Input.IsActionPressed("key_space"))
+            _smsTalkSwallowA = false; // the talk's A released: A is his again (PAD_FLAG_TALK_SELECT off, pass 85)
+        if (!_smsTalkSwallowA && (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space")))
         {
             jumpBuffer = JUMP_BUFFER_FRAMES;
         }
@@ -3089,14 +3093,15 @@ public partial class Mario : CharacterBody3D
 
             // hitWantToTake / canTake (MarioCheckCol.cpp 101, MarioCollision.cpp 130): touching a takeable with B HELD takes it -- from the
             // collision check, which runs before the status machine, so the take beats the dive (pass 62)
-            if (UseSmsPhysics && heldBody == null && pendingPickup == null && Input.IsActionPressed("button_b") && SmsFindTakeTarget(out RigidBody3D smsTake))
+            if (UseSmsPhysics && heldBody == null && pendingPickup == null && !SmsBIsTalkB && Input.IsActionPressed("button_b") && SmsFindTakeTarget(out RigidBody3D smsTake))
             {
                 _smsTakeAttached = false;
                 StartPickupRaise(smsTake);
                 goto EndFrame;
             }
 
-            if (Input.IsActionJustPressed("button_b"))
+            // MarioGamePad.cpp 100: with PAD_FLAG_TALK_NPC on, B is MEANING_TALK_B, never MEANING_B -- his own B does nothing by a talkable NPC (pass 85)
+            if (Input.IsActionJustPressed("button_b") && !SmsBIsTalkB)
             {
                 Console.WriteLine(
                     stickStrength + " " + new Vector2(velocity.X, velocity.Z).Length()
@@ -11025,10 +11030,132 @@ public partial class Mario : CharacterBody3D
     public bool SmsIsTalking => _smsTalking;
     /// <summary>findNearestTalkNPC: MARIO_STATUS_WAIT; movement_game: not holding, not the L camera; and not already talking.</summary>
     public bool SmsCanStartTalk => UseSmsPhysics && !_smsTalking && IsOnFloor() && stateOfMario == MarioState.idle && heldBody == null && pendingPickup == null && !SmsYCamOn;
+    private bool _smsTalkPadFlag, _smsTalkPadFlagPrev;   // TMarioGamePad::PAD_FLAG_TALK_NPC this frame / as the pad read it (set last frame)
+    /// <summary>The NPC the director associated the cursor with this frame (TTalkCursor::associateNPC); null = no cursor.</summary>
+    public SmsNpc SmsTalkTargetNpc { get; private set; }
+    /// <summary>MarioGamePad.cpp 100: with the pad flag on, B's meaning this frame is TALK_B -- his own B handling never sees MEANING_B.</summary>
+    public bool SmsBIsTalkB => UseSmsPhysics && _smsTalkPadFlagPrev;
+    /// <summary>isTouchGround4cm() this frame (the NPCs' setVariableDamageRadius_ reads it).</summary>
+    public bool SmsTouchGround4cm => _smsGround4cm;
+
+    /// <summary>TMarDirector::movement_game (MarDirectorEvent.cpp 80), run at the top of his tick -- in the game the director acts before any
+    /// actor's perform. Not holding, not the L camera; findNearestTakeNPC first (a liftable NPC in his take situation gets the cursor instead);
+    /// else findNearestTalkNPC: MARIO_STATUS_WAIT and the nearest NPC flagged talkable (LIVE_FLAG_UNK20000, set in the NPC's own tick) ->
+    /// associateNPC (the cursor), PAD_FLAG_TALK_NPC on (B becomes TALK_B from the next pad update), and a TALK_B just pressed while the flag was
+    /// already on last frame (unk128 bit 2) -> unk126 = 1: the talk starts (TNerveNPCTalk on the NPC, startTalking -> READ_BILLBOARD for him).
+    /// Pass 82 had the NPC's tick read B: an NPC after him in the tree saw the press only after waiting() had turned it into TAKE_POSE, so
+    /// stateOfMario had left WAIT and it never talked -- the Level's Pianta2 / PiantaFemale (pass 85).</summary>
+    private void SmsDirectorTalkCheck()
+    {
+        _smsTalkPadFlagPrev = _smsTalkPadFlag;
+        _smsTalkPadFlag = false;
+        SmsTalkTargetNpc = null;
+        if (_smsTalking || !SmsCanStartTalk)
+            return;
+        if (SmsNpcTakeOffered())
+            return;
+        SmsNpc npc = SmsNpc.FindNearestTalk(this);
+        if (npc == null)
+            return;
+        SmsTalkTargetNpc = npc;
+        _smsTalkPadFlag = true;
+        if (_smsTalkPadFlagPrev && Input.IsActionJustPressed("button_b"))
+        {
+            npc.StartTalk();
+            if (SmsDebugPrint)
+                GD.Print($"[SMS talk] director: B by {npc.Name} -> the talk");
+        }
+    }
+
+    /// <summary>findNearestTakeNPC (MarDirectorEvent.cpp 61): a liftable NPC (isNowCanTaken) in his isTakeSituation.</summary>
+    private bool SmsNpcTakeOffered()
+    {
+        if (!SmsCanTakeNow())
+            return false;
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+        float cosCone = Mathf.Cos(SmsParams.Take.ConeBam * SmsUnits.BamToRad);
+        float marioH = SmsUnits.UnitsToMetres(SmsUnits.MarioHeightUnits);
+        float bestD = float.MaxValue;
+        return SmsFindTakeNpc(GlobalPosition, marioH, face, cosCone, ref bestD) != null;
+    }
+
+    /// <summary>TMario::hitNpc (MarioCheckCol.cpp 95) + trampleExec (MarioCollision.cpp 136), from the NPC's hit check: a JUMPING-type status
+    /// (airborne here), not the hip drop, mVel.y < 0, his feet above the NPC's, isBeTrampledNpc (the caller) and not a dive -> HIT_MESSAGE_TRAMPLE:
+    /// MARIO_STATUS_TRAMPLE with ma_step1 / 2 / 3 (StompBounce). Not baked: PARTICLE_MS_FUMI_B / C at half scale, MSD_SE_MA_KICK_ENEMY.</summary>
+    public bool SmsHitNpcTrample(Vector3 npcPosU)
+    {
+        if (!UseSmsPhysics || IsOnFloor() || velocity.Y >= 0f)
+            return false;
+        // checkStatusType(MARIO_STATUS_FLAG_JUMPING) is a STATUS test: the jump family, the fall, the knock-downs, the trample itself. Not
+        // IsOnFloor() alone -- Godot's floor flag drops out for single frames on a standing Mario, and a WAIT beside a Pianta is no trample
+        bool jumpingType = TryGetAirProfile(stateOfMario, out _) || stateOfMario == MarioState.ledgeFall || stateOfMario == MarioState.hurt
+            || (stateOfMario == MarioState.bonk && _bonkAirborne);
+        if (!jumpingType)
+            return false;
+        // actor->mPosition.y < mPosition.y: his feet above the NPC's. The game's NPC stands 1 unit over its ground (bind: mGroundHeight += 1), so a
+        // Mario on the same floor is never 'above' it; here he rests ~1.4 units over a Pianta on one floor (the shape margins), hence the margin
+        if (SmsUnits.MetresToUnits(GlobalPosition.Y) <= npcPosU.Y + SmsParams.Npc.TrampleFeetMargin)
+            return false;
+        switch (stateOfMario)
+        {
+            case MarioState.diving: case MarioState.singleJumpDive: case MarioState.doubleJumpDive: case MarioState.tripleJumpDive:
+            case MarioState.bellySlidingFromDive: // trampleExec: MARIO_STATUS_DIVE
+            case MarioState.groundPoundStartup: case MarioState.groundPoundFalling: case MarioState.groundPoundLanding: // hitNpc: not HIP_DROP
+            case MarioState.swimming: case MarioState.hurt: case MarioState.dead: case MarioState.shineGet: case MarioState.talking:
+            case MarioState.ledgeHang: case MarioState.ledgeClimb: case MarioState.ledgeHopUp: case MarioState.ledgeDescend:
+            case MarioState.treeGrab: case MarioState.treeWait: case MarioState.treeClimb: case MarioState.treeMoveL: case MarioState.treeMoveR: case MarioState.treeTopReach:
+            case MarioState.wire: case MarioState.fence: case MarioState.roofHang: case MarioState.fluddRocket:
+                return false;
+        }
+        StompBounce();
+        if (SmsDebugPrint)
+            GD.Print($"[SMS npc] trampled an NPC: MARIO_STATUS_TRAMPLE, chain {_stompChain}");
+        return true;
+    }
+
+    /// <summary>TMario::keepDistance(actor, 0) (MarioPhysics.cpp 27): inside radius + unk15C (50, his wall radius) of the actor's axis he is set out
+    /// to that distance along the line from it, at most 50 units a tick, the step through the walls (MoveAndCollide); running in above ClashSpeed
+    /// (40: mForwardVel or the XZ speed) is the clash -- PARTICLE_MS_DMG_C and changePlayerDropping(JUMP_SHORT_BACK_DOWN). Not checked: the game
+    /// skips the push when the ground at the new spot is not legal.</summary>
+    public void SmsKeepDistance(Vector3 targetU, float radiusU)
+    {
+        if (!UseSmsPhysics)
+            return;
+        Vector3 posU = GlobalPosition * SmsUnits.UnitsPerMetre;
+        float dx = posU.X - targetU.X, dz = posU.Z - targetU.Z;
+        float thresh = radiusU + SmsParams.Mario.KeepDistanceRadius;
+        float dist = Mathf.Sqrt(dx * dx + dz * dz);
+        if (dist == 0f) { dist = 1f; dx = 1f; dz = 0f; }
+        if (dist >= thresh)
+            return;
+        Vector3 vxz = new Vector3(velocity.X, 0f, velocity.Z);
+        float sp = vxz.Length();
+        float fwd = SmsUnits.MpsToSpeed(sp);
+        if (fwd > SmsParams.Mario.ClashSpeed && stateOfMario != MarioState.bonk)
+        {
+            if (heldBody != null)
+                Anim_DetachPickup(); // changePlayerDropping: dropObject()
+            Vector3 back = sp > 1e-4f ? -vxz / sp : new Vector3(dx, 0f, dz).Normalized();
+            SmsEnterBonk(back, IsOnFloor() ? 0f : velocity.Y, "ran into an NPC (keepDistance)", fwd);
+            return;
+        }
+        Vector3 newU = new Vector3(targetU.X + dx / dist * thresh, posU.Y, targetU.Z + dz / dist * thresh);
+        Vector3 dU = newU - posU;
+        float step = dU.Length();
+        if (step <= 0f)
+            return;
+        if (step > SmsParams.Mario.KeepDistanceStepMax)
+            dU *= SmsParams.Mario.KeepDistanceStepMax / step;
+        MoveAndCollide(dU / SmsUnits.UnitsPerMetre);
+    }
     /// <summary>mFaceAngle.y as a direction, for the NPCs' "Mario faces me" cone (MsIsInSight with *gpMarioAngleY).</summary>
     public Vector3 SmsFacingDir() => _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : (lastFacingDirection.LengthSquared() > 1e-6f ? lastFacingDirection.Normalized() : -armature.GlobalTransform.Basis.Z);
     public void SmsTalkStart(SmsNpc npc) { _smsTalkNpc = npc; _smsTalking = true; _smsTalkPhase = 0; }
-    public void SmsTalkEnd() { _smsTalking = false; _smsTalkNpc = null; _smsTalkPhase = 0; }
+    public void SmsTalkEnd() { _smsTalking = false; _smsTalkNpc = null; _smsTalkPhase = 0; _smsTalkSwallowA = true; }
+    /// <summary>PAD_FLAG_TALK_SELECT (MarDirectorDirect.cpp 999 / 978): during the talk A and B belong to the window, and the pad's frame meaning is
+    /// mMeaning & ~prevMeaning -- the A that closed the window is still down when his input comes back and is no new press. Here: no jump
+    /// buffer from an A held over from the talk; it is his again once released.</summary>
+    private bool _smsTalkSwallowA;
 
     /// <summary>readBillboard: state 0 -- nearer than 100 units he is set back to 100 along the line, ANIM_T_WAIT; state 1 -- mFaceAngle.y
     /// converges on the speaker at mReadRotSp (1024 BAM) a tick; facing it, the director opens the window (unk126 = 2); state 2 -- he
@@ -16537,7 +16664,7 @@ public partial class Mario : CharacterBody3D
             Vector3 bottom = rb.GlobalPosition - Vector3.Up * SmsBodyHalfHeight(rb, d); // the game's mPosition is the object's ground point
             Vector3 rel = bottom - feet;
             float dxz = new Vector2(rel.X, rel.Z).Length();
-            if (dxz > SmsUnits.UnitsToMetres(SmsParams.Mario.DamageRadius + d.HitRadius))
+            if (dxz > SmsUnits.UnitsToMetres(SmsParams.Mario.HoldRadius + d.HitRadius)) // the hit pair: his standing attack radius (setNormalAttackArea) + the object's damage radius
                 continue;
             float objH = SmsUnits.UnitsToMetres(d.HitHeight);
             if (rel.Y + objH < 0f || rel.Y > marioH)
@@ -16555,6 +16682,15 @@ public partial class Mario : CharacterBody3D
         }
         // hitNpc (MarioCheckCol.cpp 95): an NPC carrying LIVE_FLAG_UNK100000 is offered to wantToTakeActor on contact -- the same canTake /
         // isTakeSituation geometry (pass 83). The NPC's origin is its ground point; its hit cylinder is the profile's damage cylinder.
+        SmsNpc bestNpc = SmsFindTakeNpc(feet, marioH, face, cosCone, ref bestD);
+        if (bestNpc != null)
+            best = SmsNpcHoldProxy.Create(bestNpc, this); // the frozen stand-in his RigidBody-typed hold carries; the NPC rides it (getTakingMtx)
+        return best != null;
+    }
+
+    /// <summary>The liftable NPC nearest his feet inside the isTakeSituation geometry, nearer than <paramref name="bestD"/> (updated).</summary>
+    private SmsNpc SmsFindTakeNpc(Vector3 feet, float marioH, Vector3 face, float cosCone, ref float bestD)
+    {
         SmsNpc bestNpc = null;
         foreach (SmsNpc npc in SmsNpc.Everyone)
         {
@@ -16562,7 +16698,7 @@ public partial class Mario : CharacterBody3D
                 continue;
             Vector3 rel = npc.GlobalPosition - feet;
             float dxz = new Vector2(rel.X, rel.Z).Length();
-            if (dxz > SmsUnits.UnitsToMetres(SmsParams.Mario.DamageRadius + npc.HitRadiusUnits))
+            if (dxz > SmsUnits.UnitsToMetres(SmsParams.Mario.HoldRadius + npc.HitRadiusUnits)) // the pair Mario-as-attacker: 80 + 100 = 180 u -- keepDistance leaves him at 150, inside it (pass 85)
                 continue;
             if (rel.Y + SmsUnits.UnitsToMetres(npc.HitHeightUnits) < 0f || rel.Y > marioH)
                 continue;
@@ -16577,9 +16713,7 @@ public partial class Mario : CharacterBody3D
                 bestNpc = npc;
             }
         }
-        if (bestNpc != null)
-            best = SmsNpcHoldProxy.Create(bestNpc, this); // the frozen stand-in his RigidBody-typed hold carries; the NPC rides it (getTakingMtx)
-        return best != null;
+        return bestNpc;
     }
 
     /// <summary>TTakeActor::ensureTakeSituation from the held side: is this body what he pends or holds.</summary>
