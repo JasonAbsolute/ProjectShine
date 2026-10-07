@@ -2163,6 +2163,12 @@ public partial class Mario : CharacterBody3D
 
         if (_smsInvincibleTicks > 0)
             _smsInvincibleTicks = Math.Max(0, _smsInvincibleTicks - Mathf.RoundToInt((float)delta * 120f)); // thinkParams(): mInvincibilityFrames -= 1 a tick
+        if (UseSmsPhysics && _smsTalking)
+        {
+            SmsTalkTick(); // MARIO_STATUS_READ_BILLBOARD: set 100 u off the speaker, turn to it at ReadRotSp, stand until the window closes (pass 82)
+            goto EndFrame;
+        }
+
         if (_smsDamageWaitPhase != 0)
             SmsDamageWaitTick();
         if (_smsHangDropFall && stateOfMario != MarioState.ledgeFall)
@@ -11009,6 +11015,49 @@ public partial class Mario : CharacterBody3D
         else
         {
             animPlayer.SpeedScale = s;
+        }
+    }
+
+    // ---- NPC talk (pass 82): TMario::startTalking (MarioWait.cpp 14) -> MARIO_STATUS_READ_BILLBOARD, readBillboard (MarioAutodemo.cpp 43) ----
+    private SmsNpc _smsTalkNpc; private bool _smsTalking; private int _smsTalkPhase;
+    public bool SmsIsTalking => _smsTalking;
+    /// <summary>findNearestTalkNPC: MARIO_STATUS_WAIT; movement_game: not holding, not the L camera; and not already talking.</summary>
+    public bool SmsCanStartTalk => UseSmsPhysics && !_smsTalking && IsOnFloor() && stateOfMario == MarioState.idle && heldBody == null && pendingPickup == null && !SmsYCamOn;
+    /// <summary>mFaceAngle.y as a direction, for the NPCs' "Mario faces me" cone (MsIsInSight with *gpMarioAngleY).</summary>
+    public Vector3 SmsFacingDir() => _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : (lastFacingDirection.LengthSquared() > 1e-6f ? lastFacingDirection.Normalized() : -armature.GlobalTransform.Basis.Z);
+    public void SmsTalkStart(SmsNpc npc) { _smsTalkNpc = npc; _smsTalking = true; _smsTalkPhase = 0; }
+    public void SmsTalkEnd() { _smsTalking = false; _smsTalkNpc = null; _smsTalkPhase = 0; }
+
+    /// <summary>readBillboard: state 0 -- nearer than 100 units he is set back to 100 along the line, ANIM_T_WAIT; state 1 -- mFaceAngle.y
+    /// converges on the speaker at mReadRotSp (1024 BAM) a tick; facing it, the director opens the window (unk126 = 2); state 2 -- he
+    /// stands until the talk ends (unk124 back to 0) and returns to WAIT. No input reaches him meanwhile.</summary>
+    private void SmsTalkTick()
+    {
+        velocity.X = 0f; velocity.Z = 0f;
+        if (_smsTalkNpc == null || !IsInstanceValid(_smsTalkNpc)) { SmsTalkEnd(); return; }
+        Vector3 np = _smsTalkNpc.GlobalPosition, me = GlobalPosition;
+        if (_smsTalkPhase == 0)
+        {
+            float dx = me.X - np.X, dz = me.Z - np.Z;
+            if (dx == 0f && dz == 0f) dx += SmsUnits.UnitsToMetres(1f);
+            float dist = Mathf.Sqrt(dx * dx + dz * dz), read = SmsUnits.UnitsToMetres(SmsParams.Npc.MarioReadDist);
+            if (dist < read) GlobalPosition = new Vector3(np.X + dx / dist * read, me.Y, np.Z + dz / dist * read); // moveRequest
+            ForceLoop("ma_wait"); // ANIM_T_WAIT
+            _smsTalkPhase = 1;
+        }
+        Vector3 to = np - GlobalPosition; to.Y = 0f;
+        if (to.LengthSquared() > 1e-8f)
+        {
+            float target = Mathf.Atan2(-to.X, -to.Z);                                 // DirFromYaw(y) = (-sin y, 0, -cos y)
+            float diff = SmsMath.WrapAngle(target - _smsFaceYaw);
+            float step = SmsParams.Npc.MarioReadRotSp * SmsUnits.BamToRad;            // IConverge(diff, 0, ReadRotSp, ReadRotSp)
+            bool facing = Mathf.Abs(diff) <= step;
+            _smsFaceYaw = facing ? target : SmsMath.WrapAngle(_smsFaceYaw + Mathf.Sign(diff) * step);
+            _smsFaceValid = true; _smsFaceSource = 1;
+            Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
+            lastFacingDirection = face; _smsLatchedFacing = face;
+            armature.Rotation = armature.Rotation with { Y = BaseYawFromDir(face) };   // mModelFaceAngle = mFaceAngle.y
+            if (facing && _smsTalkPhase == 1) { _smsTalkPhase = 2; _smsTalkNpc.MarioFacesYou(); }
         }
     }
 

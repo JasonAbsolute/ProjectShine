@@ -234,6 +234,35 @@ public static class SmsParams
 
     /// <summary>/enemy/namekuri.prm (TNameKuriSaveLoadParams on TWalkerEnemyParams on TSmallEnemyParams), the shipped values; the code
     /// defaults in the comments where they differ. Units a 120 Hz tick, degrees a tick, ticks. The Gooble (Swoopin' Stu): Gooble.cs.</summary>
+    /// <summary>/params/npc/npcnormal.prm (TNpcSaveNormal, NpcSave.hpp): what every NPC shares. Units, units/tick, degrees, ticks.</summary>
+    public static class Npc
+    {
+        public const float MarioTalkAcceptDegree = 150f;   // mSLMarioTalkAcceptDegree: Mario must face the NPC within this cone
+        public const float TalkAcceptDist = 400f, TalkAcceptHeight = 500f, TalkAcceptDegree = 360f; // the NPC's own cone (360 = any side)
+        public const float SitTalkAcceptDegree = 100f;
+        public const float ThrowTalkAcceptDist = 200f, ThrowTalkAcceptHeight = 150f;
+        public const int ThrowStartFrame = 40;
+        public const int TrampleShakeFrames = 40;           // mSLTrampleShakeFrames: the squash wobble's length
+        public const float TrampleAmplitude = 0.75f;        // mSLTrampleAmplitude
+        public const int TrampleVelocity = 1500;            // mSLTrampleVelocity: BAM per tick of the wobble's phase
+        public const int TrampleToMadFrames = 60;           // mSLTrampleToMadFrames: then the Pianta gets angry
+        public const float HeadHeightNormal = 100f, HeadHeightSandBomb = 200f;
+        public const float BlownVelocity = 30f;
+        public const float GravityY = 0.3f;                 // mGravityY: units / tick^2 on a falling NPC
+        public const float MoveWalkAnmRateChase = 0.9f, StopWalkAnmRateChase = 0.01f;
+        public const int StopWalkAnmRateFrame = 10, MotionBlendFrame = 20, PosInbetweenFrame = 6;
+        public const float DanceAnmOffDist = 6500f;
+        public const float ThrowSpeedXZ = 3f, ThrowSpeedY = 2.5f; // releaseTaken_: a carried NPC let go flies with this (unported)
+        public const int GraphWanderMinFrame = 300, GraphWanderMaxFrame = 3000; // a wander leg's length before a wait
+        public const int GraphWaitMinFrame = 100, GraphWaitMaxFrame = 1200;     // the wait between legs
+        public const float ToSweatProbability = 0.2f, CleanEffectScale = 1.65f;
+        public const int TalkForbidTicksAfterTalk = 60, WalkForbidTicksAfterTalk = 120; // npcTalkOut
+        public const float NeckTargetHeight = 85f;          // NPCNeckCallBack: Mario's position + 85 is what the head looks at
+        public const float ArriveDist = 100f, ArriveDistOneWay = 50f; // TNerveNPCGraphWander: a node counts as reached inside this
+        public const int MarioReadRotSp = 1024;             // autodemo.prm mReadRotSp: Mario turns to the speaker at this BAM / tick
+        public const float MarioReadDist = 100f;            // readBillboard: nearer than this he is set back to this distance
+    }
+
     public static class NameKuri
     {
         public const float HeadHeight = 30f, BodyRadius = 5f, WallRadius = 20f;

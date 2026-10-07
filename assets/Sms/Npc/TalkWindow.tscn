@@ -1,0 +1,82 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/Npc/SmsTalkWindow.cs" id="1_talk"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_box"]
+content_margin_left = 34.0
+content_margin_top = 22.0
+content_margin_right = 34.0
+content_margin_bottom = 22.0
+bg_color = Color(0.98, 0.97, 0.92, 1)
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+border_color = Color(0.17, 0.12, 0.08, 1)
+corner_radius_top_left = 34
+corner_radius_top_right = 34
+corner_radius_bottom_right = 34
+corner_radius_bottom_left = 34
+shadow_color = Color(0, 0, 0, 0.25)
+shadow_size = 6
+shadow_offset = Vector2(0, 5)
+
+[sub_resource type="LabelSettings" id="LabelSettings_next"]
+font_size = 26
+font_color = Color(0.17, 0.12, 0.08, 1)
+
+[node name="TalkWindow" type="CanvasLayer"]
+layer = 20
+script = ExtResource("1_talk")
+
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Tail" type="Polygon2D" parent="Root"]
+color = Color(0.98, 0.97, 0.92, 1)
+polygon = PackedVector2Array(0, 0, 44, 0, 22, -40)
+
+[node name="Box" type="PanelContainer" parent="Root"]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -420.0
+offset_top = -214.0
+offset_right = 420.0
+offset_bottom = -40.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_box")
+
+[node name="Margin" type="MarginContainer" parent="Root/Box"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="Text" type="RichTextLabel" parent="Root/Box/Margin"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/default_color = Color(0.1, 0.08, 0.06, 1)
+theme_override_font_sizes/normal_font_size = 30
+bbcode_enabled = true
+text = "Welcome to Isle Delfino!"
+fit_content = false
+scroll_active = false
+autowrap_mode = 3
+visible_characters_behavior = 1
+
+[node name="Next" type="Label" parent="Root/Box"]
+layout_mode = 2
+size_flags_horizontal = 8
+size_flags_vertical = 8
+text = "▼"
+label_settings = SubResource("LabelSettings_next")

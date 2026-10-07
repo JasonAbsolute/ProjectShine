@@ -1,0 +1,99 @@
+using Godot;
+
+/// <summary>One NPC TYPE as data: TNpcSaveIndividual (/params/npc/npc&lt;type&gt;.prm, every field, the game's units: units and
+/// units/tick -- live actors add their full velocity every 120 Hz tick), the per-type behaviour switches TBaseNPC derives from
+/// mActorType (NpcBase.cpp isMonte / isMadNpc / isBeTrampledNpc / isTurnToMarioWhenApproach), the clip per animation KIND
+/// (NpcInitAnmData.cpp's index tables resolved to the archive's alphabetical .bck names, which are the glb's animation names), the
+/// hit cylinders (NpcInitData.cpp TNpcInitInfo) and the colour tables (NpcInitData.cpp sMonteM_BodyColorBuf and friends --
+/// GX S10 values, so a channel may exceed 255: the TEV register brightens the skin texture). Duplicate a .tres, change a number,
+/// assign it to an NPC's Profile: that is the whole customization path.</summary>
+[GlobalClass]
+public partial class SmsNpcProfile : Resource
+{
+    public enum NpcKind { PiantaMale, PiantaFemale, Toad, Other }
+
+    [ExportGroup("Type")]
+    [Export] public NpcKind Kind = NpcKind.PiantaMale;
+    /// <summary>isBeTrampledNpc: Piantas, Nokis, Toads, Toadsworth squash and shake under a stomp.</summary>
+    [Export] public bool Trampled = true;
+    /// <summary>isMadNpc: only Piantas (M/W and their variants) get angry after a trample or a spray.</summary>
+    [Export] public bool GetsMad = true;
+    /// <summary>isBehaveToWaterNpc: reacts to FLUDD's water (the wet animation).</summary>
+    [Export] public bool ReactsToWater = true;
+    /// <summary>isTurnToMarioWhenApproach: ONLY Toads, Toadsworth and Peach (0x4000016..18) turn their whole body to Mario when he
+    /// comes near; a Pianta keeps its placed facing (isNeedTurnToFirstState) and only turns for a talk.</summary>
+    [Export] public bool TurnsToMarioOnApproach = false;
+    /// <summary>isTurnToMarioWhenTalk: everyone but the mop / tube / sunflower / board NPCs.</summary>
+    [Export] public bool TurnsToMarioWhenTalking = true;
+
+    [ExportGroup("Hit cylinders (units)")]
+    [Export] public float AttackRadius = 100f, AttackHeight = 200f, DamageRadius = 100f, DamageHeight = 200f;
+
+    [ExportGroup("npc*.prm")]
+    [Export] public float BodyHeight = 230f;           // mSLBodyHeight
+    [Export] public float CursorHeight = 30f;          // mSLCursorHeight: the talk cursor floats this far over the body
+    [Export] public float LookatHeight = 40f;          // mSLLookatHeight: the camera's focal point is BodyHeight - this
+    [Export] public float CircleShadowSize = 120f;
+    [Export] public float MinWalkAnmRate = 0.1f, MaxWalkAnmRate = 1.5f, MaxRunAnmRate = 3f;
+    [Export] public float MinMarchSpeed = 0.2f, MaxMarchSpeed = 1.2f, MaxRunSpeed = 5f;   // units / tick
+    [Export] public float RunAccel = 0.08f, MarchAccel = 0.02f, MarchDecrease = 0.1f;    // units / tick^2
+    [Export] public float WalkTurnSpeed = 1.5f, WaitTurnSpeed = 1f;                      // deg / tick
+    [Export] public float TurnAnmMinRate = 0.7f, TurnAnmMaxRate = 2f, TurnAnmRate = 1.2f;
+    [Export] public float WaitAnmOffDist0 = 3500f, WaitAnmOffDist1 = 7500f, LodChangeDist = 5000f, AllDLLockDist = 2000f;
+    [Export] public float NeckTurnSearchDist = 1000f, NeckTurnSearchHeight = 600f;
+    [Export] public float BodyTurnSearchDist = 250f, BodyTurnSearchHeight = 250f, BodyTurnSearchDegree = 90f, BodyTurnSearchAware = 300f;
+    [Export] public float MadSearchDist = 800f, MadSearchHeight = 800f, MadSearchDegree = 240f, MadSearchAware = 500f;
+    [Export] public float MadTurnSpeed = 20f, FirstStateTurnSpeed = 0.5f, UTurnSpeed = 3f;   // deg / tick
+    [Export] public float SinkSpeed = 0.8f, SinkHeight = 220f;
+    [Export] public int PollutionMax = 150;
+    [Export] public float PollutionCleanSpeed = 0.008f;
+    [Export] public int NeckMinAngleX = -3640, NeckMaxAngleX = 0, NeckMaxAngleY = 5460;     // BAM (32768 = a half turn)
+    [Export] public int NeckAngleXSpeed = 500, NeckAngleYSpeed = 700;                      // BAM / frame
+
+    [ExportGroup("Clips (NpcInitAnmData kind -> bck)")]
+    [Export] public string ClipWalk = "mom_walk";        // kind 0
+    [Export] public string ClipWait = "mom_wait";        // kind 1
+    [Export] public string ClipFall = "mom_fall";        // kind 2
+    [Export] public string ClipRecover = "mom_recover";  // kind 3
+    [Export] public string ClipStep = "mom_step";        // kind 4
+    [Export] public string ClipWet = "mom_wet";          // kind 5
+    [Export] public string ClipTalk = "mom_talk";        // kind 6
+    [Export] public string ClipRun = "mom_run";          // kind 8
+    [Export] public string ClipTaken = "mom_wait";       // kind 9
+    [Export] public string ClipMad = "mom_mad";          // kind 0xA
+    [Export] public string ClipWetAlt = "mom_wet_a";     // kind 0xB
+    [Export] public string ClipWaitA = "mom_wait_a";     // kind 0xC
+    [Export] public string ClipThrow = "mom_throw";      // kind 0xD
+    [Export] public string ClipDirty = "mom_wait_yogore"; // kind 0xF
+    [Export] public string ClipWaitFall = "mom_wait_fall"; // kind 0x10
+    [Export] public string ClipHappy = "mom_happy";      // kind 0x11
+    [Export] public string ClipSit = "mom_sit";          // kind 0x12
+    [Export] public string ClipSitTalk = "mom_sittalk";  // kind 0x13
+    [Export] public string ClipSitWet = "mom_sitwet";    // kind 0x14
+    [Export] public string ClipWaitB = "mom_wait_b";     // kind 0x15
+    [Export] public string ClipDance = "mom_dance";      // kind 0x16
+    [Export] public string ClipMadLoop = "mom_madloop";  // kind 0x17
+    [Export] public string ClipWash = "mom_wet_yogore";  // kind 0x19
+    [Export] public string ClipAppear = "mom_appear";    // kind 0x1A
+    /// <summary>The neck joint the game's NPCNeckCallBack rotates toward Mario ("kubi" on every NPC).</summary>
+    [Export] public string NeckBone = "kubi";
+
+    [ExportGroup("Colours (GX S10, may exceed 255)")]
+    /// <summary>The material whose register takes the body colour (_hand_mat on a Pianta, _mat_cap on a Toad).</summary>
+    [Export] public string BodyMaterial = "_hand_mat";
+    /// <summary>sMonteM_BodyColorBuf / sMonteW_ColorBuf / sKinopio_BodyColorData0, one entry per variant. ColorIndex picks one.</summary>
+    [Export] public Vector3[] BodyColors = {
+        new(100, 255, 300), new(120, 120, 300), new(350, 300, 0), new(200, 70, 0), new(300, 130, 255),
+        new(255, 350, 0), new(400, 255, 255), new(320, 140, 0), new(200, 255, 400), new(400, 250, 100),
+    };
+    /// <summary>A second register on the same material (the Toad cap's white spots, sKinopio_BodyColorData1); empty = none.</summary>
+    [Export] public Vector3[] BodyColors2 = System.Array.Empty<Vector3>();
+    /// <summary>A second coloured material (the Toad's _mat_cloth) and its two registers (sKinopio_ClothColorData0 / 1); empty = none.</summary>
+    [Export] public string ClothMaterial = "";
+    [Export] public Vector3[] ClothColors = System.Array.Empty<Vector3>();
+    [Export] public Vector3[] ClothColors2 = System.Array.Empty<Vector3>();
+
+    public int ColorCount => BodyColors != null && BodyColors.Length > 0 ? BodyColors.Length : 1;
+
+    public static Color S10(Vector3 v) => new Color(v.X / 255f, v.Y / 255f, v.Z / 255f, 1f);
+}

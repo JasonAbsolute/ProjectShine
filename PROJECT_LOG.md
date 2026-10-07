@@ -5080,3 +5080,52 @@ his (tree order, or a lower process priority) is exact; one that runs after is o
 The game's matrix is its own collision, so this is checkRideMovement's result in Godot's terms. LEGACY RETIRED: the extrapolated carry.
 VERIFIED: the same drive after the fix -- all three legs mean gap -0.49 cm (the resting contact, the same at a standstill), worst -0.49,
 floor True throughout, the local point 0.195 steady, no hover left after either stop; build 0 errors; boot ALL OK. He builds the hammer.
+
+### Pass 82 -- the NPCs: Piantas (M / W) and Toads, TBaseNPC 1:1
+SOURCE: NPC/NpcBase.cpp, NpcNerve.cpp, NpcChange.cpp, NpcWalkTurn.cpp, NpcAnm.cpp, NpcCallback.cpp (the neck), NpcInitData.cpp (hit cylinders,
+colour tables), NpcInitAnmData.cpp (kind -> bck index = the archive's alphabetical order), NpcSave.hpp; System/MarDirectorEvent.cpp
+(findNearestTalkNPC / movement_game: B talks), Player/MarioWait.cpp + MarioAutodemo.cpp (startTalking -> READ_BILLBOARD / readBillboard);
+his disc: params/npc/npcnormal.prm, npcmontem.prm, npcmontew.prm, npckinopio.prm (npc_prm_dump.py); the bmds' TEV (bmd_mat_dump.py):
+mom_model / mow_model / kinopio_body.
+WHAT: assets/Sms/Npc/ -- SmsNpcProfile.cs (Resource: every npc*.prm field, the per-type switches, the clip per anim kind, the hit
+cylinders, the GX S10 colour tables; Profiles/PiantaMale.tres, PiantaFemale.tres, Toad.tres), SmsNpc.cs (CharacterBody3D: the nerve
+stack GraphWander / UTurn / GraphWait / WaitMarioApproach / TurnToMario / Talk / Wet / Mad; execWalk's march + turn per 120 Hz tick;
+isInBodyTurnSearchRange -> a Toad turns its body to Mario (isTurnToMarioWhenApproach: 0x4000016..18 only), a Pianta turns back to its
+placed yaw (isNeedTurnToFirstState); changeNerveProc_'s talk accept (TalkAcceptDist 400 / Height 500 / Degree 360, Mario facing it within
+150 deg, MARIO_STATUS_WAIT, not holding, not the L camera, the nearest talkable) -> the cursor; B -> Talk: the NPC turns to him
+(isTurnToMarioWhenTalk) on the talk clip, Mario READ_BILLBOARD: set 100 u off, turns at mReadRotSp 1024 BAM/tick, facing -> the window;
+npcTalkOut: talk forbidden 60, walk 120; behaveToHitObject_(WATER) -> Wet (the wet clip, 50 % the alternate, a Pianta's cut not blended)
+-> a mad Pianta (isMadNpc) in MadSearchRange -> Mad (step to face him at 20 deg/tick, the mad clip); behaveToBeTrampled_ + TNpcTrample
+(scale.y x (1 - amp sin), amp 0.75 -> 0 over 40 ticks, then 60 ticks to Mad) on Mario landing on its damage cylinder (Mario StompBounce);
+the look: SMS_InitChangeNpcColor on _hand_mat (Pianta, TEVREG0, 10 M / 6 W colours) and _mat_cap + _mat_cloth (Toad, REG1/REG2, 5 colours),
+NpcSkin.gdshader = the three TEV layouts in display space with the game's per-vertex GX lighting (the Pianta's skin is the REGISTER,
+no texture -- why his StandardMaterial import read grey/yellow), NpcEye.gdshader; ColorIndex -1 = random), SmsNpcNeck.cs
+(SkeletonModifier3D = NPCNeckCallBack: the head follows Mario + 85 u within NeckTurnSearchDist, yaw +-NeckMaxAngleY chased at
+NeckAngleYSpeed a frame, pitch eased by the yaw ratio; axes read off the kubi bone's rest pose), SmsTalkWindow.cs + TalkWindow.tscn
+(the bubble: paged Lines, typed at 45 cps, A pages / closes, a tail toward the speaker; restyle the StyleBoxFlat), SmsTalkCursor.cs +
+TalkCursor.tscn (the white cone over the one talkable NPC, bob + spin); Pianta.tscn / PiantaFemale.tscn / Toad.tscn (the glb at
+1/74.44 facing -Z, a capsule from the game's damage cylinder, Profile assigned, Lines / Idle / Wander / Graph / ColorIndex exports);
+models/NPC/Toad (kinopio_body.glb + 4 textures) and models/NPC/PiantaFemale (mow_model.glb + 3) from his FinModelUtility export,
+imports stripped of the 11.6 MB scene defaults and the textures pinned lossless (npc_imports.py). Mario.cs: SmsCanStartTalk /
+SmsTalkStart / SmsTalkEnd / SmsTalkTick / SmsFacingDir, the talk freeze before the state machine (goto EndFrame). SmsPhysics.cs:
+SmsParams.Npc (npcnormal.prm).
+CUSTOMIZE: duplicate a Profiles/*.tres and change numbers / clip names / colours; per instance: Lines (the pages), Idle (Wait / WaitA /
+WaitB / Talking / Angry / Dance / Sit / SitTalk = the placement action flags), ColorIndex, Wander + Graph (a Node3D of Marker3Ds) or
+WanderRadiusUnits, CanTalk, the four sound slots.
+DEVIATIONS: none in the values. NOT PORTED (logged): being carried / thrown (LIVE_FLAG_UNK100000 Piantas -- the take system is
+RigidBody-only), the pollution (dirty / sink / wash), TNpcThrow (the Pianta that throws Mario), the balloon messages, the talk camera,
+TNpcParts (hats / glasses / moustaches / the W's flower + arrows and their colour tables), the Pianta's real leaf texture
+(i_mom_mino_rgba.bti; the glb carries the 8x8 dummy), sounds (slots exist), the BMG text.
+CLOCK: NPCs are TLiveActors -- every value per 120 Hz tick (MaxMarchSpeed 1.2 u/tick = 1.93 m/s). The thrown-NPC arc (3 / 2.5 / 0.3)
+is unported, so the one place the clock could bite is not yet live.
+LEGACY TO RETIRE: assets/PiantaMaleNormal.tscn (his script-less placeholder, instanced in Level.tscn) -> swap the Level's instance
+for assets/Sms/Npc/Pianta.tscn when his editor is closed, then delete it.
+DRIVE 82 (patch_smoke82.py, removed; 31 checks, all pass): spawned a Pianta, a Toad and a wandering female on the nearest goop-free
+spot (OIL_RUN is not WAIT): profiles / colours / 2 + 5 shader surfaces / nose at -Z; the Toad turned its body to Mario at 3 m and its
+neck tracked him, the Pianta kept its placed facing; Mario at 2 m facing it: talkable, B -> Talk on both sides, Mario facing the speaker
+in 0.00 deg at 149 u, the Pianta turned 60 deg to him, the window open on page 0 with the talk clip, pages typed and turned by A,
+closed by the last A, the talk ended on both sides -- the Pianta resumes in TurnToMario, not WaitMarioApproach, because
+changeNerveFromTalk_ resumes the interrupted nerve and TNerveNPCWaitMarioApproach re-pushes TurnToMario while he stands inside the
+250 u body-turn search (a Pianta there only turns back to its placed yaw) -- then talk forbidden 60 ticks and talkable again; a spray
+-> Wet (mom_wet) -> Mad -> back to waiting; Mario dropped onto the Toad: squashed to scale.y 0.44 and no Mad (isMadNpc false); the
+female walked 14.2 m in 19 s on mow_walk at the 1.2 u/tick cap. Build 0 errors, boot ALL OK.
