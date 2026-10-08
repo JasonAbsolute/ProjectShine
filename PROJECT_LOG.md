@@ -5627,3 +5627,33 @@ the Piantas, the Nokis, the Toad):
   SmsBodyOverlay and BodyOverlay.tscn. (Found while porting the sink ripple, which keys off the same counter's % 20.)
 - The same counter already drives the sink damage cadence (% 90 = 0.75 s) and the time-lag's 0x4B0 wait at 120 Hz in Mario.cs -- those
   were right.
+
+## SMS pass 96 -- the goop into the opaque pass (the ripple showed the floor, not the goop)
+
+- His rippleEffect.png / rippleEffect2.png: the pass-95 goop ripple ring read as a soft WHITE disc that erased the goop under it, with Mario's
+  shadow warped inside. Cause: Goop.gdshader blended its soft edge (blend_mix + ALPHA), which put the WHOLE goop surface in Godot's
+  TRANSPARENT pass -- and `hint_screen_texture` is a copy of the OPAQUE pass only. Every screen-reading surface over goop (the ripple
+  ring and balls of GoopSinkRipple, the Gooble's jelly body, Mario's damage fog) saw the bare floor plus Mario's shadow where the goop
+  should have been. The game's TScreenTexture (EmitterViewObj.cpp 472 / ScreenUtil.cpp 218) copies the frame drawn so far, pollution
+  layer included.
+- FIX, Godot-native: the shader body moves to assets/Sms/Fx/Goop.gdshaderinc. Goop.gdshader = the covered interior (the edge smoothstep
+  at or above RIM_CUT 0.999), drawn OPAQUE -- it discards the rim and writes no ALPHA, so it lands in the opaque pass and the screen
+  texture holds the goop. GoopRim.gdshader = the soft rim alone (the band under RIM_CUT, ~11 cm at the 32-unit texel), blended as before,
+  drawn as the goop material's next_pass. SmsPollutionLayer.EnsureRimPass() (after the layer's uniforms) creates that next_pass (or
+  reuses one already on GoopRim) and copies EVERY uniform of the interior material across, so a material of yours keeps its look on the rim;
+  the map texture is the same object (updated in place); `GoopRimShader` export for a rim of your own; a foreign next_pass is left alone
+  with a warning. The look is unchanged: the interior was already fully opaque. LEGACY RETIRED: none (one material becomes two passes).
+- VERIFIED headless (probe96.gd): the three shader files load with no SHADER ERROR; the interior and rim expose the same 29 uniforms; a
+  Goop.tscn with its own material gets Goop.gdshader + a GoopRim next_pass carrying pollution_map (the same ImageTexture), threshold,
+  layer_min / inv_size / to_local, goop_albedo, blotch_mix; a Goop.tscn given a ShaderMaterial of its own (PinkGoop, brightness 0.91,
+  flow_speed 0.33, goop_color) gets the same knobs on its rim. Your Level's five goop instances set `GoopShader` (the interior shader),
+  no material override, no rim shader -> the default rim. Floor clearance (probe96b.gd, your Level): the goop quads sit 6.1 mm above the
+  floor's BoxMesh top (0.3493 vs 0.3432), no z-fight risk in the opaque pass. Build 0 errors, boot `[SMS selftest] ALL OK`.
+- NOT A BUG (his "weird texture on the gloves and boots"): Sunshine's dirty fog. TMario::addDamageFog (MarioDraw.cpp 2184) fogs body, cap
+  and hands (0x82, 0x96, 0x00) while MARIO_FLAG_DIRTY && mPollutionTypeStandingOn == POLLUTION_TYPE_SLIP (2) -- DIRTY is simply "standing on
+  paint" (MarioMove.cpp 1095) -- yellow while mStandingOnGraffitoTimer > FogTimeYellow (240 of the 840-tick cycle: 5 s yellow, 2 s pink,
+  the floorDamageExec hit 2 s in), the strength 7/12 - s/4 (0.33..0.83) at the 0.25 s pulse of 95b. The whole body is tinted (cap orange,
+  overalls teal in the same shots); white gloves and brown boots just show it most. Mario's bmds (ma_mdl1 / ma_cap1 / ma_hnd2l) carry fog
+  type 2 = GX_FOG_LIN with range adjust off -- the pass-56 linear assumption confirmed.
+- NOTED, his Level: the test floor's collision top (0.5715) sits 22.8 cm above its visible BoxMesh top (0.3432), so Mario and the NPCs stand
+  23 cm above the visible floor and the ripple ring (placed at his feet) floats that much over the goop. Not touched.

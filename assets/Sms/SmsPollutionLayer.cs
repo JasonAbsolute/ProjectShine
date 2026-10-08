@@ -54,6 +54,10 @@ public partial class SmsPollutionLayer : MeshInstance3D
     [Export] public bool CanSpread = false;
     /// <summary>The goop look when the mesh has no material override of its own (default res://assets/Sms/Fx/Goop.gdshader).</summary>
     [Export] public Shader GoopShader;
+    /// <summary>Pass 96: the goop's soft rim, drawn as the goop material's next_pass with every uniform copied across and blended; the covered
+    /// interior itself is OPAQUE (Goop.gdshader) so hint_screen_texture effects -- the goop ripple ring and balls, the Gooble's jelly body,
+    /// Mario's damage fog -- see the goop behind them, as the game's TScreenTexture does (default res://assets/Sms/Fx/GoopRim.gdshader).</summary>
+    [Export] public Shader GoopRimShader;
     /// <summary>The goop's surface texture (goop_albedo). Empty = the type's default from assets/Sms/Fx/Goop: FireGoop for Fire / FireRegrow,
     /// ElectricGoop for Electric, BrownGoop for everything else; OilGoop, PinkGoop and BetaGoop are there to pick.</summary>
     [Export] public Texture2D GoopTexture;
@@ -404,6 +408,7 @@ public partial class SmsPollutionLayer : MeshInstance3D
                     _mat.SetShaderParameter("blotch_mix", 0f); // the game's texture as painted; no texture -> the procedural blotches (1)
                 }
             }
+            EnsureRimPass();
         }
         if (Bubbles && _bubbleMmi == null)
             SetupBubbles();
@@ -471,6 +476,33 @@ public partial class SmsPollutionLayer : MeshInstance3D
         if (!Built) return false;
         Vector3 l = _toLocal * world;
         return !(l.X < MinX - sMetres || MaxX + sMetres < l.X || l.Z < MinZ - sMetres || MaxZ + sMetres < l.Z);
+    }
+
+    /// <summary>Pass 96: Goop.gdshader draws only the covered interior (the edge smoothstep at or above RIM_CUT), OPAQUE, so Godot's screen
+    /// texture -- a copy of the opaque pass -- holds the goop for every surface that reads it (the goop ripple ring and balls of
+    /// GoopSinkRipple, the Gooble's body, Mario's damage fog); blended, the goop was invisible to them and the rings showed the bare floor.
+    /// The soft rim is drawn by GoopRim.gdshader as the material's next_pass, wearing a copy of every uniform (your own material's look knobs
+    /// included; the map texture is the same object, updated in place). A next_pass of your own that is not the rim is left alone.</summary>
+    private void EnsureRimPass()
+    {
+        if (_mat == null || _mat.Shader == null) return;
+        Shader rimShader = GoopRimShader ?? GD.Load<Shader>("res://assets/Sms/Fx/GoopRim.gdshader");
+        var rim = _mat.NextPass as ShaderMaterial;
+        if (_mat.NextPass == null)
+        {
+            rim = new ShaderMaterial { Shader = rimShader };
+            _mat.NextPass = rim;
+        }
+        else if (rim == null || rim.Shader != rimShader)
+        {
+            GD.PushWarning($"[SMS goop] layer '{Name}': its material's next_pass is not the goop rim (res://assets/Sms/Fx/GoopRim.gdshader), so the goop's soft edge is not drawn -- clear that next_pass or set it to a ShaderMaterial on GoopRim.gdshader");
+            return;
+        }
+        foreach (Variant v in _mat.Shader.GetShaderUniformList())
+        {
+            string name = v.AsGodotDictionary()["name"].AsString();
+            rim.SetShaderParameter(name, _mat.GetShaderParameter(name));
+        }
     }
 
     /// <summary>TPollutionLayer::isPolluted(x, y, z): inside the extent, the texel's surface within +-2 depth units of y, the paint above the threshold.</summary>
