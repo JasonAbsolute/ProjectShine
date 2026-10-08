@@ -1,18 +1,23 @@
-[gd_scene load_steps=4 format=3 uid="uid://cbodyovl00056"]
+[gd_scene load_steps=8 format=3 uid="uid://cbodyovl00056"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsBodyOverlay.cs" id="1_script"]
 [ext_resource type="Shader" path="res://assets/Sms/Fx/BodyOverlay.gdshader" id="2_shader"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/MarioFog.gdshader" id="3_fog"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/MarioFogTwoSided.gdshader" id="4_fog2"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/MarioFogAlpha.gdshader" id="5_foga"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/MarioFogAlphaTwoSided.gdshader" id="6_foga2"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_overlay"]
-resource_name = "the body's overlay: the damage fog (addDamageFog, (255,0,128) pulsing 0.33..0.83 at 1 Hz while invincible) and the shock's negative (drawLogic, GX_LO_INV)"
+resource_name = "the body's overlay: the shock's negative (drawLogic, GX_LO_INV) over the finished body; the damage fog is MarioFog on the surfaces themselves"
 render_priority = 1
 shader = ExtResource("2_shader")
-shader_parameter/fog = 0.0
-shader_parameter/fog_color = Vector3(1, 0, 0.5)
-shader_parameter/negative = false
 
 [node name="BodyOverlay" type="Node"]
 script = ExtResource("1_script")
 Overlay = SubResource("ShaderMaterial_overlay")
+FogShader = ExtResource("3_fog")
+FogShaderTwoSided = ExtResource("4_fog2")
+FogShaderAlpha = ExtResource("5_foga")
+FogShaderAlphaTwoSided = ExtResource("6_foga2")
 ExcludedSubtrees = PackedStringArray("SmsFluddAttach")
 FogPeriodSeconds = 0.25

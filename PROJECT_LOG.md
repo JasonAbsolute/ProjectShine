@@ -5657,3 +5657,62 @@ the Piantas, the Nokis, the Toad):
   type 2 = GX_FOG_LIN with range adjust off -- the pass-56 linear assumption confirmed.
 - NOTED, his Level: the test floor's collision top (0.5715) sits 22.8 cm above its visible BoxMesh top (0.3432), so Mario and the NPCs stand
   23 cm above the visible floor and the ripple ring (placed at his feet) floats that much over the goop. Not touched.
+
+## SMS pass 97 -- the dirty Pianta's white skirt (a TEV channel misread) and Mario's damage fog into his own draw
+
+- His piantaSkirtRef.png: a Pianta that had been in the goop stood with a WHITE skirt (a bluish white; the clean Pianta beside it had the
+  green leaves). Cause: NpcLeaf.gdshader (pass 95) read the leaf material's TEV stage 2 -- `PREV = CPREV + (1 - REG2) x RASC + REG2 x TEXC`,
+  RASC from channel COLOR1A1 -- with RASC taken as a constant white. bmd_mat_dump prints J3D's FOUR channel entries, and J3D's order is
+  COLOR0, ALPHA0, COLOR1, ALPHA1 (J3DColorChan::load's chanTbl, J3DSys.cpp 190): the dump's `chan1` (lighting off, matColor white) is
+  ALPHA0, and GX_COLOR1 is `chan2` -- lighting ON, lightMask 0x04 (the stage's light 2), attn 0 = GX_AF_SPEC (setChanCtrlMacro forces
+  GX_DF_NONE with it), ambColor1 black, matColor1 white: the SPECULAR channel, the same one the body's stage 6 and the Toad's cap rasterise
+  (NpcSkin.gdshader's `spec`). So the goop case is rak + spec -- the goop texture with the highlight -- not rak + white (which clamps to
+  white, then stage 4's half-light term tints it blue: exactly the shot). FIX: `v_spec` (NpcSkin's formula, shininess 50) in the leaf
+  shader's vertex pass, stage 2 = rak x (1 - clean) + spec x (1 - clean) + leaf x clean; the header's channel reading corrected. The
+  clean leaf is unchanged (clean = 1 zeroes both goop terms). LEGACY RETIRED: none (one term of one shader).
+- His marioTextrueRefbeingSeethru.png (Mario sinking in pink goop, the ripple ring and balls around him, the damage fog on): his navy
+  overalls appeared SMEARED around his magenta legs inside the ring, and the balls showed an unfogged red-and-blue Mario. Cause: the pass-56
+  damage fog was a screen-reading overlay (material_overlay, hint_screen_texture) -- which lives in Godot's TRANSPARENT pass -- so the
+  OPAQUE pass, which is what hint_screen_texture copies and what the goop ripple (goop_refract.gdshader) and the Gooble's body refract,
+  held the UNFOGGED Mario. The game's copy is the finished normal scene: /data/PerformLists.bin (performlists_dump.py) runs 通常シーン描画
+  ステージ (the TEfbCtrlTex whose DRAW is the GXCopyTex into TScreenTexture, JDREfbCtrl.cpp 95-108) at entry 140, after the player group
+  (73-75, 134-135) and before the indirect / particle draws (141-160) -- the fog (a GX fog on the body's own materials) is in it. The
+  rest of the shot is the game: he sinks (SmsSinkDraw, MarioDraw.cpp 1760: 150 u x timer / 240), the floor hides his feet, the ring at his
+  feet height; the rakuball billboards refract the screen displaced up to 16 texels of a 320-wide copy (5 % of the screen) -- so a ball in
+  front of his shin shows the goop beside it. The one port error was the unfogged copy.
+- FIX, Godot-native: the fog becomes part of the body's OWN draw, as the GX does it. assets/Sms/Fx/MarioFog.gdshaderinc = the surface's
+  StandardMaterial3D re-stated as a shader (albedo colour x texture [x vertex colour], roughness, metallic, specular, Burley / Schlick-GGX,
+  uv1 scale / offset, linear + mipmap sampling, repeat or clamp in the UV) plus the fog, with four thin variants for the static part
+  Mario's surfaces use: MarioFog (opaque, cull back: 7 body surfaces), MarioFogTwoSided (the 5 hand meshes' glb materials, cull off),
+  MarioFogAlpha (transparency ALPHA, cull back: _mat_head(4) / (6) / _mat_eye_L), MarioFogAlphaTwoSided (_mat_head(2), albedo alpha 0).
+  SmsBodyOverlay.Bind builds one ShaderMaterial per body surface from its StandardMaterial3D (the values copied in; a surface with a feature
+  the shader does not state -- another transparency / cull / filter mode, emission, normal map, a metallic or roughness texture, fades,
+  billboard, grow, a next_pass -- is left alone with a warning and stays unfogged, so the body can never silently change look); SetDamageFog
+  swaps each surface's override for its fog copy and puts the exact previous override back when off (FoggedCount / FogSkippedCount /
+  FogMaterialOf for the drive). The fog itself is Godot's FOG output -- applied to the LIT colour, in the opaque pass -- and the GC mixes
+  the framebuffer's gamma values, so FOG is solved per pixel for the surface lit at 1: mix(a, F, fa) = to_linear(mix(to_gamma(a), colour,
+  f)), fa raised above f only as far as keeps F >= 0 (a gamma mix darkens a bright channel more than any non-negative linear fog at f can;
+  a negative F would go negative on a shaded pixel and NaN in the tonemapper). fogcheck97.py: exact at full light for both colours
+  (0.00 / 255), and a half-lit pixel lands within ~5-20 of 255 of the game's value where a plain linear mix is 30-50 off (the glove's
+  green at f 0.58: game 75, this 73, linear 120). DOCUMENTED APPROXIMATION: the shaded side of the body is not exactly the game's mix.
+  BodyOverlay.gdshader keeps the shock's NEGATIVE only (drawLogic IS a second pass over the finished body in the game; a screen-reading
+  overlay is the right place for it) -- `fog` / `fog_color` removed from it and from BodyOverlay.tscn, which now carries the four shader
+  exports. LEGACY RETIRED: the fog's screen-reading overlay (passes 56 / 95b / 96's "the damage fog saw the bare floor" note is moot --
+  the fog no longer reads the screen at all).
+- VERIFIED headless (drive97.gd, 29 / 29; run under run_bounded.ps1 with a hard time limit after the first run stalled -- see below): the
+  six shaders load; the leaf shader carries `v_spec x (1 - clean)` and no white term; the overlay shader has no fog uniforms; Mario's 6
+  body meshes / 16 surfaces all get a fog copy (0 skipped), 7 + 5 + 3 + 1 across the four variants as the surfaces' (transparency, cull)
+  say, every copy carrying its base's albedo colour, albedo texture (the same resource), texture_repeat, roughness, specular, metallic,
+  vertex-colour flags, uv1 scale / offset and render priority, with no material_overlay on them; the FLUDD's 5 meshes untouched; the pulse
+  0.333..0.833 at the 0.25 s period with the `fog` uniform following the factor every frame; the colour switch (pink -> the goop yellow)
+  reaches all 16; the negative puts the overlay on the 6 meshes with the fog copies still on (6 / 16) and takes it off; fog off restores
+  every override and active material by identity, twice; the Pianta's leaf material is on NpcLeaf.gdshader with pol_tex / pol_mask_tex
+  bound and the shininess knob declared. Build 0 errors, boot `[SMS selftest] ALL OK`, 0 ERROR lines, no `[SMS fx]` skip warning.
+- TOOLING: drive97's first run hit a script error before its quit() and the headless tree ran 90 minutes writing a 939 MB log (Mario's
+  _PhysicsProcess throwing every tick with no GameData autoload). run_bounded.ps1 (Start-Process + WaitForExit + Kill) now runs every probe
+  / boot with a hard limit; the drive carries its own 60 s watchdog Timer and null-safe reads. Also: under --script Mario._Ready stops at
+  GameData.Instance BEFORE its Bind calls, so a probe must call BodyOverlay.Bind(mario) itself (and switch his physics tick off, since
+  SmsAfterMove drives SetDamageFog from the game's condition every tick). performlists_dump.py reads /data/PerformLists.bin (the game's draw
+  order, Shift-JIS names + cue bits).
+- NOT CHANGED, for his eye: the ring sits at his collision feet (22.8 cm over the visible floor on his test level, pass 96's note); the
+  balls' refraction of his legs is the game's (JPA indirect warp of the screen copy); the gamma solve's shaded-side approximation above.
