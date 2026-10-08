@@ -5497,3 +5497,12 @@ Build 0 errors, boot ALL OK.
   an assembly reload); then revert the six null overrides in the Level. The outfit dropdowns and the hat preview appear after that.
 - Verified: build 0 errors; boot [SMS selftest] ALL OK (the three new NPC errors are the Level's overrides, by design); probes: the female
   alone on mow_wait, blur sizes constant over three instances; probes and logs removed before the commit.
+
+## SMS pass 92 / 92b -- the female's T-pose closed, the outfit runbook
+
+- 92 (no commit, your working Level.tscn): the six `Profile = null` / `Outfit = null` instance overrides the pass-91 editor
+  session had saved onto Pianta / Pianta2 / PiantaFemale are removed (HEAD never had them). The female plays `mow_wait` again;
+  probe + main-scene boot clean. Spin rings confirmed in-engine.
+- 92b: `assets/Sms/Npc/OUTFITS.md` -- the outfit runbook: every slot and piece per wardrobe, what mixes with what, joints,
+  colour channels and the game's colour tables as hex, the random odds per density, the rules and gotchas, how to add a piece /
+  slot / wardrobe / something held, the pass-91 error fixes. Docs only; no legacy retired.
