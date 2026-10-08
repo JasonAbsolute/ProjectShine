@@ -171,9 +171,12 @@ public partial class Mario : CharacterBody3D
     // FIRE_DOWN / FIRE_JUMP_END (MarioJump.cpp fireDowning, MarioWait.cpp fireJumpEnd) and ELECTRIC_DAMAGE (MarioAutodemo.cpp
     // electricDamage): the hurt state's other kinds (pass 50). The pollution layer (checkGraffito, MarioMove.cpp 953): the port has no
     // goop map; a floor body tagged with metadata sms_pollution = fire | electric is polluted all over, the floor under his feet is the sample.
-    private enum SmsDownKind { Knockdown, Fire, FireEnd, Electric }
+    private enum SmsDownKind { Knockdown, Fire, FireEnd, Electric, Thrown, ThrownEnd }   // Thrown / ThrownEnd: MARIO_STATUS_THROWN_DOWN / THROWN_END (pass 94)
     private SmsDownKind _smsDownKind = SmsDownKind.Knockdown;
     private int _smsFireBounces = 0;          // fireDowning() mStatusState: landings bounced so far (two, then FIRE_JUMP_END)
+    private int _smsThrownBounces = 0;        // thrownDowning() mStatusState: two bounces, then THROWN_END
+    private float _smsThrownVy = 0f;          // the thrown flight's mVel.y (units a tick), integrated per tick like the fire's
+    private int _smsThrownTicks = 0;
     private int _smsFireTicks = 0;            // mStatusTimer of FIRE_DOWN
     private float _smsFireVy = 0f;            // mVel.y (units a frame) while burning, for the bounce's 0.4 x -vy
     private int _smsElecTicks = 0;            // mStatusTimer of ELECTRIC_DAMAGE (ends once past 0x78 = 120)
@@ -14853,6 +14856,8 @@ public partial class Mario : CharacterBody3D
             case SmsDownKind.Fire: SmsTickFireDown(delta, stickDir); return;
             case SmsDownKind.FireEnd: SmsTickFireEnd(stickDir); return;
             case SmsDownKind.Electric: SmsTickElectric(delta); return;
+            case SmsDownKind.Thrown: SmsTickThrown(delta, stickDir); return;
+            case SmsDownKind.ThrownEnd: SmsTickThrownEnd(stickDir); return;
         }
         if (_smsDownAir)
         {
@@ -15645,6 +15650,155 @@ public partial class Mario : CharacterBody3D
         }
         if (!(animPlayer.IsPlaying() && animPlayer.CurrentAnimation == "ma_fjpend"))
             SmsHurtStandUp("[SMS fire] up"); // isLast1AnimeFrame(): WAIT
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // THROWN_DOWN / THROWN_END (pass 94): an NPC's TNpcThrow (SMS_SendMessageToMario(HIT_MESSAGE_THROWN) + SMS_ThrowMario)
+    /// <summary>receiveMessage(HIT_MESSAGE_THROWN) (MarioReceiveMsg.cpp 123): changePlayerStatus(THROWN_DOWN, 0, false), then TMario::throwMario
+    /// (MarioMove.cpp 711): the vector normalised (a zero vector = straight up), mFaceAngle.y = matan(z, x) + 0x8000 -- he FACES BACK along the
+    /// flight, at the thrower -- mForwardVel = -speed x |xz| (negative: he moves along the vector, backwards), mVel.y = speed x y. ANIM_THROWN
+    /// loops until the second bounce (thrownDowning). Speed in units a tick; the sound (MA_HANEAGARI) is not ported.</summary>
+    public void SmsThrowMario(Vector3 dir, float speedUnitsPerTick, SmsNpc thrower)
+    {
+        if (stateOfMario == MarioState.dead || _smsGameOver)
+            return;
+        if (_smsTalking)
+            SmsTalkEnd(); // the director has let him go by the throw's tick (the talk closed 40 ticks before); a fade still running is cut here
+        Vector3 v = dir;
+        if (v.LengthSquared() <= 1e-12f)
+            v = Vector3.Up;
+        v = v.Normalized();
+        Vector3 flat = new Vector3(v.X, 0f, v.Z);
+        float xz = flat.Length();
+        Vector3 face = xz > 1e-6f ? -flat / xz : (_smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir());
+        float fwd = -speedUnitsPerTick * xz;
+        float vy = v.Y * speedUnitsPerTick;
+        // whatever he was doing is over (as the knockdown does)
+        ledgePinned = false;
+        _smsHangMovingAnim = false;
+        _smsLongFallAnim = false;
+        _smsFallCancel = false;
+        isJumping = false;
+        jumpBuffer = 0;
+        if (heldBody != null)
+            Anim_DetachPickup(); // a thrown Mario flails (ANIM_THROWN): what he held goes (dropObject)
+        SmsLatchFace(face, 1);
+        lastFacingDirection = face;
+        armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
+        StopWaistIKHard();
+        stateOfMario = MarioState.hurt;
+        _smsDownKind = SmsDownKind.Thrown;
+        _smsDownAir = true;
+        _smsDownFore = false;
+        _smsDownType = 2;
+        _smsDownFwd = fwd;
+        _smsThrownVy = vy;
+        _smsThrownBounces = 0;
+        _smsThrownTicks = 0;
+        velocity.Y = 0f;                       // the ticks integrate the vy from here (the game sets mVel.y and the same movement steps it vel/4 a tick)
+        _smsMoveVyMps = 0f;
+        _smsTrueVy = SmsUnits.SpeedToMps(vy);
+        _smsTrueVyValid = true;
+        _smsNoLandFrames = 3; // floor contact is the ground he is leaving for a frame or two
+        SmsDownApplyVelocity();
+        SmsDownPlay("ma_thrown", 1f);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS thrown] by {thrower?.Name}: vector {v}, {speedUnitsPerTick} u/tick -> fwd {fwd:F1} (backwards, facing the thrower), vy {vy:F1} ({SmsUnits.SpeedToMps(vy):F1} m/s)");
+    }
+
+    /// <summary>thrownDowning() (MarioJump.cpp 738), one physics frame: per tick the stick adds 0.03125 x mag x cos(stick - face) x ThrownAccel to
+    /// the forward speed and 0.03125 x mag x sin x ThrownSlide to the face angle (a u16: under one BAM a tick it truncates to nothing, as the
+    /// shipped 0.1 does), fwd x= ThrownBrake (1.0), the velocity along the face; jumpProcess(0): landed -> twice a bounce of 0.4 x -vy at half
+    /// the speed, the third landing THROWN_END; a wall -> playerRefrection(0) (the face mirrored). ANIM_THROWN every frame.</summary>
+    private void SmsTickThrown(double delta, Vector3 stickDir)
+    {
+        if (IsOnFloor() && velocity.Y <= 0.01f && _smsNoLandFrames <= 0)
+        {
+            if (_smsThrownBounces < 2 && _smsThrownVy < 0f)
+            {
+                _smsThrownVy = 0.4f * -_smsThrownVy;
+                _smsDownFwd *= 0.5f; // setPlayerVelocity(0.5 x fwd)
+                _smsThrownBounces++;
+                velocity.Y = SmsUnits.SpeedToMps(_smsThrownVy);
+                _smsTrueVyValid = false;
+                _smsNoLandFrames = 3;
+                SmsDownApplyVelocity();
+                if (SmsDebugPrint)
+                    GD.Print($"[SMS thrown] bounce {_smsThrownBounces}: vy {_smsThrownVy:F1} ({SmsUnits.SpeedToMps(_smsThrownVy):F1} m/s), fwd {_smsDownFwd:F1}");
+                return;
+            }
+            SmsThrownEndEnter();
+            return;
+        }
+        SmsHurtWallMirror(false); // jumpProcess() 2: playerRefrection(0)
+        int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
+        bool stick = stickDir.LengthSquared() > 1e-6f && _smsIntendedMag > 0f;
+        Vector3 faceDir = SmsMath.DirFromYaw(_smsFaceYaw);
+        float d = stick ? faceDir.SignedAngleTo(new Vector3(stickDir.X, 0f, stickDir.Z).Normalized(), Vector3.Up) : 0f; // mIntendedYaw - mFaceAngle.y
+        float yaw = _smsFaceYaw;
+        float fwd = _smsDownFwd;
+        float vyMps = (_smsTrueVyValid && Mathf.Abs(velocity.Y - _smsMoveVyMps) < 1e-3f) ? _smsTrueVy : velocity.Y;
+        float vy = SmsUnits.MpsToSpeed(vyMps);
+        float sumMv = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            _smsThrownTicks++;
+            float velInc = 0.03125f * (stick ? _smsIntendedMag : 0f);
+            fwd += velInc * MathF.Cos(d) * SmsParams.Jump.ThrownAccel;
+            int slideBam = (int)(velInc * MathF.Sin(d) * SmsParams.Jump.ThrownSlide); // mFaceAngle.y is a u16: the fraction is lost
+            if (slideBam != 0)
+                yaw += slideBam * SmsUnits.BamToRad;
+            fwd *= SmsParams.Jump.ThrownBrake;
+            SmsAir.GravityOnlyTick(ref vy, out float mv);
+            sumMv += mv;
+        }
+        if (yaw != _smsFaceYaw)
+        {
+            Vector3 nf = SmsMath.DirFromYaw(yaw);
+            SmsLatchFace(nf, 1);
+            lastFacingDirection = nf;
+            armature.Rotation = new Vector3(0f, YawFromDir(nf), 0f);
+        }
+        velocity.Y = SmsUnits.SpeedToMps(sumMv / n);
+        _smsMoveVyMps = velocity.Y;
+        _smsTrueVy = SmsUnits.SpeedToMps(vy);
+        _smsTrueVyValid = true;
+        _smsThrownVy = vy;
+        _smsDownFwd = fwd;
+        SmsDownApplyVelocity();
+        if (!animPlayer.IsPlaying() || animPlayer.CurrentAnimation != "ma_thrown")
+            SmsDownPlay("ma_thrown", 1f);
+    }
+
+    /// <summary>THROWN_END (squatStandup, MarioWait.cpp 395): on the floor, waitProcess() -- he stands, the last speed dies -- with ANIM_THROWN_END
+    /// once; a pushed stick (mInput & 1) is RUN at once; the clip's last frame is WAIT.</summary>
+    private void SmsThrownEndEnter()
+    {
+        _smsDownKind = SmsDownKind.ThrownEnd;
+        _smsDownAir = false;
+        _smsDownFwd = 0f;
+        velocity = Vector3.Zero;
+        SmsDownPlay("ma_thrown_end", 1f);
+        if (SmsDebugPrint)
+            GD.Print($"[SMS thrown] landed after {_smsThrownBounces} bounce(s), {_smsThrownTicks} ticks in the air: THROWN_END, ma_thrown_end");
+    }
+
+    private void SmsTickThrownEnd(Vector3 stickDir)
+    {
+        velocity = Vector3.Zero; // waitProcess(): setPlayerVelocity(0), on the floor
+        bool stick = stickDir.LengthSquared() > 1e-6f && _smsIntendedMag > 0f; // mInput & 1
+        if (stick)
+        {
+            SmsHurtStandUp("[SMS thrown] the stick during ma_thrown_end: up, RUN follows");
+            return;
+        }
+        if (!IsOnFloor())
+        {
+            SmsHurtStandUp("[SMS thrown] the floor went while ma_thrown_end played: up");
+            return;
+        }
+        if (!(animPlayer.IsPlaying() && animPlayer.CurrentAnimation == "ma_thrown_end"))
+            SmsHurtStandUp("[SMS thrown] up"); // isLast1AnimeFrame(): WAIT
     }
 
     /// <summary>The grounded families: MARIO_STATUS_TYPE_WAITING (WAIT, SQUAT, the *_END recoveries, SLEEPY / SLEEP) and

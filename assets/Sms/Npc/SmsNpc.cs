@@ -38,7 +38,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private const float U = SmsUnits.UnitsPerMetre;
 
     public enum IdleStyle { Wait, WaitA, WaitB, Talking, Angry, Dance, Sit, SitTalk }   // the placement's NPC_ACTION flags -> getNpcWaitAnmBase_ / UNK1 sit
-    public enum Nerve { GraphWander, UTurn, GraphWait, WaitMarioApproach, TurnToMario, Talk, Wet, Mad, Taken, Sink, RecoverFromSink, RecoverAfter }
+    public enum Nerve { GraphWander, UTurn, GraphWait, WaitMarioApproach, TurnToMario, Talk, Wet, Mad, Taken, Sink, RecoverFromSink, RecoverAfter, Throw }
 
     [ExportGroup("Who")]
     [Export] public SmsNpcProfile Profile;
@@ -79,6 +79,18 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// units a tick along his facing, 15 frames of no collision, then it stands (WaitMarioApproach). findNearestTalkNPC skips a liftable
     /// NPC: B lifts, it never talks (no cursor). Off = the game's default.</summary>
     [Export] public bool CanBeTaken = false;
+    [ExportGroup("Throw")]
+    /// <summary>TNpcThrow (the placement's flag 0x1 with its speed and angle): when the talk with this NPC ends it runs TNerveNPCThrow -- the THROW
+    /// clip (mom_throw, 119 frames), its collision off from tick ThrowStartFrame - 20 for 30 frames, and at tick ThrowStartFrame (40) Mario is
+    /// sent HIT_MESSAGE_THROWN and thrown (TMario::throwMario): along (0, sin angle, -cos angle) turned by THIS NPC's yaw -- i.e. up and
+    /// BEHIND the NPC, which faced him for the talk -- at ThrowSpeed units a tick, Mario facing back the way he came (ANIM_THROWN, the
+    /// THROWN_DOWN status: no inputs but a little steering, two bounces, THROWN_END). A throw NPC accepts the talk only within
+    /// ThrowTalkAcceptDist 200 / Height 150 (npcnormal.prm) instead of 400 / 500. The Pianta Village launchers.</summary>
+    [Export] public bool ThrowsMario = false;
+    /// <summary>TNpcThrow's speed: units a tick along the throw vector (Mario's mForwardVel / mVel.y take speed x the vector's parts).</summary>
+    [Export] public float ThrowSpeed = 60f;
+    /// <summary>TNpcThrow's angle in degrees above the ground: 0 = flat, 90 or more = straight up (CLBDegToShortAngle; the placement's value).</summary>
+    [Export(PropertyHint.Range, "0,90")] public float ThrowAngleDeg = 45f;
     [ExportGroup("Pollution")]
     /// <summary>mPollutionAmount at the start (the placement's second colour triple's B / 255, NpcInitPrg.cpp 379): 1 = placed already goop-covered
     /// -- the DIRTY wait, no talk, no turning, the head straight -- until the hose washes it (PollutionCleanSpeed a hit). An NPC standing on
@@ -629,6 +641,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
             case Nerve.Sink: break;                  // npcFallIn ran at the push (changeNerveProc_)
             case Nerve.RecoverFromSink: RecoverIn(); break;
             case Nerve.RecoverAfter: Play(Profile.ClipRecover); ResetToWait(); break;   // npcRecoverAfterIn: the recover clip once
+            case Nerve.Throw: Play(Profile.ClipThrow); ResetToWait(); _threw = false; break;   // npcThrowIn
         }
     }
 
@@ -689,7 +702,44 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
             case Nerve.Sink: TickSink(); break;
             case Nerve.RecoverFromSink: TickRecover(); break;
             case Nerve.RecoverAfter: _marchSpeed = 0f; if (ClipEnded()) Pop(); break;
+            case Nerve.Throw: TickThrow(); break;
         }
+    }
+
+    // ------------------------------------------------------------------ the throw (pass 94): npcThrowing + TNpcThrow::throwMario
+    private bool _threw;
+    /// <summary>npcThrowing (NpcAnm.cpp 768): at spine tick ThrowStartFrame - 20 (or 0 when it is under 20) the hit filter goes NO_COLLISION for
+    /// 30 frames (unk1DC); at tick ThrowStartFrame TNpcThrow::throwMario; the nerve ends with the clip.</summary>
+    private void TickThrow()
+    {
+        _marchSpeed = 0f;
+        int start = SmsParams.Npc.ThrowStartFrame;
+        if ((_nerveTime == 1 && start < 20) || _nerveTime == start - 20)
+        {
+            SetCollisionOff(true);
+            _noCollisionTicks = SmsParams.Npc.ThrowNoCollisionFrames * SmsUnits.TicksPerFrame;
+        }
+        else if (_nerveTime == start && !_threw)
+        {
+            _threw = true;
+            ThrowMario();
+        }
+        else if (ClipEnded()) Pop();
+    }
+
+    /// <summary>TNpcThrow::throwMario (NpcThrow.cpp 8): the vector (0, sin a, -cos a) -- (0, 1, 0) at 90 deg or more, (0, 0, -1) at 0 or less --
+    /// turned by the NPC's yaw (x' = x cos + z sin, z' = -x sin + z cos: the game's actor forward is +Z, so -cos lands BEHIND it), then
+    /// HIT_MESSAGE_THROWN to Mario and SMS_ThrowMario(vector, speed).</summary>
+    private void ThrowMario()
+    {
+        if (_mario == null) return;
+        float a = Mathf.DegToRad(Mathf.Clamp(ThrowAngleDeg, 0f, 90f));
+        Vector3 v = ThrowAngleDeg >= 90f ? Vector3.Up : (ThrowAngleDeg <= 0f ? Vector3.Back : new Vector3(0f, Mathf.Sin(a), Mathf.Cos(a)));
+        // the game's -Z about the NPC's yaw is its BACK (facing = +Z there); the port's facing is -Z (DirOf), so the back is -DirOf
+        Vector3 back = -DirOf(YawRad);
+        Vector3 dir = back * v.Z + Vector3.Up * v.Y;
+        _mario.SmsThrowMario(dir, ThrowSpeed, this);
+        if (DebugPrint) GD.Print($"[SMS npc] {Name}: throwMario dir {dir} speed {ThrowSpeed} u/tick (angle {ThrowAngleDeg} deg)");
     }
 
     // ------------------------------------------------------------------ pollution (pass 93): changeNerveProc_ 539-590, npcSinking, npcRecoverFromSinking
@@ -1019,9 +1069,11 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         {
             Vector3 m = MarioU(), p = PosU();
             float degree = Sitting ? SmsParams.Npc.SitTalkAcceptDegree : SmsParams.Npc.TalkAcceptDegree;
-            can = Mathf.Abs(m.Y - p.Y) < SmsParams.Npc.TalkAcceptHeight
-                && InSight(m, SmsParams.Npc.TalkAcceptDist, SmsParams.Npc.TalkAcceptHeight, degree)
-                && MarioFacesUs(SmsParams.Npc.TalkAcceptDist, SmsParams.Npc.MarioTalkAcceptDegree);
+            float dist = ThrowsMario ? SmsParams.Npc.ThrowTalkAcceptDist : SmsParams.Npc.TalkAcceptDist;        // mThrowCtrl: 200 / 150 (changeNerveProc_ 481)
+            float height = ThrowsMario ? SmsParams.Npc.ThrowTalkAcceptHeight : SmsParams.Npc.TalkAcceptHeight;
+            can = Mathf.Abs(m.Y - p.Y) < height
+                && InSight(m, dist, height, degree)
+                && MarioFacesUs(dist, SmsParams.Npc.MarioTalkAcceptDegree);
         }
         _talkable = can;                             // LIVE_FLAG_UNK20000; the director (Mario.SmsDirectorTalkCheck) reads it and B
     }
@@ -1112,7 +1164,11 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
             _happy = false;                                                 // offActionFlag(NPC_ACTION_HAPPY)
             if (ThankYouCoin != null) { _coinTimer = SmsParams.Npc.CoinAppearFrames * SmsUnits.TicksPerFrame; _talkForbid = _walkForbid = SmsParams.Npc.CoinTalkForbidTicks; }
         }
-        if (_cur == Nerve.Talk) Pop();
+        if (_cur == Nerve.Talk)
+        {
+            if (ThrowsMario && _mario != null) Enter(Nerve.Throw);          // changeNerveFromTalk_ 194: mThrowCtrl -> setNext(TNerveNPCThrow); the stack waits
+            else Pop();
+        }
     }
 
     /// <summary>makeMtxForPrevTalk's loop over gpMarDirector->unk88: npcTalkOut on every NPC of the stage.</summary>

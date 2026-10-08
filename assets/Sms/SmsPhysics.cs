@@ -107,6 +107,9 @@ public static class SmsParams
         public const float FenceSpeed = 1.3f;
         public const float FireDownForce = 50f;         // jump.prm (shipped): FIRE_DOWN's launch vy (the code default 80)
         public const float FireDownControl = 0f;        // jump.prm (shipped): the stick's steer while burning, 0.03125 x mag x this -- none ships (the code default 1.0)
+        public const float ThrownAccel = 0.3f;          // jump.prm (shipped): thrownDowning's stick push along the face, 0.03125 x mag x cos x this (the code default 0.5)
+        public const float ThrownSlide = 0.1f;          // jump.prm (shipped): the face's turn, 0.03125 x mag x sin x this BAM a tick -- under 1 BAM it truncates to nothing (the code default 0.5)
+        public const float ThrownBrake = 1f;            // jump.prm (shipped): mForwardVel x= this a tick while thrown (the code default 0.98)
         public const float FireBackVelocity = 8f;       // jump.prm (shipped): FIRE_DOWN arg 0's backward kick (the code default 1.0); the live sources use arg 1
         // DELIBERATE DEVIATION (Jaysonn, 2026-10-01 21:20 "mario should not be going the direction he's facing, he should go back the way
         // he was coming from" / "the bounce he takes should be not as much, he travels too much"): the hot floor enters FIRE_DOWN with
@@ -242,6 +245,7 @@ public static class SmsParams
         public const float SitTalkAcceptDegree = 100f;
         public const float ThrowTalkAcceptDist = 200f, ThrowTalkAcceptHeight = 150f;
         public const int ThrowStartFrame = 40;
+        public const int ThrowNoCollisionFrames = 30;      // npcThrowing: unk1DC = CLBPalFrame(30) from spine tick ThrowStartFrame - 20 -- Mario passes through the thrower
         public const float TrampleFeetMargin = 5f;          // hitNpc's 'his feet above ours': the game's NPC rests 1 u over its ground (bind), Godot's Mario ~1.4 u over a Pianta on one floor -- a same-floor Mario is not above it
         public const float DamageRadiusSmall = 10f;         // mSLDamageRadiusSmall (npcmontem / montew / kinopio.prm): the damage radius while Mario is airborne above the NPC (setVariableDamageRadius_)
         public const int TrampleShakeFrames = 40;           // mSLTrampleShakeFrames: the squash wobble's length

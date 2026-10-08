@@ -5539,3 +5539,32 @@ the Piantas, the Nokis, the Toad):
   the bottom, collision off; the Toad's 70.0 u; the clean -> APPEAR / RECOVER, the hop's 150.0 u peak, back on its ground dirty with
   collision; the first hit -> Wet on WASH, 60 hits -> 0.520, 126 hits -> clean -> HAPPY, uniform 0, head tracking, talkable after the
   forbid; the talk while happy, its end -> the plain wait, the coin 40 frames later. Drives 83 (33/33) and 87 (16/16) re-run green.
+
+## SMS pass 94 -- the throwing NPC (TNpcThrow) and Mario's THROWN_DOWN
+
+- **The NPC** (`ThrowsMario`, `ThrowSpeed`, `ThrowAngleDeg` on SmsNpc -- the placement's flag 0x1 with its two numbers): a throw NPC
+  takes the talk only within ThrowTalkAcceptDist 200 / Height 150 (npcnormal.prm) instead of 400 / 500; when the talk closes,
+  changeNerveFromTalk_ runs TNerveNPCThrow instead of resuming -- the THROW clip (mom_throw, 119 frames), the hit filter
+  NO_COLLISION from spine tick ThrowStartFrame - 20 for 30 frames (unk1DC), and at tick ThrowStartFrame (40) TNpcThrow::throwMario:
+  the vector (0, sin a, -cos a) -- (0, 1, 0) at 90 deg or more -- turned by the NPC's yaw. The game's actor forward is (sin yaw,
+  cos yaw), so -cos lands BEHIND the NPC, which turned to face Mario for the talk: Mario is hurled over it to its back, passing through
+  it while the collision is off. The nerve ends with the clip; the interrupted nerve resumes.
+- **Mario** (`SmsThrowMario(dir, speed, npc)`): receiveMessage(HIT_MESSAGE_THROWN) -> THROWN_DOWN, then TMario::throwMario: the vector
+  normalised (zero = straight up), mFaceAngle.y = matan(z, x) + 0x8000 -- he faces BACK along the flight, at the thrower --
+  mForwardVel = -speed x |xz| (he moves backwards along the vector), mVel.y = speed x y (units a tick, vel / 4 a tick like every Mario
+  speed). thrownDowning() a tick: the stick adds 0.03125 x mag x cos(stick - face) x ThrownAccel (0.3, jump.prm) to the speed and
+  0.03125 x mag x sin x ThrownSlide (0.1) BAM to the face -- a u16, so under one BAM a tick it truncates to nothing, as it does with
+  the shipped values -- fwd x= ThrownBrake (1.0); jumpProcess: a landing bounces twice (vy = 0.4 x -vy, speed halved), the third is
+  THROWN_END (squatStandup: ma_thrown_end once, a pushed stick is RUN at once, the clip's end WAIT); a wall mirrors the face
+  (playerRefrection). ANIM_THROWN loops through the flight. Lives in the hurt state as SmsDownKind.Thrown / ThrownEnd next to the
+  fire down (no FLUDD, no second hit while down: the game's isPumpOK is false on ANIM_THROWN too).
+- Not ported: MA_HANEAGARI / the surprise voices on the message. The spine clock: tick 40 = 0.33 s into the clip (the spine counts
+  CUE_MOVE ticks; changeNerveProc_ and unk1DC count frames) -- if the hurl looks early against the clip in-engine, ThrowStartFrame
+  is the knob (SmsParams.Npc).
+- LEGACY RETIRED: none (the port had no thrown status; ma_thrown served only the long fall).
+- Verified headless (drive 94, 13 / 13): no talk from 223 u, the talk from 134 u; the close -> THROW nerve on mom_throw; collision off
+  at +10 frames (tick 20), the throw at +20 (tick 40); the flight along the NPC's back at 21.2 u/tick (30 x cos 45), vy 19.2 after the
+  first frame's two ticks, Mario facing back along it; ANIM_THROWN, two bounces (3.35 m, 4.31 m), THROWN_END on ma_thrown_end at
+  4.67 m, up at idle with full HP; the apex 67.9 u = the game's 58.9 + the port's 8.9 u launch clearance nudge (Mario.cs EndFrame, every
+  launch); the collision back after 60 physics frames (30 game frames), the nerve ending with the clip into the wait. Drives 87 (16/16)
+  and 83 (33/33) re-run green.
