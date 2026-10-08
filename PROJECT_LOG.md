@@ -5506,3 +5506,36 @@ Build 0 errors, boot ALL OK.
 - 92b: `assets/Sms/Npc/OUTFITS.md` -- the outfit runbook: every slot and piece per wardrobe, what mixes with what, joints,
   colour channels and the game's colour tables as hex, the random odds per density, the rules and gotchas, how to add a piece /
   slot / wardrobe / something held, the pass-91 error fixes. Docs only; no legacy retired.
+
+## SMS pass 93 -- NPC pollution: the sink, the dirty Pianta, the wash, the thanks
+
+TBaseNPC's pollution behaviour (NpcChange.cpp 539-590, NpcAnm.cpp npcSinking / npcRecoverFromSinking / npcWetIn / npcWetting,
+NpcEffect.cpp, NpcBase.cpp 718, NpcInitPrg.cpp 379) on `SmsNpc.cs`, for every `Profile.SinksInPollution` NPC (isPollutionNpc:
+the Piantas, the Nokis, the Toad):
+- **The sink.** Once a second per NPC (TNpcSink, staggered) a standing NPC asks the goop map under its feet; painted -> npcFallIn
+  (the FALL clip) and TNerveNPCSink: y chases ground - SinkHeight (220 u a Pianta, 70 u a Toad) at SinkSpeed a tick (0.8 / 0.3,
+  the shipped npc*.prm) while mPollutionAmount rides the depth to 1; at the bottom SINK_BOTTOM: no collision, no talk, no take,
+  the WAIT_FALL clip. The goop cleaned under it -> TNerveNPCRecoverFromSink: collision back, the APPEAR clip, at its frame 32 a hop
+  of CalcJumpVelocityY(220 + 150) (peaks 150 u over the ground), the clip's end sets it on its ground, TNerveNPCRecoverAfter plays
+  RECOVER, then whatever the sink interrupted resumes -- dirty.
+- **Dirty** (amount > 0): the DIRTY wait (mom_wait_yogore), no talk (changeNerveProc_ isClean), no walking or turning (execWalk /
+  execUTurn / isNeedTurnToFirstState / isTurnToMarioWhenApproach), the head held straight (isNeedNeckStraight -- which also covers
+  an NPC in Mario's hands, added), no anger (isStateGoToMad_), and the skin: every bmd's stage 0 compares H_ma_polmask_sample_i4
+  (a 32 x 64 gradient) against GX_KCOLOR0.a = amount x PollutionMax (150) -- where the mask is under it the stage's h_ma_rak.bti
+  (the goop; Delfino Plaza's from the disc) replaces the skin, lit by the same term (NpcSkin.gdshader, all three modes from the
+  dumps). `Pollution` on the NPC = the placement's initial amount (the second colour triple's B / 255): place a Pianta already stuck.
+- **The wash.** A dirty NPC the hose hits goes Wet on the WASH clip (mom_wet_yogore) and loses PollutionCleanSpeed (0.008) a hit;
+  at 0 the thanks: talk forbidden 60 ticks, npcHappyIn -- the HAPPY pose (mom_happy, a loop) until the next talk ends (npcTalkOut),
+  which may drop a coin: `ThankYouCoin` (TNpcCoin: 40 frames after the talk, at the cursor point, 15 u/tick at 75 deg along the
+  facing; talk and walk forbidden 360). Empty = none, the game's default (the coin is a placement event).
+- Textures: assets/Sms/Npc/tex/H_ma_rak.png (dolpic0's), H_ma_polmask_sample.png (from the bmd), pinned lossless. Toad.tres gets its
+  shipped SinkSpeed 0.3 / SinkHeight 70 (the class defaults are the male's).
+- DEVIATIONS: the Toad's bmd samples the mask and the goop through TEX1; its glb has no second UV set, so UV0 serves (`pol_uv2` is
+  wired for a re-export). Not ported: the sink ripple (SMS_EmitSinkInPollutionEffect, Mario's too), the drip / wash particles
+  (MS_MNT_YOGORE_B/F, MS_MNT_WASH), the happy sparkle (MS_MNT_KIRA), the sounds (NPC_APPEAR, APPEAR_ITEM).
+- LEGACY RETIRED: the "pollution mask = 1" stand-in in NpcSkin.gdshader (pass 82 evaluated the clean case only).
+- Verified headless (drive 93, 30 / 30): the goop layer's report; the placed-dirty Pianta's clip, K0 alpha 150/255, straight neck,
+  refused talk; the sink within the poll's second, FALL then WAIT_FALL, 220.0 u down at 1.6 u a frame, amount 0.455 at 100 u, 1 at
+  the bottom, collision off; the Toad's 70.0 u; the clean -> APPEAR / RECOVER, the hop's 150.0 u peak, back on its ground dirty with
+  collision; the first hit -> Wet on WASH, 60 hits -> 0.520, 126 hits -> clean -> HAPPY, uniform 0, head tracking, talkable after the
+  forbid; the talk while happy, its end -> the plain wait, the coin 40 frames later. Drives 83 (33/33) and 87 (16/16) re-run green.

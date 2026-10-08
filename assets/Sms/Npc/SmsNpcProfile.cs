@@ -25,6 +25,10 @@ public partial class SmsNpcProfile : Resource
     [Export] public bool TurnsToMarioOnApproach = false;
     /// <summary>isTurnToMarioWhenTalk: everyone but the mop / tube / sunflower / board NPCs.</summary>
     [Export] public bool TurnsToMarioWhenTalking = true;
+    /// <summary>isPollutionNpc (NpcBase.cpp 265): the Piantas (M / MA / MC / W / WA), the Nokis (MARE_M / W) and the Toad sink into goop they
+    /// stand on (TNerveNPCSink, SinkSpeed / SinkHeight), come out dirty (PollutionMax, the DIRTY wait, no talk, no turn) and are washed
+    /// clean by the hose (PollutionCleanSpeed a hit). Off = the goop is just floor to this NPC.</summary>
+    [Export] public bool SinksInPollution = true;
 
     [ExportGroup("Hit cylinders (units)")]
     [Export] public float AttackRadius = 100f, AttackHeight = 200f, DamageRadius = 100f, DamageHeight = 200f;

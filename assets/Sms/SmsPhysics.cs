@@ -265,6 +265,13 @@ public static class SmsParams
         public const int MarioReadRotSp = 1024;             // autodemo.prm mReadRotSp: Mario turns to the speaker at this BAM / tick
         public const float MarioReadDist = 100f;            // readBillboard: nearer than this he is set back to this distance
         public const float MarioEyeHeight = 112f;           // MarioHeadCtrl (MarioDraw.cpp 411): his head looks from mPosition.y + 112 at the NPC's focal point
+        // pollution (pass 93)
+        public const int SinkPollFrames = 30;               // initSinkNpc_: TNpcSink(start, CLBPalFrame(30)) -- changeNerveProc_ asks the goop once every 30 frames per NPC, staggered
+        public const float RecoverJumpFrame = 32f;          // npcRecoverFromSinking: the APPEAR clip's frame that launches the hop out
+        public const float RecoverJumpHeight = 150f;        // CalcJumpVelocityY(unk1C4 - y + 150): the hop peaks 150 u over the ground
+        public const float VelocityMinY = -40f;             // TLiveActor::mVelocityMinY (liveactor.cpp 27): the fall's floor, u a tick
+        public const int CoinAppearFrames = 40;             // TNpcCoin::requestAppearCoin(..., 40): the thank-you coin's delay after the talk (frames outside a talk)
+        public const int CoinTalkForbidTicks = 360;         // npcTalkOut with a coin: mTalkForbidCount = mWalkForbidCount = 360
     }
 
     public static class NameKuri

@@ -38,7 +38,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private const float U = SmsUnits.UnitsPerMetre;
 
     public enum IdleStyle { Wait, WaitA, WaitB, Talking, Angry, Dance, Sit, SitTalk }   // the placement's NPC_ACTION flags -> getNpcWaitAnmBase_ / UNK1 sit
-    public enum Nerve { GraphWander, UTurn, GraphWait, WaitMarioApproach, TurnToMario, Talk, Wet, Mad, Taken }
+    public enum Nerve { GraphWander, UTurn, GraphWait, WaitMarioApproach, TurnToMario, Talk, Wet, Mad, Taken, Sink, RecoverFromSink, RecoverAfter }
 
     [ExportGroup("Who")]
     [Export] public SmsNpcProfile Profile;
@@ -79,6 +79,14 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// units a tick along his facing, 15 frames of no collision, then it stands (WaitMarioApproach). findNearestTalkNPC skips a liftable
     /// NPC: B lifts, it never talks (no cursor). Off = the game's default.</summary>
     [Export] public bool CanBeTaken = false;
+    [ExportGroup("Pollution")]
+    /// <summary>mPollutionAmount at the start (the placement's second colour triple's B / 255, NpcInitPrg.cpp 379): 1 = placed already goop-covered
+    /// -- the DIRTY wait, no talk, no turning, the head straight -- until the hose washes it (PollutionCleanSpeed a hit). An NPC standing on
+    /// painted goop sinks on its own (TNerveNPCSink) whatever this says; needs Profile.SinksInPollution.</summary>
+    [Export(PropertyHint.Range, "0,1")] public float Pollution = 0f;
+    /// <summary>TNpcCoin (the placement's event id): when a HAPPY NPC -- just washed clean -- is talked to, a coin pops out at its cursor point
+    /// 40 frames after the talk (requestAppearCoin: 15 units a tick at 75 deg up along its facing). Empty = no coin (the game's default too).</summary>
+    [Export] public PackedScene ThankYouCoin;
     [ExportGroup("Wander")]
     /// <summary>Walk between points (the game's graph "main"). Off = stands where placed (an NPC without a graph).</summary>
     [Export] public bool Wander = false;
@@ -91,6 +99,9 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     [Export] public Shader SkinShader;
     [Export] public Shader EyeShader;
     [Export] public Texture2D ToonTexture;
+    /// <summary>H_ma_polmask_sample_i4 (every NPC bmd carries the same 32 x 64 gradient) and the stage's /map/pollution/h_ma_rak.bti (Delfino
+    /// Plaza's here): the skin shader's pollution mask and goop. Empty = the defaults under assets/Sms/Npc/tex.</summary>
+    [Export] public Texture2D PollutionMaskTexture, GoopTexture;
     /// <summary>Sound slots (the sound bank pass fills them): nothing assigned = silent.</summary>
     [Export] public AudioStreamPlayer3D TalkVoice, WetVoice, TrampleVoice, MadVoice;
     [Export] public bool DebugPrint = false;
@@ -98,6 +109,8 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     public const string SkinShaderPath = "res://assets/Sms/Npc/NpcSkin.gdshader";
     public const string EyeShaderPath = "res://assets/Sms/Npc/NpcEye.gdshader";
     public const string ToonPath = "res://assets/Sms/models/toon_2_4i.png";
+    public const string PollutionMaskPath = "res://assets/Sms/Npc/tex/H_ma_polmask_sample.png";
+    public const string GoopPath = "res://assets/Sms/Npc/tex/H_ma_rak.png";
     public const string CursorPath = "res://assets/Sms/Npc/TalkCursor.tscn";
 
     // ---- state ----
@@ -133,6 +146,24 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private Vector3 _modelBaseScale = Vector3.One;
     private int _needTurnToFirst;
     private readonly Random _rng = new();
+    // ---- pollution (pass 93) ----
+    private float _pollution;                            // mPollutionAmount 0..1 (isClean: == 0)
+    private float _sinkGroundY;                          // unk1C4: the ground he stood on when the sink began (metres)
+    private bool _sinking;                               // LIVE_FLAG_UNK400000: sinking, sunk or coming back out (no bind, the sink effect)
+    private bool _sunk;                                  // LIVE_FLAG_SINK_BOTTOM: at the bottom (no collision, the WAIT_FALL clip)
+    private bool _recoverJumped; private float _sinkVy;  // LIVE_FLAG_UNK8000000 + mVelocity.y while the APPEAR clip's jump is in the air
+    private bool _thanks;                                // UNK1DA_FLAG_UNK2: washed clean this wet -- the happy pose, the talk forbid
+    private bool _happy; private int _coinTimer;         // NPC_ACTION_HAPPY (until the next talk ends: npcTalkOut) + TNpcCoin's 40-frame count
+    private int _sinkPoll;                               // TNpcSink: changeNerveProc_ polls the goop once every SinkPollFrames (staggered per NPC)
+    private static int _sinkPollStagger;                 // sCheckPollutedStartCounter
+    private readonly List<ShaderMaterial> _skinMats = new();   // the body / cloth materials carrying the `pollution` uniform
+    private bool _polDirty = true;
+    public float PollutionAmount => _pollution;
+    public bool IsClean => _pollution <= 0f;
+    public bool IsSinking => _sinking;
+    public bool IsSunk => _sunk;
+    public bool IsHappy => _happy;
+    private bool DirtyOrHappy => _pollution > 0f || _happy;
 
     public Nerve CurrentNerve => _cur;
     public bool Talkable => _talkable;
@@ -151,7 +182,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     public float HitHeightUnits => Profile != null ? Profile.DamageHeight : 200f;
     /// <summary>isNowCanTaken: the flag, no holder, collision on (not the 15 frames after a release), not talking, a nerve the take may
     /// interrupt (isNerveCanGoToTaken: the wander / wait / approach / turn / wet family -- not Talk, not Mad).</summary>
-    public bool IsNowCanTaken() => CanBeTaken && Profile != null && _holder == null && !_collisionOff && !_talking && IsInsideTree()
+    public bool IsNowCanTaken() => CanBeTaken && Profile != null && _holder == null && !_collisionOff && !_talking && !_sinking && IsInsideTree()
         && (_cur == Nerve.GraphWander || _cur == Nerve.UTurn || _cur == Nerve.GraphWait || _cur == Nerve.WaitMarioApproach || _cur == Nerve.TurnToMario || _cur == Nerve.Wet);
     public string CurrentClip => _clip;
     public float MarchSpeed => _marchSpeed;
@@ -159,7 +190,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     public int PartColorIdx(int channel) => _partColorIdx[Mathf.Clamp(channel, 0, 2)];
     public IReadOnlyList<SmsNpcPart> Parts => _parts;
     public SmsNpcNeck Neck => _neck;
-    public bool NeckAllowed => true;   // isNeedNeckStraight: only the throw / sunflower / board NPCs hold the head straight
+    public bool NeckAllowed => _pollution <= 0f && _holder == null;   // isNeedNeckStraight (NpcBase.cpp 381): held by Mario or not clean -> the head stays straight (pass 93; 82 read only the type cases)
 
     public Vector3 PosU() => GlobalPosition * U;
     public Vector3 MarioPositionMetres() => _mario != null ? _mario.GlobalPosition : Vector3.Inf;
@@ -189,6 +220,8 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         }
         _colorIdx = ColorIndex >= 0 ? ColorIndex % Profile.ColorCount : _rng.Next(Profile.ColorCount);
         _damageRadiusNow = Profile.DamageRadius;
+        _pollution = Profile.SinksInPollution ? Mathf.Clamp(Pollution, 0f, 1f) : 0f;      // NpcInitPrg.cpp 379: the placement's B / 255
+        _sinkPoll = (_sinkPollStagger++ % SmsParams.Npc.SinkPollFrames) * SmsUnits.TicksPerFrame;   // initSinkNpc_: each NPC polls on its own frame
         ExceptMario();
         SetupLook();
         SetupOutfit();
@@ -350,8 +383,11 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         var skin = SkinShader ?? GD.Load<Shader>(SkinShaderPath);
         var eye = EyeShader ?? GD.Load<Shader>(EyeShaderPath);
         var toon = ToonTexture ?? GD.Load<Texture2D>(ToonPath);
+        var polMask = PollutionMaskTexture ?? GD.Load<Texture2D>(PollutionMaskPath);
+        var goop = GoopTexture ?? GD.Load<Texture2D>(GoopPath);
         var sun = FindSun(GetTree().CurrentScene);
         bool toad = Profile.Kind == SmsNpcProfile.NpcKind.Toad;
+        _skinMats.Clear();
         foreach (var mi in AllMeshes(_model))
         {
             int n = mi.GetSurfaceOverrideMaterialCount();
@@ -399,9 +435,30 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
                 if (m == null) continue;
                 m.SetShaderParameter("toon_tex", toon);
                 SetSun(m, sun);
+                if (m.Shader == skin)
+                {
+                    // the pollution stages (pass 93): the mask gradient, the stage's goop texture, the Toad's TEX1 when the mesh carries it
+                    m.SetShaderParameter("pol_mask_tex", polMask);
+                    m.SetShaderParameter("pol_tex", goop);
+                    bool uv2 = false;
+                    try { var arrays = mi.Mesh.SurfaceGetArrays(s); uv2 = arrays.Count > (int)Mesh.ArrayType.TexUV2 && arrays[(int)Mesh.ArrayType.TexUV2].VariantType != Variant.Type.Nil; } catch { }
+                    m.SetShaderParameter("pol_uv2", uv2);
+                    _skinMats.Add(m);
+                }
                 mi.SetSurfaceOverrideMaterial(s, m);
             }
         }
+        _polDirty = true;
+        UpdatePollutionUniform();
+    }
+
+    /// <summary>GX_KCOLOR0.a = mPollutionAmount x mPollutionMax (NpcBase.cpp 718, an 8-bit register): the skin shader's compare value.</summary>
+    private void UpdatePollutionUniform()
+    {
+        if (!_polDirty) return;
+        _polDirty = false;
+        float k = Mathf.Floor(Mathf.Clamp(_pollution, 0f, 1f) * Profile.PollutionMax) / 255f;
+        foreach (var m in _skinMats) m.SetShaderParameter("pollution", k);
     }
 
     private static Vector3 Vec(Vector3[] table, int i, Vector3 fallback)
@@ -505,7 +562,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     {
         if (_anim == null) return;
         var p = Profile;
-        string[] loops = { p.ClipWalk, p.ClipRun, p.ClipWait, p.ClipWaitA, p.ClipWaitB, p.ClipTalk, p.ClipSit, p.ClipSitTalk, p.ClipMadLoop, p.ClipDance, p.ClipDirty, p.ClipWaitFall, p.ClipTaken };
+        string[] loops = { p.ClipWalk, p.ClipRun, p.ClipWait, p.ClipWaitA, p.ClipWaitB, p.ClipTalk, p.ClipSit, p.ClipSitTalk, p.ClipMadLoop, p.ClipDance, p.ClipDirty, p.ClipWaitFall, p.ClipTaken, p.ClipHappy, p.ClipFall };   // + happy / fall (pass 93: the .bck loop attribute is 2 on both)
         foreach (var name in _anim.GetAnimationList())
         {
             var a = _anim.GetAnimation(name);
@@ -535,6 +592,8 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private string WaitClip()
     {
         var p = Profile;
+        if (_pollution > 0f) return p.ClipDirty;         // npcWaitIn: !isClean -> NPC_ANM_KIND_DIRTY (mom_wait_yogore)
+        if (_happy) return p.ClipHappy;                  // NPC_ACTION_HAPPY -> the happy pose until the next talk ends
         switch (Idle)
         {
             case IdleStyle.WaitA: return p.ClipWaitA;
@@ -567,6 +626,9 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
             case Nerve.Wet: WetIn(); break;
             case Nerve.Mad: MadIn(); break;
             case Nerve.Taken: TakenIn(); break;      // TNerveNPCWaitContinue at time 0 with a holder: npcTakenIn
+            case Nerve.Sink: break;                  // npcFallIn ran at the push (changeNerveProc_)
+            case Nerve.RecoverFromSink: RecoverIn(); break;
+            case Nerve.RecoverAfter: Play(Profile.ClipRecover); ResetToWait(); break;   // npcRecoverAfterIn: the recover clip once
         }
     }
 
@@ -595,6 +657,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
             if (_holder != null) { TickHeld(); return; }               // taken inside the frame: the held path owns the rest of it
         }
         Move();
+        UpdatePollutionUniform();
         // TTalkCursor::associateNPC: the director's cursor sits on the NPC it found this frame (none while he walks: findNearestTalkNPC wants WAIT)
         if (_cursor != null) _cursor.Visible = !_talking && _mario != null && _mario.SmsTalkTargetNpc == this;
     }
@@ -609,6 +672,8 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (!_collisionOff && _mario != null && !_mario.SmsIsTalking) HitCheckMario();   // HIT_FILTER_NO_COLLISION / READ_BILLBOARD (FLAG_UNK1000): no hit pairs
         else _marioHits = false;
         TalkCheck();
+        PollutionCheck();
+        if (_coinTimer > 0 && _mario != null && !_mario.SmsIsTalking && --_coinTimer == 0) AppearCoin();   // TNpcCoin::updateCoin: counts outside a talk
         _nerveTime++;
         switch (_cur)
         {
@@ -621,12 +686,139 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
             case Nerve.Wet: TickWet(); break;
             case Nerve.Mad: TickMad(); break;
             case Nerve.Taken: break;
+            case Nerve.Sink: TickSink(); break;
+            case Nerve.RecoverFromSink: TickRecover(); break;
+            case Nerve.RecoverAfter: _marchSpeed = 0f; if (ClipEnded()) Pop(); break;
         }
+    }
+
+    // ------------------------------------------------------------------ pollution (pass 93): changeNerveProc_ 539-590, npcSinking, npcRecoverFromSinking
+    /// <summary>changeNerveProc_'s pollution half, once a frame in the game and once every SinkPollFrames per NPC (TNpcSink, staggered): a sunk NPC
+    /// whose goop was cleaned comes back out (TNerveNPCRecoverFromSink); a standing one on painted goop goes under (npcFallIn + TNerveNPCSink).</summary>
+    private void PollutionCheck()
+    {
+        if (!Profile.SinksInPollution || _talking || _happy || _cur == Nerve.Mad || _holder != null) return;   // the talk returns first; BURNING / UNK400 / HAPPY skip
+        if (--_sinkPoll > 0) return;
+        _sinkPoll = SmsParams.Npc.SinkPollFrames * SmsUnits.TicksPerFrame;
+        if (_cur == Nerve.Sink)
+        {
+            if (SmsPollutionMap.IsPolluted(new Vector3(GlobalPosition.X, _sinkGroundY, GlobalPosition.Z))) return;
+            Enter(Nerve.RecoverFromSink);                                   // setNext: the stack under the sink stays for the way back
+            return;
+        }
+        if (_sinking) return;                                               // LIVE_FLAG_UNK400000: on the way out
+        if (!IsOnFloor()) return;                                           // isAirborne
+        if (!SmsPollutionMap.IsPolluted(GlobalPosition)) return;
+        bool can = _cur == Nerve.GraphWander || _cur == Nerve.UTurn || _cur == Nerve.GraphWait || _cur == Nerve.WaitMarioApproach || _cur == Nerve.TurnToMario;   // isNerveCanGoToSink
+        if (!can) return;
+        _sinkGroundY = GlobalPosition.Y;
+        Velocity = Vector3.Zero; _marchSpeed = 0f;
+        _talkable = false; _sinking = true; _sunk = false;
+        Play(Profile.ClipFall); ResetToWait();                              // npcFallIn: the FALL clip
+        Push(Nerve.Sink);
+        if (DebugPrint) GD.Print($"[SMS npc] {Name}: on goop at y {_sinkGroundY * U:F1} u -> sinking {Profile.SinkHeight} u at {Profile.SinkSpeed} u/tick");
+    }
+
+    /// <summary>npcSinking: y chases ground - SinkHeight at SinkSpeed a tick while the amount chases 1 over the same ticks (CLBChaseConstantSpecifyFrame
+    /// with frames = distance / speed); at the bottom LIVE_FLAG_SINK_BOTTOM, HIT_FILTER_NO_COLLISION and the WAIT_FALL clip.</summary>
+    private void TickSink()
+    {
+        _marchSpeed = 0f;
+        float groundU = _sinkGroundY * U, yU = GlobalPosition.Y * U, targetU = groundU - Profile.SinkHeight;
+        if (yU == targetU) return;
+        float frames = (1f / Profile.SinkSpeed) * (yU - targetU);
+        if (frames < 0.001f) _pollution = 1f; else _pollution += (1f / frames) * (1f - _pollution);
+        _polDirty = true;
+        float d = targetU - yU, sp = Mathf.Abs(Profile.SinkSpeed);        // CLBChaseGeneralConstantSpecifySpeed
+        if (d > 0f) { d -= sp; yU = d > 0f ? targetU - d : targetU; }
+        else { d += sp; yU = d < 0f ? targetU - d : targetU; }
+        SetFeetY(yU / U);
+        if (yU == targetU)
+        {
+            _sunk = true; _pollution = 1f;
+            SetCollisionOff(true);
+            Play(Profile.ClipWaitFall);                                     // NPC_ANM_KIND_UNK10: stuck in the goop
+            if (DebugPrint) GD.Print($"[SMS npc] {Name}: sunk ({Profile.ClipWaitFall}), pollution {_pollution:F2}");
+        }
+    }
+
+    /// <summary>The way out (changeNerveProc_ 557 + npcRecoverFromSinking): collision back, the APPEAR clip; when it passes frame 32 a jump of
+    /// CalcJumpVelocityY(ground - y + 150) (min 5 a tick) under the NPC's gravity; the clip's end puts him on his ground and TNerveNPCRecoverAfter
+    /// plays the RECOVER clip -- he is still dirty (the amount stays 1 until the hose).</summary>
+    private void RecoverIn()
+    {
+        _sunk = false; _recoverJumped = false; _sinkVy = 0f;
+        SetCollisionOff(false);
+        Play(Profile.ClipAppear); ResetToWait();
+        if (DebugPrint) GD.Print($"[SMS npc] {Name}: the goop under me is clean -> {Profile.ClipAppear}");
+    }
+
+    private void TickRecover()
+    {
+        _marchSpeed = 0f;
+        float groundU = _sinkGroundY * U, yU = GlobalPosition.Y * U;
+        if (!_recoverJumped && ClipFramesPassed(SmsParams.Npc.RecoverJumpFrame))
+        {
+            _recoverJumped = true;
+            _sinkVy = CalcJumpVelocityY(groundU - yU + SmsParams.Npc.RecoverJumpHeight, SmsParams.Npc.GravityY);
+            if (_sinkVy < 5f) _sinkVy = 5f;
+            if (DebugPrint) GD.Print($"[SMS npc] {Name}: recover jump vy {_sinkVy:F2} u/tick from {yU - groundU:F1} u");
+        }
+        if (ClipEnded())
+        {
+            SetFeetY(_sinkGroundY);
+            _sinking = false; _recoverJumped = false; _sinkVy = 0f; Velocity = Vector3.Zero;
+            Enter(Nerve.RecoverAfter);
+            return;
+        }
+        if (_recoverJumped)
+        {
+            _sinkVy -= SmsParams.Npc.GravityY;
+            if (_sinkVy < SmsParams.Npc.VelocityMinY) _sinkVy = SmsParams.Npc.VelocityMinY;
+            yU += _sinkVy;
+            if (_sinkVy <= 0f && yU < groundU) yU = groundU;
+            SetFeetY(yU / U);
+        }
+    }
+
+    /// <summary>CalcJumpVelocityY (NpcAnm.cpp 27): the per-tick vy that peaks `height` above the start under `gravity` a tick a tick.</summary>
+    public static float CalcJumpVelocityY(float height, float gravity)
+    {
+        if (gravity <= 0f) return 0f;
+        return gravity * 0.5f * (Mathf.Sqrt(height * (1f / gravity) * 8f + 1f) + 1f);
+    }
+
+    private void SetFeetY(float y) { var p = GlobalPosition; p.Y = y; GlobalPosition = p; }
+
+    /// <summary>getFrameCtrl(BCK)->checkPass(frame): the current clip's 60 fps frame counter has reached `frame`.</summary>
+    private bool ClipFramesPassed(float frame) => _anim != null && _anim.IsPlaying() && _anim.CurrentAnimation == _clip && _anim.CurrentAnimationPosition * 60.0 >= frame;
+
+    /// <summary>npcHappyIn(0): NPC_ACTION_HAPPY + the happy clip, kept until the next talk ends (npcTalkOut drops it and asks for the coin).</summary>
+    private void HappyIn()
+    {
+        _happy = true;
+        Play(Profile.ClipHappy); ResetToWait();
+        if (DebugPrint) GD.Print($"[SMS npc] {Name}: clean again -> {Profile.ClipHappy} (happy until the next talk)");
+    }
+
+    /// <summary>TNpcCoin::requestAppearCoin(getCursorPos(), mRotation.y, 40) -> execAppearCoin_: the coin scene at the cursor point, launched 15 u/tick
+    /// at 75 deg up along the facing (setVelocityAndFlag10) when the 40-frame count runs out with no talk on.</summary>
+    private void AppearCoin()
+    {
+        if (ThankYouCoin == null) return;
+        var coin = ThankYouCoin.Instantiate<Node3D>();
+        GetParent().AddChild(coin);
+        Vector3 pos = GlobalPosition + Vector3.Up * ((Profile.BodyHeight + Profile.CursorHeight) / U);
+        coin.GlobalPosition = pos;
+        Vector3 v = (DirOf(YawRad) * Mathf.Cos(Mathf.DegToRad(75f)) + Vector3.Up * Mathf.Sin(Mathf.DegToRad(75f))) * SmsUnits.TickSpeedToMps(15f);
+        if (coin is RigidBody3D rb) rb.LinearVelocity = v;
+        if (DebugPrint) GD.Print($"[SMS npc] {Name}: the thank-you coin at {pos}, {v.Length():F1} m/s");
     }
 
     /// <summary>TLiveActor::bind for an NPC: the march along the facing (units/tick -> m/s), gravity when airborne, the floor otherwise.</summary>
     private void Move()
     {
+        if (_sinking) { Velocity = Vector3.Zero; return; }                 // TNerveNPCSink / Recover: the nerve owns y, no bind, no floor
         Vector3 v = Velocity;
         if (_thrown && _thrownMoves > 0 && IsOnFloor()) { _thrown = false; v = Vector3.Zero; _thrownVel = Vector3.Zero; }   // bind: on the ground mVelocity.set(0,0,0)
         if (_thrown) _thrownMoves++;
@@ -676,7 +868,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// the body turns toward the node at WalkTurnSpeed (WaitTurnSpeed while stopped) and walks along its facing.</summary>
     private void ExecWalk(bool go)
     {
-        if (_walkForbid > 0 || _talking) { _marchSpeed = 0f; _turnSpeed = 0f; return; }
+        if (_walkForbid > 0 || _talking || DirtyOrHappy) { _marchSpeed = 0f; _turnSpeed = 0f; return; }   // execWalk: !isClean / HAPPY stand still
         if (go)
         {
             bool run = _clip == Profile.ClipRun;
@@ -703,7 +895,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private void TickGraphWander()
     {
         if (!_hasTarget) ChooseNextTarget();
-        if (_walkForbid > 0 || _talking) { ExecWalk(false); if (_marchSpeed < 0.001f && _clip != WaitClip()) WaitIn(); return; } // mWalkForbidCount: standing until it runs out
+        if (_walkForbid > 0 || _talking || DirtyOrHappy) { ExecWalk(false); if (_marchSpeed < 0.001f && _clip != WaitClip()) WaitIn(); return; } // mWalkForbidCount / !isClean / HAPPY: standing
         if (_clip != Profile.ClipWalk) Play(Profile.ClipWalk);
         ExecWalk(true);
         _wanderTimer++;
@@ -719,6 +911,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private void TickUTurn()
     {
         if (!_hasTarget) { Enter(Nerve.GraphWander); return; }
+        if (DirtyOrHappy) return;                                           // execUTurn: no turning while dirty / happy
         if (TurnToward(_target, Profile.UTurnSpeed)) { _marchSpeed = 0f; Enter(Nerve.GraphWander); }
     }
 
@@ -759,7 +952,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
 
     private void TickWaitMarioApproach()
     {
-        if (InBodyTurnRange()) { Enter(Nerve.TurnToMario); return; }
+        if (InBodyTurnRange() && IsClean) { Enter(Nerve.TurnToMario); return; }   // TNerveNPCWaitMarioApproach 112: isInBodyTurnSearchRange && isClean
         if (IsNeedTurnToFirstState())
         {
             if (TurnToYaw(_firstYaw, Profile.FirstStateTurnSpeed)) { if (_clip != WaitClip()) WaitIn(); }
@@ -772,8 +965,8 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// (isTurnToMarioWhenApproach false) turns back to its placed facing instead.</summary>
     private void TickTurnToMario()
     {
-        if (!InBodyTurnRange()) { Enter(Nerve.WaitMarioApproach); return; }
-        if (Profile.TurnsToMarioOnApproach && !Sitting)
+        if (!InBodyTurnRange() || !IsClean) { Enter(Nerve.WaitMarioApproach); return; }   // 148: || mPollutionAmount != 0
+        if (Profile.TurnsToMarioOnApproach && !Sitting && !DirtyOrHappy)   // isTurnToMarioWhenApproach 187: not while dirty / happy
         {
             bool faced = TurnToward(_mario.GlobalPosition, _turnSpeed > 0f ? _turnSpeed : Profile.WaitTurnSpeed);
             if (faced) { if (_clip != WaitClip()) WaitIn(); }
@@ -788,7 +981,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     }
 
     /// <summary>isNeedTurnToFirstState: in the approach nerves, not sitting (UNK1) and not a special idle, the NPC drifts back to its placed yaw.</summary>
-    private bool IsNeedTurnToFirstState() => !Sitting && Idle != IdleStyle.Angry && (_cur == Nerve.WaitMarioApproach || _cur == Nerve.TurnToMario);
+    private bool IsNeedTurnToFirstState() => !DirtyOrHappy && !Sitting && Idle != IdleStyle.Angry && (_cur == Nerve.WaitMarioApproach || _cur == Nerve.TurnToMario);
 
     // ---- turning ----
     private static float Chase(float cur, float target, float step)
@@ -820,7 +1013,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// <summary>changeNerveProc_'s accept test (+ findNearestTalkNPC's Mario conditions): sets LIVE_FLAG_UNK20000 "talkable".</summary>
     private void TalkCheck()
     {
-        bool can = CanTalk && !CanBeTaken && Lines != null && Lines.Length > 0 && _talkForbid == 0 && !_talking && _mario != null
+        bool can = CanTalk && !CanBeTaken && Lines != null && Lines.Length > 0 && _talkForbid == 0 && !_talking && _mario != null && IsClean && !_sinking
             && (_cur == Nerve.GraphWander || _cur == Nerve.UTurn || _cur == Nerve.GraphWait || _cur == Nerve.TurnToMario || _cur == Nerve.Wet || _cur == Nerve.Mad || _cur == Nerve.WaitMarioApproach);
         if (can)
         {
@@ -914,6 +1107,11 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (!_talking) return;
         _talking = false; _windowOpen = false;
         _walkForbid = SmsParams.Npc.WalkForbidTicksAfterTalk;
+        if (_happy)
+        {
+            _happy = false;                                                 // offActionFlag(NPC_ACTION_HAPPY)
+            if (ThankYouCoin != null) { _coinTimer = SmsParams.Npc.CoinAppearFrames * SmsUnits.TicksPerFrame; _talkForbid = _walkForbid = SmsParams.Npc.CoinTalkForbidTicks; }
+        }
         if (_cur == Nerve.Talk) Pop();
     }
 
@@ -1016,7 +1214,21 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// <summary>behaveToHitObject_(WATER_SPRAY): isNerveCanGoToWet (not already wet, not in a talk's first 4 ticks) -> pushNerve(Wet).</summary>
     private void Sprayed()
     {
+        // behaveToHitObject_(WATER_SPRAY) 368: a dirty NPC in its Wet nerve loses PollutionCleanSpeed a hit; at 0 the talk forbid and the thanks
+        if (Profile.SinksInPollution && !_talking && _cur == Nerve.Wet && _pollution > 0f && !_sinking)
+        {
+            _pollution -= Profile.PollutionCleanSpeed;
+            _polDirty = true;
+            if (_pollution <= 0f)
+            {
+                _pollution = 0f;
+                _talkForbid = SmsParams.Npc.TalkForbidTicksAfterTalk;
+                _thanks = true;
+                if (DebugPrint) GD.Print($"[SMS npc] {Name}: washed clean");
+            }
+        }
         if (!Profile.ReactsToWater) return;
+        if (_sinking) return;                                               // isNerveCanGoToWet: not from Sink / Recover
         bool can = _cur == Nerve.GraphWander || _cur == Nerve.UTurn || _cur == Nerve.GraphWait || _cur == Nerve.WaitMarioApproach || _cur == Nerve.TurnToMario || (_cur == Nerve.Talk && _nerveTime >= 4);
         if (!can) return;
         if (_cur == Nerve.Talk)
@@ -1031,9 +1243,9 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
 
     private void WetIn()
     {
-        // npcWetIn: the wet clip, half the time the alternate (a sitting NPC: the sit-wet)
-        string clip = Sitting ? Profile.ClipSitWet : (_rng.NextDouble() < 0.5 ? Profile.ClipWetAlt : Profile.ClipWet);
-        Play(clip, blend: Profile.Kind == SmsNpcProfile.NpcKind.Toad); // a Pianta's wet is a cut (NPC_STOP_MOTION_BLEND_OFF)
+        // npcWetIn: the wet clip, half the time the alternate (a sitting NPC: the sit-wet); a dirty NPC washes instead (NPC_ANM_KIND_WASH)
+        string clip = _pollution > 0f ? Profile.ClipWash : (Sitting ? Profile.ClipSitWet : (_rng.NextDouble() < 0.5 ? Profile.ClipWetAlt : Profile.ClipWet));
+        Play(clip, blend: _pollution > 0f || Profile.Kind == SmsNpcProfile.NpcKind.Toad); // a Pianta's wet is a cut (NPC_STOP_MOTION_BLEND_OFF); the wash blends
         _marchSpeed = 0f; _turnSpeed = Profile.WaitTurnSpeed;
         if (WetVoice != null && WetVoice.Stream != null) WetVoice.Play();
     }
@@ -1041,8 +1253,16 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private void TickWet()
     {
         _marchSpeed = 0f;
+        // npcWetting: washed clean this wet (UNK1DA_FLAG_UNK2) -> happy and out; the WASH clip ends clean -> happy and out, still dirty -> out
+        if (_thanks) { _thanks = false; HappyIn(); Pop(); return; }
+        if (_clip == Profile.ClipWash)
+        {
+            if (_pollution <= 0f) { HappyIn(); Pop(); return; }
+            if (ClipEnded()) Pop();
+            return;
+        }
         if (!ClipEnded()) return;
-        if (Profile.GetsMad && InMadRange()) { Enter(Nerve.Mad); return; }   // the wet Pianta: isStateGoToMad_ -> Mad
+        if (Profile.GetsMad && InMadRange() && !DirtyOrHappy) { Enter(Nerve.Mad); return; }   // the wet Pianta: isStateGoToMad_ -> Mad (isClean, no HAPPY)
         Pop();                                                                 // npcWetOut
     }
 
@@ -1124,7 +1344,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         }
     }
 
-    private bool CanGoToMad() => _cur == Nerve.GraphWander || _cur == Nerve.UTurn || _cur == Nerve.GraphWait || _cur == Nerve.WaitMarioApproach || _cur == Nerve.TurnToMario || _cur == Nerve.Wet;
+    private bool CanGoToMad() => !DirtyOrHappy && (_cur == Nerve.GraphWander || _cur == Nerve.UTurn || _cur == Nerve.GraphWait || _cur == Nerve.WaitMarioApproach || _cur == Nerve.TurnToMario || _cur == Nerve.Wet);
     private void GoMad() { if (_cur == Nerve.Wet) Enter(Nerve.Mad); else Push(Nerve.Mad); }
 
     private void MadIn()
