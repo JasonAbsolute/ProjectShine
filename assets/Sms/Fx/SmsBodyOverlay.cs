@@ -6,7 +6,8 @@ using System.Collections.Generic;
 /// <see cref="DamageFog"/> -- TMario::addDamageFog (MarioDraw.cpp 2185): while mInvincibilityFrames > 0 and he is not talking, the
 /// body's, cap's and hands' materials carry a fog of colour (0xFF, 0x00, 0x80) whose range SMS_AddDamageFogEffect (DrawUtil.cpp) sets
 /// about his view depth so the linear factor at his depth is 7/12 - sin(moveTick x 0x888) / 4: a 0.33..0.83 pink pulse with a period
-/// of 30 ticks, one second, free-running on the director's tick count. <see cref="Negative"/> -- TMario::drawSpecial -> drawLogic
+/// of 30 ticks = a QUARTER second (pass 95b: gpMarDirector->mMoveTickCount is a 120 Hz counter -- MarDirectorDirect.cpp 104 adds one per
+/// simulation tick, four a drawn frame; the port ran the pulse at one second), free-running on the director's tick count. <see cref="Negative"/> -- TMario::drawSpecial -> drawLogic
 /// (MarioDraw.cpp 2058-2108) during MARIO_STATUS_ELECTRIC_DAMAGE: the body model drawn again with GX_BM_LOGIC and mBlendLogicOp 10 =
 /// GX_LO_INV, every covered pixel its own inverse, every frame. The water gun is its own actor in the game and keeps its colours, so
 /// its subtree is skipped. The overlay sits on the meshes only while something is on; off, each mesh gets back what it had.
@@ -19,8 +20,8 @@ public partial class SmsBodyOverlay : Node
     /// <summary>Node names under the Armature whose subtrees are not the body model (TWaterGun draws its own model, untouched).</summary>
     [Export] public string[] ExcludedSubtrees = { "SmsFluddAttach" };
 
-    /// <summary>The fog's pulse: 30 ticks of the game's 30 Hz move tick = 1 s.</summary>
-    [Export] public float FogPeriodSeconds = 1.0f;
+    /// <summary>The fog's pulse: 30 ticks of the director's 120 Hz move tick = 0.25 s (65536 / 0x888 = 30 ticks a cycle).</summary>
+    [Export] public float FogPeriodSeconds = 0.25f;
 
     private readonly List<MeshInstance3D> _meshes = new();
     private readonly List<Material> _previous = new();

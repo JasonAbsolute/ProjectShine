@@ -15,4 +15,4 @@ shader_parameter/negative = false
 script = ExtResource("1_script")
 Overlay = SubResource("ShaderMaterial_overlay")
 ExcludedSubtrees = PackedStringArray("SmsFluddAttach")
-FogPeriodSeconds = 1.0
+FogPeriodSeconds = 0.25

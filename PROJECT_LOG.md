@@ -5617,3 +5617,13 @@ the Piantas, the Nokis, the Toad):
   off again on its ground; the wash emitter alive on mom_wet_yogore and gone once clean; the happy sparkle at x 1.650; the Toad's drips
   at jnt_body with no feet; Mario's ring + balls on a sink layer (sinkTimer 62), both off beside the clean spot. Drive 93 re-run 30/30.
   Headless cannot draw: the refraction's look, the leaf texture on the fringe and the drips' colour are for the eye.
+
+## SMS pass 95b -- the damage fog's pulse clock
+
+- SMS_AddDamageFogEffect's s = sin(gpMarDirector->mMoveTickCount x 0x888) has a period of 65536 / 0x888 = 30 ticks. The port (pass 45's
+  BodyOverlay) read the move tick as a 30 Hz count and ran the pink pulse at ONE second; mMoveTickCount is incremented once per
+  SIMULATION tick (MarDirectorDirect.cpp 104: inside the loop that consumes 5 of the frame's 20 pending time units -- four ticks a drawn
+  frame, 120 Hz), so the game's pulse is a QUARTER second: the fast pink flicker after a hit. `FogPeriodSeconds` 1.0 -> 0.25 on
+  SmsBodyOverlay and BodyOverlay.tscn. (Found while porting the sink ripple, which keys off the same counter's % 20.)
+- The same counter already drives the sink damage cadence (% 90 = 0.75 s) and the time-lag's 0x4B0 wait at 120 Hz in Mario.cs -- those
+  were right.
