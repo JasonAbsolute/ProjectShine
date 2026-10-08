@@ -179,6 +179,21 @@ copy = a town's own fashion while the stock Piantas keep the game's.
 
 **Something held**: an `SmsNpcPart` scene on `handR_jnt`, in `Extra Parts` (always) or in a slot of its own (optional / random).
 
+## 7b. The other per-instance switches (not outfits, but on the same inspector)
+
+| Group | Field | What it does |
+|---|---|---|
+| Who | `Idle` | Wait / WaitA / WaitB / Talking / Angry / Dance / Sit / SitTalk -- the standing clip |
+| Talk | `Lines`, `CanTalk` | the balloon's pages (Enter = a new line, up to three a page); empty or off = no cursor |
+| Take | `Can Be Taken` | B lifts it instead of talking (the game's stage-script flag); carried, put down or pitched |
+| Throw | `Throws Mario`, `Throw Speed`, `Throw Angle Deg` | the Pianta Village launcher: when the talk ends it hurls Mario up and over its own head, to its BACK, at the speed (units a tick) and angle. It takes the talk only within 200 units (not 400). Stand it with its back to the destination. |
+| Pollution | `Pollution` | 0..1: placed already goop-covered (dirty wait, no talk, no turning, the head straight) until the hose washes it clean (125 hits at the Pianta's 0.008) |
+| Pollution | `Thank You Coin` | a scene to pop out 40 frames after the talk that follows a wash (the game's TNpcCoin). Empty = none. |
+| Wander | `Wander`, `Graph`, `Wander Radius Units` | walk a route of Marker3Ds, or random points in the radius |
+
+Any NPC standing on painted goop sinks into it by itself (220 units a Pianta, 70 a Toad) and comes out dirty when the goop under
+it is cleaned; `Profile.SinksInPollution` turns that off for a profile.
+
 ## 8. If it breaks
 
 - `[SMS npc] X: Profile is null` -> the instance has a `Profile = null` override (an editor save made while a class was not `[Tool]`);
