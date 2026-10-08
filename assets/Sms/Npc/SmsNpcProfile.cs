@@ -99,5 +99,41 @@ public partial class SmsNpcProfile : Resource
 
     public int ColorCount => BodyColors != null && BodyColors.Length > 0 ? BodyColors.Length : 1;
 
+    [ExportGroup("Leaves (pass 95)")]
+    /// <summary>The Pianta's leaf fringe material (_leafback_mat on mom_model / mow_model); "" = none (the Toad). NpcLeaf.gdshader = its bmd TEV.</summary>
+    [Export] public string LeafMaterial = "_leafback_mat";
+    /// <summary>The leaf texture the game swaps in for the model's 8 x 8 dummy (NpcManager.cpp: I_mom_mino_dummyI4 -> /scene/monteMCommon/
+    /// I_mom_mino_rgba.bti -- EVERY stage ships its own; assets/Sms/Npc/tex carries Delfino Plaza's two). Empty = the Kind's default.</summary>
+    [Export] public Texture2D LeafTexture;
+    /// <summary>Materials whose pollution mask and goop are read through the SECOND UV set (the bmd's TEX1): the leaves. The Pianta body reads
+    /// TEX0 (bmd_mat_dump.py: _hand_mat texgen0 / 1 src TEX0); the Toad's materials read TEX1 in the bmd but its glb has no second set.</summary>
+    [Export] public string[] PollutionUv2Materials = { "_leafback_mat" };
+
+    [ExportGroup("Effects (NpcEffect.cpp)")]
+    /// <summary>mHappyEffectMtxPtr / mPollutionEffectMtxPtr: the joint the sparkle, the centre drips and the wash are bound to -- koshi_null on a
+    /// Pianta, jnt_body on a Toad (setHappyEffectMtxPtr_ / setPollutionEffectMtxPtr_).</summary>
+    [Export] public string EffectJoint = "koshi_null";
+    /// <summary>emitHappyEffect_: ms_mnt_kira (Piantas) / ms_mare_kira (Toads) when the HAPPY clip starts, x the NPC's scale x HappyEffectScale.
+    /// Empty = the Kind's default scene (assets/Sms/Fx/NpcSparkle*.tscn).</summary>
+    [Export] public PackedScene HappyEffect;
+    /// <summary>mSLCleanEffectScale (npcnormal.prm): 1.65.</summary>
+    [Export] public float HappyEffectScale = 1.65f;
+    /// <summary>emitDirtyEffect_: the goop drips off the dirty idle -- ms_mnt_yogore_b (Piantas) / ms_kino_yogore (Toads) at EffectJoint when the
+    /// DIRTY clip passes each of DirtyDripFrames (sCheckFrameMonte 28 52 76 128 152 176; Kino 22 44).</summary>
+    [Export] public PackedScene DirtyDripEffect;
+    [Export] public float[] DirtyDripFrames = { 28f, 52f, 76f, 128f, 152f, 176f };
+    /// <summary>Piantas only: ms_mnt_yogore_f off the left foot at FootDripFramesL and the right at FootDripFramesR.</summary>
+    [Export] public PackedScene FootDripEffect;
+    [Export] public string FootJointL = "footL_jnt";
+    [Export] public string FootJointR = "footR_jnt";
+    [Export] public float[] FootDripFramesL = { 28f, 52f, 76f };
+    [Export] public float[] FootDripFramesR = { 128f, 152f, 176f };
+    /// <summary>emitWashEffect_: ms_mnt_wash / ms_mare_wash, one emitter at EffectJoint kept alive while the WASH clip plays.</summary>
+    [Export] public PackedScene WashEffect;
+    /// <summary>emitSinkEffect_ -> SMS_EmitSinkInPollutionEffect: the goop ripple ring (+ the balls while not at the bottom) at the sink point.</summary>
+    [Export] public PackedScene SinkEffect;
+    /// <summary>The Toads' drips have no foot emitters and getEffectScale_ is 1 for them (a Pianta's effects scale with its node).</summary>
+    public bool IsToad => Kind == NpcKind.Toad;
+
     public static Color S10(Vector3 v) => new Color(v.X / 255f, v.Y / 255f, v.Z / 255f, 1f);
 }

@@ -194,6 +194,26 @@ copy = a town's own fashion while the stock Piantas keep the game's.
 Any NPC standing on painted goop sinks into it by itself (220 units a Pianta, 70 a Toad) and comes out dirty when the goop under
 it is cleaned; `Profile.SinksInPollution` turns that off for a profile.
 
+## 7c. Per-profile looks and effects (pass 95: `Profiles/*.tres`, the "Leaves" and "Effects" groups)
+
+These sit on the PROFILE, not the instance -- change them on a duplicated profile for a new kind of Pianta or Toad.
+
+| Group | Knob | What it does |
+|---|---|---|
+| Leaves | `Leaf Material`, `Leaf Texture` | the Pianta's leaf fringe (`_leafback_mat`) and the texture the game swaps in for the model's dummy. Every stage of Sunshine ships its own `I_mom_mino_rgba` / `I_mow_mino_rgba`; Delfino Plaza's two are in `tex/`. Empty texture = the Kind's default; `Leaf Material` empty = no leaves (the Toad). |
+| Leaves | `Pollution Uv2 Materials` | which materials read the goop mask through the mesh's second UV set (the leaves). The body reads the first. Leave alone unless a re-export changes the UV layout. |
+| Effects | `Effect Joint` | the joint the sparkle, the centre drips and the wash hang from: `koshi_null` on a Pianta, `jnt_body` on a Toad. |
+| Effects | `Happy Effect`, `Happy Effect Scale` | the thank-you sparkle scene (`Fx/NpcSparklePianta.tscn` / `NpcSparkleToad.tscn`) and the game's 1.65 size. |
+| Effects | `Dirty Drip Effect`, `Dirty Drip Frames` | the goop-ball bursts off a dirty idle, and the clip frames (60 fps) they fire on (a Pianta 28 52 76 128 152 176, a Toad 22 44). |
+| Effects | `Foot Drip Effect`, `Foot Joint L` / `R`, `Foot Drip Frames L` / `R` | the Pianta's foot drips (left on 28 52 76, right on 128 152 176). Empty on a Toad. |
+| Effects | `Wash Effect` | the balls flying off while the hose washes it (`NpcWashPianta` / `NpcWashToad`). |
+| Effects | `Sink Effect` | the goop ripple ring and balls while it sinks (`Fx/GoopSinkRipple.tscn`; Mario's own copy sits on `Player.tscn`). |
+
+Any `SmsNpcEffect` scene can stand in: a root `Node3D` with the `SmsNpcEffect` script (`Emit Frames` = how long it emits, 1 = one
+burst, 0 = until the clip ends; `Drain Seconds` = the longest particle life) and `GPUParticles3D` children with `emitting` off.
+The drips' and the wash's colours are the goop's: `env_color` / `prm_color` on their shader material (Delfino's brown pair; the
+game's other maps' rows are in `EmitterViewObj.cpp` 644 if a level wants another colour).
+
 ## 8. If it breaks
 
 - `[SMS npc] X: Profile is null` -> the instance has a `Profile = null` override (an editor save made while a class was not `[Tool]`);

@@ -1,0 +1,127 @@
+[gd_scene load_steps=21 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsGoopRipple.cs" id="1_script"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/goop_refract.gdshader" id="2_shader"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/indhamon2.png" id="3_warp_ring"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/indmsk2.png" id="4_mask_ring"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/indwp4.png" id="5_warp_ball"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/indmsk4.png" id="6_mask_ball"]
+
+[sub_resource type="Curve" id="Curve_ring_scale"]
+resource_name = "ms_mari_rakuhamon ESP1 scale: 0.2 -> 1.0 over the whole life (in 1.0, no out)"
+_data = [Vector2(0, 0.1999), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_ring_scale"]
+curve = SubResource("Curve_ring_scale")
+
+[sub_resource type="Gradient" id="Gradient_ring_alpha"]
+resource_name = "ms_mari_rakuhamon ESP1 alpha 0 -> 1 by 6.5 %, -> 0 from 80.8 %"
+offsets = PackedFloat32Array(0, 0.0652, 0.8081, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_ring_alpha"]
+gradient = SubResource("Gradient_ring_alpha")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_ring"]
+resource_name = "one ring every 1/6 s (8 alive over 80 frames = the game's one per 20 move ticks)"
+emission_shape = 0
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+gravity = Vector3(0, 0, 0)
+scale_min = 0.875
+scale_max = 1.125
+scale_curve = SubResource("CurveTexture_ring_scale")
+color_ramp = SubResource("GradientTexture1D_ring_alpha")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ring"]
+resource_name = "ms_mari_rakuhamon: the screen behind, warped by P_msm_indhamon2 (I - 128) / 8 texels of the 320 x 224 copy, masked by P_msm_indmsk2"
+shader = ExtResource("2_shader")
+shader_parameter/warp_tex = ExtResource("3_warp_ring")
+shader_parameter/mask_tex = ExtResource("4_mask_ring")
+shader_parameter/screen_texels = Vector2(320, 224)
+shader_parameter/ind_scale = 0.125
+shader_parameter/prm_color = Vector3(1, 1, 1)
+shader_parameter/billboard = false
+
+[sub_resource type="QuadMesh" id="QuadMesh_ring"]
+resource_name = "the game's 6.0 x 6.0 Direction quad (300 units), flat: its normal is the emitter's Y"
+material = SubResource("ShaderMaterial_ring")
+size = Vector2(4.03, 4.03)
+orientation = 1
+
+[sub_resource type="Curve" id="Curve_ball_scale_x"]
+resource_name = "ms_mari_rakuball ESP1 scale X: 0.85 -> 1 by 42.1 %, -> 0.85 from 59.6 % (diffXY)"
+_data = [Vector2(0, 0.8499), 0.0, 0.0, 1, 1, Vector2(0.4211, 1), 0.0, 0.0, 1, 1, Vector2(0.5959, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.8499), 0.0, 0.0, 1, 1]
+point_count = 4
+
+[sub_resource type="Curve" id="Curve_ball_scale_y"]
+resource_name = "ms_mari_rakuball ESP1 scale Y: 3.0 -> 1 by 42.1 %, -> 3.0 from 59.6 %"
+max_value = 2.9999
+_data = [Vector2(0, 2.9999), 0.0, 0.0, 1, 1, Vector2(0.4211, 1), 0.0, 0.0, 1, 1, Vector2(0.5959, 1), 0.0, 0.0, 1, 1, Vector2(1, 2.9999), 0.0, 0.0, 1, 1]
+point_count = 4
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_ball_scale"]
+curve_x = SubResource("Curve_ball_scale_x")
+curve_y = SubResource("Curve_ball_scale_y")
+curve_z = SubResource("Curve_ball_scale_x")
+
+[sub_resource type="Gradient" id="Gradient_ball_alpha"]
+resource_name = "ms_mari_rakuball ESP1 alpha 0 -> 1 by 12.5 %, -> 0 from 87.5 %"
+offsets = PackedFloat32Array(0, 0.125, 0.875, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_ball_alpha"]
+gradient = SubResource("Gradient_ball_alpha")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_balls"]
+resource_name = "Circle 100 u minRad 0.375 (uniform in the radius: Godot's ring is uniform in the area -- noted), 20 u/f up (1 +- 0.375), gravity 1.5 u/f^2, 48 a second"
+emission_shape = 6
+emission_ring_axis = Vector3(0, 1, 0)
+emission_ring_height = 0.0
+emission_ring_radius = 1.3433
+emission_ring_inner_radius = 0.5038
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 10.075
+initial_velocity_max = 22.1651
+gravity = Vector3(0, -72.5404, 0)
+scale_min = 0.625
+scale_max = 1.375
+scale_curve = SubResource("CurveXYZTexture_ball_scale")
+color_ramp = SubResource("GradientTexture1D_ball_alpha")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_balls"]
+resource_name = "ms_mari_rakuball: the screen behind, warped by P_msm_indwp4, masked by P_msm_indmsk4, a billboard"
+shader = ExtResource("2_shader")
+shader_parameter/warp_tex = ExtResource("5_warp_ball")
+shader_parameter/mask_tex = ExtResource("6_mask_ball")
+shader_parameter/screen_texels = Vector2(320, 224)
+shader_parameter/ind_scale = 0.125
+shader_parameter/prm_color = Vector3(1, 1, 1)
+shader_parameter/billboard = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_balls"]
+resource_name = "the game's 0.7 x 0.7 billboard (35 units) before its 0.85 x 3.0 stretch"
+material = SubResource("ShaderMaterial_balls")
+size = Vector2(0.47, 0.47)
+
+[node name="GoopSinkRipple" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Ring" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1008, 0)
+emitting = false
+amount = 8
+lifetime = 1.3333
+process_material = SubResource("ParticleProcessMaterial_ring")
+draw_pass_1 = SubResource("QuadMesh_ring")
+
+[node name="Balls" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 24
+lifetime = 0.5
+process_material = SubResource("ParticleProcessMaterial_balls")
+draw_pass_1 = SubResource("QuadMesh_balls")

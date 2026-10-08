@@ -1,0 +1,128 @@
+using Godot;
+
+/// <summary>
+/// An NPC effect the way TMarioParticleManager runs one (EmitterViewObj.cpp): the scene is instanced under a BoneAttachment3D of the joint the
+/// game binds the emitter to (emitAndBindToMtxPtr / SMS_EasyEmitParticle with a MtxPtr -- the emitter's RT matrix is the joint's every frame),
+/// <see cref="Start"/> opens its emitters for the .jpa's emitter life (BEM1 maxFrame, in 60 Hz frames: 1 = one burst, 80 = the sparkle's,
+/// 0 = until <see cref="Stop"/> -- the wash, kept alive by its clip) and the node frees itself once the last particle is gone
+/// (<see cref="DrainSeconds"/> = the longest particle life). The scale (setGlobalScale(getEffectScale_()) x mSLCleanEffectScale on the happy
+/// sparkle) goes on the node AND on the quads: Godot's world-space particles keep their own size, so each GPUParticles3D gets a per-instance
+/// copy of its process material with scale_min / max multiplied. Particles are world space (local_coords off), so a burst stays where the
+/// joint was when it fired, as the game's do. The scenes: assets/Sms/Fx/Npc*.tscn (gen_fx_npc.py).
+/// </summary>
+public partial class SmsNpcEffect : Node3D
+{
+    /// <summary>BEM1 maxFrame: how long the emitter emits, in 60 Hz frames (1 = a single burst, 0 = until Stop()).</summary>
+    [Export] public float EmitFrames = 1f;
+    /// <summary>The longest particle life (lifetime x (1 + randomness)): the wait after the emitter closes before the node is freed.</summary>
+    [Export] public float DrainSeconds = 0.6f;
+
+    private double _emitLeft = -1;
+    private double _drainLeft = -1;
+    private bool _started;
+    private float _scale = 1f;
+    private Node3D _follow;                // the BoneAttachment3D (its frame carries the model's 1/74.44 scale: followed orthonormalised, top-level)
+
+    /// <summary>The joint frame without the model's scale, the effect scale on top -- the game's emitter RT matrix is the joint's, its scale its own.</summary>
+    private void Follow()
+    {
+        if (_follow == null || !IsInsideTree() || !GodotObject.IsInstanceValid(_follow)) return;
+        GlobalTransform = new Transform3D(_follow.GlobalBasis.Orthonormalized().Scaled(Vector3.One * _scale), _follow.GlobalPosition);
+    }
+
+    /// <summary>Open the emitters. `scale` = the game's emitter scale (1 for a Toad, the NPC's initial scale for a Pianta, x 1.65 on the sparkle).</summary>
+    public void Start(float scale = 1f)
+    {
+        if (_started) return;
+        _started = true;
+        _scale = scale;
+        if (!Mathf.IsEqualApprox(scale, 1f))
+        {
+            foreach (var p in Emitters())
+            {
+                if (p.ProcessMaterial is ParticleProcessMaterial pm)
+                {
+                    var copy = (ParticleProcessMaterial)pm.Duplicate();
+                    copy.ScaleMin *= scale; copy.ScaleMax *= scale;
+                    p.ProcessMaterial = copy;
+                }
+            }
+        }
+        Follow();
+        foreach (var p in Emitters())
+        {
+            if (p.OneShot) p.Restart(); else p.Emitting = true;
+        }
+        _emitLeft = EmitFrames > 0f ? EmitFrames / 60.0 : -1;
+        if (EmitFrames > 0f && EmitFrames <= 1f) { _emitLeft = -1; _drainLeft = DrainSeconds; }   // a burst: nothing to close, just drain
+    }
+
+    /// <summary>Close the emitters (the wash clip ended); the node frees itself when the live particles are gone.</summary>
+    public void Stop()
+    {
+        if (_drainLeft >= 0) return;
+        foreach (var p in Emitters()) p.Emitting = false;
+        _emitLeft = -1;
+        _drainLeft = DrainSeconds;
+    }
+
+    public bool IsEmitting => _started && _drainLeft < 0;
+    public float EffectScaleApplied => _scale;
+
+    /// <summary>Every Spawn so far (a headless drive counts the emits) and the scene file of the last one.</summary>
+    public static int SpawnCount;
+    public static string LastSpawned = "";
+
+    public override void _Process(double delta)
+    {
+        Follow();
+        if (_emitLeft >= 0)
+        {
+            _emitLeft -= delta;
+            if (_emitLeft <= 0) Stop();
+        }
+        if (_drainLeft >= 0)
+        {
+            _drainLeft -= delta;
+            if (_drainLeft <= 0) QueueFree();
+        }
+    }
+
+    private System.Collections.Generic.IEnumerable<GpuParticles3D> Emitters()
+    {
+        foreach (var c in GetChildren()) if (c is GpuParticles3D p) yield return p;
+    }
+
+    /// <summary>Instance `scene` under a BoneAttachment3D of `joint` on `skel` (made once per joint and kept) and start it; null when the
+    /// scene or the joint is missing (one warning per joint). The attachment follows the joint's full pose, as the game's MtxPtr bind does.</summary>
+    public static SmsNpcEffect Spawn(PackedScene scene, Skeleton3D skel, string joint, float scale, System.Collections.Generic.Dictionary<string, BoneAttachment3D> cache, string who)
+    {
+        if (scene == null || skel == null) return null;
+        if (cache.TryGetValue(joint, out var att) && att == null) return null;   // warned once already
+        if (att == null || !GodotObject.IsInstanceValid(att))
+        {
+            int b = string.IsNullOrEmpty(joint) ? -1 : skel.FindBone(joint);
+            if (b < 0)
+            {
+                GD.PushWarning($"[SMS npc fx] {who}: no joint '{joint}' on {skel.Name} for {scene.ResourcePath.GetFile()} -- the effect is skipped");
+                cache[joint] = null;
+                return null;
+            }
+            att = new BoneAttachment3D { Name = "Fx_" + joint, BoneName = joint };
+            skel.AddChild(att);
+            cache[joint] = att;
+        }
+        if (scene.Instantiate() is not SmsNpcEffect fx)
+        {
+            GD.PushWarning($"[SMS npc fx] {who}: {scene.ResourcePath.GetFile()} is not an SmsNpcEffect scene");
+            return null;
+        }
+        fx.TopLevel = true;                 // the attachment's frame carries the model's 1/74.44 scale -- followed without it (Follow)
+        fx._follow = att;
+        fx.ProcessPriority = 100;           // after the AnimationPlayer and the skeleton modifiers
+        att.AddChild(fx);
+        fx.Start(scale);
+        SpawnCount++; LastSpawned = scene.ResourcePath.GetFile();
+        return fx;
+    }
+}

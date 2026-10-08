@@ -5544,6 +5544,7 @@ public partial class Mario : CharacterBody3D
         _smsWallKickDust = SmsFluddModel.FindChild<SmsWallKickDust>(this);
         _smsWallSlideDust = SmsFluddModel.FindChild<SmsWallSlideDust>(this);
         _smsSlipSmoke = SmsFluddModel.FindChild<SmsSlipSmoke>(this);
+        _smsGoopRipple = SmsFluddModel.FindChild<SmsGoopRipple>(this);   // pass 95: the goop ripple at his feet (ms_mari_rakuhamon / rakuball)
         _smsWallSlideDust?.Bind(this);
         _smsSlipSmoke?.Bind(this);
         _smsSpinBlur?.Bind(this);
@@ -5587,6 +5588,8 @@ public partial class Mario : CharacterBody3D
             GD.PushError("[SMS fx] Player.tscn has no WallSlideDust under Mario: instance res://assets/Sms/Fx/WallSlideDust.tscn there (the wall slide's dust, ms_mariwallsl1)");
         if (_smsSlipSmoke == null)
             GD.PushError("[SMS fx] Player.tscn has no SlipSmoke under Mario: instance res://assets/Sms/Fx/SlipSmoke.tscn there (the slide's smoke, ms_m_slipsmoke)");
+        if (_smsGoopRipple == null)
+            GD.PushError("[SMS fx] Player.tscn has no GoopRipple under Mario: instance res://assets/Sms/Fx/GoopSinkRipple.tscn there (the goop ripple ring and balls at his feet, ms_mari_rakuhamon / ms_mari_rakuball)");
         if (SmsDebugPrint)
             GD.Print($"[SMS fx] spin rings {(_smsSpinBlur != null ? "from the scene" : "MISSING")}, hip drop streak {(_smsHipBlur != null ? "from the scene" : "MISSING")}, hip drop landing {(_smsHipLanding != null ? "from the scene" : "MISSING")}, super hip drop fall {(_smsSuperHipBlur != null ? "from the scene" : "MISSING")} / landing {(_smsSuperHipLanding != null ? "from the scene" : "MISSING")}, bonk stars {(_smsBonkStars != null ? "from the scene" : "MISSING")}, camera shake {(_smsCameraShake != null ? "from the scene" : "MISSING")}, bubbles {(_smsBubbles != null ? "from the scene" : "MISSING")}, burn cloud {(_smsFireFx != null ? "from the scene" : "MISSING")}, shock sparks {(_smsShockSparks != null ? "from the scene" : "MISSING")} / puff {(_smsShockPuff != null ? "from the scene" : "MISSING")}");
     }
@@ -15017,6 +15020,16 @@ public partial class Mario : CharacterBody3D
             _smsOilAnimRate = 0f;
         }
         SmsSinkDraw();
+        // pass 95: SMS_EmitSinkInPollutionEffect (EffectUtil.cpp 56) -- checkGraffito 1102: the goop ripple ring at mPosition while isTouchGround4cm
+        // && isDirty (ANY paint); checkSink 1221: ring + the goop balls while he sinks. The game fires an unbound emitter every 20 move ticks; the
+        // scene's two emitters run at that steady rate while asked for (SmsGoopRipple.Set), and the rings stay where they were born.
+        if (_smsGoopRipple != null)
+        {
+            bool sinking = _smsSinkTimer > 0f && _smsPollution == SmsPollution.Sink && _smsDirty;
+            bool ring = (dirty && _smsGround4cm && stateOfMario != MarioState.dead) || sinking;
+            if (ring) _smsGoopRipple.Set(feet, IsOnFloor() ? GetFloorNormal() : Vector3.Up, true, sinking);
+            else _smsGoopRipple.Off();
+        }
     }
 
     // ---------------------------------------------------------------------------------------------------------------
@@ -15035,6 +15048,7 @@ public partial class Mario : CharacterBody3D
     private bool _smsOilSlopeSlide;      // OIL_SLOPE: the surface slip is running slipBackCommon for the goop slope
     private Vector3 _smsTickStartPos;    // mPrevPosition: his position before this tick's move (the glass-wall revert)
     private uint _smsMoveTick;           // gpMarDirector->mMoveTickCount: the sink's damage cadence
+    private SmsGoopRipple _smsGoopRipple; // pass 95: SMS_EmitSinkInPollutionEffect's ring (+ balls while sinking) at his feet
     private float _smsSinkDrawY;         // the sink offset on the armature now (metres)
     private int _smsFootPrintTimer;      // mFootPrintTimer: 520 the tick he stands on paint / mud, down a grounded tick; footprints and the jump stamp while above 260 (pass 65)
     private bool _smsGround4cm;          // isTouchGround4cm() this frame

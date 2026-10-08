@@ -123,6 +123,11 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     public const string ToonPath = "res://assets/Sms/models/toon_2_4i.png";
     public const string PollutionMaskPath = "res://assets/Sms/Npc/tex/H_ma_polmask_sample.png";
     public const string GoopPath = "res://assets/Sms/Npc/tex/H_ma_rak.png";
+    public const string LeafShaderPath = "res://assets/Sms/Npc/NpcLeaf.gdshader";                    // pass 95: _leafback_mat's TEV
+    public const string LeafTexMalePath = "res://assets/Sms/Npc/tex/I_mom_mino_rgba.png";          // Delfino's /scene/monteMCommon/I_mom_mino_rgba.bti
+    public const string LeafTexFemalePath = "res://assets/Sms/Npc/tex/I_mow_mino_rgba.png";
+    public const string FxDir = "res://assets/Sms/Fx/";                                              // the Kind defaults of the profile's effect slots
+    [Export] public Shader LeafShader;
     public const string CursorPath = "res://assets/Sms/Npc/TalkCursor.tscn";
 
     // ---- state ----
@@ -168,7 +173,16 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private bool _happy; private int _coinTimer;         // NPC_ACTION_HAPPY (until the next talk ends: npcTalkOut) + TNpcCoin's 40-frame count
     private int _sinkPoll;                               // TNpcSink: changeNerveProc_ polls the goop once every SinkPollFrames (staggered per NPC)
     private static int _sinkPollStagger;                 // sCheckPollutedStartCounter
-    private readonly List<ShaderMaterial> _skinMats = new();   // the body / cloth materials carrying the `pollution` uniform
+    private readonly List<ShaderMaterial> _skinMats = new();   // the body / cloth / leaf materials carrying the `pollution` uniform
+    // ---- effects (pass 95, NpcEffect.cpp) ----
+    private readonly Dictionary<string, BoneAttachment3D> _fxJoints = new();   // one BoneAttachment3D per effect joint, made on first use
+    private SmsNpcEffect _washFx;                        // emitWashEffect_'s one emitter (emitAndBindToMtxPtr flag 1: one per owner), alive with the WASH clip
+    private SmsGoopRipple _sinkFx;                       // emitSinkEffect_: the goop ripple at the sink point
+    private Vector3 _sinkNormal = Vector3.Up;            // mGroundPlane->getNormal() when the sink began
+    private float _fxPrevFrame = -1f; private string _fxPrevClip = "";   // the BCK frame controller's checkPass: last frame's position
+    private PackedScene _happyFx, _dirtyFx, _footFx, _washScene, _sinkScene;
+    public int EffectNodeCount { get { int n = 0; foreach (var a in _fxJoints.Values) if (a != null) n += a.GetChildCount(); return n; } }   // the drive reads it
+    public SmsGoopRipple SinkRipple => _sinkFx;
     private bool _polDirty = true;
     public float PollutionAmount => _pollution;
     public bool IsClean => _pollution <= 0f;
@@ -394,11 +408,16 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (_model == null) return;
         var skin = SkinShader ?? GD.Load<Shader>(SkinShaderPath);
         var eye = EyeShader ?? GD.Load<Shader>(EyeShaderPath);
+        var leaf = LeafShader ?? GD.Load<Shader>(LeafShaderPath);
         var toon = ToonTexture ?? GD.Load<Texture2D>(ToonPath);
         var polMask = PollutionMaskTexture ?? GD.Load<Texture2D>(PollutionMaskPath);
         var goop = GoopTexture ?? GD.Load<Texture2D>(GoopPath);
         var sun = FindSun(GetTree().CurrentScene);
         bool toad = Profile.Kind == SmsNpcProfile.NpcKind.Toad;
+        // pass 95: the stage's leaf texture (the game swaps the model's dummy for it at load: NpcManager.cpp); Delfino Plaza's by default
+        Texture2D leafTex = Profile.LeafTexture;
+        if (leafTex == null && !string.IsNullOrEmpty(Profile.LeafMaterial))
+            leafTex = GD.Load<Texture2D>(Profile.Kind == SmsNpcProfile.NpcKind.PiantaFemale ? LeafTexFemalePath : LeafTexMalePath);
         _skinMats.Clear();
         foreach (var mi in AllMeshes(_model))
         {
@@ -436,6 +455,13 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
                     m.SetShaderParameter("use_vertex_color", false);
                     if (tex != null) m.SetShaderParameter("base_tex", tex);
                 }
+                else if (!string.IsNullOrEmpty(Profile.LeafMaterial) && name == Profile.LeafMaterial)
+                {
+                    // pass 95: _leafback_mat -- the import gave it a metallic StandardMaterial3D on the 8 x 8 dummy ("the NPCs look metallic")
+                    m = new ShaderMaterial { Shader = leaf };
+                    m.SetShaderParameter("use_vertex_color", true);
+                    if (leafTex != null) m.SetShaderParameter("base_tex", leafTex);
+                }
                 else if (name == "_eye_mat")
                 {
                     m = new ShaderMaterial { Shader = eye, RenderPriority = 1 };
@@ -447,14 +473,17 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
                 if (m == null) continue;
                 m.SetShaderParameter("toon_tex", toon);
                 SetSun(m, sun);
-                if (m.Shader == skin)
+                if (m.Shader == skin || m.Shader == leaf)
                 {
-                    // the pollution stages (pass 93): the mask gradient, the stage's goop texture, the Toad's TEX1 when the mesh carries it
+                    // the pollution stages (pass 93): the mask gradient, the stage's goop texture. The UV set is the MATERIAL's (pass 95): the
+                    // bmd's texgen source -- TEX0 on the Pianta body, TEX1 on the leaves (Profile.PollutionUv2Materials) when the mesh carries one;
+                    // pass 93 took any UV2 array as the mask's and sampled the Pianta body's zero-filled one at the mask's top row (always clean)
                     m.SetShaderParameter("pol_mask_tex", polMask);
                     m.SetShaderParameter("pol_tex", goop);
-                    bool uv2 = false;
-                    try { var arrays = mi.Mesh.SurfaceGetArrays(s); uv2 = arrays.Count > (int)Mesh.ArrayType.TexUV2 && arrays[(int)Mesh.ArrayType.TexUV2].VariantType != Variant.Type.Nil; } catch { }
-                    m.SetShaderParameter("pol_uv2", uv2);
+                    bool hasUv2 = false;
+                    try { var arrays = mi.Mesh.SurfaceGetArrays(s); hasUv2 = arrays.Count > (int)Mesh.ArrayType.TexUV2 && arrays[(int)Mesh.ArrayType.TexUV2].VariantType != Variant.Type.Nil; } catch { }
+                    bool wantsUv2 = Profile.PollutionUv2Materials != null && Array.IndexOf(Profile.PollutionUv2Materials, name) >= 0;
+                    m.SetShaderParameter("pol_uv2", wantsUv2 && hasUv2);
                     _skinMats.Add(m);
                 }
                 mi.SetSurfaceOverrideMaterial(s, m);
@@ -583,6 +612,89 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         }
     }
 
+    // ------------------------------------------------------------------ effects (pass 95: NpcEffect.cpp)
+    /// <summary>getEffectScale_: a Toad's effects are scale 1, a Pianta's take the actor's initial scale (the node's).</summary>
+    private float EffectScale() => Profile.IsToad ? 1f : Scale.Y;
+
+    private PackedScene Fx(PackedScene slot, ref PackedScene cache, string piantaDefault, string toadDefault)
+    {
+        if (slot != null) return slot;
+        if (cache != null) return cache;
+        string path = FxDir + (Profile.IsToad ? toadDefault : piantaDefault);
+        if (string.IsNullOrEmpty(Profile.IsToad ? toadDefault : piantaDefault)) return null;
+        cache = ResourceLoader.Exists(path) ? GD.Load<PackedScene>(path) : null;
+        if (cache == null) GD.PushWarning($"[SMS npc fx] {Name}: no effect scene at {path} (set it on the profile)");
+        return cache;
+    }
+
+    /// <summary>emitHappyEffect_: ms_mnt_kira at koshi_null (Piantas) / ms_mare_kira at jnt_body (Toads), x getEffectScale_ x mSLCleanEffectScale.</summary>
+    private void EmitHappyEffect()
+    {
+        var scene = Fx(Profile.HappyEffect, ref _happyFx, "NpcSparklePianta.tscn", "NpcSparkleToad.tscn");
+        SmsNpcEffect.Spawn(scene, _skel, Profile.EffectJoint, EffectScale() * Profile.HappyEffectScale, _fxJoints, Name);
+    }
+
+    /// <summary>IsCheckPassFrame (NpcEffect.cpp 100): the clip's frame counter crossed `frame` since the last look (the loop wrap counts).</summary>
+    private static bool Passed(float prev, float cur, float frame)
+    {
+        if (prev < 0f) return false;
+        if (cur >= prev) return prev < frame && cur >= frame;
+        return frame > prev || frame <= cur;                                  // the clip wrapped
+    }
+
+    private static bool PassedAny(float prev, float cur, float[] frames)
+    {
+        if (frames == null) return false;
+        foreach (var fr in frames) if (Passed(prev, cur, fr)) return true;
+        return false;
+    }
+
+    /// <summary>emitParticle_ (NpcBase.cpp 735, the CUE_CALC_ANIM pass): DIRTY -> emitDirtyEffect_ (the drips on the clip's check frames: the centre
+    /// at EffectJoint, a Pianta's feet at theirs), WASH -> emitWashEffect_ (one emitter kept alive); and emitSinkEffect_ (NpcBase.cpp 554) while
+    /// LIVE_FLAG_UNK400000 (sinking, sunk, climbing out) -- the balls only off the bottom. Not here: the burning smoke / fire, the note, the
+    /// water ripples (MONTE_MF / map 4), HIDDEN / CLIPPED_OUT (not modelled).</summary>
+    private void TickEffects()
+    {
+        if (_skel == null) return;
+        string clip = _anim != null && _anim.IsPlaying() ? _anim.CurrentAnimation : "";
+        float frame = clip != "" ? (float)(_anim.CurrentAnimationPosition * 60.0) : -1f;
+        float prev = clip == _fxPrevClip ? _fxPrevFrame : -1f;
+        _fxPrevClip = clip; _fxPrevFrame = frame;
+        // the dirty idle's drips
+        if (clip != "" && clip == Profile.ClipDirty && prev >= 0f)
+        {
+            float sc = EffectScale();
+            if (PassedAny(prev, frame, Profile.DirtyDripFrames))
+                SmsNpcEffect.Spawn(Fx(Profile.DirtyDripEffect, ref _dirtyFx, "NpcDripBody.tscn", "NpcDripToad.tscn"), _skel, Profile.EffectJoint, sc, _fxJoints, Name);
+            if (!Profile.IsToad)
+            {
+                var foot = Fx(Profile.FootDripEffect, ref _footFx, "NpcDripFoot.tscn", "");
+                if (PassedAny(prev, frame, Profile.FootDripFramesL)) SmsNpcEffect.Spawn(foot, _skel, Profile.FootJointL, sc, _fxJoints, Name);
+                if (PassedAny(prev, frame, Profile.FootDripFramesR)) SmsNpcEffect.Spawn(foot, _skel, Profile.FootJointR, sc, _fxJoints, Name);
+            }
+        }
+        // the wash: one emitter while the WASH clip plays (emitAndBindToMtxPtr flag 1 = the owner's slot; the manager drops it when no longer asked for)
+        bool washing = clip != "" && clip == Profile.ClipWash;
+        if (washing && (_washFx == null || !GodotObject.IsInstanceValid(_washFx)))
+            _washFx = SmsNpcEffect.Spawn(Fx(Profile.WashEffect, ref _washScene, "NpcWashPianta.tscn", "NpcWashToad.tscn"), _skel, Profile.EffectJoint, EffectScale(), _fxJoints, Name);
+        else if (!washing && _washFx != null)
+        {
+            if (GodotObject.IsInstanceValid(_washFx)) _washFx.Stop();
+            _washFx = null;
+        }
+        // the sink ripple
+        if (_sinking)
+        {
+            if (_sinkFx == null || !GodotObject.IsInstanceValid(_sinkFx))
+            {
+                var scene = Fx(Profile.SinkEffect, ref _sinkScene, "GoopSinkRipple.tscn", "GoopSinkRipple.tscn");
+                if (scene != null && scene.Instantiate() is SmsGoopRipple r) { r.TopLevel = true; AddChild(r); _sinkFx = r; }
+            }
+            _sinkFx?.Set(new Vector3(GlobalPosition.X, _sinkGroundY, GlobalPosition.Z), _sinkNormal, true, !_sunk);
+        }
+        else if (_sinkFx != null && GodotObject.IsInstanceValid(_sinkFx)) _sinkFx.Off();
+    }
+
     // ------------------------------------------------------------------ animation
     /// <summary>requestNpcAnm_ with NPC_STOP_MOTION_BLEND_ON = a MotionBlendFrame (20 frame = 0.33 s) blend; OFF = a cut.</summary>
     private void Play(string clip, bool blend = true, float rate = 1f)
@@ -671,6 +783,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         }
         Move();
         UpdatePollutionUniform();
+        TickEffects();                                                   // pass 95: emitParticle_ (CUE_CALC_ANIM: once a drawn frame)
         // TTalkCursor::associateNPC: the director's cursor sits on the NPC it found this frame (none while he walks: findNearestTalkNPC wants WAIT)
         if (_cursor != null) _cursor.Visible = !_talking && _mario != null && _mario.SmsTalkTargetNpc == this;
     }
@@ -762,6 +875,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         bool can = _cur == Nerve.GraphWander || _cur == Nerve.UTurn || _cur == Nerve.GraphWait || _cur == Nerve.WaitMarioApproach || _cur == Nerve.TurnToMario;   // isNerveCanGoToSink
         if (!can) return;
         _sinkGroundY = GlobalPosition.Y;
+        _sinkNormal = IsOnFloor() ? GetFloorNormal() : Vector3.Up;          // mGroundPlane->getNormal() for the ripple's frame (pass 95)
         Velocity = Vector3.Zero; _marchSpeed = 0f;
         _talkable = false; _sinking = true; _sunk = false;
         Play(Profile.ClipFall); ResetToWait();                              // npcFallIn: the FALL clip
@@ -848,6 +962,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     {
         _happy = true;
         Play(Profile.ClipHappy); ResetToWait();
+        EmitHappyEffect();                                                  // requestNpcAnm_(HAPPY) -> emitHappyEffect_ (NpcAnm.cpp 63)
         if (DebugPrint) GD.Print($"[SMS npc] {Name}: clean again -> {Profile.ClipHappy} (happy until the next talk)");
     }
 

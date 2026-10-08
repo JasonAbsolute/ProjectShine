@@ -234,6 +234,7 @@
 [ext_resource type="PackedScene" uid="uid://cwallkick0060" path="res://assets/Sms/Fx/WallKickDust.tscn" id="242_wkick"]
 [ext_resource type="PackedScene" uid="uid://cwallslide060" path="res://assets/Sms/Fx/WallSlideDust.tscn" id="243_wslid"]
 [ext_resource type="PackedScene" uid="uid://cslipsmoke060" path="res://assets/Sms/Fx/SlipSmoke.tscn" id="244_slips"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/GoopSinkRipple.tscn" id="245_goopr"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_fpjfl"]
 height = 1.8701391
@@ -2530,5 +2531,7 @@ script = ExtResource("221_e34sd")
 [node name="WallSlideDust" parent="." instance=ExtResource("243_wslid")]
 
 [node name="SlipSmoke" parent="." instance=ExtResource("244_slips")]
+
+[node name="GoopRipple" parent="." instance=ExtResource("245_goopr")]
 
 [editable path="Armature/Skeleton3D/RightHandBone/RightHandClosed/Model"]

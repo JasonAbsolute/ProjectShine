@@ -5568,3 +5568,52 @@ the Piantas, the Nokis, the Toad):
   4.67 m, up at idle with full HP; the apex 67.9 u = the game's 58.9 + the port's 8.9 u launch clearance nudge (Mario.cs EndFrame, every
   launch); the collision back after 60 physics frames (30 game frames), the nerve ending with the clip into the wait. Drives 87 (16/16)
   and 83 (33/33) re-run green.
+
+## SMS pass 95 -- the NPC particles (NpcEffect.cpp), the goop sink ripple, and the Pianta leaves
+
+- **The leaves** (`NpcLeaf.gdshader`, `SmsNpcProfile.LeafMaterial` / `LeafTexture`): `_leafback_mat` on mom_model / mow_model kept the glb
+  import's StandardMaterial3D -- metallic 1.0 (the glTF default when the exporter writes none), spec 0.5 -- on an 8 x 8 DUMMY texture,
+  which is the "metallic NPCs". The game swaps that dummy (I_mom_mino_dummyI4 / I_mow_mino_dummyI4) for the STAGE's
+  /scene/monteMCommon/I_mom_mino_rgba.bti at load (NpcManager.cpp); every stage ships its own, Delfino Plaza's two are under
+  assets/Sms/Npc/tex (RGB5A3 128 x 128, alpha-tested at 128). The shader is the bmd's TEV: the pollution mask compare (TEX1 on this
+  material), rak x (1 - clean) + white x (1 - clean) + leaf x clean (chan1 is UNLIT white on this material -- a goop-covered leaf region
+  reads WHITE, literally as the data says; the leaves' mask UVs sit mostly in the mask's clean rows), then + 1/2 x (C0 (150,150,180) +
+  mix(toon, lit, 5/8) - 1/2) - 1/2 with the same per-vertex GX light as the skin; cull NONE, z write, blend NONE.
+- **The pollution mask's UV set is the MATERIAL's** (`PollutionUv2Materials`): pass 93 used any UV2 array the mesh carried -- the Pianta
+  body's glb has a ZERO-FILLED second set, so the mask was sampled at one texel of its top row and the body never showed the feet-up
+  gradient (the goop came on all at once near the full amount). The bmd reads the body's mask through TEX0 (texgen0 / 1 src TEX0 on
+  _hand_mat, both models), the leaves' through TEX1. The Toad keeps its documented UV0 deviation.
+- **The effects** (`SmsNpcEffect.cs`, assets/Sms/Fx/Npc*.tscn from gen_fx_npc.py; the profile's `EffectJoint` / `HappyEffect` /
+  `DirtyDripEffect` + `DirtyDripFrames` / `FootDripEffect` + `FootJointL` / `R` + frames / `WashEffect` / `SinkEffect`, Kind defaults
+  when empty): emitHappyEffect_ -- ms_mnt_kira (Piantas, koshi_null) / ms_mare_kira (Toads, jnt_body) when the HAPPY clip starts, x the
+  NPC's scale x mSLCleanEffectScale 1.65 (npcnormal.prm): 60 / 45 stars a second for 80 frames, life 30 +-50 %, a shell 69..110 / 50..80 u,
+  drifting up at 0.15 u/f^2, env a random gold (255,206,24) .. red (255,63,15) per star to white, the AddSin twinkle, 1 -> 0.1 from half
+  life, additive. emitDirtyEffect_ -- on the DIRTY idle's check frames (sCheckFrameMonte 28 52 76 128 152 176 at the centre, the left foot
+  28 52 76, the right 128 152 176; Kino 22 44 at jnt_body) a burst of goop balls (P_msm_osenball, alpha test 190, z write, lerp(env ->
+  prm) with the STAGE's pollution colours: SMSSetEmitterPolColor 6 on Delfino = (98,14,0) -> (181,132,102); the shader's env / prm for
+  another map's row). emitWashEffect_ -- one emitter at EffectJoint kept alive while the WASH clip plays (flag 1 = the owner's slot),
+  0.85 / 0.7 balls a frame off a 45..60 / 19..25 u shell. The emitter sits on a BoneAttachment3D of the joint (the game's MtxPtr bind),
+  TOP-LEVEL and following the joint's orthonormalised frame (the skeleton carries the model's 1/74.44), particles world-space.
+- **The goop sink ripple** (`SmsGoopRipple.cs`, GoopSinkRipple.tscn): SMS_EmitSinkInPollutionEffect (EffectUtil.cpp 56) -- every 20 of
+  the director's move ticks (a 120 Hz counter: MarDirectorDirect.cpp 104, +1 per simulation tick) an UNBOUND ms_mari_rakuhamon at the
+  sink point with the ground normal as Y, plus ms_mari_rakuball while not at the bottom. Both are PROJECTED screen quads: BSP1 projection
+  + the main texture swapped for TScreenTexture (320 x 224, flag 2) + ETX1 indirect mode 1 -- the warp texel (I - 128) x [0.5 0 / 0 0.5]
+  x 2^-2 = (I - 128) / 8 texels of the copy displaces the screen lookup, the second texture (indmsk) multiplies colour and alpha
+  (goop_refract.gdshader: hint_screen_texture, SCREEN_UV + d). The ring: a Direction quad flat on the goop, 300 u x 0.2 -> 1.0 over 80
+  frames, 6 a second; the balls: billboards 35 u, X 0.85 Y 3.0 -> round -> tall, 20 u/f up (1 +- 0.375) off a 37.5..100 u circle under
+  1.5 u/f^2, 48 a second. Wired for the NPCs (NpcBase.cpp 554: while sinking, sunk or climbing out; no balls at SINK_BOTTOM) and for
+  MARIO (MarioMove.cpp 1102: the ring while isTouchGround4cm && isDirty on ANY paint; 1221: ring + balls while he sinks) -- GoopRipple
+  on Player.tscn, found like every Fx scene.
+- Deviations, logged: a faded-in JPA gravity and a constant Air lift are folded into one constant gravity matched on the end
+  displacement (Godot has one gravity); the kira's per-star moment 1 +- 0.375 is dropped; the rakuball's circle is uniform in the area
+  (the game's in the radius); the drips' random initial turn is dropped (a round ball); mipmaps on the warp textures.
+- Not ported: the burning NPC (ms_npc_kokuen / moe_fire), the note (MONTE_MH / MARE_MD), the water ripples (MONTE_MF / map 4), the DMG
+  stars (HIT_MESSAGE_UNK10 / the barrel), ENM_WATHIT (only on a burning NPC), HIDDEN / CLIPPED_OUT, the sounds.
+- LEGACY RETIRED: the leaves' import material (the metallic StandardMaterial3D on the dummy).
+- Verified headless (drive 95, 22 / 22): the male's and female's leaves on NpcLeaf.gdshader with I_mom / I_mow_mino_rgba, the leaf's
+  mask on UV2 and the body's on UV0, no leaf on the Toad; 14 drip bursts in 430 frames of the DIRTY idle, the first at clip frame 29.3
+  (28 + the frame's step), NpcDripBody at koshi_null and NpcDripFoot at footL_jnt / footR_jnt, the node at world scale 1.0000 within
+  3 cm of the joint; the sinking Pianta's ring + balls on the way down, ring only at the bottom, the ripple at the sink point with Y up,
+  off again on its ground; the wash emitter alive on mom_wet_yogore and gone once clean; the happy sparkle at x 1.650; the Toad's drips
+  at jnt_body with no feet; Mario's ring + balls on a sink layer (sinkTimer 62), both off beside the clean spot. Drive 93 re-run 30/30.
+  Headless cannot draw: the refraction's look, the leaf texture on the fringe and the drips' colour are for the eye.
