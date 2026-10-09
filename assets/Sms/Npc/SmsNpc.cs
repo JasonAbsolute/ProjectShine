@@ -772,6 +772,27 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (DebugPrint) GD.Print($"[SMS npc] {Name}: BURNING, the fire on '{_fireJoint}' of {_fireSkel?.Name}, strength {_burnStrength:F3}");
     }
 
+    /// <summary>Where the burning NPC's hit mark goes (Profile.WaterHitMarkAt): Feet = the game's own mPosition; Drop = the drop's point; Fire (pass 99b,
+    /// his ask) = the fire's position -- the live effect's root (the bag's ef_null / the palm, followed every frame), else the joint, else the body's top.</summary>
+    private Vector3 WaterHitMarkPosition(Vector3? hitPos)
+    {
+        switch (Profile.WaterHitMarkAt)
+        {
+            case SmsNpcProfile.WaterHitMarkPlace.Drop when hitPos.HasValue:
+                return hitPos.Value;
+            case SmsNpcProfile.WaterHitMarkPlace.Fire:
+                if (_burnFx != null && GodotObject.IsInstanceValid(_burnFx) && _burnFx.IsInsideTree()) return _burnFx.GlobalPosition;
+                if (_fireSkel != null && GodotObject.IsInstanceValid(_fireSkel) && !string.IsNullOrEmpty(_fireJoint))
+                {
+                    int b = _fireSkel.FindBone(_fireJoint);
+                    if (b >= 0) return (_fireSkel.GlobalTransform * _fireSkel.GetBoneGlobalPose(b)).Origin;
+                }
+                return GlobalPosition + Vector3.Up * (Profile.BodyHeight / U);
+            default:
+                return GlobalPosition;
+        }
+    }
+
     /// <summary>behaveToHitObject_ 362: mBurnStrength 0, BURNING | UNK80 | RUN off, npcHappyIn(1) -- the happy pose (and its sparkle) until the next talk
     /// ends; the fire emitters stop being asked for and burn down with their last particles.</summary>
     private void Extinguished()
@@ -1490,8 +1511,8 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         {
             if (_mario != null && _mario.SmsIsTalking) return;                       // gpMarDirector->isTalkOrDemoModeNow()
             // 351: gpMarioParticleManager->emit(PARTICLE_MS_ENM_WATHIT, &mPosition, 0, nullptr) -- one hit mark per hit at the NPC's OWN position (its
-            // feet), not the drop's; Profile.WaterHitAtDrop (a deviation knob) moves it to where the drop hit. MSD_SE_EN_COMMON_W_HIT_OK not ported.
-            SmsWaterHitMarks.Emit(this, Profile.WaterHitAtDrop && hitPos.HasValue ? hitPos.Value : GlobalPosition);
+            // feet), not the drop's; Profile.WaterHitMarkAt moves it to the fire (his ask, the default) or the drop. MSD_SE_EN_COMMON_W_HIT_OK not ported.
+            SmsWaterHitMarks.Emit(this, WaterHitMarkPosition(hitPos));
             if (FireFightingSound != null && FireFightingSound.Stream != null && !FireFightingSound.Playing) FireFightingSound.Play();   // MSD_SE_NPC_FIRE_FIGHTING (gated)
             _burnStrength -= SmsParams.Npc.FireDecSpeed;
             if (_burnStrength > 0f) return;                                           // isExtinguished_: mBurnStrength <= 0

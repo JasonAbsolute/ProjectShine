@@ -152,9 +152,12 @@ public partial class SmsNpcProfile : Resource
     [Export] public bool BurnWithLuggage = true;
     /// <summary>The luggage part BurnWithLuggage adds; empty = assets/Sms/Npc/Parts/Pianta/Luggage.tscn (the game's nimotsu_model, slot 11).</summary>
     [Export] public PackedScene BurnLuggagePart;
-    /// <summary>DEVIATION knob (off = the game): behaveToHitObject_ 351 emits the water-hit mark (PARTICLE_MS_ENM_WATHIT) at the NPC's own mPosition
-    /// -- its feet -- for every hit on a burning NPC. On: the mark goes where the drop actually hit (the enemies' convention, TSmallEnemy 547).</summary>
-    [Export] public bool WaterHitAtDrop = false;
+    /// <summary>Where a burning NPC's water-hit mark (PARTICLE_MS_ENM_WATHIT, one per hose hit) appears. Feet = the game: behaveToHitObject_ 351 emits
+    /// it at the NPC's own mPosition (TMarioParticleManager::emit flag 0 = a one-shot at that point -- its feet, every splat stacked there). DEVIATIONS
+    /// at Jaysonn's word (pass 99b, "it should be on the backpack area"): Fire = at the fire itself (the bag's ef_null, or the palm) -- the default;
+    /// Drop = where the drop hit the NPC's hit sphere (the enemies' convention, TSmallEnemy 547).</summary>
+    [Export] public WaterHitMarkPlace WaterHitMarkAt = WaterHitMarkPlace.Fire;
+    public enum WaterHitMarkPlace { Feet, Drop, Fire }
     /// <summary>The Toads' drips have no foot emitters and getEffectScale_ is 1 for them (a Pianta's effects scale with its node).</summary>
     public bool IsToad => Kind == NpcKind.Toad;
 

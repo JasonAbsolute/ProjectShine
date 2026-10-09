@@ -5828,3 +5828,18 @@ Headless cannot draw: the bag's fire, the billboards, the splat's look and size 
 ### Not ported / deviations (logged)
 - The TSplashManager splash (30 % of accepted hits) and the sounds (MSD_SE_EN_COMMON_W_HIT_OK, the fire-fighting gate). The NPC blue-coin skip.
 - WaterHitAtDrop (off) is the only deviation; a dead actor returning false lands the drop on it where the game's would fly through.
+
+## SMS pass 99b -- the burning Pianta's water-hit mark on the backpack (DEVIATION at Jaysonn's word)
+
+Jaysonn (10-09 00:20): "the yellow splat is at the feet of the pianta, I think it should be on the backpack area".
+
+- The game: TBaseNPC::behaveToHitObject_ 351 emits PARTICLE_MS_ENM_WATHIT at `&mPosition` with flag 0 = TMarioParticleManager::emit ->
+  createSimpleEmitterID at that point, a one-shot -- the NPC's position is its ground point, so every splat of a hosing stacks at its feet.
+  Pass 99 shipped exactly that. His eye says the backpack; the enemies' convention (TSmallEnemy 547) is the drop's point.
+- `SmsNpcProfile.WaterHitAtDrop` (bool) -> `WaterHitMarkAt` (enum WaterHitMarkPlace): **Fire** (default, the deviation) = the fire's position --
+  the live NpcBurn root (the bag's ef_null, or the palm), read every hit, else the joint, else the body's top; **Drop** = where the drop hit the
+  NPC's hit sphere; **Feet** = the game's own code. SmsNpc.WaterHitMarkPosition(hitPos) picks it; nothing else changed. No .tres carried the old
+  bool (it was at its default), so the rename touches no scene or resource.
+- Verified (drive 99, 13/13): M2 10 hits on the default burner -> 10 marks at the fire root, 1.90 m up and 0.61 m behind the feet (the bag);
+  M4 Drop at the drop; M6 (new) Feet at the NPC's position; the luggage rule, the Gooble's drop-point mark, the consumed drop and the pool
+  rotation as before. Build 0 errors; boot ALL OK, zero ERROR / SHADER / WARNING lines. Runbook rows (7b Burning, 7c Water Hit Mark At) updated.
