@@ -11,6 +11,7 @@
 resource_name = "Toad"
 script = ExtResource("1_prof")
 Kind = 2
+CanBurn = false
 Trampled = true
 GetsMad = false
 ReactsToWater = true

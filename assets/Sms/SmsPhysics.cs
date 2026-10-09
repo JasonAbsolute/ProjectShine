@@ -246,6 +246,8 @@ public static class SmsParams
         public const float ThrowTalkAcceptDist = 200f, ThrowTalkAcceptHeight = 150f;
         public const int ThrowStartFrame = 40;
         public const int ThrowNoCollisionFrames = 30;      // npcThrowing: unk1DC = CLBPalFrame(30) from spine tick ThrowStartFrame - 20 -- Mario passes through the thrower
+        public const float SmokeRunMagnif = 1.5f;           // mSLSmokeRunMagnif (npcnormal.prm, NpcSave.cpp 58): a BURNING NPC's run speed, run accel and run clip rate x this
+        public const float FireDecSpeed = 0.002f;           // mSLFireDecSpeed (NpcSave.cpp 59): mBurnStrength lost per water-spray hit (behaveToHitObject_) -- 500 hits from 1.0 to out
         public const float TrampleFeetMargin = 5f;          // hitNpc's 'his feet above ours': the game's NPC rests 1 u over its ground (bind), Godot's Mario ~1.4 u over a Pianta on one floor -- a same-floor Mario is not above it
         public const float DamageRadiusSmall = 10f;         // mSLDamageRadiusSmall (npcmontem / montew / kinopio.prm): the damage radius while Mario is airborne above the NPC (setVariableDamageRadius_)
         public const int TrampleShakeFrames = 40;           // mSLTrampleShakeFrames: the squash wobble's length

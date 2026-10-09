@@ -9,6 +9,9 @@ using Godot;
 /// sparkle) goes on the node AND on the quads: Godot's world-space particles keep their own size, so each GPUParticles3D gets a per-instance
 /// copy of its process material with scale_min / max multiplied. Particles are world space (local_coords off), so a burst stays where the
 /// joint was when it fired, as the game's do. The scenes: assets/Sms/Fx/Npc*.tscn (gen_fx_npc.py).
+/// Pass 98: an effect bound to a POSITION pointer (emitAndBindToPosPtr: the burning NPC's fire at mFireParticlePos) keeps the world axes --
+/// <see cref="FollowRotation"/> off -- and the emitters in the node group <see cref="StrengthGroup"/> take a live <see cref="SetStrength"/>
+/// (the game's setGlobalScale(scale x mBurnStrength) every frame: the quads and the emitter offset shrink as the fire is hosed out).
 /// </summary>
 public partial class SmsNpcEffect : Node3D
 {
@@ -16,18 +19,32 @@ public partial class SmsNpcEffect : Node3D
     [Export] public float EmitFrames = 1f;
     /// <summary>The longest particle life (lifetime x (1 + randomness)): the wait after the emitter closes before the node is freed.</summary>
     [Export] public float DrainSeconds = 0.6f;
+    /// <summary>On: the node takes the joint's rotation too (emitAndBindToMtxPtr). Off: its position only, the world axes kept (emitAndBindToPosPtr --
+    /// the burning NPC's fire rises world-up whatever the head does).</summary>
+    [Export] public bool FollowRotation = true;
+
+    /// <summary>GPUParticles3D children in this node group scale with <see cref="SetStrength"/> (the three fire emitters; the smoke does not).</summary>
+    public const string StrengthGroup = "sms_burn_strength";
 
     private double _emitLeft = -1;
     private double _drainLeft = -1;
     private bool _started;
     private float _scale = 1f;
+    private float _strength = 1f;
     private Node3D _follow;                // the BoneAttachment3D (its frame carries the model's 1/74.44 scale: followed orthonormalised, top-level)
+
+    private sealed class StrengthSlot
+    {
+        public GpuParticles3D P; public ParticleProcessMaterial Pm; public float BaseMin, BaseMax; public Vector3 BasePos; public float BaseSphere;
+    }
+    private readonly System.Collections.Generic.List<StrengthSlot> _strengthSlots = new();
 
     /// <summary>The joint frame without the model's scale, the effect scale on top -- the game's emitter RT matrix is the joint's, its scale its own.</summary>
     private void Follow()
     {
         if (_follow == null || !IsInsideTree() || !GodotObject.IsInstanceValid(_follow)) return;
-        GlobalTransform = new Transform3D(_follow.GlobalBasis.Orthonormalized().Scaled(Vector3.One * _scale), _follow.GlobalPosition);
+        Basis b = FollowRotation ? _follow.GlobalBasis.Orthonormalized() : Basis.Identity;
+        GlobalTransform = new Transform3D(b.Scaled(Vector3.One * _scale), _follow.GlobalPosition);
     }
 
     /// <summary>Open the emitters. `scale` = the game's emitter scale (1 for a Toad, the NPC's initial scale for a Pianta, x 1.65 on the sparkle).</summary>
@@ -36,16 +53,16 @@ public partial class SmsNpcEffect : Node3D
         if (_started) return;
         _started = true;
         _scale = scale;
-        if (!Mathf.IsEqualApprox(scale, 1f))
+        foreach (var p in Emitters())
         {
-            foreach (var p in Emitters())
+            bool strength = p.IsInGroup(StrengthGroup);
+            if ((strength || !Mathf.IsEqualApprox(scale, 1f)) && p.ProcessMaterial is ParticleProcessMaterial pm)
             {
-                if (p.ProcessMaterial is ParticleProcessMaterial pm)
-                {
-                    var copy = (ParticleProcessMaterial)pm.Duplicate();
-                    copy.ScaleMin *= scale; copy.ScaleMax *= scale;
-                    p.ProcessMaterial = copy;
-                }
+                var copy = (ParticleProcessMaterial)pm.Duplicate();
+                copy.ScaleMin *= scale; copy.ScaleMax *= scale;
+                p.ProcessMaterial = copy;
+                if (strength)
+                    _strengthSlots.Add(new StrengthSlot { P = p, Pm = copy, BaseMin = copy.ScaleMin, BaseMax = copy.ScaleMax, BasePos = p.Position, BaseSphere = copy.EmissionSphereRadius });
             }
         }
         Follow();
@@ -56,6 +73,23 @@ public partial class SmsNpcEffect : Node3D
         _emitLeft = EmitFrames > 0f ? EmitFrames / 60.0 : -1;
         if (EmitFrames > 0f && EmitFrames <= 1f) { _emitLeft = -1; _drainLeft = DrainSeconds; }   // a burst: nothing to close, just drain
     }
+
+    /// <summary>mBurnStrength (0..1): the StrengthGroup emitters' quad size, emitter offset and emission volume x this (setGlobalScale each frame).</summary>
+    public void SetStrength(float s)
+    {
+        s = Mathf.Clamp(s, 0f, 1f);
+        if (Mathf.IsEqualApprox(s, _strength)) return;
+        _strength = s;
+        foreach (var slot in _strengthSlots)
+        {
+            slot.Pm.ScaleMin = slot.BaseMin * s; slot.Pm.ScaleMax = slot.BaseMax * s;
+            slot.P.Position = slot.BasePos * s;
+            if (slot.BaseSphere > 0f) slot.Pm.EmissionSphereRadius = Mathf.Max(slot.BaseSphere * s, 0.001f);
+        }
+    }
+
+    public float StrengthApplied => _strength;
+    public int StrengthEmitterCount => _strengthSlots.Count;
 
     /// <summary>Close the emitters (the wash clip ended); the node frees itself when the live particles are gone.</summary>
     public void Stop()
@@ -98,19 +132,20 @@ public partial class SmsNpcEffect : Node3D
     public static SmsNpcEffect Spawn(PackedScene scene, Skeleton3D skel, string joint, float scale, System.Collections.Generic.Dictionary<string, BoneAttachment3D> cache, string who)
     {
         if (scene == null || skel == null) return null;
-        if (cache.TryGetValue(joint, out var att) && att == null) return null;   // warned once already
+        string key = skel.GetInstanceId() + ":" + joint;        // pass 98: a part's skeleton (the luggage's ef_null) shares the cache with the body's
+        if (cache.TryGetValue(key, out var att) && att == null) return null;   // warned once already
         if (att == null || !GodotObject.IsInstanceValid(att))
         {
             int b = string.IsNullOrEmpty(joint) ? -1 : skel.FindBone(joint);
             if (b < 0)
             {
                 GD.PushWarning($"[SMS npc fx] {who}: no joint '{joint}' on {skel.Name} for {scene.ResourcePath.GetFile()} -- the effect is skipped");
-                cache[joint] = null;
+                cache[key] = null;
                 return null;
             }
             att = new BoneAttachment3D { Name = "Fx_" + joint, BoneName = joint };
             skel.AddChild(att);
-            cache[joint] = att;
+            cache[key] = att;
         }
         if (scene.Instantiate() is not SmsNpcEffect fx)
         {

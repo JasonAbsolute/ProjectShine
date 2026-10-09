@@ -1,0 +1,246 @@
+[gd_scene load_steps=41 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsNpcEffect.cs" id="1_script"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/fire_smoke.gdshader" id="2_smoke_sh"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/flame_tongue.gdshader" id="3_flame_sh"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/glow_add.gdshader" id="4_glow_sh"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/goop_refract.gdshader" id="5_refract_sh"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/kemuball3_raw.png" id="6_smoke_tex"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/fire1_raw.png" id="7_flame_tex"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/radgrad_raw.png" id="8_glow_tex"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/indwp2.png" id="9_haze_warp"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/indmsk1.png" id="10_haze_mask"]
+
+[sub_resource type="Gradient" id="Gradient_smoke_prm"]
+resource_name = "ms_npc_kokuen prm colour keys (Merge over the life): (87,8,0) @2 -> (45,34,34) @8 -> (72,72,72) @15 of 20"
+offsets = PackedFloat32Array(0, 0.0952, 0.381, 0.7143, 1)
+colors = PackedColorArray(0.3412, 0.0314, 0, 1, 0.3412, 0.0314, 0, 1, 0.1765, 0.1333, 0.1333, 1, 0.2824, 0.2824, 0.2824, 1, 0.2824, 0.2824, 0.2824, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_smoke_prm"]
+gradient = SubResource("Gradient_smoke_prm")
+
+[sub_resource type="Gradient" id="Gradient_smoke_env"]
+resource_name = "ms_npc_kokuen env colour keys: (255,111,48) @2 -> (96,96,96) @8 -> (120,120,120) @15 of 20"
+offsets = PackedFloat32Array(0, 0.0952, 0.381, 0.7143, 1)
+colors = PackedColorArray(1, 0.4353, 0.1882, 1, 1, 0.4353, 0.1882, 1, 0.3765, 0.3765, 0.3765, 1, 0.4706, 0.4706, 0.4706, 1, 0.4706, 0.4706, 0.4706, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_smoke_env"]
+gradient = SubResource("Gradient_smoke_env")
+
+[sub_resource type="Gradient" id="Gradient_smoke_alpha"]
+resource_name = "ms_npc_kokuen ESP1 alpha 0 -> 0.9 by 12.5 %, -> 0 from 62.5 %"
+offsets = PackedFloat32Array(0, 0.125, 0.625, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.9, 1, 1, 1, 0.9, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_smoke_alpha"]
+gradient = SubResource("Gradient_smoke_alpha")
+
+[sub_resource type="Curve" id="Curve_smoke_scale"]
+resource_name = "ms_npc_kokuen ESP1 scale: 1 -> 2.2 over the whole life (outTiming 0)"
+max_value = 2.1997
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 2.1997), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_smoke_scale"]
+curve = SubResource("Curve_smoke_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_smoke"]
+resource_name = "0.35/frame, life 70 +-30 %; 2 u/f up + 0.5 omni (a 14 deg cone, 1.5..2.5 u/f -- deviation: no independent radial speed); +0.05 u/f^2 up (Gravity add type 1 = an acceleration)"
+lifetime_randomness = 0.3
+emission_shape = 0
+angle_min = -22.5
+angle_max = 22.5
+direction = Vector3(0, 1, 0)
+spread = 14.04
+initial_velocity_min = 1.209
+initial_velocity_max = 2.015
+gravity = Vector3(0, 2.418, 0)
+scale_min = 0.6
+scale_max = 1.4
+scale_curve = SubResource("CurveTexture_smoke_scale")
+color_ramp = SubResource("GradientTexture1D_smoke_alpha")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_smoke"]
+resource_name = "ms_npc_kokuen: P_msm_kemuball3 (raw IA8), lerp(env -> prm, I) with both registers keyed over the life (Merge), alpha x the fade"
+shader = ExtResource("2_smoke_sh")
+shader_parameter/tex = ExtResource("6_smoke_tex")
+shader_parameter/prm_ramp = SubResource("GradientTexture1D_smoke_prm")
+shader_parameter/env_ramp = SubResource("GradientTexture1D_smoke_env")
+
+[sub_resource type="QuadMesh" id="QuadMesh_smoke"]
+resource_name = "the game's 0.9 x 0.9 billboard (45 units)"
+material = SubResource("ShaderMaterial_smoke")
+size = Vector2(0.605, 0.605)
+
+[sub_resource type="Curve" id="Curve_flame_scale"]
+resource_name = "ms_moe_fire_a ESP1 scale: 1 to 25 %, -> 0.5 at the end"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.25, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.4999), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_flame_scale"]
+curve = SubResource("Curve_flame_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_flame"]
+resource_name = "0.5/frame, life 15; sphere r 8 u; velDir 1 + the Gravity field's 8 u/f drift (add type 2: a constant velocity) = 9 u/f straight up; align_y = the StripeCross along the velocity"
+particle_flag_align_y = true
+emission_shape = 1
+emission_sphere_radius = 0.1075
+angle_min = -18.0
+angle_max = 18.0
+direction = Vector3(0.001, 1, 0.009)
+spread = 0.0
+initial_velocity_min = 7.254
+initial_velocity_max = 7.254
+gravity = Vector3(0, 0, 0)
+scale_min = 0.9
+scale_max = 1.1
+scale_curve = SubResource("CurveTexture_flame_scale")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_flame"]
+resource_name = "ms_moe_fire_a: P_msm_fire1 (raw IA8), TEXC x prm (255,228,170) + env red -> orange (a 6-frame Repeat), alpha x 231/255"
+shader = ExtResource("3_flame_sh")
+shader_parameter/tex = ExtResource("7_flame_tex")
+shader_parameter/prm_color = Vector3(1, 0.894, 0.667)
+shader_parameter/prm_alpha = 0.906
+shader_parameter/env_a = Vector3(1, 0.212, 0)
+shader_parameter/env_b = Vector3(1, 0.463, 0.122)
+shader_parameter/life_frames = 15.0
+shader_parameter/cycle_frames = 6.0
+
+[sub_resource type="QuadMesh" id="QuadMesh_flame_a"]
+resource_name = "the game's 1.6 x 1.6 stripe (80 units), the Y along the velocity: the first of the cross"
+material = SubResource("ShaderMaterial_flame")
+size = Vector2(1.075, 1.075)
+
+[sub_resource type="QuadMesh" id="QuadMesh_flame_b"]
+resource_name = "the second of the cross, turned 90 deg about the Y"
+material = SubResource("ShaderMaterial_flame")
+size = Vector2(1.075, 1.075)
+orientation = 0
+
+[sub_resource type="Gradient" id="Gradient_glow_alpha"]
+resource_name = "ms_moe_fire_b ESP1 alpha 0 -> 0.4248 by 15 %, -> 0 from 71.07 %"
+offsets = PackedFloat32Array(0, 0.15, 0.7107, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.4248, 1, 1, 1, 0.4248, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_glow_alpha"]
+gradient = SubResource("Gradient_glow_alpha")
+
+[sub_resource type="Curve" id="Curve_glow_scale"]
+resource_name = "ms_moe_fire_b ESP1 scale: 1 to 29.44 %, -> 0.6 at the end"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.2944, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.6), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_glow_scale"]
+curve = SubResource("Curve_glow_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_glow"]
+resource_name = "0.25/frame, life 15; velDir 1 + the 9 u/f drift = 10 u/f straight up"
+emission_shape = 0
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 8.06
+initial_velocity_max = 8.06
+gravity = Vector3(0, 0, 0)
+scale_min = 0.95
+scale_max = 1.05
+scale_curve = SubResource("CurveTexture_glow_scale")
+color_ramp = SubResource("GradientTexture1D_glow_alpha")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_glow"]
+resource_name = "ms_moe_fire_b: P_msm_radgrad (raw I8), flat (255,172,101), alpha = I x the fade, additive"
+shader = ExtResource("4_glow_sh")
+shader_parameter/tex = ExtResource("8_glow_tex")
+shader_parameter/prm_color = Vector3(1, 0.675, 0.396)
+
+[sub_resource type="QuadMesh" id="QuadMesh_glow"]
+resource_name = "the game's 2.75 x 2.75 billboard (137.5 units)"
+material = SubResource("ShaderMaterial_glow")
+size = Vector2(1.847, 1.847)
+
+[sub_resource type="Gradient" id="Gradient_haze_alpha"]
+resource_name = "ms_moe_fire_c ESP1 alpha 0 -> 1 by 55.13 %, -> 0 from 62.5 %"
+offsets = PackedFloat32Array(0, 0.5513, 0.625, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_haze_alpha"]
+gradient = SubResource("Gradient_haze_alpha")
+
+[sub_resource type="Curve" id="Curve_haze_scale"]
+resource_name = "ms_moe_fire_c ESP1 scale: 1 -> 2.5 over the whole life (outTiming 0)"
+max_value = 2.5
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 2.5), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_haze_scale"]
+curve = SubResource("Curve_haze_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_haze"]
+resource_name = "0.125/frame, life 22; velDir 0.5 + the 6 u/f drift = 6.5 u/f straight up; a random turn (any angle)"
+emission_shape = 0
+angle_min = -180.0
+angle_max = 180.0
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 5.239
+initial_velocity_max = 5.239
+gravity = Vector3(0, 0, 0)
+scale_min = 0.95
+scale_max = 1.05
+scale_curve = SubResource("CurveTexture_haze_scale")
+color_ramp = SubResource("GradientTexture1D_haze_alpha")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_haze"]
+resource_name = "ms_moe_fire_c: the screen behind, warped by P_msm_indwp2 (I - 128) / 64 texels of the 320 x 224 copy (mtx 0.5 x 2^-5), masked by P_msm_indmsk1, a billboard"
+shader = ExtResource("5_refract_sh")
+shader_parameter/warp_tex = ExtResource("9_haze_warp")
+shader_parameter/mask_tex = ExtResource("10_haze_mask")
+shader_parameter/screen_texels = Vector2(320, 224)
+shader_parameter/ind_scale = 0.015625
+shader_parameter/prm_color = Vector3(1, 1, 1)
+shader_parameter/billboard = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_haze"]
+resource_name = "the game's 1.25 x 1.25 billboard (62.5 units) before its growth to 2.5"
+material = SubResource("ShaderMaterial_haze")
+size = Vector2(0.84, 0.84)
+
+[node name="NpcBurn" type="Node3D"]
+script = ExtResource("1_script")
+EmitFrames = 0.0
+DrainSeconds = 1.5167
+FollowRotation = false
+
+[node name="Smoke" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2687, 0)
+emitting = false
+amount = 32
+lifetime = 1.1667
+process_material = SubResource("ParticleProcessMaterial_smoke")
+draw_pass_1 = SubResource("QuadMesh_smoke")
+
+[node name="Flame" type="GPUParticles3D" parent="." groups=["sms_burn_strength"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1343, 0)
+emitting = false
+amount = 8
+lifetime = 0.25
+process_material = SubResource("ParticleProcessMaterial_flame")
+draw_passes = 2
+draw_pass_1 = SubResource("QuadMesh_flame_a")
+draw_pass_2 = SubResource("QuadMesh_flame_b")
+
+[node name="Glow" type="GPUParticles3D" parent="." groups=["sms_burn_strength"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1343, 0)
+emitting = false
+amount = 4
+lifetime = 0.25
+process_material = SubResource("ParticleProcessMaterial_glow")
+draw_pass_1 = SubResource("QuadMesh_glow")
+
+[node name="Haze" type="GPUParticles3D" parent="." groups=["sms_burn_strength"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4702, 0)
+emitting = false
+amount = 3
+lifetime = 0.3667
+process_material = SubResource("ParticleProcessMaterial_haze")
+draw_pass_1 = SubResource("QuadMesh_haze")

@@ -99,6 +99,16 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// <summary>TNpcCoin (the placement's event id): when a HAPPY NPC -- just washed clean -- is talked to, a coin pops out at its cursor point
     /// 40 frames after the talk (requestAppearCoin: 15 units a tick at 75 deg up along its facing). Empty = no coin (the game's default too).</summary>
     [Export] public PackedScene ThankYouCoin;
+    [ExportGroup("Burning (pass 98)")]
+    /// <summary>NPC_ACTION_BURNING (with NPC_ACTION_RUN and UNK80 -- the placement's flags on a normal male Pianta, NpcInitPrg.cpp 451): on fire from the
+    /// start -- the smoke and the three fire emitters on the palm joint (or the luggage's ef_null when that part is worn), RUNNING its wander at
+    /// SmokeRunMagnif x the run speed and never pausing at a node (UNK80), no talk, no mad, no sinking. The hose puts it out: FireDecSpeed (0.002) of
+    /// strength a hit, 500 hits from 1 -- then npcHappyIn(1): the happy pose until the next talk (and that talk's ThankYouCoin). Ignored, with a
+    /// warning, on a kind whose profile says CanBurn = false (the female, the Toad). Not modelled: the game skipping the burn when the NPC's blue coin
+    /// is already collected (TFlagManager, NpcInitPrg.cpp 456).</summary>
+    [Export] public bool Burning = false;
+    /// <summary>mBurnStrength at the start (the game's init is 1.0): how much hosing is left, 0..1; the three fire emitters are scaled by it.</summary>
+    [Export(PropertyHint.Range, "0,1")] public float BurnStrength = 1f;
     [ExportGroup("Wander")]
     /// <summary>Walk between points (the game's graph "main"). Off = stands where placed (an NPC without a graph).</summary>
     [Export] public bool Wander = false;
@@ -116,6 +126,8 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     [Export] public Texture2D PollutionMaskTexture, GoopTexture;
     /// <summary>Sound slots (the sound bank pass fills them): nothing assigned = silent.</summary>
     [Export] public AudioStreamPlayer3D TalkVoice, WetVoice, TrampleVoice, MadVoice;
+    /// <summary>MSD_SE_NPC_BURNING (NpcBase.cpp 728: looping while BURNING) and MSD_SE_NPC_FIRE_FIGHTING (behaveToHitObject_ 355: each water hit, gated).</summary>
+    [Export] public AudioStreamPlayer3D BurningSound, FireFightingSound;
     [Export] public bool DebugPrint = false;
 
     public const string SkinShaderPath = "res://assets/Sms/Npc/NpcSkin.gdshader";
@@ -180,7 +192,17 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private SmsGoopRipple _sinkFx;                       // emitSinkEffect_: the goop ripple at the sink point
     private Vector3 _sinkNormal = Vector3.Up;            // mGroundPlane->getNormal() when the sink began
     private float _fxPrevFrame = -1f; private string _fxPrevClip = "";   // the BCK frame controller's checkPass: last frame's position
-    private PackedScene _happyFx, _dirtyFx, _footFx, _washScene, _sinkScene;
+    private PackedScene _happyFx, _dirtyFx, _footFx, _washScene, _sinkScene, _burnScene;
+    // ---- burning (pass 98, NPC_ACTION_BURNING) ----
+    private bool _burning;                               // NPC_ACTION_BURNING (| RUN | UNK80 ride with it: RunFlag, the no-wait wander)
+    private float _burnStrength = 1f;                    // mBurnStrength: 1 -> 0 under the hose (FireDecSpeed a hit); isExtinguished_ at <= 0
+    private SmsNpcEffect _burnFx;                        // emitParticle_ 233: the four loop emitters bound to mFireParticlePos, alive while BURNING
+    private Skeleton3D _fireSkel; private string _fireJoint = "";   // mSmokeEffectMtxPtr's joint: the body's FireJoint or the luggage part's FireJointOnLuggage
+    public bool IsBurning => _burning;
+    public float BurnStrengthNow => _burnStrength;
+    public SmsNpcEffect BurnFx => _burnFx;
+    public string FireJointName => _fireJoint;
+    private bool RunFlag => _burning;                    // NPC_ACTION_RUN: the wander's RUN clip and speeds (set with BURNING by the placement, off with it)
     public int EffectNodeCount { get { int n = 0; foreach (var a in _fxJoints.Values) if (a != null) n += a.GetChildCount(); return n; } }   // the drive reads it
     public SmsGoopRipple SinkRipple => _sinkFx;
     private bool _polDirty = true;
@@ -252,6 +274,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         SetupLook();
         SetupOutfit();
         SetupParts();
+        SetupBurning();
         SetupNeck();
         SetupCursor();
         MarkLoops();
@@ -693,6 +716,60 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
             _sinkFx?.Set(new Vector3(GlobalPosition.X, _sinkGroundY, GlobalPosition.Z), _sinkNormal, true, !_sunk);
         }
         else if (_sinkFx != null && GodotObject.IsInstanceValid(_sinkFx)) _sinkFx.Off();
+        // pass 98: emitParticle_ 233 -- while BURNING the four loop emitters (SMS_EasyEmitParticle -> emitAndBindToPosPtr: one per owner, re-asked
+        // every frame) at mFireParticlePos = the fire joint's position, x getEffectScale_, the three fires x mBurnStrength (setGlobalScale)
+        if (_burning)
+        {
+            if (_burnFx == null || !GodotObject.IsInstanceValid(_burnFx))
+                _burnFx = SmsNpcEffect.Spawn(Fx(Profile.BurnEffect, ref _burnScene, "NpcBurn.tscn", "NpcBurn.tscn"), _fireSkel, _fireJoint, EffectScale(), _fxJoints, Name);
+            _burnFx?.SetStrength(_burnStrength);
+        }
+        else if (_burnFx != null)
+        {
+            if (GodotObject.IsInstanceValid(_burnFx)) _burnFx.Stop();                 // no longer asked for: the manager drops the emitters, the live particles finish
+            _burnFx = null;
+        }
+    }
+
+    // ------------------------------------------------------------------ burning (pass 98)
+    /// <summary>NpcInitPrg.cpp 451 / 474: a normal male Pianta placed with NPC_ACTION_BURNING burns from the start; setSmokeEffectMtxPtr_(parts & 0x800):
+    /// the fire sits on the luggage part's ef_null when that part (slot 11, nimotsu_model) is worn, else on the body's yashi_jnt -- here the first
+    /// attached part whose model carries Profile.FireJointOnLuggage.</summary>
+    private void SetupBurning()
+    {
+        _burning = false;
+        _burnStrength = Mathf.Clamp(BurnStrength, 0f, 1f);
+        if (!Burning) return;
+        if (!Profile.CanBurn)
+        {
+            GD.PushWarning($"[SMS npc] {Name}: Burning is set but a {Profile.Kind} cannot burn (NpcInitPrg.cpp 451: only a normal male Pianta) -- ignored");
+            return;
+        }
+        if (_burnStrength <= 0f) return;                                             // placed with nothing left to burn: not burning
+        _burning = true;
+        _fireSkel = _skel; _fireJoint = Profile.FireJoint;
+        if (!string.IsNullOrEmpty(Profile.FireJointOnLuggage))
+            foreach (var part in _parts)
+            {
+                var ps = FindChild<Skeleton3D>(part);
+                if (ps != null && ps.FindBone(Profile.FireJointOnLuggage) >= 0) { _fireSkel = ps; _fireJoint = Profile.FireJointOnLuggage; break; }
+            }
+        if (_fireSkel == null || _fireSkel.FindBone(_fireJoint) < 0)
+            GD.PushWarning($"[SMS npc] {Name}: no fire joint '{_fireJoint}' on the model -- it burns without the effect");
+        if (BurningSound != null && BurningSound.Stream != null) BurningSound.Play();   // MSD_SE_NPC_BURNING, looping while BURNING
+        if (DebugPrint) GD.Print($"[SMS npc] {Name}: BURNING, the fire on '{_fireJoint}' of {_fireSkel?.Name}, strength {_burnStrength:F3}");
+    }
+
+    /// <summary>behaveToHitObject_ 362: mBurnStrength 0, BURNING | UNK80 | RUN off, npcHappyIn(1) -- the happy pose (and its sparkle) until the next talk
+    /// ends; the fire emitters stop being asked for and burn down with their last particles.</summary>
+    private void Extinguished()
+    {
+        _burning = false;
+        if (BurningSound != null && BurningSound.Playing) BurningSound.Stop();
+        if (_burnFx != null && GodotObject.IsInstanceValid(_burnFx)) _burnFx.Stop();
+        _burnFx = null;
+        HappyIn();
+        if (DebugPrint) GD.Print($"[SMS npc] {Name}: the fire is out -> {Profile.ClipHappy}");
     }
 
     // ------------------------------------------------------------------ animation
@@ -860,7 +937,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// whose goop was cleaned comes back out (TNerveNPCRecoverFromSink); a standing one on painted goop goes under (npcFallIn + TNerveNPCSink).</summary>
     private void PollutionCheck()
     {
-        if (!Profile.SinksInPollution || _talking || _happy || _cur == Nerve.Mad || _holder != null) return;   // the talk returns first; BURNING / UNK400 / HAPPY skip
+        if (!Profile.SinksInPollution || _talking || _happy || _burning || _cur == Nerve.Mad || _holder != null) return;   // the talk returns first; BURNING / UNK400 / HAPPY skip
         if (--_sinkPoll > 0) return;
         _sinkPoll = SmsParams.Npc.SinkPollFrames * SmsUnits.TicksPerFrame;
         if (_cur == Nerve.Sink)
@@ -1038,6 +1115,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         {
             bool run = _clip == Profile.ClipRun;
             float target = run ? Profile.MaxRunSpeed : Profile.MaxMarchSpeed, accel = run ? Profile.RunAccel : Profile.MarchAccel;
+            if (run && _burning) { target *= SmsParams.Npc.SmokeRunMagnif; accel *= SmsParams.Npc.SmokeRunMagnif; }   // execWalk (NpcWalkTurn.cpp 60): BURNING x mSLSmokeRunMagnif
             _marchSpeed = Chase(_marchSpeed, target, accel);
         }
         else _marchSpeed = Chase(_marchSpeed, 0f, Profile.MarchDecrease);
@@ -1053,22 +1131,29 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (_anim == null || (_clip != Profile.ClipWalk && _clip != Profile.ClipRun)) return;
         bool run = _clip == Profile.ClipRun;
         float max = run ? Profile.MaxRunSpeed : Profile.MaxMarchSpeed;
+        float maxRate = run ? Profile.MaxRunAnmRate : Profile.MaxWalkAnmRate;
+        if (run && _burning) { max *= SmsParams.Npc.SmokeRunMagnif; maxRate *= SmsParams.Npc.SmokeRunMagnif; }   // walkAnmRateChange_ (NpcAnm.cpp 325): both x the magnif
         float t = Mathf.Clamp((_marchSpeed - Profile.MinMarchSpeed) / Mathf.Max(max - Profile.MinMarchSpeed, 1e-4f), 0f, 1f);
-        _anim.SpeedScale = Mathf.Lerp(Profile.MinWalkAnmRate, run ? Profile.MaxRunAnmRate : Profile.MaxWalkAnmRate, t);
+        _anim.SpeedScale = Mathf.Lerp(Profile.MinWalkAnmRate, maxRate, t);
     }
 
     private void TickGraphWander()
     {
         if (!_hasTarget) ChooseNextTarget();
         if (_walkForbid > 0 || _talking || DirtyOrHappy) { ExecWalk(false); if (_marchSpeed < 0.001f && _clip != WaitClip()) WaitIn(); return; } // mWalkForbidCount / !isClean / HAPPY: standing
-        if (_clip != Profile.ClipWalk) Play(Profile.ClipWalk);
+        string march = RunFlag ? Profile.ClipRun : Profile.ClipWalk;                 // walkAnmRateChange_ default: RUN -> NPC_ANM_KIND_RUN
+        if (_clip != march) Play(march);
         ExecWalk(true);
         _wanderTimer++;
         Vector3 d = _target - GlobalPosition; d.Y = 0f;
         float arrive = SmsParams.Npc.ArriveDist / U;
         if (d.LengthSquared() < arrive * arrive)
         {
-            if (_wanderTimer >= _wanderGoal) { Enter(Nerve.GraphWait); return; }     // the leg's time is up: a wait
+            if (_wanderTimer >= _wanderGoal)
+            {
+                if (_burning) { ChooseNextTarget(); Enter(Nerve.GraphWander); return; }   // NPC_ACTION_UNK80 (TNerveNPCGraphWander 44): no GraphWait, straight on
+                Enter(Nerve.GraphWait); return;
+            }     // the leg's time is up: a wait
             ChooseNextTarget();                                                    // goToShortestNextGraphNode
         }
     }
@@ -1178,7 +1263,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// <summary>changeNerveProc_'s accept test (+ findNearestTalkNPC's Mario conditions): sets LIVE_FLAG_UNK20000 "talkable".</summary>
     private void TalkCheck()
     {
-        bool can = CanTalk && !CanBeTaken && Lines != null && Lines.Length > 0 && _talkForbid == 0 && !_talking && _mario != null && IsClean && !_sinking
+        bool can = CanTalk && !CanBeTaken && Lines != null && Lines.Length > 0 && _talkForbid == 0 && !_talking && _mario != null && IsClean && !_sinking && !_burning
             && (_cur == Nerve.GraphWander || _cur == Nerve.UTurn || _cur == Nerve.GraphWait || _cur == Nerve.TurnToMario || _cur == Nerve.Wet || _cur == Nerve.Mad || _cur == Nerve.WaitMarioApproach);
         if (can)
         {
@@ -1385,6 +1470,17 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// <summary>behaveToHitObject_(WATER_SPRAY): isNerveCanGoToWet (not already wet, not in a talk's first 4 ticks) -> pushNerve(Wet).</summary>
     private void Sprayed()
     {
+        // behaveToHitObject_ 344: a BURNING NPC takes the water spray as fire-fighting and nothing else -- no Wet nerve, no wash
+        if (_burning)
+        {
+            if (_mario != null && _mario.SmsIsTalking) return;                       // gpMarDirector->isTalkOrDemoModeNow()
+            if (FireFightingSound != null && FireFightingSound.Stream != null && !FireFightingSound.Playing) FireFightingSound.Play();   // MSD_SE_NPC_FIRE_FIGHTING (gated); PARTICLE_MS_ENM_WATHIT not ported
+            _burnStrength -= SmsParams.Npc.FireDecSpeed;
+            if (_burnStrength > 0f) return;                                           // isExtinguished_: mBurnStrength <= 0
+            _burnStrength = 0f;
+            Extinguished();
+            return;
+        }
         // behaveToHitObject_(WATER_SPRAY) 368: a dirty NPC in its Wet nerve loses PollutionCleanSpeed a hit; at 0 the talk forbid and the thanks
         if (Profile.SinksInPollution && !_talking && _cur == Nerve.Wet && _pollution > 0f && !_sinking)
         {
@@ -1515,7 +1611,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         }
     }
 
-    private bool CanGoToMad() => !DirtyOrHappy && (_cur == Nerve.GraphWander || _cur == Nerve.UTurn || _cur == Nerve.GraphWait || _cur == Nerve.WaitMarioApproach || _cur == Nerve.TurnToMario || _cur == Nerve.Wet);
+    private bool CanGoToMad() => !DirtyOrHappy && !_burning && (_cur == Nerve.GraphWander || _cur == Nerve.UTurn || _cur == Nerve.GraphWait || _cur == Nerve.WaitMarioApproach || _cur == Nerve.TurnToMario || _cur == Nerve.Wet);
     private void GoMad() { if (_cur == Nerve.Wet) Enter(Nerve.Mad); else Push(Nerve.Mad); }
 
     private void MadIn()

@@ -5716,3 +5716,65 @@ the Piantas, the Nokis, the Toad):
   order, Shift-JIS names + cue bits).
 - NOT CHANGED, for his eye: the ring sits at his collision feet (22.8 cm over the visible floor on his test level, pass 96's note); the
   balls' refraction of his legs is the game's (JPA indirect warp of the screen copy); the gamma solve's shaded-side approximation above.
+
+## SMS pass 98 -- the burning NPC (NPC_ACTION_BURNING)
+
+- The Bianco Hills Pianta on fire, from TBaseNPC. In the game it is a PLACEMENT: NpcInitPrg.cpp 451 `isNormalMonteM() && NPC_ACTION_BURNING`
+  (the action flags come with the stage's object data, BURNING together with NPC_ACTION_RUN and UNK80) -- only a normal male Pianta burns.
+  PORT: `Burning` on the NPC instance (+ `BurnStrength`, the game's mBurnStrength init 1.0, as a knob); a female or a Toad with it set warns and
+  ignores it (`Profile.CanBurn`, false on PiantaFemale.tres / Toad.tres). NOT MODELLED: NpcInitPrg.cpp 456-469 -- the burn is skipped when the
+  NPC's blue coin (ids 0..49 via TFlagManager::getBlueCoinFlag) is already collected; the port has no per-NPC coin flags.
+- WHILE BURNING (every site checked in the source): changeNerveProc_ 465 refuses the talk (`!_burning` in TalkCheck); isStateGoToMad_ 425 refuses
+  Mad (CanGoToMad); changeNerveProc_ 542 skips the pollution sink poll (PollutionCheck); behaveToHitObject_ 344 takes ONLY the water spray and only
+  as fire-fighting (no Wet nerve, no wash): mBurnStrength -= mSLFireDecSpeed (npcnormal 0.002, SmsParams.Npc.FireDecSpeed) a hit, MSD_SE_NPC_
+  FIRE_FIGHTING gated (the `FireFightingSound` slot), PARTICLE_MS_ENM_WATHIT (not ported); isExtinguished_ (<= 0) -> strength 0, BURNING | UNK80 |
+  RUN off, npcHappyIn(1) = the HAPPY pose + the sparkle until the next talk ends (that talk's ThankYouCoin). NPC_ACTION_RUN: the wander plays the RUN
+  clip (walkAnmRateChange_ 356) with execWalk's run speed and accel x mSLSmokeRunMagnif (NpcWalkTurn.cpp 60, npcnormal 1.5 = SmsParams.Npc.
+  SmokeRunMagnif: 5 -> 7.5 u/tick, 0.08 -> 0.12) and the clip rate's max and speed cap x the same (NpcAnm.cpp 325). UNK80: TNerveNPCGraphWander 44
+  never pushes GraphWait -- the burning runner takes the next node at once. MSD_SE_NPC_BURNING (NpcBase.cpp 728) = the looping `BurningSound` slot.
+  Mario is NOT hurt by touching it: no NPC path sends HIT_MESSAGE_BURN (MarioReceiveMsg.cpp's BURN comes from fire actors, never TBaseNPC) -- the
+  pass-85 hitNpc keepDistance / trample stand.
+- THE FIRE (emitParticle_, NpcEffect.cpp 233): four LOOP emitters SMS_EasyEmitParticle binds to mFireParticlePos -- emitAndBindToPosPtr flag 1 / 3
+  (EmitterViewObj.cpp 289-320: ONE emitter per (effect, owner), re-positioned each frame, dropped when no longer asked for) -- at the TRANSLATION
+  of mSmokeEffectMtxPtr (setSmokeEffectMtxPtr_, NpcEffect.cpp 82): `yashi_jnt` (the palm on his head) or, with parts bit 0x800 = slot 11 = the
+  LUGGAGE (sMonteM parts table NpcInitData.cpp 1374-1377: HatA, MustacheA, GlassesA, GlassesB, HatB, HatE, HatD, HatF, HatG, LapelA, TieB,
+  Luggage), the luggage model's `ef_null` (nimotsu_model.glb node 2, a child of `nimotsu`). A position bind keeps the WORLD axes: the fire rises
+  world-up whatever the head does. All four x getEffectScale_ (mInitialScale); ms_moe_fire_a / b / c x mBurnStrength as well (setGlobalScale each
+  frame -> the quads and offsets shrink to nothing as it is hosed). PORT: SmsNpcEffect gains `FollowRotation` (off: position only) and
+  `SetStrength` for the emitters in node group `sms_burn_strength` (per-instance process-material copies: scale_min / max, the emitter offset,
+  the flame's sphere x strength); the fire joint = the first attached part whose Skeleton3D carries Profile.FireJointOnLuggage (`ef_null`), else
+  Profile.FireJoint (`yashi_jnt`); the effect cache is keyed per (skeleton, joint) so a part's bone and the body's share one dictionary.
+  assets/Sms/Fx/NpcBurn.tscn (gen_fx_npc.py burn(), from jpa_dump + the JPA source -- Gravity field add type 1 = addBaseVelVec per frame = an
+  ACCELERATION, add type 2 = mFieldVelocity zeroed every frame (JPAParticle::calcVelocity) = a CONSTANT drift):
+    Smoke  ms_npc_kokuen: Point at (0, 20, 0) u, 0.35/f, life 70 +-30 %, velDir 2 up + omni 0.5, +0.05 u/f^2 up, Billboard 45 u growing 1 -> 2.2
+           over the life (ESP1 outTiming 0) x (1 +- 0.4), alpha 0 -> 0.9 by 12.5 % -> 0 from 62.5 %, a fixed +-22.5 deg tilt; colour lerp(env -> prm, I)
+           with BOTH registers keyed over the life -- colour calc 3 = Merge (JPADrawCalcColorAnmFrameMerge: the 21-entry table stretched over the
+           life): prm (87,8,0) @2 -> (45,34,34) @8 -> (72,72,72) @15 of 20, env (255,111,48) -> (96,96,96) -> (120,120,120) -- fire_smoke.gdshader
+           samples two GradientTexture1Ds by INSTANCE_CUSTOM.y (ParticleProcessMaterial's life phase).
+    Flame  ms_moe_fire_a: Sphere r 8 at (0, 10, 0), 0.5/f, life 15, velDir 1 + the field's 8 u/f drift = 9 u/f straight up (1.8 m in a quarter
+           second), StripeCross 80 u ALONG the velocity (two crossed QuadMeshes, particle_flag_align_y) shrinking -> 0.5 from 25 % x (1 +- 0.1), a
+           +-18 deg turn; TEXC x prm (255,228,170) + env keyed (255,54,0) -> (255,118,31) over 5 frames, colour calc 1 = Repeat (frame = age % 6: a
+           10 Hz red -> orange flicker per particle), alpha = TEXA x 231/255, no ESP1 alpha -- flame_tongue.gdshader.
+    Glow   ms_moe_fire_b: Point at (0, 10, 0), 0.25/f, life 15, 10 u/f up, Billboard 137.5 u -> 0.6 from 29.4 %, alpha 0 -> 0.4248 by 15 % -> 0
+           from 71 %, colour prm FLAT (255,172,101), alpha = I (radgrad) x the fade, blend SRCALPHA + ONE -- glow_add.gdshader.
+    Haze   ms_moe_fire_c: Point at (0, 35, 0), 0.125/f, life 22, 6.5 u/f up, Billboard 62.5 u -> 2.5 over the life x (1 +- 0.05), any turn, alpha
+           0 -> 1 by 55.1 % -> 0 from 62.5 %; BSP1 projection + ETX1 indirect mode 1: the SCREEN copy (P_ms_fb_8x8i4 swapped for TScreenTexture)
+           warped by P_msm_indwp2 with mtx 0.5 x 2^-5 = (I - 128) / 64 texels of the 320 x 224 copy (an eighth of the goop ripple's), the second
+           texture P_msm_indmsk1 (ETX1 flags 0x01, index 0) on colour and alpha -- goop_refract.gdshader with ind_scale 0.015625. The heat haze
+           refracts the opaque pass: the goop and the fogged Mario are in it (passes 96 / 97); the flames are not, as in the game (the particle stage
+           draws after the copy, PerformLists.bin 140 / 152-160).
+  Textures (jpa_bake.py, raw mode: I in RGB, A in A): kemuball3_raw, fire1_raw, radgrad_raw, indmsk1, indwp2 under assets/Sms/Fx/tex, pinned
+  lossless / mipmapped / no 3D auto-compression (fx_tex_imports.py).
+  DEVIATIONS: the smoke's omni 0.5 becomes a 14 deg cone at 1.5..2.5 u/f (Godot adds no independent radial velocity); the StripeCross's roll about
+  the velocity is Godot's basis, not the game's +-18 deg random; the flame's emission sphere shrinks with the strength as the quads do (the game
+  scales the emitter volume the same way). LEGACY RETIRED: none (a new state on the NPC).
+- RUNBOOK: OUTFITS.md 7b gains the Burning switches, 7c the profile's Can Burn / Fire Joint / Fire Joint On Luggage / Burn Effect.
+- VERIFIED headless (drive 98, SmsF98: 21/21): the two placed males burn and the female warns and ignores it; the fire joint yashi_jnt bare / the
+  luggage part's ef_null worn; strength 1; the burning wanderer on mom_run, top speed 7.50 u/tick and clip rate 4.50 (both past the plain caps, =
+  x1.5), no GraphWait in 600 ticks; one NpcBurn with 4 emitters, 3 on the strength group, world axes kept (dot 1.0000) at the joint position at scale
+  1; not talkable while burning (TurnToMario, mom_wait); 100 hits -> 0.800 with the effect at 0.802; out after 500 hits -> HAPPY on mom_happy with
+  the sparkle, the effect dropped, never a Wet nerve; talkable again once out; the runner put out stands (speed 0); the luggage one untouched.
+  Two first-run FAILs in the engine, fixed before anything was committed: INSTANCE_CUSTOM is a VERTEX built-in (fire_smoke / flame_tongue read it
+  in fragment() -> "Unknown identifier", the shaders did not compile): read in vertex(), carried by a varying; and the Flame node's draw_pass_2
+  needs `draw_passes = 2` declared first (the second StripeCross quad was out of bounds). Drives 95 (22/22) and 93 (30/30) re-run green; build
+  0 errors; boot [SMS selftest] ALL OK with no error or shader line.

@@ -132,6 +132,18 @@ public partial class SmsNpcProfile : Resource
     [Export] public PackedScene WashEffect;
     /// <summary>emitSinkEffect_ -> SMS_EmitSinkInPollutionEffect: the goop ripple ring (+ the balls while not at the bottom) at the sink point.</summary>
     [Export] public PackedScene SinkEffect;
+
+    [ExportGroup("Burning (pass 98, NPC_ACTION_BURNING)")]
+    /// <summary>NpcInitPrg.cpp 451: only a normal male Pianta (isNormalMonteM) burns -- the placement flag is ignored on any other kind.</summary>
+    [Export] public bool CanBurn = true;
+    /// <summary>setSmokeEffectMtxPtr_(false): the fire sits on this joint of the body (yashi_jnt, the palm on his head).</summary>
+    [Export] public string FireJoint = "yashi_jnt";
+    /// <summary>setSmokeEffectMtxPtr_(true): with the luggage part (parts slot 11, nimotsu_model) the fire sits on ITS ef_null joint -- the first attached
+    /// part whose model carries this bone is taken as that part.</summary>
+    [Export] public string FireJointOnLuggage = "ef_null";
+    /// <summary>emitParticle_ (NpcEffect.cpp 233): ms_npc_kokuen + ms_moe_fire_a / _b / _c at the fire joint's position every frame while BURNING, the three
+    /// fire emitters scaled by mBurnStrength. Empty = assets/Sms/Fx/NpcBurn.tscn.</summary>
+    [Export] public PackedScene BurnEffect;
     /// <summary>The Toads' drips have no foot emitters and getEffectScale_ is 1 for them (a Pianta's effects scale with its node).</summary>
     public bool IsToad => Kind == NpcKind.Toad;
 

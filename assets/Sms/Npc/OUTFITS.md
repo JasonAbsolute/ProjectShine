@@ -189,6 +189,8 @@ copy = a town's own fashion while the stock Piantas keep the game's.
 | Throw | `Throws Mario`, `Throw Speed`, `Throw Angle Deg` | the Pianta Village launcher: when the talk ends it hurls Mario up and over its own head, to its BACK, at the speed (units a tick) and angle. It takes the talk only within 200 units (not 400). Stand it with its back to the destination. |
 | Pollution | `Pollution` | 0..1: placed already goop-covered (dirty wait, no talk, no turning, the head straight) until the hose washes it clean (125 hits at the Pianta's 0.008) |
 | Pollution | `Thank You Coin` | a scene to pop out 40 frames after the talk that follows a wash (the game's TNpcCoin). Empty = none. |
+| Burning | `Burning`, `Burn Strength` | the Bianco Hills kind: on fire from the start -- smoke and flames on the palm on its head (or on the luggage, when it wears one), and if it wanders it RUNS the route (1.5 x the run speed) without pausing at the nodes. No talk, no mad, no sinking while it burns. The hose puts it out: 500 hits at full strength (0.002 a hit), the flames shrinking as it goes; then it stands in the happy pose until you talk to it, and that talk drops the `Thank You Coin`. `Burn Strength` is how much is left to put out (1 = the game's start). Only a male Pianta can burn -- on a female or a Toad the flag warns and does nothing (`Profile.CanBurn`). Touching a burning Pianta does not hurt Mario (the game's NPCs never send a burn). |
+| Burning | `Burning Sound`, `Fire Fighting Sound` | the two sound slots: the loop while it burns, and the per-hit sizzle under the hose. Your WAVs. |
 | Wander | `Wander`, `Graph`, `Wander Radius Units` | walk a route of Marker3Ds, or random points in the radius |
 
 Any NPC standing on painted goop sinks into it by itself (220 units a Pianta, 70 a Toad) and comes out dirty when the goop under
@@ -208,6 +210,9 @@ These sit on the PROFILE, not the instance -- change them on a duplicated profil
 | Effects | `Foot Drip Effect`, `Foot Joint L` / `R`, `Foot Drip Frames L` / `R` | the Pianta's foot drips (left on 28 52 76, right on 128 152 176). Empty on a Toad. |
 | Effects | `Wash Effect` | the balls flying off while the hose washes it (`NpcWashPianta` / `NpcWashToad`). |
 | Effects | `Sink Effect` | the goop ripple ring and balls while it sinks (`Fx/GoopSinkRipple.tscn`; Mario's own copy sits on `Player.tscn`). |
+| Burning | `Can Burn` | whether the `Burning` switch works on this kind (the game: only a normal male Pianta). Off on the female and the Toad. |
+| Burning | `Fire Joint`, `Fire Joint On Luggage` | where the fire sits: `yashi_jnt` (the palm on his head), or the luggage part's `ef_null` when a worn part has that bone -- the game moves the fire onto the luggage. |
+| Burning | `Burn Effect` | the fire scene (`Fx/NpcBurn.tscn`): the black smoke (`ms_npc_kokuen`) and the three fire emitters (`ms_moe_fire_a` tongues, `_b` glow, `_c` heat haze -- a refraction of the screen behind it). The three fires sit in the node group `sms_burn_strength` and shrink with the strength; the smoke does not. The scene keeps the world axes (the game binds it to a position, not the joint). |
 
 Any `SmsNpcEffect` scene can stand in: a root `Node3D` with the `SmsNpcEffect` script (`Emit Frames` = how long it emits, 1 = one
 burst, 0 = until the clip ends; `Drain Seconds` = the longest particle life) and `GPUParticles3D` children with `emitting` off.
