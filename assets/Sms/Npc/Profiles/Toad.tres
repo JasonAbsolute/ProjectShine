@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="SmsNpcProfile" load_steps=11 format=3]
+[gd_resource type="Resource" script_class="SmsNpcProfile" load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcProfile.cs" id="1_prof"]
+[ext_resource type="Resource" path="res://assets/Sms/Npc/TexPatterns/Toad.tres" id="texpat"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_me_open.png" id="tex_eye"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_cap.png" id="tex_cap"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_cloth.png" id="tex_cloth"]
@@ -99,6 +100,7 @@ BodyMaterialTexture = ExtResource("tex_cap")
 ClothTexture = ExtResource("tex_cloth")
 SkinTexture = ExtResource("tex_body")
 MouthTexture = ExtResource("tex_mouth")
+TexPatterns = ExtResource("texpat")
 EffectJoint = "jnt_body"
 HappyEffect = ExtResource("happy")
 DirtyDripEffect = ExtResource("drip")

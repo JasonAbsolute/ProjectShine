@@ -1,0 +1,136 @@
+[gd_resource type="Resource" script_class="SmsNpcTexPatternSet" load_steps=24 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcTexPatternSet.cs" id="set_script"]
+[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcTexPattern.cs" id="pat_script"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mow_eye01_IA8.png" id="tex_0"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mow_eye02_IA8.png" id="tex_1"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mow_eye03_IA8.png" id="tex_2"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mow_eye04_IA8.png" id="tex_3"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mow_eye05_IA8.png" id="tex_4"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mow_eye06_IA8.png" id="tex_5"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mow_eye07_IA8.png" id="tex_6"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mow_eye08_IA8.png" id="tex_7"]
+
+[sub_resource type="Resource" id="pat_0"]
+script = ExtResource("pat_script")
+PatternName = "mow_appear"
+Clips = PackedStringArray("mow_appear")
+FrameMax = 89
+Loop = false
+Materials = PackedStringArray("_eye_mat")
+Frames = PackedInt32Array(4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 0)
+
+[sub_resource type="Resource" id="pat_1"]
+script = ExtResource("pat_script")
+PatternName = "mow_fall"
+Clips = PackedStringArray("mow_fall")
+FrameMax = 30
+Loop = true
+Materials = PackedStringArray("_eye_mat")
+Frames = PackedInt32Array(4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 0, 0, 0, 1, 1, 1, 4, 4, 4, 4, 4, 4, 0, 0, 0, 1, 1, 1, 1)
+
+[sub_resource type="Resource" id="pat_2"]
+script = ExtResource("pat_script")
+PatternName = "mow_happy"
+Clips = PackedStringArray("mow_happy")
+FrameMax = 90
+Loop = true
+Materials = PackedStringArray("_eye_mat")
+Frames = PackedInt32Array(7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7)
+
+[sub_resource type="Resource" id="pat_3"]
+script = ExtResource("pat_script")
+PatternName = "mow_mad"
+Clips = PackedStringArray("mow_mad")
+FrameMax = 79
+Loop = false
+Materials = PackedStringArray("_eye_mat")
+Frames = PackedInt32Array(0, 0, 0, 0, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 3, 0, 0, 0, 0, 0)
+
+[sub_resource type="Resource" id="pat_4"]
+script = ExtResource("pat_script")
+PatternName = "mow_madloop"
+Clips = PackedStringArray("mow_madloop")
+FrameMax = 80
+Loop = true
+Materials = PackedStringArray("_eye_mat")
+Frames = PackedInt32Array(5, 5, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5)
+
+[sub_resource type="Resource" id="pat_5"]
+script = ExtResource("pat_script")
+PatternName = "mow_recover"
+Clips = PackedStringArray("mow_recover")
+FrameMax = 59
+Loop = false
+Materials = PackedStringArray("_eye_mat")
+Frames = PackedInt32Array(2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 0, 0, 1, 1, 2, 2, 3, 3, 0)
+
+[sub_resource type="Resource" id="pat_6"]
+script = ExtResource("pat_script")
+PatternName = "mow_sitwet"
+Clips = PackedStringArray("mow_sitwet")
+FrameMax = 119
+Loop = false
+Materials = PackedStringArray("_eye_mat")
+Frames = PackedInt32Array(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 1, 1, 1, 1, 4, 4, 4, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 0, 0, 0, 0, 0)
+
+[sub_resource type="Resource" id="pat_7"]
+script = ExtResource("pat_script")
+PatternName = "mow_throw"
+Clips = PackedStringArray("mow_throw")
+FrameMax = 119
+Loop = false
+Materials = PackedStringArray("_eye_mat")
+Frames = PackedInt32Array(5, 5, 5, 5, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 0, 0, 0)
+
+[sub_resource type="Resource" id="pat_8"]
+script = ExtResource("pat_script")
+PatternName = "mow_wait_yogore"
+Clips = PackedStringArray("mow_wait_yogore")
+FrameMax = 380
+Loop = true
+Materials = PackedStringArray("_eye_mat")
+Frames = PackedInt32Array(6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 3, 3, 2, 2, 3, 3, 6, 6, 6, 6, 6, 6, 3, 3, 2, 2, 3, 3, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 3, 3, 2, 2, 2, 2, 3, 3, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6)
+
+[sub_resource type="Resource" id="pat_9"]
+script = ExtResource("pat_script")
+PatternName = "mow_wet"
+Clips = PackedStringArray("mow_wet")
+FrameMax = 119
+Loop = false
+Materials = PackedStringArray("_eye_mat")
+Frames = PackedInt32Array(4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 3, 0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 0)
+
+[sub_resource type="Resource" id="pat_10"]
+script = ExtResource("pat_script")
+PatternName = "mow_wet_a"
+Clips = PackedStringArray("mow_wet_a")
+FrameMax = 89
+Loop = false
+Materials = PackedStringArray("_eye_mat")
+Frames = PackedInt32Array(0, 0, 1, 1, 2, 2, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 3, 3, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 0, 0, 0)
+
+[sub_resource type="Resource" id="pat_11"]
+script = ExtResource("pat_script")
+PatternName = "mow_wet_yogore"
+Clips = PackedStringArray("mow_wet_yogore")
+FrameMax = 169
+Loop = false
+Materials = PackedStringArray("_eye_mat")
+Frames = PackedInt32Array(2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+
+[sub_resource type="Resource" id="pat_12"]
+script = ExtResource("pat_script")
+PatternName = "mow_wink"
+Clips = PackedStringArray()
+FrameMax = 90
+Loop = true
+Materials = PackedStringArray("_eye_mat")
+Frames = PackedInt32Array(0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 2, 3, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+
+[resource]
+resource_name = "PiantaFemale texture patterns"
+script = ExtResource("set_script")
+Textures = Array[Texture2D]([ExtResource("tex_0"), ExtResource("tex_1"), ExtResource("tex_2"), ExtResource("tex_3"), ExtResource("tex_4"), ExtResource("tex_5"), ExtResource("tex_6"), ExtResource("tex_7")])
+Patterns = [SubResource("pat_0"), SubResource("pat_1"), SubResource("pat_2"), SubResource("pat_3"), SubResource("pat_4"), SubResource("pat_5"), SubResource("pat_6"), SubResource("pat_7"), SubResource("pat_8"), SubResource("pat_9"), SubResource("pat_10"), SubResource("pat_11"), SubResource("pat_12")]
+Default = SubResource("pat_12")

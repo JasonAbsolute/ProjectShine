@@ -188,6 +188,24 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private int _sinkPoll;                               // TNpcSink: changeNerveProc_ polls the goop once every SinkPollFrames (staggered per NPC)
     private static int _sinkPollStagger;                 // sCheckPollutedStartCounter
     private readonly List<ShaderMaterial> _skinMats = new();   // the body / cloth / leaf materials carrying the `pollution` uniform
+    private readonly Dictionary<string, ShaderMaterial> _matByName = new();   // pass 101: every override material by its bmd name (the patterns' targets)
+    // ---- texture pattern animation (pass 101: the .btp -- J3DAnmTexPattern on the eye / mouth materials) ----
+    private SmsNpcTexPattern _texPat;             // the pattern the current clip plays with (TLodAnm::setBckAndBtpAnm)
+    private float _texFrame;                      // its J3DFrameCtrl: 60 Hz frames at rate 1 (the NPC code sets the BCK's rate, never the BTP's)
+    private ShaderMaterial[] _texMats = System.Array.Empty<ShaderMaterial>();
+    private string[] _texParams = System.Array.Empty<string>();
+    private int[] _texLast = System.Array.Empty<int>();
+    private bool _randomizeNextPlay;              // randomizeBckAndBtpFrame_ pending for the first clip
+    /// <summary>The pattern in play, its frame and the eye / mouth textures showing (a headless drive reads them).</summary>
+    public string TexPatternName => _texPat?.PatternName ?? "";
+    public float TexFrame => _texFrame;
+    public string EyeTextureName => MaterialTextureName("_eye_mat", "eye_tex");
+    public string MouthTextureName => MaterialTextureName("_mat_mouth", "base_tex");
+    private string MaterialTextureName(string mat, string param)
+    {
+        if (!_matByName.TryGetValue(mat, out var m) || m == null) return "";
+        return m.GetShaderParameter(param).Obj is Texture2D t ? t.ResourcePath.GetFile() : "";
+    }
     // ---- effects (pass 95, NpcEffect.cpp) ----
     private readonly Dictionary<string, BoneAttachment3D> _fxJoints = new();   // one BoneAttachment3D per effect joint, made on first use
     private SmsNpcEffect _washFx;                        // emitWashEffect_'s one emitter (emitAndBindToMtxPtr flag 1: one per owner), alive with the WASH clip
@@ -283,6 +301,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         _stack.Clear();
         if (Wander) { ChooseNextTarget(); Enter(Nerve.GraphWander); }
         else Enter(Nerve.WaitMarioApproach);
+        _randomizeNextPlay = true;                                               // randomizeBckAndBtpFrame_ (NpcInitPrg.cpp 482) runs right after npcWaitIn: here the first clip starts on the nerve's first tick
         if (DebugPrint) GD.Print($"[SMS npc] {Name}: {Profile.Kind} colour {_colorIdx}, clips {(_anim != null ? _anim.GetAnimationList().Length : 0)}, neck {(_neck != null ? "on" : "off")}");
     }
 
@@ -453,6 +472,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (leafTex == null && !string.IsNullOrEmpty(Profile.LeafMaterial))
             leafTex = GD.Load<Texture2D>(Profile.Kind == SmsNpcProfile.NpcKind.PiantaFemale ? LeafTexFemalePath : LeafTexMalePath);
         _skinMats.Clear();
+        _matByName.Clear();
         foreach (var mi in AllMeshes(_model))
         {
             int n = mi.GetSurfaceOverrideMaterialCount();
@@ -527,6 +547,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
                     m.SetShaderParameter("pol_uv2", wantsUv2 && hasUv2);
                     _skinMats.Add(m);
                 }
+                _matByName[name] = m;
                 mi.SetSurfaceOverrideMaterial(s, m);
             }
         }
@@ -820,12 +841,85 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         {
             if (_anim != null && !string.IsNullOrEmpty(clip) && _warnedClips.Add(clip))   // pass 91: the female on a male profile stood in her rest pose with no word
                 GD.PushWarning($"[SMS npc] {Name}: no clip '{clip}' in {_model?.Name} (profile {Profile?.ResourceName}) -- the model keeps its pose");
-            _clip = clip ?? ""; return;
+            _clip = clip ?? ""; SelectTexPattern(_clip); return;
         }
         if (_clip == clip && _anim.IsPlaying()) { _anim.SpeedScale = rate; return; }
         _clip = clip;
         _anim.Play(clip, blend ? SmsParams.Npc.MotionBlendFrame / 60f : 0f, rate);
         _clipLoops = _anim.GetAnimation(clip).LoopMode != Animation.LoopModeEnum.None;
+        SelectTexPattern(clip);                                                  // setBckAndBtpAnm: the kind's btp goes with its bck
+        if (_randomizeNextPlay) { _randomizeNextPlay = false; RandomizeClipAndPatternFrame(); }   // the NPC's first clip: a random start (no crowd in step)
+    }
+
+    // ------------------------------------------------------------------ texture patterns (pass 101: the .btp blinks and mouths)
+    /// <summary>TLodAnm::setBtpAnm_: the pattern paired with `clip` (or the kind's default); a change restarts its frame counter at 0
+    /// (setBtpFromIndex). The same pattern staying on across a clip change keeps its frame, as the game's does (getCurAnmIdx == tmp -> no set).</summary>
+    private void SelectTexPattern(string clip)
+    {
+        var set = Profile?.TexPatterns;
+        var pat = set?.For(clip);
+        if (pat == _texPat) return;
+        _texPat = pat;
+        _texFrame = 0f;
+        if (pat == null) { _texMats = System.Array.Empty<ShaderMaterial>(); return; }
+        int n = pat.Materials.Length;
+        _texMats = new ShaderMaterial[n]; _texParams = new string[n]; _texLast = new int[n];
+        for (int i = 0; i < n; i++)
+        {
+            _matByName.TryGetValue(pat.Materials[i], out _texMats[i]);
+            _texParams[i] = pat.Materials[i] == "_eye_mat" ? "eye_tex" : "base_tex";
+            _texLast[i] = -1;
+        }
+        ApplyTexPattern();
+    }
+
+    /// <summary>The J3DFrameCtrl of ANM_TYPE_BTP: + rate (1.0) a 60 Hz frame; attribute 2 loops, 0 stops on the last frame (getTexNo clamps).</summary>
+    private void TickTexPattern(double delta)
+    {
+        if (_texPat == null || _texPat.FrameMax <= 0) return;
+        _texFrame += (float)(delta * 60.0);
+        if (_texPat.Loop) { if (_texFrame >= _texPat.FrameMax) _texFrame = Mathf.PosMod(_texFrame, _texPat.FrameMax); }
+        else if (_texFrame > _texPat.FrameMax - 1) _texFrame = _texPat.FrameMax - 1;
+        ApplyTexPattern();
+    }
+
+    /// <summary>J3DTexNoAnm::calc -> the material's texmap: the eye shader's eye_tex / the mouth's base_tex, set only when the index changes.</summary>
+    private void ApplyTexPattern()
+    {
+        if (_texPat == null) return;
+        var set = Profile.TexPatterns;
+        int f = (int)_texFrame;
+        for (int i = 0; i < _texMats.Length; i++)
+        {
+            int idx = _texPat.TexIndex(i, f);
+            if (idx == _texLast[i] || _texMats[i] == null) continue;
+            var tex = set.TextureAt(idx);
+            if (tex == null) continue;
+            _texLast[i] = idx;
+            _texMats[i].SetShaderParameter(_texParams[i], tex);
+        }
+    }
+
+    /// <summary>randomizeBckAndBtpFrame_ (NpcAnm.cpp 259): the clip starts at a random frame; the pattern at the same frame when its length is the
+    /// clip's (a per-clip btp), else at a random frame of its own (the wink loop) -- so a crowd never blinks or idles in unison.</summary>
+    private void RandomizeClipAndPatternFrame()
+    {
+        float clipFrames = 0f, t = 0f;
+        if (_anim != null && _anim.IsPlaying() && !string.IsNullOrEmpty(_clip) && _anim.HasAnimation(_clip))
+        {
+            float len = (float)_anim.GetAnimation(_clip).Length;
+            if (len > 0f) { t = _rng.NextSingle() * len; _anim.Seek(t, true); clipFrames = len * 60f; }
+        }
+        if (_texPat == null) return;
+        _texFrame = Mathf.Abs(_texPat.FrameMax - clipFrames) <= 1.5f ? t * 60f : _rng.NextSingle() * _texPat.FrameMax;
+        if (_texFrame >= _texPat.FrameMax) _texFrame = _texPat.FrameMax - 1;
+        ApplyTexPattern();
+    }
+
+    public override void _Process(double delta)
+    {
+        if (Engine.IsEditorHint()) return;
+        TickTexPattern(delta);
     }
 
     private bool ClipEnded() => _anim == null || string.IsNullOrEmpty(_clip) || !_anim.HasAnimation(_clip) || (!_clipLoops && !_anim.IsPlaying());

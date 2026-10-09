@@ -124,8 +124,12 @@ public partial class SmsNpcProfile : Resource
     [Export] public Texture2D ClothTexture;
     /// <summary>The Toad's _mat_body texture N_kinopio_body (the face / hands / shorts sheet, CMPR 64 x 64) -- the glb's was a lossy re-encode.</summary>
     [Export] public Texture2D SkinTexture;
-    /// <summary>The Toad's _mat_mouth texture N_kinopio_kuti_close (the bmd's default; the BTP mouth shapes are not ported).</summary>
+    /// <summary>The Toad's _mat_mouth texture N_kinopio_kuti_close (the bmd's default and the mouth the patterns start from).</summary>
     [Export] public Texture2D MouthTexture;
+    /// <summary>Pass 101: the kind's texture pattern animations (the disc's .btp files: blinks, mouths) -- TexPatterns/&lt;Kind&gt;.tres. The game
+    /// pairs every anm kind with a bck and a btp (NpcInitAnmData.cpp sMonte* / sKinopio_AnmIndex): a Pianta clip with a same-named pattern
+    /// plays it, every other clip the wink (two quick blinks every 1.5 s); the Toad's six cover its clips by table. Empty = no blinking.</summary>
+    [Export] public SmsNpcTexPatternSet TexPatterns;
 
     [ExportGroup("Effects (NpcEffect.cpp)")]
     /// <summary>mHappyEffectMtxPtr / mPollutionEffectMtxPtr: the joint the sparkle, the centre drips and the wash are bound to -- koshi_null on a

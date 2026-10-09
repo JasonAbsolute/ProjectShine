@@ -5881,3 +5881,46 @@ with its orange trim, the black eyes with the glint are his to judge.
 ### Not ported
 The Toad's BTP texture animations (5 eye sets: open / half / close / worry / wet; 7 mouths) and the Piantas' 8 eye sets -- the models show the
 bmd's default (open eye, closed mouth); no blinking.
+
+## SMS pass 101 -- the NPCs blink: the .btp texture pattern animations (eyes and mouths)
+
+Jaysonn (10-09 01:52): "Port the blinking next".
+
+### The game
+- Every NPC anm kind pairs a bck with a btp (NpcInitAnmData.cpp sMonteM_ / sMonteW_ / sKinopio_AnmIndex -> TLodAnm::setBckAndBtpAnm ->
+  MActor::setBtpFromIndex). The indices are per TYPE into MActorAnmData's lists, which it sorts by file name with an UPPERCASE compare
+  (MActorData.cpp strcmp_ignore_case / to_upper_hack) -- so `moma_*` / `momb_*` ... sort BEFORE `mom_*` ('A' 0x41 < '_' 0x5F) and the plain
+  Pianta's thirteen btps are indices 54..66 of 67 (the female's 26..38 of 39; the Toad's six 0..5). Resolved: a Pianta clip with a same-named
+  .btp plays it (mom_appear / fall / happy / mad / madloop / recover / sitwet / throw / wait_yogore / wet / wet_a / wet_yogore), every other clip
+  plays `mom_wink`; the Toad: wait / walk / run / step / sit -> `kinopio_twait`, talk / sittalk -> `ttalk`, happy / appear -> `twet`, fall /
+  recover / wet / wet_a / wait_fall / sitwet / sitshake / stumble / wet_yogore -> `twet_a`, wait_yogore (+ the worried `ororo` clips) -> `twait2`,
+  worry / sitworry -> `tworry` (sIndividualKinopioBtp remaps twait -> twait2, ttalk -> tworry for the worried kind).
+- The .btp (J3DAnmTexPattern, read by btp_dump.py from the engine's J3DAnmTexPatternFullData layout): per material a texture index per
+  frame (getTexNo clamps to the keyed range); attribute 2 loops, 0 plays once and holds. `mom_wink`: 90 frames looping -- eye01, then two quick
+  blinks (eye02 / eye03 / eye04 at 5-11 and 17-23), open to the end. `kinopio_twait`: 150 frames, three blinks (open / half / close / half),
+  the mouth closed; `kinopio_ttalk`: 100 frames, the mouth cycling close / half / open every ~10 frames under two blinks; `twet`: eyes open +
+  mouth open (a shout, 3 frames); `twet_a`: wet eyes + wet mouth; `twait2` / `tworry`: the worry eyes and the worry mouths.
+- The BTP's J3DFrameCtrl advances at rate 1 per frame (the NPC code sets the BCK's rate -- the walk speed -- never the BTP's); on load
+  randomizeBckAndBtpFrame_ (NpcAnm.cpp 259, right after npcWaitIn) starts the clip at a random frame and the btp at the same frame when their
+  lengths match, else at a random frame of its own -- so a crowd never idles or blinks in unison.
+
+### Ported
+- `SmsNpcTexPattern` (one .btp: name, the clips it plays with, frameMax, loop, the materials it drives, the frame table) and
+  `SmsNpcTexPatternSet` (a kind's patterns, their textures, the default) -- [Tool, GlobalClass] Resources; `TexPatterns/{PiantaMale, PiantaFemale,
+  Toad}.tres` generated from the disc by gen_npc_btp.py (13 / 13 / 6 patterns; 8 / 8 / 12 textures), the 24 new eye / mouth sheets in
+  `assets/Sms/Npc/tex` (pinned like pass 100's).
+- `SmsNpcProfile.TexPatterns` slot (Textures group); `SmsNpc`: `SelectTexPattern` on every clip start (the same pattern staying on keeps its
+  frame, as the game's getCurAnmIdx check does), `TickTexPattern` in _Process (+60 frames a second, loop / hold), `ApplyTexPattern` sets the eye
+  shader's `eye_tex` / the mouth's `base_tex` only when the index changes, `RandomizeClipAndPatternFrame` on the NPC's first clip (the bck too:
+  Piantas no longer idle in lockstep -- the game's). `_matByName` keeps every override material by its bmd name.
+
+### Verified (drive 101, SmsF101, 11/11; build 0 errors; boot ALL OK, zero ERROR / SHADER / WARNING lines)
+S1 the three sets (13/8, 13/8, 6/12); S2 the Pianta table (own btp vs the wink); S3 the Toad table; S4 mom_wink's frames (eye01 0-4, eye02 5,
+eye03 6-10, eye04 11, the second blink, eye01 to 89); S5 every idle NPC on its wait pattern (the dirty Toad on twait2); R1 three Piantas at
+different clip positions AND wink frames; B1 / B2 the Piantas blinked within 2.5 s (only the wink's four sheets); B3 the Toad's open / half /
+closed eyes with the mouth shut; B4 the dirty Toad's worry eyes + worryclose mouth; B5 the pattern clock at 60 frames a second (300.3 in 5 s,
+three wraps of the 90-frame loop). Headless cannot draw the blink itself -- his eye.
+
+### Not ported
+The individual BTP remaps of the special Pianta kinds (MonteMA..MD's moma_*..momd_* sets) and the Toad's worried kind as a placement flag
+(NPC_ACTION_UNK100 -- the clips are mapped, the flag is not); BTK / BRK material animations (none on these models).
