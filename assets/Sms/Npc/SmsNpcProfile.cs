@@ -144,6 +144,17 @@ public partial class SmsNpcProfile : Resource
     /// <summary>emitParticle_ (NpcEffect.cpp 233): ms_npc_kokuen + ms_moe_fire_a / _b / _c at the fire joint's position every frame while BURNING, the three
     /// fire emitters scaled by mBurnStrength. Empty = assets/Sms/Fx/NpcBurn.tscn.</summary>
     [Export] public PackedScene BurnEffect;
+    /// <summary>Pass 99: a BURNING Pianta wears the Luggage. Every burning placement in the shipped stages (scene.bin, action index 24 = 0x4088)
+    /// carries parts bit 0x800 -- the luggage slot: dolpic6..10's running Pianta (blue coin 4), dolpic_ex3's (HatG + Luggage), monte2's 'monte28'
+    /// (coin 22), monte_ex0's -- 8 of 8 (npc_placements.py), so the game only ever shows the fire on the bag (setSmokeEffectMtxPtr_(true): ef_null).
+    /// On: a Burning instance whose slots, extras and hand-placed parts carry no luggage gets <see cref="BurnLuggagePart"/> added (the editor preview
+    /// shows it too). Off: the code's bare case -- the fire on the palm (yashi_jnt) -- which no shipped stage uses.</summary>
+    [Export] public bool BurnWithLuggage = true;
+    /// <summary>The luggage part BurnWithLuggage adds; empty = assets/Sms/Npc/Parts/Pianta/Luggage.tscn (the game's nimotsu_model, slot 11).</summary>
+    [Export] public PackedScene BurnLuggagePart;
+    /// <summary>DEVIATION knob (off = the game): behaveToHitObject_ 351 emits the water-hit mark (PARTICLE_MS_ENM_WATHIT) at the NPC's own mPosition
+    /// -- its feet -- for every hit on a burning NPC. On: the mark goes where the drop actually hit (the enemies' convention, TSmallEnemy 547).</summary>
+    [Export] public bool WaterHitAtDrop = false;
     /// <summary>The Toads' drips have no foot emitters and getEffectScale_ is 1 for them (a Pianta's effects scale with its node).</summary>
     public bool IsToad => Kind == NpcKind.Toad;
 

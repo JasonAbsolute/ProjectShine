@@ -8,15 +8,17 @@ using System;
 /// spheres (a stand-in for the game's silhouette / water-volume rendering). Positions are world metres, velocities
 /// metres a tick; the game's numbers (units a tick) are converted on the way in.
 /// Not ported: the ground / wall sliding (case 2 / 3: a hit drop sits, shrinks and dries instead), splashes, sound. A drop whose
-/// ray hits a body that is an <see cref="ISmsSprayTarget"/> (the enemies: Gooble.cs) sends it HIT_MESSAGE_SPRAYED_BY_WATER (pass 71;
-/// the game's water hit actors against the actors' damage cylinders). A drop that lands cleans the goop layers (splashGround / splashWall ->
+/// ray hits a body that is an <see cref="ISmsSprayTarget"/> (the enemies: Gooble.cs; the NPCs: SmsNpc.cs) sends it HIT_MESSAGE_SPRAYED_BY_WATER
+/// (pass 71; the game's water hit actors against the actors' damage cylinders) and, taken, dies there (pass 99, move() 429). A drop that lands cleans the goop layers (splashGround / splashWall ->
 /// gpPollution->clean(pos, mCleanSize x 10 on a floor, x 32 on a wall)) the tick it lands and every tick it sits there (pass 65).
 /// </summary>
 /// <summary>An actor FLUDD's water hurts: TSmallEnemy::receiveMessage(HIT_MESSAGE_SPRAYED_BY_WATER) and the like.</summary>
 public interface ISmsSprayTarget
 {
-    /// <summary>A drop (or the hose at close range) hit the actor at <paramref name="hitPos"/> (world metres).</summary>
-    void SmsSprayedByWater(Vector3 hitPos);
+    /// <summary>A drop (or the hose at close range) hit the actor at <paramref name="hitPos"/> (world metres). True = the actor took the message
+    /// (receiveMessage returned true): TModelWaterManager::move() 429 then KILLS the drop -- it neither lands nor cleans. False = it flies on
+    /// (here: it lands where it was).</summary>
+    bool SmsSprayedByWater(Vector3 hitPos);
 }
 
 public partial class SmsWaterDrops : Node3D
@@ -152,16 +154,21 @@ public partial class SmsWaterDrops : Node3D
                 {
                     Vector3 n = (Vector3)hit["normal"];
                     _hit[i] = (Vector3)hit["position"];
+                    // move() 429: a drop that meets an actor sends it HIT_MESSAGE_SPRAYED_BY_WATER; taken, the drop DIES there (mParticleLifetimeSOA
+                    // = 0: no landing, no clean stamp -- the game adds a splash sound and, 30 % of the time, a TSplashManager splash, neither ported;
+                    // the actor's own answer, the ENM_WATHIT mark, is its receiveMessage's). Pass 99 -- before this the drop sat and dried on the body.
+                    if (hit["collider"].As<GodotObject>() is ISmsSprayTarget target)
+                    {
+                        if (target.SmsSprayedByWater(_hit[i])) { _life[i] = 0f; continue; }
+                    }
+                    else if (DebugPrint && (++_dbgHits % 120) == 1 && hit["collider"].As<GodotObject>() is Node col && col is not StaticBody3D && col is not CsgShape3D)
+                        GD.Print($"[SMS water] a drop hit {col.Name} ({col.GetType().Name}): not a spray target");
                     _wall[i] = n.Y < 0.5f; // the game asks the polygon's class (floor / wall); the port splits at 60 degrees
                     _pos[i] = _hit[i] + n * (size * 0.25f);
                     _vel[i] = Vector3.Zero;
                     _state[i] = 2;
                     CleanAt(i);
                     _life[i] = MathF.Min(_life[i], GroundLifeTicks);
-                    if (hit["collider"].As<GodotObject>() is ISmsSprayTarget target)
-                        target.SmsSprayedByWater(_hit[i]); // HIT_MESSAGE_SPRAYED_BY_WATER
-                    else if (DebugPrint && (++_dbgHits % 120) == 1 && hit["collider"].As<GodotObject>() is Node col && col is not StaticBody3D && col is not CsgShape3D)
-                        GD.Print($"[SMS water] a drop hit {col.Name} ({col.GetType().Name}): not a spray target");
                 }
                 else
                 {

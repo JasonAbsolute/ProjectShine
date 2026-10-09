@@ -3,6 +3,8 @@
 // JPADrawCalcColorAnmFrameMerge) -- prm (87,8,0) -> (45,34,34) -> (72,72,72), env (255,111,48) -> (96,96,96) -> (120,120,120) at frames 2 / 8 / 15:
 // a dark-red / orange puff that goes grey -- alpha = TEXA x prmA x the ESP1 fade (COLOR.a from the ramp). The two colour ramps are sampled by
 // the particle's life phase (INSTANCE_CUSTOM.y, ParticleProcessMaterial's CUSTOM.y). The texture is the raw IA8 (I in .r, A in .a).
+// Pass 99: the quad is a BILLBOARD (the JPA's BSP1 shape) turned by the particle's own angle (CUSTOM.x, the ESP1 rotate) -- pass 98 left it flat
+// in the emitter's XY, so the puffs drew edge-on from most angles. Also the ENM_WATHIT water-hit mark (WaterHitMark.tscn): the same TEV.
 shader_type spatial;
 render_mode blend_mix, depth_draw_never, cull_disabled, unshaded, shadows_disabled, fog_disabled;
 
@@ -18,6 +20,14 @@ vec3 to_linear(vec3 c) {
 
 void vertex() {
 	life_phase = INSTANCE_CUSTOM.y;
+	// the billboard: the view's axes at the particle's position, the particle's scale kept, rolled by its angle (StandardMaterial3D's
+	// BILLBOARD_PARTICLES does the same with CUSTOM.x = the ESP1 rotate)
+	float a = INSTANCE_CUSTOM.x;
+	mat4 world = mat4(normalize(INV_VIEW_MATRIX[0]) * length(MODEL_MATRIX[0].xyz), normalize(INV_VIEW_MATRIX[1]) * length(MODEL_MATRIX[1].xyz),
+	                  normalize(INV_VIEW_MATRIX[2]) * length(MODEL_MATRIX[2].xyz), MODEL_MATRIX[3]);
+	world = world * mat4(vec4(cos(a), -sin(a), 0.0, 0.0), vec4(sin(a), cos(a), 0.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0));
+	MODELVIEW_MATRIX = VIEW_MATRIX * world;
+	MODELVIEW_NORMAL_MATRIX = mat3(MODELVIEW_MATRIX);
 }
 
 void fragment() {

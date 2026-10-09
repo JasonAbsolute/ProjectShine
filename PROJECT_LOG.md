@@ -5778,3 +5778,53 @@ the Piantas, the Nokis, the Toad):
   in fragment() -> "Unknown identifier", the shaders did not compile): read in vertex(), carried by a varying; and the Flame node's draw_pass_2
   needs `draw_passes = 2` declared first (the second StripeCross quad was out of bounds). Drives 95 (22/22) and 93 (30/30) re-run green; build
   0 errors; boot [SMS selftest] ALL OK with no error or shader line.
+
+## SMS pass 99 -- the burning Pianta's luggage, the water-hit mark (ENM_WATHIT), the fire's billboards
+
+Jaysonn (10-08): "piantas are only supposed to be on fire when they have the backpack model? or that's where the fire should be ... can
+you make the effect of FLUDD hitting enemies? I couldn't tell if I was hitting the Pianta to put out the fire ... positions and placement
+seem off".
+
+### What the game does (the source + the disc)
+- The fire joint (NpcEffect.cpp 82 setSmokeEffectMtxPtr_): by NAME -- `yashi_jnt` (the palm on his head) on a bare body, the luggage part's
+  `ef_null` with the luggage (parts bit 0x800); mFireParticlePos = that matrix's translation, no offset (233). So the code has both cases.
+- The DATA only ever uses one: every stage scene.bin was parsed (npc_placements.py, the TBaseNPC::setIndividualDifference_ layout) -- of 912
+  Pianta placements, 8 have the burning action (index 24 = BURNING | UNK80 | RUN) and ALL 8 carry parts bit 0x800, the Luggage: dolpic6-10's
+  'MonteM' (blue coin 4, graph monte0/8/10/11), dolpic_ex3's (HatG + Luggage, coin 200), monte2's 'monte28' (coin 22), monte_ex0's (coin 2000).
+  The game's fire is only ever seen on the bag; his Pianta3 (Burning, no luggage) was the bare case nobody saw in the game -- the fire at the
+  palm base, 2.35 m up a 3.43 m body (probe99.gd measured it; the luggage's ef_null is 1.93 m up, 0.62 m behind, the bag's centre).
+- The water-hit mark: PARTICLE_MS_ENM_WATHIT (0xE7, ms_enm_wathit.jpa), emitted unbound once per hit -- TSmallEnemy::receiveMessage 547 at the
+  water hit actor's position (the drop), TBaseNPC::behaveToHitObject_ 351 ONLY while BURNING, at the NPC's own mPosition (its feet). A plain or
+  washing NPC emits nothing (the game's TSplashManager splash there, 30 % of accepted hits, size 5, is not ported). TModelWaterManager::move()
+  429: when the actor takes the message (both return true) the DROP DIES -- no landing, no clean stamp (+ a splash sound, not ported).
+- The jpa: Sphere 5 (a point), rate 1 maxFrame 1 (ONE particle per emit), life 12 +-12.5 %, no velocity; Billboard 2.5 (125 u) scaling 0.8 -> 1
+  by 25 %, 1 -> 2.25 from 25 % to the end, x (1 +- 0.35), a random angle; colour lerp(env -> prm, TEXC) with both keyed over the life (Merge,
+  the 11-entry table): prm (255,255,207) @3 -> (255,207,63) @10, env (255,255,58) @3 -> (255,67,31) @10; alpha 1 until 42.5 % then -> 0;
+  P_ms_hitmrk2_ia (IA4 64 x 64, the cartoon splat); blend SRCALPHA + INVSRCALPHA, z test on / no write.
+
+### Fixed / ported
+- `SmsNpcProfile.BurnWithLuggage` (default ON) + `BurnLuggagePart`: a `Burning` Pianta whose slots / extras / hand-placed parts carry no luggage
+  gets the Luggage part (never two with a Random hand slot); the editor preview shows the bag when Burning is ticked (the export is a property
+  now). Off = the bare code case. `WaterHitAtDrop` (DEVIATION knob, off = the game): the burning NPC's mark at the drop instead of its feet.
+- `WaterHitMark.tscn` (gen_fx_npc.py wathit(), tex/hitmrk2_raw.png) + `SmsWaterHitMarks.cs`: a pool of 24 one-particle one-shot emitters under
+  the tree root (Ensure at the burners' and the Gooble's _Ready: the shader compiles with the level), `Emit(at)` restarts the next one -- the
+  spray lands tens of drops a second; a node per hit would churn. Emitted by SmsNpc.Sprayed (the burning branch, at GlobalPosition) and by
+  Gooble.SmsSprayedByWater (at the drop, every hit, before the cooldown -- TSmallEnemy 547).
+- `ISmsSprayTarget.SmsSprayedByWater` returns bool; SmsWaterDrops kills an accepted drop (move() 429) instead of landing it on the body.
+  A held / just-released NPC and a dying Gooble return false (no hit pairs in the game).
+- BUG (pass 98): fire_smoke.gdshader and glow_add.gdshader had no billboard -- the smoke puffs and the glow drew as quads flat in the emitter's
+  XY, edge-on from most angles ("positions seem off"). Both are billboards now, rolled by the particle's angle (CUSTOM.x -- the smoke's +- 22.5
+  deg and the mark's random turn, which the flat quads had also lost). The hit mark reuses fire_smoke.gdshader.
+
+### Verified (drive 99, SmsF99, 12/12; drive 98 re-run 21/21 with its bare cases made explicit; build 0 errors; boot ALL OK, zero ERROR /
+SHADER / WARNING lines)
+L1 a Burning Pianta with empty slots wears exactly one Luggage and its fire joint is ef_null; L2 BurnWithLuggage off: no luggage, yashi_jnt;
+L3 Burning + RandomOutfit at density 1: exactly one luggage; L4 a plain Pianta gets none; F1 the fire hangs on Fx_ef_null, none on the palm;
+M1 the mark pool in the tree, 24 emitters; M2 10 fire-fighting hits -> 10 marks at the NPC's feet, each taken, strength 0.98; M3 5 hits on a
+plain Pianta: taken, no marks; M4 the knob puts the mark at the drop; D1 a real drop onto a Gooble: one mark at its body's top, the drop
+consumed that tick (0 left), D2 the dying Gooble takes no further spray; M5 the pool rotated once per mark.
+Headless cannot draw: the bag's fire, the billboards, the splat's look and size are his to judge.
+
+### Not ported / deviations (logged)
+- The TSplashManager splash (30 % of accepted hits) and the sounds (MSD_SE_EN_COMMON_W_HIT_OK, the fire-fighting gate). The NPC blue-coin skip.
+- WaterHitAtDrop (off) is the only deviation; a dead actor returning false lands the drop on it where the game's would fly through.

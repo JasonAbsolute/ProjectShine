@@ -1,0 +1,285 @@
+[gd_scene load_steps=14 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsWaterHitMarks.cs" id="1_script"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/fire_smoke.gdshader" id="2_sh"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/hitmrk2_raw.png" id="3_tex"]
+
+[sub_resource type="Gradient" id="Gradient_prm"]
+resource_name = "ms_enm_wathit prm colour keys (Merge over the life): (255,255,207) @3 -> (255,207,63) @10 of 10"
+offsets = PackedFloat32Array(0, 0.2727, 0.9091, 1)
+colors = PackedColorArray(1, 1, 0.8118, 1, 1, 1, 0.8118, 1, 1, 0.8118, 0.2471, 1, 1, 0.8118, 0.2471, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_prm"]
+gradient = SubResource("Gradient_prm")
+
+[sub_resource type="Gradient" id="Gradient_env"]
+resource_name = "ms_enm_wathit env colour keys: (255,255,58) @3 -> (255,67,31) @10 of 10"
+offsets = PackedFloat32Array(0, 0.2727, 0.9091, 1)
+colors = PackedColorArray(1, 1, 0.2275, 1, 1, 1, 0.2275, 1, 1, 0.2627, 0.1216, 1, 1, 0.2627, 0.1216, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_env"]
+gradient = SubResource("Gradient_env")
+
+[sub_resource type="Gradient" id="Gradient_alpha"]
+resource_name = "ms_enm_wathit ESP1 alpha: 1 until 42.48 %, -> 0 at the end (in 0: no fade-in)"
+offsets = PackedFloat32Array(0, 0.4248, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_alpha"]
+gradient = SubResource("Gradient_alpha")
+
+[sub_resource type="Curve" id="Curve_scale"]
+resource_name = "ms_enm_wathit ESP1 scale: 0.8 -> 1 by 25 % (inTiming), 1 -> 2.25 from 25 % (outTiming) to the end"
+max_value = 2.2498
+_data = [Vector2(0, 0.7999), 0.0, 0.0, 1, 1, Vector2(0.25, 1), 0.0, 0.0, 1, 1, Vector2(1, 2.2498), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_scale"]
+curve = SubResource("Curve_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_mark"]
+resource_name = "one particle per emit (rate 1, maxFrame 1), life 12 +-12.5 %, no velocity / fields, a random angle, scale x (1 +- 0.35)"
+lifetime_randomness = 0.125
+emission_shape = 0
+angle_min = -180.0
+angle_max = 180.0
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+gravity = Vector3(0, 0, 0)
+scale_min = 0.65
+scale_max = 1.35
+scale_curve = SubResource("CurveTexture_scale")
+color_ramp = SubResource("GradientTexture1D_alpha")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_mark"]
+resource_name = "ms_enm_wathit: P_ms_hitmrk2 (raw IA4), lerp(env -> prm, I) with both registers keyed over the life (Merge), alpha x the fade; a billboard"
+shader = ExtResource("2_sh")
+shader_parameter/tex = ExtResource("3_tex")
+shader_parameter/prm_ramp = SubResource("GradientTexture1D_prm")
+shader_parameter/env_ramp = SubResource("GradientTexture1D_env")
+
+[sub_resource type="QuadMesh" id="QuadMesh_mark"]
+resource_name = "the game's 2.5 x 2.5 billboard (125 units)"
+material = SubResource("ShaderMaterial_mark")
+size = Vector2(1.679, 1.679)
+
+[node name="WaterHitMark" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Mark0" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark1" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark2" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark3" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark4" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark5" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark6" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark7" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark8" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark9" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark10" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark11" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark12" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark13" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark14" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark15" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark16" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark17" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark18" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark19" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark20" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark21" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark22" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+[node name="Mark23" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.2
+one_shot = true
+explosiveness = 1.0
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")

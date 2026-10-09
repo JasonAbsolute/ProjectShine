@@ -157,6 +157,7 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         BottleScene ??= GD.Load<PackedScene>(BottleScenePath);
         if (BottleScene == null)
             GD.PushWarning($"[SMS gooble] {GetPath()}: {BottleScenePath} did not load: no water bottle drop");
+        SmsWaterHitMarks.Ensure(this);                          // pass 99: the water-hit mark pool loads with the level, not at the first hit
         Reset();
     }
 
@@ -854,12 +855,16 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         }
     }
 
-    /// <summary>HIT_MESSAGE_SPRAYED_BY_WATER (TSmallEnemy::receiveMessage): once per 30-tick cooldown, decHpByWater (the hit's attack, at
-    /// least 1) then TNameKuri::behaveToWater: Die -- melting when on the ground -- with no reward.</summary>
-    public void SmsSprayedByWater(Vector3 hitPos)
+    /// <summary>HIT_MESSAGE_SPRAYED_BY_WATER (TSmallEnemy::receiveMessage 546): EVERY hit emits PARTICLE_MS_ENM_WATHIT at the water hit actor's
+    /// position (the drop, or the hose's point) -- the splat that shows the water landing -- then, once per 30-tick cooldown, decHpByWater (the
+    /// hit's attack, at least 1) and TNameKuri::behaveToWater: Die -- melting when on the ground -- with no reward. Returns true (the message is
+    /// taken: TModelWaterManager::move() 429 kills the drop); a dead one has no collision in the game, so false (the drop flies on -- here it lands).
+    /// MSD_SE_EN_COMMON_W_HIT_OK not ported.</summary>
+    public bool SmsSprayedByWater(Vector3 hitPos)
     {
-        if (_dead || _hp == 0) return;
-        if (_sprayCooldown != 0) return;
+        if (_dead || _hp == 0) return false;
+        SmsWaterHitMarks.Emit(this, hitPos);                    // pass 99: before the cooldown -- the game marks every hit
+        if (_sprayCooldown != 0) return true;
         _sprayCooldown = 1;
         _hp = Math.Max(0, _hp - 1);
         if (_cur != Nerve.Die)
@@ -868,6 +873,7 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
             if (!_airborne) _melt = true;                       // LIVE_FLAG_MELT_ON_DEATH
             _noReward = true;                                   // LIVE_FLAG_UNK20000
         }
+        return true;
     }
 
     /// <summary>setDeadAnm: the down anim, MSD_SE_EN_NAMEKURI_DOWN, ms_deadnamekli_o / n on joint 2, still, LIVE_FLAG_UNK10 (no bind).</summary>

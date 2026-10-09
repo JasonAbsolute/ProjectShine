@@ -106,7 +106,8 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// strength a hit, 500 hits from 1 -- then npcHappyIn(1): the happy pose until the next talk (and that talk's ThankYouCoin). Ignored, with a
     /// warning, on a kind whose profile says CanBurn = false (the female, the Toad). Not modelled: the game skipping the burn when the NPC's blue coin
     /// is already collected (TFlagManager, NpcInitPrg.cpp 456).</summary>
-    [Export] public bool Burning = false;
+    [Export] public bool Burning { get => _burningSet; set { _burningSet = value; if (Engine.IsEditorHint() && IsInsideTree()) CallDeferred(nameof(EditorPreviewOutfit)); } }   // pass 99: the preview shows the bag
+    private bool _burningSet;
     /// <summary>mBurnStrength at the start (the game's init is 1.0): how much hosing is left, 0..1; the three fire emitters are scaled by it.</summary>
     [Export(PropertyHint.Range, "0,1")] public float BurnStrength = 1f;
     [ExportGroup("Wander")]
@@ -138,6 +139,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     public const string LeafShaderPath = "res://assets/Sms/Npc/NpcLeaf.gdshader";                    // pass 95: _leafback_mat's TEV
     public const string LeafTexMalePath = "res://assets/Sms/Npc/tex/I_mom_mino_rgba.png";          // Delfino's /scene/monteMCommon/I_mom_mino_rgba.bti
     public const string LeafTexFemalePath = "res://assets/Sms/Npc/tex/I_mow_mino_rgba.png";
+    public const string BurnLuggagePath = "res://assets/Sms/Npc/Parts/Pianta/Luggage.tscn";             // pass 99: Profile.BurnLuggagePart's default
     public const string FxDir = "res://assets/Sms/Fx/";                                              // the Kind defaults of the profile's effect slots
     [Export] public Shader LeafShader;
     public const string CursorPath = "res://assets/Sms/Npc/TalkCursor.tscn";
@@ -192,7 +194,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private SmsGoopRipple _sinkFx;                       // emitSinkEffect_: the goop ripple at the sink point
     private Vector3 _sinkNormal = Vector3.Up;            // mGroundPlane->getNormal() when the sink began
     private float _fxPrevFrame = -1f; private string _fxPrevClip = "";   // the BCK frame controller's checkPass: last frame's position
-    private PackedScene _happyFx, _dirtyFx, _footFx, _washScene, _sinkScene, _burnScene;
+    private PackedScene _happyFx, _dirtyFx, _footFx, _washScene, _sinkScene, _burnScene, _burnLuggageScene;
     // ---- burning (pass 98, NPC_ACTION_BURNING) ----
     private bool _burning;                               // NPC_ACTION_BURNING (| RUN | UNK80 ride with it: RunFlag, the no-wait wander)
     private float _burnStrength = 1f;                    // mBurnStrength: 1 -> 0 under the hose (FireDecSpeed a hit); isExtinguished_ at <= 0
@@ -363,6 +365,15 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
                 if (!filled) picks.AddRange(slot.Roll(_rng, RandomOutfitDensity));
             }
         foreach (var extra in ExtraParts) if (extra != null) picks.Add(extra);
+        // pass 99: a BURNING Pianta carries the Luggage -- every burning placement in the shipped stages sets parts bit 0x800 with action 24 (8 of 8:
+        // the fire is only ever seen on the bag's ef_null). Added when no slot pick, extra or hand-placed part is the luggage already; in the
+        // editor preview too, so ticking Burning shows the bag.
+        if (Burning && Profile != null && Profile.CanBurn && Profile.BurnWithLuggage)
+        {
+            var lug = Profile.BurnLuggagePart ?? (_burnLuggageScene ??= GD.Load<PackedScene>(BurnLuggagePath));
+            if (lug != null && !placed.Contains(lug.ResourcePath) && !picks.Exists(sc => sc != null && sc.ResourcePath == lug.ResourcePath))
+                picks.Add(lug);
+        }
         return picks;
     }
 
@@ -747,6 +758,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         }
         if (_burnStrength <= 0f) return;                                             // placed with nothing left to burn: not burning
         _burning = true;
+        SmsWaterHitMarks.Ensure(this);                                               // pass 99: the hose's hit marks load with the level, not at the first hit
         _fireSkel = _skel; _fireJoint = Profile.FireJoint;
         if (!string.IsNullOrEmpty(Profile.FireJointOnLuggage))
             foreach (var part in _parts)
@@ -1465,16 +1477,22 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     }
 
     // ------------------------------------------------------------------ water
-    public void SmsSprayedByWater(Vector3 hitPos) { if (!_collisionOff) Sprayed(); }   // HIT_FILTER_NO_COLLISION: no hit pairs while held / just released
+    /// <summary>HIT_MESSAGE_SPRAYED_BY_WATER from a drop (SmsWaterDrops) or the hose at close range. True = the drop is taken (TBaseNPC::receiveMessage
+    /// returns true for the spray: TModelWaterManager::move() 429 then kills the drop); false while HIT_FILTER_NO_COLLISION (held / just released: no
+    /// hit pairs in the game, so the drop flies on -- here it lands).</summary>
+    public bool SmsSprayedByWater(Vector3 hitPos) { if (_collisionOff) return false; Sprayed(hitPos); return true; }
 
     /// <summary>behaveToHitObject_(WATER_SPRAY): isNerveCanGoToWet (not already wet, not in a talk's first 4 ticks) -> pushNerve(Wet).</summary>
-    private void Sprayed()
+    private void Sprayed(Vector3? hitPos = null)
     {
         // behaveToHitObject_ 344: a BURNING NPC takes the water spray as fire-fighting and nothing else -- no Wet nerve, no wash
         if (_burning)
         {
             if (_mario != null && _mario.SmsIsTalking) return;                       // gpMarDirector->isTalkOrDemoModeNow()
-            if (FireFightingSound != null && FireFightingSound.Stream != null && !FireFightingSound.Playing) FireFightingSound.Play();   // MSD_SE_NPC_FIRE_FIGHTING (gated); PARTICLE_MS_ENM_WATHIT not ported
+            // 351: gpMarioParticleManager->emit(PARTICLE_MS_ENM_WATHIT, &mPosition, 0, nullptr) -- one hit mark per hit at the NPC's OWN position (its
+            // feet), not the drop's; Profile.WaterHitAtDrop (a deviation knob) moves it to where the drop hit. MSD_SE_EN_COMMON_W_HIT_OK not ported.
+            SmsWaterHitMarks.Emit(this, Profile.WaterHitAtDrop && hitPos.HasValue ? hitPos.Value : GlobalPosition);
+            if (FireFightingSound != null && FireFightingSound.Stream != null && !FireFightingSound.Playing) FireFightingSound.Play();   // MSD_SE_NPC_FIRE_FIGHTING (gated)
             _burnStrength -= SmsParams.Npc.FireDecSpeed;
             if (_burnStrength > 0f) return;                                           // isExtinguished_: mBurnStrength <= 0
             _burnStrength = 0f;
@@ -1567,7 +1585,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         _marioHits = true;
         if (Profile.Trampled && _mario.SmsHitNpcTrample(g)) { Trampled(); return; }
         _mario.SmsKeepDistance(g, _damageRadiusNow);
-        if (_mario.SmsHoseSpraying) Sprayed();
+        if (_mario.SmsHoseSpraying) Sprayed(_mario.GlobalPosition + Vector3.Up * (80f / U));   // the hose at close range: the water hit actor at his position + 80 (as Gooble.cs)
     }
 
     private static bool CheckDistance(Vector3 a, float ar, float ah, Vector3 s, float sr, float sh)
