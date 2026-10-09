@@ -1,6 +1,11 @@
-[gd_resource type="Resource" script_class="SmsNpcProfile" load_steps=6 format=3]
+[gd_resource type="Resource" script_class="SmsNpcProfile" load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcProfile.cs" id="1_prof"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_me_open.png" id="tex_eye"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_cap.png" id="tex_cap"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_cloth.png" id="tex_cloth"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_body.png" id="tex_body"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_kuti_close.png" id="tex_mouth"]
 
 [ext_resource type="PackedScene" path="res://assets/Sms/Fx/NpcSparkleToad.tscn" id="happy"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Fx/NpcDripToad.tscn" id="drip"]
@@ -88,6 +93,12 @@ ClothMaterial = "_mat_cloth"
 ClothColors = PackedVector3Array(250, 150, 0, 250, 150, 0, 250, 150, 0, 250, 150, 0, 250, 150, 0)
 ClothColors2 = PackedVector3Array(30, 30, 200, 230, 0, 0, 30, 120, 30, 250, 220, 30, 150, 0, 200)
 LeafMaterial = ""
+PollutionUv2Materials = PackedStringArray("_mat_body", "_mat_cap", "_mat_cloth", "_mat_mouth")
+EyeTexture = ExtResource("tex_eye")
+BodyMaterialTexture = ExtResource("tex_cap")
+ClothTexture = ExtResource("tex_cloth")
+SkinTexture = ExtResource("tex_body")
+MouthTexture = ExtResource("tex_mouth")
 EffectJoint = "jnt_body"
 HappyEffect = ExtResource("happy")
 DirtyDripEffect = ExtResource("drip")

@@ -1,6 +1,7 @@
 [gd_resource type="Resource" script_class="SmsNpcProfile" format=3 uid="uid://3wuso3tbylaw"]
 
 [ext_resource type="Script" uid="uid://8k1ifx6lo5lh" path="res://assets/Sms/Npc/SmsNpcProfile.cs" id="1_prof"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mom_eye01_IA8.png" id="tex_eye"]
 
 [ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mom_mino_rgba.png" id="leaf"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Fx/NpcSparklePianta.tscn" id="happy"]
@@ -24,3 +25,4 @@ DirtyDripEffect = ExtResource("drip")
 FootDripEffect = ExtResource("foot")
 WashEffect = ExtResource("wash")
 SinkEffect = ExtResource("sink")
+EyeTexture = ExtResource("tex_eye")

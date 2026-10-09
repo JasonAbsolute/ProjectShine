@@ -5843,3 +5843,41 @@ Jaysonn (10-09 00:20): "the yellow splat is at the feet of the pianta, I think i
 - Verified (drive 99, 13/13): M2 10 hits on the default burner -> 10 marks at the fire root, 1.90 m up and 0.61 m behind the feet (the bag);
   M4 Drop at the drop; M6 (new) Feet at the NPC's position; the luggage rule, the Gooble's drop-point mark, the consumed drop and the pool
   rotation as before. Build 0 errors; boot ALL OK, zero ERROR / SHADER / WARNING lines. Runbook rows (7b Burning, 7c Water Hit Mark At) updated.
+
+## SMS pass 100 -- the NPCs' real textures (the Toad's cap, vest and eyes; the Piantas' eyes)
+
+Jaysonn (10-09 01:22): "toad however looks not right. texture for head is off and jacket? eyes are fine. and he looks metallic?" (Ref/ToadRef.png:
+a pink-red wash over the cap with no spots, an orange smear on the vest, white wedge eyes, a glossy sheen).
+
+### Cause: the glb export's textures, not the shaders
+The Godot materials came from FinModelUtility's glb, and its one-texture-per-material export picked the WRONG texture on kinopio_body:
+- `_mat_cap` and `_mat_cloth` got `H_ma_polmask_sample_i4` -- the 32 x 64 POLLUTION GRADIENT (stage 0's mask texture), not the real masks
+  `N_kinopio_cap` (I4 64 x 64: a black circle on white) and `N_kinopio_cloth` (a black border on white). NpcSkin.gdshader's mode 2 mixes two
+  register colours by that mask (mix(C1, C2, TEXC), bmd stage 1), so a vertical gradient became a smooth spot-colour -> white wash: the "metallic"
+  sheen and the missing spots on the cap, the orange -> vest-colour smear on the vest.
+- `_eye_mat` got `H_toon_2_4i` -- the TOON RAMP (stage 0's texture), not `N_kinopio_me_open` (IA4: a black oval with a white glint on a
+  transparent sheet). The ramp is 136..255 grey with alpha = intensity: white wedges where the eyes should be black ovals.
+- The Piantas' `_eye_mat` images carry `I_mom_eye01_IA8` / `I_mow_eye01_IA8` with the alpha exact and the INTENSITY ^ 0x80 (every pixel 128 off:
+  the pupil grey, the glint grey) -- a signed/unsigned slip in the exporter. Their body (`_hand_mat`) samples no texture, so it was never affected.
+- Also found: the Toad glb DOES carry TEXCOORD_1 on body / cap / cloth / mouth (passes 93 / 95 said it had no second set); the bmd reads the
+  pollution mask and the goop through TEX1 on all four.
+
+### Ported
+- `assets/Sms/Npc/tex/`: the bmds' own textures, decoded by bmd_mat_dump.py / bti2png: `N_kinopio_me_open`, `N_kinopio_cap`, `N_kinopio_cloth`,
+  `N_kinopio_body`, `N_kinopio_kuti_close`, `I_mom_eye01_IA8`, `I_mow_eye01_IA8` (imports pinned lossless, mipmapped, no 3D auto-compression,
+  no alpha-border fix: pin_npc100.py).
+- `SmsNpcProfile`: a "Textures" group -- `EyeTexture`, `BodyMaterialTexture` (the cap mask), `ClothTexture`, `SkinTexture`, `MouthTexture`;
+  SetupLook uses the slot when set, else the glb's albedo as before. `Toad.tres` carries all five + `PollutionUv2Materials` = the four materials;
+  `PiantaMale.tres` / `PiantaFemale.tres` carry the eye.
+- Nothing changed in the shaders: NpcSkin / NpcEye were right, they were fed the wrong textures.
+
+### Verified (drive 100, SmsF100, 11/11; build 0 errors; boot ALL OK, zero ERROR / SHADER / WARNING lines)
+T1 all five Toad surfaces on ShaderMaterials (nothing left on the glb's metallic StandardMaterial3D); T2-T5 each material samples its bmd texture;
+T6 the four pollution materials read UV2; T7 the shipped PNGs are the bmd's (cap centre black / corner white, cloth the reverse, eye black
+opaque centre / transparent corner); P1 the Piantas' eyes from the bmd; P2 no Pianta surface on a StandardMaterial3D; P3 the eye PNG's pupil I 72
+opaque on a transparent sheet; P4 the Pianta body and leaves untouched. Headless cannot draw: the white cap with coloured spots, the coloured vest
+with its orange trim, the black eyes with the glint are his to judge.
+
+### Not ported
+The Toad's BTP texture animations (5 eye sets: open / half / close / worry / wet; 7 mouths) and the Piantas' 8 eye sets -- the models show the
+bmd's default (open eye, closed mouth); no blinking.

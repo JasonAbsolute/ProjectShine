@@ -105,9 +105,27 @@ public partial class SmsNpcProfile : Resource
     /// <summary>The leaf texture the game swaps in for the model's 8 x 8 dummy (NpcManager.cpp: I_mom_mino_dummyI4 -> /scene/monteMCommon/
     /// I_mom_mino_rgba.bti -- EVERY stage ships its own; assets/Sms/Npc/tex carries Delfino Plaza's two). Empty = the Kind's default.</summary>
     [Export] public Texture2D LeafTexture;
-    /// <summary>Materials whose pollution mask and goop are read through the SECOND UV set (the bmd's TEX1): the leaves. The Pianta body reads
-    /// TEX0 (bmd_mat_dump.py: _hand_mat texgen0 / 1 src TEX0); the Toad's materials read TEX1 in the bmd but its glb has no second set.</summary>
+    /// <summary>Materials whose pollution mask and goop are read through the SECOND UV set (the bmd's TEX1): the leaves; on the Toad all four
+    /// (_mat_body / _mat_cap / _mat_cloth / _mat_mouth: texgen1 / 2 src TEX1 -- its glb DOES carry TEXCOORD_1, pass 100; passes 93 / 95 had
+    /// read it as missing). The Pianta body reads TEX0 (_hand_mat texgen0 / 1 src TEX0).</summary>
     [Export] public string[] PollutionUv2Materials = { "_leafback_mat" };
+
+    [ExportGroup("Textures (pass 100: the bmd's own -- the glb export's stand-ins are wrong)")]
+    /// <summary>_eye_mat's texture: the bmd's texmap0 (I_mom_eye01_IA8 / I_mow_eye01_IA8 / N_kinopio_me_open: a dark oval with a white glint on
+    /// a transparent sheet). Empty = the glb material's albedo, which FinModelUtility got WRONG: the Toad's is the toon ramp (white wedge eyes),
+    /// the Piantas' carry the intensity with the top bit flipped (grey pupils). assets/Sms/Npc/tex, decoded from the bmd by bmd_mat_dump.py.</summary>
+    [Export] public Texture2D EyeTexture;
+    /// <summary>BodyMaterial's texture. The Toad's _mat_cap MASK N_kinopio_cap (I4 64 x 64: a black circle on white -- stage 1 mix(C1, C2, TEXC):
+    /// black = the spot colour BodyColors, white = the cap BodyColors2). The glb gave it the pollution gradient (a pink wash, no spots). A Pianta's
+    /// _hand_mat samples no texture: leave empty.</summary>
+    [Export] public Texture2D BodyMaterialTexture;
+    /// <summary>ClothMaterial's MASK: the Toad's N_kinopio_cloth (I4 32 x 32: a black border on white -- black = the trim ClothColors (orange),
+    /// white = the vest ClothColors2). The glb gave it the pollution gradient too.</summary>
+    [Export] public Texture2D ClothTexture;
+    /// <summary>The Toad's _mat_body texture N_kinopio_body (the face / hands / shorts sheet, CMPR 64 x 64) -- the glb's was a lossy re-encode.</summary>
+    [Export] public Texture2D SkinTexture;
+    /// <summary>The Toad's _mat_mouth texture N_kinopio_kuti_close (the bmd's default; the BTP mouth shapes are not ported).</summary>
+    [Export] public Texture2D MouthTexture;
 
     [ExportGroup("Effects (NpcEffect.cpp)")]
     /// <summary>mHappyEffectMtxPtr / mPollutionEffectMtxPtr: the joint the sparkle, the centre drips and the wash are bound to -- koshi_null on a

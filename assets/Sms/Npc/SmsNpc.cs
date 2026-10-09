@@ -460,10 +460,14 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
             {
                 var src = mi.Mesh?.SurfaceGetMaterial(s);
                 string name = src?.ResourceName ?? "";
-                Texture2D tex = (src as BaseMaterial3D)?.AlbedoTexture;
+                // pass 100: the bmd's own texture from the profile when set; the glb material's albedo is only the fallback -- FinModelUtility's
+                // export gave the Toad's eye the toon ramp, its cap and cloth the pollution gradient, the Piantas' eyes a bit-flipped intensity
+                Texture2D glbTex = (src as BaseMaterial3D)?.AlbedoTexture;
+                Texture2D tex = glbTex;
                 ShaderMaterial m = null;
                 if (name == Profile.BodyMaterial)
                 {
+                    tex = Profile.BodyMaterialTexture ?? glbTex;
                     m = new ShaderMaterial { Shader = skin };
                     m.SetShaderParameter("mode", toad ? 2 : 0);
                     m.SetShaderParameter("color_a", Vec(Profile.BodyColors, _colorIdx, new Vector3(255, 255, 255)));
@@ -474,6 +478,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
                 }
                 else if (Profile.ClothMaterial != "" && name == Profile.ClothMaterial)
                 {
+                    tex = Profile.ClothTexture ?? glbTex;
                     m = new ShaderMaterial { Shader = skin };
                     m.SetShaderParameter("mode", 2);
                     m.SetShaderParameter("color_a", Vec(Profile.ClothColors, _colorIdx, new Vector3(250, 150, 0)));
@@ -484,6 +489,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
                 }
                 else if (toad && (name == "_mat_body" || name == "_mat_mouth"))
                 {
+                    tex = (name == "_mat_body" ? Profile.SkinTexture : Profile.MouthTexture) ?? glbTex;
                     m = new ShaderMaterial { Shader = skin };
                     m.SetShaderParameter("mode", 1);
                     m.SetShaderParameter("use_vertex_color", false);
@@ -498,6 +504,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
                 }
                 else if (name == "_eye_mat")
                 {
+                    tex = Profile.EyeTexture ?? glbTex;
                     m = new ShaderMaterial { Shader = eye, RenderPriority = 1 };
                     m.SetShaderParameter("eye_base", 0.5f);
                     m.SetShaderParameter("lit_mix", toad ? 0.625f : 0.5f);
