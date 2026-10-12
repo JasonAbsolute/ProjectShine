@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://assets/Sms/Talk/SmsTalkBalloon.cs" id="1_talk"]
 [ext_resource type="Resource" path="res://assets/Sms/Talk/TalkFont.tres" id="2_font"]
@@ -8,6 +8,7 @@
 [ext_resource type="Texture2D" path="res://assets/Sms/Talk/tex/talk_cursor_mark_x4.png" id="6_cc"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Talk/tex/talk_return_mark_x4.png" id="7_cr"]
 [ext_resource type="Shader" path="res://assets/Sms/Talk/TalkGlyph.gdshader" id="8_glyphsh"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Talk/tex/talk_window_x4.png" id="9_win"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_glyph"]
 shader = ExtResource("8_glyphsh")
@@ -253,8 +254,68 @@ offset_right = 10.0
 offset_bottom = 10.0
 mouse_filter = 2
 
+[node name="Choice" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 0
+offset_right = 10.0
+offset_bottom = 10.0
+pivot_offset = Vector2(5, 5)
+mouse_filter = 2
+
+[node name="Window" type="NinePatchRect" parent="Choice"]
+material = SubResource("ShaderMaterial_glyph")
+modulate = Color(0, 0, 1, 0.627451)
+layout_mode = 0
+offset_left = -48.0
+offset_top = -32.0
+offset_right = 376.0
+offset_bottom = 264.0
+scale = Vector2(0.25, 0.25)
+mouse_filter = 2
+texture = ExtResource("9_win")
+patch_margin_left = 128
+patch_margin_top = 128
+patch_margin_right = 128
+patch_margin_bottom = 128
+
+[node name="Mark1" type="TextureRect" parent="Choice"]
+material = SubResource("ShaderMaterial_glyph")
+layout_mode = 0
+offset_left = -35.0
+offset_top = -18.0
+offset_right = -15.0
+offset_bottom = 2.0
+mouse_filter = 2
+texture = ExtResource("6_cc")
+expand_mode = 1
+
+[node name="Mark2" type="TextureRect" parent="Choice"]
+visible = false
+material = SubResource("ShaderMaterial_glyph")
+layout_mode = 0
+offset_left = -35.0
+offset_top = 8.0
+offset_right = -15.0
+offset_bottom = 28.0
+mouse_filter = 2
+texture = ExtResource("6_cc")
+expand_mode = 1
+
+[node name="ChoiceText" type="Control" parent="."]
+visible = false
+material = SubResource("ShaderMaterial_glyph")
+layout_mode = 3
+anchors_preset = 0
+offset_right = 10.0
+offset_bottom = 10.0
+pivot_offset = Vector2(5, 5)
+mouse_filter = 2
+
 [node name="Sfx" type="Node" parent="."]
 
 [node name="Obi" type="AudioStreamPlayer" parent="Sfx"]
 
 [node name="Select" type="AudioStreamPlayer" parent="Sfx"]
+
+[node name="Cursor" type="AudioStreamPlayer" parent="Sfx"]

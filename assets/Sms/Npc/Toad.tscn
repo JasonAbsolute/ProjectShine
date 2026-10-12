@@ -14,7 +14,9 @@ script = ExtResource("1_npc")
 Profile = ExtResource("3_prof")
 ColorIndex = -1
 Outfit = ExtResource("4_outfit")
-Lines = PackedStringArray("Welcome to Isle Delfino!", "Enjoy your stay.")
+Lines = PackedStringArray("Th-the whole plaza is covered in that goop! I can't stop shaking!", "Is it safe to come out now?<yesno>")
+OnYes = 1
+Worried = true
 
 [node name="Model" parent="." instance=ExtResource("2_glb")]
 transform = Transform3D(-0.0134336, 0, 0, 0, 0.0134336, 0, 0, 0, -0.0134336, 0, 0, 0)

@@ -5924,3 +5924,51 @@ three wraps of the 90-frame loop). Headless cannot draw the blink itself -- his 
 ### Not ported
 The individual BTP remaps of the special Pianta kinds (MonteMA..MD's moma_*..momd_* sets) and the Toad's worried kind as a placement flag
 (NPC_ACTION_UNK100 -- the clips are mapped, the flag is not); BTK / BRK material animations (none on these models).
+
+## SMS pass 102 -- the talk's yes/no choice window ('me_4') and the Toad's worried kind
+
+Jaysonn (10-09 02:21, after "The blinking looks right whats next"): the yes/no choice window, plus the worried Toad flag "since we can test the
+yes and no text box with having toad worried then selecting yes to make him not worry and then no to keep him worried".
+
+### The game
+- The choice window is the talk layout's 'me_4' pane (message_2.blo, decoded like the balloon's): a 10 x 10 pane the code parks at (362, 187)
+  turned -18 whatever the camera mode, holding the window 'bac4' (-48, -32) 106 x 74 (a J2DWindow of message_window.bti's corner, tint 0000ff
+  alpha 160), the text box 'slct' (35, 15) 56 x 46 (the system font at 20 x 24, char space -2, line space 26, bound left / bottom; the box does
+  NOT inherit the pane's alpha) and the marks 'sc_1' (-35, -18) / 'sc_2' (-35, 8), 20 x 20 message_cursor arrows (Talk2D2.cpp 480-560).
+- A message's option tags (setTagParam group 1, tag 0 / 1: a 16-char string each) set the two options; the first met while unk214 is -1 becomes
+  the highlighted one. When the page is complete the pane shows instead of the continue mark (725-790): it fades in 0x10 a step, the highlighted
+  mark pulses like the continue mark (down 4 a tick to 0x60, up 2) and the text is rewritten with it -- the highlighted option white at the
+  pulse's alpha, the other at 0x60. checkControler (810-842): up / down (MEANING_SELECT_UP / DOWN = the main stick's direction bit, set at
+  |y| >= 0.5, or the D-pad, on the press edge; the game moves only from the OTHER option) move the highlight with MSD_SE_SY_E3_MENU_CURSOR; A or
+  B confirm (B does not cancel) and go on as the continue mark would; closeNormalWindow hides the pane with the root; getSelectedValue hands
+  the answer to the stage script at npcTalkOut; setMessageID resets unk214 to -1 (one answer per talk).
+- The worried Toad is a placement flag (NPC_ACTION_UNK100, NpcInitPrg.cpp 248-281 -> setIndividualBck / setIndividualBtp): wait / sit / run /
+  walk -> the fidgety `kinopio_waitororo` / `sitororo` / `runororo` / `walkororo`, talk -> `kinopio_worry`, sittalk -> `sitworry`; the blink
+  `twait` -> `twait2`, the talking face `ttalk` -> `tworry` (TLodAnm's mIndividualBck / mIndividualBtp). Every one of those swaps is a .bck
+  with loop attribute 2 on dolpic0's disc, like the plain clip it replaces.
+
+### Ported
+- `SmsTalkBalloon`: the `Choice` pane under the balloon (`Window` NinePatchRect of `tex/talk_window_x4.png` -- the disc's message_window.bti
+  corner, x4 sharpened like the rest, margins 128 at scale 0.25, blue alpha 160; `Mark1` / `Mark2` the cursor arrows; `ChoiceText` in the
+  system font; `Sfx/Cursor` slot), parked at the game's spot; a page carrying `<yesno>` (or `<s0=..>` / `<s1=..>`) shows it once complete,
+  fades and pulses per the fade block, moves the highlight on `StickUpAction` / `StickDownAction` (`Lstick_up` / `Lstick_down`, read as
+  strengths past 0.5) or `DpadUpAction` / `DpadDownAction` (`ui_up` / `ui_down`), confirms on A or B; `SelectedValue`, `ChoiceOption(i)`.
+- `SmsNpc`: `LastChoice`, the `TalkChoiceMade(choice)` signal, `OnYes` / `OnNo` (None / StopWorrying / StartWorrying) applied at the talk's
+  close; `Worried` (re-plays the current clip in the other variant when flipped); `SmsNpcProfile.WorriedClips` / `WorriedPatterns` with
+  `WorriedClip()` / `WorriedPattern()`; `ActualClip` maps the asked clip to the worried swap in Play, `SelectTexPattern` the pattern; the
+  loop table marks each swap as its plain clip (found by the drive: the worry talk clip stopped after one play and the Toad froze).
+  `Toad.tres` carries the game's two swap tables; `Toad.tscn` ships Worried with the test script ("Th-the whole plaza is covered in that goop!
+  I can't stop shaking!" / "Is it safe to come out now?<yesno>", OnYes = StopWorrying).
+- `Toad.tres` is his editor's re-save after pass 101 (uids added, defaults dropped) plus the hunk -- committed as such.
+
+### Verified (drive 102, SmsF102, 20/20; drives 101 11/11 and 87 16/16 re-run; build 0 errors; boot ALL OK, zero ERROR / SHADER / WARNING)
+S1-S4 the tables, the ororo / worry clips in the glb, the worried idle (waitororo + twait2), the pane's nodes and texture; T1 the worried talk
+plays kinopio_worry with tworry; C0 a tagless page: the continue mark, no window; C1 the question page: the window, 'Yes' highlighted, the mark
+hidden; C2 the pane at (362, 187) +18 deg in both camera modes, the text riding it; C3 the 0x10 fade, the text box not inheriting it; C4-C7
+down / down-ignored / up / down with the pulse's 4-down / 2-up and its 0x60 floor; A1 A on 'No': SelectedValue 1, LastChoice 1, the signal
+once; A2 he stays worried (waitororo + twait2); A3 the pane hidden after the close; B1 a new talk resets the choice; B2 'Yes' highlighted again;
+B3 A on 'Yes': 0 / 0 / the signal twice; B4 StopWorrying: the plain kinopio_wait with twait. Headless cannot draw the pane -- his eye.
+
+### Deviations / not ported
+The answer reaches the NPC (a signal and two inspector effects) instead of the game's stage script; MSD_SE_SY_E3_MENU_CURSOR is a slot; the
+board window and TALK_C / D / E remain unported. Drive 101's plain Toad is now spawned with Worried off (Toad.tscn defaults to the test).

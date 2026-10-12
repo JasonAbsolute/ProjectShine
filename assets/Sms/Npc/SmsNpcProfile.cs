@@ -130,6 +130,16 @@ public partial class SmsNpcProfile : Resource
     /// pairs every anm kind with a bck and a btp (NpcInitAnmData.cpp sMonte* / sKinopio_AnmIndex): a Pianta clip with a same-named pattern
     /// plays it, every other clip the wink (two quick blinks every 1.5 s); the Toad's six cover its clips by table. Empty = no blinking.</summary>
     [Export] public SmsNpcTexPatternSet TexPatterns;
+    [ExportGroup("Worried kind (pass 102)")]
+    /// <summary>NPC_ACTION_UNK100 (the placement's "worried" flag; the Toad and the old Toad in the game) -> TLodAnm::setIndividualBck: a clip the
+    /// worried kind swaps for another (NpcInitPrg.cpp sIndividualKinopioBck: wait -> waitororo, sit -> sitororo, run -> runororo, walk ->
+    /// walkororo, talk -> worry, sittalk -> sitworry). Empty = this kind has no worried variant (the Piantas).</summary>
+    [Export] public Godot.Collections.Dictionary<string, string> WorriedClips = new();
+    /// <summary>setIndividualBtp: a texture pattern the worried kind swaps (sIndividualKinopioBtp: twait -> twait2, ttalk -> tworry).</summary>
+    [Export] public Godot.Collections.Dictionary<string, string> WorriedPatterns = new();
+
+    public string WorriedClip(string clip) => WorriedClips != null && clip != null && WorriedClips.TryGetValue(clip, out var w) && !string.IsNullOrEmpty(w) ? w : clip;
+    public string WorriedPattern(string pattern) => WorriedPatterns != null && pattern != null && WorriedPatterns.TryGetValue(pattern, out var w) && !string.IsNullOrEmpty(w) ? w : pattern;
 
     [ExportGroup("Effects (NpcEffect.cpp)")]
     /// <summary>mHappyEffectMtxPtr / mPollutionEffectMtxPtr: the joint the sparkle, the centre drips and the wash are bound to -- koshi_null on a

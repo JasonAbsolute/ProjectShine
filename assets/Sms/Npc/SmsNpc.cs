@@ -30,8 +30,9 @@ using System.Collections.Generic;
 ///    one through pass 84 -- he stood on heads), its collision is this cylinder maths, as in the game;
 ///  * the look (NpcInitData.cpp colour tables + the bmd TEV, NpcSkin / NpcEye.gdshader): ColorIndex picks the register colour
 ///    (-1 = random), the model's materials are replaced per instance, the scene's DirectionalLight3D is the sun.
-/// NOT ported (logged): the pollution (dirty / sink / wash), the Pianta that throws Mario (TNpcThrow), the balloon messages, sounds
-/// (slots below), the talk camera, trampleExec's PARTICLE_MS_FUMI_B / C at half scale (no stomp dust is baked yet).</summary>
+/// NOT ported (logged): sounds (slots below), the special Pianta kinds' own animation sets (moma_..momd_), trampleExec's
+/// PARTICLE_MS_FUMI_B / C at half scale (no stomp dust is baked yet). Since pass 82 the pollution (dirty / sink / wash), the throw
+/// (TNpcThrow), the talk window with its camera, the blinks (pass 101) and the worried kind + the choice window (pass 102) are in.</summary>
 [Tool]
 public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
 {
@@ -72,6 +73,20 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// every page a single-line field, so no three-line page could be typed.</summary>
     [Export(PropertyHint.TypeString, "4/18:")] public string[] Lines = { "Welcome to Isle Delfino!", "Enjoy your stay." };
     [Export] public bool CanTalk = true;
+    /// <summary>Pass 102: what a confirmed answer on the choice window does (the game hands getSelectedValue to the stage's script; here the
+    /// signal TalkChoiceMade carries it to the level and these two inspector effects cover the common cases). OnYes = the first option,
+    /// OnNo = the second. StopWorrying / StartWorrying flip <see cref="Worried"/> (his test: a worried Toad asks, yes calms him).</summary>
+    [Export] public TalkChoiceEffect OnYes = TalkChoiceEffect.None, OnNo = TalkChoiceEffect.None;
+    /// <summary>getSelectedValue of the last talk with this NPC: 0 the first option, 1 the second, -1 none (no choice, or the talk ended first).</summary>
+    public int LastChoice { get; private set; } = -1;
+    [Signal] public delegate void TalkChoiceMadeEventHandler(int choice);
+    public enum TalkChoiceEffect { None, StopWorrying, StartWorrying }
+    [ExportGroup("Kind")]
+    /// <summary>NPC_ACTION_UNK100, the placement's "worried" flag (pass 102; the game's Toads only -- the kind's profile lists the swaps): the
+    /// idle / walk / run / sit clips become their fidgety ororo variants, the talk the worry clip, the eyes the worry pattern. Changing it on a
+    /// standing NPC re-plays its clip in the other variant.</summary>
+    [Export] public bool Worried { get => _worried; set { bool was = _worried; _worried = value; if (was != value && !Engine.IsEditorHint() && IsInsideTree() && _anim != null && _clip != "") Play(_clip, false); } }
+    private bool _worried;
     [ExportGroup("Take")]
     /// <summary>LIVE_FLAG_UNK100000 -- in the game the stage script sets it per NPC (evSetFlagNPCCanTaken): Mario touching this NPC with B
     /// lifts it (TMario::hitNpc -> canTake, the same isTakeSituation geometry as a fruit), carries it on his hands (its feet at his taking
@@ -159,7 +174,8 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private int _wanderTimer, _wanderGoal, _waitGoal;    // unk22C
     private int _talkForbid, _walkForbid;                // mTalkForbidCount / mWalkForbidCount
     private int _graphIndex = -1;
-    private string _clip = ""; private bool _clipLoops;
+    private string _clip = ""; private bool _clipLoops;   // _clip = the clip the nerves asked for; _playing = the one the AnimationPlayer runs (the worried kind's swap)
+    private string _playing = "";
     private float _trampleAmp; private int _trampleShake, _trampleToMad; private float _trampleDec; // TNpcTrample
     private bool _marioExcepted;                         // his body is excepted from the capsule: the hit check below is our collision with him
     private float _damageRadiusNow;                      // mDamageRadius after setVariableDamageRadius_ (units)
@@ -666,11 +682,13 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (_anim == null) return;
         var p = Profile;
         string[] loops = { p.ClipWalk, p.ClipRun, p.ClipWait, p.ClipWaitA, p.ClipWaitB, p.ClipTalk, p.ClipSit, p.ClipSitTalk, p.ClipMadLoop, p.ClipDance, p.ClipDirty, p.ClipWaitFall, p.ClipTaken, p.ClipHappy, p.ClipFall };   // + happy / fall (pass 93: the .bck loop attribute is 2 on both)
+        var loopSet = new System.Collections.Generic.HashSet<string>();
+        foreach (var l in loops) if (!string.IsNullOrEmpty(l)) { loopSet.Add(l); loopSet.Add(p.WorriedClip(l)); }   // pass 102: the worried kind's swaps loop as their plain clips do (dolpic0's *ororo / worry / sitworry .bck: loop 2, like wait / talk / sit)
         foreach (var name in _anim.GetAnimationList())
         {
             var a = _anim.GetAnimation(name);
             if (a == null) continue;
-            a.LoopMode = Array.IndexOf(loops, (string)name) >= 0 ? Animation.LoopModeEnum.Linear : Animation.LoopModeEnum.None;
+            a.LoopMode = loopSet.Contains((string)name) ? Animation.LoopModeEnum.Linear : Animation.LoopModeEnum.None;
         }
     }
 
@@ -837,27 +855,37 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// <summary>requestNpcAnm_ with NPC_STOP_MOTION_BLEND_ON = a MotionBlendFrame (20 frame = 0.33 s) blend; OFF = a cut.</summary>
     private void Play(string clip, bool blend = true, float rate = 1f)
     {
-        if (_anim == null || string.IsNullOrEmpty(clip) || !_anim.HasAnimation(clip))
+        string actual = ActualClip(clip);                                        // setIndividualBck: the worried kind's swap (pass 102)
+        if (_anim == null || string.IsNullOrEmpty(actual) || !_anim.HasAnimation(actual))
         {
-            if (_anim != null && !string.IsNullOrEmpty(clip) && _warnedClips.Add(clip))   // pass 91: the female on a male profile stood in her rest pose with no word
-                GD.PushWarning($"[SMS npc] {Name}: no clip '{clip}' in {_model?.Name} (profile {Profile?.ResourceName}) -- the model keeps its pose");
-            _clip = clip ?? ""; SelectTexPattern(_clip); return;
+            if (_anim != null && !string.IsNullOrEmpty(actual) && _warnedClips.Add(actual))   // pass 91: the female on a male profile stood in her rest pose with no word
+                GD.PushWarning($"[SMS npc] {Name}: no clip '{actual}' in {_model?.Name} (profile {Profile?.ResourceName}) -- the model keeps its pose");
+            _clip = clip ?? ""; _playing = actual ?? ""; SelectTexPattern(_playing); return;
         }
-        if (_clip == clip && _anim.IsPlaying()) { _anim.SpeedScale = rate; return; }
-        _clip = clip;
-        _anim.Play(clip, blend ? SmsParams.Npc.MotionBlendFrame / 60f : 0f, rate);
-        _clipLoops = _anim.GetAnimation(clip).LoopMode != Animation.LoopModeEnum.None;
-        SelectTexPattern(clip);                                                  // setBckAndBtpAnm: the kind's btp goes with its bck
+        if (_clip == clip && _playing == actual && _anim.IsPlaying()) { _anim.SpeedScale = rate; return; }
+        _clip = clip; _playing = actual;
+        _anim.Play(actual, blend ? SmsParams.Npc.MotionBlendFrame / 60f : 0f, rate);
+        _clipLoops = _anim.GetAnimation(actual).LoopMode != Animation.LoopModeEnum.None;
+        SelectTexPattern(actual);                                                // setBckAndBtpAnm: the kind's btp goes with its bck
         if (_randomizeNextPlay) { _randomizeNextPlay = false; RandomizeClipAndPatternFrame(); }   // the NPC's first clip: a random start (no crowd in step)
     }
 
     // ------------------------------------------------------------------ texture patterns (pass 101: the .btp blinks and mouths)
     /// <summary>TLodAnm::setBtpAnm_: the pattern paired with `clip` (or the kind's default); a change restarts its frame counter at 0
     /// (setBtpFromIndex). The same pattern staying on across a clip change keeps its frame, as the game's does (getCurAnmIdx == tmp -> no set).</summary>
+    /// <summary>The clip the AnimationPlayer runs for the one asked: the worried kind's swap when the model has it (TLodAnm's mIndividualBck).</summary>
+    private string ActualClip(string clip)
+    {
+        if (!_worried || Profile == null || string.IsNullOrEmpty(clip)) return clip;
+        string w = Profile.WorriedClip(clip);
+        return w != clip && _anim != null && _anim.HasAnimation(w) ? w : clip;
+    }
+
     private void SelectTexPattern(string clip)
     {
         var set = Profile?.TexPatterns;
         var pat = set?.For(clip);
+        if (pat != null && _worried && set != null) { string w = Profile.WorriedPattern(pat.PatternName); if (w != pat.PatternName) pat = set.ByName(w) ?? pat; }   // mIndividualBtp
         if (pat == _texPat) return;
         _texPat = pat;
         _texFrame = 0f;
@@ -905,9 +933,9 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private void RandomizeClipAndPatternFrame()
     {
         float clipFrames = 0f, t = 0f;
-        if (_anim != null && _anim.IsPlaying() && !string.IsNullOrEmpty(_clip) && _anim.HasAnimation(_clip))
+        if (_anim != null && _anim.IsPlaying() && !string.IsNullOrEmpty(_playing) && _anim.HasAnimation(_playing))
         {
-            float len = (float)_anim.GetAnimation(_clip).Length;
+            float len = (float)_anim.GetAnimation(_playing).Length;
             if (len > 0f) { t = _rng.NextSingle() * len; _anim.Seek(t, true); clipFrames = len * 60f; }
         }
         if (_texPat == null) return;
@@ -922,7 +950,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         TickTexPattern(delta);
     }
 
-    private bool ClipEnded() => _anim == null || string.IsNullOrEmpty(_clip) || !_anim.HasAnimation(_clip) || (!_clipLoops && !_anim.IsPlaying());
+    private bool ClipEnded() => _anim == null || string.IsNullOrEmpty(_playing) || !_anim.HasAnimation(_playing) || (!_clipLoops && !_anim.IsPlaying());
 
     private string WaitClip()
     {
@@ -1166,7 +1194,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private void SetFeetY(float y) { var p = GlobalPosition; p.Y = y; GlobalPosition = p; }
 
     /// <summary>getFrameCtrl(BCK)->checkPass(frame): the current clip's 60 fps frame counter has reached `frame`.</summary>
-    private bool ClipFramesPassed(float frame) => _anim != null && _anim.IsPlaying() && _anim.CurrentAnimation == _clip && _anim.CurrentAnimationPosition * 60.0 >= frame;
+    private bool ClipFramesPassed(float frame) => _anim != null && _anim.IsPlaying() && _anim.CurrentAnimation == _playing && _anim.CurrentAnimationPosition * 60.0 >= frame;
 
     /// <summary>npcHappyIn(0): NPC_ACTION_HAPPY + the happy clip, kept until the next talk ends (npcTalkOut drops it and asks for the coin).</summary>
     private void HappyIn()
@@ -1493,6 +1521,14 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (!_talking) return;
         _talking = false; _windowOpen = false;
         _walkForbid = SmsParams.Npc.WalkForbidTicksAfterTalk;
+        var balloon = SmsTalkBalloon.Instance;                                   // getSelectedValue (pass 102): the answer confirmed on the choice window
+        LastChoice = balloon != null && balloon.IsOpenOn(this) ? balloon.SelectedValue : -1;
+        if (LastChoice >= 0)
+        {
+            ApplyChoiceEffect(LastChoice == 0 ? OnYes : OnNo);
+            EmitSignal(SignalName.TalkChoiceMade, LastChoice);
+            if (DebugPrint) GD.Print($"[SMS npc] {Name}: talk choice {LastChoice} ('{balloon.ChoiceOption(LastChoice)}') -> {(LastChoice == 0 ? OnYes : OnNo)}, worried {Worried}");
+        }
         if (_happy)
         {
             _happy = false;                                                 // offActionFlag(NPC_ACTION_HAPPY)
@@ -1502,6 +1538,15 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         {
             if (ThrowsMario && _mario != null) Enter(Nerve.Throw);          // changeNerveFromTalk_ 194: mThrowCtrl -> setNext(TNerveNPCThrow); the stack waits
             else Pop();
+        }
+    }
+
+    private void ApplyChoiceEffect(TalkChoiceEffect e)
+    {
+        switch (e)
+        {
+            case TalkChoiceEffect.StopWorrying: Worried = false; break;
+            case TalkChoiceEffect.StartWorrying: Worried = true; break;
         }
     }
 

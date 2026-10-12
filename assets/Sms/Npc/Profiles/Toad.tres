@@ -1,67 +1,43 @@
-[gd_resource type="Resource" script_class="SmsNpcProfile" load_steps=12 format=3]
+[gd_resource type="Resource" script_class="SmsNpcProfile" format=3 uid="uid://c6qwwm4ljuyyr"]
 
-[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcProfile.cs" id="1_prof"]
-[ext_resource type="Resource" path="res://assets/Sms/Npc/TexPatterns/Toad.tres" id="texpat"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_me_open.png" id="tex_eye"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_cap.png" id="tex_cap"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_cloth.png" id="tex_cloth"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_body.png" id="tex_body"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_kuti_close.png" id="tex_mouth"]
-
-[ext_resource type="PackedScene" path="res://assets/Sms/Fx/NpcSparkleToad.tscn" id="happy"]
+[ext_resource type="Script" uid="uid://8k1ifx6lo5lh" path="res://assets/Sms/Npc/SmsNpcProfile.cs" id="1_prof"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Fx/NpcDripToad.tscn" id="drip"]
-[ext_resource type="PackedScene" path="res://assets/Sms/Fx/NpcWashToad.tscn" id="wash"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/NpcSparkleToad.tscn" id="happy"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Fx/GoopSinkRipple.tscn" id="sink"]
+[ext_resource type="Resource" path="res://assets/Sms/Npc/TexPatterns/Toad.tres" id="texpat"]
+[ext_resource type="Texture2D" uid="uid://dk7upnlafcjgg" path="res://assets/Sms/Npc/tex/N_kinopio_body.png" id="tex_body"]
+[ext_resource type="Texture2D" uid="uid://d1qlavxwyf2pg" path="res://assets/Sms/Npc/tex/N_kinopio_cap.png" id="tex_cap"]
+[ext_resource type="Texture2D" uid="uid://b3udeka4ic1gn" path="res://assets/Sms/Npc/tex/N_kinopio_cloth.png" id="tex_cloth"]
+[ext_resource type="Texture2D" uid="uid://dnfjdbjb85kae" path="res://assets/Sms/Npc/tex/N_kinopio_me_open.png" id="tex_eye"]
+[ext_resource type="Texture2D" uid="uid://b7sc2akyupd8n" path="res://assets/Sms/Npc/tex/N_kinopio_kuti_close.png" id="tex_mouth"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/NpcWashToad.tscn" id="wash"]
 
 [resource]
 resource_name = "Toad"
 script = ExtResource("1_prof")
 Kind = 2
-CanBurn = false
-Trampled = true
 GetsMad = false
-ReactsToWater = true
 TurnsToMarioOnApproach = true
-TurnsToMarioWhenTalking = true
 AttackRadius = 40.0
 AttackHeight = 110.0
 DamageRadius = 40.0
 DamageHeight = 110.0
 BodyHeight = 80.0
-CursorHeight = 30.0
-LookatHeight = 40.0
 CircleShadowSize = 40.0
-MinWalkAnmRate = 0.1
-MaxWalkAnmRate = 1.5
 MaxRunAnmRate = 1.8
-MinMarchSpeed = 0.2
 MaxMarchSpeed = 1.5
 MaxRunSpeed = 4.5
-RunAccel = 0.08
-MarchAccel = 0.02
-MarchDecrease = 0.1
 WalkTurnSpeed = 5.0
 WaitTurnSpeed = 1.5
 NeckTurnSearchDist = 1500.0
-NeckTurnSearchHeight = 600.0
 BodyTurnSearchDist = 5000.0
-BodyTurnSearchHeight = 250.0
 BodyTurnSearchDegree = 360.0
 BodyTurnSearchAware = 100.0
-MadSearchDist = 800.0
 MadSearchHeight = 400.0
-MadSearchDegree = 240.0
-MadSearchAware = 500.0
-MadTurnSpeed = 20.0
-FirstStateTurnSpeed = 0.5
-UTurnSpeed = 3.0
 SinkSpeed = 0.3
 SinkHeight = 70.0
 NeckMinAngleX = -8192
-NeckMaxAngleX = 0
 NeckMaxAngleY = 15000
-NeckAngleXSpeed = 500
-NeckAngleYSpeed = 700
 ClipWalk = "kinopio_walk"
 ClipWait = "kinopio_wait"
 ClipFall = "kinopio_fall"
@@ -86,7 +62,6 @@ ClipDance = "kinopio_wait"
 ClipMadLoop = "kinopio_wait"
 ClipWash = "kinopio_wet_yogore"
 ClipAppear = "kinopio_appear"
-NeckBone = "kubi"
 BodyMaterial = "_mat_cap"
 BodyColors = PackedVector3Array(30, 30, 200, 230, 0, 0, 30, 120, 30, 250, 220, 30, 150, 0, 200)
 BodyColors2 = PackedVector3Array(230, 230, 230, 230, 230, 230, 230, 230, 230, 230, 230, 230, 230, 230, 230)
@@ -101,9 +76,22 @@ ClothTexture = ExtResource("tex_cloth")
 SkinTexture = ExtResource("tex_body")
 MouthTexture = ExtResource("tex_mouth")
 TexPatterns = ExtResource("texpat")
+WorriedClips = Dictionary[String, String]({
+"kinopio_run": "kinopio_runororo",
+"kinopio_sit": "kinopio_sitororo",
+"kinopio_sittalk": "kinopio_sitworry",
+"kinopio_talk": "kinopio_worry",
+"kinopio_wait": "kinopio_waitororo",
+"kinopio_walk": "kinopio_walkororo"
+})
+WorriedPatterns = Dictionary[String, String]({
+"kinopio_ttalk": "kinopio_tworry",
+"kinopio_twait": "kinopio_twait2"
+})
 EffectJoint = "jnt_body"
 HappyEffect = ExtResource("happy")
 DirtyDripEffect = ExtResource("drip")
 DirtyDripFrames = PackedFloat32Array(22, 44)
 WashEffect = ExtResource("wash")
 SinkEffect = ExtResource("sink")
+CanBurn = false

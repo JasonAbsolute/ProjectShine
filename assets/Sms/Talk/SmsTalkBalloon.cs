@@ -25,7 +25,17 @@ using System.Collections.Generic;
 /// AutoWrap (DEVIATION, on) breaks a long line by words where the game would truncate it (the glyph laid past w = 1.1 is the line's last)
 /// and spills a fourth line into a new page. Tags as the .bmg's escapes: &lt;c0&gt;..&lt;c5&gt; = cColorTable (white, white, FFB48C, 6EE6FF, FFFF00,
 /// AAFF50), &lt;w=N&gt; = the text speed from here on -- N ticks between one glyph's fade and the next's appearance (unk280, kept until the next
-/// tag; a new message resets it). The choice window ('me_4', the game's scripted yes / no) and the board window are not ported.</summary>
+/// tag; a new message resets it).
+///
+/// The choice window (pass 102, 'me_4'): the .bmg's option tags (group 1, tag 0 / 1: a 16-char string each, the first met is the one
+/// highlighted) are &lt;s0=Yes&gt; / &lt;s1=No&gt; here, or &lt;yesno&gt; for both; a page carrying them shows, once complete, the 10 x 10 pane the code
+/// never moves -- (362, 187) turned -18 whatever the camera mode -- instead of the continue mark: its window 'bac4' (-48, -32) 106 x 74 (a
+/// J2DWindow of message_window.bti corners, tint 0000ff alpha 160), the text box 'slct' (35, 15) 56 x 46 in it (the system font at 20 x 24,
+/// char space -2, line space 26, bound left / bottom, the box does NOT inherit the pane's alpha) and the marks 'sc_1' (-35, -18) / 'sc_2'
+/// (-35, 8), 20 x 20 message_cursor arrows. The pane fades in 0x10 a step, the highlighted mark pulses like the continue mark and the text is
+/// rewritten with it: the highlighted option white at the pulse's alpha, the other at 0x60. Up / down (the main stick past 0.5 or the D-pad,
+/// on the press edge) move the highlight (MSD_SE_SY_E3_MENU_CURSOR), A or B confirm it (B does not cancel) and go on as the continue mark
+/// would; the answer (getSelectedValue) reaches the NPC at npcTalkOut (the game's stage script reads it). The board window is not ported.</summary>
 public partial class SmsTalkBalloon : CanvasLayer
 {
     public enum TalkState { Closed = 0, WaitCamera = 2, Pause = 3, Opening = 4, Open = 5, Closing = 6, Erasing = 7 }
@@ -38,6 +48,10 @@ public partial class SmsTalkBalloon : CanvasLayer
     [Export] public Vector2 ParkOffset = Vector2.Zero;
     [Export] public bool AutoWrap = true;                   // DEVIATION: the game's lines are pre-broken in the message data
     [Export] public string AdvanceActionA = "button_a", AdvanceActionB = "button_b";
+    /// <summary>The choice window's up / down (MEANING_SELECT_UP / DOWN: the main stick's direction bit -- JUTGamePad::CStick::getButton sets it
+    /// at |y| >= 0.5 -- or the D-pad, on the press edge, no repeat): the stick's axis actions read as strengths, the D-pad / key actions as
+    /// presses. An action the project lacks is ignored.</summary>
+    [Export] public string StickUpAction = "Lstick_up", StickDownAction = "Lstick_down", DpadUpAction = "ui_up", DpadDownAction = "ui_down";
     [Export] public bool DebugPrint = false;
 
     // message_2.blo + Talk2D2.cpp constants
@@ -53,6 +67,13 @@ public partial class SmsTalkBalloon : CanvasLayer
     public static readonly Vector2 RootPosTalkA = new(388f, 115f), RootPosTalkB = new(160f, 135f);   // openTalkWindow by gpCamera->mMode
     public const float RootRotTalkA = -18f, RootRotTalkB = 20f;                      // J2D degrees (J2DPane::makeMatrix turns by -mRotation)
     public static readonly Vector2 RootPivot = new(5f, 5f);                          // the 10 x 10 pane's base position 4 (its centre)
+    // 'me_4' (pass 102): the pane at (362, 187) ROT 342, 'bac4' (-48, -32) 106 x 74, 'slct' (35, 15) 56 x 46 in it, font 20 x 24, 'sc_1' (-35, -18), 'sc_2' (-35, 8)
+    public static readonly Vector2 ChoicePos = new(362f, 187f);
+    public const float ChoiceRotJ2D = -18f;
+    public static readonly Vector2 ChoiceTextBox = new(-13f, -17f);                  // bac4 + slct, in the pane
+    public const float ChoiceTextBoxH = 46f, ChoiceFontW = 20f, ChoiceFontH = 24f, ChoiceCharSpace = -2f, ChoiceLineSpace = 26f;
+    public const int ChoiceDimAlpha = 0x60, ChoiceMaxChars = 16;                    // the other option's CC/GC alpha; unk218's 0x11 buffer
+    public const float StickSelectAt = 0.5f;                                         // CStick::getButton: MAINSTICK_UP / DOWN at |y| >= 0.5
     public static readonly Color[] ColorTable =                                       // cColorTable[6] (RGBA8)
     {
         new(1f, 1f, 1f), new(1f, 1f, 1f), new(1f, 0xB4 / 255f, 0x8C / 255f), new(0x6E / 255f, 0xE6 / 255f, 1f), new(1f, 1f, 0f), new(0xAA / 255f, 1f, 0x50 / 255f),
@@ -65,7 +86,15 @@ public partial class SmsTalkBalloon : CanvasLayer
     public int Page => _page;
     public int PageCount => _pages.Count;
     /// <summary>The page's glyphs are all in and the mark group is up: A / B would act (checkControler's gate).</summary>
-    public bool PageComplete => State == TalkState.Open && _marks[_lines] != null && _marks[_lines].Visible;
+    public bool PageComplete => State == TalkState.Open && ((_marks[_lines] != null && _marks[_lines].Visible) || ChoiceVisible);
+    /// <summary>getSelectedValue as the NPC reads it: the option confirmed with A / B this talk (0 = the first, 1 = the second), -1 = none -- no
+    /// choice in the message, or the talk ended before one was confirmed (the game keeps the highlighted one there; nothing reads it).</summary>
+    public int SelectedValue => _choiceConfirmed ? _choice : -1;
+    public int ChoiceHighlighted => _choice;                                          // unk214 (-1: no choice window in this message)
+    public bool ChoiceVisible => _choicePane != null && _choicePane.Visible;
+    public int ChoiceAlpha => _choiceAlpha;
+    public int PulseAlpha => _pulseAlpha;
+    public string ChoiceOption(int i) => i >= 0 && i < 2 ? _opt[i] ?? "" : "";
     public float BandRoll(int line) => _band[Math.Clamp(line, 0, MaxLines - 1)];
     public int GlyphsShown(int line) { int n = 0; for (int k = 0; k <= _last[line] && k < MaxChars; k++) if (_g[line][k].Shown) n++; return n; }
     public int GlyphCount(int line) => _last[line] + 1;
@@ -91,8 +120,15 @@ public partial class SmsTalkBalloon : CanvasLayer
     private readonly ShaderMaterial[] _bandMats = new ShaderMaterial[MaxLines];
     private readonly Control[] _marks = new Control[MaxLines];
     private readonly TextureRect[] _markArrow = new TextureRect[MaxLines], _markDot = new TextureRect[MaxLines];
-    private AudioStreamPlayer _sfxObi, _sfxSelect;
+    private AudioStreamPlayer _sfxObi, _sfxSelect, _sfxCursor;
     private bool _nodesReady;
+    private Control _choicePane, _choiceText; private NinePatchRect _choiceWindow;   // 'me_4', 'slct' (a sibling: no alpha inheritance), 'bac4'
+    private readonly TextureRect[] _choiceMarks = new TextureRect[2];                // 'sc_1', 'sc_2'
+    private readonly string[] _opt = new string[2];                                  // unk218
+    private int _choice = -1;                                                        // unk214
+    private bool _choiceConfirmed;
+    private int _choiceAlpha;                                                        // 'me_4' alpha
+    private bool _edgeUp, _edgeDown; private int _stickBits;                         // MEANING_SELECT_UP / DOWN this tick; MAINSTICK bits (8 up, 4 down)
 
     private readonly Glyph[][] _g = new Glyph[MaxLines][];
     private readonly int[] _last = new int[MaxLines];        // unk228: the line's last glyph index (-1: no glyph)
@@ -159,9 +195,17 @@ public partial class SmsTalkBalloon : CanvasLayer
         }
         _sfxObi = GetNodeOrNull<AudioStreamPlayer>("Sfx/Obi");
         _sfxSelect = GetNodeOrNull<AudioStreamPlayer>("Sfx/Select");
+        _sfxCursor = GetNodeOrNull<AudioStreamPlayer>("Sfx/Cursor");
+        _choicePane = GetNodeOrNull<Control>("Choice");
+        _choiceWindow = GetNodeOrNull<NinePatchRect>("Choice/Window");
+        _choiceMarks[0] = GetNodeOrNull<TextureRect>("Choice/Mark1");
+        _choiceMarks[1] = GetNodeOrNull<TextureRect>("Choice/Mark2");
+        _choiceText = GetNodeOrNull<Control>("ChoiceText");
         if (_glyphs != null) _glyphs.Draw += DrawGlyphs;
+        if (_choiceText != null) _choiceText.Draw += DrawChoice;
         _invCurveLen = 1f / CurveLength();
         HideAll();
+        HideChoice();
     }
 
     /// <summary>loadAfter: the curve's length in 100 steps, 1 / that is the glyph advance's unit.</summary>
@@ -190,6 +234,8 @@ public partial class SmsTalkBalloon : CanvasLayer
         _npc = npc; _mario = mario; _camera = mario?.SmsCamera;
         _textWait = 0;                                                      // unk280 = 0
         _skip = false; _fadeStep = FadeStep; _wait = 0; _latest = 0;        // unk26C / unk340 / unk2DC / unk2DE
+        _choice = -1; _choiceConfirmed = false; _opt[0] = _opt[1] = null;  // unk214 = -1 (setMessageID)
+        HideChoice();
         _pages = LayoutPages(pages);
         _page = 0;
         _camera?.MakeMtxForTalk(npc != null && npc.IsSmallNpc, mario != null ? mario.SmsCamFaceAngleBam() : 0);
@@ -234,6 +280,7 @@ public partial class SmsTalkBalloon : CanvasLayer
     private void Finish()
     {
         HideAll();
+        HideChoice();
         Visible = false;
         var mario = _mario;
         _npc = null; _mario = null; _camera = null;
@@ -246,6 +293,7 @@ public partial class SmsTalkBalloon : CanvasLayer
         if (!IsOpen) return;
         _edgeA = Input.IsActionJustPressed(AdvanceActionA);
         _edgeB = Input.IsActionJustPressed(AdvanceActionB);
+        ReadSelectEdges();
         int n = SmsUnits.TicksFor(delta, ref _tickAccum);
         _frameAccum += (float)delta * 30f;              // CUE_CALC_ANIM: once a 30 fps frame
         bool frameEdge = false;
@@ -253,7 +301,7 @@ public partial class SmsTalkBalloon : CanvasLayer
         for (int i = 0; i < n; i++)
         {
             Tick(i == n - 1 && frameEdge);
-            _edgeA = _edgeB = false;
+            _edgeA = _edgeB = _edgeUp = _edgeDown = false;
             if (!IsOpen) break;
         }
         if (n == 0 && frameEdge && IsOpen) CalcAnim();
@@ -366,6 +414,7 @@ public partial class SmsTalkBalloon : CanvasLayer
             FadeLine(line, false);
         }
         if (_next[_lines] < MaxChars && _next[_lines] <= _last[_lines]) return;   // the last line still appearing
+        if (_choice >= 0) { MoveChoiceWindow(); return; }                        // unk214 != -1: 'me_4' and its mark instead of the continue mark
         Control group = _marks[_lines];
         TextureRect fade = _lastPage ? _markDot[_lines] : _markArrow[_lines];
         if (group == null) return;
@@ -387,6 +436,19 @@ public partial class SmsTalkBalloon : CanvasLayer
 
     private void CheckControler()
     {
+        if (_choice >= 0)
+        {
+            if (!ChoiceVisible) return;                                                      // unk204->isVisible()
+            if (_edgeUp && _choice == 1) { _sfxCursor?.Play(); SelectChoice(0); }           // MSD_SE_SY_E3_MENU_CURSOR
+            else if (_edgeDown && _choice == 0) { _sfxCursor?.Play(); SelectChoice(1); }
+            else if (_edgeA || _edgeB)
+            {
+                _choiceConfirmed = true;
+                if (_lastPage) CloseTalkWindow();                                            // MSD_SE_SY_SELECT_COMMON, state 6
+                else { _sfxSelect?.Play(); State = TalkState.Erasing; }                      // state 7 (the pane stays up, as the game's does)
+            }
+            return;
+        }
         Control group = _marks[_lines];
         if (group == null || !group.Visible) return;
         if (!(_edgeA || _edgeB)) return;
@@ -394,13 +456,115 @@ public partial class SmsTalkBalloon : CanvasLayer
         else { _sfxSelect?.Play(); State = TalkState.Erasing; }
     }
 
+    // ------------------------------------------------------------------ the choice window (pass 102: 'me_4')
+    /// <summary>MEANING_SELECT_UP / DOWN for this tick: the main stick's MAINSTICK_UP / DOWN bit (CStick::getButton: set at |y| >= 0.5) on its
+    /// press edge (CButton::update: mRepeat = mTrigger with no repeat set), or the D-pad / key action just pressed.</summary>
+    private void ReadSelectEdges()
+    {
+        float y = Strength(StickUpAction) - Strength(StickDownAction);
+        int bits = y >= StickSelectAt ? 8 : y <= -StickSelectAt ? 4 : 0;
+        _edgeUp = ((bits & 8) != 0 && (_stickBits & 8) == 0) || JustPressed(DpadUpAction);
+        _edgeDown = ((bits & 4) != 0 && (_stickBits & 4) == 0) || JustPressed(DpadDownAction);
+        _stickBits = bits;
+    }
+
+    private static float Strength(string action) => !string.IsNullOrEmpty(action) && InputMap.HasAction(action) ? Input.GetActionStrength(action) : 0f;
+    private static bool JustPressed(string action) => !string.IsNullOrEmpty(action) && InputMap.HasAction(action) && Input.IsActionJustPressed(action);
+
+    /// <summary>checkControler's up / down: the mark hidden keeps its alpha (setAlpha(0xFE)), the other shows and the pulse goes on from there.</summary>
+    private void SelectChoice(int i)
+    {
+        _choice = i;
+        for (int k = 0; k < 2; k++) if (_choiceMarks[k] != null) _choiceMarks[k].Visible = k == i;
+        _pulseAlpha = 0xFE;
+        _choiceText?.QueueRedraw();
+    }
+
+    /// <summary>moveTalkWindow's tail with a choice (unk214 != -1, the page complete): 'me_4' shown at alpha 0 and faded 0x10 a step; the
+    /// highlighted mark pulses 255 -> 60 by 4 and back by 2 (unk26B), and 'slct' is rewritten each step -- the highlighted option white at
+    /// the pulse's alpha (CC / GC ffffff%02x), the other at 0x60 (the setup's 7f7f7f grey is overwritten at once).</summary>
+    private void MoveChoiceWindow()
+    {
+        if (_choicePane == null) return;
+        if (_choicePane.Visible)
+        {
+            if (_choiceAlpha < 255) _choiceAlpha = Math.Min(255, _choiceAlpha + MarkFadeStep);
+            if (_pulseUp) { _pulseAlpha += PulseUp; if (_pulseAlpha > 255) { _pulseUp = false; _pulseAlpha = 255; } }
+            else { _pulseAlpha -= PulseDown; if (_pulseAlpha < PulseMin) { _pulseUp = true; _pulseAlpha = PulseMin; } }
+        }
+        else
+        {
+            _choicePane.Visible = true; _choiceAlpha = 0; _pulseAlpha = 255;
+            for (int k = 0; k < 2; k++) if (_choiceMarks[k] != null) _choiceMarks[k].Visible = k == _choice;
+            if (_choiceText != null) _choiceText.Visible = true;
+        }
+        _choicePane.Modulate = new Color(1f, 1f, 1f, _choiceAlpha / 255f);
+        var mark = _choiceMarks[_choice];
+        if (mark != null) mark.Modulate = new Color(1f, 1f, 1f, _pulseAlpha / 255f);
+        _choiceText?.QueueRedraw();
+    }
+
+    private void HideChoice()
+    {
+        if (_choicePane != null) { _choicePane.Visible = false; _choicePane.Modulate = new Color(1f, 1f, 1f, 0f); }
+        if (_choiceText != null) _choiceText.Visible = false;
+        _choiceAlpha = 0;
+    }
+
+    /// <summary>'slct' as J2DTextBox::draw -> J2DPrint::printReturn lays it: "%s\n%s" in the system font at 20 x 24 (the 20 x 20 cells scaled
+    /// 1 x 1.2), bound left / bottom in the 56 x 46 box -- y offset = 46 - round(26 + 24) = -4, the first baseline at -4 + 24 = 20, the second
+    /// 26 lower; a glyph's cell spans baseline - ascent x 1.2 .. baseline (drawChar_scale). J2DPrint::parse's advance: a line's first glyph
+    /// steps kern + width, every other is drawn kern to the left and steps width; char space -2 after each.</summary>
+    private void DrawChoice()
+    {
+        if (Font?.Page == null || _choiceText == null || _choice < 0) return;
+        float sx = ChoiceFontW / Font.Width, sy = ChoiceFontH / Font.CellHeight;
+        float y0 = ChoiceTextBoxH - Mathf.Round(ChoiceLineSpace + ChoiceFontH);
+        for (int line = 0; line < 2; line++)
+        {
+            string s = _opt[line] ?? "";
+            float baseline = y0 + ChoiceFontH + line * ChoiceLineSpace;
+            var col = new Color(1f, 1f, 1f, (line == _choice ? _pulseAlpha : ChoiceDimAlpha) / 255f);
+            float x = 0f; bool first = true;
+            foreach (char c in s)
+            {
+                Font.WidthEntry(c, out int kern, out int adv);
+                float drawX = first ? x : x - kern * sx;
+                var rect = new Rect2(ChoiceTextBox.X + drawX, ChoiceTextBox.Y + baseline - Font.Ascent * sy, Font.CellWidth * sx, Font.CellHeight * sy);
+                _choiceText.DrawTextureRectRegion(Font.Page, rect, Font.Cell(c), col);
+                x += (first ? adv + kern : adv) * sx + ChoiceCharSpace;
+                first = false;
+            }
+        }
+    }
+
+    /// <summary>A page's option tags (setTagParam group 1): &lt;s0=text&gt; / &lt;s1=text&gt; (16 chars kept) or &lt;yesno&gt;; the first one met while
+    /// unk214 is -1 becomes the highlighted option and shows its mark.</summary>
+    private bool ChoiceTag(string tag)
+    {
+        if (tag == "yesno") { SetOption(0, "Yes"); SetOption(1, "No"); return true; }
+        if (tag.Length >= 3 && tag[0] == 's' && (tag[1] == '0' || tag[1] == '1') && tag[2] == '=') { SetOption(tag[1] - '0', tag.Substring(3)); return true; }
+        return false;
+    }
+
+    private void SetOption(int i, string s)
+    {
+        if (_choice == -1) _choice = i;
+        _opt[i] = s.Length > ChoiceMaxChars ? s.Substring(0, ChoiceMaxChars) : s;
+    }
+
     /// <summary>closeNormalWindow: the root fades 0x10 a tick; gone, everything resets.</summary>
     private bool CloseNormalWindow()
     {
         _rootAlpha -= RootFadeStep;
-        if (_rootAlpha >= 0) return false;
+        if (_rootAlpha >= 0)
+        {
+            if (ChoiceVisible) { _choiceAlpha = _rootAlpha; _choicePane.Modulate = new Color(1f, 1f, 1f, _rootAlpha / 255f); }   // unk204->setAlpha(alpha)
+            return false;
+        }
         _rootAlpha = 0;
         HideAll();
+        HideChoice();                                                    // unk204->hide() (eraseNormalWindow leaves it: a choice carries over a page)
         return true;
     }
 
@@ -444,12 +608,19 @@ public partial class SmsTalkBalloon : CanvasLayer
         if (_root == null) return;
         Vector2 vp = GetViewport().GetVisibleRect().Size;
         float s = vp.Y / SmsHud.ScreenH * Size;
-        _root.Scale = new Vector2(s, s);
-        _root.PivotOffset = RootPivot;
-        Vector2 park = _rootPos + ParkOffset;
+        PlacePane(_root, _rootPos + ParkOffset, _rootRot, s, vp);
+        if (_choicePane != null) PlacePane(_choicePane, ChoicePos + ParkOffset, ChoiceRotJ2D, s, vp);   // 'me_4' is never moved: the blo's spot (ParkOffset lifts it with the balloon)
+        if (_choiceText != null) PlacePane(_choiceText, ChoicePos + ParkOffset, ChoiceRotJ2D, s, vp);
+    }
+
+    /// <summary>A 10 x 10 J2D pane on the viewport: park = its top-left on the frame, the (5, 5) base position the pivot of its rotation.</summary>
+    private static void PlacePane(Control pane, Vector2 park, float rotJ2D, float s, Vector2 vp)
+    {
+        pane.Scale = new Vector2(s, s);
+        pane.PivotOffset = RootPivot;
         Vector2 pivotOnScreen = new(SmsHud.CenterX(park.X + RootPivot.X, s, vp), (park.Y + RootPivot.Y) * s);
-        _root.Position = pivotOnScreen - RootPivot;      // Godot puts the pivot at Position + PivotOffset (unscaled)
-        _root.Rotation = -Mathf.DegToRad(_rootRot);
+        pane.Position = pivotOnScreen - RootPivot;      // Godot puts the pivot at Position + PivotOffset (unscaled)
+        pane.Rotation = -Mathf.DegToRad(rotJ2D);
     }
 
     public override void _Process(double delta)
@@ -483,6 +654,7 @@ public partial class SmsTalkBalloon : CanvasLayer
                         string tag = text.Substring(p + 1, e - p - 1);
                         if (tag.Length == 2 && tag[0] == 'c' && char.IsDigit(tag[1])) { col = ColorTable[Math.Clamp(tag[1] - '0', 0, 5)]; p = e; continue; }
                         if (tag.StartsWith("w=") && int.TryParse(tag.AsSpan(2), out int w)) { _textWait = Math.Max(0, w); p = e; continue; }
+                        if (ChoiceTag(tag)) { p = e; continue; }
                     }
                 }
                 chars.Add((c, col, _textWait));
