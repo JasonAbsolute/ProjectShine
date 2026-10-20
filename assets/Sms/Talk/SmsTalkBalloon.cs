@@ -35,10 +35,21 @@ using System.Collections.Generic;
 /// (-35, 8), 20 x 20 message_cursor arrows. The pane fades in 0x10 a step, the highlighted mark pulses like the continue mark and the text is
 /// rewritten with it: the highlighted option white at the pulse's alpha, the other at 0x60. Up / down (the main stick past 0.5 or the D-pad,
 /// on the press edge) move the highlight (MSD_SE_SY_E3_MENU_CURSOR), A or B confirm it (B does not cancel) and go on as the continue mark
-/// would; the answer (getSelectedValue) reaches the NPC at npcTalkOut (the game's stage script reads it). The board window is not ported.</summary>
+/// would; the answer (getSelectedValue) reaches the NPC at npcTalkOut (the game's stage script reads it).
+///
+/// The board window (pass 103, a sign's text: unk28 = the NPC is ACTOR_TYPE_NPC_BOARD): message_board_1.blo's 'mb_0' pane (296, 223) turned
+/// 10 (J2D), its window 'back' (-155, -118) 320 x 246 (a J2DWindow of message_board_1 / _2's corners, blue at alpha 160), the text box 'text'
+/// (-124, -88) 257 x 186 (the system font at 20 x 26, char space -1, line space 32, bound centre / top: up to six lines a page, the tags
+/// skipped), seven ruled lines 'li_1..7' (256 x 3 at alpha 60) and the mark group 'cu_1' at (0, 142). openBoardWindow: the pane slides in
+/// from 80 below over 25 ticks (TBoundPane, a quadratic Bezier with the control at the start), then the mark group shows at alpha 0;
+/// moveBoardWindow: the group fades in 4 a tick, then the arrow (more pages) or the dot (last page) pulses 4 a tick between 0 and 255;
+/// checkBoardControler: A or B on the last page -> closeTalkWindow at once (the camera back, every NPC's npcTalkOut) while the pane slides
+/// 600 up over 60 ticks; A or B earlier -> eraseBoardWindow (the text fades 4 a tick to 0, the next page laid) and appearBoardBoxWindow
+/// (back to 255). The game's CUE_CALC_ANIM erase step runs eraseNormalWindow on the board too (perform 1005) -- harmless, the board erase
+/// finishes first on its 64th tick -- and is not mirrored here.</summary>
 public partial class SmsTalkBalloon : CanvasLayer
 {
-    public enum TalkState { Closed = 0, WaitCamera = 2, Pause = 3, Opening = 4, Open = 5, Closing = 6, Erasing = 7 }
+    public enum TalkState { Closed = 0, WaitCamera = 2, Pause = 3, Opening = 4, Open = 5, Closing = 6, Erasing = 7, Appearing = 8 }
 
     [Export] public SmsTalkFont Font;
     /// <summary>The frame's 448 lines on the window's height, times this (1 = the game's size; the console's own Size knob is separate).</summary>
@@ -69,6 +80,14 @@ public partial class SmsTalkBalloon : CanvasLayer
     public static readonly Vector2 RootPivot = new(5f, 5f);                          // the 10 x 10 pane's base position 4 (its centre)
     // 'me_4' (pass 102): the pane at (362, 187) ROT 342, 'bac4' (-48, -32) 106 x 74, 'slct' (35, 15) 56 x 46 in it, font 20 x 24, 'sc_1' (-35, -18), 'sc_2' (-35, 8)
     public static readonly Vector2 ChoicePos = new(362f, 187f);
+    // the board (pass 103): 'mb_0' (296, 223) ROT 10; 'text' (-124, -88) 257 x 186, font 20 x 26, char space -1, line space 32; the slide-in / out
+    public static readonly Vector2 BoardPos = new(296f, 223f);
+    public const float BoardRotJ2D = 10f;
+    public static readonly Vector2 BoardTextBox = new(-124f, -88f);
+    public const float BoardTextBoxW = 257f, BoardTextBoxH = 186f, BoardFontW = 20f, BoardFontH = 26f, BoardCharSpace = -1f, BoardLineSpace = 32f;
+    public const int BoardMaxLines = 6;                                                // setupBoardTextBox: lineIdx < 6
+    public const int BoardOpenTicks = 25, BoardCloseTicks = 60, BoardFadeStep = 4;    // setPanePosition(0x19 ..) / (60 ..); the 4-a-tick fades
+    public static readonly Vector2 BoardOpenFrom = new(0f, 80f), BoardCloseTo = new(0f, -600f);
     public const float ChoiceRotJ2D = -18f;
     public static readonly Vector2 ChoiceTextBox = new(-13f, -17f);                  // bac4 + slct, in the pane
     public const float ChoiceTextBoxH = 46f, ChoiceFontW = 20f, ChoiceFontH = 24f, ChoiceCharSpace = -2f, ChoiceLineSpace = 26f;
@@ -86,7 +105,7 @@ public partial class SmsTalkBalloon : CanvasLayer
     public int Page => _page;
     public int PageCount => _pages.Count;
     /// <summary>The page's glyphs are all in and the mark group is up: A / B would act (checkControler's gate).</summary>
-    public bool PageComplete => State == TalkState.Open && ((_marks[_lines] != null && _marks[_lines].Visible) || ChoiceVisible);
+    public bool PageComplete => State == TalkState.Open && ((_marks[_lines] != null && _marks[_lines].Visible) || ChoiceVisible || (_board && BoardMarkVisible));
     /// <summary>getSelectedValue as the NPC reads it: the option confirmed with A / B this talk (0 = the first, 1 = the second), -1 = none -- no
     /// choice in the message, or the talk ended before one was confirmed (the game keeps the highlighted one there; nothing reads it).</summary>
     public int SelectedValue => _choiceConfirmed ? _choice : -1;
@@ -155,6 +174,27 @@ public partial class SmsTalkBalloon : CanvasLayer
 
     private SmsNpc _npc; private Mario _mario; private SunshineCamera _camera;
 
+    // ---- the board window (pass 103): unk10 / unk14 (TBoundPane) / unk18 (text) / unk1C (the mark group) / unk20 (arrow) / unk24 (dot)
+    private bool _board;                                      // unk28
+    private int _boardStep;                                   // unk29: openBoardWindow's case
+    private Control _boardPane, _boardText, _boardMark; private TextureRect _boardArrow, _boardDot;
+    private int _boardTextAlpha = 255;                        // unk18's alpha: 255 from the blo, faded 4 a tick on a page flip and back
+    private int _boardMarkAlpha, _boardArrowAlpha = 255, _boardDotAlpha = 255;   // unk1C / unk20 / unk24: the children keep the blo's 255 until the group has faded in
+    private bool _boardPulseUp;                               // unk26B
+    private string[][] _boardPages = System.Array.Empty<string[]>();
+    private Vector2 _boundOffset, _boundStart, _boundCtrl, _boundEnd; private float _boundT, _boundStep; private bool _boundMoving;   // TBoundPane
+    public bool IsBoardWindow => _board;
+    public Vector2 BoardOffset => _boundOffset;
+    /// <summary>The balloon's 120 Hz ticks since it opened (for tests: the fades and slides count in these, not in physics frames).</summary>
+    public int TickCount { get; private set; }
+    public int BoardTextAlpha => _boardTextAlpha;
+    public int BoardMarkAlpha => _boardMarkAlpha;
+    public bool BoardMarkVisible => _boardMark != null && _boardMark.Visible;
+    public int BoardArrowAlpha => _boardArrowAlpha;
+    public int BoardDotAlpha => _boardDotAlpha;
+    public int BoardLineCount => _page < _boardPages.Length ? _boardPages[_page].Length : 0;
+    public string BoardLine(int i) => _page < _boardPages.Length && i < _boardPages[_page].Length ? _boardPages[_page][i] : "";
+
     public static SmsTalkBalloon Instance { get; private set; }
     public const string ScenePath = "res://assets/Sms/Talk/TalkBalloon.tscn";
 
@@ -201,8 +241,15 @@ public partial class SmsTalkBalloon : CanvasLayer
         _choiceMarks[0] = GetNodeOrNull<TextureRect>("Choice/Mark1");
         _choiceMarks[1] = GetNodeOrNull<TextureRect>("Choice/Mark2");
         _choiceText = GetNodeOrNull<Control>("ChoiceText");
+        _boardPane = GetNodeOrNull<Control>("Board");
+        _boardText = GetNodeOrNull<Control>("Board/Text");
+        _boardMark = GetNodeOrNull<Control>("Board/Mark");
+        _boardArrow = GetNodeOrNull<TextureRect>("Board/Mark/Arrow");
+        _boardDot = GetNodeOrNull<TextureRect>("Board/Mark/Dot");
         if (_glyphs != null) _glyphs.Draw += DrawGlyphs;
         if (_choiceText != null) _choiceText.Draw += DrawChoice;
+        if (_boardText != null) _boardText.Draw += DrawBoardText;
+        if (_boardPane != null) _boardPane.Visible = false;
         _invCurveLen = 1f / CurveLength();
         HideAll();
         HideChoice();
@@ -236,7 +283,10 @@ public partial class SmsTalkBalloon : CanvasLayer
         _skip = false; _fadeStep = FadeStep; _wait = 0; _latest = 0;        // unk26C / unk340 / unk2DC / unk2DE
         _choice = -1; _choiceConfirmed = false; _opt[0] = _opt[1] = null;  // unk214 = -1 (setMessageID)
         HideChoice();
-        _pages = LayoutPages(pages);
+        _board = npc != null && npc.Profile != null && npc.Profile.IsBoard;   // unk28 = getActorType() == ACTOR_TYPE_NPC_BOARD
+        _boardStep = 0; _boundMoving = false; _boundOffset = Vector2.Zero;
+        if (_board) { _boardPages = LayoutBoardPages(pages); _pages = new List<string[]>(_boardPages); }
+        else _pages = LayoutPages(pages);
         _page = 0;
         _camera?.MakeMtxForTalk(npc != null && npc.IsSmallNpc, mario != null ? mario.SmsCamFaceAngleBam() : 0);
         bool talkB = _camera != null ? _camera.IsTalkCameraSmall : npc != null && npc.IsSmallNpc;
@@ -247,12 +297,15 @@ public partial class SmsTalkBalloon : CanvasLayer
         hud?.Telop?.Disappear();                                            // startDisappearTelop
         hud?.Balloon?.Hide();                                               // startDisappearBalloon(.., true)
         hud?.Standard?.TalkIn();                                            // startDisappearMario
-        _tickAccum = 0f; _frameAccum = 0f;
-        SetupPage();                                                        // setMessageID's setupTextBox: the layout is ready before the roll-out
+        _tickAccum = 0f; _frameAccum = 0f; TickCount = 0;
+        if (_board) SetupBoardPage(); else SetupPage();                     // setMessageID's setupTextBox: the layout is ready before the roll-out
+        if (_root != null) _root.Visible = !_board;                         // unk28: the draw is unk10 (the board screen) or unk2C (the balloon's)
+        if (_boardPane != null) _boardPane.Visible = _board;
+        if (_board && _boardMark != null) { _boardMark.Visible = false; _boardMark.Modulate = new Color(1f, 1f, 1f, 0f); }
         State = TalkState.WaitCamera;
         UpdateRootTransform();
         Visible = true;
-        if (DebugPrint) GD.Print($"[SMS talk2d] open on {npc?.Name}: {_pages.Count} page(s), {(talkB ? "TALK_B" : "TALK_A")} park ({_rootPos.X}, {_rootPos.Y}) rot {_rootRot}");
+        if (DebugPrint) GD.Print($"[SMS talk2d] open on {npc?.Name}: {_pages.Count} page(s), {(_board ? "BOARD, " : "")}{(talkB ? "TALK_B" : "TALK_A")} park ({_rootPos.X}, {_rootPos.Y}) rot {_rootRot}");
     }
 
     /// <summary>closeTalkWindow (unk270 & 1): MSD_SE_SY_SELECT_COMMON, makeMtxForPrevTalk (the camera back, onNeutralMarioKey, every NPC's
@@ -281,6 +334,8 @@ public partial class SmsTalkBalloon : CanvasLayer
     {
         HideAll();
         HideChoice();
+        if (_boardPane != null) _boardPane.Visible = false;
+        if (_root != null) _root.Visible = true;
         Visible = false;
         var mario = _mario;
         _npc = null; _mario = null; _camera = null;
@@ -310,23 +365,28 @@ public partial class SmsTalkBalloon : CanvasLayer
 
     private void Tick(bool frameLast)
     {
+        TickCount++;
         switch (State)
         {
             case TalkState.WaitCamera:
                 if (_camera == null || _camera.TalkCameraSettled) { _pauseFrames = PauseFrames; State = TalkState.Pause; }
                 break;
             case TalkState.Opening:
-                if (OpenNormalWindow()) State = TalkState.Open;
+                if (_board ? OpenBoardWindow() : OpenNormalWindow()) State = TalkState.Open;
                 break;
             case TalkState.Open:
-                MoveTalkWindow();
-                CheckControler();
+                if (_board) { MoveBoardWindow(); CheckBoardControler(); }
+                else { MoveTalkWindow(); CheckControler(); }
                 break;
             case TalkState.Closing:
-                if (CloseNormalWindow()) { State = TalkState.Closed; Finish(); return; }
+                if (_board ? CloseBoardWindow() : CloseNormalWindow()) { State = TalkState.Closed; Finish(); return; }
                 break;
             case TalkState.Erasing:
-                if (EraseNormalWindow()) State = TalkState.Opening;
+                if (_board) { if (EraseBoardWindow()) State = TalkState.Appearing; }
+                else if (EraseNormalWindow()) State = TalkState.Opening;
+                break;
+            case TalkState.Appearing:
+                if (AppearBoardBoxWindow()) State = TalkState.Open;
                 break;
         }
         if (frameLast) CalcAnim();
@@ -342,8 +402,192 @@ public partial class SmsTalkBalloon : CanvasLayer
                 if (--_pauseFrames < 0) { _latest = 0; State = TalkState.Opening; }
                 break;
             case TalkState.Erasing:
-                if (EraseNormalWindow()) State = TalkState.Opening;
+                if (!_board && EraseNormalWindow()) State = TalkState.Opening;   // the game runs this step on the board too (harmless: see the header)
                 break;
+        }
+    }
+
+    // ------------------------------------------------------------------ the board window (pass 103: TTalk2D2's unk28 branch)
+    /// <summary>TBoundPane::setPanePosition: the offset runs start -> end along a quadratic Bezier (control) in `ticks` updates.</summary>
+    private void BoundSet(int ticks, Vector2 start, Vector2 control, Vector2 end)
+    {
+        _boundT = 0f; _boundStep = 1f / ticks; _boundStart = start; _boundCtrl = control; _boundEnd = end; _boundMoving = true;
+    }
+
+    /// <summary>TBoundPane::update: true once nothing moves. The step past 1 clamps and ends the motion; the offset is rounded half away.</summary>
+    private bool BoundUpdate()
+    {
+        if (_boundMoving)
+        {
+            if (_boundT > 1f) { _boundT = 1f; _boundMoving = false; }
+            float t = _boundT, u = 1f - t;
+            Vector2 p = _boundEnd * (t * t) + (_boundStart * (u * u) + _boundCtrl * (2f * u * t));
+            _boundOffset = new Vector2(RoundHalfAway(p.X), RoundHalfAway(p.Y));
+            _boundT += _boundStep;
+        }
+        return !_boundMoving;
+    }
+
+    /// <summary>openBoardWindow: case 0 arms the slide from 80 below (the pane's update is idle, so this is the first tick); case 1 waits for it,
+    /// then shows the mark group at alpha 0.</summary>
+    private bool OpenBoardWindow()
+    {
+        switch (_boardStep)
+        {
+            case 0:
+                if (BoundUpdate()) { BoundSet(BoardOpenTicks, BoardOpenFrom, BoardOpenFrom, Vector2.Zero); _boardStep = 1; }
+                break;
+            case 1:
+                if (BoundUpdate())
+                {
+                    _boardMarkAlpha = 0;
+                    if (_boardMark != null) { _boardMark.Visible = true; _boardMark.Modulate = new Color(1f, 1f, 1f, 0f); }
+                    _boardStep = 2;
+                    return true;
+                }
+                break;
+        }
+        return false;
+    }
+
+    /// <summary>moveBoardWindow: the mark group fades in 4 a tick (the children still at their own alpha, 255 from the blo); at 255 the arrow and
+    /// the dot are set to 0 and the one for this page pulses 4 a tick up to 255 and down to 0. The other keeps whatever alpha it had.</summary>
+    private void MoveBoardWindow()
+    {
+        if (_boardMarkAlpha < 255)
+        {
+            _boardMarkAlpha += BoardFadeStep;
+            if (_boardMarkAlpha > 255) { _boardDotAlpha = 0; _boardArrowAlpha = 0; _boardPulseUp = true; _boardMarkAlpha = 255; }
+            return;
+        }
+        ref int alpha = ref (_lastPage ? ref _boardDotAlpha : ref _boardArrowAlpha);
+        if (_boardPulseUp) { alpha += BoardFadeStep; if (alpha > 255) { _boardPulseUp = false; alpha = 255; } }
+        else { alpha -= BoardFadeStep; if (alpha < 0) { _boardPulseUp = true; alpha = 0; } }
+    }
+
+    /// <summary>checkBoardControler: on the last page A or B (the press edge) plays MSD_SE_SY_SELECT_COMMON, arms the slide 600 up over 60 ticks and
+    /// closes the talk at once (closeTalkWindow: the camera back, every NPC's npcTalkOut); earlier, A or B goes to the erase (state 7).</summary>
+    private void CheckBoardControler()
+    {
+        if (!(_edgeA || _edgeB)) return;
+        if (_lastPage) { BoundSet(BoardCloseTicks, Vector2.Zero, Vector2.Zero, BoardCloseTo); CloseTalkWindow(); }
+        else { _sfxSelect?.Play(); State = TalkState.Erasing; }
+    }
+
+    /// <summary>closeBoardWindow: done when the slide-out has run (the pane is then 600 above its park).</summary>
+    private bool CloseBoardWindow() => BoundUpdate();
+
+    /// <summary>eraseBoardWindow: the text fades 4 a tick; under 0 the next page is laid (setupTextBox) with the text at 0.</summary>
+    private bool EraseBoardWindow()
+    {
+        _boardTextAlpha -= BoardFadeStep;
+        if (_boardTextAlpha >= 0) return false;
+        _boardTextAlpha = 0;
+        _page++;
+        SetupBoardPage();
+        return true;
+    }
+
+    /// <summary>appearBoardBoxWindow: the text fades back 4 a tick to 255.</summary>
+    private bool AppearBoardBoxWindow()
+    {
+        _boardTextAlpha += BoardFadeStep;
+        if (_boardTextAlpha <= 255) return false;
+        _boardTextAlpha = 255;
+        return true;
+    }
+
+    /// <summary>setupBoardTextBox for the current page: the lines go to the text box as one string (unk18), the last page flagged (unk26A).</summary>
+    private void SetupBoardPage()
+    {
+        _lastPage = _page >= _boardPages.Length - 1;
+        _lines = 0;
+        _boardText?.QueueRedraw();
+    }
+
+    /// <summary>The NPC's Lines as the board reads them: '\n' breaks, six lines a page (setupBoardTextBox's lineIdx &lt; 6), the &lt;tags&gt; dropped (the
+    /// board skips every 0x1A tag: no colours, no choice), a line past the box's 257 broken by words (J2DPrint wraps it by glyph: AutoWrap's
+    /// word break is the port's).</summary>
+    private string[][] LayoutBoardPages(string[] pages)
+    {
+        var out_ = new List<string[]>();
+        if (pages == null || pages.Length == 0) pages = new[] { "..." };
+        foreach (string page in pages)
+        {
+            var lines = new List<string>();
+            foreach (string raw0 in (page ?? "").Replace("\r", "").Split('\n'))
+            {
+                string raw = StripTags(raw0);
+                if (!AutoWrap || BoardLineWidth(raw) <= BoardTextBoxW) { lines.Add(raw); continue; }
+                string cur = "";
+                foreach (string word in raw.Split(' '))
+                {
+                    string trial = cur.Length == 0 ? word : cur + " " + word;
+                    if (BoardLineWidth(trial) <= BoardTextBoxW || cur.Length == 0) cur = trial;
+                    else { lines.Add(cur); cur = word; }
+                }
+                if (cur.Length > 0) lines.Add(cur);
+            }
+            for (int i = 0; i < lines.Count; i += BoardMaxLines)
+                out_.Add(lines.GetRange(i, Math.Min(BoardMaxLines, lines.Count - i)).ToArray());
+        }
+        if (out_.Count == 0) out_.Add(new[] { "" });
+        return out_.ToArray();
+    }
+
+    private static string StripTags(string s)
+    {
+        var sb = new System.Text.StringBuilder(s.Length);
+        for (int p = 0; p < s.Length; p++)
+        {
+            if (s[p] == '<') { int e = s.IndexOf('>', p); if (e > p) { p = e; continue; } }
+            sb.Append(s[p]);
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>J2DPrint::parse's line width at 20 x 26 with char space -1: the first glyph steps kern + width, the rest width, each then the
+    /// char space; the width is the cursor's reach before the last char space (f24).</summary>
+    public float BoardLineWidth(string s)
+    {
+        if (Font == null || string.IsNullOrEmpty(s)) return 0f;
+        float sx = BoardFontW / Font.Width, x = 0f, reach = 0f; bool first = true;
+        foreach (char c in s)
+        {
+            Font.WidthEntry(c, out int kern, out int adv);
+            x += (first ? adv + kern : adv) * sx;
+            reach = Math.Max(reach, x);
+            x += BoardCharSpace;
+            first = false;
+        }
+        return reach;
+    }
+
+    /// <summary>'text' as J2DTextBox::draw -> J2DPrint::printReturn lays it, bound centre / top: each line's x = (257 - round(width)) / 2 (integer),
+    /// the first baseline at 26 (VBIND_TOP adds nothing; mCursorV += fontSizeY), each next line 32 lower; a glyph's cell spans baseline -
+    /// ascent x 1.3 .. baseline; white at the text box's alpha.</summary>
+    private void DrawBoardText()
+    {
+        if (Font?.Page == null || _boardText == null || !_board) return;
+        float sx = BoardFontW / Font.Width, sy = BoardFontH / Font.CellHeight;
+        var col = new Color(1f, 1f, 1f, _boardTextAlpha / 255f);
+        int n = BoardLineCount;
+        for (int line = 0; line < n; line++)
+        {
+            string s = BoardLine(line);
+            int w = (int)(BoardLineWidth(s) + 0.5f);
+            float x0 = (int)((BoardTextBoxW - w) / 2f);
+            float baseline = BoardFontH + line * BoardLineSpace;
+            float x = 0f; bool first = true;
+            foreach (char c in s)
+            {
+                Font.WidthEntry(c, out int kern, out int adv);
+                float drawX = first ? x : x - kern * sx;
+                var rect = new Rect2(BoardTextBox.X + x0 + drawX, BoardTextBox.Y + baseline - Font.Ascent * sy, Font.CellWidth * sx, Font.CellHeight * sy);
+                _boardText.DrawTextureRectRegion(Font.Page, rect, Font.Cell(c), col);
+                x += (first ? adv + kern : adv) * sx + BoardCharSpace;
+                first = false;
+            }
         }
     }
 
@@ -598,6 +842,13 @@ public partial class SmsTalkBalloon : CanvasLayer
     private void ApplyAlpha()
     {
         if (_root != null) _root.Modulate = new Color(1f, 1f, 1f, _rootAlpha / 255f);
+        if (_board)
+        {
+            if (_boardMark != null) _boardMark.Modulate = new Color(1f, 1f, 1f, _boardMarkAlpha / 255f);
+            if (_boardArrow != null) _boardArrow.Modulate = new Color(1f, 1f, 1f, _boardArrowAlpha / 255f);
+            if (_boardDot != null) _boardDot.Modulate = new Color(1f, 1f, 1f, _boardDotAlpha / 255f);
+            _boardText?.QueueRedraw();
+        }
     }
 
     // ------------------------------------------------------------------ the layout (setupTextBox + makeBoxLine)
@@ -611,6 +862,7 @@ public partial class SmsTalkBalloon : CanvasLayer
         PlacePane(_root, _rootPos + ParkOffset, _rootRot, s, vp);
         if (_choicePane != null) PlacePane(_choicePane, ChoicePos + ParkOffset, ChoiceRotJ2D, s, vp);   // 'me_4' is never moved: the blo's spot (ParkOffset lifts it with the balloon)
         if (_choiceText != null) PlacePane(_choiceText, ChoicePos + ParkOffset, ChoiceRotJ2D, s, vp);
+        if (_boardPane != null && _board) PlacePane(_boardPane, BoardPos + _boundOffset, BoardRotJ2D, s, vp);   // 'mb_0' + the bound pane's offset (not lifted by ParkOffset: the game never moves it)
     }
 
     /// <summary>A 10 x 10 J2D pane on the viewport: park = its top-left on the frame, the (5, 5) base position the pivot of its rotation.</summary>

@@ -227,6 +227,28 @@ burst, 0 = until the clip ends; `Drain Seconds` = the longest particle life) and
 The drips' and the wash's colours are the goop's: `env_color` / `prm_color` on their shader material (Delfino's brown pair; the
 game's other maps' rows are in `EmitterViewObj.cpp` 644 if a level wants another colour).
 
+## 7d. Signs -- `SignBoard.tscn` (pass 103: the game's board NPC and its board window)
+
+In Sunshine a readable sign is two things: a sign MESH (a map object with collision) and, in front of it, an invisible **board NPC**
+(`NPCBoard`, `ACTOR_TYPE_NPC_BOARD`) that owns the talk. `assets/Sms/Npc/SignBoard.tscn` is that NPC: an `SmsNpc` on
+`Profiles/Board.tres` (`Kind = Board`) with no model, no collision (layer and mask 0; the capsule child is only the game's 80 x 160 unit
+talk cylinder drawn as a gizmo, disabled) and no behaviour but the talk -- it never turns, walks, sinks, burns, reacts to water or a
+stomp, and Mario walks through it.
+
+- Drop it in front of your sign mesh, **facing out** (its -Z toward where the player stands). The talk cone is the game's sit-talk cone
+  (`mSLSitTalkAcceptDegree`, 100 degrees): Mario must be within 50 degrees of the sign's facing, within 400 units, and facing it. The B cursor
+  appears over it at the profile's `Body Height + Cursor Height` (the `npcBoard.prm` values on `Board.tres`).
+- `Lines` are the pages. A board page holds up to **six** lines (Enter = a new line); a line wider than the box (257 units in the system font
+  at 20 x 26) breaks by words onto the next line, and lines past six flow onto the next page. Tags (`<c3>`, `<w=8>`, `<yesno>`) are dropped
+  on a board, as the game's `setupBoardTextBox` skips them: no colours, no choice window on a sign.
+- What shows: the board window (`message_board_1.blo`) -- the translucent blue plank with its seven ruled lines, the text centred line by
+  line, the camera on TALK_A -- slides in from below (25 ticks), the mark group fades in and the arrow pulses (more pages) or the dot (last
+  page). A or B flips the page (the text fades out and back in over about half a second each way); on the last page A or B closes it: the
+  camera comes straight back while the plank slides up off the screen. Game quirk kept: after a flip to the last page the arrow stays at
+  whatever alpha the flip caught it at while the dot pulses (nothing in the game hides it).
+- Knobs that still apply: the balloon's `Size` (the frame's scale), `Auto Wrap`. `Park Offset` moves only the balloon, never the board.
+- Other NPC kinds are untouched: give a Pianta or a Toad the Board profile and it loses its model handling -- make a sign, not a profile swap.
+
 ## 8. If it breaks
 
 - `[SMS npc] X: Profile is null` -> the instance has a `Profile = null` override (an editor save made while a class was not `[Tool]`);

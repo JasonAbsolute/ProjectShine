@@ -1,0 +1,56 @@
+[gd_resource type="Resource" script_class="SmsNpcProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcProfile.cs" id="1_prof"]
+
+[resource]
+resource_name = "Board"
+script = ExtResource("1_prof")
+Kind = 4
+Trampled = false
+GetsMad = false
+ReactsToWater = false
+TurnsToMarioOnApproach = false
+TurnsToMarioWhenTalking = false
+SinksInPollution = false
+AttackRadius = 80.0
+AttackHeight = 160.0
+DamageRadius = 80.0
+DamageHeight = 160.0
+BodyHeight = 180.0
+CursorHeight = 5.0
+LookatHeight = 40.0
+CircleShadowSize = 0.0
+ClipWalk = ""
+ClipWait = ""
+ClipFall = ""
+ClipRecover = ""
+ClipStep = ""
+ClipWet = ""
+ClipTalk = ""
+ClipRun = ""
+ClipTaken = ""
+ClipMad = ""
+ClipWetAlt = ""
+ClipWaitA = ""
+ClipThrow = ""
+ClipDirty = ""
+ClipWaitFall = ""
+ClipHappy = ""
+ClipSit = ""
+ClipSitTalk = ""
+ClipSitWet = ""
+ClipWaitB = ""
+ClipDance = ""
+ClipMadLoop = ""
+ClipWash = ""
+ClipAppear = ""
+BodyMaterial = ""
+BodyColors = PackedVector3Array()
+BodyColors2 = PackedVector3Array()
+ClothMaterial = ""
+ClothColors = PackedVector3Array()
+ClothColors2 = PackedVector3Array()
+LeafMaterial = ""
+PollutionUv2Materials = PackedStringArray()
+EffectJoint = ""
+CanBurn = false

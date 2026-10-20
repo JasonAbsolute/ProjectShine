@@ -1,0 +1,21 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpc.cs" id="1_npc"]
+[ext_resource type="Resource" path="res://assets/Sms/Npc/Profiles/Board.tres" id="2_prof"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_talk"]
+radius = 1.0747
+height = 2.1494
+
+[node name="SignBoard" type="CharacterBody3D"]
+collision_layer = 0
+collision_mask = 0
+script = ExtResource("1_npc")
+Profile = ExtResource("2_prof")
+ColorIndex = 0
+Lines = PackedStringArray("Welcome to\nDelfino Plaza!\nGateway to Isle Delfino,\n\nShine Sprites: 0\nBlue Coins: 0", "Please keep the plaza\nclean. Report any goop\nto the nearest Pianta.")
+
+[node name="TalkVolume" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0747, 0)
+shape = SubResource("CapsuleShape3D_talk")
+disabled = true

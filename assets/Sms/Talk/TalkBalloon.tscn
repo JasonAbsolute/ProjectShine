@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://assets/Sms/Talk/SmsTalkBalloon.cs" id="1_talk"]
 [ext_resource type="Resource" path="res://assets/Sms/Talk/TalkFont.tres" id="2_font"]
@@ -9,6 +9,8 @@
 [ext_resource type="Texture2D" path="res://assets/Sms/Talk/tex/talk_return_mark_x4.png" id="7_cr"]
 [ext_resource type="Shader" path="res://assets/Sms/Talk/TalkGlyph.gdshader" id="8_glyphsh"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Talk/tex/talk_window_x4.png" id="9_win"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Talk/tex/talk_board_x4.png" id="10_board"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Talk/tex/talk_board_rule_x4.png" id="11_rule"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_glyph"]
 shader = ExtResource("8_glyphsh")
@@ -311,6 +313,160 @@ offset_right = 10.0
 offset_bottom = 10.0
 pivot_offset = Vector2(5, 5)
 mouse_filter = 2
+
+[node name="Board" type="Control" parent="."]
+visible = false
+layout_mode = 3
+anchors_preset = 0
+offset_right = 10.0
+offset_bottom = 10.0
+pivot_offset = Vector2(5, 5)
+mouse_filter = 2
+
+[node name="Back" type="TextureRect" parent="Board"]
+material = SubResource("ShaderMaterial_glyph")
+modulate = Color(0, 0, 1, 0.627451)
+layout_mode = 0
+offset_left = -155.0
+offset_top = -118.0
+offset_right = 165.0
+offset_bottom = 128.0
+mouse_filter = 2
+texture = ExtResource("10_board")
+expand_mode = 1
+
+[node name="Rule1" type="TextureRect" parent="Board"]
+material = SubResource("ShaderMaterial_glyph")
+modulate = Color(1, 1, 1, 0.235294)
+layout_mode = 0
+offset_left = -123.0
+offset_top = -91.0
+offset_right = 133.0
+offset_bottom = -88.0
+mouse_filter = 2
+texture = ExtResource("11_rule")
+expand_mode = 1
+
+[node name="Rule2" type="TextureRect" parent="Board"]
+material = SubResource("ShaderMaterial_glyph")
+modulate = Color(1, 1, 1, 0.235294)
+layout_mode = 0
+offset_left = -123.0
+offset_top = -59.0
+offset_right = 133.0
+offset_bottom = -56.0
+mouse_filter = 2
+texture = ExtResource("11_rule")
+expand_mode = 1
+
+[node name="Rule3" type="TextureRect" parent="Board"]
+material = SubResource("ShaderMaterial_glyph")
+modulate = Color(1, 1, 1, 0.235294)
+layout_mode = 0
+offset_left = -123.0
+offset_top = -27.0
+offset_right = 133.0
+offset_bottom = -24.0
+mouse_filter = 2
+texture = ExtResource("11_rule")
+expand_mode = 1
+
+[node name="Rule4" type="TextureRect" parent="Board"]
+material = SubResource("ShaderMaterial_glyph")
+modulate = Color(1, 1, 1, 0.235294)
+layout_mode = 0
+offset_left = -123.0
+offset_top = 5.0
+offset_right = 133.0
+offset_bottom = 8.0
+mouse_filter = 2
+texture = ExtResource("11_rule")
+expand_mode = 1
+
+[node name="Rule5" type="TextureRect" parent="Board"]
+material = SubResource("ShaderMaterial_glyph")
+modulate = Color(1, 1, 1, 0.235294)
+layout_mode = 0
+offset_left = -123.0
+offset_top = 37.0
+offset_right = 133.0
+offset_bottom = 40.0
+mouse_filter = 2
+texture = ExtResource("11_rule")
+expand_mode = 1
+
+[node name="Rule6" type="TextureRect" parent="Board"]
+material = SubResource("ShaderMaterial_glyph")
+modulate = Color(1, 1, 1, 0.235294)
+layout_mode = 0
+offset_left = -123.0
+offset_top = 69.0
+offset_right = 133.0
+offset_bottom = 72.0
+mouse_filter = 2
+texture = ExtResource("11_rule")
+expand_mode = 1
+
+[node name="Rule7" type="TextureRect" parent="Board"]
+material = SubResource("ShaderMaterial_glyph")
+modulate = Color(1, 1, 1, 0.235294)
+layout_mode = 0
+offset_left = -123.0
+offset_top = 101.0
+offset_right = 133.0
+offset_bottom = 104.0
+mouse_filter = 2
+texture = ExtResource("11_rule")
+expand_mode = 1
+
+[node name="Text" type="Control" parent="Board"]
+material = SubResource("ShaderMaterial_glyph")
+layout_mode = 0
+offset_right = 10.0
+offset_bottom = 10.0
+mouse_filter = 2
+
+[node name="Mark" type="Control" parent="Board"]
+visible = false
+layout_mode = 0
+offset_top = 142.0
+offset_right = 10.0
+offset_bottom = 152.0
+mouse_filter = 2
+
+[node name="Base" type="TextureRect" parent="Board/Mark"]
+material = SubResource("ShaderMaterial_glyph")
+modulate = Color(0, 0, 1, 0.627451)
+layout_mode = 0
+offset_left = -8.0
+offset_top = -8.0
+offset_right = 18.0
+offset_bottom = 18.0
+mouse_filter = 2
+texture = ExtResource("7_cr")
+expand_mode = 1
+
+[node name="Arrow" type="TextureRect" parent="Board/Mark"]
+material = SubResource("ShaderMaterial_glyph")
+layout_mode = 0
+offset_left = -4.0
+offset_top = -3.0
+offset_right = 14.0
+offset_bottom = 15.0
+mouse_filter = 2
+texture = ExtResource("6_cc")
+expand_mode = 1
+
+[node name="Dot" type="TextureRect" parent="Board/Mark"]
+material = SubResource("ShaderMaterial_glyph")
+layout_mode = 0
+offset_left = -3.0
+offset_top = -3.0
+offset_right = 13.0
+offset_bottom = 13.0
+mouse_filter = 2
+texture = ExtResource("7_cr")
+expand_mode = 1
 
 [node name="Sfx" type="Node" parent="."]
 

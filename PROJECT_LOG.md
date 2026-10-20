@@ -5972,3 +5972,72 @@ B3 A on 'Yes': 0 / 0 / the signal twice; B4 StopWorrying: the plain kinopio_wait
 ### Deviations / not ported
 The answer reaches the NPC (a signal and two inspector effects) instead of the game's stage script; MSD_SE_SY_E3_MENU_CURSOR is a slot; the
 board window and TALK_C / D / E remain unported. Drive 101's plain Toad is now spawned with Worried off (Toad.tscn defaults to the test).
+
+## SMS pass 103 -- the sign text: the board window ('message_board_1') and the board NPC kind
+
+Jaysonn (10-11, after pass 102 "lets to the sign text talking too"): the readable signs' text, in the game's window.
+
+### The game
+- A readable sign is two objects: the sign MESH (a map object with collision) and, in front of it, an invisible board NPC (`NPCBoard`,
+  `ACTOR_TYPE_NPC_BOARD`, NpcInitPrg.cpp 145-166: no model, LIVE_FLAG_UNK2000 | UNK10 | UNK8, the hit cylinder 80 / 160 from
+  sBoardNpc_InitData, the spine at WaitMarioApproach, turn speed 0). Its perform is movementOnlyTalk_ + performOnlyDraw (NpcBase.cpp 598 /
+  642: no bind, no hit, no water -- isBehaveToWaterNpc false); its talk accept cone is mSLSitTalkAcceptDegree (100: Mario in front of the sign,
+  NpcBase.hpp 372); the talk camera is TALK_A (a board is not a small NPC). npcBoard.prm (his disc, params/npc): BodyHeight 180, CursorHeight
+  5, LookatHeight 40.
+- The talk opens the BOARD window instead of the balloon (TTalk2D2: unk28 = the NPC is a board, Talk2D2.cpp 387): message_board_1.blo's pane
+  'mb_0' (296, 223) turned 10 holding the window 'back' (-155, -118) 320 x 246 at alpha 160 -- a J2DWindow of message_board_1 / _2's 32 x 100
+  corners (TL _2 flipped x, TR _1 flipped x, BL _1 flipped y, BR _2 flipped y; contents (32, 100) 256 x 46; J2DWindow.cpp 170), the text box
+  'text' (-124, -88) 257 x 186 (the system font at 20 x 26, char space -1, line space 32, bound centre / top), seven ruled lines 'li_1..7'
+  (message_board_0, 256 x 3, alpha 60, 32 apart from -91) and the mark group 'cu_1' at (0, 142) ('cr_1' the blue ring, 'cc_1' the 18 x 18
+  more-pages arrow, 'cs_1' the 16 x 16 last-page dot).
+- The flow (Talk2D2.cpp 796-942, 1138-1226; BoundPane.cpp): openBoardWindow arms a TBoundPane slide from 80 below to the park over 25 steps
+  (a quadratic Bezier with the control at the start; update() runs once idle before the arming, so 26 updates then the clamp), then shows the
+  mark group at alpha 0; moveBoardWindow fades the group in 4 a tick and, at 255, zeroes the arrow and the dot and pulses the one for this
+  page (arrow: more pages; dot: the last) 4 a tick between 0 and 255; checkBoardControler: A or B on a page with more to come -> eraseBoardWindow
+  (the text 4 a tick down; at < 0 the next page is laid) -> appearBoardBoxWindow (4 a tick up to 255); on the last page A or B -> closeTalkWindow
+  at once (the camera back, every NPC's npcTalkOut) while the pane slides 600 up over 60 steps. setupBoardTextBox: up to six lines a page, every
+  0x1A tag skipped. Quirk kept: after a flip to the last page the arrow stays at the alpha the flip left it while the dot pulses -- nothing hides it.
+
+### Ported
+- `SmsTalkBalloon`: the board branch of TTalk2D2 1:1 -- the `Board` pane (hidden unless the talk's NPC is a board) with `Back`
+  (`tex/talk_board_x4.png`: the two corner textures composed as J2DWindow::draw_private does, sharpened x4 like the balloon's), `Rule1..7`
+  (`talk_board_rule_x4.png`), `Text` (J2DPrint's centred layout, integer x = (257 - round(width)) / 2, the first baseline at 26, 32 a line)
+  and `Mark` (`Base` / `Arrow` / `Dot`); `BoardOffset` (the TBoundPane port: `BoundSet` / `BoundUpdate`), the states Opening / Open / Closing /
+  Erasing / Appearing on the board path, `LayoutBoardPages` (six lines a page, tags dropped, a wider line broken by words when `AutoWrap`),
+  `BoardLineWidth` (the font's kern + advance at 20 / Width, char space -1); `TickCount` (the balloon's 120 Hz ticks since it opened, for
+  tests). `TalkBalloon.tscn` carries the pane.
+- `SmsNpcProfile.Kind.Board` / `IsBoard`; `SmsNpc`: a board's tick is `TickBoard` (movementOnlyTalk_: the forbid counts, the talk accept, the
+  spine -- no Move, no pollution, no effects, no water, no trample), the sit-talk cone for a board; `Profiles/Board.tres` (the prm heights; no
+  clips, no shadow, no reactions); `SignBoard.tscn` -- an `SmsNpc` on it with collision layer / mask 0 and a disabled 80 x 160 capsule as the
+  talk-cylinder gizmo; two sample pages sized to the game's box (the longest line 'Gateway to Isle Delfino,' = 252 of 257).
+- Textures from his disc: game_6/timg/message_board_{0,1,2}.bti (bti2png, raw intensity -> alpha); `pin_talk103.py` pins them lossless.
+- OUTFITS.md 7d "Signs": how to place one, the cone, the six-line pages, the tags dropped, the knobs that still apply.
+
+### Verified (drive 103, SmsF103, 21/21; drives 102 20/20, 101 11/11, 87 16/16 re-run; build 0 errors; boot ALL OK, zero ERROR / SHADER, empty err)
+S1-S3 the scene (kind, no model, no collision, the cylinder, two pages), the pane's nodes and geometry to the blo, the line width (252 / 571 for
+30 W); C1-C4 the 100-degree cone (behind: no; 70 off: no; 40 off: talkable, the director's cursor on it) and the hose refused; T1 B opens the
+board mode with the root hidden and TALK_A; O1-O3 the slide (0 on the arming tick, 80 -> 0 monotonic, 27 ticks), the park at (296, 223) / -10
+deg, six lines up at 255 (the 4th empty); M1-M3 the mark group 0 -> 255 in 62 ticks, the arrow pulsing 3..252 with the dot at 0, the root
+never shown; N1 the sign never turned or moved; P1-P2 the erase (255 -> 3 in 63, 0 on the flip) and appear (63) with page 1's three lines,
+the dot pulsing and the arrow frozen at 167; X1-X3 the close: the camera back on the first Closing frame, the pane -600 after 61 updates, the
+sign's talk forbidden while it slides, Mario freed in WAIT, talkable again after the forbid, the root back for the next NPC. Headless cannot
+draw the plank -- his eye.
+
+### Found by the drive, fixed before the commit
+- My sample sign text was wider than the game's box (a 28-char line = 308 of 257): the sample was shortened, not the box.
+- The drive's talk spot lay on his Level's goop quads: Mario stood in OIL_RUN and the director (SmsCanStartTalk wants WAIT) rightly refused the
+  talk -- the drive now sets the sign on the floor it finds by a ray and cleans the paint there (SmsPollutionMap.Clean at the FLOOR height:
+  a stamp at his spawn height missed the +-2 x 40-unit depth mask). The mechanics were right; the test was not.
+- The drive first counted the fades in physics frames (60 Hz) and read them as half the game's ticks; it now reads the balloon's own
+  `TickCount` (120 Hz).
+
+### Deviations / not ported
+A wider line is broken by words (J2DPrint breaks by glyph); the SY_SELECT_COMMON / SY_2D_OUT sounds are the balloon's existing slots; the
+message comes from the NPC's `Lines` (the game's from the stage's message data); TALK_C / D / E (the sunflowers' and one Pianta's cameras) are
+not the sign's and stay unported.
+
+### Legacy
+`Font/HudElements/SignPopup.{cs,tscn}` (his generic banner: "the 'Collect 8 red coins' style popup used by SMS for switches, secret-course
+rules, and readable signs") is SUPERSEDED FOR READABLE SIGNS by `SignBoard.tscn` -- a sign now talks through the game's board window. It is
+not removed: `RedCoinSwitch.cs` (`SignPopupScene`), `secrect_level.tscn` and `Rico4Secret.tscn` keep it for the switch's message (the game
+shows that one through the talk system by stage script -- a later pass, not this one).

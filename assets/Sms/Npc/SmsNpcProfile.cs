@@ -10,7 +10,9 @@ using Godot;
 [Tool, GlobalClass]   // [Tool] (pass 91): a [Tool] SmsNpc exports this type; a non-tool C# Resource is only a placeholder in the editor
 public partial class SmsNpcProfile : Resource
 {
-    public enum NpcKind { PiantaMale, PiantaFemale, Toad, Other }
+    /// <summary>Board (pass 103) = ACTOR_TYPE_NPC_BOARD: the sign's invisible talk point -- no model, no hit, no water, no turn; its talk opens
+    /// the board window (message_board_1.blo) instead of the balloon. Place a SignBoard.tscn in front of your sign mesh, facing out.</summary>
+    public enum NpcKind { PiantaMale, PiantaFemale, Toad, Other, Board }
 
     [ExportGroup("Type")]
     [Export] public NpcKind Kind = NpcKind.PiantaMale;
@@ -192,6 +194,7 @@ public partial class SmsNpcProfile : Resource
     public enum WaterHitMarkPlace { Feet, Drop, Fire }
     /// <summary>The Toads' drips have no foot emitters and getEffectScale_ is 1 for them (a Pianta's effects scale with its node).</summary>
     public bool IsToad => Kind == NpcKind.Toad;
+    public bool IsBoard => Kind == NpcKind.Board;
 
     public static Color S10(Vector3 v) => new Color(v.X / 255f, v.Y / 255f, v.Z / 255f, 1f);
 }

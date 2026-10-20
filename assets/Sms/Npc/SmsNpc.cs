@@ -32,7 +32,8 @@ using System.Collections.Generic;
 ///    (-1 = random), the model's materials are replaced per instance, the scene's DirectionalLight3D is the sun.
 /// NOT ported (logged): sounds (slots below), the special Pianta kinds' own animation sets (moma_..momd_), trampleExec's
 /// PARTICLE_MS_FUMI_B / C at half scale (no stomp dust is baked yet). Since pass 82 the pollution (dirty / sink / wash), the throw
-/// (TNpcThrow), the talk window with its camera, the blinks (pass 101) and the worried kind + the choice window (pass 102) are in.</summary>
+/// (TNpcThrow), the talk window with its camera, the blinks (pass 101), the worried kind + the choice window (pass 102) and the sign's
+/// board kind + board window (pass 103: Profile.Kind == Board, SignBoard.tscn) are in.</summary>
 [Tool]
 public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
 {
@@ -307,6 +308,15 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         _pollution = Profile.SinksInPollution ? Mathf.Clamp(Pollution, 0f, 1f) : 0f;      // NpcInitPrg.cpp 379: the placement's B / 255
         _sinkPoll = (_sinkPollStagger++ % SmsParams.Npc.SinkPollFrames) * SmsUnits.TicksPerFrame;   // initSinkNpc_: each NPC polls on its own frame
         ExceptMario();
+        if (Profile.IsBoard)
+        {
+            CollisionLayer = 0; CollisionMask = 0;                           // pass 103: the board NPC is a talk point only (performOnlyDraw: no bind, no hit)
+            SetupCursor();
+            _stack.Clear();
+            Enter(Nerve.WaitMarioApproach);                                  // NpcInitPrg.cpp 163: mSpine->initWith(TNerveNPCWaitMarioApproach), mTurnSpeed 0
+            if (DebugPrint) GD.Print($"[SMS npc] {Name}: Board (the sign's talk point), {Lines?.Length ?? 0} page(s)");
+            return;
+        }
         SetupLook();
         SetupOutfit();
         SetupParts();
@@ -1020,9 +1030,12 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
             Tick();
             if (_holder != null) { TickHeld(); return; }               // taken inside the frame: the held path owns the rest of it
         }
-        Move();
-        UpdatePollutionUniform();
-        TickEffects();                                                   // pass 95: emitParticle_ (CUE_CALC_ANIM: once a drawn frame)
+        if (!Profile.IsBoard)                                            // pass 103: a board's perform is movementOnlyTalk_ + performOnlyDraw (NpcBase.cpp 642)
+        {
+            Move();
+            UpdatePollutionUniform();
+            TickEffects();                                               // pass 95: emitParticle_ (CUE_CALC_ANIM: once a drawn frame)
+        }
         // TTalkCursor::associateNPC: the director's cursor sits on the NPC it found this frame (none while he walks: findNearestTalkNPC wants WAIT)
         if (_cursor != null) _cursor.Visible = !_talking && _mario != null && _mario.SmsTalkTargetNpc == this;
     }
@@ -1032,6 +1045,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     {
         if (_talkForbid > 0) _talkForbid--;
         if (_walkForbid > 0) _walkForbid--;
+        if (Profile.IsBoard) { TickBoard(); return; }                   // pass 103: movementOnlyTalk_ (NpcBase.cpp 615): updateForbidCount_, control, changeNerveProc_
         if (_noCollisionTicks > 0 && --_noCollisionTicks == 0) SetCollisionOff(false);   // unk1DC ran out: the hit filter back on
         UpdateTrample();
         if (!_collisionOff && _mario != null && !_mario.SmsIsTalking) HitCheckMario();   // HIT_FILTER_NO_COLLISION / READ_BILLBOARD (FLAG_UNK1000): no hit pairs
@@ -1422,6 +1436,21 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     }
 
     // ------------------------------------------------------------------ talk
+    /// <summary>The board NPC's tick (pass 103): TBaseNPC::movementOnlyTalk_ -- the forbid counters, the talk accept, the spine. Its spine only
+    /// ever holds WaitMarioApproach and the Talk the director pushes (NpcInitPrg.cpp 163; turn speed 0, so TNerveNPCWaitMarioApproach's turn
+    /// never moves it); a board neither walks, turns, sinks, burns nor reacts to water or a stomp.</summary>
+    private void TickBoard()
+    {
+        TalkCheck();
+        _nerveTime++;
+        switch (_cur)
+        {
+            case Nerve.Talk: _marchSpeed = 0f; if (!_talking) TalkOut(); break;   // npcTalking without the turn (isTurnToMarioWhenTalk is false for a board)
+            case Nerve.WaitMarioApproach: break;
+            default: Enter(Nerve.WaitMarioApproach); break;
+        }
+    }
+
     /// <summary>changeNerveProc_'s accept test (+ findNearestTalkNPC's Mario conditions): sets LIVE_FLAG_UNK20000 "talkable".</summary>
     private void TalkCheck()
     {
@@ -1430,7 +1459,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (can)
         {
             Vector3 m = MarioU(), p = PosU();
-            float degree = Sitting ? SmsParams.Npc.SitTalkAcceptDegree : SmsParams.Npc.TalkAcceptDegree;
+            float degree = Sitting || Profile.IsBoard ? SmsParams.Npc.SitTalkAcceptDegree : SmsParams.Npc.TalkAcceptDegree;   // NpcBase.hpp 372: sitting, a sunflower or a BOARD takes the sit-talk cone (100 deg: Mario in front of the sign)
             float dist = ThrowsMario ? SmsParams.Npc.ThrowTalkAcceptDist : SmsParams.Npc.TalkAcceptDist;        // mThrowCtrl: 200 / 150 (changeNerveProc_ 481)
             float height = ThrowsMario ? SmsParams.Npc.ThrowTalkAcceptHeight : SmsParams.Npc.TalkAcceptHeight;
             can = Mathf.Abs(m.Y - p.Y) < height
@@ -1647,7 +1676,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// <summary>HIT_MESSAGE_SPRAYED_BY_WATER from a drop (SmsWaterDrops) or the hose at close range. True = the drop is taken (TBaseNPC::receiveMessage
     /// returns true for the spray: TModelWaterManager::move() 429 then kills the drop); false while HIT_FILTER_NO_COLLISION (held / just released: no
     /// hit pairs in the game, so the drop flies on -- here it lands).</summary>
-    public bool SmsSprayedByWater(Vector3 hitPos) { if (_collisionOff) return false; Sprayed(hitPos); return true; }
+    public bool SmsSprayedByWater(Vector3 hitPos) { if (_collisionOff || Profile.IsBoard) return false; Sprayed(hitPos); return true; }   // a board: isBehaveToWaterNpc false (NpcBase.cpp 331) -- the drop flies on
 
     /// <summary>behaveToHitObject_(WATER_SPRAY): isNerveCanGoToWet (not already wet, not in a talk's first 4 ticks) -> pushNerve(Wet).</summary>
     private void Sprayed(Vector3? hitPos = null)
