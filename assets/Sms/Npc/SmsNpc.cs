@@ -153,6 +153,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     public const string PollutionMaskPath = "res://assets/Sms/Npc/tex/H_ma_polmask_sample.png";
     public const string GoopPath = "res://assets/Sms/Npc/tex/H_ma_rak.png";
     public const string LeafShaderPath = "res://assets/Sms/Npc/NpcLeaf.gdshader";                    // pass 95: _leafback_mat's TEV
+    public const string PartShaderPath = "res://assets/Sms/Npc/NpcPart.gdshader";                    // pass 104: the sign's one-stage TEV rides the part shader
     public const string LeafTexMalePath = "res://assets/Sms/Npc/tex/I_mom_mino_rgba.png";          // Delfino's /scene/monteMCommon/I_mom_mino_rgba.bti
     public const string LeafTexFemalePath = "res://assets/Sms/Npc/tex/I_mow_mino_rgba.png";
     public const string BurnLuggagePath = "res://assets/Sms/Npc/Parts/Pianta/Luggage.tscn";             // pass 99: Profile.BurnLuggagePart's default
@@ -311,10 +312,11 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (Profile.IsBoard)
         {
             CollisionLayer = 0; CollisionMask = 0;                           // pass 103: the board NPC is a talk point only (performOnlyDraw: no bind, no hit)
+            SetupBoardLook();                                                // pass 104: boardNpc.bmd -- the sign IS the NPC's model
             SetupCursor();
             _stack.Clear();
             Enter(Nerve.WaitMarioApproach);                                  // NpcInitPrg.cpp 163: mSpine->initWith(TNerveNPCWaitMarioApproach), mTurnSpeed 0
-            if (DebugPrint) GD.Print($"[SMS npc] {Name}: Board (the sign's talk point), {Lines?.Length ?? 0} page(s)");
+            if (DebugPrint) GD.Print($"[SMS npc] {Name}: Board (the sign: boardNpc.bmd + the talk point), {Lines?.Length ?? 0} page(s), model {(_model != null)}");
             return;
         }
         SetupLook();
@@ -580,6 +582,46 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         _polDirty = true;
         UpdatePollutionUniform();
     }
+
+    /// <summary>Pass 104: the board NPC's model is the SIGN -- boardNpc.bmd (TBoardNpcManager::createModelData, NpcManager.cpp 61; drawn by
+    /// TLiveActor::performOnlyDraw, NpcBase.cpp 649; pass 103's "no model" was wrong). One material '_mat_boradNpc', one TEV stage TEXC x RASC
+    /// over chan0 (lit: matSrc VTX, ambColor0 128, light 0 = the sun) -- the part shader's 'arrows' form (s0_form 1: RASC alone) times the
+    /// texture (s1_form 2), the vertex colour as the material colour. The texture is the glb's K_boardNpc_US (checked against the bmd's TEX1)
+    /// unless the profile's BodyMaterialTexture is set; an empty Profile.BodyMaterial dresses every material of the model.</summary>
+    private void SetupBoardLook()
+    {
+        if (_model == null) return;
+        var part = GD.Load<Shader>(PartShaderPath);
+        var toon = ToonTexture ?? GD.Load<Texture2D>(ToonPath);
+        var sun = FindSun(GetTree().CurrentScene);
+        _matByName.Clear();
+        foreach (var mi in AllMeshes(_model))
+        {
+            int n = mi.GetSurfaceOverrideMaterialCount();
+            for (int s = 0; s < n; s++)
+            {
+                var src = mi.Mesh?.SurfaceGetMaterial(s);
+                string name = src?.ResourceName ?? "";
+                if (!string.IsNullOrEmpty(Profile.BodyMaterial) && name != Profile.BodyMaterial) continue;
+                Texture2D tex = Profile.BodyMaterialTexture ?? (src as BaseMaterial3D)?.AlbedoTexture;
+                var m = new ShaderMaterial { Shader = part };
+                m.SetShaderParameter("s0_form", 1);                              // stage 0: the lit vertex colour alone (RASC)
+                m.SetShaderParameter("s1_form", 2);                              // stage 1: prev x TEXC
+                m.SetShaderParameter("use_vertex_color", true);                  // chan0 matSrc VTX
+                m.SetShaderParameter("ambient", new Vector3(128f, 128f, 128f) / 255f);   // ambColor0
+                m.SetShaderParameter("has_tex", tex != null);
+                if (tex != null) m.SetShaderParameter("base_tex", tex);
+                m.SetShaderParameter("toon_tex", toon);                          // sampled by the shader, unused by form 1
+                SetSun(m, sun);
+                _matByName[name] = m;
+                mi.SetSurfaceOverrideMaterial(s, m);
+            }
+        }
+    }
+
+    /// <summary>The sign's material texture (pass 104's drive).</summary>
+    public string BoardTextureName => MaterialTextureName(Profile != null && !string.IsNullOrEmpty(Profile.BodyMaterial) ? Profile.BodyMaterial : "_mat_boradNpc", "base_tex");
+    public ShaderMaterial MaterialByName(string name) => _matByName.TryGetValue(name, out var m) ? m : null;
 
     /// <summary>GX_KCOLOR0.a = mPollutionAmount x mPollutionMax (NpcBase.cpp 718, an 8-bit register): the skin shader's compare value.</summary>
     private void UpdatePollutionUniform()

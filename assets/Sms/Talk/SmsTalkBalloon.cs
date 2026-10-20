@@ -87,6 +87,10 @@ public partial class SmsTalkBalloon : CanvasLayer
     public const float BoardTextBoxW = 257f, BoardTextBoxH = 186f, BoardFontW = 20f, BoardFontH = 26f, BoardCharSpace = -1f, BoardLineSpace = 32f;
     public const int BoardMaxLines = 6;                                                // setupBoardTextBox: lineIdx < 6
     public const int BoardOpenTicks = 25, BoardCloseTicks = 60, BoardFadeStep = 4;    // setPanePosition(0x19 ..) / (60 ..); the 4-a-tick fades
+    /// <summary>DEVIATION (Jaysonn, 10-19: "speed up the page fade"): the text's fade on a page flip, per 120 Hz tick. The game's
+    /// eraseBoardWindow / appearBoardBoxWindow step 4 (64 ticks = 0.53 s each way); 8 halves that. The mark group's fade-in and the arrow /
+    /// dot pulse keep the game's 4 (BoardFadeStep).</summary>
+    [Export(PropertyHint.Range, "1,64,1")] public int BoardPageFadeStep = 8;
     public static readonly Vector2 BoardOpenFrom = new(0f, 80f), BoardCloseTo = new(0f, -600f);
     public const float ChoiceRotJ2D = -18f;
     public static readonly Vector2 ChoiceTextBox = new(-13f, -17f);                  // bac4 + slct, in the pane
@@ -300,7 +304,7 @@ public partial class SmsTalkBalloon : CanvasLayer
         _tickAccum = 0f; _frameAccum = 0f; TickCount = 0;
         if (_board) SetupBoardPage(); else SetupPage();                     // setMessageID's setupTextBox: the layout is ready before the roll-out
         if (_root != null) _root.Visible = !_board;                         // unk28: the draw is unk10 (the board screen) or unk2C (the balloon's)
-        if (_boardPane != null) _boardPane.Visible = _board;
+        if (_boardPane != null) _boardPane.Visible = false;                 // pass 104: unk10 is drawn from state 4 (Opening) on (perform's CUE_DRAW switch, states 4-7) -- nothing through WaitCamera / Pause; pass 103 showed it PARKED there, then it jumped 80 below and slid ("it just appears, then slides in")
         if (_board && _boardMark != null) { _boardMark.Visible = false; _boardMark.Modulate = new Color(1f, 1f, 1f, 0f); }
         State = TalkState.WaitCamera;
         UpdateRootTransform();
@@ -429,7 +433,8 @@ public partial class SmsTalkBalloon : CanvasLayer
     }
 
     /// <summary>openBoardWindow: case 0 arms the slide from 80 below (the pane's update is idle, so this is the first tick); case 1 waits for it,
-    /// then shows the mark group at alpha 0.</summary>
+    /// then shows the mark group at alpha 0. The pane itself shows on case 1's first update (pass 104): the game draws the board screen from
+    /// this state on, never during the camera wait and the pause.</summary>
     private bool OpenBoardWindow()
     {
         switch (_boardStep)
@@ -438,7 +443,10 @@ public partial class SmsTalkBalloon : CanvasLayer
                 if (BoundUpdate()) { BoundSet(BoardOpenTicks, BoardOpenFrom, BoardOpenFrom, Vector2.Zero); _boardStep = 1; }
                 break;
             case 1:
-                if (BoundUpdate())
+            {
+                bool done = BoundUpdate();                                    // the first update puts the pane at the slide's start (80 below)
+                if (_boardPane != null && !_boardPane.Visible) { _boardPane.Visible = true; UpdateRootTransform(); }   // pass 104: shown here, never parked before the slide
+                if (done)
                 {
                     _boardMarkAlpha = 0;
                     if (_boardMark != null) { _boardMark.Visible = true; _boardMark.Modulate = new Color(1f, 1f, 1f, 0f); }
@@ -446,6 +454,7 @@ public partial class SmsTalkBalloon : CanvasLayer
                     return true;
                 }
                 break;
+            }
         }
         return false;
     }
@@ -480,7 +489,7 @@ public partial class SmsTalkBalloon : CanvasLayer
     /// <summary>eraseBoardWindow: the text fades 4 a tick; under 0 the next page is laid (setupTextBox) with the text at 0.</summary>
     private bool EraseBoardWindow()
     {
-        _boardTextAlpha -= BoardFadeStep;
+        _boardTextAlpha -= Mathf.Max(1, BoardPageFadeStep);                   // the game: BoardFadeStep (4); pass 104's knob
         if (_boardTextAlpha >= 0) return false;
         _boardTextAlpha = 0;
         _page++;
@@ -491,7 +500,7 @@ public partial class SmsTalkBalloon : CanvasLayer
     /// <summary>appearBoardBoxWindow: the text fades back 4 a tick to 255.</summary>
     private bool AppearBoardBoxWindow()
     {
-        _boardTextAlpha += BoardFadeStep;
+        _boardTextAlpha += Mathf.Max(1, BoardPageFadeStep);                   // the game: BoardFadeStep (4); pass 104's knob
         if (_boardTextAlpha <= 255) return false;
         _boardTextAlpha = 255;
         return true;

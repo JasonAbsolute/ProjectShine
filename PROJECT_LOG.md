@@ -6041,3 +6041,51 @@ not the sign's and stay unported.
 rules, and readable signs") is SUPERSEDED FOR READABLE SIGNS by `SignBoard.tscn` -- a sign now talks through the game's board window. It is
 not removed: `RedCoinSwitch.cs` (`SignPopupScene`), `secrect_level.tscn` and `Rico4Secret.tscn` keep it for the switch's message (the game
 shows that one through the talk system by stage script -- a later pass, not this one).
+
+## SMS pass 104 -- the sign's model, the board window hidden until its slide, the page fade knob
+
+Jaysonn (10-19 21:22, after pass 103): "the sign when reading the second time it will just appear then play the animation of it sliding
+into frame"; "where is the sign model?"; "can we speed up the page fade? make it faster".
+
+### The game
+- The board NPC HAS a model, and it is the sign: `TBoardNpcManager::createModelData` (NpcManager.cpp 61-70) loads `boardNpc.bmd`, the
+  NPC's init makes its MActor from it (NpcInitPrg.cpp 145-147) and `TLiveActor::performOnlyDraw` draws it (NpcBase.cpp 649). Pass 103's
+  "the sign is a separate mesh + an invisible NPC" was WRONG -- corrected here (PROJECT_LOG 103, OUTFITS.md 7d). On his disc:
+  `scene/<stage>/boardnpc/boardnpc.bmd` in every stage with a sign; one material `_mat_boradNpc` (the bmd's own spelling), one texture
+  `K_boardNpc_US` (CMPR 64 x 64: wood grain, the Pianta-script glyphs), ONE TEV stage TEXC x RASC (alpha TEXA x RASA) over chan0 lit
+  (matSrc VTX, ambColor0 128, lightMask 0x01 = the sun), cull back, opaque. 164 vertices: x +-77, y -17.8 .. 180.1, z -7.2 .. 28 units
+  (2.4 m tall); the printed face is the model's +Z side, the back plain wood. `npcBoard.prm` mCircleShadowSize 60 (requestShadow; the NPC
+  circle shadow is not ported). Its hit actor is HIT_FILTER_NO_ATTACK and its perform skips the hit checks: the game's board does not push
+  Mario -- a solid post, where there is one, is the stage's collision.
+- `TTalk2D2::perform` CUE_DRAW (Talk2D2.cpp 1350-1365) draws the board screen (unk10) in states 4-7 only: nothing is drawn through
+  STATE_UNK2 / 3 (the camera wait and the 20-frame pause). (The switch also omits STATE_UNK8, the appear fade; Talk2D2.cpp is NonMatching
+  in the decomp -- the port keeps drawing the plank through the fade.)
+- eraseBoardWindow / appearBoardBoxWindow step the text alpha 4 a tick: 64 ticks (0.53 s) each way.
+
+### Ported
+- `SignBoard.tscn`: the `Model` child = `models/NPC/SignBoard/boardnpc.glb` (FinModelUtility's export; its texture equals the bmd's TEX1
+  within CMPR decode rounding -- max 14 / 255, tex_compare.py) at the NPC transform (1 / 74.44, turned 180 so the printed +Z face is the
+  node's -Z = the talk cone's side). `SmsNpc.SetupBoardLook`: the one material on `NpcPart.gdshader` in the bmd's form -- s0_form 1 (RASC
+  alone), s1_form 2 (x TEXC), the vertex colour, ambient 128, the scene sun; `Profile.BodyMaterialTexture` overrides the texture, an empty
+  `Profile.BodyMaterial` dresses every material. `Board.tres`: `BodyMaterial = "_mat_boradNpc"`, `CircleShadowSize = 60` (the prm's).
+  `sign_imports.py` strips the glb's inherited import defaults (11.67 MB -> 1.2 KB) and pins the texture lossless.
+- `SmsTalkBalloon`: the Board pane is hidden from `Open()` through WaitCamera / Pause and shown on openBoardWindow case 1's first update
+  (the pane then at the slide's start, 80 below). Pass 103 showed it from `Open()` -- PARKED, at offset 0 -- for the camera's settle plus
+  the 0.67 s pause, then case 1 jumped it 80 below and slid it up: "it just appears, then slides in", on every read (more visible on the
+  second, when the eye is no longer on the camera move).
+- `SmsTalkBalloon.BoardPageFadeStep` (export, default 8): the page flip's text fade per tick. DEVIATION at his ask -- the game's 4 (the
+  const `BoardFadeStep`, still used by the mark group's fade-in and the arrow / dot pulse). 8 = 0.27 s each way. OUTFITS.md 7d rewritten.
+
+### Verified (drive 104, SmsF104, 23/23; drives 102 20/20, 101 11/11, 87 16/16 re-run; build 0 errors; boot ALL OK, zero ERROR / SHADER, empty err)
+Drive 103's 21 checks carried over, with S1 flipped (the model present) and T1 flipped (the pane NOT shown during WaitCamera / Pause), plus
+S1b: '_mat_boradNpc' is the model's one material, on NpcPart.gdshader with s0_form 1 / s1_form 2 / vertex colour / ambient 128, textured
+with boardnpc.png, the model 2.4 m tall and 2.1 m wide with its slab on the node's -Z side; O0: the pane never showed before Opening and
+its first visible frame had it at 80 below; P1 reads the knob (8 a tick: ~32 ticks each way). Drive 103 is superseded by 104 (its S1 / T1
+expect the pass-103 state). Headless cannot see the board's look -- the wood, the glyphs, the lighting are his.
+
+### Deviations / not ported
+BoardPageFadeStep 8 (the game: 4). The NPC circle shadow (60 u) is not drawn. The appear-fade draw question (STATE_UNK8) is left as the port
+has it. No collision on the sign (the game's NPC has none either).
+
+### Legacy
+None retired beyond pass 103's note: `Font/HudElements/SignPopup` stays superseded for readable signs, kept for the red coin switch.
