@@ -2452,20 +2452,33 @@ public partial class Mario : CharacterBody3D
             goto EndFrame;
         }
 
-        if (stateOfMario == MarioState.stomping)
+        if (stateOfMario == MarioState.stomping && UseSmsPhysics)
         {
+            // trample() (MarioJump.cpp 773) = jumpingCommonEvents() + jumpingBasic(MARIO_STATUS_SEC_JUMP_SLIP, the step anim, 3): the SAME
+            // air as a jump -- doJumping's stick control and the 1.0 / tick gravity (SmsAirTick below), the B dive / R hover / L hip drop /
+            // spin of the airborne branch, the landing into SEC_JUMP_SLIP (the dispatcher after the move). So the frame falls THROUGH (pass
+            // 105). Before, the legacy block below ran for the SMS stomp too: ApplyAirControl(AIR_SINGLE)'s 8.9 m/s cap hauled a 10.3 m/s
+            // bounce down in 0.16 s and its drag took a neutral stick to 0 in 1.2 s -- "I lose momentum when jumping on people" (Jaysonn).
+            // A frame still standing on what he stomped (the nozzle box's lid; the bounce has vy > 0) only moves: the grounded branch must
+            // not touch the launch, and a stomp that has come down lands through the dispatcher (SmsStateSteers has the state).
+            if (IsOnFloor())
+                goto EndFrame;
+        }
+        else if (stateOfMario == MarioState.stomping)
+        {
+            // LEGACY (his): the stomp's own air -- AIR_SINGLE control, the legacy gravity, its own landing
             if (!IsOnFloor())
                 velocity += GRAVITY * (float)delta;
 
             // Run spin input detection so it works during stomp
             Vector2 stompStick = Input.GetVector("Lstick_left", "Lstick_right", "Lstick_up", "Lstick_down");
-            UpdateSpinInput(UseSmsPhysics ? SmsStick.PadStick(stompStick) : stompStick);
+            UpdateSpinInput(stompStick);
             if (spinBuffer > 0)
                 spinBuffer--;
             spinInput = (spinBuffer > 0);
 
             // Spin jump cancels stomp and resets chain
-            if ((UseSmsPhysics ? SmsAirSpinDetected() : spinInput) && CanStartSpinInAir())
+            if (spinInput && CanStartSpinInAir())
             {
                 _stompChain = 0;
                 StartSpinJumpFromAir();
@@ -4355,6 +4368,7 @@ public partial class Mario : CharacterBody3D
                         stateOfMario == MarioState.singleJump
                         || stateOfMario == MarioState.doubleJump
                         || stateOfMario == MarioState.tripleJump
+                        || (UseSmsPhysics && stateOfMario == MarioState.stomping) // pass 105: trample() runs jumpingCommonEvents -> checkBackTrig: B dives out of a stomp bounce
                     )
                     {
                         stateOfMario = MarioState.diving;
@@ -4782,7 +4796,7 @@ public partial class Mario : CharacterBody3D
             || stateOfMario == MarioState.dead // loserExec(): the game-over status is final -- a lethal hit taken on the landing frame (the re-burn of a hot floor he lands back in) must not land him as idle (pass 55 fix)
             || stateOfMario == MarioState.swimming
             || stateOfMario == MarioState.bonk
-            || stateOfMario == MarioState.stomping
+            || (stateOfMario == MarioState.stomping && !UseSmsPhysics) // pass 105: the SMS trample lands like a jump (jumpingBasic -> SEC_JUMP_SLIP); the legacy block lands its own
             || stateOfMario == MarioState.groundPoundStartup
             || stateOfMario == MarioState.groundPoundFalling
             || stateOfMario == MarioState.groundPoundLanding
@@ -4978,6 +4992,7 @@ public partial class Mario : CharacterBody3D
                 // trample() lands in SEC_JUMP_SLIP: a triple is available after a stomp bounce (needs fwd >= 25).
                 jumpChainStage = 2;
                 jumpChainTimer = JumpChainWindowFrames;
+                _stompChain = 0;                                            // the landing anim replaces the step: the next trample is STEP1
             }
             else
             {
@@ -11093,7 +11108,8 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>TMario::hitNpc (MarioCheckCol.cpp 95) + trampleExec (MarioCollision.cpp 136), from the NPC's hit check: a JUMPING-type status
     /// (airborne here), not the hip drop, mVel.y < 0, his feet above the NPC's, isBeTrampledNpc (the caller) and not a dive -> HIT_MESSAGE_TRAMPLE:
-    /// MARIO_STATUS_TRAMPLE with ma_step1 / 2 / 3 (StompBounce). Not baked: PARTICLE_MS_FUMI_B / C at half scale, MSD_SE_MA_KICK_ENEMY.</summary>
+    /// MARIO_STATUS_TRAMPLE with ma_step1 / 2 / 3 (StompBounce: the launch, the chain, the broad jump's BACK_JUMP -- pass 105). Not baked:
+    /// PARTICLE_MS_FUMI_B / C at half scale, MSD_SE_MA_KICK_ENEMY.</summary>
     public bool SmsHitNpcTrample(Vector3 npcPosU)
     {
         if (!UseSmsPhysics || IsOnFloor() || velocity.Y >= 0f)
@@ -11218,30 +11234,52 @@ public partial class Mario : CharacterBody3D
         }
     }
 
+    /// <summary>TMario::trampleExec (MarioCollision.cpp 146-163), the bounce half -- an NPC's or enemy's trample and the nozzle box's
+    /// receiveMessage(TRAMPLE) both end here (pass 105). A BROAD_JUMP (the turbo's) is sent to MARIO_STATUS_BACK_JUMP instead: the
+    /// backflip's launch (BackJumpForce -18 / BackJumpForceY 70), no step. Else the step anim escalates -- ANIM_STEP1 -> STEP2, STEP2 /
+    /// STEP3 -> STEP3, anything else -> STEP1: the chain lives in the ANIMATION, which only the TRAMPLE status keeps (trample() re-sets
+    /// mAnimationId every tick), so a dive, a hover or a landing in between starts over at STEP1 -- then setStatusToJumping(TRAMPLE):
+    /// mVel.y = 0.25 * mForwardVel + TramplePowStep1 / 2 / 3 (mario.prm 35 / 45 / 70), mForwardVel *= 0.8 (SmsAir.Launch.Trample1..3,
+    /// through SmsLaunch: the face latch, the fall cancel -- TRAMPLE carries FLAG_UNK2000000 -- the paint stamp). It runs TWICE on the
+    /// first stomp of a chain: changePlayerStatus(TRAMPLE) runs it for a TYPE_JUMPING status (MarioMove.cpp changePlayerStatus) and
+    /// trampleExec calls it again explicitly; a stomp while already in TRAMPLE (changePlayerStatus returns 0 for the same status) runs it
+    /// once. So the first stomp keeps 0.64 of the run and leaves at 0.2 fwd + step; the next ones keep 0.8. (MarioCollision.cpp is
+    /// NonMatching in the decomp; the two calls are in its code as written.)</summary>
     public void StompBounce()
     {
-        _stompChain++;
-        if (_stompChain > 3)
-            _stompChain = 3;
-
-        stateOfMario = MarioState.stomping;
-        isJumping = true;
-        isSpining(false);
-
-        // Third stomp is ~2x height
-        float bounceVel = _stompChain >= 3 ? STOMP_BOUNCE_VELOCITY_TRIPLE : STOMP_BOUNCE_VELOCITY;
         if (UseSmsPhysics)
         {
-            // MARIO_STATUS_TRAMPLE: vy = 0.25*fwd + TramplePowStep (35 / 70 for the third), fwd *= 0.8
-            float fwdSms = SmsUnits.MpsToSpeed(new Vector2(velocity.X, velocity.Z).Length());
-            float pow = _stompChain >= 3 ? SmsParams.Mario.TramplePowStep3 : SmsParams.Mario.TramplePowStep1;
-            bounceVel = SmsUnits.SpeedToMps(0.25f * fwdSms + pow);
-            velocity.X *= 0.8f;
-            velocity.Z *= 0.8f;
-            _smsTrueVyValid = false;
-            _smsNoLandFrames = 3;
+            if (_fluddBroadJump && stateOfMario == MarioState.singleJump)
+            {
+                _fluddBroadJump = false;
+                _stompChain = 0;
+                StartBackflip();                                             // changePlayerStatus(MARIO_STATUS_BACK_JUMP): the backflip's launch, no step
+                if (SmsDebugPrint) GD.Print("[SMS trample] during the broad jump: BACK_JUMP (the backflip's launch)");
+                return;
+            }
+            bool wasTrample = stateOfMario == MarioState.stomping;
+            _stompChain = wasTrample ? Math.Min(_stompChain + 1, 3) : 1;
+            stateOfMario = MarioState.stomping;
+            isJumping = true;
+            isSpining(false);
+            SmsAir.Launch kind = _stompChain >= 3 ? SmsAir.Launch.Trample3 : _stompChain == 2 ? SmsAir.Launch.Trample2 : SmsAir.Launch.Trample1;
+            SmsLaunch(kind);                                                 // setStatusToJumping(TRAMPLE) -- trampleExec's explicit call
+            if (!wasTrample)
+                SmsLaunch(kind);                                             // ... and changePlayerStatus's own, on a status change
         }
-        velocity.Y = bounceVel;
+        else
+        {
+            _stompChain++;
+            if (_stompChain > 3)
+                _stompChain = 3;
+
+            stateOfMario = MarioState.stomping;
+            isJumping = true;
+            isSpining(false);
+
+            // Third stomp is ~2x height
+            velocity.Y = _stompChain >= 3 ? STOMP_BOUNCE_VELOCITY_TRIPLE : STOMP_BOUNCE_VELOCITY;
+        }
 
         // Play the step animation
         string stepAnim = _stompChain switch

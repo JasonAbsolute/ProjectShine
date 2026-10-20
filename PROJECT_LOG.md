@@ -6089,3 +6089,64 @@ has it. No collision on the sign (the game's NPC has none either).
 
 ### Legacy
 None retired beyond pass 103's note: `Font/HudElements/SignPopup` stays superseded for readable signs, kept for the red coin switch.
+
+## SMS pass 105 -- the trample bounce keeps his momentum (NPCs, enemies, nozzle boxes)
+
+Jaysonn (10-19 22:10): "can you fix bouncing on the nozzle boxes and npcs now? it seems i lose momentum when jumping on people".
+
+### The game
+- `TMario::trampleExec` (MarioCollision.cpp 135-175): from a JUMPING-type status (not DIVE) onto an actor that takes HIT_MESSAGE_TRAMPLE.
+  A BROAD_JUMP goes to MARIO_STATUS_BACK_JUMP instead -- changePlayerStatus runs setStatusToJumping(BACK_JUMP) = the backflip's launch
+  (BackJumpForce -18 along the face, BackJumpForceY 70), no step. Else the step animation escalates (ANIM_STEP1 -> STEP2, STEP2 / STEP3 ->
+  STEP3, anything else -> STEP1), then changePlayerStatus(MARIO_STATUS_TRAMPLE) AND setStatusToJumping(MARIO_STATUS_TRAMPLE).
+- `setStatusToJumping(TRAMPLE)` (MarioMove.cpp 588-603): setPlayerJumpSpeed(0.25, TramplePowStep1 / 2 / 3 by the anim) = mVel.y = 0.25 x
+  mForwardVel + step, then mForwardVel *= 0.8. mario.prm ships 35 / 45 / 70. `changePlayerStatus` (MarioMove.cpp) returns 0 when status ==
+  mStatus and otherwise runs setStatusToJumping for a TYPE_JUMPING status (TRAMPLE = 0x2000890 has the type) -- so the FIRST stomp of a chain
+  launches TWICE (fwd x 0.64, vy = 0.2 fwd + step) and a stomp while already in TRAMPLE once (fwd x 0.8, vy = 0.25 fwd + step). The files are
+  NonMatching in the decomp; the two calls are its code as written, ported as written.
+- `TMario::trample()` (MarioJump.cpp 773): jumpingCommonEvents() -- checkBackTrig (the B dive), rocketCheck (the hover), considerJumpRotate
+  (the spin) -- then jumpingBasic(MARIO_STATUS_SEC_JUMP_SLIP, mAnimationId, 3): doJumping's stick control (fwd x 0.999 a tick, the tiny
+  accel), 1.0 / tick gravity, the ledge bit, the fall cancel (TRAMPLE carries FLAG_UNK2000000: a released A cuts the rise 0.75 a tick), the
+  landing into SEC_JUMP_SLIP (a triple is next). The SAME air as a jump; the step anim is kept, so the chain lives in the animation.
+- `TNozzleBox::receiveMessage(TRAMPLE)` (Item.cpp 1222): the box breaks and the same trampleExec bounces him -- one path for NPCs, enemies and boxes.
+- `hitNpc` / `keepDistance` (MarioCheckCol.cpp 81, MarioPhysics.cpp 27): over an NPC he is still pushed out to its damage radius (10 while he is
+  above it) + 50 each tick, the position only -- head-on over a tall Pianta with A released he hangs there until the arc clears its height; with
+  A held the full bounce clears it at once. Unchanged, the game's.
+
+### The bug
+`Mario.cs` ran the `stomping` state in an early block of its own whatever UseSmsPhysics said: his legacy ApplyAirControl(AIR_SINGLE -- a
+8.9 m/s cap hauled a 10.3 m/s bounce down in 0.16 s, a neutral stick dragged 8.9 m/s a second), the legacy gravity and its own landing. The
+SMS air path (SmsAirTick) and the landing dispatcher never saw the state. Also: the second stomp used Step1 (Step2 never played); the chain
+survived a dive or a landing; the broad jump's BACK_JUMP was missing; B could not dive out of a stomp with a stick held.
+
+### Ported
+- The early block runs for the LEGACY only. Under SMS a `stomping` frame falls through to the jump's path: SmsAirTick (doJumping + gravity),
+  the airborne branch (dive / hover / hip drop / spin / throw), the landing dispatcher (justLanded via SmsStateSteers -> EnterLanding,
+  jumpChainStage 2, the chain reset). A frame still standing on what he stomped (the box lid, vy > 0) only moves.
+- `StompBounce` (SMS): the BROAD_JUMP -> `StartBackflip()` (SmsLaunch BackJump) with the flag dropped; else the chain by the previous STATE
+  (stomping -> +1 capped at 3, anything else -> 1), `SmsLaunch(Trample1 / 2 / 3)` once, and a second time when the status changed (the
+  double launch above). SmsLaunch carries the game's setStatusToJumping side effects (the face latch, the fall cancel, the paint stamp).
+- The dispatcher: `stomping` leaves its exclusion list under SMS; the SEC_JUMP_SLIP branch resets the chain. The airborne B dive with a
+  stick held accepts `stomping` (checkBackTrig). Legacy paths untouched (`StompBounce`'s else branch, the early block).
+
+### Verified (drive 105, SmsF105, 13/13; drives 104 23/23, 102 20/20, 101 11/11, 87 16/16 re-run; build 0 errors; boot ALL OK, zero ERROR, empty err)
+L1-L6 by direct calls (no frame between): fwd 30 -> 19.2 / vy 41 (the double launch), -> 15.36 / 49.8 (Step2), -> 12.288 / 73.84, -> 9.83 /
+73.07 (STEP3 stays), another status -> 6.29 / 36.97 (STEP1 again, doubled), the broad jump -> backFlip at 18 backwards / 70, flag dropped.
+T1-T3 live: a Pianta trampled from a 30-fwd fall, 0.5 m off its axis, A held -- x0.639 on the bounce frame, then twelve frames whose XZ
+speed follows 0.999 a tick to within 0.00 % (the legacy drag is gone), vy falling 1.0 a tick, the landing through the dispatcher in a landing
+state with the triple armed and the chain reset. B1-B4: a nozzle box (NozzleBox.tscn) stomped from a 10-fwd fall -- x0.639, ten frames at
+0.999 a tick, the box broken (shape off, model hidden), the landing with the triple armed.
+
+### Found by the drive, fixed in the drive
+A jump written while Godot's floor flag was still up ran the grounded branch for a frame (WAIT, the run braked to 28): the set-up now lifts
+him one frame, then writes the jump. Dead-centre over the Pianta with A released he hung on keepDistance until a second trample -- the game's
+own rule; the test approaches 0.5 m off the axis and holds A. The port's SMS air brakes 0.999 a tick (JumpSpeedBrake) as the game does: the
+expectation is that curve, not 'unchanged'.
+
+### Deviations / not ported
+None new. Still not ported: PARTICLE_MS_FUMI_B / C at half scale on an NPC trample (FUMI_A / B / C on an enemy), MSD_SE_MA_KICK_ENEMY, the
+rumble.
+
+### Legacy
+His stomp block (`stateOfMario == MarioState.stomping`: AIR_SINGLE air control, GRAVITY, its own landing) and his STOMP_BOUNCE_VELOCITY
+launch are RETIRED under UseSmsPhysics -- SmsAirTick, the airborne branch and the landing dispatcher do the job; both stay for the legacy mode.
