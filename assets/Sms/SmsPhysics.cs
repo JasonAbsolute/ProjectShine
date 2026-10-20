@@ -375,7 +375,7 @@ public static class SmsParams
         public const float SinkJumpRateMin = 0.5f;      // the jump's vy and fwd x the same form: flat 0.5 as shipped
         public const float SinkJumpRateMax = 0.5f;
         public const float SinkRecover = 0.5f;          // a jump bleeds the depth by (1 - t) x SinkTime x this
-        public const int FootPrintTimerMax = 520;       // mFootPrintTimerMax, the code default 0x208 (not in any .prm): the footprint window
+        public const int FootPrintTimerMax = 250;       // mFootPrintTimerMax as /Mario/Mario.prm SHIPS it (TDeParams, MarioInit.cpp 466; the code default is 0x208 = 520): the footprint window -- pass 107 corrected pass 65's 520
     }
 
     public static class Dirty // /mario/dirty.prm (shipped) -- the oily goop (POLLUTION_TYPE_SLIP) and the dirt on him
@@ -386,6 +386,7 @@ public static class SmsParams
         public const float DecSwimming = 0.3f;          // mDirty off a tick in water
         public const float DecWaterHit = 0.2f;          // ... the tick he leaves water
         public const float DecRotJump = 0.5f;           // ... in a spin jump
+        public const float MeltInWaterMax = 0.7f;       // mMeltInWaterMax (/mario/marioparticle.prm, TParticleParams): the melt-in-water particle rate = mDirty x this / 255 a frame (pass 107)
         public const float BrakeStartValSlip = 1.0f;    // mOilBrake entering / in OIL_SLIP and OIL_SLOPE: no bleed on the paint
         public const float BrakeStartValRun = 0.98f;    // mOilBrake in OIL_RUN: v = 0.98 (v + 0.01 mag) -> a 15.7 u/f run at a full stick
         public const float BrakeSlipNoPollute = 0.998f; // OIL_SLIP / OIL_SLOPE briefly off the paint

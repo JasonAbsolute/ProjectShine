@@ -678,6 +678,8 @@ public partial class Mario : CharacterBody3D
     private SmsHipDropBlur _smsHipBlur;        // HipDropBlur.tscn: ms_m_blur3, the streak above the falling hip drop
     private SmsHipDropLanding _smsHipLanding;  // HipDropLanding.tscn: ms_hipdrop_a / b / c at the landing
     private SmsTrampleDust _smsTrampleDust;    // TrampleDust.tscn (pass 106): ms_fumi_a / b / c at a trample -- FUMI_B / C at half scale on an NPC, A / B / C on anything else
+    private SmsGoopMario _smsGoopFx;           // GoopMario.tscn (pass 107): his goop footprints (ms_m_ashios), the goop melting off in water (ms_m_tokeos), the spin's fling (ms_m_spinos)
+    private double _smsGaitPosPrev = -1.0;     // the gait clip's play position last tick (checkPass on the motion frame ctrl: frames 38 / 8 = the footfalls)
     private bool _smsTrampleOnNpc;             // the stomp about to launch is an NPC's (SmsHitNpcTrample): trampleExec's isHitCategory(HIT_CATEGORY_NPC)
     private SmsSuperHipDropBlur _smsSuperHipBlur;       // SuperHipDropBlur.tscn: ms_m_sphipd_a / b / c / d, the super hip drop's fall (pass 33)
     private SmsSuperHipDropLanding _smsSuperHipLanding; // SuperHipDropLanding.tscn: ms_m_sphipd_hit_a / b / c / d at its landing
@@ -2083,6 +2085,7 @@ public partial class Mario : CharacterBody3D
         if (UseSmsPhysics)
         {
             SmsTakeTick(delta);
+            SmsGoopFxTick();                                             // pass 107: the spin's goop fling follows the centre joint
             SmsRideApply(); // checkRideMovement: the actor's matrix carries him before his own move (pass 63)
             _smsTickStartPos = GlobalPosition; // mPrevPosition: the glass-wall goop's revert (pass 64)
         }
@@ -5571,6 +5574,13 @@ public partial class Mario : CharacterBody3D
             if (dustScene != null && dustScene.Instantiate() is SmsTrampleDust dust) { dust.Name = "TrampleDust"; AddChild(dust); _smsTrampleDust = dust; }
             else GD.PushWarning("[SMS fx] res://assets/Sms/Fx/TrampleDust.tscn could not be instanced: no trample dust (ms_fumi_a / b / c)");
         }
+        _smsGoopFx = SmsFluddModel.FindChild<SmsGoopMario>(this);        // pass 107: his goop footprints / melt / fling
+        if (_smsGoopFx == null && UseSmsPhysics)
+        {
+            var goopScene = GD.Load<PackedScene>("res://assets/Sms/Fx/GoopMario.tscn");
+            if (goopScene != null && goopScene.Instantiate() is SmsGoopMario goop) { goop.Name = "GoopMario"; AddChild(goop); _smsGoopFx = goop; }
+            else GD.PushWarning("[SMS fx] res://assets/Sms/Fx/GoopMario.tscn could not be instanced: no goop footprints / melt / fling (ms_m_ashios / tokeos / spinos)");
+        }
         _smsWallSlideDust?.Bind(this);
         _smsSlipSmoke?.Bind(this);
         _smsSpinBlur?.Bind(this);
@@ -5722,6 +5732,25 @@ public partial class Mario : CharacterBody3D
     {
         if (_smsSpinBlur != null)
             _smsSpinBlur.Active = isSpining;   // emitBlurSpinJump every frame of the spin (MarioJump.cpp 1022): the rings run with it
+        _smsSpinning = isSpining;
+        SmsGoopFxTick();
+    }
+
+    private bool _smsSpinning;
+
+    /// <summary>emitBlurSpinJump (MarioParticle.cpp 574-586) every frame of the spin: while mDirty > 0, MAP_POLLUTION_MS_M_SPINOS bound to
+    /// getCenterAnmMtx() at rate 1.75 x mDirty / 255 (pass 107) -- the emitter follows the centre joint; off with the spin or a clean Mario.</summary>
+    private void SmsGoopFxTick()
+    {
+        if (_smsGoopFx == null)
+            return;
+        // the game emits from rotateJumping (MARIO_STATUS_*_ROTATE_JUMP) and rotating (the ground spin, MarioRun.cpp 779) only: the port's
+        // isSpining flag also serves the roll blurs and is left up by a landing, so the states gate it
+        bool spinning = _smsSpinning && (stateOfMario == MarioState.SpinJump || stateOfMario == MarioState.groundSpin);
+        if (spinning && _smsDirtyAmount > 0f)
+            _smsGoopFx.FlingSet(SmsCenterTransform(), 1.75f * _smsDirtyAmount / 255f);
+        else
+            _smsGoopFx.FlingOff();
     }
 
     private static bool TurnExceedsAngle(Vector3 from, Vector3 to, float angleDeg)
@@ -15169,12 +15198,74 @@ public partial class Mario : CharacterBody3D
     }
 
     /// <summary>checkGraffito's tail (MarioMove.cpp 1104-1118): on the ground within 4 cm the footprint timer runs down; through its upper half
-    /// (the first 260 ticks off the paint) he leaves footprints -- MAP_POLLUTION_MS_M_ASHIOS, a particle, not ported -- and a jump stamps goop.</summary>
+    /// (the first 125 ticks off the paint: mFootPrintTimerMax 250 as /Mario/Mario.prm ships it) he leaves footprints -- MAP_POLLUTION_MS_M_ASHIOS
+    /// (pass 107: SmsEmitDirtyFootPrint) when the ground plane is legal and he is in no water -- and a jump stamps goop.</summary>
     private void SmsFootPrintTick()
     {
         if (!_smsGround4cm || _smsFootPrintTimer <= 0)
             return;
         _smsFootPrintTimer -= 1;
+        if (_smsFootPrintTimer <= SmsParams.Graffito.FootPrintTimerMax / 2)
+            return;
+        if (!IsOnFloor() || _smsInWater)                                 // !mGroundPlane->isLegal(); MARIO_FLAG_IN_ANY_WATER
+            return;
+        SmsEmitDirtyFootPrint();
+    }
+
+    /// <summary>emitDirtyFootPrint = emitFootPrintWithEffect(MAP_POLLUTION_MS_M_ASHIOS, -1) (MarioParticle.cpp 599-664): in MARIO_STATUS_RUN only (the
+    /// gait; OIL_RUN is its own status), as the motion frame ctrl passes 38 the LEFT foot joint's translation, 8 the RIGHT (checkPass: crossed since
+    /// the last tick -- SMS frames are 60ths of a second, the gait clip loops), calcGroundMtx(it) (MarioMove.cpp 1799): the ground under the joint,
+    /// X his right along the plane, Y up, Z his forward along it, 18 u up; the print emitted bound to a COPY of that frame 11 u down it (the
+    /// jpa's trs) -- SmsGoopMario.SpawnFootPrint. printId -1: no map stamp here (that is the jump's).</summary>
+    private void SmsEmitDirtyFootPrint()
+    {
+        if (_smsGoopFx == null || _sm == null || skeleton == null)
+            return;
+        bool run = stateOfMario is MarioState.walking or MarioState.running or MarioState.sprinting;
+        string node = _sm.GetCurrentNode().ToString();
+        if (!run || node != _smsGaitClip)
+        {
+            _smsGaitPosPrev = -1.0;
+            return;
+        }
+        double len = _sm.GetCurrentLength(), pos = _sm.GetCurrentPlayPosition();
+        double prev = _smsGaitPosPrev;
+        _smsGaitPosPrev = pos;
+        if (prev < 0.0 || len <= 0.0001 || pos == prev)
+            return;
+        // the state machine's play position keeps counting past the loop: fold both into the clip (the frame ctrl wraps at the clip's end)
+        double p0 = Mathf.PosMod(prev, len), p1 = Mathf.PosMod(pos, len);
+        if (pos - prev >= len)                                           // a whole loop (or more) between two reads: every footfall passed
+            p0 = p1 - len * 0.999;
+        SmsFootPrintPass(p0, p1, 38.0 / 60.0, "jnt_foot_L");
+        SmsFootPrintPass(p0, p1, 8.0 / 60.0, "jnt_foot_R");
+    }
+
+    private void SmsFootPrintPass(double prev, double pos, double at, string joint)
+    {
+        bool passed = prev <= pos ? (prev < at && at <= pos) : (at > prev || at <= pos);  // the clip wrapped: the pass is in either leg
+        if (!passed)
+            return;
+        int bone = skeleton.FindBone(joint);
+        Vector3 foot = bone >= 0 ? (skeleton.GlobalTransform * skeleton.GetBoneGlobalPose(bone)).Origin : GlobalPosition;
+        // calcGroundMtx: checkGround from the joint down (the joint hangs over the sole); the plane's tangents from his face angle
+        var q = PhysicsRayQueryParameters3D.Create(foot + Vector3.Up * 0.05f, foot - Vector3.Up * SmsUnits.UnitsToMetres(150f), CollisionMask,
+            new Godot.Collections.Array<Rid> { GetRid() });
+        var hit = GetWorld3D().DirectSpaceState.IntersectRay(q);
+        if (hit.Count == 0)
+            return;
+        Vector3 ground = (Vector3)hit["position"];
+        Vector3 n = ((Vector3)hit["normal"]).Normalized();
+        if (n.LengthSquared() < 0.5f) n = Vector3.Up;
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+        Vector3 fwd = face - n * face.Dot(n);
+        if (fwd.LengthSquared() < 1e-6f)
+            return;
+        fwd = fwd.Normalized();
+        Vector3 right = fwd.Cross(n).Normalized();
+        _smsGoopFx.SpawnFootPrint(new Transform3D(new Basis(right, n, fwd), ground));
+        if (SmsDebugPrint)
+            GD.Print($"[SMS goop] footprint {joint} at {ground} (timer {_smsFootPrintTimer}, dirty {_smsDirtyAmount:F0})");
     }
 
     /// <summary>The sink lerps: (Max - Min)(1 - t) + Min with t = depth / SinkTime (flat 0.3 / 0.5 as shipped).</summary>
@@ -15449,11 +15540,24 @@ public partial class Mario : CharacterBody3D
             if (stateOfMario == MarioState.slipping && !_smsOilSlopeSlide)
                 _smsDirtyAmount += SmsParams.Dirty.IncSlipping;
         }
-        if (stateOfMario == MarioState.swimming)
+        if (_smsInWater)                                                 // MARIO_FLAG_IN_ANY_WATER (MarioMove.cpp 1128): wading counts, not only the swim
         {
+            // meltInWaterEffect (MarioParticle.cpp 671) within 200 u of the surface: MAP_POLLUTION_MS_M_TOKEOS bound to unk220 (his x / z at the water
+            // surface, his yaw -- MarioMove.cpp 2057), rate mDirty x MeltInWaterMax / 255, setGlobalScale 0.6 in shallow water (pass 107)
+            bool nearSurface = SmsUnits.MetresToUnits(_smsWaterSurfaceY - SmsFeetY()) < 200f;
+            if (_smsDirtyAmount > 0f && nearSurface && _smsGoopFx != null)
+            {
+                bool shallow = stateOfMario != MarioState.swimming && IsOnFloor();   // MARIO_FLAG_IN_SHALLOW_WATER: wading
+                var surface = new Transform3D(new Basis(Vector3.Up, _smsFaceValid ? _smsFaceYaw : 0f), new Vector3(GlobalPosition.X, _smsWaterSurfaceY, GlobalPosition.Z));
+                _smsGoopFx.MeltSet(surface, _smsDirtyAmount * SmsParams.Dirty.MeltInWaterMax / 255f, shallow);
+            }
+            else
+                _smsGoopFx?.MeltOff();
             _smsDirtyAmount -= SmsParams.Dirty.DecSwimming;
             _smsFootPrintTimer = 0; // the water takes the footprints
         }
+        else
+            _smsGoopFx?.MeltOff();
         if (stateOfMario == MarioState.SpinJump)
         {
             _smsDirtyAmount -= SmsParams.Dirty.DecRotJump;

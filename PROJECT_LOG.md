@@ -6228,3 +6228,75 @@ on frame 0). The puff's cone of 22.5 deg is Godot's `spread` around the point's 
 
 ### Legacy
 None retired: his `TriggerLandingDust` (LandingDustFx) is the LANDING's dust and stays; the trample had no dust of its own.
+
+## SMS pass 107 -- Mario's goop particles: the footprints, the melt in water, the spin's fling (+ two corrections)
+
+Jaysonn (10-19 23:57): "Do Mario's goop smalls (sink-in, drips, wash sparkle)" -- the first of his three picks (then the red coin switch's board
+message, then the Mario leftovers). A correction to my own offer first: the sink-in ripple (ms_mari_rakuhamon / rakuball) was pass 95's, and the
+drips / wash / sparkle are the NPCs' (ms_mnt_* / mare / kino, pass 95 too). What was still open on Mario's goop was the three particles the game
+loads PER STAGE from /scene/<stage>/map/pollution/ (MarioParticle.cpp 31-54, TMario::initParticle; his disc has moved to
+E:\FromC\Documents\FinModelUtility-main\...\extracted -- 79 stages carry the set; dolpic0's == bianco0's, airport0's differ):
+
+### The game
+- ms_m_ashios (MAP_POLLUTION_MS_M_ASHIOS 0x50), the dirty FOOTPRINT. checkGraffito's tail (MarioMove.cpp 1104-1118): within 4 cm of the ground, the
+  footprint timer in its upper half, a legal ground plane, not in any water -> emitDirtyFootPrint = emitFootPrintWithEffect(ASHIOS, -1)
+  (MarioParticle.cpp 599-664): in MARIO_STATUS_RUN, as the motion frame ctrl passes 38 the LEFT foot joint (jnt_foot_L), 8 the RIGHT, calcGroundMtx
+  (MarioMove.cpp 1799) at the joint's translation: the ground under it + 18 u, X his right along the plane, Z his forward along it; the print emitted
+  bound to a COPY of that matrix (emitAndBindToMtx: it stays). The jpa: ONE Direction quad 1.0 x 1.15 (50 x 57.5 u), trs (0,-11,0) -> 7 u over the
+  ground, life 240; JPADrawExecRotDirectional (JPADrawVisitor.cpp 679): X = the seed axis (0,1,0) re-orthogonalised, Y = the direction (the nil
+  velocity along the frame's Z), Z = X x Y, then "rotate 0.5 half-turns" about Y -> the vertical quad ROLLS FLAT, its texture V (the toe, the first
+  row of P_msm_footmarkj_ia) along his forward. Scale 0.4 -> 1 over the first 9 frames then -> 1.5 by the end; alpha 1 until 37.5 % -> 0; blend
+  src DSTCLR dst ZERO (GX_BL_SRCCLR as a SOURCE factor reads the destination) = a MULTIPLY into the ground, alphaCmp GREATER 29 (the fade eats the
+  print from its soft edges in), z test no write; colour lerp(env -> prm, I) picked at RANDOM per print from a 3-entry table (two browns).
+- ms_m_tokeos (0x12B), the goop MELTING off him in water. thinkDirty (MarioMove.cpp 1128): IN_ANY_WATER and within 200 u of the surface ->
+  meltInWaterEffect (MarioParticle.cpp 671): while mDirty > 0, ONE emitter kept alive (emitAndBindToMtxPtr flag 1) on unk220 = his x / z at the water
+  surface with his yaw (MarioMove.cpp 2057), setRate(mDirty x mMeltInWaterMax 0.7 / 255), setGlobalScale 0.6 in shallow water. The jpa: a ring
+  13.1..15 u (Cylinder r 15 minRad 0.875 scaled 1 / 0.1 / 1), the cylinder's AXIS velocity = the RADIAL (JPAEmitter.cpp 560): 2.5 u/f outward x (1
+  +- 0.3), airResist 0.99, life 80 +-40 %; a 40 u Direction quad rolled flat along the drift (as above), X 0.7 / Y 1.7 -> 1 by 36.65 % -> 0.3; alpha
+  0 -> 0.875 by 12.5 % -> 0 from 50 %; colour RANDOM over 6 (4 pollution-brown, 1 half, 1 pale); P_msm_osenball_ia.
+- ms_m_spinos (0x51), the goop FLUNG OFF in a spin. emitBlurSpinJump (MarioParticle.cpp 574) every frame of a rotate jump (MarioJump.cpp 1006) and
+  of the ground spin (MarioRun.cpp 779): while mDirty > 0, an emitter kept alive on getCenterAnmMtx(), setRate(1.75 x mDirty / 255). The jpa: a ring
+  21..24 u, +-60 u tall about the centre joint, 4 u/f along the position + 15 u/f radially x (1 +- 0.2), Gravity 1 u/f^2 fading in over 50 %,
+  airResist 0.99, life 15 +-40 %; a 25 u DirBillboard along the velocity, X 0.8 / Y 3.0 -> 1 by 50 % -> 0.1; alpha 1; alphaCmp GEQUAL 190, z write;
+  colour RANDOM over 6 (3 brown, 1 half, 2 pale).
+
+### Ported
+- assets/Sms/Fx/GoopMario.tscn (npc82/goop107/gen_fx_goop.py): FootPrint (a one-shot template spawned as an unbound burst at the ground frame --
+  pass 56's rule), Melt and Fling (continuous emitters moved every tick to the game's matrix, their particles in the world, the game rate as
+  GpuParticles3D.AmountRatio). goop_footprint / goop_melt / goop_fling.gdshader: one body, three render modes (blend_mul + no z write; blend_mix + no
+  z write; blend_mix + z write): the per-axis ESP1 scale by the life phase (INSTANCE_CUSTOM.y), the random colour index from a black -> white
+  color_initial_ramp (COLOR.r), the alpha curve in COLOR.a, three quad kinds (flat in the particle frame; flat along the velocity -- Godot's align_y
+  puts the vertical in Z, so the plain quad lies flat; a DirBillboard). tex/footmarkj_raw.png (jpa_bake.py raw, pinned). SmsGoopMario.cs:
+  SpawnFootPrint(groundFrame), MeltSet(surface, rate, shallow) / MeltOff, FlingSet(centre, rate) / FlingOff, RateToAmountRatio.
+- Mario.cs: `_smsGoopFx` adopted from under Mario in SmsSetupFx or instanced from the scene (his Player.tscn: editor open -- drop GoopMario.tscn under
+  Mario to own it); SmsFootPrintTick completed (the timer's upper half, a floor, no water) -> SmsEmitDirtyFootPrint: the gait states, the state
+  machine's play position folded into the gait clip (it counts past the loop), checkPass on 38 / 8 (60ths), the foot joint, a ray to the ground,
+  the frame from the normal and his face; SmsThinkDirty's water branch keyed on `_smsInWater` (ANY water -- it was the swim state) with the melt
+  (feet within 200 u of the surface; shallow = wading); the fling through isSpining + SmsGoopFxTick every physics frame, gated on the SpinJump /
+  groundSpin states (the port's isSpining flag also serves the roll blurs and a landing leaves it up).
+- SmsPhysics.cs: Graffito.FootPrintTimerMax 520 -> 250 and Dirty.MeltInWaterMax 0.7 (below).
+
+### Corrections
+1. Pass 65's `FootPrintTimerMax = 520 "not in any .prm"` was wrong: /Mario/Mario.prm SHIPS mFootPrintTimerMax = 250 (sms_shipped_params.json
+   params/mario/mario.prm/13; TDeParams reads that file, MarioInit.cpp 466). The footprint window (and the jump stamp's) is 125 ticks, not 260.
+2. Pass 106's trample puff: its airResist 0.9 was baked as a velocity_limit_curve of 0..1 -- Godot's curve is an ABSOLUTE max speed in m/s
+   (particle_process_material.cpp 1160: min(|v|, curve)), so the puff was clamped to <= 1 m/s and crept instead of its 22 u/f (17.7 m/s). The curve
+   is now 17.7 x 0.9^age m/s (gen_fx_trample.py drag_curve); TrampleDust.tscn re-shipped. The melt's curve was baked in m/s from the start.
+
+### Verified (drive 107 SmsF107, 18/18; 106 18/18; 105b 14/14; 93 30/30; 95 22/22; 98 21/21; 99 13/13; build 0 errors; boot ALL OK; .err empty, no shader lines)
+D1-D6 the scene under Mario (1 / 36 / 18, none emitting), the quad 0.672 x 0.772 m on goop_footprint quad_kind 0 alpha test 30/255, align_y + gravity
+on the fling, the melt's limit curve 2.62 m/s -> 1.17, the trample puff's 17.73 m/s, the parameters 250 / 0.7, jnt_foot_L / R found (11 / 6). R1-R5 a
+dirty sprint (32 u/f, the gait clip 0.983 s) left 11 prints in 2 s, 5 left / 6 right, all 10 consecutive pairs on opposite sides of his facing, every
+one flat 5..9 u over the floor, within 1.2 m of him with its toe along his facing, none once the window's lower half began. S1-S3 a spin jump at
+dirty 150: the fling emitting on the centre joint (3 cm) at AmountRatio 0.829 (1.75 x 144 / 255 of the stream), mDirty down 0.5 a tick; closed the
+frame after the landing; a clean spin flings nothing. W1-W3 dropped into the plaza's Sea (surface y -19.522): the melt at the surface under his x /
+z, ratio 0.902 (150 x 0.7 / 255 of the stream), scale 1 swimming; mDirty 150 -> 113 in 60 frames and the ratio following; closed out of the water.
+Headless cannot see the prints or the blobs -- his eye.
+
+### Deviations / not ported
+The fling's airResist 0.99 is a linear damping of the same mean loss (a clamp would fight its gravity); its Gravity field's fade-in is an equivalent
+constant (the same end displacement). The melt's clamp lets a slower blob keep its speed a few frames before the curve passes it. The ground spin
+emits only while the port is in its groundSpin state. Not ported: the walk-sand / wet-ground running ripple (other particles of the same hook).
+
+### Legacy
+None retired: his LandingDustFx is the landing's; the water branch of SmsThinkDirty was mine (pass 65) and is corrected, not replaced.
