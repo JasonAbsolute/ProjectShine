@@ -677,6 +677,8 @@ public partial class Mario : CharacterBody3D
     private SmsSpinJumpBlur _smsSpinBlur;      // SpinJumpBlur.tscn: ms_m_blur2 / blur2sp, the rings around the spin
     private SmsHipDropBlur _smsHipBlur;        // HipDropBlur.tscn: ms_m_blur3, the streak above the falling hip drop
     private SmsHipDropLanding _smsHipLanding;  // HipDropLanding.tscn: ms_hipdrop_a / b / c at the landing
+    private SmsTrampleDust _smsTrampleDust;    // TrampleDust.tscn (pass 106): ms_fumi_a / b / c at a trample -- FUMI_B / C at half scale on an NPC, A / B / C on anything else
+    private bool _smsTrampleOnNpc;             // the stomp about to launch is an NPC's (SmsHitNpcTrample): trampleExec's isHitCategory(HIT_CATEGORY_NPC)
     private SmsSuperHipDropBlur _smsSuperHipBlur;       // SuperHipDropBlur.tscn: ms_m_sphipd_a / b / c / d, the super hip drop's fall (pass 33)
     private SmsSuperHipDropLanding _smsSuperHipLanding; // SuperHipDropLanding.tscn: ms_m_sphipd_hit_a / b / c / d at its landing
     private SmsBonkStars _smsBonkStars;                 // BonkStars.tscn: ms_dmg_c, the stars of a wall bonk and of a hit
@@ -5560,6 +5562,15 @@ public partial class Mario : CharacterBody3D
         _smsWallSlideDust = SmsFluddModel.FindChild<SmsWallSlideDust>(this);
         _smsSlipSmoke = SmsFluddModel.FindChild<SmsSlipSmoke>(this);
         _smsGoopRipple = SmsFluddModel.FindChild<SmsGoopRipple>(this);   // pass 95: the goop ripple at his feet (ms_mari_rakuhamon / rakuball)
+        _smsTrampleDust = SmsFluddModel.FindChild<SmsTrampleDust>(this);  // pass 106: the trample dust
+        if (_smsTrampleDust == null && UseSmsPhysics)
+        {
+            // his Player.tscn has no TrampleDust node yet (his scene: edited only with the editor closed) -- instanced here so the effect runs;
+            // dropping res://assets/Sms/Fx/TrampleDust.tscn under Mario in the editor takes over (and exposes its Sound slot)
+            var dustScene = GD.Load<PackedScene>("res://assets/Sms/Fx/TrampleDust.tscn");
+            if (dustScene != null && dustScene.Instantiate() is SmsTrampleDust dust) { dust.Name = "TrampleDust"; AddChild(dust); _smsTrampleDust = dust; }
+            else GD.PushWarning("[SMS fx] res://assets/Sms/Fx/TrampleDust.tscn could not be instanced: no trample dust (ms_fumi_a / b / c)");
+        }
         _smsWallSlideDust?.Bind(this);
         _smsSlipSmoke?.Bind(this);
         _smsSpinBlur?.Bind(this);
@@ -11108,8 +11119,8 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>TMario::hitNpc (MarioCheckCol.cpp 95) + trampleExec (MarioCollision.cpp 136), from the NPC's hit check: a JUMPING-type status
     /// (airborne here), not the hip drop, mVel.y < 0, his feet above the NPC's, isBeTrampledNpc (the caller) and not a dive -> HIT_MESSAGE_TRAMPLE:
-    /// MARIO_STATUS_TRAMPLE with ma_step1 / 2 / 3 (StompBounce: the launch, the chain, the broad jump's BACK_JUMP -- pass 105). Not baked:
-    /// PARTICLE_MS_FUMI_B / C at half scale, MSD_SE_MA_KICK_ENEMY.</summary>
+    /// MARIO_STATUS_TRAMPLE with ma_step1 / 2 / 3 (StompBounce: the launch, the chain, the broad jump's BACK_JUMP -- pass 105; the FUMI_B / C
+    /// dust at half scale -- pass 106). Not baked: MSD_SE_MA_KICK_ENEMY (TrampleDust's Sound slot).</summary>
     public bool SmsHitNpcTrample(Vector3 npcPosU)
     {
         if (!UseSmsPhysics || IsOnFloor() || velocity.Y >= 0f)
@@ -11135,6 +11146,7 @@ public partial class Mario : CharacterBody3D
             case MarioState.wire: case MarioState.fence: case MarioState.roofHang: case MarioState.fluddRocket:
                 return false;
         }
+        _smsTrampleOnNpc = true;                                             // pass 106: HIT_CATEGORY_NPC -> FUMI_B / C at half scale
         StompBounce();
         if (SmsDebugPrint)
             GD.Print($"[SMS npc] trampled an NPC: MARIO_STATUS_TRAMPLE, chain {_stompChain}");
@@ -11255,6 +11267,8 @@ public partial class Mario : CharacterBody3D
                 _stompChain = 0;
                 StartBackflip();                                             // changePlayerStatus(MARIO_STATUS_BACK_JUMP): the backflip's launch, no step
                 _smsFallCancel = false;                                      // trampleExec 178: unk78 &= ~0x100 (pass 105b)
+                _smsTrampleDust?.Play(SmsFeetWorld(), _smsTrampleOnNpc);     // pass 106: the dust comes after either branch (trampleExec 166-175)
+                _smsTrampleOnNpc = false;
                 if (SmsDebugPrint) GD.Print("[SMS trample] during the broad jump: BACK_JUMP (the backflip's launch)");
                 return;
             }
@@ -11271,6 +11285,11 @@ public partial class Mario : CharacterBody3D
             // a FLAG_UNK2000000 status is DISARMED: a stomp bounce is a set height whatever A does (pass 105b; Jaysonn: "I thought bouncing off
             // people were set heights" -- right; pass 105 let SmsLaunch's eligibility stand, so a released A cut the bounce 0.75 a tick)
             _smsFallCancel = false;
+            // trampleExec 166-175 (pass 106): the dust at mPosition -- an NPC (isHitCategory HIT_CATEGORY_NPC) gets FUMI_B / C at half scale
+            // (SMS_EasyEmitParticle .. scale 0.5), anything else FUMI_A / B / C (emitParticle): the nozzle box and the enemies. The caller says
+            // which it stomped (SmsHitNpcTrample sets the flag before calling); the default is the enemy / object case.
+            _smsTrampleDust?.Play(SmsFeetWorld(), _smsTrampleOnNpc);
+            _smsTrampleOnNpc = false;
         }
         else
         {

@@ -6174,3 +6174,57 @@ nozzle box unchanged (B1-B4).
 
 ### Deviations / not ported
 None.
+
+## SMS pass 106 -- the trample dust (ms_fumi_a / b / c)
+
+Jaysonn (10-19 23:22, after "Bouncing feels right now"): "Do the stomp dust next".
+
+### The game
+`TMario::trampleExec` (MarioCollision.cpp 166-175), after the launch: on an NPC (`isHitCategory(HIT_CATEGORY_NPC)`) `SMS_EasyEmitParticle(
+PARTICLE_MS_FUMI_B / C, &mPosition, this, scale 0.5)` -- emitAndBindToPosPtr + setGlobalScale(0.5): the puff and the hit marks at HALF size;
+on anything else (an enemy, the nozzle box) `emitParticle(FUMI_A), (FUMI_B), (FUMI_C)` = gpMarioParticleManager->emit(id, &mPosition, 0,
+nullptr): unbound, full size, the splash ring joining in. ms_fumi_a / b / c.jpa (MarDirectorLoadResource.cpp 292-294; jpa_dump.py; the JPA
+engine in libs/JSystem/src/JParticle):
+- a: 12 DirBillboard streaks (0.5 x 1.5 = 25 x 75 u) off a circle r 2.5..5 u, 5 up, 3.9 u/f straight up (velAxis 4 - velDir 0.1) x 0.8..1.2,
+  life 15 +-25 %, no fields; ESP1 scale a straight run 1 -> 6 on both axes (in 0 / out 0; x 1 +- 0.4), alpha 1 until 50 % then -> 0, turned
+  90 deg; colour lerp(env -> prm, I) with BOTH registers keyed over the life (Merge): prm white -> (255,255,207) with its alpha 255 -> 111,
+  env (253,255,255) -> (255,111,0). P_msm_smash5_ia (IA8, the splash crown). A white flash going orange.
+- b: ONE Billboard puff (2.0 = 100 u) on a circle r 30 u, 10 up, 22 u/f outward (within 22.5 deg) x moment 0.75..1, airResist 0.9 a frame,
+  life 28 +-37.5 %; scale 1 until 37.5 % -> 1.7 (x 1 +- 0.375), alpha 1 until 12.5 % -> 0, a random angle +- 1/16 turn; lerp((26,26,2) ->
+  (255,255,242), I). P_msm_kemuball3_ia.
+- c: 8 Billboard marks (2.25 x 9.0 = 112 x 450 u) at the point, no velocity, life 9, Drag 0.96; colour = prm FLAT keyed over 6 frames
+  (Merge over the life): white @1, (255,142,174) @3, white @5, (255,231,87) @6 -- a white / pink / yellow flicker; alpha 1 -> 0 over the life;
+  scale 0.8 -> 1 by 24 % -> 0.5 (x 1 +- 0.3); a random angle, spin 0.01 half-turns/frame x (1 +- 0.4). P_msm_hitmrk1_ia (IA4). SSP1 children:
+  one DirectionCross spoke per mark (0.8 x 7.0 = 40 x 350 u, two crossed quads along the velocity) flying 22 u/f +-0.2 out of the point, life
+  24, scaleOut (-> 0), prm (200,240,255,183) env (0,150,255): sky-blue rays. P_msm_glow3_i.
+Every emitter emits everything on its first frame (maxFrame 1), so the NPC case's bind to his position pointer moves nothing visible.
+
+### Ported
+- `assets/Sms/Fx/TrampleDust.tscn` (gen_fx_trample.py): four GPUParticles3D templates -- `Ring` (ms_fumi_a: DirectedPoints on the ring with
+  up normals, align_y, the JpaDirBillboard construction turned 90 deg, the two colour ramps), `Puff` (ms_fumi_b: the fire_smoke billboard
+  shader, airResist 0.9^age baked as a velocity_limit_curve), `Marks` (ms_fumi_c: the flat prm ramp, a spinning billboard), `Spokes` (the
+  SSP1 children: DirectedPoints out of the point, align_y, drawn as the aligned cross with two draw passes). `trample_mark.gdshader`: the JPA
+  TEV (lerp(env -> prm, I) or prm flat, both ramps by the life phase, alpha = A x prm.a x the fade) with three quad kinds -- a billboard
+  rolled by the particle's angle + an offset, a DirBillboard, an aligned cross. Textures `tex/smash5_raw.png` + `hitmrk1_raw.png` (jpa_bake.py
+  raw, pinned lossless by fx_tex_imports.py); kemuball3_raw / glow3_i already there.
+- `SmsTrampleDust.cs`: `Play(feet, npc)` spawns each template as a top-level one-shot burst at his feet through SmsUnboundBurst (the pass-56
+  rule: a child emitter streams a burst after a moving Mario), the copy's transform scaled 0.5 for the NPC case (the game's global scale
+  scales the emitter's positions and quads alike), the Ring only for the enemy / object case; a `Sound` slot for MSD_SE_MA_KICK_ENEMY.
+- `Mario.cs`: `_smsTrampleDust` adopted from under Mario in SmsSetupFx or, when his Player.tscn has no node yet, instanced from the scene (his
+  scene is only edited with the editor closed; dropping TrampleDust.tscn under Mario takes over and exposes the Sound slot); `StompBounce`
+  fires it after the launch, the NPC flag set by SmsHitNpcTrample (the Gooble's and the nozzle box's calls are the enemy / object case); the
+  BACK_JUMP branch fires it too (trampleExec emits after either branch).
+
+### Verified (drive 106, SmsF106, 18/18 = drive 105b's 14 + D1 / L7 / T1b / B1b; drives 105b 14/14, 104 23/23, 102 20/20, 101 11/11, 87 16/16; build 0 errors; boot ALL OK, zero ERROR / SHADER, empty err)
+D1 the scene under Mario with Ring 12 / Puff 1 / Marks 8 / Spokes 8 as non-emitting one-shot templates; L7 six direct StompBounce calls (no
+NPC flag) spawned 24 full-scale bursts at the air spot and none at half scale; T1b the live Pianta trample spawned Puff + Marks + Spokes at
+scale 0.5 and NO Ring, at his feet; B1b the nozzle box trample spawned Ring + Puff + Marks + Spokes at scale 1, one each. The log's error
+stream is empty and no shader line appears (the three new quad shaders compiled in the real scene). Headless cannot see the look -- his eye.
+
+### Deviations / not ported
+The NPC case is spawned unbound at the stomp point rather than bound to his position pointer (nothing visible differs: every FUMI emitter emits
+on frame 0). The puff's cone of 22.5 deg is Godot's `spread` around the point's radial (the JPA's spread 0.25 x pi/2). The marks' Drag field
+(0.96) is moot (no velocity). Not ported: MSD_SE_MA_KICK_ENEMY (the Sound slot), the rumble.
+
+### Legacy
+None retired: his `TriggerLandingDust` (LandingDustFx) is the LANDING's dust and stays; the trample had no dust of its own.

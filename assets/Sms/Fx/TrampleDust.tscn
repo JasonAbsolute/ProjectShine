@@ -1,0 +1,385 @@
+[gd_scene load_steps=64 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsTrampleDust.cs" id="1_script"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/JpaDirBillboard.gdshader" id="2_dirbb"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/fire_smoke.gdshader" id="3_smoke"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/trample_mark.gdshader" id="4_mark"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/smash5_raw.png" id="5_smash"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/kemuball3_raw.png" id="6_kemu"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/hitmrk1_raw.png" id="7_hitmrk"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/glow3_i.png" id="8_glow"]
+
+[sub_resource type="Image" id="Image_a_points"]
+data = {
+"data": PackedByteArray(99, 170, 62, 61, 218, 142, 137, 61, 23, 44, 61, 189, 139, 58, 112, 189, 218, 142, 137, 61, 155, 72, 5, 60, 118, 157, 5, 189, 218, 142, 137, 61, 224, 107, 144, 188, 198, 170, 111, 189, 218, 142, 137, 61, 254, 147, 123, 188, 170, 178, 200, 60, 218, 142, 137, 61, 225, 254, 98, 189, 146, 73, 113, 186, 218, 142, 137, 61, 195, 167, 91, 61, 197, 174, 232, 185, 218, 142, 137, 61, 207, 177, 23, 61, 106, 192, 146, 188, 218, 142, 137, 61, 45, 87, 87, 61, 140, 149, 124, 61, 218, 142, 137, 61, 15, 159, 191, 60, 202, 78, 107, 189, 218, 142, 137, 61, 151, 16, 202, 188, 255, 24, 89, 189, 218, 142, 137, 61, 27, 103, 245, 188, 154, 210, 207, 188, 218, 142, 137, 61, 13, 146, 6, 189, 136, 144, 239, 188, 218, 142, 137, 61, 255, 21, 114, 189, 99, 160, 82, 189, 218, 142, 137, 61, 149, 234, 13, 189, 219, 195, 38, 61, 218, 142, 137, 61, 74, 84, 58, 59, 112, 24, 60, 60, 218, 142, 137, 61, 102, 129, 82, 189, 227, 253, 216, 60, 218, 142, 137, 61, 129, 249, 75, 61, 194, 125, 81, 189, 218, 142, 137, 61, 86, 69, 3, 61, 210, 21, 7, 60, 218, 142, 137, 61, 121, 199, 134, 61, 141, 103, 205, 59, 218, 142, 137, 61, 169, 48, 53, 61, 152, 22, 165, 188, 218, 142, 137, 61, 11, 195, 67, 61, 232, 118, 46, 188, 218, 142, 137, 61, 81, 253, 101, 61, 173, 242, 22, 189, 218, 142, 137, 61, 66, 155, 245, 60, 21, 239, 28, 189, 218, 142, 137, 61, 155, 167, 118, 188, 149, 17, 15, 61, 218, 142, 137, 61, 131, 63, 188, 60, 155, 238, 196, 188, 218, 142, 137, 61, 247, 248, 21, 61, 200, 2, 230, 186, 218, 142, 137, 61, 220, 0, 109, 189, 181, 184, 129, 189, 218, 142, 137, 61, 160, 84, 167, 188, 241, 228, 231, 59, 218, 142, 137, 61, 183, 3, 69, 61, 151, 12, 3, 61, 218, 142, 137, 61, 177, 254, 15, 61, 79, 12, 80, 189, 218, 142, 137, 61, 181, 192, 149, 188, 5, 57, 116, 188, 218, 142, 137, 61, 155, 38, 55, 61, 134, 166, 73, 61, 218, 142, 137, 61, 66, 184, 246, 58, 54, 129, 42, 61, 218, 142, 137, 61, 213, 50, 126, 60, 163, 102, 84, 61, 218, 142, 137, 61, 142, 114, 249, 187, 44, 94, 180, 188, 218, 142, 137, 61, 22, 195, 80, 189, 7, 83, 114, 61, 218, 142, 137, 61, 86, 67, 207, 60, 254, 130, 170, 60, 218, 142, 137, 61, 54, 5, 19, 61, 241, 95, 90, 188, 218, 142, 137, 61, 120, 137, 132, 189, 80, 155, 36, 189, 218, 142, 137, 61, 78, 251, 33, 189, 243, 190, 25, 187, 218, 142, 137, 61, 246, 6, 71, 189, 116, 157, 177, 188, 218, 142, 137, 61, 168, 13, 231, 60, 83, 163, 89, 61, 218, 142, 137, 61, 34, 74, 147, 187, 4, 117, 180, 59, 218, 142, 137, 61, 70, 208, 36, 189, 248, 0, 24, 189, 218, 142, 137, 61, 194, 167, 11, 189, 189, 78, 5, 189, 218, 142, 137, 61, 167, 38, 175, 60, 177, 1, 33, 188, 218, 142, 137, 61, 142, 158, 130, 61, 188, 69, 47, 189, 218, 142, 137, 61, 46, 189, 83, 189, 153, 206, 131, 189, 218, 142, 137, 61, 125, 239, 216, 59, 71, 223, 69, 189, 218, 142, 137, 61, 108, 26, 21, 189, 107, 42, 240, 60, 218, 142, 137, 61, 210, 105, 14, 61, 128, 221, 28, 189, 218, 142, 137, 61, 202, 131, 132, 60, 108, 201, 31, 61, 218, 142, 137, 61, 209, 120, 22, 61, 82, 1, 25, 189, 218, 142, 137, 61, 66, 73, 60, 189, 156, 96, 205, 60, 218, 142, 137, 61, 164, 190, 184, 188, 70, 72, 13, 189, 218, 142, 137, 61, 224, 179, 44, 61, 48, 218, 93, 187, 218, 142, 137, 61, 189, 167, 64, 61, 127, 230, 58, 61, 218, 142, 137, 61, 138, 72, 211, 187, 177, 246, 235, 188, 218, 142, 137, 61, 113, 134, 112, 61, 227, 131, 238, 188, 218, 142, 137, 61, 197, 102, 75, 61, 94, 8, 11, 61, 218, 142, 137, 61, 161, 68, 146, 59, 14, 78, 33, 60, 218, 142, 137, 61, 243, 74, 90, 189, 214, 210, 123, 189, 218, 142, 137, 61, 236, 3, 135, 60, 96, 122, 101, 188, 218, 142, 137, 61, 15, 61, 130, 61, 253, 134, 28, 61, 218, 142, 137, 61, 29, 110, 18, 188, 212, 181, 21, 188, 218, 142, 137, 61, 57, 109, 115, 61, 73, 90, 38, 189, 218, 142, 137, 61, 253, 223, 19, 188, 212, 9, 30, 61, 218, 142, 137, 61, 220, 160, 43, 189, 243, 200, 84, 60, 218, 142, 137, 61, 167, 75, 134, 61, 206, 41, 65, 61, 218, 142, 137, 61, 48, 14, 173, 57, 63, 90, 82, 59, 218, 142, 137, 61, 216, 41, 27, 61, 62, 236, 214, 60, 218, 142, 137, 61, 249, 35, 3, 61, 102, 215, 180, 60, 218, 142, 137, 61, 238, 195, 14, 189, 226, 22, 43, 189, 218, 142, 137, 61, 243, 130, 11, 60, 132, 124, 10, 189, 218, 142, 137, 61, 84, 182, 198, 60, 184, 118, 57, 189, 218, 142, 137, 61, 102, 9, 23, 187, 232, 10, 221, 60, 218, 142, 137, 61, 249, 112, 70, 61, 146, 113, 35, 189, 218, 142, 137, 61, 227, 60, 29, 188, 197, 64, 35, 189, 218, 142, 137, 61, 242, 17, 185, 59, 120, 52, 206, 188, 218, 142, 137, 61, 135, 52, 37, 189, 249, 240, 8, 61, 218, 142, 137, 61, 52, 115, 179, 187, 171, 46, 215, 188, 218, 142, 137, 61, 0, 45, 124, 61, 203, 17, 72, 189, 218, 142, 137, 61, 227, 162, 137, 60, 236, 197, 58, 61, 218, 142, 137, 61, 210, 7, 23, 188, 178, 42, 37, 189, 218, 142, 137, 61, 92, 220, 229, 60, 67, 192, 25, 61, 218, 142, 137, 61, 122, 160, 23, 188, 25, 57, 232, 59, 218, 142, 137, 61, 110, 241, 107, 61, 174, 96, 170, 60, 218, 142, 137, 61, 95, 202, 249, 188, 29, 58, 60, 61, 218, 142, 137, 61, 139, 27, 186, 188, 131, 55, 133, 61, 218, 142, 137, 61, 123, 42, 50, 188, 31, 141, 16, 61, 218, 142, 137, 61, 71, 255, 53, 189, 168, 44, 19, 189, 218, 142, 137, 61, 181, 234, 212, 187, 137, 224, 117, 189, 218, 142, 137, 61, 175, 129, 157, 188, 122, 245, 62, 58, 218, 142, 137, 61, 107, 194, 123, 61, 158, 93, 11, 189, 218, 142, 137, 61, 227, 62, 64, 60, 226, 24, 62, 61, 218, 142, 137, 61, 129, 119, 34, 188),
+"format": "RGBFloat",
+"height": 1,
+"mipmaps": false,
+"width": 96
+}
+
+[sub_resource type="ImageTexture" id="ImageTexture_a_points"]
+image = SubResource("Image_a_points")
+
+[sub_resource type="Image" id="Image_a_normals"]
+data = {
+"data": PackedByteArray(0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0),
+"format": "RGBFloat",
+"height": 1,
+"mipmaps": false,
+"width": 96
+}
+
+[sub_resource type="ImageTexture" id="ImageTexture_a_normals"]
+image = SubResource("Image_a_normals")
+
+[sub_resource type="Curve" id="Curve_a_scale"]
+resource_name = "ms_fumi_a ESP1 scale: in 0 / out 0 = a straight run 1 -> 6.0 over the life, both axes (x 1 +- 0.4)"
+max_value = 6
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 6), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_a_scale"]
+curve = SubResource("Curve_a_scale")
+
+[sub_resource type="Gradient" id="Gradient_a_alpha"]
+resource_name = "ms_fumi_a ESP1 alpha: 1 until 50 %, -> 0 at the end"
+offsets = PackedFloat32Array(0, 0.5, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_a_alpha"]
+gradient = SubResource("Gradient_a_alpha")
+
+[sub_resource type="Gradient" id="Gradient_a_prm"]
+resource_name = "ms_fumi_a prm keys (Merge over the life): white -> (255,255,207) with the alpha 255 -> 111"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 0.8118, 0.4353)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_a_prm"]
+gradient = SubResource("Gradient_a_prm")
+
+[sub_resource type="Gradient" id="Gradient_a_env"]
+resource_name = "ms_fumi_a env keys: (253,255,255) -> (255,111,0)"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(0.9922, 1, 1, 1, 1, 0.4353, 0, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_a_env"]
+gradient = SubResource("Gradient_a_env")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_a"]
+resource_name = "ms_fumi_a: 12 streaks off a circle r 2.5..5 u 5 up, 3.9 u/f up (axis 4 - dir 0.1) x 0.8..1.2, life 15 +-25 %, no fields"
+lifetime_randomness = 0.25
+particle_flag_align_y = true
+emission_shape = 5
+emission_point_texture = SubResource("ImageTexture_a_points")
+emission_normal_texture = SubResource("ImageTexture_a_normals")
+emission_point_count = 96
+direction = Vector3(0, 0, 1)
+spread = 0.0
+initial_velocity_min = 2.515
+initial_velocity_max = 3.772
+gravity = Vector3(0, 0, 0)
+scale_min = 0.6
+scale_max = 1.4
+scale_curve = SubResource("CurveTexture_a_scale")
+color_ramp = SubResource("GradientTexture1D_a_alpha")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_a"]
+resource_name = "ms_fumi_a: P_msm_smash5 (raw IA8), lerp(env -> prm, I) with both keyed over the life, alpha x prm.a (255 -> 111) x the fade; a DirBillboard turned 90 deg"
+shader = ExtResource("4_mark")
+shader_parameter/tex = ExtResource("5_smash")
+shader_parameter/prm_ramp = SubResource("GradientTexture1D_a_prm")
+shader_parameter/env_ramp = SubResource("GradientTexture1D_a_env")
+shader_parameter/flat_prm = false
+shader_parameter/dir_billboard = true
+shader_parameter/angle_offset = 1.5708
+
+[sub_resource type="QuadMesh" id="QuadMesh_a"]
+resource_name = "the game's 0.5 x 1.5 DirBillboard (25 x 75 u) before its scale curve"
+material = SubResource("ShaderMaterial_a")
+size = Vector2(0.336, 1.008)
+
+[sub_resource type="Image" id="Image_b_points"]
+data = {
+"data": PackedByteArray(7, 216, 130, 190, 218, 142, 9, 62, 183, 139, 159, 190, 28, 81, 206, 190, 218, 142, 9, 62, 237, 191, 184, 187, 200, 130, 202, 190, 218, 142, 9, 62, 173, 52, 158, 61, 35, 135, 200, 62, 218, 142, 9, 62, 8, 119, 194, 189, 38, 90, 193, 190, 218, 142, 9, 62, 8, 21, 16, 190, 18, 222, 56, 190, 218, 142, 9, 62, 144, 121, 184, 62, 128, 62, 13, 189, 218, 142, 9, 62, 141, 148, 205, 190, 159, 220, 146, 190, 218, 142, 9, 62, 188, 239, 144, 62, 3, 211, 182, 190, 218, 142, 9, 62, 92, 80, 63, 62, 151, 130, 205, 62, 218, 142, 9, 62, 76, 162, 19, 61, 180, 166, 182, 190, 218, 142, 9, 62, 92, 249, 63, 62, 64, 209, 90, 61, 218, 142, 9, 62, 30, 132, 204, 62, 243, 109, 201, 62, 218, 142, 9, 62, 159, 239, 178, 61, 73, 217, 192, 62, 218, 142, 9, 62, 128, 193, 18, 190, 209, 241, 139, 62, 218, 142, 9, 62, 73, 160, 151, 62, 17, 207, 25, 62, 218, 142, 9, 62, 68, 120, 191, 190, 154, 193, 152, 190, 218, 142, 9, 62, 201, 181, 138, 190, 45, 25, 41, 62, 218, 142, 9, 62, 19, 56, 188, 190, 106, 174, 179, 190, 218, 142, 9, 62, 18, 224, 74, 62, 234, 48, 157, 190, 218, 142, 9, 62, 220, 169, 133, 190, 208, 104, 166, 190, 218, 142, 9, 62, 161, 253, 115, 62, 55, 113, 185, 62, 218, 142, 9, 62, 95, 244, 52, 190, 122, 92, 133, 190, 218, 142, 9, 62, 150, 114, 157, 190, 28, 32, 131, 61, 218, 142, 9, 62, 99, 183, 203, 62, 37, 80, 133, 62, 218, 142, 9, 62, 7, 125, 157, 62, 80, 125, 32, 190, 218, 142, 9, 62, 20, 24, 190, 190, 66, 40, 144, 190, 218, 142, 9, 62, 114, 160, 147, 190, 117, 75, 29, 62, 218, 142, 9, 62, 174, 194, 190, 190, 174, 44, 192, 62, 218, 142, 9, 62, 132, 64, 22, 62, 68, 154, 199, 190, 218, 142, 9, 62, 82, 36, 209, 189, 228, 129, 188, 190, 218, 142, 9, 62, 1, 207, 39, 62, 129, 78, 196, 190, 218, 142, 9, 62, 177, 51, 254, 61, 252, 166, 189, 190, 218, 142, 9, 62, 18, 145, 34, 62, 68, 134, 98, 62, 218, 142, 9, 62, 221, 120, 172, 190, 188, 25, 171, 62, 218, 142, 9, 62, 200, 165, 102, 62, 41, 36, 108, 190, 218, 142, 9, 62, 122, 55, 169, 62, 229, 246, 193, 190, 218, 142, 9, 62, 115, 192, 12, 190, 90, 102, 133, 190, 218, 142, 9, 62, 56, 106, 157, 190, 30, 43, 91, 62, 218, 142, 9, 62, 5, 213, 174, 62, 133, 34, 179, 62, 218, 142, 9, 62, 150, 204, 76, 62, 78, 212, 223, 189, 218, 142, 9, 62, 192, 154, 198, 62, 145, 82, 204, 62, 218, 142, 9, 62, 60, 25, 102, 189, 25, 85, 206, 190, 218, 142, 9, 62, 249, 144, 48, 187, 180, 151, 173, 189, 218, 142, 9, 62, 181, 184, 201, 190, 36, 61, 73, 190, 218, 142, 9, 62, 10, 36, 180, 62, 178, 123, 60, 62, 218, 142, 9, 62, 208, 142, 183, 62, 196, 90, 26, 62, 218, 142, 9, 62, 39, 92, 191, 190, 33, 148, 184, 62, 218, 142, 9, 62, 225, 115, 56, 190, 128, 74, 75, 190, 218, 142, 9, 62, 85, 144, 179, 62, 178, 11, 149, 62, 218, 142, 9, 62, 144, 176, 142, 190, 237, 195, 202, 190, 218, 142, 9, 62, 215, 230, 152, 61, 168, 180, 179, 61, 218, 142, 9, 62, 252, 98, 201, 190, 27, 79, 182, 62, 218, 142, 9, 62, 78, 69, 65, 190, 181, 114, 137, 190, 218, 142, 9, 62, 142, 228, 153, 190, 211, 148, 173, 62, 218, 142, 9, 62, 22, 28, 95, 62, 235, 29, 240, 189, 218, 142, 9, 62, 115, 105, 197, 190, 158, 216, 148, 62, 218, 142, 9, 62, 216, 229, 142, 62, 140, 125, 114, 190, 218, 142, 9, 62, 240, 244, 166, 62, 240, 176, 184, 62, 218, 142, 9, 62, 100, 0, 56, 190, 223, 5, 127, 62, 218, 142, 9, 62, 176, 56, 162, 62, 233, 134, 178, 190, 218, 142, 9, 62, 81, 233, 78, 190, 37, 40, 187, 190, 218, 142, 9, 62, 23, 192, 45, 62, 32, 114, 178, 190, 218, 142, 9, 62, 254, 48, 79, 62, 154, 67, 171, 61, 218, 142, 9, 62, 139, 216, 201, 190),
+"format": "RGBFloat",
+"height": 1,
+"mipmaps": false,
+"width": 64
+}
+
+[sub_resource type="ImageTexture" id="ImageTexture_b_points"]
+image = SubResource("Image_b_points")
+
+[sub_resource type="Image" id="Image_b_normals"]
+data = {
+"data": PackedByteArray(36, 86, 34, 191, 0, 0, 0, 0, 85, 242, 69, 191, 150, 249, 127, 191, 0, 0, 0, 0, 132, 55, 101, 188, 192, 64, 123, 191, 0, 0, 0, 0, 186, 72, 68, 62, 235, 202, 120, 63, 0, 0, 0, 0, 62, 69, 113, 190, 202, 227, 111, 191, 0, 0, 0, 0, 215, 194, 178, 190, 235, 92, 229, 190, 0, 0, 0, 0, 56, 224, 100, 63, 112, 61, 175, 189, 0, 0, 0, 0, 165, 15, 127, 191, 179, 53, 54, 191, 0, 0, 0, 0, 47, 210, 51, 63, 248, 211, 98, 191, 0, 0, 0, 0, 106, 92, 237, 62, 92, 249, 126, 63, 0, 0, 0, 0, 244, 42, 183, 61, 254, 156, 98, 191, 0, 0, 0, 0, 23, 46, 238, 62, 252, 189, 7, 62, 0, 0, 0, 0, 163, 189, 125, 63, 73, 233, 121, 63, 0, 0, 0, 0, 255, 0, 94, 62, 233, 67, 111, 63, 0, 0, 0, 0, 13, 20, 182, 190, 174, 160, 45, 63, 0, 0, 0, 0, 237, 30, 60, 63, 50, 212, 190, 62, 0, 0, 0, 0, 236, 141, 109, 191, 225, 133, 61, 191, 0, 0, 0, 0, 150, 24, 44, 191, 99, 204, 209, 62, 0, 0, 0, 0, 111, 133, 105, 191, 182, 237, 94, 191, 0, 0, 0, 0, 126, 180, 251, 62, 114, 6, 67, 191, 0, 0, 0, 0, 181, 213, 37, 191, 88, 118, 78, 191, 0, 0, 0, 0, 183, 91, 23, 63, 123, 19, 102, 63, 0, 0, 0, 0, 30, 130, 224, 190, 179, 117, 37, 191, 0, 0, 0, 0, 237, 87, 67, 191, 147, 175, 34, 62, 0, 0, 0, 0, 161, 191, 124, 63, 103, 102, 37, 63, 0, 0, 0, 0, 225, 100, 67, 63, 21, 30, 199, 190, 0, 0, 0, 0, 247, 216, 107, 191, 177, 218, 50, 191, 0, 0, 0, 0, 168, 40, 55, 191, 96, 39, 195, 62, 0, 0, 0, 0, 162, 172, 108, 191, 195, 109, 110, 63, 0, 0, 0, 0, 125, 106, 186, 62, 9, 165, 119, 191, 0, 0, 0, 0, 111, 189, 129, 190, 4, 225, 105, 191, 0, 0, 0, 0, 191, 50, 208, 62, 49, 142, 115, 191, 0, 0, 0, 0, 86, 177, 157, 62, 167, 76, 107, 191, 0, 0, 0, 0, 211, 177, 201, 62, 239, 133, 12, 63, 0, 0, 0, 0, 245, 251, 85, 191, 81, 72, 84, 63, 0, 0, 0, 0, 183, 20, 15, 63, 39, 125, 18, 191, 0, 0, 0, 0, 252, 241, 81, 63, 68, 166, 112, 191, 0, 0, 0, 0, 13, 161, 174, 190, 244, 129, 37, 191, 0, 0, 0, 0, 139, 77, 67, 191, 187, 245, 7, 63, 0, 0, 0, 0, 135, 233, 88, 63, 37, 64, 94, 63, 0, 0, 0, 0, 141, 23, 254, 62, 235, 217, 138, 190, 0, 0, 0, 0, 6, 104, 118, 63, 42, 128, 125, 63, 0, 0, 0, 0, 135, 189, 14, 190, 137, 254, 127, 191, 0, 0, 0, 0, 86, 16, 219, 187, 213, 95, 87, 190, 0, 0, 0, 0, 10, 70, 122, 191, 187, 172, 249, 190, 0, 0, 0, 0, 165, 127, 95, 63, 85, 217, 233, 62, 0, 0, 0, 0, 248, 188, 99, 63, 133, 129, 191, 62, 0, 0, 0, 0, 11, 107, 109, 191, 46, 1, 101, 63, 0, 0, 0, 0, 42, 217, 228, 190, 138, 56, 252, 190, 0, 0, 0, 0, 99, 200, 94, 63, 87, 235, 56, 63, 0, 0, 0, 0, 147, 8, 49, 191, 147, 145, 123, 191, 0, 0, 0, 0, 19, 180, 61, 62, 116, 245, 94, 62, 0, 0, 0, 0, 174, 219, 121, 191, 80, 48, 98, 63, 0, 0, 0, 0, 238, 201, 239, 190, 192, 135, 42, 191, 0, 0, 0, 0, 220, 238, 62, 191, 67, 92, 87, 63, 0, 0, 0, 0, 164, 103, 10, 63, 131, 244, 148, 190, 0, 0, 0, 0, 61, 237, 116, 191, 247, 171, 56, 63, 0, 0, 0, 0, 173, 74, 49, 63, 116, 109, 22, 191, 0, 0, 0, 0, 50, 36, 79, 63, 236, 36, 101, 63, 0, 0, 0, 0, 225, 73, 228, 190, 184, 51, 30, 63, 0, 0, 0, 0, 43, 68, 73, 63, 21, 127, 93, 191, 0, 0, 0, 0, 55, 91, 0, 191, 13, 52, 104, 191, 0, 0, 0, 0, 241, 145, 215, 62, 74, 101, 93, 191, 0, 0, 0, 0, 173, 135, 0, 63, 66, 124, 84, 62, 0, 0, 0, 0, 137, 109, 122, 191),
+"format": "RGBFloat",
+"height": 1,
+"mipmaps": false,
+"width": 64
+}
+
+[sub_resource type="ImageTexture" id="ImageTexture_b_normals"]
+image = SubResource("Image_b_normals")
+
+[sub_resource type="Curve" id="Curve_b_scale"]
+resource_name = "ms_fumi_b ESP1 scale: 1 until 37.5 %, -> 1.7 at the end (x 1 +- 0.375)"
+max_value = 1.7
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.375, 1), 0.0, 0.0, 1, 1, Vector2(1, 1.7), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_b_scale"]
+curve = SubResource("Curve_b_scale")
+
+[sub_resource type="Curve" id="Curve_b_drag"]
+resource_name = "ms_fumi_b airResist 0.9 a frame on the 22 u/f launch: v = v0 x 0.9^age over the 28-frame life"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.0625, 0.8316), 0.0, 0.0, 1, 1, Vector2(0.125, 0.6916), 0.0, 0.0, 1, 1, Vector2(0.1875, 0.5751), 0.0, 0.0, 1, 1, Vector2(0.25, 0.4783), 0.0, 0.0, 1, 1, Vector2(0.3125, 0.3978), 0.0, 0.0, 1, 1, Vector2(0.375, 0.3308), 0.0, 0.0, 1, 1, Vector2(0.4375, 0.2751), 0.0, 0.0, 1, 1, Vector2(0.5, 0.2288), 0.0, 0.0, 1, 1, Vector2(0.5625, 0.1902), 0.0, 0.0, 1, 1, Vector2(0.625, 0.1582), 0.0, 0.0, 1, 1, Vector2(0.6875, 0.1316), 0.0, 0.0, 1, 1, Vector2(0.75, 0.1094), 0.0, 0.0, 1, 1, Vector2(0.8125, 0.091), 0.0, 0.0, 1, 1, Vector2(0.875, 0.0757), 0.0, 0.0, 1, 1, Vector2(0.9375, 0.0629), 0.0, 0.0, 1, 1, Vector2(1, 0.0523), 0.0, 0.0, 1, 1]
+point_count = 17
+
+[sub_resource type="CurveTexture" id="CurveTexture_b_drag"]
+curve = SubResource("Curve_b_drag")
+
+[sub_resource type="Gradient" id="Gradient_b_alpha"]
+resource_name = "ms_fumi_b ESP1 alpha: 1 until 12.5 %, -> 0 at the end"
+offsets = PackedFloat32Array(0, 0.125, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_b_alpha"]
+gradient = SubResource("Gradient_b_alpha")
+
+[sub_resource type="Gradient" id="Gradient_b_prm"]
+resource_name = "ms_fumi_b prm (255,255,242) constant"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(1, 1, 0.949, 1, 1, 1, 0.949, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_b_prm"]
+gradient = SubResource("Gradient_b_prm")
+
+[sub_resource type="Gradient" id="Gradient_b_env"]
+resource_name = "ms_fumi_b env (26,26,2) constant"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(0.102, 0.102, 0.0078, 1, 0.102, 0.102, 0.0078, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_b_env"]
+gradient = SubResource("Gradient_b_env")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_b"]
+resource_name = "ms_fumi_b: ONE puff on a circle r 30 u 10 up, 22 u/f outward (within 22.5 deg) x moment 0.75..1, airResist 0.9, life 28 +-37.5 %, a random angle +- 1/16 turn"
+lifetime_randomness = 0.375
+emission_shape = 5
+emission_point_texture = SubResource("ImageTexture_b_points")
+emission_normal_texture = SubResource("ImageTexture_b_normals")
+emission_point_count = 64
+direction = Vector3(0, 0, 1)
+spread = 22.5
+initial_velocity_min = 13.299
+initial_velocity_max = 17.732
+angle_min = -22.5
+angle_max = 22.5
+gravity = Vector3(0, 0, 0)
+scale_min = 0.625
+scale_max = 1.375
+scale_curve = SubResource("CurveTexture_b_scale")
+color_ramp = SubResource("GradientTexture1D_b_alpha")
+velocity_limit_curve = SubResource("CurveTexture_b_drag")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_b"]
+resource_name = "ms_fumi_b: P_msm_kemuball3 (raw IA8), lerp((26,26,2) -> (255,255,242), I), alpha x the fade; a billboard turned by its angle"
+shader = ExtResource("3_smoke")
+shader_parameter/tex = ExtResource("6_kemu")
+shader_parameter/prm_ramp = SubResource("GradientTexture1D_b_prm")
+shader_parameter/env_ramp = SubResource("GradientTexture1D_b_env")
+
+[sub_resource type="QuadMesh" id="QuadMesh_b"]
+resource_name = "the game's 2.0 Billboard (100 u) before its scale curve"
+material = SubResource("ShaderMaterial_b")
+size = Vector2(1.343, 1.343)
+
+[sub_resource type="Curve" id="Curve_c_scale"]
+resource_name = "ms_fumi_c ESP1 scale: 0.8 -> 1 by 24 %, -> 0.5 at the end (x 1 +- 0.3)"
+_data = [Vector2(0, 0.8), 0.0, 0.0, 1, 1, Vector2(0.2397, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.5), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_c_scale"]
+curve = SubResource("Curve_c_scale")
+
+[sub_resource type="Gradient" id="Gradient_c_alpha"]
+resource_name = "ms_fumi_c ESP1 alpha: 1 -> 0 over the whole life (out 1.0)"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_c_alpha"]
+gradient = SubResource("Gradient_c_alpha")
+
+[sub_resource type="Gradient" id="Gradient_c_prm"]
+resource_name = "ms_fumi_c prm keys (6 frames, Merge over the 9-frame life): white @1, (255,142,174) @3, white @5, (255,231,87) @6 -- the flat colour"
+offsets = PackedFloat32Array(0, 0.1667, 0.5, 0.8333, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 0.5569, 0.6824, 1, 1, 1, 1, 1, 1, 0.9059, 0.3412, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_c_prm"]
+gradient = SubResource("Gradient_c_prm")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_c"]
+resource_name = "ms_fumi_c: 8 marks at the point, no velocity (omni 0.1), life 9, a random angle (+- a half turn) spinning 0.01 half-turns/frame x (1 +- 0.4)"
+emission_shape = 0
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+angle_min = -180.0
+angle_max = 180.0
+angular_velocity_min = 64.8
+angular_velocity_max = 151.2
+gravity = Vector3(0, 0, 0)
+scale_min = 0.7
+scale_max = 1.3
+scale_curve = SubResource("CurveTexture_c_scale")
+color_ramp = SubResource("GradientTexture1D_c_alpha")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_c"]
+resource_name = "ms_fumi_c: P_msm_hitmrk1 (raw IA4), colour = prm FLAT keyed over the life, alpha = A x the fade; a billboard turned by its angle"
+shader = ExtResource("4_mark")
+shader_parameter/tex = ExtResource("7_hitmrk")
+shader_parameter/prm_ramp = SubResource("GradientTexture1D_c_prm")
+shader_parameter/env_ramp = SubResource("GradientTexture1D_c_prm")
+shader_parameter/flat_prm = true
+shader_parameter/dir_billboard = false
+shader_parameter/angle_offset = 0.0
+
+[sub_resource type="QuadMesh" id="QuadMesh_c"]
+resource_name = "the game's 2.25 x 9.0 Billboard (112 x 450 u) before its scale curve"
+material = SubResource("ShaderMaterial_c")
+size = Vector2(1.511, 6.045)
+
+[sub_resource type="Image" id="Image_s_points"]
+data = {
+"data": PackedByteArray(0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 128, 0, 0, 0, 128, 0, 0, 0, 0, 0, 0, 0, 0),
+"format": "RGBFloat",
+"height": 1,
+"mipmaps": false,
+"width": 64
+}
+
+[sub_resource type="ImageTexture" id="ImageTexture_s_points"]
+image = SubResource("Image_s_points")
+
+[sub_resource type="Image" id="Image_s_normals"]
+data = {
+"data": PackedByteArray(151, 183, 188, 190, 0, 0, 0, 0, 203, 249, 109, 191, 138, 37, 71, 189, 0, 0, 0, 0, 127, 178, 127, 63, 116, 197, 113, 63, 0, 0, 0, 0, 26, 81, 168, 62, 123, 14, 8, 189, 0, 0, 0, 0, 214, 219, 127, 191, 129, 168, 115, 63, 0, 0, 0, 0, 109, 14, 157, 62, 79, 29, 98, 63, 0, 0, 0, 0, 146, 17, 240, 62, 64, 55, 61, 63, 0, 0, 0, 0, 6, 111, 44, 191, 10, 207, 120, 63, 0, 0, 0, 0, 55, 1, 113, 190, 117, 15, 4, 63, 0, 0, 0, 0, 226, 78, 91, 191, 253, 47, 135, 189, 0, 0, 0, 0, 17, 113, 127, 63, 169, 168, 8, 61, 0, 0, 0, 0, 132, 219, 127, 191, 253, 212, 154, 61, 0, 0, 0, 0, 113, 68, 127, 191, 159, 168, 104, 63, 0, 0, 0, 0, 224, 152, 213, 62, 238, 67, 53, 63, 0, 0, 0, 0, 226, 197, 52, 191, 206, 17, 92, 63, 0, 0, 0, 0, 160, 201, 2, 191, 187, 41, 102, 63, 0, 0, 0, 0, 208, 38, 224, 190, 218, 239, 37, 189, 0, 0, 0, 0, 51, 202, 127, 191, 109, 204, 240, 62, 0, 0, 0, 0, 158, 235, 97, 63, 157, 128, 123, 191, 0, 0, 0, 0, 162, 26, 63, 62, 146, 67, 44, 63, 0, 0, 0, 0, 208, 94, 61, 191, 6, 65, 45, 63, 0, 0, 0, 0, 9, 119, 60, 191, 159, 101, 56, 191, 0, 0, 0, 0, 214, 147, 49, 63, 144, 167, 71, 63, 0, 0, 0, 0, 53, 59, 32, 63, 174, 9, 210, 189, 0, 0, 0, 0, 111, 166, 126, 191, 14, 176, 125, 63, 0, 0, 0, 0, 231, 81, 9, 190, 24, 18, 33, 62, 0, 0, 0, 0, 46, 208, 124, 63, 1, 48, 222, 189, 0, 0, 0, 0, 45, 125, 126, 63, 122, 129, 247, 62, 0, 0, 0, 0, 214, 25, 96, 191, 135, 139, 171, 61, 0, 0, 0, 0, 177, 25, 127, 191, 155, 121, 117, 191, 0, 0, 0, 0, 196, 76, 145, 62, 176, 33, 81, 191, 0, 0, 0, 0, 237, 165, 19, 63, 26, 188, 207, 61, 0, 0, 0, 0, 253, 173, 126, 191, 253, 52, 58, 191, 0, 0, 0, 0, 182, 173, 47, 191, 16, 168, 246, 190, 0, 0, 0, 0, 187, 85, 96, 191, 3, 148, 90, 191, 0, 0, 0, 0, 221, 67, 5, 191, 239, 172, 172, 62, 0, 0, 0, 0, 107, 0, 113, 191, 132, 93, 113, 63, 0, 0, 0, 0, 180, 161, 170, 62, 153, 185, 232, 190, 0, 0, 0, 0, 155, 6, 100, 63, 98, 58, 45, 190, 0, 0, 0, 0, 114, 79, 124, 191, 149, 164, 126, 191, 0, 0, 0, 0, 28, 153, 210, 189, 108, 139, 31, 62, 0, 0, 0, 0, 169, 223, 124, 191, 56, 96, 15, 63, 0, 0, 0, 0, 89, 21, 84, 191, 121, 64, 39, 63, 0, 0, 0, 0, 178, 207, 65, 191, 160, 187, 190, 189, 0, 0, 0, 0, 43, 227, 126, 63, 29, 98, 185, 190, 0, 0, 0, 0, 70, 161, 110, 63, 238, 178, 163, 62, 0, 0, 0, 0, 13, 144, 114, 63, 8, 173, 252, 62, 0, 0, 0, 0, 96, 167, 94, 63, 83, 246, 236, 62, 0, 0, 0, 0, 165, 238, 98, 191, 61, 235, 95, 63, 0, 0, 0, 0, 243, 41, 248, 190, 216, 133, 208, 62, 0, 0, 0, 0, 130, 206, 105, 63, 7, 255, 13, 63, 0, 0, 0, 0, 116, 2, 85, 63, 233, 113, 101, 191, 0, 0, 0, 0, 195, 19, 227, 190, 246, 98, 124, 191, 0, 0, 0, 0, 33, 113, 43, 62, 219, 196, 99, 62, 0, 0, 0, 0, 58, 150, 121, 63, 41, 101, 74, 63, 0, 0, 0, 0, 86, 193, 28, 191, 198, 106, 91, 63, 0, 0, 0, 0, 24, 225, 3, 63, 242, 45, 121, 191, 0, 0, 0, 0, 243, 203, 106, 62, 84, 186, 226, 62, 0, 0, 0, 0, 4, 136, 101, 63, 237, 203, 106, 191, 0, 0, 0, 0, 111, 6, 204, 190, 86, 137, 49, 63, 0, 0, 0, 0, 186, 111, 56, 63, 102, 227, 219, 190, 0, 0, 0, 0, 89, 48, 103, 191, 18, 173, 196, 61, 0, 0, 0, 0, 26, 209, 126, 63, 112, 150, 133, 190, 0, 0, 0, 0, 250, 33, 119, 191, 57, 75, 56, 190, 0, 0, 0, 0, 226, 209, 123, 63),
+"format": "RGBFloat",
+"height": 1,
+"mipmaps": false,
+"width": 64
+}
+
+[sub_resource type="ImageTexture" id="ImageTexture_s_normals"]
+image = SubResource("Image_s_normals")
+
+[sub_resource type="Curve" id="Curve_s_scale"]
+resource_name = "ms_fumi_c SSP1 scaleOut: the spoke's scale 1 -> 0 over its 24-frame life"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_s_scale"]
+curve = SubResource("Curve_s_scale")
+
+[sub_resource type="Gradient" id="Gradient_s_prm"]
+resource_name = "ms_fumi_c SSP1 prm (200,240,255) constant; alpha 183"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(0.7843, 0.9412, 1, 0.7176, 0.7843, 0.9412, 1, 0.7176)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_s_prm"]
+gradient = SubResource("Gradient_s_prm")
+
+[sub_resource type="Gradient" id="Gradient_s_env"]
+resource_name = "ms_fumi_c SSP1 env (0,150,255) constant"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(0, 0.5882, 1, 1, 0, 0.5882, 1, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_s_env"]
+gradient = SubResource("Gradient_s_env")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_s"]
+resource_name = "ms_fumi_c SSP1: one spoke per mark (8), 22 u/f +-0.2 out of the point in the plane, life 24, no fields (not inherited), scale -> 0"
+particle_flag_align_y = true
+emission_shape = 5
+emission_point_texture = SubResource("ImageTexture_s_points")
+emission_normal_texture = SubResource("ImageTexture_s_normals")
+emission_point_count = 64
+direction = Vector3(0, 0, 1)
+spread = 0.0
+initial_velocity_min = 17.571
+initial_velocity_max = 17.893
+gravity = Vector3(0, 0, 0)
+scale_curve = SubResource("CurveTexture_s_scale")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_s"]
+resource_name = "ms_fumi_c SSP1: P_msm_glow3_i (I8), lerp((0,150,255) -> (200,240,255), I), alpha I x 183/255; a DirectionCross along the velocity (two crossed quads)"
+shader = ExtResource("4_mark")
+shader_parameter/tex = ExtResource("8_glow")
+shader_parameter/prm_ramp = SubResource("GradientTexture1D_s_prm")
+shader_parameter/env_ramp = SubResource("GradientTexture1D_s_env")
+shader_parameter/flat_prm = false
+shader_parameter/dir_billboard = false
+shader_parameter/aligned_cross = true
+shader_parameter/angle_offset = 0.0
+
+[sub_resource type="QuadMesh" id="QuadMesh_s_a"]
+resource_name = "the spoke's 0.8 x 7.0 (40 x 350 u), the long side along the velocity"
+material = SubResource("ShaderMaterial_s")
+size = Vector2(0.537, 4.702)
+
+[sub_resource type="QuadMesh" id="QuadMesh_s_b"]
+material = SubResource("ShaderMaterial_s")
+size = Vector2(0.537, 4.702)
+orientation = 0
+
+[node name="TrampleDust" type="Node3D" node_paths=PackedStringArray("Ring", "Puff", "Marks", "Spokes")]
+script = ExtResource("1_script")
+Ring = NodePath("Ring")
+Puff = NodePath("Puff")
+Marks = NodePath("Marks")
+Spokes = NodePath("Spokes")
+
+[node name="Ring" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 12
+lifetime = 0.25
+one_shot = true
+explosiveness = 1.0
+visibility_aabb = AABB(-8, -2, -8, 16, 10, 16)
+process_material = SubResource("ParticleProcessMaterial_a")
+draw_pass_1 = SubResource("QuadMesh_a")
+
+[node name="Puff" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.4667
+one_shot = true
+explosiveness = 1.0
+visibility_aabb = AABB(-6, -2, -6, 12, 6, 12)
+process_material = SubResource("ParticleProcessMaterial_b")
+draw_pass_1 = SubResource("QuadMesh_b")
+
+[node name="Marks" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 8
+lifetime = 0.15
+one_shot = true
+explosiveness = 1.0
+visibility_aabb = AABB(-4, -4, -4, 8, 8, 8)
+process_material = SubResource("ParticleProcessMaterial_c")
+draw_pass_1 = SubResource("QuadMesh_c")
+
+[node name="Spokes" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 8
+lifetime = 0.4
+one_shot = true
+explosiveness = 1.0
+visibility_aabb = AABB(-10, -4, -10, 20, 8, 20)
+process_material = SubResource("ParticleProcessMaterial_s")
+draw_passes = 2
+draw_pass_1 = SubResource("QuadMesh_s_a")
+draw_pass_2 = SubResource("QuadMesh_s_b")
