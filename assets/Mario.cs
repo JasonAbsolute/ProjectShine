@@ -11240,7 +11240,7 @@ public partial class Mario : CharacterBody3D
     /// STEP3 -> STEP3, anything else -> STEP1: the chain lives in the ANIMATION, which only the TRAMPLE status keeps (trample() re-sets
     /// mAnimationId every tick), so a dive, a hover or a landing in between starts over at STEP1 -- then setStatusToJumping(TRAMPLE):
     /// mVel.y = 0.25 * mForwardVel + TramplePowStep1 / 2 / 3 (mario.prm 35 / 45 / 70), mForwardVel *= 0.8 (SmsAir.Launch.Trample1..3,
-    /// through SmsLaunch: the face latch, the fall cancel -- TRAMPLE carries FLAG_UNK2000000 -- the paint stamp). It runs TWICE on the
+    /// through SmsLaunch: the face latch, the paint stamp; the fall cancel it arms is cleared again below). It runs TWICE on the
     /// first stomp of a chain: changePlayerStatus(TRAMPLE) runs it for a TYPE_JUMPING status (MarioMove.cpp changePlayerStatus) and
     /// trampleExec calls it again explicitly; a stomp while already in TRAMPLE (changePlayerStatus returns 0 for the same status) runs it
     /// once. So the first stomp keeps 0.64 of the run and leaves at 0.2 fwd + step; the next ones keep 0.8. (MarioCollision.cpp is
@@ -11254,6 +11254,7 @@ public partial class Mario : CharacterBody3D
                 _fluddBroadJump = false;
                 _stompChain = 0;
                 StartBackflip();                                             // changePlayerStatus(MARIO_STATUS_BACK_JUMP): the backflip's launch, no step
+                _smsFallCancel = false;                                      // trampleExec 178: unk78 &= ~0x100 (pass 105b)
                 if (SmsDebugPrint) GD.Print("[SMS trample] during the broad jump: BACK_JUMP (the backflip's launch)");
                 return;
             }
@@ -11266,6 +11267,10 @@ public partial class Mario : CharacterBody3D
             SmsLaunch(kind);                                                 // setStatusToJumping(TRAMPLE) -- trampleExec's explicit call
             if (!wasTrample)
                 SmsLaunch(kind);                                             // ... and changePlayerStatus's own, on a status change
+            // trampleExec (MarioCollision.cpp 178): `unk78 &= ~0x100` right after the launch -- the fall cancel that setStatusToJumping armed for
+            // a FLAG_UNK2000000 status is DISARMED: a stomp bounce is a set height whatever A does (pass 105b; Jaysonn: "I thought bouncing off
+            // people were set heights" -- right; pass 105 let SmsLaunch's eligibility stand, so a released A cut the bounce 0.75 a tick)
+            _smsFallCancel = false;
         }
         else
         {

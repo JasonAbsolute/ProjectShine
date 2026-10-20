@@ -6150,3 +6150,27 @@ rumble.
 ### Legacy
 His stomp block (`stateOfMario == MarioState.stomping`: AIR_SINGLE air control, GRAVITY, its own landing) and his STOMP_BOUNCE_VELOCITY
 launch are RETIRED under UseSmsPhysics -- SmsAirTick, the airborne branch and the landing dispatcher do the job; both stay for the legacy mode.
+
+## SMS pass 105b -- the trample bounce is a set height (no fall cancel)
+
+Jaysonn (10-19 23:12): "is holding A supposed to effect it? i thought bouncing off people were set heights?" -- he is right.
+
+### The game
+`TMario::isFallCancel` (MarioPhysics.cpp 450-461): the 0.75-a-tick cut on a released A needs unk78 & 0x100. `setStatusToJumping`
+(MarioMove.cpp 670-673) sets that bit for any status carrying MARIO_STATUS_FLAG_UNK2000000 -- TRAMPLE has it -- and `trampleExec`
+(MarioCollision.cpp 178) clears it again right after the launch, for the TRAMPLE and for the BROAD_JUMP -> BACK_JUMP branch alike:
+`unk78 &= ~0x100`. So the launch arms the cancel and trampleExec disarms it: a stomp bounce never shortens, whatever A does. Pass 105 had
+routed StompBounce through SmsLaunch, whose pre-105 FallCancelEligible list named Trample1 / 2 / 3 as cancellable (a list that had never
+mattered for a trample until then), and told him to hold A. Wrong on both counts.
+
+### Ported
+`StompBounce` clears `_smsFallCancel` after its launches (and after the BACK_JUMP's), as trampleExec's line does; SmsLaunch still arms it
+(setStatusToJumping's rule, 1:1 in structure). No other change.
+
+### Verified (drive 105b, SmsF105B, 14/14 = drive 105's checks with the cancel flag asserted OFF after every launch + T2b; build 0 errors; boot ALL OK, empty err)
+T2b: a live Pianta trample with A RELEASED rose 215.1 u (2.89 m) from the bounce -- the game's arc for a 41-u launch is 41^2 / 8 = 210 u;
+a cancelled rise would have been ~70 u. The XZ speed still follows the 0.999-a-tick brake (T2), the landing still arms the triple (T3), the
+nozzle box unchanged (B1-B4).
+
+### Deviations / not ported
+None.
