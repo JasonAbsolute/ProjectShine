@@ -6481,3 +6481,47 @@ the weight back to 0 at the end; the legs never left RUN; a type-3 hit while sta
 The first run's squat checks were mis-written on my side (a standstill on paint, where the game itself leaves the oil run each tick); rewritten to
 slide. The port's code was right both runs. Run 2 was cut by the network (his PC dropped at 21:58 with the drive installed in Mario.cs);
 resumed at 22:26 from the recorded state.
+
+## SMS pass 111 -- Mario's goop skin: TMario::addDirty, the dirt on his body and hands
+
+Jaysonn (10-20 21:42): "also mario is not being covered in goop? did we implement that?" -- no; the port had only the yellow fog. Now it does.
+
+### The game
+TMario::addDirty (MarioDraw.cpp 2139-2163, every frame from MarioMain.cpp 136) writes mDirty (0..150, thinkDirty's amount) into the TEV konst 0
+ALPHA of every body material and every hand material. ma_mdl1.bmd (all 11 materials) and ma_hnd2l.bmd (bmd_mat_dump.py) run the same chain:
+  stage 0: (TEXA, KONST, ONE, ZERO) COMP_GR16_GT -> REG2, texmap1 = the pollution MASK (H_ma_polmask1_i4 64 x 64 on the body, H_ma_polmask_hand_i4
+           32 x 64 on the hands) through TEX1:  REG2 = mask > mDirty ? 1 : 0   (1 clean, 0 goop)
+  stage 1: (ZERO, TEXC, C2, ZERO):  the body texture where clean
+  stage 2: (TEXC, ZERO, C2, CPREV), texmap2 = H_ma_rak_dummy (8 x 8, swapped at load for the stage's /map/pollution/h_ma_rak.bti, as the NPCs')
+           through TEX2:  + the goop texture where not clean
+  stages 3-4: the toon / spec lighting on the result
+A per-texel SWAP of the albedo for the goop texture, keyed by the mask against mDirty -- the NPC skin's chain (pass 93) on Mario. The body mask
+runs 51..255 (mean 147): nothing shows under mDirty 51, 19 % of the texels goop at 90, 37 % at the 150 cap -- the splatter grows from the dark cells
+out and never covers him. TEX1 and TEX2 are the same UV set in both bmds (bmd_uv_probe.py), and his glb exports carry it as TEXCOORD_1 on every
+surface (glb_uv_probe.py: distinct from UV0 on all 11 body surfaces and the hands).
+
+### The port
+* MarioFog.gdshaderinc (pass 97's per-surface replica of his StandardMaterial3D) gains the swap: `dirty` (mDirty / 255), `pol_mask_tex`, `pol_tex`,
+  `pol_uv` (1 = UV2, the bmd's TEX1 / TEX2; chosen at Bind from the mesh format). Where floor(mask x 255 + 0.5) / 255 <= dirty the albedo texture
+  sample is the goop texture's -- before the lighting, as the TEV does it. The fog term is unchanged.
+* SmsBodyOverlay: `SetDirty(amount255, goopTexture)` -- the 16 shader copies get `dirty` and the goop texture, and are INSTALLED while dirty > 0 or
+  fogged (they used to swap in for the fog alone; the restore by identity is the same). New exports on BodyOverlay.tscn: `Body Pollution Mask`
+  (tex/H_ma_polmask1.png), `Hand Pollution Mask` (tex/H_ma_polmask_hand.png) -- both from his bmds via bti2png, pinned lossless -- and `Goop Texture`
+  (Npc/tex/H_ma_rak.png, the stage skin). The five hand meshes (ma_hnd2l / 3l / 2r / 3r / 4r under Left/RightHandBone) take the hand mask by MESH
+  name (`Hand Mesh Prefixes`); their material names vary with the export. `Dirty`, `DirtyCount`, `GoopTextureNow`, `PollutionUvNow` for the drives.
+* Mario: after the fog line in SmsAfterMove, `_smsBodyOverlay.SetDirty(_smsDirtyAmount, <the 108 layer's skin>)` every tick -- the layer that dirtied
+  him dresses the skin too when SmsGoopMario.GoopFromLayer is on (pass 108's rule; off = the stage skin, the game's one look).
+LEGACY RETIRED: none. DEVIATION (inherited from 108, behind its knob): the goop texture per layer; the game keys it per stage.
+
+### Verified (drive 111, 8 checks, on his machine; drive97 (the fog) 29/29; regressions 110 / 107 / 108 / 106 green; build 0 errors; boot ALL OK)
+The overlay carries the two masks (64 x 64 / 32 x 64) and H_ma_rak and picked UV2 from the glb; clean = all 16 surfaces on their StandardMaterial3D,
+nothing installed; the body mask's CPU census matches the game's range (0 % <= 50, 19 % <= 90, 37 % <= 150); mDirty 90 installs all 16 copies with
+dirty 90/255, a mask each (the five hands the hand mask), the stage goop, pol_uv 1, the fog off; back to 0 restores the 16 standard materials; a run
+onto a layer with its own goop texture dirties him (thinkDirty) and the skin wears that layer's texture, dirty following mDirty; the knob off puts
+the stage goop back. Headless cannot see the texels -- the look is his: run through goop and the brown splatter should grow over the overalls,
+cap, gloves and face from the dark cells of the mask outward, and wash off in water as mDirty falls.
+
+### Caught by the drive
+The hand mask was first keyed on the material name and matched 3 of 5 (the exports name them `_mat_hand3_L`, `LeftHandSlightyClosed`,
+`_mat_hand4_r1`...; one ResourceName differs at runtime) -- keyed on the mesh name / the HandBone ancestor instead. A FIRE layer in the drive
+BURNED him instead of dirtying him (floorDamage, no dirt -- the game's too); the dress test uses a Slip layer carrying the fire texture.

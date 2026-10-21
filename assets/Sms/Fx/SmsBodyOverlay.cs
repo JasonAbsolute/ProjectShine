@@ -34,6 +34,25 @@ public partial class SmsBodyOverlay : Node
 
     /// <summary>The fog's pulse: 30 ticks of the director's 120 Hz move tick = 0.25 s (65536 / 0x888 = 30 ticks a cycle).</summary>
     [Export] public float FogPeriodSeconds = 0.25f;
+    [ExportGroup("Goop skin (pass 111)")]
+    /// <summary>Mario's own pollution masks from ma_mdl1.bmd / ma_hnd2l.bmd (H_ma_polmask1_i4, H_ma_polmask_hand_i4): the intensity decides
+    /// which texels goop first (dark) and last (bright). Assigned per surface by name: the hand surfaces take the hand mask.</summary>
+    [Export] public Texture2D BodyPollutionMask;
+    [Export] public Texture2D HandPollutionMask;
+    /// <summary>The stage's goop skin (the NPCs' H_ma_rak): what a dirty Mario wears where the mask goops -- unless a layer dresses him (pass 108).</summary>
+    [Export] public Texture2D GoopTexture;
+    /// <summary>A surface takes the HAND mask when its MeshInstance3D (or an ancestor) is named with one of these prefixes, or sits under a *HandBone
+    /// node -- the five hand glbs (ma_hnd2l / 3l / 2r / 3r / 4r); their material names vary with the export, so the mesh decides.</summary>
+    [Export] public string[] HandMeshPrefixes = { "ma_hnd" };
+    /// <summary>0: the mask and goop through UV; 1: through UV2 (the bmd's TEX1 / TEX2). Set from the glb at bind: UV2 when the body mesh carries a second set.</summary>
+    [Export] public int PollutionUv = -1;
+    [ExportGroup("")]
+    private float _dirty;                                   // mDirty / 255
+    private Texture2D _dirtyTex;                            // the goop texture in use (the layer's or GoopTexture)
+    public float Dirty => _dirty;
+    public Texture2D GoopTextureNow => _dirtyTex ?? GoopTexture;
+    public int PollutionUvNow => _polUv;
+    private int _polUv;
 
     /// <summary>One body surface: its mesh, surface index, the fog copy of its material, and the override it had before the fog.</summary>
     private sealed class FogSlot
@@ -70,6 +89,8 @@ public partial class SmsBodyOverlay : Node
             return;
         }
         Collect(armature);
+        // pass 111: the bmd reads its masks through TEX1 / TEX2; the glb carries them as UV2 when it carries them at all
+        _polUv = PollutionUv >= 0 ? PollutionUv : (MeshHasUv2(_meshes) ? 1 : 0);
         if (Overlay == null)
             GD.PushWarning($"[SMS fx] {GetPath()}: the scene's Overlay export is not set (see assets/Sms/Fx/BodyOverlay.tscn)");
         if (FogShader == null || FogShaderTwoSided == null || FogShaderAlpha == null || FogShaderAlphaTwoSided == null)
@@ -81,7 +102,7 @@ public partial class SmsBodyOverlay : Node
             {
                 Material active = mesh.GetActiveMaterial(s);
                 string label = $"{mesh.Name}#{s} '{(active != null ? active.ResourceName : "null")}'";
-                ShaderMaterial fogMat = active is StandardMaterial3D std ? MakeFogMaterial(std, out string why) : Refuse(active, out why);
+                ShaderMaterial fogMat = active is StandardMaterial3D std ? MakeFogMaterial(std, mesh, out string why) : Refuse(active, out why);
                 if (fogMat == null)
                 {
                     _fogSkipped.Add(label);
@@ -92,6 +113,17 @@ public partial class SmsBodyOverlay : Node
                 _fogSlots.Add(new FogSlot { Mesh = mesh, Surface = s, Material = fogMat });
             }
         }
+    }
+
+    private static bool MeshHasUv2(List<MeshInstance3D> meshes)
+    {
+        foreach (var mi in meshes)
+        {
+            if (mi.Mesh is not ArrayMesh am) continue;
+            for (int s = 0; s < am.GetSurfaceCount(); s++)
+                if ((am.SurfaceGetFormat(s) & Mesh.ArrayFormat.FormatTexUV2) != 0) return true;
+        }
+        return false;
     }
 
     private void Collect(Node node)
@@ -114,7 +146,7 @@ public partial class SmsBodyOverlay : Node
 
     /// <summary>The surface's StandardMaterial3D as a MarioFog material: the static part picks the shader, the rest is copied in. Null, with the
     /// reason, for a feature MarioFog.gdshaderinc does not state (so the body never silently changes look under the fog).</summary>
-    private ShaderMaterial MakeFogMaterial(StandardMaterial3D b, out string why)
+    private ShaderMaterial MakeFogMaterial(StandardMaterial3D b, MeshInstance3D meshForMask, out string why)
     {
         why = null;
         Shader shader = null;
@@ -160,7 +192,48 @@ public partial class SmsBodyOverlay : Node
         m.SetShaderParameter("uv1_offset", b.Uv1Offset);
         m.SetShaderParameter(FogParam, 0f);
         m.SetShaderParameter(FogColorParam, new Vector3(_fogColor.R, _fogColor.G, _fogColor.B));
+        m.SetShaderParameter("dirty", 0f);
+        // the five hand models are their own meshes (ma_hnd2l / 3l / 2r / 3r / 4r under Left/RightHandBone); their material names vary with the export
+        bool hand = false;
+        for (Node q = meshForMask; q != null && !hand; q = q.GetParent())
+        {
+            string nm = q.Name.ToString();
+            foreach (string pre in HandMeshPrefixes ?? System.Array.Empty<string>())
+                if (!string.IsNullOrEmpty(pre) && nm.StartsWith(pre, System.StringComparison.OrdinalIgnoreCase)) hand = true;
+            if (nm.EndsWith("HandBone")) hand = true;
+        }
+        var mask = hand ? HandPollutionMask : BodyPollutionMask;
+        if (mask != null) m.SetShaderParameter("pol_mask_tex", mask);
+        if (GoopTexture != null) m.SetShaderParameter("pol_tex", GoopTexture);
+        m.SetShaderParameter("pol_uv", _polUv);
         return m;
+    }
+
+    /// <summary>addDirty (MarioDraw.cpp 2139): mDirty into every surface's konst alpha -- here the `dirty` uniform (mDirty / 255) and the goop
+    /// texture (the layer's when pass 108 dressed him, else GoopTexture). The shader copies are installed while dirty > 0 (as while fogged).</summary>
+    public void SetDirty(float amount255, Texture2D goop)
+    {
+        float d = Mathf.Clamp(amount255 / 255f, 0f, 1f);
+        Texture2D tex = goop ?? GoopTexture;
+        if (d == _dirty && tex == _dirtyTex) { RefreshFog(); return; }
+        _dirty = d; _dirtyTex = tex;
+        foreach (FogSlot slot in _fogSlots)
+        {
+            slot.Material.SetShaderParameter("dirty", d);
+            if (tex != null) slot.Material.SetShaderParameter("pol_tex", tex);
+        }
+        RefreshFog();
+    }
+    /// <summary>Surfaces wearing the goop swap right now (dirty > 0 and installed), for the drives.</summary>
+    public int DirtyCount
+    {
+        get
+        {
+            if (_dirty <= 0f) return 0;
+            int n = 0;
+            foreach (FogSlot slot in _fogSlots) if (slot.Mesh.GetSurfaceOverrideMaterial(slot.Surface) == slot.Material) n++;
+            return n;
+        }
     }
 
     /// <summary>drawLogic() runs while the status is ELECTRIC_DAMAGE.</summary>
@@ -266,10 +339,11 @@ public partial class SmsBodyOverlay : Node
     /// <summary>The fog on: each surface's override becomes its fog material (what it had is kept); off: put back.</summary>
     private void RefreshFog()
     {
-        if (_fogOn == _fogApplied)
+        bool want = _fogOn || _dirty > 0f;                      // pass 111: the shader copies carry the goop skin too
+        if (want == _fogApplied)
             return;
-        _fogApplied = _fogOn;
-        if (_fogOn)
+        _fogApplied = want;
+        if (want)
         {
             foreach (FogSlot slot in _fogSlots)
             {

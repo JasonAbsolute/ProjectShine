@@ -15218,7 +15218,8 @@ public partial class Mario : CharacterBody3D
     private float _smsOilBrake;          // mOilBrake: 0.98 (OIL_RUN) / 1.0 (OIL_SLIP, OIL_SLOPE) on the paint, 0 once the skid timer runs out
     private int _smsDirtyTimer;          // mDirtyTimer: the skid's life off the paint (reset to 10 / 60 every tick on it)
     private int _smsFogTimer;            // mStandingOnGraffitoTimer: 600 -> 0 on SLIP paint; yellow above 240, pink below, 1 HP at 360
-    private float _smsDirtyAmount;       // mDirty 0..150 (thinkDirty): the goop on him; no reader in the port yet (the melt-in-water particles are not ported)
+    private float _smsDirtyAmount;       // mDirty 0..150 (thinkDirty): the goop on him -- the melt / fling (107) and the goop skin (111, addDirty) read it
+    public float SmsDirtyAmount => _smsDirtyAmount;
     private float _smsSinkTimer;         // mSinkTimer: ticks sunk in SINK goop, held at 144 while HP > 0
     private float _smsOilFwd;            // mForwardVel in OIL_SLIP
     private float _smsOilAnimRate;       // the OIL_RUN clip rate the port put on the AnimationPlayer (0 = none)
@@ -19308,6 +19309,9 @@ public partial class Mario : CharacterBody3D
         bool smsSlipDirty = _smsDirty && _smsPollution == SmsPollution.Slip;
         _smsBodyOverlay?.SetFogColor(smsSlipDirty && _smsFogTimer > SmsParams.Dirty.FogTimeYellow ? SmsBodyOverlay.GoopYellow : SmsBodyOverlay.DamagePink);
         _smsBodyOverlay?.SetDamageFog((_smsInvincibleTicks > 0 || smsSlipDirty) && stateOfMario != MarioState.talking);
+        // addDirty() (MarioDraw.cpp 2139, every frame from MarioMain.cpp 136): mDirty into every body / hand material's konst alpha -- the goop
+        // skin (pass 111). The goop texture: the layer that dirtied him when pass 108's knob dressed him, else the stage's (H_ma_rak)
+        _smsBodyOverlay?.SetDirty(_smsDirtyAmount, _smsGoopFx != null && _smsGoopFx.GoopLayer != null && _smsGoopFx.GoopLayer.CharacterGoop(out var skinTex, out _, out _) ? skinTex : null);
         SmsMissTick(); // TMarDirector: MARIO_FLAG_GAME_OVER -> the Miss state
         SmsRoofHangCheck(); // jumpProcess() roofCode 4: a fence roof met by the head while rising, hands empty -> HANG_ROOF
         if (_smsNoLandFrames > 0)

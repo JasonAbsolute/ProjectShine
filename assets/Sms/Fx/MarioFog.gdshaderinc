@@ -23,6 +23,13 @@ uniform vec3 uv1_scale = vec3(1.0);
 uniform vec3 uv1_offset = vec3(0.0);
 uniform float fog : hint_range(0.0, 1.0) = 0.0;       // SMS_AddDamageFogEffect's linear factor at his depth (7/12 - sin / 4); 0 = off
 uniform vec3 fog_color = vec3(1.0, 0.0, 0.5);         // a FRAMEBUFFER (gamma-space) colour: the damage pink (0xFF, 0x00, 0x80) or the goop's (0x82, 0x96, 0x00)
+// Pass 111: TMario::addDirty -- the goop skin. The body's TEV stage 0 compares the pollution mask (H_ma_polmask1_i4 through TEX1; the hands
+// H_ma_polmask_hand_i4) against konst 0 alpha = mDirty (COMP_GR16_GT: mask > mDirty -> clean); stage 2 puts the goop texture (the stage's
+// h_ma_rak, swapped for H_ma_rak_dummy at load) where it is not. A per-texel SWAP of the albedo texture, the same chain as the NPC skin (pass 93).
+uniform float dirty : hint_range(0.0, 1.0) = 0.0;     // mDirty / 255 (0 .. 150/255); 0 = clean, the swap off
+uniform sampler2D pol_mask_tex : hint_default_white, filter_linear, repeat_enable;   // the intensity in .r; white = never goops
+uniform sampler2D pol_tex : source_color, hint_default_black, filter_linear, repeat_enable;   // the goop texture (H_ma_rak or the layer's)
+uniform int pol_uv = 0;                               // 0: the mask / goop through UV (TEX0), 1: through UV2 (the bmd's TEX1 / TEX2 when the glb carries them)
 
 vec3 mf_to_gamma(vec3 c) {
 	c = clamp(c, vec3(0.0), vec3(1.0));
@@ -45,6 +52,14 @@ void fragment() {
 	vec4 albedo_tex = texture(texture_albedo, uv);
 	if (use_vertex_color) {
 		albedo_tex *= COLOR;
+	}
+	if (dirty > 0.0) {
+		// stage 0 / 2 (MarioDraw.cpp addDirty): the mask's 8-bit value against mDirty -- at or under it the texel wears the goop texture
+		vec2 puv = pol_uv == 1 ? UV2 : uv;
+		float mask = floor(texture(pol_mask_tex, puv).r * 255.0 + 0.5) / 255.0;
+		if (mask <= dirty) {
+			albedo_tex.rgb = texture(pol_tex, puv).rgb;
+		}
 	}
 	ALBEDO = albedo.rgb * albedo_tex.rgb;
 	METALLIC = metallic;

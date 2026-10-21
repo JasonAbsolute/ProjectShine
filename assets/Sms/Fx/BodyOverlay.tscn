@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://cbodyovl00056"]
+[gd_scene load_steps=11 format=3 uid="uid://cbodyovl00056"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsBodyOverlay.cs" id="1_script"]
 [ext_resource type="Shader" path="res://assets/Sms/Fx/BodyOverlay.gdshader" id="2_shader"]
@@ -6,6 +6,9 @@
 [ext_resource type="Shader" path="res://assets/Sms/Fx/MarioFogTwoSided.gdshader" id="4_fog2"]
 [ext_resource type="Shader" path="res://assets/Sms/Fx/MarioFogAlpha.gdshader" id="5_foga"]
 [ext_resource type="Shader" path="res://assets/Sms/Fx/MarioFogAlphaTwoSided.gdshader" id="6_foga2"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/H_ma_polmask1.png" id="7_mask"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/H_ma_polmask_hand.png" id="8_maskh"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/H_ma_rak.png" id="9_rak"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_overlay"]
 resource_name = "the body's overlay: the shock's negative (drawLogic, GX_LO_INV) over the finished body; the damage fog is MarioFog on the surfaces themselves"
@@ -19,5 +22,8 @@ FogShader = ExtResource("3_fog")
 FogShaderTwoSided = ExtResource("4_fog2")
 FogShaderAlpha = ExtResource("5_foga")
 FogShaderAlphaTwoSided = ExtResource("6_foga2")
+BodyPollutionMask = ExtResource("7_mask")
+HandPollutionMask = ExtResource("8_maskh")
+GoopTexture = ExtResource("9_rak")
 ExcludedSubtrees = PackedStringArray("SmsFluddAttach")
 FogPeriodSeconds = 0.25
