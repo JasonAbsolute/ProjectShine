@@ -11490,7 +11490,13 @@ public partial class Mario : CharacterBody3D
         Vector3 oldFace = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
         Vector3 toAttacker = new Vector3(attackerPos.X - GlobalPosition.X, 0f, attackerPos.Z - GlobalPosition.Z);
         Vector3 attackDir = toAttacker.LengthSquared() > 1e-6f ? toAttacker.Normalized() : oldFace; // getAttackAngle()
-        string what = "HP only (type 3: the upper-body damage run is not ported)";
+        string what = "HP only (type 3)";
+        // damageExec (MarioCollision.cpp 316): a type-3 hit while RUN / OIL_RUN -> setUpperDamageRun: bck 0x4A "dgrun" on the upper body from its
+        // start at rate 0.5, UPPER_STATE_FIXED_ANIMATION until the clip completes (MarioUpper.cpp 131); the legs keep running (pass 110)
+        if (p.DownType == 3 && (stateOfMario == MarioState.running || stateOfMario == MarioState.sprinting || stateOfMario == MarioState.walking || stateOfMario == MarioState.oilRun))
+        {
+            if (SmsUpperDamageRunStart()) what = "HP only (type 3): the upper-body damage run, ma_dgrun at 0.5 over the legs";
+        }
         // changePlayerDropping(statusIdx): a knockdown drops the held object (dropObject -> THROWN); a type-3 hit while RUNNING sets the upper
         // damage run (setUpperDamageRun, MarioDraw.cpp 1851: UPPER_STATE_FIXED_ANIMATION), which considerTake (MarioCollision.cpp 406) reads as
         // 'not holding' -> THROWN the next tick: dropped too. A type-3 hit standing still keeps it (pass 62)
@@ -13067,7 +13073,7 @@ public partial class Mario : CharacterBody3D
         bool treeOn = animTree != null && animTree.Active;
         foreach (var kv in _fluddUpperGraft)
         {
-            bool on = kv.Key == _fluddPumpBound && SmsFluddUpperBlend && !treeOn; // the tree carries the variant itself (below)
+            bool on = kv.Key == _fluddPumpBound && SmsFluddUpperBlend && !treeOn && !_smsDgrunOn; // the tree carries the variant itself (below); a FIXED upper animation outranks the pump (addUpper, pass 110)
             kv.Value.Weight = on ? 1f : 0f;
             if (on)
                 kv.Value.Time = _fluddPumpTime;
@@ -13204,12 +13210,49 @@ public partial class Mario : CharacterBody3D
             p.Play();
     }
 
+    // ---- the upper-body damage run (pass 110): setUpperDamageRun (MarioDraw.cpp 1854) / UPPER_STATE_FIXED_ANIMATION (MarioUpper.cpp 131) ----
+    private SmsUpperPose _smsDgrunGraft; private double _smsDgrunLen, _smsDgrunT; private bool _smsDgrunOn;
+    private const double SmsUpperDamageRunRate = 0.5;   // setUpperDamageRun: frameCtrl.setRate(0.5f) -- the clip at half speed
+    /// <summary>The upper body is in the fixed damage-run animation (the drives read it).</summary>
+    public bool SmsUpperDamageRunOn => _smsDgrunOn;
+    public double SmsUpperDamageRunTime => _smsDgrunT;
+    private void SmsSetupUpperDamageRun()
+    {
+        if (skeleton == null || animPlayer == null || !animPlayer.HasAnimation("ma_dgrun")) return;
+        var clip = animPlayer.GetAnimation("ma_dgrun");
+        _smsDgrunGraft = new SmsUpperPose { Name = "SmsUpper_ma_dgrun" };
+        skeleton.AddChild(_smsDgrunGraft);
+        skeleton.MoveChild(_smsDgrunGraft, 0);
+        _smsDgrunGraft.Bind(skeleton, clip, "chn_chest");
+        _smsDgrunLen = clip.Length; _smsDgrunGraft.Weight = 0f;
+        if (SmsDebugPrint) GD.Print($"[SMS damage] upper damage run graft: ma_dgrun ({clip.Length:F3} s) on {_smsDgrunGraft.BoneCount} bones under chn_chest");
+    }
+    /// <summary>setUpperDamageRun: the clip from its start (setFrame(getStart())) at rate 0.5; FIXED until it completes. False without the clip.</summary>
+    private bool SmsUpperDamageRunStart()
+    {
+        if (_smsDgrunGraft == null) return false;
+        _smsDgrunOn = true; _smsDgrunT = 0.0;
+        _smsDgrunGraft.Time = 0.0; _smsDgrunGraft.Weight = 1f;
+        return true;
+    }
+    /// <summary>Once a physics frame: the fixed animation advances at 0.5 and ends when the clip completes (someAnimationCompleted) -- or at once
+    /// when a knockdown, the water or a talk takes the body (the game's status change re-targets the upper track).</summary>
+    private void SmsUpperDamageRunTick(double delta)
+    {
+        if (!_smsDgrunOn || _smsDgrunGraft == null) return;
+        bool body = stateOfMario == MarioState.hurt || stateOfMario == MarioState.swimming || stateOfMario == MarioState.dead || _smsTalking || heldBody != null;
+        _smsDgrunT += delta * SmsUpperDamageRunRate;
+        if (body || _smsDgrunT >= _smsDgrunLen) { _smsDgrunOn = false; _smsDgrunGraft.Weight = 0f; return; }
+        _smsDgrunGraft.Time = _smsDgrunT; _smsDgrunGraft.Weight = 1f;
+    }
+
     /// <summary>The upper clips the tree does not carry -- ma_swpmp (0x95), ma_hgpmp (0x45), ma_fepmp (0x94) -- each on the chn_chest subtree
     /// (SmsUpperPose), for the frames the tree does not drive; the one the body clip's column names is weighted in.</summary>
     private void SmsFluddSetupUpperGrafts()
     {
         if (skeleton == null || animPlayer == null)
             return;
+        SmsSetupUpperDamageRun();
         foreach (var (id, name) in new[] { (SmsParams.Fludd.UpperPump, "ma_pump"), (SmsParams.Fludd.UpperSwPmp, "ma_swpmp"), (SmsParams.Fludd.UpperHgPmp, "ma_hgpmp"), (SmsParams.Fludd.UpperFePmp, "ma_fepmp") })
         {
             if (!animPlayer.HasAnimation(name))
@@ -13595,7 +13638,8 @@ public partial class Mario : CharacterBody3D
     // fore / aft or turns the face, ANIM_LAND with the pump on the upper body, the nozzles banking with the stick. It ends into
     // ROCKET_LANDING (landing(): the port's ledgeFall with _smsRocketLanding) when R lifts, the 3 s window closes, the tank runs
     // dry or the nozzle changes. Touching the floor does not land him (jumpProcess case 1 is a no-op in rocketing(): the spring
-    // lifts him off again); a roof stops him (fwd 0) and would hang him from a fence roof (HANG_ROOF, not ported).
+    // lifts him off again); a roof stops him (fwd 0) -- and never hangs him: hipAttacking calls jumpProcess(0), and checkGroundAtJumping gives the
+    // fence-roof code 4 only with param_2 & 2 (MarioPhysics.cpp 393; the rocket's rise does, SmsRoofHangCheck). Pass 110 corrected this comment.
     // ---------------------------------------------------------------------------------------------------------------
 
     /// <summary>TWaterGun::canSpray(): water in the tank and, for a trigger nozzle, its state ACTIVE (the spray: a strength).</summary>
@@ -15556,8 +15600,9 @@ public partial class Mario : CharacterBody3D
         armature.Rotation = new Vector3(0f, YawFromDir(f), 0f);
         if (stateOfMario == MarioState.oilRun)
         {
-            // ANIM_RUN2 at 0.5 x mag x mSlipAnmSpeed (the legs pedal, up to 4.0); no stick: ANIM_WAIT at 0.5 (ANIM_SQWAT with the squat held: not ported)
-            string clip = mag > 0f ? "ma_run2" : "ma_wait";
+            // ANIM_RUN2 at 0.5 x mag x mSlipAnmSpeed (the legs pedal, up to 4.0); no stick: ANIM_SQWAT at 0.5 with the squat button held (mInput & L,
+            // MarioRun.cpp 1282; pass 110), else ANIM_WAIT at 0.5
+            string clip = mag > 0f ? "ma_run2" : (SmsSquatLHeld() && animPlayer.HasAnimation("ma_sqwat") ? "ma_sqwat" : "ma_wait");
             float rate = mag > 0f ? 0.5f * mag * SmsParams.Dirty.SlipAnmSpeed : 0.5f;
             if (animTree != null)
                 animTree.Active = false;
@@ -17254,6 +17299,7 @@ public partial class Mario : CharacterBody3D
     private void SmsTakeTick(double delta)
     {
         SmsThrownFlight.Tick(delta);
+        SmsUpperDamageRunTick(delta);                                                     // pass 110: the fixed upper animation's clock
         if (_smsCarryGraft != null)
         {
             // UPPER_STATE_HOLDING_OBJECT (MarioDraw.cpp 1880): bck 0x4B, ma_carry_p, on the second root over whatever the body plays -- the

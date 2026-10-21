@@ -6444,3 +6444,40 @@ after it -- the jump-buffer fill is now gated on the disabled ticks (port). The 
 per-pound latch), so the message never ran, or the challenge began during the talk -- the switch keeps the pounding Mario for the message (port).
 `cs.Disabled = true` inside the HitZone's BodyEntered was refused by the physics flush -- SetDeferred (port). The boot's landing on his Level's
 Goop7 left the footprint window open, so leaked jumps stamped goop on the strip -- the drive resets the timer at setup (test).
+
+## SMS pass 110 -- the Mario leftovers: the oil run's held squat, the upper-body damage run (and two "gaps" that were not)
+
+Jaysonn (10-20 20:23 / 21:42): "do both the red coins switch and mario leftovers stuff" -- "go on with 110".
+
+### Verified first, against the decomp
+Of the five items on the list, two were not gaps and one belongs elsewhere:
+* The hip drop under a fence roof never hangs Mario. hipAttacking (MarioJump.cpp 1096) calls jumpProcess(0), and checkGroundAtJumping returns the
+  fence-roof code 4 only when its argument carries bit 2 (MarioPhysics.cpp 393) -- jumpingBasic and rocketing pass 2, the hip drop does not. The
+  port's SmsRoofHangCheck already covers the rocket's rise. The Mario.cs comment that called this "not ported" is corrected.
+* The wire / wire-hang cameras ARE ported (SunshineCamera.cs 557, pass 66y: kindWire / kindWireHang).
+* The fruits bouncing off Mario (TMapObjBall::boundByActor / kicked, MapObjBall.cpp 184-330) is a map-object physics system with per-fruit tables --
+  its own pass (112).
+
+### Shipped
+* The oil run's squat (MarioRun.cpp 1280-1284, oilRunning): with the stick centred, L held (mInput & TMarioGamePad::L) plays ANIM_SQWAT at 0.5,
+  else ANIM_WAIT at 0.5 -- the port played ma_wait either way. Now `SmsSquatLHeld()` -> ma_sqwat. (A STANDSTILL on paint is the game's own
+  OIL_RUN -> WAIT loop each tick (pass 67), so the squat shows while he still slides with the stick released.)
+* The type-3 upper-body damage run (MarioCollision.cpp 316-319: damageAnimType 3 while RUN / OIL_RUN -> setUpperDamageRun; MarioDraw.cpp 1854:
+  bck 0x4A "dgrun" on the upper track from its start at rate 0.5, mUpperState = UPPER_STATE_FIXED_ANIMATION; MarioUpper.cpp 131: back to IDLE
+  when the clip completes; addUpper leaves a FIXED animation alone, so the pump / carry upper clips yield meanwhile). The legs keep running;
+  no knockback, no camera shake. Port: an SmsUpperPose graft of ma_dgrun on the chn_chest subtree (the same modifier the swim pump uses),
+  started by the type-3 branch of SmsDamageExec while running / sprinting / walking / in the oil run, advanced at 0.5 x from SmsTakeTick, off
+  when the clip completes or a knockdown / the water / a talk / a carry takes the body. `SmsUpperDamageRunOn` / `SmsUpperDamageRunTime`.
+  The goop's HP tick (floorDamageExec, type 3) is the one type-3 source in the port today.
+LEGACY RETIRED: none (two stale "not ported" comments corrected).
+
+### Verified (drive 110, 8 checks, on his machine; regressions 109 / 105b / 106 / 107 / 102 green; build 0 errors; boot ALL OK)
+The graft on the skeleton (16 bones under chn_chest, weight 0 idle); a run on painted SLIP goop is the oil run (ma_run2 pedalling); the stick
+released with L held while sliding at 3.8 m/s -> ma_sqwat at 0.5; L released -> ma_wait at 0.5; a type-3 hit while sprinting: the fixed animation
+on from frame 0 at weight 1, HP 8 -> 7, the state still sprinting; it ran 57 frames (the 0.467 s clip at 0.5 = 56 at 60 Hz), the time monotone,
+the weight back to 0 at the end; the legs never left RUN; a type-3 hit while standing starts nothing. Headless cannot see the pose -- the look is his.
+
+### Caught by the drive
+The first run's squat checks were mis-written on my side (a standstill on paint, where the game itself leaves the oil run each tick); rewritten to
+slide. The port's code was right both runs. Run 2 was cut by the network (his PC dropped at 21:58 with the drive installed in Mario.cs);
+resumed at 22:26 from the recorded state.
