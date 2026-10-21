@@ -6300,3 +6300,29 @@ emits only while the port is in its groundSpin state. Not ported: the walk-sand 
 
 ### Legacy
 None retired: his LandingDustFx is the landing's; the water branch of SmsThinkDirty was mine (pass 65) and is corrected, not replaced.
+
+## SMS pass 107b -- the footprints and the melt were invisible (and 106's hit marks and spokes): POSITION on every shader path
+
+Jaysonn (10-20 02:07): "the spin fling is the only one i see working otherwise nothing else is it seems?"
+
+### The cause
+Godot gives a spatial shader that writes POSITION ANYWHERE the whole-shader define OVERRIDE_POSITION (scene_shader_forward_clustered.cpp 839:
+`usage_defines["POSITION"]`), and the vertex stage then does `gl_Position = position` on EVERY path, the default `projection x vertex` skipped
+(scene_forward_clustered.glsl 377 / 522; `position` starts as vec4(1.0)). goop_*.gdshader's DirBillboard kind (the fling) writes POSITION; its two
+flat kinds (the footprint, the melt) only moved VERTEX -- so they drew at vec4(1.0): nowhere. The same shape sat in pass 106's trample_mark.gdshader:
+the ring's DirBillboard branch writes POSITION, the marks' billboard branch and the spokes' aligned-cross branch do not -- the hit marks and the blue
+spokes have been invisible since 106 (he saw the ring and the puff). Headless cannot catch this: the quads compile fine and simply land off-screen.
+
+### The fix
+Every branch of goop_footprint / goop_melt / goop_fling.gdshader and of trample_mark.gdshader writes `POSITION = PROJECTION_MATRIX * MODELVIEW_MATRIX
+* vec4(VERTEX, 1.0)` after its own VERTEX / MODELVIEW_MATRIX work (gen_fx_goop.py, gen_fx_trample.py). Also: the footprint's ground frame is now
+right-handed (X = normal x forward, as the game's calcGroundMtx: X x Y = Z) -- it was a mirror, which cull_disabled hid.
+
+### Verified (drive 107 18/18, 106 18/18 on the new Mario.cs; build 0 errors; boot ALL OK -- the drives see nodes, not pixels: the look is his)
+
+### Also raised (10-20 02:08): "the goop on npc is just brown? it should be whatever goop they are in"
+The game's rule is PER STAGE, not per goop: an NPC's goop skin is the stage's one /map/pollution/h_ma_rak.bti (Delfino's is brown; the port carries it
+as assets/Sms/Npc/tex/H_ma_rak.png) and its drip / wash / sparkle colours come from SMSSetEmitterPolColor's per-MAP table (EmitterViewObj.cpp 644:
+Delfino's row (181,132,102) / (98,14,0); Sirena's pink is a different row). The port's goop LAYERS do differ per type (BrownGoop / FireGoop /
+ElectricGoop textures, pass 65). Making an NPC wear the goop it sank in is a DEVIATION the game never had; offered as a knob (SmsNpcProfile.GoopFromLayer)
+for his word.

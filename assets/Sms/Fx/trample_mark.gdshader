@@ -25,7 +25,10 @@ vec3 to_linear(vec3 c) {
 void vertex() {
 	life_phase = INSTANCE_CUSTOM.y;
 	if (aligned_cross) {
-		// the align_y transform as the process material built it: Y = the velocity, the mesh drawn in it (a DirectionCross)
+		// the align_y transform as the process material built it: Y = the velocity, the mesh drawn in it (a DirectionCross). POSITION written
+		// here too: a shader that writes POSITION anywhere skips the default transform on EVERY path (OVERRIDE_POSITION) -- pass 107b's fix;
+		// the marks and spokes had been invisible since 106
+		POSITION = PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
 	} else if (dir_billboard) {
 		vec3 center_v = (VIEW_MATRIX * MODEL_MATRIX[3]).xyz;
 		vec3 vel_w = MODEL_MATRIX[1].xyz;
@@ -45,6 +48,7 @@ void vertex() {
 		world = world * mat4(vec4(cos(a), -sin(a), 0.0, 0.0), vec4(sin(a), cos(a), 0.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0));
 		MODELVIEW_MATRIX = VIEW_MATRIX * world;
 		MODELVIEW_NORMAL_MATRIX = mat3(MODELVIEW_MATRIX);
+		POSITION = PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
 	}
 }
 

@@ -37,13 +37,17 @@ void vertex() {
 	pick = COLOR.r;
 	float t = clamp(life_phase, 0.0, 1.0);
 	vec2 v = VERTEX.xy * vec2(esp1(t, esp1_x), esp1(t, esp1_y));   // the QuadMesh faces +Z: its vertices in XY, V up the +Y side
+	// Godot (scene_shader_forward_clustered.cpp 839): a shader that writes POSITION ANYWHERE gets OVERRIDE_POSITION for the whole shader and the
+	// default gl_Position is skipped on every path (position = vec4(1.0): the quad vanishes) -- so every kind writes it (pass 107b)
 	if (quad_kind == 0) {
 		VERTEX = vec3(v.x, 0.0, v.y);
 		NORMAL = vec3(0.0, 1.0, 0.0);
+		POSITION = PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
 	} else if (quad_kind == 1) {
 		// align_y (particle_process_material.cpp 1203-1212): Y = the velocity, Z = the emitter's X x Y (vertical for a horizontal drift),
 		// X = Y x Z (the horizontal perpendicular) -> the plain XY quad already lies flat, V along the drift
 		VERTEX = vec3(v.x, v.y, 0.0);
+		POSITION = PROJECTION_MATRIX * MODELVIEW_MATRIX * vec4(VERTEX, 1.0);
 	} else {
 		vec3 center_v = (VIEW_MATRIX * MODEL_MATRIX[3]).xyz;
 		vec3 vel_w = MODEL_MATRIX[1].xyz;

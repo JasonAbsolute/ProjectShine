@@ -15262,7 +15262,7 @@ public partial class Mario : CharacterBody3D
         if (fwd.LengthSquared() < 1e-6f)
             return;
         fwd = fwd.Normalized();
-        Vector3 right = fwd.Cross(n).Normalized();
+        Vector3 right = n.Cross(fwd).Normalized();                       // X x Y = Z: the game's frame is right-handed (its X column = (cos, dy, -sin))
         _smsGoopFx.SpawnFootPrint(new Transform3D(new Basis(right, n, fwd), ground));
         if (SmsDebugPrint)
             GD.Print($"[SMS goop] footprint {joint} at {ground} (timer {_smsFootPrintTimer}, dirty {_smsDirtyAmount:F0})");
