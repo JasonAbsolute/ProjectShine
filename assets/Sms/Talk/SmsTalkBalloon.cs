@@ -105,6 +105,8 @@ public partial class SmsTalkBalloon : CanvasLayer
     public TalkState State { get; private set; } = TalkState.Closed;
     public bool IsOpen => State != TalkState.Closed;
     public bool IsOpenOn(SmsNpc npc) => IsOpen && _npc == npc;
+    /// <summary>The node name of the player the last close played (the drives read it; pass 109).</summary>
+    public string LastCloseSound { get; private set; } = "";
     public bool LastPage => _lastPage;
     public int Page => _page;
     public int PageCount => _pages.Count;
@@ -316,7 +318,9 @@ public partial class SmsTalkBalloon : CanvasLayer
     /// npcTalkOut), startAppearTelop(false) (the port's telop returns on its own clock), then state 6's fade.</summary>
     private void CloseTalkWindow()
     {
-        _sfxSelect?.Play();
+        var close = _npc != null && _npc.TalkCloseSound != null ? _npc.TalkCloseSound : _sfxSelect;   // pass 109: the switch's message closes with SY_RACE_START (Talk2D2.cpp 479: msg 30)
+        LastCloseSound = close?.Name ?? "";
+        close?.Play();
         _camera?.MakeMtxForPrevTalk();
         SmsNpc.NpcTalkOutAll();
         State = TalkState.Closing;

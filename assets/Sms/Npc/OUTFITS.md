@@ -187,6 +187,8 @@ copy = a town's own fashion while the stock Piantas keep the game's.
 | Talk | `Lines`, `CanTalk` | the balloon's pages (Enter = a new line, up to three a page); empty or off = no cursor. A page ending in `<yesno>` asks: when its text is in, the game's yes/no box (`me_4`) replaces the continue mark -- stick or D-pad up/down move the highlight, A or B confirm (B does not cancel). `<s0=Sure>` / `<s1=No way>` name the two options yourself (16 chars each, the first one met is the one highlighted). The box shows on the page that carries the tags; one answer per talk, reset when the next talk starts. |
 | Talk | `On Yes`, `On No` | what the answer does, on the NPC: None / Stop Worrying / Start Worrying. `Last Choice` (0 = the first option, 1 = the second, -1 = none yet) and the `TalkChoiceMade(choice)` signal carry it to your own scripts -- in the game the answer goes to the stage script, so anything beyond the Toad's worry is yours to wire. |
 | Who | `Worried` | the Toad's worried kind (the game's placement flag 0x100): wait / sit / run / walk play their fidgety `ororo` variants, the talk its `worry` clips, the blink `kinopio_twait2` and the talking face `kinopio_tworry` (the same face a dirty Toad wears). Flip it on a standing Toad and it re-plays its clip in the other variant. The swap tables are on the profile (`Worried Clips` / `Worried Patterns`); a Pianta's are empty, so the switch does nothing there. `Toad.tscn` ships Worried with a two-page question (`On Yes` = Stop Worrying) as the test: yes calms him, no leaves him shaking. |
+| Talk | `Hidden` | the stage scripts' `setHide4LiveActor` (pass 109): the model is not drawn, nothing collides, no cursor, and the proximity talk is refused -- only a **forced talk** reaches it (`Mario.SmsForceStartTalk(npc)`: the NPC is warped 400 units in front of Mario facing him and the talk starts the first frame he is grounded, not jumping and not already talking -- the game's `__forceStartTalk`). The red coin switch's message board is one. Deviation noted: the game's hidden board keeps its proximity talk at its placement. |
+| Talk | `Talk Close Sound` | an `AudioStreamPlayer` to play when this NPC's window closes instead of the balloon's select tick. The game keys it on the message: the red coin switch's (sys_message 30) closes with the race-start sound; empty = the tick. |
 | Take | `Can Be Taken` | B lifts it instead of talking (the game's stage-script flag); carried, put down or pitched |
 | Throw | `Throws Mario`, `Throw Speed`, `Throw Angle Deg` | the Pianta Village launcher: when the talk ends it hurls Mario up and over its own head, to its BACK, at the speed (units a tick) and angle. It takes the talk only within 200 units (not 400). Stand it with its back to the destination. |
 | Pollution | `Pollution` | 0..1: placed already goop-covered (dirty wait, no talk, no turning, the head straight) until the hose washes it clean (125 hits at the Pianta's 0.008) |
@@ -257,6 +259,26 @@ perform skips the hit checks); a stage that wants a solid post gives it one in i
   104: 0.27 s each way); the game's is 4 (0.53 s).** The arrow / dot pulse and the mark group's fade-in keep the game's 4. Also the
   balloon's `Size` (the frame's scale), `Auto Wrap`. `Park Offset` moves only the balloon, never the board.
 - Other NPC kinds are untouched: give a Pianta or a Toad the Board profile and it loses its model handling -- make a sign, not a profile swap.
+
+## 7e. The red coin switch's message -- `red_coin_switch.tscn` (pass 109: the game's `timerredcoin.sb`)
+
+In Sunshine the red coin switch (`TRedCoinSwitch`) does three things on a ground pound: plays its press clip, kills the pad for the clip's
+length x 2 + 60 frames, drops its collision -- and when the clip ends it raises a flag. The **stage script** (`timerredcoin.sb`, read off the disc)
+then warps an invisible board NPC 400 units in front of Mario, force-talks it, and the **board window** shows system message 30, "Collect 8
+red coins / before the timer / runs out! / / GOOD LUCK!"; A or B closes it with the race-start sound (the only message that does), the camera
+comes back, and only when the talk has fully ended do the 8 red coins appear, the timer start and the red coin counter come in at 0.
+`RedCoinSwitch.cs` now runs exactly that on the SMS systems:
+
+- `Message Text` is the board's page (Enter = a new line, six lines a page; it ships with the game's words). The board itself is an `SmsNpc` of
+  the Board kind instanced **hidden** under the switch at start (`SignBoard.tscn`); `Message Board Path` points it at one you placed instead.
+- `Press Sound` (the pound's `MSD_SE_OBJ_AP_BUTTON`) and `Race Start Sound` (the window's close) are `AudioStreamPlayer` slots -- drop players on
+  the switch and assign them; no streams ship yet. `Pad Disable Extra Frames` is the game's 60.
+- The challenge (your `RedCoinScene` at the `Red Coin Spawns` markers, your `ShineTimer`) starts when the talk has ended; the HUD's red coin
+  counter appears at that moment (it used to wait for the first coin). Without SMS physics on Mario, or with no board, it starts without a message.
+- **Retired:** the `SignPopup` banner for this switch. `Sign Popup Scene` / `Sign Layer Path` stay on the inspector so your level scenes load
+  clean, but nothing reads them. `Font/HudElements/SignPopup` itself is untouched.
+- Gaps, logged: the dead pad neutralises the stick and A (the jump); R / Z / X are read where they are used and are not gated -- the window is
+  the clip's length (0.2 s on the current `redcoinswitch` clip), then the talk owns him anyway.
 
 ## 8. If it breaks
 

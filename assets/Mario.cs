@@ -2130,6 +2130,14 @@ public partial class Mario : CharacterBody3D
         );
         if (UseSmsPhysics)
             LstickVec = SmsStick.PadStick(LstickVec); // the pad library (PADClamp 15 / 72 / 40, JUTGamePad / 54): mMainStick.mPosX / mPosY, what every stage below reads -- the 15 % dead zone is the game's, a pad's rest drift never reaches the wait's turn (pass 44)
+        if (UseSmsPhysics && _smsPadDisabledTicks > 0)
+        {
+            // TMarioGamePad::mDisabledFrames (MarioGamePad.cpp 70): the pad reads neutral -- the red coin switch's press (pass 109). The stick and A
+            // here (A through the talk's swallow flag); R / Z / X are read where they are used and are not gated (a logged gap)
+            _smsPadDisabledTicks = Math.Max(0, _smsPadDisabledTicks - SmsUnits.TicksFor(delta, ref _smsPadDisabledAccum));
+            LstickVec = Vector2.Zero;
+            _smsTalkSwallowA = true;
+        }
         _camMainStick = LstickVec; // mCompSPos[4],[5]: the pad's main stick as the L camera reads it (SmsCamMarioData.MainStick), before his own scaling
         if (UseSmsPhysics && (SmsYCamOn || _ycamNeutralTicks > 0))
             LstickVec *= SmsYCamOn ? 0f : SmsYCamMarioStickScale(); // the L camera: his stick is the camera's (mCompSPos[0],[1] are never written); onNeutralMarioKey() at either end: dead 0.44 s, then fades in over 0.22 s
@@ -2201,7 +2209,7 @@ public partial class Mario : CharacterBody3D
         // Update jump buffer (works in air + on ground)
         if (_smsTalkSwallowA && !Input.IsActionPressed("button_a") && !Input.IsActionPressed("key_space"))
             _smsTalkSwallowA = false; // the talk's A released: A is his again (PAD_FLAG_TALK_SELECT off, pass 85)
-        if (!_smsTalkSwallowA && (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space")))
+        if (!_smsTalkSwallowA && _smsPadDisabledTicks == 0 && (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space")))   // pass 109: a dead pad has no edges
         {
             jumpBuffer = JUMP_BUFFER_FRAMES;
         }
@@ -11117,6 +11125,8 @@ public partial class Mario : CharacterBody3D
         _smsTalkPadFlagPrev = _smsTalkPadFlag;
         _smsTalkPadFlag = false;
         SmsTalkTargetNpc = null;
+        if (_smsForceTalkNpc != null && SmsForceTalkTick())
+            return;
         if (_smsTalking || !SmsCanStartTalk)
             return;
         SmsNpc take = SmsNpcTakeOffered();
@@ -11133,6 +11143,38 @@ public partial class Mario : CharacterBody3D
                 GD.Print($"[SMS talk] director: B by {npc.Name} -> the talk");
         }
     }
+
+    // ---- the stage script's forced talk (pass 109): evWarpFrontToMario + __forceStartTalk (NpcEvent.cpp 90), retried every frame as the
+    // script's loop does, then the director's unk126 = 1 start ----
+    private SmsNpc _smsForceTalkNpc;
+    /// <summary>A forced talk is waiting for its conditions (the script's yield loop).</summary>
+    public bool SmsForceTalkPending => _smsForceTalkNpc != null;
+    /// <summary>The stage script's `warpFrontToMario(npc); forceTalk(npc)`: from the next director tick the NPC is warped 400 u in front of him facing
+    /// him and the talk starts the first frame the game's conditions hold -- not in a talk or demo, isMarioTouchGround4cm, no JUMPING-type status.
+    /// The same NPC asked twice is one request; a different NPC replaces a pending one.</summary>
+    public void SmsForceStartTalk(SmsNpc npc) { _smsForceTalkNpc = npc; }
+    public void SmsCancelForceTalk() { _smsForceTalkNpc = null; }
+    private bool SmsForceTalkTick()
+    {
+        var npc = _smsForceTalkNpc;
+        if (npc == null || !IsInstanceValid(npc) || !npc.IsInsideTree()) { _smsForceTalkNpc = null; return false; }
+        if (_smsTalking || stateOfMario == MarioState.talking || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.dead) return true;   // isTalkOrDemoModeNow
+        if (!_smsGround4cm) return true;                                                                      // SMS_IsMarioTouchGround4cm
+        bool jumpingType = TryGetAirProfile(stateOfMario, out _) || stateOfMario == MarioState.ledgeFall || stateOfMario == MarioState.hurt
+            || (stateOfMario == MarioState.bonk && _bonkAirborne);                                            // checkStatusType(MARIO_STATUS_FLAG_JUMPING)
+        if (jumpingType) return true;
+        _smsForceTalkNpc = null;
+        npc.WarpFrontOfMario(this);                                                                           // the script warps before each attempt
+        npc.StartTalk();                                                                                      // unk126 = 1: TNerveNPCTalk + startTalking -> READ_BILLBOARD
+        if (SmsDebugPrint) GD.Print($"[SMS talk] director: forced talk with {npc.Name} (warped {SmsNpc.ForceTalkWarpDistUnits} u ahead)");
+        return true;
+    }
+
+    // ---- the pad's disabled frames (pass 109) ----
+    private int _smsPadDisabledTicks; private float _smsPadDisabledAccum;
+    /// <summary>TMarioGamePad::mDisabledFrames: the pad reads neutral for this many 30 fps frames (the red coin switch: its BCK's end x 2 + 60).</summary>
+    public void SmsDisablePad(int frames) { _smsPadDisabledTicks = Math.Max(_smsPadDisabledTicks, frames * SmsUnits.TicksPerFrame); }
+    public int SmsPadDisabledTicks => _smsPadDisabledTicks;
 
     /// <summary>findNearestTakeNPC (MarDirectorEvent.cpp 61): a liftable NPC (isNowCanTaken) in his isTakeSituation.</summary>
     private SmsNpc SmsNpcTakeOffered()

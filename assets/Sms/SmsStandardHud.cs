@@ -664,6 +664,11 @@ public partial class SmsStandardHud : Control
     }
 
     // ------------------------------------------------------------------------------------------------------------------ red coins
+    /// <summary>The stage scripts' appearRedCoinCounter -> startAppearRedCoin (EventWatcher.cpp 1168: startAppearJetBalloon case 2): the red coin
+    /// counter comes in at once (at 0) -- after the red coin switch's message (pass 109). Without it the counter waits for the first coin.</summary>
+    public void AppearRedCoins() { if (!_redVisible) StartAppearRedCoin(); }
+    public bool RedCoinsVisible => _redVisible;
+
     private void StartAppearRedCoin()
     {
         _redVisible = true; _redParked = false; _redF0 = _frame;

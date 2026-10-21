@@ -75,6 +75,14 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// every page a single-line field, so no three-line page could be typed.</summary>
     [Export(PropertyHint.TypeString, "4/18:")] public string[] Lines = { "Welcome to Isle Delfino!", "Enjoy your stay." };
     [Export] public bool CanTalk = true;
+    /// <summary>LIVE_FLAG_HIDDEN (pass 109; the stage scripts' setHide4LiveActor): the model is not drawn and nothing collides; a hidden NPC is only
+    /// reached by a forced talk (Mario.SmsForceStartTalk -- the red coin switch's message board). DEVIATION: the game's hidden board keeps its
+    /// proximity talk at its placement; here Hidden also drops it from the director's search, since the switch's board sits under the switch.</summary>
+    [Export] public bool Hidden { get => _hidden; set { _hidden = value; if (!Engine.IsEditorHint() && IsInsideTree()) ApplyHidden(); } }
+    private bool _hidden;
+    /// <summary>The close sound of this NPC's talk window (null = the balloon's select sound). The game keys it on the message: sys_message 30, the
+    /// red coin switch's, closes with MSD_SE_SY_RACE_START (Talk2D2.cpp 479) -- the switch's board carries that slot.</summary>
+    [Export] public AudioStreamPlayer TalkCloseSound;
     /// <summary>Pass 102: what a confirmed answer on the choice window does (the game hands getSelectedValue to the stage's script; here the
     /// signal TalkChoiceMade carries it to the level and these two inspector effects cover the common cases). OnYes = the first option,
     /// OnNo = the second. StopWorrying / StartWorrying flip <see cref="Worried"/> (his test: a worried Toad asks, yes calms him).</summary>
@@ -325,6 +333,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
             CollisionLayer = 0; CollisionMask = 0;                           // pass 103: the board NPC is a talk point only (performOnlyDraw: no bind, no hit)
             SetupBoardLook();                                                // pass 104: boardNpc.bmd -- the sign IS the NPC's model
             SetupCursor();
+            ApplyHidden();                                                   // pass 109: a hidden board (the red coin switch's message board)
             _stack.Clear();
             Enter(Nerve.WaitMarioApproach);                                  // NpcInitPrg.cpp 163: mSpine->initWith(TNerveNPCWaitMarioApproach), mTurnSpeed 0
             if (DebugPrint) GD.Print($"[SMS npc] {Name}: Board (the sign: boardNpc.bmd + the talk point), {Lines?.Length ?? 0} page(s), model {(_model != null)}");
@@ -1131,7 +1140,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
             TickEffects();                                               // pass 95: emitParticle_ (CUE_CALC_ANIM: once a drawn frame)
         }
         // TTalkCursor::associateNPC: the director's cursor sits on the NPC it found this frame (none while he walks: findNearestTalkNPC wants WAIT)
-        if (_cursor != null) _cursor.Visible = !_talking && _mario != null && _mario.SmsTalkTargetNpc == this;
+        if (_cursor != null) _cursor.Visible = !_hidden && !_talking && _mario != null && _mario.SmsTalkTargetNpc == this;
     }
 
     /// <summary>One 120 Hz tick: moveObject (updateForbidCount_, the trample, the hit checks, changeNerveProc_'s talk accept) and the spine.</summary>
@@ -1549,7 +1558,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     /// <summary>changeNerveProc_'s accept test (+ findNearestTalkNPC's Mario conditions): sets LIVE_FLAG_UNK20000 "talkable".</summary>
     private void TalkCheck()
     {
-        bool can = CanTalk && !CanBeTaken && Lines != null && Lines.Length > 0 && _talkForbid == 0 && !_talking && _mario != null && IsClean && !_sinking && !_burning
+        bool can = CanTalk && !_hidden && !CanBeTaken && Lines != null && Lines.Length > 0 && _talkForbid == 0 && !_talking && _mario != null && IsClean && !_sinking && !_burning
             && (_cur == Nerve.GraphWander || _cur == Nerve.UTurn || _cur == Nerve.GraphWait || _cur == Nerve.TurnToMario || _cur == Nerve.Wet || _cur == Nerve.Mad || _cur == Nerve.WaitMarioApproach);
         if (can)
         {
@@ -1588,6 +1597,33 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         }
         return best;
     }
+
+    /// <summary>LIVE_FLAG_HIDDEN + HIT_FILTER_NO_COLLISION (evSetHide4LiveActor, EventWatcher.cpp 377): performOnlyDraw skips the model, nothing
+    /// collides. The talk point stays (a forced talk reaches it).</summary>
+    private void ApplyHidden()
+    {
+        if (_model != null) _model.Visible = !_hidden;
+        if (_hidden) { CollisionLayer = 0; CollisionMask = 0; }
+        else if (Profile != null && !Profile.IsBoard) { CollisionLayer = _layerSaved != 0 ? _layerSaved : CollisionLayer; }
+        if (_cursor != null && _hidden) _cursor.Visible = false;
+    }
+
+    /// <summary>evWarpFrontToMario (EventWatcher.cpp 1221): mPosition = Mario's + rotateY((0, 0, 400), his angle) -- 400 units ahead along his facing
+    /// (SMS_GetMarioAngleY = mAngle.y, the model's) at his height; mRotation.y = his angle - 0x8000: facing him.</summary>
+    public void WarpFrontOfMario(Mario mario)
+    {
+        if (mario == null) return;
+        Vector3 f = mario.SmsFacingDir(); f.Y = 0f;
+        if (f.LengthSquared() < 1e-8f) f = Vector3.Forward;
+        f = f.Normalized();
+        GlobalPosition = mario.GlobalPosition + f * SmsUnits.UnitsToMetres(ForceTalkWarpDistUnits);
+        Rotation = new Vector3(0f, YawOf(-f), 0f);                           // the board's forward (-Z) back toward him
+        _firstYaw = Rotation.Y;
+        Velocity = Vector3.Zero;
+        if (DebugPrint) GD.Print($"[SMS npc] {Name}: warped {ForceTalkWarpDistUnits} u in front of Mario at {GlobalPosition}, facing him");
+    }
+    /// <summary>evWarpFrontToMario's offset (400 units).</summary>
+    public const float ForceTalkWarpDistUnits = 400f;
 
     public void StartTalk()
     {

@@ -6387,3 +6387,60 @@ the re-run exited clean. Not seen before; watch for it.
 
 ### Not done
 The Gooble's brain mark (H_ma_rak, per stage in the game as well) stays the stage's; the sink ripple is a screen refraction and has no colour of its own.
+
+## SMS pass 109 -- the red coin switch's message through the BOARD window (the game's stage-script flow)
+
+Jaysonn (10-20 20:23): "yeha do both the red coins switch and mario leftovers stuff."
+
+### The game
+TRedCoinSwitch::receiveMessage(HIT_MESSAGE_HIP_DROP) (MapObjTown.cpp 553): the BCK "redcoinswitch", the pad disabled for (clip end x 2 + 60)
+frames (TMarioGamePad::mDisabledFrames), MSD_SE_OBJ_AP_BUTTON, removeMapCollision + HIT_FILTER_NO_COLLISION, state 2; control(): the clip ends ->
+state 3 and the flag MSF_RED_COIN_SWITCH_PRESSED. The rest is the ex stages' stage script `map/sp/timerredcoin.sb` (an SPC binary; disassembled
+with tools/projectshine/spc_dis.py written from TSpcInterp, src/Strategic/spcinterp.cpp): at load it hides the stage's invisible board NPC
+("見えない看板ＮＰＣ", type NPCBoard, setHide4LiveActor); on the flag it loops `warpFrontToMario(board); if (forceTalk(board)) { talkAndClose(30);
+appear8RedCoinsAndTimer(); startBGM(..); appearRedCoinCounter(); break; } yield;`. evWarpFrontToMario (EventWatcher.cpp 1221): 400 units ahead
+along Mario's angle, at his height, facing him. __forceStartTalk (NpcEvent.cpp 90) takes only when not in talk / demo mode, isMarioTouchGround4cm
+and no JUMPING-type status -- the script yields and retries. setTalkMsgID(30, 1): an NPC_BOARD speaker = the BOARD window (Talk2D2.cpp 387);
+message 30 is /common/2d/sys_message.bmg "Collect 8 red coins / before the timer / runs out! / / GOOD LUCK!" (bmg_dump.py); flag 1 =
+closeTalkWindow, and for message 30 the close plays MSD_SE_SY_RACE_START instead of the select tick (Talk2D2.cpp 479 / 944); the script waits for
+!isTalkModeNow (the window gone, Mario freed), then the 8 red coins appear (with their sparkle), the console timer and the director's timer
+start, and startAppearRedCoin brings the red coin counter in at 0.
+
+### The port
+* Mario: `SmsForceStartTalk(npc)` -- the director's pending forced talk (SmsDirectorTalkCheck runs it before the cursor search): the game's three
+  conditions checked every frame, then the NPC's WarpFrontOfMario + StartTalk (READ_BILLBOARD as for any talk); `SmsCancelForceTalk`,
+  `SmsForceTalkPending`. `SmsDisablePad(frames)` -- the pad's dead frames: the stick reads neutral at its one read and A buys no jump (the
+  jump buffer's fill is gated: a dead pad has no edges). R / Z / X are read where they are used and are NOT gated (a logged gap; the exposure is
+  the press clip's 0.2 s, then the talk owns him).
+* SmsNpc: `Hidden` (LIVE_FLAG_HIDDEN + HIT_FILTER_NO_COLLISION: the model not drawn, no collision, no cursor; DEVIATION: the proximity talk is
+  refused too -- the game's hidden board keeps it at its placement, but here the board sits under the switch where Mario stands);
+  `WarpFrontOfMario`; `TalkCloseSound` (the per-NPC close-sound slot; the game keys it on the message id).
+* SmsTalkBalloon: the close plays the speaker's TalkCloseSound when set (else the select tick); `LastCloseSound` for the drives.
+* SmsStandardHud: `AppearRedCoins()` (appearRedCoinCounter: the counter at 0 at once; it used to wait for the first coin), `RedCoinsVisible`.
+* RedCoinSwitch.cs (his): Trigger = the game's receiveMessage (the clip, SmsDisablePad(clip x 2 + 60), PressSound, the SwitchBody's shapes disabled
+  -- deferred: Trigger runs inside the HitZone's signal, the physics flush refuses a direct write); the clip's end sets `Pressed`; TickMessage is the
+  script: forceTalk(board) once, wait while pending, wait while talking, then BeginRedCoinChallenge (his coins + his ShineTimer + the HUD's
+  AppearRedCoins). The board: `Message Board Path`, else SignBoard.tscn instanced hidden under the switch with MessageText as its page and the
+  `Race Start Sound` slot as its close sound; `Press Sound`; `Pad Disable Extra Frames` (60). The Mario who pounded it is kept for the message
+  (`_lastHitter` clears when the pound ends). Without SMS physics or a board the challenge starts without a message.
+* Runbook (OUTFITS.md): 7b rows `Hidden`, `Talk Close Sound`; a 7e section for the switch.
+LEGACY RETIRED: Font/HudElements/SignPopup for the red coin switch (`SignPopupScene` / `SignLayerPath` stay as unused exports so secrect_level.tscn
+and Rico4Secret.tscn load clean; the class itself is untouched). Not ported: the coins' kill-by-timer and their appear particles, startBGM, the
+switch's 120-frame state 3 (no effect), the pad disable's R / Z / X.
+
+### Verified (drive 109, 19 checks, on his machine; regressions 104 / 102 / 87 / 101 / 108 / 106 / 105b green; build 0 errors; boot ALL OK)
+His red_coin_switch.tscn instanced on the test floor with red_coin.tscn and eight markers: the hidden board under it (Board kind, model off,
+CanTalk off, MessageText as its page, the RaceStart slot as its close); B in front of the hidden board opens nothing; a hip drop onto it triggers
+it (the SwitchBody's shape off, the flag at the clip's end), the pad dead for exactly (6.2 x 2 + 60) frames with the stick held right reading
+neutral and A buying no jump; the board warped 400 u ahead facing him to the millimetre and the talk started (pending seen first); the board
+stayed hidden; no coins before the close; the BOARD window with the five lines; the close played RaceStart; the challenge began after the talk had
+fully ended (closed at frame 151, began at 183); 8 coins; the HUD's counter at 0; the pad's disable ran out after; a forced talk asked in the
+air waited 8 airborne frames and took on landing; a second board without the slot closed with the select tick. Headless cannot see the plank or
+the camera: the look is his.
+
+### Caught by the drive (test-side and port-side)
+The first run leaked A through the dead pad: the swallow flag clears on the release frame and Godot's "just pressed" for a scripted press lands
+after it -- the jump-buffer fill is now gated on the disabled ticks (port). The switch forgot its Mario when the pound ended (`_lastHitter` is a
+per-pound latch), so the message never ran, or the challenge began during the talk -- the switch keeps the pounding Mario for the message (port).
+`cs.Disabled = true` inside the HitZone's BodyEntered was refused by the physics flush -- SetDeferred (port). The boot's landing on his Level's
+Goop7 left the footprint window open, so leaked jumps stamped goop on the strip -- the drive resets the timer at setup (test).
