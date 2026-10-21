@@ -31,6 +31,12 @@ public partial class SmsNpcProfile : Resource
     /// stand on (TNerveNPCSink, SinkSpeed / SinkHeight), come out dirty (PollutionMax, the DIRTY wait, no talk, no turn) and are washed
     /// clean by the hose (PollutionCleanSpeed a hit). Off = the goop is just floor to this NPC.</summary>
     [Export] public bool SinksInPollution = true;
+    /// <summary>Pass 108 (DEVIATION, his ask): on, a dirty NPC wears the goop of the LAYER it sank in -- the skin takes the layer's texture, the drips
+    /// and the wash its colours (SmsPollutionLayer.CharacterGoop: a brown layer with nothing of its own keeps the stage default, so nothing seen so
+    /// far changes; a Fire / Electric layer, or one with a GoopTexture or goop colours set, dresses the NPC in its own). Off = the game: the one
+    /// stage skin (/map/pollution/h_ma_rak.bti, NpcManager.cpp 38) and SMSSetEmitterPolColor's map row (EmitterViewObj.cpp 597) whatever layer
+    /// he stood in -- Delfino's brown. Read at the sink start and, placed dirty, on the first tick.</summary>
+    [Export] public bool GoopFromLayer = true;
 
     [ExportGroup("Hit cylinders (units)")]
     [Export] public float AttackRadius = 100f, AttackHeight = 200f, DamageRadius = 100f, DamageHeight = 200f;

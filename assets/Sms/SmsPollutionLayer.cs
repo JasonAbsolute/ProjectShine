@@ -61,6 +61,17 @@ public partial class SmsPollutionLayer : MeshInstance3D
     /// <summary>The goop's surface texture (goop_albedo). Empty = the type's default from assets/Sms/Fx/Goop: FireGoop for Fire / FireRegrow,
     /// ElectricGoop for Electric, BrownGoop for everything else; OilGoop, PinkGoop and BetaGoop are there to pick.</summary>
     [Export] public Texture2D GoopTexture;
+    /// <summary>Pass 108 (DEVIATION, his ask: "it should be whatever goop they are in"): what a character dirtied on THIS layer wears. The game
+    /// dresses every dirty NPC of a stage in the stage's one skin (/map/pollution/h_ma_rak.bti, NpcManager.cpp 38) and colours its goop particles
+    /// -- the NPC drips and wash, Mario's melt and spin fling -- by the map's row of SMSSetEmitterPolColor (EmitterViewObj.cpp 597 / 644; Delfino:
+    /// (181,132,102) over (98,14,0)): one goop per stage. The port's layers each carry a type and a texture, so a level can mix them, and the
+    /// characters follow the layer they got dirty on (SmsNpcProfile.GoopFromLayer / SmsGoopMario.GoopFromLayer, both default on). The rule
+    /// (CharacterGoop): a brown layer with nothing of its own keeps the stage default (nothing seen so far changes); a Fire / FireRegrow /
+    /// Electric layer, or one with a GoopTexture set, dresses them in that texture, with these two colours for the drips, wash, footprints,
+    /// melt and fling. Alpha 0 = measured from the texture (the mean of its brightest quarter is the light colour, of its darkest quarter the
+    /// dark); set on a brown layer they recolour the particles and keep the stage skin. Display-space colours, like the game's registers.</summary>
+    [Export] public Color GoopLightColor = new Color(0f, 0f, 0f, 0f);
+    [Export] public Color GoopDarkColor = new Color(0f, 0f, 0f, 0f);
     /// <summary>TPollutionLayer::action's PARTICLE_MS_RAKU_INDAWA: a bubble swells and pops at a random painted spot near Mario (not on fire
     /// layers). The game's particle is not here; a dome in the goop's own texture stands in.</summary>
     [Export] public bool Bubbles = true;
@@ -437,6 +448,79 @@ public partial class SmsPollutionLayer : MeshInstance3D
         };
         string path = $"res://assets/Sms/Fx/Goop/{name}.png";
         return ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;
+    }
+
+    /// <summary>The goop drawn on this layer: GoopTexture, else the type's default.</summary>
+    public Texture2D EffectiveGoopTexture => GoopTexture ?? DefaultGoopTexture(Type);
+
+    /// <summary>Pass 108: does this layer dress a dirty character differently from the stage default? A Fire / FireRegrow / Electric layer, a layer
+    /// with its own GoopTexture, or one with a goop colour set (GoopLightColor / GoopDarkColor).</summary>
+    public bool DressesCharacters => GoopTexture != null || GoopLightColor.A > 0f || GoopDarkColor.A > 0f || IsHotOrElectric;
+    private bool IsHotOrElectric => Type == SmsPollutionType.Fire || Type == SmsPollutionType.FireRegrow || Type == SmsPollutionType.Electric;
+
+    /// <summary>Pass 108: the skin texture and the light / dark particle colours a character takes from this layer (see GoopLightColor). False when
+    /// the layer keeps the stage default (the caller keeps its own). `skin` is null when only the colours change (a brown layer with colours set).</summary>
+    public bool CharacterGoop(out Texture2D skin, out Color light, out Color dark)
+    {
+        skin = null; light = GoopLightDefault; dark = GoopDarkDefault;
+        if (!DressesCharacters) return false;
+        skin = GoopTexture ?? (IsHotOrElectric ? DefaultGoopTexture(Type) : null);
+        light = GoopLightColor; dark = GoopDarkColor;
+        if (light.A <= 0f || dark.A <= 0f)
+        {
+            MeasureGoopColors(skin ?? EffectiveGoopTexture, out var ml, out var md);
+            if (light.A <= 0f) light = ml;
+            if (dark.A <= 0f) dark = md;
+        }
+        light.A = 1f; dark.A = 1f;
+        return true;
+    }
+
+    /// <summary>SMSSetEmitterPolColor's Delfino row (EmitterViewObj.cpp 644, map 1 -> index 2): prm (181,132,102) = the light colour, env (98,14,0)
+    /// = the dark -- the stage default every goop particle of the port was baked with.</summary>
+    public static readonly Color GoopLightDefault = new Color(181f / 255f, 132f / 255f, 102f / 255f, 1f);
+    public static readonly Color GoopDarkDefault = new Color(98f / 255f, 14f / 255f, 0f, 1f);
+    private static readonly Dictionary<ulong, (Color light, Color dark)> _goopColorCache = new Dictionary<ulong, (Color light, Color dark)>();
+
+    /// <summary>Pass 108: the mean colour of the texture's brightest quarter (light) and of its darkest quarter (dark), by luminance, over up to a
+    /// 64 x 64 sample grid of opaque pixels; cached per texture. The pixels come from the texture's image (a headless run's dummy renderer keeps it;
+    /// a GPU run reads it back once), else from the source file by its path; a texture that gives neither measures as the Delfino pair.</summary>
+    public static void MeasureGoopColors(Texture2D tex, out Color light, out Color dark)
+    {
+        light = GoopLightDefault; dark = GoopDarkDefault;
+        if (tex == null) return;
+        ulong key = tex.GetInstanceId();
+        if (_goopColorCache.TryGetValue(key, out var hit)) { light = hit.light; dark = hit.dark; return; }
+        Image img = null;
+        try { img = tex.GetImage(); } catch { img = null; }
+        if ((img == null || img.IsEmpty()) && !string.IsNullOrEmpty(tex.ResourcePath) && !tex.ResourcePath.Contains("::"))
+        {
+            try { var fromFile = Image.LoadFromFile(tex.ResourcePath); if (fromFile != null && !fromFile.IsEmpty()) img = fromFile; } catch { }
+        }
+        if (img != null && !img.IsEmpty() && img.IsCompressed() && img.Decompress() != Error.Ok) img = null;
+        if (img == null || img.IsEmpty()) { _goopColorCache[key] = (light, dark); return; }
+        int w = img.GetWidth(), h = img.GetHeight();
+        int sx = Mathf.Max(1, w / 64), sy = Mathf.Max(1, h / 64);
+        var samples = new List<(float lum, Color c)>();
+        for (int y = 0; y < h; y += sy)
+            for (int x = 0; x < w; x += sx)
+            {
+                Color c = img.GetPixel(x, y);
+                if (c.A < 0.5f) continue;
+                samples.Add((0.299f * c.R + 0.587f * c.G + 0.114f * c.B, c));
+            }
+        if (samples.Count == 0) { _goopColorCache[key] = (light, dark); return; }
+        samples.Sort((a, b) => a.lum.CompareTo(b.lum));
+        int q = Mathf.Max(1, samples.Count / 4);
+        Vector3 lo = Vector3.Zero, hi = Vector3.Zero;
+        for (int i = 0; i < q; i++)
+        {
+            Color a = samples[i].c, b = samples[samples.Count - 1 - i].c;
+            lo += new Vector3(a.R, a.G, a.B); hi += new Vector3(b.R, b.G, b.B);
+        }
+        lo /= q; hi /= q;
+        light = new Color(hi.X, hi.Y, hi.Z, 1f); dark = new Color(lo.X, lo.Y, lo.Z, 1f);
+        _goopColorCache[key] = (light, dark);
     }
 
     private int EdgeDegree(int x, int z)
@@ -1149,6 +1233,16 @@ public static class SmsPollutionMap
             if (l.IsPolluted(p))
                 return true;
         return false;
+    }
+
+    /// <summary>Pass 108: the first layer with PAINT under the point (IsPolluted: through its height mask), else null -- the layer a character
+    /// standing there gets dirty on.</summary>
+    public static SmsPollutionLayer PollutedLayerAt(Vector3 p)
+    {
+        foreach (var l in Layers)
+            if (l.IsPolluted(p))
+                return l;
+        return null;
     }
 
     public static void Stamp(int stampType, Vector3 p, float sizeUnits)

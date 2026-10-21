@@ -12,6 +12,8 @@ using Godot;
 /// Pass 98: an effect bound to a POSITION pointer (emitAndBindToPosPtr: the burning NPC's fire at mFireParticlePos) keeps the world axes --
 /// <see cref="FollowRotation"/> off -- and the emitters in the node group <see cref="StrengthGroup"/> take a live <see cref="SetStrength"/>
 /// (the game's setGlobalScale(scale x mBurnStrength) every frame: the quads and the emitter offset shrink as the fire is hosed out).
+/// Pass 108: <see cref="SetGoopColors"/> recolours the goop-ball materials of THIS instance (SMSSetEmitterPolColor by the layer the NPC sank
+/// in, SmsNpcProfile.GoopFromLayer): the scene's material is shared by every spawn, so the emitter gets a per-instance copy as its MaterialOverride.
 /// </summary>
 public partial class SmsNpcEffect : Node3D
 {
@@ -86,6 +88,34 @@ public partial class SmsNpcEffect : Node3D
             slot.P.Position = slot.BasePos * s;
             if (slot.BaseSphere > 0f) slot.Pm.EmissionSphereRadius = Mathf.Max(slot.BaseSphere * s, 0.001f);
         }
+    }
+
+    /// <summary>Pass 108: SMSSetEmitterPolColor by the layer -- every emitter whose draw-pass material carries the goop ball's `prm_color` / `env_color`
+    /// uniforms (NpcDrip* / NpcWash*: the ball is lerp(env -> prm, I)) gets a copy with `light` as prm and `dark` as env as its MaterialOverride.
+    /// Display-space colours, as the uniforms are. The sparkle, the burn and the sink ripple carry no such uniform and are left alone.</summary>
+    public void SetGoopColors(Color light, Color dark)
+    {
+        var l = new Vector3(light.R, light.G, light.B); var d = new Vector3(dark.R, dark.G, dark.B);
+        foreach (var p in Emitters())
+        {
+            var src = (p.MaterialOverride ?? p.DrawPass1?.SurfaceGetMaterial(0)) as ShaderMaterial;
+            if (src == null || src.Shader == null || !HasUniform(src.Shader, "prm_color") || !HasUniform(src.Shader, "env_color")) continue;
+            var copy = (ShaderMaterial)src.Duplicate();
+            copy.SetShaderParameter("prm_color", l);
+            copy.SetShaderParameter("env_color", d);
+            p.MaterialOverride = copy;
+            _goopColored++;
+        }
+    }
+    private int _goopColored;
+    /// <summary>How many emitters SetGoopColors recoloured (the drive reads it; 0 = the baked stage colours).</summary>
+    public int GoopColoredEmitters => _goopColored;
+
+    private static bool HasUniform(Shader shader, string name)
+    {
+        foreach (var u in shader.GetShaderUniformList())
+            if (u.AsGodotDictionary()["name"].AsString() == name) return true;
+        return false;
     }
 
     public float StrengthApplied => _strength;

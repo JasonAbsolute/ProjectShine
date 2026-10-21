@@ -6326,3 +6326,64 @@ as assets/Sms/Npc/tex/H_ma_rak.png) and its drip / wash / sparkle colours come f
 Delfino's row (181,132,102) / (98,14,0); Sirena's pink is a different row). The port's goop LAYERS do differ per type (BrownGoop / FireGoop /
 ElectricGoop textures, pass 65). Making an NPC wear the goop it sank in is a DEVIATION the game never had; offered as a knob (SmsNpcProfile.GoopFromLayer)
 for his word.
+
+## SMS pass 108 -- goop from the layer: several goops in one stage, and the characters wear the one they got dirty on (DEVIATION)
+
+Jaysonn (10-20 02:08 / 13:59): "the goop on npc is just brown? it should be whatever goop they are in" -- "lets make it so we can have multiple goop
+in a stage and have that reflect on the chars".
+
+### The game
+One goop look per stage LOAD. TNpcManager swaps every NPC bmd's dummy for the stage's one /map/pollution/h_ma_rak.bti (NpcManager.cpp 38); the NPC
+drips and wash, Mario's melt-in-water and spin fling are coloured by SMSSetEmitterPolColor's per-MAP row (EmitterViewObj.cpp 597 / 644; Delfino: prm
+(181,132,102) over env (98,14,0)); Mario's footprint jpa (ms_m_ashios) is loaded per stage. What a patch DOES is per layer (its type); what the goop
+LOOKS like on a body never asks the layer. Each stage was one villain's mess, so it never needed to.
+
+### The deviation
+The port's layers each carry a type and a texture (SmsPollutionLayer.Type / GoopTexture / DefaultGoopTexture: BrownGoop / FireGoop / ElectricGoop), so a
+level can mix goops -- and with this pass the characters follow the layer they got dirty on. The rule (SmsPollutionLayer.CharacterGoop):
+* a brown layer with nothing of its own keeps the stage default (H_ma_rak, Delfino's row) -- every look confirmed so far is unchanged;
+* a Fire / FireRegrow / Electric layer, or a layer with a GoopTexture set, dresses the character in that texture and in two colours measured from it
+  (the mean of its brightest quarter = the light / prm colour, of its darkest quarter = the dark / env);
+* the layer's new `GoopLightColor` / `GoopDarkColor` exports name the two colours outright (alpha 0 = measured); set on a brown layer they recolour
+  the particles and keep the stage skin.
+Knobs, both default ON: `SmsNpcProfile.GoopFromLayer` and `SmsGoopMario.GoopFromLayer`; off = the game.
+
+### Where it lands
+* SmsPollutionLayer: `EffectiveGoopTexture`, `DressesCharacters`, `CharacterGoop`, `MeasureGoopColors` (cached per texture; the pixels from the texture's
+  image or its source file), the two colour exports; SmsPollutionMap.PollutedLayerAt (the first layer with PAINT under a point).
+* SmsNpc: at the sink start (PollutionCheck) `WearGoopOf(PollutedLayerAt)` puts the layer's skin into every skin / leaf material's `pol_tex` and keeps
+  its colours; an NPC placed dirty reads the layer under its feet on its first tick; the body / foot drips and the wash spawn through SpawnGoopFx ->
+  SmsNpcEffect.SetGoopColors: a per-instance MaterialOverride copy of the goop-ball material with the layer's prm / env (the scene's shared material is
+  never edited; the sparkle, burn and sink ripple carry no such uniforms and are left alone).
+* Mario (thinkDirty, every tick on paint): `SmsGoopMario.SetGoopLayer(PollutedLayerAt(feet))` -- a change rewrites the footprint / melt / fling materials'
+  colour tables in a MaterialOverride: prm0 / env0 = the pair, prm1 / env1 half-way to the pale top row, which the melt and the fling keep (the game's
+  PolColor writes the goop rows of a 6-row table); the footprint's table is all goop, so it becomes the pair. A footprint burst spawned while dressed
+  carries the override (Duplicate copies material_override). Mario's own dirty tint stays the game's fog colour (code-fixed, not per stage).
+* The runbook (OUTFITS.md 7c): the `Goop From Layer` row, the colour paragraph.
+
+### Verified (drive 108, 26 checks, on his machine; regressions 107 / 95 / 93 / 106 / 102 / 87; build 0 errors; boot ALL OK)
+Four layers in a strip (brown / fire / electric / brown-type with set colours): PollutedLayerAt names each; CharacterGoop false on the brown, FireGoop /
+ElectricGoop on the hot ones with colours measured from the images (the image's mean luminance between dark and light; fire and electric differ), the
+set pair on the fourth with no skin. Six NPCs: the brown sinker keeps H_ma_rak + Delfino's row; the fire sinker wears FireGoop.png on every skin / leaf
+material with the fire pair; the electric one ElectricGoop.png; the knob-off Pianta on the fire layer keeps the stage look; the set-colour layer's Pianta
+keeps H_ma_rak with the set colours; a Toad placed dirty on the electric goop wears it from its first tick. Out of the goop and dripping: the fire Pianta's
+body and foot drips wear MaterialOverrides with the fire prm / env, the brown one's drips none; its wash emitter too. Mario: on the set-colour layer his
+three emitters are dressed (the melt's prm0 / env0 the pair, prm2 / env2 the baked pale, prm1 half-way; the footprint's whole table the pair; the baked
+materials untouched), a footprint burst carries the override, the brown layer drops the overrides, the knob off dresses nothing.
+Headless cannot see colours drawn: the look is his -- the fire / electric Pianta skin, the recoloured drips, the footprints behind a run off coloured goop.
+
+### What the drive caught (all on the test side; the port's code is unchanged from the staged bytes)
+The first run was 18 / 26: two Piantas (the fire one, the knob-off one) 0.9 m apart on one 3 m layer -- their 1.34 m capsules shoved both off it, so
+neither sank; Mario bounced on the Level's spawn NPC through the setup and landed in oilRun on the Level's own Goop7 (its paint was cleaned at his
+AIRBORNE height, so the clean missed the floor); the brown layer was emptied at the climb-out and never repainted for Mario's visit; and Mario's spot
+on the brown layer sat 1.7 m back of its centre, where the texel grid (anchored at the low edge) leaves ~0.2 m of the high edge unsurfaced, so a
+Slip sample's 0.43 m ring read clean. Fixed in the drive: 4.5 m layers 5 m apart with the floor read per layer, bodies 2.4-2.8 m apart, Mario parked
+on cleaned floor (its paint cleaned at the floor's height) with the boot dress reset, the brown layer re-stamped alone before his visit, his spot
+1.3 m forward of the centre. Note for Level authors: his Level's Goop7 already carries a GoopTexture (PinkGoop), so with this pass a character dirtied
+there wears pink -- the spawn sits on it.
+Drive 95's D2 (the first drip at the clip's frame 28) was a chance check since pass 101's random first frame: it now accepts any check frame.
+One boot ended in a Godot C# exit-time finalizer crash (Godot.Collections.Array.Finalize after the native side tore down; .err only, after ALL OK);
+the re-run exited clean. Not seen before; watch for it.
+
+### Not done
+The Gooble's brain mark (H_ma_rak, per stage in the game as well) stays the stage's; the sink ripple is a screen refraction and has no colour of its own.

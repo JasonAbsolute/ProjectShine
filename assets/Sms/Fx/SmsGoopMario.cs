@@ -9,6 +9,9 @@ using Godot;
 /// ground frame (the game binds a COPY of the matrix). The melt and the fling are continuous emitters the owner moves every tick to the game's
 /// matrix (emitAndBindToMtxPtr: the pointer is re-read each frame) and opens with a rate; their particles live in the world.
 /// Scene: assets/Sms/Fx/GoopMario.tscn (gen_fx_goop.py).
+/// Pass 108 (DEVIATION, his ask): the three take their colours from the LAYER that dirtied him (SetGoopLayer, called from thinkDirty every tick he
+/// stands on paint) when GoopFromLayer is on -- a MaterialOverride copy of each emitter's material with its colour table rewritten; the game
+/// colours them by the stage's one row (SMSSetEmitterPolColor) and loads the footprint jpa per stage.
 /// </summary>
 public partial class SmsGoopMario : Node3D
 {
@@ -18,6 +21,16 @@ public partial class SmsGoopMario : Node3D
     [Export] public GpuParticles3D Melt;
     /// <summary>ms_m_spinos: the spin-jump droplets (continuous).</summary>
     [Export] public GpuParticles3D Fling;
+    /// <summary>Pass 108 (DEVIATION, his ask "it should be whatever goop they are in"): on, the footprints, the melt and the fling take their light /
+    /// dark colours from the layer that dirtied him (SmsPollutionLayer.CharacterGoop: a brown layer with nothing of its own keeps the baked stage
+    /// colours; Fire / Electric layers and layers with a GoopTexture or goop colours set give theirs). Off = the game: the stage's one colour row
+    /// (SMSSetEmitterPolColor, EmitterViewObj.cpp 597) and footprint file whatever he walked through -- Delfino's brown.</summary>
+    [Export] public bool GoopFromLayer = true;
+    private SmsPollutionLayer _goopLayer;
+    /// <summary>The layer his goop colours come from (null = the stage default, the baked colours).</summary>
+    public SmsPollutionLayer GoopLayer => _goopLayer;
+    /// <summary>True while the three emitters wear a layer's colours (a MaterialOverride on each).</summary>
+    public bool GoopDressed => FootPrint != null && FootPrint.MaterialOverride != null;
 
     /// <summary>The particle clock the scenes were baked at (gen_fx.FPS): a game rate in particles a frame times this is particles a second.</summary>
     public const float ParticleFps = 60f;
@@ -67,6 +80,42 @@ public partial class SmsGoopMario : Node3D
     }
 
     public void FlingOff() { if (Fling != null && Fling.Emitting) Fling.Emitting = false; }
+
+    /// <summary>Pass 108: the layer he is getting dirty on (thinkDirty: SmsPollutionMap.PollutedLayerAt his feet, every tick on paint). A change
+    /// rewrites the three emitters' colour tables: prm0 / env0 = the layer's light / dark, prm1 / env1 half-way to the pale top entry, which the
+    /// melt and the fling keep (SMSSetEmitterPolColor writes the goop entries of a 6-row table; the top rows stay the jpa's white / pale); the
+    /// footprint's table is all goop (ms_m_ashios' own browns), so it becomes the pair. Null, a layer that keeps the stage default, or the knob
+    /// off = the baked materials (the overrides dropped).</summary>
+    public void SetGoopLayer(SmsPollutionLayer layer)
+    {
+        Color light = default, dark = default;
+        if (!GoopFromLayer || layer == null || !layer.CharacterGoop(out _, out light, out dark)) layer = null;
+        if (layer == _goopLayer) return;
+        _goopLayer = layer;
+        if (layer == null)
+        {
+            if (FootPrint != null) FootPrint.MaterialOverride = null;
+            if (Melt != null) Melt.MaterialOverride = null;
+            if (Fling != null) Fling.MaterialOverride = null;
+            return;
+        }
+        Dress(FootPrint, light, dark, false);
+        Dress(Melt, light, dark, true);
+        Dress(Fling, light, dark, true);
+    }
+
+    private static void Dress(GpuParticles3D p, Color light, Color dark, bool keepPale)
+    {
+        var src = p?.DrawPass1?.SurfaceGetMaterial(0) as ShaderMaterial;       // the baked (stage) table, never edited
+        if (src == null) return;
+        var copy = (ShaderMaterial)src.Duplicate();
+        Vector3 l = new Vector3(light.R, light.G, light.B), d = new Vector3(dark.R, dark.G, dark.B);
+        Vector3 top = keepPale ? src.GetShaderParameter("prm2").AsVector3() : l, topEnv = keepPale ? src.GetShaderParameter("env2").AsVector3() : d;
+        copy.SetShaderParameter("prm0", l); copy.SetShaderParameter("env0", d);
+        copy.SetShaderParameter("prm1", l.Lerp(top, 0.5f)); copy.SetShaderParameter("env1", d.Lerp(topEnv, 0.5f));
+        copy.SetShaderParameter("prm2", top); copy.SetShaderParameter("env2", topEnv);
+        p.MaterialOverride = copy;
+    }
 
     public bool MeltOn => Melt != null && Melt.Emitting;
     public bool FlingOn => Fling != null && Fling.Emitting;

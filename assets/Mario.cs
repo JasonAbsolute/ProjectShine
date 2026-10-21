@@ -15528,11 +15528,13 @@ public partial class Mario : CharacterBody3D
     }
 
     /// <summary>thinkDirty() (MarioMove.cpp 1129): the goop on him, 0..150 -- up on paint by the status (0.15 running, 1.5 catching / skidding,
-    /// 0.5 slipping), down in water (0.3 a tick), in a spin jump (0.5), the tick he leaves water (0.2, not tracked). No port reads it yet.</summary>
+    /// 0.5 slipping), down in water (0.3 a tick), in a spin jump (0.5), the tick he leaves water (0.2, not tracked). The melt and the fling (pass
+    /// 107) read it; the layer dirtying him dresses his goop particles (pass 108, SmsGoopMario.GoopFromLayer).</summary>
     private void SmsThinkDirty()
     {
         if (_smsDirty)
         {
+            _smsGoopFx?.SetGoopLayer(SmsPollutionMap.PollutedLayerAt(SmsPollutionMap.MarioPos));   // pass 108: the layer under his feet (set by SmsCheckGraffito this frame)
             if (stateOfMario is MarioState.walking or MarioState.running or MarioState.sprinting or MarioState.oilRun)
                 _smsDirtyAmount += SmsParams.Dirty.IncRunning;
             if (stateOfMario == MarioState.bellySlidingFromDive || stateOfMario == MarioState.oilSlip || (stateOfMario == MarioState.slipping && _smsOilSlopeSlide))

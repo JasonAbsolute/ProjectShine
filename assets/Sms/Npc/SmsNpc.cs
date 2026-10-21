@@ -30,10 +30,11 @@ using System.Collections.Generic;
 ///    one through pass 84 -- he stood on heads), its collision is this cylinder maths, as in the game;
 ///  * the look (NpcInitData.cpp colour tables + the bmd TEV, NpcSkin / NpcEye.gdshader): ColorIndex picks the register colour
 ///    (-1 = random), the model's materials are replaced per instance, the scene's DirectionalLight3D is the sun.
-/// NOT ported (logged): sounds (slots below), the special Pianta kinds' own animation sets (moma_..momd_), trampleExec's
-/// PARTICLE_MS_FUMI_B / C at half scale (no stomp dust is baked yet). Since pass 82 the pollution (dirty / sink / wash), the throw
-/// (TNpcThrow), the talk window with its camera, the blinks (pass 101), the worried kind + the choice window (pass 102) and the sign's
-/// board kind + board window (pass 103: Profile.Kind == Board, SignBoard.tscn) are in.</summary>
+/// NOT ported (logged): sounds (slots below), the special Pianta kinds' own animation sets (moma_..momd_). trampleExec's
+/// PARTICLE_MS_FUMI_B / C at half scale is Mario's (SmsTrampleDust, pass 106). Since pass 82 the pollution (dirty / sink / wash), the throw
+/// (TNpcThrow), the talk window with its camera, the blinks (pass 101), the worried kind + the choice window (pass 102), the sign's
+/// board kind + board window (pass 103: Profile.Kind == Board, SignBoard.tscn) and the goop worn from the LAYER sunk in (pass 108, a
+/// deviation: Profile.GoopFromLayer -- the game has one skin and one particle colour row a stage) are in.</summary>
 [Tool]
 public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
 {
@@ -139,7 +140,9 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     [Export] public Shader EyeShader;
     [Export] public Texture2D ToonTexture;
     /// <summary>H_ma_polmask_sample_i4 (every NPC bmd carries the same 32 x 64 gradient) and the stage's /map/pollution/h_ma_rak.bti (Delfino
-    /// Plaza's here): the skin shader's pollution mask and goop. Empty = the defaults under assets/Sms/Npc/tex.</summary>
+    /// Plaza's here): the skin shader's pollution mask and goop. Empty = the defaults under assets/Sms/Npc/tex. Pass 108: with
+    /// Profile.GoopFromLayer the goop texture is the STAGE DEFAULT -- a Fire / Electric layer or one with its own texture replaces it while
+    /// the NPC wears that layer's goop (SmsPollutionLayer.CharacterGoop).</summary>
     [Export] public Texture2D PollutionMaskTexture, GoopTexture;
     /// <summary>Sound slots (the sound bank pass fills them): nothing assigned = silent.</summary>
     [Export] public AudioStreamPlayer3D TalkVoice, WetVoice, TrampleVoice, MadVoice;
@@ -229,6 +232,13 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     private SmsNpcEffect _washFx;                        // emitWashEffect_'s one emitter (emitAndBindToMtxPtr flag 1: one per owner), alive with the WASH clip
     private SmsGoopRipple _sinkFx;                       // emitSinkEffect_: the goop ripple at the sink point
     private Vector3 _sinkNormal = Vector3.Up;            // mGroundPlane->getNormal() when the sink began
+    // ---- pass 108: the goop he wears (DEVIATION knob Profile.GoopFromLayer; the game: one skin + one colour row a stage) ----
+    private SmsPollutionLayer _goopLayer;                // the layer he sank in that dresses him (null = the stage default: GoopTexture / H_ma_rak, Delfino's colours)
+    private Color _goopLight = SmsPollutionLayer.GoopLightDefault, _goopDark = SmsPollutionLayer.GoopDarkDefault;   // SMSSetEmitterPolColor's prm / env for his drips and wash
+    private bool _goopInitPending;                       // placed dirty: the layer under his feet is read on the first tick (the layers register in their own _Ready)
+    public SmsPollutionLayer GoopLayer => _goopLayer;
+    public Color GoopLight => _goopLight;
+    public Color GoopDark => _goopDark;
     private float _fxPrevFrame = -1f; private string _fxPrevClip = "";   // the BCK frame controller's checkPass: last frame's position
     private PackedScene _happyFx, _dirtyFx, _footFx, _washScene, _sinkScene, _burnScene, _burnLuggageScene;
     // ---- burning (pass 98, NPC_ACTION_BURNING) ----
@@ -308,6 +318,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         _damageRadiusNow = Profile.DamageRadius;
         _pollution = Profile.SinksInPollution ? Mathf.Clamp(Pollution, 0f, 1f) : 0f;      // NpcInitPrg.cpp 379: the placement's B / 255
         _sinkPoll = (_sinkPollStagger++ % SmsParams.Npc.SinkPollFrames) * SmsUnits.TicksPerFrame;   // initSinkNpc_: each NPC polls on its own frame
+        _goopInitPending = _pollution > 0f;                                                        // pass 108: placed dirty -> the layer under him, first tick
         ExceptMario();
         if (Profile.IsBoard)
         {
@@ -623,6 +634,46 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     public string BoardTextureName => MaterialTextureName(Profile != null && !string.IsNullOrEmpty(Profile.BodyMaterial) ? Profile.BodyMaterial : "_mat_boradNpc", "base_tex");
     public ShaderMaterial MaterialByName(string name) => _matByName.TryGetValue(name, out var m) ? m : null;
 
+    /// <summary>Pass 108 (DEVIATION, Profile.GoopFromLayer): dress him in the goop of `layer` -- its skin texture into every skin / leaf material's
+    /// pol_tex (the stage's h_ma_rak stands when the layer gives none), its light / dark colours for the drips and the wash. Null, a layer that keeps
+    /// the stage default (SmsPollutionLayer.CharacterGoop false) or the knob off = the defaults (GoopTexture / H_ma_rak.png, Delfino's row). The game
+    /// has one skin and one colour row a stage (NpcManager.cpp 38, EmitterViewObj.cpp 597).</summary>
+    private void WearGoopOf(SmsPollutionLayer layer)
+    {
+        Texture2D skin = null; Color light = SmsPollutionLayer.GoopLightDefault, dark = SmsPollutionLayer.GoopDarkDefault;
+        if (Profile.GoopFromLayer && layer != null && layer.CharacterGoop(out var s, out var l, out var d)) { skin = s; light = l; dark = d; }
+        else layer = null;
+        if (layer == _goopLayer) return;
+        _goopLayer = layer; _goopLight = light; _goopDark = dark;
+        var tex = skin ?? GoopTexture ?? GD.Load<Texture2D>(GoopPath);
+        foreach (var m in _skinMats) m.SetShaderParameter("pol_tex", tex);
+        if (DebugPrint) GD.Print($"[SMS npc] {Name}: goop from {(layer != null ? $"{layer.Name} ({layer.Type})" : "the stage default")}: skin {tex?.ResourcePath.GetFile()}, light {light}, dark {dark}");
+    }
+
+    /// <summary>SmsNpcEffect.Spawn on the body's skeleton, then the layer's colours (pass 108) when he wears a layer's goop.</summary>
+    private SmsNpcEffect SpawnGoopFx(PackedScene scene, string joint, float scale)
+    {
+        var fx = SmsNpcEffect.Spawn(scene, _skel, joint, scale, _fxJoints, Name);
+        if (fx != null && _goopLayer != null) fx.SetGoopColors(_goopLight, _goopDark);
+        return fx;
+    }
+
+    /// <summary>The goop texture the skin materials sample (pol_tex): one file name, "mixed" if they disagree, "none" without skin materials (the drive reads it).</summary>
+    public string GoopTextureName
+    {
+        get
+        {
+            string name = "none";
+            foreach (var m in _skinMats)
+            {
+                var t = m.GetShaderParameter("pol_tex").As<Texture2D>();
+                string n = t?.ResourcePath.GetFile() ?? "null";
+                if (name == "none") name = n; else if (name != n) return "mixed";
+            }
+            return name;
+        }
+    }
+
     /// <summary>GX_KCOLOR0.a = mPollutionAmount x mPollutionMax (NpcBase.cpp 718, an 8-bit register): the skin shader's compare value.</summary>
     private void UpdatePollutionUniform()
     {
@@ -797,18 +848,18 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         {
             float sc = EffectScale();
             if (PassedAny(prev, frame, Profile.DirtyDripFrames))
-                SmsNpcEffect.Spawn(Fx(Profile.DirtyDripEffect, ref _dirtyFx, "NpcDripBody.tscn", "NpcDripToad.tscn"), _skel, Profile.EffectJoint, sc, _fxJoints, Name);
+                SpawnGoopFx(Fx(Profile.DirtyDripEffect, ref _dirtyFx, "NpcDripBody.tscn", "NpcDripToad.tscn"), Profile.EffectJoint, sc);
             if (!Profile.IsToad)
             {
                 var foot = Fx(Profile.FootDripEffect, ref _footFx, "NpcDripFoot.tscn", "");
-                if (PassedAny(prev, frame, Profile.FootDripFramesL)) SmsNpcEffect.Spawn(foot, _skel, Profile.FootJointL, sc, _fxJoints, Name);
-                if (PassedAny(prev, frame, Profile.FootDripFramesR)) SmsNpcEffect.Spawn(foot, _skel, Profile.FootJointR, sc, _fxJoints, Name);
+                if (PassedAny(prev, frame, Profile.FootDripFramesL)) SpawnGoopFx(foot, Profile.FootJointL, sc);
+                if (PassedAny(prev, frame, Profile.FootDripFramesR)) SpawnGoopFx(foot, Profile.FootJointR, sc);
             }
         }
         // the wash: one emitter while the WASH clip plays (emitAndBindToMtxPtr flag 1 = the owner's slot; the manager drops it when no longer asked for)
         bool washing = clip != "" && clip == Profile.ClipWash;
         if (washing && (_washFx == null || !GodotObject.IsInstanceValid(_washFx)))
-            _washFx = SmsNpcEffect.Spawn(Fx(Profile.WashEffect, ref _washScene, "NpcWashPianta.tscn", "NpcWashToad.tscn"), _skel, Profile.EffectJoint, EffectScale(), _fxJoints, Name);
+            _washFx = SpawnGoopFx(Fx(Profile.WashEffect, ref _washScene, "NpcWashPianta.tscn", "NpcWashToad.tscn"), Profile.EffectJoint, EffectScale());
         else if (!washing && _washFx != null)
         {
             if (GodotObject.IsInstanceValid(_washFx)) _washFx.Stop();
@@ -1065,6 +1116,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
     {
         if (Engine.IsEditorHint() || Profile == null) return;
         if (_mario == null) { _mario = GetTree().GetFirstNodeInGroup("player") as Mario; ExceptMario(); }
+        if (_goopInitPending) { _goopInitPending = false; WearGoopOf(SmsPollutionMap.PollutedLayerAt(GlobalPosition) ?? SmsPollutionMap.LayerAt(GlobalPosition)); }   // pass 108
         int n = SmsUnits.TicksFor(delta, ref _tickAccum);              // TLiveActor: every 120 Hz tick of the frame (pass 83; 82 ran one a frame)
         if (_holder != null) { for (int i = 0; i < n; i++) TickHeldClocks(); TickHeld(); return; }   // perform with mHolder: no bind
         for (int i = 0; i < n; i++)
@@ -1171,6 +1223,7 @@ public partial class SmsNpc : CharacterBody3D, ISmsSprayTarget
         if (!can) return;
         _sinkGroundY = GlobalPosition.Y;
         _sinkNormal = IsOnFloor() ? GetFloorNormal() : Vector3.Up;          // mGroundPlane->getNormal() for the ripple's frame (pass 95)
+        WearGoopOf(SmsPollutionMap.PollutedLayerAt(GlobalPosition));        // pass 108: the layer he sinks in dresses him (Profile.GoopFromLayer)
         Velocity = Vector3.Zero; _marchSpeed = 0f;
         _talkable = false; _sinking = true; _sunk = false;
         Play(Profile.ClipFall); ResetToWait();                              // npcFallIn: the FALL clip

@@ -212,6 +212,7 @@ These sit on the PROFILE, not the instance -- change them on a duplicated profil
 | Effects | `Foot Drip Effect`, `Foot Joint L` / `R`, `Foot Drip Frames L` / `R` | the Pianta's foot drips (left on 28 52 76, right on 128 152 176). Empty on a Toad. |
 | Effects | `Wash Effect` | the balls flying off while the hose washes it (`NpcWashPianta` / `NpcWashToad`). |
 | Effects | `Sink Effect` | the goop ripple ring and balls while it sinks (`Fx/GoopSinkRipple.tscn`; Mario's own copy sits on `Player.tscn`). |
+| Pollution | `Goop From Layer` | on (default; a deviation at Jaysonn's word -- the game has one goop look per stage): a dirty NPC wears the goop of the **layer it sank in**. A Fire or Electric layer, or one with its own `Goop Texture`, puts that texture on its skin and colours its drips and wash from it (the brightest quarter of the texture = the light colour, the darkest quarter = the dark); a plain brown layer keeps the stage look (`tex/H_ma_rak`, the Delfino pair), so nothing seen so far changes. Name the two colours yourself with `Goop Light Color` / `Goop Dark Color` on the LAYER (alpha 0 = measured; on a brown layer they recolour the particles and keep the skin). An NPC placed `Pollution` > 0 on a layer takes that layer's goop at once. Off = the game: the one stage skin and colour row whatever it stood in. Mario's footprints, melt and spin fling follow the same rule through `Goop From Layer` on his `GoopMario` node (his own dirty tint stays the game's). |
 | Textures | `Eye Texture` | the eye sheet (`tex/I_mom_eye01_IA8`, `I_mow_eye01_IA8`, `N_kinopio_me_open`): a dark oval with a white glint on a transparent sheet, from the bmd. Empty = the glb's own image, which the exporter got wrong (the Toad's was the toon ramp = white wedge eyes; the Piantas' had a bit-flipped grey pupil). The blinks and expressions come from `Tex Patterns` (below). |
 | Textures | `Body Material Texture`, `Cloth Texture` | the Toad's two MASKS: `N_kinopio_cap` (black circle = the spot colour `Body Colors`, white = the cap `Body Colors 2`) and `N_kinopio_cloth` (black border = the trim `Cloth Colors`, white = the vest `Cloth Colors 2`). The glb had given both the pollution gradient -- a pink wash with no spots, an orange smear, a glossy look. Leave empty on a Pianta (its body samples no texture). |
 | Textures | `Skin Texture`, `Mouth Texture` | the Toad's `N_kinopio_body` (face / hands / shorts) and `N_kinopio_kuti_close` (the default mouth; the talking / worried / wet shapes come from `Tex Patterns`). |
@@ -225,7 +226,9 @@ These sit on the PROFILE, not the instance -- change them on a duplicated profil
 Any `SmsNpcEffect` scene can stand in: a root `Node3D` with the `SmsNpcEffect` script (`Emit Frames` = how long it emits, 1 = one
 burst, 0 = until the clip ends; `Drain Seconds` = the longest particle life) and `GPUParticles3D` children with `emitting` off.
 The drips' and the wash's colours are the goop's: `env_color` / `prm_color` on their shader material (Delfino's brown pair; the
-game's other maps' rows are in `EmitterViewObj.cpp` 644 if a level wants another colour).
+game's other maps' rows are in `EmitterViewObj.cpp` 644 if a level wants another colour). With `Goop From Layer` on, an NPC dirtied on
+a Fire / Electric / own-texture layer gets a per-instance copy of that material carrying the layer's two colours (the scene file itself
+is never edited); a brown layer leaves the scene's colours as they are.
 
 ## 7d. Signs -- `SignBoard.tscn` (pass 103: the game's board NPC and its board window)
 
