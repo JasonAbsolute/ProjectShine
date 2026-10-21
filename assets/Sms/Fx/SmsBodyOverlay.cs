@@ -203,10 +203,32 @@ public partial class SmsBodyOverlay : Node
             if (nm.EndsWith("HandBone")) hand = true;
         }
         var mask = hand ? HandPollutionMask : BodyPollutionMask;
-        if (mask != null) m.SetShaderParameter("pol_mask_tex", mask);
+        if (mask != null) m.SetShaderParameter("pol_mask_tex", RawLinearMask(mask));
         if (GoopTexture != null) m.SetShaderParameter("pol_tex", GoopTexture);
         m.SetShaderParameter("pol_uv", _polUv);
         return m;
+    }
+
+    private static readonly System.Collections.Generic.Dictionary<ulong, Texture2D> _rawMaskCache = new System.Collections.Generic.Dictionary<ulong, Texture2D>();
+
+    /// <summary>Pass 113b: the pollution mask is intensity DATA (the game's I4 threshold per texel), but a colour PNG is sampled sRGB-DECODED on
+    /// the GPU, which drops its values (147 -> ~75) so almost the whole body reads &lt;= mDirty and goops -- Mario turned uniformly dark instead of
+    /// the ~20 % the mask intends. (The headless drive read the mask IMAGE on the CPU, where the values are already raw, so it could not see
+    /// this; the NPC skin's gradient mask tolerates the shift, Mario's splatter does not.) Re-wrap the mask as a linear R8 texture so
+    /// `texture(pol_mask_tex).r` returns the raw 8-bit value the shader's `floor(.r * 255)` expects. Cached per source texture.</summary>
+    private static Texture2D RawLinearMask(Texture2D src)
+    {
+        if (src == null) return null;
+        ulong key = src.GetInstanceId();
+        if (_rawMaskCache.TryGetValue(key, out var hit) && hit != null) return hit;
+        Image img = null;
+        try { img = src.GetImage(); } catch { img = null; }
+        if (img == null) { _rawMaskCache[key] = src; return src; }
+        if (img.IsCompressed()) img.Decompress();
+        if (img.GetFormat() != Image.Format.R8) img.Convert(Image.Format.R8);  // R8 = R8_UNORM: sampled raw, never sRGB-decoded
+        var tex = ImageTexture.CreateFromImage(img);
+        _rawMaskCache[key] = tex;
+        return tex;
     }
 
     /// <summary>addDirty (MarioDraw.cpp 2139): mDirty into every surface's konst alpha -- here the `dirty` uniform (mDirty / 255) and the goop
