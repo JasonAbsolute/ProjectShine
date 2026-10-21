@@ -6525,3 +6525,54 @@ cap, gloves and face from the dark cells of the mask outward, and wash off in wa
 The hand mask was first keyed on the material name and matched 3 of 5 (the exports name them `_mat_hand3_L`, `LeftHandSlightyClosed`,
 `_mat_hand4_r1`...; one ResourceName differs at runtime) -- keyed on the mesh name / the HandBone ancestor instead. A FIRE layer in the drive
 BURNED him instead of dirtying him (floorDamage, no dirt -- the game's too); the dress test uses a Slip layer carrying the fire texture.
+
+## SMS pass 112 -- the fruits bounce off Mario: TMapObjBall::kicked / boundByActor, and Mario walks THROUGH fruits
+
+Jaysonn (10-20 22:08): "Finish 110, then do 111 Mario's goop skin, then fruit bounce".
+
+### The game
+TMapObjBall (MapObjBall.cpp) is every fruit, the football and the watermelon. How one reacts to Mario (touchActor 299 / receiveMessage 427-449,
+every frame their hit cylinders overlap, while the fruit is not held and its 10-frame guard unk194 is down):
+* kicked() (184) when Mario's mVel.y != 0 -- he jumps, falls or DIVES onto it: a fruit already rising is left alone; at rest it hops unk178 (20 u /
+  frame), falling it rebounds -unk160 x its own vy + unk174 (0.13) x his vy; xz += unk170 (0.9) x his xz; both axes under the physical's min speed
+  -> a random unit xz; AIRBORNE; Mario's receiveMessage(HIT_MESSAGE_ATTACK).
+* boundByActor() (229) when his vy == 0 -- he runs or stands into it: inside mDamageRadius in XZ; faster than the min speed on an axis -> vy +=
+  unk150 (1.3), else unk154 (durian 15); xz += unk148 x his xz - (the unit offset to him) x unk14C; receiveMessage(ATTACK). Its "dive" branch
+  (his vy < 0 and his feet + 130 u under the fruit's top) is only reached from the WATERMELON's receiveMessage: for a fruit a Mario with any
+  vertical speed goes to kicked() first.
+* What Mario does with HIT_MESSAGE_ATTACK from a fruit (MarioReceiveMsg.cpp 877): a DURIAN (and the football) freezes him mKickFreezeTime = 2
+  frames (mario.prm; his move skipped, MarioMain.cpp 96, then mNoFreezeTime 2 of immunity) with the AMIATTACK puff; every other fruit: nothing.
+  Picking up stays HIT_MESSAGE_TAKE (B).
+* The per-type numbers (initMapObj 451-607), u / frame: coconut / papaya / pineapple / pepper 148 .4, 14C .2, 150 1.3, 154 0, 158 1.2, 15C .8,
+  160 .5, 170 .9, 174 .13, 178 20; durian 148 .6, 154 15, 158 .5, 15C 1.3, 160 1.0; BANANA all zero (it never bounces off him -- it slides).
+  Min speeds (the physical data): 0.3, durian 0.2, banana 1.0. Body radius 50 u x the scale (coconut / papaya 40, durian 45); hit cylinders
+  (TMapObjHitDataTable) 80 r x 90 h, the coconut's 50 x 80; Mario's 50 x 160.
+* And the fact that made the port's run-in impossible: a fruit's TMapObjData carries NO map collision (the collision slot is null, MapObjInit.cpp
+  coconut_data) -- Mario walks THROUGH fruits; only the cylinders react.
+
+### The port
+* Fruit.cs (his RigidBody3D fruits; the bounce / roll PhysicsMaterial profile is his and stays): `SmsBallTick` from _PhysicsProcess at the map
+  objects' 30 fps -- the cylinder test (SmsMarioTouches), the guard, a held fruit (Freeze) skipped, then `SmsKicked` / `SmsBoundByActor` as above
+  with the per-type table (`SmsBallParamsFor`) as velocity writes on the body (units a frame <-> m/s through SmsUnits). A resting Godot body's
+  vy jitter (|vy| < 0.05 u/f) counts as the game's exact 0 in kicked(). `SmsPassThroughMario` (default ON, a knob): at _Ready the body leaves
+  collision layer 1 for 2, so Mario's mask (1 + 3) no longer stops on it -- the floor still catches it (its own mask is unchanged), the take
+  (group "pickable") and the throw are physics-layer-free. Off = the port's solid fruits (with which a run-in stops 60 u short, inside the
+  touch radius but outside a coconut's 50 u damage radius: the game's run-in can then never fire). `SmsLastTouch` / `SmsTouchCount` /
+  `SmsLastTouchVelUnits` for the drives. LEGACY RETIRED: the durian-only kick (`_PhysicsProcess`'s GetCollidingBodies / KickImpulse block); the
+  Kick* exports stay so the scenes load, read by nothing.
+* Mario: `SmsMarioVelUnits`, `SmsFeetWorldY`, `SmsHitRadiusUnits` / `SmsHitHeightUnits` (50 / 160); `SmsKickFreeze()` -> mFreezeTimer: the SMS
+  frame skips his move (velocity zeroed) for 2 frames, then 2 of immunity (`SmsFrozen`). The AMIATTACK puff is not baked (no slot yet).
+
+### Verified (drive 112, 7 checks, on his machine; regressions 110 / 111 / 105b / 107 / 106 green; build 0 errors; boot ALL OK)
+A sprint (32 u/f) into a resting coconut: ONE touch, the run-in, lifted exactly 1.30 u/f and carried 0.4 x his run minus the push (-37.4 u/f), no
+freeze on him; a fall onto a resting durian: the FIRST touch a kick with the set hop 20.00 u/f and a random unit xz, and he froze 2 frames a touch
+(12 physics frames over 3 touches as he settled beside it); a DIVE onto a resting coconut: a kick (20.00 up, 0.9 x his run forward), as the game
+dispatches it; a sprint into a banana: the touch registers, the velocity unchanged. Headless cannot see the arc -- the look is his.
+
+### Caught by the drive (port and test)
+Run 1: no run-in touch at all -- the probe showed Mario STOPPED 60 u from the coconut (the port's solid fruit body), and the game's boundByActor
+radius is the fruit's own 50 u: the run-in could never fire while fruits block him. The decomp's data gave the answer (no map collision on a
+fruit); SmsPassThroughMario is the port of that. Run 2: a resting RigidBody's vy reads +-0.00x, which kicked()'s `vy > 0 -> return` took as rising:
+clamped. The test's D1 first expected boundByActor's dive branch for a diving Mario -- wrong: the game's dispatch (vy != 0 -> kicked) sends a dive
+to kicked(); the drive now asserts the game's rule. No regression drive covers the take / throw (62 / 63's installers are gone); the take search
+is group-based and the held fruit is Freeze = true in both paths, so the layer change does not touch them -- his hands-on check is owed there.

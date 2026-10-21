@@ -2180,6 +2180,11 @@ public partial class Mario : CharacterBody3D
         if (_smsInvincibleTicks > 0)
             _smsInvincibleTicks = Math.Max(0, _smsInvincibleTicks - Mathf.RoundToInt((float)delta * 120f)); // thinkParams(): mInvincibilityFrames -= 1 a tick
         if (UseSmsPhysics)
+        {
+            SmsFreezeTick(delta);
+            if (_smsFreezeTicks > 0) { velocity = Vector3.Zero; goto EndFrame; }   // pass 112: mFreezeTimer (a durian's kick): perform skips the move (MarioMain.cpp 96)
+        }
+        if (UseSmsPhysics)
             SmsDirectorTalkCheck(); // TMarDirector::movement_game: the cursor / the talk start are the director's, before any actor moves (pass 85)
         if (UseSmsPhysics && _smsTalking)
         {
@@ -11175,6 +11180,36 @@ public partial class Mario : CharacterBody3D
     /// <summary>TMarioGamePad::mDisabledFrames: the pad reads neutral for this many 30 fps frames (the red coin switch: its BCK's end x 2 + 60).</summary>
     public void SmsDisablePad(int frames) { _smsPadDisabledTicks = Math.Max(_smsPadDisabledTicks, frames * SmsUnits.TicksPerFrame); }
     public int SmsPadDisabledTicks => _smsPadDisabledTicks;
+
+    // ---- the fruits' bounce off him (pass 112): what TMapObjBall reads of him ----
+    /// <summary>mVel in the game's units a FRAME (SMS_GetMarioSpeedX / Y / Z): his velocity through MpsToSpeed.</summary>
+    public Vector3 SmsMarioVelUnits => new Vector3(SmsUnits.MpsToSpeed(velocity.X), SmsUnits.MpsToSpeed(velocity.Y), SmsUnits.MpsToSpeed(velocity.Z));
+    /// <summary>mPosition.y: his feet, world metres.</summary>
+    public float SmsFeetWorldY => SmsFeetY();
+    /// <summary>His hit cylinder for the map objects' touch test: radius 50 u, height 160 u (the game's THitActor on Mario).</summary>
+    public const float SmsHitRadiusUnits = 50f, SmsHitHeightUnits = 160f;
+    /// <summary>MarioReceiveMsg.cpp 877 (a durian's / football's HIT_MESSAGE_ATTACK): mFreezeTimer = mKickFreezeTime (2 frames, mario.prm) while
+    /// mFreezeImmunityTimer is 0 -- his move is skipped for those frames (MarioMain.cpp 96), then mNoFreezeTime (2) of immunity. The AMIATTACK puff
+    /// (kickFruitEffect) is not baked. Returns false while immune.</summary>
+    public bool SmsKickFreeze()
+    {
+        if (_smsFreezeImmunityTicks > 0) return false;
+        _smsFreezeTicks = SmsFreezeParams.KickFreezeFrames * SmsUnits.TicksPerFrame;
+        return true;
+    }
+    private int _smsFreezeTicks, _smsFreezeImmunityTicks; private float _smsFreezeAccum;
+    private static class SmsFreezeParams { public const int KickFreezeFrames = 2, NoFreezeFrames = 2; }   // mario.prm mKickFreezeTime / mNoFreezeTime (sms_shipped_params.json)
+    public bool SmsFrozen => _smsFreezeTicks > 0;
+    /// <summary>MarioMain.cpp 31-38 / 96: the freeze counts down a tick a tick; when it runs out the immunity starts.</summary>
+    private void SmsFreezeTick(double delta)
+    {
+        int n = SmsUnits.TicksFor(delta, ref _smsFreezeAccum);
+        for (int i = 0; i < n; i++)
+        {
+            if (_smsFreezeTicks > 0) { if (--_smsFreezeTicks == 0) _smsFreezeImmunityTicks = SmsFreezeParams.NoFreezeFrames * SmsUnits.TicksPerFrame; }
+            else if (_smsFreezeImmunityTicks > 0) _smsFreezeImmunityTicks--;
+        }
+    }
 
     /// <summary>findNearestTakeNPC (MarDirectorEvent.cpp 61): a liftable NPC (isNowCanTaken) in his isTakeSituation.</summary>
     private SmsNpc SmsNpcTakeOffered()
