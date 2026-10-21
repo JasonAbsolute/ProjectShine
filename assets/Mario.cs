@@ -430,6 +430,7 @@ public partial class Mario : CharacterBody3D
     [Export] public bool SmsStepUp = true;      // checkGroundAtWalking: step UP risers up to 30 units (0.40 m) without breaking stride
     [Export] public float SmsStepSmoothRate = 12f; // visual only: the rig rides a virtual ramp through stairs (one riser per tread of travel) and never settles slower than this standstill ease (1/s); 0 = the mesh pops with the body
     [Export] public int SmsWallSlidePinTicks = 4;     // stayWall(): 120 Hz ticks of zero velocity when the slide begins. Game value 10 (83 ms, felt sticky); 4 (33 ms) by request, playtested; 0 = slides at once
+    [Export] public bool SmsSkinFromLayer = false;  // DEVIATION knob (pass 113): the goop SKIN's texture. false = the game's: the stage's one h_ma_rak (GoopTexture on BodyOverlay.tscn, Delfino's brown) whatever goop dirtied him; true = pass 108's rule for Mario too (the layer's own GoopTexture -- pink in pink goop, BLACK in OilGoop; Jaysonn 2026-10-20 23:20 saw the black)
     [Export] public bool SmsRollJumpKnockdown = false; // DEVIATION: decomp jumpingBasic() knocks the roll-jump (fwd 55 > ClashSpeed 40) down on a head-height wall; Jaysonn (2026-09-24) wants the wall slide he remembers from the game. true = the code's rule
     private bool _smsSteppedUp = false;         // this frame's grounded MoveAndSlide hit a riser he has since stepped onto
     [Export] public float SmsRollJumpMinSpeed = 20f; // catching(): slide speed (SMS units/tick) above which A is the big roll-jump. Game value: mario.prm mClashSpeed = 40 (big roll only within ~0.13 s of touchdown); 20 chosen by feel (Jaysonn, 2026-09-24) -- a deliberate deviation
@@ -19345,8 +19346,9 @@ public partial class Mario : CharacterBody3D
         _smsBodyOverlay?.SetFogColor(smsSlipDirty && _smsFogTimer > SmsParams.Dirty.FogTimeYellow ? SmsBodyOverlay.GoopYellow : SmsBodyOverlay.DamagePink);
         _smsBodyOverlay?.SetDamageFog((_smsInvincibleTicks > 0 || smsSlipDirty) && stateOfMario != MarioState.talking);
         // addDirty() (MarioDraw.cpp 2139, every frame from MarioMain.cpp 136): mDirty into every body / hand material's konst alpha -- the goop
-        // skin (pass 111). The goop texture: the layer that dirtied him when pass 108's knob dressed him, else the stage's (H_ma_rak)
-        _smsBodyOverlay?.SetDirty(_smsDirtyAmount, _smsGoopFx != null && _smsGoopFx.GoopLayer != null && _smsGoopFx.GoopLayer.CharacterGoop(out var skinTex, out _, out _) ? skinTex : null);
+        // skin (pass 111). The goop texture: the STAGE's (H_ma_rak_dummy is swapped at load for the stage's one h_ma_rak.bti -- never per goop),
+        // unless SmsSkinFromLayer (pass 113) hands him the layer's texture by pass 108's rule
+        _smsBodyOverlay?.SetDirty(_smsDirtyAmount, SmsSkinFromLayer && _smsGoopFx != null && _smsGoopFx.GoopLayer != null && _smsGoopFx.GoopLayer.CharacterGoop(out var skinTex, out _, out _) ? skinTex : null);
         SmsMissTick(); // TMarDirector: MARIO_FLAG_GAME_OVER -> the Miss state
         SmsRoofHangCheck(); // jumpProcess() roofCode 4: a fence roof met by the head while rising, hands empty -> HANG_ROOF
         if (_smsNoLandFrames > 0)

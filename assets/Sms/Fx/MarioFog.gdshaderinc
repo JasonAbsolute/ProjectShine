@@ -53,15 +53,18 @@ void fragment() {
 	if (use_vertex_color) {
 		albedo_tex *= COLOR;
 	}
+	vec3 base = albedo.rgb * albedo_tex.rgb;
 	if (dirty > 0.0) {
-		// stage 0 / 2 (MarioDraw.cpp addDirty): the mask's 8-bit value against mDirty -- at or under it the texel wears the goop texture
+		// stage 0 / 2 (MarioDraw.cpp addDirty): the mask's 8-bit value against mDirty -- at or under it the texel wears the goop texture AS-IS:
+		// stage 1 is the body texture x REG2 (0 where gooped), stage 2 adds rak x (1 - REG2) in its place; the material colour never multiplies
+		// the rak (pass 113 -- a tint of colour x goop made a dark goop paint him black)
 		vec2 puv = pol_uv == 1 ? UV2 : uv;
 		float mask = floor(texture(pol_mask_tex, puv).r * 255.0 + 0.5) / 255.0;
 		if (mask <= dirty) {
-			albedo_tex.rgb = texture(pol_tex, puv).rgb;
+			base = texture(pol_tex, puv).rgb;
 		}
 	}
-	ALBEDO = albedo.rgb * albedo_tex.rgb;
+	ALBEDO = base;
 	METALLIC = metallic;
 	SPECULAR = specular;
 	ROUGHNESS = roughness;

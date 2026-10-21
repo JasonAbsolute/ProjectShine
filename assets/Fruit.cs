@@ -293,10 +293,16 @@ public partial class Fruit : RigidBody3D
 	/// <summary>Pass 112: Mario walks through fruits as in the game (their bodies leave his collision mask); off = the port's solid fruits.</summary>
 	[Export] public bool SmsPassThroughMario { get; set; } = true;
 
+	/// <summary>DEVIATION knob (Jaysonn 2026-10-20 23:20 "all the fruit are kickable? shouldn't we have that as a flag?"): false = THIS fruit ignores
+	/// Mario's touch -- no kick, no bounce, no durian freeze; picking it up is untouched. The game has no such flag: every TMapObjBall goes through
+	/// touchActor (MapObjBall.cpp 299); what makes the banana inert is its all-zero table (initMapObj 583). true = the game.</summary>
+	[Export] public bool SmsBallReacts { get; set; } = true;
+
 	/// <summary>touchActor each 30 fps frame (the map objects' CUE_MOVE): Mario's cylinder (50 x 160 u) against the fruit's damage cylinder; a
 	/// held fruit (STATE_HOLDING) and the guard skip it; kicked() when his mVel.y != 0, else boundByActor().</summary>
 	private void SmsBallTick(double delta)
 	{
+		if (!SmsBallReacts) return;
 		if (_ballMario == null || !IsInstanceValid(_ballMario)) _ballMario = GetTree().GetFirstNodeInGroup("player") as Mario;
 		var mario = _ballMario;
 		if (mario == null || !mario.UseSmsPhysics) return;

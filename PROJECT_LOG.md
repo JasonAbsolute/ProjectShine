@@ -6576,3 +6576,45 @@ fruit); SmsPassThroughMario is the port of that. Run 2: a resting RigidBody's vy
 clamped. The test's D1 first expected boundByActor's dive branch for a diving Mario -- wrong: the game's dispatch (vy != 0 -> kicked) sends a dive
 to kicked(); the drive now asserts the game's rule. No regression drive covers the take / throw (62 / 63's installers are gone); the take search
 is group-based and the held fruit is Freeze = true in both paths, so the layer change does not touch them -- his hands-on check is owed there.
+
+## SMS pass 113 -- Mario's goop skin follows the STAGE, not the layer (the all-black oil skin); a per-fruit kick flag
+
+Jaysonn (10-20 23:20): "when mario has dirt on him hes turning all black but when walking on goop he flashes like normal" and "also all the fruit
+are kickable? shouldnt we have that as a flag?". Both the skin and the flag land here; his editor was CLOSED (00:01), so any file could be touched.
+
+### The all-black oil skin
+Pass 111 ported TMario::addDirty, and handed SmsBodyOverlay.SetDirty the goop texture that pass 108's rule (SmsPollutionLayer.CharacterGoop)
+picked for the LAYER Mario stood in -- that was his 02:08 ask for the NPCs ("the goop on npc should be whatever goop they are in"). On a layer
+whose own texture is dark (OilGoop = the glossy green-black), the per-texel swap painted his splatter black: his dirtRef.png shot measured the
+head at (0,0,0) and the overalls at OilGoop's teal (0,44,55) -- the LAYER's texture, not goop-brown. The GAME never does this: TMario's
+H_ma_rak_dummy is swapped at LOAD for the stage's one h_ma_rak.bti (Delfino's is the brown H_ma_rak.png) -- a skin per STAGE, never per goop; a
+dark goop still dirties Mario brown. (The fog "flashing normal" he contrasted it with is a separate effect -- addDamageFog, untouched.)
+
+### The port
+* Mario.cs: new DEVIATION knob `SmsSkinFromLayer` (default FALSE = the game). The SetDirty call now gates the layer texture on it: false -> the
+  texture arg is null, and SetDirty falls back to the BodyOverlay's GoopTexture export (the stage's H_ma_rak); true -> pass 108's rule (the
+  layer's own texture, pink in pink goop, BLACK in oil -- his old look, kept on a knob). The NPCs are UNCHANGED (their GoopFromLayer still dresses
+  them in the layer they sank in -- his explicit 02:08 ask); only Mario moved to the game's per-stage skin.
+* MarioFog.gdshaderinc: the gooped texel now takes the goop texture AS-IS (`base = texture(pol_tex)`), matching the GX TEV chain (stage 1 = body
+  x REG2, stage 2 = + rak x (1 - REG2): a replace, the rak never multiplied by a material colour). The old line multiplied by the material's
+  AlbedoColor -- a NO-OP here (all 11 of Mario's body materials have baseColorFactor 1,1,1, verified from ma_mdl1.glb) but wrong in principle and
+  corrected so a future tinted material cannot darken the goop.
+* Fruit.cs: new DEVIATION flag `SmsBallReacts` (default TRUE = the game) -- false makes THAT fruit ignore Mario's touch entirely (SmsBallTick
+  returns: no kick, no bounce, no durian freeze); picking it up is untouched. The GAME has no such flag: every TMapObjBall runs touchActor
+  (MapObjBall.cpp 299); what makes the banana inert is its all-zero table, not a flag. Offered because he asked for one.
+
+### Verified (on his machine; editor closed; build 0 errors; boot ALL OK; Mario.cs back to 210a09de drive-free)
+* The dll carried SmsSkinFromLayer and boot was ALL OK BEFORE this log -- the "still black" screenshot (dirtRef.png, 23:38) predated the fixes
+  AND a running instance never hot-reloads C#, so it showed the old 111 skin regardless of the 23:35 rebuild.
+* Drive 111 (patch_smoke111.py, retargeted for the 113 default) 8/8: S1 masks + stage goop + pol_uv 1; C1 clean 16 StandardMaterial3Ds; M1 the
+  mask census 0 / 19 / 37 %; D1 mDirty 90 -> 16 copies, the STAGE goop, 5 hand masks; D2 fog off; D3 restore; **L1 `SmsSkinFromLayer` ON -> the
+  skin wears the LAYER's FireGoop on all 16; K1 (THE BUG) `SmsSkinFromLayer` OFF (the default) -> though he STILL stands dirty on the FireGoop
+  layer, all 16 surfaces wear the STAGE H_ma_rak and NEVER the layer's (layerWorn 0, skin H_ma_rak.png)** -- the headless proof the oil skin is brown.
+* Drive 112 (patch_smoke112.py) 8/8: B1/B2/K1/K2/D1/N1/N2 as pass 112, plus **R1 `SmsBallReacts` off -> a sprint into a coconut registers NO
+  touch (touches 0, velocity at rest): the fruit ignores Mario**.
+* Regressions: 107 18/18, 108 26/26, 110 8/8, 106 18/18, 105b 14/14 (the goop-adjacent set -- 113 touches the goop skin and the fruits).
+
+### Not ported / owed
+The goop PARTICLES (107's footprints / melt / fling) still take the layer's colour from pass 108's WearGoopOf -- so on oil they stay oil-coloured
+even though the skin is now stage brown; offered to move them to the stage colour too (his call). HIS EYE still owes the look: run through goop ->
+brown splatter over overalls / cap / gloves / face (heaviest on the shoes and cap at the dirt cap), oil no longer black.
