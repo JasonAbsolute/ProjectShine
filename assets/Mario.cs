@@ -430,7 +430,7 @@ public partial class Mario : CharacterBody3D
     [Export] public bool SmsStepUp = true;      // checkGroundAtWalking: step UP risers up to 30 units (0.40 m) without breaking stride
     [Export] public float SmsStepSmoothRate = 12f; // visual only: the rig rides a virtual ramp through stairs (one riser per tread of travel) and never settles slower than this standstill ease (1/s); 0 = the mesh pops with the body
     [Export] public int SmsWallSlidePinTicks = 4;     // stayWall(): 120 Hz ticks of zero velocity when the slide begins. Game value 10 (83 ms, felt sticky); 4 (33 ms) by request, playtested; 0 = slides at once
-    [Export] public bool SmsSkinFromLayer = false;  // DEVIATION knob (pass 113): the goop SKIN's texture. false = the game's: the stage's one h_ma_rak (GoopTexture on BodyOverlay.tscn, Delfino's brown) whatever goop dirtied him; true = pass 108's rule for Mario too (the layer's own GoopTexture -- pink in pink goop, BLACK in OilGoop; Jaysonn 2026-10-20 23:20 saw the black)
+    [Export] public bool SmsSkinFromLayer = true;   // DEVIATION knob (pass 113; default ON since 114, Jaysonn 2026-10-21 23:36): the goop SKIN's texture. true = pass 108's rule for Mario too: the layer he is dirtied on (pink in pink goop, the stage brown on a plain layer, oil's dark green-black on oil), re-read every tick he stands on paint; false = the game's: the stage's one h_ma_rak (GoopTexture on BodyOverlay.tscn, Delfino's brown) whatever goop dirtied him
     [Export] public bool SmsRollJumpKnockdown = false; // DEVIATION: decomp jumpingBasic() knocks the roll-jump (fwd 55 > ClashSpeed 40) down on a head-height wall; Jaysonn (2026-09-24) wants the wall slide he remembers from the game. true = the code's rule
     private bool _smsSteppedUp = false;         // this frame's grounded MoveAndSlide hit a riser he has since stepped onto
     [Export] public float SmsRollJumpMinSpeed = 20f; // catching(): slide speed (SMS units/tick) above which A is the big roll-jump. Game value: mario.prm mClashSpeed = 40 (big roll only within ~0.13 s of touchdown); 20 chosen by feel (Jaysonn, 2026-09-24) -- a deliberate deviation
@@ -2134,10 +2134,14 @@ public partial class Mario : CharacterBody3D
         if (UseSmsPhysics && _smsPadDisabledTicks > 0)
         {
             // TMarioGamePad::mDisabledFrames (MarioGamePad.cpp 70): the pad reads neutral -- the red coin switch's press (pass 109). The stick and A
-            // here (A through the talk's swallow flag); R / Z / X are read where they are used and are not gated (a logged gap)
+            // here (A through the talk's swallow flag); pass 114: every other meaning too -- updateMeaning skips B / R / Z / L / the sub stick / Y / the
+            // L camera / X while disabled (only START survives), so those actions are released each tick (the Y cam eats A / B the same way, MarioYCam.cs);
+            // the FLUDD's R strength, the X swap and the Y / cancel edges are gated at their reads, the camera's C-stick / L edge through SmsCamMarioData.PadDead
             _smsPadDisabledTicks = Math.Max(0, _smsPadDisabledTicks - SmsUnits.TicksFor(delta, ref _smsPadDisabledAccum));
             LstickVec = Vector2.Zero;
             _smsTalkSwallowA = true;
+            foreach (string action in SmsDeadPadActions)
+                if (InputMap.HasAction(action)) Input.ActionRelease(action);
         }
         _camMainStick = LstickVec; // mCompSPos[4],[5]: the pad's main stick as the L camera reads it (SmsCamMarioData.MainStick), before his own scaling
         if (UseSmsPhysics && (SmsYCamOn || _ycamNeutralTicks > 0))
@@ -11178,6 +11182,10 @@ public partial class Mario : CharacterBody3D
 
     // ---- the pad's disabled frames (pass 109) ----
     private int _smsPadDisabledTicks; private float _smsPadDisabledAccum;
+    /// <summary>The actions a dead pad releases every tick (MarioGamePad.cpp 70-121: no meaning for B / R / Z / L / Y / X while disabled; START is not touched).
+    /// A button HELD across the window's end stays released until it is pressed again (Godot keeps no raw state to re-read) -- a logged deviation.</summary>
+    private static readonly string[] SmsDeadPadActions = { "button_b", "button_r", "button_x", "button_y", "button_z", "key_z", "button_l", "button_rclick" };
+    public bool SmsPadDead => _smsPadDisabledTicks > 0;
     /// <summary>TMarioGamePad::mDisabledFrames: the pad reads neutral for this many 30 fps frames (the red coin switch: its BCK's end x 2 + 60).</summary>
     public void SmsDisablePad(int frames) { _smsPadDisabledTicks = Math.Max(_smsPadDisabledTicks, frames * SmsUnits.TicksPerFrame); }
     public int SmsPadDisabledTicks => _smsPadDisabledTicks;
@@ -12510,9 +12518,9 @@ public partial class Mario : CharacterBody3D
         if (!_fluddReady)
             return;
         int n = SmsUnits.TicksFor(delta, ref _fluddTickAccum);
-        _fluddR = Input.GetActionStrength("button_r");
+        _fluddR = _smsPadDisabledTicks > 0 ? 0f : Input.GetActionStrength("button_r");   // pass 114: no MEANING_R while the pad is dead
         // gunExec(): X swaps to the second nozzle and back (changeBackup: only from a finished tween)
-        if (Input.IsActionJustPressed("button_x") && stateOfMario != MarioState.hurt && stateOfMario != MarioState.dead)
+        if (_smsPadDisabledTicks == 0 && Input.IsActionJustPressed("button_x") && stateOfMario != MarioState.hurt && stateOfMario != MarioState.dead)   // pass 114: no MEANING_X either
         {
             if (_fluddSwitch <= 0f)
             {
@@ -17900,8 +17908,8 @@ public partial class Mario : CharacterBody3D
         int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
         bool aPressed = Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space");
         bool bPressed = Input.IsActionJustPressed("button_b");
-        bool rHeld = Input.IsActionPressed("button_r");
-        bool bHeld = Input.IsActionPressed("button_b");
+        bool rHeld = _smsPadDisabledTicks == 0 && Input.IsActionPressed("button_r");   // pass 114: a dead pad pumps nothing
+        bool bHeld = _smsPadDisabledTicks == 0 && Input.IsActionPressed("button_b");
         bool stick = stickDir.LengthSquared() > 1e-6f && _smsIntendedMag > 0f; // mInput & 1
         float intendedYaw = stick ? SmsMath.YawFromDir(stickDir) : 0f;
         float q = 1f / SmsUnits.TicksPerFrame;

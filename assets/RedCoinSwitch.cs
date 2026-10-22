@@ -1,4 +1,5 @@
 using Godot;
+using System.Linq;
 
 /// <summary>
 /// SMS-style red coin switch. Ground pound it to start the level's ShineTimer
@@ -56,6 +57,12 @@ public partial class RedCoinSwitch : Node3D
     [Export] public AudioStreamPlayer RaceStartSound;
     /// <summary>TRedCoinSwitch::receiveMessage: the pad is disabled for the press clip's end x 2 + this many frames (0x3C).</summary>
     [Export] public int PadDisableExtraFrames = 60;
+    /// <summary>MSD_SE_SY_COIN_DISAPPEAR: the red coins' death when the timer runs out (TItem::appeared, Item.cpp 50; pass 114). A slot, no stream yet.</summary>
+    [Export] public AudioStreamPlayer CoinDisappearSound;
+    /// <summary>DEVIATION knob (pass 114). The game's switch stays pressed for the rest of the stage visit after a time-up (control() state 4, the flag
+    /// kept): no retry without leaving. true = this switch re-arms when its coins die -- the clip rewound, the collision back, a new pound starts a new
+    /// challenge -- for levels with no exit. false = the game.</summary>
+    [Export] public bool SmsRearmOnTimeUp = false;
     [ExportGroup("")]
 
     /// <summary>The red coin scene instantiated when this switch is hit.</summary>
@@ -88,6 +95,14 @@ public partial class RedCoinSwitch : Node3D
     private bool _redCoinShineSpawned = false;
     private bool _signAcknowledged = false;
     private bool _challengeStarted = false;
+    private readonly System.Collections.Generic.List<RedCoin> _smsCoins = new();   // the coins of this challenge, in spawn order (pass 114)
+    private readonly System.Collections.Generic.List<Area3D> _smsCoinPickups = new(); // their pickup areas, off for the first second (TItem::killByTimer's HIT_FILTER_NO_COLLISION)
+    private bool _smsTimeUp = false;          // the coins' timers ran out (TItem::appeared -> makeObjDead for all eight)
+    private bool _smsCoinsUntouchable = false;
+    private int _smsUntouchableTicks = 0; private float _smsUntouchableAccum = 0f; // the first second, on its own 120 Hz clock (not the ShineTimer's)
+    /// <summary>The game's coin flush: hidden every other 10 ticks (1 / 12 s) through the last 360 ticks (3 s) of its life (TMapObjGeneral::perform 584,
+    /// mNormalFlushTime / mNormalFlushInterval); untouchable for its first 120 ticks (TItem::initMapObj mUntouchableFrames).</summary>
+    public const int SmsFlushTicks = 360, SmsFlushInterval = 10, SmsUntouchableTicks = 120;
     private bool _pressed = false;            // MSF_RED_COIN_SWITCH_PRESSED: set when the press clip ends (control() state 2 -> 3)
     private bool _talkRequested = false;      // the script's forceTalk issued
     private bool _talkSeen = false;           // the forced talk started (isTalkModeNow was true)
@@ -97,6 +112,10 @@ public partial class RedCoinSwitch : Node3D
     public bool Pressed => _pressed;
     public bool ChallengeStarted => _challengeStarted;
     public SmsNpc MessageBoard => _board;
+    /// <summary>The live coins / the time-up, for the drives (pass 114).</summary>
+    public int LiveRedCoins { get { PruneCoins(); return _smsCoins.Count; } }
+    public bool TimeUp => _smsTimeUp;
+    public bool CoinsUntouchable => _smsCoinsUntouchable;
 
     // Same per-pound latch as Nail.cs: only clears once Mario's state has
     // fully left the ground-pound family, so a single pound can't double-fire.
@@ -152,6 +171,7 @@ public partial class RedCoinSwitch : Node3D
     public override void _PhysicsProcess(double delta)
     {
         TickMessage();
+        TickCoinTimer(delta);
         if (!_hitThisPound)
             return;
         if (_lastHitter == null || !IsInstanceValid(_lastHitter))
@@ -281,9 +301,19 @@ public partial class RedCoinSwitch : Node3D
             spawnCount++;
             coin.Name = $"RedCoin{spawnCount:00}";
             coin.PlaySpawnPuff();
+            _smsCoins.Add(coin);
+            // killByTimer: HIT_FILTER_NO_COLLISION for the first 120 ticks -- the coin cannot be taken for a second (its pickup Area3D, if one is reachable)
+            Area3D pickup = ((Node)coin) as Area3D ?? coin.FindChildren("*", nameof(Area3D), true, false).OfType<Area3D>().FirstOrDefault();
+            if (pickup != null) { pickup.SetDeferred(Area3D.PropertyName.Monitoring, false); pickup.SetDeferred(Area3D.PropertyName.Monitorable, false); _smsCoinPickups.Add(pickup); }
         }
 
         _redCoinsSpawned = true;
+        _smsTimeUp = false;
+        _smsCoinsUntouchable = _smsCoinPickups.Count > 0;
+        _smsUntouchableTicks = _smsCoinsUntouchable ? SmsUntouchableTicks : 0;
+        _smsUntouchableAccum = 0f;
+        if (spawnCount > 0 && _smsCoinPickups.Count == 0)
+            GD.Print($"[RedCoinSwitch] '{Name}': no pickup Area3D found on the red coins -- the game's first untouchable second is skipped (pass 114)");
 
         if (spawnCount != RequiredRedCoins)
             GD.PushWarning($"[RedCoinSwitch] '{Name}' spawned {spawnCount} red coins; expected {RequiredRedCoins} Marker3D children.");
@@ -469,5 +499,82 @@ public partial class RedCoinSwitch : Node3D
         SpawnRedCoins();
         _shineTimer?.StartTimer();
         SmsHudLayer.Current?.Standard?.AppearRedCoins();
+    }
+
+    private void PruneCoins()
+    {
+        for (int i = _smsCoins.Count - 1; i >= 0; i--)
+            if (!IsInstanceValid(_smsCoins[i]) || !_smsCoins[i].IsInsideTree() || _smsCoins[i].IsQueuedForDeletion())
+                _smsCoins.RemoveAt(i);
+    }
+
+    /// <summary>The coins' remaining life in 120 Hz ticks, from his ShineTimer (a countdown to its target); -1 when there is no countdown to read.</summary>
+    private int SmsCoinTicksLeft(out bool reached, out bool running)
+    {
+        reached = false; running = false;
+        var t = _shineTimer;
+        if (t == null || !IsInstanceValid(t) || !t.CountDown) return -1;
+        float remaining = (float)(t.CurrentValue - t.TargetValue);
+        running = t.IsRunning;
+        reached = !t.IsRunning && remaining <= 0f;
+        return Mathf.Max(0, Mathf.CeilToInt(remaining * SmsUnits.TicksPerSecond));
+    }
+
+    /// <summary>evAppear8RedCoinsAndTimer gives every coin killByTimer(timer - 120): its life is the challenge timer itself, so the coins die the tick the
+    /// countdown reaches zero, drawn blinking through the last 360 ticks (hidden while ticks / 10 is odd, TMapObjGeneral::perform 584), untouchable for
+    /// the first 120. His ShineTimer is the clock (no countdown = the coins live on; stopped early by the 8th coin = frozen, like stopMoveTimer).</summary>
+    private void TickCoinTimer(double delta)
+    {
+        if (!_challengeStarted || _smsTimeUp || _completionReached) return;
+        if (_smsCoinsUntouchable)
+        {
+            _smsUntouchableTicks -= SmsUnits.TicksFor(delta, ref _smsUntouchableAccum);
+            if (_smsUntouchableTicks <= 0)
+            {
+                foreach (var a in _smsCoinPickups) if (IsInstanceValid(a)) { a.SetDeferred(Area3D.PropertyName.Monitoring, true); a.SetDeferred(Area3D.PropertyName.Monitorable, true); }
+                _smsCoinPickups.Clear();
+                _smsCoinsUntouchable = false;
+            }
+        }
+        int ticks = SmsCoinTicksLeft(out bool reached, out bool running);
+        if (ticks < 0) return;
+        if (reached) { SmsCoinsTimeUp(); return; }
+        if (!running) return;
+        PruneCoins();
+        bool shown = ticks >= SmsFlushTicks || ((ticks / SmsFlushInterval) & 1) == 0;
+        foreach (var c in _smsCoins) if (c.Visible != shown) c.Visible = shown;
+    }
+
+    /// <summary>TItem::appeared (Item.cpp 42) for every coin whose timer ran out: MSD_SE_SY_COIN_DISAPPEAR, makeObjDead. The switch stays pressed -- control()
+    /// state 4 and MSF_RED_COIN_SWITCH_PRESSED for the stage visit -- unless SmsRearmOnTimeUp.</summary>
+    private void SmsCoinsTimeUp()
+    {
+        _smsTimeUp = true;
+        PruneCoins();
+        int n = 0;
+        foreach (var c in _smsCoins) { c.Visible = true; c.QueueFree(); n++; }
+        _smsCoins.Clear();
+        _smsCoinPickups.Clear();
+        _smsCoinsUntouchable = false;
+        if (n > 0) CoinDisappearSound?.Play();
+        GD.Print($"[RedCoinSwitch] '{Name}': time up -- {n} red coins gone (killByTimer), {_collectedRedCoins}/{RequiredRedCoins} taken; the switch {(SmsRearmOnTimeUp ? "re-arms (SmsRearmOnTimeUp)" : "stays pressed (the game)")}");
+        if (SmsRearmOnTimeUp) Rearm();
+    }
+
+    /// <summary>DEVIATION (SmsRearmOnTimeUp): back to the unpressed switch -- the press clip rewound to its first frame, the collision back, every latch cleared;
+    /// his ShineTimer and the HUD's counter are left as they are (the counter keeps the count, as the game's does).</summary>
+    private void Rearm()
+    {
+        _triggered = false; _pressed = false; _talkRequested = false; _talkSeen = false; _signAcknowledged = false;
+        _challengeStarted = false; _redCoinsSpawned = false; _collectedRedCoins = 0; _completionReached = false;
+        _hitThisPound = false; _lastHitter = null; _messageMario = null;
+        if (_anim != null && _anim.HasAnimation("redcoinswitch"))
+        {
+            _anim.Play("redcoinswitch");
+            _anim.Seek(0.0, true);
+            _anim.Stop(true);
+        }
+        foreach (var shape in GetNodeOrNull<Node>("SwitchBody")?.FindChildren("*", "CollisionShape3D", true, false) ?? new Godot.Collections.Array<Node>())
+            if (shape is CollisionShape3D cs) cs.SetDeferred(CollisionShape3D.PropertyName.Disabled, false);
     }
 }

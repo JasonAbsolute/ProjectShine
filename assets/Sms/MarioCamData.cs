@@ -43,6 +43,7 @@ public struct SmsCamMarioData
     public bool Talking;                // isTalkModeNow: the NPC talk from the B press to the balloon's fade (the talk kind holds the camera meanwhile; pass 86)
     public bool Teleported;             // the frame jumped him (a respawn, the intro's spawn): the camera warps behind him as a stage load does
     public bool Debug;                  // SmsDebugPrint
+    public bool PadDead;                // TMarioGamePad::mDisabledFrames > 0 (the red coin switch's press): no meaning for the sub stick, L, R, Y, A / B this frame (pass 114)
 }
 
 public partial class Mario
@@ -103,8 +104,9 @@ public partial class Mario
         d.OnWireHang = onWire && (_smsWire == SmsWireState.Hanging || _smsWire == SmsWireState.Rolling || _smsWire == SmsWireState.WaitToHang || _smsWire == SmsWireState.SWaitToHang);
         d.OnWireTop = onWire && !d.OnWireHang; // on the wire but not hanging/rolling = on top (WIRE_WAIT / WALK / the turns / Return)
         d.ReadyGun = _smsHasFludd && stateOfMario == MarioState.crouch;
-        d.AimR = Input.IsActionPressed("button_r");
-        d.CamL = Input.IsActionPressed("button_l");
+        d.PadDead = _smsPadDisabledTicks > 0;
+        d.AimR = !d.PadDead && Input.IsActionPressed("button_r");   // pass 114: a dead pad has no MEANING_R / MEANING_L / MEANING_CAM_L
+        d.CamL = !d.PadDead && Input.IsActionPressed("button_l");
         float lMin = SmsFluddCurrent.LAngleMin;
         d.AimRatio = lMin != 0f ? Mathf.Clamp(_fluddGunAngle / lMin, 0f, 1f) : 0f; // CLBCalcRatio<s16>(0, mLAngleMin, angle), clamped
         d.Downed = stateOfMario == MarioState.hurt || stateOfMario == MarioState.dead;
@@ -117,8 +119,8 @@ public partial class Mario
             d.NozzleTopU = (g.Origin + g.Basis.Y.Normalized() * SmsUnits.UnitsToMetres(30f)) * SmsUnits.UnitsPerMetre;
         }
         d.MainStick = _camMainStick;
-        d.YPressed = _camYPressed;
-        d.CamCancelPressed = _camCancelPressed;
+        d.YPressed = _camYPressed && !d.PadDead;
+        d.CamCancelPressed = _camCancelPressed && !d.PadDead;
         d.YCamCanEnter = SmsYCamCanEnter();
         d.Locked = CameraLocked || stateOfMario == MarioState.talking || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.dead;
         d.Talking = _smsTalking;

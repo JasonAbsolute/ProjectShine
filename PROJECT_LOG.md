@@ -6655,3 +6655,35 @@ brown on back/torso/legs; drive97 (the fog) 29/29; build 0 errors; boot `ALL OK`
 `SmsBodyOverlay.cs` untouched (210a09de / d0ccc02f).
 
 **Rule for every spatial shader here:** if a shader writes `FOG` anywhere, write it on EVERY path. The tree has no other FOG writer.
+
+### SMS pass 114 -- the red coin challenge's time-up, the whole dead pad, and the goop skin follows the goop (2026-10-22)
+
+**The time-up (SMS 1:1).** In the game `evAppear8RedCoinsAndTimer` hands every red coin `killByTimer(timer - 120)` the moment it appears
+(EventWatcher.cpp 1193), so a coin's life IS the challenge timer, on the 120 Hz clock: untouchable for its first 120 ticks (`TItem::initMapObj`
+mUntouchableFrames: HIT_FILTER_NO_COLLISION), blinking through its last 360 (`mNormalFlushTime`, hidden while ticks / 10 is odd = 12 Hz), dying
+with MSD_SE_SY_COIN_DISAPPEAR the tick the timer hits zero (`TItem::appeared`). Nothing else reacts: the switch sits in `control()` state 4
+for the stage visit (no retry), the console clamps 0:00.00, the counter keeps its count (`timerredcoin.sb` ends after `appearRedCoinCounter`).
+Port: `RedCoinSwitch` keeps the coins it spawns (`_smsCoins`), runs the flush and the death off your `ShineTimer`'s countdown (no countdown
+= no kill), turns the coins' `PickupZone` Area3D off for the first second, `CoinDisappearSound` slot (no stream yet). DEVIATION knob
+`SmsRearmOnTimeUp` (default off = the game): on, the time-up re-arms the switch (your test levels have no exit to reset it).
+Your `ShineTimer.cs` / `RedCoin.cs` untouched; the HUD timer still leaves at the target (nothing in the game's script decides otherwise).
+
+**The dead pad, complete.** `TMarioGamePad::updateMeaning` (MarioGamePad.cpp 70) gives NOTHING but START a meaning while `mDisabledFrames`
+> 0. Pass 109 neutralised the stick and A; now B / R / Z / L / Y / X / key_z / rclick are released each dead tick (MarioYCam's ActionRelease
+precedent), the FLUDD's R strength and rHeld / bHeld, the X swap and the Y / cancel edges are gated at their reads, and the camera's C-stick,
+L edge, AimR and CamL go through `SmsCamMarioData.PadDead`. Logged deviation: a button held across the window's end stays released until
+re-pressed.
+
+**The goop skin follows the goop he is in -- by default** (Jaysonn 2026-10-21 23:36: "covered in pink but when steps on brown it changes to
+that color"). `SmsSkinFromLayer` (pass 113) now defaults ON: the skin is re-read every tick he stands on paint, so pink in pink goop, the
+stage brown on a plain layer, oil's dark green-black on oil; off = the game's one skin per stage (each Sunshine stage has one goop; your
+levels mix them). The switch is instant and whole-body (one goop texture slot in the material chain, as in the game).
+
+**Verified on your machine:** drive 114 15/15 -- two switches with 7 s / 2.5 s timers: the untouchable second (a coin stood in from 0.35 s is
+still live at 0.70 s, taken at 1.70 s), no blink above 3 s, 23 toggles through the last 1.9 s, all seven left gone at zero with the switch
+still pressed and inert to a second pound, the HUD counter kept, R / Z / L / Y / X / B and the C-stick dead through the press (the camera's
+own follow aside) and live again after (the C-stick turned the camera 83 deg, Y entered the Y camera), the knob's re-arm and a new challenge
+from it. Drive 111 11/11 with three new checks: N1 the default, W1 a dirty Mario stepping from a FireGoop-textured layer onto a plain one
+switches to the stage brown with his dirt kept, W2 back again. Regressions 109 19/19, 110 8/8, 112 8/8, 106 18/18, 105b 14/14, 102 20/20,
+104 23/23; build 0 errors; boot `ALL OK`. Three drive-side fixes (the yaw read was Mario's armature, not the camera's; the re-pound needed
+a step off the switch to re-enter its hit zone; D1 compared the 113b raw mask by identity) -- no code change from them.

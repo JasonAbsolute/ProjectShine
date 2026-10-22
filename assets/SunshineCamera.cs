@@ -222,9 +222,10 @@ public partial class SunshineCamera : Node3D
             WarpBehind();
         // the C-stick through the pad library (PADClamp's sub-stick region 59 / 31 / 15 and JUTGamePad's 42): mCompSPos[6] = x, [7] = y (up +)
         Vector2 sub = SmsStick.PadSubStick(Input.GetVector(RStickLeft, RStickRight, RStickUp, RStickDown));
+        if (_md.PadDead) sub = Vector2.Zero;   // pass 114: TMarioGamePad::mDisabledFrames skips the sub stick (mCompSPos[6], [7]) and the L edge too
         _cx = sub.X;
         _cy = -sub.Y;
-        bool lEdge = InputMap.HasAction(LButtonAction) && Input.IsActionJustPressed(LButtonAction);
+        bool lEdge = !_md.PadDead && InputMap.HasAction(LButtonAction) && Input.IsActionJustPressed(LButtonAction);
         int n = SmsUnits.TicksFor(delta, ref _tickAccum);
         for (int i = 0; i < n; i++)
             Tick(lEdge && i == 0);

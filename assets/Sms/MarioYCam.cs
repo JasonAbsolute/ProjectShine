@@ -106,8 +106,9 @@ public partial class Mario
     {
         if (!UseSmsPhysics)
             return;
-        _camYPressed = Input.IsActionJustPressed("button_y");
-        _camCancelPressed = _camYPressed || Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space") || Input.IsActionJustPressed("button_b");
+        bool padDead = _smsPadDisabledTicks > 0;   // pass 114: TMarioGamePad::mDisabledFrames -- no MEANING_Y / MEANING_CAM_AB while the pad is dead
+        _camYPressed = !padDead && Input.IsActionJustPressed("button_y");
+        _camCancelPressed = !padDead && (_camYPressed || Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space") || Input.IsActionJustPressed("button_b"));
         bool on = SmsYCamOn;
         if (on != _ycamWasOn)
         {
