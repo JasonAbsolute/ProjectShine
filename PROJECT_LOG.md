@@ -6630,3 +6630,28 @@ FIX (SmsBodyOverlay.cs b693b2b8 -> d0ccc02f): `RawLinearMask()` re-wraps the mas
 VERIFIED on his RTX 3070 Ti via a new NON-headless capture harness (patch_fogoff.py force-dirties mDirty 150 with the fog OFF, run_gpu.ps1 runs windowed, saves the real viewport): at mDirty 150 the cap renders RED, the gloves yellow, the FLUDD blue -- all CLEAN -- and the goop is now PATCHY H_ma_rak brown on the back / torso / legs, no longer the whole body. Build 0 errors, boot ALL OK. The harness means the goop LOOK can now be judged/tuned without a user run -- the gap that made this take so long (headless cannot sample textures on a GPU).
 
 STILL OPEN (his eye / a deviation call): the gooped areas are a DARK brown (H_ma_rak is a dark albedo; the decomp does a hard albedo replace, so this is close to faithful) and read near-black on the shadowed side. If the game's dirt looks lighter / more like a tint over the clothes, that is a deviation to tune (a goop brightness / blend knob) -- offered, awaiting his word. Committed the gating fix; NOT yet committed as a drive check (the gating is GPU-only, so a headless drive cannot assert it -- the capture harness is the check).
+
+### SMS pass 113c -- a dirty Mario off the goop no longer renders BLACK (2026-10-21)
+
+**Jaysonn's report:** "fine while standing in goop getting dirty, but the moment he's not in that pulse red/yellow state and dirty, his mesh
+goes black." Confirmed on the RTX 3070 Ti with the fog-off capture harness: at mDirty 150 with the fog off the gooped body was PURE (0,0,0)
+-- not a dark brown, a true zero -- while the cap, gloves and FLUDD rendered normally.
+
+**Cause -- the engine's FOG contract, not the goop.** `MarioFog.gdshaderinc` (pass 97) writes `FOG` only inside `if (fog > 0.0)`. In Godot
+4.4+ (`scene_forward_clustered.glsl`) `fog` starts at (0,0,0,1) and, when a shader writes FOG at all (`CUSTOM_FOG_USED`), the engine
+unconditionally converts it with `rgb *= a; a = 1 - a` and blends `frag x a + rgb`. A fragment that leaves FOG untouched therefore ends with
+a = 0 and renders BLACK. Godot 4.3 blended `mix(frag, fog.rgb, fog.a)` from (0,0,0,0), where the unwritten case was harmless. Pass 111 made
+the hazard visible: it keeps the shader copies installed while `dirty > 0` with `fog = 0` -- exactly the branch-skipped case -- so the body
+was black whenever he was dirty and NOT pulsing; the pulse (fog > 0) wrote FOG and looked right. The goop skin, the mask (113b) and the
+texture (113) were all correct; six probe variants (albedo green, emission green, discard, FOG blue) pinned it: only a written FOG changed
+the pixels.
+
+**Fix (`assets/Sms/Fx/MarioFog.gdshaderinc`):** `FOG = vec4(0.0);` on every path before the `if (fog > 0.0)` -- a written (0,0,0,0)
+converts to (0,0,0,1) = no fog. The 113c "brightness" change (feeding the goop at gamma brightness) is NOT shipped: it was a diagnosis of
+the wrong variable -- with FOG written, the gooped texels render as the lit stage brown (`H_ma_rak`), mean (94,49,34) on the shadowed back.
+
+**Verified on his machine:** fog-off GPU capture at mDirty 150 -- 0 pure-black body pixels (2441 before), cap red, gloves yellow, goop a lit
+brown on back/torso/legs; drive97 (the fog) 29/29; build 0 errors; boot `ALL OK`. Only the shader include changed; `Mario.cs` /
+`SmsBodyOverlay.cs` untouched (210a09de / d0ccc02f).
+
+**Rule for every spatial shader here:** if a shader writes `FOG` anywhere, write it on EVERY path. The tree has no other FOG writer.

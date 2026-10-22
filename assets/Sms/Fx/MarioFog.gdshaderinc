@@ -71,6 +71,11 @@ void fragment() {
 #ifdef MARIO_FOG_ALPHA
 	ALPHA *= albedo.a * albedo_tex.a;
 #endif
+	// Pass 113c: FOG is written on EVERY path. Godot 4.4+ (scene_forward_clustered.glsl: fog starts (0,0,0,1); with CUSTOM_FOG_USED the
+	// engine always runs `rgb *= a; a = 1 - a` and blends frag x a + rgb) -- a fragment that leaves FOG unwritten ends with a = 0 and
+	// renders PURE BLACK. Pass 111 keeps these copies installed while dirty with fog = 0, which is exactly when the branch below was
+	// skipped: Mario went black the moment the pulse stopped (Jaysonn, 2026-10-21). A written (0,0,0,0) converts to (0,0,0,1) = no fog.
+	FOG = vec4(0.0);
 	if (fog > 0.0) {
 		// The GX fogs the framebuffer's 8-bit (gamma) values: c' = c + (fogColor - c) x f. Godot's FOG mixes the LIT colour in linear light,
 		// after this function, and the lit colour is not known here -- so FOG is solved per pixel for the surface lit at 1 (lit = ALBEDO):
