@@ -6727,3 +6727,19 @@ nothing and falls through to the floor (the landing's boundByActor is kind 2), a
 fruit frozen kinematic. Regressions 111 11/11, 110 8/8, 114 15/15, 109 19/19, 106 18/18, 105b 14/14, 107 18/18; build 0 errors; boot
 `ALL OK`. Drive-side fixes only: W1's expectations were written for the launch speed (the ball reaches the wall at 4.9 after the game's
 0.97/tick roll-out), F1's roof stood where the ball popped off the wall (it rolled 1.6 m out from under it), T4 needed a re-settled durian.
+
+### SMS pass 115b -- the fruit holds Mario off (keepDistance); he no longer walks through it (2026-10-22)
+
+Jaysonn 23:34: "fruits feel right but mario is walking thru them". 115's "no map collision" reading was half the game: a fruit has no MAP
+collision (he is never blocked by its body, never stands on it), but Mario's own collision pass holds him off its HIT cylinder.
+`TMario::checkCollision` (MarioCheckCol.cpp 487-493): coconut / papaya / pine / banana / red pepper -> `hitWantToTake` = `keepDistance(*actor,
+0)` + the B take; the durian (495) -> `hitPushup` (a rising jump sends HIT_MESSAGE_PUSH_UP) + `hitNormal` -- NO keepDistance: the durian is the
+one moved. `keepDistance` (MarioPhysics.cpp 27): inside the actor's damage radius + unk15C (50, his wall radius) of its axis he is set back out
+to that distance along the line from it, 50 units a call at most; running in above mClashSpeed (40 -- the turbo dash) is the clash knockdown
+instead. It is a RADIAL push: a run that is not dead-centre slides AROUND the fruit rather than stopping dead, as in the game. Port: the fruit
+calls Mario's existing `SmsKeepDistance` (pass 85, the NPCs) every tick its cylinder holds him, when it is a fruit that does not answer his body
+(`SmsTouchLikeDurian` moves instead; `SmsBallReacts` off stands like a rock); in both the sim and the knob-off path. Fruit.cs only.
+
+**Verified on your machine:** drive 115 14/14 -- T1 a run at a resting coconut: closest approach 100 u from its axis over the whole run (never
+through it; he slid around and past), no touch, still at rest; T1b from the held-off spot the B take still finds it (the take pair 80 + 50 = 130
+u > 100); the durian run-in / fall / rising kick unchanged. Regressions 111 11/11, 114 15/15, 109 19/19, 107 18/18; build 0 errors; boot `ALL OK`.

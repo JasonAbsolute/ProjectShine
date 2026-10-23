@@ -398,6 +398,7 @@ public partial class Fruit : RigidBody3D
 		for (int t = 0; t < n; t++)
 		{
 			if (_bGuard > 0) _bGuard--;
+			if (!TopLevel) SmsHoldMarioOff(mario);
 			if (_bGuard > 0 || Freeze || TopLevel || !SmsAnswersMario) continue;
 			if (!SmsMarioTouches(mario)) continue;
 			Vector3 mv = mario.SmsMarioVelUnits;
@@ -419,6 +420,7 @@ public partial class Fruit : RigidBody3D
 			Vector3 mv = mario.SmsMarioVelUnits;
 			if (mv.Y != 0f) SmsKicked(mario, mv, ref _bVel, _bAirborne); else SmsBoundByActor(mario, mv, ref _bVel);
 		}
+		if (!held) SmsHoldMarioOff(mario);
 		if (held || _bRest) return;                                      // STATE_HOLDING: the holder's matrix; LIVE_FLAG_UNK10: bind returns
 
 		// ---- TMapObjGeneral::bind (500): calcVelocity (475) ----
@@ -529,6 +531,17 @@ public partial class Fruit : RigidBody3D
 	}
 
 	/// <summary>The hit cylinders overlap (THitActor::isHit): XZ within r_mario + r_fruit, the height spans crossing; the fruit's stands on its bottom.</summary>
+	/// <summary>TMario::checkCollision (MarioCheckCol.cpp 487-493): coconut / papaya / pine / banana / red pepper -> hitWantToTake =
+	/// keepDistance(us, 0) + the B take: inside our damage radius + 50 (his wall radius) of our axis he is set back out to that distance in XZ,
+	/// 50 units a tick at most -- never through us, though we have no map collision; running in above ClashSpeed (40: the turbo dash) is the
+	/// clash knockdown. The durian (495) -> hitPushup / hitNormal, NO keepDistance: the durian is the one moved (boundByActor / kicked). So the
+	/// fruit that does not answer his body is the one that holds him off (SmsTouchLikeDurian moves instead; SmsBallReacts off stands like a rock).
+	/// Pass 115b (Jaysonn 2026-10-22 23:34 "mario is walking thru them").</summary>
+	private void SmsHoldMarioOff(Mario mario)
+	{
+		if (SmsAnswersMario || !SmsMarioTouches(mario)) return;
+		mario.SmsKeepDistance(GlobalPosition * SmsUnits.UnitsPerMetre, _ball.DamageRadius * Size);
+	}
 	public bool SmsMarioTouches(Mario mario)
 	{
 		float u = SmsUnits.UnitsPerMetre;
