@@ -6833,3 +6833,37 @@ shine: dropped (its sim resumes on the floor), the shine taken. C a Gooble 1500 
 air: pending (locked, falling) until the floor, then the demo. Regressions 115 16/16, 111, 114, 109, 110, 107, 104, 102 green; build 0 errors
 (first compile clean); boot `ALL OK`. Drive-side only: the Level root carries an offset (spawn, then set the global position), his physics
 ticks are not 60 Hz (time by seconds, never frames), a leaked stick press, the carry state is the run's.
+
+### SMS pass 117 -- the shine APPEAR demo (2026-10-23)
+
+The last 1:1 piece of the shine front. The game (Item.cpp: `TShine::appearWithTime` 677, `appearWithDemo` 757, `control` 536-626; the stage
+script's `appearShine(shine, demoCamera)` in EventWatcher.cpp 736): the shine is put where the event says, and `appearWithDemo` starts a
+demo for the stage's placed camera tool's length with the world FROZEN (`DEMO_FLAG_SHINE_GET_STOP_THE_WORLD` -- this flag belongs to the
+APPEAR, not the get; only the shine manager and camera 1 move) and runs `appearWithTime(len, -1, -1, -1)` with `initMapObj`'s defaults. All
+timers are 120 Hz ticks (`TMapObjBase::control` runs every MOVE tick): `STATE_APPEAR_WAIT` (0) -> `MOVING_UP` 240 ticks at `mUpSpeed` 1.0 u a
+tick (240 u = 3.2 m straight up) -> `MOVING_CIRCLE` for len - 480 ticks (`movingCircle` 481: xz stepped linearly to the PLACED spot; y = the
+half-sine arc of `mCircleHeight` = 0.5 x (the xz distance, 1000 u when it appears where it belongs, + |yDelta| if the placed spot is above the
+rise's top) over the lerp from the rise's top to the placed y; rotation += 7 deg a tick) -> `FLOAT` 240 ticks (above the placed y it keeps the
+arc's last vy decaying x 0.99 a tick, else clamps; the spin slows from 7 toward 2 by 0.1 a tick) -> `WAIT` (2 deg a tick = 240 deg/s idle).
+`HIT_FILTER_NO_COLLISION` (no pickup) from the appear until the float ends. Without a demo camera the script path is `appearWithTime(1200)`:
+the same flight over 10 s with the world running.
+
+Port (`ShineSprite.cs`): `PlaySpawnEntrance()` runs `SmsAppear(SmsAppearDemoTicks, withDemo: true)` when `SmsAppearGame` (default on; off = your
+tween entrance exactly as before): the state machine above on the PHYSICS clock (`_PhysicsProcess` + `SmsUnits.TicksFor`, so it runs through
+the pause with `ProcessMode` Always), the pickup zone off until the float ends, `SpawnEntranceFinished` at the demo's end (your red coin switch
+listens). `SmsAppearFrom(start, ticks, demo)` for a script-style appear from elsewhere. The placed transform (`SmsInitialPosition`, and 116's
+`SmsInitialYaw`) is now latched at the first frame or first use, not in `_Ready` -- a spawner sets the transform AFTER `AddChild`, so 116's facing
+read the pre-placement yaw for a switch-spawned shine (fixed here). DEVIATIONS, both knobs, both because the stage data is yours: the demo length
+`SmsAppearDemoTicks` (default 1200 = the engine's own no-camera path; the game reads it from the placed `TCameraMapTool`), and the camera
+`SmsAppearCamera` / `SmsAppearCamOffset` (0, 2.5, 7): a fixed camera 7 m in front of and 2.5 m above the placed spot, looking at the shine as it
+flies -- the game's is a hand-placed stage tool. `SmsAppearStopWorld` (default on). The game's idle spin after an appear, `SmsIdleSpinDegPerTick`
+2 (240 deg/s); shines placed at level start keep `IdleSpinSpeed`. Sound slot `AppearSound` (MSD_SE_SHINE_APPEAR + the jingle BGM 0x8001002D;
+MSD_SE_SHINE_EXIST every tick not ported). `RedCoinSwitch` skips its own reveal camera when the game's demo brings one.
+
+**Verified on your machine:** drive 117 9/9 -- A the appear where it belongs: at once the demo running, the world frozen, its camera current, the
+zone off, visible; 119 u straight up at 1 s; the arc under way past 240 u at 2.2 s; the crest 626 u over the placed spot (want ~620: 500 of the
+arc + the lerp's 120); landed and settling at 8.1 s with the zone still off; at 10 s `WAIT` on the spot to 0.0 u, the zone on, the world
+running, the gameplay camera back, `SpawnEntranceFinished` emitted; the idle spin 610 deg in 2.2 s (240 deg/s + the 7 -> 2 decay). B an
+appear 5 m from its placed spot with no demo: the arc (height 186 u over the 166 u rise) delivers it onto the spot to 0.0 u and it settles.
+Regressions 116 18/18, 114 15/15, 109 19/19, 115 16/16; build 0 errors (first compile clean); boot `ALL OK`. Drive-side: the flight first ticked
+on the render clock (its _Process) and read 1.2x the drive's physics seconds, then both (2.3x) -- the physics clock alone is right.

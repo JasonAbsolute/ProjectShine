@@ -174,6 +174,9 @@ public partial class ShineSprite : Node3D
             return;
 
         SmsInitialYaw = GlobalRotation.Y;       // pass 116: TMapObjBase::mInitialRotation.y -- the placed yaw, before the entrance spin
+        SmsInitialPosition = GlobalPosition;   // pass 117: TMapObjBase::mInitialPosition -- the placed spot the appear flight returns to
+        // a spawner sets the transform AFTER AddChild (RedCoinSwitch: AddChild then GlobalTransform = the spawn node's), so the real placed
+        // transform is latched again at the first frame or the first use (SmsLatchPlaced) -- pass 117 (116 read the pre-placement yaw there)
         _smsBaseScale = Mathf.Abs(Scale.X) > 1e-6f ? Mathf.Abs(Scale.X) : 0.006f;
 
         // Stop any baked animation — the shine is spun/positioned in code now
@@ -204,6 +207,7 @@ public partial class ShineSprite : Node3D
     {
         if (_spawnEntrancePlaying || _collected)
             return;
+        if (SmsAppearGame) { SmsAppear(SmsAppearDemoTicks, true); return; }   // pass 117: the game's appear flight + demo; below = the tween (knob off)
 
         var tree = GetTree();
         if (tree == null)
@@ -394,6 +398,7 @@ public partial class ShineSprite : Node3D
         // calibrates here (the actual FX pin is applied at the end, below).
         AnimateShineEffects(d);
 
+        SmsLatchPlaced();   // pass 117: the placed transform, once the spawner has set it (the first frame)
         if (_spawnEntrancePlaying)
         {
             // The entrance tween owns position, rotation, and scale while the
@@ -407,6 +412,10 @@ public partial class ShineSprite : Node3D
         else if (_smsDriven)
         {
             // pass 116: Mario drives the root from the game's shine_demo_shine_get.bck (SmsDemoDrive) each physics frame
+        }
+        else if (_apState != 0)
+        {
+            // pass 117: the appear flight owns position and yaw (SmsAppearTick), including the WAIT idle spin after it
         }
         else if (_inCutscene && _mario != null && IsInstanceValid(_mario))
         {
@@ -462,6 +471,7 @@ public partial class ShineSprite : Node3D
     {
         _mario = mario;
         _inCutscene = true;
+        _apState = 0;   // pass 117: the appear's WAIT idle hands the root over
         if (gameDriven)
         {
             // pass 116: TShine::receiveMessage -- the shine jumps to Mario and plays shine_demo_shine_get in HIS frame; the root is driven from
@@ -846,6 +856,188 @@ public partial class ShineSprite : Node3D
         Basis b = (marioFrame.Basis * new Basis(rot)).Scaled(new Vector3(s, s, s));
         Vector3 star = marioFrame * (starU / SmsUnits.UnitsPerMetre);
         GlobalTransform = new Transform3D(b, star - b * SmsStarLocal);
+    }
+
+
+    // ---------------------------------------------------------------------
+    //  Pass 117: the game's appear (TShine::appearWithTime / appearWithDemo, Item.cpp 677 / 757 / control 536)
+    // ---------------------------------------------------------------------
+    /// <summary>The game's appear: the shine rises 240 units over 2 s, loops in a half-sine arc (height = half the distance to its placed spot,
+    /// 1000 u -> 500 u when it appears where it belongs) back down onto its placed spot, settles, and idles spinning 240 deg/s -- the zone off
+    /// until it settles. With the demo the world freezes (DEMO_FLAG_SHINE_GET_STOP_THE_WORLD) and a camera watches. false = your tween entrance.</summary>
+    [Export] public bool SmsAppearGame = true;
+    /// <summary>The demo's length in 120 Hz ticks: wait 0 + up 240 + the loop + settle 240. The game takes it from the stage's placed demo camera
+    /// (TCameraMapTool::mDemoLengthFrames); its no-camera path is 1200 (10 s). DEVIATION: a knob, your levels have no camera tools.</summary>
+    [Export] public int SmsAppearDemoTicks = 1200;
+    /// <summary>The demo freezes everything but the shine and the camera (Shine PfLst Mov = the shine manager + camera 1).</summary>
+    [Export] public bool SmsAppearStopWorld = true;
+    /// <summary>A fixed demo camera at SmsAppearCamOffset in the shine's PLACED frame (x = its right, y up, z = its forward), looking at the shine
+    /// as it flies -- the game's camera is a hand-placed stage tool (DEVIATION). false = the current camera stays.</summary>
+    [Export] public bool SmsAppearCamera = true;
+    [Export] public Vector3 SmsAppearCamOffset = new Vector3(0f, 2.5f, 7f);
+    /// <summary>STATE_WAIT: mRotateSpeed 2 deg a tick after an appear (the game's idle spin, 240 deg/s). Shines placed at level start keep IdleSpinSpeed.</summary>
+    [Export] public float SmsIdleSpinDegPerTick = 2f;
+    /// <summary>MSD_SE_SHINE_APPEAR (+ the appear jingle BGM 0x8001002D) at the appear; MSD_SE_SHINE_EXIST while it flies -- slots, no streams yet.</summary>
+    [Export] public AudioStreamPlayer AppearSound;
+    public Vector3 SmsInitialPosition { get; private set; }
+    public const float SmsUpSpeed = 1.0f, SmsCircleRateY = 0.5f, SmsSpeedDownRate = 0.99f;   // mUpSpeed, mCircleRateY, mSpeedDownRate (Item.cpp 412-414)
+    public const int SmsMoveUpTicks = 240, SmsFloatTicks = 240;                              // initMapObj (795): mMoveUpTime 240, mAppearWaitTime 0, mFloatTime 240
+    private int _apState;            // 0 none, 1 APPEAR_WAIT, 2 MOVING_UP, 3 MOVING_CIRCLE, 4 FLOAT, 5 WAIT (the idle after)
+    private int _apTimer, _apCircleTime, _apDemoLeft, _apTick;
+    private float _apTickAccum, _apCircleAngle, _apCircleHeight, _apCircleStartY, _apVelY, _apRotSpeed, _apRotYDeg;
+    private Vector3 _apPosU, _apStepU, _apPlacedU;
+    private bool _apDemo, _apPausedTree;
+    private Camera3D _apCam, _apCamBefore;
+    private ProcessModeEnum _apModeBefore;
+    public int SmsAppearState => _apState;
+    public int SmsAppearTicks => _apTick;
+    public bool SmsAppearDemoRunning => _apDemo;
+    public Camera3D SmsAppearCam => _apCam;
+
+    /// <summary>appearWithTime(time, -1, -1, -1) from where the shine stands now, back to its PLACED spot; withDemo = appearWithDemo's demo
+    /// (stop-the-world + the camera) for the same length.</summary>
+    private bool _smsPlacedLatched;
+    /// <summary>TMapObjBase::mInitialPosition / mInitialRotation: the placed transform. _Ready runs at AddChild, before a spawner sets the
+    /// transform, so the latch happens at the first frame or the first use -- whichever comes first.</summary>
+    private void SmsLatchPlaced()
+    {
+        if (_smsPlacedLatched) return;
+        _smsPlacedLatched = true;
+        SmsInitialYaw = GlobalRotation.Y;
+        SmsInitialPosition = GlobalPosition;
+    }
+    /// <summary>The script's appear from somewhere else (makeShineAppearWithTime / WithDemo set mPosition first): the placed spot stays, the flight
+    /// starts at startGlobal.</summary>
+    public void SmsAppearFrom(Vector3 startGlobal, int demoTicks, bool withDemo)
+    {
+        SmsLatchPlaced();
+        GlobalPosition = startGlobal;
+        SmsAppear(demoTicks, withDemo);
+    }
+
+    public void SmsAppear(int demoTicks, bool withDemo)
+    {
+        if (_apState != 0 || _collected) return;
+        SmsLatchPlaced();
+        float u = SmsUnits.UnitsPerMetre;
+        _apPosU = GlobalPosition * u;
+        _apPlacedU = SmsInitialPosition * u;
+        _apCircleTime = Mathf.Max(1, demoTicks - (0 + SmsMoveUpTicks + SmsFloatTicks));
+        _apCircleAngle = 0f;
+        float yDelta = _apPlacedU.Y - (SmsUpSpeed * SmsMoveUpTicks + _apPosU.Y);
+        _apStepU = new Vector3((_apPlacedU.X - _apPosU.X) / _apCircleTime, yDelta / _apCircleTime, (_apPlacedU.Z - _apPosU.Z) / _apCircleTime);
+        float radius = new Vector2(_apPlacedU.X - _apPosU.X, _apPlacedU.Z - _apPosU.Z).Length();
+        if (radius == 0f) radius = 1000f;
+        if (yDelta > 0f) radius += Mathf.Abs(yDelta);
+        _apCircleHeight = radius * SmsCircleRateY;
+        _apRotYDeg = Mathf.RadToDeg(Rotation.Y); _apRotSpeed = 2f; _apVelY = 0f; _apTick = 0; _apTickAccum = 0f;
+        _apTimer = 0;                       // mAppearWaitTime 0 (appearWithTime's -1 keeps initMapObj's)
+        _apState = 1;
+        Visible = true;                     // TItem::appear
+        if (_pickupZone != null) _pickupZone.Monitoring = false;   // HIT_FILTER_NO_COLLISION until the float ends
+        AppearSound?.Play();
+        _apDemo = withDemo; _apDemoLeft = demoTicks;
+        if (withDemo)
+        {
+            _apModeBefore = ProcessMode;
+            ProcessMode = ProcessModeEnum.Always;
+            var tree = GetTree();
+            if (SmsAppearStopWorld && tree != null && !tree.Paused) { tree.Paused = true; _apPausedTree = true; }
+            if (SmsAppearCamera && tree != null)
+            {
+                _apCamBefore = GetViewport().GetCamera3D();
+                _apCam = new Camera3D { Name = "SmsShineAppearCam", ProcessMode = ProcessModeEnum.Always };
+                (tree.CurrentScene ?? tree.Root).AddChild(_apCam);
+                Vector3 f = SmsMath.DirFromYaw(SmsInitialYaw);
+                Basis frame = new Basis(f.Cross(Vector3.Up), Vector3.Up, f);   // x = the shine's right, z = its forward
+                _apCam.GlobalPosition = SmsInitialPosition + frame * SmsAppearCamOffset;
+                _apCam.LookAt(GlobalPosition + Vector3.Up * 0.5f, Vector3.Up);
+                _apCam.MakeCurrent();
+            }
+        }
+        GD.Print($"[SMS shine] appear: from {GlobalPosition} to {SmsInitialPosition}, up {SmsMoveUpTicks} ticks, loop {_apCircleTime} ticks (height {_apCircleHeight:F0} u), settle {SmsFloatTicks}; demo {withDemo} ({demoTicks} ticks), world frozen {_apPausedTree}, camera {(_apCam != null)}");
+    }
+
+    /// <summary>The flight steps on the PHYSICS clock (TMapObjBase::control is a 120 Hz simulation; Mario's SMS ticks run there too) -- it keeps
+    /// running through the stop-the-world pause (ProcessMode Always).</summary>
+    public override void _PhysicsProcess(double delta)
+    {
+        if (_apState != 0) SmsAppearTick((float)delta);
+    }
+
+    private void SmsAppearTick(float d)
+    {
+        int n = SmsUnits.TicksFor(d, ref _apTickAccum);
+        for (int i = 0; i < n && _apState != 0; i++) SmsAppearStep();
+        if (_apState != 0)
+        {
+            GlobalPosition = _apPosU / SmsUnits.UnitsPerMetre;
+            Rotation = new Vector3(Rotation.X, Mathf.DegToRad(_apRotYDeg), Rotation.Z);
+            if (_apCam != null && IsInstanceValid(_apCam)) _apCam.LookAt(GlobalPosition + Vector3.Up * 0.5f, Vector3.Up);
+        }
+    }
+
+    /// <summary>One 120 Hz tick of TShine::control's appear states.</summary>
+    private void SmsAppearStep()
+    {
+        _apTick++;
+        switch (_apState)
+        {
+            case 1:   // STATE_APPEAR_WAIT
+                if (_apTimer-- > 0) break;
+                _apTimer = SmsMoveUpTicks; _apState = 2;
+                break;
+            case 2:   // STATE_MOVING_UP (movingUp 509)
+                _apPosU.Y += SmsUpSpeed;
+                if (--_apTimer > 0) break;
+                _apCircleStartY = _apPosU.Y; _apTimer = _apCircleTime; _apState = 3;
+                break;
+            case 3:   // STATE_MOVING_CIRCLE (movingCircle 481)
+            {
+                float prevY = _apPosU.Y;
+                _apCircleAngle += 180f / _apCircleTime;
+                _apTimer--;
+                float tmp = (float)(_apCircleTime - _apTimer) / _apCircleTime;
+                _apPosU.X += _apStepU.X;
+                _apPosU.Y = _apCircleHeight * Mathf.Sin(Mathf.DegToRad(_apCircleAngle)) + (tmp * (_apPlacedU.Y - _apCircleStartY) + _apCircleStartY);
+                _apVelY = _apPosU.Y - prevY;
+                _apPosU.Z += _apStepU.Z;
+                _apRotYDeg = Mathf.Wrap(_apRotYDeg + 7f, 0f, 360f);
+                if (_apTimer > 0) break;
+                _apRotSpeed = 7f; _apTimer = SmsFloatTicks; _apState = 4;
+                break;
+            }
+            case 4:   // STATE_FLOAT (584)
+                if (_apPosU.Y > _apPlacedU.Y) { _apPosU.Y += _apVelY; _apVelY *= SmsSpeedDownRate; }
+                else _apPosU.Y = _apPlacedU.Y;
+                if (_apRotSpeed > 2f) _apRotSpeed -= 0.1f; else _apRotSpeed = 2f;
+                _apRotYDeg = Mathf.Wrap(_apRotYDeg + _apRotSpeed, 0f, 360f);
+                if (--_apTimer > 0) break;
+                if (_pickupZone != null) _pickupZone.Monitoring = true;   // offHitFilter(HIT_FILTER_NO_COLLISION)
+                _apState = 5;
+                break;
+            case 5:   // STATE_WAIT: the idle spin
+                _apRotYDeg = Mathf.Wrap(_apRotYDeg + SmsIdleSpinDegPerTick, 0f, 360f);
+                break;
+        }
+        if (_apDemo && --_apDemoLeft <= 0) SmsAppearDemoEnd();
+    }
+
+    /// <summary>appearWithTimeCallback(1): the demo is over -- the world runs again, the camera goes back; your switch's SpawnEntranceFinished.</summary>
+    private void SmsAppearDemoEnd()
+    {
+        _apDemo = false;
+        var tree = GetTree();
+        if (_apPausedTree && tree != null) tree.Paused = false;
+        _apPausedTree = false;
+        ProcessMode = _apModeBefore;
+        if (_apCam != null && IsInstanceValid(_apCam))
+        {
+            if (_apCamBefore != null && IsInstanceValid(_apCamBefore)) _apCamBefore.MakeCurrent();
+            _apCam.QueueFree(); _apCam = null;
+        }
+        EmitSignal(SignalName.SpawnEntranceFinished);
+        GD.Print($"[SMS shine] appear demo over at tick {_apTick}: state {_apState}, at {GlobalPosition} (placed {SmsInitialPosition})");
     }
 
 }

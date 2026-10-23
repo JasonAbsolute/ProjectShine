@@ -361,7 +361,7 @@ public partial class RedCoinSwitch : Node3D
         _redCoinShineSpawned = true;
         parent.AddChild(shine);
         shine.GlobalTransform = spawn.GlobalTransform;
-        PlayRedCoinShineRevealCamera(shine);
+        if (!(shine.SmsAppearGame && shine.SmsAppearCamera)) PlayRedCoinShineRevealCamera(shine);   // pass 117: the game's appear demo brings its own camera
         shine.PlaySpawnEntrance();
 
         GD.Print($"[RedCoinSwitch] red-coin Shine spawned at {shine.GlobalPosition}");
