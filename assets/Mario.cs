@@ -1994,6 +1994,8 @@ public partial class Mario : CharacterBody3D
             return;
         }
 
+        SmsShineDemoTick(delta);   // pass 116: the shine-get demo's clock, camera, shine, fade (runs through the lock)
+
         if (CameraLocked)
         {
             bool wasAirPrev = !wasOnFloor;
@@ -10523,7 +10525,6 @@ public partial class Mario : CharacterBody3D
         {
             case MarioState.shineGet:
             case MarioState.pickupRaise:
-            case MarioState.carrying:
             case MarioState.putDown:
             case MarioState.hurt:
             case MarioState.dead:
@@ -10581,6 +10582,8 @@ public partial class Mario : CharacterBody3D
         // undo both here so he holds the shine with an OPEN hand and a clean pose.
         ShowOpenHands();
         StopWaistIKHard();
+
+        if (SmsShineGetGame) { SmsShineGetBegin(shine); return; }   // pass 116: the game's demo; below = the hand-authored one (knob off)
 
         // Order matters: BeginCollectSequence teleports the shine to its sky
         // start point (the scripted fly-down), and EnterShineGetShot's first
@@ -10685,6 +10688,7 @@ public partial class Mario : CharacterBody3D
         // SHINE GET cutscene finished — hand control back to the player.
         if (stateOfMario == MarioState.shineGet && animName == "ma_demo_shine_get")
         {
+            if (SmsShineGetGame) return;   // pass 116: winDemo's stopProcess holds the last frame; the fade (5.333 s + 1 s) ends the demo
             CameraLocked = false;
             stateOfMario = MarioState.idle;
             animPlayer.Play("ma_wait");
@@ -19381,4 +19385,158 @@ public partial class Mario : CharacterBody3D
         else
             _smsTrueVyValid = false;
     }
+
+    // ======================================================================================================================================
+    //  Pass 116: the shine get as the game plays it (MarioReceiveMsg.cpp 236, MarioAutodemo.cpp winDemo, MarDirectorDirect.cpp 839, the bcks)
+    // ======================================================================================================================================
+    /// <summary>The game's shine-get demo: Mario faces the shine's placed yaw with full HP and air (a carried object dropped, enemies within 2000 u
+    /// killed), the camera plays camera_demo_shine_get_outside.bck at his position, the shine flies its shine_demo_shine_get.bck in his frame, the
+    /// SHINE! letters come in at 3 s, a 1 s fade to black starts at 5.333 s (TShineFader). false = the hand-authored cutscene (the rig, the rail,
+    /// the Wonderful! popup, the clip's end hands control back).</summary>
+    [Export] public bool SmsShineGetGame = true;
+    /// <summary>camera_demo_shine_get_inside.bck instead of _outside (TShine::mIsInside: the stage's indoor shines).</summary>
+    [Export] public bool SmsShineGetInside = false;
+    /// <summary>DEVIATION (default on): after the fade to black the game leaves the stage; your levels have no hub, so the screen fades back in over
+    /// the same second and play resumes (the shine freed, the gameplay camera back). false = hold black (your transition hooks here).</summary>
+    [Export] public bool SmsShineGetResume = true;
+    /// <summary>registFadeout(1 s x rate, 5.3333 s x rate): when the fade to black starts and how long it takes (seconds since the demo began).</summary>
+    [Export] public float SmsShineGetFadeAt = 5.3333f;
+    [Export] public float SmsShineGetFadeLen = 1.0f;
+    /// <summary>The SHINE! letters through the console (TConsoleStr::startAppearShineGet); false = your Wonderful! popup.</summary>
+    [Export] public bool SmsShineGetLetters = true;
+    /// <summary>MSD_BGM_CHUBOSS, the shine-get fanfare (the pending step starts it) -- a player to fire; no stream yet (the sound front).</summary>
+    [Export] public AudioStreamPlayer ShineGetFanfare;
+    private float _smsShineDemoT = -1f;              // seconds since the demo began (-1 = no demo)
+    private Transform3D _smsShineDemoFrame;          // origin = his position, +Z = the facing, +X = its left (SMS is right-handed, +Z forward)
+    private Camera3D _smsShineCam;
+    private CanvasLayer _smsShineFadeLayer; private ColorRect _smsShineFadeRect;
+    private float _smsShineFadeIn = -1f;             // the resume's fade back in, seconds left
+    public bool SmsShineDemoRunning => _smsShineDemoT >= 0f;
+    public float SmsShineDemoT => _smsShineDemoT;
+    public float SmsShineFadeAlpha => _smsShineFadeRect != null && _smsShineFadeRect.Visible ? _smsShineFadeRect.Color.A : 0f;
+    public Camera3D SmsShineCamera => _smsShineCam;
+    public Transform3D SmsShineDemoFrame => _smsShineDemoFrame;
+
+    /// <summary>TMario::receiveMessage(ACTOR_TYPE_SHINE) + winDemo state 0 -> 1 + TMarDirector::fireGetStar + the pending step, at the landing.</summary>
+    private void SmsShineGetBegin(ShineSprite shine)
+    {
+        // winDemo: the held object is dropped (HIT_MESSAGE_UNKD), the enemies within 2000 u are killed
+        if (heldBody != null) Anim_DetachPickup();
+        pendingPickup = null;
+        SmsShineGetKillEnemies(SmsUnits.UnitsToMetres(2000f));
+        // mFaceAngle.y = the shine's INITIAL rotation.y; velocity 0; HP and air full
+        float yaw = shine.SmsInitialYaw;
+        Vector3 face = SmsMath.DirFromYaw(yaw);
+        SmsLatchFace(face, 1);
+        if (armature != null) armature.Rotation = new Vector3(0f, yaw, 0f);
+        lastFacingDirection = face;
+        velocity = Vector3.Zero; Velocity = Vector3.Zero;
+        _health = StartingHealth;
+        _smsAir = _smsMaxAir;
+        // the demo frame: fireStartDemoCamera at his position with the shine's yaw; TShine::receiveMessage puts the shine at his position / angle
+        _smsShineDemoFrame = new Transform3D(new Basis(Vector3.Up.Cross(face), Vector3.Up, face), GlobalPosition);
+        _smsShineDemoT = 0f;
+        _activeShine = shine;
+        shine.BeginCollectSequence(this, yaw, true);
+        // the camera: TCameraBck on camera_model.bmd -- the eye, the look-at and the fovy from the bck
+        if (_smsShineCam == null || !IsInstanceValid(_smsShineCam))
+        {
+            _smsShineCam = new Camera3D { Name = "SmsShineGetCam" };
+            (GetTree().CurrentScene ?? GetTree().Root).AddChild(_smsShineCam);
+        }
+        SmsShineDemoCamera(0f);
+        _smsShineCam.MakeCurrent();
+        // the pending step: the letters, the fanfare, the fade registered; the count-up as before
+        if (SmsShineGetLetters && _smsConsoleStr != null) _smsConsoleStr.StartAppearShineGet(); else SpawnShineGetPopup();
+        ShineGetFanfare?.Play();
+        SmsShineFadeAlpha_(0f);
+        ScheduleShineCountUp();
+        if (SmsDebugPrint)
+            GD.Print($"[SMS shine] demo: face {Mathf.RadToDeg(yaw):F0} deg (the shine's placed yaw), HP {_health}, air {_smsAir:F1}, camera {( SmsShineGetInside ? "inside" : "outside")}, fade at {SmsShineGetFadeAt:F2} s for {SmsShineGetFadeLen:F1} s, resume {SmsShineGetResume}");
+    }
+
+    /// <summary>gpConductor->killEnemiesWithin(mPosition, 2000): every enemy in the sms_enemy group within the radius dies (its death look).</summary>
+    private int SmsShineGetKillEnemies(float radiusM)
+    {
+        int n = 0;
+        foreach (Node node in GetTree().GetNodesInGroup("sms_enemy"))
+        {
+            if (node is Gooble g && IsInstanceValid(g) && g.GlobalPosition.DistanceTo(GlobalPosition) <= radiusM) { g.SmsKillByDemo(); n++; }
+        }
+        return n;
+    }
+
+    private void SmsShineDemoCamera(float t)
+    {
+        if (_smsShineCam == null) return;
+        SmsShineGetData.Camera(t, SmsShineGetInside, out Vector3 eyeU, out Vector3 targetU, out float fov);
+        Vector3 eye = _smsShineDemoFrame * (eyeU / SmsUnits.UnitsPerMetre);
+        Vector3 target = _smsShineDemoFrame * (targetU / SmsUnits.UnitsPerMetre);
+        _smsShineCam.GlobalPosition = eye;
+        if ((target - eye).LengthSquared() > 1e-6f) _smsShineCam.LookAt(target, Vector3.Up);
+        _smsShineCam.Fov = fov;
+    }
+
+    private void SmsShineFadeAlpha_(float a)
+    {
+        if (_smsShineFadeRect == null || !IsInstanceValid(_smsShineFadeRect))
+        {
+            _smsShineFadeLayer = new CanvasLayer { Name = "SmsShineFade", Layer = 200 };
+            _smsShineFadeRect = new ColorRect { Name = "Black", Color = new Color(0f, 0f, 0f, 0f), MouseFilter = Control.MouseFilterEnum.Ignore };
+            _smsShineFadeRect.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+            _smsShineFadeLayer.AddChild(_smsShineFadeRect);
+            (GetTree().CurrentScene ?? GetTree().Root).AddChild(_smsShineFadeLayer);
+        }
+        _smsShineFadeRect.Color = new Color(0f, 0f, 0f, Mathf.Clamp(a, 0f, 1f));
+        _smsShineFadeRect.Visible = a > 0f;
+    }
+
+    /// <summary>Every physics frame: winDemo state 1 (setAnimation(DEMO_SHINE_GET) + stopProcess), the demo camera and the shine on the bck clock,
+    /// TShineFader's fade, and the resume's fade back in.</summary>
+    private void SmsShineDemoTick(double delta)
+    {
+        float dt = (float)delta;
+        if (_smsShineDemoT >= 0f && stateOfMario == MarioState.shineGet)
+        {
+            velocity = Vector3.Zero; Velocity = Vector3.Zero;   // stopProcess
+            _smsShineDemoT += dt;
+            float t = _smsShineDemoT;
+            SmsShineDemoCamera(t);
+            if (_activeShine != null && IsInstanceValid(_activeShine)) _activeShine.SmsDemoDrive(_smsShineDemoFrame, t);
+            float a = SmsShineGetFadeLen > 0f ? (t - SmsShineGetFadeAt) / SmsShineGetFadeLen : (t >= SmsShineGetFadeAt ? 1f : 0f);
+            SmsShineFadeAlpha_(a);
+            if (t >= SmsShineGetFadeAt + SmsShineGetFadeLen) SmsShineGetEnd();
+        }
+        else if (_smsShineDemoT >= 0f)
+        {
+            _smsShineDemoT = -1f;   // the state was left some other way (a reload, his debug keys): nothing to drive
+        }
+        if (_smsShineFadeIn > 0f)
+        {
+            _smsShineFadeIn -= dt;
+            SmsShineFadeAlpha_(SmsShineGetFadeLen > 0f ? _smsShineFadeIn / SmsShineGetFadeLen : 0f);
+            if (_smsShineFadeIn <= 0f) { _smsShineFadeIn = -1f; SmsShineFadeAlpha_(0f); }
+        }
+    }
+
+    /// <summary>The fade reached black: the game's STAGE_TRANSITION. SmsShineGetResume: the fade back in and control returned; else hold black.</summary>
+    private void SmsShineGetEnd()
+    {
+        _smsShineDemoT = -1f;
+        if (_activeShine != null && IsInstanceValid(_activeShine)) _activeShine.OnCollectSequenceEnd();
+        _activeShine = null;
+        if (!SmsShineGetResume)
+        {
+            if (SmsDebugPrint) GD.Print("[SMS shine] faded to black -- holding (SmsShineGetResume off: the stage transition is yours)");
+            return;
+        }
+        CameraLocked = false;
+        stateOfMario = MarioState.idle;
+        animPlayer.Play("ma_wait");
+        SetMarioState(stateOfMario);
+        camera?.MakeCurrent();
+        _smsShineFadeIn = SmsShineGetFadeLen;
+        if (SmsDebugPrint) GD.Print("[SMS shine] demo over: fading back in, control returned");
+    }
+
 }

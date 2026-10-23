@@ -137,6 +137,7 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
 
     public override void _Ready()
     {
+        AddToGroup("sms_enemy");   // pass 116: gpConductor->killEnemiesWithin (the shine get)
         _model = GetNodeOrNull<Node3D>("Model");
         _anim = GetNodeOrNull<AnimationPlayer>("Model/AnimationPlayer");
         if (_model == null || _anim == null)
@@ -928,6 +929,10 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         var bottle = SmsWaterBottle.Spawn(BottleScene, GetParent(), (Vector3)hit["position"]);  // loaded at _Ready
         if (DebugPrint) GD.Print($"[SMS gooble] {Name}: the water bottle {(bottle != null ? "dropped at " + bottle.GlobalPosition : "did not load")} (water {_mario.SmsWaterNow}/{_mario.SmsWaterMax})");
     }
+
+    /// <summary>TConductor::killEnemiesWithin (TMario::winDemo, 2000 u of the shine get): this enemy dies now.</summary>
+    public void SmsKillByDemo() { if (!_dead) Dead(); }
+    public bool SmsIsDead => _dead;
 
     /// <summary>LIVE_FLAG_DEAD: out of the world until the launcher brings it back (or freed).</summary>
     private void Dead()

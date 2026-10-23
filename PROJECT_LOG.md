@@ -6778,3 +6778,58 @@ tipped toward +X (0.83, 0.56, 0); H2 hit scale 0.589, hold-off 79.5 u inside the
 T3 falling kicks nothing; T4 standing beside the durian outside its 27 u damage radius then jumping: the first rising tick kicks it (hop 20,
 kind 1); K1 the knob. Regressions 111 11/11, 114 15/15, 109 19/19, 107 18/18; build 0 errors; boot `ALL OK`. Drive-side: T4 and K1 re-staged for
 the smaller cylinders (a 27 u attack band is one rising tick tall; the camera-relative run drifts in X).
+
+### SMS pass 116 -- the shine get as the game plays it (2026-10-23)
+
+The disc files came back: `super_mario_sunshine.iso` on your E: drive (`E:\fromC\downloads\games\GAMECUBE GAMES`). `tools/projectshine/gcm_tools.py`
+(new: GCM FST + Yaz0 + RARC, pure Python, run on your PC) pulled `/data/common.szs` -> `camera/camera_demo_shine_get_outside.bck`,
+`_inside.bck`, `camera_model.bmd`; `/data/scene/dolpic0.szs` -> `mapobj/shine.bmd`, `shine_demo_shine_get.bck` (+ `_yo`, `shine_empty_*`,
+`shine_float.bck`); `/data/game_6.szs` -> `scrn/big_tx_1.blo`. `gen_shine116.py` bakes the two camera clips and the shine's flight into
+`assets/Sms/SmsShineGetData.cs` (419 frames at 30 fps each, game units, in the demo frame: origin Mario, +Z his facing, +X its LEFT -- SMS is
+right-handed with +Z forward; Godot: Basis(Up x F, Up, F)).
+
+**The touch** (MarioReceiveMsg.cpp 236-250): `mPosition.xz` = the shine's (your snap was already the game), `mFaceAngle.y` = the SHINE's placed
+yaw (`mInitialRotation.y`, captured in `ShineSprite._Ready` before the entrance spin; the port used to keep his facing and aim the rig with the
+camera's), velocity 0, HP = max, air = max, `WIN_DEMO`. `winDemo` (MarioAutodemo.cpp 18): the held object dropped (HIT_MESSAGE_UNKD -- the take
+while carrying is no longer refused), `killEnemiesWithin(2000)` (the Goobles in group `sms_enemy`, new `Gooble.SmsKillByDemo`), and if he is
+airborne he keeps falling until he lands (your `_pendingShine` wait IS `jumpProcess`); then `fireGetStar` + the shine's TAKE and state 1:
+`demo_shine_get` + `stopProcess` every frame (velocity 0; the clip's end no longer hands control back -- the fade does).
+
+**The camera** (TMarDirector::fireGetStar -> fireStartDemoCamera; TCameraBck::updateDemo): `camera_model.bmd` has two joints, `cam_interest`
+(the look-at) and `cam_position` (the eye) as its CHILD, and J3DMtxCalcBasic composes the child under the parent's full matrix INCLUDING its
+scale (the interest's scale.y runs 36..42 -- so the eye's local (230, -9, 53) lands at (220, 18, 60): a low angle 237 u out on his left,
+looking up at the descending shine, then a sweep up and around to the front, high (eye y 461, z 437 at 6.33 s) looking down at him). The fovy
+= the position joint's scale.y (49.3 deg -> 35 deg). Driven on its own `Camera3D` (`SmsShineGetCam`) with LookAt; knob `SmsShineGetInside`
+picks the `_inside` clip (`TShine::mIsInside`).
+
+**The shine's flight** (TShine::receiveMessage 640: the shine jumps to Mario's position / angle and plays `shine_demo_shine_get` in HIS frame):
+the root rises 214 -> 364 u (0.67 s), descends to his hands (~16 u at 3 s), the star spins about Y (the `body` joint, -1382 deg -> +1074 deg
+over 6 s) and tilts; root scale 0.5 (the game's demo shrinks the shine; `mEffectScale` 0.5). `ShineSprite.SmsDemoDrive` sets your root so the
+star's centre (`SmsStarLocal` (0, 200, 0) root-local) lands on the composed `body` joint each frame; `SmsDemoScale` (default 1 = your full
+size; 0.5 = the game's) -- a DEVIATION by default since your star model is not the game's. No baked clip while driven (the neutral pose).
+
+**The letters** (ConsoleStr.cpp 364 / 570): the US `big_tx_1.blo` spells **SHINE!** (sg00..sg05, 70 x 70, ROT 12; JP / PAL have SHINE GET!) at
+(59, 364) (118, 349) [I: 417 x 51 in this blo, interpolated] (224, 320) (283, 301) (341, 287) -- the lower third, rising to the right. On the
+120 Hz console clock: `unk18 += 0.5` a tick, the first letter at `unk20` = 0xB4 = **3.0 s**; then index = ticks: letter i shows at 6i with a
+40-tick Bezier from (150, -50) via (-21, 7), alpha +7 a tick; at 6i + 40 a 20-tick settle to its home; at 6i + 200 (4.67 s) a 40-tick fly-out to
+(-200, 65) -- gone by 5.25 s. `SmsConsoleStr.StartAppearShineGet` / `ProcessShineGet` through pass 61's SmsBigText (your palette, one colour a
+letter). Not ported: the sparkle emitters 0x1FE / 0x1FF at each letter (eye-owed). Knob `SmsShineGetLetters` (off = your Wonderful! popup).
+
+**The end** (MarDirectorDirect.cpp 839-856): the pending step starts the letters, `MSD_BGM_CHUBOSS` (slot `ShineGetFanfare`), and
+`TShineFader::registFadeout(60, 320)` at rate 60: a **1 s fade to BLACK starting 5.333 s** after the demo began; then the stage transition.
+DEVIATION knob `SmsShineGetResume` (default on): your levels have no hub, so the screen fades back in over the same second and play resumes
+(idle, the gameplay camera, the shine let go into its end tween); off = hold black for your transition. `SmsShineGetFadeAt` / `FadeLen` knobs.
+NOT stop-the-world: `DEMO_FLAG_SHINE_GET_STOP_THE_WORLD` belongs to the shine APPEAR demo (Item.cpp 719); the get is `GAME_MODE_INNER_DEMO` --
+the world keeps moving (brief114's audit said otherwise; corrected).
+
+Master knob `SmsShineGetGame` (default on); off = the hand-authored cutscene exactly as before.
+
+**Verified on your machine:** drive 116 18/18 -- A the ground touch: shineGet at once with velocity 0; face 90 deg = the shine's placed yaw (the
+model too); HP 8/8 and air 9/9 from 3 and 1; the demo camera current at the bck's eye to 5 cm with fovy 49.3, starting on his LEFT; the star at
+the bck's (0.6, 389, -0.1) u at 1 s; the letters armed and hidden at 2.9 s, all six in and settled by 3.6 s, flying out at 5.0 s with no fade
+yet; at 5.83 s the fade half way, the letters gone, the camera high in front with fovy narrowing, Mario still frozen; black at 6.3 s; at 6.333
+the resume: idle, the lock off, the gameplay camera, the shine let go; half way back in at 0.5 s, gone at 1.2 s. B carrying a coconut into a
+shine: dropped (its sim resumes on the floor), the shine taken. C a Gooble 1500 u away dies at the touch, one at 2500 u lives. D touched in the
+air: pending (locked, falling) until the floor, then the demo. Regressions 115 16/16, 111, 114, 109, 110, 107, 104, 102 green; build 0 errors
+(first compile clean); boot `ALL OK`. Drive-side only: the Level root carries an offset (spawn, then set the global position), his physics
+ticks are not 60 Hz (time by seconds, never frames), a leaked stick press, the carry state is the run's.

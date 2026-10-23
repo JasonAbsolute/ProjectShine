@@ -35,6 +35,13 @@ public partial class SmsConsoleStr : CanvasLayer
     [Export] public Vector2 MissCenter = new Vector2(308.5f, 377f);
     /// <summary>A longer word is built smaller to fit this many blo px (the screen is 600 wide; 760 fills a 16:9 window). 0 = never.</summary>
     [Export] public float MaxWidth = 760f;
+    /// <summary>Pass 116: TConsoleStr::startAppearShineGet -- the US big_tx_1.blo's sg00..sg05 spell SHINE! (JP / PAL: SHINE GET!).</summary>
+    [Export] public string ShineText = "SHINE!";
+    /// <summary>The panes' centres in the blo's 600 x 480 (sg00 (59, 364) .. sg05 (341, 287), 70 x 70; the I's pane reads 417 x 51 in this blo and
+    /// is interpolated between H and N).</summary>
+    [Export] public Vector2[] ShineHomes = { new Vector2(94f, 399f), new Vector2(153f, 384f), new Vector2(206f, 369f), new Vector2(259f, 355f), new Vector2(318f, 336f), new Vector2(376f, 322f) };
+    [Export] public float ShineTiltDeg = 12f;      // the panes' ROT 12 (the I untilted)
+    [Export] public float ShineGlyphHeight = 70f;
 
     private TextureRect[] _letters = System.Array.Empty<TextureRect>();
     private Vector2[] _home = System.Array.Empty<Vector2>();
@@ -42,6 +49,12 @@ public partial class SmsConsoleStr : CanvasLayer
     private float _frame = -1f;
 
     public bool MissRunning => _frame >= 0f;
+    private Control _shineRoot; private TextureRect[] _shineLetters = System.Array.Empty<TextureRect>(); private Vector2[] _shineHome = System.Array.Empty<Vector2>();
+    private float _shineFrame = -1f;
+    public bool ShineGetRunning => _shineFrame >= 0f;
+    public float ShineGetFrame => _shineFrame;
+    public int ShineLettersVisible { get { int n = 0; foreach (var t in _shineLetters) if (t.Visible) n++; return n; } }
+    public Vector2 ShineLetterOffset(int i) => i < _shineLetters.Length ? _shineLetters[i].Position - _shineHome[i] : Vector2.Zero;
     public int LetterCount => _letters.Length;
 
     public override void _Ready()
@@ -99,6 +112,61 @@ public partial class SmsConsoleStr : CanvasLayer
         Miss.Visible = true;
     }
 
+    /// <summary>TConsoleStr::startAppearShineGet (ConsoleStr.cpp 364): the letters from the start, after the 0xB4 half-tick wait.</summary>
+    public void StartAppearShineGet()
+    {
+        if (_shineRoot == null)
+        {
+            _shineRoot = new Control { Name = "ShineGet", MouseFilter = Control.MouseFilterEnum.Ignore };
+            AddChild(_shineRoot);
+        }
+        if (_shineLetters.Length != ShineText.Length)
+        {
+            foreach (var t in _shineLetters) if (IsInstanceValid(t)) t.QueueFree();
+            var letters = new System.Collections.Generic.List<TextureRect>();
+            for (int i = 0; i < ShineText.Length; i++)
+            {
+                Vector2 home = i < ShineHomes.Length ? ShineHomes[i] : new Vector2(94f + 56f * i, 399f - 15f * i);
+                char ch = ShineText[i];
+                float tilt = ch == 'I' ? 0f : ShineTiltDeg;
+                var pal = Palette.Length > 0 ? new[] { Palette[i % Palette.Length] } : Palette;
+                var one = SmsBigText.Build(_shineRoot, ch.ToString(), GlyphPathFormat, home, ShineGlyphHeight, LetterGap, SpaceWidth, pal, Colored, null, tilt, 0f);
+                letters.AddRange(one);
+            }
+            _shineLetters = letters.ToArray();
+            _shineHome = new Vector2[_shineLetters.Length];
+            for (int i = 0; i < _shineLetters.Length; i++) _shineHome[i] = _shineLetters[i].Position;
+        }
+        foreach (var t in _shineLetters) { t.Visible = false; t.Modulate = new Color(1f, 1f, 1f, 0f); }
+        _shineFrame = 0f;
+        _shineRoot.Visible = true;
+    }
+
+    /// <summary>processShineGet (570) on the index = ticks past the wait: letter i shows at 6i with a 40-tick Bezier from (150, -50) via (-21, 7) to
+    /// (-21, 7) and alpha +7 a tick; at 6i + 40 a 20-tick settle to (0, 0); at 6i + 200 a 40-tick fly-out to (-200, 65); done when all are out.</summary>
+    private void ProcessShineGet(float f)
+    {
+        float idx = f - 360f;   // unk20 = 0xB4 half-ticks: 3.0 s before the first letter
+        if (idx < 0f) return;
+        bool any = false;
+        for (int i = 0; i < _shineLetters.Length; i++)
+        {
+            TextureRect t = _shineLetters[i];
+            float since = idx - 6f * i;
+            if (since < 0f || since > 240f) { t.Visible = false; continue; }
+            any = true; t.Visible = true;
+            Vector2 off;
+            if (since < 40f) off = SmsHud.Bezier(new Vector2(150f, -50f), new Vector2(-21f, 7f), new Vector2(-21f, 7f), since / 40f);
+            else if (since < 60f) off = SmsHud.Bezier(new Vector2(-21f, 7f), new Vector2(-21f, 7f), Vector2.Zero, (since - 40f) / 20f);
+            else if (since < 200f) off = Vector2.Zero;
+            else off = SmsHud.Bezier(Vector2.Zero, Vector2.Zero, new Vector2(-200f, 65f), (since - 200f) / 40f);
+            t.Position = _shineHome[i] + off;
+            float a = since < 40f ? Mathf.Min(1f, since * 7f / 255f) : 1f;
+            t.Modulate = new Color(1f, 1f, 1f, a);
+        }
+        if (!any && idx > 240f) { _shineFrame = -1f; _shineRoot.Visible = false; }
+    }
+
     public void Clear()
     {
         _frame = -1f;
@@ -116,6 +184,8 @@ public partial class SmsConsoleStr : CanvasLayer
         float s = vp.Y / 480f * Size;
         Miss.Scale = new Vector2(s, s);
         Miss.Position = vp * 0.5f - LayoutCenter * s;
+        if (_shineRoot != null) { _shineRoot.Scale = Miss.Scale; _shineRoot.Position = Miss.Position; }
+        if (_shineFrame >= 0f) { _shineFrame += (float)delta * 120f * SmsHud.Anim; ProcessShineGet(_shineFrame); }
         if (_frame < 0f)
             return;
         _frame += (float)delta * 120f * SmsHud.Anim;

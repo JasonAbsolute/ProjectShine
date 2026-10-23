@@ -173,6 +173,9 @@ public partial class ShineSprite : Node3D
         if (Engine.IsEditorHint())
             return;
 
+        SmsInitialYaw = GlobalRotation.Y;       // pass 116: TMapObjBase::mInitialRotation.y -- the placed yaw, before the entrance spin
+        _smsBaseScale = Mathf.Abs(Scale.X) > 1e-6f ? Mathf.Abs(Scale.X) : 0.006f;
+
         // Stop any baked animation — the shine is spun/positioned in code now
         // (idle spin, cutscene tracking, end shrink), not by the glb animations.
         _animPlayer = GetNodeOrNull<AnimationPlayer>("AnimationPlayer");
@@ -401,6 +404,10 @@ public partial class ShineSprite : Node3D
             // Idle spin while it floats up and shrinks away.
             RotateY(IdleSpinSpeed * d);
         }
+        else if (_smsDriven)
+        {
+            // pass 116: Mario drives the root from the game's shine_demo_shine_get.bck (SmsDemoDrive) each physics frame
+        }
         else if (_inCutscene && _mario != null && IsInstanceValid(_mario))
         {
             // Cutscene: track Mario's live position + facing so the shine stays put
@@ -451,10 +458,19 @@ public partial class ShineSprite : Node3D
     /// <summary>Called by Mario once the cutscene starts. The shine snaps to his
     /// hand and, from here on, tracks his live position + facing (see _Process),
     /// spinning in place — no baked animation.</summary>
-    public void BeginCollectSequence(Mario mario, float visualYaw)
+    public void BeginCollectSequence(Mario mario, float visualYaw, bool gameDriven = false)
     {
         _mario = mario;
         _inCutscene = true;
+        if (gameDriven)
+        {
+            // pass 116: TShine::receiveMessage -- the shine jumps to Mario and plays shine_demo_shine_get in HIS frame; the root is driven from
+            // the bck table (SmsDemoDrive), the bones at the neutral pose (no baked clip)
+            _smsDriven = true;
+            RestoreNeutralPose();
+            SmsDemoDrive(new Transform3D(new Basis(Vector3.Up.Cross(SmsMath.DirFromYaw(visualYaw)), Vector3.Up, SmsMath.DirFromYaw(visualYaw)), mario.GlobalPosition), 0f);
+            return;
+        }
 
         // Orient + snap to Mario, then play the baked collect routine.
         Rotation = new Vector3(0f, visualYaw + Mathf.DegToRad(CutsceneFaceYawOffsetDeg), 0f);
@@ -477,6 +493,7 @@ public partial class ShineSprite : Node3D
             return;
         _ending = true;
         _inCutscene = false;
+        _smsDriven = false;
 
         // Drop the baked grab animation's final pose so the star reads as the
         // normal floating shine — but compensate the root so the star doesn't
@@ -803,4 +820,32 @@ public partial class ShineSprite : Node3D
             GD.Print($"[ShineFX] emitting from mesh center {emit}");
         }
     }
+
+    // ---------------------------------------------------------------------
+    //  Pass 116: the game's shine_demo_shine_get.bck flight (SmsShineGetData)
+    // ---------------------------------------------------------------------
+    /// <summary>TMapObjBase::mInitialRotation.y: the yaw this shine was placed with (captured in _Ready) -- Mario faces it and the demo camera
+    /// is set up with it (TMario::receiveMessage(SHINE), TMarDirector::fireGetStar).</summary>
+    public float SmsInitialYaw { get; private set; }
+    /// <summary>Where the star's centre sits in this scene's root-local units ((0, 200, 0) at the 0.006 root scale = 1.2 m up): the bck's
+    /// 'body' joint lands there.</summary>
+    [Export] public Vector3 SmsStarLocal = new Vector3(0f, 200f, 0f);
+    /// <summary>The game's demo shrinks the shine to 0.5 (the root scale track; mEffectScale 0.5). 1 = your full size.</summary>
+    [Export] public float SmsDemoScale = 1f;
+    private bool _smsDriven;
+    private float _smsBaseScale = 0.006f;
+    public bool SmsDemoDriven => _smsDriven;
+
+    /// <summary>The root set so the star's centre, rotation and scale are the bck's at time t (seconds), in Mario's frame (origin his position,
+    /// +Z his facing, +X its left).</summary>
+    public void SmsDemoDrive(Transform3D marioFrame, float t)
+    {
+        _smsDriven = true;
+        SmsShineGetData.Shine(t, out Vector3 starU, out Quaternion rot, out float sc);
+        float s = _smsBaseScale * (SmsDemoScale * sc / 0.5f);      // the track's 0.5 = the game's demo size; SmsDemoScale rescales it
+        Basis b = (marioFrame.Basis * new Basis(rot)).Scaled(new Vector3(s, s, s));
+        Vector3 star = marioFrame * (starU / SmsUnits.UnitsPerMetre);
+        GlobalTransform = new Transform3D(b, star - b * SmsStarLocal);
+    }
+
 }
