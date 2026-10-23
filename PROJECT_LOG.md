@@ -6687,3 +6687,43 @@ from it. Drive 111 11/11 with three new checks: N1 the default, W1 a dirty Mario
 switches to the stage brown with his dirt kept, W2 back again. Regressions 109 19/19, 110 8/8, 112 8/8, 106 18/18, 105b 14/14, 102 20/20,
 104 23/23; build 0 errors; boot `ALL OK`. Three drive-side fixes (the yaw read was Mario's armature, not the camera's; the re-pound needed
 a step off the switch to re-enter its hit zone; D1 compared the 113b raw mask by identity) -- no code change from them.
+
+### SMS pass 115 -- the fruits' own ball physics, and only the durian answers Mario's body (2026-10-22)
+
+**Only the durian reacts to Mario's body (SMS 1:1) -- pass 112 was a mis-port.** Every fruit is a `TResetFruit` (MapObjManager.cpp 290), whose
+`kicked()` (MapObjBall.cpp 793) RETURNS on MAP_OBJ_FLAG_UNK2000000 and on a falling Mario (SMS_GetMarioSpeedY() < 0), and whose
+`boundByActor` Mario branch (245) is gated by the same flag. Coconut / papaya / pineapple / banana / pepper all carry 0x02000000 (MapObjInit.cpp
+0x02130100 / 0x02130000); the durian (0x00170100) does not. So walking into or landing on a coconut does nothing; the durian is pushed when
+you run into it (`boundByActor`: vy += 1.3 over the min speed else 15, xz += 0.6 x his run - 0.2 away, Mario gets HIT_MESSAGE_ATTACK) and
+kicked when a RISING Mario meets it (`kicked`: a resting one hops unk178 = 20 u/tick, else 0.13 x his vy - 1.0 x its vy; xz += 0.9 x his,
+a random unit xz under the min speed; the 10-tick guard). The dispatch is `touchActor` 299: Mario's vy != 0 -> kicked, else boundByActor.
+DEVIATION knob `SmsTouchLikeDurian` (per fruit, default off): that fruit answers Mario like the durian (pass 112's look). Drive 112's
+expectations are wrong by the game: dropped from the chain, 115 replaces it.
+
+**The ball itself (`TMapObjGeneral::bind` 500 every 120 Hz tick, `TMapObjBall` 37-180, physical data MapObjInit.cpp).** While Mario runs SMS
+physics the RigidBody3D goes frozen KINEMATIC (moved by GlobalPosition) and the game's sim drives it: gravity 0.3 a tick (clamped to the body
+radius), air drag 1.0, a fall slower than 1.5 u/tick lands else rebounds about the floor with 1 + 0.6 (banana 0.4), the roll decays x 0.97
+(banana 0.4) every contact tick and stops under 0.3 (banana 1.0), 0.5 x the floor normal's xz downhill, a wall pops a rolling ball 1.0 x its
+speed and reflects the into-wall velocity with 1 + 0.3 (durian 0.2; the decomp's own touchWall line reads INTO the wall -- the general
+TMapObjGeneral::touchWall reflection is used, noted), a roof clamps the head and reflects with 0.6, the model rolls |vxz| / R x 2 a tick,
+rest = bind skipped (LIVE_FLAG_UNK10). `hold()` refuses a ball faster than 10 u/tick (`SmsTakeable.MayTake`). Mario's take / put / throw feed
+the sim through `SmsHold` / `SmsPut` / `SmsThrown(vel)`; `SmsThrownFlight.Begin` skips a sim fruit. Knob `SmsBallPhysics` (default on); off =
+your Godot RigidBody profile with the corrected touch rules.
+
+**A fruit has no map collision.** `coconut_data`'s TMapCollisionInfo slot is nullptr (WoodBox carries one): Mario is never blocked by a fruit and
+cannot stand on one -- he meets it through the hit cylinders alone. The sim's kinematic body is excepted from his MoveAndSlide every frame
+(his throw adds the same exception and removes it 0.6 s later). Found by the drive: he landed ON the durian and kept pushing it.
+
+**Not ported (logged):** the TResetFruit life cycle (14400 ticks living -> rotting / breaking -> 360 waiting -> reappear at home; your fruits
+are your own supply), the water-surface / goop respawn, the banana / pineapple model Y offsets, the ground actor's carry, the sounds (slots
+`SmsBounceSound` / `SmsKickSound` only). Also fixed: the stale "empty-tank rate not ported" comment at Mario.cs 13058 -- pass 46 ported it
+(`_fluddPumpRate = R x PressureMax x PumpAnmSpeed`); 116 needs no pass.
+
+**Verified on your machine:** drive 115 13/13 -- the sim owns a spawned coconut (kinematic, at rest, bottom 1 u over the floor), a 300 u drop
+rebounds to 106 u (want ~108) and rests after 4 rebounds, a 6 u/tick roll runs out 190 u with the model rolling, no take while faster than
+10 u/tick, a wall: arrival 4.9 -> pop 4.6 and -1.39 back (1.0x / 0.3x), a roof: 12 up -> -6.24 down with the head clamped under it, a run
+THROUGH a resting coconut moves nothing and he is 5.7 m past it, the durian run-in (kind 2, lift 1.3, pushed 7 m), a FALLING Mario kicks
+nothing and falls through to the floor (the landing's boundByActor is kind 2), a RISING Mario kicks it (hop 20, kind 1), the knob, every
+fruit frozen kinematic. Regressions 111 11/11, 110 8/8, 114 15/15, 109 19/19, 106 18/18, 105b 14/14, 107 18/18; build 0 errors; boot
+`ALL OK`. Drive-side fixes only: W1's expectations were written for the launch speed (the ball reaches the wall at 4.9 after the game's
+0.97/tick roll-out), F1's roof stood where the ball popped off the wall (it rolled 1.6 m out from under it), T4 needed a re-settled durian.

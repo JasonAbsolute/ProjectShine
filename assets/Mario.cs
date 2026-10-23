@@ -10449,6 +10449,7 @@ public partial class Mario : CharacterBody3D
         heldBody.LinearVelocity = Vector3.Zero;
         heldBody.AngularVelocity = Vector3.Zero;
         heldBody.Freeze = true;
+        if (heldBody is Fruit heldFruit) heldFruit.SmsHold();   // pass 115: the ball sim's STATE_HOLDING
 
         heldBody.CollisionLayer = 0;
         heldBody.CollisionMask = 0;
@@ -13055,7 +13056,7 @@ public partial class Mario : CharacterBody3D
     /// ctrl at frame 0, rate 1 -- MarioBlend.cpp 11) and leaves the rate alone while the tank has water, so the clip ping-pongs at
     /// rate 1 (ATTR_PING_PONG_LOOP) through PUMPING and HOLDING_PUMP's PumpWaitTime cooldown; once the cooldown is out
     /// stateMachineUpper() does setFrame(0) every tick (MarioUpper.cpp 117) -- the L camera and the squat hold the grips at the
-    /// clip's frame 0, still -- and IDLE unbinds it. (The empty tank's R x PumpAnmSpeed rate is not ported.)</summary>
+    /// clip's frame 0, still -- and IDLE unbinds it. (The empty tank's R x PumpAnmSpeed rate: pass 46, SmsFluddPumpClock -- this note was stale until 115.)</summary>
     private void SmsFluddPumpClock(double delta)
     {
         // changeMtxCalcSIAnmBQAnmTransform(1, 0, gMarioAnimeData[anim].unk2): the upper clip is the body clip's column; a graft takes a
@@ -17423,6 +17424,7 @@ public partial class Mario : CharacterBody3D
             rb.Sleeping = false;
             rb.SetDeferred("linear_velocity", Vector3.Zero);
             rb.SetDeferred("angular_velocity", Vector3.Zero);
+            if (rb is Fruit putFruit) putFruit.SmsPut();   // pass 115: the ball sim takes it back, still
             if (SmsDebugPrint)
                 GD.Print($"[SMS take] PUT the {_smsTakeData.Name}: {SmsUnits.MetresToUnits(ahead):F0} units ahead at his feet");
         }
@@ -17437,6 +17439,7 @@ public partial class Mario : CharacterBody3D
             rb.SetDeferred("linear_velocity", vel);
             rb.SetDeferred("angular_velocity", Vector3.Zero);
             SmsThrownFlight.Begin(rb, _smsTakeData.WithGravity(_smsTakeData.Gravity * ThrowGravityScale)); // the game: the type's gravity (ThrowGravityScale 1)
+            if (rb is Fruit thrownFruit) thrownFruit.SmsThrown(vel);   // pass 115: the ball sim flies it on the same launch (Begin skips a sim fruit)
             // it starts inside his cylinder: no shoving him for the first moments (his legacy's guard, kept)
             rb.AddCollisionExceptionWith(this);
             var clearExc = GetTree().CreateTimer(0.6);

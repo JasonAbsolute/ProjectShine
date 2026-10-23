@@ -117,6 +117,7 @@ public partial class SmsTakeable : Node
     /// <summary>Whether a body may be taken at all: its SmsTakeable's CanTake, else his Fruit.CanBePickedUp, else yes.</summary>
     public static bool MayTake(Node body)
     {
+        if (body is Fruit ball && !ball.SmsHoldable) return false;   // pass 115: TMapObjBall::hold refuses a ball faster than 10 units a tick
         foreach (Node c in body.GetChildren())
             if (c is SmsTakeable t)
                 return t.CanTake;
@@ -180,6 +181,8 @@ public static class SmsThrownFlight
     {
         if (rb == null)
             return;
+        if (rb is Fruit simFruit && simFruit.SmsBallSimActive)
+            return; // pass 115: the fruit's own ball sim flies it (Fruit.SmsThrown); nothing here to restore
         End(rb);
         float g = (float)ProjectSettings.GetSetting("physics/3d/default_gravity", 9.8f);
         var e = new Entry { Body = rb, GravityScale = rb.GravityScale, LinearDamp = rb.LinearDamp, DampMode = rb.LinearDampMode, Material = rb.PhysicsMaterialOverride, Data = d, HalfH = HalfHeight(rb) };

@@ -239,11 +239,11 @@ public partial class Fruit : RigidBody3D
 	/// </summary>
 	public void LaunchAsDrop()
 	{
-		LinearVelocity = new Vector3(0f, BouncePhysics.INITIAL_POP_Y, 0f);
-		// Add a tiny random XZ scatter so multiple fruits don't stack
 		var rng = new RandomNumberGenerator();
 		rng.Randomize();
-		LinearVelocity += new Vector3(rng.RandfRange(-1.5f, 1.5f), 0f, rng.RandfRange(-1.5f, 1.5f));
+		Vector3 v = new Vector3(rng.RandfRange(-1.5f, 1.5f), BouncePhysics.INITIAL_POP_Y, rng.RandfRange(-1.5f, 1.5f)); // a tiny XZ scatter so fruits don't stack
+		if (_bSim) { SmsBallLaunch(v); return; }   // pass 115: the ball sim owns the motion
+		LinearVelocity = v;
 	}
 
 	public override void _PhysicsProcess(double delta)
@@ -251,13 +251,24 @@ public partial class Fruit : RigidBody3D
 		SmsBallTick(delta);
 	}
 
-	// ------------------------------------------------------------------------------------------------------------ pass 112: TMapObjBall
-	/// <summary>The game's per-type ball numbers (TMapObjBall::initMapObj, MapObjBall.cpp 451-607), in units a FRAME: the push of Mario's run
-	/// (unk148) and away from him (unk14C), the lift when he runs in fast (unk150) / slow (unk154), the dive case's run carry (unk158) and his
-	/// fall's share (unk15C) and the rebound of the fruit's own fall (unk160), the kick's run carry (unk170), fall share (unk174) and set hop
-	/// (unk178); the physical's min speed (unkC) and the body radius (units, x the scale).</summary>
-	private struct SmsBallParams { public float Run, Away, LiftFast, LiftSlow, DiveRun, DiveFall, Rebound, KickRun, KickFall, KickHop, MinSpeed, BodyRadius, DamageRadius, DamageHeight; }
-	private static readonly SmsBallParams BallCommon = new SmsBallParams { Run = 0.4f, Away = 0.2f, LiftFast = 1.3f, LiftSlow = 0f, DiveRun = 1.2f, DiveFall = 0.8f, Rebound = 0.5f, KickRun = 0.9f, KickFall = 0.13f, KickHop = 20f, MinSpeed = 0.3f, BodyRadius = 50f, DamageRadius = 80f, DamageHeight = 90f };
+	// ------------------------------------------------------------------------------------------------------ pass 112 / 115: TResetFruit
+	/// <summary>The game's per-type ball numbers (TMapObjBall::initMapObj, MapObjBall.cpp 451-607), units a 120 Hz TICK: the push of Mario's run
+	/// (unk148) and away from him (unk14C), the lift when he runs in fast (unk150) / slow (unk154), the rebound of the fruit's own fall (unk160),
+	/// the kick's run carry (unk170), fall share (unk174) and set hop (unk178), the wall pop (unk184) and the landing threshold (unk188); from the
+	/// type's TMapObjPhysicalData (MapObjInit.cpp coconut_physical_data 1543 ...): gravity, the floor / roof restitution (unk4), the wall
+	/// reflection (unk8), the min speed (unkC), the ground friction (unk10), the air drag (unk18, 1.0 = none); the body radius (units, x the
+	/// scale) and the hit cylinder. Durian 0x00170100 is the ONLY fruit without MAP_OBJ_FLAG_UNK2000000 -> the only one Mario's body moves.</summary>
+	private struct SmsBallParams
+	{
+		public float Run, Away, LiftFast, LiftSlow, Rebound, KickRun, KickFall, KickHop, WallPop, LandVy;
+		public float Gravity, Bounce, WallReflect, MinSpeed, Friction, AirDrag, BodyRadius, DamageRadius, DamageHeight;
+		public bool AnswersMario;
+	}
+	private static readonly SmsBallParams BallCommon = new SmsBallParams
+	{
+		Run = 0.4f, Away = 0.2f, LiftFast = 1.3f, LiftSlow = 0f, Rebound = 0.5f, KickRun = 0.9f, KickFall = 0.13f, KickHop = 20f, WallPop = 1.0f, LandVy = 1.5f,
+		Gravity = 0.3f, Bounce = 0.6f, WallReflect = 0.3f, MinSpeed = 0.3f, Friction = 0.97f, AirDrag = 1.0f, BodyRadius = 50f, DamageRadius = 80f, DamageHeight = 90f, AnswersMario = false
+	};
 	private static SmsBallParams SmsBallParamsFor(FruitType t)
 	{
 		var p = BallCommon;
@@ -265,123 +276,309 @@ public partial class Fruit : RigidBody3D
 		{
 			case FruitType.Coconut: p.BodyRadius = 40f; p.DamageRadius = 50f; p.DamageHeight = 80f; break;   // coconut_hit_data_table 50 / 80
 			case FruitType.Papaya: p.BodyRadius = 40f; break;
-			case FruitType.Durian: p.Run = 0.6f; p.LiftSlow = 15f; p.DiveRun = 0.5f; p.DiveFall = 1.3f; p.Rebound = 1.0f; p.MinSpeed = 0.2f; p.BodyRadius = 45f; break;
-			case FruitType.Banana: p = new SmsBallParams { MinSpeed = 1.0f, BodyRadius = 50f, DamageRadius = 80f, DamageHeight = 90f }; break;   // all zero: no bounce off him
+			case FruitType.Pineapple: break;                                                                   // pine: the common row, R 50
+			case FruitType.RedPepper: break;                                                                   // red_pepper: the common row
+			case FruitType.Durian:   // durian_physical_data: unk8 / unkC 0.2; initMapObj 505: run 0.6, slow lift 15, rebound 1.0; R 45; the one that answers him
+				p.Run = 0.6f; p.LiftSlow = 15f; p.Rebound = 1.0f; p.WallReflect = 0.2f; p.MinSpeed = 0.2f; p.BodyRadius = 45f; p.AnswersMario = true; break;
+			case FruitType.Banana:   // banana_physical_data: bounce 0.4, wall 0.2, min speed 1.0, friction 0.4; its touch table is all zero
+				p.Run = 0.2f; p.Away = 0f; p.LiftFast = 0f; p.Rebound = 0f; p.KickRun = 0f; p.KickFall = 0f; p.KickHop = 0f;
+				p.Bounce = 0.4f; p.WallReflect = 0.2f; p.MinSpeed = 1.0f; p.Friction = 0.4f; break;
 		}
 		return p;
 	}
 	private SmsBallParams _ball;
-	private int _ballGuardFrames;          // unk194: 10 frames after a touch, no second one
-	private float _ballFrameAccum;
+	/// <summary>Pass 112: Mario walks through fruits as in the game (their TMapObjData has no map collision: he never collides with one); off =
+	/// the port's solid fruits.</summary>
+	[Export] public bool SmsPassThroughMario { get; set; } = true;
+	/// <summary>DEVIATION knob (Jaysonn 2026-10-20 23:20): false = THIS fruit ignores Mario's touch entirely; picking it up is untouched.</summary>
+	[Export] public bool SmsBallReacts { get; set; } = true;
+	/// <summary>Pass 115: the game's own ball physics (TMapObjBall: gravity 0.3 a tick^2, the 0.6 floor bounce, the 0.97 roll-out, the downhill
+	/// roll, the wall pop + reflection, the roof) drive this fruit while Mario runs SMS physics; the RigidBody3D is frozen kinematic and moved by
+	/// the sim. false = his Godot RigidBody profile (ApplyPhysicsProfile) as before.</summary>
+	[Export] public bool SmsBallPhysics { get; set; } = true;
+	/// <summary>DEVIATION knob (pass 115): true = this fruit answers Mario's body the way the game's DURIAN does (a run-in pushes it, a rising jump
+	/// kicks it) -- pass 112's look for every fruit. The game: TResetFruit::kicked (MapObjBall.cpp 795) and boundByActor's Mario branch (245)
+	/// both return on MAP_OBJ_FLAG_UNK2000000, which every fruit but the durian carries (MapObjInit.cpp: coconut / papaya / pine / banana
+	/// 0x02130100, red pepper 0x02130000, durian 0x00170100) -- a coconut sits still when he walks into or lands on it.</summary>
+	[Export] public bool SmsTouchLikeDurian { get; set; } = false;
+	/// <summary>Sound slots (no streams yet): the ball's own bound / roll (mSoundIdTable[4]) and MSD_SE_MA_KICK_DRIAN.</summary>
+	[Export] public AudioStreamPlayer3D SmsBounceSound, SmsKickSound;
+
+	private bool _bSim;                        // the sim drives the body (frozen kinematic)
+	private Vector3 _bVel;                     // mVelocity, units a tick
+	private bool _bAirborne, _bRest, _bHeld;   // LIVE_FLAG_AIRBORNE, LIVE_FLAG_UNK10 (bind skipped), STATE_HOLDING
+	private int _bGuard;                       // unk194: 10 ticks after a touch, no second one
+	private float _bTickAccum;
+	private float _bGeomR = 0.3f;              // metres: HIS collision sphere's radius (the ground / wall geometry; the game's R is for the numbers)
+	private Vector3 _bGroundN = Vector3.Up;
+	private Node3D _bModel; private Basis _bModelBasis0 = Basis.Identity; private Basis _bRoll = Basis.Identity;
 	private Mario _ballMario;
-	/// <summary>The last touch, for the drives: 0 none, 1 kicked, 2 bound (run-in), 3 bound (the dive case).</summary>
+	/// <summary>The last touch, for the drives: 0 none, 1 kicked, 2 bound (run-in).</summary>
 	public int SmsLastTouch { get; private set; }
 	public int SmsTouchCount { get; private set; }
-	/// <summary>How many times the touch test ran (the drives: is the 30 fps tick reaching it?).</summary>
 	public int SmsTickCount { get; private set; }
 	public Vector3 SmsLastTouchVelUnits { get; private set; }
+	/// <summary>For the drives: the sim's state.</summary>
+	public bool SmsBallSimActive => _bSim;
+	public Vector3 SmsBallVelUnits => _bVel;
+	public bool SmsBallAirborne => _bAirborne;
+	public bool SmsBallAtRest => _bRest;
+	public bool SmsBallHeld => _bHeld;
+	public int SmsBallGuard => _bGuard;
+	public float SmsBallBottomY => GlobalPosition.Y - _bGeomR;
+	public float SmsBallGeomRadius => _bGeomR;
+	public Basis SmsBallRoll => _bRoll;
+	/// <summary>TMapObjBall::hold (174): a ball faster than 10 units a tick cannot be grabbed.</summary>
+	public bool SmsHoldable => !_bSim || _bVel.Length() <= 10f;
+	/// <summary>Does this fruit answer Mario's body (the game: the durian; the knob: any).</summary>
+	public bool SmsAnswersMario => SmsBallReacts && (_ball.AnswersMario || SmsTouchLikeDurian);
 
 	private void SmsBallSetup()
 	{
 		_ball = SmsBallParamsFor(Type);
 		// The game's fruits carry NO collision against Mario (their TMapObjData's collision slot is null: MapObjInit.cpp coconut_data): he walks
-		// THROUGH a fruit and only the hit cylinders react. The port's RigidBody was solid to him (layer 1 in his mask 5), which stopped him 60 u
-		// short -- inside the touch radius but outside boundByActor's own mDamageRadius (50 u on a coconut), so a run-in could never bounce it.
-		// With SmsPassThroughMario the body leaves layer 1 for layer 2 (the floor still catches it; Mario's mask 5 = layers 1 + 3 does not).
+		// THROUGH a fruit and only the hit cylinders react. With SmsPassThroughMario the body leaves layer 1 for layer 2 (the floor still catches it;
+		// Mario's mask 5 = layers 1 + 3 does not).
 		if (SmsPassThroughMario) { CollisionLayer = (CollisionLayer & ~1u) | 2u; }
+		foreach (Node c in GetChildren())
+		{
+			if (c is CollisionShape3D cs && cs.Shape is SphereShape3D sph) _bGeomR = sph.Radius * Mathf.Abs(cs.Scale.Y);   // ApplySize already baked Size into the radius
+			else if (_bModel == null && c is Node3D n3 && c is not CollisionShape3D && c is not CollisionObject3D) { _bModel = n3; }
+		}
+		if (_bModel != null) _bModelBasis0 = _bModel.Basis;
 	}
-	/// <summary>Pass 112: Mario walks through fruits as in the game (their bodies leave his collision mask); off = the port's solid fruits.</summary>
-	[Export] public bool SmsPassThroughMario { get; set; } = true;
 
-	/// <summary>DEVIATION knob (Jaysonn 2026-10-20 23:20 "all the fruit are kickable? shouldn't we have that as a flag?"): false = THIS fruit ignores
-	/// Mario's touch -- no kick, no bounce, no durian freeze; picking it up is untouched. The game has no such flag: every TMapObjBall goes through
-	/// touchActor (MapObjBall.cpp 299); what makes the banana inert is its all-zero table (initMapObj 583). true = the game.</summary>
-	[Export] public bool SmsBallReacts { get; set; } = true;
+	// ---- the hooks Mario's take calls (hold / put / thrown; TMapObjBall::hold 174, TMapObjGeneral::put 92 / thrown 110) ----
+	public void SmsHold() { _bHeld = true; _bVel = Vector3.Zero; _bRest = true; _bAirborne = false; }
+	public void SmsPut()
+	{
+		_bHeld = false; _bVel = Vector3.Zero; _bAirborne = true; _bRest = false; _bGuard = 0;
+		if (_bSim) { Freeze = true; FreezeMode = FreezeModeEnum.Kinematic; }
+	}
+	/// <summary>thrown(): the velocity Mario's code computed (m/s; the game's per-tick launch), already led one tick (his code).</summary>
+	public void SmsThrown(Vector3 velMps)
+	{
+		_bHeld = false; _bAirborne = true; _bRest = false; _bGuard = 0;
+		_bVel = SmsBallMpsToTick(velMps);
+		if (_bSim) { Freeze = true; FreezeMode = FreezeModeEnum.Kinematic; }
+	}
+	/// <summary>A spawner's pop (LaunchAsDrop) while the sim runs.</summary>
+	private void SmsBallLaunch(Vector3 velMps) { _bVel = SmsBallMpsToTick(velMps); _bAirborne = true; _bRest = false; }
+	private static Vector3 SmsBallMpsToTick(Vector3 mps) => mps * (SmsUnits.UnitsPerMetre / SmsUnits.TicksPerSecond);
 
-	/// <summary>touchActor each 30 fps frame (the map objects' CUE_MOVE): Mario's cylinder (50 x 160 u) against the fruit's damage cylinder; a
-	/// held fruit (STATE_HOLDING) and the guard skip it; kicked() when his mVel.y != 0, else boundByActor().</summary>
+	/// <summary>Every physics frame: the 120 Hz ticks (TicksFor); each = TMapObjBase::control's touchActor + TMapObjGeneral::bind.</summary>
 	private void SmsBallTick(double delta)
 	{
-		if (!SmsBallReacts) return;
 		if (_ballMario == null || !IsInstanceValid(_ballMario)) _ballMario = GetTree().GetFirstNodeInGroup("player") as Mario;
 		var mario = _ballMario;
 		if (mario == null || !mario.UseSmsPhysics) return;
-		_ballFrameAccum += (float)delta;
-		int frames = 0;
-		while (_ballFrameAccum >= 1f / 30f && frames < 4) { _ballFrameAccum -= 1f / 30f; frames++; }
-		for (int f = 0; f < frames; f++)
+		if (!_bSim)
 		{
-			if (_ballGuardFrames > 0) _ballGuardFrames--;
-			if (_ballGuardFrames > 0 || Freeze) continue;        // unk194 / STATE_HOLDING (Mario's take sets Freeze = true on the held body)
+			if (!SmsBallPhysics) { SmsBallTouchOnly(delta, mario); return; }
+			// take the body over: its Godot velocity becomes the ball's, the body goes kinematic (moved by GlobalPosition from here on)
+			_bVel = SmsBallMpsToTick(LinearVelocity);
+			_bAirborne = true; _bRest = false;
+			_bHeld = TopLevel;                  // Mario's take sets TopLevel on the held body
+			Freeze = true; FreezeMode = FreezeModeEnum.Kinematic;
+			_bSim = true;
+		}
+		if (!_bHeld && !Freeze) { Freeze = true; FreezeMode = FreezeModeEnum.Kinematic; }   // a release path that unfroze it: the sim keeps it kinematic
+		// the game's fruit has NO map collision (MapObjInit.cpp coconut_data: the TMapCollisionInfo slot is nullptr, where WoodBox carries one):
+		// Mario is never blocked by a fruit and cannot stand on one -- he meets it through the hit cylinders alone (touchActor). The sim's
+		// kinematic body is excepted from his MoveAndSlide every frame (his throw adds the same exception and REMOVES it 0.6 s later).
+		AddCollisionExceptionWith(mario);
+		int n = SmsUnits.TicksFor(delta, ref _bTickAccum);
+		for (int t = 0; t < n; t++) SmsBallStep(mario);
+	}
+
+	/// <summary>The knob off: the 112 touch reactions alone (the RigidBody keeps the motion), at the game's tick.</summary>
+	private void SmsBallTouchOnly(double delta, Mario mario)
+	{
+		int n = SmsUnits.TicksFor(delta, ref _bTickAccum);
+		for (int t = 0; t < n; t++)
+		{
+			if (_bGuard > 0) _bGuard--;
+			if (_bGuard > 0 || Freeze || TopLevel || !SmsAnswersMario) continue;
 			if (!SmsMarioTouches(mario)) continue;
 			Vector3 mv = mario.SmsMarioVelUnits;
-			if (mv.Y != 0f && Type != FruitType.Banana) SmsKicked(mario, mv);              // the banana: no kicked() case either (its numbers are 0)
-			else SmsBoundByActor(mario, mv);
+			Vector3 v = SmsBallMpsToTick(LinearVelocity);
+			if (Mathf.Abs(v.Y) < 0.05f) v.Y = 0f;
+			bool did = mv.Y != 0f ? SmsKicked(mario, mv, ref v, false) : SmsBoundByActor(mario, mv, ref v);
+			if (did) { LinearVelocity = v * (SmsUnits.TicksPerSecond / SmsUnits.UnitsPerMetre); Sleeping = false; }
 		}
 	}
 
-	/// <summary>The hit cylinders overlap: XZ within r_mario + r_fruit, the height spans crossing (THitActor::isHit's cylinder test).</summary>
+	private void SmsBallStep(Mario mario)
+	{
+		SmsTickCount++;
+		if (_bGuard > 0) _bGuard--;
+		bool held = _bHeld || TopLevel;
+		// TMapObjBase::control (MapObjBase.cpp 399): touchActor for each collision this tick -> TResetFruit::pick -> TMapObjBall::touchActor (299)
+		if (!held && _bGuard == 0 && SmsAnswersMario && SmsMarioTouches(mario))
+		{
+			Vector3 mv = mario.SmsMarioVelUnits;
+			if (mv.Y != 0f) SmsKicked(mario, mv, ref _bVel, _bAirborne); else SmsBoundByActor(mario, mv, ref _bVel);
+		}
+		if (held || _bRest) return;                                      // STATE_HOLDING: the holder's matrix; LIVE_FLAG_UNK10: bind returns
+
+		// ---- TMapObjGeneral::bind (500): calcVelocity (475) ----
+		float R = _ball.BodyRadius * Size;
+		if (_bAirborne) { _bVel.Y -= _ball.Gravity; _bVel.Y = Mathf.Clamp(_bVel.Y, -R, R); }
+		_bVel.X = Mathf.Clamp(_bVel.X * _ball.AirDrag, -R, R);
+		_bVel.Z = Mathf.Clamp(_bVel.Z * _ball.AirDrag, -R, R);
+		if (_bGroundN.Y >= 0.9999f)
+		{
+			if (Mathf.Abs(_bVel.X) < _ball.MinSpeed) _bVel.X = 0f;
+			if (Mathf.Abs(_bVel.Z) < _ball.MinSpeed) _bVel.Z = 0f;
+		}
+		// ---- pos += vel (metres); the game's mPosition is the ball's BOTTOM ----
+		Vector3 bottom = GlobalPosition - Vector3.Up * _bGeomR + _bVel * (1f / SmsUnits.UnitsPerMetre);
+		var space = GetWorld3D().DirectSpaceState;
+		var excl = new Godot.Collections.Array<Rid> { GetRid(), mario.GetRid() };   // the map only: never Mario's body
+		// ---- checkGroundCollision (464): the floor under the HEAD point, + 1 unit ----
+		Vector3 headPt = bottom + Vector3.Up * (2f * _bGeomR);
+		var gq = PhysicsRayQueryParameters3D.Create(headPt, headPt - Vector3.Up * 200f, CollisionMask, excl);
+		var ghit = space.IntersectRay(gq);
+		bool grounded = false;
+		if (ghit.Count > 0 && SmsBallIsMap(ghit["collider"].AsGodotObject()))
+		{
+			float groundY = ((Vector3)ghit["position"]).Y + SmsUnits.UnitsToMetres(1f);
+			Vector3 gn = (Vector3)ghit["normal"];
+			if (bottom.Y <= groundY) { grounded = true; _bGroundN = gn; SmsBallTouchGround(ref bottom, gn, groundY); }
+		}
+		if (!grounded) _bAirborne = true;
+		// ---- checkWallCollision (357): a wall within R of the centre -> pushed out in XZ, touchWall (47) ----
+		Vector3 centre = bottom + Vector3.Up * _bGeomR;
+		var sq = new PhysicsShapeQueryParameters3D { Shape = _bWallShape ??= new SphereShape3D(), CollisionMask = CollisionMask, Exclude = excl, Transform = new Transform3D(Basis.Identity, centre) };
+		((SphereShape3D)sq.Shape).Radius = _bGeomR;
+		var rest = space.GetRestInfo(sq);
+		if (rest.Count > 0 && Mathf.Abs(((Vector3)rest["normal"]).Y) < 0.7f && SmsBallIsMap(GodotObject.InstanceFromId(rest["collider_id"].AsUInt64())))
+		{
+			Vector3 wn = (Vector3)rest["normal"]; wn.Y = 0f;
+			if (wn.LengthSquared() > 1e-6f)
+			{
+				wn = wn.Normalized();
+				Vector3 wp = (Vector3)rest["point"];
+				float pen = _bGeomR - (centre - wp).Dot(wn);
+				if (pen > 0f) { centre += wn * pen; bottom = centre - Vector3.Up * _bGeomR; }
+				SmsBallTouchWall(wn);
+			}
+		}
+		// ---- checkRoofCollision (429), while rising: the head against a roof, reflected with unk4 ----
+		if (_bVel.Y > 0f)
+		{
+			var rq = PhysicsRayQueryParameters3D.Create(centre, centre + Vector3.Up * (_bGeomR + 0.02f), CollisionMask, excl);
+			var rhit = space.IntersectRay(rq);
+			if (rhit.Count > 0 && SmsBallIsMap(rhit["collider"].AsGodotObject()))
+			{
+				float roofY = ((Vector3)rhit["position"]).Y;
+				bottom.Y = roofY - 2f * _bGeomR;
+				Vector3 rn = (Vector3)rhit["normal"];
+				_bVel -= rn * (_bVel.Dot(rn) * (1f + _ball.Bounce));
+				SmsBounceSound?.Play();
+			}
+		}
+		if (!_bAirborne && _bVel == Vector3.Zero) _bRest = true;        // bind's end: on the ground and still -> LIVE_FLAG_UNK10
+		GlobalPosition = bottom + Vector3.Up * _bGeomR;
+		// ---- calcCurrentMtx (318): the roll, |vxz| / R x 2 about the axis across the motion ----
+		float sp = new Vector2(_bVel.X, _bVel.Z).Length();
+		if (_bModel != null && (Mathf.Abs(_bVel.X) > _ball.MinSpeed || Mathf.Abs(_bVel.Z) > _ball.MinSpeed))
+		{
+			Vector3 dir = new Vector3(_bVel.X, 0f, _bVel.Z) / sp;
+			Vector3 axis = Vector3.Up.Cross(dir);                                 // getVerticalVecToTargetXZ: across the motion, horizontal
+			if (axis.LengthSquared() > 1e-8f)
+			{
+				float ang = SmsUnits.UnitsToMetres(sp) / _bGeomR * 2f;           // his sphere's radius: the model rolls (x2, the game's own factor)
+				_bRoll = new Basis(axis.Normalized(), ang) * _bRoll;
+				_bModel.Basis = _bRoll * _bModelBasis0;
+			}
+		}
+	}
+	private SphereShape3D _bWallShape;
+	/// <summary>The game's ball collides with the map (BG) only: not Mario, not another body, not an area.</summary>
+	private static bool SmsBallIsMap(GodotObject o) => o is Node && o is not RigidBody3D && o is not CharacterBody3D && o is not Area3D;
+
+	/// <summary>TMapObjBall::touchGround (118): (water / goop: the game respawns the fruit -- not ported, it rolls on) vy above -unk188 lands (vy
+	/// 0, AIRBORNE off), else rebound (91: reflected about the floor with 1 + unk4, AIRBORNE on); on the ground vxz += unk180 x normal.xz; vxz x=
+	/// unk10 on every contact.</summary>
+	private void SmsBallTouchGround(ref Vector3 bottom, Vector3 n, float groundY)
+	{
+		if (_bVel.Y > -_ball.LandVy) { _bAirborne = false; _bVel.Y = 0f; bottom.Y = groundY; }
+		else
+		{
+			_bVel -= n * (_bVel.Dot(n) * (1f + _ball.Bounce));
+			bottom.Y = groundY; _bAirborne = true;
+			SmsBounceSound?.Play();
+		}
+		if (!_bAirborne) { _bVel.X += 0.5f * n.X; _bVel.Z += 0.5f * n.Z; }   // unk180 = 0.5 for every fruit: it rolls downhill
+		_bVel.X *= _ball.Friction; _bVel.Z *= _ball.Friction;
+	}
+
+	/// <summary>TMapObjBall::touchWall (47): a rolling ball pops vy += unk184 x speed; the velocity into the wall reflects with unk8 (see the
+	/// generator's note on the decomp's sign).</summary>
+	private void SmsBallTouchWall(Vector3 wn)
+	{
+		if (!_bAirborne) _bVel.Y += _ball.WallPop * _bVel.Length();
+		float velDot = _bVel.X * wn.X + _bVel.Z * wn.Z;
+		if (velDot < 0f)
+		{
+			float k = (1f + _ball.WallReflect) * velDot;
+			_bVel.X -= k * wn.X; _bVel.Z -= k * wn.Z;
+			SmsBounceSound?.Play();
+		}
+	}
+
+	/// <summary>The hit cylinders overlap (THitActor::isHit): XZ within r_mario + r_fruit, the height spans crossing; the fruit's stands on its bottom.</summary>
 	public bool SmsMarioTouches(Mario mario)
 	{
 		float u = SmsUnits.UnitsPerMetre;
-		SmsTickCount++;
-		Vector3 fp = GlobalPosition * u;
 		float feet = mario.SmsFeetWorldY * u;
-		Vector3 mp = new Vector3(mario.GlobalPosition.X * u, feet, mario.GlobalPosition.Z * u);
-		float dx = mp.X - fp.X, dz = mp.Z - fp.Z;
+		float fBottom = (GlobalPosition.Y - _bGeomR) * u;
+		float dx = (mario.GlobalPosition.X - GlobalPosition.X) * u, dz = (mario.GlobalPosition.Z - GlobalPosition.Z) * u;
 		float r = Mario.SmsHitRadiusUnits + _ball.DamageRadius * Size;
 		if (dx * dx + dz * dz > r * r) return false;
-		float fBottom = fp.Y - _ball.BodyRadius * Size, fTop = fBottom + _ball.DamageHeight * Size;   // the fruit's cylinder stands on its bottom
+		float fTop = fBottom + _ball.DamageHeight * Size;
 		return feet < fTop && feet + Mario.SmsHitHeightUnits > fBottom;
 	}
 
-	private Vector3 SmsVelUnits => new Vector3(SmsUnits.MpsToSpeed(LinearVelocity.X), SmsUnits.MpsToSpeed(LinearVelocity.Y), SmsUnits.MpsToSpeed(LinearVelocity.Z));
-	private void SmsSetVelUnits(Vector3 v) { LinearVelocity = new Vector3(SmsUnits.SpeedToMps(v.X), SmsUnits.SpeedToMps(v.Y), SmsUnits.SpeedToMps(v.Z)); Sleeping = false; }
-
-	/// <summary>kicked() (MapObjBall.cpp 184): a fruit already rising is left alone; at rest it hops unk178 (20 u / frame), falling it rebounds
-	/// -unk160 x its fall + unk174 x Mario's vy; xz += unk170 x his xz; both axes under the min speed -> a random unit xz; the guard; AIRBORNE;
-	/// Mario's receiveMessage(ATTACK) -- the durian's freeze, nothing for the others (MarioReceiveMsg.cpp 877).</summary>
-	private void SmsKicked(Mario mario, Vector3 mv)
+	/// <summary>TResetFruit::kicked (MapObjBall.cpp 793): a FALLING Mario kicks nothing (marioVy < 0 returns -- landing on a durian does nothing);
+	/// a ball already rising, or airborne and moving toward him, is left alone; at rest it hops unk178 (20), falling it rebounds -unk160 x its
+	/// fall + unk174 x his vy; xz += unk170 x his xz; both under the min speed -> a random unit xz; the guard; Mario's receiveMessage(ATTACK) -- the
+	/// durian's freeze (MarioReceiveMsg.cpp 877); MSD_SE_MA_KICK_DRIAN.</summary>
+	private bool SmsKicked(Mario mario, Vector3 mv, ref Vector3 v, bool airborne)
 	{
-		Vector3 v = SmsVelUnits;
-		if (Mathf.Abs(v.Y) < 0.05f) v.Y = 0f;                 // a Godot body at rest jitters by a hair; the game's ball sits at exactly 0
-		if (v.Y > 0f) return;
+		if (mv.Y < 0f) return false;
+		Vector3 toMario = new Vector3(mario.GlobalPosition.X - GlobalPosition.X, 0f, mario.GlobalPosition.Z - GlobalPosition.Z);
+		if (v.Y > 0f || (airborne && v.X * toMario.X + v.Z * toMario.Z > 0f)) return false;
 		v.Y = v.Y == 0f ? _ball.KickHop : _ball.KickFall * mv.Y - _ball.Rebound * v.Y;
 		v.X += _ball.KickRun * mv.X; v.Z += _ball.KickRun * mv.Z;
 		if (Mathf.Abs(v.X) < _ball.MinSpeed && Mathf.Abs(v.Z) < _ball.MinSpeed) { v.X = GD.Randf() * 2f - 1f; v.Z = GD.Randf() * 2f - 1f; }
-		SmsSetVelUnits(v);
-		_ballGuardFrames = 10;
+		_bGuard = 10; _bRest = false;
 		SmsLastTouch = 1; SmsTouchCount++; SmsLastTouchVelUnits = v;
 		if (Type == FruitType.Durian) mario.SmsKickFreeze();
+		SmsKickSound?.Play();
+		return true;
 	}
 
-	/// <summary>boundByActor(actor = Mario) (MapObjBall.cpp 229): inside mDamageRadius in XZ; the offset to him normalised; a Mario faster than the
-	/// min speed on an axis lifts it unk150 (else unk154) and it takes unk148 x his xz pushed unk14C away from him; receiveMessage(ATTACK). Then
-	/// the DIVE case: his vy < 0 and his feet + 130 under the fruit's top -> vy = -unk160 x its own vy, xz += unk158 x his xz, vy += unk15C x his
-	/// vy. The guard; AIRBORNE. (Nothing checks the fruit's own motion: a fruit rolled into also bounces.)</summary>
-	private void SmsBoundByActor(Mario mario, Vector3 mv)
+	/// <summary>boundByActor(Mario) (229): inside mDamageRadius in XZ (the fruit's alone); the offset to him normalised; faster than the min speed
+	/// on an axis lifts it unk150, else unk154 (the durian's 15: a slow touch pops it); xz += unk148 x his xz - dir x unk14C; receiveMessage(ATTACK).
+	/// (The dive branch, 283, needs his vy &lt; 0 -- which touchActor routes to kicked(): for Mario it never runs.) The guard; AIRBORNE.</summary>
+	private bool SmsBoundByActor(Mario mario, Vector3 mv, ref Vector3 v)
 	{
 		float u = SmsUnits.UnitsPerMetre;
 		Vector3 off = new Vector3(mario.GlobalPosition.X - GlobalPosition.X, 0f, mario.GlobalPosition.Z - GlobalPosition.Z) * u;
 		float r = _ball.DamageRadius * Size;
-		if (off.X * off.X + off.Z * off.Z > r * r) return;
+		if (off.X * off.X + off.Z * off.Z > r * r) return false;
 		if (off.X != 0f && off.Z != 0f) off = off.Normalized();
-		Vector3 v = SmsVelUnits;
 		bool fast = Mathf.Abs(mv.X) > _ball.MinSpeed || Mathf.Abs(mv.Z) > _ball.MinSpeed;
 		v.Y += fast ? _ball.LiftFast : _ball.LiftSlow;
 		v.X += _ball.Run * mv.X - off.X * _ball.Away;
 		v.Z += _ball.Run * mv.Z - off.Z * _ball.Away;
-		int kind = 2;
+		_bGuard = 10; _bRest = false; _bAirborne = true;
+		SmsLastTouch = 2; SmsTouchCount++; SmsLastTouchVelUnits = v;
 		if (Type == FruitType.Durian) mario.SmsKickFreeze();
-		float feet = mario.SmsFeetWorldY * u, top = GlobalPosition.Y * u + _ball.BodyRadius * Size;
-		if (mv.Y < 0f && feet + 130f < top)
-		{
-			v.Y = -_ball.Rebound * v.Y;
-			v.X += _ball.DiveRun * mv.X; v.Y += _ball.DiveFall * mv.Y; v.Z += _ball.DiveRun * mv.Z;
-			kind = 3;
-		}
-		SmsSetVelUnits(v);
-		_ballGuardFrames = 10;
-		SmsLastTouch = kind; SmsTouchCount++; SmsLastTouchVelUnits = v;
+		if (fast) SmsKickSound?.Play();
+		return true;
 	}
+
 }
