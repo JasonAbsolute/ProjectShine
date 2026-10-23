@@ -261,28 +261,30 @@ public partial class Fruit : RigidBody3D
 	private struct SmsBallParams
 	{
 		public float Run, Away, LiftFast, LiftSlow, Rebound, KickRun, KickFall, KickHop, WallPop, LandVy;
-		public float Gravity, Bounce, WallReflect, MinSpeed, Friction, AirDrag, BodyRadius, DamageRadius, DamageHeight;
+		public float Gravity, Bounce, WallReflect, MinSpeed, Friction, AirDrag, BodyRadius, DamageRadius, DamageHeight, AttackRadius, AttackHeight;
 		public bool AnswersMario;
 	}
 	private static readonly SmsBallParams BallCommon = new SmsBallParams
 	{
 		Run = 0.4f, Away = 0.2f, LiftFast = 1.3f, LiftSlow = 0f, Rebound = 0.5f, KickRun = 0.9f, KickFall = 0.13f, KickHop = 20f, WallPop = 1.0f, LandVy = 1.5f,
-		Gravity = 0.3f, Bounce = 0.6f, WallReflect = 0.3f, MinSpeed = 0.3f, Friction = 0.97f, AirDrag = 1.0f, BodyRadius = 50f, DamageRadius = 80f, DamageHeight = 90f, AnswersMario = false
+		Gravity = 0.3f, Bounce = 0.6f, WallReflect = 0.3f, MinSpeed = 0.3f, Friction = 0.97f, AirDrag = 1.0f, BodyRadius = 50f, DamageRadius = 80f, DamageHeight = 90f, AttackRadius = 60f, AttackHeight = 60f, AnswersMario = false   // fruit_hit_data_table (MapObjInit.cpp 1536, the red pepper's): {60, 60, 80, 90}
 	};
 	private static SmsBallParams SmsBallParamsFor(FruitType t)
 	{
 		var p = BallCommon;
 		switch (t)
 		{
-			case FruitType.Coconut: p.BodyRadius = 40f; p.DamageRadius = 50f; p.DamageHeight = 80f; break;   // coconut_hit_data_table 50 / 80
-			case FruitType.Papaya: p.BodyRadius = 40f; break;
-			case FruitType.Pineapple: break;                                                                   // pine: the common row, R 50
-			case FruitType.RedPepper: break;                                                                   // red_pepper: the common row
+			case FruitType.Coconut: p.BodyRadius = 40f; p.AttackRadius = 40f; p.DamageRadius = 50f; p.DamageHeight = 80f; break;      // coconut_hit_data_table 1553 {40, 60, 50, 80}
+			case FruitType.Papaya: p.BodyRadius = 40f; p.AttackRadius = 40f; p.DamageRadius = 50f; p.DamageHeight = 80f; break;       // papaya_hit_data_table 1594 {40, 60, 50, 80}
+			case FruitType.Pineapple: p.AttackRadius = 80f; p.DamageRadius = 50f; p.DamageHeight = 80f; break;                        // pine_hit_data_table 1629 {80, 60, 50, 80}; R 50
+			case FruitType.RedPepper: break;                                                                                             // RedPepper_data -> fruit_obj_hit_info: the common row
 			case FruitType.Durian:   // durian_physical_data: unk8 / unkC 0.2; initMapObj 505: run 0.6, slow lift 15, rebound 1.0; R 45; the one that answers him
-				p.Run = 0.6f; p.LiftSlow = 15f; p.Rebound = 1.0f; p.WallReflect = 0.2f; p.MinSpeed = 0.2f; p.BodyRadius = 45f; p.AnswersMario = true; break;
+				p.Run = 0.6f; p.LiftSlow = 15f; p.Rebound = 1.0f; p.WallReflect = 0.2f; p.MinSpeed = 0.2f; p.BodyRadius = 45f; p.AnswersMario = true;
+				p.AttackRadius = 150f; p.AttackHeight = 60f; p.DamageRadius = 60f; p.DamageHeight = 90f; break;                             // durian_hit_data_table 1702 {150, 60, 60, 90}
 			case FruitType.Banana:   // banana_physical_data: bounce 0.4, wall 0.2, min speed 1.0, friction 0.4; its touch table is all zero
 				p.Run = 0.2f; p.Away = 0f; p.LiftFast = 0f; p.Rebound = 0f; p.KickRun = 0f; p.KickFall = 0f; p.KickHop = 0f;
-				p.Bounce = 0.4f; p.WallReflect = 0.2f; p.MinSpeed = 1.0f; p.Friction = 0.4f; break;
+				p.Bounce = 0.4f; p.WallReflect = 0.2f; p.MinSpeed = 1.0f; p.Friction = 0.4f;
+				p.AttackRadius = 80f; p.AttackHeight = 60f; p.DamageRadius = 60f; p.DamageHeight = 90f; break;                              // banana_hit_data_table 1743 {80, 60, 60, 90}
 		}
 		return p;
 	}
@@ -296,6 +298,15 @@ public partial class Fruit : RigidBody3D
 	/// roll, the wall pop + reflection, the roof) drive this fruit while Mario runs SMS physics; the RigidBody3D is frozen kinematic and moved by
 	/// the sim. false = his Godot RigidBody profile (ApplyPhysicsProfile) as before.</summary>
 	[Export] public bool SmsBallPhysics { get; set; } = true;
+	/// <summary>Pass 115c: the game scales an object's hit cylinders with its model (TMapObjBase::setObjHitData: radii x max(sx, sz), heights x sy).
+	/// Your fruit models at Size 1 are about half the game's (coconut sphere 23.6 u vs the game's body radius 40, durian 20.6 vs 45, pineapple 24.7 vs
+	/// 50, banana 19.5 vs 50), so the scale is read off the collision sphere: sphere radius / the game's body radius (Size is already baked into the
+	/// sphere). false = the game's raw numbers x Size (passes 115 / 115b: a hold-off bubble well outside the model).</summary>
+	[Export] public bool SmsHitScaleFromModel { get; set; } = true;
+	/// <summary>The hit cylinders' scale (see SmsHitScaleFromModel).</summary>
+	public float SmsHitScale => SmsHitScaleFromModel && _bGeomR > 0f ? _bGeomR * SmsUnits.UnitsPerMetre / _ball.BodyRadius : Size;
+	/// <summary>keepDistance's hold-off radius about the axis, units: the scaled damage radius + Mario's 50.</summary>
+	public float SmsHoldOffRadiusU => _ball.DamageRadius * SmsHitScale + SmsParams.Mario.KeepDistanceRadius;
 	/// <summary>DEVIATION knob (pass 115): true = this fruit answers Mario's body the way the game's DURIAN does (a run-in pushes it, a rising jump
 	/// kicks it) -- pass 112's look for every fruit. The game: TResetFruit::kicked (MapObjBall.cpp 795) and boundByActor's Mario branch (245)
 	/// both return on MAP_OBJ_FLAG_UNK2000000, which every fruit but the durian carries (MapObjInit.cpp: coconut / papaya / pine / banana
@@ -487,11 +498,15 @@ public partial class Fruit : RigidBody3D
 		if (_bModel != null && (Mathf.Abs(_bVel.X) > _ball.MinSpeed || Mathf.Abs(_bVel.Z) > _ball.MinSpeed))
 		{
 			Vector3 dir = new Vector3(_bVel.X, 0f, _bVel.Z) / sp;
-			Vector3 axis = Vector3.Up.Cross(dir);                                 // getVerticalVecToTargetXZ: across the motion, horizontal
+			Vector3 axis = Vector3.Up.Cross(dir);                                 // getVerticalVecToTargetXZ: the direction turned +90 deg about Y = up x d, WORLD space
 			if (axis.LengthSquared() > 1e-8f)
 			{
 				float ang = SmsUnits.UnitsToMetres(sp) / _bGeomR * 2f;           // his sphere's radius: the model rolls (x2, the game's own factor)
-				_bRoll = new Basis(axis.Normalized(), ang) * _bRoll;
+				// calcCurrentMtx concatenates the roll in WORLD space (MTXConcat(rot, anmMtx)); the model child's Basis is in the BODY's frame, and the
+				// body keeps whatever orientation it last had (Mario's hand at a throw: the sim moves GlobalPosition only) -- so the axis goes through
+				// the body's inverse basis (pass 115c: a thrown fruit spun about a yawed axis)
+				Vector3 axisL = GlobalTransform.Basis.Orthonormalized().Inverse() * axis;
+				_bRoll = new Basis(axisL.Normalized(), ang) * _bRoll;
 				_bModel.Basis = _bRoll * _bModelBasis0;
 			}
 		}
@@ -539,19 +554,40 @@ public partial class Fruit : RigidBody3D
 	/// Pass 115b (Jaysonn 2026-10-22 23:34 "mario is walking thru them").</summary>
 	private void SmsHoldMarioOff(Mario mario)
 	{
-		if (SmsAnswersMario || !SmsMarioTouches(mario)) return;
-		mario.SmsKeepDistance(GlobalPosition * SmsUnits.UnitsPerMetre, _ball.DamageRadius * Size);
+		if (SmsAnswersMario || !SmsMarioAttacks(mario)) return;
+		mario.SmsKeepDistance(GlobalPosition * SmsUnits.UnitsPerMetre, _ball.DamageRadius * SmsHitScale);
 	}
+	/// <summary>TObjHitCheck::checkActorsInList (ObjHitCheck.cpp 43), the fruit's side of the pair: OUR attack cylinder (the hit table's attack
+	/// radius / height, scaled) against Mario's DAMAGE cylinder (50 x 160) puts him in our collision list -> TMapObjBase::control -> touchActor
+	/// (kicked / boundByActor). The durian's attack radius is 150: a rising Mario kicks it from 150 x scale + 50 away.</summary>
 	public bool SmsMarioTouches(Mario mario)
 	{
-		float u = SmsUnits.UnitsPerMetre;
+		float u = SmsUnits.UnitsPerMetre, hs = SmsHitScale;
 		float feet = mario.SmsFeetWorldY * u;
 		float fBottom = (GlobalPosition.Y - _bGeomR) * u;
 		float dx = (mario.GlobalPosition.X - GlobalPosition.X) * u, dz = (mario.GlobalPosition.Z - GlobalPosition.Z) * u;
-		float r = Mario.SmsHitRadiusUnits + _ball.DamageRadius * Size;
+		float r = _ball.AttackRadius * hs + Mario.SmsHitRadiusUnits;
 		if (dx * dx + dz * dz > r * r) return false;
-		float fTop = fBottom + _ball.DamageHeight * Size;
+		float fTop = fBottom + _ball.AttackHeight * hs;
 		return feet < fTop && feet + Mario.SmsHitHeightUnits > fBottom;
+	}
+	/// <summary>The other side of the pair: MARIO's attack cylinder (setNormalAttackArea HoldRadius 80 x AttackHeight 50 on the ground;
+	/// setJumpingAttackArea PushupRadius 60 x PushupHeight 180 rising, TrampleRadius 100 x AttackHeight 50 falling -- the NPC rule, pass 85)
+	/// against OUR damage cylinder puts us in his list -> TMario::checkCollision -> hitWantToTake (keepDistance).</summary>
+	public bool SmsMarioAttacks(Mario mario)
+	{
+		float u = SmsUnits.UnitsPerMetre, hs = SmsHitScale;
+		bool onGround = mario.IsOnFloor();
+		bool rising = !onGround && mario.Velocity.Y > 0f;
+		float ar = onGround ? SmsParams.Mario.HoldRadius : (rising ? SmsParams.Mario.PushupRadius : SmsParams.Mario.TrampleRadius);
+		float ah = onGround ? SmsParams.Mario.AttackHeight : (rising ? SmsParams.Mario.PushupHeight : SmsParams.Mario.AttackHeight);
+		float feet = mario.SmsFeetWorldY * u;
+		float fBottom = (GlobalPosition.Y - _bGeomR) * u;
+		if (feet > fBottom + _ball.DamageHeight * hs) return false;
+		if (feet + ah < fBottom) return false;
+		float dx = (mario.GlobalPosition.X - GlobalPosition.X) * u, dz = (mario.GlobalPosition.Z - GlobalPosition.Z) * u;
+		float r = ar + _ball.DamageRadius * hs;
+		return r * r > dx * dx + dz * dz;
 	}
 
 	/// <summary>TResetFruit::kicked (MapObjBall.cpp 793): a FALLING Mario kicks nothing (marioVy < 0 returns -- landing on a durian does nothing);
@@ -580,7 +616,7 @@ public partial class Fruit : RigidBody3D
 	{
 		float u = SmsUnits.UnitsPerMetre;
 		Vector3 off = new Vector3(mario.GlobalPosition.X - GlobalPosition.X, 0f, mario.GlobalPosition.Z - GlobalPosition.Z) * u;
-		float r = _ball.DamageRadius * Size;
+		float r = _ball.DamageRadius * SmsHitScale;
 		if (off.X * off.X + off.Z * off.Z > r * r) return false;
 		if (off.X != 0f && off.Z != 0f) off = off.Normalized();
 		bool fast = Mathf.Abs(mv.X) > _ball.MinSpeed || Mathf.Abs(mv.Z) > _ball.MinSpeed;

@@ -6743,3 +6743,38 @@ calls Mario's existing `SmsKeepDistance` (pass 85, the NPCs) every tick its cyli
 **Verified on your machine:** drive 115 14/14 -- T1 a run at a resting coconut: closest approach 100 u from its axis over the whole run (never
 through it; he slid around and past), no touch, still at rest; T1b from the held-off spot the B take still finds it (the take pair 80 + 50 = 130
 u > 100); the durian run-in / fall / rising kick unchanged. Regressions 111 11/11, 114 15/15, 109 19/19, 107 18/18; build 0 errors; boot `ALL OK`.
+
+### SMS pass 115c -- the fruits' hit cylinders at your models' size, and the roll in world space (2026-10-23)
+
+Jaysonn 00:04: "the fruits hit boxes seem off and they spin the wrong way when thrown". Three faults in 115, all in `Fruit.cs`:
+
+**The per-type hit tables.** MapObjInit.cpp `{attackR, attackH, damageR, damageH}`: coconut 1553 and papaya 1594 {40, 60, 50, 80}, pine 1629
+{80, 60, 50, 80}, durian 1702 {150, 60, 60, 90}, banana 1743 {80, 60, 60, 90}; only the red pepper uses the generic `fruit_hit_data_table`
+1536 {60, 60, 80, 90}. 115 had given everything but the coconut the pepper's 80 / 90.
+
+**The pair is two-sided** (ObjHitCheck.cpp 43 `checkActorsInList`): Mario's ATTACK cylinder (HoldRadius 80 x AttackHeight 50 standing;
+PushupRadius 60 x 180 rising; TrampleRadius 100 x 50 falling -- the NPC rule, pass 85) against the fruit's DAMAGE cylinder puts the fruit
+in HIS list (`checkCollision` -> `hitWantToTake` -> keepDistance); the fruit's ATTACK cylinder against Mario's DAMAGE cylinder (50 x 160)
+puts him in the FRUIT's list (`control` -> `touchActor` -> kicked / boundByActor). 115 tested one cylinder (50 + damage) for both. So the
+durian's rising kick reaches 150 x scale + 50, and a coconut's hold-off engages from 80 + 50 x scale.
+
+**The scale.** `TMapObjBase::setObjHitData` (MapObjBase.cpp 70) scales an object's hit radii by max(sx, sz) and heights by sy -- the game ties
+the hit boxes to the model. Your fruit models at Size 1 are about half the game's: `fruit_coconut.tscn` sphere 0.3166 m = 23.6 u (the game's
+body radius 40), durian 20.6 u (45), pineapple 24.7 u (50), banana 19.5 u (50). 115 / 115b used the game's raw numbers, so a coconut held
+Mario off at 100 u (a 26 u gap outside the model; a pineapple at 130). Now `SmsHitScale` = the collision sphere's radius / the game's body
+radius (Size is already in the sphere via ApplySize); knob `SmsHitScaleFromModel` (default on; off = the game's numbers x Size). Coconut:
+scale 0.59, hold-off 50 x 0.59 + 50 = 79.5 u (the game's proportion: a 10-unit gap), inside the B take's 80 + 40 = 120 reach. boundByActor's
+own XZ test (mDamageRadius) scales too: the durian is shoved when his feet pass within 60 x 0.46 = 27.5 u of its axis.
+
+**The roll's frame.** `calcCurrentMtx` (MapObjBall.cpp 318) rolls about `getVerticalVecToTargetXZ` -- the direction turned +90 deg about Y
+(MapObjLib.cpp 549) = up x d, the physical rolling axis -- by |vxz| / R x 2 a tick (radians, `TRotation3::setRotate`), and concatenates it on
+the WORLD side of the model matrix (`MTXConcat(rot, anmMtx)`). 115 built that world axis but applied it to the model child in the BODY's
+frame; after a hold the body keeps Mario's hand orientation (the throw sets GlobalPosition only), so a thrown fruit rolled about a yawed
+axis -- the wrong way. The axis now goes through the body's inverse basis.
+
+**Verified on your machine:** drive 115 16/16 -- R0 with the body yawed 180 deg (as after a hold) one frame into a +X roll the model's top has
+tipped toward +X (0.83, 0.56, 0); H2 hit scale 0.589, hold-off 79.5 u inside the 120 u take reach; T1 a run at a coconut: closest approach
+79 u (the hold-off, never through), no touch, at rest; T1b the B take finds it from there; T2 the durian run-in (kind 2, lift 1.3, pushed 8 m);
+T3 falling kicks nothing; T4 standing beside the durian outside its 27 u damage radius then jumping: the first rising tick kicks it (hop 20,
+kind 1); K1 the knob. Regressions 111 11/11, 114 15/15, 109 19/19, 107 18/18; build 0 errors; boot `ALL OK`. Drive-side: T4 and K1 re-staged for
+the smaller cylinders (a 27 u attack band is one rising tick tall; the camera-relative run drifts in X).
