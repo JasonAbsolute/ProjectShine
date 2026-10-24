@@ -840,11 +840,13 @@ public partial class ShineSprite : Node3D
     /// <summary>Where the star's centre sits in this scene's root-local units ((0, 200, 0) at the 0.006 root scale = 1.2 m up): the bck's
     /// 'body' joint lands there.</summary>
     [Export] public Vector3 SmsStarLocal = new Vector3(0f, 200f, 0f);
-    /// <summary>The demo shine's drawn size on the pose, in model sizes: 1 = the full model (143 u across the points) held up, as the game's
-    /// screen shows it; the catch is 0.71 of that (the bck's scale track, 0.5 -> 0.7, divided by its 0.7). 0.7 = the J3D maths taken literally
-    /// (116b/c, "super small"). Scales the star about its own joint -- the attachment to the wrist and the star's centre never move with it.
-    /// 116d.</summary>
+    /// <summary>Scales the demo shine about its own joint (the wrist attachment and the star's centre never move with it). 1 = the game's
+    /// footage: the catch / low hold at the bck's 0.5 of the model (hovering at his hip), the pose at SmsDemoPoseScale. 116e.</summary>
     [Export] public float SmsDemoScale = 1f;
+    /// <summary>The star's size held up on the pose, in model sizes. 0.9 = the game's screen (two captures measured against Mario's cap, the
+    /// raise grows the star ~1.8x); 0.7 = the bck's scale track taken literally (116c, "super small"). The growth runs on the track's own
+    /// keys (frames 211-222, 3.5-3.7 s). DEVIATION from the data, matched to the screen -- the engine mechanism is not understood.</summary>
+    [Export] public float SmsDemoPoseScale = 0.9f;
     private bool _smsDriven;
     private int _smsBoneRoot = -2, _smsBoneGlow = -1, _smsBoneBody = -1;   // the bck's joints 0 / 1 / 2 by name (-2 = not looked up yet)
     private float _smsBaseScale = 0.006f;
@@ -867,10 +869,17 @@ public partial class ShineSprite : Node3D
         // screenshot agrees); the star's DRAWN size is the game's screen, the full model on the pose: track / 0.7 x SmsDemoScale.
         SmsShineGetData.ShineJoint(0, t, out Vector3 rp, out Quaternion rq, out Vector3 rs);
         _starSkel.SetBonePosePosition(_smsBoneRoot, rp); _starSkel.SetBonePoseRotation(_smsBoneRoot, rq); _starSkel.SetBonePoseScale(_smsBoneRoot, Vector3.One);
-        float geom = SmsDemoScale * rs.X / 0.7f;
+        float geom = SmsDemoGeomScale(rs.X);   // 116e: the catch at the track's 0.5, the pose at the screen's SmsDemoPoseScale
         if (_smsBoneGlow >= 0) SmsDemoBone(_smsBoneGlow, 1, t, rs.X, geom);
         SmsDemoBone(_smsBoneBody, 2, t, rs.X, geom);
         _starSkel.ForceUpdateAllBoneTransforms();
+    }
+    /// <summary>The star's drawn scale for the bck root's scale track value: the track itself up to 0.5, then its 0.5 -> 0.7 rise mapped onto
+    /// 0.5 -> SmsDemoPoseScale (the game's footage: the raise grows the star more than the track says), x SmsDemoScale.</summary>
+    public float SmsDemoGeomScale(float track)
+    {
+        float g = track <= 0.5f ? track : Mathf.Lerp(0.5f, SmsDemoPoseScale, Mathf.Clamp((track - 0.5f) / 0.2f, 0f, 1f));
+        return SmsDemoScale * g;
     }
     private void SmsDemoBone(int bone, int joint, float t, float parentScale, float geom)
     {

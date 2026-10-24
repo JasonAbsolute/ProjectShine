@@ -6954,3 +6954,25 @@ check on the 116c code reads 3.71 -> 3.71 (frozen to the millimetre) -- the cont
 
 Verified: drive 116 22/22 (E1 new; A5b / A7b re-pinned to the screen's sizes, A7c the attachment), 117 9/9, 114 15/15, build 0 errors,
 boot ALL OK; GPU capture of the pose and the catch at the new size. Files: `ShineSprite.cs`, `Mario.cs`.
+
+### SMS pass 116e -- the demo shine sized from the game's footage: the catch at the bck's 0.5, the pose at 0.9 (2026-10-23)
+
+Jaysonn on 116d: "the shine before Mario grabs it is wrong, and during the shine get it's wrong also" (his game was on the 116d build:
+editor restarted 21:38:23, dll 21:38:44, Play 21:39:40). This pass stops arguing from the data and goes by real footage of the sequence
+(a 43-frame capture of the indoor variant, decoded frame by frame with the new `tools/projectshine/gif_frames.py`; plus the wiki's outdoor
+pose shot):
+
+- The catch / low hold: the star is SMALL -- the bck's 0.5 of the model -- and HOVERS at his hip (its bottom point well clear of the
+  floor); Mario walks up to it and spin-grabs, then holds it low in his right hand while the letters come in. 116d had drawn it at 0.71
+  and set it on the ground. Back to the track's 0.5.
+- The raise (the pose): the star grows to about 0.9 of the model (two captures measured against his cap, corrected for the inside
+  camera's wide lens); the bck's scale track says 0.7, i.e. the raise grows the star ~1.8x on screen where the track grows it 1.4x. No
+  engine mechanism found (J3D applies the root's scale to the geometry; checked the mtx calcs, the SDL model path, the loader flags). The
+  screen wins: the 0.5 -> 0.7 rise of the track (its own keys, frames 211-222) is mapped onto 0.5 -> `SmsDemoPoseScale` (default 0.9;
+  0.7 = the data literally, 116c's "super small"). `SmsDemoScale` multiplies the whole thing about the star's own joint.
+
+The attachment and timing are unchanged from 116c/d: the shine's root on `jnt_hand_R`, the star's centre 57 u out along the arm, Mario's
+clip at rate 1.0, the water falling through the demo.
+
+Verified: drive 116 22/22 (A5b the catch at the track's 0.5 = 0.00679 a model unit, A7b the pose at 0.9), 117 9/9, build 0 errors,
+boot ALL OK; GPU capture of the catch and pose. Files: `ShineSprite.cs`.
