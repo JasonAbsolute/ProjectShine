@@ -178,6 +178,9 @@ public partial class ShineSprite : Node3D
         // a spawner sets the transform AFTER AddChild (RedCoinSwitch: AddChild then GlobalTransform = the spawn node's), so the real placed
         // transform is latched again at the first frame or the first use (SmsLatchPlaced) -- pass 117 (116 read the pre-placement yaw there)
         _smsBaseScale = Mathf.Abs(Scale.X) > 1e-6f ? Mathf.Abs(Scale.X) : 0.006f;
+        // 118c: TShine::makeMActors -- the flag already set: shine_empty.bmd (see-through, no flare / rainbow; the effects below read SmsIsEmpty)
+        SmsIsEmpty = GameData.Instance != null && SmsShineKey != "" && GameData.Instance.IsShineCollected(SmsShineKey);
+        if (SmsIsEmpty) EmptyMaterialsRecursive(this);
 
         // Stop any baked animation — the shine is spun/positioned in code now
         // (idle spin, cutscene tracking, end shrink), not by the glb animations.
@@ -387,6 +390,29 @@ public partial class ShineSprite : Node3D
             TintMaterialsRecursive(child);
     }
 
+    /// <summary>The empty shine's body: the tinted material made see-through in EmptyTint (the eyes and the rest untouched).</summary>
+    private void EmptyMaterialsRecursive(Node node)
+    {
+        if (node is MeshInstance3D mesh && mesh.Mesh != null)
+        {
+            for (int i = 0; i < mesh.Mesh.GetSurfaceCount(); i++)
+            {
+                if (mesh.GetActiveMaterial(i) is not BaseMaterial3D mat || mat.ResourceName != "_mat_shine_body")
+                    continue;
+                var dup = (BaseMaterial3D)mat.Duplicate();
+                dup.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+                dup.AlbedoTexture = null;   // the gold goes: a flat glassy colour with a lit rim, as the empty model reads (a see-through outline)
+                dup.AlbedoColor = EmptyTint;
+                dup.EmissionEnabled = false;
+                dup.RimEnabled = true; dup.Rim = 1f; dup.RimTint = 0.3f;
+                dup.Roughness = 0.25f;
+                mesh.SetSurfaceOverrideMaterial(i, dup);
+            }
+        }
+        foreach (Node child in node.GetChildren())
+            EmptyMaterialsRecursive(child);
+    }
+
     public override void _Process(double delta)
     {
         if (Engine.IsEditorHint())
@@ -559,7 +585,7 @@ public partial class ShineSprite : Node3D
         {
             Name = "ShineLight",
             LightColor = ShineGlowColor,
-            LightEnergy = 1.6f,
+            LightEnergy = SmsIsEmpty ? 0.8f : 1.6f,   // 118c: the empty shine glows less (no promi)
             OmniRange = 4.5f,
             OmniAttenuation = 1.4f,
             ShadowEnabled = false,
@@ -586,23 +612,23 @@ public partial class ShineSprite : Node3D
         // Faint iridescent "sun glare" ring encircling the shine — the subtle
         // rainbow lens-flare halo from the reference footage. Kept dim so it's a
         // hint, not a hoop.
-        _ring = MakeBillboardQuad(
+        if (!SmsIsEmpty) _ring = MakeBillboardQuad(   // 118c: the empty shine has no rainbow (the bow emitter)
             "Ring",
             "res://assets/shine_lens_ring.png",
             new Color(0.15f, 0.15f, 0.15f, 1f),
             2.4f
         );
-        _fx.AddChild(_ring);
+        if (_ring != null) _fx.AddChild(_ring);
 
         // Camera-facing rotating sun-rays (custom shader; spins + pulses itself).
-        _rays = new MeshInstance3D
+        if (!SmsIsEmpty) _rays = new MeshInstance3D   // 118c: nor the flare (the promi emitter)
         {
             Name = "Rays",
             Mesh = new QuadMesh { Size = new Vector2(3.4f, 3.4f) },
             CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
         };
         var raysShader = GD.Load<Shader>("res://assets/shine_rays.gdshader");
-        if (raysShader != null)
+        if (raysShader != null && _rays != null)
         {
             var raysMat = new ShaderMaterial { Shader = raysShader };
             raysMat.SetShaderParameter(
@@ -614,7 +640,7 @@ public partial class ShineSprite : Node3D
             raysMat.SetShaderParameter("ray_life", 0.35f);
             _rays.MaterialOverride = raysMat;
         }
-        _fx.AddChild(_rays);
+        if (_rays != null) _fx.AddChild(_rays);
 
         // Twinkling sparkles drifting off the star.
         _sparkles = BuildSparkles();
@@ -858,6 +884,17 @@ public partial class ShineSprite : Node3D
     /// <summary>118b: this shine's word for the big letters ("" = the console's ShineText, the game's SHINE!). Any letters (A-Z and !): the first six
     /// at the game's layout, the rest on along the same rising line; a word too wide for the window is built smaller to fit.</summary>
     [Export] public string ShineText = "";
+    /// <summary>118c: this shine's save flag -- TShine's event id (TFlagManager's MSF_SHINE_BASE + id). "" = made from the scene it is placed in and
+    /// its path there (stable while the level keeps the node); a spawned shine has no scene of its own, so its spawner sets this (the red coin
+    /// switch does), else it is counted for the run and not remembered.</summary>
+    [Export] public string ShineId = "";
+    /// <summary>shine_empty.bmd: a collected shine stands where it was, see-through and without the flare and rainbow (TShine::makeMActors; the
+    /// promi / bow emitters are skipped when mIsEmpty). Touching it plays the same demo; the count stays (setShineFlag).</summary>
+    [Export] public Color EmptyTint = new Color(0.72f, 0.82f, 0.95f, 0.55f);
+    public string SmsShineKey => !string.IsNullOrEmpty(ShineId) ? ShineId
+        : Owner != null && !string.IsNullOrEmpty(Owner.SceneFilePath) ? $"{Owner.SceneFilePath}:{Owner.GetPathTo(this)}" : "";
+    /// <summary>TShine::mIsEmpty: this shine's flag was already set when it loaded.</summary>
+    public bool SmsIsEmpty { get; private set; }
     private bool _smsDriven;
     private int _smsBoneRoot = -2, _smsBoneGlow = -1, _smsBoneBody = -1;   // the bck's joints 0 / 1 / 2 by name (-2 = not looked up yet)
     private bool _smsMeshZeroed;

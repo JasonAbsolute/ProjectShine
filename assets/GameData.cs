@@ -7,6 +7,7 @@ public partial class GameData : Node
 
     private const string SavePath = "user://save_data.json";
     private readonly HashSet<string> _collectedBlueCoins = new();
+    private readonly HashSet<string> _collectedShines = new();
 
     public override void _Ready()
     {
@@ -26,6 +27,24 @@ public partial class GameData : Node
     }
 
     public int BlueCoinCount => _collectedBlueCoins.Count;
+
+    // ------------------------------------------------------------------ shines (SMS pass 118c) --
+
+    /// <summary>TFlagManager::setShineFlag (FlagManager.cpp 308): the shine's flag set, and MSF_SHINE_COUNT up by one only when it was clear;
+    /// written to disk at once (the game's card save follows in the Plaza; its dialog is not ported). True when the flag was new.</summary>
+    public bool CollectShine(string id)
+    {
+        if (!_collectedShines.Add(id))
+            return false;
+        Save();
+        return true;
+    }
+
+    /// <summary>TFlagManager::getShineFlag: TShine loads shine_empty.bmd for a set flag.</summary>
+    public bool IsShineCollected(string id) => _collectedShines.Contains(id);
+
+    /// <summary>MSF_SHINE_COUNT: the shines collected, as saved. Mario's count starts from it.</summary>
+    public int ShineCount => _collectedShines.Count;
 
     // ----------------------------------------------------- character select --
 
@@ -66,6 +85,7 @@ public partial class GameData : Node
     public void ClearSave()
     {
         _collectedBlueCoins.Clear();
+        _collectedShines.Clear();
         Save();
         GetTree().ReloadCurrentScene();
     }
@@ -76,7 +96,11 @@ public partial class GameData : Node
         foreach (var id in _collectedBlueCoins)
             coinArray.Add(id);
 
-        var data = new Godot.Collections.Dictionary { ["blue_coins"] = coinArray };
+        var shineArray = new Godot.Collections.Array();
+        foreach (var id in _collectedShines)
+            shineArray.Add(id);
+
+        var data = new Godot.Collections.Dictionary { ["blue_coins"] = coinArray, ["shines"] = shineArray };
 
         using var file = FileAccess.Open(SavePath, FileAccess.ModeFlags.Write);
         if (file != null)
@@ -93,11 +117,14 @@ public partial class GameData : Node
         var json = new Json();
         if (json.Parse(file.GetAsText()) != Error.Ok) return;
 
-        if (json.Data.AsGodotDictionary() is Godot.Collections.Dictionary data &&
-            data.TryGetValue("blue_coins", out var coinsVar))
+        if (json.Data.AsGodotDictionary() is Godot.Collections.Dictionary data)
         {
-            foreach (var coin in coinsVar.AsGodotArray())
-                _collectedBlueCoins.Add(coin.AsString());
+            if (data.TryGetValue("blue_coins", out var coinsVar))
+                foreach (var coin in coinsVar.AsGodotArray())
+                    _collectedBlueCoins.Add(coin.AsString());
+            if (data.TryGetValue("shines", out var shinesVar))
+                foreach (var shine in shinesVar.AsGodotArray())
+                    _collectedShines.Add(shine.AsString());
         }
     }
 }

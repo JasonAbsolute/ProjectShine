@@ -359,6 +359,8 @@ public partial class RedCoinSwitch : Node3D
         var shine = RedCoinShineScene.Instantiate<ShineSprite>();
         var parent = GetTree().CurrentScene ?? GetParent();
         _redCoinShineSpawned = true;
+        if (string.IsNullOrEmpty(shine.ShineId))
+            shine.ShineId = $"{GetTree().CurrentScene?.SceneFilePath ?? ""}:{Name}:red_coins";   // 118c: the reward's save flag (a spawned shine has no scene of its own)
         parent.AddChild(shine);
         shine.GlobalTransform = spawn.GlobalTransform;
         if (!(shine.SmsAppearGame && shine.SmsAppearCamera)) PlayRedCoinShineRevealCamera(shine);   // pass 117: the game's appear demo brings its own camera

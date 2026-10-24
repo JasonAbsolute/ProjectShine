@@ -7053,3 +7053,28 @@ not a shine's. Now:
 Verified: drive 118 31/31 (B says WONDERFUL!: ten letters, cycling, full size, inside the window; C says CONGRATULATIONS!: sixteen, shrunk to
 the edge; D back to the console's SHINE!, six letters rebuilt), 117 9/9, build 0 errors, boot ALL OK; a GPU capture of WONDERFUL! at 4.1 s
 viewed. Files: `Mario.cs`, `ShineSprite.cs`, `Sms/Console/SmsConsoleStr.cs`.
+
+### SMS pass 118c -- shine flags and the save (2026-10-24)
+
+Jaysonn: "Do the shine flags and save". Nothing remembered a shine: GameData saved blue coins by id but no shines, the count lived on Mario and
+died with the scene, an ExitLevel reload brought the same shine back.
+
+**The game** (TFlagManager::setShineFlag, FlagManager.cpp 308): the pending step of the shine get sets the shine's flag (MSF_SHINE_BASE +
+event id) and raises MSF_SHINE_COUNT by one ONLY if the flag was clear, then marks the card save (PURPOSE_SHINE_GET: the dialog in the
+Plaza). TShine::makeMActors loads `shine_empty.bmd` for a shine whose flag is set -- it stands where it was, see-through, and its promi
+(flare) and bow (rainbow) emitters are skipped; touching it plays the same demo (`shine_empty_demo_shine_get`) and the count stays.
+
+**Port:**
+- `GameData`: a saved set of shine keys (`"shines"` in user://save_data.json beside the blue coins) -- `CollectShine(id)` (true when new, written
+  at once), `IsShineCollected`, `ShineCount`; F8 clears it with the rest.
+- `ShineSprite.ShineId` -- the flag key. Empty: made from the scene the shine is placed in and its path there, so every placed shine is
+  remembered without setup; a spawned shine has no scene, so its spawner sets it (the red coin switch: `<scene>:<switch>:red_coins`), else
+  it is counted for the run only. `SmsIsEmpty` at load -> the empty look: the body's gold texture dropped for a glassy EmptyTint (0.72,
+  0.82, 0.95, 0.55) with a lit rim, no rays and no ring, the light halved; eyes and sparkles stay.
+- `Mario`: the count starts from the save (`_shines = GameData.ShineCount`); the flag is set at the touch (StartShineGet, both demo paths); the
+  2 s count-up adds one only for a fresh flag. The save dialog itself is NOT ported (the write is immediate, as the blue coins' already is).
+
+Verified: drive 118 35/35 -- E's shine carries a key: set at the touch and in the file at once (E0b), across the ExitLevel reload the new
+Mario's count is the saved set's (F1), the same key placed again loads empty (F2), taking the empty one plays the demo and leaves the count
+and the file alone (F3); his save file is put back by the drive. 117 9/9, build 0 errors, boot ALL OK; a GPU frame of the empty shine beside
+a fresh one viewed. Files: `Mario.cs`, `ShineSprite.cs`, `GameData.cs`, `RedCoinSwitch.cs`.

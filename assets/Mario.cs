@@ -1506,7 +1506,7 @@ public partial class Mario : CharacterBody3D
         _coins = 0;
         _redCoins = 0;
         _blueCoins = GameData.Instance.BlueCoinCount;
-        _shines = 0;
+        _shines = GameData.Instance?.ShineCount ?? 0;   // 118c: MSF_SHINE_COUNT, from the save
         SmsStandardHudSetup(); // the console (assets/Sms/Console/SmsHud.tscn) draws the counters, the life meter and the gauge -- it reads the fields above
         _camera = GetNodeOrNull<SunshineCamera>("CamController");
 
@@ -10567,6 +10567,10 @@ public partial class Mario : CharacterBody3D
 
         EmitSignal(SignalName.ShineCollected);
 
+        // 118c: the pending step's setShineFlag(eventId) (MarDirectorDirect.cpp 849): the flag, and the count only if it was clear, then the card save.
+        // GameData keeps both and writes them at once (the save dialog is not ported); the count-up shows it 2 s in.
+        _smsShineFresh = SmsShineRegister(shine);
+
         // Kill ALL momentum and plant him — no slide, no residual fall/arc.
         // (StartShineGet only fires once he's grounded, so zeroing Y here just
         // stops him dead; the CameraLocked freeze keeps him there.)
@@ -17105,13 +17109,30 @@ public partial class Mario : CharacterBody3D
     {
         var t = CreateTween();
         t.TweenInterval(ShineCountDelay);
-        t.TweenCallback(Callable.From(AddShine));
+        t.TweenCallback(Callable.From(SmsShineCountUp));
     }
 
     public void AddShine()
     {
         _shines++; // the console's shine digits flip on the change
     }
+
+    private bool _smsShineFresh = true;
+    /// <summary>setShineFlag: true when this shine's flag was clear (the count goes up); a shine with no key is counted for the run only.</summary>
+    private bool SmsShineRegister(ShineSprite shine)
+    {
+        string key = shine.SmsShineKey;
+        if (GameData.Instance == null || key == "")
+        {
+            if (SmsDebugPrint) GD.Print("[SMS shine] no ShineId (a spawned shine without one): counted for the run, not saved");
+            return true;
+        }
+        bool fresh = GameData.Instance.CollectShine(key);
+        if (SmsDebugPrint) GD.Print($"[SMS shine] flag '{key}' {(fresh ? "set -- the count is now" : "was already set -- the count stays at")} {GameData.Instance.ShineCount} (saved)");
+        return fresh;
+    }
+    /// <summary>The count-up 2 s into the demo: one more only for a fresh flag (an empty shine's demo leaves the digits alone).</summary>
+    private void SmsShineCountUp() { if (_smsShineFresh) AddShine(); _smsShineFresh = true; }
 
     // ---------------------------------------------------------------------------------------------------------------
     // TTakeActor (pass 62): holding, carrying and throwing, 1:1. Mario's mHeldObject is heldBody; the object's mHolder is implied.
