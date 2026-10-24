@@ -840,9 +840,12 @@ public partial class ShineSprite : Node3D
     /// <summary>Where the star's centre sits in this scene's root-local units ((0, 200, 0) at the 0.006 root scale = 1.2 m up): the bck's
     /// 'body' joint lands there.</summary>
     [Export] public Vector3 SmsStarLocal = new Vector3(0f, 200f, 0f);
-    /// <summary>The game's demo shrinks the shine to 0.5 (the root scale track; mEffectScale 0.5). 1 = your full size.</summary>
+    /// <summary>The demo shine's size. 1 = the game's: the model at the game's 74.44 units a metre with the bck's root scale (0.5 through the
+    /// catch, 0.7 on the pose), independent of the size you place shines at (yours are 0.45 of the game's); 2 = twice the game's.
+    /// 116b -- 116 scaled it off your placed shine (11 % under the game's).</summary>
     [Export] public float SmsDemoScale = 1f;
     private bool _smsDriven;
+    private int _smsBoneRoot = -2, _smsBoneGlow = -1, _smsBoneBody = -1;   // the bck's joints 0 / 1 / 2 by name (-2 = not looked up yet)
     private float _smsBaseScale = 0.006f;
     public bool SmsDemoDriven => _smsDriven;
 
@@ -851,12 +854,24 @@ public partial class ShineSprite : Node3D
     public void SmsDemoDrive(Transform3D marioFrame, float t)
     {
         _smsDriven = true;
-        SmsShineGetData.Shine(t, out Vector3 starU, out Quaternion rot, out float sc);
-        float s = _smsBaseScale * (SmsDemoScale * sc / 0.5f);      // the track's 0.5 = the game's demo size; SmsDemoScale rescales it
-        Basis b = (marioFrame.Basis * new Basis(rot)).Scaled(new Vector3(s, s, s));
-        Vector3 star = marioFrame * (starU / SmsUnits.UnitsPerMetre);
-        GlobalTransform = new Transform3D(b, star - b * SmsStarLocal);
+        // 116b: as the game -- the actor at Mario's position and angle (the model's +Z = his facing), the model's units at 74.44 a metre, and the
+        // bck replacing each JOINT's TRS (root / starglow / body). 116 placed the root around the captured neutral pose, whose body yaw is
+        // whatever frame of shine_float the editor left it on -- the star came out edge-on, and at your placed size.
+        float s = SmsDemoScale / SmsUnits.UnitsPerMetre;
+        GlobalTransform = new Transform3D(marioFrame.Basis.Scaled(new Vector3(s, s, s)), marioFrame.Origin);
+        if (_smsBoneRoot == -2 && _starSkel != null) { _smsBoneRoot = _starSkel.FindBone("shine"); _smsBoneGlow = _starSkel.FindBone("starglow"); _smsBoneBody = _starSkel.FindBone("body"); }
+        if (_starSkel == null || _smsBoneRoot < 0 || _smsBoneBody < 0) return;
+        SmsDemoBone(_smsBoneRoot, 0, t); if (_smsBoneGlow >= 0) SmsDemoBone(_smsBoneGlow, 1, t); SmsDemoBone(_smsBoneBody, 2, t);
+        _starSkel.ForceUpdateAllBoneTransforms();
     }
+    private void SmsDemoBone(int bone, int joint, float t)
+    {
+        SmsShineGetData.ShineJoint(joint, t, out Vector3 p, out Quaternion q, out Vector3 sc);
+        _starSkel.SetBonePosePosition(bone, p); _starSkel.SetBonePoseRotation(bone, q); _starSkel.SetBonePoseScale(bone, sc);
+    }
+    /// <summary>The body joint (the star hangs on it) in the world -- for the drive.</summary>
+    public Vector3 SmsDemoBodyJointWorld() => _starSkel != null && _smsBoneBody >= 0 ? _starSkel.GlobalTransform * _starSkel.GetBoneGlobalPose(_smsBoneBody).Origin : GlobalPosition;
+    public Basis SmsDemoBodyJointBasis() => _starSkel != null && _smsBoneBody >= 0 ? (_starSkel.GlobalTransform.Basis * _starSkel.GetBoneGlobalPose(_smsBoneBody).Basis) : GlobalBasis;
 
 
     // ---------------------------------------------------------------------

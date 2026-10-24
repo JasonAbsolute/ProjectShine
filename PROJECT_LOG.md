@@ -6867,3 +6867,40 @@ running, the gameplay camera back, `SpawnEntranceFinished` emitted; the idle spi
 appear 5 m from its placed spot with no demo: the arc (height 186 u over the 166 u rise) delivers it onto the spot to 0.0 u and it settles.
 Regressions 116 18/18, 114 15/15, 109 19/19, 115 16/16; build 0 errors (first compile clean); boot `ALL OK`. Drive-side: the flight first ticked
 on the render clock (its _Process) and read 1.2x the drive's physics seconds, then both (2.3x) -- the physics clock alone is right.
+
+### SMS pass 116b -- the shine get at the game's speed, with the game's shine (2026-10-23)
+
+Jaysonn, first play of 116: "the shine sprite is too small, the scene plays too slow and cuts away too fast". Three things, all 116's:
+
+**The rate.** 116 played the two bcks (the camera's `camera_demo_shine_get_outside`, the shine's `shine_demo_shine_get`, 419 frames each) at
+30 fps -- 14 s of camera, cut by the fade at 5.33 s a third of the way through. The game runs EVERY MActor bck at `SMSGetAnmFrameRate()` =
+60 / 30 = 2 frames per display frame (`MActorAnmBase::setFrameCtrl`, MActorAnm.hpp 149) with one `calcAnm` a frame (`TCameraBck::updateDemo`
+runs on the last simulation tick, cameragc.cpp 964 / CameraDemo.cpp 59), and `getTotalDemoFrames` = (end + 1) x 2 ticks says the same: the
+clips are 60 fps, 6.98 s long. `SmsShineGetData.Fps` 30 -> 60. The timeline now: the shine arcs up and comes down into his hands at 1.5 s,
+the camera swings round and up to the pose shot at 4 s (lens 28.5 deg), the letters 3.0-4.7 s, the fade at 5.33 s while the camera is still
+pulling back -- which is how the game does it (the clip's last 0.6 s are under the black).
+
+**The shine.** Two faults. (1) 116 placed the shine's ROOT around the "neutral pose" captured at `_Ready` -- the bones wherever the editor's
+`shine_float` frame left them, and that clip spins the body joint two turns (`body R.y 0 -> -720`), so the star's yaw inside the root was
+arbitrary: his GPU capture showed the star EDGE-ON through the whole demo, a sliver with two balls on top. (2) the size was scaled off his
+placed shine (0.006 a model unit = 0.45 of the game's 1 / 74.44). Now as the game: the actor's root at Mario's position and angle at the
+game's 74.44 units a metre, and the bck's TRS written onto the three JOINTS each frame (`SmsShineGetData.ShineJoint`, root / starglow /
+body -- J3D replaces each joint's TRS, and Godot's bone hierarchy composes the Softimage way, child T x parent S). The star faces the camera
+on the pose (face . toEye 0.99), 0.5 of the model through the catch and 0.7 held up -- 115 u tall against his 150: the game's proportion.
+`SmsDemoScale` (1 = the game's size) now multiplies that, independent of the size shines are placed at.
+
+**The camera roll.** `TCameraBck::updateDemo` hands `C_MTXLookAt` the cam_position joint's Y axis as the UP vector (unkC column 1); the
+joint's frame IS a camera frame (its X axis points exactly from the eye to the interest at every frame -- which also proves the eye
+composition under the interest joint's scale 36..42 on Y, `J3DMtxCalcSoftimage::calcTransform`, J3DJoint.cpp 132). Level through the catch,
+a -25.4 deg dutch angle from the pose shot on (frame 240). Baked as `CamUpOutside/Inside`; `LookAt(target, up)`. Knob `SmsShineGetRoll`
+(default on; off = 116's level camera).
+
+Verified on his 3070 with the GPU capture harness (`patch_sgcap.py` + `run_gpu.ps1`: the level's own shine, frames at 0.3 / 1.5 / 3.0 /
+4.0 / 5.2 s -- the star a proper shine in his raised hand at 4 s, the letters out at 5.2 s) and drive 116 20/20 (new: A5b the catch at
+1.5 s pins the 60 fps rate -- 53 u up, the table's 53; body scale 0.00675 vs 0.00672; face . toEye 0.54 -- and A7b the pose shot: up = the
+bck's (1.000), roll -25.4 deg, fov 28.8, face . toEye 0.99, body scale 0.00949 = 0.71 / 74.44). Regressions 117 9/9, 114 15/15, build 0
+errors, boot ALL OK. Files: `Sms/SmsShineGetData.cs` (regenerated: Fps, CamUp, ShineJoint tables), `ShineSprite.cs` (SmsDemoDrive bone
+driven, SmsDemoScale absolute, SmsDemoBodyJointWorld/Basis), `Mario.cs` (SmsShineDemoCamera up, SmsShineGetRoll).
+
+Lessons logged: every MActor bck -- Mario's, an object's, a CAMERA's -- is 60 fps data at 30 fps play (rate 2); a captured "neutral pose"
+is a snapshot of whatever clip frame the editor was on, never a reference frame for driving a model -- drive the joints from the data.

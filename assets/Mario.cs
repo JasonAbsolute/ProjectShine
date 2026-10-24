@@ -19396,6 +19396,9 @@ public partial class Mario : CharacterBody3D
     [Export] public bool SmsShineGetGame = true;
     /// <summary>camera_demo_shine_get_inside.bck instead of _outside (TShine::mIsInside: the stage's indoor shines).</summary>
     [Export] public bool SmsShineGetInside = false;
+    /// <summary>The bck camera rolls: TCameraBck::updateDemo hands C_MTXLookAt the cam_position joint's Y axis as the up vector -- level through
+    /// the catch, a -25 deg dutch angle on the pose shot (from 4 s). false = always level (116's camera).</summary>
+    [Export] public bool SmsShineGetRoll = true;
     /// <summary>DEVIATION (default on): after the fade to black the game leaves the stage; your levels have no hub, so the screen fades back in over
     /// the same second and play resumes (the shine freed, the gameplay camera back). false = hold black (your transition hooks here).</summary>
     [Export] public bool SmsShineGetResume = true;
@@ -19469,11 +19472,14 @@ public partial class Mario : CharacterBody3D
     private void SmsShineDemoCamera(float t)
     {
         if (_smsShineCam == null) return;
-        SmsShineGetData.Camera(t, SmsShineGetInside, out Vector3 eyeU, out Vector3 targetU, out float fov);
+        SmsShineGetData.Camera(t, SmsShineGetInside, out Vector3 eyeU, out Vector3 targetU, out Vector3 upU, out float fov);
         Vector3 eye = _smsShineDemoFrame * (eyeU / SmsUnits.UnitsPerMetre);
         Vector3 target = _smsShineDemoFrame * (targetU / SmsUnits.UnitsPerMetre);
+        // 116b: the up C_MTXLookAt gets is the cam_position joint's Y axis (unkC column 1) -- the bck rolls the pose shot 25 deg
+        Vector3 up = SmsShineGetRoll ? (_smsShineDemoFrame.Basis * upU).Normalized() : Vector3.Up;
+        if (Mathf.Abs(up.Dot((target - eye).Normalized())) > 0.999f) up = Vector3.Up;
         _smsShineCam.GlobalPosition = eye;
-        if ((target - eye).LengthSquared() > 1e-6f) _smsShineCam.LookAt(target, Vector3.Up);
+        if ((target - eye).LengthSquared() > 1e-6f) _smsShineCam.LookAt(target, up);
         _smsShineCam.Fov = fov;
     }
 
