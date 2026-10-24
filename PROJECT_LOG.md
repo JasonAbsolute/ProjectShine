@@ -7107,3 +7107,19 @@ pose) viewed. Files: `Mario.cs`, `GameData.cs`, `Level.cs`, `Sms/Console/SmsPaus
 
 Note: between two drive runs the level's own shine key turned up in the save file once (the save showed one shine Jaysonn did not collect);
 no run reproduces it and no log records a collection. The save was put back clean; both drives now back it up and restore it. F8 clears it.
+
+### SMS pass 119b -- the return spot never matched: the editor saves scene paths as uid:// (2026-10-24)
+
+Jaysonn placed an SmsReturnSpot in Level.tscn pointing at the level itself and a shine with ExitLevel + ExitScene = the level: "mario just
+resets like normal". His scene file shows why: Godot 4.4+ saves a `PropertyHint.File` string export as `"uid://cwve1f1kpa2pf"`, while a
+scene's `SceneFilePath` is `"res://assets/Level.tscn"` -- the spot's FromScene could never equal the level he left, so every return fell back
+to the plain start (the exit itself worked: ChangeSceneToFile takes a uid).
+
+- `SmsReturnSpot.ScenePath()` resolves either form through `ResourceUid.EnsurePath`; `Find` compares resolved paths; the shine's `ExitScene`
+  and the pause menu's `ExitAreaScene` are resolved the same way before the scene change.
+- A shine that reloads its own level (ExitScene empty and no Exit Area scene) records the return too, so a spot made for that level catches
+  it; for a same-level reload only a spot made for it counts (no "any level" fallback) -- the game's Plaza reload is the plain start.
+
+Verified: drive 119 13/13 with the plain-return run's spot naming its level by uid://, 118 35/35, build 0 errors, boot ALL OK. Files:
+`Mario.cs`, `Sms/SmsReturnSpot.cs`. (The "shine in the save I did not collect" note in 119 was his own play-test with the 118c build --
+the save is right; the drives back it up and restore it.)

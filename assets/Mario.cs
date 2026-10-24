@@ -19576,13 +19576,14 @@ public partial class Mario : CharacterBody3D
         _activeShine = null;
         if (shine != null && shine.ExitLevel)
         {
-            string dest = shine.ExitScene ?? "";
-            if (dest == "") dest = SmsFluddModel.FindChild<SmsPauseMenu>(this)?.ExitAreaScene ?? "";
+            string dest = SmsReturnSpot.ScenePath(shine.ExitScene);   // 119b: the editor saves the File export as uid://, resolved to the path
+            if (dest == "") dest = SmsReturnSpot.ScenePath(SmsFluddModel.FindChild<SmsPauseMenu>(this)?.ExitAreaScene);
             if (SmsDebugPrint) GD.Print($"[SMS shine] demo over at {SmsShineGetEndTime:F2} s behind the white: moveStage -> {(dest != "" ? dest : "this level again (the Plaza's decideNextStage)")}");
             EmitSignal(SignalName.SmsShineGetExit, dest);
-            if (GameData.Instance != null && dest != "")
+            if (GameData.Instance != null)
             {
-                // 119: MSF_GOT_SHINE_IN_PREV_STAGE + the previous area: the next level starts him at its return spot for this one, with the shine pose
+                // 119: MSF_GOT_SHINE_IN_PREV_STAGE + the previous area: the next level (this one again included) starts him at its return spot for
+                // this one, with the shine pose; no spot for it = the plain start, as the Plaza's own reload
                 GameData.Instance.ReturnFromScene = GetTree().CurrentScene?.SceneFilePath;
                 GameData.Instance.ReturnWithShine = true;
             }
@@ -19666,7 +19667,9 @@ public partial class Mario : CharacterBody3D
         {
             _smsGateOutPending = false;
             if (GameData.Instance != null) { GameData.Instance.ReturnFromScene = null; GameData.Instance.ReturnWithShine = false; }
-            var spot = SmsReturnSpot.Find(GetTree(), _smsGateOutFrom);
+            // a level reloading itself (the Plaza's own shine) takes only a spot made for it: the game's Plaza reload is the plain start
+            bool sameLevel = SmsReturnSpot.ScenePath(_smsGateOutFrom) == (GetTree().CurrentScene?.SceneFilePath ?? "");
+            var spot = SmsReturnSpot.Find(GetTree(), _smsGateOutFrom, allowAny: !sameLevel);
             if (spot != null) SmsGateOutStart(spot, _smsGateOutShine);
             else if (SmsDebugPrint) GD.Print($"[SMS return] back from {_smsGateOutFrom} but this level has no SmsReturnSpot for it: the plain start");
             return;

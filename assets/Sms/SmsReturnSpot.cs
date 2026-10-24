@@ -17,15 +17,19 @@ public partial class SmsReturnSpot : Node3D
 
     public override void _EnterTree() => AddToGroup(Group);
 
-    /// <summary>The spot for the level he left: its own first, else the one for any level; null = none placed.</summary>
-    public static SmsReturnSpot Find(SceneTree tree, string fromScene)
+    /// <summary>A scene reference as a res:// path: the editor saves a File export as "uid://..." (Godot 4.4+), SceneFilePath is the path.</summary>
+    public static string ScenePath(string pathOrUid) => string.IsNullOrEmpty(pathOrUid) ? "" : ResourceUid.EnsurePath(pathOrUid);
+
+    /// <summary>The spot for the level he left: its own first, else (allowAny) the one for any level; null = none placed.</summary>
+    public static SmsReturnSpot Find(SceneTree tree, string fromScene, bool allowAny = true)
     {
+        string want = ScenePath(fromScene);
         SmsReturnSpot any = null;
         foreach (Node n in tree.GetNodesInGroup(Group))
         {
             if (n is not SmsReturnSpot spot || !spot.IsInsideTree()) continue;
-            if (!string.IsNullOrEmpty(fromScene) && spot.FromScene == fromScene) return spot;
-            if (string.IsNullOrEmpty(spot.FromScene)) any ??= spot;
+            if (want != "" && !string.IsNullOrEmpty(spot.FromScene) && ScenePath(spot.FromScene) == want) return spot;
+            if (allowAny && string.IsNullOrEmpty(spot.FromScene)) any ??= spot;
         }
         return any;
     }
