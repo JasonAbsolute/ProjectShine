@@ -19472,7 +19472,7 @@ public partial class Mario : CharacterBody3D
         SmsShineDemoCamera(0f);
         _smsShineCam.MakeCurrent();
         // the pending step: the letters, the fanfare, the fade registered; the count-up as before
-        if (SmsShineGetLetters && _smsConsoleStr != null) _smsConsoleStr.StartAppearShineGet(); else SpawnShineGetPopup();
+        if (SmsShineGetLetters && _smsConsoleStr != null) _smsConsoleStr.StartAppearShineGet(shine.ShineText); else SpawnShineGetPopup();   // 118b: the shine's own word, if any
         ShineGetFanfare?.Play();
         SmsShineFadeAlpha_(0f);
         ScheduleShineCountUp();

@@ -35,8 +35,13 @@ public partial class SmsConsoleStr : CanvasLayer
     [Export] public Vector2 MissCenter = new Vector2(308.5f, 377f);
     /// <summary>A longer word is built smaller to fit this many blo px (the screen is 600 wide; 760 fills a 16:9 window). 0 = never.</summary>
     [Export] public float MaxWidth = 760f;
-    /// <summary>Pass 116: TConsoleStr::startAppearShineGet -- the US big_tx_1.blo's sg00..sg05 spell SHINE! (JP / PAL: SHINE GET!).</summary>
+    /// <summary>Pass 116: TConsoleStr::startAppearShineGet -- the US big_tx_1.blo's sg00..sg05 spell SHINE! (JP / PAL: SHINE GET!). 118b: any word
+    /// (a shine's own ShineText wins): the first six letters at the blo's homes, the rest on along the same rising line, the six gradient pairs
+    /// cycling; a word too wide for the window is built smaller to fit (<see cref="ShineMaxRight"/>).</summary>
     [Export] public string ShineText = "SHINE!";
+    /// <summary>The word's right edge must stay inside this x of the blo's 600 x 480 screen (a 16:9 window shows to ~727). 0 = the window's edge
+    /// less 30. SHINE! never shrinks; WONDERFUL! fits a 16:9 window unshrunk.</summary>
+    [Export] public float ShineMaxRight = 0f;
     /// <summary>The panes' centres in the blo's 600 x 480 (sg00 (59, 364) .. sg05 (341, 287), 70 x 70; the I's pane reads 417 x 51 in this blo and
     /// is interpolated between H and N).</summary>
     [Export] public Vector2[] ShineHomes = { new Vector2(94f, 399f), new Vector2(153f, 384f), new Vector2(206f, 369f), new Vector2(259f, 355f), new Vector2(318f, 336f), new Vector2(376f, 322f) };
@@ -67,6 +72,9 @@ public partial class SmsConsoleStr : CanvasLayer
 
     public bool MissRunning => _frame >= 0f;
     private Control _shineRoot; private TextureRect[] _shineLetters = System.Array.Empty<TextureRect>(); private Vector2[] _shineHome = System.Array.Empty<Vector2>();
+    private string _shineBuilt; private float _shineFit = 1f;
+    public string ShineBuiltText => _shineBuilt;
+    public float ShineFit => _shineFit;
     private float _shineFrame = -1f;
     private SmsShineSparks _shineStreaks, _shineStars; private int[] _shineSparkStage = System.Array.Empty<int>();   // the lines behind the letters, the stars over them
     public int ShineSparkCount => (_shineStreaks?.Count ?? 0) + (_shineStars?.Count ?? 0);
@@ -131,44 +139,17 @@ public partial class SmsConsoleStr : CanvasLayer
         Miss.Visible = true;
     }
 
-    /// <summary>TConsoleStr::startAppearShineGet (ConsoleStr.cpp 364): the letters from the start, after the 0xB4 half-tick wait.</summary>
-    public void StartAppearShineGet()
+    /// <summary>TConsoleStr::startAppearShineGet (ConsoleStr.cpp 364): the letters from the start, after the 0xB4 half-tick wait. 118b: the word is
+    /// <paramref name="text"/> when given (a shine's own), else <see cref="ShineText"/>; rebuilt when it changes.</summary>
+    public void StartAppearShineGet(string text = null)
     {
+        if (string.IsNullOrEmpty(text)) text = ShineText;
         if (_shineRoot == null)
         {
             _shineRoot = new Control { Name = "ShineGet", MouseFilter = Control.MouseFilterEnum.Ignore };
             AddChild(_shineRoot);
         }
-        if (_shineLetters.Length != ShineText.Length)
-        {
-            foreach (var t in _shineLetters) if (IsInstanceValid(t)) t.QueueFree();
-            var letters = new System.Collections.Generic.List<TextureRect>();
-            for (int i = 0; i < ShineText.Length; i++)
-            {
-                Vector2 home = i < ShineHomes.Length ? ShineHomes[i] : new Vector2(94f + 56f * i, 399f - 15f * i);
-                char ch = ShineText[i];
-                float tilt = -ShineTiltDeg;   // J2D: MTXRotRad(rotate, 'z', -mRotation)
-                var pal = Palette.Length > 0 ? new[] { Palette[i % Palette.Length] } : Palette;
-                var one = SmsBigText.Build(_shineRoot, ch.ToString(), GlyphPathFormat, home, ShineGlyphHeight, LetterGap, SpaceWidth, pal, Colored && !SmsShineGetGradient, null, tilt, 0f);
-                if (SmsShineGetGradient)
-                {
-                    // 116f: the pane's corner colours as a top -> bottom gradient over the white glyph (the outline stays black: it multiplies)
-                    _shineGradShader ??= new Shader { Code = ShineGradCode };
-                    foreach (var rect in one)
-                    {
-                        var mat = new ShaderMaterial { Shader = _shineGradShader };
-                        mat.SetShaderParameter("top_color", i < ShineGradientTop.Length ? ShineGradientTop[i] : Colors.White);
-                        mat.SetShaderParameter("bottom_color", i < ShineGradientBottom.Length ? ShineGradientBottom[i] : Colors.White);
-                        mat.SetShaderParameter("rect_h", Mathf.Max(rect.Size.Y, 1f));
-                        rect.Material = mat; rect.SelfModulate = Colors.White;
-                    }
-                }
-                letters.AddRange(one);
-            }
-            _shineLetters = letters.ToArray();
-            _shineHome = new Vector2[_shineLetters.Length];
-            for (int i = 0; i < _shineLetters.Length; i++) _shineHome[i] = _shineLetters[i].Position;
-        }
+        if (_shineBuilt != text) BuildShine(text);
         if (_shineStreaks == null) { _shineStreaks = new SmsShineSparks { Name = "Streaks" }; _shineRoot.AddChild(_shineStreaks); }
         if (_shineStars == null) { _shineStars = new SmsShineSparks { Name = "Stars" }; _shineRoot.AddChild(_shineStars); }
         _shineRoot.MoveChild(_shineStreaks, 0); _shineRoot.MoveChild(_shineStars, -1);   // the lines under the letters (they would slice the ones still flying in), the stars over them
@@ -177,6 +158,51 @@ public partial class SmsConsoleStr : CanvasLayer
         foreach (var t in _shineLetters) { t.Visible = false; t.Modulate = new Color(1f, 1f, 1f, 0f); }
         _shineFrame = 0f;
         _shineRoot.Visible = true;
+    }
+
+    /// <summary>Builds the word's letters under the ShineGet root: letter i about its home (the blo's six, then on along their line), each at
+    /// ShineGlyphHeight x the fit, tilted -ShineTiltDeg, with its gradient pair (cycling). The fit shrinks a word whose right edge would pass
+    /// <see cref="ShineMaxRight"/> (0 = the window's right edge in blo px, less 30), about the first letter's home.</summary>
+    private void BuildShine(string text)
+    {
+        foreach (var t in _shineLetters) if (IsInstanceValid(t)) { t.GetParent()?.RemoveChild(t); t.QueueFree(); }
+        int n = text.Length;
+        var homes = new Vector2[n];
+        for (int i = 0; i < n; i++) homes[i] = i < ShineHomes.Length ? ShineHomes[i] : new Vector2(94f + 56f * i, 399f - 15f * i);
+        Vector2 vp = GetViewport()?.GetVisibleRect().Size ?? new Vector2(1152f, 648f);
+        float s = Mathf.Max(vp.Y / 480f * Size, 1e-3f);
+        float maxRight = ShineMaxRight > 0f ? ShineMaxRight : LayoutCenter.X + vp.X / s * 0.5f - 30f;
+        float half = ShineGlyphHeight * 0.5f;   // the glyphs are about square
+        float span = n > 0 ? homes[n - 1].X - homes[0].X + half : half;
+        _shineFit = n > 0 && homes[0].X + span > maxRight && span > 0f ? Mathf.Clamp((maxRight - homes[0].X) / span, 0.3f, 1f) : 1f;
+        float height = ShineGlyphHeight * _shineFit;
+        var letters = new System.Collections.Generic.List<TextureRect>();
+        for (int i = 0; i < n; i++)
+        {
+            Vector2 home = n > 0 ? homes[0] + (homes[i] - homes[0]) * _shineFit : Vector2.Zero;
+            char ch = text[i];
+            float tilt = -ShineTiltDeg;   // J2D: MTXRotRad(rotate, 'z', -mRotation)
+            var pal = Palette.Length > 0 ? new[] { Palette[i % Palette.Length] } : Palette;
+            var one = SmsBigText.Build(_shineRoot, ch.ToString(), GlyphPathFormat, home, height, LetterGap, SpaceWidth, pal, Colored && !SmsShineGetGradient, null, tilt, 0f);
+            if (SmsShineGetGradient)
+            {
+                // 116f: the pane's corner colours as a top -> bottom gradient over the white glyph (the outline stays black: it multiplies)
+                _shineGradShader ??= new Shader { Code = ShineGradCode };
+                foreach (var rect in one)
+                {
+                    var mat = new ShaderMaterial { Shader = _shineGradShader };
+                    mat.SetShaderParameter("top_color", ShineGradientTop.Length > 0 ? ShineGradientTop[i % ShineGradientTop.Length] : Colors.White);
+                    mat.SetShaderParameter("bottom_color", ShineGradientBottom.Length > 0 ? ShineGradientBottom[i % ShineGradientBottom.Length] : Colors.White);
+                    mat.SetShaderParameter("rect_h", Mathf.Max(rect.Size.Y, 1f));
+                    rect.Material = mat; rect.SelfModulate = Colors.White;
+                }
+            }
+            letters.AddRange(one);
+        }
+        _shineLetters = letters.ToArray();
+        _shineHome = new Vector2[_shineLetters.Length];
+        for (int i = 0; i < _shineLetters.Length; i++) _shineHome[i] = _shineLetters[i].Position;
+        _shineBuilt = text;
     }
 
     /// <summary>The two emitters of processShineGet, approximated: speed lines when a letter is called in, stars when it has settled.</summary>

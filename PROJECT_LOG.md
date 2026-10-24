@@ -7034,3 +7034,22 @@ Verified: drive 118 28/28 (the 116 timeline through the pose, the stay case to 6
 moments, the ExitLevel case's half white at 5.83 s in (0.824, 0.824, 0.824), full at 6.4 s, the scene change at 6.98 s seen from the reloaded
 level), 117 9/9, build 0 errors, boot ALL OK; GPU captures at 3.1 / 3.25 / 3.6 / 4.0 / 6.9 s viewed against the game's frames. Drive 118
 supersedes drive 116. Files: `Mario.cs`, `ShineSprite.cs`, `Sms/Console/SmsConsoleStr.cs`.
+
+### SMS pass 118b -- any word on the shine: a per-shine ShineText, the colours cycling, a long word shrunk to fit (2026-10-24)
+
+Jaysonn: "font looks great! we made it scale to be anything even something like wonderful!?" -- then: add a per-shine ShineText override.
+
+The word was already free (`SmsConsoleStr.ShineText`, every letter on the game's timing, lean and sparks; he has glyphs for A-Z and !), but
+only the six gradient pairs existed (letters past the sixth fell to white), nothing shrank a long word, and the word was the console's,
+not a shine's. Now:
+
+- `ShineSprite.ShineText` ("" = the console's word, the game's SHINE!): the shine's own word, handed to the console as its demo starts; the
+  console rebuilds the letters whenever the word changes.
+- The six corner-colour pairs cycle past the sixth letter (WONDERFUL!: W green, O pink, N yellow, D blue, E orange, R pink, F green ...).
+- A word whose right edge would pass `ShineMaxRight` (0 = the window's right edge in the blo's pixels, less 30) is built smaller about the
+  first letter's home -- letters and steps alike -- so it fits. SHINE! never shrinks; WONDERFUL! (ten letters) fits a 16:9 window at full
+  size; CONGRATULATIONS! (sixteen) comes out at 0.69 of the size with its edge at the window's.
+
+Verified: drive 118 31/31 (B says WONDERFUL!: ten letters, cycling, full size, inside the window; C says CONGRATULATIONS!: sixteen, shrunk to
+the edge; D back to the console's SHINE!, six letters rebuilt), 117 9/9, build 0 errors, boot ALL OK; a GPU capture of WONDERFUL! at 4.1 s
+viewed. Files: `Mario.cs`, `ShineSprite.cs`, `Sms/Console/SmsConsoleStr.cs`.

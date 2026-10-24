@@ -855,6 +855,9 @@ public partial class ShineSprite : Node3D
     /// <summary>Where <see cref="ExitLevel"/> goes (a .tscn path). Empty: the pause menu's Exit Area scene; none set either: this level reloads
     /// (the Plaza's own case).</summary>
     [Export(PropertyHint.File, "*.tscn")] public string ExitScene = "";
+    /// <summary>118b: this shine's word for the big letters ("" = the console's ShineText, the game's SHINE!). Any letters (A-Z and !): the first six
+    /// at the game's layout, the rest on along the same rising line; a word too wide for the window is built smaller to fit.</summary>
+    [Export] public string ShineText = "";
     private bool _smsDriven;
     private int _smsBoneRoot = -2, _smsBoneGlow = -1, _smsBoneBody = -1;   // the bck's joints 0 / 1 / 2 by name (-2 = not looked up yet)
     private bool _smsMeshZeroed;
