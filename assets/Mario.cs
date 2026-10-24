@@ -1212,12 +1212,14 @@ public partial class Mario : CharacterBody3D
     // rules below for now; wired up so it can be given a state later.
     private Node3D RightSlightlyOpenHand;
     private Node3D LeftSlightlyOpenHand;
+    private Node3D RightHandWithHat;   // 121: his hand-with-cap model under the right hand bone (hidden in the scene until the pose)
 
     private enum HandPose
     {
         Open,
         Closed,
         SlightlyOpen,
+        WithHat,   // 121: the right hand holding the cap (the scene's RightHandWithHat), the left open -- the return pose
     }
 
     // Deliberately starts at an invalid value so the first ApplyHandPose always
@@ -5238,6 +5240,7 @@ public partial class Mario : CharacterBody3D
         LeftSlightlyOpenHand = GetNodeOrNull<Node3D>(
             "Armature/Skeleton3D/LeftHandBone/LeftHandSlightyOpen"
         );
+        RightHandWithHat = GetNodeOrNull<Node3D>("Armature/Skeleton3D/RightHandBone/RightHandWithHat");   // 121
         marioMesh = GetNode<MeshInstance3D>("Armature/Skeleton3D/Mesh_0");
         // Find the mesh inside the closed right hand rather than hard-coding a path
         // through its internals - a different character's hand model will not have
@@ -6738,7 +6741,9 @@ public partial class Mario : CharacterBody3D
 
         bool openVisible = pose == HandPose.Open;
         Color openAlbedoR = openVisible ? _rightHandOpenAlbedo : new Color(0, 0, 0, 0);
-        Color openAlbedoL = openVisible ? _leftHandOpenAlbedo : new Color(0, 0, 0, 0);
+        Color openAlbedoL = openVisible || pose == HandPose.WithHat ? _leftHandOpenAlbedo : new Color(0, 0, 0, 0);   // 121: the left stays open with the cap in the right
+        if (RightHandWithHat != null)
+            RightHandWithHat.Visible = pose == HandPose.WithHat;
 
         if (RightHandMaterial != null)
             RightHandMaterial.AlbedoColor = openAlbedoR;
@@ -14460,6 +14465,7 @@ public partial class Mario : CharacterBody3D
     /// clip here); the run blend RUN2's fist (doRunningAnimation: setAnimation(ANIM_RUN2, rate), RUN1 is the blend partner).</summary>
     private HandPose SmsHandPose()
     {
+        if (_smsCapInHand) return HandPose.WithHat;   // 121: the return pose, cap in hand (TMarioCap: ma_cap3 at the hand, ma_cap1 off the head)
         string clip = SmsCurrentClip();
         int hand;
         if (heldBody != null)
@@ -19655,6 +19661,39 @@ public partial class Mario : CharacterBody3D
         if (SmsDebugPrint) GD.Print($"[SMS return] gate out at {spot.Name} {GlobalPosition} facing {Mathf.RadToDeg(yaw):F0} deg, {(withShine ? "with the shine (the pose)" : "no shine")}, held {SmsGateOutHoldSeconds:F1} s then the fall");
     }
 
+    /// <summary>121: the body mesh's cap surface -- the dome at the top of the head in Mario.glb (its material's name); hidden while the cap is in his hand.
+    /// Another character's mesh names it differently (or has a separate cap node): set it, or leave the cap on.</summary>
+    [Export] public string SmsCapSurfaceMaterial = "_mat_head(7)";
+    private bool _smsCapInHand;
+    private int _smsCapSurface = -2;   // -2 = not looked up, -1 = none
+    private Material _smsCapPrevOverride, _smsCapHidden;
+    public bool SmsCapInHandNow => _smsCapInHand;
+
+    /// <summary>TMarioCap: ma_cap1 (the head) off and ma_cap3 (the hand) on, or back. The hand pose follows through SmsHandPose (WithHat).</summary>
+    private void SmsCapInHand(bool on)
+    {
+        if (_smsCapInHand == on) return;
+        _smsCapInHand = on;
+        if (marioMesh?.Mesh == null) return;
+        if (_smsCapSurface == -2)
+        {
+            _smsCapSurface = -1;
+            for (int i = 0; i < marioMesh.Mesh.GetSurfaceCount(); i++)
+                if (marioMesh.Mesh.SurfaceGetMaterial(i)?.ResourceName == SmsCapSurfaceMaterial) { _smsCapSurface = i; break; }
+            if (_smsCapSurface < 0 && SmsDebugPrint) GD.Print($"[SMS cap] no surface '{SmsCapSurfaceMaterial}' on the body mesh: the cap stays on through the pose");
+        }
+        if (_smsCapSurface < 0) return;
+        if (on)
+        {
+            _smsCapHidden ??= new StandardMaterial3D { ResourceName = "sms cap off (transparent)", Transparency = BaseMaterial3D.TransparencyEnum.Alpha, AlbedoColor = new Color(0f, 0f, 0f, 0f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
+            _smsCapPrevOverride = marioMesh.GetSurfaceOverrideMaterial(_smsCapSurface);
+            marioMesh.SetSurfaceOverrideMaterial(_smsCapSurface, _smsCapHidden);
+        }
+        else
+            marioMesh.SetSurfaceOverrideMaterial(_smsCapSurface, _smsCapPrevOverride);
+        if (SmsDebugPrint) GD.Print($"[SMS cap] {(on ? "off the head, in the right hand (RightHandWithHat)" : "back on the head")}");
+    }
+
     private void SmsGateOutClip(string clip)
     {
         if (animPlayer == null) return;
@@ -19681,7 +19720,7 @@ public partial class Mario : CharacterBody3D
             return;
         }
         if (_smsGateOutPhase == 0) return;
-        if (stateOfMario != MarioState.shineGet) { _smsGateOutPhase = 0; return; }   // left some other way (a reload, his debug keys)
+        if (stateOfMario != MarioState.shineGet) { _smsGateOutPhase = 0; SmsCapInHand(false); return; }   // left some other way (a reload, his debug keys)
         float dt = (float)delta;
         _smsGateOutT += dt;
         switch (_smsGateOutPhase)
@@ -19702,9 +19741,12 @@ public partial class Mario : CharacterBody3D
                 }
                 break;
             case 3:
+                // 121: TMarioCap::perform / TMario::calcAnim on ANIM_DEMO_GATE_OUT_GET2: the cap in the hand while the frame < 157, back on after
+                SmsCapInHand(_smsGateOutShine && animPlayer != null && animPlayer.IsPlaying() && animPlayer.CurrentAnimationPosition * 60f < 157f);
                 if (SmsGateOutClipDone())
                 {
                     _smsGateOutPhase = 0;
+                    SmsCapInHand(false);
                     CameraLocked = false;
                     stateOfMario = MarioState.idle;
                     animPlayer?.Play("ma_wait");

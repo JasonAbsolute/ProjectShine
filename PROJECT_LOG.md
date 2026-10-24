@@ -7163,3 +7163,23 @@ is 1.5 s -- which is the appear clip's 89 frames at 60 to the frame: he spins in
 
 Verified: drive 119 19/19 on the new timeline (still hanging at 1.3 s with the appear clip playing, falling by 1.75 s, the whole return over
 in 5.1 s), 117 9/9, build 0 errors, boot ALL OK. Files: `Mario.cs`, `Level.cs`.
+
+### SMS pass 121 -- the cap off in the return pose (2026-10-24)
+
+Jaysonn: "now we gotta have mario take his hat off just like in game when he does the ending pose!"
+
+**The game** (TMarioCap::perform, MarioCap.cpp 137; TMario::calcAnim, MarioDraw.cpp 1964): while the clip is ANIM_DEMO_GATE_OUT_GET2 and
+its frame is under 157 the head cap (ma_cap1.bmd) is hidden and the hand cap (ma_cap3.bmd, on the right hand joint) shown, the body model's
+open-hand shapes shown; from frame 157 the cap is back on the head and from 158 the right hand becomes the ma_hnd4r model for the last 24
+of the clip's 181 frames. Only this clip does it -- the plain gate-out keeps the cap on.
+
+**Port.** A new hand pose `WithHat`: the scene's `RightHandWithHat` (his hand-holding-the-cap model under the right hand bone, hidden until
+now) shown, the open right hand hidden, the left hand open; and the body mesh's cap -- the dome at the top of the head in Mario.glb, the
+surface whose material is `SmsCapSurfaceMaterial` ("_mat_head(7)") -- hidden by a transparent override. Both for frames < 157 of
+`ma_demo_gate_out_get2`, restored from 157 and at the pose's end; the hair under the cap shows meanwhile (it is in the head mesh). Another
+character's mesh names its cap surface differently: set the knob, or the cap stays on. hnd4r for the last 24 frames is not ported (the open
+hand).
+
+Verified: drive 119 22/22 (cap off and in hand through the pose, back on from frame 157 with the clip still playing, on again at the end, the
+plain gate-out untouched), 117 9/9, build 0 errors, boot ALL OK; a GPU capture of the pose at 2.6 / 3.5 / 4.4 / 5.0 s viewed -- the cap in
+his hand, his hair showing, the cap back on. File: `Mario.cs`.
