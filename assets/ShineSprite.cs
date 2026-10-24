@@ -840,9 +840,10 @@ public partial class ShineSprite : Node3D
     /// <summary>Where the star's centre sits in this scene's root-local units ((0, 200, 0) at the 0.006 root scale = 1.2 m up): the bck's
     /// 'body' joint lands there.</summary>
     [Export] public Vector3 SmsStarLocal = new Vector3(0f, 200f, 0f);
-    /// <summary>The demo shine's size. 1 = the game's: the model at the game's 74.44 units a metre with the bck's root scale (0.5 through the
-    /// catch, 0.7 on the pose), independent of the size you place shines at (yours are 0.45 of the game's); 2 = twice the game's.
-    /// 116b -- 116 scaled it off your placed shine (11 % under the game's).</summary>
+    /// <summary>The demo shine's drawn size on the pose, in model sizes: 1 = the full model (143 u across the points) held up, as the game's
+    /// screen shows it; the catch is 0.71 of that (the bck's scale track, 0.5 -> 0.7, divided by its 0.7). 0.7 = the J3D maths taken literally
+    /// (116b/c, "super small"). Scales the star about its own joint -- the attachment to the wrist and the star's centre never move with it.
+    /// 116d.</summary>
     [Export] public float SmsDemoScale = 1f;
     private bool _smsDriven;
     private int _smsBoneRoot = -2, _smsBoneGlow = -1, _smsBoneBody = -1;   // the bck's joints 0 / 1 / 2 by name (-2 = not looked up yet)
@@ -857,17 +858,24 @@ public partial class ShineSprite : Node3D
         // 116b: as the game -- the actor at Mario's position and angle (the model's +Z = his facing), the model's units at 74.44 a metre, and the
         // bck replacing each JOINT's TRS (root / starglow / body). 116 placed the root around the captured neutral pose, whose body yaw is
         // whatever frame of shine_float the editor left it on -- the star came out edge-on, and at your placed size.
-        float s = SmsDemoScale / SmsUnits.UnitsPerMetre;
+        float s = 1f / SmsUnits.UnitsPerMetre;   // the model's units at 74.44 a metre; the size knob rides on the star's joints below (116d)
         GlobalTransform = new Transform3D(marioFrame.Basis.Scaled(new Vector3(s, s, s)), marioFrame.Origin);
         if (_smsBoneRoot == -2 && _starSkel != null) { _smsBoneRoot = _starSkel.FindBone("shine"); _smsBoneGlow = _starSkel.FindBone("starglow"); _smsBoneBody = _starSkel.FindBone("body"); }
         if (_starSkel == null || _smsBoneRoot < 0 || _smsBoneBody < 0) return;
-        SmsDemoBone(_smsBoneRoot, 0, t); if (_smsBoneGlow >= 0) SmsDemoBone(_smsBoneGlow, 1, t); SmsDemoBone(_smsBoneBody, 2, t);
+        // 116d: the root joint sits ON Mario's wrist (116c: the bck puts it at (-36.5, 91.4, -4.9) = jnt_hand_R) at scale 1; the children's
+        // positions follow J3D (child T x the root's scale track) so the star's centre is the game's (57 u out on the pose -- the wiki's
+        // screenshot agrees); the star's DRAWN size is the game's screen, the full model on the pose: track / 0.7 x SmsDemoScale.
+        SmsShineGetData.ShineJoint(0, t, out Vector3 rp, out Quaternion rq, out Vector3 rs);
+        _starSkel.SetBonePosePosition(_smsBoneRoot, rp); _starSkel.SetBonePoseRotation(_smsBoneRoot, rq); _starSkel.SetBonePoseScale(_smsBoneRoot, Vector3.One);
+        float geom = SmsDemoScale * rs.X / 0.7f;
+        if (_smsBoneGlow >= 0) SmsDemoBone(_smsBoneGlow, 1, t, rs.X, geom);
+        SmsDemoBone(_smsBoneBody, 2, t, rs.X, geom);
         _starSkel.ForceUpdateAllBoneTransforms();
     }
-    private void SmsDemoBone(int bone, int joint, float t)
+    private void SmsDemoBone(int bone, int joint, float t, float parentScale, float geom)
     {
         SmsShineGetData.ShineJoint(joint, t, out Vector3 p, out Quaternion q, out Vector3 sc);
-        _starSkel.SetBonePosePosition(bone, p); _starSkel.SetBonePoseRotation(bone, q); _starSkel.SetBonePoseScale(bone, sc);
+        _starSkel.SetBonePosePosition(bone, p * parentScale); _starSkel.SetBonePoseRotation(bone, q); _starSkel.SetBonePoseScale(bone, sc * geom);
     }
     /// <summary>The body joint (the star hangs on it) in the world -- for the drive.</summary>
     public Vector3 SmsDemoBodyJointWorld() => _starSkel != null && _smsBoneBody >= 0 ? _starSkel.GlobalTransform * _starSkel.GetBoneGlobalPose(_smsBoneBody).Origin : GlobalPosition;

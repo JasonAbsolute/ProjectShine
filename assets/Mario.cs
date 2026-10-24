@@ -1998,6 +1998,7 @@ public partial class Mario : CharacterBody3D
 
         if (CameraLocked)
         {
+            SmsFluddDropsTickLocked(delta);   // 116d: the water in flight keeps falling through the demo / the lock (TModelWaterManager::move)
             bool wasAirPrev = !wasOnFloor;
 
             if (IsOnFloor())
@@ -12518,6 +12519,16 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>playerControl()'s FLUDD part for one physics frame: the R analog, X, the upper-body state, the swap tween,
     /// the deploy / stow, the clips.</summary>
+    /// <summary>116d: TModelWaterManager::move() is its own perform-list entry, run every 120 Hz tick whatever Mario's status -- the drops
+    /// already in the air fall, splash and land through the shine demo and a locked camera. Nothing is emitted (gunExec does not run).</summary>
+    private void SmsFluddDropsTickLocked(double delta)
+    {
+        if (!_fluddReady || _fluddDrops == null) return;
+        int n = SmsUnits.TicksFor(delta, ref _fluddTickAccum);
+        _fluddDrops.MarioPos = GlobalPosition;
+        for (int i = 0; i < n; i++) _fluddDrops.Tick();
+    }
+
     private void SmsFluddTick(double delta)
     {
         if (!_fluddReady)

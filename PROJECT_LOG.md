@@ -6929,3 +6929,28 @@ screenshot's size. Not touched: the hand mesh (hand id 0 = the body's open hands
 
 Verified: drive 116 21/21 (A7c: SpeedScale 1, the clip on the clock, the shine root on jnt_hand_R to 0.0 u, the star centre 57 u out),
 117 9/9, 114 15/15, build 0 errors, boot ALL OK. GPU capture of the 116c demo at 0.3 / 1.5 / 3.0 / 4.0 / 5.2 s.
+
+### SMS pass 116d -- the demo shine drawn at the game's screen size; FLUDD's water keeps falling through the demo (2026-10-23)
+
+Jaysonn on 116c, with screenshots: "the shine is still super small by default, it's not positioned correctly, and the water from FLUDD
+froze in the air". 116c had argued the pose from the game's data; the user's eye and the game's own screen said otherwise, so this pass
+goes by the screen.
+
+**The star's size.** The bck's root scale track (0.5 through the catch, 0.7 on the pose) applied to the star's geometry, as the J3D maths
+reads, gives a star 1.4x smaller than the game actually shows: against the Mario Wiki's in-game capture of this pose (640x448, US), the
+star measured 2.15 cap-widths across vs 116c's 1.53, while its CENTRE sat at the same place relative to his face (1.29 vs 1.35 cap
+widths from the eyes). So the game's star is the full model with its centre where the scaled chain puts it. Now: the root bone keeps
+scale 1 ON the wrist (116c's measured attachment), the children's positions follow J3D (child T x the root's track), and the star's drawn
+scale is track / 0.7 x `SmsDemoScale` -- full size on the pose, 0.71 at the catch (where its bottom point sits just at the ground, which
+is the authored look: the star resting on the sand in front of him). 116d measures 2.06 cap-widths and 1.35 from the eyes -- within 5 %
+of the game's screen on both. `SmsDemoScale` now scales the star about its own joint (116b/c scaled the whole actor and moved the wrist
+attachment with it); 0.7 = the J3D maths taken literally. Why the engine's maths and its screen disagree is not resolved; the screen wins.
+
+**The water.** The CameraLocked block returned before `SmsFluddTick`, so `SmsWaterDrops.Tick()` (TModelWaterManager::move) stopped the
+moment the demo began: a spray carried into the shine hung in the air for the whole demo. In the game the water manager is its own
+perform-list entry and runs every tick whatever Mario's status. Now `SmsFluddDropsTickLocked` ticks the drops inside the lock (nothing
+is emitted: gunExec does not run). Drive 116 E1: 30 drops launched at the touch rise from 3.71 to 7.36 m by 0.5 s into the demo; the same
+check on the 116c code reads 3.71 -> 3.71 (frozen to the millimetre) -- the control fails as it should.
+
+Verified: drive 116 22/22 (E1 new; A5b / A7b re-pinned to the screen's sizes, A7c the attachment), 117 9/9, 114 15/15, build 0 errors,
+boot ALL OK; GPU capture of the pose and the catch at the new size. Files: `ShineSprite.cs`, `Mario.cs`.
