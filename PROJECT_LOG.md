@@ -6904,3 +6904,28 @@ driven, SmsDemoScale absolute, SmsDemoBodyJointWorld/Basis), `Mario.cs` (SmsShin
 
 Lessons logged: every MActor bck -- Mario's, an object's, a CAMERA's -- is 60 fps data at 30 fps play (rate 2); a captured "neutral pose"
 is a snapshot of whatever clip frame the editor was on, never a reference frame for driving a model -- drive the joints from the data.
+
+### SMS pass 116c -- Mario's shine-get clip on the game's clock; the shine's hold measured against the game (2026-10-23)
+
+Jaysonn on 116b: "a bit better, but the shine is behind his hand in the finished pose". Two findings.
+
+**A real bug, fixed.** `SetMarioState(shineGet)` played `ma_demo_shine_get` on the AnimationPlayer without resetting its `SpeedScale`, so
+whatever the run had left there (1.25-2.8x from a run or dash, 4x in the drives) ran the 6.97 s clip out early and FROZE its last frame
+while the shine kept flying on the demo's clock -- Mario struck the pose and stood in it while the star was still coming down. The game's
+`setAnimation(ANIM_DEMO_SHINE_GET, 1.0)` is rate 1.0; now `SpeedScale = 1` on entry. Drive 116 A7c pins it (the clip at 4.59 s at T 4.60).
+
+**The pose itself is the game's, to the unit.** I took the game's own Mario (`ma_mdl1.bmd` + `ma_demo_shine_get.bck`, pulled from the ISO's
+`chr0.szs` with gcm_tools.py) and composed its skeleton in Python: at the pose `jnt_hand_R` = (-36, 91, -5), and the port's Godot skeleton
+measures (-36, 91, -5) with the same bone axes to two decimals. The shine's bck puts its ROOT joint at exactly (-36.5, 91.4, -4.9) = the
+wrist (the animators parented it there), the body joint 81 u out along the root's X, scaled 0.7 = 57 u. FinModelUtility's independent decode
+of the same bck (the glb's `shine_demo_shine_get` clip) matches my table at every joint to 0.1 u / 0.1 deg. So the rendered arrangement --
+the glove in front of the star's lower-right point, the star body beyond the fingertips -- is what the data draws.
+
+Compared against the game's actual screen (the Mario Wiki's `Shine!.png`, a 640x448 US capture at ~4.7 s of the demo): the star's CENTRE
+sits at the same place relative to Mario's face (1.30 vs 1.35 cap widths from the eyes), so the attachment is right; the star's drawn SIZE
+in that shot reads 1.2-1.4x ours (the glow blurs the edge; the solid-body measures vary). The decomp's J3D (`J3DMtxCalcSoftimage::
+calcTransform`) applies the root's 0.7 to the geometry, so 0.7 is kept as the default; `SmsDemoScale` lifts it if his eye wants the
+screenshot's size. Not touched: the hand mesh (hand id 0 = the body's open hands in the game's `gMarioAnimeData[0xCD]`, as the port shows).
+
+Verified: drive 116 21/21 (A7c: SpeedScale 1, the clip on the clock, the shine root on jnt_hand_R to 0.0 u, the star centre 57 u out),
+117 9/9, 114 15/15, build 0 errors, boot ALL OK. GPU capture of the 116c demo at 0.3 / 1.5 / 3.0 / 4.0 / 5.2 s.

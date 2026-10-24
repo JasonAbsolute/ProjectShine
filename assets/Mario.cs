@@ -18612,6 +18612,8 @@ public partial class Mario : CharacterBody3D
                 // Keep AnimationPlayer for the shine-get cutscene animation
                 if (animTree != null)
                     animTree.Active = false;
+                animPlayer.SpeedScale = 1f;   // 116c: setAnimation(ANIM_DEMO_SHINE_GET, 1.0) -- the run's SpeedScale must not leak in (it ran the
+                                              // 6.97 s clip out in 1.7 s and froze the LAST frame, the shine at the chest, under the raised shine)
                 animPlayer.Play("ma_demo_shine_get");
                 break;
             case MarioState.wallPush:
