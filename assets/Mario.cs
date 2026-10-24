@@ -19605,6 +19605,9 @@ public partial class Mario : CharacterBody3D
     // ======================================================================================================================================
     /// <summary>warpOut state 1: the appear clip held this long before the rolling fall (0xB4 = 180 frames at 60).</summary>
     [Export] public float SmsGateOutHoldSeconds = 3.0f;
+    /// <summary>120: warpOutEffect kind 0 -- ms_m_gout_gate, the paint-water stream out of the M gate (SmsGateStream: the jpa run on the CPU). The
+    /// game's kinds 1 (the pipe, ms_m_gout_dokan) and 2 (the body-part sparkles) are not ported.</summary>
+    [Export] public bool SmsGateOutStream = true;
     private int _smsGateOutPhase;                 // 0 none, 1 the appear (held at the gate), 2 the rolling fall, 3 landed (the gate-out clip / the pose)
     private float _smsGateOutT;
     private bool _smsGateOutShine, _smsGateOutPending;
@@ -19625,7 +19628,7 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>returnStart(pos, rot, gotShine, type): startCommon warps him to the spot facing its forward (a shine) or the opposite way, then
     /// WARP_OUT: ANIM_DEMO_GATE_OUT_APPEAR(_GET) held, the rolling clip falling under gravity, on the floor ANIM_DEMO_GATE_OUT (_GET2: the shine
-    /// pose) to its last frame, then WAIT. The gate particle (PARTICLE_MS_M_GOUT_GATE) is not ported.</summary>
+    /// pose) to its last frame, then WAIT. The gate particle (PARTICLE_MS_M_GOUT_GATE) is SmsGateStream (120).</summary>
     public void SmsGateOutStart(SmsReturnSpot spot, bool withShine)
     {
         if (spot == null) return;
@@ -19646,6 +19649,8 @@ public partial class Mario : CharacterBody3D
         SmsCameraWarpBehind();
         _smsGateOutShine = withShine; _smsGateOutPhase = 1; _smsGateOutT = 0f;
         SmsGateOutClip(withShine ? "ma_demo_gate_out_appear_get" : "ma_demo_gate_out_appear");
+        // warpOutEffect(kind, (arg & 0xff) * 180 + face): the stream's frame is the spot's forward with or without the shine
+        if (SmsGateOutStream) SmsGateStream.Spawn(GetTree().CurrentScene ?? GetTree().Root, GlobalPosition, fwd);
         if (SmsDebugPrint) GD.Print($"[SMS return] gate out at {spot.Name} {GlobalPosition} facing {Mathf.RadToDeg(yaw):F0} deg, {(withShine ? "with the shine (the pose)" : "no shine")}, held {SmsGateOutHoldSeconds:F1} s then the fall");
     }
 

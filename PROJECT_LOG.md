@@ -7123,3 +7123,28 @@ to the plain start (the exit itself worked: ChangeSceneToFile takes a uid).
 Verified: drive 119 13/13 with the plain-return run's spot naming its level by uid://, 118 35/35, build 0 errors, boot ALL OK. Files:
 `Mario.cs`, `Sms/SmsReturnSpot.cs`. (The "shine in the save I did not collect" note in 119 was his own play-test with the 118c build --
 the save is right; the drives back it up and restore it.)
+
+### SMS pass 120 -- the gate stream: ms_m_gout_gate on the return (2026-10-24)
+
+Jaysonn, on the return: "it looks kinda off? also where are the particle effects when spawning in?" The spawn effect is the game's
+`ms_m_gout_gate.jpa` (TMario::warpOutEffect kind 0, MarioParticle.cpp 494: emitWithRotate at his feet, the emitter turned to the spot's
+rotation whether or not a shine sent him), and it is what the 3 s hold reads as: the appear clip keeps Mario at scale zero for 0.9 s, pops
+him in spinning over half a second and holds its last frame -- in the game inside the stream, in the port in empty air.
+
+**The file** (jpa_dump.py): a 60 u sphere emitter 3.3 m behind the spot and 0.7 m low, 10 beads a frame for 30 frames, life 60, launched
+40 u/f up-and-forward under airResist 0.96 and a moment of 0.75 +- 0.125; a Newton field toward (0, 120, 350) (mag 0.3, 1/d^2 beyond 100 u,
+faded in over the first half of life, accumulating); a Magnet field toward (0, 110, 350) (20 u/f from half life, faded in to the end); a
+Vortex that never acts (enabled from progress 1.0). 25 u beads along their velocity, alpha 0 -> 1 by 25 %, -> 0 from 75 %; the colour is
+the TEV's lerp(env, prm, intensity) with BOTH colours keyed over a 23-frame cycle -- red, yellow, blue held eight frames, salmon, white,
+brown -- each bead at a random phase; sweep children from 87.5 % of life, one every 2 frames, 55 u shrinking over 16 frames.
+
+**Port:** `assets/Sms/Fx/SmsGateStream.cs` (new) runs the jpa on the CPU exactly as JPAField.cpp / JPAParticle.cpp do -- one particle
+frame a 60th, fields in the emitter's frame, field acceleration accumulating, field velocity per frame, air resistance on the base
+velocity, moment on the sum -- and draws the beads as one MultiMesh of velocity-aligned quads with a spatial shader doing the TEV lerp
+(prm in the instance colour, env in the custom data). Texture: the game's `P_msm_mizutama1_ia` baked raw (`assets/Sms/Fx/tex/
+gout_drop_raw.png`; a drawn bead stands in until the editor imports it). Spawned by `SmsGateOutStart`; frees itself when spent (~1.8 s).
+Knob `SmsGateOutStream`. Not ported: the pipe variant (ms_m_gout_dokan), the body-part sparkles (kind 2), the children's field response.
+
+Verified: drive 119 19/19 (the stream spawned at his feet with the appear, 240-250 beads alive at 0.4 s, gone by 2.8 s), 117 9/9, build 0
+errors, boot ALL OK; a GPU capture of the stream rising behind the gate at 0.3 s and Mario popping in at 1.6 s viewed.
+Files: `Mario.cs`, `Sms/Fx/SmsGateStream.cs` (new), `Sms/Fx/tex/gout_drop_raw.png` (new).
