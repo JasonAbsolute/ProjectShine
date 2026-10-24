@@ -7183,3 +7183,27 @@ hand).
 Verified: drive 119 22/22 (cap off and in hand through the pose, back on from frame 157 with the clip still playing, on again at the end, the
 plain gate-out untouched), 117 9/9, build 0 errors, boot ALL OK; a GPU capture of the pose at 2.6 / 3.5 / 4.4 / 5.0 s viewed -- the cap in
 his hand, his hair showing, the cap back on. File: `Mario.cs`.
+
+### SMS pass 122 -- the top of the head while the cap is off (2026-10-24)
+
+Jaysonn (after 121): "the hat is working but mario is missing the top of his head?" He was right: the capture showed the head cut flat
+at the hairline with the scenery through it. Mario.glb (= ma_mdl1.bmd, 11 shapes) has no top under the cap -- and neither does the
+game's body model. The game never draws one from the body: TMarioCap holds TWO head models placed at the M_head joint (MarioCap.cpp
+20-68): ma_cap1.bmd, the cap (159 tris -- the body's own cap shape 4 is the same geometry, hidden for good at MarioDraw.cpp 1157), and
+ma_cap3.bmd, material `_mat_hair`, 151 tris: the HAIR DOME, the capless head top. perform() (137-146): get2 frame < 157 -> cap1 hidden,
+cap3 shown; else cap1 shown, cap3 hidden. (In SMS's J3D a shape with flag bit 1 SET is skipped by J3DJoint's draw, so
+onFlag1OnAllShapes HIDES -- the JSystem header's comment reads it backwards; the hnd/hand toggles in changeHand read consistently only
+this way.) calcAnim (1964-1982): the right hand is ma_hnd4r (hand + cap: 328 = 169 + 159 tris) while the frame < 158, hnd3r after -- one
+frame past the head's 157; the left is hnd3l throughout.
+
+**Port.** New `assets/Sms/SmsCaplessHead.cs` (generated from his ma_cap3.bmd by `gen_capless_head.py`: 106 vertices, 151 triangles,
+positions / normals / UVs the bmd's own, in the M_head frame, Godot's clockwise winding): `Build(material)` -> an ArrayMesh. Mario
+builds it once under a BoneAttachment3D on `M_head` (the game's attach joint; `jnt_head` if missing) with the head surface's material
+(knob `SmsHeadSurfaceMaterial`, "_mat_head(8)" -- the game gives cap3 the body's texture, and its UVs land in the atlas's hair strip),
+shown while the cap surface is hidden, hidden when the cap is back; `SmsCaplessHeadDome` turns it off. The hand's cap now leaves at
+frame 158 (`SmsHandCap`), the head's at 157, as the game. Nothing in the scene to touch; the other characters' meshes keep their caps
+unless they name the surfaces.
+
+Verified: drive 119 25/25 (S4d the dome on M_head, visible, 151 tris, the head's material while the cap is off; S4e hidden with the cap
+back and the hand open from 158; P4d never built on the plain gate-out), 118 35/35, 117 9/9, build 0 errors, boot ALL OK; GPU capture
+`capless122.png` -- full hair through the pose, the cap back at 5.0 s with no double. Files: `Mario.cs`, `assets/Sms/SmsCaplessHead.cs`.

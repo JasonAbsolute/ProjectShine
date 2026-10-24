@@ -14465,7 +14465,7 @@ public partial class Mario : CharacterBody3D
     /// clip here); the run blend RUN2's fist (doRunningAnimation: setAnimation(ANIM_RUN2, rate), RUN1 is the blend partner).</summary>
     private HandPose SmsHandPose()
     {
-        if (_smsCapInHand) return HandPose.WithHat;   // 121: the return pose, cap in hand (TMarioCap: ma_cap3 at the hand, ma_cap1 off the head)
+        if (_smsHandCap) return HandPose.WithHat;   // 121/122: the return pose, the cap in the right hand (TMario::calcAnim: hnd4r while the frame < 158)
         string clip = SmsCurrentClip();
         int hand;
         if (heldBody != null)
@@ -19668,6 +19668,45 @@ public partial class Mario : CharacterBody3D
     private int _smsCapSurface = -2;   // -2 = not looked up, -1 = none
     private Material _smsCapPrevOverride, _smsCapHidden;
     public bool SmsCapInHandNow => _smsCapInHand;
+    /// <summary>122: the game's capless head top (ma_cap3.bmd, TMarioCap's hair dome) shown at the M_head bone while the cap is off; the body mesh has no top under the cap.</summary>
+    [Export] public bool SmsCaplessHeadDome = true;
+    /// <summary>122: the body mesh's head surface (its material's name) -- the hair dome borrows its material (the game gives ma_cap3 the body's texture).</summary>
+    [Export] public string SmsHeadSurfaceMaterial = "_mat_head(8)";
+    private MeshInstance3D _smsHairDome;
+    private bool _smsHandCap;   // 122: hnd4r -- the right hand holds the cap while the frame < 158 (one frame past the head's 157)
+    public bool SmsHandCapNow => _smsHandCap;
+
+    private void SmsHandCap(bool on)
+    {
+        if (_smsHandCap == on) return;
+        _smsHandCap = on;
+        if (SmsDebugPrint) GD.Print($"[SMS cap] right hand {(on ? "holds the cap (RightHandWithHat)" : "open again")}");
+    }
+
+    /// <summary>122: the hair dome -- built once from SmsCaplessHead under a BoneAttachment3D on M_head (the game's attach joint), the head surface's material.</summary>
+    private void SmsHairDome(bool on)
+    {
+        if (!SmsCaplessHeadDome) return;
+        if (_smsHairDome == null)
+        {
+            if (!on || marioMesh?.Mesh == null) return;
+            var skel = marioMesh.GetParentOrNull<Skeleton3D>();
+            if (skel == null) { if (SmsDebugPrint) GD.Print("[SMS cap] the body mesh is not under a Skeleton3D: no hair dome"); return; }
+            string bone = skel.FindBone("M_head") >= 0 ? "M_head" : skel.FindBone("jnt_head") >= 0 ? "jnt_head" : null;
+            if (bone == null) { if (SmsDebugPrint) GD.Print("[SMS cap] no M_head / jnt_head bone: no hair dome"); return; }
+            Material mat = null;
+            for (int i = 0; i < marioMesh.Mesh.GetSurfaceCount() && mat == null; i++)
+                if (marioMesh.Mesh.SurfaceGetMaterial(i)?.ResourceName == SmsHeadSurfaceMaterial) mat = marioMesh.GetActiveMaterial(i);
+            if (mat == null && _smsCapSurface >= 0) mat = marioMesh.GetActiveMaterial(_smsCapSurface);
+            if (mat == null && SmsDebugPrint) GD.Print($"[SMS cap] no surface '{SmsHeadSurfaceMaterial}' on the body mesh: the hair dome goes unlit white");
+            var att = new BoneAttachment3D { Name = "SmsCaplessHeadBone", BoneName = bone };
+            skel.AddChild(att);
+            _smsHairDome = new MeshInstance3D { Name = "SmsCaplessHead", Mesh = SmsCaplessHead.Build(mat), CastShadow = marioMesh.CastShadow, Layers = marioMesh.Layers };
+            att.AddChild(_smsHairDome);
+            if (SmsDebugPrint) GD.Print($"[SMS cap] hair dome built: ma_cap3's {SmsCaplessHead.TriangleCount} tris on {bone}, material {(mat?.ResourceName ?? "none")}");
+        }
+        _smsHairDome.Visible = on;
+    }
 
     /// <summary>TMarioCap: ma_cap1 (the head) off and ma_cap3 (the hand) on, or back. The hand pose follows through SmsHandPose (WithHat).</summary>
     private void SmsCapInHand(bool on)
@@ -19691,7 +19730,8 @@ public partial class Mario : CharacterBody3D
         }
         else
             marioMesh.SetSurfaceOverrideMaterial(_smsCapSurface, _smsCapPrevOverride);
-        if (SmsDebugPrint) GD.Print($"[SMS cap] {(on ? "off the head, in the right hand (RightHandWithHat)" : "back on the head")}");
+        SmsHairDome(on);   // 122: TMarioCap: ma_cap3 (the hair dome) shown while ma_cap1 (the cap) is hidden
+        if (SmsDebugPrint) GD.Print($"[SMS cap] {(on ? "off the head (the hair dome on)" : "back on the head")}");
     }
 
     private void SmsGateOutClip(string clip)
@@ -19720,7 +19760,7 @@ public partial class Mario : CharacterBody3D
             return;
         }
         if (_smsGateOutPhase == 0) return;
-        if (stateOfMario != MarioState.shineGet) { _smsGateOutPhase = 0; SmsCapInHand(false); return; }   // left some other way (a reload, his debug keys)
+        if (stateOfMario != MarioState.shineGet) { _smsGateOutPhase = 0; SmsCapInHand(false); SmsHandCap(false); return; }   // left some other way (a reload, his debug keys)
         float dt = (float)delta;
         _smsGateOutT += dt;
         switch (_smsGateOutPhase)
@@ -19741,12 +19781,18 @@ public partial class Mario : CharacterBody3D
                 }
                 break;
             case 3:
-                // 121: TMarioCap::perform / TMario::calcAnim on ANIM_DEMO_GATE_OUT_GET2: the cap in the hand while the frame < 157, back on after
-                SmsCapInHand(_smsGateOutShine && animPlayer != null && animPlayer.IsPlaying() && animPlayer.CurrentAnimationPosition * 60f < 157f);
+                // 121/122: TMarioCap::perform / TMario::calcAnim on ANIM_DEMO_GATE_OUT_GET2: the cap off the head (the hair dome on) while the
+                // frame < 157, the right hand holding it (hnd4r) while the frame < 158, both back after
+                {
+                    float gateFrame = _smsGateOutShine && animPlayer != null && animPlayer.IsPlaying() ? (float)animPlayer.CurrentAnimationPosition * 60f : 1e9f;
+                    SmsCapInHand(gateFrame < 157f);
+                    SmsHandCap(gateFrame < 158f);
+                }
                 if (SmsGateOutClipDone())
                 {
                     _smsGateOutPhase = 0;
                     SmsCapInHand(false);
+                    SmsHandCap(false);
                     CameraLocked = false;
                     stateOfMario = MarioState.idle;
                     animPlayer?.Play("ma_wait");
