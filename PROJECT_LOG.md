@@ -7148,3 +7148,18 @@ Knob `SmsGateOutStream`. Not ported: the pipe variant (ms_m_gout_dokan), the bod
 Verified: drive 119 19/19 (the stream spawned at his feet with the appear, 240-250 beads alive at 0.4 s, gone by 2.8 s), 117 9/9, build 0
 errors, boot ALL OK; a GPU capture of the stream rising behind the gate at 0.3 s and Mario popping in at 1.6 s viewed.
 Files: `Mario.cs`, `Sms/Fx/SmsGateStream.cs` (new), `Sms/Fx/tex/gout_drop_raw.png` (new).
+
+### SMS pass 120b -- no hang at the gate: the hold is 1.5 s, the appear clip's own length (2026-10-24)
+
+Jaysonn: "looks good! ... mario does hang for a second floating in the air and doesn't seem right." He was right, and the data agrees once
+the clock is read properly: warpOut's 0xB4 = 180 is counted in Mario's status ticks, and Mario performs on the director's 120 Hz movement
+ticks (the console's unk18 += 0.5 a perform, TShineFader's mRate 120 and the hit check every 4th tick all run on that cadence), so the hold
+is 1.5 s -- which is the appear clip's 89 frames at 60 to the frame: he spins in and goes straight into the rolling fall. 119 held him 3.0 s
+(a 60 Hz assumption), so he hung a second and a half in the last frame.
+
+- `SmsGateOutHoldSeconds` 3.0 -> 1.5.
+- The return's fade in now lasts the spiral wipe's 38 wiper frames at 30 Hz (1.27 s) instead of the miss's 0.4 s, so the appear clip's
+  invisible first 0.9 s passes under the fade as it does under the spiral in the game.
+
+Verified: drive 119 19/19 on the new timeline (still hanging at 1.3 s with the appear clip playing, falling by 1.75 s, the whole return over
+in 5.1 s), 117 9/9, build 0 errors, boot ALL OK. Files: `Mario.cs`, `Level.cs`.

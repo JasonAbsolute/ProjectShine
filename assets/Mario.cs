@@ -19603,8 +19603,9 @@ public partial class Mario : CharacterBody3D
     // ======================================================================================================================================
     //  Pass 119: the return from a stage -- TMario::returnStart + warpOut (MarioAutodemo.cpp 318 / 368), TMarDirector::setMario (534)
     // ======================================================================================================================================
-    /// <summary>warpOut state 1: the appear clip held this long before the rolling fall (0xB4 = 180 frames at 60).</summary>
-    [Export] public float SmsGateOutHoldSeconds = 3.0f;
+    /// <summary>warpOut state 1: from the appear to the rolling fall, 0xB4 = 180 of Mario's status ticks -- the director's 120 Hz movement ticks, so
+    /// 1.5 s: the appear clip's own 89 frames at 60 (he spins in and straight into the roll). 120b: it was 3.0 s here (60 Hz assumed) and he hung.</summary>
+    [Export] public float SmsGateOutHoldSeconds = 1.5f;
     /// <summary>120: warpOutEffect kind 0 -- ms_m_gout_gate, the paint-water stream out of the M gate (SmsGateStream: the jpa run on the CPU). The
     /// game's kinds 1 (the pipe, ms_m_gout_dokan) and 2 (the body-part sparkles) are not ported.</summary>
     [Export] public bool SmsGateOutStream = true;

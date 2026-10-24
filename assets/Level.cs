@@ -145,14 +145,15 @@ public partial class Level : Node3D
 
         // SMS pass 119: back from a stage (an ExitLevel shine, the pause menu's Exit Area) -- the game runs no intro: TMarDirector::setMario puts
         // him at the return spot for the stage he left (SmsReturnSpot; Mario starts the gate-out demo on his first tick) and the screen comes in
-        // with the spiral wipe (startWipe(7) = Hx_Test4 -- NOT ported: black and a plain 0.4 s fade in, as after a miss).
+        // with the spiral wipe (startWipe(7) = Hx_Test4 -- NOT ported: black and a plain fade in over the spiral's 38 wiper frames at 30 Hz, 1.27 s,
+        // so the appear clip's invisible first 0.9 s passes under it as it does under the spiral).
         if (GameData.Instance != null && !string.IsNullOrEmpty(GameData.Instance.ReturnFromScene))
         {
             PreviewShot = false;
             if (SmsFader.Current != null)
             {
                 SmsFader.Current.SetBlack();
-                SmsFader.Current.FadeIn(0.4f);
+                SmsFader.Current.FadeIn(38f / 30f);
             }
         }
 
