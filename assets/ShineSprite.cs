@@ -847,6 +847,14 @@ public partial class ShineSprite : Node3D
     /// raise grows the star ~1.8x); 0.7 = the bck's scale track taken literally (116c, "super small"). The growth runs on the track's own
     /// keys (frames 211-222, 3.5-3.7 s). DEVIATION from the data, matched to the screen -- the engine mechanism is not understood.</summary>
     [Export] public float SmsDemoPoseScale = 0.9f;
+    /// <summary>Pass 118: what follows the demo. The game leaves the stage after EVERY shine -- TMarDirector::updateGameMode registers the 1 s
+    /// fade to (210, 210, 210) at 5.333 s and decideNextStage() sends it to Delfino Plaza (in the Plaza itself the Plaza reloads). On: that fade,
+    /// then <see cref="ExitScene"/>. Off (DEVIATION, Jaysonn's: a shine that keeps you in the level): no fade; the demo runs to its camera's end
+    /// (6.98 s) and play resumes where he stands.</summary>
+    [Export] public bool ExitLevel = false;
+    /// <summary>Where <see cref="ExitLevel"/> goes (a .tscn path). Empty: the pause menu's Exit Area scene; none set either: this level reloads
+    /// (the Plaza's own case).</summary>
+    [Export(PropertyHint.File, "*.tscn")] public string ExitScene = "";
     private bool _smsDriven;
     private int _smsBoneRoot = -2, _smsBoneGlow = -1, _smsBoneBody = -1;   // the bck's joints 0 / 1 / 2 by name (-2 = not looked up yet)
     private bool _smsMeshZeroed;

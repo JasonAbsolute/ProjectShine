@@ -7001,3 +7001,36 @@ the blo's homes).
 
 Verified: drive 116 23/23 (A7d new), 117 9/9, build 0 errors, boot ALL OK; GPU capture at 4.75 s with Godot's projections matched to the
 drawn star. Files: `ShineSprite.cs`, `Sms/Console/SmsConsoleStr.cs`.
+
+### SMS pass 118 -- after the shine: leave the level or stay; the SHINE! letters lean the right way and spark (2026-10-23)
+
+Jaysonn, on 116f ("that looks right"): the shine should have an option to transition out of a level with the game's white fade; otherwise
+Mario pauses a moment and play resumes; and the letters lacked their effects ("stars and such") and were tilted the wrong way.
+
+**What the game does after the demo** (TMarDirector::updateGameMode, MarDirectorDirect.cpp 839): it registers the TShineFader's fade --
+`registFadeout(1 s x 120, 5.3333 s x 120)`, and the fader's colour is `(0xD2, 0xD2, 0xD2)` (MarDirectorSetup2.cpp 76), a near-white, not the
+black 116 had -- and sets the stage transition; `decideNextStage()` is Delfino Plaza for EVERY shine (stage 1, scenario by the story flags), the
+Plaza included, which simply reloads. The inner demo ends with the camera bck (419 frames = 6.98 s; Mario's own ma_demo_shine_get is 6.97 s)
+and moveStage runs then, behind the white. There is no "stay" in the game; a shine that keeps you in the level is Jaysonn's deviation, so
+it is the shine's option:
+
+- `ShineSprite.ExitLevel` (off) + `ExitScene`: on, the (210, 210, 210) fade from 5.333 s over 1 s, the white held, and at 6.98 s the scene
+  changes -- `ExitScene`, else the pause menu's Exit Area scene, else this level reloaded (the Plaza's own case). `Mario.SmsShineGetExit(scene)`
+  fires right before (a hook for saving). Off: no fade; the camera plays to its end and control returns where he stands.
+- Knobs: `SmsShineGetFadeColor` (the D2 grey-white), `SmsShineGetFadeAt / Len` (5.333 / 1), `SmsShineGetEndAt` (0 = the camera's end).
+  `SmsShineGetResume` and its fade back in are gone.
+
+**The letters leaned the wrong way.** J2DPane::makeMatrix (J2DPane.cpp 256) applies `-mRotation` about Z, so the blo's ROT 12 leans the
+letters' tops LEFT on screen; 116 passed +12 to Godot and leaned them right. The I gets the same tilt: its pane in the US blo reads 417 x 51
+with no ROT (unreadable), and the footage tilts it like its neighbours.
+
+**The effects.** processShineGet (ConsoleStr.cpp 570) makes two JPA emitters per letter at its pane's centre: 0x1FE when the letter is called
+in (the footage: white speed lines shooting left from where it will land) and 0x1FF sixty ticks later, when it has settled (small pastel
+stars flung out, falling and fading). The particle files are not ported; both are APPROXIMATED in code from the footage (sizes and speeds
+in the blo's pixels, the lines drawn under the letters so they never slice one still flying in, the stars over them). Knobs
+`SmsShineGetSparks`, `ShineStreakCount` (6), `ShineStarCount` (10), `ShineStarColors` (white, pink, pale yellow).
+
+Verified: drive 118 28/28 (the 116 timeline through the pose, the stay case to 6.98 s with no fade, every letter at -12 deg, the sparks' two
+moments, the ExitLevel case's half white at 5.83 s in (0.824, 0.824, 0.824), full at 6.4 s, the scene change at 6.98 s seen from the reloaded
+level), 117 9/9, build 0 errors, boot ALL OK; GPU captures at 3.1 / 3.25 / 3.6 / 4.0 / 6.9 s viewed against the game's frames. Drive 118
+supersedes drive 116. Files: `Mario.cs`, `ShineSprite.cs`, `Sms/Console/SmsConsoleStr.cs`.

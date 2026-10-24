@@ -40,7 +40,16 @@ public partial class SmsConsoleStr : CanvasLayer
     /// <summary>The panes' centres in the blo's 600 x 480 (sg00 (59, 364) .. sg05 (341, 287), 70 x 70; the I's pane reads 417 x 51 in this blo and
     /// is interpolated between H and N).</summary>
     [Export] public Vector2[] ShineHomes = { new Vector2(94f, 399f), new Vector2(153f, 384f), new Vector2(206f, 369f), new Vector2(259f, 355f), new Vector2(318f, 336f), new Vector2(376f, 322f) };
-    [Export] public float ShineTiltDeg = 12f;      // the panes' ROT 12 (the I untilted)
+    /// <summary>The panes' ROT 12. J2DPane::makeMatrix NEGATES a Z rotation (J2DPane.cpp 256), so the tops lean LEFT on screen (116 leaned them right).
+    /// The I's pane is unreadable in the US blo (417 x 51, no ROT); the footage tilts it like its neighbours, so it gets the same.</summary>
+    [Export] public float ShineTiltDeg = 12f;
+    /// <summary>118: the letters' JPA effects, approximated (the game's particle files are not ported): 0x1FE at a letter's arrival -- white speed
+    /// lines shooting left from where it lands -- and 0x1FF half a second later, when it has settled -- a burst of small pastel stars that scatter
+    /// and fall (processShineGet 570: gpEmitterManager4D2->createEmitter at the pane's centre). Sizes and speeds in the blo's pixels. false = none.</summary>
+    [Export] public bool SmsShineGetSparks = true;
+    [Export] public int ShineStreakCount = 6;
+    [Export] public int ShineStarCount = 10;
+    [Export] public Color[] ShineStarColors = { Colors.White, new Color("ffb4d2"), new Color("fff0a0") };
     [Export] public float ShineGlyphHeight = 70f;
     /// <summary>116f: the game's letters are white glyphs x each pane's four CORNER COLOURS (big_tx_1.blo): a vertical gradient, light at the
     /// top and saturated at the bottom. false = the flat tint from Palette (116).</summary>
@@ -59,6 +68,8 @@ public partial class SmsConsoleStr : CanvasLayer
     public bool MissRunning => _frame >= 0f;
     private Control _shineRoot; private TextureRect[] _shineLetters = System.Array.Empty<TextureRect>(); private Vector2[] _shineHome = System.Array.Empty<Vector2>();
     private float _shineFrame = -1f;
+    private SmsShineSparks _shineStreaks, _shineStars; private int[] _shineSparkStage = System.Array.Empty<int>();   // the lines behind the letters, the stars over them
+    public int ShineSparkCount => (_shineStreaks?.Count ?? 0) + (_shineStars?.Count ?? 0);
     public bool ShineGetRunning => _shineFrame >= 0f;
     public float ShineGetFrame => _shineFrame;
     public int ShineLettersVisible { get { int n = 0; foreach (var t in _shineLetters) if (t.Visible) n++; return n; } }
@@ -136,7 +147,7 @@ public partial class SmsConsoleStr : CanvasLayer
             {
                 Vector2 home = i < ShineHomes.Length ? ShineHomes[i] : new Vector2(94f + 56f * i, 399f - 15f * i);
                 char ch = ShineText[i];
-                float tilt = ch == 'I' ? 0f : ShineTiltDeg;
+                float tilt = -ShineTiltDeg;   // J2D: MTXRotRad(rotate, 'z', -mRotation)
                 var pal = Palette.Length > 0 ? new[] { Palette[i % Palette.Length] } : Palette;
                 var one = SmsBigText.Build(_shineRoot, ch.ToString(), GlyphPathFormat, home, ShineGlyphHeight, LetterGap, SpaceWidth, pal, Colored && !SmsShineGetGradient, null, tilt, 0f);
                 if (SmsShineGetGradient)
@@ -158,9 +169,72 @@ public partial class SmsConsoleStr : CanvasLayer
             _shineHome = new Vector2[_shineLetters.Length];
             for (int i = 0; i < _shineLetters.Length; i++) _shineHome[i] = _shineLetters[i].Position;
         }
+        if (_shineStreaks == null) { _shineStreaks = new SmsShineSparks { Name = "Streaks" }; _shineRoot.AddChild(_shineStreaks); }
+        if (_shineStars == null) { _shineStars = new SmsShineSparks { Name = "Stars" }; _shineRoot.AddChild(_shineStars); }
+        _shineRoot.MoveChild(_shineStreaks, 0); _shineRoot.MoveChild(_shineStars, -1);   // the lines under the letters (they would slice the ones still flying in), the stars over them
+        _shineStreaks.Clear(); _shineStars.Clear();
+        _shineSparkStage = new int[_shineLetters.Length];
         foreach (var t in _shineLetters) { t.Visible = false; t.Modulate = new Color(1f, 1f, 1f, 0f); }
         _shineFrame = 0f;
         _shineRoot.Visible = true;
+    }
+
+    /// <summary>The two emitters of processShineGet, approximated: speed lines when a letter is called in, stars when it has settled.</summary>
+    private partial class SmsShineSparks : Node2D
+    {
+        private struct P { public Vector2 Pos, Vel; public float Life, Age, Size, Rot, Spin; public Color Col; public bool Star; }
+        private readonly System.Collections.Generic.List<P> _p = new();
+        private readonly RandomNumberGenerator _rng = new();
+        public int Count => _p.Count;
+        /// <summary>0x1FE: white lines from the letter's home, shooting left (the letters fly in from the right) and braking as they fade.</summary>
+        public void Streaks(Vector2 at, int n)
+        {
+            for (int i = 0; i < n; i++)
+                _p.Add(new P { Pos = at + new Vector2(_rng.RandfRange(-12f, 12f), _rng.RandfRange(-30f, 30f)), Vel = new Vector2(-_rng.RandfRange(700f, 1200f), _rng.RandfRange(-25f, 25f)),
+                    Life = _rng.RandfRange(0.25f, 0.4f), Size = _rng.RandfRange(2f, 3.5f), Col = Colors.White, Star = false });
+        }
+        /// <summary>0x1FF: small five-point stars in pastel colours, flung from the letter's centre, falling and fading.</summary>
+        public void Stars(Vector2 at, int n, Color[] cols)
+        {
+            for (int i = 0; i < n; i++)
+            {
+                float ang = _rng.RandfRange(0f, Mathf.Tau), sp = _rng.RandfRange(60f, 230f);
+                _p.Add(new P { Pos = at + new Vector2(_rng.RandfRange(-20f, 20f), _rng.RandfRange(-20f, 20f)), Vel = new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * sp,
+                    Life = _rng.RandfRange(0.9f, 1.5f), Size = _rng.RandfRange(4.5f, 9f), Rot = _rng.RandfRange(0f, Mathf.Tau), Spin = _rng.RandfRange(-3f, 3f),
+                    Col = cols != null && cols.Length > 0 ? cols[_rng.RandiRange(0, cols.Length - 1)] : Colors.White, Star = true });
+            }
+        }
+        public void Step(float dt)
+        {
+            for (int i = _p.Count - 1; i >= 0; i--)
+            {
+                P q = _p[i]; q.Age += dt;
+                if (q.Age >= q.Life) { _p.RemoveAt(i); continue; }
+                if (q.Star) { q.Vel.Y += 260f * dt; q.Rot += q.Spin * dt; } else q.Vel *= Mathf.Pow(0.02f, dt);
+                q.Pos += q.Vel * dt; _p[i] = q;
+            }
+            QueueRedraw();
+        }
+        public void Clear() { _p.Clear(); QueueRedraw(); }
+        public override void _Draw()
+        {
+            foreach (P q in _p)
+            {
+                float u = q.Age / q.Life, a = u < 0.6f ? 1f : 1f - (u - 0.6f) / 0.4f;
+                if (!q.Star) DrawLine(q.Pos, q.Pos - q.Vel * 0.12f, new Color(1f, 1f, 1f, 0.85f * a), q.Size * (1f - 0.5f * u));
+                else DrawColoredPolygon(StarPoints(q.Pos, q.Size, q.Rot), new Color(q.Col, a));
+            }
+        }
+        private static Vector2[] StarPoints(Vector2 c, float r, float rot)
+        {
+            var pts = new Vector2[10];
+            for (int k = 0; k < 10; k++)
+            {
+                float ang = rot - Mathf.Pi / 2f + k * Mathf.Pi / 5f, rr = (k & 1) == 0 ? r : r * 0.45f;
+                pts[k] = c + new Vector2(Mathf.Cos(ang), Mathf.Sin(ang)) * rr;
+            }
+            return pts;
+        }
     }
 
     /// <summary>processShineGet (570) on the index = ticks past the wait: letter i shows at 6i with a 40-tick Bezier from (150, -50) via (-21, 7) to
@@ -176,6 +250,12 @@ public partial class SmsConsoleStr : CanvasLayer
             float since = idx - 6f * i;
             if (since < 0f || since > 240f) { t.Visible = false; continue; }
             any = true; t.Visible = true;
+            if (SmsShineGetSparks && _shineStreaks != null && _shineStars != null && i < _shineSparkStage.Length)
+            {
+                Vector2 centre = _shineHome[i] + t.Size * 0.5f;   // the pane's centre: getBounds() at the emitter's creation (the move applies after)
+                if (_shineSparkStage[i] == 0) { _shineStreaks.Streaks(centre, ShineStreakCount); _shineSparkStage[i] = 1; }
+                if (_shineSparkStage[i] == 1 && since >= 60f) { _shineStars.Stars(centre, ShineStarCount, ShineStarColors); _shineSparkStage[i] = 2; }
+            }
             Vector2 off;
             if (since < 40f) off = SmsHud.Bezier(new Vector2(150f, -50f), new Vector2(-21f, 7f), new Vector2(-21f, 7f), since / 40f);
             else if (since < 60f) off = SmsHud.Bezier(new Vector2(-21f, 7f), new Vector2(-21f, 7f), Vector2.Zero, (since - 40f) / 20f);
@@ -185,7 +265,7 @@ public partial class SmsConsoleStr : CanvasLayer
             float a = since < 40f ? Mathf.Min(1f, since * 7f / 255f) : 1f;
             t.Modulate = new Color(1f, 1f, 1f, a);
         }
-        if (!any && idx > 240f) { _shineFrame = -1f; _shineRoot.Visible = false; }
+        if (!any && idx > 240f && ShineSparkCount == 0) { _shineFrame = -1f; _shineRoot.Visible = false; }
     }
 
     public void Clear()
@@ -207,6 +287,8 @@ public partial class SmsConsoleStr : CanvasLayer
         Miss.Position = vp * 0.5f - LayoutCenter * s;
         if (_shineRoot != null) { _shineRoot.Scale = Miss.Scale; _shineRoot.Position = Miss.Position; }
         if (_shineFrame >= 0f) { _shineFrame += (float)delta * 120f * SmsHud.Anim; ProcessShineGet(_shineFrame); }
+        if (_shineStreaks != null && _shineStreaks.Count > 0) _shineStreaks.Step((float)delta * SmsHud.Anim);
+        if (_shineStars != null && _shineStars.Count > 0) _shineStars.Step((float)delta * SmsHud.Anim);
         if (_frame < 0f)
             return;
         _frame += (float)delta * 120f * SmsHud.Anim;
