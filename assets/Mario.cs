@@ -1507,6 +1507,7 @@ public partial class Mario : CharacterBody3D
         _redCoins = 0;
         _blueCoins = GameData.Instance.BlueCoinCount;
         _shines = GameData.Instance?.ShineCount ?? 0;   // 118c: MSF_SHINE_COUNT, from the save
+        SmsGateOutCapture();                            // 119: back from a stage? the return spot and the gate-out on the first tick
         SmsStandardHudSetup(); // the console (assets/Sms/Console/SmsHud.tscn) draws the counters, the life meter and the gauge -- it reads the fields above
         _camera = GetNodeOrNull<SunshineCamera>("CamController");
 
@@ -1995,13 +1996,14 @@ public partial class Mario : CharacterBody3D
         }
 
         SmsShineDemoTick(delta);   // pass 116: the shine-get demo's clock, camera, shine, fade (runs through the lock)
+        SmsGateOutTick(delta);     // pass 119: the return from a stage -- warpOut's appear / rolling / landing (runs through the lock)
 
         if (CameraLocked)
         {
             SmsFluddDropsTickLocked(delta);   // 116d: the water in flight keeps falling through the demo / the lock (TModelWaterManager::move)
             bool wasAirPrev = !wasOnFloor;
 
-            if (IsOnFloor())
+            if (IsOnFloor() || _smsGateOutPhase == 1)   // 119: warpOut state 1 runs no jumpProcess -- he hangs at the gate until the hold is over
             {
                 // Standing: full freeze, no slide.
                 velocity = Vector3.Zero;
@@ -19578,6 +19580,12 @@ public partial class Mario : CharacterBody3D
             if (dest == "") dest = SmsFluddModel.FindChild<SmsPauseMenu>(this)?.ExitAreaScene ?? "";
             if (SmsDebugPrint) GD.Print($"[SMS shine] demo over at {SmsShineGetEndTime:F2} s behind the white: moveStage -> {(dest != "" ? dest : "this level again (the Plaza's decideNextStage)")}");
             EmitSignal(SignalName.SmsShineGetExit, dest);
+            if (GameData.Instance != null && dest != "")
+            {
+                // 119: MSF_GOT_SHINE_IN_PREV_STAGE + the previous area: the next level starts him at its return spot for this one, with the shine pose
+                GameData.Instance.ReturnFromScene = GetTree().CurrentScene?.SceneFilePath;
+                GameData.Instance.ReturnWithShine = true;
+            }
             if (dest != "") GetTree().ChangeSceneToFile(dest); else GetTree().ReloadCurrentScene();
             return;
         }
@@ -19589,6 +19597,113 @@ public partial class Mario : CharacterBody3D
         SetMarioState(stateOfMario);
         camera?.MakeCurrent();
         if (SmsDebugPrint) GD.Print($"[SMS shine] demo over at {SmsShineGetEndTime:F2} s: control returned (the shine's ExitLevel is off)");
+    }
+
+    // ======================================================================================================================================
+    //  Pass 119: the return from a stage -- TMario::returnStart + warpOut (MarioAutodemo.cpp 318 / 368), TMarDirector::setMario (534)
+    // ======================================================================================================================================
+    /// <summary>warpOut state 1: the appear clip held this long before the rolling fall (0xB4 = 180 frames at 60).</summary>
+    [Export] public float SmsGateOutHoldSeconds = 3.0f;
+    private int _smsGateOutPhase;                 // 0 none, 1 the appear (held at the gate), 2 the rolling fall, 3 landed (the gate-out clip / the pose)
+    private float _smsGateOutT;
+    private bool _smsGateOutShine, _smsGateOutPending;
+    private string _smsGateOutFrom;
+    public bool SmsGateOutRunning => _smsGateOutPhase > 0;
+    public int SmsGateOutPhase => _smsGateOutPhase;
+
+    /// <summary>At _Ready: GameData says he left a stage -- the return spot is looked for on the first physics tick (every node is in the tree by
+    /// then, spawners included) and the flags are cleared there (the level's own _Ready, which runs after this, still reads them to skip its
+    /// intro; TMarDirector::setMario clears MSF_GOT_SHINE_IN_PREV_STAGE the same way, once used).</summary>
+    private void SmsGateOutCapture()
+    {
+        if (GameData.Instance == null || string.IsNullOrEmpty(GameData.Instance.ReturnFromScene)) return;
+        _smsGateOutFrom = GameData.Instance.ReturnFromScene;
+        _smsGateOutShine = GameData.Instance.ReturnWithShine;
+        _smsGateOutPending = true;
+    }
+
+    /// <summary>returnStart(pos, rot, gotShine, type): startCommon warps him to the spot facing its forward (a shine) or the opposite way, then
+    /// WARP_OUT: ANIM_DEMO_GATE_OUT_APPEAR(_GET) held, the rolling clip falling under gravity, on the floor ANIM_DEMO_GATE_OUT (_GET2: the shine
+    /// pose) to its last frame, then WAIT. The gate particle (PARTICLE_MS_M_GOUT_GATE) is not ported.</summary>
+    public void SmsGateOutStart(SmsReturnSpot spot, bool withShine)
+    {
+        if (spot == null) return;
+        Vector3 fwd = -spot.GlobalBasis.Z; fwd.Y = 0f;
+        if (fwd.LengthSquared() < 1e-6f) fwd = Vector3.Forward;
+        Vector3 face = (withShine ? fwd : -fwd).Normalized();   // rotation (a shine) / rotation + 180
+        GlobalPosition = spot.GlobalPosition;
+        velocity = Vector3.Zero; Velocity = Vector3.Zero;
+        float yaw = SmsMath.YawFromDir(face);
+        SmsLatchFace(face, 1);
+        if (armature != null) armature.Rotation = new Vector3(0f, yaw, 0f);
+        lastFacingDirection = face;
+        if (heldBody != null) Anim_DetachPickup();
+        pendingPickup = null;
+        CameraLocked = true;
+        stateOfMario = MarioState.shineGet;   // the demo state: input and the state machine off, the tree off for the direct clips
+        SetMarioState(stateOfMario);
+        SmsCameraWarpBehind();
+        _smsGateOutShine = withShine; _smsGateOutPhase = 1; _smsGateOutT = 0f;
+        SmsGateOutClip(withShine ? "ma_demo_gate_out_appear_get" : "ma_demo_gate_out_appear");
+        if (SmsDebugPrint) GD.Print($"[SMS return] gate out at {spot.Name} {GlobalPosition} facing {Mathf.RadToDeg(yaw):F0} deg, {(withShine ? "with the shine (the pose)" : "no shine")}, held {SmsGateOutHoldSeconds:F1} s then the fall");
+    }
+
+    private void SmsGateOutClip(string clip)
+    {
+        if (animPlayer == null) return;
+        if (animTree != null) animTree.Active = false;
+        animPlayer.SpeedScale = 1f;
+        if (animPlayer.HasAnimation(clip)) animPlayer.Play(clip);
+        else GD.PushWarning($"[SMS return] Player.tscn has no clip '{clip}' (the game's ma_demo_gate_out set)");
+    }
+
+    private bool SmsGateOutClipDone() => animPlayer == null || !animPlayer.IsPlaying() || animPlayer.CurrentAnimationPosition >= animPlayer.CurrentAnimationLength - 1f / 60f;
+
+    /// <summary>Every physics frame, before the lock block: the first tick's start (the spot looked up), then warpOut's states.</summary>
+    private void SmsGateOutTick(double delta)
+    {
+        if (_smsGateOutPending)
+        {
+            _smsGateOutPending = false;
+            if (GameData.Instance != null) { GameData.Instance.ReturnFromScene = null; GameData.Instance.ReturnWithShine = false; }
+            var spot = SmsReturnSpot.Find(GetTree(), _smsGateOutFrom);
+            if (spot != null) SmsGateOutStart(spot, _smsGateOutShine);
+            else if (SmsDebugPrint) GD.Print($"[SMS return] back from {_smsGateOutFrom} but this level has no SmsReturnSpot for it: the plain start");
+            return;
+        }
+        if (_smsGateOutPhase == 0) return;
+        if (stateOfMario != MarioState.shineGet) { _smsGateOutPhase = 0; return; }   // left some other way (a reload, his debug keys)
+        float dt = (float)delta;
+        _smsGateOutT += dt;
+        switch (_smsGateOutPhase)
+        {
+            case 1:
+                velocity = Vector3.Zero; Velocity = Vector3.Zero;
+                if (_smsGateOutT >= SmsGateOutHoldSeconds)
+                {
+                    _smsGateOutPhase = 2;
+                    SmsGateOutClip(_smsGateOutShine ? "ma_demo_gate_out_rolling_get" : "ma_demo_gate_out_rolling");   // jumpProcess(0): the lock block's gravity
+                }
+                break;
+            case 2:
+                if (IsOnFloor())
+                {
+                    _smsGateOutPhase = 3;
+                    SmsGateOutClip(_smsGateOutShine ? "ma_demo_gate_out_get2" : "ma_demo_gate_out");
+                }
+                break;
+            case 3:
+                if (SmsGateOutClipDone())
+                {
+                    _smsGateOutPhase = 0;
+                    CameraLocked = false;
+                    stateOfMario = MarioState.idle;
+                    animPlayer?.Play("ma_wait");
+                    SetMarioState(stateOfMario);
+                    if (SmsDebugPrint) GD.Print($"[SMS return] gate out over at {_smsGateOutT:F2} s: WAIT, control returned");
+                }
+                break;
+        }
     }
 
 }

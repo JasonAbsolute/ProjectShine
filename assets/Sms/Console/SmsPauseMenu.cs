@@ -554,6 +554,12 @@ public partial class SmsPauseMenu : CanvasLayer
         if (SmsFader.Current == null || SmsFader.Current.IsFullyFadedOut)
         {
             _leaving = false;
+            if (GameData.Instance != null)
+            {
+                // SMS pass 119: decideNextStage + moveStage without a shine: the next level starts him at its return spot for this one
+                GameData.Instance.ReturnFromScene = GetTree().CurrentScene?.SceneFilePath;
+                GameData.Instance.ReturnWithShine = false;
+            }
             GetTree().ChangeSceneToFile(ExitAreaScene);
         }
     }

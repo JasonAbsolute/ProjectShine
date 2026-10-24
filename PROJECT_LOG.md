@@ -7078,3 +7078,32 @@ Verified: drive 118 35/35 -- E's shine carries a key: set at the touch and in th
 Mario's count is the saved set's (F1), the same key placed again loads empty (F2), taking the empty one plays the demo and leaves the count
 and the file alone (F3); his save file is put back by the drive. 117 9/9, build 0 errors, boot ALL OK; a GPU frame of the empty shine beside
 a fresh one viewed. Files: `Mario.cs`, `ShineSprite.cs`, `GameData.cs`, `RedCoinSwitch.cs`.
+
+### SMS pass 119 -- where he lands after leaving a stage: the return spot and the gate-out (2026-10-24)
+
+Jaysonn: "lets do 1, 2, 3" -- this is 2, the spawn on exit.
+
+**The game.** Leaving a stage sets MSF_GOT_SHINE_IN_PREV_STAGE (a shine) and the previous area; the next stage's director picks the
+"マリオセット位置" entry (TMarioPositionObj: the Plaza's return spots, one per stage -- MarDirectorSetupObjects.cpp 80) for the stage he left and
+calls `TMario::returnStart(pos, rot, gotShine, type)` (MarioAutodemo.cpp 318): startCommon warps him there facing `rot` with a shine or
+`rot + 180` without, then `warpOut()` (368): ANIM_DEMO_GATE_OUT_APPEAR(_GET) plus the gate particle, held 0xB4 = 180 frames, then
+ANIM_DEMO_GATE_OUT_ROLLING(_GET) under jumpProcess -- he drops from the spot -- and on the floor ANIM_DEMO_GATE_OUT (_GET2, the shine
+pose) to its last frame, then WAIT. No intro runs; the screen comes in with startWipe(7) = Hx_Test4, the spiral.
+
+**Port.**
+- `SmsReturnSpot` (new, `assets/Sms/SmsReturnSpot.cs`, a Node3D marker): `FromScene` = the level it is the return for ("" = any level
+  without its own). Place one per level you can come back from; he faces its forward (-Z) with a shine, the opposite way without, and drops
+  from it, so a spot in the air falls as the game's do.
+- `GameData.ReturnFromScene / ReturnWithShine` (run-scoped): set by an ExitLevel shine's exit (with the shine) and the pause menu's Exit Area
+  (without), read by the next level: `Level` skips its intro (black and a plain 0.4 s fade in -- the spiral is NOT ported) and Mario, on his
+  first tick, finds the spot and runs the gate-out in the demo state (`SmsGateOutHoldSeconds` 3.0 for the hold). The gate particle is not
+  ported. No spot: the plain start, a note in the log. Mario clears the flags once used, as setMario does.
+
+Verified: drive 119 13/13 -- the first tick after the load has him at the spot in the demo state with the right clip and facing, the fader
+black then in; 2.8 s in he still hangs there (the appear clip over, its last frame held); past 3 s the rolling clip and the fall; on the floor
+the gate-out clip (the pose with a shine, the plain one without); then idle with control; a return with no spot = the plain start, intro still
+skipped. Drives 118 35/35 and 117 9/9 on the new code, build 0 errors, boot ALL OK; a GPU capture of the gate-out (hanging, tumbling, the
+pose) viewed. Files: `Mario.cs`, `GameData.cs`, `Level.cs`, `Sms/Console/SmsPauseMenu.cs`, `Sms/SmsReturnSpot.cs` (new).
+
+Note: between two drive runs the level's own shine key turned up in the save file once (the save showed one shine Jaysonn did not collect);
+no run reproduces it and no log records a collection. The save was put back clean; both drives now back it up and restore it. F8 clears it.

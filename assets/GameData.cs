@@ -73,6 +73,12 @@ public partial class GameData : Node
     /// <summary>The game's flag 0x30002: the next stage load follows a miss -- no intro, a plain fade in. Level.cs clears it.</summary>
     public bool CameFromMiss;
 
+    /// <summary>SMS pass 119: the stage he just left (its scene path; null = a plain start) and whether a shine sent him
+    /// (MSF_GOT_SHINE_IN_PREV_STAGE). Mario's ExitLevel exit and the pause menu's Exit Area set them; the next level starts him at its
+    /// SmsReturnSpot for that stage in the gate-out demo and skips its intro. Mario clears them once used. Not saved -- the run's.</summary>
+    public string ReturnFromScene;
+    public bool ReturnWithShine;
+
     /// <summary>The pause menu's SAVE (the game's card save): write the save file now.</summary>
     public void SaveNow() => Save();
 
