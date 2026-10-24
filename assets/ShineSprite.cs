@@ -849,6 +849,7 @@ public partial class ShineSprite : Node3D
     [Export] public float SmsDemoPoseScale = 0.9f;
     private bool _smsDriven;
     private int _smsBoneRoot = -2, _smsBoneGlow = -1, _smsBoneBody = -1;   // the bck's joints 0 / 1 / 2 by name (-2 = not looked up yet)
+    private bool _smsMeshZeroed;
     private float _smsBaseScale = 0.006f;
     public bool SmsDemoDriven => _smsDriven;
 
@@ -864,6 +865,14 @@ public partial class ShineSprite : Node3D
         GlobalTransform = new Transform3D(marioFrame.Basis.Scaled(new Vector3(s, s, s)), marioFrame.Origin);
         if (_smsBoneRoot == -2 && _starSkel != null) { _smsBoneRoot = _starSkel.FindBone("shine"); _smsBoneGlow = _starSkel.FindBone("starglow"); _smsBoneBody = _starSkel.FindBone("body"); }
         if (_starSkel == null || _smsBoneRoot < 0 || _smsBoneBody < 0) return;
+        if (!_smsMeshZeroed)
+        {
+            // 116f: the scene's Mesh_0 node carries a (0, -48.2, 0) drop that Godot adds to the skinned vertices on top of the bones -- the
+            // placed shine's look, but through the demo it drew the star 48 u below the joint the bck drives ("sitting low"). The bones
+            // are the game's; the mesh follows them alone. The shine is freed after the demo, so nothing is restored.
+            foreach (Node n in _starSkel.GetChildren()) if (n is MeshInstance3D mi) mi.Transform = Transform3D.Identity;
+            _smsMeshZeroed = true;
+        }
         // 116d: the root joint sits ON Mario's wrist (116c: the bck puts it at (-36.5, 91.4, -4.9) = jnt_hand_R) at scale 1; the children's
         // positions follow J3D (child T x the root's scale track) so the star's centre is the game's (57 u out on the pose -- the wiki's
         // screenshot agrees); the star's DRAWN size is the game's screen, the full model on the pose: track / 0.7 x SmsDemoScale.

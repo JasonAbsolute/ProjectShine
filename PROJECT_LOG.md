@@ -6976,3 +6976,28 @@ clip at rate 1.0, the water falling through the demo.
 
 Verified: drive 116 22/22 (A5b the catch at the track's 0.5 = 0.00679 a model unit, A7b the pose at 0.9), 117 9/9, build 0 errors,
 boot ALL OK; GPU capture of the catch and pose. Files: `ShineSprite.cs`.
+
+### SMS pass 116f -- the star where its joint is, and the SHINE! letters' gradients (2026-10-23)
+
+Jaysonn on 116e, with a screenshot: "the shine is still not in the right spot -- sitting low and offset behind Mario a bit -- and the font
+looks off." Both right, both found by measuring his frame against the game's.
+
+**The star sat 48 u below its joint.** Godot's own `UnprojectPosition` of the bck-driven body joint landed 36 px ABOVE the drawn star in the
+4.75 s capture, with the wrist and head projecting where they render. The cause is in `shine_sprite.tscn`: the skinned `Mesh_0` node
+carries `transform = (…, 0, -48.1984, 0)`, a 48 u drop in the skeleton's frame that Godot adds to the skinned vertices on top of the bones
+-- how the placed shine's height was set up, and harmless there, but through the demo it put the rendered star 0.65 m under the joint the
+game's animation drives: the star beside the glove instead of above it, "sitting low". Every drive check since 116b measured the JOINT
+(right to the unit) and so passed. While the demo drives the bones the mesh node's transform is identity; the shine is freed after the
+demo, nothing to restore. Drive 116 A7d now checks the mesh node, not just the joint. Against the game's outdoor capture at the same
+moment the star now sits up-left of his head with the glove at its lower-right point, as the game draws it.
+
+**The letters were flat.** The game's SHINE! glyphs are white textures tinted by each pane's four CORNER COLOURS (big_tx_1.blo PIC1, after
+the black/white pair -- blo_dump.py stopped before them): a vertical gradient per letter, light at the top, saturated at the bottom
+(S 00ff00 -> 006400, H ffdcdc -> ff0064, I ffff50 -> e68c00, N 00ffff -> 001eff, E ffd264 -> ff0000, ! ffdcdc -> ff0064; the file's first
+pair is the bottom on screen). 116 tinted them flat from his palette. Now a canvas_item shader per letter multiplies the glyph by
+mix(top, bottom, v) with v the glyph's own vertical coordinate (so it rotates with the pane's 12 deg, as the game's does); the black outline
+stays black. Knob `SmsShineGetGradient` (off = the flat palette). Letter size and spacing were already the game's (0.12 of the frame height,
+the blo's homes).
+
+Verified: drive 116 23/23 (A7d new), 117 9/9, build 0 errors, boot ALL OK; GPU capture at 4.75 s with Godot's projections matched to the
+drawn star. Files: `ShineSprite.cs`, `Sms/Console/SmsConsoleStr.cs`.

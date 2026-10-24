@@ -42,6 +42,14 @@ public partial class SmsConsoleStr : CanvasLayer
     [Export] public Vector2[] ShineHomes = { new Vector2(94f, 399f), new Vector2(153f, 384f), new Vector2(206f, 369f), new Vector2(259f, 355f), new Vector2(318f, 336f), new Vector2(376f, 322f) };
     [Export] public float ShineTiltDeg = 12f;      // the panes' ROT 12 (the I untilted)
     [Export] public float ShineGlyphHeight = 70f;
+    /// <summary>116f: the game's letters are white glyphs x each pane's four CORNER COLOURS (big_tx_1.blo): a vertical gradient, light at the
+    /// top and saturated at the bottom. false = the flat tint from Palette (116).</summary>
+    [Export] public bool SmsShineGetGradient = true;
+    /// <summary>sg00..sg05's corner colours, top then bottom per letter (the blo's second pair is the top on screen).</summary>
+    [Export] public Color[] ShineGradientTop = { new Color("00ff00"), new Color("ffdcdc"), new Color("ffff50"), new Color("00ffff"), new Color("ffd264"), new Color("ffdcdc") };
+    [Export] public Color[] ShineGradientBottom = { new Color("006400"), new Color("ff0064"), new Color("e68c00"), new Color("001eff"), new Color("ff0000"), new Color("ff0064") };
+    private static Shader _shineGradShader;
+    private const string ShineGradCode = "shader_type canvas_item;\nuniform vec4 top_color : source_color = vec4(1.0);\nuniform vec4 bottom_color : source_color = vec4(1.0);\nuniform float rect_h = 1.0;\nvarying float v_t;\nvoid vertex() { v_t = clamp(VERTEX.y / max(rect_h, 1.0), 0.0, 1.0); }\nvoid fragment() { vec4 t = texture(TEXTURE, UV); COLOR = t * mix(top_color, bottom_color, v_t); }\n";
 
     private TextureRect[] _letters = System.Array.Empty<TextureRect>();
     private Vector2[] _home = System.Array.Empty<Vector2>();
@@ -130,7 +138,20 @@ public partial class SmsConsoleStr : CanvasLayer
                 char ch = ShineText[i];
                 float tilt = ch == 'I' ? 0f : ShineTiltDeg;
                 var pal = Palette.Length > 0 ? new[] { Palette[i % Palette.Length] } : Palette;
-                var one = SmsBigText.Build(_shineRoot, ch.ToString(), GlyphPathFormat, home, ShineGlyphHeight, LetterGap, SpaceWidth, pal, Colored, null, tilt, 0f);
+                var one = SmsBigText.Build(_shineRoot, ch.ToString(), GlyphPathFormat, home, ShineGlyphHeight, LetterGap, SpaceWidth, pal, Colored && !SmsShineGetGradient, null, tilt, 0f);
+                if (SmsShineGetGradient)
+                {
+                    // 116f: the pane's corner colours as a top -> bottom gradient over the white glyph (the outline stays black: it multiplies)
+                    _shineGradShader ??= new Shader { Code = ShineGradCode };
+                    foreach (var rect in one)
+                    {
+                        var mat = new ShaderMaterial { Shader = _shineGradShader };
+                        mat.SetShaderParameter("top_color", i < ShineGradientTop.Length ? ShineGradientTop[i] : Colors.White);
+                        mat.SetShaderParameter("bottom_color", i < ShineGradientBottom.Length ? ShineGradientBottom[i] : Colors.White);
+                        mat.SetShaderParameter("rect_h", Mathf.Max(rect.Size.Y, 1f));
+                        rect.Material = mat; rect.SelfModulate = Colors.White;
+                    }
+                }
                 letters.AddRange(one);
             }
             _shineLetters = letters.ToArray();
