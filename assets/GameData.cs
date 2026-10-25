@@ -15,10 +15,11 @@ public partial class GameData : Node
         Load();
     }
 
+    /// <summary>TFlagManager::setBlueCoinFlag: the flag set in RAM; the write is the card save's (pass 124: fireGetBlueCoin's
+    /// CARD_SAVE_PENDING -> the dialog, "Save and Continue" writes).</summary>
     public void CollectBlueCoin(string id)
     {
         _collectedBlueCoins.Add(id);
-        Save();
     }
 
     public bool IsBlueCoinCollected(string id)
@@ -30,15 +31,19 @@ public partial class GameData : Node
 
     // ------------------------------------------------------------------ shines (SMS pass 118c) --
 
-    /// <summary>TFlagManager::setShineFlag (FlagManager.cpp 308): the shine's flag set, and MSF_SHINE_COUNT up by one only when it was clear;
-    /// written to disk at once (the game's card save follows in the Plaza; its dialog is not ported). True when the flag was new.</summary>
+    /// <summary>TFlagManager::setShineFlag (FlagManager.cpp 308): the shine's flag set, and MSF_SHINE_COUNT up by one only when it was clear --
+    /// in RAM: the card save after the demo writes it (pass 124, SmsCardSave; "Continue" leaves it unsaved, as the game). True when the flag was new.</summary>
     public bool CollectShine(string id)
     {
-        if (!_collectedShines.Add(id))
-            return false;
-        Save();
-        return true;
+        return _collectedShines.Add(id);
     }
+
+    // ------------------------------------------------------------------- the card's bookmark (SMS pass 124, TCardBookmarkInfo) --
+
+    /// <summary>unk18: a save file exists (user://save_data.json) -- else the card save's windows read "New".</summary>
+    public bool HasSaveFile { get; private set; }
+    /// <summary>unk1C: the shine count AS SAVED (the file's), shown by the card save before the write; the live count after.</summary>
+    public int SavedShineCount { get; private set; }
 
     /// <summary>TFlagManager::getShineFlag: TShine loads shine_empty.bmd for a set flag.</summary>
     public bool IsShineCollected(string id) => _collectedShines.Contains(id);
@@ -79,7 +84,7 @@ public partial class GameData : Node
     public string ReturnFromScene;
     public bool ReturnWithShine;
 
-    /// <summary>The pause menu's SAVE (the game's card save): write the save file now.</summary>
+    /// <summary>The card save's write (TFlagManager::saveSuccess): the pause menu's SAVE, a shine's "Save and ...", a blue coin's "Save and Continue".</summary>
     public void SaveNow() => Save();
 
     public override void _Input(InputEvent @event)
@@ -92,7 +97,9 @@ public partial class GameData : Node
     {
         _collectedBlueCoins.Clear();
         _collectedShines.Clear();
-        Save();
+        using (var dir = DirAccess.Open("user://"))
+            if (dir != null && dir.FileExists("save_data.json")) dir.Remove("save_data.json");   // no file: the card save reads "New" (pass 124)
+        HasSaveFile = false; SavedShineCount = 0;
         GetTree().ReloadCurrentScene();
     }
 
@@ -110,7 +117,10 @@ public partial class GameData : Node
 
         using var file = FileAccess.Open(SavePath, FileAccess.ModeFlags.Write);
         if (file != null)
+        {
             file.StoreString(Json.Stringify(data));
+            HasSaveFile = true; SavedShineCount = _collectedShines.Count;   // the bookmark follows the file
+        }
     }
 
     private void Load()
@@ -132,5 +142,6 @@ public partial class GameData : Node
                 foreach (var shine in shinesVar.AsGodotArray())
                     _collectedShines.Add(shine.AsString());
         }
+        HasSaveFile = true; SavedShineCount = _collectedShines.Count;
     }
 }

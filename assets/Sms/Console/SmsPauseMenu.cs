@@ -205,6 +205,8 @@ public partial class SmsPauseMenu : CanvasLayer
             {
                 if (_mario != null && !_mario.SmsDirectorInPlay)
                     return; // MarDirectorDirect.cpp 804: START is read in case 0 only -- a talk (unk124 1 / 2) ignores it, silently (pass 87)
+                if (SmsCardSave.Current != null && SmsCardSave.Current.IsOpen)
+                    return; // STATE_CARD_SAVE: the director is in the dialog, START means nothing (pass 124)
                 if (_mario == null || _mario.SmsCanPause())
                     Open();
                 else if (NotNow != null && NotNow.Stream != null)
@@ -445,11 +447,20 @@ public partial class SmsPauseMenu : CanvasLayer
             _confirmed = true;
             switch (cur)
             {
-                case 1: // SAVE: the card dialog is not ported -- GameData saves while the menu dips
+                case 1: // SAVE: STATE_CARD_SAVE with PURPOSE_SAVE (pass 124, SmsCardSave) -- the "Save?" dialog over the menu; its UNK1 is this
+                        // menu's setDrawEnd (the game resumes), its UNK19 the title. Without the dialog node: the old dip while GameData saves.
                     if (PauseOn != null && PauseOn.Stream != null) PauseOn.Play();
-                    GameData.Instance?.SaveNow();
                     _saveHold = 0f;
                     _state = State.Saving;
+                    if (SmsCardSave.Current != null && !SmsCardSave.Current.IsOpen)
+                    {
+                        SmsCardSave card = SmsCardSave.Current;
+                        void OnDone(int next) { card.Finished -= OnDone; CardSaveDone(card, next); }
+                        card.Finished += OnDone;
+                        card.Open(SmsCardSave.Purpose.Save, pauseTree: false);
+                        return;
+                    }
+                    GameData.Instance?.SaveNow();
                     return;
                 default: // CONTINUE, EXIT AREA: setDrawEnd
                     _fade = 0f;
@@ -490,8 +501,26 @@ public partial class SmsPauseMenu : CanvasLayer
         _bounce += units;
     }
 
+    /// <summary>TCardSave's end with PURPOSE_SAVE: PROGRESS_UNK1 -> TPauseMenu2::setDrawEnd (CardSave.cpp 1794: the menu disappears, the game
+    /// goes on); UNK19 (Save complete -- Continue playing? No) -> the title (MarDirectorDirect.cpp 403).</summary>
+    private void CardSaveDone(SmsCardSave card, int next)
+    {
+        if (_state != State.Saving) return;
+        _confirmed = false;
+        if (next == 1)
+        {
+            GetTree().Paused = false;
+            string title = card?.TitleScene ?? "";
+            if (title != "") GetTree().ChangeSceneToFile(title); else GetTree().ChangeSceneToFile(ProjectSettings.GetSetting("application/run/main_scene").AsString());
+            return;
+        }
+        _fade = 0f;
+        _state = State.Disappearing;
+    }
+
     private void SavingTick(float units)
     {
+        if (SmsCardSave.Current != null && SmsCardSave.Current.IsOpen) return;   // the dialog is up: CardSaveDone moves us on
         if (Menu != null)
             Menu.Modulate = new Color(1f, 1f, 1f, Mathf.Max(0f, Menu.Modulate.A - 16f / 255f * units));
         _saveHold += units;

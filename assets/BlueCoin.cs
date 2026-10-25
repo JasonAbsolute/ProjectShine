@@ -75,11 +75,15 @@ public partial class BlueCoin : Node3D
         if (body is Mario mario)
         {
             if (!string.IsNullOrEmpty(CoinId))
-                GameData.Instance.CollectBlueCoin(CoinId);       // TMarDirector::fireGetBlueCoin: setBlueCoinFlag + the card save (written at once here)
+                GameData.Instance.CollectBlueCoin(CoinId);       // TMarDirector::fireGetBlueCoin: setBlueCoinFlag (in RAM) ...
 
             if (SmsHealTwo) { mario.HealOneHP(); mario.HealOneHP(); }
             mario.AddBlueCoin();
             QueueFree();
+            // ... + DIRECTOR_FLAG_CARD_SAVE_PENDING with PURPOSE_BLUE_COIN_GET (MarDirectorEvent.cpp 114): the "You got a Blue Coin!" save window
+            // over the stopped game, every coin (pass 124). The write is its "Save and Continue".
+            if (!string.IsNullOrEmpty(CoinId) && SmsCardSave.Current != null && !SmsCardSave.Current.IsOpen)
+                SmsCardSave.Current.Open(SmsCardSave.Purpose.BlueCoinGet, pauseTree: true);
         }
     }
 }

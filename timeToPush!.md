@@ -16,6 +16,11 @@ the URL it produced. Jaysonn can also just run the commands himself.
 4. If the entry asks for a PR and `gh` is installed (`gh --version`): `gh pr create --base main --head <branch> --title "<title>" --body-file <file>`
    with the body the entry gives. If `gh` is not installed, either `winget install GitHub.cli` once, or open the compare URL the entry gives
    in the browser and create the PR there.
+   **State 2026-10-25:** `gh` 2.103.2 IS now installed (`C:\Program Files\GitHub CLI\gh.exe`, not yet on the shell's PATH in a fresh session),
+   but it is **not authenticated** -- `gh auth status` says "not logged into any GitHub hosts". The cached git credential is Git Credential
+   Manager's and `gh` does not read it. Until Jaysonn runs `gh auth login` once (or sets `GH_TOKEN`), the local Claude cannot open a PR itself;
+   the fallback is to build the compare URL with `?expand=1&title=<urlencoded>&body=<urlencoded>` and open it, so the form arrives prefilled
+   and Jaysonn only presses "Create pull request".
 5. If the entry asks for a MERGE into main: Kiro has already merged locally (`git merge --no-ff`), so the entry only asks to push `main` (and
    the feature branch for the record).
 6. Verify: `git rev-list --count origin/<branch>..<branch>` prints `0`.
@@ -48,6 +53,42 @@ Expect `0`. Nothing in the range is over GitHub's 100 MB limit (largest file: `m
 Result: `main` `3eed4c0..144b11e` (307 commits), `sms-physics` `61d5810..c48b3f9` (294 commits). Both
 `rev-list --count` checks returned `0`. No PR, as the entry specified. Working tree was clean apart from
 the 19 `addons/godot_ai/` entries, which were left untouched.
+
+### #2 -- PUSHED 2026-10-25 -- https://github.com/JasonAbsolute/ProjectShine/tree/feature/save-prompt -- PR awaiting Jaysonn's click -- queued 2026-10-25 03:55 PDT, updated 04:45 (Kiro)
+Push the first feature branch and open its PR: the card save ("Save?" after a shine, a blue coin, the pause menu's SAVE). PLAYTESTED BY
+JAYSONN 2026-10-25 04:40 ("ok looks good") -- the PR can be merged once it is open (squash or merge commit, his call; `main` then needs a
+`git pull` here).
+- Branch `feature/save-prompt` -- the branch tip is this file's latest commit; the code tip is `25f69fd` ("SMS pass 124c: card save counter --
+  the blo's own digit / x / shine-icon textures"; 124b `3ab4893`, 124 `a804f34`), 7 commits since main (`7e448b9`).
+- PR: title "Feature: the card save (SMS passes 124-124c)"; base `main`; body:
+  > TCardSave (GC2D/CardSave.cpp) on the game's own `save.blo` + `savemessage.bmg`: the shine-get window (Save and Continue / Save and
+  > Quit / Continue, the saved count or "New", the pointing hand), the blue-coin window (every coin, as the game), the pause menu's SAVE
+  > ("Save?" YES/NO with the breathing green-to-yellow pick, then "Save complete. Continue playing?"), the 300-frame saving window with the
+  > live count at frame 200. The save write moved from the pickup to the dialog's "Save and ..." (Continue leaves it unsaved, as the game).
+  > New: SmsCardSave.cs, SmsTextBox.cs (a J2DTextBox on the system font), CardSave.tscn (under Mario in Player.tscn), 21 textures from the
+  > disc (the frame as a tinted body + white rim, the digits / x / shine icon the blo's own).
+  > 124b/c after Jaysonn's playtest: contents centred on the window, WindowColor knob (darker default), DigitPitch / CountShown knobs, the
+  > counter on the disc's textures (the HUD's 36x36 re-renders overlapped).
+  > Drive 124 34/34 through the real input path (across the stage move); 123 32/32, 118 35/35, 119 25/25; boot ALL OK. Playtested OK.
+  > Knobs on CardSave.tscn: WindowColor (any colour; the game's is (0, 0.733, 0.725, 0.533)), CenterContents (off = the game's left-weighted
+  > layout), DigitPitch, CountShown (Saved = the game / Live), HeadingMessage (33 = the game's "File created." quirk, 41 = "SHINE! Save
+  > data?"), TitleScene, Size, SavingFrames, the six sound slots (empty).
+  > Not ported: memory-card states, the YES/NO sparks, the dialog's mask (never shown for these purposes).
+  compare URL: https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/save-prompt
+```
+git push -u origin feature/save-prompt
+git rev-list --count origin/feature/save-prompt..feature/save-prompt
+```
+Expect `0`. Then open the PR from the compare URL with the title and body above. Note the working tree carries Jaysonn's own uncommitted
+`assets/Level.tscn` edit -- leave it, do not add it to this PR.
+
+Result: `feature/save-prompt` pushed as a new remote branch, `main` `7e448b9..125ade9` on it (7 commits).
+`git rev-list --count origin/feature/save-prompt..feature/save-prompt` returned `0`. Entry's code tip `25f69fd`
+confirmed an ancestor of the branch, and 124b `3ab4893` / 124 `a804f34` are both in the range as the entry says.
+**The PR itself is not open yet** -- `gh` was installed during this pass but is unauthenticated (see the procedure's
+step 4 note), so the prefilled compare page was opened in the browser instead and Jaysonn creates it from there.
+Working tree left untouched: Jaysonn's `assets/Level.tscn` plus two Koopa `.png.import` compression flips, and the
+19 `addons/godot_ai/` entries.
 
 <!-- Kiro appends the next entry below this line. Entry template:
 
