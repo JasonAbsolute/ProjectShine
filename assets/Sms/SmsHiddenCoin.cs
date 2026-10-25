@@ -19,24 +19,40 @@ using System;
 /// ms_watcoin_hit at the spot and binds ms_watcoin_kira to the coin. Bianco Hills' data (scene_hideobj.py): appear 0 or 100 (-> 6 u/tick),
 /// y -1 (-> 20), disappear 1200 ticks; 17 of its 20 sprayed spots hide a yellow coin, 2 a blue, 1 a shine.
 /// Collision: the body sits on layer 8 (Mario's mask 5 ignores it, the drops' ray hits it); the touch kinds use an Area3D on Mario's layer.
+/// 123c -- HOW THE COIN FLIES OUT: `FlyOut` picks the launch direction (Forward = the game's throwObjToFrontFromPoint along this node's blue
+/// arrow, tilt included; Up; TowardPlayer / AwayFromPlayer; Custom = FlyDirection in this node's frame), `AppearSpeed` the speed along it,
+/// `AppearYSpeed` the extra lift. A [Tool] script: in the editor the node draws the predicted flight (the coin's own physics) from where the coin
+/// will appear, so you can aim it before playing; `ShowFlightPath` hides it (in play the line shows only with DebugPrint).
 /// Not ported: the barrel hit, the picture's back-face rule and its own texture (PictureTexture is yours), the twin pictures, the sounds (slots).
 /// </summary>
+[Tool]
 [GlobalClass]
 public partial class SmsHiddenCoin : StaticBody3D, ISmsSprayTarget
 {
     public enum HideKind { WaterHit, HipDrop, HeadHit, FruitHit, Picture }
     /// <summary>Game: a yellow coin and any Picture coin disappear, a blue coin from a plain spot stays (MAP_OBJ_FLAG_UNK10000000, see SmsCoinItem).</summary>
     public enum DisappearRule { Game, Always, Never }
+    /// <summary>Where the coin flies: Forward = the game (along this node's -Z arrow, the tilt included: throwObjToFrontFromPoint uses the object's full
+    /// forward); Up = straight up (AppearSpeed ignored); TowardPlayer / AwayFromPlayer = the horizontal line to Mario at the reveal; Custom = FlyDirection.</summary>
+    public enum FlyMode { Forward, Up, TowardPlayer, AwayFromPlayer, Custom }
 
     [Export] public HideKind Kind = HideKind.WaterHit;
     /// <summary>What comes out: his blue_coin.tscn by default; yellow_coin.tscn for the game's common case; any Node3D scene is placed and thrown if it is a coin.</summary>
     [Export] public PackedScene HiddenScene;
     /// <summary>The blue coin's flag (GameData): given to the revealed BlueCoin; empty = derived from the scene and this node's path (as a shine's ShineId).</summary>
     [Export] public string CoinId = "";
-    /// <summary>loadHideObjInfo: the stage's appear speed, x 0.06 at load -> units a tick along the forward (Bianco: 0 or 100).</summary>
+    /// <summary>loadHideObjInfo: the stage's appear speed, x 0.06 at load -> units a tick along the fly direction (Bianco: 0 or 100 = 6 u/tick = 9.7 m/s).
+    /// 0 = straight up whatever FlyOut says. 50 = a gentle lob (4.8 m/s), 100 = a throw landing ~3 m out, 200 = ~6 m.</summary>
     [Export] public float AppearSpeed = 0f;
-    /// <summary>loadHideObjInfo: the up speed, units a tick; below 0 = the game's default 20.</summary>
+    /// <summary>loadHideObjInfo: the lift, units a tick; below 0 = the game's default 20 (a 7.5 m pop, half a second up). 10 = 1.9 m, 30 = 17 m.</summary>
     [Export] public float AppearYSpeed = -1f;
+    /// <summary>123c: which way the coin flies out (see FlyMode). Forward is the game's rule: this node's blue arrow (-Z), tilt included.</summary>
+    [Export] public FlyMode FlyOut = FlyMode.Forward;
+    /// <summary>123c: FlyOut = Custom: the direction in THIS node's frame (normalised; (0, 0, -1) = the arrow). Rotating the node turns it.</summary>
+    [Export] public Vector3 FlyDirection = new Vector3(0f, 0f, -1f);
+    /// <summary>123c: the editor draws the coin's predicted flight (its own physics: gravity 0.35, drag 0.99, 2 s) from where it will appear. In
+    /// play the line shows only with DebugPrint.</summary>
+    [Export] public bool ShowFlightPath = true;
     /// <summary>The coin's life once touchable, 120 Hz ticks; 0 or less = the game's default 1200 (10 s). Applies when the coin disappears at all.</summary>
     [Export] public int DisappearTicks = 0;
     [Export] public DisappearRule CoinDisappears = DisappearRule.Game;
@@ -89,7 +105,7 @@ public partial class SmsHiddenCoin : StaticBody3D, ISmsSprayTarget
     /// taken when the drop is no higher than the spot's top, no lower than 80 units under its base, and within 50 + the spot's radius in XZ.</summary>
     public const float WaterAttackRadiusUnits = 50f, WaterAttackHeightUnits = 80f;
     private static readonly System.Collections.Generic.List<SmsHiddenCoin> _live = new();
-    public override void _EnterTree() { if (!_live.Contains(this)) _live.Add(this); }
+    public override void _EnterTree() { if (!Engine.IsEditorHint() && !_live.Contains(this)) _live.Add(this); }
     public override void _ExitTree() { _live.Remove(this); }
 
     /// <summary>The spot whose damage cylinder a flying drop at <paramref name="dropPos"/> (world metres) overlaps by the game's test, or null.
@@ -133,6 +149,13 @@ public partial class SmsHiddenCoin : StaticBody3D, ISmsSprayTarget
 
     public override void _Ready()
     {
+        if (Engine.IsEditorHint())
+        {
+            // the editor: only the flight preview (no bodies, no areas, no registry); redrawn by _Process when a knob or the transform changes
+            SetProcess(true);
+            RebuildArc();
+            return;
+        }
         if (AutoLayer) { CollisionLayer = HideLayer; CollisionMask = 0; }
         ResolvedCoinId = CoinId;
         if (string.IsNullOrEmpty(ResolvedCoinId) && Owner != null && !string.IsNullOrEmpty(Owner.SceneFilePath))
@@ -159,6 +182,7 @@ public partial class SmsHiddenCoin : StaticBody3D, ISmsSprayTarget
                 break;
         }
         if (DebugPrint) GD.Print($"[SmsHiddenCoin] '{Name}' {Kind} id '{ResolvedCoinId}' allowReveal {_allowReveal} dead {_dead}");
+        SetProcess(DebugPrint && ShowFlightPath);   // 123c: the flight line in play only while debugging
     }
 
     private bool HidesBlue()
@@ -220,7 +244,7 @@ public partial class SmsHiddenCoin : StaticBody3D, ISmsSprayTarget
 
     public override void _PhysicsProcess(double delta)
     {
-        if (_dead) return;
+        if (_dead || Engine.IsEditorHint()) return;
         if (Kind == HideKind.Picture)
         {
             // control() STATE_NORMAL (mReverse): the picture heals unk15C a tick toward the max
@@ -325,12 +349,8 @@ public partial class SmsHiddenCoin : StaticBody3D, ISmsSprayTarget
         coin.Name = $"{Name}_coin";
         if (coin is BlueCoin blue && !string.IsNullOrEmpty(ResolvedCoinId)) blue.CoinId = ResolvedCoinId;   // TCoinBlue's event id: the flag it will set
         parent.AddChild(coin);
-        Vector3 fwd = -GlobalTransform.Basis.Z;
-        fwd.Y = 0f;
-        fwd = fwd.LengthSquared() > 1e-8f ? fwd.Normalized() : Vector3.Forward;
-        coin.GlobalPosition = GlobalPosition + Vector3.Up * SmsUnits.UnitsToMetres(yOffsetUnits) + fwd * SmsUnits.UnitsToMetres(alongForwardUnits);
-        // throwObjToFrontFromPoint: vel = forward x speed (x 0.06 at load) + (0, ySpeed, 0)
-        Vector3 vel = fwd * (AppearSpeed * 0.06f) + Vector3.Up * (AppearYSpeed < 0f ? SmsCoinItem.PopUpSpeedUnits : AppearYSpeed);
+        var (appearAt, vel) = LaunchFor(yOffsetUnits, alongForwardUnits, PlayerPosition());
+        coin.GlobalPosition = appearAt;
         int life = DisappearTicks <= 0 ? 1200 : DisappearTicks;
         bool disappears = CoinDisappears switch
         {
@@ -361,6 +381,141 @@ public partial class SmsHiddenCoin : StaticBody3D, ISmsSprayTarget
         parent.AddChild(fx);
         fx.GlobalPosition = at;
         if (fx is SmsNpcEffect e) e.Start();
+    }
+
+    // ---- 123c: how the coin flies out ----
+    /// <summary>The coin's starting point and velocity (world axes, units a tick) for a reveal <paramref name="yOffsetUnits"/> up and
+    /// <paramref name="alongForwardUnits"/> out of the face. throwObjToFrontFromPoint: vel = dir x (AppearSpeed x 0.06) + (0, lift, 0) with dir by
+    /// FlyOut -- Forward = this node's -Z WITH its tilt (the game reads the object's anmMtx column 2 whole), Up = none, Toward / AwayFromPlayer =
+    /// the horizontal line to <paramref name="player"/> (null = Forward), Custom = FlyDirection in this node's frame.</summary>
+    public (Vector3 appearAt, Vector3 velUnitsPerTick) LaunchFor(float yOffsetUnits, float alongForwardUnits, Vector3? player)
+    {
+        Vector3 fwdFull = -GlobalTransform.Basis.Z;
+        fwdFull = fwdFull.LengthSquared() > 1e-8f ? fwdFull.Normalized() : Vector3.Forward;
+        Vector3 fwdFlat = new Vector3(fwdFull.X, 0f, fwdFull.Z);
+        fwdFlat = fwdFlat.LengthSquared() > 1e-8f ? fwdFlat.Normalized() : Vector3.Forward;
+        Vector3 appearAt = GlobalPosition + Vector3.Up * SmsUnits.UnitsToMetres(yOffsetUnits) + fwdFlat * SmsUnits.UnitsToMetres(alongForwardUnits);
+        Vector3 dir;
+        switch (FlyOut)
+        {
+            case FlyMode.Up: dir = Vector3.Zero; break;
+            case FlyMode.TowardPlayer:
+            case FlyMode.AwayFromPlayer:
+                if (player.HasValue)
+                {
+                    Vector3 to = player.Value - GlobalPosition; to.Y = 0f;
+                    dir = to.LengthSquared() > 1e-6f ? to.Normalized() : fwdFlat;
+                    if (FlyOut == FlyMode.AwayFromPlayer) dir = -dir;
+                }
+                else dir = fwdFull;
+                break;
+            case FlyMode.Custom:
+                dir = GlobalTransform.Basis.Orthonormalized() * FlyDirection;
+                dir = dir.LengthSquared() > 1e-8f ? dir.Normalized() : fwdFull;
+                break;
+            default: dir = fwdFull; break;
+        }
+        float lift = AppearYSpeed < 0f ? SmsCoinItem.PopUpSpeedUnits : AppearYSpeed;
+        return (appearAt, dir * (AppearSpeed * 0.06f) + Vector3.Up * lift);
+    }
+
+    /// <summary>Mario's position (the "player" group), or null; in the editor the scene's node named Mario if any.</summary>
+    private Vector3? PlayerPosition()
+    {
+        if (Engine.IsEditorHint())
+        {
+            var root = GetTree()?.EditedSceneRoot;
+            return root?.GetNodeOrNull<Node3D>("Mario")?.GlobalPosition;
+        }
+        return (GetTree()?.GetFirstNodeInGroup("player") as Node3D)?.GlobalPosition;
+    }
+
+    /// <summary>The reveal's own offsets by kind (appearObj: WaterHit / FruitHit +50, HipDrop 0, HeadHit +100; the picture 30 out of its face).</summary>
+    private (float up, float forward) RevealOffsets() => Kind switch
+    {
+        HideKind.HipDrop => (0f, 0f), HideKind.HeadHit => (100f, 0f), HideKind.Picture => (0f, 30f), _ => (50f, 0f),
+    };
+
+    /// <summary>The coin's predicted flight, world metres: SmsCoinItem's physics without the map (gravity 0.35, drag 0.99, the +-70 x scale clamp),
+    /// one point every <paramref name="everyTicks"/> ticks for <paramref name="ticks"/> ticks or until it has fallen <paramref name="stopBelow"/> m under the start.</summary>
+    public System.Collections.Generic.List<Vector3> PredictedPath(int ticks = 240, int everyTicks = 4, float stopBelow = 6f)
+    {
+        var (p, v) = LaunchFor(RevealOffsets().up, RevealOffsets().forward, PlayerPosition());
+        float R = SmsCoinItem.BodyRadiusUnits;
+        var pts = new System.Collections.Generic.List<Vector3> { p };
+        float startY = p.Y;
+        for (int t = 1; t <= ticks; t++)
+        {
+            v.Y = Mathf.Clamp(v.Y - SmsCoinItem.Gravity, -R, R);
+            v.X = Mathf.Clamp(v.X * SmsCoinItem.AirDrag, -R, R);
+            v.Z = Mathf.Clamp(v.Z * SmsCoinItem.AirDrag, -R, R);
+            p += v * (1f / SmsUnits.UnitsPerMetre);
+            if (t % everyTicks == 0) pts.Add(p);
+            if (p.Y < startY - stopBelow) break;
+        }
+        return pts;
+    }
+
+    private MeshInstance3D _arc;
+    private int _arcHash;
+    private double _arcCooldown;
+
+    /// <summary>The flight line (an ImmediateMesh line strip, unshaded, drawn over everything) -- the editor only, or in play with DebugPrint.</summary>
+    public void RebuildArc()
+    {
+        bool want = ShowFlightPath && (Engine.IsEditorHint() || DebugPrint);
+        if (!want) { if (_arc != null) _arc.Visible = false; return; }
+        if (_arc == null || !GodotObject.IsInstanceValid(_arc))
+        {
+            var mat = new StandardMaterial3D
+            {
+                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, NoDepthTest = true,
+                Transparency = BaseMaterial3D.TransparencyEnum.Alpha, RenderPriority = 10,
+            };
+            _arc = new MeshInstance3D { Name = "SmsFlightPath", Mesh = new ImmediateMesh(), MaterialOverride = mat, TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+            AddChild(_arc);   // no Owner: never saved into the scene
+        }
+        _arc.Visible = true;
+        _arc.GlobalTransform = Transform3D.Identity;
+        var im = (ImmediateMesh)_arc.Mesh;
+        im.ClearSurfaces();
+        var pts = PredictedPath();
+        im.SurfaceBegin(Mesh.PrimitiveType.LineStrip);
+        for (int i = 0; i < pts.Count; i++)
+        {
+            float f = pts.Count > 1 ? i / (float)(pts.Count - 1) : 0f;
+            im.SurfaceSetColor(new Color(0.25f, 0.85f, 1f, 1f - 0.6f * f));   // bright at the start, fading along the fall
+            im.SurfaceAddVertex(pts[i]);
+        }
+        im.SurfaceEnd();
+        // the appear point: a small cross
+        float c = 0.12f;
+        im.SurfaceBegin(Mesh.PrimitiveType.Lines);
+        im.SurfaceSetColor(new Color(1f, 0.9f, 0.2f)); im.SurfaceAddVertex(pts[0] + Vector3.Left * c); im.SurfaceAddVertex(pts[0] + Vector3.Right * c);
+        im.SurfaceSetColor(new Color(1f, 0.9f, 0.2f)); im.SurfaceAddVertex(pts[0] + Vector3.Forward * c); im.SurfaceAddVertex(pts[0] + Vector3.Back * c);
+        im.SurfaceSetColor(new Color(1f, 0.9f, 0.2f)); im.SurfaceAddVertex(pts[0] + Vector3.Down * c); im.SurfaceAddVertex(pts[0] + Vector3.Up * c);
+        im.SurfaceEnd();
+    }
+
+    private int ArcHash()
+    {
+        var h = new System.HashCode();
+        h.Add(Kind); h.Add(FlyOut); h.Add(FlyDirection); h.Add(AppearSpeed); h.Add(AppearYSpeed); h.Add(ShowFlightPath); h.Add(DebugPrint);
+        var tr = GlobalTransform; h.Add(tr.Origin); h.Add(tr.Basis.Z); h.Add(tr.Basis.X); h.Add(Scale);
+        var pl = PlayerPosition(); if (pl.HasValue) h.Add(pl.Value);
+        return h.ToHashCode();
+    }
+
+    public override void _Process(double delta)
+    {
+        if (!Engine.IsEditorHint() && !(DebugPrint && ShowFlightPath)) { SetProcess(false); return; }
+        _arcCooldown -= delta;
+        if (_arcCooldown > 0) return;
+        _arcCooldown = 0.2;
+        int hash = ArcHash();
+        if (hash == _arcHash && _arc != null) return;
+        _arcHash = hash;
+        RebuildArc();
     }
 
     /// <summary>HIT_MESSAGE_ATTACH from the coin dying by its timer (TItem::appeared / TCoin::perform): mAllowReveal back on; a Picture gets its

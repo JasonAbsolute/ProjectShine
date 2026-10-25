@@ -7283,3 +7283,24 @@ real water, so it never saw either problem:
 Mario 3 m back pressing R with no water in the air -- the coin out 3 frames later. Regressions 119 25/25, 118 35/35, 107 15/15 (on the committed
 Level: his uncommitted level puts a NozzleBox in that drive's run lane), 106 16/18 -- the same two fail on the 122 Mario.cs with the committed
 level, so not this pass (T2b/T3: the bounce off the Toad rises 252 u; noted for the next Mario pass). Build 0 errors, boot ALL OK.
+
+## SMS pass 123c -- pick how the coin flies out (and see it in the editor)
+
+**File:** `assets/Sms/SmsHiddenCoin.cs` (now a `[Tool]` script).
+
+Jaysonn: "can we make it so we pick how it flys out?" -- yes, and it fixes a deviation of mine: 123 flattened the node's forward to the horizontal,
+while the game's `throwObjToFrontFromPoint` throws along the hide object's FULL forward (anmMtx column 2 -- a pitched spot throws up or down).
+- `FlyOut`: **Forward** (the game: along this node's blue arrow, tilt included), **Up** (straight up, AppearSpeed ignored), **TowardPlayer** /
+  **AwayFromPlayer** (the horizontal line to Mario at the moment of the reveal), **Custom** (`FlyDirection`, a vector in the node's own frame --
+  rotating the node turns it). The speed along the direction is still `AppearSpeed` x 0.06 units a tick (100 = 6 u/tick = 9.7 m/s, a throw
+  landing about 3 m out; 200 = ~6 m), the lift `AppearYSpeed` (default 20 = a 7.5 m pop). AppearSpeed 0 pops straight up in every mode.
+- **The flight line.** In the editor each spot draws the coin's predicted flight (the coin's own physics: gravity 0.35, drag 0.99, two seconds,
+  from where the coin will appear -- 50 units up for a sprayed / fruit spot, 100 for a head-hit, the spot itself for a pound, 30 out of a
+  picture's face), redrawn 5x a second as you move the node or turn a knob; a yellow cross marks the appear point. `ShowFlightPath` hides it. In
+  play the line shows only with `DebugPrint`. The line is a runtime child with no owner, so it is never saved into your scene. TowardPlayer
+  previews toward a node named Mario in the open scene, if there is one.
+
+**Verified (drive 123 now 29/29):** L1 the five modes' velocities on a node yawed 90 and pitched 30 (Forward carries the pitch; Up; toward /
+away along the horizontal line to a given Mario; Custom along the node's +X); L2 the predicted path's apex = the real coin's 561.5-unit pop and
+its start = the appear point; L3 the line is a runtime, owner-less, top-level ImmediateMesh. Build 0 errors, boot ALL OK. Not editor-tested
+headless: the drawing itself in the editor is for Jaysonn's eye (a [Tool] script runs there after the Build).
