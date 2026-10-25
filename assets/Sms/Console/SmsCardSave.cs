@@ -31,7 +31,9 @@ using System.Collections.Generic;
 /// no memory-card states (no card, format, corrupt -- the file is user://save_data.json); the YES / NO sparks (emitter 0x1FA) are not ported;
 /// <see cref="HeadingMessage"/>: the game's shine-get heading is savemessage.bmg entry 0x21 (CardSave.cpp 1460) -- on the US disc that
 /// entry reads "File created." (the Japanese order's "SHINE! Save data?" moved to 41 and the index was never updated); 33 = as shipped,
-/// 41 = the intended line. One save file: <see cref="FileLetter"/> 0 = "Mario A".
+/// 41 = the intended line. One save file: <see cref="FileLetter"/> 0 = "Mario A". 124b (Jaysonn's playtest, SaveRef.png): <see cref="WindowColor"/>
+/// (the frame split into a tinted body and the white rim; his default darker and denser than the game's 00bbb9 at 0x88), <see cref="CenterContents"/>
+/// (everything centred on the window, the hand following each option -- the blo is left-weighted), <see cref="DigitPitch"/> and <see cref="CountShown"/>.
 /// </summary>
 [GlobalClass]
 public partial class SmsCardSave : CanvasLayer
@@ -46,7 +48,22 @@ public partial class SmsCardSave : CanvasLayer
     [Export] public SmsTalkFont Font;
     /// <summary>TalkGlyph.gdshader: the x4 sheet sharpened to a one-pixel edge (pass 87); empty = plain bilinear.</summary>
     [Export] public Shader GlyphShader;
-    [Export] public Texture2D WindowTexture;            // save/standard_window.png (NinePatch, margins 20)
+    [Export] public Texture2D WindowTexture;            // save/standard_window_body.png (NinePatch, margins 20): the body, tinted by WindowColor
+    /// <summary>save/standard_window_rim.png: the white inner line and the corner dots, drawn over the body untinted.</summary>
+    [Export] public Texture2D WindowRimTexture;
+    /// <summary>The window colour (J2DWindow's contents 00bbb988 and the frame's "black" -- the game's teal at alpha 0x88 = (0, 0.733, 0.725, 0.533)).
+    /// 124b, Jaysonn: "the blue should be darker ... make it so I can set it to any color" -- his default a darker teal, denser.</summary>
+    [Export] public Color WindowColor { get => _windowColor; set { _windowColor = value; ApplyWindowColor(); } }
+    private Color _windowColor = new Color(0f, 0.5f, 0.5f, 0.85f);
+    /// <summary>124b (Jaysonn: "have everything middle aligned"), a DEVIATION: the heading, the file name, the count and the options are
+    /// centred on the window and the hand follows each option's left edge at the blo's distance; off = the blo's left-weighted layout.</summary>
+    [Export] public bool CenterContents = true;
+    /// <summary>The count's digit pitch in blo px (the blo's panes sit 17 apart with 25-wide cells -- the game's tight look; the HUD's ratio is 27 / 36).</summary>
+    [Export(PropertyHint.Range, "12,30")] public float DigitPitch = 17f;
+    public enum CountMode { Saved, Live }
+    /// <summary>What the windows show before the write: Saved = the game (the file's count, TCardBookmarkInfo; the saving window ticks it to
+    /// the live one at frame 200), Live = the count with this pickup already in it.</summary>
+    [Export] public CountMode CountShown = CountMode.Saved;
     [Export] public Texture2D CursorTexture;            // save/cursor.png: the pointer hand
     [Export] public Texture2D MarioTexture;             // save/file_name_mario.png
     [Export] public Texture2D[] LetterTextures = new Texture2D[3];   // save/file_name_a/b/c.png
@@ -118,7 +135,7 @@ public partial class SmsCardSave : CanvasLayer
     /// <summary>A WIN1 pane with TExPane's size animation (setCenteredSize + update: linear over N frames, about the initial bounds' centre).</summary>
     private sealed class Win
     {
-        public NinePatchRect Frame; public Rect2 Initial;
+        public NinePatchRect Frame, Rim; public Rect2 Initial;
         public Vector2 Cur, Target, Vel; public bool Animating;
         public readonly List<Control> Contents = new();
         public SmsTextBox Msg, NewText; public TextureRect MarioText; public TextureRect[] Letters = new TextureRect[3];
@@ -149,6 +166,7 @@ public partial class SmsCardSave : CanvasLayer
         {
             Frame.Size = new Vector2(Mathf.Round(Cur.X), Mathf.Round(Cur.Y));
             Frame.Position = Initial.Position + (Initial.Size - Frame.Size) * 0.5f;
+            if (Rim != null) Rim.Size = Frame.Size;
         }
         public void HideContents() { foreach (Control c in Contents) c.Visible = false; }
 
@@ -251,9 +269,21 @@ public partial class SmsCardSave : CanvasLayer
     {
         var w = new Win();
         w.Frame = new NinePatchRect { Name = name, Texture = WindowTexture, Position = pos, Size = size, PatchMarginLeft = 20, PatchMarginTop = 20, PatchMarginRight = 20, PatchMarginBottom = 20, Visible = false, MouseFilter = Control.MouseFilterEnum.Ignore };
+        w.Frame.SelfModulate = WindowColor;   // the body only: the rim and the contents keep their own colours
         w.Initial = new Rect2(pos, size);
         _root.AddChild(w.Frame);
+        if (WindowRimTexture != null)
+        {
+            w.Rim = new NinePatchRect { Name = "Rim", Texture = WindowRimTexture, Position = Vector2.Zero, Size = size, PatchMarginLeft = 20, PatchMarginTop = 20, PatchMarginRight = 20, PatchMarginBottom = 20, MouseFilter = Control.MouseFilterEnum.Ignore };
+            w.Frame.AddChild(w.Rim);          // the first child: under the contents
+        }
         return w;
+    }
+
+    /// <summary>Live: the colour knob on the three frames (the editor's inspector or a script at run time).</summary>
+    public void ApplyWindowColor()
+    {
+        foreach (Win w in new[] { _confirm, _event, _shine }) if (w?.Frame != null) w.Frame.SelfModulate = WindowColor;
     }
 
     /// <summary>The file bookmark: the Mario-text, the three letters (one shown), the "New" box and the two count groups (icon, x, digits).</summary>
@@ -267,17 +297,47 @@ public partial class SmsCardSave : CanvasLayer
             w.Contents.Add(w.Letters[i]);
         }
         w.NewText = TextBox(w.Frame, "NewText", newBPos, new Vector2(130f, 24f), 0, 0); w.Contents.Add(w.NewText);
-        w.CountUnder = new Control { Name = "CountUnder", Position = underPos, Size = new Vector2(35f, 41f), MouseFilter = Control.MouseFilterEnum.Ignore }; w.Frame.AddChild(w.CountUnder); w.Contents.Add(w.CountUnder);
+        // the blo's digit panes: x at +31, the digits at +50 / +67 (two) and +50 / +67 / +87 (three); DigitPitch scales the digit steps
+        float p1 = DigitPitch, p2 = DigitPitch * 37f / 17f;
+        w.CountUnder = new Control { Name = "CountUnder", Position = underPos, Size = new Vector2(50f + p1 + 25f, 41f), MouseFilter = Control.MouseFilterEnum.Ignore }; w.Frame.AddChild(w.CountUnder); w.Contents.Add(w.CountUnder);
         Pic(w.CountUnder, "Icon", ShineIcon, Vector2.Zero, new Vector2(35f, 41f));
         Pic(w.CountUnder, "Times", TimesTexture, new Vector2(31f, 7f), new Vector2(25f, 25f));
         w.UnderDigits[0] = Pic(w.CountUnder, "Tens", null, new Vector2(50f, 7f), new Vector2(25f, 25f));
-        w.UnderDigits[1] = Pic(w.CountUnder, "Ones", null, new Vector2(67f, 7f), new Vector2(25f, 25f));
-        w.CountOver = new Control { Name = "CountOver", Position = overPos, Size = new Vector2(35f, 41f), MouseFilter = Control.MouseFilterEnum.Ignore }; w.Frame.AddChild(w.CountOver); w.Contents.Add(w.CountOver);
+        w.UnderDigits[1] = Pic(w.CountUnder, "Ones", null, new Vector2(50f + p1, 7f), new Vector2(25f, 25f));
+        w.CountOver = new Control { Name = "CountOver", Position = overPos, Size = new Vector2(50f + p2 + 25f, 41f), MouseFilter = Control.MouseFilterEnum.Ignore }; w.Frame.AddChild(w.CountOver); w.Contents.Add(w.CountOver);
         Pic(w.CountOver, "Icon", ShineIcon, Vector2.Zero, new Vector2(35f, 41f));
         Pic(w.CountOver, "Times", TimesTexture, new Vector2(31f, 7f), new Vector2(25f, 25f));
         w.OverDigits[0] = Pic(w.CountOver, "Hundreds", null, new Vector2(50f, 7f), new Vector2(25f, 25f));
-        w.OverDigits[1] = Pic(w.CountOver, "Tens", null, new Vector2(67f, 7f), new Vector2(25f, 25f));
-        w.OverDigits[2] = Pic(w.CountOver, "Ones", null, new Vector2(87f, 7f), new Vector2(25f, 25f));
+        w.OverDigits[1] = Pic(w.CountOver, "Tens", null, new Vector2(50f + p1, 7f), new Vector2(25f, 25f));
+        w.OverDigits[2] = Pic(w.CountOver, "Ones", null, new Vector2(50f + p2, 7f), new Vector2(25f, 25f));
+    }
+
+    /// <summary>124b, CenterContents: the heading / message box, the file name group (90 + the letter's 30), the "New" box, the count groups and
+    /// the option boxes centred on the window's width; the hands follow each option's text at the blo's distance (text left 97 -> hand centre 63.5).</summary>
+    private void CenterWindow(Win w)
+    {
+        float W = w.Initial.Size.X, c = W * 0.5f;
+        if (w.Msg != null) w.Msg.Position = new Vector2(c - w.Msg.Size.X * 0.5f - 3f, w.Msg.Position.Y);
+        if (w.MarioText != null)
+        {
+            float x = Mathf.Round(c - 60f);
+            w.MarioText.Position = new Vector2(x, w.MarioText.Position.Y);
+            for (int i = 0; i < 3; i++) if (w.Letters[i] != null) w.Letters[i].Position = new Vector2(x + 89f, w.Letters[i].Position.Y);
+        }
+        if (w.NewText != null) w.NewText.Position = new Vector2(c - 65f - 3f, w.NewText.Position.Y);
+        if (w.CountUnder != null) w.CountUnder.Position = new Vector2(Mathf.Round(c - w.CountUnder.Size.X * 0.5f), w.CountUnder.Position.Y);
+        if (w.CountOver != null) w.CountOver.Position = new Vector2(Mathf.Round(c - w.CountOver.Size.X * 0.5f), w.CountOver.Position.Y);
+        for (int i = 0; i < w.Options.Length; i++)
+        {
+            SmsTextBox o = w.Options[i];
+            o.HBind = 0;
+            o.Position = new Vector2(c - 125f - 3f, o.Position.Y);
+            int lineW = (int)(o.LineWidth(o.Text) + 0.5f);
+            float textLeft = o.Position.X + (250 - lineW) / 2;             // J2DPrint's integer centring inside the 250 box
+            float handCentre = textLeft - 33.5f;
+            w.Hands[i].Position = new Vector2(handCentre - 14.5f, w.Hands[i].Position.Y);
+            w.HandShadows[i].Position = new Vector2(handCentre - 13.5f, w.HandShadows[i].Position.Y);
+        }
     }
 
     /// <summary>The option list: the texts (left-bound 250 x 24) and the hands ('scNa' 29 x 41 turned 270 at (49, y - 5); the shadow 'scNb' at (50, y - 1), black, alpha 125).</summary>
@@ -312,7 +372,7 @@ public partial class SmsCardSave : CanvasLayer
         Bookmark(_shine, new Vector2(114f, 96f), new Vector2(114f, 129f), new Vector2(127f, 122f), new Vector2(118f, 122f));
         OptionList(_shine, new[] { 174f, 210f, 246f });
         _shine.Options[0].SetText(Message(28)); _shine.Options[1].SetText(Message(30)); _shine.Options[2].SetText(Message(29));
-        foreach (Win w in new[] { _confirm, _event, _shine }) w.HideContents();
+        foreach (Win w in new[] { _confirm, _event, _shine }) { if (CenterContents) CenterWindow(w); w.HideContents(); }
     }
 
     // ------------------------------------------------------------------------------------------------------------------ open / finish
@@ -457,6 +517,7 @@ public partial class SmsCardSave : CanvasLayer
         w.MarioText.Visible = true;
         for (int i = 0; i < 3; i++) w.Letters[i].Visible = i == Mathf.Clamp(FileLetter, 0, 2);
         if (!withCount) { w.NewText.Visible = false; w.CountUnder.Visible = false; w.CountOver.Visible = false; return; }
+        if (CountShown == CountMode.Live) { ShowCount(w, GameData.Instance?.ShineCount ?? 0, newFile: false); return; }   // 124b knob: the live count, always a number
         if (newFileText) { w.NewText.SetText(Message(25)); w.NewText.Visible = true; w.CountUnder.Visible = false; w.CountOver.Visible = false; }
         else ShowCount(w, _savedCount, newFile: false);
     }

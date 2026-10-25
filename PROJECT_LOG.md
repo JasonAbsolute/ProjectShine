@@ -7415,3 +7415,26 @@ with the bookmark 'saved'; B1-B5 the blue coin -> 'w_4' with bmg 36, no count ->
 (YES (t,255,0), NO white) -> right / left -> the breath at the card's own clock 44 (96 wide, ebff00) and 80 (67 wide, 06ff00) -> YES -> the
 file now carries the blue coin -> "Save complete." -> YES -> the menu gone; D1-D2 SAVE -> NO = no write, the menu closes. Drive 123 32/32
 (its P-case updated: the coin opens the dialog, A saves), 118 35/35, 119 25/25 (the prompt off inside them). Build 0 errors, boot ALL OK.
+
+## SMS pass 124b -- the card save after the playtest: centred contents, the window colour as a knob, the counter's pitch and mode
+
+**Files:** `assets/Sms/Console/SmsCardSave.cs`, `assets/Sms/Console/CardSave.tscn`, `assets/Sms/Console/save/standard_window_body.png` +
+`standard_window_rim.png` (replace `standard_window.png`).
+
+Jaysonn (SaveRef.png): "the font is not in the right spots ... have everything middle aligned. and fix the counter. next the blue should be
+darker i think but lets make it so i can set it to any color."
+
+- **`WindowColor`** (Color, default (0, 0.5, 0.5, 0.85)): the frame is now two NinePatch layers -- the BODY (white, alpha = the piece's A x (1 - I),
+  normalised; `SelfModulate` = WindowColor, so its alpha is the window's density) and the RIM (white, alpha = A x I: the inner line and the corner
+  dots) drawn over it untinted. The game's own value is (0, 0.733, 0.725, 0.533) -- 00bbb9 at 0x88 -- which over the near-white shine fade read
+  as the pale blue he saw; his default is darker and denser. Any colour works; a change applies to the three frames at once (a property setter).
+- **`CenterContents`** (default on, a DEVIATION -- the blo is left-weighted: the file name at x 114/129, the count under it, the options left-bound at
+  x 100 with the hand at 49): the heading / message box, the "MARIO A" group (90 + the letter's 30), the "New" box, the count groups and the option
+  boxes are centred on the window; each option text is centred (HBIND centre) and its hand follows the text's left edge at the blo's distance (text
+  left 97 -> hand centre 63.5 = 33.5 px). Off = the game's layout.
+- **`DigitPitch`** (default 17 = the blo's: the digit panes 17 apart with 25-px cells -- the game's own tight "x01"; the HUD's ratio would be ~19):
+  widen it for air between the digits. The three-digit group keeps the blo's shape (the third digit at 37/17 of the pitch).
+- **`CountShown`**: `Saved` (the game: the FILE's count before the write -- "x01" after the second shine -- then the saving window ticks it to the live
+  count at frame 200 with the DECIDE) or `Live` (the count with this pickup in it from the start, never "New").
+
+Drive 124 34/34 unchanged (it asserts sizes, states and the count class, not positions). Build 0 errors.
