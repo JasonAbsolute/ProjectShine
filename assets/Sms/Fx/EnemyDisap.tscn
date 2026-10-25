@@ -1,4 +1,4 @@
-[gd_scene load_steps=35 format=3 uid="uid://cenmdisap0125"]
+[gd_scene format=3 uid="uid://cenmdisap0125"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsFxBurst.cs" id="1_script"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/kemuball3_enemy.png" id="2_smoke"]

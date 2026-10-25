@@ -7580,3 +7580,35 @@ the latched normal is used now), the Puff at joint 1 (55 u), the Splat at +45 u 
 EnemyDisapWet (the sphere at the point) + the glow. Build 0 errors; boot ALL OK. Regression 118: 7/8 on HIS working Level.tscn -- his placed
 test Stu charges Mario during the shine demo (the environment, not the code) -- 35/35 on the committed level (his copy restored at the same
 md5). Not checked headless: the pixels (the dummy renderer) -- the look is Jaysonn's.
+
+## SMS pass 125d -- the drop table: what an enemy drops when it dies (feature/enemy-base; Jaysonn's request)
+
+**Files:** new `assets/Sms/Enemy/SmsDropTable.cs` + `SmsDropEntry.cs` ([GlobalClass] Resources), `assets/Sms/Enemy/Drops/StuDrops.tres` (the Stu's
+default table), `SmsSmallEnemy.cs` (the `DropTable` export replaces `DropScene`; GenRandomItem rolls it; `LastDrops` for the drives; `DropSpawner`
+for a species' own drops), `SmsHamukuri.cs` (the serial 1-UP and the serial-crash coin go through the same spawner), `Hamukuri.tscn` (DropTable
+set), the three `assets/Sms/Fx/Enemy*.tscn` headers (Godot rewrote the hand uids: a 14-character one is invalid and gets replaced -- the
+generator pins the assigned one now).
+
+**The game (smallEnemy.cpp 326-415):** genRandomItem = setAfterDeadEffect + genEventCoin (a coin the STAGE placed with the enemy, thrown (0, 20,
+0) u/tick) + generateItem: rand 0..100 < mSLGenItemRate + mSLGenEggRate (the Stu: 100 + 80 = always) -> gpMapObjManager->makeObjAppear(x,
+mGroundHeight, z, ACTOR_TYPE_ITEM_UNK8) -- an item type (HIT_CATEGORY_ITEM | 8) no shipped stage carries, so the retail game drops NOTHING from a
+plain kill; its coins are the placed event coin and the serial crash. The drop table is therefore a DEVIATION (requested); kept of the game: the
+hook (genRandomItem, skipped when LIVE_FLAG_UNK20000 -- the wall crash, a kill by another attacker -- or DEAD is set: the wall death drops
+nothing), the point (x, mGroundHeight, z), the pop (0, 20, 0) u/tick with the coin's own item life (a dropped yellow coin lives 480 ticks as
+TCoin::appearWithoutSound makes it), the .prm odds as an option (UseEnemyRate).
+
+**The system:** `SmsDropTable` = Chance (the odds a death drops anything) or UseEnemyRate, `Entries` (weighted `SmsDropEntry` lines: Scene, Weight,
+CountMin..CountMax, ScatterUnits for the extra ones of a count, LifeTicks (0 = the kind's default), a Note), PopUnitsPerTick (20),
+BodyPopMetresPerSecond (6, for an item without the SMS item life). One death = ONE roll: the chance, then one line by weight, then its count. An
+entry with no Scene is a "nothing" result with a weight. `SpawnItem` launches by the item's kind: anything with `SmsThrow` (the coins) gets the
+game's item life; a CharacterBody3D / RigidBody3D (his 1_up_mushroom.tscn) gets a Velocity hop (6 m/s up, the scatter scaled); anything else is
+placed; an `SmsDropped(Node3D by)` method on the item is called if it has one -- the hook for items that want to know. Nothing in the enemy
+code names a coin or a mushroom: a new item kind is a new line with its scene. The default `StuDrops.tres`: every death drops; a coin 80 %, a
+fan of three 12 %, a 1-UP 8 % -- Jaysonn's to tune (Chance under 1 for nothing-deaths; a per-enemy table on a placed Stu overrides the species').
+
+**Drive 125** 31/31: T1 the shipped table loads (3 lines, pop 20, Chance 1) and 20000 seeded rolls land within 1.5 % of 80 / 12 / 8, never
+nothing; T2 Chance 0.3 -> 30.2 %, UseEnemyRate at 180 -> always, at 0 -> never, a nothing-line w 5 beside a coin w 1 -> 16.7 %; T3 the REAL
+stomp death with a one-line count-2 table -> two yellow coins under the level at the ground point, SmsThrow'n (untouchable, 480 of life); T4
+the first straight up at (0, 20, 0), the second fanned 2..4 u/tick (the first run had both scattered -- the spawner's `count > 1` test is `i > 0`
+now, as its comment said); T5 the body path: a 1_up_mushroom gets Velocity (1.2, 6, 0) and no SmsThrow; T6 the wall death adds no drop (the same
+LastDrops list) -- the UNK20000 gate. Build 0 errors; boot ALL OK.

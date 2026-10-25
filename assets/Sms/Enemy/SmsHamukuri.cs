@@ -280,9 +280,7 @@ public partial class SmsHamukuri : SmsSmallEnemy
             if (h != this && IsInstanceValid(h) && h.IsBck(BckJitabata) && !h.IsDead) { h.Kill(); trampled++; }
         if (trampled >= Prm.TrampleBonusNum && OneUpScene != null)
         {
-            var up = OneUpScene.Instantiate<Node3D>();
-            GetParent().AddChild(up);
-            up.GlobalPosition = GlobalPosition;
+            DropSpawner.SpawnItem(OneUpScene, GetParent(), new Vector3(GlobalPosition.X, _groundY / U, GlobalPosition.Z), new Vector3(0f, SmsCoinItem.PopUpSpeedUnits, 0f), 0, this);
             if (DebugPrint) GD.Print($"[SMS hamukuri] serial kill: {trampled} flailing Stus -> a 1-UP");
         }
     }
@@ -296,9 +294,7 @@ public partial class SmsHamukuri : SmsSmallEnemy
             if (IsInstanceValid(h) && h._rolledByStu && h.IsNerve(NerveWallDie)) { count++; rep = h; }
         if (rep != null && count >= Prm.CrashBonusNum && SerialCrashScene != null)
         {
-            var coin = SerialCrashScene.Instantiate<Node3D>();
-            GetParent().AddChild(coin);
-            coin.GlobalPosition = rep.GlobalPosition;
+            DropSpawner.SpawnItem(SerialCrashScene, GetParent(), new Vector3(rep.GlobalPosition.X, rep._groundY / U, rep.GlobalPosition.Z), new Vector3(0f, SmsCoinItem.PopUpSpeedUnits, 0f), 0, rep);
             _serialCrashClock = 0;
             if (DebugPrint) GD.Print($"[SMS hamukuri] serial crash: {count} -> the coin");
         }

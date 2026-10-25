@@ -21,7 +21,7 @@ using Godot;
 /// Mario's attack cylinder on the damage cylinder with him falling = TRAMPLE (his StompBounce) / HIP_DROP in a ground pound -> isHitValid ->
 /// kill -> Die: decHitPoints; at 0 the dead anim + the dead effect, the body gone once the anim ended + the manager's 60 ticks (or at 360),
 /// genRandomItem (the DISAP puffs; the event coin only for a placed coin id; generateItem's ACTOR_TYPE_ITEM_UNK8 is a type nothing in the
-/// shipped game carries -- the real game drops NOTHING, DropScene is the deviation knob). SPRAYED_BY_WATER: the WATHIT mark every hit; once
+/// shipped game carries -- the real game drops NOTHING, the DropTable is the deviation knob). SPRAYED_BY_WATER: the WATHIT mark every hit; once
 /// per 30-tick cooldown decHpByWater (the hit's attack, at least 1) + behaveToWater (the base: Freeze -- the freeze anim for FreezeWait).
 /// Other small enemies on the ground push each other apart at march x 3 (isCollidMove). The game stopped (a talk, the pause, a dialog):
 /// the tree's pause.
@@ -62,8 +62,11 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     /// <summary>TLauncher's period (launcher.prm mSLLaunchPeriod 200): a dead one re-launches from its placed point after this many ticks
     /// (DEVIATION: the game pools them behind launchers / the manager; a placed one here is its own). Below 0 = freed when dead.</summary>
     [Export] public int RelaunchTicks = 200;
-    /// <summary>DEVIATION, off by default (see the header): a scene (his coin) dropped at the death point GenItemRate % of the time.</summary>
-    [Export] public PackedScene DropScene;
+    /// <summary>What this enemy drops when it dies (pass 125d; a DEVIATION -- the retail game's generateItem asks for an item type no stage carries, so
+    /// it drops nothing): an SmsDropTable (New in the inspector, or a .tres such as assets/Sms/Enemy/Drops/StuDrops.tres), rolled once per death
+    /// at the game's hook (genRandomItem: never for a wall crash or a body already dead), spawned at (x, mGroundHeight, z) with the game's coin pop.
+    /// Unset = nothing drops.</summary>
+    [Export] public SmsDropTable DropTable;
     /// <summary>TSmallEnemy::setAfterDeadEffect: PARTICLE_MS_ENM_DISAP_A + _B at the body (scaled) -- assets/Sms/Fx/EnemyDisap.tscn (an SmsFxBurst: the
     /// blue-gray smoke + the mint glow streaks; pass 125c), any one-shot GPUParticles3D, or nothing.</summary>
     [Export] public PackedScene DeathFxScene;
@@ -697,18 +700,21 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         if (_cur != NerveFreeze && _cur != NerveDie) PushNerve(NerveFreeze);
     }
 
-    /// <summary>genRandomItem: setAfterDeadEffect (the puffs) + genEventCoin (nothing without a placed coin) + generateItem (the deviation drop).</summary>
+    /// <summary>genRandomItem: setAfterDeadEffect (the puffs) + genEventCoin (nothing without a placed coin) + generateItem -> the drop table, skipped for
+    /// a death flagged UNK20000 (the wall crash, a kill by another attacker) or a body already dead, as the game's flag test.</summary>
     protected virtual void GenRandomItem()
     {
         SetAfterDeadEffect();
         if (_noReward || _dead) return;
-        if (DropScene != null && Rand() * 100f < P.GenItemRate)
-        {
-            var drop = DropScene.Instantiate<Node3D>();
-            GetParent().AddChild(drop);
-            drop.GlobalPosition = new Vector3(GlobalPosition.X, _groundY / U, GlobalPosition.Z);
-        }
+        if (DropTable != null)
+            LastDrops = DropTable.Spawn(_rng, P.GenItemRate + P.GenEggRate, GetParent(), new Vector3(GlobalPosition.X, _groundY / U, GlobalPosition.Z), this);
     }
+    /// <summary>For the drives: the nodes the last death dropped.</summary>
+    public List<Node3D> LastDrops { get; private set; } = new();
+    /// <summary>The spawner the species' own drops (the Stu's serial 1-UP and serial-crash coin) go through: the DropTable when set (its pop and hop
+    /// settings), else a default table with the game's pop.</summary>
+    protected SmsDropTable DropSpawner => DropTable ?? (_defaultSpawner ??= new SmsDropTable());
+    private static SmsDropTable _defaultSpawner;
     /// <summary>setAfterDeadEffect: PARTICLE_MS_ENM_DISAP_A + _B at the body, scaled (setGlobalScale(mScaling)); MSD_SE_EN_COMMON_SMOKE.</summary>
     protected virtual void SetAfterDeadEffect()
     {
