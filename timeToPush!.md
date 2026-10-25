@@ -52,8 +52,8 @@ the 19 `addons/godot_ai/` entries, which were left untouched.
 ### #2 -- PENDING -- 2026-10-25 03:55 PDT (Kiro)
 Push the first feature branch and open its PR: the card save ("Save?" after a shine, a blue coin, the pause menu's SAVE). Not merged yet --
 Jaysonn playtests from the PR, then merges there (or `git merge --no-ff feature/save-prompt` into main here).
-- Branch `feature/save-prompt` -- tip `3ab4893` ("SMS pass 124b: card save -- centred contents, WindowColor knob (darker default), digit
-  pitch, count mode"; pass 124 is `a804f34`), 3 commits since main (`7e448b9`) plus this file's commits.
+- Branch `feature/save-prompt` -- tip `25f69fd` ("SMS pass 124c: card save counter -- the blo's own digit / x / shine-icon textures";
+  124b `3ab4893`, 124 `a804f34`), 3 passes since main (`7e448b9`) plus this file's commits.
 - PR: title "Feature: the card save (SMS pass 124)"; base `main`; body:
   > TCardSave (GC2D/CardSave.cpp) on the game's own `save.blo` + `savemessage.bmg`: the shine-get window (Save and Continue / Save and
   > Quit / Continue, the saved count or "New", the pointing hand), the blue-coin window (every coin, as the game), the pause menu's SAVE
