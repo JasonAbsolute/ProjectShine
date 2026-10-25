@@ -127,7 +127,7 @@ identical content, nothing duplicated in the tree -- but avoidable; hence the ne
 `feature/enemy-base` was sitting at the old `main` tip with no commits of its own, so it was fast-forwarded onto the reconciled `main` to keep
 the next feature branched from the real trunk. Working tree left untouched throughout.
 
-### #4 -- PENDING -- 2026-10-25 05:35 PDT (Kiro)
+### #4 -- DONE 2026-10-25 -- https://github.com/JasonAbsolute/ProjectShine/tree/feature/enemy-base -- queued 2026-10-25 05:35 PDT (Kiro)
 Push the second feature branch so the work is visible on GitHub. NO PR YET: the feature is in progress (next passes: the DISAP / wall-hit
 puffs, the Gooble moved onto the base, more Stu kinds and enemies). When Jaysonn says the feature is done, a later entry asks for the PR;
 per the rule above Kiro will NOT merge this branch locally.
@@ -143,6 +143,16 @@ git rev-list --count origin/feature/enemy-base..feature/enemy-base
 ```
 Expect `0`. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn` (and the editor re-flips two Koopa `.png.import`
 files every session) -- leave them.
+
+Result: `feature/enemy-base` pushed as a new remote branch (4 commits since `main` `985fb29`), tracking set.
+`git rev-list --count origin/feature/enemy-base..feature/enemy-base` returned `0`. All three shas confirmed
+ancestors: code tip `3f7927b`, `e039b9c`, and the reconciled `main` `985fb29` -- so the branch really is off the
+real trunk, not the pre-merge tip. No PR, as the entry specified; `main` untouched and still in sync at `985fb29`.
+Hygiene checks on the range came back clean: 0 `addons/godot_ai` paths, 0 of the two Koopa `.png.import` flips.
+The 35 changed paths are exactly the ones the entry lists. Largest blobs: `PROJECT_LOG.md` 0.79 MB, `Hamukuri.glb`
+0.48 MB -- and `Hamukuri.glb.import` really is the stripped one (a few KB, not the multi-MB `slice_N` kind).
+Working tree left untouched: Jaysonn's `assets/Level.tscn` and `assets/Sms/SmsHiddenCoin.cs` (open in his editor
+this session), the two Koopa flips, and the `addons/godot_ai` churn.
 
 <!-- Kiro appends the next entry below this line. Entry template:
 
