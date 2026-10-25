@@ -127,6 +127,22 @@ identical content, nothing duplicated in the tree -- but avoidable; hence the ne
 `feature/enemy-base` was sitting at the old `main` tip with no commits of its own, so it was fast-forwarded onto the reconciled `main` to keep
 the next feature branched from the real trunk. Working tree left untouched throughout.
 
+### #4 -- PENDING -- 2026-10-25 05:35 PDT (Kiro)
+Push the second feature branch so the work is visible on GitHub. NO PR YET: the feature is in progress (next passes: the DISAP / wall-hit
+puffs, the Gooble moved onto the base, more Stu kinds and enemies). When Jaysonn says the feature is done, a later entry asks for the PR;
+per the rule above Kiro will NOT merge this branch locally.
+- Branch `feature/enemy-base` -- code tip `e039b9c` ("SMS pass 125: the enemy base (TSmallEnemy / TWalkerEnemy / Spine) + Strollin' Stu
+  (THamuKuri)"), branched from the reconciled `main` (`985fb29`); the branch tip is this file's latest commit.
+- New files: `assets/Sms/Enemy/` (SmsSmallEnemy.cs, SmsHamukuri.cs, Hamukuri.tscn + .uid), `models/Eniemes/Hamukuri/` (the glb, 3 png, their
+  .import -- the glb .import is the stripped 1.2 KB one); `assets/Gooble.cs` one line; PROJECT_LOG.md. Nothing near the 100 MB limit (the glb is
+  0.5 MB).
+```
+git push -u origin feature/enemy-base
+git rev-list --count origin/feature/enemy-base..feature/enemy-base
+```
+Expect `0`. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn` (and the editor re-flips two Koopa `.png.import`
+files every session) -- leave them.
+
 <!-- Kiro appends the next entry below this line. Entry template:
 
 ### #N -- PENDING -- <date> (Kiro)
