@@ -398,8 +398,8 @@ public partial class Gooble : CharacterBody3D, ISmsSprayTarget
         {
             var col = GetSlideCollision(i);
             GodotObject other = col.GetCollider();
-            if (other is Gooble g2)
-                _touching.Add(g2.GlobalPosition * U);          // another small enemy: pushed apart, no hop
+            if (other is Gooble || other is SmsSmallEnemy)
+                _touching.Add(((Node3D)other).GlobalPosition * U);   // another small enemy (a Gooble, or any SmsSmallEnemy -- pass 125): pushed apart, no hop
             else if (other is not Mario && MathF.Abs(col.GetNormal().Dot(UpDirection)) < 0.5f)
                 _onWall = true;                                 // TWalker: a wall ahead -> the hop
         }

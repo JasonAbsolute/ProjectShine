@@ -7451,3 +7451,53 @@ shine_icon.bti 30 x 36, drawn 25 x 25 / 35 x 41 at the 17-px digit pitch. With t
 touch at the outline, the x stands full-height beside the sun, the sun fills its pane under "MARIO A" (its top at the name's bottom, as the blo).
 `DigitPitch` stays for his taste. Drive 124 34/34 (its C6/C7 now sample the breath clock in a 44-50 / 76-80 window: on a frame hiccup the
 dialog's 60 Hz accumulator steps twice per physics tick and the exact 44 / 80 can be skipped).
+
+## SMS pass 125 -- the enemy base (TSmallEnemy / TWalkerEnemy) + Strollin' Stu (feature/enemy-base)
+
+**Files:** `assets/Sms/Enemy/SmsSmallEnemy.cs` (new, the base), `assets/Sms/Enemy/SmsHamukuri.cs` (new), `assets/Sms/Enemy/Hamukuri.tscn` (new),
+`models/Eniemes/Hamukuri/Hamukuri.glb` + 3 textures (new: his FinModelUtility export of bianco0's hamukuri/default.bmd with the 15
+hamukurianm bck clips; the .import stripped of the scene default), `assets/Gooble.cs` (one line: an SmsSmallEnemy is a fellow small enemy).
+
+**The base** (`SmsSmallEnemy`, abstract CharacterBody3D, ISmsSprayTarget) is the game's small-enemy stack ported once so each enemy is a thin
+species on it -- Enemy/smallEnemy.cpp (TSmallEnemy: init/reset, moveObject, receiveMessage, kill, the Die / Freeze / Jump / HitWaterJump /
+Wait nerves, genRandomItem, isFindMario, the hit cylinders), walkerEnemy.cpp (TWalkerEnemy: the Generate / GraphWander / Attack / PostAttack /
+Escape / TraceMario nerves, walkBehavior, behaveToFindMario, attackToMario's hop, the wall hop), enemy.cpp (TSpineEnemy: walkToCurPathNode,
+calcTurnSpeedToReach, the graph goals, isInSight), walker.cpp (TWalker::bind: gravity 0.15 a tick, terminal 40, the velocity zeroed on landing,
+no drag) and Strategic/Spine (the nerve stack: push / pushAfterCurrent / setNext / reset, the nerve's time). ONE TICK = one 120 Hz movement
+tick (the .prm speeds are units a tick); the physics step is the ticks' displacement through MoveAndSlide. A species gives: its `Params` (the
+.prm), its bck table (names, frame counts, loop attributes read off the disc), the anim setters, its own nerves (`ExecuteNerve`, ids from
+100) and the hooks named after the game's virtuals (SetBehavior, BehaveToWater, AttackToMario, IsFindMario, WalkBehavior, IsHitValid,
+IsCollidMove, GravityY, LaunchVelocity, KeepVelocityOnGround...). Knobs: Graph (the wander graph; none = random points within WanderRadiusUnits
+-- DEVIATION, his levels carry no graph), RelaunchTicks (200 = launcher.prm's period; a placed enemy is its own launcher -- DEVIATION), DropScene
+(the game's generateItem asks for a type nothing shipped carries: nothing drops; the knob is the deviation), DeathFxScene / DeathSound (slots),
+ModelScale (1 / 74.44 for a raw FinModelUtility glb in game units), DebugPrint. `SmsPlace(pos, yaw)` for spawners that place after AddChild.
+
+⚠️ **The hit cadence:** TMarDirector::direct (MarDirectorDirect.cpp 126) runs gpObjHitCheck->checkActorsHit() only on the ticks whose
+mMoveTickCount has both low bits clear -- the actor collision lists exist every FOURTH movement tick (clearHitNum on the others). The base
+checks its Mario pair on that cadence. It matters: a kicked Stu leaves at 30 u/tick, so by the next list it is 120 u away and its 90 + 42 u
+attack reach no longer covers him -- per tick, the kick hit Mario back. ⚠️ **checkCurAnmEnd** is MActorAnm::endsNext: frame + rate + 0.1 >=
+the end -- true once a CYCLE for a looping clip (the game's PostAttack waits on the looping wait anim this way); a never-ending loop hangs the
+nerve. ⚠️ A body placed AFTER AddChild must call `SmsPlace`: `_Ready` captures the placed point / yaw at entry.
+
+**Strollin' Stu** (`SmsHamukuri`, hamukuri.cpp's THamuKuri with the shipped /enemy/hamukuri.prm: 5 HP, march 1, turn 0.9..1, scale 1, jump 3,
+search 800 / 1000 / 10 / 90 deg, give-up 1500 / 650, attack wait 200, damage 60 x 100, attack 90 x 50, water coeff 30, first vy 5, bound 10,
+jitabata 800, kick vy 3, fly 600, trample bonus 3, crash bonus 2 / 60, kyoro 500): the wander's KYORO look-around (setWalkAnm IS the look-around,
+bck 4, then the walk 14; again every 500 ticks of wandering), the sight (x5 and give-up x3 when he pumps an EMPTY tank), the charge (run at
+x3) and hit (dmghamukuri.prm) with the hop + PostAttack, the long-fall Land, the stomp -> down (turn_down when flailing) -> dead -> the launcher's
+(0, 4, 4) re-launch arc with the set anim (LaunchArc knob), WATER on the ground -> JITABATA (turn_start -> the flail loop for 800 ticks -> turn_end
+-> Wait; the hose's drops carry it: inside 1.77 m its attack cylinder hits first, as the game), water while falling -> the water roll, the KICK
+of a flailing Stu (its body below his feet) -> forceRoll with the FLY: the puck skids on the floor (THamuKuri::bind: vy 0, y = ground + 1) at 30
+u/tick for 600 ticks -> a wall in its way (isHitWallInBound: moving INTO the wall) -> WallDie: the crash anim, the wall puff slot, dead after it
+(a rolling Stu rolls the Stu it hits: the serial crash -- 2+ within 60 ticks = a coin, SerialCrashScene slot); a flailing Stu stomped kills every
+other flailing one (requestSerialKill) and 3+ leave a 1-UP (his 1_up_mushroom.tscn); a thrown fruit landing on it (|vy| > 2, |vxz| > 2) flips it.
+Exports: LaunchArc, OneUpScene, SerialCrashScene, WallHitFxScene, AttackVoice / CrushedSound (slots).
+
+**Not ported (logged):** the football chase (GoForSearchActor -- Pinna's ball), the winged / goop (cap-stealing) / stack / fire kinds, the
+goop-walk pollution, the DISAP / WALLHIT particles (slots), the sounds (slots), the Gooble's migration onto the base (it keeps its own code;
+only the push-apart line knows the base), TEnemyManager's pooling / clipping, the generator (TGenerator) objects.
+
+**Drive 125** (`npc82/enemy125/patch_smoke125.py`, 15/15, the real collision / input path with Mario placed): A1-A4 generate (set anim, 78
+ticks) -> wander: the kyoro standing still, then the walk at 240 u / 240 ticks toward a one-node graph; B1-B4 Mario 5 m ahead -> the find,
+the run closing 3.2 m / 80 ticks, the hit (health -1, dmghamukuri) + the hop, PostAttack's wait; C1-C3 the trample -> Die with the down anim,
+dead at 74 ticks, the re-launch at 200 ticks with the arc (5 HP again); D1-D2 R from 3 m -> the drops flip it (HP 4) -> the flail loop; E1-E3
+the contact kick -> the puck (5.6 m in 12 ticks) -> the wall crash. Regression 118 35/35; build 0 errors; boot ALL OK.

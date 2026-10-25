@@ -1,0 +1,20 @@
+[gd_scene load_steps=4 format=3 uid="uid://chamukuri0125"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsHamukuri.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Hamukuri/Hamukuri.glb" id="2_model"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
+radius = 0.55
+height = 1.5
+
+[node name="Hamukuri" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+floor_max_angle = 1.1868
+script = ExtResource("1_script")
+ModelScale = 0.013434
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.78, 0)
+shape = SubResource("CapsuleShape3D_body")
