@@ -1,0 +1,64 @@
+[gd_scene load_steps=25 format=3 uid="uid://ccardsave0124"]
+
+[ext_resource type="Script" path="res://assets/Sms/Console/SmsCardSave.cs" id="1_script"]
+[ext_resource type="Resource" path="res://assets/Sms/Talk/TalkFont.tres" id="2_font"]
+[ext_resource type="Shader" path="res://assets/Sms/Talk/TalkGlyph.gdshader" id="3_glyph"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/standard_window_body.png" id="4_window"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/standard_window_rim.png" id="4b_rim"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/cursor.png" id="5_cursor"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/file_name_mario.png" id="6_mario"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/file_name_a.png" id="7_a"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/file_name_b.png" id="8_b"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/file_name_c.png" id="9_c"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/select_yes.png" id="10_yes"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/select_no.png" id="11_no"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/shine_icon.png" id="12_shine"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/coin_number_x.png" id="13_x"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/coin_number_0.png" id="14_d0"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/coin_number_1.png" id="15_d1"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/coin_number_2.png" id="16_d2"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/coin_number_3.png" id="17_d3"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/coin_number_4.png" id="18_d4"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/coin_number_5.png" id="19_d5"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/coin_number_6.png" id="20_d6"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/coin_number_7.png" id="21_d7"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/coin_number_8.png" id="22_d8"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Console/save/coin_number_9.png" id="23_d9"]
+
+[node name="CardSave" type="CanvasLayer" node_paths=PackedStringArray("WindowIn", "WindowOut", "Decide", "Select", "Cancel", "CursorMove")]
+process_mode = 3
+layer = 205
+script = ExtResource("1_script")
+Font = ExtResource("2_font")
+GlyphShader = ExtResource("3_glyph")
+WindowTexture = ExtResource("4_window")
+WindowRimTexture = ExtResource("4b_rim")
+WindowColor = Color(0, 0.5, 0.5, 0.85)
+CenterContents = true
+DigitPitch = 17.0
+CursorTexture = ExtResource("5_cursor")
+MarioTexture = ExtResource("6_mario")
+LetterTextures = Array[Texture2D]([ExtResource("7_a"), ExtResource("8_b"), ExtResource("9_c")])
+YesTexture = ExtResource("10_yes")
+NoTexture = ExtResource("11_no")
+ShineIcon = ExtResource("12_shine")
+TimesTexture = ExtResource("13_x")
+DigitTextures = Array[Texture2D]([ExtResource("14_d0"), ExtResource("15_d1"), ExtResource("16_d2"), ExtResource("17_d3"), ExtResource("18_d4"), ExtResource("19_d5"), ExtResource("20_d6"), ExtResource("21_d7"), ExtResource("22_d8"), ExtResource("23_d9")])
+WindowIn = NodePath("WindowIn")
+WindowOut = NodePath("WindowOut")
+Decide = NodePath("Decide")
+Select = NodePath("Select")
+Cancel = NodePath("Cancel")
+CursorMove = NodePath("CursorMove")
+
+[node name="WindowIn" type="AudioStreamPlayer" parent="."]
+
+[node name="WindowOut" type="AudioStreamPlayer" parent="."]
+
+[node name="Decide" type="AudioStreamPlayer" parent="."]
+
+[node name="Select" type="AudioStreamPlayer" parent="."]
+
+[node name="Cancel" type="AudioStreamPlayer" parent="."]
+
+[node name="CursorMove" type="AudioStreamPlayer" parent="."]

@@ -17138,7 +17138,10 @@ public partial class Mario : CharacterBody3D
             return true;
         }
         bool fresh = GameData.Instance.CollectShine(key);
-        if (SmsDebugPrint) GD.Print($"[SMS shine] flag '{key}' {(fresh ? "set -- the count is now" : "was already set -- the count stays at")} {GameData.Instance.ShineCount} (saved)");
+        // 124: the write is the card save's ("Save and ..."); with the prompt off (or no CardSave node) the touch writes at once, as before 124
+        bool prompt = SmsShineGetSavePrompt && SmsCardSave.Current != null;
+        if (!prompt) GameData.Instance.SaveNow();
+        if (SmsDebugPrint) GD.Print($"[SMS shine] flag '{key}' {(fresh ? "set -- the count is now" : "was already set -- the count stays at")} {GameData.Instance.ShineCount} ({(prompt ? "the card save writes" : "saved")})");
         return fresh;
     }
     /// <summary>The count-up 2 s into the demo: one more only for a fresh flag (an empty shine's demo leaves the digits alone).</summary>
@@ -19448,6 +19451,9 @@ public partial class Mario : CharacterBody3D
     /// (116 had it black). It runs only for a shine whose ExitLevel is on (118).</summary>
     [Export] public Color SmsShineGetFadeColor = new Color(0xD2 / 255f, 0xD2 / 255f, 0xD2 / 255f);
     /// <summary>registFadeout(1 s x rate, 5.3333 s x rate): when the fade starts and how long it takes (seconds since the demo began).</summary>
+    /// <summary>124: fireGetStar's DIRECTOR_FLAG_CARD_SAVE_PENDING -- the demo over, the card save (SmsCardSave, PURPOSE_SHINE_GET) before the
+    /// stage moves: "Save and Continue" / "Save and Quit" / "Continue". Off = the stage moves at once, nothing written (the pass 118 way).</summary>
+    [Export] public bool SmsShineGetSavePrompt = true;
     [Export] public float SmsShineGetFadeAt = 5.3333f;
     [Export] public float SmsShineGetFadeLen = 1.0f;
     /// <summary>When the demo is over, seconds since it began: an ExitLevel shine changes the scene here, otherwise play resumes here. 0 = the camera
@@ -19582,6 +19588,33 @@ public partial class Mario : CharacterBody3D
         _smsShineDemoT = -1f;
         ShineSprite shine = _activeShine != null && IsInstanceValid(_activeShine) ? _activeShine : null;
         _activeShine = null;
+        // 124: DIRECTOR_FLAG_CARD_SAVE_PENDING (MarDirectorDirect.cpp 854 / 866): the demo over, STATE_CARD_SAVE with PURPOSE_SHINE_GET before the
+        // stage moves -- the dialog over the faded screen (or over the live level for a shine that stays, his option), the game stopped under it
+        SmsCardSave card = SmsShineGetSavePrompt ? SmsCardSave.Current : null;
+        if (card != null && !card.IsOpen)
+        {
+            if (SmsDebugPrint) GD.Print($"[SMS shine] demo over at {SmsShineGetEndTime:F2} s: the card save (PURPOSE_SHINE_GET), the game stopped");
+            void OnDone(int next) { card.Finished -= OnDone; SmsShineGetFinish(shine, next); }
+            card.Finished += OnDone;
+            card.Open(SmsCardSave.Purpose.ShineGet, pauseTree: true, screenFaded: shine != null && shine.ExitLevel);
+            return;
+        }
+        SmsShineGetFinish(shine, 0);
+    }
+
+    /// <summary>After the card save (or at once without it): getNextState 1 = "Save and Quit" -> the title (STATE_UNK12 / APP_STATE_DONE); 0 = the
+    /// stage moves (an ExitLevel shine) or control comes back (his option).</summary>
+    private void SmsShineGetFinish(ShineSprite shine, int next)
+    {
+        if (shine != null && !IsInstanceValid(shine)) shine = null;
+        if (next == 1)
+        {
+            string title = SmsCardSave.Current?.TitleScene ?? "";
+            if (GameData.Instance != null) { GameData.Instance.ReturnFromScene = null; GameData.Instance.ReturnWithShine = false; }
+            if (SmsDebugPrint) GD.Print($"[SMS shine] Save and Quit -> {(title != "" ? title : "the main scene")}");
+            if (title != "") GetTree().ChangeSceneToFile(title); else GetTree().ChangeSceneToFile(ProjectSettings.GetSetting("application/run/main_scene").AsString());
+            return;
+        }
         if (shine != null && shine.ExitLevel)
         {
             string dest = SmsReturnSpot.ScenePath(shine.ExitScene);   // 119b: the editor saves the File export as uid://, resolved to the path
