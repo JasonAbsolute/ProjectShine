@@ -7540,3 +7540,43 @@ stand where the colour texture belongs; pull TEX1 out of the bmd (bmd_tex.py) an
 three shaders; L3 the top reads K_hamu_dot + the toon ramp with REG0 (1.5843, 0.7451, -0.8275), dirt 0, the eye K_hamu_eye1; L4 the six pngs
 import lossless / no mipmaps / no 3D auto-compression; A-E as pass 125. Build 0 errors; boot ALL OK. Not checked headless: the pixels (the
 dummy renderer) -- the look was checked by the numpy render; Jaysonn's eye decides. Not ported: the goop-walk that would raise `dirt` in play.
+
+## SMS pass 125c -- the small enemies' puffs: the death smoke + glow, the wall-crash puff + goop splat (feature/enemy-base)
+
+**Files:** new `assets/Sms/Fx/EnemyDisap.tscn`, `EnemyDisapWet.tscn`, `EnemyWallHit.tscn` (tools/projectshine/gen_fx_enemy.py from the disc's
+ms_enm_disap_a / _a_w / _b / ms_enm_wallhit / _o .jpa), `SmsFxBurst.cs` (a generic world-pinned one-shot burst: restarts every GPUParticles3D
+child, frees itself when the last finishes, SetShaderParam for the splat's colour), `JpaDirBillboardAdd.gdshader` (JpaDirBillboard's additive
+twin), `JpaQuad.gdshader` (a JPA quad in the emitter's frame -- no billboard -- with the alpha test), `tex/kemuball3_enemy.png` (lerp((74,98,170)
+-> white)), `tex/glow1_raw.png`, `tex/pecha3_raw.png` (raw I / IA, imports pinned lossless); `SmsSmallEnemy.cs` (SpawnBurst: the unbound emit;
+SetAfterDeadEffect uses it), `SmsHamukuri.cs` (DeathFxWetScene, SplatColor / SplatShade knobs; SetWallDeadEffect puts the burst ON the wall;
+SetAfterDeadEffect picks the wet smoke during the crash anim), `Hamukuri.tscn` (the three slots filled).
+
+**The game (smallEnemy.cpp 390, hamukuri.cpp 1007 / 1095, EmitterViewObj.cpp 599):** every small enemy's death = emit(DISAP_A) + emit(DISAP_B) at
+mPosition, both setGlobalScale(mScaling) -- UNBOUND (the burst stays where it died). The Stu's wall death: TNerveHamuKuriWallDie's first tick
+emitWithRotate(WALLHIT, anmMtx(1) = joint 1's point, the yaw) scaled + emitWithRotate(WALLHIT_O, mPosition, the yaw) with SMSSetEmitterPolColor(6) =
+the stage's goop colour from prmarray / envarray; when its crash anim ends genRandomItem -> setAfterDeadEffect, which emits DISAP_A_W instead of _A
+while bck 1 (the crash) is current. The .jpa data (jpa_dump.py): the smoke = 30 puffs off a ring r 10 u, 30 u up, 22 u/f outward x the moment
+0.4 (1 - 0.2249 r), a Drag field 0.9 a frame fading in over 35.5 %, a Gravity field 3.4 u/f^2 UP from 12.5 % fading in over 62 %, life 55, a 75 u
+billboard 0.85 -> 1 -> 1.8, kemuball3 lerp((74,98,170) -> white) = a blue-gray smoke, alpha out from 58.6 %; the glow = 22 streaks off a sphere
+r 30 u at 15 u/f (x 0.5..1.5), airResist 0.94, a 12.5 x 17.5 u DirBillboard Y 3 -> 1 -> 0.3, ADDITIVE flat (111, 255, 183) mint, alpha out from
+25 %; the wall puff = ONE 90 u kemuball3 puff off a ring r 15 u stood on edge (rot X 90) facing the yaw, 18 u/f out + 3 along the axis,
+airResist 0.92, life 35; the splat = ONE 325 u Direction quad at (0, 45, 0), life 180 (3 s), X 0.1 -> 1 by 4 %, Y -> 1.4 at the end (the sag), a
+0.01 u/f^2 downward BaseVelocity gravity from 12.5 % (1.7 m of slide over its life), P_ms_pecha3_ia lerp(env -> prm), OPAQUE, alpha test > 33.
+⚠️ **JPA Drag** (JPAField.cpp 396 / JPAParticle.cpp 59): mCurrentDragForce starts at 1 and is MULTIPLIED every frame by 1 - fade x (1 - mag)
+-- an exponential decay (0.9^n once faded in), not a per-frame factor; a FieldAccel field accumulates (a true acceleration), velocity = drag x
+(base + field) x moment. gen_fx_enemy.py simulates the frames and hands Godot the radial / directional velocity CURVES (the smoke spreads 1.9 m
+and lifts 0.5 m) rather than an initial velocity + damping.
+
+**DEVIATIONS (logged):** the splat is placed ON the wall (a ray along the latched wall normal from the body, 1 u off the face, the quad's +Z = the
+normal) -- the game's 325 u quad sits at the body's point and reads as "on the wall" from any camera, but a Godot quad there floats 40 u in front
+of it; the splat's SSP1 drips (life 120, one every 6 frames from 20 %) are not ported; the stage colour is a knob (SplatColor / SplatShade,
+default the table's stages 0 / 9 / 57 entry (255, 227, 168) over (216, 48, 96); Bianco's is (181, 132, 102) over (98, 14, 0)); the sounds stay
+slots. ⚠️ The dummy renderer never reports GPUParticles3D.Emitting true for a restarted one-shot; the burst's own Running count is the signal.
+
+**Drive 125** 25/25 (`npc82/enemy125/patch_smoke125.py`): P1-P3 the stomp death spawns EnemyDisap at the body, scaled, TopLevel, both emitters
+restarted one-shot, the smoke's curves and the glow's additive shader, freed within 70 frames; W1-W3 the wall crash spawns EnemyWallHit 1.0 u
+off the wall face facing its normal (the first run had it 41 u off, facing the wrong way: the wall flag was already cleared when WallDie ran --
+the latched normal is used now), the Puff at joint 1 (55 u), the Splat at +45 u in the knob colours, 3 s, sliding; the crash anim's end spawns
+EnemyDisapWet (the sphere at the point) + the glow. Build 0 errors; boot ALL OK. Regression 118: 7/8 on HIS working Level.tscn -- his placed
+test Stu charges Mario during the shine demo (the environment, not the code) -- 35/35 on the committed level (his copy restored at the same
+md5). Not checked headless: the pixels (the dummy renderer) -- the look is Jaysonn's.

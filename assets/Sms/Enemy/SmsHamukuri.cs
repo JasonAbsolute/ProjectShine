@@ -58,8 +58,15 @@ public partial class SmsHamukuri : SmsSmallEnemy
     public const string OneUpScenePath = "res://1_up_mushroom.tscn";
     /// <summary>checkSerialKill's coin (2+ crashes within 60 ticks): a scene (his yellow coin) or nothing.</summary>
     [Export] public PackedScene SerialCrashScene;
-    /// <summary>PARTICLE_MS_ENM_WALLHIT (+ _O): the crash puff -- a one-shot GPUParticles3D scene, or nothing.</summary>
+    /// <summary>THamuKuri::setWallDeadEffect: PARTICLE_MS_ENM_WALLHIT (the puff at the body's joint 1, turned to its yaw, scaled) + _O (the goop splat on the
+    /// wall at the body's point) -- assets/Sms/Fx/EnemyWallHit.tscn (an SmsFxBurst; pass 125c), any one-shot GPUParticles3D, or nothing.</summary>
     [Export] public PackedScene WallHitFxScene;
+    /// <summary>THamuKuri::setAfterDeadEffect's PARTICLE_MS_ENM_DISAP_A_W: the smoke of a death during the CRASH anim (the wall) -- EnemyDisapWet.tscn; unset = DeathFxScene.</summary>
+    [Export] public PackedScene DeathFxWetScene;
+    /// <summary>The splat's colours: SMSSetEmitterPolColor(6) picks the stage's goop (EmitterViewObj.cpp 606: stages 0 / 9 / 57 -> (255, 227, 168) over
+    /// (216, 48, 96) = the default here; 1 (Bianco) / 2 / 55 -> (181, 132, 102) over (98, 14, 0); 3, and Bianco's scenario 5 -> (110, 103, 87) over black;
+    /// 8 -> (239, 176, 46) over (183, 36, 8); 6 / 7 / 14 / 56 -> (176, 191, 48) over (0, 115, 108)). Set them to the level's goop.</summary>
+    [Export] public Color SplatColor = new Color(1f, 227f / 255f, 168f / 255f), SplatShade = new Color(216f / 255f, 48f / 255f, 96f / 255f);
     /// <summary>MSD_SE_EN_HMKRI_VO_ATTACK (the charge cry), MSD_SE_EN_HAMUKURI_CRUSHED (the wall), MSD_SE_EN_DOROKURI_JUMP. Unset = silent.</summary>
     [Export] public AudioStreamPlayer3D AttackVoice, CrushedSound;
 
@@ -365,14 +372,48 @@ public partial class SmsHamukuri : SmsSmallEnemy
         return base.ExecuteNerve(n);
     }
 
-    /// <summary>THamuKuri::setWallDeadEffect: MS_ENM_WALLHIT at joint 1 (+ _O in the goop colour), turned to the body's yaw, scaled.</summary>
+    /// <summary>THamuKuri::setWallDeadEffect: emitWithRotate(MS_ENM_WALLHIT, anmMtx(1) = joint 1's point, the body's yaw) scaled by the body, + emitWithRotate(_O,
+    /// mPosition, the yaw) in the stage's goop colour. The game's splat is a 325 u Direction quad at the body's point -- big enough to read as "on the wall"
+    /// from any camera; here it is put ON the wall: the point the roll hit (a ray along the wall's normal from the body, 1 u off the face), facing the
+    /// normal, so it never floats in front of a wall the Stu stopped short of.</summary>
     private void SetWallDeadEffect()
     {
         if (WallHitFxScene == null) return;
-        var fx = WallHitFxScene.Instantiate<Node3D>();
-        GetParent().AddChild(fx);
-        fx.GlobalPosition = GlobalPosition + Vector3.Up * (55f / U); fx.Rotation = new Vector3(0f, Mathf.DegToRad(_yaw), 0f); fx.Scale = Vector3.One * _scale;
-        if (fx is GpuParticles3D gp) { gp.OneShot = true; gp.Emitting = true; }
+        // isHitWallInBound cleared the flag but left the normal (the wall the roll hit); after it the yaw IS the normal, so the fallback is +yaw
+        Vector3 n = _wallNormal.LengthSquared() > 0.5f ? new Vector3(_wallNormal.X, 0f, _wallNormal.Z).Normalized() : PolarXZ(_yaw, 1f);
+        if (n.LengthSquared() < 0.5f) n = PolarXZ(_yaw, 1f);
+        Vector3 wallPoint = GlobalPosition;
+        var space = GetWorld3D().DirectSpaceState;
+        var q = PhysicsRayQueryParameters3D.Create(GlobalPosition + Vector3.Up * (45f / U), GlobalPosition + Vector3.Up * (45f / U) - n * 2f, CollisionMask);
+        q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+        var hit = space.IntersectRay(q);
+        if (hit.Count > 0) wallPoint = (Vector3)hit["position"] - Vector3.Up * (45f / U) + n * (1f / U);
+        // the burst's frame: Z = out of the wall (the quad's face), Y up; the puff's ring stands in its XY plane as the game's rot X 90 leaves it
+        Basis frame = Basis.LookingAt(-n, Vector3.Up);                      // -Z toward -n => +Z = n
+        var fx = SpawnBurst(WallHitFxScene, new Transform3D(frame * Basis.FromScale(Vector3.One * _scale), wallPoint));
+        if (fx is SmsFxBurst burst)
+        {
+            burst.SetShaderParam("prm", new Vector4(SplatColor.R, SplatColor.G, SplatColor.B, 1f));
+            burst.SetShaderParam("env", new Vector4(SplatShade.R, SplatShade.G, SplatShade.B, 1f));
+            // the puff rides joint 1 (the body root, ~55 u up), the splat the point: the Puff child is lifted by the body's joint height
+            if (burst.GetNodeOrNull<Node3D>("Puff") is Node3D puff) puff.Position = new Vector3(0f, 55f / U, 0f);
+        }
+        _lastWallFx = fx;
+    }
+    private Node3D _lastWallFx;
+    /// <summary>For the drives: the last wall-crash burst spawned.</summary>
+    public Node3D LastWallFx => _lastWallFx;
+
+    /// <summary>THamuKuri::setAfterDeadEffect: the _A_W smoke while the CRASH anim plays (the wall death), _A otherwise; _B with both; scaled by the body.</summary>
+    protected override void SetAfterDeadEffect()
+    {
+        if (IsBck(BckCrash) && DeathFxWetScene != null)
+        {
+            SpawnBurst(DeathFxWetScene, new Transform3D(Basis.FromScale(Vector3.One * _scale), GlobalPosition));
+            if (DeathSound != null && DeathSound.Stream != null) DeathSound.Play();
+            return;
+        }
+        base.SetAfterDeadEffect();
     }
 
     /// <summary>For the drives: the Stu's flags.</summary>

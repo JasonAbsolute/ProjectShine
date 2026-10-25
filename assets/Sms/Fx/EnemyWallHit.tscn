@@ -1,0 +1,167 @@
+[gd_scene load_steps=25 format=3 uid="uid://cenmwallhit125"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsFxBurst.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/kemuball3.png" id="2_smoke"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/JpaQuad.gdshader" id="3_shader"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/pecha3_raw.png" id="4_splat"]
+
+[sub_resource type="Image" id="Image_puff_points"]
+data = {
+"data": PackedByteArray(171, 165, 62, 62, 235, 215, 157, 61, 0, 0, 0, 0, 130, 25, 79, 61, 83, 188, 71, 62, 0, 0, 0, 0, 140, 192, 123, 189, 254, 128, 68, 62, 0, 0, 0, 0, 118, 65, 46, 62, 60, 255, 220, 189, 0, 0, 0, 0, 77, 147, 167, 189, 43, 143, 60, 62, 0, 0, 0, 0, 130, 65, 49, 190, 203, 60, 211, 189, 0, 0, 0, 0, 114, 201, 71, 62, 157, 78, 78, 189, 0, 0, 0, 0, 237, 21, 162, 61, 84, 193, 61, 190, 0, 0, 0, 0, 123, 86, 186, 188, 165, 4, 77, 62, 0, 0, 0, 0, 78, 46, 69, 62, 155, 34, 115, 61, 0, 0, 0, 0, 21, 39, 51, 62, 160, 188, 204, 189, 0, 0, 0, 0, 241, 137, 177, 61, 13, 68, 58, 62, 0, 0, 0, 0, 206, 195, 67, 62, 146, 102, 130, 189, 0, 0, 0, 0, 135, 164, 57, 190, 114, 33, 180, 61, 0, 0, 0, 0, 226, 190, 136, 61, 247, 173, 66, 190, 0, 0, 0, 0, 214, 174, 161, 189, 79, 215, 61, 62, 0, 0, 0, 0, 39, 106, 49, 190, 33, 180, 210, 189, 0, 0, 0, 0, 122, 103, 53, 190, 144, 165, 196, 61, 0, 0, 0, 0, 54, 140, 7, 190, 186, 145, 27, 62, 0, 0, 0, 0, 205, 137, 18, 62, 120, 67, 17, 190, 0, 0, 0, 0, 15, 190, 46, 62, 81, 116, 219, 61, 0, 0, 0, 0, 49, 34, 37, 190, 14, 111, 247, 189, 0, 0, 0, 0, 7, 203, 160, 61, 168, 7, 62, 190, 0, 0, 0, 0, 10, 66, 218, 61, 219, 29, 47, 62, 0, 0, 0, 0, 77, 163, 70, 62, 199, 90, 95, 189, 0, 0, 0, 0, 135, 208, 45, 189, 166, 181, 73, 190, 0, 0, 0, 0, 46, 214, 145, 61, 229, 5, 65, 190, 0, 0, 0, 0, 180, 157, 234, 60, 4, 62, 76, 62, 0, 0, 0, 0, 193, 21, 74, 190, 5, 177, 38, 189, 0, 0, 0, 0, 31, 56, 66, 190, 219, 86, 139, 189, 0, 0, 0, 0, 34, 106, 33, 189, 64, 90, 74, 62, 0, 0, 0, 0, 172, 108, 10, 62, 223, 3, 25, 62, 0, 0, 0, 0, 73, 231, 66, 190, 189, 118, 135, 189, 0, 0, 0, 0, 53, 167, 6, 61, 141, 146, 75, 190, 0, 0, 0, 0, 68, 79, 185, 61, 41, 93, 56, 190, 0, 0, 0, 0, 193, 74, 233, 60, 21, 68, 76, 62, 0, 0, 0, 0, 12, 173, 145, 189, 168, 13, 65, 190, 0, 0, 0, 0, 57, 98, 74, 190, 239, 201, 32, 61, 0, 0, 0, 0, 77, 1, 75, 62, 98, 185, 19, 189, 0, 0, 0, 0, 141, 4, 68, 190, 62, 223, 128, 61, 0, 0, 0, 0, 229, 54, 18, 62, 234, 150, 17, 190, 0, 0, 0, 0, 74, 208, 70, 190, 176, 214, 92, 189, 0, 0, 0, 0, 252, 3, 55, 190, 184, 148, 190, 189, 0, 0, 0, 0, 3, 3, 107, 61, 166, 203, 69, 62, 0, 0, 0, 0, 174, 17, 245, 61, 72, 3, 38, 190, 0, 0, 0, 0, 36, 85, 26, 190, 63, 244, 8, 62, 0, 0, 0, 0, 122, 48, 35, 190, 107, 138, 252, 189, 0, 0, 0, 0, 163, 177, 27, 187, 155, 82, 78, 62, 0, 0, 0, 0, 157, 103, 217, 188, 36, 138, 76, 190, 0, 0, 0, 0, 253, 114, 68, 190, 39, 111, 124, 189, 0, 0, 0, 0, 183, 113, 1, 190, 246, 174, 32, 190, 0, 0, 0, 0, 184, 133, 67, 190, 29, 217, 131, 189, 0, 0, 0, 0, 8, 137, 68, 62, 9, 92, 123, 61, 0, 0, 0, 0, 180, 70, 41, 190, 128, 248, 235, 61, 0, 0, 0, 0, 57, 49, 8, 189, 43, 130, 75, 62, 0, 0, 0, 0, 26, 68, 35, 190, 168, 87, 252, 61, 0, 0, 0, 0, 27, 169, 50, 190, 30, 115, 206, 189, 0, 0, 0, 0, 101, 224, 13, 190, 231, 209, 21, 62, 0, 0, 0, 0, 148, 90, 85, 61, 228, 82, 71, 62, 0, 0, 0, 0, 132, 112, 104, 188, 50, 211, 77, 190, 0, 0, 0, 0, 42, 162, 49, 62, 10, 247, 209, 189, 0, 0, 0, 0, 244, 208, 28, 190, 101, 26, 6, 62, 0, 0, 0, 0, 198, 89, 37, 62, 105, 218, 246, 189, 0, 0, 0, 0, 234, 146, 223, 61, 149, 110, 45, 190, 0, 0, 0, 0),
+"format": "RGBFloat",
+"height": 1,
+"mipmaps": false,
+"width": 64
+}
+
+[sub_resource type="ImageTexture" id="ImageTexture_puff_points"]
+image = SubResource("Image_puff_points")
+
+[sub_resource type="Image" id="Image_puff_normals"]
+data = {
+"data": PackedByteArray(193, 80, 105, 63, 134, 43, 193, 62, 53, 88, 40, 62, 60, 115, 125, 62, 34, 112, 116, 63, 53, 88, 40, 62, 81, 12, 154, 190, 163, 123, 112, 63, 53, 88, 40, 62, 103, 65, 85, 63, 154, 58, 7, 191, 53, 88, 40, 62, 127, 20, 205, 190, 160, 194, 102, 63, 53, 88, 40, 62, 88, 237, 88, 191, 205, 65, 1, 191, 53, 88, 40, 62, 49, 128, 116, 63, 239, 122, 124, 190, 53, 88, 40, 62, 150, 92, 198, 62, 79, 57, 104, 191, 53, 88, 40, 62, 171, 10, 228, 189, 29, 231, 122, 63, 53, 88, 40, 62, 189, 79, 113, 63, 125, 198, 148, 62, 53, 88, 40, 62, 152, 63, 91, 63, 250, 142, 250, 190, 53, 88, 40, 62, 253, 69, 217, 62, 28, 244, 99, 63, 53, 88, 40, 62, 28, 148, 111, 63, 217, 149, 159, 190, 53, 88, 40, 62, 226, 48, 99, 191, 253, 113, 220, 62, 53, 88, 40, 62, 177, 89, 167, 62, 22, 64, 110, 191, 53, 88, 40, 62, 109, 222, 197, 190, 53, 84, 104, 63, 53, 88, 40, 62, 22, 31, 89, 191, 44, 238, 0, 191, 53, 88, 40, 62, 253, 0, 94, 191, 100, 168, 240, 62, 53, 88, 40, 62, 99, 226, 37, 191, 8, 99, 62, 63, 53, 88, 40, 62, 174, 85, 51, 63, 80, 198, 49, 191, 53, 88, 40, 62, 227, 217, 85, 63, 244, 72, 6, 63, 53, 88, 40, 62, 124, 23, 74, 191, 220, 103, 23, 191, 53, 88, 40, 62, 161, 199, 196, 62, 96, 143, 104, 191, 53, 88, 40, 62, 139, 141, 5, 63, 32, 79, 86, 63, 53, 88, 40, 62, 55, 24, 115, 63, 234, 171, 136, 190, 53, 88, 40, 62, 50, 183, 84, 190, 142, 218, 118, 191, 53, 88, 40, 62, 219, 121, 178, 62, 27, 57, 108, 191, 53, 88, 40, 62, 253, 143, 15, 62, 7, 244, 121, 63, 53, 88, 40, 62, 43, 80, 119, 191, 146, 255, 75, 190, 53, 88, 40, 62, 223, 175, 109, 191, 68, 134, 170, 190, 53, 88, 40, 62, 89, 138, 69, 190, 255, 163, 119, 63, 53, 88, 40, 62, 172, 103, 41, 63, 215, 66, 59, 63, 53, 88, 40, 62, 60, 134, 110, 191, 27, 200, 165, 190, 53, 88, 40, 62, 34, 202, 36, 62, 49, 34, 121, 191, 53, 88, 40, 62, 139, 200, 226, 62, 64, 160, 97, 191, 53, 88, 40, 62, 149, 192, 14, 62, 116, 251, 121, 63, 53, 88, 40, 62, 133, 71, 178, 190, 155, 66, 108, 191, 53, 88, 40, 62, 192, 173, 119, 191, 75, 198, 68, 62, 53, 88, 40, 62, 111, 112, 120, 63, 53, 201, 52, 190, 53, 88, 40, 62, 88, 227, 111, 191, 240, 182, 157, 62, 53, 88, 40, 62, 56, 240, 50, 63, 111, 44, 50, 191, 53, 88, 40, 62, 70, 79, 115, 191, 203, 33, 135, 190, 53, 88, 40, 62, 210, 249, 95, 191, 3, 60, 233, 190, 53, 88, 40, 62, 250, 205, 143, 62, 76, 16, 114, 63, 53, 88, 40, 62, 110, 245, 21, 63, 243, 42, 75, 191, 53, 88, 40, 62, 152, 223, 60, 191, 255, 154, 39, 63, 53, 88, 40, 62, 96, 182, 71, 191, 215, 135, 26, 191, 53, 88, 40, 62, 22, 138, 62, 188, 210, 127, 124, 63, 53, 88, 40, 62, 226, 7, 5, 190, 50, 81, 122, 191, 53, 88, 40, 62, 128, 106, 112, 191, 40, 119, 154, 190, 53, 88, 40, 62, 49, 106, 30, 191, 73, 165, 68, 191, 53, 88, 40, 62, 33, 72, 111, 191, 82, 91, 161, 190, 53, 88, 40, 62, 122, 133, 112, 63, 207, 206, 153, 62, 53, 88, 40, 62, 88, 41, 79, 191, 50, 100, 16, 63, 53, 88, 40, 62, 84, 172, 38, 190, 36, 14, 121, 63, 53, 88, 40, 62, 101, 206, 71, 191, 199, 104, 26, 63, 53, 88, 40, 62, 109, 165, 90, 191, 155, 167, 252, 190, 53, 88, 40, 62, 46, 161, 45, 191, 206, 89, 55, 63, 53, 88, 40, 62, 82, 141, 130, 62, 27, 239, 115, 63, 53, 88, 40, 62, 11, 59, 142, 189, 228, 227, 123, 191, 53, 88, 40, 62, 162, 99, 89, 63, 120, 122, 0, 191, 53, 88, 40, 62, 180, 233, 63, 191, 205, 29, 36, 63, 53, 88, 40, 62, 129, 91, 74, 63, 231, 12, 23, 191, 53, 88, 40, 62, 68, 206, 8, 63, 84, 63, 84, 191, 53, 88, 40, 62),
+"format": "RGBFloat",
+"height": 1,
+"mipmaps": false,
+"width": 64
+}
+
+[sub_resource type="ImageTexture" id="ImageTexture_puff_normals"]
+image = SubResource("Image_puff_normals")
+
+[sub_resource type="Curve" id="Curve_puff_scale"]
+resource_name = "ms_enm_wallhit ESP1 scale: 0.75 -> 1 by 50 %, -> 1.7 at the end; x (1 +- 0.375)"
+max_value = 1.7
+_data = [Vector2(0, 0.75), 0.0, 0.0, 1, 1, Vector2(0.5, 1), 0.0, 0.0, 1, 1, Vector2(1, 1.7), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_puff_scale"]
+curve = SubResource("Curve_puff_scale")
+
+[sub_resource type="Gradient" id="Gradient_puff"]
+resource_name = "alpha 1 -> 0 over the last 12.5 %"
+offsets = PackedFloat32Array(0, 0.875, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_puff"]
+gradient = SubResource("Gradient_puff")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_puff"]
+resource_name = "ms_enm_wallhit: one puff off a ring r 15 u on edge, 18 u/f out + 3 along the axis (x 0.875..1.125), airResist 0.92 as a brake (2.9 m in all), rolled +- 22.5 deg"
+lifetime_randomness = 0.5
+emission_shape = 5
+emission_point_texture = SubResource("ImageTexture_puff_points")
+emission_normal_texture = SubResource("ImageTexture_puff_normals")
+emission_point_count = 64
+direction = Vector3(0, 0, 1)
+spread = 0.0
+initial_velocity_min = 12.8697
+initial_velocity_max = 16.5467
+angle_min = -22.5
+angle_max = 22.5
+gravity = Vector3(0, 0, 0)
+damping_min = 33.391
+damping_max = 33.391
+scale_min = 0.625
+scale_max = 1.375
+scale_curve = SubResource("CurveTexture_puff_scale")
+color_ramp = SubResource("GradientTexture1D_puff")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_puff"]
+resource_name = "ms_enm_wallhit: P_msm_kemuball3 lerp((26,26,2) -> (255,255,242)), mix -- the wall kick's bake"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+disable_receive_shadows = true
+albedo_texture = ExtResource("2_smoke")
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_puff"]
+resource_name = "the game's 1.8 billboard (90 units)"
+material = SubResource("StandardMaterial3D_puff")
+size = Vector2(1.209, 1.209)
+
+[sub_resource type="Curve" id="Curve_splat_sx"]
+resource_name = "ms_enm_wallhit_o ESP1 scale X 0.1 -> 1 by 4 %, 1 at the end; Y 0.1 -> 1 by 4 %, 1 until 40 %, -> 1.4 at the end (the sag); x (1 +- 0.1)"
+_data = [Vector2(0, 0.1), 0.0, 0.0, 1, 1, Vector2(0.04, 1), 0.0, 0.0, 1, 1, Vector2(0.4, 1), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 4
+
+[sub_resource type="Curve" id="Curve_splat_sy"]
+max_value = 1.4
+_data = [Vector2(0, 0.1), 0.0, 0.0, 1, 1, Vector2(0.04, 1), 0.0, 0.0, 1, 1, Vector2(0.4, 1), 0.0, 0.0, 1, 1, Vector2(1, 1.4), 0.0, 0.0, 1, 1]
+point_count = 4
+
+[sub_resource type="Curve" id="Curve_one"]
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_splat_scale"]
+curve_x = SubResource("Curve_splat_sx")
+curve_y = SubResource("Curve_splat_sy")
+curve_z = SubResource("Curve_one")
+
+[sub_resource type="Gradient" id="Gradient_splat"]
+resource_name = "alpha 1 -> 0 over the last 12.5 %"
+offsets = PackedFloat32Array(0, 0.875, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_splat"]
+gradient = SubResource("Gradient_splat")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_splat"]
+resource_name = "ms_enm_wallhit_o: one quad at (0, 45, 0), turned 90 deg, the Gravity field 0.01 u/f^2 down from 12.5 % (1.67 m of slide over 3 s) as a constant gravity"
+emission_shape = 0
+direction = Vector3(0, 0, 0)
+spread = 0.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+angle_min = 90.0
+angle_max = 90.0
+gravity = Vector3(0, -0.3703, 0)
+scale_min = 0.9
+scale_max = 1.1
+scale_curve = SubResource("CurveXYZTexture_splat_scale")
+color_ramp = SubResource("GradientTexture1D_splat")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_splat"]
+resource_name = "ms_enm_wallhit_o: P_ms_pecha3_ia lerp(env -> prm) in the stage's goop colours (SMSSetEmitterPolColor 6: Dolpic's here; SmsHamukuri's SplatColor / SplatShade set them), opaque, alpha test > 33"
+shader = ExtResource("3_shader")
+shader_parameter/prm = Vector4(1, 0.8902, 0.6588, 1)
+shader_parameter/env = Vector4(0.8471, 0.1882, 0.3765, 1)
+shader_parameter/alpha_ref = 0.1333
+shader_parameter/tex = ExtResource("4_splat")
+
+[sub_resource type="QuadMesh" id="QuadMesh_splat"]
+resource_name = "the game's 6.5 x 6.5 Direction quad (325 units) before its scale curve"
+material = SubResource("ShaderMaterial_splat")
+size = Vector2(4.366, 4.366)
+
+[node name="EnemyWallHit" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Puff" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.5833
+one_shot = true
+explosiveness = 1.0
+fixed_fps = 60
+local_coords = true
+visibility_aabb = AABB(-3, -3, -3, 6, 6, 6)
+process_material = SubResource("ParticleProcessMaterial_puff")
+draw_pass_1 = SubResource("QuadMesh_puff")
+
+[node name="Splat" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6045, 0)
+emitting = false
+amount = 1
+lifetime = 3
+one_shot = true
+explosiveness = 1.0
+fixed_fps = 60
+local_coords = true
+visibility_aabb = AABB(-4, -4, -4, 8, 8, 8)
+process_material = SubResource("ParticleProcessMaterial_splat")
+draw_pass_1 = SubResource("QuadMesh_splat")

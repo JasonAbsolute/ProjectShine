@@ -64,7 +64,8 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     [Export] public int RelaunchTicks = 200;
     /// <summary>DEVIATION, off by default (see the header): a scene (his coin) dropped at the death point GenItemRate % of the time.</summary>
     [Export] public PackedScene DropScene;
-    /// <summary>TSmallEnemy::setAfterDeadEffect: PARTICLE_MS_ENM_DISAP_A + _B at the body (scaled) -- a one-shot GPUParticles3D scene, or nothing.</summary>
+    /// <summary>TSmallEnemy::setAfterDeadEffect: PARTICLE_MS_ENM_DISAP_A + _B at the body (scaled) -- assets/Sms/Fx/EnemyDisap.tscn (an SmsFxBurst: the
+    /// blue-gray smoke + the mint glow streaks; pass 125c), any one-shot GPUParticles3D, or nothing.</summary>
     [Export] public PackedScene DeathFxScene;
     /// <summary>MSD_SE_EN_COMMON_SMOKE (the death puff) and the species' own slots below it. Unset = silent.</summary>
     [Export] public AudioStreamPlayer3D DeathSound;
@@ -708,17 +709,25 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
             drop.GlobalPosition = new Vector3(GlobalPosition.X, _groundY / U, GlobalPosition.Z);
         }
     }
-    /// <summary>setAfterDeadEffect: PARTICLE_MS_ENM_DISAP_A + _B at the body, scaled; MSD_SE_EN_COMMON_SMOKE.</summary>
+    /// <summary>setAfterDeadEffect: PARTICLE_MS_ENM_DISAP_A + _B at the body, scaled (setGlobalScale(mScaling)); MSD_SE_EN_COMMON_SMOKE.</summary>
     protected virtual void SetAfterDeadEffect()
     {
-        if (DeathFxScene != null)
-        {
-            var fx = DeathFxScene.Instantiate<Node3D>();
-            GetParent().AddChild(fx);
-            fx.GlobalPosition = GlobalPosition; fx.Scale = Vector3.One * _scale;
-            if (fx is GpuParticles3D gp) { gp.OneShot = true; gp.Emitting = true; }
-        }
+        SpawnBurst(DeathFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale), GlobalPosition));
         if (DeathSound != null && DeathSound.Stream != null) DeathSound.Play();
+    }
+
+    /// <summary>The game's emit(id, &amp;pos) with no bind: an unbound one-shot (an SmsFxBurst scene, or a bare GPUParticles3D) at <paramref name="at"/>
+    /// (its basis = the emitter's rotation x the body's scale), under the level, freed when done.</summary>
+    protected Node3D SpawnBurst(PackedScene scene, Transform3D at)
+    {
+        if (scene == null) return null;
+        var fx = scene.Instantiate<Node3D>();
+        fx.TopLevel = true;
+        GetParent().AddChild(fx);
+        fx.GlobalTransform = at;
+        if (fx is SmsFxBurst burst) burst.Play(at);
+        else if (fx is GpuParticles3D gp) { gp.OneShot = true; gp.Emitting = true; gp.Finished += gp.QueueFree; }
+        return fx;
     }
 
     /// <summary>LIVE_FLAG_DEAD: hidden, no collision, waiting for the relaunch (or freed).</summary>
