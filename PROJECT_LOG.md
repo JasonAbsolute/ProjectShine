@@ -7207,3 +7207,56 @@ unless they name the surfaces.
 Verified: drive 119 25/25 (S4d the dome on M_head, visible, 151 tris, the head's material while the cap is off; S4e hidden with the cap
 back and the hand open from 158; P4d never built on the plain gate-out), 118 35/35, 117 9/9, build 0 errors, boot ALL OK; GPU capture
 `capless122.png` -- full hair through the pose, the cap back at 5.0 s with no double. Files: `Mario.cs`, `assets/Sms/SmsCaplessHead.cs`.
+
+## SMS pass 123 -- the hidden coin and the coin's game life (TItem / TCoin / the hide objects)
+
+**Files:** `assets/Sms/SmsHiddenCoin.cs` (new, `[GlobalClass]` -- a node type in Add Node after the editor's Build), `assets/Sms/SmsCoinItem.cs` (new),
+`assets/BlueCoin.cs`, `assets/YellowCoin.cs`, `assets/Sms/Fx/WatCoinHit.tscn`, `WatCoinKira.tscn`, `drop_mix.gdshader` (generated).
+
+**Game (doldecomp/sms, MoveBG/Item.cpp + MapObjHide.cpp + MapObjGeneral.cpp):** a hidden coin lives in a HIDE OBJECT -- an invisible spot
+that throws it out when you do the right thing to it. Four plain kinds and the graffiti picture:
+- **WaterHit** (hit cylinder r 60 x h 20 x scale): any FLUDD drop -> the coin 50 units up, the spot spent (makeObjDead).
+- **HipDrop** (r 100 x h 60): a ground pound on it -> the coin at the spot.
+- **HeadHit** (r 100 x h 60, 10 units under the point): a jump up INTO it from below, rising -> the coin 100 units up (the hidden block).
+- **FruitHit**: a fruit touching it -> the coin 50 up, the fruit destroyed.
+- **Picture** (the red M, KoopaJrSignM): its alpha is a progress 255 -> 20; every drop hit takes 1.8 off (the game: 2.8 on a floor, 2.5 on
+  a ceiling), it heals 0.4 a tick while you do not spray, under 20 it fades out and the coin comes out; when THAT coin dies by its timer the
+  picture is back and sprayable again -- the same blue coin comes every time until it is collected.
+The throw (throwObjToFrontFromPoint): along the spot's forward at the stage's appear speed x 0.06 units a tick + 20 up (the default; Bianco Hills
+uses 0 or 100 -> 6 u/tick, y 20 / 10, disappear 1200 ticks). The coin then flies by the game's coin physics (coin_physical_data: gravity 0.35
+u/tick^2, bounce x -0.5, 0.5 on the ground speed at a contact, 0.99 air drag, lands under 1 u/tick, no wall or roof collision) at 120 Hz: a
+20 u/tick pop reaches 561 units (7.5 m) in half a second, bounces 20 -> 10 -> 5 -> 2.6 -> 1.3, rests in ~2 s. Untouchable for its first 120
+ticks (TItem::appear). **Which coins disappear:** TItem::load marks every stage item "never" (MAP_OBJ_FLAG_UNK10000000); a yellow pool coin
+clears it (TCoin::appearWithoutSound) -> 480 ticks for a drop, the spot's value when hidden; a graffiti picture clears it for ANY coin it hides
+(1200). So a blue coin out of a plain sprayed / pounded spot STAYS; one out of a graffiti M goes after 10 s, blinking its last 3 s (hidden while
+(timer / 10) is odd), then MSD_SE_SY_COIN_DISAPPEAR + the picture re-armed. A blue coin already got (its flag) reveals nothing (the spot still
+dies to a spray; a picture is dead from the start). The spin is the item manager's ONE matrix: 2 deg a tick (240 deg/s), every coin in phase.
+The collect: TMario::getCoinBlue incHP(2); fireGetBlueCoin sets the flag and saves (TIMECOIN_APPEAR plays only for a blue not yet got).
+
+**Port:**
+- `SmsHiddenCoin` (StaticBody3D): `Kind`, `HiddenScene` (blue_coin.tscn by default; yellow_coin.tscn for the game's common case), `CoinId`
+  (empty = derived from the scene + node path, like a ShineId; given to the revealed BlueCoin so the collect saves it), `AppearSpeed` (the
+  stage number; x 0.06), `AppearYSpeed` (-1 = 20), `DisappearTicks` (0 = 1200), `CoinDisappears` Game / Always / Never, `HitEffect`,
+  `CoinSparkle`, `AppearSound` (slot), `AutoLayer` (layer 8, no mask: Mario's mask 5 never touches it, the drops' ray does); Picture:
+  `PictureMesh` (empty = a `PictureSize` quad facing the forward with `PictureColor` / `PictureTexture`), `SprayProgressSpeed`, `PictureMin`,
+  `PictureMax`, `HealPerTick`. Place it like a marker: forward (-Z) = where the coin flies; a Picture's quad faces the forward.
+- `SmsCoinItem`: the item life as a state the coin scripts carry (`Throw`, `Tick`, `SharedYaw`, `Spin`); `IsMap` = the level only.
+- `BlueCoin` / `YellowCoin`: `SmsItemLife` (on: a thrown / dropped coin uses the game's life; `LaunchAsDrop` from a nail = TSmallEnemy's
+  (0, 20, 0) pop -- a yellow then lives 480 ticks, a blue for good), `SmsSpin` (the shared 240 deg/s; off = SpinSpeed), BlueCoin `SmsHealTwo`,
+  slots `SmsBoundSound` / `SmsDisappearSound`. Placed coins are untouched (static, as the game's). RedCoin.cs left alone (the switch's coins).
+- Effects from the disc's own .jpa: `WatCoinHit` (ms_watcoin_hit: 10 water drops out of a 10-unit sphere at 12 + 4 up u/f, gravity 0.5 faded
+  in, 0.75 billboards lerp((150,199,231) -> white, I) x A, mix blend) at the spot; `WatCoinKira` (ms_watcoin_kira: a 50-frame sparkle of
+  1.3 x 2.0 stars, yellow -> cyan at a random phase, additive, twinkling, 80 units over the coin) riding the coin. `drop_mix.gdshader` is
+  the mix-blend sibling of kira_add.
+
+**Verified (drive 123, 22/22, headless on the Level):** the body's layer and the two rays; the WaterHit reveal (position, 3 + 20 u/tick,
+untouchable 120, never disappearing, both effects, the spot spent); the already-got spot refusing; the yellow's 240-tick life with the blink
+and the death; the apex at 561.4 u; touchable again at 1 s in flight; at rest on the floor + 1 u after 5 bounces, carried forward; the pound,
+the head hit (falling: nothing; rising: 100 up), the fruit (killed); the picture: 10 hits -> 237, healed to 255 in a second, 131 hits -> 20,
+the coin with the id and a 240-tick life, a drop refused while finished, the coin's death re-arming it (healing from 20), the same coin
+again; the shared yaw on two coins; the collect: +2 HP, the flag written, the count. Regressions 119 25/25, 118 35/35, 117 9/9; boot ALL OK.
+
+**Not ported:** the talk-mode freeze of a resting coin, the barrel hit on a picture, the picture's back-face rule and the M's own texture
+(PictureTexture is yours), the twin pictures and their demo camera, the shine kind of hidden object (place a shine as the HiddenScene and it is
+placed, not thrown), the sounds (slots: TIMECOIN_APPEAR / COIN_APPEAR, COIN_BOUND, COIN_DISAPPEAR, BLUE_COIN_GET). The game emits the hit
+burst twice for a fruit spot (touchFruit + appearObjFromPoint) -- once here.
