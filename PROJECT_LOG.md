@@ -7331,3 +7331,22 @@ plays MSD_SE_EN_COMMON_W_HIT_OK (touchWater 349). The quad is 300 x 300 units (4
 test on the real texture on the CPU (253 / 183 / 5 / 0 / 0 texels at 255 / 128 / 33 / 32 / 20); G2 healed and drawn in full; G3 finished = hidden,
 the coin out; G5 regrown = drawn again. The real-spray phases also reached this picture 8 m away through the zone test (counted). Build 0 errors,
 boot ALL OK. The look of the erosion on screen is for Jaysonn's eye (headless draws nothing).
+
+## SMS pass 123e -- the graffiti dissolve knob (a deviation: the game's erosion is all outline until the last 18 drops)
+
+**Files:** `assets/Sms/Fx/graffiti_erode.gdshader`, `assets/Sms/SmsHiddenCoin.cs`.
+
+Jaysonn: "it feels like the erosion kinda doesnt work untill right before its done ... seems like it need more random erosion?" He read the game's
+curve correctly: by koopa_jr_sign's alpha test the first ~110 of the 131 drops only nibble the soft outline (100 % -> 65 % of the fresh pixels by
+drop 81, 50 % by drop 97) and the whole body goes in the last ~18 (34 % at drop 108, 0 at 124). Faithful, and not what he wants.
+
+- `ErosionNoise` (0..1, default **0.6**; 0 = the game's exact look) adds a random dissolve ON TOP of the game's test: a two-octave smooth value
+  noise over the quad (`ErosionGrain` cells across, default 6 -- small = a few big ragged holes, large = fine speckle) removes a pixel once its
+  noise, stretched over the noise's own 0.35..0.78 band so the knob reads as a share of the body, falls under ErosionNoise x the erosion
+  fraction (0 fresh -> 1 at the game's finish of 20/255). Holes open from their centres and grow as you spray. The finish is unchanged.
+- Measured on the game's texture at the quad's pixel scale (`erosion_curve.py`, the shader's own hash / noise reproduced): fresh pixels still
+  drawn at drops 31 / 47 / 64 / 81 / 97 / 108 / 117 / 124 -- game 92 / 83 / 75 / 65 / 50 / 34 / 18 / 0 %; knob 0.6: 86 / 75 / 63 / 49 / 32 /
+  18 / 8 / 0 %; knob 1.0: 81 / 61 / 43 / 25 / 9 / 3 / 1 / 0 %. So at 0.6 a quarter of the body is gone by drop 47 and half by drop 81.
+
+**Verified (drive 123 now 31/31):** G1c the three uniforms reach the material (0.6 / 6 / 20/255) from the node's exports. Build 0 errors, boot
+ALL OK, no shader errors. The feel is his to tune: `ErosionNoise` up for more holes earlier, `ErosionGrain` for their size.

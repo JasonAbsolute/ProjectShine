@@ -77,6 +77,12 @@ public partial class SmsHiddenCoin : StaticBody3D, ISmsSprayTarget
     [Export] public Vector2 PictureSize = Vector2.Zero;
     /// <summary>MSD_SE_EN_COMMON_W_HIT_OK: the splash sound on every drop that hits the picture (a slot; empty = silent).</summary>
     [Export] public AudioStreamPlayer3D HitSound;
+    /// <summary>123e, a DEVIATION knob: a random dissolve on top of the game's alpha test (which only nibbles the outline until the last ~18 drops, then
+    /// drops the whole body). 0 = the game's exact look; 1 = every pixel dissolved by the finish. The default 0.6 scatters holes through the body from
+    /// the first drops on, the game's rule finishing it.</summary>
+    [Export(PropertyHint.Range, "0,1,0.05")] public float ErosionNoise = 0.6f;
+    /// <summary>123e: the dissolve's noise cells across the quad -- small = a few big ragged holes, large = fine speckle.</summary>
+    [Export] public float ErosionGrain = 6f;
     /// <summary>TWaterHitPictureHideObj::touchWater forward(mSprayProgressSpeed): per drop hit (1.8 on a wall; 2.8 floor, 2.5 ceiling in the game).</summary>
     [Export] public float SprayProgressSpeed = 1.8f;
     /// <summary>KoopaJrSignM: mMinProgress 20 (the reveal), mMaxProgress 255 (the full picture), unk15C 0.4 (the heal a tick).</summary>
@@ -239,6 +245,9 @@ public partial class SmsHiddenCoin : StaticBody3D, ISmsSprayTarget
                 sm.SetShaderParameter("tex", tex);
                 sm.SetShaderParameter("color", PictureColor);
                 sm.SetShaderParameter("progress", 1f);
+                sm.SetShaderParameter("finish", PictureMin / 255f);
+                sm.SetShaderParameter("erosion_noise", Mathf.Clamp(ErosionNoise, 0f, 1f));
+                sm.SetShaderParameter("erosion_grain", Mathf.Max(0.5f, ErosionGrain));
                 mat = sm;
                 _pictureShader = sm;
             }
