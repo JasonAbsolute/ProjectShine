@@ -36,6 +36,11 @@ the URL it produced. Jaysonn can also just run the commands himself.
 - A finished feature (Jaysonn has play-tested it) is merged with `git merge --no-ff feature/<name>` and a "Feature: <name> (passes N-M)" commit,
   or through a GitHub PR -- the entry says which.
 - Keep `.import` compression flips, whitespace retabs of `.cs` files and `addons/godot_ai` out of commits.
+- **A feature is merged ONCE, one way: either Kiro's local `git merge --no-ff`, or a GitHub PR -- never both.** If an entry asks for a PR,
+  Kiro must NOT pre-merge the branch into local `main`; if Kiro has already merged locally, the entry must say "push only, no PR". Doing both
+  put two independent merges of identical code on `main` on 2026-10-25 (see #2/#3). Also note GitHub's **squash** option makes the feature's
+  own commits non-ancestors of `origin/main`, so any later `git merge-base --is-ancestor <pass sha> origin/main` check will say NO even though
+  the code is present -- compare trees (`git diff origin/main main`) rather than ancestry after a squash merge.
 
 ## Entries
 
@@ -54,7 +59,7 @@ Result: `main` `3eed4c0..144b11e` (307 commits), `sms-physics` `61d5810..c48b3f9
 `rev-list --count` checks returned `0`. No PR, as the entry specified. Working tree was clean apart from
 the 19 `addons/godot_ai/` entries, which were left untouched.
 
-### #2 -- PUSHED 2026-10-25 -- https://github.com/JasonAbsolute/ProjectShine/tree/feature/save-prompt -- PR awaiting Jaysonn's click -- queued 2026-10-25 03:55 PDT, updated 04:45 (Kiro)
+### #2 -- DONE 2026-10-25 -- https://github.com/JasonAbsolute/ProjectShine/pull/6 (SQUASH-merged by Jaysonn) -- queued 2026-10-25 03:55 PDT, updated 04:45 (Kiro)
 Push the first feature branch and open its PR: the card save ("Save?" after a shine, a blue coin, the pause menu's SAVE). PLAYTESTED BY
 JAYSONN 2026-10-25 04:40 ("ok looks good") -- the PR can be merged once it is open (squash or merge commit, his call; `main` then needs a
 `git pull` here).
@@ -94,7 +99,12 @@ Follow-up 04:52 (Kiro): Jaysonn playtested and said "merge the last branch so re
 for #2 is no longer needed: if the prefilled form was already submitted, GitHub closes it as merged when #3's push lands; if not, do not
 create it.
 
-### #3 -- PENDING -- 2026-10-25 04:52 PDT (Kiro)
+Closing note (local Claude): Jaysonn HAD already submitted the prefilled form, and he **squash-merged** it as PR #6 -> `origin/main` commit
+`e123d1d`, which has a SINGLE parent (`7e448b9`). So the 7 feature commits are NOT ancestors of `origin/main` -- the code is there as one
+squashed commit. Combined with Kiro's local `--no-ff` merge `a0590ea`, `main` had two independent merges of byte-identical code. See #3 for
+how that was reconciled, and the new rule under "Rules both agents follow".
+
+### #3 -- DONE 2026-10-25 -- https://github.com/JasonAbsolute/ProjectShine/commits/main -- queued 2026-10-25 04:52 PDT (Kiro)
 Push the trunk: `feature/save-prompt` merged into `main` with `--no-ff` at Jaysonn's word (he playtested 124-124c and approved).
 - Branch `main` -- tip `a0590ea` ("Feature: the card save (SMS passes 124-124c)", the merge commit), 9 commits ahead of `origin/main`
   (the 7 feature commits, the #2 result commit `bd60e67`, the merge). No PR.
@@ -105,6 +115,17 @@ git rev-list --count origin/main..main
 ```
 Expect `0`. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn` and the two Koopa `.png.import` flips -- leave them.
 Next feature branch in progress: `feature/enemy-base` (branched from this `main`).
+
+Result: **the plain `git push origin main` in this entry could not run** -- `main` had diverged (10 local commits vs 1 remote), because
+Jaysonn's PR #6 was squash-merged on GitHub while Kiro had already merged the same branch locally with `--no-ff`. `git diff origin/main main`
+listed ONLY `timeToPush!.md`, confirming the code was byte-identical both ways, so the fix was a normal non-destructive merge (no `--force`,
+no `--amend`, no rebase): `git merge origin/main` on `main`. Every code file auto-merged with zero conflicts (git sees the same change on both
+sides); the one conflict was `timeToPush!.md`, where the remote side was the stale pre-squash version (it reverted #2 to PENDING and dropped
+#3), so it resolved to ours. Merge commit `b63dead`, then pushed. `git rev-list --count origin/main..main` returned `0`.
+Cost of the double merge: `main`'s history now holds both `e123d1d` (the squash) and the 7 original commits under `a0590ea`. Harmless --
+identical content, nothing duplicated in the tree -- but avoidable; hence the new rule below.
+`feature/enemy-base` was sitting at the old `main` tip with no commits of its own, so it was fast-forwarded onto the reconciled `main` to keep
+the next feature branched from the real trunk. Working tree left untouched throughout.
 
 <!-- Kiro appends the next entry below this line. Entry template:
 
