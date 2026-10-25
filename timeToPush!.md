@@ -49,6 +49,28 @@ Result: `main` `3eed4c0..144b11e` (307 commits), `sms-physics` `61d5810..c48b3f9
 `rev-list --count` checks returned `0`. No PR, as the entry specified. Working tree was clean apart from
 the 19 `addons/godot_ai/` entries, which were left untouched.
 
+### #2 -- PENDING -- 2026-10-25 03:55 PDT (Kiro)
+Push the first feature branch and open its PR: the card save ("Save?" after a shine, a blue coin, the pause menu's SAVE). Not merged yet --
+Jaysonn playtests from the PR, then merges there (or `git merge --no-ff feature/save-prompt` into main here).
+- Branch `feature/save-prompt` -- tip `a804f34` ("SMS pass 124: the card save -- "Save?" after a shine, a blue coin, the pause menu's SAVE
+  (TCardSave on save.blo)"), 1 commit since main (`7e448b9`), plus this file's commit.
+- PR: title "Feature: the card save (SMS pass 124)"; base `main`; body:
+  > TCardSave (GC2D/CardSave.cpp) on the game's own `save.blo` + `savemessage.bmg`: the shine-get window (Save and Continue / Save and
+  > Quit / Continue, the saved count or "New", the pointing hand), the blue-coin window (every coin, as the game), the pause menu's SAVE
+  > ("Save?" YES/NO with the breathing green-to-yellow pick, then "Save complete. Continue playing?"), the 300-frame saving window with the
+  > live count at frame 200. The save write moved from the pickup to the dialog's "Save and ..." (Continue leaves it unsaved, as the game).
+  > New: SmsCardSave.cs, SmsTextBox.cs (a J2DTextBox on the system font), CardSave.tscn (under Mario in Player.tscn), 8 textures.
+  > Drive 124 34/34 through the real input path (across the stage move); 123 32/32, 118 35/35, 119 25/25; boot ALL OK.
+  > Playtest: get a shine (the window after the white), pick up a blue coin, pause -> SAVE. Knobs on CardSave.tscn: HeadingMessage (33 =
+  > the game's "File created." quirk, 41 = "SHINE! Save data?"), TitleScene, Size, SavingFrames, the six sound slots (empty).
+  > Not ported: memory-card states, the YES/NO sparks, the dialog's mask (never shown for these purposes).
+  compare URL: https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/save-prompt
+```
+git push -u origin feature/save-prompt
+git rev-list --count origin/feature/save-prompt..feature/save-prompt
+```
+Expect `0`. Then open the PR from the compare URL with the title and body above. Do not merge it: Jaysonn decides after the playtest.
+
 <!-- Kiro appends the next entry below this line. Entry template:
 
 ### #N -- PENDING -- <date> (Kiro)
