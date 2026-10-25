@@ -7304,3 +7304,30 @@ while the game's `throwObjToFrontFromPoint` throws along the hide object's FULL 
 away along the horizontal line to a given Mario; Custom along the node's +X); L2 the predicted path's apex = the real coin's 561.5-unit pop and
 its start = the appear point; L3 the line is a runtime, owner-less, top-level ImmediateMesh. Build 0 errors, boot ALL OK. Not editor-tested
 headless: the drawing itself in the editor is for Jaysonn's eye (a [Tool] script runs there after the Build).
+
+## SMS pass 123d -- the graffiti erodes like the game's (and splashes, and is gone when the coin comes)
+
+**Files:** `assets/Sms/SmsHiddenCoin.cs`, new `assets/Sms/Fx/graffiti_erode.gdshader`, new `assets/Sms/Fx/tex/jr_picture_a.png` (the game's M).
+
+Jaysonn: "i dont see the effects of hitting a picture and its not disappearing like it does in sms its just getting more transparent ... when the
+coin spawns it still shows the faintest alpha of the picture." All three are the game's material, read from `koopa_jr_sign.bmd` in the Bianco
+archive on his ISO (bmd_mat_dump): ONE TEV stage, colour = GX_TEVREG0 (the stage's picture colour -- the texture's colour is never read, the
+`Q_jr_picture_IA8` 32 x 32 has I = 0 everywhere; its ALPHA is the M with soft edges), alpha = TEXA x A0 (the register alpha = mProgress) with
+the stage's scale x4, blend NONE, **alphaCmp GEQUAL 128**. So a texel draws only while texA x progress x 4 >= 128: the M does not fade, it
+**erodes from its soft edges inward** -- 253 of 1024 texels at 255, 183 at 128, 110 at 64, 5 at 33, NONE at 32 -- and is completely gone before
+the game's minimum of 20 (which is why 20 is the minimum: nothing is left to see). Each drop that hits emits PARTICLE_MS_ENM_WATHIT at the drop and
+plays MSD_SE_EN_COMMON_W_HIT_OK (touchWater 349). The quad is 300 x 300 units (4.03 m; the Bianco signs stand at scale 2 and 1.5 on top).
+
+**Port:**
+- `graffiti_erode.gdshader`: the TEV and the alpha test to the register (`tex`, `color`, `progress`, `alpha_scale` 4, `alpha_ref` 128/255),
+  lit, opaque, `discard` under the threshold. The spot's auto quad now wears it with the game's M alpha (`jr_picture_a.png`, white RGB so
+  PictureColor is the colour) and the game's 300 x 300 units (PictureSize 0 = that; set it for another size). Your own `PictureTexture`
+  works the same way: its alpha is the shape that erodes, its colour multiplies PictureColor.
+- Every hit: the water-hit mark from pass 99 (`SmsWaterHitMarks.Emit` at the drop; the pool loads with the level) and the new `HitSound` slot.
+- FINISHED hides the mesh outright (the alpha test already drew nothing at 20 -- no ghost under the coin); the regrow shows it again. Your own
+  `PictureMesh` still fades by transparency (no erosion without its material) and is hidden / shown the same way.
+
+**Verified (drive 123 now 30/30):** G1 the quad's shader, texture and size, `progress` 237/255 after ten hits, ten marks emitted; G1b the alpha
+test on the real texture on the CPU (253 / 183 / 5 / 0 / 0 texels at 255 / 128 / 33 / 32 / 20); G2 healed and drawn in full; G3 finished = hidden,
+the coin out; G5 regrown = drawn again. The real-spray phases also reached this picture 8 m away through the zone test (counted). Build 0 errors,
+boot ALL OK. The look of the erosion on screen is for Jaysonn's eye (headless draws nothing).

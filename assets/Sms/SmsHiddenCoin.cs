@@ -67,11 +67,16 @@ public partial class SmsHiddenCoin : StaticBody3D, ISmsSprayTarget
     [Export] public bool DebugPrint = false;
 
     // ---- Picture ----
-    /// <summary>The graffiti's mesh; empty = a PictureSize quad facing the forward, PictureColor / PictureTexture on it.</summary>
+    /// <summary>The graffiti's mesh; empty = the game's M (koopa_jr_sign: a quad facing the forward, PictureColor, the M's own alpha shape or your
+    /// PictureTexture's) eroding under the spray. Your own mesh instead fades and is hidden when finished.</summary>
     [Export] public MeshInstance3D PictureMesh;
     [Export] public Color PictureColor = new Color(1f, 0f, 0f, 1f);     // the Bianco M signs: (255, 0, 0)
+    /// <summary>Your own shape: its ALPHA is what erodes (a transparent PNG), its colour multiplies PictureColor. Empty = the game's M.</summary>
     [Export] public Texture2D PictureTexture;
-    [Export] public Vector2 PictureSize = new Vector2(1.5f, 1.5f);      // metres
+    /// <summary>The quad, metres; 0 = the game's 300 x 300 units (4.03 m -- the Bianco signs are placed at scale 2 and 1.5 on top of that).</summary>
+    [Export] public Vector2 PictureSize = Vector2.Zero;
+    /// <summary>MSD_SE_EN_COMMON_W_HIT_OK: the splash sound on every drop that hits the picture (a slot; empty = silent).</summary>
+    [Export] public AudioStreamPlayer3D HitSound;
     /// <summary>TWaterHitPictureHideObj::touchWater forward(mSprayProgressSpeed): per drop hit (1.8 on a wall; 2.8 floor, 2.5 ceiling in the game).</summary>
     [Export] public float SprayProgressSpeed = 1.8f;
     /// <summary>KoopaJrSignM: mMinProgress 20 (the reveal), mMaxProgress 255 (the full picture), unk15C 0.4 (the heal a tick).</summary>
@@ -178,7 +183,8 @@ public partial class SmsHiddenCoin : StaticBody3D, ISmsSprayTarget
                 break;
             case HideKind.Picture:
                 SetupPicture();
-                if (got && HidesBlue()) { Die(); if (PictureMesh != null) PictureMesh.Visible = false; }
+                SmsWaterHitMarks.Ensure(this);                                   // pass 99's rule: the hit marks load with the level, not at the first hit
+                if (got && HidesBlue()) { Die(); ApplyPictureAlpha(); }
                 break;
         }
         if (DebugPrint) GD.Print($"[SmsHiddenCoin] '{Name}' {Kind} id '{ResolvedCoinId}' allowReveal {_allowReveal} dead {_dead}");
@@ -221,25 +227,60 @@ public partial class SmsHiddenCoin : StaticBody3D, ISmsSprayTarget
     {
         if (PictureMesh == null)
         {
-            var mat = new StandardMaterial3D
+            // 123d: the game's M -- koopa_jr_sign.bmd: a 300 x 300 unit quad (x the node's scale), ONE TEV stage: colour = the stage's picture colour
+            // (GX_TEVREG0, lit), alpha = TEXA x progress x 4 against alphaCmp GEQUAL 128 -> the shape ERODES from its soft edges and is gone under
+            // progress 32 (graffiti_erode.gdshader). The texture is the game's Q_jr_picture_IA8 unless you give a PictureTexture (its alpha = the shape).
+            var shader = ResourceLoader.Exists(ErodeShaderPath) ? GD.Load<Shader>(ErodeShaderPath) : null;
+            var tex = PictureTexture ?? (ResourceLoader.Exists(DefaultPicturePath) ? GD.Load<Texture2D>(DefaultPicturePath) : null);
+            Material mat;
+            if (shader != null)
             {
-                AlbedoColor = PictureColor, AlbedoTexture = PictureTexture, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
-                Transparency = BaseMaterial3D.TransparencyEnum.Alpha, CullMode = BaseMaterial3D.CullModeEnum.Back,
-            };
-            PictureMesh = new MeshInstance3D { Name = "SmsPicture", Mesh = new QuadMesh { Size = PictureSize, Material = mat } };
+                var sm = new ShaderMaterial { Shader = shader };
+                sm.SetShaderParameter("tex", tex);
+                sm.SetShaderParameter("color", PictureColor);
+                sm.SetShaderParameter("progress", 1f);
+                mat = sm;
+                _pictureShader = sm;
+            }
+            else
+            {
+                // the shader missing (a stale import): a plain fading quad, as 123 drew it
+                mat = new StandardMaterial3D
+                {
+                    AlbedoColor = PictureColor, AlbedoTexture = tex, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                    Transparency = BaseMaterial3D.TransparencyEnum.Alpha, CullMode = BaseMaterial3D.CullModeEnum.Back,
+                };
+            }
+            Vector2 size = PictureSize.X > 0f && PictureSize.Y > 0f ? PictureSize : new Vector2(SmsUnits.UnitsToMetres(300f), SmsUnits.UnitsToMetres(300f));
+            PictureMesh = new MeshInstance3D { Name = "SmsPicture", Mesh = new QuadMesh { Size = size, Material = mat } };
             PictureMesh.RotateY(Mathf.Pi);                                  // a QuadMesh faces +Z; the picture faces this node's forward (-Z)
             AddChild(PictureMesh);
+            _pictureBox = new Vector3(size.X, size.Y, 0.05f);
         }
-        _shape = new CollisionShape3D { Name = "SmsPictureBox", Shape = new BoxShape3D { Size = new Vector3(PictureSize.X, PictureSize.Y, 0.05f) } };
+        else
+        {
+            // your own mesh: the shot fades it by its transparency (no erosion without its material's cooperation) and hides it when finished
+            _pictureBox = new Vector3(PictureSize.X, PictureSize.Y, 0.05f);
+        }
+        _shape = new CollisionShape3D { Name = "SmsPictureBox", Shape = new BoxShape3D { Size = _pictureBox } };
         AddChild(_shape);
         _progress = PictureMax;
         ApplyPictureAlpha();
     }
+    private ShaderMaterial _pictureShader;
+    private Vector3 _pictureBox;
+    public const string ErodeShaderPath = "res://assets/Sms/Fx/graffiti_erode.gdshader";
+    public const string DefaultPicturePath = "res://assets/Sms/Fx/tex/jr_picture_a.png";
 
+    /// <summary>initPacketMatColor GX_TEVREG0: the register's alpha = mProgress. The erosion shader takes it as `progress`; your own mesh gets a plain
+    /// transparency. FINISHED (the game's alpha test already draws nothing at progress 20) -> the mesh hidden outright, shown again when it regrows.</summary>
     private void ApplyPictureAlpha()
     {
         if (PictureMesh == null) return;
-        PictureMesh.Transparency = 1f - Mathf.Clamp(_progress / 255f, 0f, 1f);   // initPacketMatColor GX_TEVREG0 alpha = mProgress
+        float p = Mathf.Clamp(_progress / 255f, 0f, 1f);
+        if (_pictureShader != null) _pictureShader.SetShaderParameter("progress", p);
+        else PictureMesh.Transparency = 1f - p;
+        PictureMesh.Visible = !_finished && !_dead;
     }
 
     public override void _PhysicsProcess(double delta)
@@ -307,11 +348,17 @@ public partial class SmsHiddenCoin : StaticBody3D, ISmsSprayTarget
         if (Kind == HideKind.Picture)
         {
             if (_finished) return false;
+            // TWaterHitPictureHideObj::touchWater 349: a flying drop's hit emits PARTICLE_MS_ENM_WATHIT at the drop and plays MSD_SE_EN_COMMON_W_HIT_OK
+            SmsWaterHitMarks.Emit(this, hitPos);
+            if (HitSound != null && HitSound.Stream != null) { HitSound.GlobalPosition = hitPos; HitSound.Play(); }
+            PictureHits++;
             Forward(SprayProgressSpeed);
             return true;
         }
         return false;
     }
+    /// <summary>Drops that hit this picture so far (the drives).</summary>
+    public int PictureHits { get; private set; }
 
     /// <summary>makeObjDead for a spent spot: no more reactions, the hit body gone (removeMapCollision + HIT_FILTER_NO_COLLISION).</summary>
     private void Die()
@@ -529,6 +576,7 @@ public partial class SmsHiddenCoin : StaticBody3D, ISmsSprayTarget
             _finished = false;
             _dead = false;
             _shape?.SetDeferred(CollisionShape3D.PropertyName.Disabled, false);
+            ApplyPictureAlpha();   // 123d: the picture shows again (at progress 20 the erosion still draws nothing; the heal brings it back)
         }
         if (DebugPrint) GD.Print($"[SmsHiddenCoin] '{Name}': the coin is gone -- re-armed ({Kind})");
     }
