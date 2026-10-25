@@ -1,4 +1,4 @@
-[gd_scene load_steps=21 format=3 uid="uid://cgetwater76b"]
+[gd_scene format=3 uid="uid://cgetwater76b"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsGetWater.cs" id="1_script"]
 [ext_resource type="Shader" path="res://assets/Sms/Fx/GetWaterStreak.gdshader" id="2_shader"]

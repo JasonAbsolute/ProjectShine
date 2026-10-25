@@ -1,5 +1,8 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://d332ak3mwu1a1"]
 
 [ext_resource type="PackedScene" uid="uid://d3ph56ccg345h" path="res://assets/Player.tscn" id="1_base"]
 
-[node name="Mario" instance=ExtResource("1_base")]
+[node name="Mario" unique_id=700261403 instance=ExtResource("1_base")]
+SmsDebugPrint = true
+
+[editable path="Armature/Skeleton3D/RightHandBone/RightHandClosed/Model"]

@@ -218,10 +218,10 @@
 [ext_resource type="PackedScene" uid="uid://bq5ntr8yh3wek" path="res://assets/Sms/Fx/SpinJumpBlur.tscn" id="226_od6ah"]
 [ext_resource type="PackedScene" uid="uid://dm7kq2xf4tcbs" path="res://assets/Sms/Fx/HipDropBlur.tscn" id="227_xnbyg"]
 [ext_resource type="PackedScene" uid="uid://ch8vwy3mp6qrd" path="res://assets/Sms/Fx/HipDropLanding.tscn" id="228_ahpw5"]
-[ext_resource type="PackedScene" uid="uid://dsphipdbl2r33" path="res://assets/Sms/Fx/SuperHipDropBlur.tscn" id="230_sphbl"]
-[ext_resource type="PackedScene" uid="uid://esphipdhit233" path="res://assets/Sms/Fx/SuperHipDropLanding.tscn" id="231_sphld"]
-[ext_resource type="PackedScene" uid="uid://fbonkstars233" path="res://assets/Sms/Fx/BonkStars.tscn" id="232_bnkst"]
 [ext_resource type="PackedScene" uid="uid://ydk4hvu1bqs2" path="res://assets/Sms/BodyLag.tscn" id="229_bdylg"]
+[ext_resource type="PackedScene" uid="uid://dsphipdbl2r33" path="res://assets/Sms/Fx/SuperHipDropBlur.tscn" id="230_sphbl"]
+[ext_resource type="PackedScene" uid="uid://xblwnf7xm7dc" path="res://assets/Sms/Fx/SuperHipDropLanding.tscn" id="231_sphld"]
+[ext_resource type="PackedScene" uid="uid://bgaryqv07l7dc" path="res://assets/Sms/Fx/BonkStars.tscn" id="232_bnkst"]
 [ext_resource type="PackedScene" uid="uid://cshake120h01" path="res://assets/Sms/CameraShake.tscn" id="233_cshak"]
 [ext_resource type="PackedScene" uid="uid://fbubbles0048" path="res://assets/Sms/Fx/SmsBubbles.tscn" id="234_bubbl"]
 [ext_resource type="PackedScene" uid="uid://cfiredmg00051" path="res://assets/Sms/Fx/FireDamage.tscn" id="235_firdm"]
@@ -230,7 +230,7 @@
 [ext_resource type="PackedScene" uid="uid://cbodyovl00056" path="res://assets/Sms/Fx/BodyOverlay.tscn" id="238_bdyov"]
 [ext_resource type="PackedScene" uid="uid://cconstr000058" path="res://assets/Sms/Console/ConsoleStr.tscn" id="239_cnstr"]
 [ext_resource type="PackedScene" uid="uid://cfader0000058" path="res://assets/Sms/Console/Fader.tscn" id="240_fader"]
-[ext_resource type="PackedScene" uid="uid://cpausemn00059" path="res://assets/Sms/Console/PauseMenu.tscn" id="241_pause"]
+[ext_resource type="PackedScene" uid="uid://cpausemn0006a" path="res://assets/Sms/Console/PauseMenu.tscn" id="241_pause"]
 [ext_resource type="PackedScene" uid="uid://cwallkick0060" path="res://assets/Sms/Fx/WallKickDust.tscn" id="242_wkick"]
 [ext_resource type="PackedScene" uid="uid://cwallslide060" path="res://assets/Sms/Fx/WallSlideDust.tscn" id="243_wslid"]
 [ext_resource type="PackedScene" uid="uid://cslipsmoke060" path="res://assets/Sms/Fx/SlipSmoke.tscn" id="244_slips"]
@@ -2141,7 +2141,6 @@ debug_color = Color(0, 0.6, 0.701961, 0.964706)
 
 [node name="CamController" type="Node3D" parent="." unique_id=325679756]
 script = ExtResource("12_e34sd")
-OverShoulderLocalOffset = Vector3(-0.75, 1.2, 0)
 
 [node name="SpringArmPivot" type="Node3D" parent="CamController" unique_id=237137616]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 200, 0)
@@ -2458,7 +2457,23 @@ script = ExtResource("22_2gwog")
 FootOffset = 0.165
 HipDropToLowest = 1.0
 
-[node name="BodyLag" parent="Armature/Skeleton3D" instance=ExtResource("229_bdylg")]
+[node name="BodyLag" parent="Armature/Skeleton3D" unique_id=10604659 instance=ExtResource("229_bdylg")]
+unique_name_in_owner = false
+process_mode = 0
+process_priority = 0
+process_physics_priority = 0
+process_thread_group = 0
+physics_interpolation_mode = 0
+auto_translate_mode = 0
+editor_description = ""
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+rotation_edit_mode = 0
+rotation_order = 2
+top_level = false
+visible = true
+visibility_parent = NodePath("")
+active = true
+influence = 1.0
 
 [node name="SmsFluddAttach" type="BoneAttachment3D" parent="Armature/Skeleton3D" unique_id=160108726]
 transform = Transform3D(-2.958005e-05, 0.0005775978, 0.99999976, 0.9880221, -0.15431309, 0.000118356606, 0.15431307, 0.9880219, -0.0005661148, 0.0140279755, 53.62667, -0.371227)
@@ -2502,35 +2517,35 @@ script = ExtResource("221_e34sd")
 
 [node name="HipDropLanding" parent="." unique_id=1584372963 instance=ExtResource("228_ahpw5")]
 
-[node name="SuperHipDropBlur" parent="." instance=ExtResource("230_sphbl")]
+[node name="SuperHipDropBlur" parent="." unique_id=244663707 instance=ExtResource("230_sphbl")]
 
-[node name="SuperHipDropLanding" parent="." instance=ExtResource("231_sphld")]
+[node name="SuperHipDropLanding" parent="." unique_id=624326433 instance=ExtResource("231_sphld")]
 
-[node name="BonkStars" parent="." instance=ExtResource("232_bnkst")]
+[node name="BonkStars" parent="." unique_id=733930573 instance=ExtResource("232_bnkst")]
 
-[node name="CameraShake" parent="." instance=ExtResource("233_cshak")]
+[node name="CameraShake" parent="." unique_id=1688529418 instance=ExtResource("233_cshak")]
 
-[node name="SmsBubbles" parent="." instance=ExtResource("234_bubbl")]
+[node name="SmsBubbles" parent="." unique_id=1528626551 instance=ExtResource("234_bubbl")]
 
-[node name="FireDamage" parent="." instance=ExtResource("235_firdm")]
+[node name="FireDamage" parent="." unique_id=1374011181 instance=ExtResource("235_firdm")]
 
-[node name="ShockSparks" parent="." instance=ExtResource("236_shspk")]
+[node name="ShockSparks" parent="." unique_id=1987444996 instance=ExtResource("236_shspk")]
 
-[node name="ShockPuff" parent="." instance=ExtResource("237_shpuf")]
+[node name="ShockPuff" parent="." unique_id=681176112 instance=ExtResource("237_shpuf")]
 
-[node name="BodyOverlay" parent="." instance=ExtResource("238_bdyov")]
+[node name="BodyOverlay" parent="." unique_id=2037691828 instance=ExtResource("238_bdyov")]
 
-[node name="ConsoleStr" parent="." instance=ExtResource("239_cnstr")]
+[node name="ConsoleStr" parent="." unique_id=170354189 instance=ExtResource("239_cnstr")]
 
-[node name="Fader" parent="." instance=ExtResource("240_fader")]
+[node name="Fader" parent="." unique_id=1267899420 instance=ExtResource("240_fader")]
 
-[node name="PauseMenu" parent="." instance=ExtResource("241_pause")]
+[node name="PauseMenu" parent="." unique_id=608312684 instance=ExtResource("241_pause")]
 
-[node name="WallKickDust" parent="." instance=ExtResource("242_wkick")]
+[node name="WallKickDust" parent="." unique_id=629332914 instance=ExtResource("242_wkick")]
 
-[node name="WallSlideDust" parent="." instance=ExtResource("243_wslid")]
+[node name="WallSlideDust" parent="." unique_id=1765670997 instance=ExtResource("243_wslid")]
 
-[node name="SlipSmoke" parent="." instance=ExtResource("244_slips")]
+[node name="SlipSmoke" parent="." unique_id=2053794965 instance=ExtResource("244_slips")]
 
 [node name="GoopRipple" parent="." instance=ExtResource("245_goopr")]
 

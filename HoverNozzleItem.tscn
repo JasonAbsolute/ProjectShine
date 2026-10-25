@@ -1,0 +1,5 @@
+[gd_scene format=3 uid="uid://ct3l07rhp5s0v"]
+
+[ext_resource type="PackedScene" uid="uid://behdd0mehjgbu" path="res://models/Nozzles/Hover/normal_nozzle_item.glb" id="1_3bb7u"]
+
+[node name="default" unique_id=226632108 instance=ExtResource("1_3bb7u")]

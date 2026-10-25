@@ -7,7 +7,6 @@ resource_name = "the FLUDD balloon's text: the game's standard_font.bfn at 20 x 
 line_spacing = 4.0
 font = ExtResource("1_font")
 font_size = 20
-font_color = Color(1, 1, 1, 1)
 shadow_size = 0
 shadow_color = Color(0, 0, 0, 0.627451)
 shadow_offset = Vector2(2, 3)

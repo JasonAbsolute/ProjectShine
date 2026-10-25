@@ -1,13 +1,13 @@
 [gd_resource type="Resource" script_class="SmsNpcProfile" format=3 uid="uid://b6o704wah2ri7"]
 
 [ext_resource type="Script" uid="uid://8k1ifx6lo5lh" path="res://assets/Sms/Npc/SmsNpcProfile.cs" id="1_prof"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mow_eye01_IA8.png" id="tex_eye"]
-[ext_resource type="Resource" path="res://assets/Sms/Npc/TexPatterns/PiantaFemale.tres" id="texpat"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Fx/NpcDripBody.tscn" id="drip"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Fx/NpcDripFoot.tscn" id="foot"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Fx/NpcSparklePianta.tscn" id="happy"]
 [ext_resource type="Texture2D" uid="uid://g80ntr07utj7" path="res://assets/Sms/Npc/tex/I_mow_mino_rgba.png" id="leaf"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Fx/GoopSinkRipple.tscn" id="sink"]
+[ext_resource type="Resource" path="res://assets/Sms/Npc/TexPatterns/PiantaFemale.tres" id="texpat"]
+[ext_resource type="Texture2D" uid="uid://blj8yiqbdmq5h" path="res://assets/Sms/Npc/tex/I_mow_eye01_IA8.png" id="tex_eye"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Fx/NpcWashPianta.tscn" id="wash"]
 
 [resource]
@@ -45,11 +45,11 @@ ClipWash = "mow_wet_yogore"
 ClipAppear = "mow_appear"
 BodyColors = PackedVector3Array(300, 100, 200, 400, 150, 0, 300, 330, 0, 400, 330, 0, 330, 40, 0, 400, 200, 255)
 LeafTexture = ExtResource("leaf")
+EyeTexture = ExtResource("tex_eye")
+TexPatterns = ExtResource("texpat")
 HappyEffect = ExtResource("happy")
 DirtyDripEffect = ExtResource("drip")
 FootDripEffect = ExtResource("foot")
 WashEffect = ExtResource("wash")
 SinkEffect = ExtResource("sink")
 CanBurn = false
-EyeTexture = ExtResource("tex_eye")
-TexPatterns = ExtResource("texpat")

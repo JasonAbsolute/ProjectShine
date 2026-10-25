@@ -1,4 +1,4 @@
-[gd_resource type="ShaderMaterial" load_steps=4 format=3 uid="uid://cgoobleeye71"]
+[gd_resource type="ShaderMaterial" format=3 uid="uid://cgoobleeye71"]
 
 [ext_resource type="Shader" path="res://assets/Sms/GoobleEye.gdshader" id="1_shader"]
 [ext_resource type="Texture2D" uid="uid://rw1n14w5xcs2" path="res://assets/Sms/models/gooble_eye.png" id="2_eye"]

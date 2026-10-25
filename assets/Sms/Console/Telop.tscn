@@ -1,10 +1,10 @@
-[gd_scene load_steps=4 format=3 uid="uid://pxikt1k5ifgx"]
+[gd_scene format=3 uid="uid://pxikt1k5ifgx"]
 
-[ext_resource type="Script" path="res://assets/Sms/Console/SmsTelop.cs" id="1_script"]
-[ext_resource type="Texture2D" path="res://assets/Sms/hud/telop_window.png" id="2_frame"]
-[ext_resource type="LabelSettings" path="res://assets/Sms/Console/TelopText.tres" id="3_text"]
+[ext_resource type="Script" uid="uid://cdqhxkpe6ver8" path="res://assets/Sms/Console/SmsTelop.cs" id="1_script"]
+[ext_resource type="Texture2D" uid="uid://b3s131nv1q31s" path="res://assets/Sms/hud/telop_window.png" id="2_frame"]
+[ext_resource type="LabelSettings" uid="uid://etyw7on7gc65" path="res://assets/Sms/Console/TelopText.tres" id="3_text"]
 
-[node name="Telop" type="Control" node_paths=PackedStringArray("Frame", "Clip", "Text", "Sound")]
+[node name="Telop" type="Control" unique_id=511982027 node_paths=PackedStringArray("Frame", "Clip", "Text", "Sound")]
 layout_mode = 3
 anchors_preset = 0
 offset_left = 37.0
@@ -17,43 +17,34 @@ Frame = NodePath("Frame")
 Clip = NodePath("Clip")
 Text = NodePath("Clip/Text")
 Sound = NodePath("Sound")
-Messages = PackedStringArray()
-FirstWaitSeconds = 5.0
-WaitSeconds = 60.0
-SlideFrames = 80.0
-ScrollPerFrame = 0.7
-WidthFrame = 443.0
-SizeScale = 1.0
-ShiftFrame = Vector2(0, 0)
+Messages = PackedStringArray("...D.E.B.S. ALERT...It seems several people have gone missing near the Grand Pianta statue in Bianco Square...")
 
-[node name="Frame" type="NinePatchRect" parent="."]
+[node name="Frame" type="NinePatchRect" parent="." unique_id=2023655728]
 layout_mode = 0
 offset_right = 443.0
 offset_bottom = 42.0
-mouse_filter = 2
 texture = ExtResource("2_frame")
 patch_margin_left = 8
 patch_margin_top = 8
 patch_margin_right = 8
 patch_margin_bottom = 8
 
-[node name="Clip" type="Control" parent="."]
-layout_mode = 0
+[node name="Clip" type="Control" parent="." unique_id=1621665238]
+clip_contents = true
+anchors_preset = 0
 offset_left = 8.0
 offset_top = 8.0
 offset_right = 435.0
 offset_bottom = 34.0
 mouse_filter = 2
-clip_contents = true
 
-[node name="Text" type="Label" parent="Clip"]
+[node name="Text" type="Label" parent="Clip" unique_id=1697086862]
 layout_mode = 0
 offset_left = 427.0
 offset_right = 900.0
 offset_bottom = 26.0
-mouse_filter = 2
 text = "...D.E.B.S. ALERT..."
 label_settings = ExtResource("3_text")
 vertical_alignment = 1
 
-[node name="Sound" type="AudioStreamPlayer" parent="."]
+[node name="Sound" type="AudioStreamPlayer" parent="." unique_id=135266082]

@@ -1,44 +1,41 @@
-[gd_resource type="Resource" script_class="SmsNpcTexPatternSet" load_steps=21 format=3]
+[gd_resource type="Resource" script_class="SmsNpcTexPatternSet" format=3 uid="uid://g5w4rlph7sm4"]
 
-[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcTexPatternSet.cs" id="set_script"]
-[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcTexPattern.cs" id="pat_script"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_me_open.png" id="tex_0"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_kuti_close.png" id="tex_1"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_me_half.png" id="tex_2"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_me_close.png" id="tex_3"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_me_worry.png" id="tex_4"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_me_wet.png" id="tex_5"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_kuti_half.png" id="tex_6"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_kuti_open.png" id="tex_7"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_kuti_worryopen.png" id="tex_8"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_kuti_worryhalf.png" id="tex_9"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_kuti_worryclose.png" id="tex_10"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/N_kinopio_kuti_wet.png" id="tex_11"]
-
-[sub_resource type="Resource" id="pat_0"]
-script = ExtResource("pat_script")
-PatternName = "kinopio_ttalk"
-Clips = PackedStringArray("kinopio_talk", "kinopio_sittalk")
-FrameMax = 100
-Loop = true
-Materials = PackedStringArray("_eye_mat", "_mat_mouth")
-Frames = PackedInt32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 3, 3, 3, 2, 2, 0, 0, 0, 0, 0, 0, 0, 2, 2, 3, 3, 3, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 6, 6, 7, 7, 7, 6, 6, 1, 1, 1, 6, 6, 7, 7, 7, 6, 6, 1, 1, 1, 1, 6, 6, 7, 7, 7, 6, 6, 1, 1, 1, 6, 6, 7, 7, 7, 6, 6, 1, 1, 1, 1, 1, 1, 6, 6, 7, 7, 7, 6, 6, 1, 1, 1, 6, 6, 7, 7, 7, 6, 6, 1, 1, 1, 1, 1, 6, 6, 7, 7, 7, 6, 6, 1, 1, 1, 6, 6, 7, 7, 7, 6, 6, 1, 1, 1, 6, 6, 7, 7, 7, 6, 6, 1, 1, 1, 1, 1)
+[ext_resource type="Script" uid="uid://3u750ilm60uq" path="res://assets/Sms/Npc/SmsNpcTexPattern.cs" id="pat_script"]
+[ext_resource type="Script" uid="uid://crmxoafdr8q3" path="res://assets/Sms/Npc/SmsNpcTexPatternSet.cs" id="set_script"]
+[ext_resource type="Texture2D" uid="uid://dnfjdbjb85kae" path="res://assets/Sms/Npc/tex/N_kinopio_me_open.png" id="tex_0"]
+[ext_resource type="Texture2D" uid="uid://b7sc2akyupd8n" path="res://assets/Sms/Npc/tex/N_kinopio_kuti_close.png" id="tex_1"]
+[ext_resource type="Texture2D" uid="uid://chia3wrjjjegi" path="res://assets/Sms/Npc/tex/N_kinopio_me_half.png" id="tex_2"]
+[ext_resource type="Texture2D" uid="uid://kun4ik533k61" path="res://assets/Sms/Npc/tex/N_kinopio_me_close.png" id="tex_3"]
+[ext_resource type="Texture2D" uid="uid://c5khi7ogcg7c4" path="res://assets/Sms/Npc/tex/N_kinopio_me_worry.png" id="tex_4"]
+[ext_resource type="Texture2D" uid="uid://dvy671im665br" path="res://assets/Sms/Npc/tex/N_kinopio_me_wet.png" id="tex_5"]
+[ext_resource type="Texture2D" uid="uid://d3qnl42g2y1yr" path="res://assets/Sms/Npc/tex/N_kinopio_kuti_half.png" id="tex_6"]
+[ext_resource type="Texture2D" uid="uid://3wht6wc5fkyg" path="res://assets/Sms/Npc/tex/N_kinopio_kuti_open.png" id="tex_7"]
+[ext_resource type="Texture2D" uid="uid://bjahh35c1yrwt" path="res://assets/Sms/Npc/tex/N_kinopio_kuti_worryopen.png" id="tex_8"]
+[ext_resource type="Texture2D" uid="uid://b0tr323db6b4w" path="res://assets/Sms/Npc/tex/N_kinopio_kuti_worryhalf.png" id="tex_9"]
+[ext_resource type="Texture2D" uid="uid://d15dkgdjmh7xx" path="res://assets/Sms/Npc/tex/N_kinopio_kuti_worryclose.png" id="tex_10"]
+[ext_resource type="Texture2D" uid="uid://lbqwrxurhjcn" path="res://assets/Sms/Npc/tex/N_kinopio_kuti_wet.png" id="tex_11"]
 
 [sub_resource type="Resource" id="pat_1"]
 script = ExtResource("pat_script")
 PatternName = "kinopio_twait"
 Clips = PackedStringArray("kinopio_walk", "kinopio_wait", "kinopio_step", "kinopio_run", "kinopio_sit")
 FrameMax = 150
-Loop = true
 Materials = PackedStringArray("_eye_mat", "_mat_mouth")
 Frames = PackedInt32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 3, 3, 3, 2, 2, 0, 0, 2, 2, 3, 3, 3, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 3, 3, 3, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)
+
+[sub_resource type="Resource" id="pat_0"]
+script = ExtResource("pat_script")
+PatternName = "kinopio_ttalk"
+Clips = PackedStringArray("kinopio_talk", "kinopio_sittalk")
+FrameMax = 100
+Materials = PackedStringArray("_eye_mat", "_mat_mouth")
+Frames = PackedInt32Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 2, 3, 3, 3, 2, 2, 0, 0, 0, 0, 0, 0, 0, 2, 2, 3, 3, 3, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 6, 6, 7, 7, 7, 6, 6, 1, 1, 1, 6, 6, 7, 7, 7, 6, 6, 1, 1, 1, 1, 6, 6, 7, 7, 7, 6, 6, 1, 1, 1, 6, 6, 7, 7, 7, 6, 6, 1, 1, 1, 1, 1, 1, 6, 6, 7, 7, 7, 6, 6, 1, 1, 1, 6, 6, 7, 7, 7, 6, 6, 1, 1, 1, 1, 1, 6, 6, 7, 7, 7, 6, 6, 1, 1, 1, 6, 6, 7, 7, 7, 6, 6, 1, 1, 1, 6, 6, 7, 7, 7, 6, 6, 1, 1, 1, 1, 1)
 
 [sub_resource type="Resource" id="pat_2"]
 script = ExtResource("pat_script")
 PatternName = "kinopio_twait2"
 Clips = PackedStringArray("kinopio_wait_yogore", "kinopio_waitororo", "kinopio_sitororo", "kinopio_runororo", "kinopio_walkororo")
 FrameMax = 150
-Loop = true
 Materials = PackedStringArray("_eye_mat", "_mat_mouth")
 Frames = PackedInt32Array(4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 2, 2, 3, 3, 3, 2, 2, 4, 4, 2, 2, 3, 3, 3, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 2, 2, 3, 3, 3, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10)
 
@@ -47,7 +44,6 @@ script = ExtResource("pat_script")
 PatternName = "kinopio_twet"
 Clips = PackedStringArray("kinopio_happy", "kinopio_appear")
 FrameMax = 3
-Loop = true
 Materials = PackedStringArray("_eye_mat", "_mat_mouth")
 Frames = PackedInt32Array(0, 0, 0, 7, 7, 7)
 
@@ -56,7 +52,6 @@ script = ExtResource("pat_script")
 PatternName = "kinopio_twet_a"
 Clips = PackedStringArray("kinopio_fall", "kinopio_recover", "kinopio_wet", "kinopio_stumble", "kinopio_wet_a", "kinopio_wait_fall", "kinopio_sitwet", "kinopio_sitshake", "kinopio_wet_yogore")
 FrameMax = 3
-Loop = true
 Materials = PackedStringArray("_eye_mat", "_mat_mouth")
 Frames = PackedInt32Array(5, 5, 5, 11, 11, 11)
 
@@ -65,7 +60,6 @@ script = ExtResource("pat_script")
 PatternName = "kinopio_tworry"
 Clips = PackedStringArray("kinopio_worry", "kinopio_sitworry")
 FrameMax = 100
-Loop = true
 Materials = PackedStringArray("_eye_mat", "_mat_mouth")
 Frames = PackedInt32Array(4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 2, 2, 3, 3, 3, 2, 2, 4, 4, 4, 4, 4, 4, 4, 2, 2, 3, 3, 3, 2, 2, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 10, 10, 9, 9, 8, 8, 8, 9, 9, 10, 10, 10, 9, 9, 8, 8, 8, 9, 9, 10, 10, 10, 10, 9, 9, 8, 8, 8, 9, 9, 10, 10, 10, 9, 9, 8, 8, 8, 9, 9, 10, 10, 10, 10, 10, 10, 9, 9, 8, 8, 8, 9, 9, 10, 10, 10, 9, 9, 8, 8, 8, 9, 9, 10, 10, 10, 10, 10, 9, 9, 8, 8, 8, 9, 9, 10, 10, 10, 9, 9, 8, 8, 8, 9, 9, 10, 10, 10, 9, 9, 8, 8, 8, 9, 9, 10, 10, 10, 10, 10)
 

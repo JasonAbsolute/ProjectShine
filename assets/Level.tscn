@@ -1,11 +1,28 @@
 [gd_scene format=3 uid="uid://cwve1f1kpa2pf"]
 
+[ext_resource type="Script" uid="uid://3aw1w481iqnu" path="res://assets/Level.cs" id="1_f14dc"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Npc/Pianta.tscn" id="2_i3ws1"]
 [ext_resource type="PackedScene" uid="uid://7exkcbpcjut8" path="res://assets/marioHUD.tscn" id="2_w7srv"]
 [ext_resource type="PackedScene" uid="uid://lxisv6iyx202" path="res://assets/SleepyBoo.tscn" id="4_fjm2c"]
 [ext_resource type="PackedScene" uid="uid://doqjj0ahoycbe" path="res://assets/plaza.tscn" id="4_i3ws1"]
-[ext_resource type="PackedScene" path="res://assets/Mario.tscn" id="5_i3ws1"]
 [ext_resource type="PackedScene" uid="uid://delxpxy0gt873" path="res://assets/Gooble.tscn" id="6_rakau"]
+[ext_resource type="PackedScene" uid="uid://d3ph56ccg345h" path="res://assets/Player.tscn" id="6_swhci"]
+[ext_resource type="PackedScene" uid="uid://vjf8vmkgemkf" path="res://models/Nozzles/NozzleBox.tscn" id="7_swhci"]
+[ext_resource type="PackedScene" uid="uid://b2km1ecb3arua" path="res://fruit_pineapple.tscn" id="9_mmr7s"]
+[ext_resource type="PackedScene" uid="uid://duike4wtbxsen" path="res://fruit_coconut.tscn" id="10_8bsb2"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Goop.tscn" id="11_18x7l"]
+[ext_resource type="Shader" uid="uid://bssabo0ggrvyy" path="res://assets/Sms/Fx/Goop.gdshader" id="12_oxkgh"]
+[ext_resource type="Texture2D" uid="uid://6k7r6h1nbfr7" path="res://assets/Sms/Fx/Goop/PaintLayouts/GOOP.png" id="13_oxkgh"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Wire.tscn" id="15_775vm"]
+[ext_resource type="Texture2D" uid="uid://2j8fkcphf3fn" path="res://assets/Sms/Fx/Goop/PinkGoop.png" id="15_ji6bj"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/PiantaFemale.tscn" id="16_ji6bj"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/Toad.tscn" id="17_n3xqm"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Npc/SignBoard.tscn" id="18_i36gb"]
+[ext_resource type="PackedScene" uid="uid://biv4ticii2qoh" path="res://shine_sprite.tscn" id="19_eqqsb"]
+[ext_resource type="Script" uid="uid://soejxmdbmib6" path="res://assets/Sms/SmsHiddenCoin.cs" id="19_lltui"]
+[ext_resource type="Script" uid="uid://f2hy74ux2obi" path="res://assets/Sms/SmsReturnSpot.cs" id="20_arohq"]
+[ext_resource type="PackedScene" uid="uid://vodc17m8tfot" path="res://yellow_coin.tscn" id="20_s1m0r"]
+[ext_resource type="Texture2D" uid="uid://cvyk3kjuhnex7" path="res://Font/LifeMeter/194-p.png" id="23_s1m0r"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_82gkg"]
 sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
@@ -21,6 +38,7 @@ tonemap_mode = 2
 glow_enabled = true
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_8pqrm"]
+size = Vector3(0.98254395, 1, 1)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_i3ws1"]
 
@@ -28,7 +46,7 @@ glow_enabled = true
 material = SubResource("StandardMaterial3D_i3ws1")
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ldqj5"]
-albedo_color = Color(0, 0, 0, 1)
+albedo_color = Color(1, 0.7058824, 0.05490196, 1)
 
 [sub_resource type="BoxMesh" id="BoxMesh_s3nef"]
 material = SubResource("StandardMaterial3D_ldqj5")
@@ -38,8 +56,19 @@ material = SubResource("StandardMaterial3D_ldqj5")
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_cl6yo"]
 albedo_color = Color(0.45098, 0.188235, 0.266667, 1)
 
+[sub_resource type="SphereMesh" id="SphereMesh_18x7l"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_p5iwl"]
+size = Vector3(127.72015, 20.725586, 221.44788)
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_oxkgh"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_0kids"]
+
 [node name="Level" type="Node3D" unique_id=761080037]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.09137, 0.0328064, -2.65286)
+script = ExtResource("1_f14dc")
+News = PackedStringArray("This is a test!!!! ")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1568431078]
 environment = SubResource("Environment_g6m7q")
@@ -50,6 +79,11 @@ shadow_enabled = true
 
 [node name="Pianta" parent="." unique_id=1113589533 instance=ExtResource("2_i3ws1")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -94.983, -28.4903, -72.2841)
+OutfitHat = 0
+OutfitMoustache = 0
+OutfitGlasses = 0
+OutfitNeck = 0
+OutfitHand = 0
 
 [node name="StaticBody3D" type="StaticBody3D" parent="." unique_id=889397817]
 transform = Transform3D(99.9779, 0, 2.10297, 0, 1, 0, -2.10297, 0, 99.9779, 0.15142, 0.0386906, -0.301396)
@@ -58,17 +92,19 @@ transform = Transform3D(99.9779, 0, 2.10297, 0, 1, 0, -2.10297, 0, 99.9779, 0.15
 shape = SubResource("BoxShape3D_8pqrm")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D" unique_id=1166857323]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.00184711, -0.2283, 0.00262144)
+transform = Transform3D(1, 0, 1.8626451e-09, 0, 1, 0, -1.8626451e-09, 0, 1, 0.0018471107, -0.2283, 0.0026214402)
 mesh = SubResource("BoxMesh_s6h6r")
 
 [node name="StaticBody3D3" type="StaticBody3D" parent="." unique_id=1190867863]
-transform = Transform3D(20, 0, 0, 0, 1, 0, 0, 0, 20, 13.6968, 1.82492, 0)
+transform = Transform3D(20, 0, 0, 0, 1, 0, 0, 0, 20, 75.94967, 1.82492, 0)
+metadata/sms_pollution = "electric"
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D3" unique_id=895114780]
+transform = Transform3D(0.99999976, 0, 0, 0, 1, 0, 0, 0, 0.99999976, 2.844922, 0, 0)
 shape = SubResource("BoxShape3D_8pqrm")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=430991484]
-transform = Transform3D(20, 0, 0, 0, 1, 0, 0, 0, 20, 13.6968, 1.82492, 0)
+transform = Transform3D(20, 0, 0, 0, 1, 0, 0, 0, 20, 72.07713, 1.82492, 0)
 mesh = SubResource("BoxMesh_s3nef")
 skeleton = NodePath("../StaticBody3D3")
 
@@ -87,6 +123,11 @@ shape = SubResource("BoxShape3D_8pqrm")
 mesh = SubResource("BoxMesh_s6h6r")
 skin = SubResource("Skin_dipj8")
 surface_material_override/0 = SubResource("StandardMaterial3D_cl6yo")
+
+[node name="Goop2" parent="." unique_id=1149392537 instance=ExtResource("11_18x7l")]
+transform = Transform3D(10.05, 0, 0, 0, 10.05, 0, 0, 0, 10.05, -4.734366, 3.762412, -24.691929)
+mesh = SubResource("SphereMesh_18x7l")
+GoopShader = ExtResource("12_oxkgh")
 
 [node name="SleepyBoo2" parent="." unique_id=275812337 instance=ExtResource("4_fjm2c")]
 transform = Transform3D(0.309117, 0, -0.951024, 0, 1, 0, 0.951024, 0, 0.309117, 35.2887, 16.3884, 4.53111)
@@ -139,9 +180,6 @@ transform = Transform3D(-0.219359, 0, -0.304149, 0, 0.375, 0, 0.304149, 0, -0.21
 [node name="SleepyBoo8" parent="SleepyBoo8/SleepyBoo8/SleepyBoo8/SleepyBoo8/SleepyBoo8/SleepyBoo8/SleepyBoo8/SleepyBoo8/SleepyBoo8" unique_id=1446872825 instance=ExtResource("4_fjm2c")]
 transform = Transform3D(-0.219359, 0, -0.304149, 0, 0.375, 0, 0.304149, 0, -0.219359, -102.846, -7.34166, -30.6784)
 
-[node name="Mario" parent="." unique_id=937349213 instance=ExtResource("5_i3ws1")]
-transform = Transform3D(0.999391, -0.0348995, 8.74228e-08, 0.0348995, 0.999391, 0, -8.73695e-08, 3.05101e-09, 1, -19.60505, -14.152219, 42.953598)
-
 [node name="StaticBody3D2" type="StaticBody3D" parent="." unique_id=694150140]
 transform = Transform3D(0.0135331, -7.00138, -0.576676, 3.39408, -0.0854056, 0.0210287, -0.0778357, -4.94149, 0.816703, -94.397, -14.3693, 41.4589)
 
@@ -156,7 +194,7 @@ mesh = SubResource("BoxMesh_s6h6r")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -89.978, -14.4019, 41)
 
 [node name="gooby2" parent="." unique_id=15037938 instance=ExtResource("6_rakau")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -88.1736, -14.4019, 41)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -88.18499, -14.4019, 41)
 
 [node name="gooby3" parent="." unique_id=1422426061 instance=ExtResource("6_rakau")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -87.9786, -14.4019, 36.0857)
@@ -169,3 +207,207 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -84.5004, -14.4019, 41)
 
 [node name="gooby6" parent="." unique_id=2081943420 instance=ExtResource("6_rakau")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -86.2609, -14.4019, 41)
+
+[node name="Mario" parent="." unique_id=1241972682 instance=ExtResource("6_swhci")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.4623823, 20.642525)
+
+[node name="Sea" type="Area3D" parent="." unique_id=927641836 groups=["sms_water"]]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 62.4823, -20.054996, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Sea" unique_id=1376257566]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -21.889984, -9.862793, -37.232365)
+shape = SubResource("BoxShape3D_p5iwl")
+
+[node name="NozzleBox" parent="." unique_id=475842942 instance=ExtResource("7_swhci")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.58380795, 27.41575)
+
+[node name="NozzleBox2" parent="." unique_id=380630249 instance=ExtResource("7_swhci")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.5786314, 0.58380795, 27.41575)
+Nozzle = 2
+Valid = false
+
+[node name="NozzleBox3" parent="." unique_id=507920219 instance=ExtResource("7_swhci")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.557088, 0.58380795, 27.41575)
+Nozzle = 3
+Valid = false
+
+[node name="FruitPineapple" parent="." unique_id=540510503 instance=ExtResource("9_mmr7s")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.791213, 11.966865)
+SmsBallReacts = false
+
+[node name="FruitPineapple2" parent="." unique_id=102805949 instance=ExtResource("9_mmr7s")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.9566989, 2.791213, 11.966865)
+
+[node name="FruitPineapple3" parent="." unique_id=251685257 instance=ExtResource("9_mmr7s")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.8127923, 2.791213, 11.966865)
+Size = 4.125
+
+[node name="FruitCoconut" parent="." unique_id=1771006975 instance=ExtResource("10_8bsb2")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.976842, 3.5953467, 16.404964)
+Size = 2.085
+SmsPassThroughMario = false
+
+[node name="Goop" parent="." unique_id=462388942 instance=ExtResource("11_18x7l")]
+transform = Transform3D(3.1646066, 0, 0.049913168, 0, 1, 0, -0.049913168, 0, 3.1646066, 31.248135, 0.34927845, -35.753212)
+Type = 4
+InitialPaint = 2
+InitialPaintTexture = ExtResource("13_oxkgh")
+GoopShader = ExtResource("12_oxkgh")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Goop" unique_id=798505760]
+
+[node name="StaticBody3D5" type="StaticBody3D" parent="." unique_id=2101416368]
+transform = Transform3D(11.525, 0, 0, 0, 11.525, 0, 0, 0, 11.525, -6.999751, 0.3127408, -36.909058)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D5" unique_id=1906987576]
+shape = SubResource("SphereShape3D_oxkgh")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="StaticBody3D5" unique_id=1456076352]
+transform = Transform3D(0.9999999, 0, 0, 0, 0.9999999, 0, 0, 0, 0.9999999, 0, 0, 0)
+mesh = SubResource("SphereMesh_0kids")
+skeleton = NodePath("../CollisionShape3D")
+
+[node name="Goop3" parent="." unique_id=750001934 instance=ExtResource("11_18x7l")]
+transform = Transform3D(0.024114847, 0, -3.1649082, 0, 1, 0, 3.1649082, 0, 0.024114847, 31.613281, 0.34927845, -2.8615983)
+Type = 1
+InitialPaint = 2
+InitialPaintTexture = ExtResource("13_oxkgh")
+GoopShader = ExtResource("12_oxkgh")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Goop3" unique_id=177071142]
+
+[node name="Goop4" parent="." unique_id=2078742241 instance=ExtResource("11_18x7l")]
+transform = Transform3D(0.024114847, 0, -3.1649082, 0, 1, 0, 3.1649082, 0, 0.024114847, 31.86421, 0.34927845, 30.071201)
+GoopShader = ExtResource("12_oxkgh")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Goop4" unique_id=2005274291]
+
+[node name="Goop7" parent="." unique_id=1235464213 instance=ExtResource("11_18x7l")]
+transform = Transform3D(0.024114847, 0, -3.1649082, 0, 1, 0, 3.1649082, 0, 0.024114847, -0.8232534, 0.34927845, -7.1046066)
+InitialPaint = 2
+InitialPaintTexture = ExtResource("13_oxkgh")
+GoopShader = ExtResource("12_oxkgh")
+GoopTexture = ExtResource("15_ji6bj")
+Flames = false
+Sparks = false
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Goop7" unique_id=770502719]
+
+[node name="Wire" parent="." unique_id=938073269 instance=ExtResource("15_775vm")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8.081735, 17.175179)
+LengthUnits = 1556.85
+RopeSpeedScale = 2.0
+
+[node name="NozzleBox4" parent="." unique_id=341296556 instance=ExtResource("7_swhci")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12.074273, 0.58380795, 27.41575)
+Nozzle = 2
+
+[node name="NozzleBox5" parent="." unique_id=152764932 instance=ExtResource("7_swhci")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.100254, 0.58380795, 27.41575)
+Nozzle = 3
+
+[node name="Pianta2" parent="." unique_id=1206019365 instance=ExtResource("2_i3ws1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -42.338146, 0.83433247, 24.84737)
+Idle = 5
+RandomOutfit = true
+OutfitHat = 0
+OutfitMoustache = 0
+OutfitGlasses = 0
+OutfitNeck = 0
+OutfitHand = 0
+
+[node name="PiantaFemale" parent="." unique_id=1702659000 instance=ExtResource("16_ji6bj")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -46.54372, 0.79008675, 30.115536)
+RandomOutfit = true
+Lines = PackedStringArray("Welcome to Isle Delfino!\nI love this Text!!!\n!!!!\nanother line?", "Enjoy your stay.")
+OutfitFlower = 0
+OutfitHat = 0
+OutfitGlasses = 0
+OutfitArrows = 0
+
+[node name="Pianta3" parent="." unique_id=1707124539 instance=ExtResource("2_i3ws1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 33.902683, 0.83433247, 24.84737)
+Idle = 5
+RandomOutfit = true
+ThrowsMario = true
+Burning = true
+OutfitHat = 0
+OutfitMoustache = 0
+OutfitGlasses = 0
+OutfitNeck = 0
+OutfitHand = 0
+
+[node name="Toad" parent="." unique_id=1541195062 instance=ExtResource("17_n3xqm")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 27.785185, 0.39642096, 23.368542)
+OutfitGlasses = 0
+
+[node name="Toad2" parent="." unique_id=1915009329 instance=ExtResource("17_n3xqm")]
+OutfitGlasses = 0
+
+[node name="Toad3" parent="." unique_id=770037016 instance=ExtResource("17_n3xqm")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 27.785185, 0.39642096, 25.66246)
+OutfitGlasses = 0
+
+[node name="Toad4" parent="." unique_id=1065645648 instance=ExtResource("17_n3xqm")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 23.895105, 0.39642096, 23.368542)
+OutfitGlasses = 0
+
+[node name="Toad5" parent="." unique_id=266625485 instance=ExtResource("17_n3xqm")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.509054, 0.39642096, 24.76384)
+OutfitGlasses = 0
+
+[node name="Toad6" parent="." unique_id=327868384 instance=ExtResource("17_n3xqm")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 24.56199, 0.39642096, 26.433905)
+OutfitGlasses = 0
+
+[node name="Toad7" parent="." unique_id=719673678 instance=ExtResource("17_n3xqm")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 25.5902, 0.39642096, 22.283203)
+OutfitGlasses = 0
+
+[node name="Toad8" parent="." unique_id=219728111 instance=ExtResource("17_n3xqm")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 27.785185, 0.39642096, 21.062546)
+OutfitGlasses = 0
+
+[node name="SignBoard" parent="." unique_id=1976163242 instance=ExtResource("18_i36gb")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4697361, 47.755383)
+
+[node name="SmsHiddenCoin" type="StaticBody3D" parent="SignBoard" unique_id=1718805421]
+transform = Transform3D(1, 0, 0, 0, -0.73226726, 0.6810174, 0, -0.6810174, -0.73226726, 0, 6.98905, -5.873034)
+script = ExtResource("19_lltui")
+HiddenScene = ExtResource("20_s1m0r")
+FlyDirection = Vector3(100, 0, -1)
+PictureSize = Vector2(1.5, 1.5)
+
+[node name="Toad9" parent="." unique_id=1105920956 instance=ExtResource("17_n3xqm")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 11.815138, 0.39642096, 42.5532)
+ColorIndex = 3
+Idle = 6
+RandomOutfit = true
+OutfitGlasses = 0
+
+[node name="ShineSprite" parent="." unique_id=1110047867 instance=ExtResource("19_eqqsb")]
+transform = Transform3D(0.006, 0, 0, 0, 0.006, 0, 0, 0, 0.006, 0, 4.7885895, 41.277275)
+ExitLevel = true
+ExitScene = "uid://cwve1f1kpa2pf"
+EmptyTint = Color(0.85, 0.92, 1, 0.45)
+
+[node name="ShineSprite2" parent="." unique_id=2020465133 instance=ExtResource("19_eqqsb")]
+transform = Transform3D(0.006, 0, 0, 0, 0.006, 0, 0, 0, 0.006, 3.4261487, 4.7885895, 41.277275)
+ShineText = "Amazing!"
+EmptyTint = Color(0.85, 0.92, 1, 0.45)
+
+[node name="SmsReturnSpot" type="Node3D" parent="." unique_id=938974479]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.78689, 17.657501, 37.604706)
+script = ExtResource("20_arohq")
+FromScene = "uid://cwve1f1kpa2pf"
+
+[node name="SmsHiddenCoin" type="StaticBody3D" parent="." unique_id=1545901797]
+transform = Transform3D(0.06797475, -0.090072304, -0.9936126, -0.06874141, 0.99312663, -0.0947309, 0.9953161, 0.07474168, 0.06131585, -8.04111, 5.372006, 40.22412)
+script = ExtResource("19_lltui")
+Kind = 4
+HiddenScene = ExtResource("20_s1m0r")
+AppearSpeed = 120.0
+AppearYSpeed = -100.0
+PictureColor = Color(1, 1, 1, 1)
+PictureTexture = ExtResource("23_s1m0r")
+PictureSize = Vector2(10, 10.035)

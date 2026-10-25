@@ -1,4 +1,4 @@
-[gd_resource type="StandardMaterial3D" load_steps=2 format=3 uid="uid://cgooblebrn71"]
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://cgooblebrn71"]
 
 [ext_resource type="Texture2D" uid="uid://diobl43kh7mcu" path="res://assets/Sms/models/goop_mark_bianco.png" id="1_goop"]
 

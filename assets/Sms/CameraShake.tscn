@@ -1,4 +1,4 @@
-[gd_scene load_steps=6 format=3 uid="uid://cshake120h01"]
+[gd_scene format=3 uid="uid://cshake120h01"]
 
 [ext_resource type="Script" path="res://assets/Sms/SmsCameraShake.cs" id="1_script"]
 [ext_resource type="Script" path="res://assets/Sms/SmsCameraShakeMode.cs" id="2_mode"]

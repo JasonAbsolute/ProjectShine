@@ -1,30 +1,23 @@
 [gd_resource type="Resource" script_class="SmsNpcProfile" format=3 uid="uid://3wuso3tbylaw"]
 
 [ext_resource type="Script" uid="uid://8k1ifx6lo5lh" path="res://assets/Sms/Npc/SmsNpcProfile.cs" id="1_prof"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mom_eye01_IA8.png" id="tex_eye"]
-[ext_resource type="Resource" path="res://assets/Sms/Npc/TexPatterns/PiantaMale.tres" id="texpat"]
-
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mom_mino_rgba.png" id="leaf"]
-[ext_resource type="PackedScene" path="res://assets/Sms/Fx/NpcSparklePianta.tscn" id="happy"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Fx/NpcDripBody.tscn" id="drip"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Fx/NpcDripFoot.tscn" id="foot"]
-[ext_resource type="PackedScene" path="res://assets/Sms/Fx/NpcWashPianta.tscn" id="wash"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/NpcSparklePianta.tscn" id="happy"]
+[ext_resource type="Texture2D" uid="uid://cp6t4g3w1ekxu" path="res://assets/Sms/Npc/tex/I_mom_mino_rgba.png" id="leaf"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Fx/GoopSinkRipple.tscn" id="sink"]
+[ext_resource type="Resource" path="res://assets/Sms/Npc/TexPatterns/PiantaMale.tres" id="texpat"]
+[ext_resource type="Texture2D" uid="uid://25w0g4w2i1pi" path="res://assets/Sms/Npc/tex/I_mom_eye01_IA8.png" id="tex_eye"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/NpcWashPianta.tscn" id="wash"]
 
 [resource]
 resource_name = "PiantaMale"
 script = ExtResource("1_prof")
-MinWalkAnmRate = 0.1
-MinMarchSpeed = 0.2
-MaxMarchSpeed = 1.2
-RunAccel = 0.08
-MarchAccel = 0.02
-MarchDecrease = 0.1
 LeafTexture = ExtResource("leaf")
+EyeTexture = ExtResource("tex_eye")
+TexPatterns = ExtResource("texpat")
 HappyEffect = ExtResource("happy")
 DirtyDripEffect = ExtResource("drip")
 FootDripEffect = ExtResource("foot")
 WashEffect = ExtResource("wash")
 SinkEffect = ExtResource("sink")
-EyeTexture = ExtResource("tex_eye")
-TexPatterns = ExtResource("texpat")

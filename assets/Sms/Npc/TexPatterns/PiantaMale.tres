@@ -1,15 +1,22 @@
-[gd_resource type="Resource" script_class="SmsNpcTexPatternSet" load_steps=24 format=3]
+[gd_resource type="Resource" script_class="SmsNpcTexPatternSet" format=3 uid="uid://dktrhuslht61f"]
 
-[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcTexPatternSet.cs" id="set_script"]
-[ext_resource type="Script" path="res://assets/Sms/Npc/SmsNpcTexPattern.cs" id="pat_script"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mom_eye01_IA8.png" id="tex_0"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mom_eye02_IA8.png" id="tex_1"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mom_eye03_IA8.png" id="tex_2"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mom_eye04_IA8.png" id="tex_3"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mom_eye05_IA8.png" id="tex_4"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mom_eye06_IA8.png" id="tex_5"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mom_eye07_IA8.png" id="tex_6"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Npc/tex/I_mom_eye08_IA8.png" id="tex_7"]
+[ext_resource type="Script" uid="uid://3u750ilm60uq" path="res://assets/Sms/Npc/SmsNpcTexPattern.cs" id="pat_script"]
+[ext_resource type="Script" uid="uid://crmxoafdr8q3" path="res://assets/Sms/Npc/SmsNpcTexPatternSet.cs" id="set_script"]
+[ext_resource type="Texture2D" uid="uid://25w0g4w2i1pi" path="res://assets/Sms/Npc/tex/I_mom_eye01_IA8.png" id="tex_0"]
+[ext_resource type="Texture2D" uid="uid://bdu3jlvm2dc6h" path="res://assets/Sms/Npc/tex/I_mom_eye02_IA8.png" id="tex_1"]
+[ext_resource type="Texture2D" uid="uid://xup8uxn3v7nh" path="res://assets/Sms/Npc/tex/I_mom_eye03_IA8.png" id="tex_2"]
+[ext_resource type="Texture2D" uid="uid://jquchnfwqar0" path="res://assets/Sms/Npc/tex/I_mom_eye04_IA8.png" id="tex_3"]
+[ext_resource type="Texture2D" uid="uid://67webnb03de7" path="res://assets/Sms/Npc/tex/I_mom_eye05_IA8.png" id="tex_4"]
+[ext_resource type="Texture2D" uid="uid://fq62fsbv04v8" path="res://assets/Sms/Npc/tex/I_mom_eye06_IA8.png" id="tex_5"]
+[ext_resource type="Texture2D" uid="uid://deidea7npubv2" path="res://assets/Sms/Npc/tex/I_mom_eye07_IA8.png" id="tex_6"]
+[ext_resource type="Texture2D" uid="uid://3hw6fhkk6mob" path="res://assets/Sms/Npc/tex/I_mom_eye08_IA8.png" id="tex_7"]
+
+[sub_resource type="Resource" id="pat_12"]
+script = ExtResource("pat_script")
+PatternName = "mom_wink"
+FrameMax = 90
+Materials = PackedStringArray("_eye_mat")
+Frames = PackedInt32Array(0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 2, 3, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
 [sub_resource type="Resource" id="pat_0"]
 script = ExtResource("pat_script")
@@ -25,7 +32,6 @@ script = ExtResource("pat_script")
 PatternName = "mom_fall"
 Clips = PackedStringArray("mom_fall")
 FrameMax = 30
-Loop = true
 Materials = PackedStringArray("_eye_mat")
 Frames = PackedInt32Array(4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 0, 0, 0, 1, 1, 1, 4, 4, 4, 4, 4, 4, 0, 0, 0, 1, 1, 1, 1)
 
@@ -34,7 +40,6 @@ script = ExtResource("pat_script")
 PatternName = "mom_happy"
 Clips = PackedStringArray("mom_happy")
 FrameMax = 90
-Loop = true
 Materials = PackedStringArray("_eye_mat")
 Frames = PackedInt32Array(7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7)
 
@@ -52,7 +57,6 @@ script = ExtResource("pat_script")
 PatternName = "mom_madloop"
 Clips = PackedStringArray("mom_madloop")
 FrameMax = 80
-Loop = true
 Materials = PackedStringArray("_eye_mat")
 Frames = PackedInt32Array(5, 5, 5, 5, 5, 5, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5)
 
@@ -88,7 +92,6 @@ script = ExtResource("pat_script")
 PatternName = "mom_wait_yogore"
 Clips = PackedStringArray("mom_wait_yogore")
 FrameMax = 380
-Loop = true
 Materials = PackedStringArray("_eye_mat")
 Frames = PackedInt32Array(6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 3, 3, 2, 2, 3, 3, 6, 6, 6, 6, 6, 6, 3, 3, 2, 2, 3, 3, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 3, 3, 2, 2, 2, 2, 3, 3, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6)
 
@@ -118,15 +121,6 @@ FrameMax = 169
 Loop = false
 Materials = PackedStringArray("_eye_mat")
 Frames = PackedInt32Array(2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-
-[sub_resource type="Resource" id="pat_12"]
-script = ExtResource("pat_script")
-PatternName = "mom_wink"
-Clips = PackedStringArray()
-FrameMax = 90
-Loop = true
-Materials = PackedStringArray("_eye_mat")
-Frames = PackedInt32Array(0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 2, 3, 0, 0, 0, 0, 0, 1, 2, 2, 2, 2, 2, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
 [resource]
 resource_name = "PiantaMale texture patterns"

@@ -1,4 +1,4 @@
-[gd_scene load_steps=11 format=3 uid="uid://fbubbles0048"]
+[gd_scene format=3 uid="uid://fbubbles0048"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsBubbles.cs" id="1_script"]
 [ext_resource type="Shader" path="res://assets/Sms/Fx/bubble_add.gdshader" id="2_bubble_shader"]

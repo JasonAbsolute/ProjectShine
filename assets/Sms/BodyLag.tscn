@@ -1,4 +1,4 @@
-[gd_scene load_steps=6 format=3 uid="uid://ydk4hvu1bqs2"]
+[gd_scene format=3 uid="uid://ydk4hvu1bqs2"]
 
 [ext_resource type="Script" path="res://assets/Sms/SmsTimeLag.cs" id="1_script"]
 [ext_resource type="Script" path="res://assets/Sms/SmsTimeLagEntry.cs" id="2_entry"]
