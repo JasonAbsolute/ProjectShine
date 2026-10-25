@@ -16,6 +16,11 @@ the URL it produced. Jaysonn can also just run the commands himself.
 4. If the entry asks for a PR and `gh` is installed (`gh --version`): `gh pr create --base main --head <branch> --title "<title>" --body-file <file>`
    with the body the entry gives. If `gh` is not installed, either `winget install GitHub.cli` once, or open the compare URL the entry gives
    in the browser and create the PR there.
+   **State 2026-10-25:** `gh` 2.103.2 IS now installed (`C:\Program Files\GitHub CLI\gh.exe`, not yet on the shell's PATH in a fresh session),
+   but it is **not authenticated** -- `gh auth status` says "not logged into any GitHub hosts". The cached git credential is Git Credential
+   Manager's and `gh` does not read it. Until Jaysonn runs `gh auth login` once (or sets `GH_TOKEN`), the local Claude cannot open a PR itself;
+   the fallback is to build the compare URL with `?expand=1&title=<urlencoded>&body=<urlencoded>` and open it, so the form arrives prefilled
+   and Jaysonn only presses "Create pull request".
 5. If the entry asks for a MERGE into main: Kiro has already merged locally (`git merge --no-ff`), so the entry only asks to push `main` (and
    the feature branch for the record).
 6. Verify: `git rev-list --count origin/<branch>..<branch>` prints `0`.
@@ -49,7 +54,7 @@ Result: `main` `3eed4c0..144b11e` (307 commits), `sms-physics` `61d5810..c48b3f9
 `rev-list --count` checks returned `0`. No PR, as the entry specified. Working tree was clean apart from
 the 19 `addons/godot_ai/` entries, which were left untouched.
 
-### #2 -- PENDING -- 2026-10-25 03:55 PDT, updated 04:45 (Kiro)
+### #2 -- PUSHED 2026-10-25 -- https://github.com/JasonAbsolute/ProjectShine/tree/feature/save-prompt -- PR awaiting Jaysonn's click -- queued 2026-10-25 03:55 PDT, updated 04:45 (Kiro)
 Push the first feature branch and open its PR: the card save ("Save?" after a shine, a blue coin, the pause menu's SAVE). PLAYTESTED BY
 JAYSONN 2026-10-25 04:40 ("ok looks good") -- the PR can be merged once it is open (squash or merge commit, his call; `main` then needs a
 `git pull` here).
@@ -76,6 +81,14 @@ git rev-list --count origin/feature/save-prompt..feature/save-prompt
 ```
 Expect `0`. Then open the PR from the compare URL with the title and body above. Note the working tree carries Jaysonn's own uncommitted
 `assets/Level.tscn` edit -- leave it, do not add it to this PR.
+
+Result: `feature/save-prompt` pushed as a new remote branch, `main` `7e448b9..125ade9` on it (7 commits).
+`git rev-list --count origin/feature/save-prompt..feature/save-prompt` returned `0`. Entry's code tip `25f69fd`
+confirmed an ancestor of the branch, and 124b `3ab4893` / 124 `a804f34` are both in the range as the entry says.
+**The PR itself is not open yet** -- `gh` was installed during this pass but is unauthenticated (see the procedure's
+step 4 note), so the prefilled compare page was opened in the browser instead and Jaysonn creates it from there.
+Working tree left untouched: Jaysonn's `assets/Level.tscn` plus two Koopa `.png.import` compression flips, and the
+19 `addons/godot_ai/` entries.
 
 <!-- Kiro appends the next entry below this line. Entry template:
 
