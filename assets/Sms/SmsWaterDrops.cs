@@ -133,6 +133,11 @@ public partial class SmsWaterDrops : Node3D
                     _life[i] = 0f;
                     continue;
                 }
+                // pass 123b -- TObjHitCheck::checkWater (ObjHitCheck.cpp 97) + move() 424: every flying drop is a 50 x 80 cylinder tested against the
+                // actors' damage cylinders; a hidden-coin spot / graffiti picture it overlaps takes the drop (HIT_MESSAGE_SPRAYED_BY_WATER) and the drop
+                // dies there. The ray below only meets what the drop's path CROSSES; the game's test also counts a drop passing beside a spot.
+                var zone = SmsHiddenCoin.WaterZoneAt(p);
+                if (zone != null && zone.SmsSprayedByWater(p)) { _life[i] = 0f; continue; }
                 Vector3 v = _vel[i];
                 float size = _size[i];
                 float hor2 = v.X * v.X + v.Z * v.Z;

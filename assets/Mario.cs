@@ -13353,7 +13353,9 @@ public partial class Mario : CharacterBody3D
     /// <summary>The drops, the water level in the tank, the muzzle joints.</summary>
     private void SmsFluddSetupWater()
     {
-        _fluddDrops = new SmsWaterDrops { Name = "SmsWaterDrops", CollisionMask = CollisionMask, Exclude = GetRid(), DebugPrint = SmsDebugPrint };
+        // pass 123b: the drops' ray also sees the hidden-coin spots (layer 8 -- off Mario's own mask so he never bumps into one); the game's
+        // water hit actors test every actor's cylinder, hide objects included (TWaterHitHideObj::touchWater)
+        _fluddDrops = new SmsWaterDrops { Name = "SmsWaterDrops", CollisionMask = CollisionMask | SmsHiddenCoin.HideLayer, Exclude = GetRid(), DebugPrint = SmsDebugPrint };
         AddChild(_fluddDrops);
         for (int i = 0; i < 4; i++)
         {

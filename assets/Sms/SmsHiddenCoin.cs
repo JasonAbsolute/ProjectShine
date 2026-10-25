@@ -84,6 +84,46 @@ public partial class SmsHiddenCoin : StaticBody3D, ISmsSprayTarget
     public static Vector3 LastRevealPos;
     public static int RevealCount;
 
+    // ---- 123b: the game's water hit (TObjHitCheck::checkWater, ObjHitCheck.cpp 97; TModelWaterManager::mStaticHitActor r 50 x h 80, ModelWaterManager.cpp 106) ----
+    /// <summary>Every FLYING drop is a cylinder of this radius / height tested against each actor's damage cylinder (checkDistance, ObjHitCheck.cpp 10):
+    /// taken when the drop is no higher than the spot's top, no lower than 80 units under its base, and within 50 + the spot's radius in XZ.</summary>
+    public const float WaterAttackRadiusUnits = 50f, WaterAttackHeightUnits = 80f;
+    private static readonly System.Collections.Generic.List<SmsHiddenCoin> _live = new();
+    public override void _EnterTree() { if (!_live.Contains(this)) _live.Add(this); }
+    public override void _ExitTree() { _live.Remove(this); }
+
+    /// <summary>The spot whose damage cylinder a flying drop at <paramref name="dropPos"/> (world metres) overlaps by the game's test, or null.
+    /// SmsWaterDrops asks this for every flying drop each tick before it moves (move() 424: a taken drop dies there).</summary>
+    public static SmsHiddenCoin WaterZoneAt(Vector3 dropPos)
+    {
+        for (int i = 0; i < _live.Count; i++)
+        {
+            var h = _live[i];
+            if (!GodotObject.IsInstanceValid(h) || h._dead || !h.IsInsideTree()) continue;
+            if (h.Kind != HideKind.WaterHit && h.Kind != HideKind.Picture) continue;
+            if (h.Kind == HideKind.Picture && h._finished) continue;                 // HIT_FILTER_NO_DAMAGE: checkWaterWithActorsInList skips it
+            if (h.WaterCylinderHit(dropPos)) return h;
+        }
+        return null;
+    }
+
+    /// <summary>checkDistance(drop, 50, 80, spot, damageRadius, damageHeight) in game units. WaterHitHideObj: {60, 20} x scale, base at the point;
+    /// KoopaJrSignM (the graffiti M): {150, 300} x scale with mYOffset -150 x scale -- a cylinder centred on the placed point, 2 m wide and 4 m
+    /// tall at scale 1 (the game's generous wall-graffiti zone). Radius x max(scale.x, scale.z), height x scale.y (initObjCollisionData).</summary>
+    public bool WaterCylinderHit(Vector3 dropPos)
+    {
+        float sy = Mathf.Max(0.01f, Scale.Y), sxz = Mathf.Max(0.01f, Mathf.Max(Scale.X, Scale.Z));
+        float dmgR, dmgH, baseY;
+        if (Kind == HideKind.Picture) { dmgR = 150f * sxz; dmgH = 300f * sy; baseY = SmsUnits.MetresToUnits(GlobalPosition.Y) - 150f * sy; }
+        else { dmgR = 60f * sxz; dmgH = 20f * sy; baseY = SmsUnits.MetresToUnits(GlobalPosition.Y); }
+        float dropY = SmsUnits.MetresToUnits(dropPos.Y);
+        if (dropY > baseY + dmgH) return false;
+        if (dropY + WaterAttackHeightUnits < baseY) return false;
+        float r = WaterAttackRadiusUnits + dmgR;
+        float dx = SmsUnits.MetresToUnits(dropPos.X - GlobalPosition.X), dz = SmsUnits.MetresToUnits(dropPos.Z - GlobalPosition.Z);
+        return r * r > dx * dx + dz * dz;
+    }
+
     public bool AllowReveal => _allowReveal;
     public bool IsDead => _dead;
     public bool PictureFinished => _finished;

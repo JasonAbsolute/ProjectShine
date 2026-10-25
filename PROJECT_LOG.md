@@ -7260,3 +7260,26 @@ again; the shared yaw on two coins; the collect: +2 HP, the flag written, the co
 (PictureTexture is yours), the twin pictures and their demo camera, the shine kind of hidden object (place a shine as the HiddenScene and it is
 placed, not thrown), the sounds (slots: TIMECOIN_APPEAR / COIN_APPEAR, COIN_BOUND, COIN_DISAPPEAR, BLUE_COIN_GET). The game emits the hit
 burst twice for a fruit spot (touchFruit + appearObjFromPoint) -- once here.
+
+## SMS pass 123b -- the water never reached the spots (two bugs under "nothing is happening")
+
+**Files:** `assets/Mario.cs` (one line), `assets/Sms/SmsWaterDrops.cs`, `assets/Sms/SmsHiddenCoin.cs`.
+
+Jaysonn put a WaterHit `SmsHiddenCoin` on a sign and sprayed it: nothing. Drive 123 had called the spot's handler directly instead of spraying
+real water, so it never saw either problem:
+1. **The drops could not see the spots.** `SmsFluddSetupWater` built the drop manager with Mario's own collision mask (layers 1 + 3), and the
+   spots sit on layer 8 precisely so Mario never bumps into one -- every drop's ray passed straight through them. The mask now carries the hide
+   layer too.
+2. **A ray is the wrong test anyway.** The game (`TObjHitCheck::checkWater`, ObjHitCheck.cpp 97) treats every flying drop as a cylinder of
+   r 50 x h 80 (`TModelWaterManager::mStaticHitActor`) and tests it against each actor's damage cylinder with `checkDistance`: the drop is taken
+   when it is no higher than the spot's top, no lower than 80 units under its base, and within 50 + the spot's radius in XZ. For a WaterHit spot
+   (60 x 20) that is a 2.2 m wide, 1.3 m tall zone -- a drop landing on a sign anywhere near the spot counts, and so does one passing beside it.
+   My ray only fired when a drop's own path crossed the 27 cm puck. `SmsWaterDrops.Tick` now asks `SmsHiddenCoin.WaterZoneAt(p)` for every flying
+   drop before its step (move() 424: a taken drop dies there); the picture uses the game's KoopaJrSignM cylinder (150 x 300, centred on the point).
+   One rule to know: a drop ABOVE the spot's top is refused -- the spray arcing over a ground spot does nothing; it must come down to it.
+
+**Verified (drive 123 now 26/26):** R0 the mask; R1 real water from the nozzle on a ground spot placed where the standing spray lands (9.9 m out)
+-- taken 16 frames after the spot appeared; W0 the cylinder rule to the unit on all six edges; W1 HIS case: a spot on the face of a 3 m wall,
+Mario 3 m back pressing R with no water in the air -- the coin out 3 frames later. Regressions 119 25/25, 118 35/35, 107 15/15 (on the committed
+Level: his uncommitted level puts a NozzleBox in that drive's run lane), 106 16/18 -- the same two fail on the 122 Mario.cs with the committed
+level, so not this pass (T2b/T3: the bounce off the Toad rises 252 u; noted for the next Mario pass). Build 0 errors, boot ALL OK.
