@@ -90,6 +90,22 @@ step 4 note), so the prefilled compare page was opened in the browser instead an
 Working tree left untouched: Jaysonn's `assets/Level.tscn` plus two Koopa `.png.import` compression flips, and the
 19 `addons/godot_ai/` entries.
 
+Follow-up 04:52 (Kiro): Jaysonn playtested and said "merge the last branch so ready to go" -- merged LOCALLY into `main` (see #3). The PR
+for #2 is no longer needed: if the prefilled form was already submitted, GitHub closes it as merged when #3's push lands; if not, do not
+create it.
+
+### #3 -- PENDING -- 2026-10-25 04:52 PDT (Kiro)
+Push the trunk: `feature/save-prompt` merged into `main` with `--no-ff` at Jaysonn's word (he playtested 124-124c and approved).
+- Branch `main` -- tip `a0590ea` ("Feature: the card save (SMS passes 124-124c)", the merge commit), 9 commits ahead of `origin/main`
+  (the 7 feature commits, the #2 result commit `bd60e67`, the merge). No PR.
+- `feature/save-prompt` is already on the remote (#2) and fully contained in `main`; it can stay as the record.
+```
+git push origin main
+git rev-list --count origin/main..main
+```
+Expect `0`. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn` and the two Koopa `.png.import` flips -- leave them.
+Next feature branch in progress: `feature/enemy-base` (branched from this `main`).
+
 <!-- Kiro appends the next entry below this line. Entry template:
 
 ### #N -- PENDING -- <date> (Kiro)
