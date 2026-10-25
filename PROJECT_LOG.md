@@ -7438,3 +7438,16 @@ darker i think but lets make it so i can set it to any color."
   count at frame 200 with the DECIDE) or `Live` (the count with this pickup in it from the start, never "New").
 
 Drive 124 34/34 unchanged (it asserts sizes, states and the count class, not positions). Build 0 errors.
+
+## SMS pass 124c -- the card save's counter: the blo's own digit, x and shine-icon textures
+
+**Files:** `assets/Sms/Console/CardSave.tscn`, `assets/Sms/Console/save/coin_number_0..9.png`, `coin_number_x.png`, `shine_icon.png` (new, from
+game_6.szs via gen_save_assets.py).
+
+Jaysonn's second screenshot: the "0" and "1" of "x01" drawn over each other, the x into the sun, the digits riding high. Cause: 124 pointed the
+count at the HUD folder's `coin_number_*.png` -- pass 70's 36 x 36 re-renders (the glyph filling the cell) -- and its 38 x 46 `shine_icon.png`,
+while save.blo's panes are laid for the disc's textures: coin_number_%d.bti 26 x 26 (the glyph 22 of 26 wide), coin_number_x.bti 16 x 16 (full),
+shine_icon.bti 30 x 36, drawn 25 x 25 / 35 x 41 at the 17-px digit pitch. With the disc textures the geometry is the game's: the digits just
+touch at the outline, the x stands full-height beside the sun, the sun fills its pane under "MARIO A" (its top at the name's bottom, as the blo).
+`DigitPitch` stays for his taste. Drive 124 34/34 (its C6/C7 now sample the breath clock in a 44-50 / 76-80 window: on a frame hiccup the
+dialog's 60 Hz accumulator steps twice per physics tick and the exact 44 / 80 can be skipped).
