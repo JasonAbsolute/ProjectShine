@@ -1,3 +1,9 @@
 # Godot 4+ specific ignores
 .godot/
-logForLarry.txt)  
+
+# Reference captures and videos: 61 MB of screenshots and mp4, kept out of the repo
+Ref/
+
+# Dev harness and the play-test log
+run_bounded.ps1
+logForLarry.txt
