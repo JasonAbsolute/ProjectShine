@@ -52,8 +52,8 @@ the 19 `addons/godot_ai/` entries, which were left untouched.
 ### #2 -- PENDING -- 2026-10-25 03:55 PDT (Kiro)
 Push the first feature branch and open its PR: the card save ("Save?" after a shine, a blue coin, the pause menu's SAVE). Not merged yet --
 Jaysonn playtests from the PR, then merges there (or `git merge --no-ff feature/save-prompt` into main here).
-- Branch `feature/save-prompt` -- tip `a804f34` ("SMS pass 124: the card save -- "Save?" after a shine, a blue coin, the pause menu's SAVE
-  (TCardSave on save.blo)"), 1 commit since main (`7e448b9`), plus this file's commit.
+- Branch `feature/save-prompt` -- tip `3ab4893` ("SMS pass 124b: card save -- centred contents, WindowColor knob (darker default), digit
+  pitch, count mode"; pass 124 is `a804f34`), 3 commits since main (`7e448b9`) plus this file's commits.
 - PR: title "Feature: the card save (SMS pass 124)"; base `main`; body:
   > TCardSave (GC2D/CardSave.cpp) on the game's own `save.blo` + `savemessage.bmg`: the shine-get window (Save and Continue / Save and
   > Quit / Continue, the saved count or "New", the pointing hand), the blue-coin window (every coin, as the game), the pause menu's SAVE
@@ -61,8 +61,10 @@ Jaysonn playtests from the PR, then merges there (or `git merge --no-ff feature/
   > live count at frame 200. The save write moved from the pickup to the dialog's "Save and ..." (Continue leaves it unsaved, as the game).
   > New: SmsCardSave.cs, SmsTextBox.cs (a J2DTextBox on the system font), CardSave.tscn (under Mario in Player.tscn), 8 textures.
   > Drive 124 34/34 through the real input path (across the stage move); 123 32/32, 118 35/35, 119 25/25; boot ALL OK.
-  > Playtest: get a shine (the window after the white), pick up a blue coin, pause -> SAVE. Knobs on CardSave.tscn: HeadingMessage (33 =
-  > the game's "File created." quirk, 41 = "SHINE! Save data?"), TitleScene, Size, SavingFrames, the six sound slots (empty).
+  > Playtest: get a shine (the window after the white), pick up a blue coin, pause -> SAVE. Knobs on CardSave.tscn: WindowColor (any colour;
+  > the game's is (0, 0.733, 0.725, 0.533)), CenterContents (off = the game's left-weighted layout), DigitPitch, CountShown (Saved = the game /
+  > Live), HeadingMessage (33 = the game's "File created." quirk, 41 = "SHINE! Save data?"), TitleScene, Size, SavingFrames, the six sound
+  > slots (empty).
   > Not ported: memory-card states, the YES/NO sparks, the dialog's mask (never shown for these purposes).
   compare URL: https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/save-prompt
 ```
