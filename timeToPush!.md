@@ -34,7 +34,7 @@ the URL it produced. Jaysonn can also just run the commands himself.
 
 ## Entries
 
-### #1 -- PENDING -- 2026-10-25 02:15 PDT (Kiro)
+### #1 -- DONE 2026-10-25 -- https://github.com/JasonAbsolute/ProjectShine/commit/144b11e -- queued 2026-10-25 02:15 PDT (Kiro)
 Push the trunk and the old long branch. No PR: `main` is the trunk and already carries everything.
 - Branch `main` -- 307 commits ahead of `origin/main` (includes this file's commit; tip at or after `c48b3f9`).
 - Branch `sms-physics` -- 294 commits ahead of `origin/sms-physics` (tip `c48b3f9`; historical pointer, nothing new goes on it).
@@ -44,6 +44,10 @@ git push origin sms-physics
 git rev-list --count origin/main..main
 ```
 Expect `0`. Nothing in the range is over GitHub's 100 MB limit (largest file: `models/ResortMario/.../ma_mdl1.glb`, 28 MB).
+
+Result: `main` `3eed4c0..144b11e` (307 commits), `sms-physics` `61d5810..c48b3f9` (294 commits). Both
+`rev-list --count` checks returned `0`. No PR, as the entry specified. Working tree was clean apart from
+the 19 `addons/godot_ai/` entries, which were left untouched.
 
 <!-- Kiro appends the next entry below this line. Entry template:
 
