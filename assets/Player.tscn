@@ -231,6 +231,7 @@
 [ext_resource type="PackedScene" uid="uid://cconstr000058" path="res://assets/Sms/Console/ConsoleStr.tscn" id="239_cnstr"]
 [ext_resource type="PackedScene" uid="uid://cfader0000058" path="res://assets/Sms/Console/Fader.tscn" id="240_fader"]
 [ext_resource type="PackedScene" uid="uid://cpausemn0006a" path="res://assets/Sms/Console/PauseMenu.tscn" id="241_pause"]
+[ext_resource type="PackedScene" uid="uid://ccardsave0124" path="res://assets/Sms/Console/CardSave.tscn" id="242_cardsave"]
 [ext_resource type="PackedScene" uid="uid://cwallkick0060" path="res://assets/Sms/Fx/WallKickDust.tscn" id="242_wkick"]
 [ext_resource type="PackedScene" uid="uid://cwallslide060" path="res://assets/Sms/Fx/WallSlideDust.tscn" id="243_wslid"]
 [ext_resource type="PackedScene" uid="uid://cslipsmoke060" path="res://assets/Sms/Fx/SlipSmoke.tscn" id="244_slips"]
@@ -2540,6 +2541,8 @@ script = ExtResource("221_e34sd")
 [node name="Fader" parent="." unique_id=1267899420 instance=ExtResource("240_fader")]
 
 [node name="PauseMenu" parent="." unique_id=608312684 instance=ExtResource("241_pause")]
+
+[node name="CardSave" parent="." instance=ExtResource("242_cardsave")]
 
 [node name="WallKickDust" parent="." unique_id=629332914 instance=ExtResource("242_wkick")]
 

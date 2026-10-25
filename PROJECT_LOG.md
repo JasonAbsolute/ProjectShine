@@ -7350,3 +7350,68 @@ drop 81, 50 % by drop 97) and the whole body goes in the last ~18 (34 % at drop 
 
 **Verified (drive 123 now 31/31):** G1c the three uniforms reach the material (0.6 / 6 / 20/255) from the node's exports. Build 0 errors, boot
 ALL OK, no shader errors. The feel is his to tune: `ErosionNoise` up for more holes earlier, `ErosionGrain` for their size.
+
+## SMS pass 124 -- the card save (feature/save-prompt): TCardSave's "Save?" windows after a shine, a blue coin, and the pause menu's SAVE
+
+**Files:** `assets/Sms/Console/SmsCardSave.cs` (new), `assets/Sms/Console/SmsTextBox.cs` (new), `assets/Sms/Console/CardSave.tscn` (new, instanced in
+`assets/Player.tscn` beside PauseMenu), `assets/Sms/Console/save/*.png` (8 textures from game_6.szs), `assets/GameData.cs`, `assets/Mario.cs`,
+`assets/BlueCoin.cs`, `assets/Sms/Console/SmsPauseMenu.cs`.
+
+The game's TCardSave (GC2D/CardSave.cpp, 2408 lines) on its own screen `save.blo` (game_6.szs) with `savemessage.bmg`'s strings (common.szs),
+three of its ten purposes:
+
+- **PURPOSE_SHINE_GET** -- fireGetStar sets DIRECTOR_FLAG_CARD_SAVE_PENDING; when the shine demo ends the director enters STATE_CARD_SAVE (the
+  whole scene's CUE_MOVE blacklisted = the game stopped) BEFORE the stage moves. Window 'w_5' (373 x 300): the heading 'sm6a', the file's
+  "Mario" text + letter A/B/C, the SAVED shine count (shine icon x digits; "New" for a file never saved), three options "Save and Continue" /
+  "Save and Quit" / "Continue" with the pointing-hand cursor (cursor.bti 29 x 41 turned 270, a black twin at alpha 125). Up/down move the hand
+  (E3_MENU_CURSOR, no wrap, one move per stick press), A picks (SELECT_COMMON). 0 / 1 save (1 quits to the title afterwards), 2 just closes.
+  Here: `Mario.SmsShineGetEnd` opens the dialog with the tree paused; its `Finished(next)` runs the old exit (`SmsShineGetFinish`): 0 = the
+  stage move (the ExitScene / this level again), 1 = `SmsCardSave.TitleScene` (default `res://assets/CharacterSelect.tscn`).
+- **PURPOSE_BLUE_COIN_GET** -- fireGetBlueCoin, EVERY blue coin (as the game): window 'w_4' (373 x 239) with bmg 36 "You got a Blue Coin!...",
+  two options "Save and Continue" / "Continue". BlueCoin.cs opens it right after the pickup; the tree is paused under it.
+- **PURPOSE_SAVE** -- the pause menu's SAVE (was a 40-frame dip while GameData wrote): window 'w_1' (402 x 202) "Save?" (yellow text) with the
+  bookmark and the YES / NO pictures (select_yes/no.bti): left/right pick; the pick is green (0,255,0), the other white; from its 4th frame the
+  pick BREATHES -- TExPane::setCenteredSize to 1.5 x over 40 frames, back over 40 -- while its colour runs (t, 255, 0), t 0 -> 255 -> 0 over 80
+  frames (green to yellow); the clock restarts on a move. A = SELECT_COMMON (yes) / CANCEL_COMMON (no). YES saves; then "Save complete.
+  Continue playing?" YES/NO with the live count: YES -> TPauseMenu2::setDrawEnd (the menu disappears, play resumes), NO -> the title. NO at
+  "Save?" also closes the menu (PROGRESS_UNK1).
+- **Every window** opens as `setCenteredSize(20, w, h, 0, 0)`: 20 frames of LINEAR growth about its centre (TCoord2D: (target - start) / 20 a
+  frame), the contents hidden until it is open (SY_2D_IN then); it closes shrinking the same way (SY_2D_OUT at the start).
+- **THE SAVING** (PROGRESS_SAVING): the file is written AT ONCE (saveSuccess), then 'w_1' shows bmg 26 "Saving file... Please do not touch the
+  Memory Card or the POWER Button." with the bookmark as it WAS (the saved count or "New") for 300 frames: at frame 200 SY_DECIDE_COMMON and the
+  count becomes the live MSF_SHINE_COUNT ("New" goes); past 300 the option block is "written" and the window shrinks. The blue coin's saving shows
+  the name but no count (the game's purpose check). ~5.4 s, as the game -- knobs `SavingFrames` 300 / `SavingDecideFrame` 200.
+- **THE WRITE MOVED**: `GameData.CollectShine` / `CollectBlueCoin` now set the flag in RAM only (TFlagManager); the card save's "Save and ..."
+  calls `SaveNow()`. "Continue" leaves the pickup unsaved, as the game -- quitting loses it. `GameData.HasSaveFile` / `SavedShineCount` are the
+  card's bookmark (TCardBookmarkInfo unk18 / unk1C): what the windows show before the write. F8's ClearSave now DELETES the file ("New").
+  With `Mario.SmsShineGetSavePrompt` off (or no CardSave node) the touch writes at once as before 124 (drives 118 / 119 run that way).
+- **The frame**: standard_window.bti (IA4 20 x 20, one rounded corner) at the four corners mirrored, the edges stretched from its last
+  column / row, the contents 00bbb988 (teal at alpha 136); J2DWindow's TEV colour = teal + (white - teal) x I, alpha = the texture's --
+  composed by `tools/projectshine/npc82/save124/gen_save_assets.py` into `save/standard_window.png`, a 42 x 42 NinePatch (margins 20).
+- **The text**: `SmsTextBox` -- a J2DTextBox on the system font the talk balloon already carries (TalkFont.tres, TalkGlyph.gdshader): 20 x 24,
+  line space 20, HBIND/VBIND as the blo (options left-bound, messages centred, the saving text top-bound), each with its black twin box
+  (alpha 125, +3 +3) drawn under. Any blo text box can use it.
+- **Input**: A only (MEANING_MENU_A; START is not read by TCardSave), the stick as a button (JUTGamePad's mRepeat with no repeat mask = the
+  trigger: one move per press) with the pause menu's knobs `MenuStickOn` 0.3 / `MenuStickOff` 0.15.
+
+**Exported tunables (CardSave.tscn):** Font, GlyphShader, the textures, `FileLetter` (0 = Mario A), `TitleScene`, `Size` (1 = the blo's 480
+lines on the window height), `HeadingMessage`, `SavingFrames` / `SavingDecideFrame`, `MenuStickOn/Off`, the six sound slots (WindowIn 0x4819,
+WindowOut 0x481A, Decide 0x481B, Select 0x481C, Cancel 0x481D, CursorMove 0x481E -- empty, his to fill), `DebugPrint`. Mario: `SmsShineGetSavePrompt`.
+
+⚠️ **The heading quirk (verified on his disc, the US build):** CardSave.cpp 1460 writes savemessage.bmg entry 0x21 into the shine-get window's
+heading. In the US bmg that entry is **"File created."** -- the Japanese order's "SHINE! Save data?" sits at 41 and the index was never
+updated when the table was re-ordered (the options 28/29/30 and every other id line up with the US strings, so this is not a decode slip).
+`HeadingMessage` = 33 ships the game as it is; 41 the line the designers meant.
+
+**Deviations (logged):** no memory-card states (no card / format / corrupt -- the file is user://save_data.json, so the bookmark's "Corrupt"
+never shows); the dialog's own dark mask never shows (the game shows it for GAME_OVER / ALL_SHINES / EXPLANATION only, none ported); the
+YES / NO pick's sparks (emitter 0x1FA, ms_2d_pause_sel rotated 12 deg, scale (0.9, 1, 0.1)) not ported; a NinePatch below 40 px draws its
+corners overlapping for the first ~2 frames of the grow (J2DWindow clips them); the pause menu stays drawn (static) under the dialog.
+
+**Drive 124** (`npc82/save124/patch_smoke124.py`, the real input path, 34/34): A0-A15 the shine -> demo -> 'w_5' grows (131 x 105 at 8
+frames) -> heading / hand / saved count -> the stick walks the three options with no wrap -> A -> the list closes unwritten -> SAVING writes
+at once, 'w_1' with the saved count at frame ~90, the LIVE count past 200, shrinking past 300 -> the scene moves, the new Mario in the gate-out
+with the bookmark 'saved'; B1-B5 the blue coin -> 'w_4' with bmg 36, no count -> Continue = no write, unpaused; C0-C10 START -> SAVE -> "Save?"
+(YES (t,255,0), NO white) -> right / left -> the breath at the card's own clock 44 (96 wide, ebff00) and 80 (67 wide, 06ff00) -> YES -> the
+file now carries the blue coin -> "Save complete." -> YES -> the menu gone; D1-D2 SAVE -> NO = no write, the menu closes. Drive 123 32/32
+(its P-case updated: the coin opens the dialog, A saves), 118 35/35, 119 25/25 (the prompt off inside them). Build 0 errors, boot ALL OK.
