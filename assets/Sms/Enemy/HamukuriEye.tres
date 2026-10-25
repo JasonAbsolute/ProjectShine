@@ -1,0 +1,14 @@
+[gd_resource type="ShaderMaterial" load_steps=4 format=3 uid="uid://chamueye125b"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/EnemyToonCutout.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/Hamukuri/K_hamu_eye1.png" id="2_eye"]
+[ext_resource type="Texture2D" uid="uid://c7qc8aqne083g" path="res://assets/Sms/models/toon_2_4i.png" id="3_toon"]
+
+[resource]
+resource_name = "_mat_eye1 (hamukuri/default.bmd): the pupil decal -- GX_TEVREG0 (400, 404, 424), konst 3/4, mix(spec, K_hamu_eye1, s0); alpha = TEXA x ALPHA0 x 4, test GEQUAL 128 (the clear texels are never drawn)"
+shader = ExtResource("1_shader")
+shader_parameter/s0_k = 0.75
+shader_parameter/s1_form = 0
+shader_parameter/c0 = Vector3(1.5686, 1.5843, 1.6627)
+shader_parameter/base_tex = ExtResource("2_eye")
+shader_parameter/toon_tex = ExtResource("3_toon")

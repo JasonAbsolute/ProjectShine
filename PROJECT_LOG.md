@@ -7501,3 +7501,42 @@ ticks) -> wander: the kyoro standing still, then the walk at 240 u / 240 ticks t
 the run closing 3.2 m / 80 ticks, the hit (health -1, dmghamukuri) + the hop, PostAttack's wait; C1-C3 the trample -> Die with the down anim,
 dead at 74 ticks, the re-launch at 200 ticks with the arc (5 HP again); D1-D2 R from 3 m -> the drops flip it (HP 4) -> the flail loop; E1-E3
 the contact kick -> the puck (5.6 m in 12 ticks) -> the wall crash. Regression 118 35/35; build 0 errors; boot ALL OK.
+
+## SMS pass 125b -- the Stu's look: the editor-size scale and the bmd's TEV materials (feature/enemy-base)
+
+**Files:** `assets/Sms/Enemy/Hamukuri.tscn` (the Model node carries the 0.013434 scale; no ModelScale property), `SmsSmallEnemy.cs` (the Model
+node's placed scale replaces the ModelScale export: what the editor shows is what the game uses), new `assets/Sms/Enemy/EnemyToon.gdshaderinc` +
+`EnemyToon.gdshader` (cull back) / `EnemyToonTwoSided.gdshader` (cull none) / `EnemyToonCutout.gdshader` (the alpha test), five materials
+`HamukuriNose / Foot / Trousers / Top / Eye.tres`, the bmd's own textures `models/Eniemes/Hamukuri/K_hamu_dot.png`, `K_hamu_eye1.png`,
+`H_ma_polmask1_i4_hamu.png` (bti2png out of default.bmd's TEX1, imports pinned lossless), `Hamukuri.glb.import` (`_subresources`: the six
+glTF materials swapped for the .tres by name -- use_external -- so the editor shows them too), the three `default_*.png.import` pinned.
+
+**Why (Jaysonn's Ref/enemyref.png):** the Stu stood 117 m tall in the editor -- pass 125 scaled the glb only at run time (ApplyLook x ModelScale)
+-- and wore the exporter's materials: FinModelUtility gives each material one stage's first texture, so `default_0.png` is the TOON RAMP
+(H_toon_2_4i) standing in for K_hamu_dot on the nose / feet / trousers / top, in BLEND mode with the TEV register colours baked into vertex
+colours. Read default.bmd instead (bmd_mat_dump.py, then every claim checked with a numpy render of the glb through the stages --
+`npc82/enemy125/hamu_preview.py` -- against the Mario Wiki's in-game screenshot: top (255, 158, 0) lit / (236, 131, 0) shade, trousers
+(243, 19, 96) lit / (202, 0, 55) shade, feet (68, 68, 238), nose (255, 238, 177) -- all within a few units):
+- the lighting is TLightCommon's per vertex: COLOR0 = amb 128 + the sun x N.L, ALPHA0 = amb 50 + N.L, COLOR1 = the sun as a GX_AF_SPEC light
+  (the bmd's channel list is [COLOR0, ALPHA0, COLOR1, ALPHA1] -- the spec is the THIRD entry; reading the second as COLOR1 made the top white);
+- stage 0 everywhere: s0 = 1/2 (REG0 + mix(toon, COLOR0, k) - 1/2), k 3/4 (nose / feet / eye) or 5/8 (body); REG0 is S10: the top's
+  (404, 190, -211) clamps to the orange, the feet's (10, 10, 350) to the blue, the nose's (500, 350, 225) to the cream, the eye's (400, 404, 424) to white;
+- nose / feet / top / eye: s1 = mix(COLOR1, TEX, s0) -- the texture where lit, the specular where dark. K_hamu_dot is WHITE with one black disc:
+  the nose and feet UVs sit on a white corner (a plain colour), the top's strip is white with a gray band at v > 0.84 (its bottom rim), so the
+  dots are the TROUSERS': s1 = s0 + mix(REG1 (230, 230, 230), REG2 (242, 16, 93), TEX) - 1/2 = the red where the texture is white, a white
+  dot where the disc is, + COLOR1 (the specular). The eye draws the pupil decal: alpha = TEXA x ALPHA0 x 4, test GEQUAL 128 -- the clear texels
+  are never drawn (no sclera: the Stu's eyes are the dark (0, 57, 49) discs with a glint);
+- the top's seven stages are the POLLUTION path: stage 0 REG2 = polmask.a > konst.a (the mask through TEXMTX1 (4, 2.489) + (0.166, 0.039),
+  S wraps), REG1 = s1 x REG2, PREV = rak x COLOR0 (the dummy swapped for the stage's h_ma_rak), PREV = PREV x (1 - REG2) + REG1. The bmd's
+  konst 128 would spatter every Stu; the plain Stu is clean, the generator Stus wear the brown spatter -> `dirt` knob on HamukuriTop.tres:
+  0 = clean (default; the mask is not read), 0.5 = the bmd's own pattern with assets/Sms/Npc/tex/H_ma_rak.png. `unshaded, fog_disabled` as
+  NpcSkin / GoobleBody (the GX lighting is the TEV's); all textures read RAW (display-referred) and the result to_linear once.
+
+⚠️ A glb's `default_N.png` set is NOT the bmd's texture set -- it is one texture per material, the first stage's, so a toon ramp or a mask can
+stand where the colour texture belongs; pull TEX1 out of the bmd (bmd_tex.py) and check the UVs' sample (probe_uv.py) before trusting a texel.
+⚠️ A species scene scales its glb on the Model node (the editor's size is the game's); SmsSmallEnemy multiplies that by the .prm body scale.
+
+**Drive 125** 19/19 -- L1 the Model node at 0.013434 in the scene, the 117.4 u mesh 1.577 m; L2 the six surfaces wear the five .tres with the
+three shaders; L3 the top reads K_hamu_dot + the toon ramp with REG0 (1.5843, 0.7451, -0.8275), dirt 0, the eye K_hamu_eye1; L4 the six pngs
+import lossless / no mipmaps / no 3D auto-compression; A-E as pass 125. Build 0 errors; boot ALL OK. Not checked headless: the pixels (the
+dummy renderer) -- the look was checked by the numpy render; Jaysonn's eye decides. Not ported: the goop-walk that would raise `dirt` in play.

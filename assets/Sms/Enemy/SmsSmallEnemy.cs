@@ -68,9 +68,9 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     [Export] public PackedScene DeathFxScene;
     /// <summary>MSD_SE_EN_COMMON_SMOKE (the death puff) and the species' own slots below it. Unset = silent.</summary>
     [Export] public AudioStreamPlayer3D DeathSound;
-    /// <summary>The model's units: 1 for a glb exported in metres (the Gooble's Blender pass), 1 / 74.44 for a raw FinModelUtility glb in the
-    /// game's units (the Stu). Multiplied into the body scale.</summary>
-    [Export] public float ModelScale = 1f;
+    /// <summary>The Model node's scale AS PLACED in the species scene (the glb's units -> metres: 1 / 74.44 = 0.013434 for a raw FinModelUtility glb in the
+    /// game's units, 1 for a glb exported in metres). Captured in _Ready and multiplied into the body scale -- the editor shows the real size (pass 125b).</summary>
+    protected float _modelScale = 1f;
     [Export] public bool DebugPrint;
 
     // ------------------------------------------------------------------------------------------------------------------ nerves
@@ -146,6 +146,7 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         _anim = GetNodeOrNull<AnimationPlayer>("Model/AnimationPlayer");
         if (_model == null || _anim == null)
             GD.PushWarning($"[SMS enemy] {GetPath()}: the scene needs Model (the glb) with Model/AnimationPlayer");
+        if (_model != null) _modelScale = _model.Scale.X;          // the scene's own scale on the glb (the editor's size is the game's)
         if (_anim != null)
             foreach (string n in BckNames)
                 if (!_anim.HasAnimation(n))
@@ -338,7 +339,7 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         if (x.LengthSquared() < 1e-6f) { up = Vector3.Up; x = up.Cross(fwd); }
         x = x.Normalized();
         Vector3 z = x.Cross(up).Normalized();
-        _model.Transform = new Transform3D(new Basis(x, up, z) * Basis.FromScale(Vector3.One * (_scale * ModelScale)), Vector3.Zero);
+        _model.Transform = new Transform3D(new Basis(x, up, z) * Basis.FromScale(Vector3.One * (_scale * _modelScale)), Vector3.Zero);
     }
 
     // ------------------------------------------------------------------------------------------------------------------ anims
