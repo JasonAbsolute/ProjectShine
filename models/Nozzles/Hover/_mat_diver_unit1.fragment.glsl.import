@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://bktnc8bexfab4"
+path="res://.godot/imported/_mat_diver_unit1.fragment.glsl-bc306ad38d5e64de27b42d645e14c568.res"
+
+[deps]
+
+source_file="res://models/Nozzles/Hover/_mat_diver_unit1.fragment.glsl"
+dest_files=["res://.godot/imported/_mat_diver_unit1.fragment.glsl-bc306ad38d5e64de27b42d645e14c568.res"]
+
+[params]
+

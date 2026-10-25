@@ -1,0 +1,14 @@
+[remap]
+
+importer="glsl"
+type="RDShaderFile"
+uid="uid://cum2e5qpi4maw"
+path="res://.godot/imported/_mat_G_pump.vertex.glsl-9348fd922aef83f24e0122d52f25ae51.res"
+
+[deps]
+
+source_file="res://models/Nozzles/Turbo/_mat_G_pump.vertex.glsl"
+dest_files=["res://.godot/imported/_mat_G_pump.vertex.glsl-9348fd922aef83f24e0122d52f25ae51.res"]
+
+[params]
+
