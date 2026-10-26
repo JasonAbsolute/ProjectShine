@@ -154,16 +154,17 @@ The 35 changed paths are exactly the ones the entry lists. Largest blobs: `PROJE
 Working tree left untouched: Jaysonn's `assets/Level.tscn` and `assets/Sms/SmsHiddenCoin.cs` (open in his editor
 this session), the two Koopa flips, and the `addons/godot_ai` churn.
 
-### #5 -- PENDING -- 2026-10-25 16:20 PDT, updated 16:50 (Kiro)
-Push the enemy branch again: passes 125c (the small enemies' puffs) and 125d (the drop table) landed on it. PUSH ONLY, still no PR -- the
-feature is in progress (next: the Gooble moved onto the base, more Stu kinds, a second species). Kiro does not merge this branch locally.
-- Branch `feature/enemy-base` -- code tip `6f4c588` ("SMS pass 125d: the drop table -- what an enemy drops when it dies (coins, 1-UPs, anything
-  with a scene)"), on top of `27f9e38` (125c), `3f7927b` (125b) and `e039b9c` (125); the branch tip is this file's latest commit. Already
+### #5 -- PENDING -- 2026-10-25 16:20 PDT, updated 19:40 (Kiro)
+Push the enemy branch again: passes 125c (the small enemies' puffs), 125d (the drop table) and 125e (the Gooble moved onto the base) landed on
+it. PUSH ONLY, still no PR -- the feature is in progress (next: more Stu kinds, a second species). Kiro does not merge this branch locally.
+- Branch `feature/enemy-base` -- code tip `26f9666` ("SMS pass 125e: the Gooble onto the enemy base -- TNameKuri as a species on SmsSmallEnemy"),
+  on top of `6f4c588` (125d), `27f9e38` (125c), `3f7927b` (125b) and `e039b9c` (125); the branch tip is this file's latest commit. Already
   tracking `origin/feature/enemy-base` (entry #4), so a plain push is enough.
 - New files: `assets/Sms/Fx/EnemyDisap.tscn`, `EnemyDisapWet.tscn`, `EnemyWallHit.tscn`, `SmsFxBurst.cs` + .uid, `JpaDirBillboardAdd.gdshader`
   + .uid, `JpaQuad.gdshader` + .uid, `tex/kemuball3_enemy.png`, `tex/glow1_raw.png`, `tex/pecha3_raw.png` + their .import;
-  `assets/Sms/Enemy/SmsDropTable.cs`, `SmsDropEntry.cs` + .uid, `assets/Sms/Enemy/Drops/StuDrops.tres`; changed: `assets/Sms/Enemy/SmsSmallEnemy.cs`,
-  `SmsHamukuri.cs`, `Hamukuri.tscn`, PROJECT_LOG.md. Nothing large (the biggest new file is 65 KB).
+  `assets/Sms/Enemy/SmsDropTable.cs`, `SmsDropEntry.cs` + .uid, `assets/Sms/Enemy/Drops/StuDrops.tres`, `GoobleDrops.tres`; changed:
+  `assets/Gooble.cs` (rewritten on the base), `Gooble.tscn`, `assets/Mario.cs` (one line), `assets/Sms/Enemy/SmsSmallEnemy.cs`, `SmsHamukuri.cs`,
+  `Hamukuri.tscn`, PROJECT_LOG.md. Nothing large (the biggest new file is 65 KB).
 ```
 git push origin feature/enemy-base
 git rev-list --count origin/feature/enemy-base..feature/enemy-base
