@@ -154,17 +154,20 @@ The 35 changed paths are exactly the ones the entry lists. Largest blobs: `PROJE
 Working tree left untouched: Jaysonn's `assets/Level.tscn` and `assets/Sms/SmsHiddenCoin.cs` (open in his editor
 this session), the two Koopa flips, and the `addons/godot_ai` churn.
 
-### #5 -- PENDING -- 2026-10-25 16:20 PDT, updated 19:40 (Kiro)
-Push the enemy branch again: passes 125c (the small enemies' puffs), 125d (the drop table) and 125e (the Gooble moved onto the base) landed on
-it. PUSH ONLY, still no PR -- the feature is in progress (next: more Stu kinds, a second species). Kiro does not merge this branch locally.
-- Branch `feature/enemy-base` -- code tip `26f9666` ("SMS pass 125e: the Gooble onto the enemy base -- TNameKuri as a species on SmsSmallEnemy"),
-  on top of `6f4c588` (125d), `27f9e38` (125c), `3f7927b` (125b) and `e039b9c` (125); the branch tip is this file's latest commit. Already
-  tracking `origin/feature/enemy-base` (entry #4), so a plain push is enough.
+### #5 -- PENDING -- 2026-10-25 16:20 PDT, updated 21:20 (Kiro)
+Push the enemy branch again: passes 125c (the small enemies' puffs), 125d (the drop table), 125e (the Gooble moved onto the base) and 125f (the
+winged Soarin' Stu + the goop Stu) landed on it. PUSH ONLY, still no PR -- Jaysonn playtests the three Stu kinds and the Gooble first, then
+says when the feature is done (Kiro adds the PR entry then). Kiro does not merge this branch locally.
+- Branch `feature/enemy-base` -- code tip `7f1a436` ("SMS pass 125f: two more Stu kinds on the base -- the winged Soarin' Stu (THaneHamuKuri) and
+  the goop Stu (TDoroHamuKuri)"), on top of `26f9666` (125e), `6f4c588` (125d), `27f9e38` (125c), `3f7927b` (125b) and `e039b9c` (125); the branch
+  tip is this file's latest commit. Already tracking `origin/feature/enemy-base` (entry #4), so a plain push is enough.
 - New files: `assets/Sms/Fx/EnemyDisap.tscn`, `EnemyDisapWet.tscn`, `EnemyWallHit.tscn`, `SmsFxBurst.cs` + .uid, `JpaDirBillboardAdd.gdshader`
   + .uid, `JpaQuad.gdshader` + .uid, `tex/kemuball3_enemy.png`, `tex/glow1_raw.png`, `tex/pecha3_raw.png` + their .import;
-  `assets/Sms/Enemy/SmsDropTable.cs`, `SmsDropEntry.cs` + .uid, `assets/Sms/Enemy/Drops/StuDrops.tres`, `GoobleDrops.tres`; changed:
-  `assets/Gooble.cs` (rewritten on the base), `Gooble.tscn`, `assets/Mario.cs` (one line), `assets/Sms/Enemy/SmsSmallEnemy.cs`, `SmsHamukuri.cs`,
-  `Hamukuri.tscn`, PROJECT_LOG.md. Nothing large (the biggest new file is 65 KB).
+  `assets/Sms/Enemy/SmsDropTable.cs`, `SmsDropEntry.cs` + .uid, `Drops/StuDrops.tres`, `GoobleDrops.tres`, `DoroDrops.tres`;
+  `assets/Sms/Enemy/SmsHaneHamukuri.cs` + .uid, `SmsDoroHamukuri.cs` + .uid, `Hanekuri.tscn`, `Dorokuri.tscn`, `EnemyWing.gdshader` + .uid,
+  `HanekuriTop/Trousers/Wing.tres`, `DorokuriTop/Trousers/Foot/Nose.tres`; `models/Eniemes/Hanekuri/` and `models/Eniemes/Dorokuri/` (glbs,
+  pngs, .imports); changed: `assets/Gooble.cs` (rewritten on the base), `Gooble.tscn`, `assets/Mario.cs` (one line), `assets/Sms/Enemy/SmsSmallEnemy.cs`,
+  `SmsHamukuri.cs`, `Hamukuri.tscn`, PROJECT_LOG.md. Nothing large (the biggest new file is the 116 KB Hanekuri.glb).
 ```
 git push origin feature/enemy-base
 git rev-list --count origin/feature/enemy-base..feature/enemy-base
