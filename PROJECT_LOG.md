@@ -7869,3 +7869,20 @@ NORMAL; regen (RegenTicks 30 for the drive); Mario on the pile -> -1; five hits 
 layer 0; nothing more launched). Regression 125 85/85, 118 35/35; build 0 errors; boot ALL OK; headless editor runs of Spawner.tscn and Launcher.tscn
 clean. Probe: one launched Stu traced (rises to 0.8 m, lands at 35 frames, then finds Mario). Note: the launcher's spit must read the clip's frame
 (BckFrame >= 62), the port's ticks run two a frame and the bcks at 60 frames a second.
+
+### 126a -- the launcher's pile in the EDITOR (Jaysonn: "rotated 90 degrees about X once the build loads")
+
+**Files:** NEW `models/Eniemes/Launcher/launcher_post_import.gd` (+ .uid), `Launcher.glb.import` (import_script/path); the editor's re-saves of
+`assets/Sms/Enemy/{Dorokuri,Hamukuri*}.tres`, `assets/Sms/Fx/Gene{Hit,Dead}.tscn` (uids on the ext_resources, the shaders' defaults written out).
+**The cause:** the glb's bind pose has every joint at identity -- the pile MODELLED flat, its goop column up +Y (movenul1..3 at y 7, 19, 21 u). The
+clips turn the root +90 deg about X (the column along +Z), and Launcher.tscn's Model carries the game's `mRotation.x += 270` (-90) that lays it back
+down. The import's `rest_pose/load_pose` from the wait clip sets the bones' REST to the clip's first frame (parenul1 rest (90, 0, 0): the probe of
+pass 126 read the rest) -- but it leaves the bone POSE at the bind (probe126b: REST (90, 0, 0), POSE (0, 0, 0)), and the editor draws the POSE: at
+the bind pose the Model's -90 stood the pile on its edge in the editor, while in play the AnimationPlayer's clips posed it flat (drive L1's vertical
+column). **The fix:** a post-import script (`EditorScenePostImport._post_import`: `Skeleton3D.reset_bone_poses()` -- pose := rest) on the glb's
+import; the pose now matches the rest = the wait clip's first frame; the editor and the game show the same flat pile. Re-import headless; probe126b
+POSE (90, 0, 0); drive 126's launcher section 11/11 again; build 0 errors; headless editor run of Launcher.tscn clean. patch_import126.py's glb mode
+writes the import_script path too.
+**Asked and answered:** the generator (`Spawner.tscn`) is invisible in play on purpose -- TGenerator is a bare TViewObj (generator.cpp 13: no model,
+no hit actor; the one-shot adds only the water's hit cylinder): the game's level designers put the point where the appearance is covered, and the
+VISIBLE kind is the launcher pile. The ghost of the kind is the editor's placement aid only (Engine.IsEditorHint()).

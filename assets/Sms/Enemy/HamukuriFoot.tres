@@ -1,14 +1,25 @@
-[gd_resource type="ShaderMaterial" load_steps=4 format=3 uid="uid://chamufoot125b"]
+[gd_resource type="ShaderMaterial" format=3 uid="uid://chamufoot125b"]
 
-[ext_resource type="Shader" path="res://assets/Sms/Enemy/EnemyToon.gdshader" id="1_shader"]
-[ext_resource type="Texture2D" path="res://models/Eniemes/Hamukuri/K_hamu_dot.png" id="2_dot"]
+[ext_resource type="Shader" uid="uid://c8svah8pvfbcp" path="res://assets/Sms/Enemy/EnemyToon.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" uid="uid://bxaf53hhsx0he" path="res://models/Eniemes/Hamukuri/K_hamu_dot.png" id="2_dot"]
 [ext_resource type="Texture2D" uid="uid://c7qc8aqne083g" path="res://assets/Sms/models/toon_2_4i.png" id="3_toon"]
 
 [resource]
 resource_name = "_mat_Lfoot1 / _mat_Rfoot1 (hamukuri/default.bmd): GX_TEVREG0 (10, 10, 350), konst 3/4, mix(spec, K_hamu_dot, s0) -- the feet's UVs sit on the dot texture's white corner"
+render_priority = 0
 shader = ExtResource("1_shader")
 shader_parameter/s0_k = 0.75
 shader_parameter/s1_form = 0
 shader_parameter/c0 = Vector3(0.0392, 0.0392, 1.3725)
+shader_parameter/c1 = Vector3(0.902, 0.902, 0.902)
+shader_parameter/c2 = Vector3(0.949, 0.063, 0.365)
 shader_parameter/base_tex = ExtResource("2_dot")
 shader_parameter/toon_tex = ExtResource("3_toon")
+shader_parameter/dirt = 0.0
+shader_parameter/pol_scale = Vector2(4.000002, 2.48926)
+shader_parameter/pol_offset = Vector2(0.16601563, 0.0390625)
+shader_parameter/sun_dir = Vector3(0.348, 0.87, 0.348)
+shader_parameter/sun_color = Vector3(1, 1, 1)
+shader_parameter/ambient = Vector3(0.502, 0.502, 0.502)
+shader_parameter/ambient_a = 0.196
+shader_parameter/shininess = 50.0
