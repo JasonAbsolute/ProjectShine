@@ -62,6 +62,10 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     /// <summary>TLauncher's period (launcher.prm mSLLaunchPeriod 200): a dead one re-launches from its placed point after this many ticks
     /// (DEVIATION: the game pools them behind launchers / the manager; a placed one here is its own). Below 0 = freed when dead.</summary>
     [Export] public int RelaunchTicks = 200;
+    /// <summary>Set before the body enters the tree by a spawner (SmsEnemySpawner / SmsEnemyOneShotSpawner / SmsEnemyLauncher, pass 126): the body is
+    /// one of a pool -- TEnemyManager's objects. Dead, it stays dead and hidden until the pool launches it again (getFarOutEnemy -> resetSRTV); it is
+    /// never its own launcher and never freed.</summary>
+    public bool Pooled;
     /// <summary>What this enemy drops when it dies (pass 125d; a DEVIATION -- the retail game's generateItem asks for an item type no stage carries, so
     /// it drops nothing): an SmsDropTable (New in the inspector, or a .tres such as assets/Sms/Enemy/Drops/StuDrops.tres), rolled once per death
     /// at the game's hook (genRandomItem: never for a wall crash or a body already dead), spawned at (x, mGroundHeight, z) with the game's coin pop.
@@ -294,7 +298,7 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     {
         if (_dead)
         {
-            if (RelaunchTicks >= 0 && ++_relaunch > RelaunchTicks) Relaunch();
+            if (!Pooled && RelaunchTicks >= 0 && ++_relaunch > RelaunchTicks) Relaunch();
             return;
         }
         _lin = Vector3.Zero;
@@ -310,6 +314,9 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
             {
                 if (!IsCollidMove(o)) continue;
                 Vector3 d = Pos() - o.GlobalPosition * U;
+                d.Y = 0f;                                        // DEVIATION (pass 126): the game's push is the full 3D direction; here a body launched onto one standing
+                                                                 // at the launch point stood ON it (Godot's floor), was lifted by the push, stood on it again -- a lift
+                                                                 // without end. Pushed aside instead, it slides off and gravity does the rest.
                 if (d == Vector3.Zero) d.X += 1f;
                 _lin += d.Normalized() * (_marchSpeed * 3f);        // v.add(local_74): the push on top of the walk (125f: it replaced the walk before)
             }
@@ -782,7 +789,19 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         if (_model != null) _model.Visible = false;
         SetCollisionLayerValue(1, false);
         if (_anim != null) _anim.Stop();
-        if (RelaunchTicks < 0) QueueFree();
+        if (RelaunchTicks < 0 && !Pooled) QueueFree();
+    }
+    /// <summary>A pooled body's birth: LIVE_FLAG_DEAD at once (TEnemyManager::createEnemies makes its objects dead; a generator / launcher brings them in).</summary>
+    public void SmsSpawnDead() { if (!_dead) Dead(); }
+    /// <summary>TSpineEnemy::resetSRTV from a generator / launcher (Enemy/enemy.cpp 187): the body at the point facing yawDeg, alive again (the flags off,
+    /// reset, the hit points, the collision), with the launch velocity (units a tick) and LIVE_FLAG_AIRBORNE; on `graph` when one is given
+    /// (getTracer()->setGraph / init). The point becomes the body's own launch point.</summary>
+    public void SmsLaunch(Vector3 globalPosition, float yawDeg, Vector3 velocityUnitsPerTick, Node3D graph = null)
+    {
+        if (graph != null) Graph = graph;
+        SmsPlace(globalPosition, yawDeg);
+        _vel = velocityUnitsPerTick;
+        _airborne = true;
     }
     /// <summary>TLauncher::stateLaunch -> resetSRTV at the placed point, the set anim.</summary>
     protected virtual void Relaunch()

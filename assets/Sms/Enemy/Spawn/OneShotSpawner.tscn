@@ -1,0 +1,19 @@
+[gd_scene load_steps=4 format=3 uid="uid://coneshot126"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/Spawn/SmsEnemyOneShotSpawner.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Enemy/Hamukuri.tscn" id="2_stu"]
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_hit"]
+resource_name = "the game's hit cylinder: radius 80, height 120 units (initHitActor 80 x 120)"
+radius = 1.075
+height = 1.612
+
+[node name="OneShotSpawner" type="StaticBody3D"]
+collision_layer = 128
+collision_mask = 0
+script = ExtResource("1_script")
+EnemyScene = ExtResource("2_stu")
+
+[node name="Hit" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.806, 0)
+shape = SubResource("CylinderShape3D_hit")

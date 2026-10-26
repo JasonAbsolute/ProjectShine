@@ -1,0 +1,8 @@
+[gd_scene load_steps=3 format=3 uid="uid://cspawner126"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/Spawn/SmsEnemySpawner.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Enemy/Hamukuri.tscn" id="2_stu"]
+
+[node name="Spawner" type="Node3D"]
+script = ExtResource("1_script")
+EnemyScene = ExtResource("2_stu")
