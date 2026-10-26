@@ -6,7 +6,7 @@ using Godot;
 /// The game's SMALL-ENEMY BASE (SMS pass 125, feature/enemy-base): TSmallEnemy (Enemy/smallEnemy.cpp) + TWalkerEnemy (walkerEnemy.cpp) on
 /// TSpineEnemy's walk / sight helpers (enemy.cpp) and TWalker's bind (walker.cpp), with the Spine nerve stack (Strategic/Spine.hpp). Most of
 /// the game's ground enemies -- the Stus (hamukuri.cpp, every kind), the Cataquack, the Pokey's head, the Bob-omb, the Klamber, the Gooble
-/// (namekuri.cpp; its own port predates this base, see Gooble.cs) -- are a thin species on top: their .prm numbers, their bck table and the
+/// (namekuri.cpp; Gooble.cs, a species here since pass 125e) -- are a thin species on top: their .prm numbers, their bck table and the
 /// anim setters, a few nerves of their own. ONE TICK = one 120 Hz movement tick (TMarDirector::direct runs every live actor's CUE_MOVE each
 /// tick; the .prm speeds are UNITS A TICK, SmsUnits.TickSpeedToMps); the physics step is the ticks' displacement through MoveAndSlide
 /// (the world's floors and walls as TWalker's bind: gravity 0.15 a tick, a terminal 40, the velocity ZEROED on landing, no drag).
@@ -132,6 +132,8 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
 
     // ------------------------------------------------------------------------------------------------------------------ for the drives
     public string NerveNameNow => _cur == NerveNone ? NerveName(_prev) + "(done)" : NerveName(_cur);
+    /// <summary>The nerve before the current one (mSpine's previous): a drive's way to see a nerve that lasted less than a physics frame.</summary>
+    public string PrevNerveName => NerveName(_prev);
     public int NerveTime => _time;
     public string BckName => _bck >= 0 && _bck < BckNames.Length ? BckNames[_bck] : "-";
     public int BckIndex => _bck;
@@ -227,7 +229,7 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         {
             var col = GetSlideCollision(i);
             GodotObject other = col.GetCollider();
-            if (other is SmsSmallEnemy || other is Gooble) _touching.Add((Node3D)other);             // another small enemy: pushed apart, no hop
+            if (other is SmsSmallEnemy) _touching.Add((Node3D)other);                                // another small enemy (the Gooble included): pushed apart, no hop
             else if (other is not Mario && MathF.Abs(col.GetNormal().Dot(UpDirection)) < 0.5f) { _onWall = true; OnWallContact(col); }
             else if (other is Node3D n3 && other is not Mario) OnBodyContact(n3);
         }
@@ -670,7 +672,7 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     /// <summary>TSmallEnemy::isCollidMove: both on the ground (map objects never push).</summary>
     protected virtual bool IsCollidMove(Node3D other)
     {
-        bool otherAir = other is SmsSmallEnemy e ? e._airborne : other is Gooble g && g.Airborne;
+        bool otherAir = other is SmsSmallEnemy e && e._airborne;
         return !otherAir && !_airborne;
     }
 

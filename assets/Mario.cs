@@ -19523,7 +19523,7 @@ public partial class Mario : CharacterBody3D
         int n = 0;
         foreach (Node node in GetTree().GetNodesInGroup("sms_enemy"))
         {
-            if (node is Gooble g && IsInstanceValid(g) && g.GlobalPosition.DistanceTo(GlobalPosition) <= radiusM) { g.SmsKillByDemo(); n++; }
+            if (node is SmsSmallEnemy g && IsInstanceValid(g) && g.GlobalPosition.DistanceTo(GlobalPosition) <= radiusM) { g.SmsKillByDemo(); n++; }   // every small enemy on the base (the Gooble since pass 125e)
         }
         return n;
     }

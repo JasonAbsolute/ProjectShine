@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://delxpxy0gt873"]
+[gd_scene load_steps=11 format=3 uid="uid://delxpxy0gt873"]
 
 [ext_resource type="Script" uid="uid://do5oxl8fyy7ow" path="res://assets/Gooble.cs" id="1_610nq"]
 [ext_resource type="PackedScene" uid="uid://btn6akvyop415" path="res://models/Eniemes/Gooby/Gooble.glb" id="1_xcf38"]
@@ -8,12 +8,14 @@
 [ext_resource type="Material" uid="uid://cgoobleeye71" path="res://assets/Sms/GoobleEye.tres" id="5_eye"]
 [ext_resource type="PackedScene" path="res://assets/Sms/models/gooble_brain.glb" id="6_brain"]
 [ext_resource type="Material" uid="uid://cgooblebrn71" path="res://assets/Sms/GoobleBrain.tres" id="7_brainmat"]
+[ext_resource type="Resource" path="res://assets/Sms/Enemy/Drops/GoobleDrops.tres" id="8_drops"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_cy8ll"]
 radius = 0.596495
 
 [node name="Gooble" type="CharacterBody3D" unique_id=974490050]
 script = ExtResource("1_610nq")
+DropTable = ExtResource("8_drops")
 BottleScene = ExtResource("2_bottle")
 BodyMaterial = ExtResource("4_body")
 EyeMaterial = ExtResource("5_eye")

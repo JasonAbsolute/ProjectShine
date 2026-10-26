@@ -7612,3 +7612,47 @@ stomp death with a one-line count-2 table -> two yellow coins under the level at
 the first straight up at (0, 20, 0), the second fanned 2..4 u/tick (the first run had both scattered -- the spawner's `count > 1` test is `i > 0`
 now, as its comment said); T5 the body path: a 1_up_mushroom gets Velocity (1.2, 6, 0) and no SmsThrow; T6 the wall death adds no drop (the same
 LastDrops list) -- the UNK20000 gate. Build 0 errors; boot ALL OK.
+## SMS pass 125e -- the Gooble onto the enemy base (feature/enemy-base)
+
+**Files:** `assets/Gooble.cs` (rewritten: TNameKuri as a species on SmsSmallEnemy -- 959 -> 590 lines; the look code carried over verbatim),
+`assets/Gooble.tscn` (DropTable set), `assets/Sms/Enemy/Drops/GoobleDrops.tres` (new: the Gooble's own copy of the Stu's defaults),
+`assets/Sms/Enemy/SmsSmallEnemy.cs` (the two `is Gooble` special cases gone; `PrevNerveName` for the drives), `assets/Mario.cs` (one line:
+gpConductor->killEnemiesWithin kills every `SmsSmallEnemy` in the sms_enemy group -- it tested `is Gooble`, so a Stu within 2000 u of a shine get
+survived it since pass 125).
+
+**What moved:** the Gooble's stand-alone port (passes 56-99) duplicated the whole TSmallEnemy / TWalkerEnemy / Spine stack. It is now ONLY what
+namekuri.cpp adds (read again at doldecomp/sms main, src/Enemy/namekuri.cpp): `Prm` (the shipped namekuri.prm over the base `Params`, built from
+SmsParams.NameKuri), the bck table (wait / walk loop), the species nerves FollowMario / JumpAttackPrepare / JumpAttack / Land (ids 100+),
+`Init` (unk150 = 0x3A -> the death stamps goop; the look; the death splash child; the bottle scene), `Reset` (the alive clock, the flash, the
+next of the seven colours), the anim setters (setGenerateAnm zeroes the velocity; setDeadAnm / setMeltAnm play the splash and set UNK10),
+`GravityY` (0.135 in the leap), `WallHopAllowed` (not while preparing / leaping), `SetBehavior` (moveObject's tail: Land past LandHeight 100 u
+while wandering / escaping, the walk sound, the alive clock with the x1.01 inflation over the last 100 ticks), `BehaveToFindMario` (Wander after
+FollowMario -- no hop, no run), `AttackToMario` (dmgnamekuri; a leaper stops and dies, UNK20000), `BehaveToWater` (Die, melting on the ground,
+UNK20000), `IsHitValid` (unk198 = 1 -> the bottle's gate), `LaunchVelocity` ((0, 4, 0), yaw 0), `SetAfterDeadEffect` (the bottle under half a tank;
+no smoke -- TSmallEnemy's DISAP overridden away, as the game). Everything else -- the hit cylinders, the 4th-tick collision cadence, the wall hop,
+the push-apart, Die's timing, the relaunch, genRandomItem -> the DropTable -- is the base's.
+
+**Corrections the base brought (the stand-alone port had them wrong):** (1) TNerveSmallEnemyDie ends at checkCurAnmEnd && time > the manager's
+unk5C (60) + the anim's end frame (smallEnemy.cpp) -- the old Gooble lacked the 60 ticks, so the body vanished half a second early (now 78 ticks
+after a stomp, 102 after a melt); (2) RelaunchTicks 200 = launcher.prm's shipped mSLLaunchPeriod (the old 180 was TLauncherParams' code default);
+(3) TNameKuriLauncher::stateLaunch's resetSRTV passes rotation (0, 0, 0): a re-launched Gooble faces yaw 0, not its placed yaw; (4) the collision
+lists exist every FOURTH tick (the old port checked every tick). DEVIATIONS (logged): `DropOnTimeOut` (default off): the alive clock's kill()
+carries no UNK20000 in the game, so its generateItem would roll -- but the table is for his kills, so a timed-out Gooble drops nothing unless the
+knob is on; `GoobleDrops.tres` = the Stu's odds (a coin 80 %, three 12 %, a 1-UP 8 %) on a STOMP / ground pound only (the leap's and the water's
+deaths are the game's no-reward ones). NOT PORTED: isCollidMove's kill of a leaping Gooble on a map object, the Explosion / Diffuse nerves (the
+diffusion kind), NameKuriScaleCallback's HitWaterJump squash, the sounds (slots). The base's DeathSound slot is inert on the Gooble (no smoke).
+
+**Drive 125** (`npc82/enemy125/patch_smoke125.py`, now 45/45: the Stu's A-E / W / T as before, then G1-G14 on a Gooble.tscn placed in the arena with
+Mario 12 m off and a one-node graph at its feet; his level's other placed enemies are cleared for the section -- his test Stu charged Mario mid-leap
+in the first runs): G1 Generate / set anim / 1 HP / scale 0.6..1 / the Model node at scale 1 wearing the body scale / the colour step per reset;
+G2 the look (the per-instance GoobleBody shader with TEVREG0 fed and TEVREG1 0, BrainAttach, ShadowCaster, the SmsGoobleDeath child, the shipped
+GoobleDrops.tres); G3 the alive clock at tick 350 of a drive-shortened AliveTime 400 (`Gooble.Prm.AliveTime`, restored after): inflating,
+ratio 1.61; G4 kill at 401 -> Die with name_down, the splash playing at the inflated scale, no reward; G5 dead after the 18 + 60 ticks (35 frames
+observed), nothing dropped; G6 the re-launch at 200 ticks: yaw 0, the set anim, the scale back, 1 HP; G7 FollowMario at once (Mario 5 m); G8
+JumpAttackPrepare (the wait anim, gap 347 u; it passes within one physics frame when already facing him -- `PrevNerveName`); G9 the charge flash
+reaching 254 then the leap at frame 62 with vy 5.73 (6 less the ticks since), XZ toward him; G10 the leaper's hit: his health -1, the Gooble dead
+mid-air with no reward (`LeapHitMario`); G11 the stomp during Generate: Trample -> isHitValid -> Die, his bounce; G12 the bottle (tank 0) + ONE coin
+from the test table; G13 R from 3 m -> melt (name_hit, UNK20000, a WATHIT mark); G14 dead after 42 + 60 ticks, nothing dropped. Regression 118
+35/35 on the committed level (C1 = the demo kill of the Gooble through the base type). Build 0 errors; boot ALL OK with his placed Goobles.
+NOTE for the patch scripts: `write_text` on Windows writes CRLF -- the repo's `.gitattributes` (text=auto eol=lf) normalises it, so nothing reached
+a commit, but use `write_bytes` (as drive 118 does) for byte-exact mirrors.
