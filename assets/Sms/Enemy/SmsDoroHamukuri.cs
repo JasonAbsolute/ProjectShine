@@ -61,49 +61,12 @@ public partial class SmsDoroHamukuri : SmsHamukuri
         AttachDisguise();
     }
 
-    /// <summary>The Stu's AnimationPlayer library onto this model: the Doro's skeleton is the Stu's but for the root bone's name (root_2), so each copied
-    /// clip's tracks are re-pointed at this skeleton by path, the root track onto root_2 (the skin binds by bone name: renaming the bone would break it);
-    /// the Doro glb carries no AnimationPlayer, so one is made under Model with the glb root as its root node.</summary>
+    /// <summary>The Stu's clips onto this model (the base's BorrowClips: the root track lands on root_2).</summary>
     private void BorrowClips()
     {
-        if (_model == null) return;
-        var skel = FindSkeleton(_model);
         PackedScene src = ClipSource ?? GD.Load<PackedScene>(ClipSourcePath);
         if (src == null) { GD.PushWarning($"[SMS dorokuri] {GetPath()}: {ClipSourcePath} did not load: no clips"); return; }
-        var donor = src.Instantiate<Node>();
-        AnimationPlayer donorAnim = FindAnimationPlayer(donor);
-        if (donorAnim == null) { GD.PushWarning($"[SMS dorokuri] {GetPath()}: the clip source has no AnimationPlayer"); donor.Free(); return; }
-        var player = _model.GetNodeOrNull<AnimationPlayer>("AnimationPlayer");
-        if (player == null)
-        {
-            player = new AnimationPlayer { Name = "AnimationPlayer" };
-            _model.AddChild(player);
-            player.RootNode = player.GetPathTo(_model);
-        }
-        foreach (string libName in donorAnim.GetAnimationLibraryList())
-        {
-            var lib = donorAnim.GetAnimationLibrary(libName);
-            if (lib == null) continue;
-            var copy = new AnimationLibrary();
-            foreach (string clip in lib.GetAnimationList())
-            {
-                var a = (Animation)lib.GetAnimation(clip).Duplicate();
-                if (skel != null)
-                    for (int t = 0; t < a.GetTrackCount(); t++)
-                    {
-                        NodePath tp = a.TrackGetPath(t);
-                        if (tp.GetSubNameCount() == 0) continue;
-                        string bone = tp.GetSubName(0);
-                        if (skel.FindBone(bone) < 0 && skel.FindBone(bone + "_2") >= 0) bone += "_2";      // the Stu's 'root' is the Doro's 'root_2'
-                        a.TrackSetPath(t, new NodePath($"{_model.GetPathTo(skel)}:{bone}"));
-                    }
-                copy.AddAnimation(clip, a);
-            }
-            if (player.HasAnimationLibrary(libName)) player.RemoveAnimationLibrary(libName);
-            player.AddAnimationLibrary(libName, copy);
-        }
-        donor.Free();
-        _anim = player;
+        BorrowClips(src, "dorokuri");
     }
 
     private void AttachDisguise()
@@ -126,12 +89,6 @@ public partial class SmsDoroHamukuri : SmsHamukuri
     {
         if (n is Skeleton3D s) return s;
         foreach (Node c in n.GetChildren()) { var r = FindSkeleton(c); if (r != null) return r; }
-        return null;
-    }
-    private static AnimationPlayer FindAnimationPlayer(Node n)
-    {
-        if (n is AnimationPlayer a) return a;
-        foreach (Node c in n.GetChildren()) { var r = FindAnimationPlayer(c); if (r != null) return r; }
         return null;
     }
 

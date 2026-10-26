@@ -93,7 +93,7 @@ public partial class SmsHamukuri : SmsSmallEnemy
     private bool _rolledByStu;                // unk1A3: this roll came from another Stu (the serial crash)
     protected bool _fly;                        // unk1A4: the kicked puck (vy 0, y = the ground) until FlyTimer
     protected bool _fellFar;                    // unk1F0: airborne 250+ u over the ground -> Land on touchdown
-    private bool _giveUpAttack;               // unk1A2: endHitWaterJump found no Mario -> isResignationAttack
+    protected bool _giveUpAttack;             // unk1A2: endHitWaterJump found no Mario -> isResignationAttack
     protected int _bounces;                     // unk1E0
     protected Vector3 _rollVel;                 // unk1E4
     protected Vector3 _wallNormal; protected bool _wallHit;

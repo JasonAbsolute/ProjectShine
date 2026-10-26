@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://cmariocap125g"]
+
+[ext_resource type="Script" path="res://assets/Sms/Items/SmsMarioCap.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Sms/MarioCap/MarioCap.glb" id="2_model"]
+
+[node name="MarioCap" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)

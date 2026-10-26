@@ -74,13 +74,13 @@ public partial class SmsHaneHamukuri : SmsHamukuri
     protected override int DefaultNerve => NerveGraphWander;
 
     // ------------------------------------------------------------------------------------------------------------------ the flight's state
-    private float _flyBase;                   // unk230: the ground the flight stands on, units
-    private float _flyRise;                   // unk234: the climb over it
-    private float _flyBob;                    // unk210: the sine
-    private float _flyAdjust;                 // unk214: the base's ramp toward a new ground height, u a tick
-    private float _flyPhase;                  // unk20C: the sine's tick counter
-    private bool _dive;                       // unk21C
-    private float _scaleXZ, _scaleY;          // mScaling.x/z, mScaling.y (the body scale, squashed by the dive)
+    protected float _flyBase;                 // unk230: the ground the flight stands on, units
+    protected float _flyRise;                 // unk234: the climb over it
+    protected float _flyBob;                  // unk210: the sine
+    protected float _flyAdjust;                 // unk214: the base's ramp toward a new ground height, u a tick
+    protected float _flyPhase;                 // unk20C: the sine's tick counter
+    protected bool _dive;                     // unk21C
+    protected float _scaleXZ, _scaleY;         // mScaling.x/z, mScaling.y (the body scale, squashed by the dive)
 
     public float FlyRise => _flyRise;
     public float FlyBase => _flyBase;

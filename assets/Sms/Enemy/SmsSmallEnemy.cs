@@ -143,6 +143,7 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     public Vector3 VelUnits => _vel;
     public int Hp => _hp;
     public float BodyScale => _bodyScale;
+    public uint Flags150 => _flags150;
 
     // ------------------------------------------------------------------------------------------------------------------ setup
     public override void _Ready()
@@ -521,7 +522,9 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     protected void ZigzagToCurPathNode(float march, float turn, float cycle, float angle) => WalkToCurPathNode(march, turn, 0f);
 
     /// <summary>TWalkerEnemy::walkBehavior(mode, k): 0 zigzag at march x k / turn x k; 1, 2 the walk; 3 turn only; 4 march only; 5 nothing.</summary>
-    protected virtual void WalkBehavior(int mode, float k)
+    protected virtual void WalkBehavior(int mode, float k) => WalkBehaviorBase(mode, k);
+    /// <summary>TWalkerEnemy::walkBehavior itself, for a nerve the game writes as the explicit base call (past a kind's flight math).</summary>
+    protected void WalkBehaviorBase(int mode, float k)
     {
         switch (mode)
         {
@@ -792,4 +795,60 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     protected virtual void LaunchVelocity() { }
     /// <summary>pass 116: gpConductor->killEnemiesWithin (the shine get).</summary>
     public void SmsKillByDemo() { if (!_dead) Dead(); }
+
+    // ------------------------------------------------------------------------------------------------------------------ borrowed clips
+    /// <summary>A model with no clips of its own playing another archive's (the game's createMActor(model, anm data): dorokuri_model.bmd with hamukurianm,
+    /// dorohane.bmd with hanekuri's): the source scene's AnimationPlayer library copied onto an AnimationPlayer built under Model, every track re-pointed at
+    /// this skeleton; a bone the exporter named differently (root / root_1 / root_2, body / body_3) is matched on its name without the _N suffix. Returns the
+    /// player (also set as <see cref="_anim"/>), or null.</summary>
+    protected AnimationPlayer BorrowClips(PackedScene src, string tag)
+    {
+        if (_model == null || src == null) return null;
+        Skeleton3D skel = null;
+        foreach (Node n in _model.FindChildren("*", "Skeleton3D", true, false)) { skel = n as Skeleton3D; if (skel != null) break; }
+        var donor = src.Instantiate<Node>();
+        AnimationPlayer donorAnim = null;
+        foreach (Node n in donor.FindChildren("*", "AnimationPlayer", true, false)) { donorAnim = n as AnimationPlayer; if (donorAnim != null) break; }
+        if (donorAnim == null) { GD.PushWarning($"[SMS {tag}] {GetPath()}: the clip source has no AnimationPlayer"); donor.Free(); return null; }
+        var player = _model.GetNodeOrNull<AnimationPlayer>("AnimationPlayer");
+        if (player == null)
+        {
+            player = new AnimationPlayer { Name = "AnimationPlayer" };
+            _model.AddChild(player);
+            player.RootNode = player.GetPathTo(_model);
+        }
+        foreach (string libName in donorAnim.GetAnimationLibraryList())
+        {
+            var lib = donorAnim.GetAnimationLibrary(libName);
+            if (lib == null) continue;
+            var copy = new AnimationLibrary();
+            foreach (string clip in lib.GetAnimationList())
+            {
+                var a = (Animation)lib.GetAnimation(clip).Duplicate();
+                if (skel != null)
+                    for (int t = 0; t < a.GetTrackCount(); t++)
+                    {
+                        NodePath tp = a.TrackGetPath(t);
+                        if (tp.GetSubNameCount() == 0) continue;
+                        a.TrackSetPath(t, new NodePath($"{_model.GetPathTo(skel)}:{MatchBone(skel, tp.GetSubName(0))}"));
+                    }
+                copy.AddAnimation(clip, a);
+            }
+            if (player.HasAnimationLibrary(libName)) player.RemoveAnimationLibrary(libName);
+            player.AddAnimationLibrary(libName, copy);
+        }
+        donor.Free();
+        _anim = player;
+        return player;
+    }
+    /// <summary>The skeleton's bone for a track's bone name: exact, else the same name without the exporter's _N suffix on either side.</summary>
+    protected static string MatchBone(Skeleton3D skel, string name)
+    {
+        if (skel.FindBone(name) >= 0) return name;
+        string Strip(string s) { int i = s.LastIndexOf('_'); return i > 0 && int.TryParse(s[(i + 1)..], out _) ? s[..i] : s; }
+        string want = Strip(name);
+        for (int i = 0; i < skel.GetBoneCount(); i++)
+            if (Strip(skel.GetBoneName(i)) == want) return skel.GetBoneName(i);
+        return name;
+    }
 }

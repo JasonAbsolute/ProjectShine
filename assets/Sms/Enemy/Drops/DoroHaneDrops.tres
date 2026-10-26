@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="SmsDropTable" load_steps=4 format=3 uid="uid://cdorohaned125g"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsDropTable.cs" id="1_table"]
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsDropEntry.cs" id="2_entry"]
+[ext_resource type="PackedScene" path="res://yellow_coin.tscn" id="3_coin"]
+
+[sub_resource type="Resource" id="Resource_fan"]
+script = ExtResource("2_entry")
+Scene = ExtResource("3_coin")
+Weight = 1.0
+CountMin = 5
+CountMax = 5
+ScatterUnits = 6.0
+LifeTicks = 0
+Note = "the game's five event coins (TDoroHaneKuri::reset unk18C = 5): a fan of five at every death"
+
+[resource]
+resource_name = "DoroHaneDrops: the Swipin' Stu's five coins (the game's genEventCoin fan) at every kill"
+script = ExtResource("1_table")
+Chance = 1.0
+UseEnemyRate = false
+Entries = Array[ExtResource("2_entry")]([SubResource("Resource_fan")])
+PopUnitsPerTick = 20.0
+BodyPopMetresPerSecond = 6.0

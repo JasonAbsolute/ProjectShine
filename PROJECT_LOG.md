@@ -7712,3 +7712,50 @@ Regression 118 35/35 on the committed level (its log shows pre-existing `det == 
 SmsFluddDropsTickLocked during the E reload -- not this pass's code; noted for a shine pass). Build 0 errors; boot ALL OK, no errors.
 NOTE: `tar` from this Mac drops AppleDouble `._*` files into his tree (the C# compiler reads them as binary sources) -- delete them after an untar,
 or ship with scp per folder.
+## SMS pass 125g -- the rest of the Stu kinds: Smolderin' Stu, the Stu tower, Swipin' Stu + the cap theft (feature/enemy-base)
+
+**Files:** `assets/Sms/Enemy/SmsFireHamukuri.cs` + `FireHamukuri.tscn` (TFireHamuKuri), `SmsDangoHamukuri.cs` + `Dango.tscn` (TDangoHamuKuri /
+TBossDangoHamuKuri), `SmsDoroHaneKuri.cs` + `DoroHane.tscn` (TDoroHaneKuri) + `Drops/DoroHaneDrops.tres`; `assets/Sms/Items/SmsMarioCap.cs` +
+`MarioCap.tscn` + `MarioCapItem.tres` (TMarioCap, the cap on the ground); `models/Eniemes/Dorohane/` (his rip's dorohane.glb + the exporter's pngs;
+its materials are the goop Stu's and the winged one's -- the registers match to within 10/255) and `models/Sms/MarioCap/` (mapobj/mariocap.glb);
+`assets/Mario.cs` (the pass-121 cap-off routine split into SmsCapOffHead, shared by the shine pose and a new STOLEN state: `SmsCapStolen(bool)`,
+`SmsCapStolenNow`, `SmsWearingCap` = isWearingCap); `SmsSmallEnemy.cs` (`BorrowClips` + `MatchBone` moved in from the Doro and generalised to the
+exporter's _N bone suffixes, `WalkBehaviorBase` for a kind's explicit base call, `Flags150`); `SmsHamukuri.cs` (`_giveUpAttack` protected);
+`SmsHaneHamukuri.cs` (the flight fields protected); `SmsDoroHamukuri.cs` (uses the base helper).
+
+**Smolderin' Stu** (hamukuri.cpp 2120-2312, firehamukuri.prm: 4 HP, jump 5, turn 3..5, sight 1000 / 200 / 120 deg, aware 300, AttackWait 300,
+damage 80 x 90, attack 70 x 70, RecoverTimer 1000, GenItemRate 50 + 10 -> DoroDrops' UseEnemyRate): burning from its first walk tick; its hit is
+HIT_MESSAGE_BURN (`SmsBurnMethod` on Mario if he ever has one, else his damage); unstompable while burning (he bounces, his feet take the hit);
+each drop knocks it 8 u/tick away with the spray cooldown at 20; at 0 HP dieFire -- out, the recover clock, unk150 flips to ESCAPE, the attack
+given up; out it is a plain Stu (flip, stomp); after RecoverTimer ticks of walking the Recover nerve (wait, then the RETURN clip) relights it with
+full HP. The colour ramp (changeTevColor): the nose (500, 200, 120) <-> (-20, -90, -140), the top and feet (500, -40, -70) <-> (80, 5, -50) over 30
+ticks, the trousers fixed green-dotted (200, 200, 200) / (0, 90, 0) / (200, 160, 130), no goop stage -- per-instance material copies. SLOTS: the
+MOE_FIRE flames (`FireFxScene`, a looping scene on null_cap, shown while burning), FireOffFxScene, CoolSound / FlameSound.
+
+**The Stu tower** (hamukuri.cpp 1710-2126; the boss on bossdangohamukuri.prm: scale 2.0..2.1, 1 HP, aware 600, AttackWait 240, NumArray 10 --
+`StackCount`; the bodies on dangohamukuri.prm = the Stu's): the boss makes its bodies at the set anim and TAKES them into a chain; each rides the
+one below's null_cap joint (+40 u on the boss) at the boss's yaw, swaying 10 u on its own slow circle (16 while the boss attacks), in DangoWait (the
+wait clip from a random frame); a carrying boss walks its run. A chained body cannot be stomped (isHitValid: lone ones only) but its attack cylinder
+hurts; water on the TOP knocks it off into a free Stu (5 u/tick away, vy 1, +20 u), a middle one spins once, the boss hops with the tower; the
+boss dead -> every body of its tower (freed too) dies with it (forceKill, no reward); bodies are freed when dead, the boss's re-launch rebuilds the
+tower. A tower never shoves itself (collision exceptions across the chain; a new body is placed on the head at once -- the first run's overlap
+lifted the boss 2.5 m). NOT PORTED: mAttackSw's wobble (a static the game leaves off), changeByJuice, the pool, the TURN sound (slot).
+
+**Swipin' Stu + the cap** (hamukuri.cpp 1557-1645, 2699-2765; dorohanekuri.prm: scale 1.5, march 4, turn 2, FlyBaseHeight 500, bob 100 / 200,
+FirstVelocityY 20, BoundNum 2, 1 HP): the winged kind playing hanekuri's clips (borrowed); attackToMario on a cap-wearing Mario: his damage, onHaveCap
+-- `Mario.SmsCapStolen(true)` (the cap surface hidden, the hair dome on), the disguise (his cap + the moustache) on the thief's null_cap, the
+TLS_CHANGE slot, TNerveDoroHaneRise: it climbs toward 800 u and HOVERS THERE while it holds the cap (the game's own rule: out of the hose's reach
+from the ground). behaveToWater: the dive flag + TNerveDoroHaneHitWater (300 ticks: the rise -4 a tick while over 50 u, spinning 10 deg a tick,
+the clips at 1.5x; the bind's gravity brings it to ~40 u: the stomp window). Die -> releaseCap: `MarioCap.tscn` put on the ground under it; Mario
+within 1 m takes it back (`SmsCapStolen(false)`); its five event coins (unk18C = 5) as DoroHaneDrops. A reset / a demo kill returns the cap
+straight to his head. NOT PORTED: the capless Mario's sun damage, TDoroHamuKuri's RobCap exchange between ground Stus (the ground goop Stu keeps
+the plain hit), the map-object bounce, the sounds.
+
+**Drive 125** (`npc82/enemy125/patch_smoke125.py`, 79/79): the Stu / Gooble / winged / goop sections as before (E1's health baseline is now taken as
+Mario is placed for the kick), then F1-F5 the fire Stu (lit with the burning registers; the stomp bounces without a kill; four drops put it out
+-- knocked 8 u/tick, cooldown 20, ESCAPE bit, the dark registers; RecoverTimer shortened to 60: the Recover nerve relights it), S1-S5 the tower (3
+bodies for the drive: held, in DangoWait, 1.1 m apart over the 2x boss; the tower rides along; the top knocked off by the water message delivered
+BY HAND (the tower's top is out of the hose's reach) into a free Stu thrown 5 u/tick; one knock-off per 30-tick cooldown; the lone boss stomped
+-> every body dies), W1-W7 the thief (hanekuri's clips on dorohane's skeleton, scale 1.5; the dive hit takes the cap -- Mario capless, the disguise
+on, Rise; the water message by hand at 800 u -> HitWater -> low within 19 frames; the stomp puts the cap down and five coins out; Mario landing on
+the spot picks it up -- wearing again). Regression 118 35/35 on the committed level; build 0 errors; boot ALL OK, no errors.

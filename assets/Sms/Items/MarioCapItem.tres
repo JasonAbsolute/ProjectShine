@@ -1,0 +1,14 @@
+[gd_resource type="ShaderMaterial" load_steps=4 format=3 uid="uid://cmariocapm125g"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/EnemyToon.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://models/Sms/MarioCap/mariocap.png" id="2_cap"]
+[ext_resource type="Texture2D" uid="uid://c7qc8aqne083g" path="res://assets/Sms/models/toon_2_4i.png" id="3_toon"]
+
+[resource]
+resource_name = "_mat_cap (mapobj/mariocap.bmd, as dorokurihige.bmd's _mat_cap2): GX_TEVREG0 (350, 350, 350), konst 3/4, mix(spec, H_mariocap, s0)"
+shader = ExtResource("1_shader")
+shader_parameter/s0_k = 0.75
+shader_parameter/s1_form = 0
+shader_parameter/c0 = Vector3(1.3725, 1.3725, 1.3725)
+shader_parameter/base_tex = ExtResource("2_cap")
+shader_parameter/toon_tex = ExtResource("3_toon")
