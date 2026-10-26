@@ -154,7 +154,7 @@ The 35 changed paths are exactly the ones the entry lists. Largest blobs: `PROJE
 Working tree left untouched: Jaysonn's `assets/Level.tscn` and `assets/Sms/SmsHiddenCoin.cs` (open in his editor
 this session), the two Koopa flips, and the `addons/godot_ai` churn.
 
-### #5 -- PENDING -- queued 2026-10-25 16:20 PDT, updated 23:50 (Kiro)
+### #5 -- DONE 2026-10-26 -- https://github.com/JasonAbsolute/ProjectShine/pull/7 (SQUASH-merged by Jaysonn) -- queued 2026-10-25 16:20 PDT, updated 23:50 (Kiro)
 Push the enemy branch and open its PR: the enemy base (TSmallEnemy / TWalkerEnemy / the Spine) with the whole Stu family on it -- Strollin', Soarin',
 the goop Stu, Smolderin', the tower, Swipin' with the cap theft -- the Gooble moved onto the base, the death / wall-hit puffs, the drop tables, and
 the editor previews (passes 125-125h). PLAYTESTED BY JAYSONN 2026-10-25 23:37 ("awesome looks like its all working. includong seeing them in the
@@ -208,6 +208,39 @@ Expect `0` from the rev-list. `gh` is still unauthenticated here (`gh auth statu
 The working tree carries Jaysonn's own uncommitted `assets/Level.tscn` and `assets/Sms/Enemy/Drops/StuDrops.tres` (the Stu's single coin made a
 BLUE coin -- his call whether it goes in this PR: if yes, `git add` it and commit it on the branch BEFORE the push), the editor's retab of
 `assets/Sms/SmsHiddenCoin.cs`, the two Koopa `.png.import` flips and the `addons/godot_ai` churn -- leave them unless he says otherwise.
+
+Result: all nine shas confirmed ancestors of the branch (code tip `4e10187`, 125g `0867da7`, 125f `7f1a436`, 125e `26f9666`,
+125d `6f4c588`, 125c `27f9e38`, 125b `3f7927b`, 125 `e039b9c`, the fx re-saves `59e3dec`) plus `main` `985fb29`.
+**Asked and answered -- `StuDrops.tres` IS IN**: Jaysonn said "include it!", so it was committed on the branch BEFORE the push
+as `1cd23b3` ("Stu drops: the single-coin drop made a blue coin"), staging that one file only. Worth recording what that diff
+actually was, since it looked bigger than it is: the ONLY behavioural change is the 80 %-weight entry swapping
+`yellow_coin.tscn` -> `blue_coin.tscn` (the 12 % fan of three stays yellow). Everything else the editor stripped equals its
+script default -- `Chance` 1, `UseEnemyRate` false, `CountMin`/`CountMax` 1, `ScatterUnits` 4, `LifeTicks` 0,
+`BodyPopMetresPerSecond` 6, and `PopUnitsPerTick` 20 = `SmsCoinItem.PopUpSpeedUnits` (SmsCoinItem.cs:29) -- so Godot omitted
+them on re-save and behaviour is unchanged. **General lesson: a Godot re-save that deletes property lines is not a content
+change when each deleted value matches the script default -- check the defaults before assuming the resource was gutted.**
+Branch pushed `b289ee9..1cd23b3`, 21 commits since `main`; `git rev-list --count origin/feature/enemy-base..feature/enemy-base`
+returned `0`. Hygiene on the range: 0 `addons/godot_ai` paths, 0 Koopa `.png.import` flips, and the `SmsHiddenCoin.cs` retab
+stayed out, as the rules require.
+`gh auth status` still said "not logged into any GitHub hosts", so the prefilled compare page was opened in the browser
+(title + `pr125.md`'s body urlencoded onto the compare URL, 4256 chars) for Jaysonn to submit.
+Working tree otherwise untouched: `assets/Level.tscn`, `assets/Sms/SmsHiddenCoin.cs`, the two Koopa flips, `addons/godot_ai`.
+
+Merged 2026-10-26: Jaysonn opened and **squash-merged** it as PR #7 -> `origin/main` `aaf6279`, single parent `985fb29`.
+Because Kiro did NOT pre-merge locally this time (the one-way rule holding), local `main` had 0 commits of its own and this
+was a clean `git merge --ff-only origin/main` -- no divergence, no conflict, nothing to reconcile. That is the whole point of
+the rule: compare with #2/#3, which needed a reconciling merge commit.
+Two things worth knowing about GitHub's squash here:
+- **The squash cut at `1cd23b3`, not at the branch tip `ef67d77`.** GitHub squashes the PR head as it stood, and the PR was
+  created and merged in the window between those two pushes, so the `timeToPush!.md` result paragraph above did NOT travel
+  with the code and had to be re-applied onto `main` by hand (`git checkout feature/enemy-base -- timeToPush!.md`). All CODE
+  landed -- only this log file lagged. Lesson: push the log commit BEFORE opening the PR page, not after.
+- Ancestry checks are again useless after a squash: `git merge-base --is-ancestor ef67d77 origin/main` says NO. Verified by
+  tree instead -- `git diff --name-only main feature/enemy-base` listed only `timeToPush!.md`, and spot checks confirmed
+  `blue_coin.tscn` in `StuDrops.tres`, `SmsSmallEnemy.cs`, `models/Sms/MarioCap/MarioCap.glb` and
+  `assets/Sms/Items/SmsMarioCap.cs` (note: the cap files sit directly in `assets/Sms/Items/`, NOT in an `Items/MarioCap/`
+  subfolder as the PR body's wording suggests).
+`pr125.md` deleted now that the PR exists and is merged.
 
 <!-- Kiro appends the next entry below this line. Entry template:
 
