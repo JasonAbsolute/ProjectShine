@@ -242,6 +242,26 @@ Two things worth knowing about GitHub's squash here:
   subfolder as the PR body's wording suggests).
 `pr125.md` deleted now that the PR exists and is merged.
 
+### #6 -- PENDING -- 2026-10-26 02:10 PDT (Kiro)
+Push the third feature branch so the work is visible on GitHub: `feature/enemy-spawners`, branched from `main` `e77b85f` (the trunk after PR #7).
+PUSH ONLY, NO PR YET -- the feature is in progress: pass 126 (the generator, the one-shot generator, the common launcher) landed; the gatekeeper
+(the Polluted Piranha) comes next. Jaysonn plays the spawners first; when he says the feature is done a later entry asks for the PR. Kiro does not
+merge this branch locally.
+- Branch `feature/enemy-spawners` -- code tip `3cdf15b` ("SMS pass 126: the spawners -- the generator, the one-shot generator, the common launcher
+  (TGenerator / TOneShotGenerator / TCommonLauncher)"); the branch tip is this file's latest commit. A NEW remote branch: push with `-u`.
+- New files: `assets/Sms/Enemy/Spawn/` (SmsEnemyPool.cs, SmsEnemySpawner.cs, SmsEnemyOneShotSpawner.cs, SmsEnemyLauncher.cs + .uids, Spawner.tscn,
+  OneShotSpawner.tscn, Launcher.tscn, LauncherBody.gdshader + .uid, LauncherBody.tres), `assets/Sms/Fx/GeneHit.tscn`, `GeneDead.tscn`,
+  `models/Eniemes/Launcher/` (Launcher.glb 180 KB + .import, generator_model1.png + .import); changed: `assets/Sms/Enemy/SmsSmallEnemy.cs`,
+  PROJECT_LOG.md. Nothing large.
+- To try it: drop `assets/Sms/Enemy/Spawn/Launcher.tscn` (the goop pile that spits Stus; hose it five times) or `Spawner.tscn` (an invisible point that
+  launches a Stu every IntervalTicks; the editor shows a ghost of the kind) into a level. EnemyScene picks the kind; PoolSize how many are out at once.
+```
+git push -u origin feature/enemy-spawners
+git rev-list --count origin/feature/enemy-spawners..feature/enemy-spawners
+```
+Expect `0`. The working tree carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the two Koopa
+`.png.import` flips and the `addons/godot_ai` churn -- leave them.
+
 <!-- Kiro appends the next entry below this line. Entry template:
 
 ### #N -- PENDING -- <date> (Kiro)
