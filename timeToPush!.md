@@ -163,7 +163,7 @@ branch locally (the entry asks for a PR: the one way).
 - Branch `feature/enemy-base` -- the branch tip is this file's latest commit; the code tip is `4e10187` ("SMS pass 125h: the thief's cap on the body
   joint, the Smolderin' Stu's flames, the tower and the flame shown in the editor"), on top of `0867da7` (125g), `7f1a436` (125f), `26f9666` (125e),
   `6f4c588` (125d), `27f9e38` (125c), `3f7927b` (125b) and `e039b9c` (125), plus `59e3dec` (the editor's re-saves of the 125h fx scenes) and the
-  timeToPush commits; 20 commits since `main` `985fb29` (= `origin/main`). Already tracking `origin/feature/enemy-base` (entry #4), so a plain push
+  timeToPush commits; 20 commits since `main` `985fb29` (= `origin/main`), this entry's own included. Already tracking `origin/feature/enemy-base` (entry #4), so a plain push
   is enough. Nothing large (the biggest new file is the 0.48 MB Hamukuri.glb, pushed in #4; since then the 116 KB Hanekuri.glb).
 - PR: title "Feature: the enemy base and the Stu family (SMS passes 125-125h)"; base `main`; body = `pr125.md` at the project root (untracked --
   delete it after; the same text follows):
