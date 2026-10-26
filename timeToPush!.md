@@ -154,20 +154,24 @@ The 35 changed paths are exactly the ones the entry lists. Largest blobs: `PROJE
 Working tree left untouched: Jaysonn's `assets/Level.tscn` and `assets/Sms/SmsHiddenCoin.cs` (open in his editor
 this session), the two Koopa flips, and the `addons/godot_ai` churn.
 
-### #5 -- PENDING -- 2026-10-25 16:20 PDT, updated 21:20 (Kiro)
-Push the enemy branch again: passes 125c (the small enemies' puffs), 125d (the drop table), 125e (the Gooble moved onto the base) and 125f (the
-winged Soarin' Stu + the goop Stu) landed on it. PUSH ONLY, still no PR -- Jaysonn playtests the three Stu kinds and the Gooble first, then
-says when the feature is done (Kiro adds the PR entry then). Kiro does not merge this branch locally.
-- Branch `feature/enemy-base` -- code tip `7f1a436` ("SMS pass 125f: two more Stu kinds on the base -- the winged Soarin' Stu (THaneHamuKuri) and
-  the goop Stu (TDoroHamuKuri)"), on top of `26f9666` (125e), `6f4c588` (125d), `27f9e38` (125c), `3f7927b` (125b) and `e039b9c` (125); the branch
-  tip is this file's latest commit. Already tracking `origin/feature/enemy-base` (entry #4), so a plain push is enough.
-- New files: `assets/Sms/Fx/EnemyDisap.tscn`, `EnemyDisapWet.tscn`, `EnemyWallHit.tscn`, `SmsFxBurst.cs` + .uid, `JpaDirBillboardAdd.gdshader`
-  + .uid, `JpaQuad.gdshader` + .uid, `tex/kemuball3_enemy.png`, `tex/glow1_raw.png`, `tex/pecha3_raw.png` + their .import;
-  `assets/Sms/Enemy/SmsDropTable.cs`, `SmsDropEntry.cs` + .uid, `Drops/StuDrops.tres`, `GoobleDrops.tres`, `DoroDrops.tres`;
-  `assets/Sms/Enemy/SmsHaneHamukuri.cs` + .uid, `SmsDoroHamukuri.cs` + .uid, `Hanekuri.tscn`, `Dorokuri.tscn`, `EnemyWing.gdshader` + .uid,
-  `HanekuriTop/Trousers/Wing.tres`, `DorokuriTop/Trousers/Foot/Nose.tres`; `models/Eniemes/Hanekuri/` and `models/Eniemes/Dorokuri/` (glbs,
-  pngs, .imports); changed: `assets/Gooble.cs` (rewritten on the base), `Gooble.tscn`, `assets/Mario.cs` (one line), `assets/Sms/Enemy/SmsSmallEnemy.cs`,
-  `SmsHamukuri.cs`, `Hamukuri.tscn`, PROJECT_LOG.md. Nothing large (the biggest new file is the 116 KB Hanekuri.glb).
+### #5 -- PENDING -- 2026-10-25 16:20 PDT, updated 22:25 (Kiro)
+Push the enemy branch again: passes 125c (the small enemies' puffs), 125d (the drop table), 125e (the Gooble moved onto the base), 125f (the
+winged Soarin' Stu + the goop Stu) and 125g (Smolderin' Stu, the Stu tower, Swipin' Stu with the cap theft) landed on it. PUSH ONLY, still no
+PR -- Jaysonn playtests the Stu kinds and the Gooble first, then says when the feature is done (Kiro adds the PR entry then). Kiro does not merge
+this branch locally.
+- Branch `feature/enemy-base` -- code tip `0867da7` ("SMS pass 125g: the rest of the Stu kinds -- Smolderin' Stu, the Stu tower, Swipin' Stu with
+  the cap theft"), on top of `7f1a436` (125f), `26f9666` (125e), `6f4c588` (125d), `27f9e38` (125c), `3f7927b` (125b) and `e039b9c` (125); the
+  branch tip is this file's latest commit. Already tracking `origin/feature/enemy-base` (entry #4), so a plain push is enough.
+- New files since #4: `assets/Sms/Fx/EnemyDisap.tscn`, `EnemyDisapWet.tscn`, `EnemyWallHit.tscn`, `SmsFxBurst.cs` + .uid, `JpaDirBillboardAdd.gdshader`
+  + .uid, `JpaQuad.gdshader` + .uid, `tex/*.png` + .import; `assets/Sms/Enemy/SmsDropTable.cs`, `SmsDropEntry.cs` + .uid, `Drops/*.tres`;
+  `SmsHaneHamukuri.cs`, `SmsDoroHamukuri.cs`, `SmsFireHamukuri.cs`, `SmsDangoHamukuri.cs`, `SmsDoroHaneKuri.cs` + .uids, `Hanekuri.tscn`,
+  `Dorokuri.tscn`, `FireHamukuri.tscn`, `Dango.tscn`, `DoroHane.tscn`, `EnemyWing.gdshader` + .uid, the Hanekuri* / Dorokuri* .tres;
+  `assets/Sms/Items/SmsMarioCap.cs` + .uid, `MarioCap.tscn`, `MarioCapItem.tres`; `models/Eniemes/Hanekuri/`, `models/Eniemes/Dorokuri/`,
+  `models/Eniemes/Dorohane/`, `models/Sms/MarioCap/`; changed: `assets/Gooble.cs`, `Gooble.tscn`, `assets/Mario.cs` (the demo kill line + the
+  stolen-cap state), `assets/Sms/Enemy/SmsSmallEnemy.cs`, `SmsHamukuri.cs`, `Hamukuri.tscn`, PROJECT_LOG.md. Nothing large (the biggest new file is
+  the 116 KB Hanekuri.glb).
+- NOT in this push, Jaysonn's own: his editor re-saved several enemy .tres/.tscn (headers normalised: no content change) and changed
+  `Drops/StuDrops.tres` (the Stu's single coin is now a BLUE coin) -- his to commit when he wants them, with `assets/Level.tscn`.
 ```
 git push origin feature/enemy-base
 git rev-list --count origin/feature/enemy-base..feature/enemy-base
