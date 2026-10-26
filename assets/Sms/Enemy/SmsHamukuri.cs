@@ -4,8 +4,8 @@ using Godot;
 
 /// <summary>
 /// STROLLIN' STU -- THamuKuri (Enemy/hamukuri.cpp; JP ハムクリ) on <see cref="SmsSmallEnemy"/>, with the shipped /enemy/hamukuri.prm (pass 125).
-/// The plain kind only; the winged (HaneHamuKuri), goop / cap-stealing (DoroHamuKuri), stack (Dango), fire (FireHamuKuri) kinds share this
-/// class in the game and are later passes.
+/// The plain kind; the winged (THaneHamuKuri -> SmsHaneHamukuri) and the goop / cap-stealing (TDoroHamuKuri -> SmsDoroHamukuri) kinds are
+/// species on this class (pass 125f); the stack (Dango) and fire (FireHamuKuri) kinds are later passes.
 ///
 /// WANDER (TNerveWalkerGraphWander + THamuKuri::moveObject): setWalkAnm is the KYORO look-around (bck 4, 59 frames, standing: walkBehavior does
 /// nothing while it plays), then the walk (14); every KyoroTimer (500) ticks of wandering it looks around again. March 1 u/tick (1.6 m/s),
@@ -48,7 +48,9 @@ public partial class SmsHamukuri : SmsSmallEnemy
         TurnSpeedLow = 0.9f, TurnSpeedHigh = 1f, BodyScaleLow = 1f, BodyScaleHigh = 1f, GenItemRate = 100f, GenEggRate = 80f, WaitTime = 0,
         StampRange = 15f, ZigzagCycle = 1000f, ZigzagAngle = 30f, MarchSpeedLow = 1f, MarchSpeedHigh = 1f,
     };
-    protected override Params P => Prm;
+    protected override Params P => HPrm;
+    /// <summary>The kind's .prm (THamuKuriSaveLoadParams): the Stu's shipped hamukuri.prm here; a kind overrides it (pass 125f).</summary>
+    protected virtual HamukuriParams HPrm => Prm;
 
     // ------------------------------------------------------------------------------------------------------------------ the knobs
     /// <summary>THamuKuriLauncher: the re-launch flies in with (0, 4, 4) u/tick in the placed frame (the set anim in the air). Off = it just appears.</summary>
@@ -75,29 +77,29 @@ public partial class SmsHamukuri : SmsSmallEnemy
     private static readonly string[] Names = { "hamukuri_appear", "hamukuri_crash", "hamukuri_down", "hamukuri_jitabata", "hamukuri_kyoro", "hamukuri_land", "hamukuri_return", "hamukuri_roll", "hamukuri_run", "hamukuri_set", "hamukuri_turn_down", "hamukuri_turn_end", "hamukuri_turn_start", "hamukuri_wait", "hamukuri_walk" };
     private static readonly int[] Frames = { 30, 5, 14, 48, 59, 29, 24, 12, 12, 39, 14, 62, 38, 60, 30 };
     private static readonly bool[] Loops = { false, false, false, true, false, false, false, true, true, false, false, false, false, true, true };
-    private const int BckAppear = 0, BckCrash = 1, BckDown = 2, BckJitabata = 3, BckKyoro = 4, BckLand = 5, BckReturn = 6, BckRoll = 7, BckRun = 8, BckSet = 9, BckTurnDown = 10, BckTurnEnd = 11, BckTurnStart = 12, BckWait = 13, BckWalk = 14;
+    protected const int BckAppear = 0, BckCrash = 1, BckDown = 2, BckJitabata = 3, BckKyoro = 4, BckLand = 5, BckReturn = 6, BckRoll = 7, BckRun = 8, BckSet = 9, BckTurnDown = 10, BckTurnEnd = 11, BckTurnStart = 12, BckWait = 13, BckWalk = 14;
     protected override string[] BckNames => Names;
     protected override int[] BckFrames => Frames;
     protected override bool[] BckLoops => Loops;
 
     // ------------------------------------------------------------------------------------------------------------------ nerves
-    private const int NerveGoForSearchActor = NerveSpecies + 0, NerveBoundFreeze = NerveSpecies + 1, NerveWallDie = NerveSpecies + 2, NerveLand = NerveSpecies + 3, NerveJitabata = NerveSpecies + 4;
+    protected const int NerveGoForSearchActor = NerveSpecies + 0, NerveBoundFreeze = NerveSpecies + 1, NerveWallDie = NerveSpecies + 2, NerveLand = NerveSpecies + 3, NerveJitabata = NerveSpecies + 4;
     protected override string NerveName(int n) => n switch { NerveGoForSearchActor => "GoForSearchActor", NerveBoundFreeze => "BoundFreeze", NerveWallDie => "WallDie", NerveLand => "Land", NerveJitabata => "Jitabata", _ => base.NerveName(n) };
 
     // ------------------------------------------------------------------------------------------------------------------ state
-    private float _giveUp;                    // unk194: GiveUpLength, x3 while he pumps an empty tank
-    private int _kyoro;                       // unk1A8: ticks of wandering since the last look-around
+    protected float _giveUp;                    // unk194: GiveUpLength, x3 while he pumps an empty tank
+    protected int _kyoro;                       // unk1A8: ticks of wandering since the last look-around
     private bool _wetWhileFlailing;           // unk165
     private bool _rolledByStu;                // unk1A3: this roll came from another Stu (the serial crash)
-    private bool _fly;                        // unk1A4: the kicked puck (vy 0, y = the ground) until FlyTimer
-    private bool _fellFar;                    // unk1F0: airborne 250+ u over the ground -> Land on touchdown
+    protected bool _fly;                        // unk1A4: the kicked puck (vy 0, y = the ground) until FlyTimer
+    protected bool _fellFar;                    // unk1F0: airborne 250+ u over the ground -> Land on touchdown
     private bool _giveUpAttack;               // unk1A2: endHitWaterJump found no Mario -> isResignationAttack
-    private int _bounces;                     // unk1E0
-    private Vector3 _rollVel;                 // unk1E4
-    private Vector3 _wallNormal; private bool _wallHit;
+    protected int _bounces;                     // unk1E0
+    protected Vector3 _rollVel;                 // unk1E4
+    protected Vector3 _wallNormal; protected bool _wallHit;
     private static int _serialCrashClock;     // THamuKuriManager::unk6C
-    private static readonly List<SmsHamukuri> All = new();   // the manager's objects (the serial kills)
-    private bool _launching;                  // the arc from the launcher: the set anim with the velocity
+    protected static readonly List<SmsHamukuri> All = new();   // the manager's objects (the serial kills)
+    protected bool _launching;                  // the arc from the launcher: the set anim with the velocity
 
     public bool Flailing => IsNerve(NerveJitabata);
     public bool Rolling => IsNerve(NerveBoundFreeze);
@@ -115,7 +117,7 @@ public partial class SmsHamukuri : SmsSmallEnemy
     protected override void Reset()
     {
         base.Reset();
-        _giveUp = Prm.GiveUpLength; _kyoro = 0; _wetWhileFlailing = false; _rolledByStu = false; _fly = false; _fellFar = false; _giveUpAttack = false;
+        _giveUp = HPrm.GiveUpLength; _kyoro = 0; _wetWhileFlailing = false; _rolledByStu = false; _fly = false; _fellFar = false; _giveUpAttack = false;
         _bounces = 0; _wallHit = false; _launching = false;
     }
 
@@ -126,13 +128,13 @@ public partial class SmsHamukuri : SmsSmallEnemy
     protected override void SetRunAnm() => SetBck(BckRun);
     protected override void SetFreezeAnm() => SetBck(BckWait);                      // THamuKuri never freezes (behaveToWater is its own); the base's fallback
     protected override void SetMeltAnm() => SetBck(BckDown);
-    private void SetRollAnm() => SetBck(BckRoll);
+    protected virtual void SetRollAnm() => SetBck(BckRoll);
     protected override void SetDeadAnm()
     {
         if (_attackerKilled) { _noReward = true; SetAfterDeadEffect(); }          // killed by another attacker's hit: the puff at once, nothing dropped
         else SetBck(IsBck(BckJitabata) ? BckTurnDown : BckDown);
     }
-    private void SetCrashAnm()
+    protected virtual void SetCrashAnm()
     {
         _fly = false;
         SetBck(BckCrash);
@@ -140,25 +142,32 @@ public partial class SmsHamukuri : SmsSmallEnemy
     }
 
     // ------------------------------------------------------------------------------------------------------------------ the hooks
-    protected override float GravityY() => _melt ? 0.01f : Prm.Gravity;
+    protected override float GravityY() => _melt ? 0.01f : HPrm.Gravity;
 
     protected override void MoveObjectPre()
     {
-        if (IsNerve(NerveGraphWander))
-        {
-            if (++_kyoro > Prm.KyoroTimer) { _kyoro = 0; SetBck(BckKyoro); }   // the look-around every KyoroTimer ticks
-            if (IsBck(BckKyoro) && BckEnded()) SetBck(BckWalk);
-        }
+        KyoroTick();
         if (_launching && !_airborne) _launching = false;
         if (_fly)
         {
             // THamuKuri::bind with unk1A4: no fall -- vy 0, nextPos.y = the ground + 1; the fly ends at FlyTimer (or on a water surface)
-            if (_time > Prm.FlyTimer) _fly = false;
+            if (_time > HPrm.FlyTimer) _fly = false;
             _vel.Y = 0f;
             _airborne = false;
             if (_groundY > Pos().Y - 200f) GlobalPosition = new Vector3(GlobalPosition.X, (_groundY + 1f) / U, GlobalPosition.Z);
         }
         if (_serialCrashClock != 0 && this == All[0]) CheckSerialKill();         // THamuKuriManager::perform(CUE_MOVE), once a tick
+    }
+
+    /// <summary>THamuKuri::moveObject's look-around: every KyoroTimer ticks of wandering the KYORO clip, standing; the walk again when it ends. A kind
+    /// without the clip (the winged one) overrides it away.</summary>
+    protected virtual void KyoroTick()
+    {
+        if (IsNerve(NerveGraphWander))
+        {
+            if (++_kyoro > HPrm.KyoroTimer) { _kyoro = 0; SetBck(BckKyoro); }   // the look-around every KyoroTimer ticks
+            if (IsBck(BckKyoro) && BckEnded()) SetBck(BckWalk);
+        }
     }
 
     /// <summary>THamuKuri::setBehavior: a long fall (250+ u over the ground) while wandering / attacking -> Land on the ground.</summary>
@@ -179,7 +188,7 @@ public partial class SmsHamukuri : SmsSmallEnemy
     protected override bool IsFindMario(float k)
     {
         _giveUpAttack = false;
-        if (_mario != null && _mario.SmsHoseSpraying && _mario.SmsWaterNow == 0) { _giveUp = Prm.GiveUpLength * 3f; return base.IsFindMario(k * 5f); }
+        if (_mario != null && _mario.SmsHoseSpraying && _mario.SmsWaterNow == 0) { _giveUp = HPrm.GiveUpLength * 3f; return base.IsFindMario(k * 5f); }
         return base.IsFindMario(k);
     }
     protected override void BehaveToFindMario()
@@ -189,7 +198,7 @@ public partial class SmsHamukuri : SmsSmallEnemy
     }
     protected override bool IsResignationAttack()
     {
-        if ((Goal() - Pos()).Length() > _giveUp) { _giveUp = Prm.GiveUpLength; return true; }
+        if ((Goal() - Pos()).Length() > _giveUp) { _giveUp = HPrm.GiveUpLength; return true; }
         if (_giveUpAttack) { _giveUpAttack = false; return true; }
         return false;
     }
@@ -245,7 +254,7 @@ public partial class SmsHamukuri : SmsSmallEnemy
 
     /// <summary>TSmallEnemy::isHitWallInBound: a wall within WallRadius 25 x scale x 1.1 that the velocity points INTO -> turned to face it, no
     /// collision, LIVE_FLAG_UNK10 (the body stops): the crash. Here: this frame's wall contact with the roll velocity into its normal.</summary>
-    private bool IsHitWallInBound()
+    protected bool IsHitWallInBound()
     {
         if (!_wallHit) return false;
         _wallHit = false;
@@ -259,26 +268,26 @@ public partial class SmsHamukuri : SmsSmallEnemy
 
     /// <summary>THamuKuri::forceRoll(from, isWater): away from `from` (the vector with y 10 before the normalise) x WaterCoeff (WaterAttackCoeff
     /// while attacking); up 10 u; vy FirstVelocityY (water) or FirstKickVelocityY with the FLY (the kicked puck); -> BoundFreeze.</summary>
-    private void ForceRoll(Vector3 from, bool water)
+    protected void ForceRoll(Vector3 from, bool water)
     {
         Vector3 d = new Vector3(Pos().X - from.X, 10f, Pos().Z - from.Z).Normalized();
-        d *= IsNerve(NerveAttack) ? Prm.WaterAttackCoeff : Prm.WaterCoeff;
+        d *= IsNerve(NerveAttack) ? HPrm.WaterAttackCoeff : HPrm.WaterCoeff;
         _airborne = true;
         GlobalPosition += Vector3.Up * (10f / U);
-        if (water) d.Y = Prm.FirstVelocityY;
-        else { d.Y = Prm.FirstKickVelocityY; _fly = true; }
+        if (water) d.Y = HPrm.FirstVelocityY;
+        else { d.Y = HPrm.FirstKickVelocityY; _fly = true; }
         _vel = d; _lin = Vector3.Zero;
         PushNerve(NerveBoundFreeze);
     }
 
     // ------------------------------------------------------------------------------------------------------------------ the manager's bonuses
     /// <summary>THamuKuriManager::requestSerialKill: every other flailing Stu dies with this one; TrampleBonusNum (3) or more -> a 1-UP here.</summary>
-    private void RequestSerialKill()
+    protected void RequestSerialKill()
     {
         int trampled = 1;
         foreach (SmsHamukuri h in All)
             if (h != this && IsInstanceValid(h) && h.IsBck(BckJitabata) && !h.IsDead) { h.Kill(); trampled++; }
-        if (trampled >= Prm.TrampleBonusNum && OneUpScene != null)
+        if (trampled >= HPrm.TrampleBonusNum && OneUpScene != null)
         {
             DropSpawner.SpawnItem(OneUpScene, GetParent(), new Vector3(GlobalPosition.X, _groundY / U, GlobalPosition.Z), new Vector3(0f, SmsCoinItem.PopUpSpeedUnits, 0f), 0, this);
             if (DebugPrint) GD.Print($"[SMS hamukuri] serial kill: {trampled} flailing Stus -> a 1-UP");
@@ -286,13 +295,13 @@ public partial class SmsHamukuri : SmsSmallEnemy
     }
     /// <summary>THamuKuriManager::checkSerialKill: the clock runs SerialCrashFrame (60) ticks from the first Stu-caused crash; CrashBonusNum (2) or more
     /// crashing in that window -> the coin at one of them.</summary>
-    private void CheckSerialKill()
+    protected void CheckSerialKill()
     {
-        if (++_serialCrashClock > Prm.SerialCrashFrame) _serialCrashClock = 0;
+        if (++_serialCrashClock > HPrm.SerialCrashFrame) _serialCrashClock = 0;
         int count = 0; SmsHamukuri rep = null;
         foreach (SmsHamukuri h in All)
             if (IsInstanceValid(h) && h._rolledByStu && h.IsNerve(NerveWallDie)) { count++; rep = h; }
-        if (rep != null && count >= Prm.CrashBonusNum && SerialCrashScene != null)
+        if (rep != null && count >= HPrm.CrashBonusNum && SerialCrashScene != null)
         {
             DropSpawner.SpawnItem(SerialCrashScene, GetParent(), new Vector3(rep.GlobalPosition.X, rep._groundY / U, rep.GlobalPosition.Z), new Vector3(0f, SmsCoinItem.PopUpSpeedUnits, 0f), 0, rep);
             _serialCrashClock = 0;
@@ -320,10 +329,10 @@ public partial class SmsHamukuri : SmsSmallEnemy
                 if (IsHitWallInBound()) { PushAfterCurrent(NerveWallDie); return true; }
                 if (!_fly && !_airborne)
                 {
-                    if (_bounces >= Prm.BoundNum) { ResetSpine(); SetNext(NerveGraphWander); return false; }
+                    if (_bounces >= HPrm.BoundNum) { ResetSpine(); SetNext(NerveGraphWander); return false; }
                     _bounces++;
                     GlobalPosition += Vector3.Up * (5f / U);
-                    _rollVel *= Prm.VelocityRate;
+                    _rollVel *= HPrm.VelocityRate;
                     _vel = _rollVel; _airborne = true;
                 }
                 if (!IsBck(BckKyoro)) base.WalkBehavior(3, 1000f);                // the roll keeps turning toward him (turn only, x1000 = at once)
@@ -358,7 +367,7 @@ public partial class SmsHamukuri : SmsSmallEnemy
                 {
                     if (IsBck(BckTurnStart)) SetBck(BckJitabata);
                     else if (IsBck(BckTurnEnd)) { if (BckEnded()) { PushAfterCurrent(NerveWait); return true; } }
-                    else if (IsBck(BckJitabata) && _time > Prm.JitabataTimer) SetBck(BckTurnEnd);
+                    else if (IsBck(BckJitabata) && _time > HPrm.JitabataTimer) SetBck(BckTurnEnd);
                 }
                 return false;
 
@@ -372,7 +381,7 @@ public partial class SmsHamukuri : SmsSmallEnemy
     /// mPosition, the yaw) in the stage's goop colour. The game's splat is a 325 u Direction quad at the body's point -- big enough to read as "on the wall"
     /// from any camera; here it is put ON the wall: the point the roll hit (a ray along the wall's normal from the body, 1 u off the face), facing the
     /// normal, so it never floats in front of a wall the Stu stopped short of.</summary>
-    private void SetWallDeadEffect()
+    protected virtual void SetWallDeadEffect()
     {
         if (WallHitFxScene == null) return;
         // isHitWallInBound cleared the flag but left the normal (the wall the roll hit); after it the yaw IS the normal, so the fallback is +yaw

@@ -1,0 +1,9 @@
+[gd_resource type="ShaderMaterial" load_steps=3 format=3 uid="uid://chanewng125f"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/EnemyWing.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/Hanekuri/K_hane_wing.png" id="2_wing"]
+
+[resource]
+resource_name = "_mat_Lwing1 / _mat_Rwing1 (hanekuri.bmd): the wings -- K_hane_wing (IA4: white, the shape in the alpha) x the lit vertex colour, translucent, two-sided, no z write"
+shader = ExtResource("1_shader")
+shader_parameter/base_tex = ExtResource("2_wing")

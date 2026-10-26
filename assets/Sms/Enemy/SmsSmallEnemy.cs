@@ -150,25 +150,27 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         AddToGroup("sms_enemy");                                // pass 116: gpConductor->killEnemiesWithin (the shine get)
         _model = GetNodeOrNull<Node3D>("Model");
         _anim = GetNodeOrNull<AnimationPlayer>("Model/AnimationPlayer");
+        if (_model != null) _modelScale = _model.Scale.X;          // the scene's own scale on the glb (the editor's size is the game's)
+        _rng = new Random(GetInstanceId().GetHashCode());
+        Init();                                                 // before the clip check: a species may build its AnimationPlayer (the goop Stu borrows the Stu's clips) or dress the model
+        _anim ??= GetNodeOrNull<AnimationPlayer>("Model/AnimationPlayer");
         if (_model == null || _anim == null)
             GD.PushWarning($"[SMS enemy] {GetPath()}: the scene needs Model (the glb) with Model/AnimationPlayer");
-        if (_model != null) _modelScale = _model.Scale.X;          // the scene's own scale on the glb (the editor's size is the game's)
         if (_anim != null)
             foreach (string n in BckNames)
-                if (!_anim.HasAnimation(n))
+                if (!string.IsNullOrEmpty(n) && !_anim.HasAnimation(n))     // an empty slot = a clip this kind has not (the winged Stu's 4-clip table on the Stu's 15 slots)
                     GD.PushWarning($"[SMS enemy] {GetPath()}: the model has no '{n}' clip (the game's bck table: {string.Join(", ", BckNames)})");
-        _rng = new Random(GetInstanceId().GetHashCode());
         _spawnPos = GlobalPosition * U;
         _spawnYaw = Mathf.RadToDeg(Rotation.Y);
         _yaw = _spawnYaw;
         MotionMode = MotionModeEnum.Grounded;
         CallDeferred(nameof(SetupCollisionExceptions));         // the game pushes Mario and enemies apart by messages, not bodies
         SmsWaterHitMarks.Ensure(this);                          // pass 99: the water-hit mark pool loads with the level
-        Init();
         Reset();
     }
 
-    /// <summary>TSmallEnemy::init's species tail (actor type, flags, hit filters) -- after the model is found, before the first reset.</summary>
+    /// <summary>TSmallEnemy::init's species tail (actor type, flags, hit filters, the model's dressing) -- after the model is found, before the clip
+    /// check and the first reset. <see cref="_rng"/> is ready; <see cref="_mario"/> is not.</summary>
     protected virtual void Init() { }
 
     /// <summary>resetSRTV for a spawner (or a drive) that places the body AFTER adding it to the tree: the placed point and yaw become the launcher's, the body resets there.</summary>
@@ -218,6 +220,28 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         _disp = Vector3.Zero;
         for (int i = 0; i < n; i++) Tick();
         if (_dead) return;
+        if (FlyBind)
+        {
+            // THaneHamuKuri::bind is the species' own (its SetBehavior): the step moves the body by the ticks' XZ displacement, reads the walls and
+            // the contacts, and leaves the airborne flag, the height and the floor normal to the species
+            FloorSnapLength = 0f;
+            Velocity = _disp / U / (float)delta;
+            MoveAndSlide();
+            _onWall = false;
+            _touching.Clear();
+            for (int i = 0; i < GetSlideCollisionCount(); i++)
+            {
+                var col = GetSlideCollision(i);
+                GodotObject other = col.GetCollider();
+                if (other is SmsSmallEnemy) _touching.Add((Node3D)other);
+                else if (other is not Mario && MathF.Abs(col.GetNormal().Dot(UpDirection)) < 0.5f) { _onWall = true; OnWallContact(col); }
+                else if (other is Node3D n3 && other is not Mario) OnBodyContact(n3);
+            }
+            _floorNormal = Vector3.Up;
+            _groundY = GroundYBelow();
+            ApplyLook();
+            return;
+        }
         // the ticks' displacement through the body: the world's floors and walls (TWalker's bind)
         FloorSnapLength = _airborne && !KeepVelocityOnGround() ? 0f : 0.3f;
         Velocity = _disp / U / (float)delta;
@@ -258,6 +282,11 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     protected virtual void OnLanded() { }
     /// <summary>A species whose own bind keeps the velocity on the floor (THamuKuri's kicked puck): the landing does not zero it.</summary>
     protected virtual bool KeepVelocityOnGround() => false;
+    /// <summary>A flying species (THaneHamuKuri::bind, pass 125f): the physics step neither snaps it to a floor nor sets its airborne flag -- the species
+    /// sets <see cref="_airborne"/> and its height itself and keeps <see cref="_noBind"/> on (the base's gravity and velocity are its own).</summary>
+    protected virtual bool FlyBind => false;
+    /// <summary>The body's scale per axis for the look (mScaling): the one body scale, unless a species squashes (the winged Stu's dive).</summary>
+    protected virtual Vector3 LookScale => Vector3.One * _scale;
 
     /// <summary>perform(CUE_MOVE) -> moveObject: TSmallEnemy's with TWalkerEnemy's wall hop; the species' MoveObjectPre / SetBehavior hooks.</summary>
     private void Tick()
@@ -281,7 +310,7 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
                 if (!IsCollidMove(o)) continue;
                 Vector3 d = Pos() - o.GlobalPosition * U;
                 if (d == Vector3.Zero) d.X += 1f;
-                _lin = d.Normalized() * (_marchSpeed * 3f);
+                _lin += d.Normalized() * (_marchSpeed * 3f);        // v.add(local_74): the push on top of the walk (125f: it replaced the walk before)
             }
         if (_dead) return;
         // TLiveActor::bind / TWalker::bind: gravity and the terminal speed while airborne (the ground is MoveAndSlide's)
@@ -324,13 +353,16 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     protected static float Wrap360(float a) { a %= 360f; return a < 0f ? a + 360f : a; }                   // MsWrap(a, 0, 360)
     protected static float AngleDiff(float a, float b) { float d = Wrap360(a - b); return d > 180f ? d - 360f : d; } // MsAngleDiff
 
-    /// <summary>The floor under the body, units (mGroundHeight): a ray down from the head height.</summary>
+    /// <summary>The floor under the body, units (mGroundHeight): a ray down from the head height -- the MAP only: Mario's body is excluded (the game's
+    /// checkGround is a bg check; a diving Hane over him read his head as the ground, a Stu under him his feet).</summary>
     protected float GroundYBelow()
     {
         var space = GetWorld3D().DirectSpaceState;
         Vector3 from = GlobalPosition + Vector3.Up * (P.HeadHeight / U);
         var q = PhysicsRayQueryParameters3D.Create(from, GlobalPosition + Vector3.Down * 60f, CollisionMask);
-        q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
+        var excl = new Godot.Collections.Array<Rid> { GetRid() };
+        if (_mario != null && IsInstanceValid(_mario)) excl.Add(_mario.GetRid());
+        q.Exclude = excl;
         var hit = space.IntersectRay(q);
         return hit.Count > 0 ? ((Vector3)hit["position"]).Y * U : Pos().Y - 60f * U;
     }
@@ -345,7 +377,7 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         if (x.LengthSquared() < 1e-6f) { up = Vector3.Up; x = up.Cross(fwd); }
         x = x.Normalized();
         Vector3 z = x.Cross(up).Normalized();
-        _model.Transform = new Transform3D(new Basis(x, up, z) * Basis.FromScale(Vector3.One * (_scale * _modelScale)), Vector3.Zero);
+        _model.Transform = new Transform3D(new Basis(x, up, z) * Basis.FromScale(LookScale * _modelScale), Vector3.Zero);
     }
 
     // ------------------------------------------------------------------------------------------------------------------ anims
@@ -426,7 +458,8 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         {
             var kids = Graph.GetChildren();
             Node3D pick = kids[_rng.Next(kids.Count)] as Node3D;
-            if (kids.Count > 1 && pick != null && (pick.GlobalPosition * U - Pos()).Length() < 100f)
+            Vector3 dd = pick != null ? pick.GlobalPosition * U - Pos() : Vector3.Zero; dd.Y = 0f;        // on the ground plane: a flying body's height is not a distance to a node
+            if (kids.Count > 1 && pick != null && dd.Length() < 100f)
                 pick = kids[(kids.IndexOf(pick) + 1 + _rng.Next(kids.Count - 1)) % kids.Count] as Node3D;
             if (pick != null) { SetGoalPoint(pick.GlobalPosition * U); return; }
         }
@@ -448,8 +481,8 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         if (away.LengthSquared() < 1e-3f) away = PolarXZ(_yaw, 1f);
         SetGoalPoint(Pos() + away.Normalized() * WanderRadiusUnits);
     }
-    /// <summary>isReachedToGoal: within 100 u.</summary>
-    protected bool IsReachedToGoal() => (Goal() - Pos()).Length() < 100f;
+    /// <summary>isReachedToGoal: within 100 u (THaneHamuKuri's: on the ground plane only).</summary>
+    protected virtual bool IsReachedToGoal() => (Goal() - Pos()).Length() < 100f;
 
     /// <summary>TSpineEnemy::calcTurnSpeedToReach(march, half the distance): the turn a tick that reaches the goal on an arc.</summary>
     protected static float CalcTurnSpeedToReach(float march, float d)
@@ -623,7 +656,7 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     /// cylinder -> isHitValid -> kill; the hose at close range -> SPRAYED_BY_WATER.</summary>
     protected virtual void HitCheckMario()
     {
-        if (_mario == null || _hp == 0 || _cur == NerveDie || !GetCollisionLayerValue(1)) return;
+        if (_mario == null || _cur == NerveDie || !GetCollisionLayerValue(1)) return;   // (not gated on the hit points: decHpByWater floors at 0 and the game's lists still find it -- the 1-HP kinds would be immune after one drop)
         Vector3 g = Pos(), m = MarioPos();
         float s = _bodyScale;
         bool onGround = _mario.IsOnFloor();
@@ -688,11 +721,11 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     /// (the hit's attack, at least 1) and behaveToWater. True = the drop is taken.</summary>
     public virtual bool SmsSprayedByWater(Vector3 hitPos)
     {
-        if (_dead || _hp == 0) return false;
+        if (_dead) return false;
         SmsWaterHitMarks.Emit(this, hitPos);
         if (_sprayCooldown != 0) return true;
         _sprayCooldown = 1;
-        _hp = Math.Max(0, _hp - 1);                              // decHpByWater: the particle attack (1 for the hose's drops)
+        _hp = Math.Max(0, _hp - 1);                              // decHpByWater: the particle attack (1 for the hose's drops), floored at 0 -- the body lives on until a hit message kills it
         BehaveToWater();
         return true;
     }

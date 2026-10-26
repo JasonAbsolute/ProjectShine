@@ -7656,3 +7656,59 @@ from the test table; G13 R from 3 m -> melt (name_hit, UNK20000, a WATHIT mark);
 35/35 on the committed level (C1 = the demo kill of the Gooble through the base type). Build 0 errors; boot ALL OK with his placed Goobles.
 NOTE for the patch scripts: `write_text` on Windows writes CRLF -- the repo's `.gitattributes` (text=auto eol=lf) normalises it, so nothing reached
 a commit, but use `write_bytes` (as drive 118 does) for byte-exact mirrors.
+## SMS pass 125f -- two more Stu kinds on the base: the winged Soarin' Stu and the goop Stu (feature/enemy-base)
+
+**Files:** `assets/Sms/Enemy/SmsHaneHamukuri.cs` (new: THaneHamuKuri), `SmsDoroHamukuri.cs` (new: TDoroHamuKuri), `Hanekuri.tscn` / `Dorokuri.tscn`
+(new), `EnemyWing.gdshader` (new), `HanekuriTop/Trousers/Wing.tres` + `DorokuriTop/Trousers/Foot/Nose.tres` (new, from the bmds' TEV registers),
+`Drops/DoroDrops.tres` (new: the game's 60 % through UseEnemyRate), `models/Eniemes/Hanekuri/` (his rip's hanekuri.glb with the 4 clips + the
+bmd's K_hane_wing; the exporter's 3 pngs) and `models/Eniemes/Dorokuri/` (dorokuri_model.glb, dorokurihige.glb, K_doro_dot / K_dorokuri_face from
+the bmd; the exporter's pngs) -- imports: materials swapped for the .tres (use_external), textures pinned lossless, the 11.6 MB scene default
+stripped (patch_import125f.py); `SmsHamukuri.cs` (the .prm through a virtual `HPrm`, the members its kinds need protected, the kyoro as a hook);
+`SmsSmallEnemy.cs` (Init before the clip check, `FlyBind` / `LookScale` hooks, `IsReachedToGoal` virtual, four fixes below).
+
+**The winged Stu** (`SmsHaneHamukuri : SmsHamukuri`, hamukuri.cpp 1291-1555 + the nerves at 2600 / 2751, hanehamukuri.prm: HP 1, scale 0.7, march 3,
+turn 0.5, sight 1000 / 1200 / 180 deg, give-up 2000 / 1500, damage 120 x 100, attack 100 x 60, JumpForce 5, FirstVelocityY 10, BoundNum 0,
+GenItemRate 0, FlyBaseHeight 600, Amplitude 100, Frequency 300, NormalJumpVy 15, AttackJumpVy 10): THaneHamuKuri::walkBehavior and ::bind ported
+as the species' WalkBehavior and SetBehavior -- the height = BASE (the ground, ramped at dh/120 u a tick, at most 10) + RISE (1 u a tick to 600
+while wandering / attacking / preparing, decaying elsewhere) + BOB (100 sin, 300 ticks); not airborne while hovering (so it finds Mario and
+pushes others); isReachedToGoal on the ground plane within 10 u (MsVECMag2 < 100); over him at height -> the dive flag + TNerveDoroHanePrepareAttack
+(50 ticks +4, 50 ticks -15), the plunge at 15 u a tick (the squash: y x1.1 to 1.3 above 200 u of rise, 0.8 x below) to the ground -> the hip-drop
+slot (PARTICLE_MS_HIPDROP_C, the rumble, MSD_SE_MA_HIP_ATTACK: `DiveHitFxScene` / `DiveHitSound`) -> TNerveHaneHamuKuriUpWait (400 ticks, +1 u a
+tick, the squash recovering, turning to him); attackToMario = the cry + the damage, NO hop / PostAttack; behaveToWater = forceRoll(Mario, water)
+always -- the roll anim at hover height on a true arc (vy 10, ~30 u/tick) until the base point lands (~134 ticks), BoundNum 0 -> straight back to
+Wander (a wall: WallDie); isHitValid = not hidden; the 4-clip table (crash / down / roll / wait) sits on the Stu's slots 1 / 2 / 7 / 13 (empty slots
+are no longer warned). `BoundFly` knob = THaneHamuKuri::mBoundFly (the hopping flight the shipped game never turns on). DEVIATIONS / NOT PORTED:
+the bank (mRotation.z from the heading), the long-fall Land and the fruit flip (no clips), THaneHamuKuri2's graph flight, the cap-stealing
+TDoroHaneKuri (dorohane.bmd).
+
+**The goop Stu** (`SmsDoroHamukuri : SmsHamukuri`, hamukuri.cpp 2314-2440, dorohamukuri.prm: HP 1, jump 6, turn 5..8, march 1..2, 180 deg, give-up
+1000 / 1100, damage 100 x 90, attack 60 x 60, AttackWait 100, GenItemRate 50 + 10, BoundNum 2, VelocityRate 0.8, FirstVelocityY 10, JitabataTimer
+200): the Stu with its own model and numbers; attackToMario = the kick of a flailing one (+ the rumble) else selectCapHolder = the attack message
+only -- NO hop, no PostAttack (it keeps coming). The model has no clips of its own (the game plays hamukurianm on it): `Init` builds an
+AnimationPlayer under Model and copies the Stu's library from `ClipSource` (Hamukuri.glb), re-pointing every track at this skeleton and the
+Stu's `root` track at the Doro's `root_2` (renaming the bone broke the skin's named bind: "Skin bind #0 contains named bind 'root_2'"). The
+disguise (TDoroHige: Mario's cap + the moustache, dorokurihige.bmd) hangs on joint 5 'body', shown only with the `Disguise` knob. NOT PORTED
+(logged, needs Mario's cap as an item + a capless Mario): the cap robbing -- selectCapHolder's cap item and holder, TNerveDoroHamuKuriRobCap, the
+cap pass in isCollidMove, releaseCap on the holder's death.
+
+**Base fixes found by the two kinds:** (1) `HitCheckMario` no longer gates on `_hp == 0` and `SmsSprayedByWater` no longer refuses at 0 HP -- the
+game's decHpByWater floors at 0 and the collision lists still find the body; the 1-HP kinds were immune to everything after one drop (a Doro at 0
+HP flailed forever). (2) `GroundYBelow` excludes Mario's body (checkGround is a bg check): a diving Hane over him read his head as the ground (182
+u) and a Stu under him his feet. (3) `GoToRandomNextGraphNode`'s "not the node within 100 u" test is on the ground plane: a hovering body is never
+within 100 u of a floor node in 3D, so it re-picked the node under it and (reached within 10 u) dived on it. (4) the push-apart ADDS to the walk
+(`v.add(local_74)`), it replaced it before. ALSO: a fresh glb import writes the project's multi-line scene default into `_subresources`; 125b's
+one-line `set_key` only works on an already-stripped import -- patch_import125f.py brace-matches the block (strip_glb_import_defaults.py's way).
+
+**Drive 125** (`npc82/enemy125/patch_smoke125.py`, 62/62): the Stu's A-E / W / T, the Gooble's G1-G14, then H1-H11 on a Hanekuri.tscn placed in the
+arena with a two-node graph along the lane (a one-node graph is 'reached' every tick and the hover dived on it), FlyBaseHeight 250 and SearchLength
+400 for the hover checks (restored after): H1 boots straight into GraphWander with the flap, 1 HP, 0.7, the Model at 0.013434 x 0.7, 6 TEV
+materials; H2 the hover: rise 250 held, the bob swung 150..350 u over one 300-tick cycle, not airborne; H3 the find -> Jump -> Attack in 26 frames;
+H4 the dive flag over him by 6 u -> PrepareAttack; H5 the climb +4 a tick; H6 the plunge to the ground -> UpWait, rise 0, his HP -1 on the way
+down with no hop; H7 the stomp -> Die (hanekuri_down); H8 dead at 37 frames, nothing dropped; H9 the re-launch at 101 frames (Mario moved out of
+sight first); H10 the hose -> forceRoll: the roll anim, vy 9.7, 30 u/tick away, airborne; H11 landed back to Wander after 57 frames. D1-D6 on a
+Dorokuri.tscn: the 15 borrowed clips on its own skeleton (root_2 kept), 6 Doro materials, the disguise hidden on 'body'; D2 jnt_head turned 38 deg
+under hamukuri_set; D3 the hit with NO hop (still Attack); D4 still Attack 30 frames on; D5 the stomp -> Die; D6 one coin from the test table.
+Regression 118 35/35 on the committed level (its log shows pre-existing `det == 0` in ShineSprite.UpdateShineFxPosition and a not-in-tree read in
+SmsFluddDropsTickLocked during the E reload -- not this pass's code; noted for a shine pass). Build 0 errors; boot ALL OK, no errors.
+NOTE: `tar` from this Mac drops AppleDouble `._*` files into his tree (the C# compiler reads them as binary sources) -- delete them after an untar,
+or ship with scp per folder.
