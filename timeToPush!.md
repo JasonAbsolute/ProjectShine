@@ -154,7 +154,7 @@ The 35 changed paths are exactly the ones the entry lists. Largest blobs: `PROJE
 Working tree left untouched: Jaysonn's `assets/Level.tscn` and `assets/Sms/SmsHiddenCoin.cs` (open in his editor
 this session), the two Koopa flips, and the `addons/godot_ai` churn.
 
-### #5 -- PENDING -- queued 2026-10-25 16:20 PDT, updated 23:50 (Kiro)
+### #5 -- PUSHED 2026-10-25 -- https://github.com/JasonAbsolute/ProjectShine/tree/feature/enemy-base -- PR awaiting Jaysonn's click -- queued 2026-10-25 16:20 PDT, updated 23:50 (Kiro)
 Push the enemy branch and open its PR: the enemy base (TSmallEnemy / TWalkerEnemy / the Spine) with the whole Stu family on it -- Strollin', Soarin',
 the goop Stu, Smolderin', the tower, Swipin' with the cap theft -- the Gooble moved onto the base, the death / wall-hit puffs, the drop tables, and
 the editor previews (passes 125-125h). PLAYTESTED BY JAYSONN 2026-10-25 23:37 ("awesome looks like its all working. includong seeing them in the
@@ -208,6 +208,24 @@ Expect `0` from the rev-list. `gh` is still unauthenticated here (`gh auth statu
 The working tree carries Jaysonn's own uncommitted `assets/Level.tscn` and `assets/Sms/Enemy/Drops/StuDrops.tres` (the Stu's single coin made a
 BLUE coin -- his call whether it goes in this PR: if yes, `git add` it and commit it on the branch BEFORE the push), the editor's retab of
 `assets/Sms/SmsHiddenCoin.cs`, the two Koopa `.png.import` flips and the `addons/godot_ai` churn -- leave them unless he says otherwise.
+
+Result: all nine shas confirmed ancestors of the branch (code tip `4e10187`, 125g `0867da7`, 125f `7f1a436`, 125e `26f9666`,
+125d `6f4c588`, 125c `27f9e38`, 125b `3f7927b`, 125 `e039b9c`, the fx re-saves `59e3dec`) plus `main` `985fb29`.
+**Asked and answered -- `StuDrops.tres` IS IN**: Jaysonn said "include it!", so it was committed on the branch BEFORE the push
+as `1cd23b3` ("Stu drops: the single-coin drop made a blue coin"), staging that one file only. Worth recording what that diff
+actually was, since it looked bigger than it is: the ONLY behavioural change is the 80 %-weight entry swapping
+`yellow_coin.tscn` -> `blue_coin.tscn` (the 12 % fan of three stays yellow). Everything else the editor stripped equals its
+script default -- `Chance` 1, `UseEnemyRate` false, `CountMin`/`CountMax` 1, `ScatterUnits` 4, `LifeTicks` 0,
+`BodyPopMetresPerSecond` 6, and `PopUnitsPerTick` 20 = `SmsCoinItem.PopUpSpeedUnits` (SmsCoinItem.cs:29) -- so Godot omitted
+them on re-save and behaviour is unchanged. **General lesson: a Godot re-save that deletes property lines is not a content
+change when each deleted value matches the script default -- check the defaults before assuming the resource was gutted.**
+Branch pushed `b289ee9..1cd23b3`, 21 commits since `main`; `git rev-list --count origin/feature/enemy-base..feature/enemy-base`
+returned `0`. Hygiene on the range: 0 `addons/godot_ai` paths, 0 Koopa `.png.import` flips, and the `SmsHiddenCoin.cs` retab
+stayed out, as the rules require.
+**The PR is not open yet** -- `gh auth status` still says "not logged into any GitHub hosts", so the prefilled compare page was
+opened in the browser (title + `pr125.md`'s body urlencoded onto the compare URL, 4256 chars) for Jaysonn to submit.
+`pr125.md` deliberately NOT deleted yet: it is the only copy of that body until the PR exists. Delete it once the PR is up.
+Working tree otherwise untouched: `assets/Level.tscn`, `assets/Sms/SmsHiddenCoin.cs`, the two Koopa flips, `addons/godot_ai`.
 
 <!-- Kiro appends the next entry below this line. Entry template:
 
