@@ -1,0 +1,16 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://chanetro125f"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/EnemyToonTwoSided.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/Hamukuri/K_hamu_dot.png" id="2_dot"]
+[ext_resource type="Texture2D" uid="uid://c7qc8aqne083g" path="res://assets/Sms/models/toon_2_4i.png" id="3_toon"]
+
+[resource]
+resource_name = "_mat_body_bottom1 (hanekuri.bmd): the BLUE bottom -- GX_TEVREG0 (200, 200, 200), konst 5/8; s0 + mix(REG1 (230, 230, 230) the white dots, REG2 (64, 72, 190) the blue, K_hamu_dot) - 1/2; + the specular"
+shader = ExtResource("1_shader")
+shader_parameter/s0_k = 0.625
+shader_parameter/s1_form = 1
+shader_parameter/c0 = Vector3(0.7843, 0.7843, 0.7843)
+shader_parameter/c1 = Vector3(0.902, 0.902, 0.902)
+shader_parameter/c2 = Vector3(0.251, 0.2824, 0.7451)
+shader_parameter/base_tex = ExtResource("2_dot")
+shader_parameter/toon_tex = ExtResource("3_toon")

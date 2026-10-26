@@ -1,0 +1,259 @@
+[gd_scene format=3 uid="uid://cstufire125h"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsNpcEffect.cs" id="1_script"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/flame_tongue.gdshader" id="3_flame_sh"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/glow_add.gdshader" id="4_glow_sh"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/goop_refract.gdshader" id="5_refract_sh"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/fire1_raw.png" id="7_flame_tex"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/radgrad_raw.png" id="8_glow_tex"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/indwp2.png" id="9_haze_warp"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/indmsk1.png" id="10_haze_mask"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/glow1_raw.png" id="11_spark_tex"]
+
+[sub_resource type="Curve" id="Curve_flame_scale"]
+resource_name = "ms_moe_fire_a ESP1 scale: 1 to 25 %, -> 0.5 at the end"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.25, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.4999), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_flame_scale"]
+curve = SubResource("Curve_flame_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_flame"]
+resource_name = "0.5/frame, life 15; sphere r 8 u; velDir 1 + the Gravity field's 8 u/f drift (add type 2: a constant velocity) = 9 u/f up the joint's Y; align_y = the StripeCross along the velocity"
+particle_flag_align_y = true
+emission_shape = 1
+emission_sphere_radius = 0.1075
+angle_min = -18.0
+angle_max = 18.0
+direction = Vector3(0.001, 1, 0.009)
+spread = 0.0
+initial_velocity_min = 7.254
+initial_velocity_max = 7.254
+gravity = Vector3(0, 0, 0)
+scale_min = 0.9
+scale_max = 1.1
+scale_curve = SubResource("CurveTexture_flame_scale")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_flame"]
+resource_name = "ms_moe_fire_a: P_msm_fire1 (raw IA8), TEXC x prm (255,228,170) + env red -> orange (a 6-frame Repeat), alpha x 231/255"
+shader = ExtResource("3_flame_sh")
+shader_parameter/tex = ExtResource("7_flame_tex")
+shader_parameter/prm_color = Vector3(1, 0.894, 0.667)
+shader_parameter/prm_alpha = 0.906
+shader_parameter/env_a = Vector3(1, 0.212, 0)
+shader_parameter/env_b = Vector3(1, 0.463, 0.122)
+shader_parameter/life_frames = 15.0
+shader_parameter/cycle_frames = 6.0
+
+[sub_resource type="QuadMesh" id="QuadMesh_flame_a"]
+resource_name = "the game's 1.6 x 1.6 stripe (80 units), the Y along the velocity: the first of the cross"
+material = SubResource("ShaderMaterial_flame")
+size = Vector2(1.075, 1.075)
+
+[sub_resource type="QuadMesh" id="QuadMesh_flame_b"]
+resource_name = "the second of the cross, turned 90 deg about the Y"
+material = SubResource("ShaderMaterial_flame")
+size = Vector2(1.075, 1.075)
+orientation = 0
+
+[sub_resource type="Gradient" id="Gradient_glow_alpha"]
+resource_name = "ms_moe_fire_b ESP1 alpha 0 -> 0.4248 by 15 %, -> 0 from 71.07 %"
+offsets = PackedFloat32Array(0, 0.15, 0.7107, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.4248, 1, 1, 1, 0.4248, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_glow_alpha"]
+gradient = SubResource("Gradient_glow_alpha")
+
+[sub_resource type="Curve" id="Curve_glow_scale"]
+resource_name = "ms_moe_fire_b ESP1 scale: 1 to 29.44 %, -> 0.6 at the end"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.2944, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.6), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_glow_scale"]
+curve = SubResource("Curve_glow_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_glow"]
+resource_name = "0.25/frame, life 15; velDir 1 + the 9 u/f drift = 10 u/f up the joint's Y"
+emission_shape = 0
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 8.06
+initial_velocity_max = 8.06
+gravity = Vector3(0, 0, 0)
+scale_min = 0.95
+scale_max = 1.05
+scale_curve = SubResource("CurveTexture_glow_scale")
+color_ramp = SubResource("GradientTexture1D_glow_alpha")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_glow"]
+resource_name = "ms_moe_fire_b: P_msm_radgrad (raw I8), flat (255,172,101), alpha = I x the fade, additive"
+shader = ExtResource("4_glow_sh")
+shader_parameter/tex = ExtResource("8_glow_tex")
+shader_parameter/prm_color = Vector3(1, 0.675, 0.396)
+
+[sub_resource type="QuadMesh" id="QuadMesh_glow"]
+resource_name = "the game's 2.75 x 2.75 billboard (137.5 units)"
+material = SubResource("ShaderMaterial_glow")
+size = Vector2(1.847, 1.847)
+
+[sub_resource type="Gradient" id="Gradient_haze_alpha"]
+resource_name = "ms_moe_fire_c ESP1 alpha 0 -> 1 by 55.13 %, -> 0 from 62.5 %"
+offsets = PackedFloat32Array(0, 0.5513, 0.625, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_haze_alpha"]
+gradient = SubResource("Gradient_haze_alpha")
+
+[sub_resource type="Curve" id="Curve_haze_scale"]
+resource_name = "ms_moe_fire_c ESP1 scale: 1 -> 2.5 over the whole life (outTiming 0)"
+max_value = 2.5
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 2.5), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_haze_scale"]
+curve = SubResource("Curve_haze_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_haze"]
+resource_name = "0.125/frame, life 22; velDir 0.5 + the 6 u/f drift = 6.5 u/f up the joint's Y; a random turn (any angle)"
+emission_shape = 0
+angle_min = -180.0
+angle_max = 180.0
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 5.239
+initial_velocity_max = 5.239
+gravity = Vector3(0, 0, 0)
+scale_min = 0.95
+scale_max = 1.05
+scale_curve = SubResource("CurveTexture_haze_scale")
+color_ramp = SubResource("GradientTexture1D_haze_alpha")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_haze"]
+resource_name = "ms_moe_fire_c: the screen behind, warped by P_msm_indwp2 (I - 128) / 64 texels of the 320 x 224 copy (mtx 0.5 x 2^-5), masked by P_msm_indmsk1, a billboard"
+shader = ExtResource("5_refract_sh")
+shader_parameter/warp_tex = ExtResource("9_haze_warp")
+shader_parameter/mask_tex = ExtResource("10_haze_mask")
+shader_parameter/screen_texels = Vector2(320, 224)
+shader_parameter/ind_scale = 0.015625
+shader_parameter/prm_color = Vector3(1, 1, 1)
+shader_parameter/billboard = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_haze"]
+resource_name = "the game's 1.25 x 1.25 billboard (62.5 units) before its growth to 2.5"
+material = SubResource("ShaderMaterial_haze")
+size = Vector2(0.84, 0.84)
+
+[sub_resource type="Image" id="Image_spark_points"]
+data = {
+"data": PackedByteArray(2, 16, 22, 62, 125, 80, 21, 190, 217, 38, 152, 61, 148, 118, 22, 62, 100, 200, 46, 190, 171, 218, 156, 188, 33, 242, 27, 190, 118, 206, 30, 62, 54, 249, 55, 61, 120, 159, 251, 61, 223, 124, 57, 62, 213, 128, 137, 189, 97, 152, 1, 61, 208, 165, 132, 189, 165, 191, 68, 190, 38, 195, 127, 189, 219, 118, 149, 189, 34, 217, 58, 62, 101, 11, 29, 190, 112, 134, 202, 61, 21, 17, 213, 61, 201, 109, 121, 188, 201, 143, 115, 62, 135, 37, 132, 61, 244, 173, 23, 190, 7, 202, 46, 62, 212, 235, 123, 59, 79, 235, 81, 189, 250, 101, 88, 190, 131, 128, 198, 189, 187, 62, 32, 62, 17, 172, 234, 61, 176, 213, 179, 189, 93, 245, 2, 62, 51, 123, 3, 62, 172, 172, 239, 61, 35, 91, 140, 189, 13, 116, 191, 61, 204, 72, 50, 190, 146, 216, 236, 61, 110, 13, 76, 62, 165, 126, 46, 189, 93, 12, 167, 61, 26, 166, 69, 190, 70, 226, 205, 189, 27, 38, 150, 61, 200, 220, 206, 189, 125, 120, 45, 190, 223, 238, 58, 62, 149, 141, 42, 61, 73, 215, 160, 189, 206, 148, 253, 61, 18, 97, 48, 62, 60, 88, 162, 189, 6, 227, 246, 60, 53, 10, 6, 62, 247, 143, 45, 62, 167, 36, 142, 60, 217, 76, 19, 190, 89, 113, 40, 190, 27, 156, 207, 188, 214, 80, 244, 189, 49, 221, 51, 190, 255, 102, 189, 61, 17, 206, 33, 62, 163, 207, 1, 190, 150, 35, 71, 62, 250, 129, 116, 61, 158, 178, 183, 60, 144, 225, 180, 61, 121, 156, 194, 61, 7, 85, 40, 190, 191, 2, 21, 62, 32, 162, 38, 62, 21, 247, 75, 189, 179, 172, 17, 61, 216, 36, 36, 61, 70, 109, 72, 190, 168, 150, 161, 188, 179, 176, 87, 190, 50, 165, 222, 61, 24, 4, 1, 62, 146, 124, 147, 189, 220, 212, 21, 62, 177, 201, 59, 190, 119, 136, 72, 189, 109, 6, 151, 189, 214, 14, 242, 189, 115, 76, 183, 60, 245, 26, 38, 62, 175, 69, 179, 189, 47, 226, 130, 189, 243, 82, 50, 190, 95, 20, 62, 190, 43, 122, 154, 189, 120, 0, 77, 61),
+"format": "RGBFloat",
+"height": 1,
+"mipmaps": false,
+"width": 32
+}
+
+[sub_resource type="ImageTexture" id="ImageTexture_spark_points"]
+image = SubResource("Image_spark_points")
+[sub_resource type="Image" id="Image_spark_normals"]
+data = {
+"data": PackedByteArray(0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0),
+"format": "RGBFloat",
+"height": 1,
+"mipmaps": false,
+"width": 32
+}
+
+[sub_resource type="ImageTexture" id="ImageTexture_spark_normals"]
+image = SubResource("Image_spark_normals")
+
+[sub_resource type="Gradient" id="Gradient_spark_alpha"]
+resource_name = "ms_moe_fire_d ESP1 alpha: the AddSin flicker (0.75, 0.125, 0.875) over the life"
+offsets = PackedFloat32Array(0, 0.0167, 0.0333, 0.05, 0.0667, 0.0833, 0.1, 0.1167, 0.1333, 0.15, 0.1667, 0.1833, 0.2, 0.2167, 0.2333, 0.25, 0.2667, 0.2833, 0.3, 0.3167, 0.3333, 0.35, 0.3667, 0.3833, 0.4, 0.4167, 0.4333, 0.45, 0.4667, 0.4833, 0.5, 0.5167, 0.5333, 0.55, 0.5667, 0.5833, 0.6, 0.6167, 0.6333, 0.65, 0.6667, 0.6833, 0.7, 0.7167, 0.7333, 0.75, 0.7667, 0.7833, 0.8, 0.8167, 0.8333, 0.85, 0.8667, 0.8833, 0.9, 0.9167, 0.9333, 0.95, 0.9667, 0.9833, 1)
+colors = PackedColorArray(1, 1, 1, 0.5625, 1, 1, 1, 1, 1, 1, 1, 0.881, 1, 1, 1, 0.5562, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.6446, 1, 1, 1, 0.1078, 1, 1, 1, 0.457, 1, 1, 1, 0.6174, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0.4206, 1, 1, 1, 0.8204, 1, 1, 1, 0.4261, 1, 1, 1, 0.4197, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.7236, 1, 1, 1, 0.4953, 1, 1, 1, 0.9421, 1, 1, 1, 0.8153, 1, 1, 1, 0.0077, 1, 1, 1, 0, 1, 1, 1, 0.4344, 1, 1, 1, 0.4692, 1, 1, 1, 0, 1, 1, 1, 0.1996, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.6029, 1, 1, 1, 0.768, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.2272, 1, 1, 1, 0.2413, 1, 1, 1, 0.6573, 1, 1, 1, 0.3023, 1, 1, 1, 0, 1, 1, 1, 0.0717, 1, 1, 1, 0.7663, 1, 1, 1, 0.6332, 1, 1, 1, 0.3008, 1, 1, 1, 0.8202, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0.473, 1, 1, 1, 0.7417, 1, 1, 1, 1, 1, 1, 1, 0.3547, 1, 1, 1, 0, 1, 1, 1, 0.1763, 1, 1, 1, 0.5737, 1, 1, 1, 0.1623, 1, 1, 1, 0, 1, 1, 1, 0.6905, 1, 1, 1, 1, 1, 1, 1, 0.7993, 1, 1, 1, 0.582, 1, 1, 1, 1, 1, 1, 1, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_spark_alpha"]
+gradient = SubResource("Gradient_spark_alpha")
+
+[sub_resource type="Curve" id="Curve_spark_scale"]
+resource_name = "ms_moe_fire_d ESP1 scale: 1 to 62.5 %, -> 0 at the end"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.625, 1), 0.0, 0.0, 1, 1, Vector2(1, 0), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTexture_spark_scale"]
+curve = SubResource("Curve_spark_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_spark"]
+resource_name = "0.05/frame, life 70 +-25 %; the shell r 15 u stretched 1.25 in Y; 6 u/f up a 27 deg cone; airResist 0.97 -> 4.94 m/s^2 of damping (176 u of rise either way); the Random field (+-1.5 u/f every 2 frames) as turbulence"
+lifetime_randomness = 0.25
+emission_shape = 5
+emission_point_texture = SubResource("ImageTexture_spark_points")
+emission_normal_texture = SubResource("ImageTexture_spark_normals")
+emission_point_count = 32
+direction = Vector3(0, 1, 0)
+spread = 27.0
+initial_velocity_min = 4.836
+initial_velocity_max = 4.836
+gravity = Vector3(0, 0, 0)
+damping_min = 4.938
+damping_max = 4.938
+scale_min = 0.75
+scale_max = 1.25
+scale_curve = SubResource("CurveTexture_spark_scale")
+color_ramp = SubResource("GradientTexture1D_spark_alpha")
+turbulence_enabled = true
+turbulence_noise_strength = 1.0
+turbulence_noise_scale = 2.0
+turbulence_noise_speed = Vector3(0, 0.5, 0)
+turbulence_influence_min = 0.08
+turbulence_influence_max = 0.15
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_spark"]
+resource_name = "ms_moe_fire_d: P_msm_glow1 (raw I8), TEXC x prm (255,135,87) -- the glow's I shapes the alpha, prm the colour -- additive"
+shader = ExtResource("4_glow_sh")
+shader_parameter/tex = ExtResource("11_spark_tex")
+shader_parameter/prm_color = Vector3(1, 0.529, 0.341)
+
+[sub_resource type="QuadMesh" id="QuadMesh_spark"]
+resource_name = "the game's 0.5 x 0.5 billboard (25 units)"
+material = SubResource("ShaderMaterial_spark")
+size = Vector2(0.336, 0.336)
+
+[node name="StuFire" type="Node3D"]
+script = ExtResource("1_script")
+EmitFrames = 0.0
+DrainSeconds = 1.4583
+FollowRotation = true
+
+[node name="Flame" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1343, 0)
+emitting = true
+amount = 8
+lifetime = 0.25
+process_material = SubResource("ParticleProcessMaterial_flame")
+draw_passes = 2
+draw_pass_1 = SubResource("QuadMesh_flame_a")
+draw_pass_2 = SubResource("QuadMesh_flame_b")
+
+[node name="Glow" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1343, 0)
+emitting = true
+amount = 4
+lifetime = 0.25
+process_material = SubResource("ParticleProcessMaterial_glow")
+draw_pass_1 = SubResource("QuadMesh_glow")
+
+[node name="Haze" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.4702, 0)
+emitting = true
+amount = 3
+lifetime = 0.3667
+process_material = SubResource("ParticleProcessMaterial_haze")
+draw_pass_1 = SubResource("QuadMesh_haze")
+
+[node name="Sparks" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5247, 0)
+emitting = true
+amount = 4
+lifetime = 1.1667
+process_material = SubResource("ParticleProcessMaterial_spark")
+draw_pass_1 = SubResource("QuadMesh_spark")

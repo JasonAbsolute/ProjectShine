@@ -7451,3 +7451,363 @@ shine_icon.bti 30 x 36, drawn 25 x 25 / 35 x 41 at the 17-px digit pitch. With t
 touch at the outline, the x stands full-height beside the sun, the sun fills its pane under "MARIO A" (its top at the name's bottom, as the blo).
 `DigitPitch` stays for his taste. Drive 124 34/34 (its C6/C7 now sample the breath clock in a 44-50 / 76-80 window: on a frame hiccup the
 dialog's 60 Hz accumulator steps twice per physics tick and the exact 44 / 80 can be skipped).
+
+## SMS pass 125 -- the enemy base (TSmallEnemy / TWalkerEnemy) + Strollin' Stu (feature/enemy-base)
+
+**Files:** `assets/Sms/Enemy/SmsSmallEnemy.cs` (new, the base), `assets/Sms/Enemy/SmsHamukuri.cs` (new), `assets/Sms/Enemy/Hamukuri.tscn` (new),
+`models/Eniemes/Hamukuri/Hamukuri.glb` + 3 textures (new: his FinModelUtility export of bianco0's hamukuri/default.bmd with the 15
+hamukurianm bck clips; the .import stripped of the scene default), `assets/Gooble.cs` (one line: an SmsSmallEnemy is a fellow small enemy).
+
+**The base** (`SmsSmallEnemy`, abstract CharacterBody3D, ISmsSprayTarget) is the game's small-enemy stack ported once so each enemy is a thin
+species on it -- Enemy/smallEnemy.cpp (TSmallEnemy: init/reset, moveObject, receiveMessage, kill, the Die / Freeze / Jump / HitWaterJump /
+Wait nerves, genRandomItem, isFindMario, the hit cylinders), walkerEnemy.cpp (TWalkerEnemy: the Generate / GraphWander / Attack / PostAttack /
+Escape / TraceMario nerves, walkBehavior, behaveToFindMario, attackToMario's hop, the wall hop), enemy.cpp (TSpineEnemy: walkToCurPathNode,
+calcTurnSpeedToReach, the graph goals, isInSight), walker.cpp (TWalker::bind: gravity 0.15 a tick, terminal 40, the velocity zeroed on landing,
+no drag) and Strategic/Spine (the nerve stack: push / pushAfterCurrent / setNext / reset, the nerve's time). ONE TICK = one 120 Hz movement
+tick (the .prm speeds are units a tick); the physics step is the ticks' displacement through MoveAndSlide. A species gives: its `Params` (the
+.prm), its bck table (names, frame counts, loop attributes read off the disc), the anim setters, its own nerves (`ExecuteNerve`, ids from
+100) and the hooks named after the game's virtuals (SetBehavior, BehaveToWater, AttackToMario, IsFindMario, WalkBehavior, IsHitValid,
+IsCollidMove, GravityY, LaunchVelocity, KeepVelocityOnGround...). Knobs: Graph (the wander graph; none = random points within WanderRadiusUnits
+-- DEVIATION, his levels carry no graph), RelaunchTicks (200 = launcher.prm's period; a placed enemy is its own launcher -- DEVIATION), DropScene
+(the game's generateItem asks for a type nothing shipped carries: nothing drops; the knob is the deviation), DeathFxScene / DeathSound (slots),
+ModelScale (1 / 74.44 for a raw FinModelUtility glb in game units), DebugPrint. `SmsPlace(pos, yaw)` for spawners that place after AddChild.
+
+⚠️ **The hit cadence:** TMarDirector::direct (MarDirectorDirect.cpp 126) runs gpObjHitCheck->checkActorsHit() only on the ticks whose
+mMoveTickCount has both low bits clear -- the actor collision lists exist every FOURTH movement tick (clearHitNum on the others). The base
+checks its Mario pair on that cadence. It matters: a kicked Stu leaves at 30 u/tick, so by the next list it is 120 u away and its 90 + 42 u
+attack reach no longer covers him -- per tick, the kick hit Mario back. ⚠️ **checkCurAnmEnd** is MActorAnm::endsNext: frame + rate + 0.1 >=
+the end -- true once a CYCLE for a looping clip (the game's PostAttack waits on the looping wait anim this way); a never-ending loop hangs the
+nerve. ⚠️ A body placed AFTER AddChild must call `SmsPlace`: `_Ready` captures the placed point / yaw at entry.
+
+**Strollin' Stu** (`SmsHamukuri`, hamukuri.cpp's THamuKuri with the shipped /enemy/hamukuri.prm: 5 HP, march 1, turn 0.9..1, scale 1, jump 3,
+search 800 / 1000 / 10 / 90 deg, give-up 1500 / 650, attack wait 200, damage 60 x 100, attack 90 x 50, water coeff 30, first vy 5, bound 10,
+jitabata 800, kick vy 3, fly 600, trample bonus 3, crash bonus 2 / 60, kyoro 500): the wander's KYORO look-around (setWalkAnm IS the look-around,
+bck 4, then the walk 14; again every 500 ticks of wandering), the sight (x5 and give-up x3 when he pumps an EMPTY tank), the charge (run at
+x3) and hit (dmghamukuri.prm) with the hop + PostAttack, the long-fall Land, the stomp -> down (turn_down when flailing) -> dead -> the launcher's
+(0, 4, 4) re-launch arc with the set anim (LaunchArc knob), WATER on the ground -> JITABATA (turn_start -> the flail loop for 800 ticks -> turn_end
+-> Wait; the hose's drops carry it: inside 1.77 m its attack cylinder hits first, as the game), water while falling -> the water roll, the KICK
+of a flailing Stu (its body below his feet) -> forceRoll with the FLY: the puck skids on the floor (THamuKuri::bind: vy 0, y = ground + 1) at 30
+u/tick for 600 ticks -> a wall in its way (isHitWallInBound: moving INTO the wall) -> WallDie: the crash anim, the wall puff slot, dead after it
+(a rolling Stu rolls the Stu it hits: the serial crash -- 2+ within 60 ticks = a coin, SerialCrashScene slot); a flailing Stu stomped kills every
+other flailing one (requestSerialKill) and 3+ leave a 1-UP (his 1_up_mushroom.tscn); a thrown fruit landing on it (|vy| > 2, |vxz| > 2) flips it.
+Exports: LaunchArc, OneUpScene, SerialCrashScene, WallHitFxScene, AttackVoice / CrushedSound (slots).
+
+**Not ported (logged):** the football chase (GoForSearchActor -- Pinna's ball), the winged / goop (cap-stealing) / stack / fire kinds, the
+goop-walk pollution, the DISAP / WALLHIT particles (slots), the sounds (slots), the Gooble's migration onto the base (it keeps its own code;
+only the push-apart line knows the base), TEnemyManager's pooling / clipping, the generator (TGenerator) objects.
+
+**Drive 125** (`npc82/enemy125/patch_smoke125.py`, 15/15, the real collision / input path with Mario placed): A1-A4 generate (set anim, 78
+ticks) -> wander: the kyoro standing still, then the walk at 240 u / 240 ticks toward a one-node graph; B1-B4 Mario 5 m ahead -> the find,
+the run closing 3.2 m / 80 ticks, the hit (health -1, dmghamukuri) + the hop, PostAttack's wait; C1-C3 the trample -> Die with the down anim,
+dead at 74 ticks, the re-launch at 200 ticks with the arc (5 HP again); D1-D2 R from 3 m -> the drops flip it (HP 4) -> the flail loop; E1-E3
+the contact kick -> the puck (5.6 m in 12 ticks) -> the wall crash. Regression 118 35/35; build 0 errors; boot ALL OK.
+
+## SMS pass 125b -- the Stu's look: the editor-size scale and the bmd's TEV materials (feature/enemy-base)
+
+**Files:** `assets/Sms/Enemy/Hamukuri.tscn` (the Model node carries the 0.013434 scale; no ModelScale property), `SmsSmallEnemy.cs` (the Model
+node's placed scale replaces the ModelScale export: what the editor shows is what the game uses), new `assets/Sms/Enemy/EnemyToon.gdshaderinc` +
+`EnemyToon.gdshader` (cull back) / `EnemyToonTwoSided.gdshader` (cull none) / `EnemyToonCutout.gdshader` (the alpha test), five materials
+`HamukuriNose / Foot / Trousers / Top / Eye.tres`, the bmd's own textures `models/Eniemes/Hamukuri/K_hamu_dot.png`, `K_hamu_eye1.png`,
+`H_ma_polmask1_i4_hamu.png` (bti2png out of default.bmd's TEX1, imports pinned lossless), `Hamukuri.glb.import` (`_subresources`: the six
+glTF materials swapped for the .tres by name -- use_external -- so the editor shows them too), the three `default_*.png.import` pinned.
+
+**Why (Jaysonn's Ref/enemyref.png):** the Stu stood 117 m tall in the editor -- pass 125 scaled the glb only at run time (ApplyLook x ModelScale)
+-- and wore the exporter's materials: FinModelUtility gives each material one stage's first texture, so `default_0.png` is the TOON RAMP
+(H_toon_2_4i) standing in for K_hamu_dot on the nose / feet / trousers / top, in BLEND mode with the TEV register colours baked into vertex
+colours. Read default.bmd instead (bmd_mat_dump.py, then every claim checked with a numpy render of the glb through the stages --
+`npc82/enemy125/hamu_preview.py` -- against the Mario Wiki's in-game screenshot: top (255, 158, 0) lit / (236, 131, 0) shade, trousers
+(243, 19, 96) lit / (202, 0, 55) shade, feet (68, 68, 238), nose (255, 238, 177) -- all within a few units):
+- the lighting is TLightCommon's per vertex: COLOR0 = amb 128 + the sun x N.L, ALPHA0 = amb 50 + N.L, COLOR1 = the sun as a GX_AF_SPEC light
+  (the bmd's channel list is [COLOR0, ALPHA0, COLOR1, ALPHA1] -- the spec is the THIRD entry; reading the second as COLOR1 made the top white);
+- stage 0 everywhere: s0 = 1/2 (REG0 + mix(toon, COLOR0, k) - 1/2), k 3/4 (nose / feet / eye) or 5/8 (body); REG0 is S10: the top's
+  (404, 190, -211) clamps to the orange, the feet's (10, 10, 350) to the blue, the nose's (500, 350, 225) to the cream, the eye's (400, 404, 424) to white;
+- nose / feet / top / eye: s1 = mix(COLOR1, TEX, s0) -- the texture where lit, the specular where dark. K_hamu_dot is WHITE with one black disc:
+  the nose and feet UVs sit on a white corner (a plain colour), the top's strip is white with a gray band at v > 0.84 (its bottom rim), so the
+  dots are the TROUSERS': s1 = s0 + mix(REG1 (230, 230, 230), REG2 (242, 16, 93), TEX) - 1/2 = the red where the texture is white, a white
+  dot where the disc is, + COLOR1 (the specular). The eye draws the pupil decal: alpha = TEXA x ALPHA0 x 4, test GEQUAL 128 -- the clear texels
+  are never drawn (no sclera: the Stu's eyes are the dark (0, 57, 49) discs with a glint);
+- the top's seven stages are the POLLUTION path: stage 0 REG2 = polmask.a > konst.a (the mask through TEXMTX1 (4, 2.489) + (0.166, 0.039),
+  S wraps), REG1 = s1 x REG2, PREV = rak x COLOR0 (the dummy swapped for the stage's h_ma_rak), PREV = PREV x (1 - REG2) + REG1. The bmd's
+  konst 128 would spatter every Stu; the plain Stu is clean, the generator Stus wear the brown spatter -> `dirt` knob on HamukuriTop.tres:
+  0 = clean (default; the mask is not read), 0.5 = the bmd's own pattern with assets/Sms/Npc/tex/H_ma_rak.png. `unshaded, fog_disabled` as
+  NpcSkin / GoobleBody (the GX lighting is the TEV's); all textures read RAW (display-referred) and the result to_linear once.
+
+⚠️ A glb's `default_N.png` set is NOT the bmd's texture set -- it is one texture per material, the first stage's, so a toon ramp or a mask can
+stand where the colour texture belongs; pull TEX1 out of the bmd (bmd_tex.py) and check the UVs' sample (probe_uv.py) before trusting a texel.
+⚠️ A species scene scales its glb on the Model node (the editor's size is the game's); SmsSmallEnemy multiplies that by the .prm body scale.
+
+**Drive 125** 19/19 -- L1 the Model node at 0.013434 in the scene, the 117.4 u mesh 1.577 m; L2 the six surfaces wear the five .tres with the
+three shaders; L3 the top reads K_hamu_dot + the toon ramp with REG0 (1.5843, 0.7451, -0.8275), dirt 0, the eye K_hamu_eye1; L4 the six pngs
+import lossless / no mipmaps / no 3D auto-compression; A-E as pass 125. Build 0 errors; boot ALL OK. Not checked headless: the pixels (the
+dummy renderer) -- the look was checked by the numpy render; Jaysonn's eye decides. Not ported: the goop-walk that would raise `dirt` in play.
+
+## SMS pass 125c -- the small enemies' puffs: the death smoke + glow, the wall-crash puff + goop splat (feature/enemy-base)
+
+**Files:** new `assets/Sms/Fx/EnemyDisap.tscn`, `EnemyDisapWet.tscn`, `EnemyWallHit.tscn` (tools/projectshine/gen_fx_enemy.py from the disc's
+ms_enm_disap_a / _a_w / _b / ms_enm_wallhit / _o .jpa), `SmsFxBurst.cs` (a generic world-pinned one-shot burst: restarts every GPUParticles3D
+child, frees itself when the last finishes, SetShaderParam for the splat's colour), `JpaDirBillboardAdd.gdshader` (JpaDirBillboard's additive
+twin), `JpaQuad.gdshader` (a JPA quad in the emitter's frame -- no billboard -- with the alpha test), `tex/kemuball3_enemy.png` (lerp((74,98,170)
+-> white)), `tex/glow1_raw.png`, `tex/pecha3_raw.png` (raw I / IA, imports pinned lossless); `SmsSmallEnemy.cs` (SpawnBurst: the unbound emit;
+SetAfterDeadEffect uses it), `SmsHamukuri.cs` (DeathFxWetScene, SplatColor / SplatShade knobs; SetWallDeadEffect puts the burst ON the wall;
+SetAfterDeadEffect picks the wet smoke during the crash anim), `Hamukuri.tscn` (the three slots filled).
+
+**The game (smallEnemy.cpp 390, hamukuri.cpp 1007 / 1095, EmitterViewObj.cpp 599):** every small enemy's death = emit(DISAP_A) + emit(DISAP_B) at
+mPosition, both setGlobalScale(mScaling) -- UNBOUND (the burst stays where it died). The Stu's wall death: TNerveHamuKuriWallDie's first tick
+emitWithRotate(WALLHIT, anmMtx(1) = joint 1's point, the yaw) scaled + emitWithRotate(WALLHIT_O, mPosition, the yaw) with SMSSetEmitterPolColor(6) =
+the stage's goop colour from prmarray / envarray; when its crash anim ends genRandomItem -> setAfterDeadEffect, which emits DISAP_A_W instead of _A
+while bck 1 (the crash) is current. The .jpa data (jpa_dump.py): the smoke = 30 puffs off a ring r 10 u, 30 u up, 22 u/f outward x the moment
+0.4 (1 - 0.2249 r), a Drag field 0.9 a frame fading in over 35.5 %, a Gravity field 3.4 u/f^2 UP from 12.5 % fading in over 62 %, life 55, a 75 u
+billboard 0.85 -> 1 -> 1.8, kemuball3 lerp((74,98,170) -> white) = a blue-gray smoke, alpha out from 58.6 %; the glow = 22 streaks off a sphere
+r 30 u at 15 u/f (x 0.5..1.5), airResist 0.94, a 12.5 x 17.5 u DirBillboard Y 3 -> 1 -> 0.3, ADDITIVE flat (111, 255, 183) mint, alpha out from
+25 %; the wall puff = ONE 90 u kemuball3 puff off a ring r 15 u stood on edge (rot X 90) facing the yaw, 18 u/f out + 3 along the axis,
+airResist 0.92, life 35; the splat = ONE 325 u Direction quad at (0, 45, 0), life 180 (3 s), X 0.1 -> 1 by 4 %, Y -> 1.4 at the end (the sag), a
+0.01 u/f^2 downward BaseVelocity gravity from 12.5 % (1.7 m of slide over its life), P_ms_pecha3_ia lerp(env -> prm), OPAQUE, alpha test > 33.
+⚠️ **JPA Drag** (JPAField.cpp 396 / JPAParticle.cpp 59): mCurrentDragForce starts at 1 and is MULTIPLIED every frame by 1 - fade x (1 - mag)
+-- an exponential decay (0.9^n once faded in), not a per-frame factor; a FieldAccel field accumulates (a true acceleration), velocity = drag x
+(base + field) x moment. gen_fx_enemy.py simulates the frames and hands Godot the radial / directional velocity CURVES (the smoke spreads 1.9 m
+and lifts 0.5 m) rather than an initial velocity + damping.
+
+**DEVIATIONS (logged):** the splat is placed ON the wall (a ray along the latched wall normal from the body, 1 u off the face, the quad's +Z = the
+normal) -- the game's 325 u quad sits at the body's point and reads as "on the wall" from any camera, but a Godot quad there floats 40 u in front
+of it; the splat's SSP1 drips (life 120, one every 6 frames from 20 %) are not ported; the stage colour is a knob (SplatColor / SplatShade,
+default the table's stages 0 / 9 / 57 entry (255, 227, 168) over (216, 48, 96); Bianco's is (181, 132, 102) over (98, 14, 0)); the sounds stay
+slots. ⚠️ The dummy renderer never reports GPUParticles3D.Emitting true for a restarted one-shot; the burst's own Running count is the signal.
+
+**Drive 125** 25/25 (`npc82/enemy125/patch_smoke125.py`): P1-P3 the stomp death spawns EnemyDisap at the body, scaled, TopLevel, both emitters
+restarted one-shot, the smoke's curves and the glow's additive shader, freed within 70 frames; W1-W3 the wall crash spawns EnemyWallHit 1.0 u
+off the wall face facing its normal (the first run had it 41 u off, facing the wrong way: the wall flag was already cleared when WallDie ran --
+the latched normal is used now), the Puff at joint 1 (55 u), the Splat at +45 u in the knob colours, 3 s, sliding; the crash anim's end spawns
+EnemyDisapWet (the sphere at the point) + the glow. Build 0 errors; boot ALL OK. Regression 118: 7/8 on HIS working Level.tscn -- his placed
+test Stu charges Mario during the shine demo (the environment, not the code) -- 35/35 on the committed level (his copy restored at the same
+md5). Not checked headless: the pixels (the dummy renderer) -- the look is Jaysonn's.
+
+## SMS pass 125d -- the drop table: what an enemy drops when it dies (feature/enemy-base; Jaysonn's request)
+
+**Files:** new `assets/Sms/Enemy/SmsDropTable.cs` + `SmsDropEntry.cs` ([GlobalClass] Resources), `assets/Sms/Enemy/Drops/StuDrops.tres` (the Stu's
+default table), `SmsSmallEnemy.cs` (the `DropTable` export replaces `DropScene`; GenRandomItem rolls it; `LastDrops` for the drives; `DropSpawner`
+for a species' own drops), `SmsHamukuri.cs` (the serial 1-UP and the serial-crash coin go through the same spawner), `Hamukuri.tscn` (DropTable
+set), the three `assets/Sms/Fx/Enemy*.tscn` headers (Godot rewrote the hand uids: a 14-character one is invalid and gets replaced -- the
+generator pins the assigned one now).
+
+**The game (smallEnemy.cpp 326-415):** genRandomItem = setAfterDeadEffect + genEventCoin (a coin the STAGE placed with the enemy, thrown (0, 20,
+0) u/tick) + generateItem: rand 0..100 < mSLGenItemRate + mSLGenEggRate (the Stu: 100 + 80 = always) -> gpMapObjManager->makeObjAppear(x,
+mGroundHeight, z, ACTOR_TYPE_ITEM_UNK8) -- an item type (HIT_CATEGORY_ITEM | 8) no shipped stage carries, so the retail game drops NOTHING from a
+plain kill; its coins are the placed event coin and the serial crash. The drop table is therefore a DEVIATION (requested); kept of the game: the
+hook (genRandomItem, skipped when LIVE_FLAG_UNK20000 -- the wall crash, a kill by another attacker -- or DEAD is set: the wall death drops
+nothing), the point (x, mGroundHeight, z), the pop (0, 20, 0) u/tick with the coin's own item life (a dropped yellow coin lives 480 ticks as
+TCoin::appearWithoutSound makes it), the .prm odds as an option (UseEnemyRate).
+
+**The system:** `SmsDropTable` = Chance (the odds a death drops anything) or UseEnemyRate, `Entries` (weighted `SmsDropEntry` lines: Scene, Weight,
+CountMin..CountMax, ScatterUnits for the extra ones of a count, LifeTicks (0 = the kind's default), a Note), PopUnitsPerTick (20),
+BodyPopMetresPerSecond (6, for an item without the SMS item life). One death = ONE roll: the chance, then one line by weight, then its count. An
+entry with no Scene is a "nothing" result with a weight. `SpawnItem` launches by the item's kind: anything with `SmsThrow` (the coins) gets the
+game's item life; a CharacterBody3D / RigidBody3D (his 1_up_mushroom.tscn) gets a Velocity hop (6 m/s up, the scatter scaled); anything else is
+placed; an `SmsDropped(Node3D by)` method on the item is called if it has one -- the hook for items that want to know. Nothing in the enemy
+code names a coin or a mushroom: a new item kind is a new line with its scene. The default `StuDrops.tres`: every death drops; a coin 80 %, a
+fan of three 12 %, a 1-UP 8 % -- Jaysonn's to tune (Chance under 1 for nothing-deaths; a per-enemy table on a placed Stu overrides the species').
+
+**Drive 125** 31/31: T1 the shipped table loads (3 lines, pop 20, Chance 1) and 20000 seeded rolls land within 1.5 % of 80 / 12 / 8, never
+nothing; T2 Chance 0.3 -> 30.2 %, UseEnemyRate at 180 -> always, at 0 -> never, a nothing-line w 5 beside a coin w 1 -> 16.7 %; T3 the REAL
+stomp death with a one-line count-2 table -> two yellow coins under the level at the ground point, SmsThrow'n (untouchable, 480 of life); T4
+the first straight up at (0, 20, 0), the second fanned 2..4 u/tick (the first run had both scattered -- the spawner's `count > 1` test is `i > 0`
+now, as its comment said); T5 the body path: a 1_up_mushroom gets Velocity (1.2, 6, 0) and no SmsThrow; T6 the wall death adds no drop (the same
+LastDrops list) -- the UNK20000 gate. Build 0 errors; boot ALL OK.
+## SMS pass 125e -- the Gooble onto the enemy base (feature/enemy-base)
+
+**Files:** `assets/Gooble.cs` (rewritten: TNameKuri as a species on SmsSmallEnemy -- 959 -> 590 lines; the look code carried over verbatim),
+`assets/Gooble.tscn` (DropTable set), `assets/Sms/Enemy/Drops/GoobleDrops.tres` (new: the Gooble's own copy of the Stu's defaults),
+`assets/Sms/Enemy/SmsSmallEnemy.cs` (the two `is Gooble` special cases gone; `PrevNerveName` for the drives), `assets/Mario.cs` (one line:
+gpConductor->killEnemiesWithin kills every `SmsSmallEnemy` in the sms_enemy group -- it tested `is Gooble`, so a Stu within 2000 u of a shine get
+survived it since pass 125).
+
+**What moved:** the Gooble's stand-alone port (passes 56-99) duplicated the whole TSmallEnemy / TWalkerEnemy / Spine stack. It is now ONLY what
+namekuri.cpp adds (read again at doldecomp/sms main, src/Enemy/namekuri.cpp): `Prm` (the shipped namekuri.prm over the base `Params`, built from
+SmsParams.NameKuri), the bck table (wait / walk loop), the species nerves FollowMario / JumpAttackPrepare / JumpAttack / Land (ids 100+),
+`Init` (unk150 = 0x3A -> the death stamps goop; the look; the death splash child; the bottle scene), `Reset` (the alive clock, the flash, the
+next of the seven colours), the anim setters (setGenerateAnm zeroes the velocity; setDeadAnm / setMeltAnm play the splash and set UNK10),
+`GravityY` (0.135 in the leap), `WallHopAllowed` (not while preparing / leaping), `SetBehavior` (moveObject's tail: Land past LandHeight 100 u
+while wandering / escaping, the walk sound, the alive clock with the x1.01 inflation over the last 100 ticks), `BehaveToFindMario` (Wander after
+FollowMario -- no hop, no run), `AttackToMario` (dmgnamekuri; a leaper stops and dies, UNK20000), `BehaveToWater` (Die, melting on the ground,
+UNK20000), `IsHitValid` (unk198 = 1 -> the bottle's gate), `LaunchVelocity` ((0, 4, 0), yaw 0), `SetAfterDeadEffect` (the bottle under half a tank;
+no smoke -- TSmallEnemy's DISAP overridden away, as the game). Everything else -- the hit cylinders, the 4th-tick collision cadence, the wall hop,
+the push-apart, Die's timing, the relaunch, genRandomItem -> the DropTable -- is the base's.
+
+**Corrections the base brought (the stand-alone port had them wrong):** (1) TNerveSmallEnemyDie ends at checkCurAnmEnd && time > the manager's
+unk5C (60) + the anim's end frame (smallEnemy.cpp) -- the old Gooble lacked the 60 ticks, so the body vanished half a second early (now 78 ticks
+after a stomp, 102 after a melt); (2) RelaunchTicks 200 = launcher.prm's shipped mSLLaunchPeriod (the old 180 was TLauncherParams' code default);
+(3) TNameKuriLauncher::stateLaunch's resetSRTV passes rotation (0, 0, 0): a re-launched Gooble faces yaw 0, not its placed yaw; (4) the collision
+lists exist every FOURTH tick (the old port checked every tick). DEVIATIONS (logged): `DropOnTimeOut` (default off): the alive clock's kill()
+carries no UNK20000 in the game, so its generateItem would roll -- but the table is for his kills, so a timed-out Gooble drops nothing unless the
+knob is on; `GoobleDrops.tres` = the Stu's odds (a coin 80 %, three 12 %, a 1-UP 8 %) on a STOMP / ground pound only (the leap's and the water's
+deaths are the game's no-reward ones). NOT PORTED: isCollidMove's kill of a leaping Gooble on a map object, the Explosion / Diffuse nerves (the
+diffusion kind), NameKuriScaleCallback's HitWaterJump squash, the sounds (slots). The base's DeathSound slot is inert on the Gooble (no smoke).
+
+**Drive 125** (`npc82/enemy125/patch_smoke125.py`, now 45/45: the Stu's A-E / W / T as before, then G1-G14 on a Gooble.tscn placed in the arena with
+Mario 12 m off and a one-node graph at its feet; his level's other placed enemies are cleared for the section -- his test Stu charged Mario mid-leap
+in the first runs): G1 Generate / set anim / 1 HP / scale 0.6..1 / the Model node at scale 1 wearing the body scale / the colour step per reset;
+G2 the look (the per-instance GoobleBody shader with TEVREG0 fed and TEVREG1 0, BrainAttach, ShadowCaster, the SmsGoobleDeath child, the shipped
+GoobleDrops.tres); G3 the alive clock at tick 350 of a drive-shortened AliveTime 400 (`Gooble.Prm.AliveTime`, restored after): inflating,
+ratio 1.61; G4 kill at 401 -> Die with name_down, the splash playing at the inflated scale, no reward; G5 dead after the 18 + 60 ticks (35 frames
+observed), nothing dropped; G6 the re-launch at 200 ticks: yaw 0, the set anim, the scale back, 1 HP; G7 FollowMario at once (Mario 5 m); G8
+JumpAttackPrepare (the wait anim, gap 347 u; it passes within one physics frame when already facing him -- `PrevNerveName`); G9 the charge flash
+reaching 254 then the leap at frame 62 with vy 5.73 (6 less the ticks since), XZ toward him; G10 the leaper's hit: his health -1, the Gooble dead
+mid-air with no reward (`LeapHitMario`); G11 the stomp during Generate: Trample -> isHitValid -> Die, his bounce; G12 the bottle (tank 0) + ONE coin
+from the test table; G13 R from 3 m -> melt (name_hit, UNK20000, a WATHIT mark); G14 dead after 42 + 60 ticks, nothing dropped. Regression 118
+35/35 on the committed level (C1 = the demo kill of the Gooble through the base type). Build 0 errors; boot ALL OK with his placed Goobles.
+NOTE for the patch scripts: `write_text` on Windows writes CRLF -- the repo's `.gitattributes` (text=auto eol=lf) normalises it, so nothing reached
+a commit, but use `write_bytes` (as drive 118 does) for byte-exact mirrors.
+## SMS pass 125f -- two more Stu kinds on the base: the winged Soarin' Stu and the goop Stu (feature/enemy-base)
+
+**Files:** `assets/Sms/Enemy/SmsHaneHamukuri.cs` (new: THaneHamuKuri), `SmsDoroHamukuri.cs` (new: TDoroHamuKuri), `Hanekuri.tscn` / `Dorokuri.tscn`
+(new), `EnemyWing.gdshader` (new), `HanekuriTop/Trousers/Wing.tres` + `DorokuriTop/Trousers/Foot/Nose.tres` (new, from the bmds' TEV registers),
+`Drops/DoroDrops.tres` (new: the game's 60 % through UseEnemyRate), `models/Eniemes/Hanekuri/` (his rip's hanekuri.glb with the 4 clips + the
+bmd's K_hane_wing; the exporter's 3 pngs) and `models/Eniemes/Dorokuri/` (dorokuri_model.glb, dorokurihige.glb, K_doro_dot / K_dorokuri_face from
+the bmd; the exporter's pngs) -- imports: materials swapped for the .tres (use_external), textures pinned lossless, the 11.6 MB scene default
+stripped (patch_import125f.py); `SmsHamukuri.cs` (the .prm through a virtual `HPrm`, the members its kinds need protected, the kyoro as a hook);
+`SmsSmallEnemy.cs` (Init before the clip check, `FlyBind` / `LookScale` hooks, `IsReachedToGoal` virtual, four fixes below).
+
+**The winged Stu** (`SmsHaneHamukuri : SmsHamukuri`, hamukuri.cpp 1291-1555 + the nerves at 2600 / 2751, hanehamukuri.prm: HP 1, scale 0.7, march 3,
+turn 0.5, sight 1000 / 1200 / 180 deg, give-up 2000 / 1500, damage 120 x 100, attack 100 x 60, JumpForce 5, FirstVelocityY 10, BoundNum 0,
+GenItemRate 0, FlyBaseHeight 600, Amplitude 100, Frequency 300, NormalJumpVy 15, AttackJumpVy 10): THaneHamuKuri::walkBehavior and ::bind ported
+as the species' WalkBehavior and SetBehavior -- the height = BASE (the ground, ramped at dh/120 u a tick, at most 10) + RISE (1 u a tick to 600
+while wandering / attacking / preparing, decaying elsewhere) + BOB (100 sin, 300 ticks); not airborne while hovering (so it finds Mario and
+pushes others); isReachedToGoal on the ground plane within 10 u (MsVECMag2 < 100); over him at height -> the dive flag + TNerveDoroHanePrepareAttack
+(50 ticks +4, 50 ticks -15), the plunge at 15 u a tick (the squash: y x1.1 to 1.3 above 200 u of rise, 0.8 x below) to the ground -> the hip-drop
+slot (PARTICLE_MS_HIPDROP_C, the rumble, MSD_SE_MA_HIP_ATTACK: `DiveHitFxScene` / `DiveHitSound`) -> TNerveHaneHamuKuriUpWait (400 ticks, +1 u a
+tick, the squash recovering, turning to him); attackToMario = the cry + the damage, NO hop / PostAttack; behaveToWater = forceRoll(Mario, water)
+always -- the roll anim at hover height on a true arc (vy 10, ~30 u/tick) until the base point lands (~134 ticks), BoundNum 0 -> straight back to
+Wander (a wall: WallDie); isHitValid = not hidden; the 4-clip table (crash / down / roll / wait) sits on the Stu's slots 1 / 2 / 7 / 13 (empty slots
+are no longer warned). `BoundFly` knob = THaneHamuKuri::mBoundFly (the hopping flight the shipped game never turns on). DEVIATIONS / NOT PORTED:
+the bank (mRotation.z from the heading), the long-fall Land and the fruit flip (no clips), THaneHamuKuri2's graph flight, the cap-stealing
+TDoroHaneKuri (dorohane.bmd).
+
+**The goop Stu** (`SmsDoroHamukuri : SmsHamukuri`, hamukuri.cpp 2314-2440, dorohamukuri.prm: HP 1, jump 6, turn 5..8, march 1..2, 180 deg, give-up
+1000 / 1100, damage 100 x 90, attack 60 x 60, AttackWait 100, GenItemRate 50 + 10, BoundNum 2, VelocityRate 0.8, FirstVelocityY 10, JitabataTimer
+200): the Stu with its own model and numbers; attackToMario = the kick of a flailing one (+ the rumble) else selectCapHolder = the attack message
+only -- NO hop, no PostAttack (it keeps coming). The model has no clips of its own (the game plays hamukurianm on it): `Init` builds an
+AnimationPlayer under Model and copies the Stu's library from `ClipSource` (Hamukuri.glb), re-pointing every track at this skeleton and the
+Stu's `root` track at the Doro's `root_2` (renaming the bone broke the skin's named bind: "Skin bind #0 contains named bind 'root_2'"). The
+disguise (TDoroHige: Mario's cap + the moustache, dorokurihige.bmd) hangs on joint 5 'body', shown only with the `Disguise` knob. NOT PORTED
+(logged, needs Mario's cap as an item + a capless Mario): the cap robbing -- selectCapHolder's cap item and holder, TNerveDoroHamuKuriRobCap, the
+cap pass in isCollidMove, releaseCap on the holder's death.
+
+**Base fixes found by the two kinds:** (1) `HitCheckMario` no longer gates on `_hp == 0` and `SmsSprayedByWater` no longer refuses at 0 HP -- the
+game's decHpByWater floors at 0 and the collision lists still find the body; the 1-HP kinds were immune to everything after one drop (a Doro at 0
+HP flailed forever). (2) `GroundYBelow` excludes Mario's body (checkGround is a bg check): a diving Hane over him read his head as the ground (182
+u) and a Stu under him his feet. (3) `GoToRandomNextGraphNode`'s "not the node within 100 u" test is on the ground plane: a hovering body is never
+within 100 u of a floor node in 3D, so it re-picked the node under it and (reached within 10 u) dived on it. (4) the push-apart ADDS to the walk
+(`v.add(local_74)`), it replaced it before. ALSO: a fresh glb import writes the project's multi-line scene default into `_subresources`; 125b's
+one-line `set_key` only works on an already-stripped import -- patch_import125f.py brace-matches the block (strip_glb_import_defaults.py's way).
+
+**Drive 125** (`npc82/enemy125/patch_smoke125.py`, 62/62): the Stu's A-E / W / T, the Gooble's G1-G14, then H1-H11 on a Hanekuri.tscn placed in the
+arena with a two-node graph along the lane (a one-node graph is 'reached' every tick and the hover dived on it), FlyBaseHeight 250 and SearchLength
+400 for the hover checks (restored after): H1 boots straight into GraphWander with the flap, 1 HP, 0.7, the Model at 0.013434 x 0.7, 6 TEV
+materials; H2 the hover: rise 250 held, the bob swung 150..350 u over one 300-tick cycle, not airborne; H3 the find -> Jump -> Attack in 26 frames;
+H4 the dive flag over him by 6 u -> PrepareAttack; H5 the climb +4 a tick; H6 the plunge to the ground -> UpWait, rise 0, his HP -1 on the way
+down with no hop; H7 the stomp -> Die (hanekuri_down); H8 dead at 37 frames, nothing dropped; H9 the re-launch at 101 frames (Mario moved out of
+sight first); H10 the hose -> forceRoll: the roll anim, vy 9.7, 30 u/tick away, airborne; H11 landed back to Wander after 57 frames. D1-D6 on a
+Dorokuri.tscn: the 15 borrowed clips on its own skeleton (root_2 kept), 6 Doro materials, the disguise hidden on 'body'; D2 jnt_head turned 38 deg
+under hamukuri_set; D3 the hit with NO hop (still Attack); D4 still Attack 30 frames on; D5 the stomp -> Die; D6 one coin from the test table.
+Regression 118 35/35 on the committed level (its log shows pre-existing `det == 0` in ShineSprite.UpdateShineFxPosition and a not-in-tree read in
+SmsFluddDropsTickLocked during the E reload -- not this pass's code; noted for a shine pass). Build 0 errors; boot ALL OK, no errors.
+NOTE: `tar` from this Mac drops AppleDouble `._*` files into his tree (the C# compiler reads them as binary sources) -- delete them after an untar,
+or ship with scp per folder.
+## SMS pass 125g -- the rest of the Stu kinds: Smolderin' Stu, the Stu tower, Swipin' Stu + the cap theft (feature/enemy-base)
+
+**Files:** `assets/Sms/Enemy/SmsFireHamukuri.cs` + `FireHamukuri.tscn` (TFireHamuKuri), `SmsDangoHamukuri.cs` + `Dango.tscn` (TDangoHamuKuri /
+TBossDangoHamuKuri), `SmsDoroHaneKuri.cs` + `DoroHane.tscn` (TDoroHaneKuri) + `Drops/DoroHaneDrops.tres`; `assets/Sms/Items/SmsMarioCap.cs` +
+`MarioCap.tscn` + `MarioCapItem.tres` (TMarioCap, the cap on the ground); `models/Eniemes/Dorohane/` (his rip's dorohane.glb + the exporter's pngs;
+its materials are the goop Stu's and the winged one's -- the registers match to within 10/255) and `models/Sms/MarioCap/` (mapobj/mariocap.glb);
+`assets/Mario.cs` (the pass-121 cap-off routine split into SmsCapOffHead, shared by the shine pose and a new STOLEN state: `SmsCapStolen(bool)`,
+`SmsCapStolenNow`, `SmsWearingCap` = isWearingCap); `SmsSmallEnemy.cs` (`BorrowClips` + `MatchBone` moved in from the Doro and generalised to the
+exporter's _N bone suffixes, `WalkBehaviorBase` for a kind's explicit base call, `Flags150`); `SmsHamukuri.cs` (`_giveUpAttack` protected);
+`SmsHaneHamukuri.cs` (the flight fields protected); `SmsDoroHamukuri.cs` (uses the base helper).
+
+**Smolderin' Stu** (hamukuri.cpp 2120-2312, firehamukuri.prm: 4 HP, jump 5, turn 3..5, sight 1000 / 200 / 120 deg, aware 300, AttackWait 300,
+damage 80 x 90, attack 70 x 70, RecoverTimer 1000, GenItemRate 50 + 10 -> DoroDrops' UseEnemyRate): burning from its first walk tick; its hit is
+HIT_MESSAGE_BURN (`SmsBurnMethod` on Mario if he ever has one, else his damage); unstompable while burning (he bounces, his feet take the hit);
+each drop knocks it 8 u/tick away with the spray cooldown at 20; at 0 HP dieFire -- out, the recover clock, unk150 flips to ESCAPE, the attack
+given up; out it is a plain Stu (flip, stomp); after RecoverTimer ticks of walking the Recover nerve (wait, then the RETURN clip) relights it with
+full HP. The colour ramp (changeTevColor): the nose (500, 200, 120) <-> (-20, -90, -140), the top and feet (500, -40, -70) <-> (80, 5, -50) over 30
+ticks, the trousers fixed green-dotted (200, 200, 200) / (0, 90, 0) / (200, 160, 130), no goop stage -- per-instance material copies. SLOTS: the
+MOE_FIRE flames (`FireFxScene`, a looping scene on null_cap, shown while burning), FireOffFxScene, CoolSound / FlameSound.
+
+**The Stu tower** (hamukuri.cpp 1710-2126; the boss on bossdangohamukuri.prm: scale 2.0..2.1, 1 HP, aware 600, AttackWait 240, NumArray 10 --
+`StackCount`; the bodies on dangohamukuri.prm = the Stu's): the boss makes its bodies at the set anim and TAKES them into a chain; each rides the
+one below's null_cap joint (+40 u on the boss) at the boss's yaw, swaying 10 u on its own slow circle (16 while the boss attacks), in DangoWait (the
+wait clip from a random frame); a carrying boss walks its run. A chained body cannot be stomped (isHitValid: lone ones only) but its attack cylinder
+hurts; water on the TOP knocks it off into a free Stu (5 u/tick away, vy 1, +20 u), a middle one spins once, the boss hops with the tower; the
+boss dead -> every body of its tower (freed too) dies with it (forceKill, no reward); bodies are freed when dead, the boss's re-launch rebuilds the
+tower. A tower never shoves itself (collision exceptions across the chain; a new body is placed on the head at once -- the first run's overlap
+lifted the boss 2.5 m). NOT PORTED: mAttackSw's wobble (a static the game leaves off), changeByJuice, the pool, the TURN sound (slot).
+
+**Swipin' Stu + the cap** (hamukuri.cpp 1557-1645, 2699-2765; dorohanekuri.prm: scale 1.5, march 4, turn 2, FlyBaseHeight 500, bob 100 / 200,
+FirstVelocityY 20, BoundNum 2, 1 HP): the winged kind playing hanekuri's clips (borrowed); attackToMario on a cap-wearing Mario: his damage, onHaveCap
+-- `Mario.SmsCapStolen(true)` (the cap surface hidden, the hair dome on), the disguise (his cap + the moustache) on the thief's null_cap, the
+TLS_CHANGE slot, TNerveDoroHaneRise: it climbs toward 800 u and HOVERS THERE while it holds the cap (the game's own rule: out of the hose's reach
+from the ground). behaveToWater: the dive flag + TNerveDoroHaneHitWater (300 ticks: the rise -4 a tick while over 50 u, spinning 10 deg a tick,
+the clips at 1.5x; the bind's gravity brings it to ~40 u: the stomp window). Die -> releaseCap: `MarioCap.tscn` put on the ground under it; Mario
+within 1 m takes it back (`SmsCapStolen(false)`); its five event coins (unk18C = 5) as DoroHaneDrops. A reset / a demo kill returns the cap
+straight to his head. NOT PORTED: the capless Mario's sun damage, TDoroHamuKuri's RobCap exchange between ground Stus (the ground goop Stu keeps
+the plain hit), the map-object bounce, the sounds.
+
+**Drive 125** (`npc82/enemy125/patch_smoke125.py`, 79/79): the Stu / Gooble / winged / goop sections as before (E1's health baseline is now taken as
+Mario is placed for the kick), then F1-F5 the fire Stu (lit with the burning registers; the stomp bounces without a kill; four drops put it out
+-- knocked 8 u/tick, cooldown 20, ESCAPE bit, the dark registers; RecoverTimer shortened to 60: the Recover nerve relights it), S1-S5 the tower (3
+bodies for the drive: held, in DangoWait, 1.1 m apart over the 2x boss; the tower rides along; the top knocked off by the water message delivered
+BY HAND (the tower's top is out of the hose's reach) into a free Stu thrown 5 u/tick; one knock-off per 30-tick cooldown; the lone boss stomped
+-> every body dies), W1-W7 the thief (hanekuri's clips on dorohane's skeleton, scale 1.5; the dive hit takes the cap -- Mario capless, the disguise
+on, Rise; the water message by hand at 800 u -> HitWater -> low within 19 frames; the stomp puts the cap down and five coins out; Mario landing on
+the spot picks it up -- wearing again). Regression 118 35/35 on the committed level; build 0 errors; boot ALL OK, no errors.
+## SMS pass 125h -- the thief's cap on the right joint, the Smolderin' Stu's flames, the tower and the flame in the editor (feature/enemy-base)
+
+Jaysonn's playtest of 125g (FlyingMariohatRef.png): the Swipin' Stu's stolen cap sat big and tilted; the fire Stu had no flame; and he wants the
+Stu tower (and the flame) visible in the editor.
+
+**Files:** `assets/Sms/Enemy/SmsDoroHaneKuri.cs`, `SmsFireHamukuri.cs`, `SmsDangoHamukuri.cs`; NEW `SmsDangoTowerPreview.cs` (+ .uid); `FireHamukuri.tscn`,
+`DoroHane.tscn`, `Dango.tscn`; NEW `assets/Sms/Fx/StuFire.tscn`, `StuFireOff.tscn`, `CapSteal.tscn` (gen_fx125h.py from the disc's .jpa); the
+editor's re-saves of the 125f/125g resources (uids / default-valued lines) committed with it so they stop showing as modified.
+
+**The cap (TDoroHaneKuriManager::createHige, hamukuri.cpp 441):** the disguise -- dorokuriHige.bmd, the cap AND the moustache in one model -- is a
+TSharedParts on joint **7** of dorohane.bmd = `body` in the bmd's depth-first joint order (`body_3` in the glb; matched without the exporter's suffix),
+whose frame the hige's vertices are modelled in (X up: the cap at local x 68..121, the moustache at x 19..57 in front of the face). 125g had hung it on
+`null_cap` (joint 5 = unk1AC), which is the TLS_CHANGE PARTICLE's point -- a joint with its own 1.5 scale and a 150 deg turn, hence the big tilted
+cap. The Dorokuri's (joint 5 = its `body`) was right. The steal puff now fires at the null_cap joint's point (emitAndBindToPosPtr).
+
+**The flames (TFireHamuKuri::calcRootMatrix, 2182-2215):** every burning frame the game re-asks for PARTICLE_MS_MOE_FIRE_A/B/C/D bound to the null_cap
+joint's matrix (setGlobalScale(mScaling)); dieFire fires MS_MOE_FIRE_OFF the same way. setGlobalRTMatrix NORMALISES the matrix (JPAMath.cpp
+JPAGetRMtxTVecElement): the joint's 1.5 does not reach the emitters -- rotation + translation + the body scale = SmsNpcEffect's Spawn (FollowRotation
+on). `StuFire.tscn`: the burning NPC's flame / glow / haze (the same ms_moe_fire_a/b/c as NpcBurn, pass 98/99: flame_tongue / glow_add /
+goop_refract) + the SPARKS ms_moe_fire_d (new: the r 15 shell stretched 1.25 in Y at (0, 39, 0), 0.05/f, life 70 +-25 %, 6 u/f up a 27 deg cone,
+airResist 0.97 -> 4.9 m/s^2 of linear damping for the same 176 u of rise, the Random field as a light turbulence, 25 u additive glow1 quads x prm
+(255,135,87), the AddSin flicker (0.75, 0.125, 0.875), shrinking from 62.5 %), an SmsNpcEffect with EmitFrames 0 spawned on the joint when the fire
+lights and Stop()ped (drained) when it goes out, when the body dies, at reset; relit = a fresh spawn. `StuFireOff.tscn`: ms_moe_fire_off (60 frames at
+1/f off the r 5 shell at (0, 30, 0), life 50 +-30 %, 2.5 u/f +-20 % up an 9 deg cone, +0.05 u/f^2 from 25 %, 30 u kemuball3 quads growing to 2.2,
+lerp((24,24,24) -> (80 -> 120 grey), I) x 0.9 fading from 62.5 %), EmitFrames 60 on the joint. `CapSteal.tscn`: ms_tls_change (10 kemuball3 puffs off
+the 75..100 u shell, 15 u/f out with x0.9 drag -> 36 m/s^2 of damping for the same 150 u, gravity 0.15 faded in over the first half, 125 u quads
+X 0.75 -> 1 -> 1.5 / Y 0.75 -> 1 -> 2.0 (a CurveXYZTexture), lerp((74,182,187) -> (249,255,242), I) x A, alpha to 75 %), an SmsFxBurst on the
+StealFxScene slot. DEVIATIONS (logged): the Random field is turbulence; the x0.9 / x0.97 air resistance is linear damping with the same end
+displacement; the off smoke's one-texture animation has nothing to pick.
+
+**The editor:** `FireHamukuri.tscn` carries the flame itself -- `Model/Node/Skeleton3D/FirePreview` (a BoneAttachment3D on null_cap; the Model made
+editable) with a StuFire instance scaled 1 / (0.013434 x 1.5) so its quads read in metres under the model's units and the joint's 1.5 -- the editor
+shows the Stu burning; the runtime frees it and spawns the real one on the joint. `Dango.tscn` carries `EditorTower`, an **SmsDangoTowerPreview**
+([Tool]; it frees itself in the game): in the editor a placed Dango is shown as the boss it will be -- the Model at BossPrm's scale (x2.0) and a tower
+of StackCount Stu models (the glb the Model instances, unowned: never saved) stacked as TBossDangoHamuKuri::getTakingMtx stacks them (the first on
+the boss's null_cap + 40 u, each next on the one below's null_cap, at the boss's yaw), rebuilt when StackCount is edited (read off the placeholder
+every editor frame). Because the preview writes the x2 on the owned Model node (saved into Dango.tscn when that scene itself is saved),
+SmsDangoHamukuri now takes its unit scale from `ModelUnits` (0.013434) and not from the node. Why a helper node and not [Tool] on the enemy: the
+enemy's typed resource export (DropTable: SmsDropTable) is set by the editor before the C# assembly has typed the .tres -- an InvalidCastException on
+every early load (the headless editor and the import runs showed it); the helper exports nothing. Godot's bone rests: the glb exporter writes identity
+node transforms but Godot derives the rests from the inverse binds (probe125h.gd: the Stu's null_cap at (0, 76.9, 0) x1.5, the wait pose), so the
+editor's rest pose is the game's bind pose and the attachments sit right there.
+
+**Uids:** Godot regenerates a hand uid longer than 13 chars on save (DoroHaneDrops.tres and MarioCapItem.tres from 125g came back regenerated; the
+glb import's external-material uid followed) -- the 125h ones are 12 chars.
+
+**Drive 125** (85/85): F1b the flames spawned on null_cap and emitting, the editor preview gone at runtime; F3b dieFire stops them and spawns the off
+smoke on the joint; F5b relit = a fresh effect; S1b SmsDangoTowerPreview.Build at runtime: 3 Stu models stacked on the 2x boss (3.3..3.6 m up, then
+1.03 m each, in the column, at the body scale); W1b the disguise on body_3 (the attachment's bone); W2b one CapSteal burst at the joint as the cap
+goes. E1 reads 'no damage' as health >= the baseline (a coin had healed him once between the placement and the kick); S1's riser threshold 0.9 m;
+S2 allows the chain's summed sway. Headless editor runs (-e on Dango.tscn and FireHamukuri.tscn): no errors; `[SMS dango editor] Dango: the boss
+at x2.0 (model scale 0.0269), a tower of 10 (StackCount 10)` under SMS_YCAM_SMOKE. Regression 118 35/35; build 0 errors; boot ALL OK.

@@ -127,6 +127,88 @@ identical content, nothing duplicated in the tree -- but avoidable; hence the ne
 `feature/enemy-base` was sitting at the old `main` tip with no commits of its own, so it was fast-forwarded onto the reconciled `main` to keep
 the next feature branched from the real trunk. Working tree left untouched throughout.
 
+### #4 -- DONE 2026-10-25 -- https://github.com/JasonAbsolute/ProjectShine/tree/feature/enemy-base -- queued 2026-10-25 05:35 PDT (Kiro)
+Push the second feature branch so the work is visible on GitHub. NO PR YET: the feature is in progress (next passes: the DISAP / wall-hit
+puffs, the Gooble moved onto the base, more Stu kinds and enemies). When Jaysonn says the feature is done, a later entry asks for the PR;
+per the rule above Kiro will NOT merge this branch locally.
+- Branch `feature/enemy-base` -- code tip `3f7927b` ("SMS pass 125b: the Stu's look -- the editor-size scale and default.bmd's TEV materials",
+  on top of `e039b9c` "SMS pass 125: the enemy base (TSmallEnemy / TWalkerEnemy / Spine) + Strollin' Stu (THamuKuri)"), branched from the
+  reconciled `main` (`985fb29`); the branch tip is this file's latest commit.
+- New files: `assets/Sms/Enemy/` (SmsSmallEnemy.cs, SmsHamukuri.cs, Hamukuri.tscn + .uid; 125b: the EnemyToon shaders + include with their .uid,
+  the five Hamukuri*.tres), `models/Eniemes/Hamukuri/` (the glb, 6 png, their .import -- the glb .import is the stripped one, now with the
+  material swap); `assets/Gooble.cs` one line; PROJECT_LOG.md. Nothing near the 100 MB limit (the glb is 0.5 MB).
+```
+git push -u origin feature/enemy-base
+git rev-list --count origin/feature/enemy-base..feature/enemy-base
+```
+Expect `0`. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn` (and the editor re-flips two Koopa `.png.import`
+files every session) -- leave them.
+
+Result: `feature/enemy-base` pushed as a new remote branch (4 commits since `main` `985fb29`), tracking set.
+`git rev-list --count origin/feature/enemy-base..feature/enemy-base` returned `0`. All three shas confirmed
+ancestors: code tip `3f7927b`, `e039b9c`, and the reconciled `main` `985fb29` -- so the branch really is off the
+real trunk, not the pre-merge tip. No PR, as the entry specified; `main` untouched and still in sync at `985fb29`.
+Hygiene checks on the range came back clean: 0 `addons/godot_ai` paths, 0 of the two Koopa `.png.import` flips.
+The 35 changed paths are exactly the ones the entry lists. Largest blobs: `PROJECT_LOG.md` 0.79 MB, `Hamukuri.glb`
+0.48 MB -- and `Hamukuri.glb.import` really is the stripped one (a few KB, not the multi-MB `slice_N` kind).
+Working tree left untouched: Jaysonn's `assets/Level.tscn` and `assets/Sms/SmsHiddenCoin.cs` (open in his editor
+this session), the two Koopa flips, and the `addons/godot_ai` churn.
+
+### #5 -- PENDING -- queued 2026-10-25 16:20 PDT, updated 23:50 (Kiro)
+Push the enemy branch and open its PR: the enemy base (TSmallEnemy / TWalkerEnemy / the Spine) with the whole Stu family on it -- Strollin', Soarin',
+the goop Stu, Smolderin', the tower, Swipin' with the cap theft -- the Gooble moved onto the base, the death / wall-hit puffs, the drop tables, and
+the editor previews (passes 125-125h). PLAYTESTED BY JAYSONN 2026-10-25 23:37 ("awesome looks like its all working. includong seeing them in the
+editor!") -- the PR can be merged once it is open (squash or merge commit, his call; `main` then needs a `git pull` here). Kiro has NOT merged this
+branch locally (the entry asks for a PR: the one way).
+- Branch `feature/enemy-base` -- the branch tip is this file's latest commit; the code tip is `4e10187` ("SMS pass 125h: the thief's cap on the body
+  joint, the Smolderin' Stu's flames, the tower and the flame shown in the editor"), on top of `0867da7` (125g), `7f1a436` (125f), `26f9666` (125e),
+  `6f4c588` (125d), `27f9e38` (125c), `3f7927b` (125b) and `e039b9c` (125), plus `59e3dec` (the editor's re-saves of the 125h fx scenes) and the
+  timeToPush commits; 20 commits since `main` `985fb29` (= `origin/main`), this entry's own included. Already tracking `origin/feature/enemy-base` (entry #4), so a plain push
+  is enough. Nothing large (the biggest new file is the 0.48 MB Hamukuri.glb, pushed in #4; since then the 116 KB Hanekuri.glb).
+- PR: title "Feature: the enemy base and the Stu family (SMS passes 125-125h)"; base `main`; body = `pr125.md` at the project root (untracked --
+  delete it after; the same text follows):
+  > The small-enemy base from the decomp -- TSmallEnemy / TWalkerEnemy / the Spine nerves (Enemy/smallEnemy.cpp, walkerEnemy.cpp) -- and every Stu
+  > kind on it (Enemy/hamukuri.cpp), from the game's own .prm numbers, models, clips and particle data:
+  > - Strollin' Stu (THamuKuri): the wander, the find / the attack hop, the stomp, the flail and the kick, the wall crash, the water hit and the roll;
+  >   the editor-size scale and default.bmd's TEV materials (passes 125, 125b).
+  > - The puffs (125c): the death smoke + glow (ms_enm_disap_a / _a_w / _b) and the wall-crash puff + goop splat (ms_enm_wallhit / _o) from the
+  >   disc's .jpa; SmsFxBurst.
+  > - The drop table (125d): SmsDropTable / SmsDropEntry -- what an enemy drops when it dies (coins, 1-UPs, anything with a scene); the game's
+  >   GenItemRate as UseEnemyRate; one editable .tres per kind.
+  > - The Gooble (125e) moved onto the base (TNameKuri as a species), its leap and melt kept.
+  > - Soarin' Stu (THaneHamuKuri: the hover, the dive, the hip drop, the wings) and the goop Stu (TDoroHamuKuri, the Stu's clips borrowed onto its
+  >   own skeleton) (125f).
+  > - Smolderin' Stu (TFireHamuKuri: burning from its first step, unstompable while lit, four drops put it out and it flees, the recover relights it;
+  >   the MOE_FIRE flames and the fire-out smoke on its head), the Stu tower (TDangoHamuKuri / TBossDangoHamuKuri: the 2x boss making and carrying a
+  >   tower of StackCount Stus, nothing in the chain stompable, water knocks the top off, the boss's death takes the tower) and Swipin' Stu with the
+  >   cap theft (TDoroHaneKuri: its hit takes Mario's cap -- he goes bare-headed, the thief wears the cap and moustache and hovers at 800 u -- hosed
+  >   down, stomped, the cap on the ground as an item and back on his head) (125g, 125h).
+  > - In the editor: a placed tower shows the boss at its scale with its stack (SmsDangoTowerPreview, a helper that frees itself in the game); the
+  >   Smolderin' Stu shows its flame.
+  > New: assets/Sms/Enemy/* (the base SmsSmallEnemy, the kinds, the drop tables, the scenes, the TEV materials and shaders), assets/Sms/Fx/EnemyDisap*,
+  > EnemyWallHit, StuFire*, CapSteal, assets/Sms/Items/MarioCap (SmsMarioCap), the models from the rip (models/Eniemes/Hamukuri, Hanekuri, Dorokuri,
+  > Dorohane, models/Sms/MarioCap). Changed: Gooble.cs / Gooble.tscn, Mario.cs (the shine demo's killEnemiesWithin on the base; the stolen-cap state
+  > SmsCapStolen / SmsWearingCap), PROJECT_LOG.md (passes 125-125h).
+  > Knobs: every kind's .prm numbers as statics; DropTable per scene (plain .tres resources); StackCount on the tower; Disguise on the goop Stu; the fx
+  > slots (DeathFxScene, DeathFxWetScene, WallHitFxScene, FireFxScene, FireOffFxScene, StealFxScene) and the sound slots (empty).
+  > Verification: drive 125 85/85 through the real input path -- the Stu (A-W), the Gooble (G1-G14), the winged (H1-H11), the goop (D1-D6), the fire
+  > (F1-F5), the tower (S1-S5), the thief and the cap (W1-W7) plus the 125h checks; regression 118 35/35; build 0 errors; boot ALL OK; headless editor
+  > runs clean. Playtested OK by Jaysonn (2026-10-25).
+  > Not ported (logged in PROJECT_LOG.md): the launcher / the pools (TSmallEnemyManager's spawning), Yoshi's juice (changeByJuice), the sounds (slots),
+  > the goop Stus' cap exchange on the ground (RobCap), the capless Mario's sun damage, the tower's attack wobble (a static the shipped game leaves
+  > off), the map-object bounce.
+  compare URL: https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/enemy-base
+```
+git push origin feature/enemy-base
+git rev-list --count origin/feature/enemy-base..feature/enemy-base
+gh pr create --base main --head feature/enemy-base --title "Feature: the enemy base and the Stu family (SMS passes 125-125h)" --body-file pr125.md
+```
+Expect `0` from the rev-list. `gh` is still unauthenticated here (`gh auth status`: "not logged into any GitHub hosts") -- unless Jaysonn has run
+`gh auth login` since, open the compare URL in the browser instead, paste the title and the body, and Jaysonn presses "Create pull request".
+The working tree carries Jaysonn's own uncommitted `assets/Level.tscn` and `assets/Sms/Enemy/Drops/StuDrops.tres` (the Stu's single coin made a
+BLUE coin -- his call whether it goes in this PR: if yes, `git add` it and commit it on the branch BEFORE the push), the editor's retab of
+`assets/Sms/SmsHiddenCoin.cs`, the two Koopa `.png.import` flips and the `addons/godot_ai` churn -- leave them unless he says otherwise.
+
 <!-- Kiro appends the next entry below this line. Entry template:
 
 ### #N -- PENDING -- <date> (Kiro)

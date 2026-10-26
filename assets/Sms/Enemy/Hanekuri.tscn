@@ -1,0 +1,25 @@
+[gd_scene format=3 uid="uid://chanekuri125f"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsHaneHamukuri.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Hanekuri/Hanekuri.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisap.tscn" id="3_disap"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisapWet.tscn" id="4_disapwet"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyWallHit.tscn" id="5_wallhit"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_body"]
+radius = 0.5
+
+[node name="Hanekuri" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+floor_max_angle = 1.1868
+script = ExtResource("1_script")
+DeathFxScene = ExtResource("3_disap")
+DeathFxWetScene = ExtResource("4_disapwet")
+WallHitFxScene = ExtResource("5_wallhit")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.67, 0)
+shape = SubResource("SphereShape3D_body")

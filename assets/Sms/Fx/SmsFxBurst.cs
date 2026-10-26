@@ -1,0 +1,58 @@
+using Godot;
+
+/// <summary>
+/// A one-shot particle burst scene with any number of GPUParticles3D children (the small enemies' death puffs, the wall crash): the game's
+/// emit(id, &amp;pos) with no bind -- the burst stays where it was fired. _Ready pins the node to the world (TopLevel), restarts every child
+/// one-shot and frees the node once the longest child has finished. The spawner sets the transform (position, the body's yaw, the body's
+/// scale = the game's setGlobalScale) before AddChild, or calls <see cref="Play"/> after it to place and restart in one.
+/// </summary>
+public partial class SmsFxBurst : Node3D
+{
+    private int _running;
+    private bool _wired;
+
+    public override void _Ready()
+    {
+        TopLevel = true;
+        Fire();
+    }
+
+    /// <summary>At <paramref name="at"/> (its basis = the emitter's rotation x the body's scale), restarted.</summary>
+    public void Play(Transform3D at)
+    {
+        GlobalTransform = at;
+        Fire();
+    }
+
+    /// <summary>A shader parameter on every child's draw-pass material that declares it (the splat's goop colour).</summary>
+    public void SetShaderParam(string name, Variant value)
+    {
+        foreach (Node n in GetChildren())
+        {
+            if (n is not GpuParticles3D p || p.DrawPass1 is not Mesh mesh) continue;
+            for (int i = 0; i < mesh.GetSurfaceCount(); i++)
+                if (mesh.SurfaceGetMaterial(i) is ShaderMaterial sm && sm.Shader != null)
+                    foreach (Variant u in sm.Shader.GetShaderUniformList())
+                        if (u.AsGodotDictionary()["name"].AsString() == name) { sm.SetShaderParameter(name, value); break; }
+        }
+    }
+
+    private void Fire()
+    {
+        _running = 0;
+        foreach (Node n in GetChildren())
+        {
+            if (n is not GpuParticles3D p) continue;
+            p.OneShot = true;
+            p.Emitting = false;
+            _running++;
+            if (!_wired) p.Finished += () => { if (--_running <= 0) QueueFree(); };
+            p.Restart();
+        }
+        _wired = true;
+        if (_running == 0) QueueFree();
+    }
+
+    /// <summary>For the drives: the children still emitting.</summary>
+    public int Running => _running;
+}

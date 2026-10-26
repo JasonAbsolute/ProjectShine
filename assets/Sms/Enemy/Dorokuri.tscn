@@ -1,0 +1,32 @@
+[gd_scene format=3 uid="uid://cdorokuri125f"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsDoroHamukuri.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Dorokuri/Dorokuri.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Hamukuri/Hamukuri.glb" id="3_clips"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Dorokuri/DorokuriHige.glb" id="4_hige"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisap.tscn" id="5_disap"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisapWet.tscn" id="6_disapwet"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyWallHit.tscn" id="7_wallhit"]
+[ext_resource type="Resource" path="res://assets/Sms/Enemy/Drops/DoroDrops.tres" id="8_drops"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
+radius = 0.55
+height = 1.5
+
+[node name="Dorokuri" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+floor_max_angle = 1.1868
+script = ExtResource("1_script")
+ClipSource = ExtResource("3_clips")
+DisguiseScene = ExtResource("4_hige")
+DropTable = ExtResource("8_drops")
+DeathFxScene = ExtResource("5_disap")
+DeathFxWetScene = ExtResource("6_disapwet")
+WallHitFxScene = ExtResource("7_wallhit")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.78, 0)
+shape = SubResource("CapsuleShape3D_body")

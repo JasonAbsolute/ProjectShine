@@ -19523,7 +19523,7 @@ public partial class Mario : CharacterBody3D
         int n = 0;
         foreach (Node node in GetTree().GetNodesInGroup("sms_enemy"))
         {
-            if (node is Gooble g && IsInstanceValid(g) && g.GlobalPosition.DistanceTo(GlobalPosition) <= radiusM) { g.SmsKillByDemo(); n++; }
+            if (node is SmsSmallEnemy g && IsInstanceValid(g) && g.GlobalPosition.DistanceTo(GlobalPosition) <= radiusM) { g.SmsKillByDemo(); n++; }   // every small enemy on the base (the Gooble since pass 125e)
         }
         return n;
     }
@@ -19748,6 +19748,28 @@ public partial class Mario : CharacterBody3D
     {
         if (_smsCapInHand == on) return;
         _smsCapInHand = on;
+        SmsCapOffHead(on || _smsCapStolen);
+    }
+
+    /// <summary>125g: the cap TAKEN by a Swipin' Stu (TDoroHaneKuri's onHaveCap) -- off the head (the hair dome on) until the cap item on the ground is
+    /// picked up (SmsMarioCap) or the thief resets. The capless sun damage is not ported.</summary>
+    private bool _smsCapStolen, _smsCapOff;
+    public bool SmsCapStolenNow => _smsCapStolen;
+    /// <summary>gpMarioOriginal->isWearingCap(): neither in his hand (the shine pose) nor stolen.</summary>
+    public bool SmsWearingCap => !_smsCapStolen && !_smsCapInHand;
+    public void SmsCapStolen(bool stolen)
+    {
+        if (_smsCapStolen == stolen) return;
+        _smsCapStolen = stolen;
+        SmsCapOffHead(stolen || _smsCapInHand);
+        if (SmsDebugPrint) GD.Print($"[SMS cap] {(stolen ? "STOLEN" : "back from the thief")}");
+    }
+
+    /// <summary>TMarioCap: ma_cap1 (the head) off and ma_cap3 (the hair dome) on, or back -- shared by the shine pose and the theft.</summary>
+    private void SmsCapOffHead(bool on)
+    {
+        if (_smsCapOff == on) return;
+        _smsCapOff = on;
         if (marioMesh?.Mesh == null) return;
         if (_smsCapSurface == -2)
         {
