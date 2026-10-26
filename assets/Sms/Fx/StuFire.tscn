@@ -1,4 +1,4 @@
-[gd_scene load_steps=41 format=3 uid="uid://cstufire125h"]
+[gd_scene format=3 uid="uid://cstufire125h"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsNpcEffect.cs" id="1_script"]
 [ext_resource type="Shader" path="res://assets/Sms/Fx/flame_tongue.gdshader" id="3_flame_sh"]
