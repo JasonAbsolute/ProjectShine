@@ -43,11 +43,16 @@ public partial class SmsFireHamukuri : SmsHamukuri
     protected override HamukuriParams HPrm => FirePrm;
 
     // ------------------------------------------------------------------------------------------------------------------ the knobs
-    /// <summary>The flames while burning (PARTICLE_MS_MOE_FIRE_A/B/C/D on joint 'null_cap', scaled by the body): a looping scene (GPUParticles3D or an
-    /// SmsFxBurst) kept as a child of the joint and shown while burning. Unset = no flames (the colours still ramp).</summary>
+    /// <summary>The flames while burning: PARTICLE_MS_MOE_FIRE_A/B/C/D, emitAndBindToMtxPtr on joint 'null_cap' every frame while burning (the manager
+    /// keeps one of each alive as long as it is asked for), setGlobalScale(the body scale) -- StuFire.tscn (gen_fx125h.py from the disc's .jpa), an
+    /// SmsNpcEffect spawned on the joint when the fire lights (Spawn: the joint's rotation + translation, as setGlobalRTMatrix's normalised matrix)
+    /// and stopped (drained) when it goes out. Any other scene is kept as a plain child of the joint and shown while burning. Unset = no flames (the
+    /// colours still ramp). The scene also sits in FireHamukuri.tscn under Model/Node/Skeleton3D/FirePreview as the EDITOR's preview; the runtime frees it.</summary>
     [Export] public PackedScene FireFxScene;
-    /// <summary>The fire going out (PARTICLE_MS_MOE_FIRE_OFF at the joint): a one-shot scene, or nothing.</summary>
+    /// <summary>The fire going out (PARTICLE_MS_MOE_FIRE_OFF bound to the joint for its 60 frames): StuFireOff.tscn, an SmsNpcEffect spawned on the joint;
+    /// any other scene fires as a one-shot burst at the joint's point. Unset = nothing.</summary>
     [Export] public PackedScene FireOffFxScene;
+    public const string FirePreviewNode = "FirePreview";
     /// <summary>MSD_SE_EN_MOEKURI_COOL (the fire out); MSD_SE_EN_MOEKURI_FLAME loops while burning. Unset = silent.</summary>
     [Export] public AudioStreamPlayer3D CoolSound, FlameSound;
     /// <summary>HIT_MESSAGE_BURN: the method on Mario that sets him on fire (called with the attacker's position) when it exists; else his plain damage.</summary>
@@ -64,7 +69,13 @@ public partial class SmsFireHamukuri : SmsHamukuri
     private int _recover;                     // unk214: 0 = burning; counts up from 1 while out
     private int _ramp = 30, _rampApplied = -1;// unk218: 0 burning .. 30 out
     private ShaderMaterial _noseMat, _topMat;
-    private Node3D _fireFx;
+    private Node3D _fireFx;                   // a non-SmsNpcEffect FireFxScene: a child of the joint, shown while burning
+    private SmsNpcEffect _fire;               // the live StuFire effect (null when out)
+    private Skeleton3D _skel;
+    private readonly System.Collections.Generic.Dictionary<string, BoneAttachment3D> _fxCache = new();
+    /// <summary>For the drives: the flames are live; the editor's preview node was in the scene.</summary>
+    public bool FireFxEmitting => _fire != null && IsInstanceValid(_fire) && _fire.IsEmitting;
+    public bool FirePreviewSeen { get; private set; }
     private const int NerveRecover = NerveSpecies + 20;
     protected override string NerveName(int n) => n == NerveRecover ? "Recover" : base.NerveName(n);
 
@@ -107,18 +118,20 @@ public partial class SmsFireHamukuri : SmsHamukuri
                     string sn = (mi.Mesh as ArrayMesh)?.SurfaceGetName(i) ?? "";
                     if ((sn == "_mat_Rfoot1" || sn == "_mat_Lfoot1") && mi.GetActiveMaterial(i) is ShaderMaterial f) _feet.Add(f);
                 }
-        if (FireFxScene != null)
+        foreach (Node n in _model.FindChildren("*", "Skeleton3D", true, false)) { _skel = n as Skeleton3D; if (_skel != null) break; }
+        // the editor's preview of the flame (FireHamukuri.tscn): the game's emitters are spawned on the joint as the fire lights
+        foreach (Node n in _model.FindChildren(FirePreviewNode, "", true, false)) { FirePreviewSeen = true; n.QueueFree(); }
+        if (FireFxScene != null && _skel != null && FireFxScene.Instantiate() is Node3D probe)
         {
-            Skeleton3D skel = null;
-            foreach (Node n in _model.FindChildren("*", "Skeleton3D", true, false)) { skel = n as Skeleton3D; if (skel != null) break; }
-            if (skel != null && skel.FindBone(FireBone) >= 0)
-            {
+            if (probe is not SmsNpcEffect && _skel.FindBone(FireBone) >= 0)
+            {   // a plain scene on the slot: a child of the joint, shown while burning
                 var att = new BoneAttachment3D { Name = "FireAttach", BoneName = FireBone };
-                skel.AddChild(att); att.BoneName = FireBone;
-                _fireFx = FireFxScene.Instantiate<Node3D>(); _fireFx.Name = "Fire";
+                _skel.AddChild(att); att.BoneName = FireBone;
+                _fireFx = probe; _fireFx.Name = "Fire";
                 att.AddChild(_fireFx);
                 _fireFx.Visible = false;
             }
+            else probe.Free();                                  // an SmsNpcEffect: spawned on the joint as the fire lights
         }
     }
     private readonly System.Collections.Generic.List<ShaderMaterial> _feet = new();
@@ -145,13 +158,45 @@ public partial class SmsFireHamukuri : SmsHamukuri
         _flags150 = (_flags150 | 2u) & ~1u;
         _recover = 1;
         if (CoolSound != null && CoolSound.Stream != null) CoolSound.Play();
-        Vector3 at = _fireFx != null ? _fireFx.GlobalPosition : GlobalPosition + Vector3.Up * (100f * _bodyScale / U);
+        if (FireOffFxScene == null) return;
+        if (_skel != null && FireOffFxScene.Instantiate() is Node3D probe)
+        {   // an SmsNpcEffect: bound to the joint for its 60 frames, as the game's emitAndBindToMtxPtr
+            bool npcFx = probe is SmsNpcEffect;
+            probe.Free();
+            if (npcFx && SmsNpcEffect.Spawn(FireOffFxScene, _skel, FireBone, _bodyScale, _fxCache, Name) != null) return;
+        }
+        Vector3 at = JointPoint();
         SpawnBurst(FireOffFxScene, new Transform3D(Basis.FromScale(Vector3.One * _bodyScale), at));
     }
+    /// <summary>The null_cap joint's point in the world (the emitters' bind), else the head's height.</summary>
+    private Vector3 JointPoint()
+    {
+        int b = _skel != null ? _skel.FindBone(FireBone) : -1;
+        return b >= 0 ? (_skel.GlobalTransform * _skel.GetBoneGlobalPose(b)).Origin : GlobalPosition + Vector3.Up * (100f * _bodyScale / U);
+    }
+    /// <summary>LIVE_FLAG_DEAD: a dead body is not performing, so the game stops asking for its emitters -- the flames drain (the state keeps unk210; reset
+    /// settles it).</summary>
+    protected override void Dead()
+    {
+        base.Dead();
+        if (_fire != null) { if (IsInstanceValid(_fire)) _fire.Stop(); _fire = null; }
+    }
+    /// <summary>The fire on or off: the StuFire effect spawned on the joint (the game re-asks for its four emitters every burning frame) or stopped
+    /// (its live particles drain, as the invalidated emitters' do); a plain slot scene shown / hidden.</summary>
     private void SetBurning(bool on)
     {
         _burning = on;
         if (_fireFx != null) _fireFx.Visible = on;
+        if (on)
+        {
+            if ((_fire == null || !IsInstanceValid(_fire) || !_fire.IsEmitting) && FireFxScene != null && _fireFx == null && _skel != null && IsInsideTree())
+                _fire = SmsNpcEffect.Spawn(FireFxScene, _skel, FireBone, _bodyScale, _fxCache, Name);
+        }
+        else if (_fire != null)
+        {
+            if (IsInstanceValid(_fire)) _fire.Stop();
+            _fire = null;
+        }
         if (FlameSound != null && FlameSound.Stream != null) { if (on && !FlameSound.Playing) FlameSound.Play(); else if (!on && FlameSound.Playing) FlameSound.Stop(); }
     }
 

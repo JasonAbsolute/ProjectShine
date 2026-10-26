@@ -1,4 +1,4 @@
-[gd_resource type="ShaderMaterial" load_steps=4 format=3 uid="uid://cdorotro125f"]
+[gd_resource type="ShaderMaterial" format=3 uid="uid://cdorotro125f"]
 
 [ext_resource type="Shader" path="res://assets/Sms/Enemy/EnemyToonTwoSided.gdshader" id="1_shader"]
 [ext_resource type="Texture2D" path="res://models/Eniemes/Dorokuri/K_doro_dot.png" id="2_dot"]

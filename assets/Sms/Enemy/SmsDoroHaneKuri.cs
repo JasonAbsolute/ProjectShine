@@ -10,7 +10,8 @@ using Godot;
 ///
 /// THE THEFT (attackToMario): Mario not wearing his cap -> the attack message and the cry; wearing it -> the message, then onHaveCap: Mario's cap comes
 /// OFF (<see cref="Mario.SmsCapStolen"/>: the cap surface hidden, the hair dome on), the disguise -- Mario's cap + a moustache (dorokuriHige.bmd,
-/// TDoroHige on joint 5 'null_cap') -- shows on the thief, PARTICLE_MS_TLS_CHANGE at the joint (<see cref="StealFxScene"/> slot), and TNerveDoroHaneRise:
+/// TDoroHige, a TSharedParts on joint 7 = 'body' in the bmd's depth-first joint order -- the hige model's vertices are in that joint's frame; the Dorokuri's
+/// is joint 5, its 'body' too) -- shows on the thief, PARTICLE_MS_TLS_CHANGE at joint 5 = 'null_cap' (unk1AC; <see cref="StealFxScene"/> slot), and TNerveDoroHaneRise:
 /// it climbs toward 800 u over the ground (faster each tick, up to 5 u), x/z easing back from a squash, turning to Mario at 2 deg a tick -- and stays
 /// up there WHILE IT HOLDS THE CAP (the nerve ends only when the cap is gone). WATER (behaveToWater): the dive flag set + TNerveDoroHaneHitWater for 300
 /// ticks: the rise drops 4 u a tick while it is over 50 u up (the bind's gravity brings the body down to ~40 u), spinning 10 deg a tick, the clips at
@@ -43,10 +44,15 @@ public partial class SmsDoroHaneKuri : SmsHaneHamukuri
     /// <summary>The scene whose AnimationPlayer holds hanekuri's 4 clips: models/Eniemes/Hanekuri/Hanekuri.glb unless another is set.</summary>
     [Export] public PackedScene ClipSource;
     public const string ClipSourcePath = "res://models/Eniemes/Hanekuri/Hanekuri.glb";
-    /// <summary>TDoroHige: Mario's cap + the moustache (dorokuriHige.bmd) on joint 5 'null_cap', shown while it holds his cap.</summary>
+    /// <summary>TDoroHige: Mario's cap + the moustache (dorokuriHige.bmd) on joint 7 'body' (createHige's TDoroHige(.., 7, ..); the exporter names the
+    /// bone body_3 here -- matched without the suffix), shown while it holds his cap. Pass 125h: it sat on null_cap, a joint with its own 1.5 scale
+    /// and a 150 deg turn -- the cap came out big and tilted.</summary>
     [Export] public PackedScene DisguiseScene;
     public const string DisguiseScenePath = "res://models/Eniemes/Dorokuri/DorokuriHige.glb";
-    public const string DisguiseBone = "null_cap";
+    public const string DisguiseBone = "body";
+    /// <summary>unk1AC = 5 'null_cap': where the TLS_CHANGE puff fires as the cap is taken.</summary>
+    public const string StealBone = "null_cap";
+    public string DisguiseBoneName { get; private set; } = "";
     /// <summary>The cap on the ground after the thief's death (releaseCap -> the TMarioCap item): assets/Sms/Items/MarioCap.tscn unless another is set.</summary>
     [Export] public PackedScene CapItemScene;
     public const string CapItemScenePath = "res://assets/Sms/Items/MarioCap.tscn";
@@ -75,10 +81,12 @@ public partial class SmsDoroHaneKuri : SmsHaneHamukuri
         Skeleton3D skel = null;
         foreach (Node n in _model.FindChildren("*", "Skeleton3D", true, false)) { skel = n as Skeleton3D; if (skel != null) break; }
         PackedScene dis = DisguiseScene ?? GD.Load<PackedScene>(DisguiseScenePath);
-        if (skel != null && skel.FindBone(DisguiseBone) >= 0 && dis != null)
+        string bone = skel != null ? MatchBone(skel, DisguiseBone) : DisguiseBone;
+        if (skel != null && skel.FindBone(bone) >= 0 && dis != null)
         {
+            DisguiseBoneName = bone;
             var att = new BoneAttachment3D { Name = "DisguiseAttach" };
-            skel.AddChild(att); att.BoneName = DisguiseBone;
+            skel.AddChild(att); att.BoneName = bone;
             _disguise = dis.Instantiate<Node3D>(); _disguise.Name = "Disguise";
             att.AddChild(_disguise);
             _disguise.Visible = false;
@@ -104,7 +112,9 @@ public partial class SmsDoroHaneKuri : SmsHaneHamukuri
         _holding = true;
         _mario.SmsCapStolen(true);
         if (_disguise != null) _disguise.Visible = true;
-        Vector3 at = _disguise != null ? _disguise.GlobalPosition : GlobalPosition + Vector3.Up * (100f * _bodyScale / U);
+        Vector3 at = GlobalPosition + Vector3.Up * (100f * _bodyScale / U);
+        if (_disguise != null && _disguise.GetParent()?.GetParent() is Skeleton3D sk && sk.FindBone(StealBone) is int sb && sb >= 0)
+            at = (sk.GlobalTransform * sk.GetBoneGlobalPose(sb)).Origin;                 // emitAndBindToPosPtr at the null_cap joint's point
         SpawnBurst(StealFxScene, new Transform3D(Basis.FromScale(Vector3.One * _bodyScale), at));
         if (DebugPrint) GD.Print($"[SMS dorohane] {Name}: took his cap");
     }

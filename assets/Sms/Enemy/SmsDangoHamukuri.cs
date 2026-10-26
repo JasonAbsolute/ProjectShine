@@ -22,10 +22,17 @@ using Godot;
 /// the game's event coin (genEventCoin) is a placed coin, none here.
 /// NOT PORTED (logged): mAttackSw's attack wobble (a static the shipped game leaves off), changeByJuice (Yoshi), the pool (TDangoHamuKuriManager), the
 /// sound slots (DANGOKURI_TURN).
+///
+/// IN THE EDITOR (pass 125h): Dango.tscn carries an <see cref="SmsDangoTowerPreview"/> child (a [Tool] helper; it frees itself in the game) that shows a
+/// placed Dango as the boss it will be -- the model at BossPrm's scale with its tower of <see cref="StackCount"/> Stu models stacked the way the game
+/// stacks them. The runtime takes the model's unit scale from <see cref="ModelUnits"/> instead of the Model node's saved scale (the preview writes the
+/// boss's 2x on the node, saved with Dango.tscn when that scene itself is saved).
 /// </summary>
 [GlobalClass]
 public partial class SmsDangoHamukuri : SmsHamukuri
 {
+    /// <summary>The Stu glb's scale in a Stu scene (1 / 74.44 metres a unit): this kind's model scale whatever the Model node says.</summary>
+    public const float ModelUnits = 0.013434f;
     // ------------------------------------------------------------------------------------------------------------------ the .prm
     public class BossParams : HamukuriParams { public int NumArray = 3; }
     /// <summary>The shipped /enemy/bossdangohamukuri.prm (params.szs on his disc): the Stu's numbers where the file does not differ.</summary>
@@ -82,11 +89,13 @@ public partial class SmsDangoHamukuri : SmsHamukuri
     protected override void Init()
     {
         base.Init();
+        _modelScale = ModelUnits;                               // not the Model node's (the editor's tower preview writes the boss's 2x on it)
         if (!IsBody) _boss = this;
         if (_model != null)
             foreach (Node n in _model.FindChildren("*", "Skeleton3D", true, false)) { _skel = n as Skeleton3D; if (_skel != null) break; }
         if (_skel != null) _rideBone = _skel.FindBone(RideBone);
     }
+
     protected override void Reset()
     {
         base.Reset();

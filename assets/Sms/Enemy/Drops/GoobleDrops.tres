@@ -1,18 +1,14 @@
-[gd_resource type="Resource" script_class="SmsDropTable" load_steps=7 format=3 uid="uid://cgoobledrops1"]
+[gd_resource type="Resource" script_class="SmsDropTable" format=3 uid="uid://cgoobledrops1"]
 
-[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsDropTable.cs" id="1_table"]
-[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsDropEntry.cs" id="2_entry"]
-[ext_resource type="PackedScene" path="res://yellow_coin.tscn" id="3_coin"]
-[ext_resource type="PackedScene" path="res://1_up_mushroom.tscn" id="4_oneup"]
+[ext_resource type="Script" uid="uid://cxxq5n45jvqot" path="res://assets/Sms/Enemy/SmsDropTable.cs" id="1_table"]
+[ext_resource type="Script" uid="uid://c0l2h86h6qt2t" path="res://assets/Sms/Enemy/SmsDropEntry.cs" id="2_entry"]
+[ext_resource type="PackedScene" uid="uid://vodc17m8tfot" path="res://yellow_coin.tscn" id="3_coin"]
+[ext_resource type="PackedScene" uid="uid://3i321r0h4sxx" path="res://1_up_mushroom.tscn" id="4_oneup"]
 
 [sub_resource type="Resource" id="Resource_coin1"]
 script = ExtResource("2_entry")
 Scene = ExtResource("3_coin")
 Weight = 80.0
-CountMin = 1
-CountMax = 1
-ScatterUnits = 4.0
-LifeTicks = 0
 Note = "one coin -- most deaths"
 
 [sub_resource type="Resource" id="Resource_coin3"]
@@ -22,24 +18,16 @@ Weight = 12.0
 CountMin = 3
 CountMax = 3
 ScatterUnits = 6.0
-LifeTicks = 0
 Note = "a fan of three"
 
 [sub_resource type="Resource" id="Resource_oneup"]
 script = ExtResource("2_entry")
 Scene = ExtResource("4_oneup")
 Weight = 8.0
-CountMin = 1
-CountMax = 1
 ScatterUnits = 0.0
-LifeTicks = 0
 Note = "a 1-UP, rarely"
 
 [resource]
 resource_name = "GoobleDrops: a STOMPED / ground-pounded Gooble drops (Chance 1); a coin 80 %, three coins 12 %, a 1-UP 8 %. Its own leap, water and the alive clock drop nothing (the game's no-reward deaths). Add a line (New SmsDropEntry) for another item; set Chance under 1 for kills that give nothing."
 script = ExtResource("1_table")
-Chance = 1.0
-UseEnemyRate = false
-Entries = Array[ExtResource("2_entry")]([SubResource("Resource_coin1"), SubResource("Resource_coin3"), SubResource("Resource_oneup")])
-PopUnitsPerTick = 20.0
-BodyPopMetresPerSecond = 6.0
+Entries = [SubResource("Resource_coin1"), SubResource("Resource_coin3"), SubResource("Resource_oneup")]

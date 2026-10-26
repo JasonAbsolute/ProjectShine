@@ -1,4 +1,4 @@
-[gd_resource type="ShaderMaterial" load_steps=4 format=3 uid="uid://chanetop125f"]
+[gd_resource type="ShaderMaterial" format=3 uid="uid://chanetop125f"]
 
 [ext_resource type="Shader" path="res://assets/Sms/Enemy/EnemyToon.gdshader" id="1_shader"]
 [ext_resource type="Texture2D" path="res://models/Eniemes/Hamukuri/K_hamu_dot.png" id="2_dot"]

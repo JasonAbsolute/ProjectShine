@@ -1,4 +1,4 @@
-[gd_resource type="ShaderMaterial" load_steps=4 format=3 uid="uid://cmariocapm125g"]
+[gd_resource type="ShaderMaterial" format=3 uid="uid://cyl3u6voc0ky5"]
 
 [ext_resource type="Shader" path="res://assets/Sms/Enemy/EnemyToon.gdshader" id="1_shader"]
 [ext_resource type="Texture2D" path="res://models/Sms/MarioCap/mariocap.png" id="2_cap"]

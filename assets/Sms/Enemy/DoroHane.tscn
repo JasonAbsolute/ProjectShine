@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://cdorohane125g"]
+[gd_scene format=3 uid="uid://cdorohane125g"]
 
 [ext_resource type="Script" path="res://assets/Sms/Enemy/SmsDoroHaneKuri.cs" id="1_script"]
 [ext_resource type="PackedScene" path="res://models/Eniemes/Dorohane/Dorohane.glb" id="2_model"]
@@ -8,6 +8,7 @@
 [ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisap.tscn" id="6_disap"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyWallHit.tscn" id="7_wallhit"]
 [ext_resource type="Resource" path="res://assets/Sms/Enemy/Drops/DoroHaneDrops.tres" id="8_drops"]
+[ext_resource type="PackedScene" uid="uid://ccapstl125h" path="res://assets/Sms/Fx/CapSteal.tscn" id="9_steal"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_body"]
 radius = 0.7
@@ -22,6 +23,7 @@ CapItemScene = ExtResource("5_cap")
 DropTable = ExtResource("8_drops")
 DeathFxScene = ExtResource("6_disap")
 WallHitFxScene = ExtResource("7_wallhit")
+StealFxScene = ExtResource("9_steal")
 
 [node name="Model" parent="." instance=ExtResource("2_model")]
 transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)

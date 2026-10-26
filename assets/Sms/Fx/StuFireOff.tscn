@@ -1,0 +1,81 @@
+[gd_scene load_steps=15 format=3 uid="uid://cstufoff125h"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsNpcEffect.cs" id="1_script"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/fire_smoke.gdshader" id="2_smoke_sh"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/kemuball3_raw.png" id="3_smoke_tex"]
+
+[sub_resource type="Gradient" id="Gradient_prm"]
+resource_name = "ms_moe_fire_off prm colour keys (Merge): (80,80,80) @2 -> (120,120,120) @15 of 20"
+offsets = PackedFloat32Array(0, 0.0952, 0.7143, 1)
+colors = PackedColorArray(0.3137, 0.3137, 0.3137, 1, 0.3137, 0.3137, 0.3137, 1, 0.4706, 0.4706, 0.4706, 1, 0.4706, 0.4706, 0.4706, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_prm"]
+gradient = SubResource("Gradient_prm")
+
+[sub_resource type="Gradient" id="Gradient_env"]
+resource_name = "ms_moe_fire_off env colour: (24,24,24) throughout"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(0.0941, 0.0941, 0.0941, 1, 0.0941, 0.0941, 0.0941, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_env"]
+gradient = SubResource("Gradient_env")
+
+[sub_resource type="Gradient" id="Gradient_alpha"]
+resource_name = "ms_moe_fire_off ESP1 alpha 0.9 to 62.5 %, -> 0 at the end"
+offsets = PackedFloat32Array(0, 0.625, 1)
+colors = PackedColorArray(1, 1, 1, 0.9, 1, 1, 1, 0.9, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_alpha"]
+gradient = SubResource("Gradient_alpha")
+
+[sub_resource type="Curve" id="Curve_scale"]
+resource_name = "ms_moe_fire_off ESP1 scale: 1 -> 2.2 over the whole life (outTiming 0)"
+max_value = 2.1997
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 2.1997), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTexture_scale"]
+curve = SubResource("Curve_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_smoke"]
+resource_name = "1/frame for 60 frames, life 50 +-30 %; the shell r 5 u; 2.5 u/f (+-20 %) up an 9 deg cone; +0.0281 u/f^2 up (the 0.05 field from 25 %)"
+lifetime_randomness = 0.3
+emission_shape = 1
+emission_sphere_radius = 0.0672
+angle_min = -22.5
+angle_max = 22.5
+direction = Vector3(0, 1, 0)
+spread = 9
+initial_velocity_min = 1.612
+initial_velocity_max = 2.418
+gravity = Vector3(0, 1.3601, 0)
+scale_min = 0.5
+scale_max = 1.5
+scale_curve = SubResource("CurveTexture_scale")
+color_ramp = SubResource("GradientTexture1D_alpha")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_smoke"]
+resource_name = "ms_moe_fire_off: P_msm_kemuball3 (raw IA8), lerp(env -> prm, I) with prm keyed over the life, alpha x the fade"
+shader = ExtResource("2_smoke_sh")
+shader_parameter/tex = ExtResource("3_smoke_tex")
+shader_parameter/prm_ramp = SubResource("GradientTexture1D_prm")
+shader_parameter/env_ramp = SubResource("GradientTexture1D_env")
+
+[sub_resource type="QuadMesh" id="QuadMesh_smoke"]
+resource_name = "the game's 0.6 x 0.6 billboard (30 units)"
+material = SubResource("ShaderMaterial_smoke")
+size = Vector2(0.403, 0.403)
+
+[node name="StuFireOff" type="Node3D"]
+script = ExtResource("1_script")
+EmitFrames = 60.0
+DrainSeconds = 1.0833
+FollowRotation = true
+
+[node name="Smoke" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.403, 0)
+emitting = false
+amount = 50
+lifetime = 0.8333
+process_material = SubResource("ParticleProcessMaterial_smoke")
+draw_pass_1 = SubResource("QuadMesh_smoke")

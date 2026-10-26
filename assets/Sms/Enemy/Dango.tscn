@@ -1,4 +1,4 @@
-[gd_scene load_steps=101 format=3 uid="uid://cdangohamu125g"]
+[gd_scene format=3 uid="uid://bpbr2gp3pfcio"]
 
 [ext_resource type="Script" path="res://assets/Sms/Enemy/SmsDangoHamukuri.cs" id="1_script"]
 [ext_resource type="PackedScene" path="res://models/Eniemes/Hamukuri/Hamukuri.glb" id="2_model"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisapWet.tscn" id="4_disapwet"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyWallHit.tscn" id="5_wallhit"]
 [ext_resource type="Resource" path="res://assets/Sms/Enemy/Drops/StuDrops.tres" id="6_drops"]
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsDangoTowerPreview.cs" id="7_preview"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
 radius = 0.55
@@ -26,3 +27,6 @@ transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.78, 0)
 shape = SubResource("CapsuleShape3D_body")
+
+[node name="EditorTower" type="Node3D" parent="."]
+script = ExtResource("7_preview")

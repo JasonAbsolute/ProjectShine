@@ -1,4 +1,4 @@
-[gd_resource type="ShaderMaterial" load_steps=3 format=3 uid="uid://chanewng125f"]
+[gd_resource type="ShaderMaterial" format=3 uid="uid://chanewng125f"]
 
 [ext_resource type="Shader" path="res://assets/Sms/Enemy/EnemyWing.gdshader" id="1_shader"]
 [ext_resource type="Texture2D" path="res://models/Eniemes/Hanekuri/K_hane_wing.png" id="2_wing"]

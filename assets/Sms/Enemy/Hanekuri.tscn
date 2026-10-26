@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3 uid="uid://chanekuri125f"]
+[gd_scene format=3 uid="uid://chanekuri125f"]
 
 [ext_resource type="Script" path="res://assets/Sms/Enemy/SmsHaneHamukuri.cs" id="1_script"]
 [ext_resource type="PackedScene" path="res://models/Eniemes/Hanekuri/Hanekuri.glb" id="2_model"]

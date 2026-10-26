@@ -7759,3 +7759,55 @@ BY HAND (the tower's top is out of the hose's reach) into a free Stu thrown 5 u/
 -> every body dies), W1-W7 the thief (hanekuri's clips on dorohane's skeleton, scale 1.5; the dive hit takes the cap -- Mario capless, the disguise
 on, Rise; the water message by hand at 800 u -> HitWater -> low within 19 frames; the stomp puts the cap down and five coins out; Mario landing on
 the spot picks it up -- wearing again). Regression 118 35/35 on the committed level; build 0 errors; boot ALL OK, no errors.
+## SMS pass 125h -- the thief's cap on the right joint, the Smolderin' Stu's flames, the tower and the flame in the editor (feature/enemy-base)
+
+Jaysonn's playtest of 125g (FlyingMariohatRef.png): the Swipin' Stu's stolen cap sat big and tilted; the fire Stu had no flame; and he wants the
+Stu tower (and the flame) visible in the editor.
+
+**Files:** `assets/Sms/Enemy/SmsDoroHaneKuri.cs`, `SmsFireHamukuri.cs`, `SmsDangoHamukuri.cs`; NEW `SmsDangoTowerPreview.cs` (+ .uid); `FireHamukuri.tscn`,
+`DoroHane.tscn`, `Dango.tscn`; NEW `assets/Sms/Fx/StuFire.tscn`, `StuFireOff.tscn`, `CapSteal.tscn` (gen_fx125h.py from the disc's .jpa); the
+editor's re-saves of the 125f/125g resources (uids / default-valued lines) committed with it so they stop showing as modified.
+
+**The cap (TDoroHaneKuriManager::createHige, hamukuri.cpp 441):** the disguise -- dorokuriHige.bmd, the cap AND the moustache in one model -- is a
+TSharedParts on joint **7** of dorohane.bmd = `body` in the bmd's depth-first joint order (`body_3` in the glb; matched without the exporter's suffix),
+whose frame the hige's vertices are modelled in (X up: the cap at local x 68..121, the moustache at x 19..57 in front of the face). 125g had hung it on
+`null_cap` (joint 5 = unk1AC), which is the TLS_CHANGE PARTICLE's point -- a joint with its own 1.5 scale and a 150 deg turn, hence the big tilted
+cap. The Dorokuri's (joint 5 = its `body`) was right. The steal puff now fires at the null_cap joint's point (emitAndBindToPosPtr).
+
+**The flames (TFireHamuKuri::calcRootMatrix, 2182-2215):** every burning frame the game re-asks for PARTICLE_MS_MOE_FIRE_A/B/C/D bound to the null_cap
+joint's matrix (setGlobalScale(mScaling)); dieFire fires MS_MOE_FIRE_OFF the same way. setGlobalRTMatrix NORMALISES the matrix (JPAMath.cpp
+JPAGetRMtxTVecElement): the joint's 1.5 does not reach the emitters -- rotation + translation + the body scale = SmsNpcEffect's Spawn (FollowRotation
+on). `StuFire.tscn`: the burning NPC's flame / glow / haze (the same ms_moe_fire_a/b/c as NpcBurn, pass 98/99: flame_tongue / glow_add /
+goop_refract) + the SPARKS ms_moe_fire_d (new: the r 15 shell stretched 1.25 in Y at (0, 39, 0), 0.05/f, life 70 +-25 %, 6 u/f up a 27 deg cone,
+airResist 0.97 -> 4.9 m/s^2 of linear damping for the same 176 u of rise, the Random field as a light turbulence, 25 u additive glow1 quads x prm
+(255,135,87), the AddSin flicker (0.75, 0.125, 0.875), shrinking from 62.5 %), an SmsNpcEffect with EmitFrames 0 spawned on the joint when the fire
+lights and Stop()ped (drained) when it goes out, when the body dies, at reset; relit = a fresh spawn. `StuFireOff.tscn`: ms_moe_fire_off (60 frames at
+1/f off the r 5 shell at (0, 30, 0), life 50 +-30 %, 2.5 u/f +-20 % up an 9 deg cone, +0.05 u/f^2 from 25 %, 30 u kemuball3 quads growing to 2.2,
+lerp((24,24,24) -> (80 -> 120 grey), I) x 0.9 fading from 62.5 %), EmitFrames 60 on the joint. `CapSteal.tscn`: ms_tls_change (10 kemuball3 puffs off
+the 75..100 u shell, 15 u/f out with x0.9 drag -> 36 m/s^2 of damping for the same 150 u, gravity 0.15 faded in over the first half, 125 u quads
+X 0.75 -> 1 -> 1.5 / Y 0.75 -> 1 -> 2.0 (a CurveXYZTexture), lerp((74,182,187) -> (249,255,242), I) x A, alpha to 75 %), an SmsFxBurst on the
+StealFxScene slot. DEVIATIONS (logged): the Random field is turbulence; the x0.9 / x0.97 air resistance is linear damping with the same end
+displacement; the off smoke's one-texture animation has nothing to pick.
+
+**The editor:** `FireHamukuri.tscn` carries the flame itself -- `Model/Node/Skeleton3D/FirePreview` (a BoneAttachment3D on null_cap; the Model made
+editable) with a StuFire instance scaled 1 / (0.013434 x 1.5) so its quads read in metres under the model's units and the joint's 1.5 -- the editor
+shows the Stu burning; the runtime frees it and spawns the real one on the joint. `Dango.tscn` carries `EditorTower`, an **SmsDangoTowerPreview**
+([Tool]; it frees itself in the game): in the editor a placed Dango is shown as the boss it will be -- the Model at BossPrm's scale (x2.0) and a tower
+of StackCount Stu models (the glb the Model instances, unowned: never saved) stacked as TBossDangoHamuKuri::getTakingMtx stacks them (the first on
+the boss's null_cap + 40 u, each next on the one below's null_cap, at the boss's yaw), rebuilt when StackCount is edited (read off the placeholder
+every editor frame). Because the preview writes the x2 on the owned Model node (saved into Dango.tscn when that scene itself is saved),
+SmsDangoHamukuri now takes its unit scale from `ModelUnits` (0.013434) and not from the node. Why a helper node and not [Tool] on the enemy: the
+enemy's typed resource export (DropTable: SmsDropTable) is set by the editor before the C# assembly has typed the .tres -- an InvalidCastException on
+every early load (the headless editor and the import runs showed it); the helper exports nothing. Godot's bone rests: the glb exporter writes identity
+node transforms but Godot derives the rests from the inverse binds (probe125h.gd: the Stu's null_cap at (0, 76.9, 0) x1.5, the wait pose), so the
+editor's rest pose is the game's bind pose and the attachments sit right there.
+
+**Uids:** Godot regenerates a hand uid longer than 13 chars on save (DoroHaneDrops.tres and MarioCapItem.tres from 125g came back regenerated; the
+glb import's external-material uid followed) -- the 125h ones are 12 chars.
+
+**Drive 125** (85/85): F1b the flames spawned on null_cap and emitting, the editor preview gone at runtime; F3b dieFire stops them and spawns the off
+smoke on the joint; F5b relit = a fresh effect; S1b SmsDangoTowerPreview.Build at runtime: 3 Stu models stacked on the 2x boss (3.3..3.6 m up, then
+1.03 m each, in the column, at the body scale); W1b the disguise on body_3 (the attachment's bone); W2b one CapSteal burst at the joint as the cap
+goes. E1 reads 'no damage' as health >= the baseline (a coin had healed him once between the placement and the kick); S1's riser threshold 0.9 m;
+S2 allows the chain's summed sway. Headless editor runs (-e on Dango.tscn and FireHamukuri.tscn): no errors; `[SMS dango editor] Dango: the boss
+at x2.0 (model scale 0.0269), a tower of 10 (StackCount 10)` under SMS_YCAM_SMOKE. Regression 118 35/35; build 0 errors; boot ALL OK.
