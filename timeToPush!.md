@@ -247,8 +247,8 @@ Push the third feature branch so the work is visible on GitHub: `feature/enemy-s
 PUSH ONLY, NO PR YET -- the feature is in progress: pass 126 (the generator, the one-shot generator, the common launcher) and pass 126b (the
 gatekeeper: the Polluted Piranha) landed; its particle effects (126c) come next. Jaysonn plays the spawners first; when he says the feature is done a
 later entry asks for the PR. Kiro does not merge this branch locally.
-- Branch `feature/enemy-spawners` -- code tip `a38f59f` ("SMS pass 126e: the gatekeeper's seven particle effects from the disc's jpa ..."), on top of
-  `76f1e3f` (126d), `c0a49da` (126c), `3386d73` (126b, the gatekeeper), `a70ead0` (126a) and `3cdf15b` (126); the branch tip is this file's latest
+- Branch `feature/enemy-spawners` -- code tip `87cbba2` ("SMS pass 126f: the gatekeeper's effects inherit the goop sheet in use ..."), on top of `a38f59f`
+  (126e), `76f1e3f` (126d), `c0a49da` (126c), `3386d73` (126b, the gatekeeper), `a70ead0` (126a) and `3cdf15b` (126); the branch tip is this file's latest
   commit. A NEW remote branch: push with `-u`.
 - New files: `assets/Sms/Enemy/Spawn/` (SmsEnemyPool.cs, SmsEnemySpawner.cs, SmsEnemyOneShotSpawner.cs, SmsEnemyLauncher.cs, SmsGateKeeper.cs,
   SmsGateKeeperHead.cs, SmsGateKeeperBasePin.cs + .uids, Spawner.tscn, OneShotSpawner.tscn, Launcher.tscn, GateKeeper.tscn, LauncherBody / GateKeeperBody / GateKeeperSkirt
