@@ -7,9 +7,11 @@ using System.Collections.Generic;
 /// its shines (<see cref="SmsSelectShineRing"/>), and scenario_select_1.blo's panes laid out as the disc has them on the game's 600 x 448
 /// frame (the blo is 600 x 480 with rows 16 .. 464 on screen). Its states and frames (perform, at 30 a second):
 /// <list type="bullet">
-/// <item>LETTERBOX (30 frames): the two bars grow in from the top and bottom edges; the banner slides in from the right (20 frames)
-/// and squashes (15), stretches (20) and settles (15) -- TBoundPane's three-point curves.</item>
-/// <item>APPEAR: the stage name fades in 6 a frame, then the EPISODE pane, the marks row and the score 6 a frame.</item>
+/// <item>LETTERBOX (15 frames -- the game writes its times as 30 x mRcpAnmFrameRate, and SMSGetAnmFrameRate() is 60 / the 30 fps loop = 2, so
+/// every "time" is halved and every "x SMSGetAnmFrameRate" step doubled; pass 127b -- Jaysonn: "a speed issue like the older ones"): the two
+/// bars grow in from the top and bottom edges; from frame 11 the banner slides in from the right (10 frames) and squashes (7), stretches (10)
+/// and settles (7) -- TBoundPane's three-point curves.</item>
+/// <item>APPEAR: the stage name fades in 12 a frame, then the EPISODE pane, the marks row and the score 12 a frame.</item>
 /// <item>INPUT: left / right step through the open episodes (the ring turns a slot in 10 frames, the EPISODE pane slides out as its
 /// twin slides in from the side over 10 frames, the arrows show at the ends there are more past); A picks (the bars close to the middle
 /// over 30 frames while everything fades 16 a frame, the ring fades out, the burst -- a slot) then 10 frames of wait; the selected
@@ -68,6 +70,9 @@ public partial class SmsEpisodeSelect : Control
     [Export] public AudioStreamPlayer SelectSound;  // MSD_SE_SY_SHINE_SELECT
     /// <summary>127b: ms_2d_scsel_on_a / a2 (a2 for a cleared episode) / b / c / d at the screen's centre on the pick (a Node2D scene).</summary>
     [Export] public PackedScene PickBurstScene;
+    /// <summary>127b: the selected shine's sparkles -- ms_2d_shine_kira + senko on a full shine, kira_em on a hollow one (3D scenes, in the ring's units).</summary>
+    [Export] public PackedScene SparkleScene;
+    [Export] public PackedScene SparkleEmptyScene;
 
     /// <summary>The pick is made (the episode, 0-based) -- before the fade.</summary>
     [Signal] public delegate void PickedEventHandler(int episode);
@@ -306,7 +311,7 @@ public partial class SmsEpisodeSelect : Control
         var light = new DirectionalLight3D { Position = new Vector3(300f, 800f, 1300f) };
         _ringVp.AddChild(light);
         light.LookAt(new Vector3(300f, 160f, 0f), Vector3.Up);
-        _ring = new SmsSelectShineRing { Name = "Shines", DebugPrint = DebugPrint };
+        _ring = new SmsSelectShineRing { Name = "Shines", DebugPrint = DebugPrint, SparkleScene = SparkleScene, SparkleEmptyScene = SparkleEmptyScene };
         if (ResourceLoader.Exists("res://models/ShineSprite/ShineSprite.glb")) _ring.ShineScene = GD.Load<PackedScene>("res://models/ShineSprite/ShineSprite.glb");
         _ringVp.AddChild(_ring);
         // the frame: the blo's 600 x 480 with rows 16 .. 464 on screen
@@ -449,9 +454,9 @@ void fragment() {
         _state = MenuState.LetterboxAnimation;
         _letterboxFrame = 0;
         // the bars grow in from the edges over 30 frames: the top from height 0, the bottom from its base + height (off the bottom) and height 0
-        _topAnim.Node = _barTop; _topAnim.BasePos = _barTop.Position; _topAnim.BaseSize = _barTop.Size; _topAnim.Frames = 30; _topAnim.T = 0;
+        _topAnim.Node = _barTop; _topAnim.BasePos = _barTop.Position; _topAnim.BaseSize = _barTop.Size; _topAnim.Frames = 15; _topAnim.T = 0;
         _topAnim.HasSize = true; _topAnim.SizeFrom = new Vector2(_barTop.Size.X, 0f); _topAnim.SizeTo = _barTop.Size; _topAnim.HasOff = false; _topAnim.HasAlpha = false;
-        _bottomAnim.Node = _barBottom; _bottomAnim.BasePos = _barBottom.Position; _bottomAnim.BaseSize = _barBottom.Size; _bottomAnim.Frames = 30; _bottomAnim.T = 0;
+        _bottomAnim.Node = _barBottom; _bottomAnim.BasePos = _barBottom.Position; _bottomAnim.BaseSize = _barBottom.Size; _bottomAnim.Frames = 15; _bottomAnim.T = 0;
         _bottomAnim.HasSize = true; _bottomAnim.SizeFrom = new Vector2(_barBottom.Size.X, 0f); _bottomAnim.SizeTo = _barBottom.Size;
         _bottomAnim.HasOff = true; _bottomAnim.OffFrom = new Vector2(0f, _barBottomH); _bottomAnim.OffTo = Vector2.Zero; _bottomAnim.HasAlpha = false;
         _barTop.Size = _topAnim.SizeFrom; _barBottom.Size = _bottomAnim.SizeFrom; _barBottom.Position = _bottomAnim.BasePos + _bottomAnim.OffFrom;
@@ -466,11 +471,11 @@ void fragment() {
             case MenuState.LetterboxAnimation:
             {
                 bool updated = _topAnim.Update() & _bottomAnim.Update();
-                if (updated || _letterboxFrame > 20)
+                if (updated || _letterboxFrame > 10)
                 {   // the banner slides in from off the right edge: offset 601 - x1 -> 0 over 20 frames
                     _bannerGroup.Visible = true;
                     float x1 = _bannerGroup.Position.X + (_banner.Visible ? _banner.Position.X : -220f);
-                    _bannerAnim.Node = _bannerGroup; _bannerAnim.BasePos = _bannerGroup.Position; _bannerAnim.BaseSize = _bannerGroup.Size; _bannerAnim.Frames = 20; _bannerAnim.T = 0;
+                    _bannerAnim.Node = _bannerGroup; _bannerAnim.BasePos = _bannerGroup.Position; _bannerAnim.BaseSize = _bannerGroup.Size; _bannerAnim.Frames = 10; _bannerAnim.T = 0;
                     _bannerAnim.HasOff = true; _bannerAnim.OffFrom = new Vector2(601f - x1, 0f); _bannerAnim.OffTo = Vector2.Zero; _bannerAnim.HasSize = false; _bannerAnim.HasAlpha = false;
                     _bannerGroup.Position = _bannerAnim.BasePos + _bannerAnim.OffFrom;
                     _state = MenuState.StageBannerSlide;
@@ -483,8 +488,8 @@ void fragment() {
                 bool updated = _topAnim.Update() & _bottomAnim.Update() & _bannerAnim.Update();
                 if (updated)
                 {   // the squash against the left: 15 frames, up 10 and 160 narrower / 20 taller
-                    Bound(_bannerText, _banner, 15, new Vector2(0f, 0f), new Vector2(0f, -6f), new Vector2(0f, -10f), new Vector2(0f, 0f), new Vector2(-110f, 12f), new Vector2(-160f, 20f));
-                    Bound(_bannerShadowText, _bannerShadow, 15, new Vector2(0f, 0f), new Vector2(0f, -6f), new Vector2(0f, -10f), new Vector2(0f, 0f), new Vector2(-110f, 12f), new Vector2(-160f, 20f));
+                    Bound(_bannerText, _banner, 7, new Vector2(0f, 0f), new Vector2(0f, -6f), new Vector2(0f, -10f), new Vector2(0f, 0f), new Vector2(-110f, 12f), new Vector2(-160f, 20f));
+                    Bound(_bannerShadowText, _bannerShadow, 7, new Vector2(0f, 0f), new Vector2(0f, -6f), new Vector2(0f, -10f), new Vector2(0f, 0f), new Vector2(-110f, 12f), new Vector2(-160f, 20f));
                     _state = MenuState.StageBannerSquash;
                 }
                 break;
@@ -492,16 +497,16 @@ void fragment() {
             case MenuState.StageBannerSquash:
                 if (_bannerText.Update() & _bannerShadowText.Update())
                 {   // the stretch: 20 frames to 40 wider / 8 shorter, 4 down
-                    Bound(_bannerText, _banner, 20, new Vector2(0f, -10f), new Vector2(0f, -6f), new Vector2(0f, 4f), new Vector2(-160f, 20f), new Vector2(-110f, 12f), new Vector2(40f, -8f));
-                    Bound(_bannerShadowText, _bannerShadow, 20, new Vector2(0f, -10f), new Vector2(0f, -6f), new Vector2(0f, 4f), new Vector2(-160f, 20f), new Vector2(-110f, 12f), new Vector2(40f, -8f));
+                    Bound(_bannerText, _banner, 10, new Vector2(0f, -10f), new Vector2(0f, -6f), new Vector2(0f, 4f), new Vector2(-160f, 20f), new Vector2(-110f, 12f), new Vector2(40f, -8f));
+                    Bound(_bannerShadowText, _bannerShadow, 10, new Vector2(0f, -10f), new Vector2(0f, -6f), new Vector2(0f, 4f), new Vector2(-160f, 20f), new Vector2(-110f, 12f), new Vector2(40f, -8f));
                     _state = MenuState.StageBannerStretch;
                 }
                 break;
             case MenuState.StageBannerStretch:
                 if (_bannerText.Update() & _bannerShadowText.Update())
                 {   // the settle: 15 frames back to its size
-                    Bound(_bannerText, _banner, 15, new Vector2(0f, 4f), new Vector2(0f, 3f), new Vector2(0f, 0f), new Vector2(40f, -8f), new Vector2(15f, -6f), new Vector2(0f, 0f));
-                    Bound(_bannerShadowText, _bannerShadow, 15, new Vector2(0f, 4f), new Vector2(0f, 3f), new Vector2(0f, 0f), new Vector2(40f, -8f), new Vector2(15f, -6f), new Vector2(0f, 0f));
+                    Bound(_bannerText, _banner, 7, new Vector2(0f, 4f), new Vector2(0f, 3f), new Vector2(0f, 0f), new Vector2(40f, -8f), new Vector2(15f, -6f), new Vector2(0f, 0f));
+                    Bound(_bannerShadowText, _bannerShadow, 7, new Vector2(0f, 4f), new Vector2(0f, 3f), new Vector2(0f, 0f), new Vector2(40f, -8f), new Vector2(15f, -6f), new Vector2(0f, 0f));
                     _stageNameText.Visible = true; _stageNameText.Modulate = new Color(1f, 1f, 1f, 0f);
                     _pane1.Visible = true; _pane1.Modulate = new Color(1f, 1f, 1f, 0f);
                     _marksGroup.Visible = true; _marksGroup.Modulate = new Color(1f, 1f, 1f, 0f);
@@ -512,12 +517,12 @@ void fragment() {
             case MenuState.AppearMenu:
             {
                 bool updated = _bannerText.Update() & _bannerShadowText.Update();
-                float stageAlpha = Mathf.Min(_stageNameText.Modulate.A + 6f / 255f, 1f);
+                float stageAlpha = Mathf.Min(_stageNameText.Modulate.A + 12f / 255f, 1f);
                 _stageNameText.Modulate = new Color(1f, 1f, 1f, stageAlpha);
                 float menuAlpha = 0f;
                 if (stageAlpha > 128f / 255f)
                 {
-                    menuAlpha = Mathf.Min(_pane1.Modulate.A + 6f / 255f, 1f);
+                    menuAlpha = Mathf.Min(_pane1.Modulate.A + 12f / 255f, 1f);
                     _pane1.Modulate = new Color(1f, 1f, 1f, menuAlpha); _marksGroup.Modulate = new Color(1f, 1f, 1f, menuAlpha); _scoreGroup.Modulate = new Color(1f, 1f, 1f, menuAlpha);
                 }
                 if (updated && menuAlpha >= 1f) _state = MenuState.MenuInputLoop;
@@ -618,7 +623,7 @@ void fragment() {
     {
         if (_num > 1)
         {
-            float x = _arrowPos * 0.5f;
+            float x = _arrowPos * 1f;   // 0.5 x SMSGetAnmFrameRate (2)
             if (_arrowL.Visible) _arrowL.Position = new Vector2(_arrowLHome.X - x, _arrowLHome.Y);
             if (_arrowR.Visible) _arrowR.Position = new Vector2(_arrowRHome.X + x, _arrowRHome.Y);
             if (_arrowDirUp) { _arrowPos++; if (_arrowPos > 10) _arrowDirUp = false; }
@@ -657,9 +662,9 @@ void fragment() {
     {
         SelectSound?.Play();
         // the top bar grows to the middle (blo y 224), the bottom's top edge moves up to it
-        _topAnim.Node = _barTop; _topAnim.BasePos = _barTop.Position; _topAnim.BaseSize = _barTop.Size; _topAnim.Frames = 30; _topAnim.T = 0;
+        _topAnim.Node = _barTop; _topAnim.BasePos = _barTop.Position; _topAnim.BaseSize = _barTop.Size; _topAnim.Frames = 15; _topAnim.T = 0;
         _topAnim.HasSize = true; _topAnim.SizeFrom = _barTop.Size; _topAnim.SizeTo = new Vector2(_barTop.Size.X, 224f); _topAnim.HasOff = false; _topAnim.HasAlpha = false;
-        _bottomAnim.Node = _barBottom; _bottomAnim.BasePos = _barBottom.Position; _bottomAnim.BaseSize = _barBottom.Size; _bottomAnim.Frames = 30; _bottomAnim.T = 0;
+        _bottomAnim.Node = _barBottom; _bottomAnim.BasePos = _barBottom.Position; _bottomAnim.BaseSize = _barBottom.Size; _bottomAnim.Frames = 15; _bottomAnim.T = 0;
         _bottomAnim.HasSize = true; _bottomAnim.SizeFrom = _barBottom.Size; _bottomAnim.SizeTo = new Vector2(_barBottom.Size.X, 480f - 224f);
         _bottomAnim.HasOff = true; _bottomAnim.OffFrom = Vector2.Zero; _bottomAnim.OffTo = new Vector2(0f, 224f - 314f); _bottomAnim.HasAlpha = false;
         _ring.StartClose();

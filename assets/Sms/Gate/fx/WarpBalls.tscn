@@ -1,0 +1,175 @@
+[gd_scene load_steps=22 format=3 uid="uid://cwarpballs127"]
+
+[ext_resource type="Script" path="res://assets/Sms/Gate/SmsWarpBalls.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/mizutama1_ia.png" id="2_ball"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/shwave1.png" id="3_wave"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/glow1.png" id="4_glow"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/senko.png" id="5_senko"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/JpaDirBillboardAdd.gdshader" id="6_dir"]
+
+[sub_resource type="Curve" id="Curve_ring"]
+_data = [Vector2(0.0, 0.0), 0.0, 0.0, 1, 1, Vector2(1.0, 1.0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTex_ring"]
+curve = SubResource("Curve_ring")
+
+[sub_resource type="Gradient" id="Grad_ring"]
+interpolation_mode = 0
+offsets = PackedFloat32Array(0.0, 0.2, 1.0)
+colors = PackedColorArray(0.3765, 0.7529, 0.7529, 0.0000, 0.3765, 0.7529, 0.7529, 1.0000, 0.0000, 0.3412, 0.7176, 0.0000)
+
+[sub_resource type="GradientTexture1D" id="GradTex_ring"]
+gradient = SubResource("Grad_ring")
+
+[sub_resource type="ParticleProcessMaterial" id="PPM_ring"]
+resource_name = "ms_mariowp_dust: 6 rings over 6 frames at his centre, growing 0 -> 650 u over 25 frames, fading"
+emission_shape = 0
+angle_min = -180.0
+angle_max = 180.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+gravity = Vector3(0, 0, 0)
+scale_min = 8.7319
+scale_max = 8.7319
+scale_curve = SubResource("CurveTex_ring")
+color_ramp = SubResource("GradTex_ring")
+
+[sub_resource type="StandardMaterial3D" id="Mat_ring"]
+transparency = 1
+blend_mode = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("3_wave")
+texture_filter = 3
+disable_receive_shadows = true
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="Quad_ring"]
+material = SubResource("Mat_ring")
+size = Vector2(1.0, 1.0)
+
+[sub_resource type="Gradient" id="Grad_streak"]
+interpolation_mode = 0
+offsets = PackedFloat32Array(0.0, 1.0)
+colors = PackedColorArray(0.6078, 1.0000, 1.0000, 1.0000, 0.0000, 1.0000, 0.4902, 0.0000)
+
+[sub_resource type="GradientTexture1D" id="GradTex_streak"]
+gradient = SubResource("Grad_streak")
+
+[sub_resource type="ParticleProcessMaterial" id="PPM_streak"]
+resource_name = "ms_mariowp_dust children: 20 a ring, 20 u/f (+-37 %) in every direction, 12.5 x 60 u glow1 streaks, life 40"
+emission_shape = 1
+emission_sphere_radius = 0.2687
+particle_flag_align_y = true
+spread = 180.0
+initial_velocity_min = 10.0752
+initial_velocity_max = 22.1655
+gravity = Vector3(0, 0, 0)
+scale_min = 1.0
+scale_max = 1.0
+color_ramp = SubResource("GradTex_streak")
+
+[sub_resource type="ShaderMaterial" id="Mat_streak"]
+shader = ExtResource("6_dir")
+shader_parameter/tex = ExtResource("4_glow")
+shader_parameter/prm = Vector4(1, 1, 1, 1)
+shader_parameter/env = Vector4(1, 1, 1, 1)
+
+[sub_resource type="QuadMesh" id="Quad_streak"]
+material = SubResource("Mat_streak")
+size = Vector2(0.1679, 0.806)
+
+[sub_resource type="Curve" id="Curve_flash_x"]
+max_value = 2.5
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 2.5), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_flash_y"]
+max_value = 4.0
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 4.0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_flash_z"]
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 1.0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveTex_flash"]
+curve_x = SubResource("Curve_flash_x")
+curve_y = SubResource("Curve_flash_y")
+curve_z = SubResource("Curve_flash_z")
+
+[sub_resource type="Gradient" id="Grad_flash_hue"]
+interpolation_mode = 0
+offsets = PackedFloat32Array(0.0, 0.5, 1.0)
+colors = PackedColorArray(0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.4353, 1.0000, 1.0000, 0.4353, 0.4353, 1.0000)
+
+[sub_resource type="GradientTexture1D" id="GradTex_flash_hue"]
+gradient = SubResource("Grad_flash_hue")
+
+[sub_resource type="Curve" id="Curve_flash_alpha"]
+_data = [Vector2(0.0, 0.0), 0.0, 0.0, 1, 1, Vector2(0.25, 1.0), 0.0, 0.0, 1, 1, Vector2(0.8, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 0.0), 0.0, 0.0, 1, 1]
+point_count = 4
+
+[sub_resource type="CurveTexture" id="CurveTex_flash_alpha"]
+curve = SubResource("Curve_flash_alpha")
+
+[sub_resource type="ParticleProcessMaterial" id="PPM_flash"]
+resource_name = "ms_mariowp_senko: one streak a frame for 50 frames at his centre (a 3 u sphere), life 60, growing x 2.5 wide / x 4 tall, blue -> green -> red"
+emission_shape = 1
+emission_sphere_radius = 0.0403
+particle_flag_align_y = true
+spread = 180.0
+initial_velocity_min = 0.0403
+initial_velocity_max = 0.1612
+gravity = Vector3(0, 0, 0)
+scale_min = 0.625
+scale_max = 1.375
+scale_curve = SubResource("CurveTex_flash")
+color_initial_ramp = SubResource("GradTex_flash_hue")
+alpha_curve = SubResource("CurveTex_flash_alpha")
+
+[sub_resource type="ShaderMaterial" id="Mat_flash"]
+shader = ExtResource("6_dir")
+shader_parameter/tex = ExtResource("5_senko")
+shader_parameter/prm = Vector4(1, 1, 1, 1)
+shader_parameter/env = Vector4(1, 1, 1, 1)
+
+[sub_resource type="QuadMesh" id="Quad_flash"]
+material = SubResource("Mat_flash")
+size = Vector2(0.1343, 1.0075)
+
+[node name="WarpBalls" type="Node3D"]
+script = ExtResource("1_script")
+BallTexture = ExtResource("2_ball")
+
+[node name="DustRings" type="GPUParticles3D" parent="."]
+amount = 6
+lifetime = 0.4167
+one_shot = true
+explosiveness = 0.9
+fixed_fps = 60
+local_coords = false
+process_material = SubResource("PPM_ring")
+draw_pass_1 = SubResource("Quad_ring")
+
+[node name="DustStreaks" type="GPUParticles3D" parent="."]
+amount = 120
+lifetime = 0.6667
+one_shot = true
+explosiveness = 0.9
+fixed_fps = 60
+local_coords = false
+process_material = SubResource("PPM_streak")
+draw_pass_1 = SubResource("Quad_streak")
+
+[node name="Flash" type="GPUParticles3D" parent="."]
+amount = 50
+lifetime = 1.0
+one_shot = true
+explosiveness = 0.0
+fixed_fps = 60
+local_coords = false
+process_material = SubResource("PPM_flash")
+draw_pass_1 = SubResource("Quad_flash")

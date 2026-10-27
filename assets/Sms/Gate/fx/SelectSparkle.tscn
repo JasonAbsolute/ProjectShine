@@ -1,0 +1,136 @@
+[gd_scene load_steps=14 format=3 uid="uid://cselsparkle127"]
+
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/glow1_sel.png" id="1_glow"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/hoso_senko4.png" id="2_senko"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/senko.png" id="3_senko_em"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/JpaDirBillboardAdd.gdshader" id="4_dir"]
+
+[sub_resource type="Gradient" id="Grad_kira"]
+interpolation_mode = 0
+offsets = PackedFloat32Array(0.0, 1.0)
+colors = PackedColorArray(1.0000, 1.0000, 0.5294, 1.0000, 1.0000, 0.4353, 0.7176, 1.0000)
+
+[sub_resource type="GradientTexture1D" id="GradTex_kira"]
+gradient = SubResource("Grad_kira")
+
+[sub_resource type="Curve" id="Curve_kira_alpha"]
+_data = [Vector2(0.0, 0.0), 0.0, 0.0, 1, 1, Vector2(0.15, 0.875), 0.0, 0.0, 1, 1, Vector2(0.3, 0.35), 0.0, 0.0, 1, 1, Vector2(0.45, 0.875), 0.0, 0.0, 1, 1, Vector2(0.6, 0.35), 0.0, 0.0, 1, 1, Vector2(0.75, 0.875), 0.0, 0.0, 1, 1, Vector2(1.0, 0.0), 0.0, 0.0, 1, 1]
+point_count = 7
+
+[sub_resource type="CurveTexture" id="CurveTex_kira_alpha"]
+curve = SubResource("Curve_kira_alpha")
+
+[sub_resource type="Curve" id="Curve_kira_scale"]
+_data = [Vector2(0.0, 0.0), 0.0, 0.0, 1, 1, Vector2(0.5, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 0.1), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTex_kira_scale"]
+curve = SubResource("Curve_kira_scale")
+
+[sub_resource type="ParticleProcessMaterial" id="PPM_kira"]
+resource_name = "ms_2d_shine_kira: glow1 twinkles 60 u in a 50 u sphere about the shine, 3 u/f out, a yellow / pink random phase, life 50"
+lifetime_randomness = 0.125
+emission_shape = 1
+emission_sphere_radius = 50.0
+spread = 180.0
+initial_velocity_min = 180
+initial_velocity_max = 180
+gravity = Vector3(0, 0, 0)
+scale_min = 45.0
+scale_max = 75.0
+scale_curve = SubResource("CurveTex_kira_scale")
+color_initial_ramp = SubResource("GradTex_kira")
+alpha_curve = SubResource("CurveTex_kira_alpha")
+
+[sub_resource type="StandardMaterial3D" id="Mat_kira"]
+transparency = 1
+blend_mode = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("1_glow")
+texture_filter = 3
+disable_receive_shadows = true
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="Quad_kira"]
+material = SubResource("Mat_kira")
+size = Vector2(1.0, 1.0)
+
+[sub_resource type="Gradient" id="Grad_senko_hue"]
+interpolation_mode = 0
+offsets = PackedFloat32Array(0.0, 0.5, 1.0)
+colors = PackedColorArray(0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.4353, 1.0000, 1.0000, 0.4353, 0.4353, 1.0000)
+
+[sub_resource type="GradientTexture1D" id="GradTex_senko_hue"]
+gradient = SubResource("Grad_senko_hue")
+
+[sub_resource type="Curve" id="Curve_senko_alpha"]
+_data = [Vector2(0.0, 0.0), 0.0, 0.0, 1, 1, Vector2(0.25, 0.625), 0.0, 0.0, 1, 1, Vector2(0.5, 0.625), 0.0, 0.0, 1, 1, Vector2(1.0, 0.0), 0.0, 0.0, 1, 1]
+point_count = 4
+
+[sub_resource type="CurveTexture" id="CurveTex_senko_alpha"]
+curve = SubResource("Curve_senko_alpha")
+
+[sub_resource type="Curve" id="Curve_senko_x"]
+max_value = 2.5
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 2.5), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_senko_y"]
+max_value = 3.0
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 3.0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_senko_z"]
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 1.0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveTex_senko"]
+curve_x = SubResource("Curve_senko_x")
+curve_y = SubResource("Curve_senko_y")
+curve_z = SubResource("Curve_senko_z")
+
+[sub_resource type="ParticleProcessMaterial" id="PPM_senko"]
+resource_name = "ms_2d_shine_senko: streaks 0.1 a frame in a 15 u sphere, hue cycling, growing x 2.5 / x 3, random roll, life 100 +-37 %"
+lifetime_randomness = 0.375
+emission_shape = 1
+emission_sphere_radius = 15
+particle_flag_align_y = true
+spread = 180.0
+initial_velocity_min = 6.0
+initial_velocity_max = 30.0
+gravity = Vector3(0, 0, 0)
+scale_min = 0.625
+scale_max = 1.375
+scale_curve = SubResource("CurveTex_senko")
+color_initial_ramp = SubResource("GradTex_senko_hue")
+alpha_curve = SubResource("CurveTex_senko_alpha")
+
+[sub_resource type="ShaderMaterial" id="Mat_senko"]
+shader = ExtResource("4_dir")
+shader_parameter/tex = ExtResource("2_senko")
+shader_parameter/prm = Vector4(1, 1, 1, 1)
+shader_parameter/env = Vector4(1, 1, 1, 1)
+
+[sub_resource type="QuadMesh" id="Quad_senko"]
+material = SubResource("Mat_senko")
+size = Vector2(30, 100)
+
+[node name="SelectSparkle" type="Node3D"]
+
+[node name="Kira" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 71.4, 0)
+amount = 8
+lifetime = 0.8333
+fixed_fps = 60
+process_material = SubResource("PPM_kira")
+draw_pass_1 = SubResource("Quad_kira")
+
+[node name="Senko" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 71.4, 0)
+amount = 10
+lifetime = 1.6667
+fixed_fps = 60
+process_material = SubResource("PPM_senko")
+draw_pass_1 = SubResource("Quad_senko")

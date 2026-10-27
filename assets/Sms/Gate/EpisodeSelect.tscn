@@ -1,7 +1,10 @@
-[gd_scene load_steps=29 format=3 uid="uid://cepselect127"]
+[gd_scene load_steps=32 format=3 uid="uid://cepselect127"]
 
 [ext_resource type="Script" path="res://assets/Sms/Gate/SmsEpisodeSelect.cs" id="1_script"]
 [ext_resource type="Resource" path="res://assets/Sms/Gate/Stages/RiccoHarbor.tres" id="2_stage"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Gate/fx/SelectPickBurst.tscn" id="fx_burst"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Gate/fx/SelectSparkle.tscn" id="fx_sparkle"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Gate/fx/SelectSparkleEmpty.tscn" id="fx_sparkle_em"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_story.png" id="t_sc_story"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_mark_1.png" id="t_sc_mark_1"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_mark_0.png" id="t_sc_mark_0"]
@@ -49,6 +52,9 @@ CoinIcon = ExtResource("t_coin_icon")
 CoinX = ExtResource("t_coin_number_x")
 CoinDigits = Array[Texture2D]([ExtResource("t_coin_number_0"), ExtResource("t_coin_number_1"), ExtResource("t_coin_number_2"), ExtResource("t_coin_number_3"), ExtResource("t_coin_number_4"), ExtResource("t_coin_number_5"), ExtResource("t_coin_number_6"), ExtResource("t_coin_number_7"), ExtResource("t_coin_number_8"), ExtResource("t_coin_number_9")])
 ShineGetIcon = ExtResource("t_shine_get_icon")
+PickBurstScene = ExtResource("fx_burst")
+SparkleScene = ExtResource("fx_sparkle")
+SparkleEmptyScene = ExtResource("fx_sparkle_em")
 Music = NodePath("Music")
 CursorSound = NodePath("CursorSound")
 SelectSound = NodePath("SelectSound")

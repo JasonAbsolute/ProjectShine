@@ -1,0 +1,123 @@
+[gd_scene load_steps=14 format=3 uid="uid://cgatehit127"]
+
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/kemuball3.png" id="1_ball"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/indhamon1.png" id="2_ripple"]
+
+[sub_resource type="Curve" id="Curve_hit_a_scale"]
+max_value = 1.5
+_data = [Vector2(0.0, 1.5), 0.0, 0.0, 1, 1, Vector2(0.75, 1.5), 0.0, 0.0, 1, 1, Vector2(1.0, 0.3), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTex_hit_a_scale"]
+curve = SubResource("Curve_hit_a_scale")
+
+[sub_resource type="Gradient" id="Grad_hit_a"]
+interpolation_mode = 0
+offsets = PackedFloat32Array(0.0, 0.5, 1.0)
+colors = PackedColorArray(0.6235, 0.8118, 1.0000, 1.0000, 1.0000, 0.6235, 0.8118, 1.0000, 0.8118, 1.0000, 0.6235, 1.0000)
+
+[sub_resource type="GradientTexture1D" id="GradTex_hit_a"]
+gradient = SubResource("Grad_hit_a")
+
+[sub_resource type="Curve" id="Curve_hit_a_alpha"]
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(0.9, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 0.0), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTex_hit_a_alpha"]
+curve = SubResource("Curve_hit_a_alpha")
+
+[sub_resource type="ParticleProcessMaterial" id="PPM_hit_a"]
+resource_name = "ms_gatehit_a: one kemuball3 ball shot out of the gate at 26 u/f (a 7 deg cone), falling 1.5 u/f^2, 50 u x 1.5 -> 0.3, a random rainbow colour, life 30"
+emission_shape = 0
+direction = Vector3(0, 0, -1)
+spread = 7.0
+initial_velocity_min = 18.3369
+initial_velocity_max = 23.576
+gravity = Vector3(0, -72.542, 0)
+scale_min = 0.4198
+scale_max = 0.9236
+scale_curve = SubResource("CurveTex_hit_a_scale")
+color_initial_ramp = SubResource("GradTex_hit_a")
+alpha_curve = SubResource("CurveTex_hit_a_alpha")
+
+[sub_resource type="StandardMaterial3D" id="Mat_hit_a"]
+transparency = 1
+blend_mode = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("1_ball")
+texture_filter = 3
+disable_receive_shadows = true
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="Quad_hit_a"]
+material = SubResource("Mat_hit_a")
+size = Vector2(1.0, 1.0)
+
+[sub_resource type="Curve" id="Curve_hit_b_scale"]
+max_value = 2.0
+_data = [Vector2(0.0, 0.3), 0.0, 0.0, 1, 1, Vector2(1.0, 2.0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveTexture" id="CurveTex_hit_b_scale"]
+curve = SubResource("Curve_hit_b_scale")
+
+[sub_resource type="Curve" id="Curve_hit_b_alpha"]
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(0.5, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 0.0), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTex_hit_b_alpha"]
+curve = SubResource("Curve_hit_b_alpha")
+
+[sub_resource type="ParticleProcessMaterial" id="PPM_hit_b"]
+resource_name = "ms_gatehit_b: one indhamon1 ripple at the hit, 82 u growing x 0.3 -> 2, fading from half life, life 20"
+emission_shape = 0
+angle_min = 90.0
+angle_max = 90.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+gravity = Vector3(0, 0, 0)
+scale_min = 0.8812
+scale_max = 1.3219
+scale_curve = SubResource("CurveTex_hit_b_scale")
+alpha_curve = SubResource("CurveTex_hit_b_alpha")
+
+[sub_resource type="StandardMaterial3D" id="Mat_hit_b"]
+transparency = 1
+blend_mode = 1
+shading_mode = 0
+vertex_color_use_as_albedo = true
+albedo_texture = ExtResource("2_ripple")
+texture_filter = 3
+disable_receive_shadows = true
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="Quad_hit_b"]
+material = SubResource("Mat_hit_b")
+size = Vector2(1.0, 1.0)
+
+[node name="GateHit" type="Node3D"]
+
+[node name="Spark" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.5
+one_shot = true
+explosiveness = 1.0
+fixed_fps = 60
+local_coords = false
+process_material = SubResource("PPM_hit_a")
+draw_pass_1 = SubResource("Quad_hit_a")
+
+[node name="Ripple" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.3333
+one_shot = true
+explosiveness = 1.0
+fixed_fps = 60
+local_coords = false
+process_material = SubResource("PPM_hit_b")
+draw_pass_1 = SubResource("Quad_hit_b")

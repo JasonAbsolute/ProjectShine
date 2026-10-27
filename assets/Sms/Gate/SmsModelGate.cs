@@ -378,8 +378,9 @@ public partial class SmsModelGate : StaticBody3D, ISmsSprayTarget
             var fx = HitScene.Instantiate<Node3D>();
             (GetTree().CurrentScene ?? GetParent()).AddChild(fx);
             fx.GlobalPosition = hitPos;
-            fx.GlobalRotation = new Vector3(0f, Mathf.Atan2(FrontWorld.X, FrontWorld.Z), 0f);   // emitWithRotate(.., unk74 = the front's yaw)
-            foreach (Node c in fx.GetChildren()) if (c is GpuParticles3D p) { p.OneShot = true; p.Emitting = true; }
+            fx.LookAt(hitPos + FrontWorld, Vector3.Up);   // emitWithRotate(.., unk74 = the gate's yaw): the sparks fly out of the gate's face (the scene's -Z)
+            foreach (Node c in fx.GetChildren()) if (c is GpuParticles3D p) { p.OneShot = true; p.Restart(); p.Emitting = true; }
+            GetTree().CreateTimer(1.0).Timeout += () => { if (IsInstanceValid(fx)) fx.QueueFree(); };
         }
         return true;
     }

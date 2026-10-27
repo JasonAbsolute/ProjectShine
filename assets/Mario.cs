@@ -1924,7 +1924,22 @@ public partial class Mario : CharacterBody3D
     public void RevealFromIntro(Transform3D? spawnTransform = null)
     {
         if (spawnTransform.HasValue)
-            GlobalTransform = spawnTransform.Value;
+        {
+            // 127b: the spawn point's POSITION, and its yaw as his start facing -- the root stays unrotated (pass 54: the armature, the camera
+            // pivot and the sensors are posed in its frame as the world's; a rotated root flipped every character in Rico4Secret, whose spawn
+            // point is turned 180 degrees)
+            GlobalPosition = spawnTransform.Value.Origin;
+            GlobalRotation = Vector3.Zero;
+            Vector3 fwd = -spawnTransform.Value.Basis.Z; fwd.Y = 0f;
+            if (fwd.LengthSquared() > 1e-6f)
+            {
+                fwd = fwd.Normalized();
+                float yaw = SmsMath.YawFromDir(fwd);
+                _smsFaceYaw = yaw; _smsFaceValid = true;
+                lastFacingDirection = fwd;
+                if (armature != null) { armature.Rotation = new Vector3(0f, yaw, 0f); _lastArmatureYaw = yaw; }
+            }
+        }
 
         Visible = true;
         SetProcess(true);
@@ -19890,11 +19905,9 @@ public partial class Mario : CharacterBody3D
     [Export] public float SmsWarpInTremble = 6f;
     /// <summary>The pad: rumbleStart(0x15, 0x14) at the vanish and (0x14, mMotorWall / 2) every tick of the capture.</summary>
     [Export] public bool SmsWarpInRumble = true;
-    /// <summary>127b: the ten light-ball emitters (ms_mariowp_body / head / cap / hands / legs / feet / watgun) + the dust; a scene placed at his
-    /// centre whose GpuParticles3D children emit once, pulled toward the gate by an attractor the pull strength drives.</summary>
+    /// <summary>127b: the warp-in's effects scene (WarpBalls.tscn when empty): the ten light-ball bursts off his joints with the game's pull toward
+    /// the gate (SmsWarpBalls), the dust rings and streaks, and the senko flash at the take -- all from the disc's ms_mariowp_* files.</summary>
     [Export] public PackedScene SmsWarpInBallsScene;
-    /// <summary>127b: ms_mariowp_senko, the flash at his centre as the take begins (warpInLight).</summary>
-    [Export] public PackedScene SmsWarpInLightScene;
     /// <summary>STATE_UNK9: startWipe(8, 0.4) -- the spiral wipe begins this long after the capture.</summary>
     [Export] public float SmsWarpInWipeDelay = 0.4f;
     /// <summary>MSD_SE_MA_INTO_DOKAN, played as the wipe starts (a slot).</summary>
@@ -19915,6 +19928,8 @@ public partial class Mario : CharacterBody3D
     public int SmsWarpInPhase => _smsWarpInPhase;
     public float SmsWarpInTicks => _smsWarpInTicks;
     public SmsModelGate SmsWarpGate => _smsWarpGate;
+    /// <summary>MARIO_FLAG_HAS_FLUDD, for the balls scene (the FLUDD burst only with the pack).</summary>
+    public bool HasFludd => _smsHasFludd;
 
     /// <summary>SMS_IsMarioStatusTypeJumping: in the air by a jump-type status (the gate takes him only then).</summary>
     public bool SmsWarpInJumping()
@@ -19949,8 +19964,11 @@ public partial class Mario : CharacterBody3D
         if (animTree != null) animTree.Active = false;
         if (animPlayer != null)
         {
-            if (!wasJumping && animPlayer.HasAnimation("ma_jump"))
-            {   // setAnimation(ANIM_JUMP) at its end frame
+            // setAnimation(ANIM_JUMP) at its end frame when he was not jumping; a jumping Mario keeps his frame -- but the demo state's entry
+            // (SetMarioState above) has just started ma_demo_shine_get, whose frame 0 carries the demo's 90-unit centre translation (the walk-in),
+            // so the frozen pose would stand 1.2 m from his body (drive 127b, G7b). Hold the jump clip's last frame in both cases -- a tiny deviation.
+            if (animPlayer.HasAnimation("ma_jump"))
+            {
                 animPlayer.Play("ma_jump");
                 animPlayer.Seek(animPlayer.CurrentAnimationLength, true);
             }
@@ -19959,7 +19977,7 @@ public partial class Mario : CharacterBody3D
         _smsWarpInPhase = 1; _smsWarpInTicks = 0f; _smsWarpInPull = 0f;
         _smsWarpWipeStarted = false; _smsWarpMoved = false; _smsWarpWipeT = 0f;
         _smsWarpTrembleBase = armature != null ? armature.Position : Vector3.Zero; _smsWarpTrembling = false;
-        if (SmsDebugPrint) GD.Print($"[SMS warp] TAKEN by {gate.Name} at {GlobalPosition} ({(wasJumping ? "mid-jump" : "not jumping: the jump pose")}); the hold {gate.HoldPointWorld}");
+        if (SmsDebugPrint) GD.Print($"[SMS warp] TAKEN by {gate.Name} at {GlobalPosition} ({(wasJumping ? "mid-jump" : "not jumping: the jump pose")}); the hold {gate.HoldPointWorld}; centre joint {SmsCenterTransform().Origin - GlobalPosition} from his feet, clip {animPlayer?.CurrentAnimation} at {animPlayer?.CurrentAnimationPosition:F2}");
         return true;
     }
 
@@ -19991,16 +20009,16 @@ public partial class Mario : CharacterBody3D
                 if (before < 1f)
                 {   // the first tick: the pull direction (the centre less the hold), the flash, setNextStage
                     _smsWarpInDir = (_smsWarpGate.CentreWorld - _smsWarpGate.HoldPointWorld).Normalized();
-                    if (SmsWarpInLightScene != null)
+                    SmsWarpInMakeBalls();
+                    if (_smsWarpBalls != null)
                     {
-                        var light = SmsWarpInLightScene.Instantiate<Node3D>();
-                        GetTree().CurrentScene.AddChild(light);
-                        light.GlobalPosition = GlobalPosition + Vector3.Up * SmsUnits.UnitsToMetres(SmsUnits.MarioHeightUnits * 0.5f);
-                        foreach (Node c in light.GetChildren()) if (c is GpuParticles3D p) { p.OneShot = true; p.Emitting = true; }
+                        _smsWarpBalls.GlobalPosition = GlobalPosition + Vector3.Up * SmsUnits.UnitsToMetres(SmsUnits.MarioHeightUnits * 0.5f);
+                        if (_smsWarpBalls.HasMethod("SmsWarpInFlash")) _smsWarpBalls.Call("SmsWarpInFlash");   // warpInLight: ms_mariowp_senko at his centre
                     }
                     if (GameData.Instance != null) { GameData.Instance.PendingStage = _smsWarpGate.Stage; GameData.Instance.PendingEpisode = -1; }
                 }
                 SmsWarpInHide(false);
+                if (_smsWarpBalls != null && IsInstanceValid(_smsWarpBalls)) _smsWarpBalls.GlobalPosition = GlobalPosition + Vector3.Up * SmsUnits.UnitsToMetres(SmsUnits.MarioHeightUnits * 0.5f);   // FollowEmitter: the flash rides his centre
                 // marioDist x 0.02 a tick, as many ticks as this frame holds
                 int n = Mathf.Max(1, Mathf.RoundToInt(ticks));
                 for (int i = 0; i < n; i++) GlobalPosition += (hold - GlobalPosition) * SmsWarpInPullRate;
@@ -20017,7 +20035,7 @@ public partial class Mario : CharacterBody3D
                     _smsWarpInTicks = 0f; _smsWarpInPull = 0f;
                     SmsWarpInBalls();
                     _smsWarpInPhase = 2;
-                    if (SmsDebugPrint) GD.Print($"[SMS warp] the pull is over at {GlobalPosition} ({distUnits:F0} units from the hold): the light balls");
+                    if (SmsDebugPrint) GD.Print($"[SMS warp] the pull is over at {GlobalPosition} ({distUnits:F0} units from the hold): the light balls; centre joint {SmsCenterTransform().Origin - GlobalPosition} from his feet, clip {animPlayer?.CurrentAnimation} at {animPlayer?.CurrentAnimationPosition:F2} speed {animPlayer?.SpeedScale}");
                 }
                 break;
             }
@@ -20073,17 +20091,29 @@ public partial class Mario : CharacterBody3D
         }
     }
 
-    /// <summary>warpInEffect: the balls scene at his centre, one emitter a joint in the game (mJointIdCenter / Head x2 / HandR / HandL / the feet, the
-    /// watgun only with FLUDD), each with TWarpInCallBack pulling its particles toward the gate.</summary>
+    /// <summary>The balls scene (WarpBalls.tscn by default): made once per warp-in at the take, so its flash can run through the pull.</summary>
+    private void SmsWarpInMakeBalls()
+    {
+        if (_smsWarpBalls != null && IsInstanceValid(_smsWarpBalls)) return;
+        var scene = SmsWarpInBallsScene;
+        if (scene == null && ResourceLoader.Exists("res://assets/Sms/Gate/fx/WarpBalls.tscn")) scene = GD.Load<PackedScene>("res://assets/Sms/Gate/fx/WarpBalls.tscn");
+        if (scene == null) return;
+        _smsWarpBalls = scene.Instantiate<Node3D>();
+        if (SmsDebugPrint) _smsWarpBalls.Set("DebugPrint", true);
+        (GetTree().CurrentScene ?? GetTree().Root).AddChild(_smsWarpBalls);
+    }
+
+    /// <summary>warpInEffect: the balls off his joints (the scene's SmsWarpInStart: ten bursts, the dust), each with TWarpInCallBack's pull toward the gate.</summary>
     private void SmsWarpInBalls()
     {
-        if (SmsWarpInBallsScene == null) return;
-        _smsWarpBalls = SmsWarpInBallsScene.Instantiate<Node3D>();
-        GetTree().CurrentScene.AddChild(_smsWarpBalls);
-        _smsWarpBalls.GlobalPosition = GlobalPosition + Vector3.Up * SmsUnits.UnitsToMetres(SmsUnits.MarioHeightUnits * 0.5f);
-        _smsWarpBalls.LookAt(_smsWarpBalls.GlobalPosition + _smsWarpInDir, Vector3.Up);
+        SmsWarpInMakeBalls();
+        if (_smsWarpBalls == null) return;
         if (_smsWarpBalls.HasMethod("SmsWarpInStart")) _smsWarpBalls.Call("SmsWarpInStart", this, _smsWarpGate);
-        foreach (Node c in _smsWarpBalls.GetChildren()) if (c is GpuParticles3D p) { p.OneShot = true; p.Emitting = true; }
+        else
+        {
+            _smsWarpBalls.GlobalPosition = GlobalPosition + Vector3.Up * SmsUnits.UnitsToMetres(SmsUnits.MarioHeightUnits * 0.5f);
+            foreach (Node c in _smsWarpBalls.GetChildren()) if (c is GpuParticles3D p) { p.OneShot = true; p.Emitting = true; }
+        }
     }
 
     /// <summary>TWarpInCallBack::execute every tick of state 2: each ball's velocity += dir x unk468 x mStatusTimer x its own 1 .. 5 factor -- the pull
@@ -20129,6 +20159,7 @@ public partial class Mario : CharacterBody3D
         if (animPlayer != null) animPlayer.SpeedScale = 1f;
         if (IsInstanceValid(_smsWarpGate)) _smsWarpGate.SmsRelease();
         _smsWarpGate = null;
+        _smsWarpBalls = null;   // the scene frees itself when its flash and balls are spent
         _smsWarpInPhase = 0;
         if (stateOfMario == MarioState.shineGet)
         {

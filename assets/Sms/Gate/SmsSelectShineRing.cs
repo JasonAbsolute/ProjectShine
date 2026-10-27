@@ -18,6 +18,16 @@ public partial class SmsSelectShineRing : Node3D
     public const float SlotAngleUnits = 40f;              // the game's step in its own units
     public const float UnitsToDegrees = 57.295776f * 360f / 65536f;   // x 57.3 = a short angle (65536 a turn)
     public const int FullFrame = 99;                       // the bpk's last frame (alpha 0)
+    /// <summary>SMSGetAnmFrameRate() = 60 / SMSGetVSyncTimesPerSec() = 2 on the 30 fps loop: the spin is 3 degrees x this a frame.</summary>
+    public const float AnmFrameRate = 2f;
+
+    /// <summary>mShines[i]->mIsSelected: the flag and the game's play / stop of the shine's emitters.</summary>
+    private void Select(int i, bool on)
+    {
+        if (i < 0 || i >= 8 || _slots[i] == null) return;
+        _slots[i].Selected = on;
+        SetSparkle(_slots[i], on);
+    }
 
     /// <summary>The shine mesh (a glb whose root holds MeshInstance3Ds); the game's body is 165 units tall -- the mesh is scaled to it.</summary>
     [Export] public PackedScene ShineScene;
@@ -28,11 +38,19 @@ public partial class SmsSelectShineRing : Node3D
     [Export] public float ModelHeightUnits = 535f;
     /// <summary>Degrees added to every shine's yaw: the game's model faces +Z (toward the camera at angle 0); if the glb faces -Z set 180.</summary>
     [Export] public float MeshYawOffset = 0f;
+    /// <summary>The additive halo behind each shine: his T_VFX_simple_1 by default; its size in units (the game's glow quad is 281 x 267; his is 283).</summary>
+    [Export] public Texture2D GlowTexture;
+    [Export] public float GlowSizeUnits = 283f;
+    /// <summary>Where the body's centre sits above the slot (the game's body joint at 71.3 + half its 165; the glow and the sparkles go there).</summary>
+    [Export] public float BodyCentreUnits = 110f;
+    /// <summary>127b: the game's sparkle emitters on a full shine (ms_2d_shine_kira + senko) and on a hollow one (kira_em), playing on the selected.</summary>
+    [Export] public PackedScene SparkleScene;
+    [Export] public PackedScene SparkleEmptyScene;
     [Export] public bool DebugPrint;
 
     private class Slot
     {
-        public Node3D Node; public MeshInstance3D[] Meshes; public StandardMaterial3D[] Mats; public Color[] Base;
+        public Node3D Node, Sparkle; public MeshInstance3D[] Meshes; public StandardMaterial3D[] Mats; public Color[] Base;
         public int State; public bool Selected, Closing, Opening; public float BobPhase, BobSpeed = 0.01f, BobHeight = 10f, SpinAngle, AngleY;
         public int AnmFrame; public Vector3 Pos, Offset;
     }
@@ -72,7 +90,7 @@ public partial class SmsSelectShineRing : Node3D
             s.Node.Rotation = new Vector3(0f, Mathf.DegToRad(s.AngleY + MeshYawOffset), 0f);
             _slots[i] = s;
         }
-        if (_slots[_selected] != null) _slots[_selected].Selected = true;
+        Select(_selected, true);
         _increasing = _decreasing = _closing = false;
         if (DebugPrint) GD.Print($"[SMS select ring] {_num} shines, selected {_selected}, ring angle {_ringAngle}");
     }
@@ -86,25 +104,74 @@ public partial class SmsSelectShineRing : Node3D
         var meshes = new System.Collections.Generic.List<MeshInstance3D>();
         foreach (Node n in list) if (n is MeshInstance3D mi) meshes.Add(mi);
         if (inst is MeshInstance3D rootMi) meshes.Add(rootMi);
-        // the game's body is 165 units: scale the whole mesh to it
-        Aabb box = new Aabb(); bool first = true;
-        foreach (var mi in meshes) { var b = mi.GlobalTransform * mi.GetAabb(); box = first ? b : box.Merge(b); first = false; }
-        if (!first && box.Size.Y > 1e-4f) inst.Scale = Vector3.One * (ModelHeightUnits / box.Size.Y) * inst.Scale.Y;
-        s.Meshes = meshes.ToArray();
+        // his shine scene hides the glb's glow dome (the "_starglow1" surface: a bowl when drawn as imported) and the exporter's stray plane,
+        // and draws its own additive billboard glow instead (ShineSprite.cs BuildShineEffects) -- the same here
+        foreach (var mi in meshes) if (mi.Name.ToString().Contains("PlaneObject")) mi.Visible = false;
         var mats = new System.Collections.Generic.List<StandardMaterial3D>(); var bases = new System.Collections.Generic.List<Color>();
+        MeshInstance3D body = null; int bodySurface = -1;
         foreach (var mi in meshes)
         {
-            for (int i = 0; i < mi.GetSurfaceOverrideMaterialCount(); i++)
+            if (!mi.Visible || mi.Mesh == null) continue;
+            for (int i = 0; i < mi.Mesh.GetSurfaceCount(); i++)
             {
                 var m = mi.GetActiveMaterial(i);
-                StandardMaterial3D copy = m is StandardMaterial3D sm ? (StandardMaterial3D)sm.Duplicate() : new StandardMaterial3D { AlbedoColor = new Color(0.88f, 0.47f, 0.12f) };
+                string mn = m?.ResourceName ?? "";
+                if (mn.Contains("starglow"))
+                {   // the dome: off
+                    mi.SetSurfaceOverrideMaterial(i, new StandardMaterial3D { ResourceName = "_starglow_hidden", Transparency = BaseMaterial3D.TransparencyEnum.Alpha, AlbedoColor = new Color(1f, 1f, 1f, 0f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded });
+                    continue;
+                }
+                StandardMaterial3D copy;
+                if (s.State == 3)
+                {   // the full shine: his gold body look (shine_sprite.tscn's _mat_shine_body)
+                    copy = m is StandardMaterial3D sm ? (StandardMaterial3D)sm.Duplicate() : new StandardMaterial3D();
+                    copy.ResourceName = "_mat_shine_body (select)";
+                    copy.AlbedoColor = new Color(1f, 0.8f, 0.2f); copy.Metallic = 0.85f; copy.MetallicSpecular = 0.7f; copy.Roughness = 0.32f;
+                    copy.EmissionEnabled = true; copy.Emission = new Color(1f, 0.78f, 0.3f); copy.EmissionEnergyMultiplier = 0.35f;
+                }
+                else
+                {   // the open (hollow) shine: see-through, his EmptyTint
+                    copy = new StandardMaterial3D { ResourceName = "_mat_shine_empty (select)", AlbedoColor = EmptyTint, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
+                }
                 copy.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
-                if (s.State != 3) { copy.AlbedoColor = EmptyTint; copy.AlbedoTexture = null; copy.ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded; }
                 mi.SetSurfaceOverrideMaterial(i, copy);
                 mats.Add(copy); bases.Add(copy.AlbedoColor);
+                if (body == null) { body = mi; bodySurface = i; }
             }
         }
+        // the game's shine_menu model is 535 units tall with its glow quad; scale the mesh to it
+        Aabb box = new Aabb(); bool first = true;
+        foreach (var mi in meshes) { if (!mi.Visible) continue; var b = mi.GlobalTransform * mi.GetAabb(); box = first ? b : box.Merge(b); first = false; }
+        if (!first && box.Size.Y > 1e-4f) inst.Scale = Vector3.One * (ModelHeightUnits / box.Size.Y) * inst.Scale.Y;
+        // the glow: his additive halo (T_VFX_simple_1, half the gold, 1.7 m at his 0.006 scale = 283 units -- the game's 281 x 267 glow quad) at the body's centre
+        Vector3 centre = new Vector3(0f, BodyCentreUnits, 0f);
+        var glowMat = new StandardMaterial3D
+        {
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add,
+            BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true,
+            AlbedoColor = s.State == 3 ? new Color(0.5f, 0.425f, 0.2f) : new Color(EmptyTint.R * 0.3f, EmptyTint.G * 0.3f, EmptyTint.B * 0.3f),
+            AlbedoTexture = GlowTexture ?? (ResourceLoader.Exists("res://Font/T_VFX_simple_1.png") ? GD.Load<Texture2D>("res://Font/T_VFX_simple_1.png") : null),
+        };
+        var glow = new MeshInstance3D { Name = "Glow", Mesh = new QuadMesh { Size = new Vector2(GlowSizeUnits, GlowSizeUnits) }, MaterialOverride = glowMat, Position = centre, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        s.Node.AddChild(glow);
+        mats.Add(glowMat); bases.Add(glowMat.AlbedoColor);
+        // the sparkles: the game's emitters on the shine (promi / senko / kira for a full one, kira_em for a hollow one), playing while selected
+        var sparkleScene = s.State == 3 ? SparkleScene : SparkleEmptyScene;
+        if (sparkleScene != null)
+        {
+            s.Sparkle = sparkleScene.Instantiate<Node3D>();
+            s.Node.AddChild(s.Sparkle);
+            SetSparkle(s, false);
+        }
+        s.Meshes = meshes.ToArray();
         s.Mats = mats.ToArray(); s.Base = bases.ToArray();
+    }
+
+    /// <summary>playCreateParticle / stopCreateParticle on the shine's emitters.</summary>
+    private static void SetSparkle(Slot s, bool on)
+    {
+        if (s.Sparkle == null) return;
+        foreach (Node c in s.Sparkle.GetChildren()) if (c is GpuParticles3D p) p.Emitting = on;
     }
 
     /// <summary>getPosition(angle): the ring in the game's units.</summary>
@@ -128,23 +195,23 @@ public partial class SmsSelectShineRing : Node3D
     public void StartIncrease(int step)
     {
         _increasing = true; _ringSpeed = step * -SlotAngleUnits / 10f;
-        if (_slots[_selected] != null) _slots[_selected].Selected = false;
+        Select(_selected, false);
         _selected += step;
-        if (_slots[_selected] != null) _slots[_selected].Selected = true;
+        Select(_selected, true);
     }
 
     public void StartDecrease(int step)
     {
         _decreasing = true; _ringSpeed = step * SlotAngleUnits / 10f;
-        if (_slots[_selected] != null) _slots[_selected].Selected = false;
+        Select(_selected, false);
         _selected -= step;
-        if (_slots[_selected] != null) _slots[_selected].Selected = true;
+        Select(_selected, true);
     }
 
     /// <summary>startClose: the others fade out (their frame runs to the end), the selected one finishes its turn and stops.</summary>
     public void StartClose()
     {
-        if (_slots[_selected] != null) _slots[_selected].Selected = false;
+        Select(_selected, false);
         for (int i = 0; i < 8; i++)
         {
             var s = _slots[i];
@@ -198,12 +265,12 @@ public partial class SmsSelectShineRing : Node3D
         else s.AnmFrame = Mathf.Clamp(frame, 0, FullFrame);
         if (s.Selected)
         {
-            s.SpinAngle += 3f;
+            s.SpinAngle += 3f * AnmFrameRate;
             if (s.SpinAngle > 360f) s.SpinAngle -= 360f;
         }
         else if (s.SpinAngle != 0f)
         {   // not selected any more: the turn runs on to 360 and stops there
-            s.SpinAngle += 3f;
+            s.SpinAngle += 3f * AnmFrameRate;
             if (s.SpinAngle >= 360f) s.SpinAngle = 0f;
         }
         s.BobPhase += s.BobSpeed;
