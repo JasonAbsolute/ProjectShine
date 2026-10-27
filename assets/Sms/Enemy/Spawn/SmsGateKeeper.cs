@@ -26,7 +26,8 @@ using Godot;
 ///          SmsSmallEnemy kind lobbed toward Mario by generateByGateKeeper's rule) / ten Goobles in a ring (vel (4 sin, 12, 4 cos) u/tick, 36 deg
 ///          apart, from 100 u up); GORO ends -> SLEEP (or APPEAR at fog 255), NAME ends -> APPEAR.
 /// Every tick: Mario inside the BODY cylinder (400 x 150 u at the base) takes HIT_MESSAGE_ATTACK; in the swaying clips the root joint turns toward
-/// him at 3 deg a drawn frame (TBGKMtxCalc: here the Model node, 0.75 deg a tick); the damage fog (SMS_AddDamageFogEffect: the material fog, colour
+/// him at 3 deg a drawn frame (TBGKMtxCalc: here the Model node, 0.75 deg a tick, with the mound's joint pinned back to the actor frame by
+/// SmsGateKeeperBasePin so only the stalk and head turn); the damage fog (SMS_AddDamageFogEffect: the material fog, colour
 /// (200, 0, 80), 0.33 .. 0.83 pulsing at 30 ticks) while recently hit in the awake clips; in the Plaza kinds a goop STAMP (stamp_keeper_model1.bmd,
 /// a 2340 u disc x 0.8 / 1.2 / 1.4) is re-stamped into the pollution layer every frame -- the goop under it cannot be cleaned while it lives.
 /// The hit bodies are StaticBody3Ds on <see cref="SmsHiddenCoin.HideLayer"/> (the drops' ray reaches them; nothing collides -- the game's hit actors
@@ -92,6 +93,9 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
     /// <summary>The root joint turns toward Mario in the swaying clips (TBGKMtxCalc), 3 deg a drawn frame = 0.75 a tick.</summary>
     [Export] public bool TrackMario = true;
     [Export] public float TrackDegPerTick = 0.75f;
+    /// <summary>DEVIATION knob, off = the game: the goop mound (joint 11's rings) stays put while the stalk and head turn (TBGKMtxCalc pins centnull1 to the actor
+    /// frame). On: the whole plant turns, mound and all (pass 126b's first look).</summary>
+    [Export] public bool BaseTurnsToo = false;
     /// <summary>SMS_AddDamageFogEffect while recently hit in the awake clips: the pink pulse on the body's materials.</summary>
     [Export] public bool DamageFog = true;
     /// <summary>SMSRumbleMgr: the pad shakes at the smoke cues (power 2000 / distance in units, capped 1) and all through the death, when Mario stands.</summary>
@@ -124,6 +128,7 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
     private Node3D _model; private AnimationPlayer _anim; private Skeleton3D _skel; private int _bck = -1, _headBone = -1; private float _bckRate = 60f, _prevFrame;
     private Mario _mario;
     private SmsGateKeeperHead _head;
+    private SmsGateKeeperBasePin _basePin;
     private readonly List<ShaderMaterial> _mats = new();
     private readonly Dictionary<string, BoneAttachment3D> _fxCache = new();
     private readonly List<SmsNpcEffect> _mouthFx = new();
@@ -149,6 +154,7 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
     public SmsEnemyPool LaunchPool => _launchPool;
     public SmsEnemyPool NamekuriPool => _namePool;
     public SmsGateKeeperHead Head => _head;
+    public SmsGateKeeperBasePin BasePin => _basePin;
     public string BckName => _bck >= 0 ? BckNames[_bck] : "";
     public int Bck => _bck;
     public float Scale3 => GlobalTransform.Basis.Scale.Y;
@@ -163,6 +169,11 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
         if (_model == null || _anim == null) GD.PushWarning($"[SMS gatekeeper] {GetPath()}: the scene needs Model (the glb) with Model/AnimationPlayer");
         if (_model != null) foreach (Node n in _model.FindChildren("*", "Skeleton3D", true, false)) { _skel = n as Skeleton3D; if (_skel != null) break; }
         if (_skel != null) { _headBone = _skel.FindBone(HeadJointName); if (_headBone < 0) _headBone = Mathf.Min(HeadJoint, _skel.GetBoneCount() - 1); }
+        if (_skel != null && !Engine.IsEditorHint())
+        {
+            _basePin = _skel.GetNodeOrNull<SmsGateKeeperBasePin>("BasePin");
+            if (_basePin == null) { _basePin = new SmsGateKeeperBasePin { Name = "BasePin" }; _skel.AddChild(_basePin); }
+        }
         if (AutoLayer) { CollisionLayer = SmsHiddenCoin.HideLayer; CollisionMask = 0; }
         _head = GetNodeOrNull<SmsGateKeeperHead>("HeadHit");
         if (_head == null)
@@ -511,8 +522,8 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
 
     // ------------------------------------------------------------------------------------------------------------------ the look
     /// <summary>TBGKMtxCalc::calc(0): in wait2 / wait3 / wait2_open / wait2_openloop / wait2_close (not in a demo or a talk) the root joint turns toward Mario by
-    /// up to 3 deg a drawn frame (unk180, about the actor's yaw) -- here the Model node, 0.75 a tick. The base (joint 11, pinned to the actor) turns with it: a
-    /// round mound (deviation).</summary>
+    /// up to 3 deg a drawn frame (unk180, about the actor's yaw) -- here the Model node, 0.75 a tick; calc(11) pins centnull1 (the mound's rings) to the actor
+    /// frame -- here <see cref="SmsGateKeeperBasePin"/> turning the base back by the same yaw, so only the stalk and head swing round.</summary>
     private void TrackYaw()
     {
         if (_model == null) return;
@@ -525,6 +536,7 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
             _yawTrack = Mathf.Wrap(_yawTrack + Mathf.Clamp(delta, -TrackDegPerTick, TrackDegPerTick), 0f, 360f);
         }
         _model.Rotation = new Vector3(0f, Mathf.DegToRad(_yawTrack), 0f);
+        if (_basePin != null) { _basePin.Active = !BaseTurnsToo; _basePin.YawDeg = _yawTrack; }
     }
     /// <summary>isDamageFogSituation + SMS_AddDamageFogEffect: the fog on the body's materials while recently hit (unk17C > 0) in the awake clips (not in wait2 /
     /// wait2_start / wait2_end / iyaiya / dive, not outside wait3's active window), and all through AWAKE DAMAGE's first 110 ticks; its factor at the body

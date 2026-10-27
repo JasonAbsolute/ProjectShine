@@ -1,4 +1,4 @@
-[gd_resource type="ShaderMaterial" load_steps=5 format=3 uid="uid://cgkskirt126b"]
+[gd_resource type="ShaderMaterial" format=3 uid="uid://cgkskirt126b"]
 
 [ext_resource type="Shader" path="res://assets/Sms/Enemy/Spawn/GateKeeperSkirt.gdshader" id="1_shader"]
 [ext_resource type="Texture2D" uid="uid://diobl43kh7mcu" path="res://assets/Sms/models/goop_mark_bianco.png" id="2_goop"]
