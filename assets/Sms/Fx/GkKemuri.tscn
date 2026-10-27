@@ -1,4 +1,4 @@
-[gd_scene load_steps=16 format=3 uid="uid://cgkkemu126e"]
+[gd_scene format=3 uid="uid://cgkkemu126e"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsFxBurst.cs" id="1_script"]
 [ext_resource type="Shader" path="res://assets/Sms/Fx/goop_refract.gdshader" id="2_shader"]

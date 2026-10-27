@@ -97,6 +97,17 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
     /// <summary>The colour for Tint / Recolour (see GoopColorMode).</summary>
     [Export] public Color GoopColor = new Color(1f, 1f, 1f, 1f);
 
+    [ExportGroup("Drool (this keeper)")]
+    /// <summary>How far the drool strands hang, as a multiple of the game's (1 = the game's 1.4 m for the long ones; 2 = twice).</summary>
+    [Export(PropertyHint.Range, "0.25,4,0.05")] public float DroolLength = 1.6f;
+    /// <summary>How wide the strands are, as a multiple of the game's (1 = 67 cm for the long ones).</summary>
+    [Export(PropertyHint.Range, "0.25,3,0.05")] public float DroolWidth = 1f;
+    /// <summary>The last part of each strand (0..0.8) narrowed to a rounded point. 0 = the game's flat-cut ribbon.</summary>
+    [Export(PropertyHint.Range, "0,0.8,0.01")] public float DroolRoundTip = 0.35f;
+    /// <summary>On: the game's texture scroll (the teardrop slides off the strand within a second and a plain string is left). Off: the drop stays mapped
+    /// along the strand.</summary>
+    [Export] public bool DroolGameScroll = false;
+
     [ExportGroup("What it spits")]
     /// <summary>Bianco kind: the enemy scene it spits (the game's Gorogoro rolling head -- not yet ported; any enemy of the small-enemy base works, lobbed
     /// toward Mario). Empty = the spit animation plays with nothing coming out.</summary>
@@ -695,20 +706,35 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
     {
         if (scene == null || _skel == null || joint >= _skel.GetBoneCount()) return null;
         var fx = SmsNpcEffect.Spawn(scene, _skel, _skel.GetBoneName(joint), Scale3, _fxCache, Name + joint);
-        if (fx != null && goop && GoopPair(out Color light, out Color dark)) fx.SetGoopColors(light, dark);
+        if (fx == null) return null;
+        if (goop && GoopPair(out Color light, out Color dark)) fx.SetGoopColors(light, dark);
+        foreach (Node c in fx.GetChildren())
+            if (c is SmsGoopStrand strand) { strand.LengthScale = DroolLength; strand.WidthScale = DroolWidth; strand.TipTaper = DroolRoundTip; strand.ScrollPerFrame = DroolGameScroll ? 0.0137f : 0f; }
         return fx;
     }
-    /// <summary>The goop pair the effects wear: FromMaterial / Texture = the stage's (the scenes' baked Bianco pair: nothing pushed); Tint = that pair x
-    /// GoopColor; Recolour = GoopColor and a 0.4 shade of it (the brown pair's light / dark ratio).</summary>
+    /// <summary>The goop pair the effects wear (SMSSetEmitterPolColor 6: the game takes the STAGE's goop colours, i.e. the colours of the goop sheet in use). The
+    /// sheet = <see cref="GoopTexture"/> or the material's own: Bianco's mark gives the game's own table pair (181, 132, 102) / (98, 14, 0); any other sheet gives
+    /// its measured light / dark quarter means (SmsPollutionLayer.MeasureGoopColors, as the NPC goop skin does). Then Tint multiplies that pair by GoopColor;
+    /// Recolour replaces it with GoopColor and a 0.4 shade. Returns false only when nothing needs pushing (the baked Bianco pair, unmodified).</summary>
     public bool GoopPair(out Color light, out Color dark)
     {
-        Color prm = new Color(181f / 255f, 132f / 255f, 102f / 255f), env = new Color(98f / 255f, 14f / 255f, 0f);
+        Color prm = SmsPollutionLayer.GoopLightDefault, env = SmsPollutionLayer.GoopDarkDefault;
+        Texture2D sheet = EffectiveGoopTexture();
+        bool bianco = sheet == null || sheet.ResourcePath.EndsWith("goop_mark_bianco.png");
+        if (!bianco) SmsPollutionLayer.MeasureGoopColors(sheet, out prm, out env);
         switch (GoopColorMode)
         {
             case GoopColorModes.Tint: light = prm * GoopColor; dark = env * GoopColor; light.A = 1f; dark.A = 1f; return true;
             case GoopColorModes.Recolour: light = GoopColor; dark = GoopColor * 0.4f; light.A = 1f; dark.A = 1f; return true;
-            default: light = prm; dark = env; return false;
+            default: light = prm; dark = env; light.A = 1f; dark.A = 1f; return !bianco;
         }
+    }
+    /// <summary>The goop sheet the plant wears right now: the node's GoopTexture, else the material's goop_texture.</summary>
+    public Texture2D EffectiveGoopTexture()
+    {
+        if (GoopTexture != null) return GoopTexture;
+        if (_mats.Count > 0) { var v = _mats[0].GetShaderParameter("goop_texture"); if (v.VariantType == Godot.Variant.Type.Object) return v.As<Texture2D>(); }
+        return null;
     }
     /// <summary>A one-shot at a joint's animated position (emitAndBindToMtxPtr(id, getAnmMtx(joint), EFFECT_ONETIME_*) for a burst that is over in a frame), at the
     /// body's scale.</summary>

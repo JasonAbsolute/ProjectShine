@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3 uid="uid://cgkdead126e"]
+[gd_scene format=3 uid="uid://cgkdead126e"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsNpcEffect.cs" id="1_script"]
 [ext_resource type="Shader" path="res://assets/Sms/Fx/JpaDirBillboard.gdshader" id="2_shader"]
