@@ -319,8 +319,8 @@ Push the fourth feature branch: `feature/gate-entry`, branched from `main` `4c96
 warp-in, the spiral wipe, the episode select screen and the hand-off through the character select to the level and back to the gate (SMS pass 127).
 NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says the feature is done (Kiro will replace this entry
 with the PR entry then, as #5 / #6 went).
-- Branch `feature/gate-entry` -- code tip `9469471` (127b: the effects and the five fixes; before it 79bd8a8 127a, 84a2c73 127) ("SMS pass 127a: ..." -- the [Tool] resource classes and the editor's re-save of RiccoHarbor.tres, on top of
-  `84a2c73`, pass 127 itself); 8 commits since `main` `4c96841`; ~125 files, +5400 / -60. A NEW remote branch (never pushed): push with `-u`. Nothing over 1 MB (the 36 select
+- Branch `feature/gate-entry` -- code tip `4af9915` ("SMS pass 127c: the gate string's effects made right ..."; before it 9469471 127b, 79bd8a8 127a, 84a2c73 127); the branch
+  tip is this file's own commit on top of it; 11 commits since `main` `4c96841`; ~130 files, +5700 / -90. A NEW remote branch (never pushed): push with `-u`. Nothing over 1 MB (the 36 select
   textures are small PNGs; the biggest new file is SmsEpisodeSelect.cs).
 ```
 git push -u origin feature/gate-entry

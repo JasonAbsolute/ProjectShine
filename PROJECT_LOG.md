@@ -8027,3 +8027,58 @@ halved frames (88 of 166 at frame 8, the slide at 11, the loop at 70); S2d the s
 S6b the close at 60 drive frames); the Rico probe; build 0 errors; boot ALL OK. Regression 118: 33/35 -- B0 / B1 (the coconut take) fail with
 Mario in oilRun: his Level.tscn (uncommitted, saved 01:57 after 118 passed 35/35 at 01:55) adds an OilGoop patch where the drive's arena is; no
 pickup code changed (not re-run on a worktree: the oil is the cause).
+
+
+### 127c -- the gate string's effects made right (his refs: shineselectRef.png, gateref.png -- "sloppy": white boxes, black boxes, wrong backgrounds)
+
+**Files:** `assets/Sms/Gate/fx/` -- the ten I-format textures re-baked with their GX alpha (`glow1`, `glow1_sel`, `hoso_senko4`, `radgrad`, `senko`,
+`senko1`, `smash2`; `select/sc_arrow`, `sc_mark_0`, `sc_mark_1`: bake127c.py), `GateWind.tscn` / `WarpBalls.tscn` / `SelectSparkle(Empty).tscn`
+regenerated (gen_fx127.py), NEW `JpaStripeTrailAdd.gdshader` (the wind's Stripe children as GPU trails), `JpaDirBillboardAddRamp.gdshader` (a
+direction billboard that takes the particle colour ramp as prm), `WarpBall.gdshader` (the light balls' TEV); `SmsEpisodeSelect.cs` (the ring's
+view), `SmsSelectShineRing.cs` (the shine's materials), `SmsWarpBalls.cs` (two colours a ball). Tools: `bti2png.py` docstring warning,
+`bake127c.py`, `cap_select.gd` + `run_gpu.ps1` (the select's GPU capture), `patch_smoke127.py` (SMS_F127_CAP=1: a fixed camera 9 m in front /
+5 m right of the gate and user://cap_gate_*.png at the swirl, the pull, the balls, the pull-in; the installer / remover now write LF).
+
+1. **Every I-format texture shipped in 127b had ALPHA 255.** They came straight from jpa_dump / bti2png, which write an I4 / I8 as grey RGB with an
+   opaque alpha; GX samples an intensity texture as R = G = B = A = I, and every JPA TEV here reads "alpha = TEXA x prmA" (the panes' coverage
+   too). jpa_bake.py's 'raw' convention (r = I, a = I) is what all the shaders on the tree expect -- 127b bypassed it. So: the gate's wind heads
+   drew as WHITE SQUARES (lerp(env white -> prm blue, I) at full alpha: the fringe solid white), the select's senko streaks as white bars in
+   black boxes, the marks / arrow as black squares behind the row ("the backgrounds at the bottom are wrong"). A := I on all ten (bake127c.py);
+   bti2png.py's docstring now says so. NOTE for GPU captures: a game run reads `.godot/imported/*.ctex` -- a changed PNG needs the editor's
+   import first (`godot --headless --import`, 90 s here), or the run shows the OLD texture.
+2. **The select's dark boxes = the ring's TRANSPARENT viewport.** Godot's blend_add writes alpha (a x a + dst), so the additive glow quad behind
+   each shine stamped its coverage over the whole 283-unit quad and the SubViewportContainer composited that as a dark translucent square (the
+   283-unit boxes in his ref, 183 px). Fix: the ring's SubViewport is OPAQUE, spans the window, and draws the gradient INSIDE it as the 3D's
+   background (Environment BG_CANVAS, canvas layer 0 behind the shines) -- gradient -> shines -> panes into one buffer, as the game. An ambient
+   colour (`RingAmbient`) and the sun (`RingLightEnergy`) light the shines.
+3. **The shine itself** (shine_menu.bmd via his ShineSprite.glb, probed: Mesh_0 = `_starglow1` dome 562 x 535 / `_mat_shine_body` 143 x 165 /
+   `_mat_shine_eyes`): the body is a flat-lit gold (his (1, 0.8, 0.2) + emission) with NO albedo texture -- the glb's is the glow's radial gradient
+   WITH alpha, and a transparent material (the depth fade needs one) took it as coverage (127b: a see-through body); no metal (a metallic surface
+   mirrors a sky this viewport has not: it rendered near-black). The eyes keep their texture, unlit. The glow quad is the model's own: 540 units
+   (the bmd's 562 x 535 starglow quad about the joint 71.4 up), its texture ShineSprite_shine_0.png (the exporter's copy of the game's), the bpk's
+   colour (250, 240, 154) -- alpha 0.8 over its 155 / 255 (knob `GlowColor`). The hollow shine: his EmptyTint, a white glow.
+4. **The streaks' colour.** JpaDirBillboardAdd.gdshader ignores COLOR.rgb (prm / env uniforms only), so every 127b emitter that fed its hue through a
+   colour ramp (the select senko / kira_em, the warp flash, the dust's streaks) drew WHITE. JpaDirBillboardAddRamp.gdshader multiplies the ramp
+   in (colour = lerp(env, prm, I) x COLOR.rgb; env black = the TEV's "TEXC x prm"); the prm key tables that LOOP by age (calc 3, every 30 frames:
+   blue -> green -> red) are laid over the life as repeating gradient stops (gen_fx127.hue_cycle_stops), the streaks grow from their base (pivot
+   Y 2: center_offset). The select's streaks are the game's (111, 111, 255)-keyed tints at alpha 0.625 -- subtle on the gradient, as his ref shows.
+5. **The wind** (ms_gatewind_a / a2 / a3): the SSP1 Stripe children are now drawn -- a twin emitter with the SAME fixed seed (`use_fixed_seed`) as
+   each head draws the same particles as a GPU trail (24 frames, a 15.8-unit cross ribbon, lerp(env blue -> prm cyan, I) of smash2 along it, the
+   head's alpha, a tail fade). The Vortex SETS 10 u/f tangential every frame in JPA; Godot's tangential_accel accumulates, so it fires for the
+   first two frames only (a curve) and the drag does the rest -- the wisps curl at birth and straighten as the Magnet speeds them up. The Magnet
+   pulls toward a POINT 550 units behind the wall: a radial velocity toward it (`velocity_pivot`) converges the wisps on the M instead of a
+   5.6 m ring hitting the wall. ms_gatewind_b (the rainbow rays) is a DirectionCross: two quads crossed about the velocity (`particle_flag_align_y`
+   + `draw_passes = 2`, FACE_Z and FACE_X), standing OUT of the wall from their base, not camera billboards with a random roll (127b's "white sticks").
+6. **The light balls** (TMario::warpInEffect): colour = lerp(env, prm, I) PER TEXEL in WarpBall.gdshader -- the rim env (the part's deep colour),
+   the core prm (its light one): red cap, blue body, cream skin, brown shoes, each a vivid shaded sphere. 127b multiplied one flat lerp into the
+   grey drop shading: grey marbles. prm rides the instance colour, env the instance custom data (`use_custom_data`; INSTANCE_CUSTOM is a
+   VERTEX built-in -- a varying carries it). The hard GEQUAL 222 cut, the billboard-keep-scale form per instance.
+
+**Verified on his PC by GPU CAPTURE, not headless** (the lesson of 113 / 116): the select by itself (cap_select.gd: rest, a LEFT step, the pick) --
+the gold shine with its face and glow, the hollow blue one, the sparkles, the marks row clean, the gradient edge to edge -- against the real
+game's screen (mariowiki's Pianta Village episode select); the gate from a fixed camera: the swirl's heads soft blue-white, their cyan trails,
+the rays out of the M, the ball cloud in Mario's colours, the pull-in. Drive 127 44/44 (the GPU run IS the drive); build 0 errors; boot ALL OK;
+the drive removed (Mario.cs / GameData.cs back to LF). Not re-run: 118 (no Mario / shine code changed).
+
+**DEVIATIONS (logged):** the trail's tail fade (`tail_fade`, the game's children die all at once); the Vortex as a two-frame impulse; the Magnet's
+convergence as an initial radial velocity; the glow's alpha 0.8 over the bpk's 0.61 (knob).
