@@ -7973,3 +7973,57 @@ closing, the close at 88 drive frames (84), MSF_EPISODE 2, the WHITE fade, the c
 dispatched InputEventAction) loads the GATE's stage with a character chosen; L1 Episode 2 in the level; L2 SmsEpisodeOnly (the episode-1 node's
 children gone, 2 and 1+2 kept); L3 a plain start; R1 the shine's exit (ReturnFromScene + the move) lands at the GATE's spot in the gate-out demo
 (0.00 m); R2 control back. Regression 118 35/35; build 0 errors; boot ALL OK; the load probe of MGate.tscn / EpisodeSelect.tscn / RiccoHarbor.tres clean.
+
+
+### 127b -- the gate string's effects and polish (Jaysonn's five: the jump-in effect, the select's speed, the shine "bowl", the character list, the Rico flip)
+
+**Files:** NEW `assets/Sms/Gate/SmsWarpBalls.cs` (TMario::warpInEffect + TWarpInCallBack as a CPU MultiMesh sim), `SmsSelectPickBurst.cs`,
+`assets/Sms/Gate/fx/` (gen_fx127.py from the disc's .jpa: `WarpBalls.tscn` = the ball sim + ms_mariowp_dust rings and streaks + ms_mariowp_senko
+flash; `GateWind.tscn` = ms_gatewind_a / a2 / a3 / b; `GateHit.tscn` = ms_gatehit_a / b; `SelectSparkle.tscn` = ms_2d_shine_kira + senko,
+`SelectSparkleEmpty.tscn` = kira_em; `SelectPickBurst.tscn` = ms_2d_scsel_on_a / a2 / b / c / d as GPUParticles2D; the textures glow1, glow1_sel,
+senko, senko1, hoso_senko4, smash2, radgrad, indhamon1 + .imports pinned lossless), `MGate.tscn` (WindScene / HitScene wired), `EpisodeSelect.tscn`
+(PickBurstScene / SparkleScene / SparkleEmptyScene wired); `SmsSelectShineRing.cs` (the glb's "_starglow1" dome and the exporter's PlaneObject hidden,
+his additive billboard glow and gold body material instead, the sparkle scenes per slot playing on the selected one, the spin at 3 x
+SMSGetAnmFrameRate), `SmsEpisodeSelect.cs` (the clock), `SmsModelGate.cs` (the sparks face out of the gate and free themselves), `assets/Mario.cs`
+(the warp-in: the balls scene at the take with the flash, the burst, the pose held on ma_jump's last frame; RevealFromIntro), `assets/CharacterSelect.tscn`.
+
+1. **The jump-in effect** -- the disc's 18 gate emitters (jpa_dump.py). The balls: ten one-frame bursts off his joints (body 80 / head 140 / cap 140 /
+   hands 40 / legs 30 / feet 20 / FLUDD 80 = 620) of 20 u P_msm_mizutama1 billboards in the part's colours (the body a random red / cream / blue),
+   omni 4-6 u/f (+-2-3) decaying 5 % a frame, the Vortex field a tangential velocity of 5-8 u/f about the joint's axis (JPAVortexField::affect: mag x
+   (1 - d^2 / 1000^2), set every frame, undamped -- each part's cloud spins), life 90 +-62 %, hard-edged (GEQUAL 222), shrinking over the last quarter;
+   then TWarpInCallBack every frame of state 2: base velocity += dir x 0.6 x mStatusTimer x (1 .. 5 per ball) -- the push grows with the timer, so
+   the cloud streams into the gate within a few frames. DEVIATION: a ball past the gate's plane is removed (the game's fly on behind the gate's wall
+   and die unseen). The dust: 6 shwave1 rings growing 0 -> 650 u over 25 frames (96,192,192) -> (0,87,183) with 20 glow1 streaks each at 20 u/f; the
+   flash (warpInLight, at the take, following his centre): 50 frames of a senko streak a frame, hue cycling, growing x 2.5 / x 4. The swirl while
+   active: smash2 streaks born on a ring r 420 / 420 / 300 u 500 u in FRONT of the gate, drifting in (1 u/f), the Vortex +-10 u/f about the gate's
+   axis (Godot's tangential_accel about the material's gravity axis = the Magnet's 1 u/f a frame pull through the gate), life 44, lerp(white -> blue),
+   alpha 0.5; and gatewind_b: glow3 streaks 20 x 222 u on a disc r 150 u at the plane drifting out 0.5 u/f, hue cycling, alpha 0.875. The drop
+   sparks (70 % a drop): one kemuball3 ball shot out at 26 u/f falling 1.5 u/f^2 in a random rainbow colour, and one indhamon1 ripple x 0.3 -> 2.
+   FOUND ON THE WAY: the demo state's entry starts ma_demo_shine_get, whose frame 0 carries the demo's 90-unit centre translation -- the pose frozen
+   there stood 1.2 m from his body through the pull (the balls burst 1.2 m behind him: drive G7b). The take now holds ma_jump's last frame in both
+   cases (the game keeps a jumping Mario's frame -- a tiny deviation).
+2. **The select's speed** -- the game writes every time as N x mRcpAnmFrameRate and every step as N x SMSGetAnmFrameRate(), and SMSGetAnmFrameRate()
+   = 60 / SMSGetVSyncTimesPerSec() = 60 / 30 = 2 on the 30 fps loop (the display waits two retraces for every director; the select too). So the
+   letterbox is 15 frames, the banner slide 10, the squash / stretch / settle 7 / 10 / 7, the fades 12 a frame, the pick's bars 15, the arrows' bob
+   1 px a step, the spin 6 deg a frame; the unscaled ones stay (the ring's 10-frame turn, the pane slide, the bob, the -16 fades, the 10-frame wait).
+   The menu is up by frame ~70 (was ~140) -- half the time: the "older speed issue" again (the demo at 30 / the gate-out hold).
+3. **The shine "bowl"** -- the ring instantiated the raw ShineSprite.glb, whose surface 0 is the "_starglow1" glow dome; his shine_sprite.tscn hides
+   it (alpha 0), hides the exporter's fast64 PlaneObject, and draws an additive billboard glow instead (ShineSprite.cs BuildShineEffects: T_VFX_simple_1
+   at half the gold, 1.7 m = 283 units -- the game's glow quad is 281 x 267). The ring now does the same, with his gold body material (albedo
+   (1, 0.8, 0.2), emission) for a cleared episode and his EmptyTint unshaded for an open one. The sparkles: kira (glow1 twinkles, yellow / pink) +
+   senko (hue-cycling streaks) on the selected full shine, kira_em on a selected hollow one -- played / stopped with the selection as the game's.
+   The pick burst at (300, 244): the glow4 pop at once; at frame 30 the white radgrad flood, the rainbow glows, the senko streaks (a cleared
+   episode: the red / green / blue lines) -- GPUParticles2D in the Frame, the sizes in screen pixels.
+4. **The character select** -- Koopa, Wario and Waluigi removed from `Characters` (the three ext_resources too): Mario, Luigi, Piantissimo, Yoshi stay.
+5. **The Rico flip** -- Mario.RevealFromIntro(spawnTransform) wrote the spawn point's WHOLE transform onto his root, rotation included; since pass 54
+   the root must stand unrotated (the armature yaw, the camera pivot and the sensors are posed in its frame as the world's; _Ready reads the authored
+   yaw once and zeroes the root). Rico4Secret's MarioSpawnPoint is turned 180 degrees, so every character came out of the intro with the body facing
+   one way and the world math the other. Now: the position from the spawn point, its yaw as his start facing (probe: root yaw 0.0, facing = the
+   spawn's forward, dot 1.000).
+
+**Drive 127** 44/44 (G2b the wind's emitters on while active; G4b spark scenes after the hose; G7b 620 balls, the cloud 0.48 m from his body centre;
+G7c 8 ticks into the pull the cloud 1.45 m along the pull direction with 493 alive -- the rest already through the plane; S2a / S2b / S2 at the
+halved frames (88 of 166 at frame 8, the slide at 11, the loop at 70); S2d the sparkles on the selected shine only; S6d the pick burst popping;
+S6b the close at 60 drive frames); the Rico probe; build 0 errors; boot ALL OK. Regression 118: 33/35 -- B0 / B1 (the coconut take) fail with
+Mario in oilRun: his Level.tscn (uncommitted, saved 01:57 after 118 passed 35/35 at 01:55) adds an OilGoop patch where the drive's arena is; no
+pickup code changed (not re-run on a worktree: the oil is the cause).
