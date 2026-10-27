@@ -146,6 +146,8 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     public float YawDeg => _yaw;
     public Vector3 VelUnits => _vel;
     public int Hp => _hp;
+    /// <summary>mGravity in units a tick squared (pass 126b: a launcher's calcVelocityToJumpToY reads the launched body's).</summary>
+    public float GravityUnits => P.Gravity;
     public float BodyScale => _bodyScale;
     public uint Flags150 => _flags150;
 

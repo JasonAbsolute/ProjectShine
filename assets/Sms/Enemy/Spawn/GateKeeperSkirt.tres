@@ -1,0 +1,13 @@
+[gd_resource type="ShaderMaterial" load_steps=5 format=3 uid="uid://cgkskirt126b"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/Spawn/GateKeeperSkirt.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" uid="uid://diobl43kh7mcu" path="res://assets/Sms/models/goop_mark_bianco.png" id="2_goop"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/GateKeeper/gk_hilight.png" id="3_hl"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/GateKeeper/gk_indtex.png" id="4_ind"]
+
+[resource]
+resource_name = "_mat2 (gene_pakkun_model1.bmd): the goop mound -- the same stages, the indirect warp (Q_indtex2_16), alpha = vertex alpha x the mark's; blended"
+shader = ExtResource("1_shader")
+shader_parameter/goop_tex = ExtResource("2_goop")
+shader_parameter/hilight_tex = ExtResource("3_hl")
+shader_parameter/ind_tex = ExtResource("4_ind")
