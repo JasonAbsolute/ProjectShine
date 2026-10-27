@@ -1,8 +1,8 @@
-[gd_resource type="Resource" script_class="SmsStageInfo" load_steps=5 format=3 uid="uid://cstagericco127"]
+[gd_resource type="Resource" script_class="SmsStageInfo" format=3 uid="uid://bsbbfjarv8sfe"]
 
-[ext_resource type="Script" path="res://assets/Sms/Gate/SmsStageInfo.cs" id="1_stage"]
-[ext_resource type="Script" path="res://assets/Sms/Gate/SmsEpisodeInfo.cs" id="2_episode"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_map_ricco.png" id="3_banner"]
+[ext_resource type="Script" uid="uid://cvx8temo7g23p" path="res://assets/Sms/Gate/SmsStageInfo.cs" id="1_stage"]
+[ext_resource type="Script" uid="uid://bnsbeg67n46pu" path="res://assets/Sms/Gate/SmsEpisodeInfo.cs" id="2_episode"]
+[ext_resource type="Texture2D" uid="uid://bv3h6g4k8j62i" path="res://assets/Sms/Gate/select/sc_map_ricco.png" id="3_banner"]
 
 [sub_resource type="Resource" id="Resource_ep1"]
 script = ExtResource("2_episode")
@@ -20,8 +20,4 @@ script = ExtResource("1_stage")
 Scene = "res://Levels/Rico4Secrect/Skybox/Rico4Secret.tscn"
 StageName = "RICCO HARBOR"
 Banner = ExtResource("3_banner")
-Episodes = Array[ExtResource("2_episode")]([SubResource("Resource_ep1"), SubResource("Resource_ep2")])
-CharacterSelectScene = "res://assets/CharacterSelect.tscn"
-GradientTopLeft = Color(0, 1, 0, 1)
-GradientBottomRight = Color(0, 1, 1, 1)
-GradientCycle = Vector3i(4, 2, 0)
+Episodes = [SubResource("Resource_ep1"), SubResource("Resource_ep2")]
