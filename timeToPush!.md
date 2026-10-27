@@ -247,10 +247,10 @@ Push the third feature branch so the work is visible on GitHub: `feature/enemy-s
 PUSH ONLY, NO PR YET -- the feature is in progress: pass 126 (the generator, the one-shot generator, the common launcher) and pass 126b (the
 gatekeeper: the Polluted Piranha) landed; its particle effects (126c) come next. Jaysonn plays the spawners first; when he says the feature is done a
 later entry asks for the PR. Kiro does not merge this branch locally.
-- Branch `feature/enemy-spawners` -- code tip `3386d73` ("SMS pass 126b: the gatekeeper -- the Polluted Piranha (TBiancoGateKeeper) ..."), on top of
-  `a70ead0` (126a) and `3cdf15b` (126); the branch tip is this file's latest commit. A NEW remote branch: push with `-u`.
+- Branch `feature/enemy-spawners` -- code tip `c0a49da` ("SMS pass 126c: the gatekeeper's mound stays put while the stalk turns to Mario ..."), on top of
+  `3386d73` (126b, the gatekeeper), `a70ead0` (126a) and `3cdf15b` (126); the branch tip is this file's latest commit. A NEW remote branch: push with `-u`.
 - New files: `assets/Sms/Enemy/Spawn/` (SmsEnemyPool.cs, SmsEnemySpawner.cs, SmsEnemyOneShotSpawner.cs, SmsEnemyLauncher.cs, SmsGateKeeper.cs,
-  SmsGateKeeperHead.cs + .uids, Spawner.tscn, OneShotSpawner.tscn, Launcher.tscn, GateKeeper.tscn, LauncherBody / GateKeeperBody / GateKeeperSkirt
+  SmsGateKeeperHead.cs, SmsGateKeeperBasePin.cs + .uids, Spawner.tscn, OneShotSpawner.tscn, Launcher.tscn, GateKeeper.tscn, LauncherBody / GateKeeperBody / GateKeeperSkirt
   .gdshader + .uid + .tres), `assets/Sms/Fx/GeneHit.tscn`, `GeneDead.tscn`, `models/Eniemes/Launcher/` (Launcher.glb 180 KB + .import,
   generator_model1.png + .import, launcher_post_import.gd + .uid), `models/Eniemes/GateKeeper/` (GateKeeper.glb 2.8 MB + .import, three small pngs +
   .imports); changed: `assets/Sms/Enemy/SmsSmallEnemy.cs`, the editor's re-saves of `assets/Sms/Enemy/*.tres`, PROJECT_LOG.md. Nothing over 3 MB.
