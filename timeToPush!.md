@@ -313,3 +313,26 @@ Next: tell Kiro the trunk sha for branching the next feature.
 git push -u origin feature/<name>
 ```
 -->
+
+### #7 -- PENDING -- queued 2026-10-27 (Kiro) -- PUSH ONLY, no PR yet
+Push the fourth feature branch: `feature/gate-entry`, branched from `main` `4c96841` (the trunk after PR #8) -- the M-graffiti gate, Mario's
+warp-in, the spiral wipe, the episode select screen and the hand-off through the character select to the level and back to the gate (SMS pass 127).
+NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says the feature is done (Kiro will replace this entry
+with the PR entry then, as #5 / #6 went).
+- Branch `feature/gate-entry` -- code tip `84a2c73` ("SMS pass 127: the M gate (TModelGate) ..."); the branch tip is this file's own commit on top of
+  it; 2 commits since `main` `4c96841`; 103 files, +3691 / -10. A NEW remote branch (never pushed): push with `-u`. Nothing over 1 MB (the 36 select
+  textures are small PNGs; the biggest new file is SmsEpisodeSelect.cs).
+```
+git push -u origin feature/gate-entry
+git rev-list --count origin/feature/gate-entry..feature/gate-entry
+```
+Expect `0` from the rev-list. No PR, no merge.
+- New files: `assets/Sms/Gate/` (SmsModelGate.cs, SmsStageInfo.cs, SmsEpisodeInfo.cs, SmsEpisodeSelect.cs, SmsSelectShineRing.cs, SmsEpisodeOnly.cs
+  + .uids, MGate.tscn, MGate.gdshader + .uid, EpisodeSelect.tscn, the three gate textures + .imports, `select/` 36 textures + .imports,
+  `Stages/RiccoHarbor.tres`); changed: assets/Mario.cs (the warp-in spliced in; the demo state invincible), assets/GameData.cs, assets/CharacterSelect.cs,
+  assets/Level.cs, assets/Sms/Console/SmsFader.cs + Fader.gdshader (the spiral wipe, the fader colour), Levels/Rico4Secrect/Skybox/Rico4Secret.tscn
+  (ShineSprite2 exits to the Plaza), PROJECT_LOG.md.
+- To try it: drop `assets/Sms/Gate/MGate.tscn` into the Plaza (assets/Level.tscn) against a wall, its -Z (the blue arrow / the M's face) toward
+  where Mario stands; set `Stage` = `assets/Sms/Gate/Stages/RiccoHarbor.tres`. Walk up (it lights in ~2 s), jump into the M.
+The working tree carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the two Koopa and the two
+Goop `.png.import` flips and the `addons/godot_ai` churn: his, leave them.
