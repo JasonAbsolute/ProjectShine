@@ -247,13 +247,16 @@ Push the third feature branch so the work is visible on GitHub: `feature/enemy-s
 PUSH ONLY, NO PR YET -- the feature is in progress: pass 126 (the generator, the one-shot generator, the common launcher) and pass 126b (the
 gatekeeper: the Polluted Piranha) landed; its particle effects (126c) come next. Jaysonn plays the spawners first; when he says the feature is done a
 later entry asks for the PR. Kiro does not merge this branch locally.
-- Branch `feature/enemy-spawners` -- code tip `76f1e3f` ("SMS pass 126d: the gatekeeper's death as the disc has it ..."), on top of `c0a49da` (126c),
-  `3386d73` (126b, the gatekeeper), `a70ead0` (126a) and `3cdf15b` (126); the branch tip is this file's latest commit. A NEW remote branch: push with `-u`.
+- Branch `feature/enemy-spawners` -- code tip `a38f59f` ("SMS pass 126e: the gatekeeper's seven particle effects from the disc's jpa ..."), on top of
+  `76f1e3f` (126d), `c0a49da` (126c), `3386d73` (126b, the gatekeeper), `a70ead0` (126a) and `3cdf15b` (126); the branch tip is this file's latest
+  commit. A NEW remote branch: push with `-u`.
 - New files: `assets/Sms/Enemy/Spawn/` (SmsEnemyPool.cs, SmsEnemySpawner.cs, SmsEnemyOneShotSpawner.cs, SmsEnemyLauncher.cs, SmsGateKeeper.cs,
   SmsGateKeeperHead.cs, SmsGateKeeperBasePin.cs + .uids, Spawner.tscn, OneShotSpawner.tscn, Launcher.tscn, GateKeeper.tscn, LauncherBody / GateKeeperBody / GateKeeperSkirt
-  .gdshader + .uid + .tres), `assets/Sms/Fx/GeneHit.tscn`, `GeneDead.tscn`, `models/Eniemes/Launcher/` (Launcher.glb 180 KB + .import,
+  .gdshader + .uid + .tres), `assets/Sms/Fx/GeneHit.tscn`, `GeneDead.tscn`, `Gk{Bota,Dead,DeadSmoke,Kemuri,KemuriW,YodareL,YodareS}.tscn`, `SmsGoopStrand.cs` + .uid,
+  `JpaStripe.gdshader` + .uid, `tex/{indwp1,kemuball3_gkdead,yodare_raw}.png` + .imports, `models/Eniemes/Launcher/` (Launcher.glb 180 KB + .import,
   generator_model1.png + .import, launcher_post_import.gd + .uid), `models/Eniemes/GateKeeper/` (GateKeeper.glb 2.8 MB + .import, three small pngs +
-  .imports); changed: `assets/Sms/Enemy/SmsSmallEnemy.cs`, the editor's re-saves of `assets/Sms/Enemy/*.tres`, PROJECT_LOG.md. Nothing over 3 MB.
+  .imports); changed: `assets/Sms/Enemy/SmsSmallEnemy.cs`, `assets/Sms/Fx/SmsNpcEffect.cs`, the editor's re-saves of `assets/Sms/Enemy/*.tres`, PROJECT_LOG.md.
+  Nothing over 3 MB.
 - To try it: drop `assets/Sms/Enemy/Spawn/Launcher.tscn` (the goop pile that spits Stus; hose it five times) or `Spawner.tscn` (an invisible point that
   launches a Stu every IntervalTicks; the editor shows a ghost of the kind) into a level. EnemyScene picks the kind; PoolSize how many are out at once.
   `GateKeeper.tscn` is the Polluted Piranha: hose the mound ~2 s to wake it, then spray its head when the mouth is down (Kind: Airport / Bianco /
