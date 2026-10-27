@@ -133,7 +133,7 @@ public partial class SmsModelGate : StaticBody3D, ISmsSprayTarget
     private int _activeRun;        // unkCC
     private GateState _state = GateState.Normal;
     private Node3D _held;          // mHeldObject
-    private bool _wasActive, _mesh;
+    private bool _wasActive, _mesh, _rearmWhenOut;
 
     /// <summary>unkD0: 0 asleep .. 1 lit (the brk frame / 99).</summary>
     public float Glow => _glow;
@@ -283,7 +283,8 @@ public partial class SmsModelGate : StaticBody3D, ISmsSprayTarget
             float front = -local.Z;                                                    // the game's +z: toward the player
             if (Mathf.Abs(local.X) < TakeHalfWidthUnits / u && local.Y > -TakeBelowUnits / u && local.Y < TakeAboveUnits / u && front > 0f && front < TakeDepthUnits / u)
             {
-                if (_activeLeft > 0)
+                if (_rearmWhenOut) { }   // released inside the box: nothing until he has left it
+                else if (_activeLeft > 0)
                 {
                     if (_held == null && mario.SmsWarpInJumping() && mario.SmsWarpInTake(this))
                     {
@@ -301,6 +302,7 @@ public partial class SmsModelGate : StaticBody3D, ISmsSprayTarget
                         mario.GlobalPosition += new Vector3(dx / dist, 0f, dz / dist) * (PushOutPerTickUnits / u);   // SMS_MarioMoveRequest
                 }
             }
+            else _rearmWhenOut = false;   // out of the box: a new jump in may take him again
         }
     }
 
@@ -392,10 +394,12 @@ public partial class SmsModelGate : StaticBody3D, ISmsSprayTarget
         EmitSignal(SignalName.Captured);
     }
 
-    /// <summary>The take fell through (he left some other way): the gate forgets him.</summary>
+    /// <summary>The take fell through (he left some other way, or the gate has no stage): the gate forgets him and will not take him again
+    /// until he has left the box -- else the fall from the hold point is a new jump inside it and the take loops.</summary>
     public void SmsRelease()
     {
         _held = null;
+        _rearmWhenOut = true;
         if (_state == GateState.Captured) _state = GateState.Normal;
     }
 

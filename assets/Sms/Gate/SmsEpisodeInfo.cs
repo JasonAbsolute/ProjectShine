@@ -2,7 +2,7 @@ using Godot;
 
 /// <summary>One episode of a stage: its name (scenarioname.bmg), the shine that marks it cleared, and the picture the select screen shows
 /// for it (the game plays a THP movie of the episode there; a still stands in -- DEVIATION, pass 127).</summary>
-[GlobalClass]
+[Tool, GlobalClass]
 public partial class SmsEpisodeInfo : Resource
 {
     /// <summary>The episode's name, as scenarioname.bmg gives it ("Red Coins in a Bottle").</summary>

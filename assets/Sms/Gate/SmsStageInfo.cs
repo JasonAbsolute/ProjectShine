@@ -7,7 +7,7 @@ using Godot;
 /// you can enter through a gate and put it on the gate (<see cref="SmsModelGate.Stage"/>). The game's rule for what you may pick
 /// (initData 460-490): episode i is open when i is the first or episode i - 1 has its shine; the newest open one starts selected.
 /// </summary>
-[GlobalClass]
+[Tool, GlobalClass]
 public partial class SmsStageInfo : Resource
 {
     /// <summary>The level this stage is: the scene the gate finally loads (the character select, when it runs, loads it too).</summary>
