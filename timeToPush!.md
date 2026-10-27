@@ -242,7 +242,7 @@ Two things worth knowing about GitHub's squash here:
   subfolder as the PR body's wording suggests).
 `pr125.md` deleted now that the PR exists and is merged.
 
-### #6 -- PUSHED 2026-10-26 -- https://github.com/JasonAbsolute/ProjectShine/tree/feature/enemy-spawners -- PR awaiting Jaysonn's click -- queued 2026-10-26 02:10 PDT, PR added 23:05 PDT (Kiro)
+### #6 -- DONE 2026-10-26 -- https://github.com/JasonAbsolute/ProjectShine/pull/8 (SQUASH-merged by Jaysonn) -- queued 2026-10-26 02:10 PDT, PR added 23:05 PDT (Kiro)
 Push the third feature branch and OPEN ITS PR: `feature/enemy-spawners`, branched from `main` `e77b85f` (the trunk after PR #7) -- the enemy spawners
 (the generator, the one-shot generator, the goop-pile launcher) and the Polluted Piranha gatekeeper with its effects and knobs (passes 126-126g).
 PLAYTESTED BY JAYSONN 2026-10-26 ("everything looks great"; the drool tip flicker fixed in 126g: "Smooth now -- the spawners feature is done") -- the PR
@@ -286,7 +286,21 @@ live edits stayed out.
 **Ordering change, learned from #5:** this result commit was made and pushed BEFORE the PR page was opened, so that if Jaysonn
 squash-merges it travels with the code. In #5 the squash cut at the commit before the log commit and the result paragraph had
 to be re-applied onto `main` by hand.
-`gh auth status` still reports "not logged into any GitHub hosts", so the PR is opened from the prefilled compare page again.
+`gh auth status` still reports "not logged into any GitHub hosts", so the PR is opened from the prefilled compare page again
+(5573-char URL, under the ~8000 safe limit; the body was also put on the Windows clipboard as a fallback against truncation).
+
+Merged 2026-10-26: PR #8 **squash-merged** -> `origin/main` `14c07c4`, single parent `e77b85f`. Kiro again did not pre-merge,
+so local `main` had 0 commits of its own and this was a clean `git merge --ff-only` -- second time in a row the one-way rule
+made the pull trivial.
+**The #5 ordering fix is confirmed working.** Committing and pushing the result paragraph BEFORE opening the PR page meant it
+travelled with the squash this time: `git diff --name-only main feature/enemy-spawners` came back EMPTY (in #5 it listed
+`timeToPush!.md` and the paragraph had to be re-applied onto `main` by hand). **Keep this order for every future PR entry:
+push the branch -> commit and push the log result -> only then open the PR page.**
+Verified by tree, not ancestry (`merge-base --is-ancestor ee769a9 origin/main` says NO, as always after a squash): 27 files
+under `assets/Sms/Enemy/Spawn/` and all 7 `assets/Sms/Fx/Gk*.tscn` present on `main`, plus `SmsEnemySpawner.cs`,
+`SmsGateKeeper.cs`, `Launcher.tscn`, `GateKeeper.tscn` and `GateKeeper.glb`.
+`pr126.md` deleted now that the PR exists and is merged. Jaysonn's four live edits were never touched.
+Next: tell Kiro the trunk sha for branching the next feature.
 
 <!-- Kiro appends the next entry below this line. Entry template:
 
