@@ -1,8 +1,9 @@
-[gd_scene load_steps=20 format=3 uid="uid://cgatewind127"]
+[gd_scene load_steps=30 format=3 uid="uid://cgatewind127"]
 
 [ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/smash2.png" id="1_smash"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/glow3_i.png" id="2_glow3"]
 [ext_resource type="Shader" path="res://assets/Sms/Fx/JpaDirBillboardAdd.gdshader" id="3_dir"]
+[ext_resource type="Shader" path="res://assets/Sms/Gate/fx/JpaStripeTrailAdd.gdshader" id="4_stripe"]
 
 [sub_resource type="Curve" id="Curve_wind_alpha"]
 _data = [Vector2(0.0, 0.0), 0.0, 0.0, 1, 1, Vector2(0.5, 0.5), 0.0, 0.0, 1, 1, Vector2(0.75, 0.5), 0.0, 0.0, 1, 1, Vector2(1.0, 0.0), 0.0, 0.0, 1, 1]
@@ -18,6 +19,13 @@ point_count = 3
 [sub_resource type="CurveTexture" id="CurveTex_wind_scale"]
 curve = SubResource("Curve_wind_scale")
 
+[sub_resource type="Curve" id="Curve_wind_vortex"]
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(0.04, 1.0), 0.0, 0.0, 1, 1, Vector2(0.06, 0.0), 0.0, 0.0, 1, 1, Vector2(1.0, 0.0), 0.0, 0.0, 1, 1]
+point_count = 4
+
+[sub_resource type="CurveTexture" id="CurveTex_wind_vortex"]
+curve = SubResource("Curve_wind_vortex")
+
 [sub_resource type="ParticleProcessMaterial" id="PPM_wind_a"]
 resource_name = "ms_gatewind_a: smash2 streaks born on a ring r 420 u (hollow 30 %) 500 u in front of the gate, drifting in 1 u/f, the Vortex +10 u/f about the gate's axis, the Magnet pulling them back through it, life 44"
 emission_shape = 6
@@ -30,9 +38,13 @@ direction = Vector3(0, 0, 1)
 spread = 60.0
 initial_velocity_min = 0.806
 initial_velocity_max = 4.0301
+velocity_pivot = Vector3(0, 0, 14.1053)
+radial_velocity_min = -6.4481
+radial_velocity_max = -4.8361
 gravity = Vector3(0, 0, 48.361)
-tangential_accel_min = 24.181
-tangential_accel_max = 24.181
+tangential_accel_min = 290.167
+tangential_accel_max = 290.167
+tangential_accel_curve = SubResource("CurveTex_wind_vortex")
 damping_min = 1.0
 damping_max = 1.0
 scale_min = 0.75
@@ -52,9 +64,13 @@ direction = Vector3(0, 0, 1)
 spread = 60.0
 initial_velocity_min = 0.806
 initial_velocity_max = 4.0301
+velocity_pivot = Vector3(0, 0, 14.1053)
+radial_velocity_min = -6.4481
+radial_velocity_max = -4.8361
 gravity = Vector3(0, 0, 48.361)
-tangential_accel_min = -24.181
-tangential_accel_max = -24.181
+tangential_accel_min = -290.167
+tangential_accel_max = -290.167
+tangential_accel_curve = SubResource("CurveTex_wind_vortex")
 damping_min = 1.0
 damping_max = 1.0
 scale_min = 0.75
@@ -74,9 +90,13 @@ direction = Vector3(0, 0, 1)
 spread = 60.0
 initial_velocity_min = 0.806
 initial_velocity_max = 4.0301
+velocity_pivot = Vector3(0, 0, 14.1053)
+radial_velocity_min = -6.4481
+radial_velocity_max = -4.8361
 gravity = Vector3(0, 0, 48.361)
-tangential_accel_min = 24.181
-tangential_accel_max = 24.181
+tangential_accel_min = 290.167
+tangential_accel_max = 290.167
+tangential_accel_curve = SubResource("CurveTex_wind_vortex")
 damping_min = 1.0
 damping_max = 1.0
 scale_min = 0.75
@@ -94,10 +114,24 @@ shader_parameter/env = Vector4(1, 1, 1, 1)
 material = SubResource("Mat_wind")
 size = Vector2(1.0075, 1.0075)
 
+[sub_resource type="ShaderMaterial" id="Mat_trail"]
+shader = ExtResource("4_stripe")
+shader_parameter/tex = ExtResource("1_smash")
+shader_parameter/prm = Vector4(0.0000, 1.0000, 0.7843, 1.0000)
+shader_parameter/env = Vector4(0.0000, 0.0000, 1.0000, 1.0000)
+
+[sub_resource type="RibbonTrailMesh" id="Ribbon_trail"]
+material = SubResource("Mat_trail")
+shape = 1
+size = 0.2123
+sections = 8
+section_length = 0.2123
+section_segments = 1
+
 [sub_resource type="Gradient" id="Grad_b_hue"]
 interpolation_mode = 0
-offsets = PackedFloat32Array(0.0, 0.5, 1.0)
-colors = PackedColorArray(0.2471, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.2471, 1.0000, 1.0000, 0.2471, 0.4353, 1.0000)
+offsets = PackedFloat32Array(0.0, 0.1875, 0.3745, 0.375, 0.5625, 0.7495, 0.75, 0.9375, 1.0)
+colors = PackedColorArray(0.2471, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.2471, 1.0000, 1.0000, 0.2471, 0.4353, 1.0000, 0.2471, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.2471, 1.0000, 1.0000, 0.2471, 0.4353, 1.0000, 0.2471, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.2471, 1.0000, 0.6235, 0.7490, 0.3098, 1.0000)
 
 [sub_resource type="GradientTexture1D" id="GradTex_b_hue"]
 gradient = SubResource("Grad_b_hue")
@@ -120,7 +154,8 @@ _data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 2.0), 0.0, 0.0, 1, 1]
 point_count = 2
 
 [sub_resource type="Curve" id="Curve_b_z"]
-_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 1.0), 0.0, 0.0, 1, 1]
+max_value = 1.3
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 1.3), 0.0, 0.0, 1, 1]
 point_count = 2
 
 [sub_resource type="CurveXYZTexture" id="CurveTex_b_scale"]
@@ -129,24 +164,23 @@ curve_y = SubResource("Curve_b_y")
 curve_z = SubResource("Curve_b_z")
 
 [sub_resource type="ParticleProcessMaterial" id="PPM_b"]
-resource_name = "ms_gatewind_b: glow3 streaks 20 x 222 u born on a disc r 150 u (hollow 50 %) at the plane, out 0.5 u/f, hue cycling, growing x 1.3 / x 2, random roll, life 80 +-45 %"
+resource_name = "ms_gatewind_b: glow3 DirectionCross streaks 20 x 222 u born on a disc r 150 u (hollow 50 %) at the plane, standing out of it (0.5 u/f, +-4 deg), the prm hue cycling blue -> green -> red every 30 frames, growing x 1.3 / x 2, life 80 +-45 %"
 lifetime_randomness = 0.45
 emission_shape = 6
 emission_ring_axis = Vector3(0, 0, 1)
 emission_ring_height = 0.0403
 emission_ring_radius = 2.015
 emission_ring_inner_radius = 1.0075
-angle_min = -180.0
-angle_max = 180.0
+particle_flag_align_y = true
 direction = Vector3(0, 0, -1)
-spread = 5.0
+spread = 4.0
 initial_velocity_min = 0.403
 initial_velocity_max = 0.403
 gravity = Vector3(0, 0, 0)
 scale_min = 0.375
 scale_max = 1.625
 scale_curve = SubResource("CurveTex_b_scale")
-color_initial_ramp = SubResource("GradTex_b_hue")
+color_ramp = SubResource("GradTex_b_hue")
 alpha_curve = SubResource("CurveTex_b_alpha")
 
 [sub_resource type="StandardMaterial3D" id="Mat_b"]
@@ -157,12 +191,19 @@ vertex_color_use_as_albedo = true
 albedo_texture = ExtResource("2_glow3")
 texture_filter = 3
 disable_receive_shadows = true
-billboard_mode = 3
-billboard_keep_scale = true
+cull_mode = 2
 
-[sub_resource type="QuadMesh" id="Quad_b"]
+[sub_resource type="QuadMesh" id="Quad_b1"]
 material = SubResource("Mat_b")
 size = Vector2(0.2687, 2.9823)
+orientation = 2
+center_offset = Vector3(0, 1.4911, 0)
+
+[sub_resource type="QuadMesh" id="Quad_b2"]
+material = SubResource("Mat_b")
+size = Vector2(0.2687, 2.9823)
+orientation = 0
+center_offset = Vector3(0, 1.4911, 0)
 
 [node name="GateWind" type="Node3D"]
 
@@ -174,8 +215,25 @@ lifetime = 0.7333
 preprocess = 0.0
 fixed_fps = 60
 local_coords = false
+use_fixed_seed = true
+seed = 1270
 process_material = SubResource("PPM_wind_a")
 draw_pass_1 = SubResource("Quad_wind")
+
+[node name="Trail_a" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -6.7168)
+emitting = false
+amount = 44
+lifetime = 0.7333
+preprocess = 0.0
+fixed_fps = 60
+local_coords = false
+use_fixed_seed = true
+seed = 1270
+process_material = SubResource("PPM_wind_a")
+trail_enabled = true
+trail_lifetime = 0.4
+draw_pass_1 = SubResource("Ribbon_trail")
 
 [node name="Wind_a2" type="GPUParticles3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -6.7168)
@@ -185,8 +243,25 @@ lifetime = 0.7333
 preprocess = 0.0
 fixed_fps = 60
 local_coords = false
+use_fixed_seed = true
+seed = 1271
 process_material = SubResource("PPM_wind_a2")
 draw_pass_1 = SubResource("Quad_wind")
+
+[node name="Trail_a2" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -6.7168)
+emitting = false
+amount = 44
+lifetime = 0.7333
+preprocess = 0.0
+fixed_fps = 60
+local_coords = false
+use_fixed_seed = true
+seed = 1271
+process_material = SubResource("PPM_wind_a2")
+trail_enabled = true
+trail_lifetime = 0.4
+draw_pass_1 = SubResource("Ribbon_trail")
 
 [node name="Wind_a3" type="GPUParticles3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -6.7168)
@@ -196,8 +271,25 @@ lifetime = 0.7333
 preprocess = 0.0
 fixed_fps = 60
 local_coords = false
+use_fixed_seed = true
+seed = 1272
 process_material = SubResource("PPM_wind_a3")
 draw_pass_1 = SubResource("Quad_wind")
+
+[node name="Trail_a3" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -6.7168)
+emitting = false
+amount = 44
+lifetime = 0.7333
+preprocess = 0.0
+fixed_fps = 60
+local_coords = false
+use_fixed_seed = true
+seed = 1272
+process_material = SubResource("PPM_wind_a3")
+trail_enabled = true
+trail_lifetime = 0.4
+draw_pass_1 = SubResource("Ribbon_trail")
 
 [node name="Wind_b" type="GPUParticles3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.2687)
@@ -207,4 +299,6 @@ lifetime = 1.3333
 fixed_fps = 60
 local_coords = false
 process_material = SubResource("PPM_b")
-draw_pass_1 = SubResource("Quad_b")
+draw_passes = 2
+draw_pass_1 = SubResource("Quad_b1")
+draw_pass_2 = SubResource("Quad_b2")

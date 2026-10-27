@@ -38,11 +38,18 @@ public partial class SmsSelectShineRing : Node3D
     [Export] public float ModelHeightUnits = 535f;
     /// <summary>Degrees added to every shine's yaw: the game's model faces +Z (toward the camera at angle 0); if the glb faces -Z set 180.</summary>
     [Export] public float MeshYawOffset = 0f;
-    /// <summary>The additive halo behind each shine: his T_VFX_simple_1 by default; its size in units (the game's glow quad is 281 x 267; his is 283).</summary>
+    /// <summary>127c: the full shine's body -- his shine_sprite.tscn gold (1, 0.8, 0.2) with his emission (1, 0.78, 0.3) x 0.35, lit by the select's
+    /// ambient and sun (SmsEpisodeSelect.RingAmbient / RingLightEnergy); the game's register is (225, 120, 30) under its own lights.</summary>
+    [Export] public Color BodyColor = new Color(1f, 0.8f, 0.2f);
+    [Export] public Color BodyEmission = new Color(1f, 0.78f, 0.3f);
+    [Export] public float BodyEmissionEnergy = 0.25f;
+    /// <summary>The additive glow behind each shine: the model's own glow texture (ShineSprite_shine_0.png, the radial gradient) by default; its
+    /// quad in the bmd is 562 x 535 units (the whole model's height) about the starglow joint; the bpk colours it (250, 240, 154) at alpha 155.</summary>
     [Export] public Texture2D GlowTexture;
-    [Export] public float GlowSizeUnits = 283f;
-    /// <summary>Where the body's centre sits above the slot (the game's body joint at 71.3 + half its 165; the glow and the sparkles go there).</summary>
-    [Export] public float BodyCentreUnits = 110f;
+    [Export] public float GlowSizeUnits = 540f;
+    [Export] public Color GlowColor = new Color(250f / 255f, 240f / 255f, 154f / 255f, 0.8f);
+    /// <summary>Where the glow and the sparkles sit above the slot: the starglow / body joint, 71.4 units up (the body spans 0 .. 165).</summary>
+    [Export] public float BodyCentreUnits = 71.4f;
     /// <summary>127b: the game's sparkle emitters on a full shine (ms_2d_shine_kira + senko) and on a hollow one (kira_em), playing on the selected.</summary>
     [Export] public PackedScene SparkleScene;
     [Export] public PackedScene SparkleEmptyScene;
@@ -122,35 +129,48 @@ public partial class SmsSelectShineRing : Node3D
                     continue;
                 }
                 StandardMaterial3D copy;
-                if (s.State == 3)
-                {   // the full shine: his gold body look (shine_sprite.tscn's _mat_shine_body)
-                    copy = m is StandardMaterial3D sm ? (StandardMaterial3D)sm.Duplicate() : new StandardMaterial3D();
-                    copy.ResourceName = "_mat_shine_body (select)";
-                    copy.AlbedoColor = new Color(1f, 0.8f, 0.2f); copy.Metallic = 0.85f; copy.MetallicSpecular = 0.7f; copy.Roughness = 0.32f;
-                    copy.EmissionEnabled = true; copy.Emission = new Color(1f, 0.78f, 0.3f); copy.EmissionEnergyMultiplier = 0.35f;
+                bool eyes = mn.Contains("eyes");
+                if (eyes)
+                {   // 127c: the eyes keep their own texture (the black oval with its highlight: its alpha IS the eye's shape), unlit
+                    copy = m is StandardMaterial3D em ? (StandardMaterial3D)em.Duplicate() : new StandardMaterial3D();
+                    copy.ResourceName = "_mat_shine_eyes (select)";
+                    copy.ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded;
+                    copy.AlbedoColor = s.State == 3 ? Colors.White : new Color(1f, 1f, 1f, EmptyTint.A);
+                }
+                else if (s.State == 3)
+                {   // the full shine: his gold (shine_sprite.tscn's _mat_shine_body colours) lit flat and bright, as the game's menu shine. 127c: NO
+                    // albedo texture -- the glb's is the glow's radial gradient WITH alpha, and a transparent material (the depth fade needs one)
+                    // took that alpha as coverage: the body went see-through from the middle out (127b drew it as a faint ring). No metal
+                    // either: a metallic surface mirrors the sky, and this viewport has none (it rendered near-black in 127b).
+                    copy = new StandardMaterial3D { ResourceName = "_mat_shine_body (select)", AlbedoColor = BodyColor, Metallic = 0f, Roughness = 0.45f, SpecularMode = BaseMaterial3D.SpecularModeEnum.SchlickGgx };
+                    copy.EmissionEnabled = true; copy.Emission = BodyEmission; copy.EmissionEnergyMultiplier = BodyEmissionEnergy;
                 }
                 else
                 {   // the open (hollow) shine: see-through, his EmptyTint
                     copy = new StandardMaterial3D { ResourceName = "_mat_shine_empty (select)", AlbedoColor = EmptyTint, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
                 }
                 copy.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+                copy.CullMode = BaseMaterial3D.CullModeEnum.Back;
                 mi.SetSurfaceOverrideMaterial(i, copy);
                 mats.Add(copy); bases.Add(copy.AlbedoColor);
-                if (body == null) { body = mi; bodySurface = i; }
+                if (body == null && !eyes) { body = mi; bodySurface = i; }
             }
         }
         // the game's shine_menu model is 535 units tall with its glow quad; scale the mesh to it
         Aabb box = new Aabb(); bool first = true;
         foreach (var mi in meshes) { if (!mi.Visible) continue; var b = mi.GlobalTransform * mi.GetAabb(); box = first ? b : box.Merge(b); first = false; }
         if (!first && box.Size.Y > 1e-4f) inst.Scale = Vector3.One * (ModelHeightUnits / box.Size.Y) * inst.Scale.Y;
-        // the glow: his additive halo (T_VFX_simple_1, half the gold, 1.7 m at his 0.006 scale = 283 units -- the game's 281 x 267 glow quad) at the body's centre
+        // the glow: the model's own glow quad re-drawn as an additive billboard (the glb turned it into a dome): the bmd's starglow quad is 562 x 535
+        // units about the starglow joint (71.4 up), its texture the radial gradient the exporter saved as ShineSprite_shine_0.png, its colour the
+        // bpk's register (250, 240, 154) at alpha 155 for the full shine and white at 155 for the hollow one
         Vector3 centre = new Vector3(0f, BodyCentreUnits, 0f);
+        Color glowCol = s.State == 3 ? GlowColor : new Color(EmptyTint.R, EmptyTint.G, EmptyTint.B, GlowColor.A);
         var glowMat = new StandardMaterial3D
         {
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add,
-            BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true,
-            AlbedoColor = s.State == 3 ? new Color(0.5f, 0.425f, 0.2f) : new Color(EmptyTint.R * 0.3f, EmptyTint.G * 0.3f, EmptyTint.B * 0.3f),
-            AlbedoTexture = GlowTexture ?? (ResourceLoader.Exists("res://Font/T_VFX_simple_1.png") ? GD.Load<Texture2D>("res://Font/T_VFX_simple_1.png") : null),
+            BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, NoDepthTest = false,
+            AlbedoColor = glowCol,
+            AlbedoTexture = GlowTexture ?? (ResourceLoader.Exists("res://models/ShineSprite/ShineSprite_shine_0.png") ? GD.Load<Texture2D>("res://models/ShineSprite/ShineSprite_shine_0.png") : null),
         };
         var glow = new MeshInstance3D { Name = "Glow", Mesh = new QuadMesh { Size = new Vector2(GlowSizeUnits, GlowSizeUnits) }, MaterialOverride = glowMat, Position = centre, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
         s.Node.AddChild(glow);

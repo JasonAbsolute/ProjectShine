@@ -3,7 +3,7 @@
 [ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/glow1_sel.png" id="1_glow"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/hoso_senko4.png" id="2_senko"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/senko.png" id="3_senko_em"]
-[ext_resource type="Shader" path="res://assets/Sms/Fx/JpaDirBillboardAdd.gdshader" id="4_dir"]
+[ext_resource type="Shader" path="res://assets/Sms/Gate/fx/JpaDirBillboardAddRamp.gdshader" id="4_dir"]
 
 [sub_resource type="Gradient" id="Grad_kira"]
 interpolation_mode = 0
@@ -59,8 +59,8 @@ size = Vector2(1.0, 1.0)
 
 [sub_resource type="Gradient" id="Grad_senko_hue"]
 interpolation_mode = 0
-offsets = PackedFloat32Array(0.0, 0.5, 1.0)
-colors = PackedColorArray(0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.4353, 1.0000, 1.0000, 0.4353, 0.4353, 1.0000)
+offsets = PackedFloat32Array(0.0, 0.15, 0.2995, 0.3, 0.45, 0.5995, 0.6, 0.75, 0.8995, 0.9, 1.0)
+colors = PackedColorArray(0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.4353, 1.0000, 1.0000, 0.4353, 0.4353, 1.0000, 0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.4353, 1.0000, 1.0000, 0.4353, 0.4353, 1.0000, 0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.4353, 1.0000, 1.0000, 0.4353, 0.4353, 1.0000, 0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 0.8118, 0.6235, 1.0000)
 
 [sub_resource type="GradientTexture1D" id="GradTex_senko_hue"]
 gradient = SubResource("Grad_senko_hue")
@@ -92,30 +92,32 @@ curve_y = SubResource("Curve_senko_y")
 curve_z = SubResource("Curve_senko_z")
 
 [sub_resource type="ParticleProcessMaterial" id="PPM_senko"]
-resource_name = "ms_2d_shine_kira_em: streaks 0.1 a frame in a 30 u sphere, hue cycling, growing x 2.5 / x 3, random roll, life 100 +-37 %"
+resource_name = "ms_2d_shine_kira_em: streaks 0.1 a frame in a 30 u sphere, the prm hue cycling every 30 frames, growing x 2.5 / x 3 from the base, random roll, life 100 +-37 %"
 lifetime_randomness = 0.375
 emission_shape = 1
 emission_sphere_radius = 30
 particle_flag_align_y = true
 spread = 180.0
-initial_velocity_min = 6.0
-initial_velocity_max = 30.0
+initial_velocity_min = 12.0
+initial_velocity_max = 12.0
 gravity = Vector3(0, 0, 0)
 scale_min = 0.5
 scale_max = 1.5
 scale_curve = SubResource("CurveTex_senko")
-color_initial_ramp = SubResource("GradTex_senko_hue")
+color_ramp = SubResource("GradTex_senko_hue")
 alpha_curve = SubResource("CurveTex_senko_alpha")
 
 [sub_resource type="ShaderMaterial" id="Mat_senko"]
 shader = ExtResource("4_dir")
 shader_parameter/tex = ExtResource("3_senko_em")
 shader_parameter/prm = Vector4(1, 1, 1, 1)
-shader_parameter/env = Vector4(1, 1, 1, 1)
+shader_parameter/env = Vector4(0, 0, 0, 1)
 
 [sub_resource type="QuadMesh" id="Quad_senko"]
 material = SubResource("Mat_senko")
 size = Vector2(7.5, 85)
+orientation = 2
+center_offset = Vector3(0, 42.5, 0)
 
 [node name="SelectSparkleEmpty" type="Node3D"]
 

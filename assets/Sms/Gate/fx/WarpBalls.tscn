@@ -5,7 +5,7 @@
 [ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/shwave1.png" id="3_wave"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/glow1.png" id="4_glow"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/senko.png" id="5_senko"]
-[ext_resource type="Shader" path="res://assets/Sms/Fx/JpaDirBillboardAdd.gdshader" id="6_dir"]
+[ext_resource type="Shader" path="res://assets/Sms/Gate/fx/JpaDirBillboardAddRamp.gdshader" id="6_dir"]
 
 [sub_resource type="Curve" id="Curve_ring"]
 _data = [Vector2(0.0, 0.0), 0.0, 0.0, 1, 1, Vector2(1.0, 1.0), 0.0, 0.0, 1, 1]
@@ -75,7 +75,7 @@ color_ramp = SubResource("GradTex_streak")
 shader = ExtResource("6_dir")
 shader_parameter/tex = ExtResource("4_glow")
 shader_parameter/prm = Vector4(1, 1, 1, 1)
-shader_parameter/env = Vector4(1, 1, 1, 1)
+shader_parameter/env = Vector4(0, 0, 0, 1)
 
 [sub_resource type="QuadMesh" id="Quad_streak"]
 material = SubResource("Mat_streak")
@@ -102,8 +102,8 @@ curve_z = SubResource("Curve_flash_z")
 
 [sub_resource type="Gradient" id="Grad_flash_hue"]
 interpolation_mode = 0
-offsets = PackedFloat32Array(0.0, 0.5, 1.0)
-colors = PackedColorArray(0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.4353, 1.0000, 1.0000, 0.4353, 0.4353, 1.0000)
+offsets = PackedFloat32Array(0.0, 0.25, 0.4995, 0.5, 0.75, 1.0)
+colors = PackedColorArray(0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.4353, 1.0000, 1.0000, 0.4353, 0.4353, 1.0000, 0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.4353, 1.0000, 1.0000, 0.4353, 0.4353, 1.0000)
 
 [sub_resource type="GradientTexture1D" id="GradTex_flash_hue"]
 gradient = SubResource("Grad_flash_hue")
@@ -127,14 +127,14 @@ gravity = Vector3(0, 0, 0)
 scale_min = 0.625
 scale_max = 1.375
 scale_curve = SubResource("CurveTex_flash")
-color_initial_ramp = SubResource("GradTex_flash_hue")
+color_ramp = SubResource("GradTex_flash_hue")
 alpha_curve = SubResource("CurveTex_flash_alpha")
 
 [sub_resource type="ShaderMaterial" id="Mat_flash"]
 shader = ExtResource("6_dir")
 shader_parameter/tex = ExtResource("5_senko")
 shader_parameter/prm = Vector4(1, 1, 1, 1)
-shader_parameter/env = Vector4(1, 1, 1, 1)
+shader_parameter/env = Vector4(0, 0, 0, 1)
 
 [sub_resource type="QuadMesh" id="Quad_flash"]
 material = SubResource("Mat_flash")

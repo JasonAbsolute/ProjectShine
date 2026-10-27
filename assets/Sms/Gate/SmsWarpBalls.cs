@@ -25,13 +25,15 @@ public partial class SmsWarpBalls : Node3D
     {
         public Vector3 Pos, Vel, Axis, Centre;   // Pos / Centre world metres; Vel units a frame (world axes); Axis the vortex axis (world)
         public float Life, Age, Size, Vortex, Factor;   // frames; Size metres; Vortex units a frame; Factor the callback's 1 .. 5
-        public Color Col;
+        public Color Col, Env;   // 127c: prm (the core) and env (the rim): the TEV's lerp(env -> prm, I) runs in WarpBall.gdshader
     }
 
     /// <summary>The ball texture (P_msm_mizutama1: a water-drop highlight, alpha = coverage).</summary>
     [Export] public Texture2D BallTexture;
     /// <summary>GX alpha compare GEQUAL 222 / 255: the balls are hard-edged.</summary>
-    [Export] public float AlphaCut = 0.87f;
+    [Export] public float AlphaCut = 0.8706f;
+    /// <summary>127c: the ball shader (WarpBall.gdshader: lerp(env -> prm, I) per texel, the hard cut, billboarded per instance); none = the file.</summary>
+    [Export] public Shader BallShader;
     /// <summary>x the counts (600 balls at 1); his GPU decides.</summary>
     [Export] public float Density = 1f;
     /// <summary>Skip the FLUDD burst when he has no FLUDD (the game's MARIO_FLAG_HAS_FLUDD test).</summary>
@@ -137,8 +139,8 @@ public partial class SmsWarpBalls : Node3D
                 Life = 90f * (1f + (_rng.Randf() * 2f - 1f) * 0.625f), Age = 0f,
                 Size = 20f / u * (1f + (_rng.Randf() * 2f - 1f) * 0.25f), Vortex = vortex, Factor = 1f + _rng.RandiRange(0, 63) / 16f,
             };
-            if (bodyTable) { int k = _rng.RandiRange(0, 2); b.Col = BodyTable[k].Lerp(BodyEnv[k], 0.3f); }
-            else b.Col = prm.Lerp(env, 0.3f);   // lerp(env -> prm, TEXC): the texture's bright core shows prm, its rim env
+            if (bodyTable) { int k = _rng.RandiRange(0, 2); b.Col = BodyTable[k]; b.Env = BodyEnv[k]; }
+            else { b.Col = prm; b.Env = env; }   // lerp(env -> prm, TEXC) in the shader: the texture's bright core shows prm, its rim env
             _balls.Add(b);
         }
     }
@@ -148,14 +150,23 @@ public partial class SmsWarpBalls : Node3D
         if (_mmi == null)
         {
             var quad = new QuadMesh { Size = new Vector2(1f, 1f) };
-            var mat = new StandardMaterial3D
+            var shader = BallShader ?? (ResourceLoader.Exists("res://assets/Sms/Gate/fx/WarpBall.gdshader") ? GD.Load<Shader>("res://assets/Sms/Gate/fx/WarpBall.gdshader") : null);
+            if (shader != null)
             {
-                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.AlphaScissor, AlphaScissorThreshold = AlphaCut,
-                BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled, VertexColorUseAsAlbedo = true, AlbedoTexture = BallTexture, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
-                TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps, DisableReceiveShadows = true,
-            };
-            quad.Material = mat;
-            _mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true, Mesh = quad, InstanceCount = _balls.Count };
+                var mat = new ShaderMaterial { Shader = shader };
+                mat.SetShaderParameter("tex", BallTexture); mat.SetShaderParameter("alpha_ref", AlphaCut);
+                quad.Material = mat;
+            }
+            else
+            {   // no shader file: the 127b stand-in (one flat colour x the shading)
+                quad.Material = new StandardMaterial3D
+                {
+                    ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.AlphaScissor, AlphaScissorThreshold = AlphaCut,
+                    BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled, VertexColorUseAsAlbedo = true, AlbedoTexture = BallTexture, CullMode = BaseMaterial3D.CullModeEnum.Disabled,
+                    TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps, DisableReceiveShadows = true,
+                };
+            }
+            _mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true, UseCustomData = true, Mesh = quad, InstanceCount = _balls.Count };
             _mmi = new MultiMeshInstance3D { Name = "Balls", Multimesh = _mm, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, TopLevel = true };
             AddChild(_mmi);
             _mmi.GlobalTransform = Transform3D.Identity;
@@ -235,6 +246,7 @@ public partial class SmsWarpBalls : Node3D
             float s = b.Size * (t < 0.75f ? 1f : 1f - (t - 0.75f) / 0.25f);   // ESP1 scale: 1 -> 0 over the last quarter
             _mm.SetInstanceTransform(i, new Transform3D(Basis.Identity.Scaled(Vector3.One * Mathf.Max(s, 0.001f)), b.Pos));
             _mm.SetInstanceColor(i, b.Col);
+            _mm.SetInstanceCustomData(i, b.Env);
         }
     }
 }

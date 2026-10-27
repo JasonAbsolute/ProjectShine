@@ -62,6 +62,10 @@ public partial class SmsEpisodeSelect : Control
     /// <summary>Where the episode's still sits (frame px, the game's 3D band) and its size; the ring shows through where it is transparent.</summary>
     [Export] public Vector2 PreviewCentre = new Vector2(300f, 150f);
     [Export] public Vector2 PreviewSize = new Vector2(256f, 144f);
+    /// <summary>127c: the light on the ring's shines -- the ambient colour filling their shadow side and the sun's strength (the game lights
+    /// the menu shines flat and bright: raise the ambient for a flatter gold, lower it for more shading).</summary>
+    [Export] public Color RingAmbient = new Color(0.42f, 0.42f, 0.45f);
+    [Export] public float RingLightEnergy = 1.0f;
     [Export] public bool DebugPrint;
 
     [ExportGroup("Sounds (slots)")]
@@ -291,24 +295,32 @@ public partial class SmsEpisodeSelect : Control
         foreach (Node c in GetChildren()) if (c.Name == "Backdrop" || c.Name == "Ring" || c.Name == "Frame") { RemoveChild(c); c.QueueFree(); }
         MouseFilter = MouseFilterEnum.Ignore;
         SetAnchorsPreset(LayoutPreset.FullRect);
+        // 127c: the ring's 3D view is OPAQUE and the gradient is drawn INSIDE it as the 3D's background (Environment BG_CANVAS: canvas layer 0 behind
+        // the shines), the way the game draws gradient -> shines -> panes into one frame buffer. 127b rendered the ring into a TRANSPARENT
+        // viewport: Godot's blend_add writes alpha (a x a + dst) so the additive glow quad stamped its coverage over the whole quad and the
+        // container composited that as a DARK BOX around each shine. The view spans the window (the camera keeps the height: 448 rows = the
+        // window's height, x 300 at its centre, as before); the gradient fills it edge to edge.
+        _ringView = new SubViewportContainer { Name = "Ring", Stretch = true, MouseFilter = MouseFilterEnum.Ignore };
+        _ringView.SetAnchorsPreset(LayoutPreset.FullRect);
+        AddChild(_ringView);
+        _ringVp = new SubViewport { TransparentBg = false, Size = new Vector2I(600, 448), RenderTargetUpdateMode = SubViewport.UpdateMode.Always, Msaa3D = Viewport.Msaa.Msaa4X };
+        _ringView.AddChild(_ringVp);
         // the gradient (TSelectGrad: a quad from the stage's top-left colour to its bottom-right one, the other corners their mean)
         _backdrop = new ColorRect { Name = "Backdrop", MouseFilter = MouseFilterEnum.Ignore };
         _backdrop.SetAnchorsPreset(LayoutPreset.FullRect);
         var shader = new Shader { Code = GradientShader };
         _gradMat = new ShaderMaterial { Shader = shader };
         _backdrop.Material = _gradMat;
-        AddChild(_backdrop);
+        _ringVp.AddChild(_backdrop);
         _gradTL = _stage.GradientTopLeft; _gradBR = _stage.GradientBottomRight; _cycle = new[] { _stage.GradientCycle.X, _stage.GradientCycle.Y, _stage.GradientCycle.Z };
         ApplyGradient();
+        var env = new Godot.Environment { BackgroundMode = Godot.Environment.BGMode.Canvas, BackgroundCanvasMaxLayer = 0, AmbientLightSource = Godot.Environment.AmbientSource.Color, AmbientLightColor = RingAmbient, AmbientLightEnergy = 1f };
+        _ringVp.AddChild(new WorldEnvironment { Name = "RingEnvironment", Environment = env });
         // the ring: a 3D view the size of the frame (Screen 3D: the camera at (300, 240, 1300) looking at (300, 240, 0), fovy 30, 50 .. 10000)
-        _ringView = new SubViewportContainer { Name = "Ring", Stretch = true, MouseFilter = MouseFilterEnum.Ignore };
-        AddChild(_ringView);
-        _ringVp = new SubViewport { TransparentBg = true, Size = new Vector2I(600, 448), RenderTargetUpdateMode = SubViewport.UpdateMode.Always };
-        _ringView.AddChild(_ringVp);
         _ringCam = new Camera3D { Position = new Vector3(300f, 240f, 1300f), Fov = 30f, Near = 50f, Far = 10000f, KeepAspect = Camera3D.KeepAspectEnum.Height };
         _ringVp.AddChild(_ringCam);
         _ringCam.LookAt(new Vector3(300f, 240f, 0f), Vector3.Up);
-        var light = new DirectionalLight3D { Position = new Vector3(300f, 800f, 1300f) };
+        var light = new DirectionalLight3D { Position = new Vector3(300f, 800f, 1300f), LightEnergy = RingLightEnergy };
         _ringVp.AddChild(light);
         light.LookAt(new Vector3(300f, 160f, 0f), Vector3.Up);
         _ring = new SmsSelectShineRing { Name = "Shines", DebugPrint = DebugPrint, SparkleScene = SparkleScene, SparkleEmptyScene = SparkleEmptyScene };
@@ -391,8 +403,7 @@ public partial class SmsEpisodeSelect : Control
         float x0 = (vp.X - FrameW * s) * 0.5f;
         _frame.Scale = new Vector2(s, s);
         _frame.Position = new Vector2(x0, 0f);
-        _ringView.Position = new Vector2(x0, 0f);
-        _ringView.Size = new Vector2(FrameW * s, FrameH * s);
+        // the ring view is anchored to the whole window (127c); its camera keeps the frame's 448 rows on the height
         if (StretchBars)
         {
             float left = -x0 / s, width = vp.X / s;
