@@ -242,6 +242,52 @@ Two things worth knowing about GitHub's squash here:
   subfolder as the PR body's wording suggests).
 `pr125.md` deleted now that the PR exists and is merged.
 
+### #6 -- PUSHED 2026-10-26 -- https://github.com/JasonAbsolute/ProjectShine/tree/feature/enemy-spawners -- PR awaiting Jaysonn's click -- queued 2026-10-26 02:10 PDT, PR added 23:05 PDT (Kiro)
+Push the third feature branch and OPEN ITS PR: `feature/enemy-spawners`, branched from `main` `e77b85f` (the trunk after PR #7) -- the enemy spawners
+(the generator, the one-shot generator, the goop-pile launcher) and the Polluted Piranha gatekeeper with its effects and knobs (passes 126-126g).
+PLAYTESTED BY JAYSONN 2026-10-26 ("everything looks great"; the drool tip flicker fixed in 126g: "Smooth now -- the spawners feature is done") -- the PR
+can be merged once it is open (squash or merge commit, his call; `main` then needs a `git pull` here). Kiro has NOT merged this branch locally (the
+entry asks for a PR: the one way).
+- Branch `feature/enemy-spawners` -- code tip `fa9e054` ("SMS pass 126g: the drool tip no longer flickers ..."), on top of `87cbba2` (126f), `a38f59f`
+  (126e), `76f1e3f` (126d), `c0a49da` (126c), `3386d73` (126b, the gatekeeper), `a70ead0` (126a) and `3cdf15b` (126); the branch tip is this file's latest
+  commit; 17 commits since `main` `e77b85f`, this entry's own included; 70 files, +3369 / -27. A NEW remote branch (never pushed): push with `-u`.
+  The biggest new file is GateKeeper.glb (2.8 MB).
+- PR: title "Feature: the enemy spawners and the Polluted Piranha gatekeeper (SMS passes 126-126g)"; base `main`; body = `pr126.md` at the project root
+  (untracked -- delete it after).
+  compare URL: https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/enemy-spawners
+```
+git push -u origin feature/enemy-spawners
+git rev-list --count origin/feature/enemy-spawners..feature/enemy-spawners
+gh pr create --base main --head feature/enemy-spawners --title "Feature: the enemy spawners and the Polluted Piranha gatekeeper (SMS passes 126-126g)" --body-file pr126.md
+```
+Expect `0` from the rev-list. If `gh` is still unauthenticated here (`gh auth status`), open the compare URL in the browser instead, paste the title
+and the body of `pr126.md`, and Jaysonn presses "Create pull request". Once merged: `git checkout main && git pull` here, then tell Kiro the sha.
+- New files: `assets/Sms/Enemy/Spawn/` (SmsEnemyPool.cs, SmsEnemySpawner.cs, SmsEnemyOneShotSpawner.cs, SmsEnemyLauncher.cs, SmsGateKeeper.cs,
+  SmsGateKeeperHead.cs, SmsGateKeeperBasePin.cs + .uids, Spawner.tscn, OneShotSpawner.tscn, Launcher.tscn, GateKeeper.tscn, LauncherBody / GateKeeperBody / GateKeeperSkirt
+  .gdshader + .uid + .tres), `assets/Sms/Fx/GeneHit.tscn`, `GeneDead.tscn`, `Gk{Bota,Dead,DeadSmoke,Kemuri,KemuriW,YodareL,YodareS}.tscn`, `SmsGoopStrand.cs` + .uid,
+  `JpaStripe.gdshader` + .uid, `tex/{indwp1,kemuball3_gkdead,yodare_raw}.png` + .imports, `models/Eniemes/Launcher/` (Launcher.glb 180 KB + .import,
+  generator_model1.png + .import, launcher_post_import.gd + .uid), `models/Eniemes/GateKeeper/` (GateKeeper.glb 2.8 MB + .import, three small pngs +
+  .imports); changed: `assets/Sms/Enemy/SmsSmallEnemy.cs`, `assets/Sms/Fx/SmsNpcEffect.cs`, the editor's re-saves of `assets/Sms/Enemy/*.tres`, PROJECT_LOG.md.
+  Nothing over 3 MB.
+- To try it: drop `assets/Sms/Enemy/Spawn/Launcher.tscn` (the goop pile that spits Stus; hose it five times) or `Spawner.tscn` (an invisible point that
+  launches a Stu every IntervalTicks; the editor shows a ghost of the kind) into a level. EnemyScene picks the kind; PoolSize how many are out at once.
+  `GateKeeper.tscn` is the Polluted Piranha: hose the mound ~2 s to wake it, then spray its head when the mouth is down (Kind: Airport / Bianco /
+  Plaza / PlazaRicco / PlazaGelato on the node).
+The working tree carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the two Koopa and the two
+Goop (FireGoop / OilGoop) `.png.import` flips (the editor's detect_3d) and the `addons/godot_ai` churn -- leave them; nothing of the feature is uncommitted.
+
+Result: all eight pass shas confirmed ancestors (code tip `fa9e054`, 126f `87cbba2`, 126e `a38f59f`, 126d `76f1e3f`, 126c `c0a49da`,
+126b `3386d73`, 126a `a70ead0`, 126 `3cdf15b`) plus the trunk `e77b85f`. Pushed as a NEW remote branch with `-u`, tracking set;
+`git rev-list --count origin/feature/enemy-spawners..feature/enemy-spawners` returned `0`. 17 commits since `main`.
+Diffstat measured 70 files / **+3377** / -27 against the entry's +3369 -- the 8-line gap is this log file's own entry commit,
+written after Kiro took the count. Largest blobs: `GateKeeper.glb` 2.69 MB, `PROJECT_LOG.md` 0.83 MB, `Launcher.glb` 0.17 MB.
+Hygiene on the range: 0 `addons/godot_ai`, 0 Koopa or Goop `.png.import` flips, 0 `SmsHiddenCoin.cs` -- all four of Jaysonn's
+live edits stayed out.
+**Ordering change, learned from #5:** this result commit was made and pushed BEFORE the PR page was opened, so that if Jaysonn
+squash-merges it travels with the code. In #5 the squash cut at the commit before the log commit and the result paragraph had
+to be re-applied onto `main` by hand.
+`gh auth status` still reports "not logged into any GitHub hosts", so the PR is opened from the prefilled compare page again.
+
 <!-- Kiro appends the next entry below this line. Entry template:
 
 ### #N -- PENDING -- <date> (Kiro)

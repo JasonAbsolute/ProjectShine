@@ -1,0 +1,13 @@
+[gd_resource type="ShaderMaterial" load_steps=3 format=3 uid="uid://clbody126"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/Spawn/LauncherBody.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" uid="uid://diobl43kh7mcu" path="res://assets/Sms/models/goop_mark_bianco.png" id="2_goop"]
+
+[resource]
+resource_name = "_body1 (generator_model1.bmd): the stage's goop mark (h_ma_rak.bti swapped into Q_gene_dummy_I4) x the vertex colour + the object sun's specular; opaque, cull back"
+shader = ExtResource("1_shader")
+shader_parameter/goop_tex = ExtResource("2_goop")
+shader_parameter/mat_color1 = Vector3(1, 1, 1)
+shader_parameter/sun_dir = Vector3(0.348, 0.87, 0.348)
+shader_parameter/sun_color = Vector3(1, 1, 1)
+shader_parameter/shininess = 50.0

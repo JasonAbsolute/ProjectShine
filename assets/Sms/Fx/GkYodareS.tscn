@@ -1,0 +1,32 @@
+[gd_scene load_steps=6 format=3 uid="uid://cgkydrs126e"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsNpcEffect.cs" id="1_script"]
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsGoopStrand.cs" id="2_strand"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/JpaStripe.gdshader" id="3_shader"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/yodare_raw.png" id="4_tex"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_strand"]
+resource_name = "ms_gkpa_yodare_s: P_msm_yodare (raw IA8) along the ribbon, lerp(pollution env -> prm, I) (SMSSetEmitterPolColor 6), alpha GEQUAL 192, z written"
+shader = ExtResource("3_shader")
+shader_parameter/tex = ExtResource("4_tex")
+shader_parameter/prm = Vector4(0.7098, 0.5176, 0.4, 1)
+shader_parameter/env = Vector4(0.3843, 0.0549, 0, 1)
+shader_parameter/alpha_ref = 0.7529
+
+[node name="GkYodareS" type="Node3D"]
+script = ExtResource("1_script")
+EmitFrames = 0
+DrainSeconds = 0.2167
+FollowRotation = true
+
+[node name="Strand" type="MeshInstance3D" parent="."]
+script = ExtResource("2_strand")
+WidthUnits = 40
+LifeFrames = 10
+EmitEveryFrames = 1
+GravityUnits = 1.2
+ScrollPerFrame = 0.0
+TipTaper = 0.35
+Subdivisions = 3
+Cross = true
+StrandMaterial = SubResource("ShaderMaterial_strand")

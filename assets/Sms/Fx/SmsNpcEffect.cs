@@ -21,6 +21,8 @@ public partial class SmsNpcEffect : Node3D
     [Export] public float EmitFrames = 1f;
     /// <summary>The longest particle life (lifetime x (1 + randomness)): the wait after the emitter closes before the node is freed.</summary>
     [Export] public float DrainSeconds = 0.6f;
+    /// <summary>BEM1 startFrame: frames the emitter waits after Start() before it opens (the gatekeeper's death mist: 215). 0 = at once.</summary>
+    [Export] public float StartDelayFrames = 0f;
     /// <summary>On: the node takes the joint's rotation too (emitAndBindToMtxPtr). Off: its position only, the world axes kept (emitAndBindToPosPtr --
     /// the burning NPC's fire rises world-up whatever the head does).</summary>
     [Export] public bool FollowRotation = true;
@@ -68,6 +70,13 @@ public partial class SmsNpcEffect : Node3D
             }
         }
         Follow();
+        if (StartDelayFrames > 0f) { _delayLeft = StartDelayFrames / 60.0; return; }   // BEM1 startFrame: the emitters open from _Process
+        Open();
+    }
+    private double _delayLeft = -1;
+    /// <summary>The emitters open and the emit clock starts (Start, or the end of the start delay).</summary>
+    private void Open()
+    {
         foreach (var p in Emitters())
         {
             if (p.OneShot) p.Restart(); else p.Emitting = true;
@@ -75,6 +84,8 @@ public partial class SmsNpcEffect : Node3D
         _emitLeft = EmitFrames > 0f ? EmitFrames / 60.0 : -1;
         if (EmitFrames > 0f && EmitFrames <= 1f) { _emitLeft = -1; _drainLeft = DrainSeconds; }   // a burst: nothing to close, just drain
     }
+    /// <summary>Still waiting out the start delay (nothing emitted yet).</summary>
+    public bool Delayed => _delayLeft >= 0;
 
     /// <summary>mBurnStrength (0..1): the StrengthGroup emitters' quad size, emitter offset and emission volume x this (setGlobalScale each frame).</summary>
     public void SetStrength(float s)
@@ -99,13 +110,42 @@ public partial class SmsNpcEffect : Node3D
         foreach (var p in Emitters())
         {
             var src = (p.MaterialOverride ?? p.DrawPass1?.SurfaceGetMaterial(0)) as ShaderMaterial;
-            if (src == null || src.Shader == null || !HasUniform(src.Shader, "prm_color") || !HasUniform(src.Shader, "env_color")) continue;
-            var copy = (ShaderMaterial)src.Duplicate();
-            copy.SetShaderParameter("prm_color", l);
-            copy.SetShaderParameter("env_color", d);
+            var copy = Recoloured(src, l, d, light, dark);
+            if (copy == null) continue;
             p.MaterialOverride = copy;
             _goopColored++;
         }
+        foreach (var c in GetChildren())                                            // pass 126e: a drool strand (SmsGoopStrand) wears the same uniforms
+        {
+            if (c is not SmsGoopStrand strand) continue;
+            var copy = Recoloured(strand.MaterialOverride as ShaderMaterial, l, d, light, dark);
+            if (copy == null) continue;
+            strand.MaterialOverride = copy; strand.StrandMaterial = copy;
+            _goopColored++;
+        }
+    }
+    /// <summary>A per-instance copy with the goop pair set: prm_color / env_color (goop_ball) or prm / env (JpaDirBillboard, JpaQuad, JpaStripe: vec4);
+    /// null when the material has neither.</summary>
+    private static ShaderMaterial Recoloured(ShaderMaterial src, Vector3 l, Vector3 d, Color light, Color dark)
+    {
+        if (src == null || src.Shader == null) return null;
+        if (HasUniform(src.Shader, "prm_color") && HasUniform(src.Shader, "env_color"))
+        {
+            var copy = (ShaderMaterial)src.Duplicate();
+            copy.SetShaderParameter("prm_color", l);
+            copy.SetShaderParameter("env_color", d);
+            return copy;
+        }
+        if (HasUniform(src.Shader, "prm") && HasUniform(src.Shader, "env"))
+        {
+            var copy = (ShaderMaterial)src.Duplicate();
+            float pa = copy.GetShaderParameter("prm").VariantType == Variant.Type.Vector4 ? copy.GetShaderParameter("prm").AsVector4().W : 1f;
+            float ea = copy.GetShaderParameter("env").VariantType == Variant.Type.Vector4 ? copy.GetShaderParameter("env").AsVector4().W : 1f;
+            copy.SetShaderParameter("prm", new Vector4(light.R, light.G, light.B, pa));
+            copy.SetShaderParameter("env", new Vector4(dark.R, dark.G, dark.B, ea));
+            return copy;
+        }
+        return null;
     }
     private int _goopColored;
     /// <summary>How many emitters SetGoopColors recoloured (the drive reads it; 0 = the baked stage colours).</summary>
@@ -125,6 +165,7 @@ public partial class SmsNpcEffect : Node3D
     public void Stop()
     {
         if (_drainLeft >= 0) return;
+        if (_delayLeft >= 0) { _delayLeft = -1; _drainLeft = 0.01; return; }   // stopped before it opened: nothing out, just go
         foreach (var p in Emitters()) p.Emitting = false;
         _emitLeft = -1;
         _drainLeft = DrainSeconds;
@@ -140,6 +181,11 @@ public partial class SmsNpcEffect : Node3D
     public override void _Process(double delta)
     {
         Follow();
+        if (_delayLeft >= 0)
+        {
+            _delayLeft -= delta;
+            if (_delayLeft <= 0) { _delayLeft = -1; Open(); }
+        }
         if (_emitLeft >= 0)
         {
             _emitLeft -= delta;

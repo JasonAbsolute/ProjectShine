@@ -7811,3 +7811,78 @@ smoke on the joint; F5b relit = a fresh effect; S1b SmsDangoTowerPreview.Build a
 goes. E1 reads 'no damage' as health >= the baseline (a coin had healed him once between the placement and the kick); S1's riser threshold 0.9 m;
 S2 allows the chain's summed sway. Headless editor runs (-e on Dango.tscn and FireHamukuri.tscn): no errors; `[SMS dango editor] Dango: the boss
 at x2.0 (model scale 0.0269), a tower of 10 (StackCount 10)` under SMS_YCAM_SMOKE. Regression 118 35/35; build 0 errors; boot ALL OK.
+## SMS pass 126 -- the spawners: the generator, the one-shot generator, the common launcher (feature/enemy-spawners)
+
+**Files:** NEW `assets/Sms/Enemy/Spawn/SmsEnemyPool.cs` (TEnemyManager's objects for a spawner), `SmsEnemySpawner.cs` + `Spawner.tscn` (TGenerator),
+`SmsEnemyOneShotSpawner.cs` + `OneShotSpawner.tscn` (TOneShotGenerator), `SmsEnemyLauncher.cs` + `Launcher.tscn` + `LauncherBody.gdshader` +
+`LauncherBody.tres` (TLauncher / TCommonLauncher); `assets/Sms/Fx/GeneHit.tscn`, `GeneDead.tscn` (ms_gene_hit / ms_gene_dead, gen_fx126.py);
+`models/Eniemes/Launcher/Launcher.glb` (/scene/clauncher/generator_model1.bmd from his rip, its 4 clips; the import's _body1 external, the skeleton's
+rest pose loaded from the wait clip -- patch_import126.py) + the glb's 8 x 8 dummy png; `assets/Sms/Enemy/SmsSmallEnemy.cs` (`Pooled`, `SmsSpawnDead`,
+`SmsLaunch`; the push-apart horizontal -- see the deviation).
+
+**The pool** (Enemy/enemymanager.cpp 405-436): the game's manager makes mSLInstanceNum objects at load, all LIVE_FLAG_DEAD; a spawner asks it
+for getFarOutEnemy() -- a DEAD one first, else of the live ones LIVE_FLAG_CLIPPED_OUT (out of the camera's view) the nearest to Mario -- and
+resetSRTV()s it at its own point (enemy.cpp 187: position, rotation, the body's scale, the launch VELOCITY, hit points back, no collision filter,
+LIVE_FLAG_AIRBORNE). Here every spawner owns its pool: `SmsEnemyPool.Fill` instantiates PoolSize bodies of the EnemyScene (any SmsSmallEnemy kind)
+beside the spawner, `Pooled` (dead they stay dead and hidden: no self-relaunch, never freed) and dead at birth (`SmsSpawnDead`); `FarOut` is the
+game's rule with the clip read as a distance (RecycleDistance, 60 m: the port does not clip); `SmsLaunch` is resetSRTV (SmsPlace + the velocity in
+units a tick + the airborne flag, the spawner's graph). The scene's placed enemies stay their own launchers (pass 125's RelaunchTicks).
+
+**TGenerator** (generator.cpp 1-93) -> `SmsEnemySpawner`, a Node3D: mTimer starts at a random fraction of mInterval and counts down; at 0 the far-out
+body is launched at the point with (0, 4, 0) u/tick turned by the generator's rotation (a generator rotated 90 deg about Z spits sideways), rotation
+(0, 0, 0), on the graph; knobs EnemyScene, PoolSize (the manager's mSLActiveEnemyNum), IntervalTicks, Graph, LaunchVelocityUnits, RecycleDistance,
+Enabled. IN THE EDITOR ([Tool]: no custom-resource exports) one ghost of the kind stands at the point (unowned), rebuilt when EnemyScene changes.
+**TOneShotGenerator** (generator.cpp 95-142) -> `SmsEnemyOneShotSpawner`, a StaticBody3D on the hidden coins' spray-only layer 8 (mask 0) with the
+game's 80 x 120 u cylinder: the first water message releases the body (mCount 1 -> 0); later drops are still taken (TRUE: the drop dies) and do
+nothing. **TCommonLauncher** (launcher.cpp) -> `SmsEnemyLauncher`, a StaticBody3D (layer 8) with the goop pile: NORMAL (the looping wait clip) counts
+the cooldown down and, a far-out body available, LAUNCHes (the appear clip, 89 frames; the body spat at frame 62 = mTicksSpentInCurState 0x3E with
+the clip at a frame a game frame; the clip's end reloads the cooldown to the period -- the placement's mLaunchPeriod, TCommonLauncher's 120, Bianco's
+pile 768); water -> HIT (the damage clip, -1 HP, the WATHIT mark, MS_GENE_HIT asked for on joint 0 while the clip plays -- GeneHit.tscn, an
+SmsNpcEffect started and stopped), a hit while HIT ignored, water while dying refused; 0 HP -> DIE (the dead clip, then MS_GENE_DEAD + MS_ENM_DISAP_A/B
+at the body, scaled; kill: hidden, no collision, no more launches); +1 HP every 1200 ticks of NORMAL below 5 (RegenTicks); Mario inside the 150 x 100 u
+hit cylinder takes HIT_MESSAGE_ATTACK every tick (his TakeDamage, the common profile). 5 HP at birth (launcher.prm's 255 unused: init sets 5; the
+file: HeadHeight 120, BodyRadius 30, WallRadius 50, ClipRadius 300, FarClip 10000, InstanceNum 100, ActiveEnemyNum 10, LaunchPeriod 200).
+LOOK: generator_model1.bmd's _body1 (bmd_mat_dump.py: TEXC x RASC0 + RASC1 -- the stage's goop mark h_ma_rak.bti swapped into Q_gene_dummy_I4
+(goop_mark_bianco.png, the Gooble brain's) x the vertex colour (0.12..1 grey) + the object sun's GX_AF_SPEC channel, shininess 50; opaque, cull back)
+-> LauncherBody.gdshader, unshaded as EnemyToon. The clips pose the root joint +90 deg about X (the bind pose lies flat): the game's
+`mRotation.x += 270` lays it back down -- Launcher.tscn's Model carries that -90 deg with the 1/74.44; the launch direction is the node's own.
+Bianco's scene.bin places one (scale 2, rotation 0, "hamukuri" graph, the Hamukuri manager, period 768).
+**The fx** (the disc's .jpa, gen_fx126.py): ms_gene_hit (a Cylinder r 50 minRad 0.25 flattened x0.1 at (0, 30, 0): a disc; 0.5/f while asked; life 26 +-25 %;
+velAxis 7 out along the radius + velDir 10 (+-25 %) up a 9 deg cone; Gravity 0.6 u/f^2 down; DirBillboard 35 u of P_msm_osenball coloured
+lerp(pollution env -> prm, I) (SMSSetEmitterPolColor 6: gen_fx_npc's POL colours), alpha test GREATER 86; ESP1 X 0.85 -> 1 by 37.5 % then -> 0 from
+75 %, Y 3 -> 1 then -> 0: the drop stretched along its flight) and ms_gene_dead (the same at r 70, 25 drops in one frame, life 35, axis 9 + dir 12
+(+-37.5 %), 42.5 u, x (1 +-0.375)) -- JpaDirBillboard.gdshader with a CurveXYZTexture.
+**DEVIATIONS (logged):** the far-out rule reads a distance for the game's view clipping; the push-apart between small enemies is now HORIZONTAL
+(the game's is the full 3D direction: a body launched onto one standing at the point stood ON it under Godot's floor logic, was lifted by the push,
+stood on it again -- a lift without end; pushed aside it slides off and falls); the one-shot and the launcher are StaticBody3Ds on the spray-only
+layer (the game's hit actors block nothing either); the generator's sounds / the launcher's bas cues are slots. NOT PORTED: TLauncher's bare 12-tick
+states (no model; no stage uses it alone), the manager's pooling across spawners, the gatekeeper (TBiancoGateKeeper: the Polluted Piranha, with its
+demos, stamp, BTK and the gorogoro / Gooble launches -- the next passes).
+
+**Drive 126** (`npc82/spawn126/patch_smoke126.py`, 21/21; one drive frame per PHYSICS frame = two game ticks; the hook is in _Process, which outruns
+the physics headless -- the drive's old frame counter was not a clock): G1-G7 the generator (3 Stus pooled dead; the first launch at the timer's 0,
+alive, airborne, vy 3.7 after the tick's gravity, at the point; the second and the third 61 ticks apart; all live and near -> nothing; one killed ->
+relaunched; one 100 m up -> taken back; the generator turned 90 deg about Z -> vel (-4, 0, 0)); O1-O3 the one-shot (layer 8, the cylinder, one pooled
+dead; the hose's first drop releases it; 77 later drops taken, nothing more); L1-L11 the launcher (the flat pile: its joint column vertical over the
+centre, LauncherBody.tres; LAUNCH; the spit at clip frame 62.9; the clip's end -> cooldown 90; a drop -> HIT, -1 HP, the mark, GeneHit; 78 ticks ->
+NORMAL; regen (RegenTicks 30 for the drive); Mario on the pile -> -1; five hits -> DIE, the water refused; 128 ticks -> GeneDead + EnemyDisap, hidden,
+layer 0; nothing more launched). Regression 125 85/85, 118 35/35; build 0 errors; boot ALL OK; headless editor runs of Spawner.tscn and Launcher.tscn
+clean. Probe: one launched Stu traced (rises to 0.8 m, lands at 35 frames, then finds Mario). Note: the launcher's spit must read the clip's frame
+(BckFrame >= 62), the port's ticks run two a frame and the bcks at 60 frames a second.
+
+### 126a -- the launcher's pile in the EDITOR (Jaysonn: "rotated 90 degrees about X once the build loads")
+
+**Files:** NEW `models/Eniemes/Launcher/launcher_post_import.gd` (+ .uid), `Launcher.glb.import` (import_script/path); the editor's re-saves of
+`assets/Sms/Enemy/{Dorokuri,Hamukuri*}.tres`, `assets/Sms/Fx/Gene{Hit,Dead}.tscn` (uids on the ext_resources, the shaders' defaults written out).
+**The cause:** the glb's bind pose has every joint at identity -- the pile MODELLED flat, its goop column up +Y (movenul1..3 at y 7, 19, 21 u). The
+clips turn the root +90 deg about X (the column along +Z), and Launcher.tscn's Model carries the game's `mRotation.x += 270` (-90) that lays it back
+down. The import's `rest_pose/load_pose` from the wait clip sets the bones' REST to the clip's first frame (parenul1 rest (90, 0, 0): the probe of
+pass 126 read the rest) -- but it leaves the bone POSE at the bind (probe126b: REST (90, 0, 0), POSE (0, 0, 0)), and the editor draws the POSE: at
+the bind pose the Model's -90 stood the pile on its edge in the editor, while in play the AnimationPlayer's clips posed it flat (drive L1's vertical
+column). **The fix:** a post-import script (`EditorScenePostImport._post_import`: `Skeleton3D.reset_bone_poses()` -- pose := rest) on the glb's
+import; the pose now matches the rest = the wait clip's first frame; the editor and the game show the same flat pile. Re-import headless; probe126b
+POSE (90, 0, 0); drive 126's launcher section 11/11 again; build 0 errors; headless editor run of Launcher.tscn clean. patch_import126.py's glb mode
+writes the import_script path too.
+**Asked and answered:** the generator (`Spawner.tscn`) is invisible in play on purpose -- TGenerator is a bare TViewObj (generator.cpp 13: no model,
+no hit actor; the one-shot adds only the water's hit cylinder): the game's level designers put the point where the appearance is covered, and the
+VISIBLE kind is the launcher pile. The ghost of the kind is the editor's placement aid only (Engine.IsEditorHint()).
