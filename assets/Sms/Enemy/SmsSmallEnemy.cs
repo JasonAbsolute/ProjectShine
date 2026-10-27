@@ -83,10 +83,10 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
 
     // ------------------------------------------------------------------------------------------------------------------ nerves
     protected const int NerveNone = 0, NerveGenerate = 1, NerveGraphWander = 2, NerveAttack = 3, NervePostAttack = 4, NerveEscape = 5,
-        NerveTraceMario = 6, NerveDie = 7, NerveFreeze = 8, NerveJump = 9, NerveHitWaterJump = 10, NerveWait = 11;
+        NerveTraceMario = 6, NerveDie = 7, NerveFreeze = 8, NerveJump = 9, NerveHitWaterJump = 10, NerveWait = 11, NerveDiffuse = 12;
     /// <summary>A species' own nerves start here.</summary>
     protected const int NerveSpecies = 100;
-    private static readonly string[] BaseNerveNames = { "None", "Generate", "GraphWander", "Attack", "PostAttack", "Escape", "TraceMario", "Die", "Freeze", "Jump", "HitWaterJump", "Wait" };
+    private static readonly string[] BaseNerveNames = { "None", "Generate", "GraphWander", "Attack", "PostAttack", "Escape", "TraceMario", "Die", "Freeze", "Jump", "HitWaterJump", "Wait", "Diffuse" };
     protected virtual string NerveName(int n) => n >= 0 && n < BaseNerveNames.Length ? BaseNerveNames[n] : $"Nerve{n}";
 
     protected readonly List<int> _stack = new();
@@ -647,6 +647,11 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
             case NerveWait:                                      // TNerveSmallEnemyWait
                 if (_time == 0) SetWaitAnm();
                 return BckEnded() && _time > P.WaitTime;
+
+            case NerveDiffuse:                                   // TNerveNameKuriDiffuse (namekuri.cpp 783): the launch flight -- done once landed; then the default
+                if (_time == 0) SetWaitAnm();
+                if (!_airborne) { PushAfterCurrent(DefaultNerve); return true; }
+                return false;
         }
         return true;
     }
@@ -797,13 +802,15 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     public void SmsSpawnDead() { if (!_dead) Dead(); }
     /// <summary>TSpineEnemy::resetSRTV from a generator / launcher (Enemy/enemy.cpp 187): the body at the point facing yawDeg, alive again (the flags off,
     /// reset, the hit points, the collision), with the launch velocity (units a tick) and LIVE_FLAG_AIRBORNE; on `graph` when one is given
-    /// (getTracer()->setGraph / init). The point becomes the body's own launch point.</summary>
-    public void SmsLaunch(Vector3 globalPosition, float yawDeg, Vector3 velocityUnitsPerTick, Node3D graph = null)
+    /// (getTracer()->setGraph / init). The point becomes the body's own launch point. <paramref name="flyFirst"/> = the gatekeeper's launchNamekuri:
+    /// mSpine->pushNerve(TNerveNameKuriDiffuse) replaces the default Generate (whose set anim zeroes the velocity) with a flight that lasts until landing.</summary>
+    public void SmsLaunch(Vector3 globalPosition, float yawDeg, Vector3 velocityUnitsPerTick, Node3D graph = null, bool flyFirst = false)
     {
         if (graph != null) Graph = graph;
         SmsPlace(globalPosition, yawDeg);
         _vel = velocityUnitsPerTick;
         _airborne = true;
+        if (flyFirst) { _stack.Clear(); _cur = NerveNone; _prev = NerveNone; _time = 0; PushAfterCurrent(NerveDiffuse); }
     }
     /// <summary>TLauncher::stateLaunch -> resetSRTV at the placed point, the set anim.</summary>
     protected virtual void Relaunch()

@@ -6,8 +6,8 @@
 [ext_resource type="Texture2D" path="res://models/Eniemes/GateKeeper/gk_indtex.png" id="4_ind"]
 
 [resource]
-resource_name = "_mat2 (gene_pakkun_model1.bmd): the goop mound -- the same stages, the indirect warp (Q_indtex2_16), alpha = vertex alpha x the mark's; blended"
+resource_name = "The Polluted Piranha's goop mound (_mat2): the same sheet and sheen with the slow warp, blended by the rim's vertex alpha; the death melts it away (mound_alpha). Knobs: see the shader's header."
 shader = ExtResource("1_shader")
-shader_parameter/goop_tex = ExtResource("2_goop")
-shader_parameter/hilight_tex = ExtResource("3_hl")
-shader_parameter/ind_tex = ExtResource("4_ind")
+shader_parameter/goop_texture = ExtResource("2_goop")
+shader_parameter/goop_warp_texture = ExtResource("4_ind")
+shader_parameter/highlight_texture = ExtResource("3_hl")

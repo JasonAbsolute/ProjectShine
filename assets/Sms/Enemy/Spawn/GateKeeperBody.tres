@@ -5,7 +5,7 @@
 [ext_resource type="Texture2D" path="res://models/Eniemes/GateKeeper/gk_hilight.png" id="3_hl"]
 
 [resource]
-resource_name = "_mat1 (gene_pakkun_model1.bmd): the stage's goop mark + the normal-mapped highlight sheet, x the vertex colour; opaque, cull back; the damage fog (200, 0, 80)"
+resource_name = "The Polluted Piranha's stalk and head (_mat1): the stage's goop sheet + the sheen by the surface normal, x the baked vertex shading; opaque. Knobs: see the shader's header."
 shader = ExtResource("1_shader")
-shader_parameter/goop_tex = ExtResource("2_goop")
-shader_parameter/hilight_tex = ExtResource("3_hl")
+shader_parameter/goop_texture = ExtResource("2_goop")
+shader_parameter/highlight_texture = ExtResource("3_hl")

@@ -19,7 +19,8 @@ using Godot;
 ///   WAIT2 (the airport idle): wait2_start -> wait2_open (199; the head active past frame 40) -> wait2_openloop (200) x Loop2Dive -> wait2_close (199)
 ///          -> wait2_end -> DIVE; ANY vulnerable hit is damage.
 ///   DIVE (dive1, 149): it rears to 12 m and plunges; at tick 240 the base's smoke + rumble; ends -> (Bianco: a launch) -> SLEEP.
-///   DIE (dead1, 299): the finish demo + BGM off, the dead colour (gene_pakkun_dead1.bpk, here dead_fade), the death bursts (dead at joint 6,
+///   DIE (dead1, 299): the finish demo + BGM off, the stalk plunging under the floor then the mound melting away (gene_pakkun_dead1.bpk: _mat2's alpha
+///          255 to frame 250, eased to 0 at 300 -- DeadMoundAlpha), the death bursts (dead at joint 6,
 ///          deadsmoke at 0); at tick 340 the smoke, the disappear sound, a rumble; a fading rumble all along; ends -> kill (the Ricco / Gelato kinds
 ///          revive ONCE with 3 HP: Ricco -> APPEAR, Gelato -> LAUNCH NAME).
 ///   LAUNCH GORO / LAUNCH NAME (shoot1, 59): at tick 52 the spit -- a Gorogoro (<see cref="LaunchScene"/>: the rolling goop head, NOT yet ported; any
@@ -35,11 +36,14 @@ using Godot;
 /// no receiver), the particle effects (slots: pass 126c), the btk texture scroll and the bpk colour (steady scroll / a fade; 126c), the sounds (slots),
 /// the Ricco / Gelato unlock flags (the kinds are placed by hand).
 /// </summary>
+[Tool]
 [GlobalClass]
 public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
 {
     public enum Variant { Airport, Bianco, Plaza, PlazaRicco, PlazaGelato }      // VARIANT_AIRPORT 0, GENERIC 1 (Bianco), DOLPIC_TOWN 2, RICO 3, MAMMA 4
     public enum Nerve { Sleep, Appear, Wait, Wait2, SleepDamage, AwakeDamage, Die, Dive, LaunchGoro, LaunchName, Dead }
+    /// <summary>The shaders' goop_colour_mode: 0 Texture, 1 Tint, 2 Recolour; FromMaterial leaves the material's own setting.</summary>
+    public enum GoopColorModes { FromMaterial = -1, Texture = 0, Tint = 1, Recolour = 2 }
     // gatekeeper.prm (the shipped file)
     public const int PrmDiveTimer = 2000, PrmLoop2Dive = 5, PrmLaunchTimerNormal = 600, PrmLaunchTimerDamage = 600, PrmHitPointMax = 3, PrmInstanceNum = 2;
     public const float HeadHeight = 120f, BodyRadius = 30f, WallRadius = 50f, ClipRadius = 600f, FarClip = 13000f;
@@ -61,55 +65,110 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
         BckWait2Close = 12, BckWait2End = 13, BckWait2Loop = 14, BckWait2Open = 15, BckWait2OpenLoop = 16, BckWait2Start = 17, BckWait3 = 18;
 
     // ------------------------------------------------------------------------------------------------------------------ the knobs
-    /// <summary>Which gatekeeper: the airport's (WAIT2's open-mouth loop), Bianco's (the sleeper that spits Gorogoro), the Plaza's (the stamp; 0.8), the
-    /// Ricco gate's (stamp 1.2, revives once), the Gelato gate's (stamp 1.4, revives once and spits ten Goobles).</summary>
+    // The inspector shows them in these groups. The <summary> of each is its description (shown as a hover tooltip once the C# inspector-tooltips
+    // editor plugin is installed; stock Godot shows C# doc comments nowhere -- the group names and the names themselves carry the gist).
+    [ExportGroup("Kind and life")]
+    /// <summary>Which gatekeeper this is -- it decides the idle, the spits and the stamp:
+    /// Airport = the open-mouth loop that dives after a few cycles; any head hit hurts.
+    /// Bianco = the sleeper of Bianco Hills that spits an enemy (LaunchScene) on a timer, from sleep and after each dive.
+    /// Plaza = Delfino Plaza's: stamps goop under itself (0.8); dies once.
+    /// PlazaRicco = the Ricco gate's: stamp 1.2, REVIVES ONCE after its first death.
+    /// PlazaGelato = the Gelato gate's: stamp 1.4, REVIVES ONCE and spits a ring of ten Goobles (NamekuriScene) as it comes back.</summary>
     [Export] public Variant Kind = Variant.Bianco;
-    /// <summary>mHitPoints at init (3; gatekeeper.prm's HitPointMax 3).</summary>
+    /// <summary>Head hits to kill it (the game: 3). A revived one gets them back.</summary>
     [Export] public int HitPoints = PrmHitPointMax;
-    /// <summary>mSLDiveTimer: ticks in WAIT before it dives back into the goop (the shipped 2000 = 16.7 s; the code default 480).</summary>
+    /// <summary>Ticks awake before it dives back into the goop (120 ticks = 1 s; the game's shipped 2000 = 16.7 s).</summary>
     [Export] public int DiveTimerTicks = PrmDiveTimer;
-    /// <summary>mSLLoop2Dive: open-mouth loops (wait2_openloop, 200 frames each) before the airport kind closes and dives.</summary>
+    /// <summary>Airport kind only: open-mouth loops (3.3 s each) before it closes and dives (the game: 5).</summary>
     [Export] public int Loop2Dive = PrmLoop2Dive;
-    /// <summary>mSLLaunchTimerNormal / mSLLaunchTimerDamage: ticks between Gorogoro spits (+-120 random), from SLEEP / from SLEEP DAMAGE.</summary>
-    [Export] public int LaunchTimerNormal = PrmLaunchTimerNormal, LaunchTimerDamage = PrmLaunchTimerDamage;
-    /// <summary>What LAUNCH GORO spits (the Gorogoro manager's enemy: the rolling goop head -- not yet ported; any SmsSmallEnemy kind) and what the Gelato
-    /// kind's LAUNCH NAME spits (the Gooble manager's). Unset = the spit plays with nothing coming out.</summary>
-    [Export] public PackedScene LaunchScene, NamekuriScene;
-    /// <summary>The pools behind them (the managers' mSLActiveEnemyNum: gorogoro.prm 10; the Goobles' ring needs 10).</summary>
-    [Export] public int LaunchPoolSize = 10, NamekuriPoolSize = NamekuriCount;
-    /// <summary>The walk graph for the launched bodies; none = free.</summary>
+    /// <summary>Bianco kind only: ticks between spits while asleep (+-120 random; the game: 600 = 5 s). The first spit comes at once.</summary>
+    [Export] public int LaunchTimerNormal = PrmLaunchTimerNormal;
+    /// <summary>Bianco kind only: ticks between spits while it is being sprayed asleep (the game: 600).</summary>
+    [Export] public int LaunchTimerDamage = PrmLaunchTimerDamage;
+
+    [ExportGroup("Goop colour (this keeper)")]
+    /// <summary>The goop sheet the whole plant wears -- the game uses the STAGE's pollution mark (empty = the material's own, Bianco's brown). Any of
+    /// assets/Sms/Fx/Goop/*.png (Brown, Fire, Electric, Oil, Pink) fits.</summary>
+    [Export] public Texture2D GoopTexture;
+    /// <summary>How GoopColor is used: FromMaterial = ignore it, the material's own setting rules (the default); Texture = the sheet's own colours (the game);
+    /// Tint = GoopColor multiplies the sheet (white = unchanged, darker colours darken it); Recolour = GoopColor REPLACES the sheet's colour and keeps only
+    /// its light / dark pattern -- the way to get a blue or green piranha.</summary>
+    [Export] public GoopColorModes GoopColorMode = GoopColorModes.FromMaterial;
+    /// <summary>The colour for Tint / Recolour (see GoopColorMode).</summary>
+    [Export] public Color GoopColor = new Color(1f, 1f, 1f, 1f);
+
+    [ExportGroup("What it spits")]
+    /// <summary>Bianco kind: the enemy scene it spits (the game's Gorogoro rolling head -- not yet ported; any enemy of the small-enemy base works, lobbed
+    /// toward Mario). Empty = the spit animation plays with nothing coming out.</summary>
+    [Export] public PackedScene LaunchScene;
+    /// <summary>PlazaGelato kind: the Gooble scene for the ring of ten it spits as it revives. Empty = nothing comes out.</summary>
+    [Export] public PackedScene NamekuriScene;
+    /// <summary>How many of LaunchScene can be out at once (the game's manager pool: 10).</summary>
+    [Export] public int LaunchPoolSize = 10;
+    /// <summary>How many Goobles the ring has (the game: 10).</summary>
+    [Export] public int NamekuriPoolSize = NamekuriCount;
+    /// <summary>The walk graph the launched enemies follow; empty = they wander free.</summary>
     [Export] public Node3D Graph;
-    /// <summary>generateByGateKeeper: the Gorogoro is lobbed (vy 15 u/tick) toward Mario when he is in sight within 2000 u, else toward the graph (here:
-    /// a random point up to LaunchSpreadUnits ahead), a random 0 .. 1500 u along the way, the heading jittered +-15 deg.</summary>
-    [Export] public float LaunchJumpUnits = 15f, LaunchSightUnits = 2000f, LaunchSpreadUnits = 1500f;
-    /// <summary>A live launched body farther than this (metres) from Mario counts as clipped out and may be taken back.</summary>
+    /// <summary>The spit's lob: the rise in units a tick (the game: 15).</summary>
+    [Export] public float LaunchJumpUnits = 15f;
+    /// <summary>The spit aims at Mario when he is within this many units (2000 = 27 m), else straight ahead.</summary>
+    [Export] public float LaunchSightUnits = 2000f;
+    /// <summary>How far the spit may fly: a random 0 .. this many units along the aim (the game: 1500 = 20 m).</summary>
+    [Export] public float LaunchSpreadUnits = 1500f;
+    /// <summary>A launched enemy farther than this from Mario (metres) counts as out of view and may be spat again.</summary>
     [Export] public float RecycleDistance = 60f;
-    /// <summary>The goop stamp: 0 = the game's rule (the Plaza kinds only; 0.8 / 1.2 / 1.4 of the stamp model), 1 = on at StampScale, 2 = off.</summary>
+
+    [ExportGroup("Goop stamp under it")]
+    /// <summary>Game rule = only the Plaza kinds stamp (0.8 / 1.2 / 1.4 of the 31 m stamp disc); On = always, at StampScale; Off = never. The stamped goop
+    /// cannot be cleaned while the plant lives.</summary>
     [Export(PropertyHint.Enum, "Game rule,On,Off")] public int StampMode = 0;
-    /// <summary>The stamp disc's scale when StampMode is On (the stamp model is 2340 u across).</summary>
+    /// <summary>The stamp disc's scale when StampMode is On (1 = the 31 m disc).</summary>
     [Export] public float StampScale = 1f;
-    /// <summary>How often the stamp is re-laid (the game: every drawn frame = 4 ticks).</summary>
+    /// <summary>Ticks between re-stamps (the game: every drawn frame = 4).</summary>
     [Export] public int StampEveryTicks = 4;
-    /// <summary>The root joint turns toward Mario in the swaying clips (TBGKMtxCalc), 3 deg a drawn frame = 0.75 a tick.</summary>
+
+    [ExportGroup("Turning to Mario")]
+    /// <summary>The stalk turns to face Mario while it sways (the game does).</summary>
     [Export] public bool TrackMario = true;
+    /// <summary>How fast it turns, degrees a tick (the game: 3 a drawn frame = 0.75).</summary>
     [Export] public float TrackDegPerTick = 0.75f;
-    /// <summary>DEVIATION knob, off = the game: the goop mound (joint 11's rings) stays put while the stalk and head turn (TBGKMtxCalc pins centnull1 to the actor
-    /// frame). On: the whole plant turns, mound and all (pass 126b's first look).</summary>
+    /// <summary>Off (the game): the goop mound stays put, only the stalk and head turn. On: the whole plant turns, mound and all.</summary>
     [Export] public bool BaseTurnsToo = false;
-    /// <summary>SMS_AddDamageFogEffect while recently hit in the awake clips: the pink pulse on the body's materials.</summary>
+
+    [ExportGroup("Hurt look and feel")]
+    /// <summary>The pink pulse over its body after a hit (the game's damage fog).</summary>
     [Export] public bool DamageFog = true;
-    /// <summary>SMSRumbleMgr: the pad shakes at the smoke cues (power 2000 / distance in units, capped 1) and all through the death, when Mario stands.</summary>
+    /// <summary>The pad shakes when it slams and all through its death (stronger the closer Mario stands).</summary>
     [Export] public bool Rumble = true;
-    /// <summary>MS_GKPA_KEMURI (the base's smoke at appear / dive / death), MS_GKPA_KEMURI_W (the sleep's puff), MS_GKPA_DEAD + MS_GKPA_DEADSMOKE (the death),
-    /// MS_GKPA_BOTA (the goop drip from the head, joint 6) and MS_GKPA_YODARE_L / _S (the drool, joints 9 + 5 / 8), continuous while awake. Unset = none
-    /// (pass 126c). A one-shot is an SmsFxBurst / SmsNpcEffect / GpuParticles3D at the joint; a continuous one an SmsNpcEffect started and stopped.</summary>
-    [Export] public PackedScene KemuriFxScene, KemuriWFxScene, DeadFxScene, DeadSmokeFxScene, BotaFxScene, YodareLFxScene, YodareSFxScene;
-    /// <summary>MSD_SE_EN_COMMON_W_HIT_OK on each water hit; MSD_SE_DM_OSEN_DISAPPEAR at death tick 340; the boss BGM (startBGM at the first appear, stopBGM at
-    /// the finish demo). Unset = silent.</summary>
-    [Export] public AudioStreamPlayer3D WaterHitSound, DisappearSound;
+
+    [ExportGroup("Effects (empty = none yet)")]
+    /// <summary>The base's smoke when it appears, dives and dies (ms_gkpa_kemuri).</summary>
+    [Export] public PackedScene KemuriFxScene;
+    /// <summary>The goop puff while it sleeps (ms_gkpa_kemuri_w).</summary>
+    [Export] public PackedScene KemuriWFxScene;
+    /// <summary>The goop burst as it dies (ms_gkpa_dead).</summary>
+    [Export] public PackedScene DeadFxScene;
+    /// <summary>The smoke as it dies (ms_gkpa_deadsmoke).</summary>
+    [Export] public PackedScene DeadSmokeFxScene;
+    /// <summary>The goop dripping from the head while awake (ms_gkpa_bota).</summary>
+    [Export] public PackedScene BotaFxScene;
+    /// <summary>The big drool from the mouth while awake (ms_gkpa_yodare_l, two emitters).</summary>
+    [Export] public PackedScene YodareLFxScene;
+    /// <summary>The small drool while awake (ms_gkpa_yodare_s).</summary>
+    [Export] public PackedScene YodareSFxScene;
+
+    [ExportGroup("Sounds (empty = silent)")]
+    /// <summary>Each water hit.</summary>
+    [Export] public AudioStreamPlayer3D WaterHitSound;
+    /// <summary>The goop vanishing near the end of its death.</summary>
+    [Export] public AudioStreamPlayer3D DisappearSound;
+    /// <summary>The boss music: starts when it first appears, stops when it dies for good.</summary>
     [Export] public AudioStreamPlayer BossMusic;
-    /// <summary>On: the hit bodies go on the spray-only layer (the hidden coins' HideLayer) with no mask at _Ready, whatever the scene says.</summary>
+
+    [ExportGroup("Advanced")]
+    /// <summary>Puts the hit bodies on the water-only layer at start (leave on).</summary>
     [Export] public bool AutoLayer = true;
+    /// <summary>Prints every state change to the output.</summary>
     [Export] public bool DebugPrint;
 
     /// <summary>fireStartDemoCamera("<name>出現カメラ") at the first APPEAR / ("<name>撃沈カメラ") at DIE: the demo cameras are the stage's data; here a signal
@@ -169,7 +228,14 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
         if (_model == null || _anim == null) GD.PushWarning($"[SMS gatekeeper] {GetPath()}: the scene needs Model (the glb) with Model/AnimationPlayer");
         if (_model != null) foreach (Node n in _model.FindChildren("*", "Skeleton3D", true, false)) { _skel = n as Skeleton3D; if (_skel != null) break; }
         if (_skel != null) { _headBone = _skel.FindBone(HeadJointName); if (_headBone < 0) _headBone = Mathf.Min(HeadJoint, _skel.GetBoneCount() - 1); }
-        if (_skel != null && !Engine.IsEditorHint())
+        // the look: this body's own copies of the two materials (the fog, the death and the goop colour are per body), the goop knobs applied. In the EDITOR too:
+        // the copies live on the instanced glb's mesh, which the scene does not save (not an editable instance), so the preview costs nothing in the file.
+        if (_model != null) foreach (Node n in _model.FindChildren("*", "MeshInstance3D", true, false))
+            if (n is MeshInstance3D mi) for (int s = 0; s < mi.GetSurfaceOverrideMaterialCount(); s++)
+                if (mi.GetActiveMaterial(s) is ShaderMaterial sm) { var own = (ShaderMaterial)sm.Duplicate(); mi.SetSurfaceOverrideMaterial(s, own); _mats.Add(own); }
+        ApplyLook();
+        if (Engine.IsEditorHint()) return;
+        if (_skel != null)
         {
             _basePin = _skel.GetNodeOrNull<SmsGateKeeperBasePin>("BasePin");
             if (_basePin == null) { _basePin = new SmsGateKeeperBasePin { Name = "BasePin" }; _skel.AddChild(_basePin); }
@@ -187,16 +253,36 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
         _head.Owner3 = this;
         _head.TopLevel = true;
         if (AutoLayer) { _head.CollisionLayer = SmsHiddenCoin.HideLayer; _head.CollisionMask = 0; }
-        if (_model != null) foreach (Node n in _model.FindChildren("*", "MeshInstance3D", true, false))
-            if (n is MeshInstance3D mi) for (int s = 0; s < mi.GetSurfaceOverrideMaterialCount(); s++)
-                if (mi.GetActiveMaterial(s) is ShaderMaterial sm) { var own = (ShaderMaterial)sm.Duplicate(); mi.SetSurfaceOverrideMaterial(s, own); _mats.Add(own); }   // the fog and the fade are this body's
         _hp = HitPoints;
         _stampOn = StampMode == 1 || (StampMode == 0 && (Kind == Variant.Plaza || Kind == Variant.PlazaRicco || Kind == Variant.PlazaGelato));
         SmsWaterHitMarks.Ensure(this);
-        if (!Engine.IsEditorHint()) CallDeferred(MethodName.FillPools);
+        CallDeferred(MethodName.FillPools);
         _nerve = Nerve.Sleep; _next = Nerve.Sleep; _nerveTicks = 0;
         SetBck(BckWait1);                                                             // the spine's init nerve: SLEEP, its clip at once (a drawn frame before the first tick)
         PlaceHead();
+    }
+    /// <summary>In the editor only: the goop knobs re-applied when they change, so the viewport shows the colour being picked.</summary>
+    public override void _Process(double delta)
+    {
+        if (!Engine.IsEditorHint()) return;
+        string sig = $"{GoopTexture?.ResourcePath}|{GoopColorMode}|{GoopColor}";
+        if (sig == _lookSig) return;
+        ApplyLook();
+    }
+    private string _lookSig = "";
+    /// <summary>The goop knobs onto this body's materials: GoopTexture replaces the sheet when set; GoopColorMode / GoopColor are pushed unless FromMaterial.</summary>
+    public void ApplyLook()
+    {
+        _lookSig = $"{GoopTexture?.ResourcePath}|{GoopColorMode}|{GoopColor}";
+        foreach (var m in _mats)
+        {
+            if (GoopTexture != null) m.SetShaderParameter("goop_texture", GoopTexture);
+            if (GoopColorMode != GoopColorModes.FromMaterial)
+            {
+                m.SetShaderParameter("goop_colour_mode", (int)GoopColorMode);
+                m.SetShaderParameter("goop_colour", GoopColor);
+            }
+        }
     }
     private void FillPools()
     {
@@ -347,7 +433,7 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
                 SpawnJointBurst(DeadSmokeFxScene, 0, 1f);                              // MS_GKPA_DEADSMOKE at joint 0
             }
         }
-        if (!revivable) SetDeadFade(Mathf.Clamp(f / BckFrames[BckDead], 0f, 1f));      // gene_pakkun_dead1.bpk stands in as a fade over the clip
+        if (!revivable) SetMoundAlpha(DeadMoundAlpha(f));                               // gene_pakkun_dead1.bpk: the mound's alpha, 255 to frame 250 then eased to 0 at 300
         if (_nerveTicks == DeathSmokeTick)
         {
             SpawnJointBurst(KemuriFxScene, 0, 2f);
@@ -505,7 +591,7 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
             if (e == null) break;
             float a = Mathf.DegToRad(36f * i);
             Vector3 vel = new Vector3(4f * Mathf.Sin(a), 12f, 4f * Mathf.Cos(a));
-            e.SmsLaunch(GlobalPosition + Vector3.Up * (100f / u), Mathf.RadToDeg(Rotation.Y), vel, Graph);
+            e.SmsLaunch(GlobalPosition + Vector3.Up * (100f / u), Mathf.RadToDeg(Rotation.Y), vel, Graph, flyFirst: true);   // pushNerve(TNerveNameKuriDiffuse)
             Launched++;
         }
         if (DebugPrint) GD.Print($"[SMS gatekeeper] {Name}: the Gooble ring, {_namePool.Alive} out");
@@ -550,7 +636,7 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
             float s = Mathf.Sin((((long)TicksSeen * 0x888) & 0xFFFF) / 65536f * Mathf.Tau);   // JMASSin((s16)(moveTick x 0x888)): a 30-tick period
             amount = 7f / 12f - s / 4f;
         }
-        foreach (var m in _mats) m.SetShaderParameter("fog_amount", amount);
+        foreach (var m in _mats) m.SetShaderParameter("damage_fog_amount", amount);
     }
     private bool FogSituation()
     {
@@ -559,7 +645,20 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
         if (_bck == BckWait2 || _bck == BckWait2Start || _bck == BckWait2End || _bck == BckIyaiya || _bck == BckDive) return false;
         return _fog > 0;
     }
-    private void SetDeadFade(float t) { foreach (var m in _mats) m.SetShaderParameter("dead_fade", t); }
+    private void SetMoundAlpha(float a) { foreach (var m in _mats) m.SetShaderParameter("mound_alpha", a); }
+    /// <summary>gene_pakkun_dead1.bpk (bpk_dump.py): _mat2's material colour register -- R, G, B constant 255; A keyed 255 at frame 0, 255 at frame 250 and 0 at
+    /// frame 300, in/out tangents -2 a frame at the last two keys: J3D's Hermite between them (the tangents scaled by the 50-frame span). The stalk's _mat1 is not
+    /// animated at all -- it has plunged under the floor by frame 180 of the dead clip (gk_fk.py: the head at -3.8 m), so what the player sees is the stalk
+    /// diving into the mound, then the mound melting away in the last 0.8 s. Returns 0 .. 1.</summary>
+    public static float DeadMoundAlpha(float frame)
+    {
+        if (frame <= 250f) return 1f;
+        if (frame >= 300f) return 0f;
+        const float h = 50f, v0 = 255f, v1 = 0f, m0 = -2f, m1 = -2f;
+        float s = (frame - 250f) / h, s2 = s * s, s3 = s2 * s;
+        float v = (2f * s3 - 3f * s2 + 1f) * v0 + (s3 - 2f * s2 + s) * h * m0 + (-2f * s3 + 3f * s2) * v1 + (s3 - s2) * h * m1;
+        return Mathf.Clamp(v / 255f, 0f, 1f);
+    }
     /// <summary>TGateKeeperBase::perform (CUE_ENTRY): gpPollution->stampModel(the stamp model at the root matrix x mStampScale) -- the goop disc under it re-laid
     /// every frame; here the layer's Stamp (pollute) with the model's 2340 u x the scale.</summary>
     private void StampGoop()
