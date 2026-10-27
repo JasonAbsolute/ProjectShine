@@ -242,7 +242,7 @@ Two things worth knowing about GitHub's squash here:
   subfolder as the PR body's wording suggests).
 `pr125.md` deleted now that the PR exists and is merged.
 
-### #6 -- PENDING -- queued 2026-10-26 02:10 PDT, PR added 23:05 PDT (Kiro)
+### #6 -- PUSHED 2026-10-26 -- https://github.com/JasonAbsolute/ProjectShine/tree/feature/enemy-spawners -- PR awaiting Jaysonn's click -- queued 2026-10-26 02:10 PDT, PR added 23:05 PDT (Kiro)
 Push the third feature branch and OPEN ITS PR: `feature/enemy-spawners`, branched from `main` `e77b85f` (the trunk after PR #7) -- the enemy spawners
 (the generator, the one-shot generator, the goop-pile launcher) and the Polluted Piranha gatekeeper with its effects and knobs (passes 126-126g).
 PLAYTESTED BY JAYSONN 2026-10-26 ("everything looks great"; the drool tip flicker fixed in 126g: "Smooth now -- the spawners feature is done") -- the PR
@@ -275,6 +275,18 @@ and the body of `pr126.md`, and Jaysonn presses "Create pull request". Once merg
   Plaza / PlazaRicco / PlazaGelato on the node).
 The working tree carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the two Koopa and the two
 Goop (FireGoop / OilGoop) `.png.import` flips (the editor's detect_3d) and the `addons/godot_ai` churn -- leave them; nothing of the feature is uncommitted.
+
+Result: all eight pass shas confirmed ancestors (code tip `fa9e054`, 126f `87cbba2`, 126e `a38f59f`, 126d `76f1e3f`, 126c `c0a49da`,
+126b `3386d73`, 126a `a70ead0`, 126 `3cdf15b`) plus the trunk `e77b85f`. Pushed as a NEW remote branch with `-u`, tracking set;
+`git rev-list --count origin/feature/enemy-spawners..feature/enemy-spawners` returned `0`. 17 commits since `main`.
+Diffstat measured 70 files / **+3377** / -27 against the entry's +3369 -- the 8-line gap is this log file's own entry commit,
+written after Kiro took the count. Largest blobs: `GateKeeper.glb` 2.69 MB, `PROJECT_LOG.md` 0.83 MB, `Launcher.glb` 0.17 MB.
+Hygiene on the range: 0 `addons/godot_ai`, 0 Koopa or Goop `.png.import` flips, 0 `SmsHiddenCoin.cs` -- all four of Jaysonn's
+live edits stayed out.
+**Ordering change, learned from #5:** this result commit was made and pushed BEFORE the PR page was opened, so that if Jaysonn
+squash-merges it travels with the code. In #5 the squash cut at the commit before the log commit and the result paragraph had
+to be re-applied onto `main` by hand.
+`gh auth status` still reports "not logged into any GitHub hosts", so the PR is opened from the prefilled compare page again.
 
 <!-- Kiro appends the next entry below this line. Entry template:
 
