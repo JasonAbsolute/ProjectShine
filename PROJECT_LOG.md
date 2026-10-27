@@ -7886,3 +7886,90 @@ writes the import_script path too.
 **Asked and answered:** the generator (`Spawner.tscn`) is invisible in play on purpose -- TGenerator is a bare TViewObj (generator.cpp 13: no model,
 no hit actor; the one-shot adds only the water's hit cylinder): the game's level designers put the point where the appearance is covered, and the
 VISIBLE kind is the launcher pile. The ghost of the kind is the editor's placement aid only (Engine.IsEditorHint()).
+
+
+## SMS pass 127 -- the M gate, the warp-in and the episode select: jump into an M, pick an episode, pick a character, play, come back out (feature/gate-entry)
+
+**Files:** NEW `assets/Sms/Gate/SmsModelGate.cs` + `MGate.tscn` + `MGate.gdshader` (TModelGate), `P_gate_msk_m2.png` / `P_gate_spec2s3tc.png` /
+`P_ms_indwp1_ia.png` (05_gate01.bmd's textures, bmd_tex.py), `SmsStageInfo.cs` + `SmsEpisodeInfo.cs` (a stage and its episodes as the select screen
+knows them), `Stages/RiccoHarbor.tres` (his Rico4Secret level behind a gate: EPISODE 1 the tower's shine, 2 the red coins), `SmsEpisodeSelect.cs` +
+`EpisodeSelect.tscn` (TSelectDir / TSelectMenu / TSelectGrad), `SmsSelectShineRing.cs` (TSelectShineManager), `select/*.png` (the 36 textures of
+the disc's select archive: the stage banners, EPISODE, the numerals, the marks, the arrow, SCORE, the coin digits), `SmsEpisodeOnly.cs` (what a level
+shows per episode); `assets/Mario.cs` (the warp-in: SmsWarpIn*, spliced; the demo state counts as invincible), `assets/Sms/Console/SmsFader.cs` +
+`Fader.gdshader` (the spiral wipe, Hx_Test4 type 8; the fader's colour, TSMSFader::setColor), `assets/GameData.cs` (PendingStage / PendingEpisode /
+Episode / FadeInFrom), `assets/CharacterSelect.cs` (loads the gate's stage; fades in from the select's white), `assets/Level.cs` (the pause bar takes the
+episode's name), `Levels/Rico4Secrect/Skybox/Rico4Secret.tscn` (ShineSprite2 ExitLevel -> the Plaza, so the loop closes). Sources: doldecomp/sms
+src/MoveBG/ModelGate.cpp, Player/MarioAutodemo.cpp (warpIn 158-249) + MarioReceiveMsg.cpp 856 + MarioParticle.cpp (warpInEffect), System/
+MarDirectorDirect.cpp (moveStage: a main stage -> APP_STATE_TITLE = the select, wipe 8), GC2D/SelectDir.cpp + SelectMenu.cpp + SelectShine2.cpp,
+GC2D/hx_wiper.c (Hx_Test4); autodemo.prm (shipped: BallsDisp 6, Balls 90, Captured 110, Tremble 6, VecBase 0.6 over the code's 6 / 70 / 120 / 15 /
+0.3); the disc's select/scrn/scenario_select_1.blo (blo_dump.py) and select/timg; 05_gate01.btk / .brk / .bpk (btk_dump.py, the brk / bpk readers).
+
+**The gate** (TModelGate): a 400 x 400-unit quad (the 'center' joint 200 up), its one material: the M mask x a scrolling rainbow sheen, the stage's
+THP movie inside once lit, an indirect wobble on the sheen and the M's edge (never the movie), blend SRCALPHA/ZERO with alpha compare >= 80 -- MGate.
+gdshader carries the TEV as read from the bmd (the header says which stage does what). The brk's K3 register is the glow: (255, 130) asleep -> (91, 0)
+lit, frame = unkD0 x 99. Hit actor 300 x 400 on the player category: here a slab the M's size, 100 units deep about the plane, on the spray-only layer.
+LIFE: shut until the M is painted (`Opened`; `Open()` = startOpen: the bpk fades it in 12 -> 255 over 100 frames and the first light needs the hose: ten
+drops of 0.1 within 200 units of the centre AT THE PLANE); awake, Mario within 1000 units charges the glow 0.01 a TICK (CUE_MOVE runs four times a
+frame -- pass 125's rule; at one a frame the 0.02-a-frame fade would have won and the gate never lit: drive 127 G2), at 1 the gate is ACTIVE for 360
+frames, renewed every tick he is near; away, the ticks count the run down too (5 a frame: 2.4 s) and the glow follows unkCA / 1000. Active: the four
+gatewind emitters and the two sounds (slots, 127b); the TAKE: Mario in the box in front of the M (x +-150, y 1000 below .. 150 above the centre, 0 .. 300
+in front) while JUMPING (an air status) -> HIT_MESSAGE_TAKE -> WARP_IN. Not active: within 200 units of the centre he is nudged out 10 units a TICK (40 a
+frame: more than his run). Captured: the glow fades 0.025 a frame. The node's -Z is the front (the game's quad faces its own +Z; turned so the node
+points like every Godot node). `Stage` (an SmsStageInfo) says where it goes; a return spot for that level is added 250 units in front unless the level has
+one (SmsReturnSpot, pass 119), so the shine's exit lands at THIS gate (the gate-out demo).
+
+**Mario's warp-in** (TMario::warpIn, MarioAutodemo.cpp): TAKE -> mHolder = the gate, the jump pose at its end if he was not jumping, WARP_IN. State 0
+(120 ticks): drawn 2 % a tick toward the hold point (the centre + 250 in front, 80 below: centred on the M), the model trembling by 6 - dist / 10 units
+(the armature jittered -- TTrembleModelEffect is not ported), the pose frozen, setNextStage (GameData.PendingStage = the gate's stage), warpInLight
+(the senko flash, a slot). Then warpInEffect (the ten light-ball emitters off his joints + the dust, a slot: 127b) -> state 1: 6 ticks in he vanishes and
+the pad buzzes, at 90 -> state 2 with unk468 = 0.6: the balls pulled in (TWarpInCallBack: dir x 0.6 x timer x 1..5 a tick), rumble every tick, at 110 ->
+HIT_MESSAGE_ATTACK to the gate, state 3 IS_PERFORMING. The director then: the actor demo camera on the gate (DEVIATION: the camera stays locked),
+STATE_UNK9 startWipe(8, 0.4) = the SPIRAL WIPE 0.4 s later with the pipe sound (a slot), at black APP_STATE_TITLE = the episode select (a main stage) --
+or the level itself when the stage has no episodes. Mario's SmsDamageExec now treats the demo state (and talking) as invincible, as TMario::
+isInvincible() does: a Stu wandering into the hold point knocked him out of the warp-in in the drive.
+
+**The spiral wipe** (Hx_Test4, type 8 = direction 0): a black band of half-width thin (124.3 + 0.15 a frame) winding in from radius 520 about the
+centre, 2.4 px of radius per 0.12 rad, five more segments a frame for 38 frames; a turn drops 126 px and the band is 249 wide, so the turns overlap and
+the hole shrinks with a spiral edge sweeping round ~3.6 turns; the fader then fills solid. Fader.gdshader mode 5 (`spiral` = rstep, thin), in the
+wiper's 640 x 448 frame; SmsFader.Wipe.Spiral, `SetColor` (black / the select's white), `RunningWipe`.
+
+**The episode select** (TSelectDir / TSelectMenu / TSelectGrad, at 30 frames a second): the gradient (per stage: Ricco green -> cyan with its six-step
+hue cycle, 2 a frame), the 3D ring of the stage's shines in a SubViewport (the camera at (300, 240, 1300) looking at (300, 240, 0), fovy 30: the
+selected at z 0, its neighbours a slot (12.6 degrees of the ellipse x 1500 / z 9000 about (300, 160, -9000)) to the side and 216 back; the full shine
+for a cleared episode, his EmptyTint for an open one; each faces the camera, bobs 10 units on a four-piece curve, fades with depth (the bpk frame -0.05 z,
+at least 30: 70 % at the front); the selected spins 3 degrees a frame; his ShineSprite.glb stands in for shine_menu.bmd / shine_menu_empty.bmd -- it
+measures the game's 535 units with its glow), and scenario_select_1.blo's panes on the 600 x 448 frame (rows 16 .. 464 of the 480-row blo): the two
+bars (msk1 / msk2, 600 x 166 at alpha 160, stretched over the window -- knob), the stage banner xx_a + its black shadow xx_b at (296, 150), EPISODE +
+the numeral + the name at (300, 299) with its twin 144 to the right for the slide, the marks row at (296, 384) (i_o / i_e slots 32 apart, 28 px, the dot
+for open, the sun for cleared, the selected yellow at 255 pulsing 64..255 by 6, the others white at 120), the arrows a_lN / a_rN (16 further out per
+episode, bobbing 5 px, fading 4 a frame at the ends), SCORE x NNN at (296, 423) (hidden: the port keeps no coin record -- knob). The states: LETTERBOX
+(30 frames: the bars grow in from the edges; at frame 21 the banner slides in from off the right edge over 20), SQUASH (15: up 10, 160 narrower / 20
+taller on TBoundPane's three-point curves), STRETCH (20: 40 wider / 8 shorter, 4 down), SETTLE (15), APPEAR (the 'map' text's alpha 6 a frame -- the
+Japanese stage name, empty here -- then the panes 6 a frame once it passes 128), INPUT (left / right: the ring turns a slot in 10 frames, pane2 with the
+new episode slides into pane1's place as pane1 slides out, alphas crossing; A: the pick), DISAPPEAR (the bars close to blo y 224 over 30 frames and go
+opaque 16 a frame, everything fades 16 a frame, the ring closes: the others run their frame out at +8), WAIT (10), CLOSE: MSF_EPISODE = the pick
+(GameData.Episode / PendingEpisode), a 1 s fade to WHITE, then his character select (the stage's CharacterSelectScene; it fades in from the white
+and loads GameData.PendingStage's level instead of its own) or the level. The rule (initData): episode i is open when the first or i - 1 cleared
+(its shine's save flag); the newest open one starts selected. Inputs are read per menu frame as edges (checkFrameMeaning), not IsActionJustPressed.
+`SmsEpisodeOnly`: a Node3D whose children exist only in the episodes listed (freed in _EnterTree, before their _Ready) -- the game's per-scenario
+scene.bin; a level run without an episode keeps everything.
+
+**DEVIATIONS (logged):** the movie inside the M and the episode's preview are stills (`Preview` on the gate; `SmsEpisodeInfo.Preview` -- the game's
+THP player); the gate's directional screen blur toward it (screenBlur, the after-effect) is not ported; the demo camera on the gate is the locked
+camera; the select's 'map' stage-name text is the Japanese version's (a stage without a banner draws its name in the big letters instead); the SCORE
+row is hidden; the bars and gradient span the 16:9 window; the select's 2D particles (ms_2d_shine_*, ms_2d_scsel_on_*), the warp-in's light balls,
+the gate's swirl and sparks, the sounds: slots for 127b. His Rico4Secret's shine now exits to the Plaza (two lines on ShineSprite2).
+
+**Drive 127** (patch_smoke127.py: the helpers in Mario.cs, the driver in GameData.cs -- the autoload lives across the scene changes and its
+_PhysicsProcess runs before the scene's nodes, so a press lands in Mario's just-pressed and a gate re-made on a return frame exists before his first
+tick), 39/39 on his PC through the real paths: G1 the quad + shader + spray layer + the return spot 250 in front; G2 nearness: glow 0.62 at 1 s, lit
+at 1.7 s, the run 360 renewed, Activated once; G3 not lit, a grounded Mario inside the box nudged to the 200-unit edge (2.75 m); G4 the REAL hose lights
+a gate that wants it (ten drops at the plane); G5 a REAL jump (button_a) inside the lit gate's box -> TAKEN, shineGet, held; G6 the pull: 0.19 m from
+the hold after 61 physics frames (60 expected); G7 gone at tick 8 of the balls; G8 captured at 163 frames (160), the stage handed over, the spiral
+24 frames after the capture, the select scene at black; S1 the rule (episode 1 cleared -> 1 cleared / 2 open / 3 locked, 2 selected), the ring's slots,
+EPISODE 2 + its name, the fader from black; S2 the bars at 55 of 166 at menu frame 10, the banner slide at frame 21, the input loop at frame 140;
+S2c / S3b the arrows; S3 LEFT -> episode 1 (ring 0, EPISODE 1 + name); S4 RIGHT -> 2; S5 RIGHT at the end does nothing; S6 A -> DISAPPEAR + the ring
+closing, the close at 88 drive frames (84), MSF_EPISODE 2, the WHITE fade, the character select at white; C1 FadeInFrom consumed; C2 ui_accept (a
+dispatched InputEventAction) loads the GATE's stage with a character chosen; L1 Episode 2 in the level; L2 SmsEpisodeOnly (the episode-1 node's
+children gone, 2 and 1+2 kept); L3 a plain start; R1 the shine's exit (ReturnFromScene + the move) lands at the GATE's spot in the gate-out demo
+(0.00 m); R2 control back. Regression 118 35/35; build 0 errors; boot ALL OK; the load probe of MGate.tscn / EpisodeSelect.tscn / RiccoHarbor.tres clean.

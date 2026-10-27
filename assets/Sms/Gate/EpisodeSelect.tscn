@@ -1,0 +1,60 @@
+[gd_scene load_steps=29 format=3 uid="uid://cepselect127"]
+
+[ext_resource type="Script" path="res://assets/Sms/Gate/SmsEpisodeSelect.cs" id="1_script"]
+[ext_resource type="Resource" path="res://assets/Sms/Gate/Stages/RiccoHarbor.tres" id="2_stage"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_story.png" id="t_sc_story"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_mark_1.png" id="t_sc_mark_1"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_mark_0.png" id="t_sc_mark_0"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_arrow.png" id="t_sc_arrow"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_myscore.png" id="t_sc_myscore"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/coin_icon.png" id="t_coin_icon"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/coin_number_x.png" id="t_coin_number_x"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/shine_get_icon.png" id="t_shine_get_icon"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_number_1.png" id="t_sc_number_1"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_number_2.png" id="t_sc_number_2"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_number_3.png" id="t_sc_number_3"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_number_4.png" id="t_sc_number_4"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_number_5.png" id="t_sc_number_5"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_number_6.png" id="t_sc_number_6"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_number_7.png" id="t_sc_number_7"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_number_8.png" id="t_sc_number_8"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/coin_number_0.png" id="t_coin_number_0"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/coin_number_1.png" id="t_coin_number_1"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/coin_number_2.png" id="t_coin_number_2"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/coin_number_3.png" id="t_coin_number_3"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/coin_number_4.png" id="t_coin_number_4"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/coin_number_5.png" id="t_coin_number_5"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/coin_number_6.png" id="t_coin_number_6"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/coin_number_7.png" id="t_coin_number_7"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/coin_number_8.png" id="t_coin_number_8"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/coin_number_9.png" id="t_coin_number_9"]
+
+[node name="EpisodeSelect" type="Control" node_paths=PackedStringArray("Music", "CursorSound", "SelectSound")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_script")
+TestStage = ExtResource("2_stage")
+EpisodeWord = ExtResource("t_sc_story")
+Numbers = Array[Texture2D]([ExtResource("t_sc_number_1"), ExtResource("t_sc_number_2"), ExtResource("t_sc_number_3"), ExtResource("t_sc_number_4"), ExtResource("t_sc_number_5"), ExtResource("t_sc_number_6"), ExtResource("t_sc_number_7"), ExtResource("t_sc_number_8")])
+MarkGot = ExtResource("t_sc_mark_1")
+MarkOpen = ExtResource("t_sc_mark_0")
+Arrow = ExtResource("t_sc_arrow")
+ScoreWord = ExtResource("t_sc_myscore")
+CoinIcon = ExtResource("t_coin_icon")
+CoinX = ExtResource("t_coin_number_x")
+CoinDigits = Array[Texture2D]([ExtResource("t_coin_number_0"), ExtResource("t_coin_number_1"), ExtResource("t_coin_number_2"), ExtResource("t_coin_number_3"), ExtResource("t_coin_number_4"), ExtResource("t_coin_number_5"), ExtResource("t_coin_number_6"), ExtResource("t_coin_number_7"), ExtResource("t_coin_number_8"), ExtResource("t_coin_number_9")])
+ShineGetIcon = ExtResource("t_shine_get_icon")
+Music = NodePath("Music")
+CursorSound = NodePath("CursorSound")
+SelectSound = NodePath("SelectSound")
+
+[node name="Music" type="AudioStreamPlayer" parent="."]
+
+[node name="CursorSound" type="AudioStreamPlayer" parent="."]
+
+[node name="SelectSound" type="AudioStreamPlayer" parent="."]

@@ -84,6 +84,20 @@ public partial class GameData : Node
     public string ReturnFromScene;
     public bool ReturnWithShine;
 
+    // ------------------------------------------------------- the M gate -> stage hand-off (SMS pass 127, TApplication::mNextArea) --
+
+    /// <summary>The stage a gate opened on (its SmsStageInfo: the level, its episodes, the select screen's art), carried through the episode
+    /// select and the character select to the level. Set by Mario's warp-in; the next gate replaces it. Not saved -- the run's.</summary>
+    public SmsStageInfo PendingStage;
+    /// <summary>The episode the select screen picked for <see cref="PendingStage"/> (0-based; -1 = not picked yet).</summary>
+    public int PendingEpisode = -1;
+    /// <summary>MSF_EPISODE: the episode the level runs (0-based; -1 = none -- a level run on its own shows everything). The select screen sets
+    /// it as the game does (TSelectDir::direct); SmsEpisodeOnly nodes read it.</summary>
+    public int Episode = -1;
+    /// <summary>The screen the next scene fades in from (the select screen leaves white behind it, TSelectDir's startWipe(0xf) with the white
+    /// fader); null = the scene's own start. Whoever starts clears it.</summary>
+    public Color? FadeInFrom;
+
     /// <summary>The card save's write (TFlagManager::saveSuccess): the pause menu's SAVE, a shine's "Save and ...", a blue coin's "Save and Continue".</summary>
     public void SaveNow() => Save();
 
@@ -144,4 +158,5 @@ public partial class GameData : Node
         }
         HasSaveFile = true; SavedShineCount = _collectedShines.Count;
     }
+
 }

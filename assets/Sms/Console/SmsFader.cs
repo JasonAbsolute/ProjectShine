@@ -6,12 +6,13 @@ using Godot;
 /// a fade in ends FULLY_FADED_IN (clear). The death wipe (10, Hx_Test2): four bands, each an Hx motion of 500 rows -- 2 frames of
 /// acceleration, 8 / 8 / 7 / 9 of cruise, 1 of braking (Hx_MotionSet) -- over timers of 11 / 11 / 10 / 12 frames, the earlier bands
 /// held complete. The hell death (2, Hx_Circle direction 0): the iris from 400 to 0 over 25 frames (400, 2, 13, 10). The plain fades
-/// (startFadeout / startFadein): alpha over the frames given. The game-over wipe (0xD, Hx_GameOver) draws a texture the port does not
+/// (startFadeout / startFadein): alpha over the frames given. The gate-in wipe (8, Hx_Test4; pass 127): a black spiral band winding in
+/// from the edge to the centre over 38 frames. The game-over wipe (0xD, Hx_GameOver) draws a texture the port does not
 /// have: a plain fade stands in. assets/Sms/Console/Fader.tscn holds the rect and its shader (Fader.gdshader); it sits above everything.
 /// </summary>
 public partial class SmsFader : CanvasLayer
 {
-    public enum Wipe { None, Arcs, Circle, FadeOut, FadeIn }
+    public enum Wipe { None, Arcs, Circle, FadeOut, FadeIn, Spiral }
     public enum Status { FullyFadedIn, FadingOut, FullyFadedOut, FadingIn }
 
     [Export] public ColorRect Rect;
@@ -24,6 +25,8 @@ public partial class SmsFader : CanvasLayer
     public Status State { get; private set; } = Status.FullyFadedIn;
     public bool IsFullyFadedOut => State == Status.FullyFadedOut;
     public bool IsFullyFadedIn => State == Status.FullyFadedIn;
+    /// <summary>The wipe running now (None between wipes) -- for the drives.</summary>
+    public Wipe RunningWipe => _running;
 
     private ShaderMaterial _mat;
     private Wipe _pending = Wipe.None;
@@ -34,6 +37,7 @@ public partial class SmsFader : CanvasLayer
     private int _stage;           // the band being drawn
     private float[] _rows = new float[4];
     private float _plainSeconds, _plainT;
+    private float _spiralStep, _spiralThin;   // Hx_Test4: rstep, thin
     // Hx motion
     private float _mT1, _mT2, _mT3, _mAcc, _mDec, _mVel, _mPos, _mFrames;
     private int _timer;
@@ -49,6 +53,7 @@ public partial class SmsFader : CanvasLayer
         _mat = Rect.Material as ShaderMaterial;
         Rect.Visible = false;
         SetParam("mode", 0);
+        SetParam("color", new Vector3(FadeColor.R, FadeColor.G, FadeColor.B));
     }
 
     public override void _ExitTree()
@@ -76,6 +81,10 @@ public partial class SmsFader : CanvasLayer
 
     /// <summary>startFadein over the seconds given (a stage's plain start, startWipe(0xF, 0.4)).</summary>
     public void FadeIn(float seconds) => StartWipe(Wipe.FadeIn, 0f, seconds);
+
+    /// <summary>TSMSFader::setColor: what the fades and wipes are drawn in (black; the select screen's white). Kept until set again.</summary>
+    public void SetColor(Color c) { FadeColor = c; SetParam("color", new Vector3(c.R, c.G, c.B)); }
+    public Color FadeColor { get; private set; } = Colors.Black;
 
     private void SetParam(string name, Variant v) => _mat?.SetShaderParameter(name, v);
 
@@ -132,6 +141,13 @@ public partial class SmsFader : CanvasLayer
                 SetParam("alpha", 0f);
                 Show(2);
                 break;
+            case Wipe.Spiral:
+                // Hx_Test4 direction 0 (type 8, the gate-in): rstep 0 + 5 a frame, thin 124.3 + 0.15 a frame, 38 frames (SMS pass 127)
+                State = Status.FadingOut;
+                _spiralStep = 0f; _spiralThin = 124.3f; _timer = 38;
+                SetParam("spiral", new Vector2(0f, _spiralThin));
+                Show(5);
+                break;
             case Wipe.FadeIn:
                 State = Status.FadingIn;
                 _plainSeconds = _pendingSeconds; _plainT = 0f;
@@ -178,6 +194,7 @@ public partial class SmsFader : CanvasLayer
             }
             case Wipe.Arcs:
             case Wipe.Circle:
+            case Wipe.Spiral:
                 _acc += delta * FrameRate;
                 while (_acc >= 1.0 && _running != Wipe.None)
                 {
@@ -213,6 +230,17 @@ public partial class SmsFader : CanvasLayer
                         return;
                 }
                 SetParam("rows", new Vector4(_rows[0], _rows[1], _rows[2], _rows[3]));
+            }
+        }
+        else if (_running == Wipe.Spiral)
+        {
+            _spiralStep += 5f; _spiralThin += 0.15f;
+            SetParam("spiral", new Vector2(_spiralStep, _spiralThin));
+            if (--_timer <= 0)
+            {
+                _running = Wipe.None;
+                State = Status.FullyFadedOut;
+                Show(1);
             }
         }
         else if (_running == Wipe.Circle)

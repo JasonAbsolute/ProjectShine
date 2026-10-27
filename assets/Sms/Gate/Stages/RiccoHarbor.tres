@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="SmsStageInfo" load_steps=5 format=3 uid="uid://cstagericco127"]
+
+[ext_resource type="Script" path="res://assets/Sms/Gate/SmsStageInfo.cs" id="1_stage"]
+[ext_resource type="Script" path="res://assets/Sms/Gate/SmsEpisodeInfo.cs" id="2_episode"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_map_ricco.png" id="3_banner"]
+
+[sub_resource type="Resource" id="Resource_ep1"]
+script = ExtResource("2_episode")
+Name = "The Secret of Ricco Tower"
+ShineId = "res://Levels/Rico4Secrect/Skybox/Rico4Secret.tscn:ShineSprite2"
+
+[sub_resource type="Resource" id="Resource_ep2"]
+script = ExtResource("2_episode")
+Name = "The Red Coins of Ricco Tower"
+ShineId = "res://Levels/Rico4Secrect/Skybox/Rico4Secret.tscn:RedCoinSwitch:red_coins"
+
+[resource]
+resource_name = "RICCO HARBOR: his Rico4Secret level behind an M gate -- EPISODE 1 the tower's shine, EPISODE 2 the red coins (open once 1 is cleared). Add episodes (New SmsEpisodeInfo) and gate the level's content with SmsEpisodeOnly nodes."
+script = ExtResource("1_stage")
+Scene = "res://Levels/Rico4Secrect/Skybox/Rico4Secret.tscn"
+StageName = "RICCO HARBOR"
+Banner = ExtResource("3_banner")
+Episodes = Array[ExtResource("2_episode")]([SubResource("Resource_ep1"), SubResource("Resource_ep2")])
+CharacterSelectScene = "res://assets/CharacterSelect.tscn"
+GradientTopLeft = Color(0, 1, 0, 1)
+GradientBottomRight = Color(0, 1, 1, 1)
+GradientCycle = Vector3i(4, 2, 0)

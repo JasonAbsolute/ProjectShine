@@ -1,0 +1,16 @@
+[gd_scene load_steps=3 format=3 uid="uid://cmgate127a"]
+
+[ext_resource type="Script" path="res://assets/Sms/Gate/SmsModelGate.cs" id="1_script"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hit"]
+resource_name = "the M's slab: 400 x 400 units, 100 deep about the plane (the game's hit actor is a 300 x 400 cylinder; the water must reach the plane)"
+size = Vector3(5.373, 5.373, 1.343)
+
+[node name="MGate" type="StaticBody3D"]
+collision_layer = 128
+collision_mask = 0
+script = ExtResource("1_script")
+
+[node name="Hit" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.6866, 0)
+shape = SubResource("BoxShape3D_hit")

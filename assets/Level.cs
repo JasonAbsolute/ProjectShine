@@ -132,6 +132,14 @@ public partial class Level : Node3D
 
         // After a miss the game brings the same stage back from its start with no intro, black, and a plain 0.4 s fade in
         // (TMarDirector: unkE4 = 0xF on the miss, startWipe(unkE4, 0.4f) at the next stage's start; flag 0x30002).
+        // SMS pass 127: entered through an M gate -- the pause menu's bar takes the episode's name (scenarioname.bmg) when the level sets none
+        if (GameData.Instance != null && GameData.Instance.PendingStage != null && GameData.Instance.Episode >= 0
+            && SmsReturnSpot.ScenePath(GameData.Instance.PendingStage.Scene) == SceneFilePath)
+        {
+            if (string.IsNullOrEmpty(ScenarioName)) ScenarioName = GameData.Instance.PendingStage.EpisodeName(GameData.Instance.Episode);
+            if (string.IsNullOrEmpty(StageName)) StageName = GameData.Instance.PendingStage.StageName;
+        }
+
         if (GameData.Instance != null && GameData.Instance.CameFromMiss)
         {
             GameData.Instance.CameFromMiss = false;
