@@ -1,8 +1,15 @@
-[gd_scene format=3 uid="uid://qs0dnce4fbuh"]
+[gd_scene load_steps=12 format=3 uid="uid://qs0dnce4fbuh"]
 
 [ext_resource type="Script" path="res://assets/Sms/Enemy/Spawn/SmsGateKeeper.cs" id="1_script"]
 [ext_resource type="PackedScene" path="res://models/Eniemes/GateKeeper/GateKeeper.glb" id="2_model"]
 [ext_resource type="PackedScene" path="res://assets/Gooble.tscn" id="3_gooble"]
+[ext_resource type="PackedScene" uid="uid://cgkkemu126e" path="res://assets/Sms/Fx/GkKemuri.tscn" id="4_kemuri"]
+[ext_resource type="PackedScene" uid="uid://cgkkemw126e" path="res://assets/Sms/Fx/GkKemuriW.tscn" id="5_kemuriw"]
+[ext_resource type="PackedScene" uid="uid://cgkdead126e" path="res://assets/Sms/Fx/GkDead.tscn" id="6_dead"]
+[ext_resource type="PackedScene" uid="uid://cgkdsmk126e" path="res://assets/Sms/Fx/GkDeadSmoke.tscn" id="7_deadsmoke"]
+[ext_resource type="PackedScene" uid="uid://cgkbota126e" path="res://assets/Sms/Fx/GkBota.tscn" id="8_bota"]
+[ext_resource type="PackedScene" uid="uid://cgkydrl126e" path="res://assets/Sms/Fx/GkYodareL.tscn" id="9_yodarel"]
+[ext_resource type="PackedScene" uid="uid://cgkydrs126e" path="res://assets/Sms/Fx/GkYodareS.tscn" id="10_yodares"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_body"]
 resource_name = "the game's body hit cylinder: radius 400, height 150 units (initHitActor 400 x 150) -- Mario in it is hurt; vulnerable while asleep"
@@ -14,6 +21,13 @@ collision_layer = 128
 collision_mask = 0
 script = ExtResource("1_script")
 NamekuriScene = ExtResource("3_gooble")
+KemuriFxScene = ExtResource("4_kemuri")
+KemuriWFxScene = ExtResource("5_kemuriw")
+DeadFxScene = ExtResource("6_dead")
+DeadSmokeFxScene = ExtResource("7_deadsmoke")
+BotaFxScene = ExtResource("8_bota")
+YodareLFxScene = ExtResource("9_yodarel")
+YodareSFxScene = ExtResource("10_yodares")
 
 [node name="Model" parent="." instance=ExtResource("2_model")]
 transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)

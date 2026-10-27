@@ -349,7 +349,7 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
             if (_launchTimer > 0) _launchTimer--;
             if (_launchTimer == 0) { _launchTimer = LaunchTimerNormal + (int)(240f * _rng.Randf()) - 120; Push(Nerve.LaunchGoro); return; }
         }
-        if (BckPassed(18f, f)) { Puffs++; SpawnJointBurst(KemuriWFxScene, 0, 2f); }   // checkBckPass(18): MS_GKPA_KEMURI_W at joint 0, x2
+        if (BckPassed(18f, f)) { Puffs++; SpawnJointBurst(KemuriWFxScene, 0); }       // checkBckPass(18): MS_GKPA_KEMURI_W at joint 0 (EFFECT_ONETIME_INDIRECT)
         if (_fog >= FogMax) { Push(Nerve.Appear); return; }
         if (_hits > 0) { Push(Nerve.SleepDamage); return; }
     }
@@ -361,7 +361,7 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
             if (_appearCount == 0) StartAppearDemo();
             if (_appearCount < 255) _appearCount++;
         }
-        if (_nerveTicks == AppearSmokeTick) { SpawnJointBurst(KemuriFxScene, 12, 2f); RumblePad(); }
+        if (_nerveTicks == AppearSmokeTick) { SpawnJointBurst(KemuriFxScene, 12); RumblePad(); }
         if (endsNext) { Push(Kind == Variant.Airport ? Nerve.Wait2 : Nerve.Wait); }
     }
     private void NerveWait(bool fin)
@@ -429,14 +429,14 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
             if (!revivable)
             {
                 StartFinishDemo();
-                SpawnJointBurst(DeadFxScene, 6, 1f);                                   // MS_GKPA_DEAD at joint 6 (the pollution colour)
-                SpawnJointBurst(DeadSmokeFxScene, 0, 1f);                              // MS_GKPA_DEADSMOKE at joint 0
+                SpawnBound(DeadFxScene, 6, true);                                      // MS_GKPA_DEAD bound to joint 6 for its 220 frames (the pollution colour)
+                SpawnBound(DeadSmokeFxScene, 0, false);                                // MS_GKPA_DEADSMOKE bound to joint 0 (its 215-frame start delay inside)
             }
         }
         if (!revivable) SetMoundAlpha(DeadMoundAlpha(f));                               // gene_pakkun_dead1.bpk: the mound's alpha, 255 to frame 250 then eased to 0 at 300
         if (_nerveTicks == DeathSmokeTick)
         {
-            SpawnJointBurst(KemuriFxScene, 0, 2f);
+            SpawnJointBurst(KemuriFxScene, 0);
             if (DisappearSound != null && DisappearSound.Stream != null) DisappearSound.Play();
             RumblePad();
         }
@@ -454,7 +454,7 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
     private void NerveDive(bool endsNext)
     {
         if (_nerveTicks == 0) ChangeBck(BckDive);
-        if (_nerveTicks == DiveSmokeTick) { SpawnJointBurst(KemuriFxScene, 0, 2f); RumblePad(); }
+        if (_nerveTicks == DiveSmokeTick) { SpawnJointBurst(KemuriFxScene, 0); RumblePad(); }
         if (!endsNext) return;
         if (Kind == Variant.Bianco) { _launchTimer = LaunchTimerNormal + (int)(240f * _rng.Randf()) - 120; LaunchGorogoro(); RumblePad(); }
         Push(Nerve.Sleep);
@@ -673,7 +673,8 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
         }
     }
     /// <summary>emitParticles (CUE_CALC_ANIM, not clipped): bota on joint 6, yodare_l on 9 and 5, yodare_s on 8, every frame while not SLEEP / LAUNCH GORO -- one
-    /// emitter each, bound to the joint (emitAndBindToMtxPtr with a fixed id).</summary>
+    /// emitter each, bound to the joint (emitAndBindToMtxPtr with a fixed id), SMSSetEmitterPolColor 6 = the stage's goop pair -- here the keeper's own
+    /// goop colour when the knobs set one (<see cref="GoopPair"/>).</summary>
     private void MouthFx()
     {
         bool on = _nerve != Nerve.Sleep && _nerve != Nerve.LaunchGoro && _nerve != Nerve.Dead;
@@ -683,14 +684,35 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
         if (_skel == null) return;
         foreach (var (scene, joint) in new[] { (BotaFxScene, 6), (YodareLFxScene, 9), (YodareLFxScene, 5), (YodareSFxScene, 8) })
         {
-            if (scene == null || joint >= _skel.GetBoneCount()) continue;
-            var fx = SmsNpcEffect.Spawn(scene, _skel, _skel.GetBoneName(joint), Scale3, _fxCache, Name + joint);
+            var fx = SpawnBound(scene, joint, true);
             if (fx != null) _mouthFx.Add(fx);
         }
     }
     private void StopMouthFx() { foreach (var fx in _mouthFx) if (IsInstanceValid(fx)) fx.Stop(); _mouthFx.Clear(); _mouthFxOn = false; }
-    /// <summary>A one-shot at a joint's animated position (emitAndBindToMtxPtr(id, getAnmMtx(joint), ...) for a burst), at the body's scale x the emitter's.</summary>
-    private void SpawnJointBurst(PackedScene scene, int joint, float fxScale)
+    /// <summary>emitAndBindToMtxPtr for an effect that lives on: an SmsNpcEffect under a BoneAttachment3D of the joint (it follows the joint every frame), at the
+    /// body's scale; <paramref name="goop"/> = SMSSetEmitterPolColor 6, the goop pair onto its materials.</summary>
+    private SmsNpcEffect SpawnBound(PackedScene scene, int joint, bool goop)
+    {
+        if (scene == null || _skel == null || joint >= _skel.GetBoneCount()) return null;
+        var fx = SmsNpcEffect.Spawn(scene, _skel, _skel.GetBoneName(joint), Scale3, _fxCache, Name + joint);
+        if (fx != null && goop && GoopPair(out Color light, out Color dark)) fx.SetGoopColors(light, dark);
+        return fx;
+    }
+    /// <summary>The goop pair the effects wear: FromMaterial / Texture = the stage's (the scenes' baked Bianco pair: nothing pushed); Tint = that pair x
+    /// GoopColor; Recolour = GoopColor and a 0.4 shade of it (the brown pair's light / dark ratio).</summary>
+    public bool GoopPair(out Color light, out Color dark)
+    {
+        Color prm = new Color(181f / 255f, 132f / 255f, 102f / 255f), env = new Color(98f / 255f, 14f / 255f, 0f);
+        switch (GoopColorMode)
+        {
+            case GoopColorModes.Tint: light = prm * GoopColor; dark = env * GoopColor; light.A = 1f; dark.A = 1f; return true;
+            case GoopColorModes.Recolour: light = GoopColor; dark = GoopColor * 0.4f; light.A = 1f; dark.A = 1f; return true;
+            default: light = prm; dark = env; return false;
+        }
+    }
+    /// <summary>A one-shot at a joint's animated position (emitAndBindToMtxPtr(id, getAnmMtx(joint), EFFECT_ONETIME_*) for a burst that is over in a frame), at the
+    /// body's scale.</summary>
+    private void SpawnJointBurst(PackedScene scene, int joint)
     {
         if (scene == null) return;
         Vector3 at = GlobalPosition;
@@ -698,12 +720,14 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
         var fx = scene.Instantiate<Node3D>();
         fx.TopLevel = true;
         GetParent().AddChild(fx);
-        Transform3D tr = new Transform3D(Basis.FromScale(Vector3.One * Scale3 * fxScale), at);
+        Transform3D tr = new Transform3D(Basis.FromScale(Vector3.One * Scale3), at);
         fx.GlobalTransform = tr;
         if (fx is SmsFxBurst burst) burst.Play(tr);
-        else if (fx is SmsNpcEffect npc) npc.Start(Scale3 * fxScale);
+        else if (fx is SmsNpcEffect npc) npc.Start(Scale3);
         else if (fx is GpuParticles3D gp) { gp.OneShot = true; gp.Emitting = true; gp.Finished += gp.QueueFree; }
+        Bursts++;
     }
+    public int Bursts { get; private set; }
     private float RumblePower()
     {
         float dist = (GlobalPosition - MarioPos).Length() * SmsUnits.UnitsPerMetre;
