@@ -177,7 +177,7 @@ curve_y = SubResource("CurveTex_a_scale_y")
 curve_z = SubResource("CurveTex_a_scale_z")
 
 [sub_resource type="ParticleProcessMaterial" id="PPM_a"]
-resource_name = "ms_2d_scsel_on_a: senko1 streaks 10 x 85 px, 2.4 a frame from frame 30, hue cycling, growing, random roll, life 100 +-37 %"
+resource_name = "ms_2d_scsel_on_a: senko1 streaks 10 x 85 px, 2.4 a frame from frame 30, blue -> green -> red over the life, growing, random roll, life 100 +-37 %"
 lifetime_randomness = 0.375
 particle_flag_disable_z = true
 emission_shape = 1
@@ -191,7 +191,7 @@ gravity = Vector3(0, 0, 0)
 scale_min = 0.25
 scale_max = 1.75
 scale_curve = SubResource("CurveTex_a_scale")
-color_initial_ramp = SubResource("GradTex_a_hue")
+color_ramp = SubResource("GradTex_a_hue")
 alpha_curve = SubResource("CurveTex_a_alpha")
 
 [sub_resource type="Gradient" id="Grad_a2_hue"]
@@ -229,7 +229,7 @@ curve_y = SubResource("CurveTex_a2_scale_y")
 curve_z = SubResource("CurveTex_a2_scale_z")
 
 [sub_resource type="ParticleProcessMaterial" id="PPM_a2"]
-resource_name = "ms_2d_scsel_on_a2 (a cleared episode): shikaku lines 25 x 125 px, 10 a frame from frame 30 off a 35 px ring, 6 px/f outward, blue / green / red, life 90"
+resource_name = "ms_2d_scsel_on_a2 (a cleared episode): shikaku lines 25 x 125 px, 10 a frame from frame 30 off a 35 px ring, 6 px/f outward, blue -> green -> red over the life, life 90"
 lifetime_randomness = 0.25
 particle_flag_disable_z = true
 particle_flag_align_y = true
@@ -245,7 +245,7 @@ gravity = Vector3(0, 0, 0)
 scale_min = 0.75
 scale_max = 1.25
 scale_curve = SubResource("CurveTex_a2_scale")
-color_initial_ramp = SubResource("GradTex_a2_hue")
+color_ramp = SubResource("GradTex_a2_hue")
 alpha_curve = SubResource("CurveTex_a2_alpha")
 
 [node name="SelectPickBurst" type="Node2D"]

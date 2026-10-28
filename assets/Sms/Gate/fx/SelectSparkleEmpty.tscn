@@ -59,8 +59,8 @@ size = Vector2(1.0, 1.0)
 
 [sub_resource type="Gradient" id="Grad_senko_hue"]
 interpolation_mode = 0
-offsets = PackedFloat32Array(0.0, 0.15, 0.2995, 0.3, 0.45, 0.5995, 0.6, 0.75, 0.8995, 0.9, 1.0)
-colors = PackedColorArray(0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.4353, 1.0000, 1.0000, 0.4353, 0.4353, 1.0000, 0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.4353, 1.0000, 1.0000, 0.4353, 0.4353, 1.0000, 0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.4353, 1.0000, 1.0000, 0.4353, 0.4353, 1.0000, 0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 0.8118, 0.6235, 1.0000)
+offsets = PackedFloat32Array(0.0, 0.5, 1.0)
+colors = PackedColorArray(0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.4353, 1.0000, 1.0000, 0.4353, 0.4353, 1.0000)
 
 [sub_resource type="GradientTexture1D" id="GradTex_senko_hue"]
 gradient = SubResource("Grad_senko_hue")
@@ -97,6 +97,7 @@ lifetime_randomness = 0.375
 emission_shape = 1
 emission_sphere_radius = 30
 particle_flag_align_y = true
+particle_flag_disable_z = true
 spread = 180.0
 initial_velocity_min = 12.0
 initial_velocity_max = 12.0

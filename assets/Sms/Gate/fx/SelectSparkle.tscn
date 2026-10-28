@@ -61,8 +61,8 @@ size = Vector2(1.0, 1.0)
 
 [sub_resource type="Gradient" id="Grad_senko_hue"]
 interpolation_mode = 0
-offsets = PackedFloat32Array(0.0, 0.15, 0.2995, 0.3, 0.45, 0.5995, 0.6, 0.75, 0.8995, 0.9, 1.0)
-colors = PackedColorArray(0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.4353, 1.0000, 1.0000, 0.4353, 0.4353, 1.0000, 0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.4353, 1.0000, 1.0000, 0.4353, 0.4353, 1.0000, 0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.4353, 1.0000, 1.0000, 0.4353, 0.4353, 1.0000, 0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 0.8118, 0.6235, 1.0000)
+offsets = PackedFloat32Array(0.0, 0.5, 1.0)
+colors = PackedColorArray(0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.4353, 1.0000, 1.0000, 0.4353, 0.4353, 1.0000)
 
 [sub_resource type="GradientTexture1D" id="GradTex_senko_hue"]
 gradient = SubResource("Grad_senko_hue")
@@ -99,6 +99,7 @@ lifetime_randomness = 0.375
 emission_shape = 1
 emission_sphere_radius = 15
 particle_flag_align_y = true
+particle_flag_disable_z = true
 spread = 180.0
 initial_velocity_min = 6.0
 initial_velocity_max = 30.0
@@ -133,18 +134,18 @@ _data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 0.15), 0.0, 0.0, 1, 1]
 point_count = 2
 
 [sub_resource type="ParticleProcessMaterial" id="PPM_promi"]
-resource_name = "ms_2d_shine_promi: one head a second off a 30 u ring about the body, 7-17 u/f any way, pulled back 0.1 u/f^2, alive 30 frames (the first half of the 1 s cycle)"
+resource_name = "ms_2d_shine_promi: one head a second off a 30 u ring about the body, 2-17 u/f any way, the Newton pull back 1.0 u/f^2 (10 x 0.1 inside 200 u), alive 30 frames (the first half of the 1 s cycle)"
 emission_shape = 6
 emission_ring_axis = Vector3(0, 0, 1)
 emission_ring_radius = 30.0
 emission_ring_inner_radius = 30.0
 emission_ring_height = 1.0
 spread = 180.0
-initial_velocity_min = 420
+initial_velocity_min = 120
 initial_velocity_max = 1020
 gravity = Vector3(0, 0, 0)
-radial_accel_min = -360.0
-radial_accel_max = -360.0
+radial_accel_min = -3600.0
+radial_accel_max = -3600.0
 scale_min = 1.0
 scale_max = 1.0
 alpha_curve = SubResource("CurveTex_promi_alpha")

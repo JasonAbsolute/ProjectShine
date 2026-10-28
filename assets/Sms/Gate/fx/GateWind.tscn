@@ -6,14 +6,14 @@
 [ext_resource type="Shader" path="res://assets/Sms/Gate/fx/JpaStripeTrailAdd.gdshader" id="4_stripe"]
 
 [sub_resource type="Curve" id="Curve_wind_alpha"]
-_data = [Vector2(0.0, 0.0), 0.0, 0.0, 1, 1, Vector2(0.5, 0.5), 0.0, 0.0, 1, 1, Vector2(0.75, 0.5), 0.0, 0.0, 1, 1, Vector2(1.0, 0.0), 0.0, 0.0, 1, 1]
-point_count = 4
+_data = [Vector2(0.0, 0.0), 0.0, 0.0, 1, 1, Vector2(0.2894736842105263, 0.5), 0.0, 0.0, 1, 1, Vector2(0.4342105263157895, 0.5), 0.0, 0.0, 1, 1, Vector2(0.5789473684210527, 0.0), 0.0, 0.0, 1, 1, Vector2(1.0, 0.0), 0.0, 0.0, 1, 1]
+point_count = 5
 
 [sub_resource type="CurveTexture" id="CurveTex_wind_alpha"]
 curve = SubResource("Curve_wind_alpha")
 
 [sub_resource type="Curve" id="Curve_wind_scale"]
-_data = [Vector2(0.0, 0.0), 0.0, 0.0, 1, 1, Vector2(0.375, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 1.0), 0.0, 0.0, 1, 1]
+_data = [Vector2(0.0, 0.0), 0.0, 0.0, 1, 1, Vector2(0.21710526315789475, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 1.0), 0.0, 0.0, 1, 1]
 point_count = 3
 
 [sub_resource type="CurveTexture" id="CurveTex_wind_scale"]
@@ -140,8 +140,8 @@ section_segments = 1
 
 [sub_resource type="Gradient" id="Grad_b_hue"]
 interpolation_mode = 0
-offsets = PackedFloat32Array(0.0, 0.1875, 0.3745, 0.375, 0.5625, 0.7495, 0.75, 0.9375, 1.0)
-colors = PackedColorArray(0.2471, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.2471, 1.0000, 1.0000, 0.2471, 0.4353, 1.0000, 0.2471, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.2471, 1.0000, 1.0000, 0.2471, 0.4353, 1.0000, 0.2471, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.2471, 1.0000, 0.6235, 0.7490, 0.3098, 1.0000)
+offsets = PackedFloat32Array(0.0, 0.5, 1.0)
+colors = PackedColorArray(0.2471, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.2471, 1.0000, 1.0000, 0.2471, 0.4353, 1.0000)
 
 [sub_resource type="GradientTexture1D" id="GradTex_b_hue"]
 gradient = SubResource("Grad_b_hue")
@@ -220,8 +220,8 @@ center_offset = Vector3(0, 1.4911, 0)
 [node name="Wind_a" type="GPUParticles3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 7.3885)
 emitting = false
-amount = 44
-lifetime = 0.7333
+amount = 1
+lifetime = 1.2667
 visibility_aabb = AABB(-8, -8, -16, 16, 16, 24)
 preprocess = 0.0
 fixed_fps = 60
@@ -234,8 +234,8 @@ draw_pass_1 = SubResource("Quad_wind")
 [node name="Trail_a" type="GPUParticles3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 7.3885)
 emitting = false
-amount = 44
-lifetime = 0.7333
+amount = 1
+lifetime = 1.2667
 visibility_aabb = AABB(-8, -8, -16, 16, 16, 24)
 preprocess = 0.0
 fixed_fps = 60
@@ -244,14 +244,14 @@ use_fixed_seed = true
 seed = 1270
 process_material = SubResource("PPM_wind_a")
 trail_enabled = true
-trail_lifetime = 0.2333
+trail_lifetime = 0.4
 draw_pass_1 = SubResource("Ribbon_trail")
 
 [node name="Wind_a2" type="GPUParticles3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 7.3885)
 emitting = false
-amount = 44
-lifetime = 0.7333
+amount = 1
+lifetime = 1.2667
 visibility_aabb = AABB(-8, -8, -16, 16, 16, 24)
 preprocess = 0.0
 fixed_fps = 60
@@ -264,8 +264,8 @@ draw_pass_1 = SubResource("Quad_wind")
 [node name="Trail_a2" type="GPUParticles3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 7.3885)
 emitting = false
-amount = 44
-lifetime = 0.7333
+amount = 1
+lifetime = 1.2667
 visibility_aabb = AABB(-8, -8, -16, 16, 16, 24)
 preprocess = 0.0
 fixed_fps = 60
@@ -274,14 +274,14 @@ use_fixed_seed = true
 seed = 1271
 process_material = SubResource("PPM_wind_a2")
 trail_enabled = true
-trail_lifetime = 0.2333
+trail_lifetime = 0.4
 draw_pass_1 = SubResource("Ribbon_trail")
 
 [node name="Wind_a3" type="GPUParticles3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 7.3885)
 emitting = false
-amount = 44
-lifetime = 0.7333
+amount = 1
+lifetime = 1.2667
 visibility_aabb = AABB(-8, -8, -16, 16, 16, 24)
 preprocess = 0.0
 fixed_fps = 60
@@ -294,8 +294,8 @@ draw_pass_1 = SubResource("Quad_wind")
 [node name="Trail_a3" type="GPUParticles3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 7.3885)
 emitting = false
-amount = 44
-lifetime = 0.7333
+amount = 1
+lifetime = 1.2667
 visibility_aabb = AABB(-8, -8, -16, 16, 16, 24)
 preprocess = 0.0
 fixed_fps = 60
@@ -304,7 +304,7 @@ use_fixed_seed = true
 seed = 1272
 process_material = SubResource("PPM_wind_a3")
 trail_enabled = true
-trail_lifetime = 0.2333
+trail_lifetime = 0.4
 draw_pass_1 = SubResource("Ribbon_trail")
 
 [node name="Wind_b" type="GPUParticles3D" parent="."]

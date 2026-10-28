@@ -45,8 +45,14 @@ public partial class SmsSelectShineRing : Node3D
     [Export] public Texture2D RadgradTexture;
     /// <summary>x the full shine's two highlights (the cream sheen and the white spot); 1 = the game.</summary>
     [Export(PropertyHint.Range, "0,2")] public float BodyHighlight = 1f;
-    /// <summary>x the full shine's light (the select's one light, frontal; the ambient is the bmd's 0.5); 1 = a white light.</summary>
-    [Export(PropertyHint.Range, "0,2")] public float BodyLight = 1f;
+    /// <summary>x the full shine's light (the select's one light, frontal; the ambient is the bmd's 0.5). 127f: 1.6 -- the select scene sets no
+    /// light of its own, and the game's lemon-yellow body (248, 248, 88 in a real screenshot) needs 0.5 + 2.0 x N.L over the orange (225, 120, 30) -- 1.6 left the lower dome gold;
+    /// 1.0 (127d) gave an orange body with cream patches.</summary>
+    [Export(PropertyHint.Range, "0,3")] public float BodyLight = 2.0f;
+    /// <summary>127f: the body's opacity at the FRONT of the ring (the selected shine and its neighbours). The game draws them at 0.72 -- the
+    /// bpk's depth fade sits at frame 30 for anything nearer than 600 units -- which reads see-through over a blue stage; 1 = opaque
+    /// (DEVIATION, his call). The shines further back fade from this level to nothing, as in the game.</summary>
+    [Export(PropertyHint.Range, "0.3,1")] public float FrontAlpha = 1f;
     /// <summary>The stand-in colours when the shader files are missing (his shine_sprite.tscn gold; the hollow tint).</summary>
     [Export] public Color BodyColor = new Color(1f, 0.8f, 0.2f);
     /// <summary>The additive glow behind each shine: the model's own glow texture (ShineSprite_shine_0.png, the radial gradient) by default; its
@@ -143,6 +149,7 @@ public partial class SmsSelectShineRing : Node3D
                     copy.AlbedoColor = Colors.White;
                     copy.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
                     copy.CullMode = BaseMaterial3D.CullModeEnum.Back;
+                    copy.RenderPriority = 1;   // 127f: drawn AFTER the body -- both are alpha-blended at one depth, and an opaque body drawn second painted the eyes out
                     mi.SetSurfaceOverrideMaterial(i, copy);
                     mats.Add(copy); bases.Add(copy.AlbedoColor);
                     continue;
@@ -155,7 +162,7 @@ public partial class SmsSelectShineRing : Node3D
                 {
                     var sm = new ShaderMaterial { Shader = shader, ResourceName = s.State == 3 ? "_mat_shine_body (select, the bmd's TEV)" : "_mat_shine_body empty (select, the bmd's TEV)" };
                     sm.SetShaderParameter("radgrad", RadgradTexture ?? (ResourceLoader.Exists("res://assets/Sms/Gate/fx/radgrad.png") ? GD.Load<Texture2D>("res://assets/Sms/Gate/fx/radgrad.png") : null));
-                    sm.SetShaderParameter("fade", 1f);
+                    sm.SetShaderParameter("fade", FrontAlpha);
                     if (s.State == 3) { sm.SetShaderParameter("highlight", BodyHighlight); sm.SetShaderParameter("light_strength", BodyLight); }
                     mi.SetSurfaceOverrideMaterial(i, sm);
                     shaderMats.Add(sm);
@@ -276,9 +283,11 @@ public partial class SmsSelectShineRing : Node3D
             var s = _slots[i]; if (s == null) continue;
             s.Node.Position = s.Pos + s.Offset;
             s.Node.Rotation = new Vector3(0f, Mathf.DegToRad(s.AngleY + s.SpinAngle + MeshYawOffset), 0f);
-            float alpha = 1f - (float)s.AnmFrame / FullFrame;
+            float alpha = 1f - (float)s.AnmFrame / FullFrame;                         // the game's bpk fade: 0.7 at the front (frame 30), 0 at 99
             for (int m = 0; m < s.Mats.Length; m++) { Color c = s.Base[m]; c.A = s.Base[m].A * alpha; s.Mats[m].AlbedoColor = c; }
-            if (s.ShaderMats != null) foreach (var sm in s.ShaderMats) sm.SetShaderParameter("fade", alpha);
+            // 127f: the body shaders take FrontAlpha at the front and fade from there (alpha / the frame-30 value); the glow keeps the game's curve
+            float bodyAlpha = Mathf.Clamp(FrontAlpha * alpha / (1f - 30f / FullFrame), 0f, 1f);
+            if (s.ShaderMats != null) foreach (var sm in s.ShaderMats) sm.SetShaderParameter("fade", bodyAlpha);
             s.Node.Visible = alpha > 0.002f;
         }
     }

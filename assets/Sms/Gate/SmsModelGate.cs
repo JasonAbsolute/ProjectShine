@@ -98,12 +98,15 @@ public partial class SmsModelGate : StaticBody3D, ISmsSprayTarget
     [Export] public Vector3 ReturnSpotOffsetUnits = new Vector3(0f, 0f, -250f);
 
     [ExportGroup("Effects and sounds")]
-    /// <summary>The swirl while active: a scene of GpuParticles3D (ms_gatewind_a / a2 / a3 / b) placed at the centre, emitting while active (pass 127b).</summary>
+    /// <summary>The swirl while active: a scene of GpuParticles3D (ms_gatewind_a / a2 / a3 / b) placed at the centre, emitting while active (pass 127b).
+    /// 127f: the three swirl emitters each release ONE wisp every 76 frames (JPAEmitter.cpp: the rate is added only on an emit frame, one every
+    /// rateStep + 1), living 44, started 0 / 25 / 50 frames apart -- at most two wisps on screen at once, the game's count (127b-e had 44 per emitter).</summary>
     [Export] public PackedScene WindScene;
     /// <summary>127d DEVIATION knobs: the swirl's strength and size over the game's values (1 / 1 = the disc's data). Jaysonn wanted it dialed
     /// down: the wisps' and rays' alpha x WindAlpha, the wisps' size x WindSize.</summary>
     [Export(PropertyHint.Range, "0,1.5")] public float WindAlpha = 0.45f;
-    /// <summary>x the number of wisps, trails and rays (the game: 44 a swirl emitter, 80 rays). 127e: 0.35 -- "dial it back a lot".</summary>
+    /// <summary>x the number of rainbow RAYS out of the M (the game: 80 alive, one born a frame). The wisps are not scaled: their count is the
+    /// game's cadence (see WindScene). 127e: 0.35 -- "dial it back a lot".</summary>
     [Export(PropertyHint.Range, "0.1,1.5")] public float WindDensity = 0.35f;
     [Export(PropertyHint.Range, "0.25,1.5")] public float WindSize = 0.6f;
     /// <summary>The rainbow rays out of the M (ms_gatewind_b): their alpha x this (1 = the game's 0.875; they are 3-6 m long additive streaks and read very bright over a sunny sky).</summary>
@@ -361,7 +364,7 @@ public partial class SmsModelGate : StaticBody3D, ISmsSprayTarget
     private void ApplyWindKnobs()
     {
         if (_wind == null) return;
-        foreach (Node c in _wind.GetChildren()) if (c is GpuParticles3D pd && !Mathf.IsEqualApprox(WindDensity, 1f)) pd.Amount = Mathf.Max(1, Mathf.RoundToInt(pd.Amount * WindDensity));
+        foreach (Node c in _wind.GetChildren()) if (c is GpuParticles3D pd && pd.Name == "Wind_b" && !Mathf.IsEqualApprox(WindDensity, 1f)) pd.Amount = Mathf.Max(1, Mathf.RoundToInt(pd.Amount * WindDensity));
         if (Mathf.IsEqualApprox(WindAlpha, 1f) && Mathf.IsEqualApprox(WindSize, 1f) && Mathf.IsEqualApprox(RayAlpha, 1f)) return;
         var seen = new System.Collections.Generic.Dictionary<Material, Material>();
         foreach (Node c in _wind.GetChildren())
@@ -393,10 +396,25 @@ public partial class SmsModelGate : StaticBody3D, ISmsSprayTarget
         }
     }
 
+    private int _windSerial;
+
+    /// <summary>The swirl on / off. 127f: the game creates the three swirl emitters together but their BEM1 start frames are 0 / 25 / 50, so a2 and
+    /// a3 (and their trail twins) begin emitting 25 and 50 frames after a -- the stagger that keeps at most two wisps alive at once.</summary>
     private void SetWind(bool on)
     {
+        _windSerial++;
         if (_wind != null)
-            foreach (Node c in _wind.GetChildren()) if (c is GpuParticles3D p) p.Emitting = on;
+        {
+            foreach (Node c in _wind.GetChildren())
+            {
+                if (c is not GpuParticles3D p) continue;
+                string n = p.Name;
+                int startFrames = n.EndsWith("_a2") ? 25 : n.EndsWith("_a3") ? 50 : 0;
+                if (!on || startFrames == 0) { p.Emitting = on; if (on) p.Restart(); continue; }
+                int serial = _windSerial;
+                GetTree().CreateTimer(startFrames / 60.0, false).Timeout += () => { if (serial == _windSerial && IsInstanceValid(p)) { p.Restart(); p.Emitting = true; } };
+            }
+        }
         if (LightSound != null) { if (on && !LightSound.Playing) LightSound.Play(); else if (!on) LightSound.Stop(); }
         if (WaveSound != null) { if (on && !WaveSound.Playing) WaveSound.Play(); else if (!on) WaveSound.Stop(); }
     }
