@@ -8128,3 +8128,40 @@ pick series (above), the gate from the fixed camera (the wisps in a ring converg
 GPU run), build 0 errors, boot ALL OK, the drive removed (Mario.cs / GameData.cs back to LF). Not re-run: 118.
 
 **Open for his eye:** the wisps' motion (stills cannot show the spiral), the rays' look (their direction -- out of the wall -- is the data).
+
+
+### 127e -- the select's layering and its missing emitter, the wind and the flash dialed back (his third round: "wind insane", "Mario pulses", "A does nothing", "shine above the iris")
+
+**Files:** `SmsEpisodeSelect.cs` (the frame inside the ring's viewport; `ShineOverBars`; CloseHoldSeconds 1.5), `SmsSelectShineRing.cs` (unchanged API),
+`fx/SelectSparkle.tscn` (+ the Promi emitter; gen_fx127.py) + NEW `fx/kemuri1_ia.png` (P_ms_kemuri1, IA8, pinned lossless), `SmsModelGate.cs` (WindDensity;
+the defaults), `fx/GateWind.tscn` (14-frame trails), `SmsWarpBalls.cs` (FlashAlpha / FlashSize). Drive: the select section releases the stick
+actions at its start (a drifting controller on his desk held LEFT) and sets CloseHoldSeconds 0 to time the game's close.
+
+1. **The layering.** The game lists its select screens grad -> Screen 2D -> Screen 3D -> Screen 2D (off) -> particles (SelectDir.cpp 180-224): at rest
+   the PANES are drawn under the shines, so a shine's glow spills over the bars and the banner; at the pick `changeOrder` turns the second 2D screen
+   on and the first off, so the closing bars cover the shine. 127c had the frame over the ring always (the glow was clipped at the band). Now the
+   frame lives INSIDE the ring's SubViewport, drawn as the 3D's canvas background; the pick moves it to a layer over the 3D (the game) unless
+   `ShineOverBars` -- ON by default at his request ("the shine should be above the iris"): the shine stays over the closing bars with its glow and
+   the burst around it. The burst itself is on a top layer in the same viewport. Godot 4.7 fact: under Environment BG_CANVAS only the viewport's
+   OWN canvas (items added straight to the SubViewport) draws behind the 3D; a CanvasLayer whose layer EQUALS the max layer is drawn after it
+   (renderer_viewport.cpp: the 3D is drawn at `layer >= max`), so the frame is a direct child, the over / top layers are CanvasLayers 1 / 2.
+2. **The missing effect.** A full shine has THREE emitters (SelectShine2.cpp 304-312): resource 0 = ms_2d_shine_promi, 1 = senko, 2 = kira; 127b/c
+   built senko + kira only. Promi is the shine's solar PROMINENCE: one head every 60 frames off a 30 u ring about the body, 5 u/f omni + 12 u/f
+   random, a Newton field (0.1 u/f^2) pulling it back, life 30, a StripeCross whose children (one a frame, velInf 0.1) lay a 42 u ribbon along
+   its path -- lerp(env (255, 50, 0) -> prm (255, 255, 155), I) of kemuri1, additive, narrowing to the tail. Godot: a one-particle emitter with a
+   1 s life visible for its first half (the alpha curve) and a GPU ribbon trail (RibbonTrailMesh cross, a width curve), radial_accel toward the
+   node. It plays on the selected full shine, as the others.
+3. **"A does nothing / closes too fast".** The sequence is the game's (127d); what read as "nothing" was the burst popping over an already-black
+   screen with the shine gone under the bars at 0.5 s. With the shine over the bars and `CloseHoldSeconds` 1.5 by default (DEVIATION; 0 = the
+   game) the pick reads: the pop, the shine spinning in its glow over the black, the lines and glows, then the white -- a 0.2 s capture
+   series shows each phase.
+4. **The wind, dialed back a lot** (DEVIATION defaults; 1 / 1 / 1 / 1 = the disc): `WindDensity` 0.35 (the game's 44 wisps a swirl emitter and 80 rays
+   x this), `WindAlpha` 0.45, `WindSize` 0.6, `RayAlpha` 0.25, the trails 14 frames (the game's 24). The fields stay 127d's (the orbit and the
+   magnet: into the M).
+5. **Mario's "pulse"** is warpInLight -- ms_mariowp_senko: 50 colour-cycling (blue -> green -> red every 30 frames) streaks of 10 x 75 u growing
+   x 2.5 / x 4 radiating from his centre for ~1.8 s of the pull. It IS the game's; `FlashAlpha` 0.4 and `FlashSize` 0.6 (DEVIATION; 1 / 1 = the disc).
+
+**Verified on his PC by GPU capture**: the select at rest / after a LEFT (the glow over the banner, the prominence's flame ribbon off the sun), the
+pick series (the shine spinning over the black bars under the pop, the lines, the white), the gate from the fixed camera (a sparse swirl, the
+smaller flash). Drive 127 44/44 (the drive now times the game's close); build 0 errors; boot ALL OK; the drive removed, Mario.cs / GameData.cs
+EOL restored.
