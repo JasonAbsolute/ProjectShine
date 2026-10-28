@@ -244,7 +244,7 @@ use_fixed_seed = true
 seed = 1270
 process_material = SubResource("PPM_wind_a")
 trail_enabled = true
-trail_lifetime = 0.4
+trail_lifetime = 0.2333
 draw_pass_1 = SubResource("Ribbon_trail")
 
 [node name="Wind_a2" type="GPUParticles3D" parent="."]
@@ -274,7 +274,7 @@ use_fixed_seed = true
 seed = 1271
 process_material = SubResource("PPM_wind_a2")
 trail_enabled = true
-trail_lifetime = 0.4
+trail_lifetime = 0.2333
 draw_pass_1 = SubResource("Ribbon_trail")
 
 [node name="Wind_a3" type="GPUParticles3D" parent="."]
@@ -304,7 +304,7 @@ use_fixed_seed = true
 seed = 1272
 process_material = SubResource("PPM_wind_a3")
 trail_enabled = true
-trail_lifetime = 0.4
+trail_lifetime = 0.2333
 draw_pass_1 = SubResource("Ribbon_trail")
 
 [node name="Wind_b" type="GPUParticles3D" parent="."]

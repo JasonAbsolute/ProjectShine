@@ -1,4 +1,4 @@
-[gd_scene load_steps=14 format=3 uid="uid://cselsparkem127"]
+[gd_scene load_steps=25 format=3 uid="uid://cselsparkem127"]
 
 [ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/glow1_sel.png" id="1_glow"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/hoso_senko4.png" id="2_senko"]

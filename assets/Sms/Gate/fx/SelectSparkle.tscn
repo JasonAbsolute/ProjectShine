@@ -1,9 +1,11 @@
-[gd_scene load_steps=14 format=3 uid="uid://cselsparkle127"]
+[gd_scene load_steps=33 format=3 uid="uid://cselsparkle127"]
 
 [ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/glow1_sel.png" id="1_glow"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/hoso_senko4.png" id="2_senko"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/senko.png" id="3_senko_em"]
 [ext_resource type="Shader" path="res://assets/Sms/Gate/fx/JpaDirBillboardAddRamp.gdshader" id="4_dir"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/kemuri1_ia.png" id="5_kemuri"]
+[ext_resource type="Shader" path="res://assets/Sms/Gate/fx/JpaStripeTrailAdd.gdshader" id="6_stripe"]
 
 [sub_resource type="Gradient" id="Grad_kira"]
 interpolation_mode = 0
@@ -119,6 +121,50 @@ size = Vector2(30, 100)
 orientation = 2
 center_offset = Vector3(0, 50.0, 0)
 
+[sub_resource type="Curve" id="Curve_promi_alpha"]
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(0.49, 1.0), 0.0, 0.0, 1, 1, Vector2(0.5, 0.0), 0.0, 0.0, 1, 1, Vector2(1.0, 0.0), 0.0, 0.0, 1, 1]
+point_count = 4
+
+[sub_resource type="CurveTexture" id="CurveTex_promi_alpha"]
+curve = SubResource("Curve_promi_alpha")
+
+[sub_resource type="Curve" id="Curve_promi_width"]
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 0.15), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="ParticleProcessMaterial" id="PPM_promi"]
+resource_name = "ms_2d_shine_promi: one head a second off a 30 u ring about the body, 7-17 u/f any way, pulled back 0.1 u/f^2, alive 30 frames (the first half of the 1 s cycle)"
+emission_shape = 6
+emission_ring_axis = Vector3(0, 0, 1)
+emission_ring_radius = 30.0
+emission_ring_inner_radius = 30.0
+emission_ring_height = 1.0
+spread = 180.0
+initial_velocity_min = 420
+initial_velocity_max = 1020
+gravity = Vector3(0, 0, 0)
+radial_accel_min = -360.0
+radial_accel_max = -360.0
+scale_min = 1.0
+scale_max = 1.0
+alpha_curve = SubResource("CurveTex_promi_alpha")
+
+[sub_resource type="ShaderMaterial" id="Mat_promi"]
+shader = ExtResource("6_stripe")
+shader_parameter/tex = ExtResource("5_kemuri")
+shader_parameter/prm = Vector4(1.0000, 1.0000, 0.6078, 1.0000)
+shader_parameter/env = Vector4(1.0000, 0.1961, 0.0000, 1.0000)
+shader_parameter/tail_fade = 1.0
+
+[sub_resource type="RibbonTrailMesh" id="Ribbon_promi"]
+material = SubResource("Mat_promi")
+shape = 1
+size = 42.5
+sections = 10
+section_length = 20.0
+section_segments = 1
+curve = SubResource("Curve_promi_width")
+
 [node name="SelectSparkle" type="Node3D"]
 
 [node name="Kira" type="GPUParticles3D" parent="."]
@@ -128,6 +174,16 @@ lifetime = 0.8333
 fixed_fps = 60
 process_material = SubResource("PPM_kira")
 draw_pass_1 = SubResource("Quad_kira")
+
+[node name="Promi" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 71.4, 0)
+amount = 1
+lifetime = 1.0
+fixed_fps = 60
+trail_enabled = true
+trail_lifetime = 0.5
+process_material = SubResource("PPM_promi")
+draw_pass_1 = SubResource("Ribbon_promi")
 
 [node name="Senko" type="GPUParticles3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 71.4, 0)

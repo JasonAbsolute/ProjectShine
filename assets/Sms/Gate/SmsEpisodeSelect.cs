@@ -66,11 +66,15 @@ public partial class SmsEpisodeSelect : Control
     /// the menu shines flat and bright: raise the ambient for a flatter gold, lower it for more shading).</summary>
     [Export] public Color RingAmbient = new Color(0.42f, 0.42f, 0.45f);
     [Export] public float RingLightEnergy = 1.0f;
-    /// <summary>127d DEVIATION knob: seconds to hold on the closed (black) screen with the pick burst playing before the white fade starts. The game
-    /// holds 0: A -> the bars close in 0.5 s -> 0.37 s of wait -> a 1 s fade to white (about 1.9 s in all). Raise it to watch the burst.</summary>
-    [Export(PropertyHint.Range, "0,5")] public float CloseHoldSeconds = 0f;
+    /// <summary>127d DEVIATION knob: seconds to hold on the closed screen with the pick burst playing before the white fade starts. The game
+    /// holds 0: A -> the bars close in 0.5 s -> 0.37 s of wait -> a 1 s fade to white (about 1.9 s in all). 127e: 1.5 by default -- Jaysonn
+    /// found the game's close too quick to see the burst; set 0 for the game's.</summary>
+    [Export(PropertyHint.Range, "0,5")] public float CloseHoldSeconds = 1.5f;
     /// <summary>The white fade's length (startWipe(0xf, 1.0): 1 s in the game).</summary>
     [Export(PropertyHint.Range, "0.2,4")] public float CloseFadeSeconds = 1f;
+    /// <summary>127e DEVIATION knob (his call): keep the shines drawn OVER the closing bars at the pick. The game swaps its draw order at the
+    /// pick (TSelectDir::changeOrder) so the bars close over the shine; off = the game.</summary>
+    [Export] public bool ShineOverBars = true;
     [Export] public bool DebugPrint;
 
     [ExportGroup("Sounds (slots)")]
@@ -101,7 +105,7 @@ public partial class SmsEpisodeSelect : Control
 
     // -- nodes -------------------------------------------------------------------------------------------------------------------------------
     private ColorRect _backdrop; private ShaderMaterial _gradMat;
-    private Control _frame; private ColorRect _barTop, _barBottom;
+    private Control _frame, _frameTop; private CanvasLayer _over, _top; private ColorRect _barTop, _barBottom;
     private SubViewportContainer _ringView; private SubViewport _ringVp; private Camera3D _ringCam; private SmsSelectShineRing _ring;
     private TextureRect _preview, _previewFrame;
     private Control _bannerGroup; private TextureRect _banner, _bannerShadow; private List<TextureRect> _bannerLetters = new();
@@ -174,6 +178,8 @@ public partial class SmsEpisodeSelect : Control
     public Texture2D ShownNumber => Pane2Current ? _num2?.Texture : _num1?.Texture;
     public string ShownName => Pane2Current ? _name2?.Text : _name1?.Text;
     public SmsFader Fader => _fader;
+    /// <summary>The pick burst node once fired (the drive reads it).</summary>
+    public Node2D BurstNode => _frameTop?.GetNodeOrNull<Node2D>("SelectPickBurst");
 
     public override void _Ready()
     {
@@ -271,7 +277,8 @@ public partial class SmsEpisodeSelect : Control
     private void SetScore(int coins)
     {
         coins = Mathf.Clamp(coins, 0, 999);
-        var digits = new[] { GetNodeOrNull<TextureRect>("Frame/Score/Digit0"), GetNodeOrNull<TextureRect>("Frame/Score/Digit1"), GetNodeOrNull<TextureRect>("Frame/Score/Digit2") };
+        var digits = new[] { _frame?.GetNodeOrNull<TextureRect>("Score/Digit0"), _frame?.GetNodeOrNull<TextureRect>("Score/Digit1"), _frame?.GetNodeOrNull<TextureRect>("Score/Digit2") };
+        if (digits[0] == null || digits[1] == null || digits[2] == null) return;
         if (CoinDigits.Length < 10) return;
         if (coins < 100) { digits[0].Visible = false; digits[1].Texture = CoinDigits[coins / 10]; digits[2].Texture = CoinDigits[coins % 10]; }
         else { digits[0].Visible = true; digits[0].Texture = CoinDigits[coins / 100]; digits[1].Texture = CoinDigits[coins / 10 % 10]; digits[2].Texture = CoinDigits[coins % 10]; }
@@ -332,8 +339,18 @@ public partial class SmsEpisodeSelect : Control
         if (ResourceLoader.Exists("res://models/ShineSprite/ShineSprite.glb")) _ring.ShineScene = GD.Load<PackedScene>("res://models/ShineSprite/ShineSprite.glb");
         _ringVp.AddChild(_ring);
         // the frame: the blo's 600 x 480 with rows 16 .. 464 on screen
+        // 127e: the frame (the bars, banner, panes, marks) lives INSIDE the ring's viewport on a canvas layer BEHIND the 3D (Environment
+        // BG_CANVAS, max layer 0): the shines and their glow draw OVER the bars and the banner, as the game's Screen 2D is listed before its
+        // Screen 3D (SelectDir.cpp 180-224). At the pick the game swaps the order (changeOrder: the bars close over the shine); `ShineOverBars`
+        // keeps the shine on top instead (Jaysonn's call). The burst sits on a layer above everything.
+        // (Godot 4.7: only the viewport's OWN canvas -- items added straight to the SubViewport -- draws behind the 3D under BG_CANVAS; a CanvasLayer
+        // whose layer EQUALS the max layer is drawn after it: renderer_viewport.cpp draws the 3D at `layer >= max`)
+        _over = new CanvasLayer { Name = "Over", Layer = 1 }; _ringVp.AddChild(_over);
+        _top = new CanvasLayer { Name = "Top", Layer = 2 }; _ringVp.AddChild(_top);
         _frame = new Control { Name = "Frame", MouseFilter = MouseFilterEnum.Ignore, Size = new Vector2(FrameW, FrameH) };
-        AddChild(_frame);
+        _ringVp.AddChild(_frame);
+        _frameTop = new Control { Name = "FrameTop", MouseFilter = MouseFilterEnum.Ignore, Size = new Vector2(FrameW, FrameH) };
+        _top.AddChild(_frameTop);
         // the episode's still (DEVIATION: the game's movie) in the 3D band
         _previewFrame = PreviewFrame != null ? Pic(_frame, "PreviewFrame", PreviewFrame, PreviewCentre - PreviewSize * 0.5f - new Vector2(8f, 8f), PreviewSize + new Vector2(16f, 16f)) : null;
         _preview = Pic(_frame, "Preview", null, PreviewCentre - PreviewSize * 0.5f, PreviewSize);
@@ -406,7 +423,7 @@ public partial class SmsEpisodeSelect : Control
         if (vp.X < 1f || vp.Y < 1f) return;
         float s = vp.Y / FrameH;
         float x0 = (vp.X - FrameW * s) * 0.5f;
-        _frame.Scale = new Vector2(s, s);
+        _frame.Scale = new Vector2(s, s); if (_frameTop != null) { _frameTop.Scale = new Vector2(s, s); _frameTop.Position = new Vector2(x0, 0f); }
         _frame.Position = new Vector2(x0, 0f);
         // the ring view is anchored to the whole window (127c); its camera keeps the frame's 448 rows on the height
         if (StretchBars)
@@ -684,10 +701,11 @@ void fragment() {
         _bottomAnim.HasSize = true; _bottomAnim.SizeFrom = _barBottom.Size; _bottomAnim.SizeTo = new Vector2(_barBottom.Size.X, 480f - 224f);
         _bottomAnim.HasOff = true; _bottomAnim.OffFrom = Vector2.Zero; _bottomAnim.OffTo = new Vector2(0f, 224f - 314f); _bottomAnim.HasAlpha = false;
         _ring.StartClose();
+        if (!ShineOverBars) _frame.Reparent(_over, false);   // the game's changeOrder: the 2D panes now draw OVER the 3D -- the bars close over the shine
         if (PickBurstScene != null)
         {
             var burst = PickBurstScene.Instantiate<Node2D>();
-            _frame.AddChild(burst);
+            _frameTop.AddChild(burst);   // the top layer: over the bars and the shines
             burst.Position = new Vector2(300f, 244f - FrameTop);
             if (burst.HasMethod("SmsBurst")) burst.Call("SmsBurst", _unlock[_selected] == 3);
         }

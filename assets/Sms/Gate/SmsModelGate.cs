@@ -102,10 +102,12 @@ public partial class SmsModelGate : StaticBody3D, ISmsSprayTarget
     [Export] public PackedScene WindScene;
     /// <summary>127d DEVIATION knobs: the swirl's strength and size over the game's values (1 / 1 = the disc's data). Jaysonn wanted it dialed
     /// down: the wisps' and rays' alpha x WindAlpha, the wisps' size x WindSize.</summary>
-    [Export(PropertyHint.Range, "0,1.5")] public float WindAlpha = 0.6f;
-    [Export(PropertyHint.Range, "0.25,1.5")] public float WindSize = 0.75f;
+    [Export(PropertyHint.Range, "0,1.5")] public float WindAlpha = 0.45f;
+    /// <summary>x the number of wisps, trails and rays (the game: 44 a swirl emitter, 80 rays). 127e: 0.35 -- "dial it back a lot".</summary>
+    [Export(PropertyHint.Range, "0.1,1.5")] public float WindDensity = 0.35f;
+    [Export(PropertyHint.Range, "0.25,1.5")] public float WindSize = 0.6f;
     /// <summary>The rainbow rays out of the M (ms_gatewind_b): their alpha x this (1 = the game's 0.875; they are 3-6 m long additive streaks and read very bright over a sunny sky).</summary>
-    [Export(PropertyHint.Range, "0,1.5")] public float RayAlpha = 0.4f;
+    [Export(PropertyHint.Range, "0,1.5")] public float RayAlpha = 0.25f;
     /// <summary>The sparks a drop throws (ms_gatehit_a / b), one-shot at the drop, 70 % of hits (pass 127b).</summary>
     [Export] public PackedScene HitScene;
     [Export(PropertyHint.Range, "0,1")] public float HitSparkChance = 0.7f;
@@ -358,7 +360,9 @@ public partial class SmsModelGate : StaticBody3D, ISmsSprayTarget
     /// prm.a) or StandardMaterial3D (the rays: the albedo alpha), and the heads' / trails' quad / ribbon size (the rays keep their size).</summary>
     private void ApplyWindKnobs()
     {
-        if (_wind == null || (Mathf.IsEqualApprox(WindAlpha, 1f) && Mathf.IsEqualApprox(WindSize, 1f) && Mathf.IsEqualApprox(RayAlpha, 1f))) return;
+        if (_wind == null) return;
+        foreach (Node c in _wind.GetChildren()) if (c is GpuParticles3D pd && !Mathf.IsEqualApprox(WindDensity, 1f)) pd.Amount = Mathf.Max(1, Mathf.RoundToInt(pd.Amount * WindDensity));
+        if (Mathf.IsEqualApprox(WindAlpha, 1f) && Mathf.IsEqualApprox(WindSize, 1f) && Mathf.IsEqualApprox(RayAlpha, 1f)) return;
         var seen = new System.Collections.Generic.Dictionary<Material, Material>();
         foreach (Node c in _wind.GetChildren())
         {

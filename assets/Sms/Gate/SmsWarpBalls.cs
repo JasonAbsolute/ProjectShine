@@ -181,7 +181,30 @@ public partial class SmsWarpBalls : Node3D
     public void SmsWarpInFlash()
     {
         _flashT = 0f; _flashed = true;
+        ApplyFlashKnobs();
         Fire("Flash");
+    }
+
+    /// <summary>127e DEVIATION knobs: the flash's alpha and size over the game's (1 / 1 = the disc: 50 colour-cycling streaks of 10 x 75 units growing
+    /// x 2.5 / x 4 around him for ~1.8 s -- Jaysonn: "a weird pulsing light on Mario", so dialed down).</summary>
+    [Export(PropertyHint.Range, "0,1.5")] public float FlashAlpha = 0.4f;
+    [Export(PropertyHint.Range, "0.25,1.5")] public float FlashSize = 0.6f;
+    private bool _flashKnobsApplied;
+    private void ApplyFlashKnobs()
+    {
+        if (_flashKnobsApplied) return;
+        _flashKnobsApplied = true;
+        var p = GetNodeOrNull<GpuParticles3D>("Flash");
+        if (p == null || p.DrawPasses < 1 || (Mathf.IsEqualApprox(FlashAlpha, 1f) && Mathf.IsEqualApprox(FlashSize, 1f))) return;
+        var mesh = p.GetDrawPassMesh(0)?.Duplicate() as Mesh;
+        if (mesh == null) return;
+        if (mesh.SurfaceGetMaterial(0)?.Duplicate() is ShaderMaterial sm)
+        {
+            var prm = sm.GetShaderParameter("prm").AsVector4(); prm.W *= FlashAlpha; sm.SetShaderParameter("prm", prm);
+            mesh.SurfaceSetMaterial(0, sm);
+        }
+        if (mesh is QuadMesh q) q.Size *= FlashSize;
+        p.SetDrawPassMesh(0, mesh);
     }
 
     private void Fire(string name)
