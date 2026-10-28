@@ -66,6 +66,11 @@ public partial class SmsEpisodeSelect : Control
     /// the menu shines flat and bright: raise the ambient for a flatter gold, lower it for more shading).</summary>
     [Export] public Color RingAmbient = new Color(0.42f, 0.42f, 0.45f);
     [Export] public float RingLightEnergy = 1.0f;
+    /// <summary>127d DEVIATION knob: seconds to hold on the closed (black) screen with the pick burst playing before the white fade starts. The game
+    /// holds 0: A -> the bars close in 0.5 s -> 0.37 s of wait -> a 1 s fade to white (about 1.9 s in all). Raise it to watch the burst.</summary>
+    [Export(PropertyHint.Range, "0,5")] public float CloseHoldSeconds = 0f;
+    /// <summary>The white fade's length (startWipe(0xf, 1.0): 1 s in the game).</summary>
+    [Export(PropertyHint.Range, "0.2,4")] public float CloseFadeSeconds = 1f;
     [Export] public bool DebugPrint;
 
     [ExportGroup("Sounds (slots)")]
@@ -92,7 +97,7 @@ public partial class SmsEpisodeSelect : Control
     private readonly Dictionary<string, bool> _held = new();
     private bool _selectNext;
     private bool _markPulseUp = true, _arrowDirUp = true; private int _arrowPos;
-    private float _fadeT; private bool _fadeStarted;
+    private float _fadeT, _closeHold; private bool _fadeStarted;
 
     // -- nodes -------------------------------------------------------------------------------------------------------------------------------
     private ColorRect _backdrop; private ShaderMaterial _gradMat;
@@ -727,13 +732,14 @@ void fragment() {
         {
             if (_fader == null || _fader.IsFullyFadedIn || _fader.State == SmsFader.Status.FadingIn)
             {
-                if (!_fadeStarted)
+                _closeHold += (float)delta;
+                if (!_fadeStarted && _closeHold >= CloseHoldSeconds)
                 {   // the pick is MSF_EPISODE; startWipe(0xf, 1.0) in WHITE; the sound fades
                     _fadeStarted = true;
                     if (GameData.Instance != null) { GameData.Instance.Episode = _selected; GameData.Instance.PendingEpisode = _selected; GameData.Instance.PendingStage = _stage; }
-                    if (_fader != null) { _fader.SetColor(Colors.White); _fader.StartWipe(SmsFader.Wipe.FadeOut, 0f, 1f); }
-                    if (Music != null && Music.Playing) { var tw = CreateTween(); tw.TweenProperty(Music, "volume_db", -40f, 1f); }
-                    if (DebugPrint) GD.Print($"[SMS select] closing: episode {_selected + 1}, the white fade");
+                    if (_fader != null) { _fader.SetColor(Colors.White); _fader.StartWipe(SmsFader.Wipe.FadeOut, 0f, CloseFadeSeconds); }
+                    if (Music != null && Music.Playing) { var tw = CreateTween(); tw.TweenProperty(Music, "volume_db", -40f, CloseFadeSeconds); }
+                    if (DebugPrint) GD.Print($"[SMS select] closing: episode {_selected + 1}, the white fade ({CloseFadeSeconds} s after a {CloseHoldSeconds} s hold)");
                 }
             }
             if (_fadeStarted && (_fader == null || _fader.IsFullyFadedOut) && !_moved)

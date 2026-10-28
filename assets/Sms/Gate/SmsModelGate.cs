@@ -100,6 +100,12 @@ public partial class SmsModelGate : StaticBody3D, ISmsSprayTarget
     [ExportGroup("Effects and sounds")]
     /// <summary>The swirl while active: a scene of GpuParticles3D (ms_gatewind_a / a2 / a3 / b) placed at the centre, emitting while active (pass 127b).</summary>
     [Export] public PackedScene WindScene;
+    /// <summary>127d DEVIATION knobs: the swirl's strength and size over the game's values (1 / 1 = the disc's data). Jaysonn wanted it dialed
+    /// down: the wisps' and rays' alpha x WindAlpha, the wisps' size x WindSize.</summary>
+    [Export(PropertyHint.Range, "0,1.5")] public float WindAlpha = 0.6f;
+    [Export(PropertyHint.Range, "0.25,1.5")] public float WindSize = 0.75f;
+    /// <summary>The rainbow rays out of the M (ms_gatewind_b): their alpha x this (1 = the game's 0.875; they are 3-6 m long additive streaks and read very bright over a sunny sky).</summary>
+    [Export(PropertyHint.Range, "0,1.5")] public float RayAlpha = 0.4f;
     /// <summary>The sparks a drop throws (ms_gatehit_a / b), one-shot at the drop, 70 % of hits (pass 127b).</summary>
     [Export] public PackedScene HitScene;
     [Export(PropertyHint.Range, "0,1")] public float HitSparkChance = 0.7f;
@@ -173,6 +179,7 @@ public partial class SmsModelGate : StaticBody3D, ISmsSprayTarget
             _wind = WindScene.Instantiate<Node3D>();
             AddChild(_wind);
             _wind.Position = new Vector3(0f, HeightUnits / SmsUnits.UnitsPerMetre * 0.5f, 0f);
+            ApplyWindKnobs();
             SetWind(false);
         }
         if (MakeReturnSpot && Stage != null && Stage.ScenePath != "")
@@ -345,6 +352,41 @@ public partial class SmsModelGate : StaticBody3D, ISmsSprayTarget
         bool was = _activeLeft > 0;
         _activeLeft = ActiveFrames;
         if (!was) EmitSignal(SignalName.Activated);
+    }
+
+    /// <summary>127d: WindAlpha / WindSize onto this gate's own copies of the wind's materials: a draw pass's ShaderMaterial (the wisps, the trails:
+    /// prm.a) or StandardMaterial3D (the rays: the albedo alpha), and the heads' / trails' quad / ribbon size (the rays keep their size).</summary>
+    private void ApplyWindKnobs()
+    {
+        if (_wind == null || (Mathf.IsEqualApprox(WindAlpha, 1f) && Mathf.IsEqualApprox(WindSize, 1f) && Mathf.IsEqualApprox(RayAlpha, 1f))) return;
+        var seen = new System.Collections.Generic.Dictionary<Material, Material>();
+        foreach (Node c in _wind.GetChildren())
+        {
+            if (c is not GpuParticles3D p) continue;
+            bool head = c.Name.ToString().StartsWith("Wind_a") || c.Name.ToString().StartsWith("Trail_");
+            for (int i = 0; i < p.DrawPasses; i++)
+            {
+                var mesh = p.GetDrawPassMesh(i);
+                if (mesh == null) continue;
+                var m = mesh.SurfaceGetMaterial(0);
+                if (m == null) continue;
+                if (!seen.TryGetValue(m, out var copy))
+                {
+                    copy = (Material)m.Duplicate();
+                    if (copy is ShaderMaterial sm)
+                    {
+                        var prm = sm.GetShaderParameter("prm").AsVector4(); prm.W *= WindAlpha; sm.SetShaderParameter("prm", prm);
+                    }
+                    else if (copy is StandardMaterial3D std) { Color a = std.AlbedoColor; a.A *= head ? WindAlpha : RayAlpha; std.AlbedoColor = a; }
+                    seen[m] = copy;
+                }
+                var meshCopy = (Mesh)mesh.Duplicate();
+                meshCopy.SurfaceSetMaterial(0, copy);
+                if (head && meshCopy is QuadMesh q) q.Size *= WindSize;
+                if (head && meshCopy is RibbonTrailMesh r) { r.Size *= WindSize; r.SectionLength *= WindSize; }
+                p.SetDrawPassMesh(i, meshCopy);
+            }
+        }
     }
 
     private void SetWind(bool on)

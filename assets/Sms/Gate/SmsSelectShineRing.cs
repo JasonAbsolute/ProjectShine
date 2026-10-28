@@ -38,16 +38,22 @@ public partial class SmsSelectShineRing : Node3D
     [Export] public float ModelHeightUnits = 535f;
     /// <summary>Degrees added to every shine's yaw: the game's model faces +Z (toward the camera at angle 0); if the glb faces -Z set 180.</summary>
     [Export] public float MeshYawOffset = 0f;
-    /// <summary>127c: the full shine's body -- his shine_sprite.tscn gold (1, 0.8, 0.2) with his emission (1, 0.78, 0.3) x 0.35, lit by the select's
-    /// ambient and sun (SmsEpisodeSelect.RingAmbient / RingLightEnergy); the game's register is (225, 120, 30) under its own lights.</summary>
+    /// <summary>127d: the GAME's body materials as shaders (shine_menu.bmd / shine_menu_empty.bmd's TEVs: SelectShineFull / SelectShineEmpty
+    /// .gdshader, loaded from assets/Sms/Gate when empty) and their radgrad texture (P_ms_radgrad_i: fx/radgrad.png when empty).</summary>
+    [Export] public Shader FullShader;
+    [Export] public Shader EmptyShader;
+    [Export] public Texture2D RadgradTexture;
+    /// <summary>x the full shine's two highlights (the cream sheen and the white spot); 1 = the game.</summary>
+    [Export(PropertyHint.Range, "0,2")] public float BodyHighlight = 1f;
+    /// <summary>x the full shine's light (the select's one light, frontal; the ambient is the bmd's 0.5); 1 = a white light.</summary>
+    [Export(PropertyHint.Range, "0,2")] public float BodyLight = 1f;
+    /// <summary>The stand-in colours when the shader files are missing (his shine_sprite.tscn gold; the hollow tint).</summary>
     [Export] public Color BodyColor = new Color(1f, 0.8f, 0.2f);
-    [Export] public Color BodyEmission = new Color(1f, 0.78f, 0.3f);
-    [Export] public float BodyEmissionEnergy = 0.25f;
     /// <summary>The additive glow behind each shine: the model's own glow texture (ShineSprite_shine_0.png, the radial gradient) by default; its
     /// quad in the bmd is 562 x 535 units (the whole model's height) about the starglow joint; the bpk colours it (250, 240, 154) at alpha 155.</summary>
     [Export] public Texture2D GlowTexture;
     [Export] public float GlowSizeUnits = 540f;
-    [Export] public Color GlowColor = new Color(250f / 255f, 240f / 255f, 154f / 255f, 0.8f);
+    [Export] public Color GlowColor = new Color(250f / 255f, 240f / 255f, 154f / 255f, 155f / 255f);
     /// <summary>Where the glow and the sparkles sit above the slot: the starglow / body joint, 71.4 units up (the body spans 0 .. 165).</summary>
     [Export] public float BodyCentreUnits = 71.4f;
     /// <summary>127b: the game's sparkle emitters on a full shine (ms_2d_shine_kira + senko) and on a hollow one (kira_em), playing on the selected.</summary>
@@ -57,7 +63,7 @@ public partial class SmsSelectShineRing : Node3D
 
     private class Slot
     {
-        public Node3D Node, Sparkle; public MeshInstance3D[] Meshes; public StandardMaterial3D[] Mats; public Color[] Base;
+        public Node3D Node, Sparkle; public MeshInstance3D[] Meshes; public StandardMaterial3D[] Mats; public Color[] Base; public ShaderMaterial[] ShaderMats;
         public int State; public bool Selected, Closing, Opening; public float BobPhase, BobSpeed = 0.01f, BobHeight = 10f, SpinAngle, AngleY;
         public int AnmFrame; public Vector3 Pos, Offset;
     }
@@ -114,7 +120,7 @@ public partial class SmsSelectShineRing : Node3D
         // his shine scene hides the glb's glow dome (the "_starglow1" surface: a bowl when drawn as imported) and the exporter's stray plane,
         // and draws its own additive billboard glow instead (ShineSprite.cs BuildShineEffects) -- the same here
         foreach (var mi in meshes) if (mi.Name.ToString().Contains("PlaneObject")) mi.Visible = false;
-        var mats = new System.Collections.Generic.List<StandardMaterial3D>(); var bases = new System.Collections.Generic.List<Color>();
+        var mats = new System.Collections.Generic.List<StandardMaterial3D>(); var bases = new System.Collections.Generic.List<Color>(); var shaderMats = new System.Collections.Generic.List<ShaderMaterial>();
         MeshInstance3D body = null; int bodySurface = -1;
         foreach (var mi in meshes)
         {
@@ -128,32 +134,39 @@ public partial class SmsSelectShineRing : Node3D
                     mi.SetSurfaceOverrideMaterial(i, new StandardMaterial3D { ResourceName = "_starglow_hidden", Transparency = BaseMaterial3D.TransparencyEnum.Alpha, AlbedoColor = new Color(1f, 1f, 1f, 0f), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded });
                     continue;
                 }
-                StandardMaterial3D copy;
                 bool eyes = mn.Contains("eyes");
                 if (eyes)
                 {   // 127c: the eyes keep their own texture (the black oval with its highlight: its alpha IS the eye's shape), unlit
-                    copy = m is StandardMaterial3D em ? (StandardMaterial3D)em.Duplicate() : new StandardMaterial3D();
+                    var copy = m is StandardMaterial3D em ? (StandardMaterial3D)em.Duplicate() : new StandardMaterial3D();
                     copy.ResourceName = "_mat_shine_eyes (select)";
                     copy.ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded;
-                    copy.AlbedoColor = s.State == 3 ? Colors.White : new Color(1f, 1f, 1f, EmptyTint.A);
+                    copy.AlbedoColor = Colors.White;
+                    copy.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
+                    copy.CullMode = BaseMaterial3D.CullModeEnum.Back;
+                    mi.SetSurfaceOverrideMaterial(i, copy);
+                    mats.Add(copy); bases.Add(copy.AlbedoColor);
+                    continue;
                 }
-                else if (s.State == 3)
-                {   // the full shine: his gold (shine_sprite.tscn's _mat_shine_body colours) lit flat and bright, as the game's menu shine. 127c: NO
-                    // albedo texture -- the glb's is the glow's radial gradient WITH alpha, and a transparent material (the depth fade needs one)
-                    // took that alpha as coverage: the body went see-through from the middle out (127b drew it as a faint ring). No metal
-                    // either: a metallic surface mirrors the sky, and this viewport has none (it rendered near-black in 127b).
-                    copy = new StandardMaterial3D { ResourceName = "_mat_shine_body (select)", AlbedoColor = BodyColor, Metallic = 0f, Roughness = 0.45f, SpecularMode = BaseMaterial3D.SpecularModeEnum.SchlickGgx };
-                    copy.EmissionEnabled = true; copy.Emission = BodyEmission; copy.EmissionEnergyMultiplier = BodyEmissionEnergy;
+                // 127d: the body is the GAME's material, its TEV in a shader (SelectShineFull / SelectShineEmpty.gdshader, read from the two
+                // bmds): the full shine the lit orange (225, 120, 30) with the cream and white highlights mapped by the view normal, z-written
+                // so the star occludes itself; the empty one the translucent blue glass. The bpk's fade is the shader's `fade`.
+                var shader = s.State == 3 ? (FullShader ?? LoadShader("res://assets/Sms/Gate/SelectShineFull.gdshader")) : (EmptyShader ?? LoadShader("res://assets/Sms/Gate/SelectShineEmpty.gdshader"));
+                if (shader != null)
+                {
+                    var sm = new ShaderMaterial { Shader = shader, ResourceName = s.State == 3 ? "_mat_shine_body (select, the bmd's TEV)" : "_mat_shine_body empty (select, the bmd's TEV)" };
+                    sm.SetShaderParameter("radgrad", RadgradTexture ?? (ResourceLoader.Exists("res://assets/Sms/Gate/fx/radgrad.png") ? GD.Load<Texture2D>("res://assets/Sms/Gate/fx/radgrad.png") : null));
+                    sm.SetShaderParameter("fade", 1f);
+                    if (s.State == 3) { sm.SetShaderParameter("highlight", BodyHighlight); sm.SetShaderParameter("light_strength", BodyLight); }
+                    mi.SetSurfaceOverrideMaterial(i, sm);
+                    shaderMats.Add(sm);
                 }
                 else
-                {   // the open (hollow) shine: see-through, his EmptyTint
-                    copy = new StandardMaterial3D { ResourceName = "_mat_shine_empty (select)", AlbedoColor = EmptyTint, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
+                {   // no shader files: a flat stand-in
+                    var copy = new StandardMaterial3D { ResourceName = "_mat_shine_body (select, stand-in)", AlbedoColor = s.State == 3 ? BodyColor : EmptyTint, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, CullMode = BaseMaterial3D.CullModeEnum.Back };
+                    mi.SetSurfaceOverrideMaterial(i, copy);
+                    mats.Add(copy); bases.Add(copy.AlbedoColor);
                 }
-                copy.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
-                copy.CullMode = BaseMaterial3D.CullModeEnum.Back;
-                mi.SetSurfaceOverrideMaterial(i, copy);
-                mats.Add(copy); bases.Add(copy.AlbedoColor);
-                if (body == null && !eyes) { body = mi; bodySurface = i; }
+                if (body == null) { body = mi; bodySurface = i; }
             }
         }
         // the game's shine_menu model is 535 units tall with its glow quad; scale the mesh to it
@@ -164,7 +177,7 @@ public partial class SmsSelectShineRing : Node3D
         // units about the starglow joint (71.4 up), its texture the radial gradient the exporter saved as ShineSprite_shine_0.png, its colour the
         // bpk's register (250, 240, 154) at alpha 155 for the full shine and white at 155 for the hollow one
         Vector3 centre = new Vector3(0f, BodyCentreUnits, 0f);
-        Color glowCol = s.State == 3 ? GlowColor : new Color(EmptyTint.R, EmptyTint.G, EmptyTint.B, GlowColor.A);
+        Color glowCol = s.State == 3 ? GlowColor : new Color(1f, 1f, 1f, GlowColor.A);   // the empty bmd's starglow is white at the same alpha
         var glowMat = new StandardMaterial3D
         {
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add,
@@ -184,7 +197,7 @@ public partial class SmsSelectShineRing : Node3D
             SetSparkle(s, false);
         }
         s.Meshes = meshes.ToArray();
-        s.Mats = mats.ToArray(); s.Base = bases.ToArray();
+        s.Mats = mats.ToArray(); s.Base = bases.ToArray(); s.ShaderMats = shaderMats.ToArray();
     }
 
     /// <summary>playCreateParticle / stopCreateParticle on the shine's emitters.</summary>
@@ -193,6 +206,8 @@ public partial class SmsSelectShineRing : Node3D
         if (s.Sparkle == null) return;
         foreach (Node c in s.Sparkle.GetChildren()) if (c is GpuParticles3D p) p.Emitting = on;
     }
+
+    private static Shader LoadShader(string path) => ResourceLoader.Exists(path) ? GD.Load<Shader>(path) : null;
 
     /// <summary>getPosition(angle): the ring in the game's units.</summary>
     public static Vector3 RingPosition(float angleUnits)
@@ -263,6 +278,7 @@ public partial class SmsSelectShineRing : Node3D
             s.Node.Rotation = new Vector3(0f, Mathf.DegToRad(s.AngleY + s.SpinAngle + MeshYawOffset), 0f);
             float alpha = 1f - (float)s.AnmFrame / FullFrame;
             for (int m = 0; m < s.Mats.Length; m++) { Color c = s.Base[m]; c.A = s.Base[m].A * alpha; s.Mats[m].AlbedoColor = c; }
+            if (s.ShaderMats != null) foreach (var sm in s.ShaderMats) sm.SetShaderParameter("fade", alpha);
             s.Node.Visible = alpha > 0.002f;
         }
     }
