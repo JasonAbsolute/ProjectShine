@@ -8165,3 +8165,48 @@ actions at its start (a drifting controller on his desk held LEFT) and sets Clos
 pick series (the shine spinning over the black bars under the pop, the lines, the white), the gate from the fixed camera (a sparse swirl, the
 smaller flash). Drive 127 44/44 (the drive now times the game's close); build 0 errors; boot ALL OK; the drive removed, Mario.cs / GameData.cs
 EOL restored.
+
+### 127f -- the wind at the game's cadence, the select shines opaque and yellow, every colour table once over the life (his fourth round: "shines transparent and changing colour every rotation", "the A effects are white rectangles", "at most 2 wind at a time")
+
+**Files:** `SmsModelGate.cs` (SetWind staggers a / a2 / a3 by 0 / 25 / 50 frames; WindDensity scales the rays only), `fx/GateWind.tscn` (amount 1,
+the 76-frame period, 24-frame trails, the rays' ramp), `SmsSelectShineRing.cs` (FrontAlpha; BodyLight 2.0; the eyes' render priority),
+`SelectShineFull.gdshader` / `SelectShineEmpty.gdshader` (the sheen mapping; the fade), `fx/SelectSparkle.tscn` + `fx/SelectSparkleEmpty.tscn`
+(the prominence's pull; the senko in the screen plane; the senko ramp), `fx/SelectPickBurst.tscn` (the lines' and streaks' colour by age),
+`fx/WarpBalls.tscn` (the flash's colour once over the life). gen_fx127.py regenerates the five scenes.
+
+1. **The wind: a misread rate, not a density matter.** `JPABaseEmitter::calcCreateParticle` (doldecomp/sms JPAEmitter.cpp) adds the emitter's
+   rate to the spawn timer ONLY on an EMIT_NEXT_FRAME, and with mEmitInterval (rateStep) 75 that frame comes once every 76 frames -- so
+   ms_gatewind_a / a2 / a3's rate 1.0 is ONE wisp every 76 frames per emitter, each living 44 (at most one alive per emitter); their BEM1
+   start frames 0 / 25 / 50 put at most TWO on screen at once -- exactly what Jaysonn counted in the game. 127b-e read the rate as per frame
+   (44 alive per emitter, x3) and 127d-e's "dial-downs" were papering over it. Now: amount 1 with the 76-frame period as the particle's
+   lifetime (visible for its first 44 frames: the alpha / scale curves keyed on 44 / 76), the three emitters started 25 frames apart by the
+   gate's SetWind (scene-tree timers, serial-guarded), the trail the game's 24 frames. The rays (gatewind_b: one a frame, life 80 -- ~80 alive
+   in the game) keep the knobs: `WindDensity` 0.35 (now the rays only), `RayAlpha` 0.25.
+2. **Colour calc type 3 is MERGE, not a loop.** `JPADrawCalcColorAnmFrameMerge` (JPADrawVisitor.cpp 1659): frame = (maxFrame + 1) x
+   lifeProgress -- the key table is run through ONCE from birth to death. 127c-e laid every calc-3 table as a 30-frame LOOP: the warp flash
+   (ms_mariowp_senko -- each streak cycled blue -> green -> red twice: the "pulsing light" he saw on Mario in 127e, which was never the game's),
+   the gate rays, the select's senko / kira_em sparkles, and the pick burst's lines and streaks (127b-e gave those one RANDOM colour each). All
+   six now run blue -> green -> red once over each particle's life (merge_stops / color_ramp); the burst reads as a rainbow by age (young blue
+   at the centre, old red outside) instead of colour noise.
+3. **The shines.** (a) OPAQUE: the game's bpk sits at frame 30 for anything nearer than 600 units, 0.72 alpha -- faithful, and it reads
+   see-through over Ricco's blue (his complaint). `FrontAlpha` 1 (DEVIATION; 0.72 = the game): the body shaders take it at the front and the
+   back shines fade from there; the glow keeps the game's curve. (b) YELLOW: measured against a real Pianta Village select screenshot
+   (ref/game_select.png, px_probe.py) the game's body is (248, 248, 88) lemon over the whole star with a cream (248, 248, 170) highlight region;
+   127d's rendered (232, 184, 136) salmon / copper (the "drastically changing colour" as the sheen slid). Two changes: the stage-0 sheen's
+   translate applied BEFORE its scale (face-on radgrad 0.41, not 0.76 -- the convention the pixels confirm; trans0 = -0.15 x 1.528), and the
+   light 2.0 x white (`BodyLight`; the select scene sets no light of its own in SelectDir.cpp, so its strength is not in the data; 1.0 gave
+   an orange body, 1.6 a gold lower dome). Result (248, 248, 72) dominant. The light stays FIXED TO THE SCREEN as the game's: a try at turning
+   it with the spin lit only the front and the back of every half-turn went dark brown -- a screen-fixed frontal light lights whichever side
+   faces the viewer. (c) The EYES: an opaque body drawn second painted them out (both alpha-blended at one depth); render priority 1 on the
+   eyes. (d) The PROMINENCE flew off across the screen as a chain of ten flames: the game's Newton field (JPANewtonField::affect, JPAField.cpp
+   243) is 10 x its 0.1 mag inside the 200-unit reference distance -- a constant 1.0 u/f^2, ten times 127e's pull; it now loops by the sun.
+   (e) The senko streaks keep to the screen plane (particle_flag_disable_z).
+4. **The A press.** The lines (ms_2d_scsel_on_a2) ARE the game's: shikaku (a 16 x 16 square) lines 25 x 125 units, ~10 a frame flying out of a
+   35-unit ring, blend SRCALPHA / ONE -- hard-edged bars by design; with `CloseHoldSeconds` 1.5 they pile over black for 1.5 s longer than
+   the game's white would allow. Their colour by age (2) is what reads differently; the count / size are the disc's.
+
+**Verified on his PC by GPU capture**: the select at rest (an opaque lemon shine with its eyes, the blue glass hollow one), the selected shine
+across three spin angles (gold at every angle, no copper), the prominence hugging the sun, the pick series (the by-age sunburst), the gate
+from the fixed camera (one wisp with its trail arcing into the M, then two). Drive 127 51 / 51 (seven new checks: the wind's amount / period /
+trail, the three stagger steps, the rays' 3-stop ramp and density, the bodies' fade and light, the burst's ramps). Build 0 errors, boot ALL
+OK; the drive removed, Mario.cs / GameData.cs restored. Tools: bem1_check.py (the loader-exact BEM1 read), px_probe.py, crop_zoom.py.
