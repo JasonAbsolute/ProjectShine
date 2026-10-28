@@ -8082,3 +8082,49 @@ the drive removed (Mario.cs / GameData.cs back to LF). Not re-run: 118 (no Mario
 
 **DEVIATIONS (logged):** the trail's tail fade (`tail_fade`, the game's children die all at once); the Vortex as a two-frame impulse; the Magnet's
 convergence as an initial radial velocity; the glow's alpha 0.8 over the bpk's 0.61 (knob).
+
+
+### 127d -- the select shines from the bmds, the close's knobs, the wind on Godot's fields (his second refs: "wind still not good", "shines look off", "closes too fast")
+
+**Files:** NEW `assets/Sms/Gate/SelectShineFull.gdshader` + `SelectShineEmpty.gdshader` (shine_menu.bmd / shine_menu_empty.bmd `_mat_shine_body` as read
+by bmd_mat_dump.py), `SmsSelectShineRing.cs` (the shaders on the body surfaces, `fade` the bpk alpha; knobs FullShader / EmptyShader /
+RadgradTexture / BodyHighlight / BodyLight), `SmsEpisodeSelect.cs` (CloseHoldSeconds / CloseFadeSeconds), `SmsModelGate.cs` (WindAlpha / WindSize /
+RayAlpha, ApplyWindKnobs on the gate's own material copies), `fx/GateWind.tscn` (gen_fx127.py: the heads and trails rebuilt). Tools: bpk_keys.py (the
+bpk key quads), radgrad_profile.py, cap_select.gd (a 0.2 s series through the pick).
+
+1. **The shines** -- the game's own materials, not a Godot stand-in. The FULL body (bmd): matColor (225, 120, 30) lit (ambient (128, 128, 128) +
+   one light), + konst (255, 196, 155) x radgrad by the VIEW NORMAL (texmtx scale 1.528 trans -0.15: a broad cream sheen peaking at normals
+   (0.2, 0.2)) + radgrad by the normal (scale 4.09 trans 0.908: a small white spot); alpha = the bpk fade; z written. The sums MUST be done in
+   DISPLAY space as the GX adds 8-bit values: face-on, (255, 170, 43) lit + 0.76 x the cream = (255, 255, 161), the bright yellow of the game's
+   menu shine; the same values summed in linear (Godot lighting + EMISSION) gave a dull copper, so the shader is unshaded and does the GX diffuse
+   itself (a frontal light: the game's menu shines are lit evenly). Turned shines go orange (the highlight needs face-on normals) -- a spinning
+   selected shine caught at 45 deg IS orange in the game too. The EMPTY body: a three-stage TEV -- (lerp(K0 (0, 15, 255), 0, I0) + C2 - 0.5) x 4
+   (grey-blue, light blue at the rim where I0 falls), + K1 (143, 141, 128) x I1 (a centre highlight), alpha 0.55 at the face -> 1 at the rim, x the
+   fade; z not written: the translucent blue glass star. The eyes keep their IA8 texture. The glow: the bpk's (250, 240, 154) at 155 / 255 (the
+   empty's white). The depth fade: the bpk's A keys are hermite (0: 255, tan -2) -> (100: 0): at frame 30 (the selected) 183 = 72 %, within 2 %
+   of the linear 1 - frame / 99 kept.
+2. **The close's timing** is the game's, checked line by line (SelectMenu.cpp 759-806, 1052-1163; SelectDir.cpp 261-290): A -> the bars close to
+   row 224 over 30 x mRcpAnmFrameRate = 15 frames and go opaque (+16 a frame) while the panes fade (-16 a frame: 16 frames) = 0.53 s of DISAPPEAR
+   -> WAIT_BEFORE_CLOSE 11 frames (0.37 s) -> CLOSE_MENU -> startWipe(0xf, 1.0) to WHITE -> the next scene at FULLY_FADED_OUT: ~1.9 s from A to
+   white, the burst (the glow4 pop 0.53 s, the flood / glows / lines from 0.5 s) over the black and then the whitening screen. Measured on the
+   port by a 0.2 s capture series: black at 0.6 s, the fader's grey 4 / 55 / 106 / 157 / 208 at 1.0 / 1.2 / 1.4 / 1.6 / 1.8 s, the character select
+   at 2.2 s -- the game's curve. He finds it too fast to judge the burst, so DEVIATION KNOBS: `CloseHoldSeconds` (a hold on the closed screen with
+   the burst playing before the white fade; 0 = the game) and `CloseFadeSeconds` (1 = the game). JPA frames on the select screen ARE 1/60 s:
+   TEmitterViewObj::perform calcs the manager SMSGetAnmFrameRate() = 2 times a 30 fps frame (EmitterViewObj.cpp 28).
+3. **The wind** -- 127c's two-frame tangential impulse sent every wisp off on a straight tangent at 8.7 m/s (a 12 m fan hanging in the air: his
+   gateref) and its radial velocity was front-loaded. Now the JPA fields are Godot's own: the Vortex (10 u/f tangential SET every frame about the
+   gate's axis, JPA type-2) is `orbit_velocity` about the emitter's Z through a CurveXYZTexture (0, 0, 1) -- a positional circular motion, 0.35
+   turns a second at the ring's mean radius; the Magnet (1 u/f a frame toward a point 550 u behind the wall, accumulating, JPA type-0) is
+   `radial_accel` -48 m/s^2 toward the EMITTER ORIGIN, so the nodes sit AT the magnet point (+550 u) and `emission_shape_offset` puts the ring
+   1050 u out in front (500 u before the wall); damping 2 m/s^2 stands in for airResist 0.98. A wisp born on the 5.6 m ring reaches the wall in
+   ~0.53 s on a line toward the magnet point, 2.9 m from the axis: into the M's rim, spiralling -- "into the portal". Knobs (he asked for it dialed
+   down, DEVIATION defaults): WindAlpha 0.6 (the wisps and their trails), WindSize 0.75, RayAlpha 0.4 (the 3-6 m rainbow rays read very bright
+   over his sunny sky); 1 / 1 / 1 = the disc. Godot facts: `radial_accel` is about EMISSION_TRANSFORM's origin (not velocity_pivot); 3D
+   `orbit_velocity` rotates about the emitter's local axes through velocity_pivot by the XYZ curve's channels -- with NO curve all three axes
+   turn; a `.tscn` GPUParticles3D needs `draw_passes = 2` written BEFORE `draw_pass_2` or the pass is dropped ("p_pass = 1 out of bounds").
+
+**Verified on his PC by GPU capture**: the select at rest and after a LEFT (the gold sun with face and sheen, the blue glass one, the sparkles), the
+pick series (above), the gate from the fixed camera (the wisps in a ring converging on the M, dimmer; the balls; the pull-in). Drive 127 44/44 (the
+GPU run), build 0 errors, boot ALL OK, the drive removed (Mario.cs / GameData.cs back to LF). Not re-run: 118.
+
+**Open for his eye:** the wisps' motion (stills cannot show the spiral), the rays' look (their direction -- out of the wall -- is the data).
