@@ -372,4 +372,6 @@ Verified by tree, not ancestry (`merge-base --is-ancestor be9538b origin/main` s
 under `assets/Sms/Gate/` on `main`, including `SmsModelGate.cs`, `SmsEpisodeSelect.cs`, `MGate.tscn`, `EpisodeSelect.tscn`,
 `Stages/RiccoHarbor.tres` and `fx/WarpBalls.tscn`.
 `pr127.md` deleted now that the PR exists and is merged. Jaysonn's nine live edits were never touched.
-Trunk sha for Kiro to branch the next feature from: **`<the timeToPush #7 done commit below>`** -- see `git log --oneline -1 main`.
+Trunk for Kiro to branch the next feature from: **`main`'s current tip** -- read it with `git log --oneline -1 main`. (Stated this way
+on purpose: a commit cannot carry its own sha, and the "#7 done" commit that closes this entry IS the new tip, so any literal sha
+written here would already be one commit stale.)
