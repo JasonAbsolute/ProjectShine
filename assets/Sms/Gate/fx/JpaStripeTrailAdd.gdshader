@@ -9,6 +9,9 @@ uniform sampler2D tex : filter_linear, repeat_enable;           // raw I: r = in
 uniform vec4 prm = vec4(0.0, 1.0, 0.7843, 1.0);                 // colorPrm (0, 255, 200): the ribbon's bright cyan
 uniform vec4 env = vec4(0.0, 0.0, 1.0, 1.0);                    // colorEnv (0, 0, 255): its blue
 uniform float tail_fade = 1.0;                                  // 1 = the strip fades to nothing at its tail (a Godot nicety: the game's children die all at once)
+uniform float head_gate = 4.0;                                  // 127g: the strip shows at FULL strength while the head is alive (SSP1 inherit alp = False:
+                                                                // the children keep their own alpha, not the head's 0.5 fade); COLOR.a x this, clamped, only
+                                                                // hides the ribbon in the head's dead frames and eases it out over the head's last fade
 
 vec3 to_linear(vec3 c) {
 	return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c));
@@ -17,5 +20,5 @@ vec3 to_linear(vec3 c) {
 void fragment() {
 	vec4 t = texture(tex, UV);
 	ALBEDO = to_linear(mix(env.rgb, prm.rgb, t.r));
-	ALPHA = t.a * prm.a * COLOR.a * mix(1.0, 1.0 - UV.y, tail_fade);
+	ALPHA = t.a * prm.a * clamp(COLOR.a * head_gate, 0.0, 1.0) * mix(1.0, 1.0 - UV.y, tail_fade);
 }

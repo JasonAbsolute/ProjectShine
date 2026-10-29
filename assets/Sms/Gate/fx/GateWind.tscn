@@ -136,7 +136,7 @@ shape = 1
 size = 0.2123
 sections = 8
 section_length = 0.2123
-section_segments = 1
+section_segments = 4
 
 [sub_resource type="Gradient" id="Grad_b_hue"]
 interpolation_mode = 0

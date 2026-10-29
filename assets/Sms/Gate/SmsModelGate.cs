@@ -109,6 +109,12 @@ public partial class SmsModelGate : StaticBody3D, ISmsSprayTarget
     /// game's cadence (see WindScene). 127e: 0.35 -- "dial it back a lot".</summary>
     [Export(PropertyHint.Range, "0.1,1.5")] public float WindDensity = 0.35f;
     [Export(PropertyHint.Range, "0.25,1.5")] public float WindSize = 0.6f;
+    /// <summary>127g DEVIATION: the swirl's SIZE over the game's. The disc births the wisps on a ring of 420 units (a / a2; 300 for a3) 500 units
+    /// in FRONT of the M and pulls them toward a point 550 behind it -- 2.1 x the M's half-width, so the game's wisps swing in from well outside
+    /// the painted M (Jaysonn: "waves go outside the painted M -- tighten it so it only tracks the M"). This scales the ring, the distance in front
+    /// and the pull point TOGETHER with the speeds, so the motion is the game's at a smaller size: 0.4 = a ring of 168 inside a 400-unit M, born
+    /// 200 units (2.7 m) out, reaching the paint as they fade. 1 = the disc. The wisps' own size is WindSize.</summary>
+    [Export(PropertyHint.Range, "0.15,1.5")] public float WindReach = 0.4f;
     /// <summary>The rainbow rays out of the M (ms_gatewind_b): their alpha x this (1 = the game's 0.875; they are 3-6 m long additive streaks and read very bright over a sunny sky).</summary>
     [Export(PropertyHint.Range, "0,1.5")] public float RayAlpha = 0.25f;
     /// <summary>The sparks a drop throws (ms_gatehit_a / b), one-shot at the drop, 70 % of hits (pass 127b).</summary>
@@ -365,6 +371,7 @@ public partial class SmsModelGate : StaticBody3D, ISmsSprayTarget
     {
         if (_wind == null) return;
         foreach (Node c in _wind.GetChildren()) if (c is GpuParticles3D pd && pd.Name == "Wind_b" && !Mathf.IsEqualApprox(WindDensity, 1f)) pd.Amount = Mathf.Max(1, Mathf.RoundToInt(pd.Amount * WindDensity));
+        ApplyWindReach();
         if (Mathf.IsEqualApprox(WindAlpha, 1f) && Mathf.IsEqualApprox(WindSize, 1f) && Mathf.IsEqualApprox(RayAlpha, 1f)) return;
         var seen = new System.Collections.Generic.Dictionary<Material, Material>();
         foreach (Node c in _wind.GetChildren())
@@ -397,6 +404,37 @@ public partial class SmsModelGate : StaticBody3D, ISmsSprayTarget
     }
 
     private int _windSerial;
+
+    /// <summary>127g: WindReach onto this gate's own copies of the swirl's process materials and the emitters' positions (GateWind.tscn: each wisp
+    /// emitter sits at the Magnet point 550 units behind the wall and births on a ring emission_shape_offset 1050 units out in front; the Magnet is
+    /// radial_accel toward it, airResist the damping). Lengths, speeds and accelerations all x WindReach, the orbit's turns a second as they are:
+    /// a uniform scale of the whole motion, so the swirl keeps the game's shape and timing at a smaller size. A head and its trail twin share ONE
+    /// copy: the twin's sim must stay identical to the head's.</summary>
+    private void ApplyWindReach()
+    {
+        float s = WindReach;
+        if (Mathf.IsEqualApprox(s, 1f)) return;
+        var seen = new System.Collections.Generic.Dictionary<Material, ParticleProcessMaterial>();
+        foreach (Node c in _wind.GetChildren())
+        {
+            if (c is not GpuParticles3D p) continue;
+            string n = p.Name;
+            if (!(n.StartsWith("Wind_a") || n.StartsWith("Trail_"))) continue;
+            p.Position *= s;                                 // the Magnet point: 550 units behind the wall at 1
+            if (p.ProcessMaterial is not ParticleProcessMaterial src) continue;
+            if (!seen.TryGetValue(src, out var pm))
+            {
+                pm = (ParticleProcessMaterial)src.Duplicate();
+                pm.EmissionRingRadius *= s; pm.EmissionRingInnerRadius *= s; pm.EmissionRingHeight *= s;
+                pm.EmissionShapeOffset *= s;                  // the ring 1050 units out from the Magnet point = 500 in front of the wall at 1
+                pm.InitialVelocityMin *= s; pm.InitialVelocityMax *= s;
+                pm.RadialAccelMin *= s; pm.RadialAccelMax *= s;
+                pm.DampingMin *= s; pm.DampingMax *= s;
+                seen[src] = pm;
+            }
+            p.ProcessMaterial = pm;
+        }
+    }
 
     /// <summary>The swirl on / off. 127f: the game creates the three swirl emitters together but their BEM1 start frames are 0 / 25 / 50, so a2 and
     /// a3 (and their trail twins) begin emitting 25 and 50 frames after a -- the stagger that keeps at most two wisps alive at once.</summary>
@@ -441,8 +479,12 @@ public partial class SmsModelGate : StaticBody3D, ISmsSprayTarget
         {
             var fx = HitScene.Instantiate<Node3D>();
             (GetTree().CurrentScene ?? GetParent()).AddChild(fx);
-            fx.GlobalPosition = hitPos;
-            fx.LookAt(hitPos + FrontWorld, Vector3.Up);   // emitWithRotate(.., unk74 = the gate's yaw): the sparks fly out of the gate's face (the scene's -Z)
+            // 127g: ON the M's plane (the game registers a drop at -100 < z <= 0, i.e. at or just behind the paint; here the drop meets the 100-unit-deep
+            // hit box up to 50 units in front) -- the bubble pops out of the paint and the ripple sits 5 units over it
+            Vector3 lp = GlobalTransform.AffineInverse() * hitPos; lp.Z = 0f;
+            Vector3 atPlane = GlobalTransform * lp;
+            fx.GlobalPosition = atPlane;
+            fx.LookAt(atPlane + FrontWorld, Vector3.Up);   // emitWithRotate(.., unk74 = the gate's yaw): the fx frame's -Z is out of the gate's face
             foreach (Node c in fx.GetChildren()) if (c is GpuParticles3D p) { p.OneShot = true; p.Restart(); p.Emitting = true; }
             GetTree().CreateTimer(1.0).Timeout += () => { if (IsInstanceValid(fx)) fx.QueueFree(); };
         }

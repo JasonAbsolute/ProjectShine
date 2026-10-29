@@ -167,6 +167,7 @@ public partial class SmsEpisodeSelect : Control
     public int UnlockState(int i) => i >= 0 && i < 8 ? _unlock[i] : 0;
     public SmsStageInfo Stage => _stage;
     public SmsSelectShineRing Ring => _ring;
+    public SubViewport RingViewport => _ringVp;
     public bool CloseRequested => _closeMenu;
     public float BarTopHeight => _barTop != null ? _barTop.Size.Y : 0f;
     public float BannerX => _bannerGroup != null ? _bannerGroup.Position.X : 0f;
@@ -179,7 +180,8 @@ public partial class SmsEpisodeSelect : Control
     public string ShownName => Pane2Current ? _name2?.Text : _name1?.Text;
     public SmsFader Fader => _fader;
     /// <summary>The pick burst node once fired (the drive reads it).</summary>
-    public Node2D BurstNode => _frameTop?.GetNodeOrNull<Node2D>("SelectPickBurst");
+    public Node2D BurstNode => _frame?.GetNodeOrNull<Node2D>("SelectPickBurst") ?? _frameTop?.GetNodeOrNull<Node2D>("SelectPickBurst");
+    public Control FrameControl => _frame;
 
     public override void _Ready()
     {
@@ -705,7 +707,10 @@ void fragment() {
         if (PickBurstScene != null)
         {
             var burst = PickBurstScene.Instantiate<Node2D>();
-            _frameTop.AddChild(burst);   // the top layer: over the bars and the shines
+            // 127g: with the shine kept on top, the burst goes UNDER it too -- into the frame (the viewport's own canvas, drawn behind the 3D under
+            // BG_CANVAS; added last, so over the closed bars; the frame carries the window layout): bars < burst < shine. Jaysonn: "the effects
+            // are on top of the shine, sloppy". With the game's order the burst stays on the top layer over everything, as the game's 2D effects are.
+            if (ShineOverBars) _frame.AddChild(burst); else _frameTop.AddChild(burst);
             burst.Position = new Vector2(300f, 244f - FrameTop);
             if (burst.HasMethod("SmsBurst")) burst.Call("SmsBurst", _unlock[_selected] == 3);
         }

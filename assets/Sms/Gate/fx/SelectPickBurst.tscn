@@ -210,13 +210,13 @@ point_count = 4
 curve = SubResource("Curve_a2_alpha")
 
 [sub_resource type="Curve" id="CurveTex_a2_scale_x"]
-max_value = 1.5625
-_data = [Vector2(0.0, 1.5625), 0.0, 0.0, 1, 1, Vector2(1.0, 1.5625), 0.0, 0.0, 1, 1]
+max_value = 0.15625
+_data = [Vector2(0.0, 0.15625), 0.0, 0.0, 1, 1, Vector2(1.0, 0.15625), 0.0, 0.0, 1, 1]
 point_count = 2
 
 [sub_resource type="Curve" id="CurveTex_a2_scale_y"]
-max_value = 15.625
-_data = [Vector2(0.0, 7.8125), 0.0, 0.0, 1, 1, Vector2(1.0, 15.625), 0.0, 0.0, 1, 1]
+max_value = 3.125
+_data = [Vector2(0.0, 1.5625), 0.0, 0.0, 1, 1, Vector2(1.0, 3.125), 0.0, 0.0, 1, 1]
 point_count = 2
 
 [sub_resource type="Curve" id="CurveTex_a2_scale_z"]
@@ -229,7 +229,7 @@ curve_y = SubResource("CurveTex_a2_scale_y")
 curve_z = SubResource("CurveTex_a2_scale_z")
 
 [sub_resource type="ParticleProcessMaterial" id="PPM_a2"]
-resource_name = "ms_2d_scsel_on_a2 (a cleared episode): shikaku lines 25 x 125 px, 10 a frame from frame 30 off a 35 px ring, 6 px/f outward, blue -> green -> red over the life, life 90"
+resource_name = "ms_2d_scsel_on_a2 (a cleared episode): shikaku LINES 2 px wide, 25 -> 50 px long along the flight, 10 a frame from frame 30 off a 35 px ring, 3.5 -> 6 px/f outward, blue -> green -> red over the life, life 90"
 lifetime_randomness = 0.25
 particle_flag_disable_z = true
 particle_flag_align_y = true
@@ -239,7 +239,7 @@ emission_ring_radius = 35.0
 emission_ring_inner_radius = 30.0
 emission_ring_height = 1.0
 spread = 180.0
-initial_velocity_min = 270.0
+initial_velocity_min = 157.5
 initial_velocity_max = 450.0
 gravity = Vector3(0, 0, 0)
 scale_min = 0.75

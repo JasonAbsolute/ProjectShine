@@ -20116,7 +20116,8 @@ public partial class Mario : CharacterBody3D
         }
     }
 
-    /// <summary>TWarpInCallBack::execute every tick of state 2: each ball's velocity += dir x unk468 x mStatusTimer x its own 1 .. 5 factor -- the pull
+    /// <summary>TWarpInCallBack::execute every frame of state 2: each ball's POSITION += dir x unk468 x mStatusTimer x its own 1 .. 5 factor (127g:
+    /// the callback adds to the particle's global offset, not its velocity) -- the pull
     /// grows with the timer. The balls scene gets the strength (SmsWarpInPull(strength)) and drives its attractor.</summary>
     private void SmsWarpInBallsPull()
     {

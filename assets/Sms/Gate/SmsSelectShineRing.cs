@@ -53,6 +53,10 @@ public partial class SmsSelectShineRing : Node3D
     /// bpk's depth fade sits at frame 30 for anything nearer than 600 units -- which reads see-through over a blue stage; 1 = opaque
     /// (DEVIATION, his call). The shines further back fade from this level to nothing, as in the game.</summary>
     [Export(PropertyHint.Range, "0.3,1")] public float FrontAlpha = 1f;
+    /// <summary>127g DEVIATION (off = Jaysonn's call): the hollow shine's glass look is mapped by the VIEW-space normal in the game, so turned edge-on
+    /// every visible face is 'rim' and the whole star goes opaque light blue (his screenshot 2); off locks the look to the star's own face -- the
+    /// grey-blue glass of his screenshot 1 at every spin angle, light blue only on the bevels. On = the game's mapping.</summary>
+    [Export] public bool EmptyRimFollowsView = false;
     /// <summary>The stand-in colours when the shader files are missing (his shine_sprite.tscn gold; the hollow tint).</summary>
     [Export] public Color BodyColor = new Color(1f, 0.8f, 0.2f);
     /// <summary>The additive glow behind each shine: the model's own glow texture (ShineSprite_shine_0.png, the radial gradient) by default; its
@@ -164,6 +168,15 @@ public partial class SmsSelectShineRing : Node3D
                     sm.SetShaderParameter("radgrad", RadgradTexture ?? (ResourceLoader.Exists("res://assets/Sms/Gate/fx/radgrad.png") ? GD.Load<Texture2D>("res://assets/Sms/Gate/fx/radgrad.png") : null));
                     sm.SetShaderParameter("fade", FrontAlpha);
                     if (s.State == 3) { sm.SetShaderParameter("highlight", BodyHighlight); sm.SetShaderParameter("light_strength", BodyLight); }
+                    else
+                    {   // 127g: the glass look locked to the star's own face (SelectShineEmpty.gdshader rim_follows_view = false): the face axis is the
+                        // shine node's +Z (toward the camera at spin 0) expressed in the mesh's object space, through the glb's own node transforms
+                        Transform3D rel = Transform3D.Identity;
+                        for (Node3D p = mi; p != null && p != s.Node; p = p.GetParent() as Node3D) rel = p.Transform * rel;
+                        Vector3 axis = rel.Basis.Inverse() * Vector3.Back;
+                        sm.SetShaderParameter("face_axis", axis.Normalized());
+                        sm.SetShaderParameter("rim_follows_view", EmptyRimFollowsView);
+                    }
                     mi.SetSurfaceOverrideMaterial(i, sm);
                     shaderMats.Add(sm);
                 }

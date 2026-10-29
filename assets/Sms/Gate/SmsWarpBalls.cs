@@ -12,7 +12,8 @@ using System.Collections.Generic;
 /// 1000^2), 5-8 u/f, set every frame and never damped: the cloud of each part spins about its joint), lives 90 frames (+-62 %), is a
 /// 20 u billboard (0.4 x 50) of P_msm_mizutama1 x (1 +- 25 %) lerp(env -> prm) by the texture, alpha-tested hard (GEQUAL 222), shrinking
 /// to nothing over its last quarter. Colours per part: body a random one of cap-red / cream / blue (the 14-frame random table), head
-/// skin, cap red, hands white, legs blue, feet brown, FLUDD lilac. Then the callback (every frame while warpIn is in state 2): base vel +=
+/// skin, cap red, hands white, legs blue, feet brown, FLUDD lilac. Then the callback (every frame while warpIn is in state 2): the ball's
+/// position (its global offset unk14) +=
 /// dir x unk468 x mStatusTimer x (1 + ((ptr >> 2) & 63) / 16) -- each ball its own 1 .. 5 factor, the push growing with the timer --
 /// so the cloud streams into the gate and through it. A .jpa frame is 1/60 s. Drawn by one MultiMesh of unlit alpha-tested billboards.
 /// Mario's warp-in calls SmsWarpInStart(mario, gate) at the burst and SmsWarpInPull(strength, centre) every tick of the pull (strength =
@@ -24,7 +25,7 @@ public partial class SmsWarpBalls : Node3D
     private struct Ball
     {
         public Vector3 Pos, Vel, Axis, Centre;   // Pos / Centre world metres; Vel units a frame (world axes); Axis the vortex axis (world)
-        public float Life, Age, Size, Vortex, Factor;   // frames; Size metres; Vortex units a frame; Factor the callback's 1 .. 5
+        public float Life, Age, Size, Vortex, Factor, Weight;   // frames; Size metres; Vortex units a frame; Factor the callback's 1 .. 5; Weight the dynamics weight 0.625 .. 1
         public Color Col, Env;   // 127c: prm (the core) and env (the rim): the TEV's lerp(env -> prm, I) runs in WarpBall.gdshader
     }
 
@@ -38,6 +39,12 @@ public partial class SmsWarpBalls : Node3D
     [Export] public float Density = 1f;
     /// <summary>Skip the FLUDD burst when he has no FLUDD (the game's MARIO_FLAG_HAS_FLUDD test).</summary>
     [Export] public bool FluddBurst = true;
+    /// <summary>127g: x the pull into the gate (TWarpInCallBack's dir x 0.6 x timer x 1..5 a frame, as a POSITION shift). 1 = the game: after the
+    /// 90-tick hang the slowest balls take 20 frames (a third of a second) to cover the 3.4 m from the hold point, the fastest 9. Lower = a slower
+    /// stream; Mario's own SmsWarpInBallsTicks (90) sets how long the cloud hangs first.</summary>
+    [Export(PropertyHint.Range, "0.1,3")] public float PullScale = 1f;
+    /// <summary>127g: the joint-spin (the Vortex field) fades to nothing by this fraction of each ball's life -- the disc's 0.625 (FLD1 fadeOut 0 -> 0.625, cutoff).</summary>
+    [Export(PropertyHint.Range, "0.05,1")] public float VortexFadeEnd = 0.625f;
     [Export] public bool DebugPrint;
 
     private readonly List<Ball> _balls = new();
@@ -131,13 +138,17 @@ public partial class SmsWarpBalls : Node3D
             }
             Vector3 local = p * scl * (sizeU / u);
             Vector3 pos = centre + frame * local;
-            // the base velocity: omni outward, axis along the emitter's Y, random -- units a frame
-            Vector3 v = outward * omni + Vector3.Up * axisV + new Vector3(_rng.Randf() - 0.5f, _rng.Randf() - 0.5f, _rng.Randf() - 0.5f) * 2f * rndm;
+            // the base velocity, units a frame: omni outward from the centre, 'axis' = RADIAL from the volume's Y axis (JPAEmitter.cpp
+            // calcCreateParticle: setLength((pos.x, 0, pos.z), velAxis) -- 127g; 127b had it along Y), random per axis, x (1 +- 12.5 %: velRatio)
+            Vector3 radial = new Vector3(p.X, 0f, p.Z);
+            radial = radial.LengthSquared() > 1e-8f ? radial.Normalized() : Vector3.Zero;
+            Vector3 v = (outward * omni + radial * axisV + new Vector3(_rng.Randf() - 0.5f, _rng.Randf() - 0.5f, _rng.Randf() - 0.5f) * 2f * rndm) * (1f + 0.125f * (_rng.Randf() * 2f - 1f));
             var b = new Ball
             {
                 Pos = pos, Vel = frame * v, Axis = (frame * fieldAxis).Normalized(), Centre = centre,
                 Life = 90f * (1f + (_rng.Randf() * 2f - 1f) * 0.625f), Age = 0f,
                 Size = 20f / u * (1f + (_rng.Randf() * 2f - 1f) * 0.25f), Vortex = vortex, Factor = 1f + _rng.RandiRange(0, 63) / 16f,
+                Weight = 1f - 0.375f * _rng.Randf(),   // mDynamicsWeight = moment x (1 - 0.375 x rnd): the move is scaled 0.625 .. 1 per ball
             };
             if (bodyTable) { int k = _rng.RandiRange(0, 2); b.Col = BodyTable[k]; b.Env = BodyEnv[k]; }
             else { b.Col = prm; b.Env = env; }   // lerp(env -> prm, TEXC) in the shader: the texture's bright core shows prm, its rim env
@@ -231,7 +242,12 @@ public partial class SmsWarpBalls : Node3D
     }
 
     /// <summary>One .jpa frame: JPAVortexField::affect (a tangential FIELD velocity about the joint's axis of mag x (1 - d^2 / 1000^2), set each
-    /// frame, undamped), the base velocity x airResist 0.95, the callback's push on the base velocity, then the move.</summary>
+    /// frame, undamped -- 127g: fading to nothing by 62.5 % of the ball's life, its FLD1 status 0x50 = fadeOut from 0 + cutoff at 0.625), the base
+    /// velocity x airResist 0.95, the move x the ball's dynamics weight (BEM1 moment 1 - 0.375 x rnd: 0.625 .. 1), then the callback's push.
+    /// 127g -- TWarpInCallBack::execute (MarioParticle.cpp 393) does `particle->unk14 += dir x unk468 x mStatusTimer x factor`, and unk14 is the
+    /// particle's GLOBAL OFFSET (JPAParticle.cpp: mGlobalPosition = mLocalPosition x scale + unk14), i.e. the ball's POSITION moves by that much
+    /// each frame -- a velocity that grows with the timer, not an acceleration. 127b-f added it to the VELOCITY (quadratic growth, ~1.6 x
+    /// faster, and it never let the cloud sit): Jaysonn -- "they explode in, they should explode then go in".</summary>
     private void Frame()
     {
         float u = SmsUnits.UnitsPerMetre;
@@ -240,18 +256,19 @@ public partial class SmsWarpBalls : Node3D
             var b = _balls[i];
             b.Age += 1f;
             if (b.Age >= b.Life) { _balls.RemoveAt(i); continue; }
+            float progress = b.Age / b.Life;
             Vector3 relU = (b.Pos - b.Centre) * u;
             Vector3 perp = relU - b.Axis * relU.Dot(b.Axis);
             Vector3 fieldVel = Vector3.Zero;
             float d2 = perp.LengthSquared();
-            if (d2 > 1e-6f)
+            if (d2 > 1e-6f && progress < VortexFadeEnd)
             {
                 float t = Mathf.Min(d2, 1e6f) / 1e6f;
-                fieldVel = perp.Normalized().Cross(b.Axis) * (b.Vortex * (1f - t));
+                fieldVel = perp.Normalized().Cross(b.Axis) * (b.Vortex * (1f - t)) * (1f - progress / VortexFadeEnd);
             }
             b.Vel *= 0.95f;
-            if (_pull > 0f) b.Vel += _dir * (_pull * b.Factor);   // the callback: dir x unk468 x mStatusTimer x the ball's factor
-            b.Pos += (b.Vel + fieldVel) / u;
+            b.Pos += (b.Vel + fieldVel) * b.Weight / u;
+            if (_pull > 0f) b.Pos += _dir * (_pull * b.Factor * PullScale / u);   // the callback: the global offset += dir x unk468 x mStatusTimer x the ball's factor
             // DEVIATION: a ball that has crossed the gate's plane is gone (the game's fly on behind the gate's wall and die there unseen)
             if (_pull > 0f && (b.Pos - _gateCentre).Dot(_dir) > 0f) { _balls.RemoveAt(i); continue; }
             _balls[i] = b;
