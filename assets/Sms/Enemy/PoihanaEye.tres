@@ -1,0 +1,16 @@
+[gd_resource type="ShaderMaterial" load_steps=4 format=3 uid="uid://cpoieye128"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/EnemyToonBlend.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/Poihana/M_poihana_eye.png" id="2_eye"]
+[ext_resource type="Texture2D" uid="uid://c7qc8aqne083g" path="res://assets/Sms/models/toon_2_4i.png" id="3_toon"]
+
+[resource]
+resource_name = "_eye (poihana/default.bmd): the eye decal -- GX_TEVREG0 (408, 335, 323) S10, konst 5/8, stage 0 'a' = the toon (texcoord 1), x M_poihana_eye + K2, + 5/8 spec; alpha = the eye picture's, blended, no z write"
+render_priority = 1
+shader = ExtResource("1_shader")
+shader_parameter/s0_k = 0.625
+shader_parameter/s1_form = 3
+shader_parameter/c0 = Vector3(1.6, 1.3137, 1.2667)
+shader_parameter/c2 = Vector3(0, 0, 0.1255)
+shader_parameter/base_tex = ExtResource("2_eye")
+shader_parameter/toon_tex = ExtResource("3_toon")

@@ -16018,7 +16018,7 @@ public partial class Mario : CharacterBody3D
     /// (MarioMove.cpp 711): the vector normalised (a zero vector = straight up), mFaceAngle.y = matan(z, x) + 0x8000 -- he FACES BACK along the
     /// flight, at the thrower -- mForwardVel = -speed x |xz| (negative: he moves along the vector, backwards), mVel.y = speed x y. ANIM_THROWN
     /// loops until the second bounce (thrownDowning). Speed in units a tick; the sound (MA_HANEAGARI) is not ported.</summary>
-    public void SmsThrowMario(Vector3 dir, float speedUnitsPerTick, SmsNpc thrower)
+    public void SmsThrowMario(Vector3 dir, float speedUnitsPerTick, Node thrower)   // pass 128: any thrower (an NPC's TNpcThrow, the Cataquack's TNervePoihanaThrow)
     {
         if (stateOfMario == MarioState.dead || _smsGameOver)
             return;

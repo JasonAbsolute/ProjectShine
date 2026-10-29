@@ -141,6 +141,10 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     public int NerveTime => _time;
     public string BckName => _bck >= 0 && _bck < BckNames.Length ? BckNames[_bck] : "-";
     public int BckIndex => _bck;
+    /// <summary>pass 128: the current clip's bck frame (a drive reads the held throw / the waken's start).</summary>
+    public float BckFrameNow => BckFrame();
+    /// <summary>pass 128: LIVE_FLAG_UNK10 -- the body does not bind (the rooted sleeping Cataquack).</summary>
+    public bool NoBind => _noBind;
     public bool IsDead => _dead;
     public bool Airborne => _airborne;
     public float YawDeg => _yaw;
@@ -404,6 +408,18 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         _anim.SpeedScale = 60f / _bckRate;
     }
     protected bool IsBck(int i) => _bck == i;
+    /// <summary>pass 128: setFrameRate(0) / setFrameRate(SMSGetAnmFrameRate()) -- the clip held where it is (the Cataquack's throw holds at frame 4), or running again.</summary>
+    protected void SetBckPaused(bool paused)
+    {
+        if (_anim == null) return;
+        _anim.SpeedScale = paused ? 0f : 60f / _bckRate;
+    }
+    /// <summary>pass 128: getFrameCtrl()->setFrame(f): the current clip jumped to bck frame f (the Cataquack's waken from frame 148).</summary>
+    protected void SeekBck(float frame)
+    {
+        if (_anim == null || _bck < 0 || _bck >= BckNames.Length || !_anim.HasAnimation(BckNames[_bck])) return;
+        _anim.Seek(frame / _bckRate, true);
+    }
     /// <summary>getCurAnmFrameNo: the clip's position in bck frames.</summary>
     protected float BckFrame()
     {

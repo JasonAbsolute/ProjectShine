@@ -17,7 +17,7 @@
 //             (the stage's h_ma_rak swapped for the dummy), PREV = PREV x (1 - REG2) + REG1. dirt 0 skips it all.
 
 uniform float s0_k = 0.75;                  // the stage-0 konst: 3/4 or 5/8
-uniform int s1_form = 0;                    // 0 mix(spec, tex, s0); 1 the trousers' two-register mask + the specular
+uniform int s1_form = 0;                    // 0 mix(spec, tex, s0); 1 the trousers' two-register mask + the specular; 2 / 3 the Cataquack's body / eye (pass 128)
 uniform vec3 c0 = vec3(1.0);                // GX_TEVREG0 / 255 (S10: may exceed 1 or go below 0)
 uniform vec3 c1 = vec3(0.902);              // GX_TEVREG1 / 255 (form 1)
 uniform vec3 c2 = vec3(0.949, 0.063, 0.365);// GX_TEVREG2 / 255 (form 1)
@@ -69,6 +69,18 @@ vec3 enemy_color(vec2 uv, vec2 uv2) {
 	if (s1_form == 1) {
 		prev = clamp(s0 + mix(c1, c2, tex) - 0.5, 0.0, 1.0);
 		prev = clamp(prev + v_spec, 0.0, 1.0);
+	} else if (s1_form == 2 || s1_form == 3) {
+		// pass 128, the Cataquack (poihana/default.bmd, all three materials): stage 0 (ONE, RASC, KONST k, C0) SUBHALF /2 -- the body and the
+		// mouth have NO texture in stage 0 ('a' = ONE: s0 = 1/2 (c0 + mix(1, COLOR0, k) - 1/2)); the eye's 'a' is the toon (form 3 = enemy_s0).
+		// stage 1 (ZERO, TEXC, CPREV, KONST K2): s1 = s0 x TEX + k2 -- TEX = the toon through SRTG for the body / mouth (base_tex = the toon
+		// sheet), the eye picture for the eye; stage 2 (ZERO, RASC1, KONST k, CPREV): + k x the specular. c2 carries konst2 ((0, 0, 32) / 255).
+		vec3 toon = texture(toon_tex, v_lit0.rg).rgb;
+		if (s1_form == 2) {
+			s0 = clamp(0.5 * (c0 + mix(vec3(1.0), v_lit0, s0_k) - 0.5), 0.0, 1.0);
+			tex = toon;
+		}
+		prev = clamp(s0 * tex + c2, 0.0, 1.0);
+		prev = clamp(prev + s0_k * v_spec, 0.0, 1.0);
 	} else {
 		prev = clamp(mix(v_spec, tex, s0), 0.0, 1.0);
 	}
