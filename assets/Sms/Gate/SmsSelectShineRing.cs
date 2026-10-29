@@ -77,6 +77,13 @@ public partial class SmsSelectShineRing : Node3D
     [Export] public Texture2D GlowTexture;
     [Export] public float GlowSizeUnits = 540f;
     [Export] public Color GlowColor = new Color(250f / 255f, 240f / 255f, 154f / 255f, 155f / 255f);
+    /// <summary>127i: how far BEHIND the body's centre, along the camera's view, the glow quad sits (Jaysonn: "push the glow farther back so the
+    /// turning doesn't affect it"). At the centre (0 = the bmd's starglow joint) the depth test clipped the glow only where the body was NEARER
+    /// than the centre plane, so the far half of a turning star had the glow painted over it and the near half not -- a bright half that
+    /// swapped sides every quarter turn. The star's points reach 71 units from its axis and its faces 27.5, so at 100 the whole body is in
+    /// front of the glow at every spin angle: the glow is clipped by the body's silhouette and nothing else changes with the turn. The quad is
+    /// enlarged by the perspective ((distance + back) / distance) so the halo's size on screen is the same as at 0.</summary>
+    [Export(PropertyHint.Range, "0,400")] public float GlowBackUnits = 100f;
     /// <summary>Where the glow and the sparkles sit above the slot: the starglow / body joint, 71.4 units up (the body spans 0 .. 165).</summary>
     [Export] public float BodyCentreUnits = 71.4f;
     /// <summary>127b: the game's sparkle emitters on a full shine (ms_2d_shine_kira + senko) and on a hollow one (kira_em), playing on the selected.</summary>
@@ -86,7 +93,7 @@ public partial class SmsSelectShineRing : Node3D
 
     private class Slot
     {
-        public Node3D Node, Sparkle; public MeshInstance3D[] Meshes; public StandardMaterial3D[] Mats; public Color[] Base; public ShaderMaterial[] ShaderMats;
+        public Node3D Node, Sparkle; public MeshInstance3D Glow; public MeshInstance3D[] Meshes; public StandardMaterial3D[] Mats; public Color[] Base; public ShaderMaterial[] ShaderMats;
         public int State; public bool Selected, Closing, Opening; public float BobPhase, BobSpeed = 0.01f, BobHeight = 10f, SpinAngle, AngleY;
         public int AnmFrame; public Vector3 Pos, Offset;
     }
@@ -234,12 +241,14 @@ public partial class SmsSelectShineRing : Node3D
         var glowMat = new StandardMaterial3D
         {
             ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add,
-            BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, NoDepthTest = false,
+            BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled, BillboardKeepScale = true, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, NoDepthTest = false,
             AlbedoColor = glowCol,
             AlbedoTexture = GlowTexture ?? (ResourceLoader.Exists("res://models/ShineSprite/ShineSprite_shine_0.png") ? GD.Load<Texture2D>("res://models/ShineSprite/ShineSprite_shine_0.png") : null),
         };
+        // 127i: the quad is placed each frame GlowBackUnits behind the centre along the camera's view (PlaceGlow), not at the centre -- see the knob
         var glow = new MeshInstance3D { Name = "Glow", Mesh = new QuadMesh { Size = new Vector2(GlowSizeUnits, GlowSizeUnits) }, MaterialOverride = glowMat, Position = centre, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
         s.Node.AddChild(glow);
+        s.Glow = glow;
         mats.Add(glowMat); bases.Add(glowMat.AlbedoColor);
         // the sparkles: the game's emitters on the shine (promi / senko / kira for a full one, kira_em for a hollow one), playing while selected
         var sparkleScene = s.State == 3 ? SparkleScene : SparkleEmptyScene;
@@ -337,6 +346,7 @@ public partial class SmsSelectShineRing : Node3D
             var s = _slots[i]; if (s == null) continue;
             s.Node.Position = s.Pos + s.Offset;
             s.Node.Rotation = new Vector3(0f, Mathf.DegToRad(s.AngleY + s.SpinAngle + MeshYawOffset), 0f);
+            PlaceGlow(s);
             float alpha = 1f - (float)s.AnmFrame / FullFrame;                         // the game's bpk fade: 0.7 at the front (frame 30), 0 at 99
             for (int m = 0; m < s.Mats.Length; m++) { Color c = s.Base[m]; c.A = s.Base[m].A * alpha; s.Mats[m].AlbedoColor = c; }
             // 127f: the body shaders take FrontAlpha at the front and fade from there (alpha / the frame-30 value); the glow keeps the game's curve
@@ -347,6 +357,22 @@ public partial class SmsSelectShineRing : Node3D
     }
 
     private static float Bezier(float t, float p0, float p1, float p2) { float u = 1f - t; return p0 * u * u + p1 * 2f * u * t + p2 * t * t; }
+
+    /// <summary>127i: the glow quad GlowBackUnits behind the body's centre along the camera's view (the slot's own frame spins, so the offset is
+    /// taken in world space each frame), enlarged by the perspective so its size on screen is that of a quad at the centre.</summary>
+    private void PlaceGlow(Slot s)
+    {
+        if (s.Glow == null) return;
+        Vector3 centre = s.Node.GlobalTransform * new Vector3(0f, BodyCentreUnits, 0f);
+        var cam = GetViewport()?.GetCamera3D();
+        Vector3 away = cam != null ? -cam.GlobalTransform.Basis.Z : Vector3.Forward;   // the camera looks down its -Z: away from it is its forward
+        s.Glow.GlobalPosition = centre + away * GlowBackUnits;
+        float d = cam != null ? (centre - cam.GlobalPosition).Length() : 0f;
+        s.Glow.Scale = Vector3.One * (d > 1f ? (d + GlowBackUnits) / d : 1f);
+    }
+    /// <summary>The glow's offset from the slot's body centre (world units; a drive reads it).</summary>
+    public Vector3 GlowOffset(int i) { var s = _slots[i]; if (s?.Glow == null) return Vector3.Zero; return s.Glow.GlobalPosition - s.Node.GlobalTransform * new Vector3(0f, BodyCentreUnits, 0f); }
+    public float GlowScale(int i) => _slots[i]?.Glow?.Scale.X ?? 0f;
 
     /// <summary>TSelectShine::move: the bob, the depth fade (or the close's run-out), the spin.</summary>
     private void Move(Slot s)
