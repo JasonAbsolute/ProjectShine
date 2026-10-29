@@ -319,8 +319,8 @@ Push the fourth feature branch: `feature/gate-entry`, branched from `main` `4c96
 warp-in, the spiral wipe, the episode select screen and the hand-off through the character select to the level and back to the gate (SMS pass 127).
 NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says the feature is done (Kiro will replace this entry
 with the PR entry then, as #5 / #6 went).
-- Branch `feature/gate-entry` -- code tip `155f3a3` ("SMS 127f: the gate wind at the game's cadence, the select shines opaque and lemon yellow, every calc-3 colour table once over the life ..."; before it 06c9c33 127e, 4db0ff9 127d, 4af9915 127c, 9469471 127b, 79bd8a8 127a, 84a2c73 127);
-  the branch tip is this file's own commit on top of it; 16 commits since `main` `4c96841`; ~140 files, +6400 / -200. A NEW remote branch (never pushed): push with `-u`. Nothing over 1 MB (the 36 select
+- Branch `feature/gate-entry` -- code tip `e0f3d2f` ("SMS 127g: the spray's paint bubbles, the balls' pull as the game moves them, the swirl inside the M, the hollow shine's tint locked, the burst as fine lines under the shine"; before it 155f3a3 127f, 06c9c33 127e, 4db0ff9 127d, 4af9915 127c, 9469471 127b, 79bd8a8 127a, 84a2c73 127);
+  the branch tip is this file's own commit on top of it; 18 commits since `main` `4c96841`; ~145 files, +6600 / -250. A NEW remote branch (never pushed): push with `-u`. Nothing over 1 MB (the 36 select
   textures are small PNGs; the biggest new file is SmsEpisodeSelect.cs).
 ```
 git push -u origin feature/gate-entry

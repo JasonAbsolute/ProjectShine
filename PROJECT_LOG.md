@@ -8210,3 +8210,76 @@ across three spin angles (gold at every angle, no copper), the prominence huggin
 from the fixed camera (one wisp with its trail arcing into the M, then two). Drive 127 51 / 51 (seven new checks: the wind's amount / period /
 trail, the three stagger steps, the rays' 3-stop ramp and density, the bodies' fade and light, the burst's ramps). Build 0 errors, boot ALL
 OK; the drive removed, Mario.cs / GameData.cs restored. Tools: bem1_check.py (the loader-exact BEM1 read), px_probe.py, crop_zoom.py.
+
+### 127g -- the spray's paint bubbles, the balls' pull as the game moves them, the swirl inside the M, the hollow shine's tint locked, the burst as fine lines under the shine (his fifth round, with refs 1 / 2 / SprayGatewref)
+
+**Files:** `SmsModelGate.cs` (WindReach; the hit fx on the plane), `SmsWarpBalls.cs` (the callback as a position shift, the vortex fade, the
+dynamics weight, the radial 'axis' velocity; PullScale / VortexFadeEnd), `SmsEpisodeSelect.cs` (the burst into the frame under the 3D;
+FrameControl / RingViewport), `SmsSelectShineRing.cs` (EmptyRimFollowsView; the face axis to the shader), `SelectShineEmpty.gdshader` (the
+spin-locked lookup, rim_fold), NEW `fx/GateBubble.gdshader` + `fx/mizutama1_ia.png` + `fx/kemuball3_ia.png`, `fx/GateHit.tscn` (rebuilt),
+`fx/GateWind.tscn` (the ribbon's segments), `fx/JpaStripeTrailAdd.gdshader` (head_gate), `fx/SelectPickBurst.tscn` (the a2 lines),
+`Mario.cs` (one comment). gen_fx127.py regenerates the scenes. Read for this pass: doldecomp/sms libs/JSystem JPAEmitter.cpp, JPAField.cpp,
+JPAParticle.cpp, JPADraw.cpp, JPADrawVisitor.cpp, JPADrawSetupTev.cpp, JPAExtraShape.cpp, JPAMath.cpp; src/Player MarioParticle.cpp,
+MarioAutodemo.cpp (decomp/).
+
+1. **The spray (his SprayGatewref: "should be little bubbles of paint coming up and sinking back into the gate").** ms_gatehit_a is an
+   INDIRECT effect (ETX1 mode 1 + a second texture): TEXMAP0 is the screen behind the quad, its lookup displaced by P_msm_mizutama1 (a
+   water-drop bump; GX reads an indirect texel's S from its ALPHA, T from its BLUE = the I of an IA8), x prm + env, then x P_msm_kemuball3's I
+   with alpha = its A x prmA, alpha compare GREATER 101, blend ONE / ZERO -- a hard-edged GLASS BUBBLE of the paint behind it, tinted one of
+   three random pairs (calc 4): peach (159, 207, 255)+(111, 48, 0), mint (255, 159, 207)+(0, 96, 48), lavender (207, 255, 159)+(48, 0, 96).
+   Motion: dirVel 26 u/f along the emitter's +Y, which its own rot (90, 0, 0) turns onto the bind frame's +Z = OUT of the M (JPAGetXYZRotateMtx),
+   and the Gravity field 1.5 u/f^2 along (0, 0, -1) in the BIND frame only (JPAGravityField::set multiplies by info->unk6C = mGlobalRotation,
+   not the emitter's rot) = back INTO the M: out 3 m by frame 17, sinking back, 105 u out when it dies at 30. 50 u base (the ESP1 scale-in has
+   ZERO length -- JPAExtraShape: time < inTiming never -- so the 'in 1.5' value never applies; 127b drew x 1.5), shrinking to 0.3 over the last
+   quarter. ms_gatehit_b is a Direction quad whose frame (JPADrawExecRotDirectional) is X = the emitter's Y axis (the normal after the rot),
+   Y = the velocity -- velAxis 0.1, which for a non-point volume is RADIAL in the circle's plane (calcCreateParticle: setLength((pos.x, 0,
+   pos.z), velAxis)) -- turned 90 deg about Y by the ESP1 rotate: the quad lies IN THE SURFACE PLANE 5 u out, an indirect ripple (indhamon1
+   warp, indmsk2 mask) 82 u x 0.3 -> 1 -> 2, fading from half life. 127b-f drew a as an ADDITIVE kemuball at x 1.5 falling under WORLD
+   gravity (the big white cloud in his screenshot) and b as an additive picture of the bump map. GateBubble.gdshader does a's TEV
+   (goop_refract's screen-warp pattern + the env pairing by nearest prm + the alpha test as a discard); b is goop_refract flat on the plane.
+   The fx node is placed ON the M's plane (his drops meet the 100-unit hit box up to 50 u in front; the game registers a drop at -100 < z <= 0).
+2. **The balls ("they go in too fast -- they should explode, then go in").** TWarpInCallBack::execute (MarioParticle.cpp 393) does
+   `particle->unk14 += dir x unk468 x mStatusTimer x factor`, and unk14 is the particle's GLOBAL OFFSET (JPAParticle.cpp: mGlobalPosition =
+   mLocalPosition x scale + unk14): the ball's POSITION moves by that much a frame -- a velocity growing with the timer. 127b-f added it to the
+   VELOCITY (compounding: 0.2 f k^3 units after k frames -- the whole cloud through the plane in 8 frames, the first frames already a jerk).
+   Now the shift: 0.6 f k(k + 1) units -- after the 90-tick hang the slowest balls (f 1) take 20 frames to cover the hold point's 250 u, the
+   fastest (f 4.9) 9: a stream over a third of a second. Also from the data: the 'axis' velocity is RADIAL from the volume's Y axis (127b
+   sent it UP), the velocity x (1 +- 12.5 %), the dynamics weight (moment 1 - 0.375 x rnd: the move x 0.625 .. 1 per ball), the Vortex fading
+   to nothing by 62.5 % of life (FLD1 status 0x50: fadeOut from 0 + cutoff at 0.625). Knobs: `PullScale` (1 = the game), `VortexFadeEnd`;
+   the hang is Mario's SmsWarpInBallsTicks (90).
+3. **The wind ("waves go outside the painted M").** The disc births the wisps on a ring of 420 u (a / a2; 300 a3) 500 u in FRONT of the M
+   and pulls them to a point 550 behind it (the Magnet: JPAMagnetField's pos in the bind frame): 2.1 x the M's half-width -- the game's wisps
+   swing in from well outside the paint, and 6.7 m out they sit outside the M's screen footprint from a near camera. `WindReach` 0.4
+   (DEVIATION; 1 = the disc) scales the ring, the distance in front, the Magnet point, the initial velocities, the radial acceleration and the
+   damping TOGETHER (the orbit's turns a second as they are) -- a uniform scale of the whole motion: the same shape and timing at 0.4 x, the
+   ring 168 u inside a 400-unit M, born 2.7 m out, at the paint as they fade. The Magnet's 1 u/f^2 against the 500 u front distance is what
+   puts the game's wisp at the wall exactly as its alpha-out starts (frame ~35 of 44): scaled together that stays true.
+   "Make the blue marks more solid, not segmented": the RibbonTrailMesh had 8 sections x 1 segment -- the 24-frame spiral drawn as eight
+   straight pieces -- now 8 x 4 (= the particle trail's subdivisions, sampled along the curve); and the strip was dimmed by the head's 0.5
+   alpha while the SSP1 children do NOT inherit alpha (inherit alp False) -- JpaStripeTrailAdd now only gates on the head being alive
+   (head_gate: COLOR.a x 4 clamped), the strip at the texture's full strength x WindAlpha.
+4. **The hollow shine ("every 180 degrees it tints very differently -- keep the tint of 1").** shine_menu_empty's two radgrad lookups are by
+   the VIEW-space normal: turned edge-on every visible face is 'rim' (I0 low) and the star goes opaque medium blue (86, 112, 255) at 0.89 --
+   his screenshot 2 against the grey glass of his 1. The radgrad is radial, so a lookup only needs the normal's angle to an axis:
+   `rim_follows_view` false (DEVIATION, default; SmsSelectShineRing.EmptyRimFollowsView) takes it against the star's own FACE AXIS in the
+   mesh's space (the shine node's +Z through the glb's node transforms: (0, 0, 1) here), so the flat faces stay the grey glass and the bevels
+   blue at every spin angle; `rim_fold` 0.9 folds the extruded SIDE WALLS (a normal past 0.9 off the face -- hidden face-on) back toward the
+   face tint, else edge-on the sliver is all side wall = a solid blue bar (the first try). Captured at 0 / 45 / 90 degrees: the same glass.
+5. **The A press ("the effects on top of the shine, sloppy").** Two things. (a) ms_2d_scsel_on_a2's BSP1 shape is LINE (type 1), not a
+   quad: JPADrawExecLine draws a GX_LINES segment from the particle back along its velocity by unk4.y x scaleY, with JPADraw.cpp 800-809
+   unk4 = 25 x baseSize x (1.02, 0.4) for a line -> 25 x 2.5 x 0.4 = 25 px long growing to 50 (the Y scale 1 -> 2 over the life), and
+   GXSetLineWidth(25 x 0.5 x 1.02 = 12.75 sixths of a pixel) = 2 px WIDE. 127b-f read (0.5, 2.5) as a quad: 25 x 125 px bars -- his "white
+   rectangles". Now 2.5 x (25 -> 50) px streaks (the shikaku square stretched along the flight). (b) with `ShineOverBars` the burst goes INTO
+   the frame (the ring viewport's own canvas, drawn behind the 3D under BG_CANVAS; added last so over the closed bars; the frame carries the
+   window layout -- a first try parented it to the bare viewport and it drew unscaled at the top left): bars < burst < shine. The game's
+   order (ShineOverBars off) keeps the burst on the top layer.
+
+**Verified on his PC by GPU capture**: the hose at gate2 (three frames: glass bubbles of the scene behind, peach / mint / lavender, popping
+out of the M toward Mario; the ripple rings on the paint), the warp-in (the cloud hanging 2 m wide at the end of the 90 ticks, then every 6
+frames of the pull: stretching into the M over ~20 frames), the swirl (a wisp with a smooth trail inside the M's right lobe), the select at
+rest / +45 / +90 degrees (the same grey glass), the pick series (fine rainbow sparks centred on the shine, under it). Drive 127 61 / 61
+(ten new: G2j the reach's geometry on one shared material, G2k the ribbon's 8 x 4, G4c the fx on the plane, G4d the bubble's shader / frame /
+pull-back / three tints, G4e the ripple's shader / offset, G7d the hang with no pull, G7c the pull a short way at 12 ticks with most alive,
+G7e the stream at 28 ticks (90 of 620 left, the slow ones), S2f the hollow shine's lock, S6f the burst's layer, S6g the lines' width). Build
+0 errors, boot ALL OK; the drive removed, Mario.cs restored to the one comment change. Tools: tex_stats.py (channel stats of the dumps),
+fix127g_comment.py.
