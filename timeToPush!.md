@@ -314,7 +314,7 @@ git push -u origin feature/<name>
 ```
 -->
 
-### #7 -- PENDING -- queued 2026-10-27, PR added 2026-10-29 00:45 PDT (Kiro)
+### #7 -- PUSHED 2026-10-29 -- https://github.com/JasonAbsolute/ProjectShine/tree/feature/gate-entry -- PR awaiting Jaysonn's click -- queued 2026-10-27, PR added 2026-10-29 00:45 PDT (Kiro)
 Push the fourth feature branch and OPEN ITS PR: `feature/gate-entry`, branched from `main` `4c96841` (the trunk after PR #8) -- the M-graffiti gate,
 Mario's warp-in, the spiral wipe, the episode select screen and the hand-off through the character select to the level and back to the gate, with
 all their effects (SMS passes 127-127i). PLAYTESTED BY JAYSONN 2026-10-28/29 ("I'm happy with this for now") -- the PR can be merged once it is open
@@ -347,3 +347,19 @@ the title and the body of `pr127.md`, and Jaysonn presses "Create pull request".
 The working tree carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper /
 launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the `addons/godot_ai` churn: his, leave them; nothing of the feature
 is uncommitted.
+
+Result: all ten pass shas confirmed ancestors (code tip `c491f02`, 127h `a54e6f8`, 127g `e0f3d2f`, 127f `155f3a3`, 127e `06c9c33`,
+127d `4db0ff9`, 127c `4af9915`, 127b `9469471`, 127a `79bd8a8`, 127 `84a2c73`), plus the 127i log commit `81972f8` and the trunk
+`4c96841`. Pushed as a NEW remote branch with `-u`, tracking set; `git rev-list --count origin/feature/gate-entry..feature/gate-entry`
+returned `0`. 23 commits since `main`.
+Diffstat measured 151 files / **+6844** / -15 against the entry's +6833 -- the 11-line gap is this log file's own entry commit, as
+the entry itself predicted ("before this entry's lines"). Largest blobs: `Mario.cs` 1.00 MB and `PROJECT_LOG.md` 0.88 MB (both
+already on `main`, so not new weight), then `SmsEpisodeSelect.cs` 53 KB -- nothing else over 30 KB, the 50 textures all small.
+Hygiene on the range: 0 `addons/godot_ai`, 0 Koopa or Goop `.png.import` flips, 0 `SmsHiddenCoin.cs`, and 0 of the three
+gatekeeper / launcher `.tres` re-saves -- all nine of Jaysonn's live edits stayed out.
+Kept the #6 order as the entry asked: branch pushed -> this paragraph committed and pushed -> only then the PR page opened.
+`gh auth status` still reports "not logged into any GitHub hosts" (fourth entry running), so the PR is opened from the prefilled
+compare page again.
+FILE NOTE: Kiro appended this entry BELOW the "Kiro appends the next entry below this line" template comment rather than above it,
+so the template block now sits between #6 and #7. Left exactly as found -- it is Kiro's file and the entry reads fine -- but worth
+knowing when looking for the newest entry: grep `^### #` rather than reading to the end.
