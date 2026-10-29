@@ -8326,3 +8326,20 @@ series, and with SMS_CAP_PICK_EMPTY=1 the hollow pick series). Drive 127 66 / 66
 colours, S2h the gold drawn directly, S3c kira + senko on with the flame off, S6h the streaks radial / aligned / unrolled / anchored base-in,
 S6i the lines radial off the ring trailing behind); the select section alone 35 / 35. Build 0 errors, boot ALL OK; the drive removed.
 Tools: shape_list.py (every emitter's shape / pivot / rotation), glb_faces.py (a glb's front / back / side triangles per primitive).
+### 127i -- the select glow behind the body ("push the glow farther back so the turning doesn't affect it")
+
+**Files:** `SmsSelectShineRing.cs` (GlowBackUnits, PlaceGlow, GlowOffset / GlowScale for the drive).
+
+With the glow quad AT the body's centre (the bmd's starglow joint), 127h's depth test clipped it only where the body was NEARER than the
+centre plane: the far half of a turning star had the glow painted over it and the near half not -- a bright half-moon that swapped sides
+every quarter turn (his "the turning affects the glow"). The quad now sits `GlowBackUnits` (100, DEVIATION; 0 = the joint) BEHIND the
+centre along the CAMERA's view, placed each frame in world space (the slot's own frame spins): the star's points reach 71 units from its
+axis and its faces 27.5, so at 100 the whole body is in front of the glow at every spin angle -- the glow is clipped by the body's
+silhouette and nothing else moves with the turn. Enlarged by (distance + back) / distance (1.077 at the selected shine's 1300 units;
+BillboardKeepScale on) so the halo's size on screen is unchanged. Both shines (the gold's back half carried the same glow).
+
+**Verified on his PC by GPU capture**: the hollow shine at 45-degree steps (186 / 234 / 276 / 324 / 6 / 54 degrees): no glow on either half
+at the 45-degree frames, the halo outside the silhouette as before, the exact back view symmetric (L (112, 149, 200) = R (112, 148, 201)), the
+halo at 100 px from the centre the same brightness as 127h. Drive 127's select section 37 / 37 (two new: S2i both glows 100 behind along
+the view with the 1.077 scale, S3d the offset the same world vector after the ring's turn and the spin). Build 0 errors, boot ALL OK;
+the drive removed.
