@@ -8343,3 +8343,72 @@ at the 45-degree frames, the halo outside the silhouette as before, the exact ba
 halo at 100 px from the centre the same brightness as 127h. Drive 127's select section 37 / 37 (two new: S2i both glows 100 behind along
 the view with the 1.077 scale, S3d the offset the same world vector after the ring's turn and the spin). Build 0 errors, boot ALL OK;
 the drive removed.
+### 128 -- the Cataquack (TPoiHana) on the small-enemy base (feature/enemy-pokey-cataquack, off main e9eb60b after PR #9)
+
+**Files:** NEW `assets/Sms/Enemy/SmsPoihana.cs` (+ .uid), `Poihana.tscn`, `PoihanaBody.tres`, `PoihanaEye.tres`, `PoihanaMouth.tres`,
+`EnemyToonBlend.gdshader` (+ .uid); `EnemyToon.gdshaderinc` (forms 2 / 3), `SmsSmallEnemy.cs` (SetBckPaused, SeekBck, BckFrameNow, NoBind),
+`Mario.cs` (SmsThrowMario's thrower: SmsNpc -> Node, one line); `models/Eniemes/Poihana/Poihana.glb` (mamma0's poihana/default.bmd from his
+whole-disc rip, 14 clips, 16 bones) + `default_0.png` (the toon), `default_1.png` / `M_poihana_eye.png` (the eye) + .imports (the glb's materials
+swapped for the .tres by name, the pngs pinned: patch_import128.py). Sources: doldecomp/sms src/Enemy/poihana.cpp + include/Enemy/PoiHana.hpp
+(decomp/), the shipped `/enemy/poihana.prm` + `/mario/dmgpoihana.prm` (params.szs) and the 14 bck (mamma0.szs) pulled with gcm_tools.py
+(npc82/enemy128/disc).
+
+**The game** (poihana.cpp): a TWalkerEnemy whose default nerve is the WANDER (init: initWith(GraphWander), or Sleep for TSleepPoiHana) -- no set
+anim; march 1.8, turn 3..5, body scale 1.2..1.5 (the model 191 u tall -> 3.1..3.8 m), search 800 u / 180 deg / 200 u high (300 aware), give-up
+2000 / 300, attack 120 x 80, damage 100 x 100, 1 HP. Contact (TPoiHanaCollision at jnt_body + the body's own hit actor) -> attackToMario: asleep ->
+unk1A0 = unk194 = true (it wakes); in ATTACK -> TNervePoihanaThrow; else (not Throw / Freeze) -> ATTACK (dmgpoihana: 1 HP, type 1, min speed
+50). TNervePoihanaThrow: the throw bck (8), mThrowTimer 1; past frame 4 with the timer running the clip's rate is 0 (held); timer 4: rumble (0x15,
+0xf) + MS_DMG_B / MS_M_AMIATTACK at mMouthJntIndex 6; timer > 16: HIT_MESSAGE_THROWN + SMS_ThrowMario((0, 1, -BackThrowVal 0) in the body's
+frame, ThrowSpeed 140) = straight up at 140 u/frame (vy 140 at gravity 1: an apex 2450 u = 32.9 m up after 140 ticks), the clip runs on; done
+at its end. TPoiHanaRed::attackToMario sends ATTACK first in the Attack nerve; unk1C8 false = it never sleeps; GX_TEVREG0 (283, -53, -122).
+behaveToWater: unk165 = 1; in GraphWander / Attack / Jump -> TNervePoihanaFreeze: isSand ? waterhit (12) : waterhit2 (13), the collision killed;
+at a clip's end: 12 or humi (3) -> pikupiku (4); 4 -> getup (2) once the nerve's time > FreezeWait (3000 = 25 s) else 4 again; 2 or 13 -> the
+collision back, done. isHitValid(msg): ONLY HIT_MESSAGE_UNKB (0xB: Yoshi's eat -- Yoshi.cpp 403 sends it to what he swallows) is true; frozen ->
+setBckAnm(humi) + genRandomItem (setAfterDeadEffect + genEventCoin; TPoiHana::generateItem drops NOTHING -- it only clears unk195) and false. So a
+stomp on a flipped Cataquack pays its attached EVENT COIN once ((pos - Mario) x (10, 18, 10) u/tick) and squashes it; Mario cannot kill one.
+walkBehavior (mSleepVersion 1, mode 0): mGoToSleepTimer++ ; at a clip's end past WakeFrame 6000 + 100 x mInstanceIndex -> timer = rand(-500,
+500), setNext(Sleep), unk195. TNervePoihanaSleep: t0 (unk1C8 false -> straight back to the wander) sleep_start (6) + AIRBORNE on; the
+sleeping kind on the ground: LIVE_FLAG_UNK10 (rooted); timer++; (unk194 || unsetUnk165) && not waken -> KOHANA_WAKEUP3 + waken (10) from frame
+148; at a clip's end: 6 -> 5; 5 -> waken if unk1A0 && timer > SleepFrame 200; else 10 (or unk1C8 false) -> timer 0, pushAfterCurrent(wander),
+UNK10 off, done; anything else -> 6. init: mGoToSleepTimer = mInstanceIndex x -250 (init runs AFTER load's reset: the birth keeps the stagger).
+calcRootMatrix: POI_KIZETSU bound while bck 3 / 4, POI_ZZZ while 5, the dust (JUMP_ED_A/B, or POI_SAND + A on sand) at frame 18 of 12 / 13, POI_SAND
+at frame 34 of the getup on sand. setDeadAnm: the collision off, death (1), POI_DEAD + the dust. isCollidMove: a MAP OBJECT hit while attacking ->
+Freeze with vel (-2x, 5y, -2z) + 10 u up. TNervePoihanaTrapped: the sand-bomb pillars (ACTOR_TYPE_SAND_BOMB_BASE00) fling it.
+**The materials** (bmd_mat_dump.py): all three share the TEV shape stage 0 (ONE | TEXC toon, RASC, KONST 5/8, C0) SUBHALF /2, stage 1 (ZERO, TEXC,
+CPREV, KONST K2 (0, 0, 32)), stage 2 (ZERO, RASC1 spec, KONST 5/8, CPREV): _body C0 (-191, 8, 303) S10 = the blue (the red kind's register
+(283, -53, -122) set by TPoiHanaManager::initSetEnemies' SMS_InitPacket_OneTevColor), no texture in stage 0, the toon through SRTG in stage 1;
+_mouth (the bill) C0 (380, 291, 28); _eye C0 (408, 335, 323), stage 0's a = the toon (texcoord 1), stage 1 x M_poihana_eye (the yellow ring with
+the green centre -- the Cataquack's one big eye IS this texture), blend SRCALPHA / INVSRCALPHA, z write off, alphaCmp ALWAYS.
+
+**The port** (`SmsPoihana : SmsSmallEnemy`): `Kind` Blue / Red / Sleeping (TPoiHana / TPoiHanaRed / TSleepPoiHana), `DefaultNerve` = Sleep for a
+sleeping kind not yet woken else the wander; the three nerves (Sleep, PoiFreeze, Throw) as read; `AttackToMario` / `BehaveToWater` / `IsHitValid` /
+`WalkBehavior` (the sleep timer) / `SetDeadAnm` overrides; `_mario.SmsThrowMario(dir, 140 x ThrowSpeedScale, this)` -- Mario's pass-94 THROWN_DOWN
+(the vector normalised, mForwardVel -speed x |xz|, mVel.y = speed x y, ANIM_THROWN to the second bounce) takes any Node as the thrower now.
+`GroundKind` Auto (the floor collider in the "sms_sand" group or named *sand*) / Sand / Hard = isSand. `EventCoinScene` (his yellow_coin.tscn by
+default -- DEVIATION: the game's placement decides which carry a coin) popped through the drop spawner once. `DressBody`: a per-instance copy
+of PoihanaBody.tres with the kind's C0 (`UseBodyColorOverride` / `BodyColorOverride` to paint one). The mouth joint found by NAME ('mouth1_2' =
+the bmd's joint 6; Godot's bone order follows the bmd's, probed) for the throw bursts. Base: `SetBckPaused` (setFrameRate 0 / normal), `SeekBck`
+(setFrame), `BckFrameNow`, `NoBind`. Knobs grouped: Kind / Ground / Deviations (StompKills: a ground pound on the twitch loop kills -- off = the
+game, where only Yoshi kills one; WakeTicksOverride; ThrowSpeedScale) / Coin and effects (DizzyFx, ZzzFx, LandDustFx, SandFx, ThrowFx slots,
+EMPTY -- 128b generates them from the jpa; ThrowSound, WakeSound).
+**DEVIATIONS / NOT PORTED (logged):** the sand-bomb trap (no such object), the map-object stun (his walls are bg, which never stuns), Yoshi's eat and
+juice, doKeepDistance, the sounds (slots), the particles (slots), the event-coin placement rule (every one carries a coin unless cleared).
+
+**Drive 128** (`npc82/enemy128/patch_smoke128.py`, spliced into Mario.cs, SMS_YCAM_SMOKE=1; 29/29 through the real paths on his Level.tscn's clear
+arena): C1 boot (wander at once, scale 1.46, the blue c0 on the copy, the three .tres), C1b the mouth bone on the skeleton; C2 sight -> Attack
+with the dash after 23 frames; C3 the dash closes 4.25 m in 30 frames (5.4 u/tick); T1 contact -> Throw (clip 0, timer 1); T2 THROWN after 8
+frames: vy 56.4 m/s (= 140 u/frame), fwd 0, no damage (T2b); T3 the clip held at frame 4 for 4 drive frames; T4 the flight's apex 33.3 m over the
+floor; T5 Throw ends, the attack gives up (GiveUpHeight) -> wander; W1 the real hose (R from 4.5 m) -> PoiFreeze with waterhit2 on hard ground,
+HP 0; W2 waterhit2 (156 frames) ends it straight to the wander, no twitch; W2b no damage beside a frozen one; S1 sand -> waterhit; S2 -> pikupiku
+at 79 frames; S3 a real fall onto it: TRAMPLE -> humi + ONE coin (CoinPaid), not a kill, his StompBounce; S4 humi -> pikupiku, no second coin;
+S5 past FreezeWait (240 for the drive) -> getup; S6 getup (92 frames) -> wander; Z1 past WakeTicksOverride 60 at a walk clip's end -> Sleep with
+sleep_start; Z2 -> the sleep loop at 184 frames; Z3 -> the waken at the LOOP's end (416 frames: checkCurAnmEnd on the looping clip); Z4 -> wander;
+K1 the sleeping kind born asleep, not waking by itself; K2 asleep on the ground: rooted (NoBind); K3 the touch wakes it: the waken from frame
+148, no damage, wakes by itself from now; K4 the tail (52 frames) -> awake (the attack at its first tick with Mario 1.5 m away); R1 the red
+body (283, -53, -122); R2 the red kind's contact: health -1 AND the fling (vy 56.4 m/s). Lessons: a Mario placed a hair above the floor reads as
+FALLING for a frame -- 3 m from a 140-u damage cylinder that trampled it three times (placed at the floor's Y, a 12-frame settle, 4.5 m); one
+bck frame per drive frame (the clips play in real time, the ticks are 120 Hz: a 156-frame clip takes 156 drive frames, not 78).
+**Regression:** drive 125 (the base changed): 83/85 live, and 82/85 on a `main` control worktree (the same Level.tscn, the same import cache) --
+H11 (the winged Stu's knock skids into a wall on this arena) and F5 fail on BOTH, S1/S2 (the Dango tower) flaked on main only: the misses
+are the arena / timing, not 128's base change. Build 0 errors, boot ALL OK. **GPU capture** (cap_poihana.gd, run_gpu.ps1: the two kinds on a floor,
+front and 3/4): the blue and red bodies, the yellow bill, the big yellow-ringed green eye -- the game's textures and registers as read.
