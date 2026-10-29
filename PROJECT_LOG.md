@@ -8283,3 +8283,46 @@ pull-back / three tints, G4e the ripple's shader / offset, G7d the hang with no 
 G7e the stream at 28 ticks (90 of 620 left, the slow ones), S2f the hollow shine's lock, S6f the burst's layer, S6g the lines' width). Build
 0 errors, boot ALL OK; the drive removed, Mario.cs restored to the one comment change. Tools: tex_stats.py (channel stats of the dumps),
 fix127g_comment.py.
+### 127h -- the select shines: the flame off, the hollow shine one colour at every angle, the pick burst's streaks standing on the centre (his sixth round, with ref 3)
+
+**Files:** `SmsSelectShineRing.cs` (SunFlame, EmptyGameLook, EmptyTint / EmptyRim, the depth-only pass), `SelectShineEmpty.gdshader` (the
+one-colour glass; the bmd's TEV behind `game_look`), NEW `fx/JpaDir2D.gdshader`, `fx/SelectPickBurst.tscn` (the streaks and lines rebuilt),
+`fx/SelectSparkle.tscn` (the Promi node off). gen_fx127.py regenerates the scenes. Read for this pass: doldecomp/sms libs/JSystem
+JPADraw.cpp (setParticleClipBoard), JPADrawVisitor.cpp (JPADrawExecDirBillBoard, JPADrawExecDirectional, JPADrawExecLine), JPAEmitter.cpp
+(calcCreateParticle: the omni velocity).
+
+1. **The flame ("a weird effect that circles the gold shine -- remove it", his 3.png).** The orange streak through the sun is
+   ms_2d_shine_promi, the game's solar prominence (127e). Off by default: `SunFlame` on the ring (DEVIATION, his call; on = the game's three
+   emitters). SetSparkle skips the 'Promi' node unless it is on.
+2. **The hollow shine ("still differs every 180 degrees").** 127g's lock was not the cause: the 127g captures at 90 degrees show CREAM
+   STRIPES on the sliver. The 127g fold sent every side wall (tilt > 0.9) to the lookup's CENTRE, where the TEV's stage-1 spot (K1 x I1) is at
+   full strength: (0.90, 0.89, 0.71) at alpha 0.8 -- the walls painted cream, and edge-on a dozen of them stack their alpha into a bar, while
+   face-on the smooth-shaded face (its vertex normals tilt 0.2 .. 0.6 off the axis) reads the blue-grey part of the ramp at 0.6 alpha. So the
+   colour changed with the angle, as he said. Now (DEVIATION, "the tint as 1 at every angle"): the glass is ONE colour -- `EmptyTint`
+   (0.557, 0.541, 0.733) @ 0.6 on the flat faces (fitted to his screenshot 1: its body read (150, 133, 214) over Ricco's purple (162, 126, 255)),
+   `EmptyRim` (0.79, 0.79, 0.74) @ 0.75 on the bevels and side walls (its bevels (192, 183, 205)), picked by each normal's tilt off the star's
+   own face axis in the mesh (the front and the back match) -- and drawn as ONE LAYER: the body surface gets a depth-only ShaderMaterial
+   (alpha 0, depth_draw_always, priority -2) whose NextPass is the glass (depth_draw_never, priority -1): the nearest wall writes depth, the
+   glass is tested against it, so edge-on the sliver is one layer of the same tint. The glow (priority 0) is then depth-tested BEHIND the body
+   (the halo outside the star, the hot core no longer through the face -- as in his 1), the eyes (priority 1) draw over it (NoDepthTest on the
+   hollow: the eye dome straddles the face plane). Godot's own `depth_prepass_alpha` cannot do this: it writes depth only above ~0.99 alpha.
+   `EmptyGameLook` on = the bmd's TEV as before (it changes colour with the spin). Captured at 186 / 276 / 6 / 96 degrees of spin: the body
+   (133, 162, 200) / (167, 214, 255 edge) / (121, 142, 213) / (169, 199, 255 edge) over the blue -- one grey-lavender glass, no stripes.
+3. **The A press ("not really rectangles -- streaks that look off, maybe because the shine is see-through").** The streak emitters are not
+   centred quads with a roll. ms_2d_scsel_on_a is BSP1 type 9 DirBillboard with ESP1 pivot Y 2: JPADraw.cpp 813 sets unkC.y = unk4.y x
+   (pivotY - 1), so JPADrawExecDirBillBoard's quad spans 0 .. 2h along the particle's on-screen VELOCITY with tex v = 0 (the senko's soft
+   point) at the far end and v = 1 (its bright flat base) AT the particle; and the emitter's omni velocity is RADIAL from the burst's centre
+   (JPAEmitter.cpp 541: setLength(the volume position, omni)). Every streak stands on the centre, bright end in, soft point out -- a
+   starburst; type 9 has no rotation exec (the ESP1 rotate is ignored). 127b-g drew them centred with a random roll, their hard bright bases
+   scattered: the "rectangles". ms_2d_scsel_on_a2's lines likewise run from the particle BACK along the velocity (JPADrawExecLine) off a
+   radial 3.5 -> 6 u/f. `JpaDir2D.gdshader` (canvas_item): shifts VERTEX along the particle's own Y by half the texture (anchor +1 = the base
+   at the particle growing ahead, -1 = trailing behind) and flips v; the process materials use radial_velocity (no initial velocity, no
+   angle) with align_y. Captured on both picks: the gold's lines fly outward from the sun; the hollow's streaks fan out from behind the
+   glass, their roots hidden by the now one-layer body. The same senko texture serves three disc names (P_ms_senko1_i = hoso_senko4 =
+   P_msm_senko_i's pixels; only their BTI headers differ) -- checked, not a dump bug.
+
+**Verified on his PC by GPU capture** (cap_select.gd: the hollow shine every 90 degrees with the ring's spin angle printed, the gold pick
+series, and with SMS_CAP_PICK_EMPTY=1 the hollow pick series). Drive 127 66 / 66 (five new: S2g the depth pass -> glass chain and the
+colours, S2h the gold drawn directly, S3c kira + senko on with the flame off, S6h the streaks radial / aligned / unrolled / anchored base-in,
+S6i the lines radial off the ring trailing behind); the select section alone 35 / 35. Build 0 errors, boot ALL OK; the drive removed.
+Tools: shape_list.py (every emitter's shape / pivot / rotation), glb_faces.py (a glb's front / back / side triangles per primitive).
