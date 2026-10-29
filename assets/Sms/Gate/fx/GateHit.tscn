@@ -1,0 +1,117 @@
+[gd_scene load_steps=23 format=3 uid="uid://cgatehit127"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Gate/fx/GateBubble.gdshader" id="1_bubble"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/goop_refract.gdshader" id="2_refract"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/mizutama1_ia.png" id="3_mizutama"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/kemuball3_ia.png" id="4_kemuball"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/indhamon1.png" id="5_hamon"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/indmsk2.png" id="6_ringmask"]
+
+[sub_resource type="Curve" id="Curve_hit_a_scale"]
+max_value = 1.0
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(0.75, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 0.3), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTex_hit_a_scale"]
+curve = SubResource("Curve_hit_a_scale")
+
+[sub_resource type="Gradient" id="Grad_hit_a"]
+resource_name = "the prm keys, one picked at random per bubble (calc 4): (159, 207, 255) / (255, 159, 207) / (207, 255, 159); the shader pairs each with its env"
+interpolation_mode = 1
+offsets = PackedFloat32Array(0.0, 0.3334, 0.6667)
+colors = PackedColorArray(0.6235, 0.8118, 1.0, 1.0, 1.0, 0.6235, 0.8118, 1.0, 0.8118, 1.0, 0.6235, 1.0)
+
+[sub_resource type="GradientTexture1D" id="GradTex_hit_a"]
+gradient = SubResource("Grad_hit_a")
+
+[sub_resource type="Curve" id="Curve_hit_a_alpha"]
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(0.9, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 0.0), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTex_hit_a_alpha"]
+curve = SubResource("Curve_hit_a_alpha")
+
+[sub_resource type="ParticleProcessMaterial" id="PPM_hit_a"]
+resource_name = "ms_gatehit_a: one paint bubble out of the M at 26 u/f (+-12.5 %, a 14 deg cone), 1.5 u/f^2 back into it, 50 u (+-37 %) shrinking to 0.3 over the last quarter, one of three pastel tints, life 30"
+emission_shape = 0
+direction = Vector3(0, 0, -1)
+spread = 14.4
+initial_velocity_min = 18.3369
+initial_velocity_max = 23.576
+gravity = Vector3(0, 0, 72.542)
+scale_min = 0.4198
+scale_max = 0.9236
+scale_curve = SubResource("CurveTex_hit_a_scale")
+color_initial_ramp = SubResource("GradTex_hit_a")
+alpha_curve = SubResource("CurveTex_hit_a_alpha")
+
+[sub_resource type="ShaderMaterial" id="Mat_hit_a"]
+shader = ExtResource("1_bubble")
+shader_parameter/warp_tex = ExtResource("3_mizutama")
+shader_parameter/mask_tex = ExtResource("4_kemuball")
+
+[sub_resource type="QuadMesh" id="Quad_hit_a"]
+material = SubResource("Mat_hit_a")
+size = Vector2(1.0, 1.0)
+
+[sub_resource type="Curve" id="Curve_hit_b_scale"]
+max_value = 2.0
+_data = [Vector2(0.0, 0.3), 0.0, 0.0, 1, 1, Vector2(0.5, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 2.0), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTex_hit_b_scale"]
+curve = SubResource("Curve_hit_b_scale")
+
+[sub_resource type="Curve" id="Curve_hit_b_alpha"]
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(0.5, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 0.0), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTex_hit_b_alpha"]
+curve = SubResource("Curve_hit_b_alpha")
+
+[sub_resource type="ParticleProcessMaterial" id="PPM_hit_b"]
+resource_name = "ms_gatehit_b: one ripple ring on the paint 5 u out, 82 u x 0.3 -> 1 -> 2 (+-20 %), fading from half life, life 20"
+emission_shape = 0
+emission_shape_offset = Vector3(0, 0, -0.0672)
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+gravity = Vector3(0, 0, 0)
+scale_min = 0.8812
+scale_max = 1.3219
+scale_curve = SubResource("CurveTex_hit_b_scale")
+alpha_curve = SubResource("CurveTex_hit_b_alpha")
+
+[sub_resource type="ShaderMaterial" id="Mat_hit_b"]
+shader = ExtResource("2_refract")
+shader_parameter/warp_tex = ExtResource("5_hamon")
+shader_parameter/mask_tex = ExtResource("6_ringmask")
+shader_parameter/prm_color = Vector3(1, 1, 1)
+shader_parameter/billboard = false
+
+[sub_resource type="QuadMesh" id="Quad_hit_b"]
+material = SubResource("Mat_hit_b")
+size = Vector2(1.0, 1.0)
+
+[node name="GateHit" type="Node3D"]
+
+[node name="Bubble" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.5
+one_shot = true
+explosiveness = 1.0
+fixed_fps = 60
+local_coords = true
+process_material = SubResource("PPM_hit_a")
+draw_pass_1 = SubResource("Quad_hit_a")
+
+[node name="Ripple" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.3333
+one_shot = true
+explosiveness = 1.0
+fixed_fps = 60
+local_coords = true
+process_material = SubResource("PPM_hit_b")
+draw_pass_1 = SubResource("Quad_hit_b")

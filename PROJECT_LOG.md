@@ -7886,3 +7886,460 @@ writes the import_script path too.
 **Asked and answered:** the generator (`Spawner.tscn`) is invisible in play on purpose -- TGenerator is a bare TViewObj (generator.cpp 13: no model,
 no hit actor; the one-shot adds only the water's hit cylinder): the game's level designers put the point where the appearance is covered, and the
 VISIBLE kind is the launcher pile. The ghost of the kind is the editor's placement aid only (Engine.IsEditorHint()).
+
+
+## SMS pass 127 -- the M gate, the warp-in and the episode select: jump into an M, pick an episode, pick a character, play, come back out (feature/gate-entry)
+
+**Files:** NEW `assets/Sms/Gate/SmsModelGate.cs` + `MGate.tscn` + `MGate.gdshader` (TModelGate), `P_gate_msk_m2.png` / `P_gate_spec2s3tc.png` /
+`P_ms_indwp1_ia.png` (05_gate01.bmd's textures, bmd_tex.py), `SmsStageInfo.cs` + `SmsEpisodeInfo.cs` (a stage and its episodes as the select screen
+knows them), `Stages/RiccoHarbor.tres` (his Rico4Secret level behind a gate: EPISODE 1 the tower's shine, 2 the red coins), `SmsEpisodeSelect.cs` +
+`EpisodeSelect.tscn` (TSelectDir / TSelectMenu / TSelectGrad), `SmsSelectShineRing.cs` (TSelectShineManager), `select/*.png` (the 36 textures of
+the disc's select archive: the stage banners, EPISODE, the numerals, the marks, the arrow, SCORE, the coin digits), `SmsEpisodeOnly.cs` (what a level
+shows per episode); `assets/Mario.cs` (the warp-in: SmsWarpIn*, spliced; the demo state counts as invincible), `assets/Sms/Console/SmsFader.cs` +
+`Fader.gdshader` (the spiral wipe, Hx_Test4 type 8; the fader's colour, TSMSFader::setColor), `assets/GameData.cs` (PendingStage / PendingEpisode /
+Episode / FadeInFrom), `assets/CharacterSelect.cs` (loads the gate's stage; fades in from the select's white), `assets/Level.cs` (the pause bar takes the
+episode's name), `Levels/Rico4Secrect/Skybox/Rico4Secret.tscn` (ShineSprite2 ExitLevel -> the Plaza, so the loop closes). Sources: doldecomp/sms
+src/MoveBG/ModelGate.cpp, Player/MarioAutodemo.cpp (warpIn 158-249) + MarioReceiveMsg.cpp 856 + MarioParticle.cpp (warpInEffect), System/
+MarDirectorDirect.cpp (moveStage: a main stage -> APP_STATE_TITLE = the select, wipe 8), GC2D/SelectDir.cpp + SelectMenu.cpp + SelectShine2.cpp,
+GC2D/hx_wiper.c (Hx_Test4); autodemo.prm (shipped: BallsDisp 6, Balls 90, Captured 110, Tremble 6, VecBase 0.6 over the code's 6 / 70 / 120 / 15 /
+0.3); the disc's select/scrn/scenario_select_1.blo (blo_dump.py) and select/timg; 05_gate01.btk / .brk / .bpk (btk_dump.py, the brk / bpk readers).
+
+**The gate** (TModelGate): a 400 x 400-unit quad (the 'center' joint 200 up), its one material: the M mask x a scrolling rainbow sheen, the stage's
+THP movie inside once lit, an indirect wobble on the sheen and the M's edge (never the movie), blend SRCALPHA/ZERO with alpha compare >= 80 -- MGate.
+gdshader carries the TEV as read from the bmd (the header says which stage does what). The brk's K3 register is the glow: (255, 130) asleep -> (91, 0)
+lit, frame = unkD0 x 99. Hit actor 300 x 400 on the player category: here a slab the M's size, 100 units deep about the plane, on the spray-only layer.
+LIFE: shut until the M is painted (`Opened`; `Open()` = startOpen: the bpk fades it in 12 -> 255 over 100 frames and the first light needs the hose: ten
+drops of 0.1 within 200 units of the centre AT THE PLANE); awake, Mario within 1000 units charges the glow 0.01 a TICK (CUE_MOVE runs four times a
+frame -- pass 125's rule; at one a frame the 0.02-a-frame fade would have won and the gate never lit: drive 127 G2), at 1 the gate is ACTIVE for 360
+frames, renewed every tick he is near; away, the ticks count the run down too (5 a frame: 2.4 s) and the glow follows unkCA / 1000. Active: the four
+gatewind emitters and the two sounds (slots, 127b); the TAKE: Mario in the box in front of the M (x +-150, y 1000 below .. 150 above the centre, 0 .. 300
+in front) while JUMPING (an air status) -> HIT_MESSAGE_TAKE -> WARP_IN. Not active: within 200 units of the centre he is nudged out 10 units a TICK (40 a
+frame: more than his run). Captured: the glow fades 0.025 a frame. The node's -Z is the front (the game's quad faces its own +Z; turned so the node
+points like every Godot node). `Stage` (an SmsStageInfo) says where it goes; a return spot for that level is added 250 units in front unless the level has
+one (SmsReturnSpot, pass 119), so the shine's exit lands at THIS gate (the gate-out demo).
+
+**Mario's warp-in** (TMario::warpIn, MarioAutodemo.cpp): TAKE -> mHolder = the gate, the jump pose at its end if he was not jumping, WARP_IN. State 0
+(120 ticks): drawn 2 % a tick toward the hold point (the centre + 250 in front, 80 below: centred on the M), the model trembling by 6 - dist / 10 units
+(the armature jittered -- TTrembleModelEffect is not ported), the pose frozen, setNextStage (GameData.PendingStage = the gate's stage), warpInLight
+(the senko flash, a slot). Then warpInEffect (the ten light-ball emitters off his joints + the dust, a slot: 127b) -> state 1: 6 ticks in he vanishes and
+the pad buzzes, at 90 -> state 2 with unk468 = 0.6: the balls pulled in (TWarpInCallBack: dir x 0.6 x timer x 1..5 a tick), rumble every tick, at 110 ->
+HIT_MESSAGE_ATTACK to the gate, state 3 IS_PERFORMING. The director then: the actor demo camera on the gate (DEVIATION: the camera stays locked),
+STATE_UNK9 startWipe(8, 0.4) = the SPIRAL WIPE 0.4 s later with the pipe sound (a slot), at black APP_STATE_TITLE = the episode select (a main stage) --
+or the level itself when the stage has no episodes. Mario's SmsDamageExec now treats the demo state (and talking) as invincible, as TMario::
+isInvincible() does: a Stu wandering into the hold point knocked him out of the warp-in in the drive.
+
+**The spiral wipe** (Hx_Test4, type 8 = direction 0): a black band of half-width thin (124.3 + 0.15 a frame) winding in from radius 520 about the
+centre, 2.4 px of radius per 0.12 rad, five more segments a frame for 38 frames; a turn drops 126 px and the band is 249 wide, so the turns overlap and
+the hole shrinks with a spiral edge sweeping round ~3.6 turns; the fader then fills solid. Fader.gdshader mode 5 (`spiral` = rstep, thin), in the
+wiper's 640 x 448 frame; SmsFader.Wipe.Spiral, `SetColor` (black / the select's white), `RunningWipe`.
+
+**The episode select** (TSelectDir / TSelectMenu / TSelectGrad, at 30 frames a second): the gradient (per stage: Ricco green -> cyan with its six-step
+hue cycle, 2 a frame), the 3D ring of the stage's shines in a SubViewport (the camera at (300, 240, 1300) looking at (300, 240, 0), fovy 30: the
+selected at z 0, its neighbours a slot (12.6 degrees of the ellipse x 1500 / z 9000 about (300, 160, -9000)) to the side and 216 back; the full shine
+for a cleared episode, his EmptyTint for an open one; each faces the camera, bobs 10 units on a four-piece curve, fades with depth (the bpk frame -0.05 z,
+at least 30: 70 % at the front); the selected spins 3 degrees a frame; his ShineSprite.glb stands in for shine_menu.bmd / shine_menu_empty.bmd -- it
+measures the game's 535 units with its glow), and scenario_select_1.blo's panes on the 600 x 448 frame (rows 16 .. 464 of the 480-row blo): the two
+bars (msk1 / msk2, 600 x 166 at alpha 160, stretched over the window -- knob), the stage banner xx_a + its black shadow xx_b at (296, 150), EPISODE +
+the numeral + the name at (300, 299) with its twin 144 to the right for the slide, the marks row at (296, 384) (i_o / i_e slots 32 apart, 28 px, the dot
+for open, the sun for cleared, the selected yellow at 255 pulsing 64..255 by 6, the others white at 120), the arrows a_lN / a_rN (16 further out per
+episode, bobbing 5 px, fading 4 a frame at the ends), SCORE x NNN at (296, 423) (hidden: the port keeps no coin record -- knob). The states: LETTERBOX
+(30 frames: the bars grow in from the edges; at frame 21 the banner slides in from off the right edge over 20), SQUASH (15: up 10, 160 narrower / 20
+taller on TBoundPane's three-point curves), STRETCH (20: 40 wider / 8 shorter, 4 down), SETTLE (15), APPEAR (the 'map' text's alpha 6 a frame -- the
+Japanese stage name, empty here -- then the panes 6 a frame once it passes 128), INPUT (left / right: the ring turns a slot in 10 frames, pane2 with the
+new episode slides into pane1's place as pane1 slides out, alphas crossing; A: the pick), DISAPPEAR (the bars close to blo y 224 over 30 frames and go
+opaque 16 a frame, everything fades 16 a frame, the ring closes: the others run their frame out at +8), WAIT (10), CLOSE: MSF_EPISODE = the pick
+(GameData.Episode / PendingEpisode), a 1 s fade to WHITE, then his character select (the stage's CharacterSelectScene; it fades in from the white
+and loads GameData.PendingStage's level instead of its own) or the level. The rule (initData): episode i is open when the first or i - 1 cleared
+(its shine's save flag); the newest open one starts selected. Inputs are read per menu frame as edges (checkFrameMeaning), not IsActionJustPressed.
+`SmsEpisodeOnly`: a Node3D whose children exist only in the episodes listed (freed in _EnterTree, before their _Ready) -- the game's per-scenario
+scene.bin; a level run without an episode keeps everything.
+
+**DEVIATIONS (logged):** the movie inside the M and the episode's preview are stills (`Preview` on the gate; `SmsEpisodeInfo.Preview` -- the game's
+THP player); the gate's directional screen blur toward it (screenBlur, the after-effect) is not ported; the demo camera on the gate is the locked
+camera; the select's 'map' stage-name text is the Japanese version's (a stage without a banner draws its name in the big letters instead); the SCORE
+row is hidden; the bars and gradient span the 16:9 window; the select's 2D particles (ms_2d_shine_*, ms_2d_scsel_on_*), the warp-in's light balls,
+the gate's swirl and sparks, the sounds: slots for 127b. His Rico4Secret's shine now exits to the Plaza (two lines on ShineSprite2).
+
+**Drive 127** (patch_smoke127.py: the helpers in Mario.cs, the driver in GameData.cs -- the autoload lives across the scene changes and its
+_PhysicsProcess runs before the scene's nodes, so a press lands in Mario's just-pressed and a gate re-made on a return frame exists before his first
+tick), 39/39 on his PC through the real paths: G1 the quad + shader + spray layer + the return spot 250 in front; G2 nearness: glow 0.62 at 1 s, lit
+at 1.7 s, the run 360 renewed, Activated once; G3 not lit, a grounded Mario inside the box nudged to the 200-unit edge (2.75 m); G4 the REAL hose lights
+a gate that wants it (ten drops at the plane); G5 a REAL jump (button_a) inside the lit gate's box -> TAKEN, shineGet, held; G6 the pull: 0.19 m from
+the hold after 61 physics frames (60 expected); G7 gone at tick 8 of the balls; G8 captured at 163 frames (160), the stage handed over, the spiral
+24 frames after the capture, the select scene at black; S1 the rule (episode 1 cleared -> 1 cleared / 2 open / 3 locked, 2 selected), the ring's slots,
+EPISODE 2 + its name, the fader from black; S2 the bars at 55 of 166 at menu frame 10, the banner slide at frame 21, the input loop at frame 140;
+S2c / S3b the arrows; S3 LEFT -> episode 1 (ring 0, EPISODE 1 + name); S4 RIGHT -> 2; S5 RIGHT at the end does nothing; S6 A -> DISAPPEAR + the ring
+closing, the close at 88 drive frames (84), MSF_EPISODE 2, the WHITE fade, the character select at white; C1 FadeInFrom consumed; C2 ui_accept (a
+dispatched InputEventAction) loads the GATE's stage with a character chosen; L1 Episode 2 in the level; L2 SmsEpisodeOnly (the episode-1 node's
+children gone, 2 and 1+2 kept); L3 a plain start; R1 the shine's exit (ReturnFromScene + the move) lands at the GATE's spot in the gate-out demo
+(0.00 m); R2 control back. Regression 118 35/35; build 0 errors; boot ALL OK; the load probe of MGate.tscn / EpisodeSelect.tscn / RiccoHarbor.tres clean.
+
+
+### 127b -- the gate string's effects and polish (Jaysonn's five: the jump-in effect, the select's speed, the shine "bowl", the character list, the Rico flip)
+
+**Files:** NEW `assets/Sms/Gate/SmsWarpBalls.cs` (TMario::warpInEffect + TWarpInCallBack as a CPU MultiMesh sim), `SmsSelectPickBurst.cs`,
+`assets/Sms/Gate/fx/` (gen_fx127.py from the disc's .jpa: `WarpBalls.tscn` = the ball sim + ms_mariowp_dust rings and streaks + ms_mariowp_senko
+flash; `GateWind.tscn` = ms_gatewind_a / a2 / a3 / b; `GateHit.tscn` = ms_gatehit_a / b; `SelectSparkle.tscn` = ms_2d_shine_kira + senko,
+`SelectSparkleEmpty.tscn` = kira_em; `SelectPickBurst.tscn` = ms_2d_scsel_on_a / a2 / b / c / d as GPUParticles2D; the textures glow1, glow1_sel,
+senko, senko1, hoso_senko4, smash2, radgrad, indhamon1 + .imports pinned lossless), `MGate.tscn` (WindScene / HitScene wired), `EpisodeSelect.tscn`
+(PickBurstScene / SparkleScene / SparkleEmptyScene wired); `SmsSelectShineRing.cs` (the glb's "_starglow1" dome and the exporter's PlaneObject hidden,
+his additive billboard glow and gold body material instead, the sparkle scenes per slot playing on the selected one, the spin at 3 x
+SMSGetAnmFrameRate), `SmsEpisodeSelect.cs` (the clock), `SmsModelGate.cs` (the sparks face out of the gate and free themselves), `assets/Mario.cs`
+(the warp-in: the balls scene at the take with the flash, the burst, the pose held on ma_jump's last frame; RevealFromIntro), `assets/CharacterSelect.tscn`.
+
+1. **The jump-in effect** -- the disc's 18 gate emitters (jpa_dump.py). The balls: ten one-frame bursts off his joints (body 80 / head 140 / cap 140 /
+   hands 40 / legs 30 / feet 20 / FLUDD 80 = 620) of 20 u P_msm_mizutama1 billboards in the part's colours (the body a random red / cream / blue),
+   omni 4-6 u/f (+-2-3) decaying 5 % a frame, the Vortex field a tangential velocity of 5-8 u/f about the joint's axis (JPAVortexField::affect: mag x
+   (1 - d^2 / 1000^2), set every frame, undamped -- each part's cloud spins), life 90 +-62 %, hard-edged (GEQUAL 222), shrinking over the last quarter;
+   then TWarpInCallBack every frame of state 2: base velocity += dir x 0.6 x mStatusTimer x (1 .. 5 per ball) -- the push grows with the timer, so
+   the cloud streams into the gate within a few frames. DEVIATION: a ball past the gate's plane is removed (the game's fly on behind the gate's wall
+   and die unseen). The dust: 6 shwave1 rings growing 0 -> 650 u over 25 frames (96,192,192) -> (0,87,183) with 20 glow1 streaks each at 20 u/f; the
+   flash (warpInLight, at the take, following his centre): 50 frames of a senko streak a frame, hue cycling, growing x 2.5 / x 4. The swirl while
+   active: smash2 streaks born on a ring r 420 / 420 / 300 u 500 u in FRONT of the gate, drifting in (1 u/f), the Vortex +-10 u/f about the gate's
+   axis (Godot's tangential_accel about the material's gravity axis = the Magnet's 1 u/f a frame pull through the gate), life 44, lerp(white -> blue),
+   alpha 0.5; and gatewind_b: glow3 streaks 20 x 222 u on a disc r 150 u at the plane drifting out 0.5 u/f, hue cycling, alpha 0.875. The drop
+   sparks (70 % a drop): one kemuball3 ball shot out at 26 u/f falling 1.5 u/f^2 in a random rainbow colour, and one indhamon1 ripple x 0.3 -> 2.
+   FOUND ON THE WAY: the demo state's entry starts ma_demo_shine_get, whose frame 0 carries the demo's 90-unit centre translation -- the pose frozen
+   there stood 1.2 m from his body through the pull (the balls burst 1.2 m behind him: drive G7b). The take now holds ma_jump's last frame in both
+   cases (the game keeps a jumping Mario's frame -- a tiny deviation).
+2. **The select's speed** -- the game writes every time as N x mRcpAnmFrameRate and every step as N x SMSGetAnmFrameRate(), and SMSGetAnmFrameRate()
+   = 60 / SMSGetVSyncTimesPerSec() = 60 / 30 = 2 on the 30 fps loop (the display waits two retraces for every director; the select too). So the
+   letterbox is 15 frames, the banner slide 10, the squash / stretch / settle 7 / 10 / 7, the fades 12 a frame, the pick's bars 15, the arrows' bob
+   1 px a step, the spin 6 deg a frame; the unscaled ones stay (the ring's 10-frame turn, the pane slide, the bob, the -16 fades, the 10-frame wait).
+   The menu is up by frame ~70 (was ~140) -- half the time: the "older speed issue" again (the demo at 30 / the gate-out hold).
+3. **The shine "bowl"** -- the ring instantiated the raw ShineSprite.glb, whose surface 0 is the "_starglow1" glow dome; his shine_sprite.tscn hides
+   it (alpha 0), hides the exporter's fast64 PlaneObject, and draws an additive billboard glow instead (ShineSprite.cs BuildShineEffects: T_VFX_simple_1
+   at half the gold, 1.7 m = 283 units -- the game's glow quad is 281 x 267). The ring now does the same, with his gold body material (albedo
+   (1, 0.8, 0.2), emission) for a cleared episode and his EmptyTint unshaded for an open one. The sparkles: kira (glow1 twinkles, yellow / pink) +
+   senko (hue-cycling streaks) on the selected full shine, kira_em on a selected hollow one -- played / stopped with the selection as the game's.
+   The pick burst at (300, 244): the glow4 pop at once; at frame 30 the white radgrad flood, the rainbow glows, the senko streaks (a cleared
+   episode: the red / green / blue lines) -- GPUParticles2D in the Frame, the sizes in screen pixels.
+4. **The character select** -- Koopa, Wario and Waluigi removed from `Characters` (the three ext_resources too): Mario, Luigi, Piantissimo, Yoshi stay.
+5. **The Rico flip** -- Mario.RevealFromIntro(spawnTransform) wrote the spawn point's WHOLE transform onto his root, rotation included; since pass 54
+   the root must stand unrotated (the armature yaw, the camera pivot and the sensors are posed in its frame as the world's; _Ready reads the authored
+   yaw once and zeroes the root). Rico4Secret's MarioSpawnPoint is turned 180 degrees, so every character came out of the intro with the body facing
+   one way and the world math the other. Now: the position from the spawn point, its yaw as his start facing (probe: root yaw 0.0, facing = the
+   spawn's forward, dot 1.000).
+
+**Drive 127** 44/44 (G2b the wind's emitters on while active; G4b spark scenes after the hose; G7b 620 balls, the cloud 0.48 m from his body centre;
+G7c 8 ticks into the pull the cloud 1.45 m along the pull direction with 493 alive -- the rest already through the plane; S2a / S2b / S2 at the
+halved frames (88 of 166 at frame 8, the slide at 11, the loop at 70); S2d the sparkles on the selected shine only; S6d the pick burst popping;
+S6b the close at 60 drive frames); the Rico probe; build 0 errors; boot ALL OK. Regression 118: 33/35 -- B0 / B1 (the coconut take) fail with
+Mario in oilRun: his Level.tscn (uncommitted, saved 01:57 after 118 passed 35/35 at 01:55) adds an OilGoop patch where the drive's arena is; no
+pickup code changed (not re-run on a worktree: the oil is the cause).
+
+
+### 127c -- the gate string's effects made right (his refs: shineselectRef.png, gateref.png -- "sloppy": white boxes, black boxes, wrong backgrounds)
+
+**Files:** `assets/Sms/Gate/fx/` -- the ten I-format textures re-baked with their GX alpha (`glow1`, `glow1_sel`, `hoso_senko4`, `radgrad`, `senko`,
+`senko1`, `smash2`; `select/sc_arrow`, `sc_mark_0`, `sc_mark_1`: bake127c.py), `GateWind.tscn` / `WarpBalls.tscn` / `SelectSparkle(Empty).tscn`
+regenerated (gen_fx127.py), NEW `JpaStripeTrailAdd.gdshader` (the wind's Stripe children as GPU trails), `JpaDirBillboardAddRamp.gdshader` (a
+direction billboard that takes the particle colour ramp as prm), `WarpBall.gdshader` (the light balls' TEV); `SmsEpisodeSelect.cs` (the ring's
+view), `SmsSelectShineRing.cs` (the shine's materials), `SmsWarpBalls.cs` (two colours a ball). Tools: `bti2png.py` docstring warning,
+`bake127c.py`, `cap_select.gd` + `run_gpu.ps1` (the select's GPU capture), `patch_smoke127.py` (SMS_F127_CAP=1: a fixed camera 9 m in front /
+5 m right of the gate and user://cap_gate_*.png at the swirl, the pull, the balls, the pull-in; the installer / remover now write LF).
+
+1. **Every I-format texture shipped in 127b had ALPHA 255.** They came straight from jpa_dump / bti2png, which write an I4 / I8 as grey RGB with an
+   opaque alpha; GX samples an intensity texture as R = G = B = A = I, and every JPA TEV here reads "alpha = TEXA x prmA" (the panes' coverage
+   too). jpa_bake.py's 'raw' convention (r = I, a = I) is what all the shaders on the tree expect -- 127b bypassed it. So: the gate's wind heads
+   drew as WHITE SQUARES (lerp(env white -> prm blue, I) at full alpha: the fringe solid white), the select's senko streaks as white bars in
+   black boxes, the marks / arrow as black squares behind the row ("the backgrounds at the bottom are wrong"). A := I on all ten (bake127c.py);
+   bti2png.py's docstring now says so. NOTE for GPU captures: a game run reads `.godot/imported/*.ctex` -- a changed PNG needs the editor's
+   import first (`godot --headless --import`, 90 s here), or the run shows the OLD texture.
+2. **The select's dark boxes = the ring's TRANSPARENT viewport.** Godot's blend_add writes alpha (a x a + dst), so the additive glow quad behind
+   each shine stamped its coverage over the whole 283-unit quad and the SubViewportContainer composited that as a dark translucent square (the
+   283-unit boxes in his ref, 183 px). Fix: the ring's SubViewport is OPAQUE, spans the window, and draws the gradient INSIDE it as the 3D's
+   background (Environment BG_CANVAS, canvas layer 0 behind the shines) -- gradient -> shines -> panes into one buffer, as the game. An ambient
+   colour (`RingAmbient`) and the sun (`RingLightEnergy`) light the shines.
+3. **The shine itself** (shine_menu.bmd via his ShineSprite.glb, probed: Mesh_0 = `_starglow1` dome 562 x 535 / `_mat_shine_body` 143 x 165 /
+   `_mat_shine_eyes`): the body is a flat-lit gold (his (1, 0.8, 0.2) + emission) with NO albedo texture -- the glb's is the glow's radial gradient
+   WITH alpha, and a transparent material (the depth fade needs one) took it as coverage (127b: a see-through body); no metal (a metallic surface
+   mirrors a sky this viewport has not: it rendered near-black). The eyes keep their texture, unlit. The glow quad is the model's own: 540 units
+   (the bmd's 562 x 535 starglow quad about the joint 71.4 up), its texture ShineSprite_shine_0.png (the exporter's copy of the game's), the bpk's
+   colour (250, 240, 154) -- alpha 0.8 over its 155 / 255 (knob `GlowColor`). The hollow shine: his EmptyTint, a white glow.
+4. **The streaks' colour.** JpaDirBillboardAdd.gdshader ignores COLOR.rgb (prm / env uniforms only), so every 127b emitter that fed its hue through a
+   colour ramp (the select senko / kira_em, the warp flash, the dust's streaks) drew WHITE. JpaDirBillboardAddRamp.gdshader multiplies the ramp
+   in (colour = lerp(env, prm, I) x COLOR.rgb; env black = the TEV's "TEXC x prm"); the prm key tables that LOOP by age (calc 3, every 30 frames:
+   blue -> green -> red) are laid over the life as repeating gradient stops (gen_fx127.hue_cycle_stops), the streaks grow from their base (pivot
+   Y 2: center_offset). The select's streaks are the game's (111, 111, 255)-keyed tints at alpha 0.625 -- subtle on the gradient, as his ref shows.
+5. **The wind** (ms_gatewind_a / a2 / a3): the SSP1 Stripe children are now drawn -- a twin emitter with the SAME fixed seed (`use_fixed_seed`) as
+   each head draws the same particles as a GPU trail (24 frames, a 15.8-unit cross ribbon, lerp(env blue -> prm cyan, I) of smash2 along it, the
+   head's alpha, a tail fade). The Vortex SETS 10 u/f tangential every frame in JPA; Godot's tangential_accel accumulates, so it fires for the
+   first two frames only (a curve) and the drag does the rest -- the wisps curl at birth and straighten as the Magnet speeds them up. The Magnet
+   pulls toward a POINT 550 units behind the wall: a radial velocity toward it (`velocity_pivot`) converges the wisps on the M instead of a
+   5.6 m ring hitting the wall. ms_gatewind_b (the rainbow rays) is a DirectionCross: two quads crossed about the velocity (`particle_flag_align_y`
+   + `draw_passes = 2`, FACE_Z and FACE_X), standing OUT of the wall from their base, not camera billboards with a random roll (127b's "white sticks").
+6. **The light balls** (TMario::warpInEffect): colour = lerp(env, prm, I) PER TEXEL in WarpBall.gdshader -- the rim env (the part's deep colour),
+   the core prm (its light one): red cap, blue body, cream skin, brown shoes, each a vivid shaded sphere. 127b multiplied one flat lerp into the
+   grey drop shading: grey marbles. prm rides the instance colour, env the instance custom data (`use_custom_data`; INSTANCE_CUSTOM is a
+   VERTEX built-in -- a varying carries it). The hard GEQUAL 222 cut, the billboard-keep-scale form per instance.
+
+**Verified on his PC by GPU CAPTURE, not headless** (the lesson of 113 / 116): the select by itself (cap_select.gd: rest, a LEFT step, the pick) --
+the gold shine with its face and glow, the hollow blue one, the sparkles, the marks row clean, the gradient edge to edge -- against the real
+game's screen (mariowiki's Pianta Village episode select); the gate from a fixed camera: the swirl's heads soft blue-white, their cyan trails,
+the rays out of the M, the ball cloud in Mario's colours, the pull-in. Drive 127 44/44 (the GPU run IS the drive); build 0 errors; boot ALL OK;
+the drive removed (Mario.cs / GameData.cs back to LF). Not re-run: 118 (no Mario / shine code changed).
+
+**DEVIATIONS (logged):** the trail's tail fade (`tail_fade`, the game's children die all at once); the Vortex as a two-frame impulse; the Magnet's
+convergence as an initial radial velocity; the glow's alpha 0.8 over the bpk's 0.61 (knob).
+
+
+### 127d -- the select shines from the bmds, the close's knobs, the wind on Godot's fields (his second refs: "wind still not good", "shines look off", "closes too fast")
+
+**Files:** NEW `assets/Sms/Gate/SelectShineFull.gdshader` + `SelectShineEmpty.gdshader` (shine_menu.bmd / shine_menu_empty.bmd `_mat_shine_body` as read
+by bmd_mat_dump.py), `SmsSelectShineRing.cs` (the shaders on the body surfaces, `fade` the bpk alpha; knobs FullShader / EmptyShader /
+RadgradTexture / BodyHighlight / BodyLight), `SmsEpisodeSelect.cs` (CloseHoldSeconds / CloseFadeSeconds), `SmsModelGate.cs` (WindAlpha / WindSize /
+RayAlpha, ApplyWindKnobs on the gate's own material copies), `fx/GateWind.tscn` (gen_fx127.py: the heads and trails rebuilt). Tools: bpk_keys.py (the
+bpk key quads), radgrad_profile.py, cap_select.gd (a 0.2 s series through the pick).
+
+1. **The shines** -- the game's own materials, not a Godot stand-in. The FULL body (bmd): matColor (225, 120, 30) lit (ambient (128, 128, 128) +
+   one light), + konst (255, 196, 155) x radgrad by the VIEW NORMAL (texmtx scale 1.528 trans -0.15: a broad cream sheen peaking at normals
+   (0.2, 0.2)) + radgrad by the normal (scale 4.09 trans 0.908: a small white spot); alpha = the bpk fade; z written. The sums MUST be done in
+   DISPLAY space as the GX adds 8-bit values: face-on, (255, 170, 43) lit + 0.76 x the cream = (255, 255, 161), the bright yellow of the game's
+   menu shine; the same values summed in linear (Godot lighting + EMISSION) gave a dull copper, so the shader is unshaded and does the GX diffuse
+   itself (a frontal light: the game's menu shines are lit evenly). Turned shines go orange (the highlight needs face-on normals) -- a spinning
+   selected shine caught at 45 deg IS orange in the game too. The EMPTY body: a three-stage TEV -- (lerp(K0 (0, 15, 255), 0, I0) + C2 - 0.5) x 4
+   (grey-blue, light blue at the rim where I0 falls), + K1 (143, 141, 128) x I1 (a centre highlight), alpha 0.55 at the face -> 1 at the rim, x the
+   fade; z not written: the translucent blue glass star. The eyes keep their IA8 texture. The glow: the bpk's (250, 240, 154) at 155 / 255 (the
+   empty's white). The depth fade: the bpk's A keys are hermite (0: 255, tan -2) -> (100: 0): at frame 30 (the selected) 183 = 72 %, within 2 %
+   of the linear 1 - frame / 99 kept.
+2. **The close's timing** is the game's, checked line by line (SelectMenu.cpp 759-806, 1052-1163; SelectDir.cpp 261-290): A -> the bars close to
+   row 224 over 30 x mRcpAnmFrameRate = 15 frames and go opaque (+16 a frame) while the panes fade (-16 a frame: 16 frames) = 0.53 s of DISAPPEAR
+   -> WAIT_BEFORE_CLOSE 11 frames (0.37 s) -> CLOSE_MENU -> startWipe(0xf, 1.0) to WHITE -> the next scene at FULLY_FADED_OUT: ~1.9 s from A to
+   white, the burst (the glow4 pop 0.53 s, the flood / glows / lines from 0.5 s) over the black and then the whitening screen. Measured on the
+   port by a 0.2 s capture series: black at 0.6 s, the fader's grey 4 / 55 / 106 / 157 / 208 at 1.0 / 1.2 / 1.4 / 1.6 / 1.8 s, the character select
+   at 2.2 s -- the game's curve. He finds it too fast to judge the burst, so DEVIATION KNOBS: `CloseHoldSeconds` (a hold on the closed screen with
+   the burst playing before the white fade; 0 = the game) and `CloseFadeSeconds` (1 = the game). JPA frames on the select screen ARE 1/60 s:
+   TEmitterViewObj::perform calcs the manager SMSGetAnmFrameRate() = 2 times a 30 fps frame (EmitterViewObj.cpp 28).
+3. **The wind** -- 127c's two-frame tangential impulse sent every wisp off on a straight tangent at 8.7 m/s (a 12 m fan hanging in the air: his
+   gateref) and its radial velocity was front-loaded. Now the JPA fields are Godot's own: the Vortex (10 u/f tangential SET every frame about the
+   gate's axis, JPA type-2) is `orbit_velocity` about the emitter's Z through a CurveXYZTexture (0, 0, 1) -- a positional circular motion, 0.35
+   turns a second at the ring's mean radius; the Magnet (1 u/f a frame toward a point 550 u behind the wall, accumulating, JPA type-0) is
+   `radial_accel` -48 m/s^2 toward the EMITTER ORIGIN, so the nodes sit AT the magnet point (+550 u) and `emission_shape_offset` puts the ring
+   1050 u out in front (500 u before the wall); damping 2 m/s^2 stands in for airResist 0.98. A wisp born on the 5.6 m ring reaches the wall in
+   ~0.53 s on a line toward the magnet point, 2.9 m from the axis: into the M's rim, spiralling -- "into the portal". Knobs (he asked for it dialed
+   down, DEVIATION defaults): WindAlpha 0.6 (the wisps and their trails), WindSize 0.75, RayAlpha 0.4 (the 3-6 m rainbow rays read very bright
+   over his sunny sky); 1 / 1 / 1 = the disc. Godot facts: `radial_accel` is about EMISSION_TRANSFORM's origin (not velocity_pivot); 3D
+   `orbit_velocity` rotates about the emitter's local axes through velocity_pivot by the XYZ curve's channels -- with NO curve all three axes
+   turn; a `.tscn` GPUParticles3D needs `draw_passes = 2` written BEFORE `draw_pass_2` or the pass is dropped ("p_pass = 1 out of bounds").
+
+**Verified on his PC by GPU capture**: the select at rest and after a LEFT (the gold sun with face and sheen, the blue glass one, the sparkles), the
+pick series (above), the gate from the fixed camera (the wisps in a ring converging on the M, dimmer; the balls; the pull-in). Drive 127 44/44 (the
+GPU run), build 0 errors, boot ALL OK, the drive removed (Mario.cs / GameData.cs back to LF). Not re-run: 118.
+
+**Open for his eye:** the wisps' motion (stills cannot show the spiral), the rays' look (their direction -- out of the wall -- is the data).
+
+
+### 127e -- the select's layering and its missing emitter, the wind and the flash dialed back (his third round: "wind insane", "Mario pulses", "A does nothing", "shine above the iris")
+
+**Files:** `SmsEpisodeSelect.cs` (the frame inside the ring's viewport; `ShineOverBars`; CloseHoldSeconds 1.5), `SmsSelectShineRing.cs` (unchanged API),
+`fx/SelectSparkle.tscn` (+ the Promi emitter; gen_fx127.py) + NEW `fx/kemuri1_ia.png` (P_ms_kemuri1, IA8, pinned lossless), `SmsModelGate.cs` (WindDensity;
+the defaults), `fx/GateWind.tscn` (14-frame trails), `SmsWarpBalls.cs` (FlashAlpha / FlashSize). Drive: the select section releases the stick
+actions at its start (a drifting controller on his desk held LEFT) and sets CloseHoldSeconds 0 to time the game's close.
+
+1. **The layering.** The game lists its select screens grad -> Screen 2D -> Screen 3D -> Screen 2D (off) -> particles (SelectDir.cpp 180-224): at rest
+   the PANES are drawn under the shines, so a shine's glow spills over the bars and the banner; at the pick `changeOrder` turns the second 2D screen
+   on and the first off, so the closing bars cover the shine. 127c had the frame over the ring always (the glow was clipped at the band). Now the
+   frame lives INSIDE the ring's SubViewport, drawn as the 3D's canvas background; the pick moves it to a layer over the 3D (the game) unless
+   `ShineOverBars` -- ON by default at his request ("the shine should be above the iris"): the shine stays over the closing bars with its glow and
+   the burst around it. The burst itself is on a top layer in the same viewport. Godot 4.7 fact: under Environment BG_CANVAS only the viewport's
+   OWN canvas (items added straight to the SubViewport) draws behind the 3D; a CanvasLayer whose layer EQUALS the max layer is drawn after it
+   (renderer_viewport.cpp: the 3D is drawn at `layer >= max`), so the frame is a direct child, the over / top layers are CanvasLayers 1 / 2.
+2. **The missing effect.** A full shine has THREE emitters (SelectShine2.cpp 304-312): resource 0 = ms_2d_shine_promi, 1 = senko, 2 = kira; 127b/c
+   built senko + kira only. Promi is the shine's solar PROMINENCE: one head every 60 frames off a 30 u ring about the body, 5 u/f omni + 12 u/f
+   random, a Newton field (0.1 u/f^2) pulling it back, life 30, a StripeCross whose children (one a frame, velInf 0.1) lay a 42 u ribbon along
+   its path -- lerp(env (255, 50, 0) -> prm (255, 255, 155), I) of kemuri1, additive, narrowing to the tail. Godot: a one-particle emitter with a
+   1 s life visible for its first half (the alpha curve) and a GPU ribbon trail (RibbonTrailMesh cross, a width curve), radial_accel toward the
+   node. It plays on the selected full shine, as the others.
+3. **"A does nothing / closes too fast".** The sequence is the game's (127d); what read as "nothing" was the burst popping over an already-black
+   screen with the shine gone under the bars at 0.5 s. With the shine over the bars and `CloseHoldSeconds` 1.5 by default (DEVIATION; 0 = the
+   game) the pick reads: the pop, the shine spinning in its glow over the black, the lines and glows, then the white -- a 0.2 s capture
+   series shows each phase.
+4. **The wind, dialed back a lot** (DEVIATION defaults; 1 / 1 / 1 / 1 = the disc): `WindDensity` 0.35 (the game's 44 wisps a swirl emitter and 80 rays
+   x this), `WindAlpha` 0.45, `WindSize` 0.6, `RayAlpha` 0.25, the trails 14 frames (the game's 24). The fields stay 127d's (the orbit and the
+   magnet: into the M).
+5. **Mario's "pulse"** is warpInLight -- ms_mariowp_senko: 50 colour-cycling (blue -> green -> red every 30 frames) streaks of 10 x 75 u growing
+   x 2.5 / x 4 radiating from his centre for ~1.8 s of the pull. It IS the game's; `FlashAlpha` 0.4 and `FlashSize` 0.6 (DEVIATION; 1 / 1 = the disc).
+
+**Verified on his PC by GPU capture**: the select at rest / after a LEFT (the glow over the banner, the prominence's flame ribbon off the sun), the
+pick series (the shine spinning over the black bars under the pop, the lines, the white), the gate from the fixed camera (a sparse swirl, the
+smaller flash). Drive 127 44/44 (the drive now times the game's close); build 0 errors; boot ALL OK; the drive removed, Mario.cs / GameData.cs
+EOL restored.
+
+### 127f -- the wind at the game's cadence, the select shines opaque and yellow, every colour table once over the life (his fourth round: "shines transparent and changing colour every rotation", "the A effects are white rectangles", "at most 2 wind at a time")
+
+**Files:** `SmsModelGate.cs` (SetWind staggers a / a2 / a3 by 0 / 25 / 50 frames; WindDensity scales the rays only), `fx/GateWind.tscn` (amount 1,
+the 76-frame period, 24-frame trails, the rays' ramp), `SmsSelectShineRing.cs` (FrontAlpha; BodyLight 2.0; the eyes' render priority),
+`SelectShineFull.gdshader` / `SelectShineEmpty.gdshader` (the sheen mapping; the fade), `fx/SelectSparkle.tscn` + `fx/SelectSparkleEmpty.tscn`
+(the prominence's pull; the senko in the screen plane; the senko ramp), `fx/SelectPickBurst.tscn` (the lines' and streaks' colour by age),
+`fx/WarpBalls.tscn` (the flash's colour once over the life). gen_fx127.py regenerates the five scenes.
+
+1. **The wind: a misread rate, not a density matter.** `JPABaseEmitter::calcCreateParticle` (doldecomp/sms JPAEmitter.cpp) adds the emitter's
+   rate to the spawn timer ONLY on an EMIT_NEXT_FRAME, and with mEmitInterval (rateStep) 75 that frame comes once every 76 frames -- so
+   ms_gatewind_a / a2 / a3's rate 1.0 is ONE wisp every 76 frames per emitter, each living 44 (at most one alive per emitter); their BEM1
+   start frames 0 / 25 / 50 put at most TWO on screen at once -- exactly what Jaysonn counted in the game. 127b-e read the rate as per frame
+   (44 alive per emitter, x3) and 127d-e's "dial-downs" were papering over it. Now: amount 1 with the 76-frame period as the particle's
+   lifetime (visible for its first 44 frames: the alpha / scale curves keyed on 44 / 76), the three emitters started 25 frames apart by the
+   gate's SetWind (scene-tree timers, serial-guarded), the trail the game's 24 frames. The rays (gatewind_b: one a frame, life 80 -- ~80 alive
+   in the game) keep the knobs: `WindDensity` 0.35 (now the rays only), `RayAlpha` 0.25.
+2. **Colour calc type 3 is MERGE, not a loop.** `JPADrawCalcColorAnmFrameMerge` (JPADrawVisitor.cpp 1659): frame = (maxFrame + 1) x
+   lifeProgress -- the key table is run through ONCE from birth to death. 127c-e laid every calc-3 table as a 30-frame LOOP: the warp flash
+   (ms_mariowp_senko -- each streak cycled blue -> green -> red twice: the "pulsing light" he saw on Mario in 127e, which was never the game's),
+   the gate rays, the select's senko / kira_em sparkles, and the pick burst's lines and streaks (127b-e gave those one RANDOM colour each). All
+   six now run blue -> green -> red once over each particle's life (merge_stops / color_ramp); the burst reads as a rainbow by age (young blue
+   at the centre, old red outside) instead of colour noise.
+3. **The shines.** (a) OPAQUE: the game's bpk sits at frame 30 for anything nearer than 600 units, 0.72 alpha -- faithful, and it reads
+   see-through over Ricco's blue (his complaint). `FrontAlpha` 1 (DEVIATION; 0.72 = the game): the body shaders take it at the front and the
+   back shines fade from there; the glow keeps the game's curve. (b) YELLOW: measured against a real Pianta Village select screenshot
+   (ref/game_select.png, px_probe.py) the game's body is (248, 248, 88) lemon over the whole star with a cream (248, 248, 170) highlight region;
+   127d's rendered (232, 184, 136) salmon / copper (the "drastically changing colour" as the sheen slid). Two changes: the stage-0 sheen's
+   translate applied BEFORE its scale (face-on radgrad 0.41, not 0.76 -- the convention the pixels confirm; trans0 = -0.15 x 1.528), and the
+   light 2.0 x white (`BodyLight`; the select scene sets no light of its own in SelectDir.cpp, so its strength is not in the data; 1.0 gave
+   an orange body, 1.6 a gold lower dome). Result (248, 248, 72) dominant. The light stays FIXED TO THE SCREEN as the game's: a try at turning
+   it with the spin lit only the front and the back of every half-turn went dark brown -- a screen-fixed frontal light lights whichever side
+   faces the viewer. (c) The EYES: an opaque body drawn second painted them out (both alpha-blended at one depth); render priority 1 on the
+   eyes. (d) The PROMINENCE flew off across the screen as a chain of ten flames: the game's Newton field (JPANewtonField::affect, JPAField.cpp
+   243) is 10 x its 0.1 mag inside the 200-unit reference distance -- a constant 1.0 u/f^2, ten times 127e's pull; it now loops by the sun.
+   (e) The senko streaks keep to the screen plane (particle_flag_disable_z).
+4. **The A press.** The lines (ms_2d_scsel_on_a2) ARE the game's: shikaku (a 16 x 16 square) lines 25 x 125 units, ~10 a frame flying out of a
+   35-unit ring, blend SRCALPHA / ONE -- hard-edged bars by design; with `CloseHoldSeconds` 1.5 they pile over black for 1.5 s longer than
+   the game's white would allow. Their colour by age (2) is what reads differently; the count / size are the disc's.
+
+**Verified on his PC by GPU capture**: the select at rest (an opaque lemon shine with its eyes, the blue glass hollow one), the selected shine
+across three spin angles (gold at every angle, no copper), the prominence hugging the sun, the pick series (the by-age sunburst), the gate
+from the fixed camera (one wisp with its trail arcing into the M, then two). Drive 127 51 / 51 (seven new checks: the wind's amount / period /
+trail, the three stagger steps, the rays' 3-stop ramp and density, the bodies' fade and light, the burst's ramps). Build 0 errors, boot ALL
+OK; the drive removed, Mario.cs / GameData.cs restored. Tools: bem1_check.py (the loader-exact BEM1 read), px_probe.py, crop_zoom.py.
+
+### 127g -- the spray's paint bubbles, the balls' pull as the game moves them, the swirl inside the M, the hollow shine's tint locked, the burst as fine lines under the shine (his fifth round, with refs 1 / 2 / SprayGatewref)
+
+**Files:** `SmsModelGate.cs` (WindReach; the hit fx on the plane), `SmsWarpBalls.cs` (the callback as a position shift, the vortex fade, the
+dynamics weight, the radial 'axis' velocity; PullScale / VortexFadeEnd), `SmsEpisodeSelect.cs` (the burst into the frame under the 3D;
+FrameControl / RingViewport), `SmsSelectShineRing.cs` (EmptyRimFollowsView; the face axis to the shader), `SelectShineEmpty.gdshader` (the
+spin-locked lookup, rim_fold), NEW `fx/GateBubble.gdshader` + `fx/mizutama1_ia.png` + `fx/kemuball3_ia.png`, `fx/GateHit.tscn` (rebuilt),
+`fx/GateWind.tscn` (the ribbon's segments), `fx/JpaStripeTrailAdd.gdshader` (head_gate), `fx/SelectPickBurst.tscn` (the a2 lines),
+`Mario.cs` (one comment). gen_fx127.py regenerates the scenes. Read for this pass: doldecomp/sms libs/JSystem JPAEmitter.cpp, JPAField.cpp,
+JPAParticle.cpp, JPADraw.cpp, JPADrawVisitor.cpp, JPADrawSetupTev.cpp, JPAExtraShape.cpp, JPAMath.cpp; src/Player MarioParticle.cpp,
+MarioAutodemo.cpp (decomp/).
+
+1. **The spray (his SprayGatewref: "should be little bubbles of paint coming up and sinking back into the gate").** ms_gatehit_a is an
+   INDIRECT effect (ETX1 mode 1 + a second texture): TEXMAP0 is the screen behind the quad, its lookup displaced by P_msm_mizutama1 (a
+   water-drop bump; GX reads an indirect texel's S from its ALPHA, T from its BLUE = the I of an IA8), x prm + env, then x P_msm_kemuball3's I
+   with alpha = its A x prmA, alpha compare GREATER 101, blend ONE / ZERO -- a hard-edged GLASS BUBBLE of the paint behind it, tinted one of
+   three random pairs (calc 4): peach (159, 207, 255)+(111, 48, 0), mint (255, 159, 207)+(0, 96, 48), lavender (207, 255, 159)+(48, 0, 96).
+   Motion: dirVel 26 u/f along the emitter's +Y, which its own rot (90, 0, 0) turns onto the bind frame's +Z = OUT of the M (JPAGetXYZRotateMtx),
+   and the Gravity field 1.5 u/f^2 along (0, 0, -1) in the BIND frame only (JPAGravityField::set multiplies by info->unk6C = mGlobalRotation,
+   not the emitter's rot) = back INTO the M: out 3 m by frame 17, sinking back, 105 u out when it dies at 30. 50 u base (the ESP1 scale-in has
+   ZERO length -- JPAExtraShape: time < inTiming never -- so the 'in 1.5' value never applies; 127b drew x 1.5), shrinking to 0.3 over the last
+   quarter. ms_gatehit_b is a Direction quad whose frame (JPADrawExecRotDirectional) is X = the emitter's Y axis (the normal after the rot),
+   Y = the velocity -- velAxis 0.1, which for a non-point volume is RADIAL in the circle's plane (calcCreateParticle: setLength((pos.x, 0,
+   pos.z), velAxis)) -- turned 90 deg about Y by the ESP1 rotate: the quad lies IN THE SURFACE PLANE 5 u out, an indirect ripple (indhamon1
+   warp, indmsk2 mask) 82 u x 0.3 -> 1 -> 2, fading from half life. 127b-f drew a as an ADDITIVE kemuball at x 1.5 falling under WORLD
+   gravity (the big white cloud in his screenshot) and b as an additive picture of the bump map. GateBubble.gdshader does a's TEV
+   (goop_refract's screen-warp pattern + the env pairing by nearest prm + the alpha test as a discard); b is goop_refract flat on the plane.
+   The fx node is placed ON the M's plane (his drops meet the 100-unit hit box up to 50 u in front; the game registers a drop at -100 < z <= 0).
+2. **The balls ("they go in too fast -- they should explode, then go in").** TWarpInCallBack::execute (MarioParticle.cpp 393) does
+   `particle->unk14 += dir x unk468 x mStatusTimer x factor`, and unk14 is the particle's GLOBAL OFFSET (JPAParticle.cpp: mGlobalPosition =
+   mLocalPosition x scale + unk14): the ball's POSITION moves by that much a frame -- a velocity growing with the timer. 127b-f added it to the
+   VELOCITY (compounding: 0.2 f k^3 units after k frames -- the whole cloud through the plane in 8 frames, the first frames already a jerk).
+   Now the shift: 0.6 f k(k + 1) units -- after the 90-tick hang the slowest balls (f 1) take 20 frames to cover the hold point's 250 u, the
+   fastest (f 4.9) 9: a stream over a third of a second. Also from the data: the 'axis' velocity is RADIAL from the volume's Y axis (127b
+   sent it UP), the velocity x (1 +- 12.5 %), the dynamics weight (moment 1 - 0.375 x rnd: the move x 0.625 .. 1 per ball), the Vortex fading
+   to nothing by 62.5 % of life (FLD1 status 0x50: fadeOut from 0 + cutoff at 0.625). Knobs: `PullScale` (1 = the game), `VortexFadeEnd`;
+   the hang is Mario's SmsWarpInBallsTicks (90).
+3. **The wind ("waves go outside the painted M").** The disc births the wisps on a ring of 420 u (a / a2; 300 a3) 500 u in FRONT of the M
+   and pulls them to a point 550 behind it (the Magnet: JPAMagnetField's pos in the bind frame): 2.1 x the M's half-width -- the game's wisps
+   swing in from well outside the paint, and 6.7 m out they sit outside the M's screen footprint from a near camera. `WindReach` 0.4
+   (DEVIATION; 1 = the disc) scales the ring, the distance in front, the Magnet point, the initial velocities, the radial acceleration and the
+   damping TOGETHER (the orbit's turns a second as they are) -- a uniform scale of the whole motion: the same shape and timing at 0.4 x, the
+   ring 168 u inside a 400-unit M, born 2.7 m out, at the paint as they fade. The Magnet's 1 u/f^2 against the 500 u front distance is what
+   puts the game's wisp at the wall exactly as its alpha-out starts (frame ~35 of 44): scaled together that stays true.
+   "Make the blue marks more solid, not segmented": the RibbonTrailMesh had 8 sections x 1 segment -- the 24-frame spiral drawn as eight
+   straight pieces -- now 8 x 4 (= the particle trail's subdivisions, sampled along the curve); and the strip was dimmed by the head's 0.5
+   alpha while the SSP1 children do NOT inherit alpha (inherit alp False) -- JpaStripeTrailAdd now only gates on the head being alive
+   (head_gate: COLOR.a x 4 clamped), the strip at the texture's full strength x WindAlpha.
+4. **The hollow shine ("every 180 degrees it tints very differently -- keep the tint of 1").** shine_menu_empty's two radgrad lookups are by
+   the VIEW-space normal: turned edge-on every visible face is 'rim' (I0 low) and the star goes opaque medium blue (86, 112, 255) at 0.89 --
+   his screenshot 2 against the grey glass of his 1. The radgrad is radial, so a lookup only needs the normal's angle to an axis:
+   `rim_follows_view` false (DEVIATION, default; SmsSelectShineRing.EmptyRimFollowsView) takes it against the star's own FACE AXIS in the
+   mesh's space (the shine node's +Z through the glb's node transforms: (0, 0, 1) here), so the flat faces stay the grey glass and the bevels
+   blue at every spin angle; `rim_fold` 0.9 folds the extruded SIDE WALLS (a normal past 0.9 off the face -- hidden face-on) back toward the
+   face tint, else edge-on the sliver is all side wall = a solid blue bar (the first try). Captured at 0 / 45 / 90 degrees: the same glass.
+5. **The A press ("the effects on top of the shine, sloppy").** Two things. (a) ms_2d_scsel_on_a2's BSP1 shape is LINE (type 1), not a
+   quad: JPADrawExecLine draws a GX_LINES segment from the particle back along its velocity by unk4.y x scaleY, with JPADraw.cpp 800-809
+   unk4 = 25 x baseSize x (1.02, 0.4) for a line -> 25 x 2.5 x 0.4 = 25 px long growing to 50 (the Y scale 1 -> 2 over the life), and
+   GXSetLineWidth(25 x 0.5 x 1.02 = 12.75 sixths of a pixel) = 2 px WIDE. 127b-f read (0.5, 2.5) as a quad: 25 x 125 px bars -- his "white
+   rectangles". Now 2.5 x (25 -> 50) px streaks (the shikaku square stretched along the flight). (b) with `ShineOverBars` the burst goes INTO
+   the frame (the ring viewport's own canvas, drawn behind the 3D under BG_CANVAS; added last so over the closed bars; the frame carries the
+   window layout -- a first try parented it to the bare viewport and it drew unscaled at the top left): bars < burst < shine. The game's
+   order (ShineOverBars off) keeps the burst on the top layer.
+
+**Verified on his PC by GPU capture**: the hose at gate2 (three frames: glass bubbles of the scene behind, peach / mint / lavender, popping
+out of the M toward Mario; the ripple rings on the paint), the warp-in (the cloud hanging 2 m wide at the end of the 90 ticks, then every 6
+frames of the pull: stretching into the M over ~20 frames), the swirl (a wisp with a smooth trail inside the M's right lobe), the select at
+rest / +45 / +90 degrees (the same grey glass), the pick series (fine rainbow sparks centred on the shine, under it). Drive 127 61 / 61
+(ten new: G2j the reach's geometry on one shared material, G2k the ribbon's 8 x 4, G4c the fx on the plane, G4d the bubble's shader / frame /
+pull-back / three tints, G4e the ripple's shader / offset, G7d the hang with no pull, G7c the pull a short way at 12 ticks with most alive,
+G7e the stream at 28 ticks (90 of 620 left, the slow ones), S2f the hollow shine's lock, S6f the burst's layer, S6g the lines' width). Build
+0 errors, boot ALL OK; the drive removed, Mario.cs restored to the one comment change. Tools: tex_stats.py (channel stats of the dumps),
+fix127g_comment.py.
+### 127h -- the select shines: the flame off, the hollow shine one colour at every angle, the pick burst's streaks standing on the centre (his sixth round, with ref 3)
+
+**Files:** `SmsSelectShineRing.cs` (SunFlame, EmptyGameLook, EmptyTint / EmptyRim, the depth-only pass), `SelectShineEmpty.gdshader` (the
+one-colour glass; the bmd's TEV behind `game_look`), NEW `fx/JpaDir2D.gdshader`, `fx/SelectPickBurst.tscn` (the streaks and lines rebuilt),
+`fx/SelectSparkle.tscn` (the Promi node off). gen_fx127.py regenerates the scenes. Read for this pass: doldecomp/sms libs/JSystem
+JPADraw.cpp (setParticleClipBoard), JPADrawVisitor.cpp (JPADrawExecDirBillBoard, JPADrawExecDirectional, JPADrawExecLine), JPAEmitter.cpp
+(calcCreateParticle: the omni velocity).
+
+1. **The flame ("a weird effect that circles the gold shine -- remove it", his 3.png).** The orange streak through the sun is
+   ms_2d_shine_promi, the game's solar prominence (127e). Off by default: `SunFlame` on the ring (DEVIATION, his call; on = the game's three
+   emitters). SetSparkle skips the 'Promi' node unless it is on.
+2. **The hollow shine ("still differs every 180 degrees").** 127g's lock was not the cause: the 127g captures at 90 degrees show CREAM
+   STRIPES on the sliver. The 127g fold sent every side wall (tilt > 0.9) to the lookup's CENTRE, where the TEV's stage-1 spot (K1 x I1) is at
+   full strength: (0.90, 0.89, 0.71) at alpha 0.8 -- the walls painted cream, and edge-on a dozen of them stack their alpha into a bar, while
+   face-on the smooth-shaded face (its vertex normals tilt 0.2 .. 0.6 off the axis) reads the blue-grey part of the ramp at 0.6 alpha. So the
+   colour changed with the angle, as he said. Now (DEVIATION, "the tint as 1 at every angle"): the glass is ONE colour -- `EmptyTint`
+   (0.557, 0.541, 0.733) @ 0.6 on the flat faces (fitted to his screenshot 1: its body read (150, 133, 214) over Ricco's purple (162, 126, 255)),
+   `EmptyRim` (0.79, 0.79, 0.74) @ 0.75 on the bevels and side walls (its bevels (192, 183, 205)), picked by each normal's tilt off the star's
+   own face axis in the mesh (the front and the back match) -- and drawn as ONE LAYER: the body surface gets a depth-only ShaderMaterial
+   (alpha 0, depth_draw_always, priority -2) whose NextPass is the glass (depth_draw_never, priority -1): the nearest wall writes depth, the
+   glass is tested against it, so edge-on the sliver is one layer of the same tint. The glow (priority 0) is then depth-tested BEHIND the body
+   (the halo outside the star, the hot core no longer through the face -- as in his 1), the eyes (priority 1) draw over it (NoDepthTest on the
+   hollow: the eye dome straddles the face plane). Godot's own `depth_prepass_alpha` cannot do this: it writes depth only above ~0.99 alpha.
+   `EmptyGameLook` on = the bmd's TEV as before (it changes colour with the spin). Captured at 186 / 276 / 6 / 96 degrees of spin: the body
+   (133, 162, 200) / (167, 214, 255 edge) / (121, 142, 213) / (169, 199, 255 edge) over the blue -- one grey-lavender glass, no stripes.
+3. **The A press ("not really rectangles -- streaks that look off, maybe because the shine is see-through").** The streak emitters are not
+   centred quads with a roll. ms_2d_scsel_on_a is BSP1 type 9 DirBillboard with ESP1 pivot Y 2: JPADraw.cpp 813 sets unkC.y = unk4.y x
+   (pivotY - 1), so JPADrawExecDirBillBoard's quad spans 0 .. 2h along the particle's on-screen VELOCITY with tex v = 0 (the senko's soft
+   point) at the far end and v = 1 (its bright flat base) AT the particle; and the emitter's omni velocity is RADIAL from the burst's centre
+   (JPAEmitter.cpp 541: setLength(the volume position, omni)). Every streak stands on the centre, bright end in, soft point out -- a
+   starburst; type 9 has no rotation exec (the ESP1 rotate is ignored). 127b-g drew them centred with a random roll, their hard bright bases
+   scattered: the "rectangles". ms_2d_scsel_on_a2's lines likewise run from the particle BACK along the velocity (JPADrawExecLine) off a
+   radial 3.5 -> 6 u/f. `JpaDir2D.gdshader` (canvas_item): shifts VERTEX along the particle's own Y by half the texture (anchor +1 = the base
+   at the particle growing ahead, -1 = trailing behind) and flips v; the process materials use radial_velocity (no initial velocity, no
+   angle) with align_y. Captured on both picks: the gold's lines fly outward from the sun; the hollow's streaks fan out from behind the
+   glass, their roots hidden by the now one-layer body. The same senko texture serves three disc names (P_ms_senko1_i = hoso_senko4 =
+   P_msm_senko_i's pixels; only their BTI headers differ) -- checked, not a dump bug.
+
+**Verified on his PC by GPU capture** (cap_select.gd: the hollow shine every 90 degrees with the ring's spin angle printed, the gold pick
+series, and with SMS_CAP_PICK_EMPTY=1 the hollow pick series). Drive 127 66 / 66 (five new: S2g the depth pass -> glass chain and the
+colours, S2h the gold drawn directly, S3c kira + senko on with the flame off, S6h the streaks radial / aligned / unrolled / anchored base-in,
+S6i the lines radial off the ring trailing behind); the select section alone 35 / 35. Build 0 errors, boot ALL OK; the drive removed.
+Tools: shape_list.py (every emitter's shape / pivot / rotation), glb_faces.py (a glb's front / back / side triangles per primitive).
+### 127i -- the select glow behind the body ("push the glow farther back so the turning doesn't affect it")
+
+**Files:** `SmsSelectShineRing.cs` (GlowBackUnits, PlaceGlow, GlowOffset / GlowScale for the drive).
+
+With the glow quad AT the body's centre (the bmd's starglow joint), 127h's depth test clipped it only where the body was NEARER than the
+centre plane: the far half of a turning star had the glow painted over it and the near half not -- a bright half-moon that swapped sides
+every quarter turn (his "the turning affects the glow"). The quad now sits `GlowBackUnits` (100, DEVIATION; 0 = the joint) BEHIND the
+centre along the CAMERA's view, placed each frame in world space (the slot's own frame spins): the star's points reach 71 units from its
+axis and its faces 27.5, so at 100 the whole body is in front of the glow at every spin angle -- the glow is clipped by the body's
+silhouette and nothing else moves with the turn. Enlarged by (distance + back) / distance (1.077 at the selected shine's 1300 units;
+BillboardKeepScale on) so the halo's size on screen is unchanged. Both shines (the gold's back half carried the same glow).
+
+**Verified on his PC by GPU capture**: the hollow shine at 45-degree steps (186 / 234 / 276 / 324 / 6 / 54 degrees): no glow on either half
+at the 45-degree frames, the halo outside the silhouette as before, the exact back view symmetric (L (112, 149, 200) = R (112, 148, 201)), the
+halo at 100 px from the centre the same brightness as 127h. Drive 127's select section 37 / 37 (two new: S2i both glows 100 behind along
+the view with the 1.077 scale, S3d the offset the same world vector after the ring's turn and the spin). Build 0 errors, boot ALL OK;
+the drive removed.

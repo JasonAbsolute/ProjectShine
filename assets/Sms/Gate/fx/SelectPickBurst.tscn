@@ -1,0 +1,325 @@
+[gd_scene load_steps=27 format=3 uid="uid://cselpick127"]
+
+[ext_resource type="Script" path="res://assets/Sms/Gate/SmsSelectPickBurst.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/glow4.png" id="2_glow4"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/radgrad.png" id="3_radgrad"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/fx/senko1.png" id="4_senko1"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/shikaku.png" id="5_shikaku"]
+[ext_resource type="Shader" path="res://assets/Sms/Gate/fx/JpaDir2D.gdshader" id="6_dir2d"]
+
+[sub_resource type="CanvasItemMaterial" id="CIM_add"]
+blend_mode = 1
+particles_animation = false
+
+[sub_resource type="CanvasItemMaterial" id="CIM_mix"]
+blend_mode = 0
+
+[sub_resource type="ShaderMaterial" id="Mat_streak2d"]
+shader = ExtResource("6_dir2d")
+shader_parameter/anchor = 1.0
+shader_parameter/flip_v = true
+
+[sub_resource type="ShaderMaterial" id="Mat_line2d"]
+shader = ExtResource("6_dir2d")
+shader_parameter/anchor = -1.0
+shader_parameter/flip_v = false
+
+[sub_resource type="Curve" id="CurveTex_d_scale_x"]
+max_value = 84.375
+_data = [Vector2(0.0, 0.0), 0.0, 0.0, 1, 1, Vector2(1.0, 84.375), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="CurveTex_d_scale_y"]
+max_value = 75.0
+_data = [Vector2(0.0, 0.0), 0.0, 0.0, 1, 1, Vector2(1.0, 75.0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="CurveTex_d_scale_z"]
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 1.0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveTex_d_scale"]
+curve_x = SubResource("CurveTex_d_scale_x")
+curve_y = SubResource("CurveTex_d_scale_y")
+curve_z = SubResource("CurveTex_d_scale_z")
+
+[sub_resource type="Gradient" id="Grad_d"]
+interpolation_mode = 0
+offsets = PackedFloat32Array(0.0, 0.2, 0.375, 1.0)
+colors = PackedColorArray(1.0000, 1.0000, 1.0000, 1.0000, 0.4353, 0.5294, 1.0000, 1.0000, 0.6235, 1.0000, 0.8118, 1.0000, 1.0000, 0.4353, 0.0000, 0.0000)
+
+[sub_resource type="GradientTexture1D" id="GradTex_d"]
+gradient = SubResource("Grad_d")
+
+[sub_resource type="ParticleProcessMaterial" id="PPM_d"]
+resource_name = "ms_2d_scsel_on_d: one glow4 pop 900 x 800 px at the pick, growing x 3 over 32 frames, white -> blue -> mint -> orange, fading from 37 %"
+particle_flag_disable_z = true
+emission_shape = 0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+gravity = Vector3(0, 0, 0)
+scale_min = 1.0
+scale_max = 1.0
+scale_curve = SubResource("CurveTex_d_scale")
+color_ramp = SubResource("GradTex_d")
+
+[sub_resource type="Curve" id="CurveTex_c_scale_x"]
+max_value = 46.875
+_data = [Vector2(0.0, 0.0), 0.0, 0.0, 1, 1, Vector2(0.45, 46.875), 0.0, 0.0, 1, 1, Vector2(1.0, 46.875), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="Curve" id="CurveTex_c_scale_y"]
+max_value = 39.0625
+_data = [Vector2(0.0, 0.0), 0.0, 0.0, 1, 1, Vector2(0.45, 39.0625), 0.0, 0.0, 1, 1, Vector2(1.0, 39.0625), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="Curve" id="CurveTex_c_scale_z"]
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 1.0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveTex_c_scale"]
+curve_x = SubResource("CurveTex_c_scale_x")
+curve_y = SubResource("CurveTex_c_scale_y")
+curve_z = SubResource("CurveTex_c_scale_z")
+
+[sub_resource type="Gradient" id="Grad_c"]
+interpolation_mode = 0
+offsets = PackedFloat32Array(0.0, 0.375, 1.0)
+colors = PackedColorArray(1.0000, 1.0000, 1.0000, 0.0000, 1.0000, 1.0000, 1.0000, 0.6235, 1.0000, 1.0000, 1.0000, 0.0000)
+
+[sub_resource type="GradientTexture1D" id="GradTex_c"]
+gradient = SubResource("Grad_c")
+
+[sub_resource type="ParticleProcessMaterial" id="PPM_c"]
+resource_name = "ms_2d_scsel_on_c: one white radgrad flood 600 x 500 px from frame 30, growing x 2.5, alpha to 0.625 by 37 % then out, 200 frames"
+particle_flag_disable_z = true
+emission_shape = 0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+gravity = Vector3(0, 0, 0)
+scale_min = 1.0
+scale_max = 1.0
+scale_curve = SubResource("CurveTex_c_scale")
+color_ramp = SubResource("GradTex_c")
+
+[sub_resource type="Gradient" id="Grad_b"]
+interpolation_mode = 0
+offsets = PackedFloat32Array(0.0, 0.33, 0.66, 1.0)
+colors = PackedColorArray(1.0000, 0.5294, 0.0000, 1.0000, 0.0000, 1.0000, 0.5294, 1.0000, 0.5294, 0.0000, 1.0000, 1.0000, 1.0000, 0.5294, 0.0000, 1.0000)
+
+[sub_resource type="GradientTexture1D" id="GradTex_b"]
+gradient = SubResource("Grad_b")
+
+[sub_resource type="Curve" id="Curve_b_alpha"]
+_data = [Vector2(0.0, 0.0), 0.0, 0.0, 1, 1, Vector2(0.25, 0.375), 0.0, 0.0, 1, 1, Vector2(1.0, 0.2), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveTexture" id="CurveTex_b_alpha"]
+curve = SubResource("Curve_b_alpha")
+
+[sub_resource type="Curve" id="CurveTex_b_scale_x"]
+max_value = 1.828125
+_data = [Vector2(0.0, 0.703125), 0.0, 0.0, 1, 1, Vector2(0.48, 1.40625), 0.0, 0.0, 1, 1, Vector2(1.0, 1.828125), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="Curve" id="CurveTex_b_scale_y"]
+max_value = 1.625
+_data = [Vector2(0.0, 0.625), 0.0, 0.0, 1, 1, Vector2(0.48, 1.25), 0.0, 0.0, 1, 1, Vector2(1.0, 1.625), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="Curve" id="CurveTex_b_scale_z"]
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 1.0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveTex_b_scale"]
+curve_x = SubResource("CurveTex_b_scale_x")
+curve_y = SubResource("CurveTex_b_scale_y")
+curve_z = SubResource("CurveTex_b_scale_z")
+
+[sub_resource type="ParticleProcessMaterial" id="PPM_b"]
+resource_name = "ms_2d_scsel_on_b: radgrad glows 45 x 40 px flying 11 px/f every way with drag, a random rainbow colour, dim (0.375 -> 0.2), life 160"
+particle_flag_disable_z = true
+emission_shape = 3
+emission_box_extents = Vector3(10, 1, 1)
+spread = 180.0
+initial_velocity_min = 577.5
+initial_velocity_max = 742.5
+gravity = Vector3(0, 0, 0)
+damping_min = 300.0
+damping_max = 300.0
+scale_min = 0.625
+scale_max = 1.375
+scale_curve = SubResource("CurveTex_b_scale")
+color_initial_ramp = SubResource("GradTex_b")
+alpha_curve = SubResource("CurveTex_b_alpha")
+
+[sub_resource type="Gradient" id="Grad_a_hue"]
+interpolation_mode = 0
+offsets = PackedFloat32Array(0.0, 0.5, 1.0)
+colors = PackedColorArray(0.4353, 0.4353, 1.0000, 1.0000, 0.4353, 1.0000, 0.4353, 1.0000, 1.0000, 0.4353, 0.4353, 1.0000)
+
+[sub_resource type="GradientTexture1D" id="GradTex_a_hue"]
+gradient = SubResource("Grad_a_hue")
+
+[sub_resource type="Curve" id="Curve_a_alpha"]
+_data = [Vector2(0.0, 0.0), 0.0, 0.0, 1, 1, Vector2(0.25, 0.5), 0.0, 0.0, 1, 1, Vector2(0.5, 0.5), 0.0, 0.0, 1, 1, Vector2(1.0, 0.0), 0.0, 0.0, 1, 1]
+point_count = 4
+
+[sub_resource type="CurveTexture" id="CurveTex_a_alpha"]
+curve = SubResource("Curve_a_alpha")
+
+[sub_resource type="Curve" id="CurveTex_a_scale_x"]
+max_value = 0.78125
+_data = [Vector2(0.0, 0.3125), 0.0, 0.0, 1, 1, Vector2(1.0, 0.78125), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="CurveTex_a_scale_y"]
+max_value = 7.96875
+_data = [Vector2(0.0, 2.65625), 0.0, 0.0, 1, 1, Vector2(1.0, 7.96875), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="CurveTex_a_scale_z"]
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 1.0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveTex_a_scale"]
+curve_x = SubResource("CurveTex_a_scale_x")
+curve_y = SubResource("CurveTex_a_scale_y")
+curve_z = SubResource("CurveTex_a_scale_z")
+
+[sub_resource type="ParticleProcessMaterial" id="PPM_a"]
+resource_name = "ms_2d_scsel_on_a: senko1 streaks 10 x 85 px standing on the centre (base in, point out along their radial 0.5 px/f drift), 2.4 a frame from frame 30 in a 15 px sphere, blue -> green -> red over the life, growing x 2.5 / x 3, life 100 +-37 %"
+lifetime_randomness = 0.375
+particle_flag_align_y = true
+particle_flag_disable_z = true
+emission_shape = 1
+emission_sphere_radius = 15.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+radial_velocity_min = 30.0
+radial_velocity_max = 30.0
+gravity = Vector3(0, 0, 0)
+scale_min = 0.25
+scale_max = 1.75
+scale_curve = SubResource("CurveTex_a_scale")
+color_ramp = SubResource("GradTex_a_hue")
+alpha_curve = SubResource("CurveTex_a_alpha")
+
+[sub_resource type="Gradient" id="Grad_a2_hue"]
+interpolation_mode = 0
+offsets = PackedFloat32Array(0.0, 0.5, 1.0)
+colors = PackedColorArray(0.2471, 0.2471, 1.0000, 1.0000, 0.2471, 1.0000, 0.2471, 1.0000, 1.0000, 0.1529, 0.1529, 1.0000)
+
+[sub_resource type="GradientTexture1D" id="GradTex_a2_hue"]
+gradient = SubResource("Grad_a2_hue")
+
+[sub_resource type="Curve" id="Curve_a2_alpha"]
+_data = [Vector2(0.0, 0.0), 0.0, 0.0, 1, 1, Vector2(0.25, 1.0), 0.0, 0.0, 1, 1, Vector2(0.625, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 0.0), 0.0, 0.0, 1, 1]
+point_count = 4
+
+[sub_resource type="CurveTexture" id="CurveTex_a2_alpha"]
+curve = SubResource("Curve_a2_alpha")
+
+[sub_resource type="Curve" id="CurveTex_a2_scale_x"]
+max_value = 0.15625
+_data = [Vector2(0.0, 0.15625), 0.0, 0.0, 1, 1, Vector2(1.0, 0.15625), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="CurveTex_a2_scale_y"]
+max_value = 3.125
+_data = [Vector2(0.0, 1.5625), 0.0, 0.0, 1, 1, Vector2(1.0, 3.125), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="CurveTex_a2_scale_z"]
+_data = [Vector2(0.0, 1.0), 0.0, 0.0, 1, 1, Vector2(1.0, 1.0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveTex_a2_scale"]
+curve_x = SubResource("CurveTex_a2_scale_x")
+curve_y = SubResource("CurveTex_a2_scale_y")
+curve_z = SubResource("CurveTex_a2_scale_z")
+
+[sub_resource type="ParticleProcessMaterial" id="PPM_a2"]
+resource_name = "ms_2d_scsel_on_a2 (a cleared episode): shikaku LINES 2 px wide, 25 -> 50 px long trailing behind the flight, 10 a frame from frame 30 off a 35 px ring, radially 3.5 -> 6 px/f (+-25 %) with a 0.1 px/f wobble, blue -> green -> red over the life, life 90"
+lifetime_randomness = 0.25
+particle_flag_disable_z = true
+particle_flag_align_y = true
+emission_shape = 6
+emission_ring_axis = Vector3(0, 0, 1)
+emission_ring_radius = 35.0
+emission_ring_inner_radius = 30.0
+emission_ring_height = 1.0
+spread = 180.0
+initial_velocity_min = 6.0
+initial_velocity_max = 6.0
+radial_velocity_min = 157.5
+radial_velocity_max = 450.0
+gravity = Vector3(0, 0, 0)
+scale_min = 0.75
+scale_max = 1.25
+scale_curve = SubResource("CurveTex_a2_scale")
+color_ramp = SubResource("GradTex_a2_hue")
+alpha_curve = SubResource("CurveTex_a2_alpha")
+
+[node name="SelectPickBurst" type="Node2D"]
+script = ExtResource("1_script")
+
+[node name="Pop" type="GPUParticles2D" parent="."]
+material = SubResource("CIM_add")
+emitting = false
+amount = 1
+process_material = SubResource("PPM_d")
+texture = ExtResource("2_glow4")
+lifetime = 0.5333
+one_shot = true
+explosiveness = 1.0
+fixed_fps = 60
+local_coords = false
+
+[node name="Flood" type="GPUParticles2D" parent="."]
+material = SubResource("CIM_mix")
+emitting = false
+amount = 1
+process_material = SubResource("PPM_c")
+texture = ExtResource("3_radgrad")
+lifetime = 3.3333
+one_shot = true
+explosiveness = 1.0
+fixed_fps = 60
+local_coords = false
+
+[node name="Glows" type="GPUParticles2D" parent="."]
+material = SubResource("CIM_add")
+emitting = false
+amount = 40
+process_material = SubResource("PPM_b")
+texture = ExtResource("3_radgrad")
+lifetime = 2.6667
+one_shot = true
+explosiveness = 0.3
+fixed_fps = 60
+local_coords = false
+
+[node name="Streaks" type="GPUParticles2D" parent="."]
+material = SubResource("Mat_streak2d")
+emitting = false
+amount = 120
+process_material = SubResource("PPM_a")
+texture = ExtResource("4_senko1")
+lifetime = 1.6667
+one_shot = true
+explosiveness = 0.0
+fixed_fps = 60
+local_coords = false
+
+[node name="Lines" type="GPUParticles2D" parent="."]
+material = SubResource("Mat_line2d")
+emitting = false
+amount = 300
+process_material = SubResource("PPM_a2")
+texture = ExtResource("5_shikaku")
+lifetime = 1.5
+one_shot = true
+explosiveness = 0.0
+fixed_fps = 60
+local_coords = false

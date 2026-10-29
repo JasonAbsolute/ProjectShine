@@ -1924,7 +1924,22 @@ public partial class Mario : CharacterBody3D
     public void RevealFromIntro(Transform3D? spawnTransform = null)
     {
         if (spawnTransform.HasValue)
-            GlobalTransform = spawnTransform.Value;
+        {
+            // 127b: the spawn point's POSITION, and its yaw as his start facing -- the root stays unrotated (pass 54: the armature, the camera
+            // pivot and the sensors are posed in its frame as the world's; a rotated root flipped every character in Rico4Secret, whose spawn
+            // point is turned 180 degrees)
+            GlobalPosition = spawnTransform.Value.Origin;
+            GlobalRotation = Vector3.Zero;
+            Vector3 fwd = -spawnTransform.Value.Basis.Z; fwd.Y = 0f;
+            if (fwd.LengthSquared() > 1e-6f)
+            {
+                fwd = fwd.Normalized();
+                float yaw = SmsMath.YawFromDir(fwd);
+                _smsFaceYaw = yaw; _smsFaceValid = true;
+                lastFacingDirection = fwd;
+                if (armature != null) { armature.Rotation = new Vector3(0f, yaw, 0f); _lastArmatureYaw = yaw; }
+            }
+        }
 
         Visible = true;
         SetProcess(true);
@@ -1999,13 +2014,14 @@ public partial class Mario : CharacterBody3D
 
         SmsShineDemoTick(delta);   // pass 116: the shine-get demo's clock, camera, shine, fade (runs through the lock)
         SmsGateOutTick(delta);     // pass 119: the return from a stage -- warpOut's appear / rolling / landing (runs through the lock)
+        SmsWarpInTick(delta);      // pass 127: the M gate's warp-in -- the pull, the balls, the capture, the wipe (runs through the lock)
 
         if (CameraLocked)
         {
             SmsFluddDropsTickLocked(delta);   // 116d: the water in flight keeps falling through the demo / the lock (TModelWaterManager::move)
             bool wasAirPrev = !wasOnFloor;
 
-            if (IsOnFloor() || _smsGateOutPhase == 1)   // 119: warpOut state 1 runs no jumpProcess -- he hangs at the gate until the hold is over
+            if (IsOnFloor() || _smsGateOutPhase == 1 || _smsWarpInPhase > 0)   // 119: warpOut state 1 runs no jumpProcess -- he hangs at the gate until the hold is over; 127: the warp-in moves him itself
             {
                 // Standing: full freeze, no slide.
                 velocity = Vector3.Zero;
@@ -11535,7 +11551,7 @@ public partial class Mario : CharacterBody3D
     private void SmsDamageExec(Vector3 attackerPos, SmsDamageProfile p)
     {
         // isInvincible(): mInvincibilityFrames > 0 (also talking / demo); mHealth == 0 and game over return as well
-        if (_smsInvincibleTicks > 0 || _health <= 0 || stateOfMario == MarioState.dead)
+        if (_smsInvincibleTicks > 0 || _health <= 0 || stateOfMario == MarioState.dead || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.talking)   // 127: isInvincible() is also true in a demo / talking
             return;
         // Port-side: no second hit while he is already down. The game has no such rule (its enemies recoil from the hit,
         // and dmgenemycommon.prm gives no invincibility), but ours keep touching him through the fall.
@@ -16195,7 +16211,7 @@ public partial class Mario : CharacterBody3D
             _smsGraffitoTimer--;
             return;
         }
-        if (_smsInvincibleTicks > 0 || _health <= 0 || stateOfMario == MarioState.dead)
+        if (_smsInvincibleTicks > 0 || _health <= 0 || stateOfMario == MarioState.dead || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.talking)   // 127: isInvincible() is also true in a demo / talking
             return;
         if (!SmsWaitingOrRunningType(stateOfMario))
             return;
@@ -19859,5 +19875,301 @@ public partial class Mario : CharacterBody3D
                 break;
         }
     }
+
+    // ===== SMS pass 127: the M gate warp-in BEGIN =====
+    // <summary>
+    // SMS pass 127: MARIO_STATUS_WARP_IN -- TMario::warpIn (MarioAutodemo.cpp 158-249) and the TAKE from an M gate (MarioReceiveMsg.cpp
+    // 856: ACTOR_TYPE_MODEL_GATE). The gate takes him when he is JUMPING inside its box; he is then drawn toward the gate's hold point
+    // (unkAC, 80 below: centred on the M) 2 % a tick for 120 ticks, trembling harder the nearer he gets (mWarpInTremble 6 - dist / 10),
+    // his pose frozen (the jump's last frame if he was not already in one). Then the light balls leave his joints (warpInEffect, the
+    // ms_mariowp_* set -- a slot), he vanishes 6 ticks in, the pad buzzes, and after 90 ticks the balls are pulled into the gate for 110
+    // more (mWarpInVecBase 0.6); the gate gets HIT_MESSAGE_ATTACK (its glow fades) and he is IS_PERFORMING -- frozen -- while the
+    // director moves the stage: the spiral wipe (Hx_Test4, type 8) 0.4 s later with the pipe sound, and at black the episode select.
+    // The numbers are autodemo.prm's (6 / 90 / 110 / 6.0 / 0.6), which override the code's 6 / 70 / 120 / 15 / 0.3. Mario's status
+    // ticks are the 120 Hz movement ticks (pass 119). The game's demo camera on the gate is the locked camera here -- DEVIATION.
+    // </summary>
+    [ExportGroup("SMS gate warp-in (pass 127)")]
+    /// <summary>0x78 of mStatusTimer: ticks of the pull toward the hold point (1 s).</summary>
+    [Export] public int SmsWarpInPullTicks = 120;
+    /// <summary>The pull: this much of the way to the hold point every tick (marioDist x 0.02).</summary>
+    [Export] public float SmsWarpInPullRate = 0.02f;
+    /// <summary>autodemo.prm mWarpInBallsDispTime: ticks into the balls before he vanishes and the pad buzzes.</summary>
+    [Export] public int SmsWarpInBallsDispTicks = 6;
+    /// <summary>autodemo.prm mWarpInBallsTime: ticks the balls hang before they are pulled in.</summary>
+    [Export] public int SmsWarpInBallsTicks = 90;
+    /// <summary>autodemo.prm mWarpInCapturedTime: ticks of the pull of the balls into the gate before the capture.</summary>
+    [Export] public int SmsWarpInCapturedTicks = 110;
+    /// <summary>autodemo.prm mWarpInVecBase: the balls' pull strength (per tick per tick, scaled by each ball's own factor).</summary>
+    [Export] public float SmsWarpInVecBase = 0.6f;
+    /// <summary>autodemo.prm mWarpInTremble: the shake (units) at the hold point, less by a tenth of the distance left.</summary>
+    [Export] public float SmsWarpInTremble = 6f;
+    /// <summary>The pad: rumbleStart(0x15, 0x14) at the vanish and (0x14, mMotorWall / 2) every tick of the capture.</summary>
+    [Export] public bool SmsWarpInRumble = true;
+    /// <summary>127b: the warp-in's effects scene (WarpBalls.tscn when empty): the ten light-ball bursts off his joints with the game's pull toward
+    /// the gate (SmsWarpBalls), the dust rings and streaks, and the senko flash at the take -- all from the disc's ms_mariowp_* files.</summary>
+    [Export] public PackedScene SmsWarpInBallsScene;
+    /// <summary>STATE_UNK9: startWipe(8, 0.4) -- the spiral wipe begins this long after the capture.</summary>
+    [Export] public float SmsWarpInWipeDelay = 0.4f;
+    /// <summary>MSD_SE_MA_INTO_DOKAN, played as the wipe starts (a slot).</summary>
+    [Export] public AudioStreamPlayer SmsWarpInWipeSound;
+    /// <summary>The episode select screen (TSelectDir) the stage move goes through; empty = straight to the stage.</summary>
+    [Export(PropertyHint.File, "*.tscn")] public string SmsEpisodeSelectScene = "res://assets/Sms/Gate/EpisodeSelect.tscn";
+
+    private SmsModelGate _smsWarpGate;
+    private int _smsWarpInPhase;          // 0 none; 1 the pull (state 0); 2 the balls (1); 3 the capture (2); 4 performing (3)
+    private float _smsWarpInTicks;        // mStatusTimer
+    private float _smsWarpInPull;         // unk468
+    private Vector3 _smsWarpInDir;        // mWarpInDir
+    private Vector3 _smsWarpTrembleBase;
+    private bool _smsWarpInHidden, _smsWarpWipeStarted, _smsWarpMoved, _smsWarpTrembling;
+    private float _smsWarpWipeT;
+    private Node3D _smsWarpBalls;
+    public bool SmsWarpInRunning => _smsWarpInPhase > 0;
+    public int SmsWarpInPhase => _smsWarpInPhase;
+    public float SmsWarpInTicks => _smsWarpInTicks;
+    public SmsModelGate SmsWarpGate => _smsWarpGate;
+    /// <summary>MARIO_FLAG_HAS_FLUDD, for the balls scene (the FLUDD burst only with the pack).</summary>
+    public bool HasFludd => _smsHasFludd;
+
+    /// <summary>SMS_IsMarioStatusTypeJumping: in the air by a jump-type status (the gate takes him only then).</summary>
+    public bool SmsWarpInJumping()
+    {
+        if (IsOnFloor()) return false;
+        switch (stateOfMario)
+        {
+            case MarioState.singleJump: case MarioState.doubleJump: case MarioState.tripleJump: case MarioState.sideFlip: case MarioState.SpinJump:
+            case MarioState.backFlip: case MarioState.diving: case MarioState.singleJumpDive: case MarioState.doubleJumpDive: case MarioState.tripleJumpDive:
+            case MarioState.wallJump: case MarioState.fluddRocket: case MarioState.ledgeFall: case MarioState.stomping: case MarioState.bonk:
+            case MarioState.groundPoundStartup: case MarioState.groundPoundFalling: case MarioState.hurt:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /// <summary>receiveMessage(gate, HIT_MESSAGE_TAKE): not already warping -> mHolder = the gate, the jump pose at its end if he was not jumping,
+    /// WARP_IN. False = refused (another demo owns him).</summary>
+    public bool SmsWarpInTake(SmsModelGate gate)
+    {
+        if (gate == null || _smsWarpInPhase > 0) return false;
+        if (stateOfMario == MarioState.shineGet || stateOfMario == MarioState.dead || stateOfMario == MarioState.talking) return false;
+        _smsWarpGate = gate;
+        bool wasJumping = SmsWarpInJumping();
+        if (heldBody != null) Anim_DetachPickup();
+        pendingPickup = null;
+        CameraLocked = true;
+        stateOfMario = MarioState.shineGet;   // the demo lock: input and the state machine off (as the gate-out, pass 119)
+        SetMarioState(stateOfMario);
+        velocity = Vector3.Zero; Velocity = Vector3.Zero;
+        if (animTree != null) animTree.Active = false;
+        if (animPlayer != null)
+        {
+            // setAnimation(ANIM_JUMP) at its end frame when he was not jumping; a jumping Mario keeps his frame -- but the demo state's entry
+            // (SetMarioState above) has just started ma_demo_shine_get, whose frame 0 carries the demo's 90-unit centre translation (the walk-in),
+            // so the frozen pose would stand 1.2 m from his body (drive 127b, G7b). Hold the jump clip's last frame in both cases -- a tiny deviation.
+            if (animPlayer.HasAnimation("ma_jump"))
+            {
+                animPlayer.Play("ma_jump");
+                animPlayer.Seek(animPlayer.CurrentAnimationLength, true);
+            }
+            animPlayer.SpeedScale = 0f;   // getMotionFrameCtrl().setRate(0): the pose freezes
+        }
+        _smsWarpInPhase = 1; _smsWarpInTicks = 0f; _smsWarpInPull = 0f;
+        _smsWarpWipeStarted = false; _smsWarpMoved = false; _smsWarpWipeT = 0f;
+        _smsWarpTrembleBase = armature != null ? armature.Position : Vector3.Zero; _smsWarpTrembling = false;
+        if (SmsDebugPrint) GD.Print($"[SMS warp] TAKEN by {gate.Name} at {GlobalPosition} ({(wasJumping ? "mid-jump" : "not jumping: the jump pose")}); the hold {gate.HoldPointWorld}; centre joint {SmsCenterTransform().Origin - GlobalPosition} from his feet, clip {animPlayer?.CurrentAnimation} at {animPlayer?.CurrentAnimationPosition:F2}");
+        return true;
+    }
+
+    private void SmsWarpInHide(bool hide)
+    {
+        if (_smsWarpInHidden == hide) return;
+        _smsWarpInHidden = hide;
+        if (armature != null) armature.Visible = !hide;   // offUnk114(UNK114_FLAG_VISIBLE)
+    }
+
+    /// <summary>Every physics frame before the lock block: warpIn's states at 120 ticks a second, then the director's stage move.</summary>
+    private void SmsWarpInTick(double delta)
+    {
+        if (_smsWarpInPhase == 0) return;
+        if (stateOfMario != MarioState.shineGet || _smsWarpGate == null || !IsInstanceValid(_smsWarpGate))
+        {   // left some other way (his debug keys, a reload): everything back
+            SmsWarpInAbort("the demo state was left");
+            return;
+        }
+        float ticks = (float)delta * SmsUnits.TicksPerSecond;
+        velocity = Vector3.Zero; Velocity = Vector3.Zero;
+        Vector3 hold = _smsWarpGate.HoldPointWorld;
+        switch (_smsWarpInPhase)
+        {
+            case 1:
+            {
+                float before = _smsWarpInTicks;
+                _smsWarpInTicks += ticks;
+                if (before < 1f)
+                {   // the first tick: the pull direction (the centre less the hold), the flash, setNextStage
+                    _smsWarpInDir = (_smsWarpGate.CentreWorld - _smsWarpGate.HoldPointWorld).Normalized();
+                    SmsWarpInMakeBalls();
+                    if (_smsWarpBalls != null)
+                    {
+                        _smsWarpBalls.GlobalPosition = GlobalPosition + Vector3.Up * SmsUnits.UnitsToMetres(SmsUnits.MarioHeightUnits * 0.5f);
+                        if (_smsWarpBalls.HasMethod("SmsWarpInFlash")) _smsWarpBalls.Call("SmsWarpInFlash");   // warpInLight: ms_mariowp_senko at his centre
+                    }
+                    if (GameData.Instance != null) { GameData.Instance.PendingStage = _smsWarpGate.Stage; GameData.Instance.PendingEpisode = -1; }
+                }
+                SmsWarpInHide(false);
+                if (_smsWarpBalls != null && IsInstanceValid(_smsWarpBalls)) _smsWarpBalls.GlobalPosition = GlobalPosition + Vector3.Up * SmsUnits.UnitsToMetres(SmsUnits.MarioHeightUnits * 0.5f);   // FollowEmitter: the flash rides his centre
+                // marioDist x 0.02 a tick, as many ticks as this frame holds
+                int n = Mathf.Max(1, Mathf.RoundToInt(ticks));
+                for (int i = 0; i < n; i++) GlobalPosition += (hold - GlobalPosition) * SmsWarpInPullRate;
+                float distUnits = SmsUnits.MetresToUnits((hold - GlobalPosition).Length());
+                float tremble = SmsWarpInTremble - distUnits * 0.1f;
+                if (tremble > 0f && armature != null)
+                {   // mTrembleModelEffect->clash(dist): the model shakes by that many units (the game kicks the vertices; the armature here)
+                    _smsWarpTrembling = true;
+                    Vector3 off = new Vector3(GD.Randf() - 0.5f, GD.Randf() - 0.5f, GD.Randf() - 0.5f).Normalized() * SmsUnits.UnitsToMetres(tremble);
+                    armature.Position = _smsWarpTrembleBase + off;
+                }
+                if (_smsWarpInTicks > SmsWarpInPullTicks)
+                {
+                    _smsWarpInTicks = 0f; _smsWarpInPull = 0f;
+                    SmsWarpInBalls();
+                    _smsWarpInPhase = 2;
+                    if (SmsDebugPrint) GD.Print($"[SMS warp] the pull is over at {GlobalPosition} ({distUnits:F0} units from the hold): the light balls; centre joint {SmsCenterTransform().Origin - GlobalPosition} from his feet, clip {animPlayer?.CurrentAnimation} at {animPlayer?.CurrentAnimationPosition:F2} speed {animPlayer?.SpeedScale}");
+                }
+                break;
+            }
+            case 2:
+                _smsWarpInTicks += ticks;
+                if (_smsWarpInTicks > SmsWarpInBallsDispTicks)
+                {
+                    if (!_smsWarpInHidden)
+                    {
+                        SmsWarpInHide(true);
+                        if (SmsWarpInRumble) Input.StartJoyVibration(0, 0.6f, 1f, 0.35f);   // rumbleStart(0x15, 0x14)
+                        if (SmsDebugPrint) GD.Print($"[SMS warp] gone (tick {_smsWarpInTicks:F0} of the balls)");
+                    }
+                }
+                if (_smsWarpInTicks > SmsWarpInBallsTicks)
+                {
+                    _smsWarpInTicks = 0f; _smsWarpInPull = SmsWarpInVecBase;
+                    _smsWarpInPhase = 3;
+                    if (SmsDebugPrint) GD.Print("[SMS warp] the balls are pulled in");
+                }
+                break;
+            case 3:
+                SmsWarpInHide(true);
+                _smsWarpInTicks += ticks;
+                if (SmsWarpInRumble) Input.StartJoyVibration(0, 0.3f, 0.5f, 0.05f);   // rumbleStart(0x14, mMotorWall / 2) every tick
+                SmsWarpInBallsPull();
+                if (_smsWarpInTicks > SmsWarpInCapturedTicks)
+                {
+                    _smsWarpInTicks = 0f;
+                    _smsWarpGate.SmsCaptured();   // mHolder->receiveMessage(this, HIT_MESSAGE_ATTACK)
+                    _smsWarpInPhase = 4;
+                    if (SmsDebugPrint) GD.Print("[SMS warp] CAPTURED: performing; the wipe follows");
+                }
+                break;
+            case 4:
+                // onFlag(MARIO_FLAG_IS_PERFORMING): nothing of his runs; the director's STATE_UNK9: the wipe after its delay, the move at black
+                SmsWarpInHide(true);
+                _smsWarpWipeT += (float)delta;
+                var fader = SmsFader.Current;
+                if (!_smsWarpWipeStarted && _smsWarpWipeT >= SmsWarpInWipeDelay)
+                {
+                    _smsWarpWipeStarted = true;
+                    if (fader != null) fader.StartWipe(SmsFader.Wipe.Spiral, 0f);
+                    SmsWarpInWipeSound?.Play();
+                    if (SmsDebugPrint) GD.Print($"[SMS warp] the spiral wipe{(fader == null ? " (no fader: the move at once)" : "")}");
+                }
+                if (_smsWarpWipeStarted && !_smsWarpMoved && (fader == null || fader.IsFullyFadedOut))
+                {
+                    _smsWarpMoved = true;
+                    SmsWarpInMoveStage();
+                }
+                break;
+        }
+    }
+
+    /// <summary>The balls scene (WarpBalls.tscn by default): made once per warp-in at the take, so its flash can run through the pull.</summary>
+    private void SmsWarpInMakeBalls()
+    {
+        if (_smsWarpBalls != null && IsInstanceValid(_smsWarpBalls)) return;
+        var scene = SmsWarpInBallsScene;
+        if (scene == null && ResourceLoader.Exists("res://assets/Sms/Gate/fx/WarpBalls.tscn")) scene = GD.Load<PackedScene>("res://assets/Sms/Gate/fx/WarpBalls.tscn");
+        if (scene == null) return;
+        _smsWarpBalls = scene.Instantiate<Node3D>();
+        if (SmsDebugPrint) _smsWarpBalls.Set("DebugPrint", true);
+        (GetTree().CurrentScene ?? GetTree().Root).AddChild(_smsWarpBalls);
+    }
+
+    /// <summary>warpInEffect: the balls off his joints (the scene's SmsWarpInStart: ten bursts, the dust), each with TWarpInCallBack's pull toward the gate.</summary>
+    private void SmsWarpInBalls()
+    {
+        SmsWarpInMakeBalls();
+        if (_smsWarpBalls == null) return;
+        if (_smsWarpBalls.HasMethod("SmsWarpInStart")) _smsWarpBalls.Call("SmsWarpInStart", this, _smsWarpGate);
+        else
+        {
+            _smsWarpBalls.GlobalPosition = GlobalPosition + Vector3.Up * SmsUnits.UnitsToMetres(SmsUnits.MarioHeightUnits * 0.5f);
+            foreach (Node c in _smsWarpBalls.GetChildren()) if (c is GpuParticles3D p) { p.OneShot = true; p.Emitting = true; }
+        }
+    }
+
+    /// <summary>TWarpInCallBack::execute every frame of state 2: each ball's POSITION += dir x unk468 x mStatusTimer x its own 1 .. 5 factor (127g:
+    /// the callback adds to the particle's global offset, not its velocity) -- the pull
+    /// grows with the timer. The balls scene gets the strength (SmsWarpInPull(strength)) and drives its attractor.</summary>
+    private void SmsWarpInBallsPull()
+    {
+        if (_smsWarpBalls == null || !IsInstanceValid(_smsWarpBalls)) return;
+        float strength = _smsWarpInPull * _smsWarpInTicks;
+        if (_smsWarpBalls.HasMethod("SmsWarpInPull")) _smsWarpBalls.Call("SmsWarpInPull", strength, _smsWarpGate.CentreWorld);
+    }
+
+    /// <summary>The director's move: TMarDirector::moveStage -> APP_STATE_TITLE (the select screen) for a main stage, else the stage itself.</summary>
+    private void SmsWarpInMoveStage()
+    {
+        var stage = _smsWarpGate.Stage;
+        string dest = stage != null ? stage.ScenePath : "";
+        if (dest == "")
+        {
+            if (SmsDebugPrint) GD.Print("[SMS warp] the gate has no stage: letting him go");
+            SmsWarpInAbort("no stage");
+            SmsFader.Current?.FadeIn(0.4f);
+            return;
+        }
+        string select = SmsReturnSpot.ScenePath(SmsEpisodeSelectScene);
+        string next = select != "" && stage.Episodes.Length > 0 && ResourceLoader.Exists(select) ? select : dest;
+        if (GameData.Instance != null)
+        {
+            GameData.Instance.PendingStage = stage;
+            GameData.Instance.PendingEpisode = -1;
+            if (next == dest) GameData.Instance.Episode = 0;
+        }
+        if (SmsDebugPrint) GD.Print($"[SMS warp] moveStage -> {next}{(next != dest ? " then " + dest : "")}");
+        GetTree().ChangeSceneToFile(next);
+    }
+
+    /// <summary>Everything back (a demo left early, no stage): visible, the pose unfrozen, the gate released, control returned.</summary>
+    private void SmsWarpInAbort(string why)
+    {
+        if (SmsDebugPrint) GD.Print($"[SMS warp] off: {why}");
+        SmsWarpInHide(false);
+        if (_smsWarpTrembling && armature != null) armature.Position = _smsWarpTrembleBase;
+        _smsWarpTrembling = false;
+        if (animPlayer != null) animPlayer.SpeedScale = 1f;
+        if (IsInstanceValid(_smsWarpGate)) _smsWarpGate.SmsRelease();
+        _smsWarpGate = null;
+        _smsWarpBalls = null;   // the scene frees itself when its flash and balls are spent
+        _smsWarpInPhase = 0;
+        if (stateOfMario == MarioState.shineGet)
+        {
+            CameraLocked = false;
+            stateOfMario = MarioState.idle;
+            animPlayer?.Play("ma_wait");
+            SetMarioState(stateOfMario);
+        }
+    }
+    // ===== SMS pass 127: the M gate warp-in END =====
 
 }

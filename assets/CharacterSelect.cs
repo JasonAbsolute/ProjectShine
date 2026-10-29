@@ -56,7 +56,22 @@ public partial class CharacterSelect : Control
             _buttons[0].GrabFocus();
             Highlight(0);
         }
+
+        // SMS pass 127: arriving from the episode select the screen is white (its startWipe(0xf) with the white fader): fade in from it
+        if (GameData.Instance != null && GameData.Instance.FadeInFrom.HasValue && _fadeRect != null)
+        {
+            Color from = GameData.Instance.FadeInFrom.Value;
+            GameData.Instance.FadeInFrom = null;
+            _fadeRect.Color = new Color(from, 1f);
+            _fadeRect.Visible = true;
+            Tween fadeIn = CreateTween();
+            fadeIn.TweenProperty(_fadeRect, "color:a", 0f, ArriveFadeSeconds);
+            fadeIn.TweenCallback(Callable.From(() => { if (IsInstanceValid(_fadeRect)) { _fadeRect.Visible = false; _fadeRect.Color = new Color(0f, 0f, 0f, 0f); } }));
+        }
     }
+
+    /// <summary>SMS pass 127: seconds of the fade in from the episode select's white (the game's stage fade-in, startWipe(.., 0.4)).</summary>
+    [Export] public float ArriveFadeSeconds = 0.4f;
 
     private void BuildButtons()
     {
@@ -160,7 +175,9 @@ public partial class CharacterSelect : Control
         }
 
         GameData.Instance.SelectedCharacter = entry;
-        GD.Print($"CharacterSelect: {entry.DisplayName} -> {LevelToLoad}");
+        // SMS pass 127: through an M gate the destination is the gate's stage (GameData.PendingStage), not this screen's own level
+        string dest = GameData.Instance.PendingStage != null && GameData.Instance.PendingStage.ScenePath != "" ? GameData.Instance.PendingStage.ScenePath : LevelToLoad;
+        GD.Print($"CharacterSelect: {entry.DisplayName} -> {dest}");
 
         // Let the stamp finish painting before the level swallows the screen.
         _confirming = true;
@@ -185,9 +202,9 @@ public partial class CharacterSelect : Control
                 return;
         }
 
-        var err = GetTree().ChangeSceneToFile(LevelToLoad);
+        var err = GetTree().ChangeSceneToFile(dest);
         if (err != Error.Ok)
-            GD.PushError($"CharacterSelect: could not load '{LevelToLoad}' ({err}).");
+            GD.PushError($"CharacterSelect: could not load '{dest}' ({err}).");
     }
 
     /// <summary>Left/right to move, accept to confirm — so a controller works without extra wiring.</summary>

@@ -3,7 +3,6 @@
 [ext_resource type="Script" uid="uid://h274ijsmornb" path="res://assets/CharacterSelect.cs" id="1_script"]
 [ext_resource type="Resource" uid="uid://b20oyjaihlb72" path="res://assets/characters/MarioEntry.tres" id="2_mario"]
 [ext_resource type="Resource" uid="uid://cf52d1g7et4fy" path="res://assets/characters/LuigiEntry.tres" id="3_luigi"]
-[ext_resource type="Resource" uid="uid://ct4w7djl8qsub" path="res://assets/characters/KoopaEntry.tres" id="4_koopa"]
 [ext_resource type="Resource" uid="uid://cncnd8i82u6vi" path="res://assets/characters/PiantissimoEntry.tres" id="5_pianti"]
 [ext_resource type="Texture2D" uid="uid://sjwc2cvryw5j" path="res://Font/CharacterSelect/SelectHand.png" id="6_hand"]
 [ext_resource type="Texture2D" uid="uid://clk3k5lf0nfbn" path="res://Font/CharacterSelect/MenuGraphic6.png" id="7_sunl"]
@@ -19,8 +18,6 @@
 [ext_resource type="PackedScene" uid="uid://bg72dlcmvwypi" path="res://assets/CharacterPoster.tscn" id="51_poster"]
 [ext_resource type="Texture2D" uid="uid://cuqnfpj2nqqrx" path="res://Font/CharacterSelect/PlayerSelectText.png" id="52_title"]
 [ext_resource type="Shader" uid="uid://dy4lyx2nlb5pf" path="res://assets/ArtGradient.gdshader" id="60_grad"]
-[ext_resource type="Resource" path="res://assets/characters/WarioEntry.tres" id="61_wario"]
-[ext_resource type="Resource" path="res://assets/characters/WaluigiEntry.tres" id="62_waluigi"]
 [ext_resource type="Resource" path="res://assets/characters/YoshiEntry.tres" id="63_yoshi"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sun"]
@@ -38,7 +35,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
-Characters = [ExtResource("2_mario"), ExtResource("3_luigi"), ExtResource("4_koopa"), ExtResource("5_pianti"), ExtResource("61_wario"), ExtResource("62_waluigi"), ExtResource("63_yoshi")]
+Characters = [ExtResource("2_mario"), ExtResource("3_luigi"), ExtResource("5_pianti"), ExtResource("63_yoshi")]
 PosterScene = ExtResource("51_poster")
 SelectHandPath = NodePath("SelectHand")
 SelectHandGap = 16.0
