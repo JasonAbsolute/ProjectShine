@@ -178,6 +178,7 @@ draw_pass_1 = SubResource("Quad_kira")
 
 [node name="Promi" type="GPUParticles3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 71.4, 0)
+emitting = false
 amount = 1
 lifetime = 1.0
 fixed_fps = 60

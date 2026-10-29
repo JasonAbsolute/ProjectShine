@@ -31,8 +31,6 @@ public partial class SmsSelectShineRing : Node3D
 
     /// <summary>The shine mesh (a glb whose root holds MeshInstance3Ds); the game's body is 165 units tall -- the mesh is scaled to it.</summary>
     [Export] public PackedScene ShineScene;
-    /// <summary>The hollow (open, not cleared) shine's tint -- his ShineSprite.EmptyTint.</summary>
-    [Export] public Color EmptyTint = new Color(0.72f, 0.82f, 0.95f, 0.55f);
     /// <summary>The game's shine_menu model is 535 units tall with its glow quad (the body 165 of them); the mesh's bounds are scaled to this
     /// (his ShineSprite.glb measures the same 535: scale 1).</summary>
     [Export] public float ModelHeightUnits = 535f;
@@ -55,8 +53,23 @@ public partial class SmsSelectShineRing : Node3D
     [Export(PropertyHint.Range, "0.3,1")] public float FrontAlpha = 1f;
     /// <summary>127g DEVIATION (off = Jaysonn's call): the hollow shine's glass look is mapped by the VIEW-space normal in the game, so turned edge-on
     /// every visible face is 'rim' and the whole star goes opaque light blue (his screenshot 2); off locks the look to the star's own face -- the
-    /// grey-blue glass of his screenshot 1 at every spin angle, light blue only on the bevels. On = the game's mapping.</summary>
+    /// grey-blue glass of his screenshot 1 at every spin angle, light blue only on the bevels. On = the game's mapping. Only read when
+    /// <see cref="EmptyGameLook"/> is on.</summary>
     [Export] public bool EmptyRimFollowsView = false;
+    /// <summary>127h: the hollow (open) shine's look. OFF (default, DEVIATION -- his call, "the tint as 1 at every angle"): a glass of ONE colour,
+    /// <see cref="EmptyTint"/> on the flat faces and <see cref="EmptyRim"/> on the bevels and side walls (by the face's own tilt in the mesh, so
+    /// the front and the back match), drawn as a single layer (a depth pre-pass: the side walls no longer stack up edge-on into a solid bar).
+    /// ON = the game's shine_menu_empty TEV (two radgrad lookups: a cream centre spot and a blue rim), which changes colour as the star turns.</summary>
+    [Export] public bool EmptyGameLook = false;
+    /// <summary>The hollow shine's glass colour and opacity (EmptyGameLook off): fitted to his screenshot 1 -- over Ricco's purple its body read
+    /// (150, 133, 214), a grey-lavender glass at 60 %.</summary>
+    [Export] public Color EmptyTint = new Color(0.557f, 0.541f, 0.733f, 0.6f);
+    /// <summary>The hollow shine's bevel / side-wall colour and opacity (EmptyGameLook off): the lighter warm grey of the bevels in his screenshot 1
+    /// ((192, 183, 205) over the purple).</summary>
+    [Export] public Color EmptyRim = new Color(0.79f, 0.79f, 0.74f, 0.75f);
+    /// <summary>127h: the game's third emitter on a full shine -- the solar flame ribbon looping off the sun once a second (ms_2d_shine_promi).
+    /// OFF by default: Jaysonn circled it as a weird effect and asked for it gone (his 3.png). On = the game.</summary>
+    [Export] public bool SunFlame = false;
     /// <summary>The stand-in colours when the shader files are missing (his shine_sprite.tscn gold; the hollow tint).</summary>
     [Export] public Color BodyColor = new Color(1f, 0.8f, 0.2f);
     /// <summary>The additive glow behind each shine: the model's own glow texture (ShineSprite_shine_0.png, the radial gradient) by default; its
@@ -154,6 +167,7 @@ public partial class SmsSelectShineRing : Node3D
                     copy.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
                     copy.CullMode = BaseMaterial3D.CullModeEnum.Back;
                     copy.RenderPriority = 1;   // 127f: drawn AFTER the body -- both are alpha-blended at one depth, and an opaque body drawn second painted the eyes out
+                    copy.NoDepthTest = s.State != 3;   // 127h: the hollow body now writes depth (one glass layer); the eye dome straddles the face plane and would be clipped
                     mi.SetSurfaceOverrideMaterial(i, copy);
                     mats.Add(copy); bases.Add(copy.AlbedoColor);
                     continue;
@@ -176,6 +190,25 @@ public partial class SmsSelectShineRing : Node3D
                         Vector3 axis = rel.Basis.Inverse() * Vector3.Back;
                         sm.SetShaderParameter("face_axis", axis.Normalized());
                         sm.SetShaderParameter("rim_follows_view", EmptyRimFollowsView);
+                        // 127h: one glass colour on the faces, one on the bevels, drawn as a single layer (see the knobs); game_look = the bmd's TEV
+                        sm.SetShaderParameter("game_look", EmptyGameLook);
+                        sm.SetShaderParameter("glass", EmptyTint);
+                        sm.SetShaderParameter("rim", EmptyRim);
+                        if (!EmptyGameLook)
+                        {   // ONE layer of glass: a depth-only pass (invisible, writes depth: the nearest surface wins whatever the triangle order)
+                            // and the glass as its next pass, depth-tested against it -- so edge-on the side walls no longer stack their alpha into
+                            // a solid bar, and nothing changes with the spin. Priorities -2 / -1 (the sort is by priority first, so the depth pass is
+                            // guaranteed before the glass); the glow (0) and the eyes (1) draw after, the glow depth-tested behind the body (the halo
+                            // outside the star, as in his screenshot 1), the eyes over it.
+                            // (Godot's depth_prepass_alpha only writes depth for fragments above ~0.99 alpha, so it does nothing for a 60 % glass.)
+                            var depthMat = new ShaderMaterial { Shader = DepthOnlyShader(), ResourceName = "_mat_shine_body empty (depth pass)", RenderPriority = -2 };
+                            sm.RenderPriority = -1;
+                            depthMat.NextPass = sm;
+                            mi.SetSurfaceOverrideMaterial(i, depthMat);
+                            shaderMats.Add(sm);
+                            if (body == null) { body = mi; bodySurface = i; }
+                            continue;
+                        }
                     }
                     mi.SetSurfaceOverrideMaterial(i, sm);
                     shaderMats.Add(sm);
@@ -220,14 +253,22 @@ public partial class SmsSelectShineRing : Node3D
         s.Mats = mats.ToArray(); s.Base = bases.ToArray(); s.ShaderMats = shaderMats.ToArray();
     }
 
-    /// <summary>playCreateParticle / stopCreateParticle on the shine's emitters.</summary>
-    private static void SetSparkle(Slot s, bool on)
+    /// <summary>playCreateParticle / stopCreateParticle on the shine's emitters (the flame ribbon 'Promi' only with <see cref="SunFlame"/>).</summary>
+    private void SetSparkle(Slot s, bool on)
     {
         if (s.Sparkle == null) return;
-        foreach (Node c in s.Sparkle.GetChildren()) if (c is GpuParticles3D p) p.Emitting = on;
+        foreach (Node c in s.Sparkle.GetChildren()) if (c is GpuParticles3D p) p.Emitting = on && (SunFlame || p.Name != "Promi");
     }
 
     private static Shader LoadShader(string path) => ResourceLoader.Exists(path) ? GD.Load<Shader>(path) : null;
+
+    private static Shader _depthOnly;
+    /// <summary>127h: an invisible pass that only writes depth (alpha 0, depth_draw_always) -- the hollow glass's first pass, so its next pass draws one layer.</summary>
+    private static Shader DepthOnlyShader() => _depthOnly ??= new Shader
+    {
+        Code = "shader_type spatial;\nrender_mode blend_mix, depth_draw_always, cull_back, unshaded, shadows_disabled, fog_disabled;\n"
+             + "void fragment() {\n\tALBEDO = vec3(0.0);\n\tALPHA = 0.0;\n}\n",
+    };
 
     /// <summary>getPosition(angle): the ring in the game's units.</summary>
     public static Vector3 RingPosition(float angleUnits)
