@@ -314,25 +314,36 @@ git push -u origin feature/<name>
 ```
 -->
 
-### #7 -- PENDING -- queued 2026-10-27 (Kiro) -- PUSH ONLY, no PR yet
-Push the fourth feature branch: `feature/gate-entry`, branched from `main` `4c96841` (the trunk after PR #8) -- the M-graffiti gate, Mario's
-warp-in, the spiral wipe, the episode select screen and the hand-off through the character select to the level and back to the gate (SMS pass 127).
-NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says the feature is done (Kiro will replace this entry
-with the PR entry then, as #5 / #6 went).
-- Branch `feature/gate-entry` -- code tip `c491f02` ("SMS 127i: the select glow behind the body along the view (GlowBackUnits), so a turning star never carries it"; before it a54e6f8 127h, e0f3d2f 127g, 155f3a3 127f, 06c9c33 127e, 4db0ff9 127d, 4af9915 127c, 9469471 127b, 79bd8a8 127a, 84a2c73 127);
-  the branch tip is this file's own commit on top of it; 22 commits since `main` `4c96841`; ~146 files, +6750 / -270. A NEW remote branch (never pushed): push with `-u`. Nothing over 1 MB (the 36 select
-  textures are small PNGs; the biggest new file is SmsEpisodeSelect.cs).
+### #7 -- PENDING -- queued 2026-10-27, PR added 2026-10-29 00:45 PDT (Kiro)
+Push the fourth feature branch and OPEN ITS PR: `feature/gate-entry`, branched from `main` `4c96841` (the trunk after PR #8) -- the M-graffiti gate,
+Mario's warp-in, the spiral wipe, the episode select screen and the hand-off through the character select to the level and back to the gate, with
+all their effects (SMS passes 127-127i). PLAYTESTED BY JAYSONN 2026-10-28/29 ("I'm happy with this for now") -- the PR can be merged once it is open
+(squash or merge commit, his call; `main` then needs a `git pull` here). Kiro has NOT merged this branch locally (the entry asks for a PR: the one way).
+- Branch `feature/gate-entry` -- code tip `c491f02` ("SMS 127i: the episode select's glow quad placed behind the body ..."), on top of `a54e6f8` (127h),
+  `e0f3d2f` (127g), `155f3a3` (127f), `06c9c33` (127e), `4db0ff9` (127d), `4af9915` (127c), `9469471` (127b), `79bd8a8` (127a) and `84a2c73` (127); the
+  branch tip is this file's own commit on top of `81972f8` (the 127i log); 23 commits since `main` `4c96841`, this entry's own included; 151 files,
+  +6833 / -15 before this entry's lines. A NEW remote branch (never pushed): push with `-u`. Nothing over 1 MB except the two logs that are already
+  on `main` (Mario.cs 1.0 MB, PROJECT_LOG.md 0.9 MB); the biggest new file is SmsEpisodeSelect.cs (53 KB); the 50 textures are small PNGs.
+- PR: title "Feature: the M-gate entry and the episode select (SMS passes 127-127i)"; base `main`; body = `pr127.md` at the project root
+  (untracked -- delete it after).
+  compare URL: https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/gate-entry
 ```
 git push -u origin feature/gate-entry
 git rev-list --count origin/feature/gate-entry..feature/gate-entry
+gh pr create --base main --head feature/gate-entry --title "Feature: the M-gate entry and the episode select (SMS passes 127-127i)" --body-file pr127.md
 ```
-Expect `0` from the rev-list. No PR, no merge.
-- New files: `assets/Sms/Gate/` (SmsModelGate.cs, SmsStageInfo.cs, SmsEpisodeInfo.cs, SmsEpisodeSelect.cs, SmsSelectShineRing.cs, SmsEpisodeOnly.cs
-  + .uids, MGate.tscn, MGate.gdshader + .uid, EpisodeSelect.tscn, the three gate textures + .imports, `select/` 36 textures + .imports,
-  `Stages/RiccoHarbor.tres`); changed: assets/Mario.cs (the warp-in spliced in; the demo state invincible), assets/GameData.cs, assets/CharacterSelect.cs,
-  assets/Level.cs, assets/Sms/Console/SmsFader.cs + Fader.gdshader (the spiral wipe, the fader colour), Levels/Rico4Secrect/Skybox/Rico4Secret.tscn
-  (ShineSprite2 exits to the Plaza), PROJECT_LOG.md.
-- To try it: drop `assets/Sms/Gate/MGate.tscn` into the Plaza (assets/Level.tscn) against a wall, its -Z (the blue arrow / the M's face) toward
-  where Mario stands; set `Stage` = `assets/Sms/Gate/Stages/RiccoHarbor.tres`. Walk up (it lights in ~2 s), jump into the M.
-The working tree carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the two Koopa and the two
-Goop `.png.import` flips and the `addons/godot_ai` churn: his, leave them.
+Expect `0` from the rev-list. KEEP THE #6 ORDER: push the branch -> write the result paragraph below, commit it and push -> only THEN open the PR
+(so the result travels with a squash). If `gh` is still unauthenticated here (`gh auth status`), open the compare URL in the browser instead, paste
+the title and the body of `pr127.md`, and Jaysonn presses "Create pull request". Once merged: `git checkout main && git pull` here, then tell Kiro the sha.
+- New files: `assets/Sms/Gate/` (SmsModelGate.cs, SmsStageInfo.cs, SmsEpisodeInfo.cs, SmsEpisodeSelect.cs, SmsSelectShineRing.cs, SmsSelectPickBurst.cs,
+  SmsWarpBalls.cs, SmsEpisodeOnly.cs + .uids, MGate.tscn, MGate.gdshader, SelectShineFull.gdshader, SelectShineEmpty.gdshader + .uids, EpisodeSelect.tscn,
+  the three gate textures + .imports, `Stages/RiccoHarbor.tres`, `select/` 36 textures + .imports, `fx/` (WarpBalls / GateWind / GateHit / SelectSparkle /
+  SelectSparkleEmpty / SelectPickBurst .tscn, WarpBall / GateBubble / JpaDir2D / JpaDirBillboardAddRamp / JpaStripeTrailAdd .gdshader + .uids, 11 textures +
+  .imports)); changed: assets/Mario.cs (the warp-in spliced in; the demo state invincible), assets/GameData.cs, assets/CharacterSelect.cs + .tscn (four
+  characters), assets/Level.cs (the spawn's facing), assets/Sms/Console/SmsFader.cs + Fader.gdshader (the spiral wipe, the fader colour),
+  Levels/Rico4Secrect/Skybox/Rico4Secret.tscn (ShineSprite2 exits to the Plaza), PROJECT_LOG.md.
+- To try it: drop `assets/Sms/Gate/MGate.tscn` into the Plaza (assets/Level.tscn) against a wall, its -Z (the M's face) toward where Mario stands; set
+  `Stage` = `assets/Sms/Gate/Stages/RiccoHarbor.tres`. Walk up (it lights in ~2 s), jump into the M; the Rico shine brings you back out of it.
+The working tree carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper /
+launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the `addons/godot_ai` churn: his, leave them; nothing of the feature
+is uncommitted.
