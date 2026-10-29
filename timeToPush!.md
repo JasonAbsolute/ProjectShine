@@ -314,7 +314,7 @@ git push -u origin feature/<name>
 ```
 -->
 
-### #7 -- PUSHED 2026-10-29 -- https://github.com/JasonAbsolute/ProjectShine/tree/feature/gate-entry -- PR awaiting Jaysonn's click -- queued 2026-10-27, PR added 2026-10-29 00:45 PDT (Kiro)
+### #7 -- DONE 2026-10-29 -- https://github.com/JasonAbsolute/ProjectShine/pull/9 (SQUASH-merged by Jaysonn) -- queued 2026-10-27, PR added 2026-10-29 00:45 PDT (Kiro)
 Push the fourth feature branch and OPEN ITS PR: `feature/gate-entry`, branched from `main` `4c96841` (the trunk after PR #8) -- the M-graffiti gate,
 Mario's warp-in, the spiral wipe, the episode select screen and the hand-off through the character select to the level and back to the gate, with
 all their effects (SMS passes 127-127i). PLAYTESTED BY JAYSONN 2026-10-28/29 ("I'm happy with this for now") -- the PR can be merged once it is open
@@ -363,3 +363,13 @@ compare page again.
 FILE NOTE: Kiro appended this entry BELOW the "Kiro appends the next entry below this line" template comment rather than above it,
 so the template block now sits between #6 and #7. Left exactly as found -- it is Kiro's file and the entry reads fine -- but worth
 knowing when looking for the newest entry: grep `^### #` rather than reading to the end.
+
+Merged 2026-10-29: PR #9 **squash-merged** -> `origin/main` `6fc7a6f`, single parent `4c96841`. Local `main` had 0 commits of its
+own (Kiro did not pre-merge), so a clean `git merge --ff-only` -- third consecutive trivial pull under the one-way rule.
+The #6 ordering held again: `git diff --name-only main feature/gate-entry` came back EMPTY, so this result paragraph travelled
+with the squash instead of needing a hand re-apply. That is now 2 for 2 since the fix.
+Verified by tree, not ancestry (`merge-base --is-ancestor be9538b origin/main` says NO, as always after a squash): **141 files**
+under `assets/Sms/Gate/` on `main`, including `SmsModelGate.cs`, `SmsEpisodeSelect.cs`, `MGate.tscn`, `EpisodeSelect.tscn`,
+`Stages/RiccoHarbor.tres` and `fx/WarpBalls.tscn`.
+`pr127.md` deleted now that the PR exists and is merged. Jaysonn's nine live edits were never touched.
+Trunk sha for Kiro to branch the next feature from: **`<the timeToPush #7 done commit below>`** -- see `git log --oneline -1 main`.
