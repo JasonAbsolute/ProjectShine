@@ -8513,3 +8513,56 @@ Die; H9 the puff; W1 the hose knocks it away (12, 10); W2 hit_end; W3 the skid 1
 at 33 frames. **GPU capture** (cap_sambo.gd: the Pokey standing / leaning / dead, the head, a bud and a bloom, a Cataquack; axis markers): the
 orange stack with the eyes toward its heading, the pink crown, the lean to the ground toward the camera, the four pieces, the four puffs; the bud
 and the open bloom over the leaves. Build 0 errors, boot ALL OK.
+### 130 -- the Bob-omb (TBombHei) on the walker base (feature/enemy-pokey-cataquack, `1778a42`)
+
+**Files:** NEW `assets/Sms/Enemy/Bomb/` -- `SmsBombHei.cs` + `BombHei.tscn`, `BombBody.gdshader`, the materials `BombBody` / `BombLed` / `BombLeg` /
+`BombLegEnv` / `BombFragment` .tres; `models/Eniemes/Bomb/` (NejiBomb.glb = nejibomb_model1.bmd with its six clips, NejiBombDown.glb =
+downnejibomb_model1.bmd with downnejibomb_down1, from his rip (delfinoBoss); the disc textures Q_nejibomb (the face), Q_stop_nejibomb (the dizzy
+face), Q_nejibomb_txanm1 / 2 / 3 (the LED digits 1 / 2 / 3), Q_nejibomb_kankyo (the sphere map), the glb's own png; .imports with the materials
+swapped by name and the pngs pinned: patch_import130.py). Sources: doldecomp/sms src/Enemy/bombhei.cpp + include/Enemy/BombHei.hpp, the shipped
+/enemy/bombhei.prm, the bombhei archive (delfinoBoss / pinnaBeach1 / sirena2 .szs: bmd + bck + the two btp), btp_dump.py for the texture patterns.
+
+**The game** (per tick): Generate (the default; nejibomb_fling1 looping = the falling pose, the stop btp held at frame 0 = the normal face; landed ->
+nejibomb_land1 44 -> Attack) -> Attack (nejibomb_run1, the goal Mario, walkBehavior(2, 1.0) for ever: march 2 u/tick = 3.2 m/s, turn 4 -- no sight
+test, no give-up; the wind-up ZENMAI every tick). attackToMario sends NOTHING outside the explosion and isHitValid takes only Yoshi's eat: a walking
+Bob-omb neither hurts on touch nor dies to a stomp. The fuse (moveObject, every tick outside Thrown / Explosion / Generate): past BombTime (1000 =
+8.3 s) the doused flag drops and WalkExplosion is pushed unless it sits in WaitExplosion: nejibomb_run_down1 (119) with the count btp (the LED
+`_led1` material shows txanm3 / 2 / 1 for 40 frames each: 3-2-1), walking at 0.6 x, BOMBHEI_COUNT every 40 btp frames, BOMB_LIMIT bound to the
+body joint; at the clip's end -> Explosion. Water (behaveToWater while on run1 / land1 with the hit point gone, cooldown 20) -> WaitExplosion:
+nejibomb_stop_down1 (179), doused: the clip held at frame 60 (it sits), the stop btp to frame 1 at frame 10 (the blue dizzy face); the fuse keeps
+counting and when it runs out the clip runs on with the count btp, and at its end past 150 ticks -> Explosion. Explosion: downnejibomb_model1 (the
+pieces) at a random yaw, downnejibomb_down1 (80), camera shake + rumble; the attack cylinder grows x 1.2 a tick to BombRange x scale / AttackRadius
+= 200 / 60 = 3.33 (a 200 x 467 u blast = 2.7 m round, 6.3 m tall); Mario in it -> HIT_MESSAGE_BURN (dmgfire: 1 HP, FIRE_DOWN); frame 2 of the
+clip -> TEffectExplosion at the body's scale; at the clip's end dead with no drops (setAfterDeadEffect empty, genRandomItem never; a coin only
+for a bomb Mario carried). isCollidMove with mSerialBomb: a Bob-omb whose hit cylinder meets an exploding one goes off too. PickUp / Thrown:
+behaveToTaken / behaveToRelease -- Mario carries a doused or counting bomb (ThrownRateXZ 3 x his throw power, VY 22, gravity 0.3, the collision
+back at tick 120, the blast on landing). Water surface / sand columns, forceKill on death planes, the cannon (ShootVelocity): stage things.
+**Materials** (bmd_mat_dump.py): no toon -- `_body1` TEX x COLOR0 + COLOR1 (the glint); `_led1` unlit TEX + Q_nejibomb_kankyo through a NRM texgen
+(a sphere map by the view-space normal: the gloss on the black ball); `_rleg1(2)` TEX x COLOR0 + the sphere map; `_rleg1` / `_rleg1(3)` TEX x
+COLOR0; the pieces `_mat3` / `_mat5` matColor BLACK x the light (the glb merged the bmd's eight into two) -> BombBody.gdshader modes 0-5 on
+enemy_light. The btp is the texture swap: `SetTextures(body, led)` on per-instance copies of `_body1` / `_led1` (DressBody), the count by the clip's
+frame (CountFace), the stop face at frame 10 of stop_down1.
+
+**The port** (`SmsBombHei : SmsSmallEnemy`): the five nerves above (Generate / Attack / WalkExplosion / WaitExplosion / Explosion); the fuse in
+MoveObjectPre; HitCheckMario during the blast = the attack cylinder x the growth on Mario's damage cylinder -> TakeDamage(Fire); IsHitValid false;
+AttackToMario only in the blast; BehaveToWater -> WaitExplosion; the chain from the exploding one's side every fourth tick (the game's actor-pair
+test on the damage cylinders: ChainNeighbours) and from a body contact (IsCollidMove); Kill -> Explosion. ModelDead (the pieces glb, its own
+AnimationPlayer) rides the live model's frame; SmsCameraShake.Current.Start(Damage) at the blast. Knobs grouped: Deviations (FuseScale x BombTime,
+BlastScale x BombRange, ChainReaction = mSerialBomb) / Effects and sounds (ExplosionFxScene -- default EnemyDisap.tscn scaled to the blast radius,
+a PLACEHOLDER until the jpa pass; FuseFxScene = BOMB_LIMIT; WindUpSound, CountSound, ExplosionSound).
+**DEVIATIONS / NOT PORTED (logged):** Mario carrying and throwing a bomb (behaveToTaken / Thrown) -- Mario's take system holds RigidBody3D objects
+only; an enemy body needs its own hold path (130b); the blast's visual (the placeholder puff); the particles and sounds (slots); the camera shake
+mode (the port's Damage shake for the game's mode 6); the rumble; a short FuseScale does not restart the count on top of itself (the game's 1000-tick
+fuse can never run out again inside the 238-tick count, so the game's re-push is unreachable there); the stage effects (water / sand columns),
+death planes, the cannon, Yoshi.
+
+**Drive 130** (`npc82/enemy128/patch_smoke130.py`, spliced into Mario.cs, SMS_YCAM_SMOKE=1; 16/16 on the 80 m platform; FuseScale 0.3 / 0.15 on the
+drive's bombs): B1 born in Generate (fling -> land1 a tick later), the face textures 0/0, the five materials on BombBody.gdshader; B2 land1; B3 ->
+Attack on run1 after 43 frames; B4 after the 180-degree turn (4 deg a tick) 1.61 m in 30 frames closing on Mario; B5 touching a walking one: no
+damage; B6 the fuse (300 ticks) -> WalkExplosion with the LED on 3 at 0.6 x; B7 the count 3 -> 2 -> 1 over 118 frames walking 3.77 m -> Explosion;
+B8 the pieces model on downnejibomb_down1, the live one hidden, the blast scene at frame 2; B9 Mario at 4.5 m: no burn; B10 the growth x 1.2 a tick
+to 3.58 (past 3.33), the clip ends at 79 frames -> dead; X1 Mario 1.5 m from a blast: -1 HP, hurt, the Fire down kind (FIRE_DOWN); W1 the REAL
+hose on a walking one -> WaitExplosion doused on stop_down1, hp 0; W2 held at frame 60 with the stop face 2/2; W3 the fuse runs out while it sits ->
+the flag drops, the LED counts again (3); W4 the clip's end past 150 ticks -> Explosion after 118 frames; C1 a neighbour in the hit cylinder of an
+exploding one goes off (2 frames). **GPU capture** (cap_bomb.gd): the black ball with the red LED face and the red key, the LED showing 3 then 1,
+the doused one blue with the green crossed eyes and the sphere-map gloss, the blast puff and the dark pieces flying. Build 0 errors, boot ALL OK.

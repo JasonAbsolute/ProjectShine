@@ -378,18 +378,21 @@ written here would already be one commit stale.)
 
 ### #8 -- PENDING -- queued 2026-10-29 02:20 PDT (Kiro) -- PUSH ONLY, no PR yet
 Push the fifth feature branch: `feature/enemy-pokey-cataquack`, branched from `main` `e9eb60b` (the trunk after PR #9) -- the Cataquack (TPoiHana, SMS
-pass 128, painted any colour in 128b) and the Pokey + Pokey Head (THanaSambo / TSamboHead, pass 129) on the small-enemy base. NOT yet playtested by
+pass 128, painted any colour in 128b), the Pokey + Pokey Head (THanaSambo / TSamboHead, pass 129) and the Bob-omb (TBombHei, pass 130) on the
+small-enemy base. NOT yet playtested by
 Jaysonn: push the branch so it is on
 GitHub; do NOT open a PR until he says the feature is done (Kiro will replace this entry with the PR entry then, as #5-#7 went).
-- Branch `feature/enemy-pokey-cataquack` -- code tip `f08ea69` ("SMS 129: the Pokey (THanaSambo) and the Pokey Head (TSamboHead) ..." over `636ac9c`
-  128b and `c565f39` 128); the branch tip is this file's own commit on top of it; 6 commits since `main` `e9eb60b` (128, 128b, 129 and their three
-  log + entry commits). A NEW remote branch (never pushed): push with `-u`. The biggest new files are `models/Eniemes/Poihana/Poihana.glb` (1.7 MB) and
+- Branch `feature/enemy-pokey-cataquack` -- code tip `1778a42` ("SMS 130: the Bob-omb (TBombHei) ..." over `f08ea69` 129, `636ac9c` 128b, `c565f39`
+  128); the branch tip is this file's own commit on top of it; 8 commits since `main` `e9eb60b` (128, 128b, 129, 130 and their four log + entry
+  commits). A NEW remote branch (never pushed): push with `-u`. The biggest new files are `models/Eniemes/Poihana/Poihana.glb` (1.7 MB) and
   `models/Eniemes/Sambo/Sambo.glb` (0.4 MB); SamboDown.tres / SamboYdown.tres are baked clips (~60 KB each).
 ```
 git push -u origin feature/enemy-pokey-cataquack
 git rev-list --count origin/feature/enemy-pokey-cataquack..feature/enemy-pokey-cataquack
 ```
 Expect `0` from the rev-list. No PR, no merge.
+- New files (130): `assets/Sms/Enemy/Bomb/` (SmsBombHei.cs + .uid, BombHei.tscn, BombBody.gdshader + .uid, five .tres materials), `models/Eniemes/Bomb/`
+  (two glbs, seven pngs, .imports).
 - New files (129): `assets/Sms/Enemy/Sambo/` (SmsHanaSambo / SmsSamboHead / SmsSamboFlower / SmsSamboLeaf / SmsBoneRoll .cs + .uid, HanaSambo /
   SamboHead / SamboFlower / SamboLeaf .tscn, four .tres materials, SamboDown / SamboYdown .tres clips), `assets/Sms/Enemy/EnemyToonCutoutTwoSided.gdshader`
   + .uid, `models/Eniemes/Sambo/` (five glbs, twelve pngs, .imports); changed: EnemyToon.gdshaderinc (form 4), SmsSmallEnemy.cs (the facing fix),
@@ -408,5 +411,9 @@ Expect `0` from the rev-list. No PR, no merge.
   on its head freezes it, a stomp on the head kills it (the stack falls apart), it sinks back when he is 27 m away. `SamboHead.tscn` = the Pokey Head:
   buried too, pops when Mario is in front within 8 m (three leaves fly), hops 4 m at him every 2.5 s, water knocks it back (into a wall = three coins),
   touching it on the ground stuns it for a stomp. `SamboFlower.tscn` alone = a bud the hose opens. All particle / sound slots are empty.
+- To try the Bob-omb (130): drop `assets/Sms/Enemy/Bomb/BombHei.tscn` anywhere; it marches at Mario at once and for ever (touching it does nothing);
+  after 8.3 s its LED counts 3-2-1 and it blows up (a 2.7 m blast burns Mario: the fire knock). The hose douses it (it sits with the dizzy blue
+  face) until the fuse runs out anyway. Two close together go off together. Picking it up / throwing it is NOT in yet (Mario's take system only
+  carries fruit-type bodies: 130b). `FuseScale` shortens the fuse for testing; the blast's visual is a placeholder puff until the particle pass.
 The working tree carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher
 `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the `addons/godot_ai` churn: his, leave them.
