@@ -8720,3 +8720,35 @@ dizzy stars' 3-every-21-frames cadence (a steady 9 a second), the sand's alpha f
 scene alone at three ages, ref/131): the pastel drop splash; the sand cloud over its ring; the white landing puffs with the flat ring; three
 tinted stars circling at head height; two Zs rising; the pollen motes (pink-centred soft dots) rising / fanning; the rocks tumbling out of the
 smoke ring; the sink's delayed rocks and smoke at frame 60.
+
+### 132 -- the one-shot effects' emit counts by the JPA engine's FixedInterval rule (main, `eb8b1f0`)
+
+**Why:** pass 130c found the rule while sizing the Bob-omb blast: JPAEmitter.cpp 645 (`JPABaseEmitter::calcCreateParticle`) -- with the
+EMIT_FLAG_FIXED_INTERVAL flag an emit frame creates the VOLUME'S DIVISION (`mVolumeSubdivision` for a Circle or Line; a Sphere 2 + sum over the
+layers i of (4i) + (4i + 4) = 6 / 18 / 38 for div 1 / 2 / 3, the yaw step 360 / the last layer's count), and `mChildSpawnRate` (the dump's
+"rate") is read only WITHOUT the flag (accumulated per emit frame, >= 1 on the first). Emit frames come every (interval + 1) frames while frame <
+maxFrame (0 = for ever); mStartFrame delays the emitter on its own counter. Every emitter below has maxFrame 1: ONE emit frame = the division.
+Passes 55-125h read the rate; an audit of the 268 jpa files pulled so far (tools/projectshine/jpa/particle; jpa_dump.py BEM1 lines) found 50 FixedInterval emitters, 13 of them in
+nine scenes on `main` (the 131 scenes and the Bob-omb's were already by the rule; the gate's and select's emitters are not FixedInterval, except
+the warp-in's ten `ms_marioap_*` Sphere emitters -- see below). **Corrected (the `amount` line only, the one-shot / explosiveness 1 unchanged):**
+EnemyDisap Smoke 30 -> 15 (ms_enm_disap_a Circle div 15), EnemyDisapWet Smoke 30 -> 18 (ms_enm_disap_a_w Sphere div 2), EnemyWallHit Puff
+1 -> 12 (ms_enm_wallhit Circle div 12: the game's puff RING on the wall, not one puff), TrampleDust Ring 12 -> 10 (ms_fumi_a div 10) and Puff
+1 -> 12 (ms_fumi_b div 12: the stomp's smoke ring), WallKickDust Puff 1 -> 10 (ms_wallkick_a div 10) and Marks 8 -> 10 (ms_wallkick_b div 10),
+HipDropLanding Sparks 12 -> 10 (ms_hipdrop_a div 10; its Smoke was already 20 = ms_hipdrop_b's div), SuperHipDropLanding Smoke 30 -> 22
+(ms_m_sphipd_hit_b div 22), Flames 16 -> 24 (hit_c div 24), Stars 8 -> 12 (hit_d div 12; `StarCount` 16 still overrides it -- Jaysonn's
+2026-09-30 choice -- and its summary now gives the game's 12 instead of "8"), CapSteal Puffs 10 -> 38 (ms_tls_change Sphere div 3), PauseSparks
+14 -> 10 (ms_2d_pause_sel div 10). The notes in the scenes that quoted a count were updated. **Not changed:** the warp-in's light balls
+(SmsWarpBalls.cs, pass 127): its ten marioap emitters are Spheres with the flag (body div 5 = 102, cap / FLUDD div 4 = 66, head and each limb
+div 3 = 38: 500 in all) where the port hand-codes the rates (80 / 140 / 140 / 40 / 40 / 30 / 30 / 20 / 20 / 80 = 620, the head and cap heavier);
+the look was judged against Jaysonn's screenshots in 127 and approved, so it stays until he wants the game's distribution. Also not changed: the
+circles' placement -- the game puts a FixedInterval circle's particles at even angles (mVolumeEmitIdx x sweep / div), the port's ring emission is
+random; for 10-12 overlapping puffs the difference does not read.
+**Tools:** npc82/counts132/patch_counts132.py (node-scoped, byte-preserving, idempotent; `--check` lists the before values), cap_fx132.gd (each
+scene alone on the sand, every GPUParticles3D restarted a frame after it enters the tree -- the scripted scenes hold theirs off until Mario fires
+them; `++ --tag pre|post`), ref/ab_*.png (before over after at three ages). The generators (gen_fx_enemy / trample / dust / pause / super, gen_fx,
+gen_fx125h) carry the new literals; drives 125 (P1: Smoke 15) and 106 (D1: Ring 10 / Puff 12) updated to match.
+**Judged by GPU capture, before / after:** the wall kick, the wall hit and the stomp go from one puff (the wall kick's single puff mostly vanished
+into the wall) to the game's ring of puffs around the point -- a proper cloud, pale and fading, not a wall; the death smoke thins a little (30 ->
+15 / 18 kemuball puffs read much the same at 75 u); the hip drops are indistinguishable (the smoke fills the frame either way); the cap-steal poof
+is the one real growth: 38 mint puffs make a 3 m cloud by frame 40 where 10 made a plume. Build 0 errors, boot `ALL OK`. No drive re-run (the
+amounts are the only change; the capture harness loaded and ran all eight 3D scenes clean).

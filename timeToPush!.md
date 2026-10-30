@@ -479,3 +479,20 @@ CARRIED FORWARD from this PR's own "Not in this PR": four effects already on `ma
 instead of the engine's fixed-interval division (enemy death puff 30 vs 15, wet death 30 vs 18, wall-crash puff 1 vs 12,
 trample dust 12 vs 10). Kiro flagged it as a small follow-up pass on `main` -- not lost, just not in #8.
 Trunk for the next feature: `main`'s current tip (`git log --oneline -1 main`).
+
+### #9 -- PENDING -- queued 2026-10-30 02:05 PDT (Kiro) -- PUSH main ONLY, no PR
+Push the trunk: one small pass committed straight on `main` (the rules allow Kiro's small passes that are not part of a feature), after PR #10's
+squash and the "#8 done" commit `e4fffc5` that the local Claude already pushed. SMS 132 corrects the emit counts of thirteen one-shot effect
+emitters in nine scenes (the JPA engine's FixedInterval rule: an emit frame creates the volume's division, not the dumped rate -- the wall kick's,
+the wall hit's and the stomp's single puffs become the game's puff rings; the death smoke thins; the cap-steal poof grows). Amounts only; judged by
+GPU capture before / after; build 0 errors, boot ALL OK. No branch, no merge, no PR.
+- Branch `main` -- code tip `eb8b1f0` ("SMS 132: the one-shot effects' emit counts by the JPA engine's FixedInterval rule"), the tip is this file's
+  own commit on top of it; 2 commits ahead of `origin/main` `e4fffc5` (10 files, +19 / -19 in the pass, all under assets/Sms/Fx/ and
+  assets/Sms/Console/PauseSparks.tscn). The range carries none of Jaysonn's nine live edits.
+```
+git push origin main
+git rev-list --count origin/main..main
+```
+Expect `0`. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the
+three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the `addons/godot_ai` churn: his, leave them.
+No feature branch is in progress; the next one branches from this `main`.
