@@ -94,14 +94,17 @@ public partial class SmsPoihana : SmsSmallEnemy
     /// default (DEVIATION: the game's placement data decides which ones carry a coin; here every one does unless this is cleared).</summary>
     [Export] public PackedScene EventCoinScene;
     public const string EventCoinScenePath = "res://yellow_coin.tscn";
-    /// <summary>PARTICLE_MS_POI_KIZETSU: the dizzy stars while squashed / twitching (bck 3 / 4), bound to the body -- a looping GPUParticles3D scene.</summary>
+    /// <summary>PARTICLE_MS_POI_KIZETSU: the dizzy stars while squashed / twitching (bck 3 / 4), bound to the body -- a looping GPUParticles3D scene. Default PoiDizzy.tscn (pass 131).</summary>
     [Export] public PackedScene DizzyFxScene;
-    /// <summary>PARTICLE_MS_POI_ZZZ: the sleep bubbles while in the sleep loop (bck 5), bound to the body -- a looping GPUParticles3D scene.</summary>
+    /// <summary>PARTICLE_MS_POI_ZZZ: the sleep bubbles while in the sleep loop (bck 5), bound to the body -- a looping GPUParticles3D scene. Default PoiZzz.tscn.</summary>
     [Export] public PackedScene ZzzFxScene;
-    /// <summary>PARTICLE_MS_JUMP_ED_A + _B: the landing dust when it hits the ground flipping (waterhit frame 18), on hard ground.</summary>
+    /// <summary>PARTICLE_MS_JUMP_ED_A + _B: the landing dust when it hits the ground flipping (waterhit frame 18), on hard ground. Default JumpEd.tscn.</summary>
     [Export] public PackedScene LandDustFxScene;
-    /// <summary>PARTICLE_MS_POI_SAND (+ JUMP_ED_A): the sand spray of the flip (frame 18) and the getup (frame 34), on sand.</summary>
+    /// <summary>PARTICLE_MS_POI_SAND (+ JUMP_ED_A): the sand spray of the flip (frame 18) and the getup (frame 34), on sand. Default PoiSand.tscn.</summary>
     [Export] public PackedScene SandFxScene;
+    /// <summary>PARTICLE_MS_POI_DEAD: the splash of coloured water drops at the death clip's start (setDeadAnm: Yoshi's eat, or StompKills). Default PoiDead.tscn.</summary>
+    [Export] public PackedScene DeadFxScene;
+    public const string FxDir = "res://assets/Sms/Enemy/Fx131/";
     /// <summary>PARTICLE_MS_DMG_B + MS_M_AMIATTACK at the mouth joint, 4 ticks into the fling (with the rumble).</summary>
     [Export] public PackedScene ThrowFxScene;
     /// <summary>poihana_throw.bas / MSD_SE_EN_KOHANA_WAKEUP3 (the waken). Unset = silent.</summary>
@@ -159,8 +162,10 @@ public partial class SmsPoihana : SmsSmallEnemy
         _awakeKind = Kind != PoihanaKind.Sleeping;         // TSleepPoiHana::load: unk1A0 = false
         _canSleep = Kind != PoihanaKind.Red;              // TPoiHanaRed::init: unk1C8 = false
         EventCoinScene ??= ResourceLoader.Exists(EventCoinScenePath) ? GD.Load<PackedScene>(EventCoinScenePath) : null;
+        DizzyFxScene ??= LoadFx("PoiDizzy"); ZzzFxScene ??= LoadFx("PoiZzz"); LandDustFxScene ??= LoadFx("JumpEd"); SandFxScene ??= LoadFx("PoiSand"); DeadFxScene ??= LoadFx("PoiDead");   // pass 131
         DressBody();
     }
+    private static PackedScene LoadFx(string name) => ResourceLoader.Exists(FxDir + name + ".tscn") ? GD.Load<PackedScene>(FxDir + name + ".tscn") : null;
 
     /// <summary>TPoiHanaManager::initSetEnemies: SMS_InitPacket_OneTevColor(GX_TEVREG0) on the '_body' material -- a per-instance copy of PoihanaBody.tres
     /// with the kind's colour (the red kind's (283, -53, -122)).</summary>
@@ -232,6 +237,7 @@ public partial class SmsPoihana : SmsSmallEnemy
     protected override void SetDeadAnm()
     {
         SetBck(BckDeath);
+        SpawnBurst(DeadFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale), GlobalPosition));                                  // PARTICLE_MS_POI_DEAD at mPosition, mScaling
         SpawnBurst(GroundIsSand() ? SandFxScene : LandDustFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale), GlobalPosition));
     }
 
@@ -451,14 +457,15 @@ public partial class SmsPoihana : SmsSmallEnemy
     }
     public const string MouthJointName = "mouth1_2";
 
-    /// <summary>A looping bound effect (emitAndBindToPosPtr): the scene kept as a child of the body while `on`, freed when not.</summary>
+    /// <summary>A looping bound effect (emitAndBindToPosPtr(&amp;mPosition)): the scene kept as a child of the body at its origin while `on` -- the jpa's own
+    /// emitter translation (the stars 120 u up, the Zs 100 u) is baked into the scene -- scaled by the body scale, freed when not.</summary>
     private void BoundFx(ref Node3D slot, PackedScene scene, bool on)
     {
         if (on && slot == null && scene != null)
         {
             slot = scene.Instantiate<Node3D>();
             AddChild(slot);
-            slot.Position = Vector3.Up * (P.HeadHeight * 0.5f * _scale / U);
+            slot.Position = Vector3.Zero;
             slot.Scale = Vector3.One * _scale;
         }
         else if (!on && slot != null) { slot.QueueFree(); slot = null; }

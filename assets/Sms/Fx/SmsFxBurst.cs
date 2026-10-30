@@ -54,7 +54,14 @@ public partial class SmsFxBurst : Node3D
             p.Emitting = false;
             _running++;
             if (!_wired) p.Finished += () => { if (--_running <= 0) Done(); };
-            p.Restart();
+            // pass 131: a JPA emitter's start frame (the Pokey's sink rocks come 40 frames into the sink) -- `metadata/sms_delay_frames` on the child
+            int delay = p.HasMeta("sms_delay_frames") ? p.GetMeta("sms_delay_frames").AsInt32() : 0;
+            if (delay > 0 && IsInsideTree())
+            {
+                var pp = p;
+                GetTree().CreateTimer(delay / 60.0).Timeout += () => { if (IsInstanceValid(pp)) pp.Restart(); };
+            }
+            else p.Restart();
         }
         _wired = true;
         if (_running == 0) Done();

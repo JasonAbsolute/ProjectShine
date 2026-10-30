@@ -69,6 +69,7 @@ public partial class SmsSamboFlower : Node3D, ISmsSprayTarget
     {
         _model = GetNodeOrNull<Node3D>("Model");
         _anim = GetNodeOrNull<AnimationPlayer>("Model/AnimationPlayer");
+        BloomFxScene ??= SmsHanaSambo.Fx131("SmbPollen");   // pass 131: bloom() emits PARTICLE_MS_SMB_KAFUN_OW at mPosition (no rotation: the motes rise)
         if (_anim != null)
         {
             foreach (string n in new[] { "flower_wait", "flower_fwait" })

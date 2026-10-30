@@ -120,6 +120,8 @@ public partial class SmsHanaSambo : SmsSmallEnemy
     /// <summary>The puffs the last death spawned (4 at the pieces; a drive reads it).</summary>
     public int DeathPuffs { get; private set; }
 
+    /// <summary>A pass-131 effect scene by name (assets/Sms/Enemy/Fx131/), or null when missing.</summary>
+    internal static PackedScene Fx131(string name) => ResourceLoader.Exists("res://assets/Sms/Enemy/Fx131/" + name + ".tscn") ? GD.Load<PackedScene>("res://assets/Sms/Enemy/Fx131/" + name + ".tscn") : null;
     protected override void Init()
     {
         _flags150 = 17;                                   // unk150 = 0x11
@@ -136,6 +138,7 @@ public partial class SmsHanaSambo : SmsSmallEnemy
         }
         _headShape = GetNodeOrNull<CollisionShape3D>("HeadShape");
         FlowerScene ??= ResourceLoader.Exists(FlowerScenePath) ? GD.Load<PackedScene>(FlowerScenePath) : null;
+        AppearFxScene ??= Fx131("SmbAppear"); HideFxScene ??= Fx131("SmbHide"); PollenWaitFxScene ??= Fx131("SmbPollen"); PollenAttackFxScene ??= Fx131("SmbPollenAttack");   // pass 131: the disc's jpa
         _skipSink = StartBuried;
     }
 

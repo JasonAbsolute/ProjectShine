@@ -115,12 +115,15 @@ public partial class SmsSamboHead : SmsSmallEnemy
     public int PrepareTicks => _prepare;
     public SmsSamboFlower Flower => _flower;
 
+    /// <summary>A pass-131 effect scene by name (assets/Sms/Enemy/Fx131/), or null when missing.</summary>
+    internal static PackedScene Fx131(string name) => ResourceLoader.Exists("res://assets/Sms/Enemy/Fx131/" + name + ".tscn") ? GD.Load<PackedScene>("res://assets/Sms/Enemy/Fx131/" + name + ".tscn") : null;
     protected override void Init()
     {
         _flags150 = 17;                                   // unk150 = 0x11
         SetGoalMario();
         FlowerScene ??= ResourceLoader.Exists(FlowerScenePath) ? GD.Load<PackedScene>(FlowerScenePath) : null;
         LeafScene ??= ResourceLoader.Exists(LeafScenePath) ? GD.Load<PackedScene>(LeafScenePath) : null;
+        AppearFxScene ??= Fx131("SmbAppear"); HideFxScene ??= Fx131("SmbHide");   // pass 131: the disc's jpa
         EventCoinScene ??= ResourceLoader.Exists(EventCoinScenePath) ? GD.Load<PackedScene>(EventCoinScenePath) : null;
         if (_model != null)
             foreach (Node n in _model.FindChildren("*", "Skeleton3D", true, false))
