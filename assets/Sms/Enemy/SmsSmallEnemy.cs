@@ -158,6 +158,7 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     // ------------------------------------------------------------------------------------------------------------------ setup
     public override void _Ready()
     {
+        if (Engine.IsEditorHint()) { _model = GetNodeOrNull<Node3D>("Model"); EditorPreview(); return; }   // pass 128b: a [Tool] species dresses its model for the editor; no group, no reset, no tick there
         AddToGroup("sms_enemy");                                // pass 116: gpConductor->killEnemiesWithin (the shine get)
         _model = GetNodeOrNull<Node3D>("Model");
         _anim = GetNodeOrNull<AnimationPlayer>("Model/AnimationPlayer");
@@ -183,6 +184,10 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     /// <summary>TSmallEnemy::init's species tail (actor type, flags, hit filters, the model's dressing) -- after the model is found, before the clip
     /// check and the first reset. <see cref="_rng"/> is ready; <see cref="_mario"/> is not.</summary>
     protected virtual void Init() { }
+
+    /// <summary>What a [Tool] species shows in the EDITOR (pass 128b: the Cataquack's body paint). Only <see cref="_model"/> is resolved when this
+    /// runs; nothing else of the enemy exists there -- no Mario, no rng, no tick. A species without [Tool] never gets here.</summary>
+    protected virtual void EditorPreview() { }
 
     /// <summary>resetSRTV for a spawner (or a drive) that places the body AFTER adding it to the tree: the placed point and yaw become the launcher's, the body resets there.</summary>
     public void SmsPlace(Vector3 globalPosition, float yawDeg)
@@ -222,6 +227,7 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     // ------------------------------------------------------------------------------------------------------------------ the tick
     public override void _PhysicsProcess(double delta)
     {
+        if (Engine.IsEditorHint()) return;                      // pass 128b: a [Tool] species only previews in the editor
         if (_mario == null || !IsInstanceValid(_mario))
         {
             _mario = GetTree().GetFirstNodeInGroup("player") as Mario;

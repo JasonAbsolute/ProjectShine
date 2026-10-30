@@ -28,6 +28,7 @@ using Godot;
 /// map-object stun (isCollidMove: a charging one hitting a MOVABLE map object knocks itself out -- his levels' walls are the bg, which never
 /// stuns), Yoshi (the eat, the juice platform), the sounds (slots), doKeepDistance.
 /// </summary>
+[Tool]   // pass 128b: the body paint previews in the editor (SmsSmallEnemy._Ready / _PhysicsProcess return there after EditorPreview)
 [GlobalClass]
 public partial class SmsPoihana : SmsSmallEnemy
 {
@@ -56,12 +57,21 @@ public partial class SmsPoihana : SmsSmallEnemy
     // ------------------------------------------------------------------------------------------------------------------ the knobs
     [ExportGroup("Kind")]
     /// <summary>Blue = TPoiHana: flings Mario, no damage. Red = TPoiHanaRed: the fling hurts too (1 HP), and it never sleeps. Sleeping =
-    /// TSleepPoiHana: a blue one born asleep that only a touch or the hose wakes.</summary>
-    [Export] public PoihanaKind Kind = PoihanaKind.Blue;
-    /// <summary>The game's body colours per kind (GX_TEVREG0, S10: these may run outside 0..1): blue (-191, 8, 303) / 255, red (283, -53, -122) / 255.
-    /// Set <see cref="BodyColorOverride"/> to paint one differently.</summary>
-    [Export] public bool UseBodyColorOverride = false;
-    [Export] public Vector3 BodyColorOverride = new Vector3(-0.749f, 0.0314f, 1.1882f);
+    /// TSleepPoiHana: a blue one born asleep that only a touch or the hose wakes. The kind also picks the game's paint (blue or red) unless
+    /// <see cref="UseBodyColor"/> is on. Behaviour is fixed at birth; the paint follows a change live (and in the editor).</summary>
+    [Export] public PoihanaKind Kind { get => _kind; set { _kind = value; if (IsInsideTree()) ApplyBodyColor(); } }
+    private PoihanaKind _kind = PoihanaKind.Blue;
+
+    [ExportGroup("Paint (off = the kind's game colour)")]
+    /// <summary>On: the body is painted <see cref="BodyColor"/> instead of the kind's game paint -- any colour, behaviour unchanged. Shows in the
+    /// editor too.</summary>
+    [Export] public bool UseBodyColor { get => _useBodyColor; set { _useBodyColor = value; if (IsInsideTree()) ApplyBodyColor(); } }
+    private bool _useBodyColor;
+    /// <summary>The body's colour where the sun hits it full on; the game's toon shading darkens it in the shade and adds the sun's white glint on
+    /// top. The pick is exact: the material's register is solved from it (c0 = 2 x colour - 1/2, the game's constant blue tint dropped), so a
+    /// yellow is a yellow. The default is the blue kind's own lit colour (0, 68, 247). Only the body: the bill stays yellow and the eye its own.</summary>
+    [Export(PropertyHint.ColorNoAlpha)] public Color BodyColor { get => _bodyColor; set { _bodyColor = value; if (IsInsideTree()) ApplyBodyColor(); } }
+    private Color _bodyColor = new Color(0f, 0.2657f, 0.9696f);
 
     [ExportGroup("Ground")]
     /// <summary>What it stands on decides the flip: Auto = sand when the floor it touches is in the "sms_sand" group (or its name contains "sand"),
@@ -173,14 +183,32 @@ public partial class SmsPoihana : SmsSmallEnemy
         }
         ApplyBodyColor();
     }
+    /// <summary>The body's GX_TEVREG0 + konst 2 for the look: the kind's game registers (C0 blue (-191, 8, 303) / red (283, -53, -122), K2 (0, 0, 32)),
+    /// or the pick solved back through the material's stages (pass 128b). Stage 0 with no texture is s0 = 1/2 (c0 + mix(1, COLOR0, 5/8) - 1/2) --
+    /// at full light COLOR0 = 1, so s0 = c0 / 2 + 1/4 -- then stage 1 is s0 x toon (1 there) + K2: the lit colour = c0 / 2 + 1/4 + K2. K2 = 0 for
+    /// a pick so every channel lands exactly (the game's blue cast would floor a yellow's blue at 32), and c0 = 2 x pick - 1/2.</summary>
     private void ApplyBodyColor()
     {
         if (_bodyMat == null) return;
-        Vector3 c = UseBodyColorOverride ? BodyColorOverride : (Kind == PoihanaKind.Red ? new Vector3(283f, -53f, -122f) / 255f : new Vector3(-191f, 8f, 303f) / 255f);
-        _bodyMat.SetShaderParameter("c0", c);
+        Vector3 c0, k2;
+        if (_useBodyColor)
+        {
+            c0 = new Vector3(2f * _bodyColor.R - 0.5f, 2f * _bodyColor.G - 0.5f, 2f * _bodyColor.B - 0.5f);
+            k2 = Vector3.Zero;
+        }
+        else
+        {
+            c0 = _kind == PoihanaKind.Red ? new Vector3(283f, -53f, -122f) / 255f : new Vector3(-191f, 8f, 303f) / 255f;
+            k2 = new Vector3(0f, 0f, 32f / 255f);
+        }
+        _bodyMat.SetShaderParameter("c0", c0);
+        _bodyMat.SetShaderParameter("c2", k2);
     }
-    /// <summary>The body's GX_TEVREG0 as set (a drive reads it).</summary>
+    /// <summary>The body's GX_TEVREG0 / konst 2 as set (a drive reads them).</summary>
     public Vector3 BodyColorNow => _bodyMat == null ? Vector3.Zero : _bodyMat.GetShaderParameter("c0").AsVector3();
+    public Vector3 BodyKonstNow => _bodyMat == null ? Vector3.Zero : _bodyMat.GetShaderParameter("c2").AsVector3();
+    /// <summary>[Tool]: the editor shows the kind's paint or the pick on the placed body (the override material is not saved -- the glb's nodes are the instance's own).</summary>
+    protected override void EditorPreview() => DressBody();
 
     protected override void Reset()
     {
