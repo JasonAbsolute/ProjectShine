@@ -162,7 +162,7 @@ public partial class SmsPoihana : SmsSmallEnemy
         _awakeKind = Kind != PoihanaKind.Sleeping;         // TSleepPoiHana::load: unk1A0 = false
         _canSleep = Kind != PoihanaKind.Red;              // TPoiHanaRed::init: unk1C8 = false
         EventCoinScene ??= ResourceLoader.Exists(EventCoinScenePath) ? GD.Load<PackedScene>(EventCoinScenePath) : null;
-        DizzyFxScene ??= LoadFx("PoiDizzy"); ZzzFxScene ??= LoadFx("PoiZzz"); LandDustFxScene ??= LoadFx("JumpEd"); SandFxScene ??= LoadFx("PoiSand"); DeadFxScene ??= LoadFx("PoiDead");   // pass 131
+        DizzyFxScene ??= LoadFx("PoiDizzy"); ZzzFxScene ??= LoadFx("PoiZzz"); LandDustFxScene ??= LoadFx("JumpEd"); SandFxScene ??= LoadFx("PoiSand"); DeadFxScene ??= LoadFx("PoiDead"); ThrowFxScene ??= LoadFx("PoiThrow");   // pass 131; ThrowFx = pass 133 (the fling's flash + streaks at the mouth: DMG_B + MS_M_AMIATTACK)
         DressBody();
     }
     private static PackedScene LoadFx(string name) => ResourceLoader.Exists(FxDir + name + ".tscn") ? GD.Load<PackedScene>(FxDir + name + ".tscn") : null;

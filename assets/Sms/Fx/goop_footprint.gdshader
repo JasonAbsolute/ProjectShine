@@ -18,6 +18,7 @@ uniform vec3 env2 = vec3(0.0);
 uniform float pick1 = 0.3333;          // COLOR.r (a uniform random 0..1 per particle) below pick1 -> index 0, below pick2 -> the middle, else the top
 uniform float pick2 = 0.6667;
 uniform float alpha_ref = 0.0;         // the GX alpha compare (GEQUAL ref / 255); 0 = none
+uniform vec2 fade_white = vec2(1.0, 1.0); // pass 133: the print's colour -> white between these life fractions (the sand print's env keys 45 -> 60 of 60); x >= 1 = none
 
 varying float life_phase;
 varying float pick;
@@ -66,7 +67,8 @@ void fragment() {
 	vec4 t = texture(tex, UV);
 	vec3 prm = pick < pick1 ? prm0 : (pick < pick2 ? prm1 : prm2);
 	vec3 env = pick < pick1 ? env0 : (pick < pick2 ? env1 : env2);
-	ALBEDO = to_linear(mix(env, prm, t.r));
+	float w = fade_white.x < 1.0 ? clamp((clamp(life_phase, 0.0, 1.0) - fade_white.x) / max(fade_white.y - fade_white.x, 1e-4), 0.0, 1.0) : 0.0;
+	ALBEDO = to_linear(mix(mix(env, prm, t.r), vec3(1.0), w));   // a multiply blend fades by going WHITE, not transparent
 	ALPHA = t.a * COLOR.a;
 	ALPHA_SCISSOR_THRESHOLD = alpha_ref;
 }

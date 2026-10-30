@@ -2417,6 +2417,7 @@ public partial class Mario : CharacterBody3D
         if (UseSmsPhysics)
         {
             SmsWaterCheck();      // playerControl(): the water surface at the feet, every tick
+            SmsWaterInOutTick();  // pass 133: inOutWaterEffect -- the splash when MARIO_FLAG_IN_ANY_WATER flips either way
             SmsBubblesFrame();    // the bubbles under water (pass 48): one particle frame a physics frame
             SmsYCamFrame(delta);  // the L (Y) camera's Mario half (MarioYCam.cs): the pad's meanings for the rig, his dead stick, A / B eaten, his facing -- the camera itself is the rig's mode (pass 68)
             SmsAirTick(delta);    // mAir drains with the head under, refills out; the meter turns to air after 2 s under
@@ -5589,6 +5590,109 @@ public partial class Mario : CharacterBody3D
     /// <summary>Pass 28: the game's Mario particles as scenes under Mario (assets/Sms/Fx/*.tscn, the disc's .jpa data read into
     /// GPUParticles3D) -- adopted from wherever he instanced them; the bound ones follow the 'center' joint like the game's
     /// emitters. A missing scene keeps the legacy effect, with a warning naming the scene to instance.</summary>
+    // ------------------------------------------------------------------------------------------------------------------
+    // Pass 133: Mario's own one-shot effects from the disc, as SmsFxBurst scenes in assets/Sms/Fx (loaded once, spawned under the level,
+    // freed when done): the water splash (inOutWaterEffect), the water-run splash and the sand puffs + print at the gait's footfalls
+    // (runningRippleEffect / emitSandEffect), the rocket launch (rocketEffectStart) and the hit burst (damageExec's DMG_A / DMG_B beside
+    // BonkStars' DMG_C). A missing scene warns once and that effect stays off.
+    // ------------------------------------------------------------------------------------------------------------------
+    private bool _smsWasInAnyWater;                                   // last tick's MARIO_FLAG_IN_ANY_WATER: the splash fires on either flip
+    private bool _smsDirtyPrintTick, _smsFootfallDirty;               // SmsFootPrintTick's verdict this tick: a goop print at the footfall
+    private readonly System.Collections.Generic.Dictionary<string, PackedScene> _smsFx133 = new();
+
+    private PackedScene SmsFx133(string name)
+    {
+        if (_smsFx133.TryGetValue(name, out var scene)) return scene;
+        string path = $"res://assets/Sms/Fx/{name}.tscn";
+        scene = ResourceLoader.Exists(path) ? GD.Load<PackedScene>(path) : null;
+        if (scene == null) GD.PushWarning($"[SMS fx] {path} is missing: that effect does not play (pass 133)");
+        _smsFx133[name] = scene;
+        return scene;
+    }
+
+    /// <summary>The game's emit(id, &amp;pos) with no bind: the scene's burst at <paramref name="at"/> (its basis = the emitter's frame), under
+    /// the level, freed when done; <paramref name="dropChild"/> names an emitter left out of this one (the sand print below 20 u/f).</summary>
+    private void SmsSpawnFx133(string name, Transform3D at, string dropChild = null)
+    {
+        var scene = SmsFx133(name);
+        if (scene == null) return;
+        var fx = scene.Instantiate<Node3D>();
+        if (dropChild != null && fx.GetNodeOrNull(dropChild) is Node drop) { fx.RemoveChild(drop); drop.QueueFree(); }
+        fx.TopLevel = true;
+        (GetTree().CurrentScene ?? GetParent()).AddChild(fx);
+        fx.GlobalTransform = at;
+        if (fx is SmsFxBurst burst) burst.Play(at);
+    }
+
+    /// <summary>mForwardVel in game units a frame: his horizontal speed along the face.</summary>
+    private float SmsForwardUnits()
+    {
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+        return SmsUnits.MpsToSpeed(new Vector3(velocity.X, 0f, velocity.Z).Dot(face));
+    }
+
+    /// <summary>inOutWaterEffect (MarioMove.cpp 2066 / MarioParticle.cpp 174): the tick MARIO_FLAG_IN_ANY_WATER flips -- in or out -- a splash
+    /// at (x, the surface, z): the small one (TOBIKOMI_S_A / _S_B) in shallow water (a pool, or under 50 u of water: the splash model's own
+    /// floor) or at |vel.y| at or under JumpIntoMdlEffectSpY 10 u/f (watereffect.prm); else the big one (TOBIKOMI_A / _B). TOBIKOMI_C, the
+    /// indirect ripple, and the 04_tobikomi.bmd splash model are not ported. Right after SmsWaterCheck every tick; the surface and the floor
+    /// keep their last in-water values for the way out.</summary>
+    private void SmsWaterInOutTick()
+    {
+        bool now = _smsInWater;
+        if (now == _smsWasInAnyWater) return;
+        _smsWasInAnyWater = now;
+        if (_smsMoveTick < 10 || stateOfMario == MarioState.dead || stateOfMario == MarioState.shineGet) return; // a start in the water is no dive
+        float vyU = SmsUnits.MpsToSpeed(_smsTrueVyValid ? _smsTrueVy : velocity.Y);
+        float depthU = float.IsNegativeInfinity(_smsWaterFloorY) ? 9999f : SmsUnits.MetresToUnits(_smsWaterSurfaceY - _smsWaterFloorY);
+        bool small = depthU < 50f || MathF.Abs(vyU) <= 10f;
+        SmsSpawnFx133(small ? "WaterSplashSmall" : "WaterSplash", new Transform3D(Basis.Identity, new Vector3(GlobalPosition.X, _smsWaterSurfaceY, GlobalPosition.Z)));
+        if (SmsDebugPrint)
+            GD.Print($"[SMS fx] water {(now ? "in" : "out")}: the {(small ? "small" : "big")} splash at y {_smsWaterSurfaceY:F2} (vy {vyU:F1} u/f, {depthU:F0} u of water)");
+    }
+
+    /// <summary>damageExec (MarioCollision.cpp 383-387): PARTICLE_MS_DMG_A (the marks) and _B (the streaks) at calcDamagePos, beside BonkStars'
+    /// DMG_C (SpawnHitStars), for every damageAnimType but 3.</summary>
+    private void SmsSpawnHitBurst(Vector3 at) => SmsSpawnFx133("HitBurst", new Transform3D(Basis.Identity, at));
+
+    /// <summary>rocketEffectStart (MarioParticle.cpp 679): ROCKET_D (the shockwave), ROCKET_C (the smoke ring) and HIPDROP_A (the sparks) at his
+    /// position as MARIO_STATUS_ROCKET begins with the Rocket nozzle. The nozzle-bound ROCKET_A / B / B2 mist is not ported.</summary>
+    private void SmsRocketLaunchFx() => SmsSpawnFx133("RocketLaunch", new Transform3D(Basis.Identity, ComputeFeetPosition()));
+
+    /// <summary>mGroundPlane->isSand() for a floor collider: it or an ancestor in the "sms_sand" group, or named with "sand" (the Cataquack's rule).</summary>
+    private static bool SmsColliderIsSand(Node n)
+    {
+        for (Node q = n; q != null; q = q.GetParent())
+            if (q.IsInGroup("sms_sand") || q.Name.ToString().Contains("sand", StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
+    }
+
+    /// <summary>One footfall of the gait (the motion frame ctrl passing 38 = the left foot, 8 = the right; SmsFootPrintPass): <paramref name="ground"/>
+    /// = calcGroundMtx under the joint (X his right, Y the plane's normal, Z his forward, at the ground), <paramref name="collider"/> the floor hit.
+    /// emitFootPrintWithEffect: the goop print while the dirty timer runs (pass 107). thinkSand -> emitSandEffect (MarioMove.cpp 2126): on a sand
+    /// floor in no water, WALKSAND_A's eight puffs at the frame and WALKSAND_B's print when he runs over 20 u/f. runningRippleEffect (MarioMove.cpp
+    /// 2040): wading, the surface under RunningRippleDepth 30 u above the feet, over 30 u/f: WATRUN_A at (x, the surface, z). The wet-ground case
+    /// (isWetGround) has no floor flag here.</summary>
+    private void SmsFootfall(string joint, Transform3D ground, Node collider)
+    {
+        if (_smsFootfallDirty && _smsGoopFx != null)
+        {
+            _smsGoopFx.SpawnFootPrint(ground);
+            if (SmsDebugPrint)
+                GD.Print($"[SMS goop] footprint {joint} at {ground.Origin} (timer {_smsFootPrintTimer}, dirty {_smsDirtyAmount:F0})");
+        }
+        float fwd = SmsForwardUnits();
+        if (!_smsInWater && SmsColliderIsSand(collider))
+        {
+            SmsSpawnFx133("SandWalk", ground, fwd > 20f ? null : "Print");
+            if (SmsDebugPrint) GD.Print($"[SMS fx] sand footfall {joint} at {ground.Origin} ({fwd:F0} u/f{(fwd > 20f ? ", a print" : "")})");
+        }
+        if (_smsInWater && SmsUnits.MetresToUnits(_smsWaterSurfaceY - SmsFeetY()) < 30f && fwd > 30f)
+        {
+            SmsSpawnFx133("WaterRun", new Transform3D(Basis.Identity, new Vector3(GlobalPosition.X, _smsWaterSurfaceY, GlobalPosition.Z)));
+            if (SmsDebugPrint) GD.Print($"[SMS fx] water-run splash {joint} ({fwd:F0} u/f)");
+        }
+    }
+
     private void SmsSetupFx()
     {
         _smsSpinBlur = SmsFluddModel.FindChild<SmsSpinJumpBlur>(this);
@@ -11619,7 +11723,7 @@ public partial class Mario : CharacterBody3D
                 SmsFireDownEnter(1, fwd, face, "the fire hit"); // ReceiveMsg: changePlayerStatus(FIRE_DOWN, 1, false) right after damageExec -- the knockdown status it set is replaced before it ticks
             else
                 SmsDownEnter(airborne, fwd);
-            SpawnHitStars(ComputeFeetPosition() + attackDir * SmsUnits.UnitsToMetres(50f)); // PARTICLE_MS_DMG_A/B/C at calcDamagePos = mPosition + 50 units toward the attacker; the rumble and voice are not ported
+            SpawnHitStars(ComputeFeetPosition() + attackDir * SmsUnits.UnitsToMetres(50f)); SmsSpawnHitBurst(ComputeFeetPosition() + attackDir * SmsUnits.UnitsToMetres(50f)); /* pass 133 */ // PARTICLE_MS_DMG_A/B/C at calcDamagePos = mPosition + 50 units toward the attacker; the rumble and voice are not ported
             _smsCameraShake?.Start(SmsCameraShake.Kind.Damage); // gpCameraShake->startShake(CAM_SHAKE_MODE_UNK2 shakeDamage, 1.0) for every type but 3 (MarioCollision.cpp 380)
             what = $"{(_smsDownFore ? "FORE" : "BACK")}_DOWN type {_smsDownType} {(airborne ? "in the air (+-16 along the face until he lands)" : $"on the ground, {_smsDownAnim} at fwd {fwd:F1} ({SmsUnits.SpeedToMps(MathF.Abs(fwd)):F1} m/s)")}";
             if (p.FireDown)
@@ -12388,7 +12492,7 @@ public partial class Mario : CharacterBody3D
             Vector3 attackDir = toAttacker.Normalized();
             Vector3 oldFace = SmsMath.DirFromYaw(_smsFaceYaw);
             _smsFaceYaw = SmsMath.YawFromDir(oldFace.Dot(attackDir) >= 0f ? attackDir : -attackDir); // getAttackAngle(), +180 from behind
-            SpawnHitStars(ComputeFeetPosition() + attackDir * SmsUnits.UnitsToMetres(50f)); // calcDamagePos
+            SpawnHitStars(ComputeFeetPosition() + attackDir * SmsUnits.UnitsToMetres(50f)); SmsSpawnHitBurst(ComputeFeetPosition() + attackDir * SmsUnits.UnitsToMetres(50f)); /* pass 133 */ // calcDamagePos
         }
         _smsInvincibleTicks = p.InvincibleTicks;
         SmsFluddDamage(p.WaterEmit); // the tank spills (mWaterEmit x DamageLoss)
@@ -13799,6 +13903,7 @@ public partial class Mario : CharacterBody3D
         armature.Rotation = new Vector3(0f, YawFromDir(face), 0f);
         stateOfMario = MarioState.fluddRocket;
         SetMarioState(MarioState.fluddRocket); // ANIM_LAND; the pump rides the upper-body blend
+        if (_fluddNozzle == SmsNozzle.Rocket) SmsRocketLaunchFx(); // pass 133: rocketEffectStart() (MarioMove.cpp 582): the smoke ring, the shockwave, the sparks
         if (SmsDebugPrint)
         {
             if (_fluddNozzle == SmsNozzle.Rocket)
@@ -15282,6 +15387,7 @@ public partial class Mario : CharacterBody3D
             }
             _smsDirty = dirty; // onFlag / offFlag(MARIO_FLAG_DIRTY)
             SmsFootPrintTick();
+            SmsGaitFootfallTick(); // pass 133: the gait's footfalls -> the goop print, the sand puffs + print, the water-run splash
             SmsThinkDirty();
             SmsCheckSink();
         }
@@ -15390,7 +15496,7 @@ public partial class Mario : CharacterBody3D
             return;
         if (!IsOnFloor() || _smsInWater)                                 // !mGroundPlane->isLegal(); MARIO_FLAG_IN_ANY_WATER
             return;
-        SmsEmitDirtyFootPrint();
+        _smsDirtyPrintTick = true; // pass 133: SmsGaitFootfallTick spawns the print at the footfall (with the sand and water-run effects)
     }
 
     /// <summary>emitDirtyFootPrint = emitFootPrintWithEffect(MAP_POLLUTION_MS_M_ASHIOS, -1) (MarioParticle.cpp 599-664): in MARIO_STATUS_RUN only (the
@@ -15398,9 +15504,10 @@ public partial class Mario : CharacterBody3D
     /// the last tick -- SMS frames are 60ths of a second, the gait clip loops), calcGroundMtx(it) (MarioMove.cpp 1799): the ground under the joint,
     /// X his right along the plane, Y up, Z his forward along it, 18 u up; the print emitted bound to a COPY of that frame 11 u down it (the
     /// jpa's trs) -- SmsGoopMario.SpawnFootPrint. printId -1: no map stamp here (that is the jump's).</summary>
-    private void SmsEmitDirtyFootPrint()
+    private void SmsGaitFootfallTick()
     {
-        if (_smsGoopFx == null || _sm == null || skeleton == null)
+        bool dirtyPrint = _smsDirtyPrintTick; _smsDirtyPrintTick = false; _smsFootfallDirty = dirtyPrint; // pass 133: every tick, print or not
+        if (_sm == null || skeleton == null)
             return;
         bool run = stateOfMario is MarioState.walking or MarioState.running or MarioState.sprinting;
         string node = _sm.GetCurrentNode().ToString();
@@ -15444,9 +15551,7 @@ public partial class Mario : CharacterBody3D
             return;
         fwd = fwd.Normalized();
         Vector3 right = n.Cross(fwd).Normalized();                       // X x Y = Z: the game's frame is right-handed (its X column = (cos, dy, -sin))
-        _smsGoopFx.SpawnFootPrint(new Transform3D(new Basis(right, n, fwd), ground));
-        if (SmsDebugPrint)
-            GD.Print($"[SMS goop] footprint {joint} at {ground} (timer {_smsFootPrintTimer}, dirty {_smsDirtyAmount:F0})");
+        SmsFootfall(joint, new Transform3D(new Basis(right, n, fwd), ground), hit["collider"].AsGodotObject() as Node); // pass 133: the dispatcher
     }
 
     /// <summary>The sink lerps: (Max - Min)(1 - t) + Min with t = depth / SinkTime (flat 0.3 / 0.5 as shipped).</summary>

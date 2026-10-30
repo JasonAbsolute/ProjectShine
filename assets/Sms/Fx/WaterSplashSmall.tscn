@@ -1,0 +1,136 @@
+[gd_scene load_steps=18 format=3 uid="uid://d133wsplashsm"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsFxBurst.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/mizutama1_add.png" id="T_drop"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/hamonring2_add.png" id="T_ring"]
+
+[sub_resource type="Curve" id="Curve_one"]
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Gradient" id="Gradient_drop"]
+resource_name = "ms_m_tobikomi_s_a ESP1 alpha 1 -> 0 from 75 %"
+offsets = PackedFloat32Array(0, 0.75, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_drop"]
+gradient = SubResource("Gradient_drop")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_drop"]
+resource_name = "ms_m_tobikomi_s_a: 20 drops (Circle div 20, FixedInterval) off a ring r 5 u 10 u up: 6 u/f out of the centre + 16 u/f up in a 4.5 deg cone x (1 +- 0.25), gravity 1 u/f^2"
+lifetime_randomness = 0.25
+emission_shape = 6
+emission_ring_axis = Vector3(0, 1, 0)
+emission_ring_height = 0.0
+emission_ring_radius = 0.6717
+emission_ring_inner_radius = 0.6717
+direction = Vector3(0, 1, 0)
+spread = 4.5
+initial_velocity_min = 9.672
+initial_velocity_max = 16.1201
+radial_velocity_min = 3.627
+radial_velocity_max = 6.045
+gravity = Vector3(0, -48.36, 0)
+scale_min = 0.875
+scale_max = 1.125
+color_ramp = SubResource("GradientTexture1D_drop")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_drop"]
+resource_name = "P_msm_mizutama1_i as a white drop (env = prm = white), ADDITIVE"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+disable_receive_shadows = true
+albedo_texture = ExtResource("T_drop")
+billboard_mode = 3
+billboard_keep_scale = true
+blend_mode = 1
+
+[sub_resource type="QuadMesh" id="QuadMesh_drop"]
+resource_name = "the game's 0.17 x 0.17 quad (8 x 8 units)"
+material = SubResource("StandardMaterial3D_drop")
+size = Vector2(0.1142, 0.1142)
+
+[sub_resource type="Curve" id="Curve_ring_sx"]
+resource_name = "_s_b ESP1 scale 0.5 -> 1 by 37.3 %, -> 2.0 at the end (x 1 +- 0.2)"
+max_value = 2
+_data = [Vector2(0, 0.5), 0.0, 0.0, 1, 1, Vector2(0.3733, 1), 0.0, 0.0, 1, 1, Vector2(1, 2), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="Curve" id="Curve_ring_sy"]
+max_value = 2
+_data = [Vector2(0, 0.5), 0.0, 0.0, 1, 1, Vector2(0.3733, 1), 0.0, 0.0, 1, 1, Vector2(1, 2), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_ring_scale"]
+curve_x = SubResource("Curve_ring_sx")
+curve_y = SubResource("Curve_ring_sy")
+curve_z = SubResource("Curve_one")
+
+[sub_resource type="Gradient" id="Gradient_ring"]
+resource_name = "alpha 0 -> 0.2 by 11.65 %, -> 0 from 87.5 %"
+offsets = PackedFloat32Array(0, 0.1165, 0.875, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 0.2, 1, 1, 1, 0.2, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_ring"]
+gradient = SubResource("Gradient_ring")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_ring"]
+resource_name = "_s_b: one flat ring every 5 frames for 28 (6), 3 u above the surface, 0.05 u/f up, life 38"
+lifetime_randomness = 0.0
+emission_shape = 0
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 0.0403
+initial_velocity_max = 0.0403
+gravity = Vector3(0, 0, 0)
+scale_min = 0.8
+scale_max = 1.2
+scale_curve = SubResource("CurveXYZTexture_ring_scale")
+color_ramp = SubResource("GradientTexture1D_ring")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ring"]
+resource_name = "P_msm_hamonring2 white, ADDITIVE, flat on the water"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+disable_receive_shadows = true
+albedo_texture = ExtResource("T_ring")
+blend_mode = 1
+
+[sub_resource type="QuadMesh" id="QuadMesh_ring"]
+orientation = 1
+resource_name = "the game's 4 x 4 quad (2 x 2 units)"
+material = SubResource("StandardMaterial3D_ring")
+size = Vector2(2.6867, 2.6867)
+
+[node name="WaterSplashSmall" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Drops" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 20
+lifetime = 0.5833
+one_shot = true
+explosiveness = 1
+fixed_fps = 60
+local_coords = true
+visibility_aabb = AABB(-6, -2, -6, 12, 10, 12)
+process_material = SubResource("ParticleProcessMaterial_drop")
+draw_pass_1 = SubResource("QuadMesh_drop")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1343, 0)
+
+[node name="Rings" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 6
+lifetime = 0.6333
+one_shot = true
+explosiveness = 0
+fixed_fps = 60
+local_coords = true
+visibility_aabb = AABB(-8, -1, -8, 16, 2, 16)
+process_material = SubResource("ParticleProcessMaterial_ring")
+draw_pass_1 = SubResource("QuadMesh_ring")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0403, 0)

@@ -1,0 +1,177 @@
+[gd_scene load_steps=28 format=3 uid="uid://d133hitbursta"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsFxBurst.cs" id="1_script"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/trample_mark.gdshader" id="SH_mark"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/hitmrk1_raw.png" id="T_hitmrk"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/smash5_raw.png" id="T_smash"]
+
+[sub_resource type="Curve" id="Curve_one"]
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_mark_sx"]
+resource_name = "ms_dmg_a ESP1 scale 1.2 -> 1 by 12.5 %, -> 0.5 from 87.5 %; x (1 +- 0.3)"
+max_value = 1.2
+_data = [Vector2(0, 1.2), 0.0, 0.0, 1, 1, Vector2(0.125, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.5), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="Curve" id="Curve_mark_sy"]
+max_value = 1.2
+_data = [Vector2(0, 1.2), 0.0, 0.0, 1, 1, Vector2(0.125, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.5), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_mark_scale"]
+curve_x = SubResource("Curve_mark_sx")
+curve_y = SubResource("Curve_mark_sy")
+curve_z = SubResource("Curve_one")
+
+[sub_resource type="Gradient" id="Gradient_mark"]
+resource_name = "alpha 1 -> 0 over the whole life"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_mark"]
+gradient = SubResource("Gradient_mark")
+
+[sub_resource type="Gradient" id="Gradient_mark_prm"]
+resource_name = "ms_dmg_a prm keys over 5 of the 6 frames: white, (255,118,78) @1, white @3, (255,111,159) @5 -- the FLAT colour"
+offsets = PackedFloat32Array(0, 0.2, 0.6, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 0.4627, 0.3059, 1, 1, 1, 1, 1, 1, 0.4353, 0.6235, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_mark_prm"]
+gradient = SubResource("Gradient_mark_prm")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_mark"]
+resource_name = "ms_dmg_a: 8 marks (rate 8, one frame) at the point, no velocity (omni 1 under a 0.96 drag), life 6; a random angle +- a half turn spinning 0.04 half-turns a frame x (1 +- 0.25)"
+lifetime_randomness = 0.0
+emission_shape = 0
+angle_min = -180.0
+angle_max = 180.0
+angular_velocity_min = 324
+angular_velocity_max = 540
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+gravity = Vector3(0, 0, 0)
+scale_min = 0.7
+scale_max = 1.3
+scale_curve = SubResource("CurveXYZTexture_mark_scale")
+color_ramp = SubResource("GradientTexture1D_mark")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_mark"]
+resource_name = "ms_dmg_a: P_msm_hitmrk1_ia (raw), colour = prm FLAT keyed over the life, alpha = A x the fade; a billboard turned by its angle (drawPrntAhead: over the body)"
+shader = ExtResource("SH_mark")
+shader_parameter/tex = ExtResource("T_hitmrk")
+shader_parameter/prm_ramp = SubResource("GradientTexture1D_mark_prm")
+shader_parameter/env_ramp = SubResource("GradientTexture1D_mark_prm")
+shader_parameter/flat_prm = true
+shader_parameter/dir_billboard = false
+shader_parameter/aligned_cross = false
+shader_parameter/angle_offset = 0
+
+[sub_resource type="QuadMesh" id="QuadMesh_mark"]
+resource_name = "the game's 2 x 9 quad (1 x 45 units)"
+material = SubResource("ShaderMaterial_mark")
+size = Vector2(1.3433, 6.045)
+
+[sub_resource type="Curve" id="Curve_streak_sx"]
+resource_name = "ms_dmg_b ESP1 scale X 1 -> 2.5, Y 1 -> 3.0 over the life (diffXY); x (1 +- 0.375)"
+max_value = 2.5
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 2.5), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_streak_sy"]
+max_value = 3
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 3), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_streak_scale"]
+curve_x = SubResource("Curve_streak_sx")
+curve_y = SubResource("Curve_streak_sy")
+curve_z = SubResource("Curve_one")
+
+[sub_resource type="Gradient" id="Gradient_streak"]
+resource_name = "alpha 0.75 -> 0 from 75 %"
+offsets = PackedFloat32Array(0, 0.75, 1)
+colors = PackedColorArray(1, 1, 1, 0.75, 1, 1, 1, 0.75, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_streak"]
+gradient = SubResource("Gradient_streak")
+
+[sub_resource type="Gradient" id="Gradient_streak_prm"]
+resource_name = "ms_dmg_b prm (255,231,231) constant"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(1, 0.9059, 0.9059, 1, 1, 0.9059, 0.9059, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_streak_prm"]
+gradient = SubResource("Gradient_streak_prm")
+
+[sub_resource type="Gradient" id="Gradient_streak_env"]
+resource_name = "ms_dmg_b env keys (255,183,111) -> (255,111,87) over 10 frames (the 8-frame life sees most of it)"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(1, 0.7176, 0.4353, 1, 1, 0.4902, 0.3608, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_streak_env"]
+gradient = SubResource("Gradient_streak_env")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_streak"]
+resource_name = "ms_dmg_b: 16 streaks (rate 16, one frame) off a 1 u sphere 5 u up, 20 u/f x (1 +- 0.25) in every direction, life 8 +- 25 %"
+lifetime_randomness = 0.25
+particle_flag_align_y = true
+emission_shape = 1
+emission_sphere_radius = 0.0134
+direction = Vector3(0, 1, 0)
+spread = 180.0
+initial_velocity_min = 12.0901
+initial_velocity_max = 20.1501
+gravity = Vector3(0, 0, 0)
+scale_min = 0.625
+scale_max = 1.375
+scale_curve = SubResource("CurveXYZTexture_streak_scale")
+color_ramp = SubResource("GradientTexture1D_streak")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_streak"]
+resource_name = "ms_dmg_b: P_msm_smash5_ia (raw), lerp(env -> prm, I) x A x the fade; a DirectionCross along the velocity"
+shader = ExtResource("SH_mark")
+shader_parameter/tex = ExtResource("T_smash")
+shader_parameter/prm_ramp = SubResource("GradientTexture1D_streak_prm")
+shader_parameter/env_ramp = SubResource("GradientTexture1D_streak_env")
+shader_parameter/flat_prm = false
+shader_parameter/dir_billboard = false
+shader_parameter/aligned_cross = true
+shader_parameter/angle_offset = 0
+
+[sub_resource type="QuadMesh" id="QuadMesh_streak"]
+resource_name = "the game's 1 x 2.6 quad (5 x 13 units)"
+material = SubResource("ShaderMaterial_streak")
+size = Vector2(0.6717, 1.7463)
+
+[node name="HitBurst" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Marks" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 8
+lifetime = 0.1
+one_shot = true
+explosiveness = 1
+fixed_fps = 60
+local_coords = true
+visibility_aabb = AABB(-7, -7, -7, 14, 14, 14)
+process_material = SubResource("ParticleProcessMaterial_mark")
+draw_pass_1 = SubResource("QuadMesh_mark")
+
+
+[node name="Streaks" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 16
+lifetime = 0.1333
+one_shot = true
+explosiveness = 1
+fixed_fps = 60
+local_coords = true
+visibility_aabb = AABB(-4, -3, -4, 8, 8, 8)
+process_material = SubResource("ParticleProcessMaterial_streak")
+draw_pass_1 = SubResource("QuadMesh_streak")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0672, 0)

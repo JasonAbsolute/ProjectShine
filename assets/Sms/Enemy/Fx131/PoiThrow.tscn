@@ -1,0 +1,261 @@
+[gd_scene load_steps=44 format=3 uid="uid://d133poithrowa"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsFxBurst.cs" id="1_script"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/trample_mark.gdshader" id="SH_mark"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/trample_mark_add.gdshader" id="SH_add"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/hitmrk1_raw.png" id="T_hitmrk"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/smash5_raw.png" id="T_smash"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/glow3_raw.png" id="T_glow"]
+
+[sub_resource type="Curve" id="Curve_one"]
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_flash_sx"]
+resource_name = "ms_m_amiattack ESP1 scale 1 until 12.5 %, -> 2.25 at the end"
+max_value = 2.25
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.125, 1), 0.0, 0.0, 1, 1, Vector2(1, 2.25), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="Curve" id="Curve_flash_sy"]
+max_value = 2.25
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(0.125, 1), 0.0, 0.0, 1, 1, Vector2(1, 2.25), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_flash_scale"]
+curve_x = SubResource("Curve_flash_sx")
+curve_y = SubResource("Curve_flash_sy")
+curve_z = SubResource("Curve_one")
+
+[sub_resource type="Gradient" id="Gradient_flash"]
+resource_name = "alpha 1 -> 0 from 75 %"
+offsets = PackedFloat32Array(0, 0.75, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_flash"]
+gradient = SubResource("Gradient_flash")
+
+[sub_resource type="Gradient" id="Gradient_flash_prm"]
+resource_name = "ms_m_amiattack prm keys a frame: white, white, (255,63,111), (255,255,144), (255,135,0)"
+offsets = PackedFloat32Array(0.2, 0.4, 0.6, 0.8, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 0.2471, 0.4353, 1, 1, 1, 0.5647, 1, 1, 0.5294, 0, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_flash_prm"]
+gradient = SubResource("Gradient_flash_prm")
+
+[sub_resource type="Gradient" id="Gradient_flash_env"]
+resource_name = "ms_m_amiattack env keys a frame: white, (255,222,0), white, yellow, yellow"
+offsets = PackedFloat32Array(0.2, 0.4, 0.6, 0.8, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 0.8706, 0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_flash_env"]
+gradient = SubResource("Gradient_flash_env")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_flash"]
+resource_name = "ms_m_amiattack: ONE flash at the mouth, no velocity, life 6"
+lifetime_randomness = 0.0
+emission_shape = 0
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 0.0
+initial_velocity_max = 0.0
+gravity = Vector3(0, 0, 0)
+scale_curve = SubResource("CurveXYZTexture_flash_scale")
+color_ramp = SubResource("GradientTexture1D_flash")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_flash"]
+resource_name = "ms_m_amiattack: P_msm_hitmrk1_ia (raw), lerp(env -> prm, I) with both keyed a frame (a white / yellow / pink / orange flicker), alpha A x the fade; a billboard"
+shader = ExtResource("SH_mark")
+shader_parameter/tex = ExtResource("T_hitmrk")
+shader_parameter/prm_ramp = SubResource("GradientTexture1D_flash_prm")
+shader_parameter/env_ramp = SubResource("GradientTexture1D_flash_env")
+shader_parameter/flat_prm = false
+shader_parameter/dir_billboard = false
+shader_parameter/aligned_cross = false
+shader_parameter/angle_offset = 0
+
+[sub_resource type="QuadMesh" id="QuadMesh_flash"]
+resource_name = "the game's 2.2 x 2.2 quad (11 x 11 units)"
+material = SubResource("ShaderMaterial_flash")
+size = Vector2(1.4777, 1.4777)
+
+[sub_resource type="Curve" id="Curve_spark_sx"]
+resource_name = "SSP1 scaleOut: the spark's scale 1 -> 0 over its 14-frame life"
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_spark_sy"]
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_spark_scale"]
+curve_x = SubResource("Curve_spark_sx")
+curve_y = SubResource("Curve_spark_sy")
+curve_z = SubResource("Curve_one")
+
+[sub_resource type="Gradient" id="Gradient_spark"]
+resource_name = "alpha 1 (alphaOut off)"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_spark"]
+gradient = SubResource("Gradient_spark")
+
+[sub_resource type="Gradient" id="Gradient_spark_prm"]
+resource_name = "SSP1 prm (255,230,150)"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(1, 0.902, 0.5882, 1, 1, 0.902, 0.5882, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_spark_prm"]
+gradient = SubResource("Gradient_spark_prm")
+
+[sub_resource type="Gradient" id="Gradient_spark_env"]
+resource_name = "SSP1 env (255,200,100)"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(1, 0.7843, 0.3922, 1, 1, 0.7843, 0.3922, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_spark_env"]
+gradient = SubResource("Gradient_spark_env")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_spark"]
+resource_name = "ms_m_amiattack SSP1: 8 sparks at the flash's start, 19 u/f x (1 +- 0.25) in every direction, life 14, no fields"
+lifetime_randomness = 0.0
+particle_flag_align_y = true
+emission_shape = 0
+direction = Vector3(0, 1, 0)
+spread = 180.0
+initial_velocity_min = 11.4856
+initial_velocity_max = 19.1426
+gravity = Vector3(0, 0, 0)
+scale_curve = SubResource("CurveXYZTexture_spark_scale")
+color_ramp = SubResource("GradientTexture1D_spark")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_spark"]
+resource_name = "ms_m_amiattack SSP1: P_msm_glow3_i (raw), lerp((255,200,100) -> (255,230,150), I), ADDITIVE; a DirBillboard along the velocity"
+shader = ExtResource("SH_add")
+shader_parameter/tex = ExtResource("T_glow")
+shader_parameter/prm_ramp = SubResource("GradientTexture1D_spark_prm")
+shader_parameter/env_ramp = SubResource("GradientTexture1D_spark_env")
+shader_parameter/flat_prm = false
+shader_parameter/dir_billboard = true
+shader_parameter/aligned_cross = false
+shader_parameter/angle_offset = 0
+
+[sub_resource type="QuadMesh" id="QuadMesh_spark"]
+resource_name = "the game's 1 x 1.5 quad (5 x 75 units)"
+material = SubResource("ShaderMaterial_spark")
+size = Vector2(0.6717, 1.0075)
+
+[sub_resource type="Curve" id="Curve_streak_sx"]
+resource_name = "ms_dmg_b ESP1 scale X 1 -> 2.5, Y 1 -> 3.0 over the life (diffXY); x (1 +- 0.375)"
+max_value = 2.5
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 2.5), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_streak_sy"]
+max_value = 3
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 3), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_streak_scale"]
+curve_x = SubResource("Curve_streak_sx")
+curve_y = SubResource("Curve_streak_sy")
+curve_z = SubResource("Curve_one")
+
+[sub_resource type="Gradient" id="Gradient_streak"]
+resource_name = "alpha 0.75 -> 0 from 75 %"
+offsets = PackedFloat32Array(0, 0.75, 1)
+colors = PackedColorArray(1, 1, 1, 0.75, 1, 1, 1, 0.75, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_streak"]
+gradient = SubResource("Gradient_streak")
+
+[sub_resource type="Gradient" id="Gradient_streak_prm"]
+resource_name = "ms_dmg_b prm (255,231,231) constant"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(1, 0.9059, 0.9059, 1, 1, 0.9059, 0.9059, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_streak_prm"]
+gradient = SubResource("Gradient_streak_prm")
+
+[sub_resource type="Gradient" id="Gradient_streak_env"]
+resource_name = "ms_dmg_b env keys (255,183,111) -> (255,111,87) over 10 frames (the 8-frame life sees most of it)"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(1, 0.7176, 0.4353, 1, 1, 0.4902, 0.3608, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_streak_env"]
+gradient = SubResource("Gradient_streak_env")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_streak"]
+resource_name = "ms_dmg_b: 16 streaks (rate 16, one frame) off a 1 u sphere 5 u up, 20 u/f x (1 +- 0.25) in every direction, life 8 +- 25 %"
+lifetime_randomness = 0.25
+particle_flag_align_y = true
+emission_shape = 1
+emission_sphere_radius = 0.0134
+direction = Vector3(0, 1, 0)
+spread = 180.0
+initial_velocity_min = 12.0901
+initial_velocity_max = 20.1501
+gravity = Vector3(0, 0, 0)
+scale_min = 0.625
+scale_max = 1.375
+scale_curve = SubResource("CurveXYZTexture_streak_scale")
+color_ramp = SubResource("GradientTexture1D_streak")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_streak"]
+resource_name = "ms_dmg_b: P_msm_smash5_ia (raw), lerp(env -> prm, I) x A x the fade; a DirectionCross along the velocity"
+shader = ExtResource("SH_mark")
+shader_parameter/tex = ExtResource("T_smash")
+shader_parameter/prm_ramp = SubResource("GradientTexture1D_streak_prm")
+shader_parameter/env_ramp = SubResource("GradientTexture1D_streak_env")
+shader_parameter/flat_prm = false
+shader_parameter/dir_billboard = false
+shader_parameter/aligned_cross = true
+shader_parameter/angle_offset = 0
+
+[sub_resource type="QuadMesh" id="QuadMesh_streak"]
+resource_name = "the game's 1 x 2.6 quad (5 x 13 units)"
+material = SubResource("ShaderMaterial_streak")
+size = Vector2(0.6717, 1.7463)
+
+[node name="PoiThrow" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Flash" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 1
+lifetime = 0.1
+one_shot = true
+explosiveness = 1
+fixed_fps = 60
+local_coords = true
+visibility_aabb = AABB(-3, -3, -3, 6, 6, 6)
+process_material = SubResource("ParticleProcessMaterial_flash")
+draw_pass_1 = SubResource("QuadMesh_flash")
+
+
+[node name="Sparks" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 8
+lifetime = 0.2333
+one_shot = true
+explosiveness = 1
+fixed_fps = 60
+local_coords = true
+visibility_aabb = AABB(-5, -5, -5, 10, 10, 10)
+process_material = SubResource("ParticleProcessMaterial_spark")
+draw_pass_1 = SubResource("QuadMesh_spark")
+
+
+[node name="Streaks" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 16
+lifetime = 0.1333
+one_shot = true
+explosiveness = 1
+fixed_fps = 60
+local_coords = true
+visibility_aabb = AABB(-4, -3, -4, 8, 8, 8)
+process_material = SubResource("ParticleProcessMaterial_streak")
+draw_pass_1 = SubResource("QuadMesh_streak")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)

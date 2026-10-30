@@ -1,0 +1,95 @@
+[gd_scene load_steps=17 format=3 uid="uid://d133waterruna"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsFxBurst.cs" id="1_script"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/trample_mark_add.gdshader" id="SH_add"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/kemuri1_raw.png" id="T_kemuri"]
+
+[sub_resource type="Curve" id="Curve_one"]
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_puff_sx"]
+resource_name = "ms_m_watrun_a ESP1 scale X 0.85 -> 1 by 12.7 %; Y 0.7 -> 1 by 12.7 % -> 0.3 at the end (diffXY); x (1 +- 0.3)"
+_data = [Vector2(0, 0.85), 0.0, 0.0, 1, 1, Vector2(0.1267, 1), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="Curve" id="Curve_puff_sy"]
+_data = [Vector2(0, 0.7), 0.0, 0.0, 1, 1, Vector2(0.1267, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.3), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_puff_scale"]
+curve_x = SubResource("Curve_puff_sx")
+curve_y = SubResource("Curve_puff_sy")
+curve_z = SubResource("Curve_one")
+
+[sub_resource type="Gradient" id="Gradient_puff"]
+resource_name = "alpha 1 -> 0 from 75 %"
+offsets = PackedFloat32Array(0, 0.75, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_puff"]
+gradient = SubResource("Gradient_puff")
+
+[sub_resource type="Gradient" id="Gradient_prm_white"]
+resource_name = "prm white"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_prm_white"]
+gradient = SubResource("Gradient_prm_white")
+
+[sub_resource type="Gradient" id="Gradient_env_blue"]
+resource_name = "env (183,231,255): the puffs' dark pixels"
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(0.7176, 0.9059, 1, 1, 0.7176, 0.9059, 1, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_env_blue"]
+gradient = SubResource("Gradient_env_blue")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_puff"]
+resource_name = "ms_m_watrun_a: 10 standing puffs (Circle div 10, FixedInterval) at the point, 20 u under the surface, 9 u/f up x (1 +- 0.2), life 16 +- 25 %"
+lifetime_randomness = 0.25
+particle_flag_align_y = true
+emission_shape = 0
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 5.8032
+initial_velocity_max = 8.7048
+gravity = Vector3(0, 0, 0)
+scale_min = 0.7
+scale_max = 1.3
+scale_curve = SubResource("CurveXYZTexture_puff_scale")
+color_ramp = SubResource("GradientTexture1D_puff")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_puff"]
+resource_name = "ms_m_watrun_a: P_msm_kemuri1_i (raw), lerp((183,231,255) -> white, I), ADDITIVE; a Direction quad standing along the rise (DirBillboard), its pivot at the bottom"
+shader = ExtResource("SH_add")
+shader_parameter/tex = ExtResource("T_kemuri")
+shader_parameter/prm_ramp = SubResource("GradientTexture1D_prm_white")
+shader_parameter/env_ramp = SubResource("GradientTexture1D_env_blue")
+shader_parameter/flat_prm = false
+shader_parameter/dir_billboard = true
+shader_parameter/aligned_cross = false
+shader_parameter/angle_offset = 0
+
+[sub_resource type="QuadMesh" id="QuadMesh_puff"]
+resource_name = "the game's 0.8 x 1.2 quad (4 x 6 units) with its pivot at the bottom"
+material = SubResource("ShaderMaterial_puff")
+size = Vector2(0.5373, 0.806)
+center_offset = Vector3(0, 0.403, 0)
+
+[node name="WaterRun" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Puffs" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 10
+lifetime = 0.2667
+one_shot = true
+explosiveness = 1
+fixed_fps = 60
+local_coords = true
+visibility_aabb = AABB(-3, -2, -3, 6, 6, 6)
+process_material = SubResource("ParticleProcessMaterial_puff")
+draw_pass_1 = SubResource("QuadMesh_puff")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.2687, 0)
