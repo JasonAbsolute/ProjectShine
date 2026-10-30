@@ -376,7 +376,7 @@ Trunk for Kiro to branch the next feature from: **`main`'s current tip** -- read
 on purpose: a commit cannot carry its own sha, and the "#7 done" commit that closes this entry IS the new tip, so any literal sha
 written here would already be one commit stale.)
 
-### #8 -- PUSHED 2026-10-30 -- https://github.com/JasonAbsolute/ProjectShine/tree/feature/enemy-pokey-cataquack -- PR awaiting Jaysonn's click -- queued 2026-10-29 02:20 PDT, PR added 2026-10-30 01:35 PDT (Kiro)
+### #8 -- DONE 2026-10-30 -- https://github.com/JasonAbsolute/ProjectShine/pull/10 (SQUASH-merged by Jaysonn) -- queued 2026-10-29 02:20 PDT, PR added 2026-10-30 01:35 PDT (Kiro)
 Push the fifth feature branch and OPEN ITS PR: `feature/enemy-pokey-cataquack`, branched from `main` `e9eb60b` (the trunk after PR #9) -- the
 Cataquack (TPoiHana, SMS pass 128, painted any colour in 128b), the Pokey + Pokey Head (THanaSambo / TSamboHead, 129) and the Bob-omb (TBombHei, 130;
 carried, thrown and its blast effect in 130b, the carry fixed in 130c) on the small-enemy base, with the Cataquack's and Pokey's particles (131).
@@ -457,3 +457,25 @@ Hygiene re-checked independently of Kiro's own check and agrees: 0 of the nine l
 0 `Level.tscn`, 0 `SmsHiddenCoin.cs`, 0 of the three `.tres` re-saves, 0 of the four `.png.import` flips).
 Kept the #6 order: branch pushed -> this paragraph committed and pushed -> only then the PR page opened.
 `gh auth status` still reports "not logged into any GitHub hosts" -- fifth entry running on the browser route.
+
+**NEW LIMIT HIT -- the prefilled-URL trick ran out at this entry.** `pr128.md` is 7124 bytes, which urlencodes to an
+**8151-character** compare URL, past the ~8000 that is safe to hand a browser. Fallback used instead, and it works: open the
+compare URL with ONLY `?expand=1&title=<urlencoded>` (180 chars) and put the body on the Windows clipboard with
+`Set-Clipboard`, so Jaysonn clicks the description box, Ctrl+V, Create. **Procedure for future entries: measure the encoded URL
+first; under ~8000 prefill both, over it prefill the title and clipboard the body.** PR bodies have been growing steadily
+(#2 1.6 KB -> #6 4.8 KB -> #7 5.2 KB -> #8 7.1 KB), so the clipboard route is now the default expectation, not the exception.
+Authenticating `gh` once would retire this whole workaround.
+
+Merged 2026-10-30: PR #10 **squash-merged** -> `origin/main` `b353ec6`, single parent `e9eb60b`. Local `main` had 0 commits of
+its own, so a clean `git merge --ff-only` -- fourth consecutive trivial pull under the one-way rule.
+The #6 ordering held: `git diff --name-only main feature/enemy-pokey-cataquack` came back EMPTY, so this result travelled with
+the squash. That is 3 for 3 since the fix.
+Verified by tree, not ancestry (`merge-base --is-ancestor d9a25cb origin/main` says NO, as always after a squash): on `main`,
+all **9** `assets/Sms/Enemy/Fx131/*.tscn`, **20** files under `Sambo/`, **32** under `Bomb/`, plus `SmsPoihana.cs`,
+`Poihana.tscn`, `SmsHanaSambo.cs`, `SamboHead.tscn`, `SmsBombHei.cs`, `BombExplosion.tscn`, `SmsEnemyHoldProxy.cs` and the
+1.65 MB `models/Eniemes/Poihana/Poihana.glb`.
+`pr128.md` deleted now that the PR exists and is merged. Jaysonn's nine live edits were never touched.
+CARRIED FORWARD from this PR's own "Not in this PR": four effects already on `main` are sized by the misread emitter rate
+instead of the engine's fixed-interval division (enemy death puff 30 vs 15, wet death 30 vs 18, wall-crash puff 1 vs 12,
+trample dust 12 vs 10). Kiro flagged it as a small follow-up pass on `main` -- not lost, just not in #8.
+Trunk for the next feature: `main`'s current tip (`git log --oneline -1 main`).
