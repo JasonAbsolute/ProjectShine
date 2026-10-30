@@ -1,0 +1,8 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3 uid="uid://cbombfrag130"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/Bomb/BombBody.gdshader" id="1_shader"]
+
+[resource]
+resource_name = "_mat3 / _mat5 (downnejibomb_model1.bmd, pass 130): the exploded pieces -- matColor black x the light (mode 5); the vertex-colour ones would be mode 4"
+shader = ExtResource("1_shader")
+shader_parameter/mode = 5

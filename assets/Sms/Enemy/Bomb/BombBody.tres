@@ -1,0 +1,12 @@
+[gd_resource type="ShaderMaterial" load_steps=4 format=3 uid="uid://cbombbombbody130"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/Bomb/BombBody.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/Bomb/Q_nejibomb_s3tc.png" id="2_tex"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/Bomb/Q_nejibomb_kankyo_s3tc.png" id="3_env"]
+
+[resource]
+resource_name = "_body1 (nejibomb_model1.bmd, pass 130): TEX x COLOR0 + COLOR1 (the glint) -- the black body with the face; the btp swaps the texture (index 0 Q_nejibomb, 2 Q_stop_nejibomb)"
+shader = ExtResource("1_shader")
+shader_parameter/mode = 0
+shader_parameter/base_tex = ExtResource("2_tex")
+shader_parameter/env_tex = ExtResource("3_env")
