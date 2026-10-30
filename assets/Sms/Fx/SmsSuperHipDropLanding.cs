@@ -28,7 +28,7 @@ public partial class SmsSuperHipDropLanding : Node3D
     [Export] public AudioStreamPlayer3D Sound;
 
     /// <summary>How many stars the landing throws. DEVIATION (Jaysonn, 2026-09-30: "not as many stars"): 16; the game's ms_m_sphipd_hit_d
-    /// emits 8 (rate 8, one frame).</summary>
+    /// emits 12 (a Circle of division 12 with the FixedInterval flag emits its division, not its rate 8 -- pass 132).</summary>
     [Export(PropertyHint.Range, "1,64,1")] public int StarCount = 16;
 
     /// <summary>The flame streaks' speed away from the landing point, game units a frame (60 Hz). The game: ms_m_sphipd_hit_c velAxis 26.</summary>

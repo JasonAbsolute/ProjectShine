@@ -57,7 +57,7 @@ curve_y = SubResource("Curve_scale_y")
 curve_z = SubResource("Curve_scale_z")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_puffs"]
-resource_name = "10 puffs in one frame off the 75..100 u shell, 15 u/f outward, life 70 +-60 %; airResist 0.9 -> 36.3 m/s^2 of damping (150 u of travel either way); 0.0875 u/f^2 down"
+resource_name = "38 puffs (Sphere div 3 with FixedInterval: 2 + 4 + 12 + 20; pass 132) in one frame off the 75..100 u shell, 15 u/f outward, life 70 +-60 %; airResist 0.9 -> 36.3 m/s^2 of damping (150 u of travel either way); 0.0875 u/f^2 down"
 lifetime_randomness = 0.6
 emission_shape = 5
 emission_point_texture = SubResource("ImageTexture_points")
@@ -94,7 +94,7 @@ script = ExtResource("1_script")
 
 [node name="Puffs" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 10
+amount = 38
 lifetime = 1.1667
 one_shot = true
 explosiveness = 1.0

@@ -225,7 +225,7 @@ Sound = NodePath("Sound")
 
 [node name="Sparks" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 12
+amount = 10
 lifetime = 0.3333
 one_shot = true
 explosiveness = 1.0

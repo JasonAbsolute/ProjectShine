@@ -127,7 +127,7 @@ Marks = NodePath("Marks")
 [node name="Puff" type="GPUParticles3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 emitting = false
-amount = 1
+amount = 10
 lifetime = 0.5833
 one_shot = true
 explosiveness = 1.0
@@ -138,7 +138,7 @@ draw_pass_1 = SubResource("QuadMesh_puff")
 [node name="Marks" type="GPUParticles3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 0, 1, 0, -1, 0, 0, 0, 0)
 emitting = false
-amount = 8
+amount = 10
 lifetime = 0.1
 one_shot = true
 explosiveness = 1.0

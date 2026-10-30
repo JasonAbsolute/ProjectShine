@@ -47,7 +47,7 @@ colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
 gradient = SubResource("Gradient_puff")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_puff"]
-resource_name = "ms_enm_wallhit: one puff off a ring r 15 u on edge, 18 u/f out + 3 along the axis (x 0.875..1.125), airResist 0.92 as a brake (2.9 m in all), rolled +- 22.5 deg"
+resource_name = "ms_enm_wallhit: 12 puffs (the ring's division; FixedInterval, pass 132) off a ring r 15 u on edge, 18 u/f out + 3 along the axis (x 0.875..1.125), airResist 0.92 as a brake (2.9 m in all), rolled +- 22.5 deg"
 lifetime_randomness = 0.5
 emission_shape = 5
 emission_point_texture = SubResource("ImageTexture_puff_points")
@@ -143,7 +143,7 @@ script = ExtResource("1_script")
 
 [node name="Puff" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 1
+amount = 12
 lifetime = 0.5833
 one_shot = true
 explosiveness = 1.0

@@ -210,7 +210,7 @@ script = ExtResource("1_script")
 [node name="Smoke" type="GPUParticles3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.403, 0)
 emitting = false
-amount = 30
+amount = 15
 lifetime = 0.9167
 one_shot = true
 explosiveness = 1.0

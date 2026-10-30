@@ -320,7 +320,7 @@ draw_pass_1 = SubResource("QuadMesh_shockwave")
 
 [node name="Smoke" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 30
+amount = 22
 lifetime = 2
 one_shot = true
 explosiveness = 1.0
@@ -330,7 +330,7 @@ draw_pass_1 = SubResource("QuadMesh_smoke")
 
 [node name="Flames" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 16
+amount = 24
 lifetime = 0.5833
 one_shot = true
 explosiveness = 1.0
@@ -342,7 +342,7 @@ draw_pass_2 = SubResource("QuadMesh_flames_b")
 
 [node name="Stars" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 8
+amount = 12
 lifetime = 2.3333
 one_shot = true
 explosiveness = 1.0

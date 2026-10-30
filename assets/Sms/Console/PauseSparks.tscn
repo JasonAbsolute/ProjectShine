@@ -12,7 +12,7 @@ colors = PackedColorArray(1, 1, 0.2824, 1, 1, 1, 0.2824, 1, 1, 0.6442, 0.1638, 1
 gradient = SubResource("Gradient_colour")
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sparks"]
-resource_name = "ms_2d_pause_sel: the emitter's (90, 0, -12) deg rotation stands the 15 px circle up into the screen -- 14 sparks at fixed angles flying out radially at 10 px/f under 0.85/f drag for 25 frames, 10 x 25 px streaks along the flight; rim_scale_x = 4 x the item's width / 129 (set by the menu), the -12 tilt is the node's rotation"
+resource_name = "ms_2d_pause_sel: the emitter's (90, 0, -12) deg rotation stands the 15 px circle up into the screen -- 10 sparks (the circle's division; FixedInterval, pass 132) at fixed angles flying out radially at 10 px/f under 0.85/f drag for 25 frames, 10 x 25 px streaks along the flight; rim_scale_x = 4 x the item's width / 129 (set by the menu), the -12 tilt is the node's rotation"
 shader = ExtResource("sh_sparks")
 shader_parameter/rim_scale_x = 4.0
 shader_parameter/rim_radius = 15.0
@@ -30,7 +30,7 @@ blend_mode = 1
 [node name="PauseSparks" type="GPUParticles2D"]
 material = SubResource("CanvasItemMaterial_add")
 emitting = false
-amount = 14
+amount = 10
 texture = ExtResource("t_spark")
 lifetime = 0.41667
 one_shot = true

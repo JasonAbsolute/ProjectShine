@@ -67,7 +67,7 @@ colors = PackedColorArray(0.9922, 1, 1, 1, 1, 0.4353, 0, 1)
 gradient = SubResource("Gradient_a_env")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_a"]
-resource_name = "ms_fumi_a: 12 streaks off a circle r 2.5..5 u 5 up, 3.9 u/f up (axis 4 - dir 0.1) x 0.8..1.2, life 15 +-25 %, no fields"
+resource_name = "ms_fumi_a: 10 streaks (the circle's division; FixedInterval, pass 132) off a circle r 2.5..5 u 5 up, 3.9 u/f up (axis 4 - dir 0.1) x 0.8..1.2, life 15 +-25 %, no fields"
 lifetime_randomness = 0.25
 particle_flag_align_y = true
 emission_shape = 5
@@ -166,7 +166,7 @@ colors = PackedColorArray(0.102, 0.102, 0.0078, 1, 0.102, 0.102, 0.0078, 1)
 gradient = SubResource("Gradient_b_env")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_b"]
-resource_name = "ms_fumi_b: ONE puff on a circle r 30 u 10 up, 22 u/f outward (within 22.5 deg) x moment 0.75..1, airResist 0.9, life 28 +-37.5 %, a random angle +- 1/16 turn"
+resource_name = "ms_fumi_b: 12 puffs (the circle's division; FixedInterval, pass 132) on a circle r 30 u 10 up, 22 u/f outward (within 22.5 deg) x moment 0.75..1, airResist 0.9, life 28 +-37.5 %, a random angle +- 1/16 turn"
 lifetime_randomness = 0.375
 emission_shape = 5
 emission_point_texture = SubResource("ImageTexture_b_points")
@@ -345,7 +345,7 @@ Spokes = NodePath("Spokes")
 
 [node name="Ring" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 12
+amount = 10
 lifetime = 0.25
 one_shot = true
 explosiveness = 1.0
@@ -355,7 +355,7 @@ draw_pass_1 = SubResource("QuadMesh_a")
 
 [node name="Puff" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 1
+amount = 12
 lifetime = 0.4667
 one_shot = true
 explosiveness = 1.0
