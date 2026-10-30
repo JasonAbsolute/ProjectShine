@@ -129,6 +129,60 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     protected uint _flags150;                                   // unk150 (the species' behaviour bits: 2 = escapes, 0x20 = stamps goop at the death)
     protected int _wallHopCooldown;
 
+    // ------------------------------------------------------------------------------------------------------------------ taken (TTakeActor, pass 130b)
+    protected Mario _holder; protected SmsEnemyHoldProxy _holdProxy;   // mHolder: the Mario carrying this body (the Bob-omb) and his stand-in in the hold code
+    /// <summary>mHolder != null: in Mario's hands (TSpineEnemy::calcRootMatrix puts the body at his taking matrix; no bind, no hit checks).</summary>
+    public bool Carried => _holder != null;
+    /// <summary>TMario::hitPickUpEnemy (MarioCheckCol.cpp 211): may his touch take this body right now (TBombHei: unk164, the doused flag). A species Mario
+    /// can carry says yes here; the base says no. His side adds: not jumping, B held, isTakeSituation.</summary>
+    public virtual bool SmsCanBeTaken() => false;
+    /// <summary>The body's receive cylinder for his take search (the pair test: his HoldRadius + this radius; the game's mDamageRadius / Height x the scale).</summary>
+    public float TakeHitRadiusUnits => P.DamageRadius * _bodyScale;
+    public float TakeHitHeightUnits => P.DamageHeight * _bodyScale;
+    /// <summary>HIT_MESSAGE_TAKE (TSmallEnemy::receiveMessage, smallEnemy.cpp 505): the hit filter NO_COLLISION, mHolder = the sender, behaveToTaken. From
+    /// the proxy at his raise's take frame.</summary>
+    public void SmsTaken(Mario holder, SmsEnemyHoldProxy proxy)
+    {
+        if (holder == null || _holder != null || _dead) return;
+        _holder = holder; _holdProxy = proxy;
+        SetCollisionLayerValue(1, false);                      // onHitFilter(HIT_FILTER_NO_COLLISION): no lists, no pushes, the hose finds nothing
+        _vel = Vector3.Zero; _lin = Vector3.Zero; _airborne = false; _onWall = false; _touching.Clear();
+        BehaveToTaken(holder);
+        if (DebugPrint) GD.Print($"[SMS enemy] {Name}: taken by {holder.Name}");
+    }
+    /// <summary>HIT_MESSAGE_THROWN / HIT_MESSAGE_PUT from the holder (receiveMessage 512): mHolder = null, behaveToRelease, the hit filter back on -- both
+    /// messages end the same way for a small enemy; the species decides the flight (TBombHei: always its Thrown nerve, as isThrowStart always pitches
+    /// an enemy).</summary>
+    public void SmsReleased(bool put)
+    {
+        if (_holder == null) return;
+        Mario holder = _holder;
+        _holder = null; _holdProxy = null;
+        BehaveToRelease(holder, put);
+        if (!_dead) SetCollisionLayerValue(1, true);           // offHitFilter(HIT_FILTER_NO_COLLISION)
+        if (DebugPrint) GD.Print($"[SMS enemy] {Name}: released ({(put ? "put" : "thrown")})");
+    }
+    /// <summary>behaveToTaken(THitActor*): the species' side of the take (the Bob-omb pushes its PickUp nerve).</summary>
+    protected virtual void BehaveToTaken(Mario holder) { }
+    /// <summary>behaveToRelease(): the species' side of the drop (the Bob-omb pushes its Thrown nerve).</summary>
+    protected virtual void BehaveToRelease(Mario holder, bool put) { }
+    /// <summary>TSpineEnemy::calcRootMatrix with a holder (enemy.cpp 156): the model's base matrix = the holder's taking matrix -- the body's origin (the
+    /// game's mPosition, its feet) at his hand, turned with his facing. Runs each physics frame in place of the bind while held; a holder gone (freed,
+    /// his hands emptied without a message) releases the body where it is (ensureTakeSituation).</summary>
+    protected virtual void RideHolder()
+    {
+        if (_holder == null || !IsInstanceValid(_holder) || _holdProxy == null || !IsInstanceValid(_holdProxy) || !_holder.SmsHoldsOrPends(_holdProxy))
+        {
+            SmsReleased(false);
+            return;
+        }
+        GlobalPosition = _holdProxy.GlobalPosition;
+        Vector3 f = _holder.SmsFacingDir(); f.Y = 0f;
+        if (f.LengthSquared() > 1e-6f) _yaw = Mathf.RadToDeg(Mathf.Atan2(f.X, f.Z));
+        _floorNormal = Vector3.Up;
+        _airborne = false;
+    }
+
     // ------------------------------------------------------------------------------------------------------------------ the bck table
     protected abstract string[] BckNames { get; }
     protected abstract int[] BckFrames { get; }
@@ -216,6 +270,7 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         _dead = false; _noReward = false; _melt = false; _noBind = false; _hitValid = false; _attackerKilled = false;
         _sprayCooldown = 0; _relaunch = 0; _wanderTicks = 0; _wallHopCooldown = 0;
         _vel = Vector3.Zero; _lin = Vector3.Zero; _airborne = false;
+        if (_holder != null) { var proxy = _holdProxy; _holder = null; _holdProxy = null; if (proxy != null && IsInstanceValid(proxy)) proxy.OnBodyGone(); }   // pass 130b: a reset in his hands empties them
         _stack.Clear(); _cur = NerveNone; _prev = NerveNone; _time = 0;
         PushAfterCurrent(DefaultNerve);                         // mSpine->pushAfterCurrent(mSpine->getDefault())
         _goalIsMario = true;                                    // setGoalPath(TPathNode(gpMarioAddress))
@@ -237,6 +292,13 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         _disp = Vector3.Zero;
         for (int i = 0; i < n; i++) Tick();
         if (_dead) return;
+        if (_holder != null)
+        {
+            // TSpineEnemy::calcRootMatrix with mHolder: no bind -- the ticks ran the spine (the Bob-omb's fuse counts in his hands), the body follows his
+            // taking matrix; the ticks' displacement is dropped (a walk clip in his hands moves nothing)
+            RideHolder();
+            if (_holder != null) { ApplyLook(); return; }
+        }
         if (FlyBind)
         {
             // THaneHamuKuri::bind is the species' own (its SetBehavior): the step moves the body by the ticks' XZ displacement, reads the walls and
@@ -819,6 +881,13 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     {
         _dead = true; _relaunch = 0;
         _vel = Vector3.Zero; _lin = Vector3.Zero;
+        if (_holder != null)
+        {
+            // the end of TNerveBombHeiExplosion: mHolder = nullptr with the body dead -- his ensureTakeSituation sees the held object gone and empties his hands
+            var proxy = _holdProxy;
+            _holder = null; _holdProxy = null;
+            if (proxy != null && IsInstanceValid(proxy)) proxy.OnBodyGone();
+        }
         if (_model != null) _model.Visible = false;
         SetCollisionLayerValue(1, false);
         if (_anim != null) _anim.Stop();

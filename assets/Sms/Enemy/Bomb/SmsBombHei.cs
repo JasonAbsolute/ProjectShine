@@ -25,10 +25,19 @@ using System;
 ///   -> HIT_MESSAGE_BURN (dmgfire: 1 HP + FIRE_DOWN); frame 2 of the clip spawns TEffectExplosion (the blast) at the body's scale; at the
 ///   clip's end dead (no drops: setAfterDeadEffect is empty, genRandomItem never runs; a coin only for a bomb Mario carried). Another Bob-omb
 ///   touching an exploding one explodes too (isCollidMove, mSerialBomb). Water surface / sand columns, death planes (forceKill): not here.
-/// - PickUp / Thrown (behaveToTaken / behaveToRelease: Mario carries a doused or counting bomb and throws it; it explodes on landing): NOT
-///   PORTED in this pass -- Mario's take system carries RigidBody3D objects only (fruit, barrels); an enemy body needs its own hold path (130b).
-/// DEVIATIONS (logged): the pick-up (above); the particles and sounds are slots (empty = none), the blast's visual is <see cref="ExplosionFxScene"/>
-/// (default EnemyDisap at the blast's size until the jpa pass); the camera shake is the port's Damage shake (the game's mode 6 is not ported).
+/// - PickUp / Thrown (pass 130b): Mario's touch takes a DOUSED Bob-omb (TMario::hitPickUpEnemy, MarioCheckCol.cpp 211: unk164 set and he is not JUMPING;
+///   B held, isTakeSituation) -- HIT_MESSAGE_TAKE: the hit filter NO_COLLISION, mHolder = Mario, behaveToTaken pushes PickUp (unk1A4 = 1: a coin at
+///   the end) and the body rides his taking matrix with the sit clip frozen (calcRootMatrix). The fuse keeps counting in his hands: run out -> the
+///   doused flag drops and WalkExplosion is pushed OVER PickUp (the legs run and the LED counts in his hands) -> Explosion there: sendAttackMsgToMario
+///   (the common ATTACK, not BURN) and the end of the blast empties his hands (mHolder = nullptr). B (isThrowStart: an enemy is always PITCHED) ->
+///   HIT_MESSAGE_THROWN -> behaveToRelease (doused or counting; never from the Explosion) pushes Thrown: velocity = (ThrownRateXZ x his mThrowPower 2.8
+///   x sin / cos of his angle, ThrownVY) = (8.4, 22, 8.4) u/tick, mPosition.y += 2, AIRBORNE, ThrownGravityY 0.3 a tick (getGravityY); landed ->
+///   genEventCoin (a coin toward Mario at 20 u/tick, 20 up -- the manager allows 20 a stage, canMakeDeadCoin) and Explosion. A walking or counting
+///   Bob-omb cannot be picked up; a doused one only on the ground.
+/// DEVIATIONS (logged): the particles and sounds are slots (empty = none); the camera shake is the port's Damage shake (the game's mode 6 is not ported);
+/// the blast's visual <see cref="ExplosionFxScene"/> defaults to the disc's TEffectExplosion port (BombExplosion.tscn: the 10_bomb fireball with its
+/// bck / brk / btk and the four jpa emitters) at the body's scale x <see cref="BlastScale"/> (the game scales only the hit cylinder by BombRange);
+/// the fuse spark <see cref="FuseFxScene"/> defaults to ms_bomb_limit's port (BombFuse.tscn).
 /// </summary>
 [GlobalClass]
 public partial class SmsBombHei : SmsSmallEnemy
@@ -59,14 +68,21 @@ public partial class SmsBombHei : SmsSmallEnemy
     [Export(PropertyHint.Range, "0.25,3,0.05")] public float BlastScale = 1f;
     /// <summary>mSerialBomb: a Bob-omb touching an exploding one goes off too (the game's default on).</summary>
     [Export] public bool ChainReaction = true;
+    /// <summary>TBombHeiManager::canMakeDeadCoin: how many coins the bombs Mario carried may drop in one stage (the game's 20). 0 = none.</summary>
+    [Export(PropertyHint.Range, "0,100,1")] public int MaxCarryCoins = 20;
 
     [ExportGroup("Effects and sounds (empty = none)")]
-    /// <summary>TEffectExplosion: the blast at frame 2 of the death clip, at the body's scale. Default: EnemyDisap.tscn scaled to the blast (a
-    /// placeholder until the jpa pass); any one-shot scene.</summary>
+    /// <summary>TEffectExplosion: the blast at frame 2 of the death clip, at the body's scale. Default: BombExplosion.tscn (the disc's 10_bomb fireball + the
+    /// four jpa emitters, pass 130b); any one-shot scene.</summary>
     [Export] public PackedScene ExplosionFxScene;
-    public const string ExplosionFxPath = "res://assets/Sms/Fx/EnemyDisap.tscn";
-    /// <summary>PARTICLE_MS_BOMB_LIMIT: the fuse spark bound to the body while it counts down -- a looping GPUParticles3D scene.</summary>
+    public const string ExplosionFxPath = "res://assets/Sms/Enemy/Bomb/BombExplosion.tscn";
+    /// <summary>PARTICLE_MS_BOMB_LIMIT: the fuse smoke bound to the body while it counts down. Default: BombFuse.tscn (ms_bomb_limit's port); any looping
+    /// GPUParticles3D scene.</summary>
     [Export] public PackedScene FuseFxScene;
+    public const string FuseFxPath = "res://assets/Sms/Enemy/Bomb/BombFuse.tscn";
+    /// <summary>genEventCoin: the coin a bomb Mario carried drops where it lands (gpItemManager ACTOR_TYPE_COIN). Default his yellow_coin.tscn.</summary>
+    [Export] public PackedScene EventCoinScene;
+    public const string EventCoinScenePath = "res://yellow_coin.tscn";
     /// <summary>MSD_SE_EN_BOMBHEI_ZENMAI: the wind-up whir while it walks (looping: played while walking, stopped otherwise). Unset = silent.</summary>
     [Export] public AudioStreamPlayer3D WindUpSound;
     /// <summary>MSD_SE_EN_BOMBHEI_COUNT: the beep at each count digit (3, 2, 1). Unset = silent.</summary>
@@ -92,8 +108,9 @@ public partial class SmsBombHei : SmsSmallEnemy
     public static readonly string[] TexPaths = { "res://models/Eniemes/Bomb/Q_nejibomb_s3tc.png", "", "res://models/Eniemes/Bomb/Q_stop_nejibomb_s3tc.png", "res://models/Eniemes/Bomb/Q_nejibomb_txanm1_s3tc.png", "res://models/Eniemes/Bomb/Q_nejibomb_txanm2_s3tc.png", "res://models/Eniemes/Bomb/Q_nejibomb_txanm3_s3tc.png" };
 
     // ------------------------------------------------------------------------------------------------------------------ nerves
-    protected const int NerveBGenerate = NerveSpecies + 0, NerveBAttack = NerveSpecies + 1, NerveBWalkExplosion = NerveSpecies + 2, NerveBWaitExplosion = NerveSpecies + 3, NerveBExplosion = NerveSpecies + 4;
-    protected override string NerveName(int n) => n switch { NerveBGenerate => "BombGenerate", NerveBAttack => "BombAttack", NerveBWalkExplosion => "WalkExplosion", NerveBWaitExplosion => "WaitExplosion", NerveBExplosion => "Explosion", _ => base.NerveName(n) };
+    protected const int NerveBGenerate = NerveSpecies + 0, NerveBAttack = NerveSpecies + 1, NerveBWalkExplosion = NerveSpecies + 2, NerveBWaitExplosion = NerveSpecies + 3, NerveBExplosion = NerveSpecies + 4,
+        NerveBPickUp = NerveSpecies + 5, NerveBThrown = NerveSpecies + 6;
+    protected override string NerveName(int n) => n switch { NerveBGenerate => "BombGenerate", NerveBAttack => "BombAttack", NerveBWalkExplosion => "WalkExplosion", NerveBWaitExplosion => "WaitExplosion", NerveBExplosion => "Explosion", NerveBPickUp => "PickUp", NerveBThrown => "Thrown", _ => base.NerveName(n) };
     protected override int DefaultNerve => NerveBGenerate;
 
     // ------------------------------------------------------------------------------------------------------------------ state
@@ -107,6 +124,9 @@ public partial class SmsBombHei : SmsSmallEnemy
     private ShaderMaterial _bodyMat, _ledMat;
     private Node3D _fuseFx;
     private bool _blastSpawned;
+    private bool _takenByMario;        // unk1A4: Mario carried it -> a coin where it blows (genEventCoin)
+    private float _throwYaw, _throwPower;   // SMS_GetMarioAngleY / SMS_GetMarioThrowPower read at the release, for the Thrown nerve's first tick
+    private static int _deadCoins; private static ulong _deadCoinsScene;   // TBombHeiManager::unk60: the carry coins made this stage
 
     public int FuseTicks => _fuse;
     public bool Doused => _doused;
@@ -114,6 +134,10 @@ public partial class SmsBombHei : SmsSmallEnemy
     public int BodyTex => _bodyTex;
     public int LedTex => _ledTex;
     public bool Exploding => _cur == NerveBExplosion;
+    public bool Thrown => _cur == NerveBThrown;
+    public bool TakenByMario => _takenByMario;
+    public Node3D FuseFxNow => _fuseFx;
+    public Node3D LastBlastFx { get; private set; }
     public string DeadClipName => _deadAnim != null && _deadAnim.IsPlaying() ? _deadAnim.CurrentAnimation : "";
     public float DeadClipFrame => _deadAnim != null && _deadAnim.IsPlaying() ? (float)_deadAnim.CurrentAnimationPosition * 60f : -1f;
     /// <summary>The blast's reach right now, metres (the attack radius x the growth).</summary>
@@ -124,6 +148,8 @@ public partial class SmsBombHei : SmsSmallEnemy
         _flags150 = 17;                                   // unk150 = 0x11
         SetGoalMario();
         ExplosionFxScene ??= ResourceLoader.Exists(ExplosionFxPath) ? GD.Load<PackedScene>(ExplosionFxPath) : null;
+        FuseFxScene ??= ResourceLoader.Exists(FuseFxPath) ? GD.Load<PackedScene>(FuseFxPath) : null;
+        EventCoinScene ??= ResourceLoader.Exists(EventCoinScenePath) ? GD.Load<PackedScene>(EventCoinScenePath) : null;
         _modelDead = GetNodeOrNull<Node3D>("ModelDead");
         if (_modelDead != null)
         {
@@ -186,6 +212,7 @@ public partial class SmsBombHei : SmsSmallEnemy
     {
         base.Reset();
         _fuse = 0; _doused = false; _waterCooldown = 0; _grow = 1f; _growTarget = 1f; _countBeeps = 0; _blastSpawned = false;
+        _takenByMario = false; _throwYaw = 0f; _throwPower = 0f;   // TBombHei::reset: unk1A4 = 0, unk164 = 0
         _sitHeld = false; _stopFaceOn = false; _resumeFrame = -1f;
         if (_model != null) _model.Visible = true;
         if (_modelDead != null) _modelDead.Visible = false;
@@ -248,16 +275,56 @@ public partial class SmsBombHei : SmsSmallEnemy
         _hp = 1;
         if (_cur != NerveBExplosion) { _stack.Clear(); SetNext(NerveBExplosion); }
     }
-    /// <summary>TBombHei::getGravityY: ThrownGravityY while thrown (not ported), else mGravity.</summary>
-    protected override float GravityY() => base.GravityY();
+    /// <summary>TBombHei::getGravityY: ThrownGravityY (0.3 a tick) while thrown, else mGravity.</summary>
+    protected override float GravityY() => _cur == NerveBThrown ? Prm.ThrownGravityY : base.GravityY();
     protected override bool WallHopAllowed() => _cur == NerveBAttack || _cur == NerveBWalkExplosion;
+
+    // ------------------------------------------------------------------------------------------------------------------ taken (pass 130b)
+    /// <summary>TMario::hitPickUpEnemy: his touch takes it while unk164 (doused) is set -- a sitting dizzy Bob-omb; never a walking, counting or exploding one.</summary>
+    public override bool SmsCanBeTaken() => _doused && !_dead && _holder == null && _cur != NerveBExplosion && GetCollisionLayerValue(1);
+    /// <summary>TBombHei::behaveToTaken: unk1A4 = 1 for Mario (the coin at the end), PickUp pushed unless already in it.</summary>
+    protected override void BehaveToTaken(Mario holder)
+    {
+        if (_cur == NerveBPickUp) return;
+        _takenByMario = true;
+        PushNerve(NerveBPickUp);
+    }
+    /// <summary>TBombHei::behaveToRelease: nothing unless doused or counting (the Explosion keeps its place); not twice; else Thrown pushed with his angle and
+    /// throw power read now (SMS_GetMarioAngleY / SMS_GetMarioThrowPower in the nerve's first tick, which runs on the next tick).</summary>
+    protected override void BehaveToRelease(Mario holder, bool put)
+    {
+        if (!_doused && _cur != NerveBWalkExplosion) return;
+        if (_cur == NerveBThrown) return;
+        Vector3 f = holder != null && IsInstanceValid(holder) ? holder.SmsFacingDir() : PolarXZ(_yaw, 1f);
+        f.Y = 0f;
+        _throwYaw = f.LengthSquared() > 1e-6f ? Mathf.RadToDeg(Mathf.Atan2(f.X, f.Z)) : _yaw;
+        _throwPower = SmsParams.Take.ThrowPower;
+        PushNerve(NerveBThrown);
+    }
+    /// <summary>TBombHei::genEventCoin: a bomb Mario carried (unk1A4) makes a coin at its point flying toward him (20 u/tick each way, 20 up) -- while the
+    /// manager's budget (20 a stage) lasts.</summary>
+    protected virtual void GenEventCoin()
+    {
+        if (!_takenByMario || EventCoinScene == null || !CanMakeDeadCoin()) return;
+        Vector3 d = MarioPos() - Pos(); d.Y = 0f;
+        d = d.LengthSquared() > 1e-6f ? d.Normalized() : PolarXZ(_yaw, 1f);
+        DropSpawner.SpawnItem(EventCoinScene, GetParent(), GlobalPosition, new Vector3(d.X * 20f, 20f, d.Z * 20f), 0, this);
+    }
+    private bool CanMakeDeadCoin()
+    {
+        ulong scene = GetTree()?.CurrentScene?.GetInstanceId() ?? 0;
+        if (scene != _deadCoinsScene) { _deadCoinsScene = scene; _deadCoins = 0; }   // TBombHeiManager lives with the stage: a new one, a new count
+        if (_deadCoins >= MaxCarryCoins) return false;
+        _deadCoins++;
+        return true;
+    }
 
     /// <summary>moveObject's fuse: every tick outside Thrown / Explosion / Generate; past BombTime the doused flag drops and (unless sitting in
     /// WaitExplosion, whose own clock takes over) WalkExplosion is pushed.</summary>
     protected override void MoveObjectPre()
     {
         if (_waterCooldown > 0) _waterCooldown--;
-        if (_cur == NerveBExplosion || _cur == NerveBGenerate || _cur == NerveNone) return;
+        if (_cur == NerveBExplosion || _cur == NerveBGenerate || _cur == NerveBThrown || _cur == NerveNone) return;   // moveObject: not in Thrown / Explosion / Generate / Change (it DOES count in PickUp: a carried bomb goes off in his hands)
         _fuse++;
         if (_fuse > Prm.BombTime * FuseScale)
         {
@@ -271,7 +338,7 @@ public partial class SmsBombHei : SmsSmallEnemy
     protected override void HitCheckMario()
     {
         if (_cur != NerveBExplosion) { base.HitCheckMario(); return; }
-        if (_mario == null || _dead) return;
+        if (_mario == null || _dead || !GetCollisionLayerValue(1)) return;   // HIT_FILTER_NO_COLLISION (a blast still in his hands reaches him by sendAttackMsgToMario instead)
         float s = _bodyScale * _grow;
         if (CheckDistance(Pos(), Prm.AttackRadius * s, Prm.AttackHeight * s, MarioPos(), SmsParams.Mario.DamageRadius, SmsParams.Mario.DamageHeight))
             AttackToMario();
@@ -347,16 +414,17 @@ public partial class SmsBombHei : SmsSmallEnemy
                     _growTarget = Prm.BombRange * BlastScale * _bodyScale / Prm.AttackRadius;
                     _grow = 1f;
                     SetDeadAnm();
+                    if (_holder != null) SendAttackMsgToMario();   // getHolder() == gpMarioAddress -> sendAttackMsgToMario: it went off in his hands (the common ATTACK, not the blast's BURN)
                     _doused = false;
                     WindUp(false); BoundFuse(false);
                     // the collision stays on through the blast (the game turns it off at the end): the body lists are the blast's own (HitCheckMario),
                     // a stomp is refused by isHitValid, the hose finds nothing to do -- and the contact is what sets off a neighbour (isCollidMove)
                 }
-                if (!_blastSpawned && DeadClipFrame >= 2f)      // calcRootMatrix: frame 2 of down1 -> TEffectExplosion at mScaling
+                if (!_blastSpawned && DeadClipFrame >= 2f)      // calcRootMatrix: frame 2 of down1 -> TEffectExplosion::generate(mPosition, mScaling)
                 {
                     _blastSpawned = true;
-                    float r = Prm.BombRange * BlastScale * _bodyScale / U;
-                    SpawnBurst(ExplosionFxScene, new Transform3D(Basis.FromScale(Vector3.One * r), GlobalPosition + Vector3.Up * (r * 0.3f)));
+                    float s = _bodyScale * BlastScale;           // the game: mScaling (the fireball model is its own 200 u -> 240 u); BlastScale folded in so the knob scales the look with the reach
+                    LastBlastFx = SpawnBurst(ExplosionFxScene, new Transform3D(Basis.FromScale(Vector3.One * s), GlobalPosition));
                 }
                 if (_grow < _growTarget) _grow *= 1.2f;
                 else if (DeadClipEnded || _time > 400)
@@ -364,7 +432,30 @@ public partial class SmsBombHei : SmsSmallEnemy
                     Dead();
                     return true;
                 }
-                if (ChainReaction && (_tickCount & 3) == 0) ChainNeighbours();   // isCollidMove on the pair: the hit lists meet every fourth tick
+                if (ChainReaction && (_tickCount & 3) == 0 && GetCollisionLayerValue(1)) ChainNeighbours();   // isCollidMove on the pair: the hit lists meet every fourth tick (none under NO_COLLISION: a blast in his hands)
+                return false;
+
+            case NerveBPickUp:                                   // TNerveBombHeiPickUp: nothing happens in his hands (the sit clip stays frozen, the dizzy face on); a bomb no longer doused when it starts falls straight back
+                if (_time == 0 && !_doused) return true;
+                return false;
+
+            case NerveBThrown:                                   // TNerveBombHeiThrown
+                if (_time == 0)
+                {
+                    float rate = Prm.ThrownRateXZ;
+                    Vector3 f = PolarXZ(_throwYaw, 1f);
+                    _vel = new Vector3(rate * _throwPower * f.X, Prm.ThrownVY, rate * _throwPower * f.Z);   // (sin, cos of SMS_GetMarioAngleY) x rate x SMS_GetMarioThrowPower; VY
+                    GlobalPosition += Vector3.Up * (2f / U);     // mPosition.y += 2
+                    _airborne = true;
+                    _onWall = false;
+                    if (DebugPrint) GD.Print($"[SMS bomb] {Name}: thrown at ({_vel.X:F2}, {_vel.Y:F1}, {_vel.Z:F2}) u/tick toward {_throwYaw:F0} deg, gravity {Prm.ThrownGravityY} a tick");
+                }
+                if (!_airborne && _time > 0)                     // landed (bind: nextPos.y <= ground -> AIRBORNE off): the coin, the blast
+                {
+                    GenEventCoin();
+                    PushAfterCurrent(NerveBExplosion);
+                    return true;
+                }
                 return false;
         }
         return base.ExecuteNerve(n);
