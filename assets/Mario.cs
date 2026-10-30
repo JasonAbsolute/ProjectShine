@@ -2105,6 +2105,8 @@ public partial class Mario : CharacterBody3D
 
             // optional: enforce local scale too (helps if anything else touches it)
             heldBody.Scale = Vector3.One;
+            if (heldBody is SmsEnemyHoldProxy smsHeldEnemy)
+                smsHeldEnemy.RideNow(); // the carried enemy goes to the hand in THIS step (pass 130c): its own step may have run first and shown last frame's hand
         }
         if (UseSmsPhysics)
         {

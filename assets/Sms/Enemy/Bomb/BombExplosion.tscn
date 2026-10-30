@@ -1,4 +1,4 @@
-[gd_scene load_steps=87 format=3 uid="uid://cbombexplo130b"]
+[gd_scene load_steps=87 format=3 uid="uid://dyoidy3b3l74b"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsFxBurst.cs" id="1_script"]
 [ext_resource type="Script" path="res://assets/Sms/Enemy/Bomb/SmsBombFireball.cs" id="2_fire_script"]
@@ -124,7 +124,7 @@ colors = PackedColorArray(1, 0.6235, 0.2824, 1, 1, 0.6235, 0.2824, 1, 0, 0, 0, 1
 gradient = SubResource("Gradient_glow_env")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_glow"]
-resource_name = "ms_bomb_bomb: one glow ball off a sphere r 20 u, 38 (+- 15) u/f outward decaying 0.93 a frame, 0.04 u/f^2 down"
+resource_name = "ms_bomb_bomb: 38 glow balls (FixedInterval Sphere div 3) off a sphere r 20 u, 38 (+- 15) u/f outward decaying 0.93 a frame, 0.04 u/f^2 down"
 lifetime_randomness = 0.4
 emission_shape = 5
 emission_point_texture = SubResource("ImageTexture_glow_points")
@@ -290,7 +290,7 @@ colors = PackedColorArray(1, 1, 1, 0.875, 1, 1, 1, 0.875, 1, 1, 1, 0)
 gradient = SubResource("Gradient_scrap")
 
 [sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_scrap"]
-resource_name = "ms_bomb_hahen: 5 scraps off a circle r 5 u, 32 u/f up in a cone (spread 0.375 x pi), x (1 +- 0.125), gravity 0.4 u/f^2, airResist 0.99; a trail puff every 6 frames"
+resource_name = "ms_bomb_hahen: 3 scraps (FixedInterval Circle div 3) off a circle r 5 u, 32 u/f up in a cone (spread 0.375 x pi), x (1 +- 0.125), gravity 0.4 u/f^2, airResist 0.99; a trail puff every 6 frames"
 lifetime_randomness = 0.375
 particle_flag_align_y = true
 emission_shape = 1
@@ -501,7 +501,7 @@ ScaleCurve = SubResource("Curve_fire_scale")
 
 [node name="Glow" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 1
+amount = 38
 lifetime = 0.8333
 one_shot = true
 explosiveness = 1.0
@@ -513,7 +513,7 @@ draw_pass_1 = SubResource("QuadMesh_glow")
 
 [node name="Smoke" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 30
+amount = 14
 lifetime = 1.25
 one_shot = true
 explosiveness = 1.0
@@ -525,7 +525,7 @@ draw_pass_1 = SubResource("QuadMesh_smoke")
 
 [node name="Scraps" type="GPUParticles3D" parent="."]
 emitting = false
-amount = 5
+amount = 3
 sub_emitter = NodePath("Trail")
 lifetime = 1.6667
 one_shot = true
@@ -537,7 +537,7 @@ process_material = SubResource("ParticleProcessMaterial_scrap")
 draw_pass_1 = SubResource("QuadMesh_scrap")
 
 [node name="Trail" type="GPUParticles3D" parent="Scraps"]
-amount = 96
+amount = 60
 lifetime = 0.8333
 fixed_fps = 60
 local_coords = true

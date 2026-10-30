@@ -70,6 +70,11 @@ public partial class SmsBombHei : SmsSmallEnemy
     [Export] public bool ChainReaction = true;
     /// <summary>TBombHeiManager::canMakeDeadCoin: how many coins the bombs Mario carried may drop in one stage (the game's 20). 0 = none.</summary>
     [Export(PropertyHint.Range, "0,100,1")] public int MaxCarryCoins = 20;
+    /// <summary>How Mario holds it (pass 130c). Off = the game: the body's origin (its feet) sits AT his hand's taking point, so the whole 1.75 m bomb
+    /// stands up from his hand over his head. On = the ball's centre (the body joint, 90 u up) sits in his hand like a fruit does: the bomb hangs lower,
+    /// its feet at his waist, the ball at his face.</summary>
+    [Export] public bool CarryByBall = false;
+    protected override float HeldOriginDropUnits => CarryByBall ? 90.5f * _scale : 0f;
 
     [ExportGroup("Effects and sounds (empty = none)")]
     /// <summary>TEffectExplosion: the blast at frame 2 of the death clip, at the body's scale. Default: BombExplosion.tscn (the disc's 10_bomb fireball + the

@@ -51,6 +51,14 @@ public partial class SmsEnemyHoldProxy : RigidBody3D
         QueueFree();
     }
 
+    /// <summary>The holder has just placed this proxy on his carry socket (his physics step, pass 130c): the body goes there NOW, in the same step -- the
+    /// body's own step may run before his and would otherwise show last frame's hand (a visible trail while he runs).</summary>
+    public void RideNow()
+    {
+        if (!_taken || _gone || Enemy == null || !IsInstanceValid(Enemy)) return;
+        Enemy.SmsRideHand(GlobalPosition);
+    }
+
     /// <summary>The body died in his hands (the Bob-omb's blast) or reset: his ensureTakeSituation empties his hands with no throw.</summary>
     public void OnBodyGone()
     {

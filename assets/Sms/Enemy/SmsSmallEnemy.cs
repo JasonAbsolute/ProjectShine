@@ -168,7 +168,8 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     protected virtual void BehaveToRelease(Mario holder, bool put) { }
     /// <summary>TSpineEnemy::calcRootMatrix with a holder (enemy.cpp 156): the model's base matrix = the holder's taking matrix -- the body's origin (the
     /// game's mPosition, its feet) at his hand, turned with his facing. Runs each physics frame in place of the bind while held; a holder gone (freed,
-    /// his hands emptied without a message) releases the body where it is (ensureTakeSituation).</summary>
+    /// his hands emptied without a message) releases the body where it is (ensureTakeSituation). The holder ALSO places the body from his own step
+    /// (<see cref="SmsRideHand"/>, pass 130c) so the body never trails the hand by the frame the node order would cost it here.</summary>
     protected virtual void RideHolder()
     {
         if (_holder == null || !IsInstanceValid(_holder) || _holdProxy == null || !IsInstanceValid(_holdProxy) || !_holder.SmsHoldsOrPends(_holdProxy))
@@ -176,12 +177,23 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
             SmsReleased(false);
             return;
         }
-        GlobalPosition = _holdProxy.GlobalPosition;
+        SmsRideHand(_holdProxy.GlobalPosition);
+    }
+    /// <summary>The body at the holder's hand point (the proxy = his carry socket): the origin <see cref="HeldOriginDropUnits"/> below it, the yaw his facing.
+    /// Called from the holder's step the moment he places the proxy, and from this body's own step.</summary>
+    public void SmsRideHand(Vector3 hand)
+    {
+        if (_holder == null || !IsInstanceValid(_holder)) return;
+        GlobalPosition = hand + Vector3.Down * (HeldOriginDropUnits / U);
         Vector3 f = _holder.SmsFacingDir(); f.Y = 0f;
         if (f.LengthSquared() > 1e-6f) _yaw = Mathf.RadToDeg(Mathf.Atan2(f.X, f.Z));
         _floorNormal = Vector3.Up;
         _airborne = false;
+        ApplyLook();
     }
+    /// <summary>How far below the hand point the body's origin sits while carried, in units: 0 = the game (the origin, its feet, AT the taking matrix); a
+    /// species may offer a deviation (the Bob-omb's CarryByBall puts its ball's centre in the hand).</summary>
+    protected virtual float HeldOriginDropUnits => 0f;
 
     // ------------------------------------------------------------------------------------------------------------------ the bck table
     protected abstract string[] BckNames { get; }
@@ -297,7 +309,7 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
             // TSpineEnemy::calcRootMatrix with mHolder: no bind -- the ticks ran the spine (the Bob-omb's fuse counts in his hands), the body follows his
             // taking matrix; the ticks' displacement is dropped (a walk clip in his hands moves nothing)
             RideHolder();
-            if (_holder != null) { ApplyLook(); return; }
+            if (_holder != null) return;
         }
         if (FlyBind)
         {
