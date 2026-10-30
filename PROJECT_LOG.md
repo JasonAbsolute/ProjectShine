@@ -8752,3 +8752,70 @@ into the wall) to the game's ring of puffs around the point -- a proper cloud, p
 15 / 18 kemuball puffs read much the same at 75 u); the hip drops are indistinguishable (the smoke fills the frame either way); the cap-steal poof
 is the one real growth: 38 mint puffs make a 3 m cloud by frame 40 where 10 made a plume. Build 0 errors, boot `ALL OK`. No drive re-run (the
 amounts are the only change; the capture harness loaded and ran all eight 3D scenes clean).
+
+### 133 -- Mario's own effects from the disc: the water splash, the water-run splash, the sand walk, the rocket launch, the hit burst (main, `505917c`)
+
+**Files:** NEW `assets/Sms/Fx/WaterSplash.tscn`, `WaterSplashSmall.tscn`, `WaterRun.tscn`, `SandWalk.tscn`, `RocketLaunch.tscn`, `HitBurst.tscn` (SmsFxBurst
+scenes), `assets/Sms/Enemy/Fx131/PoiThrow.tscn`, `assets/Sms/Fx/trample_mark_add.gdshader` (trample_mark with the additive blend), `assets/Sms/Fx/tex/`
+mizutama1_add / hamonring2_add (flat white, alpha = I) / kemuri1_raw / sand1_raw / glow3_raw (raw I, A) / footmarkj_sand (raw I; alpha = the print's
+own pixels, the GX test LESS 255) / shwave1_rocket (lerp); changed `assets/Mario.cs` (+121: the hooks below, before SmsSetupFx), `SmsPoihana.cs`
+(ThrowFxScene's default), `goop_footprint.gdshader` (+ `fade_white`: a multiply-blended print cannot fade by alpha, so it goes WHITE between two life
+fractions; default off). Tools: npc82/mario133/gen_fx_133.py (the seven scenes + the bakes), fix133_mario.py (anchored, idempotent, EOL-preserving),
+patch_import133.py, cap_fx133.gd, ref/sheet_*.png. Sources: MarioParticle.cpp 174-213 (inOutWaterEffect), 294-300 (runningRippleEffect), 560-660
+(emitFootPrintWithEffect / emitSandEffect), 679 (rocketEffectStart); MarioMove.cpp 582 (ROCKET), 1996-2075 (the water flags, 2066 the flip), 2126
+(thinkSand); MarioCollision.cpp 263-271 (calcDamagePos), 383-387 (the DMG set); MarioEffect.cpp 64 (the splash model); poihana.cpp 675; the shipped
+params (watereffect.prm: JumpIntoMdlEffectSpY 10, RunningRippleDepth 30, JumpIntoMinY / MaxY 20 / 50, ScaleMin / Width 0.7 / 0.3).
+
+**The game, per effect** (jpa_dump.py; the counts by the FixedInterval rule): WATER SPLASH = inOutWaterEffect the tick MARIO_FLAG_IN_ANY_WATER flips
+either way (in AND out), at (x, the surface, z): IN_SHALLOW_WATER (a pool) -> the small set; else |vel.y| > 10 u/f -> TOBIKOMI_A (51 drops, Circle div
+51, off a ring r 50 u 10 u up: 8 u/f out of the centre + 22 u/f up in a 4.5 deg cone x (1 +- 0.25), gravity 1 u/f^2, life 50 +- 25 %, 10 u additive
+mizutama drops x (1 +- 0.125), alpha 1 -> 0 from 75 %) + TOBIKOMI_B (one 250 u hamonring2 Direction quad flat on the water every 5 frames for 40 =
+8 rings, life 38, scale 0.5 -> 1 by 37.3 % -> 2.0, alpha 0 -> 0.2 by 11.65 % -> 0 from 87.5 %, additive) + TOBIKOMI_C (an indirect refraction ripple,
+projected: NOT ported) + the 04_tobikomi.bmd splash MODEL (bck + btk, scaled 0.7..1.0 by |vel.y| 20..50, only over 50 u of water: NOT ported -- the
+one visible gap of this pass); |vel.y| <= 10 -> the small set S_A (20 drops: 6 out + 16 up, life 35, 8.5 u) + S_B (200 u rings every 5 for 28 = 6)
++ S_C. WATER RUN = runningRippleEffect at the run clip's footfalls (frames 38 / 8) while the surface is under RunningRippleDepth 30 u above the feet
+(or the floor isWetGround, no flag here) and mForwardVel > 30: WATRUN_A = 10 (div 10) Direction quads 40 x 60 u standing along a 9 u/f rise (axis
+4 + dir 5, x 1 +- 0.2) from 20 u UNDER the surface, pivot at the bottom, life 16 +- 25 %, scale X 0.85 -> 1, Y 0.7 -> 1 by 12.7 % -> 0.3, alpha 1 ->
+0 from 75 % (test > 21), kemuri1 lerp((183,231,255) -> white) ADDITIVE, + SMS_EmitRippleTiny (the water's ripple decal: not here). SAND WALK =
+thinkSand every tick on a sand ground in no water -> emitSandEffect -> emitFootPrintWithEffect(WALKSAND_B, WALKSAND_A): at the footfalls, _A's 8
+puffs (div 8) off a ring r 20 u 5 u up, 9 u/f up (axis 3 + dir 6, x 1 +- 0.25), gravity 0.5 down, airResist 0.99, life 25 +- 35 %, 45 u sand1
+lerp((231,151,108) -> (243,237,214)) scaled 0.9 -> 1 by 26 % -> 1.8, alpha 1 -> 0 from 62.5 %, bound to calcGroundMtx at the foot; _B the PRINT when
+RUN and fwd > 20: ONE 35 x 57.5 u Direction quad at the sole (11 u under the foot joint), life 240, blend SRCCLR x ZERO = a MULTIPLY into the sand,
+alpha test LESS 255 (the white field does not draw), footmarkj_i lerp(env (237,183,153) -> white, I), env -> white over keys 45..60 of 60 (Merged over
+the life: the last 25 %). ROCKET LAUNCH = rocketEffectStart as MARIO_STATUS_ROCKET begins with the Rocket nozzle (MarioMove.cpp 582): ROCKET_D (one
+200 u shwave1 Direction quad flat 7 u up, scale 1 -> 7.0 over 18 frames, alpha 0.875 -> 0 from 75 %, env (255,240,207) -> (255,120,135) under prm
+white -> (255,240,231)), ROCKET_C (26 kemuball puffs, div 26, off a ring r 18 u 100 u up, 30 +- 3 u/f out in a 22.5 deg cone x (1 +- 0.2249),
+airResist 0.93, 0.05 u/f^2 of lift, life 70 +- 45 %, 100 u scaled 1 -> 3.0, alpha 0 -> 0.5 by 5.1 % -> 0 from 41.4 %), HIPDROP_A (the hip drop's
+10 sparks), and ROCKET_A / _B / _B2 bound to the nozzle's emit point for 33 frames (a KFA1-keyed kemuball fountain, smash streaks, mizutama drops:
+NOT ported). HIT = damageExec for every damageAnimType but 3: calcDamagePos = mPosition + 50 u toward the attacker; DMG_B (16 DirectionCross smash5
+streaks 50 x 130 u off a 1 u sphere 5 u up, 20 u/f x (1 +- 0.25) in every direction, life 8 +- 25 %, scale X 1 -> 2.5 / Y 1 -> 3.0 x (1 +- 0.375),
+alpha 0.75 -> 0 from 75 %, env (255,183,111) -> (255,111,87) under prm (255,231,231)), DMG_C (the stars: BonkStars.tscn since pass 36, Jaysonn's
+fewer), DMG_A (8 hitmrk1 Billboards 100 x 450 u at the point, life 6, a random angle spinning 0.04 half-turns a frame x (1 +- 0.25), scale 1.2 -> 1 by
+12.5 % -> 0.5 from 87.5 % x (1 +- 0.3), alpha 1 -> 0, prm FLAT keyed white / (255,118,78) / white / (255,111,159), drawPrntAhead). The Cataquack's
+fling (poihana.cpp 675, frame 4): DMG_B + MS_M_AMIATTACK (one 110 u hitmrk1 flash, life 6, scale 1 until 12.5 % -> 2.25, alpha 1 -> 0 from 75 %,
+prm / env keyed a frame white, white / (255,222,0), (255,63,111) / white, (255,255,144) / yellow, (255,135,0) / yellow; SSP1: 8 DirBillboard glow3
+sparks 50 x 75 u at 19 u/f x (1 +- 0.25), life 14, scale -> 0, (255,200,100) -> (255,230,150) additive) bound to the mouth joint.
+
+**The port.** `SmsWaterInOutTick` right after SmsWaterCheck: the flip of `_smsInWater` (the surface and the floor keep their last in-water values for
+the way out), skipped in the first 10 ticks (a start in the water is no dive) and when dead / in the shine demo; small when the water under the
+point is under 50 u deep (the pool stand-in) or |vy| <= 10 (the true vy); the burst at (x, the surface, z). `SmsGaitFootfallTick` replaces pass 107's
+SmsEmitDirtyFootPrint as the one footfall detector (the gait clip's play position crossing 38 / 8 of 60), run every tick from SmsCheckGraffito;
+SmsFootPrintTick only flags `_smsDirtyPrintTick`; `SmsFootfall(joint, groundFrame, collider)` spawns the goop print (the flag), the sand puffs +
+print (the collider or an ancestor in "sms_sand" or named "sand" -- the Cataquack's rule -- and no water; the print only over 20 u/f: the scene's
+Print child dropped below it) and the water-run splash (wading under 30 u, over 30 u/f). `SmsRocketLaunchFx` at the ROCKET entry with the Rocket
+nozzle. `SmsSpawnHitBurst` beside both SpawnHitStars (the ground hit, the swim hit); the type-3 floor hits keep their stars only, as the game draws
+nothing there. `SmsSpawnFx133(name, at, dropChild)` loads each scene once from assets/Sms/Fx and spawns it TopLevel under the level (SmsFxBurst
+frees it). The scenes: the drops a RING emission (Godot's directed points steer the velocity by their normals, which sent the first bake sideways),
+the rings and the shockwave flat quads (orientation 1), the standing water-run puffs the dir_billboard quad kind with the mesh pivot at the bottom
+(center_offset), the sand print the goop shader with the sand colours and fade_white (0.75, 1), the hit marks / streaks / flash / sparks the
+trample_mark shaders with per-life colour ramps (the game's keyed registers), the rocket's sparks copied from HipDropLanding.
+**DEVIATIONS (logged):** the splash model and the indirect ripples; the nozzle mist; the wet-ground water run; the water's ripple decal; the game's
+IN_SHALLOW_WATER (a pool flag) stood in for by the depth; the DirectionCross streaks as one aligned quad pair of the align_y basis; the print's
+exact frame (the foot joint minus 11 u) is the ground hit under the joint; one shared colour phase per emitter.
+**Verification:** build 0 errors; boot ALL OK; drive 128 32/32 with the hooks live (the Cataquack's hits -> HitBurst, its fling -> PoiThrow); GPU
+captures of each scene alone at three ages (ref/sheet_*.png): the splash's drop fountain and rings, the water-run puff, the sand puffs and the print
+(a multiply: on the blown-out test floor only its blue channel shows the darkening, 212 -> 180; the outline 255 -> 222 / 136), the rocket's ring,
+shockwave and sparks, the hit starburst, the fling's flash and sparks. NOTE for the harness (cap_fx133.gd): a `-s` SceneTree script that keeps a RAW
+reference to a node that frees itself hangs Godot 4.7.1 when it tests that reference afterwards (`!= null` / is_instance_valid on the freed object);
+a WeakRef is fine. The first "hang" chase (HitBurst's 0.1 s lifetime, GDScript mimics, EnemyDisap self-freeing the same way) was that, not an engine
+or SmsFxBurst fault -- the game frees bursts this way on every enemy death.
