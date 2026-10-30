@@ -376,24 +376,30 @@ Trunk for Kiro to branch the next feature from: **`main`'s current tip** -- read
 on purpose: a commit cannot carry its own sha, and the "#7 done" commit that closes this entry IS the new tip, so any literal sha
 written here would already be one commit stale.)
 
-### #8 -- PENDING -- queued 2026-10-29 02:20 PDT (Kiro) -- PUSH ONLY, no PR yet
-Push the fifth feature branch: `feature/enemy-pokey-cataquack`, branched from `main` `e9eb60b` (the trunk after PR #9) -- the Cataquack (TPoiHana, SMS
-pass 128, painted any colour in 128b), the Pokey + Pokey Head (THanaSambo / TSamboHead, pass 129) and the Bob-omb (TBombHei, pass 130; carried,
-thrown and its blast effect in 130b, the carry fixed in 130c) on the small-enemy base, with the Cataquack's and Pokey's particles (131).
-Partly playtested by
-Jaysonn: push the branch so it is on
-GitHub; do NOT open a PR until he says the feature is done (Kiro will replace this entry with the PR entry then, as #5-#7 went).
-- Branch `feature/enemy-pokey-cataquack` -- code tip `a6b4dd3` ("SMS 131: the Cataquack's and the Pokey's particles ..." over `c0127c5` 130c,
-  `d968bc9` 130b, `1778a42` 130, `f08ea69` 129, `636ac9c` 128b, `c565f39` 128); the branch tip is this file's own commit on top of it; 13 commits
-  since `main` `e9eb60b` (128, 128b, 129, 130, 130b, 130c, 131 and their six log + entry commits). A NEW remote branch (never pushed): push with
-  `-u`. The biggest new files are
-  `models/Eniemes/Poihana/Poihana.glb` (1.7 MB), `models/Eniemes/Sambo/Sambo.glb` (0.4 MB) and `assets/Sms/Enemy/Bomb/BombExplosion.tscn`
-  (105 KB of baked curves); SamboDown.tres / SamboYdown.tres are baked clips (~60 KB each).
+### #8 -- PENDING -- queued 2026-10-29 02:20 PDT, PR added 2026-10-30 01:35 PDT (Kiro)
+Push the fifth feature branch and OPEN ITS PR: `feature/enemy-pokey-cataquack`, branched from `main` `e9eb60b` (the trunk after PR #9) -- the
+Cataquack (TPoiHana, SMS pass 128, painted any colour in 128b), the Pokey + Pokey Head (THanaSambo / TSamboHead, 129) and the Bob-omb (TBombHei, 130;
+carried, thrown and its blast effect in 130b, the carry fixed in 130c) on the small-enemy base, with the Cataquack's and Pokey's particles (131).
+PLAYTESTED BY JAYSONN 2026-10-29/30 ("everything is good for now") -- the PR can be merged once it is open (squash or merge commit, his call; `main`
+then needs a `git pull` here). Kiro has NOT merged this branch locally (the entry asks for a PR: the one way).
+- Branch `feature/enemy-pokey-cataquack` -- code tip `a6b4dd3` ("SMS 131: the Cataquack's and the Pokey's particles ..."), on top of `c0127c5` (130c),
+  `d968bc9` (130b), `1778a42` (130), `f08ea69` (129), `636ac9c` (128b) and `c565f39` (128); the branch tip is this file's own commit on top of `5bad9aa`
+  (the 130c + 131 log); 14 commits since `main` `e9eb60b`, this entry's own included; 156 files, +7517 / -7 before this entry's lines. A NEW remote
+  branch (never pushed): push with `-u`. Over 1 MB: `models/Eniemes/Poihana/Poihana.glb` (1.7 MB, the Cataquack's model -- NEW) and the two files
+  already on `main` (Mario.cs 1.0 MB, PROJECT_LOG.md 0.95 MB); then Sambo.glb 0.36 MB, SamboHead.glb 0.27 MB, NejiBomb.glb 0.22 MB and
+  `assets/Sms/Enemy/Bomb/BombExplosion.tscn` (103 KB of baked curves); nothing else over 80 KB. The range carries NONE of Jaysonn's nine live edits
+  (checked 2026-10-30: 0 addons, 0 Level.tscn, 0 SmsHiddenCoin.cs, 0 of the three .tres, 0 of the four .png.import flips).
+- PR: title "Feature: the Cataquack, the Pokey and the Bob-omb (SMS passes 128-131)"; base `main`; body = `pr128.md` at the project root
+  (untracked -- delete it after).
+  compare URL: https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/enemy-pokey-cataquack
 ```
 git push -u origin feature/enemy-pokey-cataquack
 git rev-list --count origin/feature/enemy-pokey-cataquack..feature/enemy-pokey-cataquack
+gh pr create --base main --head feature/enemy-pokey-cataquack --title "Feature: the Cataquack, the Pokey and the Bob-omb (SMS passes 128-131)" --body-file pr128.md
 ```
-Expect `0` from the rev-list. No PR, no merge.
+Expect `0` from the rev-list. KEEP THE #6 ORDER: push the branch -> write the result paragraph below, commit it and push -> only THEN open the PR
+(so the result travels with a squash). If `gh` is still unauthenticated here (`gh auth status`), open the compare URL in the browser instead, paste
+the title and the body of `pr128.md`, and Jaysonn presses "Create pull request". Once merged: `git checkout main && git pull` here, then tell Kiro the sha.
 - New files (131): `assets/Sms/Enemy/Fx131/` (nine .tscn, tex/ seven pngs + .imports); changed: SmsPoihana.cs, Sambo/SmsHanaSambo.cs,
   SmsSamboHead.cs, SmsSamboFlower.cs (the effect defaults), assets/Sms/Fx/SmsFxBurst.cs (a child's start delay). 130c changed: assets/Mario.cs
   (+2: the held enemy placed from his step), SmsSmallEnemy.cs, SmsEnemyHoldProxy.cs, Bomb/SmsBombHei.cs (CarryByBall), Bomb/BombExplosion.tscn +
@@ -417,12 +423,12 @@ Expect `0` from the rev-list. No PR, no merge.
   Mario and FLINGS him straight up (33 m, the game's 140); `Kind` = Red hurts too, Sleeping starts asleep (a touch or the hose wakes it). The hose
   flips it; on sand (`GroundKind`, or a floor in the "sms_sand" group) it lies twitching 25 s and a stomp pays one coin -- Mario cannot kill one
   (only Yoshi could; `StompKills` is the knob). Paint group: `UseBodyColor` + `BodyColor` paints the body any colour (shows in the editor too);
-  off = the kind's game blue / red. The particle slots are still empty.
+  off = the kind's game blue / red. The particle slots carry the 131 defaults; the sound slots are empty.
 - To try the Pokey (129): drop `assets/Sms/Enemy/Sambo/HanaSambo.tscn` on the ground with its blue arrow (+Z) toward where Mario comes from; it starts
   buried under a sunflower bud, rises when he is within 13 m, leans its head at him within 6.7 m (the head hurts; the stalk hurts on touch), the hose
   on its head freezes it, a stomp on the head kills it (the stack falls apart), it sinks back when he is 27 m away. `SamboHead.tscn` = the Pokey Head:
   buried too, pops when Mario is in front within 8 m (three leaves fly), hops 4 m at him every 2.5 s, water knocks it back (into a wall = three coins),
-  touching it on the ground stuns it for a stomp. `SamboFlower.tscn` alone = a bud the hose opens. All particle / sound slots are empty.
+  touching it on the ground stuns it for a stomp. `SamboFlower.tscn` alone = a bud the hose opens. The particle slots carry the 131 defaults; the sound slots are empty.
 - To try the Bob-omb (130): drop `assets/Sms/Enemy/Bomb/BombHei.tscn` anywhere; it marches at Mario at once and for ever (touching it does nothing);
   after 8.3 s its LED counts 3-2-1 and it blows up (a 2.7 m blast burns Mario: the fire knock). The hose douses it (it sits with the dizzy blue
   face) until the fuse runs out anyway. Two close together go off together. A DOUSED one can be picked up (130b): stand beside it on the ground
