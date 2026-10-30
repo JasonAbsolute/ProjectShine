@@ -8649,3 +8649,74 @@ Kill on a placed bomb): the pieces fly first; frame 0 a white sphere behind the 
 peeking around it (cap_wave130b.gd isolates them); f17 the cream-yellow fireball with red magma blotches, grey puffs at its base, cyan sparks, black
 scraps high up; f30-35 red / yellow with holes, the smoke ring spread; f56 the last red bits, the smoke low and wide (the lower halves under the
 floor); the fuse: a dark grey column off the key. Build 0 errors, boot ALL OK.
+### 130c -- the carried Bob-omb rides the hand; the blast's emit counts (feature/enemy-pokey-cataquack, `c0127c5`)
+
+**What Jaysonn saw:** "carrying the bomb looks off". Measured on his PC (the drive's capture mode, SMS_F131_CAP=1: Mario holding it at rest, from the
+front / side / back, and running): the body was placed from ITS OWN physics step off the proxy Mario had set in HIS step, so whenever the enemy
+node ran before Mario's the bomb showed last frame's hand -- 0.21-0.28 m behind the glove at a run, 1.58 m in a side-flip frame -- while a fruit,
+placed in Mario's own step, has no such trail. **Fix:** Mario's step pushes the hand point to the body the moment he places the proxy
+(`SmsEnemyHoldProxy.RideNow` -> `SmsSmallEnemy.SmsRideHand`); the body's own step keeps the validity check and re-applies the same point. Drive
+T5b: 22 running frames, the bomb within 0.0 mm of the proxy (the fruit's hold point) on every one. **Knob:** `CarryByBall` on the Bob-omb (off = the
+game: the origin, its feet, AT the taking matrix -- TSpineEnemy::calcRootMatrix / TMario::getTakingMtx = jnt_hand_R, so the 1.75 m bomb stands up
+from his raised hand) -- on puts the ball's centre (the body joint, 90.5 u) in his hand like a fruit, the feet at his waist. The game applies the
+hand's full ROTATION too (the fruit gets the socket's); the bomb stays upright with his facing (the Godot rig's socket frame is his, not the SMS
+joint's). The two capture artifacts worth knowing: the windowed harness renders at ~8 fps, so a socket read at the top of a physics step alternates
+between the carry pose and a physics-time pose (0.5 m apart) -- it is the READ, not the hand (the fruit shows the same numbers and renders fine);
+read the body against the PROXY, not the socket.
+
+**The blast's counts -- the engine's rule, misread since pass 125c:** JPAEmitter.cpp 645 (calcCreateParticle): with the FixedInterval flag the count
+per emit frame is the VOLUME'S DIVISION -- a Circle / Line emits `div`; a Sphere emits 2 + the layers (4, 8, 12...: div 1 = 6, 2 = 18, 3 = 38); the
+dumped "rate" (mChildSpawnRate) is used ONLY without the flag (accumulated per emit frame, one at least on the first). Emit frames come every
+(interval + 1) frames while frame < maxFrame (0 = for ever); mStartFrame delays the whole emitter (checkStartFrame on its own counter), the
+maxFrame counting from there. The Bob-omb: ms_bomb_bomb Sphere div 3 = 38 glow balls (shipped as ONE -- the "flash" was invisible; now the orange
+additive fireball cloud the game has), ms_bomb_smoke 14 (not 30), ms_bomb_hahen 3 (not 5). STILL WRONG ON MAIN (a follow-up): EnemyDisap 15 (shipped
+30), EnemyDisapWet 18 (30), EnemyWallHit's puff 12 (ONE), TrampleDust ms_fumi_a 10 (12); the gate / select passes' FixedInterval emitters unchecked.
+Godot rewrites a hand-made scene uid that is not 13 base-36 chars (BombExplosion / BombFuse got Godot's; the 131 scenes use 13-char ids).
+
+### 131 -- the Cataquack's and the Pokey's particles (feature/enemy-pokey-cataquack, `a6b4dd3`)
+
+**Files:** NEW `assets/Sms/Enemy/Fx131/` -- PoiDead / PoiSand / JumpEd / PoiDizzy / PoiZzz / SmbPollen / SmbPollenAttack / SmbAppear / SmbHide .tscn,
+`tex/` (mizutama1_poi, sand1_poi, shwave1_jumped, hoshi_poi, zzz_poi, glow1_pollen, rock_atlas -- from the jpa TEX1 via jpa_bake, pinned by
+patch_import131.py); `SmsPoihana.cs` (DeadFxScene slot + FxDir defaults; SetDeadAnm emits POI_DEAD then the dust; BoundFx at the body ORIGIN -- the
+jpa's own 120 / 100 u lift is in the scenes, 128's HeadHeight/2 guess dropped), `Sambo/SmsHanaSambo.cs` + `SmsSamboHead.cs` (Fx131 defaults for
+Appear / Hide / the two pollens), `SmsSamboFlower.cs` (BloomFxScene = SmbPollen), `Fx/SmsFxBurst.cs` (a child's `metadata/sms_delay_frames` = the
+emitter's start frame). Tools: npc82/enemy128/gen_fx_131.py, pull_particle131.py, cap_fx131.gd. Sources: poihana.cpp 297-330 / 411-440,
+hanasambo.cpp 510 / 764 / 812 / 904 / 1326 / 1414, System/Particles.hpp ids, /data/particle.szs (ms_poi_*, ms_smb_*, ms_jump_ed_*), the JPA
+engine (JPAEmitter.cpp calcCreateParticle, JPAField.cpp Vortex).
+
+**The game, per emitter** (jpa_dump.py; counts by the FixedInterval rule above): POI_DEAD at setDeadAnm = 24 water drops (Sphere div 1: 6 a frame
+for 4) off a sphere r 30 u, 7 u/f off the axis + 18 up in a 27 deg cone x (1 +- 0.4), gravity 0.3, airResist 0.98, life 50 +- 50 %, 40 u mizutama
+x (1 +- 0.6) with a 10-frame X/Y ping-pong wobble, alpha test >= 115, one of four colour pairs a drop (blue / cream / teal / yellow), a 10-frame
+ghost child a frame; POI_SAND (sand: the flip's frame 18, the getup's 34, the death) = 30 sand puffs (Circle div 30) off a ring r 50, 11 out + 20
+up (9 deg), gravity 0.8, life 36, 87 x 110 u 0.9 -> 1 -> 1.8, sand1 lerp((231,175,132) -> (231,211,190)), + JUMP_ED_A; JUMP_ED_A = ONE flat
+Direction quad (shwave1 lerp((111,231,255) -> white)) 212 u scaled 0.6 -> 1 -> 3.5 over 14 frames, alpha 0.25 -> 1 -> 0 from 37.5 %; JUMP_ED_B = 14
+kemuball3 puffs (Circle div 14) off a ring r 30 at 18 u/f, airResist 0.92, 0.125 u/f^2 UP, life 30, 100 u 0.75 -> 1 -> 1.7, alpha 0.8 out from
+12.5 %, lerp((26,26,2) -> (255,255,242)) = tex/kemuball3.png; POI_KIZETSU (bound, bck 3 / 4) = 3 hoshi stars every 21 frames on a ring r 56..90 u
+120 u up, the Vortex field (JPAVortexField::affect: a tangential velocity (1 - t) mag + t rndm about the emitter's up, t = min(r, outer)^2 /
+outer^2 with outer = the dumped pos.z) at 6 u/f -> they ORBIT the head (a turn in 76 frames), life 40, 60 u 1.5 -> 1, a 16-frame colour cycle
+yellow / pink / mint / white; POI_ZZZ (bound, bck 5) = one Z every 83 frames (rate 0.012) from 100 u up, 1.7 up + 3 out, accel 0.075 along its
+way, the Vortex 3..6 (outer 50 u) -- a rising widening spiral, life 60, 15 -> 50 -> 100 u, drawParent FALSE: only its CHILDREN show, one every 16
+frames at the parent's point at 7.5 % of its speed, life 40, alpha out, zzz lerp(pink -> blue in 3 frames -> white); SMB_KAFUN_OW / OA = 12 / 16
+glow motes off a sphere r 20 u, 8 / 13 u/f along the emitter's up in a 45 / 63 deg cone x (1 +- 0.5), airResist 0.95, gravity 0.01 down / 0.02 UP,
+a 2 u/f random kick every 5 frames, life 60 +- 60 %, 25 u 0.7 -> 1 -> 0.3, prm pink (231,38,120) .. orange (207,111,39) random a mote over env
+white, a texture flip radgrad -> glow1 -> hamonring2 over the life; the emitter frame = the pollen joint ('head') x RotZ(-90), lifted 200 u in
+Wait, pushed 200 u along the facing in Attack; SMB_AP_ROCK = rate 4 every 3rd frame for 5 frames (8) off a ring r 25..50, 6 out + 28 up x (1 +-
+0.375), gravity 1.3, life 50, 50 u gone over the last 15 %, tumbling 0.08 half-turns a frame +- 50 %, rock2 / rock3 random, alpha test > 220, z
+write, lerp((85,78,68) -> (207,207,163)); SMB_AP_SMOKE = 2 a frame for 15 (30) off a ring r 30 at 18 u/f, airResist 0.92, 0.125 UP, life 26, 125 u
+0.75 -> 1 -> 1.7; SMB_HD_ROCK = START FRAME 40, 0.3 a frame for 30 (9), 7 out + 25 up; SMB_HD_SMOKE = start 45, 0.7 a frame for 30 (21), ring r 35,
+7 u/f, airResist 0.96, life 30, 137 u 0.75 -> 1 -> 1.5. TSamboFlower::bloom emits KAFUN_OW at mPosition unrotated. The Pokey Head's appear / hide
+use the same ids.
+
+**The port:** SmsFxBurst scenes for the one-shots (the puffs' outward speed and lift as curves from the JPA sim, as 125c); PoiDizzy / PoiZzz are
+looping bound scenes (BoundFx children at the origin, scaled by the body scale): the Vortex = `orbit_velocity` about local Y through a
+CurveXYZTexture(0,1,0) (6 u/f at r 73 u = 0.785 turns a second x (1 +- 0.125)); PoiZzz = an undrawn parent emitter (no draw pass: rising,
+orbiting, accelerating) with a `sub_emitter` child at 3.75 Hz for the Zs; the rocks a 2-frame atlas with a random `anim_offset` (particles_anim
+h 2); SmbHide's two emitters carry `metadata/sms_delay_frames` 40 / 45 (SmsFxBurst starts them on a timer). The drives: 128 32/32, 129 36/36
+(H9 now counts EnemyDisap bursts alone -- the new appear / hide bursts come and go around the stomp), boot ALL OK.
+**DEVIATIONS (logged):** the drops' ghost children, the Zs' inherited birth size (they grow 0.6 -> 1.6 over their own life instead), the pollen's
+dot -> glow -> ring texture flip (one glow texture at the mid pink-orange), the stars' random colour phase (one shared 16-frame cycle), the
+dizzy stars' 3-every-21-frames cadence (a steady 9 a second), the sand's alpha flicker; PoiDead's children; Mario's fling effect on the Cataquack
+(PARTICLE_MS_DMG_B + MS_M_AMIATTACK, the ThrowFxScene slot) is NOT in -- Mario-side hit effects, a later pass. **GPU capture** (cap_fx131.gd, each
+scene alone at three ages, ref/131): the pastel drop splash; the sand cloud over its ring; the white landing puffs with the flat ring; three
+tinted stars circling at head height; two Zs rising; the pollen motes (pink-centred soft dots) rising / fanning; the rocks tumbling out of the
+smoke ring; the sink's delayed rocks and smoke at frame 60.

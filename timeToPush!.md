@@ -379,12 +379,14 @@ written here would already be one commit stale.)
 ### #8 -- PENDING -- queued 2026-10-29 02:20 PDT (Kiro) -- PUSH ONLY, no PR yet
 Push the fifth feature branch: `feature/enemy-pokey-cataquack`, branched from `main` `e9eb60b` (the trunk after PR #9) -- the Cataquack (TPoiHana, SMS
 pass 128, painted any colour in 128b), the Pokey + Pokey Head (THanaSambo / TSamboHead, pass 129) and the Bob-omb (TBombHei, pass 130; carried,
-thrown and its blast effect in 130b) on the small-enemy base. NOT yet playtested by
+thrown and its blast effect in 130b, the carry fixed in 130c) on the small-enemy base, with the Cataquack's and Pokey's particles (131).
+Partly playtested by
 Jaysonn: push the branch so it is on
 GitHub; do NOT open a PR until he says the feature is done (Kiro will replace this entry with the PR entry then, as #5-#7 went).
-- Branch `feature/enemy-pokey-cataquack` -- code tip `d968bc9` ("SMS 130b: the Bob-omb carried and thrown, and its blast ..." over `1778a42` 130,
-  `f08ea69` 129, `636ac9c` 128b, `c565f39` 128); the branch tip is this file's own commit on top of it; 10 commits since `main` `e9eb60b` (128,
-  128b, 129, 130, 130b and their five log + entry commits). A NEW remote branch (never pushed): push with `-u`. The biggest new files are
+- Branch `feature/enemy-pokey-cataquack` -- code tip `a6b4dd3` ("SMS 131: the Cataquack's and the Pokey's particles ..." over `c0127c5` 130c,
+  `d968bc9` 130b, `1778a42` 130, `f08ea69` 129, `636ac9c` 128b, `c565f39` 128); the branch tip is this file's own commit on top of it; 13 commits
+  since `main` `e9eb60b` (128, 128b, 129, 130, 130b, 130c, 131 and their six log + entry commits). A NEW remote branch (never pushed): push with
+  `-u`. The biggest new files are
   `models/Eniemes/Poihana/Poihana.glb` (1.7 MB), `models/Eniemes/Sambo/Sambo.glb` (0.4 MB) and `assets/Sms/Enemy/Bomb/BombExplosion.tscn`
   (105 KB of baked curves); SamboDown.tres / SamboYdown.tres are baked clips (~60 KB each).
 ```
@@ -392,6 +394,10 @@ git push -u origin feature/enemy-pokey-cataquack
 git rev-list --count origin/feature/enemy-pokey-cataquack..feature/enemy-pokey-cataquack
 ```
 Expect `0` from the rev-list. No PR, no merge.
+- New files (131): `assets/Sms/Enemy/Fx131/` (nine .tscn, tex/ seven pngs + .imports); changed: SmsPoihana.cs, Sambo/SmsHanaSambo.cs,
+  SmsSamboHead.cs, SmsSamboFlower.cs (the effect defaults), assets/Sms/Fx/SmsFxBurst.cs (a child's start delay). 130c changed: assets/Mario.cs
+  (+2: the held enemy placed from his step), SmsSmallEnemy.cs, SmsEnemyHoldProxy.cs, Bomb/SmsBombHei.cs (CarryByBall), Bomb/BombExplosion.tscn +
+  BombFuse.tscn (the emit counts; Godot's uids).
 - New files (130b): `assets/Sms/Enemy/SmsEnemyHoldProxy.cs` + .uid, `assets/Sms/Enemy/Bomb/` (BombExplosion.tscn, BombFuse.tscn, BombFireball.gdshader
   + .uid, SmsBombFireball.cs + .uid, tex/ eight pngs + .imports), `assets/Sms/Fx/JpaBillboardKeyedAdd.gdshader` + .uid; changed: assets/Mario.cs (+67:
   the enemy branch of the take search, the proxy's attach / release, SmsHeldGone), assets/Sms/Enemy/SmsSmallEnemy.cs (the TTakeActor side: taken /
@@ -425,6 +431,10 @@ Expect `0` from the rev-list. No PR, no merge.
   budget). Hold it too long and its fuse runs out in his hands: the LED counts, it goes off there -- one HP and a knockdown. A walking or
   counting one cannot be taken, nor any while jumping. The blast is now the game's: the white flash, the growing magma fireball dissolving
   to embers, the smoke ring, the black scraps with their trails, the shockwave and its cyan sparks; the fuse smokes while it counts.
-  `FuseScale` shortens the fuse for testing; `BlastScale` the reach and the look; the sounds are still slots.
+  `FuseScale` shortens the fuse for testing; `BlastScale` the reach and the look; the sounds are still slots. The carried bomb now sits on his
+  hand with no trail (130c); `CarryByBall` on the bomb puts the ball's centre in his hand instead of its feet (off = the game).
+- The particles (131) come on by themselves: the Cataquack's dizzy stars and sleep Zs, its landing dust / sand spray and death splash; the
+  Pokey's pollen (off the crown every wait loop, puffed at you as it leans, at the bud's bloom), the rocks and smoke as it rises and sinks
+  (the Pokey Head too). Each is a slot on the node (empty = none; the default scenes live in assets/Sms/Enemy/Fx131/).
 The working tree carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher
 `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the `addons/godot_ai` churn: his, leave them.
