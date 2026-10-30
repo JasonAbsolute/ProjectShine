@@ -8412,3 +8412,27 @@ bck frame per drive frame (the clips play in real time, the ticks are 120 Hz: a 
 H11 (the winged Stu's knock skids into a wall on this arena) and F5 fail on BOTH, S1/S2 (the Dango tower) flaked on main only: the misses
 are the arena / timing, not 128's base change. Build 0 errors, boot ALL OK. **GPU capture** (cap_poihana.gd, run_gpu.ps1: the two kinds on a floor,
 front and 3/4): the blue and red bodies, the yellow bill, the big yellow-ringed green eye -- the game's textures and registers as read.
+### 128b -- the Cataquack painted any colour (feature/enemy-pokey-cataquack, `636ac9c`)
+
+**Files:** `assets/Sms/Enemy/SmsPoihana.cs` ([Tool]; `Kind` a property; `UseBodyColor` + `BodyColor` replace the register-space `UseBodyColorOverride` /
+`BodyColorOverride` nobody could pick a colour with; `BodyKonstNow`; `EditorPreview`), `SmsSmallEnemy.cs` (`_Ready` / `_PhysicsProcess` return in the
+editor after a new `EditorPreview()` hook -- no group, no reset, no tick there; a species without [Tool] never reaches it).
+
+**The knob.** Paint group: `UseBodyColor` on paints the body `BodyColor` (a plain colour picker, no alpha) instead of the kind's game paint; behaviour
+is the Kind's as before. The pick is the body's colour where the sun hits it full on; the game's toon shading darkens it in the shade and the sun's
+white glint sits on top. Default = the blue kind's own lit colour (0, 68, 247). The bill stays the game's yellow, the eye its own texture (the feet are
+part of the `_body` material, as in the game: a green pick gives green feet).
+**The maths** (poihana/default.bmd `_body`, EnemyToon form 2): stage 0 with no texture is s0 = 1/2 (C0 + mix(1, COLOR0, 5/8) - 1/2); at full light
+COLOR0 = 1 so s0 = C0 / 2 + 1/4; stage 1 is s0 x toon (1 there) + K2, so the lit colour = C0 / 2 + 1/4 + K2. For a pick: C0 = 2 x pick - 1/2 and
+K2 = 0 -- the game's K2 (0, 0, 32) is a constant blue cast that would floor a yellow's blue channel at 32 and make black navy; dropped, every channel
+lands exactly (a game kind keeps its K2). `Kind` / `UseBodyColor` / `BodyColor` re-apply live through their setters (a drive check and the editor).
+**The editor:** `SmsPoihana` is now [Tool], so a placed Cataquack shows its kind's paint or the pick in the viewport, as the NPC outfits and the
+spawner ghost do. `_Ready` in the editor resolves `Model` and calls `EditorPreview()` = `DressBody()` (the per-instance material copy), nothing else;
+the override material lands on the glb instance's own mesh node (owned by the instance, not the saved scene), so it is NOT written into Level.tscn.
+
+**Drive 128** 32/32 (three new: P1 a painted red kind: c0 = 2 x (0.2, 0.8, 0.3) - 1/2 on the copy, K2 zero, still on EnemyToon; P2 a live BodyColor
+change re-paints at once; P3 UseBodyColor off -> the red register + K2 (0, 0, 32) / 255). C1 now expects the instance index = the level's own
+count of Cataquacks (his Level carries three placed ones since 128; mInstanceIndex is the nth born). **GPU capture** (cap_poihana_b.gd: a green and
+a yellow pick beside the blue and red kinds, frozen): the green body reads (51, 204, 77) = the pick to the digit on its lit top; the shade side the
+toon's darkening of the same green; the yellow one yellow with the game's yellow bill (a probe that landed on the bill read the bill's (254, 209, 110)
++ glint -- the bill, not the paint). Build 0 errors, boot ALL OK.

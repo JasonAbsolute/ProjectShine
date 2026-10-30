@@ -380,9 +380,9 @@ written here would already be one commit stale.)
 Push the fifth feature branch: `feature/enemy-pokey-cataquack`, branched from `main` `e9eb60b` (the trunk after PR #9) -- the Cataquack (TPoiHana) on
 the small-enemy base (SMS pass 128); the Pokey (THanaSambo) follows on the same branch. NOT yet playtested by Jaysonn: push the branch so it is on
 GitHub; do NOT open a PR until he says the feature is done (Kiro will replace this entry with the PR entry then, as #5-#7 went).
-- Branch `feature/enemy-pokey-cataquack` -- code tip `c565f39` ("SMS 128: the Cataquack (TPoiHana, poihana.cpp) on the small-enemy base ..."); the
-  branch tip is this file's own commit on top of it; 2 commits since `main` `e9eb60b` (the code; the log + this entry); 19 files, +736 / -2. A NEW
-  remote branch (never pushed): push with `-u`. The biggest new file is `models/Eniemes/Poihana/Poihana.glb` (1.7 MB).
+- Branch `feature/enemy-pokey-cataquack` -- code tip `636ac9c` ("SMS 128b: the Cataquack painted any colour ..." on top of `c565f39`, pass 128); the
+  branch tip is this file's own commit on top of it; 4 commits since `main` `e9eb60b` (128, its log + this entry, 128b, its log + this entry); 19 files,
+  about +790 / -4. A NEW remote branch (never pushed): push with `-u`. The biggest new file is `models/Eniemes/Poihana/Poihana.glb` (1.7 MB).
 ```
 git push -u origin feature/enemy-pokey-cataquack
 git rev-list --count origin/feature/enemy-pokey-cataquack..feature/enemy-pokey-cataquack
@@ -395,6 +395,7 @@ Expect `0` from the rev-list. No PR, no merge.
 - To try it: drop `assets/Sms/Enemy/Poihana.tscn` into a level with its blue arrow (+Z) toward where Mario comes from. It wanders, charges when it sees
   Mario and FLINGS him straight up (33 m, the game's 140); `Kind` = Red hurts too, Sleeping starts asleep (a touch or the hose wakes it). The hose
   flips it; on sand (`GroundKind`, or a floor in the "sms_sand" group) it lies twitching 25 s and a stomp pays one coin -- Mario cannot kill one
-  (only Yoshi could; `StompKills` is the knob). The particle slots are empty until 128b.
+  (only Yoshi could; `StompKills` is the knob). Paint group: `UseBodyColor` + `BodyColor` paints the body any colour (shows in the editor too);
+  off = the kind's game blue / red. The particle slots are still empty.
 The working tree carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher
 `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the `addons/godot_ai` churn: his, leave them.
