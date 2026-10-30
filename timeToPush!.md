@@ -375,3 +375,85 @@ under `assets/Sms/Gate/` on `main`, including `SmsModelGate.cs`, `SmsEpisodeSele
 Trunk for Kiro to branch the next feature from: **`main`'s current tip** -- read it with `git log --oneline -1 main`. (Stated this way
 on purpose: a commit cannot carry its own sha, and the "#7 done" commit that closes this entry IS the new tip, so any literal sha
 written here would already be one commit stale.)
+
+### #8 -- PUSHED 2026-10-30 -- https://github.com/JasonAbsolute/ProjectShine/tree/feature/enemy-pokey-cataquack -- PR awaiting Jaysonn's click -- queued 2026-10-29 02:20 PDT, PR added 2026-10-30 01:35 PDT (Kiro)
+Push the fifth feature branch and OPEN ITS PR: `feature/enemy-pokey-cataquack`, branched from `main` `e9eb60b` (the trunk after PR #9) -- the
+Cataquack (TPoiHana, SMS pass 128, painted any colour in 128b), the Pokey + Pokey Head (THanaSambo / TSamboHead, 129) and the Bob-omb (TBombHei, 130;
+carried, thrown and its blast effect in 130b, the carry fixed in 130c) on the small-enemy base, with the Cataquack's and Pokey's particles (131).
+PLAYTESTED BY JAYSONN 2026-10-29/30 ("everything is good for now") -- the PR can be merged once it is open (squash or merge commit, his call; `main`
+then needs a `git pull` here). Kiro has NOT merged this branch locally (the entry asks for a PR: the one way).
+- Branch `feature/enemy-pokey-cataquack` -- code tip `a6b4dd3` ("SMS 131: the Cataquack's and the Pokey's particles ..."), on top of `c0127c5` (130c),
+  `d968bc9` (130b), `1778a42` (130), `f08ea69` (129), `636ac9c` (128b) and `c565f39` (128); the branch tip is this file's own commit on top of `5bad9aa`
+  (the 130c + 131 log); 14 commits since `main` `e9eb60b`, this entry's own included; 156 files, +7517 / -7 before this entry's lines. A NEW remote
+  branch (never pushed): push with `-u`. Over 1 MB: `models/Eniemes/Poihana/Poihana.glb` (1.7 MB, the Cataquack's model -- NEW) and the two files
+  already on `main` (Mario.cs 1.0 MB, PROJECT_LOG.md 0.95 MB); then Sambo.glb 0.36 MB, SamboHead.glb 0.27 MB, NejiBomb.glb 0.22 MB and
+  `assets/Sms/Enemy/Bomb/BombExplosion.tscn` (103 KB of baked curves); nothing else over 80 KB. The range carries NONE of Jaysonn's nine live edits
+  (checked 2026-10-30: 0 addons, 0 Level.tscn, 0 SmsHiddenCoin.cs, 0 of the three .tres, 0 of the four .png.import flips).
+- PR: title "Feature: the Cataquack, the Pokey and the Bob-omb (SMS passes 128-131)"; base `main`; body = `pr128.md` at the project root
+  (untracked -- delete it after).
+  compare URL: https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/enemy-pokey-cataquack
+```
+git push -u origin feature/enemy-pokey-cataquack
+git rev-list --count origin/feature/enemy-pokey-cataquack..feature/enemy-pokey-cataquack
+gh pr create --base main --head feature/enemy-pokey-cataquack --title "Feature: the Cataquack, the Pokey and the Bob-omb (SMS passes 128-131)" --body-file pr128.md
+```
+Expect `0` from the rev-list. KEEP THE #6 ORDER: push the branch -> write the result paragraph below, commit it and push -> only THEN open the PR
+(so the result travels with a squash). If `gh` is still unauthenticated here (`gh auth status`), open the compare URL in the browser instead, paste
+the title and the body of `pr128.md`, and Jaysonn presses "Create pull request". Once merged: `git checkout main && git pull` here, then tell Kiro the sha.
+- New files (131): `assets/Sms/Enemy/Fx131/` (nine .tscn, tex/ seven pngs + .imports); changed: SmsPoihana.cs, Sambo/SmsHanaSambo.cs,
+  SmsSamboHead.cs, SmsSamboFlower.cs (the effect defaults), assets/Sms/Fx/SmsFxBurst.cs (a child's start delay). 130c changed: assets/Mario.cs
+  (+2: the held enemy placed from his step), SmsSmallEnemy.cs, SmsEnemyHoldProxy.cs, Bomb/SmsBombHei.cs (CarryByBall), Bomb/BombExplosion.tscn +
+  BombFuse.tscn (the emit counts; Godot's uids).
+- New files (130b): `assets/Sms/Enemy/SmsEnemyHoldProxy.cs` + .uid, `assets/Sms/Enemy/Bomb/` (BombExplosion.tscn, BombFuse.tscn, BombFireball.gdshader
+  + .uid, SmsBombFireball.cs + .uid, tex/ eight pngs + .imports), `assets/Sms/Fx/JpaBillboardKeyedAdd.gdshader` + .uid; changed: assets/Mario.cs (+67:
+  the enemy branch of the take search, the proxy's attach / release, SmsHeldGone), assets/Sms/Enemy/SmsSmallEnemy.cs (the TTakeActor side: taken /
+  released / riding his hand), assets/Sms/Enemy/Bomb/SmsBombHei.cs (PickUp / Thrown, the coin, the fx defaults), assets/Sms/Fx/SmsFxBurst.cs
+  (ISmsFxBurstPart, the sub-emitter tail).
+- New files (130): `assets/Sms/Enemy/Bomb/` (SmsBombHei.cs + .uid, BombHei.tscn, BombBody.gdshader + .uid, five .tres materials), `models/Eniemes/Bomb/`
+  (two glbs, seven pngs, .imports).
+- New files (129): `assets/Sms/Enemy/Sambo/` (SmsHanaSambo / SmsSamboHead / SmsSamboFlower / SmsSamboLeaf / SmsBoneRoll .cs + .uid, HanaSambo /
+  SamboHead / SamboFlower / SamboLeaf .tscn, four .tres materials, SamboDown / SamboYdown .tres clips), `assets/Sms/Enemy/EnemyToonCutoutTwoSided.gdshader`
+  + .uid, `models/Eniemes/Sambo/` (five glbs, twelve pngs, .imports); changed: EnemyToon.gdshaderinc (form 4), SmsSmallEnemy.cs (the facing fix),
+  assets/Sms/SmsWaterDrops.cs (the bud zone test).
+- New files (128): `assets/Sms/Enemy/` (SmsPoihana.cs + .uid, Poihana.tscn, PoihanaBody / PoihanaEye / PoihanaMouth .tres, EnemyToonBlend.gdshader + .uid),
+  `models/Eniemes/Poihana/` (Poihana.glb + .import, default_0.png, default_1.png, M_poihana_eye.png + .imports); changed: assets/Sms/Enemy/
+  EnemyToon.gdshaderinc (two TEV forms), assets/Sms/Enemy/SmsSmallEnemy.cs (four small helpers), assets/Mario.cs (ONE line: SmsThrowMario's thrower
+  parameter widened to Node), PROJECT_LOG.md.
+- To try it: drop `assets/Sms/Enemy/Poihana.tscn` into a level with its blue arrow (+Z) toward where Mario comes from. It wanders, charges when it sees
+  Mario and FLINGS him straight up (33 m, the game's 140); `Kind` = Red hurts too, Sleeping starts asleep (a touch or the hose wakes it). The hose
+  flips it; on sand (`GroundKind`, or a floor in the "sms_sand" group) it lies twitching 25 s and a stomp pays one coin -- Mario cannot kill one
+  (only Yoshi could; `StompKills` is the knob). Paint group: `UseBodyColor` + `BodyColor` paints the body any colour (shows in the editor too);
+  off = the kind's game blue / red. The particle slots carry the 131 defaults; the sound slots are empty.
+- To try the Pokey (129): drop `assets/Sms/Enemy/Sambo/HanaSambo.tscn` on the ground with its blue arrow (+Z) toward where Mario comes from; it starts
+  buried under a sunflower bud, rises when he is within 13 m, leans its head at him within 6.7 m (the head hurts; the stalk hurts on touch), the hose
+  on its head freezes it, a stomp on the head kills it (the stack falls apart), it sinks back when he is 27 m away. `SamboHead.tscn` = the Pokey Head:
+  buried too, pops when Mario is in front within 8 m (three leaves fly), hops 4 m at him every 2.5 s, water knocks it back (into a wall = three coins),
+  touching it on the ground stuns it for a stomp. `SamboFlower.tscn` alone = a bud the hose opens. The particle slots carry the 131 defaults; the sound slots are empty.
+- To try the Bob-omb (130): drop `assets/Sms/Enemy/Bomb/BombHei.tscn` anywhere; it marches at Mario at once and for ever (touching it does nothing);
+  after 8.3 s its LED counts 3-2-1 and it blows up (a 2.7 m blast burns Mario: the fire knock). The hose douses it (it sits with the dizzy blue
+  face) until the fuse runs out anyway. Two close together go off together. A DOUSED one can be picked up (130b): stand beside it on the ground
+  and press B -- Mario lifts it (the sitting dizzy bomb rides his hands); B again throws it (always a throw: the game pitches an enemy even
+  standing still) ~17 m along his facing in a 10.8 m arc, and it blows up where it lands, dropping a coin toward him (20 a stage, the game's
+  budget). Hold it too long and its fuse runs out in his hands: the LED counts, it goes off there -- one HP and a knockdown. A walking or
+  counting one cannot be taken, nor any while jumping. The blast is now the game's: the white flash, the growing magma fireball dissolving
+  to embers, the smoke ring, the black scraps with their trails, the shockwave and its cyan sparks; the fuse smokes while it counts.
+  `FuseScale` shortens the fuse for testing; `BlastScale` the reach and the look; the sounds are still slots. The carried bomb now sits on his
+  hand with no trail (130c); `CarryByBall` on the bomb puts the ball's centre in his hand instead of its feet (off = the game).
+- The particles (131) come on by themselves: the Cataquack's dizzy stars and sleep Zs, its landing dust / sand spray and death splash; the
+  Pokey's pollen (off the crown every wait loop, puffed at you as it leans, at the bud's bloom), the rocks and smoke as it rises and sinks
+  (the Pokey Head too). Each is a slot on the node (empty = none; the default scenes live in assets/Sms/Enemy/Fx131/).
+The working tree carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher
+`.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the `addons/godot_ai` churn: his, leave them.
+
+Result: all seven pass shas confirmed ancestors (code tip `a6b4dd3`, 130c `c0127c5`, 130b `d968bc9`, 130 `1778a42`, 129 `f08ea69`,
+128b `636ac9c`, 128 `c565f39`), plus the 130c+131 log commit `5bad9aa` and the trunk `e9eb60b`. Pushed as a NEW remote branch with
+`-u`, tracking set; `git rev-list --count origin/feature/enemy-pokey-cataquack..feature/enemy-pokey-cataquack` returned `0`.
+14 commits since `main`.
+Diffstat measured 156 files / **+7523** / -7 against the entry's +7517 -- the 6-line gap is this log file's own entry commit, as the
+entry predicted ("before this entry's lines"). Largest blobs confirm the entry: `Poihana.glb` 1.65 MB (the only new file over 1 MB),
+`Mario.cs` 1.00 MB and `PROJECT_LOG.md` 0.93 MB (both already on `main`, so not new weight), then `Sambo.glb` 0.35,
+`SamboHead.glb` 0.26, `NejiBomb.glb` 0.22, `BombExplosion.tscn` 0.10 and `NejiBombDown.glb` 0.08 -- nothing else over 80 KB.
+Hygiene re-checked independently of Kiro's own check and agrees: 0 of the nine live edits in the range (0 `addons/godot_ai`,
+0 `Level.tscn`, 0 `SmsHiddenCoin.cs`, 0 of the three `.tres` re-saves, 0 of the four `.png.import` flips).
+Kept the #6 order: branch pushed -> this paragraph committed and pushed -> only then the PR page opened.
+`gh auth status` still reports "not logged into any GitHub hosts" -- fifth entry running on the browser route.

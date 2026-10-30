@@ -8343,3 +8343,380 @@ at the 45-degree frames, the halo outside the silhouette as before, the exact ba
 halo at 100 px from the centre the same brightness as 127h. Drive 127's select section 37 / 37 (two new: S2i both glows 100 behind along
 the view with the 1.077 scale, S3d the offset the same world vector after the ring's turn and the spin). Build 0 errors, boot ALL OK;
 the drive removed.
+### 128 -- the Cataquack (TPoiHana) on the small-enemy base (feature/enemy-pokey-cataquack, off main e9eb60b after PR #9)
+
+**Files:** NEW `assets/Sms/Enemy/SmsPoihana.cs` (+ .uid), `Poihana.tscn`, `PoihanaBody.tres`, `PoihanaEye.tres`, `PoihanaMouth.tres`,
+`EnemyToonBlend.gdshader` (+ .uid); `EnemyToon.gdshaderinc` (forms 2 / 3), `SmsSmallEnemy.cs` (SetBckPaused, SeekBck, BckFrameNow, NoBind),
+`Mario.cs` (SmsThrowMario's thrower: SmsNpc -> Node, one line); `models/Eniemes/Poihana/Poihana.glb` (mamma0's poihana/default.bmd from his
+whole-disc rip, 14 clips, 16 bones) + `default_0.png` (the toon), `default_1.png` / `M_poihana_eye.png` (the eye) + .imports (the glb's materials
+swapped for the .tres by name, the pngs pinned: patch_import128.py). Sources: doldecomp/sms src/Enemy/poihana.cpp + include/Enemy/PoiHana.hpp
+(decomp/), the shipped `/enemy/poihana.prm` + `/mario/dmgpoihana.prm` (params.szs) and the 14 bck (mamma0.szs) pulled with gcm_tools.py
+(npc82/enemy128/disc).
+
+**The game** (poihana.cpp): a TWalkerEnemy whose default nerve is the WANDER (init: initWith(GraphWander), or Sleep for TSleepPoiHana) -- no set
+anim; march 1.8, turn 3..5, body scale 1.2..1.5 (the model 191 u tall -> 3.1..3.8 m), search 800 u / 180 deg / 200 u high (300 aware), give-up
+2000 / 300, attack 120 x 80, damage 100 x 100, 1 HP. Contact (TPoiHanaCollision at jnt_body + the body's own hit actor) -> attackToMario: asleep ->
+unk1A0 = unk194 = true (it wakes); in ATTACK -> TNervePoihanaThrow; else (not Throw / Freeze) -> ATTACK (dmgpoihana: 1 HP, type 1, min speed
+50). TNervePoihanaThrow: the throw bck (8), mThrowTimer 1; past frame 4 with the timer running the clip's rate is 0 (held); timer 4: rumble (0x15,
+0xf) + MS_DMG_B / MS_M_AMIATTACK at mMouthJntIndex 6; timer > 16: HIT_MESSAGE_THROWN + SMS_ThrowMario((0, 1, -BackThrowVal 0) in the body's
+frame, ThrowSpeed 140) = straight up at 140 u/frame (vy 140 at gravity 1: an apex 2450 u = 32.9 m up after 140 ticks), the clip runs on; done
+at its end. TPoiHanaRed::attackToMario sends ATTACK first in the Attack nerve; unk1C8 false = it never sleeps; GX_TEVREG0 (283, -53, -122).
+behaveToWater: unk165 = 1; in GraphWander / Attack / Jump -> TNervePoihanaFreeze: isSand ? waterhit (12) : waterhit2 (13), the collision killed;
+at a clip's end: 12 or humi (3) -> pikupiku (4); 4 -> getup (2) once the nerve's time > FreezeWait (3000 = 25 s) else 4 again; 2 or 13 -> the
+collision back, done. isHitValid(msg): ONLY HIT_MESSAGE_UNKB (0xB: Yoshi's eat -- Yoshi.cpp 403 sends it to what he swallows) is true; frozen ->
+setBckAnm(humi) + genRandomItem (setAfterDeadEffect + genEventCoin; TPoiHana::generateItem drops NOTHING -- it only clears unk195) and false. So a
+stomp on a flipped Cataquack pays its attached EVENT COIN once ((pos - Mario) x (10, 18, 10) u/tick) and squashes it; Mario cannot kill one.
+walkBehavior (mSleepVersion 1, mode 0): mGoToSleepTimer++ ; at a clip's end past WakeFrame 6000 + 100 x mInstanceIndex -> timer = rand(-500,
+500), setNext(Sleep), unk195. TNervePoihanaSleep: t0 (unk1C8 false -> straight back to the wander) sleep_start (6) + AIRBORNE on; the
+sleeping kind on the ground: LIVE_FLAG_UNK10 (rooted); timer++; (unk194 || unsetUnk165) && not waken -> KOHANA_WAKEUP3 + waken (10) from frame
+148; at a clip's end: 6 -> 5; 5 -> waken if unk1A0 && timer > SleepFrame 200; else 10 (or unk1C8 false) -> timer 0, pushAfterCurrent(wander),
+UNK10 off, done; anything else -> 6. init: mGoToSleepTimer = mInstanceIndex x -250 (init runs AFTER load's reset: the birth keeps the stagger).
+calcRootMatrix: POI_KIZETSU bound while bck 3 / 4, POI_ZZZ while 5, the dust (JUMP_ED_A/B, or POI_SAND + A on sand) at frame 18 of 12 / 13, POI_SAND
+at frame 34 of the getup on sand. setDeadAnm: the collision off, death (1), POI_DEAD + the dust. isCollidMove: a MAP OBJECT hit while attacking ->
+Freeze with vel (-2x, 5y, -2z) + 10 u up. TNervePoihanaTrapped: the sand-bomb pillars (ACTOR_TYPE_SAND_BOMB_BASE00) fling it.
+**The materials** (bmd_mat_dump.py): all three share the TEV shape stage 0 (ONE | TEXC toon, RASC, KONST 5/8, C0) SUBHALF /2, stage 1 (ZERO, TEXC,
+CPREV, KONST K2 (0, 0, 32)), stage 2 (ZERO, RASC1 spec, KONST 5/8, CPREV): _body C0 (-191, 8, 303) S10 = the blue (the red kind's register
+(283, -53, -122) set by TPoiHanaManager::initSetEnemies' SMS_InitPacket_OneTevColor), no texture in stage 0, the toon through SRTG in stage 1;
+_mouth (the bill) C0 (380, 291, 28); _eye C0 (408, 335, 323), stage 0's a = the toon (texcoord 1), stage 1 x M_poihana_eye (the yellow ring with
+the green centre -- the Cataquack's one big eye IS this texture), blend SRCALPHA / INVSRCALPHA, z write off, alphaCmp ALWAYS.
+
+**The port** (`SmsPoihana : SmsSmallEnemy`): `Kind` Blue / Red / Sleeping (TPoiHana / TPoiHanaRed / TSleepPoiHana), `DefaultNerve` = Sleep for a
+sleeping kind not yet woken else the wander; the three nerves (Sleep, PoiFreeze, Throw) as read; `AttackToMario` / `BehaveToWater` / `IsHitValid` /
+`WalkBehavior` (the sleep timer) / `SetDeadAnm` overrides; `_mario.SmsThrowMario(dir, 140 x ThrowSpeedScale, this)` -- Mario's pass-94 THROWN_DOWN
+(the vector normalised, mForwardVel -speed x |xz|, mVel.y = speed x y, ANIM_THROWN to the second bounce) takes any Node as the thrower now.
+`GroundKind` Auto (the floor collider in the "sms_sand" group or named *sand*) / Sand / Hard = isSand. `EventCoinScene` (his yellow_coin.tscn by
+default -- DEVIATION: the game's placement decides which carry a coin) popped through the drop spawner once. `DressBody`: a per-instance copy
+of PoihanaBody.tres with the kind's C0 (`UseBodyColorOverride` / `BodyColorOverride` to paint one). The mouth joint found by NAME ('mouth1_2' =
+the bmd's joint 6; Godot's bone order follows the bmd's, probed) for the throw bursts. Base: `SetBckPaused` (setFrameRate 0 / normal), `SeekBck`
+(setFrame), `BckFrameNow`, `NoBind`. Knobs grouped: Kind / Ground / Deviations (StompKills: a ground pound on the twitch loop kills -- off = the
+game, where only Yoshi kills one; WakeTicksOverride; ThrowSpeedScale) / Coin and effects (DizzyFx, ZzzFx, LandDustFx, SandFx, ThrowFx slots,
+EMPTY -- 128b generates them from the jpa; ThrowSound, WakeSound).
+**DEVIATIONS / NOT PORTED (logged):** the sand-bomb trap (no such object), the map-object stun (his walls are bg, which never stuns), Yoshi's eat and
+juice, doKeepDistance, the sounds (slots), the particles (slots), the event-coin placement rule (every one carries a coin unless cleared).
+
+**Drive 128** (`npc82/enemy128/patch_smoke128.py`, spliced into Mario.cs, SMS_YCAM_SMOKE=1; 29/29 through the real paths on his Level.tscn's clear
+arena): C1 boot (wander at once, scale 1.46, the blue c0 on the copy, the three .tres), C1b the mouth bone on the skeleton; C2 sight -> Attack
+with the dash after 23 frames; C3 the dash closes 4.25 m in 30 frames (5.4 u/tick); T1 contact -> Throw (clip 0, timer 1); T2 THROWN after 8
+frames: vy 56.4 m/s (= 140 u/frame), fwd 0, no damage (T2b); T3 the clip held at frame 4 for 4 drive frames; T4 the flight's apex 33.3 m over the
+floor; T5 Throw ends, the attack gives up (GiveUpHeight) -> wander; W1 the real hose (R from 4.5 m) -> PoiFreeze with waterhit2 on hard ground,
+HP 0; W2 waterhit2 (156 frames) ends it straight to the wander, no twitch; W2b no damage beside a frozen one; S1 sand -> waterhit; S2 -> pikupiku
+at 79 frames; S3 a real fall onto it: TRAMPLE -> humi + ONE coin (CoinPaid), not a kill, his StompBounce; S4 humi -> pikupiku, no second coin;
+S5 past FreezeWait (240 for the drive) -> getup; S6 getup (92 frames) -> wander; Z1 past WakeTicksOverride 60 at a walk clip's end -> Sleep with
+sleep_start; Z2 -> the sleep loop at 184 frames; Z3 -> the waken at the LOOP's end (416 frames: checkCurAnmEnd on the looping clip); Z4 -> wander;
+K1 the sleeping kind born asleep, not waking by itself; K2 asleep on the ground: rooted (NoBind); K3 the touch wakes it: the waken from frame
+148, no damage, wakes by itself from now; K4 the tail (52 frames) -> awake (the attack at its first tick with Mario 1.5 m away); R1 the red
+body (283, -53, -122); R2 the red kind's contact: health -1 AND the fling (vy 56.4 m/s). Lessons: a Mario placed a hair above the floor reads as
+FALLING for a frame -- 3 m from a 140-u damage cylinder that trampled it three times (placed at the floor's Y, a 12-frame settle, 4.5 m); one
+bck frame per drive frame (the clips play in real time, the ticks are 120 Hz: a 156-frame clip takes 156 drive frames, not 78).
+**Regression:** drive 125 (the base changed): 83/85 live, and 82/85 on a `main` control worktree (the same Level.tscn, the same import cache) --
+H11 (the winged Stu's knock skids into a wall on this arena) and F5 fail on BOTH, S1/S2 (the Dango tower) flaked on main only: the misses
+are the arena / timing, not 128's base change. Build 0 errors, boot ALL OK. **GPU capture** (cap_poihana.gd, run_gpu.ps1: the two kinds on a floor,
+front and 3/4): the blue and red bodies, the yellow bill, the big yellow-ringed green eye -- the game's textures and registers as read.
+### 128b -- the Cataquack painted any colour (feature/enemy-pokey-cataquack, `636ac9c`)
+
+**Files:** `assets/Sms/Enemy/SmsPoihana.cs` ([Tool]; `Kind` a property; `UseBodyColor` + `BodyColor` replace the register-space `UseBodyColorOverride` /
+`BodyColorOverride` nobody could pick a colour with; `BodyKonstNow`; `EditorPreview`), `SmsSmallEnemy.cs` (`_Ready` / `_PhysicsProcess` return in the
+editor after a new `EditorPreview()` hook -- no group, no reset, no tick there; a species without [Tool] never reaches it).
+
+**The knob.** Paint group: `UseBodyColor` on paints the body `BodyColor` (a plain colour picker, no alpha) instead of the kind's game paint; behaviour
+is the Kind's as before. The pick is the body's colour where the sun hits it full on; the game's toon shading darkens it in the shade and the sun's
+white glint sits on top. Default = the blue kind's own lit colour (0, 68, 247). The bill stays the game's yellow, the eye its own texture (the feet are
+part of the `_body` material, as in the game: a green pick gives green feet).
+**The maths** (poihana/default.bmd `_body`, EnemyToon form 2): stage 0 with no texture is s0 = 1/2 (C0 + mix(1, COLOR0, 5/8) - 1/2); at full light
+COLOR0 = 1 so s0 = C0 / 2 + 1/4; stage 1 is s0 x toon (1 there) + K2, so the lit colour = C0 / 2 + 1/4 + K2. For a pick: C0 = 2 x pick - 1/2 and
+K2 = 0 -- the game's K2 (0, 0, 32) is a constant blue cast that would floor a yellow's blue channel at 32 and make black navy; dropped, every channel
+lands exactly (a game kind keeps its K2). `Kind` / `UseBodyColor` / `BodyColor` re-apply live through their setters (a drive check and the editor).
+**The editor:** `SmsPoihana` is now [Tool], so a placed Cataquack shows its kind's paint or the pick in the viewport, as the NPC outfits and the
+spawner ghost do. `_Ready` in the editor resolves `Model` and calls `EditorPreview()` = `DressBody()` (the per-instance material copy), nothing else;
+the override material lands on the glb instance's own mesh node (owned by the instance, not the saved scene), so it is NOT written into Level.tscn.
+
+**Drive 128** 32/32 (three new: P1 a painted red kind: c0 = 2 x (0.2, 0.8, 0.3) - 1/2 on the copy, K2 zero, still on EnemyToon; P2 a live BodyColor
+change re-paints at once; P3 UseBodyColor off -> the red register + K2 (0, 0, 32) / 255). C1 now expects the instance index = the level's own
+count of Cataquacks (his Level carries three placed ones since 128; mInstanceIndex is the nth born). **GPU capture** (cap_poihana_b.gd: a green and
+a yellow pick beside the blue and red kinds, frozen): the green body reads (51, 204, 77) = the pick to the digit on its lit top; the shade side the
+toon's darkening of the same green; the yellow one yellow with the game's yellow bill (a probe that landed on the bill read the bill's (254, 209, 110)
++ glint -- the bill, not the paint). Build 0 errors, boot ALL OK.
+### 129 -- the Pokey (THanaSambo) and the Pokey Head (TSamboHead) on the small-enemy base (feature/enemy-pokey-cataquack, `f08ea69`)
+
+**Files:** NEW `assets/Sms/Enemy/Sambo/` -- `SmsHanaSambo.cs` + `HanaSambo.tscn` (the Pokey), `SmsSamboHead.cs` + `SamboHead.tscn` (the head),
+`SmsSamboFlower.cs` + `SamboFlower.tscn` (the bud), `SmsSamboLeaf.cs` + `SamboLeaf.tscn`, `SmsBoneRoll.cs` (a SkeletonModifier3D), the materials
+`SamboBody.tres` / `SamboCrownFlower.tres` / `SamboBudFlower.tres` / `SamboLeaf.tres`, the baked death clips `SamboDown.tres` / `SamboYdown.tres`;
+`EnemyToonCutoutTwoSided.gdshader`; `models/Eniemes/Sambo/` (Sambo / SamboD / SamboHead / SamboFlower / SamboLeaf .glb from his whole-disc rip,
+bianco1; the disc textures K_sambo_orange, K_Sflower_orange, K_flower_orange (from flower_orange.bmt), K_leaf; the glbs' own pngs; .imports with
+the materials swapped by name and the pngs pinned: patch_import129.py). CHANGED: `EnemyToon.gdshaderinc` (form 4), `SmsSmallEnemy.cs` (ApplyLook:
+the model's WORLD basis -- see the base fix), `SmsWaterDrops.cs` (the bud zone test beside the hidden-coin one). Sources: doldecomp/sms
+src/Enemy/hanasambo.cpp + include/Enemy/HanaSambo.hpp (+ smallEnemy.cpp, Spine.hpp for the spine rules), the shipped hanasambo / sambohead /
+samboflower .prm (params.szs), the sambo archive from bianco3.szs (bmd + 11 bck), sambohead + samboflower from bianco0.szs (gcm_tools.py).
+
+**The game.** THanaSambo (TSmallEnemy, rooted: mPosition.x/z pinned to the placed point, isCollidMove false): Hide (the default; sambo_fhide 79
+with HD_ROCK/SMOKE; initFlower at tick 75 and at the end: the bud at the ground; then no collision, sambo_fset held at frame 0, HIDDEN; Mario within
+AppearDist 1000 -> Appear) -> Appear (fset 79 rising with AP_ROCK/SMOKE, the bud hidden, turning at 3 x turn; at the end Wait, + Attack when
+Mario within AttackDist 500 and below base + 100) -> Wait (fwait loop turning toward Mario; frame 16 each loop createPollen KAFUN_OW 200 u over
+the pollen joint; past AttackInterval 150 + in range -> Attack; beyond HideDist 2000 -> Hide) -> Attack (fattack_start 34; at its end KAFUN_OA
+200 u ahead + SAMBO_ATTACK, fattack loop; a loop end past AttackingTime 250 with no water since -> fattack_end 14 -> Wait). The head hit actor
+THanaSamboHead at jnt_head (attack 60 x 20, damage 120 x 40, x scale): Mario in its attack cylinder -> ATTACK; TRAMPLE / HIP_DROP -> kill (the body's
+isHitValid takes only Yoshi's eat and its damage cylinder is 5 x 5); SPRAYED -> waterDamage: the wet flag, in Wait -> Freeze (fhit_start 4, hit
+loop while water keeps coming). Die: no collision, the model swapped for samboD.bmd (the stack as four loose pieces) playing ydown (36) when
+leaning else down (36); at the clip's end or tick 300: DISAP_A + B at Dhead / Dbody3 / Dbody2 / Dbody1, DEAD, genRandomItem. TSamboHead
+(TWalkerEnemy, scale 1.5 = 2.4 m, turn 0.3..0.5): Hide (samboHead_Fhide 44, HD fx; at the end HIDDEN + wait + initFlower; isFindMario(1) AND
+within AppearDist 800 -> Appear) -> Appear (set 44 with AP fx, the bud hidden -- a bloomed bud pops its pollen again; tick 20: dropLeaf, three
+leaves at 0/120/240 deg (0, rand(4, 4.8), rand(3, 3.6)) turned, gravity 0.15; at the end wait -> Attack) -> Attack (on the ground past
+JumpPrepareTime 300 ticks at a clip end: a hop MoveDist 300 u toward Mario at JumpSp 8 under MoveGravity 0.3 (calcVelocityToJumpToY),
+jump_start; falling -> jump_end held; landed -> runs -> wait; the roll = the velocity's pitch clamped JumpAngY 30 over 30 u up, x 0.8 a tick
+near the ground; turn 5 in the air). attackToMario: ATTACK; airborne -> a bounce away ((pos - Mario, +10) x 8); on the ground in Attack ->
+TNerveSmallEnemyFreeze (FreezeWait 120, setFreezeAnm EMPTY: the clip kept) = the stomp window. behaveToWater (not Hide/Appear/HitWall/Die): a hop
+away (12, 10) lifted 2 u -> HitWater (again while in it: added): hit loop in the air; landed -> jump_end a tick -> hit_end 36 skidding at the
+saved velocity (the game: y = ground + 1 + AIRBORNE each tick); at its end vel x 0.6, grounded, wait -> RecoverWater (roll x 0.99 until < 1)
+-> back to Attack (the stack: setNext(Attack) is dropped by the `return true`, Recover pops, then what was under). A wall while hit
+(isHitWallInBound) -> HitWall: crash 5 with ENM_WALLHIT (+ _O); 60 ticks past the clip: dead with UNK20000 (no drop roll) and genRandomItem ->
+genEventCoin in the crash pose: THREE coins fanned -60/0/+60 deg 100 u out, (dir 4, rand(8, 16), dir 4). A stomp: the base's Die (down 14,
+DISAP_A_W after a crash else A + B, scale 1.5). TSamboFlower: flower.bmd + flower_orange.bmt; wait (bud loop) / hit (opening 30) / fwait (open
+loop); SPRAYED on a closed one -> bloom (KAFUN_OW, hit, FLOWER_OPEN); hit's end -> fwait; a Pokey's flower stays open (unk160 false; the stage's
+coin-unit flowers close after 300 and pay a coin ring -- not here); hide = no collision, not drawn.
+**Materials** (bmd_mat_dump.py): `_mat_head` x4 (sambo; shared registers): stage 0 (TEXC toon, RASC, KONST 5/8, C0 (150, 150, 180)) SUBHALF x1,
+stage 1 (CPREV, RASC1 spec, KONST 1/2, TEXC K_sambo_orange) SUBHALF x1 = TEX + mix(s0, spec, 1/2) - 1/2 -> EnemyToon form 4; `_flower` /
+`_mat_flower` / `_mat_leaf1`: stage 0 (toon, RASC, 3/4, C0 500 (leaf 350)) /2 saturates, stage 1 mix(spec, TEX, s0) = the texture; alpha TEXA x
+ALPHA0 x 4, test GEQUAL 128, cull NONE -> EnemyToonCutoutTwoSided. The standalone flower.bmd's K_name_dummy is swapped by the bmt for
+K_flower_orange (64x64: the sepal + the pink petal); the crown petal is K_Sflower_orange. **samboD.bmd carries no clips in the rip**: sambo_down /
+sambo_ydown (6 joints: Dhead ends 200 u out at y 6) are BAKED from the bck with bck_to_anim.py (one position / rotation / scale track per JNT1
+joint, 60 Hz keys, Rz*Ry*Rx -> quaternions) into Animation .tres the Pokey loads onto an AnimationPlayer it builds under ModelDead, the tracks
+re-pointed at its skeleton. The live glb's copies of those clips (mapped onto the wrong joints by the exporter) are never played.
+
+**The port.** `SmsHanaSambo` / `SmsSamboHead : SmsSmallEnemy` with the nerves above (ids from NerveSpecies), the head actor's lists in a
+HitCheckMario override (the base's tests for the stalk, then Mario's attack cylinder on the head's damage cylinder -> Kill / waterDamage, the head's
+attack cylinder on his damage cylinder -> ATTACK), SmsSprayedByWater deciding by the drop's 50 x 80 cylinder on the head's (the HeadShape sphere
+follows jnt_head so the drops' ray meets it), the root pin in ApplyLook, the dead stack riding the live model's frame. The head's roll =
+`SmsBoneRoll` on 'jnt_body' (the game's post-multiplied turn about up x velocity, in the joint's own frame) set every physics frame, 0 outside
+Attack / HitWater / Recover. `SmsSamboFlower : Node3D` -- NO body: a shown bud registers itself and SmsWaterDrops asks `ZoneAt(drop)` (the game's
+checkWater cylinder test) beside the hidden-coin zones; a body was a floor to the ground rays (the Pokey re-buried itself 1.6 m up on its own bud)
+and the hose's ray alike. Knobs grouped: Deviations (StartBuried, on: a placed one starts buried instead of standing and sinking at the load as the
+game does) / The flower and the dead stack (FlowerScene, DeadDownClip, DeadYdownClip; the head: FlowerScene, LeafScene, EventCoinScene = his
+yellow_coin.tscn) / Effects and sounds (AppearFx, HideFx, PollenWaitFx, PollenAttackFx, AttackSound; the head: AppearFx, HideFx, WallHitFx,
+WetDeathFx) -- all EMPTY until the jpa pass. DropTable unset (the game's generateItem drops nothing; set StuDrops.tres to change that).
+**BASE FIX (SmsSmallEnemy.ApplyLook):** the heading (mRotation.y, a WORLD yaw) was written as the model's LOCAL basis while the body node kept its
+placed / launched rotation -- a body placed at 180 degrees faced +Z while its walk, hits and lists went -Z (the Pokey leaned AWAY from Mario in the
+drive; every placed-with-a-rotation or launched body since 125 faced 2 x its yaw). The model's world basis is set now. Regression: drive 128
+32/32, drive 125 84/85 (H11 = the known arena miss, failed on main's control too; F5 passes now).
+**DEVIATIONS / NOT PORTED (logged):** StartBuried; a Pokey's re-shown bud takes the hose (the game's initFlower leaves its collision off after a
+hide -- a slip); a Freeze whose 4-frame start ends with no water left ends (the game holds the pose until the next drop); the particles and the
+sounds (slots); the coin units; Yoshi's eat / the juice; the crash wait = the Stu's 60 ticks (TSmallEnemyManager::unk5C).
+
+**Drive 129** (`npc82/enemy128/patch_smoke129.py`, spliced into Mario.cs, SMS_YCAM_SMOKE=1; 36/36 on a 20 x 70 m platform the drive builds 80 m
+over his level -- nothing of the level up there): P1 buried + the bud + the materials; P1b stays buried at 20 m; P2 Appear at 11 m; P3 the rise 77
+frames -> Wait; P4 Attack past the interval; P5 the lean loop; P6 the head hits Mario 3.3 m out (health -1, the lean's lowest head 1.09 m over the
+base at 3.53 m); P7 the attack ends; P8 the REAL hose from 7.2 m (outside AttackDist, the squat aim with the stick up) -> Freeze; P8b the hit loop;
+P9 back to Wait; P10 a real fall on the head -> Die with the dead stack and sambo_down, Mario bounced; P11 4 puffs at 35 frames; Q1 StartBuried off =
+the sink at birth; Q2 buried with the bud at the ground; Q3 re-rise at 3 m; Q4 Hide at 32 m; Q5 near the bud = near the Pokey; Q6 the real hose on a
+free bud -> flower_hit; Q7 -> fwait; H1 the head buried (Mario behind: out of the cone); H2 Appear in sight; H3 three leaves at tick 20; H4 ->
+Attack; H5 the hop at tick 361 (300 + the wait's end) toward Mario; H6 lands 4.08 m on, roll 30 deg; H7 contact: -1 HP + Freeze; H8 the stomp ->
+Die; H9 the puff; W1 the hose knocks it away (12, 10); W2 hit_end; W3 the skid 11.2 m -> Recover; W4 -> Attack; W5 the wall crash; W6 three coins
+at 33 frames. **GPU capture** (cap_sambo.gd: the Pokey standing / leaning / dead, the head, a bud and a bloom, a Cataquack; axis markers): the
+orange stack with the eyes toward its heading, the pink crown, the lean to the ground toward the camera, the four pieces, the four puffs; the bud
+and the open bloom over the leaves. Build 0 errors, boot ALL OK.
+### 130 -- the Bob-omb (TBombHei) on the walker base (feature/enemy-pokey-cataquack, `1778a42`)
+
+**Files:** NEW `assets/Sms/Enemy/Bomb/` -- `SmsBombHei.cs` + `BombHei.tscn`, `BombBody.gdshader`, the materials `BombBody` / `BombLed` / `BombLeg` /
+`BombLegEnv` / `BombFragment` .tres; `models/Eniemes/Bomb/` (NejiBomb.glb = nejibomb_model1.bmd with its six clips, NejiBombDown.glb =
+downnejibomb_model1.bmd with downnejibomb_down1, from his rip (delfinoBoss); the disc textures Q_nejibomb (the face), Q_stop_nejibomb (the dizzy
+face), Q_nejibomb_txanm1 / 2 / 3 (the LED digits 1 / 2 / 3), Q_nejibomb_kankyo (the sphere map), the glb's own png; .imports with the materials
+swapped by name and the pngs pinned: patch_import130.py). Sources: doldecomp/sms src/Enemy/bombhei.cpp + include/Enemy/BombHei.hpp, the shipped
+/enemy/bombhei.prm, the bombhei archive (delfinoBoss / pinnaBeach1 / sirena2 .szs: bmd + bck + the two btp), btp_dump.py for the texture patterns.
+
+**The game** (per tick): Generate (the default; nejibomb_fling1 looping = the falling pose, the stop btp held at frame 0 = the normal face; landed ->
+nejibomb_land1 44 -> Attack) -> Attack (nejibomb_run1, the goal Mario, walkBehavior(2, 1.0) for ever: march 2 u/tick = 3.2 m/s, turn 4 -- no sight
+test, no give-up; the wind-up ZENMAI every tick). attackToMario sends NOTHING outside the explosion and isHitValid takes only Yoshi's eat: a walking
+Bob-omb neither hurts on touch nor dies to a stomp. The fuse (moveObject, every tick outside Thrown / Explosion / Generate): past BombTime (1000 =
+8.3 s) the doused flag drops and WalkExplosion is pushed unless it sits in WaitExplosion: nejibomb_run_down1 (119) with the count btp (the LED
+`_led1` material shows txanm3 / 2 / 1 for 40 frames each: 3-2-1), walking at 0.6 x, BOMBHEI_COUNT every 40 btp frames, BOMB_LIMIT bound to the
+body joint; at the clip's end -> Explosion. Water (behaveToWater while on run1 / land1 with the hit point gone, cooldown 20) -> WaitExplosion:
+nejibomb_stop_down1 (179), doused: the clip held at frame 60 (it sits), the stop btp to frame 1 at frame 10 (the blue dizzy face); the fuse keeps
+counting and when it runs out the clip runs on with the count btp, and at its end past 150 ticks -> Explosion. Explosion: downnejibomb_model1 (the
+pieces) at a random yaw, downnejibomb_down1 (80), camera shake + rumble; the attack cylinder grows x 1.2 a tick to BombRange x scale / AttackRadius
+= 200 / 60 = 3.33 (a 200 x 467 u blast = 2.7 m round, 6.3 m tall); Mario in it -> HIT_MESSAGE_BURN (dmgfire: 1 HP, FIRE_DOWN); frame 2 of the
+clip -> TEffectExplosion at the body's scale; at the clip's end dead with no drops (setAfterDeadEffect empty, genRandomItem never; a coin only
+for a bomb Mario carried). isCollidMove with mSerialBomb: a Bob-omb whose hit cylinder meets an exploding one goes off too. PickUp / Thrown:
+behaveToTaken / behaveToRelease -- Mario carries a doused or counting bomb (ThrownRateXZ 3 x his throw power, VY 22, gravity 0.3, the collision
+back at tick 120, the blast on landing). Water surface / sand columns, forceKill on death planes, the cannon (ShootVelocity): stage things.
+**Materials** (bmd_mat_dump.py): no toon -- `_body1` TEX x COLOR0 + COLOR1 (the glint); `_led1` unlit TEX + Q_nejibomb_kankyo through a NRM texgen
+(a sphere map by the view-space normal: the gloss on the black ball); `_rleg1(2)` TEX x COLOR0 + the sphere map; `_rleg1` / `_rleg1(3)` TEX x
+COLOR0; the pieces `_mat3` / `_mat5` matColor BLACK x the light (the glb merged the bmd's eight into two) -> BombBody.gdshader modes 0-5 on
+enemy_light. The btp is the texture swap: `SetTextures(body, led)` on per-instance copies of `_body1` / `_led1` (DressBody), the count by the clip's
+frame (CountFace), the stop face at frame 10 of stop_down1.
+
+**The port** (`SmsBombHei : SmsSmallEnemy`): the five nerves above (Generate / Attack / WalkExplosion / WaitExplosion / Explosion); the fuse in
+MoveObjectPre; HitCheckMario during the blast = the attack cylinder x the growth on Mario's damage cylinder -> TakeDamage(Fire); IsHitValid false;
+AttackToMario only in the blast; BehaveToWater -> WaitExplosion; the chain from the exploding one's side every fourth tick (the game's actor-pair
+test on the damage cylinders: ChainNeighbours) and from a body contact (IsCollidMove); Kill -> Explosion. ModelDead (the pieces glb, its own
+AnimationPlayer) rides the live model's frame; SmsCameraShake.Current.Start(Damage) at the blast. Knobs grouped: Deviations (FuseScale x BombTime,
+BlastScale x BombRange, ChainReaction = mSerialBomb) / Effects and sounds (ExplosionFxScene -- default EnemyDisap.tscn scaled to the blast radius,
+a PLACEHOLDER until the jpa pass; FuseFxScene = BOMB_LIMIT; WindUpSound, CountSound, ExplosionSound).
+**DEVIATIONS / NOT PORTED (logged):** Mario carrying and throwing a bomb (behaveToTaken / Thrown) -- Mario's take system holds RigidBody3D objects
+only; an enemy body needs its own hold path (130b); the blast's visual (the placeholder puff); the particles and sounds (slots); the camera shake
+mode (the port's Damage shake for the game's mode 6); the rumble; a short FuseScale does not restart the count on top of itself (the game's 1000-tick
+fuse can never run out again inside the 238-tick count, so the game's re-push is unreachable there); the stage effects (water / sand columns),
+death planes, the cannon, Yoshi.
+
+**Drive 130** (`npc82/enemy128/patch_smoke130.py`, spliced into Mario.cs, SMS_YCAM_SMOKE=1; 16/16 on the 80 m platform; FuseScale 0.3 / 0.15 on the
+drive's bombs): B1 born in Generate (fling -> land1 a tick later), the face textures 0/0, the five materials on BombBody.gdshader; B2 land1; B3 ->
+Attack on run1 after 43 frames; B4 after the 180-degree turn (4 deg a tick) 1.61 m in 30 frames closing on Mario; B5 touching a walking one: no
+damage; B6 the fuse (300 ticks) -> WalkExplosion with the LED on 3 at 0.6 x; B7 the count 3 -> 2 -> 1 over 118 frames walking 3.77 m -> Explosion;
+B8 the pieces model on downnejibomb_down1, the live one hidden, the blast scene at frame 2; B9 Mario at 4.5 m: no burn; B10 the growth x 1.2 a tick
+to 3.58 (past 3.33), the clip ends at 79 frames -> dead; X1 Mario 1.5 m from a blast: -1 HP, hurt, the Fire down kind (FIRE_DOWN); W1 the REAL
+hose on a walking one -> WaitExplosion doused on stop_down1, hp 0; W2 held at frame 60 with the stop face 2/2; W3 the fuse runs out while it sits ->
+the flag drops, the LED counts again (3); W4 the clip's end past 150 ticks -> Explosion after 118 frames; C1 a neighbour in the hit cylinder of an
+exploding one goes off (2 frames). **GPU capture** (cap_bomb.gd): the black ball with the red LED face and the red key, the LED showing 3 then 1,
+the doused one blue with the green crossed eyes and the sphere-map gloss, the blast puff and the dark pieces flying. Build 0 errors, boot ALL OK.
+### 130b -- the Bob-omb carried and thrown; the blast effect (TEffectExplosion) (feature/enemy-pokey-cataquack, `d968bc9`)
+
+**Files:** `assets/Sms/Enemy/SmsSmallEnemy.cs` (the TTakeActor side: `SmsCanBeTaken` / `SmsTaken` / `SmsReleased` / `BehaveToTaken` /
+`BehaveToRelease` / `RideHolder`, `Carried`, `TakeHitRadiusUnits` / `HeightUnits`; the held branch of the physics step; a body dying or reset in
+his hands empties them), NEW `assets/Sms/Enemy/SmsEnemyHoldProxy.cs` (the frozen RigidBody3D stand-in his hold carries for a small enemy, Kind
+Enemy; `OnAttached` = HIT_MESSAGE_TAKE, `Release(put)` = THROWN / PUT, `OnBodyGone`), `assets/Mario.cs` (+67: `SmsFindTakeEnemy` in the take search
+behind `!SmsIsJumpingStatus()`, the proxy's attach in `Anim_AttachPickup`, its release in `SmsReleaseHeld`, `SmsHeldGone`), `assets/Sms/Enemy/Bomb/
+SmsBombHei.cs` (PickUp / Thrown nerves, the hooks, `GenEventCoin` + the 20-a-stage budget, `MaxCarryCoins`, `EventCoinScene`, the fx defaults), NEW
+`BombExplosion.tscn`, `BombFuse.tscn`, `BombFireball.gdshader`, `SmsBombFireball.cs`, `tex/` (P_magmared2 + P_sandnoise2mm from the bmd's TEX1,
+kemuball3 x3 / osenkake / shwave1 / glow1 bakes from the jpa, pinned), `assets/Sms/Fx/SmsFxBurst.cs` (`ISmsFxBurstPart`; the sub-emitter tail),
+NEW `assets/Sms/Fx/JpaBillboardKeyedAdd.gdshader`. Tools: `tools/projectshine/brk_dump.py` (TRK1 reader + hermite), `npc82/enemy128/gen_fx_bomb.py`,
+`bck_track.py`, `pull_explosion.py` / `pull_particle.py` / `find_popo.py` (the ISO: scene/explosion in delfinoBoss.szs, ms_popo_bomb_b +
+ms_bomb_limit in /data/particle.szs), `patch_import130b.py`, `patch_smoke130b.py`, `cap_bomb130b.gd` / `cap_wave130b.gd`.
+
+**The game.** TMario::hitPickUpEnemy (MarioCheckCol.cpp 211): a small enemy whose unk164 is set (TBombHei: the DOUSED flag, raised in WaitExplosion's
+first tick) is offered to hitWantToTake on contact unless he is JUMPING (every airborne status; a fruit may be taken from a dive) -> canTake /
+isTakeSituation -> MARIO_STATUS_TAKE. TSmallEnemy::receiveMessage(TAKE): HIT_FILTER_NO_COLLISION, mHolder = Mario, behaveToTaken -> TBombHei pushes
+PickUp (unk1A4 = 1: a coin at the end); TSpineEnemy::calcRootMatrix puts the body at the holder's taking matrix; the PickUp nerve does nothing (the
+sit clip stays frozen, the dizzy face on) and returns at once if the bomb is not doused when it starts. moveObject's fuse is NOT excluded in PickUp:
+run out in his hands -> unk164 = 0 and WalkExplosion pushed over PickUp (the legs run and the LED counts 3-2-1 in his hands) -> Explosion there:
+getHolder() == Mario -> sendAttackMsgToMario (the COMMON attack, 1 HP + the knockdown -- not the blast's BURN), and the blast's end clears mHolder
+with the body dead (his ensureTakeSituation empties his hands). THROWN / PUT (isThrowStart always PITCHES an enemy -- actor type bit 0x10000000):
+mHolder = null, behaveToRelease (only doused or counting; never from the Explosion; not twice) pushes Thrown: velocity (ThrownRateXZ 3 x
+SMS_GetMarioThrowPower 2.8 x sin / cos of SMS_GetMarioAngleY, ThrownVY 22) = (8.4, 22, 8.4) u/tick, mPosition.y += 2, AIRBORNE, getGravityY =
+ThrownGravityY 0.3 a tick (apex 807 u = 10.8 m, ~17 m of range); landed -> genEventCoin (TBombHeiManager::canMakeDeadCoin: 20 a stage; the coin at
+the point flying toward Mario at 20 u/tick, 20 up) and Explosion pushed. TEffectExplosion::generate(mPosition, mScaling) (effectObj.cpp 576):
+10_bomb.bmd at a random yaw with bck + brk + btk "10_bomb" (59 frames at the 60 fps anim rate), dead at the clip's end, plus emit(ms_bomb_smoke /
+ms_bomb_bomb / ms_bomb_hahen / PARTICLE_MS_POPO_BOMB_B) at the point, setGlobalScale(scale.x). The fireball: a sphere r 200 u, one material: K0 +
+TEX0 x C0 (the magma at scale 1) + TEX1 x C1 (the magma at scale 2, through texture matrices centred at 0.5), the alpha chain (1-K0a) TEX0A ->
+TEX1A - K0a -> TEX2A - (1 - APREV) K0a with the sand noise's alpha, blend NONE, z write, cull NONE, alpha compare GEQUAL 16 -- so the sphere is
+drawn where noiseA >= K0a^2 + 16/255; the brk: K0 rgb 255 -> 207 (f12) -> 63 (f24) -> 0 (f42) = the white flash, K0 a 0 until f12 -> 255 at f60 =
+the dissolve, C0 (254,254,254) -> (211,187,121) f24 -> (178,92,87) f48 -> 30, C1 white -> (201,201,159) f18 -> (220,192,92) f36 -> 11; the bck:
+scale 0.16 -> 1.0 by f20 -> 1.2 at f58; the btk: Ty 0 -> 1 (both magma layers), 0 -> 0.25 (the noise) over 60 frames. The emitters (jpa_dump.py):
+one additive glow ball (100 u x (1 +- 0.5), 38 +- 15 u/f off a sphere r 20, airResist 0.93, life 50, prm (255,231,207) -> red / env (255,159,72) ->
+black over 16 frames, a sine flicker on the alpha); 30 grey smoke puffs (150 u x (1 +- 0.35) scaled 0.85 -> 1.75, off a ring r 18 u at 23 u/f
+outward, Drag 0.88 fading in over 23 %, Gravity 6 u/f^2 UP from 25 % fading in over 49 %, life 75: the drag's exponential kills the lift -- 4.7 m
+out, 0.28 m up: a low spreading ring); 5 dark scraps (osenkake, 100 u x (1 +- 0.35) shrinking to 0.3 from 37.5 %, 12 up the axis + 20 in a cone
+(spread 0.375), gravity 0.4 u/f^2, airResist 0.99, life 100, two random colour keys, each trailing a 95 u grey puff every 6 frames from 12.5 %);
+one shockwave (shwave1 star, a camera billboard 100 -> 900 u over 16 frames, orange-cream, alpha out from 25 %) with 21 cyan-white glow sparks at
+its birth (50 u shrinking to 0, 35 +- 50 % u/f within 25 u, the parent's Drag 0.93). ms_bomb_limit (the fuse): a grey puff every second frame
+(rateStep 1) from 60 u above the body joint, 2.8 u/f up (+- 20 %), Gravity 0.05 UP from 25 %, 45 u growing to 2.2 x, life 40, alpha 0.9 out from
+62.5 %, bound to the body (not global coords: the puffs ride the bomb).
+
+**The port.** The base: `SmsTaken` (the hit filter = layer 1 off, the velocity cleared, BehaveToTaken), `SmsReleased` (BehaveToRelease, the layer back
+unless dead), the physics step with a holder runs the ticks (the spine, the fuse) and `RideHolder` places the origin on the proxy (= his carry
+socket, its yaw his facing), no MoveAndSlide; `Dead` / `Reset` with a holder -> `proxy.OnBodyGone` -> `Mario.SmsHeldGone` (hands empty, no
+message). Mario: the enemy branch of the take search after the NPC's (the same cylinders: his HoldRadius 80 + the body's DamageRadius x scale, the
++-60 deg cone, his height), skipped in the jump / dive states; `_smsTakeData` from the proxy's SmsTakeable (Kind Enemy -> SmsThrowOrPut pitches at
+any speed); the release hands the proxy THROWN / PUT and returns before the RigidBody flight. The Bob-omb: `SmsCanBeTaken` = doused, alive, not held,
+not exploding, the filter on; PickUp / Thrown nerves as the game's (the throw yaw and power read at the release for the nerve's first tick; the
+fuse excluded in Thrown); the Explosion's time 0 sends the common attack while held; the blast's cylinder test and the chain need the filter on;
+`GravityY` = ThrownGravityY while thrown; `GenEventCoin` through `DropSpawner.SpawnItem(EventCoinScene, ...)` with the game's velocity, the budget a
+static per current scene. The blast: `BombExplosion.tscn` = SmsFxBurst + `Fireball` (MeshInstance3D SphereMesh r 2.687 m, `SmsBombFireball`:
+ISmsFxBurstPart -- Restart = the random yaw + frame 0; _Process advances 60 frames a second, sets the shader's k0 / c0 / c1 / scroll0-2 from the
+nine Curves sampled off the brk / bck a frame, the node's scale from the bck, Finished at frame 58 (curAnmEndsNext)) + Glow (JpaBillboardKeyedAdd:
+the prm / env tables as GradientTexture1Ds read by INSTANCE_CUSTOM.y, the particle's life phase) + Smoke (the 125c sim: radial + lift curves) +
+Scraps (align_y JpaDirBillboard, gravity, a Godot sub-emitter `Trail` child at 5 Hz) + Shockwave (the scale curve 1 -> 9) + Sparks; spawned at
+the body with the basis = bodyScale x BlastScale (the game: mScaling; the knob folded in so the look follows the reach). `BombFuse.tscn` (a Node3D
+with the emitter 60 u up, local coords) is the FuseFxScene default. SmsFxBurst: an ISmsFxBurstPart child is restarted and counted; `Done` waits a
+sub-emitter target's lifetime before QueueFree (the trail puffs are not cut).
+**DEVIATIONS (logged):** the scraps' two-colour random pick is their mid colour and their tumble is not drawn; the glow ball's keyed colours run by
+the mean life (40 frames) and its sine flicker is baked into the alpha ramp (a fixed phase); the sparks' Random field is Godot turbulence; the
+fireball is a Godot sphere of the bmd's radius and UV layout (the bmd's is 160 triangles); BlastScale also scales the visual (the game's BombRange
+is the hit cylinder only); the sounds (ZENMAI, COUNT, the blast's) and the rumble stay slots; the camera shake is the port's Damage kind. The game's
+Thrown nerve re-clears NO_COLLISION at tick 120 after receiveMessage already did at the release -- the port turns the layer on at the release.
+Mario's `Held`-named property was avoided (`Carried`): SmsDangoHamukuri has a `Held` of its own.
+
+**Drive 130b** (`patch_smoke130b.py`, SMS_YCAM_SMOKE=1; 15/15 on the 80 m platform; everything through the real paths -- B held on contact, the real
+hose, B on the putDown state, the real cylinder): T1 B against a WALKING bomb takes nothing (SmsCanBeTaken false, no raise); T2 hosed -> doused and
+sitting -> takeable; T3 B in the AIR beside it (a standing jump) takes nothing; T4 B on the ground -> the raise with an SmsEnemyHoldProxy pending;
+T5 the attach: PickUp, the layer off, the origin 0.11 m from the carry socket (one frame of the hand's motion), the sit clip frozen at 60 with the
+dizzy face, unk1A4; T6 B standing still -> putDown with the throw queued on ma_throw (PITCHING, never PUT); T7 Thrown at vxz 8.40 u/tick 0.0 deg
+off his facing, vy 21.4 (two ticks of 0.3 off 22), airborne, the layer on, his hands empty; T8 20 frames on: dvy 12.00, the XZ speed kept, 8.2 m
+up; T9 landed 16.7 m along at the platform's height after ~75 frames: coins +1, Explosion; T10 the burst at the body: 6 parts running, the fireball
+playing at scale 0.21; T11 24 frames later: scale 1.054 at f24.9, k0 rgb 0.235, k0 a 0.265 (the brk at f24: 63 / 62 of 255); T12 the fireball done,
+the burst freed 148 frames after the blast (the scraps' 100 + the trail's 50), no proxy, hands empty. H1 bomb 2 (FuseScale 0.5) hosed, taken, held:
+the fuse runs out in his hands -> not doused, nejibomb_run_down1 with the LED on 3, still 0.00 m from the socket, the BombFuse smoke bound and
+emitting; H2 the Explosion in his hands: health 8 -> 7, hurt, the Knockdown kind (not Fire); H3 the body dead -> hands empty, no proxy, no second
+hit. **Regressions**: drive 130 16/16, drive 128 32/32 (the base's held branch is behind `_holder != null`). **GPU capture** (cap_bomb130b.gd, a
+Kill on a placed bomb): the pieces fly first; frame 0 a white sphere behind the stacking smoke; f8 a white-pink dome with the shockwave's cream rays
+peeking around it (cap_wave130b.gd isolates them); f17 the cream-yellow fireball with red magma blotches, grey puffs at its base, cyan sparks, black
+scraps high up; f30-35 red / yellow with holes, the smoke ring spread; f56 the last red bits, the smoke low and wide (the lower halves under the
+floor); the fuse: a dark grey column off the key. Build 0 errors, boot ALL OK.
+### 130c -- the carried Bob-omb rides the hand; the blast's emit counts (feature/enemy-pokey-cataquack, `c0127c5`)
+
+**What Jaysonn saw:** "carrying the bomb looks off". Measured on his PC (the drive's capture mode, SMS_F131_CAP=1: Mario holding it at rest, from the
+front / side / back, and running): the body was placed from ITS OWN physics step off the proxy Mario had set in HIS step, so whenever the enemy
+node ran before Mario's the bomb showed last frame's hand -- 0.21-0.28 m behind the glove at a run, 1.58 m in a side-flip frame -- while a fruit,
+placed in Mario's own step, has no such trail. **Fix:** Mario's step pushes the hand point to the body the moment he places the proxy
+(`SmsEnemyHoldProxy.RideNow` -> `SmsSmallEnemy.SmsRideHand`); the body's own step keeps the validity check and re-applies the same point. Drive
+T5b: 22 running frames, the bomb within 0.0 mm of the proxy (the fruit's hold point) on every one. **Knob:** `CarryByBall` on the Bob-omb (off = the
+game: the origin, its feet, AT the taking matrix -- TSpineEnemy::calcRootMatrix / TMario::getTakingMtx = jnt_hand_R, so the 1.75 m bomb stands up
+from his raised hand) -- on puts the ball's centre (the body joint, 90.5 u) in his hand like a fruit, the feet at his waist. The game applies the
+hand's full ROTATION too (the fruit gets the socket's); the bomb stays upright with his facing (the Godot rig's socket frame is his, not the SMS
+joint's). The two capture artifacts worth knowing: the windowed harness renders at ~8 fps, so a socket read at the top of a physics step alternates
+between the carry pose and a physics-time pose (0.5 m apart) -- it is the READ, not the hand (the fruit shows the same numbers and renders fine);
+read the body against the PROXY, not the socket.
+
+**The blast's counts -- the engine's rule, misread since pass 125c:** JPAEmitter.cpp 645 (calcCreateParticle): with the FixedInterval flag the count
+per emit frame is the VOLUME'S DIVISION -- a Circle / Line emits `div`; a Sphere emits 2 + the layers (4, 8, 12...: div 1 = 6, 2 = 18, 3 = 38); the
+dumped "rate" (mChildSpawnRate) is used ONLY without the flag (accumulated per emit frame, one at least on the first). Emit frames come every
+(interval + 1) frames while frame < maxFrame (0 = for ever); mStartFrame delays the whole emitter (checkStartFrame on its own counter), the
+maxFrame counting from there. The Bob-omb: ms_bomb_bomb Sphere div 3 = 38 glow balls (shipped as ONE -- the "flash" was invisible; now the orange
+additive fireball cloud the game has), ms_bomb_smoke 14 (not 30), ms_bomb_hahen 3 (not 5). STILL WRONG ON MAIN (a follow-up): EnemyDisap 15 (shipped
+30), EnemyDisapWet 18 (30), EnemyWallHit's puff 12 (ONE), TrampleDust ms_fumi_a 10 (12); the gate / select passes' FixedInterval emitters unchecked.
+Godot rewrites a hand-made scene uid that is not 13 base-36 chars (BombExplosion / BombFuse got Godot's; the 131 scenes use 13-char ids).
+
+### 131 -- the Cataquack's and the Pokey's particles (feature/enemy-pokey-cataquack, `a6b4dd3`)
+
+**Files:** NEW `assets/Sms/Enemy/Fx131/` -- PoiDead / PoiSand / JumpEd / PoiDizzy / PoiZzz / SmbPollen / SmbPollenAttack / SmbAppear / SmbHide .tscn,
+`tex/` (mizutama1_poi, sand1_poi, shwave1_jumped, hoshi_poi, zzz_poi, glow1_pollen, rock_atlas -- from the jpa TEX1 via jpa_bake, pinned by
+patch_import131.py); `SmsPoihana.cs` (DeadFxScene slot + FxDir defaults; SetDeadAnm emits POI_DEAD then the dust; BoundFx at the body ORIGIN -- the
+jpa's own 120 / 100 u lift is in the scenes, 128's HeadHeight/2 guess dropped), `Sambo/SmsHanaSambo.cs` + `SmsSamboHead.cs` (Fx131 defaults for
+Appear / Hide / the two pollens), `SmsSamboFlower.cs` (BloomFxScene = SmbPollen), `Fx/SmsFxBurst.cs` (a child's `metadata/sms_delay_frames` = the
+emitter's start frame). Tools: npc82/enemy128/gen_fx_131.py, pull_particle131.py, cap_fx131.gd. Sources: poihana.cpp 297-330 / 411-440,
+hanasambo.cpp 510 / 764 / 812 / 904 / 1326 / 1414, System/Particles.hpp ids, /data/particle.szs (ms_poi_*, ms_smb_*, ms_jump_ed_*), the JPA
+engine (JPAEmitter.cpp calcCreateParticle, JPAField.cpp Vortex).
+
+**The game, per emitter** (jpa_dump.py; counts by the FixedInterval rule above): POI_DEAD at setDeadAnm = 24 water drops (Sphere div 1: 6 a frame
+for 4) off a sphere r 30 u, 7 u/f off the axis + 18 up in a 27 deg cone x (1 +- 0.4), gravity 0.3, airResist 0.98, life 50 +- 50 %, 40 u mizutama
+x (1 +- 0.6) with a 10-frame X/Y ping-pong wobble, alpha test >= 115, one of four colour pairs a drop (blue / cream / teal / yellow), a 10-frame
+ghost child a frame; POI_SAND (sand: the flip's frame 18, the getup's 34, the death) = 30 sand puffs (Circle div 30) off a ring r 50, 11 out + 20
+up (9 deg), gravity 0.8, life 36, 87 x 110 u 0.9 -> 1 -> 1.8, sand1 lerp((231,175,132) -> (231,211,190)), + JUMP_ED_A; JUMP_ED_A = ONE flat
+Direction quad (shwave1 lerp((111,231,255) -> white)) 212 u scaled 0.6 -> 1 -> 3.5 over 14 frames, alpha 0.25 -> 1 -> 0 from 37.5 %; JUMP_ED_B = 14
+kemuball3 puffs (Circle div 14) off a ring r 30 at 18 u/f, airResist 0.92, 0.125 u/f^2 UP, life 30, 100 u 0.75 -> 1 -> 1.7, alpha 0.8 out from
+12.5 %, lerp((26,26,2) -> (255,255,242)) = tex/kemuball3.png; POI_KIZETSU (bound, bck 3 / 4) = 3 hoshi stars every 21 frames on a ring r 56..90 u
+120 u up, the Vortex field (JPAVortexField::affect: a tangential velocity (1 - t) mag + t rndm about the emitter's up, t = min(r, outer)^2 /
+outer^2 with outer = the dumped pos.z) at 6 u/f -> they ORBIT the head (a turn in 76 frames), life 40, 60 u 1.5 -> 1, a 16-frame colour cycle
+yellow / pink / mint / white; POI_ZZZ (bound, bck 5) = one Z every 83 frames (rate 0.012) from 100 u up, 1.7 up + 3 out, accel 0.075 along its
+way, the Vortex 3..6 (outer 50 u) -- a rising widening spiral, life 60, 15 -> 50 -> 100 u, drawParent FALSE: only its CHILDREN show, one every 16
+frames at the parent's point at 7.5 % of its speed, life 40, alpha out, zzz lerp(pink -> blue in 3 frames -> white); SMB_KAFUN_OW / OA = 12 / 16
+glow motes off a sphere r 20 u, 8 / 13 u/f along the emitter's up in a 45 / 63 deg cone x (1 +- 0.5), airResist 0.95, gravity 0.01 down / 0.02 UP,
+a 2 u/f random kick every 5 frames, life 60 +- 60 %, 25 u 0.7 -> 1 -> 0.3, prm pink (231,38,120) .. orange (207,111,39) random a mote over env
+white, a texture flip radgrad -> glow1 -> hamonring2 over the life; the emitter frame = the pollen joint ('head') x RotZ(-90), lifted 200 u in
+Wait, pushed 200 u along the facing in Attack; SMB_AP_ROCK = rate 4 every 3rd frame for 5 frames (8) off a ring r 25..50, 6 out + 28 up x (1 +-
+0.375), gravity 1.3, life 50, 50 u gone over the last 15 %, tumbling 0.08 half-turns a frame +- 50 %, rock2 / rock3 random, alpha test > 220, z
+write, lerp((85,78,68) -> (207,207,163)); SMB_AP_SMOKE = 2 a frame for 15 (30) off a ring r 30 at 18 u/f, airResist 0.92, 0.125 UP, life 26, 125 u
+0.75 -> 1 -> 1.7; SMB_HD_ROCK = START FRAME 40, 0.3 a frame for 30 (9), 7 out + 25 up; SMB_HD_SMOKE = start 45, 0.7 a frame for 30 (21), ring r 35,
+7 u/f, airResist 0.96, life 30, 137 u 0.75 -> 1 -> 1.5. TSamboFlower::bloom emits KAFUN_OW at mPosition unrotated. The Pokey Head's appear / hide
+use the same ids.
+
+**The port:** SmsFxBurst scenes for the one-shots (the puffs' outward speed and lift as curves from the JPA sim, as 125c); PoiDizzy / PoiZzz are
+looping bound scenes (BoundFx children at the origin, scaled by the body scale): the Vortex = `orbit_velocity` about local Y through a
+CurveXYZTexture(0,1,0) (6 u/f at r 73 u = 0.785 turns a second x (1 +- 0.125)); PoiZzz = an undrawn parent emitter (no draw pass: rising,
+orbiting, accelerating) with a `sub_emitter` child at 3.75 Hz for the Zs; the rocks a 2-frame atlas with a random `anim_offset` (particles_anim
+h 2); SmbHide's two emitters carry `metadata/sms_delay_frames` 40 / 45 (SmsFxBurst starts them on a timer). The drives: 128 32/32, 129 36/36
+(H9 now counts EnemyDisap bursts alone -- the new appear / hide bursts come and go around the stomp), boot ALL OK.
+**DEVIATIONS (logged):** the drops' ghost children, the Zs' inherited birth size (they grow 0.6 -> 1.6 over their own life instead), the pollen's
+dot -> glow -> ring texture flip (one glow texture at the mid pink-orange), the stars' random colour phase (one shared 16-frame cycle), the
+dizzy stars' 3-every-21-frames cadence (a steady 9 a second), the sand's alpha flicker; PoiDead's children; Mario's fling effect on the Cataquack
+(PARTICLE_MS_DMG_B + MS_M_AMIATTACK, the ThrowFxScene slot) is NOT in -- Mario-side hit effects, a later pass. **GPU capture** (cap_fx131.gd, each
+scene alone at three ages, ref/131): the pastel drop splash; the sand cloud over its ring; the white landing puffs with the flat ring; three
+tinted stars circling at head height; two Zs rising; the pollen motes (pink-centred soft dots) rising / fanning; the rocks tumbling out of the
+smoke ring; the sink's delayed rocks and smoke at frame 60.

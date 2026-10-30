@@ -2105,6 +2105,8 @@ public partial class Mario : CharacterBody3D
 
             // optional: enforce local scale too (helps if anything else touches it)
             heldBody.Scale = Vector3.One;
+            if (heldBody is SmsEnemyHoldProxy smsHeldEnemy)
+                smsHeldEnemy.RideNow(); // the carried enemy goes to the hand in THIS step (pass 130c): its own step may have run first and shown last frame's hand
         }
         if (UseSmsPhysics)
         {
@@ -10495,6 +10497,8 @@ public partial class Mario : CharacterBody3D
         heldBody.Visible = true;
         if (heldBody is SmsNpcHoldProxy smsNpcProxy)
             smsNpcProxy.OnAttached(this); // the NPC's behaveToBeTaken_: in his hands from here (pass 83)
+        if (heldBody is SmsEnemyHoldProxy smsEnemyProxyAttach)
+            smsEnemyProxyAttach.OnAttached(this); // TSmallEnemy::receiveMessage(TAKE) -> behaveToTaken: the Bob-omb's PickUp nerve (pass 130b)
         GD.Print($"held post-attach gscale = {heldBody.GlobalTransform.Basis.Scale}");
         GD.Print($"held local scale = {heldBody.Scale}");
     }
@@ -16018,7 +16022,7 @@ public partial class Mario : CharacterBody3D
     /// (MarioMove.cpp 711): the vector normalised (a zero vector = straight up), mFaceAngle.y = matan(z, x) + 0x8000 -- he FACES BACK along the
     /// flight, at the thrower -- mForwardVel = -speed x |xz| (negative: he moves along the vector, backwards), mVel.y = speed x y. ANIM_THROWN
     /// loops until the second bounce (thrownDowning). Speed in units a tick; the sound (MA_HANEAGARI) is not ported.</summary>
-    public void SmsThrowMario(Vector3 dir, float speedUnitsPerTick, SmsNpc thrower)
+    public void SmsThrowMario(Vector3 dir, float speedUnitsPerTick, Node thrower)   // pass 128: any thrower (an NPC's TNpcThrow, the Cataquack's TNervePoihanaThrow)
     {
         if (stateOfMario == MarioState.dead || _smsGameOver)
             return;
@@ -17241,7 +17245,49 @@ public partial class Mario : CharacterBody3D
         SmsNpc bestNpc = SmsFindTakeNpc(feet, marioH, face, cosCone, ref bestD);
         if (bestNpc != null)
             best = SmsNpcHoldProxy.Create(bestNpc, this); // the frozen stand-in his RigidBody-typed hold carries; the NPC rides it (getTakingMtx)
+        // hitPickUpEnemy (MarioCheckCol.cpp 211): a small enemy whose species allows it now (TBombHei: unk164, doused) is offered to hitWantToTake on
+        // contact -- but NOT while he is JUMPING (MARIO_STATUS_FLAG_JUMPING: every airborne status, the dive included; a fruit may be taken from one).
+        // The same canTake / isTakeSituation geometry; the body's origin is its ground point, its cylinder the species' damage cylinder (pass 130b).
+        if (!SmsIsJumpingStatus())
+        {
+            SmsSmallEnemy bestEnemy = SmsFindTakeEnemy(feet, marioH, face, cosCone, ref bestD);
+            if (bestEnemy != null)
+                best = SmsEnemyHoldProxy.Create(bestEnemy, this); // the enemy's stand-in; the body rides it (TSpineEnemy::calcRootMatrix with mHolder)
+        }
         return best != null;
+    }
+
+    /// <summary>MARIO_STATUS_FLAG_JUMPING (0x800) in the port's states: the jumps and the dives (the statuses isTakeSituation lets a FRUIT be taken from).</summary>
+    private bool SmsIsJumpingStatus() => stateOfMario == MarioState.singleJump || stateOfMario == MarioState.doubleJump || stateOfMario == MarioState.tripleJump
+        || stateOfMario == MarioState.diving || stateOfMario == MarioState.singleJumpDive || stateOfMario == MarioState.doubleJumpDive || stateOfMario == MarioState.tripleJumpDive;
+
+    /// <summary>The takeable small enemy nearest his feet inside the isTakeSituation geometry (pass 130b), nearer than <paramref name="bestD"/> (updated).</summary>
+    private SmsSmallEnemy SmsFindTakeEnemy(Vector3 feet, float marioH, Vector3 face, float cosCone, ref float bestD)
+    {
+        SmsSmallEnemy bestEnemy = null;
+        foreach (Node n in GetTree().GetNodesInGroup("sms_enemy"))
+        {
+            if (n is not SmsSmallEnemy e || !IsInstanceValid(e) || !e.IsInsideTree() || e.IsDead || e.Carried || !e.SmsCanBeTaken())
+                continue;
+            Vector3 rel = e.GlobalPosition - feet;
+            float dxz = new Vector2(rel.X, rel.Z).Length();
+            float reach = SmsUnits.UnitsToMetres(SmsParams.Mario.HoldRadius + e.TakeHitRadiusUnits); // the pair: his standing attack radius + the body's damage radius
+            if (dxz > reach)
+                continue;
+            if (rel.Y + SmsUnits.UnitsToMetres(e.TakeHitHeightUnits) < 0f || rel.Y > marioH)
+                continue;
+            float dist = rel.Length();
+            if (dist > reach)
+                continue;
+            if (dxz > 1e-4f && new Vector3(rel.X, 0f, rel.Z).Normalized().Dot(face) < cosCone)
+                continue;
+            if (dist < bestD)
+            {
+                bestD = dist;
+                bestEnemy = e;
+            }
+        }
+        return bestEnemy;
     }
 
     /// <summary>The liftable NPC nearest his feet inside the isTakeSituation geometry, nearer than <paramref name="bestD"/> (updated).</summary>
@@ -17274,6 +17320,21 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>TTakeActor::ensureTakeSituation from the held side: is this body what he pends or holds.</summary>
     public bool SmsHoldsOrPends(Node body) => body != null && (heldBody == body || pendingPickup == body);
+
+    /// <summary>TTakeActor::ensureTakeSituation from HIS side (pass 130b): the thing in his hands is gone with no drop message (the Bob-omb blew up
+    /// there -- TNerveBombHeiExplosion's end sets mHolder = nullptr with the body dead; a pooled body's reset) -- mHeldObject = nullptr, the hands
+    /// empty, no throw, no put.</summary>
+    public void SmsHeldGone(RigidBody3D body)
+    {
+        if (body == null) return;
+        if (pendingPickup == body) { pendingPickup = null; _smsTakeAttached = false; }
+        if (heldBody != body) return;
+        heldBody = null;
+        _smsTakeAttached = false;
+        if (animTree != null && animTree.Active)
+            animTree.Set(CARRY_BLEND_PATH, 0.0f);
+        if (SmsDebugPrint) GD.Print("[SMS take] the held object is gone: the hands empty (ensureTakeSituation)");
+    }
 
     /// <summary>The body's half height off its first CollisionShape3D (his fruit are centred RigidBody3Ds; the game's object origin is its
     /// ground point), else half the game's hit height.</summary>
@@ -17472,6 +17533,14 @@ public partial class Mario : CharacterBody3D
             // TBaseNPC ignores THROWN and PUT: its ensureTakeSituation sees the hold end and releaseTaken_ launches it on its own numbers
             if (SmsDebugPrint) GD.Print($"[SMS take] {(put ? "PUT" : "THROWN")} the NPC {smsNpcProxy.Npc?.Name}: its own releaseTaken_ (ThrowSpeedXZ {SmsParams.Npc.ThrowSpeedXZ} / Y {SmsParams.Npc.ThrowSpeedY} a tick along my facing)");
             smsNpcProxy.Release();
+            return;
+        }
+        if (rb is SmsEnemyHoldProxy smsEnemyProxy)
+        {
+            // TSmallEnemy takes THROWN and PUT alike (receiveMessage 512): mHolder = null, behaveToRelease -- the Bob-omb's Thrown nerve flies it on its
+            // own numbers (ThrownRateXZ x my throw power along my facing, ThrownVY, ThrownGravityY), never SmsThrownFlight's (pass 130b)
+            if (SmsDebugPrint) GD.Print($"[SMS take] {(put ? "PUT" : "THROWN")} the enemy {smsEnemyProxy.Enemy?.Name}: its own behaveToRelease along my facing");
+            smsEnemyProxy.Release(put);
             return;
         }
         rb.TopLevel = false;

@@ -1,0 +1,14 @@
+[gd_resource type="ShaderMaterial" load_steps=4 format=3 uid="uid://csambobody129"]
+
+[ext_resource type="Shader" uid="uid://c8svah8pvfbcp" path="res://assets/Sms/Enemy/EnemyToon.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/Sambo/K_sambo_orange.png" id="2_body"]
+[ext_resource type="Texture2D" uid="uid://c7qc8aqne083g" path="res://assets/Sms/models/toon_2_4i.png" id="3_toon"]
+
+[resource]
+resource_name = "_mat_head (sambo / sambod / samboHead.bmd, the Pokey family's body, pass 129): stage 0 (TEXC toon, RASC, KONST 5/8, C0 (150, 150, 180)) SUBHALF x1, stage 1 (CPREV, RASC1, KONST 1/2, TEXC K_sambo_orange) SUBHALF x1 = TEX + mix(s0, spec, 1/2) - 1/2; cull BACK"
+shader = ExtResource("1_shader")
+shader_parameter/s0_k = 0.625
+shader_parameter/s1_form = 4
+shader_parameter/c0 = Vector3(0.5882, 0.5882, 0.7059)
+shader_parameter/base_tex = ExtResource("2_body")
+shader_parameter/toon_tex = ExtResource("3_toon")

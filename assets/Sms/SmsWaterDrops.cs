@@ -138,6 +138,8 @@ public partial class SmsWaterDrops : Node3D
                 // dies there. The ray below only meets what the drop's path CROSSES; the game's test also counts a drop passing beside a spot.
                 var zone = SmsHiddenCoin.WaterZoneAt(p);
                 if (zone != null && zone.SmsSprayedByWater(p)) { _life[i] = 0f; continue; }
+                var bud = SmsSamboFlower.ZoneAt(p);      // pass 129: a Pokey's sunflower bud (TSamboFlower's 30 x 120 hit actor) -- no body, the game's cylinder test
+                if (bud != null && bud.SmsSprayedByWater(p)) { _life[i] = 0f; continue; }
                 Vector3 v = _vel[i];
                 float size = _size[i];
                 float hor2 = v.X * v.X + v.Z * v.Z;

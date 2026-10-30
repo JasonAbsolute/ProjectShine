@@ -129,6 +129,72 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     protected uint _flags150;                                   // unk150 (the species' behaviour bits: 2 = escapes, 0x20 = stamps goop at the death)
     protected int _wallHopCooldown;
 
+    // ------------------------------------------------------------------------------------------------------------------ taken (TTakeActor, pass 130b)
+    protected Mario _holder; protected SmsEnemyHoldProxy _holdProxy;   // mHolder: the Mario carrying this body (the Bob-omb) and his stand-in in the hold code
+    /// <summary>mHolder != null: in Mario's hands (TSpineEnemy::calcRootMatrix puts the body at his taking matrix; no bind, no hit checks).</summary>
+    public bool Carried => _holder != null;
+    /// <summary>TMario::hitPickUpEnemy (MarioCheckCol.cpp 211): may his touch take this body right now (TBombHei: unk164, the doused flag). A species Mario
+    /// can carry says yes here; the base says no. His side adds: not jumping, B held, isTakeSituation.</summary>
+    public virtual bool SmsCanBeTaken() => false;
+    /// <summary>The body's receive cylinder for his take search (the pair test: his HoldRadius + this radius; the game's mDamageRadius / Height x the scale).</summary>
+    public float TakeHitRadiusUnits => P.DamageRadius * _bodyScale;
+    public float TakeHitHeightUnits => P.DamageHeight * _bodyScale;
+    /// <summary>HIT_MESSAGE_TAKE (TSmallEnemy::receiveMessage, smallEnemy.cpp 505): the hit filter NO_COLLISION, mHolder = the sender, behaveToTaken. From
+    /// the proxy at his raise's take frame.</summary>
+    public void SmsTaken(Mario holder, SmsEnemyHoldProxy proxy)
+    {
+        if (holder == null || _holder != null || _dead) return;
+        _holder = holder; _holdProxy = proxy;
+        SetCollisionLayerValue(1, false);                      // onHitFilter(HIT_FILTER_NO_COLLISION): no lists, no pushes, the hose finds nothing
+        _vel = Vector3.Zero; _lin = Vector3.Zero; _airborne = false; _onWall = false; _touching.Clear();
+        BehaveToTaken(holder);
+        if (DebugPrint) GD.Print($"[SMS enemy] {Name}: taken by {holder.Name}");
+    }
+    /// <summary>HIT_MESSAGE_THROWN / HIT_MESSAGE_PUT from the holder (receiveMessage 512): mHolder = null, behaveToRelease, the hit filter back on -- both
+    /// messages end the same way for a small enemy; the species decides the flight (TBombHei: always its Thrown nerve, as isThrowStart always pitches
+    /// an enemy).</summary>
+    public void SmsReleased(bool put)
+    {
+        if (_holder == null) return;
+        Mario holder = _holder;
+        _holder = null; _holdProxy = null;
+        BehaveToRelease(holder, put);
+        if (!_dead) SetCollisionLayerValue(1, true);           // offHitFilter(HIT_FILTER_NO_COLLISION)
+        if (DebugPrint) GD.Print($"[SMS enemy] {Name}: released ({(put ? "put" : "thrown")})");
+    }
+    /// <summary>behaveToTaken(THitActor*): the species' side of the take (the Bob-omb pushes its PickUp nerve).</summary>
+    protected virtual void BehaveToTaken(Mario holder) { }
+    /// <summary>behaveToRelease(): the species' side of the drop (the Bob-omb pushes its Thrown nerve).</summary>
+    protected virtual void BehaveToRelease(Mario holder, bool put) { }
+    /// <summary>TSpineEnemy::calcRootMatrix with a holder (enemy.cpp 156): the model's base matrix = the holder's taking matrix -- the body's origin (the
+    /// game's mPosition, its feet) at his hand, turned with his facing. Runs each physics frame in place of the bind while held; a holder gone (freed,
+    /// his hands emptied without a message) releases the body where it is (ensureTakeSituation). The holder ALSO places the body from his own step
+    /// (<see cref="SmsRideHand"/>, pass 130c) so the body never trails the hand by the frame the node order would cost it here.</summary>
+    protected virtual void RideHolder()
+    {
+        if (_holder == null || !IsInstanceValid(_holder) || _holdProxy == null || !IsInstanceValid(_holdProxy) || !_holder.SmsHoldsOrPends(_holdProxy))
+        {
+            SmsReleased(false);
+            return;
+        }
+        SmsRideHand(_holdProxy.GlobalPosition);
+    }
+    /// <summary>The body at the holder's hand point (the proxy = his carry socket): the origin <see cref="HeldOriginDropUnits"/> below it, the yaw his facing.
+    /// Called from the holder's step the moment he places the proxy, and from this body's own step.</summary>
+    public void SmsRideHand(Vector3 hand)
+    {
+        if (_holder == null || !IsInstanceValid(_holder)) return;
+        GlobalPosition = hand + Vector3.Down * (HeldOriginDropUnits / U);
+        Vector3 f = _holder.SmsFacingDir(); f.Y = 0f;
+        if (f.LengthSquared() > 1e-6f) _yaw = Mathf.RadToDeg(Mathf.Atan2(f.X, f.Z));
+        _floorNormal = Vector3.Up;
+        _airborne = false;
+        ApplyLook();
+    }
+    /// <summary>How far below the hand point the body's origin sits while carried, in units: 0 = the game (the origin, its feet, AT the taking matrix); a
+    /// species may offer a deviation (the Bob-omb's CarryByBall puts its ball's centre in the hand).</summary>
+    protected virtual float HeldOriginDropUnits => 0f;
+
     // ------------------------------------------------------------------------------------------------------------------ the bck table
     protected abstract string[] BckNames { get; }
     protected abstract int[] BckFrames { get; }
@@ -141,6 +207,10 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     public int NerveTime => _time;
     public string BckName => _bck >= 0 && _bck < BckNames.Length ? BckNames[_bck] : "-";
     public int BckIndex => _bck;
+    /// <summary>pass 128: the current clip's bck frame (a drive reads the held throw / the waken's start).</summary>
+    public float BckFrameNow => BckFrame();
+    /// <summary>pass 128: LIVE_FLAG_UNK10 -- the body does not bind (the rooted sleeping Cataquack).</summary>
+    public bool NoBind => _noBind;
     public bool IsDead => _dead;
     public bool Airborne => _airborne;
     public float YawDeg => _yaw;
@@ -154,6 +224,7 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     // ------------------------------------------------------------------------------------------------------------------ setup
     public override void _Ready()
     {
+        if (Engine.IsEditorHint()) { _model = GetNodeOrNull<Node3D>("Model"); EditorPreview(); return; }   // pass 128b: a [Tool] species dresses its model for the editor; no group, no reset, no tick there
         AddToGroup("sms_enemy");                                // pass 116: gpConductor->killEnemiesWithin (the shine get)
         _model = GetNodeOrNull<Node3D>("Model");
         _anim = GetNodeOrNull<AnimationPlayer>("Model/AnimationPlayer");
@@ -179,6 +250,10 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     /// <summary>TSmallEnemy::init's species tail (actor type, flags, hit filters, the model's dressing) -- after the model is found, before the clip
     /// check and the first reset. <see cref="_rng"/> is ready; <see cref="_mario"/> is not.</summary>
     protected virtual void Init() { }
+
+    /// <summary>What a [Tool] species shows in the EDITOR (pass 128b: the Cataquack's body paint). Only <see cref="_model"/> is resolved when this
+    /// runs; nothing else of the enemy exists there -- no Mario, no rng, no tick. A species without [Tool] never gets here.</summary>
+    protected virtual void EditorPreview() { }
 
     /// <summary>resetSRTV for a spawner (or a drive) that places the body AFTER adding it to the tree: the placed point and yaw become the launcher's, the body resets there.</summary>
     public void SmsPlace(Vector3 globalPosition, float yawDeg)
@@ -207,6 +282,7 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         _dead = false; _noReward = false; _melt = false; _noBind = false; _hitValid = false; _attackerKilled = false;
         _sprayCooldown = 0; _relaunch = 0; _wanderTicks = 0; _wallHopCooldown = 0;
         _vel = Vector3.Zero; _lin = Vector3.Zero; _airborne = false;
+        if (_holder != null) { var proxy = _holdProxy; _holder = null; _holdProxy = null; if (proxy != null && IsInstanceValid(proxy)) proxy.OnBodyGone(); }   // pass 130b: a reset in his hands empties them
         _stack.Clear(); _cur = NerveNone; _prev = NerveNone; _time = 0;
         PushAfterCurrent(DefaultNerve);                         // mSpine->pushAfterCurrent(mSpine->getDefault())
         _goalIsMario = true;                                    // setGoalPath(TPathNode(gpMarioAddress))
@@ -218,6 +294,7 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     // ------------------------------------------------------------------------------------------------------------------ the tick
     public override void _PhysicsProcess(double delta)
     {
+        if (Engine.IsEditorHint()) return;                      // pass 128b: a [Tool] species only previews in the editor
         if (_mario == null || !IsInstanceValid(_mario))
         {
             _mario = GetTree().GetFirstNodeInGroup("player") as Mario;
@@ -227,6 +304,13 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         _disp = Vector3.Zero;
         for (int i = 0; i < n; i++) Tick();
         if (_dead) return;
+        if (_holder != null)
+        {
+            // TSpineEnemy::calcRootMatrix with mHolder: no bind -- the ticks ran the spine (the Bob-omb's fuse counts in his hands), the body follows his
+            // taking matrix; the ticks' displacement is dropped (a walk clip in his hands moves nothing)
+            RideHolder();
+            if (_holder != null) return;
+        }
         if (FlyBind)
         {
             // THaneHamuKuri::bind is the species' own (its SetBehavior): the step moves the body by the ticks' XZ displacement, reads the walls and
@@ -377,7 +461,9 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         return hit.Count > 0 ? ((Vector3)hit["position"]).Y * U : Pos().Y - 60f * U;
     }
 
-    /// <summary>calcRootMatrix: the body stands on the floor normal, faces the heading, at the body scale.</summary>
+    /// <summary>calcRootMatrix: the body stands on the floor normal, faces the heading, at the body scale. The heading is a WORLD yaw (mRotation.y),
+    /// so the model's world basis is set from it -- the body NODE keeps whatever rotation it was placed or launched with (pass 129: setting the
+    /// model's LOCAL basis added that rotation on top, so a body placed at 180 degrees faced +Z while its heading, hits and walk went -Z).</summary>
     protected virtual void ApplyLook()
     {
         if (_model == null) return;
@@ -387,7 +473,9 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         if (x.LengthSquared() < 1e-6f) { up = Vector3.Up; x = up.Cross(fwd); }
         x = x.Normalized();
         Vector3 z = x.Cross(up).Normalized();
-        _model.Transform = new Transform3D(new Basis(x, up, z) * Basis.FromScale(LookScale * _modelScale), Vector3.Zero);
+        Basis b = new Basis(x, up, z) * Basis.FromScale(LookScale * _modelScale);
+        if (IsInsideTree()) _model.GlobalTransform = new Transform3D(b, GlobalPosition);
+        else _model.Transform = new Transform3D(b, Vector3.Zero);
     }
 
     // ------------------------------------------------------------------------------------------------------------------ anims
@@ -404,6 +492,18 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         _anim.SpeedScale = 60f / _bckRate;
     }
     protected bool IsBck(int i) => _bck == i;
+    /// <summary>pass 128: setFrameRate(0) / setFrameRate(SMSGetAnmFrameRate()) -- the clip held where it is (the Cataquack's throw holds at frame 4), or running again.</summary>
+    protected void SetBckPaused(bool paused)
+    {
+        if (_anim == null) return;
+        _anim.SpeedScale = paused ? 0f : 60f / _bckRate;
+    }
+    /// <summary>pass 128: getFrameCtrl()->setFrame(f): the current clip jumped to bck frame f (the Cataquack's waken from frame 148).</summary>
+    protected void SeekBck(float frame)
+    {
+        if (_anim == null || _bck < 0 || _bck >= BckNames.Length || !_anim.HasAnimation(BckNames[_bck])) return;
+        _anim.Seek(frame / _bckRate, true);
+    }
     /// <summary>getCurAnmFrameNo: the clip's position in bck frames.</summary>
     protected float BckFrame()
     {
@@ -793,6 +893,13 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     {
         _dead = true; _relaunch = 0;
         _vel = Vector3.Zero; _lin = Vector3.Zero;
+        if (_holder != null)
+        {
+            // the end of TNerveBombHeiExplosion: mHolder = nullptr with the body dead -- his ensureTakeSituation sees the held object gone and empties his hands
+            var proxy = _holdProxy;
+            _holder = null; _holdProxy = null;
+            if (proxy != null && IsInstanceValid(proxy)) proxy.OnBodyGone();
+        }
         if (_model != null) _model.Visible = false;
         SetCollisionLayerValue(1, false);
         if (_anim != null) _anim.Stop();

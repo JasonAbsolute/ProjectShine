@@ -1,0 +1,118 @@
+[gd_scene load_steps=15 format=3 uid="uid://d131poizzzabc"]
+
+[ext_resource type="Texture2D" path="res://assets/Sms/Enemy/Fx131/tex/zzz_poi.png" id="T_zzz"]
+
+[sub_resource type="Curve" id="Curve_one"]
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_zero"]
+_data = [Vector2(0, 0), 0.0, 0.0, 1, 1, Vector2(1, 0), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_orbit_y"]
+curve_x = SubResource("Curve_zero")
+curve_y = SubResource("Curve_one")
+curve_z = SubResource("Curve_zero")
+
+[sub_resource type="Curve" id="Curve_z_grow"]
+resource_name = "the parent Z's ESP1 scale 0.3 -> 1 by 37.5 % -> 2.0 (15 -> 50 -> 100 u)"
+max_value = 2
+_data = [Vector2(0, 0.3), 0.0, 0.0, 1, 1, Vector2(0.375, 1), 0.0, 0.0, 1, 1, Vector2(1, 2), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_z_grow"]
+curve_x = SubResource("Curve_z_grow")
+curve_y = SubResource("Curve_z_grow")
+curve_z = SubResource("Curve_one")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_z"]
+resource_name = "ms_poi_zzz's parent (not drawn): one Z a second (the game: every 83 frames) from a circle r 5 u, 1.7 u/f up + 3 u/f out, accelerating 0.075 u/f^2 along its way, the Vortex as an orbit about the head's axis -- a rising, widening spiral, life 60"
+lifetime_randomness = 0.0
+emission_shape = 1
+emission_sphere_radius = 0.0672
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 1.3702
+initial_velocity_max = 1.3702
+radial_velocity_min = 2.418
+radial_velocity_max = 2.418
+linear_accel_min = 3.627
+linear_accel_max = 3.627
+orbit_velocity_min = 1.0743
+orbit_velocity_max = 1.0743
+orbit_velocity_curve = SubResource("CurveXYZTexture_orbit_y")
+gravity = Vector3(0, 0, 0)
+scale_curve = SubResource("CurveXYZTexture_z_grow")
+sub_emitter_mode = 1
+sub_emitter_frequency = 3.75
+sub_emitter_keep_velocity = false
+
+[sub_resource type="Curve" id="Curve_zc_scale"]
+resource_name = "the children inherit the parent's size at birth (the game); here they grow 0.6 -> 1.6 over their life instead"
+max_value = 1.6
+_data = [Vector2(0, 0.6), 0.0, 0.0, 1, 1, Vector2(1, 1.6), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_zc_scale"]
+curve_x = SubResource("Curve_zc_scale")
+curve_y = SubResource("Curve_zc_scale")
+curve_z = SubResource("Curve_one")
+
+[sub_resource type="Gradient" id="Gradient_zc"]
+resource_name = "SSP1 alphaOut"
+offsets = PackedFloat32Array(0, 0.3, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_zc"]
+gradient = SubResource("Gradient_zc")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_zc"]
+resource_name = "ms_poi_zzz's children -- the Zs you see: one every 16 frames at the parent's point, drifting at 7.5 % of its speed (still here), life 40, alpha out"
+lifetime_randomness = 0.0
+emission_shape = 0
+direction = Vector3(0, 1, 0)
+spread = 0.0
+initial_velocity_min = 0.1048
+initial_velocity_max = 0.1048
+gravity = Vector3(0, 0, 0)
+scale_curve = SubResource("CurveXYZTexture_zc_scale")
+color_ramp = SubResource("GradientTexture1D_zc")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_zc"]
+resource_name = "P_msm_zzz_ia lerp((0,183,255) -> white), mix: the Z"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+disable_receive_shadows = true
+albedo_texture = ExtResource("T_zzz")
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_zc"]
+resource_name = "the game's 1 x 1 quad (5 x 5 units)"
+material = SubResource("StandardMaterial3D_zc")
+size = Vector2(0.6717, 0.6717)
+
+[node name="PoiZzz" type="Node3D"]
+
+[node name="Z" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.3433, 0)
+amount = 1
+lifetime = 1
+explosiveness = 0.0
+fixed_fps = 60
+local_coords = true
+sub_emitter = NodePath("Zs")
+visibility_aabb = AABB(-4, -2, -4, 8, 8, 8)
+process_material = SubResource("ParticleProcessMaterial_z")
+
+[node name="Zs" type="GPUParticles3D" parent="Z"]
+amount = 6
+lifetime = 0.6667
+fixed_fps = 60
+local_coords = true
+visibility_aabb = AABB(-4, -2, -4, 8, 8, 8)
+process_material = SubResource("ParticleProcessMaterial_zc")
+draw_pass_1 = SubResource("QuadMesh_zc")

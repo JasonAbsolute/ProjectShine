@@ -1,0 +1,22 @@
+[gd_scene load_steps=5 format=3 uid="uid://csambohead129"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/Sambo/SmsSamboHead.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Sambo/SamboHead.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisap.tscn" id="3_disap"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
+radius = 0.8
+height = 2.3
+
+[node name="SamboHead" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+floor_max_angle = 1.1868
+script = ExtResource("1_script")
+DeathFxScene = ExtResource("3_disap")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.15, 0)
+shape = SubResource("CapsuleShape3D_body")

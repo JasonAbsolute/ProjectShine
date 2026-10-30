@@ -1,0 +1,14 @@
+[gd_resource type="ShaderMaterial" load_steps=3 format=3 uid="uid://cpoimouth128"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/EnemyToon.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" uid="uid://c7qc8aqne083g" path="res://assets/Sms/models/toon_2_4i.png" id="2_toon"]
+
+[resource]
+resource_name = "_mouth (poihana/default.bmd): the yellow bill -- GX_TEVREG0 (380, 291, 28) S10, konst 5/8, no texture in stage 0, x the toon + K2 (0, 0, 32), + 5/8 spec"
+shader = ExtResource("1_shader")
+shader_parameter/s0_k = 0.625
+shader_parameter/s1_form = 2
+shader_parameter/c0 = Vector3(1.4902, 1.1412, 0.1098)
+shader_parameter/c2 = Vector3(0, 0, 0.1255)
+shader_parameter/base_tex = ExtResource("2_toon")
+shader_parameter/toon_tex = ExtResource("2_toon")

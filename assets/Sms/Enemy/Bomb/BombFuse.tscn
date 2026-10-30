@@ -1,0 +1,82 @@
+[gd_scene format=3 uid="uid://dyoiev54fl74b"]
+
+[ext_resource type="Texture2D" path="res://assets/Sms/Enemy/Bomb/tex/kemuball3_bomb_fuse.png" id="1_smoke"]
+
+[sub_resource type="Curve" id="Curve_fuse_v"]
+resource_name = "ms_bomb_limit: 2.8 u/f up + a Gravity field 0.05 u/f^2 UP from 25 % (peak 3.47 m/s)"
+_data = [Vector2(0, 0.6512), 0.0, 0.0, 1, 1, Vector2(0.05, 0.6512), 0.0, 0.0, 1, 1, Vector2(0.1, 0.6512), 0.0, 0.0, 1, 1, Vector2(0.15, 0.6512), 0.0, 0.0, 1, 1, Vector2(0.2, 0.6512), 0.0, 0.0, 1, 1, Vector2(0.25, 0.6628), 0.0, 0.0, 1, 1, Vector2(0.3, 0.686), 0.0, 0.0, 1, 1, Vector2(0.35, 0.7093), 0.0, 0.0, 1, 1, Vector2(0.4, 0.7326), 0.0, 0.0, 1, 1, Vector2(0.45, 0.7558), 0.0, 0.0, 1, 1, Vector2(0.5, 0.7791), 0.0, 0.0, 1, 1, Vector2(0.55, 0.8023), 0.0, 0.0, 1, 1, Vector2(0.6, 0.8256), 0.0, 0.0, 1, 1, Vector2(0.65, 0.8488), 0.0, 0.0, 1, 1, Vector2(0.7, 0.8721), 0.0, 0.0, 1, 1, Vector2(0.75, 0.8953), 0.0, 0.0, 1, 1, Vector2(0.8, 0.9186), 0.0, 0.0, 1, 1, Vector2(0.85, 0.9419), 0.0, 0.0, 1, 1, Vector2(0.9, 0.9651), 0.0, 0.0, 1, 1, Vector2(0.95, 0.9884), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 21
+
+[sub_resource type="CurveTexture" id="CurveTexture_fuse_v"]
+curve = SubResource("Curve_fuse_v")
+
+[sub_resource type="Curve" id="Curve_fuse_sx"]
+resource_name = "ESP1 scale 1 -> 2.2 over the life; x (1 +- 0.4)"
+max_value = 2.2
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 2.2), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_fuse_sy"]
+max_value = 2.2
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 2.2), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_one"]
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_fuse_scale"]
+curve_x = SubResource("Curve_fuse_sx")
+curve_y = SubResource("Curve_fuse_sy")
+curve_z = SubResource("Curve_one")
+
+[sub_resource type="Gradient" id="Gradient_fuse"]
+resource_name = "alpha 0.9 -> 0 from 62.5 %"
+offsets = PackedFloat32Array(0, 0.625, 1)
+colors = PackedColorArray(1, 1, 1, 0.9, 1, 1, 1, 0.9, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_fuse"]
+gradient = SubResource("Gradient_fuse")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_fuse"]
+resource_name = "a puff every second frame (rateStep 1) off a sphere r 5 u, up (+- 20 %, spread 0.1 x 180 deg), the rise as a curve"
+lifetime_randomness = 0.3
+emission_shape = 1
+emission_sphere_radius = 0.0672
+direction = Vector3(0, 1, 0)
+spread = 18.0
+initial_velocity_min = 2.7727
+initial_velocity_max = 4.159
+gravity = Vector3(0, 0, 0)
+scale_min = 0.6
+scale_max = 1.4
+scale_curve = SubResource("CurveXYZTexture_fuse_scale")
+color_ramp = SubResource("GradientTexture1D_fuse")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_fuse"]
+resource_name = "P_msm_kemuball3_ia lerp((24,24,24) -> (100,100,100)), mix: the fuse's grey smoke"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+disable_receive_shadows = true
+albedo_texture = ExtResource("1_smoke")
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_fuse"]
+resource_name = "the game's 0.9 billboard (45 units)"
+material = SubResource("StandardMaterial3D_fuse")
+size = Vector2(0.605, 0.605)
+
+[node name="BombFuse" type="Node3D"]
+
+[node name="Smoke" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.806, 0)
+amount = 20
+lifetime = 0.6667
+fixed_fps = 60
+local_coords = true
+visibility_aabb = AABB(-2, -1, -2, 4, 4, 4)
+process_material = SubResource("ParticleProcessMaterial_fuse")
+draw_pass_1 = SubResource("QuadMesh_fuse")

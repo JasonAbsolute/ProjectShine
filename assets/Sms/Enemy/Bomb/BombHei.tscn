@@ -1,0 +1,25 @@
+[gd_scene load_steps=5 format=3 uid="uid://cbombhei130"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/Bomb/SmsBombHei.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Bomb/NejiBomb.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Bomb/NejiBombDown.glb" id="3_dead"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_body"]
+radius = 0.55
+height = 1.7
+
+[node name="BombHei" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+floor_max_angle = 1.1868
+script = ExtResource("1_script")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="ModelDead" parent="." instance=ExtResource("3_dead")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+visible = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.85, 0)
+shape = SubResource("CapsuleShape3D_body")

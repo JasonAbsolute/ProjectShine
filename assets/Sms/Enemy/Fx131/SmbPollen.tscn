@@ -1,0 +1,86 @@
+[gd_scene load_steps=12 format=3 uid="uid://d131smbpollen"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsFxBurst.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Enemy/Fx131/tex/glow1_pollen.png" id="T_pollen"]
+
+[sub_resource type="Curve" id="Curve_one"]
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="Curve" id="Curve_pol_sx"]
+resource_name = "ESP1 scale 0.7 -> 1 by 25 %, -> 0.3 from 62.5 %; x (1 +- 0.25)"
+_data = [Vector2(0, 0.7), 0.0, 0.0, 1, 1, Vector2(0.25, 1), 0.0, 0.0, 1, 1, Vector2(0.625, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.3), 0.0, 0.0, 1, 1]
+point_count = 4
+
+[sub_resource type="Curve" id="Curve_pol_sy"]
+_data = [Vector2(0, 0.7), 0.0, 0.0, 1, 1, Vector2(0.25, 1), 0.0, 0.0, 1, 1, Vector2(0.625, 1), 0.0, 0.0, 1, 1, Vector2(1, 0.3), 0.0, 0.0, 1, 1]
+point_count = 4
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_pol_scale"]
+curve_x = SubResource("Curve_pol_sx")
+curve_y = SubResource("Curve_pol_sy")
+curve_z = SubResource("Curve_one")
+
+[sub_resource type="Gradient" id="Gradient_pol"]
+resource_name = "alpha 1 -> 0 from 62.5 %"
+offsets = PackedFloat32Array(0, 0.625, 1)
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_pol"]
+gradient = SubResource("Gradient_pol")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_pol"]
+resource_name = "ms_smb_kafun_ow: 12 motes off a sphere r 20 u, 8 u/f along the emitter's up in a 45 deg cone x (1 +- 0.5), airResist 0.95 as a brake (2.05 m in all), gravity 0.01 down, the 2 u/f random kicks as turbulence"
+lifetime_randomness = 0.6
+emission_shape = 1
+emission_sphere_radius = 0.2687
+direction = Vector3(0, 1, 0)
+spread = 45
+initial_velocity_min = 3.224
+initial_velocity_max = 9.672
+gravity = Vector3(0, -0.4836, 0)
+damping_min = 8.795
+damping_max = 8.795
+scale_min = 0.75
+scale_max = 1.25
+scale_curve = SubResource("CurveXYZTexture_pol_scale")
+color_ramp = SubResource("GradientTexture1D_pol")
+turbulence_enabled = true
+turbulence_noise_strength = 1.0
+turbulence_noise_scale = 3.0
+turbulence_noise_speed = Vector3(1, 1, 1)
+turbulence_noise_speed_random = 1.0
+turbulence_influence_min = 0.06
+turbulence_influence_max = 0.06
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pol"]
+resource_name = "P_msm_glow1_i lerp(white -> pink / orange), mix: the pollen mote"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+disable_receive_shadows = true
+albedo_texture = ExtResource("T_pollen")
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_pol"]
+resource_name = "the game's 0.5 x 0.5 quad (25 x 25 units)"
+material = SubResource("StandardMaterial3D_pol")
+size = Vector2(0.3358, 0.3358)
+
+[node name="SmbPollen" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Pollen" type="GPUParticles3D" parent="."]
+emitting = false
+amount = 12
+lifetime = 1
+one_shot = true
+explosiveness = 1
+fixed_fps = 60
+local_coords = true
+visibility_aabb = AABB(-4, -4, -4, 8, 8, 8)
+process_material = SubResource("ParticleProcessMaterial_pol")
+draw_pass_1 = SubResource("QuadMesh_pol")
+
