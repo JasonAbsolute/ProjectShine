@@ -8566,3 +8566,86 @@ hose on a walking one -> WaitExplosion doused on stop_down1, hp 0; W2 held at fr
 the flag drops, the LED counts again (3); W4 the clip's end past 150 ticks -> Explosion after 118 frames; C1 a neighbour in the hit cylinder of an
 exploding one goes off (2 frames). **GPU capture** (cap_bomb.gd): the black ball with the red LED face and the red key, the LED showing 3 then 1,
 the doused one blue with the green crossed eyes and the sphere-map gloss, the blast puff and the dark pieces flying. Build 0 errors, boot ALL OK.
+### 130b -- the Bob-omb carried and thrown; the blast effect (TEffectExplosion) (feature/enemy-pokey-cataquack, `d968bc9`)
+
+**Files:** `assets/Sms/Enemy/SmsSmallEnemy.cs` (the TTakeActor side: `SmsCanBeTaken` / `SmsTaken` / `SmsReleased` / `BehaveToTaken` /
+`BehaveToRelease` / `RideHolder`, `Carried`, `TakeHitRadiusUnits` / `HeightUnits`; the held branch of the physics step; a body dying or reset in
+his hands empties them), NEW `assets/Sms/Enemy/SmsEnemyHoldProxy.cs` (the frozen RigidBody3D stand-in his hold carries for a small enemy, Kind
+Enemy; `OnAttached` = HIT_MESSAGE_TAKE, `Release(put)` = THROWN / PUT, `OnBodyGone`), `assets/Mario.cs` (+67: `SmsFindTakeEnemy` in the take search
+behind `!SmsIsJumpingStatus()`, the proxy's attach in `Anim_AttachPickup`, its release in `SmsReleaseHeld`, `SmsHeldGone`), `assets/Sms/Enemy/Bomb/
+SmsBombHei.cs` (PickUp / Thrown nerves, the hooks, `GenEventCoin` + the 20-a-stage budget, `MaxCarryCoins`, `EventCoinScene`, the fx defaults), NEW
+`BombExplosion.tscn`, `BombFuse.tscn`, `BombFireball.gdshader`, `SmsBombFireball.cs`, `tex/` (P_magmared2 + P_sandnoise2mm from the bmd's TEX1,
+kemuball3 x3 / osenkake / shwave1 / glow1 bakes from the jpa, pinned), `assets/Sms/Fx/SmsFxBurst.cs` (`ISmsFxBurstPart`; the sub-emitter tail),
+NEW `assets/Sms/Fx/JpaBillboardKeyedAdd.gdshader`. Tools: `tools/projectshine/brk_dump.py` (TRK1 reader + hermite), `npc82/enemy128/gen_fx_bomb.py`,
+`bck_track.py`, `pull_explosion.py` / `pull_particle.py` / `find_popo.py` (the ISO: scene/explosion in delfinoBoss.szs, ms_popo_bomb_b +
+ms_bomb_limit in /data/particle.szs), `patch_import130b.py`, `patch_smoke130b.py`, `cap_bomb130b.gd` / `cap_wave130b.gd`.
+
+**The game.** TMario::hitPickUpEnemy (MarioCheckCol.cpp 211): a small enemy whose unk164 is set (TBombHei: the DOUSED flag, raised in WaitExplosion's
+first tick) is offered to hitWantToTake on contact unless he is JUMPING (every airborne status; a fruit may be taken from a dive) -> canTake /
+isTakeSituation -> MARIO_STATUS_TAKE. TSmallEnemy::receiveMessage(TAKE): HIT_FILTER_NO_COLLISION, mHolder = Mario, behaveToTaken -> TBombHei pushes
+PickUp (unk1A4 = 1: a coin at the end); TSpineEnemy::calcRootMatrix puts the body at the holder's taking matrix; the PickUp nerve does nothing (the
+sit clip stays frozen, the dizzy face on) and returns at once if the bomb is not doused when it starts. moveObject's fuse is NOT excluded in PickUp:
+run out in his hands -> unk164 = 0 and WalkExplosion pushed over PickUp (the legs run and the LED counts 3-2-1 in his hands) -> Explosion there:
+getHolder() == Mario -> sendAttackMsgToMario (the COMMON attack, 1 HP + the knockdown -- not the blast's BURN), and the blast's end clears mHolder
+with the body dead (his ensureTakeSituation empties his hands). THROWN / PUT (isThrowStart always PITCHES an enemy -- actor type bit 0x10000000):
+mHolder = null, behaveToRelease (only doused or counting; never from the Explosion; not twice) pushes Thrown: velocity (ThrownRateXZ 3 x
+SMS_GetMarioThrowPower 2.8 x sin / cos of SMS_GetMarioAngleY, ThrownVY 22) = (8.4, 22, 8.4) u/tick, mPosition.y += 2, AIRBORNE, getGravityY =
+ThrownGravityY 0.3 a tick (apex 807 u = 10.8 m, ~17 m of range); landed -> genEventCoin (TBombHeiManager::canMakeDeadCoin: 20 a stage; the coin at
+the point flying toward Mario at 20 u/tick, 20 up) and Explosion pushed. TEffectExplosion::generate(mPosition, mScaling) (effectObj.cpp 576):
+10_bomb.bmd at a random yaw with bck + brk + btk "10_bomb" (59 frames at the 60 fps anim rate), dead at the clip's end, plus emit(ms_bomb_smoke /
+ms_bomb_bomb / ms_bomb_hahen / PARTICLE_MS_POPO_BOMB_B) at the point, setGlobalScale(scale.x). The fireball: a sphere r 200 u, one material: K0 +
+TEX0 x C0 (the magma at scale 1) + TEX1 x C1 (the magma at scale 2, through texture matrices centred at 0.5), the alpha chain (1-K0a) TEX0A ->
+TEX1A - K0a -> TEX2A - (1 - APREV) K0a with the sand noise's alpha, blend NONE, z write, cull NONE, alpha compare GEQUAL 16 -- so the sphere is
+drawn where noiseA >= K0a^2 + 16/255; the brk: K0 rgb 255 -> 207 (f12) -> 63 (f24) -> 0 (f42) = the white flash, K0 a 0 until f12 -> 255 at f60 =
+the dissolve, C0 (254,254,254) -> (211,187,121) f24 -> (178,92,87) f48 -> 30, C1 white -> (201,201,159) f18 -> (220,192,92) f36 -> 11; the bck:
+scale 0.16 -> 1.0 by f20 -> 1.2 at f58; the btk: Ty 0 -> 1 (both magma layers), 0 -> 0.25 (the noise) over 60 frames. The emitters (jpa_dump.py):
+one additive glow ball (100 u x (1 +- 0.5), 38 +- 15 u/f off a sphere r 20, airResist 0.93, life 50, prm (255,231,207) -> red / env (255,159,72) ->
+black over 16 frames, a sine flicker on the alpha); 30 grey smoke puffs (150 u x (1 +- 0.35) scaled 0.85 -> 1.75, off a ring r 18 u at 23 u/f
+outward, Drag 0.88 fading in over 23 %, Gravity 6 u/f^2 UP from 25 % fading in over 49 %, life 75: the drag's exponential kills the lift -- 4.7 m
+out, 0.28 m up: a low spreading ring); 5 dark scraps (osenkake, 100 u x (1 +- 0.35) shrinking to 0.3 from 37.5 %, 12 up the axis + 20 in a cone
+(spread 0.375), gravity 0.4 u/f^2, airResist 0.99, life 100, two random colour keys, each trailing a 95 u grey puff every 6 frames from 12.5 %);
+one shockwave (shwave1 star, a camera billboard 100 -> 900 u over 16 frames, orange-cream, alpha out from 25 %) with 21 cyan-white glow sparks at
+its birth (50 u shrinking to 0, 35 +- 50 % u/f within 25 u, the parent's Drag 0.93). ms_bomb_limit (the fuse): a grey puff every second frame
+(rateStep 1) from 60 u above the body joint, 2.8 u/f up (+- 20 %), Gravity 0.05 UP from 25 %, 45 u growing to 2.2 x, life 40, alpha 0.9 out from
+62.5 %, bound to the body (not global coords: the puffs ride the bomb).
+
+**The port.** The base: `SmsTaken` (the hit filter = layer 1 off, the velocity cleared, BehaveToTaken), `SmsReleased` (BehaveToRelease, the layer back
+unless dead), the physics step with a holder runs the ticks (the spine, the fuse) and `RideHolder` places the origin on the proxy (= his carry
+socket, its yaw his facing), no MoveAndSlide; `Dead` / `Reset` with a holder -> `proxy.OnBodyGone` -> `Mario.SmsHeldGone` (hands empty, no
+message). Mario: the enemy branch of the take search after the NPC's (the same cylinders: his HoldRadius 80 + the body's DamageRadius x scale, the
++-60 deg cone, his height), skipped in the jump / dive states; `_smsTakeData` from the proxy's SmsTakeable (Kind Enemy -> SmsThrowOrPut pitches at
+any speed); the release hands the proxy THROWN / PUT and returns before the RigidBody flight. The Bob-omb: `SmsCanBeTaken` = doused, alive, not held,
+not exploding, the filter on; PickUp / Thrown nerves as the game's (the throw yaw and power read at the release for the nerve's first tick; the
+fuse excluded in Thrown); the Explosion's time 0 sends the common attack while held; the blast's cylinder test and the chain need the filter on;
+`GravityY` = ThrownGravityY while thrown; `GenEventCoin` through `DropSpawner.SpawnItem(EventCoinScene, ...)` with the game's velocity, the budget a
+static per current scene. The blast: `BombExplosion.tscn` = SmsFxBurst + `Fireball` (MeshInstance3D SphereMesh r 2.687 m, `SmsBombFireball`:
+ISmsFxBurstPart -- Restart = the random yaw + frame 0; _Process advances 60 frames a second, sets the shader's k0 / c0 / c1 / scroll0-2 from the
+nine Curves sampled off the brk / bck a frame, the node's scale from the bck, Finished at frame 58 (curAnmEndsNext)) + Glow (JpaBillboardKeyedAdd:
+the prm / env tables as GradientTexture1Ds read by INSTANCE_CUSTOM.y, the particle's life phase) + Smoke (the 125c sim: radial + lift curves) +
+Scraps (align_y JpaDirBillboard, gravity, a Godot sub-emitter `Trail` child at 5 Hz) + Shockwave (the scale curve 1 -> 9) + Sparks; spawned at
+the body with the basis = bodyScale x BlastScale (the game: mScaling; the knob folded in so the look follows the reach). `BombFuse.tscn` (a Node3D
+with the emitter 60 u up, local coords) is the FuseFxScene default. SmsFxBurst: an ISmsFxBurstPart child is restarted and counted; `Done` waits a
+sub-emitter target's lifetime before QueueFree (the trail puffs are not cut).
+**DEVIATIONS (logged):** the scraps' two-colour random pick is their mid colour and their tumble is not drawn; the glow ball's keyed colours run by
+the mean life (40 frames) and its sine flicker is baked into the alpha ramp (a fixed phase); the sparks' Random field is Godot turbulence; the
+fireball is a Godot sphere of the bmd's radius and UV layout (the bmd's is 160 triangles); BlastScale also scales the visual (the game's BombRange
+is the hit cylinder only); the sounds (ZENMAI, COUNT, the blast's) and the rumble stay slots; the camera shake is the port's Damage kind. The game's
+Thrown nerve re-clears NO_COLLISION at tick 120 after receiveMessage already did at the release -- the port turns the layer on at the release.
+Mario's `Held`-named property was avoided (`Carried`): SmsDangoHamukuri has a `Held` of its own.
+
+**Drive 130b** (`patch_smoke130b.py`, SMS_YCAM_SMOKE=1; 15/15 on the 80 m platform; everything through the real paths -- B held on contact, the real
+hose, B on the putDown state, the real cylinder): T1 B against a WALKING bomb takes nothing (SmsCanBeTaken false, no raise); T2 hosed -> doused and
+sitting -> takeable; T3 B in the AIR beside it (a standing jump) takes nothing; T4 B on the ground -> the raise with an SmsEnemyHoldProxy pending;
+T5 the attach: PickUp, the layer off, the origin 0.11 m from the carry socket (one frame of the hand's motion), the sit clip frozen at 60 with the
+dizzy face, unk1A4; T6 B standing still -> putDown with the throw queued on ma_throw (PITCHING, never PUT); T7 Thrown at vxz 8.40 u/tick 0.0 deg
+off his facing, vy 21.4 (two ticks of 0.3 off 22), airborne, the layer on, his hands empty; T8 20 frames on: dvy 12.00, the XZ speed kept, 8.2 m
+up; T9 landed 16.7 m along at the platform's height after ~75 frames: coins +1, Explosion; T10 the burst at the body: 6 parts running, the fireball
+playing at scale 0.21; T11 24 frames later: scale 1.054 at f24.9, k0 rgb 0.235, k0 a 0.265 (the brk at f24: 63 / 62 of 255); T12 the fireball done,
+the burst freed 148 frames after the blast (the scraps' 100 + the trail's 50), no proxy, hands empty. H1 bomb 2 (FuseScale 0.5) hosed, taken, held:
+the fuse runs out in his hands -> not doused, nejibomb_run_down1 with the LED on 3, still 0.00 m from the socket, the BombFuse smoke bound and
+emitting; H2 the Explosion in his hands: health 8 -> 7, hurt, the Knockdown kind (not Fire); H3 the body dead -> hands empty, no proxy, no second
+hit. **Regressions**: drive 130 16/16, drive 128 32/32 (the base's held branch is behind `_holder != null`). **GPU capture** (cap_bomb130b.gd, a
+Kill on a placed bomb): the pieces fly first; frame 0 a white sphere behind the stacking smoke; f8 a white-pink dome with the shockwave's cream rays
+peeking around it (cap_wave130b.gd isolates them); f17 the cream-yellow fireball with red magma blotches, grey puffs at its base, cyan sparks, black
+scraps high up; f30-35 red / yellow with holes, the smoke ring spread; f56 the last red bits, the smoke low and wide (the lower halves under the
+floor); the fuse: a dark grey column off the key. Build 0 errors, boot ALL OK.

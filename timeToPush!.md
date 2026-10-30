@@ -378,19 +378,25 @@ written here would already be one commit stale.)
 
 ### #8 -- PENDING -- queued 2026-10-29 02:20 PDT (Kiro) -- PUSH ONLY, no PR yet
 Push the fifth feature branch: `feature/enemy-pokey-cataquack`, branched from `main` `e9eb60b` (the trunk after PR #9) -- the Cataquack (TPoiHana, SMS
-pass 128, painted any colour in 128b), the Pokey + Pokey Head (THanaSambo / TSamboHead, pass 129) and the Bob-omb (TBombHei, pass 130) on the
-small-enemy base. NOT yet playtested by
+pass 128, painted any colour in 128b), the Pokey + Pokey Head (THanaSambo / TSamboHead, pass 129) and the Bob-omb (TBombHei, pass 130; carried,
+thrown and its blast effect in 130b) on the small-enemy base. NOT yet playtested by
 Jaysonn: push the branch so it is on
 GitHub; do NOT open a PR until he says the feature is done (Kiro will replace this entry with the PR entry then, as #5-#7 went).
-- Branch `feature/enemy-pokey-cataquack` -- code tip `1778a42` ("SMS 130: the Bob-omb (TBombHei) ..." over `f08ea69` 129, `636ac9c` 128b, `c565f39`
-  128); the branch tip is this file's own commit on top of it; 8 commits since `main` `e9eb60b` (128, 128b, 129, 130 and their four log + entry
-  commits). A NEW remote branch (never pushed): push with `-u`. The biggest new files are `models/Eniemes/Poihana/Poihana.glb` (1.7 MB) and
-  `models/Eniemes/Sambo/Sambo.glb` (0.4 MB); SamboDown.tres / SamboYdown.tres are baked clips (~60 KB each).
+- Branch `feature/enemy-pokey-cataquack` -- code tip `d968bc9` ("SMS 130b: the Bob-omb carried and thrown, and its blast ..." over `1778a42` 130,
+  `f08ea69` 129, `636ac9c` 128b, `c565f39` 128); the branch tip is this file's own commit on top of it; 10 commits since `main` `e9eb60b` (128,
+  128b, 129, 130, 130b and their five log + entry commits). A NEW remote branch (never pushed): push with `-u`. The biggest new files are
+  `models/Eniemes/Poihana/Poihana.glb` (1.7 MB), `models/Eniemes/Sambo/Sambo.glb` (0.4 MB) and `assets/Sms/Enemy/Bomb/BombExplosion.tscn`
+  (105 KB of baked curves); SamboDown.tres / SamboYdown.tres are baked clips (~60 KB each).
 ```
 git push -u origin feature/enemy-pokey-cataquack
 git rev-list --count origin/feature/enemy-pokey-cataquack..feature/enemy-pokey-cataquack
 ```
 Expect `0` from the rev-list. No PR, no merge.
+- New files (130b): `assets/Sms/Enemy/SmsEnemyHoldProxy.cs` + .uid, `assets/Sms/Enemy/Bomb/` (BombExplosion.tscn, BombFuse.tscn, BombFireball.gdshader
+  + .uid, SmsBombFireball.cs + .uid, tex/ eight pngs + .imports), `assets/Sms/Fx/JpaBillboardKeyedAdd.gdshader` + .uid; changed: assets/Mario.cs (+67:
+  the enemy branch of the take search, the proxy's attach / release, SmsHeldGone), assets/Sms/Enemy/SmsSmallEnemy.cs (the TTakeActor side: taken /
+  released / riding his hand), assets/Sms/Enemy/Bomb/SmsBombHei.cs (PickUp / Thrown, the coin, the fx defaults), assets/Sms/Fx/SmsFxBurst.cs
+  (ISmsFxBurstPart, the sub-emitter tail).
 - New files (130): `assets/Sms/Enemy/Bomb/` (SmsBombHei.cs + .uid, BombHei.tscn, BombBody.gdshader + .uid, five .tres materials), `models/Eniemes/Bomb/`
   (two glbs, seven pngs, .imports).
 - New files (129): `assets/Sms/Enemy/Sambo/` (SmsHanaSambo / SmsSamboHead / SmsSamboFlower / SmsSamboLeaf / SmsBoneRoll .cs + .uid, HanaSambo /
@@ -413,7 +419,12 @@ Expect `0` from the rev-list. No PR, no merge.
   touching it on the ground stuns it for a stomp. `SamboFlower.tscn` alone = a bud the hose opens. All particle / sound slots are empty.
 - To try the Bob-omb (130): drop `assets/Sms/Enemy/Bomb/BombHei.tscn` anywhere; it marches at Mario at once and for ever (touching it does nothing);
   after 8.3 s its LED counts 3-2-1 and it blows up (a 2.7 m blast burns Mario: the fire knock). The hose douses it (it sits with the dizzy blue
-  face) until the fuse runs out anyway. Two close together go off together. Picking it up / throwing it is NOT in yet (Mario's take system only
-  carries fruit-type bodies: 130b). `FuseScale` shortens the fuse for testing; the blast's visual is a placeholder puff until the particle pass.
+  face) until the fuse runs out anyway. Two close together go off together. A DOUSED one can be picked up (130b): stand beside it on the ground
+  and press B -- Mario lifts it (the sitting dizzy bomb rides his hands); B again throws it (always a throw: the game pitches an enemy even
+  standing still) ~17 m along his facing in a 10.8 m arc, and it blows up where it lands, dropping a coin toward him (20 a stage, the game's
+  budget). Hold it too long and its fuse runs out in his hands: the LED counts, it goes off there -- one HP and a knockdown. A walking or
+  counting one cannot be taken, nor any while jumping. The blast is now the game's: the white flash, the growing magma fireball dissolving
+  to embers, the smoke ring, the black scraps with their trails, the shockwave and its cyan sparks; the fuse smokes while it counts.
+  `FuseScale` shortens the fuse for testing; `BlastScale` the reach and the look; the sounds are still slots.
 The working tree carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher
 `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the `addons/godot_ai` churn: his, leave them.
