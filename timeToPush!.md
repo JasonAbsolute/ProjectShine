@@ -376,7 +376,7 @@ Trunk for Kiro to branch the next feature from: **`main`'s current tip** -- read
 on purpose: a commit cannot carry its own sha, and the "#7 done" commit that closes this entry IS the new tip, so any literal sha
 written here would already be one commit stale.)
 
-### #8 -- PENDING -- queued 2026-10-29 02:20 PDT, PR added 2026-10-30 01:35 PDT (Kiro)
+### #8 -- PUSHED 2026-10-30 -- https://github.com/JasonAbsolute/ProjectShine/tree/feature/enemy-pokey-cataquack -- PR awaiting Jaysonn's click -- queued 2026-10-29 02:20 PDT, PR added 2026-10-30 01:35 PDT (Kiro)
 Push the fifth feature branch and OPEN ITS PR: `feature/enemy-pokey-cataquack`, branched from `main` `e9eb60b` (the trunk after PR #9) -- the
 Cataquack (TPoiHana, SMS pass 128, painted any colour in 128b), the Pokey + Pokey Head (THanaSambo / TSamboHead, 129) and the Bob-omb (TBombHei, 130;
 carried, thrown and its blast effect in 130b, the carry fixed in 130c) on the small-enemy base, with the Cataquack's and Pokey's particles (131).
@@ -444,3 +444,16 @@ the title and the body of `pr128.md`, and Jaysonn presses "Create pull request".
   (the Pokey Head too). Each is a slot on the node (empty = none; the default scenes live in assets/Sms/Enemy/Fx131/).
 The working tree carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher
 `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the `addons/godot_ai` churn: his, leave them.
+
+Result: all seven pass shas confirmed ancestors (code tip `a6b4dd3`, 130c `c0127c5`, 130b `d968bc9`, 130 `1778a42`, 129 `f08ea69`,
+128b `636ac9c`, 128 `c565f39`), plus the 130c+131 log commit `5bad9aa` and the trunk `e9eb60b`. Pushed as a NEW remote branch with
+`-u`, tracking set; `git rev-list --count origin/feature/enemy-pokey-cataquack..feature/enemy-pokey-cataquack` returned `0`.
+14 commits since `main`.
+Diffstat measured 156 files / **+7523** / -7 against the entry's +7517 -- the 6-line gap is this log file's own entry commit, as the
+entry predicted ("before this entry's lines"). Largest blobs confirm the entry: `Poihana.glb` 1.65 MB (the only new file over 1 MB),
+`Mario.cs` 1.00 MB and `PROJECT_LOG.md` 0.93 MB (both already on `main`, so not new weight), then `Sambo.glb` 0.35,
+`SamboHead.glb` 0.26, `NejiBomb.glb` 0.22, `BombExplosion.tscn` 0.10 and `NejiBombDown.glb` 0.08 -- nothing else over 80 KB.
+Hygiene re-checked independently of Kiro's own check and agrees: 0 of the nine live edits in the range (0 `addons/godot_ai`,
+0 `Level.tscn`, 0 `SmsHiddenCoin.cs`, 0 of the three `.tres` re-saves, 0 of the four `.png.import` flips).
+Kept the #6 order: branch pushed -> this paragraph committed and pushed -> only then the PR page opened.
+`gh auth status` still reports "not logged into any GitHub hosts" -- fifth entry running on the browser route.
