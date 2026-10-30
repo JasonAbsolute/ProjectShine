@@ -8436,3 +8436,80 @@ count of Cataquacks (his Level carries three placed ones since 128; mInstanceInd
 a yellow pick beside the blue and red kinds, frozen): the green body reads (51, 204, 77) = the pick to the digit on its lit top; the shade side the
 toon's darkening of the same green; the yellow one yellow with the game's yellow bill (a probe that landed on the bill read the bill's (254, 209, 110)
 + glint -- the bill, not the paint). Build 0 errors, boot ALL OK.
+### 129 -- the Pokey (THanaSambo) and the Pokey Head (TSamboHead) on the small-enemy base (feature/enemy-pokey-cataquack, `f08ea69`)
+
+**Files:** NEW `assets/Sms/Enemy/Sambo/` -- `SmsHanaSambo.cs` + `HanaSambo.tscn` (the Pokey), `SmsSamboHead.cs` + `SamboHead.tscn` (the head),
+`SmsSamboFlower.cs` + `SamboFlower.tscn` (the bud), `SmsSamboLeaf.cs` + `SamboLeaf.tscn`, `SmsBoneRoll.cs` (a SkeletonModifier3D), the materials
+`SamboBody.tres` / `SamboCrownFlower.tres` / `SamboBudFlower.tres` / `SamboLeaf.tres`, the baked death clips `SamboDown.tres` / `SamboYdown.tres`;
+`EnemyToonCutoutTwoSided.gdshader`; `models/Eniemes/Sambo/` (Sambo / SamboD / SamboHead / SamboFlower / SamboLeaf .glb from his whole-disc rip,
+bianco1; the disc textures K_sambo_orange, K_Sflower_orange, K_flower_orange (from flower_orange.bmt), K_leaf; the glbs' own pngs; .imports with
+the materials swapped by name and the pngs pinned: patch_import129.py). CHANGED: `EnemyToon.gdshaderinc` (form 4), `SmsSmallEnemy.cs` (ApplyLook:
+the model's WORLD basis -- see the base fix), `SmsWaterDrops.cs` (the bud zone test beside the hidden-coin one). Sources: doldecomp/sms
+src/Enemy/hanasambo.cpp + include/Enemy/HanaSambo.hpp (+ smallEnemy.cpp, Spine.hpp for the spine rules), the shipped hanasambo / sambohead /
+samboflower .prm (params.szs), the sambo archive from bianco3.szs (bmd + 11 bck), sambohead + samboflower from bianco0.szs (gcm_tools.py).
+
+**The game.** THanaSambo (TSmallEnemy, rooted: mPosition.x/z pinned to the placed point, isCollidMove false): Hide (the default; sambo_fhide 79
+with HD_ROCK/SMOKE; initFlower at tick 75 and at the end: the bud at the ground; then no collision, sambo_fset held at frame 0, HIDDEN; Mario within
+AppearDist 1000 -> Appear) -> Appear (fset 79 rising with AP_ROCK/SMOKE, the bud hidden, turning at 3 x turn; at the end Wait, + Attack when
+Mario within AttackDist 500 and below base + 100) -> Wait (fwait loop turning toward Mario; frame 16 each loop createPollen KAFUN_OW 200 u over
+the pollen joint; past AttackInterval 150 + in range -> Attack; beyond HideDist 2000 -> Hide) -> Attack (fattack_start 34; at its end KAFUN_OA
+200 u ahead + SAMBO_ATTACK, fattack loop; a loop end past AttackingTime 250 with no water since -> fattack_end 14 -> Wait). The head hit actor
+THanaSamboHead at jnt_head (attack 60 x 20, damage 120 x 40, x scale): Mario in its attack cylinder -> ATTACK; TRAMPLE / HIP_DROP -> kill (the body's
+isHitValid takes only Yoshi's eat and its damage cylinder is 5 x 5); SPRAYED -> waterDamage: the wet flag, in Wait -> Freeze (fhit_start 4, hit
+loop while water keeps coming). Die: no collision, the model swapped for samboD.bmd (the stack as four loose pieces) playing ydown (36) when
+leaning else down (36); at the clip's end or tick 300: DISAP_A + B at Dhead / Dbody3 / Dbody2 / Dbody1, DEAD, genRandomItem. TSamboHead
+(TWalkerEnemy, scale 1.5 = 2.4 m, turn 0.3..0.5): Hide (samboHead_Fhide 44, HD fx; at the end HIDDEN + wait + initFlower; isFindMario(1) AND
+within AppearDist 800 -> Appear) -> Appear (set 44 with AP fx, the bud hidden -- a bloomed bud pops its pollen again; tick 20: dropLeaf, three
+leaves at 0/120/240 deg (0, rand(4, 4.8), rand(3, 3.6)) turned, gravity 0.15; at the end wait -> Attack) -> Attack (on the ground past
+JumpPrepareTime 300 ticks at a clip end: a hop MoveDist 300 u toward Mario at JumpSp 8 under MoveGravity 0.3 (calcVelocityToJumpToY),
+jump_start; falling -> jump_end held; landed -> runs -> wait; the roll = the velocity's pitch clamped JumpAngY 30 over 30 u up, x 0.8 a tick
+near the ground; turn 5 in the air). attackToMario: ATTACK; airborne -> a bounce away ((pos - Mario, +10) x 8); on the ground in Attack ->
+TNerveSmallEnemyFreeze (FreezeWait 120, setFreezeAnm EMPTY: the clip kept) = the stomp window. behaveToWater (not Hide/Appear/HitWall/Die): a hop
+away (12, 10) lifted 2 u -> HitWater (again while in it: added): hit loop in the air; landed -> jump_end a tick -> hit_end 36 skidding at the
+saved velocity (the game: y = ground + 1 + AIRBORNE each tick); at its end vel x 0.6, grounded, wait -> RecoverWater (roll x 0.99 until < 1)
+-> back to Attack (the stack: setNext(Attack) is dropped by the `return true`, Recover pops, then what was under). A wall while hit
+(isHitWallInBound) -> HitWall: crash 5 with ENM_WALLHIT (+ _O); 60 ticks past the clip: dead with UNK20000 (no drop roll) and genRandomItem ->
+genEventCoin in the crash pose: THREE coins fanned -60/0/+60 deg 100 u out, (dir 4, rand(8, 16), dir 4). A stomp: the base's Die (down 14,
+DISAP_A_W after a crash else A + B, scale 1.5). TSamboFlower: flower.bmd + flower_orange.bmt; wait (bud loop) / hit (opening 30) / fwait (open
+loop); SPRAYED on a closed one -> bloom (KAFUN_OW, hit, FLOWER_OPEN); hit's end -> fwait; a Pokey's flower stays open (unk160 false; the stage's
+coin-unit flowers close after 300 and pay a coin ring -- not here); hide = no collision, not drawn.
+**Materials** (bmd_mat_dump.py): `_mat_head` x4 (sambo; shared registers): stage 0 (TEXC toon, RASC, KONST 5/8, C0 (150, 150, 180)) SUBHALF x1,
+stage 1 (CPREV, RASC1 spec, KONST 1/2, TEXC K_sambo_orange) SUBHALF x1 = TEX + mix(s0, spec, 1/2) - 1/2 -> EnemyToon form 4; `_flower` /
+`_mat_flower` / `_mat_leaf1`: stage 0 (toon, RASC, 3/4, C0 500 (leaf 350)) /2 saturates, stage 1 mix(spec, TEX, s0) = the texture; alpha TEXA x
+ALPHA0 x 4, test GEQUAL 128, cull NONE -> EnemyToonCutoutTwoSided. The standalone flower.bmd's K_name_dummy is swapped by the bmt for
+K_flower_orange (64x64: the sepal + the pink petal); the crown petal is K_Sflower_orange. **samboD.bmd carries no clips in the rip**: sambo_down /
+sambo_ydown (6 joints: Dhead ends 200 u out at y 6) are BAKED from the bck with bck_to_anim.py (one position / rotation / scale track per JNT1
+joint, 60 Hz keys, Rz*Ry*Rx -> quaternions) into Animation .tres the Pokey loads onto an AnimationPlayer it builds under ModelDead, the tracks
+re-pointed at its skeleton. The live glb's copies of those clips (mapped onto the wrong joints by the exporter) are never played.
+
+**The port.** `SmsHanaSambo` / `SmsSamboHead : SmsSmallEnemy` with the nerves above (ids from NerveSpecies), the head actor's lists in a
+HitCheckMario override (the base's tests for the stalk, then Mario's attack cylinder on the head's damage cylinder -> Kill / waterDamage, the head's
+attack cylinder on his damage cylinder -> ATTACK), SmsSprayedByWater deciding by the drop's 50 x 80 cylinder on the head's (the HeadShape sphere
+follows jnt_head so the drops' ray meets it), the root pin in ApplyLook, the dead stack riding the live model's frame. The head's roll =
+`SmsBoneRoll` on 'jnt_body' (the game's post-multiplied turn about up x velocity, in the joint's own frame) set every physics frame, 0 outside
+Attack / HitWater / Recover. `SmsSamboFlower : Node3D` -- NO body: a shown bud registers itself and SmsWaterDrops asks `ZoneAt(drop)` (the game's
+checkWater cylinder test) beside the hidden-coin zones; a body was a floor to the ground rays (the Pokey re-buried itself 1.6 m up on its own bud)
+and the hose's ray alike. Knobs grouped: Deviations (StartBuried, on: a placed one starts buried instead of standing and sinking at the load as the
+game does) / The flower and the dead stack (FlowerScene, DeadDownClip, DeadYdownClip; the head: FlowerScene, LeafScene, EventCoinScene = his
+yellow_coin.tscn) / Effects and sounds (AppearFx, HideFx, PollenWaitFx, PollenAttackFx, AttackSound; the head: AppearFx, HideFx, WallHitFx,
+WetDeathFx) -- all EMPTY until the jpa pass. DropTable unset (the game's generateItem drops nothing; set StuDrops.tres to change that).
+**BASE FIX (SmsSmallEnemy.ApplyLook):** the heading (mRotation.y, a WORLD yaw) was written as the model's LOCAL basis while the body node kept its
+placed / launched rotation -- a body placed at 180 degrees faced +Z while its walk, hits and lists went -Z (the Pokey leaned AWAY from Mario in the
+drive; every placed-with-a-rotation or launched body since 125 faced 2 x its yaw). The model's world basis is set now. Regression: drive 128
+32/32, drive 125 84/85 (H11 = the known arena miss, failed on main's control too; F5 passes now).
+**DEVIATIONS / NOT PORTED (logged):** StartBuried; a Pokey's re-shown bud takes the hose (the game's initFlower leaves its collision off after a
+hide -- a slip); a Freeze whose 4-frame start ends with no water left ends (the game holds the pose until the next drop); the particles and the
+sounds (slots); the coin units; Yoshi's eat / the juice; the crash wait = the Stu's 60 ticks (TSmallEnemyManager::unk5C).
+
+**Drive 129** (`npc82/enemy128/patch_smoke129.py`, spliced into Mario.cs, SMS_YCAM_SMOKE=1; 36/36 on a 20 x 70 m platform the drive builds 80 m
+over his level -- nothing of the level up there): P1 buried + the bud + the materials; P1b stays buried at 20 m; P2 Appear at 11 m; P3 the rise 77
+frames -> Wait; P4 Attack past the interval; P5 the lean loop; P6 the head hits Mario 3.3 m out (health -1, the lean's lowest head 1.09 m over the
+base at 3.53 m); P7 the attack ends; P8 the REAL hose from 7.2 m (outside AttackDist, the squat aim with the stick up) -> Freeze; P8b the hit loop;
+P9 back to Wait; P10 a real fall on the head -> Die with the dead stack and sambo_down, Mario bounced; P11 4 puffs at 35 frames; Q1 StartBuried off =
+the sink at birth; Q2 buried with the bud at the ground; Q3 re-rise at 3 m; Q4 Hide at 32 m; Q5 near the bud = near the Pokey; Q6 the real hose on a
+free bud -> flower_hit; Q7 -> fwait; H1 the head buried (Mario behind: out of the cone); H2 Appear in sight; H3 three leaves at tick 20; H4 ->
+Attack; H5 the hop at tick 361 (300 + the wait's end) toward Mario; H6 lands 4.08 m on, roll 30 deg; H7 contact: -1 HP + Freeze; H8 the stomp ->
+Die; H9 the puff; W1 the hose knocks it away (12, 10); W2 hit_end; W3 the skid 11.2 m -> Recover; W4 -> Attack; W5 the wall crash; W6 three coins
+at 33 frames. **GPU capture** (cap_sambo.gd: the Pokey standing / leaning / dead, the head, a bud and a bloom, a Cataquack; axis markers): the
+orange stack with the eyes toward its heading, the pink crown, the lean to the ground toward the camera, the four pieces, the four puffs; the bud
+and the open bloom over the leaves. Build 0 errors, boot ALL OK.
