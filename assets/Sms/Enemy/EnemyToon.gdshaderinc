@@ -17,7 +17,7 @@
 //             (the stage's h_ma_rak swapped for the dummy), PREV = PREV x (1 - REG2) + REG1. dirt 0 skips it all.
 
 uniform float s0_k = 0.75;                  // the stage-0 konst: 3/4 or 5/8
-uniform int s1_form = 0;                    // 0 mix(spec, tex, s0); 1 the trousers' two-register mask + the specular; 2 / 3 the Cataquack's body / eye (pass 128)
+uniform int s1_form = 0;                    // 0 mix(spec, tex, s0); 1 the trousers' two-register mask + the specular; 2 / 3 the Cataquack's body / eye (pass 128); 4 the Pokey body (pass 129)
 uniform vec3 c0 = vec3(1.0);                // GX_TEVREG0 / 255 (S10: may exceed 1 or go below 0)
 uniform vec3 c1 = vec3(0.902);              // GX_TEVREG1 / 255 (form 1)
 uniform vec3 c2 = vec3(0.949, 0.063, 0.365);// GX_TEVREG2 / 255 (form 1)
@@ -81,6 +81,13 @@ vec3 enemy_color(vec2 uv, vec2 uv2) {
 		}
 		prev = clamp(s0 * tex + c2, 0.0, 1.0);
 		prev = clamp(prev + s0_k * v_spec, 0.0, 1.0);
+	} else if (s1_form == 4) {
+		// pass 129, the Pokey family's body (sambo / sambod / samboHead.bmd '_mat_head'): stage 0 (TEXC toon, RASC, KONST 5/8, C0) SUBHALF at
+		// scale x1 (not /2): s0 = c0 + mix(toon, COLOR0, k) - 1/2 with c0 (150, 150, 180); stage 1 (CPREV, RASC1 spec, KONST 1/2, TEXC) SUBHALF x1:
+		// TEX + mix(s0, spec, 1/2) - 1/2 -- the orange body texture, darkened up to 0.2 in the shade, lifted by half the sun's glint.
+		vec3 toon = texture(toon_tex, v_lit0.rg).rgb;
+		vec3 s0x = clamp(c0 + mix(toon, v_lit0, s0_k) - 0.5, 0.0, 1.0);
+		prev = clamp(tex + mix(s0x, v_spec, 0.5) - 0.5, 0.0, 1.0);
 	} else {
 		prev = clamp(mix(v_spec, tex, s0), 0.0, 1.0);
 	}

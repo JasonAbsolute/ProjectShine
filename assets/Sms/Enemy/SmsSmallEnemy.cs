@@ -387,7 +387,9 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         return hit.Count > 0 ? ((Vector3)hit["position"]).Y * U : Pos().Y - 60f * U;
     }
 
-    /// <summary>calcRootMatrix: the body stands on the floor normal, faces the heading, at the body scale.</summary>
+    /// <summary>calcRootMatrix: the body stands on the floor normal, faces the heading, at the body scale. The heading is a WORLD yaw (mRotation.y),
+    /// so the model's world basis is set from it -- the body NODE keeps whatever rotation it was placed or launched with (pass 129: setting the
+    /// model's LOCAL basis added that rotation on top, so a body placed at 180 degrees faced +Z while its heading, hits and walk went -Z).</summary>
     protected virtual void ApplyLook()
     {
         if (_model == null) return;
@@ -397,7 +399,9 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
         if (x.LengthSquared() < 1e-6f) { up = Vector3.Up; x = up.Cross(fwd); }
         x = x.Normalized();
         Vector3 z = x.Cross(up).Normalized();
-        _model.Transform = new Transform3D(new Basis(x, up, z) * Basis.FromScale(LookScale * _modelScale), Vector3.Zero);
+        Basis b = new Basis(x, up, z) * Basis.FromScale(LookScale * _modelScale);
+        if (IsInsideTree()) _model.GlobalTransform = new Transform3D(b, GlobalPosition);
+        else _model.Transform = new Transform3D(b, Vector3.Zero);
     }
 
     // ------------------------------------------------------------------------------------------------------------------ anims

@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3 uid="uid://csamboleafscn129"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/Sambo/SmsSamboLeaf.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Sambo/SamboLeaf.glb" id="2_model"]
+
+[node name="SamboLeaf" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)

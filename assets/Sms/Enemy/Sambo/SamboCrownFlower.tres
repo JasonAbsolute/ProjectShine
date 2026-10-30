@@ -1,0 +1,14 @@
+[gd_resource type="ShaderMaterial" load_steps=4 format=3 uid="uid://csambocrown129"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/EnemyToonCutoutTwoSided.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/Sambo/K_Sflower_orange.png" id="2_petal"]
+[ext_resource type="Texture2D" uid="uid://c7qc8aqne083g" path="res://assets/Sms/models/toon_2_4i.png" id="3_toon"]
+
+[resource]
+resource_name = "_flower / _mat_flower (sambo / sambod / samboHead.bmd, the crown petals, pass 129): stage 0 (TEXC toon, RASC, KONST 3/4, C0 (500, 500, 500)) SUBHALF /2 saturates to 1, stage 1 mix(spec, K_Sflower_orange, s0) = the texture; alpha TEXA x ALPHA0 x 4, test GEQUAL 128, cull NONE"
+shader = ExtResource("1_shader")
+shader_parameter/s0_k = 0.75
+shader_parameter/s1_form = 0
+shader_parameter/c0 = Vector3(1.9608, 1.9608, 1.9608)
+shader_parameter/base_tex = ExtResource("2_petal")
+shader_parameter/toon_tex = ExtResource("3_toon")
