@@ -8819,3 +8819,63 @@ shockwave and sparks, the hit starburst, the fling's flash and sparks. NOTE for 
 reference to a node that frees itself hangs Godot 4.7.1 when it tests that reference afterwards (`!= null` / is_instance_valid on the freed object);
 a WeakRef is fine. The first "hang" chase (HitBurst's 0.1 s lifetime, GDScript mimics, EnemyDisap self-freeing the same way) was that, not an engine
 or SmsFxBurst fault -- the game frees bursts this way on every enemy death.
+
+### 134 -- the dive splash MODEL: mario/04_tobikomi (the water column, the crown, the ring) fired with the splash particles (main, `440f24d`)
+
+**Files:** NEW `assets/Sms/Fx/WaterSplashModel.tscn` (generated), `SmsSplashModel.cs`, `splash_model.gdshader`, `assets/Sms/Fx/tex/splash_wave1.png` /
+`splash_tamatama.png` / `splash_hamonring3.png` (the bmd's three I8 textures as grey PNGs, pinned lossless); changed `assets/Mario.cs` (+30 / -5 in
+SmsWaterInOutTick + SmsSpawnSplashModel). Tools: npc82/mario133/{pull_tobikomi.py (chr0.szs out of the ISO: 04_tobikomi.bmd + bck / bpk / brk / btk),
+dump_tobikomi.py (INF1 shape -> joint / material, the bck per joint, the bpk / brk / btk), gen_splash_model.py (the scene: five joints, five
+materials, one 18-track Animation sampled a key a frame with J3D's Hermite), patch_import134.py, patch_smoke134.py (drive 134), cap_splash134.gd,
+ref134/}. Sources: MarioEffect.cpp (TMarioEffect::init 20-62, setJumpIntoWaterEffect 64-117, setJumpIntoWaterEffectSmall 119-148, perform 170-224),
+MarioParticle.cpp 174-213 (inOutWaterEffect: the Small call on the shallow flag, else the big call), MarioMove.cpp 2059 (unk220 = rotateY(face) x
+translate(x, the surface, z)); the shipped watereffect.prm (JumpIntoMdlEffectSpY 10, MinY 20, MaxY 50, ScaleMin 0.7, ScaleWidth 0.3).
+
+**The model, from the disc.** `/mario/04_tobikomi/04_tobikomi.bmd` lives in `data/chr0.szs` (Mario's character archive; nothing named "mario" on the
+ISO). Five shapes under the root joint `bashan` (scale 1.5): shape 0 (joint `2_mizubashira1`, material `_mizubashira`) a 12-sided cone y -30.3..132.0,
+r 34.2 -> 44.4, u 0.082 + i/12 around, v 0 at the top; shape 3 (`3_mizubashira1r`, `_mizubashira1r`) the same cone with the winding reversed; shapes
+2 / 4 (`1_mizubashira2` / `4_mizubashira2r`, `_mizubashira2` / `2r`) a wider cone y -12.6..65.1, r 51.1 -> 67.0, outside and inside; shape 1
+(`0_hamon`, `_hamon`) a 150 x 150 quad 5 u up. Textures P_wave1 (I8 64x64: one horizontal wavy band, intensity 0 at the top and bottom rows, 227
+mid), P_tamatama (I8 droplet noise), P_ms_hamonring3 (the ring). Materials: all blend SRCALPHA / ONE, z test on, z write off, no fog, lighting off
+except the ring's. `_hamon`: rgb = 3/8 + 3/8 x RASC, a = TEXA x K0.a. `_mizubashira`: tex0 wave1 (S 1.5,1; t clamped), tex1 tamatama (S 4,1);
+rgb = 1/8 + RASC x tex1, a = clamp(4 x (tex0 x RASA - tex1)): the foam shows where the wave band beats the scrolling droplet noise.
+`_mizubashira1r`: tex0 wave1, tex1 wave1 (S 1.5,1); a0 = clamp(2 x tex0 x RASA), rgb = 1/8 + RASC x tex1, a = clamp(4 x a0 x tex1), alpha test
+GEQUAL 64. `_mizubashira2 / 2r`: matColor 207; tex0 wave1 (S 3,1), tex1 tamatama (S 7,1); rgb = 1/8 + RASC x tex1, a = clamp(tex0 x RASA + tex1 -
+1/2) (stage 1 (TEXA, TEXA, APREV, APREV) ADD SUBHALF), alpha test GEQUAL 253 XNOR LEQUAL 100 = drawn only in 100 < a < 253 (a cut-out band of
+droplets); cull BACK. The clips: bck 79 frames (joints 1 / 4 S (0.3, 0.1, 0.3) -> (2.9, 0.45, 2.9) at f48 with S.y peaking 1.32 at f24, T.y 2 -> 54.5
+(f24) -> 4 (f48), then 1e-5 from f54; joints 2 / 3 S (0.65, 0.2, 0.65) -> (2.0, 0.35, 2.0) at f48, S.y peaking 1.62 at f24, gone at f54; joint 5
+S.xz 0.1 -> 2.94 over all 79); bpk (matA: `_mizubashira` 200 -> 200 f27 -> 0 f50; `_mizubashira1r` 150 -> 0 f50; `_mizubashira2 / 2r` 255 -> 255 f27
+-> 0 f50); brk (`_hamon` K0.a 200 -> 200 f25 -> 0 f80); btk (texmtx 1: `_mizubashira` T.y 0 -> 1.5, `_mizubashira1r` T.y 0.2 -> 0.8, `_mizubashira2 /
+2r` S.y 1 -> 0.4 and T.y 0 -> 1.5; the material's static texmtx trans values are the btk's last frame and are replaced). All four at
+SMSGetAnmFrameRate = 60 frames a second (the project's bck rule): 1.32 s.
+
+**The port.** `WaterSplashModel.tscn`: J1..J5 (Node3D, the JNT1 rest TRS) each with a `Mesh` (MeshInstance3D, a ShaderMaterial local to the scene so two
+alive splashes fade apart) and `Anim` (AnimationPlayer, callback mode PHYSICS = 60 Hz, one clip `splash` of 79/60 s: scale_3d / position_3d tracks
+on the joints and value tracks on `Mesh:material_override:shader_parameter/...` -- mat_alpha, k0_alpha, tex1_trans, tex1_scale -- a key a frame from
+the J3D Hermite). `SmsSplashModel.cs` ([Tool]) builds the three meshes from the bmd's exact numbers with SurfaceTool at _Ready (the editor shows the
+rest pose), `Play(surface, small, scale)`: TopLevel, the node's scale = units x 1.5 x scale (small: x (0.8, 0.4, 0.8), no speed scale, J5 / J4 / J1
+hidden = shape packets 1, 2, 4), `intensity` pushed to the five materials, the clip played; frees itself on `animation_finished`.
+`splash_model.gdshader`: one shader, `variant` 0..3 picks the TEV above, `cull_back` discards !FRONT_FACING (GX_CULL_BACK with cull_disabled so one
+shader serves all five), the J3D texmtx uv' = S x (uv - 0.5) + 0.5 + T with t clamped for wave1, the TEV run raw and put to linear. Mario
+(`SmsWaterInOutTick`): the shallow stand-in (depth < 50 u, 133) -> the small model whatever the speed; else the big one at |vel.y| >= 10 u/f and
+depth >= 50 u, scale 0.7 + 0.3 x clamp((|vel.y| - 20) / 30) (`SmsSplashModel.ScaleForSpeed`); `SmsSpawnSplashModel` keeps a list of two (TMarioEffect's
+two MActors: a third request while two are alive is dropped, getThing() < 0). A 6 m drop reaches the surface at 62 u/f (the port's fall), so any
+real dive is the full 1.0; the 0.7..1.0 band belongs to drops under 4 m.
+
+**Deviations (logged):** (1) the game writes the scale over the diagonal of unk220 (rotateY(face) x translate) and leaves the sin terms in: at a
+facing of 90 degrees the model is sqrt(s^2 + 1) / s wider than tall -- the port scales uniformly (the facing is not applied at all: the cone is
+symmetric, only the wave band's seam would turn). (2) `_hamon`'s lit vertex colour (chan0: ambient 128 + the stage light, clamped) is the constant
+`ras_lit` 1 -> rgb 0.75. (3) Knobs on the scene: `SizeScale`, `Intensity` (1 = the game). Not in: TOBIKOMI_C / S_C (the indirect refraction
+ripples, projected), the pool / shallow flag proper (still the 50 u depth stand-in).
+
+**Verification:** drive 134 (patch_smoke134.py, SMS_YCAM_SMOKE=1) 20/20 through the real path on a floor 80 m over the arena with a 3 m pool (an
+Area3D in sms_water), a shelf 30 u under the surface and a dry dock: D1-D10 a 6 m dive flips the water flag and spawns the big model through
+SmsWaterInOutTick (|vy| 62 u/f, scale 1.0 = the formula, the node's scale units x 1.5 x 1.0 uniform, the clip 'splash' 1.3167 s on the physics
+callback, the particle splash beside it, all five joints shown), frame 24 of the clip = the bck / bpk / brk values (column S (1.005, 1.623, 1.005),
+crown 54.5 u up, ring S.x 1.635, matA 0.784, K0a 0.788), frame 48 (S (2.0, 0.35, 2.0), matA 0.064, K0a 0.479, tama T.y 0.936, crown S.y 0.64),
+freed by frame 90; O1 stepping onto the dock at |vy| 0: the particles, no model; S1-S4 a drop onto the shelf: the small model, shapes 1 / 2 / 4
+hidden, scale x (0.8, 0.4, 0.8), the same clip values, freed; C1 / C2 three requests -> two alive -> none. Build 0 errors, boot ALL OK. GPU capture
+(cap_splash134.gd, ref134/): the full splash at frames 4, 12, 24, 36, 48, 60, 76 and at scale 0.7, the small one at 4, 12, 24, 40, beside a 2.15 m
+post over a translucent slab -- the white column shooting up with the crown's droplet ring and the surface ring, the column fading by 48 while
+the ring spreads to 76; the small one a squat foamy cup. Two drive-side fixes on the way: the first arena's dry spot was inside the water box, and
+the capture harness must start its first scene from _process (a node added in _init has no _Ready yet: Play found no AnimationPlayer and freed).
