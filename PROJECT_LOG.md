@@ -9675,3 +9675,119 @@ keeps him invincible for the approach, and a drive-side nerve-name mismatch ("Do
 (the shell upside down over the dock), the struggle in the sand, the ground pound, the sunflowers around Mario, the flat body, the carry.
 
 **Note for the drives:** a leaping body comes down exactly on Mario's spot at the leap; a drive that leaves him there takes the hit (the game's).
+
+### 146 -- the Monty Mole in its cannon: Pinna Beach's three-barrelled cannon, its bomb lobs, its hide, its three-hit break (feature/enemy-pinna, `45574ec`)
+
+**Files:** NEW `assets/Sms/Enemy/Cannon.tscn`, `SmsCannon.cs` (+ .uid), `assets/Sms/Enemy/Cannon/TyorobeBody.tres`, `models/Eniemes/Cannon/`
+(cannon.glb = /scene/cannon/default.bmd, cannon_dom.glb, tyorobe_model1.glb from his FinModelUtility rip of /scene/cannon -- game units; the mole's
+glb carries the archive's 8 tyorobe_* bck clips, the cannon's and the domes' carry none; the three pngs; tyorobe_model1.glb.import swaps the
+mole's `_body2` for TyorobeBody.tres, the cannon and the domes keep the glb's own materials; cannon.glb.import and cannon_dom.glb.import have an
+EMPTY `_subresources` -- see the note at the end). Nothing of Mario's or the base's changed. Tools: npc82/pinna146/{patch_import146.py (glb /
+pins / trim), probe_clips146.gd, patch_smoke146.py (drive 146 + its capture mode), run_drive146.bat / run_cap146.bat, cap/, disc/ (the three bmds,
+the 20 bcks, the rip folders), decomp/ (cannon.cpp, Cannon.hpp)}. Sources: cannon.cpp / Cannon.hpp (all of it), bombhei.cpp (isDamageToCannon),
+the shipped cannon.prm (sms_shipped_params.json: HeadHeight 120, BodyRadius 5, WallRadius 50, ClipRadius 400, 3 hit points, SearchLength 2000 /
+Height 800 / Aware 400 / Angle 90, GiveUp 1100 / 650, damage 200 x 500, attack 200 x 500, turn 0.5 / 0.5, body scale 1 / 1, HideDist 500,
+BombDist 3000, KillerDist 20000, BombInterval 200, KillerInterval 100, ShootInterval 500, Chorobei attack 200 x 300, Chorobei damage 200 x 250,
+KillerTransYOffset 0, BombHeiGenerateRate 1, ThrowXZSpeed 9), the bmds (default.bmd: the cannon's joints Cannon / nullC / nullB / nullA /
+Cannon_FUTA; cannon_dom.bmd: null1 / enemy / CannonDom; tyorobe_model1.bmd: the mole, 213 u tall, MAT3 `_body2` the enemy toon with konst 3/4,
+C0 (75, 75, 100), C1 (157, 161, 169), and `_cap2` plain), the bcks' ANK1 headers (cannonclose 15; cannondom 30; cannondom_break 99; cannonopen
+15; cannon_break 80; the three cannon_demo_* 379; the four hodai_mario_* 309 / 379; tyorobe_appear1 59; damage1 59; down1 189; hyde1 34; throw1
+74; wait1_end 29; wait1 60 L; wait1_start 29), the skin's inverse bind matrices for the dome joints (nullC (-129.3, 152.5, 162.7), nullB (129.1,
+151.8, 162.9), nullA (0, 252.7, 204.7)), SmsBombHei.cs (Thrown / Exploding, Kill, the hit-filter idiom), SmsSmallEnemy.cs (SmsLaunch, SmsSpawnDead).
+
+**The game.** TCannon is a TSmallEnemy (ACTOR_TYPE_CANNON, unk150 0x11) with a TChorobei (the mole: a TSharedParts of tyorobe_model1 at the
+cannon's root matrix + 300 u, its hit point 150 u under that, hidden while unk70) and three TCannonDom (cannon_dom.bmd on the joints nullC /
+nullB / nullA, with map collision; beyond BombDist they wobble: a 1-deg-a-tick phase, -20 / -10 x sin). reset: the hit points (HitPointMax 3), the
+collision off (onHitFilter NO_COLLISION: the cannon body's own cylinders never hit anything), LIVE_FLAG_UNK10 (no bind), the goal. The statics
+mVelocityRate 0.62 and mSearchRate 0.02. The mole's checkHit each tick (TChorobei::checkHit over its hit list): Mario -> ATTACK; a TBombHei ->
+TCannon::hitHead: not in DAMAGE and the bomb's isDamageToCannon (in its Thrown or Explosion nerve -- and that getter turns the bomb's
+HIT_FILTER_NO_COLLISION ON, so it leaves every hit list at once) -> DAMAGE pushed, the bomb killed; a TKiller rolling (isRollFly) -> DAMAGE, the
+Bill killed. OPEN: the mole appear1 + cannonopen; both done -> SEARCH. SEARCH: tick 0 the goal Mario when within BombDist; the mole wait1_start
+-> wait1_loop; within HideDist -> CLOSE; within BombDist past BombInterval -> SHOOT (the bomb); else within KillerDist past ShootInterval -> SHOOT
+x 3 (the Bullet Bills), FORCEBOMBSHOOT, SEARCH queued; the yaw changing -> CANNON_MOVE; turnToGoal = walkToCurPathNode(0, mTurnSpeed, 0) at
+TurnSpeedLow. SHOOT (the bomb, unk290 on): the mole wait1_end; its end -> throw1 + bombSet (the Bob-omb made at the mole's point, TAKEn by the
+cannon -- its taking matrix is the mole's hand -- at scale 0, its clip frozen); throw1 past frame 26 bombScaleUp (+0.2 of its scale a tick);
+passing frame 38 bombShoot: the velocity = the XZ direction to Mario x ThrowXZSpeed with vy ThrowXZSpeed (the +-30 deg yaw roll is computed and
+never applied), +2 u, airborne, the clip running, PUT -- the bomb is released into its own default nerve (not Thrown: it never damages its own
+cannon); throw1's end -> SEARCH. SHOOT (a Bullet Bill, unk290 off): setKillerGoalPoint (a point 500 u from Mario at a random angle, the dome's
+cannondom clip); ticks < 40 turnToGoal; tick 40 killerShoot (the Bill at the dome's joint 1 + (0, -60, 150), calcVelocityToJumpToY(Mario + a
+300-u jitter, 5, its gravity) x mVelocityRate toward where his speed puts him, 1 in 5 homing, KILLER_FIRE + _FLY); past KillerInterval -> the
+next dome. FORCEBOMBSHOOT: Mario within sqrt 2 x BombDist -> the bomb throw again. CLOSE: ticks 0-1 deadCannon (no collision), the mole hyde1,
+CHO_ASE (the sweat) 300 u up; the mole's hyde1 done -> cannonclose; its frame 10 -> JUMP_ED_B x 1.5 at 290 u; Mario past 3 x HideDist -> the
+collision back, OPEN. DAMAGE: tick 0 BOMB_SMOKE + BOMB_BOMB + BOMB_HAHEN x 2 at the cannon (the three particle emitters: no fireball -- the
+bomb's own TEffectExplosion is already there); decHitPoints; 0 -> killShootAct (the held bomb killed), the mole damage1, a rumble, CHO_MOKU_B at
+the mole's joint 12 + CHO_MOKU_A, the demo camera (tyorocam_pinna / tyorocam_mare), deadCannon; else damage(): setFreezeAnm, the mole damage1 +
+CHO_MOKU_A at its joint 0; the cannon hops (mVelocity.y 4, mPosition.y += 10, airborne; moveObject brings it back down to its placed height:
+y += vy, vy -= gravity, never under unk23C); the mole's clip done -> 0 hit points ? DAMAGEDEMO : SEARCH. DAMAGEDEMO: the mole down1; past 120
+ticks with the clip done -> cannon_break, CANNON_DOWN, TEffectExplosion x 2.5, MSF_MONTY_MOLE_DEFEATED -> OBJECT. OBJECT: cannon_break held at
+its end, the mole hidden; frame 60 CANNON_LAND; past 150 gateOpen (the Mare stage's gate). updateAttachPos: the held bomb at the mole's hand;
+CLOSE kills it; a held bomb that stops keeping its distance (sprayed) -> DAMAGE. isHitValid false: nothing of Mario's kills the cannon.
+
+**The port.** `SmsCannon : SmsSmallEnemy`, Prm = the shipped prm; nerves Open / Search / Shoot / ForceBombShoot / Close / Damage / DamageDemo /
+Object (100..107), Search the default. The cannon is the body: `_noBind` (no fall), `FlyBind` (no step), `CollisionMask` 0 (nothing pushes it;
+the first drive's bombs, landing inside its shape, shoved it a metre a blast), its hit layer off in Reset (the cannon body is no target, no
+attack, isHitValid false, the hose does nothing); a `Solid` StaticBody3D child (layer 1, mask 0) carries the same r 4.4 x 4.9 m cylinder so
+Mario and the bombs stand on it without moving it. The mole and the three domes are the Model's children in the glb's units (Mole at
+(0, MoleHeightUnits, 0); Dome0 / Dome1 / Dome2 at the skin's nullC / nullB / nullA), so they turn and hop with the cannon; the hop is
+`_hopY` / `_hopVy` on the Model's y (moveObject's). The mole's clips through the base's bck table by the archive's indices 12-19 (the cannon's
+own table is the archive's 20 names; its clips 0-11 are not in his rip's glbs). MoveObjectPre: the hop, then MoleCheckHit every fourth tick
+outside Object / Close / dead: Mario's damage cylinder in the mole's 200 x 300 at MoleHitUnits (the mole's point less 150 u) -> TakeDamage; any
+SmsBombHei in the sms_enemy group that is alive, still in the hit lists (its layer 1 on), not the one being made, Thrown or Exploding and in the
+mole's 200 x 250 -> its layer 1 OFF (isDamageToCannon's NO_COLLISION: one hit a bomb -- its 80-frame blast outlives the 59-frame damage1, and
+without it the lingering blast hit again the moment damage1 ended: the third drive run's 2 -> 0 in one go), DAMAGE, `Kill()`. Shoot: wait1_end;
+its end -> throw1 + BombSet (BombScene instanced dormant -- `SmsSpawnDead`, Pooled, RelaunchTicks -1 -- under the cannon's parent at the mole's
+hand, riding it each tick); passing frame 26 the scale grows 0.2 a tick; passing frame 38 `SmsLaunch` with (dir x 9, 9, dir x 9) u/tick (+2 u,
+airborne): the bomb lives its own Bob-omb life (the walk, the fuse, Mario's pick-up and throw); throw1's end -> Search. The Bullet Bill volleys
+run only with a <c>KillerScene</c>: any SmsSmallEnemy scene launched from the dome at the game's velocity (calcVelocityToJumpToY x 0.62 toward
+Mario's led point); empty = the long-range branch is skipped. Close: hyde1 (34) then `SetMoleHidden`, the lid's puff (LidPuffFxScene x 1.5 at
+290 u; the cannonclose clip is not in the rip), the sweat slot; Mario past 3 x HideDist -> Open: appear1 (59) -> Search. Damage: `Blast(2,
+fireball: false)` -- the BombExplosion scene at the cannon's middle with its Fireball, Shockwave and Sparks hidden (the game's three emitters:
+the smoke, the glow balls, the scraps; the bomb's own fireball is already there), a hit point off, damage1 with DamageSound, the mole smoke
+slot, the hop (vy 4, +10 u); damage1's end -> Search or, with no hit points, DamageDemo (the held bomb killed by demo): down1 (189); past 120
+ticks with the clip done -> DownSound, `Blast(2.5)` (the whole thing), the domes and the mole hidden -> Object: alive, no collision, no shots,
+for good (Kill() on it does nothing; a Kill() before the break = DamageDemo). Getters for the drives (CurrentNerveName, MoleHidden, MoleClip,
+MoleFrame, MoleUnits, MoleHitUnits, Hits, Throws, Volleys, LastBomb, Broken, HopUnits). Knobs (grouped, plain English): Deviations (SpeedScale,
+MoleHeightUnits 300, HitPoints 3); Shots (BombScene = Bomb/BombHei.tscn, KillerScene = none); Effects (BlastFxScene = Bomb/BombExplosion.tscn,
+MoleSmokeFxScene / SweatFxScene / LidPuffFxScene slots -- the lid puff Fx131/JumpEd by default); Sounds (MoveSound, DownSound, LandSound,
+AppearSound, DamageSound, HideSound, ThrowSound). The scene: CharacterBody3D (sms_enemy, mask 0), Model = cannon.glb at 1 / 74.44 with Mole and
+Dome0-2 under it, the base's cylinder r 4.4 x 4.9 m at y 2.45 (the hit shape, its layer off), Solid with the same shape, RelaunchTicks -1, a
+plain-English `_sms_note` (+Z is its front; how to beat it).
+
+**Deviations (logged; knobs where they matter):** the cannon's own clips (cannonopen / cannonclose / cannon_break) and the domes' (cannondom /
+cannondom_break) are not in his rip's glbs (the rip merged no bck into default.glb or cannon_dom.glb) -- the lid stays put, the hide is the mole's
+hyde1 + its model off, the break is the mole and the domes off with the blast; the Bullet Bill (TKiller) is not ported -- a slot; the demo
+cameras, the rumbles, the shake and the Mare gate are not ported; the stand-in effects (the Bob-omb's blast scene for the three bomb emitters and
+the break; JumpEd for the lid's puff; the mole smoke and the sweat are slots); the sounds are slots; the dome wobble beyond BombDist is not
+ported (the domes have no clips); CANNON_MOVE's sound is the MoveSound slot; the game's bombSet takes the bomb through HIT_MESSAGE_TAKE (the
+cannon as its holder) -- the port spawns it dormant and rides it; the +-30 deg roll the game computes and never applies is not computed.
+
+**Verification:** drive 146 (patch_smoke146.py, SMS_YCAM_SMOKE=1; two game ticks a physics frame) 13/13 on the 30 x 30 m hard dock 80 m over the
+arena: S1 placed facing +Z with Mario 15 m off its side: SEARCH, the mole up (wait1_start then its loop), the cannon's own layer off, the three
+domes, turned 59.0 deg toward him in 60 frames (TurnSpeedLow 0.5 deg a tick); S2 Mario beside the cannon's foot: health 8 -> 8 (no attack from
+the body; the mole's cylinder is 2 m up). S3 Mario 15 m off within BombDist, past BombInterval: SHOOT -- wait1_end, then throw1 with the bomb
+made in its hand; frame 38: the bomb launched at (9, 8.7, 0) u/tick (the XZ direction to Mario x 9, vy 9 less a tick of gravity), airborne, in
+its own BombGenerate nerve; S4 it came down 19.2 m from the cannon toward Mario and lives on (the walk, the fuse); the mole back to SEARCH after
+throw1. C1 Mario put 4 m from the cannon (within HideDist 500 u): CLOSE -- hyde1 (34 frames) then hidden, no attack on him; C2 90 frames on with
+Mario still within 3 x HideDist: the mole stays in; C3 Mario 25 m off: OPEN -- appear1 (59 frames), then SEARCH with the wait clip (nerves Close,
+Open, Search; clips hyde1, appear1, wait1_start). D1 a Bob-omb made 60 u beside the mole's hit point and killed (its Explosion nerve in the 200
+x 250): DAMAGE within a frame -- one hit point off (3 -> 2), damage1, the hop (10 u at once, 65.3 u at the top); D2 damage1 done 58 frames on
+-> SEARCH, two hit points, the hop back down; D3 the second bomb: one hit, 60 frames on SEARCH again with one hit point (hits 2); D4 the third
+bomb: DAMAGE then DAMAGEDEMO with down1, hits 3, no hit points; D5 189 frames on (down1 done past 120 ticks): the blast x 2.5, the mole and the
+domes gone -> OBJECT, the cannon still there, its layer off, not dead; D6 the prop two seconds on: still OBJECT, Mario near it unharmed, one
+throw in all. (Run a: the dormant bomb in the hand was dropped as "dead" before its throw -- `_shot` is now cleared only when freed. Run b 13/13
+but the cannon walked a metre a blast: the bombs' bodies landing inside its shape pushed the CharacterBody3D -- mask 0 + the Solid child. Run c
+10/13: with the cannon no longer shoved out of the lingering 80-frame blast, each blast hit AGAIN the moment the 59-frame damage1 ended -- the
+game's isDamageToCannon turns the bomb's NO_COLLISION on at the first hit; ported. Run d 13/13.) Build 0 errors, boot ALL OK. GPU captures
+(SMS_F146_CAP=1 under run_gpu.ps1, cap/): the cannon with the mole up and the three domes, the throw (the bomb in the air over the mole's hand),
+the hide (the lid's puff, Mario at its foot), the hit (the bomb's fireball at the mole with the x 2 smoke, glow balls and scraps round it, the
+mole in damage1), the broken prop. The first hit capture, taken with the full BombExplosion scene at x 2, was a 24-m fireball over everything --
+the game's Damage is the three emitters only; the Fireball / Shockwave / Sparks are hidden now.
+
+**Note on the imports (his project):** project.godot carries an 11.7 MB `[importer_defaults] scene=` block (Mario's animation slices, saved as
+the default once), and every new glb import copies it into its `.import` -- 16 such 11.6 MB files sit in the repo already (the coins, the
+fruits, Gooble, SleepyBoo, the 1-up, two watergun parts). The passes' glb imports escaped it only because the material swap replaced the block;
+cannon.glb.import and cannon_dom.glb.import (no swap) were trimmed to an empty `_subresources` before the commit (patch_import146.py trim).
+Clearing that default in project.godot would stop it for the next model.
+
+**Note for the drives:** a bomb blown up on the mole leaves the hit lists for good (its layer 1 off); a drive that counts hits by bombs gets
+exactly one a bomb, and the 80-frame blast is no longer a second hit.

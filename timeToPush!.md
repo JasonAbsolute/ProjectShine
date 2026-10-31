@@ -651,7 +651,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #13 -- PENDING -- queued 2026-10-31 15:15 PDT (Kiro) -- PUSH ONLY, no PR yet (updated for SMS 145)
+### #13 -- PENDING -- queued 2026-10-31 15:15 PDT (Kiro) -- PUSH ONLY, no PR yet (updated for SMS 146: the family complete)
 Push the eighth feature branch: `feature/enemy-pinna`, branched from the RICCO branch's tip `76c46d8` (the 143 log commit; see #12), not from
 `main`: the Pinna species lean on the Ricco branch's base and Mario work (the water-surface helpers in SmsSmallEnemy.cs, Mario's fence getters
 from 139) and the Klamber's net mechanics. Pinna Park's enemy family, one pass each on this branch. SMS 144: the Electrokoopa on the net
@@ -660,15 +660,19 @@ from the other -- assets/Sms/Enemy/AmiNoko.tscn + SmsAmiNoko.cs, its material un
 models/Eniemes/AmiNoko/. SMS 145: the Snooza Koopa (TTamaNoko), the big Koopa asleep in its shell on the sand that a long hosing wakes, that runs
 at Mario and leaps (the hang, the drop), that lands stuck in the sand for his ground pound -- a sunflower grows and bursts five coins -- or flat on
 hard ground for his pick-up and throw -- assets/Sms/Enemy/TamaNoko.tscn + SmsTamaNoko.cs, the sunflower and the materials under
-assets/Sms/Enemy/TamaNoko/, the models under models/Eniemes/TamaNoko/. NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says the family is done
-(Kiro will replace this entry with the PR entry then, as #5-#8 went). More passes (the Monty Mole in its cannon) will land
-on this branch and re-point this entry's tip. Because the branch stacks on Ricco, open its PR AFTER #12's has merged and, if GitHub then shows
+assets/Sms/Enemy/TamaNoko/, the models under models/Eniemes/TamaNoko/. SMS 146: the Monty Mole in its cannon (TCannon + TChorobei), Pinna
+Beach's three-barrelled cannon that turns to Mario, whose mole lobs Bob-ombs at him, ducks inside when he comes close and takes three Bob-ombs
+blown up on it before the cannon breaks to a prop -- assets/Sms/Enemy/Cannon.tscn + SmsCannon.cs, the mole's material under
+assets/Sms/Enemy/Cannon/, the models under models/Eniemes/Cannon/. That is the whole Pinna Park family (three species in three passes). NOT yet
+playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says the family is done
+(Kiro will replace this entry with the PR entry then, as #5-#8 went). No more Pinna passes are planned: the branch is
+complete and waits for his playtest. Because the branch stacks on Ricco, open its PR AFTER #12's has merged and, if GitHub then shows
 Ricco's files in the Pinna diff, rebase first: `git rebase --onto main 76c46d8 feature/enemy-pinna` (replays only the Pinna commits onto the
 merged main), then `git push --force-with-lease`.
-- Branch `feature/enemy-pinna` -- code tip `a702b49` ("SMS 145: the Snooza Koopa ...", 16 files +850: TamaNoko.tscn, SmsTamaNoko.cs (+ .uid),
-  TamaNoko/ (SmsTamaFlower.cs (+ .uid), TamaFlower.tscn, two .tres), the two glbs with their pngs and .import files) on `6537026` (the 144 log),
-  `858718c` (SMS 144, 8 files +744) and `76c46d8` (the Ricco tip: the ten commits of #12); the branch tip is this file's own commit on top of it; 14
-  commits since `main` `55514c8`, 4 of them Pinna's. The range carries none of Jaysonn's nine live edits.
+- Branch `feature/enemy-pinna` -- code tip `45574ec` ("SMS 146: the Monty Mole in its cannon ...", 16 files +760: Cannon.tscn, SmsCannon.cs
+  (+ .uid), Cannon/TyorobeBody.tres, the three glbs with their pngs and .import files) on `ab46ae3` (the 145 log), `a702b49` (SMS 145, 16 files
+  +850), `6537026` (the 144 log), `858718c` (SMS 144, 8 files +744) and `76c46d8` (the Ricco tip: the ten commits of #12); the branch tip is this
+  file's own commit on top of it; 16 commits since `main` `55514c8`, 6 of them Pinna's. The range carries none of Jaysonn's nine live edits.
 - To try 144: build a NET (a thin StaticBody3D with metadata sms_fence, or in the group sms_fence, so Mario can climb it), drop
   assets/Sms/Enemy/AmiNoko.tscn ON it (within 0.4 m of the face; it also takes a wall, a ceiling or a floor) and give it a Graph: a Node3D child
   whose children are the points of its path on the same face -- it crawls from point to point (a random other one each time), stops and turns at
@@ -686,6 +690,14 @@ merged main), then `git push --force-with-lease`.
   off and it goes back to sleep. Knobs: Deviations (SpeedScale, Ground, WakeSeconds), Effects (the Zs, the landing puffs, the stretch burst, the
   sunflower and its coin, and slots for the sand column, the fall streaks, the flower puff and the shake sparkle), Sounds (seven slots);
   RelaunchTicks -1 = gone for good.
+- To try 146: drop assets/Sms/Enemy/Cannon.tscn on flat ground with room around it (it is 9 m across; +Z is its front) -- the mole pops up on
+  top and the cannon turns to face you. Stand 10 to 40 m off and every 1.7 s the mole lobs a Bob-omb at you; it lands, walks at you and blows
+  (or sits dizzy if you hose it: pick it up with B and throw it with B). Come within 6.7 m and the mole ducks inside (the lid's puff) until you
+  are 20 m off. To beat it: throw a Bob-omb so it blows up ON TOP of the cannon by the mole -- the smoke and scraps, the mole flinches, the cannon
+  hops; three hits and the mole collapses, the cannon blows and stays as a harmless prop. Touching the cannon itself hurts nothing; the mole's
+  reach is 2.7 m around the top of it. The barrels' Bullet Bills need a scene in Shots > KillerScene (none yet). Knobs: Deviations (SpeedScale,
+  MoleHeightUnits, HitPoints), Shots (the Bob-omb, the Bullet Bill), Effects (the blast; slots for the mole's smoke, the sweat, the lid's puff),
+  Sounds (seven slots); RelaunchTicks -1 = gone for good.
 ```
 git push -u origin feature/enemy-pinna
 git rev-list --count origin/feature/enemy-pinna..feature/enemy-pinna
