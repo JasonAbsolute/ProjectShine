@@ -650,3 +650,34 @@ git rev-list --count origin/feature/enemy-ricco..feature/enemy-ricco
 Expect `0` from the rev-list. No PR, no merge. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
 `assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
+
+### #13 -- PENDING -- queued 2026-10-31 15:15 PDT (Kiro) -- PUSH ONLY, no PR yet (SMS 144)
+Push the eighth feature branch: `feature/enemy-pinna`, branched from the RICCO branch's tip `76c46d8` (the 143 log commit; see #12), not from
+`main`: the Pinna species lean on the Ricco branch's base and Mario work (the water-surface helpers in SmsSmallEnemy.cs, Mario's fence getters
+from 139) and the Klamber's net mechanics. Pinna Park's enemy family, one pass each on this branch. SMS 144: the Electrokoopa on the net
+(TAmiNoko), the crackling Koopa that crawls the Ferris wheel's nets from node to node, shocks Mario on its side of the net and is punched off
+from the other -- assets/Sms/Enemy/AmiNoko.tscn + SmsAmiNoko.cs, its material under assets/Sms/Enemy/AmiNoko/, its model under
+models/Eniemes/AmiNoko/. NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says the family is done
+(Kiro will replace this entry with the PR entry then, as #5-#8 went). More passes (the Snooza Koopa, the Monty Mole in its cannon) will land
+on this branch and re-point this entry's tip. Because the branch stacks on Ricco, open its PR AFTER #12's has merged and, if GitHub then shows
+Ricco's files in the Pinna diff, rebase first: `git rebase --onto main 76c46d8 feature/enemy-pinna` (replays only the Pinna commits onto the
+merged main), then `git push --force-with-lease`.
+- Branch `feature/enemy-pinna` -- code tip `858718c` ("SMS 144: the Electrokoopa on the net ...", 8 files +744: AmiNoko.tscn, SmsAmiNoko.cs
+  (+ .uid), AmiNokoBody.tres, the glb with its png and their .import files) on `76c46d8` (the Ricco tip: the ten commits of #12); the branch tip
+  is this file's own commit on top of it; 12 commits since `main` `55514c8`, 2 of them Pinna's. The range carries none of Jaysonn's nine live
+  edits.
+- To try 144: build a NET (a thin StaticBody3D with metadata sms_fence, or in the group sms_fence, so Mario can climb it), drop
+  assets/Sms/Enemy/AmiNoko.tscn ON it (within 0.4 m of the face; it also takes a wall, a ceiling or a floor) and give it a Graph: a Node3D child
+  whose children are the points of its path on the same face -- it crawls from point to point (a random other one each time), stops and turns at
+  each. Its body and the charged air 1.3 m out from its back shock you on ITS side of the net (the shock pose, -1 HP); it then sits stunned a few
+  seconds (the air stays charged). Climb the OTHER side and punch it (B) -- it flies off its back and vanishes in a puff; a ground pound kills
+  one on a floor; the hose stuns it; jumping on it only bounces you. Knobs: Deviations (SpeedScale, ClipSet 1 = Pinna Park's clips / 2 = Pianta
+  Village's, FeetOnPlane, AttacksAcrossTheNet = the game's rule: standing right behind the net within its reach shocks you through it), Effects
+  (the sparks, the stun stars, the knock-off smoke, the wall puff), Sounds (five slots); RelaunchTicks -1 = gone for good (1800 = back in 15 s).
+```
+git push -u origin feature/enemy-pinna
+git rev-list --count origin/feature/enemy-pinna..feature/enemy-pinna
+```
+Expect `0` from the rev-list. No PR, no merge. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
+`assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
+`addons/godot_ai` churn: his, leave them.

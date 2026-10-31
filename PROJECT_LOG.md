@@ -9465,3 +9465,115 @@ that angle; the puff and the stars show), the water hit (the hit clip, the body 
 
 **Note for the drives:** a scheduled run that starts against a stale or failed build keeps running on the old DLL; kill_headless.ps1 stops only the
 `--headless` Godot console processes (his editor's Godot_v4.7.1-stable_mono_win64.exe instances are left alone) before the rerun.
+
+### 144 -- the Electrokoopa on the net: Pinna Park's crackling Koopa that crawls the Ferris wheel's nets (feature/enemy-pinna, `858718c`)
+
+**Branch:** `feature/enemy-pinna`, branched from the Ricco tip `76c46d8` (not from `main`): the Pinna species lean on the Ricco branch's base
+and Mario work (the water-surface helpers in SmsSmallEnemy.cs, Mario's fence getters from 139), and the Klamber's net mechanics are the model
+for this one. Until Ricco merges, the Pinna range carries Ricco's ten commits too; the PR (when its time comes) is opened after Ricco's, or the
+branch rebased onto `main` with `git rebase --onto main 76c46d8 feature/enemy-pinna` (queue entry #13).
+
+**Files:** NEW `assets/Sms/Enemy/AmiNoko.tscn`, `SmsAmiNoko.cs` (+ .uid), `assets/Sms/Enemy/AmiNoko/AmiNokoBody.tres`, `models/Eniemes/AmiNoko/`
+(aminoko_model1.glb from his FinModelUtility rip of /scene/amiNoko -- game units, the 16 bck clips, none renamed: Godot strips the five `_loop`
+suffixes and loops them -- with its png; the glb .import swaps the bmd's `_Default` for the .tres). Nothing of Mario's or the base's changed.
+Tools: npc82/pinna144/{patch_import144.py, probe_clips144.gd, patch_smoke144.py (drive 144 + its capture mode), run_drive144.bat /
+run_cap144.bat, cap/, disc/ (the rip, the bmd, the bcks), decomp/ (amiNoko.cpp, AmiNoko.hpp; tamaNoko.cpp / TamaNoko.hpp and cannon.cpp /
+Cannon.hpp fetched for 145 / 146), cur/ (the base and Mario.cs as read)}. Sources: amiNoko.cpp / AmiNoko.hpp (all of it, the US build's
+calcRootMatrix and creepToCurPathNode), the shipped aminoko.prm (sms_shipped_params.json: HeadHeight 120, BodyRadius 5, WallRadius 400, 1 hit
+point, SearchLength 800, GiveUp 2000 / 650, AttackWait 120, FreezeWait 300, damage 120 x 150, attack 120 x 150, turn 5, body scale 1, WaitTime
+100, march 15, ElecRange 200, MtxRotSpeed 0.05), the bmd's MAT3 (bmd_mat_dump.py: the enemy toon, s0 konst 3/4, C0 (180, 150, 150), C1 (157,
+161, 169), opaque, cull BACK), the bcks' ANK1 headers (flying1_loop 40 L, flying1_start 9, hit1 194, run1_end 19, run1_loop 25 L, run1_start
+79, run2 the same, turn1_end 19, turn1_loop 40 L, turn1_start 19, turn2 the same, wait1 120 L), Mario.cs's TakeShock (pass 50's ELECTRIC_DAMAGE),
+the Klamber's SmsKumokun.cs (the net mechanics), SmsShockSparks / SmsFollowEffect (the sparks).
+
+**The game.** TAmiNoko is a TWalkerEnemy (ACTOR_TYPE_AMI_NOKO, unk150 0x11) with LIVE_FLAG_UNK10 from init: no bind while it walks; only the
+death flight (bck 0) binds -- the velocity, gravity (0 in Die), the ground under the next point at the head height (vec.y <= ground + 0.05 ->
+down, not airborne, the velocity 0), the airborne flag. The bck table is the archive's 16 clips in order; unk210 picks set 1 (run1 / turn1;
+every stage but 8) or set 2. The PLANE (unk194 / unk198: PLANE 0 a floor, 1 a roof, 2 a wall) is picked every frame in calcRootMatrix: the
+walls within 10 u (isTouchedWallsAndMoveXZ, radius 10), the ground under the head height (its signed distance >= 0) and the roof above -- the
+nearest wins. The orientation: unk19C (the up) eases to the plane's normal and unk1A8 (the heading) to the current node's direction, each
+COMPONENT by MtxRotSpeed a frame, renormalised; the heading is first turned 90 deg about the normal when it points the other way (dot < -0.1),
+so a turn never goes through zero; the root matrix = (axis = up x heading, up, heading) re-orthogonalised (unk1B4 / unk1C0 keep the last good
+pair) at mPosition - 30 x up, scale mScaling. WALKONFENCE (the default): tick 0 setWalkAnm (run1_start); its end -> run1_loop; the target within
+1.5 u with the clip at its end: run1_loop -> run1_end; run1_end's end -> goToRandomNextGraphNode + TURN; creepToCurPathNode(3) every tick:
+during a loop clip (run / turn) mPositionDelta += the direction to the node x 3 (the US build does not clamp it -- the body dithers about the node
+until the loop ends; the PAL build clamps it to the distance left). TURN: turn1_start -> turn1_loop; the heading within 0.8 of the node's
+direction with the clip at its end: turn1_loop -> turn1_end -> wait1 -> (a wait1 loop end) WALKONFENCE; creep(0). THE ELECTRICITY: TAmiHit, a
+hit actor (initHitActor 120 x 240 / 120 x 240, HIT_CATEGORY_PLAYER, in the enemy group) kept at mPosition + 100 x the up with its base half the
+height down; Mario in it (TAmiHit::perform's collision list, while the body is not dead) or in the body's own attack cylinder -> attackToMario:
+nothing in TNerveSmallEnemyChange or without a plane; PLANE 0: Mario with a roof plane over him and under the body -> nothing; PLANE 1: Mario
+with a ground plane and his feet + 5 over the body -> nothing; PLANE 2: Mario's wall plane facing against the body's plane -> nothing; else
+SMS_SendMessageToMario(ELECTRIC_SHOCK) and, taken, FREEZE (pushed, unless already). behaveToWater: FREEZE pushed unless already, the spray
+cooldown 0. isHitValid: PUNCH with (body - Mario) . up > 0 (Mario behind the net) or any HIP_DROP -> DIE pushed; TRAMPLE never valid; only UNKB
+returns true. DIE: flying1_start, no collision (the TAmiHit's too on PAL); its end: the velocity = the model's up (the matrix's column 1) x 20,
+mPosition.y += 10, airborne, flying1_loop; KIL_SMOKE bound to the base matrix every frame; past 30 ticks isDeadByWall (a wall within 3 x
+BodyRadius: ENM_WALLHIT + _O, the velocity 0), !airborne or 10000 u from Mario -> no collision, DEAD, UNK8, MELT off, mHolder null, the spine
+reset to TNerveSmallEnemyDie with the default after it, genRandomItem. FREEZE: hit1 + DNK_SHIBIRE_B x 2 at joint 0; its end -> wait1; a wait1
+loop end past FreezeWait -> done. Every frame: MSD_SE_EN_AMINOKO_SPARK, AMN_BIRI at joints 11 / 10 / 9 (lkejnt1, rkejnt1, effnull1), AMN_SPARK_R
+/ _L / _M at joint 11; in Freeze's first 46 ticks DNK_SHIBIRE_A x 2 at joint 0, DNK_HIBANA x 2 at joint 6 (headjnt1). getGravityY 0 in Die;
+isCollidMove false; init puts unk210 = 0 in stage 8; load reads mCoinId.
+
+**The port.** `SmsAmiNoko : SmsSmallEnemy`, Prm = the shipped prm; nerves WalkOnFence / Turn / Die / Freeze (100..103). `_noBind` + `FlyBind`: the
+species owns the step -- CreepToCurPathNode writes `_lin` (and `_posU`), the death flight's SetBehavior adds `_flyVel` with GroundAt (a ray from
+the head height down 60 u) as the only floor; the collision mask 0 (the scene's mask names the plane layers, read in Init). FindPlane each
+tick: a ray along the last up (+30 .. -30 u) tracks the surface it rides; none -> the game's search (eight 10-u wall rays cast from 20 u behind,
+the floor under the head height within 120 u, the roof above; 30 / 200 u at the first attach), the nearest signed distance wins; the up snaps
+to the normal at the attach. CalcDirection: the game's pair with the 90-deg rule, but turned about their common axis by MtxRotSpeed radians a
+tick (<c>RotateToward</c>; an anti-parallel pair snaps) -- DEVIATION: the game's per-component step with its renormalisation has fixed points
+(the first run's body, heading +X toward a node up and behind it, stepped straight inward from the diagonal and never finished turning); the
+same speed in the small angles. Frame() = the game's re-orthogonalised basis; ApplyLook puts the model at the body point minus the up x the
+measured gap (<c>FeetOnPlane</c>: the feet on the surface wherever the nodes sit; off = the game's 30 u), the collision shape riding the same
+frame. The path: the base's Graph; <c>InitialGraphNode</c> = the nearest node, <c>NextGraphNode</c> = a random OTHER node (beyond 50 u in 3D:
+the base's pick ignores height and would skip the nodes straight up a net) -- DEVIATION: the game walks the graph's edges, the port's graph
+has none. The creep is clamped to the distance left (the PAL fix). <c>ClipEnded</c> = the base's BckEnded or a looping clip seen to wrap since
+the last tick (the 1.1-frame window is narrower than an uneven render step: a missed wait1 end held one Freeze a whole loop longer).
+HitCheckMario (the Klamber's shape): his fence punch (SmsFencePunchActive, TMario's 250 x 200) / hold / push-up / trample cylinders on the
+body's 120 x 150: a ground pound falling or landing -> Die("a ground pound"); a trample -> StompBounce only; the hose at close range ->
+SmsSprayedByWater; the punch with (body - Mario) . up > 0 -> Die("a punch from behind the net"); then the body's attack cylinder OR the TAmiHit
+cylinder (ElecCentreUnits = the body + 100 x the up, the base 120 down; 120 x 240) on his damage cylinder -> AttackToMario: the plane rule
+(Floor: Mario under the body by 5 u; Roof: his feet + 5 u over the body -- his ground plane is always some floor; Wall: SmsIsFencing with
+SmsFenceNormal . the plane's normal < 0, or, with <c>AttacksAcrossTheNet</c> off, any Mario 5 u behind the plane) then
+<c>_mario.TakeShock()</c>; taken (his state turned to hurt) -> Shocks++ and FREEZE pushed. IsHitValid false for everything (the deaths are the
+species' own). BehaveToWater: FREEZE pushed unless already, `_sprayCooldown` 0. Kill() from outside -> the species' Die. Die: the hp 0, the hit
+layer off, the up remembered; the start clip's end: +10 u, the velocity, flying1; past 30 ticks IsDeadByWall (a 15-u ray along the flight,
+the WallHitFxScene burst) / `_flyLanded` / 10000 u -> GenRandomItem + Dead. Effects: SetSparks binds two SparkFxScene instances to lkejnt1 /
+rkejnt1 (SmsFollowEffect.Bind on this body's Skeleton3D) at scale 0.45 with only their Flashes and Sparks emitting (Mario's streaks and arcs
+are his whole-body shock), Active while alive; BoundFx parents the FreezeFxScene (x 2) and the FlySmokeFxScene under the model. Knobs
+(grouped, plain English): Deviations (SpeedScale, ClipSet, FeetOnPlane, AttacksAcrossTheNet); Effects (SparkFxScene = ShockSparks.tscn,
+FreezeFxScene = Fx131/PoiDizzy.tscn, FlySmokeFxScene = none, WallHitFxScene = EnemyWallHit.tscn); Sounds (SparkSound -- give it a looping
+stream -- RunSound, TurnSound, HitSound, FlySound). The scene: CharacterBody3D (sms_enemy, mask 5 = the plane layers), Model = the glb at
+1 / 74.44 (the body is 235 u = 3.2 m tall), a sphere r 1 m at 1.2 m, RelaunchTicks -1, DeathFxScene EnemyDisap, a plain-English `_sms_note`.
+
+**Deviations (logged; knobs where they matter):** the angular easing (above); the path's nodes are picked at random with no edges; the creep
+clamped at the node; the model's feet on the surface by default (the game's -30 u behind FeetOnPlane off); the sparks and the numbness are
+stand-ins (Mario's shock sparks, the Cataquack's dizzy stars) until the ms_amn_* / ms_dnk_* jpa are ported; the death flight's smoke is a slot;
+the sounds are slots; the Floor rule tests Mario's height alone (the game also wants a roof over him); the clipped-out rules, mCoinId and the
+stage-8 clip set switch (ClipSet instead) are not ported. A frozen body keeps its charged air live (the game's TAmiHit tests only LIVE_FLAG_DEAD):
+a Mario who stands in it after his shock is shocked again once his 60 invincible ticks are up.
+
+**Verification:** drive 144 (patch_smoke144.py, SMS_YCAM_SMOKE=1; two game ticks a physics frame) 21/21 on a 30 x 30 m dock 80 m over the arena
+with an 8 x 6 m net (0.2 m, sms_fence) across it, a backstop 8.4 m behind the net's +Z face, a 6 x 6 m slab 4 m up over the far corner: A1 a
+body placed on the net's +Z face with a 3-node path (two 1.5 m up at x +-2.5, one 4.5 m up): attached to a WALL (the normal +Z), the up on it,
+no bind, the sparks on, the feet 3.7 u off the face; A2 run1_start first; A3 three node visits (the first its own spot) with run1 / run1_end /
+turn1_start / turn1 / turn1_end / wait1 in 1149 frames; A4 the step 6.00 u a frame at most, 0.0 u off the face, the up error 0.000, within the
+path's triangle, 581 u walked over two legs. S1 Mario caught the net's +Z face (FENCE_CATCH, the normal +Z); S2 the body crawled into him 93
+frames on: ELECTRIC_SHOCK -- the shock pose, 8 -> 7 HP on its first tick; S3 FREEZE at once (hit1); S5 he stood up at 120 ticks (WAIT) with
+one shock, moved away; S4 the Freeze out at 315 frames (hit1 194 + one wait1 loop past FreezeWait). O1 Mario caught the -Z face first, a body
+placed across from him: no shock over 2 s (his fence normal against the plane's), HP kept; O2 his real fence punch: Die("a punch from behind
+the net"), flying1_start, the flight +Z at 20 u a tick with flying1; O3 the backstop 8.06 m on: dead (a wall), freed. W1 SPRAYED_BY_WATER (the
+message: 1.5 m up the net is beyond the drive's aim) -> FREEZE on the next tick; W2 out at 314 frames, crawling. F1 a body on the dock: a FLOOR,
+the up +Y, crawling two nodes; T1 Mario dropped onto it from 2.2 m: no kill (isHitValid false), then its cylinders shock him (8 -> 7); P1 his
+real ground pound from 1.4 m inside his post-shock invincibility (a floor one's charged air reaches 2.96 m up: a vulnerable Mario falling in is
+shocked before his pound lands, as the game's cylinders say): Die("a ground pound"), the flight +Y; P2 it rose 3.8 m into the slab past the
+grace and the bind's ground check set it down on the slab's top: dead (the ground). R1 a body under the slab: a ROOF, the up -Y, crawling; R2
+Mario standing on the slab over it: no shock over 3 s; R3 the roof crawl within 1.5 u of the underside, 6 u a frame, the up kept. (Run a's
+S2 / S3 fired every frame -- the drive's gating; run c found the stuck turn -- the species' easing fixed; run d's Freeze ran one wait1 loop
+long -- ClipEnded; run d's pound was pre-empted by the charged air -- the drive pounds inside his invincibility; run e's P2 expected the lid --
+the game's ground check lands a rising body on the slab it enters.) Build 0 errors, boot ALL OK. GPU captures (SMS_F144_CAP=1 under
+run_gpu.ps1, cap/): the crawl on the net (the shell outward, the small crackles at the antennae -- the first run's full ShockSparks whited the
+frame out: the streaks and arcs are off now), Mario and the body side by side on the net, the knock-off flight (head tucked, no sparks), the
+freeze, the floor one, the ground pound, the roof one.
+
+**Note for the drives:** the bodies are made in the frame the drive asks for them and tick first in the NEXT frame -- a track that reads them in
+the same frame sees the pre-attach state (the run's A4 up error of 1.000); the track skips a body without a plane. A freed body (RelaunchTicks
+-1) throws on its Node3D members after the frame it dies: the checks read the last tracked position and IsInstanceValid.
