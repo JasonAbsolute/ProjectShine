@@ -1,0 +1,23 @@
+[gd_scene format=3 uid="uid://d136gorogoro"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsGorogoro.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Gorogoro/bosspaku_head.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisap.tscn" id="3_disap"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_body"]
+radius = 1.6
+
+[node name="Gorogoro" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+floor_max_angle = 1.1868
+script = ExtResource("1_script")
+RelaunchTicks = 2500
+DeathFxScene = ExtResource("3_disap")
+metadata/_sms_note = "Pass 136: the Gorogoro, Bianco Hills' rolling goop head (Petey's head under the stage's goop). Place it facing the way it should roll (its -Z... the body's heading is the node's yaw); give it a Graph (a Node3D whose children are the path's nodes, in order) or let it roll straight. The Bianco gatekeeper spits these by default. Knobs: Goop (the sheet / tint), Deviations (the death stamp, the trail, the speed), Effects, Sounds. RelaunchTicks 2500 = the game's GenerateInterval."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.66, 0)
+shape = SubResource("SphereShape3D_body")

@@ -112,6 +112,8 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
     /// <summary>Bianco kind: the enemy scene it spits (the game's Gorogoro rolling head -- not yet ported; any enemy of the small-enemy base works, lobbed
     /// toward Mario). Empty = the spit animation plays with nothing coming out.</summary>
     [Export] public PackedScene LaunchScene;
+    /// <summary>The game's spit (pass 136): assets/Sms/Enemy/Gorogoro.tscn, the Bianco kind's LaunchScene when none is set.</summary>
+    public const string GorogoroScenePath = "res://assets/Sms/Enemy/Gorogoro.tscn";
     /// <summary>PlazaGelato kind: the Gooble scene for the ring of ten it spits as it revives. Empty = nothing comes out.</summary>
     [Export] public PackedScene NamekuriScene;
     /// <summary>How many of LaunchScene can be out at once (the game's manager pool: 10).</summary>
@@ -299,6 +301,7 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
     {
         if (_filled) return;
         _filled = true;
+        if (LaunchScene == null && Kind == Variant.Bianco && ResourceLoader.Exists(GorogoroScenePath)) LaunchScene = GD.Load<PackedScene>(GorogoroScenePath);  // pass 136: the game's Gorogoro by default
         if (LaunchScene != null && Kind == Variant.Bianco) _launchPool.Fill(GetParent(), LaunchScene, LaunchPoolSize, GlobalPosition, DebugPrint, Name);          // the Gorogoro manager is Bianco's
         if (NamekuriScene != null && Kind == Variant.PlazaGelato) _namePool.Fill(GetParent(), NamekuriScene, NamekuriPoolSize, GlobalPosition, DebugPrint, Name); // the Gooble ring is the Gelato gate's
     }

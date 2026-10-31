@@ -1,0 +1,101 @@
+[gd_scene format=3 uid="uid://d136gorotoke"]
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsNpcEffect.cs" id="1_script"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/JpaDirBillboard.gdshader" id="2_shader"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/osenball_raw.png" id="3_ball"]
+
+[sub_resource type="Image" id="Image_points"]
+data = {
+"data": PackedByteArray(147, 69, 9, 63, 0, 0, 0, 0, 47, 52, 137, 191, 63, 67, 112, 191, 0, 0, 0, 0, 54, 47, 57, 191, 170, 201, 36, 191, 0, 0, 0, 0, 239, 58, 137, 63, 65, 238, 147, 191, 0, 0, 0, 0, 206, 109, 24, 63, 110, 220, 158, 189, 0, 0, 0, 0, 31, 160, 157, 63, 178, 142, 162, 63, 0, 0, 0, 0, 122, 215, 177, 190, 56, 93, 240, 190, 0, 0, 0, 0, 8, 97, 149, 191, 158, 26, 166, 63, 0, 0, 0, 0, 143, 34, 173, 190, 77, 236, 133, 63, 0, 0, 0, 0, 231, 208, 70, 191, 73, 110, 137, 191, 0, 0, 0, 0, 169, 182, 23, 191, 61, 227, 177, 190, 0, 0, 0, 0, 142, 166, 148, 63, 5, 244, 135, 63, 0, 0, 0, 0, 140, 110, 47, 191, 134, 141, 106, 62, 0, 0, 0, 0, 50, 90, 152, 191, 40, 203, 75, 63, 0, 0, 0, 0, 123, 235, 133, 191, 159, 178, 131, 63, 0, 0, 0, 0, 115, 241, 75, 191, 147, 182, 56, 63, 0, 0, 0, 0, 74, 225, 133, 63, 164, 153, 8, 63, 0, 0, 0, 0, 173, 155, 138, 191, 7, 178, 61, 191, 0, 0, 0, 0, 251, 168, 140, 191, 239, 124, 213, 190, 0, 0, 0, 0, 155, 215, 138, 63, 129, 91, 65, 62, 0, 0, 0, 0, 146, 33, 166, 191, 52, 83, 153, 63, 0, 0, 0, 0, 159, 197, 243, 190, 49, 7, 112, 63, 0, 0, 0, 0, 253, 57, 43, 191, 214, 119, 106, 191, 0, 0, 0, 0, 48, 1, 73, 63, 0, 157, 147, 63, 0, 0, 0, 0, 58, 50, 168, 190, 250, 239, 168, 61, 0, 0, 0, 0, 130, 31, 150, 191, 219, 250, 155, 191, 0, 0, 0, 0, 88, 78, 9, 190, 118, 212, 53, 63, 0, 0, 0, 0, 143, 176, 138, 63, 84, 48, 115, 63, 0, 0, 0, 0, 3, 136, 78, 191, 107, 219, 246, 62, 0, 0, 0, 0, 196, 71, 135, 191, 89, 13, 134, 191, 0, 0, 0, 0, 135, 221, 66, 191, 81, 191, 202, 61, 0, 0, 0, 0, 119, 136, 161, 191, 102, 35, 142, 191, 0, 0, 0, 0, 219, 117, 168, 62, 82, 155, 67, 63, 0, 0, 0, 0, 1, 228, 139, 191, 156, 74, 151, 63, 0, 0, 0, 0, 155, 179, 231, 190, 138, 157, 95, 191, 0, 0, 0, 0, 101, 88, 104, 63, 129, 43, 155, 63, 0, 0, 0, 0, 44, 95, 141, 190, 169, 75, 140, 63, 0, 0, 0, 0, 40, 101, 3, 63, 186, 130, 64, 63, 0, 0, 0, 0, 140, 126, 128, 191, 207, 19, 147, 191, 0, 0, 0, 0, 111, 89, 18, 191, 100, 234, 28, 62, 0, 0, 0, 0, 242, 93, 150, 63, 247, 91, 11, 191, 0, 0, 0, 0, 42, 44, 151, 191, 194, 225, 247, 190, 0, 0, 0, 0, 253, 49, 141, 63, 95, 144, 232, 62, 0, 0, 0, 0, 9, 186, 137, 191, 61, 181, 42, 63, 0, 0, 0, 0, 53, 240, 136, 191, 152, 139, 165, 191, 0, 0, 0, 0, 177, 115, 24, 62, 90, 217, 98, 190, 0, 0, 0, 0, 200, 38, 160, 63, 136, 193, 169, 191, 0, 0, 0, 0, 80, 251, 65, 190, 52, 59, 183, 62, 0, 0, 0, 0, 206, 219, 147, 191, 152, 180, 221, 189, 0, 0, 0, 0, 16, 210, 168, 191, 216, 31, 159, 191, 0, 0, 0, 0, 223, 176, 0, 62, 156, 1, 92, 63, 0, 0, 0, 0, 236, 157, 95, 63, 133, 210, 152, 63, 0, 0, 0, 0, 233, 45, 49, 190, 145, 56, 154, 191, 0, 0, 0, 0, 102, 240, 157, 190, 184, 148, 216, 190, 0, 0, 0, 0, 3, 194, 161, 191, 9, 254, 181, 62, 0, 0, 0, 0, 104, 185, 164, 191, 20, 78, 143, 191, 0, 0, 0, 0, 73, 103, 46, 191, 96, 53, 151, 63, 0, 0, 0, 0, 104, 130, 223, 62, 198, 132, 150, 63, 0, 0, 0, 0, 111, 246, 51, 61, 81, 172, 162, 63, 0, 0, 0, 0, 72, 15, 217, 190, 204, 34, 165, 63, 0, 0, 0, 0, 171, 172, 24, 190, 154, 234, 48, 63, 0, 0, 0, 0, 163, 97, 112, 63, 52, 232, 51, 63, 0, 0, 0, 0, 42, 35, 109, 191, 207, 230, 165, 63, 0, 0, 0, 0, 18, 136, 165, 62, 144, 156, 134, 191, 0, 0, 0, 0, 126, 5, 231, 62),
+"format": "RGBFloat",
+"height": 1,
+"mipmaps": false,
+"width": 64
+}
+
+[sub_resource type="ImageTexture" id="ImageTexture_points"]
+image = SubResource("Image_points")
+[sub_resource type="Image" id="Image_normals"]
+data = {
+"data": PackedByteArray(0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0),
+"format": "RGBFloat",
+"height": 1,
+"mipmaps": false,
+"width": 64
+}
+
+[sub_resource type="ImageTexture" id="ImageTexture_normals"]
+image = SubResource("Image_normals")
+
+[sub_resource type="Curve" id="Curve_scale_x"]
+resource_name = "ms_pkh_toke ESP1 scale X: 1 -> 0.3 by 40.75 %"
+_data = [Vector2(0, 0.9998), 0.0, 0.0, 1, 1, Vector2(0.4075, 0.3), 0.0, 0.0, 1, 1, Vector2(1, 0.3), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="Curve" id="Curve_scale_y"]
+resource_name = "ms_pkh_toke ESP1 scale Y: 2.5 -> 0.3 by 40.75 % (the bubble stretched up its rise)"
+max_value = 2.5
+_data = [Vector2(0, 2.5), 0.0, 0.0, 1, 1, Vector2(0.4075, 0.3), 0.0, 0.0, 1, 1, Vector2(1, 0.3), 0.0, 0.0, 1, 1]
+point_count = 3
+
+[sub_resource type="Curve" id="Curve_scale_z"]
+_data = [Vector2(0, 1), 0.0, 0.0, 1, 1, Vector2(1, 1), 0.0, 0.0, 1, 1]
+point_count = 2
+
+[sub_resource type="CurveXYZTexture" id="CurveXYZTexture_scale"]
+curve_x = SubResource("Curve_scale_x")
+curve_y = SubResource("Curve_scale_y")
+curve_z = SubResource("Curve_scale_z")
+
+[sub_resource type="Curve" id="Curve_alpha"]
+resource_name = "ms_pkh_toke ESP1 alpha: 0 -> 0.875 by 12.5 %, -> 0 from 50 %"
+_data = [Vector2(0, 0), 0.0, 0.0, 1, 1, Vector2(0.125, 0.875), 0.0, 0.0, 1, 1, Vector2(0.5, 0.875), 0.0, 0.0, 1, 1, Vector2(1, 0), 0.0, 0.0, 1, 1]
+point_count = 4
+
+[sub_resource type="CurveTexture" id="CurveTexture_alpha"]
+curve = SubResource("Curve_alpha")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_drops"]
+resource_name = "ms_pkh_toke: the ring r 85..100 u (the game: 105..120 shrinking to 44..50 over the 100 frames) at the ground, 6.5 u/f (+-20 %; the game 10 -> 3) up, no gravity; life 80 +-40 %; ~0.75 a frame for 100 frames"
+lifetime_randomness = 0.4
+particle_flag_align_y = true
+emission_shape = 5
+emission_point_texture = SubResource("ImageTexture_points")
+emission_normal_texture = SubResource("ImageTexture_normals")
+emission_point_count = 64
+direction = Vector3(0, 0, 1)
+spread = 0.0
+initial_velocity_min = 4.1916
+initial_velocity_max = 6.2517
+gravity = Vector3(0, 0, 0)
+scale_min = 0.7
+scale_max = 1.3
+scale_curve = SubResource("CurveXYZTexture_scale")
+alpha_curve = SubResource("CurveTexture_alpha")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_drops"]
+resource_name = "ms_pkh_toke: P_msm_osenball (raw IA4), lerp(goop env -> prm, I) -- SmsNpcEffect.SetGoopColors recolours prm / env per instance; alpha test >= 0"
+shader = ExtResource("2_shader")
+shader_parameter/tex = ExtResource("3_ball")
+shader_parameter/prm = Vector4(0.7098, 0.5176, 0.4, 1)
+shader_parameter/env = Vector4(0.3843, 0.0549, 0, 1)
+shader_parameter/alpha_ref = 0
+
+[sub_resource type="QuadMesh" id="QuadMesh_drops"]
+resource_name = "the game's 1.93 x 1.93 quad (96.2 units) before the ESP1 scale"
+material = SubResource("ShaderMaterial_drops")
+size = Vector2(1.293, 1.293)
+
+[node name="GoroToke" type="Node3D"]
+script = ExtResource("1_script")
+EmitFrames = 100
+DrainSeconds = 1.8667
+FollowRotation = true
+
+[node name="Drops" type="GPUParticles3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+emitting = false
+amount = 80
+lifetime = 1.3333
+process_material = SubResource("ParticleProcessMaterial_drops")
+draw_pass_1 = SubResource("QuadMesh_drops")

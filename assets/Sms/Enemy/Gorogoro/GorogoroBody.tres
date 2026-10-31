@@ -1,0 +1,22 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://d136gorobody"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/Gorogoro/GorogoroBody.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://assets/Sms/models/goop_mark_bianco.png" id="2_goop"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/Gorogoro/yogore2.png" id="3_dirt"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/Gorogoro/pakkun_head.png" id="4_head"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/Gorogoro/H_toon_2_4i.png" id="5_toon"]
+
+[resource]
+resource_name = "The Gorogoro's body (_body1): the stage's goop sheet over Petey's head, washed off along the dirt sheet's pattern by the hose (wash = the hit points' fraction, set by SmsGorogoro). Knobs: goop_colour / goop_colour_mode as the gatekeeper's."
+shader = ExtResource("1_shader")
+shader_parameter/goop_texture = ExtResource("2_goop")
+shader_parameter/goop_colour = Color(1, 1, 1, 1)
+shader_parameter/goop_colour_mode = 0
+shader_parameter/goop_uv_scale = Vector2(2, 2)
+shader_parameter/wash = 1.0
+shader_parameter/dirt_mask = ExtResource("3_dirt")
+shader_parameter/dirt_uv_scale = Vector2(1.86035, 1.07422)
+shader_parameter/head_texture = ExtResource("4_head")
+shader_parameter/toon_tex = ExtResource("5_toon")
+shader_parameter/sun_dir = Vector3(0.348, 0.87, 0.348)
+shader_parameter/ambient = Vector3(0.502, 0.502, 0.502)
