@@ -9293,3 +9293,93 @@ mahi_start cost him 1 HP; the drowned body frees itself before the check read it
 capture mode, SMS_F141_CAP=1 under run_gpu.ps1, cap/): the sitter on the edge, the roll, the hang under the walkway over Mario, the lean toward him
 with the ball mid-flight, the ball at the mouth, the knock off the edge under the drops, the walker on the floor, the punch, the paralysis with its
 stars, the squash under his stomp, the drown's column.
+
+### 142 -- the Cheep Cheep: Ricco Harbor's leaping fish and its launch pad, the swimmer (feature/enemy-ricco, `85f17aa`)
+
+**Files:** NEW `assets/Sms/Enemy/Puku.tscn`, `SmsPuku.cs` (+ .uid), `assets/Sms/Enemy/Puku/PukuBody.tres`, `models/Eniemes/Puku/` (default.glb from his
+FinModelUtility rip -- game units, the 11 bck clips, none renamed -- with its pngs; the glb .import swaps the bmd's four `_mat_Lhand` materials for the
+.tres). Nothing of Mario's or the base's changed. Tools: npc82/ricco142/{patch_import142.py, probe_clips142.gd, patch_smoke142.py (drive 142 + its
+capture mode), run_drive142.bat / run_cap142.bat (the detached runners), cap/, disc/ (the rip, the bmd, the bcks), decomp/}. Sources: tobiPuku.cpp /
+TobiPuku.hpp (all of it), LiveActor.hpp (LIVE_FLAG_UNK10 = no bind), liveactor.cpp (bind), smallEnemy.cpp (moveObject's position delta, forceKill,
+genRandomItem), walkerEnemy.cpp (walkBehavior), the shipped tobipuku.prm and tobipukulaunch.prm (sms_shipped_params.json; tabepuku.prm is another
+class's), the bmd's MAT3 and JNT1 (bmd_mat_dump.py; joint 1 'center', joint 6 'chn9'), the bcks' ANK1 headers (the frame counts and loop modes).
+
+**The game.** TTobiPuku is a TWalkerEnemy (unk150 0x31, ACTOR_TYPE_PUKU_PUKU) with /enemy/tobipuku.prm: HeadHeight 50, WallRadius 10, 1 hit point,
+SearchLength 800 / Height 600 / Aware 400 / Angle 90, GiveUp 2000 / 650, AttackWait 120, FreezeWait 300, damage 100 x 80 / attack 105 x 60, turn 3..5,
+body scale 1, march 2.5..3.5 u/tick, zigzag 1000 / 30; its own: BoundNum 3, BoundVal 0.5, LifeTimer 800, FlyGravityY 0.25, PowerFromWater 30; the
+statics mLandAngle 90, mBoundSw true, mBoundVelocityY 0.8, mReturnLaunchSw true. The bck table is the archive's 11 clips in order: 0 attack (14), 1
+death (174), 2 down_air (14), 3 down_land (20), 4 fall (15, loop), 5 fall_end_land (29), 6 jump (15, loop), 7 jump_start (9), 8 pitipiti (35, loop), 9
+swim (60, loop), 10 wait (60, loop). The LAUNCH PAD (TTobiPukuLaunchPad, a tiny TSmallEnemy of tobipukulaunch.prm placed in the water with an extra
+s32 launchPower): perform() with mReturnLaunchSw launches a fish when it has none or its fish is dead (else every LaunchInterval 300); forceLaunch: the
+velocity (sin yaw, 1, cos yaw) x launchPower, then x (cos pitch, sin pitch, cos pitch) from the pad's X rotation; the fish reset at the pad with unk1D0 =
+it, unk1B0 = the pad's height, unk1DC = the pad (the manager's unk60 mode -- calcVelocityToJumpToY to FlyDist along the facing at LaunchVelocityY -- is
+never set). GENERATE (the default): tick 0 UNK10 (no bind), mPosition.y -= 300, the pitch of the velocity (MsGetRotFromZaxis), the jump clip; each tick
+y += unk1D0.y until over unk1B0 -> flyStart (unk194: FlyGravityY, mVelocity = unk1D0, unk1B4 = its pitch, the water column + TOBIPUKU_FRWATER, airborne,
+UNK10 off) -> FLY: the pitch follows the velocity, unk1E4 = vy; landed -> LAND. LAND ticks 0-1: a WATER surface: y -= 10, UNK10, the column +
+TOBIPUKU_TOWATER, with the return switch unk1E4 x 0.8 and unk1E8 = (180 - pitch) / |600 / unk1E4|; the GROUND: mBoundSw and canBound (unk198 <
+BoundNum) -> BOUND, else unk1B8[0] = the position, fall_end_land, pitch 0. From tick 2: fall_end_land playing -> (a 20-tick blend of the position by
+unk1B8[1], which the decomp never sets) -> its end -> PITIPITI; else with the return switch the DIVE by hand: unk1D0.xz x 0.5, the velocity = unk1D0.xz
+x cos(pitch), vy = unk1E4, pitch = clamp(pitch + unk1E8, 0, 180), past 120 u deep the roll +3 a tick to 180 (TobiPukuRollCallback: joint 1 about its
+Z), past 600 u -> RETURNLAUNCH; without the switch y -= 12 a tick, the pitch +1.2 to 90, dead after 100 ticks. BOUND: bound(): unk1AE = 1, unk198++,
+the velocity = unk1D0.xz x BoundVal, vy = 0.8 x BoundVal x (unk1B0 - the ground) / 30, airborne; rising -> unk1B0 = y; landed -> LAND. PITIPITI: the
+pitipiti clip (PUKU_PICHI at joint 1), its end past LifeTimer -> unk1AD = 0 -> DIE. RETURNLAUNCH: the goal = the pad, the swim clip, PUKU_AWA bubbles at
+joint 6; within 200 u in XZ -> PREPAREFLY; else toward the pad at the march speed less unk1D0.xz decaying x 0.99, the roll +1. PREPAREFLY: unk1F0 =
+(wrap(unk1B4) - pitch) / 60; the position eases 1/60 a tick toward the pad, the roll -3, the pitch += unk1F0; tick 50 setJumpStartAnm; past 60 ->
+forceLaunch + reset -> GENERATE. attackToMario: ATTACK; not attacking, not bouncing (unk1AE), Mario not in water -> unk1D0 = 0, the ATTACK nerve: the
+attack clip, airborne: frame 6 fallStart (unk194 = 0, the XZ velocity zeroed, +2 u, airborne), its end -> FALL; on the ground done. behaveToWater ->
+EN_COMMON_FLY + HITWATER unless in it: tick 0 airborne over 50 u -> the attack clip + hitWater (the velocity = the direction from Mario x PowerFromWater,
+y x 2, unk1D0 = it, unk1B0 = y, yaw = 180 - Mario's angle); on the ground and bouncing -> pitipiti; each tick on the ground the knock (away x 5, vy 5, +5
+u, airborne); the clip's end: the attack clip -> FALL; done. FALL: pitch 0, the fall clip; landed: water -> the column, DIE with UNK20000; ground -> DIE
+with UNK20000. DIE: airborne -> no collision, the XZ velocity zeroed, down_air; else unk1AD -> no collision, down_land; else UNK20000 + death; the
+clip's end -> DEAD, TNerveSmallEnemyDie, genRandomItem. kill: hit points 1; dying from a kill already -> nothing; else unk1AD, the spine reset to DIE.
+moveObject: the turn speed = TurnSpeedLow; airborne with mBoundSw -> hitWall (a wall reflects the velocity, vy x 0.5, unk1D0 / unk1B0 updated; a roof
+caps vy at 0). getGravityY: FlyGravityY while unk194. calcRootMatrix: pitch != 0 -> the model at (x, y + 70 x pitch / 90, z) with the full rotation.
+TPukuPuku: SWIMWANDER: unk1E0 = y, the swim clip, initialGraphNode, UNK10; at the goal (200 u in XZ) goToRandomNextGraphNode; walkBehavior(0, 1.5), then
+y = unk1E0 + 10 sin(2 x time), the pitch from the position delta. TMoePuku (the flaming one) is another level's.
+
+**The port.** `SmsPuku : SmsSmallEnemy`, `Kind` = Leaper (the fish AND its pad: the node's place is the pad, in the water at the surface, the node's yaw
+the direction; `LaunchSpeedUnits` 18 / `LaunchPitchDegrees` 70 = launchPower and the pad's X rotation -- 7.7 m up, 11 m far) or Swimmer; Prm = the
+shipped prm; nerves Generate / Fly / Attack / HitWater / Fall / PitiPiti / Die / Land / Bound / PrepareFly / ReturnLaunch / SwimWander (100..111). UNK10 =
+the base's `_noBind` with the COLLISION MASK OFF (MoveObjectPre: the game's bind-less fish passes through the map -- a rising one under a pool's floor, a
+diving one through it; the base's step moves it by `_lin` alone); the hit layer off while under the pad. The flight, the bounces and the falls ride the
+base's bind (gravity = FlyGravityY while `_flying`). A WATER SURFACE is a floor: `SetBehavior` lands a falling body meeting the surface this tick (the
+base's `WaterSurfaceAt` 2 m down, the velocity = the gap, `_onWater`, airborne off), MoveObjectPre zeroes the velocity at rest on it (the floor
+landing's zero, which no floor gives) and the `_PhysicsProcess` tail keeps the airborne flag down (the step finds no floor under a floating body); the
+nerves read `_onWater` as mGroundPlane->isWaterSurface(). The dive's depth = what the pool allows (`GroundAt` at the splashdown: the surface - the
+floor - 30 u, clamped to `DiveDepthUnits` 600): the pitch step is computed over THAT depth so the fish still faces back (180) at the bottom. The pitch
+is the model's X turn under the heading in ApplyLook (with the 70 x pitch / 90 lift), the roll an `SmsBoneRoll` on 'center' about the model's forward
+axis. Relaunch: the pad's (RelaunchTicks 1 = at once with ReturnsToPad; off: `Relaunch` waits LaunchIntervalTicks). Kill, AttackToMario, BehaveToWater,
+WalkBehavior, GravityY, OnWallContact (+ a roof ray), IsCollidMove (false: isInhibitedForceMove), WallHopAllowed (false), IsReachedToGoal (200 u XZ)
+as the game's. Knobs (grouped, plain English): Kind; Launch pad (LaunchSpeedUnits, LaunchPitchDegrees, ReturnsToPad, LaunchIntervalTicks); Deviations
+(DiveDepthUnits, Bounces, SpeedScale); Effects (WaterColumnFxScene = WaterSplashSmall by default, SwimBubbleFxScene, FlopFxScene); Sounds (LeapSound,
+SplashSound, HitWaterSound, FlopSound, SwimSound). The scene: CharacterBody3D (sms_enemy, mask 5), Model = the glb at 1 / 74.44, a sphere r 0.8 m at
+0.8 m, RelaunchTicks 1, DeathFxScene EnemyDisap.
+
+**Deviations (logged; knobs where they matter):** the landing's 20-tick position blend is not ported (its second vector is never set in the decomp);
+the dive ends at a pool's floor (the game's 600 u); the swimmer's goal rule is the base's (a random Graph node, or a random point within
+WanderRadiusUnits); the water column, the bubbles and the flop drops are slots (none but the column by default); the sounds are slots; the hosed
+fish's heading 180 - Mario's angle is taken literally; the clipped-out rules and the Yoshi are not ported.
+
+**Verification:** drive 142 (patch_smoke142.py, SMS_YCAM_SMOKE=1; two game ticks a physics frame) 18/18 on a 30 x 30 m dock 80 m over the arena with a
+20 x 20 m, 3 m deep pool (an sms_water area, its surface level with the dock) off the +X edge and a 1.3 m step at the dock's edge: G1 a Leaper placed
+at the surface: GENERATE from 300 u under (no bind, mask 0, the hit layer off, the jump clip, pitch -70); G2 over the pad: the LEAP (Leaps 1, the column,
+FlyGravityY, airborne, the bind and the mask back, the velocity (6.16, 16.9, 0) = 18 u/tick at 70 deg); G3 the apex 7.63 m (572 u), the pitch -69..+70
+following the velocity; G4 the splashdown 11.2 m on (x 31.2) landed on the surface; G5 LAND: the second column, the dive by hand to 2.67 m (the pool's
+floor less 30 u), the pitch stepped to 180, RETURNLAUNCH; G6 the swim back (the swim clip, the roll to 180, the depth kept) to 2.61 m off the pad in XZ
+-> PREPAREFLY; G7 60 ticks later the second LEAP from the pad's spot (Leaps 2, the roll 0). A1 a 10 u/tick leaper through Mario on the step: -1 HP (8
+-> 7) at frame 27, the Attack nerve with the attack clip; A2 FALL -> DIE with down_land, dead, no reward (freed). S1 a leap onto the dock: BOUND x 3,
+fall_end_land, PITIPITI 1.1 m in from the edge; L1 the flop runs out at 592 frames (800 ticks + the 174-frame death clip) -> dead, no reward; S2 the pad
+launches again 10 frames later (Leaps 2); S3 the real hose on the flopping fish from 2.3 m (the squat spray, inside the 80 + 100 u close range):
+HITWATER's knock (airborne at vy 5), back to the flop, his health kept; S4 his real fall onto it: TRAMPLE -> kill -> DIE with down_land, his bounce,
+no damage. H1 the message at the apex (the drive cannot aim the nozzle up): HITWATER, the attack clip, flung from Mario at (-25.1, 32.4, 0) = 30 x
+the direction (y x 2) -> FALL; H2 the fall (145 m on, 90 m down into the arena) -> DIE, dead, no reward. W1 a Swimmer 0.6 m under: SWIMWANDER, no
+bind, the swim clip, random points within 450 u (moved 3.3 m), the bob y -0.73..-0.47 (+-10 u), the pitch +-4, never airborne; W2 Mario put in the
+water (1.3 m deep, swimming after 8 frames) at the centre of its disc while it was 3.2 m off: its bite -> "hit in the water: -1 HP" with Mario still
+SWIMMING, no Attack nerve for a Mario in the water. (The first run's fish flew to z 4891: Generate had divided only Y of the pad's units by 74.44 --
+fixed; a swimmer placed under a falling Mario was trampled, as the game's cylinders say it must be -- the drive now lets him swim first.) Build 0
+errors, boot ALL OK. GPU captures (the drive's capture mode, SMS_F142_CAP=1 under run_gpu.ps1, cap/): the rise under the surface, the leap out with
+the column, the arc's apex, the nose-first splashdown with its ring, the dive turning over under the water, the swim back rolled upright, the hit on
+Mario over the step, the flop on the dock, the stomp, the fling high over the arena, the swimmer under the surface.
+
+**Note for the drives:** the headless and windowed runs are launched through the Task Scheduler (run_drive142.bat / run_cap142.bat via `schtasks /run`)
+and polled: a run started from the ssh session dragged at a few frames a second (the 141 drive took 7 minutes); detached it finishes in about a minute.

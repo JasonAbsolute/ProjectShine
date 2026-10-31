@@ -586,7 +586,7 @@ Bianco gatekeeper filling its pool of ten Gorogoros at Level boot. Watch for the
 bisect to run.
 Trunk for the next feature: `main`'s current tip (`git log --oneline -1 main`).
 
-### #12 -- PENDING -- queued 2026-10-31 01:02 PDT (Kiro) -- PUSH ONLY, no PR yet (updated for SMS 141)
+### #12 -- PENDING -- queued 2026-10-31 01:02 PDT (Kiro) -- PUSH ONLY, no PR yet (updated for SMS 142)
 Push the seventh feature branch: `feature/enemy-ricco`, branched from `main` `55514c8` (the trunk after SMS 138 and entry #10). Ricco Harbor's
 enemy family, one pass each on this branch. SMS 139: the Klamber (TKumokun), the wall-walking spider -- assets/Sms/Enemy/Kumokun.tscn +
 SmsKumokun.cs, its body material and model under assets/Sms/Enemy/Kumokun/ and models/Eniemes/Kumokun/, and seven public getters on Mario.cs (what
@@ -595,13 +595,16 @@ that floats on the water and flattens into a platform under the hose -- assets/S
 under assets/Sms/Enemy/MameGesso/ and models/Eniemes/MameGesso/. SMS 141: the land Blooper (TGesso / TLandGesso / TSurfGesso), the big squid
 that sits on a walkway's edge, leans after Mario, spits goop balls, hangs under the walkway when he is below it, and walks the ground once the hose
 knocks it off -- assets/Sms/Enemy/Gesso.tscn + SmsGesso.cs, its materials and models under assets/Sms/Enemy/Gesso/ and models/Eniemes/Gesso/, and the
-water-surface helpers moved from SmsMameGesso.cs into the base SmsSmallEnemy.cs. NOT yet playtested by Jaysonn: push the branch so it is
+water-surface helpers moved from SmsMameGesso.cs into the base SmsSmallEnemy.cs. SMS 142: the Cheep Cheep (TTobiPuku with its launch pad,
+TPukuPuku), the fish that leaps out of the water in an arc, splashes down, loops under and swims back to leap again, or swims under the surface --
+assets/Sms/Enemy/Puku.tscn + SmsPuku.cs, its material and model under assets/Sms/Enemy/Puku/ and models/Eniemes/Puku/. NOT yet playtested by Jaysonn:
+push the branch so it is
 on GitHub; do NOT open a PR until he says the family is done (Kiro will replace this entry with the PR entry then, as #5-#8 went). More passes
-(the Cheep Cheeps, the Wind Spirit) will land on this branch and re-point this entry's tip.
-- Branch `feature/enemy-ricco` -- code tip `50bda5f` ("SMS 141: the land Blooper ...", 17 files +1106 -25: Gesso.tscn, SmsGesso.cs (+ .uid),
-  GessoBody.tres, GessoGoop.tres, the two glbs with three pngs and their .import files, SmsSmallEnemy.cs +28, SmsMameGesso.cs -25) on `eea8e68`
-  (the 140 log), `949e16f` (SMS 140, 12 files +763), `0bbbfcc` (the 139 log) and `fb28f13` (SMS 139, 13 files +1068); the branch tip is this file's
-  own commit on top of it; 6 commits since `main` `55514c8`. The range carries none of Jaysonn's nine live edits.
+(the Wind Spirit) will land on this branch and re-point this entry's tip.
+- Branch `feature/enemy-ricco` -- code tip `85f17aa` ("SMS 142: the Cheep Cheep ...", 12 files +858: Puku.tscn, SmsPuku.cs (+ .uid), PukuBody.tres,
+  the glb with three pngs and their .import files) on `5f10da6` (the 141 log), `50bda5f` (SMS 141, 17 files +1106 -25), `eea8e68` (the 140 log),
+  `949e16f` (SMS 140, 12 files +763), `0bbbfcc` (the 139 log) and `fb28f13` (SMS 139, 13 files +1068); the branch tip is this file's own commit on top
+  of it; 8 commits since `main` `55514c8`. The range carries none of Jaysonn's nine live edits.
 - To try 139: drop assets/Sms/Enemy/Kumokun.tscn into the Ricco test level within 1.3 m of a wall (a net), under a ceiling, or on a floor -- it
   attaches at its first tick and roams that surface. For Mario to climb the net its StaticBody3D (or a parent) needs metadata `sms_fence` (any
   value) or the group `sms_fence`; the Klamber walks any wall. On the net: it chases him when he is on the SAME side, hurts him on touch (through
@@ -621,6 +624,14 @@ on GitHub; do NOT open a PR until he says the family is done (Kiro will replace 
   searches, charges and punches; the hose paralyses a walker (the dizzy stars) for 10 s; a stomp kills a walker or an upright sitter (never a
   hanging one); knocked over water it drowns. Kind = Surf is the walker that never chases him. Knobs: Kind, Deviations (SpeedScale), Effects
   (the goop splat, the spit, the dizzy stars, the water column), Sounds (five slots), RelaunchTicks -1 by default (gone for good).
+- To try 142: drop assets/Sms/Enemy/Puku.tscn IN the water with its origin at the surface, turned the way the fish should fly (Kind = Leaper: the node
+  is the launch pad) -- a fish rises from under it, leaps in an arc (Launch pad: LaunchSpeedUnits = how hard, 18 clears about 7.7 m up and 11 m far;
+  LaunchPitchDegrees = how steep), splashes down, loops under the surface, swims back to the pad and leaps again, forever. Stand in its path and it
+  hurts you and drops; one that lands on a dock bounces, flops about (its touch hurts) and dies after 13 s; hose one in the air and it is flung away
+  and drops dead into the water; stomp a flopping one. The pad launches a new one as soon as its fish dies. Kind = Swimmer: put it under the surface
+  and it swims from point to point (a Graph of Node3D children, or within WanderRadiusUnits), bobbing; it bites a swimming Mario (set RelaunchTicks -1
+  for one that stays dead). The water must be an sms_water area deep enough for the leap's rise (3 m or more). Knobs: Launch pad, Deviations
+  (DiveDepthUnits, Bounces, SpeedScale), Effects (the water column, the swim bubbles, the flop drops), Sounds (five slots).
 ```
 git push -u origin feature/enemy-ricco
 git rev-list --count origin/feature/enemy-ricco..feature/enemy-ricco
