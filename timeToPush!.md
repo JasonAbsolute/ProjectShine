@@ -545,7 +545,7 @@ Expect `0`. The working tree still carries Jaysonn's uncommitted `assets/Level.t
 three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the `addons/godot_ai` churn: his, leave them.
 A feature branch for the episode select's other stages (`feature/select-stages`) may be in progress off this `main`; it gets its own entry.
 
-### #11 -- PENDING -- queued 2026-10-30 21:20 PDT (Kiro) -- PUSH ONLY, no PR yet
+### #11 -- DONE 2026-10-31 -- https://github.com/JasonAbsolute/ProjectShine/tree/feature/select-stages -- queued 2026-10-30 21:20 PDT (Kiro) -- PUSH ONLY, no PR yet
 Push the sixth feature branch: `feature/select-stages`, branched from `main` `0baa25a` (the trunk after SMS 134 and entry #10; #10 itself may
 still be pending -- push `main` first if so, the branch carries main's commits anyway). SMS 135 adds the other seven stages' episode-select
 resources from the disc (assets/Sms/Gate/Stages/: Bianco, Gelato, Pinna, Sirena, Pianta, Noki, Corona -- the names from stagename.bmg, the eight
@@ -566,3 +566,17 @@ git rev-list --count origin/feature/select-stages..feature/select-stages
 Expect `0` from the rev-list. No PR, no merge. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
 `assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
+
+Result: `feature/select-stages` pushed as a NEW remote branch (`* [new branch]`), 2 commits over `main` `0baa25a` --
+code tip `9f34bc4` (SMS 135, 12 files +410 / -11: the seven stage `.tres`, `SmsStageInfo.cs`, `SmsEpisodeSelect.cs`,
+`SmsModelGate.cs`, `assets/Mario.cs`, `assets/GameData.cs`) plus `e69e0f6` (the 135 log + this entry). The diffstat matches
+the entry exactly, and `0baa25a` is confirmed an ancestor. `git rev-list --count origin/feature/select-stages..feature/select-stages`
+returned `0`. Hygiene: 0 of Jaysonn's nine live edits in the range.
+**NO PR, by the entry's own instruction** -- "do NOT open a PR until he says the feature is done". Jaysonn asked for a PR in
+chat, but SMS 135 is not playtested yet and the entry is explicit, so the branch is on GitHub and nothing more. When he says the
+episode-select feature is done, Kiro replaces this entry with a PR entry (the way #5-#8 went) and the local Claude opens it then.
+**This Result is committed on the BRANCH, not on `main`**, because this entry's text only exists here (`e69e0f6` added it on the
+branch, so `main`'s copy of the file has no #11). Entry #10's Result on `main` carries a pointer to it. When the branch is
+eventually merged, `timeToPush!.md` will conflict -- take BOTH entries, they are different sections of the same file.
+NOTE: `#10` was pending when this entry was queued, as the entry anticipated; it was pushed first in the same pass
+(`main` `b32c023..a0659b9`, then the #10 Result commit `55514c8`), so this branch's base `0baa25a` is now on the trunk.
