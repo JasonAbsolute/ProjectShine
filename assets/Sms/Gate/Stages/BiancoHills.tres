@@ -1,0 +1,57 @@
+[gd_resource type="Resource" script_class="SmsStageInfo" format=3 uid="uid://d135stgbianco"]
+
+[ext_resource type="Script" path="res://assets/Sms/Gate/SmsStageInfo.cs" id="1_stage"]
+[ext_resource type="Script" path="res://assets/Sms/Gate/SmsEpisodeInfo.cs" id="2_episode"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_map_bianco.png" id="3_banner"]
+
+[sub_resource type="Resource" id="Resource_ep1"]
+script = ExtResource("2_episode")
+Name = "Road to the Big Windmill"
+ShineId = ""
+
+[sub_resource type="Resource" id="Resource_ep2"]
+script = ExtResource("2_episode")
+Name = "Down with Petey Piranha!"
+ShineId = ""
+
+[sub_resource type="Resource" id="Resource_ep3"]
+script = ExtResource("2_episode")
+Name = "The Hillside Cave Secret"
+ShineId = ""
+
+[sub_resource type="Resource" id="Resource_ep4"]
+script = ExtResource("2_episode")
+Name = "Red Coins of Windmill Village"
+ShineId = ""
+
+[sub_resource type="Resource" id="Resource_ep5"]
+script = ExtResource("2_episode")
+Name = "Petey Piranha Strikes Back"
+ShineId = ""
+
+[sub_resource type="Resource" id="Resource_ep6"]
+script = ExtResource("2_episode")
+Name = "The Secret of the Dirty Lake"
+ShineId = ""
+
+[sub_resource type="Resource" id="Resource_ep7"]
+script = ExtResource("2_episode")
+Name = "Shadow Mario on the Loose"
+ShineId = ""
+
+[sub_resource type="Resource" id="Resource_ep8"]
+script = ExtResource("2_episode")
+Name = "The Red Coins of the Lake"
+ShineId = ""
+
+[resource]
+resource_name = "BIANCO HILLS: the disc's select data (pass 135) -- the banner, the gradient and the 8 episode names from scenarioname.bmg. No level yet: Scene is empty, so an M gate with this Stage shows the select and the pick brings Mario back out of the gate; set Scene to the level when it exists and give each episode the ShineId of its shine. AllEpisodesOpen is ON (a deviation: with no shines to clear the game would open EPISODE 1 only) -- turn it off once the level has shines."
+script = ExtResource("1_stage")
+Scene = ""
+StageName = "BIANCO HILLS"
+Banner = ExtResource("3_banner")
+Episodes = [SubResource("Resource_ep1"), SubResource("Resource_ep2"), SubResource("Resource_ep3"), SubResource("Resource_ep4"), SubResource("Resource_ep5"), SubResource("Resource_ep6"), SubResource("Resource_ep7"), SubResource("Resource_ep8")]
+GradientTopLeft = Color(1, 1, 0, 1)
+GradientBottomRight = Color(0, 1, 0, 1)
+GradientCycle = Vector3i(3, 1, 5)
+AllEpisodesOpen = true

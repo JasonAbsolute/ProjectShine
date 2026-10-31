@@ -20330,19 +20330,22 @@ public partial class Mario : CharacterBody3D
     {
         var stage = _smsWarpGate.Stage;
         string dest = stage != null ? stage.ScenePath : "";
-        if (dest == "")
+        string select = SmsReturnSpot.ScenePath(SmsEpisodeSelectScene);
+        // pass 135: a stage with episodes but no level yet (the disc stages under Stages/) still shows its select; the pick brings him back out
+        bool canSelect = select != "" && stage != null && stage.Episodes.Length > 0 && ResourceLoader.Exists(select);
+        if (dest == "" && !canSelect)
         {
             if (SmsDebugPrint) GD.Print("[SMS warp] the gate has no stage: letting him go");
             SmsWarpInAbort("no stage");
             SmsFader.Current?.FadeIn(0.4f);
             return;
         }
-        string select = SmsReturnSpot.ScenePath(SmsEpisodeSelectScene);
-        string next = select != "" && stage.Episodes.Length > 0 && ResourceLoader.Exists(select) ? select : dest;
+        string next = canSelect ? select : dest;
         if (GameData.Instance != null)
         {
             GameData.Instance.PendingStage = stage;
             GameData.Instance.PendingEpisode = -1;
+            GameData.Instance.GateOriginScene = GetTree().CurrentScene?.SceneFilePath;   // pass 135: the select's way back for a stage with no level
             if (next == dest) GameData.Instance.Episode = 0;
         }
         if (SmsDebugPrint) GD.Print($"[SMS warp] moveStage -> {next}{(next != dest ? " then " + dest : "")}");

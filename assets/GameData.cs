@@ -91,6 +91,9 @@ public partial class GameData : Node
     public SmsStageInfo PendingStage;
     /// <summary>The episode the select screen picked for <see cref="PendingStage"/> (0-based; -1 = not picked yet).</summary>
     public int PendingEpisode = -1;
+    /// <summary>The level the M gate stood in (SMS pass 135): the select screen's way back when <see cref="PendingStage"/> has no level yet
+    /// (the pick then sends Mario out of the gate he came in by). Set by Mario's warp-in. Not saved -- the run's.</summary>
+    public string GateOriginScene;
     /// <summary>MSF_EPISODE: the episode the level runs (0-based; -1 = none -- a level run on its own shows everything). The select screen sets
     /// it as the game does (TSelectDir::direct); SmsEpisodeOnly nodes read it.</summary>
     public int Episode = -1;

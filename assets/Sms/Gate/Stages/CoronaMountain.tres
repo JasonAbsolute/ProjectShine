@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="SmsStageInfo" format=3 uid="uid://d135stgcorona"]
+
+[ext_resource type="Script" path="res://assets/Sms/Gate/SmsStageInfo.cs" id="1_stage"]
+[ext_resource type="Script" path="res://assets/Sms/Gate/SmsEpisodeInfo.cs" id="2_episode"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_map_corona.png" id="3_banner"]
+
+[sub_resource type="Resource" id="Resource_ep1"]
+script = ExtResource("2_episode")
+Name = "???"
+ShineId = ""
+
+[resource]
+resource_name = "CORONA MOUNTAIN: the disc's select data (pass 135) -- the banner, the gradient and the 1 episode name from scenarioname.bmg. No level yet: Scene is empty, so an M gate with this Stage shows the select and the pick brings Mario back out of the gate; set Scene to the level when it exists and give each episode the ShineId of its shine. AllEpisodesOpen is ON (a deviation: with no shines to clear the game would open EPISODE 1 only) -- turn it off once the level has shines. DEVIATION: the game never shows the select for Corona (one scenario, no banner pane, TSelectMenu skips it); here one episode named with the game's unknown-name text so a Corona gate behaves like the others. Rename it or point the gate's Stage straight at the level."
+script = ExtResource("1_stage")
+Scene = ""
+StageName = "CORONA MOUNTAIN"
+Banner = ExtResource("3_banner")
+Episodes = [SubResource("Resource_ep1")]
+GradientTopLeft = Color(0, 0, 1, 1)
+GradientBottomRight = Color(1, 0, 1, 1)
+GradientCycle = Vector3i(0, 4, 2)
+AllEpisodesOpen = true

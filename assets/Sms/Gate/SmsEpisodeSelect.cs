@@ -221,6 +221,7 @@ public partial class SmsEpisodeSelect : Control
         if (_num > n) _num = n;
         if (_num == 0) _num = Mathf.Min(1, n);
         _selected = Mathf.Max(_num - 1, 0);
+        if (_stage.AllEpisodesOpen) { _num = n; _selected = 0; }   // pass 135: the knob -- every episode open, EPISODE 1 selected first (the game: the newest open)
         for (int i = _num; i < 8; i++) _unlock[i] = 0;
         // the marks row: odd counts on the i_o slots, even on the i_e ones (centred either way)
         for (int i = 0; i < 8; i++) _marks[i].Visible = false;
@@ -777,14 +778,32 @@ void fragment() {
     private void MoveOn()
     {
         string level = _stage.ScenePath;
+        if (level == "")
+        {
+            // pass 135: a stage with no level yet (the disc stages under Stages/) -- the pick sends him back out of the gate he came in by:
+            // the level he left (GameData.GateOriginScene), arriving at the gate's return spot keyed stage://NAME, as if the stage were
+            // entered and left at once
+            string origin = SmsReturnSpot.ScenePath(GameData.Instance?.GateOriginScene ?? "");
+            if (origin == "" || !ResourceLoader.Exists(origin))
+            {
+                GD.PushWarning("[SMS select] the stage has no scene and no level to go back to: nothing to load");
+                return;
+            }
+            if (GameData.Instance != null)
+            {
+                GameData.Instance.ReturnFromScene = _stage.ReturnKey;
+                GameData.Instance.ReturnWithShine = false;
+                GameData.Instance.FadeInFrom = Colors.White;
+                GameData.Instance.PendingStage = null;
+                GameData.Instance.PendingEpisode = -1;
+            }
+            if (DebugPrint) GD.Print($"[SMS select] {_stage.StageName} has no level yet: back out through the gate, to {origin}");
+            GetTree().ChangeSceneToFile(origin);
+            return;
+        }
         string select = SmsReturnSpot.ScenePath(_stage.CharacterSelectScene ?? "");
         string next = select != "" && ResourceLoader.Exists(select) ? select : level;
         if (GameData.Instance != null) GameData.Instance.FadeInFrom = Colors.White;
-        if (next == "")
-        {
-            GD.PushWarning("[SMS select] the stage has no scene: nothing to load");
-            return;
-        }
         if (DebugPrint) GD.Print($"[SMS select] -> {next}{(next != level ? " then " + level : "")}");
         GetTree().ChangeSceneToFile(next);
     }

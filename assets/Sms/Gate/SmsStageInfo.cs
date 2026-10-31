@@ -30,12 +30,22 @@ public partial class SmsStageInfo : Resource
     [Export] public Color GradientBottomRight = new Color(0f, 1f, 1f);
     [Export] public Vector3I GradientCycle = new Vector3I(4, 2, 0);
 
+    /// <summary>Knob (pass 135): every episode may be picked whatever the save, EPISODE 1 selected first -- for a stage whose level has no
+    /// shines yet (the seven disc stages under Stages/ ship with it on). Off = the game's rule above (the newest open episode selected).</summary>
+    [ExportGroup("Deviations (off = the game)")]
+    [Export] public bool AllEpisodesOpen = false;
+
+    /// <summary>The key the gate's return spot and the select's way back share (pass 135): the level's scene, or for a stage with no
+    /// level yet "stage://NAME" -- the pick then sends Mario back out of the gate he came in by.</summary>
+    public string ReturnKey => ScenePath != "" ? Scene : $"stage://{StageName}";
+
     /// <summary>How many episodes may be picked (TSelectMenu::mNumUnlockedShines): one past the last cleared one, at least one, at most
     /// the count. A cleared episode = its shine's save flag (GameData.IsShineCollected on its ShineId).</summary>
     public int UnlockedCount()
     {
         int n = Episodes.Length;
         if (n == 0) return 0;
+        if (AllEpisodesOpen) return n;
         int unlocked = 1;
         for (int i = 0; i < n; i++)
             if (IsCleared(i)) unlocked = i + 2;

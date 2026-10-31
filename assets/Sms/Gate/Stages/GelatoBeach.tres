@@ -1,0 +1,57 @@
+[gd_resource type="Resource" script_class="SmsStageInfo" format=3 uid="uid://d135stggelato"]
+
+[ext_resource type="Script" path="res://assets/Sms/Gate/SmsStageInfo.cs" id="1_stage"]
+[ext_resource type="Script" path="res://assets/Sms/Gate/SmsEpisodeInfo.cs" id="2_episode"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Gate/select/sc_map_mamma.png" id="3_banner"]
+
+[sub_resource type="Resource" id="Resource_ep1"]
+script = ExtResource("2_episode")
+Name = "Dune Bud Sand Castle Secret"
+ShineId = ""
+
+[sub_resource type="Resource" id="Resource_ep2"]
+script = ExtResource("2_episode")
+Name = "Mirror Madness! Tilt, Slam, Bam!"
+ShineId = ""
+
+[sub_resource type="Resource" id="Resource_ep3"]
+script = ExtResource("2_episode")
+Name = "Wiggler Ahoy! Full Steam Ahead!"
+ShineId = ""
+
+[sub_resource type="Resource" id="Resource_ep4"]
+script = ExtResource("2_episode")
+Name = "The Sand Bird is Born"
+ShineId = ""
+
+[sub_resource type="Resource" id="Resource_ep5"]
+script = ExtResource("2_episode")
+Name = "Il Piantissimo's Sand Sprint"
+ShineId = ""
+
+[sub_resource type="Resource" id="Resource_ep6"]
+script = ExtResource("2_episode")
+Name = "Red Coins in the Coral Reef"
+ShineId = ""
+
+[sub_resource type="Resource" id="Resource_ep7"]
+script = ExtResource("2_episode")
+Name = "It's Shadow Mario! After Him!"
+ShineId = ""
+
+[sub_resource type="Resource" id="Resource_ep8"]
+script = ExtResource("2_episode")
+Name = "The Watermelon Festival"
+ShineId = ""
+
+[resource]
+resource_name = "GELATO BEACH: the disc's select data (pass 135) -- the banner, the gradient and the 8 episode names from scenarioname.bmg. No level yet: Scene is empty, so an M gate with this Stage shows the select and the pick brings Mario back out of the gate; set Scene to the level when it exists and give each episode the ShineId of its shine. AllEpisodesOpen is ON (a deviation: with no shines to clear the game would open EPISODE 1 only) -- turn it off once the level has shines."
+script = ExtResource("1_stage")
+Scene = ""
+StageName = "GELATO BEACH"
+Banner = ExtResource("3_banner")
+Episodes = [SubResource("Resource_ep1"), SubResource("Resource_ep2"), SubResource("Resource_ep3"), SubResource("Resource_ep4"), SubResource("Resource_ep5"), SubResource("Resource_ep6"), SubResource("Resource_ep7"), SubResource("Resource_ep8")]
+GradientTopLeft = Color(1, 0, 0, 1)
+GradientBottomRight = Color(1, 1, 0, 1)
+GradientCycle = Vector3i(2, 0, 4)
+AllEpisodesOpen = true

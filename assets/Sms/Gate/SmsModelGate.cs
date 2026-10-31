@@ -193,12 +193,12 @@ public partial class SmsModelGate : StaticBody3D, ISmsSprayTarget
             ApplyWindKnobs();
             SetWind(false);
         }
-        if (MakeReturnSpot && Stage != null && Stage.ScenePath != "")
+        if (MakeReturnSpot && Stage != null && (Stage.ScenePath != "" || Stage.Episodes.Length > 0))   // pass 135: a stage with no level yet keys its spot "stage://NAME"
         {
-            var own = SmsReturnSpot.Find(GetTree(), Stage.ScenePath, allowAny: false);
+            var own = SmsReturnSpot.Find(GetTree(), Stage.ReturnKey, allowAny: false);
             if (own == null)
             {
-                _spot = new SmsReturnSpot { Name = "GateReturnSpot", FromScene = Stage.Scene, Position = ReturnSpotOffsetUnits / SmsUnits.UnitsPerMetre };
+                _spot = new SmsReturnSpot { Name = "GateReturnSpot", FromScene = Stage.ReturnKey, Position = ReturnSpotOffsetUnits / SmsUnits.UnitsPerMetre };
                 AddChild(_spot);
             }
             else _spot = own;
