@@ -585,3 +585,28 @@ one in 138) printed `ALL OK` and then died at exit on `csharp_lang && !csharp_la
 Bianco gatekeeper filling its pool of ten Gorogoros at Level boot. Watch for the game crashing on quit; if it does, that is the
 bisect to run.
 Trunk for the next feature: `main`'s current tip (`git log --oneline -1 main`).
+
+### #12 -- PENDING -- queued 2026-10-31 01:02 PDT (Kiro) -- PUSH ONLY, no PR yet
+Push the seventh feature branch: `feature/enemy-ricco`, branched from `main` `55514c8` (the trunk after SMS 138 and entry #10). Ricco Harbor's
+enemy family, one pass each on this branch; SMS 139 is the first: the Klamber (TKumokun), the wall-walking spider -- assets/Sms/Enemy/Kumokun.tscn
++ SmsKumokun.cs, its body material and model under assets/Sms/Enemy/Kumokun/ and models/Eniemes/Kumokun/, and seven public getters on Mario.cs (what
+the Klamber reads of him: fencing / roofing, the fence normal, the punch and kick windows). NOT yet playtested by Jaysonn: push the branch so it is
+on GitHub; do NOT open a PR until he says the family is done (Kiro will replace this entry with the PR entry then, as #5-#8 went). More passes
+(the Bloopers, the Cheep Cheeps, the Wind Spirit) will land on this branch and re-point this entry's tip.
+- Branch `feature/enemy-ricco` -- code tip `fb28f13` ("SMS 139: the Klamber -- Ricco Harbor's wall-walking spider ...", 13 files +1068: Mario.cs +32,
+  Kumokun.tscn, SmsKumokun.cs (+ .uid), KumokunBody.tres, the glb with three pngs and their .import files); the branch tip is this file's own
+  commit on top of it; 2 commits since `main` `55514c8`. The range carries none of Jaysonn's nine live edits.
+- To try 139: drop assets/Sms/Enemy/Kumokun.tscn into the Ricco test level within 1.3 m of a wall (a net), under a ceiling, or on a floor -- it
+  attaches at its first tick and roams that surface. For Mario to climb the net its StaticBody3D (or a parent) needs metadata `sms_fence` (any
+  value) or the group `sms_fence`; the Klamber walks any wall. On the net: it chases him when he is on the SAME side, hurts him on touch (through
+  the net too -- the 'Attacks Across The Net' knob turns that off); punch it (B on the net) from the OTHER side to knock it off; the hose curls
+  it up; stomp a floor one; ground-pound the slab over a ceiling one. Knobs: Deviations (SpeedScale, SearchRangeUnits, FlySpeedUnits,
+  AttacksAcrossTheNet), Effects (the fly smoke slot), Sounds (four slots), RelaunchTicks 1800 (-1 = gone for good), Graph = a closed loop of
+  Node3D children fencing the area it may roam.
+```
+git push -u origin feature/enemy-ricco
+git rev-list --count origin/feature/enemy-ricco..feature/enemy-ricco
+```
+Expect `0` from the rev-list. No PR, no merge. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
+`assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
+`addons/godot_ai` churn: his, leave them.

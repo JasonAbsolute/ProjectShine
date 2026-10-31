@@ -9011,3 +9011,106 @@ died at exit on Godot's C# finalize assertion (`csharp_lang && !csharp_lang->scr
 "leaked unsafe reference" dump of the whole scene after it; the other six boots and every drive run (which quit through GetTree().Quit()) were
 clean. Not seen in the ~20 boots of the earlier passes. The one new thing at this Level's boot since 136 is the Bianco gatekeeper (Kind 1 in
 Level.tscn) filling its pool of ten Gorogoros. Open: an exit-time race to bisect if the game ever crashes on quit.
+
+### 139 -- the Klamber: Ricco Harbor's wall-walking spider, the first of Ricco's enemy family (feature/enemy-ricco, `fb28f13`)
+
+**Files:** NEW `assets/Sms/Enemy/Kumokun.tscn`, `SmsKumokun.cs` (+ .uid), `assets/Sms/Enemy/Kumokun/KumokunBody.tres`, `models/Eniemes/Kumokun/` (kumo_model1.glb
+from his FinModelUtility rip -- game units, the 13 bck clips -- with its pngs; the glb .import swaps `_mat1` and `_mat2` for the .tres); changed
+`assets/Mario.cs` (+32: the public reads `SmsIsFencing`, `SmsIsRoofing`, `SmsFenceNormal`, `SmsFenceBody`, `SmsRoofNormalY`, `SmsFencePunchActive` (FENCE_PUNCH
+frames 5..9), `SmsRoofKickActive` (KICK_ROOF frames 9..13)). Tools: npc82/ricco139/{patch_mario139.py, patch_import139.py, patch_smoke139.py (drive 139),
+probe_clips139.gd, cap_kumo139.gd, cap/}. Sources: Kumokun.cpp / .hpp (all of it), smallEnemy.cpp (TSmallEnemy::moveObject 428: mPositionDelta.zero(), the
+cylinders x mBodyScale; TSmallEnemyParams' PARAM_INIT 53; reset 250 -- the scaling the Klamber skips), enemy.cpp 21 (TSpineEnemy's mBodyScale 1),
+MarioCheckCol.cpp 15-62 (hitNormal / hitHipDrop) and 341-359 (ACTOR_TYPE_KUMOKUN: hitNormal, doKeepDistance -> keepDistance, hitHipDrop, the FENCE_PUNCH
+/ KICK_ROOF PUNCH windows), MarioCollision.cpp 135 (trampleExec: no bounce when the message is refused), MarioSpecial.cpp 1444 (fencePunch: the attack
+cylinder 250 / 200 at checkPass(5)), MarioPhysics.cpp 27 (keepDistance). The disc: no `/enemy/kumokun.prm` anywhere (params.szs' 342 files, the ricco /
+monte stage archives' map/params) -- the PARAM_INIT defaults are the retail numbers.
+
+**The game.** TKumokun is a TSmallEnemy whose init never calls TSmallEnemy::init and whose reset() is empty: the body scale stays TSpineEnemy's 1.0
+(the small-enemy scaling never runs -- the PARAM_INIT BodyScale 0.108..0.11 would have made it 15 cm), the hit cylinders are initCollision's own
+(attack 60 x 50, damage 65 x 70; the manager sets the same into the params), head height 75, body / wall radius 100, one hit point (water drains it to 0
+and it lives on: it dies only by messages). The prm defaults: TorqueY 0.01 (a turn is 100 ticks; x 3 = 33 attacking), MarchSpeed 1.0, AttackSpeed 1.5,
+MarchTimer 600, WaitTimer 180, SearchRange 1000, FlySpeed 30. initAttachPlane: checkWallPlane(pos, 75, 100) (a wall within 100 u at head height) ->
+unk198 = the wall, unk19C = setRotate(up -> normal); else checkRoofPlane (a roof 0..75 u above) -> setEulerZ(pi); else checkFloorPlane (the ground at or
+under the point + 1). isOnFloor normal.y > 0.7, isOnRoof < -0.7, a wall otherwise. calcRootMatrix: the model at mPosition - 30 x normal on a wall or
+roof, the quaternion, mScaling; KIL_SMOKE bound to it while flying (scale 1.5, alpha 128). The nerves: SEARCH -- decideTarget: isFindOutMario
+(isOnSamePlaneWithMario: on a wall, SMS_IsMarioFencing && isSameNormal(his WlPlane, unk198) (dot >= 0.99); under a roof, roofing && the RfPlane; on a
+floor, his GrPlane) and his position in the body's frame within SearchRange with |y| < head height (x 3 under a roof) -> decideTargetAtDir (the local
+direction flattened, the quaternion turned from +Z to it) with unk1D4 attacking, the turn1 loop at once; else decideTargetAtRandom ((rand + 0.5) pi
+about the normal, attacking off) with turn1_start -> loop through the clip stack (pushNextAnm / updateAnimation); doAdjustTarget slerps unk1AC ->
+unk1BC by TorqueY (x 3) a tick; done and the clip at its end: turn1_loop -> turn1_end, then PREWALK (run1_start) -> WALK (prepareWalk: the counter reset,
+run1_loop; doWalk: the Z dir x MarchSpeed / AttackSpeed as mPositionDelta; ends when the counter passed 30 or MarchTimer, at the clip's end) -> POSTWALK
+(run1_end) -> WAIT (attacking off, wait1; Mario found -> Search; else WaitTimer and the clip's end -> Search). The BIND: on a floor, checkOnMovingFloor
+for a point 50 u ahead along the delta and for the body (the point pulled 10 u into the plane; the ground under it: a step up over 30 u or a drop
+away = no move and a hit; a wall within 100 u = pushed out, a hit); under a roof, checkOnMovingRoof (half a head height toward the roof, the roof within
+head height over it or no move); on a wall, checkOnMovingWall for a point 37.5 u ahead and the body (100 u off the wall, moved, kept head height over
+the ground, the wall found within 100 u from 10 u in or no move, back onto the plane); TWallAtGraph::checkWalls (the graph loop's edges as planes
+through their first node, normal = planeNormal x edge toward the body, the point kept 100 u inside each); any hit -> mHitPlaneCounter++, else 0;
+mPositionDelta = the two deltas SUMMED (twice the march on a clear plane; the look-ahead's block halves it and starts the count, so the body
+stops short of an edge). bindOnFlying: the point ahead against checkRoofPlane and checkFloorPlane (either: the velocity zeroed) and a wall within
+the body radius; a hit counts, over 30 the plane becomes the one met; doFly ends the flight when the counter passed 30 or any plane was met after 30
+ticks (the orientation up-to-the-plane) -> Die with unk1EC 1 (flyingdown1); 1800 ticks likewise. receiveMessage: PUNCH -> behaveHitPunch: nothing when
+he is fencing a plane of the same normal (or roofing the same roof, or neither) else the spine reset into PREFLY (hit_start at the full rate) -> FLY
+(flying1_loop; prepareFly: the velocity = the normal x FlySpeed, the body a head height off the plane); TRAMPLE -> on a floor only: Die with unk1EC 0
+(down1), true (Mario bounces); HIP_DROP -> a floor: Die; a roof: PreFly. behaveToWater -> behaveHitWater: with unk1D0 down, unk1D0 = 30 and the spine
+reset into FREEZE (the stack cleared; hit_end / hit_start -> hit_loop, else hit_start -> hit_loop) until unk1D0 runs out (it decrements in moveObject;
+a hit while curled is ignored) -> POSTFREEZE (hit_end, 149 frames) -> Search. attackToMario: the message only while isAttack (the Search / Walk /
+Wait / PreWalk / PostWalk nerves, and not when Mario's y + 5 is over a roof-hanging one's); doKeepDistance = on the same plane and not isAttack ->
+TMario::keepDistance (he is set DamageRadius + 50 u from its axis); isCollidMove false. changeBck: SMSGetAnmFrameRate x 0.5, x 2 when attacking or in
+PreFly, never in Die. Mario's side (MarioCheckCol.cpp 341): hitNormal (a fall onto it: HIP_DROP in a ground pound, else trampleExec -- the bounce only
+if the message is taken; the hose at close range), keepDistance when doKeepDistance, hitHipDrop (the landing frames: HIP_DROP to a body below him),
+FENCE_PUNCH frames 5..9 at attack radius 250 / height 200 and KICK_ROOF frames 9..13 -> PUNCH.
+
+**The port.** `SmsKumokun : SmsSmallEnemy`: Prm = the defaults above with the cylinders; nerves Search / PreWalk / Walk / PostWalk / Wait / Freeze /
+PostFreeze / PreFly / Fly (100..108), the default Search. The body collides with NOTHING: its scene mask (5) is read into the plane mask and zeroed in
+Init, the base's `FlyBind` step moves it by the ticks' displacement through MoveAndSlide against nothing, `_noBind` keeps the base's gravity and
+velocity off; the collision shape stays on layer 1 (the hose's drops) and rides the orientation in ApplyLook. The map queries are rays on the plane
+mask excluding the body and Mario, a hit on a CharacterBody3D / RigidBody3D dropped (the game's checks see only the BG): `CheckGround` / `CheckRoof` a
+ray 80 m down / up; `CheckWallPlane(ref p, yOff, r)` eight XZ rays plus one into the plane from (x, y + yOff, z), the nearest hit with |normal.y| <
+0.7, the point pushed out to r along the wall's XZ normal (isTouchedWallsAndMoveXZ); `CheckFloorPlane` / `CheckRoofPlane` as the game's. `_posU` is
+mPosition as the ticks advance it inside one physics frame (the body moves at the frame's end; re-synced each frame). `Bind()` runs in SetBehavior's
+slot: the walk's delta (+ the fly velocity) through CheckOnMovingFloor / Roof / Wall for the look-ahead and the body, the graph fences, the counter;
+`BindOnFlying` likewise. The orientation `_q` (Godot's Quaternion: ArcTo = setRotate, Slerp, `_q * Vector3.Back` = getZDir) with the placed yaw folded in
+about the normal at the attach; `ApplyLook` sets the model's world basis from it (30 u into a wall or roof) and the shape's. The clip stack is a list
+(`PushNextAnm` / `UpdateAnimation` / `CheckSerialAnmEnd`); `ChangeBck` = the base's SetBck with SpeedScale x 0.5 (x 2 attacking / PreFly). Godot's glTF
+import strips a `_loop` suffix and sets the clip looping (probe_clips139.gd): the table names the player's `kumo_run1`, `kumo_turn1`, `kumo_hit`,
+`kumo_flying1` (the first drive ran with the four loops silently missing -- the base's missing-clip warning caught it). `HitCheckMario` is the
+species' own, the game's dispatch for ACTOR_TYPE_KUMOKUN with Mario's cylinder on his FEET (SmsFeetWorld = mPosition): his attack cylinder (the
+punch's 250 / 200 or the kick's 200 / 250 when those windows are active, else the base's hold / pushup / trample radii) on our damage cylinder ->
+a ground-pound fall or his landing frames (groundPoundLanding, the body under him + 2 u) -> BehaveHitHipdrop; a fall -> BehaveHitTrample and his
+StompBounce only when taken; the hose at close range; the punch / kick windows -> BehaveHitPunch; then doKeepDistance with the receive cylinders
+overlapping -> `_mario.SmsKeepDistance(pos, 65)`; then our attack cylinder on his damage cylinder -> AttackToMario (IsAttack). `BehaveToWater` = the
+30-tick timer and the spine reset into Freeze. `SetDeadAnm` per `_dieKind` (down1 / flyingdown1 / the clip held). `GenRandomItem` finds the ground
+under the body itself (the base's ray sees nothing with the mask zeroed). Knobs (grouped, plain English): SpeedScale, SearchRangeUnits, FlySpeedUnits,
+AttacksAcrossTheNet (the game: on; off = a body on the far side of the plane cannot hurt him), FlySmokeFxScene (the KIL_SMOKE slot), the sounds
+WalkSound / FreezeSound / FlySound / DownSound. `Graph` is the TWallAtGraph loop here, not a wander path (the note says so). The scene: CharacterBody3D
+(sms_enemy, mask 5), Model = the glb at 1 / 74.44, a sphere r 0.35 m at 0.6 m, RelaunchTicks 1800 (a placed one is back on its surface 15 s after a
+death; the game's are the manager's), DeathFxScene EnemyDisap. Mario.cs: the seven getters only.
+
+**Deviations (logged; knobs where they matter):** the look-ahead's delta keeps only its part along the plane -- the game sums both deltas whole,
+which doubles the plane SNAP as well as the walk: a roof one sits at roof - 1 u after the attach, its rest is roof - 38.5 u, the doubled correction
+overshoots to roof - 76 and back for ever (the first drive showed exactly that: the body alternating 75 u every tick; whether the retail game's roof
+Klambers do it is unverified -- Ricco's are on the nets); the placement SNAPS onto the plane found (the game leaves the point as placed; a point off
+the wall never moves) and a body a little over a floor is set down onto it; a plane not found at the first tick is looked for again every 30 ticks;
+his landing frames send HIP_DROP once (the game would restart hit_start on every collision list of the landing); an outside Kill (a fruit, Yoshi, a
+drive) plays the squash instead of holding the current clip for three seconds; a flying / pre-flying body is not frozen by water (the game would
+hang it in the air); AttacksAcrossTheNet; KIL_SMOKE (ms_kil_smoke.jpa is in the dump, not generated yet) and the bas sound tables are slots; moving
+floors / the ride momentum and the game's fence-sound variant tables are not ported; the body's cylinders are unscaled as the game's (no body-scale
+roll). The queries are rays, not the game's triangle lists: a thin post between two of the eight directions is missed.
+
+**Verification:** drive 139 (patch_smoke139.py, SMS_YCAM_SMOKE=1) 33/33 on a 30 x 30 m platform 80 m over the arena with a thin net (0.2 m,
+sms_fence), a roof slab 3 m up (sms_fence) and a backstop wall: A1-A5 a body 0.4 m off the net attaches to the WALL at its first tick (normal +Z, the
+point on the plane, the model's up along the normal and 0.40 m into the net), one 0.1 m over the floor to the FLOOR (+1 u), one 0.25 m under the slab
+to the ROOF (hanging 38.5 u under it, upside down), all in Search with the turn clips; S1-S7 12 s of roaming: the wall one cycles Search -> PreWalk ->
+Walk -> PostWalk -> Wait with every clip, stays on the plane (0.000 m deviation), walks 4..8 m, never leaves the 8 x 6 m net (x -4.0..1.3, y 1.5..5.0:
+the edge stops and the head-height floor), the model's up never off the normal; the floor one walks 33 m and stays on the platform; the roof one
+walks 5..8 m under its slab; W0-W3 a floor one finds Mario standing 1.65 m away on its floor (attacking at its first Search), the hose (the real
+nozzle: the pack deploys from housed first, then the drops and the close-range static hit actor) curls it before its run (Freeze, timer 30, hit_start
+-> the hit loop), the hose off -> PostFreeze (hit_end) -> Search, Mario untouched; F1-F4 Mario put on the net's +Z face by the fence catch, a wall one
+placed 3 m along it sees him (isOnSamePlaneWithMario), its first Search turns toward him attacking, its run reaches him: -1 HP within 125 frames;
+P1-P4 Mario on the net's -Z face (not the same plane: no find), his real B punch (frames 5..9) -> PreFly -> Fly straight out +Z into the backstop 13 m on
+(31 ticks) -> Die with flyingdown1 -> dead; T1-T3 his real fall onto a floor one -> TRAMPLE -> Die with down1, his bounce, no damage, dead; R0-R3 a
+roof one re-placed hangs at its rest height, his real ground pound (L) onto the slab over it -> the landing's HIP_DROP -> PreFly -> Fly down to the
+floor 3 m below -> Die with flyingdown1 at y 0.01 -> dead; G1-G2 a 4-node closed loop becomes 4 fence planes and 12 s of roaming stays at most 1.66 m
+from the centre (the 3 m half-square less the 1.34 m fence). Build 0 errors, boot ALL OK. GPU capture (cap_kumo139.gd, cap/): the three bodies at
+their attach (the net walker with its legs through the net, the roof hanger upside down, the floor one), the turn and the run on the net, the curl
+(the legs tucked under the shell) and the uncurl, the squash (down1: flattened, the eyes out front), the roof one from below.
