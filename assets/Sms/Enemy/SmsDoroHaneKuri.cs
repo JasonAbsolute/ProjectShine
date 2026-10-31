@@ -60,6 +60,9 @@ public partial class SmsDoroHaneKuri : SmsHaneHamukuri
     [Export] public PackedScene StealFxScene;
     /// <summary>Steal the cap at all (off = the plain winged hit; the game always steals).</summary>
     [Export] public bool StealsCap = true;
+    /// <summary>Pass 138: x the cap-steal poof's puff count (CapSteal.tscn: the game's 38 off the 75..100 u shell -- a Sphere of division 3 with the
+    /// FixedInterval flag, pass 132). 1 = the game; lower thins the poof if it reads too big in play.</summary>
+    [Export(PropertyHint.Range, "0.1,1,0.05")] public float StealPuffDensity = 1f;
 
     private Node3D _disguise;
     private bool _holding;                                       // unk198
@@ -115,7 +118,9 @@ public partial class SmsDoroHaneKuri : SmsHaneHamukuri
         Vector3 at = GlobalPosition + Vector3.Up * (100f * _bodyScale / U);
         if (_disguise != null && _disguise.GetParent()?.GetParent() is Skeleton3D sk && sk.FindBone(StealBone) is int sb && sb >= 0)
             at = (sk.GlobalTransform * sk.GetBoneGlobalPose(sb)).Origin;                 // emitAndBindToPosPtr at the null_cap joint's point
-        SpawnBurst(StealFxScene, new Transform3D(Basis.FromScale(Vector3.One * _bodyScale), at));
+        var steal = SpawnBurst(StealFxScene, new Transform3D(Basis.FromScale(Vector3.One * _bodyScale), at));
+        if (steal != null && StealPuffDensity < 1f && steal.GetNodeOrNull<GpuParticles3D>("Puffs") is GpuParticles3D puffs)
+            puffs.Amount = Mathf.Max(1, Mathf.RoundToInt(puffs.Amount * StealPuffDensity));   // pass 138: the density knob (the amount's setter restarts the one-shot)
         if (DebugPrint) GD.Print($"[SMS dorohane] {Name}: took his cap");
     }
     /// <summary>THamuKuri::releaseCap: the held cap PUT on the ground under the body -- the cap item there (Mario picks it up), or straight back on his head.</summary>

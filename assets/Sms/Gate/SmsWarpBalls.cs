@@ -4,9 +4,12 @@ using System.Collections.Generic;
 /// <summary>
 /// The warp-in's light balls -- TMario::warpInEffect (MarioParticle.cpp 423-486) and TWarpInCallBack (388-411); SMS pass 127b. Mario
 /// dissolves into ten one-frame bursts of ms_mariowp_* balls off his joints (the .jpa files under /scene/map/map/gate, jpa_dump.py):
-/// body 80 off the centre joint (a 20 u sphere x (1.12, 1.2, 1.02), 6 up), head 140 (a 22 u half shell, 5 / -16 off, tilted 65 deg),
-/// cap 140 (26 u, 6 / -26, -125 deg), each hand 40 (a 5 x 20 u cylinder at 8 / 1), each leg 30 (a 7 x 10 u ring, hollow 75 %),
-/// each foot 20 (a 10 u sphere x 2 tall), the FLUDD 80 (a 17 u shell x (0.5, 2.3, 0.5) at 35 / -44) -- about 600 balls. Each flies
+/// body 80 off the centre joint (a 20 u sphere x (1.12, 1.2, 1.02), 6 up), head 66 (a 22 u half shell, 5 / -16 off, tilted 65 deg),
+/// cap 66 (26 u, 6 / -26, -125 deg), each hand 40 (a 5 x 20 u cylinder at 8 / 1), each leg 30 (a 7 x 10 u ring, hollow 75 %),
+/// each foot 20 (a 10 u sphere x 2 tall), the FLUDD 66 (a 17 u shell x (0.5, 2.3, 0.5) at 35 / -44) -- 458 balls with the FLUDD. Pass 138: the
+/// head, cap and FLUDD emitters carry the FixedInterval flag, so their count is the sphere's division (div 4: 2 + 4 + 12 + 20 + 28 = 66,
+/// JPAEmitter.cpp 683-687), not their rates 140 / 140 / 80 (which 127b used: 620 balls); the body and limbs have no flag and keep their rates.
+/// The flag's regular lattice placement (a yaw / pitch grid on the shell) is not ported: the shell is sampled at random. Each flies
 /// off at omni 4-6 u/f (+-2-3 random) on its base velocity, slowed 5 % a frame (airResist 0.95), and carries the Vortex field's
 /// velocity (JPAVortexField::affect: tangential about the joint's axis -- Y for most, X for the head and cap -- at mag x (1 - d^2 /
 /// 1000^2), 5-8 u/f, set every frame and never damped: the cloud of each part spins about its joint), lives 90 frames (+-62 %), is a
@@ -35,8 +38,11 @@ public partial class SmsWarpBalls : Node3D
     [Export] public float AlphaCut = 0.8706f;
     /// <summary>127c: the ball shader (WarpBall.gdshader: lerp(env -> prm, I) per texel, the hard cut, billboarded per instance); none = the file.</summary>
     [Export] public Shader BallShader;
-    /// <summary>x the counts (600 balls at 1); his GPU decides.</summary>
+    /// <summary>x the counts (458 balls at 1 with the FLUDD); his GPU decides.</summary>
     [Export] public float Density = 1f;
+    /// <summary>Pass 138: the head, cap and FLUDD bursts at the game's FixedInterval counts (66 each). Off = the 127b rates (140 / 140 / 80: a heavier head
+    /// and cap, the look approved against his screenshots before the rule was read).</summary>
+    [Export] public bool GameCounts = true;
     /// <summary>Skip the FLUDD burst when he has no FLUDD (the game's MARIO_FLAG_HAS_FLUDD test).</summary>
     [Export] public bool FluddBurst = true;
     /// <summary>127g: x the pull into the gate (TWarpInCallBack's dir x 0.6 x timer x 1..5 a frame, as a POSITION shift). 1 = the game: after the
@@ -92,8 +98,9 @@ public partial class SmsWarpBalls : Node3D
         Color Lilac = new Color(183f / 255f, 183f / 255f, 1f), LilacEnv = new Color(72f / 255f, 72f / 255f, 135f / 255f);
         // (joint, count, volume 0 sphere / 1 cylinder, size u, minRad, sweep, scale, trs u, rot z deg, omni, axis, rndm, vortex mag, prm, env, the body's random table, the vortex axis)
         Burst(J("center", "jnt_waist"), 80, 0, 20f, 0.625f, 1f, new Vector3(1.12f, 1.2f, 1.02f), new Vector3(0f, 6f, 0f), 0f, 5f, 5f, 3f, 8f, White, White, true, Vector3.Up);
-        Burst(J("jnt_head", "M_head"), 140, 0, 22f, 0.875f, 0.5f, Vector3.One, new Vector3(5f, -16.1f, 0f), 65f, 4f, 1f, 2f, -8f, Skin, SkinEnv, false, Vector3.Right);
-        Burst(J("jnt_head", "M_head"), 140, 0, 26f, 0.875f, 0.5f, Vector3.One, new Vector3(6f, -26f, 0f), -125f, 5f, 1f, 2f, 8f, CapRed, CapEnv, false, Vector3.Right);
+        int shell = GameCounts ? 66 : 140, fludd = GameCounts ? 66 : 80;   // pass 138: Sphere div 4 with FixedInterval = 66, else the 127b rates
+        Burst(J("jnt_head", "M_head"), shell, 0, 22f, 0.875f, 0.5f, Vector3.One, new Vector3(5f, -16.1f, 0f), 65f, 4f, 1f, 2f, -8f, Skin, SkinEnv, false, Vector3.Right);
+        Burst(J("jnt_head", "M_head"), shell, 0, 26f, 0.875f, 0.5f, Vector3.One, new Vector3(6f, -26f, 0f), -125f, 5f, 1f, 2f, 8f, CapRed, CapEnv, false, Vector3.Right);
         Burst(J("jnt_hand_R", "M_hand1_R"), 40, 1, 5f, 0f, 1f, new Vector3(1f, 4f, 1f), new Vector3(8f, 1f, 0f), -76f, 6f, 0f, 3f, 5f, White, HandEnv, false, Vector3.Up);
         Burst(J("jnt_hand_L", "M_hand1_L"), 40, 1, 5f, 0f, 1f, new Vector3(1f, 4f, 1f), new Vector3(8f, 1f, 0f), -76f, 6f, 0f, 3f, -5f, White, HandEnv, false, Vector3.Up);
         Burst(J("chn_foot_R", "jnt_leg_R2"), 30, 1, 7f, 0.75f, 1f, new Vector3(1f, 1.5f, 1f), new Vector3(0.5f, -0.5f, 0f), 90f, 5f, 0f, 2f, 5f, Blue, BlueEnv, false, Vector3.Up);
@@ -101,7 +108,7 @@ public partial class SmsWarpBalls : Node3D
         Burst(J("chn_foot_L", "jnt_leg_L2"), 30, 1, 7f, 0.75f, 1f, new Vector3(1f, 1.5f, 1f), new Vector3(0.5f, -0.5f, 0f), 90f, 5f, 0f, 2f, -5f, Blue, BlueEnv, false, Vector3.Up);
         Burst(J("jnt_foot_L", "M_foot_L"), 20, 0, 10f, 0.5f, 1f, new Vector3(1f, 2f, 1f), new Vector3(5f, 2.4f, 0f), 95f, 5f, 0f, 2f, -5f, Brown, BrownEnv, false, Vector3.Up);
         if (FluddBurst && mario.HasFludd)
-            Burst(J("center", "jnt_waist"), 80, 0, 17f, 1f, 1f, new Vector3(0.5f, 2.3f, 0.5f), new Vector3(0f, 35f, -43.9f), 0f, 5f, 2f, 3f, 6f, Lilac, LilacEnv, false, Vector3.Up);
+            Burst(J("center", "jnt_waist"), fludd, 0, 17f, 1f, 1f, new Vector3(0.5f, 2.3f, 0.5f), new Vector3(0f, 35f, -43.9f), 0f, 5f, 2f, 3f, 6f, Lilac, LilacEnv, false, Vector3.Up);
         _running = true;
         BuildMesh();
         // ms_mariowp_dust at his centre joint: the rings and their streaks, one shot
