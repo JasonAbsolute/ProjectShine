@@ -1,0 +1,10 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://d145tamaflower"]
+
+[ext_resource type="Texture2D" path="res://models/Eniemes/TamaNoko/tamaflower_model1.png" id="1_tex"]
+
+[resource]
+resource_name = "_mat62 (tamaNoko/tamaflower_model1.bmd): the sunflower's eight materials, one recipe -- the texture x the vertex light, the alpha test at 128 (the petals' cut-outs), both sides drawn"
+transparency = 2
+alpha_scissor_threshold = 0.5
+cull_mode = 2
+albedo_texture = ExtResource("1_tex")
