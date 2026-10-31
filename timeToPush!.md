@@ -523,7 +523,7 @@ NOTE on the tip commit `52015b3`: it is the Godot editor's re-stamp of seven new
 `StuDrops.tres` re-save in #5, and harmless to commit.
 Trunk for the next feature: `main`'s current tip (`git log --oneline -1 main`).
 
-### #10 -- PENDING -- queued 2026-10-30 20:40 PDT, updated 2026-10-31 (Kiro) -- PUSH main ONLY, no PR
+### #10 -- DONE 2026-10-31 -- https://github.com/JasonAbsolute/ProjectShine/commit/a0659b9 -- queued 2026-10-30 20:40 PDT, updated 2026-10-31 (Kiro) -- PUSH main ONLY, no PR
 Push the trunk: small passes committed straight on `main` (the rules allow Kiro's small passes that are not part of a feature), after the #9 push
 (`origin/main` `b32c023`, the "#9 done" commit). SMS 134 adds the dive splash MODEL from the disc -- mario/04_tobikomi in chr0.szs: the white
 water column, the crown of droplets and the surface ring, the game's own five materials (one shader) and its bck / bpk / brk / btk baked a key a frame
@@ -558,3 +558,30 @@ git rev-list --count origin/main..main
 Expect `0`. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the
 three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the `addons/godot_ai` churn: his, leave them.
 `feature/select-stages` (entry #11) is a separate branch off `0baa25a`; it gets pushed by its own entry.
+
+Result: `main` `b32c023..a0659b9`, **9** commits, 39 files / +2236 / -17. `git rev-list --count origin/main..main` returned `0`,
+and `main..origin/main` was `0` before the push, so a plain fast-forward with no divergence. All four code shas confirmed
+ancestors on top of `b32c023` -- 138 `da3c478`, 137 `4cc2902`, 136 `8af428e`, 134 `440f24d` -- with their log commits
+`8db0390` / `0690b2d` / `25926a5` / `0baa25a` interleaved. Every per-pass diffstat matches the entry exactly: 134 = 12 files
++736 / -5, 136 = 23 files +1234, 137 = `assets/Mario.cs` +21 / -7, 138 = `SmsWarpBalls.cs` +14 / -7 and
+`SmsDoroHaneKuri.cs` +6 / -1.
+NOTE on the ahead-count: the entry says 8 (corrected in `a0659b9` from an earlier number) but the real figure is **9** --
+`a0659b9` is the correction commit itself, which cannot count itself. Same off-by-one as every previous entry: the log file's
+own commit is always the one not counted. Not a problem, just the reason the numbers never match on the nose.
+Largest new blobs: `bosspaku_head.glb` 110 KB, `WaterSplashModel.tscn` 53 KB (the 79-frame-a-key clip), `SmsGorogoro.cs` 30 KB,
+the five Gorogoro pngs 11-15 KB each. Nothing near the `.import` bloat problem.
+Hygiene: 0 of Jaysonn's nine live edits in the range -- agrees with Kiro's own check. Note `assets/Sms/Enemy/Spawn/SmsGateKeeper.cs`
+IS in the range (+3, the Bianco kind's Gorogoro default); it is a different file from the three `GateKeeper*.tres` / `LauncherBody.tres`
+re-saves sitting uncommitted in Jaysonn's tree, so no collision.
+**NO PR, and that is correct even though Jaysonn asked for one again.** Second entry running: the heading says `PUSH main ONLY`
+and the four passes are already on the trunk, so there is nothing to open a PR *from*. The #9 rule of thumb held -- read the
+entry heading, it overrides a habitual "make a pr" in the chat.
+**Entry #11 pushed in the same pass** (its text lives only on `feature/select-stages`, so its Result is committed there, not here).
+`feature/select-stages` is now on GitHub as a new branch, 2 commits over `0baa25a`, and deliberately has **no PR**: the entry says
+"do NOT open a PR until he says the feature is done". Jaysonn has not playtested SMS 135 yet.
+Carried forward for the next entry: **the exit-time C# finalize crash.** Two of eight headless boots in this batch (one in 137,
+one in 138) printed `ALL OK` and then died at exit on `csharp_lang && !csharp_lang->script_bindings.is_empty()`
+(csharp_script.cpp 179) with a "leaked unsafe reference" dump. Not seen in the ~20 boots before this batch. Kiro's suspect is the
+Bianco gatekeeper filling its pool of ten Gorogoros at Level boot. Watch for the game crashing on quit; if it does, that is the
+bisect to run.
+Trunk for the next feature: `main`'s current tip (`git log --oneline -1 main`).
