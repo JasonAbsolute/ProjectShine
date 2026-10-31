@@ -1,0 +1,30 @@
+[gd_scene format=3 uid="uid://d141gesso"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsGesso.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Gesso/geso_model1.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Gesso/gero_model1.glb" id="3_goop"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisap.tscn" id="4_disap"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_body"]
+radius = 1.0
+
+[node name="Gesso" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+script = ExtResource("1_script")
+RelaunchTicks = 1800
+DeathFxScene = ExtResource("4_disap")
+metadata/_sms_note = "Pass 141: the land Blooper (Riku Gesso), Ricco Harbor's big goop-spitting squid. Kind = Regular: place it ON the edge of a dock or walkway, facing out over the edge (the node's yaw): it sits there, leans after Mario, spits goop balls at him (they splat goop on the ground, and hurt), rolls over the edge to hang UNDER the walkway when he is below it (and back up when he is above), turns round when he is behind it; the hose knocks it off the edge -- it falls, and from then on it WALKS (the Land kind). Kind = Land: it wanders the ground, chases Mario (the punch), spits when he is near; the hose knocks it back and paralyses it (the dizzy stars) for a while; a stomp or ground pound kills it. Kind = Surf: a walker with the surfing death clip (the game drops a surfboard: not ported). Knobs: Deviations (SpeedScale), Effects (the goop splat, the spit, the dizzy stars, the water column), Sounds (slots). RelaunchTicks 1800 = back at its point 15 s after a death; -1 = gone for good. The goop ball under GoopBall is placed by the script."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+shape = SubResource("SphereShape3D_body")
+
+[node name="GoopBall" type="Node3D" parent="."]
+visible = false
+metadata/_sms_note = "TGessoPolluteObj (gero_model1.bmd): the goop ball it spits -- placed at its mouth, flown and splatted by the script. Leave it be."
+
+[node name="Model" parent="GoopBall" instance=ExtResource("3_goop")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)

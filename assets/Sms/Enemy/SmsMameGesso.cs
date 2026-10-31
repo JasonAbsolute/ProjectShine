@@ -166,31 +166,7 @@ public partial class SmsMameGesso : SmsSmallEnemy
         if (_onWater && !_dead && _holder == null) _airborne = false;      // the base's step raised it (no floor under a floating body): resting on the surface is grounded
     }
 
-    // ------------------------------------------------------------------------------------------------------------------ the water surface as a floor
-    /// <summary>Mario's SmsWaterSurfaceOf: the area's sms_water_surface_y, else its first BoxShape3D's top, else its origin (metres).</summary>
-    private static float WaterSurfaceOf(Area3D area)
-    {
-        if (area.HasMeta("sms_water_surface_y")) return (float)area.GetMeta("sms_water_surface_y").AsDouble();
-        foreach (Node child in area.GetChildren())
-            if (child is CollisionShape3D cs && cs.Shape is BoxShape3D box) return (cs.GlobalTransform * new Vector3(0f, box.Size.Y * 0.5f, 0f)).Y;
-        return area.GlobalPosition.Y;
-    }
-    /// <summary>The highest sms_water surface at the body's XZ within 0.5 m under <paramref name="posM"/> (a point query half a metre down), in metres.</summary>
-    private bool WaterSurfaceAt(Vector3 posM, out float surfM)
-    {
-        surfM = float.NegativeInfinity;
-        var space = GetWorld3D().DirectSpaceState;
-        var q = new PhysicsPointQueryParameters3D { Position = posM + Vector3.Down * 0.5f, CollideWithAreas = true, CollideWithBodies = false, CollisionMask = uint.MaxValue };
-        bool any = false;
-        foreach (var hit in space.IntersectPoint(q, 8))
-        {
-            if (hit["collider"].As<GodotObject>() is not Area3D area) continue;
-            if (!area.IsInGroup("sms_water") && !area.HasMeta("sms_water")) continue;
-            float s = WaterSurfaceOf(area);
-            if (!any || s > surfM) { surfM = s; any = true; }
-        }
-        return any;
-    }
+    // ------------------------------------------------------------------------------------------------------------------ the water surface as a floor (the base's WaterSurfaceAt, pass 141)
     /// <summary>mGroundHeight: the water surface when the body is over one, else the floor (units).</summary>
     private float GroundHeightU() => _waterUnder ? _waterSurfU : _groundY;
 
