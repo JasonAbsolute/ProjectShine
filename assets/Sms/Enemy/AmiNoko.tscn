@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://d144aminoko"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsAmiNoko.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/AmiNoko/aminoko_model1.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisap.tscn" id="3_disap"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_body"]
+radius = 1.0
+
+[node name="AmiNoko" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+script = ExtResource("1_script")
+RelaunchTicks = -1
+DeathFxScene = ExtResource("3_disap")
+metadata/_sms_note = "Pass 144: the Electrokoopa on the net (AmiNoko), Pinna Park's crackling Koopa. Put it ON a net, a wall, a ceiling or a floor (within 0.4 m) and give it a Graph: a Node3D child whose children are the points of its path, placed on the same surface -- it crawls from point to point (a random other one each time), stops and turns at each. Its body and the charged air 1.3 m out from its back shock Mario on the same side (the shock pose, -1 HP); it then sits stunned a few seconds. To kill one on a net: climb the OTHER side and punch it (B) -- it flies off its back and vanishes in a puff. A ground pound kills one on a floor. The hose stuns it. Jumping on it only bounces you. For Mario to climb the net its StaticBody3D needs metadata sms_fence (any value) or the group sms_fence. Knobs: Deviations (SpeedScale, ClipSet, FeetOnPlane, AttacksAcrossTheNet), Effects (the sparks, the stun stars, the smoke, the wall puff), Sounds (five slots); RelaunchTicks -1 = gone for good (1800 = back in 15 s)."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+shape = SubResource("SphereShape3D_body")
