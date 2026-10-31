@@ -530,12 +530,18 @@ water column, the crown of droplets and the surface ring, the game's own five ma
 into one AnimationPlayer clip -- fired by Mario beside the 133 splash particles: the one visible gap of 133 (drive 134 20/20). SMS 136 adds the
 GOROGORO, Bianco Hills' rolling goop head (Petey's head under the stage's goop; igaiga.cpp): the roll along a graph or straight on, the landing
 bounces with their splats, the goop trail, the hose washing the goop off to Petey's skin (never a kill), the stomp squash, the melt into water, the
-stuck kill at a wall; the Bianco gatekeeper now spits it by default (its slot was any enemy). Drive 136 24/24 through the real paths. Each pass:
-build 0 errors, boot ALL OK, looks judged by GPU capture. No branch, no merge, no PR.
-- Branch `main` -- code tip `8af428e` ("SMS 136: the Gorogoro ...", 23 files +1234: assets/Sms/Enemy/Gorogoro.tscn + SmsGorogoro.cs,
-  assets/Sms/Enemy/Gorogoro/ (the body shader + material, four fx scenes), models/Eniemes/Gorogoro/ (the glb, five pngs, their .import),
-  SmsGateKeeper.cs +3) over `0baa25a` (the 134 log + this entry's earlier text), `440f24d` (SMS 134: 12 files +736 / -5); the tip is this file's own
-  commit (the 136 log + this entry) on top of it. The range carries none of Jaysonn's nine live edits.
+stuck kill at a wall; the Bianco gatekeeper now spits it by default (its slot was any enemy). Drive 136 24/24 through the real paths. SMS 137 makes
+the shallow-water flag the game's: a POOL is an sms_water Area3D in the group `sms_pool` (the fountain basins, the puddles) -- Mario wades it whatever
+its depth and never swims it, the small splash and the small splash model are the pool's (a plain shallow shelf gives the big particles and no model,
+as the game), the goop melt's small scale too; the 133 stand-in "under 50 u of water" is gone. Drive 137 8/8, drive 134 20/20. Each pass: build 0
+errors, boot ALL OK, looks judged by GPU capture. No branch, no merge, no PR.
+- Branch `main` -- code tip `4cc2902` ("SMS 137: MARIO_FLAG_IN_SHALLOW_WATER proper ...", assets/Mario.cs +21 / -7) over `25926a5` (the 136 log),
+  `8af428e` ("SMS 136: the Gorogoro ...", 23 files +1234: assets/Sms/Enemy/Gorogoro.tscn + SmsGorogoro.cs, assets/Sms/Enemy/Gorogoro/ (the body
+  shader + material, four fx scenes), models/Eniemes/Gorogoro/ (the glb, five pngs, their .import), SmsGateKeeper.cs +3), `0baa25a` (the 134 log),
+  `440f24d` (SMS 134: 12 files +736 / -5); the tip is this file's own commit (the 137 log + this entry) on top of it. The range carries none of
+  Jaysonn's nine live edits.
+- To try 137: add the group `sms_pool` to a water Area3D (the Node tab > Groups) that should be a wading pool -- Mario walks through it however deep
+  it is and splashes small; leave the sea without it.
 - To try 136: drop assets/Sms/Enemy/Gorogoro.tscn in a level facing the way it should roll (or leave the Bianco gatekeeper to spit them); hose it to
   wash Petey's head out of the goop; stomp it; let one roll into water. Knobs on the node: Goop (the sheet / tint), Deviations (DeathStampScale: the
   game's 25.8 m goop stamp under a stomped head -- turn it down if it reads too big; LeavesTrail / TrailScale; SpeedScale), Effects, Sounds.

@@ -8957,3 +8957,33 @@ once) and is dead within 360 ticks; L1-L3 the public SmsLaunch the gatekeeper ca
 splats, three bounces, then the roll along the lane; G1 a Bianco gatekeeper with no LaunchScene takes Gorogoro.tscn and fills its pool of 10. Build 0
 errors, boot ALL OK. GPU capture (cap_goro136.gd, ref/): the goop head rolling, the wash at 0.6 and 0.2 (Petey's red spotted head and green frill
 showing through along the dirt pattern), the squash at frame 5 (the head flattening on the ground) and 25 (gone, the goop drops bouncing).
+
+### 137 -- MARIO_FLAG_IN_SHALLOW_WATER proper: a POOL is an sms_water area in the group sms_pool (main, `4cc2902`)
+
+**Files:** changed `assets/Mario.cs` (+21 / -7). Tools: npc82/shallow137/patch_smoke137.py (drive 137), npc82/mario133/patch_smoke134.py (drive 134's
+shelf marked sms_pool). Sources: MarioMove.cpp 1950-1975 (the flags: `offFlag(IN_SHALLOW_WATER); offFlag(IN_WATER); if (mGroundPlane->isPool()) {
+mFloorPosition.z = gpPoolManager->getWaterLevel(plane); if (level > mPosition.y) { isInWater = true; onFlag(IN_SHALLOW_WATER); } }` -- then the sea
+check sets IN_WATER), MarioParticle.cpp 161 (rippleEffect: the pool ripple on the flag), 179 (inOutWaterEffect: the flag this tick or the last ->
+the small splash), 671 (the goop melt's 0.6 scale on the flag), MarioMove.cpp 2309 (the suck drains a pool: not ported), WaterGun.cpp 1570 / 1770
+(the pump clip and the no-emit-under-water test on IN_SHALLOW_WATER | IN_WATER: the port's _smsInWater already covers a pool).
+
+**The game.** "Shallow water" is not a depth: it is the POOL ground type (the Plaza's fountain basins, the puddles, the Bianco lake's shallows are
+sea) with the pool manager's water level above Mario. In a pool only IN_SHALLOW_WATER is set, never IN_WATER, so doSwimming never starts -- he wades
+whatever the depth (the game's pools are shallow by construction). The small splash (TOBIKOMI_S_A / _S_B and the small model) is the flag's (this tick
+or the previous: the way out too); the sea gives the big set at |vel.y| > 10 u/f and the splash model only over 50 u of water.
+
+**The port.** `_smsInShallowWater` (+ `_smsWasInShallowWater`): in SmsWaterCheck the winning surface's Area3D in the group "sms_pool" (or with the meta
+"sms_pool") sets it; the highest surface wins as before, and the flag follows that area. `SmsWaterEntryCheck` returns before the swim depth test when the
+flag is on. `SmsWaterInOutTick`: `shallow = flag || prev flag` (was `depth < 50 u`, the 133 stand-in) -- the small particles and the small model on it;
+otherwise the big particles at |vy| > 10 and the big model only at depth >= 50 u (the model's own gate, unchanged). The goop melt's 0.6 scale reads the
+flag (was "not swimming and on the floor"). `SmsInShallowWater` / `SmsLastSplash` for the drives. A level author marks a pool by adding its water Area3D
+to the group sms_pool (his water areas are plain Area3Ds in sms_water, set in the Level). Not ported: the pool ripple vs the sea ripple
+(rippleEffect: neither decal exists yet), the suck draining a pool's level (gpPoolManager::subWaterLevel).
+
+**Verification:** drive 137 (patch_smoke137.py, SMS_YCAM_SMOKE=1) 8/8 through the real drops on a floor 80 m over the arena with three waters: P1-P3 a 6 m
+drop into a 1.8 m POOL (sms_water + sms_pool): the flag, "in small/small" (the small splash and the small model at 62 u/f), on the floor and not
+swimming in water deeper than SwimDepth 1.48 m, then stepping out: "out small/small" by the previous flag; D1-D3 a 6 m drop into 3 m of plain water:
+"in big/big", swimming, then out at vy 0: "out small/none"; U1-U2 a 6 m drop into a 0.4 m plain puddle: "in big/none" (the big particles, no model
+under the 50 u gate), wading. Drive 134 re-run with its shelf as a pool area (the plain shelf now correctly gives no model): 20/20. Build 0 errors,
+boot ALL OK (one of three boot runs dumped Godot's "leaked unsafe reference" list at exit with the csharp_lang FATAL -- an exit-time race seen once,
+not reproduced in the two re-runs; noted).
