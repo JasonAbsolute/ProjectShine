@@ -586,16 +586,18 @@ Bianco gatekeeper filling its pool of ten Gorogoros at Level boot. Watch for the
 bisect to run.
 Trunk for the next feature: `main`'s current tip (`git log --oneline -1 main`).
 
-### #12 -- PENDING -- queued 2026-10-31 01:02 PDT (Kiro) -- PUSH ONLY, no PR yet
+### #12 -- PENDING -- queued 2026-10-31 01:02 PDT (Kiro) -- PUSH ONLY, no PR yet (updated for SMS 140)
 Push the seventh feature branch: `feature/enemy-ricco`, branched from `main` `55514c8` (the trunk after SMS 138 and entry #10). Ricco Harbor's
-enemy family, one pass each on this branch; SMS 139 is the first: the Klamber (TKumokun), the wall-walking spider -- assets/Sms/Enemy/Kumokun.tscn
-+ SmsKumokun.cs, its body material and model under assets/Sms/Enemy/Kumokun/ and models/Eniemes/Kumokun/, and seven public getters on Mario.cs (what
-the Klamber reads of him: fencing / roofing, the fence normal, the punch and kick windows). NOT yet playtested by Jaysonn: push the branch so it is
+enemy family, one pass each on this branch. SMS 139: the Klamber (TKumokun), the wall-walking spider -- assets/Sms/Enemy/Kumokun.tscn +
+SmsKumokun.cs, its body material and model under assets/Sms/Enemy/Kumokun/ and models/Eniemes/Kumokun/, and seven public getters on Mario.cs (what
+the Klamber reads of him: fencing / roofing, the fence normal, the punch and kick windows). SMS 140: the small Blooper (TMameGesso), the hopping squid
+that floats on the water and flattens into a platform under the hose -- assets/Sms/Enemy/MameGesso.tscn + SmsMameGesso.cs, its material and model
+under assets/Sms/Enemy/MameGesso/ and models/Eniemes/MameGesso/. NOT yet playtested by Jaysonn: push the branch so it is
 on GitHub; do NOT open a PR until he says the family is done (Kiro will replace this entry with the PR entry then, as #5-#8 went). More passes
 (the Bloopers, the Cheep Cheeps, the Wind Spirit) will land on this branch and re-point this entry's tip.
-- Branch `feature/enemy-ricco` -- code tip `fb28f13` ("SMS 139: the Klamber -- Ricco Harbor's wall-walking spider ...", 13 files +1068: Mario.cs +32,
-  Kumokun.tscn, SmsKumokun.cs (+ .uid), KumokunBody.tres, the glb with three pngs and their .import files); the branch tip is this file's own
-  commit on top of it; 2 commits since `main` `55514c8`. The range carries none of Jaysonn's nine live edits.
+- Branch `feature/enemy-ricco` -- code tip `949e16f` ("SMS 140: the small Blooper ...", 12 files +763: MameGesso.tscn, SmsMameGesso.cs (+ .uid),
+  MameGessoBody.tres, the glb with three pngs and their .import files) on `fb28f13` (SMS 139, 13 files +1068) and `0bbbfcc` (the 139 log); the
+  branch tip is this file's own commit on top of it; 4 commits since `main` `55514c8`. The range carries none of Jaysonn's nine live edits.
 - To try 139: drop assets/Sms/Enemy/Kumokun.tscn into the Ricco test level within 1.3 m of a wall (a net), under a ceiling, or on a floor -- it
   attaches at its first tick and roams that surface. For Mario to climb the net its StaticBody3D (or a parent) needs metadata `sms_fence` (any
   value) or the group `sms_fence`; the Klamber walks any wall. On the net: it chases him when he is on the SAME side, hurts him on touch (through
@@ -603,6 +605,11 @@ on GitHub; do NOT open a PR until he says the family is done (Kiro will replace 
   it up; stomp a floor one; ground-pound the slab over a ceiling one. Knobs: Deviations (SpeedScale, SearchRangeUnits, FlySpeedUnits,
   AttacksAcrossTheNet), Effects (the fly smoke slot), Sounds (four slots), RelaunchTicks 1800 (-1 = gone for good), Graph = a closed loop of
   Node3D children fencing the area it may roam.
+- To try 140: drop assets/Sms/Enemy/MameGesso.tscn on a dock or on the water (an sms_water area: it floats on the surface) -- it hops from point to
+  point within WanderRadiusUnits (or along a Graph's nodes), waits, hops again; its touch hurts. Hose it (or stomp it) and it flails stunned: B picks
+  it up, B again throws it. Hose one FLOATING on the water and it flattens into a platform you can stand on (the Platform child's box) for
+  ObjectRecoverTicks (25 s in the game), then swims off. Only a ground pound on a hopping one kills it. Knobs: Deviations (ObjectRecoverTicks,
+  PlatformHeightUnits, WanderRadiusUnits), Effects (the water column: the small splash by default), Sounds (four slots), RelaunchTicks 300.
 ```
 git push -u origin feature/enemy-ricco
 git rev-list --count origin/feature/enemy-ricco..feature/enemy-ricco
