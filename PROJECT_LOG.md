@@ -8879,3 +8879,81 @@ hidden, scale x (0.8, 0.4, 0.8), the same clip values, freed; C1 / C2 three requ
 post over a translucent slab -- the white column shooting up with the crown's droplet ring and the surface ring, the column fading by 48 while
 the ring spreads to 76; the small one a squat foamy cup. Two drive-side fixes on the way: the first arena's dry spot was inside the water box, and
 the capture harness must start its first scene from _process (a node added in _init has no _Ready yet: Play found no AnimationPlayer and freed).
+
+### 136 -- the Gorogoro: Bianco Hills' rolling goop head, the gatekeeper's real spit (main, `8af428e`)
+
+**Files:** NEW `assets/Sms/Enemy/Gorogoro.tscn`, `SmsGorogoro.cs`, `assets/Sms/Enemy/Gorogoro/` (`GorogoroBody.gdshader` + `.tres`, `GoroDoro.tscn`,
+`GoroWash.tscn`, `GoroFumi.tscn`, `GoroToke.tscn`), `models/Eniemes/Gorogoro/` (bosspaku_head.glb from his FinModelUtility rip -- game units, the humi /
+melt / move clips -- with its five pngs; the glb .import swaps `_body1` for the .tres); changed `SmsGateKeeper.cs` (+3: `GorogoroScenePath`, the Bianco
+kind's default LaunchScene). Tools: npc82/goro136/{pull_pkh136.py (the four ms_pkh_*.jpa out of particle.szs), gen_fx_136.py, patch_import136.py,
+patch_smoke136.py (drive 136), cap_goro136.gd, ref/}. Sources: igaiga.cpp (TRollEnemy 69-246, TGorogoroManager 689-822, TGorogoro 824-1229),
+smallEnemy.cpp (receiveMessage 503, decHpByWater 737, TNerveSmallEnemyDie 929, TNerveSmallEnemyJump 1005), walkerEnemy.cpp 54-80 (moveObject's hop),
+enemy.cpp 470-490 (the stuck counter), MarioCheckCol.cpp 319 (hitNormal), the shipped gorogoro.prm (sms_shipped_params.json), the bmd's MAT3 (bmd_mat_dump.py).
+
+**The game.** TGorogoro is a TRollEnemy (a TWalkerEnemy that rolls): /enemy/gorogoro.prm march 7..8 u/tick (11..13 m/s), turn 0.03 deg/tick (it
+barely steers), body scale 0.8 (the head 470 u across: 5 m), 255 hit points, attack 180 / damage 220 cylinders, JumpForce 60, StampRange 60,
+PolluteRange 5 and PolluteInterval 1, GenerateInterval 2500, BoundVYMax 20, GroundOffsetY -50 (the model origin 50 u under the body point: the
+goop ball sinks into the ground), ExpandRate / Max 1.0 (no growth). The manager spawns them on the gorogoro0 / 1 graphs every 2500 ticks while
+Mario is in its area; the Bianco gatekeeper's launchGorogoro -> generateByGateKeeper: reset at the gate, lobbed (vy 15 u/tick) toward Mario within
+2000 u else the nearest graph node, the heading jittered +-15 deg, a random 0..1500 u of the way, in flight (unk1A8) until the landing. One nerve,
+RollOnGraph: the move clip (bck 2), the walk to the next node (goToShortestNextGraphNode; reached within 200 u XZ -> the next; a jump edge ->
+flagJump), walkBehavior(2, 1): airborne when above the ground, turn = TurnSpeedLow, the walk unless in flight, the BOUNCE (airborne over 20 u: the
+fall / 80 remembered up to 20; on landing not on water: above 1.0 -> straight up at that speed, requestPolluteModel (the splat model
+bosspaku_head_stamp) and the pad rumble when Mario is grounded), the roll SE near the ground, the STUCK kill (walkToCurPathNode's unk128: the goal
+distance unchanged by 100 u for 300 ticks), the roll angle += 0.4 x march (RollEnemyBodyCallback: joint 1 'center' rotated about its X), a WATER
+SURFACE under it -> kill with UNK10000 | UNK20000 (no reward) = the melt. setBehavior (the trail): on the ground, alive, a polluter -> stampGround(1,
+the point unk1AC -10 x mPositionDelta behind, 32 x PolluteRange) every PolluteInterval tick. receiveMessage(SPRAYED_BY_WATER): the WATHIT mark,
+decHpByWater (the drop's attack, 1 for the hose), TGorogoro::behaveToWater: the spray cooldown reset (every hit counts), hit points floored at 1 (it
+never dies of water), K0.a = hp x 255 / max (the wash), PKH_WASH bound to the root. calcRootMatrix: PKH_DORO bound to the root while within 30 u of
+the ground; in the die nerve TSpineEnemy::calcRootMatrix (no ground offset). kill (a stomp / ground pound through hitNormal -- no isHitValid override):
+TNerveGorogoroDie: time < 2: no collision, a water surface -> the water column, MELT_ON_DEATH -> setMeltAnm (bck 1, PKH_TOKE at the base matrix
+pinned to the ground, the SINK sound) else requestPolluteModel + setDeadAnm (bck 0 humi, PKH_FUMI at joint 1, the DOWN sound) + setDeadEffect; at the
+clip's end or 360: dead, genRandomItem; a melting head keeps walkBehavior(2, 0.5). Then TNerveSmallEnemyDie's first tick: the 0x20 stamp (unk150 =
+0x31): StampRange 60 x 32 x unk158 = 1920 u under the body. isCollidMove: a STOP_ROCK kills it, anything else is ATTACKED and never pushes. The
+material (_body1, five TEV stages): stage 0 REG2 = (yogore2.a > K0.a) through TEXMTX1 (1.86, 1.07) on UV2; stage 1 PREV = pakkun_head x REG2; stage 2
+PREV += M_dummy (swapped for the stage's h_ma_rak goop sheet at init) x (1 - REG2) through TEXMTX2 (2, 2); stage 3 a toon term into REG1 (unused by
+stage 4); stage 4 PREV += C1 / 2.
+
+**The port.** `SmsGorogoro : SmsSmallEnemy`: Prm = the shipped prm; nerves RollOnGraph (100) and GoroDie (101), the default RollOnGraph; `Graph` (a Node3D's
+children, in order) = the game's graph, followed in order and then straight on; none = the goal 2000 u ahead, re-set when reached (a lobbed body: the
+goal where the lob lands). `WalkBehaviorGoro`: the low turn, WalkBehaviorBase(2, k) unless in flight, the bounce bookkeeping (+5 u, the splat as a
+280 u x scale pollution stamp, the pad), the stuck counter, the roll angle, the water-surface melt (an sms_water Area3D with its surface above the
+feet, a point query). `SetBehavior`: the trail stamp every FOURTH tick (30 u apart at the march: still one line, a quarter of the texel work --
+DEVIATION) at 160 u x TrailScale, `LeavesTrail` on (mIsPolluter is the placement's); PKH_DORO as an SmsNpcEffect on the root ('scale') while within
+30 u of the ground, PKH_WASH likewise kept alive 8 ticks past each hit. `SmsSprayedByWater`: the mark, the cooldown reset, hp floored at 1, `wash` =
+hp / 255 on the body material, no Freeze. `Kill`: the roll angle zeroed, the spine reset into GoroDie (then the default). GoroDie: the game's `time <
+2` guard as a once-flag (a kill from inside the running nerve lands with the time already 1: the first port used == 0 and the melt skipped its
+clip and bubbles -- the drive caught it); the melt: the melt clip, GoroToke at the ground with the heading (an SmsNpcEffect, EmitFrames 100), half-
+speed rolling; else the splat stamp, the humi clip with GoroFumi at 'center', SetDeadEffect; at BckEnded or 360: GenRandomItem, the 1920 u x
+DeathStampScale death stamp (not for a melt), Dead. `ApplyLook`: the model 50 u under the body point except in GoroDie (the squash plays on the
+ground); the roll through `SmsBoneRoll` (pass 129) on 'center' about the model's world X, while RollOnGraph or the melt clip. `IsCollidMove` false (no
+push), `AttackToMario` = the message only (no PostAttack hop), `WallHopAllowed` false (DEVIATION: TWalkerEnemy::moveObject's hop would run
+TNerveSmallEnemyJump at JumpForce 60 x 0.8 = 48 u/tick -- a 100 m leap off every wall; the game's jump nerve is guarded by its once-flag and the roll
+enemy's wall answer is the stuck rule). The body: `GorogoroBody.gdshader` = stages 0-2 as the bmd has them (the dirt mask's alpha against `wash`,
+Petey's skin where it passes, the goop sheet elsewhere; the sheet with the gatekeeper's goop_colour / goop_colour_mode knobs, and the species'
+GoopTexture / GoopColorMode / GoopColor exports), lit by EnemyToon.gdshaderinc's sun + ambient through the H_toon_2_4i ramp (DEVIATION: the bmd's
+stages 3 / 4 add a flat C1 / 2 and drop the toon term). The effects (gen_fx_136.py, from the jpa dumps): GoroDoro the shell r 45..60 u (x the scale),
+15 u/f out, 0.7 u/f^2 down, life 26, 65 u balls wobbling 0.7 <-> 1.35, alpha 1 -> 0, one a frame; GoroWash the upper shell r 179..239 at 224 u up, 12
+u/f, life 25, 60 u shrinking 1.25 -> 0.1, every other frame; GoroFumi 32 in 4 frames off the upper shell r 75..150 at -70 u, 13 u/f, life 40, 70 u,
+no fade; GoroToke a ring r 85..100 u at the ground, 6.5 u/f up, no gravity, life 80, 96 u quads along the rise (X 1 -> 0.3, Y 2.5 -> 0.3 by 40 %), alpha
+0 -> 0.875 -> 0, ~0.75 a frame for 100 frames (the game's ring 120 -> 50 and 10 -> 3 u/f shrink over the 100 frames: fixed means here). All P_msm_osenball
+with the sheet's goop pair (SmsPollutionLayer.MeasureGoopColors; SetGoopColors per instance); the SSP1 child trails (15-frame children behind each
+drop) are not ported. `SmsGateKeeper`: Kind Bianco with no LaunchScene loads Gorogoro.tscn (the spit was any SmsSmallEnemy before). The scene:
+CharacterBody3D (sms_enemy, mask 5), Model = the glb at 1 / 74.44, a sphere r 1.6 m at 1.66 m, RelaunchTicks 2500 (= GenerateInterval for a placed
+one), DeathFxScene EnemyDisap.
+
+**Deviations (logged; knobs where they matter):** DeathStampScale (the game's 1920 u = 25.8 m of goop under a stomped head; 0 = none), LeavesTrail /
+TrailScale, SpeedScale; the trail every fourth tick; no wall hop; the splat model as a pollution stamp; the graph's jump edges, the Bianco watermill
+turning, STOP_ROCK, the mirror actor, the water column at a water-surface death, ExpandRate (1.0 shipped) and the sounds (slots) not ported; the
+lit look through the enemy toon instead of the bmd's odd stages 3 / 4.
+
+**Verification:** drive 136 (patch_smoke136.py, SMS_YCAM_SMOKE=1) 24/24 through the real paths on a 24 x 90 m platform 80 m over the arena with a wall
+and a 3 m pool: R1-R8 a placed head rolls at once (RollOnGraph, the move clip) at 11.5 m/s along -Z, the roll angle and the SmsBoneRoll agree, ~34
+trail stamps in 60 frames, GoroDoro emitting, the model 0.672 m under the body point, hp 255 / wash 1; W1-W5 the real nozzle's drops take hp 255 ->
+175 in 75 frames with the wash 1 -> 0.686 = hp / 255, GoroWash seen, no Freeze, the contact costs Mario 1 HP and the head rolls on; S1-S3 stalled at
+the wall (no hop), Mario's real fall onto it -> GoroDie's humi, GoroFumi once, then dead; K1 a second head left at the wall dies by the stuck rule
+after ~248 frames of stall (the first stall frames are the slide-in); M1-M3 a head rolling into the sms_water area melts (the melt clip, GoroToke
+once) and is dead within 360 ticks; L1-L3 the public SmsLaunch the gatekeeper calls (vy 15 u/tick): in flight, the first landing bounces up and
+splats, three bounces, then the roll along the lane; G1 a Bianco gatekeeper with no LaunchScene takes Gorogoro.tscn and fills its pool of 10. Build 0
+errors, boot ALL OK. GPU capture (cap_goro136.gd, ref/): the goop head rolling, the wash at 0.6 and 0.2 (Petey's red spotted head and green frill
+showing through along the dirt pattern), the squash at frame 5 (the head flattening on the ground) and 25 (gone, the goop drops bouncing).

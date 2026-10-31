@@ -523,18 +523,22 @@ NOTE on the tip commit `52015b3`: it is the Godot editor's re-stamp of seven new
 `StuDrops.tres` re-save in #5, and harmless to commit.
 Trunk for the next feature: `main`'s current tip (`git log --oneline -1 main`).
 
-### #10 -- PENDING -- queued 2026-10-30 20:40 PDT (Kiro) -- PUSH main ONLY, no PR
-Push the trunk: one small pass committed straight on `main` (the rules allow Kiro's small passes that are not part of a feature), after the #9
-push (`origin/main` `b32c023`, the "#9 done" commit). SMS 134 adds the dive splash MODEL from the disc -- mario/04_tobikomi in chr0.szs: the
-white water column, the crown of droplets and the surface ring, the game's own five materials (one shader) and its bck / bpk / brk / btk baked a
-key a frame into one AnimationPlayer clip -- fired by Mario beside the 133 splash particles: the one visible gap of 133. The small variant (the
-column alone at 40 % height) on the shallow stand-in, the whole model on a dive at 10 u/f or more over 50 u of water, scaled 0.7..1.0 by the
-speed (watereffect.prm); two alive at most, as the game's two MActors. Drive 134 20/20 through the real path (a 6 m dive, the step out, a
-drop onto 30 u of water, the pool of two); build 0 errors; boot ALL OK; judged by GPU capture at frames 4..76. No branch, no merge, no PR.
-- Branch `main` -- code tip `440f24d` ("SMS 134: the dive splash model (mario/04_tobikomi) ...", 12 files +736 / -5: assets/Sms/Fx/WaterSplashModel.tscn,
-  SmsSplashModel.cs, splash_model.gdshader, their two .uid files, tex/splash_wave1 / splash_tamatama / splash_hamonring3 .png with their .import,
-  assets/Mario.cs +30 / -5 in SmsWaterInOutTick + SmsSpawnSplashModel); the tip is this file's own commit (the 134 log + this entry) on top of it;
-  2 commits ahead of `origin/main` `b32c023`. The range carries none of Jaysonn's nine live edits.
+### #10 -- PENDING -- queued 2026-10-30 20:40 PDT, updated 2026-10-31 (Kiro) -- PUSH main ONLY, no PR
+Push the trunk: small passes committed straight on `main` (the rules allow Kiro's small passes that are not part of a feature), after the #9 push
+(`origin/main` `b32c023`, the "#9 done" commit). SMS 134 adds the dive splash MODEL from the disc -- mario/04_tobikomi in chr0.szs: the white
+water column, the crown of droplets and the surface ring, the game's own five materials (one shader) and its bck / bpk / brk / btk baked a key a frame
+into one AnimationPlayer clip -- fired by Mario beside the 133 splash particles: the one visible gap of 133 (drive 134 20/20). SMS 136 adds the
+GOROGORO, Bianco Hills' rolling goop head (Petey's head under the stage's goop; igaiga.cpp): the roll along a graph or straight on, the landing
+bounces with their splats, the goop trail, the hose washing the goop off to Petey's skin (never a kill), the stomp squash, the melt into water, the
+stuck kill at a wall; the Bianco gatekeeper now spits it by default (its slot was any enemy). Drive 136 24/24 through the real paths. Each pass:
+build 0 errors, boot ALL OK, looks judged by GPU capture. No branch, no merge, no PR.
+- Branch `main` -- code tip `8af428e` ("SMS 136: the Gorogoro ...", 23 files +1234: assets/Sms/Enemy/Gorogoro.tscn + SmsGorogoro.cs,
+  assets/Sms/Enemy/Gorogoro/ (the body shader + material, four fx scenes), models/Eniemes/Gorogoro/ (the glb, five pngs, their .import),
+  SmsGateKeeper.cs +3) over `0baa25a` (the 134 log + this entry's earlier text), `440f24d` (SMS 134: 12 files +736 / -5); the tip is this file's own
+  commit (the 136 log + this entry) on top of it. The range carries none of Jaysonn's nine live edits.
+- To try 136: drop assets/Sms/Enemy/Gorogoro.tscn in a level facing the way it should roll (or leave the Bianco gatekeeper to spit them); hose it to
+  wash Petey's head out of the goop; stomp it; let one roll into water. Knobs on the node: Goop (the sheet / tint), Deviations (DeathStampScale: the
+  game's 25.8 m goop stamp under a stomped head -- turn it down if it reads too big; LeavesTrail / TrailScale; SpeedScale), Effects, Sounds.
 - To try 134: dive into deep water from a jump or a ledge -- the white column with the crown and the ring beside the drops; step into a pool
   under 50 u deep (or walk in from a beach) -- the squat small one. Knobs on assets/Sms/Fx/WaterSplashModel.tscn: SizeScale, Intensity (1 = the game).
 ```
@@ -543,4 +547,4 @@ git rev-list --count origin/main..main
 ```
 Expect `0`. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the
 three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the `addons/godot_ai` churn: his, leave them.
-A feature branch for the episode select's other stages (`feature/select-stages`) may be in progress off this `main`; it gets its own entry.
+`feature/select-stages` (entry #11) is a separate branch off `0baa25a`; it gets pushed by its own entry.
