@@ -8987,3 +8987,27 @@ swimming in water deeper than SwimDepth 1.48 m, then stepping out: "out small/sm
 under the 50 u gate), wading. Drive 134 re-run with its shelf as a pool area (the plain shelf now correctly gives no model): 20/20. Build 0 errors,
 boot ALL OK (one of three boot runs dumped Godot's "leaked unsafe reference" list at exit with the csharp_lang FATAL -- an exit-time race seen once,
 not reproduced in the two re-runs; noted).
+
+### 138 -- the warp-in's light balls at the game's FixedInterval counts; a density knob on the cap-steal poof (main, `da3c478`)
+
+**Files:** changed `assets/Sms/Gate/SmsWarpBalls.cs` (+14 / -7), `assets/Sms/Enemy/SmsDoroHaneKuri.cs` (+6 / -1). Tools: npc82/counts138/probe138.gd. Sources: the
+gate's jpa dumps (npc82/gate127/jpa/ms_mariowp_*.txt), JPAEmitter.cpp 673-690 (the FixedInterval count: a Sphere emits 2 + the layers 4, 8, 12 ... summed
+over its division -- 6 / 18 / 38 / 66 / 102 for div 1..5 -- a Circle / Line its division; an emitter WITHOUT the flag emits its rate).
+
+**The game.** Of the ten warp-in emitters only three carry the FixedInterval flag: ms_mariowp_head (Sphere div 4), ms_mariowp_cap (div 4) and
+ms_mariowp_watgun (div 4) -- 66 balls each, not their rates 140 / 140 / 80. The body (rate 80), hands (40), legs (30) and feet (20) have no flag and
+emit their rates. So the burst is 458 balls with the FLUDD (392 without), not 620 -- the 132 note's "500 by division, body 102" was wrong on the
+body (it has no flag). The cap-steal poof (ms_tls_change, Sphere div 3 with the flag) is 38, as 132 set it.
+
+**The port.** `SmsWarpBalls.GameCounts` (on): the head, cap and FLUDD bursts at 66; off = the 127b rates (140 / 140 / 80), the look Jaysonn approved
+against his screenshots before the rule was read. `Density` still scales everything. The flag's regular lattice (a yaw / pitch grid on the shell,
+JPAEmitter.cpp 340-378) is not ported: the shell stays randomly sampled (logged). `SmsDoroHaneKuri.StealPuffDensity` (0.1..1, default 1 = the game's
+38): the goop winged Stu's cap-steal burst gets its Puffs amount scaled before it fires (the amount's setter restarts the one-shot).
+
+**Verification:** probe138.gd (headless): a Player instanced for its skeleton, WarpBalls.tscn fired with no gate -- GameCounts on: 458 alive (HasFludd
+true), off: 620; CapSteal.tscn's Puffs amount 38; the DoroHane's StealPuffDensity exists and reads 1. Build 0 errors, boot ALL OK.
+NOTE on the boots of this batch: two of eight headless `--quit-after 600` boots (one in 137, one in 138) printed the self-test's ALL OK and then
+died at exit on Godot's C# finalize assertion (`csharp_lang && !csharp_lang->script_bindings.is_empty()`, csharp_script.cpp 179) with the
+"leaked unsafe reference" dump of the whole scene after it; the other six boots and every drive run (which quit through GetTree().Quit()) were
+clean. Not seen in the ~20 boots of the earlier passes. The one new thing at this Level's boot since 136 is the Bianco gatekeeper (Kind 1 in
+Level.tscn) filling its pool of ten Gorogoros. Open: an exit-time race to bisect if the game ever crashes on quit.

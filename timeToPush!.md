@@ -533,13 +533,17 @@ bounces with their splats, the goop trail, the hose washing the goop off to Pete
 stuck kill at a wall; the Bianco gatekeeper now spits it by default (its slot was any enemy). Drive 136 24/24 through the real paths. SMS 137 makes
 the shallow-water flag the game's: a POOL is an sms_water Area3D in the group `sms_pool` (the fountain basins, the puddles) -- Mario wades it whatever
 its depth and never swims it, the small splash and the small splash model are the pool's (a plain shallow shelf gives the big particles and no model,
-as the game), the goop melt's small scale too; the 133 stand-in "under 50 u of water" is gone. Drive 137 8/8, drive 134 20/20. Each pass: build 0
-errors, boot ALL OK, looks judged by GPU capture. No branch, no merge, no PR.
-- Branch `main` -- code tip `4cc2902` ("SMS 137: MARIO_FLAG_IN_SHALLOW_WATER proper ...", assets/Mario.cs +21 / -7) over `25926a5` (the 136 log),
+as the game), the goop melt's small scale too; the 133 stand-in "under 50 u of water" is gone. Drive 137 8/8, drive 134 20/20. SMS 138 puts the
+warp-in's light balls at the game's FixedInterval counts (head / cap / FLUDD 66 each: 458 balls, not 620; `GameCounts` off on WarpBalls.tscn = the
+127b look) and gives the goop winged Stu a `StealPuffDensity` knob for its cap-steal poof (1 = the game's 38). Each pass: build 0 errors, boot ALL OK,
+looks judged by GPU capture. No branch, no merge, no PR. (Two of eight headless boots this batch died at exit on Godot's C# finalize assertion AFTER
+the self-test passed -- an exit-time race, not seen before this batch; the 138 log entry has the details. Tell Kiro if the game crashes on quit.)
+- Branch `main` -- code tip `da3c478` ("SMS 138: the warp-in's light balls at the game's FixedInterval counts ...", SmsWarpBalls.cs +14 / -7,
+  SmsDoroHaneKuri.cs +6 / -1) over `0690b2d` (the 137 log), `4cc2902` ("SMS 137: MARIO_FLAG_IN_SHALLOW_WATER proper ...", assets/Mario.cs +21 / -7), `25926a5` (the 136 log),
   `8af428e` ("SMS 136: the Gorogoro ...", 23 files +1234: assets/Sms/Enemy/Gorogoro.tscn + SmsGorogoro.cs, assets/Sms/Enemy/Gorogoro/ (the body
   shader + material, four fx scenes), models/Eniemes/Gorogoro/ (the glb, five pngs, their .import), SmsGateKeeper.cs +3), `0baa25a` (the 134 log),
-  `440f24d` (SMS 134: 12 files +736 / -5); the tip is this file's own commit (the 137 log + this entry) on top of it. The range carries none of
-  Jaysonn's nine live edits.
+  `440f24d` (SMS 134: 12 files +736 / -5); the tip is this file's own commit (the 138 log + this entry) on top of it: 10 commits ahead of
+  `origin/main` `b32c023`. The range carries none of Jaysonn's nine live edits.
 - To try 137: add the group `sms_pool` to a water Area3D (the Node tab > Groups) that should be a wading pool -- Mario walks through it however deep
   it is and splashes small; leave the sea without it.
 - To try 136: drop assets/Sms/Enemy/Gorogoro.tscn in a level facing the way it should roll (or leave the Bianco gatekeeper to spit them); hose it to
