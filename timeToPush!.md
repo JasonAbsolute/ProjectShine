@@ -586,18 +586,22 @@ Bianco gatekeeper filling its pool of ten Gorogoros at Level boot. Watch for the
 bisect to run.
 Trunk for the next feature: `main`'s current tip (`git log --oneline -1 main`).
 
-### #12 -- PENDING -- queued 2026-10-31 01:02 PDT (Kiro) -- PUSH ONLY, no PR yet (updated for SMS 140)
+### #12 -- PENDING -- queued 2026-10-31 01:02 PDT (Kiro) -- PUSH ONLY, no PR yet (updated for SMS 141)
 Push the seventh feature branch: `feature/enemy-ricco`, branched from `main` `55514c8` (the trunk after SMS 138 and entry #10). Ricco Harbor's
 enemy family, one pass each on this branch. SMS 139: the Klamber (TKumokun), the wall-walking spider -- assets/Sms/Enemy/Kumokun.tscn +
 SmsKumokun.cs, its body material and model under assets/Sms/Enemy/Kumokun/ and models/Eniemes/Kumokun/, and seven public getters on Mario.cs (what
 the Klamber reads of him: fencing / roofing, the fence normal, the punch and kick windows). SMS 140: the small Blooper (TMameGesso), the hopping squid
 that floats on the water and flattens into a platform under the hose -- assets/Sms/Enemy/MameGesso.tscn + SmsMameGesso.cs, its material and model
-under assets/Sms/Enemy/MameGesso/ and models/Eniemes/MameGesso/. NOT yet playtested by Jaysonn: push the branch so it is
+under assets/Sms/Enemy/MameGesso/ and models/Eniemes/MameGesso/. SMS 141: the land Blooper (TGesso / TLandGesso / TSurfGesso), the big squid
+that sits on a walkway's edge, leans after Mario, spits goop balls, hangs under the walkway when he is below it, and walks the ground once the hose
+knocks it off -- assets/Sms/Enemy/Gesso.tscn + SmsGesso.cs, its materials and models under assets/Sms/Enemy/Gesso/ and models/Eniemes/Gesso/, and the
+water-surface helpers moved from SmsMameGesso.cs into the base SmsSmallEnemy.cs. NOT yet playtested by Jaysonn: push the branch so it is
 on GitHub; do NOT open a PR until he says the family is done (Kiro will replace this entry with the PR entry then, as #5-#8 went). More passes
-(the Bloopers, the Cheep Cheeps, the Wind Spirit) will land on this branch and re-point this entry's tip.
-- Branch `feature/enemy-ricco` -- code tip `949e16f` ("SMS 140: the small Blooper ...", 12 files +763: MameGesso.tscn, SmsMameGesso.cs (+ .uid),
-  MameGessoBody.tres, the glb with three pngs and their .import files) on `fb28f13` (SMS 139, 13 files +1068) and `0bbbfcc` (the 139 log); the
-  branch tip is this file's own commit on top of it; 4 commits since `main` `55514c8`. The range carries none of Jaysonn's nine live edits.
+(the Cheep Cheeps, the Wind Spirit) will land on this branch and re-point this entry's tip.
+- Branch `feature/enemy-ricco` -- code tip `50bda5f` ("SMS 141: the land Blooper ...", 17 files +1106 -25: Gesso.tscn, SmsGesso.cs (+ .uid),
+  GessoBody.tres, GessoGoop.tres, the two glbs with three pngs and their .import files, SmsSmallEnemy.cs +28, SmsMameGesso.cs -25) on `eea8e68`
+  (the 140 log), `949e16f` (SMS 140, 12 files +763), `0bbbfcc` (the 139 log) and `fb28f13` (SMS 139, 13 files +1068); the branch tip is this file's
+  own commit on top of it; 6 commits since `main` `55514c8`. The range carries none of Jaysonn's nine live edits.
 - To try 139: drop assets/Sms/Enemy/Kumokun.tscn into the Ricco test level within 1.3 m of a wall (a net), under a ceiling, or on a floor -- it
   attaches at its first tick and roams that surface. For Mario to climb the net its StaticBody3D (or a parent) needs metadata `sms_fence` (any
   value) or the group `sms_fence`; the Klamber walks any wall. On the net: it chases him when he is on the SAME side, hurts him on touch (through
@@ -610,6 +614,13 @@ on GitHub; do NOT open a PR until he says the family is done (Kiro will replace 
   it up, B again throws it. Hose one FLOATING on the water and it flattens into a platform you can stand on (the Platform child's box) for
   ObjectRecoverTicks (25 s in the game), then swims off. Only a ground pound on a hopping one kills it. Knobs: Deviations (ObjectRecoverTicks,
   PlatformHeightUnits, WanderRadiusUnits), Effects (the water column: the small splash by default), Sounds (four slots), RelaunchTicks 300.
+- To try 141: drop assets/Sms/Enemy/Gesso.tscn ON the edge of a walkway or beam, facing out over the edge (the yaw you give it is the way it looks;
+  Kind = Regular) -- it sits there, leans after Mario, and every few seconds spits a goop ball at him that splats a goop stamp where it lands;
+  stand under it (in front of the edge) and it rolls over to hang under the walkway; get above it again and it rolls back. Hose it from the side
+  and it is knocked off, drops through the walkway to the ground and walks from then on. Kind = Land is a ground walker from the start: it
+  searches, charges and punches; the hose paralyses a walker (the dizzy stars) for 10 s; a stomp kills a walker or an upright sitter (never a
+  hanging one); knocked over water it drowns. Kind = Surf is the walker that never chases him. Knobs: Kind, Deviations (SpeedScale), Effects
+  (the goop splat, the spit, the dizzy stars, the water column), Sounds (five slots), RelaunchTicks -1 by default (gone for good).
 ```
 git push -u origin feature/enemy-ricco
 git rev-list --count origin/feature/enemy-ricco..feature/enemy-ricco

@@ -9207,3 +9207,89 @@ a wandering one: Trample (turn1) -> Damage -> Jitabata, his bounce, no damage, n
 pushed, no bounce, no damage, dead once the clip ran. Build 0 errors, boot ALL OK. GPU capture (cap_gesso140.gd, cap/): the two Bloopers mid-hop over
 the dock and the pool (the water column's ring on the surface), the landing and the wait, the flattened platform floating with its spotted mantle
 spread, the dock one flailing stunned.
+
+### 141 -- the land Blooper: Ricco Harbor's goop-spitting squid on the walkways (feature/enemy-ricco, `50bda5f`)
+
+**Files:** NEW `assets/Sms/Enemy/Gesso.tscn`, `SmsGesso.cs` (+ .uid), `assets/Sms/Enemy/Gesso/GessoBody.tres` + `GessoGoop.tres`, `models/Eniemes/Gesso/`
+(geso_model1.glb and the goop ball gero_model1.glb from his FinModelUtility rip -- game units, the 23 bck clips; `geso_mahi_loop1` renamed
+`geso_mahiloop1` and `gero_run_loop1` `gero_runloop1` inside the glbs' JSON chunks before import, Godot drops a `_loop` -- with their pngs; the glb
+.imports swap the bmds' materials for the .tres). CHANGED `assets/Sms/Enemy/SmsSmallEnemy.cs` (+28: the water helpers `WaterSurfaceOf(Area3D)` /
+`WaterSurfaceAt(posM, out surfM, depthM)` moved up from the small Blooper, a "water surfaces (pass 141)" section at the end of the class) and
+`SmsMameGesso.cs` (its private copies removed, -25). Nothing of Mario's changed. Tools: npc82/ricco141/{patch_import141.py, rename_clips141.py,
+probe_clips141.gd, patch_smoke141.py (drive 141 + its capture mode), cap/, disc/ (the rip, the bmds, the glsl), cur/SmsSmallEnemy.cs}. Sources:
+gesso.cpp / Gesso.hpp (all of it), enemyAttachment.cpp / EnemyAttachment.hpp (the ball's bind and rebirth), smallEnemy.cpp, walkerEnemy.cpp,
+liveactor.cpp (calcVelocityToJumpToY), MarioCheckCol.cpp, the shipped gesso.prm (sms_shipped_params.json), the bmds' MAT3 and JNT1 (bodyjnt1 12,
+kutijnt1 13), the archive's bck list (the clip indices).
+
+**The game.** TGesso is a TWalkerEnemy (unk150 17, ACTOR_TYPE_GESSO) with /enemy/gesso.prm: march 0.8..1.2 u/tick, turn 0.7..1.2, body scale 1.1, 1
+hit point, attack 70 x 120 / damage 60 x 160, SearchLength 1600 / Angle 360 / Aware 400 / Height 1200, GiveUp 2500 / 2000, FreezeWait 600, AttackWait
+120; its own: SearchLengthOnObj 2000 / AngleOnObj 180 / AwareOnObj 500, PollutionLength 1000, PollutionInterval 200, PolluteObjGravity 0.14 / Speed 10,
+DropGravityY 0.4, BodyAngMax 40, TurnLength 1000, HitWaterSpXZ 18 / SpY 5. Three classes: TGesso the walkway-edge sitter (STATE_BEAM_CHILLING), TLandGesso
+a ground walker from the start (STATE_WANDERING), TSurfGesso a walker that never finds Mario and dies with surf1 (dropping a surfboard). The bck table
+is the archive's 23 clips in order (0-1 the ball's own run1 / run_loop1, 22 the stamp's): 2 180turn1, 3 down1, 4 fall1, 5 gero1, 6 hit1, 7 land1, 8
+mahi_end1, 9 mahi_loop1, 10 mahi_start1, 11 punch1, 12 run1, 13 search1, 14 stairland1, 15 surf1, 16 turn_down1, 17 turn_gero1, 18 turn_hit1, 19
+turn_up1, 20 turn_wait1, 21 wait1. load(): the placed yaw is rounded to mStayYaw 0 / 90 / 180 / 270 and the body's yaw zeroed. BEAM_CHILLING: the bind
+pins mPosition.y = the placed height - unk1D0 (0 upright, mDamageHeight hanging -- the body point under the walkway while the model, drawn at
+mPosition.y + unk1D0, hangs there in turn_wait1); the body leans after Mario (mBodyTrackingAngle eases 0.5 deg/tick toward the angle between the
+facing's side axis and his direction; GessoBodyCallback turns bodyjnt1 about X by clamp(angle - 90, +-BodyAngMax)). STAY: setWaitAnm (wait1 /
+turn_wait1), rollCheck, polluteBehavior. rollCheck: no cooldown, Mario in sight along the facing (2000 u, 180 deg, aware 500) and under the body point
+by 10 u upright (over it hanging) -> no collision, ROLLING (turn_down1 / turn_up1; rollEnd: collision on, BEAM_CHILLING, upright flipped); within
+TurnLength, upright and NOT in sight -> TURN (180turn1, 7.2 deg/tick to 180; turnOut flips the facing). polluteBehavior (Stay, and walkBehavior mode 2):
+the timer past PollutionInterval with the clip at its end and Mario in sight (PollutionLength, 180 deg) -> POLLUTE: setPolluteGoal (his position
++-100 u, calcVelocityToJumpToY at PolluteObjSpeed under PolluteObjGravity; 0 hanging); gero1 (turn_gero1 hanging), the spit particle at kutijnt1,
+the ball at the mouth; frame 50 -> pollute(): the ball flies (vy -3 hanging) from the mouth + 100 u along the facing. The BALL (TGessoPolluteObj, a
+TEnemyAttachment, a 10 x 10 hit actor): bind under PolluteObjGravity; the ground -> rebirth: tick 0 GESO_OSENHIT_A / B + the land sound, tick 10 vy -15
+and gpPollution->pollute(pos, 8 x 32 x 0.5 = 128 u) + the stamp model, past 20 gone; a wall -> rebirth; touching Mario -> ATTACK and gone. behaveToWater
+(every hit; the cooldown reset): not in Die / Fall / Freeze and not rolling: BEAM_CHILLING -> (upright: the knock away from Mario at HitWaterSpXZ, at
+least 5 per axis, +2 u, airborne) FALL; wandering -> FREEZE. FALL: wandering: away from Mario at 4, hit1; its end: away at 6 with vy 5, fall1; landed
+on water -> the column and Die; fall1's end -> land1 -> GraphWander. The beam kind: hit1 (upright) or turn_hit1 with the body 200 u down (hanging),
+STATE_FALLING (the bind: pos += vel under DropGravityY / 2, NO ground check until 100 u under the placed height or turn_hit1 -> the normal bind); the
+clip's end -> fall1; landed: water -> Die, else land1 (mStayYaw and mRotation x 0.8 a tick) -> fallEnd: WANDERING, upright, the rotation 0 ->
+GraphWander. FREEZE: the knock away from Mario (x 4, vy 5), +2 u, airborne; checkDropInWater (50 ticks of the parabola: a water surface at the landing
+-> Fall instead); mahi_start1 -> mahi_loop1 (POI_KIZETSU while down) -> past FreezeWait and no new hit (unk165) mahi_end1 -> done; the knock bounces
+(vy x 0.3 each landing until under 1.5); airborne it turns toward Mario. attackToMario: not wandering -> ATTACK + the cooldown; wandering: PostAttack +
+PUNCH pushed (punch1: frame 10 -> ATTACK) -- and the same call sends the ATTACK at once unless the clip is mahi_loop (a touch hurts immediately, the
+punch's own hit then falls under his 300 ticks of invincibility). doKeepDistance: mahi_loop with Mario not 50 u above (he is pushed off the paralysed
+body). setBehavior: the attack cooldown (200), mNeedsLanding airborne 250 u over the ground -> LAND (stairland1) on landing in GraphWander / Attack.
+behaveToFindMario: the goal Mario, GraphWander + Attack, FINDMARIO (search1) once per 300 ticks. walkBehavior runs only past clip frame 20. kill: never
+while hanging; the ball gone. setDeadAnm: a water surface -> hidden; surf1 for the surf kind, else down1.
+
+**The port.** `SmsGesso : SmsSmallEnemy`, `Kind` = Regular / Land / Surf; Prm = the shipped prm; nerves Stay / GFreeze / Punch / Pollute / Fall / Rolling /
+Turn / Land / FindMario over the base's GraphWander / Attack / PostAttack / Die, the overrides named after the game's virtuals (SetBehavior, MoveObjectPre,
+BehaveToFindMario, WalkBehavior, AttackToMario, HitCheckMario, Kill, SmsSprayedByWater, IsFindMario, SetWaitAnm, SetDeadAnm, GenRandomItem,
+WallHopAllowed). The beam kind collides with NOTHING while it sits (the scene mask read into `_planeMask` and zeroed; SetBehavior pins the body point at
+`_beamY - _hosei` each tick; MoveObjectPre and the `_PhysicsProcess` tail keep the airborne flag down); a fall from the beam sets the mask to 0 again so
+STATE_FALLING drops THROUGH the walkway until 100 u under the placed height (or turn_hit1), when `States.FreeFall` restores it and the base's bind takes
+over. The lean is an `SmsBoneRoll` on bodyjnt1 about the model's X (`LeanDegrees` = clamp(track - 90, +-40)). The goop ball is the scene's `GoopBall`
+child (gero_model1.glb, TopLevel; gero_run1 then gero_runloop1 while it flies) stepped by the species: Held = at the mouth (kutijnt1 through the
+Skeleton3D), Flying = PolluteObjGravity with a ray for the map and a ground ray, a 10 x 10 cylinder on Mario -> `TakeDamage` + gone, Splat = the burst
+(`GoopSplatFxScene` slot), `SmsPollutionMap.Pollute(pos, 128 u)` at tick 10, gone past 20. `CheckDropInWater` = 50 ticks of the knock's parabola with
+`GroundAt` at the landing point and the base's `WaterSurfaceAt`; the drown = `WaterColumnFxScene` (WaterSplashSmall.tscn by default) + Die with the
+model hidden. The punch's ATTACK = `IsBck(BckPunch) && BckFrame() >= 10` once per punch (`_punchSent`). The dizzy stars = `DizzyFxScene`
+(assets/Sms/Enemy/Fx131/PoiDizzy.tscn by default) bound while mahi_loop1 plays on the ground. Knobs (grouped, plain English): Kind, SpeedScale,
+GoopSplatFxScene, SpitFxScene, DizzyFxScene, WaterColumnFxScene, five sound slots (the spit, the punch, the hit, the roll, the ball's landing). The
+scene: CharacterBody3D (sms_enemy, mask 5), Model = the glb at 1 / 74.44 x 1.1, the GoopBall child at 1.4 / 74.44, RelaunchTicks -1.
+
+**Deviations (logged; knobs where they matter):** the facing is the placed yaw as is (the game rounds to 0 / 90 / 180 / 270 and the land kinds start
+facing +Z); a wandering one spits in front of ITSELF (the game passes a direction of 0 = +Z for a wanderer); the surfboard, the stamp model (the
+pollution stamp stands in, as the Gorogoro's), the trail and spit particles and the sounds are slots; the fall's integration is the base's bind (the
+game's own loop in STATE_FALLING); the clipped-out rules are not ported.
+
+**Verification:** drive 141 (patch_smoke141.py, SMS_YCAM_SMOKE=1) 16/16 on a 30 x 30 m dock 80 m over the arena with a raised 8 x 20 m WALKWAY (its top
+3 m up), a 2 x 2 m perch (4 m) in front of its +X edge, two 1.3 m steps and a 20 x 20 m, 3 m deep pool (an sms_water area) off the +X edge, every
+check through the real path: A1 a Regular one placed ON the walkway's edge sits (BeamChilling, Stay, wait1, pinned at its placed height, facing the
+placed yaw, mask 0); A2-A3 Mario below the edge and in sight -> Rolling (turn_down1) -> hanging (turn_wait1) with the body point 176 u down and the
+model drawn at the edge; A4 Mario on the perch over the hanging body -> turn_up1 -> upright at the edge; A5 Mario to the side on the perch -> the lean
+grows to 13.7 deg (the angle to him; within 40); P1-P2 Pollute (gero1, the ball held at the mouth, the spit at frame 50) -> the ball flew toward him
+and splatted (the 128 u stamp); W1-W2 the hose from the perch's near edge through the real nozzle -> the knock away at 18 u/tick, hit1, Falling
+THROUGH the walkway, fall1, land1 on the floor 3 m below -> Wandering with the mask back and GraphWander / FindMario; L1-L2 a Land one on the floor
+2 m from Mario: FindMario (search1) -> Attack (run1) -> Punch (punch1), -1 HP (7 -> 6) in 105 frames; F1-F2 the hose on a Surf one (it never charges
+him, so it stays in the stream) placed 1.8 m in front of where he stands -> Freeze: the knock away (vy 5, x 4), mahi_start1 -> mahi_loop1 with the
+dizzy stars, past FreezeWait 600 mahi_end1 -> GraphWander, his health kept; S1 his real fall onto a walker -> Trample -> kill -> Die with down1, his
+bounce, no damage; D1-D2 the hose on a Surf one at the pool's edge -> checkDropInWater -> Fall (hit1, fall1) instead of Freeze -> landed on the water:
+the column, Die hidden, the body freed. (Two drive fixes along the way, both the drive's: a body placed a fixed 1.8 m from the placed spot stood
+inside the 77 + 42 u touch reach because Mario ends up 0.56 m off that spot by the time the stream runs -- the game-faithful touch ATTACK out of
+mahi_start cost him 1 HP; the drowned body frees itself before the check read its position.) Build 0 errors, boot ALL OK. GPU captures (the drive's
+capture mode, SMS_F141_CAP=1 under run_gpu.ps1, cap/): the sitter on the edge, the roll, the hang under the walkway over Mario, the lean toward him
+with the ball mid-flight, the ball at the mouth, the knock off the edge under the drops, the walker on the floor, the punch, the paralysis with its
+stars, the squash under his stomp, the drown's column.
