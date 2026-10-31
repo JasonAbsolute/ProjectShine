@@ -480,17 +480,20 @@ instead of the engine's fixed-interval division (enemy death puff 30 vs 15, wet 
 trample dust 12 vs 10). Kiro flagged it as a small follow-up pass on `main` -- not lost, just not in #8.
 Trunk for the next feature: `main`'s current tip (`git log --oneline -1 main`).
 
-### #9 -- PENDING -- queued 2026-10-30 02:05 PDT (Kiro) -- PUSH main ONLY, no PR
+### #9 -- PENDING -- queued 2026-10-30 02:05 PDT, updated 2026-10-30 19:25 PDT (Kiro) -- PUSH main ONLY, no PR
 Push the trunk: two small passes committed straight on `main` (the rules allow Kiro's small passes that are not part of a feature), after PR #10's
 squash and the "#8 done" commit `e4fffc5` that the local Claude already pushed. SMS 132 corrects the emit counts of thirteen one-shot effect
 emitters in nine scenes (the JPA engine's FixedInterval rule: an emit frame creates the volume's division, not the dumped rate -- the wall kick's,
 the wall hit's and the stomp's single puffs become the game's puff rings; the death smoke thins; the cap-steal poof grows). SMS 133 adds Mario's
 own effects from the disc: the water splash in and out (drops + rings), the splash at his feet running through shallow water, the sand puffs and
 footprints on a sand floor, the Rocket Nozzle's launch burst, the hit burst beside the stars, and the Cataquack fling's flash. Judged by GPU
-capture; build 0 errors, boot ALL OK, drive 128 32/32. No branch, no merge, no PR.
-- Branch `main` -- code tip `505917c` ("SMS 133: Mario's own effects from the disc ...") over `30681e4` (the 132 log) and `eb8b1f0` (SMS 132);
-  the tip is this file's own commit on top of it; 4 commits ahead of `origin/main` `e4fffc5` (132: 10 files +19 / -19; 133: 26 files +1752 / -10,
-  all under assets/Sms/Fx/ and Fx131/ plus assets/Mario.cs +121 and SmsPoihana.cs). The range carries none of Jaysonn's nine live edits.
+capture; build 0 errors, boot ALL OK, drive 128 32/32. Jaysonn read the 133 summary and said "ok cool" (2026-10-30 19:18 PDT). No branch, no
+merge, no PR.
+- Branch `main` -- code tip `52015b3` (the seven new 133 fx scene headers as the Godot editor re-stamped them on first sight: `load_steps` dropped
+  by ResourceSaver::set_uid on ACTION_FILE_ADD, a load-progress hint only, 7 files +7 / -7) over `e1e242d` (the 133 log), `505917c` ("SMS 133:
+  Mario's own effects from the disc ..."), `30681e4` (the 132 log) and `eb8b1f0` (SMS 132); the tip is this file's own commit on top of it;
+  6 commits ahead of `origin/main` `e4fffc5` (132: 10 files +19 / -19; 133: 26 files +1752 / -10, all under assets/Sms/Fx/ and Fx131/ plus
+  assets/Mario.cs +121 and SmsPoihana.cs). The range carries none of Jaysonn's nine live edits.
 - To try 133: jump into the sea and out (the splash: big from a fall, small from a step); run through ankle-deep water; put a floor in the
   "sms_sand" group (or name it with "sand") and run on it -- puffs at every step, prints when running; fire the Rocket Nozzle; take a hit.
 ```
