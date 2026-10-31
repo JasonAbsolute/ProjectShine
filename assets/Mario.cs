@@ -223,6 +223,13 @@ public partial class Mario : CharacterBody3D
     private enum SmsSwim { Start, Wait, WaitToPaddle, PaddleStart, Paddle, PaddleEnd, PaddleEndToWait, Up, Dive, PDamage, Down, PDown }
     private SmsSwim _smsSwim = SmsSwim.Start;
     private bool _smsInWater = false;          // MARIO_FLAG_IN_WATER: a water surface at or above the feet this frame
+    private bool _smsInShallowWater = false;   // MARIO_FLAG_IN_SHALLOW_WATER (pass 137): the water at the feet is a POOL's (MarioMove.cpp 1962: mGroundPlane->isPool()
+                                               // and the pool's level above him) -- an sms_water Area3D in the group "sms_pool" (or with the meta "sms_pool"). He wades a
+                                               // pool whatever its depth and never swims it; the small splash, the goop melt's 0.6 scale read it.
+    private bool _smsWasInShallowWater = false; // checkPrevFlag(IN_SHALLOW_WATER): last tick's
+    /// <summary>For the drives: the shallow-water flag and the last splash decision ("in small/small", "out big/none" ...).</summary>
+    public bool SmsInShallowWater => _smsInShallowWater;
+    public string SmsLastSplash { get; private set; } = "";
     private float _smsWaterSurfaceY = 0f;      // mFloorPosition.z (world metres)
     private float _smsWaterFloorY = float.NegativeInfinity; // mFloorPosition.y: the ground under the water; -inf = none within 30 m
     private float _smsSwimFwd = 0f;            // mForwardVel (units) along the face
@@ -5632,8 +5639,8 @@ public partial class Mario : CharacterBody3D
     }
 
     /// <summary>inOutWaterEffect (MarioMove.cpp 2066 / MarioParticle.cpp 174): the tick MARIO_FLAG_IN_ANY_WATER flips -- in or out -- a splash
-    /// at (x, the surface, z): the small one (TOBIKOMI_S_A / _S_B) in shallow water (a pool, or under 50 u of water: the splash model's own
-    /// floor) or at |vel.y| at or under JumpIntoMdlEffectSpY 10 u/f (watereffect.prm); else the big one (TOBIKOMI_A / _B). TOBIKOMI_C, the
+    /// at (x, the surface, z): the small one (TOBIKOMI_S_A / _S_B) in shallow water (a POOL: the sms_pool flag, this tick or the last -- pass 137;
+    /// 133-136 stood in with "under 50 u of water") or at |vel.y| at or under JumpIntoMdlEffectSpY 10 u/f (watereffect.prm); else the big one (TOBIKOMI_A / _B). TOBIKOMI_C, the
     /// indirect ripple, is not ported; the 04_tobikomi.bmd splash model is (pass 134, SmsSpawnSplashModel). Right after SmsWaterCheck every
     /// tick; the surface and the floor keep their last in-water values for the way out.</summary>
     private void SmsWaterInOutTick()
@@ -5644,16 +5651,17 @@ public partial class Mario : CharacterBody3D
         if (_smsMoveTick < 10 || stateOfMario == MarioState.dead || stateOfMario == MarioState.shineGet) return; // a start in the water is no dive
         float vyU = SmsUnits.MpsToSpeed(_smsTrueVyValid ? _smsTrueVy : velocity.Y);
         float depthU = float.IsNegativeInfinity(_smsWaterFloorY) ? 9999f : SmsUnits.MetresToUnits(_smsWaterSurfaceY - _smsWaterFloorY);
-        bool shallow = depthU < 50f;                                     // the pool stand-in for MARIO_FLAG_IN_SHALLOW_WATER (133)
+        bool shallow = _smsInShallowWater || _smsWasInShallowWater;      // pass 137: checkFlag(IN_SHALLOW_WATER) || checkPrevFlag (MarioParticle.cpp 179): a POOL, in or out
         bool small = shallow || MathF.Abs(vyU) <= 10f;
         var surfacePos = new Vector3(GlobalPosition.X, _smsWaterSurfaceY, GlobalPosition.Z);
         SmsSpawnFx133(small ? "WaterSplashSmall" : "WaterSplash", new Transform3D(Basis.Identity, surfacePos));
         // pass 134: the splash MODEL beside the particles (MarioEffect.cpp): the small one on the shallow flag, whatever the speed; else the
-        // whole model at |vel.y| >= JumpIntoMdlEffectSpY 10 u/f over at least 50 u of water, scaled 0.7..1.0 by |vel.y| 20..50
+        // whole model at |vel.y| >= JumpIntoMdlEffectSpY 10 u/f over at least 50 u of water (the model's own floor gate), scaled 0.7..1.0 by |vel.y| 20..50
         string model = shallow ? "small" : (MathF.Abs(vyU) >= SmsSplashModel.JumpIntoMdlEffectSpY && depthU >= 50f ? "big" : "none");
         if (model != "none") SmsSpawnSplashModel(surfacePos, model == "small", SmsSplashModel.ScaleForSpeed(MathF.Abs(vyU)), MathF.Abs(vyU));
+        SmsLastSplash = $"{(now ? "in" : "out")} {(small ? "small" : "big")}/{model}";
         if (SmsDebugPrint)
-            GD.Print($"[SMS fx] water {(now ? "in" : "out")}: the {(small ? "small" : "big")} splash at y {_smsWaterSurfaceY:F2} (vy {vyU:F1} u/f, {depthU:F0} u of water); model {model}");
+            GD.Print($"[SMS fx] water {(now ? "in" : "out")}: the {(small ? "small" : "big")} splash at y {_smsWaterSurfaceY:F2} (vy {vyU:F1} u/f, {depthU:F0} u of water{(shallow ? ", a pool" : "")}); model {model}");
     }
 
     /// <summary>TMarioEffect's two MActors of 04_tobikomi (pass 134): a splash model at the surface point, world-anchored; a third while two
@@ -11949,10 +11957,13 @@ public partial class Mario : CharacterBody3D
     // ---------------------------------------------------------------------------------------------------------------
 
     /// <summary>playerControl(): the water surface at the feet this tick (MARIO_FLAG_IN_WATER when it is at or above them)
-    /// and the ground under the water (mFloorPosition.y).</summary>
+    /// and the ground under the water (mFloorPosition.y). Pass 137: an area in the group "sms_pool" (or with the meta) is the game's POOL
+    /// (mGroundPlane->isPool(): the fountain basins, the puddles) -- MARIO_FLAG_IN_SHALLOW_WATER instead of IN_WATER; the highest surface wins.</summary>
     private void SmsWaterCheck()
     {
+        _smsWasInShallowWater = _smsInShallowWater;
         _smsInWater = false;
+        _smsInShallowWater = false;
         float feetY = SmsFeetY();
         var space = GetWorld3D().DirectSpaceState;
         var q = new PhysicsPointQueryParameters3D
@@ -11975,6 +11986,7 @@ public partial class Mario : CharacterBody3D
             {
                 _smsInWater = true;
                 _smsWaterSurfaceY = surface;
+                _smsInShallowWater = area.IsInGroup("sms_pool") || area.HasMeta("sms_pool");   // pass 137: the pool flag follows the surface that won
             }
         }
         if (!_smsInWater)
@@ -12012,6 +12024,8 @@ public partial class Mario : CharacterBody3D
         }
         if (!_smsInWater || stateOfMario == MarioState.swimming)
             return;
+        if (_smsInShallowWater)
+            return;                                              // pass 137: a pool sets IN_SHALLOW_WATER, never IN_WATER -- doSwimming never starts in one (he wades it whatever its depth)
         float depthUnits = SmsUnits.MetresToUnits(_smsWaterSurfaceY - SmsFeetY());
         if (depthUnits <= SmsParams.Swim.SwimDepth)
             return;
@@ -15861,7 +15875,7 @@ public partial class Mario : CharacterBody3D
             bool nearSurface = SmsUnits.MetresToUnits(_smsWaterSurfaceY - SmsFeetY()) < 200f;
             if (_smsDirtyAmount > 0f && nearSurface && _smsGoopFx != null)
             {
-                bool shallow = stateOfMario != MarioState.swimming && IsOnFloor();   // MARIO_FLAG_IN_SHALLOW_WATER: wading
+                bool shallow = _smsInShallowWater;                                   // MARIO_FLAG_IN_SHALLOW_WATER: a pool (pass 137; was "wading" until then)
                 var surface = new Transform3D(new Basis(Vector3.Up, _smsFaceValid ? _smsFaceYaw : 0f), new Vector3(GlobalPosition.X, _smsWaterSurfaceY, GlobalPosition.Z));
                 _smsGoopFx.MeltSet(surface, _smsDirtyAmount * SmsParams.Dirty.MeltInWaterMax / 255f, shallow);
             }
