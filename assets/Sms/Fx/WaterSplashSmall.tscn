@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3 uid="uid://d133wsplashsm"]
+[gd_scene format=3 uid="uid://d133wsplashsm"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsFxBurst.cs" id="1_script"]
 [ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/mizutama1_add.png" id="T_drop"]

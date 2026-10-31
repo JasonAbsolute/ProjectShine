@@ -1,4 +1,4 @@
-[gd_scene load_steps=44 format=3 uid="uid://d133poithrowa"]
+[gd_scene format=3 uid="uid://d133poithrowa"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsFxBurst.cs" id="1_script"]
 [ext_resource type="Shader" path="res://assets/Sms/Fx/trample_mark.gdshader" id="SH_mark"]

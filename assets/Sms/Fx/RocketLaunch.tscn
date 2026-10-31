@@ -1,4 +1,4 @@
-[gd_scene load_steps=49 format=3 uid="uid://d133rocketlau"]
+[gd_scene format=3 uid="uid://d133rocketlau"]
 
 [ext_resource type="Script" path="res://assets/Sms/Fx/SmsFxBurst.cs" id="1_script"]
 [ext_resource type="Shader" path="res://assets/Sms/Fx/fire_smoke.gdshader" id="SH_smoke"]
