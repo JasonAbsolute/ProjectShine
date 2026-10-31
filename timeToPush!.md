@@ -544,3 +544,25 @@ git rev-list --count origin/main..main
 Expect `0`. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the
 three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the `addons/godot_ai` churn: his, leave them.
 A feature branch for the episode select's other stages (`feature/select-stages`) may be in progress off this `main`; it gets its own entry.
+
+### #11 -- PENDING -- queued 2026-10-30 21:20 PDT (Kiro) -- PUSH ONLY, no PR yet
+Push the sixth feature branch: `feature/select-stages`, branched from `main` `0baa25a` (the trunk after SMS 134 and entry #10; #10 itself may
+still be pending -- push `main` first if so, the branch carries main's commits anyway). SMS 135 adds the other seven stages' episode-select
+resources from the disc (assets/Sms/Gate/Stages/: Bianco, Gelato, Pinna, Sirena, Pianta, Noki, Corona -- the names from stagename.bmg, the eight
+episode names a stage from scenarioname.bmg, the sc_map banners, TSelectGrad's gradients) and makes a stage with no level yet usable: its gate
+still opens the select, every episode shows (the AllEpisodesOpen knob), and the pick brings Mario back out of the gate. NOT yet playtested by
+Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says the feature is done (Kiro will replace this entry with the PR
+entry then, as #5-#8 went).
+- Branch `feature/select-stages` -- code tip `9f34bc4` ("SMS 135: the other seven stages' episode-select resources ...", 12 files +410 / -11:
+  the seven .tres, SmsStageInfo.cs, SmsEpisodeSelect.cs, SmsModelGate.cs, Mario.cs +9 / -3, GameData.cs +3); the branch tip is this file's own
+  commit on top of it; 2 commits since `main` `0baa25a`. The range carries none of Jaysonn's nine live edits.
+- To try 135: put an M gate (assets/Sms/Gate/MGate.tscn) in a level and set its Stage to assets/Sms/Gate/Stages/GelatoBeach.tres (or any of the
+  seven); walk in -- the GELATO BEACH select with all eight episodes; pick one -- Mario comes back out of the gate (the stage has no level yet).
+  Set the resource's Scene to a level when there is one. Knobs on the resource: AllEpisodesOpen (off = the game's one-open rule).
+```
+git push -u origin feature/select-stages
+git rev-list --count origin/feature/select-stages..feature/select-stages
+```
+Expect `0` from the rev-list. No PR, no merge. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
+`assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
+`addons/godot_ai` churn: his, leave them.
