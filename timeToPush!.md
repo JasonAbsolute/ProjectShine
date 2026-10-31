@@ -480,7 +480,7 @@ instead of the engine's fixed-interval division (enemy death puff 30 vs 15, wet 
 trample dust 12 vs 10). Kiro flagged it as a small follow-up pass on `main` -- not lost, just not in #8.
 Trunk for the next feature: `main`'s current tip (`git log --oneline -1 main`).
 
-### #9 -- PENDING -- queued 2026-10-30 02:05 PDT, updated 2026-10-30 19:25 PDT (Kiro) -- PUSH main ONLY, no PR
+### #9 -- DONE 2026-10-30 -- https://github.com/JasonAbsolute/ProjectShine/commit/491a9fc -- queued 2026-10-30 02:05 PDT, updated 2026-10-30 19:25 PDT (Kiro) -- PUSH main ONLY, no PR
 Push the trunk: two small passes committed straight on `main` (the rules allow Kiro's small passes that are not part of a feature), after PR #10's
 squash and the "#8 done" commit `e4fffc5` that the local Claude already pushed. SMS 132 corrects the emit counts of thirteen one-shot effect
 emitters in nine scenes (the JPA engine's FixedInterval rule: an emit frame creates the volume's division, not the dumped rate -- the wall kick's,
@@ -503,3 +503,22 @@ git rev-list --count origin/main..main
 Expect `0`. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the
 three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the `addons/godot_ai` churn: his, leave them.
 No feature branch is in progress; the next one branches from this `main`.
+
+Result: `main` `e4fffc5..491a9fc`, 6 commits, 38 files / +1894 / -29. `git rev-list --count origin/main..main` returned `0`, and
+`main..origin/main` was `0` before the push, so it was a plain fast-forward push with no divergence. All five shas confirmed
+ancestors of `main` (tip `52015b3`, 133 log `e1e242d`, 133 `505917c`, 132 log `30681e4`, 132 `eb8b1f0`) on top of `e4fffc5`.
+Hygiene: 0 of Jaysonn's nine live edits in the range -- agrees with Kiro's own check.
+**NO PR, and that is correct even though Jaysonn asked for one.** He said "make a pr" out of habit from #5-#8, but this entry is
+`PUSH main ONLY`: the two passes are already committed on the trunk, so there is nothing to open a PR *from*. Manufacturing one
+would mean branching main's own commits off and merging them back, which the standing rules forbid ("never push a feature
+branch's commits onto main by hand"). Told him plainly rather than inventing a branch. **Rule of thumb for future entries: read
+the entry's own heading for push-only vs push+PR -- it overrides a habitual "make a pr" in the chat.**
+**The #8 follow-up is CLOSED by SMS 132.** Last entry carried forward four effects on `main` sized by the misread emitter rate;
+checked the commit and all four are corrected exactly as predicted -- `EnemyDisap.tscn` 30 -> 15, `EnemyDisapWet.tscn` 30 -> 18,
+`EnemyWallHit.tscn` 1 -> 12, `TrampleDust.tscn` 12 -> 10 -- plus nine more emitters across `PauseSparks`, `CapSteal`,
+`HipDropLanding`, `SuperHipDropLanding` and `WallKickDust` (thirteen in nine scenes, as the entry says). Nothing left outstanding
+from #8.
+NOTE on the tip commit `52015b3`: it is the Godot editor's re-stamp of seven new 133 fx scene headers (`load_steps` dropped by
+`ResourceSaver::set_uid` on file-add), 7 files +7 / -7. A load-progress hint only, no content change -- same class of thing as the
+`StuDrops.tres` re-save in #5, and harmless to commit.
+Trunk for the next feature: `main`'s current tip (`git log --oneline -1 main`).
