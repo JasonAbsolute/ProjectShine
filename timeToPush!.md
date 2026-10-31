@@ -542,7 +542,7 @@ the self-test passed -- an exit-time race, not seen before this batch; the 138 l
   SmsDoroHaneKuri.cs +6 / -1) over `0690b2d` (the 137 log), `4cc2902` ("SMS 137: MARIO_FLAG_IN_SHALLOW_WATER proper ...", assets/Mario.cs +21 / -7), `25926a5` (the 136 log),
   `8af428e` ("SMS 136: the Gorogoro ...", 23 files +1234: assets/Sms/Enemy/Gorogoro.tscn + SmsGorogoro.cs, assets/Sms/Enemy/Gorogoro/ (the body
   shader + material, four fx scenes), models/Eniemes/Gorogoro/ (the glb, five pngs, their .import), SmsGateKeeper.cs +3), `0baa25a` (the 134 log),
-  `440f24d` (SMS 134: 12 files +736 / -5); the tip is this file's own commit (the 138 log + this entry) on top of it: 10 commits ahead of
+  `440f24d` (SMS 134: 12 files +736 / -5); the tip is this file's own commit (the 138 log + this entry) on top of it: 8 commits ahead of
   `origin/main` `b32c023`. The range carries none of Jaysonn's nine live edits.
 - To try 137: add the group `sms_pool` to a water Area3D (the Node tab > Groups) that should be a wading pool -- Mario walks through it however deep
   it is and splashes small; leave the sea without it.
