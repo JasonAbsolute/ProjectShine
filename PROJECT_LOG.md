@@ -9383,3 +9383,85 @@ Mario over the step, the flop on the dock, the stomp, the fling high over the ar
 
 **Note for the drives:** the headless and windowed runs are launched through the Task Scheduler (run_drive142.bat / run_cap142.bat via `schtasks /run`)
 and polled: a run started from the ssh session dragged at a few frames a second (the 141 drive took 7 minutes); detached it finishes in about a minute.
+
+### 143 -- the Wind Spirit: Ricco Harbor's wisp that circles Mario, winds up and dashes through him (feature/enemy-ricco, `f0a834d`)
+
+**Files:** NEW `assets/Sms/Enemy/Kazekun.tscn`, `SmsKazekun.cs` (+ .uid), `assets/Sms/Enemy/Kazekun/` (KazekunGlow.gdshader + KazekunBody.tres for
+the body and the lips, KazekunEye.gdshader + KazekunEye.tres for the eyes, + the shader .uid files), `models/Eniemes/Kazekun/` (kazekun.glb from his
+FinModelUtility rip -- game units, the 5 bck clips, none renamed -- with its two pngs and the two H_ copies the rip wrote; the glb .import swaps the
+bmd's `_mat_kazekun_body` and `_mat_kazekun_lips` for KazekunBody.tres and `_mat_kazekun_eye` for KazekunEye.tres and pins the pngs). Nothing of
+Mario's or the base's changed. Tools: npc82/ricco143/{patch_import143.py, probe_clips143.gd, patch_smoke143.py (drive 143 + its capture mode),
+run_drive143.bat / run_cap143.bat (the detached runners), cap/, disc/ (the rip, the bmd, the bcks, the glsl), decomp/}; kill_headless.ps1 (stops
+only `--headless` Godot console processes: a scheduled run that started on a stale build). Sources: Kazekun.cpp / Kazekun.hpp (all of it),
+smallEnemy.cpp (TSmallEnemy::kill, the Die nerve, reset -- which TKazekun does NOT call), the shipped kazekun.prm (sms_shipped_params.json), the
+bmd's MAT3 (bmd_mat_dump.py: body + lips SRCALPHA / ONE additive, no depth write, GX_MIRROR wrap; eye opaque), the bcks' ANK1 headers.
+
+**The game.** TKazekun is a TSmallEnemy (ACTOR_TYPE_KAZEKUN) with LIVE_FLAG_UNK10 set in its constructor: NO bind -- its bind() is mPositionDelta +=
+mVelocity and nothing else (no gravity, no ground, no walls; it passes through everything). init() does not call TSmallEnemy::init and reset() does
+not call TSmallEnemy::reset: the body scale stays 1, the hit points 1, mHeadHeight 40 / mBodyRadius 50 from initCollision; the manager's cylinders
+(the attack and the damage) are 50 x 40, unscaled. /enemy/kazekun.prm: AppearDist 1000, AroundDist 800, AroundSpeed 10, AroundTime 524, AttackSpeed
+60, AirFric 0.97, ResetTime 300, ResetTimeHitting 1500 (the default: not in the shipped prm), PoseTime 90, DicideTiming 0.1, TurnOffsetY 200,
+LostOffsetYUp 2000, LostOffsetYDown 600, PoseSpeed 13.887, PoseOmegaRate 0.12. The clips are set by name: kazekun_appear (59), kazekun_attack (20,
+loop), kazekun_hit (19), kazekun_vanish (59), kazekun_wait (70, loop). The orientation is a QUATERNION (unk1A0), not a yaw: calcRootMatrix = the
+quaternion at mPosition, no scale; while it has wind (Turn / PreAttack / Attack / HitWater) ms_kaze_wind + ms_kaze_blur are bound to the model's
+matrix. getAroundQuat(dir, rate): the frame with Z along dir (X = up x Z, Y = Z x X), then turned about its own Y by (2 - rate) x 90 deg -- rate 2
+faces dir, 1 is broadside, 0 faces away. The nerves: SEARCH (the default): tick 0 reset (the orientation identity, the body at its place, invisible:
+LIVE_FLAG_HIDDEN + UNK8 -- nothing performs or collides); Mario within AppearDist in 3D -> APPEAR: visible, the appear puff (ms_kaze_appear), the
+appear clip; its end -> TURN: the wait clip, the collision on; each tick flyAroundMario: toMario = Mario + (0, TurnOffsetY, 0) - the body; climb =
+clamp(toMario.y, +-400) x 0.0025; the horizontal toMario gives the around-quat at rate |toMario| / AroundDist (clamped 0..2: far away it heads in, at
+AroundDist it circles broadside, close up it turns away); the delta = the quat's forward with y = climb, x (1 + |climb|) x AroundSpeed.
+isGiveUpAround (Mario under the PLACE by LostOffsetYDown or over it by LostOffsetYUp) -> DISAPPEAR; past AroundTime -> PREATTACK: doAttackPose(start):
+the around-quat at rate 1 (broadside), the velocity = its forward x PoseSpeed, KAZEKUN_READY; each tick the orientation spins about the body's own
+-X by pi x PoseOmegaRate (21.6 deg: a somersault every 17 ticks) and the velocity = the new forward x |v| (vertical loops 37 u in radius: it tumbles
+in place); past PoseTime x DicideTiming the goal = Mario's position, set every tick (his spot at the dash's start); past PoseTime -> ATTACK: the
+attack clip, the velocity = toward the goal at AttackSpeed; each tick the orientation slerps 0.1 onto the velocity's frame (rate 2: nose along the
+dash) and the velocity x AirFric; under 1 u/tick -> DISAPPEAR with unk1B0 = ResetTime. DISAPPEAR: the vanish clip, the puff again, the velocity 0,
+the collision off; its end -> WAIT: invisible; past unk1B0 -> SEARCH. behaveToWater (Turn / PreAttack / Attack only): the spine reset -> HITWATER:
+the hit clip, KAZEKUN_DOWN, the velocity 0 each tick; its end -> DISAPPEAR with unk1B0 = ResetTimeHitting. attackToMario: the ATTACK only in Turn /
+PreAttack / Attack. isCollidMove false. setDeadAnm (a stomp: TSmallEnemy::kill -> the Die nerve): the frame controller is handed a one-frame clip
+at frame 0 -- the body frozen where it is -> dead after the nerve's 60 ticks, the drop table.
+
+**The port.** `SmsKazekun : SmsSmallEnemy`, Prm = the shipped prm; nerves Search / Appear / Turn / PreAttack / Attack / Disappear / Wait / HitWater
+(100..107) + the species' own Die. UNK10 = the base's `_noBind` with the COLLISION MASK 0 on the scene AND re-asserted in Reset (through everything,
+as the game's); the orbit and the pose write the base's `_lin` (mPositionDelta) and `SetBehavior` adds `_vel` (the game's bind); GravityY 0,
+MoveObjectPre keeps it airborne (no floor ever). The ORIENTATION is a Godot Quaternion `_quat` with the game's formulas in the same right-handed Y-up
+frame (the model's +Z forward; `AroundQuat` = the basis (up x z, z x x, z) times the turn about its own Y; the pose's spin about `_quat * -X`; the
+dash's slerp 0.1 onto `AroundQuat(v, 2)`); ApplyLook sets the model's basis from it at the glb's scale only (LookScale 1: no body scale, as the game
+never scales this one). Hidden = the model off + the hit layer off + the wind effect freed (`SetShown`; `SetVisible` clashes with Node3D's). The hit
+layer is on only in Turn / PreAttack / Attack (`CanBeHurt`: isHitWater / isDamage); `AttackToMario` and `BehaveToWater` test it; `IsCollidMove`
+false; `WallHopAllowed` false. The Die nerve is the species' (SetDeadAnm = the clip sought to 0 and paused; the death effect; dead after 60 ticks,
+GenRandomItem). Knobs (grouped, plain English): Deviations (SpeedScale x the circling, the tumble and the dash); Effects (AppearFxScene =
+ms_kaze_appear for the appear AND the vanish, the enemy death puff EnemyDisap.tscn by default; WindFxScene = ms_kaze_wind + ms_kaze_blur, a looping
+scene parented to the model while it is out, none by default); Sounds (ReadySound, DownSound, AppearSound, AttackSound, VanishSound, WaitSound). The
+scene: CharacterBody3D (sms_enemy, mask 0), Model = the glb at 1 / 74.44, a sphere r 0.6 m at the origin (the body's 50 x 40 u), RelaunchTicks -1,
+DeathFxScene EnemyDisap, a plain-English `_sms_note`. The materials: KazekunGlow = the bmd's additive blend (blend_add, depth_draw_never,
+cull_disabled, unshaded; the vertex colour x the texture x the material's tint, with the GX mirror wrap folded by hand since Godot's samplers have no
+mirror mode) -- the body and the lips glow over whatever is behind them, as on the disc; KazekunEye opaque, textured, unshaded.
+
+**Deviations (logged; knobs where they matter):** the appear puff is the enemy death puff until a ms_kaze_appear scene is given; the wind streaks
+and the blur are a slot (none by default); the sounds are slots; the clipped-out rules are not ported. Renamed on the way: the species'
+`SetVisible` -> `SetShown` (Node3D.SetVisible); a redundant FlyBind override removed; a `Dying` getter added for the drive.
+
+**Verification:** drive 143 (patch_smoke143.py, SMS_YCAM_SMOKE=1; two game ticks a physics frame) 14/14 on a 30 x 30 m dock 80 m over the arena with
+the spirit's place 2.5 m over the dock's middle and a 6 x 6 m shelf 9 m under it: K1 placed with Mario 18.6 m off: SEARCH, hidden, the hit layer
+off, mask 0, no bind, at its place; K2 Mario 6.5 m off (within AppearDist 1000 u): APPEAR, visible, the puff, the appear clip, the hit layer still
+off; K3 58 frames on: TURN with the wait clip and the hit layer on; K4 the whole AroundTime (263 frames): it spiralled out from 6.27 m to circle at
+10.83 m (AroundDist 800 u = 10.7 m), 2.51..2.81 m over his feet (TurnOffsetY 200 u = 2.69 m), the step 20.1 u a frame average (max 22.3 with the
+climb), the heading along the motion (alignment 1.00), the bearing round him swept 387 deg -> PREATTACK; K5 the wind-up (46 frames): the speed 13.89
+u a tick, the loops 74 u tall (2 x the 37 u radius), the body drifted 1.21 m in all, the wait clip on -> ATTACK; K6 the dash's start: the attack
+clip, |v| 58.2 u a tick after the first frame's two 0.97s, straight at the goal (dot 1.000) = his feet as they were; K7 Mario on a post 25 m along the
+dash's line where it crawls at 4.5 u a tick: the real touch -> the ATTACK, 8 -> 7 HP, the nose on the dash (fwd . v 1.000), the velocity under 1 ->
+DISAPPEAR with wait 300; K8 the vanish clip, the second puff, the hit layer off, the velocity 0 -> 58 frames -> WAIT, hidden; K9 151 frames on ->
+SEARCH, back at its place, hidden, and Mario 25 m off keeps it hidden. H1 Mario back within range: the second APPEAR (Puffs 3) -> TURN; H2
+SmsSprayedByWater on the circling body (the message: 10 m out and 2.7 m up is beyond the drive's aim): HITWATER, the hit clip 19 frames with the body
+hanging where it was hit (moved 0.0 u) -> DISAPPEAR with wait 1500; H3 hidden 200 frames on with Mario in range (12.5 s in the game). S1 a second
+spirit knocked still by the message while circling, Mario dropped 1.1 m over it: his real fall -> TRAMPLE -> kill -> DIE (the clip frozen, the hit
+layer off), his bounce, 7 -> 7 HP, gone after the 60 ticks (a stomp on the tumbling PreAttack body landed beside it as often as on it: the pose loops
+28 u a frame -- the check moved to the still body). G1 a third spirit circling while Mario is put on the shelf 9 m under its PLACE: isGiveUpAround
+(LostOffsetYDown 600 u = 8.06 m) -> DISAPPEAR within a frame, the wait unchanged (0). Build 0 errors, boot ALL OK. GPU captures (the drive's capture
+mode, SMS_F143_CAP=1 under run_gpu.ps1, cap/): the appear (the body half-formed in its puff), the orbit over the dock (the glowing body broadside,
+the wait clip), the wind-up (the body mid-somersault), the dash (nose first, the attack clip), the vanish puff (mostly behind the dock's block from
+that angle; the puff and the stars show), the water hit (the hit clip, the body hanging), the stomp (the frozen body under Mario's bounce).
+
+**Note for the drives:** a scheduled run that starts against a stale or failed build keeps running on the old DLL; kill_headless.ps1 stops only the
+`--headless` Godot console processes (his editor's Godot_v4.7.1-stable_mono_win64.exe instances are left alone) before the rerun.
