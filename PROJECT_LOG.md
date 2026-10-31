@@ -9577,3 +9577,101 @@ freeze, the floor one, the ground pound, the roof one.
 **Note for the drives:** the bodies are made in the frame the drive asks for them and tick first in the NEXT frame -- a track that reads them in
 the same frame sees the pre-attach state (the run's A4 up error of 1.000); the track skips a body without a plane. A freed body (RelaunchTicks
 -1) throws on its Node3D members after the frame it dies: the checks read the last tracked position and IsInstanceValid.
+
+### 145 -- the Snooza Koopa: Pinna Park's big Koopa asleep on the sand, its hosed waking, its leap, the sunflower (feature/enemy-pinna, `a702b49`)
+
+**Files:** NEW `assets/Sms/Enemy/TamaNoko.tscn`, `SmsTamaNoko.cs` (+ .uid), `assets/Sms/Enemy/TamaNoko/` (TamaNokoBody.tres, TamaFlower.tres,
+TamaFlower.tscn + SmsTamaFlower.cs (+ .uid)), `models/Eniemes/TamaNoko/` (tamanoko_model1.glb and tamaflower_model1.glb from his FinModelUtility rip
+of /scene/tamaNoko -- game units, 16 + 1 bck clips; `tamanoko_waterhit1_loop` renamed `tamanoko_waterhit1_cycl` inside the glb's JSON chunk, same
+length, so Godot's "_loop" strip does not land on `tamanoko_waterhit1`; the two pngs; the glb .imports swap the body's three materials for
+TamaNokoBody.tres and the flower's eight for TamaFlower.tres). Nothing of Mario's or the base's changed. Tools: npc82/pinna145/{patch_import145.py,
+probe_clips145.gd, patch_smoke145.py (drive 145 + its capture mode), run_drive145.bat / run_cap145.bat, cap/, disc/, decomp/ (tamaNoko.cpp,
+TamaNoko.hpp)}. Sources: tamaNoko.cpp / TamaNoko.hpp (all of it), the shipped tamanoko.prm (sms_shipped_params.json: HeadHeight 120, BodyRadius 7,
+WallRadius 100, 1 hit point, SearchLength 1500 / Height 1000 / Aware 500 / Angle 180, GiveUp 4000 / 1200, AttackWait 240, FreezeWait 200, damage 90 x
+120, attack 80 x 100, turn 1.2 / 2.5, body scale 2 / 2, WaitTime 60, march 4 / 4.5, PickUpTime 120, JumpAttackDist 800, ThrownVY 10, ThrownRateXZ 2,
+ThrownGravityY 0.2, JumpAttackSp 25, AttackGravityY 0.4, SinkTime 400, WakeUpTimer 200), the bmds' MAT3 (the body: the enemy toon with konst 3/4,
+C0 (160, 200, 160), C1 (157, 161, 169), x 3; the flower: TEXC x RASC, alpha >= 128, cull NONE, x 8), the bcks' ANK1 headers (grow1 244; appear1 249;
+attack1 99; down1 74; land1 59; mogaki1 30 L; mudland1 14; return1 169; run1_end 14; run1_loop 60 L; run1_start 14; sleep1 159; wait1_end 14;
+wait1_loop 60 L; wait1_start 14; waterhit1 9; waterhit1_loop 30 L), SmsBombHei.cs (the take / throw hooks of 130b), SmsPoihana.cs (the sand rule).
+
+**The game.** TTamaNoko is a TWalkerEnemy (ACTOR_TYPE_TAMA_NOKO, unk150 0x11); reset: TWalkerEnemy::reset, the flags cleared (unk1B9 back to
+true), mScaledBodyRadius 280 (the shadow), LIVE_FLAG_UNK1000 (the ground check ignores water). The statics: mStopOnAirTimeMax 40, mRollOnAirTimeMax
+20, mRollOnAirAngle 360, mDropVelocityY -30. The bck table is the archive's 17 clips in order (0 the flower's grow1). SLEEP (the default): a clip
+at its end -> waterhit1 held at frame 0 (the shell at rest), POI_ZZZ every frame, walkBehavior(5, 0); doKeepDistance true (Mario pushed out of the
+cylinder); isCollidMove: its own kind pushes, asleep it hands another actor a TRAMPLE and is not moved. receiveMessage: TRAMPLE / HIP_DROP ->
+isHitValid -> kill (unk184 = 0); UNKD -> dead at once; SPRAYED_BY_WATER: the WATHIT mark, the W_HIT sound, once per cooldown decHpByWater +
+behaveToWater. behaveToWater: the cooldown 0 (every drop), unk165 = 1; asleep -> HITWATER pushed; wandering -> ATTACK pushed. HITWATER: ticks 0-1
+waterhit1 at the full rate; at its end waterhit1_loop; at a loop's end: past WakeUpTimer or unk1B9 off -> unk1B9 off, appear1 (unless already);
+else unsetUnk165 (sprayed since) -> the loop again; else the spine reset to SLEEP (twice over). appear1's end -> WAIT then GRAPHWANDER pushed
+after. WAIT: ticks 0-1 wait1_start; its end wait1_loop; past WaitTime wait1_end; its end -> GRAPHWANDER. moveObject: in GRAPHWANDER run1_start's
+end -> run1_loop. walkBehavior(mode, k): the turn toward the target at TurnSpeedLow x k, the march at MarchSpeedLow x k unless mode 5 or 3; in
+GRAPHWANDER every 200 ticks forceSleep (Mario past GiveUpLength: sleep1, the spine reset to SLEEP); a sleeper's mWakeUpTimer (never set) would
+count 400 to HITWATER. behaveToFindMario: ATTACK after the current. ATTACK: tick 0 run1_start unless in run1_loop, the goal Mario; each tick vy <
+-1 -> TAMA_BLUR at joint 1; mIsDoingJumpAttack: landed -> landEffect, the flag off, DOWN after; vy < 0 -> M_BLUR2 200 u under joint 1, and for
+mAirAttackTimer < StopOnAirTimeMax: UNK10 (no bind: it hangs), the yaw + 360 / 20 a tick while under RollOnAirTimeMax, the timer++; else the
+velocity (0, DropVelocityY, 0) and UNK10 off. Not jumping: at a clip's end run1_start -> run1_loop; run1_loop with Mario past SearchLength -> unk1B8
++ run1_end, within JumpAttackDist (not clipped out) -> run1_end; run1_end: unk1B8 -> GRAPHWANDER after; Mario in shallow water / swimming / on a
+water surface -> GRAPHWANDER after; Mario invincible -> WAIT pushed; attack1. attack1 passing frame 63: unk1A0 = calcVelocityToJumpToY(Mario,
+JumpAttackSp, getGravityY) with x and z doubled, mPosition.y += 30, the velocity, airborne, the flag, the timer 0; walkBehavior(3, 0.5) during
+attack1, else walkBehavior(2, 1). DOWN: tick 0 on sand -> SINK after + the sand column (エフェクト砂柱, scale (1.2, 0.5, 1.2)); else DROPOK, unk164,
+a shake, land1; tick 10 a rumble; the clip's end past PickUpTime -> unk164 off, WAIT after. PICKUP: tick 0 without unk164 -> done; the clip's end
+past PickUpTime -> unk164 off, attackToMario, done. THROWN: tick 0 the velocity (ThrownRateXZ x his throw power x sin / cos of his angle, ThrownVY),
++2 u, airborne; landed -> unk164 off, done. SINK: tick 0 mIsSunkInGround, mudland1; at a clip's end mudland1 -> mogaki1; sinkTime = SinkTime x
+(the live count / the manager's count); past it: return1 playing -> unsunk, WAIT after; else return1. isHitValid: UNKB false; not sunk, or return1
+past frame 80 -> false; HIP_DROP true; else false. attackToMario: unk164 off, not asleep, not (sunk with Mario's y > its y + 10) -> ATTACK.
+doKeepDistance asleep. calcRootMatrix: waterhit1_loop -> TAMA_HIT; sleep1 past frame 90 -> TAMA_HIT; appear1 passing 0 / 46 -> JUMP_ED_B, passing
+25 -> sand ? landEffect : a shake, a rumble, SMB_AP_ROCK + SMB_AP_SMOKE x 2; return1 passing 110 -> landEffect, 152 -> JUMP_ED_B unless over
+water; asleep -> POI_ZZZ. landEffect: sand -> HIPDROP_C + POI_SAND x 0.8; water -> the column; else HIPDROP_C + HIPDROP_B x 0.8; a shake, a rumble.
+getGravityY: AttackGravityY in ATTACK, ThrownGravityY in THROWN. setWalkAnm run1_start; setDeadAnm down1; isReachedToGoal 200 u in XZ.
+setAfterDeadEffect: TSmallEnemy's, the flower's unk34 on and grow1, TAMA_FLOWER, COMMON_SMOKE. TTamaNokoFlower (a TSharedParts at the body's
+position): grow1 about to end -> reviveOneSunflower; then, once, five coins (makeObjAppear at 350 u out at 72-deg steps, the velocity (dir x 4,
+20, dir x 4), the bind on). requestShadow: the circle shadow at joint 1 with mScaledBodyRadius, the question-mark request.
+
+**The port.** `SmsTamaNoko : SmsSmallEnemy`, Prm = the shipped prm; nerves Sleep / Attack / Down / PickUp / Thrown / Sink / HitWater / Wait
+(100..107) + the base's GraphWander and Die. The base's walker carries the wander, the sight (IsFindMario), the hold proxy (SmsCanBeTaken while
+flat, BehaveToTaken -> PickUp, BehaveToRelease -> Thrown with his facing and SmsParams.Take.ThrowPower, `_airborne` on any release so a dropped body
+falls), the Die nerve (SetDeadAnm down1 -> GenRandomItem -> SetAfterDeadEffect -> Dead). WalkBehavior is the species' (TurnSpeedLow x k,
+MarchSpeedLow x k, the 200-tick ForceSleep); MoveObjectPre runs run1_start into run1 in the wander and keeps the clip-frame pair for
+<c>PassedFrame</c> (checkPass) and the loop-wrap test (<c>ClipEnded</c>, as 144's). The leap: <c>CalcVelocityToJumpToY</c> (the Gesso's: the ticks to
+come down to the goal's height at speedY, the XZ speed to arrive then) with the XZ doubled; the hang = `_noBind` for the 40 ticks (the base keeps
+the velocity and skips gravity while it is on), the yaw + 18 deg a tick for the first 20, then `_vel` = (0, -30, 0) and the bind back; the landing
+= the base's floor contact (`!_airborne` with `_noBind` off) -> LandEffect -> Down. Sand: a ray down from the body's point to the floor collider,
+in the "sms_sand" group or named with "sand" (the Cataquack's rule), or the <c>Ground</c> knob. The live fraction = this kind alive among this kind
+in the level (a freed body no longer counts). Mario's invincibility = his hurt state (DEVIATION: no getter). The flower: TamaFlower.tscn (an
+<c>SmsTamaFlower</c> Node3D over the glb at 1 / 74.44) spawned under the level at (x, mGroundHeight, z) at the death, so it outlives the freed body;
+grow1 once; its AnimationFinished -> five coins through an SmsDropTable.SpawnItem (res://yellow_coin.tscn by default) 350 u out at 72-deg steps
+with (dir x 4, 20, dir x 4). HitCheckMario: the base's, plus keepDistance while asleep (Mario's damage cylinder in its 180 x 240) through
+SmsKeepDistance. Knobs (grouped, plain English): Deviations (SpeedScale, Ground Auto / Sand / Hard, WakeSeconds = WakeUpTimer in seconds);
+Effects (SleepFxScene = Fx131/PoiZzz, LandSandFxScene = Fx131/PoiSand, LandHardFxScene = HipDropLanding, PuffFxScene = Fx131/JumpEd,
+AppearHardFxScene = Fx131/SmbAppear x 2, SandColumnFxScene / FallBlurFxScene / FlowerPuffFxScene / ShakeFxScene slots, FlowerScene = TamaFlower.tscn,
+FlowerCoinScene = yellow_coin.tscn); Sounds (DropSound, AppearSound, AttackSound, DownSound, LandSound, SleepSound, WaterHitSound). The scene:
+CharacterBody3D (sms_enemy, mask 5), Model = the glb at 1 / 74.44 (x the body scale 2: 6 m tall), a sphere r 1.6 m at 1.6 m (its bottom at the
+feet: the first run's r 2 at 2.6 let the feet sink 0.6 m into the floor, and the sand ray then started inside the slab), RelaunchTicks -1,
+DeathFxScene EnemyDisap, a plain-English `_sms_note`. TamaFlower.tscn carries its own `_sms_note`.
+
+**Deviations (logged; knobs where they matter):** the stand-in effects (the Cataquack's Zs and sand puff, the Pokey's appear burst, the jump puff,
+Mario's hip-drop landing) until the ms_tama_* / ms_poi_* jpa are ported; the sand column, the fall blurs, the flower puff and the shake sparkle are
+slots; the sounds are slots; the shakes and rumbles are not ported; Mario's invincibility is his hurt state; reviveOneSunflower (Pinna's sunflower
+event) is not ported; the question-mark and circle-shadow requests are not ported; the clipped-out rules are not ported.
+
+**Verification:** drive 145 (patch_smoke145.py, SMS_YCAM_SMOKE=1; two game ticks a physics frame) 20/20 on a 30 x 30 m SAND dock (sms_sand) 80 m
+over the arena with a 16 x 16 m hard slab on its far quarter: Z1 placed on the sand with a two-node path: SLEEP, waterhit1 held at frame 0, no
+step, the body scale 2, the Zs; Z2 Mario put 1.6 m from the shell: pushed out to 3.09 m, no damage. W1 the message 60 frames (120 ticks): HITWATER,
+waterhit1 then its loop; W2 the hose off: back to SLEEP at the loop's end, no wake. W3 the message 150 frames (300 ticks): the wake at 248 ticks
+(the loop's end past 200), appear1, Wakes 1; W4 appear1's end -> WAIT -> GRAPHWANDER 337 frames after the wake, the frame-25 sand landing puff; W5
+the wander: run1_start then run1, 946 u in 120 frames (4 u a tick). A1 Mario 6 m off (within SearchAware, invincible for the approach so the run
+into him knocks nothing about): ATTACK after the wander; A2 the LEAP from 5.8 m: the velocity (2.66, 25, 5.74) along him, run1_end and attack1 seen;
+A3 the hang: 39 timer ticks tracked, the yaw swept 342 deg between the first and last tracked frames (18 deg a tick), the apex 9.67 m up; A4 the
+drop at -30.4 u a tick, landed 0.05 m from his spot at the leap; A5 SAND -> landEffect -> DOWN -> SINK: stuck, mudland1 then mogaki1. P1 his real
+ground pound from 1.6 m over the sunk body: HIP_DROP valid -> kill -> DIE with down1 -> dead 112 frames on, his HP kept (no attack on him from a
+sunk body he is over); P2 the sunflower at the spot, growing; P3 270 frames on: grown, five coins. H1 a second one woken on the HARD slab (the
+SMB_AP burst, no landing count), WAIT, the wander; H2 its leap onto the hard slab: the hang (39) and the drop, Down (flat), land1, the landing
+"hard"; T1 Mario beside it, B 6 frames: his take -- PICKUP, the body in his hands (the hold proxy), its collision off; T2 B again: THROWN at
+(-5.6, 9.6, 0) = 2 x his throw power along his facing and ThrownVY 10 less a tick of gravity, airborne, out of his hands; T3 it flew 8.1 m and
+landed: unk164 off, back through the Down it left, the collision back on. (Run a's body sank 0.6 m into the floor -- the shape; run b's hard-slab
+leap landed on the sand because the run into Mario had knocked him 0.4 m past the slab's edge and the drop lands on his spot -- the drive now
+keeps him invincible for the approach, and a drive-side nerve-name mismatch ("Down(done)").) Build 0 errors, boot ALL OK. GPU captures
+(SMS_F145_CAP=1 under run_gpu.ps1, cap/): the shell asleep on the sand, the shake, the stretch out of the shell, the hang at the top of the leap
+(the shell upside down over the dock), the struggle in the sand, the ground pound, the sunflowers around Mario, the flat body, the carry.
+
+**Note for the drives:** a leaping body comes down exactly on Mario's spot at the leap; a drive that leaves him there takes the hit (the game's).

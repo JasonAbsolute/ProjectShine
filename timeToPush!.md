@@ -651,21 +651,24 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #13 -- PENDING -- queued 2026-10-31 15:15 PDT (Kiro) -- PUSH ONLY, no PR yet (SMS 144)
+### #13 -- PENDING -- queued 2026-10-31 15:15 PDT (Kiro) -- PUSH ONLY, no PR yet (updated for SMS 145)
 Push the eighth feature branch: `feature/enemy-pinna`, branched from the RICCO branch's tip `76c46d8` (the 143 log commit; see #12), not from
 `main`: the Pinna species lean on the Ricco branch's base and Mario work (the water-surface helpers in SmsSmallEnemy.cs, Mario's fence getters
 from 139) and the Klamber's net mechanics. Pinna Park's enemy family, one pass each on this branch. SMS 144: the Electrokoopa on the net
 (TAmiNoko), the crackling Koopa that crawls the Ferris wheel's nets from node to node, shocks Mario on its side of the net and is punched off
 from the other -- assets/Sms/Enemy/AmiNoko.tscn + SmsAmiNoko.cs, its material under assets/Sms/Enemy/AmiNoko/, its model under
-models/Eniemes/AmiNoko/. NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says the family is done
-(Kiro will replace this entry with the PR entry then, as #5-#8 went). More passes (the Snooza Koopa, the Monty Mole in its cannon) will land
+models/Eniemes/AmiNoko/. SMS 145: the Snooza Koopa (TTamaNoko), the big Koopa asleep in its shell on the sand that a long hosing wakes, that runs
+at Mario and leaps (the hang, the drop), that lands stuck in the sand for his ground pound -- a sunflower grows and bursts five coins -- or flat on
+hard ground for his pick-up and throw -- assets/Sms/Enemy/TamaNoko.tscn + SmsTamaNoko.cs, the sunflower and the materials under
+assets/Sms/Enemy/TamaNoko/, the models under models/Eniemes/TamaNoko/. NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says the family is done
+(Kiro will replace this entry with the PR entry then, as #5-#8 went). More passes (the Monty Mole in its cannon) will land
 on this branch and re-point this entry's tip. Because the branch stacks on Ricco, open its PR AFTER #12's has merged and, if GitHub then shows
 Ricco's files in the Pinna diff, rebase first: `git rebase --onto main 76c46d8 feature/enemy-pinna` (replays only the Pinna commits onto the
 merged main), then `git push --force-with-lease`.
-- Branch `feature/enemy-pinna` -- code tip `858718c` ("SMS 144: the Electrokoopa on the net ...", 8 files +744: AmiNoko.tscn, SmsAmiNoko.cs
-  (+ .uid), AmiNokoBody.tres, the glb with its png and their .import files) on `76c46d8` (the Ricco tip: the ten commits of #12); the branch tip
-  is this file's own commit on top of it; 12 commits since `main` `55514c8`, 2 of them Pinna's. The range carries none of Jaysonn's nine live
-  edits.
+- Branch `feature/enemy-pinna` -- code tip `a702b49` ("SMS 145: the Snooza Koopa ...", 16 files +850: TamaNoko.tscn, SmsTamaNoko.cs (+ .uid),
+  TamaNoko/ (SmsTamaFlower.cs (+ .uid), TamaFlower.tscn, two .tres), the two glbs with their pngs and .import files) on `6537026` (the 144 log),
+  `858718c` (SMS 144, 8 files +744) and `76c46d8` (the Ricco tip: the ten commits of #12); the branch tip is this file's own commit on top of it; 14
+  commits since `main` `55514c8`, 4 of them Pinna's. The range carries none of Jaysonn's nine live edits.
 - To try 144: build a NET (a thin StaticBody3D with metadata sms_fence, or in the group sms_fence, so Mario can climb it), drop
   assets/Sms/Enemy/AmiNoko.tscn ON it (within 0.4 m of the face; it also takes a wall, a ceiling or a floor) and give it a Graph: a Node3D child
   whose children are the points of its path on the same face -- it crawls from point to point (a random other one each time), stops and turns at
@@ -674,6 +677,15 @@ merged main), then `git push --force-with-lease`.
   one on a floor; the hose stuns it; jumping on it only bounces you. Knobs: Deviations (SpeedScale, ClipSet 1 = Pinna Park's clips / 2 = Pianta
   Village's, FeetOnPlane, AttacksAcrossTheNet = the game's rule: standing right behind the net within its reach shocks you through it), Effects
   (the sparks, the stun stars, the knock-off smoke, the wall puff), Sounds (five slots); RelaunchTicks -1 = gone for good (1800 = back in 15 s).
+- To try 145: drop assets/Sms/Enemy/TamaNoko.tscn on SAND -- a floor whose StaticBody3D is in the group sms_sand or has "sand" in its name (the
+  Deviations knob Ground = Sand forces it) -- and it sleeps there in its shell (it is big: 6 m). Hose it for about two seconds (WakeSeconds): it
+  shakes, then stretches out and wanders (a Graph of Node3D children, or within WanderRadiusUnits); stop hosing early and it dozes off again. When it
+  sees you it runs at you and leaps -- a somersault at the top, a hang, a straight drop onto where you stood (its touch hurts: move). Landing on
+  sand it is stuck and struggles: ground-pound it then and it dies -- a sunflower grows there and bursts five coins. Landing on hard ground it lies
+  flat for two seconds: pick it up (B) and throw it (B again), or wait and it gets up; held too long it wakes in your hands and hurts you. Walk far
+  off and it goes back to sleep. Knobs: Deviations (SpeedScale, Ground, WakeSeconds), Effects (the Zs, the landing puffs, the stretch burst, the
+  sunflower and its coin, and slots for the sand column, the fall streaks, the flower puff and the shake sparkle), Sounds (seven slots);
+  RelaunchTicks -1 = gone for good.
 ```
 git push -u origin feature/enemy-pinna
 git rev-list --count origin/feature/enemy-pinna..feature/enemy-pinna
