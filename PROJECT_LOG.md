@@ -10106,3 +10106,20 @@ sphere's bottom is at the node origin).
 **Verification:** build 0 errors, boot ALL OK. Checked this round on a headless GPU capture (patch_smoke150.py's drive at SMS_F150_CAP=1, 22/22; the
 splice removed and Mario.cs restored to committed before the commit): the hot mouth's yellow-orange embers, the steam low around the body, the stomp dust
 at the feet -- the embers and steam compared against Ref/TeethSparkRef.
+
+### 150e -- the Chain Chomp's mouth sparks jet out as directional streaks (feature/enemy-monte, `73be638`)
+
+**Files:** CHANGED `assets/Sms/Fx/BwHibana.tscn` (an ember burst -> a streak jet), `assets/Sms/Enemy/SmsBossWanwan.cs` (the spark spawn now faces the mouth),
+`assets/Sms/Enemy/BossWanwan.tscn` (the _sms_note). Tools: npc82/monte151/{commit150e.txt, append150e.py; the pass-150 drive re-used for a verification
+capture}. Jaysonn on the 150d sparks: they "need to directionally go out of the mouth as longer short-lived streaks" (the steam and the stomp were fine).
+
+**The change.** 150d's BwHibana was scattered round embers (an emission sphere, spread 180, gravity pulling them down). It is now a forward JET: the
+emission is a 14-degree cone along +Z, initial 6-11, slight gravity; each particle is elongated along its own velocity (particle_flag_align_y on a
+0.07 x 0.8 quad -- a streak, not a dot), short-lived (0.32 s), at low explosiveness (0.2) so a continuous stream of streaks shoots out instead of one
+bunched birth-burst; the yellow -> orange ramp kept. The emit (EmitEffects) now spawns the burst FACING the mouth: it builds the same basis the body's
+look uses (fwd = PolarXZ(_yaw); new Basis(Up x fwd, Up, fwd)) times the scale, so the material's local +Z direction is the mouth's forward and the streaks
+jet straight out of the teeth (at CenterUnits + PolarXZ(_yaw, 460) + up 60), fired a steady ~4 a second while hot plus the bark / shake accents.
+
+**Verification:** build 0 errors, boot ALL OK; a headless GPU capture (patch_smoke150's drive, spliced then removed and Mario.cs restored to committed
+before the commit) -- the sparks read as elongated streaks jetting from the mouth, not the 150d scatter. The streak length (the quad's 0.8), the cone
+(spread 14), the speed (6-11) and the life (0.32 s) are knobs if the feel wants tuning in motion.
