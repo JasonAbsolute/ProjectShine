@@ -10055,3 +10055,27 @@ a knob, with a doc line -- turn it on to try the tumble), so it walks upright; A
 **Verification:** build 0 errors, boot ALL OK. Read by eye (the Chomplet's chain FireEffect now gets fireOn + a scale that ramps through RECOVER; the
 Chomp's body, chain and haze all read HeatRatioNow through the bark; RollSw off gates ApplyLook's body roll). Not separately captured -- a visual touch-up
 on top of pass 150's 22/22 drive and its eleven captures; Jaysonn plays the reignite himself.
+
+### 150c -- the Chain Chomp's stomp dust hugs the ground, its hot mouth throws sparks, and its steam stops dropping (feature/enemy-monte, `75fd1eb`)
+
+**Files:** CHANGED `assets/Sms/Enemy/SmsBossWanwan.cs`, `assets/Sms/Enemy/BossWanwan.tscn` (the _sms_note's effects line). Tools: npc82/monte151/
+{commit150c.txt, append150c.py}. A second polish pass on the pass 150 Chain Chomp after Jaysonn's playtest: "the dust and impact blue streaks sit too
+high when he stomps" (the walk itself now looks right, from 150b), "add the sparks coming out of his teeth", and "the steam coming off when spraying".
+
+**The stomp dust.** emitEffects fired the HipDropLanding burst at the feet (GlobalPosition -- the scene rests the body on the floor: the foot sphere's
+bottom is at the node origin, the model 500 u over it) but scaled it a uniform x 4, so its smoke and its blue impact streaks rose x 4 up the body. It now
+scales (4, 1.4, 4) -- as wide as before but low, so the dust and streaks hug the ground where it slams (the wait-clip bobs, the bark's three slams, the
+shake all call StompEffects).
+
+**The mouth sparks (HIBANA).** The spark slot was empty, so the bark / bob sparks never showed. It now defaults to HitBurst (ms_dmg_a/b, an orange-streak
+burst -- not the cyan electric ShockSparks, which would have clashed with the blue stomp streaks) and fires at the upper jaw's hinge + 200 u forward
+(HitUpUnits + PolarXZ(_yaw, 200), the mouth / teeth) instead of the body centre, on the bark passing 72 / the wait passing 6 or 12 / the shake passing 4.
+
+**The hose steam.** receiveMessage(WATER) sets a steam flag each drop, but emitEffects cleared it every tick while gating the puff to one tick in eight --
+so seven sprays in eight were dropped before they could show. The puff now fires every four ticks while the flag is set and clears the flag only when it
+actually fires (and if it has cooled to 0 by then the flag just clears -- the great cool-down steam already played on that drop), so a steady steam comes
+off the hot body under the hose. Its scale 1.5 -> 2.5 to read on the 13 m body.
+
+**Verification:** build 0 errors, boot ALL OK; the diff read by eye and against HEAD (the four hunks, nothing stray). Not separately captured -- effect
+tweaks on top of pass 150's 22/22 drive and its eleven captures; Jaysonn plays them. The rocks / heat haze slots stay empty (no faithful asset, and he
+named only the dust height, the sparks and the steam).
