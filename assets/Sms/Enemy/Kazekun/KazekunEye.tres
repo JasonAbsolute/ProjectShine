@@ -1,0 +1,13 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://d143kazekuneye"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/Kazekun/KazekunEye.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/Kazekun/H_kazekun_eye1.png" id="2_tex"]
+
+[resource]
+resource_name = "_mat_kazekun_eye (kazekun.bmd): the Wind Spirit's eyes -- tex x the lit vertex colour, opaque, cull BACK"
+render_priority = 0
+shader = ExtResource("1_shader")
+shader_parameter/base_tex = ExtResource("2_tex")
+shader_parameter/sun_dir = Vector3(0.348, 0.87, 0.348)
+shader_parameter/sun_color = Vector3(1, 1, 1)
+shader_parameter/ambient = Vector3(0.502, 0.502, 0.502)

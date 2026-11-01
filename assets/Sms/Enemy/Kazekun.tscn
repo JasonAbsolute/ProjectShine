@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://d143kazekun"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsKazekun.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Kazekun/kazekun.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisap.tscn" id="3_disap"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_body"]
+radius = 0.6
+
+[node name="Kazekun" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 0
+script = ExtResource("1_script")
+RelaunchTicks = -1
+DeathFxScene = ExtResource("3_disap")
+metadata/_sms_note = "Pass 143: the Wind Spirit (Kazekun), Ricco Harbor's wisp of wind. Put it where it should live (its place; it flies, so anywhere in the air is fine). It stays invisible until Mario comes within about 13 m, then puffs into view, circles 2.7 m over his head about 10 m out for 4 s or so, tumbles in place to wind up (the READY sound), and dashes through him (its touch hurts) before vanishing in a puff; a few seconds later it comes back from its place. Spray it with water while it is out and it drops with a cry and stays away much longer. It flies through walls and floors (as the game's does). A stomp while it is out kills it (RelaunchTicks -1 = gone for good; 1800 = back in 15 s). Knobs: Deviations (SpeedScale), Effects (the appear puff, the wind streaks), Sounds (slots)."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_body")

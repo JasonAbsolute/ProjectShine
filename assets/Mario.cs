@@ -11479,6 +11479,38 @@ public partial class Mario : CharacterBody3D
     }
     /// <summary>mFaceAngle.y as a direction, for the NPCs' "Mario faces me" cone (MsIsInSight with *gpMarioAngleY).</summary>
     public Vector3 SmsFacingDir() => _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : (lastFacingDirection.LengthSquared() > 1e-6f ? lastFacingDirection.Normalized() : -armature.GlobalTransform.Basis.Z);
+    // ---------------------------------------------------------------------------------------------- pass 139: what the Klamber (SmsKumokun) reads of him
+    /// <summary>SMS_IsMarioFencing(): on a fence (the FENCE_CATCH / JUMP_CATCH / MOVE / PUNCH statuses).</summary>
+    public bool SmsIsFencing => stateOfMario == MarioState.fence;
+    /// <summary>SMS_IsMarioRoofing(): hanging under a roof (HANG_ROOF / WAIT_ROOF / MOVE_ROOF / KICK_ROOF).</summary>
+    public bool SmsIsRoofing => stateOfMario == MarioState.roofHang;
+    /// <summary>SMS_GetMarioWlPlane()->getNormal(): the fence plane's outward normal he is pressed on (the side he is on; meaningful while fencing).</summary>
+    public Vector3 SmsFenceNormal => _smsFenceNormal;
+    /// <summary>The fence or roof body he is on (meaningful while fencing / roofing).</summary>
+    public Node SmsFenceBody => _smsFenceBody;
+    /// <summary>SMS_GetMarioRfPlane()->getNormal().y: the roof plane's normal.y (meaningful while roofing; -1 for a flat roof).</summary>
+    public float SmsRoofNormalY => _smsRoofNormalY;
+    /// <summary>MARIO_STATUS_FENCE_PUNCH with the clip between frames 5 and 9 (MarioCheckCol.cpp 349): the ticks a Klamber / net Koopa in his attack cylinder
+    /// (setAttackRadius 250 / Height 200) gets HIT_MESSAGE_PUNCH.</summary>
+    public bool SmsFencePunchActive
+    {
+        get
+        {
+            if (stateOfMario != MarioState.fence || _smsFence != SmsFence.Punch || animPlayer == null || animPlayer.CurrentAnimation != "ma_fence_punch") return false;
+            double f = animPlayer.CurrentAnimationPosition * 60.0;
+            return f >= 5.0 && f < 9.0;
+        }
+    }
+    /// <summary>MARIO_STATUS_KICK_ROOF with the clip between frames 9 and 13 (MarioCheckCol.cpp 354): the roof kick's HIT_MESSAGE_PUNCH window (radius 200 / height 250).</summary>
+    public bool SmsRoofKickActive
+    {
+        get
+        {
+            if (stateOfMario != MarioState.roofHang || _smsRoof != SmsRoof.Kick || animPlayer == null || animPlayer.CurrentAnimation != "ma_ladder_hang_kick") return false;
+            double f = animPlayer.CurrentAnimationPosition * 60.0;
+            return f >= 9.0 && f < 13.0;
+        }
+    }
     public void SmsTalkStart(SmsNpc npc) { _smsTalkNpc = npc; _smsTalking = true; _smsTalkPhase = 0; }
     public void SmsTalkEnd()
     {

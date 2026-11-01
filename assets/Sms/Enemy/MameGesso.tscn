@@ -1,0 +1,33 @@
+[gd_scene format=3 uid="uid://d140mamegesso"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsMameGesso.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/MameGesso/default.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisap.tscn" id="3_disap"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_body"]
+radius = 0.7
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_platform"]
+size = Vector3(5.374, 0.27, 5.374)
+
+[node name="MameGesso" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+script = ExtResource("1_script")
+RelaunchTicks = 300
+DeathFxScene = ExtResource("3_disap")
+metadata/_sms_note = "Pass 140: the small Blooper (Mame Gesso), Ricco Harbor's hopping squid. Place it on a dock or on the water (an sms_water area: it floats on the surface). It hops from point to point (random points within WanderRadiusUnits of where it was placed, or the Graph's nodes if you give it one), waits, hops again; its touch hurts Mario. The hose (or a stomp) stuns it: it flails for a few seconds, and while stunned Mario can pick it up (B) and throw it. Sprayed while floating on water it flattens into a PLATFORM Mario can stand on (the Platform child's box, 5.4 m square, for ObjectRecoverTicks, 25 s in the game), then swims off and hops again. A ground pound on a hopping one kills it. Knobs: Deviations (ObjectRecoverTicks, PlatformHeightUnits, WanderRadiusUnits), Effects (the water column -- the small splash by default), Sounds (four slots). RelaunchTicks 300 = back at its point 2.5 s after a death (the game's GenerateInterval); -1 = gone for good."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7, 0)
+shape = SubResource("SphereShape3D_body")
+
+[node name="Platform" type="StaticBody3D" parent="."]
+metadata/sms_surface = "normal"
+metadata/_sms_note = "The flattened Blooper's standing surface (TNerveMameGessoObject's two-triangle TMapCollisionMove, 2 x CollisionScale x AttackRadius = 400 u square at the body joint + 90 u). Placed and enabled by the script only while it is a platform."
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Platform"]
+shape = SubResource("BoxShape3D_platform")
+disabled = true

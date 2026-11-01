@@ -1,0 +1,15 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://d143kazekunbody"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/Kazekun/KazekunGlow.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/Kazekun/H_kazekun_body.png" id="2_tex"]
+
+[resource]
+resource_name = "_mat_kazekun_body + _lips (kazekun.bmd): the Wind Spirit's glow -- tex x the lit vertex colour - 1/2, additive (SRCALPHA / ONE), no Z write, cull BACK"
+render_priority = 1
+shader = ExtResource("1_shader")
+shader_parameter/base_tex = ExtResource("2_tex")
+shader_parameter/sun_dir = Vector3(0.348, 0.87, 0.348)
+shader_parameter/sun_color = Vector3(1, 1, 1)
+shader_parameter/ambient = Vector3(0.502, 0.502, 0.502)
+shader_parameter/ambient_a = 0.196
+shader_parameter/glow = 1.0

@@ -9011,3 +9011,457 @@ died at exit on Godot's C# finalize assertion (`csharp_lang && !csharp_lang->scr
 "leaked unsafe reference" dump of the whole scene after it; the other six boots and every drive run (which quit through GetTree().Quit()) were
 clean. Not seen in the ~20 boots of the earlier passes. The one new thing at this Level's boot since 136 is the Bianco gatekeeper (Kind 1 in
 Level.tscn) filling its pool of ten Gorogoros. Open: an exit-time race to bisect if the game ever crashes on quit.
+
+### 139 -- the Klamber: Ricco Harbor's wall-walking spider, the first of Ricco's enemy family (feature/enemy-ricco, `fb28f13`)
+
+**Files:** NEW `assets/Sms/Enemy/Kumokun.tscn`, `SmsKumokun.cs` (+ .uid), `assets/Sms/Enemy/Kumokun/KumokunBody.tres`, `models/Eniemes/Kumokun/` (kumo_model1.glb
+from his FinModelUtility rip -- game units, the 13 bck clips -- with its pngs; the glb .import swaps `_mat1` and `_mat2` for the .tres); changed
+`assets/Mario.cs` (+32: the public reads `SmsIsFencing`, `SmsIsRoofing`, `SmsFenceNormal`, `SmsFenceBody`, `SmsRoofNormalY`, `SmsFencePunchActive` (FENCE_PUNCH
+frames 5..9), `SmsRoofKickActive` (KICK_ROOF frames 9..13)). Tools: npc82/ricco139/{patch_mario139.py, patch_import139.py, patch_smoke139.py (drive 139),
+probe_clips139.gd, cap_kumo139.gd, cap/}. Sources: Kumokun.cpp / .hpp (all of it), smallEnemy.cpp (TSmallEnemy::moveObject 428: mPositionDelta.zero(), the
+cylinders x mBodyScale; TSmallEnemyParams' PARAM_INIT 53; reset 250 -- the scaling the Klamber skips), enemy.cpp 21 (TSpineEnemy's mBodyScale 1),
+MarioCheckCol.cpp 15-62 (hitNormal / hitHipDrop) and 341-359 (ACTOR_TYPE_KUMOKUN: hitNormal, doKeepDistance -> keepDistance, hitHipDrop, the FENCE_PUNCH
+/ KICK_ROOF PUNCH windows), MarioCollision.cpp 135 (trampleExec: no bounce when the message is refused), MarioSpecial.cpp 1444 (fencePunch: the attack
+cylinder 250 / 200 at checkPass(5)), MarioPhysics.cpp 27 (keepDistance). The disc: no `/enemy/kumokun.prm` anywhere (params.szs' 342 files, the ricco /
+monte stage archives' map/params) -- the PARAM_INIT defaults are the retail numbers.
+
+**The game.** TKumokun is a TSmallEnemy whose init never calls TSmallEnemy::init and whose reset() is empty: the body scale stays TSpineEnemy's 1.0
+(the small-enemy scaling never runs -- the PARAM_INIT BodyScale 0.108..0.11 would have made it 15 cm), the hit cylinders are initCollision's own
+(attack 60 x 50, damage 65 x 70; the manager sets the same into the params), head height 75, body / wall radius 100, one hit point (water drains it to 0
+and it lives on: it dies only by messages). The prm defaults: TorqueY 0.01 (a turn is 100 ticks; x 3 = 33 attacking), MarchSpeed 1.0, AttackSpeed 1.5,
+MarchTimer 600, WaitTimer 180, SearchRange 1000, FlySpeed 30. initAttachPlane: checkWallPlane(pos, 75, 100) (a wall within 100 u at head height) ->
+unk198 = the wall, unk19C = setRotate(up -> normal); else checkRoofPlane (a roof 0..75 u above) -> setEulerZ(pi); else checkFloorPlane (the ground at or
+under the point + 1). isOnFloor normal.y > 0.7, isOnRoof < -0.7, a wall otherwise. calcRootMatrix: the model at mPosition - 30 x normal on a wall or
+roof, the quaternion, mScaling; KIL_SMOKE bound to it while flying (scale 1.5, alpha 128). The nerves: SEARCH -- decideTarget: isFindOutMario
+(isOnSamePlaneWithMario: on a wall, SMS_IsMarioFencing && isSameNormal(his WlPlane, unk198) (dot >= 0.99); under a roof, roofing && the RfPlane; on a
+floor, his GrPlane) and his position in the body's frame within SearchRange with |y| < head height (x 3 under a roof) -> decideTargetAtDir (the local
+direction flattened, the quaternion turned from +Z to it) with unk1D4 attacking, the turn1 loop at once; else decideTargetAtRandom ((rand + 0.5) pi
+about the normal, attacking off) with turn1_start -> loop through the clip stack (pushNextAnm / updateAnimation); doAdjustTarget slerps unk1AC ->
+unk1BC by TorqueY (x 3) a tick; done and the clip at its end: turn1_loop -> turn1_end, then PREWALK (run1_start) -> WALK (prepareWalk: the counter reset,
+run1_loop; doWalk: the Z dir x MarchSpeed / AttackSpeed as mPositionDelta; ends when the counter passed 30 or MarchTimer, at the clip's end) -> POSTWALK
+(run1_end) -> WAIT (attacking off, wait1; Mario found -> Search; else WaitTimer and the clip's end -> Search). The BIND: on a floor, checkOnMovingFloor
+for a point 50 u ahead along the delta and for the body (the point pulled 10 u into the plane; the ground under it: a step up over 30 u or a drop
+away = no move and a hit; a wall within 100 u = pushed out, a hit); under a roof, checkOnMovingRoof (half a head height toward the roof, the roof within
+head height over it or no move); on a wall, checkOnMovingWall for a point 37.5 u ahead and the body (100 u off the wall, moved, kept head height over
+the ground, the wall found within 100 u from 10 u in or no move, back onto the plane); TWallAtGraph::checkWalls (the graph loop's edges as planes
+through their first node, normal = planeNormal x edge toward the body, the point kept 100 u inside each); any hit -> mHitPlaneCounter++, else 0;
+mPositionDelta = the two deltas SUMMED (twice the march on a clear plane; the look-ahead's block halves it and starts the count, so the body
+stops short of an edge). bindOnFlying: the point ahead against checkRoofPlane and checkFloorPlane (either: the velocity zeroed) and a wall within
+the body radius; a hit counts, over 30 the plane becomes the one met; doFly ends the flight when the counter passed 30 or any plane was met after 30
+ticks (the orientation up-to-the-plane) -> Die with unk1EC 1 (flyingdown1); 1800 ticks likewise. receiveMessage: PUNCH -> behaveHitPunch: nothing when
+he is fencing a plane of the same normal (or roofing the same roof, or neither) else the spine reset into PREFLY (hit_start at the full rate) -> FLY
+(flying1_loop; prepareFly: the velocity = the normal x FlySpeed, the body a head height off the plane); TRAMPLE -> on a floor only: Die with unk1EC 0
+(down1), true (Mario bounces); HIP_DROP -> a floor: Die; a roof: PreFly. behaveToWater -> behaveHitWater: with unk1D0 down, unk1D0 = 30 and the spine
+reset into FREEZE (the stack cleared; hit_end / hit_start -> hit_loop, else hit_start -> hit_loop) until unk1D0 runs out (it decrements in moveObject;
+a hit while curled is ignored) -> POSTFREEZE (hit_end, 149 frames) -> Search. attackToMario: the message only while isAttack (the Search / Walk /
+Wait / PreWalk / PostWalk nerves, and not when Mario's y + 5 is over a roof-hanging one's); doKeepDistance = on the same plane and not isAttack ->
+TMario::keepDistance (he is set DamageRadius + 50 u from its axis); isCollidMove false. changeBck: SMSGetAnmFrameRate x 0.5, x 2 when attacking or in
+PreFly, never in Die. Mario's side (MarioCheckCol.cpp 341): hitNormal (a fall onto it: HIP_DROP in a ground pound, else trampleExec -- the bounce only
+if the message is taken; the hose at close range), keepDistance when doKeepDistance, hitHipDrop (the landing frames: HIP_DROP to a body below him),
+FENCE_PUNCH frames 5..9 at attack radius 250 / height 200 and KICK_ROOF frames 9..13 -> PUNCH.
+
+**The port.** `SmsKumokun : SmsSmallEnemy`: Prm = the defaults above with the cylinders; nerves Search / PreWalk / Walk / PostWalk / Wait / Freeze /
+PostFreeze / PreFly / Fly (100..108), the default Search. The body collides with NOTHING: its scene mask (5) is read into the plane mask and zeroed in
+Init, the base's `FlyBind` step moves it by the ticks' displacement through MoveAndSlide against nothing, `_noBind` keeps the base's gravity and
+velocity off; the collision shape stays on layer 1 (the hose's drops) and rides the orientation in ApplyLook. The map queries are rays on the plane
+mask excluding the body and Mario, a hit on a CharacterBody3D / RigidBody3D dropped (the game's checks see only the BG): `CheckGround` / `CheckRoof` a
+ray 80 m down / up; `CheckWallPlane(ref p, yOff, r)` eight XZ rays plus one into the plane from (x, y + yOff, z), the nearest hit with |normal.y| <
+0.7, the point pushed out to r along the wall's XZ normal (isTouchedWallsAndMoveXZ); `CheckFloorPlane` / `CheckRoofPlane` as the game's. `_posU` is
+mPosition as the ticks advance it inside one physics frame (the body moves at the frame's end; re-synced each frame). `Bind()` runs in SetBehavior's
+slot: the walk's delta (+ the fly velocity) through CheckOnMovingFloor / Roof / Wall for the look-ahead and the body, the graph fences, the counter;
+`BindOnFlying` likewise. The orientation `_q` (Godot's Quaternion: ArcTo = setRotate, Slerp, `_q * Vector3.Back` = getZDir) with the placed yaw folded in
+about the normal at the attach; `ApplyLook` sets the model's world basis from it (30 u into a wall or roof) and the shape's. The clip stack is a list
+(`PushNextAnm` / `UpdateAnimation` / `CheckSerialAnmEnd`); `ChangeBck` = the base's SetBck with SpeedScale x 0.5 (x 2 attacking / PreFly). Godot's glTF
+import strips a `_loop` suffix and sets the clip looping (probe_clips139.gd): the table names the player's `kumo_run1`, `kumo_turn1`, `kumo_hit`,
+`kumo_flying1` (the first drive ran with the four loops silently missing -- the base's missing-clip warning caught it). `HitCheckMario` is the
+species' own, the game's dispatch for ACTOR_TYPE_KUMOKUN with Mario's cylinder on his FEET (SmsFeetWorld = mPosition): his attack cylinder (the
+punch's 250 / 200 or the kick's 200 / 250 when those windows are active, else the base's hold / pushup / trample radii) on our damage cylinder ->
+a ground-pound fall or his landing frames (groundPoundLanding, the body under him + 2 u) -> BehaveHitHipdrop; a fall -> BehaveHitTrample and his
+StompBounce only when taken; the hose at close range; the punch / kick windows -> BehaveHitPunch; then doKeepDistance with the receive cylinders
+overlapping -> `_mario.SmsKeepDistance(pos, 65)`; then our attack cylinder on his damage cylinder -> AttackToMario (IsAttack). `BehaveToWater` = the
+30-tick timer and the spine reset into Freeze. `SetDeadAnm` per `_dieKind` (down1 / flyingdown1 / the clip held). `GenRandomItem` finds the ground
+under the body itself (the base's ray sees nothing with the mask zeroed). Knobs (grouped, plain English): SpeedScale, SearchRangeUnits, FlySpeedUnits,
+AttacksAcrossTheNet (the game: on; off = a body on the far side of the plane cannot hurt him), FlySmokeFxScene (the KIL_SMOKE slot), the sounds
+WalkSound / FreezeSound / FlySound / DownSound. `Graph` is the TWallAtGraph loop here, not a wander path (the note says so). The scene: CharacterBody3D
+(sms_enemy, mask 5), Model = the glb at 1 / 74.44, a sphere r 0.35 m at 0.6 m, RelaunchTicks 1800 (a placed one is back on its surface 15 s after a
+death; the game's are the manager's), DeathFxScene EnemyDisap. Mario.cs: the seven getters only.
+
+**Deviations (logged; knobs where they matter):** the look-ahead's delta keeps only its part along the plane -- the game sums both deltas whole,
+which doubles the plane SNAP as well as the walk: a roof one sits at roof - 1 u after the attach, its rest is roof - 38.5 u, the doubled correction
+overshoots to roof - 76 and back for ever (the first drive showed exactly that: the body alternating 75 u every tick; whether the retail game's roof
+Klambers do it is unverified -- Ricco's are on the nets); the placement SNAPS onto the plane found (the game leaves the point as placed; a point off
+the wall never moves) and a body a little over a floor is set down onto it; a plane not found at the first tick is looked for again every 30 ticks;
+his landing frames send HIP_DROP once (the game would restart hit_start on every collision list of the landing); an outside Kill (a fruit, Yoshi, a
+drive) plays the squash instead of holding the current clip for three seconds; a flying / pre-flying body is not frozen by water (the game would
+hang it in the air); AttacksAcrossTheNet; KIL_SMOKE (ms_kil_smoke.jpa is in the dump, not generated yet) and the bas sound tables are slots; moving
+floors / the ride momentum and the game's fence-sound variant tables are not ported; the body's cylinders are unscaled as the game's (no body-scale
+roll). The queries are rays, not the game's triangle lists: a thin post between two of the eight directions is missed.
+
+**Verification:** drive 139 (patch_smoke139.py, SMS_YCAM_SMOKE=1) 33/33 on a 30 x 30 m platform 80 m over the arena with a thin net (0.2 m,
+sms_fence), a roof slab 3 m up (sms_fence) and a backstop wall: A1-A5 a body 0.4 m off the net attaches to the WALL at its first tick (normal +Z, the
+point on the plane, the model's up along the normal and 0.40 m into the net), one 0.1 m over the floor to the FLOOR (+1 u), one 0.25 m under the slab
+to the ROOF (hanging 38.5 u under it, upside down), all in Search with the turn clips; S1-S7 12 s of roaming: the wall one cycles Search -> PreWalk ->
+Walk -> PostWalk -> Wait with every clip, stays on the plane (0.000 m deviation), walks 4..8 m, never leaves the 8 x 6 m net (x -4.0..1.3, y 1.5..5.0:
+the edge stops and the head-height floor), the model's up never off the normal; the floor one walks 33 m and stays on the platform; the roof one
+walks 5..8 m under its slab; W0-W3 a floor one finds Mario standing 1.65 m away on its floor (attacking at its first Search), the hose (the real
+nozzle: the pack deploys from housed first, then the drops and the close-range static hit actor) curls it before its run (Freeze, timer 30, hit_start
+-> the hit loop), the hose off -> PostFreeze (hit_end) -> Search, Mario untouched; F1-F4 Mario put on the net's +Z face by the fence catch, a wall one
+placed 3 m along it sees him (isOnSamePlaneWithMario), its first Search turns toward him attacking, its run reaches him: -1 HP within 125 frames;
+P1-P4 Mario on the net's -Z face (not the same plane: no find), his real B punch (frames 5..9) -> PreFly -> Fly straight out +Z into the backstop 13 m on
+(31 ticks) -> Die with flyingdown1 -> dead; T1-T3 his real fall onto a floor one -> TRAMPLE -> Die with down1, his bounce, no damage, dead; R0-R3 a
+roof one re-placed hangs at its rest height, his real ground pound (L) onto the slab over it -> the landing's HIP_DROP -> PreFly -> Fly down to the
+floor 3 m below -> Die with flyingdown1 at y 0.01 -> dead; G1-G2 a 4-node closed loop becomes 4 fence planes and 12 s of roaming stays at most 1.66 m
+from the centre (the 3 m half-square less the 1.34 m fence). Build 0 errors, boot ALL OK. GPU capture (cap_kumo139.gd, cap/): the three bodies at
+their attach (the net walker with its legs through the net, the roof hanger upside down, the floor one), the turn and the run on the net, the curl
+(the legs tucked under the shell) and the uncurl, the squash (down1: flattened, the eyes out front), the roof one from below.
+
+### 140 -- the small Blooper: Ricco Harbor's hopping squid, the floating platform (feature/enemy-ricco, `949e16f`)
+
+**Files:** NEW `assets/Sms/Enemy/MameGesso.tscn`, `SmsMameGesso.cs` (+ .uid), `assets/Sms/Enemy/MameGesso/MameGessoBody.tres`, `models/Eniemes/MameGesso/`
+(default.glb from his FinModelUtility rip -- game units, the 19 bck clips, the run_loop1 clip renamed `mamegeso_runloop1` inside the glb's JSON chunk
+before import: Godot drops a `_loop` from a clip's name and it collided with mamegeso_run1 -- with its pngs; the glb .import swaps `_eyes1` for the
+.tres). Nothing of Mario's changed. Tools: npc82/ricco140/{patch_import140.py, patch_smoke140.py (drive 140), probe_clips140.gd, cap_gesso140.gd,
+cap/, disc/ (the rip, the bmd)}. Sources: mameGesso.cpp / MameGesso.hpp (all of it), smallEnemy.cpp (TNerveSmallEnemyDie 929: the water column on a
+water surface, decHpByWater, expandCollision 841, isEaten 853), liveactor.cpp (bind 182: the velocity zeroed on landing; calcVelocityToJumpToY 409),
+MathUtil.cpp 349 (SMSCalcJumpVelocityY), MarioCheckCol.cpp 211 (hitPickUpEnemy) and 366 (ACTOR_TYPE_MAME_GESSO: doKeepDistance -> keepDistance else
+hitPickUpEnemy), the shipped mamegesso.prm (sms_shipped_params.json), the bmd's MAT3 (bmd_mat_dump.py), the archive's bck list (the clip indices).
+
+**The game.** TMameGesso is a TWalkerEnemy (unk150 0x11, ACTOR_TYPE_MAME_GESSO) with /enemy/MameGesso.prm: march 3..5 u/tick, turn 1.3..1.5 deg/tick,
+body scale 1, 1 hit point, attack 100 x 90 / damage 100 x 120, HeadHeight 120, WallRadius 50, FreezeWait 500, 9 instances; its own: JumpWanderGravityY
+0.1, JumpWanderSpeed 10, PickUpTime 500, ThrownGravityY 0.15, ThrownVY 12, ThrownRateXZ 1.0, GenerateInterval 300, WaitTimeOnGround 100, WaitTimeInWater
+200, ObjectRecoverTime 3000, ObjectScale 2, CollisionScale 2, ReturnJumpDist 200, ReturnJumpSp 10. The manager resets a dead placed one (unk1D2) after
+GenerateInterval ticks; reset() puts the body 20 u over its placed point (unk1D4). The bck table is the archive's 19 clips in order: 0 fall1, 1 land1,
+2 land2, 3 press_downside1, 4 press_upside1, 5 return1, 6 run1, 7 run2, 8 run_end1, 9 run_end2, 10 run_loop1, 11 run_start1, 12 run_start2, 13
+turn1, 14 wait1, 15 wait2, 16 wait3, 17 wait4, 18 water_return1 (the bas table names 2, 9, 12, 13 and 18). The nerves: GRAPHJUMPWANDER (the
+default): time 0 run_start1, or run_start2 when mGroundPlane->isWaterSurface(); while a start clip plays: at its end run_loop1; on the ground past
+frame 26 the HOP -- on water generateEffectColumWater; on the graph (unk1EC) goToShortestNextGraphNode and calcVelocityToJumpToY(the goal,
+JumpWanderSpeed, getGravityY()) (SMSCalcJumpVelocityY: vy = the speed; the XZ speed = the offset over the ticks the parabola takes to fall back to
+the goal's height, terminal -40), +10 u, airborne; off the graph a hop of ReturnJumpDist toward the goal at ReturnJumpSp (+2 u); each tick on the graph:
+not at the goal or airborne -> walkBehavior(2) on the ground (the walk toward the goal) / (3) in the air (turn only); off the graph: at the goal ->
+unk1EC = 1, clipped out -> Die (no reward), walkBehavior(3); landed with run_loop1 -> run_end1 (run_end2 and the column on water); the end clip over
+-> WAIT: setWaitAnm (wait1, wait4 on water; mHeadHeight 150), the clip ended and the time past WaitTimeOnGround / InWater + 10 x the instance index
+-> GraphJumpWander. DAMAGE: time 0 the XZ velocity zeroed, turn1; landed on water -> OBJECT; the clip ended: airborne with turn1 -> fall1; landed ->
+OBJECT on water else JITABATA. JITABATA: setFreezeAnm on ticks 0..2 (unk164 = 1: the stun; wait2, the flail); the clip's end past FreezeWait -> return1;
+return1's end: the goal over 300 u away -> unk1EC = 0; WAIT with unk164 = 0. kill() (TSmallEnemy::receiveMessage after isHitValid): wandering or waiting
+-> Damage then Trample pushed (Trample runs first); flailing -> Trample alone; unk184 while wandering -> Die. TRAMPLE: unk1D1 (not a hip drop):
+press_downside1 if flailing else turn1; a hip drop: press_downside1 if flailing else press_upside1; done at the clip's end (then Damage pops).
+isHitValid: unk1D1 = the message was not HIP_DROP; a HIP_DROP while wandering -> unk1D0, the Die nerve PUSHED, false (trampleExec gets false: no bounce
+-- and kill() is not called). setDeadAnm: unk164 = 1 only -- the running clip plays out, then the Die nerve's 60 ticks (0 on water, with the water
+column) and the body is gone. behaveToWater: wandering or waiting -> Damage. behaveToTaken: PickUp pushed; PICKUP: time 0 not stunned -> done; the clip
+ended past PickUpTime -> unk164 = 0 and attackToMario (it bites in his hands); behaveToRelease: stunned and not thrown -> THROWN: (ThrownRateXZ x
+SMS_GetMarioThrowPower along SMS_GetMarioAngleY, ThrownVY), +2 u, airborne; landed on water -> Object with the stun off; on land land1, then the stun
+off. OBJECT: each tick SMS_IsMarioStatusTypeSwimming -> offHitFilter(NO_COLLISION), unk190 = unk154 x 2.5, expandCollision (the cylinders x 2.5) else
+onHitFilter; time 0: land2, no collision, calcObjCollision + entryObjCollision (a TMapCollisionMove of two triangles: a square of half-size
+CollisionScale x mAttackRadius x mBodyScale = 200 u at joint 1 (anmMtx 1) + 90 u), the water column, unk1E0 = 0, unk1E4 = mGroundHeight, unk1E8 = 80;
+land2 ended -> wait3; past ObjectRecoverTime: the clip's end: wait3 -> water_return1, water_return1 -> the quad re-entered, the collision on,
+mPosition.y = unk1E4, unk1E8 = 0 -> WAIT; unk1E0 rises back to 0 (+1 a tick) -- before that it sinks to mBaseHoseiTransY -20 (-1 a tick); the quad
+re-entered every tick he is not swimming. moveObject: in Object mPosition.y = unk1E4 - unk1E8 (80 u under the surface); calcRootMatrix: in Object the
+model at mPosition.y + unk1E0 + unk1E8 (= the surface + the sink) with the rotation, else TSpineEnemy's. attackToMario: nothing while unk164, nothing
+as a platform, else ATTACK (no PostAttack hop). isCollidMove: false only wandering on the ground. isInhibitedForceMove true. doKeepDistance: wait3
+(the platform at rest). getGravityY: JumpWanderGravityY in Object, ThrownGravityY thrown, else mGravity. Mario's side (MarioCheckCol.cpp 366):
+doKeepDistance -> keepDistance(it, 0) (a swimming Mario held DamageRadius + 50 u off its axis), else hitPickUpEnemy: unk164 and not jumping ->
+hitWantToTake (B held takes it), else hitNormal (+ keepDistance if doKeepDistance).
+
+**The port.** `SmsMameGesso : SmsSmallEnemy`: Prm = the shipped prm; nerves GraphJumpWander / Damage / Jitabata / Trample / PickUp / Thrown / Object /
+Wait (100..107), the default GraphJumpWander. The hops ride the base's bind (gravity 0.15, the terminal, the floor through MoveAndSlide, the landing
+zero); `CalcVelocityToJumpToY` = SMSCalcJumpVelocityY tick for tick. A WATER SURFACE is a floor: the game's water triangles are ground, his water is
+an sms_water Area3D the body would fall through -- `WaterSurfaceAt` (a point query half a metre under the body; the surface = the area's
+sms_water_surface_y or its first BoxShape3D's top, Mario's own rule) over the real floor sets `_waterUnder` (= mGroundPlane->isWaterSurface()) each tick
+in MoveObjectPre; `SetBehavior` (after the base's gravity) lands a fall meeting the surface this tick (the vertical velocity = the gap, the landing
+tick's velocity zeroed on the next, OnLanded), holds a resting body on it (the velocity pinned, airborne off), and lets a rise leave it; the base's
+step raises the airborne flag at every frame's end (no floor under a floating body) -- MoveObjectPre and the `_PhysicsProcess` tail put it back down
+while resting. `GroundHeightU()` = the surface when over water (the hop's goal height, the drops, the Object's base). The PLATFORM is the scene's
+`Platform` StaticBody3D (TopLevel; a 400 x 20 x 400 u box with `sms_surface = normal`; the body excepted from it), placed every tick of Object with its
+top at joint 1 (bodyjnt1 through the Skeleton3D) + `PlatformHeightUnits` and enabled, disabled at the recovery / a death (DEVIATION: the game's quad
+is re-entered at the recovery and left; the move-collision system drops it). In Object: SetBehavior pins the body at the surface - 80 u (clamped
+over the real floor: a shallow pool), the velocity and the walk zeroed; `ApplyLook` draws the model at the surface + unk1E0; the collision layer
+follows Mario's swimming (SetCollisionLayerValue(1, swimming)) with `_bodyScale` x 2.5 for the cylinders (the look is `_scale`); `HitCheckMario` = the
+base's plus doKeepDistance (wait3) with the receive cylinders overlapping -> `_mario.SmsKeepDistance`. `IsHitValid` / `Kill` / `AttackToMario` /
+`IsCollidMove` / `GravityY` / `BehaveToWater` / `SetWaitAnm` / `SetFreezeAnm` / `SetDeadAnm` (the stun only) / `SetDeadEffect` (the column on water) as
+the game's; `SmsCanBeTaken` = stunned, alive, unheld, not a platform, the collision on (his hitPickUpEnemy); `BehaveToTaken` / `BehaveToRelease` as the
+Bob-omb's (the yaw and the throw power read at the release). The goal: `GoToRandomNextGraphNode` (a random other Graph node, or a random point within
+WanderRadiusUnits of the placed point -- the base's GraphWander rule; the game walks its graph's shortest next edge: DEVIATION). The water column
+(TEffectColumWater, an effect actor with a column model) = `WaterColumnFxScene`, WaterSplashSmall.tscn by default (Mario's small splash; DEVIATION).
+Knobs (grouped, plain English): ObjectRecoverTicks (3000), PlatformHeightUnits (90), WaterColumnFxScene, WaterHopSound / WaterLandSound / HitSound /
+RecoverSound. The scene: CharacterBody3D (sms_enemy, mask 5), Model = the glb at 1 / 74.44, a sphere r 0.7 m at 0.7 m (its bottom at the body point),
+the Platform child, RelaunchTicks 300 (= GenerateInterval), DeathFxScene EnemyDisap.
+
+**Deviations (logged; knobs where they matter):** the goal rule (random node / point); the hit-react clip set once (the game sets the freeze clip on
+ticks 0, 1 and 2); the platform box off when the Object ends; the water column stand-in; the instance index is a hash of the node (the manager's
+slot) for the wait's + 10 x index; the clipped-out return hop's death and Yoshi are not ported; the sounds are slots; the Object's sink is clamped
+over a shallow pool's floor; a shallower-than-0.3 m pool would snap the body to its floor (the base's floor snap) -- not seen.
+
+**Verification:** drive 140 (patch_smoke140.py, SMS_YCAM_SMOKE=1) 23/23 on a 30 x 30 m dock 80 m over the arena with a 20 x 20 m, 3 m deep pool (an
+sms_water area, its surface level with the dock) off its +X edge: A1 a body placed on the dock fell its 20 u onto the floor, GraphJumpWander with
+run_start1; A2 one placed on the water rests on the SURFACE (y = the dock's) with run_start2; H1-H6 15 s of hops: the dock one hopped 4 times through
+GraphJumpWander -> Wait, the apex 4.55 m (333 u + 10 u), the clips run_start1 -> runloop1 -> run_end1 -> wait1, the goals within 8 m (farthest 5.4 m),
+on the dock throughout; the water one hopped 3 times off the surface with 6 water columns (a launch and a landing each), run_start2 / run_end2 /
+wait4, rested floating between hops, never under the surface; W1-W2 the hose (the real nozzle from a 1.3 m step 2 m away: his feet over its 90 u
+attack cylinder, inside the hose's 80 + 100 u close range) -> Damage (turn1) -> Jitabata (wait2), stunned, takeable, his health kept; C1 B held
+beside it: taken (SmsEnemyHoldProxy) -> PickUp in his hands; C2 B again: Thrown at vy 11.7..12 along his facing; C3 land1 on the dock, the stun off,
+then the stack pops back into Jitabata; O1-O6 the hose on the floating one from the pool's edge -> Damage -> Object: land2 then wait3, the body 80 u
+down, the model sunk 20 u, the Platform box on with its top 0.32 m over the water, no collision (health kept), Mario dropped onto it STANDS on it
+(feet -0.016 m off the top, not swimming), Mario put in the water 3.6 m from its axis swims and is pushed to 4.03 m (the collision on, x 2.5, keepDistance),
+past ObjectRecoverTicks (1500 in the drive) water_return1 -> the platform off, the body back at the surface, Wait with wait4; S1-S2 his real fall onto
+a wandering one: Trample (turn1) -> Damage -> Jitabata, his bounce, no damage, no death; G1-G2 his real ground pound onto a wandering one: Die
+pushed, no bounce, no damage, dead once the clip ran. Build 0 errors, boot ALL OK. GPU capture (cap_gesso140.gd, cap/): the two Bloopers mid-hop over
+the dock and the pool (the water column's ring on the surface), the landing and the wait, the flattened platform floating with its spotted mantle
+spread, the dock one flailing stunned.
+
+### 141 -- the land Blooper: Ricco Harbor's goop-spitting squid on the walkways (feature/enemy-ricco, `50bda5f`)
+
+**Files:** NEW `assets/Sms/Enemy/Gesso.tscn`, `SmsGesso.cs` (+ .uid), `assets/Sms/Enemy/Gesso/GessoBody.tres` + `GessoGoop.tres`, `models/Eniemes/Gesso/`
+(geso_model1.glb and the goop ball gero_model1.glb from his FinModelUtility rip -- game units, the 23 bck clips; `geso_mahi_loop1` renamed
+`geso_mahiloop1` and `gero_run_loop1` `gero_runloop1` inside the glbs' JSON chunks before import, Godot drops a `_loop` -- with their pngs; the glb
+.imports swap the bmds' materials for the .tres). CHANGED `assets/Sms/Enemy/SmsSmallEnemy.cs` (+28: the water helpers `WaterSurfaceOf(Area3D)` /
+`WaterSurfaceAt(posM, out surfM, depthM)` moved up from the small Blooper, a "water surfaces (pass 141)" section at the end of the class) and
+`SmsMameGesso.cs` (its private copies removed, -25). Nothing of Mario's changed. Tools: npc82/ricco141/{patch_import141.py, rename_clips141.py,
+probe_clips141.gd, patch_smoke141.py (drive 141 + its capture mode), cap/, disc/ (the rip, the bmds, the glsl), cur/SmsSmallEnemy.cs}. Sources:
+gesso.cpp / Gesso.hpp (all of it), enemyAttachment.cpp / EnemyAttachment.hpp (the ball's bind and rebirth), smallEnemy.cpp, walkerEnemy.cpp,
+liveactor.cpp (calcVelocityToJumpToY), MarioCheckCol.cpp, the shipped gesso.prm (sms_shipped_params.json), the bmds' MAT3 and JNT1 (bodyjnt1 12,
+kutijnt1 13), the archive's bck list (the clip indices).
+
+**The game.** TGesso is a TWalkerEnemy (unk150 17, ACTOR_TYPE_GESSO) with /enemy/gesso.prm: march 0.8..1.2 u/tick, turn 0.7..1.2, body scale 1.1, 1
+hit point, attack 70 x 120 / damage 60 x 160, SearchLength 1600 / Angle 360 / Aware 400 / Height 1200, GiveUp 2500 / 2000, FreezeWait 600, AttackWait
+120; its own: SearchLengthOnObj 2000 / AngleOnObj 180 / AwareOnObj 500, PollutionLength 1000, PollutionInterval 200, PolluteObjGravity 0.14 / Speed 10,
+DropGravityY 0.4, BodyAngMax 40, TurnLength 1000, HitWaterSpXZ 18 / SpY 5. Three classes: TGesso the walkway-edge sitter (STATE_BEAM_CHILLING), TLandGesso
+a ground walker from the start (STATE_WANDERING), TSurfGesso a walker that never finds Mario and dies with surf1 (dropping a surfboard). The bck table
+is the archive's 23 clips in order (0-1 the ball's own run1 / run_loop1, 22 the stamp's): 2 180turn1, 3 down1, 4 fall1, 5 gero1, 6 hit1, 7 land1, 8
+mahi_end1, 9 mahi_loop1, 10 mahi_start1, 11 punch1, 12 run1, 13 search1, 14 stairland1, 15 surf1, 16 turn_down1, 17 turn_gero1, 18 turn_hit1, 19
+turn_up1, 20 turn_wait1, 21 wait1. load(): the placed yaw is rounded to mStayYaw 0 / 90 / 180 / 270 and the body's yaw zeroed. BEAM_CHILLING: the bind
+pins mPosition.y = the placed height - unk1D0 (0 upright, mDamageHeight hanging -- the body point under the walkway while the model, drawn at
+mPosition.y + unk1D0, hangs there in turn_wait1); the body leans after Mario (mBodyTrackingAngle eases 0.5 deg/tick toward the angle between the
+facing's side axis and his direction; GessoBodyCallback turns bodyjnt1 about X by clamp(angle - 90, +-BodyAngMax)). STAY: setWaitAnm (wait1 /
+turn_wait1), rollCheck, polluteBehavior. rollCheck: no cooldown, Mario in sight along the facing (2000 u, 180 deg, aware 500) and under the body point
+by 10 u upright (over it hanging) -> no collision, ROLLING (turn_down1 / turn_up1; rollEnd: collision on, BEAM_CHILLING, upright flipped); within
+TurnLength, upright and NOT in sight -> TURN (180turn1, 7.2 deg/tick to 180; turnOut flips the facing). polluteBehavior (Stay, and walkBehavior mode 2):
+the timer past PollutionInterval with the clip at its end and Mario in sight (PollutionLength, 180 deg) -> POLLUTE: setPolluteGoal (his position
++-100 u, calcVelocityToJumpToY at PolluteObjSpeed under PolluteObjGravity; 0 hanging); gero1 (turn_gero1 hanging), the spit particle at kutijnt1,
+the ball at the mouth; frame 50 -> pollute(): the ball flies (vy -3 hanging) from the mouth + 100 u along the facing. The BALL (TGessoPolluteObj, a
+TEnemyAttachment, a 10 x 10 hit actor): bind under PolluteObjGravity; the ground -> rebirth: tick 0 GESO_OSENHIT_A / B + the land sound, tick 10 vy -15
+and gpPollution->pollute(pos, 8 x 32 x 0.5 = 128 u) + the stamp model, past 20 gone; a wall -> rebirth; touching Mario -> ATTACK and gone. behaveToWater
+(every hit; the cooldown reset): not in Die / Fall / Freeze and not rolling: BEAM_CHILLING -> (upright: the knock away from Mario at HitWaterSpXZ, at
+least 5 per axis, +2 u, airborne) FALL; wandering -> FREEZE. FALL: wandering: away from Mario at 4, hit1; its end: away at 6 with vy 5, fall1; landed
+on water -> the column and Die; fall1's end -> land1 -> GraphWander. The beam kind: hit1 (upright) or turn_hit1 with the body 200 u down (hanging),
+STATE_FALLING (the bind: pos += vel under DropGravityY / 2, NO ground check until 100 u under the placed height or turn_hit1 -> the normal bind); the
+clip's end -> fall1; landed: water -> Die, else land1 (mStayYaw and mRotation x 0.8 a tick) -> fallEnd: WANDERING, upright, the rotation 0 ->
+GraphWander. FREEZE: the knock away from Mario (x 4, vy 5), +2 u, airborne; checkDropInWater (50 ticks of the parabola: a water surface at the landing
+-> Fall instead); mahi_start1 -> mahi_loop1 (POI_KIZETSU while down) -> past FreezeWait and no new hit (unk165) mahi_end1 -> done; the knock bounces
+(vy x 0.3 each landing until under 1.5); airborne it turns toward Mario. attackToMario: not wandering -> ATTACK + the cooldown; wandering: PostAttack +
+PUNCH pushed (punch1: frame 10 -> ATTACK) -- and the same call sends the ATTACK at once unless the clip is mahi_loop (a touch hurts immediately, the
+punch's own hit then falls under his 300 ticks of invincibility). doKeepDistance: mahi_loop with Mario not 50 u above (he is pushed off the paralysed
+body). setBehavior: the attack cooldown (200), mNeedsLanding airborne 250 u over the ground -> LAND (stairland1) on landing in GraphWander / Attack.
+behaveToFindMario: the goal Mario, GraphWander + Attack, FINDMARIO (search1) once per 300 ticks. walkBehavior runs only past clip frame 20. kill: never
+while hanging; the ball gone. setDeadAnm: a water surface -> hidden; surf1 for the surf kind, else down1.
+
+**The port.** `SmsGesso : SmsSmallEnemy`, `Kind` = Regular / Land / Surf; Prm = the shipped prm; nerves Stay / GFreeze / Punch / Pollute / Fall / Rolling /
+Turn / Land / FindMario over the base's GraphWander / Attack / PostAttack / Die, the overrides named after the game's virtuals (SetBehavior, MoveObjectPre,
+BehaveToFindMario, WalkBehavior, AttackToMario, HitCheckMario, Kill, SmsSprayedByWater, IsFindMario, SetWaitAnm, SetDeadAnm, GenRandomItem,
+WallHopAllowed). The beam kind collides with NOTHING while it sits (the scene mask read into `_planeMask` and zeroed; SetBehavior pins the body point at
+`_beamY - _hosei` each tick; MoveObjectPre and the `_PhysicsProcess` tail keep the airborne flag down); a fall from the beam sets the mask to 0 again so
+STATE_FALLING drops THROUGH the walkway until 100 u under the placed height (or turn_hit1), when `States.FreeFall` restores it and the base's bind takes
+over. The lean is an `SmsBoneRoll` on bodyjnt1 about the model's X (`LeanDegrees` = clamp(track - 90, +-40)). The goop ball is the scene's `GoopBall`
+child (gero_model1.glb, TopLevel; gero_run1 then gero_runloop1 while it flies) stepped by the species: Held = at the mouth (kutijnt1 through the
+Skeleton3D), Flying = PolluteObjGravity with a ray for the map and a ground ray, a 10 x 10 cylinder on Mario -> `TakeDamage` + gone, Splat = the burst
+(`GoopSplatFxScene` slot), `SmsPollutionMap.Pollute(pos, 128 u)` at tick 10, gone past 20. `CheckDropInWater` = 50 ticks of the knock's parabola with
+`GroundAt` at the landing point and the base's `WaterSurfaceAt`; the drown = `WaterColumnFxScene` (WaterSplashSmall.tscn by default) + Die with the
+model hidden. The punch's ATTACK = `IsBck(BckPunch) && BckFrame() >= 10` once per punch (`_punchSent`). The dizzy stars = `DizzyFxScene`
+(assets/Sms/Enemy/Fx131/PoiDizzy.tscn by default) bound while mahi_loop1 plays on the ground. Knobs (grouped, plain English): Kind, SpeedScale,
+GoopSplatFxScene, SpitFxScene, DizzyFxScene, WaterColumnFxScene, five sound slots (the spit, the punch, the hit, the roll, the ball's landing). The
+scene: CharacterBody3D (sms_enemy, mask 5), Model = the glb at 1 / 74.44 x 1.1, the GoopBall child at 1.4 / 74.44, RelaunchTicks -1.
+
+**Deviations (logged; knobs where they matter):** the facing is the placed yaw as is (the game rounds to 0 / 90 / 180 / 270 and the land kinds start
+facing +Z); a wandering one spits in front of ITSELF (the game passes a direction of 0 = +Z for a wanderer); the surfboard, the stamp model (the
+pollution stamp stands in, as the Gorogoro's), the trail and spit particles and the sounds are slots; the fall's integration is the base's bind (the
+game's own loop in STATE_FALLING); the clipped-out rules are not ported.
+
+**Verification:** drive 141 (patch_smoke141.py, SMS_YCAM_SMOKE=1) 16/16 on a 30 x 30 m dock 80 m over the arena with a raised 8 x 20 m WALKWAY (its top
+3 m up), a 2 x 2 m perch (4 m) in front of its +X edge, two 1.3 m steps and a 20 x 20 m, 3 m deep pool (an sms_water area) off the +X edge, every
+check through the real path: A1 a Regular one placed ON the walkway's edge sits (BeamChilling, Stay, wait1, pinned at its placed height, facing the
+placed yaw, mask 0); A2-A3 Mario below the edge and in sight -> Rolling (turn_down1) -> hanging (turn_wait1) with the body point 176 u down and the
+model drawn at the edge; A4 Mario on the perch over the hanging body -> turn_up1 -> upright at the edge; A5 Mario to the side on the perch -> the lean
+grows to 13.7 deg (the angle to him; within 40); P1-P2 Pollute (gero1, the ball held at the mouth, the spit at frame 50) -> the ball flew toward him
+and splatted (the 128 u stamp); W1-W2 the hose from the perch's near edge through the real nozzle -> the knock away at 18 u/tick, hit1, Falling
+THROUGH the walkway, fall1, land1 on the floor 3 m below -> Wandering with the mask back and GraphWander / FindMario; L1-L2 a Land one on the floor
+2 m from Mario: FindMario (search1) -> Attack (run1) -> Punch (punch1), -1 HP (7 -> 6) in 105 frames; F1-F2 the hose on a Surf one (it never charges
+him, so it stays in the stream) placed 1.8 m in front of where he stands -> Freeze: the knock away (vy 5, x 4), mahi_start1 -> mahi_loop1 with the
+dizzy stars, past FreezeWait 600 mahi_end1 -> GraphWander, his health kept; S1 his real fall onto a walker -> Trample -> kill -> Die with down1, his
+bounce, no damage; D1-D2 the hose on a Surf one at the pool's edge -> checkDropInWater -> Fall (hit1, fall1) instead of Freeze -> landed on the water:
+the column, Die hidden, the body freed. (Two drive fixes along the way, both the drive's: a body placed a fixed 1.8 m from the placed spot stood
+inside the 77 + 42 u touch reach because Mario ends up 0.56 m off that spot by the time the stream runs -- the game-faithful touch ATTACK out of
+mahi_start cost him 1 HP; the drowned body frees itself before the check read its position.) Build 0 errors, boot ALL OK. GPU captures (the drive's
+capture mode, SMS_F141_CAP=1 under run_gpu.ps1, cap/): the sitter on the edge, the roll, the hang under the walkway over Mario, the lean toward him
+with the ball mid-flight, the ball at the mouth, the knock off the edge under the drops, the walker on the floor, the punch, the paralysis with its
+stars, the squash under his stomp, the drown's column.
+
+### 142 -- the Cheep Cheep: Ricco Harbor's leaping fish and its launch pad, the swimmer (feature/enemy-ricco, `85f17aa`)
+
+**Files:** NEW `assets/Sms/Enemy/Puku.tscn`, `SmsPuku.cs` (+ .uid), `assets/Sms/Enemy/Puku/PukuBody.tres`, `models/Eniemes/Puku/` (default.glb from his
+FinModelUtility rip -- game units, the 11 bck clips, none renamed -- with its pngs; the glb .import swaps the bmd's four `_mat_Lhand` materials for the
+.tres). Nothing of Mario's or the base's changed. Tools: npc82/ricco142/{patch_import142.py, probe_clips142.gd, patch_smoke142.py (drive 142 + its
+capture mode), run_drive142.bat / run_cap142.bat (the detached runners), cap/, disc/ (the rip, the bmd, the bcks), decomp/}. Sources: tobiPuku.cpp /
+TobiPuku.hpp (all of it), LiveActor.hpp (LIVE_FLAG_UNK10 = no bind), liveactor.cpp (bind), smallEnemy.cpp (moveObject's position delta, forceKill,
+genRandomItem), walkerEnemy.cpp (walkBehavior), the shipped tobipuku.prm and tobipukulaunch.prm (sms_shipped_params.json; tabepuku.prm is another
+class's), the bmd's MAT3 and JNT1 (bmd_mat_dump.py; joint 1 'center', joint 6 'chn9'), the bcks' ANK1 headers (the frame counts and loop modes).
+
+**The game.** TTobiPuku is a TWalkerEnemy (unk150 0x31, ACTOR_TYPE_PUKU_PUKU) with /enemy/tobipuku.prm: HeadHeight 50, WallRadius 10, 1 hit point,
+SearchLength 800 / Height 600 / Aware 400 / Angle 90, GiveUp 2000 / 650, AttackWait 120, FreezeWait 300, damage 100 x 80 / attack 105 x 60, turn 3..5,
+body scale 1, march 2.5..3.5 u/tick, zigzag 1000 / 30; its own: BoundNum 3, BoundVal 0.5, LifeTimer 800, FlyGravityY 0.25, PowerFromWater 30; the
+statics mLandAngle 90, mBoundSw true, mBoundVelocityY 0.8, mReturnLaunchSw true. The bck table is the archive's 11 clips in order: 0 attack (14), 1
+death (174), 2 down_air (14), 3 down_land (20), 4 fall (15, loop), 5 fall_end_land (29), 6 jump (15, loop), 7 jump_start (9), 8 pitipiti (35, loop), 9
+swim (60, loop), 10 wait (60, loop). The LAUNCH PAD (TTobiPukuLaunchPad, a tiny TSmallEnemy of tobipukulaunch.prm placed in the water with an extra
+s32 launchPower): perform() with mReturnLaunchSw launches a fish when it has none or its fish is dead (else every LaunchInterval 300); forceLaunch: the
+velocity (sin yaw, 1, cos yaw) x launchPower, then x (cos pitch, sin pitch, cos pitch) from the pad's X rotation; the fish reset at the pad with unk1D0 =
+it, unk1B0 = the pad's height, unk1DC = the pad (the manager's unk60 mode -- calcVelocityToJumpToY to FlyDist along the facing at LaunchVelocityY -- is
+never set). GENERATE (the default): tick 0 UNK10 (no bind), mPosition.y -= 300, the pitch of the velocity (MsGetRotFromZaxis), the jump clip; each tick
+y += unk1D0.y until over unk1B0 -> flyStart (unk194: FlyGravityY, mVelocity = unk1D0, unk1B4 = its pitch, the water column + TOBIPUKU_FRWATER, airborne,
+UNK10 off) -> FLY: the pitch follows the velocity, unk1E4 = vy; landed -> LAND. LAND ticks 0-1: a WATER surface: y -= 10, UNK10, the column +
+TOBIPUKU_TOWATER, with the return switch unk1E4 x 0.8 and unk1E8 = (180 - pitch) / |600 / unk1E4|; the GROUND: mBoundSw and canBound (unk198 <
+BoundNum) -> BOUND, else unk1B8[0] = the position, fall_end_land, pitch 0. From tick 2: fall_end_land playing -> (a 20-tick blend of the position by
+unk1B8[1], which the decomp never sets) -> its end -> PITIPITI; else with the return switch the DIVE by hand: unk1D0.xz x 0.5, the velocity = unk1D0.xz
+x cos(pitch), vy = unk1E4, pitch = clamp(pitch + unk1E8, 0, 180), past 120 u deep the roll +3 a tick to 180 (TobiPukuRollCallback: joint 1 about its
+Z), past 600 u -> RETURNLAUNCH; without the switch y -= 12 a tick, the pitch +1.2 to 90, dead after 100 ticks. BOUND: bound(): unk1AE = 1, unk198++,
+the velocity = unk1D0.xz x BoundVal, vy = 0.8 x BoundVal x (unk1B0 - the ground) / 30, airborne; rising -> unk1B0 = y; landed -> LAND. PITIPITI: the
+pitipiti clip (PUKU_PICHI at joint 1), its end past LifeTimer -> unk1AD = 0 -> DIE. RETURNLAUNCH: the goal = the pad, the swim clip, PUKU_AWA bubbles at
+joint 6; within 200 u in XZ -> PREPAREFLY; else toward the pad at the march speed less unk1D0.xz decaying x 0.99, the roll +1. PREPAREFLY: unk1F0 =
+(wrap(unk1B4) - pitch) / 60; the position eases 1/60 a tick toward the pad, the roll -3, the pitch += unk1F0; tick 50 setJumpStartAnm; past 60 ->
+forceLaunch + reset -> GENERATE. attackToMario: ATTACK; not attacking, not bouncing (unk1AE), Mario not in water -> unk1D0 = 0, the ATTACK nerve: the
+attack clip, airborne: frame 6 fallStart (unk194 = 0, the XZ velocity zeroed, +2 u, airborne), its end -> FALL; on the ground done. behaveToWater ->
+EN_COMMON_FLY + HITWATER unless in it: tick 0 airborne over 50 u -> the attack clip + hitWater (the velocity = the direction from Mario x PowerFromWater,
+y x 2, unk1D0 = it, unk1B0 = y, yaw = 180 - Mario's angle); on the ground and bouncing -> pitipiti; each tick on the ground the knock (away x 5, vy 5, +5
+u, airborne); the clip's end: the attack clip -> FALL; done. FALL: pitch 0, the fall clip; landed: water -> the column, DIE with UNK20000; ground -> DIE
+with UNK20000. DIE: airborne -> no collision, the XZ velocity zeroed, down_air; else unk1AD -> no collision, down_land; else UNK20000 + death; the
+clip's end -> DEAD, TNerveSmallEnemyDie, genRandomItem. kill: hit points 1; dying from a kill already -> nothing; else unk1AD, the spine reset to DIE.
+moveObject: the turn speed = TurnSpeedLow; airborne with mBoundSw -> hitWall (a wall reflects the velocity, vy x 0.5, unk1D0 / unk1B0 updated; a roof
+caps vy at 0). getGravityY: FlyGravityY while unk194. calcRootMatrix: pitch != 0 -> the model at (x, y + 70 x pitch / 90, z) with the full rotation.
+TPukuPuku: SWIMWANDER: unk1E0 = y, the swim clip, initialGraphNode, UNK10; at the goal (200 u in XZ) goToRandomNextGraphNode; walkBehavior(0, 1.5), then
+y = unk1E0 + 10 sin(2 x time), the pitch from the position delta. TMoePuku (the flaming one) is another level's.
+
+**The port.** `SmsPuku : SmsSmallEnemy`, `Kind` = Leaper (the fish AND its pad: the node's place is the pad, in the water at the surface, the node's yaw
+the direction; `LaunchSpeedUnits` 18 / `LaunchPitchDegrees` 70 = launchPower and the pad's X rotation -- 7.7 m up, 11 m far) or Swimmer; Prm = the
+shipped prm; nerves Generate / Fly / Attack / HitWater / Fall / PitiPiti / Die / Land / Bound / PrepareFly / ReturnLaunch / SwimWander (100..111). UNK10 =
+the base's `_noBind` with the COLLISION MASK OFF (MoveObjectPre: the game's bind-less fish passes through the map -- a rising one under a pool's floor, a
+diving one through it; the base's step moves it by `_lin` alone); the hit layer off while under the pad. The flight, the bounces and the falls ride the
+base's bind (gravity = FlyGravityY while `_flying`). A WATER SURFACE is a floor: `SetBehavior` lands a falling body meeting the surface this tick (the
+base's `WaterSurfaceAt` 2 m down, the velocity = the gap, `_onWater`, airborne off), MoveObjectPre zeroes the velocity at rest on it (the floor
+landing's zero, which no floor gives) and the `_PhysicsProcess` tail keeps the airborne flag down (the step finds no floor under a floating body); the
+nerves read `_onWater` as mGroundPlane->isWaterSurface(). The dive's depth = what the pool allows (`GroundAt` at the splashdown: the surface - the
+floor - 30 u, clamped to `DiveDepthUnits` 600): the pitch step is computed over THAT depth so the fish still faces back (180) at the bottom. The pitch
+is the model's X turn under the heading in ApplyLook (with the 70 x pitch / 90 lift), the roll an `SmsBoneRoll` on 'center' about the model's forward
+axis. Relaunch: the pad's (RelaunchTicks 1 = at once with ReturnsToPad; off: `Relaunch` waits LaunchIntervalTicks). Kill, AttackToMario, BehaveToWater,
+WalkBehavior, GravityY, OnWallContact (+ a roof ray), IsCollidMove (false: isInhibitedForceMove), WallHopAllowed (false), IsReachedToGoal (200 u XZ)
+as the game's. Knobs (grouped, plain English): Kind; Launch pad (LaunchSpeedUnits, LaunchPitchDegrees, ReturnsToPad, LaunchIntervalTicks); Deviations
+(DiveDepthUnits, Bounces, SpeedScale); Effects (WaterColumnFxScene = WaterSplashSmall by default, SwimBubbleFxScene, FlopFxScene); Sounds (LeapSound,
+SplashSound, HitWaterSound, FlopSound, SwimSound). The scene: CharacterBody3D (sms_enemy, mask 5), Model = the glb at 1 / 74.44, a sphere r 0.8 m at
+0.8 m, RelaunchTicks 1, DeathFxScene EnemyDisap.
+
+**Deviations (logged; knobs where they matter):** the landing's 20-tick position blend is not ported (its second vector is never set in the decomp);
+the dive ends at a pool's floor (the game's 600 u); the swimmer's goal rule is the base's (a random Graph node, or a random point within
+WanderRadiusUnits); the water column, the bubbles and the flop drops are slots (none but the column by default); the sounds are slots; the hosed
+fish's heading 180 - Mario's angle is taken literally; the clipped-out rules and the Yoshi are not ported.
+
+**Verification:** drive 142 (patch_smoke142.py, SMS_YCAM_SMOKE=1; two game ticks a physics frame) 18/18 on a 30 x 30 m dock 80 m over the arena with a
+20 x 20 m, 3 m deep pool (an sms_water area, its surface level with the dock) off the +X edge and a 1.3 m step at the dock's edge: G1 a Leaper placed
+at the surface: GENERATE from 300 u under (no bind, mask 0, the hit layer off, the jump clip, pitch -70); G2 over the pad: the LEAP (Leaps 1, the column,
+FlyGravityY, airborne, the bind and the mask back, the velocity (6.16, 16.9, 0) = 18 u/tick at 70 deg); G3 the apex 7.63 m (572 u), the pitch -69..+70
+following the velocity; G4 the splashdown 11.2 m on (x 31.2) landed on the surface; G5 LAND: the second column, the dive by hand to 2.67 m (the pool's
+floor less 30 u), the pitch stepped to 180, RETURNLAUNCH; G6 the swim back (the swim clip, the roll to 180, the depth kept) to 2.61 m off the pad in XZ
+-> PREPAREFLY; G7 60 ticks later the second LEAP from the pad's spot (Leaps 2, the roll 0). A1 a 10 u/tick leaper through Mario on the step: -1 HP (8
+-> 7) at frame 27, the Attack nerve with the attack clip; A2 FALL -> DIE with down_land, dead, no reward (freed). S1 a leap onto the dock: BOUND x 3,
+fall_end_land, PITIPITI 1.1 m in from the edge; L1 the flop runs out at 592 frames (800 ticks + the 174-frame death clip) -> dead, no reward; S2 the pad
+launches again 10 frames later (Leaps 2); S3 the real hose on the flopping fish from 2.3 m (the squat spray, inside the 80 + 100 u close range):
+HITWATER's knock (airborne at vy 5), back to the flop, his health kept; S4 his real fall onto it: TRAMPLE -> kill -> DIE with down_land, his bounce,
+no damage. H1 the message at the apex (the drive cannot aim the nozzle up): HITWATER, the attack clip, flung from Mario at (-25.1, 32.4, 0) = 30 x
+the direction (y x 2) -> FALL; H2 the fall (145 m on, 90 m down into the arena) -> DIE, dead, no reward. W1 a Swimmer 0.6 m under: SWIMWANDER, no
+bind, the swim clip, random points within 450 u (moved 3.3 m), the bob y -0.73..-0.47 (+-10 u), the pitch +-4, never airborne; W2 Mario put in the
+water (1.3 m deep, swimming after 8 frames) at the centre of its disc while it was 3.2 m off: its bite -> "hit in the water: -1 HP" with Mario still
+SWIMMING, no Attack nerve for a Mario in the water. (The first run's fish flew to z 4891: Generate had divided only Y of the pad's units by 74.44 --
+fixed; a swimmer placed under a falling Mario was trampled, as the game's cylinders say it must be -- the drive now lets him swim first.) Build 0
+errors, boot ALL OK. GPU captures (the drive's capture mode, SMS_F142_CAP=1 under run_gpu.ps1, cap/): the rise under the surface, the leap out with
+the column, the arc's apex, the nose-first splashdown with its ring, the dive turning over under the water, the swim back rolled upright, the hit on
+Mario over the step, the flop on the dock, the stomp, the fling high over the arena, the swimmer under the surface.
+
+**Note for the drives:** the headless and windowed runs are launched through the Task Scheduler (run_drive142.bat / run_cap142.bat via `schtasks /run`)
+and polled: a run started from the ssh session dragged at a few frames a second (the 141 drive took 7 minutes); detached it finishes in about a minute.
+
+### 143 -- the Wind Spirit: Ricco Harbor's wisp that circles Mario, winds up and dashes through him (feature/enemy-ricco, `f0a834d`)
+
+**Files:** NEW `assets/Sms/Enemy/Kazekun.tscn`, `SmsKazekun.cs` (+ .uid), `assets/Sms/Enemy/Kazekun/` (KazekunGlow.gdshader + KazekunBody.tres for
+the body and the lips, KazekunEye.gdshader + KazekunEye.tres for the eyes, + the shader .uid files), `models/Eniemes/Kazekun/` (kazekun.glb from his
+FinModelUtility rip -- game units, the 5 bck clips, none renamed -- with its two pngs and the two H_ copies the rip wrote; the glb .import swaps the
+bmd's `_mat_kazekun_body` and `_mat_kazekun_lips` for KazekunBody.tres and `_mat_kazekun_eye` for KazekunEye.tres and pins the pngs). Nothing of
+Mario's or the base's changed. Tools: npc82/ricco143/{patch_import143.py, probe_clips143.gd, patch_smoke143.py (drive 143 + its capture mode),
+run_drive143.bat / run_cap143.bat (the detached runners), cap/, disc/ (the rip, the bmd, the bcks, the glsl), decomp/}; kill_headless.ps1 (stops
+only `--headless` Godot console processes: a scheduled run that started on a stale build). Sources: Kazekun.cpp / Kazekun.hpp (all of it),
+smallEnemy.cpp (TSmallEnemy::kill, the Die nerve, reset -- which TKazekun does NOT call), the shipped kazekun.prm (sms_shipped_params.json), the
+bmd's MAT3 (bmd_mat_dump.py: body + lips SRCALPHA / ONE additive, no depth write, GX_MIRROR wrap; eye opaque), the bcks' ANK1 headers.
+
+**The game.** TKazekun is a TSmallEnemy (ACTOR_TYPE_KAZEKUN) with LIVE_FLAG_UNK10 set in its constructor: NO bind -- its bind() is mPositionDelta +=
+mVelocity and nothing else (no gravity, no ground, no walls; it passes through everything). init() does not call TSmallEnemy::init and reset() does
+not call TSmallEnemy::reset: the body scale stays 1, the hit points 1, mHeadHeight 40 / mBodyRadius 50 from initCollision; the manager's cylinders
+(the attack and the damage) are 50 x 40, unscaled. /enemy/kazekun.prm: AppearDist 1000, AroundDist 800, AroundSpeed 10, AroundTime 524, AttackSpeed
+60, AirFric 0.97, ResetTime 300, ResetTimeHitting 1500 (the default: not in the shipped prm), PoseTime 90, DicideTiming 0.1, TurnOffsetY 200,
+LostOffsetYUp 2000, LostOffsetYDown 600, PoseSpeed 13.887, PoseOmegaRate 0.12. The clips are set by name: kazekun_appear (59), kazekun_attack (20,
+loop), kazekun_hit (19), kazekun_vanish (59), kazekun_wait (70, loop). The orientation is a QUATERNION (unk1A0), not a yaw: calcRootMatrix = the
+quaternion at mPosition, no scale; while it has wind (Turn / PreAttack / Attack / HitWater) ms_kaze_wind + ms_kaze_blur are bound to the model's
+matrix. getAroundQuat(dir, rate): the frame with Z along dir (X = up x Z, Y = Z x X), then turned about its own Y by (2 - rate) x 90 deg -- rate 2
+faces dir, 1 is broadside, 0 faces away. The nerves: SEARCH (the default): tick 0 reset (the orientation identity, the body at its place, invisible:
+LIVE_FLAG_HIDDEN + UNK8 -- nothing performs or collides); Mario within AppearDist in 3D -> APPEAR: visible, the appear puff (ms_kaze_appear), the
+appear clip; its end -> TURN: the wait clip, the collision on; each tick flyAroundMario: toMario = Mario + (0, TurnOffsetY, 0) - the body; climb =
+clamp(toMario.y, +-400) x 0.0025; the horizontal toMario gives the around-quat at rate |toMario| / AroundDist (clamped 0..2: far away it heads in, at
+AroundDist it circles broadside, close up it turns away); the delta = the quat's forward with y = climb, x (1 + |climb|) x AroundSpeed.
+isGiveUpAround (Mario under the PLACE by LostOffsetYDown or over it by LostOffsetYUp) -> DISAPPEAR; past AroundTime -> PREATTACK: doAttackPose(start):
+the around-quat at rate 1 (broadside), the velocity = its forward x PoseSpeed, KAZEKUN_READY; each tick the orientation spins about the body's own
+-X by pi x PoseOmegaRate (21.6 deg: a somersault every 17 ticks) and the velocity = the new forward x |v| (vertical loops 37 u in radius: it tumbles
+in place); past PoseTime x DicideTiming the goal = Mario's position, set every tick (his spot at the dash's start); past PoseTime -> ATTACK: the
+attack clip, the velocity = toward the goal at AttackSpeed; each tick the orientation slerps 0.1 onto the velocity's frame (rate 2: nose along the
+dash) and the velocity x AirFric; under 1 u/tick -> DISAPPEAR with unk1B0 = ResetTime. DISAPPEAR: the vanish clip, the puff again, the velocity 0,
+the collision off; its end -> WAIT: invisible; past unk1B0 -> SEARCH. behaveToWater (Turn / PreAttack / Attack only): the spine reset -> HITWATER:
+the hit clip, KAZEKUN_DOWN, the velocity 0 each tick; its end -> DISAPPEAR with unk1B0 = ResetTimeHitting. attackToMario: the ATTACK only in Turn /
+PreAttack / Attack. isCollidMove false. setDeadAnm (a stomp: TSmallEnemy::kill -> the Die nerve): the frame controller is handed a one-frame clip
+at frame 0 -- the body frozen where it is -> dead after the nerve's 60 ticks, the drop table.
+
+**The port.** `SmsKazekun : SmsSmallEnemy`, Prm = the shipped prm; nerves Search / Appear / Turn / PreAttack / Attack / Disappear / Wait / HitWater
+(100..107) + the species' own Die. UNK10 = the base's `_noBind` with the COLLISION MASK 0 on the scene AND re-asserted in Reset (through everything,
+as the game's); the orbit and the pose write the base's `_lin` (mPositionDelta) and `SetBehavior` adds `_vel` (the game's bind); GravityY 0,
+MoveObjectPre keeps it airborne (no floor ever). The ORIENTATION is a Godot Quaternion `_quat` with the game's formulas in the same right-handed Y-up
+frame (the model's +Z forward; `AroundQuat` = the basis (up x z, z x x, z) times the turn about its own Y; the pose's spin about `_quat * -X`; the
+dash's slerp 0.1 onto `AroundQuat(v, 2)`); ApplyLook sets the model's basis from it at the glb's scale only (LookScale 1: no body scale, as the game
+never scales this one). Hidden = the model off + the hit layer off + the wind effect freed (`SetShown`; `SetVisible` clashes with Node3D's). The hit
+layer is on only in Turn / PreAttack / Attack (`CanBeHurt`: isHitWater / isDamage); `AttackToMario` and `BehaveToWater` test it; `IsCollidMove`
+false; `WallHopAllowed` false. The Die nerve is the species' (SetDeadAnm = the clip sought to 0 and paused; the death effect; dead after 60 ticks,
+GenRandomItem). Knobs (grouped, plain English): Deviations (SpeedScale x the circling, the tumble and the dash); Effects (AppearFxScene =
+ms_kaze_appear for the appear AND the vanish, the enemy death puff EnemyDisap.tscn by default; WindFxScene = ms_kaze_wind + ms_kaze_blur, a looping
+scene parented to the model while it is out, none by default); Sounds (ReadySound, DownSound, AppearSound, AttackSound, VanishSound, WaitSound). The
+scene: CharacterBody3D (sms_enemy, mask 0), Model = the glb at 1 / 74.44, a sphere r 0.6 m at the origin (the body's 50 x 40 u), RelaunchTicks -1,
+DeathFxScene EnemyDisap, a plain-English `_sms_note`. The materials: KazekunGlow = the bmd's additive blend (blend_add, depth_draw_never,
+cull_disabled, unshaded; the vertex colour x the texture x the material's tint, with the GX mirror wrap folded by hand since Godot's samplers have no
+mirror mode) -- the body and the lips glow over whatever is behind them, as on the disc; KazekunEye opaque, textured, unshaded.
+
+**Deviations (logged; knobs where they matter):** the appear puff is the enemy death puff until a ms_kaze_appear scene is given; the wind streaks
+and the blur are a slot (none by default); the sounds are slots; the clipped-out rules are not ported. Renamed on the way: the species'
+`SetVisible` -> `SetShown` (Node3D.SetVisible); a redundant FlyBind override removed; a `Dying` getter added for the drive.
+
+**Verification:** drive 143 (patch_smoke143.py, SMS_YCAM_SMOKE=1; two game ticks a physics frame) 14/14 on a 30 x 30 m dock 80 m over the arena with
+the spirit's place 2.5 m over the dock's middle and a 6 x 6 m shelf 9 m under it: K1 placed with Mario 18.6 m off: SEARCH, hidden, the hit layer
+off, mask 0, no bind, at its place; K2 Mario 6.5 m off (within AppearDist 1000 u): APPEAR, visible, the puff, the appear clip, the hit layer still
+off; K3 58 frames on: TURN with the wait clip and the hit layer on; K4 the whole AroundTime (263 frames): it spiralled out from 6.27 m to circle at
+10.83 m (AroundDist 800 u = 10.7 m), 2.51..2.81 m over his feet (TurnOffsetY 200 u = 2.69 m), the step 20.1 u a frame average (max 22.3 with the
+climb), the heading along the motion (alignment 1.00), the bearing round him swept 387 deg -> PREATTACK; K5 the wind-up (46 frames): the speed 13.89
+u a tick, the loops 74 u tall (2 x the 37 u radius), the body drifted 1.21 m in all, the wait clip on -> ATTACK; K6 the dash's start: the attack
+clip, |v| 58.2 u a tick after the first frame's two 0.97s, straight at the goal (dot 1.000) = his feet as they were; K7 Mario on a post 25 m along the
+dash's line where it crawls at 4.5 u a tick: the real touch -> the ATTACK, 8 -> 7 HP, the nose on the dash (fwd . v 1.000), the velocity under 1 ->
+DISAPPEAR with wait 300; K8 the vanish clip, the second puff, the hit layer off, the velocity 0 -> 58 frames -> WAIT, hidden; K9 151 frames on ->
+SEARCH, back at its place, hidden, and Mario 25 m off keeps it hidden. H1 Mario back within range: the second APPEAR (Puffs 3) -> TURN; H2
+SmsSprayedByWater on the circling body (the message: 10 m out and 2.7 m up is beyond the drive's aim): HITWATER, the hit clip 19 frames with the body
+hanging where it was hit (moved 0.0 u) -> DISAPPEAR with wait 1500; H3 hidden 200 frames on with Mario in range (12.5 s in the game). S1 a second
+spirit knocked still by the message while circling, Mario dropped 1.1 m over it: his real fall -> TRAMPLE -> kill -> DIE (the clip frozen, the hit
+layer off), his bounce, 7 -> 7 HP, gone after the 60 ticks (a stomp on the tumbling PreAttack body landed beside it as often as on it: the pose loops
+28 u a frame -- the check moved to the still body). G1 a third spirit circling while Mario is put on the shelf 9 m under its PLACE: isGiveUpAround
+(LostOffsetYDown 600 u = 8.06 m) -> DISAPPEAR within a frame, the wait unchanged (0). Build 0 errors, boot ALL OK. GPU captures (the drive's capture
+mode, SMS_F143_CAP=1 under run_gpu.ps1, cap/): the appear (the body half-formed in its puff), the orbit over the dock (the glowing body broadside,
+the wait clip), the wind-up (the body mid-somersault), the dash (nose first, the attack clip), the vanish puff (mostly behind the dock's block from
+that angle; the puff and the stars show), the water hit (the hit clip, the body hanging), the stomp (the frozen body under Mario's bounce).
+
+**Note for the drives:** a scheduled run that starts against a stale or failed build keeps running on the old DLL; kill_headless.ps1 stops only the
+`--headless` Godot console processes (his editor's Godot_v4.7.1-stable_mono_win64.exe instances are left alone) before the rerun.

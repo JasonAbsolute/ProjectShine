@@ -1,0 +1,6 @@
+[gd_resource type="StandardMaterial3D" format=3 uid="uid://d141gessogoop"]
+
+[resource]
+resource_name = "_mat1 (rikugesso/gero_model1.bmd): the spat goop ball -- one TEV stage of the lit material colour (1, 0, 0) / 255: black; opaque"
+albedo_color = Color(0.02, 0.01, 0.01, 1)
+roughness = 0.55

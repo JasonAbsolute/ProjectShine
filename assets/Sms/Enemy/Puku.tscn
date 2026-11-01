@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://d142puku"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsPuku.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Puku/default.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisap.tscn" id="3_disap"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_body"]
+radius = 0.8
+
+[node name="Puku" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+script = ExtResource("1_script")
+RelaunchTicks = 1
+DeathFxScene = ExtResource("3_disap")
+metadata/_sms_note = "Pass 142: the Cheep Cheep (Puku Puku), Ricco Harbor's fish. Kind = Leaper: this node is the LAUNCH PAD -- put it in the water at the surface, turned the way the fish should fly (the node's yaw); the fish rises from under it, leaps in an arc (Launch pad: LaunchSpeedUnits = how hard, LaunchPitchDegrees = how steep), splashes down, loops under the surface, swims back to the pad and leaps again, forever. One that lands on a dock bounces, flops about (its touch hurts) and dies after 13 s; one that hits Mario in the air falls and dies; the hose in the air flings it away and it falls into the water, dead -- the pad then launches a new one (RelaunchTicks 1 = at once, as the game; with ReturnsToPad off every LaunchIntervalTicks). Kind = Swimmer: it swims under the surface from point to point (a Graph of Node3D children, or within WanderRadiusUnits of its place), bobbing; it hurts a swimming Mario it touches (set RelaunchTicks -1 for one that stays dead). Knobs: Launch pad, Deviations (DiveDepthUnits, Bounces, SpeedScale), Effects (the water column, the swim bubbles, the flop drops), Sounds (slots)."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+shape = SubResource("SphereShape3D_body")

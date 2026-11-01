@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://d139kumokun"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsKumokun.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Kumokun/kumo_model1.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisap.tscn" id="3_disap"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_body"]
+radius = 0.35
+
+[node name="Kumokun" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+script = ExtResource("1_script")
+RelaunchTicks = 1800
+DeathFxScene = ExtResource("3_disap")
+metadata/_sms_note = "Pass 139: the Klamber, Ricco Harbor's wall-walking spider. Place it within 1.3 m of a wall (a net), under a ceiling (within 1 m), or on a floor: at the first tick it attaches to the nearest -- a wall first, then a roof, then the floor -- and roams that surface: turning, running, waiting. It only notices Mario on the SAME surface (fencing the same side of the net, hanging the same roof, standing a floor like its own) and runs at him; its touch hurts him (even through a thin net: the 'Attacks Across The Net' knob). Water curls it up for as long as the hose keeps hitting; a fence punch from the OTHER side of the net (or a roof kick from below a wall one) knocks it off -- it flies straight out and dies where it lands; a stomp or ground pound kills a floor one; a ground pound under a ceiling one drops it. Collision > Mask = the layers it treats as walls, roofs and floors (the body itself collides with nothing: the game's own bind). Graph (optional) = a Node3D whose children trace a CLOSED loop on the surface, in order: fences 1.3 m inside which it stays (the game's TWallAtGraph), not a path. RelaunchTicks 1800 = back on its surface 15 s after dying; -1 = gone for good. Mario climbs a net only if its body (or a parent) carries metadata sms_fence or the group sms_fence; the Klamber walks any wall."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+shape = SubResource("SphereShape3D_body")
