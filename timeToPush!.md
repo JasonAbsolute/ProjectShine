@@ -690,7 +690,7 @@ on `feature/enemy-pinna` only. Corrected here. For the same reason `main` still 
 `feature/select-stages` and #13's on `feature/enemy-pinna`, and each arrives with its own merge.
 Next: #13's merge-and-PR steps, which need `main` merged into `feature/enemy-pinna` first.
 
-### #13 -- DONE 2026-10-31 -- https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/enemy-pinna -- queued 2026-10-31 15:15 PDT, PR added 2026-10-31 17:45 PDT (Kiro) -- PUSH + PR, the PR AFTER #12 HAS MERGED (stacked)
+### #13 -- DONE 2026-10-31 -- https://github.com/JasonAbsolute/ProjectShine/pull/12 (SQUASH-merged by Jaysonn) -- queued 2026-10-31 15:15 PDT, PR added 2026-10-31 17:45 PDT (Kiro) -- PUSH + PR, the PR AFTER #12 HAS MERGED (stacked)
 Push the eighth feature branch: `feature/enemy-pinna`, branched from the RICCO branch's tip `76c46d8` (the 143 log commit; see #12), not from
 `main`: the Pinna species lean on the Ricco branch's base and Mario work (the water-surface helpers in SmsSmallEnemy.cs, Mario's fence getters
 from 139) and the Klamber's net mechanics. Pinna Park's enemy family, one pass each on this branch. SMS 144: the Electrokoopa on the net
@@ -796,10 +796,21 @@ log files and the single Kazekun line, with no Ricco scene, no `assets/Mario.cs`
 43 files / +2784 / -8. Largest new files as stated: `tamanoko_model1.glb` 0.92 MB, `aminoko_model1.glb` 0.81,
 `tyorobe_model1.glb` 0.63, `tamaflower_model1.glb` 0.21, nothing over 1 MB.
 `gh auth status` still prints "You are not logged into any GitHub hosts", so the browser route again.
-PR opened at: https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/enemy-pinna
-Still to do once Jaysonn merges it: `git checkout main`, fast-forward it (`git merge --ff-only origin/main`, NOT `git pull`,
-which this repo's `pull.rebase` setting refuses while Jaysonn has unstaged work), verify Pinna's three species by tree rather
-than ancestry if it is squashed, delete `pr144.md`, mark this DONE on `main` with the PR number, and tell Kiro the sha.
+PR #12 opened through the browser, the URL 7490 characters with title and body prefilled.
+MERGED BY JAYSONN as a **SQUASH**: `main` is now `3732f6a`, one commit with a single parent `0546b25`. Verified by TREE, the way
+a squash requires: `git merge-base --is-ancestor 45574ec main` says NO, while `git diff --name-only feature/enemy-pinna main`
+is EMPTY, so every file matches the branch including both log files. All three scenes present on the trunk (`AmiNoko.tscn`,
+`TamaNoko.tscn`, `Cannon.tscn`), the sunflower scene too, and `assets/Sms/Enemy/Kazekun.tscn` carries the normalized uid
+`d143ka0ekun`, so the hand-merge of that one line survived. `PROJECT_LOG.md` on `main` holds entries 139 through 146 once each,
+and this file holds both #12's and #13's result paragraphs once each with no conflict residue. `pr144.md` deleted.
+THE SHA FOR KIRO: `main` is at `3732f6a` after PR #12's squash, and `5a4bb52` is this entry's own closing commit on top of it.
+Both Ricco and Pinna are on the trunk: eight species in eight passes, 139 through 146. Nothing from either branch is pending.
+The two feature branches `feature/enemy-ricco` and `feature/enemy-pinna` are merged and can be deleted whenever Jaysonn wants,
+local and remote. Left them in place rather than deleting without being asked.
+STILL OPEN from earlier entries, carried forward: `feature/select-stages` (entry #11, SMS 135) is pushed and waiting on
+Jaysonn's playtest before it gets a PR entry, and its copy of this file still holds the only text of entry #11, so `main` has
+no #11 section until that branch merges. Also the exit-time C# finalize crash first seen in entry #10's batch has not recurred
+in these eight passes, and Kiro reports every drive green, so it stays a watch item rather than an open bug.
 A NOTE FOR THE NEXT STACKED PAIR: pushing both branches at once worked, and so did putting the lower entry's result on the
 upper branch. The one thing to repeat is the inverted resolution above. Whenever a squash lands, `main`'s copy of this file is
 whatever the merged branch had, so any queue edit Kiro made after that branch's last commit lives only on the branch that
