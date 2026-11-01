@@ -10032,3 +10032,26 @@ brown stake with the chain up to the cold Chomp, the leap, the bath (the blue Ch
 you grab the stake COLD and back away, which stretches the chain taut (it starts with ~8 m of sag) before the body moves; a leap needs the body within
 5.4 m of the BathPoint; grabbed HOT the stake drags Mario instead; the cold-to-bark timer is ColdTicks (2400 = 20 s), the staked-to-shake timer
 ShakeTicks (600 = 5 s) -- the drives set them near their ends to reach BARK / SHAKE without the wait.
+
+### 150b -- the Chomps' reignition shows its fire building, and the Chain Chomp walks instead of tumbling (feature/enemy-monte, `3cbcc37`)
+
+**Files:** CHANGED `assets/Sms/Enemy/SmsFireWanwan.cs` (the pass 149 Chain Chomplet), `assets/Sms/Enemy/SmsBossWanwan.cs` (the pass 150 Chain Chomp).
+Tools: npc82/monte151/{commit150b.txt, append150b.py}. A polish fix on top of passes 149-150 after Jaysonn's first look: "the fire effects both Chomps
+don't show when they reignite" and "he rolls when moving, he needs to just walk".
+
+**The reignition.** The Chain Chomplet lit its chain's ring flame only at the return clip's LAST frame, and with ReheatFxScene an empty slot the whole
+reheat played with no fire at all. It now lights the ring flame the instant RECOVER begins and grows it from a quarter to full over the return clip, in
+step with the body's black -> red lerp (SetBehavior: `fireOn = (_onFire || IsRecovering) && !_dead`, `fireScale` ramped on BckReturn's frame; the chain's
+FireEffect already took a ramped scale and updates the emitter every tick, and the heat-haze gate now counts IsRecovering too), RecoverFire then holding
+it at full. The Chain Chomp snapped from cold blue to red-hot at the one bark tick (280) where its hit points restore; its heat now ramps 0 -> 1 across
+the whole bark roar (`HeatRatioNow = max(hp / max, time / 280)` while barking), so the body AND the chain links glow back up from cold as it barks (the
+body brk frame = HeatRatioNow x 299, the chain's ApplyColors reads it, the heat haze fires through the bark). Faithful: the game's boss has no literal
+flame -- its reignite is the heat glow, the YUGAMI haze and the HIBANA sparks, which is what now plays over the roar.
+
+**The roll.** The Chain Chomp tumbled its whole body as it slid down its rail -- a house-sized Chomp somersaulting instead of walking. The game rolls
+only an inner 'roll' joint (unk168 / MsMtxSetRotX on that node), not the body; the port's rig had turned the whole body. RollSw now defaults OFF (kept as
+a knob, with a doc line -- turn it on to try the tumble), so it walks upright; ApplyLook already guarded the roll behind `RollSw && _rollDeg != 0`.
+
+**Verification:** build 0 errors, boot ALL OK. Read by eye (the Chomplet's chain FireEffect now gets fireOn + a scale that ramps through RECOVER; the
+Chomp's body, chain and haze all read HeatRatioNow through the bark; RollSw off gates ApplyLook's body roll). Not separately captured -- a visual touch-up
+on top of pass 150's 22/22 drive and its eleven captures; Jaysonn plays the reignite himself.
