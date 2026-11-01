@@ -9907,3 +9907,114 @@ homing one's dive and homing turn, the hit on Mario, the stomp (Mario over the B
 
 **Note for the drives:** a Bill's NerveNameNow is "None" in the frame it is made (the default nerve lands on its first tick); a fresh one's flyTimer
 gates everything at 100 / 200 ticks -- the stomp and the ground blast need a Bill past tick 200.
+
+### 148 -- the ground Electrokoopa: Pinna's beach Koopa, its sparking shell shot and taken back, the stun, the thunder death (feature/enemy-pinna2, `1ab6ff6`)
+
+**Files:** NEW `assets/Sms/Enemy/ElecNokonoko.tscn`, `SmsElecNokonoko.cs` (+ .uid), `assets/Sms/Enemy/ElecNoko/` (ElecCarapace.tscn, SmsElecCarapace.cs
+(+ .uid), ElecNokoBody.tres, ElecNokoShell.tres), `models/Eniemes/ElecNoko/` (dennoko_model1.glb and koura_model1.glb from his FinModelUtility rip of
+/scene/dennoko (pinnaParco0) -- game units, 18 + 0 bck clips; dennoko_model1.png and koura_model1.png (the bmds' 8 x 8 dummies), Q_dennoko2.png (the
+bmt's texture, decoded from its TEX1 by npc82/pinna148/bmt_tex.py); the glb .imports swap the body's two materials and the shell's one for the .tres,
+replacing the 11.7 MB importer_defaults block his project copies in). Nothing of Mario's or the base's changed. Tools: npc82/pinna148/{patch_import148.py,
+probe_clips148.gd, patch_smoke148.py (drive 148 + its capture mode), run_drive148.bat / run_cap148.bat, bmt_tex.py, inspect148.py, cap/, logs/, disc/
+(the two bmds, the bmt, the 18 bcks, the rip folders), decomp/ (elecNokonoko.cpp, ElecNokonoko.hpp, enemyAttachment.cpp, EnemyAttachment.hpp, graph.cpp,
+Graph.hpp), ref/}. Sources: elecNokonoko.cpp / ElecNokonoko.hpp (TElecNokonoko and TElecCarapace), enemyAttachment.cpp (TEnemyAttachment's bind and
+recoverScale), enemy.cpp's walkToCurPathNode / zigzagToCurPathNode and graph.cpp's TGraphTracer (the zigzag's scale is the tracer's 1.0 off a graph),
+MarioCheckCol.cpp's checkCollision table (ACTOR_TYPE_ELEC_NOKONOKO -> hitNormal) and MarioCollision.cpp's isTakeSituation, the shipped elecnokonoko.prm
+(sms_shipped_params.json: HeadHeight 20, BodyRadius 5, WallRadius 100, SearchLength 2000 / Height 500 / Aware 600 / Angle 180, GiveUp 2500 / 600, damage
+80 x 80, attack 60 x 60, turn 2, body scale 1.5, march 0.8, ReadyTime 200, CarapaceGravity 0.5, CarapaceSpeed 15, CarapaceTurnSpeed 100, CarapaceSpinSpeed
+50, CarapaceShootRange 2000, CarapaceFlyDist 1500), the bmt's MAT3 (`_body1` and `_koura1`, one recipe: stage 0 (TEXC toon, RASC, KONST 3/4, C0) SUBHALF,
+stage 1 (CPREV, RASC, KONST 1/2, TEXC) SUBHALF; C0 (225, 225, 225, 161); chan0 matSrc REG for the body, VTX for the shell; blend SRCALPHA), the bcks' ANK1
+headers (catch1 59, down1 19, elec_down1 110, hit1 59, melt1 64, mogaki1_end 14, mogaki1_loop 20 L, mogaki1_start 9, nwait1 60 L, run1_end 14,
+run1_loop 40 L, run1_start 9, shoot1 114, supply1 139, turn1_end 4, turn1_loop 20 L, turn1_start 4, wait1 60 L), the bmds' JNT1 (the body's joints 0
+bodyjnt1 .. 6 koura1, 7 effnul1, 8 headjnt1, 9 hairjnt1; the shell's 0 root1, 1 koura1, 2 effnul1 -- the game's spark joints 7 and 2 are both effnul1).
+
+**The game.** TElecNokonoko : TWalkerEnemy. init: ACTOR_TYPE_ELEC_NOKONOKO, unk150 17, the shell (TElecCarapace on koura_model1.bmd) made as its
+attachment, both models dressed by the archive's dennoko_model1.bmt, the spine's default GRAPHWANDER, the collision on. reset: the scaled body radius
+140. hasCarapace = unk1A4 == 0. The anims: wait = wait1, walk / run = run1_start unless in run1_loop (moveObject: run1_start done -> run1_loop), dead =
+down1, melt = elec_down1 (LIVE_FLAG_UNK8, the shell's velocity 0, DNK_SHIBIRE_B). attackToMario: not dying: TSmallEnemy's (the message by the shell:
+on -> ELECTRIC_SHOCK, off -> the common ATTACK), then, not in ATTACK / COLLECT / SHOOT and with the shell, ATTACK pushed (hit1 to its end, the zap pose).
+receiveMessage: UNKD / UNKB -> dead; TAKE / PUT / THROWN branches (TSmallEnemy boilerplate -- Mario's checkCollision routes this actor type to hitNormal,
+never hitPickUpEnemy, so he never lifts it); TRAMPLE: bare -> hp 1, killed; the shell on -> Mario ELECTRIC_SHOCK, not valid; SPRAYED_BY_WATER ->
+behaveToWater (a juice change aside: the shell killed). isResignationAttack (the walker ATTACK's end): in view and the goal within CarapaceShootRange ->
+SHOOT after, true. behaveToFindMario: GRAPHWANDER, ATTACK, TURN after; the goal Mario. behaveToWater: in shoot1 past frame 58, dying, or in catch1 with
+the shell -> nothing; else unk165, the cooldown 0 and, unless frozen, FREEZE. SHOOT: tick 0 run1_end; its end -> shoot1; passing frame 60 the shell
+appears; under 62 the turn to the goal; passing 62 shootIn (the shell shot, unk1A4 1); shoot1's end -> COLLECT after. COLLECT: tick 0 nwait1 (unless
+catch1), the goal = the shell; the clip runs only while the shell moves (frame rate 0 in its WAIT); in catch1 (catchIn, from the shell's RETURN): past
+frame 20 the shell's collision off, past 32 the shell back on (unk1A4 0, the shell killed = hidden), the clip's end -> done; else past 800 ticks or the
+shell dead -> REBIRTH after; the turn to the goal. TURN: tick 0 turn1_start, the goal Mario; in turn1_loop with Mario in sight (SearchLength, 60 deg) ->
+turn1_end; start's end -> loop, end's end -> done; the turn; past 500 -> done. FREEZE: tick 0 the shell on -> hit1 + DNK_SHIBIRE_B, else mogaki1_start;
+hit1 under frame 25 -> DNK_HIBANA at the head; the clips' ends: start -> loop; loop -> not re-sprayed and the shell on -> mogaki1_end, else the loop
+again; else done; past 400 ticks the spine reset, the default next and REBIRTH after. REBIRTH: tick 0 supply1, the shell back (unk1A4 0), TLS_CHANGE at
+the shell, the shell killed; passing 88 TLS_CHANGE at the body; the end -> GRAPHWANDER after. ATTACK (the zap): hit1 to its end. calcRootMatrix: the
+shell on and not FREEZE / DIE / COLLECT -> DENNOKO_SPARK1 and DNK_BIRI / SPARK_L / SPARK_R at joint 7 (effnul1) every frame, scaled to the body; in
+elec_down1 DNK_SHIBIRE_A at the root, DNK_HIBANA at joint 8 (the head), passing 72 BOMB_LIMIT. genRandomItem: the shell killed, TLS_CHANGE, TSmallEnemy's,
+and, MELT_ON_DEATH, a coin popping at the shell's point (vy 20). isDeadByThunder: in FREEZE with the shell within 200 u. forceCatchReady (the shell near
+home): not DIE / FREEZE / COLLECT -> COLLECT next. TElecCarapace : TEnemyAttachment. loadInit: the hit actor ELEC_CARAPACE (attack 80 x 80, receive 60
+x 60, the player / enemy / boss lists), the collision on, the state 0 (hidden on the host's back), the spine's default MOVE, the zigzag side random
+(unk174 = 1 unless rand(0, 300) < 150), the head height 80. appear (shoot1 frame 60): state 1 -- the position and scale the host's (the scale from 0.01
+x 2 a tick back up: recoverScale), the body radius 50, no collision. shoot (frame 62): the goal = its point + the XZ way to Mario x CarapaceFlyDist, the
+zigzag side flipped, the spin 0, state 2, the flags cleared, the collision on, the spine reset to MOVE, setZigParameter (the cycle 3..5 x the goal
+distance, the angle 20..30). bind: control (the spine), then the attachment's: pos += the delta + the velocity, recoverScale, vy -= CarapaceGravity (the
+terminal mVelocityMinY), the ground (the water surface counts) -> hitGround (a bounce in progress -> now returning; water -> killed; landed, airborne off,
+the velocity 0), a wall (2 x the body radius) -> hitWall (mReflectSw: the velocity -1.5 x (the delta . the normal) x the normal, vy 3, 2 u up, the goal =
+the host, straight home, a 5-tick cooldown), setBehavior (the host dead -> killed; landed -> y = the ground), forceKill (off the map or in a pool ->
+killed). move: the spin + CarapaceSpinSpeed a tick; straight (after a wall) walkToCurPathNode(CarapaceSpeed, CarapaceTurnSpeed, 0), else
+zigzagToCurPathNode(the speed, the turn, the cycle, the angle) -- TSpineEnemy's: the heading offset = the angle x the tracer's scale (1.0 off a graph)
+x sin(wrap(the distance LEFT to the goal, 0, cycle) x 360 / cycle + getPhaseShift (0 one side, 180 the other)), the turn clamped at the turn speed (100
+>= 90: always), so the shell leaves at nearly the full angle and straightens as it closes on its point. MOVE: move; returning and within 64 x the speed
+(960 u) of the host -> the host made catch-ready (COLLECT) and RETURN after; the goal reached (XZ^2 under 100) without a bounce: returning -> RETURN
+after, else now returning with the goal = the host. WAIT (after shocking Mario): 60 ticks. RETURN: tick 0 the step = (the host - it) / 64 and the host's
+catchIn (catch1), the first 20 ticks too; the host dead by thunder -> MELT_ON_DEATH + killed, TLS_CHANGE; the spin; the position += the step, clamped at
+the host; the host dead -> its y scale x 0.8 to nothing. sendMessage (the hit lists): Mario -> ELECTRIC_SHOCK and, taken, no collision + WAIT; the host
+-> the collision back on; water nothing; another actor (mReflectSw) -> reflect: not the same twice, now bouncing, zigzag off, the normal = the dominant
+axis toward it, the velocity = the way to it x -7 x (the way . the normal), vy 2, 2 u up, the zigzag side by the quadrant, the goal = the host.
+receiveMessage: UNKD -> TLS_CHANGE, killed; TRAMPLE -> Mario ELECTRIC_SHOCK; the hose taken and ignored. calcRootMatrix: the model at the position, the
+yaw + the spin, the scale; DENNOKO_SPARK2 and DNK_BIRI / SPARK_L / SPARK_R at joint 2 (effnul1) every frame.
+
+**The port.** `SmsElecNokonoko : SmsSmallEnemy`, Prm = the shipped prm; nerves Freeze / Collect / Zap / Rebirth / Turn / Shoot (NerveSpecies + 0..5,
+the base's GraphWander the default) as the game's above, the base's walker ATTACK and Die. The shell is `SmsElecCarapace : SmsSmallEnemy`
+(ElecNoko/ElecCarapace.tscn, koura_model1), instanced by the Koopa at Init beside itself (a deferred AddChild to its parent, then SetHost: the
+back-reference, the two colliders excepted both ways, its sparks); its own CPrm (attack 80 x 80, receive 60 x 60, Gravity 0.5, speed 15, turn 100), the
+states 0 hidden / 1 appearing / 2 shot through Appear / Shoot / KillAttach, three nerves Move / Wait / Return, the base's physics (the walk in `_lin`,
+gravity on `_vel`, MoveAndSlide, the landing, OnWallContact for the bounce, `_touching` for the reflect); hidden it moves and shows nothing (its model
+off, its collision off); the shell on the back is the body glb's own koura1 part (the clips hide it when bare). Mario's shock is his TakeShock (no-op
+invincible / hurt / swimming); the bare body's touch his common TakeDamage. The sparks are Mario's ShockSparks (Flashes / Sparks) through SmsFollowEffect
+on the effnul1 joint of each model (the body's animates with the shell; the shot shell's glb has no clips, so its effnul1 sits at the origin and the
+emitter is lifted 40 u x the scale to the dome's centre), sized 0.8 x the body's 1.5 (setGlobalScale(mScaling)); the stun the same on bodyjnt1 at the
+body scale. The thunder coin is an SmsDropTable.SpawnItem of CoinScene at the shell's point (vy 20), counted on ThunderCoins / a static
+ThunderCoinsSpawned (the body is freed in the tick it pops it). The materials: the shared EnemyToon shader's form 4 (TEX + mix(s0, the glint, 1/2) -
+1/2) with C0 (225, 225, 225) on Q_dennoko2 for both `_body1` and `_koura1` (the bmt's one recipe). No pick-up: the base's default SmsCanBeTaken (false),
+as the game's collision table. Knobs (grouped, plain English): Deviations (SpeedScale, ReflectSw), Effects (SparkFxScene / StunFxScene = Fx/ShockSparks,
+HeadSparkFxScene / ChangeFxScene slots, CoinScene = yellow_coin), Sounds (SparkSound, ShootSound, CatchSound, HitSound, DownSound, SupplySound). The
+scenes: CharacterBody3D (sms_enemy, mask 5), Model at 1 / 74.44, a sphere r 0.75 m at 0.75 m (the Koopa) / r 0.6 m at 0.6 m (the shell), RelaunchTicks
+-1, plain-English `_sms_note`s (the shell's says it is not for placing by hand).
+
+**Deviations (logged; knobs where they matter):** the far point counts as reached within 20 u, not the game's 10 (the port moves two ticks a physics
+frame as one 30 u step from the same read position: a 10 u band can be straddled for ever -- run e's shell hovered at its far point until the Koopa gave
+up and grew a new one; 20 u keeps the game's 2/3-of-a-step ratio); the two bodies ignore each other's colliders (the game has none); the shell's
+collision comes back at the next shot, not at a touch of the host; the head sparks, the change puff, the sounds, DENNOKO_SPARK1 / 2 and BOMB_LIMIT are
+slots; a ground pound on it does nothing (the game handles TRAMPLE alone); the shell's forceKill map test is the base's ground ray (nothing under it ->
+killed); a shock counts as taken when it put Mario in his hurt state.
+
+**Verification:** drive 148 (patch_smoke148.py, SMS_YCAM_SMOKE=1; two game ticks a physics frame) 16/16 on a 60 x 60 m hard dock 80 m over the arena:
+E1 placed facing Mario 12 m off: GRAPHWANDER finds him -> TURN (turn1_start / turn1_end) -> ATTACK -> SHOOT, the shell on and sparking, the body scale
+1.5 (70 frames); E2 run1_end, shoot1, the shell appearing at frame 60 and shot at 62 -- the Koopa bare, the shell in MOVE with its collision on (85
+frames); E3 20 frames on: the shell 8 m out on its zigzag, spinning, the Koopa still in shoot1 (COLLECT comes at its end); E4 Mario put 1.6 m ahead of
+it on its heading: ELECTRIC_SHOCK -- health 8 -> 7, his hurt state, the shell's collision off and WAIT (3 frames); E5 the far point: returning, 20.3 m
+out at most, the Koopa in COLLECT / nwait1 (61 frames); E6 within 960 u of home: RETURN, the Koopa's catch1 (21 frames); E7 catch1 past frame 32: the
+shell back on (state 0, its model off, its collision off), Catches 1 (33 frames); E8 GRAPHWANDER again, sparking (25 frames). Z1 Mario against the shell
+on its back: health 7 -> 6, his hurt state, the Koopa's hit1 (2 frames). W1 the hose with the shell on: FREEZE, hit1, the stun, the sparks off (6
+frames); W2 59 frames on: FREEZE over, back to TURN, sparking. T1 a second shot's shell on its way home (RETURN) with the Koopa in catch1 (74 frames); T2
+the hose on it then: FREEZE (mogaki1_start / mogaki1), isDeadByThunder -> elec_down1, dead, one coin at the shell, Mario (kept invincible for the trip)
+unhurt (136 frames). B0 a third Koopa's shot, bare in COLLECT (nwait1); B1 Mario dropped 1.8 m onto it: TRAMPLE -> Die (down1), Mario unharmed (7
+frames). P1 a fourth Koopa bare, Mario put 1.0 m beside it with B held: no pick-up (SmsCanBeTaken false), the bare body's common hit instead -- health 6
+-> 5, knocked down (2 frames). (Run a 12/17: E3 asked for COLLECT 52 ticks early; E4's first flight missed a standing Mario (the zigzag -- as the game's)
+and the cascade took E7; T2 read the coin count a frame late; P1 was blocked by the common bump. Run c: E4's -1 HP lands a frame after the shock state.
+Run d: P1's invincibility (meant to survive the bump) also disables the take (isTakeSituation) -- then MarioCheckCol.cpp showed the game never offers
+this type to hitPickUpEnemy at all: the take was dropped from the port and P1 became the negative check. Run e 15/16: the far-point band (above). Run f
+16/16.) Build 0 errors, boot ALL OK. GPU captures (SMS_F148_CAP=1 under run_gpu.ps1, cap/): the Koopa with its sparking shell (the yellow body, the pink
+crest, the blue spiral shell), the shot (the bare back), the skidding shell and Mario shocked behind it, the shock, the catch, the zap pose, the stun,
+the thunder death (on its back under the sparks), the bare Koopa under his stomp, the bump.
+
+**Note for the drives:** the Koopa's COLLECT begins at shoot1's end (frame 114), 52 ticks after the shot; a shell's catch takes about 100 frames
+after its shot (50 out, 18 back to 960 u, 32 of RETURN); the shot shell is 2.6 m wide at the 1.5 scale, so frame it from 5 m or more.
