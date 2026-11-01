@@ -917,3 +917,30 @@ is pushed and waiting on Jaysonn's playtest, and it is now the branch that merge
 `PROJECT_LOG.md` and `timeToPush!.md` against this entry's sections. Keep both sides: nothing else overlaps, measured.
 `feature/select-stages` (entry #11, SMS 135) is likewise pushed and waiting on a playtest, and holds the only copy of #11's
 text. The exit-time C# finalize crash from #10's batch has still not recurred.
+
+### #16 -- PENDING -- queued 2026-11-01 10:38 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 151)
+Push the eleventh feature branch: `feature/enemy-sirena`, branched from `main` `c082a22` (the trunk after PR #13, the Chain Chomps). Sirena Beach's
+family -- Hotel Delfino's ghosts -- one pass each on this branch. SMS 151: the Boo (TTelesa), the hotel's ghost -- it drifts between its graph's nodes
+a little off the floor, bobbing and tilting, fading in and out (the LOOP kind), and hurts you on touch; your jump passes straight through it until you
+HOSE it: a spray knocks it back, shows it and stuns it, sunk to the floor and solid, and NOW a jump pops it (the down clip, coins). The PINK box Boo
+(Kind = Box) is always visible and a spray turns it into a pink Boo BLOCK you stand on for 25 s before the Boo comes back out; a jump on a box Boo only
+makes it flinch -- assets/Sms/Enemy/Telesa.tscn + SmsTelesa.cs, the block, the shader and six materials under assets/Sms/Enemy/Telesa/, the two
+models under models/Eniemes/Telesa/. NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says the family is
+done (Kiro will replace this entry with the PR entry then). Further passes (the Sleepy Boo) re-point this entry's tip.
+- Branch `feature/enemy-sirena` -- code tip `a5b0234` ("SMS 151: the Boo ...", 36 files +1298: Telesa.tscn, SmsTelesa.cs (+ .uid), Telesa/
+  (SmsTelesaBlock.cs (+ .uid), TelesaBlock.tscn, TelesaToon.gdshader (+ .uid), six .tres), the two glbs with nine pngs and their .import files) on
+  `main` `c082a22`; the branch tip is this file's own commit on top of it; 2 commits since `main`. The range carries none of Jaysonn's nine live edits.
+- To try 151: drop assets/Sms/Enemy/Telesa.tscn in a room where it should FLOAT (it keeps the floor under the placed point as its base and bobs
+  0.7-2.3 m over it; +Z is its face) with a Graph node of Node3D children to drift between, or it roams within WanderRadiusUnits. Kind: Loop (the
+  hotel's: fades in ~3 s, out, hidden ~5 s, again), Box (the PINK one, always visible), Normal (invisible until sprayed), CanSee (always visible).
+  It hurts you on touch unless you are above it, and your jump passes through it -- hose it: it is knocked back, shown and stunned (it sinks to the
+  floor, solid); jump on it or ground-pound it NOW and it pops. The stun ends by itself and it drifts off. A BOX Boo sprayed turns into a pink block
+  you can stand on for 25 s (it blinks before the Boo comes back). Knobs: Kind, Deviations (SpeedScale, BaseOffsetUnits), Effects (the change puff,
+  the drool slot, the block scene), Sounds (eight slots); RelaunchTicks -1 = gone for good.
+```
+git push -u origin feature/enemy-sirena
+git rev-list --count origin/feature/enemy-sirena..feature/enemy-sirena
+```
+Expect `0` from the rev-list. No PR, no merge. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
+`assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
+`addons/godot_ai` churn: his, leave them.

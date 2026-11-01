@@ -10123,3 +10123,94 @@ jet straight out of the teeth (at CenterUnits + PolarXZ(_yaw, 460) + up 60), fir
 **Verification:** build 0 errors, boot ALL OK; a headless GPU capture (patch_smoke150's drive, spliced then removed and Mario.cs restored to committed
 before the commit) -- the sparks read as elongated streaks jetting from the mouth, not the 150d scatter. The streak length (the quad's 0.8), the cone
 (spread 14), the speed (6-11) and the life (0.32 s) are knobs if the feel wants tuning in motion.
+
+### 151 -- the Boo: Hotel Delfino's ghost -- it drifts and bobs, hurts on touch, is untouchable until hosed, then stunned and jumped on; the pink box Boo turns into a block (feature/enemy-sirena, `a5b0234`)
+
+**Files:** NEW `assets/Sms/Enemy/Telesa.tscn`, `SmsTelesa.cs` (+ .uid), `assets/Sms/Enemy/Telesa/` (SmsTelesaBlock.cs (+ .uid) + TelesaBlock.tscn -- the pink
+Boo block; TelesaToon.gdshader (+ .uid); the six materials TelesaBody / Eye / Kiba / Mouth / Block / BlockEye .tres), `models/Eniemes/Telesa/` (telesa.glb
+-- 6 bck clips -- and telesablock.glb from his FinModelUtility rip of /scene/telesa and /scene/mapobj; game units; K_telesa_body / _eye / _kiba.png,
+telesa_0 / 1 / 2.png, H_toon_2_4i.png, H_ma_rak_dummy.png (the screen-texture dummy), telesablock.png (the rip's name for the block's eye sheet); the
+glb .imports swap the bmd materials for the .tres). Nothing of Mario's or the base's changed. Tools: npc82/sirena151/{patch_import151.py,
+probe_clips151.gd, bmd_mat3.py (the MAT3 colours), make_tres151.py, patch_smoke151.py (drive 151 + its capture mode), run_drive151.bat /
+run_cap151.bat, cap/, logs/, disc/ (the rip's _mat_*.fragment.glsl), decomp/ (telesa.cpp, Telesa.hpp, smallEnemy.cpp, MapObjBlock.cpp)}. The
+shipped /enemy/telesa.prm (sms_shipped_params.json); the bck frame counts read from the .bck headers (clush 49, down 14, hit 15 L, hit_end 19,
+hit_start 9, wait 50 L; modoki_wait 180 is the imitator's).
+
+**The game.** TTelesa : TWalkerEnemy (ACTOR_TYPE_TELESA, unk150 0x12; HIT_CATEGORY_ENEMY OFF and BOSS on -- Mario's jump does not find a Boo),
+body scale 1.5. telesa.prm: HeadHeight 120, BodyRadius 30, WallRadius 50, 1 hit point, Search 800 / 600 / 400 / 90 (unused: isFindMario is false),
+GiveUp 2000 / 650, AttackWait 120, FreezeWait 300, damage 80 x 90, attack 70 x 80, turn 1 / 1.5, march 1 / 1.7, WaitTime 100; its own FadeInTime /
+AppearTime / FadeOutTime 240, FlyHeight 50..100, FlyAmplitude 50..75, FlyFrequency 200..400, TelesaGravityY 0.05, GenAttackerTime 200,
+TelesaAttackGravityY 0.02, TelesaPowerByWater 40, LoopAppearTime 200, LoopHideTime 300; the static mFlyAngMax 35. init: the screen texture swapped
+into H_ma_rak_dummy and LIGHT_TYPE_INDIRECT (a see-through ghost), setFlyParam (the target height, the bob's amplitude and frequency at random in
+their ranges), GRAPHWANDER. reset: HIDDEN, the head 100, ENEMY / BOSS off, the base colour white (350, 350, 350). load: setTypeNormal (HIDDEN off, the
+fade INVISIBLE), mDampenedGroundHeight = the placed Y. The four kinds: TLoopTelesa (LOOP: in 240, visible 200, out 240, hidden 300, again),
+TBoxTelesa (CAN_SEE, PINK (600, 270, 220), unk150 0x40, a TelesaBlock registered dead), the NORMAL one (invisible until sprayed, visible 240 after),
+TSeeTelesa (always visible). setBehavior (wandering / waiting / attacking): the bob phase +1 to its frequency, offsetY = amplitude x sin, rotation.x =
+10 - 35 cos (the `==` typo skips a jump over 5 deg). walkBehavior: TWalkerEnemy's, the fly height +1 a tick to its target; the damping speed is
+(ground - ground) / 120 = 0 for a plain Boo so the base height STAYS the placed Y; y = base + fly + bob. bind: the base point (y - fly - bob) carries
+the velocity under TelesaGravityY (the terminal -40?), landed at the ground + 1.05 -> not airborne, the velocity 0 (dying: set on the ground).
+calcRootMatrix: the drool (TLS_YODARE_L / _S at joints 4 / 3, x the fade). moveObject: changeTevKColor -- VISIBLE (alpha 255; NORMAL past
+AppearTime / LOOP past LoopAppearTime -> FADE_OUT + INDIRECT; CAN_SEE or frozen: stays), INVISIBLE (alpha 0; LOOP past LoopHideTime -> FADE_IN),
+FADE_IN (t x 255 / 240; at 255 VISIBLE + LIGHT_TYPE_OBJECT), FADE_OUT (255 - t x 255 / 240; at 0 INVISIBLE); the alpha is K0_A on every material,
+TEVREG0 the base colour on the body. receiveMessage (TSmallEnemy's): TRAMPLE / HIP_DROP -> isHitValid (not HIDDEN) -> kill; WATER -> changeByJuice
+(the box Boo: true) else decHpByWater (NOTHING for a Boo) + behaveToWater. behaveToWater: unk165; not frozen -> the velocity normalize(away from
+Mario, y 2) x 5, +2 u, AIRBORNE, FADE_IN unless visible, FREEZE pushed, unk1C8, HIT_CATEGORY_ENEMY ON. FREEZE: hit_start; a clip's end: hit_end
+ended and not flying -> ENEMY off, done; else sprayed since (resetBaseGround) or hit_start -> hit (loop); else hit_end; reduceFlyForce (the fly
+height -4 a tick to 0, the bob toward 0 by 4, the phase and the tilt x 0.9), walkToCurPathNode(0, turn x 0.2). kill -> DIE: decHitPoints; at 0:
+FADE_IN if hidden, NO_COLLISION; the down clip (an attacker: TLS_CHANGE instead); reduceFlyForce; the clip's end -> DEAD, genRandomItem, the
+manager's generatePetBottle (every FIFTH kill a large water bottle), 0xCE. TRAMPLE (TBoxTelesa::isHitValid): the clush clip, false. attackToMario:
+HIDDEN, or Mario not above (his y < y + attackHeight - 50) -> ATTACK. isReachedToGoal: XZ MsVECMag2 < 200. setWalkAnm: NO_COLLISION off, wait, the
+bob phase 0. isCollidMove: everything but an effect object. TBoxTelesa::changeByJuice: the block appears at the body (scale 1, rate 0.1, the Boo's
+yaw), the Boo HIDDEN + NO_COLLISION, CHANGE pushed with FREEZE after it, MSD_SE_EN_TELESA_FIX + OBJ_AWAY_INTO_GRAF, unk185 1. CHANGE
+(TNerveSmallEnemyChange): the clip rate 0, 0xCD; scalingChangeActor (the rate +0.02 XZ to mBlockXZScale 1.5, +0.01 Y to mBlockYScale 0.6);
+changeMove: for the first 80 ticks (mBlockWaitTime 400 x 0.2) the block's y bob (x unk188 = 0: none) and three turns of spin; past 400 and in the
+last 200 of getChangeBlockTime 3000 the block blinks 10 in 20; at 3000 changeOut: NO_COLLISION, MSD_SE_EN_TELSA_RECOVER, HIDDEN off, the body at
+the block, 0xCD, the clip rate back, the block killed. TJuiceBlock (MoveBG/MapObjBlock.cpp): initMapObj binds TEVREG0 of material 0 to unk138 (the
+juice colour -- never set for the Boo's block); perform scales joints 0 / 1 by unk140; moveObject kills it with its enemy. TTelesaManager:
+modoki.bmd for the imitators, telesaForceKill, generatePetBottle, setFlagOutOfCube. TMarioModokiTelesa / TKageMarioModoki (the Boos that copy
+Mario) and the King Boo's attackers (setAttacker / initAttacker / initItemAttacker, TNerveTelesaAttackMario, setAttackPoint, the attack gravity and
+PowerByWater) are the boss's -- not this pass.
+
+**The port.** `SmsTelesa : SmsSmallEnemy`, Prm = the shipped telesa.prm; the base's walker nerves (GraphWander, Wait, Die) with the species'
+TelesaFreeze, Trample and Change. Its own HitCheckMario: the jump finds it only while `_tangible` (HIT_CATEGORY_ENEMY on -- the sprayed stun), else he
+passes through the ghost with no bounce; the hose always; the touch attack (not when he is above it). Its own SmsSprayedByWater (the mark; the box
+Boo's ChangeByJuice first; no hit point off for water). FlyBind: the species sets its height (the base point + the fly height + the bob) and airborne
+flag itself; the bind runs BEFORE setBehavior's new bob (the game's order: control, bind, setBehavior) so the base point is read with the bob the walk
+placed the body with -- read after, it drifted by the bob's delta every tick and the body was "airborne" half of every bob with the velocity piling
+up to the terminal (the first run's find). The base point is the FLOOR under the placed point (+ BaseOffsetUnits): the game's Boos are placed ON their
+floor (bind lands the base there); a dropped-anywhere one here does not hang airborne over its own floor. The fade is a `fade` uniform on per-body
+copies of the four materials (set when it changes). TelesaToon.gdshader is the bmd's TEV: X = clamp((C0 + toon x (1 - 3/4) + lit x 3/4 - 1/2) / 2),
+colour = mix(MAT x (the glint channel + amb1), TEX, X) -- the MAT3 colours are white (bmd_mat3.py), so the white Boo is its white sheet pulled toward
+the dark glint channel in the toon's shade, and the pink box Boo's salmon is that dark channel through the unsaturated green (0.73) and blue (0.63)
+under a saturated red; blend_mix, depth_draw_opaque; the eye / fangs / block eye cut out at the texture's alpha. The block is `SmsTelesaBlock`
+(TelesaBlock.tscn: a StaticBody3D on layer 1 Mario stands on, its BoxShape3D the glb's AABB at the live rate, re-sized as it grows; the Boo hands it
+the rate, the yaw and the blink each tick); its flat pink is mat_color + amb1 with C0 0 (the unset unk138). Knobs (grouped, plain English): Kind
+(Loop / Box / Normal / CanSee), Deviations (SpeedScale, BaseOffsetUnits), Effects (ChangeFxScene = Fx/EnemyDisap, the drool slot, BlockScene =
+Telesa/TelesaBlock.tscn), Sounds (eight slots). The scene: CharacterBody3D (sms_enemy, mask 5), Model at 1 / 74.44, a 1.0 m sphere at 1.03 m (the glb's
+bounds: 137 x 108 x 142 u), RelaunchTicks -1, a plain-English `_sms_note`.
+
+**Deviations (logged; knobs where they matter):** the fade is alpha (the game draws a fading Boo with the screen texture, a see-through refraction);
+the base height snaps to the floor under the placed point (the game's is the placed Y -- BaseOffsetUnits lifts it); the tilt eases over a 5-deg jump
+(the game's `==` typo would freeze the tilt for good after a stun); the fifth kill's water bottle is the DropTable's business; the Boos that copy
+Mario and the King Boo's attackers are the boss's; the camera shakes and the area cube are not ported; the graph node's Y as the ground (bind's
+unk124 branch) is not used.
+
+**Verification:** drive 151 (patch_smoke151.py, SMS_YCAM_SMOKE=1; two game ticks a physics frame) 24/24 on a 30 x 30 m slate dock 80 m over the
+arena: A1 a LOOP Boo placed -- GRAPHWANDER in the wait clip, fading in from 0, not tangible, the fly height rising; A2 the fly height at its 50..100
+target and held, the bob swinging both ways, the tilt -25..45; A3 the height = the base + the fly height + the bob every frame (max err 0); A4
+FADE_IN -> VISIBLE at 120 frames; A5 the loop: VISIBLE -> FADE_OUT -> INVISIBLE -> FADE_IN, the alpha 0..1; A6 a wandering ghost (GraphWander, the
+wait clip only, never tangible). T1 the touch: Mario on the dock in its path hurt (8 -> 7). S1 the hose: knocked away, airborne, FREEZE, tangible,
+hit_start; S2 the stun held by the re-sprays (hit_start -> hit -> hit), sunk (fly 0, bob 0, tilt 0), Mario's hit point kept; S3 thrown 5.5 m off,
+coming down; S4 the hose off: hit -> hit_end -> the stun ends by itself, not tangible, GRAPHWANDER; S4b the base re-rooted on the dock; S5 the rise
+after. J1 stunned again and sunk; J2 Mario's fall onto the tangible Boo: TRAMPLE -> kill -> DIE in the down clip, Mario bounced; J3 dead and gone.
+B1 a BOX Boo: CAN_SEE, visible at once, pink; B2 sprayed: the TelesaBlock made (rate 0.1), the Boo hidden, CHANGE; B3 the block grown to 1.5 x 0.6
+x 1.5 (4.0 x 1.6 x 4.1 m), spun three turns; B4 Mario standing ON the block (his y = its top); B5 the blink through the last 200 ticks; B6 changeOut
+at 3000: the Boo back, the block gone, FREEZE; B7 the drift again, pink and visible; B8 Mario's fall onto the box Boo: not tangible, through the
+ghost, no kill. (Run a's finds: the spine's one-frame "(done)" idle between nerves is not a state -- the tracker skips it; the bob-before-bind order
+above; a Boo placed 0.6 m up hung airborne over the dock with its velocity at the terminal -- the base point is now the floor.) Build 0 errors,
+boot ALL OK. GPU captures (SMS_F151_CAP=1 under run_gpu.ps1, cap/): the drift (the white Boo bobbing, tilted), the stun (the half-faded ghost on
+the dock in the hose's hit marks), the pop (the squashed Boo, eyes wide, tongue out, Mario bounced), the pink box Boo, Mario on the pink block.
+
+**Note for the drives:** the Boo is untouchable (his jump passes through it) until a spray; the stun lasts the hit clips (hit_start 9, hit 15 per
+re-spray, hit_end 19 frames) plus the sink; the box Boo's block stands ChangeBlockTime 3000 ticks (25 s) -- the drive waits it out (no timer knob:
+the game's is a static).
