@@ -74,6 +74,7 @@ public partial class Mario : CharacterBody3D
         oilRun,       // SMS: MARIO_STATUS_OIL_RUN -- the run on the oily goop (oilRun(), MarioRun.cpp 1238) (pass 64)
         oilSlip,      // SMS: MARIO_STATUS_OIL_SLIP -- the belly skid on it (oilSlip(), 1306); OIL_SLOPE is the surface slip with _smsOilSlopeSlide (pass 64)
         wire,         // SMS: the WIRE_* statuses (MarioSpecial.cpp 649-1167: on top, hanging, the swing) on a tightrope (SmsWire.cs), sub-status in _smsWire (pass 66)
+        pulling,      // SMS: MARIO_STATUS_PULLING -- holding an anchored handle without lifting it (the Chain Chomplet's chain end), sub-status in _smsPull (MarioPull.cs, pass 149)
     }
 
     private struct AirControlProfile
@@ -2459,6 +2460,11 @@ public partial class Mario : CharacterBody3D
                 SmsTickRoof(delta, inputDirWorld); // hangRoof() / waitRoof() / moveRoof() / kickRoof(): no other handler runs
                 goto EndFrame;
             }
+            if (stateOfMario == MarioState.pulling)
+            {
+                SmsTickPull(delta, inputDirWorld, stickStrength); // pulling(): the handle held, the stick pulls against it, B up lets go (pass 149)
+                goto EndFrame;
+            }
             // running(): FLUDD_EMITTING && A && mForwardVel > DashMax - 1 -> BROAD_JUMP (before the ordinary jump reads A)
             // (changePlayerJumping() asks considerRotateJumpStart() first: a spun stick is the spin jump, not the broad jump)
             if (_fluddDashing && stateOfMario != MarioState.swimming && SmsDashState() && IsOnFloor() && !SmsOrBufferedSpin()
@@ -3161,6 +3167,13 @@ public partial class Mario : CharacterBody3D
             {
                 if (TickGroundWall(delta, inputDirWorld, stickStrength))
                     goto EndFrame;
+            }
+
+            // hitNoKeepPull (MarioCheckCol.cpp 226): touching a PULLABLE handle with B HELD in a take situation -> TAKE accepted -> PULLING (pass 149)
+            if (UseSmsPhysics && heldBody == null && pendingPickup == null && !SmsBIsTalkB && Input.IsActionPressed("button_b") && SmsFindPullHandle(out SmsPullHandle smsPull))
+            {
+                SmsPullBegin(smsPull);
+                goto EndFrame;
             }
 
             // hitWantToTake / canTake (MarioCheckCol.cpp 101, MarioCollision.cpp 130): touching a takeable with B HELD takes it -- from the
