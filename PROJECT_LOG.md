@@ -10214,3 +10214,47 @@ the dock in the hose's hit marks), the pop (the squashed Boo, eyes wide, tongue 
 **Note for the drives:** the Boo is untouchable (his jump passes through it) until a spray; the stun lasts the hit clips (hit_start 9, hit 15 per
 re-spray, hit_end 19 frames) plus the sink; the box Boo's block stands ChangeBlockTime 3000 ticks (25 s) -- the drive waits it out (no timer knob:
 the game's is a static).
+
+### 152 -- the Sleepy Boo: Hotel Delfino's huge Boo asleep across a doorway -- it snores, hurts and shoves on touch, and nothing of Mario's moves it; the hose + a ground pound beat it here, a knob (feature/enemy-sirena, `f29bf3e`)
+
+**Files:** NEW `assets/Sms/Enemy/DebuTelesa.tscn`, `SmsDebuTelesa.cs` (+ .uid), `assets/Sms/Enemy/Telesa/DebuTelesaBody.tres` + `DebuTelesaEye.tres` (the
+standard EnemyToon / EnemyToonCutout shaders), `models/Eniemes/Telesa/debutelesa.glb` (one bck clip) with debutelesa_0 / 1.png, K_debutelesa_eye.png,
+K_debutelesa_mouth.png from his FinModelUtility rip of /scene/debutelesa (game units; the glb .import swaps the two bmd materials for the .tres).
+Nothing of Mario's or the base's changed. Tools: npc82/sirena151/{patch_import152.py, probe_clips152.gd, make_tres152.py, patch_smoke152.py (drive
+152 + its capture mode), run_drive152.bat / run_cap152.bat, decomp/ (DebuTelesa.cpp, DebuTelesa.hpp)}. No /enemy/debuTelesa.prm ships: the numbers
+are TSmallEnemyParams' PARAM_INIT defaults with TDebuTelesaManager::load's forced hits. The bck frame count read from the .bck header (94, loop).
+
+**The game.** TDebuTelesa : TSmallEnemy (ACTOR_TYPE_DEBU_TELESA) with LIVE_FLAG_UNK10 -- no bind: it never moves, falls or turns. The manager's load:
+attack 240 x 330, damage 220 x 300, body scale 1..1; createModelData debuTelesa.bmd (MaterialPEFull, unique materials, 1 TEV stage); clipEnemies at a
+350 near clip. init: WAIT, initCollision (the hit actor, HIT_CATEGORY_PLAYER, 10 x 10; NO_COLLISION off), the joints null_yodare and jnt_Rhand. reset:
+nothing. The one nerve TNerveDebuTelesaWait: debutelesa_wait and its bas (the snore). receiveMessage: TRAMPLE / HIP_DROP / PUNCH -> false -- nothing
+happens; UNKB (Yoshi's eat, Yoshi.cpp) -> MSD_SE_EN_DB_TELSA_EATEN, then TSmallEnemy's (isHitValid -> kill -> DIE; setDeadAnm: the frame control
+init(1) -- there is no death clip, Yoshi swallows it). behaveToWater: nothing (TSmallEnemy's decHpByWater still takes the hit point, to no effect).
+attackToMario: sendAttackMsgToMario. isCollidMove: false. doKeepDistance: true. emitEffects (every frame unless taken or dying): POI_ZZZ (1.5) at
+jnt_Rhand, TLS_YODARE_L (2.3) at null_yodare. The bmd's TEV: TEX + (clamp(C0 + TOON x (1 - 0.627) + LIT x 0.627 - 1/2) - 1/2) / 2 (konst 160).
+
+**The port.** `SmsDebuTelesa : SmsSmallEnemy`, Prm = the defaults + the forced hits. FlyBind with `_noBind` on and the velocity zeroed every tick: the
+body stays where it was placed (the game's UNK10). One nerve, DebuWait (the clip for ever); DefaultNerve = DebuWait; no walker (IsFindMario false,
+IsCollidMove false, no wall hop, gravity 0). Its own HitCheckMario: the base's lists (the trample finds it -- IsHitValid says no, Mario bounces; the
+hose; the touch attack) plus doKeepDistance: Mario in its damage cylinder is pushed out (SmsKeepDistance, the Snooza Koopa's). IsHitValid: false to
+all -- or, with BeatenBy = SprayThenGroundPound, true to a HIP_DROP on a woken one. SmsSprayedByWater: the mark; under the knob the awake timer
+(AwakeSeconds x 120 ticks), else nothing. The Zs: PoiZzz (Fx131) as a top-level child placed at the right-hand bone each tick (x 1.5), shown while
+asleep; the drool: a slot at null_yodare (x 2.3). A woken one stirs: the look scale x (1 + 0.04 sin). Beaten: the base's DIE with the wait clip (no
+death clip) and the look scale shrinking to nothing over 40 ticks (the port's stand-in for Yoshi's swallow), the EATEN sound slot, the base's puffs
+and drops at the end. Materials: the standard enemy toon (form 0, s0_k 0.627 for the bmd's konst) and its cutout for the eyes -- the usual stand-in
+for this family of stages. Knobs (grouped, plain English): Deviations (BeatenBy, AwakeSeconds 8), Effects (SleepFxScene = Fx131/PoiZzz, the drool
+slot), Sounds (EatenSound, SnoreSound). The scene: CharacterBody3D (sms_enemy, mask 5), Model at 1 / 74.44, a 2.0 m sphere at (0, 2.0, -0.5) (the glb's
+bounds: 306 x 299 x 432 u, the body set back), RelaunchTicks -1, a plain-English `_sms_note`.
+
+**Deviations (logged; knobs where they matter):** BeatenBy = SprayThenGroundPound by DEFAULT: in the game only Yoshi eating it clears a Sleepy Boo
+and Yoshi's eating is not in this port -- the game's rule (BeatenBy = YoshiOnly) is a wall for good, so Jaysonn's ask (hose it awake, ground-pound
+the woken one) is the default and the "wake" (the Zs stop, it stirs) is the port's own, the game having no such state and no second clip; Mario's
+fall onto it bounces (the base's trampleExec) where the game's TRAMPLE is simply refused; the shrink-away death is the port's (no clip); the 350-u
+near clip and the sounds are slots / not ported.
+
+**Verification:** drive 152 (patch_smoke152.py, SMS_YCAM_SMOKE=1) 9/9 on the 30 x 30 m slate dock: D1 placed -- DEBUWAIT in debutelesa_wait, no bind
+(moved 0.001 m), the Zs, asleep; D2 Mario walked into it: hurt (8 -> 7); D3 shoved back out of the 220-u cylinder (2.67 -> 5.55 m); D4 his fall onto
+it: nothing (DebuWait, the Zs on); D5 the hose: woken (the Zs gone, stirring); D6 his ground pound on the woken one: DIE; D7 dead and gone; Y1 a
+YoshiOnly one: the hose does nothing; Y2 his ground pound does nothing. (Run b's find: a 2.4 m collision sphere centred on the node pushed the body
+0.4 m out of the dock's floor on placement -- 2.0 m at (0, 2, -0.5) now.) Build 0 errors, boot ALL OK. GPU captures (SMS_F152_CAP=1, cap/): the
+sleeper with its Zs, the woken one, the beaten one shrinking away.

@@ -918,7 +918,7 @@ is pushed and waiting on Jaysonn's playtest, and it is now the branch that merge
 `feature/select-stages` (entry #11, SMS 135) is likewise pushed and waiting on a playtest, and holds the only copy of #11's
 text. The exit-time C# finalize crash from #10's batch has still not recurred.
 
-### #16 -- PENDING -- queued 2026-11-01 10:38 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 151)
+### #16 -- PENDING -- queued 2026-11-01 10:38 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 151-152), updated 2026-11-01 10:52 PST
 Push the eleventh feature branch: `feature/enemy-sirena`, branched from `main` `c082a22` (the trunk after PR #13, the Chain Chomps). Sirena Beach's
 family -- Hotel Delfino's ghosts -- one pass each on this branch. SMS 151: the Boo (TTelesa), the hotel's ghost -- it drifts between its graph's nodes
 a little off the floor, bobbing and tilting, fading in and out (the LOOP kind), and hurts you on touch; your jump passes straight through it until you
@@ -926,10 +926,10 @@ HOSE it: a spray knocks it back, shows it and stuns it, sunk to the floor and so
 (Kind = Box) is always visible and a spray turns it into a pink Boo BLOCK you stand on for 25 s before the Boo comes back out; a jump on a box Boo only
 makes it flinch -- assets/Sms/Enemy/Telesa.tscn + SmsTelesa.cs, the block, the shader and six materials under assets/Sms/Enemy/Telesa/, the two
 models under models/Eniemes/Telesa/. NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says the family is
-done (Kiro will replace this entry with the PR entry then). Further passes (the Sleepy Boo) re-point this entry's tip.
-- Branch `feature/enemy-sirena` -- code tip `a5b0234` ("SMS 151: the Boo ...", 36 files +1298: Telesa.tscn, SmsTelesa.cs (+ .uid), Telesa/
-  (SmsTelesaBlock.cs (+ .uid), TelesaBlock.tscn, TelesaToon.gdshader (+ .uid), six .tres), the two glbs with nine pngs and their .import files) on
-  `main` `c082a22`; the branch tip is this file's own commit on top of it; 2 commits since `main`. The range carries none of Jaysonn's nine live edits.
+done (Kiro will replace this entry with the PR entry then). SMS 152: the Sleepy Boo (TDebuTelesa), the hotel's huge Boo asleep across a doorway -- it snores, hurts and shoves you on touch, and nothing of Mario's moves it; in the game only Yoshi eats it, so here (BeatenBy, a knob, on by default) the hose wakes it and a ground pound on the woken one beats it -- assets/Sms/Enemy/DebuTelesa.tscn + SmsDebuTelesa.cs, two materials under Telesa/, the model under models/Eniemes/Telesa/. Further passes re-point this entry's tip.
+- Branch `feature/enemy-sirena` -- code tip `f29bf3e` ("SMS 152: the Sleepy Boo ...", DebuTelesa.tscn, SmsDebuTelesa.cs (+ .uid), two .tres,
+  debutelesa.glb with four pngs and their .import files) on `a5b0234` ("SMS 151: the Boo ...", 36 files +1298) on `main` `c082a22`; the branch tip
+  is this file's own commit on top of them; 4 commits since `main`. The range carries none of Jaysonn's nine live edits.
 - To try 151: drop assets/Sms/Enemy/Telesa.tscn in a room where it should FLOAT (it keeps the floor under the placed point as its base and bobs
   0.7-2.3 m over it; +Z is its face) with a Graph node of Node3D children to drift between, or it roams within WanderRadiusUnits. Kind: Loop (the
   hotel's: fades in ~3 s, out, hidden ~5 s, again), Box (the PINK one, always visible), Normal (invisible until sprayed), CanSee (always visible).
@@ -937,6 +937,11 @@ done (Kiro will replace this entry with the PR entry then). Further passes (the 
   floor, solid); jump on it or ground-pound it NOW and it pops. The stun ends by itself and it drifts off. A BOX Boo sprayed turns into a pink block
   you can stand on for 25 s (it blinks before the Boo comes back). Knobs: Kind, Deviations (SpeedScale, BaseOffsetUnits), Effects (the change puff,
   the drool slot, the block scene), Sounds (eight slots); RelaunchTicks -1 = gone for good.
+- To try 152: drop assets/Sms/Enemy/DebuTelesa.tscn in a doorway or corridor (it is ~4 m across and never moves; +Z is its face). It
+  snores with its Zs; walk into it and it hurts you and shoves you back out; your jump, ground pound and punch do nothing to it. Hose it and it
+  wakes for AwakeSeconds (8 s: the Zs stop, it stirs) -- ground-pound it THEN and it is beaten (it shrinks away; coins if a DropTable is set).
+  BeatenBy = YoshiOnly makes it the game's unbeatable wall (only Yoshi eats it, and Yoshi's eating is not in the port). Knobs: Deviations
+  (BeatenBy, AwakeSeconds), Effects (the Zs, the drool slot), Sounds (two slots); RelaunchTicks -1 = gone for good.
 ```
 git push -u origin feature/enemy-sirena
 git rev-list --count origin/feature/enemy-sirena..feature/enemy-sirena
