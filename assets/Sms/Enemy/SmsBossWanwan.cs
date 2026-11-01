@@ -197,6 +197,7 @@ public partial class SmsBossWanwan : SmsSmallEnemy
         StompDustFxScene ??= LoadIf("res://assets/Sms/Fx/HipDropLanding.tscn");
         SteamFxScene ??= LoadIf("res://assets/Sms/Fx/GkKemuriW.tscn");
         SplashFxScene ??= LoadIf("res://assets/Sms/Fx/WaterSplash.tscn");
+        SparkFxScene ??= LoadIf("res://assets/Sms/Fx/HitBurst.tscn");   // the HIBANA sparks off its hot mouth (pass 150c): an orange-streak burst, not the cyan ShockSparks
         ShakeLand1 ??= new SmsCameraShakeMode { TimeTicks = 20, AmpX = 100f, VelX = 5000 };
         ShakeLand2 ??= new SmsCameraShakeMode { TimeTicks = 80, AmpX = 150f, VelX = 4000, AmpZ = 100f, VelZ = 2000 };
         if (_model != null)
@@ -679,7 +680,7 @@ public partial class SmsBossWanwan : SmsSmallEnemy
     private void StompEffects()
     {
         Stomps++;
-        StompDust(GlobalPosition, Vector3.One * 4f);
+        StompDust(GlobalPosition, new Vector3(4f, 1.4f, 4f));   // wide but low: the dust and the impact streaks hug the ground instead of rising up the body (pass 150c)
         if (RockFxScene != null) SpawnBurst(RockFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale), GlobalPosition));
         if (_hp == 0) ChainColdSound?.Play(); else ChainHotSound?.Play();
     }
@@ -688,15 +689,15 @@ public partial class SmsBossWanwan : SmsSmallEnemy
         bool waiting = IsBck(BckWait) || IsBck(BckWait2);
         if ((waiting && BckPassed(_bck, 8f)) || BckPassed(BckShake, 38f)) StompEffects();
         bool spark = BckPassed(BckBark, 72f) || (waiting && (BckPassed(_bck, 6f) || BckPassed(_bck, 12f))) || BckPassed(BckShake, 4f);
-        if (spark && SparkFxScene != null) SpawnBurst(SparkFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale), CenterUnits() / U));
+        if (spark && SparkFxScene != null) SpawnBurst(SparkFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale), (HitUpUnits() + PolarXZ(_yaw, 200f)) / U));   // the HIBANA at the mouth / teeth, not the belly (pass 150c)
         if (waiting && BckPassed(_bck, 10f)) ShakeCamera(ShakeLand1);
         if (BckPassed(BckBark, 60f) || BckPassed(BckBark, 127f)) { ShakeCamera(ShakeLand1); StompEffects(); }
         if (BckPassed(BckBark, 202f)) { ShakeCamera(ShakeLand2); StompEffects(); }
         if (BckPassed(BckShake, 40f)) ShakeCamera(ShakeLand1);
         if ((_hp != 0 || IsBarking) && HeatHazeFxScene != null && (_tickCount & 15) == 0) SpawnBurst(HeatHazeFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale * 3f * MathF.Max(0.3f, HeatRatioNow)), CenterUnits() / U));
-        if (_steamPending != 0 && _hp != 0)
+        if (_steamPending != 0 && (_tickCount & 3) == 0)   // a steam puff every 4 ticks while it is hosed; clears the flag only when it actually fires, so a spray is never silently dropped (pass 150c)
         {
-            if (SteamFxScene != null && (_tickCount & 7) == 0) SpawnBurst(SteamFxScene, new Transform3D(Basis.FromScale(Vector3.One * 1.5f), CenterUnits() / U + Vector3.Up * 2f));
+            if (_hp != 0 && SteamFxScene != null) SpawnBurst(SteamFxScene, new Transform3D(Basis.FromScale(Vector3.One * 2.5f), CenterUnits() / U + Vector3.Up * 2f));
             _steamPending = 0;
         }
         if (_invincible && _goldFrame > 150f && SparkleFxScene != null && (_tickCount & 31) == 0) SpawnBurst(SparkleFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale * 3f), CenterUnits() / U));
