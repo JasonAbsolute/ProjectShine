@@ -817,3 +817,30 @@ A NOTE FOR THE NEXT STACKED PAIR: pushing both branches at once worked, and so d
 upper branch. The one thing to repeat is the inverted resolution above. Whenever a squash lands, `main`'s copy of this file is
 whatever the merged branch had, so any queue edit Kiro made after that branch's last commit lives only on the branch that
 carries it. Compare the two bodies before trusting "take main's side".
+
+### #14 -- PENDING -- queued 2026-10-31 20:20 PDT (Kiro) -- PUSH ONLY, no PR yet (SMS 147)
+Push the ninth feature branch: `feature/enemy-pinna2`, branched from `main` `f89159e` (the trunk after PR #12, the Pinna Park family). Pinna Park's
+leftovers, one pass each on this branch. SMS 147: the Bullet Bill (TKiller), the Monty Mole cannon's long-range shot -- it flies straight on its
+launch, drifts with Mario, chases him when it sees him (a plain one dives at his level and blows on the ground, a homing one turns after him and
+hits for 3 HP), blows up on anything it touches, bursts into two coins under the hose, and drops to the ground off a stomp -- assets/Sms/Enemy/Killer.tscn
++ SmsKiller.cs, its shader and four materials under assets/Sms/Enemy/Killer/, its two models under models/Eniemes/Killer/; the cannon
+(assets/Sms/Enemy/SmsCannon.cs) now fires it by default from its three barrels at long range (its KillerScene slot filled). NOT yet playtested by
+Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says the family is done (Kiro will replace this entry with the PR entry then,
+as #12 / #13 went). More passes (the ground Electrokoopa, the Wire Trap) will land on this branch and re-point this entry's tip.
+- Branch `feature/enemy-pinna2` -- code tip `ed0bbba` ("SMS 147: the Bullet Bill ...", 20 files +951 -8: Killer.tscn, SmsKiller.cs (+ .uid), Killer/
+  (the shader (+ .uid), four .tres), the two glbs with three pngs and their .import files, SmsCannon.cs (+22 -8)) on `main` `f89159e`; the branch tip
+  is this file's own commit on top of it; 2 commits since `main`. The range carries none of Jaysonn's nine live edits.
+- To try 147: the Monty Mole cannon (assets/Sms/Enemy/Cannon.tscn) fires Bullet Bills on its own now -- stand 40 to 270 m from one and, 4 s after it
+  last shot, its three barrels fire in turn (a bomb follows if you are within 56 m): the black Bills fly at you in slow arcs, dive at your height and
+  blow up on the ground short of you; one in five is PURPLE and homes in (3 HP if it reaches you, the fire knock) -- spray it (two coins) or
+  stomp it (you bounce, it drops and blows on the ground). You can also drop assets/Sms/Enemy/Killer.tscn in a level: it flies off the way it
+  faces (+Z) at Launch > LaunchSpeedUnits and chases you when it sees you within 40 m. Kind = Plain / Homing / Gold (gold is worth eight coins; Auto
+  = 1 in 20 gold). Knobs: Kind, Launch, Deviations (SpeedScale, RollSw, TrampleDie, SerialBomb), Effects (the blast, the smoke trail / water and
+  sand column slots, the coin), Sounds (two slots); RelaunchTicks -1 = gone for good.
+```
+git push -u origin feature/enemy-pinna2
+git rev-list --count origin/feature/enemy-pinna2..feature/enemy-pinna2
+```
+Expect `0` from the rev-list. No PR, no merge. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
+`assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
+`addons/godot_ai` churn: his, leave them.

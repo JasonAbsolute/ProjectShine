@@ -9791,3 +9791,119 @@ Clearing that default in project.godot would stop it for the next model.
 
 **Note for the drives:** a bomb blown up on the mole leaves the hit lists for good (its layer 1 off); a drive that counts hits by bombs gets
 exactly one a bomb, and the 80-frame blast is no longer a second hit.
+
+### 147 -- the Bullet Bill: the Monty Mole cannon's long-range shot, its straight flight, its homing dive, its blast (feature/enemy-pinna2, `ed0bbba`)
+
+**Files:** NEW `assets/Sms/Enemy/Killer.tscn`, `SmsKiller.cs` (+ .uid), `assets/Sms/Enemy/Killer/` (KillerBody.gdshader (+ .uid), KillerBody.tres,
+KillerEyes.tres, KillerNose.tres, KillerPieces.tres), `models/Eniemes/Killer/` (killer_model1.glb and downkiller_model1.glb from his FinModelUtility rip
+of /scene/killer (pinnaBeach1) -- game units, 4 + 1 bck clips; killer_model1.png, Q_killer2_s3tc.png, Q_killer_kankyo3_I4.png; the glb .imports swap
+the body's three materials and the pieces' one for the .tres, replacing the 11.7 MB importer_defaults block his project copies in). CHANGED:
+`assets/Sms/Enemy/SmsCannon.cs` (pass 146: KillerScene defaults to Killer.tscn when the file is there; killerShoot now rolls the 1-in-5 homing, uses the
+0.55 / 0.68 lead rates by Mario's speed, calls setColorType, starts the Bill at scale 0.1 and hands it the goal pushed past Mario; a FireSound slot;
+LastKiller for the drives). Nothing of Mario's or the base's changed. Tools: npc82/pinna147/{patch_import147.py, probe_clips147.gd, patch_smoke147.py
+(drive 147 + its capture mode), run_drive147.bat / run_cap147.bat, cap/, disc/ (the two bmds, the five bcks, the rip folders), decomp/ (killer.cpp,
+Killer.hpp), ref/}. Sources: killer.cpp / Killer.hpp (all of it: TFlyEnemy and TKiller), cannon.cpp's killerShoot, the shipped killer.prm
+(sms_shipped_params.json: HeadHeight 120, BodyRadius 6, WallRadius 50, ClipRadius 300, 1 hit point, SearchLength 3000 / Height 2000 / Aware 10 / Angle
+90, GiveUp 3000 / 1200, AttackWait 120, FreezeWait 300, damage 130 x 100, attack 120 x 120, turn 0.4 / 0.4, body scale 1 / 1, march 3.8 / 3.8,
+NormalFlyGravityY 0.03, NormalFlySpeed 40, ChaseFlyGravityY 0.1, ChaseDist 10000, ForceGravityY -3.5, WaterAddGravityY 10, ChaseTimer 3000, BombRange
+300), dmgkiller.prm (3 HP, down type 1, invincible 300: Mario's SmsDamageProfile.Killer, already there), the bmds' MAT3 (killer_model1: `_body1` /
+`_eyesmat1` / `_nosemat1`, one recipe -- stage 0 (ZERO, TEXC, RASC, C0) = Q_killer2 x COLOR0 + C0, stage 1 (ZERO, C2, TEXC, CPREV) = + C2 (225, 255,
+225) x Q_killer_kankyo3_I4 by a NRM texgen with TEXMTX1 (info 0x06, scale 0.5, trans -0.039), C0 (0, 0, 0), C1 (175, 157, 114), C2 (225, 255, 225),
+cull BACK; downkiller_model1: `_bodymat1` (RASC, ZERO, ZERO, C0) = the vertex colour (matSrc VTX, ambient 128) x the light + C0, cull NONE), the
+bcks' ANK1 headers (downkiller_down1 89; killer_chase1 90 L; killer_run1 60 L; killer_search1 29; killer_zrot1 45 L), the TEX1 of the bmd (the I4
+gradient decoded straight from it: 34-51 in its middle, 150-220 at its rim -- the rip's gray+alpha png carries the same values; a preview of it
+misleads, its dark pixels being also transparent), the Mario Wiki's SMS render of the Bill (a near-black green-tinted body with a glossy sheen).
+
+**The game.** TFlyEnemy : TWalkerEnemy. reset: the fly timer 0, the mode NEUTRAL, mForceChase off, mChaseGravityY = NormalFlyGravityY, homing off.
+getGravityY: mChaseGravityY in CHASEFLY, else NormalFlyGravityY. bind: in CHASEFLY or while the timer is under mInvalidTime 200 -> fly(): pos += the
+velocity (nothing ever slows it: no gravity on it) + Mario's speed / mTestMarioSpMax 12 (the Bill drifts with him), pos.y += mChaseGravityY (a drift a
+tick: up for 0.03 / 0.1, down for -3.5); the ground = checkGround at the head height + 1 (the water surface counts); at or under it: past the invalid
+time -> landed (AIRBORNE off, the velocity 0, y = the ground), an illegal ground -> kill; a basket under it killed. Else TLiveActor::bind (gravity on
+the velocity, the landing). calcChaseParam: diff = Mario - pos with XZ x 1.1; the goal = pos + diff (set only when homing); Mario over it by more than
+100 or within 100: homing -> HOMING (mChaseGravityY = ChaseFlyGravityY unless just sprayed, once), else pos.y -= 1; return. Otherwise (Mario under it
+by 100 or more): mChaseGravityY = NormalFlyGravityY, the velocity (0, 0, 0); not HOMING (or diff.y > 150) -> DIVE: the normalized diff x
+NormalFlySpeed 40 into the velocity's XZ and mChaseGravityY = ForceGravityY -- then `velocity.x = velocity.z = 0; mVelocity = velocity`: the XZ speed
+it computed is thrown away; else pos.y -= 3. flyMove: the velocity x 0.9, the turn toward the current target at the turn speed (the delta clamped), the
+position delta += polar(mMarchSpeed, the heading). NORMALFLY: tick 0 setNormalFlyAnm (killer_model1, bck 2 run1, the roll angle 0, the timer 0);
+force-chase past 500 ticks or, not gold, isFindMario(1) past 100 ticks (TKiller's: |dy| under SearchHeight 2000 and isInSight(3000, 90, 10) -- no
+airborne, water or demo test), within ChaseDist -> CHASEFLY after; the pitch = MsGetRotFromZaxis(the velocity).x; the scale x 1.05 up to the body
+scale. CHASEFLY: tick 0 mLaunchVelocity = the velocity, calcChaseParam, setChaseFlyAnm (bck 3 search1); the speed k: not homing: the launch velocity
+with y 0.1, |it| / mMarchSpeed^2 x mTestSp 2.5; homing in DIVE: 2; else 1; walkBehavior(2, k); homing and isReachedToGoalXZ, or DIVE under the ground
++ 100 -> calcChaseParam; DIVE / NEUTRAL -> walkBehavior(3, 1), HOMING -> flyMove; not HOMING over the ground + 200: the pitch of (march, -40 x the
+gravity, march) then of the position delta with y = the gravity; else the pitch x 0.99; flyBehavior (TKiller: mTurnSpeed = TurnSpeedLow; past
+ChaseTimer mChaseGravityY -= WaterAddGravityY a tick; search1 done -> bck 1 chase1; mRollAngle += 2.5); the scale x 1.1 up to the body scale.
+TKiller::bind: TFlyEnemy::bind; the timer++; not exploding: landed past the invalid time -> EXPLOSION; past the invalid time
+isTouchedWallsAndMoveXZ(2 x BodyRadius) -> EXPLOSION (a basket killed); airborne: KILLER_FLY, the pitch clamped -25 .. 90, KIL_SMOKE bound to the body
+matrix. KillerBodyCallback (joint 1): with mRollSw (a static, off in the shipped game) and isRollFly (CHASEFLY with chase1) the body rolls about Z by
+mRollAngle at the body scale. isCollidMove: a basket killed; mSerialBomb and CHASEFLY -> EXPLOSION; true. attackToMario: Mario's y under its y only:
+not exploding -> EXPLOSION + sendAttackMsgToMario (ATTACK: dmgkiller 3 HP, FIRE_DOWN); exploding -> BURN. isHitValid: UNKB -> dead, no collision,
+genEventCoin, false; else mTrampleDie -> mChaseGravityY -= 12; false. behaveToWater: in NORMALFLY / CHASEFLY genEventCoin (2 coins, 8 gold: 30 u out
+at 360 / n x (i + 1), (3 dir, 20, 3 dir), the bind off); not exploding -> EXPLOSION, NO_COLLISION, the velocity 0. setDeadAnm: downkiller_model1 bck 0
+down1, TEffectExplosion at (mPosition, mScaling), a shake (mode 6, 1.0), a rumble. EXPLOSION: tick 0 mBombScaleMax = BombRange x the body scale /
+AttackRadius, the pitch 0, setDeadAnm; not airborne: a water surface -> the bomb water column x 2, sand -> the sand column (0.6, 0.9, 0.6); a rumble;
+then unk190 x 1.3 a tick up to the max (expandCollision), else NO_COLLISION and, the clip done, LIVE_FLAG_DEAD + UNK8, UNK10000 off, mHolder null,
+the anim sound stopped, DIE set with the default after, y -= 200. reset: gpCurKiller; the colours black; 5 % gold (the body (200, 185, 0), the pieces
+(255, 225, 70)). setColorType (the cannon, after setHoming): gold -> not homing; homing -> the body and pieces (70, 20, 70). calcRootMatrix: a demo
+pending -> dead; run1: gold -> the nose and eyes (170, 140, 0), else black; search1: the nose's g, b and the eyes' r 0; time % 10 < 5: the nose's r
+and the eyes' g, b 0; gold: the nose (170, 140, 0) / (180, 140, 150) by the half; homing: the nose and eyes' r 200 with the nose's g, b 0 / the nose
+(70, 20, 70); chase1: the eyes black, the nose's g, b 0, wave = |sin(360 x t / 120)|; gold: the body (170, 140, 0), the nose (10w + 160, 30w + 140,
+150w); homing: the body and pieces (70, 20, 70), the nose (130w + 70, 20 - 20w, 70 - 70w); the pitch clamped -25 .. 90. killerShoot (cannon.cpp): the
+Bill reset at the dome's joint 1 + (0, -60, 150); the goal = Mario + a 300-u jitter (dome 0: -2 |jitter| in z, dome 2: + ); the velocity =
+calcVelocityToJumpToY(the goal, 5, its gravity); the time = |the goal - the cannon| / (velocity.x x mVelocityRate 0.62); homing off, then 1 in 5
+(rand(0, 100) % 5 == 0) on, else the rate 0.55 for Mario's speedX > 2, 0.68 under -2; the velocity = calcVelocityToJumpToY(the goal led by mSearchRate
+0.02 x his speed x the time, 5, its gravity) x the rate; the yaw from it; the scale 0.1 (a demo: the velocity x 0.2 / 0.4 / 0.2, the scale 0.6);
+setColorType; mLaunchVelocity; the velocity; AIRBORNE; the goal += Mario - the cannon (XZ); setGoal; KILLER_FIRE and _FLY.
+
+**The port.** `SmsKiller : SmsSmallEnemy`, Prm = the shipped prm (Gravity = NormalFlyGravityY: what a launcher's calcVelocityToJumpToY reads through
+GravityUnits, as the game passes killer->getGravityY()); nerves NormalFly / ChaseFly / Explosion (100..102), NormalFly the default. The base's
+`_noBind` with <c>FlyBind</c>: the physics step moves the body by the tick's `_lin` only and reports the wall and body contacts (OnWallContact /
+OnBodyContact, kept for a frame); the species' SetBehavior is the game's bind: Fly() (the velocity + Mario's speed / 12 + the drift; the ground =
+the base's floor ray or the water surface (WaterSurfaceAt 1.5 m) + 1 u; landed past the invalid time) or LiveBind() (gravity on the velocity, the
+terminal -40, the landing), the timer, then the triggers (landed past 200 -> Explosion; a wall or floor touch past 200 -> Explosion; a chasing one
+touching another enemy -> Explosion with SerialBomb), the fly sound and the trail. The nerves as the game's: NormalFly's find and pop-in (the scale x
+1.05 from the cannon's 0.1), ChaseFly's speed k, walkBehavior(2, k) (the base's WalkToCurPathNode: the turn and the march toward Goal()), the
+calcChaseParam re-runs, walkBehavior(3, 1) / FlyMove, the pitch of the tick's `_lin` with y = the gravity, FlyBehavior, the scale x 1.1; Explosion's
+collision growth (HitCheckMario at the collision scale while the layer is on -> AttackToMario -> BURN), then the layer off and, down1 done (the Down
+player's clip, 89 bck frames over its length), Dead() (freed with RelaunchTicks -1: nothing dropped, as the game's dead flag). The two models are the
+scene's `Model` (killer_model1) and `Down` (downkiller_model1, hidden), both driven by the species' ApplyLook (yaw, the pitch -25 .. 90 nose-down
+positive, the roll with RollSw in the chase) at the scale. The four materials are the species' shader (KillerBody.gdshader, `part` 0-3) duplicated per
+body at Init (OwnMaterials) so each Bill writes its own tev_color (UpdateColors = calcRootMatrix's table every tick; ApplyTev only on a change).
+IsFindMario is TKiller's (no airborne gate); IsReachedToGoalXZ within 100 u; IsHitValid false with the -12 drift (TrampleDie); IsCollidMove true;
+BehaveToWater the coins (GenEventCoin through an SmsDropTable.SpawnItem of CoinScene) and the harmless burst; Kill() = the explosion. A placed Bill (no
+cannon) gets its launch velocity from the Launch knobs along its facing and a goal 3000 u ahead at Reset; the cannon's SmsSetHoming / SmsSetColorType /
+SmsSetScale / SmsSetGoalPoint come after its SmsLaunch. Knobs (grouped, plain English): Kind (Auto = the game's roll, 1 in 20 gold, homing only from a
+cannon's 1 in 5; Plain / Homing / Gold force one), Launch (LaunchSpeedUnits 6, LaunchRiseUnits 0), Deviations (SpeedScale, RollSw off, TrampleDie on,
+SerialBomb on), Effects (BlastFxScene = Bomb/BombExplosion.tscn, SmokeTrailFxScene / WaterColumnFxScene / SandColumnFxScene slots, CoinScene =
+yellow_coin.tscn), Sounds (FlySound, ExplodeSound). The scene: CharacterBody3D (sms_enemy, mask 5), Model and Down at 1 / 74.44, a sphere r 0.85 m
+at 0.8 m (the wall and floor touches), RelaunchTicks -1, a plain-English `_sms_note`. SmsCannon: KillerShoot as the game's killerShoot (above) on the
+SmsKiller API, the lead time by the XZ speed.
+
+**Deviations (logged; knobs where they matter):** the smoke trail (ms_kil_smoke), the water and sand columns and the sounds are slots; the camera
+shake and the rumble are not ported; the body roll is off (the game's static mRollSw) but offered (RollSw); the force-chase (a subclass's), UNKB (the
+juice / Yoshi) and changeOut are not ported; the demo's 0.6 scale and slowed shot are not ported; the cannon's lead time divides by the XZ speed where
+the game divides by velocity.x alone (a shot straight along Z led the goal to infinity); the DIVE's NormalFlySpeed velocity is thrown away as the
+game's code does (kept as written); the Envmap texgen reading (n x 0.25 + 0.46) is this pass's: with the plain n x 0.5 + 0.5 the whole body came out
+pale green (the first capture) -- the J3D mode-6 base (n x 0.5 + 0.5) and the material's own SRT (scale 0.5 about the centre) compound.
+
+**Verification:** drive 147 (patch_smoke147.py, SMS_YCAM_SMOKE=1; two game ticks a physics frame) 16/16 on a 60 x 60 m hard dock 80 m over the arena:
+N1 a plain Bill launched at 6 u a tick at the 0.1 scale: NORMALFLY, run1, airborne, the scale 0.5 .. 1 at frame 20, 228 u on (the straight flight, the
+velocity kept), the nose level; N2 frame 62 (past 100 ticks, Mario 3 m beside its line in sight): CHASEFLY, search1 / chase1, NEUTRAL, not homing, the
+launch velocity kept, the scale full, still short of Mario; N3 frame 128: past him without a hit (chase1; 6 + 3.95 u a tick), Mario unharmed; N4 the
+hose (SmsSprayedByWater): 2 coins made, EXPLOSION, the layer off, the pieces shown, Mario unharmed; N5 freed 87 frames on. H1 a homing one launched 6 m
+up at (0, 0.5, 5): frame 70 CHASEFLY, homing, DIVE, the drift -3.5, the velocity 0, the nose 10+ deg down, the body (70, 20, 70); H2 within 100 u of
+the ground: HOMING, the drift 0.1, the yaw 0.0 deg off Mario, 95 u over his feet, chase1 (111 frames after the launch); H3 20 frames on: EXPLOSION on
+him, health 8 -> 5, his hurt state; H4 freed 90 frames on. T1 a slow homing one (SpeedScale 0.3) chasing at knee height past tick 230: Mario dropped
+1.6 m over it 0.5 m ahead of its nose -- his bounce (vy > 2), his health kept, the Bill dropped to the dock and EXPLOSION there, landed. G1 an
+unwatched plain one 1.5 m up at 5 u a tick with Mario behind it: frame 100 (tick 200) still NORMALFLY, airborne, 990 u on, above its start; G2 past
+the invalid time: gravity 0.03 brings it down -- EXPLOSION on the dock 130 .. 200 frames after the launch, Mario unharmed. K1 the Monty Mole cannon
+22 m off the dock's centre facing Mario 45 m away (past BombDist 40 m, within KillerDist): past ShootInterval the volley -- a Bill from dome 1 at
+(5.67, 3.1, -0.16) u a tick (vy 5 x 0.62), scale 0.1, airborne, its first tick still in the spine's hand-over (None / NormalFly); K2 102 frames on:
+dome 2 then dome 0, Volleys 3, three Bills alive; K3 FORCEBOMBSHOOT after the volley: Throws 1; K4 four seconds on: the cannon alive, Mario at 45 m
+unhurt, the three Bills blown up on the dock (the plain ones dive at Mario's level and land short of him, as the game's calcChaseParam has them).
+(Run a: N3's frame 110 was 1.3 m early; the stomp's Bill at full speed ran into Mario before the drop -- SpeedScale 0.3 and a timeout. Run b 15/16:
+K1 read the Bill in its very first frame, NerveNameNow still "None". Run c 16/16.) Build 0 errors, boot ALL OK. GPU captures (SMS_F147_CAP=1 under
+run_gpu.ps1, cap/): the plain Bill in flight (the black body, the white eye with its red rim, the red nose), the burst with its two coins, the purple
+homing one's dive and homing turn, the hit on Mario, the stomp (Mario over the Bill), the cannon's volley.
+
+**Note for the drives:** a Bill's NerveNameNow is "None" in the frame it is made (the default nerve lands on its first tick); a fresh one's flyTimer
+gates everything at 100 / 200 ticks -- the stomp and the ground blast need a Bill past tick 200.
