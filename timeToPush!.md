@@ -818,7 +818,7 @@ upper branch. The one thing to repeat is the inverted resolution above. Whenever
 whatever the merged branch had, so any queue edit Kiro made after that branch's last commit lives only on the branch that
 carries it. Compare the two bodies before trusting "take main's side".
 
-### #15 -- PENDING -- queued 2026-10-31 23:40 PDT (Kiro) -- PUSH + PR (SMS 149-150e), PLAYTESTED BY JAYSONN, updated 2026-11-01 04:05 PST
+### #15 -- DONE 2026-11-01 -- https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/enemy-monte -- queued 2026-10-31 23:40 PDT (Kiro) -- PUSH + PR (SMS 149-150e), PLAYTESTED BY JAYSONN, updated 2026-11-01 04:05 PST
 Push the tenth feature branch: `feature/enemy-monte`, branched from `main` `f89159e` (the trunk after PR #12, the Pinna Park family). Pianta Village's
 family, one pass each on this branch. (`feature/enemy-pinna2` -- entry #14, passes 147-148 -- is a sibling off the same `main`, still unmerged; whichever
 of the two merges second will conflict at the tails of PROJECT_LOG.md and this file: keep both sides, nothing else overlaps.) SMS 149: the Chain
@@ -881,3 +881,29 @@ authed, else the prefilled compare URL. ONE merge only: this is a PR, so do NOT 
 Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
 `assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
+
+Result: `feature/enemy-monte` pushed as a NEW remote branch, 13 commits over `main` `f89159e`, 81 files / +4503 / -0.
+`git rev-list --count origin/feature/enemy-monte..feature/enemy-monte` returned `0`. All six code shas confirmed ancestors:
+`73be638` (150e), `a9984c3` (150d), `75fd1eb` (150c), `3cbcc37` (150b), `7876f9a` (150), `bf3de7c` (149). Per-pass diffstats
+match the entry exactly: 149 = 32 files / +1791, 150 = 48 files / +2230. `assets/Mario.cs` takes +13 and nothing else of his
+movement, and `assets/Sms/SmsCameraShake.cs` +15 for StartMode. Largest new files: `bwanwan_body.glb` 0.28 MB,
+`wanwan.glb` 0.18, then the two scripts at 65 KB and 47 KB, nothing near 1 MB. Hygiene: 0 of Jaysonn's nine live edits.
+NOTE on the commit count: the entry says 12, measured 13. The extra one is `63cfd85`, the commit that flipped this entry from
+push-only to push + PR, which cannot count itself. The same off-by-one as every entry so far, and always the queue file's own
+commit.
+SIBLING CHECK, since #14 is unmerged off the same `main`: `comm -12` over the two branches' file lists confirms Kiro's warning
+precisely. The ONLY files both `feature/enemy-monte` and `feature/enemy-pinna2` touch are `PROJECT_LOG.md` and
+`timeToPush!.md`. No scene, script, shader, material or model is shared, so whichever merges second conflicts at those two
+tails alone and the resolution is to keep both sides.
+PR body: the entry carries it inline as a blockquote rather than as a file, so it was extracted to `pr149.md` at the project
+root (untracked, delete after merge) with Kiro's wording unchanged. One formatting fix was needed: his hard-wrapped blockquote
+would have rendered the four sections as one run-on paragraph on GitHub, so blank lines were inserted between them. The words
+are his.
+`gh auth status` still prints "You are not logged into any GitHub hosts", the seventh entry running, so the browser route. The
+compare URL prefilled with title and body measured well under the ~8000 ceiling #8 established.
+PR opened at: https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/enemy-monte
+ONE merge path, as the entry insists: this branch gets a PR and is NOT also merged into local `main`.
+Still to do once Jaysonn merges it: `git checkout main`, fast-forward it with `git merge --ff-only origin/main` rather than
+`git pull`, which this repo's `pull.rebase` setting refuses while he has unstaged work. Then verify the two Chomps by TREE
+rather than ancestry if it squashes, delete `pr149.md`, and mark this entry DONE on `main` with the PR number. Do not state a
+sha for that closing commit inside the file: a commit cannot carry its own sha, a trap that has now caught two entries.
