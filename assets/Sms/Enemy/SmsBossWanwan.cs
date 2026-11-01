@@ -88,8 +88,9 @@ public partial class SmsBossWanwan : SmsSmallEnemy
     [ExportGroup("Deviations (1 / on = the game)")]
     /// <summary>x the slide, the turn and the drag speeds.</summary>
     [Export(PropertyHint.Range, "0.1,3,0.05")] public float SpeedScale = 1f;
-    /// <summary>The body rolls as it slides (the game's unk168 on the roll joint). Off: it slides upright.</summary>
-    [Export] public bool RollSw = true;
+    /// <summary>The body tumble-rolls as it slides. OFF by default (pass 150b): the game rolls only an inner joint (unk168 on the 'roll' node), but the
+    /// port's rig turned the whole body, which read as the Chomp somersaulting instead of walking -- turn it back on to try the tumble.</summary>
+    [Export] public bool RollSw = false;
     /// <summary>The upward speed of a hop between rail nodes (the game's is each node's own; units a tick).</summary>
     [Export(PropertyHint.Range, "5,60,1")] public float JumpSpeedY = 20f;
     /// <summary>How long a cooled Chomp stays cold before it barks and reheats (the game's 2400 counts; a tick here is 1/120 s, so 2400 = 20 s --
@@ -161,8 +162,12 @@ public partial class SmsBossWanwan : SmsSmallEnemy
     public bool ShineSpawned => _shineDone;
     public float RollDeg => _rollDeg;
     public float GoldFrame => _goldFrame;
-    public float HeatFrame => HpRatio * 299f;
+    public float HeatFrame => HeatRatioNow * 299f;
     public float HpRatio => _hp / (float)Prm.BWHitPointMax;
+    /// <summary>The heat ratio the LOOK uses (the body's brk colour and the chain links): during the bark it ramps 0 -> 1 over the roar up to tick 280,
+    /// where the hit points actually restore, so the Chomp GLOWS back from cold blue to red-hot as it reignites instead of snapping at that one tick
+    /// (pass 150b). Everywhere else it is the plain hit-point ratio.</summary>
+    public float HeatRatioNow => IsBarking ? MathF.Max(HpRatio, Mathf.Clamp(_time / 280f, 0f, 1f)) : HpRatio;
     public int ShakeTimer => _shakeTimer;
     public int ColdTimer => _coldTimer;
     public int EyeTexture => _eyeTex;
@@ -646,7 +651,7 @@ public partial class SmsBossWanwan : SmsSmallEnemy
         if (_leashReady)
         {
             _leash.TemperatureTick(HpRatio, _hp, Prm.BWHitPointMax);
-            if ((_tickCount & 3) == 0) { if (_goldFrame >= 0f) _leash.ApplyGold(_goldFrame); else _leash.ApplyColors(HpRatio); }   // the links' 28 uniforms at 30 Hz
+            if ((_tickCount & 3) == 0) { if (_goldFrame >= 0f) _leash.ApplyGold(_goldFrame); else _leash.ApplyColors(HeatRatioNow); }   // the links' 28 uniforms at 30 Hz (HeatRatioNow: they reheat with the body over the bark)
             _leash.Picket.Step();
             _leash.PlaceLinks();
             if (IsWandering && IsPicketTaken && _staked && DragSound != null && !DragSound.Playing && _pullDelta.LengthSquared() > 0f) DragSound.Play();
@@ -688,7 +693,7 @@ public partial class SmsBossWanwan : SmsSmallEnemy
         if (BckPassed(BckBark, 60f) || BckPassed(BckBark, 127f)) { ShakeCamera(ShakeLand1); StompEffects(); }
         if (BckPassed(BckBark, 202f)) { ShakeCamera(ShakeLand2); StompEffects(); }
         if (BckPassed(BckShake, 40f)) ShakeCamera(ShakeLand1);
-        if (_hp != 0 && HeatHazeFxScene != null && (_tickCount & 15) == 0) SpawnBurst(HeatHazeFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale * 3f), CenterUnits() / U));
+        if ((_hp != 0 || IsBarking) && HeatHazeFxScene != null && (_tickCount & 15) == 0) SpawnBurst(HeatHazeFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale * 3f * MathF.Max(0.3f, HeatRatioNow)), CenterUnits() / U));
         if (_steamPending != 0 && _hp != 0)
         {
             if (SteamFxScene != null && (_tickCount & 7) == 0) SpawnBurst(SteamFxScene, new Transform3D(Basis.FromScale(Vector3.One * 1.5f), CenterUnits() / U + Vector3.Up * 2f));

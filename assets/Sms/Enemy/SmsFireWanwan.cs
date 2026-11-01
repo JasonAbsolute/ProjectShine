@@ -468,7 +468,14 @@ public partial class SmsFireWanwan : SmsSmallEnemy
         if (_chainReady && _chain != null && IsInstanceValid(_chain))
         {
             _chain.Step(TailJointUnits());
-            _chain.FireEffect(_onFire && !_dead, _bodyScale * _hp / MathF.Max(1, Prm.HitPointMax), FireFxScene, FireOffFxScene);
+            // the ring flame: lit while hot, and ALSO building through RECOVER so the reignition SHOWS fire growing back (pass 150b -- the game lit it
+            // only at the clip's end, which read as a pop and, with ReheatFxScene an empty slot, left the reheat with no fire at all). It grows from a
+            // small flame to full over the return clip, in step with the body's black -> red lerp; RecoverFire then keeps it at full.
+            bool fireOn = (_onFire || IsRecovering) && !_dead;
+            float fireScale = IsRecovering
+                ? _bodyScale * Mathf.Clamp(BckFrame() / MathF.Max(1f, BckFrames[BckReturn]), 0.25f, 1f)
+                : _bodyScale * _hp / MathF.Max(1, Prm.HitPointMax);
+            _chain.FireEffect(fireOn, fireScale, FireFxScene, FireOffFxScene);
         }
         EmitEffects();
     }
@@ -563,7 +570,7 @@ public partial class SmsFireWanwan : SmsSmallEnemy
     {
         Vector3 center = CenterUnits();
         if (_hp != 0 && Sprayed && SteamFxScene != null && (_tickCount & 15) == 0) SpawnBurst(SteamFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale), center / U));
-        if (_hp != 0 && _onFire && HeatHazeFxScene != null && (_tickCount & 15) == 0) SpawnBurst(HeatHazeFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale), center / U));
+        if (((_hp != 0 && _onFire) || IsRecovering) && HeatHazeFxScene != null && (_tickCount & 15) == 0) SpawnBurst(HeatHazeFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale), center / U));
         if (IsFreezeF && _time < _freezeWait && DizzyFxScene != null && (_tickCount & 63) == 0) SpawnBurst(DizzyFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale), center / U + Vector3.Up * (0.6f * _scale)));
         bool slip = IsFlying || IsTailTaken;
         SlipSmoke(slip, IsFlying ? Pos() : Pos() + PolarXZ(_yaw, 150f));
