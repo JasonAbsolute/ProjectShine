@@ -818,7 +818,7 @@ upper branch. The one thing to repeat is the inverted resolution above. Whenever
 whatever the merged branch had, so any queue edit Kiro made after that branch's last commit lives only on the branch that
 carries it. Compare the two bodies before trusting "take main's side".
 
-### #15 -- DONE 2026-11-01 -- https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/enemy-monte -- queued 2026-10-31 23:40 PDT (Kiro) -- PUSH + PR (SMS 149-150e), PLAYTESTED BY JAYSONN, updated 2026-11-01 04:05 PST
+### #15 -- DONE 2026-11-01 -- https://github.com/JasonAbsolute/ProjectShine/pull/13 (SQUASH-merged by Jaysonn) -- queued 2026-10-31 23:40 PDT (Kiro) -- PUSH + PR (SMS 149-150e), PLAYTESTED BY JAYSONN, updated 2026-11-01 04:05 PST
 Push the tenth feature branch: `feature/enemy-monte`, branched from `main` `f89159e` (the trunk after PR #12, the Pinna Park family). Pianta Village's
 family, one pass each on this branch. (`feature/enemy-pinna2` -- entry #14, passes 147-148 -- is a sibling off the same `main`, still unmerged; whichever
 of the two merges second will conflict at the tails of PROJECT_LOG.md and this file: keep both sides, nothing else overlaps.) SMS 149: the Chain
@@ -901,9 +901,19 @@ would have rendered the four sections as one run-on paragraph on GitHub, so blan
 are his.
 `gh auth status` still prints "You are not logged into any GitHub hosts", the seventh entry running, so the browser route. The
 compare URL prefilled with title and body measured well under the ~8000 ceiling #8 established.
-PR opened at: https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/enemy-monte
+PR #13 opened through the browser, the URL 3073 characters with title and body prefilled.
 ONE merge path, as the entry insists: this branch gets a PR and is NOT also merged into local `main`.
-Still to do once Jaysonn merges it: `git checkout main`, fast-forward it with `git merge --ff-only origin/main` rather than
-`git pull`, which this repo's `pull.rebase` setting refuses while he has unstaged work. Then verify the two Chomps by TREE
-rather than ancestry if it squashes, delete `pr149.md`, and mark this entry DONE on `main` with the PR number. Do not state a
-sha for that closing commit inside the file: a commit cannot carry its own sha, a trap that has now caught two entries.
+MERGED BY JAYSONN as a **SQUASH**: `main` is now `de61353`, one commit with a single parent `f89159e`. Fast-forwarded with
+`git merge --ff-only origin/main`, not `git pull`, which this repo's `pull.rebase` setting refuses while he has unstaged work.
+Verified by TREE, the way a squash requires: `git merge-base --is-ancestor 7876f9a main` says NO, while
+`git diff --name-only feature/enemy-monte main` is EMPTY, so every one of the 81 files matches the branch, both log files
+included. Present on the trunk and checked individually: `FireWanwan.tscn`, `BossWanwan.tscn`, `assets/Sms/SmsPullHandle.cs`,
+`assets/Sms/MarioPull.cs` and `assets/Sms/Fx/BwHibana.tscn` (150e's spark jet). `assets/Mario.cs` carries the pulling state.
+`PROJECT_LOG.md` holds all six entries 149, 150, 150b, 150c, 150d and 150e. `pr149.md` deleted.
+THE TRUNK TIP: read it from `git log --oneline -1 main`, not from a sha written here. This entry's closing commit cannot state
+its own sha, which has now caught three entries, so the rule is written into the procedure rather than re-learned each time.
+STILL OPEN, carried forward: `feature/enemy-pinna2` (entry #14, SMS 147 and 148, the Bullet Bill and the ground Electrokoopa)
+is pushed and waiting on Jaysonn's playtest, and it is now the branch that merges SECOND, so it will conflict at the tails of
+`PROJECT_LOG.md` and `timeToPush!.md` against this entry's sections. Keep both sides: nothing else overlaps, measured.
+`feature/select-stages` (entry #11, SMS 135) is likewise pushed and waiting on a playtest, and holds the only copy of #11's
+text. The exit-time C# finalize crash from #10's batch has still not recurred.
