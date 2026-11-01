@@ -818,7 +818,7 @@ upper branch. The one thing to repeat is the inverted resolution above. Whenever
 whatever the merged branch had, so any queue edit Kiro made after that branch's last commit lives only on the branch that
 carries it. Compare the two bodies before trusting "take main's side".
 
-### #14 -- PENDING -- queued 2026-10-31 20:20 PDT (Kiro) -- PUSH ONLY, no PR yet (updated for SMS 148)
+### #14 -- PENDING -- queued 2026-10-31 20:20 PDT (Kiro) -- PUSH ONLY, no PR yet (updated for SMS 148: the family complete)
 Push the ninth feature branch: `feature/enemy-pinna2`, branched from `main` `f89159e` (the trunk after PR #12, the Pinna Park family). Pinna Park's
 leftovers, one pass each on this branch. SMS 147: the Bullet Bill (TKiller), the Monty Mole cannon's long-range shot -- it flies straight on its
 launch, drifts with Mario, chases him when it sees him (a plain one dives at his level and blows on the ground, a homing one turns after him and
@@ -831,7 +831,8 @@ its back shocks him, the bare Koopa only bumps him; a stomp on the bare Koopa ki
 when its shell comes home onto it (a coin) -- assets/Sms/Enemy/ElecNokonoko.tscn + SmsElecNokonoko.cs, the shell's scene, script and the two
 materials under assets/Sms/Enemy/ElecNoko/, the two models under models/Eniemes/ElecNoko/. NOT yet playtested by
 Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says the family is done (Kiro will replace this entry with the PR entry then,
-as #12 / #13 went). More passes (the Wire Trap) will land on this branch and re-point this entry's tip.
+as #12 / #13 went). No more Pinna2 passes are planned (the Wire Trap is skipped for now, at Jaysonn's call): the branch is complete and waits
+for his playtest.
 - Branch `feature/enemy-pinna2` -- code tip `1ab6ff6` ("SMS 148: the ground Electrokoopa ...", 18 files +1021: ElecNokonoko.tscn, SmsElecNokonoko.cs
   (+ .uid), ElecNoko/ (ElecCarapace.tscn, SmsElecCarapace.cs (+ .uid), two .tres), the two glbs with three pngs and their .import files) on `e008bba`
   (the 147 log) and `ed0bbba` (SMS 147, 20 files +951 -8: Killer.tscn, SmsKiller.cs (+ .uid), Killer/ (the shader (+ .uid), four .tres), the two glbs
