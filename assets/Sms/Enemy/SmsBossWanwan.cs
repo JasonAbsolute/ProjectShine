@@ -689,7 +689,12 @@ public partial class SmsBossWanwan : SmsSmallEnemy
         bool waiting = IsBck(BckWait) || IsBck(BckWait2);
         if ((waiting && BckPassed(_bck, 8f)) || BckPassed(BckShake, 38f)) StompEffects();
         bool spark = (_hp > 0 && (_tickCount % 15) == 0) || BckPassed(BckBark, 72f) || BckPassed(BckShake, 4f);   // pass 150d: a steady spark off the hot mouth (~4 a second) so it reads as sparking, plus the bark / shake accents (the game's sparse wait-frame hibana was easy to miss)
-        if (spark && SparkFxScene != null) SpawnBurst(SparkFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale * 2f), (CenterUnits() + PolarXZ(_yaw, 440f) + Vector3.Up * 80f) / U));   // pass 150d: out at the FRONT of the mouth (the teeth), not the jaw hinge inside the head where 150c hid it; bigger, for the 13 m body
+        if (spark && SparkFxScene != null)
+        {
+            Vector3 sfwd = PolarXZ(_yaw, 1f), sx = Vector3.Up.Cross(sfwd).Normalized();   // pass 150e: the burst FACES the mouth's forward (+Z), so its streaks shoot directionally OUT of the mouth, not every which way
+            Basis sb = new Basis(sx, Vector3.Up, sfwd) * Basis.FromScale(Vector3.One * _scale * 2f);
+            SpawnBurst(SparkFxScene, new Transform3D(sb, (CenterUnits() + PolarXZ(_yaw, 460f) + Vector3.Up * 60f) / U));   // at the mouth opening (the teeth), just inside the 500 u front surface
+        }
         if (waiting && BckPassed(_bck, 10f)) ShakeCamera(ShakeLand1);
         if (BckPassed(BckBark, 60f) || BckPassed(BckBark, 127f)) { ShakeCamera(ShakeLand1); StompEffects(); }
         if (BckPassed(BckBark, 202f)) { ShakeCamera(ShakeLand2); StompEffects(); }
