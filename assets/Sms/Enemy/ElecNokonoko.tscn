@@ -1,0 +1,20 @@
+[gd_scene load_steps=4 format=3 uid="uid://d148elecnokonoko"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsElecNokonoko.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/ElecNoko/dennoko_model1.glb" id="2_model"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_body"]
+radius = 0.75
+
+[node name="ElecNokonoko" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+script = ExtResource("1_script")
+RelaunchTicks = -1
+metadata/_sms_note = "Pass 148: the Electrokoopa on the ground (TElecNokonoko), Pinna Park's beach Koopa with the sparking blue shell. Drop it on the ground facing the way it should start (+Z is its front); it wanders (a Graph of Node3D children, or within WanderRadiusUnits). When it sees you it turns to you, runs at you and, within 27 m, SHOOTS its shell: the shell skids at you, zigzagging and spinning (it shocks you on touch, bounces off walls and other enemies), flies out about 20 m and comes back; the Koopa waits bare for it and puts it back on. Touching the shell on its back shocks you (-1 HP); the bare Koopa only bumps you -- stomp it then and it dies (one coin); it cannot be picked up (the game never lets you). The hose: with the shell on, a short stun; bare, it struggles until it grows a new shell. Hose it while its shell is coming home and the shell electrocutes it (a coin). Knobs: Deviations (SpeedScale, ReflectSw = the shell bounces off walls and enemies), Effects (the shell sparks, the stun, the head sparks, the change puff slots), Sounds (slots)."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.75, 0)
+shape = SubResource("SphereShape3D_body")
