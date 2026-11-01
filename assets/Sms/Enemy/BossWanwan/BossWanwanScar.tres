@@ -1,0 +1,29 @@
+[gd_resource type="ShaderMaterial" load_steps=5 format=3 uid="uid://dbwanwanscar1"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/BossWanwan/BossWanwan.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/BossWanwan/N_bwanwan_body.png" id="2_tex"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/BossWanwan/N_mat_spe1.png" id="3_env"]
+[ext_resource type="Texture2D" path="res://assets/Sms/models/toon_2_4i.png" id="4_toon"]
+
+[resource]
+resource_name = "_mat_kizu (bwanwan_body.bmd): the Chain Chomp's scars -- the body's recipe (form 0) with a constant gold: C1 (120, 100, 0), C2 (220, 160, 0) (not in the brk)"
+render_priority = 0
+shader = ExtResource("1_shader")
+shader_parameter/s0_k = 0.625
+shader_parameter/s1_form = 0
+shader_parameter/bw_form = 0
+shader_parameter/c0 = Vector3(0.7843, 0.7843, 0.7843)
+shader_parameter/c1 = Vector3(0.4706, 0.3922, 0.0)
+shader_parameter/c2 = Vector3(0.8627, 0.6275, 0.0)
+shader_parameter/base_tex = ExtResource("2_tex")
+shader_parameter/env_tex = ExtResource("3_env")
+shader_parameter/toon_tex = ExtResource("4_toon")
+shader_parameter/env_scale = Vector2(-1.2793, -1.2793)
+shader_parameter/env_trans = Vector2(-0.12207, -0.332031)
+shader_parameter/env_rot = 0.0
+shader_parameter/dirt = 0.0
+shader_parameter/sun_dir = Vector3(0.348, 0.87, 0.348)
+shader_parameter/sun_color = Vector3(1, 1, 1)
+shader_parameter/ambient = Vector3(0.502, 0.502, 0.502)
+shader_parameter/ambient_a = 0.196
+shader_parameter/shininess = 50.0

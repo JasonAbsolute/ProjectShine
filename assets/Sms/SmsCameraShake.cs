@@ -85,6 +85,21 @@ public partial class SmsCameraShake : Node
         s.Z = Set(mode.AmpZ, mode.VelZ, mode.TimeTicks, k);
     }
 
+    /// <summary>startShake(mode, scale) with a mode of the caller's own (pass 150: the Chain Chomp's shakebowaland1 / 2 -- an actor's .prm the scene does
+    /// not carry as a kind). The same slot and decay as <see cref="Start"/>.</summary>
+    public void StartMode(SmsCameraShakeMode mode, float scale = 1f)
+    {
+        if (!Enabled || Camera == null || mode == null || mode.TimeTicks <= 0)
+            return;
+        int i = FreeSlot();
+        ref Slot s = ref _slots[i];
+        s.Keep = false; s.Decreasing = false; s.Duration = mode.TimeTicks; s.Frame = 0;
+        float k = scale * Strength;
+        s.X = Set(mode.AmpX, mode.VelX, mode.TimeTicks, k);
+        s.Y = Set(mode.AmpY, mode.VelY, mode.TimeTicks, k);
+        s.Z = Set(mode.AmpZ, mode.VelZ, mode.TimeTicks, k);
+    }
+
     /// <summary>setShakeAngleOne_: amp x scale (a negative scale flips the sine too), the per-tick decrement amp / duration.</summary>
     private static Angle Set(float amp, int vel, int duration, float scale)
     {

@@ -25,6 +25,10 @@ public partial class Mario
     /// <summary>For the drives / other actors: the handle in his hands (null when not pulling).</summary>
     public SmsPullHandle SmsPullingHandle => stateOfMario == MarioState.pulling ? _smsPullHandle : null;
     public string SmsPullSubName => _smsPull.ToString();
+    /// <summary>mIntendedMag (0..32) and the stick's world direction of the last pulling frame -- for a handle's owner that reads his stick (pass 150: the
+    /// Chain Chomp's drag speed, bosswanwan.cpp 1535: gpMarioOriginal->mIntendedYaw / mIntendedMag).</summary>
+    public float SmsIntendedMag => _smsIntendedMag;
+    public Vector3 SmsPullStickDir { get; private set; }
 
     /// <summary>hitNoKeepPull's trigger: a pullable handle he is touching with B held in a take situation (the canTake / isTakeSituation
     /// geometry of the take, pass 83 / 130b: within HoldRadius + the handle's radius of his feet, the cylinders overlapping, within 60 deg of his face).</summary>
@@ -139,6 +143,7 @@ public partial class Mario
             return;
         }
         SmsPullFace();
+        SmsPullStickDir = inputDirWorld.LengthSquared() > 1e-6f ? new Vector3(inputDirWorld.X, 0f, inputDirWorld.Z).Normalized() : Vector3.Zero;
         Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
         Vector3 back = -face;                                                       // backAngle = mFaceAngle.y + 0x8000
         Vector3 across = new Vector3(-back.Z, 0f, back.X);                          // (-cos b, 0, sin b): the sideways axis of pulling()'s sums

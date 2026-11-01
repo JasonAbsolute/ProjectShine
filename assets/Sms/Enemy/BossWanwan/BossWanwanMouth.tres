@@ -1,0 +1,29 @@
+[gd_resource type="ShaderMaterial" load_steps=5 format=3 uid="uid://dbwanwanmouth1"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/BossWanwan/BossWanwan.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/BossWanwan/N_bwanwan_body.png" id="2_tex"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/BossWanwan/N_mat_spe1.png" id="3_env"]
+[ext_resource type="Texture2D" path="res://assets/Sms/models/toon_2_4i.png" id="4_toon"]
+
+[resource]
+resource_name = "_mat_kuti (bwanwan_body.bmd): the inside of the mouth -- form 2 (no glint): s1 = 1/2 (s0 + mix(C2, white, tex) - 1/2) with C2 the brk's red: (150, 0, 0) at rest, 50 cold, 250 hot, 0 gold"
+render_priority = 0
+shader = ExtResource("1_shader")
+shader_parameter/s0_k = 0.625
+shader_parameter/s1_form = 0
+shader_parameter/bw_form = 2
+shader_parameter/c0 = Vector3(0.7843, 0.7843, 0.7843)
+shader_parameter/c1 = Vector3(0.0, 0.1176, 0.3137)
+shader_parameter/c2 = Vector3(0.5882, 0.0, 0.0)
+shader_parameter/base_tex = ExtResource("2_tex")
+shader_parameter/env_tex = ExtResource("3_env")
+shader_parameter/toon_tex = ExtResource("4_toon")
+shader_parameter/env_scale = Vector2(1.0, 1.0)
+shader_parameter/env_trans = Vector2(0.0, 0.0)
+shader_parameter/env_rot = 0.0
+shader_parameter/dirt = 0.0
+shader_parameter/sun_dir = Vector3(0.348, 0.87, 0.348)
+shader_parameter/sun_color = Vector3(1, 1, 1)
+shader_parameter/ambient = Vector3(0.502, 0.502, 0.502)
+shader_parameter/ambient_a = 0.196
+shader_parameter/shininess = 50.0

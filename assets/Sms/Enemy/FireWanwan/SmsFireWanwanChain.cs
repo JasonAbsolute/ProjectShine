@@ -204,6 +204,7 @@ public partial class SmsFireWanwanChain : SmsPullHandle
         MaxLength = _owner.IsFlying ? p.TailMaxLength : 10000f;
         _pos[0] = tailJointU;
         Movement();
+        if (IsHeld && Holder.SmsPullingHandle != this) BehaveApart();                      // ensureTakeSituation (pass 150): his hands left it without a DETACH (a burn, a fall)
         if (IsHeld)
         {
             Vector3 toRing = _pos[NodeCount - 1] - _owner.GlobalPosition * U;
