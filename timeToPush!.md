@@ -818,7 +818,7 @@ upper branch. The one thing to repeat is the inverted resolution above. Whenever
 whatever the merged branch had, so any queue edit Kiro made after that branch's last commit lives only on the branch that
 carries it. Compare the two bodies before trusting "take main's side".
 
-### #14 -- PENDING -- queued 2026-10-31 20:20 PDT (Kiro) -- PUSH ONLY, no PR yet (updated for SMS 148: the family complete)
+### #14 -- DONE 2026-11-01 -- https://github.com/JasonAbsolute/ProjectShine/tree/feature/enemy-pinna2 -- queued 2026-10-31 20:20 PDT (Kiro) -- PUSH ONLY, no PR yet (updated for SMS 148: the family complete)
 Push the ninth feature branch: `feature/enemy-pinna2`, branched from `main` `f89159e` (the trunk after PR #12, the Pinna Park family). Pinna Park's
 leftovers, one pass each on this branch. SMS 147: the Bullet Bill (TKiller), the Monty Mole cannon's long-range shot -- it flies straight on its
 launch, drifts with Mario, chases him when it sees him (a plain one dives at his level and blows on the ground, a homing one turns after him and
@@ -859,3 +859,24 @@ git rev-list --count origin/feature/enemy-pinna2..feature/enemy-pinna2
 Expect `0` from the rev-list. No PR, no merge. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
 `assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
+
+Result: `feature/enemy-pinna2` pushed as a NEW remote branch, 5 commits over `main` `f89159e`, 40 files / +2241 / -8.
+`git rev-list --count origin/feature/enemy-pinna2..feature/enemy-pinna2` returned `0`. All three shas confirmed ancestors:
+`1ab6ff6` (148), `e008bba` (the 147 log), `ed0bbba` (147). Per-pass diffstats match the entry exactly: 147 = 20 files
+/ +951 / -8, 148 = 18 files / +1021. Largest new files: `dennoko_model1.glb` 0.73 MB, `killer_model1.glb` 0.10,
+`downkiller_model1.glb` 0.07, nothing over 1 MB. Hygiene: 0 of Jaysonn's nine live edits in the range.
+NOTE on the commit count: the entry says 4, measured 5. The extra one is `2bbedef`, the commit that marked this branch complete
+and skipped the Wire Trap, which cannot count itself. The queue file's own commit, as in every entry so far.
+NO PR, by the entry's own instruction: "do NOT open a PR until he says the family is done". Jaysonn asked for a PR in chat, but
+SMS 147 and 148 are not playtested yet, so the branch is on GitHub and nothing more. Its sibling #15 (`feature/enemy-monte`,
+the Chain Chomps) IS playtested, and that is the one whose PR opened in this same pass. When Jaysonn says the Bullet Bill and
+the ground Electrokoopa are good, Kiro replaces this entry with a PR entry, the way #12 and #13 went.
+This Result is committed on the BRANCH, not on `main`, because this entry's text only exists here: `e008bba` added it on the
+branch, so `main`'s copy of the file has no #14 section at all. Written with git plumbing (`hash-object`, `read-tree`,
+`commit-tree`, `update-ref`) against a temporary index rather than by checking the branch out, so Jaysonn's nine uncommitted
+edits were never touched. Checked after: still all nine present.
+SIBLING WARNING, confirmed by measurement rather than taken on trust: `comm -12` over this branch's and
+`feature/enemy-monte`'s file lists shows the ONLY shared files are `PROJECT_LOG.md` and `timeToPush!.md`. No scene, script,
+shader, material or model overlaps. #15's PR is open first, so when this branch is eventually merged it will conflict at those
+two tails. Resolution: keep BOTH sides, since 147 and 148 and 149 and 150 are different sections of each file. Expect
+`main` to hold #15's section and this branch to hold #14's, exactly the shape that #12 and #13 hit.
