@@ -690,7 +690,7 @@ on `feature/enemy-pinna` only. Corrected here. For the same reason `main` still 
 `feature/select-stages` and #13's on `feature/enemy-pinna`, and each arrives with its own merge.
 Next: #13's merge-and-PR steps, which need `main` merged into `feature/enemy-pinna` first.
 
-### #13 -- PENDING -- queued 2026-10-31 15:15 PDT, PR added 2026-10-31 17:45 PDT (Kiro) -- PUSH + PR, the PR AFTER #12 HAS MERGED (stacked)
+### #13 -- DONE 2026-10-31 -- https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/enemy-pinna -- queued 2026-10-31 15:15 PDT, PR added 2026-10-31 17:45 PDT (Kiro) -- PUSH + PR, the PR AFTER #12 HAS MERGED (stacked)
 Push the eighth feature branch: `feature/enemy-pinna`, branched from the RICCO branch's tip `76c46d8` (the 143 log commit; see #12), not from
 `main`: the Pinna species lean on the Ricco branch's base and Mario work (the water-surface helpers in SmsSmallEnemy.cs, Mario's fence getters
 from 139) and the Klamber's net mechanics. Pinna Park's enemy family, one pass each on this branch. SMS 144: the Electrokoopa on the net
@@ -771,3 +771,36 @@ If `gh` is still unauthenticated, the compare URL route as in #12. Once merged: 
 Kiro the sha. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`,
 the three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the `addons/godot_ai` churn: his,
 leave them.
+
+Result: `feature/enemy-pinna` pushed as a NEW remote branch alongside Ricco, 18 commits over `main` `55514c8` at that point,
+8 of them Pinna's. `git rev-list --count origin/feature/enemy-pinna..feature/enemy-pinna` returned `0`. All six shas confirmed
+ancestors: `45574ec` (146), `ab46ae3`, `a702b49` (145), `6537026`, `858718c` (144) and the Ricco base `76c46d8`.
+Hygiene: 0 of Jaysonn's nine live edits in the range.
+NOTE on the stated size: Kiro gives 42 files / +2735 over the Ricco tip, measured figure 43 files / +2785 / -9. Measured at
+`a889646` it is exactly 42 / +2735, so the gap is the two commits added after that line was written: `aa61b7c` (the Kazekun
+scene uid) and `db9f9bf` (the PR update to this file). Accounted for in full, nothing unexplained.
+UNSTACKED after PR #11's squash, by the entry's own recipe. `git merge origin/main` on this branch conflicted in exactly the two
+files predicted plus the Kazekun line Kiro flagged separately, and every source file merged clean because both sides carry the
+identical Ricco changes. Resolutions: `PROJECT_LOG.md` took this branch's copy, since
+`git diff --stat 76c46d8 origin/main -- PROJECT_LOG.md` printed nothing and this side is the superset, verified to hold entries
+139 through 146 once each. `assets/Sms/Enemy/Kazekun.tscn` kept the normalized uid `d143ka0ekun` over `main`'s `d143kazekun`,
+which is the whole point of `aa61b7c`, and the file's diff against `main` is that one line alone.
+`timeToPush!.md` was hand-merged, and ONE part of Kiro's instruction had to be inverted: the rule says take everything through
+#12 from `origin/main`, but `main`'s copy of #12's BODY PROSE is the stale pre-approval version, because the squash carried the
+Ricco branch's file whose last entry commit `76c46d8` predates Kiro's `db9f9bf`. So #12's DONE heading and result paragraph came
+from `main` and #12's body text came from this branch, which is the accurate one. Checked afterwards: no conflict markers, the
+DONE heading once, the result paragraph once, the interim "push done, merge pending" version gone, the approved
+"APPROVED BY JAYSONN" prose present and the stale "do NOT open a PR until he says the family is done" line absent.
+Merge commit `a58ef5f`, pushed. `git diff --name-only origin/main feature/enemy-pinna` then listed ONLY Pinna's files, the two
+log files and the single Kazekun line, with no Ricco scene, no `assets/Mario.cs` and no `assets/Sms/Enemy/SmsSmallEnemy.cs`:
+43 files / +2784 / -8. Largest new files as stated: `tamanoko_model1.glb` 0.92 MB, `aminoko_model1.glb` 0.81,
+`tyorobe_model1.glb` 0.63, `tamaflower_model1.glb` 0.21, nothing over 1 MB.
+`gh auth status` still prints "You are not logged into any GitHub hosts", so the browser route again.
+PR opened at: https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/enemy-pinna
+Still to do once Jaysonn merges it: `git checkout main`, fast-forward it (`git merge --ff-only origin/main`, NOT `git pull`,
+which this repo's `pull.rebase` setting refuses while Jaysonn has unstaged work), verify Pinna's three species by tree rather
+than ancestry if it is squashed, delete `pr144.md`, mark this DONE on `main` with the PR number, and tell Kiro the sha.
+A NOTE FOR THE NEXT STACKED PAIR: pushing both branches at once worked, and so did putting the lower entry's result on the
+upper branch. The one thing to repeat is the inverted resolution above. Whenever a squash lands, `main`'s copy of this file is
+whatever the merged branch had, so any queue edit Kiro made after that branch's last commit lives only on the branch that
+carries it. Compare the two bodies before trusting "take main's side".
