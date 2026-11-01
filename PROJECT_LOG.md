@@ -10079,3 +10079,30 @@ off the hot body under the hose. Its scale 1.5 -> 2.5 to read on the 13 m body.
 **Verification:** build 0 errors, boot ALL OK; the diff read by eye and against HEAD (the four hunks, nothing stray). Not separately captured -- effect
 tweaks on top of pass 150's 22/22 drive and its eleven captures; Jaysonn plays them. The rocks / heat haze slots stay empty (no faithful asset, and he
 named only the dust height, the sparks and the steam).
+
+### 150d -- the Chain Chomp's mouth throws ember sparks (a new hibana), its steam covers the body, its stomp streaks sit low (feature/enemy-monte, `a9984c3`)
+
+**Files:** NEW `assets/Sms/Fx/BwHibana.tscn` (ms_bwan_hibana -- the mouth sparks). CHANGED `assets/Sms/Enemy/SmsBossWanwan.cs`, `assets/Sms/Enemy/
+BossWanwan.tscn` (the _sms_note). Tools: npc82/monte151/{commit150d.txt, append150d.py; the pass-150 drive patch_smoke150.py / run_cap150.bat / run_gpu.ps1
+were re-used for a verification GPU capture}. The third polish round on the Chain Chomp after Jaysonn's 150c playtest: he gave Ref/TeethSparkRef to match,
+and said the sparks still did not show, the blue stomp streaks had gone, and the steam came "from the middle".
+
+**The mouth sparks (HIBANA).** 150c's HitBurst was an SmsFxBurst that DID fire (its Play restarts every child), but its white / orange hit-streaks were
+the wrong shape and sat at the jaw hinge (HitUpUnits) INSIDE the opaque head, so they read as nothing. New `assets/Sms/Fx/BwHibana.tscn`: a one-shot
+SmsFxBurst of ~28 glow1_spark embers off a 0.35 m sphere, spread 180, initial 2.5-6, gravity -14 (they fall), bright-yellow -> orange -> dark-red over
+0.55 s, additive billboards -- the scattered falling embers of Ref/TeethSparkRef. Emitted off the FRONT of the mouth (CenterUnits + PolarXZ(_yaw, 440) +
+up 80, just inside the 500 u front surface = the teeth) at _scale x 2, a steady ~4 a second while _hp > 0, plus the bark 72 / shake 4 accents (a
+DEVIATION from the game's sparse wait-frame hibana, for visibility).
+
+**The hose steam.** 150c emitted one GkKemuriW at CenterUnits -- "from the middle". GkKemuriW is rising smoke, so emitting at mid-body only pooled it
+above the head (a 4-puff mid-body ring, tried first, still plumed). It now emits LOW around the base -- a ring of three puffs ~160 u over the feet
+(PolarXZ at _yaw and _yaw +- 130) plus a belly fill, scale 2.2-2.6 -- so the rising steam sweeps UP across the whole hot body. Still every 8 ticks, the
+flag cleared only when it fires.
+
+**The stomp streaks.** 150c's (4, 1.4, 4) squash (meant to lower them) had flattened the blue impact streaks to nothing. Reverted to a UNIFORM x 2.6 --
+whole streaks again, but lower than the x 4 that read too high (the burst spawns at GlobalPosition, which the scene already rests on the floor -- the foot
+sphere's bottom is at the node origin).
+
+**Verification:** build 0 errors, boot ALL OK. Checked this round on a headless GPU capture (patch_smoke150.py's drive at SMS_F150_CAP=1, 22/22; the
+splice removed and Mario.cs restored to committed before the commit): the hot mouth's yellow-orange embers, the steam low around the body, the stomp dust
+at the feet -- the embers and steam compared against Ref/TeethSparkRef.
