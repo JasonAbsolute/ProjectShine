@@ -197,7 +197,7 @@ public partial class SmsBossWanwan : SmsSmallEnemy
         StompDustFxScene ??= LoadIf("res://assets/Sms/Fx/HipDropLanding.tscn");
         SteamFxScene ??= LoadIf("res://assets/Sms/Fx/GkKemuriW.tscn");
         SplashFxScene ??= LoadIf("res://assets/Sms/Fx/WaterSplash.tscn");
-        SparkFxScene ??= LoadIf("res://assets/Sms/Fx/HitBurst.tscn");   // the HIBANA sparks off its hot mouth (pass 150c): an orange-streak burst, not the cyan ShockSparks
+        SparkFxScene ??= LoadIf("res://assets/Sms/Fx/BwHibana.tscn");   // pass 150d: the mouth's HIBANA -- scattered yellow -> orange falling embers matching Ref/TeethSparkRef (HitBurst's streaks were the wrong shape; this is a dedicated ms_bwan_hibana scene)
         ShakeLand1 ??= new SmsCameraShakeMode { TimeTicks = 20, AmpX = 100f, VelX = 5000 };
         ShakeLand2 ??= new SmsCameraShakeMode { TimeTicks = 80, AmpX = 150f, VelX = 4000, AmpZ = 100f, VelZ = 2000 };
         if (_model != null)
@@ -680,7 +680,7 @@ public partial class SmsBossWanwan : SmsSmallEnemy
     private void StompEffects()
     {
         Stomps++;
-        StompDust(GlobalPosition, new Vector3(4f, 1.4f, 4f));   // wide but low: the dust and the impact streaks hug the ground instead of rising up the body (pass 150c)
+        StompDust(GlobalPosition, Vector3.One * 2.6f);   // pass 150d: a smaller UNIFORM burst -- 150c's (4, 1.4, 4) squash flattened the blue impact streaks away; 2.6 keeps them whole but lower than the x 4 that read too high
         if (RockFxScene != null) SpawnBurst(RockFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale), GlobalPosition));
         if (_hp == 0) ChainColdSound?.Play(); else ChainHotSound?.Play();
     }
@@ -688,16 +688,23 @@ public partial class SmsBossWanwan : SmsSmallEnemy
     {
         bool waiting = IsBck(BckWait) || IsBck(BckWait2);
         if ((waiting && BckPassed(_bck, 8f)) || BckPassed(BckShake, 38f)) StompEffects();
-        bool spark = BckPassed(BckBark, 72f) || (waiting && (BckPassed(_bck, 6f) || BckPassed(_bck, 12f))) || BckPassed(BckShake, 4f);
-        if (spark && SparkFxScene != null) SpawnBurst(SparkFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale), (HitUpUnits() + PolarXZ(_yaw, 200f)) / U));   // the HIBANA at the mouth / teeth, not the belly (pass 150c)
+        bool spark = (_hp > 0 && (_tickCount % 15) == 0) || BckPassed(BckBark, 72f) || BckPassed(BckShake, 4f);   // pass 150d: a steady spark off the hot mouth (~4 a second) so it reads as sparking, plus the bark / shake accents (the game's sparse wait-frame hibana was easy to miss)
+        if (spark && SparkFxScene != null) SpawnBurst(SparkFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale * 2f), (CenterUnits() + PolarXZ(_yaw, 440f) + Vector3.Up * 80f) / U));   // pass 150d: out at the FRONT of the mouth (the teeth), not the jaw hinge inside the head where 150c hid it; bigger, for the 13 m body
         if (waiting && BckPassed(_bck, 10f)) ShakeCamera(ShakeLand1);
         if (BckPassed(BckBark, 60f) || BckPassed(BckBark, 127f)) { ShakeCamera(ShakeLand1); StompEffects(); }
         if (BckPassed(BckBark, 202f)) { ShakeCamera(ShakeLand2); StompEffects(); }
         if (BckPassed(BckShake, 40f)) ShakeCamera(ShakeLand1);
         if ((_hp != 0 || IsBarking) && HeatHazeFxScene != null && (_tickCount & 15) == 0) SpawnBurst(HeatHazeFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale * 3f * MathF.Max(0.3f, HeatRatioNow)), CenterUnits() / U));
-        if (_steamPending != 0 && (_tickCount & 3) == 0)   // a steam puff every 4 ticks while it is hosed; clears the flag only when it actually fires, so a spray is never silently dropped (pass 150c)
+        if (_steamPending != 0 && (_tickCount & 7) == 0)   // pass 150d: a SPREAD of puffs every 8 ticks while it is hosed (not one from the centre) so the steam blankets the whole hot body; clears the flag only when it fires
         {
-            if (_hp != 0 && SteamFxScene != null) SpawnBurst(SteamFxScene, new Transform3D(Basis.FromScale(Vector3.One * 2.5f), CenterUnits() / U + Vector3.Up * 2f));
+            if (_hp != 0 && SteamFxScene != null)
+            {
+                Vector3 c = CenterUnits();   // puffs LOW around the base -- GkKemuriW rises, so emitting near the feet sends the steam UP across the whole body (emitting at mid-body just pooled it above the head)
+                SpawnBurst(SteamFxScene, new Transform3D(Basis.FromScale(Vector3.One * 2.6f), (c + PolarXZ(_yaw, 410f) + Vector3.Up * -340f) / U));         // front base
+                SpawnBurst(SteamFxScene, new Transform3D(Basis.FromScale(Vector3.One * 2.6f), (c + PolarXZ(_yaw + 130f, 410f) + Vector3.Up * -300f) / U));  // back-left base
+                SpawnBurst(SteamFxScene, new Transform3D(Basis.FromScale(Vector3.One * 2.6f), (c + PolarXZ(_yaw - 130f, 410f) + Vector3.Up * -320f) / U));  // back-right base
+                SpawnBurst(SteamFxScene, new Transform3D(Basis.FromScale(Vector3.One * 2.2f), (c + Vector3.Up * -120f) / U));                               // the belly, fill
+            }
             _steamPending = 0;
         }
         if (_invincible && _goldFrame > 150f && SparkleFxScene != null && (_tickCount & 31) == 0) SpawnBurst(SparkleFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale * 3f), CenterUnits() / U));

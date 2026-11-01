@@ -1,0 +1,59 @@
+[gd_scene load_steps=8 format=3 uid="uid://dbwhibana150d"]
+
+; ms_bwan_hibana -- the Chain Chomp's mouth sparks (pass 150d). A one-shot SmsFxBurst of small yellow -> orange embers
+; that burst outward off a small sphere and fall under gravity, cooling bright-yellow to dark-red as they fade, like the
+; TeethSparkRef (Super Mario Eclipse). glow1_spark.png, additive billboards.
+
+[ext_resource type="Script" path="res://assets/Sms/Fx/SmsFxBurst.cs" id="1_script"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/glow1_spark.png" id="2_spark"]
+
+[sub_resource type="Gradient" id="Gradient_ember"]
+resource_name = "hibana: bright yellow-white -> orange -> dark red, fading out"
+offsets = PackedFloat32Array(0, 0.35, 1)
+colors = PackedColorArray(1, 0.95, 0.6, 1, 1, 0.5, 0.1, 1, 0.6, 0.1, 0, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_ember"]
+gradient = SubResource("Gradient_ember")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_ember"]
+lifetime_randomness = 0.35
+emission_shape = 1
+emission_sphere_radius = 0.35
+direction = Vector3(0, 1, 0)
+spread = 180.0
+initial_velocity_min = 2.5
+initial_velocity_max = 6.0
+gravity = Vector3(0, -14, 0)
+scale_min = 0.4
+scale_max = 1.0
+color_ramp = SubResource("GradientTexture1D_ember")
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ember"]
+resource_name = "hibana ember (glow1_spark as alpha, the ramp's yellow -> orange, additive billboard)"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+vertex_color_use_as_albedo = true
+disable_receive_shadows = true
+blend_mode = 1
+albedo_texture = ExtResource("2_spark")
+billboard_mode = 3
+billboard_keep_scale = true
+
+[sub_resource type="QuadMesh" id="QuadMesh_ember"]
+material = SubResource("StandardMaterial3D_ember")
+size = Vector2(0.17, 0.17)
+
+[node name="BwHibana" type="Node3D"]
+script = ExtResource("1_script")
+
+[node name="Embers" type="GPUParticles3D" parent="."]
+amount = 28
+lifetime = 0.55
+one_shot = true
+emitting = false
+explosiveness = 0.9
+randomness = 0.3
+fixed_fps = 60
+process_material = SubResource("ParticleProcessMaterial_ember")
+draw_pass_1 = SubResource("QuadMesh_ember")
