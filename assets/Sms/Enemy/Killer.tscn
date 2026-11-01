@@ -1,0 +1,25 @@
+[gd_scene load_steps=5 format=3 uid="uid://d147killer"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsKiller.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Killer/killer_model1.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Killer/downkiller_model1.glb" id="3_down"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_body"]
+radius = 0.85
+
+[node name="Killer" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+script = ExtResource("1_script")
+RelaunchTicks = -1
+metadata/_sms_note = "Pass 147: the Bullet Bill (TKiller). The Monty Mole cannon fires these on its own (Shots > KillerScene is this scene by default); one placed in a level flies off the way it faces (+Z) at launch speed, levels out, and chases you when it sees you within 40 m. Plain (black) ones fly past; a Homing one (Kind) turns after you and dives; a Gold one (Kind, or 1 in 20 by chance) is worth 8 coins. It blows up on anything it touches -- a wall, the ground, another enemy, you (3 HP, the fire knock) -- and after 25 s of chasing it sinks and blows. Spray it: two coins (eight gold) and it bursts harmlessly. Stomp it: you bounce and it drops to the ground and blows there. Knobs: Kind, Deviations (SpeedScale, RollSw = the game's unused body roll in the chase, TrampleDie), Effects (the blast, the smoke trail / water and sand column slots, the coin), Sounds (two slots)."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="Down" parent="." instance=ExtResource("3_down")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+visible = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+shape = SubResource("SphereShape3D_body")

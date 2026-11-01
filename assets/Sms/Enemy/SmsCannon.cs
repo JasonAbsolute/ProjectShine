@@ -42,8 +42,8 @@ using Godot;
 /// SmsBombHei in the mole's 200 x 250 that is Thrown or Exploding -> DAMAGE and the bomb killed, its collision layer off first (isDamageToCannon's
 /// HIT_FILTER_NO_COLLISION: a bomb hits once, though its 80-frame blast outlives the 59-frame damage1). The bomb: <see cref="BombScene"/> (the Bob-omb of
 /// pass 130) instanced dormant at throw1's start and launched (SmsLaunch) from the mole's hand at frame 38; it lands and lives its own life. The
-/// Bullet Bill is a slot (<see cref="KillerScene"/>: any SmsSmallEnemy scene is launched from the dome at the game's velocity; empty = the long-range
-/// volleys are skipped -- DEVIATION: TKiller is not ported). The cannon's own clips (cannonopen / cannonclose / cannon_break) and the domes'
+/// Bullet Bill is <see cref="KillerScene"/> (pass 147's SmsKiller by default: launched from the dome at the game's velocity with the 1-in-5 homing, its
+/// colours, the 0.1 start scale and the led goal; any SmsSmallEnemy scene may stand in). The cannon's own clips (cannonopen / cannonclose / cannon_break) and the domes'
 /// (cannondom / cannondom_break) are not in his rip's glbs (the rip merged no bck into default.glb or cannon_dom.glb): the lid stays, the hide is
 /// the mole's hyde1 + its model off, the break is the mole and the domes off with the blast (DEVIATION, logged). The damage hop and the dome wobble
 /// are the model's; the Mare gate, the demos and the rumbles are not ported.
@@ -83,8 +83,9 @@ public partial class SmsCannon : SmsSmallEnemy
     [ExportGroup("Shots (empty = none)")]
     /// <summary>The Bob-omb the mole lobs (an SmsSmallEnemy scene). Empty = assets/Sms/Enemy/Bomb/BombHei.tscn.</summary>
     [Export] public PackedScene BombScene;
-    /// <summary>The Bullet Bill the barrels fire at long range (any SmsSmallEnemy scene, launched from the dome at the game's velocity). Empty = no long-range
-    /// volleys (TKiller is not ported).</summary>
+    /// <summary>The Bullet Bill the barrels fire at long range (any SmsSmallEnemy scene, launched from the dome at the game's velocity; an SmsKiller gets the
+    /// game's 1-in-5 homing, its colours, its 0.1 start scale and its led goal). Empty = assets/Sms/Enemy/Killer.tscn (pass 147) when that file is there,
+    /// else no long-range volleys.</summary>
     [Export] public PackedScene KillerScene;
     [ExportGroup("Effects (empty = the default / none)")]
     /// <summary>The Bob-omb's blast where a bomb damages the mole (x 2: its Smoke, Glow and Scraps only, the game's three emitters -- the bomb's own fireball is
@@ -93,8 +94,9 @@ public partial class SmsCannon : SmsSmallEnemy
     /// <summary>ms_cho_moku_a / _b: the smoke off the hit mole; ms_cho_ase: the sweat as it hides; ms_jump_ed_b: the lid's puff. Slots.</summary>
     [Export] public PackedScene MoleSmokeFxScene, SweatFxScene, LidPuffFxScene;
     [ExportGroup("Sounds (empty = silent)")]
-    /// <summary>MSD_SE_EN_CANNON_MOVE (the turn), _DOWN (the break), _LAND, the mole's bas tables (appear / damage / down / hyde / throw).</summary>
-    [Export] public AudioStreamPlayer3D MoveSound, DownSound, LandSound, AppearSound, DamageSound, HideSound, ThrowSound;
+    /// <summary>MSD_SE_EN_CANNON_MOVE (the turn), _DOWN (the break), _LAND, the mole's bas tables (appear / damage / down / hyde / throw), MSD_SE_EN_KILLER_FIRE (a
+    /// barrel's shot, pass 147).</summary>
+    [Export] public AudioStreamPlayer3D MoveSound, DownSound, LandSound, AppearSound, DamageSound, HideSound, ThrowSound, FireSound;
 
     // ------------------------------------------------------------------------------------------------------------------ the clips (the cannon has none in his rip; the mole's 8 by the archive's indices)
     private static readonly string[] Names = { "cannonclose", "cannondom", "cannondom_break", "cannonopen", "cannon_break", "cannon_demo_dom", "cannon_demo_dpt", "cannon_demo_pinna",
@@ -133,6 +135,7 @@ public partial class SmsCannon : SmsSmallEnemy
     public int Throws { get; private set; }
     public int Volleys { get; private set; }
     public SmsSmallEnemy LastBomb { get; private set; }
+    public SmsSmallEnemy LastKiller { get; private set; }
     public bool Broken => IsNerve(NerveObject);
     public float HopUnits => _hopY;
 
@@ -145,6 +148,7 @@ public partial class SmsCannon : SmsSmallEnemy
         if (_mole != null) { _mole.Position = Vector3.Up * MoleHeightUnits; foreach (Node n in _mole.FindChildren("*", "AnimationPlayer", true, false)) { _moleAnim = n as AnimationPlayer; if (_moleAnim != null) break; } }
         for (int i = 0; i < 3; i++) { var d = _model?.GetNodeOrNull<Node3D>($"Dome{i}"); if (d != null) _domes.Add(d); }
         if (BombScene == null && ResourceLoader.Exists("res://assets/Sms/Enemy/Bomb/BombHei.tscn")) BombScene = GD.Load<PackedScene>("res://assets/Sms/Enemy/Bomb/BombHei.tscn");
+        if (KillerScene == null && ResourceLoader.Exists("res://assets/Sms/Enemy/Killer.tscn")) KillerScene = GD.Load<PackedScene>("res://assets/Sms/Enemy/Killer.tscn");   // pass 147
         if (BlastFxScene == null && ResourceLoader.Exists("res://assets/Sms/Enemy/Bomb/BombExplosion.tscn")) BlastFxScene = GD.Load<PackedScene>("res://assets/Sms/Enemy/Bomb/BombExplosion.tscn");
         if (LidPuffFxScene == null && ResourceLoader.Exists("res://assets/Sms/Enemy/Fx131/JumpEd.tscn")) LidPuffFxScene = GD.Load<PackedScene>("res://assets/Sms/Enemy/Fx131/JumpEd.tscn");
         if (DebugPrint) GD.Print($"[SMS cannon] {Name}: mole {_mole?.Name} anim {_moleAnim?.Name} clips {(_moleAnim != null ? _moleAnim.GetAnimationList().Length : 0)}; domes {_domes.Count}");
@@ -279,14 +283,24 @@ public partial class SmsCannon : SmsSmallEnemy
         Vector3 goal = MarioPos() + new Vector3((Rand() * 2f - 1f) * 300f, 0f, (Rand() * 2f - 1f) * 300f);
         if (_dome == 0) goal.Z -= 2f * MathF.Abs((Rand() * 2f - 1f) * 300f); else if (_dome == 2) goal.Z += 2f * MathF.Abs((Rand() * 2f - 1f) * 300f);
         Vector3 v = JumpVelocityTo(mouth, goal, 5f, k.GravityUnits);
-        float t = MathF.Abs((goal - Pos()).Length() / MathF.Max(1e-3f, v.X * VelocityRate));
+        Vector3 vxz = new Vector3(v.X, 0f, v.Z);
+        float t = MathF.Abs((goal - Pos()).Length() / MathF.Max(1e-3f, vxz.Length() * VelocityRate));       // (the game divides by velocity.x alone: a shot along Z led to infinity -- the XZ speed here, DEVIATION)
         Vector3 ms = _mario != null ? _mario.Velocity * U / 120f : Vector3.Zero;
+        bool homing = _rng.Next(0, 101) % 5 == 0;                                                            // TMsRange<s32>(0, 100).rand() % 5 == 0: one shot in five homes
+        float rate = VelocityRate;
+        if (!homing) { if (ms.X > 2f) rate = 0.55f; if (ms.X < -2f) rate = 0.68f; }
         Vector3 led = new Vector3(goal.X + SearchRate * ms.X * t, goal.Y, goal.Z + SearchRate * ms.Z * t);
-        v = JumpVelocityTo(mouth, led, 5f, k.GravityUnits) * VelocityRate;
+        v = JumpVelocityTo(mouth, led, 5f, k.GravityUnits) * rate;
         k.RelaunchTicks = -1; k.DebugPrint = DebugPrint;
         GetParent().AddChild(k);
         k.SmsLaunch(mouth / U, YawOf(new Vector3(v.X, 0f, v.Z)), v);
+        Vector3 toMario = MarioPos() - Pos();                                                                // SMS_DistanceFromMarioVec(mPosition): the goal pushed past Mario by the cannon's own distance to him
+        goal.X += toMario.X; goal.Z += toMario.Z;
+        if (k is SmsKiller bill) { bill.SmsSetHoming(homing); bill.SmsSetColorType(); bill.SmsSetScale(0.1f); bill.SmsSetGoalPoint(goal); }
+        LastKiller = k;
+        FireSound?.Play();
         Volleys++;
+        if (DebugPrint) GD.Print($"[SMS cannon] {Name}: a Bullet Bill from dome {_dome} at {v} u/tick{(homing ? ", homing" : "")}");
     }
     private static Vector3 JumpVelocityTo(Vector3 from, Vector3 goal, float speedY, float gravity)
     {
