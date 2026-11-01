@@ -586,7 +586,7 @@ Bianco gatekeeper filling its pool of ten Gorogoros at Level boot. Watch for the
 bisect to run.
 Trunk for the next feature: `main`'s current tip (`git log --oneline -1 main`).
 
-### #12 -- PENDING -- queued 2026-10-31 01:02 PDT, PR added 2026-10-31 17:45 PDT (Kiro) -- PUSH + PR
+### #12 -- DONE 2026-10-31 -- https://github.com/JasonAbsolute/ProjectShine/pull/11 (SQUASH-merged by Jaysonn) -- queued 2026-10-31 01:02 PDT, PR added 2026-10-31 17:45 PDT (Kiro) -- PUSH + PR
 Push the seventh feature branch: `feature/enemy-ricco`, branched from `main` `55514c8` (the trunk after SMS 138 and entry #10). Ricco Harbor's
 enemy family, one pass each on this branch. SMS 139: the Klamber (TKumokun), the wall-walking spider -- assets/Sms/Enemy/Kumokun.tscn +
 SmsKumokun.cs, its body material and model under assets/Sms/Enemy/Kumokun/ and models/Eniemes/Kumokun/, and seven public getters on Mario.cs (what
@@ -665,22 +665,30 @@ the compare URL with `?expand=1&title=<urlencoded>&body=<urlencoded>` (or the ti
 #13. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the three
 gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the `addons/godot_ai` churn: his, leave them.
 
-Result (push done 2026-10-31, PR open, merge pending): `feature/enemy-ricco` pushed as a NEW remote branch (`* [new branch]`),
-10 commits over `main` `55514c8`, 74 files / +4920 / -0. `git rev-list --count origin/feature/enemy-ricco..feature/enemy-ricco`
-returned `0`. All nine shas confirmed ancestors: `f0a834d` (143), `c73f8c1`, `85f17aa` (142), `5f10da6`, `50bda5f` (141),
-`eea8e68`, `949e16f` (140), `0bbbfcc`, `fb28f13` (139), under the branch tip `76c46d8`. The file count and insertion total match
-the entry exactly. Largest new files as stated: `geso_model1.glb` 1.19 MB, Puku 0.56, Kumokun 0.47, MameGesso 0.43, Kazekun 0.09.
-Only four files are modified rather than added (`PROJECT_LOG.md`, `assets/Mario.cs`, `assets/Sms/Enemy/SmsSmallEnemy.cs`,
-`timeToPush!.md`), so the 70 others are new and nothing of Mario's movement is touched beyond the seven getters.
-Hygiene: 0 of Jaysonn's nine live edits in the range, which agrees with Kiro's own check.
-This result paragraph is committed on `feature/enemy-pinna`, not here on Ricco, exactly as the entry directs for a stacked pair,
-so that it survives #12's squash by travelling with #13 instead.
-`gh auth status` still prints "You are not logged into any GitHub hosts", the sixth entry running, so the PR goes through the
-browser. The compare URL prefilled with title and body measured 6971 characters, close to Kiro's 6958 and well under the ~8000
-ceiling that #8 established, so both fields prefill and no clipboard fallback was needed.
-PR opened at: https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/enemy-ricco
-Still to do once Jaysonn merges it: `git checkout main && git pull` here, mark this entry DONE on `main` with the PR number and
-merge style, delete `pr139.md`, then run #13's merge-and-PR steps.
+Result: `feature/enemy-ricco` pushed as a NEW remote branch, 10 commits over `main` `55514c8`, 74 files / +4920 / -0.
+`git rev-list --count origin/feature/enemy-ricco..feature/enemy-ricco` returned `0`. All nine shas confirmed ancestors of the
+branch before the merge: `f0a834d` (143), `c73f8c1`, `85f17aa` (142), `5f10da6`, `50bda5f` (141), `eea8e68`, `949e16f` (140),
+`0bbbfcc`, `fb28f13` (139), under the branch tip `76c46d8`. File count and insertion total match the entry exactly. Largest new
+files as stated: `geso_model1.glb` 1.19 MB, Puku 0.56, Kumokun 0.47, MameGesso 0.43, Kazekun 0.09. Only four files are modified
+rather than added (`PROJECT_LOG.md`, `assets/Mario.cs`, `assets/Sms/Enemy/SmsSmallEnemy.cs`, `timeToPush!.md`), so the 70 others
+are new and nothing of Mario's movement is touched beyond the seven getters. Hygiene: 0 of Jaysonn's nine live edits in the range.
+PR #11 opened through the browser (`gh auth status` still prints "You are not logged into any GitHub hosts", the sixth entry
+running). The compare URL prefilled with title and body measured 7183 characters including the attribution footer, under the
+~8000 ceiling #8 established, so both fields prefilled and the clipboard fallback was not needed.
+MERGED BY JAYSONN as a **SQUASH**: `main` is now `cbc812d`, one commit with a single parent `55514c8`, titled with the PR title
+and "(#11)". Verified the way a squash requires, by TREE and not by ancestry: `git merge-base --is-ancestor f0a834d main` says
+NO, as a squash implies, while `git diff --name-only feature/enemy-ricco main` lists only `timeToPush!.md` and nothing else
+outside the log files, so every one of the 70 new files and both changed source files are byte-identical on the trunk. Spot
+checked all five scenes present (`Kumokun`, `MameGesso`, `Gesso`, `Puku`, `Kazekun`) and `assets/Mario.cs` plus
+`assets/Sms/Enemy/SmsSmallEnemy.cs` identical to the branch. `pr139.md` deleted.
+NOTE on the pull: this repo has `pull.rebase` set, so `git pull` refused with "cannot pull with rebase: You have unstaged
+changes". Used `git merge --ff-only origin/main` instead, which fast-forwards without touching the working tree. Jaysonn's nine
+live edits were all still present afterwards, checked. Do NOT stash them to satisfy a rebase.
+NOTE on this heading: the squash carried the Ricco branch's copy of this file, whose last entry commit was `76c46d8`, so `main`
+arrived with the stale "#12 PUSH ONLY, no PR yet" heading. Kiro's `db9f9bf` update that re-marked #12 and #13 as PUSH + PR sits
+on `feature/enemy-pinna` only. Corrected here. For the same reason `main` still has no #11 and no #13 section: #11's lives on
+`feature/select-stages` and #13's on `feature/enemy-pinna`, and each arrives with its own merge.
+Next: #13's merge-and-PR steps, which need `main` merged into `feature/enemy-pinna` first.
 
 ### #13 -- PENDING -- queued 2026-10-31 15:15 PDT, PR added 2026-10-31 17:45 PDT (Kiro) -- PUSH + PR, the PR AFTER #12 HAS MERGED (stacked)
 Push the eighth feature branch: `feature/enemy-pinna`, branched from the RICCO branch's tip `76c46d8` (the 143 log commit; see #12), not from
