@@ -9791,3 +9791,139 @@ Clearing that default in project.godot would stop it for the next model.
 
 **Note for the drives:** a bomb blown up on the mole leaves the hit lists for good (its layer 1 off); a drive that counts hits by bombs gets
 exactly one a bomb, and the 80-frame blast is no longer a second hit.
+
+### 149 -- the Chain Chomplet: Pianta Village's red-hot little Chain Chomp on its chain, cooled by the hose, dragged by the chain, flung into the pond; Mario's PULLING status (feature/enemy-monte, `bf3de7c`)
+
+**Files:** NEW `assets/Sms/Enemy/FireWanwan.tscn`, `SmsFireWanwan.cs` (+ .uid), `assets/Sms/Enemy/FireWanwan/` (SmsFireWanwanChain.cs (+ .uid),
+FireWanwanEye.gdshader (+ .uid), FireWanwanBody.tres, FireWanwanEye.tres, FireWanwanMouth.tres, FireWanwanTail.tres), `assets/Sms/SmsPullHandle.cs` (+
+.uid), `assets/Sms/MarioPull.cs` (+ .uid), `models/Eniemes/FireWanwan/` (wanwan.glb and wanwantail.glb from his FinModelUtility rip of /scene/monte0/
+firewanwan -- game units, 8 + 0 bck clips; wanwan_0.png, wanwan_1.png, wanwantail.png (the bmds' textures) and K_wanwan.png, K_wanwan_eye.png,
+K_wanwan_tail.png (their toon ramps); the glb .imports swap the body's three materials and the link's one for the .tres). CHANGED `assets/Mario.cs` (+13,
+three anchored lines by npc82/monte149/patch_mario149.py: `MarioState.pulling` after `wire`, the dispatch to SmsTickPull after the roofHang block, the
+hitNoKeepPull entry before the take's B check). Tools: npc82/monte149/{patch_mario149.py, patch_import149.py, probe_clips149.gd, patch_smoke149.py (drive
+149 + its capture mode), run_drive149.bat / run_cap149.bat, btk_dump.py, glb_skin_dump.py, queue14_close.py, cap/, logs/, disc/ (the two bmds, the 8 bcks,
+the btk, the rip folders), decomp/ (fireWanwan.cpp, FireWanwan.hpp, bosswanwan.cpp, BossWanwan.hpp, MarioSpecial.cpp, MarioMove.cpp, MarioAction.cpp,
+MarioMain.cpp, MarioReceiveMsg.cpp, graph.cpp, Graph.hpp), ref/}. Sources: fireWanwan.cpp / FireWanwan.hpp (TFireWanwan, TFireWanwanTailHit,
+TFireWanwanTailNode, TTailRubber, TFireWanwanManager), MarioSpecial.cpp's pulling() (1168) and getCurrentPullParams (1140), MarioMove.cpp's moveRequest
+(125), MarioCheckCol.cpp's checkCollision table (ACTOR_TYPE_FIRE_WANWAN_TAIL_HIT -> hitNoKeepPull), the shipped fireWanwan.prm (sms_shipped_params.json:
+HeadHeight 50, BodyRadius 6, WallRadius 260, HitPointMax 60, ActiveEnemyNum 4, SearchLength 1300 / Height 1000 / Aware 10 / Angle 120, GiveUp 2000 / 300,
+AttackWait 120, FreezeWait 300, damage 180 x 400, attack 200 x 420, turn 1, body scale 2, march 3, AttackSpeedRate 2.3, AttackTimerMax 360,
+EscapeRecoverTime 1500, FlySpeed 100, FlyGravityY 5, AirFric 0.993, FloorFric 1, RotateY 1, NoCollideTimerMax 300, StopSearchTimerMax 600, TailLengthToFly
+50, PolluteTimerMax 20, FreezeTimeThreshold 50, FreezeWaitShort 120, RecoverRate 0.1, PolluteNormalRate 0.7 / AttackRate 1.5, TailEndPowRate 0.2,
+RubberBoundRate 0.3 / Decay 0.55, RubberBoundRateHitting 0.7 / DecayHitting 0.6, TailEndColRange 150, TailApartPowRate 0.25, TailMaxLength 300) and
+pullparamfirewanwantail.prm (V 0.3, H 0.2, oil 0.1 / 0.01), the bmds' MAT3 (the body's and the link's one recipe: stage 0 (TEXC toon, RASC, KONST 1/8, C0)
+SUBHALF / 2, stage 1 (RASC1, TEXC, CPREV, ZERO); C0 (-50, -50, 50) at rest -- the game writes (400, -50, -100) on fire, (260, 260, 270) beaten; the eye
+and mouth KONST 3/4, C0 (400, 404, 424) / (350, 350, 350); the ambient (25, 75, 100); the eye alphaCmp GEQUAL 128; the mouth cull NONE), the bcks' ANK1
+headers (damage 20 L, hit 20 L, return 39, run 20 L, run_end 39, search 39, wait 40 L, walk 40 L), the btk wanwan_eye (5 frames, looped: the pupils' S / T
+scale X 1 / 1.3 / 1 / 0.9 / 1, Y 1 / 0.9 / 1 / 1.3 / 1), the bmds' JNT1 (the body's root, center (0, 60, 0), jnt_jaw, jnt_head, jnt_body, null_tail
+(79.3, -16.8, 0) -- the chain's root; the link's root, tail_null2 (0, 0, -10), tail_null1 (0, 0, 10) -- the bar to the next link).
+
+**The game.** TFireWanwan : TSmallEnemy. init: ACTOR_TYPE_FIRE_WANWAN, unk150 1, the default GRAPHWANDER, the tail hit (the chain) made, the body
+colour's TLerpControl on `_mat_body`'s GX_TEVREG0, the placed point kept. reset: there again, on fire, the tracer reset, the shortest graph node, the
+march speed, red at once. The bcks: 0 damage, 1 hit, 2 return, 3 run, 4 run_end, 5 search, 6 wait, 7 walk; the btk wanwan_eye runs in the cooled states,
+frozen at 0 in RECOVER. doWalk: sprayed this half-second -> bck 1 (the flinch), a clip done -> walk; walkToCurPathNode(march, turn). doEscape: the same
+with bck 0 (damage) at march x EscapeSpeedRate. doAttack: the same at march x AttackSpeedRate (run), done = isMissMario (Mario hidden, in water or on its
+surface; |dy| > GiveUpHeight; the goal past GiveUpLength). decideTarget / doAdjustTarget: a slerp of the facing from the current yaw to the target over
+the clip's length. isFindMario: not while mStopSearchTimer runs, not with Mario in water, else the param search. receiveMessage: TRAMPLE / HIP_DROP ->
+false (a stomp does nothing); SPRAYED_BY_WATER -> WATHIT, the first-water sound at full hp, decHpByWater EVERY drop (no cooldown gate), behaveToWater, the
+cooldown started. behaveToWater: cooled -> the cool-more sound and the sweat; hp left -> the to-cool sound, wandering -> FINDMARIO (woken); hp 0 -> the
+cool sound, ESCAPE, the chain's fire out, cooled, the cooldown 20. behaveHitComrades (another Chomplet touched while walking, the no-collide timer out)
+-> the timer NoCollideTimerMax, TURN. kill (the pond): not already defeated -> DIE. moveObject: the timers; updateCollisionFromParam (the prm's hit
+cylinders, unscaled); the camera shake within CamShakeRange and the rumble; updatePollute: on fire, every PolluteTimerMax ticks a goop stamp at a random
+point along the body's X axis within AttackRadius, radius 375 x PolluteNormalRate (x PolluteAttackRate attacking); updateHitPoint: on fire the hp climbs
+back RecoverRate a tick to the max; checkHungTail: cooled (ESCAPE / FREEZE) and the chain taken -> HUNGTAIL; control; the hit actors (Mario ->
+attackToMario; another Chomplet -> the push + behaveHitComrades both ways; others -> the push); bind; the ground; checkInPond (on the ground, a pool or
+water surface under it, the body within HeadHeight of it -> kill); setBehavior. bind: vy -= the gravity (FlyGravityY flying / defeated, else mGravity),
+the terminal, |v| <= 100, v x AirFric; the step in 25-u pieces through 8 wall probes (the ground, the walls at WallRadius x 0.277); flying into walls ->
+the velocity reflected on the summed normal, the yaw from it, WALLKICK puffs, the shake, the reflect sound; flying on the ground -> v x FloorFric, vy x
+-0.05. attackToMario: on fire and not FLY / ESCAPE / RECOVER / FREEZE -> BURN to Mario, mStopSearchTimer = StopSearchTimerMax. emitEffects (the 'center'
+joint): on fire with hp -> CAN_YUGAMI (the heat haze); sprayed -> CAN_HITYUGE (steam); FREEZE under mFreezeWait -> POI_KIZETSU (the dizzy stars); flying
+or held -> M_SLIPSMOKE (150 u ahead when held); RECOVER -> HIKAGE1_A x 1.8; defeated -> the steam for 600 ticks, BWAN_KIRA sparkles, HAMON_A / B ripples
+at the water. calcRootMatrix in DIE: the model 160 u down its own Y axis. The nerves: GRAPHWANDER walk, the goal reached -> a random next node,
+isFindMario -> FINDMARIO after, doWalk. TURN: prepareTurn (the target = yaw + 180), search, the clip done -> walk, doTurn (RotateY a tick) ->
+GRAPHWANDER after. FINDMARIO: search, decideTarget (Mario), doAdjustTarget, the clip done -> ATTACK after. ATTACK: run, the goal Mario, doAttack ->
+RECOVERGRAPH after, past AttackTimerMax -> TIRED after. TIRED: run_end, past AttackWait -> FINDMARIO (found) or RECOVERGRAPH after. RECOVERGRAPH:
+search, the tracer reset, the nearest node, decideTarget, the clip done -> walk, done -> GRAPHWANDER after. RECOVER: return, the btk frozen at 0, the
+manager's count, the sound, red over the clip, the clip done -> recoverFire (hp max, on fire), the default after. DIE: damage, the fire out, the pitch
+90, the manager's counts (all dead -> the balloon), the sounds, silver over 40, the water column, hp 0, every tick the velocity's XZ x 0.9. HUNGTAIL:
+damage + the btk, the yaw = the way from Mario to it (its back to him), isReadyToFly (not taken and the chain within TailLengthToFly) -> FLY after. FLY:
+damage + the btk, the velocity = polar(yaw, the throw power), FUMI_C at the tail, mFreezeWait = FreezeWait (|v| > FreezeTimeThreshold) or FreezeWaitShort,
+every tick v x AirFric, the XZ speed under 1 -> FREEZE after. FREEZE: damage + the btk, the twinkle, the velocity 0, past mFreezeWait + 75 -> RECOVER
+after. ESCAPE: the node away from Mario, damage + the btk, black over 40, past EscapeRecoverTime -> RECOVER after, the goal reached -> a random escape
+node, doEscape, the bark. TFireWanwanTailHit : TTakeActor with its TTailRubber(5): nodes (pos, vel), the head fixed at the tail joint, the tail free
+(held: fixed), bound rate 0.25 / decay 0.5 (the prm's while it lives: RubberBoundRate / Decay; HUNGTAIL not taken and not ready to fly ->
+RubberBoundRateHitting / DecayHitting, the snap back; ATTACK 0.7 / 0.4), the max length 10000 (TailMaxLength while the body flies). movement: adjust
+(each node's vel += (prev - it) x rate + (next - it) x rate, x decay), restrict (the horizontal length over the max -> from the held tail or the free
+head, each segment over the average shortened to it), bind (the inner nodes: the ground under next + 40 (+ 21 at rest), at or under it the vel zeroed and
+y set to it; a one-wall XZ push of 20; vel = next - pos), then pos += vel. The hit cylinder 30 x 200 -> TailEndColRange x 200 every tick, no attack, in the
+enemy group; five wanwanTail.bmd links (the fifth, the ring, at twice the body scale), all carrying the body's GX_TEVREG0 colour; performNodes (link i at
+node i facing node i + 1, its tail_null1 joint set at node i + 1: the bar stretches to the next); on fire MOE_FIRE_A/B/C/D at the ring, scaled by the body
+scale x hp / max (the flame shrinks as the hose cools it); held: the taking matrix from (the ring - the body) with the up axis, bindBody (the hit point +=
+the tail node's vel x TailEndPowRate, XZ; the holder moved there with his own y: the chain's spring drags him), the pull sound while the length grows.
+receiveMessage from Mario: TAKE -> canTakenByMario (the body cooled: ESCAPE or FREEZE) -> behaveTaken (the holder, the tail fixed, the hold sound);
+THROWN / DETACH -> behaveApart (the tail free, the throw power = (TailApartPowRate x the length / FlySpeed) clamped 0..1, squared, x FlySpeed; the holder
+null). moveRequest (his pulling(), each frame): the ground under + 100 -> at or under it y = ground + 1; + 50; a one-wall push of 70; the tail node, the hit
+point and the taking matrix there; true. TMario: hitNoKeepPull (MarioCheckCol.cpp 226): touching the handle with B HELD in a take situation (canTake) ->
+TAKE accepted -> MARIO_STATUS_PULLING with ANIM_HOLD, the handle his held object. pulling() (MarioSpecial.cpp 1168): the hand input released (B up) ->
+DETACH, PULL_END (ma_hold_return, 24 frames, then the wait); A -> PULL_JUMP (ma_hold_to_hang, a hop with the handle kept); his face = -Z of the handle's
+taking matrix; the stick read against his BACK: cosF = the part pointing away from the body (floored at 0: a stick toward the body pulls nothing), sinF
+the part across it, both x mIntendedMag; pos += rateV x cosF x back + rateH x sinF x across (getCurrentPullParams: pullparam*.prm, OIL_PULLING on goop);
+the handle's moveRequest(pos) -> true -> he stands at pos; the clip by the frame's movement against his face: under 1 u -> ma_hold_wait, toward the body
+(within 45 deg) -> ma_hold_drag, away (past 135) -> ma_hold_back, the sides -> ma_hold_move_r / _l.
+
+**The port.** `SmsFireWanwan : SmsSmallEnemy`, Prm = the shipped prm; twelve nerves GraphWander / Turn / FindMario / Attack / Tired / RecoverGraph /
+Recover / Die / HungTail / Fly / Freeze / Escape (NerveSpecies + 0..11; the base's Die and Freeze unused) as the game's above; its own SmsSprayedByWater
+(every drop -1, no cooldown gate), HitCheckMario (the prm's unscaled cylinders, no stomp bounce; a cooled one bumps him away through SmsKeepDistance),
+AttackToMario = TakeDamage(SmsDamageProfile.Fire) + StopSearchTimer; KeepVelocityOnGround while flying / defeated; the wall bounce from the base's
+OnWallContact (the reflect on the summed normal); the pond from the base's water areas (WaterSurfaceAt). The chain is `SmsFireWanwanChain :
+SmsPullHandle` (FireWanwan/SmsFireWanwanChain.cs), made at Init beside the body (a deferred AddChild to its parent, Setup on the first MoveObjectPre,
+freed in _ExitTree) and stepped after the body's move each tick with the null_tail joint's world point: the five-node rubber as the game's (adjust /
+restrict / bind, the ground a ray on the body's mask), five wanwantail.glb instances (TopLevel; the ring at twice the body scale), the bar joint
+tail_null1 posed at the next node by SetBoneGlobalPose, the fire = FireFxScene (Fx/StuFire) under the ring scaled by hp / max + FireOffFxScene when it
+goes out, the ring's colour following the body's. Mario's grab is new plumbing shared with later pulls (the Gooper Blooper's tentacles):
+`SmsPullHandle` (assets/Sms/SmsPullHandle.cs: the group sms_pullable, HitRadiusUnits / HitHeightUnits, CanBePulled, TakingTransform, MoveRequest,
+PullRateV / H and the oil rates) and `MarioPull.cs` (a Mario partial: SmsFindPullHandle (the grab cylinder against his take reach), SmsPullBegin (the
+TAKE into `MarioState.pulling` with ma_hold), SmsTickPull (the game's pulling(): the stick against his back x mIntendedMag x 30 x delta / U, `_smsDirty`
+selecting the oil rates, the handle's MoveRequest, the clip by the movement, B up -> DETACH -> ma_hold_return -> idle), SmsPullSubName for the drives).
+The heat colour is the shared EnemyToon shader's c0 on the body and the five links, lerped as the game's TLerpControl ((400, -50, -100) / 255 on fire,
+(-50, -50, 50) / 255 cooled, (260, 260, 270) / 255 silver). The materials (EnemyToon form 0, the bmds' recipe): FireWanwanBody.tres (s0_k 1/8, the ambient
+(25, 75, 100) / 255), FireWanwanEye.tres (its own FireWanwanEye.gdshader: the toon form with a `uv_scale` the species keys from the btk's five frames
+while cooled, alpha scissor at 1/2), FireWanwanMouth.tres (EnemyToonTwoSided, c0 350 / 255), FireWanwanTail.tres (s0_k 1/8, the ambient 0.502). Knobs
+(grouped, plain English): Deviations (SpeedScale), Effects (FireFxScene = Fx/StuFire, FireOffFxScene = Fx/StuFireOff, SlipSmokeFxScene = Fx/SlipSmoke,
+WallKickFxScene = Fx/WallKickDust, LaunchFxScene = Fx/TrampleDust, DizzyFxScene = Fx/BonkStars, SteamFxScene = Fx/GkKemuriW, SplashFxScene =
+Fx/WaterSplash; HeatHazeFxScene, SweatFxScene, ReheatFxScene, SparkleFxScene, RippleFxScene slots), Sounds (eleven slots). The scene: CharacterBody3D
+(sms_enemy, mask 5), Model at 1 / 74.44, a sphere r 1.9 m at 1.95 m (the game's 2 x scale: about 3.8 m tall), RelaunchTicks -1, a plain-English `_sms_note`
+(drop it facing +Z; spray it to 0, grab the ring with B within 2 m, walk backward, let go).
+
+**Deviations (logged; knobs where they matter):** A while pulling lets go and jumps (the game: PULL_JUMP, ma_hold_to_hang -- a hop with the chain kept);
+the chain's nodes read the ground but no walls (the game's one-wall push of 20 / 70 u); the chain's drag on the holder is applied a quarter a tick
+(TailEndPowRate / TicksPerFrame: the game applies it once a 30 fps frame against his pull of that frame, the port steps the chain four times a frame --
+at the full rate each tick the spring out-pulled the stick 4:1 and the chain settled at 130 u instead of stretching); the camera shake, the rumble and
+the manager (TFireWanwanManager: the help balloons, the shine when all are beaten, the reset off the map) are not ported; the 8-point wall probe is the
+body's collider; the node radius and the chain's clipping are not ported; the heat haze, the sweat, the reheat shimmer, the sparkles, the ripples and
+the sounds are slots.
+
+**Verification:** drive 149 (patch_smoke149.py, SMS_YCAM_SMOKE=1; two game ticks a physics frame) 14/14 on a 200 x 200 m hard dock 80 m over the arena
+with a pond (an sms_water + sms_pool box 14 x 14 m, its surface 0.5 m over the dock) 25 m south: W1 placed facing Mario 10 m off: GRAPHWANDER finds him at
+once -> FINDMARIO (search), hot, the ring burning, a goop stamp already, the body scale 2 (3 frames); W2 the search clip done -> ATTACK (run) facing him
+(40 frames); W3 the charge reaches him: BURN -- health 8 -> 7, his hurt state, `down Fire`, the search stopped (37 frames); W4 Mario put 36 m off (past
+GiveUpLength 2000): isMissMario -> RECOVERGRAPH -> GRAPHWANDER (walk) (65 frames). H1 two drops from 7 m behind it: hp 60 -> 59 (every drop counts, +1
+back every 10 ticks), a wandering one woken -> FINDMARIO (4 frames); H2 the hose kept on it: hp 0 -> ESCAPE (the flinch clip as the last drops land),
+the chain's fire out, the pupils wobbling, canTakenByMario (34 frames); H3 40 frames on: black (-0.20, -0.20, 0.20), running off, more water does
+nothing. P1 Mario put 1.6 m from the ring facing it with B held: hitNoKeepPull -> PULLING (ma_hold), the chain held (216 u), HUNGTAIL (1 frame); P2 the
+stick back for 70 frames (a camera-aware push): the chain 216 -> 331 u, Mario 2.01 m further off, ma_hold_back, 69 pulls; P3 B released: DETACH, his
+PULL_END, the chain snapping home -> FLY away from him at 75 u a tick (the throw power 76), the launch dust (8 frames); P4 the slide dies -> FREEZE after
+154 frames, 69.7 m out, still cooled and grabbable; P5 FREEZE past mFreezeWait + 75 -> RECOVER -> hp 60, hot, red, the ring's fire back -> GRAPHWANDER
+(227 frames). D1 a second Chomplet facing the pond, cooled, grabbed from the north (the drive sets Mario 8 m north 60 frames into the pull so HUNGTAIL's
+turn sends the fling south) and released: FLY over the pond -> checkInPond -> DIE: the damage clip, the pitch 90, the fire out, hp 0, isDefeat (23-32
+frames); D2 120 frames on: silver (1.02, 1.02, 1.06), still DIE, the chain cold, the slide damped to 0.9 u a tick. (Run a 8/14: H1 expected the flinch
+clip in the search (it rides only the walk, escape and run) and hp 58 (one drop a frame landed); H2 expected the damage clip only (the flinch runs while
+the last drops land); P2 the chain's drag at the full rate each tick pulled him 0.6 m TOWARD the body and the chain shrank 208 -> 129 u -> the drag
+divided by TicksPerFrame; P3 read his pull sub-state a frame early ("End" accepted); D1 / D2 the fling went north onto the dock (Mario stood south of the
+ring): the drive's placement fixed. Run b 14/14; the capture run 14/14 again.) Build 0 errors, boot ALL OK. GPU captures (SMS_F149_CAP=1 under
+run_gpu.ps1, cap/): the hot Chomplet (the red body, the burning ring), the charge, the burn knock, the spray, the cooled black one with its pupils, the
+pull pose on the stretched chain, the launch with its dust, the dizzy stars, the silver one on its side in the pond.
+
+**Note for the drives:** a cooled one grabbed from 1.6 m holds the chain at ~216 u; the stick back for 70 frames at the quartered drag stretches it to
+~330 u and the release flies it ~70 m on a flat dock (75 u a tick at launch), so the pond must lie that way; HUNGTAIL turns its back on the holder, so
+where Mario stands when B goes up decides the fling's direction; the recover from FREEZE takes mFreezeWait 300 + 75 ticks (about 190 frames).

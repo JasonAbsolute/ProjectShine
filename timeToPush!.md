@@ -817,3 +817,37 @@ A NOTE FOR THE NEXT STACKED PAIR: pushing both branches at once worked, and so d
 upper branch. The one thing to repeat is the inverted resolution above. Whenever a squash lands, `main`'s copy of this file is
 whatever the merged branch had, so any queue edit Kiro made after that branch's last commit lives only on the branch that
 carries it. Compare the two bodies before trusting "take main's side".
+
+### #15 -- PENDING -- queued 2026-10-31 23:40 PDT (Kiro) -- PUSH ONLY, no PR yet (SMS 149)
+Push the tenth feature branch: `feature/enemy-monte`, branched from `main` `f89159e` (the trunk after PR #12, the Pinna Park family). Pianta Village's
+family, one pass each on this branch. (`feature/enemy-pinna2` -- entry #14, passes 147-148 -- is a sibling off the same `main`, still unmerged; whichever
+of the two merges second will conflict at the tails of PROJECT_LOG.md and this file: keep both sides, nothing else overlaps.) SMS 149: the Chain
+Chomplet (TFireWanwan), the red-hot little Chain Chomp on its chain -- it wanders its graph leaving burning goop, charges and burns Mario when it sees
+him, is cooled black by the hose (every drop takes one of its 60 heat points), and then its chain can be GRABBED: Mario's new PULLING status (B held on
+the ring at the chain's end, the stick back stretches the five-link rubber chain and it drags him back, B up releases) flings it away by the stretch,
+it skids and bounces off walls, sits dizzy, reheats; flung into water it is beaten for good (silver, on its side) -- assets/Sms/Enemy/FireWanwan.tscn
++ SmsFireWanwan.cs, the chain, the eye shader and four materials under assets/Sms/Enemy/FireWanwan/, the two models under models/Eniemes/FireWanwan/;
+Mario's pull plumbing assets/Sms/SmsPullHandle.cs + assets/Sms/MarioPull.cs and three anchored lines in assets/Mario.cs (the `pulling` state, its
+dispatch, the hitNoKeepPull entry). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says the family is
+done (Kiro will replace this entry with the PR entry then, as #12 / #13 went). More passes (the Chain Chomp) will land on this branch and re-point this
+entry's tip.
+- Branch `feature/enemy-monte` -- code tip `bf3de7c` ("SMS 149: the Chain Chomplet ...", 32 files +1791: FireWanwan.tscn, SmsFireWanwan.cs (+ .uid),
+  FireWanwan/ (SmsFireWanwanChain.cs (+ .uid), FireWanwanEye.gdshader (+ .uid), four .tres), SmsPullHandle.cs (+ .uid), MarioPull.cs (+ .uid), Mario.cs
+  (+13), the two glbs with six pngs and their .import files) on `main` `f89159e`; the branch tip is this file's own commit on top of it; 2 commits since
+  `main`. The range carries none of Jaysonn's nine live edits.
+- To try 149: drop assets/Sms/Enemy/FireWanwan.tscn on flat ground with room (about 3.8 m tall at the game's 2x scale; +Z is its front): it wanders,
+  stamps burning goop as it goes, and when it sees you within ~17 m it turns and charges (its touch is the fire knock, -1 HP; it gives up past 27 m).
+  Spray it: every drop takes one heat point of 60 (it reheats 1 every 10 ticks while hot); at 0 it turns black and runs off, and NOW you can grab the
+  big ring at the end of its chain -- stand within 2 m of the ring and hold B (a new move: he takes hold without lifting), then walk BACKWARD: the stick
+  pulls against the chain and the chain drags you back; let go of B and the Chomplet is flung AWAY from you by the stretch (a full stretch sends it
+  ~70 m on flat ground), skids, bounces off walls, sits dizzy a while and heats up red again. Fling it into water (a pool / water area it lands in) and
+  it is beaten for good: silver, lying on its side. Pressing A while pulling lets go and jumps (the game hops with the chain kept -- not ported).
+  Knobs: Deviations (SpeedScale), Effects (the ring's fire, the slip smoke, the wall puffs, the launch dust, the dizzy stars, the steam, the splash;
+  five slots), Sounds (eleven slots); RelaunchTicks -1 = gone for good.
+```
+git push -u origin feature/enemy-monte
+git rev-list --count origin/feature/enemy-monte..feature/enemy-monte
+```
+Expect `0` from the rev-list. No PR, no merge. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
+`assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
+`addons/godot_ai` churn: his, leave them.
