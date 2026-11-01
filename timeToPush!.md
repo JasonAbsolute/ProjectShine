@@ -586,7 +586,7 @@ Bianco gatekeeper filling its pool of ten Gorogoros at Level boot. Watch for the
 bisect to run.
 Trunk for the next feature: `main`'s current tip (`git log --oneline -1 main`).
 
-### #12 -- PENDING -- queued 2026-10-31 01:02 PDT (Kiro) -- PUSH ONLY, no PR yet (updated for SMS 143)
+### #12 -- PENDING -- queued 2026-10-31 01:02 PDT, PR added 2026-10-31 17:45 PDT (Kiro) -- PUSH + PR
 Push the seventh feature branch: `feature/enemy-ricco`, branched from `main` `55514c8` (the trunk after SMS 138 and entry #10). Ricco Harbor's
 enemy family, one pass each on this branch. SMS 139: the Klamber (TKumokun), the wall-walking spider -- assets/Sms/Enemy/Kumokun.tscn +
 SmsKumokun.cs, its body material and model under assets/Sms/Enemy/Kumokun/ and models/Eniemes/Kumokun/, and seven public getters on Mario.cs (what
@@ -600,10 +600,10 @@ TPukuPuku), the fish that leaps out of the water in an arc, splashes down, loops
 assets/Sms/Enemy/Puku.tscn + SmsPuku.cs, its material and model under assets/Sms/Enemy/Puku/ and models/Eniemes/Puku/. SMS 143: the Wind Spirit
 (TKazekun), the glowing wisp that stays hidden until Mario comes near, circles over his head, tumbles to wind up and dashes through him, and drops
 when sprayed -- assets/Sms/Enemy/Kazekun.tscn + SmsKazekun.cs, its two shaders and materials under assets/Sms/Enemy/Kazekun/, its model under
-models/Eniemes/Kazekun/. That is the whole Ricco Harbor family (five species in five passes). NOT yet playtested by Jaysonn:
-push the branch so it is
-on GitHub; do NOT open a PR until he says the family is done (Kiro will replace this entry with the PR entry then, as #5-#8 went). No more Ricco
-passes are planned: the branch is complete and waits for his playtest.
+models/Eniemes/Kazekun/. That is the whole Ricco Harbor family (five species in five passes). APPROVED BY JAYSONN 2026-10-31 17:30 PDT
+("ok ... tell claude how to get these PRed"): push the branch and OPEN ITS PR -- it can be merged once it is open (squash or merge commit, his
+call; `main` then needs a `git pull` here). Kiro has NOT merged this branch locally (the entry asks for a PR: the one way). No more Ricco passes
+are planned.
 - Branch `feature/enemy-ricco` -- code tip `f0a834d` ("SMS 143: the Wind Spirit ...", 19 files +631: Kazekun.tscn, SmsKazekun.cs (+ .uid), the
   two shaders (+ .uid) and two .tres, the glb with four pngs and their .import files) on `c73f8c1` (the 142 log), `85f17aa` (SMS 142, 12 files +858),
   `5f10da6` (the 141 log), `50bda5f` (SMS 141, 17 files +1106 -25), `eea8e68` (the 140 log), `949e16f` (SMS 140, 12 files +763), `0bbbfcc` (the 139
@@ -643,15 +643,29 @@ passes are planned: the branch is complete and waits for his playtest.
   12.5 s. Stomp it while it is out (easiest right after the spray, while it hangs) and it is gone for good (RelaunchTicks -1; set 1800 for one that
   comes back in 15 s). It gives up and vanishes if you get 8 m under its place or 27 m over it. Knobs: Deviations (SpeedScale), Effects (the appear
   puff -- the enemy death puff by default -- and the wind streaks slot), Sounds (six slots).
+- PR: title "Feature: the Ricco Harbor enemies -- the Klamber, the Bloopers, the Cheep Cheep and the Wind Spirit (SMS passes 139-143)"; base
+  `main`; body = `pr139.md` at the project root (untracked -- delete it after). Measured 2026-10-31: the body is 4.6 KB and the fully prefilled
+  compare URL (title + body urlencoded) is 6958 characters, under the ~8000 that #8 found to be the limit, so prefilling both works; if the
+  browser balks, prefill the title only and `Set-Clipboard` the body. 74 files, +4920 against `main`; the only new file over 1 MB is
+  models/Eniemes/Gesso/geso_model1.glb (1.19 MB), then Puku 0.56, Kumokun 0.47, MameGesso 0.43, Kazekun 0.09 (PROJECT_LOG.md and Mario.cs are
+  already on `main`). Hygiene checked 2026-10-31: 0 of the nine live edits in the range (0 addons, 0 Level.tscn, 0 SmsHiddenCoin.cs, 0 of the
+  three .tres, 0 of the four .png.import flips).
+  compare URL: https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/enemy-ricco
 ```
 git push -u origin feature/enemy-ricco
 git rev-list --count origin/feature/enemy-ricco..feature/enemy-ricco
+gh pr create --base main --head feature/enemy-ricco --title "Feature: the Ricco Harbor enemies -- the Klamber, the Bloopers, the Cheep Cheep and the Wind Spirit (SMS passes 139-143)" --body-file pr139.md
 ```
-Expect `0` from the rev-list. No PR, no merge. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
-`assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
-`addons/godot_ai` churn: his, leave them.
+Expect `0` from the rev-list. STACKED ENTRY, so the order differs from #6-#8: the checkout is `feature/enemy-pinna` (#13 stacks on this branch;
+do not check this one out -- `git push -u origin feature/enemy-ricco` pushes the local branch ref from where you are). Write this entry's result
+paragraph in THIS file, commit it on `feature/enemy-pinna` and push THAT branch (`git push -u origin feature/enemy-pinna`: #13's push, due now
+anyway); the result travels with #13's squash instead of this one's. Then open the PR: if `gh` is still unauthenticated (`gh auth status`), open
+the compare URL with `?expand=1&title=<urlencoded>&body=<urlencoded>` (or the title only + the body on the clipboard) and Jaysonn presses
+"Create pull request". Once merged: `git checkout main && git pull` here, mark this entry DONE (on `main`, as the procedure says), then go on to
+#13. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the three
+gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the `addons/godot_ai` churn: his, leave them.
 
-### #13 -- PENDING -- queued 2026-10-31 15:15 PDT (Kiro) -- PUSH ONLY, no PR yet (updated for SMS 146: the family complete)
+### #13 -- PENDING -- queued 2026-10-31 15:15 PDT, PR added 2026-10-31 17:45 PDT (Kiro) -- PUSH + PR, the PR AFTER #12 HAS MERGED (stacked)
 Push the eighth feature branch: `feature/enemy-pinna`, branched from the RICCO branch's tip `76c46d8` (the 143 log commit; see #12), not from
 `main`: the Pinna species lean on the Ricco branch's base and Mario work (the water-surface helpers in SmsSmallEnemy.cs, Mario's fence getters
 from 139) and the Klamber's net mechanics. Pinna Park's enemy family, one pass each on this branch. SMS 144: the Electrokoopa on the net
@@ -663,16 +677,18 @@ hard ground for his pick-up and throw -- assets/Sms/Enemy/TamaNoko.tscn + SmsTam
 assets/Sms/Enemy/TamaNoko/, the models under models/Eniemes/TamaNoko/. SMS 146: the Monty Mole in its cannon (TCannon + TChorobei), Pinna
 Beach's three-barrelled cannon that turns to Mario, whose mole lobs Bob-ombs at him, ducks inside when he comes close and takes three Bob-ombs
 blown up on it before the cannon breaks to a prop -- assets/Sms/Enemy/Cannon.tscn + SmsCannon.cs, the mole's material under
-assets/Sms/Enemy/Cannon/, the models under models/Eniemes/Cannon/. That is the whole Pinna Park family (three species in three passes). NOT yet
-playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says the family is done
-(Kiro will replace this entry with the PR entry then, as #5-#8 went). No more Pinna passes are planned: the branch is
-complete and waits for his playtest. Because the branch stacks on Ricco, open its PR AFTER #12's has merged and, if GitHub then shows
-Ricco's files in the Pinna diff, rebase first: `git rebase --onto main 76c46d8 feature/enemy-pinna` (replays only the Pinna commits onto the
-merged main), then `git push --force-with-lease`.
+assets/Sms/Enemy/Cannon/, the models under models/Eniemes/Cannon/. That is the whole Pinna Park family (three species in three passes). APPROVED BY
+JAYSONN 2026-10-31 17:30 PDT ("ok ... tell claude how to get these PRed"): push the branch now (with #12) and OPEN ITS PR AFTER #12's has
+merged -- it stacks on Ricco: the squash of #12 makes Ricco's commits non-ancestors of `main`, so until `main` is merged into this branch (the
+steps below) the Pinna PR would show Ricco's files and conflict on this file. Kiro has NOT merged this branch locally (the entry asks for a PR:
+the one way). No more Pinna passes are planned.
 - Branch `feature/enemy-pinna` -- code tip `45574ec` ("SMS 146: the Monty Mole in its cannon ...", 16 files +760: Cannon.tscn, SmsCannon.cs
   (+ .uid), Cannon/TyorobeBody.tres, the three glbs with their pngs and .import files) on `ab46ae3` (the 145 log), `a702b49` (SMS 145, 16 files
   +850), `6537026` (the 144 log), `858718c` (SMS 144, 8 files +744) and `76c46d8` (the Ricco tip: the ten commits of #12); the branch tip is this
-  file's own commit on top of it; 16 commits since `main` `55514c8`, 6 of them Pinna's. The range carries none of Jaysonn's nine live edits.
+  file's own commit on top of it; 18 commits since `main` `55514c8`, 8 of them Pinna's (this PR update and the Kazekun.tscn uid line included). The range over the Ricco
+  tip: 42 files, +2735; the largest new files tamanoko_model1.glb 0.92 MB, aminoko_model1.glb 0.81, tyorobe_model1.glb 0.63, tamaflower_model1.glb
+  0.21 (nothing over 1 MB); nothing of Mario's or the base's changed. It carries none of Jaysonn's nine live edits (checked 2026-10-31: 0 addons,
+  0 Level.tscn, 0 SmsHiddenCoin.cs, 0 of the three .tres, 0 of the four .png.import flips).
 - To try 144: build a NET (a thin StaticBody3D with metadata sms_fence, or in the group sms_fence, so Mario can climb it), drop
   assets/Sms/Enemy/AmiNoko.tscn ON it (within 0.4 m of the face; it also takes a wall, a ceiling or a floor) and give it a Graph: a Node3D child
   whose children are the points of its path on the same face -- it crawls from point to point (a random other one each time), stops and turns at
@@ -698,10 +714,35 @@ merged main), then `git push --force-with-lease`.
   reach is 2.7 m around the top of it. The barrels' Bullet Bills need a scene in Shots > KillerScene (none yet). Knobs: Deviations (SpeedScale,
   MoleHeightUnits, HitPoints), Shots (the Bob-omb, the Bullet Bill), Effects (the blast; slots for the mole's smoke, the sweat, the lid's puff),
   Sounds (seven slots); RelaunchTicks -1 = gone for good.
+- PR: title "Feature: the Pinna Park enemies -- the Electrokoopa, the Snooza Koopa and the Monty Mole cannon (SMS passes 144-146)"; base
+  `main`; body = `pr144.md` at the project root (untracked -- delete it after). Measured 2026-10-31: the body is 4.9 KB and the fully prefilled
+  compare URL is 7331 characters, under the ~8000 limit, so prefilling both works; if the browser balks, prefill the title only and
+  `Set-Clipboard` the body.
+  compare URL: https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/enemy-pinna
 ```
 git push -u origin feature/enemy-pinna
 git rev-list --count origin/feature/enemy-pinna..feature/enemy-pinna
 ```
-Expect `0` from the rev-list. No PR, no merge. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
-`assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
-`addons/godot_ai` churn: his, leave them.
+Expect `0` from the rev-list (push now, together with #12). THEN WAIT for #12's PR to merge. After it, with `main` pulled and #12 marked DONE on
+`main`:
+```
+git checkout feature/enemy-pinna
+git fetch origin
+git merge origin/main
+```
+The code merges clean (both sides carry the identical Ricco changes: the squash on `main`, the original commits here); expect conflicts in
+`PROJECT_LOG.md` and / or `timeToPush!.md` only. PROJECT_LOG.md: if `git diff --stat 76c46d8 origin/main -- PROJECT_LOG.md` prints nothing,
+`git checkout --ours PROJECT_LOG.md` (this branch's copy: entries 139-146); else hand-merge (139-143 once, then 144-146). timeToPush!.md:
+hand-merge -- everything through #12 from `origin/main` (its DONE header and result paragraph), #13 from this branch; nothing lost, nothing
+twice. Then `git add PROJECT_LOG.md "timeToPush!.md" && git commit` (the merge commit), `git push origin feature/enemy-pinna`, and check that
+`git diff --name-only origin/main feature/enemy-pinna` lists ONLY Pinna's files (assets/Sms/Enemy/{AmiNoko,TamaNoko,Cannon}*,
+models/Eniemes/{AmiNoko,TamaNoko,Cannon}/, PROJECT_LOG.md, timeToPush!.md) plus assets/Sms/Enemy/Kazekun.tscn -- one line: its scene uid as the
+editor normalized it on 2026-10-31 (`z` is outside Godot's uid alphabet a-y / 0-8; the 143 file carried `d143kazekun`), committed here so the
+editor stops rewriting it. Write this entry's result paragraph here, commit and push it (so it travels with the squash), and only THEN open the PR:
+```
+gh pr create --base main --head feature/enemy-pinna --title "Feature: the Pinna Park enemies -- the Electrokoopa, the Snooza Koopa and the Monty Mole cannon (SMS passes 144-146)" --body-file pr144.md
+```
+If `gh` is still unauthenticated, the compare URL route as in #12. Once merged: `git checkout main && git pull` here, mark this entry DONE, tell
+Kiro the sha. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`,
+the three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the `addons/godot_ai` churn: his,
+leave them.
