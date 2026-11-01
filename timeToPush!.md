@@ -818,7 +818,7 @@ upper branch. The one thing to repeat is the inverted resolution above. Whenever
 whatever the merged branch had, so any queue edit Kiro made after that branch's last commit lives only on the branch that
 carries it. Compare the two bodies before trusting "take main's side".
 
-### #15 -- PENDING -- queued 2026-10-31 23:40 PDT (Kiro) -- PUSH ONLY, no PR yet (SMS 149)
+### #15 -- PENDING -- queued 2026-10-31 23:40 PDT (Kiro) -- PUSH ONLY, no PR yet (SMS 149-150), updated 2026-11-01 01:05 PST
 Push the tenth feature branch: `feature/enemy-monte`, branched from `main` `f89159e` (the trunk after PR #12, the Pinna Park family). Pianta Village's
 family, one pass each on this branch. (`feature/enemy-pinna2` -- entry #14, passes 147-148 -- is a sibling off the same `main`, still unmerged; whichever
 of the two merges second will conflict at the tails of PROJECT_LOG.md and this file: keep both sides, nothing else overlaps.) SMS 149: the Chain
@@ -829,12 +829,12 @@ it skids and bounces off walls, sits dizzy, reheats; flung into water it is beat
 + SmsFireWanwan.cs, the chain, the eye shader and four materials under assets/Sms/Enemy/FireWanwan/, the two models under models/Eniemes/FireWanwan/;
 Mario's pull plumbing assets/Sms/SmsPullHandle.cs + assets/Sms/MarioPull.cs and three anchored lines in assets/Mario.cs (the `pulling` state, its
 dispatch, the hitNoKeepPull entry). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says the family is
-done (Kiro will replace this entry with the PR entry then, as #12 / #13 went). More passes (the Chain Chomp) will land on this branch and re-point this
-entry's tip.
-- Branch `feature/enemy-monte` -- code tip `bf3de7c` ("SMS 149: the Chain Chomplet ...", 32 files +1791: FireWanwan.tscn, SmsFireWanwan.cs (+ .uid),
-  FireWanwan/ (SmsFireWanwanChain.cs (+ .uid), FireWanwanEye.gdshader (+ .uid), four .tres), SmsPullHandle.cs (+ .uid), MarioPull.cs (+ .uid), Mario.cs
-  (+13), the two glbs with six pngs and their .import files) on `main` `f89159e`; the branch tip is this file's own commit on top of it; 2 commits since
-  `main`. The range carries none of Jaysonn's nine live edits.
+done (Kiro will replace this entry with the PR entry then, as #12 / #13 went). SMS 150: the Chain Chomp (TBossWanwan), Pianta Village's house-sized boss on a 15-link leash -- staked to the ground, it rampages at the end of its chain and burns you (its body and its hot chain); the hose cools its 255 heat points from red through to a cold blue; cooled, you pull its stake out (B) and drag it along its rail to the hot spring, where it leaps in, turns gold and drops the Shine (grab the stake while it is HOT and it drags YOU instead; ground-pound the stake to re-plant it) -- assets/Sms/Enemy/BossWanwan.tscn + SmsBossWanwan.cs, the leash / two shaders / eight materials under assets/Sms/Enemy/BossWanwan/, the three models under models/Eniemes/BossWanwan/; it reuses pass 149's PULLING (SmsPullHandle / MarioPull.cs, now with the stick accessors the boss's drag reads) and adds StartMode to assets/Sms/SmsCameraShake.cs. Further passes re-point this entry's tip.
+- Branch `feature/enemy-monte` -- code tip `7876f9a` ("SMS 150: the Chain Chomp ...", 48 files +2230: BossWanwan.tscn, SmsBossWanwan.cs
+  (+ .uid), BossWanwan/ (SmsBossWanwanLeash.cs (+ .uid), BossWanwan.gdshader (+ .uid), BossWanwanEye.gdshader (+ .uid), eight .tres), the three
+  glbs with eight pngs and their .import files; SmsCameraShake.cs (+15, StartMode), MarioPull.cs (+5, the stick accessors), FireWanwan/
+  SmsFireWanwanChain.cs (+1)) on `bf3de7c` ("SMS 149: the Chain Chomplet ...", 32 files +1791) on `main` `f89159e`; the branch tip is this
+  file's own commit on top of them; 4 commits since `main`. The range carries none of Jaysonn's nine live edits.
 - To try 149: drop assets/Sms/Enemy/FireWanwan.tscn on flat ground with room (about 3.8 m tall at the game's 2x scale; +Z is its front): it wanders,
   stamps burning goop as it goes, and when it sees you within ~17 m it turns and charges (its touch is the fire knock, -1 HP; it gives up past 27 m).
   Spray it: every drop takes one heat point of 60 (it reheats 1 every 10 ticks while hot); at 0 it turns black and runs off, and NOW you can grab the
@@ -844,6 +844,18 @@ entry's tip.
   it is beaten for good: silver, lying on its side. Pressing A while pulling lets go and jumps (the game hops with the chain kept -- not ported).
   Knobs: Deviations (SpeedScale), Effects (the ring's fire, the slip smoke, the wall puffs, the launch dust, the dizzy stars, the steam, the splash;
   five slots), Sounds (eleven slots); RelaunchTicks -1 = gone for good.
+- To try 150: drop assets/Sms/Enemy/BossWanwan.tscn on flat open ground facing the way it should start (+Z is its mouth; it is ~13 m across).
+  Its stake plants 13 m behind it (or at a PicketPoint node you assign) and it rampages at the end of its chain: it slides and hops along its
+  rail (a Graph node's children IN ORDER are its path; a child with metadata sms_jump = true makes it hop; no Graph = it roams within
+  WanderRadiusUnits), slams the ground with every bob (the camera shakes within ~40 m), and burns you on touch -- its body and the first eight
+  links of its chain while it is red-hot. Spray it: 255 heat points, 1 a drop (it heals 1 every 20 ticks while hot); it fades red -> dark -> a
+  cold blue, and at 0 it sits dozing (the cold wait clip) ~20 s before it barks and reheats. COOLED, go to the stake and hold B: you pull it out
+  and the Chomp is loose -- walk backward and the chain drags it along its rail toward you. Drag it back past the rail node nearest the BathPoint
+  you assign (the hot spring; a loose Chomp over water with no BathPoint counts) and it LEAPS in, turns gold over ~10 s, and the Shine appears
+  (ShineScene, e.g. assets/ShineSprite.tscn; ShineSpawnPoint or 13 m over it). Grab the stake while it is HOT and it drags YOU around instead;
+  ground-pound the stake to lock it again (it shakes free after ~5 s while hot). Knobs: the level's points (BathPoint, PicketPoint, ShineScene,
+  ShineSpawnPoint), Deviations (SpeedScale, RollSw, JumpSpeedY, ColdTicks, ShakeTicks), Effects (the stomp dust, steam, splash; the rocks /
+  sparks / heat haze / sparkles slots), Camera (the two landing shakes), Sounds (ten slots). RelaunchTicks -1 = gone for good.
 ```
 git push -u origin feature/enemy-monte
 git rev-list --count origin/feature/enemy-monte..feature/enemy-monte
