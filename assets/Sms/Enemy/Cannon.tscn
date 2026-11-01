@@ -1,0 +1,43 @@
+[gd_scene format=3 uid="uid://d146cannon"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsCannon.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Cannon/cannon.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Cannon/tyorobe_model1.glb" id="3_mole"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Cannon/cannon_dom.glb" id="4_dome"]
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_body"]
+radius = 4.4
+height = 4.9
+
+[node name="Cannon" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 0
+script = ExtResource("1_script")
+RelaunchTicks = -1
+metadata/_sms_note = "Pass 146: the Monty Mole in its cannon (Cannon + Chorobei), Pinna Beach's three-barrelled cannon. Put it on the ground facing the way it should start (+Z is its front). It turns to face you; within 40 m the mole on top lobs a Bob-omb at you every 1.7 s (the bomb lands and walks at you, then blows); come within 6.7 m and the mole ducks inside until you are 20 m off. To beat it: pick up a Bob-omb it threw (hose it first so it sits dizzy, then B) and throw it (B) so it blows up on the mole -- three hits and the mole collapses, the cannon blows and stays as a prop. Its barrels fire Bullet Bills at long range only if you give it one in Shots > KillerScene (none yet). Knobs: Deviations (SpeedScale, MoleHeightUnits, HitPoints), Shots (the Bob-omb, the Bullet Bill), Effects (the blast, slots), Sounds (seven slots)."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="Mole" parent="Model" instance=ExtResource("3_mole")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 300, 0)
+
+[node name="Dome0" parent="Model" instance=ExtResource("4_dome")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -129.3, 152.5, 162.7)
+
+[node name="Dome1" parent="Model" instance=ExtResource("4_dome")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 129.1, 151.8, 162.9)
+
+[node name="Dome2" parent="Model" instance=ExtResource("4_dome")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 252.7, 204.7)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.45, 0)
+shape = SubResource("CylinderShape3D_body")
+
+[node name="Solid" type="StaticBody3D" parent="."]
+collision_layer = 1
+collision_mask = 0
+
+[node name="SolidShape" type="CollisionShape3D" parent="Solid"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.45, 0)
+shape = SubResource("CylinderShape3D_body")

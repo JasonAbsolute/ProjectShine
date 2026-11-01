@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://d145tamaflowerscn"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/TamaNoko/SmsTamaFlower.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/TamaNoko/tamaflower_model1.glb" id="2_model"]
+
+[node name="TamaFlower" type="Node3D"]
+script = ExtResource("1_script")
+metadata/_sms_note = "Pass 145: the sunflower that grows where a Snooza Koopa died (TTamaNokoFlower). Spawned by SmsTamaNoko at its death; grows for 4 s, then bursts five coins. Not meant to be placed by hand (it works if you do)."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)

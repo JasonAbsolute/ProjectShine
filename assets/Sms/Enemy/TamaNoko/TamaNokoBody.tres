@@ -1,0 +1,23 @@
+[gd_resource type="ShaderMaterial" format=3 uid="uid://d145tamanokobody"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/EnemyToon.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/TamaNoko/tamanoko_model1.png" id="2_tex"]
+[ext_resource type="Texture2D" path="res://assets/Sms/models/toon_2_4i.png" id="3_toon"]
+
+[resource]
+resource_name = "_body1 / _head1 / _hat1 (tamaNoko/tamanoko_model1.bmd): the Snooza Koopa's three materials, one recipe -- the enemy toon form 0: s0 = C0 (160, 200, 160) + mix(toon, light, 3/4) - 1/2, then Q_tamanoko4 + mix(s0, the sun's glint, 1/2) - 1/2; opaque, cull BACK"
+render_priority = 0
+shader = ExtResource("1_shader")
+shader_parameter/s0_k = 0.75
+shader_parameter/s1_form = 0
+shader_parameter/c0 = Vector3(0.6275, 0.7843, 0.6275)
+shader_parameter/c1 = Vector3(0.6157, 0.6314, 0.6627)
+shader_parameter/c2 = Vector3(1, 1, 1)
+shader_parameter/base_tex = ExtResource("2_tex")
+shader_parameter/toon_tex = ExtResource("3_toon")
+shader_parameter/dirt = 0.0
+shader_parameter/sun_dir = Vector3(0.348, 0.87, 0.348)
+shader_parameter/sun_color = Vector3(1, 1, 1)
+shader_parameter/ambient = Vector3(0.502, 0.502, 0.502)
+shader_parameter/ambient_a = 0.196
+shader_parameter/shininess = 50.0

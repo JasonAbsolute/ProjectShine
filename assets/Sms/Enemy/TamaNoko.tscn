@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://d145tamanoko"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsTamaNoko.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/TamaNoko/tamanoko_model1.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisap.tscn" id="3_disap"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_body"]
+radius = 1.6
+
+[node name="TamaNoko" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+script = ExtResource("1_script")
+RelaunchTicks = -1
+DeathFxScene = ExtResource("3_disap")
+metadata/_sms_note = "Pass 145: the Snooza Koopa (TamaNoko), Pinna Park's big Koopa asleep in its shell. Drop it on the SAND (a floor in the group sms_sand, or named with 'sand') -- it sleeps until you hose it for about two seconds (it shakes; stop early and it dozes off again). Awake, it wanders (a Graph of Node3D children, or within WanderRadiusUnits) and, when it sees you, runs at you and leaps -- a somersault at the top, a hang, a straight drop; its touch hurts. On sand it lands stuck and struggles: ground-pound it then and it dies -- a sunflower grows there and bursts five coins. On hard ground it lands flat for two seconds: pick it up (B) and throw it, or wait and it gets up (held too long it wakes in your hands and hurts you). Far from you it goes back to sleep. Knobs: Deviations (SpeedScale, Ground, WakeSeconds), Effects (the Zs, the landing puffs, the sunflower and its coin, slots), Sounds (seven slots); RelaunchTicks -1 = gone for good."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, 0)
+shape = SubResource("SphereShape3D_body")

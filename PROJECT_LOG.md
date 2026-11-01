@@ -9465,3 +9465,329 @@ that angle; the puff and the stars show), the water hit (the hit clip, the body 
 
 **Note for the drives:** a scheduled run that starts against a stale or failed build keeps running on the old DLL; kill_headless.ps1 stops only the
 `--headless` Godot console processes (his editor's Godot_v4.7.1-stable_mono_win64.exe instances are left alone) before the rerun.
+
+### 144 -- the Electrokoopa on the net: Pinna Park's crackling Koopa that crawls the Ferris wheel's nets (feature/enemy-pinna, `858718c`)
+
+**Branch:** `feature/enemy-pinna`, branched from the Ricco tip `76c46d8` (not from `main`): the Pinna species lean on the Ricco branch's base
+and Mario work (the water-surface helpers in SmsSmallEnemy.cs, Mario's fence getters from 139), and the Klamber's net mechanics are the model
+for this one. Until Ricco merges, the Pinna range carries Ricco's ten commits too; the PR (when its time comes) is opened after Ricco's, or the
+branch rebased onto `main` with `git rebase --onto main 76c46d8 feature/enemy-pinna` (queue entry #13).
+
+**Files:** NEW `assets/Sms/Enemy/AmiNoko.tscn`, `SmsAmiNoko.cs` (+ .uid), `assets/Sms/Enemy/AmiNoko/AmiNokoBody.tres`, `models/Eniemes/AmiNoko/`
+(aminoko_model1.glb from his FinModelUtility rip of /scene/amiNoko -- game units, the 16 bck clips, none renamed: Godot strips the five `_loop`
+suffixes and loops them -- with its png; the glb .import swaps the bmd's `_Default` for the .tres). Nothing of Mario's or the base's changed.
+Tools: npc82/pinna144/{patch_import144.py, probe_clips144.gd, patch_smoke144.py (drive 144 + its capture mode), run_drive144.bat /
+run_cap144.bat, cap/, disc/ (the rip, the bmd, the bcks), decomp/ (amiNoko.cpp, AmiNoko.hpp; tamaNoko.cpp / TamaNoko.hpp and cannon.cpp /
+Cannon.hpp fetched for 145 / 146), cur/ (the base and Mario.cs as read)}. Sources: amiNoko.cpp / AmiNoko.hpp (all of it, the US build's
+calcRootMatrix and creepToCurPathNode), the shipped aminoko.prm (sms_shipped_params.json: HeadHeight 120, BodyRadius 5, WallRadius 400, 1 hit
+point, SearchLength 800, GiveUp 2000 / 650, AttackWait 120, FreezeWait 300, damage 120 x 150, attack 120 x 150, turn 5, body scale 1, WaitTime
+100, march 15, ElecRange 200, MtxRotSpeed 0.05), the bmd's MAT3 (bmd_mat_dump.py: the enemy toon, s0 konst 3/4, C0 (180, 150, 150), C1 (157,
+161, 169), opaque, cull BACK), the bcks' ANK1 headers (flying1_loop 40 L, flying1_start 9, hit1 194, run1_end 19, run1_loop 25 L, run1_start
+79, run2 the same, turn1_end 19, turn1_loop 40 L, turn1_start 19, turn2 the same, wait1 120 L), Mario.cs's TakeShock (pass 50's ELECTRIC_DAMAGE),
+the Klamber's SmsKumokun.cs (the net mechanics), SmsShockSparks / SmsFollowEffect (the sparks).
+
+**The game.** TAmiNoko is a TWalkerEnemy (ACTOR_TYPE_AMI_NOKO, unk150 0x11) with LIVE_FLAG_UNK10 from init: no bind while it walks; only the
+death flight (bck 0) binds -- the velocity, gravity (0 in Die), the ground under the next point at the head height (vec.y <= ground + 0.05 ->
+down, not airborne, the velocity 0), the airborne flag. The bck table is the archive's 16 clips in order; unk210 picks set 1 (run1 / turn1;
+every stage but 8) or set 2. The PLANE (unk194 / unk198: PLANE 0 a floor, 1 a roof, 2 a wall) is picked every frame in calcRootMatrix: the
+walls within 10 u (isTouchedWallsAndMoveXZ, radius 10), the ground under the head height (its signed distance >= 0) and the roof above -- the
+nearest wins. The orientation: unk19C (the up) eases to the plane's normal and unk1A8 (the heading) to the current node's direction, each
+COMPONENT by MtxRotSpeed a frame, renormalised; the heading is first turned 90 deg about the normal when it points the other way (dot < -0.1),
+so a turn never goes through zero; the root matrix = (axis = up x heading, up, heading) re-orthogonalised (unk1B4 / unk1C0 keep the last good
+pair) at mPosition - 30 x up, scale mScaling. WALKONFENCE (the default): tick 0 setWalkAnm (run1_start); its end -> run1_loop; the target within
+1.5 u with the clip at its end: run1_loop -> run1_end; run1_end's end -> goToRandomNextGraphNode + TURN; creepToCurPathNode(3) every tick:
+during a loop clip (run / turn) mPositionDelta += the direction to the node x 3 (the US build does not clamp it -- the body dithers about the node
+until the loop ends; the PAL build clamps it to the distance left). TURN: turn1_start -> turn1_loop; the heading within 0.8 of the node's
+direction with the clip at its end: turn1_loop -> turn1_end -> wait1 -> (a wait1 loop end) WALKONFENCE; creep(0). THE ELECTRICITY: TAmiHit, a
+hit actor (initHitActor 120 x 240 / 120 x 240, HIT_CATEGORY_PLAYER, in the enemy group) kept at mPosition + 100 x the up with its base half the
+height down; Mario in it (TAmiHit::perform's collision list, while the body is not dead) or in the body's own attack cylinder -> attackToMario:
+nothing in TNerveSmallEnemyChange or without a plane; PLANE 0: Mario with a roof plane over him and under the body -> nothing; PLANE 1: Mario
+with a ground plane and his feet + 5 over the body -> nothing; PLANE 2: Mario's wall plane facing against the body's plane -> nothing; else
+SMS_SendMessageToMario(ELECTRIC_SHOCK) and, taken, FREEZE (pushed, unless already). behaveToWater: FREEZE pushed unless already, the spray
+cooldown 0. isHitValid: PUNCH with (body - Mario) . up > 0 (Mario behind the net) or any HIP_DROP -> DIE pushed; TRAMPLE never valid; only UNKB
+returns true. DIE: flying1_start, no collision (the TAmiHit's too on PAL); its end: the velocity = the model's up (the matrix's column 1) x 20,
+mPosition.y += 10, airborne, flying1_loop; KIL_SMOKE bound to the base matrix every frame; past 30 ticks isDeadByWall (a wall within 3 x
+BodyRadius: ENM_WALLHIT + _O, the velocity 0), !airborne or 10000 u from Mario -> no collision, DEAD, UNK8, MELT off, mHolder null, the spine
+reset to TNerveSmallEnemyDie with the default after it, genRandomItem. FREEZE: hit1 + DNK_SHIBIRE_B x 2 at joint 0; its end -> wait1; a wait1
+loop end past FreezeWait -> done. Every frame: MSD_SE_EN_AMINOKO_SPARK, AMN_BIRI at joints 11 / 10 / 9 (lkejnt1, rkejnt1, effnull1), AMN_SPARK_R
+/ _L / _M at joint 11; in Freeze's first 46 ticks DNK_SHIBIRE_A x 2 at joint 0, DNK_HIBANA x 2 at joint 6 (headjnt1). getGravityY 0 in Die;
+isCollidMove false; init puts unk210 = 0 in stage 8; load reads mCoinId.
+
+**The port.** `SmsAmiNoko : SmsSmallEnemy`, Prm = the shipped prm; nerves WalkOnFence / Turn / Die / Freeze (100..103). `_noBind` + `FlyBind`: the
+species owns the step -- CreepToCurPathNode writes `_lin` (and `_posU`), the death flight's SetBehavior adds `_flyVel` with GroundAt (a ray from
+the head height down 60 u) as the only floor; the collision mask 0 (the scene's mask names the plane layers, read in Init). FindPlane each
+tick: a ray along the last up (+30 .. -30 u) tracks the surface it rides; none -> the game's search (eight 10-u wall rays cast from 20 u behind,
+the floor under the head height within 120 u, the roof above; 30 / 200 u at the first attach), the nearest signed distance wins; the up snaps
+to the normal at the attach. CalcDirection: the game's pair with the 90-deg rule, but turned about their common axis by MtxRotSpeed radians a
+tick (<c>RotateToward</c>; an anti-parallel pair snaps) -- DEVIATION: the game's per-component step with its renormalisation has fixed points
+(the first run's body, heading +X toward a node up and behind it, stepped straight inward from the diagonal and never finished turning); the
+same speed in the small angles. Frame() = the game's re-orthogonalised basis; ApplyLook puts the model at the body point minus the up x the
+measured gap (<c>FeetOnPlane</c>: the feet on the surface wherever the nodes sit; off = the game's 30 u), the collision shape riding the same
+frame. The path: the base's Graph; <c>InitialGraphNode</c> = the nearest node, <c>NextGraphNode</c> = a random OTHER node (beyond 50 u in 3D:
+the base's pick ignores height and would skip the nodes straight up a net) -- DEVIATION: the game walks the graph's edges, the port's graph
+has none. The creep is clamped to the distance left (the PAL fix). <c>ClipEnded</c> = the base's BckEnded or a looping clip seen to wrap since
+the last tick (the 1.1-frame window is narrower than an uneven render step: a missed wait1 end held one Freeze a whole loop longer).
+HitCheckMario (the Klamber's shape): his fence punch (SmsFencePunchActive, TMario's 250 x 200) / hold / push-up / trample cylinders on the
+body's 120 x 150: a ground pound falling or landing -> Die("a ground pound"); a trample -> StompBounce only; the hose at close range ->
+SmsSprayedByWater; the punch with (body - Mario) . up > 0 -> Die("a punch from behind the net"); then the body's attack cylinder OR the TAmiHit
+cylinder (ElecCentreUnits = the body + 100 x the up, the base 120 down; 120 x 240) on his damage cylinder -> AttackToMario: the plane rule
+(Floor: Mario under the body by 5 u; Roof: his feet + 5 u over the body -- his ground plane is always some floor; Wall: SmsIsFencing with
+SmsFenceNormal . the plane's normal < 0, or, with <c>AttacksAcrossTheNet</c> off, any Mario 5 u behind the plane) then
+<c>_mario.TakeShock()</c>; taken (his state turned to hurt) -> Shocks++ and FREEZE pushed. IsHitValid false for everything (the deaths are the
+species' own). BehaveToWater: FREEZE pushed unless already, `_sprayCooldown` 0. Kill() from outside -> the species' Die. Die: the hp 0, the hit
+layer off, the up remembered; the start clip's end: +10 u, the velocity, flying1; past 30 ticks IsDeadByWall (a 15-u ray along the flight,
+the WallHitFxScene burst) / `_flyLanded` / 10000 u -> GenRandomItem + Dead. Effects: SetSparks binds two SparkFxScene instances to lkejnt1 /
+rkejnt1 (SmsFollowEffect.Bind on this body's Skeleton3D) at scale 0.45 with only their Flashes and Sparks emitting (Mario's streaks and arcs
+are his whole-body shock), Active while alive; BoundFx parents the FreezeFxScene (x 2) and the FlySmokeFxScene under the model. Knobs
+(grouped, plain English): Deviations (SpeedScale, ClipSet, FeetOnPlane, AttacksAcrossTheNet); Effects (SparkFxScene = ShockSparks.tscn,
+FreezeFxScene = Fx131/PoiDizzy.tscn, FlySmokeFxScene = none, WallHitFxScene = EnemyWallHit.tscn); Sounds (SparkSound -- give it a looping
+stream -- RunSound, TurnSound, HitSound, FlySound). The scene: CharacterBody3D (sms_enemy, mask 5 = the plane layers), Model = the glb at
+1 / 74.44 (the body is 235 u = 3.2 m tall), a sphere r 1 m at 1.2 m, RelaunchTicks -1, DeathFxScene EnemyDisap, a plain-English `_sms_note`.
+
+**Deviations (logged; knobs where they matter):** the angular easing (above); the path's nodes are picked at random with no edges; the creep
+clamped at the node; the model's feet on the surface by default (the game's -30 u behind FeetOnPlane off); the sparks and the numbness are
+stand-ins (Mario's shock sparks, the Cataquack's dizzy stars) until the ms_amn_* / ms_dnk_* jpa are ported; the death flight's smoke is a slot;
+the sounds are slots; the Floor rule tests Mario's height alone (the game also wants a roof over him); the clipped-out rules, mCoinId and the
+stage-8 clip set switch (ClipSet instead) are not ported. A frozen body keeps its charged air live (the game's TAmiHit tests only LIVE_FLAG_DEAD):
+a Mario who stands in it after his shock is shocked again once his 60 invincible ticks are up.
+
+**Verification:** drive 144 (patch_smoke144.py, SMS_YCAM_SMOKE=1; two game ticks a physics frame) 21/21 on a 30 x 30 m dock 80 m over the arena
+with an 8 x 6 m net (0.2 m, sms_fence) across it, a backstop 8.4 m behind the net's +Z face, a 6 x 6 m slab 4 m up over the far corner: A1 a
+body placed on the net's +Z face with a 3-node path (two 1.5 m up at x +-2.5, one 4.5 m up): attached to a WALL (the normal +Z), the up on it,
+no bind, the sparks on, the feet 3.7 u off the face; A2 run1_start first; A3 three node visits (the first its own spot) with run1 / run1_end /
+turn1_start / turn1 / turn1_end / wait1 in 1149 frames; A4 the step 6.00 u a frame at most, 0.0 u off the face, the up error 0.000, within the
+path's triangle, 581 u walked over two legs. S1 Mario caught the net's +Z face (FENCE_CATCH, the normal +Z); S2 the body crawled into him 93
+frames on: ELECTRIC_SHOCK -- the shock pose, 8 -> 7 HP on its first tick; S3 FREEZE at once (hit1); S5 he stood up at 120 ticks (WAIT) with
+one shock, moved away; S4 the Freeze out at 315 frames (hit1 194 + one wait1 loop past FreezeWait). O1 Mario caught the -Z face first, a body
+placed across from him: no shock over 2 s (his fence normal against the plane's), HP kept; O2 his real fence punch: Die("a punch from behind
+the net"), flying1_start, the flight +Z at 20 u a tick with flying1; O3 the backstop 8.06 m on: dead (a wall), freed. W1 SPRAYED_BY_WATER (the
+message: 1.5 m up the net is beyond the drive's aim) -> FREEZE on the next tick; W2 out at 314 frames, crawling. F1 a body on the dock: a FLOOR,
+the up +Y, crawling two nodes; T1 Mario dropped onto it from 2.2 m: no kill (isHitValid false), then its cylinders shock him (8 -> 7); P1 his
+real ground pound from 1.4 m inside his post-shock invincibility (a floor one's charged air reaches 2.96 m up: a vulnerable Mario falling in is
+shocked before his pound lands, as the game's cylinders say): Die("a ground pound"), the flight +Y; P2 it rose 3.8 m into the slab past the
+grace and the bind's ground check set it down on the slab's top: dead (the ground). R1 a body under the slab: a ROOF, the up -Y, crawling; R2
+Mario standing on the slab over it: no shock over 3 s; R3 the roof crawl within 1.5 u of the underside, 6 u a frame, the up kept. (Run a's
+S2 / S3 fired every frame -- the drive's gating; run c found the stuck turn -- the species' easing fixed; run d's Freeze ran one wait1 loop
+long -- ClipEnded; run d's pound was pre-empted by the charged air -- the drive pounds inside his invincibility; run e's P2 expected the lid --
+the game's ground check lands a rising body on the slab it enters.) Build 0 errors, boot ALL OK. GPU captures (SMS_F144_CAP=1 under
+run_gpu.ps1, cap/): the crawl on the net (the shell outward, the small crackles at the antennae -- the first run's full ShockSparks whited the
+frame out: the streaks and arcs are off now), Mario and the body side by side on the net, the knock-off flight (head tucked, no sparks), the
+freeze, the floor one, the ground pound, the roof one.
+
+**Note for the drives:** the bodies are made in the frame the drive asks for them and tick first in the NEXT frame -- a track that reads them in
+the same frame sees the pre-attach state (the run's A4 up error of 1.000); the track skips a body without a plane. A freed body (RelaunchTicks
+-1) throws on its Node3D members after the frame it dies: the checks read the last tracked position and IsInstanceValid.
+
+### 145 -- the Snooza Koopa: Pinna Park's big Koopa asleep on the sand, its hosed waking, its leap, the sunflower (feature/enemy-pinna, `a702b49`)
+
+**Files:** NEW `assets/Sms/Enemy/TamaNoko.tscn`, `SmsTamaNoko.cs` (+ .uid), `assets/Sms/Enemy/TamaNoko/` (TamaNokoBody.tres, TamaFlower.tres,
+TamaFlower.tscn + SmsTamaFlower.cs (+ .uid)), `models/Eniemes/TamaNoko/` (tamanoko_model1.glb and tamaflower_model1.glb from his FinModelUtility rip
+of /scene/tamaNoko -- game units, 16 + 1 bck clips; `tamanoko_waterhit1_loop` renamed `tamanoko_waterhit1_cycl` inside the glb's JSON chunk, same
+length, so Godot's "_loop" strip does not land on `tamanoko_waterhit1`; the two pngs; the glb .imports swap the body's three materials for
+TamaNokoBody.tres and the flower's eight for TamaFlower.tres). Nothing of Mario's or the base's changed. Tools: npc82/pinna145/{patch_import145.py,
+probe_clips145.gd, patch_smoke145.py (drive 145 + its capture mode), run_drive145.bat / run_cap145.bat, cap/, disc/, decomp/ (tamaNoko.cpp,
+TamaNoko.hpp)}. Sources: tamaNoko.cpp / TamaNoko.hpp (all of it), the shipped tamanoko.prm (sms_shipped_params.json: HeadHeight 120, BodyRadius 7,
+WallRadius 100, 1 hit point, SearchLength 1500 / Height 1000 / Aware 500 / Angle 180, GiveUp 4000 / 1200, AttackWait 240, FreezeWait 200, damage 90 x
+120, attack 80 x 100, turn 1.2 / 2.5, body scale 2 / 2, WaitTime 60, march 4 / 4.5, PickUpTime 120, JumpAttackDist 800, ThrownVY 10, ThrownRateXZ 2,
+ThrownGravityY 0.2, JumpAttackSp 25, AttackGravityY 0.4, SinkTime 400, WakeUpTimer 200), the bmds' MAT3 (the body: the enemy toon with konst 3/4,
+C0 (160, 200, 160), C1 (157, 161, 169), x 3; the flower: TEXC x RASC, alpha >= 128, cull NONE, x 8), the bcks' ANK1 headers (grow1 244; appear1 249;
+attack1 99; down1 74; land1 59; mogaki1 30 L; mudland1 14; return1 169; run1_end 14; run1_loop 60 L; run1_start 14; sleep1 159; wait1_end 14;
+wait1_loop 60 L; wait1_start 14; waterhit1 9; waterhit1_loop 30 L), SmsBombHei.cs (the take / throw hooks of 130b), SmsPoihana.cs (the sand rule).
+
+**The game.** TTamaNoko is a TWalkerEnemy (ACTOR_TYPE_TAMA_NOKO, unk150 0x11); reset: TWalkerEnemy::reset, the flags cleared (unk1B9 back to
+true), mScaledBodyRadius 280 (the shadow), LIVE_FLAG_UNK1000 (the ground check ignores water). The statics: mStopOnAirTimeMax 40, mRollOnAirTimeMax
+20, mRollOnAirAngle 360, mDropVelocityY -30. The bck table is the archive's 17 clips in order (0 the flower's grow1). SLEEP (the default): a clip
+at its end -> waterhit1 held at frame 0 (the shell at rest), POI_ZZZ every frame, walkBehavior(5, 0); doKeepDistance true (Mario pushed out of the
+cylinder); isCollidMove: its own kind pushes, asleep it hands another actor a TRAMPLE and is not moved. receiveMessage: TRAMPLE / HIP_DROP ->
+isHitValid -> kill (unk184 = 0); UNKD -> dead at once; SPRAYED_BY_WATER: the WATHIT mark, the W_HIT sound, once per cooldown decHpByWater +
+behaveToWater. behaveToWater: the cooldown 0 (every drop), unk165 = 1; asleep -> HITWATER pushed; wandering -> ATTACK pushed. HITWATER: ticks 0-1
+waterhit1 at the full rate; at its end waterhit1_loop; at a loop's end: past WakeUpTimer or unk1B9 off -> unk1B9 off, appear1 (unless already);
+else unsetUnk165 (sprayed since) -> the loop again; else the spine reset to SLEEP (twice over). appear1's end -> WAIT then GRAPHWANDER pushed
+after. WAIT: ticks 0-1 wait1_start; its end wait1_loop; past WaitTime wait1_end; its end -> GRAPHWANDER. moveObject: in GRAPHWANDER run1_start's
+end -> run1_loop. walkBehavior(mode, k): the turn toward the target at TurnSpeedLow x k, the march at MarchSpeedLow x k unless mode 5 or 3; in
+GRAPHWANDER every 200 ticks forceSleep (Mario past GiveUpLength: sleep1, the spine reset to SLEEP); a sleeper's mWakeUpTimer (never set) would
+count 400 to HITWATER. behaveToFindMario: ATTACK after the current. ATTACK: tick 0 run1_start unless in run1_loop, the goal Mario; each tick vy <
+-1 -> TAMA_BLUR at joint 1; mIsDoingJumpAttack: landed -> landEffect, the flag off, DOWN after; vy < 0 -> M_BLUR2 200 u under joint 1, and for
+mAirAttackTimer < StopOnAirTimeMax: UNK10 (no bind: it hangs), the yaw + 360 / 20 a tick while under RollOnAirTimeMax, the timer++; else the
+velocity (0, DropVelocityY, 0) and UNK10 off. Not jumping: at a clip's end run1_start -> run1_loop; run1_loop with Mario past SearchLength -> unk1B8
++ run1_end, within JumpAttackDist (not clipped out) -> run1_end; run1_end: unk1B8 -> GRAPHWANDER after; Mario in shallow water / swimming / on a
+water surface -> GRAPHWANDER after; Mario invincible -> WAIT pushed; attack1. attack1 passing frame 63: unk1A0 = calcVelocityToJumpToY(Mario,
+JumpAttackSp, getGravityY) with x and z doubled, mPosition.y += 30, the velocity, airborne, the flag, the timer 0; walkBehavior(3, 0.5) during
+attack1, else walkBehavior(2, 1). DOWN: tick 0 on sand -> SINK after + the sand column (エフェクト砂柱, scale (1.2, 0.5, 1.2)); else DROPOK, unk164,
+a shake, land1; tick 10 a rumble; the clip's end past PickUpTime -> unk164 off, WAIT after. PICKUP: tick 0 without unk164 -> done; the clip's end
+past PickUpTime -> unk164 off, attackToMario, done. THROWN: tick 0 the velocity (ThrownRateXZ x his throw power x sin / cos of his angle, ThrownVY),
++2 u, airborne; landed -> unk164 off, done. SINK: tick 0 mIsSunkInGround, mudland1; at a clip's end mudland1 -> mogaki1; sinkTime = SinkTime x
+(the live count / the manager's count); past it: return1 playing -> unsunk, WAIT after; else return1. isHitValid: UNKB false; not sunk, or return1
+past frame 80 -> false; HIP_DROP true; else false. attackToMario: unk164 off, not asleep, not (sunk with Mario's y > its y + 10) -> ATTACK.
+doKeepDistance asleep. calcRootMatrix: waterhit1_loop -> TAMA_HIT; sleep1 past frame 90 -> TAMA_HIT; appear1 passing 0 / 46 -> JUMP_ED_B, passing
+25 -> sand ? landEffect : a shake, a rumble, SMB_AP_ROCK + SMB_AP_SMOKE x 2; return1 passing 110 -> landEffect, 152 -> JUMP_ED_B unless over
+water; asleep -> POI_ZZZ. landEffect: sand -> HIPDROP_C + POI_SAND x 0.8; water -> the column; else HIPDROP_C + HIPDROP_B x 0.8; a shake, a rumble.
+getGravityY: AttackGravityY in ATTACK, ThrownGravityY in THROWN. setWalkAnm run1_start; setDeadAnm down1; isReachedToGoal 200 u in XZ.
+setAfterDeadEffect: TSmallEnemy's, the flower's unk34 on and grow1, TAMA_FLOWER, COMMON_SMOKE. TTamaNokoFlower (a TSharedParts at the body's
+position): grow1 about to end -> reviveOneSunflower; then, once, five coins (makeObjAppear at 350 u out at 72-deg steps, the velocity (dir x 4,
+20, dir x 4), the bind on). requestShadow: the circle shadow at joint 1 with mScaledBodyRadius, the question-mark request.
+
+**The port.** `SmsTamaNoko : SmsSmallEnemy`, Prm = the shipped prm; nerves Sleep / Attack / Down / PickUp / Thrown / Sink / HitWater / Wait
+(100..107) + the base's GraphWander and Die. The base's walker carries the wander, the sight (IsFindMario), the hold proxy (SmsCanBeTaken while
+flat, BehaveToTaken -> PickUp, BehaveToRelease -> Thrown with his facing and SmsParams.Take.ThrowPower, `_airborne` on any release so a dropped body
+falls), the Die nerve (SetDeadAnm down1 -> GenRandomItem -> SetAfterDeadEffect -> Dead). WalkBehavior is the species' (TurnSpeedLow x k,
+MarchSpeedLow x k, the 200-tick ForceSleep); MoveObjectPre runs run1_start into run1 in the wander and keeps the clip-frame pair for
+<c>PassedFrame</c> (checkPass) and the loop-wrap test (<c>ClipEnded</c>, as 144's). The leap: <c>CalcVelocityToJumpToY</c> (the Gesso's: the ticks to
+come down to the goal's height at speedY, the XZ speed to arrive then) with the XZ doubled; the hang = `_noBind` for the 40 ticks (the base keeps
+the velocity and skips gravity while it is on), the yaw + 18 deg a tick for the first 20, then `_vel` = (0, -30, 0) and the bind back; the landing
+= the base's floor contact (`!_airborne` with `_noBind` off) -> LandEffect -> Down. Sand: a ray down from the body's point to the floor collider,
+in the "sms_sand" group or named with "sand" (the Cataquack's rule), or the <c>Ground</c> knob. The live fraction = this kind alive among this kind
+in the level (a freed body no longer counts). Mario's invincibility = his hurt state (DEVIATION: no getter). The flower: TamaFlower.tscn (an
+<c>SmsTamaFlower</c> Node3D over the glb at 1 / 74.44) spawned under the level at (x, mGroundHeight, z) at the death, so it outlives the freed body;
+grow1 once; its AnimationFinished -> five coins through an SmsDropTable.SpawnItem (res://yellow_coin.tscn by default) 350 u out at 72-deg steps
+with (dir x 4, 20, dir x 4). HitCheckMario: the base's, plus keepDistance while asleep (Mario's damage cylinder in its 180 x 240) through
+SmsKeepDistance. Knobs (grouped, plain English): Deviations (SpeedScale, Ground Auto / Sand / Hard, WakeSeconds = WakeUpTimer in seconds);
+Effects (SleepFxScene = Fx131/PoiZzz, LandSandFxScene = Fx131/PoiSand, LandHardFxScene = HipDropLanding, PuffFxScene = Fx131/JumpEd,
+AppearHardFxScene = Fx131/SmbAppear x 2, SandColumnFxScene / FallBlurFxScene / FlowerPuffFxScene / ShakeFxScene slots, FlowerScene = TamaFlower.tscn,
+FlowerCoinScene = yellow_coin.tscn); Sounds (DropSound, AppearSound, AttackSound, DownSound, LandSound, SleepSound, WaterHitSound). The scene:
+CharacterBody3D (sms_enemy, mask 5), Model = the glb at 1 / 74.44 (x the body scale 2: 6 m tall), a sphere r 1.6 m at 1.6 m (its bottom at the
+feet: the first run's r 2 at 2.6 let the feet sink 0.6 m into the floor, and the sand ray then started inside the slab), RelaunchTicks -1,
+DeathFxScene EnemyDisap, a plain-English `_sms_note`. TamaFlower.tscn carries its own `_sms_note`.
+
+**Deviations (logged; knobs where they matter):** the stand-in effects (the Cataquack's Zs and sand puff, the Pokey's appear burst, the jump puff,
+Mario's hip-drop landing) until the ms_tama_* / ms_poi_* jpa are ported; the sand column, the fall blurs, the flower puff and the shake sparkle are
+slots; the sounds are slots; the shakes and rumbles are not ported; Mario's invincibility is his hurt state; reviveOneSunflower (Pinna's sunflower
+event) is not ported; the question-mark and circle-shadow requests are not ported; the clipped-out rules are not ported.
+
+**Verification:** drive 145 (patch_smoke145.py, SMS_YCAM_SMOKE=1; two game ticks a physics frame) 20/20 on a 30 x 30 m SAND dock (sms_sand) 80 m
+over the arena with a 16 x 16 m hard slab on its far quarter: Z1 placed on the sand with a two-node path: SLEEP, waterhit1 held at frame 0, no
+step, the body scale 2, the Zs; Z2 Mario put 1.6 m from the shell: pushed out to 3.09 m, no damage. W1 the message 60 frames (120 ticks): HITWATER,
+waterhit1 then its loop; W2 the hose off: back to SLEEP at the loop's end, no wake. W3 the message 150 frames (300 ticks): the wake at 248 ticks
+(the loop's end past 200), appear1, Wakes 1; W4 appear1's end -> WAIT -> GRAPHWANDER 337 frames after the wake, the frame-25 sand landing puff; W5
+the wander: run1_start then run1, 946 u in 120 frames (4 u a tick). A1 Mario 6 m off (within SearchAware, invincible for the approach so the run
+into him knocks nothing about): ATTACK after the wander; A2 the LEAP from 5.8 m: the velocity (2.66, 25, 5.74) along him, run1_end and attack1 seen;
+A3 the hang: 39 timer ticks tracked, the yaw swept 342 deg between the first and last tracked frames (18 deg a tick), the apex 9.67 m up; A4 the
+drop at -30.4 u a tick, landed 0.05 m from his spot at the leap; A5 SAND -> landEffect -> DOWN -> SINK: stuck, mudland1 then mogaki1. P1 his real
+ground pound from 1.6 m over the sunk body: HIP_DROP valid -> kill -> DIE with down1 -> dead 112 frames on, his HP kept (no attack on him from a
+sunk body he is over); P2 the sunflower at the spot, growing; P3 270 frames on: grown, five coins. H1 a second one woken on the HARD slab (the
+SMB_AP burst, no landing count), WAIT, the wander; H2 its leap onto the hard slab: the hang (39) and the drop, Down (flat), land1, the landing
+"hard"; T1 Mario beside it, B 6 frames: his take -- PICKUP, the body in his hands (the hold proxy), its collision off; T2 B again: THROWN at
+(-5.6, 9.6, 0) = 2 x his throw power along his facing and ThrownVY 10 less a tick of gravity, airborne, out of his hands; T3 it flew 8.1 m and
+landed: unk164 off, back through the Down it left, the collision back on. (Run a's body sank 0.6 m into the floor -- the shape; run b's hard-slab
+leap landed on the sand because the run into Mario had knocked him 0.4 m past the slab's edge and the drop lands on his spot -- the drive now
+keeps him invincible for the approach, and a drive-side nerve-name mismatch ("Down(done)").) Build 0 errors, boot ALL OK. GPU captures
+(SMS_F145_CAP=1 under run_gpu.ps1, cap/): the shell asleep on the sand, the shake, the stretch out of the shell, the hang at the top of the leap
+(the shell upside down over the dock), the struggle in the sand, the ground pound, the sunflowers around Mario, the flat body, the carry.
+
+**Note for the drives:** a leaping body comes down exactly on Mario's spot at the leap; a drive that leaves him there takes the hit (the game's).
+
+### 146 -- the Monty Mole in its cannon: Pinna Beach's three-barrelled cannon, its bomb lobs, its hide, its three-hit break (feature/enemy-pinna, `45574ec`)
+
+**Files:** NEW `assets/Sms/Enemy/Cannon.tscn`, `SmsCannon.cs` (+ .uid), `assets/Sms/Enemy/Cannon/TyorobeBody.tres`, `models/Eniemes/Cannon/`
+(cannon.glb = /scene/cannon/default.bmd, cannon_dom.glb, tyorobe_model1.glb from his FinModelUtility rip of /scene/cannon -- game units; the mole's
+glb carries the archive's 8 tyorobe_* bck clips, the cannon's and the domes' carry none; the three pngs; tyorobe_model1.glb.import swaps the
+mole's `_body2` for TyorobeBody.tres, the cannon and the domes keep the glb's own materials; cannon.glb.import and cannon_dom.glb.import have an
+EMPTY `_subresources` -- see the note at the end). Nothing of Mario's or the base's changed. Tools: npc82/pinna146/{patch_import146.py (glb /
+pins / trim), probe_clips146.gd, patch_smoke146.py (drive 146 + its capture mode), run_drive146.bat / run_cap146.bat, cap/, disc/ (the three bmds,
+the 20 bcks, the rip folders), decomp/ (cannon.cpp, Cannon.hpp)}. Sources: cannon.cpp / Cannon.hpp (all of it), bombhei.cpp (isDamageToCannon),
+the shipped cannon.prm (sms_shipped_params.json: HeadHeight 120, BodyRadius 5, WallRadius 50, ClipRadius 400, 3 hit points, SearchLength 2000 /
+Height 800 / Aware 400 / Angle 90, GiveUp 1100 / 650, damage 200 x 500, attack 200 x 500, turn 0.5 / 0.5, body scale 1 / 1, HideDist 500,
+BombDist 3000, KillerDist 20000, BombInterval 200, KillerInterval 100, ShootInterval 500, Chorobei attack 200 x 300, Chorobei damage 200 x 250,
+KillerTransYOffset 0, BombHeiGenerateRate 1, ThrowXZSpeed 9), the bmds (default.bmd: the cannon's joints Cannon / nullC / nullB / nullA /
+Cannon_FUTA; cannon_dom.bmd: null1 / enemy / CannonDom; tyorobe_model1.bmd: the mole, 213 u tall, MAT3 `_body2` the enemy toon with konst 3/4,
+C0 (75, 75, 100), C1 (157, 161, 169), and `_cap2` plain), the bcks' ANK1 headers (cannonclose 15; cannondom 30; cannondom_break 99; cannonopen
+15; cannon_break 80; the three cannon_demo_* 379; the four hodai_mario_* 309 / 379; tyorobe_appear1 59; damage1 59; down1 189; hyde1 34; throw1
+74; wait1_end 29; wait1 60 L; wait1_start 29), the skin's inverse bind matrices for the dome joints (nullC (-129.3, 152.5, 162.7), nullB (129.1,
+151.8, 162.9), nullA (0, 252.7, 204.7)), SmsBombHei.cs (Thrown / Exploding, Kill, the hit-filter idiom), SmsSmallEnemy.cs (SmsLaunch, SmsSpawnDead).
+
+**The game.** TCannon is a TSmallEnemy (ACTOR_TYPE_CANNON, unk150 0x11) with a TChorobei (the mole: a TSharedParts of tyorobe_model1 at the
+cannon's root matrix + 300 u, its hit point 150 u under that, hidden while unk70) and three TCannonDom (cannon_dom.bmd on the joints nullC /
+nullB / nullA, with map collision; beyond BombDist they wobble: a 1-deg-a-tick phase, -20 / -10 x sin). reset: the hit points (HitPointMax 3), the
+collision off (onHitFilter NO_COLLISION: the cannon body's own cylinders never hit anything), LIVE_FLAG_UNK10 (no bind), the goal. The statics
+mVelocityRate 0.62 and mSearchRate 0.02. The mole's checkHit each tick (TChorobei::checkHit over its hit list): Mario -> ATTACK; a TBombHei ->
+TCannon::hitHead: not in DAMAGE and the bomb's isDamageToCannon (in its Thrown or Explosion nerve -- and that getter turns the bomb's
+HIT_FILTER_NO_COLLISION ON, so it leaves every hit list at once) -> DAMAGE pushed, the bomb killed; a TKiller rolling (isRollFly) -> DAMAGE, the
+Bill killed. OPEN: the mole appear1 + cannonopen; both done -> SEARCH. SEARCH: tick 0 the goal Mario when within BombDist; the mole wait1_start
+-> wait1_loop; within HideDist -> CLOSE; within BombDist past BombInterval -> SHOOT (the bomb); else within KillerDist past ShootInterval -> SHOOT
+x 3 (the Bullet Bills), FORCEBOMBSHOOT, SEARCH queued; the yaw changing -> CANNON_MOVE; turnToGoal = walkToCurPathNode(0, mTurnSpeed, 0) at
+TurnSpeedLow. SHOOT (the bomb, unk290 on): the mole wait1_end; its end -> throw1 + bombSet (the Bob-omb made at the mole's point, TAKEn by the
+cannon -- its taking matrix is the mole's hand -- at scale 0, its clip frozen); throw1 past frame 26 bombScaleUp (+0.2 of its scale a tick);
+passing frame 38 bombShoot: the velocity = the XZ direction to Mario x ThrowXZSpeed with vy ThrowXZSpeed (the +-30 deg yaw roll is computed and
+never applied), +2 u, airborne, the clip running, PUT -- the bomb is released into its own default nerve (not Thrown: it never damages its own
+cannon); throw1's end -> SEARCH. SHOOT (a Bullet Bill, unk290 off): setKillerGoalPoint (a point 500 u from Mario at a random angle, the dome's
+cannondom clip); ticks < 40 turnToGoal; tick 40 killerShoot (the Bill at the dome's joint 1 + (0, -60, 150), calcVelocityToJumpToY(Mario + a
+300-u jitter, 5, its gravity) x mVelocityRate toward where his speed puts him, 1 in 5 homing, KILLER_FIRE + _FLY); past KillerInterval -> the
+next dome. FORCEBOMBSHOOT: Mario within sqrt 2 x BombDist -> the bomb throw again. CLOSE: ticks 0-1 deadCannon (no collision), the mole hyde1,
+CHO_ASE (the sweat) 300 u up; the mole's hyde1 done -> cannonclose; its frame 10 -> JUMP_ED_B x 1.5 at 290 u; Mario past 3 x HideDist -> the
+collision back, OPEN. DAMAGE: tick 0 BOMB_SMOKE + BOMB_BOMB + BOMB_HAHEN x 2 at the cannon (the three particle emitters: no fireball -- the
+bomb's own TEffectExplosion is already there); decHitPoints; 0 -> killShootAct (the held bomb killed), the mole damage1, a rumble, CHO_MOKU_B at
+the mole's joint 12 + CHO_MOKU_A, the demo camera (tyorocam_pinna / tyorocam_mare), deadCannon; else damage(): setFreezeAnm, the mole damage1 +
+CHO_MOKU_A at its joint 0; the cannon hops (mVelocity.y 4, mPosition.y += 10, airborne; moveObject brings it back down to its placed height:
+y += vy, vy -= gravity, never under unk23C); the mole's clip done -> 0 hit points ? DAMAGEDEMO : SEARCH. DAMAGEDEMO: the mole down1; past 120
+ticks with the clip done -> cannon_break, CANNON_DOWN, TEffectExplosion x 2.5, MSF_MONTY_MOLE_DEFEATED -> OBJECT. OBJECT: cannon_break held at
+its end, the mole hidden; frame 60 CANNON_LAND; past 150 gateOpen (the Mare stage's gate). updateAttachPos: the held bomb at the mole's hand;
+CLOSE kills it; a held bomb that stops keeping its distance (sprayed) -> DAMAGE. isHitValid false: nothing of Mario's kills the cannon.
+
+**The port.** `SmsCannon : SmsSmallEnemy`, Prm = the shipped prm; nerves Open / Search / Shoot / ForceBombShoot / Close / Damage / DamageDemo /
+Object (100..107), Search the default. The cannon is the body: `_noBind` (no fall), `FlyBind` (no step), `CollisionMask` 0 (nothing pushes it;
+the first drive's bombs, landing inside its shape, shoved it a metre a blast), its hit layer off in Reset (the cannon body is no target, no
+attack, isHitValid false, the hose does nothing); a `Solid` StaticBody3D child (layer 1, mask 0) carries the same r 4.4 x 4.9 m cylinder so
+Mario and the bombs stand on it without moving it. The mole and the three domes are the Model's children in the glb's units (Mole at
+(0, MoleHeightUnits, 0); Dome0 / Dome1 / Dome2 at the skin's nullC / nullB / nullA), so they turn and hop with the cannon; the hop is
+`_hopY` / `_hopVy` on the Model's y (moveObject's). The mole's clips through the base's bck table by the archive's indices 12-19 (the cannon's
+own table is the archive's 20 names; its clips 0-11 are not in his rip's glbs). MoveObjectPre: the hop, then MoleCheckHit every fourth tick
+outside Object / Close / dead: Mario's damage cylinder in the mole's 200 x 300 at MoleHitUnits (the mole's point less 150 u) -> TakeDamage; any
+SmsBombHei in the sms_enemy group that is alive, still in the hit lists (its layer 1 on), not the one being made, Thrown or Exploding and in the
+mole's 200 x 250 -> its layer 1 OFF (isDamageToCannon's NO_COLLISION: one hit a bomb -- its 80-frame blast outlives the 59-frame damage1, and
+without it the lingering blast hit again the moment damage1 ended: the third drive run's 2 -> 0 in one go), DAMAGE, `Kill()`. Shoot: wait1_end;
+its end -> throw1 + BombSet (BombScene instanced dormant -- `SmsSpawnDead`, Pooled, RelaunchTicks -1 -- under the cannon's parent at the mole's
+hand, riding it each tick); passing frame 26 the scale grows 0.2 a tick; passing frame 38 `SmsLaunch` with (dir x 9, 9, dir x 9) u/tick (+2 u,
+airborne): the bomb lives its own Bob-omb life (the walk, the fuse, Mario's pick-up and throw); throw1's end -> Search. The Bullet Bill volleys
+run only with a <c>KillerScene</c>: any SmsSmallEnemy scene launched from the dome at the game's velocity (calcVelocityToJumpToY x 0.62 toward
+Mario's led point); empty = the long-range branch is skipped. Close: hyde1 (34) then `SetMoleHidden`, the lid's puff (LidPuffFxScene x 1.5 at
+290 u; the cannonclose clip is not in the rip), the sweat slot; Mario past 3 x HideDist -> Open: appear1 (59) -> Search. Damage: `Blast(2,
+fireball: false)` -- the BombExplosion scene at the cannon's middle with its Fireball, Shockwave and Sparks hidden (the game's three emitters:
+the smoke, the glow balls, the scraps; the bomb's own fireball is already there), a hit point off, damage1 with DamageSound, the mole smoke
+slot, the hop (vy 4, +10 u); damage1's end -> Search or, with no hit points, DamageDemo (the held bomb killed by demo): down1 (189); past 120
+ticks with the clip done -> DownSound, `Blast(2.5)` (the whole thing), the domes and the mole hidden -> Object: alive, no collision, no shots,
+for good (Kill() on it does nothing; a Kill() before the break = DamageDemo). Getters for the drives (CurrentNerveName, MoleHidden, MoleClip,
+MoleFrame, MoleUnits, MoleHitUnits, Hits, Throws, Volleys, LastBomb, Broken, HopUnits). Knobs (grouped, plain English): Deviations (SpeedScale,
+MoleHeightUnits 300, HitPoints 3); Shots (BombScene = Bomb/BombHei.tscn, KillerScene = none); Effects (BlastFxScene = Bomb/BombExplosion.tscn,
+MoleSmokeFxScene / SweatFxScene / LidPuffFxScene slots -- the lid puff Fx131/JumpEd by default); Sounds (MoveSound, DownSound, LandSound,
+AppearSound, DamageSound, HideSound, ThrowSound). The scene: CharacterBody3D (sms_enemy, mask 0), Model = cannon.glb at 1 / 74.44 with Mole and
+Dome0-2 under it, the base's cylinder r 4.4 x 4.9 m at y 2.45 (the hit shape, its layer off), Solid with the same shape, RelaunchTicks -1, a
+plain-English `_sms_note` (+Z is its front; how to beat it).
+
+**Deviations (logged; knobs where they matter):** the cannon's own clips (cannonopen / cannonclose / cannon_break) and the domes' (cannondom /
+cannondom_break) are not in his rip's glbs (the rip merged no bck into default.glb or cannon_dom.glb) -- the lid stays put, the hide is the mole's
+hyde1 + its model off, the break is the mole and the domes off with the blast; the Bullet Bill (TKiller) is not ported -- a slot; the demo
+cameras, the rumbles, the shake and the Mare gate are not ported; the stand-in effects (the Bob-omb's blast scene for the three bomb emitters and
+the break; JumpEd for the lid's puff; the mole smoke and the sweat are slots); the sounds are slots; the dome wobble beyond BombDist is not
+ported (the domes have no clips); CANNON_MOVE's sound is the MoveSound slot; the game's bombSet takes the bomb through HIT_MESSAGE_TAKE (the
+cannon as its holder) -- the port spawns it dormant and rides it; the +-30 deg roll the game computes and never applies is not computed.
+
+**Verification:** drive 146 (patch_smoke146.py, SMS_YCAM_SMOKE=1; two game ticks a physics frame) 13/13 on the 30 x 30 m hard dock 80 m over the
+arena: S1 placed facing +Z with Mario 15 m off its side: SEARCH, the mole up (wait1_start then its loop), the cannon's own layer off, the three
+domes, turned 59.0 deg toward him in 60 frames (TurnSpeedLow 0.5 deg a tick); S2 Mario beside the cannon's foot: health 8 -> 8 (no attack from
+the body; the mole's cylinder is 2 m up). S3 Mario 15 m off within BombDist, past BombInterval: SHOOT -- wait1_end, then throw1 with the bomb
+made in its hand; frame 38: the bomb launched at (9, 8.7, 0) u/tick (the XZ direction to Mario x 9, vy 9 less a tick of gravity), airborne, in
+its own BombGenerate nerve; S4 it came down 19.2 m from the cannon toward Mario and lives on (the walk, the fuse); the mole back to SEARCH after
+throw1. C1 Mario put 4 m from the cannon (within HideDist 500 u): CLOSE -- hyde1 (34 frames) then hidden, no attack on him; C2 90 frames on with
+Mario still within 3 x HideDist: the mole stays in; C3 Mario 25 m off: OPEN -- appear1 (59 frames), then SEARCH with the wait clip (nerves Close,
+Open, Search; clips hyde1, appear1, wait1_start). D1 a Bob-omb made 60 u beside the mole's hit point and killed (its Explosion nerve in the 200
+x 250): DAMAGE within a frame -- one hit point off (3 -> 2), damage1, the hop (10 u at once, 65.3 u at the top); D2 damage1 done 58 frames on
+-> SEARCH, two hit points, the hop back down; D3 the second bomb: one hit, 60 frames on SEARCH again with one hit point (hits 2); D4 the third
+bomb: DAMAGE then DAMAGEDEMO with down1, hits 3, no hit points; D5 189 frames on (down1 done past 120 ticks): the blast x 2.5, the mole and the
+domes gone -> OBJECT, the cannon still there, its layer off, not dead; D6 the prop two seconds on: still OBJECT, Mario near it unharmed, one
+throw in all. (Run a: the dormant bomb in the hand was dropped as "dead" before its throw -- `_shot` is now cleared only when freed. Run b 13/13
+but the cannon walked a metre a blast: the bombs' bodies landing inside its shape pushed the CharacterBody3D -- mask 0 + the Solid child. Run c
+10/13: with the cannon no longer shoved out of the lingering 80-frame blast, each blast hit AGAIN the moment the 59-frame damage1 ended -- the
+game's isDamageToCannon turns the bomb's NO_COLLISION on at the first hit; ported. Run d 13/13.) Build 0 errors, boot ALL OK. GPU captures
+(SMS_F146_CAP=1 under run_gpu.ps1, cap/): the cannon with the mole up and the three domes, the throw (the bomb in the air over the mole's hand),
+the hide (the lid's puff, Mario at its foot), the hit (the bomb's fireball at the mole with the x 2 smoke, glow balls and scraps round it, the
+mole in damage1), the broken prop. The first hit capture, taken with the full BombExplosion scene at x 2, was a 24-m fireball over everything --
+the game's Damage is the three emitters only; the Fireball / Shockwave / Sparks are hidden now.
+
+**Note on the imports (his project):** project.godot carries an 11.7 MB `[importer_defaults] scene=` block (Mario's animation slices, saved as
+the default once), and every new glb import copies it into its `.import` -- 16 such 11.6 MB files sit in the repo already (the coins, the
+fruits, Gooble, SleepyBoo, the 1-up, two watergun parts). The passes' glb imports escaped it only because the material swap replaced the block;
+cannon.glb.import and cannon_dom.glb.import (no swap) were trimmed to an empty `_subresources` before the commit (patch_import146.py trim).
+Clearing that default in project.godot would stop it for the next model.
+
+**Note for the drives:** a bomb blown up on the mole leaves the hit lists for good (its layer 1 off); a drive that counts hits by bombs gets
+exactly one a bomb, and the 80-frame blast is no longer a second hit.

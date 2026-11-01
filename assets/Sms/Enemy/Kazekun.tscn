@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://d143kazekun"]
+[gd_scene format=3 uid="uid://d143ka0ekun"]
 
 [ext_resource type="Script" path="res://assets/Sms/Enemy/SmsKazekun.cs" id="1_script"]
 [ext_resource type="PackedScene" path="res://models/Eniemes/Kazekun/kazekun.glb" id="2_model"]
