@@ -817,3 +817,93 @@ A NOTE FOR THE NEXT STACKED PAIR: pushing both branches at once worked, and so d
 upper branch. The one thing to repeat is the inverted resolution above. Whenever a squash lands, `main`'s copy of this file is
 whatever the merged branch had, so any queue edit Kiro made after that branch's last commit lives only on the branch that
 carries it. Compare the two bodies before trusting "take main's side".
+
+### #15 -- DONE 2026-11-01 -- https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/enemy-monte -- queued 2026-10-31 23:40 PDT (Kiro) -- PUSH + PR (SMS 149-150e), PLAYTESTED BY JAYSONN, updated 2026-11-01 04:05 PST
+Push the tenth feature branch: `feature/enemy-monte`, branched from `main` `f89159e` (the trunk after PR #12, the Pinna Park family). Pianta Village's
+family, one pass each on this branch. (`feature/enemy-pinna2` -- entry #14, passes 147-148 -- is a sibling off the same `main`, still unmerged; whichever
+of the two merges second will conflict at the tails of PROJECT_LOG.md and this file: keep both sides, nothing else overlaps.) SMS 149: the Chain
+Chomplet (TFireWanwan), the red-hot little Chain Chomp on its chain -- it wanders its graph leaving burning goop, charges and burns Mario when it sees
+him, is cooled black by the hose (every drop takes one of its 60 heat points), and then its chain can be GRABBED: Mario's new PULLING status (B held on
+the ring at the chain's end, the stick back stretches the five-link rubber chain and it drags him back, B up releases) flings it away by the stretch,
+it skids and bounces off walls, sits dizzy, reheats; flung into water it is beaten for good (silver, on its side) -- assets/Sms/Enemy/FireWanwan.tscn
++ SmsFireWanwan.cs, the chain, the eye shader and four materials under assets/Sms/Enemy/FireWanwan/, the two models under models/Eniemes/FireWanwan/;
+Mario's pull plumbing assets/Sms/SmsPullHandle.cs + assets/Sms/MarioPull.cs and three anchored lines in assets/Mario.cs (the `pulling` state, its
+dispatch, the hitNoKeepPull entry). PLAYTESTED BY JAYSONN (149 and 150, through the 150b-e polish -- he signed off 2026-11-01): push the branch AND open its PR; the family is done. ONE
+merge path only -- this is a PR, so do NOT also merge it into local `main`. SMS 150: the Chain Chomp (TBossWanwan), Pianta Village's house-sized boss on a 15-link leash -- staked to the ground, it rampages at the end of its chain and burns you (its body and its hot chain); the hose cools its 255 heat points from red through to a cold blue; cooled, you pull its stake out (B) and drag it along its rail to the hot spring, where it leaps in, turns gold and drops the Shine (grab the stake while it is HOT and it drags YOU instead; ground-pound the stake to re-plant it) -- assets/Sms/Enemy/BossWanwan.tscn + SmsBossWanwan.cs, the leash / two shaders / eight materials under assets/Sms/Enemy/BossWanwan/, the three models under models/Eniemes/BossWanwan/; it reuses pass 149's PULLING (SmsPullHandle / MarioPull.cs, now with the stick accessors the boss's drag reads) and adds StartMode to assets/Sms/SmsCameraShake.cs. SMS 150b polishes both Chomps: their reignition now shows its fire building (the Chomplet's ring flame grows through the reheat; the Chain Chomp's body and chain glow back from cold across the bark) and the Chain Chomp walks upright instead of tumbling (RollSw off). SMS 150c then takes the Chain Chomp's stomp dust and impact streaks down to the ground (they were sitting too high), gives its hot mouth back its sparks (HitBurst), and fixes its hose steam, which was being dropped before it could show. SMS 150d then reworks the Chain Chomp's effects to Jaysonn's reference (Ref/TeethSparkRef): its mouth throws scattered yellow -> orange ember sparks (a new Fx/BwHibana), the hose steam rises low around the whole body instead of from the middle, and the stomp's blue impact streaks sit low again. SMS 150e then makes those mouth sparks jet directionally out of the teeth as longer, short-lived streaks (BwHibana is now a forward align_y streak jet, spawned facing the mouth). Further passes re-point this entry's tip.
+- Branch `feature/enemy-monte` -- code tip `73be638` ("SMS 150e: the Chain Chomp's mouth sparks jet out as directional streaks", 3 files --
+  SmsBossWanwan.cs, Fx/BwHibana.tscn, BossWanwan.tscn) on the 150b-d polish chain (`a9984c3` 150d ember/steam/stomp, `75fd1eb` 150c, `3cbcc37`
+  150b) on `7876f9a` ("SMS 150: the Chain Chomp ...", 48 files +2230) on `bf3de7c` ("SMS 149: the Chain Chomplet ...", 32 files +1791) on
+  `main` `f89159e`; the branch tip is this file's own commit on top of them; 12 commits since `main`. The range carries none of Jaysonn's nine live edits.
+- To try 149: drop assets/Sms/Enemy/FireWanwan.tscn on flat ground with room (about 3.8 m tall at the game's 2x scale; +Z is its front): it wanders,
+  stamps burning goop as it goes, and when it sees you within ~17 m it turns and charges (its touch is the fire knock, -1 HP; it gives up past 27 m).
+  Spray it: every drop takes one heat point of 60 (it reheats 1 every 10 ticks while hot); at 0 it turns black and runs off, and NOW you can grab the
+  big ring at the end of its chain -- stand within 2 m of the ring and hold B (a new move: he takes hold without lifting), then walk BACKWARD: the stick
+  pulls against the chain and the chain drags you back; let go of B and the Chomplet is flung AWAY from you by the stretch (a full stretch sends it
+  ~70 m on flat ground), skids, bounces off walls, sits dizzy a while and heats up red again. Fling it into water (a pool / water area it lands in) and
+  it is beaten for good: silver, lying on its side. Pressing A while pulling lets go and jumps (the game hops with the chain kept -- not ported).
+  Knobs: Deviations (SpeedScale), Effects (the ring's fire, the slip smoke, the wall puffs, the launch dust, the dizzy stars, the steam, the splash;
+  five slots), Sounds (eleven slots); RelaunchTicks -1 = gone for good.
+- To try 150: drop assets/Sms/Enemy/BossWanwan.tscn on flat open ground facing the way it should start (+Z is its mouth; it is ~13 m across).
+  Its stake plants 13 m behind it (or at a PicketPoint node you assign) and it rampages at the end of its chain: it slides and hops along its
+  rail (a Graph node's children IN ORDER are its path; a child with metadata sms_jump = true makes it hop; no Graph = it roams within
+  WanderRadiusUnits), slams the ground with every bob (the camera shakes within ~40 m), and burns you on touch -- its body and the first eight
+  links of its chain while it is red-hot. Spray it: 255 heat points, 1 a drop (it heals 1 every 20 ticks while hot); it fades red -> dark -> a
+  cold blue, and at 0 it sits dozing (the cold wait clip) ~20 s before it barks and reheats. COOLED, go to the stake and hold B: you pull it out
+  and the Chomp is loose -- walk backward and the chain drags it along its rail toward you. Drag it back past the rail node nearest the BathPoint
+  you assign (the hot spring; a loose Chomp over water with no BathPoint counts) and it LEAPS in, turns gold over ~10 s, and the Shine appears
+  (ShineScene, e.g. assets/ShineSprite.tscn; ShineSpawnPoint or 13 m over it). Grab the stake while it is HOT and it drags YOU around instead;
+  ground-pound the stake to lock it again (it shakes free after ~5 s while hot). Knobs: the level's points (BathPoint, PicketPoint, ShineScene,
+  ShineSpawnPoint), Deviations (SpeedScale, RollSw, JumpSpeedY, ColdTicks, ShakeTicks), Effects (the stomp dust, steam, splash; the rocks /
+  sparks / heat haze / sparkles slots), Camera (the two landing shakes), Sounds (ten slots). RelaunchTicks -1 = gone for good.
+- PR: title "Feature: Pianta Village's Chain Chomps (SMS passes 149-150)"; base `main`; head `feature/enemy-monte`; body:
+  > Pianta Village's two Chain Chomps on `feature/enemy-monte`.
+  > **SMS 149 -- the Chain Chomplet** (TFireWanwan): the red-hot little Chain Chomp on its five-link rubber chain -- it wanders its graph leaving
+  > burning goop, charges and burns Mario on sight, is cooled black by the hose (one of 60 heat points a drop); cooled, its chain-ring is GRABBED
+  > (Mario's new PULLING -- hold B, lean the stick back to stretch the chain, release to fling it), it skids off walls, sits dizzy, reheats; flung
+  > into water it is beaten (silver, on its side). New SmsFireWanwan.cs + FireWanwan.tscn, the chain / eye shader / four materials, two models; plus
+  > Mario's pull plumbing (SmsPullHandle.cs, MarioPull.cs, three anchored lines in Mario.cs).
+  > **SMS 150 -- the Chain Chomp** (TBossWanwan): Pianta Village's house-sized boss on a 15-link leash -- staked down it rampages at the end of its
+  > chain and burns you (its body + its hot chain); the hose cools its 255 heat from red through to a cold blue; cooled, pull its stake out (B) and
+  > drag it by the chain along its rail to the hot spring, where it leaps in, turns gold and drops the Shine (grab the stake HOT and it drags YOU;
+  > ground-pound to re-stake). New SmsBossWanwan.cs + BossWanwan.tscn, the 15-node leash + picket, two shaders, eight materials, three models; reuses
+  > 149's PULLING (+ the MarioPull stick accessors) and adds StartMode to SmsCameraShake.cs.
+  > **Polish after Jaysonn's playtest (150b-e):** the reignition shows its fire building (the Chomplet's ring flame through the reheat, the Chomp's
+  > body and chain glowing back from cold across the bark); the Chomp walks upright instead of tumbling; its stomp dust and impact streaks hug the
+  > ground; its mouth jets a hibana of directional spark streaks (new Fx/BwHibana.tscn); its hose steam covers the whole body.
+  > Drive 150 22/22 headless, boot ALL OK; 149 green in its own pass. Playtested by Jaysonn. The range carries none of his nine live editor edits.
+  compare URL: https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/enemy-monte
+```
+git push -u origin feature/enemy-monte
+git rev-list --count origin/feature/enemy-monte..feature/enemy-monte
+```
+Expect `0` from the rev-list. Then open the PR with the title and body above (base `main`, head `feature/enemy-monte`) -- `gh pr create` if gh is
+authed, else the prefilled compare URL. ONE merge only: this is a PR, so do NOT also `git merge` it into local `main`. The working tree still carries
+Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
+`assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
+`addons/godot_ai` churn: his, leave them.
+
+Result: `feature/enemy-monte` pushed as a NEW remote branch, 13 commits over `main` `f89159e`, 81 files / +4503 / -0.
+`git rev-list --count origin/feature/enemy-monte..feature/enemy-monte` returned `0`. All six code shas confirmed ancestors:
+`73be638` (150e), `a9984c3` (150d), `75fd1eb` (150c), `3cbcc37` (150b), `7876f9a` (150), `bf3de7c` (149). Per-pass diffstats
+match the entry exactly: 149 = 32 files / +1791, 150 = 48 files / +2230. `assets/Mario.cs` takes +13 and nothing else of his
+movement, and `assets/Sms/SmsCameraShake.cs` +15 for StartMode. Largest new files: `bwanwan_body.glb` 0.28 MB,
+`wanwan.glb` 0.18, then the two scripts at 65 KB and 47 KB, nothing near 1 MB. Hygiene: 0 of Jaysonn's nine live edits.
+NOTE on the commit count: the entry says 12, measured 13. The extra one is `63cfd85`, the commit that flipped this entry from
+push-only to push + PR, which cannot count itself. The same off-by-one as every entry so far, and always the queue file's own
+commit.
+SIBLING CHECK, since #14 is unmerged off the same `main`: `comm -12` over the two branches' file lists confirms Kiro's warning
+precisely. The ONLY files both `feature/enemy-monte` and `feature/enemy-pinna2` touch are `PROJECT_LOG.md` and
+`timeToPush!.md`. No scene, script, shader, material or model is shared, so whichever merges second conflicts at those two
+tails alone and the resolution is to keep both sides.
+PR body: the entry carries it inline as a blockquote rather than as a file, so it was extracted to `pr149.md` at the project
+root (untracked, delete after merge) with Kiro's wording unchanged. One formatting fix was needed: his hard-wrapped blockquote
+would have rendered the four sections as one run-on paragraph on GitHub, so blank lines were inserted between them. The words
+are his.
+`gh auth status` still prints "You are not logged into any GitHub hosts", the seventh entry running, so the browser route. The
+compare URL prefilled with title and body measured well under the ~8000 ceiling #8 established.
+PR opened at: https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/enemy-monte
+ONE merge path, as the entry insists: this branch gets a PR and is NOT also merged into local `main`.
+Still to do once Jaysonn merges it: `git checkout main`, fast-forward it with `git merge --ff-only origin/main` rather than
+`git pull`, which this repo's `pull.rebase` setting refuses while he has unstaged work. Then verify the two Chomps by TREE
+rather than ancestry if it squashes, delete `pr149.md`, and mark this entry DONE on `main` with the PR number. Do not state a
+sha for that closing commit inside the file: a commit cannot carry its own sha, a trap that has now caught two entries.

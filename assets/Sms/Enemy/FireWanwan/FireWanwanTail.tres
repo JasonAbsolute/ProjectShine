@@ -1,0 +1,23 @@
+[gd_resource type="ShaderMaterial" load_steps=4 format=3 uid="uid://dfwanwantail1"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/EnemyToon.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://models/Eniemes/FireWanwan/K_wanwan_tail.png" id="2_tex"]
+[ext_resource type="Texture2D" path="res://assets/Sms/models/toon_2_4i.png" id="3_toon"]
+
+[resource]
+resource_name = "_mat_tail1 (wanwantail.bmd): a chain link and its bar -- the enemy toon, form 0, s0_k 1/8 on the 8 x 8 grey K_wanwan_tail; C0 is the Chomplet's heat (the same lerp as its body, written every tick by SmsFireWanwan); the ambient (128, 128, 128); opaque, cull BACK"
+render_priority = 0
+shader = ExtResource("1_shader")
+shader_parameter/s0_k = 0.125
+shader_parameter/s1_form = 0
+shader_parameter/c0 = Vector3(1.5686, -0.1961, -0.3922)
+shader_parameter/c1 = Vector3(0.6157, 0.6314, 0.6627)
+shader_parameter/c2 = Vector3(1, 1, 1)
+shader_parameter/base_tex = ExtResource("2_tex")
+shader_parameter/toon_tex = ExtResource("3_toon")
+shader_parameter/dirt = 0.0
+shader_parameter/sun_dir = Vector3(0.348, 0.87, 0.348)
+shader_parameter/sun_color = Vector3(1, 1, 1)
+shader_parameter/ambient = Vector3(0.502, 0.502, 0.502)
+shader_parameter/ambient_a = 0.196
+shader_parameter/shininess = 50.0

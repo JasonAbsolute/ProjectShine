@@ -1,0 +1,20 @@
+[gd_scene load_steps=4 format=3 uid="uid://dfirewanwan1"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsFireWanwan.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/FireWanwan/wanwan.glb" id="2_model"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_body"]
+radius = 1.9
+
+[node name="FireWanwan" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+script = ExtResource("1_script")
+RelaunchTicks = -1
+metadata/_sms_note = "Pass 149: the Chain Chomplet (TFireWanwan), Pianta Village's red-hot little Chain Chomp on a chain. Drop it on flat ground facing the way it should start (+Z is its front; it is about 3.8 m tall, the game's 2x scale) and give it room: it wanders (a Graph of Node3D children, or within WanderRadiusUnits of the drop point), leaves burning goop as it goes, and when it sees you it turns and charges (its touch is the fire knock). Spray it: every drop of water takes one of its 60 heat points (it reheats 1 every 10 ticks while hot); at 0 it cools black and runs off, and NOW you can grab the big ring at the end of its chain (B, within 2 m) -- walk backward to stretch the chain (the stick pulls against you; let go of B to release): the Chomplet is flung AWAY from you by the stretch and skids off (it bounces off walls), sits dizzy a while, then heats up red again. Fling it into water (a pool / water surface it lands in) and it is beaten for good: silver, lying in the pond. Knobs: Deviations (SpeedScale), Effects (the ring's fire, the slip smoke, the wall puffs, the launch dust, the dizzy stars, the steam, the splash; slots for the heat haze, the sweat, the reheat shimmer, the sparkles and the ripples), Sounds (eleven slots); RelaunchTicks -1 = gone for good."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.95, 0)
+shape = SubResource("SphereShape3D_body")

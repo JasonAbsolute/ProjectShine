@@ -9791,3 +9791,335 @@ Clearing that default in project.godot would stop it for the next model.
 
 **Note for the drives:** a bomb blown up on the mole leaves the hit lists for good (its layer 1 off); a drive that counts hits by bombs gets
 exactly one a bomb, and the 80-frame blast is no longer a second hit.
+
+### 149 -- the Chain Chomplet: Pianta Village's red-hot little Chain Chomp on its chain, cooled by the hose, dragged by the chain, flung into the pond; Mario's PULLING status (feature/enemy-monte, `bf3de7c`)
+
+**Files:** NEW `assets/Sms/Enemy/FireWanwan.tscn`, `SmsFireWanwan.cs` (+ .uid), `assets/Sms/Enemy/FireWanwan/` (SmsFireWanwanChain.cs (+ .uid),
+FireWanwanEye.gdshader (+ .uid), FireWanwanBody.tres, FireWanwanEye.tres, FireWanwanMouth.tres, FireWanwanTail.tres), `assets/Sms/SmsPullHandle.cs` (+
+.uid), `assets/Sms/MarioPull.cs` (+ .uid), `models/Eniemes/FireWanwan/` (wanwan.glb and wanwantail.glb from his FinModelUtility rip of /scene/monte0/
+firewanwan -- game units, 8 + 0 bck clips; wanwan_0.png, wanwan_1.png, wanwantail.png (the bmds' textures) and K_wanwan.png, K_wanwan_eye.png,
+K_wanwan_tail.png (their toon ramps); the glb .imports swap the body's three materials and the link's one for the .tres). CHANGED `assets/Mario.cs` (+13,
+three anchored lines by npc82/monte149/patch_mario149.py: `MarioState.pulling` after `wire`, the dispatch to SmsTickPull after the roofHang block, the
+hitNoKeepPull entry before the take's B check). Tools: npc82/monte149/{patch_mario149.py, patch_import149.py, probe_clips149.gd, patch_smoke149.py (drive
+149 + its capture mode), run_drive149.bat / run_cap149.bat, btk_dump.py, glb_skin_dump.py, queue14_close.py, cap/, logs/, disc/ (the two bmds, the 8 bcks,
+the btk, the rip folders), decomp/ (fireWanwan.cpp, FireWanwan.hpp, bosswanwan.cpp, BossWanwan.hpp, MarioSpecial.cpp, MarioMove.cpp, MarioAction.cpp,
+MarioMain.cpp, MarioReceiveMsg.cpp, graph.cpp, Graph.hpp), ref/}. Sources: fireWanwan.cpp / FireWanwan.hpp (TFireWanwan, TFireWanwanTailHit,
+TFireWanwanTailNode, TTailRubber, TFireWanwanManager), MarioSpecial.cpp's pulling() (1168) and getCurrentPullParams (1140), MarioMove.cpp's moveRequest
+(125), MarioCheckCol.cpp's checkCollision table (ACTOR_TYPE_FIRE_WANWAN_TAIL_HIT -> hitNoKeepPull), the shipped fireWanwan.prm (sms_shipped_params.json:
+HeadHeight 50, BodyRadius 6, WallRadius 260, HitPointMax 60, ActiveEnemyNum 4, SearchLength 1300 / Height 1000 / Aware 10 / Angle 120, GiveUp 2000 / 300,
+AttackWait 120, FreezeWait 300, damage 180 x 400, attack 200 x 420, turn 1, body scale 2, march 3, AttackSpeedRate 2.3, AttackTimerMax 360,
+EscapeRecoverTime 1500, FlySpeed 100, FlyGravityY 5, AirFric 0.993, FloorFric 1, RotateY 1, NoCollideTimerMax 300, StopSearchTimerMax 600, TailLengthToFly
+50, PolluteTimerMax 20, FreezeTimeThreshold 50, FreezeWaitShort 120, RecoverRate 0.1, PolluteNormalRate 0.7 / AttackRate 1.5, TailEndPowRate 0.2,
+RubberBoundRate 0.3 / Decay 0.55, RubberBoundRateHitting 0.7 / DecayHitting 0.6, TailEndColRange 150, TailApartPowRate 0.25, TailMaxLength 300) and
+pullparamfirewanwantail.prm (V 0.3, H 0.2, oil 0.1 / 0.01), the bmds' MAT3 (the body's and the link's one recipe: stage 0 (TEXC toon, RASC, KONST 1/8, C0)
+SUBHALF / 2, stage 1 (RASC1, TEXC, CPREV, ZERO); C0 (-50, -50, 50) at rest -- the game writes (400, -50, -100) on fire, (260, 260, 270) beaten; the eye
+and mouth KONST 3/4, C0 (400, 404, 424) / (350, 350, 350); the ambient (25, 75, 100); the eye alphaCmp GEQUAL 128; the mouth cull NONE), the bcks' ANK1
+headers (damage 20 L, hit 20 L, return 39, run 20 L, run_end 39, search 39, wait 40 L, walk 40 L), the btk wanwan_eye (5 frames, looped: the pupils' S / T
+scale X 1 / 1.3 / 1 / 0.9 / 1, Y 1 / 0.9 / 1 / 1.3 / 1), the bmds' JNT1 (the body's root, center (0, 60, 0), jnt_jaw, jnt_head, jnt_body, null_tail
+(79.3, -16.8, 0) -- the chain's root; the link's root, tail_null2 (0, 0, -10), tail_null1 (0, 0, 10) -- the bar to the next link).
+
+**The game.** TFireWanwan : TSmallEnemy. init: ACTOR_TYPE_FIRE_WANWAN, unk150 1, the default GRAPHWANDER, the tail hit (the chain) made, the body
+colour's TLerpControl on `_mat_body`'s GX_TEVREG0, the placed point kept. reset: there again, on fire, the tracer reset, the shortest graph node, the
+march speed, red at once. The bcks: 0 damage, 1 hit, 2 return, 3 run, 4 run_end, 5 search, 6 wait, 7 walk; the btk wanwan_eye runs in the cooled states,
+frozen at 0 in RECOVER. doWalk: sprayed this half-second -> bck 1 (the flinch), a clip done -> walk; walkToCurPathNode(march, turn). doEscape: the same
+with bck 0 (damage) at march x EscapeSpeedRate. doAttack: the same at march x AttackSpeedRate (run), done = isMissMario (Mario hidden, in water or on its
+surface; |dy| > GiveUpHeight; the goal past GiveUpLength). decideTarget / doAdjustTarget: a slerp of the facing from the current yaw to the target over
+the clip's length. isFindMario: not while mStopSearchTimer runs, not with Mario in water, else the param search. receiveMessage: TRAMPLE / HIP_DROP ->
+false (a stomp does nothing); SPRAYED_BY_WATER -> WATHIT, the first-water sound at full hp, decHpByWater EVERY drop (no cooldown gate), behaveToWater, the
+cooldown started. behaveToWater: cooled -> the cool-more sound and the sweat; hp left -> the to-cool sound, wandering -> FINDMARIO (woken); hp 0 -> the
+cool sound, ESCAPE, the chain's fire out, cooled, the cooldown 20. behaveHitComrades (another Chomplet touched while walking, the no-collide timer out)
+-> the timer NoCollideTimerMax, TURN. kill (the pond): not already defeated -> DIE. moveObject: the timers; updateCollisionFromParam (the prm's hit
+cylinders, unscaled); the camera shake within CamShakeRange and the rumble; updatePollute: on fire, every PolluteTimerMax ticks a goop stamp at a random
+point along the body's X axis within AttackRadius, radius 375 x PolluteNormalRate (x PolluteAttackRate attacking); updateHitPoint: on fire the hp climbs
+back RecoverRate a tick to the max; checkHungTail: cooled (ESCAPE / FREEZE) and the chain taken -> HUNGTAIL; control; the hit actors (Mario ->
+attackToMario; another Chomplet -> the push + behaveHitComrades both ways; others -> the push); bind; the ground; checkInPond (on the ground, a pool or
+water surface under it, the body within HeadHeight of it -> kill); setBehavior. bind: vy -= the gravity (FlyGravityY flying / defeated, else mGravity),
+the terminal, |v| <= 100, v x AirFric; the step in 25-u pieces through 8 wall probes (the ground, the walls at WallRadius x 0.277); flying into walls ->
+the velocity reflected on the summed normal, the yaw from it, WALLKICK puffs, the shake, the reflect sound; flying on the ground -> v x FloorFric, vy x
+-0.05. attackToMario: on fire and not FLY / ESCAPE / RECOVER / FREEZE -> BURN to Mario, mStopSearchTimer = StopSearchTimerMax. emitEffects (the 'center'
+joint): on fire with hp -> CAN_YUGAMI (the heat haze); sprayed -> CAN_HITYUGE (steam); FREEZE under mFreezeWait -> POI_KIZETSU (the dizzy stars); flying
+or held -> M_SLIPSMOKE (150 u ahead when held); RECOVER -> HIKAGE1_A x 1.8; defeated -> the steam for 600 ticks, BWAN_KIRA sparkles, HAMON_A / B ripples
+at the water. calcRootMatrix in DIE: the model 160 u down its own Y axis. The nerves: GRAPHWANDER walk, the goal reached -> a random next node,
+isFindMario -> FINDMARIO after, doWalk. TURN: prepareTurn (the target = yaw + 180), search, the clip done -> walk, doTurn (RotateY a tick) ->
+GRAPHWANDER after. FINDMARIO: search, decideTarget (Mario), doAdjustTarget, the clip done -> ATTACK after. ATTACK: run, the goal Mario, doAttack ->
+RECOVERGRAPH after, past AttackTimerMax -> TIRED after. TIRED: run_end, past AttackWait -> FINDMARIO (found) or RECOVERGRAPH after. RECOVERGRAPH:
+search, the tracer reset, the nearest node, decideTarget, the clip done -> walk, done -> GRAPHWANDER after. RECOVER: return, the btk frozen at 0, the
+manager's count, the sound, red over the clip, the clip done -> recoverFire (hp max, on fire), the default after. DIE: damage, the fire out, the pitch
+90, the manager's counts (all dead -> the balloon), the sounds, silver over 40, the water column, hp 0, every tick the velocity's XZ x 0.9. HUNGTAIL:
+damage + the btk, the yaw = the way from Mario to it (its back to him), isReadyToFly (not taken and the chain within TailLengthToFly) -> FLY after. FLY:
+damage + the btk, the velocity = polar(yaw, the throw power), FUMI_C at the tail, mFreezeWait = FreezeWait (|v| > FreezeTimeThreshold) or FreezeWaitShort,
+every tick v x AirFric, the XZ speed under 1 -> FREEZE after. FREEZE: damage + the btk, the twinkle, the velocity 0, past mFreezeWait + 75 -> RECOVER
+after. ESCAPE: the node away from Mario, damage + the btk, black over 40, past EscapeRecoverTime -> RECOVER after, the goal reached -> a random escape
+node, doEscape, the bark. TFireWanwanTailHit : TTakeActor with its TTailRubber(5): nodes (pos, vel), the head fixed at the tail joint, the tail free
+(held: fixed), bound rate 0.25 / decay 0.5 (the prm's while it lives: RubberBoundRate / Decay; HUNGTAIL not taken and not ready to fly ->
+RubberBoundRateHitting / DecayHitting, the snap back; ATTACK 0.7 / 0.4), the max length 10000 (TailMaxLength while the body flies). movement: adjust
+(each node's vel += (prev - it) x rate + (next - it) x rate, x decay), restrict (the horizontal length over the max -> from the held tail or the free
+head, each segment over the average shortened to it), bind (the inner nodes: the ground under next + 40 (+ 21 at rest), at or under it the vel zeroed and
+y set to it; a one-wall XZ push of 20; vel = next - pos), then pos += vel. The hit cylinder 30 x 200 -> TailEndColRange x 200 every tick, no attack, in the
+enemy group; five wanwanTail.bmd links (the fifth, the ring, at twice the body scale), all carrying the body's GX_TEVREG0 colour; performNodes (link i at
+node i facing node i + 1, its tail_null1 joint set at node i + 1: the bar stretches to the next); on fire MOE_FIRE_A/B/C/D at the ring, scaled by the body
+scale x hp / max (the flame shrinks as the hose cools it); held: the taking matrix from (the ring - the body) with the up axis, bindBody (the hit point +=
+the tail node's vel x TailEndPowRate, XZ; the holder moved there with his own y: the chain's spring drags him), the pull sound while the length grows.
+receiveMessage from Mario: TAKE -> canTakenByMario (the body cooled: ESCAPE or FREEZE) -> behaveTaken (the holder, the tail fixed, the hold sound);
+THROWN / DETACH -> behaveApart (the tail free, the throw power = (TailApartPowRate x the length / FlySpeed) clamped 0..1, squared, x FlySpeed; the holder
+null). moveRequest (his pulling(), each frame): the ground under + 100 -> at or under it y = ground + 1; + 50; a one-wall push of 70; the tail node, the hit
+point and the taking matrix there; true. TMario: hitNoKeepPull (MarioCheckCol.cpp 226): touching the handle with B HELD in a take situation (canTake) ->
+TAKE accepted -> MARIO_STATUS_PULLING with ANIM_HOLD, the handle his held object. pulling() (MarioSpecial.cpp 1168): the hand input released (B up) ->
+DETACH, PULL_END (ma_hold_return, 24 frames, then the wait); A -> PULL_JUMP (ma_hold_to_hang, a hop with the handle kept); his face = -Z of the handle's
+taking matrix; the stick read against his BACK: cosF = the part pointing away from the body (floored at 0: a stick toward the body pulls nothing), sinF
+the part across it, both x mIntendedMag; pos += rateV x cosF x back + rateH x sinF x across (getCurrentPullParams: pullparam*.prm, OIL_PULLING on goop);
+the handle's moveRequest(pos) -> true -> he stands at pos; the clip by the frame's movement against his face: under 1 u -> ma_hold_wait, toward the body
+(within 45 deg) -> ma_hold_drag, away (past 135) -> ma_hold_back, the sides -> ma_hold_move_r / _l.
+
+**The port.** `SmsFireWanwan : SmsSmallEnemy`, Prm = the shipped prm; twelve nerves GraphWander / Turn / FindMario / Attack / Tired / RecoverGraph /
+Recover / Die / HungTail / Fly / Freeze / Escape (NerveSpecies + 0..11; the base's Die and Freeze unused) as the game's above; its own SmsSprayedByWater
+(every drop -1, no cooldown gate), HitCheckMario (the prm's unscaled cylinders, no stomp bounce; a cooled one bumps him away through SmsKeepDistance),
+AttackToMario = TakeDamage(SmsDamageProfile.Fire) + StopSearchTimer; KeepVelocityOnGround while flying / defeated; the wall bounce from the base's
+OnWallContact (the reflect on the summed normal); the pond from the base's water areas (WaterSurfaceAt). The chain is `SmsFireWanwanChain :
+SmsPullHandle` (FireWanwan/SmsFireWanwanChain.cs), made at Init beside the body (a deferred AddChild to its parent, Setup on the first MoveObjectPre,
+freed in _ExitTree) and stepped after the body's move each tick with the null_tail joint's world point: the five-node rubber as the game's (adjust /
+restrict / bind, the ground a ray on the body's mask), five wanwantail.glb instances (TopLevel; the ring at twice the body scale), the bar joint
+tail_null1 posed at the next node by SetBoneGlobalPose, the fire = FireFxScene (Fx/StuFire) under the ring scaled by hp / max + FireOffFxScene when it
+goes out, the ring's colour following the body's. Mario's grab is new plumbing shared with later pulls (the Gooper Blooper's tentacles):
+`SmsPullHandle` (assets/Sms/SmsPullHandle.cs: the group sms_pullable, HitRadiusUnits / HitHeightUnits, CanBePulled, TakingTransform, MoveRequest,
+PullRateV / H and the oil rates) and `MarioPull.cs` (a Mario partial: SmsFindPullHandle (the grab cylinder against his take reach), SmsPullBegin (the
+TAKE into `MarioState.pulling` with ma_hold), SmsTickPull (the game's pulling(): the stick against his back x mIntendedMag x 30 x delta / U, `_smsDirty`
+selecting the oil rates, the handle's MoveRequest, the clip by the movement, B up -> DETACH -> ma_hold_return -> idle), SmsPullSubName for the drives).
+The heat colour is the shared EnemyToon shader's c0 on the body and the five links, lerped as the game's TLerpControl ((400, -50, -100) / 255 on fire,
+(-50, -50, 50) / 255 cooled, (260, 260, 270) / 255 silver). The materials (EnemyToon form 0, the bmds' recipe): FireWanwanBody.tres (s0_k 1/8, the ambient
+(25, 75, 100) / 255), FireWanwanEye.tres (its own FireWanwanEye.gdshader: the toon form with a `uv_scale` the species keys from the btk's five frames
+while cooled, alpha scissor at 1/2), FireWanwanMouth.tres (EnemyToonTwoSided, c0 350 / 255), FireWanwanTail.tres (s0_k 1/8, the ambient 0.502). Knobs
+(grouped, plain English): Deviations (SpeedScale), Effects (FireFxScene = Fx/StuFire, FireOffFxScene = Fx/StuFireOff, SlipSmokeFxScene = Fx/SlipSmoke,
+WallKickFxScene = Fx/WallKickDust, LaunchFxScene = Fx/TrampleDust, DizzyFxScene = Fx/BonkStars, SteamFxScene = Fx/GkKemuriW, SplashFxScene =
+Fx/WaterSplash; HeatHazeFxScene, SweatFxScene, ReheatFxScene, SparkleFxScene, RippleFxScene slots), Sounds (eleven slots). The scene: CharacterBody3D
+(sms_enemy, mask 5), Model at 1 / 74.44, a sphere r 1.9 m at 1.95 m (the game's 2 x scale: about 3.8 m tall), RelaunchTicks -1, a plain-English `_sms_note`
+(drop it facing +Z; spray it to 0, grab the ring with B within 2 m, walk backward, let go).
+
+**Deviations (logged; knobs where they matter):** A while pulling lets go and jumps (the game: PULL_JUMP, ma_hold_to_hang -- a hop with the chain kept);
+the chain's nodes read the ground but no walls (the game's one-wall push of 20 / 70 u); the chain's drag on the holder is applied a quarter a tick
+(TailEndPowRate / TicksPerFrame: the game applies it once a 30 fps frame against his pull of that frame, the port steps the chain four times a frame --
+at the full rate each tick the spring out-pulled the stick 4:1 and the chain settled at 130 u instead of stretching); the camera shake, the rumble and
+the manager (TFireWanwanManager: the help balloons, the shine when all are beaten, the reset off the map) are not ported; the 8-point wall probe is the
+body's collider; the node radius and the chain's clipping are not ported; the heat haze, the sweat, the reheat shimmer, the sparkles, the ripples and
+the sounds are slots.
+
+**Verification:** drive 149 (patch_smoke149.py, SMS_YCAM_SMOKE=1; two game ticks a physics frame) 14/14 on a 200 x 200 m hard dock 80 m over the arena
+with a pond (an sms_water + sms_pool box 14 x 14 m, its surface 0.5 m over the dock) 25 m south: W1 placed facing Mario 10 m off: GRAPHWANDER finds him at
+once -> FINDMARIO (search), hot, the ring burning, a goop stamp already, the body scale 2 (3 frames); W2 the search clip done -> ATTACK (run) facing him
+(40 frames); W3 the charge reaches him: BURN -- health 8 -> 7, his hurt state, `down Fire`, the search stopped (37 frames); W4 Mario put 36 m off (past
+GiveUpLength 2000): isMissMario -> RECOVERGRAPH -> GRAPHWANDER (walk) (65 frames). H1 two drops from 7 m behind it: hp 60 -> 59 (every drop counts, +1
+back every 10 ticks), a wandering one woken -> FINDMARIO (4 frames); H2 the hose kept on it: hp 0 -> ESCAPE (the flinch clip as the last drops land),
+the chain's fire out, the pupils wobbling, canTakenByMario (34 frames); H3 40 frames on: black (-0.20, -0.20, 0.20), running off, more water does
+nothing. P1 Mario put 1.6 m from the ring facing it with B held: hitNoKeepPull -> PULLING (ma_hold), the chain held (216 u), HUNGTAIL (1 frame); P2 the
+stick back for 70 frames (a camera-aware push): the chain 216 -> 331 u, Mario 2.01 m further off, ma_hold_back, 69 pulls; P3 B released: DETACH, his
+PULL_END, the chain snapping home -> FLY away from him at 75 u a tick (the throw power 76), the launch dust (8 frames); P4 the slide dies -> FREEZE after
+154 frames, 69.7 m out, still cooled and grabbable; P5 FREEZE past mFreezeWait + 75 -> RECOVER -> hp 60, hot, red, the ring's fire back -> GRAPHWANDER
+(227 frames). D1 a second Chomplet facing the pond, cooled, grabbed from the north (the drive sets Mario 8 m north 60 frames into the pull so HUNGTAIL's
+turn sends the fling south) and released: FLY over the pond -> checkInPond -> DIE: the damage clip, the pitch 90, the fire out, hp 0, isDefeat (23-32
+frames); D2 120 frames on: silver (1.02, 1.02, 1.06), still DIE, the chain cold, the slide damped to 0.9 u a tick. (Run a 8/14: H1 expected the flinch
+clip in the search (it rides only the walk, escape and run) and hp 58 (one drop a frame landed); H2 expected the damage clip only (the flinch runs while
+the last drops land); P2 the chain's drag at the full rate each tick pulled him 0.6 m TOWARD the body and the chain shrank 208 -> 129 u -> the drag
+divided by TicksPerFrame; P3 read his pull sub-state a frame early ("End" accepted); D1 / D2 the fling went north onto the dock (Mario stood south of the
+ring): the drive's placement fixed. Run b 14/14; the capture run 14/14 again.) Build 0 errors, boot ALL OK. GPU captures (SMS_F149_CAP=1 under
+run_gpu.ps1, cap/): the hot Chomplet (the red body, the burning ring), the charge, the burn knock, the spray, the cooled black one with its pupils, the
+pull pose on the stretched chain, the launch with its dust, the dizzy stars, the silver one on its side in the pond.
+
+**Note for the drives:** a cooled one grabbed from 1.6 m holds the chain at ~216 u; the stick back for 70 frames at the quartered drag stretches it to
+~330 u and the release flies it ~70 m on a flat dock (75 u a tick at launch), so the pond must lie that way; HUNGTAIL turns its back on the holder, so
+where Mario stands when B goes up decides the fling's direction; the recover from FREEZE takes mFreezeWait 300 + 75 ticks (about 190 frames).
+
+### 150 -- the Chain Chomp: Pianta Village's house-sized red-hot Chain Chomp on its 15-link leash, cooled by the hose, dragged by its stake to the hot spring (feature/enemy-monte, `7876f9a`)
+
+**Files:** NEW `assets/Sms/Enemy/BossWanwan.tscn`, `SmsBossWanwan.cs` (+ .uid), `assets/Sms/Enemy/BossWanwan/` (SmsBossWanwanLeash.cs (+ .uid), the two
+shaders BossWanwan.gdshader (+ .uid) and BossWanwanEye.gdshader (+ .uid), eight .tres -- BossWanwanBody / Root / Scar / Mouth / Teeth / Chain / Picket /
+Eye), `models/Eniemes/BossWanwan/` (bwanwan_body.glb (7 bck clips), bwanwan_chain.glb and bwanwan_picket.glb (no clips) from his FinModelUtility rip of
+/scene/monte1/bwanwan -- game units; bwanwan_body_0 / _1.png (the body's two textures), N_bwanwan_body.png (the 16 x 16 body palette), N_bwanwan_env2.png
+(the teeth's sheen), N_mat_spe1.png (the glint), N_bwanwan_kui.png (the stake's wood), N_bwanwan_me_open / _close / _cross.png (the eyes, decoded from the
+bmd's own TEX1 -- the glb's exported eye was one frame), bwanwan_chain.png, bwanwan_picket.png; the glb .imports swap the materials for the .tres).
+CHANGED `assets/Sms/SmsCameraShake.cs` (+15, StartMode(mode, scale) -- an actor's own shake .prm beside the three Mario kinds; patch_shake150.py),
+`assets/Sms/MarioPull.cs` (+5, SmsIntendedMag / SmsPullStickDir -- a handle's owner that reads his stick, the boss's drag), `assets/Sms/Enemy/FireWanwan/
+SmsFireWanwanChain.cs` (+1, the ensureTakeSituation guard the new picket also carries: his hands leave a held chain without a DETACH on a burn or fall).
+Tools: npc82/monte150/{patch_import150.py, patch_shake150.py, probe_clips150.gd, patch_smoke150.py (drive 150 + its capture mode), run_drive150.bat /
+run_cap150.bat, make_tres150.py, cap/, logs/, disc/ (the three bmds, the 7 bcks, the brks / btps, the rip folders, bwanwan_ofuro_col.col, the jpa list),
+decomp/ (bosswanwan.cpp, BossWanwan.hpp)}. No bosswanwan.prm ships in the game, so the numbers are TBWParams' own PARAM_INIT defaults.
+
+**The game.** TBossWanwan : TSpineEnemy. init: bwanwan_body.bmd (7 bcks: 0 bark 214, 1 down 105, 2 shake 55, 3 sleep 3 L, 4 wait 25 L, 5 wait2 25 L, 6
+wakeup 135; the brks 0 body, 1 body_gold, 2 chain, 3 chain_gold, 4 root -- the heat lerp; the btps 0 tdown, 1 tsleep, 2 twakeup -- the eyes), the graph
+"bwanwan" with its goal node at the bath (BW_BATH_POS), GRAPHWANDER, march 6 / turn 1, the body at BW_HEAD_START, the 15-node leash and the picket at
+BW_PICKET_START, STAKED (mIsNearMario), the two body hits (TBWHit at joint 3: attack 500 x 500 / receive 450 x 500; 500 u below the first: 300 x 500 /
+270 x 500), the body radius 500, the wait clip, brk 0 at the hit points' frame, 255 hit points, the bath collision model (bwanwan_ofuro_col.col) made
+then removed. perform (CUE_CALC_ANIM): the body brk frame = hp / max x 299 (hot at the max, cold at 0), node 0's chain temperature at 0 / max,
+emitEffects; the two hits; hot and staked and pulled once -> 600 ticks -> SHAKE; at 0 and not barking -> 2400 ticks -> BARK; else every 20 ticks a hit
+point back; staked wandering with the picket taken -> the drag sound. control: staked, or the picket taken and the head pulled (|mPicketPullDelta|^2 >=
+PullLimit 1) -> mPositionDelta += the pull, the turn to put its back to the chain's node 3 (4 x the turn speed). TBWBinder::bind: airborne -> gravity /
+the terminal; JumpToBath / Die -> no ground; on the ground the movement is projected onto the graph's rail (at least 3 u a tick along it, pulled back
+onto the line 10 u at most) and the body rolls (unk168 += the distance / (2 pi 500) x 720, reset past 360); staked -> kept within 860 u of node 3.
+receiveMessage: Mario -> nothing (no stomp); WATER -> the WATHIT mark and a sound (1 left -> TO_COOL + the great steam; 0 -> COOL_MORE; else COOL), a
+hit point off, the steam flag; a WOOD_BARREL (Pianta Village's water barrels) -> 0 at once. GRAPHWANDER: wait (wait2 at 0 hp), the tdown btp held at 0
+(the eyes open); LOOSE, the picket taken and the head pulled -> within 400 u of the previous rail node: the goal node -> JUMPTOBATH, else the rail
+reversed toward Mario; slide(3 x hp / max x march, turn) (0 at 0 hp -- Mario drags it); the goal reached -> jumpToNextGraphNode (a flagged node -> JUMP
+to its neighbour) or rollNextGraphNode (the next node within 100 deg of its facing, the one most away from Mario); the picket taken -> slide at hp / max
+x march x (1 - 0.75 x his stick . the way to him), clamped 0..1.5. JUMP: the ballistic velocity to the goal; reached -> GRAPHWANDER. BARK: the bark clip;
+pulled once and staked -> the stake out (the smoke, ESCAPE1); tick 280 -> hot again; the end -> GRAPHWANDER. SHAKE: the shake clip; the end ->
+releasePicket, loose, ESCAPE2. JUMPTOBATH: the velocity to the bath (y speed 10); past 120 ticks near the bath's y -> the water column (x 5) + DIVE;
+within 100 u at / under the bath's y -> the body at the bath, DIE. DIE: the velocity 0, no bind, DEADYUGE; hit points left -> one off a tick; then the
+down camera, takeBath (invincible, the body at the bath, the collision model up x 1.1, the hits / leash / picket collision off), the down clip, the
+tdown btp (the blinks then the X eyes), the GOLD brk (0 -> 300, held), past tick 60 the Shine (makeShineAppearWithDemo), the sparkles past half the gold.
+shakeCamera: Mario on the ground; the reach = ShakeLengthMax 3000 x r + ShakeLengthMaxHP0 2000 x (1 - r), r = 1 barking else hp / max; the power (reach
+- his distance) / reach x r. The LEASH (TBWLeash): a TRope(15, LeashNodeLen 120, ChainGroundRadius 60, 0.7, -2.0), the head (point 0) at joint 5
+(chain_null) every tick, the tail (point 14) at the picket; the rope hangs and drags under -2 a tick with 0.7 of its motion kept, resting 60 u over the
+ground, no segment past 120; constraintTail(pos) plants the tail and shortens the segments from it, so a taut chain MOVES THE HEAD (pullTail keeps that
+head displacement as the body's drag, mPicketPullDelta). Each node has a temperature that flows down the chain from the body (node 0 = hp / max, the
+rest toward their inner neighbour 0.02 / 0.005 a tick) and keys bwanwan_chain.brk at its frame (node i = temperature x the reach: nodes 0-4 i / 4 + hp /
+max, the last ten (15 - i) / 10, else 1 -- the chain glows by the body, cold by the stake); node i's model at point i + 30 up facing node i + 1, the odd
+links a quarter turn; the hit (ACTOR_TYPE_BOSS_UNKC, ChainHit x 2) burns Mario in a hot node under 8; the last two nodes draw nothing (the picket sits
+there). The PICKET (TBWPicket : TTakeActor, ACTOR_TYPE_BOSS_WANWAN, PicketRadius 100 x PicketHeight 100 at the tail): HIP_DROP -> staked again (the LOCK
+sound); TAKE -> releasePicket (the smoke if staked), loose, the holder; THROWN / DETACH -> the holder gone; moveRequest (his pulling(), each frame) ->
+FALSE in JumpToBath / Die or with hit points left (a hot Chomp drags HIM -- the tail is a free rope point and the picket's perform puts him at it),
+else pullTail(his hand) -> TRUE (a cooled one is dragged). Mario: hitNoKeepPull (MarioCheckCol.cpp 414) -> PULLING with pullparambgfirewanwanbosstail.prm
+(V 0.25, H 0.07, oil 0.1 / 0.01).
+
+**The port.** `SmsBossWanwan : SmsSmallEnemy`, Prm = TBWParams' defaults; six nerves GraphWander / Jump / Bark / Shake / JumpToBath / Die (NerveSpecies +
+0..5; the base's Die and the walker nerves unused). Its own HitCheckMario (the two body cylinders burn Mario when hot; the leash's first 8 nodes burn
+when hot, all the nodes keep him out through SmsKeepDistance; the hose on the body; the ground pound on the stake -> the picket's HIP_DROP), no stomp
+(receiveMessage Mario -> false, TBossWanwan::kill() empty). The body's hose / keep-distance surface is `SmsBossWanwanBody`, a StaticBody3D of the game's
+two receive cylinders (270 x 500 from the feet, 450 x 500 from the centre up) that the hose's drops' rays hit and Mario walks against, scaled 1.1 in the
+bath (the collision model he climbs). The leash is `SmsBossWanwanLeash` (a sibling made at Init, set up on the first MoveObjectPre, stepped after the
+body's move, freed with it): MoveHead (the verlet step -- every free point falls under GravityY with Damping kept, rests GroundRadius over the ground by
+a ray, the segments held from the head), PullTail (the tail planted, the segments from the tail, the head's displacement handed to the body), the body
+sphere kept clear, the temperatures, the links placed with their own copies of BossWanwanChain.tres (c1 / c2 from the chain brk at each node's frame),
+the picket (`SmsBossWanwanPicket`, an SmsPullHandle child -- the sms_pullable stake Mario grabs). The rail is the scene's Graph node's children IN ORDER
+(node i joins i - 1 / i + 1; a child with metadata `sms_jump` = the game's jump flag); the goal node is the one nearest BathPoint; no Graph -> random
+points within WanderRadiusUnits (DEVIATION, as the base's) and no rail projection. The heat is the brk's keys (BrkBodyC1 / C2, BrkGoldC1 / C2, the
+mouth's own) written to the body, root and mouth materials and each chain link by its temperature; the eyes' btp (bwanwan_tdown) swaps the eye
+material's picture (open / close / cross). The camera shakes are SmsCameraShake.StartMode with two SmsCameraShakeMode knobs (the game's shakebowaland1:
+20 ticks, pitch 100 at 5000; shakebowaland2: 80 ticks, pitch 150 at 4000, roll 100 at 2000). The two shaders: BossWanwan.gdshader (the body / chain /
+picket, three TEV stages on the enemy-toon lighting with the env-map glint, bw_form 0 / 1 teeth / 2 mouth), BossWanwanEye.gdshader (the translucent
+eye decal). Knobs (grouped, plain English): the level's points (BathPoint, PicketPoint, ShineScene, ShineSpawnPoint), Deviations (SpeedScale, RollSw,
+JumpSpeedY, ColdTicks, ShakeTicks), Effects (StompDustFxScene = Fx/HipDropLanding, SteamFxScene = Fx/GkKemuriW, SplashFxScene = Fx/WaterSplash; the
+rocks / sparks / heat haze / sparkles slots), Camera (the two shakes), Sounds (ten slots). The scene: CharacterBody3D (sms_enemy, mask 5), Model at
+1 / 74.44 raised 6.7 m (the body's centre joint sits 500 u up), a small foot sphere r 1.5 m, RelaunchTicks -1, a plain-English `_sms_note`.
+
+**Deviations (logged; knobs where they matter):** the demo cameras (the dive, the Shine reveal), the help balloons and the rumble are not ported; the
+bath collision is the two receive cylinders x 1.1, not bwanwan_ofuro_col.col; the 10-frame motion blend of changeBck is not ported (the clips cut); Mario's
+clip while a HOT Chomp drags him by its stake stays the hold (the game has no dragged-victim clip either); the rope reads the ground by a ray (no walls)
+and is clamped so a jerk of the head cannot fling a free node above the body (an instability the game's ground-bound rope never shows); JUMPTOBATH hops
+again up to three times if a leap lands short of the BathPoint (the game's bath is a pit the one leap always ends in; the port's is a point on whatever
+floor the level has); the ColdTicks / ShakeTicks timers are knobs (the game's 2400 / 600 counts = 20 s / 5 s here, raise them for a long drag); the
+body's roll is a knob (RollSw).
+
+**Verification:** drive 150 (patch_smoke150.py, SMS_YCAM_SMOKE=1; two game ticks a physics frame) 22/22 on a 300 x 300 m hard dock 80 m over the arena
+with a bath box 25 m behind the Chomp: S1 placed -- GRAPHWANDER in the wait clip, hot (255), STAKED to its picket 1000 u behind, the 15-node leash laid
+to it, the eyes open, the body red (c2 (250, 0, 0)); S2 260 frames of its rampage on the leash -- the wait clip's stomps every loop, the chain holding it
+within its reach; S3 Mario at the hot body's edge: the TBWHit cylinders -> BURN (-1 HP, the fire knock). G1 B held at the stake of a HOT Chomp:
+hitNoKeepPull -> PULLING (ma_hold), the stake out, the Chomp loose; G2 moveRequest refused while hot -> the Chomp drags Mario 3 m+ by the stake he holds.
+K1 a ground pound on the loose stake: HIP_DROP -> staked again (the LOCK); K2 hot / staked / pulled once for 600 ticks -> SHAKE (the shake clip); K3 the
+shake's end -> the stake out, loose, ESCAPE2. H1 two hose drops a frame: a hit point off each, the steam, the brk red easing; H2 kept on it: 255 -> 0,
+cold (c1 (0, 30, 80), c2 (0, 0, 60)), node 0 of the chain cold; H3 the wait clip's loop out -> wait2 (the cold wait). B1 at 0 for 2400 ticks -> BARK
+(the bark clip); B2 tick 280 -> 255, red again; B3 the end -> GRAPHWANDER with the bark's stomps and shakes counted; B4 the hose again -> 0 for the
+drag. P1 B held at the stake of the COLD Chomp -> PULLING; P2 the stick back -> the chain stretched taut, the head's displacement dragging the body (its
+back to node 3); P3 dragged within 400 u of the bath -> JUMPTOBATH (the leap at 10 u a tick); P4 landed at the bath -> DIE, the water column. D1 takeBath
+-- invincible, the collision x 1.1, the stake off and let go (Mario released), the down clip, the gold brk started; D2 the down clip out, the tdown btp
+at the X eyes, the gold past half, the Shine after tick 60; D3 the gold brk's 300 frames out and held -- c1 (120, 100, 0), c2 (220, 160, 0), the golden
+Chomp for good. (Earlier runs: the hot grab read a post-burn B as an airborne dive -- the drive now places Mario and lets him settle to idle before
+pressing B; the ground pound missed the whipping loose stake -- the drive glues Mario to the tail each tick in the pound; the long windowed drag's
+timing wobbled -- the Chomp is re-placed 12 m from the bath for a deterministic short drag and the leap hops again if it lands short.) Build 0 errors,
+boot ALL OK. GPU captures (SMS_F150_CAP=1 under run_gpu.ps1, cap/): the hot Chomp (the red body, the teeth, the eye), the burn (Mario at the mouth in the
+fire burst), the drag (Mario flung by the hot Chomp), the shake (the stake wrenched), the hose steam, the cold blue Chomp, the bark, Mario holding the
+brown stake with the chain up to the cold Chomp, the leap, the bath (the blue Chomp in the water, steaming) and the golden beaten Chomp on the bath.
+
+**Note for the drives:** the Chomp is anchored to its stake (PicketPoint, or 1000 u behind the placed body) by a 15-link chain ~22.6 m long; to drag it
+you grab the stake COLD and back away, which stretches the chain taut (it starts with ~8 m of sag) before the body moves; a leap needs the body within
+5.4 m of the BathPoint; grabbed HOT the stake drags Mario instead; the cold-to-bark timer is ColdTicks (2400 = 20 s), the staked-to-shake timer
+ShakeTicks (600 = 5 s) -- the drives set them near their ends to reach BARK / SHAKE without the wait.
+
+### 150b -- the Chomps' reignition shows its fire building, and the Chain Chomp walks instead of tumbling (feature/enemy-monte, `3cbcc37`)
+
+**Files:** CHANGED `assets/Sms/Enemy/SmsFireWanwan.cs` (the pass 149 Chain Chomplet), `assets/Sms/Enemy/SmsBossWanwan.cs` (the pass 150 Chain Chomp).
+Tools: npc82/monte151/{commit150b.txt, append150b.py}. A polish fix on top of passes 149-150 after Jaysonn's first look: "the fire effects both Chomps
+don't show when they reignite" and "he rolls when moving, he needs to just walk".
+
+**The reignition.** The Chain Chomplet lit its chain's ring flame only at the return clip's LAST frame, and with ReheatFxScene an empty slot the whole
+reheat played with no fire at all. It now lights the ring flame the instant RECOVER begins and grows it from a quarter to full over the return clip, in
+step with the body's black -> red lerp (SetBehavior: `fireOn = (_onFire || IsRecovering) && !_dead`, `fireScale` ramped on BckReturn's frame; the chain's
+FireEffect already took a ramped scale and updates the emitter every tick, and the heat-haze gate now counts IsRecovering too), RecoverFire then holding
+it at full. The Chain Chomp snapped from cold blue to red-hot at the one bark tick (280) where its hit points restore; its heat now ramps 0 -> 1 across
+the whole bark roar (`HeatRatioNow = max(hp / max, time / 280)` while barking), so the body AND the chain links glow back up from cold as it barks (the
+body brk frame = HeatRatioNow x 299, the chain's ApplyColors reads it, the heat haze fires through the bark). Faithful: the game's boss has no literal
+flame -- its reignite is the heat glow, the YUGAMI haze and the HIBANA sparks, which is what now plays over the roar.
+
+**The roll.** The Chain Chomp tumbled its whole body as it slid down its rail -- a house-sized Chomp somersaulting instead of walking. The game rolls
+only an inner 'roll' joint (unk168 / MsMtxSetRotX on that node), not the body; the port's rig had turned the whole body. RollSw now defaults OFF (kept as
+a knob, with a doc line -- turn it on to try the tumble), so it walks upright; ApplyLook already guarded the roll behind `RollSw && _rollDeg != 0`.
+
+**Verification:** build 0 errors, boot ALL OK. Read by eye (the Chomplet's chain FireEffect now gets fireOn + a scale that ramps through RECOVER; the
+Chomp's body, chain and haze all read HeatRatioNow through the bark; RollSw off gates ApplyLook's body roll). Not separately captured -- a visual touch-up
+on top of pass 150's 22/22 drive and its eleven captures; Jaysonn plays the reignite himself.
+
+### 150c -- the Chain Chomp's stomp dust hugs the ground, its hot mouth throws sparks, and its steam stops dropping (feature/enemy-monte, `75fd1eb`)
+
+**Files:** CHANGED `assets/Sms/Enemy/SmsBossWanwan.cs`, `assets/Sms/Enemy/BossWanwan.tscn` (the _sms_note's effects line). Tools: npc82/monte151/
+{commit150c.txt, append150c.py}. A second polish pass on the pass 150 Chain Chomp after Jaysonn's playtest: "the dust and impact blue streaks sit too
+high when he stomps" (the walk itself now looks right, from 150b), "add the sparks coming out of his teeth", and "the steam coming off when spraying".
+
+**The stomp dust.** emitEffects fired the HipDropLanding burst at the feet (GlobalPosition -- the scene rests the body on the floor: the foot sphere's
+bottom is at the node origin, the model 500 u over it) but scaled it a uniform x 4, so its smoke and its blue impact streaks rose x 4 up the body. It now
+scales (4, 1.4, 4) -- as wide as before but low, so the dust and streaks hug the ground where it slams (the wait-clip bobs, the bark's three slams, the
+shake all call StompEffects).
+
+**The mouth sparks (HIBANA).** The spark slot was empty, so the bark / bob sparks never showed. It now defaults to HitBurst (ms_dmg_a/b, an orange-streak
+burst -- not the cyan electric ShockSparks, which would have clashed with the blue stomp streaks) and fires at the upper jaw's hinge + 200 u forward
+(HitUpUnits + PolarXZ(_yaw, 200), the mouth / teeth) instead of the body centre, on the bark passing 72 / the wait passing 6 or 12 / the shake passing 4.
+
+**The hose steam.** receiveMessage(WATER) sets a steam flag each drop, but emitEffects cleared it every tick while gating the puff to one tick in eight --
+so seven sprays in eight were dropped before they could show. The puff now fires every four ticks while the flag is set and clears the flag only when it
+actually fires (and if it has cooled to 0 by then the flag just clears -- the great cool-down steam already played on that drop), so a steady steam comes
+off the hot body under the hose. Its scale 1.5 -> 2.5 to read on the 13 m body.
+
+**Verification:** build 0 errors, boot ALL OK; the diff read by eye and against HEAD (the four hunks, nothing stray). Not separately captured -- effect
+tweaks on top of pass 150's 22/22 drive and its eleven captures; Jaysonn plays them. The rocks / heat haze slots stay empty (no faithful asset, and he
+named only the dust height, the sparks and the steam).
+
+### 150d -- the Chain Chomp's mouth throws ember sparks (a new hibana), its steam covers the body, its stomp streaks sit low (feature/enemy-monte, `a9984c3`)
+
+**Files:** NEW `assets/Sms/Fx/BwHibana.tscn` (ms_bwan_hibana -- the mouth sparks). CHANGED `assets/Sms/Enemy/SmsBossWanwan.cs`, `assets/Sms/Enemy/
+BossWanwan.tscn` (the _sms_note). Tools: npc82/monte151/{commit150d.txt, append150d.py; the pass-150 drive patch_smoke150.py / run_cap150.bat / run_gpu.ps1
+were re-used for a verification GPU capture}. The third polish round on the Chain Chomp after Jaysonn's 150c playtest: he gave Ref/TeethSparkRef to match,
+and said the sparks still did not show, the blue stomp streaks had gone, and the steam came "from the middle".
+
+**The mouth sparks (HIBANA).** 150c's HitBurst was an SmsFxBurst that DID fire (its Play restarts every child), but its white / orange hit-streaks were
+the wrong shape and sat at the jaw hinge (HitUpUnits) INSIDE the opaque head, so they read as nothing. New `assets/Sms/Fx/BwHibana.tscn`: a one-shot
+SmsFxBurst of ~28 glow1_spark embers off a 0.35 m sphere, spread 180, initial 2.5-6, gravity -14 (they fall), bright-yellow -> orange -> dark-red over
+0.55 s, additive billboards -- the scattered falling embers of Ref/TeethSparkRef. Emitted off the FRONT of the mouth (CenterUnits + PolarXZ(_yaw, 440) +
+up 80, just inside the 500 u front surface = the teeth) at _scale x 2, a steady ~4 a second while _hp > 0, plus the bark 72 / shake 4 accents (a
+DEVIATION from the game's sparse wait-frame hibana, for visibility).
+
+**The hose steam.** 150c emitted one GkKemuriW at CenterUnits -- "from the middle". GkKemuriW is rising smoke, so emitting at mid-body only pooled it
+above the head (a 4-puff mid-body ring, tried first, still plumed). It now emits LOW around the base -- a ring of three puffs ~160 u over the feet
+(PolarXZ at _yaw and _yaw +- 130) plus a belly fill, scale 2.2-2.6 -- so the rising steam sweeps UP across the whole hot body. Still every 8 ticks, the
+flag cleared only when it fires.
+
+**The stomp streaks.** 150c's (4, 1.4, 4) squash (meant to lower them) had flattened the blue impact streaks to nothing. Reverted to a UNIFORM x 2.6 --
+whole streaks again, but lower than the x 4 that read too high (the burst spawns at GlobalPosition, which the scene already rests on the floor -- the foot
+sphere's bottom is at the node origin).
+
+**Verification:** build 0 errors, boot ALL OK. Checked this round on a headless GPU capture (patch_smoke150.py's drive at SMS_F150_CAP=1, 22/22; the
+splice removed and Mario.cs restored to committed before the commit): the hot mouth's yellow-orange embers, the steam low around the body, the stomp dust
+at the feet -- the embers and steam compared against Ref/TeethSparkRef.
+
+### 150e -- the Chain Chomp's mouth sparks jet out as directional streaks (feature/enemy-monte, `73be638`)
+
+**Files:** CHANGED `assets/Sms/Fx/BwHibana.tscn` (an ember burst -> a streak jet), `assets/Sms/Enemy/SmsBossWanwan.cs` (the spark spawn now faces the mouth),
+`assets/Sms/Enemy/BossWanwan.tscn` (the _sms_note). Tools: npc82/monte151/{commit150e.txt, append150e.py; the pass-150 drive re-used for a verification
+capture}. Jaysonn on the 150d sparks: they "need to directionally go out of the mouth as longer short-lived streaks" (the steam and the stomp were fine).
+
+**The change.** 150d's BwHibana was scattered round embers (an emission sphere, spread 180, gravity pulling them down). It is now a forward JET: the
+emission is a 14-degree cone along +Z, initial 6-11, slight gravity; each particle is elongated along its own velocity (particle_flag_align_y on a
+0.07 x 0.8 quad -- a streak, not a dot), short-lived (0.32 s), at low explosiveness (0.2) so a continuous stream of streaks shoots out instead of one
+bunched birth-burst; the yellow -> orange ramp kept. The emit (EmitEffects) now spawns the burst FACING the mouth: it builds the same basis the body's
+look uses (fwd = PolarXZ(_yaw); new Basis(Up x fwd, Up, fwd)) times the scale, so the material's local +Z direction is the mouth's forward and the streaks
+jet straight out of the teeth (at CenterUnits + PolarXZ(_yaw, 460) + up 60), fired a steady ~4 a second while hot plus the bark / shake accents.
+
+**Verification:** build 0 errors, boot ALL OK; a headless GPU capture (patch_smoke150's drive, spliced then removed and Mario.cs restored to committed
+before the commit) -- the sparks read as elongated streaks jetting from the mouth, not the 150d scatter. The streak length (the quad's 0.8), the cone
+(spread 14), the speed (6-11) and the life (0.32 s) are knobs if the feel wants tuning in motion.
