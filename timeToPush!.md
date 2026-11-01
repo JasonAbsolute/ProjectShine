@@ -803,7 +803,9 @@ is EMPTY, so every file matches the branch including both log files. All three s
 `TamaNoko.tscn`, `Cannon.tscn`), the sunflower scene too, and `assets/Sms/Enemy/Kazekun.tscn` carries the normalized uid
 `d143ka0ekun`, so the hand-merge of that one line survived. `PROJECT_LOG.md` on `main` holds entries 139 through 146 once each,
 and this file holds both #12's and #13's result paragraphs once each with no conflict residue. `pr144.md` deleted.
-THE SHA FOR KIRO: `main` is at `3732f6a` after PR #12's squash, and `5a4bb52` is this entry's own closing commit on top of it.
+THE SHA FOR KIRO: `main` is at `3732f6a` after PR #12's squash, with `e4bbf68` the "#13 done" commit on top of it, then this
+one-line correction (a commit cannot state its own sha: the first write of this line guessed one, which was wrong. Read the
+current trunk tip from `git log --oneline -1 main` rather than from any sha written inside this file).
 Both Ricco and Pinna are on the trunk: eight species in eight passes, 139 through 146. Nothing from either branch is pending.
 The two feature branches `feature/enemy-ricco` and `feature/enemy-pinna` are merged and can be deleted whenever Jaysonn wants,
 local and remote. Left them in place rather than deleting without being asked.
