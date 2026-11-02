@@ -10375,3 +10375,83 @@ floor 80 m down taken as his floor (the ray now 10 m); the discs' trimesh 74 x t
 the pad bone's odd pose (the pad mesh's centroid instead); the drive's teleports undone by Mario's SMS ride (the drive clears _smsRideBody). Build 0
 errors. GPU captures (SMS_F153_CAP=1, cap/): the appear with the slot, the Boo attacker, the roll, the fan, the flinch and laugh, the spicy loop, the
 damage, the spinning table from above, the stopped pad, the coins, the Fire Stus, the wet clip, the down, the Shine.
+
+### 153b -- King Boo after Jaysonn's playtest: the bmd's real materials (a white see-through Boo with eyes, the blink, the rolled eyes), every effect, the slot finishing before the spit, lower over the table, the hints, the rumble, the shake tables, the BGM, the intro ride (feature/enemy-sirena, `a550172`)
+
+**Jaysonn's notes on 153:** (1) "the machine is not even done spinning before it does the action", (2) "king boo is transparent", (3) "no effects for
+anything", (4) "implement the missing things", (5) "he sits too high off the battle ground". All five taken; the port now reads the rip's own data
+instead of FinModelUtility's collapsed GLSL.
+
+**What was read (npc82/sirena151/):** `j3d_dump153.py` -- btelesa.bmd's TEX1 names, each MAT3 material's bound textures / konst / TEV registers / texgens /
+the TEV stages and the indirect block; the three .btp (texture patterns), the three .brk (register animations), bosstelesa.prm and the five
+params/camera/shakebtelesa*.prm (the real shake tables), btelesa_roll_camera.bck (the roll demo camera's two joints). `bmd_tex153.py` -- a CMPR / I4 /
+IA8 decoder with a hand-rolled PNG writer: the eye_half / eye_close / eye_roll sheets no material binds by default (FinModelUtility never exported them).
+`glb_uv153.py` / `eye_texel153.py` / `sheet_grid153.py` -- which texel each primitive's UVs sit on (the body's UV0: the eye sheet's WHITE; the crown's: the
+body sheet's gold and red strip; the fangs': its white; the mouth's: its reds). `glb_anim153.py` -- the clips' root translations (the appear carries jnt_body
+from -1293 to +826; the hide drops it to -1293: the hidden depth), `rulet_geo153.py` / `slot_geo153.py` -- the discs' faces (-130 / -95 / -80 on the three
+nodes) against the centre dome (-140..+20) and the slot machine's extents (its origin at its base, 642 u tall).
+
+**The materials -- 153's mistake.** The rip's `_mat_body.fragment.glsl` showed two textures and I read "TEX0 = the screen, a dark refraction" and laid
+N_btelesa_body over it -- which is the MOUTH sheet, not his skin. The bmd says: `_mat_body` binds the EYE sheet (texmap0, UV0), the noise polmask
+(texmap1, UV1), the white fluits dummy (texmap2), the indirect warp, the screen (H_ma_rak_dummy -> TScreenTexture at init) and the toon ramp; 8 stages:
+REG2 = SCREEN; REG0 = polmask.I > K2_A (COMP_GR16_GT); REG1 = K1 x dummy = the fruit TINT; PREV = EYE x REG0 + REG1 x (1 - REG0); REG0 = clamp(5/8 +
+mix(toon, COLOR0, 5/8) - 1/2); PREV = PREV + mix(REG0, COLOR1, 1/2) - 1/2 (no clamp); PREV = lerp(REG2, PREV, K0_A). The body's UVs sit on the eye sheet's
+white: King Boo is a WHITE Boo, and he is not alpha-blended at all -- the last stage MIXES him with the picture behind him by K0 alpha (unk34C.a, 0x96 =
+0.588; + 0x1E a lost hit point; 0xFF while hit). The crown: (C0 yellow + the toon shade) / 2 x the sheet's gold / red + the env2 sphere map / 2; the fangs
+and the mouth: the sheet + mix(the toon shade, the glint, 5/8) - 1/2; all three end in the same screen mix. BossTelesaToon.gdshader is that, per part
+(`part` 0 / 1 / 2; `opacity` K0_A, `tint` K1, `mask_k` K2_A, `env_tex`, the include's `pol_mask` on UV2 with pol_scale 1, `screen_tex` the screen in display
+space; ALPHA 1 -- the see-through is the mix). `GhostOpacity` is the knob (0.588 = the game). DEVIATION: Godot's screen texture is the opaque pass, so a
+see-through thing behind him is not in his mix; the bmd's indirect block has every stage's matrix OFF -- no wobble.
+
+**The .brk and the .btp.** btelesa_damage.brk (brk 0, the flinch): K2_A 0 -> 150 over 20 frames -- the body speckles into the fruit's colour through the
+polmask's noise (the fruit "paints" him); btelesa_lick.brk (brk 2): 150 through frame 39, then to 0 at 99 -- it washes off through the lick;
+btelesa_down.brk (brk 1, a spicy hit and the down): K0_A 0 -> 255 over 30 frames -- he blinks out and comes back solid (laid over unk34C.a in ApplyAlpha).
+A frame is two ticks (the bck clock). btelesa_twait.btp (btp 2, every wait): texmap0 = eye_open 19, half 2, close 3, half 2, open 2, half 2, close 3, half 2,
+open 50, half 2, close 3, half 2, open 58 -- a double blink, a single, 150 frames looped; btelesa_tspicy.btp (btp 1, the spicy loop): eye_roll (the dizzy
+spiral); btelesa_troll.btp is eye_roll too and the code never calls index 0. The port swaps the body material's eye sheet (`EyeOpen / Half / Close / Roll`
+knobs; the models' pngs by default).
+
+**The timing.** The game's TNerveBossTelesaSpitSlotItem counts 200 ticks from checkSlot = the last drum RELEASED (isRollDrum false), while that drum still
+decelerates 150 ticks and creeps up to 90 more: its machine can start dropping with the last drum still turning -- what Jaysonn saw. The port waits for
+the last drum to STOP (the fanfare), then `ResultPauseTicks` (200): the pause, the dip at 100 u a tick (the machine out of sight with the unclamped
+hosei), the spit clip, the fan at its frame 40. Logged as a deviation.
+
+**The effects (ms_btls_*, all 19 .jpa named in the rip):** fhit = HitBurst; fhit_pe / _or / _gr = EnemyDisap recoloured to the fruit (SmsFxBurst.SetShaderParam
+`prm` / `env`: the JpaDirBillboardAdd uniforms); damage = EnemyDisap at the hit; down = EnemyDisap x 3 at the body + the same in the last fruit's colour
+(down_pe / _gr / _or); tls_change = EnemyDisap on every swallowed item; fubuki = **BtlsFubuki.tscn** (an SmsFxBurst: 180 coloured scraps in six colours
+thrown up out of a box over the slot, angular velocity, turbulence, a 2.6-s fall) at a FRUIT / COIN fanfare; spicy_a..d = **StuFire** bound to jnt_sita_4
+(the tongue tip) through the spicy loop (clip 12) and ase = **NpcDripBody** at jnt_body -- SmsNpcEffect.Spawn under BoneAttachment3Ds, Stop() when the
+clip ends; spicy_hit = HitBurst x 2 at the mouth through bero_hit's first 20 frames; chika_a / b = **ChikaFx** (a GPUParticles3D in BossTelesa.tscn: the
+port's kira stars (kira_add + star4s_raw) popping in a 4.6-m ball about jnt_body); glow = **GlowFx** (a 10-m QuadMesh on **BtlsGlow.gdshader**: the
+glow_add billboard with `strength` = his opacity and a slow breath, pale blue-white, additive); yodare1 / 2 / 3 = **DroolMouthFx / DroolTongueFx**
+(JpaDirBillboardAdd drops of mizutama1_add off the mouth and the tongue tip, not through the hide / laugh / spicy / spicy_end clips). `AmbientFx` turns
+the scene's own four off. 153 had wired HitBurst / EnemyDisap for the hits at a small enemy's scale (x 1.5 on a 7-m ghost 11 m up) and nothing else; the
+bursts are x 3.5 here (the down x 5 / 6), and the ambient ones show at any moment.
+
+**The missing things.** The hint balloons (startAppearBalloon 0xE000F once at the first plain fruit hit, 0xE0010 past two more in a row, 0xE0011 once
+at the first fruit hit of all) through the HUD's `SmsHintBalloon` (found once in the tree), the three lines knobs (`HintFirstFruit / HintFruitAgain /
+HintFirstHit`; the BMG text is not in the rip, these are mine). The rumble (SMSRumbleMgr->start(0x14, 0xf) at rouletteStart and when a Boo is spat;
+`Rumble`). The shake tables from params/camera: appear (80 ticks, 150 / 4000), hit (150, 80 / 4000, 50 / 300, 100 / 2500), damage (80, 80 / 4500, 0, 30 /
+1000), down (150, 400 / 4000, 50 / 300, 600 / 3000), roll (50, 120 / 5000) -- the appear one is dead in the game too (checkPass(78) on a 59-frame clip).
+`BossMusic` (an AudioStreamPlayer knob: started at the first appear = unk384, faded over 10 frames at the down = MSBgm::stopBGM(.., 10)). `IntroRide`
+(the FallDemo, off by default -- Jaysonn places Mario): the centre disc starts `IntroLiftUnits` (500) up, Mario's controls held (CameraLocked) while it
+sinks 1 u a tick (rouletteFall); level, the slot machine falls from 1500 u over its place at 5 u a tick, 1 u the last 300 (slotFall), the discs start as
+it passes 200 u over home, HideWait's clock starts when it lands. NOT ported: the roll demo camera (btelesa_roll_camera.bck: joint 0 the target sinking
+2965 -> -89 u, joint 1 the eye orbiting 2600 u out from under the table up over it, 499 frames) and the camera's Y-offset chase (mCameraOffsetY) -- the
+port has no demo camera (the Gate Keeper's appear / die cameras are signals for the same reason); the TBubble family -- dead code in the game (unk150 is
+set to 1 in the constructor and never cleared: genAttacker always makes a Boo).
+
+**The height.** `HoverHeight`: his model's origin over the table's centre floor. The game: mGroundHeight (the dome top, +20 on the centre disc) + 300 +
+TransYOffset 800 = 1100 u = 14.8 m -- the slot machine (origin at its base, joint 0 - 700) 400 u over the dome, his body's bottom 817 u, his crown's top
+1500. Jaysonn: too high. 11.42 m (850 u) now: the slot's base 2.0 m over the dome, his body 7.6..15 m, the hidden depth (-1293 from the origin) still
+under the table. FindArena takes only the discs within 60 m across and 30 m up or down of him: his playtest had a KingBooArena in Level.tscn and the
+drive's boss had borrowed one of its discs.
+
+**Drive 153 (patch_smoke153.py):** 41 / 41 -- the 37 of 153 plus A1c (the hover 850 / 550 u, eye 0, btp 2), C1c (the spit no sooner than 125 drive frames =
+250 ticks after the LAST STOP; the pause counter past 200), D1b (mask_k climbing on the flinch), E2b (btp 1, the rolled eyes, the fire emitting 30
+frames into the spicy loop). The drive now frees any SmsRoulette / SmsBossTelesa / SmsTelesaSlot already in the level before it spawns its arena. Build 0
+errors. GPU captures (cap/e153_*.png).
+
+**Knobs added:** HoverHeight (The arena), ResultPauseTicks (The fight), IntroRide + IntroLiftUnits (Deviations), GhostOpacity + the four eye sheets (Looks),
+FruitPuffFxScene / FanfareFxScene default / SpicyFireFxScene / SweatFxScene / AmbientFx (Effects), ShowHints + the three lines (Hints), the five shake tables
+with the prm values + Rumble (Camera), BossMusic (Sounds). `_sms_note` on BossTelesa.tscn updated.
