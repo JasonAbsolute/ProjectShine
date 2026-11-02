@@ -15,12 +15,14 @@
 // The toon ramp H_toon_2_4i (136 in shadow, 255 lit) through SRTG = COLOR0, the lighting EnemyToon's (COLOR0 the sun + ambient, COLOR1 the glint).
 // The indirect warp (P_ms_indwp3_ia) is bound but every stage's indirect matrix is OFF in the bmd: no wobble. DEVIATION: Godot's screen texture is the
 // opaque pass -- another see-through thing behind him (a Boo attacker) is not in his mix.
+// 153c: depth_draw_always -- a material that reads the screen renders in the transparent pass, where depth_draw_opaque writes NO depth: his mouth and
+// tongue were drawn over his head from behind. With depth written, the four surfaces occlude each other as the solid things they are.
 shader_type spatial;
-render_mode blend_mix, depth_draw_opaque, cull_back, unshaded, fog_disabled;
+render_mode blend_mix, depth_draw_always, cull_back, unshaded, fog_disabled;
 #include "res://assets/Sms/Enemy/EnemyToon.gdshaderinc"
 
 uniform int part = 0;                                       // 0 the body, 1 the crown, 2 the fangs / the mouth
-uniform float opacity : hint_range(0.0, 1.0) = 0.588;      // K0_A = unk34C.a / 255: the screen mix (0 = the picture behind him, 1 = solid)
+uniform float opacity : hint_range(0.0, 1.0) = 1.0;        // K0_A = unk34C.a / 255: the screen mix (0 = the picture behind him, 1 = solid); the game 0.588
 uniform vec3 tint = vec3(1.0);                              // K1 = unk348: the fruit tint (the body; white normally)
 uniform float mask_k : hint_range(0.0, 1.0) = 0.0;         // K2_A: the polmask threshold the brk animates (0 = all eye sheet / white)
 uniform sampler2D env_tex : filter_linear, repeat_disable;  // N_btelesa_env2: the crown's sphere map

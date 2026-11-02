@@ -8,8 +8,10 @@
 // The block: its C0 is the juice block's unk138, never set for the Boo's block (0), so X ~ 0.2 and the slab is 0.8 of its flat term -- given the pink
 // here through mat_color + amb1 (the player's pink block). DEVIATION: a fading Boo is LIGHT_TYPE_INDIRECT in the game -- its body drawn with the
 // screen texture (H_ma_rak_dummy swapped for it), a see-through refraction; here the fade is plain alpha.
+// 153c: depth_draw_always -- a shader that writes ALPHA renders in the transparent pass, where depth_draw_opaque writes NO depth: the Boo's
+// mouth, eyes and fangs were drawn over its body from behind. With depth written, the surfaces occlude each other in order.
 shader_type spatial;
-render_mode blend_mix, depth_draw_opaque, cull_back, unshaded, fog_disabled;
+render_mode blend_mix, depth_draw_always, cull_back, unshaded, fog_disabled;
 #include "res://assets/Sms/Enemy/EnemyToon.gdshaderinc"
 
 uniform float fade : hint_range(0.0, 1.0) = 1.0;   // mTelesaFadeColor.a / 255

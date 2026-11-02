@@ -264,7 +264,6 @@ texture_repeat = false
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hunmr"]
 resource_name = "_mat_head(4)"
-transparency = 1
 albedo_texture = ExtResource("1_j5888")
 texture_repeat = false
 
@@ -275,8 +274,6 @@ texture_repeat = false
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_qy310"]
 resource_name = "_mat_head(6)"
-transparency = 1
-vertex_color_use_as_albedo = true
 albedo_texture = ExtResource("1_j5888")
 texture_repeat = false
 
@@ -287,7 +284,6 @@ texture_repeat = false
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_7gjuo"]
 resource_name = "_mat_eye_L"
-transparency = 1
 albedo_texture = ExtResource("2_yvioq")
 texture_repeat = false
 

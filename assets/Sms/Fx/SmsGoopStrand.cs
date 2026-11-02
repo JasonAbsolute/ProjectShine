@@ -39,6 +39,12 @@ public partial class SmsGoopStrand : MeshInstance3D
     [Export] public float ScrollPerFrame = 0f;
     /// <summary>The last part of the strand (0..1) that narrows on a quarter circle to a rounded point (0 = the game's flat cut).</summary>
     [Export(PropertyHint.Range, "0,0.8,0.01")] public float TipTaper = 0.35f;
+    /// <summary>How much of the mouth's motion the hanging points ride along with: 0 = the game's (they stay where they were born -- a mouth that moves fast
+    /// leaves the strand streaked behind it for a life), 1 = the whole strand under the mouth. Set by SmsBossTelesa.DroolFollow (153c); the Piranha keeps 0.</summary>
+    [Export(PropertyHint.Range, "0,1,0.01")] public float FollowAnchor = 0f;
+    /// <summary>Where the strand hangs from, off the anchor in the anchor's own frame, game units (x the actor scale): King Boo's two mouth strands hang from
+    /// the mouth's corners (SmsBossTelesa.DroolSpreadUnits), not both from its joint behind the tongue. Zero = the anchor itself (the Piranha).</summary>
+    [Export] public Vector3 AnchorOffsetUnits = Vector3.Zero;
     /// <summary>Ribbon vertices a segment between two particles (the chain smoothed with Catmull-Rom; 1 = the game's straight segments).</summary>
     [Export(PropertyHint.Range, "1,8,1")] public int Subdivisions = 3;
     /// <summary>Two ribbons at right angles (StripeCross) or one.</summary>
@@ -81,8 +87,11 @@ public partial class SmsGoopStrand : MeshInstance3D
         Node3D anchor = _effect ?? GetParent() as Node3D;
         if (anchor == null) return;
         Vector3 mouth = anchor.GlobalPosition;
+        if (AnchorOffsetUnits != Vector3.Zero) mouth += anchor.GlobalBasis.Orthonormalized() * (AnchorOffsetUnits * scale / u);
         bool emitting = _effect == null || _effect.IsEmitting;
-        for (int i = 0; i < _pts.Count; i++) _pts[i] = new Pt(_pts[i].Born, _pts[i].Age + frames);
+        Vector3 ride = _followKnown && FollowAnchor > 0f ? (mouth - _followFrom) * FollowAnchor : Vector3.Zero;   // FollowAnchor: the born points carried with the mouth
+        _followFrom = mouth; _followKnown = true;
+        for (int i = 0; i < _pts.Count; i++) _pts[i] = new Pt(_pts[i].Born + ride, _pts[i].Age + frames);
         float keepTo = LifeFrames + EmitEveryFrames + 1f;              // one point is kept PAST the life: the tip is interpolated to age == LifeFrames between it and the last live one
         _pts.RemoveAll(p => p.Age > keepTo);
         if (emitting)
@@ -160,7 +169,7 @@ public partial class SmsGoopStrand : MeshInstance3D
         Rebuilds++;
     }
     private readonly List<float> _ages = new();
-    private Vector3 _lastTip, _lastMouth; private bool _hasTip, _wasSteady;
+    private Vector3 _lastTip, _lastMouth, _followFrom; private bool _hasTip, _wasSteady, _followKnown;
     public string MaxStepInfo { get; private set; } = "";
     /// <summary>Restart the largest-step record (a drive measures one phase of the sway).</summary>
     public void ResetMaxTipStep() { MaxTipStep = 0f; MaxStepInfo = ""; }

@@ -108,9 +108,10 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     [Export] public PackedScene ShineScene;
     /// <summary>Where it appears. Empty: at his point (300 u over the table's centre, where the slot hung).</summary>
     [Export] public Node3D ShineSpawnPoint;
-    /// <summary>How high his body's centre hangs over the table's centre, metres (the slot machine hangs 9.4 m under that point, his tongue tip ~5 m). The game:
-    /// mGroundHeight + 300 + TransYOffset 800 = 1100 u = 14.8 m; 11.4 m here (850 u) after Jaysonn's playtest ("he sits too high").</summary>
-    [Export(PropertyHint.Range, "4,25,0.01")] public float HoverHeight = 11.42f;
+    /// <summary>How high his body's centre hangs over his floor -- the table's centre: the pressed pond's bottom (143 u under the pads), metres. The slot
+    /// machine's base hangs 9.4 m under that point, his tongue tip ~5 m. The game: mGroundHeight + 300 + TransYOffset 800 = 1100 u = 14.8 m over the
+    /// pond; 12.3 m here (918 u: the slot's base a metre over the pads, his body's bottom 6.6 m up) after Jaysonn's playtest ("he sits too high").</summary>
+    [Export(PropertyHint.Range, "4,25,0.01")] public float HoverHeight = 12.33f;
     [ExportGroup("The fight (the game's numbers; change them for a custom fight)")]
     /// <summary>His hit points (bosstelesa.prm 3): one spicy fruit hit each.</summary>
     [Export(PropertyHint.Range, "1,20,1")] public int HitPoints = 3;
@@ -156,10 +157,29 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     [Export] public bool IntroRide = false;
     /// <summary>How high the centre disc starts for the intro ride, units (TRoulette::initMapObj lifts the discs 500).</summary>
     [Export(PropertyHint.Range, "100,2000,10")] public float IntroLiftUnits = 500f;
-    [ExportGroup("Looks (the bmd's materials; 0.588 = the game)")]
-    /// <summary>How solid he is: K0 alpha / 255 (mNormalAlpha 0x96 = 0.588) -- the body is MIXED with the picture behind him by this, + 30 / 255 for every hit
-    /// point he has lost, solid while he is hit. 1 = an ordinary opaque Boo.</summary>
-    [Export(PropertyHint.Range, "0.1,1,0.01")] public float GhostOpacity = 0.588f;
+    [ExportGroup("Looks (the bmd's materials)")]
+    /// <summary>The transparency slider: how solid he is. 1 = solid (Jaysonn's call, the default); the game's ghost is 0.588 (mNormalAlpha 0x96 -- K0 alpha, the
+    /// body MIXED with the picture behind him by this, + 30 / 255 for every hit point he has lost, solid while he is hit).</summary>
+    [Export(PropertyHint.Range, "0.1,1,0.01")] public float GhostOpacity = 1f;
+    /// <summary>The drool (ms_btls_yodare1 / 2 at the mouth, yodare3 at the tongue tip): the port's strand scenes (the Goopy Piranha's GkYodareL / GkYodareS,
+    /// SmsGoopStrand ribbons) recoloured to spit. Empty = those; DroolFxScene empty AND DroolSmallFxScene empty = no drool.</summary>
+    [Export] public PackedScene DroolFxScene, DroolSmallFxScene;
+    /// <summary>How far the strands hang, as a multiple of the Piranha's (its 1.4 m for the long ones); their width likewise; the rounded tip (0 = cut flat).</summary>
+    [Export(PropertyHint.Range, "0.25,6,0.05")] public float DroolLength = 2.2f, DroolWidth = 1.6f;
+    [Export(PropertyHint.Range, "0,0.8,0.01")] public float DroolRoundTip = 0.35f;
+    /// <summary>How much of his motion the hanging strands ride along with (SmsGoopStrand.FollowAnchor): 0 = the Piranha's (the points stay where they were
+    /// born, so his rise with the slot leaves a 7 m streak behind the mouth for a dozen frames); 1 = rigidly under the mouth; 0.85 = a little sway.</summary>
+    [Export(PropertyHint.Range, "0,1,0.01")] public float DroolFollow = 0.85f;
+    /// <summary>Where the two mouth strands hang from: the mouth JOINT sits 220 u inside his head (jnt_mouth at z 98, the face at z 318), so the game's yodare1 / 2
+    /// point is buried in a solid Boo -- the strands are moved DroolLipUnits forward along the joint's X (his forward) to the lower lip and DroolSpreadUnits
+    /// either side along its Z (his sideways) to the lip's corners, beside the tongue (the fangs sit at +-217 u, the tongue is ~200 u wide). 0 / 0 = the joint.</summary>
+    [Export(PropertyHint.Range, "0,400,5")] public float DroolLipUnits = 210f, DroolSpreadUnits = 200f;
+    /// <summary>The strands' colours: the pale spit and its shade (the Piranha's are its goop's pair).</summary>
+    [Export] public Color DroolLight = new Color(0.82f, 0.9f, 1f), DroolDark = new Color(0.45f, 0.58f, 0.8f);
+    /// <summary>153c: the slot machine's own motion, units a tick -- how fast it SINKS below the table after the spit and at his hide (the game drops it 100 u a
+    /// tick with the hosei: gone within a frame) and how fast it RISES back to him; it never sinks deeper than SlotHideDepthUnits under his floor.</summary>
+    [Export(PropertyHint.Range, "0.5,100,0.5")] public float SlotSinkSpeed = 4f, SlotRiseSpeed = 40f;
+    [Export(PropertyHint.Range, "200,4000,10")] public float SlotHideDepthUnits = 1500f;
     /// <summary>The eye sheets the .btp patterns swap in: open / half / close (btelesa_twait's blink: 19 open, 2 half, 3 closed, 2 half, 2 open, 2 half, 3 closed, 2
     /// half, 50 open, 2 half, 3 closed, 2 half, 58 open; 150 frames, looped) and roll (btelesa_tspicy: the rolled eyes while spicy). Empty = the models' pngs.</summary>
     [Export] public Texture2D EyeOpen, EyeHalf, EyeClose, EyeRoll;
@@ -229,6 +249,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
 
     // ------------------------------------------------------------------------------------------------------------------ state
     private int _alpha = NormalAlpha, _normalAlpha = NormalAlpha;   // unk34C.a (K0 alpha: the screen mix) and mNormalAlpha (GhostOpacity x 255)
+    private float _opacitySeen = -1f;                            // the GhostOpacity last applied: the slider moved while he plays re-derives the alpha (153c)
     private Color _tint = Colors.White;                          // unk348 (K1: the fruit tint)
     private bool _hidden, _spicy, _collisionOn, _slotRolling, _bgmStarted, _marioUnder, _shineDone;   // LIVE_FLAG_HIDDEN / mIsSpicy / the body + tongue filters / unk18C / unk384 / the kill cylinder's unk6C
     private int _spicyTimer, _prepTimer, _dieTimer, _coinRoundsLeft = 3, _slotResult, _fruitHitCount, _fruitHitFx = -1, _brk = 2, _brkTime;   // mSpicyTimer / unk368 / unk388 / unk370 / unk1A8 / mFruitHitCount / mFruitHitEffect / the brk index + its ticks
@@ -238,7 +259,9 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     private int _intro;                                          // the FallDemo: 0 none / done, 1 the disc sinking, 2 the slot falling
     private float _introSlotY;                                   // the falling slot's height, units over the table's centre
     private SmsNpcEffect _spicyFire, _sweat;                     // the spicy loop's bound emitters (ms_btls_spicy_a..d, ms_btls_ase)
-    private GpuParticles3D _chikaFx, _droolMouthFx, _droolTongueFx; private Node3D _glowFx;   // the scene's own emitters
+    private readonly List<SmsNpcEffect> _drool = new(); private bool _droolOn;   // the strands (yodare1 / 2 at the mouth, yodare3 at the tongue tip)
+    private float _slotShownY; private bool _slotShownKnown;     // 153c: the slot machine's shown height, units, chasing the game's placement
+    private GpuParticles3D _chikaFx; private Node3D _glowFx;     // the scene's own emitters
     private SmsHintBalloon _hint; private bool _hintLooked;
     private float _hoseiY;                                       // mHoseiPosY (the dip; unclamped -- the slot rides it)
     private float _floorY;                                       // mGroundHeight: the table under him, units (his own: the base's _groundY is its own ray)
@@ -312,6 +335,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         FanfareFxScene ??= LoadIf("res://assets/Sms/Enemy/BossTelesa/BtlsFubuki.tscn");
         SpicyFireFxScene ??= LoadIf("res://assets/Sms/Fx/StuFire.tscn");
         SweatFxScene ??= LoadIf("res://assets/Sms/Fx/NpcDripBody.tscn");
+        if (DroolFxScene == null && DroolSmallFxScene == null) { DroolFxScene = LoadIf("res://assets/Sms/Fx/GkYodareL.tscn"); DroolSmallFxScene = LoadIf("res://assets/Sms/Fx/GkYodareS.tscn"); }
         EyeOpen ??= LoadTex("res://models/Eniemes/BossTelesa/N_nbtelesa_eye_open.png");
         EyeHalf ??= LoadTex("res://models/Eniemes/BossTelesa/N_nbtelesa_eye_half.png");
         EyeClose ??= LoadTex("res://models/Eniemes/BossTelesa/N_nbtelesa_eye_close.png");
@@ -323,8 +347,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         ShakeDown ??= new SmsCameraShakeMode { TimeTicks = 150, AmpX = 400f, VelX = 4000, AmpY = 50f, VelY = 300, AmpZ = 600f, VelZ = 3000 };
         ShakeRoulette ??= new SmsCameraShakeMode { TimeTicks = 50, AmpX = 120f, VelX = 5000 };
         _chikaFx = GetNodeOrNull<GpuParticles3D>("ChikaFx"); _glowFx = GetNodeOrNull<Node3D>("GlowFx");
-        _droolMouthFx = GetNodeOrNull<GpuParticles3D>("DroolMouthFx"); _droolTongueFx = GetNodeOrNull<GpuParticles3D>("DroolTongueFx");
-        foreach (Node3D fx in new Node3D[] { _chikaFx, _glowFx, _droolMouthFx, _droolTongueFx }) if (fx != null) { fx.TopLevel = true; fx.Visible = false; }
+        foreach (Node3D fx in new Node3D[] { _chikaFx, _glowFx }) if (fx != null) { fx.TopLevel = true; fx.Visible = false; }
         _mats.Clear(); _bodyMat = null;
         if (_model != null)
         {
@@ -388,7 +411,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         MotionMode = MotionModeEnum.Floating;
         _hp = Math.Max(1, HitPoints);
         _bodyScale = 1f; _scale = 1f;
-        _normalAlpha = Math.Clamp(Mathf.RoundToInt(GhostOpacity * 255f), 1, 0xFE);
+        _normalAlpha = Math.Clamp(Mathf.RoundToInt(GhostOpacity * 255f), 1, 0xFE); _opacitySeen = GhostOpacity;
         _alpha = _normalAlpha; _tint = Colors.White; _brk = 2; _brkTime = 0; _maskK = 0f; _btp = 2; _btpTime = 0; _eyeNow = -1; _pauseTicks = 0;
         _spicy = false; _slotRolling = false; _marioUnder = false; _shineDone = false; _bgmStarted = false;
         _hintFirstFruit = true; _hintFirstHit = true;
@@ -397,7 +420,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         _yaw = _spawnYaw;
         for (int i = 0; i < 3; i++) _rouletteSp[i] = 0f;
         _spit.Clear(); _spitFruitNoCollision.Clear();
-        StopSpicyFx();
+        StopSpicyFx(); StopDrool(); _droolOn = false; _slotShownKnown = false;
         SetHidden(StartHidden || IntroRide);
         OffAllCollision();
         if (Slot != null) { Slot.Visible = false; Slot.ForcedResult = ForcedResultValue(); }
@@ -520,7 +543,15 @@ public partial class SmsBossTelesa : SmsSmallEnemy
                 if (!IsBck(BckAppear)) slotOff = -2400f;
             }
             else anchor = _skel != null ? JointUnits(0) : Pos() + Vector3.Up * TransYUnits;
-            Vector3 sp = new Vector3(anchor.X, _hoseiY + anchor.Y + slotOff, anchor.Z) / U;
+            // 153c: the game's placement (the unclamped hosei carries it 100 u a tick out of sight; the hide / damage / hit clips park it 2400 u under the body)
+            // is the TARGET; the machine shown chases it -- down at SlotSinkSpeed (a visible sink into the table), up at SlotRiseSpeed -- and never deeper
+            // than SlotHideDepthUnits under his floor, so it is back under him by the appear
+            float target = Mathf.Max(_hoseiY + anchor.Y + slotOff, _floorY - SlotHideDepthUnits);
+            float home = _floorY + PositionOverFloor + TransYUnits - 700f;   // where it hangs under him at rest (joint 0 - 700): above this it rides him rigidly
+            if (!_slotShownKnown || !Slot.Visible || target >= home - 1f) { _slotShownY = target; _slotShownKnown = true; }
+            else if (target < _slotShownY) _slotShownY = Mathf.Max(target, _slotShownY - SlotSinkSpeed);
+            else _slotShownY = Mathf.Min(target, _slotShownY + SlotRiseSpeed);
+            Vector3 sp = new Vector3(anchor.X, _slotShownY, anchor.Z) / U;
             Slot.GlobalTransform = new Transform3D(new Basis(Vector3.Up, Mathf.DegToRad(_yaw)), sp);
         }
         _bodyPart?.Place(BodyPointUnits / U);
@@ -548,9 +579,30 @@ public partial class SmsBossTelesa : SmsSmallEnemy
             }
         }
         bool drool = show && !IsBck(BckHide) && !IsBck(BckLaugh) && !IsBck(BckSpicy) && !IsBck(BckSpicyEnd);
-        if (_droolMouthFx != null) { _droolMouthFx.Visible = show; _droolMouthFx.Emitting = drool; if (show) _droolMouthFx.GlobalPosition = MouthUnits / U; }
-        if (_droolTongueFx != null) { _droolTongueFx.Visible = show; _droolTongueFx.Emitting = drool; if (show) _droolTongueFx.GlobalPosition = JointUnits(_bTongueTip >= 0 ? _bTongueTip : _bTongue) / U; }
+        if (drool != _droolOn) { _droolOn = drool; if (drool) StartDrool(); else StopDrool(); }
     }
+    /// <summary>ms_btls_yodare1 / 2 (emitAndBindToMtxPtr at joint 5, the mouth) and yodare3 (joint 10, the tongue tip): the Piranha's strand scenes bound to the
+    /// joints (SmsNpcEffect.Spawn), recoloured to spit, their ribbons at this boss's length and width.</summary>
+    private void StartDrool()
+    {
+        if (_skel == null) return;
+        foreach (var (scene, joint, side) in new[] { (DroolFxScene, "jnt_mouth", 1f), (DroolFxScene, "jnt_mouth", -1f), (DroolSmallFxScene, _bTongueTip >= 0 ? "eff_sita" : "jnt_sita_2", 0f) })
+        {
+            if (scene == null) continue;
+            var fx = SmsNpcEffect.Spawn(scene, _skel, joint, 1f, _fxCache, Name + joint + (side > 0f ? "R" : side < 0f ? "L" : ""));
+            if (fx == null) continue;
+            fx.SetGoopColors(DroolLight, DroolDark);
+            foreach (Node c in fx.GetChildren())
+                if (c is SmsGoopStrand strand)
+                {
+                    strand.LengthScale = DroolLength; strand.WidthScale = DroolWidth; strand.TipTaper = DroolRoundTip; strand.FollowAnchor = DroolFollow;
+                    if (side != 0f) strand.AnchorOffsetUnits = new Vector3(DroolLipUnits, 0f, side * DroolSpreadUnits);   // the mouth joint's frame: x -> his forward (+Z), y -> down, z -> his sideways (+X)
+                }
+            _drool.Add(fx);
+        }
+    }
+    private void StopDrool() { foreach (var fx in _drool) if (fx != null && IsInstanceValid(fx)) fx.Stop(); _drool.Clear(); }
+    public int DroolStrands { get { int n = 0; foreach (var fx in _drool) if (fx != null && IsInstanceValid(fx) && fx.IsEmitting) n++; return n; } }
     private void SetHidden(bool hidden)
     {
         _hidden = hidden;
@@ -606,8 +658,9 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         _eyeNow = eye;
         _bodyMat.SetShaderParameter("base_tex", t);
     }
-    /// <summary>mNormalAlpha + 30 x the hit points lost, clamped 0xFE: the ghost more solid each hit.</summary>
-    private int TargetAlpha() => Math.Clamp(_normalAlpha + (Math.Max(1, HitPoints) - _hp) * 30, 0, 0xFE);
+    /// <summary>mNormalAlpha (GhostOpacity x 255, read live: a knob set after the spawn still counts) + 30 x the hit points lost, clamped 0xFE: the ghost more
+    /// solid each hit.</summary>
+    private int TargetAlpha() { _normalAlpha = Math.Clamp(Mathf.RoundToInt(GhostOpacity * 255f), 1, 0xFE); return Math.Clamp(_normalAlpha + (Math.Max(1, HitPoints) - _hp) * 30, 0, 0xFE); }
     /// <summary>The spicy loop's bound emitters: the fire at joint 9 (jnt_sita_4) and the sweat at joint 1 (jnt_body), SmsNpcEffect scenes under BoneAttachment3Ds;
     /// the fire sound with them.</summary>
     private void StartSpicyFx()
@@ -671,6 +724,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
             if ((IsBck(BckLick) && BckFrame() > 50f) || IsBck(BckLaugh)) { if (_alpha > target) _alpha--; }
             else if (_alpha < 0xFF) _alpha++;
         }
+        else if (_opacitySeen != GhostOpacity) { _opacitySeen = GhostOpacity; _alpha = TargetAlpha(); }   // 153c: the slider is live -- every other nerve holds TargetAlpha() anyway
         if (BckPassed(BckSpit, 40f))
         {
             if (IsNerve(NerveSpitSlotItem)) GenerateSlotItem(); else GenAttacker();
@@ -1082,7 +1136,9 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         foreach (var a in _attackers) if (a != null && IsInstanceValid(a) && !a.IsDead) a.SmsKillByDemo();
         if (Slot != null && IsInstanceValid(Slot)) Slot.Visible = false;
         OffAllCollision();
+        StopSpicyFx(); StopDrool(); _droolOn = false;
         SetHidden(true);
+        PlaceAmbientFx();
         base.Dead();
     }
 
@@ -1095,7 +1151,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
                 if (_time == 0)
                 {
                     SetHidden(true); _spicy = false; _alpha = TargetAlpha(); SetBrk(2); _maskK = 0f; ApplyMask(); StopSpicyFx();
-                    if (Slot != null && _intro != 2) Slot.Visible = false;
+                    // 153c: the slot machine stays shown -- it is sinking below the table (SlotSinkSpeed) and rises back with him at the appear
                 }
                 if (_intro != 0) return false;                   // the FallDemo runs first (IntroTick); its end restarts this clock
                 if (_time > HideWaitTicks && !_marioUnder) { PushAfterCurrent(NerveAppear); SetHidden(false); return true; }
@@ -1107,6 +1163,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
                     if (!IsBck(BckAppear))
                     {
                         SetBck(BckAppear);
+                        _alpha = TargetAlpha();                      // the knob read live (GhostOpacity set after the spawn)
                         if (!_bgmStarted) { _bgmStarted = true; if (BossMusic != null && BossMusic.Stream != null && !BossMusic.Playing) BossMusic.Play(); }   // unk384: the boss BGM
                         if (Slot != null) { Slot.Visible = true; Slot.RandomReset(); }
                         OnAllCollision();

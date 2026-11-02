@@ -29,6 +29,11 @@ public partial class SmsRoulette : AnimatableBody3D
     [Export] public bool AutoCollision = true;
     /// <summary>The centre disc's pond (`_ike`) is solid floor too. Off: it is left out of the collision (for a water Area3D of the level's own over the basin).</summary>
     [Export] public bool PondSolid = true;
+    /// <summary>153c: the centre disc's gold pond PRESSED DOWN into a bowl, as the game's table stands -- rulet00.bck (the clip the intro plays and leaves) ends
+    /// with the IKE joint's Y scale at -0.897: the glb's rest dome (+160 u) turned into a 143-u-deep basin King Boo rises out of. Off: the glb's dome.</summary>
+    [Export] public bool PondPressed = true;
+    /// <summary>The IKE joint's Y scale the clip ends on (-0.897). -1 = the dome mirrored exactly; +1 = the dome.</summary>
+    [Export(PropertyHint.Range, "-1.5,1.5,0.01")] public float PondScaleY = -0.8969f;
     /// <summary>Spin it by hand (degrees a game tick) -- the boss sets this when he hides; a disc placed on its own may spin from the start.</summary>
     [Export(PropertyHint.Range, "-2,2,0.01")] public float InitialRollSpeed = 0f;
     [Export] public AudioStreamPlayer3D StopSound;
@@ -40,6 +45,7 @@ public partial class SmsRoulette : AnimatableBody3D
     private StandardMaterial3D _switchMat;
     private bool _stoppedByMario;
     private float _radiusU;
+    private float _pondJointY; private bool _pondBowl;          // the IKE joint's rest height (mesh space) and whether the bowl is on
     private Vector3 _switchLocal; private bool _switchFromPad;    // the `_switch` pad's centre in this body's space (the bone's place otherwise)
     private Mario _mario; private Mario.MarioState _prevState = Mario.MarioState.idle; private bool _stateKnown;
     /// <summary>For the drives / the boss.</summary>
@@ -52,6 +58,10 @@ public partial class SmsRoulette : AnimatableBody3D
     /// <summary>The disc's walking face, units: the switch bone's height (switch_XX sits on the face).</summary>
     public float FaceYUnits => SwitchPoint.Y * U;
     public int SwitchStops { get; private set; }
+    /// <summary>The pond is the pressed bowl (the centre disc with PondPressed on).</summary>
+    public bool PondIsBowl => _pondBowl;
+    /// <summary>The pond's lowest / highest point over this body's origin, units (the bowl's bottom, or the dome's top).</summary>
+    public float PondYUnits { get; private set; }
 
     public override void _Ready()
     {
@@ -64,7 +74,11 @@ public partial class SmsRoulette : AnimatableBody3D
             foreach (Node n in _model.FindChildren("*", "Skeleton3D", true, false)) { _skel = n as Skeleton3D; break; }
             if (_skel != null)
                 for (int i = 0; i < _skel.GetBoneCount(); i++)
-                    if (_skel.GetBoneName(i).ToLower().StartsWith("switch")) { _switchBone = i; break; }
+                {
+                    string bn = _skel.GetBoneName(i).ToLower();
+                    if (bn.StartsWith("switch") && _switchBone < 0) _switchBone = i;
+                    if (bn == "ike") { _pondJointY = _skel.GetBoneRest(i).Origin.Y; _pondBowl = PondPressed && !Engine.IsEditorHint(); }
+                }
             foreach (Node n in _model.FindChildren("*", "MeshInstance3D", true, false))
             {
                 var mi = (MeshInstance3D)n;
@@ -73,6 +87,7 @@ public partial class SmsRoulette : AnimatableBody3D
                 for (int s = 0; s < mi.Mesh.GetSurfaceCount(); s++)
                 {
                     var m = mi.GetActiveMaterial(s);
+                    if (m != null && (m.ResourceName ?? "").ToLower().Contains("_ike")) PressPond(mi, s, m);
                     if (m != null && (m.ResourceName ?? "").ToLower().Contains("switch"))
                     {
                         _switchMat = m is StandardMaterial3D sm ? (StandardMaterial3D)sm.Duplicate() : new StandardMaterial3D();
@@ -94,8 +109,55 @@ public partial class SmsRoulette : AnimatableBody3D
         ApplySwitchColor();
         if (DebugPrint) GD.Print($"[SMS roulette] {Name}: radius {_radiusU:F0} u, face {FaceYUnits:F0} u, switch bone {_switchBone}, speed {_rollSp}");
     }
-    /// <summary>One trimesh of the glb's surfaces (the pond `_ike` left out when PondSolid is off), its vertices carried into this body's space (a
-    /// CollisionShape3D cannot be scaled: the glb's 1 / 74.44 is baked into the triangles).</summary>
+    /// <summary>The pond's Y in mesh space under the pressed bowl: mirrored about the IKE joint's plane by PondScaleY (the clip's end pose).</summary>
+    private float PondY(float y) => _pondBowl ? _pondJointY + (y - _pondJointY) * PondScaleY : y;
+    /// <summary>153c: the gold pond pressed down -- a copy of the `_ike` surface with its vertices mirrored about the IKE joint (the dome's base plane), its
+    /// normals flipped and its winding turned so the bowl faces up, on the pond's own material; the skinned dome itself discarded (an alpha-scissor
+    /// override nothing passes). The skeleton keeps its rest pose: a negative bone scale would turn the skinned faces inside out for the culling.</summary>
+    private void PressPond(MeshInstance3D mi, int s, Material pondMat)
+    {
+        var arrays = mi.Mesh.SurfaceGetArrays(s);
+        Vector3[] verts = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
+        float top = float.MinValue, bottom = float.MaxValue;
+        foreach (var v in verts) { top = Mathf.Max(top, v.Y); bottom = Mathf.Min(bottom, v.Y); }
+        float scaleToBody = (GlobalTransform.AffineInverse() * mi.GlobalTransform).Basis.Scale.Y;
+        if (!_pondBowl) { PondYUnits = top * scaleToBody * U; return; }
+        PondYUnits = PondY(top) * scaleToBody * U;
+        var outArrays = new Godot.Collections.Array(); outArrays.Resize((int)Mesh.ArrayType.Max);
+        var pv = new Vector3[verts.Length];
+        for (int i = 0; i < verts.Length; i++) pv[i] = new Vector3(verts[i].X, PondY(verts[i].Y), verts[i].Z);
+        outArrays[(int)Mesh.ArrayType.Vertex] = pv;
+        var nv = arrays[(int)Mesh.ArrayType.Normal];
+        if (nv.VariantType != Variant.Type.Nil)
+        {
+            Vector3[] nn = nv.AsVector3Array();
+            // the inverse-transpose of the (1, s, 1) scale, then turned to the side we look at (the bowl's inside faces up and inward)
+            for (int i = 0; i < nn.Length; i++)
+            {
+                Vector3 n2 = new Vector3(nn[i].X, nn[i].Y / (Mathf.Abs(PondScaleY) < 1e-3f ? 1e-3f : PondScaleY), nn[i].Z);
+                if (PondScaleY < 0f) n2 = -n2;
+                nn[i] = n2.Normalized();
+            }
+            outArrays[(int)Mesh.ArrayType.Normal] = nn;
+        }
+        var uv = arrays[(int)Mesh.ArrayType.TexUV]; if (uv.VariantType != Variant.Type.Nil) outArrays[(int)Mesh.ArrayType.TexUV] = uv;
+        var idx = arrays[(int)Mesh.ArrayType.Index];
+        if (idx.VariantType != Variant.Type.Nil)
+        {
+            int[] ii = idx.AsInt32Array();
+            if (PondScaleY < 0f) for (int t = 0; t + 2 < ii.Length; t += 3) { int tmp = ii[t + 1]; ii[t + 1] = ii[t + 2]; ii[t + 2] = tmp; }
+            outArrays[(int)Mesh.ArrayType.Index] = ii;
+        }
+        var bowl = new ArrayMesh(); bowl.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, outArrays);
+        bowl.SurfaceSetMaterial(0, pondMat);
+        var bowlMi = new MeshInstance3D { Name = "PondBowl", Mesh = bowl, Transform = mi.Transform, CastShadow = mi.CastShadow };
+        mi.GetParent().AddChild(bowlMi);
+        var hide = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.AlphaScissor, AlphaScissorThreshold = 1.1f, AlbedoColor = new Color(1f, 1f, 1f, 0f) };
+        mi.SetSurfaceOverrideMaterial(s, hide);
+        if (DebugPrint) GD.Print($"[SMS roulette] {Name}: the pond pressed to a bowl {PondYUnits:F0} u deep at its centre (the dome top was {top * scaleToBody * U:F0})");
+    }
+    /// <summary>One trimesh of the glb's surfaces (the pond `_ike` left out when PondSolid is off, pressed to the bowl when PondPressed is on), its vertices
+    /// carried into this body's space (a CollisionShape3D cannot be scaled: the glb's 1 / 74.44 is baked into the triangles).</summary>
     private void BuildCollision(MeshInstance3D mi)
     {
         var am = new ArrayMesh();
@@ -103,12 +165,13 @@ public partial class SmsRoulette : AnimatableBody3D
         int tris = 0;
         for (int s = 0; s < mi.Mesh.GetSurfaceCount(); s++)
         {
-            var m = mi.GetActiveMaterial(s);
+            var m = mi.Mesh.SurfaceGetMaterial(s) ?? mi.GetActiveMaterial(s);   // the mesh's own material: PressPond has overridden the pond's with a nameless one
             string name = (m?.ResourceName ?? "").ToLower();
-            if (name.Contains("_ike") && !PondSolid) continue;
+            bool pond = name.Contains("_ike");
+            if (pond && !PondSolid) continue;
             var arrays = mi.Mesh.SurfaceGetArrays(s);
             Vector3[] verts = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
-            for (int i = 0; i < verts.Length; i++) verts[i] = rel * verts[i];
+            for (int i = 0; i < verts.Length; i++) verts[i] = rel * (pond ? new Vector3(verts[i].X, PondY(verts[i].Y), verts[i].Z) : verts[i]);
             var outArrays = new Godot.Collections.Array();
             outArrays.Resize((int)Mesh.ArrayType.Max);
             outArrays[(int)Mesh.ArrayType.Vertex] = verts;
