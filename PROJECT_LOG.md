@@ -10710,3 +10710,30 @@ clean), the root clean.
 
 **Knobs added:** SmsTelesa.JumpPopsUnsprayed (Deviations), SmsBossTelesa.AttackersJumpable (The fight); DamageFlashTicks default 90. Files:
 `assets/Sms/Enemy/SmsBossTelesa.cs`, `assets/Sms/Enemy/SmsTelesa.cs`. Tooling (npc82/sirena151/): patch_smoke153.py (54 checks), cap/x153_*.
+
+### 153i -- the Boo: a jump pops every Boo by default, and only a real stomp from above does it (feature/enemy-sirena, code `cff77b9`)
+
+**Jaysonn's notes on 153h:** (1) "the boos from king boo are randomly disappearing", (2) "normal boo that I placed are not jumpable still".
+
+**The disappearing.** Every path that ends a Boo attacker was read again: the boss's SlotStartGo (the tongue hosed: telesaForceKill), his Dead, the kill
+cylinder (a SPRAYED one only -- `Tangible`), and the stomp. Only the stomp was new in 153h, and its test was the stunned Boo's: `CheckDistance` on the two
+hit cylinders -- overlapping when Mario's centre is within TrampleRadius + DamageRadius x 1.5 = ~170 u (2.3 m) of the Boo's, his feet below its top and his
+head above its base -- plus `g.Y < m.Y` and a falling Mario. A swooping attacker approaching a Mario on the way down from any jump met that 2.3 m before
+it touched him and popped (with its puff, 150 u away): "randomly disappearing". `HitCheckMario`: the unhosed pop now needs Mario's centre within the Boo's
+OWN radius (120 u: over its body) and his feet above its lower third (`g.Y + DamageHeight x s x 0.35` = 47 u on an attacker: a Boo at his feet is a ram,
+not a landing). The stunned (`_tangible`) Boo keeps the game's test. Why the lower third and not the middle: `HitCheckMario` runs every fourth tick and a
+Mario falling at 12 m/s crosses 60 u between two -- the drive's first drop (run y, 1 m/s from 110 u, the Boo sinking ~5 u a frame under him) crossed the
+upper half between checks and missed; the window is 88 u now and the drive drops him at 4 m/s from 120 u.
+
+**The placed Boos.** 153h kept `JumpPopsUnsprayed` off for the species (the game's rule for the hotel's Boos) and set it on King Boo's attackers only;
+Jaysonn's placed Telesa.tscn stayed hose-first. The default is ON now: every Boo while it shows (`IsVisibleNow`: a faded-out Loop Boo is still a ghost;
+the box Boo's IsHitValid still turns a jump into its flinch). Off = the game. King Boo's `AttackersJumpable` still writes it onto his attackers.
+
+**Drive 153 (patch_smoke153.py): 55 / 55** -- 153h's 54 + A5a (Mario placed 150 u beside the unhosed attacker with his feet 30 u over its base, falling:
+8 frames on it is NOT in its Die nerve -- 153h's rule popped it from there) and A5b retargeted (120 u over it at 4 m/s: popped). Headless runs y (54 / 55)
+and z (55 / 55). Builds 153ap..ar: 0 errors; the splice removed (Mario.cs clean), the root clean.
+
+**Deviations:** a jump on an unhosed Boo (the game: never) -- on for every Boo by default now, Jaysonn's call; the stomp's own test (over the body, above
+the lower third) is the port's, the stunned Boo's stays the game's.
+
+**Knobs:** SmsTelesa.JumpPopsUnsprayed default on. Files: `assets/Sms/Enemy/SmsTelesa.cs`. Tooling (npc82/sirena151/): patch_smoke153.py (55 checks).
