@@ -104,6 +104,14 @@ public partial class SmsTelesa : SmsSmallEnemy
     /// through the ghost until the hose stuns it (HIT_CATEGORY_ENEMY off). ON for every Boo since 153i (Jaysonn: the placed ones "not jumpable still");
     /// King Boo's attackers take his AttackersJumpable.</summary>
     [Export] public bool JumpPopsUnsprayed = true;
+    /// <summary>153j, King Boo's attackers (set by his AttackersFirstPointTowardMario): the first swoop out of his mouth heads 1000 u toward MARIO. Off = the
+    /// game's TTelesa::setFirstAttackPoint: mRotation.y = 180 - instanceIndex x 720, i.e. the WORLD's yaw 180 whatever the boss faces (the casino's layout).</summary>
+    [Export] public bool FirstPointTowardMario = true;
+    /// <summary>153j, King Boo's attackers (set by his AttackersSmooth): the swoop homes on Mario every tick (a curve, the turn rate the game's) and, within
+    /// SmoothPassUnits of him, takes a pass-through point 1.3..1.6 of the way past him before homing again. Off = the game's TNerveTelesaAttackMario: a point
+    /// 0.7..1.6 of the way to where Mario WAS, held until reached (within 200 u), then the next -- straight legs and sharp turns.</summary>
+    [Export] public bool SmoothAttack = true;
+    [Export(PropertyHint.Range, "100,800,10")] public float SmoothPassUnits = 300f;
     [ExportGroup("Effects (empty = the default / none)")]
     /// <summary>ms_tls_change (0xCD): the puff where the box Boo turns into its block and where it comes back. Empty = assets/Sms/Fx/EnemyDisap.tscn.</summary>
     [Export] public PackedScene ChangeFxScene;
@@ -259,12 +267,27 @@ public partial class SmsTelesa : SmsSmallEnemy
         ApplyLook();
         if (DebugPrint) GD.Print($"[SMS telesa] {Name}: attacker from {from?.Name} at {Pos()} base {_attackBaseY:F0}");
     }
-    /// <summary>setFirstAttackPoint: the yaw turned about (180 - instanceIndex x 720 in the game: behind the boss's facing), the goal 1000 u ahead.</summary>
+    /// <summary>TTelesa::setFirstAttackPoint: mRotation.y = 180 - instanceIndex x 720 (the WORLD's yaw 180: 720 is a whole turn), the goal 1000 u that way --
+    /// 151..153i read it as the boss's yaw + 180 and sent them out the back of his head. 153j: toward Mario (FirstPointTowardMario), else the game's world 180.</summary>
     private void SetFirstAttackPoint()
     {
-        _yaw = Wrap360(_spawnYaw + 180f);
+        Vector3 toMario = MarioPos() - Pos(); toMario.Y = 0f;
+        _yaw = FirstPointTowardMario && toMario.LengthSquared() > 1f ? YawOf(toMario) : 180f;
         SetGoalPoint(Pos() + PolarXZ(_yaw, 1000f));
+        _firstLeg = true; _passLeg = false;
     }
+    /// <summary>153j SmoothAttack: the first leg (1000 u) and a pass-through leg are held until reached; between them the goal is Mario himself, every tick --
+    /// the turn rate (walkBehavior's x 2) bends the path into a curve. Within SmoothPassUnits of him a pass-through point 1.3..1.6 of the way past him is set,
+    /// so the Boo swoops THROUGH him and comes round again, as the game's overshooting points make it.</summary>
+    private void SmoothAttackSteer()
+    {
+        if (_firstLeg || _passLeg) { if (IsReachedToGoal()) { _firstLeg = false; _passLeg = false; SetGoalMario(); } return; }
+        Vector3 m = MarioPos(), p = Pos(); Vector3 d = m - p; d.Y = 0f;
+        if (d.Length() < SmoothPassUnits) { float r = Lerp(1.3f, 1.6f, Rand()); SetGoalPoint(new Vector3(p.X + d.X * r, p.Y, p.Z + d.Z * r)); _passLeg = true; }
+        else SetGoalMario();
+    }
+    private bool _firstLeg, _passLeg;
+    public Vector3 GoalUnitsDebug => Goal();
     /// <summary>setAttackPoint: the goal toward Mario, 0.7..1.6 of the way on the ground plane (it overshoots him).</summary>
     private void SetAttackPoint()
     {
@@ -574,7 +597,8 @@ public partial class SmsTelesa : SmsSmallEnemy
             case NerveAttackMario:                               // TNerveTelesaAttackMario (King Boo's attacker, pass 153)
                 if (_time == 0) { SetBck(BckWait); SetFirstAttackPoint(); }
                 if (_time == 10 && _model != null) _model.Visible = true;
-                if (IsReachedToGoal()) SetAttackPoint();
+                if (SmoothAttack) SmoothAttackSteer();           // 153j
+                else if (IsReachedToGoal()) SetAttackPoint();
                 WalkBehavior(2, 2f);
                 return false;
 

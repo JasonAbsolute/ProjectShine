@@ -155,6 +155,31 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     /// <summary>153h (Jaysonn: "the boos should be able to be jumped on"): a jump or a ground pound pops a spat Boo attacker without the hose first
     /// (SmsTelesa.JumpPopsUnsprayed set on each one he spits). Off = the game: the hose stuns it, then the jump.</summary>
     [Export] public bool AttackersJumpable = true;
+    /// <summary>153j: where a spat Boo appears -- this far in front of his mouth joint along his facing (the joint is 220 u inside the head; 250 = the lips).
+    /// 0 = the game's: at the joint, inside the skull (Jaysonn: "king boo is spawning them behind himself").</summary>
+    [Export(PropertyHint.Range, "0,600,10")] public float AttackersSpawnForwardUnits = 250f;
+    /// <summary>153j: a spat Boo's first swoop heads for MARIO (SmsTelesa.FirstPointTowardMario). Off = the game's: 1000 u toward the WORLD's yaw 180 (the
+    /// casino's layout; in a placed arena that is wherever -- behind him, as it happened).</summary>
+    [Export] public bool AttackersFirstPointTowardMario = true;
+    /// <summary>153j: the spat Boos home on Mario in a curve and swoop past him (SmsTelesa.SmoothAttack). Off = the game's: a fixed point 0.7..1.6 of the way to
+    /// where Mario was, then the next -- straight legs and sharp turns (Jaysonn: "they should more gracefully follow Mario").</summary>
+    [Export] public bool AttackersSmooth = true;
+    /// <summary>The table's walking surface, units: the highest of the three discs' faces (the game's absolute 500 for the casino table) -- the spat Boos' floor.
+    /// Without the discs: his floor + 143 (the pads over the pressed bowl's bottom).</summary>
+    public float TableSurfaceUnits
+    {
+        get
+        {
+            float best = float.MinValue;
+            for (int i = 0; i < 3; i++) { var r = RouletteAt(i); if (r != null && IsInstanceValid(r)) best = MathF.Max(best, r.FaceYUnits); }
+            return best > float.MinValue ? best : _floorY + 143f;
+        }
+    }
+    public float YawDeg => _yaw;
+    /// <summary>The kind of the last fruit that hit him (checkHitObject) -- a drive reads which fruit's tint he wears.</summary>
+    public Fruit.FruitType LastFruitType { get; private set; }
+    /// <summary>The game's placement of the machine without the hosei and without his dip (his clips' motion only), units -- the seat the machine rides.</summary>
+    public float SlotSeatUnits => _slotSeatPrev;
     /// <summary>Hides (and cancels the round) when Mario comes within 300 u of the table's centre under him (the kill cylinder's Mario test).</summary>
     [Export] public bool HidesWhenMarioUnder = true;
     /// <summary>The intro's hide clip on the first appearance too (the game: he is hidden by the FallDemo; the first HideWait runs its full wait).</summary>
@@ -218,9 +243,10 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     /// <summary>153g (Jaysonn: "king boo needs to flash when damage is dealt to him"): on a hit (the flinch and the spicy damage) his body blinks the whole way into
     /// a colour -- DamageFlashTicks long, DamageFlashPeriod ticks on / off -- on top of the game's own speckle (the brk's polmask sweep, which at 150 / 255 is
     /// subtle on a solid Boo). DamageFlashFruitColor: the blink is the fruit's colour (the coconut's pink, the papaya's orange ...); off = DamageFlashColor.
-    /// 0 ticks = no flash. 90 ticks (1.5 s, seven and a half blinks: 153h, "flash longer") -- 153g's 30 was half a second.</summary>
-    [Export(PropertyHint.Range, "0,300,1")] public int DamageFlashTicks = 90;
-    [Export(PropertyHint.Range, "1,20,1")] public int DamageFlashPeriod = 6;
+    /// 0 ticks = no flash. 153g: 30 ticks of 6 (half a second); 153h: 90 ("flash longer"); 153j: 150 ticks of 10 -- two and a half seconds, seven and a half
+    /// blinks at 3 Hz ("still too short and flickers too fast").</summary>
+    [Export(PropertyHint.Range, "0,600,1")] public int DamageFlashTicks = 150;
+    [Export(PropertyHint.Range, "1,40,1")] public int DamageFlashPeriod = 10;
     [Export] public bool DamageFlashFruitColor = true;
     [Export] public Color DamageFlashColor = new Color(1f, 0.3f, 0.3f);
     /// <summary>ms_btls_ase: the sweat off his body through the spicy loop -- an SmsNpcEffect scene. Empty = assets/Sms/Fx/NpcDripBody.tscn (x 3) if it exists.</summary>
@@ -285,7 +311,8 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     private SmsNpcEffect _spicyFire, _sweat;                     // the spicy loop's bound emitters (ms_btls_spicy_a..d, ms_btls_ase)
     private readonly List<SmsNpcEffect> _drool = new(); private bool _droolOn;   // the strands (yodare1 / 2 at the mouth, yodare3 at the tongue tip)
     private float _slotShownY; private bool _slotShownKnown;     // 153c: the slot machine's shown height, units, chasing the game's placement
-    private float _slotTargetPrev;                               // 153h: the game's placement last tick -- its own rise (the appear clip's) is added to the chase
+    private float _slotTargetPrev;                               // 153h: the game's placement last tick (the SlotLagUnits reader)
+    private float _slotSeatPrev; private int _slotAnchorJoint = -1;   // 153j: the machine's seat last tick (the anchor joint - SlotUnderUnits, no hosei, no dip) and which joint -- his clips' motion the machine rides
     private GpuParticles3D _chikaFx; private Node3D _glowFx;     // the scene's own emitters
     private SmsHintBalloon _hint; private bool _hintLooked;
     private float _hoseiY;                                       // mHoseiPosY (the dip; unclamped -- the slot rides it)
@@ -313,6 +340,12 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     public const float SlotCabinetTopUnits = 642f;              // srot_waku.glb: y -30..642 from its origin (slot_geo153.py)
     /// <summary>How far the shown machine is UNDER the game's placement of it, units (0 = riding it exactly; the sink's lag is negative).</summary>
     public float SlotLagUnits => Slot != null && IsInstanceValid(Slot) && Slot.Visible && _slotShownKnown ? _slotTargetPrev - _slotShownY : 0f;
+    /// <summary>The machine's shown height and its seat under him (joint 0 - SlotUnderUnits), units; the dip his model wears (the hosei's, held to the
+    /// machine's sink since 153j).</summary>
+    public float SlotShownUnits => _slotShownY;
+    public float SlotHomeUnits => _slotHome;
+    public float ModelDipUnits => _modelDip;
+    private float _modelDip, _slotHome;
     public float HoverUnits => HoverHeight * U;                  // the model's origin over the table's centre floor (the game's 300 + 800)
     public float TransYUnits => HoverHeight * U - PositionOverFloor;
     public bool SpicyFireOn => _spicyFire != null && IsInstanceValid(_spicyFire) && _spicyFire.IsEmitting;
@@ -454,7 +487,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         _yaw = _spawnYaw;
         for (int i = 0; i < 3; i++) _rouletteSp[i] = 0f;
         _spit.Clear(); _spitFruitNoCollision.Clear();
-        StopSpicyFx(); StopDrool(); _droolOn = false; _slotShownKnown = false;
+        StopSpicyFx(); StopDrool(); _droolOn = false; _slotShownKnown = false; _slotAnchorJoint = -1;
         SetHidden(StartHidden || IntroRide);
         OffAllCollision();
         if (Slot != null) { Slot.Visible = false; Slot.ForcedResult = ForcedResultValue(); }
@@ -560,7 +593,12 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     protected override void ApplyLook()
     {
         if (_model == null) return;
-        float dip = Mathf.Clamp(_hoseiY, BaseHoseiPosY, 0f);
+        float home = _floorY + PositionOverFloor + TransYUnits - SlotUnderUnits;   // the machine's seat under him at rest (joint 0 - SlotUnderUnits)
+        // 153j: the hosei dips his model only as far as the machine has SUNK under its seat -- he rides it down and it drops away under him (the game dipped
+        // him -300 in three ticks while its slot fell out of sight at 100 u a tick; with 153c's visible sink he sank 4 m into a cabinet still in plain view)
+        bool slotLive = Slot != null && IsInstanceValid(Slot) && Slot.Visible && _slotShownKnown && _intro != 2 && IsInsideTree();
+        float dip = Mathf.Clamp(slotLive ? Mathf.Max(_hoseiY, _slotShownY - _slotSeatPrev) : _hoseiY, BaseHoseiPosY, 0f);   // against the SEAT (his clips' motion without the dip), not the static home: the wait clip's bob is in both and cancels
+        _modelDip = dip; _slotHome = home;
         Basis b = new Basis(Vector3.Up, Mathf.DegToRad(_yaw)) * Basis.FromScale(Vector3.One * _scale * _modelScale);
         Vector3 at = IsInsideTree() ? GlobalPosition : Vector3.Zero;
         at += Vector3.Up * ((TransYUnits + dip) / U);
@@ -570,27 +608,35 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         if (Slot != null && IsInstanceValid(Slot) && _intro != 2)
         {
             float slotOff = -SlotUnderUnits;                  // the game's -700 (153e: a knob -- the cabinet is 642 u tall, 700 sinks his body into it)
-            Vector3 anchor;
+            Vector3 anchor; int anchorJoint;
             if (IsBck(BckHide) || IsBck(BckAppear) || IsBck(BckDamage) || IsBck(BckHit))
             {
-                anchor = JointUnits(_bBody);
+                anchor = JointUnits(_bBody); anchorJoint = 1;
                 if (!IsBck(BckAppear)) slotOff = -2400f - (SlotUnderUnits - 700f);
             }
-            else anchor = _skel != null ? JointUnits(0) : Pos() + Vector3.Up * TransYUnits;
+            else { anchor = _skel != null ? JointUnits(0) : Pos() + Vector3.Up * TransYUnits; anchorJoint = 0; }
             // 153c: the game's placement (the unclamped hosei carries it 100 u a tick out of sight; the hide / damage / hit clips park it 2400 u under the body)
             // is the TARGET; the machine shown chases it -- down at SlotSinkSpeed (a visible sink into the table), up at SlotRiseSpeed -- and never deeper
             // than SlotHideDepthUnits under his floor, so it is back under him by the appear
-            float target = Mathf.Max(_hoseiY + anchor.Y + slotOff, _floorY - SlotHideDepthUnits);
-            float home = _floorY + PositionOverFloor + TransYUnits - SlotUnderUnits;   // where it hangs under him at rest (joint 0 - SlotUnderUnits): above this it rides him rigidly
-            // 153h: the placement's OWN rise this tick rides along -- the appear clip carries jnt_body from 1293 u under his rest to 826 over it in some 30
-            // ticks (40+ u a tick), and a chase capped at SlotRiseSpeed fell behind him and then popped to its place at the clip's end (Jaysonn: "the slot
-            // machine struggles to keep up with him coming from the ground"). Now the machine comes up out of the table WITH him, as the game's bound one
-            // does, and only the gap it starts with closes at SlotRiseSpeed.
-            float rise = _slotShownKnown ? Mathf.Max(0f, target - _slotTargetPrev) : 0f;
-            _slotTargetPrev = target;
+            float parked = _floorY - SlotHideDepthUnits;
+            float target = Mathf.Max(_hoseiY + anchor.Y + slotOff, parked);   // `home` (the seat, joint 0 - SlotUnderUnits): computed above for his dip; at or above it the machine rides him rigidly
+            // 153h/j: his BODY's own motion this tick rides along, both ways -- the appear clip carries jnt_body from 1293 u under his rest to 826 over it in
+            // some 30 ticks (153h: a chase capped at SlotRiseSpeed fell behind him and popped into place at the clip's end), the hide clip hops it up and dives
+            // it 1771 u in 88 ticks (153j: the machine lingered 2.7 s over an empty table) -- so the machine is bolted under him through his clips, as the
+            // game's bound one is, and only what the HOSEI does (the spit's drop-away, the park) is chased at SlotSinkSpeed / SlotRiseSpeed. The ride is
+            // read on one joint at a time (the anchor swaps between jnt_body and the root, 478 u apart at the hide's first frame) and not while it is parked
+            // under the table (the damage clip bounces the root; a parked machine riding that would ratchet upward).
+            // The ride and the seat are read WITHOUT his dip: the dip follows the machine's sink (above), and a machine riding its own effect on him would run
+            // away from him at twice the sink speed (run aa: 44 u of error, the spit 150 ticks early).
+            float seat = anchor.Y - dip + slotOff;
+            float ride = _slotShownKnown && anchorJoint == _slotAnchorJoint && _slotShownY > parked + 1f ? seat - _slotSeatPrev : 0f;
+            _slotSeatPrev = seat; _slotAnchorJoint = anchorJoint; _slotTargetPrev = target;
             if (!_slotShownKnown || !Slot.Visible || target >= home - 1f) { _slotShownY = target; _slotShownKnown = true; }
-            else if (target < _slotShownY) _slotShownY = Mathf.Max(target, _slotShownY - SlotSinkSpeed);
-            else _slotShownY = Mathf.Min(target, _slotShownY + SlotRiseSpeed + rise);
+            else
+            {
+                float s = _slotShownY + ride;
+                _slotShownY = target < s ? Mathf.Max(target, s - SlotSinkSpeed) : Mathf.Min(target, s + SlotRiseSpeed);
+            }
             Vector3 sp = new Vector3(anchor.X, _slotShownY, anchor.Z) / U;
             Slot.GlobalTransform = new Transform3D(new Basis(Vector3.Up, Mathf.DegToRad(_yaw)), sp);
         }
@@ -901,7 +947,8 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         if (_hintFirstHit) { _hintFirstHit = false; ShowHint(HintFirstHit); }           // 0xE0011 once
         RemoveSpit(f); ReleaseIfHeld(f);
         f.QueueFree();                                           // makeObjDead
-        if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: {f.Type} on {(fx >= 0 ? "the body" : "him")} spicy {_spicy} -> hp {_hp}");
+        LastFruitType = f.Type;
+        if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: {f.Type} on {(fx >= 0 ? "the body" : "him")} spicy {_spicy} -> hp {_hp} (the fruit at {f.GlobalPosition * U - BodyPointUnits} from the body point, vel {f.LinearVelocity * U / SmsUnits.TicksPerSecond} u/tick, frozen {f.Freeze}, held {f.SmsBallHeld})");
     }
     /// <summary>TBossTelesa::setSpicy: a pepper on the tongue (not while he spits the round, not during bero_hit) -> spicy, the bero_hit clip, the pepper eaten.</summary>
     private void SetSpicy(Fruit pepper)
@@ -1185,7 +1232,11 @@ public partial class SmsBossTelesa : SmsSmallEnemy
             _attackers.Add(boo);
         }
         boo.JumpPopsUnsprayed = AttackersJumpable;               // 153h
-        boo.SmsInitAttacker(this, MouthUnits, _yaw, _floorY, SpitSpeedScale);
+        boo.FirstPointTowardMario = AttackersFirstPointTowardMario; boo.SmoothAttack = AttackersSmooth;   // 153j
+        // 153j: out of his MOUTH, not his skull -- jnt_mouth sits 220 u inside the head (the face is at z 318), and the game's 10 hidden ticks did not carry the
+        // Boo out of it; AttackersSpawnForwardUnits along his facing puts it at the lips. Its floor is the TABLE'S SURFACE (the game's absolute 500: the casino
+        // table), not his own floor -- 153c made that the pressed bowl's bottom, 143 u under the pads, and the Boos flew inside the rings' floor.
+        boo.SmsInitAttacker(this, MouthUnits + PolarXZ(_yaw, AttackersSpawnForwardUnits), _yaw, TableSurfaceUnits, SpitSpeedScale);
         RumblePad();                                             // TNerveBossTelesaSpit's SMSRumbleMgr->start(0x14, 0xf)
         if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: a Boo attacker ({AttackersAlive} out)");
     }
