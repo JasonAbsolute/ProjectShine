@@ -852,7 +852,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         if (_spicy && fx >= 0) { if (DamageFxScene != null) SpawnBurst(DamageFxScene, new Transform3D(Basis.FromScale(Vector3.One * 3.5f), at)); }
         else if (FruitHitSound != null && FruitHitSound.Stream != null) FruitHitSound.Play();
         if (_hintFirstHit) { _hintFirstHit = false; ShowHint(HintFirstHit); }           // 0xE0011 once
-        RemoveSpit(f);
+        RemoveSpit(f); ReleaseIfHeld(f);
         f.QueueFree();                                           // makeObjDead
         if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: {f.Type} on {(fx >= 0 ? "the body" : "him")} spicy {_spicy} -> hp {_hp}");
     }
@@ -862,9 +862,9 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         if (IsNerve(NerveSpitSlotItem) || IsBck(BckBeroHit)) return;
         _spicy = true; _spicyTimer = 0;
         SetBck(BckBeroHit);
-        RemoveSpit(pepper);
+        if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: SPICY (the pepper on the tongue: {pepper.Name} at {pepper.GlobalPosition * U} vel {pepper.LinearVelocity * U / SmsUnits.TicksPerSecond} u/tick, frozen {pepper.Freeze}, held {pepper.SmsBallHeld}; the tongue point {TonguePointUnits}, my point {Pos()}, model y {JointUnits(0).Y:F0})");
+        RemoveSpit(pepper); ReleaseIfHeld(pepper);
         pepper.QueueFree();
-        if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: SPICY (the pepper on the tongue)");
     }
     /// <summary>The hose on a part (the drops' rays through <see cref="SmsBossTelesaPart"/>, or the hose at close range): the body in PrepareSlot -> Freeze
     /// (checkMessage); the tongue in Appear -> SlotStart (tongueHitWater). The mark either way.</summary>
@@ -1094,8 +1094,18 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     {
         if (n == null || !IsInstanceValid(n) || n.IsQueuedForDeletion()) return;
         if (n is SmsSmallEnemy e) { if (!e.IsDead) { if (ItemKillFxScene != null && e.IsInsideTree()) SpawnBurst(ItemKillFxScene, new Transform3D(Basis.Identity, e.GlobalPosition)); e.SmsKillByDemo(); } return; }
+        ReleaseIfHeld(n);
         if (n.IsInsideTree() && ItemKillFxScene != null) SpawnBurst(ItemKillFxScene, new Transform3D(Basis.Identity, n.GlobalPosition));
         n.QueueFree();
+    }
+    /// <summary>153f: a spit thing about to die while Mario HOLDS it (a fruit in his hands when the fan is swallowed -- the hide, a hit, the down, his walk under
+    /// him) empties his hands first (Mario.SmsHeldGone: pass 130b's ensureTakeSituation, the Bob-omb that blew up in them). Without it he kept carrying a
+    /// freed body -- stuck in the carry until something hit him (Jaysonn's softlock).</summary>
+    private void ReleaseIfHeld(Node3D n)
+    {
+        if (n is not RigidBody3D rb || _mario == null || !IsInstanceValid(_mario) || !_mario.SmsHoldsOrPends(rb)) return;
+        _mario.SmsHeldGone(rb);
+        if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: the {n.Name} in Mario's hands is gone -> his hands emptied");
     }
     private void RemoveSpit(Node3D n) { _spit.Remove(n); if (n is Fruit f) _spitFruitNoCollision.Remove(f); }
     /// <summary>flashItem(result): the last 120 ticks of a round the fruit (not in his hands), the peppers and the coins blink 8 ticks in 16.</summary>
