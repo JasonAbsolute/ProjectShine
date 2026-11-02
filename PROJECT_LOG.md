@@ -10455,3 +10455,72 @@ errors. GPU captures (cap/e153_*.png).
 **Knobs added:** HoverHeight (The arena), ResultPauseTicks (The fight), IntroRide + IntroLiftUnits (Deviations), GhostOpacity + the four eye sheets (Looks),
 FruitPuffFxScene / FanfareFxScene default / SpicyFireFxScene / SweatFxScene / AmbientFx (Effects), ShowHints + the three lines (Hints), the five shake tables
 with the prm values + Rumble (Camera), BossMusic (Sounds). `_sms_note` on BossTelesa.tscn updated.
+
+### 153c -- King Boo after the second playtest: solid with a transparency slider, the parts in depth order, the slot machine sinking and rising under him, drool strands off his lip, the gold ring pressed into a bowl, Mario's glove / shoe / eye opaque (feature/enemy-sirena, code `47b3351`)
+
+**Jaysonn's notes on 153b:** (1) "make him solid then have a transparent slider", (2) "certain parts are going on the wrong layer and rendering wrong
+... his mouth and the other boos have it also", (3) "mario seems to have a layer issue on his hand from a while ago", (4) "the slot machine should be
+going down below the fight, right now it just disappears. it comes up with king boo and he sits on it", (5) "the drool doesn't show up very good ...
+the goopy piranha plant has a working example", (6) "the gold ring in the middle should be pressed down". All six taken.
+
+**What was read (npc82/sirena151/):** `rulet_anim153.py` -- rulet00.bck's joint tracks: the end pose scales the IKE joint (the gold dome) by -0.897 in Y,
+the game's pressed ring; `ike_profile153.py` -- the glb's rest dome is +160 u over the joint's plane (so the pressed bottom sits ~283 u under the disc's
+origin); `crop153.py` zooms of the 153b captures (the mouth drawn over the head); `player_mats153.py` -- assets/Player.tscn's materials: `_mat_head(6)`
+(the right glove), `_mat_head(4)` (the right shoe) and `_mat_eye_L` carry `transparency = 1` while their twins are opaque; `probe_mouth153.gd` -- King
+Boo's joint frames: jnt_mouth at (0, 59, 98) with x -> his forward (+Z), y -> down, z -> his sideways, the face at z 318, the fangs at x +-217, the
+tongue chain at z 161..746; `cur/SmsGoopStrand.cs` + `GkYodareL / S.tscn` (the Piranha's strands: particles born at the anchor every 2 frames, a
+13-frame life, 0.5 x gravity x age^2 of fall, a Catmull-Rom ribbon with a rounded tip).
+
+**Solid + the slider.** `GhostOpacity` defaults to 1 (solid); 0.588 is the game's ghost (mNormalAlpha 0x96 -- the K0 screen mix the 153b shader
+does) and the knob is LIVE: `SetBehavior` re-derives `_alpha = TargetAlpha()` the tick it changes (every nerve but the hit sequence holds TargetAlpha()
+anyway -- the hit sequence chases it and is left alone). The four .tres and the shader default to `opacity = 1.0`.
+
+**The depth.** `BossTelesaToon.gdshader` and the small Boos' `TelesaToon.gdshader`: `render_mode blend_mix, depth_draw_always`. A material that reads
+the screen (his) or writes ALPHA (theirs) renders in Godot's transparent pass, where `depth_draw_opaque` writes NO depth: his mouth and tongue, and the
+small Boo's mouth, eyes and fangs, were drawn over the head from behind (sorted by object, not by pixel). With depth written the surfaces occlude each
+other as the solid things they are; the game's GX writes Z for them too. The alternative, render_priority ordering, was rejected (an order is not an
+occlusion).
+
+**Mario's hand.** `assets/Player.tscn`: `_mat_head(6)`, `_mat_head(4)` and `_mat_eye_L` lose `transparency = 1` (and the glove its
+`vertex_color_use_as_albedo`): a transparent material sorts with the transparent pass and from some angles drew behind his body. Applied with
+`patch_player153c.py` on Jaysonn's PC; the file is in this commit (it was not among his live edits).
+
+**The slot machine.** Kept SHOWN through HideWait; `ApplyLook` chases the game's target height (the hosei / the -2400 park) down at `SlotSinkSpeed`
+(4 u a tick -- a visible sink into the table where the game's was gone within a frame), never deeper than `SlotHideDepthUnits` (1500) under his floor,
+and up at `SlotRiseSpeed` (40) back to its home `floor + PositionOverFloor + TransYUnits - 700` at the appear -- he rides up sitting on it. The slot's
+own hide happens only at his death (the down).
+
+**The drool.** The Piranha's strand scenes bound to his joints with `SmsNpcEffect.Spawn` -- `GkYodareL` x 2 at jnt_mouth, `GkYodareS` at eff_sita (the
+tongue tip) -- recoloured to spit (`DroolLight` (0.82, 0.9, 1) / `DroolDark` (0.45, 0.58, 0.8) through `SetGoopColors`), `DroolLength` 2.2 x the
+Piranha's hang, `DroolWidth` 1.6, `DroolRoundTip` 0.35. Two knobs added to `SmsGoopStrand` (the Piranha keeps their zeros): `FollowAnchor` -- the born
+points ride with the mouth by this fraction (`DroolFollow` 0.85; at 0 his 40 u-a-tick rise with the slot left a 7 m streak behind the mouth for a
+life: run h's captures) -- and `AnchorOffsetUnits` -- where the strand hangs from, in the anchor's frame: jnt_mouth sits 220 u INSIDE his head, so a
+strand from the joint (the game's yodare1 / 2 point) is buried in a solid Boo (run j: nothing visible); the mouth strands hang `DroolLipUnits` (210)
+forward at the lower lip and `DroolSpreadUnits` (+-200) to its corners, beside the tongue (run k: two strands beside the tongue, one off its tip). The
+153b GPUParticles drool nodes are gone from BossTelesa.tscn.
+
+**The gold ring.** `SmsRoulette.PondPressed` (on) / `PondScaleY` (-0.8969): `PressPond()` builds a `PondBowl` MeshInstance3D -- the dome's vertices
+mirrored about the IKE joint's plane with the normals and the winding flipped (a negative bone scale would flip the culling instead) -- and hides the
+skinned dome under an alpha-scissor override (nameless: `BuildCollision` reads `mi.Mesh.SurfaceGetMaterial(s)`); the collision uses `PondY()`. King
+Boo's floor is the bowl's bottom (283 u under the disc's origin): `HoverHeight` 12.33 m = 918 u over it (the game's 1100 over the dome's top); with the
+slot's home he sits on the machine, ~1 m over the pads.
+
+**Drive 153 (patch_smoke153.py): 45 / 45** -- 153b's 42 + A1d (the bowl: its bottom -270..-300 u, his floor there), A3b (>= 2 drool strands bound while
+he waits; the slot risen to within 60 u of its home), A3c (GhostOpacity moved to 1 while he waits -> alpha 0xFE the next tick, no nerve change). The
+drive holds GhostOpacity at 0.588 (the game's) so the alpha checks keep the game's numbers and flips it to 1 for the new `solid` capture. Headless run
+m 45 / 45; windowed capture run k 45 / 45 -- k153_solid (a solid white King Boo on the risen slot, the tongue out, two strands beside it), k153_appear
+(the crown popped, the twinkle, no streak), k153_slot (the roll), k153_down (solid, the tongue lolling). Builds 153u..x: 0 errors; the splice removed
+(Mario.cs clean), the root clean, the tree = his nine live edits.
+
+**Deviations:** depth_draw_always (Godot's object-sorted transparent pass; the game writes Z); the slot's visible sink and rise (the game: parked and
+hidden in a frame); strands instead of the game's drops, hung from the lip's corners (the drops fall from the joint inside the see-through ghost);
+FollowAnchor (the game's drops stay where born); the pond bowl as a mirrored copy; the live slider; GhostOpacity 1 by default (the game 0.588).
+
+**Knobs added:** GhostOpacity live (default 1), DroolFxScene / DroolSmallFxScene, DroolLength / DroolWidth / DroolRoundTip / DroolFollow /
+DroolLipUnits / DroolSpreadUnits / DroolLight / DroolDark (Looks), SlotSinkSpeed / SlotRiseSpeed / SlotHideDepthUnits (Looks), SmsRoulette.PondPressed /
+PondScaleY, SmsGoopStrand.FollowAnchor / AnchorOffsetUnits.
+
+**Files:** `assets/Sms/Enemy/SmsBossTelesa.cs`, `BossTelesa.tscn`, `BossTelesa/{BossTelesaToon.gdshader, BossTelesaBody / Crown / Ha / Mouth.tres,
+SmsRoulette.cs}`, `Telesa/TelesaToon.gdshader`, `assets/Sms/Fx/SmsGoopStrand.cs`, `assets/Player.tscn`. Tooling (npc82/sirena151/): rulet_anim153.py,
+ike_profile153.py, crop153.py, player_mats153.py, patch_player153c.py, probe_mouth153.gd, patch_smoke153.py (45 checks, the solid capture),
+cap/h153_* i153_* j153_* k153_*.
