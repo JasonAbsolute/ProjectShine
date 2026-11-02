@@ -60,6 +60,9 @@ public partial class SmsRoulette : AnimatableBody3D
     public int SwitchStops { get; private set; }
     /// <summary>The pond is the pressed bowl (the centre disc with PondPressed on).</summary>
     public bool PondIsBowl => _pondBowl;
+    /// <summary>The share of the bowl's triangles wound CLOCKWISE seen from above -- Godot's front face, so front-facing from above, where the bowl is looked at:
+    /// 1 = the whole bowl shows; 0 = culled (153c's bug, a hole where the ring was).</summary>
+    public float PondBowlUpFraction { get; private set; }
     /// <summary>The pond's lowest / highest point over this body's origin, units (the bowl's bottom, or the dome's top).</summary>
     public float PondYUnits { get; private set; }
 
@@ -111,9 +114,11 @@ public partial class SmsRoulette : AnimatableBody3D
     }
     /// <summary>The pond's Y in mesh space under the pressed bowl: mirrored about the IKE joint's plane by PondScaleY (the clip's end pose).</summary>
     private float PondY(float y) => _pondBowl ? _pondJointY + (y - _pondJointY) * PondScaleY : y;
-    /// <summary>153c: the gold pond pressed down -- a copy of the `_ike` surface with its vertices mirrored about the IKE joint (the dome's base plane), its
-    /// normals flipped and its winding turned so the bowl faces up, on the pond's own material; the skinned dome itself discarded (an alpha-scissor
-    /// override nothing passes). The skeleton keeps its rest pose: a negative bone scale would turn the skinned faces inside out for the culling.</summary>
+    /// <summary>153c: the gold pond pressed down -- a copy of the `_ike` surface with its vertices mirrored about the IKE joint (the dome's base plane) and
+    /// its normals turned to the inside (the bowl faces up and inward), on the pond's own material; the skinned dome itself discarded (an alpha-scissor
+    /// override nothing passes). The WINDING IS KEPT (153d): a Y mirror leaves a face's turn as seen from above unchanged -- the dome's outside seen from
+    /// above IS the bowl's inside seen from above -- and 153c's flip turned every face away from the camera: the bowl was culled, a hole where the ring was.
+    /// The skeleton keeps its rest pose: a negative bone scale would do the same to the skinned faces.</summary>
     private void PressPond(MeshInstance3D mi, int s, Material pondMat)
     {
         var arrays = mi.Mesh.SurfaceGetArrays(s);
@@ -142,12 +147,14 @@ public partial class SmsRoulette : AnimatableBody3D
         }
         var uv = arrays[(int)Mesh.ArrayType.TexUV]; if (uv.VariantType != Variant.Type.Nil) outArrays[(int)Mesh.ArrayType.TexUV] = uv;
         var idx = arrays[(int)Mesh.ArrayType.Index];
+        int up = 0, tris = 0;
         if (idx.VariantType != Variant.Type.Nil)
         {
-            int[] ii = idx.AsInt32Array();
-            if (PondScaleY < 0f) for (int t = 0; t + 2 < ii.Length; t += 3) { int tmp = ii[t + 1]; ii[t + 1] = ii[t + 2]; ii[t + 2] = tmp; }
+            int[] ii = idx.AsInt32Array();                       // the glb's winding as it is: front faces up, from above, before and after the mirror
             outArrays[(int)Mesh.ArrayType.Index] = ii;
+            for (int t = 0; t + 2 < ii.Length; t += 3) { tris++; if ((pv[ii[t + 1]] - pv[ii[t]]).Cross(pv[ii[t + 2]] - pv[ii[t]]).Y < 0f) up++; }   // clockwise from above = Godot's front face, from above
         }
+        PondBowlUpFraction = tris > 0 ? (float)up / tris : 0f;
         var bowl = new ArrayMesh(); bowl.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, outArrays);
         bowl.SurfaceSetMaterial(0, pondMat);
         var bowlMi = new MeshInstance3D { Name = "PondBowl", Mesh = bowl, Transform = mi.Transform, CastShadow = mi.CastShadow };

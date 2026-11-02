@@ -174,6 +174,9 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     /// point is buried in a solid Boo -- the strands are moved DroolLipUnits forward along the joint's X (his forward) to the lower lip and DroolSpreadUnits
     /// either side along its Z (his sideways) to the lip's corners, beside the tongue (the fangs sit at +-217 u, the tongue is ~200 u wide). 0 / 0 = the joint.</summary>
     [Export(PropertyHint.Range, "0,400,5")] public float DroolLipUnits = 210f, DroolSpreadUnits = 200f;
+    /// <summary>The strands' ribbons turned to face the camera (one strip each; SmsGoopStrand.FaceCamera): round-looking from the table, looking up at him.
+    /// Off = the Piranha's two crossed strips, an X seen from below.</summary>
+    [Export] public bool DroolFaceCamera = true;
     /// <summary>The strands' colours: the pale spit and its shade (the Piranha's are its goop's pair).</summary>
     [Export] public Color DroolLight = new Color(0.82f, 0.9f, 1f), DroolDark = new Color(0.45f, 0.58f, 0.8f);
     /// <summary>153c: the slot machine's own motion, units a tick -- how fast it SINKS below the table after the spit and at his hide (the game drops it 100 u a
@@ -595,7 +598,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
             foreach (Node c in fx.GetChildren())
                 if (c is SmsGoopStrand strand)
                 {
-                    strand.LengthScale = DroolLength; strand.WidthScale = DroolWidth; strand.TipTaper = DroolRoundTip; strand.FollowAnchor = DroolFollow;
+                    strand.LengthScale = DroolLength; strand.WidthScale = DroolWidth; strand.TipTaper = DroolRoundTip; strand.FollowAnchor = DroolFollow; strand.FaceCamera = DroolFaceCamera;
                     if (side != 0f) strand.AnchorOffsetUnits = new Vector3(DroolLipUnits, 0f, side * DroolSpreadUnits);   // the mouth joint's frame: x -> his forward (+Z), y -> down, z -> his sideways (+X)
                 }
             _drool.Add(fx);
@@ -603,6 +606,8 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     }
     private void StopDrool() { foreach (var fx in _drool) if (fx != null && IsInstanceValid(fx)) fx.Stop(); _drool.Clear(); }
     public int DroolStrands { get { int n = 0; foreach (var fx in _drool) if (fx != null && IsInstanceValid(fx) && fx.IsEmitting) n++; return n; } }
+    /// <summary>Every live strand's ribbon faces the camera (DroolFaceCamera carried into SmsGoopStrand.FaceCamera); false with no strands.</summary>
+    public bool DroolFacesCamera { get { bool any = false; foreach (var fx in _drool) { if (fx == null || !IsInstanceValid(fx)) continue; foreach (Node c in fx.GetChildren()) if (c is SmsGoopStrand s) { any = true; if (!s.FaceCamera) return false; } } return any; } }
     private void SetHidden(bool hidden)
     {
         _hidden = hidden;

@@ -45,6 +45,10 @@ public partial class SmsGoopStrand : MeshInstance3D
     /// <summary>Where the strand hangs from, off the anchor in the anchor's own frame, game units (x the actor scale): King Boo's two mouth strands hang from
     /// the mouth's corners (SmsBossTelesa.DroolSpreadUnits), not both from its joint behind the tongue. Zero = the anchor itself (the Piranha).</summary>
     [Export] public Vector3 AnchorOffsetUnits = Vector3.Zero;
+    /// <summary>The ribbon turned to face the camera at every vertex -- ONE strip (Cross is ignored), round-looking from any angle. Off = the game's
+    /// StripeCross: two strips at right angles fixed in the anchor's frame, which read as an X seen along the strand (from the table, looking up at King
+    /// Boo). Set by SmsBossTelesa.DroolFaceCamera; the Piranha keeps off.</summary>
+    [Export] public bool FaceCamera = false;
     /// <summary>Ribbon vertices a segment between two particles (the chain smoothed with Catmull-Rom; 1 = the game's straight segments).</summary>
     [Export(PropertyHint.Range, "1,8,1")] public int Subdivisions = 3;
     /// <summary>Two ribbons at right angles (StripeCross) or one.</summary>
@@ -150,16 +154,25 @@ public partial class SmsGoopStrand : MeshInstance3D
         spine.Add(_chain[_chain.Count - 1]); spineT.Add(_ages[_ages.Count - 1] / LifeFrames);
         Basis frame = anchor.GlobalBasis.Orthonormalized();
         float half = 0.5f * WidthUnits * WidthScale * scale / u;
-        int strips = Cross ? 2 : 1;
+        Camera3D cam = FaceCamera ? GetViewport()?.GetCamera3D() : null;         // FaceCamera: the strip's width runs across the line of sight at every vertex
+        int strips = Cross && cam == null ? 2 : 1;
         for (int st = 0; st < strips; st++)
         {
-            Vector3 right = (st == 0 ? frame.X : frame.Z) * half;
+            Vector3 fixedRight = (st == 0 ? frame.X : frame.Z) * half;
             _mesh.SurfaceBegin(Mesh.PrimitiveType.TriangleStrip);
             for (int i = 0; i < spine.Count; i++)
             {
                 float t = Mathf.Clamp(spineT[i], 0f, 1f);                         // T by age (JPADrawExecStripeCross's fVar2 runs by index; by age it is continuous)
                 float w = WidthAt(t);
                 float v = t - _scroll;
+                Vector3 right = fixedRight;
+                if (cam != null)
+                {
+                    Vector3 tangent = spine[Mathf.Min(i + 1, spine.Count - 1)] - spine[Mathf.Max(i - 1, 0)];
+                    if (tangent.LengthSquared() < 1e-10f) tangent = Vector3.Down;
+                    Vector3 r = (cam.GlobalPosition - spine[i]).Cross(tangent);
+                    if (r.LengthSquared() > 1e-10f) right = r.Normalized() * half;
+                }
                 _mesh.SurfaceSetUV(new Vector2(0f, v)); _mesh.SurfaceAddVertex(spine[i] - right * w);
                 _mesh.SurfaceSetUV(new Vector2(1f, v)); _mesh.SurfaceAddVertex(spine[i] + right * w);
             }
