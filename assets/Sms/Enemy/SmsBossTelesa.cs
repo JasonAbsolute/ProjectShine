@@ -108,10 +108,15 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     [Export] public PackedScene ShineScene;
     /// <summary>Where it appears. Empty: at his point (300 u over the table's centre, where the slot hung).</summary>
     [Export] public Node3D ShineSpawnPoint;
-    /// <summary>How high his body's centre hangs over his floor -- the table's centre: the pressed pond's bottom (143 u under the pads), metres. The slot
-    /// machine's base hangs 9.4 m under that point, his tongue tip ~5 m. The game: mGroundHeight + 300 + TransYOffset 800 = 1100 u = 14.8 m over the
-    /// pond; 12.3 m here (918 u: the slot's base a metre over the pads, his body's bottom 6.6 m up) after Jaysonn's playtest ("he sits too high").</summary>
-    [Export(PropertyHint.Range, "4,25,0.01")] public float HoverHeight = 12.33f;
+    /// <summary>How high his body's centre hangs over his floor -- the table's centre: the pressed pond's bottom (143 u under the pads), metres. The game:
+    /// mGroundHeight + 300 + TransYOffset 800 = 1100 u = 14.8 m over the pond; 12.33 m (918 u) after Jaysonn's first playtest ("he sits too high"), 13 m
+    /// (968 u) after his third ("sit above the slot machine a bit more"): his body's bottom (284 u under his centre) 9.2 m up.</summary>
+    [Export(PropertyHint.Range, "4,25,0.01")] public float HoverHeight = 13f;
+    /// <summary>How far under his body's centre the slot machine's origin hangs while he sits on it, units. The game: 700 (joint 0 - 700) -- but the cabinet is
+    /// 642 u tall from its origin, so the game's machine reaches 58 u under his centre and his body (284 u down) sinks 226 u into it. 960 here (Jaysonn:
+    /// "slot machine should be a little lower"): the cabinet's top 318 u under his centre -- 34 u of air under his body. With HoverHeight 13 m the
+    /// cabinet stands in the pressed bowl (its base 22 u under the bowl's bottom, its drums 100..500 u up from the bowl).</summary>
+    [Export(PropertyHint.Range, "400,1600,10")] public float SlotUnderUnits = 960f;
     [ExportGroup("The fight (the game's numbers; change them for a custom fight)")]
     /// <summary>His hit points (bosstelesa.prm 3): one spicy fruit hit each.</summary>
     [Export(PropertyHint.Range, "1,20,1")] public int HitPoints = 3;
@@ -161,6 +166,8 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     /// <summary>The transparency slider: how solid he is. 1 = solid (Jaysonn's call, the default); the game's ghost is 0.588 (mNormalAlpha 0x96 -- K0 alpha, the
     /// body MIXED with the picture behind him by this, + 30 / 255 for every hit point he has lost, solid while he is hit).</summary>
     [Export(PropertyHint.Range, "0.1,1,0.01")] public float GhostOpacity = 1f;
+    /// <summary>The drool at all (Jaysonn's toggle, 153e): off = no strands, live -- turned off while he plays, the strands stop that tick.</summary>
+    [Export] public bool DroolOn = true;
     /// <summary>The drool (ms_btls_yodare1 / 2 at the mouth, yodare3 at the tongue tip): the port's strand scenes (the Goopy Piranha's GkYodareL / GkYodareS,
     /// SmsGoopStrand ribbons) recoloured to spit. Empty = those; DroolFxScene empty AND DroolSmallFxScene empty = no drool.</summary>
     [Export] public PackedScene DroolFxScene, DroolSmallFxScene;
@@ -457,11 +464,11 @@ public partial class SmsBossTelesa : SmsSmallEnemy
             if (disc.GlobalPosition.Y > target + 0.5f / U) { disc.GlobalPosition += Vector3.Down * (1f / U); return; }
             disc.GlobalPosition = new Vector3(disc.GlobalPosition.X, target, disc.GlobalPosition.Z);
             if (DisappearSound != null && DisappearSound.Stream != null) DisappearSound.Play();   // MSD_SE_BS_TELESA_RLT_SET stands in
-            _intro = 2; _introSlotY = TransYUnits - 700f + 1500f;
+            _intro = 2; _introSlotY = TransYUnits - SlotUnderUnits + 1500f;
             if (Slot != null) Slot.Visible = true;
             return;
         }
-        float home = TransYUnits - 700f;                      // where calcRootMatrix hangs it (joint 0 - 700, no hosei)
+        float home = TransYUnits - SlotUnderUnits;            // where calcRootMatrix hangs it (joint 0 - 700 in the game; SlotUnderUnits here, no hosei)
         float above = _introSlotY - home;
         _introSlotY -= above > 300f ? 5f : 1f;
         if (above <= 200f && above + 5f > 200f) RouletteStart();   // slotFall: the discs start as it passes
@@ -538,19 +545,19 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         if (!IsInsideTree() || Engine.IsEditorHint()) return;
         if (Slot != null && IsInstanceValid(Slot) && _intro != 2)
         {
-            float slotOff = -700f;
+            float slotOff = -SlotUnderUnits;                  // the game's -700 (153e: a knob -- the cabinet is 642 u tall, 700 sinks his body into it)
             Vector3 anchor;
             if (IsBck(BckHide) || IsBck(BckAppear) || IsBck(BckDamage) || IsBck(BckHit))
             {
                 anchor = JointUnits(_bBody);
-                if (!IsBck(BckAppear)) slotOff = -2400f;
+                if (!IsBck(BckAppear)) slotOff = -2400f - (SlotUnderUnits - 700f);
             }
             else anchor = _skel != null ? JointUnits(0) : Pos() + Vector3.Up * TransYUnits;
             // 153c: the game's placement (the unclamped hosei carries it 100 u a tick out of sight; the hide / damage / hit clips park it 2400 u under the body)
             // is the TARGET; the machine shown chases it -- down at SlotSinkSpeed (a visible sink into the table), up at SlotRiseSpeed -- and never deeper
             // than SlotHideDepthUnits under his floor, so it is back under him by the appear
             float target = Mathf.Max(_hoseiY + anchor.Y + slotOff, _floorY - SlotHideDepthUnits);
-            float home = _floorY + PositionOverFloor + TransYUnits - 700f;   // where it hangs under him at rest (joint 0 - 700): above this it rides him rigidly
+            float home = _floorY + PositionOverFloor + TransYUnits - SlotUnderUnits;   // where it hangs under him at rest (joint 0 - SlotUnderUnits): above this it rides him rigidly
             if (!_slotShownKnown || !Slot.Visible || target >= home - 1f) { _slotShownY = target; _slotShownKnown = true; }
             else if (target < _slotShownY) _slotShownY = Mathf.Max(target, _slotShownY - SlotSinkSpeed);
             else _slotShownY = Mathf.Min(target, _slotShownY + SlotRiseSpeed);
@@ -581,7 +588,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
                 if (_glowFx is MeshInstance3D gm && gm.GetActiveMaterial(0) is ShaderMaterial gsm) gsm.SetShaderParameter("strength", k);
             }
         }
-        bool drool = show && !IsBck(BckHide) && !IsBck(BckLaugh) && !IsBck(BckSpicy) && !IsBck(BckSpicyEnd);
+        bool drool = DroolOn && show && !IsBck(BckHide) && !IsBck(BckLaugh) && !IsBck(BckSpicy) && !IsBck(BckSpicyEnd);
         if (drool != _droolOn) { _droolOn = drool; if (drool) StartDrool(); else StopDrool(); }
     }
     /// <summary>ms_btls_yodare1 / 2 (emitAndBindToMtxPtr at joint 5, the mouth) and yodare3 (joint 10, the tongue tip): the Piranha's strand scenes bound to the
