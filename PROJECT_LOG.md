@@ -10621,3 +10621,55 @@ spicy" and say why. Run r: 49 / 49, and the new SPICY debug line (the pepper's p
 own carried-in peppers as expected. Build 0 errors; the splice removed (Mario.cs clean), the root clean.
 
 **Files:** `assets/Sms/Enemy/SmsBossTelesa.cs`. Tooling (npc82/sirena151/): patch_smoke153.py (49 checks; F153TakeHeld / F153CheckHandsEmpty).
+
+### 153g -- King Boo: a damage flash, the spit waits for the slot machine to sink out of sight, the spicy fire from the disc's own four .jpa (feature/enemy-sirena, code `570076c`)
+
+**Jaysonn's notes on 153f:** (1) "king boo needs to flash when damage is dealt to him", (2) "king boo needs to wait for the slot machine to sink all the
+way before spitting fruit or enemies out (sound would help so we might do that soon)", (3) "fire effect needs to look better". All three taken; the sound
+is for a later pass.
+
+**What was read (npc82/sirena151/):** the disc's `data/scene/delfinoBoss/btelesa/jpa/` -- all 22 ms_btls_*.jpa pulled to `disc/btelesa/jpa/` (the 153b
+effects were built from the NAMES in the rip; the files themselves sat in the stage archive, not in data/particle/); `jpa_dump.py` on spicy_a..d
+(`disc/btelesa/jpa/dump/`): the emitter volumes, rates, lives, velocities, the local Gravity fields, the shapes and sizes, the colour maths, the ESP1
+alpha / scale / rotation curves, the four textures; `dump_moe/` the Stu's ms_moe_fire_a..d beside them (the same design: a StripeCross flame, a glow, a
+projected haze, sparks -- the Stu's at 1.6 / 2.75 / 1.25 / 0.5 x 50 u, King Boo's at 7.0 / 13.0 / 8.75 / 1.0, his flame at 40 u/f against the Stu's 1).
+
+**The flash.** The game's damage look is the brk's polmask sweep (153b): K2_A 0 -> 150 over 20 frames, the body speckling into the fruit's colour -- on a
+solid Boo a faint pink salt. `DamageFlashTicks` (30) / `DamageFlashPeriod` (6): on the hit (`StartFlash` in the Die nerve's start, the flinch and the
+spicy damage alike) a counter runs; on its ON phases `ApplyMask` drives the body's `mask_k` to 1 (every texel fails the mask test: the whole body is the
+tint) and `ApplyTint` the tint to the fruit's colour (`DamageFlashFruitColor`; `_tint` white = no fruit -> `DamageFlashColor`), on the OFF phases the
+brk's own values -- `FlashTick` re-applies on every edge, and the readers `MaskK` / `Tint` keep the game's numbers (the drive's D1b still reads the
+brk's climb). 30 ticks of 6 = on-off-on-off-on: three blinks in half a second. Readers `FlashOn`, `FlashTicksLeft`, `BodyMaskParam` (the material's
+`mask_k` as set).
+
+**The spit.** 153c made the machine sink in view (SlotSinkSpeed 4 u a tick) where the game's vanished within a frame -- and left the game's trigger: the
+spit clip as soon as the hosei passed -500, two or three ticks into the drop, the cabinet still in plain sight. `SlotSunk`: the cabinet's top
+(`SlotCabinetTopUnits` 642, srot_waku's y range) under his floor -- the pressed bowl's bottom, so under the whole table; `NerveSpitSlotItem` waits for it
+along with the pause. ~170 ticks of sinking before the clip, every round kind alike; `FruitCollisionOn` still at 600.
+
+**The fire.** `gen_fx153g.py` -> `assets/Sms/Fx/BtlsSpicyFire.tscn`, one SmsNpcEffect (EmitFrames 0, FollowRotation) with four GPUParticles3D, bound to
+jnt_sita_4 as the game binds SPICY_A..D (calcRootMatrix, every frame of the spicy clip). The joint's local +Y points DOWN in the rest pose
+(probe_mouth153.gd), which is why the artists aimed every emitter along -Y: the readings keep the joint's axes. spicy_a the flame: Sphere r 8, 0.5 a
+frame, life 10, velDir 40 along (0.01, -1, 0) + velRndm 10, the local Gravity 16 along +Y read as the Stu's constant drift (gen_fx125h) = 24 u/f off the
+tip +-10 (a speed range + a 22-deg cone), StripeCross dir PrevPctl = align_y on two crossed 350-u quads, scale 1 to 25 % then 0.5 x (1 +- 0.2249), a
+fixed random turn +- 45 deg, TEXC x prm (255,228,155) + env (255,78,0) -> (255,142,79) over 5 frames, alpha x 146/255 (flame_tongue.gdshader, fire1).
+spicy_b the glow: Point at +20, 0.5 a frame, life 10, 24 u/f, a 650-u additive billboard, flat (255,172,101), alpha 0.35 through 61 % then 0 x the
+AddSin flicker (0.125, 0, 0.625) baked, scale 1 to 29 % then 0.7. spicy_c the haze: Point at +35, 0.15 a frame, 9 u/f, a 437-u projected billboard
+through goop_refract (indwp2 through indmsk1, mtx 0.5 x 2^-3: ind_scale 0.0625, four times the Stu's), scale 1 -> 2.5, alpha 0 -> 0.5 by 55 %, 0 from
+62.5 %. spicy_d the sparks: the r-15 shell stretched 1.25 at +39, 0.2 a frame (+-37.5 %), life 70 +-25 %, 20 u/f along -Y in a 27-deg cone + omni 5 +
+velRndm 15 (8..24 m/s), airResist 0.97 as linear damping, the Random field 5 u/f every 2 frames as turbulence (influence 0.25..0.5), the 8 u/f local
+drift down as a world-down 11 m/s^2 with the same end displacement, 50-u additive glow1 x (255,135,87), the AddSin flicker (0.75, 0.125, 0.875), scale
+1 to 62.5 % then 0. `SpicyFireFxScene` empty = this scene (the Stu's as the fallback); `SpicyFireScale` 1 (the 2.5 of the stand-in gone).
+
+**Drive 153 (patch_smoke153.py): 51 / 51** -- 153f's 49 + D1c (the flash running with the hit) and D1e (an ON phase with mask_k 1 and an OFF phase with the
+brk's mask both seen while it ran -- F153Track samples every frame -- and the mask back to the brk's after); C1 asserts `SlotSunk` at the spit (the fan
+came 303 drive frames after the stop: the pause, the sink, the clip); E2b asserts the BtlsSpicyFire scene. Run t read D1c on an OFF phase (the drive's
+frame is two boss ticks: the SMS enemies tick twice a physics frame) and was rewritten; runs u and v 51 / 51; the `flinch` capture moved to +4 frames (an
+ON phase: the whole body pink), a `fire` capture added from his level. Builds 153ah..ak: 0 errors; the splice removed (Mario.cs clean), the root clean.
+
+**Deviations:** the flash itself (the game has only the speckle); the spit's wait for the sunk machine (the game's machine was gone in a frame); the
+fire's velRndm as a cone, its Random field as turbulence, its local drift as world gravity, the stripe's motion-stretch as align_y (all as the Stu's).
+
+**Knobs added:** DamageFlashTicks / DamageFlashPeriod / DamageFlashFruitColor / DamageFlashColor, SpicyFireScale (Effects). Files:
+`assets/Sms/Enemy/SmsBossTelesa.cs`, `assets/Sms/Fx/BtlsSpicyFire.tscn`. Tooling (npc82/sirena151/): gen_fx153g.py, disc/btelesa/jpa/ (+ dump/,
+dump_moe/), patch_smoke153.py (51 checks), cap/t153_* u153_* v153_*.
