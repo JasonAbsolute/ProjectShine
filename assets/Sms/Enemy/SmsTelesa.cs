@@ -44,7 +44,10 @@ using Godot;
 /// last 200 of getChangeBlockTime 3000 the block blinks 10 in 20; at 3000 changeOut: NO_COLLISION, MSD_SE_EN_TELSA_RECOVER, HIDDEN off, the body at
 /// the block, 0xCD, the clip rate back, the block killed. TSeeTelesa: CAN_SEE. TLoopTelesa: LOOP. TTelesaManager: modoki.bmd for the imitators,
 /// telesaForceKill, setFlagOutOfCube (the area cube). TMarioModokiTelesa / TKageMarioModoki (the Boos that copy Mario) and the King Boo's
-/// attackers (setAttacker / initAttacker, TNerveTelesaAttackMario, TelesaAttackGravityY, PowerByWater) are the boss's -- not this pass.
+/// attackers (initAttacker: reset, CAN_SEE, at his mouth - 150 with a lift of 8, ENEMY off, hidden 10 ticks; TNerveTelesaAttackMario: the wait clip, the
+/// first point 1000 u behind the boss's facing, then points 0.7..1.6 of the way to Mario, walkBehavior(2, 2); the base height damped to the table's 500 at
+/// (ground - 500) / 120 clamped +-2, snapped to 501 from under; TelesaAttackGravityY 0.02; the hose: y 30 and PowerByWater 40; killed: the TLS_CHANGE puff
+/// and no clip, no drops) are pass 153's -- <see cref="SmsInitAttacker"/>, for <see cref="SmsBossTelesa"/>.
 ///
 /// THE PORT. The base's walker nerves (GraphWander, Wait, Die) with the species' TelesaFreeze, Trample and Change; its own HitCheckMario (the
 /// jump finds it only while <see cref="_tangible"/>, the sprayed stun -- otherwise he passes through a ghost; the hose always; the touch attack);
@@ -54,7 +57,8 @@ using Godot;
 /// to the glb at its live scale). Knobs (grouped, plain English): Kind, Deviations (SpeedScale), Effects (the change puff, the drool slot, the
 /// block scene), Sounds (eight slots). DEVIATIONS (logged): the fade is alpha (no screen-texture refraction); the ground-damping typo is kept
 /// (the base height = the placed height -- place it where it should float); the fifth-kill water bottle is the DropTable's business; the
-/// imitators and the boss's attackers are not here; the camera shakes / the area cube are not ported.
+/// imitators are not here (the boss's attackers are, pass 153: pooled Telesa.tscn bodies the boss owns -- the table height they fly at is his floor); the
+/// camera shakes / the area cube are not ported.
 /// </summary>
 public partial class SmsTelesa : SmsSmallEnemy
 {
@@ -116,8 +120,8 @@ public partial class SmsTelesa : SmsSmallEnemy
     protected override bool[] BckLoops => Loops;
 
     // ------------------------------------------------------------------------------------------------------------------ nerves (TNerveTelesa*)
-    protected const int NerveTFreeze = NerveSpecies, NerveTrample = NerveSpecies + 1, NerveChange = NerveSpecies + 2;
-    private static readonly string[] TelesaNerveNames = { "TelesaFreeze", "Trample", "Change" };
+    protected const int NerveTFreeze = NerveSpecies, NerveTrample = NerveSpecies + 1, NerveChange = NerveSpecies + 2, NerveAttackMario = NerveSpecies + 3;
+    private static readonly string[] TelesaNerveNames = { "TelesaFreeze", "Trample", "Change", "AttackMario" };
     protected override string NerveName(int n) => n >= NerveSpecies && n < NerveSpecies + TelesaNerveNames.Length ? TelesaNerveNames[n - NerveSpecies] : base.NerveName(n);
     protected override int DefaultNerve => NerveGraphWander;
 
@@ -126,12 +130,19 @@ public partial class SmsTelesa : SmsSmallEnemy
     private float _flyCur, _flyTarget, _bob, _bobAmp, _bobPhase, _bobFreq = 200f, _dampGround, _rotX;   // mCurrentFlyHeight / mTargetFlyHeight / mFlyBobOffsetY / mFlyBobAmplitude / mFlyBobPhase / mFlyBobFrequency / mDampenedGroundHeight / mRotation.x
     private FadeState _fadeState = FadeState.Invisible; private int _fadeTimer, _fadeLoopTimer; private float _fadeA = -1f;   // mFadeState / mFadeTimer / mFadeLoopTimer / mTelesaFadeColor.a
     private bool _tangible, _sprayedSince;                      // HIT_CATEGORY_ENEMY on (a stunned one takes the jump) / unk165
+    private bool _attacker; private float _attackBaseY, _dampSpeed;   // unk184 (King Boo's attacker, pass 153) / its base height (the game's absolute 500 = the casino table) / mGroundHeightDampeningSpeed
     private SmsTelesaBlock _block;                              // mJuiceBlock
     private readonly List<ShaderMaterial> _mats = new();
     /// <summary>For the drives.</summary>
     public FadeState Fade => _fadeState;
     public float FadeAlpha => MathF.Max(0f, _fadeA);
     public bool Tangible => _tangible;
+    /// <summary>unk184: one of King Boo's attackers (pass 153) -- visible, homing on Mario at the table's height, knocked far by the hose, a puff when killed.</summary>
+    public bool IsAttacker => _attacker;
+    public bool IsAttacking => IsNerve(NerveAttackMario);
+    public float AttackBaseY => _attackBaseY;
+    /// <summary>The kind the fade follows: an attacker is CAN_SEE whatever its scene says.</summary>
+    private BooKind KindNow => _attacker ? BooKind.CanSee : Kind;
     public bool IsFrozen => IsNerve(NerveTFreeze);
     public bool IsChanging => IsNerve(NerveChange);
     public bool IsDying => IsNerve(NerveDie);
@@ -179,7 +190,7 @@ public partial class SmsTelesa : SmsSmallEnemy
         MotionMode = MotionModeEnum.Floating;
         if (_block != null && IsInstanceValid(_block)) _block.QueueFree(); _block = null;
         SetFlyParam(1f);
-        _bob = 0f; _rotX = 0f; _tangible = false; _sprayedSince = false;
+        _bob = 0f; _rotX = 0f; _tangible = false; _sprayedSince = false; _attacker = false; _dampSpeed = 0f;
         // mDampenedGroundHeight = the placed Y: the game's Boos are placed ON their floor (bind lands the base there, the velocity 0) -- here the base is
         // put on the floor under the placed point (+ BaseOffsetUnits) whatever height it was dropped at, so it never hangs airborne over its own floor
         float g = IsInsideTree() ? GroundYBelow() : Pos().Y - 100f * U;
@@ -187,7 +198,7 @@ public partial class SmsTelesa : SmsSmallEnemy
         SetY(_dampGround);
         _airborne = false; _vel = Vector3.Zero;
         _fadeTimer = 0; _fadeLoopTimer = 0;
-        switch (Kind)                                            // setTypeNormal / setTypeLoop / setTypeCanSee (the box Boo is CAN_SEE)
+        switch (KindNow)                                         // setTypeNormal / setTypeLoop / setTypeCanSee (the box Boo is CAN_SEE)
         {
             case BooKind.Normal: _fadeState = FadeState.Invisible; break;
             case BooKind.Loop: _fadeState = FadeState.FadeIn; break;
@@ -208,15 +219,64 @@ public partial class SmsTelesa : SmsSmallEnemy
     }
     protected override void MoveObjectPre() { _noBind = true; }
     protected override bool IsFindMario(float k) => false;      // TTelesa::isFindMario: never (the Boo drifts; the boss sends the attackers)
-    /// <summary>TTelesa::isReachedToGoal: on the ground plane, MsVECMag2 &lt; 200.</summary>
+    /// <summary>TTelesa::isReachedToGoal: on the ground plane, within 200 u (MsVECMag2 is the length: pass 153 fixed 151's squared reading, 14 u).</summary>
     protected override bool IsReachedToGoal()
     {
         Vector3 d = Goal() - Pos(); d.Y = 0f;
-        return d.LengthSquared() < 200f;
+        return d.Length() < 200f;
     }
     protected override void LaunchVelocity() { }
     protected override bool IsCollidMove(Node3D other) => other is SmsSmallEnemy;   // everything but an effect object
-    protected override float GravityY() => Prm.TelesaGravityY;
+    /// <summary>TTelesa::getGravityY: TelesaAttackGravityY (0.02) for an attacker, TelesaGravityY (0.05) else.</summary>
+    protected override float GravityY() => _attacker ? Prm.TelesaAttackGravityY : Prm.TelesaGravityY;
+
+    // ------------------------------------------------------------------------------------------------------------------ King Boo's attacker (pass 153)
+    /// <summary>TTelesa::initAttacker(from) -- the boss's genAttacker made this body his attacker: reset, visible (CAN_SEE), at his mouth - 150 y with a lift of 8 u a
+    /// tick, his yaw, fresh fly numbers, HIT_CATEGORY_ENEMY off, hidden for the nerve's first 10 ticks, the AttackMario nerve. The base height the attacker
+    /// settles to is the table's (the game's absolute 500 = the casino's table top; here <paramref name="tableYUnits"/> + 0, the boss's floor).</summary>
+    public void SmsInitAttacker(SmsBossTelesa from, Vector3 mouthUnits, float yawDeg, float tableYUnits, float speedScale = 1f)
+    {
+        GlobalPosition = (mouthUnits + Vector3.Down * 150f) / U;
+        _spawnPos = GlobalPosition * U; _spawnYaw = yawDeg; _yaw = yawDeg;
+        Reset();
+        _attacker = true;
+        _attackBaseY = tableYUnits;
+        _dampGround = Pos().Y; _dampSpeed = 0f;
+        _vel = new Vector3(0f, 8f * speedScale, 0f); _airborne = true;
+        SetFlyParam(1f);
+        _tangible = false; _sprayedSince = false;
+        _fadeState = FadeState.Visible; _fadeA = -1f; FadeTick();
+        _stack.Clear(); _cur = NerveNone; _prev = NerveNone; _time = 0;
+        PushAfterCurrent(NerveAttackMario);
+        if (_model != null) _model.Visible = false;           // LIVE_FLAG_HIDDEN until the nerve's tick 10
+        SetCollisionLayerValue(1, true);
+        if (AppearSound != null && AppearSound.Stream != null) AppearSound.Play();
+        ApplyLook();
+        if (DebugPrint) GD.Print($"[SMS telesa] {Name}: attacker from {from?.Name} at {Pos()} base {_attackBaseY:F0}");
+    }
+    /// <summary>setFirstAttackPoint: the yaw turned about (180 - instanceIndex x 720 in the game: behind the boss's facing), the goal 1000 u ahead.</summary>
+    private void SetFirstAttackPoint()
+    {
+        _yaw = Wrap360(_spawnYaw + 180f);
+        SetGoalPoint(Pos() + PolarXZ(_yaw, 1000f));
+    }
+    /// <summary>setAttackPoint: the goal toward Mario, 0.7..1.6 of the way on the ground plane (it overshoots him).</summary>
+    private void SetAttackPoint()
+    {
+        Vector3 m = MarioPos(), p = Pos();
+        float r = Lerp(0.7f, 1.6f, Rand());
+        SetGoalPoint(new Vector3(p.X + (m.X - p.X) * r, p.Y, p.Z + (m.Z - p.Z) * r));
+    }
+    /// <summary>TTelesa::walkBehavior's ground damping for an attacker: toward the table height at (ground - table) / 120 clamped +-2 a tick; under it, snapped to
+    /// table + 1 (a plain Boo's speed is (ground - ground) / 120 = 0: the base stays where it was placed).</summary>
+    private void DampToAttackBase()
+    {
+        float target = _attackBaseY;
+        if (_dampSpeed == 0f && MathF.Abs(_dampGround - target) > 5f)
+            _dampSpeed = Mathf.Clamp((GroundYBelow() + 1f - target) / 120f, -2f, 2f);
+        if (_dampSpeed > 0f) { _dampGround += _dampSpeed; if (_dampGround > target) _dampSpeed = 0f; }
+        if (_dampSpeed < 0f) { _dampGround += _dampSpeed; if (_dampGround < target) { _dampSpeed = 0f; _dampGround = target + 1f; } }
+    }
 
     // anims (telesa_bastable: 1 clush, 2 down, 6 wait; 3 / 4 / 5 the hit set)
     protected override void SetGenerateAnm() => SetWalkAnm();
@@ -312,10 +372,11 @@ public partial class SmsTelesa : SmsSmallEnemy
     {
         _sprayedSince = true;
         if (IsNerve(NerveTFreeze) || IsNerve(NerveChange)) return;
-        Vector3 d = new Vector3(Pos().X - MarioPos().X, 2f, Pos().Z - MarioPos().Z);
-        SetY(Pos().Y + 2f);
-        if (d.LengthSquared() < 1e-6f) d = new Vector3(0f, 2f, 1f);
-        _vel = d.Normalized() * 5f * SpeedScale;
+        float up = _attacker ? 30f : 2f;                        // an attacker is knocked high and far: y 30, PowerByWater 40 (a Boo: y 2, 5)
+        Vector3 d = new Vector3(Pos().X - MarioPos().X, up, Pos().Z - MarioPos().Z);
+        SetY(Pos().Y + 2f + (_attacker ? 30f : 0f));
+        if (d.LengthSquared() < 1e-6f) d = new Vector3(0f, up, 1f);
+        _vel = d.Normalized() * (_attacker ? Prm.TelesaPowerByWater : 5f) * SpeedScale;
         _airborne = true;
         if (_fadeState != FadeState.Visible && _fadeState != FadeState.FadeIn) _fadeState = FadeState.FadeIn;
         PushNerve(NerveTFreeze);
@@ -377,6 +438,7 @@ public partial class SmsTelesa : SmsSmallEnemy
     {
         base.WalkBehavior(mode, k * SpeedScale);
         if (!IsNerve(NerveDie) && _flyCur < _flyTarget) _flyCur += 1f;
+        if (_attacker) DampToAttackBase();
         SetY(_dampGround + _flyCur + _bob);
     }
 
@@ -387,7 +449,7 @@ public partial class SmsTelesa : SmsSmallEnemy
         if (_dead) return;
         if (IsNerve(NerveDie)) ReduceFlyForce();
         Bind();                                                  // bind first: the base point is read with the bob the walk placed the body with (the game's order: control, bind, then setBehavior's new bob)
-        if (IsNerve(NerveGraphWander) || IsNerve(NerveWait))
+        if (IsNerve(NerveGraphWander) || IsNerve(NerveWait) || IsNerve(NerveAttackMario))
         {
             _bobPhase += 1f;
             if (_bobPhase > _bobFreq) _bobPhase = 0f;
@@ -444,17 +506,17 @@ public partial class SmsTelesa : SmsSmallEnemy
         {
             case FadeState.Visible:
                 a = 1f; _fadeTimer = 0;
-                if (Kind != BooKind.CanSee && Kind != BooKind.Box && !IsNerve(NerveTFreeze))
+                if (KindNow != BooKind.CanSee && KindNow != BooKind.Box && !IsNerve(NerveTFreeze))
                 {
                     _fadeLoopTimer++;
-                    int appear = Kind == BooKind.Normal ? Prm.AppearTime : Prm.LoopAppearTime;
+                    int appear = KindNow == BooKind.Normal ? Prm.AppearTime : Prm.LoopAppearTime;
                     if (_fadeLoopTimer > appear) { _fadeState = FadeState.FadeOut; _fadeLoopTimer = 0; }
                 }
                 else { _fadeTimer = Prm.FadeOutTime; _fadeLoopTimer = 0; }
                 break;
             case FadeState.Invisible:
                 _fadeTimer = 0; a = 0f;
-                if (Kind == BooKind.Loop && ++_fadeLoopTimer > Prm.LoopHideTime) { _fadeState = FadeState.FadeIn; _fadeLoopTimer = 0; }
+                if (KindNow == BooKind.Loop && ++_fadeLoopTimer > Prm.LoopHideTime) { _fadeState = FadeState.FadeIn; _fadeLoopTimer = 0; }
                 break;
             case FadeState.FadeIn:
             {
@@ -494,6 +556,21 @@ public partial class SmsTelesa : SmsSmallEnemy
     {
         switch (n)
         {
+            case NerveAttackMario:                               // TNerveTelesaAttackMario (King Boo's attacker, pass 153)
+                if (_time == 0) { SetBck(BckWait); SetFirstAttackPoint(); }
+                if (_time == 10 && _model != null) _model.Visible = true;
+                if (IsReachedToGoal()) SetAttackPoint();
+                WalkBehavior(2, 2f);
+                return false;
+
+            case NerveDie when _attacker:                        // TNerveTelesaDie for an attacker: the TLS_CHANGE puff, no clip, dead at once, no drops
+                SetCollisionLayerValue(1, false);
+                if (_model != null) _model.Visible = true;
+                SpawnBurst(ChangeFxScene, new Transform3D(Basis.FromScale(Vector3.One * _scale), GlobalPosition));
+                _noReward = true;
+                Dead();
+                return true;
+
             case NerveTFreeze:                                   // TNerveTelesaFreeze
                 if (_time == 0) { SetBck(BckHitStart); SetGoalMario(); }
                 else if (BckEnded())

@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://d153tslot"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/BossTelesa/SmsTelesaSlot.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/BossTelesa/srotrulet.glb" id="2_drums"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/BossTelesa/srot_waku.glb" id="3_frame"]
+
+[node name="TelesaSlot" type="Node3D"]
+script = ExtResource("1_script")
+metadata/_sms_note = "Pass 153: King Boo's SLOT MACHINE (TelesaSlot): the three drums (srotRulet) in their frame (srot_waku). His BossTelesa scene carries one as its Slot child and places it under him; on its own it just spins when told (MoveStart / ForceStopSlot / TickSlot). The faces read 0 COIN, 1 ENEMY, 3 JACKPOT, 2 FRUIT every 45 degrees."
+
+[node name="Drums" parent="." instance=ExtResource("2_drums")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="Frame" parent="." instance=ExtResource("3_frame")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)

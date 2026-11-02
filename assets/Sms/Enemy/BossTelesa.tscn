@@ -1,0 +1,27 @@
+[gd_scene format=3 uid="uid://d153btelesa"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsBossTelesa.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/BossTelesa/btelesa.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Enemy/BossTelesa/TelesaSlot.tscn" id="3_slot"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisap.tscn" id="4_disap"]
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_body"]
+radius = 0.4
+height = 1.6
+
+[node name="BossTelesa" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+script = ExtResource("1_script")
+RelaunchTicks = -1
+DeathFxScene = ExtResource("4_disap")
+metadata/_sms_note = "Pass 153: KING BOO (BossTelesa), Casino Delfino's boss. Easiest: drop assets/Sms/Enemy/BossTelesa/KingBooArena.tscn (the three roulette discs + him) into the level; on his own he needs three SmsRoulette discs in the scene (the sms_roulette group) and sits over the floor under him. He hangs 11 m up over the table's centre with his slot machine under him, hidden for HideWaitTicks first. Spray his TONGUE: the slot rolls; three FRUIT and he spits a fan of fruit and two RED PEPPERS; throw a pepper at his tongue (he turns spicy and solid) and THEN a fruit at his body: a hit point off, he flees and the discs spin faster; a fruit on him while not spicy only makes him flinch and laugh. Three hits (HitPoints) and he is down: the Shine. Between rounds he hides; waiting, he spits Boo attackers every few seconds (SpitsBooAttackers). Stand within 4 m of the table's centre under him and he vanishes (HidesWhenMarioUnder). Ground-pound a disc's switch pad to stop that disc. Knobs: The arena (the discs, the slot, the Shine), The fight (HitPoints, HideWaitTicks, RoundTimeScale, the slot rates, ForceResult for a custom fight, CoinRounds), What he spits (the fruit / coin / enemy scenes, the Boo), Deviations (speed scales, the attackers, the hide), Effects, Camera, Sounds."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8, 0)
+shape = SubResource("CylinderShape3D_body")
+disabled = true
+
+[node name="Slot" parent="." instance=ExtResource("3_slot")]

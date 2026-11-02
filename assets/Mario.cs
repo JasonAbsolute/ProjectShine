@@ -17287,6 +17287,8 @@ public partial class Mario : CharacterBody3D
     /// sound in its Stream; empty = silent.</summary>
     [Export] public AudioStreamPlayer HpRecover;
 
+    /// <summary>SMS_GetMarioHP (pass 153): his hit points as the enemies read them (King Boo's slot steers its result by them).</summary>
+    public int SmsHP => _health;
     /// <summary>TMario::incHP (MarioCollision.cpp 25): under water (isUnderWater(): head below the surface less CanBreathDepth) the
     /// heal goes to the AIR, capped at mMaxAir -- a coin taken while submerged refills a unit of air and the meter steps back up --
     /// otherwise to the health, capped at HPMax; MSD_SE_SY_HP_RECOVER either way when it was not already full (pass 47).</summary>
