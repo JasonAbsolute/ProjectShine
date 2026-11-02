@@ -10524,3 +10524,40 @@ PondScaleY, SmsGoopStrand.FollowAnchor / AnchorOffsetUnits.
 SmsRoulette.cs}`, `Telesa/TelesaToon.gdshader`, `assets/Sms/Fx/SmsGoopStrand.cs`, `assets/Player.tscn`. Tooling (npc82/sirena151/): rulet_anim153.py,
 ike_profile153.py, crop153.py, player_mats153.py, patch_player153c.py, probe_mouth153.gd, patch_smoke153.py (45 checks, the solid capture),
 cap/h153_* i153_* j153_* k153_*.
+
+### 153d -- King Boo: the pressed gold ring shows (153c had culled the bowl), the drool strands face the camera instead of reading as an X (feature/enemy-sirena, code `38322f3`)
+
+**Jaysonn's notes on 153c:** (1) "gold ring sinks in but I can't see it", (2) "the drool looks like an X pattern from the top up". Both taken, nothing else
+touched.
+
+**The bowl.** `PressPond` mirrors the `_ike` dome's vertices about the IKE joint's plane (rulet00.bck's -0.897) -- and 153c ALSO reversed every triangle's
+winding, reasoning that a mirrored face must be turned back "so the bowl faces up". Wrong: the Y component of a triangle's cross product depends on X and Z
+only, so a Y mirror leaves a face's turn as seen from above unchanged -- the dome's outside seen from above IS the bowl's inside seen from above. The flip
+turned the whole bowl away from the camera, `cull_back` dropped it, and the alpha-scissor override had already hidden the dome: a hole where the ring was.
+The winding is kept now (the normals still turn to the inside for the shading). `SmsRoulette.PondBowlUpFraction` reads the result: the share of the bowl's
+triangles wound CLOCKWISE seen from above -- Godot's front face (the glb importer turns glTF's counter-clockwise into it, which is why `ike_profile153.py`
+reads the file's dome as "140 up" by the opposite sign) -- 1.00 now, 0.00 with 153c's flip. The drive's A1e asserts it (> 0.95) and the new `bowl` capture
+(the centre disc from 9 m up, before the appear) shows the golden basin with its rim at the floor: m153_bowl / n153_bowl.
+
+**The drool's X.** The Piranha's `SmsGoopStrand` is the game's JPADrawExecStripeCross: two ribbons at right angles, fixed in the anchor's frame (`Cross`).
+Seen along the strand -- from the table, looking up at a Boo 9 m over your head -- the two strips read as an X. `SmsGoopStrand.FaceCamera` (new, default
+off: the Piranha keeps its cross): ONE strip whose width direction at every spine vertex is `(camera - vertex) x tangent`, normalised -- the classic
+view-aligned ribbon, round-looking from any angle; `Cross` is ignored while it is on; without a current camera the fixed strip is used. The stripe shader
+is `cull_disabled`, so the strip's side does not matter. `SmsBossTelesa.DroolFaceCamera` (on) carries it to his three strands; `DroolFacesCamera` reads it
+back and A3b asserts it. The `drool` / `drool2` captures (from the table, 1 m up, looking up at the lip from the front and from the side) show three
+rounded drops -- two at the lip's corners, one off the tongue tip -- and no X: n153_drool / n153_drool2.
+
+**Drive 153 (patch_smoke153.py): 46 / 46** -- 153c's 45 + A1e. Windowed capture runs l (A1e read the wrong sign: 0.00; the bowl already showed), m (46 / 46;
+the `drool` camera landed under the table: his node is the point 300 u over the floor, the model hangs 618 u higher) and n (46 / 46, the drool cameras on
+the lip). The capture log now prints the capture camera's position, the shot's eye / at and whether it is current. Builds 153y..aa: 0 errors; the splice
+removed (Mario.cs clean), the root clean.
+
+**Deviations:** none new. The camera-facing strip is a rendering choice (the game's cross is two fixed strips); the Piranha keeps the game's.
+
+**Knobs added:** SmsGoopStrand.FaceCamera; SmsBossTelesa.DroolFaceCamera (Looks). Readers: SmsRoulette.PondBowlUpFraction, SmsBossTelesa.DroolFacesCamera.
+
+**Left in the tree (Jaysonn's):** the editor's re-saves of the four BossTelesa .tres (uids, the parameters re-ordered) and KingBooArena.tscn (uids,
+unique_ids, and `GhostOpacity = 0.45` on the placed boss -- he is trying the slider).
+
+**Files:** `assets/Sms/Enemy/BossTelesa/SmsRoulette.cs`, `assets/Sms/Enemy/SmsBossTelesa.cs`, `assets/Sms/Fx/SmsGoopStrand.cs`. Tooling (npc82/sirena151/):
+patch_smoke153.py (46 checks; the bowl / drool / drool2 captures, the camera in the CAP line), cap/l153_* m153_* n153_*.
