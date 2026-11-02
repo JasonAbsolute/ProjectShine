@@ -10785,3 +10785,63 @@ rule restored.
 **Knobs added:** AttackersSpawnForwardUnits, AttackersFirstPointTowardMario, AttackersSmooth (The fight); SmsTelesa.FirstPointTowardMario, SmoothAttack,
 SmoothPassUnits (Deviations); DamageFlashTicks 150 / DamageFlashPeriod 10. Files: `assets/Sms/Enemy/SmsBossTelesa.cs`, `assets/Sms/Enemy/SmsTelesa.cs`.
 Tooling (npc82/sirena151/): patch_smoke153.py (60 checks), cap/ac153_*.
+
+### 153k -- King Boo's room: the casino boss room's wall and ceiling round his arena, from the game's own files (feature/enemy-sirena, code `cc59542`)
+
+**Jaysonn's note on 153j:** "can you find the outer rim of the battle arena? we need walls for this".
+
+**The rim.** The casino boss room (`delfinoBoss`) is its own stage, and the rim is a map object of its own: `scene.bin` places `SirenabossWall`
+(mapobj/boss_wall.bmd; `TSirenabossWall`, MapObjSirena.cpp) at the origin, scale 1 -- the same point as rulet00 / 01 / 02 and srotRulet. `map.col`
+(col_dump153.py) is 48 wall triangles -- a 24-gon of corner radius 2450 u from -1500 to 4000 u -- and 44 ceiling triangles at 4000 u, surface 0; no
+floor (the discs' own .col files). `boss_wall.bmd` paints that drum (corners at 2464, -500..4050 u, one quad a column, uv u 0..24 round and v 0..-8 up,
+the stars upright) seen from INSIDE: cull back, every face wound toward the axis (casino_wall153.py). `map.bmd` is the ceiling: the marble ring
+`_B2f_ten` (1183..2464 u at 4000, L_dairiten) and the blue cap `_00ura_3` (a 1183-u cylinder from 4000 up to 4800, closed, L_danmen), both texture x
+VERTEX colour, unlit. The outer disc (rulet02, 2511 u) pokes 61 u into the wall, so the table has no edge. The roulettes stand 500 u over their placed
+point (`TRoulette::initMapObj`) and the arena's discs stand at the arena node, so the room sits `TableLiftUnits` (500 u = 6.7 m) under the node:
+the paint from 13 m under it to 47 m over, the collision from 27 m under (rulet01's `_Dark` pillar reaches -28 m: the pit's depth), the ceiling at 47 m.
+
+**The paint.** `_B2f_wall` (bmd_matfull153.py): four TEV stages, one colour channel reading the material REGISTER (96, 73, 96) -- NOT the vertex colours
+the bmd also carries (a blue gradient FinModelUtility exports as COLOR_0; a plain glb import would tint the wall blue). Stage 0: TEX0 x the register --
+TEX0 is `P_casino_floor`, which despite its name is the gold STARS on purple (CMPR 128 x 128, 24 x 8 tiles). Stages 1..3: + K0 (111, 0, 24) red / K1
+(96, 96, 0) yellow / K2 (24, 0, 72) violet x TEX1..3 -- all three `P_telusaroom1_i`, an I8 of two SOFT SPOTS (the converter's PNG put the intensity in
+alpha, so it read as grey rings on white: wall_tex153.py writes the two textures opaque straight from the bmd) -- through TEXMTX1..3 at scale 0.125
+about the tile's centre, so one spot tile spans a third of the way round and the whole height: ~20-m soft discs. `TSirenabossWall::initMapObj` makes a
+`TMultiBtk(3)` of the model's three btks and updates it every frame -- all three play at once, each on its own texture slot (btk_raw153.py: the TTK1
+anim table is Ss Rs Ts St Rt Tt Sq Rq Tq, not SSS RRR TTT): boss_wall_01 (600 frames) T runs 0 -> 2 (the spots RISE) while S eases 0 -> -0.7 -> 0;
+_02 (850) S runs 0.5 -> -2.5 while T eases 0 -> 0.8 -> 0; _03 (930) S runs 0 -> 1 while T eases 0.5 -> 1.5 -> 0.5 (zero-tangent Hermite keys:
+(1 - cos) / 2). `BossWall.gdshader` is that TEV in display space from TIME (30 frames a second x SpotSpeed), converted to linear once at the end, as
+the port's other SMS shaders; opaque, cull back, fog as the table's.
+
+**The port.** `SmsBossWall` (StaticBody3D, layer 1, `[Tool]`) BUILDS itself at `_Ready` and on any knob change, owner-less (nothing lands in the scene
+file; the editor shows the real wall): the painted drum as an ArrayMesh (`WallColumns` quads, the uv above, normals inward, the triangles wound
+CLOCKWISE seen from inside -- Godot's front face is clockwise, so the right-hand normal points OUTWARD; `WallInwardFraction` reads it), its collision
+as a `ConcavePolygonShape3D` of the game's 48 triangles with `BackfaceCollision` (both sides), the ceiling as `map.glb` instanced at 1 / 74.44 with its
+imported StandardMaterials duplicated and set Unshaded + `VertexColorUseAsAlbedo` + `VertexColorIsSrgb` (the bmd's vertex colours are display-space
+values; Godot's glTF import takes COLOR_0 as linear and would draw the ring and cap too bright and too white) and a trimesh of its 104 faces (not in
+the editor). `RoomCastsShadows` off by default: the game's room has no shadows, and in Godot a 47-m ceiling under Jaysonn's sun would shadow the
+whole table. `KingBooWall.tscn` carries the script, the shader, the two textures and the glb as exports; `KingBooArena.tscn` gets it as its `BossWall`
+child at the arena's own point, written over Jaysonn's editor re-save of the arena (the uids, his GhostOpacity 0.45 on the boss) so his placed arena
+in Level.tscn picks the room up by itself. The textures live under `models/Koopa/scene/delfinoBoss/` (his map-object layout: mapobj/boss_wall/,
+map/), imported with mipmaps + VRAM compression (patch_import153k.py; a 128-px tile over a 33-m drum seen from 60 m shimmers without).
+
+**Drive 153 (patch_smoke153.py): 66 / 66** -- 153j's 60 + a new phase 10 before the fight (the boss held hidden through it: HideWaitTicks 100000,
+the 120 back after A1): K1 a ray out from the centre at the outer disc's face meets the BossWall at 2450 u (toward +z: a corner); K2 a ray up at r 1800
+meets it 3500 u over the arena node (the game's 4000 less the 500 lift); K3 a ray out 15 m under the node, from r 1500 (past rulet01's pillar, which
+the first try hit at r 1040), meets the wall; K4 the paint's 48 triangles all wound for the inside; K5 Mario's capsule (0.373 m) cast outward from
+r 2200 stops at ~2422 (the corner less his radius; safe fraction < 1); K6 a 0.3-m ball shot outward at 15 m/s over the outer disc is still on the
+table after 1.5 s, never past 2428. The level's own SmsBossWall (Jaysonn's placed arena, 82 m under the drive's) is freed with its discs and boss at
+the start. Headless run ad 61 / 66 (the room checks added the disc's absolute face height to the arena's position: rays 119 m up in the sky);
+windowed run ae 66 / 66 with the captures `room`, `ceiling`, `wallnear` and the fight's old shots now in front of the wall. Builds 153aw..ay:
+0 errors; the splice removed (Mario.cs clean), the root clean.
+
+**Deviations:** `TableLiftUnits` (the room 500 u under the node the arena's discs stand at -- the game's relation kept, the frame moved); the knobs
+`RoomCastsShadows` (off), `Brightness`, `SpotStrength`, `SpotSpeed` (1 = the game's); the wall's fog follows the table's StandardMaterials (the game
+has none). The game's own numbers everywhere else.
+
+**Knobs added:** SmsBossWall -- Room: WallOn, CeilingOn, TableLiftUnits 500, RoomCastsShadows; Wall: WallRadiusUnits 2450, WallPaintOutsetUnits 14,
+WallColumns 24, WallBottomUnits -500, WallTopUnits 4050, WallCollisionBottomUnits -1500, WallCollisionTopUnits 4000, StarTilesAround 24, StarTilesUp 8;
+Look: WallTint, SpotColorRed / Yellow / Violet, SpotSpeed, SpotStrength, Brightness; Resources: StarsTexture, SpotsTexture, WallShader, CeilingScene.
+Files: `assets/Sms/Enemy/BossTelesa/SmsBossWall.cs`, `BossWall.gdshader`, `KingBooWall.tscn`, `KingBooArena.tscn`;
+`models/Koopa/scene/delfinoBoss/mapobj/boss_wall/boss_wall_stars.png`, `boss_wall_spots.png`; `models/Koopa/scene/delfinoBoss/map/map.glb`,
+`map_0.png`, `map_1.png` (+ .import). Tooling (npc82/sirena151/): casino_geo153.py, casino_wall153.py, col_dump153.py, btk_raw153.py,
+bmd_matfull153.py, wall_uv153.py, wall_tex153.py, glb_info153.py, patch_import153k.py, patch_smoke153.py (66 checks), cap/ae153_*.
