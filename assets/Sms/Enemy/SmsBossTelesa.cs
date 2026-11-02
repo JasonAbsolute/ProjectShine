@@ -152,6 +152,9 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     [Export(PropertyHint.Range, "0.1,3,0.05")] public float SpitSpeedScale = 1f;
     /// <summary>Spits a Boo attacker every (400 + 100 x lost HP) ticks while he waits for the spray (TNerveBossTelesaAppear). Off = he only laughs.</summary>
     [Export] public bool SpitsBooAttackers = true;
+    /// <summary>153h (Jaysonn: "the boos should be able to be jumped on"): a jump or a ground pound pops a spat Boo attacker without the hose first
+    /// (SmsTelesa.JumpPopsUnsprayed set on each one he spits). Off = the game: the hose stuns it, then the jump.</summary>
+    [Export] public bool AttackersJumpable = true;
     /// <summary>Hides (and cancels the round) when Mario comes within 300 u of the table's centre under him (the kill cylinder's Mario test).</summary>
     [Export] public bool HidesWhenMarioUnder = true;
     /// <summary>The intro's hide clip on the first appearance too (the game: he is hidden by the FallDemo; the first HideWait runs its full wait).</summary>
@@ -215,8 +218,8 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     /// <summary>153g (Jaysonn: "king boo needs to flash when damage is dealt to him"): on a hit (the flinch and the spicy damage) his body blinks the whole way into
     /// a colour -- DamageFlashTicks long, DamageFlashPeriod ticks on / off -- on top of the game's own speckle (the brk's polmask sweep, which at 150 / 255 is
     /// subtle on a solid Boo). DamageFlashFruitColor: the blink is the fruit's colour (the coconut's pink, the papaya's orange ...); off = DamageFlashColor.
-    /// 0 ticks = no flash.</summary>
-    [Export(PropertyHint.Range, "0,120,1")] public int DamageFlashTicks = 30;
+    /// 0 ticks = no flash. 90 ticks (1.5 s, seven and a half blinks: 153h, "flash longer") -- 153g's 30 was half a second.</summary>
+    [Export(PropertyHint.Range, "0,300,1")] public int DamageFlashTicks = 90;
     [Export(PropertyHint.Range, "1,20,1")] public int DamageFlashPeriod = 6;
     [Export] public bool DamageFlashFruitColor = true;
     [Export] public Color DamageFlashColor = new Color(1f, 0.3f, 0.3f);
@@ -282,6 +285,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     private SmsNpcEffect _spicyFire, _sweat;                     // the spicy loop's bound emitters (ms_btls_spicy_a..d, ms_btls_ase)
     private readonly List<SmsNpcEffect> _drool = new(); private bool _droolOn;   // the strands (yodare1 / 2 at the mouth, yodare3 at the tongue tip)
     private float _slotShownY; private bool _slotShownKnown;     // 153c: the slot machine's shown height, units, chasing the game's placement
+    private float _slotTargetPrev;                               // 153h: the game's placement last tick -- its own rise (the appear clip's) is added to the chase
     private GpuParticles3D _chikaFx; private Node3D _glowFx;     // the scene's own emitters
     private SmsHintBalloon _hint; private bool _hintLooked;
     private float _hoseiY;                                       // mHoseiPosY (the dip; unclamped -- the slot rides it)
@@ -307,6 +311,8 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     /// bottom, so under the whole table. The spit waits for this (153g).</summary>
     public bool SlotSunk => Slot == null || !IsInstanceValid(Slot) || !Slot.Visible || !_slotShownKnown || _slotShownY + SlotCabinetTopUnits <= _floorY;
     public const float SlotCabinetTopUnits = 642f;              // srot_waku.glb: y -30..642 from its origin (slot_geo153.py)
+    /// <summary>How far the shown machine is UNDER the game's placement of it, units (0 = riding it exactly; the sink's lag is negative).</summary>
+    public float SlotLagUnits => Slot != null && IsInstanceValid(Slot) && Slot.Visible && _slotShownKnown ? _slotTargetPrev - _slotShownY : 0f;
     public float HoverUnits => HoverHeight * U;                  // the model's origin over the table's centre floor (the game's 300 + 800)
     public float TransYUnits => HoverHeight * U - PositionOverFloor;
     public bool SpicyFireOn => _spicyFire != null && IsInstanceValid(_spicyFire) && _spicyFire.IsEmitting;
@@ -576,9 +582,15 @@ public partial class SmsBossTelesa : SmsSmallEnemy
             // than SlotHideDepthUnits under his floor, so it is back under him by the appear
             float target = Mathf.Max(_hoseiY + anchor.Y + slotOff, _floorY - SlotHideDepthUnits);
             float home = _floorY + PositionOverFloor + TransYUnits - SlotUnderUnits;   // where it hangs under him at rest (joint 0 - SlotUnderUnits): above this it rides him rigidly
+            // 153h: the placement's OWN rise this tick rides along -- the appear clip carries jnt_body from 1293 u under his rest to 826 over it in some 30
+            // ticks (40+ u a tick), and a chase capped at SlotRiseSpeed fell behind him and then popped to its place at the clip's end (Jaysonn: "the slot
+            // machine struggles to keep up with him coming from the ground"). Now the machine comes up out of the table WITH him, as the game's bound one
+            // does, and only the gap it starts with closes at SlotRiseSpeed.
+            float rise = _slotShownKnown ? Mathf.Max(0f, target - _slotTargetPrev) : 0f;
+            _slotTargetPrev = target;
             if (!_slotShownKnown || !Slot.Visible || target >= home - 1f) { _slotShownY = target; _slotShownKnown = true; }
             else if (target < _slotShownY) _slotShownY = Mathf.Max(target, _slotShownY - SlotSinkSpeed);
-            else _slotShownY = Mathf.Min(target, _slotShownY + SlotRiseSpeed);
+            else _slotShownY = Mathf.Min(target, _slotShownY + SlotRiseSpeed + rise);
             Vector3 sp = new Vector3(anchor.X, _slotShownY, anchor.Z) / U;
             Slot.GlobalTransform = new Transform3D(new Basis(Vector3.Up, Mathf.DegToRad(_yaw)), sp);
         }
@@ -1172,6 +1184,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
             boo.SmsSpawnDead();
             _attackers.Add(boo);
         }
+        boo.JumpPopsUnsprayed = AttackersJumpable;               // 153h
         boo.SmsInitAttacker(this, MouthUnits, _yaw, _floorY, SpitSpeedScale);
         RumblePad();                                             // TNerveBossTelesaSpit's SMSRumbleMgr->start(0x14, 0xf)
         if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: a Boo attacker ({AttackersAlive} out)");

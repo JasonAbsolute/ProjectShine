@@ -99,6 +99,10 @@ public partial class SmsTelesa : SmsSmallEnemy
     /// <summary>How far over the FLOOR under it the Boo's base sits (units; 0 = the game: the base is the floor, and it floats its fly height 50..100 +
     /// the bob over that -- 0.7 to 2.3 m). Raise it for a Boo that should hang high in a room; a stunned one sinks to this base, a dying one to the floor.</summary>
     [Export(PropertyHint.Range, "0,600,5")] public float BaseOffsetUnits = 0f;
+    /// <summary>153h (Jaysonn: "the boos should be able to be jumped on"): a jump or a ground pound on a Boo that has NOT been hosed pops it too, while it
+    /// shows (a faded-out one is still a ghost). Off = the game: his jump passes through the ghost until the hose stuns it (HIT_CATEGORY_ENEMY off).
+    /// King Boo's attackers get it from his AttackersJumpable; the hotel's Boos keep the game's rule unless this is on in their scene.</summary>
+    [Export] public bool JumpPopsUnsprayed = false;
     [ExportGroup("Effects (empty = the default / none)")]
     /// <summary>ms_tls_change (0xCD): the puff where the box Boo turns into its block and where it comes back. Empty = assets/Sms/Fx/EnemyDisap.tscn.</summary>
     [Export] public PackedScene ChangeFxScene;
@@ -329,7 +333,7 @@ public partial class SmsTelesa : SmsSmallEnemy
         bool marioHits = CheckDistance(m, ar, ah, g, P.DamageRadius * s, P.DamageHeight * s);
         if (marioHits)
         {
-            if (_tangible)
+            if (_tangible || (JumpPopsUnsprayed && IsVisibleNow))   // 153h: the knob lets his jump find a shown, unhosed Boo (the game: only the stunned one)
             {
                 bool falling = !onGround && _mario.Velocity.Y < 0f && g.Y < m.Y;
                 var st = _mario.stateOfMario;
