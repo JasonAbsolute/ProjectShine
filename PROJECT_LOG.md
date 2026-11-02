@@ -10673,3 +10673,40 @@ fire's velRndm as a cone, its Random field as turbulence, its local drift as wor
 **Knobs added:** DamageFlashTicks / DamageFlashPeriod / DamageFlashFruitColor / DamageFlashColor, SpicyFireScale (Effects). Files:
 `assets/Sms/Enemy/SmsBossTelesa.cs`, `assets/Sms/Fx/BtlsSpicyFire.tscn`. Tooling (npc82/sirena151/): gen_fx153g.py, disc/btelesa/jpa/ (+ dump/,
 dump_moe/), patch_smoke153.py (51 checks), cap/t153_* u153_* v153_*.
+
+### 153h -- King Boo: the damage flash three times longer, the slot machine rides his rise out of the table, a jump pops his Boo attackers (feature/enemy-sirena, code `be8ce44`)
+
+**Jaysonn's notes on 153g:** (1) "we need him to flash longer once he's hit", (2) "the slot machine seems to struggle to keep up with him when coming from the
+ground", (3) "the boos I think should be able to be jumped on". All three taken.
+
+**The flash.** `DamageFlashTicks` 30 -> 90: a second and a half (seven and a half blinks at the 6-tick period; 90 / 6 is odd, so it starts and ends ON).
+The flinch's hit clip is 84 ticks, the spicy hit's damage clip 438: the flash now outlasts the flinch into the lick and covers the damage clip's first
+fifth. The range widened to 300.
+
+**The ride.** `glb_anim153.py` on the appear clip: jnt_body's translation runs -1293..826 u -- he comes up from under the table, overshoots and settles --
+over the clip's first half, 40-odd u a tick. 153c's chase: the machine's target through the appear is the body joint - SlotUnderUnits (the game binds it
+there), and the shown height rose toward it at `SlotRiseSpeed` 40 u a tick from where the hide had left it, starting 215 u behind (the hosei's reset at
+the appear's first tick jumps the target from the floor - 1500 clamp to body - 960). It trailed him up, and when the clip ended and the anchor returned to
+joint 0 -- a target at or above home snaps -- it popped into its place: Jaysonn's "struggles to keep up". `ApplyLook` now remembers the target each tick
+(`_slotTargetPrev`) and adds the target's own rise to the chase: `shown = min(target, shown + SlotRiseSpeed + max(0, target - prevTarget))`. The starting
+gap closes at SlotRiseSpeed (five ticks), and from there the machine rides him rigidly -- up out of the bowl with him, up through his overshoot (a target
+above home snaps anyway) and back down with him. The sink (a falling target) is untouched. Reader `SlotLagUnits` (the placement minus the shown height);
+the drive's `_f153SlotLagMax` tracks it over every frame of the appear clip: 0 u.
+
+**The jump.** `SmsTelesa.HitCheckMario` lets Mario's jump find a Boo only while `_tangible` (the sprayed stun -- the game's HIT_CATEGORY_ENEMY).
+`JumpPopsUnsprayed` (Deviations, default off = the game): `_tangible || (JumpPopsUnsprayed && IsVisibleNow)` -- a jump or a ground pound on a shown,
+unhosed Boo pops it (the same Trample / HipDrop path: IsHitValid, Kill, StompBounce); a faded-out one is still a ghost. `SmsBossTelesa.AttackersJumpable`
+(on, Jaysonn's call) writes the knob onto each attacker in `GenAttacker` before `SmsInitAttacker`; the hotel's Boos (151) keep the game's rule unless their
+scene turns it on.
+
+**Drive 153 (patch_smoke153.py): 54 / 54** -- 153g's 51 + A3a (the slot's maximum lag through the appear < 30 u: 0), A5b (Mario placed 40 u over the
+unhosed attacker, falling at 1.5 m/s -- F153Place + velocity -- and 16 drive frames later the Boo dead or in its Die nerve), D1d (80 boss ticks after the
+hit the flash still running: left 4); D1c reads DamageFlashTicks 90, D1e moved to 120 ticks. Headless run w 53 / 54: A5b sampled the very tick the Boo
+entered Die ("Die t0 ... dead False", Mario "stomping") -- the check accepts the Die nerve and samples 8 frames later; windowed run x 54 / 54 with a
+`rise` capture 18 ticks into the appear (the machine up out of the bowl with him, x153_rise). Builds 153am..ao: 0 errors; the splice removed (Mario.cs
+clean), the root clean.
+
+**Deviations:** the longer flash (the game has only the speckle); the jump on an unhosed Boo (the game: never) -- the attackers only by default.
+
+**Knobs added:** SmsTelesa.JumpPopsUnsprayed (Deviations), SmsBossTelesa.AttackersJumpable (The fight); DamageFlashTicks default 90. Files:
+`assets/Sms/Enemy/SmsBossTelesa.cs`, `assets/Sms/Enemy/SmsTelesa.cs`. Tooling (npc82/sirena151/): patch_smoke153.py (54 checks), cap/x153_*.
