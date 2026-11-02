@@ -10258,3 +10258,120 @@ it: nothing (DebuWait, the Zs on); D5 the hose: woken (the Zs gone, stirring); D
 YoshiOnly one: the hose does nothing; Y2 his ground pound does nothing. (Run b's find: a 2.4 m collision sphere centred on the node pushed the body
 0.4 m out of the dock's floor on placement -- 2.0 m at (0, 2, -0.5) now.) Build 0 errors, boot ALL OK. GPU captures (SMS_F152_CAP=1, cap/): the
 sleeper with its Zs, the woken one, the beaten one shrinking away.
+
+### 153 -- King Boo: Casino Delfino's boss over his roulette table -- the slot machine, the fruit and pepper rounds, the spicy hits, the three spinning discs with their pound switches, the Boo attackers, the Shine (feature/enemy-sirena, `525f1b5`)
+
+**Files:** NEW `assets/Sms/Enemy/BossTelesa.tscn`, `SmsBossTelesa.cs` (+ .uid; with `SmsBossTelesaPart`), `assets/Sms/Enemy/BossTelesa/{SmsTelesaSlot.cs,
+TelesaSlot.tscn, SmsRoulette.cs, Roulette00.tscn, Roulette01.tscn, Roulette02.tscn, KingBooArena.tscn, BossTelesaToon.gdshader, BossTelesaBody.tres,
+BossTelesaCrown.tres, BossTelesaHa.tres, BossTelesaMouth.tres}`, `models/Eniemes/BossTelesa/` (btelesa.glb with 17 bck clips, srotrulet.glb, srot_waku.glb,
+rulet00 / 01 / 02.glb and their pngs from his FinModelUtility rip of /scene/delfinoBoss, game units; btelesa.glb's .import swaps its four bmd materials
+for the .tres). CHANGED `assets/Sms/Enemy/SmsTelesa.cs` (the Boo's attacker half: `SmsInitAttacker`, the AttackMario nerve, the attacker's water knock
+and death; `IsReachedToGoal` fixed -- MsVECMag2 is a LENGTH, so 200 u, not the squared 14 u of pass 151) and `assets/Mario.cs` (`public int SmsHP =>
+_health;` before SmsIncHP -- SMS_GetMarioHP, the slot steers by it). Tools: npc82/sirena151/{patch_import153.py (glb / pins / mario), make_tres153.py,
+probe_clips153.gd, probe_bones153.gd, probe_rulet153.gd / probe_ride153.gd / probe_dome153.gd (the collision tests), patch_smoke153.py (drive 153 + its
+capture mode), run_drive153.bat / run_cap153.bat, bmd_mat3.py, decomp/ (bosstelesa.cpp, BossTelesa.hpp, MapObjSirena.cpp / .hpp, telesa.cpp)}.
+bosstelesa.prm shipped: HeadHeight 120, BodyRadius 30, 3 HP, damage 30 x 260, attack 30 x 420, GenAttackerTime 200, HitAngle 180, NumGenBubble 3,
+1stBubbleSp 10, HideAreaRadius 1000, SlotItemNum 6, SlotFruitNum 16, SlotFirstHitCollectRate 0.6, SlotHitCollectRate 1.0, TransYOffset 800, StopSlotTime
+3500 / 3000 / 2500, SpicyTime 1500; the statics mNormalAlpha 0x96, mBaseHoseiPosY -300, mRouletteUpRate 0.03, mTelesaGenerateInterval 400.
+
+**The game.** TBossTelesa : TSpineEnemy (ACTOR_TYPE_BOSS_TELESA). init: the model with motion blend, K0 = unk34C (the alpha 0x96 on every channel: the
+mix konst and the fade), K1 = unk348 (the tint, white), LIGHT_TYPE 3 with the SCREEN TEXTURE swapped into H_ma_rak_dummy -- the body's TEX0 is the
+screen: King Boo is a dark see-through refraction of the casino behind him; three hit actors: the BODY (TBossTelesaBody 350 x 550 at joint 1 jnt_body
+- 200 y: Mario -> ATTACK, a MAP_OBJECT -> checkHitObject, SPRAYED -> checkMessage), the TONGUE (180 x 350 at joint 7 jnt_sita_2 - 350: Mario -> ATTACK, a
+RED_PEPPER -> setSpicy, an object over tongue.y + 100 -> checkHitObject, SPRAYED -> tongueHitWater), the KILL cylinder (400 x 300 at (joint 1 xz, y - 350):
+every HIT_CATEGORY_ENEMY in it killed; Mario within 300 u of its point -> forceHide and unk6C = 1). loadAfter: the three ACTOR_TYPE_CASINORULET discs,
+the ACTOR_TYPE_SROT_RULET slot (unk1A0 = the boss), 20 fruit (6 coconut, 6 papaya, 2 pineapple, 6 durian), 10 red peppers, 10 coins, the Boo manager, 5
+bottle_large, the srot_waku frame as TSharedParts of the slot. moveObject: the camera offset, mPosition.y = mGroundHeight + 300, the alpha in Die (+1
+a tick toward 0xFF; -1 toward 0x96 + 30 x lost HP through the lick past frame 50 and the laugh), the roulette sounds, the hit actors placed on the
+joints. calcRootMatrix: the model at mPosition + TransYOffset + the hosei dip (-300..0), the slot at joint 1 (- 700 through appear, - 2400 through hide /
+damage / hit) or joint 0 (- 700) + the UNCLAMPED hosei, the drool at joint 5 / 10, the sweat and fire at joint 9 while spicy, the spit clip's frame 40 ->
+generateSlotItem (in SpitSlotItem) or genAttacker. The bck table: 0 appear 59, 1 bero_hit 59, 2 damage 219, 3 down 199, 4 hide 44, 5 hit 42, 6 laugh
+89, 7 lick 140, 8 / 9 / 10 the hot-spring bubbles 122 / 5 / 80 L, 11 roll 139, 12 spicy 30 L, 13 spicy_end 59, 14 spit 99, 15 wait 60 L, 16 wet 59. NERVES:
+FallDemo (the intro: Mario rides rulet00 down from 2000 u, the slot drops into place, rouletteStart) -> HideWait (HIDDEN, spicy off, the alpha, the
+slot scale 0, brk 2; past 400 ticks and unk6C 0 -> Appear) -> Appear (the appear clip, the BGM, the slot scale 1 + randomReset, onAllCollision; the
+clip's end -> wait; frame 78 the SLT_LAND shake; past 800 ticks every 400 + 100 x lost HP ticks the spit clip; hosei x 0.96) -- tongueHitWater ->
+SlotStart (the roll clip; frame 53 slotStart: moveStart, telesaForceKill; the end -> wait + forceStopSlot(1); checkSlot: no drum held -> SpitSlotItem;
+hosei x 0.99) -> SpitSlotItem (past 200 ticks hosei -100 a tick; under -500 the spit clip; the clip ended and past 600 -> PrepareSlot, fruitCollisionOn)
+-> PrepareSlot (wait; spicy: bero_hit -> spicy loop until SpicyTime -> spicy_end -> plain; unk368 to StopSlotTime by HP, x 0.5 for COIN; the last 120
+ticks flashItem; all dead or time up -> forceAllItemKill, DISAPPEAR / ESCAPE, reset, Hide) -> Hide (the hide clip; its end offAllCollision, the rumble,
+rouletteStart -> HideWait). checkHitObject (PrepareSlot only): coconut (0xE6, 0x64, 0xB4) / papaya + pineapple (0xE6, 0xB4, 0) / durian (0x96, 0x32,
+0xE6) -> the tint + kill; a pepper eaten; the fhit effects; makeObjDead. kill -> Die (pushed): spicy -> decHitPoints; offAllCollision; HP left: spicy ->
+brk 1 + damage (UNK1F shake), not spicy -> hit + brk 0 (UNK20); HP 0 -> down + brk 1 (UNK21), the slot scale 0, DOWN. The end of hit -> brk 2 + lick ->
+laugh -> onAllCollision, wait, reset onto PrepareSlot; the end of damage -> damageRecover (the fruit / peppers / coins dead with TLS_CHANGE puffs, the
+sound, Hide after, unk368 0); the end of down -> the down puffs (by the last fruit), forceAllItemKill, slotStop; 240 ticks later makeShineAppearWithDemo
+and DEAD. setSpicy (not in SpitSlotItem, not during bero_hit): spicy, the bero_hit clip, the pepper killed. Freeze: the wet clip + THANKYOU; its end
+spicy off, the alpha back. TTelesaSlot (MapObjSirena's TSlotDrum): 3 drums of 8 faces (45 deg), the result by angle 0 COIN / 1 ENEMY / 3 JACKPOT / 2
+FRUIT repeating; moveStart -1 / -0.8 / +1 x 2.0 deg a tick HELD; a released drum -0.01 a tick to 0.5, then the creep to the next 45; forceStopSlot(1):
+with FirstHitCollectRate (0.9 at 1 HP) the target FRUIT (COIN at 3 HP or under) and the middle drum held to it, else its forecast; = last round's result
+-> JACKPOT; COIN with unk370 0 -> ENEMY, with Mario at 6+ -> JACKPOT; each stop steers the still-held drums with HitCollectRate; all stopped -> fanfale.
+generateSlotItem: FRUIT: 16 slots in a scattered 160-deg fan from the mouth (joint 5) - 50 y, slots 0 and 4 the red peppers (the first x 2), 6..10 u a
+tick, y -2, scale 1.5, NO_COLLISION; COIN: 10 coins in a 120-deg fan, (0.8..3.5) x 10, y 10, from the mouth - 250, killByTimer 960, unk370--; ENEMY: kind
+1 (Hamukuri) at 3 HP else 2 (Yakikuri) x 6; JACKPOT: 6 of cycling kinds 1..7 (8 at 1 HP) from {Bubble, Hamukuri, Yakikuri, BombHei, PoiHana,
+ElecNokonoko, Popo, Gesso, TobiPuku}; Mixed: 12 Bubbles; each (0.5..1) x 10, y 2 x (2 + 0.5..1), from the mouth - 240, initAttacker. TRoulette: initMapObj
+y + 500; the `_switch` material's TEVREG0 (blue in stage 56); TRouletteSw 500 x 100 at joint 1, y - 100: HIP_DROP -> unk6C -> switchStop with Mario's
+feet within 20 u of the ground and the disc turning -> speed 0, black, RLT_STOP; rotation.y += unk13C a tick (stage 56). TTelesa::initAttacker: reset,
+CAN_SEE, at the boss's mouth - 150 with a lift of 8, ENEMY off, HIDDEN 10 ticks, AttackMario (the wait clip; the first point 1000 u behind the facing,
+then 0.7..1.6 of the way to Mario; walkBehavior(2, 2); the base height damped to the table's 500 at (ground - 500) / 120 clamped +-2, snapped to 501
+from under); gravity TelesaAttackGravityY 0.02; the hose: y 30 and PowerByWater 40; killed: the TLS_CHANGE puff, no clip, no drops.
+
+**The port.** `SmsBossTelesa : SmsSmallEnemy` (Prm = bosstelesa.prm; HitPoints a knob). He never moves: each tick his floor is the MAP body under him
+within 10 m (SmsCoinItem.IsMap: the discs; never a fruit, an enemy, Mario, nor the room's floor 80 m down) and he sits 300 u over it; FlyBind + _noBind,
+his own collision shape disabled (the game's 30 x 420 cylinder is a hit check here). `SmsBossTelesaPart` x 2 (StaticBody3D cylinders on
+SmsHiddenCoin.HideLayer -- in the hose's drop mask, out of the fruit sim's, Mario's and the enemies') follow jnt_body - 200 and jnt_sita_2 - 350 and hand a
+spray to `SmsPartSprayed` (the tongue in Appear -> SlotStart; the body in PrepareSlot -> BossFreeze); his own HitCheckMario every fourth tick: his
+cylinder and the parts' on Mario (TakeDamage), the hose at close range, every Fruit (the pickable group + his own spat ones, not in Mario's hands)
+against the tongue (a pepper -> SetSpicy) then the body (CheckHitObject -- the game runs both lists on one tick), the kill cylinder on the sms_enemy
+group (an unsprayed Boo attacker spared, the category off) and Mario's distance for ForceHide. The alpha a `fade` uniform on per-body copies of the
+four materials, the tint a `tint` on the body's, the brk flashes a `c0` pulse (brk 0 a white flash, brk 1 a red pulse; the .brk tables are not in the
+rip). The slot: the child Slot (TelesaSlot.tscn: srotrulet + srot_waku at 1 / 74.44), TopLevel, placed in ApplyLook from his joints with the unclamped
+hosei (it falls away after the spit and rises back on the appear), ticked by him (SmsTelesaSlot.TickSlot; ForcedResult from ForceResult at each
+forceStopSlot). The discs: the exports or the `sms_roulette` group sorted by radius (rulet00 the small centre disc, rulet02 the outer ring); RouletteStart
+/ SlotStop set their speeds. The spit: SpawnFruit (the Fruit scene, Size 1.5, LinearVelocity = the game's u/tick x 120 / 74.44 for the ball sim, off the
+pickable group until FruitCollisionOn, a pepper turned 90), SpawnCoin (yellow_coin through SmsDropTable.Launch, life 960), SpawnEnemy (the species scene,
+RelaunchTicks -1, SmsLaunch flyFirst); ForceAllItemKill / DamageRecover / FlashItem / CheckAllItemDead over the `_spit` list. GenAttacker: Telesa.tscn
+bodies pooled under his parent (Pooled, dead until needed; MaxAttackers 6) -> `SmsTelesa.SmsInitAttacker(boss, mouth, yaw, tableY)`. The Shine:
+shine_sprite.tscn at his point with PlaySpawnEntrance; then Dead (the attackers killed, the slot hidden; RelaunchTicks -1 frees him). `SmsRoulette :
+AnimatableBody3D` (sync to physics): the collision a trimesh of the glb's surfaces built at _Ready with the vertices carried into the body's space (a
+CollisionShape3D cannot be scaled -- the first run's discs were 74 x too big and nothing stood on them); a sync-to-physics body hears only its LOCAL
+transform (and reverts a local change until the physics tick applies it), so `_Notification(TransformChanged)` pushes the global transform to the
+physics server when the ORIGIN moves (an arena placed at runtime; a spin never moves it -- pushing on every change had frozen the spin); the switch
+is the `_switch` pad's centroid in body space (the bone's pose read oddly on the skin), stopped on Mario's groundPoundLanding within 500 u x 100 u of
+it; the pad's StandardMaterial copy keeps the pad's own red / green texture (the glb's `_switch_02` samples the same red|green sheet as the pads,
+clamped) and ADDS the register as emission -- blue (SwitchGlowEnergy 1.5) while spinning, so a violet glow on the red pad, nothing at rest (TEVREG0
+black); PondSolid keeps the centre disc's gold dome (`_ike`) as floor
+(it is a dome Mario slides off; the boss's floor is its top). Mario rides the discs through his own SMS ride (pass 81: SmsRideApply / _smsRideLocal). The
+`SmsTelesa` attacker half: `_attacker`, `SmsInitAttacker`, `SetFirstAttackPoint` / `SetAttackPoint`, `DampToAttackBase` (the table height = the boss's
+floor; DEVIATION: the game's absolute 500 is the casino table's height), the AttackMario nerve, the attacker's BehaveToWater (y 30, 40 u a tick), Die as an
+attacker (the puff, dead at once, no drops), KindNow = CAN_SEE for the fade. Knobs (grouped, plain English): The arena (RouletteTop / Middle / Bottom,
+Slot, ShineScene, ShineSpawnPoint), The fight (HitPoints 3, HideWaitTicks 400, RoundTimeScale, FirstHitCollectRate, HitCollectRate, ForceResult, CoinRounds
+3), What he spits (the fruit / coin scenes, SlotEnemyScenes, BooScene, MaxAttackers), Deviations (RouletteSpeedScale, SpitSpeedScale, SpitsBooAttackers,
+HidesWhenMarioUnder, StartHidden), Effects (FruitHit, Damage, Down, ItemKill, Fanfare, Spicy, SpicyHit), Camera (five shake modes), Sounds (eleven slots);
+SmsRoulette: SwitchRadiusUnits / HeightUnits, the two switch colours + SwitchGlowEnergy, AutoCollision, PondSolid, InitialRollSpeed, StopSound. KingBooArena.tscn: the three
+discs at one height + him, a placement `_sms_note` (the faces 1.1 to 1.9 m below the node, the outer ring 34 m across).
+
+**Deviations (logged; knobs where they matter):** the FallDemo intro (Mario riding the top disc down, the slot dropping in) is not ported -- he
+starts hidden (StartHidden) for HideWaitTicks; the TBubble (hot-spring bubble) family is not ported -- a Mixed result spawns nothing (it cannot happen
+with the shipped rates); the btp face patterns, the hint balloons, the BGM, the camera offset / roll camera, the rumble and the roulette sounds are
+not ported; the brk flashes are approximated, the five camera shake tables guessed; Gesso -> MameGesso, ElecNokonoko / Popo -> skipped (not on this
+branch); a banana counts as a papaya; a fruit in Mario's hands is swallowed with the round (his hands empty by his own ensureTakeSituation -- the
+game's DETACH); the Boo attackers die with the boss (the game's manager keeps them); no motion blend between clips (the other species' rule); the
+attacker's table height is the boss's floor, not the casino's absolute 500. Jaysonn's ask for a CUSTOM King Boo fight is what the knobs are for:
+HitPoints, HideWaitTicks, RoundTimeScale, ForceResult, the rates, the enemy table, the speed scales, SpitsBooAttackers, HidesWhenMarioUnder.
+
+**Verification:** drive 153 (patch_smoke153.py, SMS_YCAM_SMOKE=1) 37/37 with KingBooArena.tscn 80 m over the level and Mario on the middle ring: A1 start
+HideWait hidden, 300 u over the dome top, the three discs by size (1147 / 1676 / 2511 u); A1b Mario stands on the ring's trimesh; A2 past 120 ticks
+APPEAR (shown, the appear clip, the slot back, collision on); A3 the wait loop, alpha 0x96; A4 past 800 ticks the spit clip -> a Boo attacker
+(IsAttacker, AttackMario); A5 150 frames on: shown, swooping toward the table; B1 the tongue hosed -> SLOTSTART, the roll, frame 53 the drums spin, the
+attackers gone; B2 the roll ended -> forceStopSlot, no drum held -> SPITSLOTITEM while they spin down (the game's isRollDrum); B3 three FRUIT (135 / 135
+/ 315 deg); C1 the spit clip's frame 40: 16 things, 14 fruit + 2 peppers, not takeable; C2 PREPARESLOT, 14 takeable, the slot carried below (hosei
+-39900); D1 a coconut in the body: the tint, DIE, the hit clip, collision off, the fruit eaten; D2 lick -> laugh, the alpha 150 -> 255; D3 PrepareSlot
+again, HP 3, the alpha back; E1 a pepper in the tongue: SPICY, bero_hit; E2 the spicy loop; F1 a papaya while spicy: orange, HP 2, the damage clip; F2
+-> Hide -> HideWait, alpha 180, the fan swallowed, the discs 0.08..0.13 with the middle one reversed; G0 Mario carried 4.9 m in 60 frames on the ring;
+G1 his ground pound on the pad stopped the middle ring, the two others on; R2 COIN forced: 10 coins, CoinRounds 2; Mario at the centre -> FORCEHIDE at
+once and HideWait holds while he stands there; R3 ENEMY at 2 HP: 6 Fire Stus; forceHide again; R4 FRUIT, the body hosed -> FREEZE (wet), the pepper,
+a pineapple -> HP 1, HideWait alpha 210, the discs faster; R5 FRUIT at 1 HP, the pepper, a DURIAN -> HP 0, the DOWN clip, the slot gone; H1 the down
+clip ended: puffs, the fan swallowed, every disc still, 240 ticks later the SHINE at his point, DEAD; H2 dead and hidden. Runs a-f found: the level
+floor 80 m down taken as his floor (the ray now 10 m); the discs' trimesh 74 x too big (scale baked in); the sync-to-physics push that froze the spin;
+the pad bone's odd pose (the pad mesh's centroid instead); the drive's teleports undone by Mario's SMS ride (the drive clears _smsRideBody). Build 0
+errors. GPU captures (SMS_F153_CAP=1, cap/): the appear with the slot, the Boo attacker, the roll, the fan, the flinch and laugh, the spicy loop, the
+damage, the spinning table from above, the stopped pad, the coins, the Fire Stus, the wet clip, the down, the Shine.
