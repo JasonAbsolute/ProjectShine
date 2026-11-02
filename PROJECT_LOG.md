@@ -10737,3 +10737,51 @@ and z (55 / 55). Builds 153ap..ar: 0 errors; the splice removed (Mario.cs clean)
 the lower third) is the port's, the stunned Boo's stays the game's.
 
 **Knobs:** SmsTelesa.JumpPopsUnsprayed default on. Files: `assets/Sms/Enemy/SmsTelesa.cs`. Tooling (npc82/sirena151/): patch_smoke153.py (55 checks).
+
+### 153j -- King Boo: the slot machine bolted to his clips and him riding it down, a slower and longer flash, the Boo attackers out of his mouth toward Mario on the table's surface in a smooth swoop (feature/enemy-sirena, code `80160d0`)
+
+**Jaysonn's notes on 153i:** (1) "the timing of the machine following king boo needs one more pass", (2) "the hurt effect is still too short and flickers
+too fast", (3) "the boos will suddenly snap below the floor", (4) "they should more gracefully follow mario", (5) "i think king boo is spawning them
+behind himself". All five taken.
+
+**The machine (1).** Two mismatches were left after 153h. The hide: the clip hops jnt_body up 478 u and drops it 1771 u in 88 ticks (glb_anim153.py) --
+the game's slot is parked 2400 u under the body the moment the clip starts; 153c's chase sank at 4 u a tick from home, 2.7 s over an empty table after
+he had gone (the forceHide when Mario walks under him). The spit: the game's hosei dips his model 300 u in three ticks while its slot drops out of sight
+at 100 u a tick; with 153c's visible sink he dipped into a cabinet still in plain view for 160 ticks. `ApplyLook` now remembers the machine's SEAT a
+tick -- the anchor joint's height - SlotUnderUnits, without the hosei and without his dip -- and adds its change to the chase (`ride`), both ways: the
+appear's rise (153h), the hide's hop and dive, the overshoots. One joint at a time (`_slotAnchorJoint`: the anchor swaps between jnt_body and the root,
+478 u apart at the hide's first frame) and not while parked under the table (the damage clip bounces the root; a parked machine riding that ratcheted
+upward). Only what the hosei does -- the spit's drop-away, the park -- is chased at SlotSinkSpeed / SlotRiseSpeed. And his model's dip is held to the
+machine's sink: `dip = clamp(max(hosei, shown - seat), -300, 0)` -- he rides the machine down 300 u at its 4 u a tick and it drops away under him. The
+seat is read WITHOUT the dip for both: run aa read it with, the dip moved the seat, the machine rode the seat, the dip followed -- twice the sink speed,
+the spit 150 ticks early, 44 u of error. Readers: SlotShownUnits, SlotSeatUnits, SlotHomeUnits, ModelDipUnits.
+
+**The flash (2).** `DamageFlashTicks` 90 -> 150 (2.5 s), `DamageFlashPeriod` 6 -> 10 (10 on / 10 off: 3 Hz; 150 / 10 = 15 phases, odd: on at both ends).
+
+**The Boos (3, 4, 5).** (3) `TTelesa::walkBehavior`: an attacker's ground height is damped toward the absolute 500 -- the casino table's surface. 153 passed
+his floor for it, and since 153c his floor is the pressed bowl's bottom, 143 u UNDER the pads: the Boos were damped down inside the rings' floor, with
+`DampToAttackBase`'s snap to target + 1 when they undershot -- "suddenly snap below the floor". `TableSurfaceUnits` (the highest of the three discs'
+`FaceYUnits`; his floor + 143 without them) is their floor now (A4c: base 8793 = the table, his floor 8599). (5) The decomp's `setFirstAttackPoint`:
+`mRotation.y = 180.0f - mInstanceIndex * 720.0f` -- 720 is two whole turns, so this is the WORLD's yaw 180 for every attacker, the casino's layout baked
+in; 151..153i read it as the boss's yaw + 180, and in a placed arena the first 1000-u swoop went out the BACK of his head. And `initAttacker` places the Boo
+at the mouth joint - 150, which sits 220 u inside the skull (probe_mouth153.gd: jnt_mouth z 98, the face z 318), hidden 10 ticks -- not long enough to
+leave it. `AttackersSpawnForwardUnits` (250: the lips, along his facing) and `AttackersFirstPointTowardMario` -> `SmsTelesa.FirstPointTowardMario` (the first
+swoop toward Mario; off = the game's world 180). (4) `AttackersSmooth` -> `SmsTelesa.SmoothAttack`: the goal is Mario himself every tick (the game's
+`walkBehavior(2, 2)` turn rate bends the path into a curve) and within `SmoothPassUnits` (300) a pass-through point 1.3..1.6 of the way past him is
+held until reached, so the Boo swoops through him and comes round -- the game's overshoot kept, its straight legs to stale points gone (off = the
+game's). The Loop / Normal hotel Boos never use these (attackers only).
+
+**Drive 153 (patch_smoke153.py): 60 / 60** -- 153i's 55 + A3f (Mario under him while he waits with the machine at home -> forceHide: by the hide clip's end
+the cabinet is under the table -- it dived with him), A3g (the second appear), A4b (the Boo 238 u in front of his face, its first goal . Mario = 1.00),
+A4c (its floor = the table's surface), C2b (his dip within 5 u of the machine's sink through the SpitSlotItem: 4 u -- one tick of lag); D1 reads the
+tint of whichever fruit hit (`LastFruitType`: in run aa a fan durian was already in his body cylinder when PrepareSlot began and beat the carried
+coconut; the drive's sequence does not depend on which); D1c / D1d / D1e retimed for 150 ticks. Headless run aa 57 / 60 (the dip feedback), ab 60 / 60;
+windowed run ac for the `dive` and `boo` captures. Builds 153as..au: 0 errors; the splice removed (Mario.cs clean), the root clean.
+
+**Deviations:** the machine's ride and his dip-follow (the game parks the slot and dips him in a frame); the Boos' first point toward Mario and the smooth
+homing (the game's world-180 point and fixed overshoot points); the spawn 250 u forward (the game's at the joint). The table-surface floor is the game's
+rule restored.
+
+**Knobs added:** AttackersSpawnForwardUnits, AttackersFirstPointTowardMario, AttackersSmooth (The fight); SmsTelesa.FirstPointTowardMario, SmoothAttack,
+SmoothPassUnits (Deviations); DamageFlashTicks 150 / DamageFlashPeriod 10. Files: `assets/Sms/Enemy/SmsBossTelesa.cs`, `assets/Sms/Enemy/SmsTelesa.cs`.
+Tooling (npc82/sirena151/): patch_smoke153.py (60 checks), cap/ac153_*.
