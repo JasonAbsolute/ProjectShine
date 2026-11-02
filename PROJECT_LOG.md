@@ -10561,3 +10561,39 @@ unique_ids, and `GhostOpacity = 0.45` on the placed boss -- he is trying the sli
 
 **Files:** `assets/Sms/Enemy/BossTelesa/SmsRoulette.cs`, `assets/Sms/Enemy/SmsBossTelesa.cs`, `assets/Sms/Fx/SmsGoopStrand.cs`. Tooling (npc82/sirena151/):
 patch_smoke153.py (46 checks; the bowl / drool / drool2 captures, the camera in the CAP line), cap/l153_* m153_* n153_*.
+
+### 153e -- King Boo: a drool toggle, him higher over the slot machine and the machine lower (SlotUnderUnits), the inside of his crown drawn (feature/enemy-sirena, code `da307fd`)
+
+**Jaysonn's notes on 153d:** (1) "toggles to turn the drool on and off", (2) "king boo needs to sit above the slot machine a bit more", (3) "slot machine
+should be a little lower -- one more render issue: when looking into his crown it's not rendering the inside of the crown". All three taken.
+
+**The toggle.** `DroolOn` (Looks, on): off = no strands. Live: the emit gate (`UpdateEmits`' drool branch) reads it every tick, so flipped while he plays
+the strands stop that tick and come back when it is on again -- the drive flips it both ways while he waits (A3d: 0 strands; A3e: 3 again).
+
+**The seat.** `slot_geo153.py`: the cabinet (srot_waku.glb) spans y -30..642 u from its origin, the drums (srotrulet) 100..500. The game hangs the slot's
+origin at joint 0 - 700, so the game's cabinet top sits 58 u under his body's centre -- and his body (the mesh's y -284..266) sinks 226 u into it; the game
+hides that under a see-through ghost. `SlotUnderUnits` (new, 960; the game's 700): the cabinet's top 318 u under his centre, 34 u of air under his body's
+bottom. `HoverHeight` 12.33 -> 13 m (968 u over the pressed bowl's bottom). Together the cabinet stands IN the pressed bowl (its base 22 u under the bowl's
+bottom, its drums 100..500 u up -- over the pads' level, which is 143 u up) and he floats just over its top. The hide / damage / hit park stays 1700 u
+under the home (`-2400 - (SlotUnderUnits - 700)`), the intro's drop starts 1500 u over it; the drive's A3b home formula and A1c read the knobs.
+
+**The crown's inside.** `cull153.py` reads btelesa.bmd's MAT3 cull modes: `_mat_crown` is NONE (two-sided); `_mat_body`, `_mat_ha`, `_mat_mouth` are BACK.
+The one shared `BossTelesaToon.gdshader` (`cull_back`) culled the crown's inner faces, so looking down into the crown showed the sky through its wall. A
+`render_mode` is per shader, so the shader's body (the uniforms, vertex, fragment -- the four parts' TEV stories) moved to
+`BossTelesaToon.gdshaderinc`; `BossTelesaToon.gdshader` (cull_back) and the new `BossTelesaToonCrown.gdshader` (cull_disabled) are each three lines over
+it. `BossTelesaCrown.tres` points at the crown's: `patch_crown153e.py` edited that one ext_resource line in place (dropping the uid the editor had
+stamped for the old shader), so the file keeps Jaysonn's editor re-save -- the texture uids and the parameters' order ride into the commit with it. The
+inner faces keep the vertex normal (no FRONT_FACING flip): GX lights per vertex regardless of the face's side, so the inside wears the outside's shade,
+as in the game. `make_tres153.py` generates the crown's .tres on the crown shader from now on.
+
+**Drive 153 (patch_smoke153.py): 48 / 48** -- 153d's 46 + A3d / A3e; A1c now reads HoverHeight 13 m (968 / 668 u) and SlotUnderUnits 960 with the
+cabinet's top clear of his body (960 - 642 > 284). Windowed capture runs o (48 / 48; o153_solid: him floating just over the lower machine) and p (the
+`crown` capture from 16 m over his node looking down into the crown: its inside wall drawn, p153_crown). Builds 153ab..ad: 0 errors; the splice removed
+(Mario.cs clean), the root clean.
+
+**Deviations:** SlotUnderUnits 960 and HoverHeight 13 m against the game's 700 / 1100 (Jaysonn's seat); the shader split is a Godot necessity (one
+render_mode per shader), not a look change.
+
+**Knobs added:** DroolOn, SlotUnderUnits (The arena); HoverHeight's default 13. Files: `assets/Sms/Enemy/SmsBossTelesa.cs`,
+`assets/Sms/Enemy/BossTelesa/{BossTelesaToon.gdshader, BossTelesaToon.gdshaderinc (+ .uid), BossTelesaToonCrown.gdshader (+ .uid), BossTelesaCrown.tres}`.
+Tooling (npc82/sirena151/): cull153.py, patch_crown153e.py, make_tres153.py, patch_smoke153.py (48 checks; the crown capture), cap/o153_* p153_*.
