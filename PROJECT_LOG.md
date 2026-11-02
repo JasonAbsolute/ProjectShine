@@ -10597,3 +10597,27 @@ render_mode per shader), not a look change.
 **Knobs added:** DroolOn, SlotUnderUnits (The arena); HoverHeight's default 13. Files: `assets/Sms/Enemy/SmsBossTelesa.cs`,
 `assets/Sms/Enemy/BossTelesa/{BossTelesaToon.gdshader, BossTelesaToon.gdshaderinc (+ .uid), BossTelesaToonCrown.gdshader (+ .uid), BossTelesaCrown.tres}`.
 Tooling (npc82/sirena151/): cull153.py, patch_crown153e.py, make_tres153.py, patch_smoke153.py (48 checks; the crown capture), cap/o153_* p153_*.
+
+### 153f -- King Boo: a fruit in Mario's hands that goes with the fan empties his hands (the carry softlock) (feature/enemy-sirena, code `acd4554`)
+
+**Jaysonn's bug:** "when the fruit disappears when you hit King Boo, and it disappears while Mario is holding it, he gets softlocked until he is hit."
+
+**What happened.** The fan is swallowed on a spicy hit (damageRecover -> Hide), on his walk-under forceHide, at the down (ForceAllItemKill -> KillSpit each) --
+and a fruit is eaten one at a time in CheckHitObject / SetSpicy. Every path QueueFree'd the fruit; the one in Mario's hands went with them while
+`Mario.heldBody` still pointed at it: the carry pose with nothing in it, B did nothing (no throw, no put), until a hit's damage flow cleared the hands.
+Pass 130b met the same thing with the Bob-omb that blows up in his hands and added `Mario.SmsHeldGone(body)` (TTakeActor::ensureTakeSituation from his
+side: mHeldObject = nullptr, `_smsTakeAttached` off, the carry blend to 0) -- the boss never called it.
+
+**The fix.** `ReleaseIfHeld(Node3D n)`: before a spat RigidBody3D dies -- in `KillSpit`, in the fruit-eaten path of `CheckHitObject`, in `SetSpicy`'s
+pepper -- if `_mario.SmsHoldsOrPends(n)` then `_mario.SmsHeldGone(n)` (a debug line names the fruit). Nothing else changes: the fruit still dies, the
+puff still spawns.
+
+**Drive 153 (patch_smoke153.py): 49 / 49** -- 153e's 48 + F2b. The round-1 spicy sequence now puts a fruit of the fan (not a pepper, not the papaya about
+to be carried in) into Mario's HANDS the way the B press's animation does (`pendingPickup = f; Anim_AttachPickup()`: frozen, TopLevel, on the carry socket),
+then the papaya hits him while spicy -> damageRecover swallows the fan -> F2b asserts `heldBody == null`, `!IsCarrying`, the fruit freed. Headless run q:
+48 / 49 -- R5 read 15 of the fan with him already spicy at PrepareSlot t1: one of the fan's own peppers bounced up into the tongue cylinder the tick
+fruitCollisionOn ran (the fan is random: the start angle and the 6..10 u/tick speeds); the game's rules allow exactly that, so R4 / R5 now accept "15 and
+spicy" and say why. Run r: 49 / 49, and the new SPICY debug line (the pepper's position / velocity / frozen / held, the tongue point) shows the drive's
+own carried-in peppers as expected. Build 0 errors; the splice removed (Mario.cs clean), the root clean.
+
+**Files:** `assets/Sms/Enemy/SmsBossTelesa.cs`. Tooling (npc82/sirena151/): patch_smoke153.py (49 checks; F153TakeHeld / F153CheckHandsEmpty).
