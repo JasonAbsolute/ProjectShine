@@ -100,9 +100,10 @@ public partial class SmsTelesa : SmsSmallEnemy
     /// the bob over that -- 0.7 to 2.3 m). Raise it for a Boo that should hang high in a room; a stunned one sinks to this base, a dying one to the floor.</summary>
     [Export(PropertyHint.Range, "0,600,5")] public float BaseOffsetUnits = 0f;
     /// <summary>153h (Jaysonn: "the boos should be able to be jumped on"): a jump or a ground pound on a Boo that has NOT been hosed pops it too, while it
-    /// shows (a faded-out one is still a ghost). Off = the game: his jump passes through the ghost until the hose stuns it (HIT_CATEGORY_ENEMY off).
-    /// King Boo's attackers get it from his AttackersJumpable; the hotel's Boos keep the game's rule unless this is on in their scene.</summary>
-    [Export] public bool JumpPopsUnsprayed = false;
+    /// shows (a faded-out one is still a ghost) -- a real stomp: Mario's centre over its body, his feet above its middle. Off = the game: his jump passes
+    /// through the ghost until the hose stuns it (HIT_CATEGORY_ENEMY off). ON for every Boo since 153i (Jaysonn: the placed ones "not jumpable still");
+    /// King Boo's attackers take his AttackersJumpable.</summary>
+    [Export] public bool JumpPopsUnsprayed = true;
     [ExportGroup("Effects (empty = the default / none)")]
     /// <summary>ms_tls_change (0xCD): the puff where the box Boo turns into its block and where it comes back. Empty = assets/Sms/Fx/EnemyDisap.tscn.</summary>
     [Export] public PackedScene ChangeFxScene;
@@ -333,7 +334,17 @@ public partial class SmsTelesa : SmsSmallEnemy
         bool marioHits = CheckDistance(m, ar, ah, g, P.DamageRadius * s, P.DamageHeight * s);
         if (marioHits)
         {
-            if (_tangible || (JumpPopsUnsprayed && IsVisibleNow))   // 153h: the knob lets his jump find a shown, unhosed Boo (the game: only the stunned one)
+            bool stompable = _tangible;                          // the stunned one: the game's cylinders (a 2.3-m side overlap counts)
+            if (!stompable && JumpPopsUnsprayed && IsVisibleNow)
+            {
+                // 153h/i: a shown, UNHOSED Boo takes a real stomp only -- Mario's centre over its body (within its radius, not the two cylinders' 2.3-m reach)
+                // with his feet above its lower third (a Boo at his feet is a ram, not a landing). 153h used the cylinders' overlap for it too, and a
+                // swooping attacker that rammed a descending Mario from the side popped a body-width before it reached him (Jaysonn: "the boos from king
+                // boo are randomly disappearing"). The lower third, not the middle: his hit check runs every fourth tick and a fast fall crosses 60 u between two.
+                float dx = m.X - g.X, dz = m.Z - g.Z, r = P.DamageRadius * s;
+                stompable = dx * dx + dz * dz < r * r && m.Y > g.Y + P.DamageHeight * s * 0.35f;
+            }
+            if (stompable)
             {
                 bool falling = !onGround && _mario.Velocity.Y < 0f && g.Y < m.Y;
                 var st = _mario.stateOfMario;
