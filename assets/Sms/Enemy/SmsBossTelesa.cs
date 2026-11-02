@@ -207,8 +207,19 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     /// <summary>ms_btls_fubuki: the confetti of a FRUIT / COIN fanfare over the slot. Empty = assets/Sms/Enemy/BossTelesa/BtlsFubuki.tscn.</summary>
     [Export] public PackedScene FanfareFxScene;
     /// <summary>ms_btls_spicy_a..d: the fire off his tongue tip (joint 9 jnt_sita_4) through the spicy loop -- an SmsNpcEffect scene, started and stopped with the
-    /// clip. Empty = assets/Sms/Fx/StuFire.tscn (the Stu's fire, x 2.5).</summary>
+    /// clip. Empty = assets/Sms/Fx/BtlsSpicyFire.tscn (153g: the four .jpa of the disc's btelesa archive, gen_fx153g.py: 350-u flame stripes shooting 24 u a
+    /// tick off the tip, a 650-u glow, the heat haze, falling sparks); 153b..f used the Stu's fire x 2.5.</summary>
     [Export] public PackedScene SpicyFireFxScene;
+    /// <summary>The fire's scale (the game's 1: the archive's own sizes; 2.5 was the Stu-fire stand-in's).</summary>
+    [Export(PropertyHint.Range, "0.25,4,0.05")] public float SpicyFireScale = 1f;
+    /// <summary>153g (Jaysonn: "king boo needs to flash when damage is dealt to him"): on a hit (the flinch and the spicy damage) his body blinks the whole way into
+    /// a colour -- DamageFlashTicks long, DamageFlashPeriod ticks on / off -- on top of the game's own speckle (the brk's polmask sweep, which at 150 / 255 is
+    /// subtle on a solid Boo). DamageFlashFruitColor: the blink is the fruit's colour (the coconut's pink, the papaya's orange ...); off = DamageFlashColor.
+    /// 0 ticks = no flash.</summary>
+    [Export(PropertyHint.Range, "0,120,1")] public int DamageFlashTicks = 30;
+    [Export(PropertyHint.Range, "1,20,1")] public int DamageFlashPeriod = 6;
+    [Export] public bool DamageFlashFruitColor = true;
+    [Export] public Color DamageFlashColor = new Color(1f, 0.3f, 0.3f);
     /// <summary>ms_btls_ase: the sweat off his body through the spicy loop -- an SmsNpcEffect scene. Empty = assets/Sms/Fx/NpcDripBody.tscn (x 3) if it exists.</summary>
     [Export] public PackedScene SweatFxScene;
     /// <summary>ms_btls_spicy_hit: the burst at the mouth when the pepper lands (the first 20 frames of bero_hit). Empty = HitBurst.</summary>
@@ -292,9 +303,16 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     public int EyeSheet => _eyeNow;                              // 0 open, 1 half, 2 close, 3 roll
     public int IntroPhase => _intro;
     public int ResultPause => _pauseTicks;
+    /// <summary>The slot machine is out of sight under the table: hidden, or its cabinet's top (642 u over its origin) under his floor -- the pressed bowl's
+    /// bottom, so under the whole table. The spit waits for this (153g).</summary>
+    public bool SlotSunk => Slot == null || !IsInstanceValid(Slot) || !Slot.Visible || !_slotShownKnown || _slotShownY + SlotCabinetTopUnits <= _floorY;
+    public const float SlotCabinetTopUnits = 642f;              // srot_waku.glb: y -30..642 from its origin (slot_geo153.py)
     public float HoverUnits => HoverHeight * U;                  // the model's origin over the table's centre floor (the game's 300 + 800)
     public float TransYUnits => HoverHeight * U - PositionOverFloor;
     public bool SpicyFireOn => _spicyFire != null && IsInstanceValid(_spicyFire) && _spicyFire.IsEmitting;
+    public string SpicyFireSceneName => _spicyFire != null && IsInstanceValid(_spicyFire) ? _spicyFire.SceneFilePath.GetFile() : "";
+    /// <summary>The body material's `mask_k` as set (1 while a damage flash is on; the brk's value otherwise).</summary>
+    public float BodyMaskParam => _bodyMat != null ? (float)_bodyMat.GetShaderParameter("mask_k") : -1f;
     public Color Tint => _tint;
     public bool IsHidden => _hidden;
     public bool IsSpicy => _spicy;
@@ -343,7 +361,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         DownFxScene ??= LoadIf("res://assets/Sms/Fx/EnemyDisap.tscn");
         ItemKillFxScene ??= LoadIf("res://assets/Sms/Fx/EnemyDisap.tscn");
         FanfareFxScene ??= LoadIf("res://assets/Sms/Enemy/BossTelesa/BtlsFubuki.tscn");
-        SpicyFireFxScene ??= LoadIf("res://assets/Sms/Fx/StuFire.tscn");
+        SpicyFireFxScene ??= LoadIf("res://assets/Sms/Fx/BtlsSpicyFire.tscn") ?? LoadIf("res://assets/Sms/Fx/StuFire.tscn");
         SweatFxScene ??= LoadIf("res://assets/Sms/Fx/NpcDripBody.tscn");
         if (DroolFxScene == null && DroolSmallFxScene == null) { DroolFxScene = LoadIf("res://assets/Sms/Fx/GkYodareL.tscn"); DroolSmallFxScene = LoadIf("res://assets/Sms/Fx/GkYodareS.tscn"); }
         EyeOpen ??= LoadTex("res://models/Eniemes/BossTelesa/N_nbtelesa_eye_open.png");
@@ -628,10 +646,27 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         if (_brk == 1) { float f = _brkTime / 2f; if (f < 30f) a = MathF.Min(a, f / 30f); }
         foreach (var m in _mats) m.SetShaderParameter("opacity", a);
     }
-    /// <summary>unk348 (K1) onto the body's `tint`.</summary>
-    private void ApplyTint() { _bodyMat?.SetShaderParameter("tint", new Vector3(_tint.R, _tint.G, _tint.B)); }
-    /// <summary>K2_A onto the body's `mask_k`: the polmask threshold the brk sweeps.</summary>
-    private void ApplyMask() { _bodyMat?.SetShaderParameter("mask_k", _maskK); }
+    /// <summary>unk348 (K1) onto the body's `tint` -- or the flash colour while a damage flash is ON (153g).</summary>
+    private void ApplyTint()
+    {
+        Color c = FlashOn ? (DamageFlashFruitColor && _tint != Colors.White ? _tint : DamageFlashColor) : _tint;
+        _bodyMat?.SetShaderParameter("tint", new Vector3(c.R, c.G, c.B));
+    }
+    /// <summary>K2_A onto the body's `mask_k`: the polmask threshold the brk sweeps -- 1 (the whole body in the tint) while a damage flash is ON (153g).</summary>
+    private void ApplyMask() { _bodyMat?.SetShaderParameter("mask_k", FlashOn ? 1f : _maskK); }
+    /// <summary>153g: the damage flash -- started by the hit (StartFlash), DamageFlashTicks long, DamageFlashPeriod ticks on then off; the tint and the mask
+    /// re-applied on every edge (the readers MaskK / Tint keep the game's values: the flash is a layer over them).</summary>
+    private int _flashLeft;
+    public bool FlashOn => _flashLeft > 0 && DamageFlashPeriod > 0 && ((_flashLeft - 1) / DamageFlashPeriod & 1) == ((DamageFlashTicks - 1) / DamageFlashPeriod & 1);
+    public int FlashTicksLeft => _flashLeft;
+    private void StartFlash() { if (DamageFlashTicks <= 0) return; _flashLeft = DamageFlashTicks; ApplyTint(); ApplyMask(); }
+    private void FlashTick()
+    {
+        if (_flashLeft <= 0) return;
+        bool was = FlashOn;
+        _flashLeft--;
+        if (FlashOn != was) { ApplyTint(); ApplyMask(); }
+    }
     /// <summary>setBrkFromIndex: the archive's three .brk (j3d_dump153.py): 0 btelesa_damage (K2_A 0 -> 150 over 20 frames: the body speckles into the fruit's tint),
     /// 1 btelesa_down (K0_A 0 -> 255 over 30 frames, held: see ApplyAlpha), 2 btelesa_lick (K2_A 150 through frame 39, then down to 0 at 99: the tint washes off).
     /// A frame = 2 ticks (the bck clock).</summary>
@@ -679,7 +714,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     {
         if (_skel == null) return;
         if ((_spicyFire == null || !IsInstanceValid(_spicyFire)) && SpicyFireFxScene != null)
-            _spicyFire = SmsNpcEffect.Spawn(SpicyFireFxScene, _skel, _bSpicy >= 0 ? "jnt_sita_4" : "jnt_sita_2", 2.5f, _fxCache, Name);
+            _spicyFire = SmsNpcEffect.Spawn(SpicyFireFxScene, _skel, _bSpicy >= 0 ? "jnt_sita_4" : "jnt_sita_2", SpicyFireScale, _fxCache, Name);
         if ((_sweat == null || !IsInstanceValid(_sweat)) && SweatFxScene != null)
             _sweat = SmsNpcEffect.Spawn(SweatFxScene, _skel, "jnt_body", 3f, _fxCache, Name);
     }
@@ -751,7 +786,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         else if (_spicyFire != null || _sweat != null) StopSpicyFx();
         if (IsBck(BckLaugh) && BckPassed(BckLaugh, 2f) && LaughSound != null && LaughSound.Stream != null) LaughSound.Play();
         SetBtp(IsBck(BckSpicy) ? 1 : 2);
-        BrkTick(); BtpTick();
+        BrkTick(); BtpTick(); FlashTick();
         ApplyAlpha();
         _prevBck = _bck; _prevBckFrame = BckFrame();
     }
@@ -1219,7 +1254,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
             case NerveSpitSlotItem:                              // TNerveBossTelesaSpitSlotItem
                 if (_time == 0) _pauseTicks = 0;
                 if (Slot != null && Slot.IsRolling && !IsBck(BckSpit)) { _pauseTicks = 0; return false; }   // 153b: the last drum stops first (the game: 200 from the last release)
-                if (!IsBck(BckSpit) && _hoseiY < BaseHoseiPosY - 200f) SetBck(BckSpit);
+                if (!IsBck(BckSpit) && _hoseiY < BaseHoseiPosY - 200f && SlotSunk) SetBck(BckSpit);   // 153g: and the machine all the way under the table first (Jaysonn; the game's vanished in a frame)
                 else if (IsBck(BckSpit) && BckEnded() && _time > 600) { PushAfterCurrent(NervePrepareSlot); _prepTimer = 0; FruitCollisionOn(); return true; }
                 else if (_pauseTicks++ > ResultPauseTicks) _hoseiY -= 100f;   // the pause over: the dip (the machine drops out of sight with it) and the spit
                 return false;
@@ -1278,6 +1313,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
                     {
                         if (_spicy) { SetBrk(1); SetBck(BckDamage); SmsCameraShake.Current?.StartMode(ShakeDamage, 1f); }
                         else { SetBck(BckHit); SetBrk(0); SmsCameraShake.Current?.StartMode(ShakeHit, 1f); }
+                        StartFlash();                                    // 153g: Jaysonn's damage flash (the flinch and the spicy hit alike)
                     }
                     else
                     {
