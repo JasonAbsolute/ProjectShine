@@ -47,17 +47,29 @@ using Godot;
 /// THE PORT. The boss never moves: his position is the floor under him + 300 u each tick (the ray takes MAP bodies only: the discs); _noBind, FlyBind,
 /// the collision shape disabled (the game's own 30 x 420 cylinder is a hit check, not a wall). The body and the tongue are two <see cref="SmsBossTelesaPart"/>
 /// StaticBody3D cylinders on the hidden-coin layer (the hose's drops hit them; nothing else does) following the joints, plus the cylinder maths against
-/// Mario and the fruit each hit tick (every fourth, the game's lists). The alpha is a `fade` uniform on per-body copies of the four BossTelesaToon
-/// materials, the fruit tint a `tint` uniform on the body's; the brk flashes are a `c0` pulse (the .brk tables are not in the rip). The slot machine is
-/// the child Slot (TelesaSlot.tscn) placed from his joints as the game does (the hosei dip carries it out of sight after the spit and it rises back on
-/// the appear); the discs are found by the exports or the `sms_roulette` group (top / middle / bottom). The fruit are the port's Fruit scenes, the coins
-/// yellow_coin, the enemies the species scenes in <see cref="SlotEnemyScenes"/>, the Boo attackers Telesa.tscn bodies pooled under the parent
-/// (SmsInitAttacker). Knobs (grouped, plain English): The arena, The fight (hit points, the wait, the round times, the slot rates and a forced result
-/// for the custom fight), What he spits, Deviations (speed scales, the Boo attackers, the hide-when-under), Effects, Camera, Sounds. DEVIATIONS (logged):
-/// the FallDemo intro (Mario riding the disc down) is not ported -- he starts hidden; the TBubble (hot-spring bubble) family is not ported -- a Mixed
-/// result spawns nothing (it cannot happen with the shipped rates); the screen-texture refraction is plain alpha; the btp face patterns, the balloons,
-/// the BGM, the camera offset and the rumble are not ported; the brk flashes are approximated; Gesso maps to the small MameGesso, ElecNokonoko / Popo
-/// to nothing (skipped); a banana counts as a papaya; the camera shake tables are guessed.
+/// Mario and the fruit each hit tick (every fourth, the game's lists). The four BossTelesaToon materials are the bmd's own TEV (pass 153b, j3d_dump153.py):
+/// per-body copies carry K0_A as `opacity` (the screen MIX, 150 / 255 normal), K1 as `tint` (the fruit colour) and K2_A as `mask_k` (the .brk tables:
+/// btelesa_damage.brk sweeps 0 -> 150 in 20 frames on the flinch, btelesa_lick.brk holds 150 then washes to 0 by frame 99; btelesa_down.brk's K0_A 0 ->
+/// 255 in 30 frames on the spicy hit and the down); the .btp face patterns swap the eye sheet (btelesa_twait: the 150-frame blink loop; btelesa_tspicy:
+/// the rolled eyes). The slot machine is the child Slot (TelesaSlot.tscn) placed from his joints as the game does (the hosei dip carries it out of sight
+/// after the spit and it rises back on the appear); the discs are found by the exports or the `sms_roulette` group (top / middle / bottom). The fruit are
+/// the port's Fruit scenes, the coins yellow_coin, the enemies the species scenes in <see cref="SlotEnemyScenes"/>, the Boo attackers Telesa.tscn bodies
+/// pooled under the parent (SmsInitAttacker). The JPA effects (ms_btls_*): chika_a / b (the twinkle around him) and glow (at the body) every tick he shows,
+/// yodare1-3 (the drool at the mouth and the tongue tip) but through the hide / laugh / spicy clips, spicy_hit (the first 20 frames of bero_hit at the mouth),
+/// ase + spicy_a..d (the sweat at the body, the fire at the tongue tip through the spicy loop), fhit (+ _pe / _or / _gr by the fruit), damage, down (+ its
+/// colours), fubuki (the fanfare's confetti), tls_change (the swallowed items) -- the port's Fx scenes and this scene's own emitters. The hint balloons
+/// (0xE000F once at the first plain fruit hit, 0xE0010 past two more, 0xE0011 once at the first hit of all) through the HUD's SmsHintBalloon with the texts as
+/// knobs; the rumble (rouletteStart, the attacker spit) on the pad; the camera shake tables from params/camera/shakebtelesa*.prm; the boss BGM a player
+/// knob (started at the first appear, stopped at the down). Knobs (grouped, plain English): The arena (and how high he hangs), The fight (hit points, the
+/// wait, the result pause, the round times, the slot rates and a forced result for the custom fight), What he spits, Deviations (speed scales, the Boo
+/// attackers, the hide-when-under, the intro ride), Looks, Effects, Hints, Camera, Sounds. DEVIATIONS (logged): the intro ride (the game's FallDemo) is a
+/// knob, off by default (his floor is the table: Jaysonn places Mario); the TBubble (hot-spring bubble) family is not ported -- it is dead code in the game
+/// too (unk150 is always 1: the attacker is a Boo) and a Mixed result cannot happen with the shipped rates; the roll demo camera (btelesa_roll_camera.bck)
+/// and the camera's Y offset chase are not ported (the port has no demo camera); the indirect wobble of the screen is off in the bmd; Gesso maps to the
+/// small MameGesso, ElecNokonoko / Popo to nothing (skipped); a banana counts as a papaya; the spit waits for the LAST DRUM TO STOP before its 200-tick
+/// pause (the game counts from the last release, which can drop the machine while that drum still creeps); he hangs HoverHeight over the table (the game's
+/// 300 + TransYOffset 800 = 1100 u, lowered to 850 by default on Jaysonn's call); the appear clip's frame-78 landing shake never fires (the clip has 59
+/// frames -- in the game too).
 /// </summary>
 public partial class SmsBossTelesa : SmsSmallEnemy
 {
@@ -96,11 +108,17 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     [Export] public PackedScene ShineScene;
     /// <summary>Where it appears. Empty: at his point (300 u over the table's centre, where the slot hung).</summary>
     [Export] public Node3D ShineSpawnPoint;
+    /// <summary>How high his body's centre hangs over the table's centre, metres (the slot machine hangs 9.4 m under that point, his tongue tip ~5 m). The game:
+    /// mGroundHeight + 300 + TransYOffset 800 = 1100 u = 14.8 m; 11.4 m here (850 u) after Jaysonn's playtest ("he sits too high").</summary>
+    [Export(PropertyHint.Range, "4,25,0.01")] public float HoverHeight = 11.42f;
     [ExportGroup("The fight (the game's numbers; change them for a custom fight)")]
     /// <summary>His hit points (bosstelesa.prm 3): one spicy fruit hit each.</summary>
     [Export(PropertyHint.Range, "1,20,1")] public int HitPoints = 3;
     /// <summary>How long he stays hidden between rounds, ticks (TNerveBossTelesaHideWait: 400, and until Mario leaves the centre). Also his first appearance.</summary>
     [Export(PropertyHint.Range, "0,6000,10")] public int HideWaitTicks = HideWaitTicksGame;
+    /// <summary>How long the stopped slot shows its result (the fanfare) before the machine sinks and he spits, ticks (TNerveBossTelesaSpitSlotItem's 200 --
+    /// the game counts them from the last drum's RELEASE, so its machine could drop while that drum still crept; here from the last STOP).</summary>
+    [Export(PropertyHint.Range, "0,1200,10")] public int ResultPauseTicks = 200;
     /// <summary>x the round times (StopSlotTime 3500 / 3000 / 2500 ticks by his hit points; a coin round half): how long his fruit stay on the table before he
     /// swallows the round and hides. 1 = the game.</summary>
     [Export(PropertyHint.Range, "0.25,6,0.05")] public float RoundTimeScale = 1f;
@@ -132,28 +150,64 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     [Export] public bool HidesWhenMarioUnder = true;
     /// <summary>The intro's hide clip on the first appearance too (the game: he is hidden by the FallDemo; the first HideWait runs its full wait).</summary>
     [Export] public bool StartHidden = true;
+    /// <summary>The game's FallDemo: the centre disc starts IntroLiftUnits over the table with Mario on it (place him there) and sinks 1 u a tick; level, the slot
+    /// machine falls out of the sky into its place, the discs start turning (rouletteStart) and the fight begins with HideWait. Mario's controls are held
+    /// (CameraLocked) through it. Off: the fight starts with him hidden and the table flat.</summary>
+    [Export] public bool IntroRide = false;
+    /// <summary>How high the centre disc starts for the intro ride, units (TRoulette::initMapObj lifts the discs 500).</summary>
+    [Export(PropertyHint.Range, "100,2000,10")] public float IntroLiftUnits = 500f;
+    [ExportGroup("Looks (the bmd's materials; 0.588 = the game)")]
+    /// <summary>How solid he is: K0 alpha / 255 (mNormalAlpha 0x96 = 0.588) -- the body is MIXED with the picture behind him by this, + 30 / 255 for every hit
+    /// point he has lost, solid while he is hit. 1 = an ordinary opaque Boo.</summary>
+    [Export(PropertyHint.Range, "0.1,1,0.01")] public float GhostOpacity = 0.588f;
+    /// <summary>The eye sheets the .btp patterns swap in: open / half / close (btelesa_twait's blink: 19 open, 2 half, 3 closed, 2 half, 2 open, 2 half, 3 closed, 2
+    /// half, 50 open, 2 half, 3 closed, 2 half, 58 open; 150 frames, looped) and roll (btelesa_tspicy: the rolled eyes while spicy). Empty = the models' pngs.</summary>
+    [Export] public Texture2D EyeOpen, EyeHalf, EyeClose, EyeRoll;
     [ExportGroup("Effects (empty = the default / none)")]
-    /// <summary>ms_btls_fhit (+ _pe / _or / _gr by the fruit): the splat where a fruit hits him. Empty = assets/Sms/Fx/HitBurst.tscn.</summary>
+    /// <summary>ms_btls_fhit: the splat where a fruit hits him. Empty = assets/Sms/Fx/HitBurst.tscn.</summary>
     [Export] public PackedScene FruitHitFxScene;
+    /// <summary>ms_btls_fhit_pe / _or / _gr: the puff in the fruit's colour beside the splat (the scene's prm / env recoloured). Empty = assets/Sms/Fx/EnemyDisap.tscn.</summary>
+    [Export] public PackedScene FruitPuffFxScene;
     /// <summary>ms_btls_damage: the spicy hit's burst. Empty = assets/Sms/Fx/EnemyDisap.tscn.</summary>
     [Export] public PackedScene DamageFxScene;
-    /// <summary>ms_btls_down (+ _pe / _or / _gr): the down clip's puff at his body. Empty = assets/Sms/Fx/EnemyDisap.tscn.</summary>
+    /// <summary>ms_btls_down (+ _pe / _or / _gr in the last fruit's colour): the down clip's puffs at his body. Empty = assets/Sms/Fx/EnemyDisap.tscn.</summary>
     [Export] public PackedScene DownFxScene;
     /// <summary>ms_tls_change (0xCD): the puff where a spat fruit / coin / enemy is swallowed back. Empty = assets/Sms/Fx/EnemyDisap.tscn.</summary>
     [Export] public PackedScene ItemKillFxScene;
-    /// <summary>ms_btls_fubuki: the confetti of a FRUIT / COIN fanfare. Slot.</summary>
+    /// <summary>ms_btls_fubuki: the confetti of a FRUIT / COIN fanfare over the slot. Empty = assets/Sms/Enemy/BossTelesa/BtlsFubuki.tscn.</summary>
     [Export] public PackedScene FanfareFxScene;
-    /// <summary>ms_btls_ase / spicy_a..d: the sweat and the fire while spicy (every 16 ticks at joint 9). Slot.</summary>
-    [Export] public PackedScene SpicyFxScene;
+    /// <summary>ms_btls_spicy_a..d: the fire off his tongue tip (joint 9 jnt_sita_4) through the spicy loop -- an SmsNpcEffect scene, started and stopped with the
+    /// clip. Empty = assets/Sms/Fx/StuFire.tscn (the Stu's fire, x 2.5).</summary>
+    [Export] public PackedScene SpicyFireFxScene;
+    /// <summary>ms_btls_ase: the sweat off his body through the spicy loop -- an SmsNpcEffect scene. Empty = assets/Sms/Fx/NpcDripBody.tscn (x 3) if it exists.</summary>
+    [Export] public PackedScene SweatFxScene;
     /// <summary>ms_btls_spicy_hit: the burst at the mouth when the pepper lands (the first 20 frames of bero_hit). Empty = HitBurst.</summary>
     [Export] public PackedScene SpicyHitFxScene;
-    [ExportGroup("Camera (the game's shake tables CAM_SHAKE_MODE_UNK1F..23 are not in the rip; empty = these guesses)")]
-    /// <summary>UNK22 at the appear clip's frame 78 (the slot landing); UNK20 a fruit flinch; UNK1F a spicy hit; UNK21 the down; UNK23 the discs starting.</summary>
+    /// <summary>The scene's own emitters: ChikaFx (ms_btls_chika_a / b, the twinkle around him), GlowFx (ms_btls_glow, the soft light at his body), DroolMouthFx /
+    /// DroolTongueFx (ms_btls_yodare1-3). Off = none of them.</summary>
+    [Export] public bool AmbientFx = true;
+    [ExportGroup("Hints (the game's balloons 0xE000F / 0xE0010 / 0xE0011 through the HUD's SmsHintBalloon; the lines are not in the rip)")]
+    /// <summary>On: the three hints show on the HUD's SmsHintBalloon (none in the scene = nothing).</summary>
+    [Export] public bool ShowHints = true;
+    /// <summary>0xE000F, once: the first fruit on him while he is NOT spicy (he just eats it).</summary>
+    [Export(PropertyHint.MultilineText)] public string HintFirstFruit = "King Boo just gobbled that fruit up! Plain fruit won't hurt him... but did you see how he eyed those red peppers?";
+    /// <summary>0xE0010: the third plain fruit in a row (and every one after).</summary>
+    [Export(PropertyHint.MultilineText)] public string HintFruitAgain = "He's too happy to eat your fruit! Make him swallow a hot pepper first -- throw it onto his tongue!";
+    /// <summary>0xE0011, once: the first fruit hit of all.</summary>
+    [Export(PropertyHint.MultilineText)] public string HintFirstHit = "A hit! While his mouth is burning, a fruit on his body really hurts him!";
+    [ExportGroup("Camera (params/camera/shakebtelesa*.prm; empty = those tables)")]
+    /// <summary>UNK22 shakebtelesaappear (80, 150 / 4000) at the appear clip's frame 78 (never reached: the clip has 59 frames, in the game too); UNK20
+    /// shakebtelesahit (150, 80 / 4000, 50 / 300, 100 / 2500) a fruit flinch; UNK1F shakebtelesadamage (80, 80 / 4500, -, 30 / 1000) a spicy hit; UNK21
+    /// shakebtelesadown (150, 400 / 4000, 50 / 300, 600 / 3000) the down; UNK23 shakebtelesaroll (50, 120 / 5000) the discs starting.</summary>
     [Export] public SmsCameraShakeMode ShakeLand, ShakeHit, ShakeDamage, ShakeDown, ShakeRoulette;
+    /// <summary>SMSRumbleMgr->start(0x14, 0xf): the pad rumbles when the discs start and when he spits a Boo.</summary>
+    [Export] public bool Rumble = true;
     [ExportGroup("Sounds (empty = silent)")]
     /// <summary>MSD_SE_BS_TELESA_*: V_LAUGH1 (the laugh), FRUIT_HIT, DOWN, DISAPPEAR, ESCAPE (hiding spicy), THANKYOU (the wet clip), FIRE (spicy), SLT_LAND,
     /// FANFALE_1 (fruit) / _2 (coin) / _3 (else); MSD_SE_EN_TELESA_APPEAR for the attackers is the Boo's own.</summary>
     [Export] public AudioStreamPlayer3D LaughSound, FruitHitSound, DownSound, DisappearSound, EscapeSound, ThankYouSound, FireSound, LandSound, Fanfare1Sound, Fanfare2Sound, Fanfare3Sound;
+    /// <summary>The boss BGM (unk384: started at his first appearance; MSBgm::stopBGM at the down): a 2D player with the track in its Stream. Empty = none.</summary>
+    [Export] public AudioStreamPlayer BossMusic;
 
     // ------------------------------------------------------------------------------------------------------------------ the clips (the archive's order)
     private static readonly string[] Names = { "btelesa_appear", "btelesa_bero_hit", "btelesa_damage", "btelesa_down", "btelesa_hide", "btelesa_hit", "btelesa_laugh", "btelesa_lick",
@@ -174,10 +228,18 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     protected override int DefaultNerve => NerveHideWait;
 
     // ------------------------------------------------------------------------------------------------------------------ state
-    private int _alpha = NormalAlpha;                            // unk34C.a (K0 alpha: the fade)
+    private int _alpha = NormalAlpha, _normalAlpha = NormalAlpha;   // unk34C.a (K0 alpha: the screen mix) and mNormalAlpha (GhostOpacity x 255)
     private Color _tint = Colors.White;                          // unk348 (K1: the fruit tint)
     private bool _hidden, _spicy, _collisionOn, _slotRolling, _bgmStarted, _marioUnder, _shineDone;   // LIVE_FLAG_HIDDEN / mIsSpicy / the body + tongue filters / unk18C / unk384 / the kill cylinder's unk6C
-    private int _spicyTimer, _prepTimer, _dieTimer, _coinRoundsLeft = 3, _slotResult, _fruitHitCount, _fruitHitFx = -1, _brk = 2, _brkTime;   // mSpicyTimer / unk368 / unk388 / unk370 / unk1A8 / mFruitHitCount / mFruitHitEffect / the brk index
+    private int _spicyTimer, _prepTimer, _dieTimer, _coinRoundsLeft = 3, _slotResult, _fruitHitCount, _fruitHitFx = -1, _brk = 2, _brkTime;   // mSpicyTimer / unk368 / unk388 / unk370 / unk1A8 / mFruitHitCount / mFruitHitEffect / the brk index + its ticks
+    private int _btp = 2, _btpTime, _eyeNow = -1, _pauseTicks;   // the face pattern (1 spicy, 2 wait) + its ticks, the eye sheet shown, the result pause (SpitSlotItem)
+    private float _maskK;                                        // K2_A: the brk's polmask threshold
+    private bool _hintFirstFruit, _hintFirstHit;                 // unk35A / unk35B: the once-only balloons still to show
+    private int _intro;                                          // the FallDemo: 0 none / done, 1 the disc sinking, 2 the slot falling
+    private float _introSlotY;                                   // the falling slot's height, units over the table's centre
+    private SmsNpcEffect _spicyFire, _sweat;                     // the spicy loop's bound emitters (ms_btls_spicy_a..d, ms_btls_ase)
+    private GpuParticles3D _chikaFx, _droolMouthFx, _droolTongueFx; private Node3D _glowFx;   // the scene's own emitters
+    private SmsHintBalloon _hint; private bool _hintLooked;
     private float _hoseiY;                                       // mHoseiPosY (the dip; unclamped -- the slot rides it)
     private float _floorY;                                       // mGroundHeight: the table under him, units (his own: the base's _groundY is its own ray)
     private float _prevBckFrame; private int _prevBck = -1;
@@ -192,6 +254,14 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     /// <summary>For the drives.</summary>
     public int Alpha => _alpha;
     public float FadeNow => _alpha / 255f;
+    public float MaskK => _maskK;
+    public int Btp => _btp;
+    public int EyeSheet => _eyeNow;                              // 0 open, 1 half, 2 close, 3 roll
+    public int IntroPhase => _intro;
+    public int ResultPause => _pauseTicks;
+    public float HoverUnits => HoverHeight * U;                  // the model's origin over the table's centre floor (the game's 300 + 800)
+    public float TransYUnits => HoverHeight * U - PositionOverFloor;
+    public bool SpicyFireOn => _spicyFire != null && IsInstanceValid(_spicyFire) && _spicyFire.IsEmitting;
     public Color Tint => _tint;
     public bool IsHidden => _hidden;
     public bool IsSpicy => _spicy;
@@ -234,15 +304,27 @@ public partial class SmsBossTelesa : SmsSmallEnemy
             foreach (string p in defaults) SlotEnemyScenes.Add(p != null ? LoadIf(p) : null);
         }
         FruitHitFxScene ??= LoadIf("res://assets/Sms/Fx/HitBurst.tscn");
+        FruitPuffFxScene ??= LoadIf("res://assets/Sms/Fx/EnemyDisap.tscn");
         SpicyHitFxScene ??= LoadIf("res://assets/Sms/Fx/HitBurst.tscn");
         DamageFxScene ??= LoadIf("res://assets/Sms/Fx/EnemyDisap.tscn");
         DownFxScene ??= LoadIf("res://assets/Sms/Fx/EnemyDisap.tscn");
         ItemKillFxScene ??= LoadIf("res://assets/Sms/Fx/EnemyDisap.tscn");
-        ShakeLand ??= new SmsCameraShakeMode { TimeTicks = 30, AmpX = 60f, VelX = 4000 };
-        ShakeHit ??= new SmsCameraShakeMode { TimeTicks = 20, AmpX = 40f, VelX = 5000 };
-        ShakeDamage ??= new SmsCameraShakeMode { TimeTicks = 40, AmpX = 80f, VelX = 4000 };
-        ShakeDown ??= new SmsCameraShakeMode { TimeTicks = 80, AmpX = 120f, VelX = 3000, AmpZ = 60f, VelZ = 2000 };
-        ShakeRoulette ??= new SmsCameraShakeMode { TimeTicks = 40, AmpX = 50f, VelX = 3000 };
+        FanfareFxScene ??= LoadIf("res://assets/Sms/Enemy/BossTelesa/BtlsFubuki.tscn");
+        SpicyFireFxScene ??= LoadIf("res://assets/Sms/Fx/StuFire.tscn");
+        SweatFxScene ??= LoadIf("res://assets/Sms/Fx/NpcDripBody.tscn");
+        EyeOpen ??= LoadTex("res://models/Eniemes/BossTelesa/N_nbtelesa_eye_open.png");
+        EyeHalf ??= LoadTex("res://models/Eniemes/BossTelesa/N_nbtelesa_eye_half.png");
+        EyeClose ??= LoadTex("res://models/Eniemes/BossTelesa/N_nbtelesa_eye_close.png");
+        EyeRoll ??= LoadTex("res://models/Eniemes/BossTelesa/N_nbtelesa_eye_roll.png");
+        // params/camera/shakebtelesa{appear,hit,damage,down,roll}.prm: mShakeTime, mShakeAmpX / VelX, AmpY / VelY, AmpZ / VelZ
+        ShakeLand ??= new SmsCameraShakeMode { TimeTicks = 80, AmpX = 150f, VelX = 4000 };
+        ShakeHit ??= new SmsCameraShakeMode { TimeTicks = 150, AmpX = 80f, VelX = 4000, AmpY = 50f, VelY = 300, AmpZ = 100f, VelZ = 2500 };
+        ShakeDamage ??= new SmsCameraShakeMode { TimeTicks = 80, AmpX = 80f, VelX = 4500, AmpZ = 30f, VelZ = 1000 };
+        ShakeDown ??= new SmsCameraShakeMode { TimeTicks = 150, AmpX = 400f, VelX = 4000, AmpY = 50f, VelY = 300, AmpZ = 600f, VelZ = 3000 };
+        ShakeRoulette ??= new SmsCameraShakeMode { TimeTicks = 50, AmpX = 120f, VelX = 5000 };
+        _chikaFx = GetNodeOrNull<GpuParticles3D>("ChikaFx"); _glowFx = GetNodeOrNull<Node3D>("GlowFx");
+        _droolMouthFx = GetNodeOrNull<GpuParticles3D>("DroolMouthFx"); _droolTongueFx = GetNodeOrNull<GpuParticles3D>("DroolTongueFx");
+        foreach (Node3D fx in new Node3D[] { _chikaFx, _glowFx, _droolMouthFx, _droolTongueFx }) if (fx != null) { fx.TopLevel = true; fx.Visible = false; }
         _mats.Clear(); _bodyMat = null;
         if (_model != null)
         {
@@ -276,14 +358,22 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: joints body {_bBody} mouth {_bMouth} tongue {_bTongue}; {_mats.Count} materials; slot {(Slot != null ? Slot.Name : "none")}");
     }
     private static PackedScene LoadIf(string path) => ResourceLoader.Exists(path) ? GD.Load<PackedScene>(path) : null;
+    private static Texture2D LoadTex(string path) => ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;
     /// <summary>loadAfter: the ACTOR_TYPE_CASINORULET objects -- the exports, else the `sms_roulette` group highest first (rulet00 the top disc).</summary>
     private void FindArena()
     {
         _roulettes[0] = RouletteTop; _roulettes[1] = RouletteMiddle; _roulettes[2] = RouletteBottom;
         if (_roulettes[0] == null || _roulettes[1] == null || _roulettes[2] == null)
         {
+            // 153b: HIS table only -- the discs within 60 m across and 30 m up or down of him (two arenas in one level: each boss takes its own)
             var found = new List<SmsRoulette>();
-            foreach (Node n in GetTree().GetNodesInGroup("sms_roulette")) if (n is SmsRoulette r) found.Add(r);
+            Vector3 me = IsInsideTree() ? GlobalPosition : Vector3.Zero;
+            foreach (Node n in GetTree().GetNodesInGroup("sms_roulette"))
+            {
+                if (n is not SmsRoulette r || !r.IsInsideTree()) continue;
+                Vector3 d = r.GlobalPosition - me; float dy = MathF.Abs(d.Y); d.Y = 0f;
+                if (d.Length() < 60f && dy < 30f) found.Add(r);
+            }
             found.Sort((a, b) => a.RadiusUnits.CompareTo(b.RadiusUnits));   // rulet00 is the small centre disc, rulet02 the outer ring
             for (int i = 0; i < 3; i++) if (_roulettes[i] == null && i < found.Count) _roulettes[i] = found[i];
         }
@@ -298,19 +388,71 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         MotionMode = MotionModeEnum.Floating;
         _hp = Math.Max(1, HitPoints);
         _bodyScale = 1f; _scale = 1f;
-        _alpha = NormalAlpha; _tint = Colors.White; _brk = 2; _brkTime = 0;
-        _spicy = false; _slotRolling = false; _marioUnder = false; _shineDone = false;
+        _normalAlpha = Math.Clamp(Mathf.RoundToInt(GhostOpacity * 255f), 1, 0xFE);
+        _alpha = _normalAlpha; _tint = Colors.White; _brk = 2; _brkTime = 0; _maskK = 0f; _btp = 2; _btpTime = 0; _eyeNow = -1; _pauseTicks = 0;
+        _spicy = false; _slotRolling = false; _marioUnder = false; _shineDone = false; _bgmStarted = false;
+        _hintFirstFruit = true; _hintFirstHit = true;
         _spicyTimer = 0; _prepTimer = 0; _dieTimer = 0; _coinRoundsLeft = CoinRounds; _slotResult = SmsTelesaSlot.Coin; _fruitHitCount = 0; _fruitHitFx = -1;
         _hoseiY = 0f; _prevBck = -1; _prevBckFrame = 0f;
         _yaw = _spawnYaw;
         for (int i = 0; i < 3; i++) _rouletteSp[i] = 0f;
         _spit.Clear(); _spitFruitNoCollision.Clear();
-        SetHidden(StartHidden);
+        StopSpicyFx();
+        SetHidden(StartHidden || IntroRide);
         OffAllCollision();
         if (Slot != null) { Slot.Visible = false; Slot.ForcedResult = ForcedResultValue(); }
-        ApplyAlpha(true); ApplyTint();
+        ApplyAlpha(true); ApplyTint(); ApplyMask(); ApplyEye(0);
         if (IsInsideTree()) { _floorY = GroundYMap(); SetY(_floorY + PositionOverFloor); }
+        _intro = 0;
+        if (IntroRide && IsInsideTree()) CallDeferred(nameof(IntroStart));
         ApplyLook();
+    }
+    /// <summary>The FallDemo's start (deferred: the discs are found a frame late): the centre disc lifted IntroLiftUnits, Mario's controls held, the slot out of sight.</summary>
+    private void IntroStart()
+    {
+        if (!IntroRide || _intro != 0 || _dead) return;
+        var disc = _roulettes[0];
+        if (disc == null || !IsInstanceValid(disc)) { FindArena(); disc = _roulettes[0]; }
+        if (disc == null || !IsInstanceValid(disc)) { if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: no centre disc for the intro ride"); return; }
+        disc.GlobalPosition += Vector3.Up * (IntroLiftUnits / U);
+        _intro = 1;
+        if (_mario != null && IsInstanceValid(_mario)) _mario.CameraLocked = true;
+        if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: the intro ride: {disc.Name} lifted {IntroLiftUnits:F0} u");
+    }
+    /// <summary>TNerveBossTelesaFallDemo, one tick: rouletteFall (the centre disc down 1 u a tick to the others' height, Mario riding it; V_LAUGH1B / RLT_DOWN),
+    /// then slotFall (the machine out of the sky at 5 u a tick, 1 u the last 300; passing 200 u over its place the discs start turning; home -> the fight).</summary>
+    private void IntroTick()
+    {
+        var disc = _roulettes[0]; var other = _roulettes[1] ?? _roulettes[2];
+        if (disc == null || !IsInstanceValid(disc)) { IntroEnd(); return; }
+        if (_intro == 1)
+        {
+            float target = other != null && IsInstanceValid(other) ? other.GlobalPosition.Y : disc.GlobalPosition.Y - IntroLiftUnits / U;
+            if (disc.GlobalPosition.Y > target + 0.5f / U) { disc.GlobalPosition += Vector3.Down * (1f / U); return; }
+            disc.GlobalPosition = new Vector3(disc.GlobalPosition.X, target, disc.GlobalPosition.Z);
+            if (DisappearSound != null && DisappearSound.Stream != null) DisappearSound.Play();   // MSD_SE_BS_TELESA_RLT_SET stands in
+            _intro = 2; _introSlotY = TransYUnits - 700f + 1500f;
+            if (Slot != null) Slot.Visible = true;
+            return;
+        }
+        float home = TransYUnits - 700f;                      // where calcRootMatrix hangs it (joint 0 - 700, no hosei)
+        float above = _introSlotY - home;
+        _introSlotY -= above > 300f ? 5f : 1f;
+        if (above <= 200f && above + 5f > 200f) RouletteStart();   // slotFall: the discs start as it passes
+        if (Slot != null && IsInstanceValid(Slot))
+        {
+            Vector3 c = IsInsideTree() ? GlobalPosition : Vector3.Zero;
+            Slot.GlobalTransform = new Transform3D(new Basis(Vector3.Up, Mathf.DegToRad(_yaw)), new Vector3(c.X, (_floorY + _introSlotY) / U, c.Z));
+        }
+        if (_introSlotY <= home) IntroEnd();
+    }
+    private void IntroEnd()
+    {
+        _intro = 0;
+        if (_mario != null && IsInstanceValid(_mario)) _mario.CameraLocked = false;
+        if (Slot != null) Slot.Visible = false;              // HideWait hides it until the appear
+        _time = 0;                                           // HideWait's clock starts here
+        if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: the intro ride over -> HideWait");
     }
     private int ForcedResultValue() => ForceResult switch { SlotForce.Coin => SmsTelesaSlot.Coin, SlotForce.Enemy => SmsTelesaSlot.Enemy, SlotForce.Fruit => SmsTelesaSlot.Fruit, SlotForce.Jackpot => SmsTelesaSlot.Jackpot, _ => int.MinValue };
     /// <summary>makeShineAppearWithDemo is the end: the body is freed with its slot (RelaunchTicks -1 in the scene); a relaunch would start the fight over.</summary>
@@ -321,6 +463,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         _floorY = GroundYMap();
         SetY(_floorY + PositionOverFloor);                       // moveObject: mPosition.y = mGroundHeight + 300
         if (Slot != null && !_dead) Slot.TickSlot(HitCollectRate, _rng);   // TTelesaSlot::moveObject (the slot is his to run)
+        if (_intro != 0 && !_dead) IntroTick();
     }
     /// <summary>The floor under him, MAP bodies only (the discs; never a fruit, an enemy or Mario), units -- within 10 m under his point (he hangs 4 m over the
     /// table: a floor further down is the room's, not his); none found: where he was (the discs' shapes are a frame late on the first tick).</summary>
@@ -345,7 +488,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     private void SetY(float yUnits) => GlobalPosition = new Vector3(GlobalPosition.X, yUnits / U, GlobalPosition.Z);
     private Vector3 JointUnits(int bone)
     {
-        if (_skel == null || bone < 0) return Pos() + Vector3.Up * Prm.TransYOffset;
+        if (_skel == null || bone < 0) return Pos() + Vector3.Up * TransYUnits;
         return (_skel.GlobalTransform * _skel.GetBoneGlobalPose(bone).Origin) * U;
     }
     protected override float GravityY() => 0f;
@@ -363,11 +506,11 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         float dip = Mathf.Clamp(_hoseiY, BaseHoseiPosY, 0f);
         Basis b = new Basis(Vector3.Up, Mathf.DegToRad(_yaw)) * Basis.FromScale(Vector3.One * _scale * _modelScale);
         Vector3 at = IsInsideTree() ? GlobalPosition : Vector3.Zero;
-        at += Vector3.Up * ((Prm.TransYOffset + dip) / U);
+        at += Vector3.Up * ((TransYUnits + dip) / U);
         if (IsInsideTree()) _model.GlobalTransform = new Transform3D(b, at);
         else _model.Transform = new Transform3D(b, at);
         if (!IsInsideTree() || Engine.IsEditorHint()) return;
-        if (Slot != null && IsInstanceValid(Slot))
+        if (Slot != null && IsInstanceValid(Slot) && _intro != 2)
         {
             float slotOff = -700f;
             Vector3 anchor;
@@ -376,39 +519,139 @@ public partial class SmsBossTelesa : SmsSmallEnemy
                 anchor = JointUnits(_bBody);
                 if (!IsBck(BckAppear)) slotOff = -2400f;
             }
-            else anchor = _skel != null ? JointUnits(0) : Pos() + Vector3.Up * Prm.TransYOffset;
+            else anchor = _skel != null ? JointUnits(0) : Pos() + Vector3.Up * TransYUnits;
             Vector3 sp = new Vector3(anchor.X, _hoseiY + anchor.Y + slotOff, anchor.Z) / U;
             Slot.GlobalTransform = new Transform3D(new Basis(Vector3.Up, Mathf.DegToRad(_yaw)), sp);
         }
         _bodyPart?.Place(BodyPointUnits / U);
         _tonguePart?.Place(TonguePointUnits / U);
+        PlaceAmbientFx();
+    }
+    /// <summary>calcRootMatrix's emits: chika_a / b at his origin and the glow at joint 1 while he shows (bound to him: they ride the body); the drool at the mouth
+    /// (yodare1 / 2) and the tongue tip (yodare3) but through the hide (4), laugh (6), spicy (12) and spicy_end (13) clips. Off while hidden / dead.</summary>
+    private void PlaceAmbientFx()
+    {
+        bool show = AmbientFx && !_hidden && !_dead && _model != null && _model.Visible && _intro == 0;
+        float k = _alpha / 255f;
+        if (_chikaFx != null)
+        {
+            _chikaFx.Visible = show; _chikaFx.Emitting = show;
+            if (show) _chikaFx.GlobalPosition = JointUnits(_bBody) / U;
+        }
+        if (_glowFx != null)
+        {
+            _glowFx.Visible = show;
+            if (show)
+            {
+                _glowFx.GlobalPosition = JointUnits(_bBody) / U;
+                if (_glowFx is MeshInstance3D gm && gm.GetActiveMaterial(0) is ShaderMaterial gsm) gsm.SetShaderParameter("strength", k);
+            }
+        }
+        bool drool = show && !IsBck(BckHide) && !IsBck(BckLaugh) && !IsBck(BckSpicy) && !IsBck(BckSpicyEnd);
+        if (_droolMouthFx != null) { _droolMouthFx.Visible = show; _droolMouthFx.Emitting = drool; if (show) _droolMouthFx.GlobalPosition = MouthUnits / U; }
+        if (_droolTongueFx != null) { _droolTongueFx.Visible = show; _droolTongueFx.Emitting = drool; if (show) _droolTongueFx.GlobalPosition = JointUnits(_bTongueTip >= 0 ? _bTongueTip : _bTongue) / U; }
     }
     private void SetHidden(bool hidden)
     {
         _hidden = hidden;
         if (_model != null) _model.Visible = !hidden;
     }
-    /// <summary>unk34C.a onto the materials' `fade` (0 when hidden: the drives read the alpha anyway).</summary>
+    /// <summary>unk34C.a (K0_A) onto the materials' `opacity`: the screen mix. btelesa_down.brk (brk 1) lays its K0_A ramp over it: 0 -> 255 across its first 30
+    /// frames (he blinks out and comes back solid on a spicy hit and on the down).</summary>
     private void ApplyAlpha(bool force = false)
     {
         float a = _alpha / 255f;
-        foreach (var m in _mats) m.SetShaderParameter("fade", a);
+        if (_brk == 1) { float f = _brkTime / 2f; if (f < 30f) a = MathF.Min(a, f / 30f); }
+        foreach (var m in _mats) m.SetShaderParameter("opacity", a);
     }
     /// <summary>unk348 (K1) onto the body's `tint`.</summary>
     private void ApplyTint() { _bodyMat?.SetShaderParameter("tint", new Vector3(_tint.R, _tint.G, _tint.B)); }
-    /// <summary>setBrkFromIndex: the TEV register animations are not in the rip -- brk 0 (the flinch) a short white flash, brk 1 (the damage / the down) a red
-    /// pulse through the clip, brk 2 plain, on the materials' `c0`.</summary>
+    /// <summary>K2_A onto the body's `mask_k`: the polmask threshold the brk sweeps.</summary>
+    private void ApplyMask() { _bodyMat?.SetShaderParameter("mask_k", _maskK); }
+    /// <summary>setBrkFromIndex: the archive's three .brk (j3d_dump153.py): 0 btelesa_damage (K2_A 0 -> 150 over 20 frames: the body speckles into the fruit's tint),
+    /// 1 btelesa_down (K0_A 0 -> 255 over 30 frames, held: see ApplyAlpha), 2 btelesa_lick (K2_A 150 through frame 39, then down to 0 at 99: the tint washes off).
+    /// A frame = 2 ticks (the bck clock).</summary>
     private void SetBrk(int i) { _brk = i; _brkTime = 0; }
     private void BrkTick()
     {
-        Vector3 c0 = Vector3.Zero;
-        if (_brk == 0 && _brkTime < 24) c0 = Vector3.One * (0.5f * (1f - _brkTime / 24f));
-        else if (_brk == 1) { float s = 0.5f + 0.5f * MathF.Sin(_brkTime * 0.35f); c0 = new Vector3(0.55f * s, 0.05f * s, 0.05f * s); }
+        float f = _brkTime / 2f;
+        float k = _maskK;
+        if (_brk == 0) k = 150f / 255f * Mathf.Clamp(f / 20f, 0f, 1f);
+        else if (_brk == 2) k = f <= 39f ? 150f / 255f : 150f / 255f * (1f - Mathf.Clamp((f - 39f) / 60f, 0f, 1f));
+        else if (_brk == 1) k = 0f;
         _brkTime++;
-        foreach (var m in _mats) m.SetShaderParameter("c0", c0);
+        if (MathF.Abs(k - _maskK) > 1e-4f) { _maskK = k; ApplyMask(); }
+    }
+    /// <summary>setBtpFromIndex: 1 btelesa_tspicy (the rolled eyes, looped), 2 btelesa_twait (the 150-frame blink loop); a frame = 2 ticks.</summary>
+    private void SetBtp(int i) { if (_btp != i) { _btp = i; _btpTime = 0; } }
+    private static readonly int[] BlinkEnds = { 19, 21, 24, 26, 28, 30, 33, 35, 85, 87, 90, 92, 150 };   // the twait runs' ends (frames)
+    private static readonly int[] BlinkEyes = { 0, 1, 2, 1, 0, 1, 2, 1, 0, 1, 2, 1, 0 };                   // open / half / close
+    private void BtpTick()
+    {
+        int eye = 0;
+        if (_btp == 1) eye = 3;
+        else
+        {
+            int f = (_btpTime / 2) % 150;
+            for (int i = 0; i < BlinkEnds.Length; i++) if (f < BlinkEnds[i]) { eye = BlinkEyes[i]; break; }
+        }
+        _btpTime++;
+        ApplyEye(eye);
+    }
+    private void ApplyEye(int eye)
+    {
+        if (eye == _eyeNow || _bodyMat == null) return;
+        Texture2D t = eye switch { 1 => EyeHalf, 2 => EyeClose, 3 => EyeRoll, _ => EyeOpen } ?? EyeOpen;
+        if (t == null) return;
+        _eyeNow = eye;
+        _bodyMat.SetShaderParameter("base_tex", t);
     }
     /// <summary>mNormalAlpha + 30 x the hit points lost, clamped 0xFE: the ghost more solid each hit.</summary>
-    private int TargetAlpha() => Math.Clamp(NormalAlpha + (Math.Max(1, HitPoints) - _hp) * 30, 0, 0xFE);
+    private int TargetAlpha() => Math.Clamp(_normalAlpha + (Math.Max(1, HitPoints) - _hp) * 30, 0, 0xFE);
+    /// <summary>The spicy loop's bound emitters: the fire at joint 9 (jnt_sita_4) and the sweat at joint 1 (jnt_body), SmsNpcEffect scenes under BoneAttachment3Ds;
+    /// the fire sound with them.</summary>
+    private void StartSpicyFx()
+    {
+        if (_skel == null) return;
+        if ((_spicyFire == null || !IsInstanceValid(_spicyFire)) && SpicyFireFxScene != null)
+            _spicyFire = SmsNpcEffect.Spawn(SpicyFireFxScene, _skel, _bSpicy >= 0 ? "jnt_sita_4" : "jnt_sita_2", 2.5f, _fxCache, Name);
+        if ((_sweat == null || !IsInstanceValid(_sweat)) && SweatFxScene != null)
+            _sweat = SmsNpcEffect.Spawn(SweatFxScene, _skel, "jnt_body", 3f, _fxCache, Name);
+    }
+    private void StopSpicyFx()
+    {
+        if (_spicyFire != null && IsInstanceValid(_spicyFire)) _spicyFire.Stop();
+        if (_sweat != null && IsInstanceValid(_sweat)) _sweat.Stop();
+        _spicyFire = null; _sweat = null;
+    }
+    private readonly Dictionary<string, BoneAttachment3D> _fxCache = new();
+    /// <summary>A burst scene recoloured (SmsFxBurst.SetShaderParam on every JpaDirBillboard `prm` / `env`): the fruit-colour puffs (fhit_pe / _or / _gr, down_*).</summary>
+    private void SpawnTintedBurst(PackedScene scene, Transform3D at, Color c)
+    {
+        if (scene == null) return;
+        var fx = SpawnBurst(scene, at);
+        if (fx is SmsFxBurst b)
+        {
+            b.SetShaderParam("prm", new Vector4(c.R, c.G, c.B, 1f));
+            b.SetShaderParam("env", new Vector4(c.R * 0.45f, c.G * 0.45f, c.B * 0.45f, 1f));
+        }
+    }
+    /// <summary>startAppearBalloon(id): the HUD's SmsHintBalloon (looked up once) with the knob's line.</summary>
+    private void ShowHint(string text)
+    {
+        if (!ShowHints || string.IsNullOrEmpty(text)) return;
+        if (!_hintLooked) { _hintLooked = true; _hint = FindHint(GetTree().Root); }
+        if (_hint != null && IsInstanceValid(_hint)) _hint.Show(text, 1, true);
+        else if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: hint (no SmsHintBalloon in the scene): {text}");
+    }
+    private static SmsHintBalloon FindHint(Node n)
+    {
+        if (n is SmsHintBalloon h) return h;
+        foreach (Node c in n.GetChildren()) { var r = FindHint(c); if (r != null) return r; }
+        return null;
+    }
+    /// <summary>SMSRumbleMgr->start(0x14, 0xf): a short strong buzz on the pad.</summary>
+    private void RumblePad() { if (Rumble) Input.StartJoyVibration(0, 0.5f, 1f, 0.35f); }
     /// <summary>checkBckPass(f) for the current clip: it passed frame f this tick.</summary>
     private bool BckPassed(int clip, float f) => IsBck(clip) && _prevBck == clip && _prevBckFrame < f && BckFrame() >= f;
 
@@ -433,14 +676,16 @@ public partial class SmsBossTelesa : SmsSmallEnemy
             if (IsNerve(NerveSpitSlotItem)) GenerateSlotItem(); else GenAttacker();
         }
         if (IsBck(BckBeroHit) && BckFrame() < 20f && (_tickCount & 7) == 0 && SpicyHitFxScene != null)
-            SpawnBurst(SpicyHitFxScene, new Transform3D(Basis.FromScale(Vector3.One * 2f), MouthUnits / U));
-        if (IsBck(BckSpicy) && (_tickCount & 15) == 0)
+            SpawnBurst(SpicyHitFxScene, new Transform3D(Basis.FromScale(Vector3.One * 3.5f), MouthUnits / U));
+        if (IsBck(BckSpicy))                                     // calcRootMatrix: ASE at joint 1, SPICY_A..D at joint 9 every frame of clip 12, the FIRE sound
         {
-            if (SpicyFxScene != null) SpawnBurst(SpicyFxScene, new Transform3D(Basis.Identity, JointUnits(_bSpicy >= 0 ? _bSpicy : _bTongue) / U));
+            if (!_hidden) StartSpicyFx();
             if (FireSound != null && FireSound.Stream != null && !FireSound.Playing) FireSound.Play();
         }
+        else if (_spicyFire != null || _sweat != null) StopSpicyFx();
         if (IsBck(BckLaugh) && BckPassed(BckLaugh, 2f) && LaughSound != null && LaughSound.Stream != null) LaughSound.Play();
-        BrkTick();
+        SetBtp(IsBck(BckSpicy) ? 1 : 2);
+        BrkTick(); BtpTick();
         ApplyAlpha();
         _prevBck = _bck; _prevBckFrame = BckFrame();
     }
@@ -528,11 +773,19 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         }
         _fruitHitFx = fx;
         if (fx >= 0) ApplyTint();
-        if (!_spicy && f.Type != Fruit.FruitType.RedPepper) _fruitHitCount++; else _fruitHitCount = 0;
+        if (!_spicy && f.Type != Fruit.FruitType.RedPepper)
+        {
+            if (_hintFirstFruit) { _hintFirstFruit = false; ShowHint(HintFirstFruit); }   // 0xE000F once
+            _fruitHitCount++;
+            if (_fruitHitCount > 2) ShowHint(HintFruitAgain);                            // 0xE0010
+        }
+        else _fruitHitCount = 0;
         Vector3 at = f.GlobalPosition;
-        if (FruitHitFxScene != null) SpawnBurst(FruitHitFxScene, new Transform3D(Basis.FromScale(Vector3.One * 1.5f), at));
-        if (_spicy && fx >= 0) { if (DamageFxScene != null) SpawnBurst(DamageFxScene, new Transform3D(Basis.FromScale(Vector3.One * 1.5f), at)); }
+        if (FruitHitFxScene != null) SpawnBurst(FruitHitFxScene, new Transform3D(Basis.FromScale(Vector3.One * 3.5f), at));   // scaled to him: the bursts are sized for a small enemy
+        if (fx >= 0) SpawnTintedBurst(FruitPuffFxScene, new Transform3D(Basis.FromScale(Vector3.One * 2.5f), at), _tint);   // fhit_pe / _or / _gr
+        if (_spicy && fx >= 0) { if (DamageFxScene != null) SpawnBurst(DamageFxScene, new Transform3D(Basis.FromScale(Vector3.One * 3.5f), at)); }
         else if (FruitHitSound != null && FruitHitSound.Stream != null) FruitHitSound.Play();
+        if (_hintFirstHit) { _hintFirstHit = false; ShowHint(HintFirstHit); }           // 0xE0011 once
         RemoveSpit(f);
         f.QueueFree();                                           // makeObjDead
         if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: {f.Type} on {(fx >= 0 ? "the body" : "him")} spicy {_spicy} -> hp {_hp}");
@@ -608,6 +861,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
             _rouletteSp[i] = direction * (hpSpeed + speed) * RouletteSpeedScale;
         }
         RollRouletteCircle();
+        RumblePad();
         SmsCameraShake.Current?.StartMode(ShakeRoulette, 1f);
     }
     /// <summary>slotStop: every disc still.</summary>
@@ -619,7 +873,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         int r = Slot != null ? Slot.SlotResult() : _slotResult;
         if (r == SmsTelesaSlot.Fruit || r == SmsTelesaSlot.Coin)
         {
-            if (FanfareFxScene != null) SpawnBurst(FanfareFxScene, new Transform3D(Basis.Identity, (Slot != null ? Slot.GlobalPosition : GlobalPosition)));
+            if (FanfareFxScene != null) SpawnBurst(FanfareFxScene, new Transform3D(Basis.Identity, (Slot != null ? Slot.GlobalPosition + Vector3.Up * (650f / U) : GlobalPosition)));
             var s = r == SmsTelesaSlot.Fruit ? Fanfare1Sound : Fanfare2Sound;
             if (s != null && s.Stream != null) s.Play();
         }
@@ -808,6 +1062,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
             _attackers.Add(boo);
         }
         boo.SmsInitAttacker(this, MouthUnits, _yaw, _floorY, SpitSpeedScale);
+        RumblePad();                                             // TNerveBossTelesaSpit's SMSRumbleMgr->start(0x14, 0xf)
         if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: a Boo attacker ({AttackersAlive} out)");
     }
     /// <summary>The Shine (makeShineAppearWithDemo "the boss shine"): the ShineScene at the ShineSpawnPoint, else his point, with its entrance.</summary>
@@ -839,10 +1094,11 @@ public partial class SmsBossTelesa : SmsSmallEnemy
             case NerveHideWait:                                  // TNerveBossTelesaHideWait
                 if (_time == 0)
                 {
-                    SetHidden(true); _spicy = false; _alpha = TargetAlpha(); SetBrk(2);
-                    if (Slot != null) Slot.Visible = false;
+                    SetHidden(true); _spicy = false; _alpha = TargetAlpha(); SetBrk(2); _maskK = 0f; ApplyMask(); StopSpicyFx();
+                    if (Slot != null && _intro != 2) Slot.Visible = false;
                 }
-                else if (_time > HideWaitTicks && !_marioUnder) { PushAfterCurrent(NerveAppear); SetHidden(false); return true; }
+                if (_intro != 0) return false;                   // the FallDemo runs first (IntroTick); its end restarts this clock
+                if (_time > HideWaitTicks && !_marioUnder) { PushAfterCurrent(NerveAppear); SetHidden(false); return true; }
                 return false;
 
             case NerveAppear:                                    // TNerveBossTelesaAppear
@@ -851,7 +1107,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
                     if (!IsBck(BckAppear))
                     {
                         SetBck(BckAppear);
-                        _bgmStarted = true;
+                        if (!_bgmStarted) { _bgmStarted = true; if (BossMusic != null && BossMusic.Stream != null && !BossMusic.Playing) BossMusic.Play(); }   // unk384: the boss BGM
                         if (Slot != null) { Slot.Visible = true; Slot.RandomReset(); }
                         OnAllCollision();
                     }
@@ -882,9 +1138,11 @@ public partial class SmsBossTelesa : SmsSmallEnemy
                 return false;
 
             case NerveSpitSlotItem:                              // TNerveBossTelesaSpitSlotItem
+                if (_time == 0) _pauseTicks = 0;
+                if (Slot != null && Slot.IsRolling && !IsBck(BckSpit)) { _pauseTicks = 0; return false; }   // 153b: the last drum stops first (the game: 200 from the last release)
                 if (!IsBck(BckSpit) && _hoseiY < BaseHoseiPosY - 200f) SetBck(BckSpit);
-                else if (BckEnded() && _time > 600) { PushAfterCurrent(NervePrepareSlot); _prepTimer = 0; FruitCollisionOn(); return true; }
-                else if (_time > 200) _hoseiY -= 100f;
+                else if (IsBck(BckSpit) && BckEnded() && _time > 600) { PushAfterCurrent(NervePrepareSlot); _prepTimer = 0; FruitCollisionOn(); return true; }
+                else if (_pauseTicks++ > ResultPauseTicks) _hoseiY -= 100f;   // the pause over: the dip (the machine drops out of sight with it) and the spit
                 return false;
 
             case NervePrepareSlot:                               // TNerveBossTelesaPrepareSlot
@@ -948,6 +1206,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
                         SetBck(BckDown); SetBrk(1);
                         if (Slot != null) Slot.Visible = false;
                         if (DownSound != null && DownSound.Stream != null) DownSound.Play();
+                        if (BossMusic != null && BossMusic.Playing) { var tw = CreateTween(); tw.TweenProperty(BossMusic, "volume_db", -60f, 10f / 30f); tw.TweenCallback(Callable.From(BossMusic.Stop)); }   // MSBgm::stopBGM(.., 10)
                     }
                     if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: Die (spicy {_spicy}) -> hp {_hp}");
                 }
@@ -957,7 +1216,9 @@ public partial class SmsBossTelesa : SmsSmallEnemy
                     {
                         if (_dieTimer == 0)
                         {
-                            if (DownFxScene != null) SpawnBurst(DownFxScene, new Transform3D(Basis.FromScale(Vector3.One * 3f), JointUnits(_bBody) / U));
+                            Vector3 bodyAt = JointUnits(_bBody) / U;
+                            if (DownFxScene != null) SpawnBurst(DownFxScene, new Transform3D(Basis.FromScale(Vector3.One * 5f), bodyAt));                  // ms_btls_down
+                            if (_fruitHitFx >= 0) SpawnTintedBurst(DownFxScene, new Transform3D(Basis.FromScale(Vector3.One * 6f), bodyAt), _tint);   // ms_btls_down_pe / _gr / _or
                             ForceAllItemKill();
                             SlotStop();
                         }
