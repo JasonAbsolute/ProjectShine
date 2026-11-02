@@ -1,17 +1,21 @@
 [gd_scene format=3 uid="uid://d153arena"]
 
-[ext_resource type="PackedScene" path="res://assets/Sms/Enemy/BossTelesa/Roulette00.tscn" id="1_r00"]
-[ext_resource type="PackedScene" path="res://assets/Sms/Enemy/BossTelesa/Roulette01.tscn" id="2_r01"]
-[ext_resource type="PackedScene" path="res://assets/Sms/Enemy/BossTelesa/Roulette02.tscn" id="3_r02"]
-[ext_resource type="PackedScene" path="res://assets/Sms/Enemy/BossTelesa.tscn" id="4_boss"]
+[ext_resource type="PackedScene" uid="uid://d153rulet00" path="res://assets/Sms/Enemy/BossTelesa/Roulette00.tscn" id="1_r00"]
+[ext_resource type="PackedScene" uid="uid://d153rulet01" path="res://assets/Sms/Enemy/BossTelesa/Roulette01.tscn" id="2_r01"]
+[ext_resource type="PackedScene" uid="uid://d153rulet02" path="res://assets/Sms/Enemy/BossTelesa/Roulette02.tscn" id="3_r02"]
+[ext_resource type="PackedScene" uid="uid://d153btelesa" path="res://assets/Sms/Enemy/BossTelesa.tscn" id="4_boss"]
+[ext_resource type="PackedScene" uid="uid://d153kwall" path="res://assets/Sms/Enemy/BossTelesa/KingBooWall.tscn" id="5_wall"]
 
-[node name="KingBooArena" type="Node3D"]
-metadata/_sms_note = "Pass 153: KING BOO'S ARENA -- the casino's great roulette table (the three discs at one height, the game's layout) with King Boo over its centre. Drop it into the level where the table should be: the discs' walking faces are 1.1 to 1.9 m BELOW this node (the centre disc lowest), the outer ring 34 m across, so put the node 2 m over the room's floor or let the table stand in a pit. King Boo finds the discs by himself (sms_roulette). The centre disc's pond (the game's water the player refills from) is solid floor here: add one of your sms_water Area3D volumes over it (7 m radius, the face at -1.9 m) if you want it to hold water."
+[node name="KingBooArena" type="Node3D" unique_id=2000134843]
+metadata/_sms_note = "Pass 153: KING BOO'S ARENA -- the casino's great roulette table (the three discs at one height, the game's layout) with King Boo over its centre, and (153k) the casino boss room round it: the BossWall child, the game's own wall and ceiling (KingBooWall.tscn), a 33-m drum the outer disc's rim pokes into, so Mario cannot fall off. Drop it into the level where the table should be: the discs' walking faces are 1.1 to 1.9 m BELOW this node (the centre disc lowest), the outer ring 34 m across, the wall's paint runs from 13 m under the node to 47 m over it (its collision from 27 m under), the ceiling closes it at 47 m. King Boo finds the discs by himself (sms_roulette). The centre disc's pond (the game's water the player refills from) is solid floor here: add one of your sms_water Area3D volumes over it (7 m radius, the face at -1.9 m) if you want it to hold water. The room's knobs (CeilingOn, RoomCastsShadows, Brightness...) are on the BossWall child."
 
-[node name="Roulette02" parent="." instance=ExtResource("3_r02")]
+[node name="BossWall" parent="." instance=ExtResource("5_wall")]
 
-[node name="Roulette01" parent="." instance=ExtResource("2_r01")]
+[node name="Roulette02" parent="." unique_id=350004841 instance=ExtResource("3_r02")]
 
-[node name="Roulette00" parent="." instance=ExtResource("1_r00")]
+[node name="Roulette01" parent="." unique_id=1741330031 instance=ExtResource("2_r01")]
 
-[node name="BossTelesa" parent="." instance=ExtResource("4_boss")]
+[node name="Roulette00" parent="." unique_id=45288040 instance=ExtResource("1_r00")]
+
+[node name="BossTelesa" parent="." unique_id=245215880 instance=ExtResource("4_boss")]
+GhostOpacity = 0.44999999999999996

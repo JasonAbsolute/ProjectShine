@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://d153kwall"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/BossTelesa/SmsBossWall.cs" id="1_script"]
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/BossTelesa/BossWall.gdshader" id="2_shader"]
+[ext_resource type="Texture2D" path="res://models/Koopa/scene/delfinoBoss/mapobj/boss_wall/boss_wall_stars.png" id="3_stars"]
+[ext_resource type="Texture2D" path="res://models/Koopa/scene/delfinoBoss/mapobj/boss_wall/boss_wall_spots.png" id="4_spots"]
+[ext_resource type="PackedScene" path="res://models/Koopa/scene/delfinoBoss/map/map.glb" id="5_ceiling"]
+
+[node name="KingBooWall" type="StaticBody3D"]
+script = ExtResource("1_script")
+StarsTexture = ExtResource("3_stars")
+SpotsTexture = ExtResource("4_spots")
+WallShader = ExtResource("2_shader")
+CeilingScene = ExtResource("5_ceiling")
+metadata/_sms_note = "Pass 153k: KING BOO'S ROOM -- the casino boss room's WALL and CEILING from the game's own files (boss_wall.bmd, map.col, map.bmd): a 24-sided drum 33 m across, 54 m tall, painted with the stars-on-purple and the three drifting coloured spots (the game's three texture animations at once), closed by the marble ring and blue cap ceiling 47 m over the table. It BUILDS ITSELF when the scene opens (in the editor too), so the file holds nothing to see: the knobs are in the inspector. KingBooArena.tscn carries one as its BossWall child at the arena's own point; on its own, drop it where the table's node is -- it sits TableLiftUnits (500 u = 6.7 m) under that point, where the game stands it against its lifted discs. The outer disc's rim pokes 0.8 m into the wall: Mario cannot fall off the table any more. CeilingOn off opens the room to the sky; RoomCastsShadows on makes a dark indoor room (off: the sun lights the table as before); Brightness, SpotStrength and SpotSpeed tune the look (1 = the game's); WallRadiusUnits and the heights re-shape the drum."
