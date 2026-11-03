@@ -918,7 +918,7 @@ is pushed and waiting on Jaysonn's playtest, and it is now the branch that merge
 `feature/select-stages` (entry #11, SMS 135) is likewise pushed and waiting on a playtest, and holds the only copy of #11's
 text. The exit-time C# finalize crash from #10's batch has still not recurred.
 
-### #16 -- DONE 2026-11-03 -- PR OPEN, awaiting Jaysonn's merge (the URL goes in the heading at close-out) -- queued 2026-11-01 10:38 PST (Kiro) -- PUSH + PR (SMS 151-153 + 153b..n), PLAYTESTED BY JAYSONN 2026-11-03, updated 2026-11-03 00:16 PST
+### #16 -- DONE 2026-11-03 -- https://github.com/JasonAbsolute/ProjectShine/pull/14 (OPEN, awaiting Jaysonn's merge) -- queued 2026-11-01 10:38 PST (Kiro) -- PUSH + PR (SMS 151-153 + 153b..n), PLAYTESTED BY JAYSONN 2026-11-03, updated 2026-11-03 00:16 PST
 Push the eleventh feature branch: `feature/enemy-sirena`, branched from `main` `c082a22` (the trunk after PR #13, the Chain Chomps). Sirena Beach's
 family -- Hotel Delfino's ghosts -- one pass each on this branch. SMS 151: the Boo (TTelesa), the hotel's ghost -- it drifts between its graph's nodes
 a little off the floor, bobbing and tilting, fading in and out (the LOOP kind), and hurts you on touch; your jump passes straight through it until you
@@ -1089,9 +1089,15 @@ collides.
 `gh auth status` still prints "You are not logged into any GitHub hosts", the eighth entry running, so the browser route again.
 The PR body went to `pr151.md` at the project root (untracked, delete after merge), 4650 bytes with the attribution footer.
 ONE merge path, as the entry insists: this branch gets a PR and is NOT also merged into local `main`.
-THE TRUNK TIP AND THIS ENTRY'S PR NUMBER: read them from `git log --oneline -1 main` and from GitHub, not from a sha or a number
-written here. A commit cannot state its own sha, and this result paragraph is committed BEFORE the PR is opened, per the #6 order,
-so it cannot state the PR number either. Both go into the heading at close-out.
+PR #14 OPENED at https://github.com/JasonAbsolute/ProjectShine/pull/14, base `main`, head `feature/enemy-sirena` at `a920350`,
+34 commits / 186 files, `mergeable_state` clean. The compare URL carried the title and body prefilled at 7050 characters, under
+the ~8000 ceiling #8 established. Verified through the public API that all 4647 characters of Kiro's prose landed byte for byte.
+ONE DEFECT, cosmetic: the attribution footer's robot glyph arrived as `ðŸ¤–`. Windows PowerShell 5.1's `Get-Content -Raw`
+reads a UTF-8 file with no BOM as cp1252, so the clipboard copy of `pr151.md` carried the mojibake and that is what reached the
+body field. Next entry: read the body with `[System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8)` before
+`Set-Clipboard`, or keep the footer out of the clipboard path. A repaired copy of the body sits in the session scratchpad.
+THE TRUNK TIP: read it from `git log --oneline -1 main`, not from a sha written here. A commit cannot state its own sha, which
+has now caught three entries.
 STILL OPEN, carried forward: `feature/enemy-pinna2` (entry #14, SMS 147 and 148, the Bullet Bill and the ground Electrokoopa) and
 `feature/select-stages` (entry #11, SMS 135) are both pushed and waiting on Jaysonn's playtest, and `feature/select-stages` holds
 the only copy of #11's text. The exit-time C# finalize crash from #10's batch has still not recurred, now across the 151-153n
