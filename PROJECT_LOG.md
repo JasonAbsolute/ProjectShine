@@ -11026,3 +11026,73 @@ SmsRoulette.PondPressT, SunshineCamera.DemoRate. Files: `assets/Sms/Enemy/BossTe
 patch_camera153n.py, patch_mario153n.py, patch_drive153n.py, patch_drive153n2.py, patch_drive153n3.py (the fan's peppers set aside on the ring:
 a steep lob through his tongue cylinder had made him spicy early in runs ak / ap), fix_braces153n.py, patch_dbg153n.py (the probe, not shipped),
 patch_smoke153.py (74 checks), cap/as/*.
+
+### 154 -- SOUND, the first pass: Mario and FLUDD from the game's own banks, fired as the game fires them (feature/sounds, code `57ec923`)
+
+**Jaysonn (2026-11-03):** "lets finally take care of starting some sound effects" -- "Mario and FLUDD first (jumps, landings, voice, the spray
+and hover)". The project had no audio at all (57 empty sound slots on the species).
+
+**The source.** No AudioRes was on the PC; the disc image on E: (`super_mario_sunshine.iso` -- the header reads Super Mario Solarshine 0.7b9a,
+GMSE05, a mod build; its AudioRes has vanilla's layout and names) gave it through DolphinTool (`extract -s /AudioRes`): 24 `.aw` wave banks
+(1680 waves, GameCube AFC ADPCM), `msound.aaf` (the init blob: the SOUND TABLE of JAISoundInfo per id, 13 IBNK instrument banks -- bank number =
+list index, the third word its wave bank --, 3 WSYS wave tables with WINF / WBCT / C-DF ids, BARC), `mSound.asn` (1704 names; 32-byte records
+of name then id, the file starting 16 bytes in -- matches the decomp's SoundEffects.hpp), `sequence.arc` (se.scom first: the SE SEQUENCE).
+
+**How a Sunshine sound effect plays.** JAIBasic::startSeSequence runs se.scom; its root opens two pools of slot tracks, 27 in all = the
+categories' maxPlaying (2 POMP, 3 MARIO, 5 ENEMY, 5 OBJECT, 2 SYSTEM, 3 ENVIRONMENT, 3 WATER, 1 MARIO_VO, 3 NPC); the slots of a category share a
+handler. JAIGFrameSe writes a slot's ports (4 = the SE index within its category, 3 the distance wait, 6 the fx line, 0 = go -> interrupt 3); the
+handler polls port 0, calls a table by the index (0xC4 with the register-table flags) and opens child tracks, one per layer, each setting
+bank:program (register 6 through the 0x20 / 0x21 writes) and playing a note (key, velocity, duration); the voices' handlers read the SE index
+from a child port (ChildWritePort) and play key = index - 48 on a drum set. `sms_audio.py` ports JASSeqParser / JASTrack / JASSeqCtrl (the 0x80
+waits, 0x90 timed params, 0xA0 register ops, 0xB0 register-argument commands, 0xC0.. with the Arglist, call / jump tables, loops, ports,
+interrupts) and runs each id to its notes; TBasicInst::getParam / TDrumSet::getParam pick the wave (key region, velocity region, the vmap's
+wave id); the WSYS answers the id with the .aw and the wave's entry; the AFC decoder (16 coefficient pairs, 9-byte frames) gives the samples.
+The baker mixes the layers at the sequence's clock (tempo 120, timebase 48: 96 ticks a second) with the pitch (2^((key - base key) / 12) x the
+instrument's x the SE's), velocity / 127 x the instrument's volume, the wave looping under a long note; a SE whose notes keep coming (the hover:
+four layers re-fired every 40 / 60 ticks; the spray; the slide) is rendered to its steady period (120 or 127 ticks) with a loop region in a
+`smpl` chunk; a held single looping wave loops its own region; an irregular held pattern is cut at 6 s. 310 WAVs (19 MB) under
+assets/Sms/Sound/Mario/, named by their MSD_SE ids: every sound Mario's animation tables name, the voices and effects his code fires, all of FLUDD's.
+
+**The animation tables.** mario.szs's `mario/bas/*.bas` (123 clips, 381 entries): JAIAnimeFrameSoundData {id, start frame, end frame, pitch,
+flags, volume...}; TMario::animSound -> MAnmSound::animeLoop fires each as the bck frame crosses it (category 0, FLUDD's clanks, skipped without
+FLUDD; category 7 to the voice channel; the footsteps' id + the floor's material = the WALK_* variant). The bck frames run at 60 a second (ma_run1
+60 frames, ma_laend 30, ma_wait 180); the port's clips are frames / 60 s less 1/24 (a dropped last key), so frame = position x 60.
+`SmsMarioSoundTable.cs` is generated from the bas dump; `SmsMarioSound` reads the AnimationTree's state (ma_runblend by its mix: run1 under 0.5),
+or the AnimationPlayer when the tree is off, and fires the entries the frame crossed (a new clip starts at its frame; a wrap fires the tail then
+the head).
+
+**The state sounds** (MarioSound.cpp soundMovement; MarioMove.cpp 440-660; MSound::startMarioVoice 855+): JUMP -> MV21_JUMP_SMALL (the five
+takes; 30% MA_VO_JUMP_SMALL), SECOND_JUMP / WALL_JUMP / BROAD -> MV22_JUMP_MID (70% MA_VO_JUMP_MID), ULTRA / BACK / U_TURN / ROTATE -> MV23_JUMP_LARGE
+(50% MA_VO_JUMP_BIG), ROCKET -> MV24_JUMP_SPECIAL (50% MA_VO_JUMP_SPECIAL; turbo MV15_EXERT_INST, hover MV21), below 3 HP the MV41_JUMP_T set;
+HANGING MV15_EXERT_INST_02 (MV34_ACTION_T_02 tired), JUMP_CATCH MV13; the landing's stopVoice (soundMovement case 1, unless a trample);
+HIP_DROP -> HIP_ATTACK (bank 5's two layers); the wall down's WALL_COL_HEAD + MV03_DAMAGE_LITLE (25% MA_VO_DAMAGE_SMALL); hurt MV02; dead MV08A
+(15% MA_VO_DEAD); SLIP looping in the slip state; FALL_IN_WATER_SLW / DEP (vy under -12 m/s) and JUMP_FR_WATER_SLW.
+
+**FLUDD** (TWaterGun::emit 1795-1830, TNozzleTrigger 525-580, soundMovement 332-360, changeNozzle 1860-1875): Spray -> PO_NORMAL_NOZZLE_IMI (the
+nozzle's hiss, startSoundActorWithInfo with unk374) AND PO_WATER_HI (the water, with unk378 -- here its volume from 0.35 to 1 with the strength);
+Turbo -> WATER_HI; Hover -> PO_HOVER while it emits; the trigger nozzles: SY_NEWP_AIR_TAME while R builds the charge (INACTIVE), the nozzle's
+sound at the launch (ROCKET_TRIGGER; the turbo's LAUNCH_TRIGGER as the dash starts); R with no water -> ACTION_ON_EMPTY; the refill -> SUCK_WATER_B
+while the tank takes water; the nozzle change -> SY_SELECT_POMP / _BACK as it starts; the house progress 0 -> HAND_OFF, 18 -> 19 NOZZLE_OFF (spray),
+49 -> 50 DOWN_OFF. `Mario.SmsFluddSound` is the read-only probe (nozzle, emitting, R, water, strength, trigger state, dash, swap, house).
+
+**The node.** `assets/Sms/Sound/SmsMarioSound.cs` + `.tscn`, the Player's `SmsSound` child: one voice AudioStreamPlayer3D (the game's single Mario
+voice), a pool of six for effects, one per loop; the sound table's volume (0..127) applied per sound; the WAVs loaded by name from SoundDir.
+
+**Drive 154** (`SmsMarioSound.Drive.cs`, a partial on the node behind SMS_SFX_SMOKE=1, shipped for the runs only): a stage of its own 150 m over
+the casino room (the level's spawn sits in King Boo's room: his nodes freed by C# type -- FindChildren's type filter needs a registered class
+name --, then a 80 m floor and Mario set on it); the run (26 steps and 15 clanks in 2.5 s off ma_run1 / ma_run2), the jump's voice, the landing's
+cut (28 ticks, nothing playing), the hip drop's thud, the spray's two loops on and off, the nozzle swap, the hover's loop on and off. Runs a..h:
+a / b the stage on the lifted disc (ran into the dome, sstep at 0.9 m/s), d / e the floor missed him (the boss still carried him: not freed), g / h
+10 / 10 (h with the run mix read from SMS_RUN_MIX_PATH: ma_run2 at the sprint). Builds 154a..j, the last 0 errors without the drive file.
+
+**Deviations (logged):** FloorMaterial as one knob (the game reads the floor's sound material; the port's floors carry none -- the hook is
+`Footstep()`); no random pitch width (sw_bit 0x20000) and no distance curves; the baked layers at the sequence's first-cycle values (the random
+command reads 0; the numbered takes are their own files and the node picks); the spray's strength as a volume ramp (the game's info value runs the
+SE's own parameters). Not in this pass: the other species' slots (Sirena's, Ricco's... the port's 57), the music streams (Streams/Music/*.adp),
+the level's object sounds, Yoshi.
+
+**Knobs:** SmsSound -- Sounds: SoundOn, MasterDb, VoiceDb, StepDb, FluddDb, MaxDistance, DebugPrint; Pieces: AnimSounds, JumpVoices, LandingCutsVoice,
+ActionSounds, FluddSounds, FluddPackClanks; Deviations: FloorMaterial, VoiceVariantChance, TiredVoices; Files: SoundDir. Files: assets/Sms/Sound/
+(SmsMarioSound.cs, SmsMarioSound.tscn, SmsMarioSoundTable.cs, Mario/*.wav + .import), assets/Mario.cs (SmsFluddSound), assets/Player.tscn (the
+child). Tooling (tools/projectshine/sound154/): sms_audio.py (names / resolve / log / bake / bake-list), bas_dump.py, make_list154.py, gen_table154.py,
+patch_mario154.py, patch_player154.py, the decomp sources under decomp/, AudioRes/ and bas/ and bck/ copies, out154/ (the bake + sms_sfx.json).

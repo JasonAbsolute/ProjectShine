@@ -1113,3 +1113,30 @@ STILL OPEN, carried forward: `feature/enemy-pinna2` (entry #14, SMS 147 and 148,
 `feature/select-stages` (entry #11, SMS 135) are both pushed and waiting on Jaysonn's playtest, and `feature/select-stages` holds
 the only copy of #11's text. The exit-time C# finalize crash from #10's batch has still not recurred, now across the 151-153n
 passes as well.
+
+### #17 -- PENDING -- queued 2026-11-03 02:42 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 154)
+Push the twelfth feature branch: `feature/sounds`, branched from `main` `90efb17` (the trunk after PR #14, Sirena Beach's ghosts). The SOUND
+branch -- the project had no audio at all. SMS 154: Mario's and FLUDD's sound effects from the game's own banks, fired the way the game fires them:
+the footsteps and the pack's clanks off his animation tables (mario.szs's bas files), the jump voices by jump kind with the game's odds of the
+grunts and the tired set, the landing cutting the voice, the hip drop, the wall hits, the damage cries, the slide, the water; the spray's two loops
+(volume with the pressure), the hover's loop, the rocket's charge and launch, the turbo's launch, the empty tank, the refill, the nozzle swap, the
+pack's deploy clicks. The waves are baked from the disc image's AudioRes by tools/projectshine/sound154/sms_audio.py (a port of the game's SE
+sequence player: one WAV per MSD_SE id, 310 under assets/Sms/Sound/Mario/, loops carried in smpl chunks). NOT yet playtested by Jaysonn: push the
+branch so it is on GitHub; do NOT open a PR until he says the sound work is done (more passes follow on this branch: the species' slots, the music).
+- Branch `feature/sounds` -- code tip `57ec923` ("SMS 154: SOUND -- Mario's and FLUDD's sound effects ...", assets/Sms/Sound/ new: SmsMarioSound.cs,
+  SmsMarioSound.tscn, SmsMarioSoundTable.cs, Mario/ 310 .wav + 310 .wav.import; assets/Mario.cs the SmsFluddSound probe; assets/Player.tscn the
+  SmsSound child) on `main` `90efb17`; the branch tip is this file's own commit on top of it; 2 commits since `main`. The 310 WAVs are 19 MB in
+  all (the biggest 0.4 MB); nothing near the 100 MB limit. The range carries none of Jaysonn's live edits (assets/Level.tscn and the rest).
+- To try 154: play. Run: his steps and FLUDD's pack clanking; jump: the small grunt, the double jump's "woo", the triple's "yahoo", the back / side
+  flip's big one, the spin jump's -- and the landing cuts them off, as the game does; hip drop: the thud; run into a wall: the hit and the cry; R:
+  the spray's water and the nozzle's hiss (quieter at a light press); the hover's loop in the air; X: the nozzle swap's chime; the rocket: the
+  charge's hiss then the launch. Knobs on the Player's SmsSound child: the volumes (Master / Voice / Step / Fludd dB), the pieces (AnimSounds,
+  JumpVoices, LandingCutsVoice, ActionSounds, FluddSounds, FluddPackClanks), FloorMaterial (Stone by default: the game reads it off the floor,
+  the port's floors have no material yet), VoiceVariantChance, TiredVoices, DebugPrint (every play in the output).
+```
+git push -u origin feature/sounds
+git rev-list --count origin/feature/sounds..feature/sounds
+```
+Expect `0` from the rev-list. No PR, no merge. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
+`assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
+`addons/godot_ai` churn: his, leave them.
