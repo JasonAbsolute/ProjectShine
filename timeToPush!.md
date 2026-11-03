@@ -918,15 +918,16 @@ is pushed and waiting on Jaysonn's playtest, and it is now the branch that merge
 `feature/select-stages` (entry #11, SMS 135) is likewise pushed and waiting on a playtest, and holds the only copy of #11's
 text. The exit-time C# finalize crash from #10's batch has still not recurred.
 
-### #16 -- PENDING -- queued 2026-11-01 10:38 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 151-153 + 153b..n), updated 2026-11-03 00:08 PST
+### #16 -- PENDING -- queued 2026-11-01 10:38 PST (Kiro) -- PUSH + PR (SMS 151-153 + 153b..n), PLAYTESTED BY JAYSONN 2026-11-03, updated 2026-11-03 00:16 PST
 Push the eleventh feature branch: `feature/enemy-sirena`, branched from `main` `c082a22` (the trunk after PR #13, the Chain Chomps). Sirena Beach's
 family -- Hotel Delfino's ghosts -- one pass each on this branch. SMS 151: the Boo (TTelesa), the hotel's ghost -- it drifts between its graph's nodes
 a little off the floor, bobbing and tilting, fading in and out (the LOOP kind), and hurts you on touch; your jump passes straight through it until you
 HOSE it: a spray knocks it back, shows it and stuns it, sunk to the floor and solid, and NOW a jump pops it (the down clip, coins). The PINK box Boo
 (Kind = Box) is always visible and a spray turns it into a pink Boo BLOCK you stand on for 25 s before the Boo comes back out; a jump on a box Boo only
 makes it flinch -- assets/Sms/Enemy/Telesa.tscn + SmsTelesa.cs, the block, the shader and six materials under assets/Sms/Enemy/Telesa/, the two
-models under models/Eniemes/Telesa/. NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says the family is
-done (Kiro will replace this entry with the PR entry then). SMS 152: the Sleepy Boo (TDebuTelesa), the hotel's huge Boo asleep across a doorway -- it snores, hurts and shoves you on touch, and nothing of Mario's moves it; in the game only Yoshi eats it, so here (BeatenBy, a knob, on by default) the hose wakes it and a ground pound on the woken one beats it -- assets/Sms/Enemy/DebuTelesa.tscn + SmsDebuTelesa.cs, two materials under Telesa/, the model under models/Eniemes/Telesa/. Further passes re-point this entry's tip.
+models under models/Eniemes/Telesa/. PLAYTESTED BY JAYSONN 2026-11-03 ("nice played thru the fight. lets pr it"): push the branch AND open its PR -- the
+family is done (the sounds come as their own pass on a later branch). ONE merge path only: this is a PR, so do NOT also merge it into
+local `main` (Kiro has not). It can be merged once it is open (squash or merge commit, his call; `main` then needs a `git pull` here). SMS 152: the Sleepy Boo (TDebuTelesa), the hotel's huge Boo asleep across a doorway -- it snores, hurts and shoves you on touch, and nothing of Mario's moves it; in the game only Yoshi eats it, so here (BeatenBy, a knob, on by default) the hose wakes it and a ground pound on the woken one beats it -- assets/Sms/Enemy/DebuTelesa.tscn + SmsDebuTelesa.cs, two materials under Telesa/, the model under models/Eniemes/Telesa/. Further passes re-point this entry's tip.
 - Branch `feature/enemy-sirena` -- code tip `28674e1` ("SMS 153n: King Boo's intro -- Mario rides the centre disc's switch pad ...",
   SmsRoulette.cs, SmsBossTelesa.cs, SunshineCamera.cs, Mario.cs) on `877791a` ("SMS 153m: King Boo faces the camera ...") on `main` `c082a22`;
   the branch tip is this file's own commit on top of them; 32 commits since `main`. The range carries none of Jaysonn's nine live edits (nor
@@ -996,10 +997,60 @@ done (Kiro will replace this entry with the PR entry then). SMS 152: the Sleepy 
   ride down for 11 s (IntroSpeed 1.5 on King Boo: 1 = the game's 17 s, 2 = 8 s -- the fall, the camera sweep and the slot's drop all follow);
   the moment the disc lands the dome sinks into its bowl (PondPressTicks on Roulette00: the second it takes; IntroPondPress off on King Boo
   = the bowl from the start) and you are in control.
+- PR: title "Feature: Sirena Beach's ghosts -- the Boo, the Sleepy Boo and King Boo's casino fight (SMS passes 151-153n)"; base `main`;
+  head `feature/enemy-sirena`; body (extract it to `pr151.md` at the project root for `--body-file`, untracked, delete it after):
+  > Sirena Beach's enemy family, one pass per species on `feature/enemy-sirena` off `main` `c082a22`, each pass read off the decompiled game
+  > (TTelesa / TDebuTelesa / TBossTelesa) and logged in `PROJECT_LOG.md` (entries 151, 152, 153, 153b-153n).
+  >
+  > **SMS 151 -- the Boo (TTelesa).** Hotel Delfino's ghost: drifts between its graph's nodes a little off the floor, bobbing and tilting, fading
+  > in and out (the LOOP kind), hurts on touch; a jump passes through it until it is HOSED -- knocked back, shown, stunned on the floor and
+  > solid, and then a jump pops it (coins). The PINK box Boo (Kind = Box) is always visible and a spray turns it into a pink block you stand on
+  > for 25 s. Kinds: Loop, Box, Normal, CanSee. `assets/Sms/Enemy/Telesa.tscn` + `SmsTelesa.cs`, the block, shader and materials under
+  > `assets/Sms/Enemy/Telesa/`, the models under `models/Eniemes/Telesa/`.
+  >
+  > **SMS 152 -- the Sleepy Boo (TDebuTelesa).** The huge Boo asleep across a doorway: snores, hurts and shoves on touch, nothing of Mario's
+  > moves it. The game lets only Yoshi eat it; here `BeatenBy` (a knob, on by default) lets the hose wake it (AwakeSeconds) and a ground pound
+  > on the woken one beat it. `assets/Sms/Enemy/DebuTelesa.tscn` + `SmsDebuTelesa.cs`.
+  >
+  > **SMS 153 -- King Boo (TBossTelesa), Casino Delfino's boss.** The roulette table (three discs with ground-pound switches), the slot machine
+  > under him, the fruit / coin / enemy / jackpot rounds, the fan of fruit and two red peppers, a pepper in his mouth making him spicy and
+  > solid, a fruit on him then taking one of three hit points, his Boo attackers, the Shine. `assets/Sms/Enemy/BossTelesa.tscn` +
+  > `SmsBossTelesa.cs`, the slot / discs / arena / room / camera path / materials / effects under `assets/Sms/Enemy/BossTelesa/`, the models
+  > under `models/Eniemes/BossTelesa/`. The polish passes after Jaysonn's playtests:
+  > 153b the bmd's materials, every ms_btls effect, the hints, the rumble, BossMusic; 153c solid by default with a live GhostOpacity, depth-writing
+  > shaders, the slot sinking into the table, drool strands, the gold ring pressed into a bowl; 153d-153e the bowl drawn, the drool facing the
+  > camera, DroolOn, the seat over a lower slot, the crown's inside; 153f-153j hands emptied with a swallowed fruit, the damage flash, the spicy
+  > fire from the game's own particles, the slot bolted to his clips, jumpable Boo attackers flying out of his mouth at Mario; 153k the ROOM
+  > (the casino boss room's wall and ceiling from the game's files: `KingBooWall.tscn`, the arena's BossWall child); 153l the INTRO (Mario taken
+  > onto the raised centre disc and lowered under the game's btelesa_roll_camera.bck, the slot's unseen fall) and the room's FIXED camera (the
+  > game's camera cube: `SunshineCamera` learns the bck demo camera and the DefiniteD2 kind, `SmsCameraArea` an Eye marker); 153m King Boo
+  > facing the camera, Mario in control from the landing, the intro camera where the bck puts it; 153n Mario riding the switch pad (the game's
+  > taking matrix), the gold dome standing through the ride and sinking into its bowl as the fight begins, `IntroSpeed` pacing the intro
+  > (1.5 = 11 s; 1 = the game's 16.7 s).
+  >
+  > **To try:** drop `assets/Sms/Enemy/Telesa.tscn` (with a Graph of Node3D children, or it roams), `assets/Sms/Enemy/DebuTelesa.tscn` in a
+  > doorway, `assets/Sms/Enemy/BossTelesa/KingBooArena.tscn` where the table should stand (the room comes with it). Walk into the room: the
+  > intro ride, then HOSE HIS TONGUE for a slot round; a pepper in his mouth, then a fruit on his body. The knobs are grouped and noted on each
+  > scene (The fight, What he spits, Deviations, Looks, Effects, Camera, Sounds).
+  >
+  > **Drives:** every pass's headless drive green before its commit (the King Boo drive 153 at 74 / 74 checks for 153n, with captures through the
+  > game camera); the numbers per pass are in PROJECT_LOG.md.
+  >
+  > **Not ported / deviations (logged):** Yoshi eating the Sleepy Boo (BeatenBy stands in); the sounds (slots on every species, nothing wired --
+  > the sound pass follows on its own branch); the game's fixed intro pace (IntroSpeed 1 restores it); King Boo solid by default (GhostOpacity
+  > 0.588 = the game's ghost); the Boo attackers' homing curve and spawn point (knobs, off = the game's); the pressed bowl as a mesh rebuild.
+  > Also in the range: `Mario.cs` (SmsHP getter, SmsHeldGone, SmsCarryTo), `SmsSmallEnemy.cs` (the spawn yaw off the node's axis -- every enemy),
+  > `SmsGoopStrand.cs` (FollowAnchor / FaceCamera), `SmsCameraShake.cs`, `Player.tscn` (three opaque materials). Jaysonn's live edits
+  > (`assets/Level.tscn` and the rest) are not in it.
 ```
 git push -u origin feature/enemy-sirena
 git rev-list --count origin/feature/enemy-sirena..feature/enemy-sirena
+gh auth status
+gh pr create --base main --head feature/enemy-sirena --title "Feature: Sirena Beach's ghosts -- the Boo, the Sleepy Boo and King Boo's casino fight (SMS passes 151-153n)" --body-file pr151.md
 ```
-Expect `0` from the rev-list. No PR, no merge. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
-`assets/Sms/SmsHiddenCoin.cs`, the three gatekeeper / launcher `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
-`addons/godot_ai` churn: his, leave them.
+Expect `0` from the rev-list. KEEP THE #6 ORDER: push the branch -> write the result paragraph below, commit it and push -> only THEN open the PR
+(`gh pr create` if `gh auth status` is logged in, else the prefilled compare URL with the title, and the body from `pr151.md` -- over ~8000
+characters of URL prefill the title and clipboard the body, as #8 learned). ONE merge only: this is a PR, so do NOT also `git merge` it into local
+`main`. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the three
+gatekeeper / launcher `.tres` re-saves, the four BossTelesa `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
+`addons/godot_ai` churn: his, leave them (none of them belong in this PR).
