@@ -185,12 +185,13 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     /// <summary>The intro's hide clip on the first appearance too (the game: he is hidden by the FallDemo; the first HideWait runs its full wait).</summary>
     [Export] public bool StartHidden = true;
     /// <summary>The game's FallDemo (TNerveBossTelesaFallDemo): the centre disc starts IntroLiftUnits over the table (scene.bin places rulet00 2000 u over the
-    /// other two) and sinks IntroFallSpeed u a tick with Mario on it -- the boss TAKES him (HIT_MESSAGE_TAKE: he is carried, no controls) and lets go
-    /// 3 u before the bottom (RLT_SET) -- while the intro camera plays (btelesa_roll_camera.bck, 16.6 s: from 12 m over the table at the +z side,
-    /// looking up at the pedestal, rising and circling to the -z wall looking down); level, the demo is over and Mario is IN CONTROL (rouletteFall's
-    /// onNeutralMarioKey stops with the fall; the room's fixed camera takes the view) while the slot machine falls to its place UNSEEN (its scale is 0
-    /// until the appear), the discs start turning as it passes (rouletteStart) and the fight begins with HideWait. Off: the fight starts with him hidden
-    /// and the table flat.</summary>
+    /// other two) and sinks 1 u a tick (x IntroSpeed) with Mario on it -- the boss TAKES him (HIT_MESSAGE_TAKE: he is carried, no controls) onto the disc's
+    /// SWITCH PAD (getTakingMtx: rulet00's joint 1, switch_00, at the disc's y - 120; 153n) and lets go 3 u before the bottom (RLT_SET) -- while the intro
+    /// camera plays (btelesa_roll_camera.bck, 16.6 s: from 12 m over the table at the +z side, looking up at the pedestal, rising and circling to the -z
+    /// wall looking down) and the gold dome stands (rulet00.bck restarted every falling tick: held at its first frame); level, the demo is over, Mario is
+    /// IN CONTROL (rouletteFall's onNeutralMarioKey stops with the fall; the room's fixed camera takes the view), the dome sinks into its bowl over the
+    /// next second (the clip plays out) while the slot machine falls to its place UNSEEN (its scale is 0 until the appear), the discs start turning as
+    /// it passes (rouletteStart) and the fight begins with HideWait. Off: the fight starts with him hidden and the table flat.</summary>
     [Export] public bool IntroRide = false;
     /// <summary>When the ride starts (153l). WhenMarioEntersRoom: the disc waits raised until Mario is within IntroTriggerRadiusUnits of the table's centre
     /// (over the table), then he is TAKEN onto it as the game's boss takes him; WhenMarioLandsOnDisc: when he stands on the raised disc himself;
@@ -202,8 +203,12 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     /// <summary>How high the centre disc starts for the intro ride, units (2000: scene.bin's rulet00 at y 2000 over the others' 0, all three then lifted 500 by
     /// TRoulette::initMapObj).</summary>
     [Export(PropertyHint.Range, "100,3000,10")] public float IntroLiftUnits = 2000f;
-    /// <summary>The disc's fall, units a tick (rouletteFall: 1 -- 2000 u in 16.7 s, the intro camera's length).</summary>
-    [Export(PropertyHint.Range, "0.25,8,0.25")] public float IntroFallSpeed = 1f;
+    /// <summary>153n, the intro's pace: x the game's -- the disc's fall (rouletteFall: 1 u a tick, 2000 u in 16.7 s), the camera's sweep (the bck at 30 frames
+    /// a second: the same 16.7 s) and the slot's unseen drop, all together. 1 = the game's; 1.5 (Jaysonn: "a bit slow") = 11 s; 2 = 8 s.</summary>
+    [Export(PropertyHint.Range, "0.25,4,0.05")] public float IntroSpeed = 1.5f;
+    /// <summary>153n: the gold dome UP through the ride and pressed into its bowl over PondPressTicks (the disc's knob, ~1 s: rulet00.bck) from the landing, as the
+    /// game plays the clip. Off: the bowl from the start (153c's table).</summary>
+    [Export] public bool IntroPondPress = true;
     /// <summary>The intro camera (fireStartDemoCamera("btelesa_roll_camera") at TBossTelesa::init): IntroCameraPath played on the game camera through the fall,
     /// in the table's frame. Off: the room's own camera watches the ride.</summary>
     [Export] public bool IntroCamera = true;
@@ -335,7 +340,8 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     private bool _hintFirstFruit, _hintFirstHit;                 // unk35A / unk35B: the once-only balloons still to show
     private int _intro;                                          // the FallDemo: 0 none / done, 10 armed (the disc raised, waiting for Mario), 1 the disc sinking, 2 the slot falling
     private float _introSlotY;                                   // the falling slot's height, units over the table's centre
-    private bool _introHold; private Vector3 _introHoldOffset;   // 153l: Mario TAKEN -- carried at this offset from the sinking disc's origin until the DETACH
+    private bool _introHold;                                     // 153l: Mario TAKEN -- carried on the sinking disc's switch pad (153n) until the DETACH
+    private int _pondPressTick = -1;                             // 153n: the dome's press after the landing (-1 none / done)
     private bool _introLiftPending;                              // the armed ride's lift still to do (on the first physics tick)
     private float _introDiscY;                                   // the centre disc's INTENDED height (global metres): a sync-to-physics body puts a written transform back until its body has moved, so it cannot be read back within the frame
     private int _introTicks;                                     // ticks since the ride began (for the drives)
@@ -528,7 +534,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         if (Slot != null) { Slot.Visible = false; Slot.ForcedResult = ForcedResultValue(); }
         ApplyAlpha(true); ApplyTint(); ApplyMask(); ApplyEye(0);
         if (IsInsideTree()) { _floorY = GroundYMap(); SetY(_floorY + PositionOverFloor); }
-        _intro = 0; _introHold = false; _introLiftPending = false; _introTicks = 0; _camOffY = 0f;
+        _intro = 0; _introHold = false; _introLiftPending = false; _introTicks = 0; _camOffY = 0f; _pondPressTick = -1;
         if (IntroRide && IsInsideTree()) CallDeferred(nameof(IntroArm));
         ApplyLook();
     }
@@ -549,11 +555,21 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         _introLiftPending = false;
         _introDiscY = disc.GlobalPosition.Y + IntroLiftUnits / U;
         disc.GlobalPosition = DiscPos(disc);
+        if (IntroPondPress) disc.PondPress(0f);                  // the dome up: rulet00.bck held at its first frame through the ride
         if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: the intro ride: {disc.Name} lifted {IntroLiftUnits:F0} u to {DiscPos(disc)} (its parent at {(disc.GetParent() as Node3D)?.GlobalPosition})");
         if (IntroStart == IntroStarts.AtOnce) IntroBegin(disc, false);
     }
     /// <summary>The centre disc's place as intended this tick (its node reads a frame behind: AnimatableBody3D's sync-to-physics write-back).</summary>
     private Vector3 DiscPos(SmsRoulette disc) => new Vector3(disc.GlobalPosition.X, _introDiscY, disc.GlobalPosition.Z);
+    /// <summary>Where the held Mario rides: the game's taking matrix is rulet00's joint 1 (switch_00: the SWITCH PAD, 920 u from the centre) with y = the disc's
+    /// position - 120 (the pad's top is at -130: 10 u over it; here ON the pad's top). The XZ off the node's switch point (it turns with the disc), the Y
+    /// off the intended height.</summary>
+    private Vector3 HoldPoint(SmsRoulette disc)
+    {
+        Vector3 sw = disc.SwitchPoint;
+        float padTopOverOrigin = (sw.Y - disc.GlobalPosition.Y) + 10f / U;
+        return new Vector3(sw.X, _introDiscY + padTopOverOrigin, sw.Z);
+    }
     /// <summary>TNerveBossTelesaFallDemo's first tick: HIDDEN, Mario TAKEN (SMS_SendMessageToMario(HIT_MESSAGE_TAKE): the boss carries him -- here onto the raised
     /// disc's centre when the room's edge started the ride, or held where he stands on it), the clips frozen, the slot's scale 0; and the game's init-time
     /// fireStartDemoCamera("btelesa_roll_camera"): the intro camera from here, in the table's frame (the discs' origins = the stage's y 500).</summary>
@@ -563,20 +579,16 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         if (_mario != null && IsInstanceValid(_mario))
         {
             _mario.CameraLocked = true;
-            if (take)
-            {
-                // the TAKE: onto the disc's centre, its pressed pond's bottom (PondYUnits under the disc's origin), facing the way he came
-                _introHoldOffset = new Vector3(0f, disc.PondIsBowl ? disc.PondYUnits / U : (disc.FaceYUnits / U - disc.GlobalPosition.Y), 0f);   // the offsets read off the node are the disc's own shape: a frame's lag is nothing
-            }
-            else _introHoldOffset = _mario.GlobalPosition - DiscPos(disc);
-            _mario.SmsCarryTo(DiscPos(disc) + _introHoldOffset);   // the TAKE: off whatever deck he rode (SmsRideApply would put him back on it)
+            // the TAKE (the game's, whichever start): onto the disc's switch pad, facing the table's centre; off whatever deck he rode (SmsRideApply would put him back on it)
+            Vector3 hold = HoldPoint(disc);
+            _mario.SmsCarryTo(hold, DiscPos(disc) - hold);
             _introHold = true;
             var cam = _mario.SmsCamera;
             if (IntroCamera && cam != null && IntroCameraPath != null && IntroCameraPath.IsValid)
-                cam.StartDemoCamera(IntroCameraPath, StageFrame());
+                cam.StartDemoCamera(IntroCameraPath, StageFrame(), IntroSpeed);
             else if (IntroCamera && DebugPrint) GD.Print($"[SMS btelesa] {Name}: no intro camera path / camera");
         }
-        if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: the intro ride begins: Mario {(take ? "taken onto" : "riding")} {disc.Name} at {DiscPos(disc)} ({(_roulettes[1] != null ? (_introDiscY - _roulettes[1].GlobalPosition.Y) * U : 0f):F0} u over the middle ring); {IntroLiftUnits / IntroFallSpeed / SmsUnits.TicksPerSecond:F1} s down; Mario at {_mario?.GlobalPosition}");
+        if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: the intro ride begins: Mario taken onto {disc.Name}'s switch pad at {_mario?.GlobalPosition} (the disc at {DiscPos(disc)}, {(_roulettes[1] != null ? (_introDiscY - _roulettes[1].GlobalPosition.Y) * U : 0f):F0} u over the middle ring); {IntroLiftUnits / IntroSpeed / SmsUnits.TicksPerSecond:F1} s down at x{IntroSpeed:F2}");
     }
     /// <summary>The stage's frame in the level: the stage's origin is 500 u under the discs' origins (TRoulette::initMapObj's lift), with the table's own
     /// bearing; the camera paths and the room's data are in it.</summary>
@@ -603,9 +615,9 @@ public partial class SmsBossTelesa : SmsSmallEnemy
             if (r < disc.RadiusUnits && _mario.IsOnFloor() && MathF.Abs(m.Y * U - disc.FaceYUnits) < 300f) IntroBegin(disc, false);
         }
     }
-    /// <summary>TNerveBossTelesaFallDemo, one tick: rouletteFall (the centre disc down IntroFallSpeed u a tick to the others' height, Mario carried on it until
-    /// 3 u from the bottom -- the DETACH, RLT_SET; V_LAUGH1B / RLT_DOWN), then slotFall (the machine, unseen, at 5 u a tick, 1 u the last 300; passing 200 u
-    /// over its place the discs start turning; home -> the fight).</summary>
+    /// <summary>TNerveBossTelesaFallDemo, one tick: rouletteFall (the centre disc down 1 u a tick x IntroSpeed to the others' height, Mario carried on its switch
+    /// pad until 3 u from the bottom -- the DETACH, RLT_SET; V_LAUGH1B / RLT_DOWN), then slotFall (the machine, unseen, at 5 u a tick, 1 u the last 300, x
+    /// IntroSpeed; passing 200 u over its place the discs start turning; home -> the fight) with the dome's press running from the landing (153n).</summary>
     private void IntroTick()
     {
         var disc = _roulettes[0]; var other = _roulettes[1] ?? _roulettes[2];
@@ -618,9 +630,9 @@ public partial class SmsBossTelesa : SmsSmallEnemy
             float left = (_introDiscY - target) * U;
             if (left > 0.5f)
             {
-                _introDiscY -= MathF.Min(IntroFallSpeed, left) / U;
+                _introDiscY -= MathF.Min(IntroSpeed, left) / U;
                 disc.GlobalPosition = DiscPos(disc);
-                if (_introHold && left > 3f && _mario != null && IsInstanceValid(_mario)) _mario.SmsCarryTo(DiscPos(disc) + _introHoldOffset);
+                if (_introHold && left > 3f && _mario != null && IsInstanceValid(_mario)) _mario.SmsCarryTo(HoldPoint(disc));
                 else if (_introHold) { _introHold = false; if (DisappearSound != null && DisappearSound.Stream != null) DisappearSound.Play(); }   // the DETACH 3 u up: MSD_SE_BS_TELESA_RLT_SET stands in
                 return;
             }
@@ -629,13 +641,22 @@ public partial class SmsBossTelesa : SmsSmallEnemy
             if (_introHold) { _introHold = false; if (DisappearSound != null && DisappearSound.Stream != null) DisappearSound.Play(); }
             _intro = 2; _introSlotY = TransYUnits - SlotUnderUnits + 1500f;
             if (Slot != null) Slot.Visible = IntroSlotShown;
+            if (IntroPondPress && disc.PondPressT < 1f) _pondPressTick = 0;   // the clip plays out from here: the dome sinks into the bowl
             IntroRelease();   // 153m: the landing ends the demo and frees him (the game: the bck ran the fall's length; slotFall holds nothing)
             return;
         }
+        if (_pondPressTick >= 0)
+        {
+            _pondPressTick++;
+            int n = Math.Max(1, disc.PondPressTicks);
+            disc.PondPress(Mathf.Min(1f, (float)_pondPressTick / n));
+            if (_pondPressTick >= n) _pondPressTick = -1;
+        }
         float home = TransYUnits - SlotUnderUnits;            // where calcRootMatrix hangs it (joint 0 - 700 in the game; SlotUnderUnits here, no hosei)
         float above = _introSlotY - home;
-        _introSlotY -= above > 300f ? 5f : 1f;
-        if (above <= 200f && above + 5f > 200f) RouletteStart();   // slotFall: the discs start as it passes
+        float step = (above > 300f ? 5f : 1f) * IntroSpeed;
+        _introSlotY -= step;
+        if (above <= 200f && above + step > 200f) RouletteStart();   // slotFall: the discs start as it passes
         if (Slot != null && IsInstanceValid(Slot))
         {
             Vector3 c = IsInsideTree() ? GlobalPosition : Vector3.Zero;
@@ -655,6 +676,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     private void IntroEnd()
     {
         _intro = 0; _introHold = false;
+        if (_pondPressTick >= 0) { _roulettes[0]?.PondPress(1f); _pondPressTick = -1; }
         IntroRelease();
         if (Slot != null) Slot.Visible = false;              // HideWait hides it until the appear
         _time = 0;                                           // HideWait's clock starts here

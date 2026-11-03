@@ -34,6 +34,11 @@ public partial class SmsRoulette : AnimatableBody3D
     [Export] public bool PondPressed = true;
     /// <summary>The IKE joint's Y scale the clip ends on (-0.897). -1 = the dome mirrored exactly; +1 = the dome.</summary>
     [Export(PropertyHint.Range, "-1.5,1.5,0.01")] public float PondScaleY = -0.8969f;
+    /// <summary>153n: the press as a motion -- rulet00.bck runs the IKE joint's Y scale from 1 (the dome) to -0.897 (the bowl) over ~1 s (the glb's 0.98 s).
+    /// King Boo's intro holds the clip at its first frame through the ride (TBossTelesa::rouletteFall calls setBck every falling tick, which restarts it)
+    /// and lets it play from the landing: the dome stands through the fall and sinks into the bowl in the second the fight begins. The ticks of that
+    /// second (PondPress(t) is driven by the boss).</summary>
+    [Export(PropertyHint.Range, "1,600,1")] public int PondPressTicks = 120;
     /// <summary>Spin it by hand (degrees a game tick) -- the boss sets this when he hides; a disc placed on its own may spin from the start.</summary>
     [Export(PropertyHint.Range, "-2,2,0.01")] public float InitialRollSpeed = 0f;
     [Export] public AudioStreamPlayer3D StopSound;
@@ -46,6 +51,9 @@ public partial class SmsRoulette : AnimatableBody3D
     private bool _stoppedByMario;
     private float _radiusU;
     private float _pondJointY; private bool _pondBowl;          // the IKE joint's rest height (mesh space) and whether the bowl is on
+    private float _pondScaleNow = 1f, _pondPressT;              // 153n: the IKE scale in force (1 the dome .. PondScaleY the bowl) and the press's 0..1
+    private float _pondTop, _pondScaleToBody; private Godot.Collections.Array _pondSrc; private Material _pondMat; private ArrayMesh _bowlMesh;   // the pond surface's source arrays and the bowl built from them
+    private readonly List<CollisionShape3D> _autoShapes = new(); private readonly List<MeshInstance3D> _autoMis = new();   // what AutoCollision built, to rebuild it
     private Vector3 _switchLocal; private bool _switchFromPad;    // the `_switch` pad's centre in this body's space (the bone's place otherwise)
     private Mario _mario; private Mario.MarioState _prevState = Mario.MarioState.idle; private bool _stateKnown;
     /// <summary>For the drives / the boss.</summary>
@@ -58,8 +66,10 @@ public partial class SmsRoulette : AnimatableBody3D
     /// <summary>The disc's walking face, units: the switch bone's height (switch_XX sits on the face).</summary>
     public float FaceYUnits => SwitchPoint.Y * U;
     public int SwitchStops { get; private set; }
-    /// <summary>The pond is the pressed bowl (the centre disc with PondPressed on).</summary>
-    public bool PondIsBowl => _pondBowl;
+    /// <summary>The pond is the pressed bowl (the centre disc with PondPressed on, and the press complete: 153n).</summary>
+    public bool PondIsBowl => _pondBowl && _pondPressT >= 1f;
+    /// <summary>153n: the press's progress, 0 the dome .. 1 the bowl (1 unless an intro has put the dome back up).</summary>
+    public float PondPressT => _pondPressT;
     /// <summary>The share of the bowl's triangles wound CLOCKWISE seen from above -- Godot's front face, so front-facing from above, where the bowl is looked at:
     /// 1 = the whole bowl shows; 0 = culled (153c's bug, a hole where the ring was).</summary>
     public float PondBowlUpFraction { get; private set; }
@@ -105,7 +115,7 @@ public partial class SmsRoulette : AnimatableBody3D
                         }
                     }
                 }
-                if (AutoCollision && !Engine.IsEditorHint()) BuildCollision(mi);
+                if (AutoCollision && !Engine.IsEditorHint()) { _autoMis.Add(mi); BuildCollision(mi); }
             }
         }
         _rollSp = InitialRollSpeed;
@@ -113,7 +123,7 @@ public partial class SmsRoulette : AnimatableBody3D
         if (DebugPrint) GD.Print($"[SMS roulette] {Name}: radius {_radiusU:F0} u, face {FaceYUnits:F0} u, switch bone {_switchBone}, speed {_rollSp}");
     }
     /// <summary>The pond's Y in mesh space under the pressed bowl: mirrored about the IKE joint's plane by PondScaleY (the clip's end pose).</summary>
-    private float PondY(float y) => _pondBowl ? _pondJointY + (y - _pondJointY) * PondScaleY : y;
+    private float PondY(float y) => _pondBowl ? _pondJointY + (y - _pondJointY) * _pondScaleNow : y;
     /// <summary>153c: the gold pond pressed down -- a copy of the `_ike` surface with its vertices mirrored about the IKE joint (the dome's base plane) and
     /// its normals turned to the inside (the bowl faces up and inward), on the pond's own material; the skinned dome itself discarded (an alpha-scissor
     /// override nothing passes). The WINDING IS KEPT (153d): a Y mirror leaves a face's turn as seen from above unchanged -- the dome's outside seen from
@@ -127,26 +137,41 @@ public partial class SmsRoulette : AnimatableBody3D
         foreach (var v in verts) { top = Mathf.Max(top, v.Y); bottom = Mathf.Min(bottom, v.Y); }
         float scaleToBody = (GlobalTransform.AffineInverse() * mi.GlobalTransform).Basis.Scale.Y;
         if (!_pondBowl) { PondYUnits = top * scaleToBody * U; return; }
-        PondYUnits = PondY(top) * scaleToBody * U;
+        _pondSrc = arrays; _pondMat = pondMat; _pondTop = top; _pondScaleToBody = scaleToBody;
+        _pondPressT = 1f; _pondScaleNow = PondScaleY;             // pressed from the start (the table as the game's stands); an intro puts the dome back up (PondPress(0))
+        _bowlMesh = new ArrayMesh();
+        RebuildBowl();
+        var bowlMi = new MeshInstance3D { Name = "PondBowl", Mesh = _bowlMesh, Transform = mi.Transform, CastShadow = mi.CastShadow };
+        mi.GetParent().AddChild(bowlMi);
+        var hide = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.AlphaScissor, AlphaScissorThreshold = 1.1f, AlbedoColor = new Color(1f, 1f, 1f, 0f) };
+        mi.SetSurfaceOverrideMaterial(s, hide);
+        if (DebugPrint) GD.Print($"[SMS roulette] {Name}: the pond pressed to a bowl {PondYUnits:F0} u deep at its centre (the dome top was {top * scaleToBody * U:F0})");
+    }
+    /// <summary>The bowl's surface from the pond's source arrays at the IKE scale in force: the vertices through PondY, the normals the inverse-transpose of the
+    /// (1, s, 1) scale turned to the side we look at (the bowl's inside faces up and inward), the winding kept (153d).</summary>
+    private void RebuildBowl()
+    {
+        if (_pondSrc == null || _bowlMesh == null) return;
+        Vector3[] verts = _pondSrc[(int)Mesh.ArrayType.Vertex].AsVector3Array();
         var outArrays = new Godot.Collections.Array(); outArrays.Resize((int)Mesh.ArrayType.Max);
         var pv = new Vector3[verts.Length];
         for (int i = 0; i < verts.Length; i++) pv[i] = new Vector3(verts[i].X, PondY(verts[i].Y), verts[i].Z);
         outArrays[(int)Mesh.ArrayType.Vertex] = pv;
-        var nv = arrays[(int)Mesh.ArrayType.Normal];
+        var nv = _pondSrc[(int)Mesh.ArrayType.Normal];
         if (nv.VariantType != Variant.Type.Nil)
         {
             Vector3[] nn = nv.AsVector3Array();
-            // the inverse-transpose of the (1, s, 1) scale, then turned to the side we look at (the bowl's inside faces up and inward)
+            float sc = Mathf.Abs(_pondScaleNow) < 1e-3f ? (_pondScaleNow < 0f ? -1e-3f : 1e-3f) : _pondScaleNow;
             for (int i = 0; i < nn.Length; i++)
             {
-                Vector3 n2 = new Vector3(nn[i].X, nn[i].Y / (Mathf.Abs(PondScaleY) < 1e-3f ? 1e-3f : PondScaleY), nn[i].Z);
-                if (PondScaleY < 0f) n2 = -n2;
+                Vector3 n2 = new Vector3(nn[i].X, nn[i].Y / sc, nn[i].Z);
+                if (_pondScaleNow < 0f) n2 = -n2;
                 nn[i] = n2.Normalized();
             }
             outArrays[(int)Mesh.ArrayType.Normal] = nn;
         }
-        var uv = arrays[(int)Mesh.ArrayType.TexUV]; if (uv.VariantType != Variant.Type.Nil) outArrays[(int)Mesh.ArrayType.TexUV] = uv;
-        var idx = arrays[(int)Mesh.ArrayType.Index];
+        var uv = _pondSrc[(int)Mesh.ArrayType.TexUV]; if (uv.VariantType != Variant.Type.Nil) outArrays[(int)Mesh.ArrayType.TexUV] = uv;
+        var idx = _pondSrc[(int)Mesh.ArrayType.Index];
         int up = 0, tris = 0;
         if (idx.VariantType != Variant.Type.Nil)
         {
@@ -155,13 +180,30 @@ public partial class SmsRoulette : AnimatableBody3D
             for (int t = 0; t + 2 < ii.Length; t += 3) { tris++; if ((pv[ii[t + 1]] - pv[ii[t]]).Cross(pv[ii[t + 2]] - pv[ii[t]]).Y < 0f) up++; }   // clockwise from above = Godot's front face, from above
         }
         PondBowlUpFraction = tris > 0 ? (float)up / tris : 0f;
-        var bowl = new ArrayMesh(); bowl.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, outArrays);
-        bowl.SurfaceSetMaterial(0, pondMat);
-        var bowlMi = new MeshInstance3D { Name = "PondBowl", Mesh = bowl, Transform = mi.Transform, CastShadow = mi.CastShadow };
-        mi.GetParent().AddChild(bowlMi);
-        var hide = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.AlphaScissor, AlphaScissorThreshold = 1.1f, AlbedoColor = new Color(1f, 1f, 1f, 0f) };
-        mi.SetSurfaceOverrideMaterial(s, hide);
-        if (DebugPrint) GD.Print($"[SMS roulette] {Name}: the pond pressed to a bowl {PondYUnits:F0} u deep at its centre (the dome top was {top * scaleToBody * U:F0})");
+        _bowlMesh.ClearSurfaces();
+        _bowlMesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, outArrays);
+        _bowlMesh.SurfaceSetMaterial(0, _pondMat);
+        PondYUnits = PondY(_pondTop) * _pondScaleToBody * U;
+    }
+    /// <summary>153n: the press's progress set from outside -- 0 the dome (rulet00.bck's first frame), 1 the bowl (its last). The bowl's surface follows at once;
+    /// the collision is rebuilt at the ends only (the dome's shape through the motion: Mario is on the switch pad then, 920 u out).</summary>
+    public void PondPress(float t)
+    {
+        if (!_pondBowl) return;
+        t = Mathf.Clamp(t, 0f, 1f);
+        bool endBefore = _pondPressT <= 0f || _pondPressT >= 1f, endAfter = t <= 0f || t >= 1f;
+        _pondPressT = t; _pondScaleNow = Mathf.Lerp(1f, PondScaleY, t);
+        RebuildBowl();
+        if (endAfter && (!endBefore || Mathf.Abs(_pondScaleNow - _collisionPondScale) > 1e-4f)) RebuildCollision();
+    }
+    private float _collisionPondScale = float.NaN;               // the IKE scale the collision was built at
+    /// <summary>AutoCollision's shapes again, at the pond scale in force.</summary>
+    private void RebuildCollision()
+    {
+        if (!AutoCollision || Engine.IsEditorHint() || !IsInsideTree()) return;
+        foreach (var cs in _autoShapes) { RemoveChild(cs); cs.QueueFree(); }
+        _autoShapes.Clear();
+        foreach (var mi in _autoMis) BuildCollision(mi);
     }
     /// <summary>One trimesh of the glb's surfaces (the pond `_ike` left out when PondSolid is off, pressed to the bowl when PondPressed is on), its vertices
     /// carried into this body's space (a CollisionShape3D cannot be scaled: the glb's 1 / 74.44 is baked into the triangles).</summary>
@@ -190,7 +232,8 @@ public partial class SmsRoulette : AnimatableBody3D
         if (am.GetSurfaceCount() == 0) return;
         var cs = new CollisionShape3D { Name = mi.Name + "Trimesh", Shape = am.CreateTrimeshShape() };
         AddChild(cs);
-        if (DebugPrint) GD.Print($"[SMS roulette] {Name}: trimesh of {am.GetSurfaceCount()} surfaces, {tris} triangles, aabb {am.GetAabb()}");
+        _autoShapes.Add(cs); _collisionPondScale = _pondScaleNow;
+        if (DebugPrint) GD.Print($"[SMS roulette] {Name}: trimesh of {am.GetSurfaceCount()} surfaces, {tris} triangles, aabb {am.GetAabb()} (pond scale {_pondScaleNow:F3})");
     }
     private Vector3 _lastOrigin; private bool _originKnown;
     /// <summary>A sync-to-physics body hears only its LOCAL transform (and reverts a local change until the physics tick applies it): carried by its parent

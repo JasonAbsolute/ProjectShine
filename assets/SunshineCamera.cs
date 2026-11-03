@@ -187,7 +187,8 @@ public partial class SunshineCamera : Node3D
     public float DefiniteAtOffsetY = 0f;
     private SmsCameraPath _demo;                         // unk2B0's bck (REPRODUCE_DEMO) while it plays
     private Transform3D _demoFrame = Transform3D.Identity; // the path's stage frame into the level: world = frame * (stageUnits / U)
-    private float _demoT;                                // seconds into the demo
+    private float _demoT;                                // seconds into the demo (the PATH's seconds: at a rate other than 1 they run faster or slower than the clock)
+    private float _demoRate = 1f;                        // 153n: x the bck's 30 frames a second (TCameraBck::setRate is empty in the game; King Boo's intro pace)
     private Vector3 _viewUp = Vector3.Up;                // mUp (the demo's; CLBConstUpVec otherwise)
     private float _viewFov = 50f, _viewNearU = 10f;      // mFovy / mNear as applied (the kind's, or the demo's)
 
@@ -712,15 +713,15 @@ public partial class SunshineCamera : Node3D
     /// <summary>startReproduceDemoCamera_ (CameraDemo.cpp 20): the bck starts, the mode is REPRODUCE_DEMO over 1 frame, the near clip
     /// ReproduceDemoNearClip. The path's samples are stage units in the stage's frame: world = frame * (units / U) -- for King Boo's room,
     /// the arena's transform less its TableLiftUnits. An open L camera and a Y swing are dropped (the game's changeCamModeSub_ out of them).</summary>
-    public void StartDemoCamera(SmsCameraPath path, Transform3D stageFrame)
+    public void StartDemoCamera(SmsCameraPath path, Transform3D stageFrame, float rate = 1f)
     {
         if (path == null || !path.IsValid) { GD.PushWarning("[SMS camera] StartDemoCamera: no path"); return; }
         DropLCamera();
         _flags &= ~(FlagFrontRotate | FlagFrontY | FlagFrontDone);
-        _demo = path; _demoFrame = stageFrame; _demoT = 0f;
+        _demo = path; _demoFrame = stageFrame; _demoT = 0f; _demoRate = MathF.Max(0.01f, rate);
         TickDemo(0f);
         if (_md.Debug)
-            GD.Print($"[SMS camera] the demo camera: {path.Frames} frames at {path.FrameRate:F0} a second ({path.Seconds:F1} s), the eye from {M(_viewPosU)} to {_demoFrame * (path.EyeUnits[path.Frames - 1] / SmsUnits.UnitsPerMetre)}");
+            GD.Print($"[SMS camera] the demo camera: {path.Frames} frames at {path.FrameRate:F0} a second x {_demoRate:F2} ({path.Seconds / _demoRate:F1} s), the eye from {M(_viewPosU)} to {_demoFrame * (path.EyeUnits[path.Frames - 1] / SmsUnits.UnitsPerMetre)}");
     }
 
     /// <summary>endReproduceDemoCamera_ (37): the bck ends, changeCamModeSpecifyFrame_(-1, 1) -- the camera resumes in the kind the next tick's
@@ -736,13 +737,15 @@ public partial class SunshineCamera : Node3D
     }
 
     public bool IsDemoCamera => _demo != null;
+    /// <summary>The demo's time along its PATH (the bck's seconds at 30 frames a second), -1 without one; DemoRate is the clock's multiple it runs at.</summary>
     public float DemoSeconds => _demo != null ? _demoT : -1f;
+    public float DemoRate => _demoRate;
 
     /// <summary>updateDemoCamera_ (56) with the bck's joints read off the baked path: the eye and look-at (unk124 / unk148), the up (mUp), the
     /// fovy; the view matrices from them. When the frames run out the demo ends (the director's endDemoCamera).</summary>
     private void TickDemo(float dt)
     {
-        _demoT += dt;
+        _demoT += dt * _demoRate;
         float frame = _demoT * _demo.FrameRate;
         _demo.Sample(frame, out Vector3 eyeU, out Vector3 atU, out Vector3 up, out float fovy);
         Vector3 eyeM = _demoFrame * (eyeU / SmsUnits.UnitsPerMetre), atM = _demoFrame * (atU / SmsUnits.UnitsPerMetre);
