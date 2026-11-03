@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/Sound/SmsMarioSound.cs" id="1_smsnd"]
+
+[node name="SmsSound" type="Node3D"]
+script = ExtResource("1_smsnd")

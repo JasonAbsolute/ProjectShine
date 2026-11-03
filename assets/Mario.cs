@@ -17289,6 +17289,16 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>SMS_GetMarioHP (pass 153): his hit points as the enemies read them (King Boo's slot steers its result by them).</summary>
     public int SmsHP => _health;
+    /// <summary>154: what FLUDD is doing this tick, for the sounds (TWaterGun's state the game's sound code reads): the nozzle (0 spray 1 hover 2 rocket
+    /// 3 turbo), isEmitting, the R analog, the water, the spray strength (unk378), the trigger nozzle's state (0 inactive 1 active 2 dead), the turbo
+    /// dash, the nozzle-change progress and speed, the pack's house progress (1 housed .. 0 deployed).</summary>
+    public readonly struct SmsFluddProbe
+    {
+        public readonly bool HasFludd, Emitting, Dashing; public readonly int Nozzle, Water, WaterMax, TrigState; public readonly float R, Strength, Switch, SwitchSpeed, Stow;
+        public SmsFluddProbe(bool has, bool emitting, bool dashing, int nozzle, int water, int waterMax, int trig, float r, float strength, float sw, float swSpeed, float stow)
+        { HasFludd = has; Emitting = emitting; Dashing = dashing; Nozzle = nozzle; Water = water; WaterMax = waterMax; TrigState = trig; R = r; Strength = strength; Switch = sw; SwitchSpeed = swSpeed; Stow = stow; }
+    }
+    public SmsFluddProbe SmsFluddSound => new SmsFluddProbe(_fluddReady, _fluddEmitting, _fluddDashing, (int)_fluddNozzle, _fluddWater, SmsFluddCurrent.AmountMax, _fluddTrigState, _fluddR, _fluddSprayStrength, _fluddSwitch, _fluddSwitchSpeed, _fluddStow);
     /// <summary>TMario::incHP (MarioCollision.cpp 25): under water (isUnderWater(): head below the surface less CanBreathDepth) the
     /// heal goes to the AIR, capped at mMaxAir -- a coin taken while submerged refills a unit of air and the meter steps back up --
     /// otherwise to the health, capped at HPMax; MSD_SE_SY_HP_RECOVER either way when it was not already full (pass 47).</summary>
