@@ -918,7 +918,7 @@ is pushed and waiting on Jaysonn's playtest, and it is now the branch that merge
 `feature/select-stages` (entry #11, SMS 135) is likewise pushed and waiting on a playtest, and holds the only copy of #11's
 text. The exit-time C# finalize crash from #10's batch has still not recurred.
 
-### #16 -- PENDING -- queued 2026-11-01 10:38 PST (Kiro) -- PUSH + PR (SMS 151-153 + 153b..n), PLAYTESTED BY JAYSONN 2026-11-03, updated 2026-11-03 00:16 PST
+### #16 -- DONE 2026-11-03 -- PR OPEN, awaiting Jaysonn's merge (the URL goes in the heading at close-out) -- queued 2026-11-01 10:38 PST (Kiro) -- PUSH + PR (SMS 151-153 + 153b..n), PLAYTESTED BY JAYSONN 2026-11-03, updated 2026-11-03 00:16 PST
 Push the eleventh feature branch: `feature/enemy-sirena`, branched from `main` `c082a22` (the trunk after PR #13, the Chain Chomps). Sirena Beach's
 family -- Hotel Delfino's ghosts -- one pass each on this branch. SMS 151: the Boo (TTelesa), the hotel's ghost -- it drifts between its graph's nodes
 a little off the floor, bobbing and tilting, fading in and out (the LOOP kind), and hurts you on touch; your jump passes straight through it until you
@@ -1054,3 +1054,45 @@ characters of URL prefill the title and clipboard the body, as #8 learned). ONE 
 `main`. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the three
 gatekeeper / launcher `.tres` re-saves, the four BossTelesa `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them (none of them belong in this PR).
+Result: `feature/enemy-sirena` pushed as a NEW remote branch, 33 commits over `main` `c082a22`, 186 files / +2168381 / -36.
+`git rev-list --count origin/feature/enemy-sirena..feature/enemy-sirena` returned `0`. `git merge-base feature/enemy-sirena main`
+is exactly `c082a22`, so the branch sits on the trunk with no merge in it. All sixteen pass shas named in PROJECT_LOG.md confirmed
+ancestors: `a5b0234` (151), `f29bf3e` (152), `525f1b5` (153), `a550172` (153b), `47b3351` (153c), `38322f3` (153d), `da307fd`
+(153e), `acd4554` (153f), `570076c` (153g), `be8ce44` (153h), `cff77b9` (153i), `80160d0` (153j), `cc59542` (153k), `6570dca`
+(153l), `877791a` (153m), `28674e1` (153n). All seventeen log entries are in the branch's PROJECT_LOG.md. Nine of the 186 files
+are modifications and 177 are additions: PROJECT_LOG.md, `assets/Mario.cs`, `assets/Player.tscn`, `assets/Sms/Enemy/SmsSmallEnemy.cs`,
+`assets/Sms/Fx/SmsGoopStrand.cs`, `assets/Sms/SmsCameraArea.cs`, `assets/Sms/SmsCameraKinds.cs`, `assets/SunshineCamera.cs` and
+this file.
+THE INSERTION COUNT IS NOT WHAT IT LOOKS LIKE. 2160288 of the 2168381 insertions are six `.glb.import` files, 360048 lines and
+11.67 MB each: `rulet00`, `rulet01`, `rulet02`, `srot_waku` and `srotrulet` under models/Eniemes/BossTelesa/, plus
+models/Koopa/scene/delfinoBoss/map/map.glb.import. Everything hand-written in the branch is the other 8093 insertions across
+180 files. This is the long-flagged `.import` bloat, not a new regression: `main` already carries 172 `.import` files over 1 MB,
+the largest `ma_mdl1.glb.import` at 13.9 MB. Largest real assets added: `btelesa.glb` 1.6 MB, `telesa.glb` 0.26,
+`debutelesa.glb` 0.16, then `SmsBossTelesa.cs` at 124 KB. Eight new scripts: SmsTelesa, SmsDebuTelesa, SmsBossTelesa,
+SmsRoulette, SmsTelesaSlot, SmsBossWall, SmsTelesaBlock, SmsCameraPath.
+Hygiene: 0 of Jaysonn's nine live edits in the range. The four BossTelesa `.tres` files do appear, as ADDITIONS the branch makes;
+his uncommitted re-saves of them sit on top in the working tree and are not in the push, which is what the entry meant.
+NOTE on the commit count: the entry says 32, measured 33. The extra one is `59cede2`, the commit that gave this entry its PR
+title, body and gh command, which cannot count itself. The same off-by-one as every entry so far, and always the queue file's
+own commit.
+ONE CORRECTION TO THE PR BODY. Kiro's "Also in the range" list names `SmsCameraShake.cs`. That file is NOT in the range:
+it exists on `main` already and the branch does not touch it (153b set its shake tables as data, it did not change the script).
+It was replaced with `SmsCameraKinds.cs` (the DefiniteD2 kind), which the branch does modify. Everything else in the body is
+Kiro's wording unchanged, with blank lines inserted between his hard-wrapped sections so GitHub does not render them as one
+run-on paragraph, the same fix #15 needed.
+UNMERGED SIBLINGS, measured by trial merge rather than by eye. Two branches are still open off older trunks: `feature/enemy-pinna2`
+(entry #14) and `feature/select-stages` (entry #11). `git merge-tree` against each one conflicts in `PROJECT_LOG.md` and
+`timeToPush!.md` only, so whichever merges after this one keeps both sides at those two tails. `feature/select-stages` also
+touches `assets/Mario.cs`, which `comm -12` flags as a shared file, but its hunks sit around line 20340 while this branch's sit
+at 17290 and 17528, and the trial merge auto-merges the file with no conflict. No scene, script, shader, material or model
+collides.
+`gh auth status` still prints "You are not logged into any GitHub hosts", the eighth entry running, so the browser route again.
+The PR body went to `pr151.md` at the project root (untracked, delete after merge), 4650 bytes with the attribution footer.
+ONE merge path, as the entry insists: this branch gets a PR and is NOT also merged into local `main`.
+THE TRUNK TIP AND THIS ENTRY'S PR NUMBER: read them from `git log --oneline -1 main` and from GitHub, not from a sha or a number
+written here. A commit cannot state its own sha, and this result paragraph is committed BEFORE the PR is opened, per the #6 order,
+so it cannot state the PR number either. Both go into the heading at close-out.
+STILL OPEN, carried forward: `feature/enemy-pinna2` (entry #14, SMS 147 and 148, the Bullet Bill and the ground Electrokoopa) and
+`feature/select-stages` (entry #11, SMS 135) are both pushed and waiting on Jaysonn's playtest, and `feature/select-stages` holds
+the only copy of #11's text. The exit-time C# finalize crash from #10's batch has still not recurred, now across the 151-153n
+passes as well.
