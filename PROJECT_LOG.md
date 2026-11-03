@@ -10927,3 +10927,47 @@ DefiniteAtOffsetY (a boss's). Files: `assets/SunshineCamera.cs`, `assets/Sms/Sms
 `assets/Sms/Enemy/BossTelesa/BtelesaRollCamera.tres` (new), `assets/Sms/Enemy/BossTelesa/KingBooArena.tscn`. Tooling (npc82/sirena151/):
 tables_dump153.py, scene_dump153.py, bck_cam153.py, decomp/camera/, patch_mario153l.py, patch_drive153l.py, patch_boss153l_shadow.py,
 tools/projectshine/gen_camera_kinds.py (DefiniteD2), patch_smoke153.py (72 checks), cap/aj153_*.
+
+### 153m -- King Boo faces the camera, Mario in control from the disc's landing, the intro camera where the game's bck puts it (feature/enemy-sirena, code `877791a`)
+
+**Jaysonn's notes on 153l:** (1) "king boo is facing the wrong way", (2) "mario should be in control once the camera goes to the normal spot for the
+fight", (3) "the intro camera angle i think is too low? we should be seeing thru the bottom of the stage". All three taken; (3) was a decoding error.
+
+**The facing (1).** `scene.bin` (scene_boss153.py) places `BossTelesa` at (0, 300, 400) with rotation y 180: he faces -z, toward the room's camera at the
+-z wall (153j's attackers heading for the world's yaw 180 is the same fact). `KingBooArena.tscn` turns its BossTelesa child 180. On its own that did
+nothing: Godot's Euler decomposition reads the basis diag(-1, 1, -1) as X 180 / Z 180 / Y 0 (the same rotation), so `SmsSmallEnemy._Ready`'s
+`_spawnYaw = Mathf.RadToDeg(Rotation.Y)` gave 0 and he faced +z still (run ak: A1f yaw 0). The spawn yaw is `atan2(GlobalBasis.Z.X, GlobalBasis.Z.Z)`
+now -- the same number as before for every ordinary rotation, 180 at 180 -- and GLOBAL, because every enemy's model basis is written global from
+`_yaw` (ApplyLook: `_model.GlobalTransform = (Basis(Up, _yaw) x scale, at)`): an enemy under a turned parent faced the world's way before; an arena
+turned in the level turns its boss with it now. His slot machine (`Slot.GlobalTransform` from `_yaw`), his fruit fan (`PolarXZ(_yaw - offset + step
+i)`), his spat Boos (`MouthUnits + PolarXZ(_yaw, 250)`) follow as they did. The drive's boss shots and Mario's placements moved to the -z side (he
+stands between King Boo and the camera, as the fight plays); a game-camera shot of him appearing (`fightboss`).
+
+**The controls (2).** `TNerveBossTelesaFallDemo`: `rouletteFall` calls `onNeutralMarioKey` every tick the disc falls and returns TRUE level; the demo
+camera's length is the bck's -- the fall's (2000 u at 1 u a tick = 500 frames); `slotFall` (the unseen machine, ~540 ticks) neutralises nothing, so the
+game's Mario walks while the machine drops into place. 153l held `CameraLocked` to `IntroEnd` (after the slot phase). `IntroRelease` -- the demo camera
+ended, `CameraLocked` off -- runs at the landing now (the transition to the slot phase), and `IntroEnd` calls it too for a fall that outlasts the demo.
+
+**The camera (3).** camera_model.bmd's INF1 reads `0x01 (open) 0x10 joint 0, 0x01 (open) 0x10 joint 1, 0x02 (close), 0x10 joint 0?...` -- the J3D codes are
+0x01 open child, 0x02 close, 0x10 joint, 0x11 material, 0x12 shape; bck_cam153.py had 0x10 / 0x11 as open / close and 0x01 as joint, so both joints read as
+roots and the eye's world place was the position joint's own translation. `cam_position` is a CHILD of `cam_interest`: the eye = the look-at + the
+position joint's local translation. Re-evaluated, btelesa_roll_camera.bck opens at the stage's (7, 1346, 2685) -- 12 m over the table at the +z side,
+beyond the wall (culled from outside: the game looks in through it), looking up at the pedestal at fovy 45 -- rises and circles the room to (-5, 2636,
+-2657) at the -z wall looking down at the table's centre at fovy 60. 153l's (3, -1620, 2685) was 28 m under the table looking up through the discs'
+undersides -- what Jaysonn saw. `BtelesaRollCamera.tres` re-baked (the same 500 frames; the ends of the up and fovy tracks unchanged). The shine-get
+camera of pass 116 is unaffected: it reads its own baked table.
+
+**Drive 153 (patch_smoke153.py): 73 / 73** -- 153l's 72 + A1f (his yaw 180); I2 re-aimed (the opening eye 600..1400 u over the node, 2000+ u out, fov
+44..48, within 150 u of the bck); I4 re-aimed (the demo over, `CameraLocked` off and the fixed camera on the view at the landing); the six placements of
+Mario at (0, -0.6, -19) facing +z; the ten boss-side shots mirrored. Runs: ak (A1f yaw 0 -- the Euler read; then a fan pepper fell onto his tongue
+right at fruitCollisionOn, made him spicy before the drive's coconut, and the cascade of a real hit, the Boos' attacks through the long E / F phases
+and the R2 forceHide killed Mario -- the stage reloaded and the drive ran a second time from phase 0 in the same log: a flake not seen in 15 runs,
+possible in the game too); al (the yaw fix built but the arena file with the rotation not yet shipped -- the chain that edited it had broken on an
+assertion); am 73 / 73; windowed run an for the captures. Builds 153bf (a `//` comment swallowing the rest of a one-line statement), bg, bh: 0 errors;
+the splice removed, the root clean.
+
+**Deviations:** none new. The yaw read is the game's number (rotation 180) read correctly.
+
+**Knobs added:** none. Files: `assets/Sms/Enemy/SmsSmallEnemy.cs` (one line), `assets/Sms/Enemy/SmsBossTelesa.cs` (IntroRelease), `assets/Sms/Enemy/BossTelesa/
+BtelesaRollCamera.tres`, `assets/Sms/Enemy/BossTelesa/KingBooArena.tscn`. Tooling (npc82/sirena151/): bck_cam153.py (the INF1 codes), scene_boss153.py,
+patch_boss153m.py, patch_drive153m.py, patch_enemy153m.py, patch_smoke153.py (73 checks), cap/an153_*.
