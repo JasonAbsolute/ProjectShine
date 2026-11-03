@@ -186,9 +186,11 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     [Export] public bool StartHidden = true;
     /// <summary>The game's FallDemo (TNerveBossTelesaFallDemo): the centre disc starts IntroLiftUnits over the table (scene.bin places rulet00 2000 u over the
     /// other two) and sinks IntroFallSpeed u a tick with Mario on it -- the boss TAKES him (HIT_MESSAGE_TAKE: he is carried, no controls) and lets go
-    /// 3 u before the bottom (RLT_SET) -- while the intro camera plays (btelesa_roll_camera.bck, 16.6 s: from under the table up and round to the
-    /// -z wall); level, the slot machine falls to its place UNSEEN (its scale is 0 until the appear), the discs start turning as it passes
-    /// (rouletteStart) and the fight begins with HideWait. Off: the fight starts with him hidden and the table flat.</summary>
+    /// 3 u before the bottom (RLT_SET) -- while the intro camera plays (btelesa_roll_camera.bck, 16.6 s: from 12 m over the table at the +z side,
+    /// looking up at the pedestal, rising and circling to the -z wall looking down); level, the demo is over and Mario is IN CONTROL (rouletteFall's
+    /// onNeutralMarioKey stops with the fall; the room's fixed camera takes the view) while the slot machine falls to its place UNSEEN (its scale is 0
+    /// until the appear), the discs start turning as it passes (rouletteStart) and the fight begins with HideWait. Off: the fight starts with him hidden
+    /// and the table flat.</summary>
     [Export] public bool IntroRide = false;
     /// <summary>When the ride starts (153l). WhenMarioEntersRoom: the disc waits raised until Mario is within IntroTriggerRadiusUnits of the table's centre
     /// (over the table), then he is TAKEN onto it as the game's boss takes him; WhenMarioLandsOnDisc: when he stands on the raised disc himself;
@@ -627,6 +629,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
             if (_introHold) { _introHold = false; if (DisappearSound != null && DisappearSound.Stream != null) DisappearSound.Play(); }
             _intro = 2; _introSlotY = TransYUnits - SlotUnderUnits + 1500f;
             if (Slot != null) Slot.Visible = IntroSlotShown;
+            IntroRelease();   // 153m: the landing ends the demo and frees him (the game: the bck ran the fall's length; slotFall holds nothing)
             return;
         }
         float home = TransYUnits - SlotUnderUnits;            // where calcRootMatrix hangs it (joint 0 - 700 in the game; SlotUnderUnits here, no hosei)
@@ -640,14 +643,19 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         }
         if (_introSlotY <= home) IntroEnd();
     }
+    /// <summary>The disc down: the game's demo camera has run the fall's length (the director ends it; the cube's fixed camera takes the view in a cut) and
+    /// rouletteFall's onNeutralMarioKey stops with the fall -- Mario is in control through the slot's unseen fall. 153m (Jaysonn: "mario should be in
+    /// control once the camera goes to the normal spot for the fight").</summary>
+    private void IntroRelease()
+    {
+        if (_mario == null || !IsInstanceValid(_mario)) return;
+        _mario.CameraLocked = false;
+        _mario.SmsCamera?.EndDemoCamera();               // the game's demo is the bck's length (= the fall at 1 u a tick); a slower fall ends it here at the latest
+    }
     private void IntroEnd()
     {
         _intro = 0; _introHold = false;
-        if (_mario != null && IsInstanceValid(_mario))
-        {
-            _mario.CameraLocked = false;
-            _mario.SmsCamera?.EndDemoCamera();           // the game's demo is the bck's length (= the fall at 1 u a tick); a slower fall ends it here at the latest
-        }
+        IntroRelease();
         if (Slot != null) Slot.Visible = false;              // HideWait hides it until the appear
         _time = 0;                                           // HideWait's clock starts here
         if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: the intro ride over after {_introTicks} ticks -> HideWait");
