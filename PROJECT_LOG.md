@@ -10845,3 +10845,85 @@ Files: `assets/Sms/Enemy/BossTelesa/SmsBossWall.cs`, `BossWall.gdshader`, `KingB
 `models/Koopa/scene/delfinoBoss/mapobj/boss_wall/boss_wall_stars.png`, `boss_wall_spots.png`; `models/Koopa/scene/delfinoBoss/map/map.glb`,
 `map_0.png`, `map_1.png` (+ .import). Tooling (npc82/sirena151/): casino_geo153.py, casino_wall153.py, col_dump153.py, btk_raw153.py,
 bmd_matfull153.py, wall_uv153.py, wall_tex153.py, glb_info153.py, patch_import153k.py, patch_smoke153.py (66 checks), cap/ae153_*.
+
+### 153l -- King Boo's intro and camera: the game's fall-in on the centre disc under the btelesa_roll_camera bck, and the casino boss room's fixed-point camera (feature/enemy-sirena, code `6570dca`)
+
+**Jaysonn's note on 153k:** "only thing now i think is the camera that is used while fighting king boo and the intro sequence when being lowered down on
+the middle platform. can we do this?"
+
+**The room's camera.** The stage's `tables.bin` (tables_dump153.py) holds one `CameraCubeInfo` -- a 300 x 600 x 300 m box, the whole stage -- naming the
+camera map tool "teiten camera D2": `CAMERA_MODE_DEFINITE_D2` at (0, 1100, -2450), pitch 22 (and two shine cameras, DEFINITE_A / B, for the game's own
+shine demos). A DEFINITE kind is a camera FIXED at a point that turns to follow Mario: `controlByCameraCode_` (CameraCodeControl.cpp 30) changes into
+the tool's mode, `changeCamModeSub_` (CameraChange.cpp 361: the default case) puts the eye at the tool's point and the look-at on the usual look point
+and WARPS there, `execCameraModeChangeProc_` returns at once for a fix / definite code (582: no status ladder, no L camera, no Y swing), and
+`calcPosAndAt_`'s fix / definite branch (cameragc.cpp 563-598) sets the look-at to the look point each tick (kindDefiniteD2.prm: AtOffsetY 300, fovy
+50) while the chased camera closes on it at AtChaseRateXZ / Y 0.1; `rotateX/Y_ByStick` are the normal branch's, so the stick is dead; the look-at's
+elevation is clamped by `CLBRevisionLookatByAngleX`. Leaving the cube (337-356): the polar target is read off the pose (`calcNowTargetFromPosAndAt_`)
+and D2 warps the camera behind the way it looked (`warpPosAndAt(ratio, yaw)`). `TBossTelesa::moveObject` adds his `mCameraOffsetY` to the camera's
+`unk290`, which `setMarioLookat_` reads in D2 only: within `mCameraMoveLimit` 1000 u of the eye the look point sinks `mCameraMoveSp` 0.02 x (his
+feet - the look-at) a tick (so he stays in frame right under the camera), and decays x 0.02 when he is further off. The port: `SmsCameraKinds.cs`
+regenerated with the kind (gen_camera_kinds.py: DefiniteD2 from kinddefinited2.prm, `IsDefiniteKind`, `IsNormalClass` without it); `SmsCameraArea` with
+an `Eye` child marker (EyePath) as the map tool's point (a definite Kind without one is read as the stage's kind, with a warning); `SunshineCamera`:
+`_areaTool` from `SampleAreaKind`, `EnterTool` (the L camera dropped, the mode over the kind's Inbet, the warp to the point), `CtrlDefinite` (the
+branch and its chase tail), `WarpPosAndAt` (both forms), `CalcNowTargetFromPosAndAt`, the leave in `ChangeMode`, the cube check kept running under
+a hold that is not the director's (King Boo's FallDemo is his nerve), `DefiniteAtOffsetY` written by the boss (`CameraChaseTick`, knobs CameraChase /
+CameraMoveLimitUnits / CameraMoveSpeed), readers `IsFixedPointCamera`, `ViewEyeUnits`, `ViewAtUnits`, `ViewFov`. `KingBooArena.tscn` gets the
+`FightCamera` child: an SmsCameraArea (Kind DefiniteD2, Priority 10) whose box is the room (68 x 100 x 68 m, centred 10 m up -- the game's cube is the
+whole stage, a deviation that keeps the camera to the room) and whose Eye is at (0, 8.06, -32.91) m: the stage's (0, 1100, -2450) less the 500-u lift.
+
+**The intro.** `scene.bin` (scene_dump153.py) places rulet00 at y 2000 and rulet01 / 02 / srotRulet / the wall at 0 (all three discs then lifted 500 by
+`TRoulette::initMapObj`); Mario at (0, 4000, -1900). `TBossTelesa::init` fires `fireStartDemoCamera("btelesa_roll_camera")`: `map/camera/
+btelesa_roll_camera.bck` on `common/camera/camera_model.bmd`'s joints `cam_position` / `cam_interest` (TCameraBck::updateDemo: the eye and look-at
+from the joints' matrices, the up from the position joint's Y axis, the fovy from its Y scale), 500 frames = 16.6 s, from (3, -1620, 2685) -- under
+the table's rim, OUTSIDE the wall (both back-face culled: the game looks in through them), looking up at Mario on the raised disc at fovy 45 -- up and
+round the room to (-9, 2725, -2657) at the -z wall looking down at the table's centre, fovy 60 (bck_cam153.py bakes it; `BtelesaRollCamera.tres`, an
+`SmsCameraPath` resource of 500 eye / look-at / up / fovy samples in stage units). `TNerveBossTelesaFallDemo`: time 0 HIDDEN, `SMS_SendMessageToMario(
+HIT_MESSAGE_TAKE)` -- the boss TAKES Mario and carries him -- the clips frozen, the slot's scale 0 (unseen); `rouletteFall` sinks the disc 1 u a tick,
+Mario held until 3 u from the bottom (the DETACH, RLT_SET), the controls neutral, V_LAUGH1B / RLT_DOWN; level: `slotFall` drops the unseen machine from
++300 at 5 u a tick to -800, then 1 u, `rouletteStart` as it passes -900 unless all three roll, done at -1100 -> `onAllCollision`, HideWait. 2000 u at
+1 u a tick is 16.7 s at the port's 120 Hz -- the bck's length: the camera was cut to the fall. The port (`SmsBossTelesa`): `IntroRide` (on in the arena)
+ARMS the ride at start -- the centre disc lifted `IntroLiftUnits` (2000; 153b's 500 was a misreading) -- and `IntroStart` picks the moment:
+`WhenMarioEntersRoom` (within `IntroTriggerRadiusUnits` 2450 of the centre and over the table: he is TAKEN onto the disc's centre, the bowl's
+bottom), `WhenMarioLandsOnDisc` (standing on the raised disc himself), `AtOnce` (153b's: place him). `IntroBegin`: CameraLocked, the TAKE
+(`Mario.SmsCarryTo` each tick: his place set, his velocity zeroed, the ride he was on dropped -- `SmsRideApply` would put him back on that deck every
+frame), `IntroCamera` -> `SunshineCamera.StartDemoCamera(IntroCameraPath, StageFrame())` (the stage's frame: the middle ring's parent's basis, the
+origin 500 u under the discs' origins); `IntroTick`: the fall at `IntroFallSpeed` u a tick with the hold until 3 u up, then the slot phase as 153b
+had it but UNSEEN (`IntroSlotShown` off = the game); `IntroEnd` ends the demo if still playing (a slower fall) and starts HideWait. `BossTelesa.tscn`
+carries the path; `KingBooArena.tscn` sets IntroRide on.
+
+**The bck demo camera** (`CAMERA_MODE_REPRODUCE_DEMO`) on SunshineCamera: `StartDemoCamera(path, frame)` / `EndDemoCamera` / `IsDemoCamera` /
+`DemoSeconds`; while it plays the game camera does not run (perform 882: ctrlGameCamera_ skipped), `TickDemo` samples the path at 30 frames a
+second into the view's eye / look-at / up / fovy with the near clip `ReproduceDemoNearClip` (30), `Apply` takes `_viewUp` / `_viewFov` / `_viewNearU`;
+at the end (the director's endDemoCamera: `changeCamModeSpecifyFrame_(-1, 1)`) the camera resumes from the last pose in one frame and the next
+tick's cube check names the kind -- in the room, the fixed-point camera, warped to its point.
+
+**Two engine facts, two runs.** (1) An `AnimatableBody3D` with `sync_to_physics` puts a written transform BACK until its physics body has moved (the next
+step): 153b's `GlobalPosition +=` read back unmoved within the frame, and with two boss ticks a frame the second tick wrote the unlifted height over the
+lifted one -- the disc never rose, the fall ended on the spot (runs af / ag). The disc's intended height is a shadow now (`_introDiscY`, `DiscPos`), the
+lift is done inside the physics tick (not the deferred call, which runs after the step and is undone by the next frame's write-back), and the drive
+reads the node a frame behind. (2) The drive placed its arena with `Position = base` under a level root that is not at the origin ((3.09, 0.03, -2.65)
+in Jaysonn's Level.tscn): its discs sat 4 m from where the drive thought -- the arena is placed in the root's space now (every earlier check used the
+arena's own global position, so none was wrong).
+
+**Drive 153 (patch_smoke153.py): 72 / 72** -- 153k's 66 + a phase 11 after the room's: I1 the ride began when Mario was placed in the room, the disc up
+2000 u less a tick's unit each tick (lift 1819 at 181 ticks), Mario taken onto its centre and carried, his controls held; I2 the bck demo on the game
+camera, from under the table (-1767 u over the node) at fovy 46.8 after 1.5 s, the eye 0 u off the bck's frame; I3 half way (ticks 1001, lift 999, fov
+55.3, the eye's worst stray 0 u); I4 the disc level after 1001 frames, the DETACH, Mario in the bowl, the slot unseen, the demo over; I5 the slot phase
+270 frames -> HideWait with the discs turning, the controls back, the camera on the fixed point (0 u off, fov 50, kind DefiniteD2, no demo); I6 Mario
+teleported to the ring and walked 9.6 m: the eye never left its point (0 u) while the look-at followed him (+302 u, 43 u off in XZ). The game-camera
+shots `intro0`, `intro1`, `introend`, `fightcam`, `fightcam2` (F153CapGameLater: the GAME camera current for the shot) and `ceiling` moved after the
+ride (the raised disc blocked its view). Headless runs af (the level root's space; the disc read back unlifted), ag (the lift in the tick; the shadow
+height), ai 72 / 72; windowed run aj for the captures. Builds 153az..bd: 0 errors; the splice removed (Mario.cs keeps SmsCarryTo), the root clean.
+
+**Deviations:** the FightCamera's box is the room, not the game's whole-stage cube; `IntroStart` (the game has one start: the stage load, Mario dropped
+in from the ceiling and taken) and the knobs `IntroFallSpeed`, `IntroCamera`, `IntroSlotShown`, `CameraChase`; Mario stands in the bowl while carried
+(the game holds him at the boss's point); the pond's pressing (rulet00.bck through the fall) is not played -- the bowl is pressed from the start (153c).
+The game's numbers everywhere else.
+
+**Knobs added:** SmsBossTelesa -- Deviations: IntroStart, IntroTriggerRadiusUnits 2450, IntroLiftUnits 2000 (was 500), IntroFallSpeed 1, IntroCamera,
+IntroCameraPath, IntroSlotShown; Camera: CameraChase, CameraMoveLimitUnits 1000, CameraMoveSpeed 0.02. SmsCameraArea: EyePath. SunshineCamera:
+DefiniteAtOffsetY (a boss's). Files: `assets/SunshineCamera.cs`, `assets/Sms/SmsCameraKinds.cs` (generated), `assets/Sms/SmsCameraArea.cs`,
+`assets/Sms/SmsCameraPath.cs` (new), `assets/Mario.cs` (SmsCarryTo), `assets/Sms/Enemy/SmsBossTelesa.cs`, `assets/Sms/Enemy/BossTelesa.tscn`,
+`assets/Sms/Enemy/BossTelesa/BtelesaRollCamera.tres` (new), `assets/Sms/Enemy/BossTelesa/KingBooArena.tscn`. Tooling (npc82/sirena151/):
+tables_dump153.py, scene_dump153.py, bck_cam153.py, decomp/camera/, patch_mario153l.py, patch_drive153l.py, patch_boss153l_shadow.py,
+tools/projectshine/gen_camera_kinds.py (DefiniteD2), patch_smoke153.py (72 checks), cap/aj153_*.
