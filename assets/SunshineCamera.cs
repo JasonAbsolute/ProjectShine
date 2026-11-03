@@ -49,6 +49,22 @@ using Godot.Collections;
 /// look-at (mTarget) and the pivot's yaw is the eye's bearing (Mario's stick reads both). The scene rig (CamController > SpringArmPivot >
 /// SpringArm3D > Camera3D) is kept; the SpringArm3D no longer processes (it would re-place the camera each physics frame) and the
 /// Camera3D is posed directly. Mode TalkingPOV is Jaysonn's sign-dialogue framing (RedCoinSwitch.cs) and stays his.
+///
+/// PASS 153l, two more of the game's modes. (1) THE FIXED-POINT (DEFINITE) CAMERA, CAMERA_MODE_DEFINITE_D2 (kindDefiniteD2.prm): a camera
+/// cube whose TCubeCameraInfo names a camera map tool (TCameraMapTool: a point, a mode) -- controlByCameraCode_ (CameraCodeControl.cpp 30)
+/// changes into the tool's mode, changeCamModeSub_ (CameraChange.cpp 361) puts the eye AT the tool's point and the look-at on Mario and
+/// WARPS there (no inbetween), execCameraModeChangeProc_ returns at once for a fix / definite code (582: no ladder, no L camera, no Y
+/// swing), and each tick calcPosAndAt_'s fix / definite branch (596) holds the eye and sets the look-at to the usual look point (Mario +
+/// AtOffsetY 300; in D2 plus unk290, a boss's offset: King Boo's camera chase), the actual look-at chasing it at AtChaseRateXZ / Y (0.1).
+/// No stick (rotateX/Y_ByStick are the normal branch's), no wall / ground push. Leaving the cube (337-356): the polar target is read off
+/// the pose (calcNowTargetFromPosAndAt_) and D2 warps the camera behind the way it looked (warpPosAndAt(ratio, yaw)). Here: an
+/// SmsCameraArea with Kind DefiniteD2 and an Eye marker (the casino boss room's: KingBooArena.tscn's FightCamera). (2) THE BCK DEMO CAMERA,
+/// CAMERA_MODE_REPRODUCE_DEMO (CameraDemo.cpp, CameraBck.cpp): fireStartDemoCamera(name) plays camera_model.bmd's cam_position /
+/// cam_interest joints along a .bck from /scene/map/camera; the game camera does not run meanwhile (perform 882: ctrlGameCamera_ skipped),
+/// the eye / look-at / up / fovy come straight off the joints (updateDemoCamera_), the near clip is ReproduceDemoNearClip (30); when the
+/// frames run out the director ends it (endReproduceDemoCamera_: changeCamModeSpecifyFrame_(-1, 1)) and the next tick's cube check names
+/// the kind. Here: StartDemoCamera(SmsCameraPath, frame) with a path baked from the bck (bck_cam153.py); King Boo's intro
+/// (btelesa_roll_camera.bck) is the first.
 /// </summary>
 public partial class SunshineCamera : Node3D
 {
@@ -161,6 +177,19 @@ public partial class SunshineCamera : Node3D
     // TalkingPOV
     private float _tkYaw, _tkPitch, _tkRadius, _tkCurYaw, _tkCurPitch, _tkCurRadius, _tkTransition;
     private Vector3 _tkLookAt;
+    // 153l: the fixed-point camera (a cube's map tool) and the bck demo camera
+    private SmsCameraArea _areaTool;                     // the cube Mario stands in, when it carries a map tool (a definite kind with an Eye)
+    private SmsCameraArea _tool;                         // unk70: the map tool the camera is on
+    private Vector3 _toolEyeU;                           // the tool's point, units (TCameraMapTool::mPosition)
+    private bool _toolWarned;
+    /// <summary>unk290: a boss's offset on the look height in CAMERA_MODE_DEFINITE_D2 only (TBossTelesa::moveObject: his mCameraOffsetY, the
+    /// look point sinking to Mario's feet while he is within 1000 u of the camera, decaying away otherwise). Written by the boss each tick.</summary>
+    public float DefiniteAtOffsetY = 0f;
+    private SmsCameraPath _demo;                         // unk2B0's bck (REPRODUCE_DEMO) while it plays
+    private Transform3D _demoFrame = Transform3D.Identity; // the path's stage frame into the level: world = frame * (stageUnits / U)
+    private float _demoT;                                // seconds into the demo
+    private Vector3 _viewUp = Vector3.Up;                // mUp (the demo's; CLBConstUpVec otherwise)
+    private float _viewFov = 50f, _viewNearU = 10f;      // mFovy / mNear as applied (the kind's, or the demo's)
 
     private static float U(float m) => m * SmsUnits.UnitsPerMetre;
     private static Vector3 U(Vector3 m) => m * SmsUnits.UnitsPerMetre;
@@ -216,6 +245,13 @@ public partial class SunshineCamera : Node3D
         if (Mode == CamMode.TalkingPOV)
         {
             TickTalking(dt);
+            return;
+        }
+        if (_demo != null)
+        {
+            // CAMERA_MODE_REPRODUCE_DEMO (perform 882): the game camera does not run; the view is the bck's joints (updateDemoCamera_)
+            _warpRequested = false;
+            TickDemo(dt);
             return;
         }
         if (_warpRequested || _md.Teleported)
@@ -297,6 +333,7 @@ public partial class SunshineCamera : Node3D
     private void WarpBehind()
     {
         _warpRequested = false;
+        _tool = null;  // 153l: a map tool's cube re-enters (and warps to its point) on the next tick
         DropLCamera(); // a stage load's camera is the normal one, no lock
         _cur.Yaw = (short)(_md.AngleY - 0x8000);
         PlaceBehind();
@@ -315,13 +352,14 @@ public partial class SunshineCamera : Node3D
         GlobalPosition = M(_atU);
         _pivot.GlobalRotation = new Vector3(0f, _finalYaw * SmsUnits.BamToRad, 0f); // global: Mario.cs rotates the stick by the body's basis and then by this yaw
         Vector3 dir = atM - eyeM;
+        if (_demo == null) { _viewUp = Vector3.Up; _viewFov = _p.Fovy; _viewNearU = _p.NearClip; }   // mUp = CLBConstUpVec, mFovy / mNear the kind's (the demo writes its own)
         if (dir.LengthSquared() > 1e-10f)
         {
-            Vector3 up = MathF.Abs(dir.Normalized().Y) > 0.999f ? _camera.GlobalBasis.Y : Vector3.Up;
+            Vector3 up = MathF.Abs(dir.Normalized().Dot(_viewUp)) > 0.999f ? _camera.GlobalBasis.Y : _viewUp;
             _camera.GlobalTransform = new Transform3D(Basis.LookingAt(dir, up), eyeM);
         }
-        _camera.Fov = _p.Fovy;
-        _camera.Near = M(_p.NearClip);
+        _camera.Fov = _viewFov;
+        _camera.Near = M(_viewNearU);
     }
 
     // ============================================================ cameralib
@@ -436,9 +474,10 @@ public partial class SunshineCamera : Node3D
         if (_groundSkip != 0) _groundSkip--;
         if (_roofSkip != 0) _roofSkip--;
         if (_lLock != 0) _lLock--;             // unk282
-        // setMarioLookat_ (cameragc.cpp 269): his origin + the kind's look height (+260 on KICK_ROOF_ROLL_UP)
+        // setMarioLookat_ (cameragc.cpp 269): his origin + the kind's look height (+260 on KICK_ROOF_ROLL_UP; + unk290 in DEFINITE_D2: a boss's chase)
         float yOff = _cur.Ratio * _p.XRotRatioAtOffsetY + _p.AtOffsetY;
         if (_md.KickRoofRollUp) yOff += 260f;
+        if (_mode == SmsCamKind.DefiniteD2) yOff += DefiniteAtOffsetY;
         _lookPoint = _md.PosU + new Vector3(0f, yOff, 0f);
         _prev = _cur;
         // controlByCameraCode_ + execCameraModeChangeProc_: only while the game is in play (director state 4), never under a demo's hold
@@ -455,6 +494,9 @@ public partial class SunshineCamera : Node3D
             // its demo camera takes the view; here the one camera keeps the frame, so an open L camera is cut and a Y swing dropped
             if (_mode == SmsCamKind.LNormal) LCameraOff(true, "a demo hold", force: true);
             _flags &= ~(FlagFrontRotate | FlagFrontY | FlagFrontDone);
+            // 153l: the cube check itself runs under a hold that is not the director's (King Boo's FallDemo is his nerve: the game's camera
+            // reads the room's map tool through it) -- a cube with a tool takes the camera, the ladder stays off
+            if (_areaTool != null && (_mode != _areaTool.Kind || _tool != _areaTool)) EnterTool(_areaTool);
         }
         else ModeChangeProc(lEdge);
         // the kind record: the mode's, blended over the inbetween (inbetweenData with the frames remaining)
@@ -466,6 +508,7 @@ public partial class SunshineCamera : Node3D
         _occluded = RayHits(M(_posU), M(_md.PosU + new Vector3(0f, 80f, 0f)));
         if (_mode == SmsCamKind.LNormal) CtrlL();
         else if (SmsCamKinds.IsTalkKind(_mode)) CtrlTalk();
+        else if (SmsCamKinds.IsDefiniteKind(_mode)) CtrlDefinite();
         else CtrlNormal();
         // calcFinalPosAndAt_ (828): the shake is SmsCameraShake's own pass; the look-at's elevation from the eye clamped to the limits
         _viewPosU = _posU;
@@ -484,6 +527,13 @@ public partial class SunshineCamera : Node3D
     /// kind and changeCamMode_ blends into it. The notice camera (execNoticeOnOffProc_: a boss to lock on to) is not ported.</summary>
     private void ModeChangeProc(bool lEdge)
     {
+        if (_areaTool != null)
+        {
+            // controlByCameraCode_ (30): a cube with a camera map tool -> changeCamModeSpecifyCamMapTool_ unless already on it; then
+            // execCameraModeChangeProc_ returns at once for a fix / definite code (582): no L camera, no Y swing, no status ladder
+            if (_mode != _areaTool.Kind || _tool != _areaTool) EnterTool(_areaTool);
+            return;
+        }
         SmsCamKind before = _mode;
         bool inL = _mode == SmsCamKind.LNormal;
         bool refuses = _md.InWater || _md.Swimming || _md.Rocketing || _md.Dashing || _md.Climbing;
@@ -550,7 +600,160 @@ public partial class SunshineCamera : Node3D
             else if (tagged == null && n.HasMeta("sms_camera_kind") && System.Enum.TryParse(n.GetMeta("sms_camera_kind").AsString(), true, out SmsCamKind k))
                 tagged = k;
         }
+        // 153l: a definite kind is a camera map tool's (TCubeCameraInfo::unk38): the area must carry its Eye; one without is the stage's own kind
+        _areaTool = null;
+        if (best != null && SmsCamKinds.IsDefiniteKind(best.Kind))
+        {
+            if (best.HasEye) _areaTool = best;
+            else
+            {
+                if (!_toolWarned) { _toolWarned = true; GD.PushWarning($"[SMS camera] {best.Name}: Kind {best.Kind} is a fixed-point camera and needs a child Marker3D named Eye (EyePath) to stand at; read as the stage's kind"); }
+                return tagged;
+            }
+        }
+        if (tagged != null && best == null && SmsCamKinds.IsDefiniteKind(tagged.Value)) return null;
         return best != null ? best.Kind : tagged;
+    }
+
+    // ============================================================ 153l: the fixed-point camera (a camera cube's map tool, TCameraMapTool)
+    /// <summary>changeCamModeSpecifyCamMapTool_ (CameraChange.cpp 426) + changeCamModeSub_'s willBeFixedMode (361): into the tool's mode over the
+    /// current kind's Inbet (16), the eye put AT the tool's point and the look-at on the usual look point, and the camera WARPED there
+    /// (the default case: tool->calcPosAndAt + warpPosAndAt(pos, at)). Out of the L camera first (setUpFromLButtonCamera_).</summary>
+    private void EnterTool(SmsCameraArea area)
+    {
+        if (_mode == SmsCamKind.LNormal) LCameraOff(true, "a fixed camera", force: true);
+        _tool = area;
+        _toolEyeU = U(area.EyeGlobal);
+        if (_mode != area.Kind) ChangeMode(area.Kind);
+        _p.CopyFrom(SmsCamKinds.Get(_mode));              // warpPosAndAt: mCurrentParams->copySaveParam
+        float yOff = _cur.Ratio * _p.XRotRatioAtOffsetY + _p.AtOffsetY + (_mode == SmsCamKind.DefiniteD2 ? DefiniteAtOffsetY : 0f);
+        _lookPoint = _md.PosU + new Vector3(0f, yOff, 0f);
+        WarpPosAndAt(_toolEyeU, _lookPoint);
+        if (_md.Debug)
+            GD.Print($"[SMS camera] the fixed-point camera {area.Name}: the eye at {area.EyeGlobal} ({(_toolEyeU - _md.PosU).Length():F0} u from him), looking at him + {_p.AtOffsetY:F0} u; the stick and the L camera are dead here");
+    }
+
+    /// <summary>warpPosAndAt(const Vec&, const Vec&) (CameraWarp.cpp 9): the record copied, the height pan killed, the chased camera and the view
+    /// set to the pose, the inbetween warped there with no frames left, the polar target read off the pose, the previous target this one.</summary>
+    private void WarpPosAndAt(Vector3 posU, Vector3 atU)
+    {
+        _p.CopyFrom(SmsCamKinds.Get(_mode));
+        KillHeightPan();
+        _posU = _viewPosU = posU;
+        _atU = _viewAtU = atU;
+        IbWarp(posU, atU);
+        _ibFrames = 0;
+        _ibMario = _md.PosU;
+        CalcNowTargetFromPosAndAt(posU, atU);
+        _prev = _cur;
+        CrossToPolar(_atU, _posU, out _, out _finalPitch, out _finalYaw);
+    }
+
+    /// <summary>warpPosAndAt(f32 ratio, s16 yaw) (CameraWarp.cpp 29): the eye at the kind's polar place about the usual look point for that
+    /// ratio and yaw, then the pose warp.</summary>
+    private void WarpPosAndAt(float ratio, int yaw)
+    {
+        _p.CopyFrom(SmsCamKinds.Get(_mode));
+        _cur.Ratio = Mathf.Clamp(ratio, 0f, 1f);
+        _cur.Pitch = LerpS(_p.XAngleMin, _p.XAngleMax, _cur.Ratio);
+        _cur.Yaw = (short)yaw;
+        float yOff = _cur.Ratio * _p.XRotRatioAtOffsetY + _p.AtOffsetY;
+        Vector3 at = _md.PosU + new Vector3(0f, yOff, 0f);
+        Vector3 pos = PolarToCross(at, LerpF(_p.DistMin, _p.DistMax, _cur.Ratio), _cur.Pitch, _cur.Yaw);
+        WarpPosAndAt(pos, at);
+    }
+
+    /// <summary>calcNowTargetFromPosAndAt_ (cameragc.cpp 302): the ratio, pitch and yaw of the polar target read off a pose.</summary>
+    private void CalcNowTargetFromPosAndAt(Vector3 posU, Vector3 atU)
+    {
+        CrossToPolar(atU, posU, out _, out int xAngle, out int yAngle);
+        _cur.Ratio = Mathf.Clamp(CalcRatio(_p.XAngleMin, _p.XAngleMax, xAngle), 0f, 1f);
+        _cur.Pitch = LerpS(_p.XAngleMin, _p.XAngleMax, _cur.Ratio);
+        _cur.Yaw = yAngle;
+        _cur.Pos = _cur.Desired = posU;
+        _cur.At = atU;
+    }
+
+    /// <summary>calcPosAndAt_'s fix / definite branch (cameragc.cpp 563-598 and the chase tail 845-900): the look-at is the usual look point
+    /// (isDefiniteCameraSpecifyMode: mCurrentTarget.mTarget = gpCameraMario->unk0 unless frozen), the eye stays the tool's point (set by the
+    /// warp; read again each tick so a moved arena carries its camera), unk28C = 0; the inbetween takes the pose, and the chased camera
+    /// closes on it at the kind's rates (no C-stick here, so the plain PosChaseRate / AtChaseRate). No wall, roof or ground check.</summary>
+    private void CtrlDefinite()
+    {
+        _followSpeed = 0f;
+        if (_tool != null && IsInstanceValid(_tool)) _toolEyeU = U(_tool.EyeGlobal);
+        if (_targetFreeze == 0) _cur.At = _lookPoint;
+        _cur.Pos = _cur.Desired = _toolEyeU;
+        _slopeX = 0;
+        IbExec(_cur.Pos, _cur.At, _md.PosU);
+        if (_posFreeze == 0)
+        {
+            ChaseDecrease(ref _posU.X, _ibPos.X, _p.PosChaseRateXZ);
+            ChaseDecrease(ref _posU.Y, _ibPos.Y, _p.PosChaseRateY);
+            ChaseDecrease(ref _posU.Z, _ibPos.Z, _p.PosChaseRateXZ);
+        }
+        if (_targetFreeze == 0)
+        {
+            ChaseDecrease(ref _atU.X, _ibAt.X, _p.AtChaseRateXZ);
+            ChaseDecrease(ref _atU.Y, _ibAt.Y, _p.AtChaseRateY);
+            ChaseDecrease(ref _atU.Z, _ibAt.Z, _p.AtChaseRateXZ);
+        }
+    }
+
+    /// <summary>For drives: the fixed-point camera's state -- on a tool, its eye (units) and the kind.</summary>
+    public bool IsFixedPointCamera => _tool != null && SmsCamKinds.IsDefiniteKind(_mode);
+    public Vector3 FixedEyeUnits => _toolEyeU;
+    /// <summary>unk124 / unk148: the view's eye and look-at this tick, units (a boss's camera chase reads them).</summary>
+    public Vector3 ViewEyeUnits => _viewPosU;
+    public Vector3 ViewAtUnits => _viewAtU;
+    public float ViewFov => _viewFov;
+
+    // ============================================================ 153l: the bck demo camera (CAMERA_MODE_REPRODUCE_DEMO)
+    /// <summary>startReproduceDemoCamera_ (CameraDemo.cpp 20): the bck starts, the mode is REPRODUCE_DEMO over 1 frame, the near clip
+    /// ReproduceDemoNearClip. The path's samples are stage units in the stage's frame: world = frame * (units / U) -- for King Boo's room,
+    /// the arena's transform less its TableLiftUnits. An open L camera and a Y swing are dropped (the game's changeCamModeSub_ out of them).</summary>
+    public void StartDemoCamera(SmsCameraPath path, Transform3D stageFrame)
+    {
+        if (path == null || !path.IsValid) { GD.PushWarning("[SMS camera] StartDemoCamera: no path"); return; }
+        DropLCamera();
+        _flags &= ~(FlagFrontRotate | FlagFrontY | FlagFrontDone);
+        _demo = path; _demoFrame = stageFrame; _demoT = 0f;
+        TickDemo(0f);
+        if (_md.Debug)
+            GD.Print($"[SMS camera] the demo camera: {path.Frames} frames at {path.FrameRate:F0} a second ({path.Seconds:F1} s), the eye from {M(_viewPosU)} to {_demoFrame * (path.EyeUnits[path.Frames - 1] / SmsUnits.UnitsPerMetre)}");
+    }
+
+    /// <summary>endReproduceDemoCamera_ (37): the bck ends, changeCamModeSpecifyFrame_(-1, 1) -- the camera resumes in the kind the next tick's
+    /// cube check names (a map tool warps it there; else the normal camera picks up from the demo's last pose in one frame).</summary>
+    public void EndDemoCamera()
+    {
+        if (_demo == null) return;
+        _demo = null;
+        _viewUp = Vector3.Up;
+        ResumeFromView(_viewPosU, _viewAtU, 1);
+        _tool = null;   // the cube check re-enters its tool (and warps) on the next tick
+        if (_md.Debug) GD.Print("[SMS camera] the demo camera over");
+    }
+
+    public bool IsDemoCamera => _demo != null;
+    public float DemoSeconds => _demo != null ? _demoT : -1f;
+
+    /// <summary>updateDemoCamera_ (56) with the bck's joints read off the baked path: the eye and look-at (unk124 / unk148), the up (mUp), the
+    /// fovy; the view matrices from them. When the frames run out the demo ends (the director's endDemoCamera).</summary>
+    private void TickDemo(float dt)
+    {
+        _demoT += dt;
+        float frame = _demoT * _demo.FrameRate;
+        _demo.Sample(frame, out Vector3 eyeU, out Vector3 atU, out Vector3 up, out float fovy);
+        Vector3 eyeM = _demoFrame * (eyeU / SmsUnits.UnitsPerMetre), atM = _demoFrame * (atU / SmsUnits.UnitsPerMetre);
+        _posU = _viewPosU = U(eyeM);
+        _atU = _viewAtU = U(atM);
+        _viewUp = (_demoFrame.Basis * up).Normalized();
+        _viewFov = fovy;
+        _viewNearU = SmsCamNormal.ReproduceDemoNearClip;
+        CrossToPolar(_atU, _posU, out _, out _finalPitch, out _finalYaw);
+        Apply();
+        if (_demoT >= _demo.Seconds) EndDemoCamera();
     }
 
     /// <summary>The ladder (CameraChange.cpp 656-826) with the stage's area kind as param_1. Of the game's branches, the port has no
@@ -605,6 +808,15 @@ public partial class SunshineCamera : Node3D
         _ibApproach = 0f;   // offMoveApproach_ (the FIX_G exception has no fixed cameras to come from here)
         KillHeightPanWhenChangeCamMode();
         HoldReset();
+        if (SmsCamKinds.IsDefiniteKind(_prevMode) && !SmsCamKinds.IsDefiniteKind(_mode))
+        {
+            // changeCamModeSub_ 337: out of a fixed mode -- the tool's unk28 is 0 for the stage's (the file's -1 clamped), so the polar target is
+            // read off the pose (calcNowTargetFromPosAndAt_), and DEFINITE_D2 (344) warps the camera behind the way it looked
+            _tool = null;
+            _p.CopyFrom(SmsCamKinds.Get(_mode));
+            CalcNowTargetFromPosAndAt(_posU, _atU);
+            if (_prevMode == SmsCamKind.DefiniteD2) WarpPosAndAt(_cur.Ratio, _cur.Yaw);
+        }
         if (_md.Debug)
             GD.Print($"[SMS camera] kind {_prevMode} -> {_mode} over {frames} ticks");
     }

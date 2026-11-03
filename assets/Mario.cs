@@ -17527,6 +17527,16 @@ public partial class Mario : CharacterBody3D
         if (SmsDebugPrint) GD.Print("[SMS take] the held object is gone: the hands empty (ensureTakeSituation)");
     }
 
+    /// <summary>An actor TAKES him (HIT_MESSAGE_TAKE from its side, pass 153l: King Boo's FallDemo carries him onto the raised centre disc and rides it
+    /// down): he is put at the point, his velocity zeroed and the ride he was on dropped -- SmsRideApply would otherwise put him back on that deck
+    /// every frame. The taker holds the controls itself (CameraLocked) and calls this each tick it carries him.</summary>
+    public void SmsCarryTo(Vector3 at)
+    {
+        GlobalPosition = at;
+        velocity = Vector3.Zero; Velocity = Vector3.Zero;
+        _smsRideBody = null; _smsRideApplied = false; _smsRideShift = Vector3.Zero;
+    }
+
     /// <summary>The body's half height off its first CollisionShape3D (his fruit are centred RigidBody3Ds; the game's object origin is its
     /// ground point), else half the game's hit height.</summary>
     private static float SmsBodyHalfHeight(RigidBody3D rb, SmsTakeData d)
