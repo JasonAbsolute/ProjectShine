@@ -918,7 +918,7 @@ is pushed and waiting on Jaysonn's playtest, and it is now the branch that merge
 `feature/select-stages` (entry #11, SMS 135) is likewise pushed and waiting on a playtest, and holds the only copy of #11's
 text. The exit-time C# finalize crash from #10's batch has still not recurred.
 
-### #16 -- DONE 2026-11-03 -- https://github.com/JasonAbsolute/ProjectShine/pull/14 (OPEN, awaiting Jaysonn's merge) -- queued 2026-11-01 10:38 PST (Kiro) -- PUSH + PR (SMS 151-153 + 153b..n), PLAYTESTED BY JAYSONN 2026-11-03, updated 2026-11-03 00:16 PST
+### #16 -- DONE 2026-11-03 -- https://github.com/JasonAbsolute/ProjectShine/pull/14 (SQUASH-merged by Jaysonn) -- queued 2026-11-01 10:38 PST (Kiro) -- PUSH + PR (SMS 151-153 + 153b..n), PLAYTESTED BY JAYSONN 2026-11-03, updated 2026-11-03 00:16 PST
 Push the eleventh feature branch: `feature/enemy-sirena`, branched from `main` `c082a22` (the trunk after PR #13, the Chain Chomps). Sirena Beach's
 family -- Hotel Delfino's ghosts -- one pass each on this branch. SMS 151: the Boo (TTelesa), the hotel's ghost -- it drifts between its graph's nodes
 a little off the floor, bobbing and tilting, fading in and out (the LOOP kind), and hurts you on touch; your jump passes straight through it until you
@@ -1059,7 +1059,7 @@ Result: `feature/enemy-sirena` pushed as a NEW remote branch, 33 commits over `m
 is exactly `c082a22`, so the branch sits on the trunk with no merge in it. All sixteen pass shas named in PROJECT_LOG.md confirmed
 ancestors: `a5b0234` (151), `f29bf3e` (152), `525f1b5` (153), `a550172` (153b), `47b3351` (153c), `38322f3` (153d), `da307fd`
 (153e), `acd4554` (153f), `570076c` (153g), `be8ce44` (153h), `cff77b9` (153i), `80160d0` (153j), `cc59542` (153k), `6570dca`
-(153l), `877791a` (153m), `28674e1` (153n). All seventeen log entries are in the branch's PROJECT_LOG.md. Nine of the 186 files
+(153l), `877791a` (153m), `28674e1` (153n). All sixteen log entries are in the branch's PROJECT_LOG.md (151, 152, 153 and 153b through 153n: sixteen, one per sha, corrected from a miscount of seventeen in this paragraph's first draft). Nine of the 186 files
 are modifications and 177 are additions: PROJECT_LOG.md, `assets/Mario.cs`, `assets/Player.tscn`, `assets/Sms/Enemy/SmsSmallEnemy.cs`,
 `assets/Sms/Fx/SmsGoopStrand.cs`, `assets/Sms/SmsCameraArea.cs`, `assets/Sms/SmsCameraKinds.cs`, `assets/SunshineCamera.cs` and
 this file.
@@ -1096,6 +1096,17 @@ ONE DEFECT, cosmetic: the attribution footer's robot glyph arrived as `ðŸ¤–
 reads a UTF-8 file with no BOM as cp1252, so the clipboard copy of `pr151.md` carried the mojibake and that is what reached the
 body field. Next entry: read the body with `[System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8)` before
 `Set-Clipboard`, or keep the footer out of the clipboard path. A repaired copy of the body sits in the session scratchpad.
+MERGED BY JAYSONN as a **SQUASH**: `main` is now `8348043`, one commit with a single parent `c082a22`. Local `main` was advanced
+with `git fetch origin main:main`, which moves the branch ref without touching the working tree, so HEAD stayed on
+`feature/enemy-sirena` and Jaysonn's thirteen uncommitted edits were never at risk. This is better than the `git merge --ff-only`
+the last three entries used, which needs `main` checked out.
+Verified by TREE, the way a squash requires: `git merge-base --is-ancestor 28674e1 main` says NO, while
+`git diff --name-only feature/enemy-sirena main` is EMPTY, so every one of the 186 files matches the branch, both log files
+included. Present on the trunk and checked individually: `Telesa.tscn`, `SmsTelesa.cs`, `DebuTelesa.tscn`, `SmsDebuTelesa.cs`,
+`BossTelesa.tscn`, `SmsBossTelesa.cs`, `BossTelesa/SmsRoulette.cs`, `SmsTelesaSlot.cs`, `SmsBossWall.cs`, `KingBooArena.tscn`,
+`KingBooWall.tscn`, `Telesa/SmsTelesaBlock.cs` and `SmsCameraPath.cs`. The fixed-point camera kind is on the trunk too:
+`DefiniteD2` appears five times in `assets/SunshineCamera.cs` and four in `assets/Sms/SmsCameraKinds.cs`. `PROJECT_LOG.md` holds
+all sixteen entries. `pr151.md` deleted.
 THE TRUNK TIP: read it from `git log --oneline -1 main`, not from a sha written here. A commit cannot state its own sha, which
 has now caught three entries.
 STILL OPEN, carried forward: `feature/enemy-pinna2` (entry #14, SMS 147 and 148, the Bullet Bill and the ground Electrokoopa) and
