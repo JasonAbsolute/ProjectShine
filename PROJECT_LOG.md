@@ -10971,3 +10971,58 @@ the splice removed, the root clean.
 **Knobs added:** none. Files: `assets/Sms/Enemy/SmsSmallEnemy.cs` (one line), `assets/Sms/Enemy/SmsBossTelesa.cs` (IntroRelease), `assets/Sms/Enemy/BossTelesa/
 BtelesaRollCamera.tres`, `assets/Sms/Enemy/BossTelesa/KingBooArena.tscn`. Tooling (npc82/sirena151/): bck_cam153.py (the INF1 codes), scene_boss153.py,
 patch_boss153m.py, patch_drive153m.py, patch_enemy153m.py, patch_smoke153.py (73 checks), cap/an153_*.
+
+### 153n -- King Boo's intro: Mario on the switch pad, the gold dome standing through the ride and sinking as the fight begins, one pace knob (feature/enemy-sirena, code `28674e1`)
+
+**Jaysonn's notes on 153m:** (1) "the intro is a bit slow", (2) "the golden dot in the middle should be bulged out then goes in once the fight starts",
+(3) "mario should be on the purple point of the inner ring when its lowering down". All three taken; (2) and (3) are the game's own behaviour, read off
+the decomp.
+
+**The pad (3).** `TBossTelesa::getTakingMtx` -- the matrix the held Mario is placed by -- is `mRoulettes[0]->getAnmMtx(1)`: rulet00's joint 1, `switch_00`,
+the centre disc's SWITCH PAD at (140, -140, -910), 920 u from the centre; its y is set to the disc's position - 120 (the pad's top is at -130, so 10 u
+over it). 153l held him at the disc's centre (the bowl's bottom). `HoldPoint`: the disc's `SwitchPoint` (the pad's centre, turning with the disc) at the
+pad's top (10 u under the game's number: no hover), the XZ off the node, the Y off the intended height (the frame-lag shadow); `Mario.SmsCarryTo` takes a
+facing now and he is turned to the table's centre at the TAKE. Every `IntroStart` takes him to the pad, as the game's TAKE does.
+
+**The dome (2).** rulet00.bck (rulet_anim153.py) runs the IKE joint's Y scale 1 -> -0.897 over ~1 s (the glb's 0.98 s): the dome into the bowl.
+`rouletteFall` calls `mRoulettes[0]->mMActor->setBck("rulet00")` every tick the disc falls, and `MActor::setBckFromIndex` -> `setAnmFromIndex(index, 0)`
+restarts the clip at frame 0: the dome stands through the whole fall; when the disc is level the calls stop and the clip plays out -- the dome sinks in
+the second the fight begins, exactly Jaysonn's memory. The port: `SmsRoulette.PondPress(t)` (0 the dome .. 1 the bowl) -- `PressPond` keeps the pond
+surface's source arrays and `RebuildBowl` makes the bowl's mesh from them at the IKE scale in force (`_pondScaleNow`; the normals the inverse-transpose,
+turned to the side we look at; the winding kept); the collision is rebuilt at the motion's ends only (`RebuildCollision`: AutoCollision's shapes again --
+the dome's shape through the second, when Mario is on the pad 920 u out); `PondPressTicks` 120 (the clip's second); `PondIsBowl` is true at the end
+only; `PondYUnits` follows. The boss: `PondPress(0)` at the lift (IntroLift), the ramp from the landing (`_pondPressTick`), `PondPress(1)` at IntroEnd if a
+very short slot phase cut it; `IntroPondPress` off = 153c's bowl from the start. A table without an intro is pressed from the start as before (PressPond
+sets t = 1).
+
+**The pace (1).** The game's fall is 1 u a tick (2000 u in 16.7 s at 120 Hz) and the bck is cut to it (500 frames at 30 = 16.7 s); the slot's unseen drop
+is 540 ticks more. `IntroSpeed` (in place of 153l's `IntroFallSpeed`) scales all three together: the fall (`_introDiscY -= IntroSpeed / U`), the bck's
+playback (`SunshineCamera.StartDemoCamera(path, frame, rate)`: `_demoT += dt x rate`, `DemoRate`; the game's `TCameraBck::setRate` is an empty function,
+so this is the port's) and the slot's drop (5 / 1 u a tick x IntroSpeed, rouletteStart as it passes 200). The default is 1.5 -- 11.1 s + 3 s -- Jaysonn's
+"a bit slow"; 1 is the game's.
+
+**Drive 153 (patch_smoke153.py): 74 / 74** -- 153m's 73 + I1b (the dome up through the ride: PondPress 0, the pond's top +20 u, not a bowl); I1 / I3 / I4 /
+I5 read `k.IntroSpeed` (the shipped default, not a forced 1): the lift 2000 - ticks x speed, half way at 500 / speed frames, the fall 1000 / speed
+frames, the slot phase 270 / speed; Mario within 0.3 m of the pad's centre and 5..15 u over it while carried, within 0.6 m after the DETACH; the press
+begun at the landing (0 < PondPressT < 0.2 two frames on) and complete by the slot phase's end (PondIsBowl, the pond -283 u); I2 reads the bck's rate.
+A1c (phase 1): the wait pattern's eye sheet is read wherever its 300-tick blink cycle stands (open / half / closed) -- the intro's new length had moved
+the drive's fixed moment onto a blink (run ao: eye 1; the pattern itself, btp 2, is still the check). Headless run ao 73 / 74 (that blink); windowed runs
+ap / ar 74 / 74 -- but on a STALE DLL: the Mario.cs patch had left two stray braces after SmsCarryTo, builds 153bl..bo failed (144 errors) and the runs
+loaded build 153bk (the boss, the discs, the camera and the drive, not SmsCarryTo's facing and idle state: Mario rode the pad in his ledgeFall pose,
+ma_land -- the ap/ar captures). Found by the HUD in the captures, confirmed by a 60-s probe (SmsCarryTo / SetMarioState prints: idle through the whole
+ride once built). Braces fixed (fix_braces153n.py); builds 153bp / bq 0 errors; windowed run as 74 / 74 with the captures (Mario standing on the pad,
+ma_wait; the dome up at intro1, pressed 0.05 at the landing, the bowl at fightcam). Lesson kept: check the build log exists and says 0 Error(s), and
+the DLL's timestamp, before every run. The splice removed (Mario.cs keeps SmsCarryTo's facing), the root clean. Jaysonn moved the level's spawn between
+runs am and ao (the drive's arena is placed off Mario: every check is relative). The switch pad is its own red texture while the disc is still and
+glows blue (purple over the red) only while it turns -- TEVREG0 in setRollSp, the game's rule -- so it is red through the ride and purple from the
+slot phase on.
+
+**Deviations:** IntroSpeed (the game has no pace; 1 restores it); the hold at the pad's top rather than 10 u over it; the dome's press as a mesh rebuild
+rather than the skinned joint (153c's choice, kept); the rest the game's own numbers.
+
+**Knobs added:** SmsBossTelesa -- Deviations: IntroSpeed 1.5 (replaces IntroFallSpeed), IntroPondPress; SmsRoulette: PondPressTicks 120. Readers:
+SmsRoulette.PondPressT, SunshineCamera.DemoRate. Files: `assets/Sms/Enemy/BossTelesa/SmsRoulette.cs`, `assets/Sms/Enemy/SmsBossTelesa.cs`,
+`assets/SunshineCamera.cs`, `assets/Mario.cs` (SmsCarryTo's facing). Tooling (npc82/sirena151/): patch_roulette153n.py, patch_boss153n.py,
+patch_camera153n.py, patch_mario153n.py, patch_drive153n.py, patch_drive153n2.py, patch_drive153n3.py (the fan's peppers set aside on the ring:
+a steep lob through his tongue cylinder had made him spicy early in runs ak / ap), fix_braces153n.py, patch_dbg153n.py (the probe, not shipped),
+patch_smoke153.py (74 checks), cap/as/*.
