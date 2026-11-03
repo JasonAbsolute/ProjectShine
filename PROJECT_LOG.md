@@ -10123,3 +10123,906 @@ jet straight out of the teeth (at CenterUnits + PolarXZ(_yaw, 460) + up 60), fir
 **Verification:** build 0 errors, boot ALL OK; a headless GPU capture (patch_smoke150's drive, spliced then removed and Mario.cs restored to committed
 before the commit) -- the sparks read as elongated streaks jetting from the mouth, not the 150d scatter. The streak length (the quad's 0.8), the cone
 (spread 14), the speed (6-11) and the life (0.32 s) are knobs if the feel wants tuning in motion.
+
+### 151 -- the Boo: Hotel Delfino's ghost -- it drifts and bobs, hurts on touch, is untouchable until hosed, then stunned and jumped on; the pink box Boo turns into a block (feature/enemy-sirena, `a5b0234`)
+
+**Files:** NEW `assets/Sms/Enemy/Telesa.tscn`, `SmsTelesa.cs` (+ .uid), `assets/Sms/Enemy/Telesa/` (SmsTelesaBlock.cs (+ .uid) + TelesaBlock.tscn -- the pink
+Boo block; TelesaToon.gdshader (+ .uid); the six materials TelesaBody / Eye / Kiba / Mouth / Block / BlockEye .tres), `models/Eniemes/Telesa/` (telesa.glb
+-- 6 bck clips -- and telesablock.glb from his FinModelUtility rip of /scene/telesa and /scene/mapobj; game units; K_telesa_body / _eye / _kiba.png,
+telesa_0 / 1 / 2.png, H_toon_2_4i.png, H_ma_rak_dummy.png (the screen-texture dummy), telesablock.png (the rip's name for the block's eye sheet); the
+glb .imports swap the bmd materials for the .tres). Nothing of Mario's or the base's changed. Tools: npc82/sirena151/{patch_import151.py,
+probe_clips151.gd, bmd_mat3.py (the MAT3 colours), make_tres151.py, patch_smoke151.py (drive 151 + its capture mode), run_drive151.bat /
+run_cap151.bat, cap/, logs/, disc/ (the rip's _mat_*.fragment.glsl), decomp/ (telesa.cpp, Telesa.hpp, smallEnemy.cpp, MapObjBlock.cpp)}. The
+shipped /enemy/telesa.prm (sms_shipped_params.json); the bck frame counts read from the .bck headers (clush 49, down 14, hit 15 L, hit_end 19,
+hit_start 9, wait 50 L; modoki_wait 180 is the imitator's).
+
+**The game.** TTelesa : TWalkerEnemy (ACTOR_TYPE_TELESA, unk150 0x12; HIT_CATEGORY_ENEMY OFF and BOSS on -- Mario's jump does not find a Boo),
+body scale 1.5. telesa.prm: HeadHeight 120, BodyRadius 30, WallRadius 50, 1 hit point, Search 800 / 600 / 400 / 90 (unused: isFindMario is false),
+GiveUp 2000 / 650, AttackWait 120, FreezeWait 300, damage 80 x 90, attack 70 x 80, turn 1 / 1.5, march 1 / 1.7, WaitTime 100; its own FadeInTime /
+AppearTime / FadeOutTime 240, FlyHeight 50..100, FlyAmplitude 50..75, FlyFrequency 200..400, TelesaGravityY 0.05, GenAttackerTime 200,
+TelesaAttackGravityY 0.02, TelesaPowerByWater 40, LoopAppearTime 200, LoopHideTime 300; the static mFlyAngMax 35. init: the screen texture swapped
+into H_ma_rak_dummy and LIGHT_TYPE_INDIRECT (a see-through ghost), setFlyParam (the target height, the bob's amplitude and frequency at random in
+their ranges), GRAPHWANDER. reset: HIDDEN, the head 100, ENEMY / BOSS off, the base colour white (350, 350, 350). load: setTypeNormal (HIDDEN off, the
+fade INVISIBLE), mDampenedGroundHeight = the placed Y. The four kinds: TLoopTelesa (LOOP: in 240, visible 200, out 240, hidden 300, again),
+TBoxTelesa (CAN_SEE, PINK (600, 270, 220), unk150 0x40, a TelesaBlock registered dead), the NORMAL one (invisible until sprayed, visible 240 after),
+TSeeTelesa (always visible). setBehavior (wandering / waiting / attacking): the bob phase +1 to its frequency, offsetY = amplitude x sin, rotation.x =
+10 - 35 cos (the `==` typo skips a jump over 5 deg). walkBehavior: TWalkerEnemy's, the fly height +1 a tick to its target; the damping speed is
+(ground - ground) / 120 = 0 for a plain Boo so the base height STAYS the placed Y; y = base + fly + bob. bind: the base point (y - fly - bob) carries
+the velocity under TelesaGravityY (the terminal -40?), landed at the ground + 1.05 -> not airborne, the velocity 0 (dying: set on the ground).
+calcRootMatrix: the drool (TLS_YODARE_L / _S at joints 4 / 3, x the fade). moveObject: changeTevKColor -- VISIBLE (alpha 255; NORMAL past
+AppearTime / LOOP past LoopAppearTime -> FADE_OUT + INDIRECT; CAN_SEE or frozen: stays), INVISIBLE (alpha 0; LOOP past LoopHideTime -> FADE_IN),
+FADE_IN (t x 255 / 240; at 255 VISIBLE + LIGHT_TYPE_OBJECT), FADE_OUT (255 - t x 255 / 240; at 0 INVISIBLE); the alpha is K0_A on every material,
+TEVREG0 the base colour on the body. receiveMessage (TSmallEnemy's): TRAMPLE / HIP_DROP -> isHitValid (not HIDDEN) -> kill; WATER -> changeByJuice
+(the box Boo: true) else decHpByWater (NOTHING for a Boo) + behaveToWater. behaveToWater: unk165; not frozen -> the velocity normalize(away from
+Mario, y 2) x 5, +2 u, AIRBORNE, FADE_IN unless visible, FREEZE pushed, unk1C8, HIT_CATEGORY_ENEMY ON. FREEZE: hit_start; a clip's end: hit_end
+ended and not flying -> ENEMY off, done; else sprayed since (resetBaseGround) or hit_start -> hit (loop); else hit_end; reduceFlyForce (the fly
+height -4 a tick to 0, the bob toward 0 by 4, the phase and the tilt x 0.9), walkToCurPathNode(0, turn x 0.2). kill -> DIE: decHitPoints; at 0:
+FADE_IN if hidden, NO_COLLISION; the down clip (an attacker: TLS_CHANGE instead); reduceFlyForce; the clip's end -> DEAD, genRandomItem, the
+manager's generatePetBottle (every FIFTH kill a large water bottle), 0xCE. TRAMPLE (TBoxTelesa::isHitValid): the clush clip, false. attackToMario:
+HIDDEN, or Mario not above (his y < y + attackHeight - 50) -> ATTACK. isReachedToGoal: XZ MsVECMag2 < 200. setWalkAnm: NO_COLLISION off, wait, the
+bob phase 0. isCollidMove: everything but an effect object. TBoxTelesa::changeByJuice: the block appears at the body (scale 1, rate 0.1, the Boo's
+yaw), the Boo HIDDEN + NO_COLLISION, CHANGE pushed with FREEZE after it, MSD_SE_EN_TELESA_FIX + OBJ_AWAY_INTO_GRAF, unk185 1. CHANGE
+(TNerveSmallEnemyChange): the clip rate 0, 0xCD; scalingChangeActor (the rate +0.02 XZ to mBlockXZScale 1.5, +0.01 Y to mBlockYScale 0.6);
+changeMove: for the first 80 ticks (mBlockWaitTime 400 x 0.2) the block's y bob (x unk188 = 0: none) and three turns of spin; past 400 and in the
+last 200 of getChangeBlockTime 3000 the block blinks 10 in 20; at 3000 changeOut: NO_COLLISION, MSD_SE_EN_TELSA_RECOVER, HIDDEN off, the body at
+the block, 0xCD, the clip rate back, the block killed. TJuiceBlock (MoveBG/MapObjBlock.cpp): initMapObj binds TEVREG0 of material 0 to unk138 (the
+juice colour -- never set for the Boo's block); perform scales joints 0 / 1 by unk140; moveObject kills it with its enemy. TTelesaManager:
+modoki.bmd for the imitators, telesaForceKill, generatePetBottle, setFlagOutOfCube. TMarioModokiTelesa / TKageMarioModoki (the Boos that copy
+Mario) and the King Boo's attackers (setAttacker / initAttacker / initItemAttacker, TNerveTelesaAttackMario, setAttackPoint, the attack gravity and
+PowerByWater) are the boss's -- not this pass.
+
+**The port.** `SmsTelesa : SmsSmallEnemy`, Prm = the shipped telesa.prm; the base's walker nerves (GraphWander, Wait, Die) with the species'
+TelesaFreeze, Trample and Change. Its own HitCheckMario: the jump finds it only while `_tangible` (HIT_CATEGORY_ENEMY on -- the sprayed stun), else he
+passes through the ghost with no bounce; the hose always; the touch attack (not when he is above it). Its own SmsSprayedByWater (the mark; the box
+Boo's ChangeByJuice first; no hit point off for water). FlyBind: the species sets its height (the base point + the fly height + the bob) and airborne
+flag itself; the bind runs BEFORE setBehavior's new bob (the game's order: control, bind, setBehavior) so the base point is read with the bob the walk
+placed the body with -- read after, it drifted by the bob's delta every tick and the body was "airborne" half of every bob with the velocity piling
+up to the terminal (the first run's find). The base point is the FLOOR under the placed point (+ BaseOffsetUnits): the game's Boos are placed ON their
+floor (bind lands the base there); a dropped-anywhere one here does not hang airborne over its own floor. The fade is a `fade` uniform on per-body
+copies of the four materials (set when it changes). TelesaToon.gdshader is the bmd's TEV: X = clamp((C0 + toon x (1 - 3/4) + lit x 3/4 - 1/2) / 2),
+colour = mix(MAT x (the glint channel + amb1), TEX, X) -- the MAT3 colours are white (bmd_mat3.py), so the white Boo is its white sheet pulled toward
+the dark glint channel in the toon's shade, and the pink box Boo's salmon is that dark channel through the unsaturated green (0.73) and blue (0.63)
+under a saturated red; blend_mix, depth_draw_opaque; the eye / fangs / block eye cut out at the texture's alpha. The block is `SmsTelesaBlock`
+(TelesaBlock.tscn: a StaticBody3D on layer 1 Mario stands on, its BoxShape3D the glb's AABB at the live rate, re-sized as it grows; the Boo hands it
+the rate, the yaw and the blink each tick); its flat pink is mat_color + amb1 with C0 0 (the unset unk138). Knobs (grouped, plain English): Kind
+(Loop / Box / Normal / CanSee), Deviations (SpeedScale, BaseOffsetUnits), Effects (ChangeFxScene = Fx/EnemyDisap, the drool slot, BlockScene =
+Telesa/TelesaBlock.tscn), Sounds (eight slots). The scene: CharacterBody3D (sms_enemy, mask 5), Model at 1 / 74.44, a 1.0 m sphere at 1.03 m (the glb's
+bounds: 137 x 108 x 142 u), RelaunchTicks -1, a plain-English `_sms_note`.
+
+**Deviations (logged; knobs where they matter):** the fade is alpha (the game draws a fading Boo with the screen texture, a see-through refraction);
+the base height snaps to the floor under the placed point (the game's is the placed Y -- BaseOffsetUnits lifts it); the tilt eases over a 5-deg jump
+(the game's `==` typo would freeze the tilt for good after a stun); the fifth kill's water bottle is the DropTable's business; the Boos that copy
+Mario and the King Boo's attackers are the boss's; the camera shakes and the area cube are not ported; the graph node's Y as the ground (bind's
+unk124 branch) is not used.
+
+**Verification:** drive 151 (patch_smoke151.py, SMS_YCAM_SMOKE=1; two game ticks a physics frame) 24/24 on a 30 x 30 m slate dock 80 m over the
+arena: A1 a LOOP Boo placed -- GRAPHWANDER in the wait clip, fading in from 0, not tangible, the fly height rising; A2 the fly height at its 50..100
+target and held, the bob swinging both ways, the tilt -25..45; A3 the height = the base + the fly height + the bob every frame (max err 0); A4
+FADE_IN -> VISIBLE at 120 frames; A5 the loop: VISIBLE -> FADE_OUT -> INVISIBLE -> FADE_IN, the alpha 0..1; A6 a wandering ghost (GraphWander, the
+wait clip only, never tangible). T1 the touch: Mario on the dock in its path hurt (8 -> 7). S1 the hose: knocked away, airborne, FREEZE, tangible,
+hit_start; S2 the stun held by the re-sprays (hit_start -> hit -> hit), sunk (fly 0, bob 0, tilt 0), Mario's hit point kept; S3 thrown 5.5 m off,
+coming down; S4 the hose off: hit -> hit_end -> the stun ends by itself, not tangible, GRAPHWANDER; S4b the base re-rooted on the dock; S5 the rise
+after. J1 stunned again and sunk; J2 Mario's fall onto the tangible Boo: TRAMPLE -> kill -> DIE in the down clip, Mario bounced; J3 dead and gone.
+B1 a BOX Boo: CAN_SEE, visible at once, pink; B2 sprayed: the TelesaBlock made (rate 0.1), the Boo hidden, CHANGE; B3 the block grown to 1.5 x 0.6
+x 1.5 (4.0 x 1.6 x 4.1 m), spun three turns; B4 Mario standing ON the block (his y = its top); B5 the blink through the last 200 ticks; B6 changeOut
+at 3000: the Boo back, the block gone, FREEZE; B7 the drift again, pink and visible; B8 Mario's fall onto the box Boo: not tangible, through the
+ghost, no kill. (Run a's finds: the spine's one-frame "(done)" idle between nerves is not a state -- the tracker skips it; the bob-before-bind order
+above; a Boo placed 0.6 m up hung airborne over the dock with its velocity at the terminal -- the base point is now the floor.) Build 0 errors,
+boot ALL OK. GPU captures (SMS_F151_CAP=1 under run_gpu.ps1, cap/): the drift (the white Boo bobbing, tilted), the stun (the half-faded ghost on
+the dock in the hose's hit marks), the pop (the squashed Boo, eyes wide, tongue out, Mario bounced), the pink box Boo, Mario on the pink block.
+
+**Note for the drives:** the Boo is untouchable (his jump passes through it) until a spray; the stun lasts the hit clips (hit_start 9, hit 15 per
+re-spray, hit_end 19 frames) plus the sink; the box Boo's block stands ChangeBlockTime 3000 ticks (25 s) -- the drive waits it out (no timer knob:
+the game's is a static).
+
+### 152 -- the Sleepy Boo: Hotel Delfino's huge Boo asleep across a doorway -- it snores, hurts and shoves on touch, and nothing of Mario's moves it; the hose + a ground pound beat it here, a knob (feature/enemy-sirena, `f29bf3e`)
+
+**Files:** NEW `assets/Sms/Enemy/DebuTelesa.tscn`, `SmsDebuTelesa.cs` (+ .uid), `assets/Sms/Enemy/Telesa/DebuTelesaBody.tres` + `DebuTelesaEye.tres` (the
+standard EnemyToon / EnemyToonCutout shaders), `models/Eniemes/Telesa/debutelesa.glb` (one bck clip) with debutelesa_0 / 1.png, K_debutelesa_eye.png,
+K_debutelesa_mouth.png from his FinModelUtility rip of /scene/debutelesa (game units; the glb .import swaps the two bmd materials for the .tres).
+Nothing of Mario's or the base's changed. Tools: npc82/sirena151/{patch_import152.py, probe_clips152.gd, make_tres152.py, patch_smoke152.py (drive
+152 + its capture mode), run_drive152.bat / run_cap152.bat, decomp/ (DebuTelesa.cpp, DebuTelesa.hpp)}. No /enemy/debuTelesa.prm ships: the numbers
+are TSmallEnemyParams' PARAM_INIT defaults with TDebuTelesaManager::load's forced hits. The bck frame count read from the .bck header (94, loop).
+
+**The game.** TDebuTelesa : TSmallEnemy (ACTOR_TYPE_DEBU_TELESA) with LIVE_FLAG_UNK10 -- no bind: it never moves, falls or turns. The manager's load:
+attack 240 x 330, damage 220 x 300, body scale 1..1; createModelData debuTelesa.bmd (MaterialPEFull, unique materials, 1 TEV stage); clipEnemies at a
+350 near clip. init: WAIT, initCollision (the hit actor, HIT_CATEGORY_PLAYER, 10 x 10; NO_COLLISION off), the joints null_yodare and jnt_Rhand. reset:
+nothing. The one nerve TNerveDebuTelesaWait: debutelesa_wait and its bas (the snore). receiveMessage: TRAMPLE / HIP_DROP / PUNCH -> false -- nothing
+happens; UNKB (Yoshi's eat, Yoshi.cpp) -> MSD_SE_EN_DB_TELSA_EATEN, then TSmallEnemy's (isHitValid -> kill -> DIE; setDeadAnm: the frame control
+init(1) -- there is no death clip, Yoshi swallows it). behaveToWater: nothing (TSmallEnemy's decHpByWater still takes the hit point, to no effect).
+attackToMario: sendAttackMsgToMario. isCollidMove: false. doKeepDistance: true. emitEffects (every frame unless taken or dying): POI_ZZZ (1.5) at
+jnt_Rhand, TLS_YODARE_L (2.3) at null_yodare. The bmd's TEV: TEX + (clamp(C0 + TOON x (1 - 0.627) + LIT x 0.627 - 1/2) - 1/2) / 2 (konst 160).
+
+**The port.** `SmsDebuTelesa : SmsSmallEnemy`, Prm = the defaults + the forced hits. FlyBind with `_noBind` on and the velocity zeroed every tick: the
+body stays where it was placed (the game's UNK10). One nerve, DebuWait (the clip for ever); DefaultNerve = DebuWait; no walker (IsFindMario false,
+IsCollidMove false, no wall hop, gravity 0). Its own HitCheckMario: the base's lists (the trample finds it -- IsHitValid says no, Mario bounces; the
+hose; the touch attack) plus doKeepDistance: Mario in its damage cylinder is pushed out (SmsKeepDistance, the Snooza Koopa's). IsHitValid: false to
+all -- or, with BeatenBy = SprayThenGroundPound, true to a HIP_DROP on a woken one. SmsSprayedByWater: the mark; under the knob the awake timer
+(AwakeSeconds x 120 ticks), else nothing. The Zs: PoiZzz (Fx131) as a top-level child placed at the right-hand bone each tick (x 1.5), shown while
+asleep; the drool: a slot at null_yodare (x 2.3). A woken one stirs: the look scale x (1 + 0.04 sin). Beaten: the base's DIE with the wait clip (no
+death clip) and the look scale shrinking to nothing over 40 ticks (the port's stand-in for Yoshi's swallow), the EATEN sound slot, the base's puffs
+and drops at the end. Materials: the standard enemy toon (form 0, s0_k 0.627 for the bmd's konst) and its cutout for the eyes -- the usual stand-in
+for this family of stages. Knobs (grouped, plain English): Deviations (BeatenBy, AwakeSeconds 8), Effects (SleepFxScene = Fx131/PoiZzz, the drool
+slot), Sounds (EatenSound, SnoreSound). The scene: CharacterBody3D (sms_enemy, mask 5), Model at 1 / 74.44, a 2.0 m sphere at (0, 2.0, -0.5) (the glb's
+bounds: 306 x 299 x 432 u, the body set back), RelaunchTicks -1, a plain-English `_sms_note`.
+
+**Deviations (logged; knobs where they matter):** BeatenBy = SprayThenGroundPound by DEFAULT: in the game only Yoshi eating it clears a Sleepy Boo
+and Yoshi's eating is not in this port -- the game's rule (BeatenBy = YoshiOnly) is a wall for good, so Jaysonn's ask (hose it awake, ground-pound
+the woken one) is the default and the "wake" (the Zs stop, it stirs) is the port's own, the game having no such state and no second clip; Mario's
+fall onto it bounces (the base's trampleExec) where the game's TRAMPLE is simply refused; the shrink-away death is the port's (no clip); the 350-u
+near clip and the sounds are slots / not ported.
+
+**Verification:** drive 152 (patch_smoke152.py, SMS_YCAM_SMOKE=1) 9/9 on the 30 x 30 m slate dock: D1 placed -- DEBUWAIT in debutelesa_wait, no bind
+(moved 0.001 m), the Zs, asleep; D2 Mario walked into it: hurt (8 -> 7); D3 shoved back out of the 220-u cylinder (2.67 -> 5.55 m); D4 his fall onto
+it: nothing (DebuWait, the Zs on); D5 the hose: woken (the Zs gone, stirring); D6 his ground pound on the woken one: DIE; D7 dead and gone; Y1 a
+YoshiOnly one: the hose does nothing; Y2 his ground pound does nothing. (Run b's find: a 2.4 m collision sphere centred on the node pushed the body
+0.4 m out of the dock's floor on placement -- 2.0 m at (0, 2, -0.5) now.) Build 0 errors, boot ALL OK. GPU captures (SMS_F152_CAP=1, cap/): the
+sleeper with its Zs, the woken one, the beaten one shrinking away.
+
+### 153 -- King Boo: Casino Delfino's boss over his roulette table -- the slot machine, the fruit and pepper rounds, the spicy hits, the three spinning discs with their pound switches, the Boo attackers, the Shine (feature/enemy-sirena, `525f1b5`)
+
+**Files:** NEW `assets/Sms/Enemy/BossTelesa.tscn`, `SmsBossTelesa.cs` (+ .uid; with `SmsBossTelesaPart`), `assets/Sms/Enemy/BossTelesa/{SmsTelesaSlot.cs,
+TelesaSlot.tscn, SmsRoulette.cs, Roulette00.tscn, Roulette01.tscn, Roulette02.tscn, KingBooArena.tscn, BossTelesaToon.gdshader, BossTelesaBody.tres,
+BossTelesaCrown.tres, BossTelesaHa.tres, BossTelesaMouth.tres}`, `models/Eniemes/BossTelesa/` (btelesa.glb with 17 bck clips, srotrulet.glb, srot_waku.glb,
+rulet00 / 01 / 02.glb and their pngs from his FinModelUtility rip of /scene/delfinoBoss, game units; btelesa.glb's .import swaps its four bmd materials
+for the .tres). CHANGED `assets/Sms/Enemy/SmsTelesa.cs` (the Boo's attacker half: `SmsInitAttacker`, the AttackMario nerve, the attacker's water knock
+and death; `IsReachedToGoal` fixed -- MsVECMag2 is a LENGTH, so 200 u, not the squared 14 u of pass 151) and `assets/Mario.cs` (`public int SmsHP =>
+_health;` before SmsIncHP -- SMS_GetMarioHP, the slot steers by it). Tools: npc82/sirena151/{patch_import153.py (glb / pins / mario), make_tres153.py,
+probe_clips153.gd, probe_bones153.gd, probe_rulet153.gd / probe_ride153.gd / probe_dome153.gd (the collision tests), patch_smoke153.py (drive 153 + its
+capture mode), run_drive153.bat / run_cap153.bat, bmd_mat3.py, decomp/ (bosstelesa.cpp, BossTelesa.hpp, MapObjSirena.cpp / .hpp, telesa.cpp)}.
+bosstelesa.prm shipped: HeadHeight 120, BodyRadius 30, 3 HP, damage 30 x 260, attack 30 x 420, GenAttackerTime 200, HitAngle 180, NumGenBubble 3,
+1stBubbleSp 10, HideAreaRadius 1000, SlotItemNum 6, SlotFruitNum 16, SlotFirstHitCollectRate 0.6, SlotHitCollectRate 1.0, TransYOffset 800, StopSlotTime
+3500 / 3000 / 2500, SpicyTime 1500; the statics mNormalAlpha 0x96, mBaseHoseiPosY -300, mRouletteUpRate 0.03, mTelesaGenerateInterval 400.
+
+**The game.** TBossTelesa : TSpineEnemy (ACTOR_TYPE_BOSS_TELESA). init: the model with motion blend, K0 = unk34C (the alpha 0x96 on every channel: the
+mix konst and the fade), K1 = unk348 (the tint, white), LIGHT_TYPE 3 with the SCREEN TEXTURE swapped into H_ma_rak_dummy -- the body's TEX0 is the
+screen: King Boo is a dark see-through refraction of the casino behind him; three hit actors: the BODY (TBossTelesaBody 350 x 550 at joint 1 jnt_body
+- 200 y: Mario -> ATTACK, a MAP_OBJECT -> checkHitObject, SPRAYED -> checkMessage), the TONGUE (180 x 350 at joint 7 jnt_sita_2 - 350: Mario -> ATTACK, a
+RED_PEPPER -> setSpicy, an object over tongue.y + 100 -> checkHitObject, SPRAYED -> tongueHitWater), the KILL cylinder (400 x 300 at (joint 1 xz, y - 350):
+every HIT_CATEGORY_ENEMY in it killed; Mario within 300 u of its point -> forceHide and unk6C = 1). loadAfter: the three ACTOR_TYPE_CASINORULET discs,
+the ACTOR_TYPE_SROT_RULET slot (unk1A0 = the boss), 20 fruit (6 coconut, 6 papaya, 2 pineapple, 6 durian), 10 red peppers, 10 coins, the Boo manager, 5
+bottle_large, the srot_waku frame as TSharedParts of the slot. moveObject: the camera offset, mPosition.y = mGroundHeight + 300, the alpha in Die (+1
+a tick toward 0xFF; -1 toward 0x96 + 30 x lost HP through the lick past frame 50 and the laugh), the roulette sounds, the hit actors placed on the
+joints. calcRootMatrix: the model at mPosition + TransYOffset + the hosei dip (-300..0), the slot at joint 1 (- 700 through appear, - 2400 through hide /
+damage / hit) or joint 0 (- 700) + the UNCLAMPED hosei, the drool at joint 5 / 10, the sweat and fire at joint 9 while spicy, the spit clip's frame 40 ->
+generateSlotItem (in SpitSlotItem) or genAttacker. The bck table: 0 appear 59, 1 bero_hit 59, 2 damage 219, 3 down 199, 4 hide 44, 5 hit 42, 6 laugh
+89, 7 lick 140, 8 / 9 / 10 the hot-spring bubbles 122 / 5 / 80 L, 11 roll 139, 12 spicy 30 L, 13 spicy_end 59, 14 spit 99, 15 wait 60 L, 16 wet 59. NERVES:
+FallDemo (the intro: Mario rides rulet00 down from 2000 u, the slot drops into place, rouletteStart) -> HideWait (HIDDEN, spicy off, the alpha, the
+slot scale 0, brk 2; past 400 ticks and unk6C 0 -> Appear) -> Appear (the appear clip, the BGM, the slot scale 1 + randomReset, onAllCollision; the
+clip's end -> wait; frame 78 the SLT_LAND shake; past 800 ticks every 400 + 100 x lost HP ticks the spit clip; hosei x 0.96) -- tongueHitWater ->
+SlotStart (the roll clip; frame 53 slotStart: moveStart, telesaForceKill; the end -> wait + forceStopSlot(1); checkSlot: no drum held -> SpitSlotItem;
+hosei x 0.99) -> SpitSlotItem (past 200 ticks hosei -100 a tick; under -500 the spit clip; the clip ended and past 600 -> PrepareSlot, fruitCollisionOn)
+-> PrepareSlot (wait; spicy: bero_hit -> spicy loop until SpicyTime -> spicy_end -> plain; unk368 to StopSlotTime by HP, x 0.5 for COIN; the last 120
+ticks flashItem; all dead or time up -> forceAllItemKill, DISAPPEAR / ESCAPE, reset, Hide) -> Hide (the hide clip; its end offAllCollision, the rumble,
+rouletteStart -> HideWait). checkHitObject (PrepareSlot only): coconut (0xE6, 0x64, 0xB4) / papaya + pineapple (0xE6, 0xB4, 0) / durian (0x96, 0x32,
+0xE6) -> the tint + kill; a pepper eaten; the fhit effects; makeObjDead. kill -> Die (pushed): spicy -> decHitPoints; offAllCollision; HP left: spicy ->
+brk 1 + damage (UNK1F shake), not spicy -> hit + brk 0 (UNK20); HP 0 -> down + brk 1 (UNK21), the slot scale 0, DOWN. The end of hit -> brk 2 + lick ->
+laugh -> onAllCollision, wait, reset onto PrepareSlot; the end of damage -> damageRecover (the fruit / peppers / coins dead with TLS_CHANGE puffs, the
+sound, Hide after, unk368 0); the end of down -> the down puffs (by the last fruit), forceAllItemKill, slotStop; 240 ticks later makeShineAppearWithDemo
+and DEAD. setSpicy (not in SpitSlotItem, not during bero_hit): spicy, the bero_hit clip, the pepper killed. Freeze: the wet clip + THANKYOU; its end
+spicy off, the alpha back. TTelesaSlot (MapObjSirena's TSlotDrum): 3 drums of 8 faces (45 deg), the result by angle 0 COIN / 1 ENEMY / 3 JACKPOT / 2
+FRUIT repeating; moveStart -1 / -0.8 / +1 x 2.0 deg a tick HELD; a released drum -0.01 a tick to 0.5, then the creep to the next 45; forceStopSlot(1):
+with FirstHitCollectRate (0.9 at 1 HP) the target FRUIT (COIN at 3 HP or under) and the middle drum held to it, else its forecast; = last round's result
+-> JACKPOT; COIN with unk370 0 -> ENEMY, with Mario at 6+ -> JACKPOT; each stop steers the still-held drums with HitCollectRate; all stopped -> fanfale.
+generateSlotItem: FRUIT: 16 slots in a scattered 160-deg fan from the mouth (joint 5) - 50 y, slots 0 and 4 the red peppers (the first x 2), 6..10 u a
+tick, y -2, scale 1.5, NO_COLLISION; COIN: 10 coins in a 120-deg fan, (0.8..3.5) x 10, y 10, from the mouth - 250, killByTimer 960, unk370--; ENEMY: kind
+1 (Hamukuri) at 3 HP else 2 (Yakikuri) x 6; JACKPOT: 6 of cycling kinds 1..7 (8 at 1 HP) from {Bubble, Hamukuri, Yakikuri, BombHei, PoiHana,
+ElecNokonoko, Popo, Gesso, TobiPuku}; Mixed: 12 Bubbles; each (0.5..1) x 10, y 2 x (2 + 0.5..1), from the mouth - 240, initAttacker. TRoulette: initMapObj
+y + 500; the `_switch` material's TEVREG0 (blue in stage 56); TRouletteSw 500 x 100 at joint 1, y - 100: HIP_DROP -> unk6C -> switchStop with Mario's
+feet within 20 u of the ground and the disc turning -> speed 0, black, RLT_STOP; rotation.y += unk13C a tick (stage 56). TTelesa::initAttacker: reset,
+CAN_SEE, at the boss's mouth - 150 with a lift of 8, ENEMY off, HIDDEN 10 ticks, AttackMario (the wait clip; the first point 1000 u behind the facing,
+then 0.7..1.6 of the way to Mario; walkBehavior(2, 2); the base height damped to the table's 500 at (ground - 500) / 120 clamped +-2, snapped to 501
+from under); gravity TelesaAttackGravityY 0.02; the hose: y 30 and PowerByWater 40; killed: the TLS_CHANGE puff, no clip, no drops.
+
+**The port.** `SmsBossTelesa : SmsSmallEnemy` (Prm = bosstelesa.prm; HitPoints a knob). He never moves: each tick his floor is the MAP body under him
+within 10 m (SmsCoinItem.IsMap: the discs; never a fruit, an enemy, Mario, nor the room's floor 80 m down) and he sits 300 u over it; FlyBind + _noBind,
+his own collision shape disabled (the game's 30 x 420 cylinder is a hit check here). `SmsBossTelesaPart` x 2 (StaticBody3D cylinders on
+SmsHiddenCoin.HideLayer -- in the hose's drop mask, out of the fruit sim's, Mario's and the enemies') follow jnt_body - 200 and jnt_sita_2 - 350 and hand a
+spray to `SmsPartSprayed` (the tongue in Appear -> SlotStart; the body in PrepareSlot -> BossFreeze); his own HitCheckMario every fourth tick: his
+cylinder and the parts' on Mario (TakeDamage), the hose at close range, every Fruit (the pickable group + his own spat ones, not in Mario's hands)
+against the tongue (a pepper -> SetSpicy) then the body (CheckHitObject -- the game runs both lists on one tick), the kill cylinder on the sms_enemy
+group (an unsprayed Boo attacker spared, the category off) and Mario's distance for ForceHide. The alpha a `fade` uniform on per-body copies of the
+four materials, the tint a `tint` on the body's, the brk flashes a `c0` pulse (brk 0 a white flash, brk 1 a red pulse; the .brk tables are not in the
+rip). The slot: the child Slot (TelesaSlot.tscn: srotrulet + srot_waku at 1 / 74.44), TopLevel, placed in ApplyLook from his joints with the unclamped
+hosei (it falls away after the spit and rises back on the appear), ticked by him (SmsTelesaSlot.TickSlot; ForcedResult from ForceResult at each
+forceStopSlot). The discs: the exports or the `sms_roulette` group sorted by radius (rulet00 the small centre disc, rulet02 the outer ring); RouletteStart
+/ SlotStop set their speeds. The spit: SpawnFruit (the Fruit scene, Size 1.5, LinearVelocity = the game's u/tick x 120 / 74.44 for the ball sim, off the
+pickable group until FruitCollisionOn, a pepper turned 90), SpawnCoin (yellow_coin through SmsDropTable.Launch, life 960), SpawnEnemy (the species scene,
+RelaunchTicks -1, SmsLaunch flyFirst); ForceAllItemKill / DamageRecover / FlashItem / CheckAllItemDead over the `_spit` list. GenAttacker: Telesa.tscn
+bodies pooled under his parent (Pooled, dead until needed; MaxAttackers 6) -> `SmsTelesa.SmsInitAttacker(boss, mouth, yaw, tableY)`. The Shine:
+shine_sprite.tscn at his point with PlaySpawnEntrance; then Dead (the attackers killed, the slot hidden; RelaunchTicks -1 frees him). `SmsRoulette :
+AnimatableBody3D` (sync to physics): the collision a trimesh of the glb's surfaces built at _Ready with the vertices carried into the body's space (a
+CollisionShape3D cannot be scaled -- the first run's discs were 74 x too big and nothing stood on them); a sync-to-physics body hears only its LOCAL
+transform (and reverts a local change until the physics tick applies it), so `_Notification(TransformChanged)` pushes the global transform to the
+physics server when the ORIGIN moves (an arena placed at runtime; a spin never moves it -- pushing on every change had frozen the spin); the switch
+is the `_switch` pad's centroid in body space (the bone's pose read oddly on the skin), stopped on Mario's groundPoundLanding within 500 u x 100 u of
+it; the pad's StandardMaterial copy keeps the pad's own red / green texture (the glb's `_switch_02` samples the same red|green sheet as the pads,
+clamped) and ADDS the register as emission -- blue (SwitchGlowEnergy 1.5) while spinning, so a violet glow on the red pad, nothing at rest (TEVREG0
+black); PondSolid keeps the centre disc's gold dome (`_ike`) as floor
+(it is a dome Mario slides off; the boss's floor is its top). Mario rides the discs through his own SMS ride (pass 81: SmsRideApply / _smsRideLocal). The
+`SmsTelesa` attacker half: `_attacker`, `SmsInitAttacker`, `SetFirstAttackPoint` / `SetAttackPoint`, `DampToAttackBase` (the table height = the boss's
+floor; DEVIATION: the game's absolute 500 is the casino table's height), the AttackMario nerve, the attacker's BehaveToWater (y 30, 40 u a tick), Die as an
+attacker (the puff, dead at once, no drops), KindNow = CAN_SEE for the fade. Knobs (grouped, plain English): The arena (RouletteTop / Middle / Bottom,
+Slot, ShineScene, ShineSpawnPoint), The fight (HitPoints 3, HideWaitTicks 400, RoundTimeScale, FirstHitCollectRate, HitCollectRate, ForceResult, CoinRounds
+3), What he spits (the fruit / coin scenes, SlotEnemyScenes, BooScene, MaxAttackers), Deviations (RouletteSpeedScale, SpitSpeedScale, SpitsBooAttackers,
+HidesWhenMarioUnder, StartHidden), Effects (FruitHit, Damage, Down, ItemKill, Fanfare, Spicy, SpicyHit), Camera (five shake modes), Sounds (eleven slots);
+SmsRoulette: SwitchRadiusUnits / HeightUnits, the two switch colours + SwitchGlowEnergy, AutoCollision, PondSolid, InitialRollSpeed, StopSound. KingBooArena.tscn: the three
+discs at one height + him, a placement `_sms_note` (the faces 1.1 to 1.9 m below the node, the outer ring 34 m across).
+
+**Deviations (logged; knobs where they matter):** the FallDemo intro (Mario riding the top disc down, the slot dropping in) is not ported -- he
+starts hidden (StartHidden) for HideWaitTicks; the TBubble (hot-spring bubble) family is not ported -- a Mixed result spawns nothing (it cannot happen
+with the shipped rates); the btp face patterns, the hint balloons, the BGM, the camera offset / roll camera, the rumble and the roulette sounds are
+not ported; the brk flashes are approximated, the five camera shake tables guessed; Gesso -> MameGesso, ElecNokonoko / Popo -> skipped (not on this
+branch); a banana counts as a papaya; a fruit in Mario's hands is swallowed with the round (his hands empty by his own ensureTakeSituation -- the
+game's DETACH); the Boo attackers die with the boss (the game's manager keeps them); no motion blend between clips (the other species' rule); the
+attacker's table height is the boss's floor, not the casino's absolute 500. Jaysonn's ask for a CUSTOM King Boo fight is what the knobs are for:
+HitPoints, HideWaitTicks, RoundTimeScale, ForceResult, the rates, the enemy table, the speed scales, SpitsBooAttackers, HidesWhenMarioUnder.
+
+**Verification:** drive 153 (patch_smoke153.py, SMS_YCAM_SMOKE=1) 37/37 with KingBooArena.tscn 80 m over the level and Mario on the middle ring: A1 start
+HideWait hidden, 300 u over the dome top, the three discs by size (1147 / 1676 / 2511 u); A1b Mario stands on the ring's trimesh; A2 past 120 ticks
+APPEAR (shown, the appear clip, the slot back, collision on); A3 the wait loop, alpha 0x96; A4 past 800 ticks the spit clip -> a Boo attacker
+(IsAttacker, AttackMario); A5 150 frames on: shown, swooping toward the table; B1 the tongue hosed -> SLOTSTART, the roll, frame 53 the drums spin, the
+attackers gone; B2 the roll ended -> forceStopSlot, no drum held -> SPITSLOTITEM while they spin down (the game's isRollDrum); B3 three FRUIT (135 / 135
+/ 315 deg); C1 the spit clip's frame 40: 16 things, 14 fruit + 2 peppers, not takeable; C2 PREPARESLOT, 14 takeable, the slot carried below (hosei
+-39900); D1 a coconut in the body: the tint, DIE, the hit clip, collision off, the fruit eaten; D2 lick -> laugh, the alpha 150 -> 255; D3 PrepareSlot
+again, HP 3, the alpha back; E1 a pepper in the tongue: SPICY, bero_hit; E2 the spicy loop; F1 a papaya while spicy: orange, HP 2, the damage clip; F2
+-> Hide -> HideWait, alpha 180, the fan swallowed, the discs 0.08..0.13 with the middle one reversed; G0 Mario carried 4.9 m in 60 frames on the ring;
+G1 his ground pound on the pad stopped the middle ring, the two others on; R2 COIN forced: 10 coins, CoinRounds 2; Mario at the centre -> FORCEHIDE at
+once and HideWait holds while he stands there; R3 ENEMY at 2 HP: 6 Fire Stus; forceHide again; R4 FRUIT, the body hosed -> FREEZE (wet), the pepper,
+a pineapple -> HP 1, HideWait alpha 210, the discs faster; R5 FRUIT at 1 HP, the pepper, a DURIAN -> HP 0, the DOWN clip, the slot gone; H1 the down
+clip ended: puffs, the fan swallowed, every disc still, 240 ticks later the SHINE at his point, DEAD; H2 dead and hidden. Runs a-f found: the level
+floor 80 m down taken as his floor (the ray now 10 m); the discs' trimesh 74 x too big (scale baked in); the sync-to-physics push that froze the spin;
+the pad bone's odd pose (the pad mesh's centroid instead); the drive's teleports undone by Mario's SMS ride (the drive clears _smsRideBody). Build 0
+errors. GPU captures (SMS_F153_CAP=1, cap/): the appear with the slot, the Boo attacker, the roll, the fan, the flinch and laugh, the spicy loop, the
+damage, the spinning table from above, the stopped pad, the coins, the Fire Stus, the wet clip, the down, the Shine.
+
+### 153b -- King Boo after Jaysonn's playtest: the bmd's real materials (a white see-through Boo with eyes, the blink, the rolled eyes), every effect, the slot finishing before the spit, lower over the table, the hints, the rumble, the shake tables, the BGM, the intro ride (feature/enemy-sirena, `a550172`)
+
+**Jaysonn's notes on 153:** (1) "the machine is not even done spinning before it does the action", (2) "king boo is transparent", (3) "no effects for
+anything", (4) "implement the missing things", (5) "he sits too high off the battle ground". All five taken; the port now reads the rip's own data
+instead of FinModelUtility's collapsed GLSL.
+
+**What was read (npc82/sirena151/):** `j3d_dump153.py` -- btelesa.bmd's TEX1 names, each MAT3 material's bound textures / konst / TEV registers / texgens /
+the TEV stages and the indirect block; the three .btp (texture patterns), the three .brk (register animations), bosstelesa.prm and the five
+params/camera/shakebtelesa*.prm (the real shake tables), btelesa_roll_camera.bck (the roll demo camera's two joints). `bmd_tex153.py` -- a CMPR / I4 /
+IA8 decoder with a hand-rolled PNG writer: the eye_half / eye_close / eye_roll sheets no material binds by default (FinModelUtility never exported them).
+`glb_uv153.py` / `eye_texel153.py` / `sheet_grid153.py` -- which texel each primitive's UVs sit on (the body's UV0: the eye sheet's WHITE; the crown's: the
+body sheet's gold and red strip; the fangs': its white; the mouth's: its reds). `glb_anim153.py` -- the clips' root translations (the appear carries jnt_body
+from -1293 to +826; the hide drops it to -1293: the hidden depth), `rulet_geo153.py` / `slot_geo153.py` -- the discs' faces (-130 / -95 / -80 on the three
+nodes) against the centre dome (-140..+20) and the slot machine's extents (its origin at its base, 642 u tall).
+
+**The materials -- 153's mistake.** The rip's `_mat_body.fragment.glsl` showed two textures and I read "TEX0 = the screen, a dark refraction" and laid
+N_btelesa_body over it -- which is the MOUTH sheet, not his skin. The bmd says: `_mat_body` binds the EYE sheet (texmap0, UV0), the noise polmask
+(texmap1, UV1), the white fluits dummy (texmap2), the indirect warp, the screen (H_ma_rak_dummy -> TScreenTexture at init) and the toon ramp; 8 stages:
+REG2 = SCREEN; REG0 = polmask.I > K2_A (COMP_GR16_GT); REG1 = K1 x dummy = the fruit TINT; PREV = EYE x REG0 + REG1 x (1 - REG0); REG0 = clamp(5/8 +
+mix(toon, COLOR0, 5/8) - 1/2); PREV = PREV + mix(REG0, COLOR1, 1/2) - 1/2 (no clamp); PREV = lerp(REG2, PREV, K0_A). The body's UVs sit on the eye sheet's
+white: King Boo is a WHITE Boo, and he is not alpha-blended at all -- the last stage MIXES him with the picture behind him by K0 alpha (unk34C.a, 0x96 =
+0.588; + 0x1E a lost hit point; 0xFF while hit). The crown: (C0 yellow + the toon shade) / 2 x the sheet's gold / red + the env2 sphere map / 2; the fangs
+and the mouth: the sheet + mix(the toon shade, the glint, 5/8) - 1/2; all three end in the same screen mix. BossTelesaToon.gdshader is that, per part
+(`part` 0 / 1 / 2; `opacity` K0_A, `tint` K1, `mask_k` K2_A, `env_tex`, the include's `pol_mask` on UV2 with pol_scale 1, `screen_tex` the screen in display
+space; ALPHA 1 -- the see-through is the mix). `GhostOpacity` is the knob (0.588 = the game). DEVIATION: Godot's screen texture is the opaque pass, so a
+see-through thing behind him is not in his mix; the bmd's indirect block has every stage's matrix OFF -- no wobble.
+
+**The .brk and the .btp.** btelesa_damage.brk (brk 0, the flinch): K2_A 0 -> 150 over 20 frames -- the body speckles into the fruit's colour through the
+polmask's noise (the fruit "paints" him); btelesa_lick.brk (brk 2): 150 through frame 39, then to 0 at 99 -- it washes off through the lick;
+btelesa_down.brk (brk 1, a spicy hit and the down): K0_A 0 -> 255 over 30 frames -- he blinks out and comes back solid (laid over unk34C.a in ApplyAlpha).
+A frame is two ticks (the bck clock). btelesa_twait.btp (btp 2, every wait): texmap0 = eye_open 19, half 2, close 3, half 2, open 2, half 2, close 3, half 2,
+open 50, half 2, close 3, half 2, open 58 -- a double blink, a single, 150 frames looped; btelesa_tspicy.btp (btp 1, the spicy loop): eye_roll (the dizzy
+spiral); btelesa_troll.btp is eye_roll too and the code never calls index 0. The port swaps the body material's eye sheet (`EyeOpen / Half / Close / Roll`
+knobs; the models' pngs by default).
+
+**The timing.** The game's TNerveBossTelesaSpitSlotItem counts 200 ticks from checkSlot = the last drum RELEASED (isRollDrum false), while that drum still
+decelerates 150 ticks and creeps up to 90 more: its machine can start dropping with the last drum still turning -- what Jaysonn saw. The port waits for
+the last drum to STOP (the fanfare), then `ResultPauseTicks` (200): the pause, the dip at 100 u a tick (the machine out of sight with the unclamped
+hosei), the spit clip, the fan at its frame 40. Logged as a deviation.
+
+**The effects (ms_btls_*, all 19 .jpa named in the rip):** fhit = HitBurst; fhit_pe / _or / _gr = EnemyDisap recoloured to the fruit (SmsFxBurst.SetShaderParam
+`prm` / `env`: the JpaDirBillboardAdd uniforms); damage = EnemyDisap at the hit; down = EnemyDisap x 3 at the body + the same in the last fruit's colour
+(down_pe / _gr / _or); tls_change = EnemyDisap on every swallowed item; fubuki = **BtlsFubuki.tscn** (an SmsFxBurst: 180 coloured scraps in six colours
+thrown up out of a box over the slot, angular velocity, turbulence, a 2.6-s fall) at a FRUIT / COIN fanfare; spicy_a..d = **StuFire** bound to jnt_sita_4
+(the tongue tip) through the spicy loop (clip 12) and ase = **NpcDripBody** at jnt_body -- SmsNpcEffect.Spawn under BoneAttachment3Ds, Stop() when the
+clip ends; spicy_hit = HitBurst x 2 at the mouth through bero_hit's first 20 frames; chika_a / b = **ChikaFx** (a GPUParticles3D in BossTelesa.tscn: the
+port's kira stars (kira_add + star4s_raw) popping in a 4.6-m ball about jnt_body); glow = **GlowFx** (a 10-m QuadMesh on **BtlsGlow.gdshader**: the
+glow_add billboard with `strength` = his opacity and a slow breath, pale blue-white, additive); yodare1 / 2 / 3 = **DroolMouthFx / DroolTongueFx**
+(JpaDirBillboardAdd drops of mizutama1_add off the mouth and the tongue tip, not through the hide / laugh / spicy / spicy_end clips). `AmbientFx` turns
+the scene's own four off. 153 had wired HitBurst / EnemyDisap for the hits at a small enemy's scale (x 1.5 on a 7-m ghost 11 m up) and nothing else; the
+bursts are x 3.5 here (the down x 5 / 6), and the ambient ones show at any moment.
+
+**The missing things.** The hint balloons (startAppearBalloon 0xE000F once at the first plain fruit hit, 0xE0010 past two more in a row, 0xE0011 once
+at the first fruit hit of all) through the HUD's `SmsHintBalloon` (found once in the tree), the three lines knobs (`HintFirstFruit / HintFruitAgain /
+HintFirstHit`; the BMG text is not in the rip, these are mine). The rumble (SMSRumbleMgr->start(0x14, 0xf) at rouletteStart and when a Boo is spat;
+`Rumble`). The shake tables from params/camera: appear (80 ticks, 150 / 4000), hit (150, 80 / 4000, 50 / 300, 100 / 2500), damage (80, 80 / 4500, 0, 30 /
+1000), down (150, 400 / 4000, 50 / 300, 600 / 3000), roll (50, 120 / 5000) -- the appear one is dead in the game too (checkPass(78) on a 59-frame clip).
+`BossMusic` (an AudioStreamPlayer knob: started at the first appear = unk384, faded over 10 frames at the down = MSBgm::stopBGM(.., 10)). `IntroRide`
+(the FallDemo, off by default -- Jaysonn places Mario): the centre disc starts `IntroLiftUnits` (500) up, Mario's controls held (CameraLocked) while it
+sinks 1 u a tick (rouletteFall); level, the slot machine falls from 1500 u over its place at 5 u a tick, 1 u the last 300 (slotFall), the discs start as
+it passes 200 u over home, HideWait's clock starts when it lands. NOT ported: the roll demo camera (btelesa_roll_camera.bck: joint 0 the target sinking
+2965 -> -89 u, joint 1 the eye orbiting 2600 u out from under the table up over it, 499 frames) and the camera's Y-offset chase (mCameraOffsetY) -- the
+port has no demo camera (the Gate Keeper's appear / die cameras are signals for the same reason); the TBubble family -- dead code in the game (unk150 is
+set to 1 in the constructor and never cleared: genAttacker always makes a Boo).
+
+**The height.** `HoverHeight`: his model's origin over the table's centre floor. The game: mGroundHeight (the dome top, +20 on the centre disc) + 300 +
+TransYOffset 800 = 1100 u = 14.8 m -- the slot machine (origin at its base, joint 0 - 700) 400 u over the dome, his body's bottom 817 u, his crown's top
+1500. Jaysonn: too high. 11.42 m (850 u) now: the slot's base 2.0 m over the dome, his body 7.6..15 m, the hidden depth (-1293 from the origin) still
+under the table. FindArena takes only the discs within 60 m across and 30 m up or down of him: his playtest had a KingBooArena in Level.tscn and the
+drive's boss had borrowed one of its discs.
+
+**Drive 153 (patch_smoke153.py):** 41 / 41 -- the 37 of 153 plus A1c (the hover 850 / 550 u, eye 0, btp 2), C1c (the spit no sooner than 125 drive frames =
+250 ticks after the LAST STOP; the pause counter past 200), D1b (mask_k climbing on the flinch), E2b (btp 1, the rolled eyes, the fire emitting 30
+frames into the spicy loop). The drive now frees any SmsRoulette / SmsBossTelesa / SmsTelesaSlot already in the level before it spawns its arena. Build 0
+errors. GPU captures (cap/e153_*.png).
+
+**Knobs added:** HoverHeight (The arena), ResultPauseTicks (The fight), IntroRide + IntroLiftUnits (Deviations), GhostOpacity + the four eye sheets (Looks),
+FruitPuffFxScene / FanfareFxScene default / SpicyFireFxScene / SweatFxScene / AmbientFx (Effects), ShowHints + the three lines (Hints), the five shake tables
+with the prm values + Rumble (Camera), BossMusic (Sounds). `_sms_note` on BossTelesa.tscn updated.
+
+### 153c -- King Boo after the second playtest: solid with a transparency slider, the parts in depth order, the slot machine sinking and rising under him, drool strands off his lip, the gold ring pressed into a bowl, Mario's glove / shoe / eye opaque (feature/enemy-sirena, code `47b3351`)
+
+**Jaysonn's notes on 153b:** (1) "make him solid then have a transparent slider", (2) "certain parts are going on the wrong layer and rendering wrong
+... his mouth and the other boos have it also", (3) "mario seems to have a layer issue on his hand from a while ago", (4) "the slot machine should be
+going down below the fight, right now it just disappears. it comes up with king boo and he sits on it", (5) "the drool doesn't show up very good ...
+the goopy piranha plant has a working example", (6) "the gold ring in the middle should be pressed down". All six taken.
+
+**What was read (npc82/sirena151/):** `rulet_anim153.py` -- rulet00.bck's joint tracks: the end pose scales the IKE joint (the gold dome) by -0.897 in Y,
+the game's pressed ring; `ike_profile153.py` -- the glb's rest dome is +160 u over the joint's plane (so the pressed bottom sits ~283 u under the disc's
+origin); `crop153.py` zooms of the 153b captures (the mouth drawn over the head); `player_mats153.py` -- assets/Player.tscn's materials: `_mat_head(6)`
+(the right glove), `_mat_head(4)` (the right shoe) and `_mat_eye_L` carry `transparency = 1` while their twins are opaque; `probe_mouth153.gd` -- King
+Boo's joint frames: jnt_mouth at (0, 59, 98) with x -> his forward (+Z), y -> down, z -> his sideways, the face at z 318, the fangs at x +-217, the
+tongue chain at z 161..746; `cur/SmsGoopStrand.cs` + `GkYodareL / S.tscn` (the Piranha's strands: particles born at the anchor every 2 frames, a
+13-frame life, 0.5 x gravity x age^2 of fall, a Catmull-Rom ribbon with a rounded tip).
+
+**Solid + the slider.** `GhostOpacity` defaults to 1 (solid); 0.588 is the game's ghost (mNormalAlpha 0x96 -- the K0 screen mix the 153b shader
+does) and the knob is LIVE: `SetBehavior` re-derives `_alpha = TargetAlpha()` the tick it changes (every nerve but the hit sequence holds TargetAlpha()
+anyway -- the hit sequence chases it and is left alone). The four .tres and the shader default to `opacity = 1.0`.
+
+**The depth.** `BossTelesaToon.gdshader` and the small Boos' `TelesaToon.gdshader`: `render_mode blend_mix, depth_draw_always`. A material that reads
+the screen (his) or writes ALPHA (theirs) renders in Godot's transparent pass, where `depth_draw_opaque` writes NO depth: his mouth and tongue, and the
+small Boo's mouth, eyes and fangs, were drawn over the head from behind (sorted by object, not by pixel). With depth written the surfaces occlude each
+other as the solid things they are; the game's GX writes Z for them too. The alternative, render_priority ordering, was rejected (an order is not an
+occlusion).
+
+**Mario's hand.** `assets/Player.tscn`: `_mat_head(6)`, `_mat_head(4)` and `_mat_eye_L` lose `transparency = 1` (and the glove its
+`vertex_color_use_as_albedo`): a transparent material sorts with the transparent pass and from some angles drew behind his body. Applied with
+`patch_player153c.py` on Jaysonn's PC; the file is in this commit (it was not among his live edits).
+
+**The slot machine.** Kept SHOWN through HideWait; `ApplyLook` chases the game's target height (the hosei / the -2400 park) down at `SlotSinkSpeed`
+(4 u a tick -- a visible sink into the table where the game's was gone within a frame), never deeper than `SlotHideDepthUnits` (1500) under his floor,
+and up at `SlotRiseSpeed` (40) back to its home `floor + PositionOverFloor + TransYUnits - 700` at the appear -- he rides up sitting on it. The slot's
+own hide happens only at his death (the down).
+
+**The drool.** The Piranha's strand scenes bound to his joints with `SmsNpcEffect.Spawn` -- `GkYodareL` x 2 at jnt_mouth, `GkYodareS` at eff_sita (the
+tongue tip) -- recoloured to spit (`DroolLight` (0.82, 0.9, 1) / `DroolDark` (0.45, 0.58, 0.8) through `SetGoopColors`), `DroolLength` 2.2 x the
+Piranha's hang, `DroolWidth` 1.6, `DroolRoundTip` 0.35. Two knobs added to `SmsGoopStrand` (the Piranha keeps their zeros): `FollowAnchor` -- the born
+points ride with the mouth by this fraction (`DroolFollow` 0.85; at 0 his 40 u-a-tick rise with the slot left a 7 m streak behind the mouth for a
+life: run h's captures) -- and `AnchorOffsetUnits` -- where the strand hangs from, in the anchor's frame: jnt_mouth sits 220 u INSIDE his head, so a
+strand from the joint (the game's yodare1 / 2 point) is buried in a solid Boo (run j: nothing visible); the mouth strands hang `DroolLipUnits` (210)
+forward at the lower lip and `DroolSpreadUnits` (+-200) to its corners, beside the tongue (run k: two strands beside the tongue, one off its tip). The
+153b GPUParticles drool nodes are gone from BossTelesa.tscn.
+
+**The gold ring.** `SmsRoulette.PondPressed` (on) / `PondScaleY` (-0.8969): `PressPond()` builds a `PondBowl` MeshInstance3D -- the dome's vertices
+mirrored about the IKE joint's plane with the normals and the winding flipped (a negative bone scale would flip the culling instead) -- and hides the
+skinned dome under an alpha-scissor override (nameless: `BuildCollision` reads `mi.Mesh.SurfaceGetMaterial(s)`); the collision uses `PondY()`. King
+Boo's floor is the bowl's bottom (283 u under the disc's origin): `HoverHeight` 12.33 m = 918 u over it (the game's 1100 over the dome's top); with the
+slot's home he sits on the machine, ~1 m over the pads.
+
+**Drive 153 (patch_smoke153.py): 45 / 45** -- 153b's 42 + A1d (the bowl: its bottom -270..-300 u, his floor there), A3b (>= 2 drool strands bound while
+he waits; the slot risen to within 60 u of its home), A3c (GhostOpacity moved to 1 while he waits -> alpha 0xFE the next tick, no nerve change). The
+drive holds GhostOpacity at 0.588 (the game's) so the alpha checks keep the game's numbers and flips it to 1 for the new `solid` capture. Headless run
+m 45 / 45; windowed capture run k 45 / 45 -- k153_solid (a solid white King Boo on the risen slot, the tongue out, two strands beside it), k153_appear
+(the crown popped, the twinkle, no streak), k153_slot (the roll), k153_down (solid, the tongue lolling). Builds 153u..x: 0 errors; the splice removed
+(Mario.cs clean), the root clean, the tree = his nine live edits.
+
+**Deviations:** depth_draw_always (Godot's object-sorted transparent pass; the game writes Z); the slot's visible sink and rise (the game: parked and
+hidden in a frame); strands instead of the game's drops, hung from the lip's corners (the drops fall from the joint inside the see-through ghost);
+FollowAnchor (the game's drops stay where born); the pond bowl as a mirrored copy; the live slider; GhostOpacity 1 by default (the game 0.588).
+
+**Knobs added:** GhostOpacity live (default 1), DroolFxScene / DroolSmallFxScene, DroolLength / DroolWidth / DroolRoundTip / DroolFollow /
+DroolLipUnits / DroolSpreadUnits / DroolLight / DroolDark (Looks), SlotSinkSpeed / SlotRiseSpeed / SlotHideDepthUnits (Looks), SmsRoulette.PondPressed /
+PondScaleY, SmsGoopStrand.FollowAnchor / AnchorOffsetUnits.
+
+**Files:** `assets/Sms/Enemy/SmsBossTelesa.cs`, `BossTelesa.tscn`, `BossTelesa/{BossTelesaToon.gdshader, BossTelesaBody / Crown / Ha / Mouth.tres,
+SmsRoulette.cs}`, `Telesa/TelesaToon.gdshader`, `assets/Sms/Fx/SmsGoopStrand.cs`, `assets/Player.tscn`. Tooling (npc82/sirena151/): rulet_anim153.py,
+ike_profile153.py, crop153.py, player_mats153.py, patch_player153c.py, probe_mouth153.gd, patch_smoke153.py (45 checks, the solid capture),
+cap/h153_* i153_* j153_* k153_*.
+
+### 153d -- King Boo: the pressed gold ring shows (153c had culled the bowl), the drool strands face the camera instead of reading as an X (feature/enemy-sirena, code `38322f3`)
+
+**Jaysonn's notes on 153c:** (1) "gold ring sinks in but I can't see it", (2) "the drool looks like an X pattern from the top up". Both taken, nothing else
+touched.
+
+**The bowl.** `PressPond` mirrors the `_ike` dome's vertices about the IKE joint's plane (rulet00.bck's -0.897) -- and 153c ALSO reversed every triangle's
+winding, reasoning that a mirrored face must be turned back "so the bowl faces up". Wrong: the Y component of a triangle's cross product depends on X and Z
+only, so a Y mirror leaves a face's turn as seen from above unchanged -- the dome's outside seen from above IS the bowl's inside seen from above. The flip
+turned the whole bowl away from the camera, `cull_back` dropped it, and the alpha-scissor override had already hidden the dome: a hole where the ring was.
+The winding is kept now (the normals still turn to the inside for the shading). `SmsRoulette.PondBowlUpFraction` reads the result: the share of the bowl's
+triangles wound CLOCKWISE seen from above -- Godot's front face (the glb importer turns glTF's counter-clockwise into it, which is why `ike_profile153.py`
+reads the file's dome as "140 up" by the opposite sign) -- 1.00 now, 0.00 with 153c's flip. The drive's A1e asserts it (> 0.95) and the new `bowl` capture
+(the centre disc from 9 m up, before the appear) shows the golden basin with its rim at the floor: m153_bowl / n153_bowl.
+
+**The drool's X.** The Piranha's `SmsGoopStrand` is the game's JPADrawExecStripeCross: two ribbons at right angles, fixed in the anchor's frame (`Cross`).
+Seen along the strand -- from the table, looking up at a Boo 9 m over your head -- the two strips read as an X. `SmsGoopStrand.FaceCamera` (new, default
+off: the Piranha keeps its cross): ONE strip whose width direction at every spine vertex is `(camera - vertex) x tangent`, normalised -- the classic
+view-aligned ribbon, round-looking from any angle; `Cross` is ignored while it is on; without a current camera the fixed strip is used. The stripe shader
+is `cull_disabled`, so the strip's side does not matter. `SmsBossTelesa.DroolFaceCamera` (on) carries it to his three strands; `DroolFacesCamera` reads it
+back and A3b asserts it. The `drool` / `drool2` captures (from the table, 1 m up, looking up at the lip from the front and from the side) show three
+rounded drops -- two at the lip's corners, one off the tongue tip -- and no X: n153_drool / n153_drool2.
+
+**Drive 153 (patch_smoke153.py): 46 / 46** -- 153c's 45 + A1e. Windowed capture runs l (A1e read the wrong sign: 0.00; the bowl already showed), m (46 / 46;
+the `drool` camera landed under the table: his node is the point 300 u over the floor, the model hangs 618 u higher) and n (46 / 46, the drool cameras on
+the lip). The capture log now prints the capture camera's position, the shot's eye / at and whether it is current. Builds 153y..aa: 0 errors; the splice
+removed (Mario.cs clean), the root clean.
+
+**Deviations:** none new. The camera-facing strip is a rendering choice (the game's cross is two fixed strips); the Piranha keeps the game's.
+
+**Knobs added:** SmsGoopStrand.FaceCamera; SmsBossTelesa.DroolFaceCamera (Looks). Readers: SmsRoulette.PondBowlUpFraction, SmsBossTelesa.DroolFacesCamera.
+
+**Left in the tree (Jaysonn's):** the editor's re-saves of the four BossTelesa .tres (uids, the parameters re-ordered) and KingBooArena.tscn (uids,
+unique_ids, and `GhostOpacity = 0.45` on the placed boss -- he is trying the slider).
+
+**Files:** `assets/Sms/Enemy/BossTelesa/SmsRoulette.cs`, `assets/Sms/Enemy/SmsBossTelesa.cs`, `assets/Sms/Fx/SmsGoopStrand.cs`. Tooling (npc82/sirena151/):
+patch_smoke153.py (46 checks; the bowl / drool / drool2 captures, the camera in the CAP line), cap/l153_* m153_* n153_*.
+
+### 153e -- King Boo: a drool toggle, him higher over the slot machine and the machine lower (SlotUnderUnits), the inside of his crown drawn (feature/enemy-sirena, code `da307fd`)
+
+**Jaysonn's notes on 153d:** (1) "toggles to turn the drool on and off", (2) "king boo needs to sit above the slot machine a bit more", (3) "slot machine
+should be a little lower -- one more render issue: when looking into his crown it's not rendering the inside of the crown". All three taken.
+
+**The toggle.** `DroolOn` (Looks, on): off = no strands. Live: the emit gate (`UpdateEmits`' drool branch) reads it every tick, so flipped while he plays
+the strands stop that tick and come back when it is on again -- the drive flips it both ways while he waits (A3d: 0 strands; A3e: 3 again).
+
+**The seat.** `slot_geo153.py`: the cabinet (srot_waku.glb) spans y -30..642 u from its origin, the drums (srotrulet) 100..500. The game hangs the slot's
+origin at joint 0 - 700, so the game's cabinet top sits 58 u under his body's centre -- and his body (the mesh's y -284..266) sinks 226 u into it; the game
+hides that under a see-through ghost. `SlotUnderUnits` (new, 960; the game's 700): the cabinet's top 318 u under his centre, 34 u of air under his body's
+bottom. `HoverHeight` 12.33 -> 13 m (968 u over the pressed bowl's bottom). Together the cabinet stands IN the pressed bowl (its base 22 u under the bowl's
+bottom, its drums 100..500 u up -- over the pads' level, which is 143 u up) and he floats just over its top. The hide / damage / hit park stays 1700 u
+under the home (`-2400 - (SlotUnderUnits - 700)`), the intro's drop starts 1500 u over it; the drive's A3b home formula and A1c read the knobs.
+
+**The crown's inside.** `cull153.py` reads btelesa.bmd's MAT3 cull modes: `_mat_crown` is NONE (two-sided); `_mat_body`, `_mat_ha`, `_mat_mouth` are BACK.
+The one shared `BossTelesaToon.gdshader` (`cull_back`) culled the crown's inner faces, so looking down into the crown showed the sky through its wall. A
+`render_mode` is per shader, so the shader's body (the uniforms, vertex, fragment -- the four parts' TEV stories) moved to
+`BossTelesaToon.gdshaderinc`; `BossTelesaToon.gdshader` (cull_back) and the new `BossTelesaToonCrown.gdshader` (cull_disabled) are each three lines over
+it. `BossTelesaCrown.tres` points at the crown's: `patch_crown153e.py` edited that one ext_resource line in place (dropping the uid the editor had
+stamped for the old shader), so the file keeps Jaysonn's editor re-save -- the texture uids and the parameters' order ride into the commit with it. The
+inner faces keep the vertex normal (no FRONT_FACING flip): GX lights per vertex regardless of the face's side, so the inside wears the outside's shade,
+as in the game. `make_tres153.py` generates the crown's .tres on the crown shader from now on.
+
+**Drive 153 (patch_smoke153.py): 48 / 48** -- 153d's 46 + A3d / A3e; A1c now reads HoverHeight 13 m (968 / 668 u) and SlotUnderUnits 960 with the
+cabinet's top clear of his body (960 - 642 > 284). Windowed capture runs o (48 / 48; o153_solid: him floating just over the lower machine) and p (the
+`crown` capture from 16 m over his node looking down into the crown: its inside wall drawn, p153_crown). Builds 153ab..ad: 0 errors; the splice removed
+(Mario.cs clean), the root clean.
+
+**Deviations:** SlotUnderUnits 960 and HoverHeight 13 m against the game's 700 / 1100 (Jaysonn's seat); the shader split is a Godot necessity (one
+render_mode per shader), not a look change.
+
+**Knobs added:** DroolOn, SlotUnderUnits (The arena); HoverHeight's default 13. Files: `assets/Sms/Enemy/SmsBossTelesa.cs`,
+`assets/Sms/Enemy/BossTelesa/{BossTelesaToon.gdshader, BossTelesaToon.gdshaderinc (+ .uid), BossTelesaToonCrown.gdshader (+ .uid), BossTelesaCrown.tres}`.
+Tooling (npc82/sirena151/): cull153.py, patch_crown153e.py, make_tres153.py, patch_smoke153.py (48 checks; the crown capture), cap/o153_* p153_*.
+
+### 153f -- King Boo: a fruit in Mario's hands that goes with the fan empties his hands (the carry softlock) (feature/enemy-sirena, code `acd4554`)
+
+**Jaysonn's bug:** "when the fruit disappears when you hit King Boo, and it disappears while Mario is holding it, he gets softlocked until he is hit."
+
+**What happened.** The fan is swallowed on a spicy hit (damageRecover -> Hide), on his walk-under forceHide, at the down (ForceAllItemKill -> KillSpit each) --
+and a fruit is eaten one at a time in CheckHitObject / SetSpicy. Every path QueueFree'd the fruit; the one in Mario's hands went with them while
+`Mario.heldBody` still pointed at it: the carry pose with nothing in it, B did nothing (no throw, no put), until a hit's damage flow cleared the hands.
+Pass 130b met the same thing with the Bob-omb that blows up in his hands and added `Mario.SmsHeldGone(body)` (TTakeActor::ensureTakeSituation from his
+side: mHeldObject = nullptr, `_smsTakeAttached` off, the carry blend to 0) -- the boss never called it.
+
+**The fix.** `ReleaseIfHeld(Node3D n)`: before a spat RigidBody3D dies -- in `KillSpit`, in the fruit-eaten path of `CheckHitObject`, in `SetSpicy`'s
+pepper -- if `_mario.SmsHoldsOrPends(n)` then `_mario.SmsHeldGone(n)` (a debug line names the fruit). Nothing else changes: the fruit still dies, the
+puff still spawns.
+
+**Drive 153 (patch_smoke153.py): 49 / 49** -- 153e's 48 + F2b. The round-1 spicy sequence now puts a fruit of the fan (not a pepper, not the papaya about
+to be carried in) into Mario's HANDS the way the B press's animation does (`pendingPickup = f; Anim_AttachPickup()`: frozen, TopLevel, on the carry socket),
+then the papaya hits him while spicy -> damageRecover swallows the fan -> F2b asserts `heldBody == null`, `!IsCarrying`, the fruit freed. Headless run q:
+48 / 49 -- R5 read 15 of the fan with him already spicy at PrepareSlot t1: one of the fan's own peppers bounced up into the tongue cylinder the tick
+fruitCollisionOn ran (the fan is random: the start angle and the 6..10 u/tick speeds); the game's rules allow exactly that, so R4 / R5 now accept "15 and
+spicy" and say why. Run r: 49 / 49, and the new SPICY debug line (the pepper's position / velocity / frozen / held, the tongue point) shows the drive's
+own carried-in peppers as expected. Build 0 errors; the splice removed (Mario.cs clean), the root clean.
+
+**Files:** `assets/Sms/Enemy/SmsBossTelesa.cs`. Tooling (npc82/sirena151/): patch_smoke153.py (49 checks; F153TakeHeld / F153CheckHandsEmpty).
+
+### 153g -- King Boo: a damage flash, the spit waits for the slot machine to sink out of sight, the spicy fire from the disc's own four .jpa (feature/enemy-sirena, code `570076c`)
+
+**Jaysonn's notes on 153f:** (1) "king boo needs to flash when damage is dealt to him", (2) "king boo needs to wait for the slot machine to sink all the
+way before spitting fruit or enemies out (sound would help so we might do that soon)", (3) "fire effect needs to look better". All three taken; the sound
+is for a later pass.
+
+**What was read (npc82/sirena151/):** the disc's `data/scene/delfinoBoss/btelesa/jpa/` -- all 22 ms_btls_*.jpa pulled to `disc/btelesa/jpa/` (the 153b
+effects were built from the NAMES in the rip; the files themselves sat in the stage archive, not in data/particle/); `jpa_dump.py` on spicy_a..d
+(`disc/btelesa/jpa/dump/`): the emitter volumes, rates, lives, velocities, the local Gravity fields, the shapes and sizes, the colour maths, the ESP1
+alpha / scale / rotation curves, the four textures; `dump_moe/` the Stu's ms_moe_fire_a..d beside them (the same design: a StripeCross flame, a glow, a
+projected haze, sparks -- the Stu's at 1.6 / 2.75 / 1.25 / 0.5 x 50 u, King Boo's at 7.0 / 13.0 / 8.75 / 1.0, his flame at 40 u/f against the Stu's 1).
+
+**The flash.** The game's damage look is the brk's polmask sweep (153b): K2_A 0 -> 150 over 20 frames, the body speckling into the fruit's colour -- on a
+solid Boo a faint pink salt. `DamageFlashTicks` (30) / `DamageFlashPeriod` (6): on the hit (`StartFlash` in the Die nerve's start, the flinch and the
+spicy damage alike) a counter runs; on its ON phases `ApplyMask` drives the body's `mask_k` to 1 (every texel fails the mask test: the whole body is the
+tint) and `ApplyTint` the tint to the fruit's colour (`DamageFlashFruitColor`; `_tint` white = no fruit -> `DamageFlashColor`), on the OFF phases the
+brk's own values -- `FlashTick` re-applies on every edge, and the readers `MaskK` / `Tint` keep the game's numbers (the drive's D1b still reads the
+brk's climb). 30 ticks of 6 = on-off-on-off-on: three blinks in half a second. Readers `FlashOn`, `FlashTicksLeft`, `BodyMaskParam` (the material's
+`mask_k` as set).
+
+**The spit.** 153c made the machine sink in view (SlotSinkSpeed 4 u a tick) where the game's vanished within a frame -- and left the game's trigger: the
+spit clip as soon as the hosei passed -500, two or three ticks into the drop, the cabinet still in plain sight. `SlotSunk`: the cabinet's top
+(`SlotCabinetTopUnits` 642, srot_waku's y range) under his floor -- the pressed bowl's bottom, so under the whole table; `NerveSpitSlotItem` waits for it
+along with the pause. ~170 ticks of sinking before the clip, every round kind alike; `FruitCollisionOn` still at 600.
+
+**The fire.** `gen_fx153g.py` -> `assets/Sms/Fx/BtlsSpicyFire.tscn`, one SmsNpcEffect (EmitFrames 0, FollowRotation) with four GPUParticles3D, bound to
+jnt_sita_4 as the game binds SPICY_A..D (calcRootMatrix, every frame of the spicy clip). The joint's local +Y points DOWN in the rest pose
+(probe_mouth153.gd), which is why the artists aimed every emitter along -Y: the readings keep the joint's axes. spicy_a the flame: Sphere r 8, 0.5 a
+frame, life 10, velDir 40 along (0.01, -1, 0) + velRndm 10, the local Gravity 16 along +Y read as the Stu's constant drift (gen_fx125h) = 24 u/f off the
+tip +-10 (a speed range + a 22-deg cone), StripeCross dir PrevPctl = align_y on two crossed 350-u quads, scale 1 to 25 % then 0.5 x (1 +- 0.2249), a
+fixed random turn +- 45 deg, TEXC x prm (255,228,155) + env (255,78,0) -> (255,142,79) over 5 frames, alpha x 146/255 (flame_tongue.gdshader, fire1).
+spicy_b the glow: Point at +20, 0.5 a frame, life 10, 24 u/f, a 650-u additive billboard, flat (255,172,101), alpha 0.35 through 61 % then 0 x the
+AddSin flicker (0.125, 0, 0.625) baked, scale 1 to 29 % then 0.7. spicy_c the haze: Point at +35, 0.15 a frame, 9 u/f, a 437-u projected billboard
+through goop_refract (indwp2 through indmsk1, mtx 0.5 x 2^-3: ind_scale 0.0625, four times the Stu's), scale 1 -> 2.5, alpha 0 -> 0.5 by 55 %, 0 from
+62.5 %. spicy_d the sparks: the r-15 shell stretched 1.25 at +39, 0.2 a frame (+-37.5 %), life 70 +-25 %, 20 u/f along -Y in a 27-deg cone + omni 5 +
+velRndm 15 (8..24 m/s), airResist 0.97 as linear damping, the Random field 5 u/f every 2 frames as turbulence (influence 0.25..0.5), the 8 u/f local
+drift down as a world-down 11 m/s^2 with the same end displacement, 50-u additive glow1 x (255,135,87), the AddSin flicker (0.75, 0.125, 0.875), scale
+1 to 62.5 % then 0. `SpicyFireFxScene` empty = this scene (the Stu's as the fallback); `SpicyFireScale` 1 (the 2.5 of the stand-in gone).
+
+**Drive 153 (patch_smoke153.py): 51 / 51** -- 153f's 49 + D1c (the flash running with the hit) and D1e (an ON phase with mask_k 1 and an OFF phase with the
+brk's mask both seen while it ran -- F153Track samples every frame -- and the mask back to the brk's after); C1 asserts `SlotSunk` at the spit (the fan
+came 303 drive frames after the stop: the pause, the sink, the clip); E2b asserts the BtlsSpicyFire scene. Run t read D1c on an OFF phase (the drive's
+frame is two boss ticks: the SMS enemies tick twice a physics frame) and was rewritten; runs u and v 51 / 51; the `flinch` capture moved to +4 frames (an
+ON phase: the whole body pink), a `fire` capture added from his level. Builds 153ah..ak: 0 errors; the splice removed (Mario.cs clean), the root clean.
+
+**Deviations:** the flash itself (the game has only the speckle); the spit's wait for the sunk machine (the game's machine was gone in a frame); the
+fire's velRndm as a cone, its Random field as turbulence, its local drift as world gravity, the stripe's motion-stretch as align_y (all as the Stu's).
+
+**Knobs added:** DamageFlashTicks / DamageFlashPeriod / DamageFlashFruitColor / DamageFlashColor, SpicyFireScale (Effects). Files:
+`assets/Sms/Enemy/SmsBossTelesa.cs`, `assets/Sms/Fx/BtlsSpicyFire.tscn`. Tooling (npc82/sirena151/): gen_fx153g.py, disc/btelesa/jpa/ (+ dump/,
+dump_moe/), patch_smoke153.py (51 checks), cap/t153_* u153_* v153_*.
+
+### 153h -- King Boo: the damage flash three times longer, the slot machine rides his rise out of the table, a jump pops his Boo attackers (feature/enemy-sirena, code `be8ce44`)
+
+**Jaysonn's notes on 153g:** (1) "we need him to flash longer once he's hit", (2) "the slot machine seems to struggle to keep up with him when coming from the
+ground", (3) "the boos I think should be able to be jumped on". All three taken.
+
+**The flash.** `DamageFlashTicks` 30 -> 90: a second and a half (seven and a half blinks at the 6-tick period; 90 / 6 is odd, so it starts and ends ON).
+The flinch's hit clip is 84 ticks, the spicy hit's damage clip 438: the flash now outlasts the flinch into the lick and covers the damage clip's first
+fifth. The range widened to 300.
+
+**The ride.** `glb_anim153.py` on the appear clip: jnt_body's translation runs -1293..826 u -- he comes up from under the table, overshoots and settles --
+over the clip's first half, 40-odd u a tick. 153c's chase: the machine's target through the appear is the body joint - SlotUnderUnits (the game binds it
+there), and the shown height rose toward it at `SlotRiseSpeed` 40 u a tick from where the hide had left it, starting 215 u behind (the hosei's reset at
+the appear's first tick jumps the target from the floor - 1500 clamp to body - 960). It trailed him up, and when the clip ended and the anchor returned to
+joint 0 -- a target at or above home snaps -- it popped into its place: Jaysonn's "struggles to keep up". `ApplyLook` now remembers the target each tick
+(`_slotTargetPrev`) and adds the target's own rise to the chase: `shown = min(target, shown + SlotRiseSpeed + max(0, target - prevTarget))`. The starting
+gap closes at SlotRiseSpeed (five ticks), and from there the machine rides him rigidly -- up out of the bowl with him, up through his overshoot (a target
+above home snaps anyway) and back down with him. The sink (a falling target) is untouched. Reader `SlotLagUnits` (the placement minus the shown height);
+the drive's `_f153SlotLagMax` tracks it over every frame of the appear clip: 0 u.
+
+**The jump.** `SmsTelesa.HitCheckMario` lets Mario's jump find a Boo only while `_tangible` (the sprayed stun -- the game's HIT_CATEGORY_ENEMY).
+`JumpPopsUnsprayed` (Deviations, default off = the game): `_tangible || (JumpPopsUnsprayed && IsVisibleNow)` -- a jump or a ground pound on a shown,
+unhosed Boo pops it (the same Trample / HipDrop path: IsHitValid, Kill, StompBounce); a faded-out one is still a ghost. `SmsBossTelesa.AttackersJumpable`
+(on, Jaysonn's call) writes the knob onto each attacker in `GenAttacker` before `SmsInitAttacker`; the hotel's Boos (151) keep the game's rule unless their
+scene turns it on.
+
+**Drive 153 (patch_smoke153.py): 54 / 54** -- 153g's 51 + A3a (the slot's maximum lag through the appear < 30 u: 0), A5b (Mario placed 40 u over the
+unhosed attacker, falling at 1.5 m/s -- F153Place + velocity -- and 16 drive frames later the Boo dead or in its Die nerve), D1d (80 boss ticks after the
+hit the flash still running: left 4); D1c reads DamageFlashTicks 90, D1e moved to 120 ticks. Headless run w 53 / 54: A5b sampled the very tick the Boo
+entered Die ("Die t0 ... dead False", Mario "stomping") -- the check accepts the Die nerve and samples 8 frames later; windowed run x 54 / 54 with a
+`rise` capture 18 ticks into the appear (the machine up out of the bowl with him, x153_rise). Builds 153am..ao: 0 errors; the splice removed (Mario.cs
+clean), the root clean.
+
+**Deviations:** the longer flash (the game has only the speckle); the jump on an unhosed Boo (the game: never) -- the attackers only by default.
+
+**Knobs added:** SmsTelesa.JumpPopsUnsprayed (Deviations), SmsBossTelesa.AttackersJumpable (The fight); DamageFlashTicks default 90. Files:
+`assets/Sms/Enemy/SmsBossTelesa.cs`, `assets/Sms/Enemy/SmsTelesa.cs`. Tooling (npc82/sirena151/): patch_smoke153.py (54 checks), cap/x153_*.
+
+### 153i -- the Boo: a jump pops every Boo by default, and only a real stomp from above does it (feature/enemy-sirena, code `cff77b9`)
+
+**Jaysonn's notes on 153h:** (1) "the boos from king boo are randomly disappearing", (2) "normal boo that I placed are not jumpable still".
+
+**The disappearing.** Every path that ends a Boo attacker was read again: the boss's SlotStartGo (the tongue hosed: telesaForceKill), his Dead, the kill
+cylinder (a SPRAYED one only -- `Tangible`), and the stomp. Only the stomp was new in 153h, and its test was the stunned Boo's: `CheckDistance` on the two
+hit cylinders -- overlapping when Mario's centre is within TrampleRadius + DamageRadius x 1.5 = ~170 u (2.3 m) of the Boo's, his feet below its top and his
+head above its base -- plus `g.Y < m.Y` and a falling Mario. A swooping attacker approaching a Mario on the way down from any jump met that 2.3 m before
+it touched him and popped (with its puff, 150 u away): "randomly disappearing". `HitCheckMario`: the unhosed pop now needs Mario's centre within the Boo's
+OWN radius (120 u: over its body) and his feet above its lower third (`g.Y + DamageHeight x s x 0.35` = 47 u on an attacker: a Boo at his feet is a ram,
+not a landing). The stunned (`_tangible`) Boo keeps the game's test. Why the lower third and not the middle: `HitCheckMario` runs every fourth tick and a
+Mario falling at 12 m/s crosses 60 u between two -- the drive's first drop (run y, 1 m/s from 110 u, the Boo sinking ~5 u a frame under him) crossed the
+upper half between checks and missed; the window is 88 u now and the drive drops him at 4 m/s from 120 u.
+
+**The placed Boos.** 153h kept `JumpPopsUnsprayed` off for the species (the game's rule for the hotel's Boos) and set it on King Boo's attackers only;
+Jaysonn's placed Telesa.tscn stayed hose-first. The default is ON now: every Boo while it shows (`IsVisibleNow`: a faded-out Loop Boo is still a ghost;
+the box Boo's IsHitValid still turns a jump into its flinch). Off = the game. King Boo's `AttackersJumpable` still writes it onto his attackers.
+
+**Drive 153 (patch_smoke153.py): 55 / 55** -- 153h's 54 + A5a (Mario placed 150 u beside the unhosed attacker with his feet 30 u over its base, falling:
+8 frames on it is NOT in its Die nerve -- 153h's rule popped it from there) and A5b retargeted (120 u over it at 4 m/s: popped). Headless runs y (54 / 55)
+and z (55 / 55). Builds 153ap..ar: 0 errors; the splice removed (Mario.cs clean), the root clean.
+
+**Deviations:** a jump on an unhosed Boo (the game: never) -- on for every Boo by default now, Jaysonn's call; the stomp's own test (over the body, above
+the lower third) is the port's, the stunned Boo's stays the game's.
+
+**Knobs:** SmsTelesa.JumpPopsUnsprayed default on. Files: `assets/Sms/Enemy/SmsTelesa.cs`. Tooling (npc82/sirena151/): patch_smoke153.py (55 checks).
+
+### 153j -- King Boo: the slot machine bolted to his clips and him riding it down, a slower and longer flash, the Boo attackers out of his mouth toward Mario on the table's surface in a smooth swoop (feature/enemy-sirena, code `80160d0`)
+
+**Jaysonn's notes on 153i:** (1) "the timing of the machine following king boo needs one more pass", (2) "the hurt effect is still too short and flickers
+too fast", (3) "the boos will suddenly snap below the floor", (4) "they should more gracefully follow mario", (5) "i think king boo is spawning them
+behind himself". All five taken.
+
+**The machine (1).** Two mismatches were left after 153h. The hide: the clip hops jnt_body up 478 u and drops it 1771 u in 88 ticks (glb_anim153.py) --
+the game's slot is parked 2400 u under the body the moment the clip starts; 153c's chase sank at 4 u a tick from home, 2.7 s over an empty table after
+he had gone (the forceHide when Mario walks under him). The spit: the game's hosei dips his model 300 u in three ticks while its slot drops out of sight
+at 100 u a tick; with 153c's visible sink he dipped into a cabinet still in plain view for 160 ticks. `ApplyLook` now remembers the machine's SEAT a
+tick -- the anchor joint's height - SlotUnderUnits, without the hosei and without his dip -- and adds its change to the chase (`ride`), both ways: the
+appear's rise (153h), the hide's hop and dive, the overshoots. One joint at a time (`_slotAnchorJoint`: the anchor swaps between jnt_body and the root,
+478 u apart at the hide's first frame) and not while parked under the table (the damage clip bounces the root; a parked machine riding that ratcheted
+upward). Only what the hosei does -- the spit's drop-away, the park -- is chased at SlotSinkSpeed / SlotRiseSpeed. And his model's dip is held to the
+machine's sink: `dip = clamp(max(hosei, shown - seat), -300, 0)` -- he rides the machine down 300 u at its 4 u a tick and it drops away under him. The
+seat is read WITHOUT the dip for both: run aa read it with, the dip moved the seat, the machine rode the seat, the dip followed -- twice the sink speed,
+the spit 150 ticks early, 44 u of error. Readers: SlotShownUnits, SlotSeatUnits, SlotHomeUnits, ModelDipUnits.
+
+**The flash (2).** `DamageFlashTicks` 90 -> 150 (2.5 s), `DamageFlashPeriod` 6 -> 10 (10 on / 10 off: 3 Hz; 150 / 10 = 15 phases, odd: on at both ends).
+
+**The Boos (3, 4, 5).** (3) `TTelesa::walkBehavior`: an attacker's ground height is damped toward the absolute 500 -- the casino table's surface. 153 passed
+his floor for it, and since 153c his floor is the pressed bowl's bottom, 143 u UNDER the pads: the Boos were damped down inside the rings' floor, with
+`DampToAttackBase`'s snap to target + 1 when they undershot -- "suddenly snap below the floor". `TableSurfaceUnits` (the highest of the three discs'
+`FaceYUnits`; his floor + 143 without them) is their floor now (A4c: base 8793 = the table, his floor 8599). (5) The decomp's `setFirstAttackPoint`:
+`mRotation.y = 180.0f - mInstanceIndex * 720.0f` -- 720 is two whole turns, so this is the WORLD's yaw 180 for every attacker, the casino's layout baked
+in; 151..153i read it as the boss's yaw + 180, and in a placed arena the first 1000-u swoop went out the BACK of his head. And `initAttacker` places the Boo
+at the mouth joint - 150, which sits 220 u inside the skull (probe_mouth153.gd: jnt_mouth z 98, the face z 318), hidden 10 ticks -- not long enough to
+leave it. `AttackersSpawnForwardUnits` (250: the lips, along his facing) and `AttackersFirstPointTowardMario` -> `SmsTelesa.FirstPointTowardMario` (the first
+swoop toward Mario; off = the game's world 180). (4) `AttackersSmooth` -> `SmsTelesa.SmoothAttack`: the goal is Mario himself every tick (the game's
+`walkBehavior(2, 2)` turn rate bends the path into a curve) and within `SmoothPassUnits` (300) a pass-through point 1.3..1.6 of the way past him is
+held until reached, so the Boo swoops through him and comes round -- the game's overshoot kept, its straight legs to stale points gone (off = the
+game's). The Loop / Normal hotel Boos never use these (attackers only).
+
+**Drive 153 (patch_smoke153.py): 60 / 60** -- 153i's 55 + A3f (Mario under him while he waits with the machine at home -> forceHide: by the hide clip's end
+the cabinet is under the table -- it dived with him), A3g (the second appear), A4b (the Boo 238 u in front of his face, its first goal . Mario = 1.00),
+A4c (its floor = the table's surface), C2b (his dip within 5 u of the machine's sink through the SpitSlotItem: 4 u -- one tick of lag); D1 reads the
+tint of whichever fruit hit (`LastFruitType`: in run aa a fan durian was already in his body cylinder when PrepareSlot began and beat the carried
+coconut; the drive's sequence does not depend on which); D1c / D1d / D1e retimed for 150 ticks. Headless run aa 57 / 60 (the dip feedback), ab 60 / 60;
+windowed run ac for the `dive` and `boo` captures. Builds 153as..au: 0 errors; the splice removed (Mario.cs clean), the root clean.
+
+**Deviations:** the machine's ride and his dip-follow (the game parks the slot and dips him in a frame); the Boos' first point toward Mario and the smooth
+homing (the game's world-180 point and fixed overshoot points); the spawn 250 u forward (the game's at the joint). The table-surface floor is the game's
+rule restored.
+
+**Knobs added:** AttackersSpawnForwardUnits, AttackersFirstPointTowardMario, AttackersSmooth (The fight); SmsTelesa.FirstPointTowardMario, SmoothAttack,
+SmoothPassUnits (Deviations); DamageFlashTicks 150 / DamageFlashPeriod 10. Files: `assets/Sms/Enemy/SmsBossTelesa.cs`, `assets/Sms/Enemy/SmsTelesa.cs`.
+Tooling (npc82/sirena151/): patch_smoke153.py (60 checks), cap/ac153_*.
+
+### 153k -- King Boo's room: the casino boss room's wall and ceiling round his arena, from the game's own files (feature/enemy-sirena, code `cc59542`)
+
+**Jaysonn's note on 153j:** "can you find the outer rim of the battle arena? we need walls for this".
+
+**The rim.** The casino boss room (`delfinoBoss`) is its own stage, and the rim is a map object of its own: `scene.bin` places `SirenabossWall`
+(mapobj/boss_wall.bmd; `TSirenabossWall`, MapObjSirena.cpp) at the origin, scale 1 -- the same point as rulet00 / 01 / 02 and srotRulet. `map.col`
+(col_dump153.py) is 48 wall triangles -- a 24-gon of corner radius 2450 u from -1500 to 4000 u -- and 44 ceiling triangles at 4000 u, surface 0; no
+floor (the discs' own .col files). `boss_wall.bmd` paints that drum (corners at 2464, -500..4050 u, one quad a column, uv u 0..24 round and v 0..-8 up,
+the stars upright) seen from INSIDE: cull back, every face wound toward the axis (casino_wall153.py). `map.bmd` is the ceiling: the marble ring
+`_B2f_ten` (1183..2464 u at 4000, L_dairiten) and the blue cap `_00ura_3` (a 1183-u cylinder from 4000 up to 4800, closed, L_danmen), both texture x
+VERTEX colour, unlit. The outer disc (rulet02, 2511 u) pokes 61 u into the wall, so the table has no edge. The roulettes stand 500 u over their placed
+point (`TRoulette::initMapObj`) and the arena's discs stand at the arena node, so the room sits `TableLiftUnits` (500 u = 6.7 m) under the node:
+the paint from 13 m under it to 47 m over, the collision from 27 m under (rulet01's `_Dark` pillar reaches -28 m: the pit's depth), the ceiling at 47 m.
+
+**The paint.** `_B2f_wall` (bmd_matfull153.py): four TEV stages, one colour channel reading the material REGISTER (96, 73, 96) -- NOT the vertex colours
+the bmd also carries (a blue gradient FinModelUtility exports as COLOR_0; a plain glb import would tint the wall blue). Stage 0: TEX0 x the register --
+TEX0 is `P_casino_floor`, which despite its name is the gold STARS on purple (CMPR 128 x 128, 24 x 8 tiles). Stages 1..3: + K0 (111, 0, 24) red / K1
+(96, 96, 0) yellow / K2 (24, 0, 72) violet x TEX1..3 -- all three `P_telusaroom1_i`, an I8 of two SOFT SPOTS (the converter's PNG put the intensity in
+alpha, so it read as grey rings on white: wall_tex153.py writes the two textures opaque straight from the bmd) -- through TEXMTX1..3 at scale 0.125
+about the tile's centre, so one spot tile spans a third of the way round and the whole height: ~20-m soft discs. `TSirenabossWall::initMapObj` makes a
+`TMultiBtk(3)` of the model's three btks and updates it every frame -- all three play at once, each on its own texture slot (btk_raw153.py: the TTK1
+anim table is Ss Rs Ts St Rt Tt Sq Rq Tq, not SSS RRR TTT): boss_wall_01 (600 frames) T runs 0 -> 2 (the spots RISE) while S eases 0 -> -0.7 -> 0;
+_02 (850) S runs 0.5 -> -2.5 while T eases 0 -> 0.8 -> 0; _03 (930) S runs 0 -> 1 while T eases 0.5 -> 1.5 -> 0.5 (zero-tangent Hermite keys:
+(1 - cos) / 2). `BossWall.gdshader` is that TEV in display space from TIME (30 frames a second x SpotSpeed), converted to linear once at the end, as
+the port's other SMS shaders; opaque, cull back, fog as the table's.
+
+**The port.** `SmsBossWall` (StaticBody3D, layer 1, `[Tool]`) BUILDS itself at `_Ready` and on any knob change, owner-less (nothing lands in the scene
+file; the editor shows the real wall): the painted drum as an ArrayMesh (`WallColumns` quads, the uv above, normals inward, the triangles wound
+CLOCKWISE seen from inside -- Godot's front face is clockwise, so the right-hand normal points OUTWARD; `WallInwardFraction` reads it), its collision
+as a `ConcavePolygonShape3D` of the game's 48 triangles with `BackfaceCollision` (both sides), the ceiling as `map.glb` instanced at 1 / 74.44 with its
+imported StandardMaterials duplicated and set Unshaded + `VertexColorUseAsAlbedo` + `VertexColorIsSrgb` (the bmd's vertex colours are display-space
+values; Godot's glTF import takes COLOR_0 as linear and would draw the ring and cap too bright and too white) and a trimesh of its 104 faces (not in
+the editor). `RoomCastsShadows` off by default: the game's room has no shadows, and in Godot a 47-m ceiling under Jaysonn's sun would shadow the
+whole table. `KingBooWall.tscn` carries the script, the shader, the two textures and the glb as exports; `KingBooArena.tscn` gets it as its `BossWall`
+child at the arena's own point, written over Jaysonn's editor re-save of the arena (the uids, his GhostOpacity 0.45 on the boss) so his placed arena
+in Level.tscn picks the room up by itself. The textures live under `models/Koopa/scene/delfinoBoss/` (his map-object layout: mapobj/boss_wall/,
+map/), imported with mipmaps + VRAM compression (patch_import153k.py; a 128-px tile over a 33-m drum seen from 60 m shimmers without).
+
+**Drive 153 (patch_smoke153.py): 66 / 66** -- 153j's 60 + a new phase 10 before the fight (the boss held hidden through it: HideWaitTicks 100000,
+the 120 back after A1): K1 a ray out from the centre at the outer disc's face meets the BossWall at 2450 u (toward +z: a corner); K2 a ray up at r 1800
+meets it 3500 u over the arena node (the game's 4000 less the 500 lift); K3 a ray out 15 m under the node, from r 1500 (past rulet01's pillar, which
+the first try hit at r 1040), meets the wall; K4 the paint's 48 triangles all wound for the inside; K5 Mario's capsule (0.373 m) cast outward from
+r 2200 stops at ~2422 (the corner less his radius; safe fraction < 1); K6 a 0.3-m ball shot outward at 15 m/s over the outer disc is still on the
+table after 1.5 s, never past 2428. The level's own SmsBossWall (Jaysonn's placed arena, 82 m under the drive's) is freed with its discs and boss at
+the start. Headless run ad 61 / 66 (the room checks added the disc's absolute face height to the arena's position: rays 119 m up in the sky);
+windowed run ae 66 / 66 with the captures `room`, `ceiling`, `wallnear` and the fight's old shots now in front of the wall. Builds 153aw..ay:
+0 errors; the splice removed (Mario.cs clean), the root clean.
+
+**Deviations:** `TableLiftUnits` (the room 500 u under the node the arena's discs stand at -- the game's relation kept, the frame moved); the knobs
+`RoomCastsShadows` (off), `Brightness`, `SpotStrength`, `SpotSpeed` (1 = the game's); the wall's fog follows the table's StandardMaterials (the game
+has none). The game's own numbers everywhere else.
+
+**Knobs added:** SmsBossWall -- Room: WallOn, CeilingOn, TableLiftUnits 500, RoomCastsShadows; Wall: WallRadiusUnits 2450, WallPaintOutsetUnits 14,
+WallColumns 24, WallBottomUnits -500, WallTopUnits 4050, WallCollisionBottomUnits -1500, WallCollisionTopUnits 4000, StarTilesAround 24, StarTilesUp 8;
+Look: WallTint, SpotColorRed / Yellow / Violet, SpotSpeed, SpotStrength, Brightness; Resources: StarsTexture, SpotsTexture, WallShader, CeilingScene.
+Files: `assets/Sms/Enemy/BossTelesa/SmsBossWall.cs`, `BossWall.gdshader`, `KingBooWall.tscn`, `KingBooArena.tscn`;
+`models/Koopa/scene/delfinoBoss/mapobj/boss_wall/boss_wall_stars.png`, `boss_wall_spots.png`; `models/Koopa/scene/delfinoBoss/map/map.glb`,
+`map_0.png`, `map_1.png` (+ .import). Tooling (npc82/sirena151/): casino_geo153.py, casino_wall153.py, col_dump153.py, btk_raw153.py,
+bmd_matfull153.py, wall_uv153.py, wall_tex153.py, glb_info153.py, patch_import153k.py, patch_smoke153.py (66 checks), cap/ae153_*.
+
+### 153l -- King Boo's intro and camera: the game's fall-in on the centre disc under the btelesa_roll_camera bck, and the casino boss room's fixed-point camera (feature/enemy-sirena, code `6570dca`)
+
+**Jaysonn's note on 153k:** "only thing now i think is the camera that is used while fighting king boo and the intro sequence when being lowered down on
+the middle platform. can we do this?"
+
+**The room's camera.** The stage's `tables.bin` (tables_dump153.py) holds one `CameraCubeInfo` -- a 300 x 600 x 300 m box, the whole stage -- naming the
+camera map tool "teiten camera D2": `CAMERA_MODE_DEFINITE_D2` at (0, 1100, -2450), pitch 22 (and two shine cameras, DEFINITE_A / B, for the game's own
+shine demos). A DEFINITE kind is a camera FIXED at a point that turns to follow Mario: `controlByCameraCode_` (CameraCodeControl.cpp 30) changes into
+the tool's mode, `changeCamModeSub_` (CameraChange.cpp 361: the default case) puts the eye at the tool's point and the look-at on the usual look point
+and WARPS there, `execCameraModeChangeProc_` returns at once for a fix / definite code (582: no status ladder, no L camera, no Y swing), and
+`calcPosAndAt_`'s fix / definite branch (cameragc.cpp 563-598) sets the look-at to the look point each tick (kindDefiniteD2.prm: AtOffsetY 300, fovy
+50) while the chased camera closes on it at AtChaseRateXZ / Y 0.1; `rotateX/Y_ByStick` are the normal branch's, so the stick is dead; the look-at's
+elevation is clamped by `CLBRevisionLookatByAngleX`. Leaving the cube (337-356): the polar target is read off the pose (`calcNowTargetFromPosAndAt_`)
+and D2 warps the camera behind the way it looked (`warpPosAndAt(ratio, yaw)`). `TBossTelesa::moveObject` adds his `mCameraOffsetY` to the camera's
+`unk290`, which `setMarioLookat_` reads in D2 only: within `mCameraMoveLimit` 1000 u of the eye the look point sinks `mCameraMoveSp` 0.02 x (his
+feet - the look-at) a tick (so he stays in frame right under the camera), and decays x 0.02 when he is further off. The port: `SmsCameraKinds.cs`
+regenerated with the kind (gen_camera_kinds.py: DefiniteD2 from kinddefinited2.prm, `IsDefiniteKind`, `IsNormalClass` without it); `SmsCameraArea` with
+an `Eye` child marker (EyePath) as the map tool's point (a definite Kind without one is read as the stage's kind, with a warning); `SunshineCamera`:
+`_areaTool` from `SampleAreaKind`, `EnterTool` (the L camera dropped, the mode over the kind's Inbet, the warp to the point), `CtrlDefinite` (the
+branch and its chase tail), `WarpPosAndAt` (both forms), `CalcNowTargetFromPosAndAt`, the leave in `ChangeMode`, the cube check kept running under
+a hold that is not the director's (King Boo's FallDemo is his nerve), `DefiniteAtOffsetY` written by the boss (`CameraChaseTick`, knobs CameraChase /
+CameraMoveLimitUnits / CameraMoveSpeed), readers `IsFixedPointCamera`, `ViewEyeUnits`, `ViewAtUnits`, `ViewFov`. `KingBooArena.tscn` gets the
+`FightCamera` child: an SmsCameraArea (Kind DefiniteD2, Priority 10) whose box is the room (68 x 100 x 68 m, centred 10 m up -- the game's cube is the
+whole stage, a deviation that keeps the camera to the room) and whose Eye is at (0, 8.06, -32.91) m: the stage's (0, 1100, -2450) less the 500-u lift.
+
+**The intro.** `scene.bin` (scene_dump153.py) places rulet00 at y 2000 and rulet01 / 02 / srotRulet / the wall at 0 (all three discs then lifted 500 by
+`TRoulette::initMapObj`); Mario at (0, 4000, -1900). `TBossTelesa::init` fires `fireStartDemoCamera("btelesa_roll_camera")`: `map/camera/
+btelesa_roll_camera.bck` on `common/camera/camera_model.bmd`'s joints `cam_position` / `cam_interest` (TCameraBck::updateDemo: the eye and look-at
+from the joints' matrices, the up from the position joint's Y axis, the fovy from its Y scale), 500 frames = 16.6 s, from (3, -1620, 2685) -- under
+the table's rim, OUTSIDE the wall (both back-face culled: the game looks in through them), looking up at Mario on the raised disc at fovy 45 -- up and
+round the room to (-9, 2725, -2657) at the -z wall looking down at the table's centre, fovy 60 (bck_cam153.py bakes it; `BtelesaRollCamera.tres`, an
+`SmsCameraPath` resource of 500 eye / look-at / up / fovy samples in stage units). `TNerveBossTelesaFallDemo`: time 0 HIDDEN, `SMS_SendMessageToMario(
+HIT_MESSAGE_TAKE)` -- the boss TAKES Mario and carries him -- the clips frozen, the slot's scale 0 (unseen); `rouletteFall` sinks the disc 1 u a tick,
+Mario held until 3 u from the bottom (the DETACH, RLT_SET), the controls neutral, V_LAUGH1B / RLT_DOWN; level: `slotFall` drops the unseen machine from
++300 at 5 u a tick to -800, then 1 u, `rouletteStart` as it passes -900 unless all three roll, done at -1100 -> `onAllCollision`, HideWait. 2000 u at
+1 u a tick is 16.7 s at the port's 120 Hz -- the bck's length: the camera was cut to the fall. The port (`SmsBossTelesa`): `IntroRide` (on in the arena)
+ARMS the ride at start -- the centre disc lifted `IntroLiftUnits` (2000; 153b's 500 was a misreading) -- and `IntroStart` picks the moment:
+`WhenMarioEntersRoom` (within `IntroTriggerRadiusUnits` 2450 of the centre and over the table: he is TAKEN onto the disc's centre, the bowl's
+bottom), `WhenMarioLandsOnDisc` (standing on the raised disc himself), `AtOnce` (153b's: place him). `IntroBegin`: CameraLocked, the TAKE
+(`Mario.SmsCarryTo` each tick: his place set, his velocity zeroed, the ride he was on dropped -- `SmsRideApply` would put him back on that deck every
+frame), `IntroCamera` -> `SunshineCamera.StartDemoCamera(IntroCameraPath, StageFrame())` (the stage's frame: the middle ring's parent's basis, the
+origin 500 u under the discs' origins); `IntroTick`: the fall at `IntroFallSpeed` u a tick with the hold until 3 u up, then the slot phase as 153b
+had it but UNSEEN (`IntroSlotShown` off = the game); `IntroEnd` ends the demo if still playing (a slower fall) and starts HideWait. `BossTelesa.tscn`
+carries the path; `KingBooArena.tscn` sets IntroRide on.
+
+**The bck demo camera** (`CAMERA_MODE_REPRODUCE_DEMO`) on SunshineCamera: `StartDemoCamera(path, frame)` / `EndDemoCamera` / `IsDemoCamera` /
+`DemoSeconds`; while it plays the game camera does not run (perform 882: ctrlGameCamera_ skipped), `TickDemo` samples the path at 30 frames a
+second into the view's eye / look-at / up / fovy with the near clip `ReproduceDemoNearClip` (30), `Apply` takes `_viewUp` / `_viewFov` / `_viewNearU`;
+at the end (the director's endDemoCamera: `changeCamModeSpecifyFrame_(-1, 1)`) the camera resumes from the last pose in one frame and the next
+tick's cube check names the kind -- in the room, the fixed-point camera, warped to its point.
+
+**Two engine facts, two runs.** (1) An `AnimatableBody3D` with `sync_to_physics` puts a written transform BACK until its physics body has moved (the next
+step): 153b's `GlobalPosition +=` read back unmoved within the frame, and with two boss ticks a frame the second tick wrote the unlifted height over the
+lifted one -- the disc never rose, the fall ended on the spot (runs af / ag). The disc's intended height is a shadow now (`_introDiscY`, `DiscPos`), the
+lift is done inside the physics tick (not the deferred call, which runs after the step and is undone by the next frame's write-back), and the drive
+reads the node a frame behind. (2) The drive placed its arena with `Position = base` under a level root that is not at the origin ((3.09, 0.03, -2.65)
+in Jaysonn's Level.tscn): its discs sat 4 m from where the drive thought -- the arena is placed in the root's space now (every earlier check used the
+arena's own global position, so none was wrong).
+
+**Drive 153 (patch_smoke153.py): 72 / 72** -- 153k's 66 + a phase 11 after the room's: I1 the ride began when Mario was placed in the room, the disc up
+2000 u less a tick's unit each tick (lift 1819 at 181 ticks), Mario taken onto its centre and carried, his controls held; I2 the bck demo on the game
+camera, from under the table (-1767 u over the node) at fovy 46.8 after 1.5 s, the eye 0 u off the bck's frame; I3 half way (ticks 1001, lift 999, fov
+55.3, the eye's worst stray 0 u); I4 the disc level after 1001 frames, the DETACH, Mario in the bowl, the slot unseen, the demo over; I5 the slot phase
+270 frames -> HideWait with the discs turning, the controls back, the camera on the fixed point (0 u off, fov 50, kind DefiniteD2, no demo); I6 Mario
+teleported to the ring and walked 9.6 m: the eye never left its point (0 u) while the look-at followed him (+302 u, 43 u off in XZ). The game-camera
+shots `intro0`, `intro1`, `introend`, `fightcam`, `fightcam2` (F153CapGameLater: the GAME camera current for the shot) and `ceiling` moved after the
+ride (the raised disc blocked its view). Headless runs af (the level root's space; the disc read back unlifted), ag (the lift in the tick; the shadow
+height), ai 72 / 72; windowed run aj for the captures. Builds 153az..bd: 0 errors; the splice removed (Mario.cs keeps SmsCarryTo), the root clean.
+
+**Deviations:** the FightCamera's box is the room, not the game's whole-stage cube; `IntroStart` (the game has one start: the stage load, Mario dropped
+in from the ceiling and taken) and the knobs `IntroFallSpeed`, `IntroCamera`, `IntroSlotShown`, `CameraChase`; Mario stands in the bowl while carried
+(the game holds him at the boss's point); the pond's pressing (rulet00.bck through the fall) is not played -- the bowl is pressed from the start (153c).
+The game's numbers everywhere else.
+
+**Knobs added:** SmsBossTelesa -- Deviations: IntroStart, IntroTriggerRadiusUnits 2450, IntroLiftUnits 2000 (was 500), IntroFallSpeed 1, IntroCamera,
+IntroCameraPath, IntroSlotShown; Camera: CameraChase, CameraMoveLimitUnits 1000, CameraMoveSpeed 0.02. SmsCameraArea: EyePath. SunshineCamera:
+DefiniteAtOffsetY (a boss's). Files: `assets/SunshineCamera.cs`, `assets/Sms/SmsCameraKinds.cs` (generated), `assets/Sms/SmsCameraArea.cs`,
+`assets/Sms/SmsCameraPath.cs` (new), `assets/Mario.cs` (SmsCarryTo), `assets/Sms/Enemy/SmsBossTelesa.cs`, `assets/Sms/Enemy/BossTelesa.tscn`,
+`assets/Sms/Enemy/BossTelesa/BtelesaRollCamera.tres` (new), `assets/Sms/Enemy/BossTelesa/KingBooArena.tscn`. Tooling (npc82/sirena151/):
+tables_dump153.py, scene_dump153.py, bck_cam153.py, decomp/camera/, patch_mario153l.py, patch_drive153l.py, patch_boss153l_shadow.py,
+tools/projectshine/gen_camera_kinds.py (DefiniteD2), patch_smoke153.py (72 checks), cap/aj153_*.
+
+### 153m -- King Boo faces the camera, Mario in control from the disc's landing, the intro camera where the game's bck puts it (feature/enemy-sirena, code `877791a`)
+
+**Jaysonn's notes on 153l:** (1) "king boo is facing the wrong way", (2) "mario should be in control once the camera goes to the normal spot for the
+fight", (3) "the intro camera angle i think is too low? we should be seeing thru the bottom of the stage". All three taken; (3) was a decoding error.
+
+**The facing (1).** `scene.bin` (scene_boss153.py) places `BossTelesa` at (0, 300, 400) with rotation y 180: he faces -z, toward the room's camera at the
+-z wall (153j's attackers heading for the world's yaw 180 is the same fact). `KingBooArena.tscn` turns its BossTelesa child 180. On its own that did
+nothing: Godot's Euler decomposition reads the basis diag(-1, 1, -1) as X 180 / Z 180 / Y 0 (the same rotation), so `SmsSmallEnemy._Ready`'s
+`_spawnYaw = Mathf.RadToDeg(Rotation.Y)` gave 0 and he faced +z still (run ak: A1f yaw 0). The spawn yaw is `atan2(GlobalBasis.Z.X, GlobalBasis.Z.Z)`
+now -- the same number as before for every ordinary rotation, 180 at 180 -- and GLOBAL, because every enemy's model basis is written global from
+`_yaw` (ApplyLook: `_model.GlobalTransform = (Basis(Up, _yaw) x scale, at)`): an enemy under a turned parent faced the world's way before; an arena
+turned in the level turns its boss with it now. His slot machine (`Slot.GlobalTransform` from `_yaw`), his fruit fan (`PolarXZ(_yaw - offset + step
+i)`), his spat Boos (`MouthUnits + PolarXZ(_yaw, 250)`) follow as they did. The drive's boss shots and Mario's placements moved to the -z side (he
+stands between King Boo and the camera, as the fight plays); a game-camera shot of him appearing (`fightboss`).
+
+**The controls (2).** `TNerveBossTelesaFallDemo`: `rouletteFall` calls `onNeutralMarioKey` every tick the disc falls and returns TRUE level; the demo
+camera's length is the bck's -- the fall's (2000 u at 1 u a tick = 500 frames); `slotFall` (the unseen machine, ~540 ticks) neutralises nothing, so the
+game's Mario walks while the machine drops into place. 153l held `CameraLocked` to `IntroEnd` (after the slot phase). `IntroRelease` -- the demo camera
+ended, `CameraLocked` off -- runs at the landing now (the transition to the slot phase), and `IntroEnd` calls it too for a fall that outlasts the demo.
+
+**The camera (3).** camera_model.bmd's INF1 reads `0x01 (open) 0x10 joint 0, 0x01 (open) 0x10 joint 1, 0x02 (close), 0x10 joint 0?...` -- the J3D codes are
+0x01 open child, 0x02 close, 0x10 joint, 0x11 material, 0x12 shape; bck_cam153.py had 0x10 / 0x11 as open / close and 0x01 as joint, so both joints read as
+roots and the eye's world place was the position joint's own translation. `cam_position` is a CHILD of `cam_interest`: the eye = the look-at + the
+position joint's local translation. Re-evaluated, btelesa_roll_camera.bck opens at the stage's (7, 1346, 2685) -- 12 m over the table at the +z side,
+beyond the wall (culled from outside: the game looks in through it), looking up at the pedestal at fovy 45 -- rises and circles the room to (-5, 2636,
+-2657) at the -z wall looking down at the table's centre at fovy 60. 153l's (3, -1620, 2685) was 28 m under the table looking up through the discs'
+undersides -- what Jaysonn saw. `BtelesaRollCamera.tres` re-baked (the same 500 frames; the ends of the up and fovy tracks unchanged). The shine-get
+camera of pass 116 is unaffected: it reads its own baked table.
+
+**Drive 153 (patch_smoke153.py): 73 / 73** -- 153l's 72 + A1f (his yaw 180); I2 re-aimed (the opening eye 600..1400 u over the node, 2000+ u out, fov
+44..48, within 150 u of the bck); I4 re-aimed (the demo over, `CameraLocked` off and the fixed camera on the view at the landing); the six placements of
+Mario at (0, -0.6, -19) facing +z; the ten boss-side shots mirrored. Runs: ak (A1f yaw 0 -- the Euler read; then a fan pepper fell onto his tongue
+right at fruitCollisionOn, made him spicy before the drive's coconut, and the cascade of a real hit, the Boos' attacks through the long E / F phases
+and the R2 forceHide killed Mario -- the stage reloaded and the drive ran a second time from phase 0 in the same log: a flake not seen in 15 runs,
+possible in the game too); al (the yaw fix built but the arena file with the rotation not yet shipped -- the chain that edited it had broken on an
+assertion); am 73 / 73; windowed run an for the captures. Builds 153bf (a `//` comment swallowing the rest of a one-line statement), bg, bh: 0 errors;
+the splice removed, the root clean.
+
+**Deviations:** none new. The yaw read is the game's number (rotation 180) read correctly.
+
+**Knobs added:** none. Files: `assets/Sms/Enemy/SmsSmallEnemy.cs` (one line), `assets/Sms/Enemy/SmsBossTelesa.cs` (IntroRelease), `assets/Sms/Enemy/BossTelesa/
+BtelesaRollCamera.tres`, `assets/Sms/Enemy/BossTelesa/KingBooArena.tscn`. Tooling (npc82/sirena151/): bck_cam153.py (the INF1 codes), scene_boss153.py,
+patch_boss153m.py, patch_drive153m.py, patch_enemy153m.py, patch_smoke153.py (73 checks), cap/an153_*.
+
+### 153n -- King Boo's intro: Mario on the switch pad, the gold dome standing through the ride and sinking as the fight begins, one pace knob (feature/enemy-sirena, code `28674e1`)
+
+**Jaysonn's notes on 153m:** (1) "the intro is a bit slow", (2) "the golden dot in the middle should be bulged out then goes in once the fight starts",
+(3) "mario should be on the purple point of the inner ring when its lowering down". All three taken; (2) and (3) are the game's own behaviour, read off
+the decomp.
+
+**The pad (3).** `TBossTelesa::getTakingMtx` -- the matrix the held Mario is placed by -- is `mRoulettes[0]->getAnmMtx(1)`: rulet00's joint 1, `switch_00`,
+the centre disc's SWITCH PAD at (140, -140, -910), 920 u from the centre; its y is set to the disc's position - 120 (the pad's top is at -130, so 10 u
+over it). 153l held him at the disc's centre (the bowl's bottom). `HoldPoint`: the disc's `SwitchPoint` (the pad's centre, turning with the disc) at the
+pad's top (10 u under the game's number: no hover), the XZ off the node, the Y off the intended height (the frame-lag shadow); `Mario.SmsCarryTo` takes a
+facing now and he is turned to the table's centre at the TAKE. Every `IntroStart` takes him to the pad, as the game's TAKE does.
+
+**The dome (2).** rulet00.bck (rulet_anim153.py) runs the IKE joint's Y scale 1 -> -0.897 over ~1 s (the glb's 0.98 s): the dome into the bowl.
+`rouletteFall` calls `mRoulettes[0]->mMActor->setBck("rulet00")` every tick the disc falls, and `MActor::setBckFromIndex` -> `setAnmFromIndex(index, 0)`
+restarts the clip at frame 0: the dome stands through the whole fall; when the disc is level the calls stop and the clip plays out -- the dome sinks in
+the second the fight begins, exactly Jaysonn's memory. The port: `SmsRoulette.PondPress(t)` (0 the dome .. 1 the bowl) -- `PressPond` keeps the pond
+surface's source arrays and `RebuildBowl` makes the bowl's mesh from them at the IKE scale in force (`_pondScaleNow`; the normals the inverse-transpose,
+turned to the side we look at; the winding kept); the collision is rebuilt at the motion's ends only (`RebuildCollision`: AutoCollision's shapes again --
+the dome's shape through the second, when Mario is on the pad 920 u out); `PondPressTicks` 120 (the clip's second); `PondIsBowl` is true at the end
+only; `PondYUnits` follows. The boss: `PondPress(0)` at the lift (IntroLift), the ramp from the landing (`_pondPressTick`), `PondPress(1)` at IntroEnd if a
+very short slot phase cut it; `IntroPondPress` off = 153c's bowl from the start. A table without an intro is pressed from the start as before (PressPond
+sets t = 1).
+
+**The pace (1).** The game's fall is 1 u a tick (2000 u in 16.7 s at 120 Hz) and the bck is cut to it (500 frames at 30 = 16.7 s); the slot's unseen drop
+is 540 ticks more. `IntroSpeed` (in place of 153l's `IntroFallSpeed`) scales all three together: the fall (`_introDiscY -= IntroSpeed / U`), the bck's
+playback (`SunshineCamera.StartDemoCamera(path, frame, rate)`: `_demoT += dt x rate`, `DemoRate`; the game's `TCameraBck::setRate` is an empty function,
+so this is the port's) and the slot's drop (5 / 1 u a tick x IntroSpeed, rouletteStart as it passes 200). The default is 1.5 -- 11.1 s + 3 s -- Jaysonn's
+"a bit slow"; 1 is the game's.
+
+**Drive 153 (patch_smoke153.py): 74 / 74** -- 153m's 73 + I1b (the dome up through the ride: PondPress 0, the pond's top +20 u, not a bowl); I1 / I3 / I4 /
+I5 read `k.IntroSpeed` (the shipped default, not a forced 1): the lift 2000 - ticks x speed, half way at 500 / speed frames, the fall 1000 / speed
+frames, the slot phase 270 / speed; Mario within 0.3 m of the pad's centre and 5..15 u over it while carried, within 0.6 m after the DETACH; the press
+begun at the landing (0 < PondPressT < 0.2 two frames on) and complete by the slot phase's end (PondIsBowl, the pond -283 u); I2 reads the bck's rate.
+A1c (phase 1): the wait pattern's eye sheet is read wherever its 300-tick blink cycle stands (open / half / closed) -- the intro's new length had moved
+the drive's fixed moment onto a blink (run ao: eye 1; the pattern itself, btp 2, is still the check). Headless run ao 73 / 74 (that blink); windowed runs
+ap / ar 74 / 74 -- but on a STALE DLL: the Mario.cs patch had left two stray braces after SmsCarryTo, builds 153bl..bo failed (144 errors) and the runs
+loaded build 153bk (the boss, the discs, the camera and the drive, not SmsCarryTo's facing and idle state: Mario rode the pad in his ledgeFall pose,
+ma_land -- the ap/ar captures). Found by the HUD in the captures, confirmed by a 60-s probe (SmsCarryTo / SetMarioState prints: idle through the whole
+ride once built). Braces fixed (fix_braces153n.py); builds 153bp / bq 0 errors; windowed run as 74 / 74 with the captures (Mario standing on the pad,
+ma_wait; the dome up at intro1, pressed 0.05 at the landing, the bowl at fightcam). Lesson kept: check the build log exists and says 0 Error(s), and
+the DLL's timestamp, before every run. The splice removed (Mario.cs keeps SmsCarryTo's facing), the root clean. Jaysonn moved the level's spawn between
+runs am and ao (the drive's arena is placed off Mario: every check is relative). The switch pad is its own red texture while the disc is still and
+glows blue (purple over the red) only while it turns -- TEVREG0 in setRollSp, the game's rule -- so it is red through the ride and purple from the
+slot phase on.
+
+**Deviations:** IntroSpeed (the game has no pace; 1 restores it); the hold at the pad's top rather than 10 u over it; the dome's press as a mesh rebuild
+rather than the skinned joint (153c's choice, kept); the rest the game's own numbers.
+
+**Knobs added:** SmsBossTelesa -- Deviations: IntroSpeed 1.5 (replaces IntroFallSpeed), IntroPondPress; SmsRoulette: PondPressTicks 120. Readers:
+SmsRoulette.PondPressT, SunshineCamera.DemoRate. Files: `assets/Sms/Enemy/BossTelesa/SmsRoulette.cs`, `assets/Sms/Enemy/SmsBossTelesa.cs`,
+`assets/SunshineCamera.cs`, `assets/Mario.cs` (SmsCarryTo's facing). Tooling (npc82/sirena151/): patch_roulette153n.py, patch_boss153n.py,
+patch_camera153n.py, patch_mario153n.py, patch_drive153n.py, patch_drive153n2.py, patch_drive153n3.py (the fan's peppers set aside on the ring:
+a steep lob through his tongue cylinder had made him spicy early in runs ak / ap), fix_braces153n.py, patch_dbg153n.py (the probe, not shipped),
+patch_smoke153.py (74 checks), cap/as/*.

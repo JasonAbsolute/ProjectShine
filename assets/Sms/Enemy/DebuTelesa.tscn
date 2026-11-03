@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://d152debutelesa"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsDebuTelesa.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Telesa/debutelesa.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisap.tscn" id="3_disap"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_body"]
+radius = 2.0
+
+[node name="DebuTelesa" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+script = ExtResource("1_script")
+RelaunchTicks = -1
+DeathFxScene = ExtResource("3_disap")
+metadata/_sms_note = "Pass 152: the Sleepy Boo (DebuTelesa), Hotel Delfino's huge Boo asleep across a doorway. Place it where it should sit (it never moves; +Z is its face; it is ~4 m across). It snores (the Zs off its hand), hurts you if you walk into it and shoves you back out, and your jump, ground pound and punch do NOTHING to it. In the game only Yoshi can clear it (he eats it) -- Yoshi's eating is not in this port, so by default (BeatenBy = SprayThenGroundPound) the HOSE wakes it for AwakeSeconds (the Zs stop, it stirs) and a ground pound on the woken one beats it; BeatenBy = YoshiOnly is the game's unbeatable wall. Knobs: Deviations (BeatenBy, AwakeSeconds), Effects (the Zs, the drool slot), Sounds (two slots); RelaunchTicks -1 = gone for good."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.0, -0.5)
+shape = SubResource("SphereShape3D_body")

@@ -1,0 +1,42 @@
+[gd_scene load_steps=8 format=3 uid="uid://d153arena"]
+
+[ext_resource type="PackedScene" uid="uid://d153rulet00" path="res://assets/Sms/Enemy/BossTelesa/Roulette00.tscn" id="1_r00"]
+[ext_resource type="PackedScene" uid="uid://d153rulet01" path="res://assets/Sms/Enemy/BossTelesa/Roulette01.tscn" id="2_r01"]
+[ext_resource type="PackedScene" uid="uid://d153rulet02" path="res://assets/Sms/Enemy/BossTelesa/Roulette02.tscn" id="3_r02"]
+[ext_resource type="PackedScene" uid="uid://d153btelesa" path="res://assets/Sms/Enemy/BossTelesa.tscn" id="4_boss"]
+[ext_resource type="PackedScene" uid="uid://d153kwall" path="res://assets/Sms/Enemy/BossTelesa/KingBooWall.tscn" id="5_wall"]
+[ext_resource type="Script" path="res://assets/Sms/SmsCameraArea.cs" id="6_camarea"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_room"]
+resource_name = "the room: the game's camera cube covers the whole stage (300 x 600 x 300 m); this box is the room itself, wall to wall, pit to ceiling"
+size = Vector3(68, 100, 68)
+
+[node name="KingBooArena" type="Node3D" unique_id=2000134843]
+metadata/_sms_note = "Pass 153: KING BOO'S ARENA -- the casino's great roulette table (the three discs at one height, the game's layout) with King Boo over its centre, (153k) the casino boss room round it -- the BossWall child, the game's own wall and ceiling (KingBooWall.tscn), a 33-m drum the outer disc's rim pokes into, so Mario cannot fall off -- and (153l) the room's CAMERA and the fight's INTRO. The FightCamera child is the game's camera cube: inside the room the camera stands FIXED at its Eye marker (8 m over the table at the far wall, the game's 'teiten camera D2') and turns to follow Mario; no C-stick, no L camera there. The intro (IntroRide on King Boo, on here): the centre disc waits 27 m up; when Mario comes into the room (IntroStart: WhenMarioEntersRoom; or stands on the raised disc, or at once) he is taken onto it and lowered for 16.7 s while the game's intro camera (btelesa_roll_camera) sweeps from under the table up to the far wall; then the discs start turning and King Boo's wait begins. Drop the arena into the level where the table should be: the discs' walking faces are 1.1 to 1.9 m BELOW this node (the centre disc lowest), the outer ring 34 m across, the wall's paint runs from 13 m under the node to 47 m over it, the ceiling closes it at 47 m -- the room has no door (the game drops Mario in from above): turn WallOn off on BossWall to walk in, or let him fall in. King Boo finds the discs by himself (sms_roulette). The centre disc's pond (the game's water the player refills from) is solid floor here: add one of your sms_water Area3D volumes over it (7 m radius, the face at -1.9 m) if you want it to hold water. Knobs: the room's on BossWall (CeilingOn, RoomCastsShadows, Brightness...), the intro's on BossTelesa (IntroRide, IntroStart, IntroLiftUnits, IntroFallSpeed, IntroCamera, CameraChase), the camera's on FightCamera (Kind, the Eye's place). King Boo FACES the camera (the game's placement: rotation 180, his slot machine turned with him): the BossTelesa child's rotation is that -- if you move the camera to the other side, turn him with it."
+
+[node name="BossWall" parent="." instance=ExtResource("5_wall")]
+
+[node name="FightCamera" type="Area3D" parent="."]
+monitoring = false
+script = ExtResource("6_camarea")
+Kind = 18
+Priority = 10
+metadata/_sms_note = "153l: the game's camera cube for the casino boss room (tables.bin: one CameraCubeInfo naming the map tool 'teiten camera D2', CAMERA_MODE_DEFINITE_D2 at the stage's (0, 1100, -2450)). Inside this box the camera stands at the Eye marker -- 600 u (8 m) over the arena node at the -z wall, the game's point -- and looks at Mario (+ 300 u) with kindDefiniteD2.prm's chase; the stick and the L camera are dead. Move the Eye to move the camera; the box is the room (the game's cube is 300 x 600 x 300 m: the whole stage)."
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="FightCamera"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 10, 0)
+shape = SubResource("BoxShape3D_room")
+
+[node name="Eye" type="Marker3D" parent="FightCamera"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8.0602, -32.9124)
+
+[node name="Roulette02" parent="." unique_id=350004841 instance=ExtResource("3_r02")]
+
+[node name="Roulette01" parent="." unique_id=1741330031 instance=ExtResource("2_r01")]
+
+[node name="Roulette00" parent="." unique_id=45288040 instance=ExtResource("1_r00")]
+
+[node name="BossTelesa" parent="." unique_id=245215880 instance=ExtResource("4_boss")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, 0, 0)
+IntroRide = true
+GhostOpacity = 0.44999999999999996

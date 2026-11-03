@@ -829,7 +829,7 @@ it skids and bounces off walls, sits dizzy, reheats; flung into water it is beat
 + SmsFireWanwan.cs, the chain, the eye shader and four materials under assets/Sms/Enemy/FireWanwan/, the two models under models/Eniemes/FireWanwan/;
 Mario's pull plumbing assets/Sms/SmsPullHandle.cs + assets/Sms/MarioPull.cs and three anchored lines in assets/Mario.cs (the `pulling` state, its
 dispatch, the hitNoKeepPull entry). PLAYTESTED BY JAYSONN (149 and 150, through the 150b-e polish -- he signed off 2026-11-01): push the branch AND open its PR; the family is done. ONE
-merge path only -- this is a PR, so do NOT also merge it into local `main`. SMS 150: the Chain Chomp (TBossWanwan), Pianta Village's house-sized boss on a 15-link leash -- staked to the ground, it rampages at the end of its chain and burns you (its body and its hot chain); the hose cools its 255 heat points from red through to a cold blue; cooled, you pull its stake out (B) and drag it along its rail to the hot spring, where it leaps in, turns gold and drops the Shine (grab the stake while it is HOT and it drags YOU instead; ground-pound the stake to re-plant it) -- assets/Sms/Enemy/BossWanwan.tscn + SmsBossWanwan.cs, the leash / two shaders / eight materials under assets/Sms/Enemy/BossWanwan/, the three models under models/Eniemes/BossWanwan/; it reuses pass 149's PULLING (SmsPullHandle / MarioPull.cs, now with the stick accessors the boss's drag reads) and adds StartMode to assets/Sms/SmsCameraShake.cs. SMS 150b polishes both Chomps: their reignition now shows its fire building (the Chomplet's ring flame grows through the reheat; the Chain Chomp's body and chain glow back from cold across the bark) and the Chain Chomp walks upright instead of tumbling (RollSw off). SMS 150c then takes the Chain Chomp's stomp dust and impact streaks down to the ground (they were sitting too high), gives its hot mouth back its sparks (HitBurst), and fixes its hose steam, which was being dropped before it could show. SMS 150d then reworks the Chain Chomp's effects to Jaysonn's reference (Ref/TeethSparkRef): its mouth throws scattered yellow -> orange ember sparks (a new Fx/BwHibana), the hose steam rises low around the whole body instead of from the middle, and the stomp's blue impact streaks sit low again. SMS 150e then makes those mouth sparks jet directionally out of the teeth as longer, short-lived streaks (BwHibana is now a forward align_y streak jet, spawned facing the mouth). Further passes re-point this entry's tip.
+merge path only -- this is a PR, so do NOT also merge it into local `main`. SMS 150: the Chain Chomp (TBossWanwan), Pianta Village's house-sized boss on a 15-link leash -- staked to the ground, it rampages at the end of its chain and burns you (its body and its hot chain); the hose cools its 255 heat points from red through to a cold blue; cooled, you pull its stake out (B) and drag it along its rail to the hot spring, where it leaps in, turns gold and drops the Shine (grab the stake while it is HOT and it drags YOU instead; ground-pound the stake to re-plant it) -- assets/Sms/Enemy/BossWanwan.tscn + SmsBossWanwan.cs, the leash / two shaders / eight materials under assets/Sms/Enemy/BossWanwan/, the three models under models/Eniemes/BossWanwan/; it reuses pass 149's PULLING (SmsPullHandle / MarioPull.cs, now with the stick accessors the boss's drag reads) and adds StartMode to assets/Sms/SmsCameraShake.cs. SMS 150b polishes both Chomps: their reignition now shows its fire building (the Chomplet's ring flame grows through the reheat; the Chain Chomp's body and chain glow back from cold across the bark) and the Chain Chomp walks upright instead of tumbling (RollSw off). SMS 150c then takes the Chain Chomp's stomp dust and impact streaks down to the ground (they were sitting too high), gives its hot mouth back its sparks (HitBurst), and fixes its hose steam, which was being dropped before it could show. SMS 150d then reworks the Chain Chomp's effects to Jaysonn's reference (Ref/TeethSparkRef): its mouth throws scattered yellow -> orange ember sparks (a new Fx/BwHibana), the hose steam rises low around the whole body instead of from the middle, and the stomp's blue impact streaks sit low again. SMS 150e then makes those mouth sparks jet directionally out of the teeth as longer, short-lived streaks (BwHibana is now a forward align_y streak jet, spawned facing the mouth). SMS 153: KING BOO (TBossTelesa), Casino Delfino's boss over his roulette table -- the slot machine, the fruit and pepper rounds, the spicy hits that take his three hit points, the three spinning discs with their ground-pound switches, the Boo attackers, the Shine -- assets/Sms/Enemy/BossTelesa.tscn + SmsBossTelesa.cs, the slot / discs / arena / materials under assets/Sms/Enemy/BossTelesa/, the models under models/Eniemes/BossTelesa/; SmsTelesa.cs gets the Boo's attacker half (and a goal-distance fix), Mario.cs a two-line SmsHP getter. SMS 153b: King Boo after the playtest -- the bmd's real materials (a WHITE see-through Boo with blue eyes, the blink loop and the rolled eyes), every ms_btls effect (the twinkle, the glow, the drool, the fruit-colour puffs, the confetti, the spicy fire and sweat), the slot finishing before he spits (ResultPauseTicks), HoverHeight (11.42 m; the game's 14.8), the hint balloons, the rumble, the real shake tables, BossMusic, the IntroRide knob (the FallDemo). SMS 153c: the second playtest -- King Boo SOLID by default with GhostOpacity a live slider (0.588 = the game's ghost), his and the small Boos' shaders writing depth (the mouth drawn over the head is gone), the slot machine sinking into the table and rising back under him, drool strands off his lip's corners (the Piranha's SmsGoopStrand, with FollowAnchor / AnchorOffsetUnits), the gold ring pressed into a bowl (rulet00.bck's end pose), Mario's right glove / shoe / left eye materials opaque in Player.tscn. SMS 153d: the pressed gold ring SHOWS (153c had reversed the bowl's winding and it was culled -- a hole), and the drool strands face the camera (SmsGoopStrand.FaceCamera; the Piranha's two crossed strips read as an X from the table). SMS 153e: a DroolOn toggle, King Boo floating just over a lower slot machine (SlotUnderUnits 960, HoverHeight 13 m), and the inside of his crown drawn (the bmd's _mat_crown is two-sided: the shader split into an include with a cull_back and a cull_disabled twin). SMS 153f: a fruit in Mario's hands that goes with the swallowed fan now empties his hands (Mario.SmsHeldGone) -- no more carrying a freed body until something hits him. SMS 153g: a damage FLASH (the whole body blinks the fruit's colour, three times in half a second), the spit waiting for the slot machine to sink out of sight, and his spicy fire rebuilt from the disc's own ms_btls_spicy_a..d (BtlsSpicyFire.tscn; the Stu's fire x 2.5 stood in before). SMS 153h: the damage flash three times longer (90 ticks), the slot machine riding his rise out of the table (no more trailing and popping), and a jump popping his Boo attackers (AttackersJumpable; SmsTelesa.JumpPopsUnsprayed, off for the hotel's Boos). SMS 153i: a jump pops EVERY Boo by default (JumpPopsUnsprayed on for the species), and only a real stomp from above does it -- 153h's cylinder test let King Boo's attackers pop as they rammed a descending Mario. SMS 153j: the slot machine bolted to his clips (it dives into the table with him) and him riding it down at the spit; the damage flash 2.5 s at 3 Hz; his Boo attackers out of his mouth toward Mario, flying over the table's surface (not 143 u under it), homing in a curve. SMS 153k: King Boo's ROOM -- the casino boss room's wall and ceiling from the game's own files round the arena (the 33-m drum the outer disc's rim pokes into, its starry purple paint with the three drifting coloured spots, the marble-ring ceiling): KingBooWall.tscn, the arena's new BossWall child. SMS 153l: King Boo's INTRO (Mario taken onto the centre disc 27 m up and lowered for 16.7 s under the game's intro camera, the slot's unseen fall, the discs' start) and the room's FIXED camera (the game's camera cube: the eye at the far wall, turning to follow Mario); SunshineCamera learns the bck demo camera and the fixed-point kind, SmsCameraArea an Eye marker, Mario.cs SmsCarryTo. SMS 153m: King Boo faces the camera (the game's rotation 180; every enemy's spawn yaw read off its node's axis), Mario in control from the disc's landing, the intro camera where the game's bck puts it (12 m over the table, not under it). SMS 153n: the intro -- Mario rides the centre disc's switch pad (the game's taking matrix), the gold dome stands through the ride and sinks into its bowl as the fight begins (rulet00.bck as the game plays it), IntroSpeed paces the whole intro (1.5 = 11 s; 1 = the game's 16.7 s). Further passes re-point this entry's tip.
 - Branch `feature/enemy-monte` -- code tip `73be638` ("SMS 150e: the Chain Chomp's mouth sparks jet out as directional streaks", 3 files --
   SmsBossWanwan.cs, Fx/BwHibana.tscn, BossWanwan.tscn) on the 150b-d polish chain (`a9984c3` 150d ember/steam/stomp, `75fd1eb` 150c, `3cbcc37`
   150b) on `7876f9a` ("SMS 150: the Chain Chomp ...", 48 files +2230) on `bf3de7c` ("SMS 149: the Chain Chomplet ...", 32 files +1791) on
@@ -917,3 +917,188 @@ is pushed and waiting on Jaysonn's playtest, and it is now the branch that merge
 `PROJECT_LOG.md` and `timeToPush!.md` against this entry's sections. Keep both sides: nothing else overlaps, measured.
 `feature/select-stages` (entry #11, SMS 135) is likewise pushed and waiting on a playtest, and holds the only copy of #11's
 text. The exit-time C# finalize crash from #10's batch has still not recurred.
+
+### #16 -- DONE 2026-11-03 -- https://github.com/JasonAbsolute/ProjectShine/pull/14 (OPEN, awaiting Jaysonn's merge) -- queued 2026-11-01 10:38 PST (Kiro) -- PUSH + PR (SMS 151-153 + 153b..n), PLAYTESTED BY JAYSONN 2026-11-03, updated 2026-11-03 00:16 PST
+Push the eleventh feature branch: `feature/enemy-sirena`, branched from `main` `c082a22` (the trunk after PR #13, the Chain Chomps). Sirena Beach's
+family -- Hotel Delfino's ghosts -- one pass each on this branch. SMS 151: the Boo (TTelesa), the hotel's ghost -- it drifts between its graph's nodes
+a little off the floor, bobbing and tilting, fading in and out (the LOOP kind), and hurts you on touch; your jump passes straight through it until you
+HOSE it: a spray knocks it back, shows it and stuns it, sunk to the floor and solid, and NOW a jump pops it (the down clip, coins). The PINK box Boo
+(Kind = Box) is always visible and a spray turns it into a pink Boo BLOCK you stand on for 25 s before the Boo comes back out; a jump on a box Boo only
+makes it flinch -- assets/Sms/Enemy/Telesa.tscn + SmsTelesa.cs, the block, the shader and six materials under assets/Sms/Enemy/Telesa/, the two
+models under models/Eniemes/Telesa/. PLAYTESTED BY JAYSONN 2026-11-03 ("nice played thru the fight. lets pr it"): push the branch AND open its PR -- the
+family is done (the sounds come as their own pass on a later branch). ONE merge path only: this is a PR, so do NOT also merge it into
+local `main` (Kiro has not). It can be merged once it is open (squash or merge commit, his call; `main` then needs a `git pull` here). SMS 152: the Sleepy Boo (TDebuTelesa), the hotel's huge Boo asleep across a doorway -- it snores, hurts and shoves you on touch, and nothing of Mario's moves it; in the game only Yoshi eats it, so here (BeatenBy, a knob, on by default) the hose wakes it and a ground pound on the woken one beats it -- assets/Sms/Enemy/DebuTelesa.tscn + SmsDebuTelesa.cs, two materials under Telesa/, the model under models/Eniemes/Telesa/. Further passes re-point this entry's tip.
+- Branch `feature/enemy-sirena` -- code tip `28674e1` ("SMS 153n: King Boo's intro -- Mario rides the centre disc's switch pad ...",
+  SmsRoulette.cs, SmsBossTelesa.cs, SunshineCamera.cs, Mario.cs) on `877791a` ("SMS 153m: King Boo faces the camera ...") on `main` `c082a22`;
+  the branch tip is this file's own commit on top of them; 32 commits since `main`. The range carries none of Jaysonn's nine live edits (nor
+  his editor re-saves of the BossTelesa .tres); his re-save of the arena (the uids, GhostOpacity 0.45) went in with 153k's BossWall child of
+  KingBooArena.tscn).
+- To try 151: drop assets/Sms/Enemy/Telesa.tscn in a room where it should FLOAT (it keeps the floor under the placed point as its base and bobs
+  0.7-2.3 m over it; +Z is its face) with a Graph node of Node3D children to drift between, or it roams within WanderRadiusUnits. Kind: Loop (the
+  hotel's: fades in ~3 s, out, hidden ~5 s, again), Box (the PINK one, always visible), Normal (invisible until sprayed), CanSee (always visible).
+  It hurts you on touch unless you are above it, and your jump passes through it -- hose it: it is knocked back, shown and stunned (it sinks to the
+  floor, solid); jump on it or ground-pound it NOW and it pops. The stun ends by itself and it drifts off. A BOX Boo sprayed turns into a pink block
+  you can stand on for 25 s (it blinks before the Boo comes back). Knobs: Kind, Deviations (SpeedScale, BaseOffsetUnits), Effects (the change puff,
+  the drool slot, the block scene), Sounds (eight slots); RelaunchTicks -1 = gone for good.
+- To try 152: drop assets/Sms/Enemy/DebuTelesa.tscn in a doorway or corridor (it is ~4 m across and never moves; +Z is its face). It
+  snores with its Zs; walk into it and it hurts you and shoves you back out; your jump, ground pound and punch do nothing to it. Hose it and it
+  wakes for AwakeSeconds (8 s: the Zs stop, it stirs) -- ground-pound it THEN and it is beaten (it shrinks away; coins if a DropTable is set).
+  BeatenBy = YoshiOnly makes it the game's unbeatable wall (only Yoshi eats it, and Yoshi's eating is not in the port). Knobs: Deviations
+  (BeatenBy, AwakeSeconds), Effects (the Zs, the drool slot), Sounds (two slots); RelaunchTicks -1 = gone for good.
+- To try 153: drop assets/Sms/Enemy/BossTelesa/KingBooArena.tscn into the level where the table should be (the three discs sit at one height;
+  their walking faces are 1.1 to 1.9 m BELOW the node, the outer ring 34 m across -- put the node ~2 m over the room's floor, or let the table stand
+  in a pit). King Boo hangs 11 m up over the centre, hidden for HideWaitTicks (400 = 3.3 s) first, then laughs with his slot machine under him and
+  spits a Boo every few seconds. HOSE HIS TONGUE: the slot rolls -- three FRUIT and he spits a fan of fruit and two RED PEPPERS over the table.
+  Throw a pepper into his mouth (his tongue hangs low) and he turns spicy and solid; THEN a fruit on his body takes a hit point (he turns the
+  fruit's colour, flees, the discs spin faster). A fruit on him while not spicy only makes him flinch, lick and laugh. Three hits and he is down:
+  the Shine. Stand on the gold dome in the centre and he vanishes (and will not come back until you step off). Ground-pound the glowing pad (one red pad
+  on each disc turns violet while the disc spins) to stop that disc. Knobs: The fight (HitPoints, HideWaitTicks, RoundTimeScale, the slot rates, ForceResult -- Coin / Enemy /
+  Fruit / Jackpot for the custom fight), What he spits (the fruit / coin / enemy scenes, the Boo), Deviations (speed scales, the attackers, the
+  hide), Effects, Camera, Sounds. SmsRoulette: SwitchRadiusUnits, the pad colours, InitialRollSpeed (a disc on its own).
+- To try 153b: he is a white see-through Boo now (GhostOpacity 0.588 = the game; 1 = solid), 11.4 m up (HoverHeight), twinkling and glowing with
+  drool off his tongue; the slot stops, the fanfare and its confetti, THEN the machine sinks and he spits (ResultPauseTicks); a plain fruit paints him
+  in its colour for a moment (the brk sweep), a pepper rolls his eyes and lights his tongue; the hints show on the HUD balloon (ShowHints, the three
+  lines are knobs); IntroRide (Deviations) is the game's intro -- Mario on the raised centre disc riding it down, the slot falling into place.
+- To try 153c: he is SOLID now; GhostOpacity (Looks) is the slider and moves live in the inspector while he plays (0.588 = the game's ghost).
+  The slot machine sinks into the table when he hides and rises back with him sitting on it (SlotSinkSpeed / SlotRiseSpeed). The gold ring is
+  a bowl (SmsRoulette.PondPressed). Drool strands hang off his lip's corners and his tongue tip and ride with him (DroolFollow, DroolLipUnits,
+  DroolSpreadUnits, DroolLength, DroolWidth). The small Boos' mouths no longer draw through their heads; Mario's right glove, right shoe and
+  left eye are opaque (Player.tscn -- a model fix, not a knob).
+- To try 153d: the gold ring is a visible golden bowl in the centre now; the drool strands read as round drops from the table (DroolFaceCamera,
+  Looks -- off = the Piranha's crossed strips).
+- To try 153e: DroolOn (Looks) turns the drool off and on, live; SlotUnderUnits (The arena, 960; the game's 700) is how far under his centre the
+  slot machine hangs and HoverHeight (13 m) how high he floats -- together they set his seat over the machine; look down into his crown: its
+  inside is drawn.
+- To try 153f: hold a fruit of the fan when he swallows it (hit him with another, or walk under him): your hands empty at once, no stuck carry.
+- To try 153g: hit him -- his whole body blinks the fruit's colour three times (DamageFlashTicks / Period / FruitColor / Color, Looks); after the
+  fanfare the machine sinks ALL the way under the table before he spits; a pepper lights his tongue with the game's own fire (SpicyFireScale).
+- To try 153h: hit him -- the blink runs a second and a half now (DamageFlashTicks); after a hide the slot machine comes up out of the bowl WITH him;
+  jump on a Boo he spits and it pops (AttackersJumpable on him; JumpPopsUnsprayed on a placed Boo for the same in the hotel).
+- To try 153i: jump on any Boo you placed -- it pops (JumpPopsUnsprayed, Deviations; off = hose first); King Boo's Boos pop only when you land ON
+  them, not when they fly into you on the way down.
+- To try 153j: walk under him while he waits -- the machine dives into the table with him; after the fanfare he sinks with the machine until it drops
+  away, then spits; a hit blinks him 2.5 s at 3 Hz (DamageFlashTicks / Period); his Boos come out of his mouth at you, fly over the pads and curve
+  after you (AttackersSpawnForwardUnits, AttackersFirstPointTowardMario, AttackersSmooth; off = the game's).
+- To try 153k: the arena has its ROOM now -- the game's wall round the table (you cannot walk or fall off the outer disc) and the ceiling
+  47 m up, built when the scene opens (the editor shows it too). Knobs on the arena's BossWall child: CeilingOn (off = open to the sky),
+  RoomCastsShadows (on = a dark indoor room), Brightness / SpotStrength / SpotSpeed (1 = the game's dark purple with its drifting lights),
+  WallRadiusUnits and the heights; TableLiftUnits is where the room sits under the node (500 u: the game's). KingBooWall.tscn on its own
+  drops onto the same point as a table.
+- To try 153l: walk into the arena's room (WallOn off on BossWall to walk in, or drop in from above) -- you are lifted onto the centre disc 27 m
+  up and ride it down for 17 s while the game's intro camera sweeps from under the table up to the far wall; then the discs start and King Boo's
+  wait begins. Through the fight the camera stands FIXED at the far wall 8 m up and turns to follow you (no C-stick, no L camera: the game's).
+  Knobs: IntroRide / IntroStart (WhenMarioEntersRoom, WhenMarioLandsOnDisc, AtOnce) / IntroLiftUnits / IntroFallSpeed / IntroCamera / IntroSlotShown
+  and CameraChase on King Boo; the FightCamera child's Eye marker is where the camera stands (move it, or delete the child for the normal camera).
+  Your spawn is inside the room's trigger: the intro runs every time the level starts -- IntroRide off on your arena's BossTelesa for quick tests.
+- To try 153m: King Boo faces you and the camera now (his fan and his Boos come at you); you can move the moment the disc lands and the
+  camera cuts to the fight's spot (the slot machine still drops into place unseen for 4 s); the intro camera opens 12 m over the table
+  looking up at your pedestal and circles up to the far wall.
+- To try 153n: walk into the room -- you are set on the centre disc's purple switch pad, facing the gold dome standing up in the middle, and
+  ride down for 11 s (IntroSpeed 1.5 on King Boo: 1 = the game's 17 s, 2 = 8 s -- the fall, the camera sweep and the slot's drop all follow);
+  the moment the disc lands the dome sinks into its bowl (PondPressTicks on Roulette00: the second it takes; IntroPondPress off on King Boo
+  = the bowl from the start) and you are in control.
+- PR: title "Feature: Sirena Beach's ghosts -- the Boo, the Sleepy Boo and King Boo's casino fight (SMS passes 151-153n)"; base `main`;
+  head `feature/enemy-sirena`; body (extract it to `pr151.md` at the project root for `--body-file`, untracked, delete it after):
+  > Sirena Beach's enemy family, one pass per species on `feature/enemy-sirena` off `main` `c082a22`, each pass read off the decompiled game
+  > (TTelesa / TDebuTelesa / TBossTelesa) and logged in `PROJECT_LOG.md` (entries 151, 152, 153, 153b-153n).
+  >
+  > **SMS 151 -- the Boo (TTelesa).** Hotel Delfino's ghost: drifts between its graph's nodes a little off the floor, bobbing and tilting, fading
+  > in and out (the LOOP kind), hurts on touch; a jump passes through it until it is HOSED -- knocked back, shown, stunned on the floor and
+  > solid, and then a jump pops it (coins). The PINK box Boo (Kind = Box) is always visible and a spray turns it into a pink block you stand on
+  > for 25 s. Kinds: Loop, Box, Normal, CanSee. `assets/Sms/Enemy/Telesa.tscn` + `SmsTelesa.cs`, the block, shader and materials under
+  > `assets/Sms/Enemy/Telesa/`, the models under `models/Eniemes/Telesa/`.
+  >
+  > **SMS 152 -- the Sleepy Boo (TDebuTelesa).** The huge Boo asleep across a doorway: snores, hurts and shoves on touch, nothing of Mario's
+  > moves it. The game lets only Yoshi eat it; here `BeatenBy` (a knob, on by default) lets the hose wake it (AwakeSeconds) and a ground pound
+  > on the woken one beat it. `assets/Sms/Enemy/DebuTelesa.tscn` + `SmsDebuTelesa.cs`.
+  >
+  > **SMS 153 -- King Boo (TBossTelesa), Casino Delfino's boss.** The roulette table (three discs with ground-pound switches), the slot machine
+  > under him, the fruit / coin / enemy / jackpot rounds, the fan of fruit and two red peppers, a pepper in his mouth making him spicy and
+  > solid, a fruit on him then taking one of three hit points, his Boo attackers, the Shine. `assets/Sms/Enemy/BossTelesa.tscn` +
+  > `SmsBossTelesa.cs`, the slot / discs / arena / room / camera path / materials / effects under `assets/Sms/Enemy/BossTelesa/`, the models
+  > under `models/Eniemes/BossTelesa/`. The polish passes after Jaysonn's playtests:
+  > 153b the bmd's materials, every ms_btls effect, the hints, the rumble, BossMusic; 153c solid by default with a live GhostOpacity, depth-writing
+  > shaders, the slot sinking into the table, drool strands, the gold ring pressed into a bowl; 153d-153e the bowl drawn, the drool facing the
+  > camera, DroolOn, the seat over a lower slot, the crown's inside; 153f-153j hands emptied with a swallowed fruit, the damage flash, the spicy
+  > fire from the game's own particles, the slot bolted to his clips, jumpable Boo attackers flying out of his mouth at Mario; 153k the ROOM
+  > (the casino boss room's wall and ceiling from the game's files: `KingBooWall.tscn`, the arena's BossWall child); 153l the INTRO (Mario taken
+  > onto the raised centre disc and lowered under the game's btelesa_roll_camera.bck, the slot's unseen fall) and the room's FIXED camera (the
+  > game's camera cube: `SunshineCamera` learns the bck demo camera and the DefiniteD2 kind, `SmsCameraArea` an Eye marker); 153m King Boo
+  > facing the camera, Mario in control from the landing, the intro camera where the bck puts it; 153n Mario riding the switch pad (the game's
+  > taking matrix), the gold dome standing through the ride and sinking into its bowl as the fight begins, `IntroSpeed` pacing the intro
+  > (1.5 = 11 s; 1 = the game's 16.7 s).
+  >
+  > **To try:** drop `assets/Sms/Enemy/Telesa.tscn` (with a Graph of Node3D children, or it roams), `assets/Sms/Enemy/DebuTelesa.tscn` in a
+  > doorway, `assets/Sms/Enemy/BossTelesa/KingBooArena.tscn` where the table should stand (the room comes with it). Walk into the room: the
+  > intro ride, then HOSE HIS TONGUE for a slot round; a pepper in his mouth, then a fruit on his body. The knobs are grouped and noted on each
+  > scene (The fight, What he spits, Deviations, Looks, Effects, Camera, Sounds).
+  >
+  > **Drives:** every pass's headless drive green before its commit (the King Boo drive 153 at 74 / 74 checks for 153n, with captures through the
+  > game camera); the numbers per pass are in PROJECT_LOG.md.
+  >
+  > **Not ported / deviations (logged):** Yoshi eating the Sleepy Boo (BeatenBy stands in); the sounds (slots on every species, nothing wired --
+  > the sound pass follows on its own branch); the game's fixed intro pace (IntroSpeed 1 restores it); King Boo solid by default (GhostOpacity
+  > 0.588 = the game's ghost); the Boo attackers' homing curve and spawn point (knobs, off = the game's); the pressed bowl as a mesh rebuild.
+  > Also in the range: `Mario.cs` (SmsHP getter, SmsHeldGone, SmsCarryTo), `SmsSmallEnemy.cs` (the spawn yaw off the node's axis -- every enemy),
+  > `SmsGoopStrand.cs` (FollowAnchor / FaceCamera), `SmsCameraShake.cs`, `Player.tscn` (three opaque materials). Jaysonn's live edits
+  > (`assets/Level.tscn` and the rest) are not in it.
+```
+git push -u origin feature/enemy-sirena
+git rev-list --count origin/feature/enemy-sirena..feature/enemy-sirena
+gh auth status
+gh pr create --base main --head feature/enemy-sirena --title "Feature: Sirena Beach's ghosts -- the Boo, the Sleepy Boo and King Boo's casino fight (SMS passes 151-153n)" --body-file pr151.md
+```
+Expect `0` from the rev-list. KEEP THE #6 ORDER: push the branch -> write the result paragraph below, commit it and push -> only THEN open the PR
+(`gh pr create` if `gh auth status` is logged in, else the prefilled compare URL with the title, and the body from `pr151.md` -- over ~8000
+characters of URL prefill the title and clipboard the body, as #8 learned). ONE merge only: this is a PR, so do NOT also `git merge` it into local
+`main`. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the three
+gatekeeper / launcher `.tres` re-saves, the four BossTelesa `.tres` re-saves, the two Koopa and the two Goop `.png.import` flips and the
+`addons/godot_ai` churn: his, leave them (none of them belong in this PR).
+Result: `feature/enemy-sirena` pushed as a NEW remote branch, 33 commits over `main` `c082a22`, 186 files / +2168381 / -36.
+`git rev-list --count origin/feature/enemy-sirena..feature/enemy-sirena` returned `0`. `git merge-base feature/enemy-sirena main`
+is exactly `c082a22`, so the branch sits on the trunk with no merge in it. All sixteen pass shas named in PROJECT_LOG.md confirmed
+ancestors: `a5b0234` (151), `f29bf3e` (152), `525f1b5` (153), `a550172` (153b), `47b3351` (153c), `38322f3` (153d), `da307fd`
+(153e), `acd4554` (153f), `570076c` (153g), `be8ce44` (153h), `cff77b9` (153i), `80160d0` (153j), `cc59542` (153k), `6570dca`
+(153l), `877791a` (153m), `28674e1` (153n). All seventeen log entries are in the branch's PROJECT_LOG.md. Nine of the 186 files
+are modifications and 177 are additions: PROJECT_LOG.md, `assets/Mario.cs`, `assets/Player.tscn`, `assets/Sms/Enemy/SmsSmallEnemy.cs`,
+`assets/Sms/Fx/SmsGoopStrand.cs`, `assets/Sms/SmsCameraArea.cs`, `assets/Sms/SmsCameraKinds.cs`, `assets/SunshineCamera.cs` and
+this file.
+THE INSERTION COUNT IS NOT WHAT IT LOOKS LIKE. 2160288 of the 2168381 insertions are six `.glb.import` files, 360048 lines and
+11.67 MB each: `rulet00`, `rulet01`, `rulet02`, `srot_waku` and `srotrulet` under models/Eniemes/BossTelesa/, plus
+models/Koopa/scene/delfinoBoss/map/map.glb.import. Everything hand-written in the branch is the other 8093 insertions across
+180 files. This is the long-flagged `.import` bloat, not a new regression: `main` already carries 172 `.import` files over 1 MB,
+the largest `ma_mdl1.glb.import` at 13.9 MB. Largest real assets added: `btelesa.glb` 1.6 MB, `telesa.glb` 0.26,
+`debutelesa.glb` 0.16, then `SmsBossTelesa.cs` at 124 KB. Eight new scripts: SmsTelesa, SmsDebuTelesa, SmsBossTelesa,
+SmsRoulette, SmsTelesaSlot, SmsBossWall, SmsTelesaBlock, SmsCameraPath.
+Hygiene: 0 of Jaysonn's nine live edits in the range. The four BossTelesa `.tres` files do appear, as ADDITIONS the branch makes;
+his uncommitted re-saves of them sit on top in the working tree and are not in the push, which is what the entry meant.
+NOTE on the commit count: the entry says 32, measured 33. The extra one is `59cede2`, the commit that gave this entry its PR
+title, body and gh command, which cannot count itself. The same off-by-one as every entry so far, and always the queue file's
+own commit.
+ONE CORRECTION TO THE PR BODY. Kiro's "Also in the range" list names `SmsCameraShake.cs`. That file is NOT in the range:
+it exists on `main` already and the branch does not touch it (153b set its shake tables as data, it did not change the script).
+It was replaced with `SmsCameraKinds.cs` (the DefiniteD2 kind), which the branch does modify. Everything else in the body is
+Kiro's wording unchanged, with blank lines inserted between his hard-wrapped sections so GitHub does not render them as one
+run-on paragraph, the same fix #15 needed.
+UNMERGED SIBLINGS, measured by trial merge rather than by eye. Two branches are still open off older trunks: `feature/enemy-pinna2`
+(entry #14) and `feature/select-stages` (entry #11). `git merge-tree` against each one conflicts in `PROJECT_LOG.md` and
+`timeToPush!.md` only, so whichever merges after this one keeps both sides at those two tails. `feature/select-stages` also
+touches `assets/Mario.cs`, which `comm -12` flags as a shared file, but its hunks sit around line 20340 while this branch's sit
+at 17290 and 17528, and the trial merge auto-merges the file with no conflict. No scene, script, shader, material or model
+collides.
+`gh auth status` still prints "You are not logged into any GitHub hosts", the eighth entry running, so the browser route again.
+The PR body went to `pr151.md` at the project root (untracked, delete after merge), 4650 bytes with the attribution footer.
+ONE merge path, as the entry insists: this branch gets a PR and is NOT also merged into local `main`.
+PR #14 OPENED at https://github.com/JasonAbsolute/ProjectShine/pull/14, base `main`, head `feature/enemy-sirena` at `a920350`,
+34 commits / 186 files, `mergeable_state` clean. The compare URL carried the title and body prefilled at 7050 characters, under
+the ~8000 ceiling #8 established. Verified through the public API that all 4647 characters of Kiro's prose landed byte for byte.
+ONE DEFECT, cosmetic: the attribution footer's robot glyph arrived as `ðŸ¤–`. Windows PowerShell 5.1's `Get-Content -Raw`
+reads a UTF-8 file with no BOM as cp1252, so the clipboard copy of `pr151.md` carried the mojibake and that is what reached the
+body field. Next entry: read the body with `[System.IO.File]::ReadAllText($p, [System.Text.Encoding]::UTF8)` before
+`Set-Clipboard`, or keep the footer out of the clipboard path. A repaired copy of the body sits in the session scratchpad.
+THE TRUNK TIP: read it from `git log --oneline -1 main`, not from a sha written here. A commit cannot state its own sha, which
+has now caught three entries.
+STILL OPEN, carried forward: `feature/enemy-pinna2` (entry #14, SMS 147 and 148, the Bullet Bill and the ground Electrokoopa) and
+`feature/select-stages` (entry #11, SMS 135) are both pushed and waiting on Jaysonn's playtest, and `feature/select-stages` holds
+the only copy of #11's text. The exit-time C# finalize crash from #10's batch has still not recurred, now across the 151-153n
+passes as well.

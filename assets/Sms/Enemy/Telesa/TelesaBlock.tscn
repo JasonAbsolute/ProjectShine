@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://d151telesablk"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/Telesa/SmsTelesaBlock.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Telesa/telesablock.glb" id="2_model"]
+
+[node name="TelesaBlock" type="StaticBody3D"]
+collision_layer = 1
+collision_mask = 0
+script = ExtResource("1_script")
+metadata/_sms_note = "Pass 151: the pink Boo block (TelesaBlock) a sprayed BOX Boo turns into -- made by SmsTelesa, not placed by hand. It grows in from a dot over about a second, spins three turns as it appears, stands as a platform for 25 s (blinking through the last ~2 s), then the Boo comes back out of it."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]

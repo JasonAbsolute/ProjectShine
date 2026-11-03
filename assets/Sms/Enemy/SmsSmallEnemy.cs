@@ -239,7 +239,7 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
                 if (!string.IsNullOrEmpty(n) && !_anim.HasAnimation(n))     // an empty slot = a clip this kind has not (the winged Stu's 4-clip table on the Stu's 15 slots)
                     GD.PushWarning($"[SMS enemy] {GetPath()}: the model has no '{n}' clip (the game's bck table: {string.Join(", ", BckNames)})");
         _spawnPos = GlobalPosition * U;
-        _spawnYaw = Mathf.RadToDeg(Rotation.Y);
+        _spawnYaw = Mathf.RadToDeg(MathF.Atan2(GlobalBasis.Z.X, GlobalBasis.Z.Z));   // 153m: the yaw of the node's +Z axis, global (the model's basis is written global from it) -- Rotation.Y reads a 180-degree turn as X 180 / Z 180 / Y 0 (King Boo placed facing the camera read as yaw 0)
         _yaw = _spawnYaw;
         MotionMode = MotionModeEnum.Grounded;
         CallDeferred(nameof(SetupCollisionExceptions));         // the game pushes Mario and enemies apart by messages, not bodies

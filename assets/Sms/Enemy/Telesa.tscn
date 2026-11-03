@@ -1,0 +1,23 @@
+[gd_scene format=3 uid="uid://d151telesa"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/SmsTelesa.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/Telesa/telesa.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisap.tscn" id="3_disap"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_body"]
+radius = 1.0
+
+[node name="Telesa" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+script = ExtResource("1_script")
+WanderRadiusUnits = 800.0
+RelaunchTicks = -1
+DeathFxScene = ExtResource("3_disap")
+metadata/_sms_note = "Pass 151: the Boo (Telesa), Hotel Delfino's ghost. Place it where it should FLOAT (it keeps that height and bobs 50-100 units over it; +Z is its face) with a Graph of Node3D children to drift between, or it roams within WanderRadiusUnits. Kind: Loop (the hotel's -- fades in for ~3 s, out, hidden ~5 s, again), Box (the PINK one, always visible), Normal (invisible until sprayed), CanSee (always visible). It hurts you on touch unless you are above it, and your jump passes straight through it -- until you HOSE it: a spray knocks it back, shows it and stuns it (it sinks to the floor, solid); NOW jump on it (or ground-pound) and it pops (the down clip, coins). The stun ends by itself and it drifts off. A BOX Boo sprayed turns into a pink Boo BLOCK you can stand on for 25 s (it blinks before the Boo comes back); jumping on a box Boo only makes it flinch. Knobs: Kind, Deviations (SpeedScale), Effects (the change puff, the drool slot, the block scene), Sounds (eight slots); RelaunchTicks -1 = gone for good."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.03, 0)
+shape = SubResource("SphereShape3D_body")

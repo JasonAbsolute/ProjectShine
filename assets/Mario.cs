@@ -17287,6 +17287,8 @@ public partial class Mario : CharacterBody3D
     /// sound in its Stream; empty = silent.</summary>
     [Export] public AudioStreamPlayer HpRecover;
 
+    /// <summary>SMS_GetMarioHP (pass 153): his hit points as the enemies read them (King Boo's slot steers its result by them).</summary>
+    public int SmsHP => _health;
     /// <summary>TMario::incHP (MarioCollision.cpp 25): under water (isUnderWater(): head below the surface less CanBreathDepth) the
     /// heal goes to the AIR, capped at mMaxAir -- a coin taken while submerged refills a unit of air and the meter steps back up --
     /// otherwise to the health, capped at HPMax; MSD_SE_SY_HP_RECOVER either way when it was not already full (pass 47).</summary>
@@ -17523,6 +17525,26 @@ public partial class Mario : CharacterBody3D
         if (animTree != null && animTree.Active)
             animTree.Set(CARRY_BLEND_PATH, 0.0f);
         if (SmsDebugPrint) GD.Print("[SMS take] the held object is gone: the hands empty (ensureTakeSituation)");
+    }
+
+    /// <summary>An actor TAKES him (HIT_MESSAGE_TAKE from its side, pass 153l: King Boo's FallDemo carries him onto the raised centre disc and rides it
+    /// down): he is put at the point, his velocity zeroed and the ride he was on dropped -- SmsRideApply would otherwise put him back on that deck
+    /// every frame. The taker holds the controls itself (CameraLocked) and calls this each tick it carries him.</summary>
+    public void SmsCarryTo(Vector3 at, Vector3? face = null)
+    {
+        GlobalPosition = at;
+        velocity = Vector3.Zero; Velocity = Vector3.Zero;
+        _smsRideBody = null; _smsRideApplied = false; _smsRideShift = Vector3.Zero;
+        if (face is Vector3 f)
+        {
+            f.Y = 0f;
+            if (f.LengthSquared() > 1e-6f)
+            {
+                f = f.Normalized(); lastFacingDirection = f; SmsLatchFace(f, 2);
+                if (armature != null) armature.Rotation = armature.Rotation with { Y = BaseYawFromDir(f) };
+            }
+            stateOfMario = MarioState.idle; SetMarioState(MarioState.idle);   // the TAKE's moment: standing (the lock freezes the state machine, and a teleport off a ride left it in ledgeFall)
+        }
     }
 
     /// <summary>The body's half height off its first CollisionShape3D (his fruit are centred RigidBody3Ds; the game's object origin is its
