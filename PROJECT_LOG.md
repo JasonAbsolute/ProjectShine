@@ -11164,3 +11164,56 @@ bus), B3 (the dive's belly slide loops MA_SLIP at 15 m/s), B4 (A on the slide ->
 errors. Files: `default_bus_layout.tres` (new), `assets/Sms/Sound/SmsMarioSound.cs`, `SmsMarioSoundTable.cs`, `Mario/` +4 WAVs, `assets/Mario.cs`
 (SmsDownKindName, SmsHoldsFruit, the OnTaken hook). Knobs added: SfxVolume (Sounds), FillMarioSlots (Pieces), RollWhoosh (Deviations).
 Not in this pass: a menu slider (SetSfxVolume is its call), the coins' and items' sounds, the music.
+
+### 154d -- the dive's start grunt, the wall slide's thud by speed, the wall kick checked against the game (feature/sounds, code `c5c5f55`)
+
+**Jaysonn on 154c:** "ok missing the start of dive noise. otherwise also missing the wall kick sound?"
+
+**The dive.** The port's dive (`diving` / `singleJumpDive` / `doubleJumpDive` / `tripleJumpDive`, clip `ma_sldct`) is the game's
+MARIO_STATUS_JUMP_CATCH -- `jumpCatch()`, entered from a run (MarioRun.cpp 41 / 1087 / 1243 / 1558 with the isJumping flag) or a jump (MarioJump.cpp
+299 / 786). `setStatusToJumping` case JUMP_CATCH (MarioMove.cpp 551): `startVoice(MSD_SE_MV13_ACTION_SMALL_01)` -- the one take, the "hup" -- and
+the tired MV34_ACTION_T_01 under 3 HP. `ma_sldct` has no bas table: that grunt is the whole start-of-dive sound; the game has no whoosh for it. Now
+played on the dive's entry (not again when one dive state hands to another). 154c had MV13 on the TREE GRAB by mistake -- the game's tree catch has
+no voice (`barJumpSetting()` is empty; `ma_tree_catch`'s table plays the two hand slaps on the trunk, which AnimTick already fires; MA_SLIP_TREE is
+the slide DOWN the trunk with the stick held down) -- so the treeGrab case is gone.
+
+**The wall kick -- nothing missing, by the game's code.** `jumpWall()` -> `jumpingBasic(JUMP_SLIP, ANIM_WJMP)`: no sound effect. `setStatusToJumping`
+case WALL_JUMP -> MV22_JUMP_MID (wired since 154: `wallJump` -> the mid voice, 70% MA_VO_JUMP_MID); `ma_wjmp`'s bas table adds the push-off steps
+(WALK_STONE_L_HEEL f10, R_TIP f14) and FLUDD's clanks (PO_FRICTION_A f11, B f14), played since 154. **What was missing is the THUD as the wall slide
+starts.** MarioJump.cpp 236-246 (jumpingBasic case 2: fwd > 16 into a wall -> WALL_SLIDE, rumble 0x15, camera shake, `startSoundActor(getWallSound(
+mWallPlane->mSoundMaterial, mForwardVel))`); `MSound::getWallSound` (MSound.cpp 1090): under 15 units a tick MA_WALL_COL_CMN_VS, under 30 CMN_S, else
+CMN_H (material 0x1C -- a soft wall -- swaps in VERYSOFT / SOFT / HARD). The node plays it on the `wallSlide` entry, by the horizontal speed of the
+tick BEFORE (`_prevHSpeed`: the slide's own tick is already zeroed into the wall; `SmsUnits.MpsToSpeed` = m/s x 74.44 / 30 gives the game's units a
+tick): a walk-off jump (16..30) thuds soft, a run-off one (30..40; the port bonks above 40 like the game's ClashSpeed) thuds hard; CMN_VS is baked
+for completeness (the game's slide needs 16+, so it never plays from a slide). 154c's SLIP_WALL scrape loop stays under it. `WallHitSounds`
+(Deviations) turns the thud off. `WallHitSe(unitsPerTick)` is public static for the drive and anything else that hits a wall.
+
+**Bakes:** MA_WALL_COL_CMN_VS, MA_WALL_COL_VERYSOFT, MA_SLIP_TREE (317 WAVs; `tools/projectshine/sound154/merge154d.py` folds a side bake into
+the set and list154.txt).
+
+**A wall-slide bug the drive found (Mario.cs).** The drive's jump at an 11-m wall gave no slide: `[SMS wall] singleJump at fwd 32.3: wall below
+head height (feet + 150 units), ignored`. `SmsWallReachesHeight` (the game's `checkWallPlane(pos, 150, r)`: does the wall reach head height? --
+asked for the ledge-bit states before a jump's wall slide) cast its ray from the NODE ORIGIN, radius + 6 cm long (0.373 + 0.06 = 0.433 m); but
+Player.tscn's CollisionShape3D sits 11.6 cm off the origin (its transform's z -0.1157, and the Player node itself never turns -- the armature does),
+so a wall met moving toward -Z stood 0.489 m from the origin and the ray fell 5 cm short (the drive's diagnostic: rays of 0.4 miss, 0.5+ hit at
+0.490; the contact's XZ distance 0.490). Every single / double jump, side flip, wall jump, stomp or roll-jump into a wall facing roughly +Z (its
+normal within ~60 degrees of +Z) stopped dead against it instead of sliding; dives and belly rollouts never ask, so they slid, and walls facing -Z
+were fine (the origin is CLOSER to those). The ray now leaves the shape's own axis (`bodyCol.GlobalPosition`), as the step-up ray (anchored on the
+contact) always did. Patch: `tools/projectshine/sound154/patch_mario154d.py`. Not touched: the other origin-based probes (the 0.75-m face ray at
+Mario.cs ~12235, the ring of rays at ~17668) -- the same 11.6 cm applies to them; a look for the physics passes.
+
+**A 154c bug the run's .err showed.** `FillSlots` added the ten slot players to Mario inside `_Ready` -> Godot: "Parent node is busy setting up
+children, `add_child()` failed" -> they never entered the tree, and a player outside the tree plays nothing: the fall cry, the burn and the shock, the
+exert grunt, the pump squeaks, the fence punch and catch, the heal chime and the warp wipe were silent in 154c (B2 only checked the fields). They
+hang under the SmsSound node itself now (a node may add its own children in `_Ready`; the node sits at Mario's origin); B2 checks `IsInsideTree`.
+
+**Drive 154: 19 / 19** -- 154c's sixteen + B5 (B in a jump -> `diving`, clip `ma_sldct`, the voice MV13_ACTION_SMALL_01), B6 (a sprint-jump into an
+11-m wall -> `wallSlide`; the thud CMN_H for 31.1 units a tick, once, the SLIP_WALL loop under it), B7 (A on the slide -> `wallJump` with
+MV22_JUMP_MID_01, one voice, no thud, the scrape off). Headless run p; build 154u 0 errors. Two runs (m, o) played a binary OLDER than the build
+just made -- a stale `dotnet build` output with the editor open on the PC -- so the drive now prints a build marker on its first line and every run
+is read against it; the final build was a full `--no-incremental` one.
+Files: `assets/Sms/Sound/SmsMarioSound.cs` (the dive voice, the wall thud, the treeGrab case gone, FillSlots' parent), `SmsMarioSoundTable.cs`,
+`Mario/` +3 WAVs (+ .import), `assets/Mario.cs` (SmsWallReachesHeight, 4 lines).
+Knob added: WallHitSounds (Deviations).
+Not in this pass: the belly slide's wall bounce (MarioRun.cpp 1126, the same getWallSound on a ground slide into a wall -- the port's slide stops
+instead), the soft-wall material (every wall here is "common"), a menu slider, the coins' and items' sounds, the music.
