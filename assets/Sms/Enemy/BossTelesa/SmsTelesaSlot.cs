@@ -40,6 +40,7 @@ public partial class SmsTelesaSlot : Node3D
 
     public override void _Ready()
     {
+        SmsActorSound.Attach(this);                             // 155: SLT_STOP on StopSound, the OBJ_SLOT_SPIN rattle while the drums roll
         var model = GetNodeOrNull<Node3D>("Drums");
         if (model != null)
         {

@@ -63,6 +63,8 @@ public partial class SmsMarioSound : Node3D
     /// soft WALL_COL_CMN_VS, under 30 the soft CMN_S, else the hard CMN_H; the game's slide needs 16+, so S or H in play). The kick itself has no
     /// sound effect in the game: its MV22 voice and ma_wjmp's steps + FLUDD clanks are all there is. Off = the SLIP_WALL scrape alone.</summary>
     [Export] public bool WallHitSounds = true;
+    /// <summary>155: a clip first seen within this many bck frames of its start counts as just begun -- its frame-0 entries fire (see AnimTick).</summary>
+    [Export(PropertyHint.Range, "0,30,0.5")] public float ClipStartFrames = 6f;
     [Export(PropertyHint.Range, "0,1,0.05")] public float VoiceVariantChance = 1f;   // x the game's 0.3 / 0.7 / 0.5 odds of the MA_VO_ voices over the MV ones
     [Export] public bool TiredVoices = true;             // at 2 HP or less the game swaps the jump voices for the tired MV41 set
 
@@ -225,7 +227,8 @@ public partial class SmsMarioSound : Node3D
     private AudioStream Stream(string se)
     {
         if (_streams.TryGetValue(se, out var s)) return s;
-        string path = SoundDir + se + ".wav";
+        // 155: a sound baked for the actors (assets/Sms/Sound/Enemy/) is found by its table folder; Mario's own stay in SoundDir
+        string path = SmsMarioSoundTable.Sounds.TryGetValue(se, out var info) && info.Folder != "Mario" ? SmsActorSound.SoundRoot + info.Folder + "/" + se + ".wav" : SoundDir + se + ".wav";
         s = ResourceLoader.Exists(path) ? GD.Load<AudioStream>(path) : null;
         if (s == null && _missing.Add(se)) GD.PushWarning($"[SMS sound] no file for {se} ({path})");
         _streams[se] = s;
@@ -346,8 +349,15 @@ public partial class SmsMarioSound : Node3D
         float frame = pos * SmsMarioSoundTable.BckFps;
         if (clip != _clip)
         {
-            // a new clip: MAnmSound::initAnmSound(frame) -- the entries before this frame are skipped, nothing fires for the past
-            _clip = clip; _lastFrame = frame - 0.001f; _frame = frame;
+            // a new clip. The game's setAnimation puts the clip AND its sound cursor at frame 0 (initAnmSound), so a clip's frame-0 entries fire on
+            // its first loop -- ma_roll's ROLL_C whoosh (the small rollout / the triple jump), ma_jump's push-off step. The node first sees a clip a
+            // tick or two in (frame 0.5..2), and 154 skipped everything before that frame: those entries never played (Jaysonn, 155: the slow
+            // slide's "little flip" was silent). Now a clip evidently just begun (within ClipStartFrames) fires its entries up to here; a clip
+            // joined mid-way (the gait blend's run1 <-> run2 swap, a resumed one) still skips its past.
+            _clip = clip; _frame = frame;
+            if (frame <= ClipStartFrames && clip != "" && SmsMarioSoundTable.Clips.TryGetValue(clip, out var start))
+                foreach (var e in start) if (e.Frame <= frame) Fire(e);
+            _lastFrame = frame;
             return;
         }
         _frame = frame;
@@ -369,7 +379,7 @@ public partial class SmsMarioSound : Node3D
         {
             // category 0 (POMP): MAnmSound::startAnimSound skips it when the actor's ground number carries 0x1000 -- no FLUDD
             if (!FluddPackClanks || !_mario.SmsFluddSound.HasFludd) return;
-            PlaySe(se, FluddDb + Mathf.LinearToDb(Mathf.Max(0.05f, e.Volume / 127f)));
+            PlaySe(se, FluddDb + Mathf.LinearToDb(Mathf.Max(0.05f, e.Volume / 127f)), e.Pitch);
             return;
         }
         if (se.StartsWith("MSD_SE_MA_WALK_STONE_")) se = Footstep(se);
@@ -383,7 +393,7 @@ public partial class SmsMarioSound : Node3D
         if (!RollWhoosh && se.StartsWith("MSD_SE_MA_ROLL") && _clip == "ma_roll_jump") return;
         float db = Mathf.LinearToDb(Mathf.Max(0.05f, e.Volume / 127f));
         if (se.Contains("_WALK_")) db += StepDb;
-        PlaySe(se, db);
+        PlaySe(se, db, e.Pitch);          // 155: the entry's own pitch (the double jump's steps at 1.11 / 1.20, the rope roll at 1.32 -- 119 of Mario's entries are not 1.0)
     }
     /// <summary>The game adds the floor's sound material to the footstep id (JAISeSwBit_GroundVariant); here the knob picks the set.</summary>
     private string Footstep(string stone)

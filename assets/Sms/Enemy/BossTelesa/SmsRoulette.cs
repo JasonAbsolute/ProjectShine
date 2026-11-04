@@ -78,6 +78,7 @@ public partial class SmsRoulette : AnimatableBody3D
 
     public override void _Ready()
     {
+        SmsActorSound.Attach(this);                             // 155: RLT_STOP on StopSound
         SyncToPhysics = true;
         SetNotifyTransform(true);                              // a sync-to-physics body only hears its LOCAL transform: moved with its parent (the arena placed at
         AddToGroup("sms_roulette");                            // runtime, a drive), its physics body would stay behind -- _Notification pushes the global one

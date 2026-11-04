@@ -633,12 +633,12 @@ public partial class SmsBossTelesa : SmsSmallEnemy
                 _introDiscY -= MathF.Min(IntroSpeed, left) / U;
                 disc.GlobalPosition = DiscPos(disc);
                 if (_introHold && left > 3f && _mario != null && IsInstanceValid(_mario)) _mario.SmsCarryTo(HoldPoint(disc));
-                else if (_introHold) { _introHold = false; if (DisappearSound != null && DisappearSound.Stream != null) DisappearSound.Play(); }   // the DETACH 3 u up: MSD_SE_BS_TELESA_RLT_SET stands in
+                else if (_introHold) { _introHold = false; GetNodeOrNull<SmsActorSound>("SmsSound")?.Play("MSD_SE_BS_TELESA_RLT_SET"); }   // the DETACH 3 u up: rouletteFall's MSD_SE_BS_TELESA_RLT_SET (155: the real one; DisappearSound stood in)
                 return;
             }
             _introDiscY = target;
             disc.GlobalPosition = DiscPos(disc);
-            if (_introHold) { _introHold = false; if (DisappearSound != null && DisappearSound.Stream != null) DisappearSound.Play(); }
+            if (_introHold) { _introHold = false; GetNodeOrNull<SmsActorSound>("SmsSound")?.Play("MSD_SE_BS_TELESA_RLT_SET"); }
             _intro = 2; _introSlotY = TransYUnits - SlotUnderUnits + 1500f;
             if (Slot != null) Slot.Visible = IntroSlotShown;
             if (IntroPondPress && disc.PondPressT < 1f) _pondPressTick = 0;   // the clip plays out from here: the dome sinks into the bowl
