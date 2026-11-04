@@ -11404,3 +11404,19 @@ render stays under `tools/projectshine/sound154/out156/` should the file select 
 
 **Drive 155 run h: 13 / 13** -- C12 156b King Boo's BossMusic the 98.9-s stereo stream, loop 133806-3165384, on the Music bus, playing since his first
 appearance. Headless (marker v156-2); build 0 errors.
+
+### 156c -- the intro's chuckle, once, as the disc seats (feature/sounds, code `4437366`)
+
+**Jaysonn:** "ok still no laugh in the beginning but the music is right!"
+
+155b was half right. `rouletteFall` restarts the one-shot V_LAUGH1B every frame of the descent and nothing audible comes of that (its first 20-40 ms,
+the breath before the first "heh", 30 times a second under the rumble). But the frame the disc seats, `rouletteFall` returns TRUE **before** its
+`startSoundActor` calls -- so the start from the frame before is never stopped, and the whole 8-syllable chuckle plays out from the moment the
+elevator lowers into place: 6 s, through the slot machine's fall, before King Boo appears. That is the laugh of the intro -- exactly Jaysonn's "they
+should play once the elevator lowers" -- and the one 155b took away along with the loop.
+
+`SmsActorSound.StateTick`, `IntroLaugh = Game`: the ROULETTE flutter loop through the fall as before, and `MSD_SE_BS_TELESA_V_LAUGH1B` (the SE as
+designed, 155b's envelope bake) played ONCE the tick the fall ends (`_prevFall`). Chuckle mode stays 155's loop through the descent; Off plays nothing.
+
+**Drive 155 run i: 13 / 13** -- C8 156c the rumble and the flutter loop off at the seat, RLT_SET at the DETACH, the chuckle played once there (t669),
+never looped; the rest as 156b. Headless (marker v156-3); build 0 errors.
