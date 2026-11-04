@@ -11340,3 +11340,48 @@ fixed camera. `FullVolumeUnits` 1200, `SilentUnits` 12000 now (Mario's channels 
 **Drive 155 run e: 12 / 12** -- C8 155b the intro's RLT_DOWN rumble and the V_LAUGH1B_ROULETTE flutter loop while the disc sinks, both off as it
 seats, RLT_SET once at the DETACH, the chuckle never; C10 155b the knobs at the game's values; C1-C7, C9-C11 as 155. Headless run (marker v155-5);
 build 0 errors. Not done: the Boos' hover hum (EN_TELESA_FLY, the DSP oscillator voice) as before; a menu SFX slider; the music streams.
+
+### 156 -- the boss music: the game's BGM sequences rendered with the game's instruments (feature/sounds, code `9c05a17`)
+
+**Jaysonn:** "can you also do the boss music?"
+
+**Which music.** The game's BGMs are SEQUENCES, not streams: `sequence.arc` holds one BMS per `MSD_BGM_*` id, played by the JAudio sequencer through
+the same instrument banks as the sound effects. `TNerveBossTelesaAppear` starts **MSD_BGM_MAP_SELECT** at King Boo's first appearance (bosstelesa.cpp
+2296) -- and so does `TBossPakkun::startBGM` (bosspakkun.cpp 862): despite its name, MAP_SELECT is `t_select.com`, THE boss theme (tempo 88, timebase
+120, 8 tracks, a 15-s loop). `TBiancoGateKeeper::startBGM` plays **MSD_BGM_CHUBOSS** (`t_chuboss.com`, the mid-boss theme: a 1.2-s intro and a 56-s
+loop) on BGM track 1 with the stage music ducked to 0 over 10 frames (gatekeeper.cpp 532), `stopTrackBGM(1, 10)` at its finish demo. `MSD_BGM_BOSS`
+(`t_boss.com`) is another piece, a 95-s loop at tempo 190; `MSD_BGM_CASINO` (`t_delfino_kajino`) the hotel casino's room music (3.4 s + 55 s). The
+BGM level is `MSBgm::smMainVolume` 0.75 over the sound table's volume.
+
+**The render -- `tools/projectshine/sound154/sms_bgm.py` (numpy).** The sequence runs in `sms_audio`'s TSeqParser model, which grew what a BGM needs
+(`patch_bgm156.py`): cmdTempo / cmdTimeBase (ticks a second = timebase x tempo / 60, logged per change), the tracks' VolumeMode, the transpose chain
+(mTransposeTotal), the pitch-range register's default (TRegisterParam::init: r7 = 12), param events tagged with their track, the instruments' effects
+(TInstRand / TInstSense). Then each note is rendered as `JASBankMgr::noteOn` sets its channel:
+- its wave from the bank's key / velocity region (or drum: its pan, its release), pitch `2^((key - wave key) / 12)` x the instrument's x the region's
+  x the pitch effects; volume = instrument x region x **(velocity / 127)^2** x the volume effects (the velocity curves live in TInstSense);
+- the TRACK CHAIN's volume at every sample (each track's timed volume **squared** -- VolumeMode 0 -- `TTrack::updateTrackAll`), its pitch
+  (`Player::pitchToCent`: pitch x 4 x r7 semitones, multiplied down the chain), the track's own pan (the default pan switch) + the drum's, moved over
+  their N ticks as `TTrack::writeTimeParam` / `mainProc` move them; the Osc1 VIBRATO (sVibratoDef's 48-unit triangle, 1/(600 x rate) s a unit,
+  depth = the track's Osc1 width -- timed params 10 / 9; `incSelfOsc` once an audio frame);
+- the mixer's sine pan law (`updateMixer`: sinfT), the note's envelope (the instrument's oscillator 0 or the track's SimpleADSR, 155b's `Envelope`),
+  its release at the note-off or the next note on its (track, voice).
+Stereo, 32 kHz, 16-bit, peaks at -1 dBFS. **The loop:** the event stream (notes, offs, params per tick) repeats once the intro is over -- the smallest
+period over the last two cycles, walked back to the earliest tick it holds from; two cycles are rendered and the SECOND is the WAV's loop region (its
+`smpl` chunk -> Godot's loop), so the notes ringing over the loop point are in it: seamless (the boss theme: 30 s, loop 15-30). `--one-cycle` keeps
+the intro + that second cycle (the mid-boss theme: 57 s, 7.3 MB instead of 14.5). `check156.py`: the first chord's spectral peaks land on the
+sequence's keys (146.7 Hz = key 50, 300 Hz = key 62). **Not rendered:** the GC's reverb (no track sets fxmix; the game's effect comes from the stage's
+AX effect line -- the mix is dry; an AudioEffectReverb on the Music bus stands in), the IIR filters, the dolby channel, tremolo (no instrument here
+has one). WAV only: no Ogg encoder on either machine (ffmpeg / oggenc absent) -- `winget install Gyan.FFmpeg` on the PC would let the music ship as
+Ogg at a tenth the size, Jaysonn's call.
+
+**The port.** `SmsActorSound.Fill` now takes a script's `AudioStreamPlayer` (2D) slot too: a player on the **Music** bus with the game's track, its WAV
+looping, at `MusicDb` (-4 dB) + the BGM's own level; a slot set by hand in the inspector is kept. King Boo: `BossMusic` = MSD_BGM_MAP_SELECT -- his
+script's own lines already start it at the first Appear (unk384) and fade it out at the down (MSBgm::stopBGM 10 frames). The Gatekeeper
+(`SmsGateKeeper`, a StaticBody3D, so `SmsActorSound.Attach(this)` from its _Ready; `ActorOf["SmsGateKeeper"] = "gatekeeper"`): `BossMusic` =
+MSD_BGM_CHUBOSS -- its script plays / stops it at the appear / finish demos. Knobs: `Music` (off = the slots left empty), `MusicDb`. Files under
+`assets/Sms/Sound/Music/` (3.8 + 7.3 MB), in the tables with Folder Music (`adopt156.py`). Rendered, not shipped (size): MSD_BGM_BOSS, MSD_BGM_CASINO
+-- a `python3 sms_bgm.py OUT NAME` away.
+
+**Drive 155 run g: 13 / 13** -- C12 156 King Boo's BossMusic a 2D player on the Music bus, the 30-s stereo stream looping 15-30 s, playing since his
+first appearance; C2 the eleventh slot a 2D player; C1-C11 as 155b. Headless (marker v156-1); build 0 errors. Open: the stage BGMs (the same
+renderer; Ogg would be wanted first), the Gatekeeper's own sound effects, the Boos' hover hum, a menu SFX / music slider.
