@@ -11420,3 +11420,28 @@ designed, 155b's envelope bake) played ONCE the tick the fall ends (`_prevFall`)
 
 **Drive 155 run i: 13 / 13** -- C8 156c the rumble and the flutter loop off at the seat, RLT_SET at the DETACH, the chuckle played once there (t669),
 never looped; the rest as 156b. Headless (marker v156-3); build 0 errors.
+
+### 156d -- the intro chuckle's pitch knob; the baker's velocity curve and gate times (feature/sounds, code `45e1b40`)
+
+**Jaysonn:** "i feel like the laugh should be sped up? some points seem like the laugh is too low".
+
+**What the sequence says.** `MSD_SE_BS_TELESA_V_LAUGH1B` is four layer tracks, each a grace note (2 ticks, keys 30-38) into a syllable (200 ticks,
+keys 18-33) twice, the layers 70 ticks apart. Bank 2 program 78's region for keys up to 38 plays the laugh sample (root key 60) at x4, so key 36 is
+the sample's own speed, 33 is 0.84 of it, 25-27 are 0.53-0.6, and the second layer's second syllable, key 18, is 0.35 -- an octave and a half down.
+Each syllable holds a second and fades over the next (SimpleADSR 10 / 600 / 700 / 0 / 1), so three or four sound at once. The pitch arithmetic is
+`JASBankMgr::noteOn`'s (`C5BASE_PITCHTABLE[key + 60 - wave key]` x the region's pitch x the sample's rate / 32000) and checks out against the decomp's
+table; no SE modifier (JALSystem) touches this id; the SE sequence's clock is its own TimeBase 48 / Tempo 120 (96 ticks a second). So the port plays
+the chuckle as deep and as paced as the data has it. Rather than argue with an ear: **`SmsBossTelesa.IntroLaughPitch`** (inspector, 0.5 .. 2, default
+1 = the game's notes), one factor for pitch and pace together, as a tape speed -- 1.25 is a quarter faster and higher; it scales the per-frame flutter
+too.
+
+**The baker, two more of JASBankMgr::noteOn's rules.** (1) A note's volume is instrument x region x **(velocity / 127)²** -- 154 took velocity linear,
+so soft notes (velocity 70-90; 48 of the sounds have one) sat 3-5 dB too loud against the loud ones. (2) A gate note sounds only **duration x gate /
+100** (cmdNoteOn's gate byte -> seqTimeToDspTime -> TChannel::play's countdown -> updatecallLogicalChannel releases its oscillators; a gate that rounds
+under one DSP frame is no gate) while the track waits the whole duration -- the model read the byte and dropped it: FLUDD's ACTION_ON / OFF clicks, the
+sprinkler and the water triggers (gate 40 %) rang two and a half times too long. 51 WAVs re-baked (`diff156d.txt`): SLIP and its three kin, the FLUDD
+clicks and triggers, FRICTION_A / B, WT_DRY_UP, King Boo's DOWN / SPICY_HIT / V_APPEAR / V_LAUGH1 / V_LAUGH1B (its soft syllables a little under its loud
+ones now) and the flutter, the Boo's FIX, the common water hit. The BGM renderer had both rules already (156) and takes the frame rounding too.
+
+**Drive 155 run j: 13 / 13** (marker v156-4); build 0 errors. Tools: `patch_gate156d.py`, `patch_velo156d.py`, `scan_gate156.py`, `patch_laugh156d.py`,
+`patch_boss156d.py` (the PC's SmsBossTelesa.cs).
