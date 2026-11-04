@@ -59,6 +59,10 @@ public partial class SmsMarioSound : Node3D
     [Export] public FloorKind FloorMaterial = FloorKind.Stone;   // the game: mGroundPlane->mSoundMaterial picks the WALK_* set; here one knob
     /// <summary>The rollout's whoosh (ma_roll_jump's table: MA_ROPE_ROLL_FULL_A, the game's own for its ROTATE_BROAD_JUMP). Off = the voice alone.</summary>
     [Export] public bool RollWhoosh = true;
+    /// <summary>154d: the thud as a WALL SLIDE starts (MarioJump.cpp 236-246: getWallSound by his forward speed -- under 15 units a tick the very
+    /// soft WALL_COL_CMN_VS, under 30 the soft CMN_S, else the hard CMN_H; the game's slide needs 16+, so S or H in play). The kick itself has no
+    /// sound effect in the game: its MV22 voice and ma_wjmp's steps + FLUDD clanks are all there is. Off = the SLIP_WALL scrape alone.</summary>
+    [Export] public bool WallHitSounds = true;
     [Export(PropertyHint.Range, "0,1,0.05")] public float VoiceVariantChance = 1f;   // x the game's 0.3 / 0.7 / 0.5 odds of the MA_VO_ voices over the MV ones
     [Export] public bool TiredVoices = true;             // at 2 HP or less the game swaps the jump voices for the tired MV41 set
 
@@ -119,6 +123,7 @@ public partial class SmsMarioSound : Node3D
     private Mario.MarioState _prev; private bool _prevAir, _first = true, _prevOnFloor;
     private int _tick;
     private float _prevVy;
+    private float _prevHSpeed;               // last tick's horizontal speed (m/s): the wall slide's thud wants the speed he hit the wall with, before the slide zeroed it
     private int _stateTicks;                 // ticks in the current state (the spin jump's ROLL_JUMP at 10, the thrown wail at 30)
     private bool _prevCap = true, _capKnown;  // SmsWearingCap last tick
     private int _waterWaitIn = -1;           // MSRandPlay's countdown for MA_WATER_WAIT while he treads water
@@ -183,14 +188,14 @@ public partial class SmsMarioSound : Node3D
         if (slot != null) return;
         var s = Stream(se); if (s == null) return;
         slot = new AudioStreamPlayer3D { Name = "Slot_" + name, Bus = SfxBus, MaxPolyphony = 1, AttenuationModel = AudioStreamPlayer3D.AttenuationModelEnum.Disabled, AttenuationFilterDb = 0f, MaxDistance = 0f, Stream = s, VolumeDb = MasterDb + SeDb(se) + db };
-        _mario.AddChild(slot); SlotsFilled++;
+        AddChild(slot); SlotsFilled++;   // 154d: under THIS node (at Mario's origin), not Mario -- 154c's _mario.AddChild in _Ready failed ("parent busy setting up children"): the ten slots were never in the tree, so never heard
     }
     private void Fill2D(ref AudioStreamPlayer slot, string name, string se, float db)
     {
         if (slot != null) return;
         var s = Stream(se); if (s == null) return;
         slot = new AudioStreamPlayer { Name = "Slot_" + name, Bus = SfxBus, MaxPolyphony = 1, Stream = s, VolumeDb = MasterDb + SeDb(se) + db };
-        _mario.AddChild(slot); SlotsFilled++;
+        AddChild(slot); SlotsFilled++;
     }
     /// <summary>The TAKE (Mario.SmsCarryTo with a facing: King Boo's ride, the gates): MARIO_STATUS_TAKEN's voice, MV06_DAMAGE_WATER (soundMovement).</summary>
     public void OnTaken() { if (JumpVoices) PlayVoice(Pick("MSD_SE_MV06_DAMAGE_WATER_0", 3)); }
@@ -295,6 +300,7 @@ public partial class SmsMarioSound : Node3D
         if (ActionSounds) CapTick();
         if (FluddSounds) FluddTick(st);
         _prev = st; _prevOnFloor = onFloor; _prevVy = _mario.Velocity.Y;
+        _prevHSpeed = new Vector2(_mario.Velocity.X, _mario.Velocity.Z).Length();
         SmsSoundDriveTick();
     }
     /// <summary>soundMovement's cap: the cap leaving his head -> MA_HAT_STOLEN; back on -> MA_TAKE_HAT.</summary>
@@ -434,7 +440,15 @@ public partial class SmsMarioSound : Node3D
                         break;
                     }
                 case Mario.MarioState.ledgeHang: PlayVoice(Tired() ? "MSD_SE_MV34_ACTION_T_02" : "MSD_SE_MV15_EXERT_INST_02"); break;   // HANGING from a jump
-                case Mario.MarioState.treeGrab: PlayVoice(Tired() ? "MSD_SE_MV34_ACTION_T_01" : "MSD_SE_MV13_ACTION_SMALL_01"); break;  // JUMP_CATCH
+                // 154d: the DIVE is the game's JUMP_CATCH (jumpCatch, ANIM_SLDCT): setStatusToJumping's MV13 "action small" grunt, the one take (the
+                // tired MV34_T_01 under 3 HP); ma_sldct has no bas table, so this is the whole start-of-dive sound. (154c had MV13 on the tree grab
+                // by mistake: the game's tree catch has no voice -- ma_tree_catch's table plays the two hand slaps on the trunk.)
+                case Mario.MarioState.diving:
+                case Mario.MarioState.singleJumpDive:
+                case Mario.MarioState.doubleJumpDive:
+                case Mario.MarioState.tripleJumpDive:
+                    if (!IsDive(_prev)) PlayVoice(Tired() ? "MSD_SE_MV34_ACTION_T_01" : "MSD_SE_MV13_ACTION_SMALL_01");
+                    break;
             }
         }
         if (ActionSounds)
@@ -446,6 +460,9 @@ public partial class SmsMarioSound : Node3D
                 case Mario.MarioState.bonk:
                     PlaySe("MSD_SE_MA_WALL_COL_HEAD");                                                        // the wall hit's down: WALL_COL_HEAD + the little damage cry
                     if (JumpVoices) PlayVoice(_rng.NextDouble() < 0.25 ? "MSD_SE_MA_VO_DAMAGE_SMALL" : Pick("MSD_SE_MV03_DAMAGE_LITLE_0", 4));
+                    break;
+                case Mario.MarioState.wallSlide:
+                    if (WallHitSounds) PlaySe(WallHitSe(SmsUnits.MpsToSpeed(_prevHSpeed)));                  // 154d: the slide's start -- the thud by the speed he met the wall with
                     break;
                 case Mario.MarioState.hurt:
                     {
@@ -499,6 +516,10 @@ public partial class SmsMarioSound : Node3D
     }
 
     private enum VoiceKind { Small, Mid, Large, Special }
+    private static bool IsDive(Mario.MarioState s) => s is Mario.MarioState.diving or Mario.MarioState.singleJumpDive or Mario.MarioState.doubleJumpDive or Mario.MarioState.tripleJumpDive;
+    /// <summary>MSound::getWallSound for a common wall (the game's material 0x1C swaps in the VERYSOFT / SOFT / HARD set): the forward speed in
+    /// the game's units a tick -- under 15 very soft, under 30 soft, else hard.</summary>
+    public static string WallHitSe(float unitsPerTick) => unitsPerTick < 15f ? "MSD_SE_MA_WALL_COL_CMN_VS" : unitsPerTick < 30f ? "MSD_SE_MA_WALL_COL_CMN_S" : "MSD_SE_MA_WALL_COL_CMN_H";
     private bool Tired() => TiredVoices && _mario.SmsHP <= 2;
     private string Pick(string prefix, int count) => $"{prefix}{1 + _rng.Next(count)}";
     /// <summary>MSound::startMarioVoice: below 3 HP the tired MV41 set; else the MA_VO_ variant with the game's odds (0.3 / 0.7 / 0.5 / 0.5), else

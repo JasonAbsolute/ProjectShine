@@ -19331,7 +19331,10 @@ public partial class Mario : CharacterBody3D
         if (dir.LengthSquared() < 1e-6f)
             return true;
         dir = dir.Normalized();
-        Vector3 from = new Vector3(GlobalPosition.X, SmsFeetY() + heightAboveFeet, GlobalPosition.Z);
+        // 154d: from the collision shape's own axis, not the node origin -- Player.tscn's cylinder sits 11.6 cm off it (CollisionShape3D at
+        // z -0.1157), so from the origin a ray of radius + 6 cm fell 5 cm short of any wall he met moving toward -Z and a jump's slide was refused
+        Vector3 axis = bodyCol != null ? bodyCol.GlobalPosition : GlobalPosition;
+        Vector3 from = new Vector3(axis.X, SmsFeetY() + heightAboveFeet, axis.Z);
         var q = PhysicsRayQueryParameters3D.Create(from, from + dir * (capRadiusWorld + 0.06f), CollisionMask);
         q.CollideWithAreas = false;
         q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
