@@ -18,9 +18,11 @@ using System.Linq;
 /// 156: the BOSS MUSIC. The game's BGMs are sequences (sequence.arc's BMS files) played through the same banks as the sound effects; the port plays
 /// them as stereo WAVs rendered from those sequences with those instruments (tools/projectshine/sound154/sms_bgm.py: the tracks' notes, volumes,
 /// pans, pitch bends and vibrato, the instruments' envelopes and velocity curves, the loop as the sequence loops). A script's AudioStreamPlayer
-/// (2D) slot named in <see cref="Fill"/> gets the game's track on the Music bus (<see cref="MusicDb"/>): King Boo's BossMusic = MSD_BGM_MAP_SELECT,
-/// the boss theme TBossTelesa and TBossPakkun both start (bosstelesa.cpp 2296, bosspakkun.cpp 862 -- t_select.com, a 15-s loop); the Gatekeeper's
-/// = MSD_BGM_CHUBOSS (gatekeeper.cpp 532 -- the mid-boss theme, 1.2 s + a 56-s loop). The scripts start / stop them at the game's moments already.
+/// (2D) slot named in <see cref="Fill"/> gets the game's track on the Music bus (<see cref="MusicDb"/>): King Boo's BossMusic = MSD_BGM_BOSS, the
+/// boss theme TBossTelesa and TBossPakkun both start (bosstelesa.cpp 2296, bosspakkun.cpp 862: id 0x8001000D = sequence.arc's t_boss.com, 4.2 s +
+/// a 95-s loop at tempo 190 -- the decomp's enum names it MSD_BGM_MAP_SELECT, one place off the game's own name table, mSound.asn, whose names these
+/// are; 156 shipped the asn's MAP_SELECT, t_select.com, the FILE SELECT music, by that name); the Gatekeeper's = MSD_BGM_CHUBOSS (gatekeeper.cpp 532,
+/// the literal 0x8001000B -- the mid-boss theme, 1.2 s + a 56-s loop). The scripts start / stop them at the game's moments already.
 /// 155b: the intro's laugh. rouletteFall calls startSoundActor(V_LAUGH1B) EVERY FRAME of the descent, but that id is a one-shot (bit 0x800): the
 /// game's JAISeEntry::storeBuffer stops the one already playing on the actor and starts it over, every frame, so the designed 8-syllable chuckle
 /// never gets past its first 20-40 ms -- the quiet breath before the first "heh" -- and the descent is, to the ear, the RLT_DOWN rumble alone
@@ -100,7 +102,7 @@ public partial class SmsActorSound : Node3D
             ("Fanfare1Sound", "MSD_SE_BS_TELESA_FANFALE_1"),    // fanfale: three fruit
             ("Fanfare2Sound", "MSD_SE_BS_TELESA_FANFALE_2"),    // three coins
             ("Fanfare3Sound", "MSD_SE_BS_TELESA_FANFALE_3"),    // anything else
-            ("BossMusic", "MSD_BGM_MAP_SELECT"),                // 156: the boss theme, started at his first appearance (unk384), faded at the down (the script's own lines)
+            ("BossMusic", "MSD_BGM_BOSS"),                      // 156b: the boss theme (t_boss.com; 156 had the file select music by the decomp's shifted name), started at his first appearance (unk384), faded at the down (the script's own lines)
             // not filled: FireSound (the FIRE is a loop; StateTick runs it)
         },
         ["gatekeeper"] = new[] { ("BossMusic", "MSD_BGM_CHUBOSS") },           // 156: TBiancoGateKeeper::startBGM at the appear demo, stopBGM at the finish demo (the script's own lines)
