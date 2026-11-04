@@ -97,6 +97,9 @@ public partial class GameData : Node
     /// <summary>The screen the next scene fades in from (the select screen leaves white behind it, TSelectDir's startWipe(0xf) with the white
     /// fader); null = the scene's own start. Whoever starts clears it.</summary>
     public Color? FadeInFrom;
+    /// <summary>SMS pass 157: the stage King Boo's rematch was entered from (the casino's scene path, SmsRematchExit) -- for the arena and a way back;
+    /// null = the arena was opened on its own. Not saved -- the run's.</summary>
+    public string RematchFrom;
 
     /// <summary>The card save's write (TFlagManager::saveSuccess): the pause menu's SAVE, a shine's "Save and ...", a blue coin's "Save and Continue".</summary>
     public void SaveNow() => Save();

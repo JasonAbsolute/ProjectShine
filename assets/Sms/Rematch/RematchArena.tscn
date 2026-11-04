@@ -1,0 +1,57 @@
+[gd_scene load_steps=8 format=3 uid="uid://d157arena"]
+
+[ext_resource type="Script" uid="uid://3aw1w481iqnu" path="res://assets/Level.cs" id="1_level"]
+[ext_resource type="PackedScene" path="res://assets/Mario.tscn" id="2_mario"]
+[ext_resource type="Script" path="res://assets/Sms/Rematch/SmsArenaFloor.cs" id="3_floor"]
+[ext_resource type="PackedScene" path="res://models/Sms/Rematch/polta_planet.glb" id="4_planet"]
+[ext_resource type="PackedScene" uid="uid://d157kingboo" path="res://assets/Sms/Rematch/KingBooRematch.tscn" id="5_boo"]
+[ext_resource type="Script" path="res://assets/Sms/Rematch/SmsRematchIntro.cs" id="6_intro"]
+
+[sub_resource type="Environment" id="Environment_arena"]
+resource_name = "the rematch arena's night: a near-black violet sky, a cold dim ambient, a thin violet fog"
+background_mode = 1
+background_color = Color(0.03, 0.015, 0.06, 1)
+ambient_light_source = 2
+ambient_light_color = Color(0.45, 0.4, 0.65, 1)
+ambient_light_energy = 0.7
+fog_enabled = true
+fog_light_color = Color(0.08, 0.04, 0.14, 1)
+fog_density = 0.006
+fog_sky_affect = 0.0
+
+[node name="RematchArena" type="Node3D"]
+script = ExtResource("1_level")
+ShowGoText = false
+HasFludd = false
+StageName = "Casino Delfino"
+ScenarioName = "King Boo's Rematch"
+metadata/_sms_note = "Pass 157: the KING BOO REMATCH arena (KINGBOO_REMATCH_gdoc.txt) -- Bouldergeist's planet from Super Mario Galaxy (Arena: models/Sms/Rematch/polta_planet.glb, the collision built from it at start), no FLUDD (the Level's HasFludd is off), a dark violet night. The casino's RematchExit loads this scene once Mario falls through the shattered table; RematchIntro runs the entrance: black, the two-line card, Mario revealed falling in FallHeight over the floor at MarioSpawn, the fade in, King Boo (KingBoo, an SmsKingBooRematch) spawning BooHeight over the floor at BooSpawn with the long laugh. Opened on its own (F6) the same intro runs. The fight itself is a later pass: King Boo only hovers, glows and watches Mario for now. Knobs: on RematchIntro (the lines, their timing, the heights, the fade, the skip), on KingBoo (opacity, glow, hover, the laugh), on Arena (Brightness, AutoCollision); move MarioSpawn / BooSpawn to place them (x and z; the heights are read from the floor under them)."
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_arena")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.9063, -0.3237, 0.2717, 0, 0.6428, 0.766, -0.4226, -0.6943, 0.5826, 0, 40, 0)
+light_color = Color(0.75, 0.78, 1, 1)
+light_energy = 0.6
+shadow_enabled = true
+
+[node name="Arena" type="StaticBody3D" parent="."]
+script = ExtResource("3_floor")
+
+[node name="Model" parent="Arena" instance=ExtResource("4_planet")]
+
+[node name="Mario" parent="." instance=ExtResource("2_mario")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 25, 10)
+
+[node name="MarioSpawn" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 25, 10)
+
+[node name="KingBoo" parent="." instance=ExtResource("5_boo")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, -8)
+
+[node name="BooSpawn" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, -8)
+
+[node name="RematchIntro" type="Node" parent="."]
+script = ExtResource("6_intro")

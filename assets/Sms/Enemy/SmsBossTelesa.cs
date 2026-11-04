@@ -198,6 +198,11 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     /// AtOnce: the moment the scene starts (place him on the raised disc yourself -- 153b's).</summary>
     [Export] public IntroStarts IntroStart = IntroStarts.WhenMarioEntersRoom;
     public enum IntroStarts { WhenMarioEntersRoom, WhenMarioLandsOnDisc, AtOnce }
+    /// <summary>157: the KING BOO REMATCH (KINGBOO_REMATCH_gdoc.txt). On: when he is down and the game would make its Shine, the RematchExit
+    /// (an SmsRematchExit: the one set here, else a sibling, else the sms_rematch_exit group) starts instead -- the casino table cracks and
+    /// shatters, Mario falls through into the rematch arena. Off: the Shine, as the game has it. KingBooArena.tscn turns it on.</summary>
+    [Export] public bool Rematch = false;
+    [Export] public SmsRematchExit RematchExit;
     /// <summary>WhenMarioEntersRoom's reach from the table's centre (2450 u: the room's wall).</summary>
     [Export(PropertyHint.Range, "500,6000,10")] public float IntroTriggerRadiusUnits = 2450f;
     /// <summary>How high the centre disc starts for the intro ride, units (2000: scene.bin's rulet00 at y 2000 over the others' 0, all three then lifted 500 by
@@ -1406,6 +1411,28 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         if (shine is ShineSprite s) s.PlaySpawnEntrance();
         if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: the Shine at {shine.GlobalPosition}");
     }
+    /// <summary>157: the Rematch knob's exit (RematchExit, else a sibling SmsRematchExit, else the nearest in the sms_rematch_exit group) begun where the
+    /// Shine would appear. False (the Shine as usual) with the knob off or no exit to be found.</summary>
+    private bool StartRematch()
+    {
+        if (!Rematch) return false;
+        var exit = RematchExit;
+        if (exit == null && GetParent() != null) foreach (Node n in GetParent().GetChildren()) if (n is SmsRematchExit e) { exit = e; break; }
+        if (exit == null)
+        {
+            float best = float.MaxValue;
+            foreach (Node n in GetTree().GetNodesInGroup("sms_rematch_exit"))
+                if (n is SmsRematchExit e && e.IsInsideTree()) { float d = e.GlobalPosition.DistanceTo(GlobalPosition); if (d < best) { best = d; exit = e; } }
+        }
+        if (exit == null) { GD.PushWarning($"[SMS btelesa] {GetPath()}: Rematch is on but there is no SmsRematchExit (KingBooArena.tscn's RematchExit) -- the Shine instead"); return false; }
+        if (!exit.Begin()) return false;
+        _rematchBegun = true;
+        if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: the rematch begins ({exit.Name}) -- no Shine");
+        return true;
+    }
+    private bool _rematchBegun;
+    /// <summary>157: the rematch's exit was begun in place of the Shine.</summary>
+    public bool RematchBegun => _rematchBegun;
     /// <summary>LIVE_FLAG_DEAD at the end: the slot and the parts gone with him, the attackers too (DEVIATION: the game's manager keeps its Boos).</summary>
     protected override void Dead()
     {
@@ -1559,7 +1586,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
                         if (_dieTimer > DownToShineTicks)
                         {
                             _dieTimer = 0;
-                            SpawnShine();
+                            if (!StartRematch()) SpawnShine();   // 157: the rematch's way out instead of the Shine
                             OffAllCollision();
                             _stack.Clear();
                             Dead();

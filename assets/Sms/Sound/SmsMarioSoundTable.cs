@@ -461,6 +461,7 @@ public static class SmsMarioSoundTable
         ["MSD_SE_MV_UNTEI_01"] = new SeInfo(127, 128, false, true, 0.333f),
         ["MSD_SE_OBJ_AWAY_INTO_GRAF"] = new SeInfo(127, 80, false, true, 0.78f, "Enemy"),
         ["MSD_SE_OBJ_DOOR_GACHA"] = new SeInfo(127, 80, false, true, 0.288f),
+        ["MSD_SE_OBJ_GLASS_BREAK"] = new SeInfo(127, 144, false, true, 1.399f, "Object"),
         ["MSD_SE_OBJ_SLOT_SPIN"] = new SeInfo(63, 200, true, false, 3.219f, "Enemy"),
         ["MSD_SE_PO_ACTION_OFF"] = new SeInfo(127, 32, false, true, 0.208f),
         ["MSD_SE_PO_ACTION_OFF_EMPTY"] = new SeInfo(127, 32, false, true, 0.208f),
