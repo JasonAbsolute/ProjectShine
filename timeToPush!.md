@@ -1114,7 +1114,7 @@ STILL OPEN, carried forward: `feature/enemy-pinna2` (entry #14, SMS 147 and 148,
 the only copy of #11's text. The exit-time C# finalize crash from #10's batch has still not recurred, now across the 151-153n
 passes as well.
 
-### #17 -- PENDING -- queued 2026-11-03 02:42 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 154)
+### #17 -- PENDING -- queued 2026-11-03 02:42 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 154 + 154b), updated 2026-11-03 18:24 PST
 Push the twelfth feature branch: `feature/sounds`, branched from `main` `90efb17` (the trunk after PR #14, Sirena Beach's ghosts). The SOUND
 branch -- the project had no audio at all. SMS 154: Mario's and FLUDD's sound effects from the game's own banks, fired the way the game fires them:
 the footsteps and the pack's clanks off his animation tables (mario.szs's bas files), the jump voices by jump kind with the game's odds of the
@@ -1122,11 +1122,13 @@ grunts and the tired set, the landing cutting the voice, the hip drop, the wall 
 (volume with the pressure), the hover's loop, the rocket's charge and launch, the turbo's launch, the empty tank, the refill, the nozzle swap, the
 pack's deploy clicks. The waves are baked from the disc image's AudioRes by tools/projectshine/sound154/sms_audio.py (a port of the game's SE
 sequence player: one WAV per MSD_SE id, 310 under assets/Sms/Sound/Mario/, loops carried in smpl chunks). NOT yet playtested by Jaysonn: push the
-branch so it is on GitHub; do NOT open a PR until he says the sound work is done (more passes follow on this branch: the species' slots, the music).
-- Branch `feature/sounds` -- code tip `57ec923` ("SMS 154: SOUND -- Mario's and FLUDD's sound effects ...", assets/Sms/Sound/ new: SmsMarioSound.cs,
+branch so it is on GitHub; do NOT open a PR until he says the sound work is done (more passes follow on this branch: the species' slots, the music). SMS 154b: Mario's sounds play FLAT -- no camera-distance falloff, no panning, no low-pass (154's 3D players made them quiet and muffled at King Boo's fixed camera); Positional (off) brings 3D channels back with the GAME's own distance curve (full within 1000 u, silent at 5000, the voices four times longer) instead of Godot's. Further passes re-point this entry's tip.
+- Branch `feature/sounds` -- code tip `ecaa420` ("SMS 154b: Mario's sounds play FLAT ...", SmsMarioSound.cs) on the 154 commit ("SMS 154: SOUND -- Mario's and FLUDD's sound effects ...", assets/Sms/Sound/ new: SmsMarioSound.cs,
   SmsMarioSound.tscn, SmsMarioSoundTable.cs, Mario/ 310 .wav + 310 .wav.import; assets/Mario.cs the SmsFluddSound probe; assets/Player.tscn the
-  SmsSound child) on `main` `90efb17`; the branch tip is this file's own commit on top of it; 2 commits since `main`. The 310 WAVs are 19 MB in
+  SmsSound child) on `main` `90efb17`; the branch tip is this file's own commit on top of them; 4 commits since `main`. The 310 WAVs are 19 MB in
   all (the biggest 0.4 MB); nothing near the 100 MB limit. The range carries none of Jaysonn's live edits (assets/Level.tscn and the rest).
+- To try 154b: the same, with the camera anywhere -- King Boo's fixed camera included: Mario's sounds stay at one volume, centred, clear.
+  Positional (Camera distance, on the Player's SmsSound) puts them back in 3D with the game's long curve (FullVolumeUnits / SilentUnits).
 - To try 154: play. Run: his steps and FLUDD's pack clanking; jump: the small grunt, the double jump's "woo", the triple's "yahoo", the back / side
   flip's big one, the spin jump's -- and the landing cuts them off, as the game does; hip drop: the thud; run into a wall: the hit and the cry; R:
   the spray's water and the nozzle's hiss (quieter at a light press); the hover's loop in the air; X: the nozzle swap's chime; the rocket: the

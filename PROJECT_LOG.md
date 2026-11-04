@@ -11096,3 +11096,29 @@ ActionSounds, FluddSounds, FluddPackClanks; Deviations: FloorMaterial, VoiceVari
 (SmsMarioSound.cs, SmsMarioSound.tscn, SmsMarioSoundTable.cs, Mario/*.wav + .import), assets/Mario.cs (SmsFluddSound), assets/Player.tscn (the
 child). Tooling (tools/projectshine/sound154/): sms_audio.py (names / resolve / log / bake / bake-list), bas_dump.py, make_list154.py, gen_table154.py,
 patch_mario154.py, patch_player154.py, the decomp sources under decomp/, AudioRes/ and bas/ and bck/ copies, out154/ (the bake + sms_sfx.json).
+
+### 154b -- Mario's sounds flat: no camera-distance falloff, no panning, no low-pass; Positional brings the game's own curve (feature/sounds, code `ecaa420`)
+
+**Jaysonn on 154:** "the sound is like dependent on the camera position and i think for mario we dont want that? lots of it sounds muffled and
+its easy for it to sound far away esp in the king boo fight".
+
+**The cause.** 154 made every channel an AudioStreamPlayer3D (MaxDistance 40 m, inverse distance, UnitSize 10) and left Godot's distance
+low-pass at its defaults (attenuation_filter_cutoff_hz 5000, attenuation_filter_db -24): at King Boo's fixed camera -- the eye at the far wall,
+~30 m from the table -- his steps and voice came through 9 dB down and filtered, and every camera swing panned and swelled them.
+
+**The fix.** `SmsMarioSound.Chan`: a channel is a plain `AudioStreamPlayer` (the voice, the six effects, one per loop) -- the same volume
+wherever the camera stands, no panning, never a filter. Mario is the listener's reference. `Positional` (Camera distance, OFF) is the other way:
+`AudioStreamPlayer3D` channels with Godot's attenuation (Disabled) and filter (0 dB) off and the GAME's curve applied by the node each tick --
+`JAISound::setDistanceVolumeCommon`: full volume within `JAIGlobalParameter::maxVolumeDistance` (1000 u) of the camera, a straight fade to
+`minDistanceVolume` (0) at `distanceMax` (5000 u); curve bits (sw_bit 0x70000 >> 16) scale the fade's range -- the effects' 0 as is, the voices'
+2 (MARIO_VO's 0x90020020 / 0x10020020) four times longer, so they all but never fade; the game has no distance low-pass at all (its FIR is the
+fx line's). Knobs `FullVolumeUnits` 1000, `SilentUnits` 5000; readers `DistanceDb` / `VoiceDistanceDb`.
+
+**What the game does, for the record:** its SEs ARE positional (JAIActor positions, the camera's distance), but the curve is long and flat:
+nothing fades within 13 m of the camera, the fade runs to 67 m, the voices to four times that. Godot's defaults (falloff from the first metre,
+the low-pass) are what made 154 sound wrong, not the idea of distance. Flat is Jaysonn's call for Mario; the enemies' sounds (the next passes)
+will be positional with this curve.
+
+**Drive 154: 12 / 12** -- 154's ten and A11 (Positional off: every channel a flat AudioStreamPlayer, the distance volume 0 dB) and A12 (the curve
+exercised directly: 0 dB at 500 u, -6.02 dB at 3000, -80 at 5000; the voices' -1.16 dB at 3000). Headless run i; build 154k 0 errors (the drive
+partial out before the commit). Files: `assets/Sms/Sound/SmsMarioSound.cs`. Tooling: sound154/ship154/.
