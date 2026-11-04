@@ -11445,3 +11445,14 @@ ones now) and the flutter, the Boo's FIX, the common water hit. The BGM renderer
 
 **Drive 155 run j: 13 / 13** (marker v156-4); build 0 errors. Tools: `patch_gate156d.py`, `patch_velo156d.py`, `scan_gate156.py`, `patch_laugh156d.py`,
 `patch_boss156d.py` (the PC's SmsBossTelesa.cs).
+
+### 156e -- the sounds back to 156c's (feature/sounds, code `79b4c87`)
+
+**Jaysonn:** "hmm go back to the one before that."
+
+156d had rendered two of `JASBankMgr::noteOn`'s rules into the SE set -- the note volume's (velocity / 127)² and a gate note sounding only its gate
+share -- and 51 WAVs changed, the intro chuckle among them (its soft syllables fell under its loud ones). Jaysonn preferred what he had, so
+`assets/Sms/Sound/Mario/`, `Enemy/` and `SmsMarioSoundTable.cs` are exactly 156c's again (`git checkout 4437366 -- ...`; the local set of record and
+ship tree restored from the 156c bake, byte for byte). The baker keeps both rules behind switches, OFF (`sms_audio.py` `VELOCITY_SQUARED`,
+`GATE_TIMES`), so a future bake reproduces this set; `sms_bgm.py` keeps both for the music, which was judged right with them. The `IntroLaughPitch`
+knob (156d) stays: at 1 it changes nothing. Build 0 errors; no drive (no code moved).
