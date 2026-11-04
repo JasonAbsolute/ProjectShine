@@ -316,9 +316,10 @@ public partial class SmsActorSound : Node3D
                     _prevRolling = rolling;
                     bool fall = boss.IntroPhase == 1;                                                                 // rouletteFall: the disc sinking with Mario on it
                     Loop("MSD_SE_BS_TELESA_RLT_DOWN", fall);                                                          // (RLT_SET at the DETACH: SmsBossTelesa's own line plays it through this node)
-                    Loop("MSD_SE_BS_TELESA_V_LAUGH1B_ROULETTE", fall && IntroLaugh == IntroLaughs.Game);               // 155b: the laugh as the engine restarts it every frame (see the class note)
-                    Loop("MSD_SE_BS_TELESA_V_LAUGH1B", fall && IntroLaugh == IntroLaughs.Chuckle);                     //       the laugh as designed (155's)
-                    if (_prevFall && !fall && IntroLaugh == IntroLaughs.Game) Play("MSD_SE_BS_TELESA_V_LAUGH1B");       // 156c: the disc seats -> the last of those starts plays out whole: the chuckle
+                    float lp = Mathf.Clamp(boss.IntroLaughPitch, 0.25f, 4f);                                           // 156d: the inspector's pitch / pace for the chuckle (1 = the game's notes)
+                    Loop("MSD_SE_BS_TELESA_V_LAUGH1B_ROULETTE", fall && IntroLaugh == IntroLaughs.Game, 0f, lp);        // 155b: the laugh as the engine restarts it every frame (see the class note)
+                    Loop("MSD_SE_BS_TELESA_V_LAUGH1B", fall && IntroLaugh == IntroLaughs.Chuckle, 0f, lp);              //       the laugh as designed (155's)
+                    if (_prevFall && !fall && IntroLaugh == IntroLaughs.Game) Play("MSD_SE_BS_TELESA_V_LAUGH1B", 0f, lp);   // 156c: the disc seats -> the last of those starts plays out whole: the chuckle
                     _prevFall = fall;
                     break;
                 }

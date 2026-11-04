@@ -206,6 +206,9 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     /// <summary>153n, the intro's pace: x the game's -- the disc's fall (rouletteFall: 1 u a tick, 2000 u in 16.7 s), the camera's sweep (the bck at 30 frames
     /// a second: the same 16.7 s) and the slot's unseen drop, all together. 1 = the game's; 1.5 (Jaysonn: "a bit slow") = 11 s; 2 = 8 s.</summary>
     [Export(PropertyHint.Range, "0.25,4,0.05")] public float IntroSpeed = 1.5f;
+    /// <summary>156d: the intro chuckle's pitch AND pace (one factor, as a tape speed): 1 = the game's own notes -- its syllables sit at half to a third of the
+    /// laugh sample's speed, one and a half octaves down at the deepest; 1.25 is a quarter faster and higher. Also scales the per-frame flutter.</summary>
+    [Export(PropertyHint.Range, "0.5,2,0.05")] public float IntroLaughPitch = 1f;
     /// <summary>153n: the gold dome UP through the ride and pressed into its bowl over PondPressTicks (the disc's knob, ~1 s: rulet00.bck) from the landing, as the
     /// game plays the clip. Off: the bowl from the start (153c's table).</summary>
     [Export] public bool IntroPondPress = true;
