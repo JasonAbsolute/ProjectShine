@@ -11456,3 +11456,78 @@ share -- and 51 WAVs changed, the intro chuckle among them (its soft syllables f
 ship tree restored from the 156c bake, byte for byte). The baker keeps both rules behind switches, OFF (`sms_audio.py` `VELOCITY_SQUARED`,
 `GATE_TIMES`), so a future bake reproduces this set; `sms_bgm.py` keeps both for the music, which was judged right with them. The `IntroLaughPitch`
 knob (156d) stays: at 1 it changes nothing. Build 0 errors; no drive (no code moved).
+
+### 157 -- the King Boo REMATCH, part 1: the transition (feature/kingboo-rematch, code `c5e718b`)
+
+**Jaysonn:** "awesome so rember how i said i want a custom fight? ...KINGBOO_REMATCH_gdoc.txt is the desgin doc i have i have anohter AI taking care
+of animations so i want you to work on the transition to the fight following this doc"
+
+The custom fight that follows the roulette fight (the design doc at the project root, `KINGBOO_REMATCH_gdoc.txt`, INTRO 1-6): this pass is the
+way from one fight to the other, on a new branch off `feature/sounds` (it needs the sound work: the laugh, the glass). Nothing of the game's own
+King Boo fight changes unless the knob is on; `KingBooArena.tscn` turns it on.
+
+**The casino's way out** (`assets/Sms/Rematch/SmsRematchExit.cs`, `SmsFloorShatter.cs`, `FloorShatter.gdshader`; `KingBooArena.tscn` gains a
+`RematchExit` child with a `FloorShatter` child, and `Rematch = true` on BossTelesa). `SmsBossTelesa` has a `Rematch` knob (off = the game): when
+he is down and `DownToShineTicks` have run -- the tick the Shine would appear -- `StartRematch()` begins the exit instead of `SpawnShine()` (the
+exit found by export, else a sibling, else the `sms_rematch_exit` group). The exit's FloorShatter takes the three roulette discs (the
+`sms_roulette` group within 60 m), hides each disc's model and puts a copy of its own triangles in its place -- the glb's surfaces re-read, every
+triangle on its own vertices, the disc's own textures and colours through the shader's `albedo_tex` / `use_vertex_color`, so nothing changes to
+the eye -- cut into Voronoi cells about random seeds spread evenly over the disc's area (CellAreaM2, 8 m² a cell, 128 cells a disc at most:
+93 / 126 / 128 on the three; CUSTOM0 carries each cell's pivot and index). Over CrackSeconds (1.4) the cell borders light up as cracks
+spreading from the table's centre to the rim (the two nearest seeds per fragment; `crack_width`, `crack_color` pale blue, `crack_glow` an
+emission), HoldSeconds (0.5) later the table BREAKS: the discs' collision goes (`CollisionLayer = 0`, the trimesh shapes disabled, the roll
+stopped), every cell flies as a rigid shard in the vertex shader -- kicked outward (Kick 2.5 m/s) and up (Pop 1.5), tumbling (Spin 2.5 rad/s),
+falling (Gravity 14), the rim's cells RimDelay (0.18 s) after the centre's -- and fades out from FadeStart (1.4 s) to ShardSeconds (2.4), when the
+shard meshes are freed. MSD_SE_OBJ_GLASS_BREAK plays at the break (baked from the game's bank, `assets/Sms/Sound/Object/`; a new Object folder in
+the sound table). Mario falls through the broken table into the LOAD TRIGGER -- a box TriggerDepth (8 m) under the arena node, TriggerWidth (70)
+across (a position test on Mario, no Area3D) -- the screen fades to black (FadeOutSeconds 0.7) and the arena loads (`ArenaScene`, empty =
+`RematchArena.tscn`); `GameData.RematchFrom` keeps the casino's scene path. FallSeconds (6) is a fail-safe load after the break. The room's
+drum has no floor and its paint runs 13 m under the table: the trigger at 8 m gives about a second of fall among the shards before the fade, and
+the black lands before the paint runs out.
+
+**The arena** (`assets/Sms/Rematch/RematchArena.tscn`): Bouldergeist's planet from Super Mario Galaxy, as the doc asks -- `PoltaBattlePlanet.dae`
+from Jaysonn's Downloads run through Blender 4.2 headless (`tools/projectshine/rematch157/pc/convert_arena.py`: the Collada import, Galaxy's
+centimetres scaled to metres in the vertices, each material's Base Color made texture x Color Attribute so the glTF export writes COLOR_0 and
+Godot's importer multiplies the vertex colours in, the fence (saku) a cut-out) to `models/Sms/Rematch/polta_planet.glb` (234 KB, 864
+triangles, 52.7 m across, the floor's top at 2.3 m; `polta_parts.glb`, the breakable rock set, converted too but not placed -- it sits beside
+the planet in the file, Bouldergeist's to raise). The `_bake.dae` twins (the vertex colours as a second UV set into vertexColors_planet.png)
+were not needed: the plain file carries the colours per vertex. `SmsArenaFloor.cs` (the Arena StaticBody3D) builds one trimesh per mesh at
+start (the glb's transform baked into the triangles, as the discs do), reads TopY / BottomY, and finds the floor under a point with a ray
+(`FloorYUnder`, Mario's body excluded). The Level root has `HasFludd` OFF (the doc: no FLUDD -- Mario arrives without the pack, R and X dead),
+`ShowGoText` off, the pause bar "Casino Delfino / King Boo's Rematch". A near-black violet sky, a cold dim ambient, a thin violet fog, a dim
+blue directional light -- the editor's to change. No edge catch yet: off the planet Mario falls into the void (a later pass).
+
+**The entrance** (`SmsRematchIntro.cs` + `SmsRematchCard`): the scene starts black (the fader set black, Mario held with `SuppressForIntro`,
+King Boo hidden); the two-line card over the black -- "You call that a fight fit for a king?" then "I'll show you a real fight..." under it,
+Delfino at 46 px white with a black shadow on a CanvasLayer at 110 (above the fader's 100), BlackBefore 0.6 / LineFadeIn 0.45 / Line1Hold 1.9 /
+LineGap 0.3 / Line2Hold 2.3 / LinesFadeOut 0.5 / BlackAfter 0.35 (6.8 s in all; A skips it) -- then Mario is revealed FallHeight (22 m) over
+the floor under his marker (`RevealFromIntro` at the marker's x / z and facing; the height from the floor ray) and the screen fades in
+(FadeInSeconds 0.7) on him falling; BooSpawnDelay (0.5 s) after he lands (BooSpawnTimeout 5 s after the reveal at the latest) King Boo spawns
+BooHeight (5.5 m) over the floor at his marker and the fight may start (`FightReady`). After a miss (`GameData.CameFromMiss`) the card is
+skipped: the fall at once. Opened on its own (F6) the same intro runs.
+
+**King Boo for the rematch** (`SmsKingBooRematch.cs`, `KingBooRematch.tscn`): the arena's own actor, apart from the casino's `SmsBossTelesa`
+(the roulette fight's 1600 lines stay as they are). The same model (btelesa.glb at 1 / 74.44) with its shader materials copied per instance
+(`opacity` = GhostOpacity 0.72, white tint, no mask), the casino boss's ChikaFx twinkle and GlowFx quad at `jnt_body` ("a slight glow on him
+throughout": Glow 0.9 x his opacity), the blink loop on his eyes (btelesa_twait's 150-frame table), the clips at the game's rate (one bck frame
+= 1 / 60 s, SmsSmallEnemy's rule). This pass is his ENTRANCE only: `Spawn()` -> `btelesa_appear`, then `btelesa_laugh` with the LONG laugh
+(MSD_SE_BS_TELESA_V_LAUGH1 through his SmsActorSound node; `ActorOf["SmsKingBooRematch"] = "kingboo"`, no slot table), then `btelesa_wait`
+looping while he hovers (HoverBob 0.35 m over 2.4 s) and turns to face Mario (TurnSpeed 3 rad/s). The attacks, the teleports, the three faces,
+the hurt flip and the Boo bombs are later passes; the new animations another hand's.
+
+**Drive 157** (`SmsRematch.Drive.cs`, v157-3, three runs, deleted before the commit): in the casino it waits for his appear, kills him
+(`DriveKill`: spicy, 1 hp, the Die nerve), and watches the exit begin at the Shine's moment with no Shine (C2, 5.3 s after the kill), the
+cracks and the break 1.90 s later with the three discs re-cut (347 cells, 2312 triangles), their collision off and models hidden (C3), Mario
+through the floor and the fade out (C5), the load fully black with RematchFrom set (C6, through the exit's `Loading` signal: the scene change
+takes the old scene out of the tree the same tick); in the arena the card over black with Mario held (C7), the floor's collision (C13), the
+reveal 22 m up and falling with the fade in (C8), no FLUDD (C9), the landing (C10), King Boo's appear / laugh (logged) / wait 5.5 m over the
+floor (C11), the intro done (C12), the screen in (C14). Run k found two things: King Boo's hover bobbed about his ORIGINAL place (the home
+read at `_Ready`, now at `Spawn`), and the arena came in 100x too big (Blender's Collada import keeps the file's centimetres; the vertices are
+scaled now). Run l found the floor ray hitting Mario himself (he waits at his marker; excluded now) and the trigger 1.6 m under the disc faces
+firing 0.27 s after the break (8 m now). Run m: 14 / 14 (the .err carries one benign "1 resources still in use at exit": a Resource
+wrapper not yet collected at the quit).
+
+**Deviations, all knobs:** the game has none of this (the Shine ends the fight): the crack and shatter, the card, the arena, the no-FLUDD
+rematch are the doc's. `Rematch` off on BossTelesa = the game's Shine. The glass break is the game's own object sound (MSD_SE_OBJ_GLASS_BREAK).
+The arena's scale is Galaxy's centimetres as metres (52.7 m across; the roulette table is 67 m): resize the Arena's Model child to taste. No
+music in the arena yet, no way back to the casino, no edge catch.

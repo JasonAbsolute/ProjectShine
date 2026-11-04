@@ -1170,3 +1170,40 @@ git rev-list --count origin/feature/sounds..feature/sounds
 Expect `0` from the rev-list. No PR, no merge. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
+
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157), AFTER #17: this branch stacks on `feature/sounds`
+Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
+are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
+custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
+(on in KingBooArena.tscn; off = the game's Shine) -- when he is down, where the game makes its Shine, the casino table cracks like glass from the
+centre to the rim and breaks (the three roulette discs re-cut into Voronoi cells on their own triangles and textures, FloorShatter.gdshader; the
+collision goes, the pieces fly and fade, the game's glass-break sound), Mario falls through into a load trigger, the screen fades to black and the
+rematch arena loads: Bouldergeist's planet from Super Mario Galaxy (models/Sms/Rematch/polta_planet.glb -- the .dae from Jaysonn's Downloads run
+through Blender headless with its vertex colours kept), no FLUDD, a violet night; the two-line card over black ("You call that a fight fit for a
+king?" / "I'll show you a real fight..."), Mario revealed 22 m up and falling as the screen fades in, King Boo (SmsKingBooRematch, the arena's
+own actor on the casino boss's model) appearing 5.5 m over the floor once he lands, with the long laugh, then hovering and watching him. The
+fight itself -- the attacks, the teleports, the faces, the Boo bombs -- is later passes on this branch; the animations another AI's.
+- Branch `feature/kingboo-rematch` -- code tip `c5e718b` ("SMS 157: the King Boo REMATCH, part 1 -- the transition"; assets/Sms/Rematch/
+  SmsRematchExit.cs, SmsFloorShatter.cs, FloorShatter.gdshader, SmsRematchIntro.cs (+ SmsRematchCard), SmsKingBooRematch.cs, KingBooRematch.tscn,
+  SmsArenaFloor.cs, RematchArena.tscn and their .uid; assets/Sms/Enemy/BossTelesa/KingBooArena.tscn (RematchExit + FloorShatter children,
+  Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
+  (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
+  models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
+  this file's own commit on top of it; 2 commits past `feature/sounds`, 24 since `main`. ~1 MB of new files. The range carries none of Jaysonn's
+  live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
+  the rematch is done (more passes follow on this branch).
+- To try 157: King Boo's room; beat him (three hits). Where the Shine came: the table cracks from the centre out, holds a breath, and breaks
+  under you -- the pieces fly off and fade -- you fall into the dark, black, the two lines, and you drop into Bouldergeist's arena with no FLUDD
+  (R and X do nothing); King Boo appears, laughs, and waits -- hovering, glowing, turning to watch you. Nothing attacks yet. A skips the card.
+  Knobs: KingBooArena.tscn's RematchExit (Enabled, FadeOutSeconds, TriggerDepth, ArenaScene) and its FloorShatter (CrackSeconds, HoldSeconds,
+  ShardSeconds, CellAreaM2 the piece size, CrackColor / CrackGlow, Kick / Pop / Spin / Gravity, ShatterSound); RematchArena.tscn's RematchIntro (the
+  two lines and their timing, FallHeight, BooHeight, FadeInSeconds, SkipAllowed, LabelSettings / FontSize), KingBoo (GhostOpacity, Glow, Twinkle,
+  HoverBob, FaceMario, LaughSe), Arena (Brightness); BossTelesa's Rematch off = the game's Shine. To open the arena on its own: F6 on
+  assets/Sms/Rematch/RematchArena.tscn (the same intro runs).
+```
+git push -u origin feature/kingboo-rematch
+git rev-list --count origin/feature/kingboo-rematch..feature/kingboo-rematch
+```
+Expect `0` from the rev-list. No PR, no merge. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
+`assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips, the
+`addons/godot_ai` churn and `KINGBOO_REMATCH_gdoc.txt` at the root: his, leave them.
