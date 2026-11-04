@@ -15,6 +15,12 @@ using System.Linq;
 /// Every channel is positional (an AudioStreamPlayer3D on the actor: Godot pans it) with Godot's own falloff and low-pass OFF and the GAME's distance
 /// curve applied here (JAISound::setDistanceVolumeCommon: full within FullVolumeUnits of the camera, a straight fade to silence at SilentUnits), so
 /// King Boo at the fixed camera's 30 m sits a few dB under Mario, as in the game, and never muffled. All on the "Sfx" bus (SmsMarioSound's volume).
+/// 156: the BOSS MUSIC. The game's BGMs are sequences (sequence.arc's BMS files) played through the same banks as the sound effects; the port plays
+/// them as stereo WAVs rendered from those sequences with those instruments (tools/projectshine/sound154/sms_bgm.py: the tracks' notes, volumes,
+/// pans, pitch bends and vibrato, the instruments' envelopes and velocity curves, the loop as the sequence loops). A script's AudioStreamPlayer
+/// (2D) slot named in <see cref="Fill"/> gets the game's track on the Music bus (<see cref="MusicDb"/>): King Boo's BossMusic = MSD_BGM_MAP_SELECT,
+/// the boss theme TBossTelesa and TBossPakkun both start (bosstelesa.cpp 2296, bosspakkun.cpp 862 -- t_select.com, a 15-s loop); the Gatekeeper's
+/// = MSD_BGM_CHUBOSS (gatekeeper.cpp 532 -- the mid-boss theme, 1.2 s + a 56-s loop). The scripts start / stop them at the game's moments already.
 /// 155b: the intro's laugh. rouletteFall calls startSoundActor(V_LAUGH1B) EVERY FRAME of the descent, but that id is a one-shot (bit 0x800): the
 /// game's JAISeEntry::storeBuffer stops the one already playing on the actor and starts it over, every frame, so the designed 8-syllable chuckle
 /// never gets past its first 20-40 ms -- the quiet breath before the first "heh" -- and the descent is, to the ear, the RLT_DOWN rumble alone
@@ -37,8 +43,14 @@ public partial class SmsActorSound : Node3D
     /// (never heard in the game). Off: the rumble alone.</summary>
     public enum IntroLaughs { Game, Chuckle, Off }
     public static IntroLaughs IntroLaugh = IntroLaughs.Game;
+    /// <summary>The boss music's level over the Music bus (the renders peak at -1 dBFS; MSBgm plays BGMs at 0.75 of full -- -2.5 dB -- so this sits
+    /// them a touch under that, under the effects). Off = the music slots left empty.</summary>
+    public static float MusicDb = -4f;
+    public static bool Music = true;
     public static bool DebugPrint = false;
     public const string SfxBus = "Sfx";
+    public const string MusicBus = "Music";
+    public int MusicSlots { get; private set; }
     public const string SoundRoot = "res://assets/Sms/Sound/";
 
     /// <summary>For the drives: every play, newest last ("tick actor/clip fN what").</summary>
@@ -71,6 +83,7 @@ public partial class SmsActorSound : Node3D
     private static readonly Dictionary<string, string> ActorOf = new()
     {
         ["SmsBossTelesa"] = "btelesa", ["SmsTelesa"] = "telesa", ["SmsTelesaSlot"] = "slot", ["SmsRoulette"] = "roulette",
+        ["SmsGateKeeper"] = "gatekeeper",                                     // 156: its BossMusic slot (no tables: TBiancoGateKeeper's own sounds are a later pass)
     };
     /// <summary>The script's sound slots and the game sound each stands for (the slot names are the species' own exports).</summary>
     private static readonly Dictionary<string, (string slot, string se)[]> Fill = new()
@@ -87,8 +100,10 @@ public partial class SmsActorSound : Node3D
             ("Fanfare1Sound", "MSD_SE_BS_TELESA_FANFALE_1"),    // fanfale: three fruit
             ("Fanfare2Sound", "MSD_SE_BS_TELESA_FANFALE_2"),    // three coins
             ("Fanfare3Sound", "MSD_SE_BS_TELESA_FANFALE_3"),    // anything else
-            // not filled: FireSound (the FIRE is a loop; StateTick runs it), BossMusic (the music pass)
+            ("BossMusic", "MSD_BGM_MAP_SELECT"),                // 156: the boss theme, started at his first appearance (unk384), faded at the down (the script's own lines)
+            // not filled: FireSound (the FIRE is a loop; StateTick runs it)
         },
+        ["gatekeeper"] = new[] { ("BossMusic", "MSD_BGM_CHUBOSS") },           // 156: TBiancoGateKeeper::startBGM at the appear demo, stopBGM at the finish demo (the script's own lines)
         ["telesa"] = new[]
         {
             ("FixSound", "MSD_SE_EN_TELESA_FIX"),               // changeByJuice: the box Boo into its block
@@ -144,7 +159,18 @@ public partial class SmsActorSound : Node3D
         foreach (var (slot, se) in list)
         {
             var f = t.GetField(slot);
-            if (f == null || f.FieldType != typeof(AudioStreamPlayer3D)) { GD.PushWarning($"[SMS actor sound] {t.Name} has no AudioStreamPlayer3D field '{slot}'"); continue; }
+            if (f == null || (f.FieldType != typeof(AudioStreamPlayer3D) && f.FieldType != typeof(AudioStreamPlayer))) { GD.PushWarning($"[SMS actor sound] {t.Name} has no AudioStreamPlayer(3D) field '{slot}'"); continue; }
+            if (f.FieldType == typeof(AudioStreamPlayer))
+            {
+                // 156: a MUSIC slot -- a 2D player on the Music bus with the game's BGM (its WAV loops as the sequence does); set by hand = kept
+                if (!Music) continue;
+                if (f.GetValue(_owner) is AudioStreamPlayer haveM && haveM.Stream != null) continue;
+                var sm = Stream(se); if (sm == null) continue;
+                var m = new AudioStreamPlayer { Name = "Music_" + slot, Bus = MusicBus, Stream = sm, VolumeDb = MusicDb + SeDb(se) };
+                AddChild(m); f.SetValue(_owner, m); SlotsFilled++; MusicSlots++;
+                if (DebugPrint) GD.Print($"[SMS actor sound] {_owner.Name}: {slot} = {se} ({(sm is AudioStreamWav wv ? wv.GetLength().ToString("F1") + " s" : "?")}, bus {MusicBus})");
+                continue;
+            }
             if (f.GetValue(_owner) is AudioStreamPlayer3D have && have.Stream != null) continue;    // set by hand in the inspector
             var s = Stream(se); if (s == null) continue;
             var p = Make("Slot_" + slot); p.Stream = s; SetBase(p, MasterDb + SeDb(se));

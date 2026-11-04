@@ -144,6 +144,8 @@ public static class SmsMarioSoundTable
     };
     public static readonly Dictionary<string, SeInfo> Sounds = new()
     {
+        ["MSD_BGM_CHUBOSS"] = new SeInfo(127, 64, true, false, 57.204f, "Music"),
+        ["MSD_BGM_MAP_SELECT"] = new SeInfo(125, 64, true, false, 30f, "Music"),
         ["MSD_SE_BS_DAMAGE_SYMBL"] = new SeInfo(127, 220, false, true, 0.579f, "Enemy"),
         ["MSD_SE_BS_TELESA_BREATHE"] = new SeInfo(60, 180, false, true, 0.551f, "Enemy"),
         ["MSD_SE_BS_TELESA_DAMAGE"] = new SeInfo(120, 220, false, true, 1.223f, "Enemy"),
