@@ -25,9 +25,10 @@ using System.Linq;
 /// the literal 0x8001000B -- the mid-boss theme, 1.2 s + a 56-s loop). The scripts start / stop them at the game's moments already.
 /// 155b: the intro's laugh. rouletteFall calls startSoundActor(V_LAUGH1B) EVERY FRAME of the descent, but that id is a one-shot (bit 0x800): the
 /// game's JAISeEntry::storeBuffer stops the one already playing on the actor and starts it over, every frame, so the designed 8-syllable chuckle
-/// never gets past its first 20-40 ms -- the quiet breath before the first "heh" -- and the descent is, to the ear, the RLT_DOWN rumble alone
-/// (<see cref="IntroLaugh"/> picks that, the chuckle 155 played, or nothing). The laugh you do hear is V_APPEAR when King Boo surfaces (the appear
-/// clip's table), as in the game.</summary>
+/// never gets past its first 20-40 ms -- the quiet breath before the first "heh" -- and the descent is, to the ear, the RLT_DOWN rumble alone.
+/// 156c: BUT the frame the disc seats, rouletteFall returns before those calls -- so the LAST start, from the frame before, is never stopped and the
+/// whole chuckle plays out as the elevator lowers into place (6 s, through the slot machine's fall), before King Boo appears. That is the laugh of
+/// the intro. <see cref="IntroLaugh"/> picks that (Game), 155's loop through the descent (Chuckle), or nothing.</summary>
 public partial class SmsActorSound : Node3D
 {
     // ---- knobs (static: the actors are spawned at runtime, one setting for all of them; the Sfx bus is the volume)
@@ -39,10 +40,10 @@ public partial class SmsActorSound : Node3D
     /// largest of MSHandle's per-category distances; minDistanceVolume 0). 155 had JAudio's defaults (1000 / 5000): too quick a fade.</summary>
     public static float FullVolumeUnits = 1200f, SilentUnits = 12000f;
     public static float MasterDb = 0f;
-    /// <summary>What plays over the intro's descent, with the RLT_DOWN rumble. Game: what the game's engine makes of rouletteFall's per-frame
-    /// V_LAUGH1B -- the restarted laugh's first 20-40 ms, 30 times a second (MSD_SE_BS_TELESA_V_LAUGH1B_ROULETTE, baked from that run of the SE
-    /// sequence: a breath flutter some 30 dB under the rumble, in effect silence). Chuckle: the SE as designed, the 8-syllable laugh 155 looped
-    /// (never heard in the game). Off: the rumble alone.</summary>
+    /// <summary>The intro's laugh. Game: what the game's engine makes of rouletteFall's per-frame V_LAUGH1B -- through the descent the restarted
+    /// laugh's first 20-40 ms, 30 times a second (MSD_SE_BS_TELESA_V_LAUGH1B_ROULETTE, baked from that run of the SE sequence: a breath flutter some
+    /// 30 dB under the rumble, in effect silence), then the whole 8-syllable chuckle ONCE as the disc seats (the last start, never stopped). Chuckle:
+    /// 155's -- the chuckle looped through the descent, stopped at the seat. Off: the rumble alone, nothing at the seat.</summary>
     public enum IntroLaughs { Game, Chuckle, Off }
     public static IntroLaughs IntroLaugh = IntroLaughs.Game;
     /// <summary>The boss music's level over the Music bus (the renders peak at -1 dBFS; MSBgm plays BGMs at 0.75 of full -- -2.5 dB -- so this sits
@@ -79,7 +80,7 @@ public partial class SmsActorSound : Node3D
     private static readonly Dictionary<string, AudioStream> _streams = new();
     private static readonly HashSet<string> _missing = new();
     private string _clip = ""; private float _frame = -1f, _lastFrame = -1f; private int _tick;
-    private int _prevRolling = -1;
+    private int _prevRolling = -1; private bool _prevFall;
 
     // ---- which script is which game actor (by the exact type: SmsDebuTelesa is a Boo of its own)
     private static readonly Dictionary<string, string> ActorOf = new()
@@ -317,6 +318,8 @@ public partial class SmsActorSound : Node3D
                     Loop("MSD_SE_BS_TELESA_RLT_DOWN", fall);                                                          // (RLT_SET at the DETACH: SmsBossTelesa's own line plays it through this node)
                     Loop("MSD_SE_BS_TELESA_V_LAUGH1B_ROULETTE", fall && IntroLaugh == IntroLaughs.Game);               // 155b: the laugh as the engine restarts it every frame (see the class note)
                     Loop("MSD_SE_BS_TELESA_V_LAUGH1B", fall && IntroLaugh == IntroLaughs.Chuckle);                     //       the laugh as designed (155's)
+                    if (_prevFall && !fall && IntroLaugh == IntroLaughs.Game) Play("MSD_SE_BS_TELESA_V_LAUGH1B");       // 156c: the disc seats -> the last of those starts plays out whole: the chuckle
+                    _prevFall = fall;
                     break;
                 }
             case "slot":
