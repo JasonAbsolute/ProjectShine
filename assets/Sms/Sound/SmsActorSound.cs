@@ -14,7 +14,12 @@ using System.Linq;
 ///     as loops keyed on the actor's state (<see cref="StateTick"/>).
 /// Every channel is positional (an AudioStreamPlayer3D on the actor: Godot pans it) with Godot's own falloff and low-pass OFF and the GAME's distance
 /// curve applied here (JAISound::setDistanceVolumeCommon: full within FullVolumeUnits of the camera, a straight fade to silence at SilentUnits), so
-/// King Boo at the fixed camera's 30 m sits a few dB under Mario, as in the game, and never muffled. All on the "Sfx" bus (SmsMarioSound's volume).</summary>
+/// King Boo at the fixed camera's 30 m sits a few dB under Mario, as in the game, and never muffled. All on the "Sfx" bus (SmsMarioSound's volume).
+/// 155b: the intro's laugh. rouletteFall calls startSoundActor(V_LAUGH1B) EVERY FRAME of the descent, but that id is a one-shot (bit 0x800): the
+/// game's JAISeEntry::storeBuffer stops the one already playing on the actor and starts it over, every frame, so the designed 8-syllable chuckle
+/// never gets past its first 20-40 ms -- the quiet breath before the first "heh" -- and the descent is, to the ear, the RLT_DOWN rumble alone
+/// (<see cref="IntroLaugh"/> picks that, the chuckle 155 played, or nothing). The laugh you do hear is V_APPEAR when King Boo surfaces (the appear
+/// clip's table), as in the game.</summary>
 public partial class SmsActorSound : Node3D
 {
     // ---- knobs (static: the actors are spawned at runtime, one setting for all of them; the Sfx bus is the volume)
@@ -22,8 +27,16 @@ public partial class SmsActorSound : Node3D
     public static bool Enabled = true;
     /// <summary>The game's camera-distance curve on the actors' sounds (off = flat, like Mario's).</summary>
     public static bool Positional = true;
-    public static float FullVolumeUnits = 1000f, SilentUnits = 5000f;   // JAIGlobalParameter maxVolumeDistance / distanceMax
+    /// <summary>MSound::init's JAIGlobalParameter values: full volume within 1200 u of the camera, a straight fade to silence at 12000 u (the
+    /// largest of MSHandle's per-category distances; minDistanceVolume 0). 155 had JAudio's defaults (1000 / 5000): too quick a fade.</summary>
+    public static float FullVolumeUnits = 1200f, SilentUnits = 12000f;
     public static float MasterDb = 0f;
+    /// <summary>What plays over the intro's descent, with the RLT_DOWN rumble. Game: what the game's engine makes of rouletteFall's per-frame
+    /// V_LAUGH1B -- the restarted laugh's first 20-40 ms, 30 times a second (MSD_SE_BS_TELESA_V_LAUGH1B_ROULETTE, baked from that run of the SE
+    /// sequence: a breath flutter some 30 dB under the rumble, in effect silence). Chuckle: the SE as designed, the 8-syllable laugh 155 looped
+    /// (never heard in the game). Off: the rumble alone.</summary>
+    public enum IntroLaughs { Game, Chuckle, Off }
+    public static IntroLaughs IntroLaugh = IntroLaughs.Game;
     public static bool DebugPrint = false;
     public const string SfxBus = "Sfx";
     public const string SoundRoot = "res://assets/Sms/Sound/";
@@ -273,7 +286,9 @@ public partial class SmsActorSound : Node3D
                     if (rolling != _prevRolling && DebugPrint) GD.Print($"[SMS actor sound] roulettes rolling: {rolling}");
                     _prevRolling = rolling;
                     bool fall = boss.IntroPhase == 1;                                                                 // rouletteFall: the disc sinking with Mario on it
-                    Loop("MSD_SE_BS_TELESA_RLT_DOWN", fall); Loop("MSD_SE_BS_TELESA_V_LAUGH1B", fall);                // (RLT_SET at the DETACH: SmsBossTelesa's own line plays it through this node)
+                    Loop("MSD_SE_BS_TELESA_RLT_DOWN", fall);                                                          // (RLT_SET at the DETACH: SmsBossTelesa's own line plays it through this node)
+                    Loop("MSD_SE_BS_TELESA_V_LAUGH1B_ROULETTE", fall && IntroLaugh == IntroLaughs.Game);               // 155b: the laugh as the engine restarts it every frame (see the class note)
+                    Loop("MSD_SE_BS_TELESA_V_LAUGH1B", fall && IntroLaugh == IntroLaughs.Chuckle);                     //       the laugh as designed (155's)
                     break;
                 }
             case "slot":
