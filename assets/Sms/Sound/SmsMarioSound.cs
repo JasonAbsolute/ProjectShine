@@ -14,7 +14,8 @@ using System.Collections.Generic;
 ///     switch, the pack's deploy clicks (HAND_OFF / NOZZLE_OFF / DOWN_OFF on the house progress).
 /// The sounds are WAVs baked from the game's banks by tools/projectshine/sound154/sms_audio.py (one file per MSD_SE name, the game's layers
 /// and pitches mixed in; a continuous sound carries a loop region). One voice channel (the game's), a small pool for effects, one player per
-/// loop. Knobs: the volumes, the floor material (DEVIATION: the game reads it off the floor; the port's floors carry none yet), the pieces.</summary>
+/// loop -- FLAT by default (154b: no panning, no camera-distance falloff; Positional turns the game's own curve on), never Godot's distance
+/// low-pass. Knobs: the volumes, the floor material (DEVIATION: the game reads it off the floor; the port's floors carry none yet), the pieces.</summary>
 public partial class SmsMarioSound : Node3D
 {
     public enum FloorKind { Stone, Marble, StoneSand, Soil, Sand, Gravel, Wood, WoodBoard, WoodThin, MetalNet }
@@ -25,8 +26,16 @@ public partial class SmsMarioSound : Node3D
     [Export(PropertyHint.Range, "-40,12,0.5")] public float VoiceDb = 0f;
     [Export(PropertyHint.Range, "-40,12,0.5")] public float StepDb = 0f;
     [Export(PropertyHint.Range, "-40,12,0.5")] public float FluddDb = 0f;
-    [Export(PropertyHint.Range, "1,60,0.5")] public float MaxDistance = 40f;
     [Export] public bool DebugPrint = false;
+
+    [ExportGroup("Camera distance")]
+    /// <summary>Off (154b, Jaysonn: "for mario we dont want that"): Mario's sounds play flat -- no panning, no falloff, wherever the camera is
+    /// (the fixed camera of King Boo's room is 30 m off). On: positional players with Godot's panning and the GAME's distance volume
+    /// (JAISound::setDistanceVolumeCommon: full within FullVolumeUnits of the camera, a straight fade to silence at SilentUnits; the voices'
+    /// curve 2 stretches the fade 4x -- they all but never fade), and never a low-pass (the game has none).</summary>
+    [Export] public bool Positional = false;
+    [Export(PropertyHint.Range, "100,5000,10")] public float FullVolumeUnits = 1000f;    // JAIGlobalParameter::maxVolumeDistance
+    [Export(PropertyHint.Range, "1000,20000,10")] public float SilentUnits = 5000f;     // JAIGlobalParameter::distanceMax (minDistanceVolume 0)
 
     [ExportGroup("Pieces")]
     [Export] public bool AnimSounds = true;
@@ -52,14 +61,45 @@ public partial class SmsMarioSound : Node3D
     public bool LoopPlaying(string name) => _loops.TryGetValue(name, out var p) && p.Playing;
     public string CurrentClip => _clip;
     public float CurrentFrame => _frame;
+    /// <summary>The camera-distance volume in force (dB; 0 when not Positional), for the drive.</summary>
+    public float DistanceDb { get; private set; }
+    public float VoiceDistanceDb { get; private set; }
+
+    /// <summary>One channel: a flat AudioStreamPlayer, or (Positional) an AudioStreamPlayer3D with Godot's own falloff and low-pass OFF -- the
+    /// node applies the game's distance curve to its volume itself.</summary>
+    private sealed class Chan
+    {
+        public readonly AudioStreamPlayer P2; public readonly AudioStreamPlayer3D P3;
+        public float BaseDb; public readonly bool IsVoice;
+        public Chan(Node parent, string name, bool positional, bool voice)
+        {
+            IsVoice = voice;
+            if (positional)
+            {
+                P3 = new AudioStreamPlayer3D { Name = name, Bus = "Master", MaxPolyphony = 1, AttenuationModel = AudioStreamPlayer3D.AttenuationModelEnum.Disabled, AttenuationFilterDb = 0f, MaxDistance = 0f };
+                parent.AddChild(P3);
+            }
+            else { P2 = new AudioStreamPlayer { Name = name, Bus = "Master", MaxPolyphony = 1 }; parent.AddChild(P2); }
+        }
+        public bool Playing => P3 != null ? P3.Playing : P2.Playing;
+        public void Stop() { if (P3 != null) P3.Stop(); else P2.Stop(); }
+        public void Play(AudioStream s, float db, float pitch, float distDb)
+        {
+            BaseDb = db;
+            if (P3 != null) { P3.Stream = s; P3.VolumeDb = db + distDb; P3.PitchScale = pitch; P3.Play(); }
+            else { P2.Stream = s; P2.VolumeDb = db; P2.PitchScale = pitch; P2.Play(); }
+        }
+        public void SetDb(float db, float distDb) { BaseDb = db; if (P3 != null) P3.VolumeDb = db + distDb; else P2.VolumeDb = db; }
+        public void ApplyDistance(float distDb) { if (P3 != null) P3.VolumeDb = BaseDb + distDb; }
+    }
 
     private Mario _mario;
     private AnimationTree _tree;
     private AnimationPlayer _ap;
-    private AudioStreamPlayer3D _voice;
-    private readonly AudioStreamPlayer3D[] _se = new AudioStreamPlayer3D[6];
+    private Chan _voice;
+    private readonly Chan[] _se = new Chan[6];
     private int _seNext;
-    private readonly Dictionary<string, AudioStreamPlayer3D> _loops = new();
+    private readonly Dictionary<string, Chan> _loops = new();
     private readonly Dictionary<string, AudioStream> _streams = new();
     private readonly HashSet<string> _missing = new();
     private readonly Random _rng = new();
@@ -76,17 +116,32 @@ public partial class SmsMarioSound : Node3D
         _mario = GetParent<Mario>();
         _tree = _mario.GetNodeOrNull<AnimationTree>("AnimationTree");
         _ap = _mario.GetNodeOrNull<AnimationPlayer>("AnimationPlayer");
-        _voice = MakePlayer("Voice");
-        for (int i = 0; i < _se.Length; i++) _se[i] = MakePlayer($"Se{i}");
+        _voice = new Chan(this, "Voice", Positional, true);
+        for (int i = 0; i < _se.Length; i++) _se[i] = new Chan(this, $"Se{i}", Positional, false);
         if (OS.GetEnvironment("SMS_SFX_SMOKE") == "1") SmsSoundDriveHook();
     }
-    private AudioStreamPlayer3D MakePlayer(string name)
-    {
-        var p = new AudioStreamPlayer3D { Name = name, MaxDistance = MaxDistance, AttenuationModel = AudioStreamPlayer3D.AttenuationModelEnum.InverseDistance, UnitSize = 10f, Bus = "Master", MaxPolyphony = 1 };
-        AddChild(p);
-        return p;
-    }
     partial void SmsSoundDriveHook();
+
+    /// <summary>JAISound::setDistanceVolumeCommon, curve 0 for the effects and 2 for the voices (the fade's range x 4): the volume factor at
+    /// the camera's distance from Mario, as dB. Only when Positional; 0 otherwise.</summary>
+    private void DistanceTick()
+    {
+        if (!Positional) { DistanceDb = 0f; VoiceDistanceDb = 0f; return; }
+        var cam = GetViewport()?.GetCamera3D();
+        if (cam == null || _mario == null) { DistanceDb = 0f; VoiceDistanceDb = 0f; return; }
+        float d = (cam.GlobalPosition - _mario.GlobalPosition).Length() * SmsUnits.UnitsPerMetre;
+        DistanceDb = CurveDb(d, 1f); VoiceDistanceDb = CurveDb(d, 4f);
+        foreach (var c in _se) c.ApplyDistance(DistanceDb);
+        foreach (var c in _loops.Values) c.ApplyDistance(DistanceDb);
+        _voice.ApplyDistance(VoiceDistanceDb);
+    }
+    private float CurveDb(float distUnits, float rangeScale)
+    {
+        if (distUnits < FullVolumeUnits) return 0f;
+        float over = distUnits - FullVolumeUnits, range = Mathf.Max(1f, SilentUnits - FullVolumeUnits) * rangeScale;
+        float f = over < range ? 1f - over / range : 0f;
+        return f > 0.0001f ? Mathf.LinearToDb(f) : -80f;
+    }
 
     // ------------------------------------------------------------------------------------------------------------------------------ the files
     private AudioStream Stream(string se)
@@ -117,10 +172,10 @@ public partial class SmsMarioSound : Node3D
     {
         if (!SoundOn) return;
         var s = Stream(se); if (s == null) return;
-        AudioStreamPlayer3D p = null;
+        Chan p = null;
         for (int i = 0; i < _se.Length; i++) { var c = _se[(_seNext + i) % _se.Length]; if (!c.Playing) { p = c; _seNext = (_seNext + i + 1) % _se.Length; break; } }
         if (p == null) { p = _se[_seNext]; _seNext = (_seNext + 1) % _se.Length; }
-        p.Stream = s; p.VolumeDb = MasterDb + SeDb(se) + extraDb; p.PitchScale = pitch; p.Play();
+        p.Play(s, MasterDb + SeDb(se) + extraDb, pitch, DistanceDb);
         Log(se);
     }
     /// <summary>The voice channel: the game's startMarioVoice -- one voice at a time, a new one replaces the old.</summary>
@@ -128,7 +183,7 @@ public partial class SmsMarioSound : Node3D
     {
         if (!SoundOn) return;
         var s = Stream(se); if (s == null) return;
-        _voice.Stop(); _voice.Stream = s; _voice.VolumeDb = MasterDb + VoiceDb + SeDb(se); _voice.Play();
+        _voice.Stop(); _voice.Play(s, MasterDb + VoiceDb + SeDb(se), 1f, VoiceDistanceDb);
         LastVoice = se; Log("voice " + se);
     }
     public void StopVoice(string why = "")
@@ -140,7 +195,7 @@ public partial class SmsMarioSound : Node3D
     {
         if (!_loops.TryGetValue(se, out var p))
         {
-            p = MakePlayer("Loop_" + se); _loops[se] = p;
+            p = new Chan(this, "Loop_" + se, Positional, false); _loops[se] = p;
         }
         if (!on || !SoundOn)
         {
@@ -148,8 +203,8 @@ public partial class SmsMarioSound : Node3D
             return;
         }
         var s = Stream(se); if (s == null) return;
-        p.VolumeDb = MasterDb + SeDb(se) + db;
-        if (!p.Playing) { p.Stream = s; p.Play(); Log("loop " + se); }
+        if (!p.Playing) { p.Play(s, MasterDb + SeDb(se) + db, 1f, DistanceDb); Log("loop " + se); }
+        else p.SetDb(MasterDb + SeDb(se) + db, DistanceDb);
     }
 
     // ------------------------------------------------------------------------------------------------------------------------------ the tick
@@ -160,6 +215,7 @@ public partial class SmsMarioSound : Node3D
         var st = _mario.stateOfMario;
         bool onFloor = _mario.IsOnFloor();
         if (_first) { _prev = st; _prevOnFloor = onFloor; _first = false; }
+        DistanceTick();
         if (AnimSounds) AnimTick();
         StateTick(st, onFloor);
         if (FluddSounds) FluddTick(st);
