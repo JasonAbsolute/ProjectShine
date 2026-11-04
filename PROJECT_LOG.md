@@ -11217,3 +11217,78 @@ Files: `assets/Sms/Sound/SmsMarioSound.cs` (the dive voice, the wall thud, the t
 Knob added: WallHitSounds (Deviations).
 Not in this pass: the belly slide's wall bounce (MarioRun.cpp 1126, the same getWallSound on a ground slide into a wall -- the port's slide stops
 instead), the soft-wall material (every wall here is "common"), a menu slider, the coins' and items' sounds, the music.
+
+### 155 -- King Boo's fight sounds (the actors' sound node), the slow slide's silent flip, the sequencer's held notes (feature/sounds, code `6649ed9`)
+
+**Jaysonn:** "ok doo all the sound effects for the king boo fight also." / "also when mario slow belly slides and doesnt roll out but get up from dive is
+missing its little flip sound effect".
+
+**The node: `assets/Sms/Sound/SmsActorSound.cs`.** One node under an actor, attached from its _Ready (`SmsSmallEnemy` for every species the tables
+know -- one line in the base class; the slot machine's and the discs' scripts by a line each), doing the three things the game does for an actor:
+1. **Its animation sound tables.** The species' bas files (JAIAnimeSoundData, from `delfinoBoss.szs` `btelesa/bas/` and `casino1.szs` `telesa/bas/`,
+   decoded by `tools/projectshine/sound154/bas_dump155.py` into `SmsActorSoundTable.cs`, keyed "actor/clip"), fired as the bck passes each frame,
+   read off `SmsSmallEnemy.BckName` / `BckFrameNow` every tick (MAnmSound::animeLoop). Flags 0x11 / 0x12 pair a HELD sound between two frames
+   (JAIAnimation's loop start / end): King Boo's damage clip laughs f49.5-157, his wet clip f0-41. A clip change stops the held ones.
+2. **Its script's sound slots.** The exported `AudioStreamPlayer3D` fields Jaysonn's scripts already play at the game's moments, filled by field name
+   with the baked WAVs when empty (`Fill`); a slot set in the inspector is kept. (The players hang under the sound node: a parent cannot take
+   children inside its own _Ready -- 154d's lesson.)
+3. **Its continuous sounds.** What the game restarts every frame while a state holds (startSoundActor each tick), as loops keyed on the actor's state
+   (`StateTick`).
+Every channel is an AudioStreamPlayer3D on the actor (Godot pans it) with Godot's falloff and low-pass OFF and the GAME's distance curve applied by the
+node (JAISound::setDistanceVolumeCommon: full within 1000 u of the camera, a straight fade to silence at 5000 u): King Boo at the fixed camera's
+30 m sits about 3 dB under Mario, as in the game, never muffled. All on the Sfx bus. Knobs (static, one setting for every actor): `Enabled`,
+`Positional` (off = flat like Mario), `FullVolumeUnits`, `SilentUnits`, `MasterDb`, `DebugPrint`. The node logs its plays and the slots' starts
+(`PlayLog`) for the drives.
+
+**King Boo** (bosstelesa.cpp, btelesa's eight bas files): tables -- appear f0 V_APPEAR; bero_hit f15 SPICY_HIT (the pepper on his tongue); damage f0
+DAMAGE + DAMAGE_SYMBL, V_LAUGH1 held f49-157 at pitch 1.1; lick f47 LICK; roll f0 V_ROLL, f49 WANWAN_REBURN1 (pitch 1.2); spicy f1 BREATHE (0.88);
+wet V_LAUGH2 held f0-41. Slots -- LaughSound V_LAUGH1 (the port's laugh at the laugh clip; the game's bck 6 has no table -- a deviation kept),
+FruitHitSound FRUIT_HIT (a fruit on the body, not spicy), DownSound DOWN (0 HP), DisappearSound DISAPPEAR / EscapeSound ESCAPE (the hide, not spicy /
+spicy), ThankYouSound THANKYOU (hosed while he waits), LandSound SLT_LAND (the game checks frame 78 of the 59-frame appear clip -- dead code there,
+dead here too), Fanfare1 / 2 / 3 FANFALE_1 / 2 / 3 (three fruit / three coins / else). FireSound stays EMPTY: the FIRE is a loop through the spicy
+clip (calcRootMatrix restarts it every frame), run by the node; BossMusic stays for the music pass. Loops -- RLT_MOVE1 / 2 / 3 by how many discs
+roll (perform: getRollingRouletteNum every frame; the discs the boss found, `RouletteAt`), the intro's RLT_DOWN rumble and V_LAUGH1B laugh while the
+disc sinks with Mario (rouletteFall, IntroPhase 1), and RLT_SET at the DETACH -- the real one now: since 153l `DisappearSound` stood in there, and
+with the slot filled it would have played the hide's sound; `SmsBossTelesa.cs`'s two lines play RLT_SET through the node. **The slot machine**
+(`SmsTelesaSlot`): StopSound SLT_STOP per drum; OBJ_SLOT_SPIN looping while a drum rolls (calcRootMatrix every other frame) -- SpinSound stays empty,
+the node loops it. **The discs** (`SmsRoulette`): StopSound RLT_STOP.
+
+**The Boo attackers** (telesa.cpp, telesa's three bas files): tables -- down f0 EN_TELESA_FIX, clush f0 EN_COMMON_BOYOYON at pitch 0.6 (the box
+Boo's flinch). Slots -- FixSound EN_TELESA_FIX (the box Boo into its block), RecoverSound EN_TELSA_RECOVER, AppearSound EN_TELESA_APPEAR,
+DisappearSound EN_TELESA_DISAPPEAR, HitSound EN_COMMON_W_HIT_OK (TSmallEnemy::receiveMessage SPRAYED_BY_WATER's common water hit, a sound set).
+DownSound / CrushSound stay empty (their tables play those moments); WaitSound too: **EN_TELESA_FLY**, the hover hum (telesa_wait f0; King Boo's
+wait f0 at pitch 0.64 and spicy f12), is bank 0 program 0xF7 -- JASBankMgr::noteOn hands programs 0xF0+ to noteOnOsc: a DSP OSCILLATOR voice (the
+ucode's 64-sample "const pattern 0", Dolphin's SRC_CONST_PATTERN_0, a 5-note wobble at 87..110 Hz), not a wave the baker renders. The Boos' hover
+stays silent for now; the pattern lives in the game's DSP init data if it is ever wanted.
+
+**The sequencer fix (sms_audio.py).** A gate note (voice 0) with duration 0 is `wait(-1)`: TTrack::mainProc holds the track at checkNoteStop(0)
+until the note has ENDED -- a one-shot wave plays out and the sequence goes on; a looping wave never ends, so the track holds until the stop
+interrupt. 154's interpreter went straight on past such a note: King Boo's FIRE, SLT_SPIN, RLT_DOWN and RLT_MOVE1-3 never baked ("no wait in 20000
+steps": a gate note + a jmp to itself), and five of Mario's sounds -- PO_HAND_OFF, PO_NOZZLE_OFF, PO_DOWN_OFF, SY_SELECT_POMP, SY_SELECT_POMP_BACK
+-- had their later notes stacked on the first instead of after it. `Resolver.note_ticks` gives the note's length (FOREVER for a looping wave); the
+whole set re-baked, those five re-shipped.
+
+**The flip (Jaysonn's slow slide).** A on a slow belly slide is the game's CATCH_STOP -- the `ma_roll` flip (Mario.cs 3548: `bellyRollout`), whose
+table has MA_ROLL_C at frame 0. 154's AnimTick skipped every entry before the frame a new clip was first SEEN at (a tick or two in, 0.5..2 bck
+frames), so no clip's frame-0 sound ever fired: the flip's whoosh, the triple jump's (ma_roll by alias), ma_jump's push-off step (which fired only
+when the clip happened to be caught at exactly 0). Now a clip first seen within `ClipStartFrames` (6) of its start fires its entries up to there
+(the game's setAnimation starts the clip and its sound cursor at 0; MAnmSound::initAnmSound); a clip joined mid-way (the gait blend's run1 <-> run2
+swap) still skips its past. The slide that stops on its own is CATCH_LOST / `ma_lost` (`gettingUpFromSliding`): the game's table has two footsteps
+at f40 / f48 and no flip sound -- as here. **The tables' per-entry PITCH** now applies (JAIAnimation's setSpeedModifySound: 119 of Mario's entries
+are not 1.0 -- the double jump's steps at 1.11 / 1.20, the rope roll at 1.32, the Boo's flinch boing at 0.6).
+
+**Bakes:** 39 under `assets/Sms/Sound/Enemy/` (the table's `Folder` says where each sound lives; `merge_side.py` folds a side bake into the set).
+356 WAVs in all.
+
+**Drive 155: 11 / 11 -- C1 the nodes on King Boo, his slot machine, the three discs (and a Boo); C2 his ten slots filled, in the tree, on Sfx, Godot's falloff
+off, FireSound / BossMusic left; C3 SLT_STOP on the slot, RLT_STOP on the discs; C4 V_APPEAR at the appear clip's f0; C5 the tongue sprayed (the
+drive calls the TonguePart's SmsSprayedByWater) -> SlotStart: V_ROLL f0 + WANWAN_REBURN1 f49; C6 OBJ_SLOT_SPIN on while the drums roll, off at the
+last stop, SLT_STOP per stop (two on one tick = one sound, as the game's same-id start); C7 the fanfare; C8 the intro's RLT_DOWN + V_LAUGH1B loops,
+off as the disc seats, RLT_SET once at the DETACH; C9 the hide's DISAPPEAR with RLT_MOVE3 looping (the port's discs roll through the fight); C10 a
+Boo's node and APPEAR; C11 Mario's ma_jump f0 push-off step + clank on a jump (the clip-start rule). Headless run d (marker v155-4); build 155f 0 errors.**
+Files: `assets/Sms/Sound/SmsActorSound.cs` (new), `SmsActorSoundTable.cs` (new, generated), `SmsMarioSoundTable.cs` (regenerated: Pitch, Folder, 39
+more sounds), `SmsMarioSound.cs` (the clip-start rule, the pitch, the folder), `Enemy/` 39 WAVs (+ .import), `Mario/` 5 WAVs re-baked,
+`assets/Sms/Enemy/SmsSmallEnemy.cs` (+1 line), `SmsBossTelesa.cs` (2 lines), `BossTelesa/SmsTelesaSlot.cs` (+1), `BossTelesa/SmsRoulette.cs` (+1).
+Knob added: ClipStartFrames (SmsMarioSound, Deviations); the node's static knobs above.
+Not in this pass: the Boos' hover hum (the DSP oscillator), the Sleepy Boo's snore (EN_DB_TELESA_INHALE / EXHALE, its bas) and EATEN, the other
+species' slots, the fruit / pepper / coin item sounds, the casino BGM and fanfare music (BossMusic), a menu slider.
