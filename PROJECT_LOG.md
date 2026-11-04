@@ -11385,3 +11385,22 @@ MSD_BGM_CHUBOSS -- its script plays / stops it at the appear / finish demos. Kno
 **Drive 155 run g: 13 / 13** -- C12 156 King Boo's BossMusic a 2D player on the Music bus, the 30-s stereo stream looping 15-30 s, playing since his
 first appearance; C2 the eleventh slot a 2D player; C1-C11 as 155b. Headless (marker v156-1); build 0 errors. Open: the stage BGMs (the same
 renderer; Ogg would be wanted first), the Gatekeeper's own sound effects, the Boos' hover hum, a menu SFX / music slider.
+
+### 156b -- King Boo's boss music is the BOSS theme, t_boss.com (feature/sounds, code `65111ac`)
+
+**Jaysonn:** "ok the laugh part is gone and its using the file select music not the boss music."
+
+Right. `bosstelesa.cpp` 2296 and `bosspakkun.cpp` 862 start what the decomp calls `MSD_BGM_MAP_SELECT` -- but the decomp's `BackgroundMusic.hpp`
+numbers that **0x8001000D**, and the game's own name table (`mSound.asn`, which this port's tables follow) calls 0x8001000D **MSD_BGM_BOSS**:
+`sequence.arc`'s `t_boss.com`, 4.2 s + a 95-s loop at tempo 190, 15 tracks -- the boss theme. The asn's MSD_BGM_MAP_SELECT is 0x8001000E,
+`t_select.com`: the FILE SELECT music, which 156 rendered and shipped by the decomp's name. The decomp's enum is shifted one place against the asn
+for every BGM (its DOLPIC is a special 0x80010800 and the rest run one behind); the literal ids it kept agree with the asn (the Gatekeeper's
+0x8001000B = asn CHUBOSS, the Manta's 0x8001002B = asn CHUBOSS_MANTA), so the asn's names are the right ones: the Gatekeeper's MSD_BGM_CHUBOSS stands.
+Lesson for the sound passes: take a BGM from the decomp by its NUMBER, never by the enum's name.
+
+`assets/Sms/Sound/Music/MSD_BGM_BOSS.wav` (99 s stereo, 12.7 MB: the intro + the second rendered cycle, looping from 4.18 s -- `--one-cycle`, since
+two would be 25 MB) replaces MSD_BGM_MAP_SELECT.wav; `SmsActorSound.Fill` for King Boo = MSD_BGM_BOSS; the tables know the new file. The file-select
+render stays under `tools/projectshine/sound154/out156/` should the file select screen ever want it.
+
+**Drive 155 run h: 13 / 13** -- C12 156b King Boo's BossMusic the 98.9-s stereo stream, loop 133806-3165384, on the Music bus, playing since his first
+appearance. Headless (marker v156-2); build 0 errors.
