@@ -11292,3 +11292,51 @@ more sounds), `SmsMarioSound.cs` (the clip-start rule, the pitch, the folder), `
 Knob added: ClipStartFrames (SmsMarioSound, Deviations); the node's static knobs above.
 Not in this pass: the Boos' hover hum (the DSP oscillator), the Sleepy Boo's snore (EN_DB_TELESA_INHALE / EXHALE, its bas) and EATEN, the other
 species' slots, the fruit / pepper / coin item sounds, the casino BGM and fanfare music (BossMusic), a menu slider.
+
+### 155b -- the intro laugh as the game's engine plays it, the baker's envelopes / voice cuts / settled loops, the game's distance values (feature/sounds, code `1ebc9d1`)
+
+**Jaysonn:** "the little laughs are playing too ealry they should play once the elevator lowers and i think they need to be sped up? or higher
+pitched? i think sped up since they play before king boo apears."
+
+**The laugh.** `TBossTelesa::rouletteFall` calls `startSoundActor(MSD_SE_BS_TELESA_V_LAUGH1B)` EVERY FRAME of the disc's descent, next to the
+RLT_DOWN rumble. RLT_DOWN is a level sound (no 0x800 bit in its id: re-calling it each frame keeps it going); V_LAUGH1B is a ONE-SHOT (0x800), and
+for those `JAISeEntry::storeBuffer` finds the one already playing on the actor, `stop(0)`s it (`JAIBasic::releaseSeRegist` -> port 0 := 0 on its
+slot track) and registers a new one, which `MSound::mainLoop` starts at the frame's end (ports 4 := index, 0 := 1). The SE sequence's slot track
+polls that port every tick (96 a second): 0 closes the layer tracks, 1 reopens them from the SE's start. Modelled with the game's timing (30 frames
+a second, 3.2 ticks each: `sim_restart.py`, `bake_perframe.py`), the designed 8-syllable chuckle never gets past its opening 2-tick grace note --
+the laugh sample's first 20-40 ms, quiet breath before the first "heh" (RMS ~700 / 32767 over its first 100 ms; the voiced burst starts at 110 ms).
+The game's output over the descent is that breath restarted 30 times a second, some 30 dB under the rumble: to the ear, the rumble alone. So
+Jaysonn's memory is right -- no laugh on the ride; the laugh he hears is **V_APPEAR**, quicker and higher than the chuckle, as King Boo surfaces
+(the appear clip's table, since 155). 155's looped chuckle was a deviation; gone.
+- `SmsActorSound.IntroLaugh` (static knob): **Game** (default) -- `MSD_SE_BS_TELESA_V_LAUGH1B_ROULETTE`, the per-frame-restarted laugh baked from that
+  run of the SE sequence (a 16-tick loop: the 96 / 30 beat's five-frame pattern), in effect silence under RLT_DOWN; **Chuckle** -- the SE as designed
+  (what 155 played); **Off** -- the rumble alone. The same per-frame call plays V_LAUGH1 while Mario is GAME OVER (the port's LaughSound slot is
+  the laugh clip's, untouched).
+
+**The baker** (`tools/projectshine/sound154/sms_audio.py`): four things the game's driver does that 154's render did not. Every WAV re-baked (357;
+43 audibly changed, listed in `diff155b.txt`).
+1. **Volume envelopes.** A SE's `SimpleADSR` routed over oscillator 0 (`OscRoute 0` -- 50 of the 357 do it, no other mode occurs), else the
+   instrument's own oscillator 0 (the IBNK's TOsc: target, rate, ADS / release tables, width, vertex), run as `JASystem::TOscillator` does: table
+   times in 1/600 s (`dacRate / 80 / 600` updates), modes 0 linear / 1-3 the driver's square, square-root and sample-cell curve tables / 13 jump /
+   14 hold / 15 stop, the release from the level reached at the note-off, the voice over when the release table ends. SLIP swells in over 0.2 s
+   (its ADSR 120 / 100 / 120 / 29000 / 100); FIRE's roar dips to 43 % after 0.3 s (20 / 160 / 500 / 14000 / 200); RLT_DOWN swells over 0.17 s;
+   PO_FRICTION_A / B are quieter and shorter; a plain note's tail is the driver's 10-unit (17 ms) default release instead of 154's 30-ms fade --
+   every one-shot a touch tighter (the kicks, the water entries, the rope rolls; MV02_DAMAGE_MID_03, MV16, MV33_T_01 / 04 lose trailing silence).
+2. **Same-voice cutting.** `TTrack::noteOn` on a voice slot still sounding calls `noteOff` on it first: the laugh's grace note ends under its
+   syllable, each syllable under the next; notes on one (track, voice) never overlap.
+3. **CloseTrack and note-offs.** `CloseTrack` (0xC3) now closes the child as `TTrack::closeTrack` does (every note off, its children with it, its
+   events kept for the render); a held note's note-off is matched by (track, voice) after its note-on -- the old test compared the off's TIME with
+   the voice number and never matched. Bake-neutral for the 357 (no SE closes a layer mid-play); it is what let the per-frame restart be modelled.
+4. **Settled loop regions.** A held, looping note's WAV loop begins only once its envelope has settled (whole wave-loops later if need be) -- else
+   the attack sat inside the loop and the port's looping player pulsed it. RLT_DOWN, RLT_MOVE1-3, SLT_SPIN and FIRE's loop points moved.
+Plus the trailing silence trimmed off one-shots (10 ms past the last audible sample). Tools: `patch_env155b/c/d.py`, `patch_close155b.py`,
+`patch_offs155b.py`, `patch_loopsettle155b.py` (the model), `scan_oscroute.py`, `cmp_rebake.py`, `diff_bakes.py`, `adopt155b.py` (a re-bake into the
+set of record and the ship tree, keeping each sound's folder), `sim_restart.py`, `bake_perframe.py`.
+
+**The distance curve.** `MSound::init` sets `JAIGlobalParameter` maxVolumeDistance 1200 and distanceMax to the largest of `MSHandle::smSeCategory`'s
+per-category distances, 12000 (minDistanceVolume 0). 155 took JAudio's compiled-in defaults, 1000 / 5000 -- a fade more than twice too quick at the
+fixed camera. `FullVolumeUnits` 1200, `SilentUnits` 12000 now (Mario's channels are flat regardless).
+
+**Drive 155 run e: 12 / 12** -- C8 155b the intro's RLT_DOWN rumble and the V_LAUGH1B_ROULETTE flutter loop while the disc sinks, both off as it
+seats, RLT_SET once at the DETACH, the chuckle never; C10 155b the knobs at the game's values; C1-C7, C9-C11 as 155. Headless run (marker v155-5);
+build 0 errors. Not done: the Boos' hover hum (EN_TELESA_FLY, the DSP oscillator voice) as before; a menu SFX slider; the music streams.
