@@ -11122,3 +11122,45 @@ will be positional with this curve.
 **Drive 154: 12 / 12** -- 154's ten and A11 (Positional off: every channel a flat AudioStreamPlayer, the distance volume 0 dB) and A12 (the curve
 exercised directly: 0 dB at 500 u, -6.02 dB at 3000, -80 at 5000; the voices' -1.16 dB at 3000). Headless run i; build 154k 0 errors (the drive
 partial out before the commit). Files: `assets/Sms/Sound/SmsMarioSound.cs`. Tooling: sound154/ship154/.
+
+### 154c -- the sound effects volume, the rollout's voice, the missing Mario sounds, Mario.cs's slots filled (feature/sounds, code `1c0c4ca`)
+
+**Jaysonn on 154b:** "rollout sounds funny. is it the right sound? and also can we have a sound effects slider or make it 50% right now its very
+loud. and do another pass to put in all the mario sound effects i think some are missing".
+
+**The volume.** `default_bus_layout.tres` (new): an `Sfx` bus and a `Music` bus, both sent to Master. Every SmsMarioSound channel and every filled
+slot plays on Sfx; `SfxVolume` (0..1, default 0.5 = -6.02 dB) sets the bus (`SetSfxVolume` / `GetSfxVolume` static, for a menu slider). The bus is
+made at runtime if the layout is missing. The game's own level: the SE sequence's track volume 0x78 / 127 and the mixer under the BGM -- the port's
+0 dB everything was the loud part; 50% is Jaysonn's number.
+
+**The rollout: the right sound, half of it.** The port's belly-slide rollout is the game's move (Mario.cs 3540: `catching()`: fwd > ClashSpeed ->
+ROTATE_BROAD_JUMP = `singleRollout` / `ma_roll_jump`; else CATCH_STOP = `bellyRollout` / `ma_roll`). `ma_roll_jump`'s bas table fires
+MA_ROPE_ROLL_FULL_A at f9 -- the roll sample (w2ndLoad wave 26) at pitch 0.67, the game's own for that animation -- and 154 played it alone;
+`setStatusToJumping(ROTATE_BROAD_JUMP)` adds MV22_JUMP_MID (70% MA_VO_JUMP_MID). Now both; `RollWhoosh` (Deviations) mutes the whoosh.
+
+**The missing, from the game's code:**
+- `bellySlidingFromDive` loops MA_SLIP (catching() starts it every frame; 154 looped it for the slope slip only); `wallSlide` loops SLIP_WALL
+  (wallSlipEffect + SLIP_WALL every frame vy < -10; 154 fired it once).
+- The spin jump: MV24_JUMP_SPECIAL (soundMovement's `isRotJump` rule fires MV24 the frame after setStatusToJumping's MV23 and replaces it) and
+  MA_ROLL_JUMP at the 10th tick (`unk22 == 10`).
+- The hurt by kind (`Mario.SmsDownKindName`): a hit -> WALL_COL_CMN_H (`unk28 == 2`: an actor) + MV03_DAMAGE_LITLE (25% MA_VO_DAMAGE_SMALL); the burn
+  -> MV05_DAMAGE_FIRE; the shock -> MV04_DAMAGE_ELEC; the throw -> MV25A_JUMP_HUGE at its 30th tick (`unk26 == 0x1E`; tired MV42). 154's MV02 for
+  every hurt was the wrong voice.
+- The cap: `SmsWearingCap` on -> off MA_HAT_STOLEN, off -> on MA_TAKE_HAT.
+- The take / put: the tables say TAKE_BARREL for `ma_raise` and `ma_put`; soundMovement picks TAKE_DRIAN / PUT_DRIAN for a fruit (`SmsHoldsFruit`)
+  and PUT_BARREL for the rest.
+- Treading water (`ma_swim_wait`): MA_WATER_WAIT by MSRandPlay's 5..60 frames (10..120 ticks here).
+- The TAKE: `Mario.SmsCarryTo` with a facing (King Boo's ride) calls `SmsMarioSound.OnTaken` -> MV06_DAMAGE_WATER (soundMovement's TAKEN).
+- The port's triple jump plays `ma_demo_gate_out_rolling_get` (no table); the game's ULTRA_JUMP is ANIM_ROLL: a clip alias to `ma_roll`'s ROLL_C.
+- **Mario.cs's own slots** (every one empty since its pass, each documented with its SE): FallCry MV10B_CRY_JUMP_01 (the 2-s fall), FireDamageSound
+  MA_DAMAGE_FIRE, ElectricDamageSound MA_DAMAGE_ELEC, ExertVoice MV15_EXERT_INST_01 (the raise's frame 11, the throw's 4), PumpSqueakIn / Out
+  PO_POMPING1 / 2, FencePunchSound / FenceCatchSound, HpRecover SY_HP_RECOVER, SmsWarpInWipeSound MA_INTO_DOKAN -- `FillMarioSlots` gives each
+  a flat player on Sfx with the baked sound when the slot is empty (a slot set in the inspector is left alone); Mario.cs plays them at the game's
+  moments. MissJingle and ShineGetFanfare are BGM sequences: the music pass. Four more bakes: SY_HP_RECOVER, MA_INTO_DOKAN, EF_LIGHTNING, SY_1UP
+  (314 WAVs).
+
+**Drive 154: 16 / 16** -- 154b's twelve + B1 (the Sfx bus, -6.02 dB, every channel on it, sent to Master), B2 (the ten slots filled, flat, on the
+bus), B3 (the dive's belly slide loops MA_SLIP at 15 m/s), B4 (A on the slide -> singleRollout with MA_VO_JUMP_MID_2). Headless run j; build 154m 0
+errors. Files: `default_bus_layout.tres` (new), `assets/Sms/Sound/SmsMarioSound.cs`, `SmsMarioSoundTable.cs`, `Mario/` +4 WAVs, `assets/Mario.cs`
+(SmsDownKindName, SmsHoldsFruit, the OnTaken hook). Knobs added: SfxVolume (Sounds), FillMarioSlots (Pieces), RollWhoosh (Deviations).
+Not in this pass: a menu slider (SetSfxVolume is its call), the coins' and items' sounds, the music.
