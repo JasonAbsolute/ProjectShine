@@ -22,6 +22,12 @@ public partial class SmsMarioSound : Node3D
 
     [ExportGroup("Sounds")]
     [Export] public bool SoundOn = true;
+    /// <summary>154c: the SOUND EFFECTS volume, 0..1 on the "Sfx" audio bus (default_bus_layout.tres; made at runtime if the layout is missing) --
+    /// every effect of the port plays through it. 0.5 = -6 dB (Jaysonn: "make it 50% right now its very loud"). A menu slider sets it with
+    /// SmsMarioSound.SetSfxVolume(v).</summary>
+    [Export(PropertyHint.Range, "0,1,0.01")] public float SfxVolume { get => _sfxVolume; set { _sfxVolume = value; if (IsInsideTree()) ApplySfxVolume(); } }
+    private float _sfxVolume = 0.5f;
+    public const string SfxBus = "Sfx";
     [Export(PropertyHint.Range, "-40,12,0.5")] public float MasterDb = 0f;
     [Export(PropertyHint.Range, "-40,12,0.5")] public float VoiceDb = 0f;
     [Export(PropertyHint.Range, "-40,12,0.5")] public float StepDb = 0f;
@@ -44,9 +50,15 @@ public partial class SmsMarioSound : Node3D
     [Export] public bool ActionSounds = true;            // hip drop, wall hits, damage, slide, water
     [Export] public bool FluddSounds = true;
     [Export] public bool FluddPackClanks = true;         // PO_FRICTION_A/B/C with the steps while he carries FLUDD (the bas entries of category 0)
+    /// <summary>154c: Mario.cs's own sound slots (FallCry, FireDamageSound, ElectricDamageSound, ExertVoice, PumpSqueakIn / Out, FencePunchSound,
+    /// FenceCatchSound, HpRecover, SmsWarpInWipeSound -- each documented with its game SE and played by Mario.cs at the game's moment) get
+    /// players with the baked sounds when they are empty. A slot you fill yourself in the inspector is left alone.</summary>
+    [Export] public bool FillMarioSlots = true;
 
     [ExportGroup("Deviations")]
     [Export] public FloorKind FloorMaterial = FloorKind.Stone;   // the game: mGroundPlane->mSoundMaterial picks the WALK_* set; here one knob
+    /// <summary>The rollout's whoosh (ma_roll_jump's table: MA_ROPE_ROLL_FULL_A, the game's own for its ROTATE_BROAD_JUMP). Off = the voice alone.</summary>
+    [Export] public bool RollWhoosh = true;
     [Export(PropertyHint.Range, "0,1,0.05")] public float VoiceVariantChance = 1f;   // x the game's 0.3 / 0.7 / 0.5 odds of the MA_VO_ voices over the MV ones
     [Export] public bool TiredVoices = true;             // at 2 HP or less the game swaps the jump voices for the tired MV41 set
 
@@ -76,10 +88,10 @@ public partial class SmsMarioSound : Node3D
             IsVoice = voice;
             if (positional)
             {
-                P3 = new AudioStreamPlayer3D { Name = name, Bus = "Master", MaxPolyphony = 1, AttenuationModel = AudioStreamPlayer3D.AttenuationModelEnum.Disabled, AttenuationFilterDb = 0f, MaxDistance = 0f };
+                P3 = new AudioStreamPlayer3D { Name = name, Bus = SfxBus, MaxPolyphony = 1, AttenuationModel = AudioStreamPlayer3D.AttenuationModelEnum.Disabled, AttenuationFilterDb = 0f, MaxDistance = 0f };
                 parent.AddChild(P3);
             }
-            else { P2 = new AudioStreamPlayer { Name = name, Bus = "Master", MaxPolyphony = 1 }; parent.AddChild(P2); }
+            else { P2 = new AudioStreamPlayer { Name = name, Bus = SfxBus, MaxPolyphony = 1 }; parent.AddChild(P2); }
         }
         public bool Playing => P3 != null ? P3.Playing : P2.Playing;
         public void Stop() { if (P3 != null) P3.Stop(); else P2.Stop(); }
@@ -107,6 +119,10 @@ public partial class SmsMarioSound : Node3D
     private Mario.MarioState _prev; private bool _prevAir, _first = true, _prevOnFloor;
     private int _tick;
     private float _prevVy;
+    private int _stateTicks;                 // ticks in the current state (the spin jump's ROLL_JUMP at 10, the thrown wail at 30)
+    private bool _prevCap = true, _capKnown;  // SmsWearingCap last tick
+    private int _waterWaitIn = -1;           // MSRandPlay's countdown for MA_WATER_WAIT while he treads water
+    public int SlotsFilled { get; private set; }
     // FLUDD
     private bool _prevEmit, _prevHover, _prevDash, _prevCharge, _prevRefill; private int _prevNozzle = -1, _prevWater = -1; private float _prevR, _prevHouse = -1f, _prevSwitch = -1f, _prevSwitchSpeed;
     private int _emptyCooldown;
@@ -116,11 +132,68 @@ public partial class SmsMarioSound : Node3D
         _mario = GetParent<Mario>();
         _tree = _mario.GetNodeOrNull<AnimationTree>("AnimationTree");
         _ap = _mario.GetNodeOrNull<AnimationPlayer>("AnimationPlayer");
+        EnsureSfxBus(); ApplySfxVolume();
         _voice = new Chan(this, "Voice", Positional, true);
         for (int i = 0; i < _se.Length; i++) _se[i] = new Chan(this, $"Se{i}", Positional, false);
+        if (FillMarioSlots) FillSlots();
         if (OS.GetEnvironment("SMS_SFX_SMOKE") == "1") SmsSoundDriveHook();
     }
     partial void SmsSoundDriveHook();
+
+    // ------------------------------------------------------------------------------------------------------------------------------ the Sfx bus
+    /// <summary>The "Sfx" bus: default_bus_layout.tres ships it (with a "Music" bus for later); without the layout it is made here, sent to Master.</summary>
+    public static int EnsureSfxBus()
+    {
+        int idx = AudioServer.GetBusIndex(SfxBus);
+        if (idx >= 0) return idx;
+        AudioServer.AddBus(); idx = AudioServer.BusCount - 1;
+        AudioServer.SetBusName(idx, SfxBus); AudioServer.SetBusSend(idx, "Master");
+        return idx;
+    }
+    /// <summary>The sound effects volume, 0..1 (a menu slider's call): the Sfx bus's volume. Remembered by the node's SfxVolume knob.</summary>
+    public static void SetSfxVolume(float linear)
+    {
+        int idx = EnsureSfxBus();
+        AudioServer.SetBusVolumeDb(idx, linear <= 0.0005f ? -80f : Mathf.LinearToDb(Mathf.Clamp(linear, 0f, 1f)));
+        AudioServer.SetBusMute(idx, linear <= 0.0005f);
+    }
+    public static float GetSfxVolume() { int idx = AudioServer.GetBusIndex(SfxBus); return idx < 0 ? 1f : (AudioServer.IsBusMute(idx) ? 0f : Mathf.DbToLinear(AudioServer.GetBusVolumeDb(idx))); }
+    private void ApplySfxVolume() => SetSfxVolume(_sfxVolume);
+
+    // ------------------------------------------------------------------------------------------------------------------------------ Mario's slots
+    /// <summary>Mario.cs's sound slots, filled with the baked game sounds when empty (their SE ids are the slots' own doc comments). Flat players
+    /// on the Sfx bus; Mario.cs plays them at the game's moments (the 2-s fall's cry, the burn, the shock, the take's and throw's grunt, the empty
+    /// tank's pump squeaks, the fence's punch and catch, the heal, the warp's wipe).</summary>
+    private void FillSlots()
+    {
+        Fill3D(ref _mario.FallCry, "FallCry", "MSD_SE_MV10B_CRY_JUMP_01", VoiceDb);
+        Fill3D(ref _mario.FireDamageSound, "FireDamageSound", "MSD_SE_MA_DAMAGE_FIRE", 0f);
+        Fill3D(ref _mario.ElectricDamageSound, "ElectricDamageSound", "MSD_SE_MA_DAMAGE_ELEC", 0f);
+        Fill3D(ref _mario.ExertVoice, "ExertVoice", "MSD_SE_MV15_EXERT_INST_01", VoiceDb);
+        Fill3D(ref _mario.PumpSqueakIn, "PumpSqueakIn", "MSD_SE_PO_POMPING1", FluddDb);
+        Fill3D(ref _mario.PumpSqueakOut, "PumpSqueakOut", "MSD_SE_PO_POMPING2", FluddDb);
+        Fill3D(ref _mario.FencePunchSound, "FencePunchSound", "MSD_SE_MA_FENCE_PUNCH", 0f);
+        Fill3D(ref _mario.FenceCatchSound, "FenceCatchSound", "MSD_SE_MA_FENCE_CATCH", 0f);
+        Fill2D(ref _mario.HpRecover, "HpRecover", "MSD_SE_SY_HP_RECOVER", 0f);
+        Fill2D(ref _mario.SmsWarpInWipeSound, "SmsWarpInWipeSound", "MSD_SE_MA_INTO_DOKAN", 0f);
+        if (DebugPrint) GD.Print($"[SMS sound] {SlotsFilled} of Mario's sound slots filled");
+    }
+    private void Fill3D(ref AudioStreamPlayer3D slot, string name, string se, float db)
+    {
+        if (slot != null) return;
+        var s = Stream(se); if (s == null) return;
+        slot = new AudioStreamPlayer3D { Name = "Slot_" + name, Bus = SfxBus, MaxPolyphony = 1, AttenuationModel = AudioStreamPlayer3D.AttenuationModelEnum.Disabled, AttenuationFilterDb = 0f, MaxDistance = 0f, Stream = s, VolumeDb = MasterDb + SeDb(se) + db };
+        _mario.AddChild(slot); SlotsFilled++;
+    }
+    private void Fill2D(ref AudioStreamPlayer slot, string name, string se, float db)
+    {
+        if (slot != null) return;
+        var s = Stream(se); if (s == null) return;
+        slot = new AudioStreamPlayer { Name = "Slot_" + name, Bus = SfxBus, MaxPolyphony = 1, Stream = s, VolumeDb = MasterDb + SeDb(se) + db };
+        _mario.AddChild(slot); SlotsFilled++;
+    }
+    /// <summary>The TAKE (Mario.SmsCarryTo with a facing: King Boo's ride, the gates): MARIO_STATUS_TAKEN's voice, MV06_DAMAGE_WATER (soundMovement).</summary>
+    public void OnTaken() { if (JumpVoices) PlayVoice(Pick("MSD_SE_MV06_DAMAGE_WATER_0", 3)); }
 
     /// <summary>JAISound::setDistanceVolumeCommon, curve 0 for the effects and 2 for the voices (the fade's range x 4): the volume factor at
     /// the camera's distance from Mario, as dB. Only when Positional; 0 otherwise.</summary>
@@ -216,11 +289,22 @@ public partial class SmsMarioSound : Node3D
         bool onFloor = _mario.IsOnFloor();
         if (_first) { _prev = st; _prevOnFloor = onFloor; _first = false; }
         DistanceTick();
+        _stateTicks = st == _prev ? _stateTicks + 1 : 0;
         if (AnimSounds) AnimTick();
         StateTick(st, onFloor);
+        if (ActionSounds) CapTick();
         if (FluddSounds) FluddTick(st);
         _prev = st; _prevOnFloor = onFloor; _prevVy = _mario.Velocity.Y;
         SmsSoundDriveTick();
+    }
+    /// <summary>soundMovement's cap: the cap leaving his head -> MA_HAT_STOLEN; back on -> MA_TAKE_HAT.</summary>
+    private void CapTick()
+    {
+        bool cap = _mario.SmsWearingCap;
+        if (!_capKnown) { _prevCap = cap; _capKnown = true; return; }
+        if (_prevCap && !cap) PlaySe("MSD_SE_MA_HAT_STOLEN");
+        else if (!_prevCap && cap) PlaySe("MSD_SE_MA_TAKE_HAT");
+        _prevCap = cap;
     }
     partial void SmsSoundDriveTick();
 
@@ -246,9 +330,13 @@ public partial class SmsMarioSound : Node3D
         if (_ap != null && _ap.IsPlaying()) return (_ap.CurrentAnimation, (float)_ap.CurrentAnimationPosition);
         return ("", 0f);
     }
+    /// <summary>Clips the port plays in another clip's role: their sound tables. The port's triple jump is the gate-out somersault (no table of
+    /// its own); the game's ULTRA_JUMP is ANIM_ROLL (jumpingBasic(ULTRA_JUMP_SLIP, ANIM_ROLL)): its ROLL_C whoosh.</summary>
+    private static readonly Dictionary<string, string> ClipAlias = new() { ["ma_demo_gate_out_rolling_get"] = "ma_roll" };
     private void AnimTick()
     {
         var (clip, pos) = Current();
+        if (ClipAlias.TryGetValue(clip, out var alias)) clip = alias;
         float frame = pos * SmsMarioSoundTable.BckFps;
         if (clip != _clip)
         {
@@ -279,7 +367,14 @@ public partial class SmsMarioSound : Node3D
             return;
         }
         if (se.StartsWith("MSD_SE_MA_WALK_STONE_")) se = Footstep(se);
+        if (se == "MSD_SE_MA_TAKE_BARREL")
+        {
+            // the tables say TAKE_BARREL for every pick-up and put-down; soundMovement's TAKE / PUTTING pick the fruit's DRIAN sounds by the held type
+            bool fruit = _mario.SmsHoldsFruit;
+            se = _clip == "ma_put" ? (fruit ? "MSD_SE_MA_PUT_DRIAN" : "MSD_SE_MA_PUT_BARREL") : (fruit ? "MSD_SE_MA_TAKE_DRIAN" : "MSD_SE_MA_TAKE_BARREL");
+        }
         if (se.StartsWith("MSD_SE_MV") || se.StartsWith("MSD_SE_MA_VO_")) { if (JumpVoices) PlayVoice(se); return; }
+        if (!RollWhoosh && se.StartsWith("MSD_SE_MA_ROLL") && _clip == "ma_roll_jump") return;
         float db = Mathf.LinearToDb(Mathf.Max(0.05f, e.Volume / 127f));
         if (se.Contains("_WALK_")) db += StepDb;
         PlaySe(se, db);
@@ -310,7 +405,7 @@ public partial class SmsMarioSound : Node3D
         or Mario.MarioState.backFlip or Mario.MarioState.sideFlip or Mario.MarioState.wallJump or Mario.MarioState.SpinJump or Mario.MarioState.ledgeFall
         or Mario.MarioState.stomping or Mario.MarioState.fluddRocket or Mario.MarioState.diving or Mario.MarioState.singleJumpDive
         or Mario.MarioState.doubleJumpDive or Mario.MarioState.tripleJumpDive or Mario.MarioState.groundPoundFalling or Mario.MarioState.groundPoundStartup
-        or Mario.MarioState.wallSlide or Mario.MarioState.hurt;
+        or Mario.MarioState.wallSlide or Mario.MarioState.hurt or Mario.MarioState.singleRollout or Mario.MarioState.bellyRollout;
     private static bool IsLanding(Mario.MarioState s) => s is Mario.MarioState.landing or Mario.MarioState.singleJumpLanding or Mario.MarioState.doubleJumpLanding
         or Mario.MarioState.tripleJumpLanding or Mario.MarioState.idle or Mario.MarioState.walking or Mario.MarioState.running or Mario.MarioState.sprinting
         or Mario.MarioState.crouch or Mario.MarioState.bellySlidingFromDive or Mario.MarioState.singleRollout or Mario.MarioState.bellyRollout or Mario.MarioState.rolloutRun;
@@ -329,7 +424,8 @@ public partial class SmsMarioSound : Node3D
                 case Mario.MarioState.backFlip: Voice(VoiceKind.Large); break;          // BACK_JUMP -> MV23
                 case Mario.MarioState.sideFlip: Voice(VoiceKind.Large); break;          // U_TURN_JUMP -> MV23
                 case Mario.MarioState.wallJump: Voice(VoiceKind.Mid); break;            // WALL_JUMP -> MV22
-                case Mario.MarioState.SpinJump: Voice(VoiceKind.Large); break;          // ROTATE_JUMP -> MV23 (ROLL_JUMP's SE is in ma_jump_rolling's table)
+                case Mario.MarioState.SpinJump: Voice(VoiceKind.Special); break;        // ROTATE_JUMP: setStatusToJumping's MV23, then soundMovement's MV24 the same frame -- MV24 is what plays
+                case Mario.MarioState.singleRollout: Voice(VoiceKind.Mid); break;       // the belly slide's A at speed = ROTATE_BROAD_JUMP (ma_roll_jump) -> MV22; ma_roll_jump's table adds the roll's whoosh
                 case Mario.MarioState.stomping: Voice(VoiceKind.Small); break;          // TRAMPLE -> MV21 / 22 / 23 by the step
                 case Mario.MarioState.fluddRocket:
                     {
@@ -352,8 +448,20 @@ public partial class SmsMarioSound : Node3D
                     if (JumpVoices) PlayVoice(_rng.NextDouble() < 0.25 ? "MSD_SE_MA_VO_DAMAGE_SMALL" : Pick("MSD_SE_MV03_DAMAGE_LITLE_0", 4));
                     break;
                 case Mario.MarioState.hurt:
-                    if (JumpVoices) PlayVoice(_rng.NextDouble() < 0.25 ? "MSD_SE_MA_VO_DAMAGE_SMALL" : Pick("MSD_SE_MV02_DAMAGE_MID_0", 4));
-                    break;
+                    {
+                        // soundMovement's down: an actor's hit -> WALL_COL_CMN_H and MV03 (25% the VO grunt); the burn's MV05 and the shock's MV04
+                        // (Mario.cs's own slots play MA_DAMAGE_FIRE / MA_DAMAGE_ELEC); the throw's wail comes 30 ticks in (Held)
+                        string kind = _mario.SmsDownKindName;
+                        if (kind == "Fire") { if (JumpVoices) PlayVoice(Pick("MSD_SE_MV05_DAMAGE_FIRE_0", 2)); }
+                        else if (kind == "Electric") { if (JumpVoices) PlayVoice(Pick("MSD_SE_MV04_DAMAGE_ELEC_0", 2)); }
+                        else if (kind == "Thrown" || kind == "ThrownEnd" || kind == "FireEnd") { }
+                        else
+                        {
+                            PlaySe("MSD_SE_MA_WALL_COL_CMN_H");
+                            if (JumpVoices) PlayVoice(_rng.NextDouble() < 0.25 ? "MSD_SE_MA_VO_DAMAGE_SMALL" : Pick("MSD_SE_MV03_DAMAGE_LITLE_0", 4));
+                        }
+                        break;
+                    }
                 case Mario.MarioState.dead:
                     if (JumpVoices) PlayVoice(_rng.NextDouble() < 0.15 ? "MSD_SE_MA_VO_DEAD" : Pick("MSD_SE_MV08A_DOWN_0", 3));
                     break;
@@ -361,21 +469,33 @@ public partial class SmsMarioSound : Node3D
                     if (IsAir(_prev) || _prev == Mario.MarioState.ledgeFall || !_prevOnFloor)
                         PlaySe(_prevVy < -12f ? "MSD_SE_MA_FALL_IN_WATER_DEP" : "MSD_SE_MA_FALL_IN_WATER_SLW");                         // the fall into water, by how hard
                     break;
-                case Mario.MarioState.wallSlide:
-                    PlaySe("MSD_SE_MA_SLIP_WALL"); break;
             }
             if (_prev == Mario.MarioState.swimming && (st == Mario.MarioState.singleJump || st == Mario.MarioState.doubleJump))
                 PlaySe("MSD_SE_MA_JUMP_FR_WATER_SLW");
-            if (_prev == Mario.MarioState.slipping) Loop("MSD_SE_MA_SLIP", false);
+            Held(st);
         }
         // the landing: soundMovement case 1 -- stopVoice() unless the touch-down was a trample
         if (LandingCutsVoice && IsAir(_prev) && _prev != Mario.MarioState.stomping && IsLanding(st) && st != Mario.MarioState.groundPoundLanding)
             StopVoice("landed");
     }
+    /// <summary>Every tick's continuous sounds and timed ones: the slides' MA_SLIP (slippingBasic / catching: the slope slip and the dive's belly
+    /// slide), the wall slide's SLIP_WALL (wallSlipEffect every frame the slide falls), the spin jump's ROLL_JUMP at its 10th tick, the throw's
+    /// MV25A wail at its 30th, the water wait's MSRandPlay (5..60 frames apart) while he treads water.</summary>
     private void Held(Mario.MarioState st)
     {
         if (!ActionSounds) return;
-        Loop("MSD_SE_MA_SLIP", st == Mario.MarioState.slipping);
+        Loop("MSD_SE_MA_SLIP", st == Mario.MarioState.slipping || st == Mario.MarioState.bellySlidingFromDive);
+        Loop("MSD_SE_MA_SLIP_WALL", st == Mario.MarioState.wallSlide);
+        if (st == Mario.MarioState.SpinJump && _stateTicks == 10) PlaySe("MSD_SE_MA_ROLL_JUMP");
+        if (st == Mario.MarioState.hurt && _stateTicks == 30 && _mario.SmsDownKindName == "Thrown" && JumpVoices)
+            PlayVoice(Tired() ? Pick("MSD_SE_MV42_JUMP_HUGE_T_0", 2) : Pick("MSD_SE_MV25A_JUMP_HUGE_0", 2));
+        bool treading = st == Mario.MarioState.swimming && _clip == "ma_swim_wait";
+        if (treading)
+        {
+            if (_waterWaitIn < 0) _waterWaitIn = 10 + _rng.Next(111);
+            else if (--_waterWaitIn == 0) { PlaySe("MSD_SE_MA_WATER_WAIT"); _waterWaitIn = 10 + _rng.Next(111); }
+        }
+        else _waterWaitIn = -1;
     }
 
     private enum VoiceKind { Small, Mid, Large, Special }

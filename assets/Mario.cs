@@ -17299,6 +17299,10 @@ public partial class Mario : CharacterBody3D
         { HasFludd = has; Emitting = emitting; Dashing = dashing; Nozzle = nozzle; Water = water; WaterMax = waterMax; TrigState = trig; R = r; Strength = strength; Switch = sw; SwitchSpeed = swSpeed; Stow = stow; }
     }
     public SmsFluddProbe SmsFluddSound => new SmsFluddProbe(_fluddReady, _fluddEmitting, _fluddDashing, (int)_fluddNozzle, _fluddWater, SmsFluddCurrent.AmountMax, _fluddTrigState, _fluddR, _fluddSprayStrength, _fluddSwitch, _fluddSwitchSpeed, _fluddStow);
+    /// <summary>154c, for the sounds: the down in force (Knockdown / Fire / FireEnd / Electric / Thrown / ThrownEnd -- the game's MV03 / MV05 / MV04 /
+    /// MV25A voices go by it) and whether the body in his hands, or on its way there, is a fruit (TAKE_DRIAN / PUT_DRIAN against the barrel's).</summary>
+    public string SmsDownKindName => _smsDownKind.ToString();
+    public bool SmsHoldsFruit => (heldBody ?? pendingPickup) is Fruit;
     /// <summary>TMario::incHP (MarioCollision.cpp 25): under water (isUnderWater(): head below the surface less CanBreathDepth) the
     /// heal goes to the AIR, capped at mMaxAir -- a coin taken while submerged refills a unit of air and the meter steps back up --
     /// otherwise to the health, capped at HPMax; MSD_SE_SY_HP_RECOVER either way when it was not already full (pass 47).</summary>
@@ -17554,6 +17558,7 @@ public partial class Mario : CharacterBody3D
                 if (armature != null) armature.Rotation = armature.Rotation with { Y = BaseYawFromDir(f) };
             }
             stateOfMario = MarioState.idle; SetMarioState(MarioState.idle);   // the TAKE's moment: standing (the lock freezes the state machine, and a teleport off a ride left it in ledgeFall)
+            GetNodeOrNull<SmsMarioSound>("SmsSound")?.OnTaken();   // 154c: MARIO_STATUS_TAKEN's voice (soundMovement: MV06_DAMAGE_WATER)
         }
     }
 

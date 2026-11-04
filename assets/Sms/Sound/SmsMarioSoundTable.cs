@@ -144,6 +144,7 @@ public static class SmsMarioSoundTable
     };
     public static readonly Dictionary<string, SeInfo> Sounds = new()
     {
+        ["MSD_SE_EF_LIGHTNING"] = new SeInfo(110, 128, false, true, 3.259f),
         ["MSD_SE_MA_BELT"] = new SeInfo(120, 100, false, true, 0.54f),
         ["MSD_SE_MA_BOTTLE_WIND"] = new SeInfo(120, 176, false, true, 1.494f),
         ["MSD_SE_MA_BOUND"] = new SeInfo(120, 176, false, true, 0.443f),
@@ -160,6 +161,7 @@ public static class SmsMarioSoundTable
         ["MSD_SE_MA_HAT_STOLEN"] = new SeInfo(127, 160, false, true, 0.593f),
         ["MSD_SE_MA_HIP_ATTACK"] = new SeInfo(115, 128, false, true, 1.019f),
         ["MSD_SE_MA_INTO_BOTTLE"] = new SeInfo(120, 176, false, true, 1.783f),
+        ["MSD_SE_MA_INTO_DOKAN"] = new SeInfo(77, 176, false, true, 1.658f),
         ["MSD_SE_MA_JUMP_FR_WATER_DEP"] = new SeInfo(100, 128, false, true, 2.131f),
         ["MSD_SE_MA_JUMP_FR_WATER_SLW"] = new SeInfo(127, 128, false, true, 1.021f),
         ["MSD_SE_MA_KICK_ENEMY"] = new SeInfo(70, 128, false, true, 0.606f),
@@ -450,6 +452,8 @@ public static class SmsMarioSoundTable
         ["MSD_SE_PO_WFLOWER_EXPLOSION"] = new SeInfo(120, 112, false, true, 1.427f),
         ["MSD_SE_PO_WFLOWER_RISE_UP"] = new SeInfo(120, 112, false, false, 2.243f),
         ["MSD_SE_PO_WT_DRY_UP"] = new SeInfo(35, 64, false, true, 1.165f),
+        ["MSD_SE_SY_1UP"] = new SeInfo(118, 239, false, true, 1.009f),
+        ["MSD_SE_SY_HP_RECOVER"] = new SeInfo(100, 208, false, true, 0.621f),
         ["MSD_SE_SY_NEWP_AIR_TAME"] = new SeInfo(90, 208, true, false, 3.219f),
         ["MSD_SE_SY_SELECT_POMP"] = new SeInfo(85, 240, false, true, 0.499f),
         ["MSD_SE_SY_SELECT_POMP_BACK"] = new SeInfo(85, 240, false, true, 0.507f),
