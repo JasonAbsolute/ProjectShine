@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://d157arena"]
+[gd_scene load_steps=9 format=3 uid="uid://d157arena"]
 
 [ext_resource type="Script" uid="uid://3aw1w481iqnu" path="res://assets/Level.cs" id="1_level"]
 [ext_resource type="PackedScene" path="res://assets/Mario.tscn" id="2_mario"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" path="res://models/Sms/Rematch/polta_planet.glb" id="4_planet"]
 [ext_resource type="PackedScene" uid="uid://d157kingboo" path="res://assets/Sms/Rematch/KingBooRematch.tscn" id="5_boo"]
 [ext_resource type="Script" path="res://assets/Sms/Rematch/SmsRematchIntro.cs" id="6_intro"]
+[ext_resource type="Script" path="res://assets/Sms/Rematch/SmsBombBooSpawner.cs" id="7_supply"]
 
 [sub_resource type="Environment" id="Environment_arena"]
 resource_name = "the rematch arena's night: a near-black violet sky, a cold dim ambient, a thin violet fog"
@@ -25,7 +26,7 @@ ShowGoText = false
 HasFludd = false
 StageName = "Casino Delfino"
 ScenarioName = "King Boo's Rematch"
-metadata/_sms_note = "Pass 157: the KING BOO REMATCH arena (KINGBOO_REMATCH_gdoc.txt) -- Bouldergeist's planet from Super Mario Galaxy (Arena: models/Sms/Rematch/polta_planet.glb, the collision built from it at start), no FLUDD (the Level's HasFludd is off), a dark violet night. The casino's RematchExit loads this scene once Mario falls through the shattered table; RematchIntro runs the entrance: black, the two-line card, Mario revealed falling in FallHeight over the floor at MarioSpawn, the fade in, King Boo (KingBoo, an SmsKingBooRematch) spawning BooHeight over the floor at BooSpawn with the long laugh. Opened on its own (F6) the same intro runs. The fight itself is a later pass: King Boo only hovers, glows and watches Mario for now. Knobs: on RematchIntro (the lines, their timing, the heights, the fade, the skip), on KingBoo (opacity, glow, hover, the laugh), on Arena (Brightness, AutoCollision); move MarioSpawn / BooSpawn to place them (x and z; the heights are read from the floor under them)."
+metadata/_sms_note = "Pass 157: the KING BOO REMATCH arena (KINGBOO_REMATCH_gdoc.txt) -- Bouldergeist's planet from Super Mario Galaxy (Arena: models/Sms/Rematch/polta_planet.glb, the collision built from it at start), no FLUDD (the Level's HasFludd is off), a dark violet night. (158) The BombBooSpawner child supplies the Bomb Boos -- Mario's weapon: X spins (no FLUDD), the spin grabs a Boo in reach, a second spin throws it at King Boo; three bursts on him and he is down. The casino's RematchExit loads this scene once Mario falls through the shattered table; RematchIntro runs the entrance: black, the two-line card, Mario revealed falling in FallHeight over the floor at MarioSpawn, the fade in, King Boo (KingBoo, an SmsKingBooRematch) spawning BooHeight over the floor at BooSpawn with the long laugh. Opened on its own (F6) the same intro runs. The fight itself is a later pass: King Boo only hovers, glows and watches Mario for now. Knobs: on RematchIntro (the lines, their timing, the heights, the fade, the skip), on KingBoo (opacity, glow, hover, the laugh), on Arena (Brightness, AutoCollision); move MarioSpawn / BooSpawn to place them (x and z; the heights are read from the floor under them)."
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_arena")
@@ -55,3 +56,8 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, -8)
 
 [node name="RematchIntro" type="Node" parent="."]
 script = ExtResource("6_intro")
+
+[node name="BombBooSpawner" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 3, 0)
+script = ExtResource("7_supply")
+metadata/_sms_note = "Pass 158: the BOMB BOO SUPPLY (KINGBOO_REMATCH_gdoc.txt) -- from the fight's start, every SpawnInterval seconds while fewer than MaxOut are out: a black foggy spot and a Bomb Boo rising out of it. SpawnMode Centre (this node's point -- the middle of the arena, for the playtests, as Jaysonn asked) or Random (within ArenaRadius, never nearer Mario than MinFromMario); the floor is found under the point. King Boo's hit clears the field and pauses the supply ClearPause seconds. The Boo's own knobs are on BombBoo.tscn's root; Mario's spin, grab reach and throw on his inspector (SMS Rematch)."

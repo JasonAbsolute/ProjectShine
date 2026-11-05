@@ -88,6 +88,7 @@ public partial class SmsActorSound : Node3D
         ["SmsBossTelesa"] = "btelesa", ["SmsTelesa"] = "telesa", ["SmsTelesaSlot"] = "slot", ["SmsRoulette"] = "roulette",
         ["SmsGateKeeper"] = "gatekeeper",                                     // 156: its BossMusic slot (no tables: TBiancoGateKeeper's own sounds are a later pass)
         ["SmsKingBooRematch"] = "kingboo",                                    // 157: the rematch's King Boo -- Play(se) by name (the casino boss's laugh); no slot table of his own
+        ["SmsBombBoo"] = "bombboo",                                           // 158: the rematch's Bomb Boo -- Play(se) by name (the small Boo's appear / fix / crush / vanish)
     };
     /// <summary>The script's sound slots and the game sound each stands for (the slot names are the species' own exports).</summary>
     private static readonly Dictionary<string, (string slot, string se)[]> Fill = new()

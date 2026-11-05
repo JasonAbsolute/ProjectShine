@@ -7,8 +7,10 @@ using System.Collections.Generic;
 /// SmsBossTelesa (the roulette fight stays as it is). This pass is his ENTRANCE: hidden until <see cref="Spawn"/>, then the appear clip, the
 /// laugh clip with the long laugh (MSD_SE_BS_TELESA_V_LAUGH1), and the wait loop -- hovering (HoverBob), turning to face Mario (FaceMario),
 /// the soft glow and the twinkle at his body (the casino boss's GlowFx / ChikaFx, "a slight glow on him throughout"), the blink loop on his
-/// eyes (btelesa_twait's 150-frame table), the ghost's screen mix at GhostOpacity. The attacks, the teleports, the faces and the hurt flip are
-/// later passes; the animations another hand's. The model is the casino boss's (btelesa.glb at 1 / 74.44) with its shader materials
+/// eyes (btelesa_twait's 150-frame table), the ghost's screen mix at GhostOpacity. Pass 158: HIS HIT POINTS -- a thrown Bomb Boo bursting on him
+/// (SmsBombBoo) is <see cref="TakeHit"/>: a point off, the hit clip with a full turn about himself (the doc's hurt flip, until its own
+/// animation comes), a flash, more solid (OpacityPerHit); at none left the down clip and he is gone (Defeated). The attacks, the teleports
+/// and the faces are later passes; the animations another hand's. The model is the casino boss's (btelesa.glb at 1 / 74.44) with its shader materials
 /// (BossTelesaBody/Crown/Ha/Mouth.tres: opacity, tint, mask_k, base_tex), copied per instance. Signals: Spawned (the appear starts), Laughed
 /// (the laugh starts), Ready (the wait begins -- the fight may start).
 /// </summary>
@@ -29,24 +31,43 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public float LaughDb = 0f;
     [Export] public bool Blink = true;
     [Export] public Texture2D EyeOpen, EyeHalf, EyeClose;
+    [ExportGroup("The fight (158)")]
+    /// <summary>The doc's three hits; each Bomb Boo burst on him takes one.</summary>
+    [Export(PropertyHint.Range, "1,9,1")] public int HitPoints = 3;
+    /// <summary>The hurt: the hit clip with this many full turns about himself (the flip, until its animation comes), the flash's colour, and how
+    /// much more solid he gets per hit (the casino boss's +30 / 255 is 0.12).</summary>
+    [Export] public float HurtTurns = 1f;
+    [Export] public Color HurtFlash = new Color(1f, 0.35f, 0.35f);
+    [Export(PropertyHint.Range, "0,0.3,0.01")] public float OpacityPerHit = 0.1f;
+    /// <summary>The hurt's sound (the casino boss's damage cry) and the down's.</summary>
+    [Export] public string HurtSe = "MSD_SE_BS_TELESA_DAMAGE", DownSe = "MSD_SE_BS_TELESA_DOWN";
+    [ExportGroup("")]
     [Export] public bool DebugPrint;
 
     [Signal] public delegate void SpawnedEventHandler();
     [Signal] public delegate void LaughedEventHandler();
     [Signal] public delegate void ReadyForFightEventHandler();
+    /// <summary>158: a Bomb Boo burst on him (the hit points left) / the last one took him down.</summary>
+    [Signal] public delegate void HitEventHandler(int hpLeft);
+    [Signal] public delegate void DefeatedEventHandler();
 
-    public enum Phase { Hidden, Appear, Laugh, Wait }
+    public enum Phase { Hidden, Appear, Laugh, Wait, Hurt, Down, Gone }
     public Phase State { get; private set; } = Phase.Hidden;
     public string Clip => _anim != null ? (string)_anim.CurrentAnimation : "";
     public bool IsSpawned => State != Phase.Hidden;
     public bool LaughPlayed { get; private set; }
+    public int Hp { get; private set; } = -1;
+    public int HitsTaken { get; private set; }
+    /// <summary>A Bomb Boo bursts on him only while he waits (not through the hurt, the down, the entrance).</summary>
+    public bool CanBeHit => State == Phase.Wait;
+    public bool IsAlive => State != Phase.Down && State != Phase.Gone;
     public int MaterialsCopied => _mats.Count;
     /// <summary>jnt_body's place in the world (where the glow sits).</summary>
     public Vector3 BodyPoint => _skel != null && _bBody >= 0 ? _skel.GlobalTransform * _skel.GetBoneGlobalPose(_bBody).Origin : GlobalPosition;
 
     // the clips used, their bck frame counts (one bck frame = 1 / 60 s) and loops -- SmsBossTelesa's table
-    private const string BckAppear = "btelesa_appear", BckLaugh = "btelesa_laugh", BckWait = "btelesa_wait";
-    private static readonly Dictionary<string, (int frames, bool loop)> Clips = new() { [BckAppear] = (59, false), [BckLaugh] = (89, false), [BckWait] = (60, true) };
+    private const string BckAppear = "btelesa_appear", BckLaugh = "btelesa_laugh", BckWait = "btelesa_wait", BckHit = "btelesa_hit", BckDown = "btelesa_down";
+    private static readonly Dictionary<string, (int frames, bool loop)> Clips = new() { [BckAppear] = (59, false), [BckLaugh] = (89, false), [BckWait] = (60, true), [BckHit] = (42, false), [BckDown] = (199, false) };
     private static readonly int[] BlinkEnds = { 19, 21, 24, 26, 28, 30, 33, 35, 85, 87, 90, 92, 150 };   // the twait runs' ends (frames)
     private static readonly int[] BlinkEyes = { 0, 1, 2, 1, 0, 1, 2, 1, 0, 1, 2, 1, 0 };                   // open / half / close
 
@@ -54,6 +75,7 @@ public partial class SmsKingBooRematch : Node3D
     private readonly List<ShaderMaterial> _mats = new(); private ShaderMaterial _bodyMat;
     private GpuParticles3D _chika; private Node3D _glow; private SmsActorSound _sound;
     private Mario _mario; private float _yaw, _hoverT, _blinkT; private int _eyeNow = -1; private Vector3 _home; private bool _laughSounded;
+    private float _hurtT, _hurtLen, _hurtYaw0; private bool _flashOn;
 
     public override void _Ready()
     {
@@ -99,6 +121,7 @@ public partial class SmsKingBooRematch : Node3D
     {
         if (State != Phase.Hidden || Engine.IsEditorHint()) return;
         State = Phase.Appear; _home = Position; _hoverT = 0f;   // the hover bobs about where he was put
+        Hp = Math.Max(1, HitPoints); HitsTaken = 0;
         if (_model != null) _model.Visible = true;
         PlayClip(BckAppear);
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: appears at {GlobalPosition}");
@@ -134,6 +157,51 @@ public partial class SmsKingBooRematch : Node3D
             if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: waits -- the fight may start");
             EmitSignal(SignalName.ReadyForFight);
         }
+        else if (State == Phase.Hurt && n == BckHit)
+        {
+            SetFlash(false); Rotation = new Vector3(0f, _yaw, 0f);
+            if (Hp > 0) { State = Phase.Wait; PlayClip(BckWait); if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: back to the wait, {Hp} hit point(s) left"); }
+            else
+            {
+                State = Phase.Down; PlayClip(BckDown);
+                if (_sound != null && !string.IsNullOrEmpty(DownSe)) _sound.Play(DownSe);
+                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: DOWN");
+            }
+        }
+        else if (State == Phase.Down && n == BckDown)
+        {
+            State = Phase.Gone;
+            if (_model != null) _model.Visible = false;
+            PlaceFx();
+            if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: gone -- defeated (the fight's end is a later pass)");
+            EmitSignal(SignalName.Defeated);
+        }
+    }
+
+    /// <summary>158: a Bomb Boo burst on him. A point off, the hurt (the hit clip, HurtTurns about himself, the flash), the Hit signal; the last takes him
+    /// down. False when he cannot be hit now.</summary>
+    public bool TakeHit(SmsBombBoo by)
+    {
+        if (!CanBeHit) return false;
+        Hp = Math.Max(0, Hp - 1); HitsTaken++;
+        State = Phase.Hurt; _hurtT = 0f; _hurtYaw0 = _yaw;
+        PlayClip(BckHit);
+        _hurtLen = _anim != null && _anim.HasAnimation(BckHit) ? (float)(_anim.GetAnimation(BckHit).Length / Mathf.Max(0.01f, _anim.SpeedScale)) : 0.7f;
+        SetFlash(true);
+        foreach (var m in _mats) m.SetShaderParameter("opacity", Mathf.Clamp(GhostOpacity + OpacityPerHit * HitsTaken, 0.1f, 1f));
+        if (_sound != null && !string.IsNullOrEmpty(HurtSe)) _sound.Play(HurtSe);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: HIT by {by?.Name ?? "?"} -> {Hp} left (the hit clip, {_hurtLen:F2} s)");
+        EmitSignal(SignalName.Hit, Hp);
+        return true;
+    }
+    private void SetFlash(bool on)
+    {
+        _flashOn = on;
+        foreach (var m in _mats)
+        {
+            m.SetShaderParameter("tint", on ? new Vector3(HurtFlash.R, HurtFlash.G, HurtFlash.B) : new Vector3(1f, 1f, 1f));
+            m.SetShaderParameter("mask_k", on ? 1f : 0f);
+        }
     }
 
     public override void _Process(double delta)
@@ -146,6 +214,14 @@ public partial class SmsKingBooRematch : Node3D
             _laughSounded = true; LaughPlayed = true;
             if (_sound != null && !string.IsNullOrEmpty(LaughSe)) _sound.Play(LaughSe, LaughDb);
             else if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: no sound node for the laugh");
+        }
+        if (State == Phase.Hurt)
+        {
+            _hurtT += dt;
+            float k = _hurtLen > 0f ? Mathf.Clamp(_hurtT / _hurtLen, 0f, 1f) : 1f;
+            Rotation = new Vector3(0f, _hurtYaw0 + HurtTurns * MathF.Tau * Mathf.SmoothStep(0f, 1f, k), 0f);   // the flip about himself, until its animation comes
+            bool flash = ((int)(_hurtT * 15f) & 1) == 0 && k < 0.8f;
+            if (flash != _flashOn) SetFlash(flash);
         }
         if (State == Phase.Wait)
         {
@@ -187,7 +263,7 @@ public partial class SmsKingBooRematch : Node3D
     }
     private void PlaceFx()
     {
-        bool show = State != Phase.Hidden && _model != null && _model.Visible;
+        bool show = State != Phase.Hidden && State != Phase.Gone && _model != null && _model.Visible;
         Vector3 at = BodyPoint;
         if (_chika != null) { bool on = show && Twinkle; _chika.Visible = on; _chika.Emitting = on; if (on) _chika.GlobalPosition = at; }
         if (_glow != null)

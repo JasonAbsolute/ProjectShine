@@ -1,0 +1,13 @@
+[gd_scene load_steps=4 format=3 uid="uid://d158bombboo"]
+
+[ext_resource type="Script" path="res://assets/Sms/Rematch/SmsBombBoo.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Sms/Rematch/bomb_boo.glb" id="2_body"]
+[ext_resource type="PackedScene" path="res://models/Sms/Rematch/bomb_boo_tongue.glb" id="3_tongue"]
+
+[node name="BombBoo" type="Node3D" groups=["sms_bomb_boo"]]
+script = ExtResource("1_script")
+metadata/_sms_note = "Pass 158: a BOMB BOO (KINGBOO_REMATCH_gdoc.txt) -- Galaxy's black Boo, Mario's weapon in the rematch. The supply (SmsBombBooSpawner in RematchArena.tscn) makes them out of black foggy spots; one drifts toward Mario and hovers; his SPIN (X, no FLUDD) within reach grabs it -- it spins over his head (CarrySpin; a spin jump speeds it); a dive drops it; another spin THROWS it his way: on King Boo it bursts and he takes a hit, elsewhere it bursts for nothing. Knobs: Look (ModelScale, Opacity, Glow, TongueOffset, FacesPlusZ), Drift (DriftSpeed, DriftStopDistance, HoverHeight, the bob, ExpireSeconds), Carry (CarryOver, CarrySpin, SpinJumpBoost), Throw (ThrowGravity, ThrowSeconds, KingBooHitRadius), the sounds. Mario's side (the reach, the throw's speed and arc, the aim help) is on his inspector under SMS Rematch."
+
+[node name="Model" parent="." instance=ExtResource("2_body")]
+
+[node name="Tongue" parent="." instance=ExtResource("3_tongue")]
