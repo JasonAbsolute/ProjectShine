@@ -11878,3 +11878,67 @@ The run's lessons: the Boolossus hangs straight over Mario, so "run away from it
 **Deviations, all knobs:** the Boolossus's size (ModelScale 5.5 = 6 m across, about two Marios tall; King Boo is 9 m), height, hang, gravity and the
 wave's numbers are mine -- the doc gives only "15 Boos" and "one second"; the Boo hit radius 1.1 over the model's 0.7 so the ring is closed near its
 start; the crown glow is the colour register pulsed, not a bloom; the laugh clip as the summon pose; the Boolossus faces the camera, not King Boo.
+
+### 165 -- the King Boo REMATCH, part 9: three Boolossi DIVE in, with effects; the Boos white; the crown GLOWS the attack's colour (feature/kingboo-rematch, code `43fbcb8`)
+
+**Jaysonn:** "ok nice but the texutres of boos flying out have the problem bomb boos have. and i wanna see boolouses dive down into the arena and have
+maybe 3 of them happen not just one. and i want some effects on it also. also king boos crown should glow the color listed in the doc to show thats the
+attack hes using."
+
+**The Boos' look** (`SmsBoolossus.cs`, SmsWaveBoo): the mechanism, read from boo.glb (`glb162/vcol_stats.py`): its COLOR_0 is dark blue -- mean 0.10 /
+0.12 / 0.16 linear, 82 % of the vertices under 0.25 (the hotel Boo's TEV recipe doubles the stage and lerps the vertex alpha; the plain multiply does
+not) -- so (vertex + 0.35) x 1.8 tinted the white sheet blue-grey, and under the 0.75 screen mix over the violet arena that is the Bomb Boos' old "purple
+and see-through". Now: WaveBooOpacity 1 (solid) and the vertex colours left out (BooVertexColors off; BooLift 1) -- the white sheet as it is, as the Bomb
+Boo fix did. The Boolossus keeps the ghost's mix at Opacity 0.75 (its textures are flat swatches; it read fine).
+
+**The DIVE** (`SmsBoolossus.cs`, the Hang / Fall phases replaced by Dive): a Boolossus appears DiveHeight 24 m over the floor and DiveDistance 20 m out
+from Mario along an approach direction King Boo gives it (FadeInSeconds 0.2, an appear puff, MSD_SE_EN_TELESA_APPEAR) and dives: it falls under
+SmashGravity 30 from DiveStartSpeed 6 m/s, and every tick its flat velocity is set to (target - position) / (time left to the floor at the fall's own
+pace), capped at MaxDiveSpeed 45 -- so it lands exactly on the TARGET whatever the target does. The target follows Mario at TrackSpeed 6 m/s until
+LockSeconds 0.6 before the landing, then holds: the dodge window (Mario runs at about 9 m/s, so 0.6 s is 5 m -- past the body's 2.94 + 0.56 m). The
+shadow sits under the target and grows as the landing nears (the tell). The body leans into the dive (DiveTilt 0.8 of the velocity's direction, 51 deg
+at full speed; upright again on the floor, facing the camera's side) and trails ghost wisps. A 24-m dive at gravity 30 from 6 m/s is 1.08 s; 20 m out
+is 18.8 m/s flat. `Begin(mario, floorY, approachDir)`; the 164 `Begin(mario, floorY)` still works (from Mario's far side).
+
+**THREE of them** (`SmsKingBooRematch.cs`): SmashCount 3, SmashStagger 0.5 s apart (0.6, 1.1, 1.6 s into the smash), their approaches SmashSpreadDeg 120
+apart about the first -- from where King Boo stands when SmashFromKingBoo (on), else a random first; the laugh clip is looped until the last is out
+(it is 1.48 s; three launches end at 1.6); SmashWatchSeconds 1 after the last, then the wait and the gap. Read-outs SmashLaunchedCount / LastApproachDir.
+
+**The EFFECTS** (`SmsSmashFx`, `SmsGhostRing`, in `SmsBoolossus.cs`, built in code from the port's Fx textures `assets/Sms/Fx/tex/`):
+- the dive's wisp TRAIL: a GPUParticles3D child (56 puffs, 0.75 s, radgrad additive, TrailColor pale blue-white), its puffs left in the world where they
+  were shed (LocalCoords off), rising a little; on from the appear, off at the landing;
+- the landing's RING of light (SmsGhostRing: a flat quad of hamonring3_flat -- the port's white ring with its alpha -- additive, RingColor, from the body's
+  radius to RingGrow 3.5 radii over RingSeconds 0.5, fast out and slowing, fading; it frees itself);
+- the landing's SMOKE (a one-shot GPUParticles3D: SmokeCount 36 puffs of kemuball3 in SmokeColor, bursting out along the floor from a ring at the
+  body's edge at 7-13 m/s, braking hard, rising a little, 0.9 s; it frees itself when its puffs are gone);
+- the CAMERA SHAKE (the port's SmsCameraShake.Current, the hip drop's shake x LandShake 1; 0 = none);
+- the APPEAR PUFF and each Boo's VANISH PUFF (the port's EnemyDisap.tscn burst -- the small enemies' blue-grey smoke and glow -- x the body's size,
+  its glow tinted PuffTint; 3 + 45 per smash).
+  Counters RingsMade / SmokesMade / PuffsMade and ShakesStarted for the drives.
+
+**The CROWN GLOW** (`SmsKingBooRematch.cs`; `assets/Sms/Enemy/BossTelesa/BossTelesaToon.gdshaderinc`): the doc's colours -- the Lick none, the Smash
+white (the later attacks: red, frosty blue, red, pink). 164 pulsed the crown's colour register alone, which the crown shader halves and mixes with the
+sheet and the sphere map: too subtle to read as a glow. Now three things at once, `SetCrownGlow(color, k)`: a LIGHT at the crown joint (jnt_crown;
+`CrownGlowFx`, an additive camera-facing quad of the port's radial gradient, CrownGlowSize 3.2 m, CrownGlowStrength 1.2, drawn through the crown), the
+crown shader's own glow term (two new uniforms in the shared include, `crown_glow` and `crown_glow_k`, added into the crown's last stage; 0 = the
+casino's crown exactly as it was -- the casino's BossTelesa reads the same include) and the colour register toward the colour. Through the tell it
+pulses at CrownPulseHz 6 between 0.35 and 1, holds at 1 while the Boolossi launch, and goes dark at the end, at a hit (the smash called off) and at
+the entrance. Read-outs CrownGlowK / CrownGlowColor / CrownGlowShown / CrownPoint.
+
+**Drive 165** (`SmsKingBoo.Drive.cs`, deleted before the commit; runs x-y; run y 17 / 17): the crown's light shown and k 1.00 in white, the register
+(1, 1, 1) through the tell (C3); three Boolossi at 0.63 / +0.50 / +0.50 s (C4), 20.00 m out, 24.00 m up, 120 and 120 deg apart (C5); the first's dive
+-- flat 18.8 m/s, down to 38.3 m/s accelerating, a 51-deg lean, 1.08 s (C6) -- the lock 0.58 s before the landing and the landing 0.00 m from the locked
+target (C7); the slam on a standing Mario, HP 8 -> 7, hurt (C8); the trail on then off, 3 appear puffs, the ring 2.94 -> 9.41 m, the smoke, one shake
+(C9); 15 solid white Boos (opacity 1.00, no vertex colours) in a ring at 2.94 m, 0.90 m up (C10); all three down, 45 Boos gone in 48 puffs, 3 rings, 3
+smokes (C11); King Boo back in the wait, the crown dark (C12); with one Boolossus: a Mario who ran is missed, 7.3 m off, the target locked behind him
+(C13), and two Boos of the ring run through him standing (C14); a held jump over the ring clears it (C15); a hit through the tell (k 0.36) takes a point
+and calls the smash off, the crown dark, no Boolossus (C16); the end (C17). Run x's one fail was the drive's: Mario ran 10 m past the landing, beyond the
+closed ring (the 164 finding); he stops 5.5 m from the locked target now. Run x's .err also had Godot's "8 ObjectDB instances leaked at exit" once
+(the drive held freed Boolossi); run y's .err is empty.
+
+**Deviations, all knobs:** the doc says "falls from above Mario"; Jaysonn asked to see them dive -- so they come in from 20 m out and 24 m up at a 50-deg
+dive, three of them (the doc: one). The second and third target where Mario is when each launches and track him until their own locks, so a Mario
+knocked down by the first is under the others too (his invincibility holds). The approach spread is 120 deg about King Boo's own direction. The effects
+are mine (the doc names none): their colours, sizes and counts are knobs on Boolossus.tscn ("The effects (165)"). The crown's glow is a light plus the
+shader term, not a bloom pass (the arena's environment has no glow); turning glow on in RematchArena.tscn's Environment would make the white crown and
+the rings bloom.
