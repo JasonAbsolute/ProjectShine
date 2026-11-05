@@ -4,8 +4,9 @@ using Godot;
 /// SMS pass 159: the LASSO ARM -- one of Mario's arms held up in the air while he swings a Bomb Boo round by its tongue (KINGBOO_REMATCH_gdoc.txt, NEW
 /// WORK: "an animation blend that holds one of Mario's arms in the air, for the carry"). A SkeletonModifier3D under his Skeleton3D, as the port's
 /// other bone systems are (SmsWaistLean, SmsBoneRotZ, SmsUpperPose): after the clip has posed him, the upper arm (jnt_arm_R1 / L1) is turned by the
-/// shortest arc so it points up -- <see cref="Tilt"/> outward (the side read off the chest-to-shoulder vector, so it holds through every clip) and
-/// <see cref="Forward"/> ahead -- and the forearm (jnt_arm_R2 / L2) up and <see cref="In"/> over the head; the hand is left as the clip has it. So the
+/// shortest arc so it points up and OUT -- <see cref="Tilt"/> outward (160: 60 deg; his head is wider than his shoulders and his arm 0.33 m long, so an
+/// arm straight up ran through the head -- the side read off the chest-to-shoulder vector, so it holds through every clip) and <see cref="Forward"/>
+/// ahead -- and the forearm (jnt_arm_R2 / L2) up and <see cref="In"/> over the head (negative = out); the hand is left as the clip has it. So the
 /// arm stays up through the run, the jumps and the landings, with the clip's own twist, until its real animation comes. <see cref="Weight"/> blends in
 /// over BlendSeconds when <see cref="On"/> and out again. <see cref="HandPoint"/> is the hand's place in the world AFTER the pose, read in the same pass
 /// (a Skeleton3D restores the clip's poses once the frame is drawn, so GetBoneGlobalPose from outside would give the arm down): the Bomb Boo's
@@ -17,8 +18,10 @@ public partial class SmsLassoArm : SkeletonModifier3D
     public string Side = "R";
     public bool On;
     public float BlendSeconds = 0.15f;
-    /// <summary>The upper arm's lean outward and forward, the forearm's lean in over the head -- fractions of straight up.</summary>
-    public float Tilt = 0.35f, Forward = 0.2f, In = 0.2f;
+    /// <summary>The upper arm's lean outward and forward, the forearm's lean in over the head (negative = outward) -- fractions of straight up (the
+    /// tangent of the angle). Mario sets them from his LassoTilt / LassoForward / LassoIn (1.7 / 0.3 / -0.4: the upper arm 60 deg out, the forearm 22 out,
+    /// the wrist half a metre out from his axis -- clear of his head).</summary>
+    public float Tilt = 1.7f, Forward = 0.3f, In = -0.4f;
     public bool Debug;
     public float Weight { get; private set; }
     public Vector3 HandPoint { get; private set; }

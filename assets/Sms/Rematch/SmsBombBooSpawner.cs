@@ -6,7 +6,8 @@ using System.Collections.Generic;
 /// SMS pass 158: the BOMB BOO SUPPLY (KINGBOO_REMATCH_gdoc.txt: "Black foggy spots appear at random through the fight and a Boo bomb comes out
 /// of each one... The spawn rate, the cap on how many are out at once and whether one expires on its own are all knobs"). From the fight's
 /// start (the intro's FightReady; at once without an intro, or StartAtOnce) every SpawnInterval seconds, while fewer than MaxOut Boos are out
-/// and King Boo stands: a black foggy spot (FogSeconds of dark smoke at the point) and a Bomb Boo rising out of it. Where: SpawnMode --
+/// and King Boo stands: a black foggy spot (FogSeconds of dark smoke at the point) and a Bomb Boo rising out of it -- which then floats as Sunshine's Boos
+/// do (160: wandering within its WanderRadiusUnits of the spot, so a Centre spawn drifts about the middle of the arena). Where: SpawnMode --
 /// Centre (this node's point: for the playtests, as Jaysonn asked), Random (anywhere within ArenaRadius of this node, at least MinFromMario
 /// from Mario), the floor found under the point. King Boo's hit clears every Boo on the field (the doc) and the supply pauses ClearPause
 /// seconds; his defeat stops it. Knobs: the timing (FirstDelay, SpawnInterval, FogSeconds, ClearPause), the cap (MaxOut), the Boo's own

@@ -865,8 +865,9 @@ public partial class Mario : CharacterBody3D
     [Export] public float BombGrabRadius = 2.8f, BombGrabHeight = 3.5f;
     [Export(PropertyHint.Enum, "R,L")] public string LassoArm = "R";
     [Export] public float LassoBlendSeconds = 0.15f;
-    /// <summary>The raised arm's lean: the upper arm outward and forward, the forearm in over the head (fractions of straight up).</summary>
-    [Export] public float LassoTilt = 0.35f, LassoForward = 0.2f, LassoIn = 0.2f;
+    /// <summary>The raised arm's lean, as fractions of straight up (the tangent of the angle): the upper arm outward (1.7 = 60 deg -- his head is wider than
+    /// his shoulders and his arm 0.33 m long, so a straighter arm runs through the head) and forward; the forearm in over the head (negative = outward).</summary>
+    [Export] public float LassoTilt = 1.7f, LassoForward = 0.3f, LassoIn = -0.4f;
     [ExportGroup("")]
     private SmsBombBoo _smsBomb; private float _smsSpinT, _smsSpinCooldown; private bool _smsSpinGrabbed, _smsSpinKeyPrev, _smsSpinKeyEdge; private int _smsSpinCount;
     private SmsLassoArm _smsLasso;                   // 159: the arm up while he swings a Bomb Boo (built on the skeleton at his setup)
