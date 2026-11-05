@@ -865,9 +865,10 @@ public partial class Mario : CharacterBody3D
     [Export] public float BombGrabRadius = 2.8f, BombGrabHeight = 3.5f;
     [Export(PropertyHint.Enum, "R,L")] public string LassoArm = "R";
     [Export] public float LassoBlendSeconds = 0.15f;
-    /// <summary>The raised arm's lean, as fractions of straight up (the tangent of the angle): the upper arm outward (1.7 = 60 deg -- his head is wider than
-    /// his shoulders and his arm 0.33 m long, so a straighter arm runs through the head) and forward; the forearm in over the head (negative = outward).</summary>
-    [Export] public float LassoTilt = 1.7f, LassoForward = 0.3f, LassoIn = -0.4f;
+    /// <summary>The raised arm's lean, as fractions of straight up (the tangent of the angle): the upper arm outward (2.5 = 68 deg -- his head is wider than
+    /// his shoulders and his arm 0.33 m long, so a straighter arm runs through the head; 161: "a little more out") and forward; the forearm in over the head
+    /// (negative = outward: -0.7 = 35 deg out).</summary>
+    [Export] public float LassoTilt = 2.5f, LassoForward = 0.3f, LassoIn = -0.7f;
     [ExportGroup("")]
     private SmsBombBoo _smsBomb; private float _smsSpinT, _smsSpinCooldown; private bool _smsSpinGrabbed, _smsSpinKeyPrev, _smsSpinKeyEdge; private int _smsSpinCount;
     private SmsLassoArm _smsLasso;                   // 159: the arm up while he swings a Bomb Boo (built on the skeleton at his setup)
@@ -1250,6 +1251,8 @@ public partial class Mario : CharacterBody3D
         Closed,
         SlightlyOpen,
         WithHat,   // 121: the right hand holding the cap (the scene's RightHandWithHat), the left open -- the return pose
+        LassoR,    // 161: the right fist closed on the Bomb Boo's tongue, the left as the clip has it (open)
+        LassoL,    // 161: the same with the left
     }
 
     // Deliberately starts at an invalid value so the first ApplyHandPose always
@@ -6947,8 +6950,8 @@ public partial class Mario : CharacterBody3D
             GD.Print($"[SMS hand] {pose} for {SmsCurrentClip()}{(heldBody != null ? " (carrying)" : "")}");
 
         bool openVisible = pose == HandPose.Open;
-        Color openAlbedoR = openVisible ? _rightHandOpenAlbedo : new Color(0, 0, 0, 0);
-        Color openAlbedoL = openVisible || pose == HandPose.WithHat ? _leftHandOpenAlbedo : new Color(0, 0, 0, 0);   // 121: the left stays open with the cap in the right
+        Color openAlbedoR = openVisible || pose == HandPose.LassoL ? _rightHandOpenAlbedo : new Color(0, 0, 0, 0);   // 161: the free hand open while the other grips the tongue
+        Color openAlbedoL = openVisible || pose == HandPose.WithHat || pose == HandPose.LassoR ? _leftHandOpenAlbedo : new Color(0, 0, 0, 0);   // 121: the left stays open with the cap in the right
         if (RightHandWithHat != null)
             RightHandWithHat.Visible = pose == HandPose.WithHat;
 
@@ -6959,9 +6962,9 @@ public partial class Mario : CharacterBody3D
 
         bool closed = pose == HandPose.Closed;
         if (RightClosedHand != null)
-            RightClosedHand.Visible = closed;
+            RightClosedHand.Visible = closed || pose == HandPose.LassoR;   // 161: the fist on the tongue
         if (LeftClosedHand != null)
-            LeftClosedHand.Visible = closed;
+            LeftClosedHand.Visible = closed || pose == HandPose.LassoL;
 
         bool slightly = pose == HandPose.SlightlyOpen;
         if (RightSlightlyOpenHand != null)
@@ -14716,6 +14719,7 @@ public partial class Mario : CharacterBody3D
     private HandPose SmsHandPose()
     {
         if (_smsHandCap) return HandPose.WithHat;   // 121/122: the return pose, the cap in the right hand (TMario::calcAnim: hnd4r while the frame < 158)
+        if (_smsBomb != null) return LassoArm == "L" ? HandPose.LassoL : HandPose.LassoR;   // 161: the fist closed on the Bomb Boo's tongue
         string clip = SmsCurrentClip();
         int hand;
         if (heldBody != null)
@@ -17836,7 +17840,24 @@ public partial class Mario : CharacterBody3D
             skeleton.AddChild(_smsLasso);
         }
         _smsLasso.BlendSeconds = LassoBlendSeconds; _smsLasso.Tilt = LassoTilt; _smsLasso.Forward = LassoForward; _smsLasso.In = LassoIn;
+        if (on && !_smsLasso.GripSet) SmsLassoSetGrip();
         _smsLasso.On = on;
+    }
+    /// <summary>161: the TONGUE ends in the middle of the closed fist: the closed hand model's mesh centre (RightHandClosed / LeftHandClosed under the hand's
+    /// BoneAttachment3D, which rides the M_hand1 bone) carried into that bone's frame -- the attachment-to-mesh relation is their local transforms, so the
+    /// global pair at any one moment gives it exactly.</summary>
+    private void SmsLassoSetGrip()
+    {
+        if (_smsLasso == null || skeleton == null) return;
+        string side = LassoArm == "L" ? "Left" : "Right";
+        var attach = GetNodeOrNull<BoneAttachment3D>($"Armature/Skeleton3D/{side}HandBone");
+        var closed = attach?.GetNodeOrNull<Node3D>($"{side}HandClosed");
+        var mesh = closed != null ? FindFirstMeshInstance(closed) : null;
+        if (attach == null || mesh == null || mesh.Mesh == null) { if (SmsDebugPrint) GD.Print($"[SMS spin] no {side}HandClosed mesh under the hand bone: the tongue ends at the wrist"); return; }
+        Transform3D rel = attach.GlobalTransform.AffineInverse() * mesh.GlobalTransform;
+        Vector3 grip = rel * mesh.Mesh.GetAabb().GetCenter();
+        _smsLasso.SetGrip(attach.BoneName, grip);
+        if (SmsDebugPrint) GD.Print($"[SMS spin] the grip: the {side} fist's centre {grip} in the {attach.BoneName} bone's frame");
     }
     /// <summary>159: where the raised hand is (the tongue's end) -- the lasso arm's hand after its pose; a point over his head when the arm is not up yet.</summary>
     public Vector3 SmsLassoHand => _smsLasso != null && IsInstanceValid(_smsLasso) && _smsLasso.HandValid && _smsLasso.Weight > 0.5f

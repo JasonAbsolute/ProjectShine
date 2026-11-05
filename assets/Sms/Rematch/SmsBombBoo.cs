@@ -39,9 +39,10 @@ public partial class SmsBombBoo : Node3D
     [Export(PropertyHint.Range, "0,3,0.05")] public float FaceGlow = 0.5f;
     [Export] public Color GlowColor = new Color(0.35f, 0.1f, 0.55f);
     [Export(PropertyHint.Range, "0,3,0.05")] public float Glow = 0.25f;
-    /// <summary>The tongue's root at the mouth (model metres, before ModelScale: the body is 2.5 m wide, its front 1.1 m ahead of the origin), how far
-    /// it droops when it just hangs (degrees), and whether the model's face is on its +Z side (off: -Z).</summary>
-    [Export] public Vector3 TongueOffset = new Vector3(0f, -0.25f, 1f);
+    /// <summary>The tongue's root in the MOUTH (model metres, before ModelScale; 161, measured on the model: the body is 2.5 m wide, 1.8 tall and 2.1 deep about
+    /// its origin, the face on its +Z side -- the mouth's centre at (0, -0.6, 0.86), the eyes at (0, 0.15, 0.93)), how far it droops when it just hangs
+    /// (degrees), and whether the face is on the +Z side (off: -Z).</summary>
+    [Export] public Vector3 TongueOffset = new Vector3(0f, -0.6f, 0.85f);
     [Export(PropertyHint.Range, "-60,80,1")] public float TongueRestDroopDeg = 35f;
     [Export] public bool FacesPlusZ = true;
     [ExportGroup("The float (Sunshine's Boo, telesa.prm)")]
@@ -69,9 +70,10 @@ public partial class SmsBombBoo : Node3D
     /// <summary>Out of the fog: the rise's length (it scales up, fades in and lifts to its height over it).</summary>
     [Export] public float RiseSeconds = 0.7f;
     [ExportGroup("The swing (carried by the tongue)")]
-    /// <summary>Round Mario: this far out, this far OVER his raised hand (his arms are short next to his head: the raised wrist comes to his ear, 1.3 m up on a
-    /// 2.15 m body -- 0.9 puts the Boo just over his head, the tongue rising to it), this fast (degrees a second; 480 = a turn in 0.75 s), leaning this far outward.</summary>
-    [Export] public float OrbitRadius = 2.8f, OrbitOverHand = 0.9f, OrbitDegPerSec = 480f, OrbitLeanDeg = 25f;
+    /// <summary>Round Mario: this far out (161: 3.6 m, "the tongue radius longer"), this far OVER his raised hand (his arms are short next to his head: the raised
+    /// wrist comes to his ear, 1.3 m up on a 2.15 m body -- 0.9 puts the Boo just over his head, the tongue rising to it), this fast (degrees a second; 480 = a
+    /// turn in 0.75 s), leaning this far outward.</summary>
+    [Export] public float OrbitRadius = 3.6f, OrbitOverHand = 0.9f, OrbitDegPerSec = 480f, OrbitLeanDeg = 25f;
     /// <summary>From the grab to the full swing (the radius and the height ease in).</summary>
     [Export] public float OrbitSettleSeconds = 0.35f;
     [Export] public bool OrbitClockwise = false;
@@ -81,7 +83,7 @@ public partial class SmsBombBoo : Node3D
     [Export] public float DropGraceSeconds = 0.6f;
     /// <summary>Carried this long, it bursts in his hand for nothing (Galaxy's held Bomb Boo blows up on its own; 0 = never). It flashes faster over its last 2 s.</summary>
     [Export] public float HoldSeconds = 0f;
-    /// <summary>The Boo's own reach when it swings into King Boo (model metres, x ModelScale: the body is 1.27 m to its side).</summary>
+    /// <summary>The Boo's own reach when it swings into King Boo (model metres, x ModelScale: the body is 1.27 m to its side, 1.05 m to its front).</summary>
     [Export] public float OwnRadius = 1f;
     [ExportGroup("Sound (empty = silent)")]
     [Export] public string AppearSe = "MSD_SE_EN_TELESA_APPEAR", GrabSe = "MSD_SE_EN_TELESA_FIX", BurstSe = "MSD_SE_EN_TELESA_CRUSH", GoneSe = "MSD_SE_EN_TELESA_DISAPPEAR";

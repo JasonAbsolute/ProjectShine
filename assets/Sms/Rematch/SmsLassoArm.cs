@@ -10,7 +10,8 @@ using Godot;
 /// arm stays up through the run, the jumps and the landings, with the clip's own twist, until its real animation comes. <see cref="Weight"/> blends in
 /// over BlendSeconds when <see cref="On"/> and out again. <see cref="HandPoint"/> is the hand's place in the world AFTER the pose, read in the same pass
 /// (a Skeleton3D restores the clip's poses once the frame is drawn, so GetBoneGlobalPose from outside would give the arm down): the Bomb Boo's
-/// tongue ends there. The directions are taken in the WORLD and carried into the skeleton's frame (the armature turns with him).
+/// tongue ends there -- in the middle of the closed FIST when Mario has set the grip (161), else at the wrist. The directions are taken in the
+/// WORLD and carried into the skeleton's frame (the armature turns with him).
 /// </summary>
 public partial class SmsLassoArm : SkeletonModifier3D
 {
@@ -19,9 +20,19 @@ public partial class SmsLassoArm : SkeletonModifier3D
     public bool On;
     public float BlendSeconds = 0.15f;
     /// <summary>The upper arm's lean outward and forward, the forearm's lean in over the head (negative = outward) -- fractions of straight up (the
-    /// tangent of the angle). Mario sets them from his LassoTilt / LassoForward / LassoIn (1.7 / 0.3 / -0.4: the upper arm 60 deg out, the forearm 22 out,
-    /// the wrist half a metre out from his axis -- clear of his head).</summary>
-    public float Tilt = 1.7f, Forward = 0.3f, In = -0.4f;
+    /// tangent of the angle). Mario sets them from his LassoTilt / LassoForward / LassoIn (2.5 / 0.3 / -0.7: the upper arm 68 deg out, the forearm 35 out,
+    /// the wrist well clear of his head).</summary>
+    public float Tilt = 2.5f, Forward = 0.3f, In = -0.7f;
+    /// <summary>161: the GRIP -- where the tongue ends: a point in a bone's frame (the closed fist's centre in the M_hand1 bone's, set by Mario from the hand
+    /// model), else the wrist joint itself.</summary>
+    public bool GripSet { get; private set; }
+    private int _grip = -1; private Vector3 _gripLocal;
+    public void SetGrip(string boneName, Vector3 local)
+    {
+        var skel = GetSkeleton(); if (skel == null) return;
+        _grip = skel.FindBone(boneName); _gripLocal = local; GripSet = _grip >= 0;
+        if (!GripSet) GD.PushWarning($"[SMS lasso] {GetPath()}: no bone {boneName} for the grip -- the tongue ends at the wrist");
+    }
     public bool Debug;
     public float Weight { get; private set; }
     public Vector3 HandPoint { get; private set; }
@@ -31,6 +42,7 @@ public partial class SmsLassoArm : SkeletonModifier3D
     /// (shoulder to wrist, world) against straight up after the pose (1 = straight up).</summary>
     public float HandLift { get; private set; }
     public Vector3 ShoulderPoint { get; private set; }
+    public Vector3 WristPoint { get; private set; }
     public float ArmUpDot { get; private set; }
 
     private int _chest = -1, _r1 = -1, _r2 = -1, _hand = -1; private int _dbg;
@@ -52,7 +64,7 @@ public partial class SmsLassoArm : SkeletonModifier3D
         if (skel == null || !Bound) return;
         Weight = Mathf.MoveToward(Weight, On ? 1f : 0f, (float)delta / Mathf.Max(0.01f, BlendSeconds));
         Transform3D sg = skel.GlobalTransform;
-        Vector3 hand0 = sg * skel.GetBoneGlobalPose(_hand).Origin;
+        Vector3 hand0 = GripSet ? sg * (skel.GetBoneGlobalPose(_grip) * _gripLocal) : sg * skel.GetBoneGlobalPose(_hand).Origin;
         if (Weight > 0f)
         {
             // the arm's side from the pose itself: chest -> shoulder is outward; up x outward is forward for the right arm (outward x up for the left),
@@ -71,7 +83,8 @@ public partial class SmsLassoArm : SkeletonModifier3D
             Aim(skel, _r2, _hand, (toSkel * lower).Normalized(), dbg);
             if (dbg) { GD.Print($"[SMS lasso]   after arm2: hand {skel.GetBoneGlobalPose(_hand).Origin} -> world {sg * skel.GetBoneGlobalPose(_hand).Origin}"); _dbg++; }
         }
-        HandPoint = sg * skel.GetBoneGlobalPose(_hand).Origin;
+        HandPoint = GripSet ? sg * (skel.GetBoneGlobalPose(_grip) * _gripLocal) : sg * skel.GetBoneGlobalPose(_hand).Origin;
+        WristPoint = sg * skel.GetBoneGlobalPose(_hand).Origin;
         ShoulderPoint = sg * skel.GetBoneGlobalPose(_r1).Origin;
         Vector3 arm = HandPoint - ShoulderPoint;
         ArmUpDot = arm.LengthSquared() > 1e-8f ? arm.Normalized().Dot(Vector3.Up) : 0f;
