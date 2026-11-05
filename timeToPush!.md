@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157), AFTER #17: this branch stacks on `feature/sounds`
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-04 18:59 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1182,16 +1182,29 @@ rematch arena loads: Bouldergeist's planet from Super Mario Galaxy (models/Sms/R
 through Blender headless with its vertex colours kept), no FLUDD, a violet night; the two-line card over black ("You call that a fight fit for a
 king?" / "I'll show you a real fight..."), Mario revealed 22 m up and falling as the screen fades in, King Boo (SmsKingBooRematch, the arena's
 own actor on the casino boss's model) appearing 5.5 m over the floor once he lands, with the long laugh, then hovering and watching him. The
-fight itself -- the attacks, the teleports, the faces, the Boo bombs -- is later passes on this branch; the animations another AI's.
-- Branch `feature/kingboo-rematch` -- code tip `c5e718b` ("SMS 157: the King Boo REMATCH, part 1 -- the transition"; assets/Sms/Rematch/
+fight itself -- the attacks, the teleports, the faces -- is later passes on this branch; the animations another AI's. SMS 158: the BOMB BOOS
+and the SPIN -- X without the FLUDD is Mario's grounded spin (a new state): it grabs a Bomb Boo in reach, a second spin throws it; the Boos rise
+out of black foggy spots at the arena's centre (the supply; Random is a knob), drift to him and hover; three bursts on King Boo and he is down.
+Further passes re-point this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `d4abcd5` ("SMS 158: the King Boo REMATCH, part 2 -- the Bomb Boos and the spin"; assets/Mario.cs the spin and the carry,
+  assets/Sms/Rematch/ SmsBombBoo.cs, SmsBombBooSpawner.cs, BombBoo.gdshader, BombBoo.tscn, SmsKingBooRematch.cs (the hit points), RematchArena.tscn (the
+  supply), assets/Sms/Sound/SmsActorSound.cs, models/Sms/Rematch/ bomb_boo.glb + bomb_boo_tongue.glb and their PNGs / .import) on the 157 commit
+  ("SMS 157: the King Boo REMATCH, part 1 -- the transition"; assets/Sms/Rematch/
   SmsRematchExit.cs, SmsFloorShatter.cs, FloorShatter.gdshader, SmsRematchIntro.cs (+ SmsRematchCard), SmsKingBooRematch.cs, KingBooRematch.tscn,
   SmsArenaFloor.cs, RematchArena.tscn and their .uid; assets/Sms/Enemy/BossTelesa/KingBooArena.tscn (RematchExit + FloorShatter children,
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of it; 2 commits past `feature/sounds`, 24 since `main`. ~1 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 4 commits past `feature/sounds`, 26 since `main`. ~1 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 158: in the arena (through the casino, or F6 on assets/Sms/Rematch/RematchArena.tscn). A black foggy spot forms at the middle and a black
+  Boo rises out of it and drifts your way, stopping short. X (the X key on a keyboard): Mario spins -- within reach the Boo is snatched and spins
+  over his head. Jump: single jumps only; dive (B): he drops it and it drifts back. X again: he spins and THROWS it the way he faces (or the
+  stick's way); aimed roughly at King Boo it curves onto him -- he flips, flashes, every Boo on the field pops, and in 6 s the next comes.
+  Three hits and he goes down and vanishes (the fight's end is a later pass). Knobs: Mario's inspector, SMS Rematch (158): SpinSeconds,
+  SpinTurns, BombGrabRadius, BombThrowSpeed, BombThrowAssistDeg (0 = pure aim)...; the arena's BombBooSpawner (SpawnMode Centre / Random,
+  SpawnInterval, MaxOut); BombBoo.tscn's root (ModelScale, Opacity, DriftSpeed, HoverHeight, CarrySpin, ExpireSeconds); KingBoo (HitPoints).
 - To try 157: King Boo's room; beat him (three hits). Where the Shine came: the table cracks from the centre out, holds a breath, and breaks
   under you -- the pieces fly off and fade -- you fall into the dark, black, the two lines, and you drop into Bouldergeist's arena with no FLUDD
   (R and X do nothing); King Boo appears, laughs, and waits -- hovering, glowing, turning to watch you. Nothing attacks yet. A skips the card.

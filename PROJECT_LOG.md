@@ -11531,3 +11531,76 @@ wrapper not yet collected at the quit).
 rematch are the doc's. `Rematch` off on BossTelesa = the game's Shine. The glass break is the game's own object sound (MSD_SE_OBJ_GLASS_BREAK).
 The arena's scale is Galaxy's centimetres as metres (52.7 m across; the roulette table is 67 m): resize the Arena's Model child to taste. No
 music in the arena yet, no way back to the casino, no edge catch.
+
+### 158 -- the King Boo REMATCH, part 2: the Bomb Boos and the spin (feature/kingboo-rematch, code `d4abcd5`)
+
+**Jaysonn:** "ok that was pretty fucking slick., next: the Boo bombs (spawn spots, grab, carry, throw) for this they can spawn anywehrre on the map
+put for play testing purpose lets have them just spawn in the middle also lets make a new button press of X when mario doesnt have fludd on
+where he will do a grounded spin. (make this a new state of grounded spin since we will add speical properties to it)"
+
+The doc's HOW MARIO DEALS DAMAGE: the Bomb Boos (Galaxy's black Boos) are his only weapon; the grounded spin grabs one, it spins over his
+head, a dive drops it, and landing it on King Boo takes a hit point. Three pieces this pass: the SPIN (Mario), the BOMB BOO (the actor and
+its supply), KING BOO'S HIT POINTS.
+
+**The spin** (`assets/Mario.cs`): `MarioState.spin`, a NEW state next to the old `groundSpin` (the stick-rotate + R spin of the pre-SMS port, left as
+it is), so the rematch can give it properties. X without the FLUDD (`!_smsHasFludd`; the pad live; the X key stands in for the pad's X) from the
+old spin's statuses (standing, walking, running, the landings), hands empty of the game's takeables, the cooldown over -> `SmsSpinStart`: the
+body turns SpinTurns (2) full turns over SpinSeconds (0.6) in `SmsSpinFrame` (the armature, as the old spin does it; `ma_spin_p` stands in for the
+spin's own animation, the spin-jump blur rings with it), the stick steers him through it at SpinMoveSpeed (7 m/s) keeping what speed he had,
+A leaves it in a spin jump; SpinCooldown (0.2 s) before the next. Hands empty: the nearest FREE Bomb Boo within BombGrabRadius (2.8 m across,
+under BombGrabHeight 3.5 up) is GRABBED the moment it is in reach. A Boo in hand: the spin THROWS it BombThrowAt (0.12 s) in -- the stick's way
+when held, else his face, at BombThrowSpeed (22 m/s) with BombThrowUp (4 m/s) of rise; a King Boo within BombThrowAssistDeg (35) of the aim
+pulls the throw onto himself (a lob at the throw speed whose rise lands it on his body point under the Boo's gravity: the aim help, for a chase
+camera and a 2.4-m target 18 m off). A grab never throws in the same spin (run a did: grabbed at 0.02 s, thrown at 0.12). The carry (the doc's
+"run and single jump, nothing else"): `_smsBomb` set makes every jump a SINGLE jump (the chain stage is dropped at both decision sites -- the
+landing's A at 3462 and `StartJumpFromLanding`, which run b found), L in the air gives no hip drop, a DIVE (and a belly slide, a rollout, a hip
+drop in flight, a hit, a death, the swim, a talk, a demo, the hangs) DROPS it (`SmsBombTick`), a SPIN JUMP (`SmsLaunch(RotateJump)`) makes the Boo
+spin faster (SpinJumpBoost x2 for 2.5 s). While he carries it his arms take the carry pose (`CARRY_BLEND_PATH`, ma_carry_p over whatever the body
+does -- the two-handed fruit hold stands in for the doc's one-arm blend until that animation comes) and the waist lean is off, as with a fruit.
+Public: `SmsBombHeld`, `SmsSpinning`, `SmsSpinCount`, `SmsSpinTime`, `SmsBombDrop()`, `SmsBombGone(boo)`. Knobs under "SMS Rematch (158)" on his
+inspector: SmsSpinEnabled, SpinSeconds, SpinTurns, SpinMoveSpeed, SpinSteerAccel, SpinCooldown, BombGrabRadius, BombGrabHeight, BombThrowAt,
+BombThrowSpeed, BombThrowUp, BombThrowAssistDeg.
+
+**The Bomb Boo** (`assets/Sms/Rematch/SmsBombBoo.cs`, `BombBoo.tscn`, `BombBoo.gdshader`): `BombTeresa.dae` (the body, 986 triangles) and
+`BombTeresaTongue.dae` from Jaysonn's Downloads through Blender headless as the arena was (`pc/convert_bombboo.py`: centimetres to metres, the
+vertex colours into COLOR_0) -> `models/Sms/Rematch/bomb_boo.glb` (35 KB) + `bomb_boo_tongue.glb` (7 KB). Galaxy's centimetres make the body
+2.5 m wide, 2.1 tall: ModelScale 0.8 (2 m wide, 1.7 tall; Mario is 2.15 m in the port's metres: 160 u / 74.44). The tongue hangs at
+TongueOffset under the body's origin (its glb has it from the origin down). The materials' BodyMat_v (ambient 64 / 64 / 64 / 150: partly
+see-through) is the shader: the BombTeresa texture x the vertex colours x `tint`, `opacity` 0.78, a dark-violet rim (`glow_color`, `glow`) so the
+black body reads against the dark arena, `flash` for the carry's pulse and the throw. Its life: RISING out of the fog (RiseSeconds 0.7, scaling
+up and lifting to HoverHeight), DRIFTING toward Mario at DriftSpeed (1.6 m/s) stopping DriftStopDistance (1.6 m) short, HoverHeight (1.3 m) over
+the floor under it (a ray every eight ticks, Mario's body excluded), bobbing (0.2 m / 1.8 s), facing him (FacesPlusZ: flip if the model's
+face is the other way); ExpireSeconds (0 = never) and it vanishes on its own; CARRIED: over his head (his height + CarryOver + half its own),
+spinning at CarrySpin (360 deg/s; x SpinJumpBoost after his spin jump), a faint pulse; dropped: drifting again, no grab for DropGraceSeconds
+(0.6); THROWN: the flight under ThrowGravity (9), each tick's sweep against King Boo's body point (KingBooHitRadius 2.4) -- a hit BURSTS it on him
+(`SmsKingBooRematch.TakeHit`); a ray against the floor and walls, ThrowSeconds (2.5) or a fall far below the floor burst it for nothing. The
+burst is the port's EnemyDisap puff recoloured violet; the sounds are the small Boo's (MSD_SE_EN_TELESA_APPEAR / FIX / CRUSH / DISAPPEAR through
+an SmsActorSound node, `ActorOf["SmsBombBoo"] = "bombboo"`). Signals: Grabbed, Dropped, Thrown, Burst(hitKingBoo). Static `All`.
+
+**The supply** (`SmsBombBooSpawner.cs`, the arena's `BombBooSpawner` at the centre): from the fight's start (the intro's FightReady; at once with
+no intro, or StartAtOnce) every SpawnInterval (6 s) while fewer than MaxOut (2) are out and King Boo stands: a black foggy spot (a GPUParticles3D
+of dark violet smoke on kemuball3_dark, FogSeconds 1.1) and a Bomb Boo rising out of it. SpawnMode Centre -- this node's point, the middle of
+the arena, for the playtests as Jaysonn asked -- or Random: anywhere within ArenaRadius (18 m) of it, never nearer Mario than MinFromMario (4),
+the floor found under the point by a ray. King Boo's hit CLEARS every Boo on the field (the doc) and pauses the supply ClearPause (2 s); his
+defeat stops it. Knobs: the supply's (FirstDelay, SpawnInterval, FogSeconds, ClearPause, MaxOut, FloorOffset, StartAtOnce, Enabled), the place
+(SpawnMode, ArenaRadius, MinFromMario), the fog (FogColor, FogRadius, FogTexture).
+
+**King Boo's hit points** (`SmsKingBooRematch.cs`): HitPoints (3, the doc). `TakeHit(boo)` while he waits: a point off, the HURT -- the hit clip
+(btelesa_hit, 0.7 s) with HurtTurns (1) full turns about himself (the doc's "flips around in a hurt animation", until its own animation comes),
+the body flashing HurtFlash red through the shader's tint / mask, the damage cry (MSD_SE_BS_TELESA_DAMAGE), OpacityPerHit (0.1) more solid --
+then the wait again; at none left the DOWN: the down clip (btelesa_down, 3.3 s) with the down sound, then he is gone (Defeated). The fight's
+end -- the Shine, a way back to the casino -- is a later pass: for now the arena is quiet once he is gone. Signals Hit(hpLeft), Defeated;
+`Hp`, `HitsTaken`, `CanBeHit` (only while he waits), `IsAlive`.
+
+**Drive 158** (`SmsBomb.Drive.cs`, the arena run on its own, four runs, deleted before the commit): A skips the card; the supply runs from
+FightReady in mode Centre (C1); the first Boo out of the fog at the centre with its two shader materials and the appear sound (C2); drifting
+to Mario at hover height (C3); X -> MarioState.spin, the armature turning, the count (C4); the grab: carried 3.4 m over his feet (C5); A, then A
+on the landing = a SINGLE jump with the Boo in hand (C6, run b caught `StartJumpFromLanding` giving a double); the dive drops it (C7); a second
+spin grabs again -- the nearest free Boo, a new one that had drifted to him (C8); the spin with it THROWS it onto King Boo through the aim help
+(C9); the burst takes a hit point, the field clears, the supply pauses (C10); the hurt over in 0.7 s (C11); three throws and he is down and gone,
+the supply stopped (C12). Run d: 12 / 12, the .err empty (a first run's glb-texture UID warnings went with the second import).
+
+**Deviations, all knobs or stand-ins:** the game has none of this. The spin's clip (ma_spin_p), the carry pose (ma_carry_p, two hands), the hurt
+flip (the hit clip + a turn) and the down are stand-ins for the animations another hand makes. The aim help (BombThrowAssistDeg 35) is mine, 0 =
+pure aim. Boos do not hurt Mario on touch (the doc says nothing of it; Galaxy's do: a knob for a later pass if wanted). The supply spawns at the
+centre for the playtests (Random is there). No HUD for his hit points yet.
