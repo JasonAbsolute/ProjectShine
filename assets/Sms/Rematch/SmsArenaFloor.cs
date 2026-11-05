@@ -5,7 +5,7 @@ using Godot;
 /// .dae with its real vertex colours, run through Blender; Galaxy's centimetres read as the port's metres, ArenaScale on the Model child
 /// re-sizes it). The collision is built from the model at start: one trimesh per mesh, the vertices carried into this body's space (the
 /// glb's scale baked into the triangles, as the roulette discs do). TopY is the highest point (the drives and the intro's spawn heights read
-/// it); the intro finds the floor under a point with a ray. Knobs: AutoCollision (off: your own CollisionShape3D children), Brightness
+/// it); the intro finds the floor under a point with a ray; 162: Centre / Radius (the vertices' span) place King Boo's teleport spots. Knobs: AutoCollision (off: your own CollisionShape3D children), Brightness
 /// (an albedo multiplier on every material; 1 = the file's).
 /// </summary>
 public partial class SmsArenaFloor : StaticBody3D
@@ -20,6 +20,10 @@ public partial class SmsArenaFloor : StaticBody3D
     public float BottomY { get; private set; } = float.NaN;
     public int Triangles { get; private set; }
     public int Meshes { get; private set; }
+    /// <summary>162: the floor's middle (x / z at TopY) and its radius (half its wider span), from the vertices -- King Boo's teleport spots.</summary>
+    public Vector3 Centre { get; private set; }
+    public float Radius { get; private set; }
+    private float _minX = float.NaN, _maxX, _minZ, _maxZ;
 
     public override void _Ready()
     {
@@ -47,7 +51,9 @@ public partial class SmsArenaFloor : StaticBody3D
                 for (int i = 0; i < verts.Length; i++)
                 {
                     verts[i] = rel * verts[i];
-                    float y = (GlobalTransform * verts[i]).Y;
+                    Vector3 w = GlobalTransform * verts[i]; float y = w.Y;
+                    if (float.IsNaN(_minX)) { _minX = _maxX = w.X; _minZ = _maxZ = w.Z; }
+                    else { _minX = Mathf.Min(_minX, w.X); _maxX = Mathf.Max(_maxX, w.X); _minZ = Mathf.Min(_minZ, w.Z); _maxZ = Mathf.Max(_maxZ, w.Z); }
                     if (float.IsNaN(TopY) || y > TopY) TopY = y;
                     if (float.IsNaN(BottomY) || y < BottomY) BottomY = y;
                 }
@@ -61,7 +67,8 @@ public partial class SmsArenaFloor : StaticBody3D
             if (AutoCollision && !Engine.IsEditorHint() && am.GetSurfaceCount() > 0)
                 AddChild(new CollisionShape3D { Name = mi.Name + "Trimesh", Shape = am.CreateTrimeshShape() });
         }
-        if (DebugPrint) GD.Print($"[SMS arena] {Name}: {Meshes} meshes, {Triangles} triangles, y {BottomY:F2}..{TopY:F2}");
+        if (!float.IsNaN(_minX)) { Centre = new Vector3((_minX + _maxX) * 0.5f, TopY, (_minZ + _maxZ) * 0.5f); Radius = Mathf.Max(_maxX - _minX, _maxZ - _minZ) * 0.5f; }
+        if (DebugPrint) GD.Print($"[SMS arena] {Name}: {Meshes} meshes, {Triangles} triangles, y {BottomY:F2}..{TopY:F2}, middle {Centre}, radius {Radius:F1}");
     }
 
     /// <summary>The ground under (x, z) from `fromY` down (a ray on the bodies, `exclude`d ones -- Mario's -- left out): its world y, or null.</summary>

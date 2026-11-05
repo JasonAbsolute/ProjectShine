@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 /// <summary>
 /// SMS pass 157: KING BOO as the REMATCH fights him (KINGBOO_REMATCH_gdoc.txt) -- the arena's own actor, apart from the casino's
@@ -10,10 +11,26 @@ using System.Collections.Generic;
 /// eyes (btelesa_twait's 150-frame table), the ghost's screen mix at GhostOpacity. Pass 158: HIS HIT POINTS -- a thrown Bomb Boo bursting on him
 /// (SmsBombBoo; 159: SWUNG into his body's hit cylinder, HitRadius / HitBelow / HitAbove) is <see cref="TakeHit"/>: a point off, the hit clip
 /// with a full turn about himself (the doc's hurt flip, until its own animation comes), a flash, more solid (OpacityPerHit); at none left the
-/// down clip and he is gone (Defeated). The attacks, the teleports
-/// and the faces are later passes; the animations another hand's. The model is the casino boss's (btelesa.glb at 1 / 74.44) with its shader materials
+/// down clip and he is gone (Defeated).
+/// Pass 162: THE TELEPORTS AND THE LICK (the doc: "quick and light... teleports between spots... does not walk"; "he teleports directly in front of
+/// Mario and licks, with half a second of wind-up before it lands. The wind-up is the whole tell and a jump clears it"). While he waits a gap runs
+/// down (GapAtStart at the first hit point to GapAtLastHit at the last, +- GapJitter: the doc's pace, shorter per hit); at its end a MOVE: he
+/// VANISHES (the hide clip -- its hop up -- under a fade of TeleportOutSeconds, MSD_SE_BS_TELESA_DISAPPEAR), and ARRIVES somewhere else (a fade in
+/// of TeleportInSeconds, settling down TeleportInDrop, the appear voice): usually LickDistance in front of Mario, facing him, at LickHeight over the
+/// floor, for the LICK; by RepositionChance just another spot of the arena (SpotRadius about its middle, SpotMinFromMario to SpotMaxFromMario from
+/// Mario) and a half gap.
+/// The lick is a casino clip for the body (LickClip: btelesa_roll's rear-up and plunge, the roulette spin; Jaysonn: "use that as a base and change
+/// where the tongue is") with the TONGUE CHANGED: at LickStrikeFrame (frame 30 at 60 bck frames a second: the half second of wind-up, the tongue
+/// raised overhead by the clip, MSD_SE_BS_TELESA_V_ROLL) <see cref="SmsTongueAim"/> snaps the tongue chain onto where Mario stands (LickAimUp over
+/// his feet) over LickSnapSeconds, holds it LickHoldSeconds, pulls it back over LickRetractSeconds; the clip is cut at LickEndFrame for the wait,
+/// AfterLickSeconds later he vanishes to another spot and the gap runs again. The HIT: through the snap and the hold, Mario within LickHitRadius of
+/// the mark the tongue lands on with his feet lower than LickClearHeight over its floor (the tongue's tip come to the mark: within reach) is the plain
+/// hit -- Mario.TakeDamage with the common enemy profile, the knockdown -- once per lick; a jump at the tell clears it. He can be hit by a swung Bomb Boo while he
+/// waits AND through the lick (the hit breaks the lick off: the hurt as before); not while he is between spots. The faces and the other attacks are
+/// later passes; the animations another hand's. The model is the casino boss's (btelesa.glb at 1 / 74.44) with its shader materials
 /// (BossTelesaBody/Crown/Ha/Mouth.tres: opacity, tint, mask_k, base_tex), copied per instance. Signals: Spawned (the appear starts), Laughed
-/// (the laugh starts), Ready (the wait begins -- the fight may start).
+/// (the laugh starts), ReadyForFight (the wait begins -- the fight may start), Hit, Defeated; 162: Teleported (he has arrived somewhere), LickStarted
+/// (the wind-up), Licked(hit) (the tongue is pulled back, with whether it got him).
 /// </summary>
 public partial class SmsKingBooRematch : Node3D
 {
@@ -45,6 +62,39 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>159: his BODY for the swung Bomb Boo -- a cylinder about jnt_body: this radius, this far under the joint to this far over it (metres; the
     /// game's body hit cylinder is 350 u across, 550 tall from 200 under the joint: 4.7 / 2.7 / 4.7). A little inside the visible body.</summary>
     [Export] public float HitRadius = 4f, HitBelow = 2.5f, HitAbove = 4.5f;
+    [ExportGroup("The fight (162): the teleports and the Lick")]
+    /// <summary>The moves run at all (off: he waits as before, for the earlier passes' tests).</summary>
+    [Export] public bool AttacksOn = true;
+    /// <summary>Seconds from the fight's start (the wait begins) to his first move.</summary>
+    [Export] public float FirstAttackDelay = 3f;
+    /// <summary>The gap between moves: this long with all his hit points, this long at his last one (the doc's pace: shorter per hit), give or take the jitter.</summary>
+    [Export] public float GapAtStart = 3.5f, GapAtLastHit = 1.8f, GapJitter = 0.6f;
+    /// <summary>The chance a move is only a hop to another spot of the arena (no lick); the gap after one is half.</summary>
+    [Export(PropertyHint.Range, "0,1,0.05")] public float RepositionChance = 0.3f;
+    /// <summary>The teleport: the fade out (the hide clip plays under it: its hop up; longer than 0.5 s shows its dive down too), the fade in, how far he
+    /// settles down as he fades in, and the clip for the vanish ("" = none).</summary>
+    [Export] public float TeleportOutSeconds = 0.4f, TeleportInSeconds = 0.3f, TeleportInDrop = 1.2f;
+    [Export] public string TeleportClip = "btelesa_hide";
+    [Export] public string VanishSe = "MSD_SE_BS_TELESA_DISAPPEAR", ArriveSe = "MSD_SE_BS_TELESA_V_APPEAR";
+    /// <summary>The spots: at least this far from Mario, at most this far (0 = no cap; the arena is 26 m across), within this radius of the arena's middle
+    /// (0 = three quarters of the floor's own).</summary>
+    [Export] public float SpotMinFromMario = 7f, SpotMaxFromMario = 16f, SpotRadius = 0f;
+    /// <summary>The lick's spot: this far in front of Mario (along his face; his body joint is 4.3 m behind his own face, so 6 puts his face about 1.7 m from
+    /// Mario), his body joint this high over the floor (0 = his hover height; low: the tongue reaches, 7.8 m from the mouth).</summary>
+    [Export] public float LickDistance = 6f, LickHeight = 3f;
+    /// <summary>The body's clip for the lick, its speed, the bck frame the tongue snaps at (30 = half a second), the frame the clip is cut at for the wait
+    /// (btelesa_roll: 139 frames; the body is back at its height by 80). btelesa_spit works too (strike 40, end 99).</summary>
+    [Export] public string LickClip = "btelesa_roll";
+    [Export] public float LickClipSpeed = 1f;
+    [Export] public int LickStrikeFrame = 30, LickEndFrame = 80;
+    /// <summary>The tongue: the snap onto Mario, the hold (the hit window), the pull back; then this long in the wait before he vanishes.</summary>
+    [Export] public float LickSnapSeconds = 0.12f, LickHoldSeconds = 0.15f, LickRetractSeconds = 0.3f, AfterLickSeconds = 0.4f;
+    /// <summary>The tongue aims this high over Mario's feet. THE HIT (through the snap and the hold): Mario within LickHitRadius of where it lands, his feet
+    /// lower than LickClearHeight over its floor (a jump clears it), and the tongue's tip come within LickTipSlack of the mark (out of reach = a miss).</summary>
+    [Export] public float LickAimUp = 0.3f, LickHitRadius = 1.2f, LickClearHeight = 0.8f, LickTipSlack = 1f;
+    /// <summary>The body joint never dips closer than this to the floor through the lick clip's plunge (the node lifts).</summary>
+    [Export] public float BodyMinOverFloor = 2.6f;
+    [Export] public string LickWindSe = "MSD_SE_BS_TELESA_V_ROLL", LickSe = "MSD_SE_BS_TELESA_LICK";
     [ExportGroup("")]
     [Export] public bool DebugPrint;
 
@@ -54,18 +104,39 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>158: a Bomb Boo burst on him (the hit points left) / the last one took him down.</summary>
     [Signal] public delegate void HitEventHandler(int hpLeft);
     [Signal] public delegate void DefeatedEventHandler();
+    /// <summary>162: he has arrived at a spot; the lick's wind-up begins; the tongue is pulled back (whether it got Mario).</summary>
+    [Signal] public delegate void TeleportedEventHandler();
+    [Signal] public delegate void LickStartedEventHandler();
+    [Signal] public delegate void LickedEventHandler(bool hit);
 
-    public enum Phase { Hidden, Appear, Laugh, Wait, Hurt, Down, Gone }
+    public enum Phase { Hidden, Appear, Laugh, Wait, Hurt, Down, Gone, Vanish, Arrive, Lick }
     public Phase State { get; private set; } = Phase.Hidden;
     public string Clip => _anim != null ? (string)_anim.CurrentAnimation : "";
     public bool IsSpawned => State != Phase.Hidden;
     public bool LaughPlayed { get; private set; }
     public int Hp { get; private set; } = -1;
     public int HitsTaken { get; private set; }
-    /// <summary>A Bomb Boo bursts on him only while he waits (not through the hurt, the down, the entrance).</summary>
-    public bool CanBeHit => State == Phase.Wait;
+    /// <summary>A Bomb Boo bursts on him while he waits or licks (not between spots, through the hurt, the down, the entrance).</summary>
+    public bool CanBeHit => State == Phase.Wait || State == Phase.Lick;
     public bool IsAlive => State != Phase.Down && State != Phase.Gone;
     public int MaterialsCopied => _mats.Count;
+    /// <summary>162, for the drives: the lick's stage (-1 none, 0 wind-up, 1 snap, 2 hold, 3 pull back, 4 the wait after), the counts, the gap left, the
+    /// last spot, his hover height over the floor, the arena's middle and radius as he read them, the tongue.</summary>
+    public int LickStage => State == Phase.Lick ? _lickStage : -1;
+    public int MovesMade { get; private set; }
+    public int TeleportsMade { get; private set; }
+    public int LicksMade { get; private set; }
+    public int LickHits { get; private set; }
+    public int LickMisses { get; private set; }
+    public float GapNow => _gapT;
+    public float LastGap { get; private set; }
+    public bool LastMoveWasLick => _moveIsLick;
+    public Vector3 LastSpot { get; private set; }
+    public float HoverOverFloor => _hoverOverFloor;
+    public Vector3 ArenaCentre => _arenaCentre;
+    public float ArenaRadius => _arenaRadius;
+    public SmsTongueAim Tongue => _tongue;
+    public float OpacityShown => _opacityShown;
     /// <summary>jnt_body's place in the world (where the glow sits).</summary>
     public Vector3 BodyPoint => _skel != null && _bBody >= 0 ? _skel.GlobalTransform * _skel.GetBoneGlobalPose(_bBody).Origin : GlobalPosition;
     /// <summary>159: a point (a swung Bomb Boo, with its own reach) is in his body's hit cylinder (HitRadius, HitBelow, HitAbove about jnt_body).</summary>
@@ -78,17 +149,27 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>The cylinder's lowest point over the world's floor, for the drives.</summary>
     public float HitBottomY => BodyPoint.Y - HitBelow;
 
+    private const float U = 74.44f;
     // the clips used, their bck frame counts (one bck frame = 1 / 60 s) and loops -- SmsBossTelesa's table
     private const string BckAppear = "btelesa_appear", BckLaugh = "btelesa_laugh", BckWait = "btelesa_wait", BckHit = "btelesa_hit", BckDown = "btelesa_down";
-    private static readonly Dictionary<string, (int frames, bool loop)> Clips = new() { [BckAppear] = (59, false), [BckLaugh] = (89, false), [BckWait] = (60, true), [BckHit] = (42, false), [BckDown] = (199, false) };
+    private static readonly Dictionary<string, (int frames, bool loop)> Clips = new()
+    {
+        [BckAppear] = (59, false), [BckLaugh] = (89, false), [BckWait] = (60, true), [BckHit] = (42, false), [BckDown] = (199, false),
+        ["btelesa_hide"] = (44, false), ["btelesa_roll"] = (139, false), ["btelesa_lick"] = (140, false), ["btelesa_spit"] = (99, false), ["btelesa_bero_hit"] = (59, false), ["btelesa_damage"] = (219, false),
+    };
     private static readonly int[] BlinkEnds = { 19, 21, 24, 26, 28, 30, 33, 35, 85, 87, 90, 92, 150 };   // the twait runs' ends (frames)
     private static readonly int[] BlinkEyes = { 0, 1, 2, 1, 0, 1, 2, 1, 0, 1, 2, 1, 0 };                   // open / half / close
 
     private Node3D _model; private AnimationPlayer _anim; private Skeleton3D _skel; private int _bBody = -1;
     private readonly List<ShaderMaterial> _mats = new(); private ShaderMaterial _bodyMat;
-    private GpuParticles3D _chika; private Node3D _glow; private SmsActorSound _sound;
+    private GpuParticles3D _chika; private Node3D _glow; private SmsActorSound _sound; private SmsTongueAim _tongue;
     private Mario _mario; private float _yaw, _hoverT, _blinkT; private int _eyeNow = -1; private Vector3 _home; private bool _laughSounded;
     private float _hurtT, _hurtLen, _hurtYaw0; private bool _flashOn;
+    // 162
+    private readonly Random _rng = new(162);
+    private float _gapT, _fadeT, _opacitySolid, _opacityShown, _hoverOverFloor = 4f, _arenaRadius = 12f, _floorAtSpot = float.NaN;
+    private Vector3 _arenaCentre, _dest, _lickTarget; private bool _moveIsLick, _lickHit, _lickClipEnded, _arenaRead;
+    private int _lickStage = -1; private float _lickT, _stageT, _strikeAt;
 
     public override void _Ready()
     {
@@ -98,7 +179,11 @@ public partial class SmsKingBooRematch : Node3D
         {
             if (_anim == null) foreach (Node n in _model.FindChildren("*", "AnimationPlayer", true, false)) { _anim = n as AnimationPlayer; if (_anim != null) break; }
             foreach (Node n in _model.FindChildren("*", "Skeleton3D", true, false)) { _skel = n as Skeleton3D; break; }
-            if (_skel != null) { _bBody = _skel.FindBone("jnt_body"); if (_bBody < 0 && _skel.GetBoneCount() > 1) _bBody = 1; }
+            if (_skel != null)
+            {
+                _bBody = _skel.FindBone("jnt_body"); if (_bBody < 0 && _skel.GetBoneCount() > 1) _bBody = 1;
+                if (!Engine.IsEditorHint()) { _tongue = new SmsTongueAim { Name = "TongueAim", Debug = DebugPrint }; _skel.AddChild(_tongue); }
+            }
             foreach (Node n in _model.FindChildren("*", "MeshInstance3D", true, false))
             {
                 var mi = (MeshInstance3D)n;
@@ -120,13 +205,17 @@ public partial class SmsKingBooRematch : Node3D
         EyeClose ??= LoadTex("res://models/Eniemes/BossTelesa/N_nbtelesa_eye_close.png");
         _chika = GetNodeOrNull<GpuParticles3D>("ChikaFx"); _glow = GetNodeOrNull<Node3D>("GlowFx");
         foreach (Node3D fx in new Node3D[] { _chika, _glow }) if (fx != null) { fx.TopLevel = true; fx.Visible = false; }
-        foreach (var m in _mats) { m.SetShaderParameter("opacity", GhostOpacity); m.SetShaderParameter("tint", new Vector3(1f, 1f, 1f)); m.SetShaderParameter("mask_k", 0f); }
+        _opacitySolid = GhostOpacity;
+        foreach (var m in _mats) { m.SetShaderParameter("tint", new Vector3(1f, 1f, 1f)); m.SetShaderParameter("mask_k", 0f); }
+        SetOpacity(GhostOpacity);
         ApplyEye(0);
         _sound = SmsActorSound.Attach(this);
         _yaw = Rotation.Y; _home = Position;
         if (_model != null) _model.Visible = false;
-        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: {_mats.Count} materials, clips {(_anim != null ? string.Join(",", _anim.GetAnimationList()) : "none")}, body joint {_bBody}");
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: {_mats.Count} materials, clips {(_anim != null ? string.Join(",", _anim.GetAnimationList()) : "none")}, body joint {_bBody}, tongue {(_tongue != null && _tongue.Bound ? "bound" : "none")}");
+        SmsKingBooDriveHook();
     }
+    partial void SmsKingBooDriveHook();
     private static Texture2D LoadTex(string path) => ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;
 
     /// <summary>He appears: the appear clip, then the laugh with the long laugh, then the wait. Nothing happens twice.</summary>
@@ -137,9 +226,37 @@ public partial class SmsKingBooRematch : Node3D
         Hp = Math.Max(1, HitPoints); HitsTaken = 0;
         if (_model != null) _model.Visible = true;
         PlayClip(BckAppear);
-        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: appears at {GlobalPosition}");
+        ReadArena();
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: appears at {GlobalPosition} ({_hoverOverFloor:F2} m over the floor; the arena's middle {_arenaCentre}, radius {_arenaRadius:F1})");
         EmitSignal(SignalName.Spawned);
     }
+
+    /// <summary>162: his hover height over the floor from where he was put, the arena's middle and radius from its floor (SmsArenaFloor), for the spots.</summary>
+    private void ReadArena()
+    {
+        float fy = FloorUnder(GlobalPosition);
+        _hoverOverFloor = float.IsNaN(fy) ? 4f : Mathf.Max(0.5f, GlobalPosition.Y - fy);
+        _arenaCentre = GlobalPosition; _arenaRadius = 12f;
+        var floor = GetTree().CurrentScene?.FindChildren("*", "StaticBody3D", true, false).OfType<SmsArenaFloor>().FirstOrDefault();
+        if (floor != null && floor.Radius > 1f) { _arenaCentre = floor.Centre; _arenaRadius = floor.Radius; }
+        _arenaRead = true;
+    }
+    /// <summary>The ground under a point (a ray from 100 m over it, 400 m down, Mario left out): its world y, or NaN.</summary>
+    private float FloorUnder(Vector3 p)
+    {
+        var space = GetWorld3D()?.DirectSpaceState; if (space == null) return float.NaN;
+        var q = PhysicsRayQueryParameters3D.Create(p + Vector3.Up * 100f, p + Vector3.Down * 300f);
+        q.CollideWithAreas = false; q.CollideWithBodies = true;
+        var m = M(); if (m != null) q.Exclude = new Godot.Collections.Array<Rid> { m.GetRid() };
+        var hit = space.IntersectRay(q);
+        return hit.Count > 0 ? hit["position"].AsVector3().Y : float.NaN;
+    }
+    private Mario M()
+    {
+        if (_mario == null || !IsInstanceValid(_mario)) _mario = GetTree().GetFirstNodeInGroup("player") as Mario;
+        return _mario;
+    }
+    private static float Flat(Vector3 a, Vector3 b) => new Vector2(a.X - b.X, a.Z - b.Z).Length();
 
     private void PlayClip(string name)
     {
@@ -151,6 +268,16 @@ public partial class SmsKingBooRematch : Node3D
         _anim.Play(name);
         _anim.Seek(0f, true);
         _anim.SpeedScale = 60f / rate;
+    }
+    /// <summary>The bck frame the clip named is at now (a big number when it is not the one playing).</summary>
+    private float ClipFrameNow(string name)
+    {
+        if (_anim == null || !_anim.IsPlaying()) return 9999f;
+        string cur = _anim.CurrentAnimation;
+        if (string.IsNullOrEmpty(cur) || cur != name) return 9999f;
+        var clip = _anim.GetAnimation(cur);
+        int frames = Clips.TryGetValue(cur, out var c) ? c.frames : 60;
+        return clip.Length > 0f ? (float)(_anim.CurrentAnimationPosition / clip.Length) * frames : 9999f;
     }
 
     private void OnClipEnd(StringName name)
@@ -165,15 +292,14 @@ public partial class SmsKingBooRematch : Node3D
         }
         else if (State == Phase.Laugh && n == BckLaugh)
         {
-            State = Phase.Wait;
-            PlayClip(BckWait);
-            if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: waits -- the fight may start");
+            EnterWait(FirstAttackDelay);
+            if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: waits -- the fight may start (the first move in {FirstAttackDelay:F1} s)");
             EmitSignal(SignalName.ReadyForFight);
         }
         else if (State == Phase.Hurt && n == BckHit)
         {
             SetFlash(false); Rotation = new Vector3(0f, _yaw, 0f);
-            if (Hp > 0) { State = Phase.Wait; PlayClip(BckWait); if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: back to the wait, {Hp} hit point(s) left"); }
+            if (Hp > 0) { EnterWait(NextGap()); if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: back to the wait, {Hp} hit point(s) left, the next move in {_gapT:F1} s"); }
             else
             {
                 State = Phase.Down; PlayClip(BckDown);
@@ -189,23 +315,45 @@ public partial class SmsKingBooRematch : Node3D
             if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: gone -- defeated (the fight's end is a later pass)");
             EmitSignal(SignalName.Defeated);
         }
+        else if (State == Phase.Lick && n == LickClip) _lickClipEnded = true;
+    }
+
+    private void EnterWait(float gap)
+    {
+        State = Phase.Wait; _hoverT = 0f; Position = _home; _gapT = gap; LastGap = gap;
+        PlayClip(BckWait);
+    }
+    /// <summary>The gap before the next move: GapAtStart with every hit point, GapAtLastHit at his last one, give or take GapJitter.</summary>
+    private float NextGap()
+    {
+        float k = HitPoints > 1 ? Mathf.Clamp(HitsTaken / (float)(HitPoints - 1), 0f, 1f) : 1f;
+        float g = Mathf.Lerp(GapAtStart, GapAtLastHit, k) + ((float)_rng.NextDouble() * 2f - 1f) * GapJitter;
+        return Mathf.Max(0.3f, g);
     }
 
     /// <summary>158: a Bomb Boo burst on him. A point off, the hurt (the hit clip, HurtTurns about himself, the flash), the Hit signal; the last takes him
-    /// down. False when he cannot be hit now.</summary>
+    /// down. False when he cannot be hit now. 162: through a lick it breaks the lick off.</summary>
     public bool TakeHit(SmsBombBoo by)
     {
         if (!CanBeHit) return false;
+        bool midLick = State == Phase.Lick;
+        AbortLick();
         Hp = Math.Max(0, Hp - 1); HitsTaken++;
-        State = Phase.Hurt; _hurtT = 0f; _hurtYaw0 = _yaw;
+        State = Phase.Hurt; _hurtT = 0f; _hurtYaw0 = _yaw; Position = _home;
         PlayClip(BckHit);
         _hurtLen = _anim != null && _anim.HasAnimation(BckHit) ? (float)(_anim.GetAnimation(BckHit).Length / Mathf.Max(0.01f, _anim.SpeedScale)) : 0.7f;
         SetFlash(true);
-        foreach (var m in _mats) m.SetShaderParameter("opacity", Mathf.Clamp(GhostOpacity + OpacityPerHit * HitsTaken, 0.1f, 1f));
+        _opacitySolid = Mathf.Clamp(GhostOpacity + OpacityPerHit * HitsTaken, 0.1f, 1f);
+        SetOpacity(_opacitySolid);
         if (_sound != null && !string.IsNullOrEmpty(HurtSe)) _sound.Play(HurtSe);
-        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: HIT by {by?.Name ?? "?"} -> {Hp} left (the hit clip, {_hurtLen:F2} s)");
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: HIT by {by?.Name ?? "?"}{(midLick ? " mid-lick" : "")} -> {Hp} left (the hit clip, {_hurtLen:F2} s)");
         EmitSignal(SignalName.Hit, Hp);
         return true;
+    }
+    private void AbortLick()
+    {
+        if (_tongue != null) { _tongue.On = false; _tongue.BlendSeconds = LickRetractSeconds; }
+        _lickStage = -1; _lickClipEnded = false;
     }
     private void SetFlash(bool on)
     {
@@ -214,6 +362,160 @@ public partial class SmsKingBooRematch : Node3D
         {
             m.SetShaderParameter("tint", on ? new Vector3(HurtFlash.R, HurtFlash.G, HurtFlash.B) : new Vector3(1f, 1f, 1f));
             m.SetShaderParameter("mask_k", on ? 1f : 0f);
+        }
+    }
+    private void SetOpacity(float o)
+    {
+        _opacityShown = o;
+        foreach (var m in _mats) m.SetShaderParameter("opacity", o);
+    }
+
+    // ------------------------------------------------------------------------------------------------------------------ 162: the moves
+    /// <summary>A move: he vanishes (the hide clip under the fade), to arrive in front of Mario for the lick, or (by RepositionChance, or when told) at another spot.</summary>
+    private void StartMove(bool? lick = null)
+    {
+        if (M() == null) { _gapT = 0.5f; return; }
+        _moveIsLick = lick ?? (_rng.NextDouble() >= RepositionChance);
+        AbortLick();
+        State = Phase.Vanish; _fadeT = 0f; MovesMade++;
+        if (!string.IsNullOrEmpty(TeleportClip)) PlayClip(TeleportClip);
+        if (_sound != null && !string.IsNullOrEmpty(VanishSe)) _sound.Play(VanishSe);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: move {MovesMade}: vanishes from {GlobalPosition} ({(_moveIsLick ? "for the LICK" : "to another spot")})");
+    }
+    /// <summary>Another spot of the arena: within SpotRadius of its middle (three quarters of the floor's radius), SpotMinFromMario to SpotMaxFromMario from Mario, over floor.</summary>
+    private Vector3 RandomSpot()
+    {
+        var m = M();
+        float radius = SpotRadius > 0f ? SpotRadius : _arenaRadius * 0.75f;
+        for (int i = 0; i < 16; i++)
+        {
+            float a = (float)(_rng.NextDouble() * Math.Tau), r = radius * Mathf.Sqrt((float)_rng.NextDouble());
+            var p = new Vector3(_arenaCentre.X + Mathf.Cos(a) * r, _arenaCentre.Y, _arenaCentre.Z + Mathf.Sin(a) * r);
+            if (m != null && (Flat(p, m.GlobalPosition) < SpotMinFromMario || (SpotMaxFromMario > 0f && Flat(p, m.GlobalPosition) > SpotMaxFromMario))) continue;
+            float fy = FloorUnder(p); if (float.IsNaN(fy)) continue;
+            _floorAtSpot = fy; p.Y = fy + _hoverOverFloor; return p;
+        }
+        _floorAtSpot = FloorUnder(_home); return _home;
+    }
+    /// <summary>The lick's spot: LickDistance in front of Mario along his face (behind him, or beside him, when there is no floor there), LickHeight over the floor.</summary>
+    private Vector3 LickSpot()
+    {
+        var m = M(); Vector3 mp = m.GlobalPosition;
+        Vector3 f = m.SmsFacingDir(); f.Y = 0f; f = f.LengthSquared() > 1e-6f ? f.Normalized() : Vector3.Forward;
+        float h = LickHeight > 0f ? LickHeight : _hoverOverFloor;
+        foreach (Vector3 dir in new[] { f, -f, f.Cross(Vector3.Up), Vector3.Up.Cross(f) })
+        {
+            Vector3 p = mp + dir * LickDistance;
+            float fy = FloorUnder(p); if (float.IsNaN(fy)) continue;
+            _floorAtSpot = fy; p.Y = fy + h; return p;
+        }
+        float under = FloorUnder(mp); _floorAtSpot = float.IsNaN(under) ? mp.Y : under;
+        return mp + f * LickDistance + Vector3.Up * (_floorAtSpot - mp.Y + h);
+    }
+    private void ArriveAt(Vector3 dest)
+    {
+        _dest = dest; _home = dest; LastSpot = dest; TeleportsMade++;
+        Position = dest + Vector3.Up * TeleportInDrop;
+        FaceNow();
+        State = Phase.Arrive; _fadeT = 0f;
+        PlayClip(BckWait);
+        SetOpacity(0f);
+        if (_sound != null && !string.IsNullOrEmpty(ArriveSe)) _sound.Play(ArriveSe);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: arrives at {dest} (floor {_floorAtSpot:F2}; Mario {(M() != null ? Flat(dest, M().GlobalPosition).ToString("F1") : "?")} m off)");
+        EmitSignal(SignalName.Teleported);
+    }
+    private void BeginLick()
+    {
+        State = Phase.Lick; _lickStage = 0; _lickT = 0f; _stageT = 0f; _lickHit = false; _lickClipEnded = false; LicksMade++;
+        PlayClip(LickClip);
+        if (_anim != null) _anim.SpeedScale *= Mathf.Max(0.1f, LickClipSpeed);
+        _strikeAt = LickStrikeFrame / 60f / Mathf.Max(0.1f, LickClipSpeed);
+        if (_sound != null && !string.IsNullOrEmpty(LickWindSe)) _sound.Play(LickWindSe);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: LICK {LicksMade}: the wind-up ({LickClip}, the tongue snaps at frame {LickStrikeFrame} = {_strikeAt:F2} s)");
+        EmitSignal(SignalName.LickStarted);
+    }
+    private void LickTick(float dt)
+    {
+        _lickT += dt; _stageT += dt;
+        var m = M();
+        switch (_lickStage)
+        {
+            case 0:                                                   // the wind-up: the clip's own tongue (raised overhead in the roll), still turning to him
+                FaceTick(dt);
+                if (_lickT >= _strikeAt)
+                {
+                    _lickStage = 1; _stageT = 0f;
+                    Vector3 mark = m != null ? m.GlobalPosition : GlobalPosition + Vector3.Forward * 5f;    // the floor under him (he may be in the air already)
+                    float fy = m != null ? FloorUnder(mark) : float.NaN; if (!float.IsNaN(fy)) mark.Y = fy;
+                    _lickTarget = mark + Vector3.Up * LickAimUp;
+                    if (_tongue != null) { _tongue.Target = _lickTarget; _tongue.BlendSeconds = LickSnapSeconds; _tongue.On = true; }
+                    if (_sound != null && !string.IsNullOrEmpty(LickSe)) _sound.Play(LickSe);
+                    if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the tongue SNAPS to {_lickTarget} (Mario {(m != null ? (m.IsOnFloor() ? "on the floor" : $"in the air, {m.GlobalPosition.Y - _lickTarget.Y + LickAimUp:F2} m up") : "?")})");
+                }
+                break;
+            case 1:                                                   // the snap
+                LickHitCheck(m);
+                if (_stageT >= LickSnapSeconds) { _lickStage = 2; _stageT = 0f; }
+                break;
+            case 2:                                                   // the hold: the hit window
+                LickHitCheck(m);
+                if (_stageT >= LickHoldSeconds)
+                {
+                    _lickStage = 3; _stageT = 0f;
+                    if (_tongue != null) { _tongue.BlendSeconds = LickRetractSeconds; _tongue.On = false; }
+                    if (!_lickHit) LickMisses++;
+                    if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the tongue pulls back -- {(_lickHit ? "it GOT him" : "a miss")}");
+                    EmitSignal(SignalName.Licked, _lickHit);
+                }
+                break;
+            case 3:                                                   // the pull back under the clip's tail, cut at LickEndFrame
+                if (_lickClipEnded || ClipFrameNow(LickClip) >= LickEndFrame) { _lickStage = 4; _stageT = 0f; PlayClip(BckWait); }
+                break;
+            case 4:                                                   // a breath in the wait, then off to another spot
+                if (_stageT >= AfterLickSeconds) StartMove(false);
+                break;
+        }
+        // the body kept out of the floor through the clip's plunge
+        if (!float.IsNaN(_floorAtSpot) && BodyMinOverFloor > 0f)
+        {
+            float bodyLocal = BodyPoint.Y - GlobalPosition.Y;
+            float lift = Mathf.Max(0f, _floorAtSpot + BodyMinOverFloor - (_home.Y + bodyLocal));
+            Position = _home + Vector3.Up * lift;
+        }
+    }
+    /// <summary>The lick on Mario, through the snap and the hold, once per lick: he is within LickHitRadius of the mark the tongue lands on, his feet
+    /// lower than LickClearHeight over the mark's floor (so a jump at the tell clears it), and the tongue's tip has come within LickTipSlack of the mark
+    /// (the chain reaches; out of reach it only points) -- the plain hit: Mario.TakeDamage with the common enemy profile, the knockdown.</summary>
+    private void LickHitCheck(Mario m)
+    {
+        if (_lickHit || m == null) return;
+        if (_lickStage == 1 && (_tongue == null || _tongue.Weight < 0.6f)) return;
+        Vector3 feet = m.GlobalPosition;
+        float floorY = _lickTarget.Y - LickAimUp;
+        if (Flat(feet, _lickTarget) > LickHitRadius) return;
+        if (feet.Y >= floorY + LickClearHeight) return;
+        if (_tongue != null && _tongue.Bound && _tongue.PointsValid && _tongue.TipPoint.DistanceTo(_lickTarget) > LickTipSlack) return;
+        _lickHit = true; LickHits++;
+        Vector3 from = _tongue != null && _tongue.PointsValid ? _tongue.TipPoint : _lickTarget;
+        m.TakeDamage(from, Mario.SmsDamageProfile.EnemyCommon);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the lick LANDS on Mario at {feet} ({Flat(feet, _lickTarget):F2} m from the mark, feet {feet.Y - floorY:F2} m up; hp {m.SmsHP})");
+    }
+    private void FaceNow()
+    {
+        var m = M(); if (m == null) return;
+        Vector3 d = m.GlobalPosition - GlobalPosition; d.Y = 0f;
+        if (d.LengthSquared() > 1e-4f) { _yaw = MathF.Atan2(d.X, d.Z); Rotation = new Vector3(0f, _yaw, 0f); }
+    }
+    private void FaceTick(float dt)
+    {
+        if (!FaceMario) return;
+        var m = M(); if (m == null) return;
+        Vector3 d = m.GlobalPosition - GlobalPosition; d.Y = 0f;
+        if (d.LengthSquared() > 1e-4f)
+        {
+            float want = MathF.Atan2(d.X, d.Z);     // +Z forward: the model faces +Z at yaw 0 (the casino places him at rotation 180 to face its camera)
+            _yaw = Mathf.LerpAngle(_yaw, want, Mathf.Clamp(TurnSpeed * dt, 0f, 1f));
+            Rotation = new Vector3(0f, _yaw, 0f);
         }
     }
 
@@ -240,21 +542,31 @@ public partial class SmsKingBooRematch : Node3D
         {
             _hoverT += dt;
             if (HoverBob > 0f && HoverBobSeconds > 0f) Position = _home + Vector3.Up * (MathF.Sin(_hoverT / HoverBobSeconds * MathF.Tau) * HoverBob);
-            if (FaceMario)
+            FaceTick(dt);
+            if (AttacksOn && _gapT > 0f) { _gapT -= dt; if (_gapT <= 0f) StartMove(); }
+        }
+        else if (State == Phase.Vanish)
+        {
+            _fadeT += dt;
+            float k = TeleportOutSeconds > 0f ? Mathf.Clamp(_fadeT / TeleportOutSeconds, 0f, 1f) : 1f;
+            SetOpacity(_opacitySolid * (1f - k));
+            if (k >= 1f) ArriveAt(_moveIsLick ? LickSpot() : RandomSpot());
+        }
+        else if (State == Phase.Arrive)
+        {
+            _fadeT += dt;
+            float k = TeleportInSeconds > 0f ? Mathf.Clamp(_fadeT / TeleportInSeconds, 0f, 1f) : 1f;
+            SetOpacity(_opacitySolid * k);
+            Position = _dest + Vector3.Up * (TeleportInDrop * (1f - k) * (1f - k));
+            FaceTick(dt);
+            if (k >= 1f)
             {
-                if (_mario == null || !IsInstanceValid(_mario)) _mario = GetTree().GetFirstNodeInGroup("player") as Mario;
-                if (_mario != null)
-                {
-                    Vector3 d = _mario.GlobalPosition - GlobalPosition; d.Y = 0f;
-                    if (d.LengthSquared() > 1e-4f)
-                    {
-                        float want = MathF.Atan2(d.X, d.Z);     // +Z forward: the model faces +Z at yaw 0 (the casino places him at rotation 180 to face its camera)
-                        _yaw = Mathf.LerpAngle(_yaw, want, Mathf.Clamp(TurnSpeed * dt, 0f, 1f));
-                        Rotation = new Vector3(0f, _yaw, 0f);
-                    }
-                }
+                Position = _dest;
+                if (_moveIsLick) BeginLick();
+                else { EnterWait(NextGap() * 0.5f); if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: waits at the new spot, the next move in {_gapT:F1} s"); }
             }
         }
+        else if (State == Phase.Lick) LickTick(dt);
         if (Blink) BlinkTick(dt);
         PlaceFx();
     }
@@ -276,7 +588,7 @@ public partial class SmsKingBooRematch : Node3D
     }
     private void PlaceFx()
     {
-        bool show = State != Phase.Hidden && State != Phase.Gone && _model != null && _model.Visible;
+        bool show = State != Phase.Hidden && State != Phase.Gone && _model != null && _model.Visible && _opacityShown > 0.02f;
         Vector3 at = BodyPoint;
         if (_chika != null) { bool on = show && Twinkle; _chika.Visible = on; _chika.Emitting = on; if (on) _chika.GlobalPosition = at; }
         if (_glow != null)
@@ -285,7 +597,7 @@ public partial class SmsKingBooRematch : Node3D
             if (_glow.Visible)
             {
                 _glow.GlobalPosition = at;
-                if (_glow is MeshInstance3D gm && gm.GetActiveMaterial(0) is ShaderMaterial gsm) gsm.SetShaderParameter("strength", Glow * GhostOpacity);
+                if (_glow is MeshInstance3D gm && gm.GetActiveMaterial(0) is ShaderMaterial gsm) gsm.SetShaderParameter("strength", Glow * _opacityShown);
             }
         }
     }
