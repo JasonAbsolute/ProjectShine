@@ -11709,3 +11709,36 @@ its flow (MaxOut, a knob; the game's two stay). Run l: 15 / 15, the .err empty.
 Bomb Boo's float is TTelesa's (telesa.prm) without the Boo's graph, fade loop, hose stun, block or imitators -- a Bomb Boo has none of those; its
 touch damage is the common enemy profile (the game's Boo's). TouchHurts ON by default ("everything just like normal boos"): off = 158's harmless
 Boo. SeeksMario off. The base stands 1.2 m over the floor where the Boo rose (the Boo keeps it; a drop re-reads the floor under it).
+
+### 161 -- the King Boo REMATCH, part 5: the fist on the tongue (feature/kingboo-rematch, code `7ffdff0`)
+
+**Jaysonn:** "ok lets have it alittle more out and have marios fist closed be the hand model and lets make sure the tounge is positioned more in the
+middle and lets make the tounge radius spin lon[ger]"
+
+**The arm further out** (`Mario.cs` LassoTilt 1.7 -> 2.5, LassoIn -0.4 -> -0.7; `SmsLassoArm.cs` the same defaults): the upper arm 68 deg out and a
+little forward, the forearm 35 deg out; the shoulder-to-wrist line 45 deg from straight up (160: 43), the wrist 1.33 m up and 0.60 m out from his
+axis (160: 0.48) -- well clear of the head.
+
+**The fist** (`Mario.cs`): two hand poses of their own, LassoR / LassoL -- the lasso side's CLOSED FIST model (the scene's RightHandClosed /
+LeftHandClosed, ma_hnd3) shown and its open hand hidden, the OTHER hand as the clip has it (open) -- picked by SmsHandPose while a Bomb Boo is
+held (ahead of the clip's hand column, after the cap's WithHat). ApplyHandPose knows them: the free side's open albedo stays, the lasso side's
+fist is visible.
+
+**The tongue in the middle** -- both ends. (1) The MOUTH: measured on the model (`pc/mouth161.py`: each polygon's UV centre sampled on BombTeresa.png,
+the pink polygons the mouth, the yellow the eyes). The body is 2.5 m wide, 1.8 tall and 2.1 deep about its origin with the face on its +Z side; the
+mouth's centre is at (0, -0.60, 0.86) in model metres, the eyes at (0, 0.15, 0.93) -- the tongue's root was at (0, -0.25, 1.0), a third of a metre
+too high, in the eyes. TongueOffset is (0, -0.6, 0.85) now: the root in the middle of the mouth, a little inside the lip. (2) The FIST: the tongue
+ends at the GRIP -- the closed hand model's mesh centre, carried into the hand bone's frame (`Mario.SmsLassoSetGrip`: the RightHandBone
+BoneAttachment3D rides the M_hand1_R bone; attachment-to-mesh is their local transforms, so the global pair at any moment gives the relation
+exactly; `SmsLassoArm.SetGrip(bone, local)`), 16.5 cm from the wrist joint, where 159-160 ended it. `SmsLassoArm.HandPoint` is the grip now,
+`WristPoint` the joint.
+
+**The swing longer** (`SmsBombBoo.cs`): OrbitRadius 2.8 -> 3.6 m. The swung Boo's reach into King Boo grows with it.
+
+**Drive 161** (`SmsBomb.Drive.cs`, two runs, deleted before the commit): 160's flow with the fist shown and the other hidden (C9b), the grip off the
+wrist and the tongue ending in it (C9), the root in the mouth in the Boo's own frame (run n read its world height against the offset: the 25-deg
+outward lean of the swing tips the face up, -0.15 m where the offset is -0.48 -- the check, not the root), the arm 45 deg / 0.60 m out (C8), the
+swing at 3.6 m (C7), the fist gone again after the drop (C12). Run o: 16 / 16.
+
+**Deviations, all knobs:** LassoTilt / LassoForward / LassoIn; TongueOffset; OrbitRadius. The grip is the closed hand model's centre -- another
+character's fist model gives its own.
