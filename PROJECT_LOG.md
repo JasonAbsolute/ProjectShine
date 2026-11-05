@@ -11604,3 +11604,66 @@ the supply stopped (C12). Run d: 12 / 12, the .err empty (a first run's glb-text
 flip (the hit clip + a turn) and the down are stand-ins for the animations another hand makes. The aim help (BombThrowAssistDeg 35) is mine, 0 =
 pure aim. Boos do not hurt Mario on touch (the doc says nothing of it; Galaxy's do: a knob for a later pass if wanted). The supply spawns at the
 centre for the playtests (Random is there). No HUD for his hit points yet.
+
+### 159 -- the King Boo REMATCH, part 3: the Bomb Boo by the tongue (feature/kingboo-rematch, code `35ae973`)
+
+**Jaysonn:** "ok the bomb boos textures are not right. they are just prueple and see thru. also the animiation blend needs to have one of marios
+arms in the air like hes spiining it around like a lasso. and the bomb boo should have a tounge that mario is holding onto while he spins around
+mario. and while he spins it around mario like that he lets it hit king boo not sending it flinging towards his facing direction"
+
+Galaxy's way, then: Mario holds the Bomb Boo's TONGUE up in one hand and the Boo SWINGS ROUND HIM; he walks it into the target. 158's over-the-head
+spin and throw are gone.
+
+**The look** (`BombBoo.gdshader`, the Boo's Look knobs). What the files hold, read in Blender (`pc/inspect_bombboo.py`): BombTeresa.png is a dark
+maroon body (0.42, 0.05, 0.03) with YELLOW eyes (1, 0.78, 0) and a pink mouth; the vertex colours are all dark (mean 0.18 linear, none over 0.4); the
+material's ambient is 64 / 64 / 64 / 150, its colour registers (0,0,0,-89) / (1023,1023,1023,255) the ghost recipe's -- the stage output doubled.
+158 multiplied texture x vertex colour straight (near black) under a violet rim at 0.9 and drew it at 78 %: a purple see-through silhouette. Now:
+colour = texture x (vertex colour + Ambient 0) x Lift 2 (the recipe's doubling) -- a near-black red body with bright yellow eyes; Opacity 1 (solid;
+Galaxy's own alpha 150 / 255 is a knob away); FaceGlow 0.5 lets the eyes (the texels over 0.45 luminance; the pink mouth stays dark) emit a
+little in the dark arena; the rim is faint (Glow 0.25, a darker violet). The tongue model on the same shader, no face glow. Lift / Ambient
+brighten the body if it reads too black.
+
+**The swing** (`SmsBombBoo.cs`, Carried). The grab takes the TONGUE: the Boo keeps its place and swings round Mario from there -- the radius and
+the height ease from where it was to OrbitRadius (2.8 m) and OrbitOverHand (0.9 m) over his raised hand over OrbitSettleSeconds (0.35) -- at
+OrbitDegPerSec (480: a turn in 0.75 s; his spin jump x SpinJumpBoost 1.7 for 2.5 s), facing in at him (the tongue leads from its mouth to his
+hand), leaning OrbitLeanDeg (25) outward with the swing. The TONGUE model (bomb_boo_tongue.glb: 76.6 cm along its +Z from its root) is re-posed
+every tick from the mouth (TongueOffset in the body's frame) to his hand: its +Z along the line, its length scaled to the distance, its width
+kept; drifting, it hangs from the mouth drooping TongueRestDroopDeg (35). HIT: the Boo's point (with OwnRadius 1 m x ModelScale) inside King
+Boo's body cylinder -- `SmsKingBooRematch.InHitCylinder`: HitRadius 4 m about jnt_body, HitBelow 2.5 under it to HitAbove 4.5 over it (the
+game's body cylinder is 350 u across and 550 tall from 200 under the joint) -- bursts it on him: `TakeHit`, the hurt, the field cleared. Nothing
+is thrown: there is no Thrown phase any more. HoldSeconds (0 = never) bursts a Boo held too long in his hand for nothing, flashing faster
+over its last 2 s (Galaxy's held Bomb Boo blows up on its own; off by default). King Boo waits lower for it: RematchIntro.BooHeight 5.5 -> 4 m,
+his cylinder's bottom at 2.18 m over the floor, where a Boo swung over Mario's head (2.2 m) reaches.
+
+**The lasso arm** (`SmsLassoArm.cs`: a SkeletonModifier3D under his Skeleton3D, as the port's other bone systems are -- SmsWaistLean, SmsBoneRotZ,
+SmsUpperPose, the JiggleBones). Built once at the first grab (`Mario.SmsLassoOn`), after the clip has posed him: the upper arm (jnt_arm_R1; LassoArm
+R or L) is turned by the shortest arc about its own origin so the shoulder-to-elbow line points up -- LassoTilt (0.35) outward, LassoForward (0.2)
+ahead; the side read off the chest-to-shoulder vector, the forward by the right-hand rule, so it holds through every clip and facing -- and
+the forearm (jnt_arm_R2) up and LassoIn (0.2) over the head; the hand is left as the clip has it. The turn is taken in the WORLD (run e aimed
+"up" along the skeleton's own axis: the armature is turned, and the wrist came out at waist height), carried into the skeleton's frame, then
+into the bone's local pose against its parent's global pose and written with SetBonePoseRotation -- the way the port's modifiers write. Weight
+blends in over LassoBlendSeconds (0.15) and out again; the body's own clips -- the run, the jumps, the landings -- play on under it, the other
+arm free. `HandPoint` is the wrist's place in the world read in the same pass (a Skeleton3D restores the clip's poses once the frame is drawn,
+so a read from outside would give the arm down); the Boo's tongue ends there and the swing rides over it. 158's two-hand carry blend
+(ma_carry_p) and the waist-lean cut no longer apply to the Boo. What the pose IS on this Mario: his arms are short next to his head -- the
+shoulder is 1.0 m over his feet and the raised wrist comes to 1.32, his ear, on a 2.15 m body (the clip had it at 0.78) -- so the Boo swings
+0.9 m over the hand, just over his head, the tongue rising to it. The real one-arm animation is the other hand's; this holds until then.
+
+**Mario** (`assets/Mario.cs`): X with a Boo in hand does nothing now (the doc: run and single jump, nothing else) -- the spin cannot start with
+one; the BombThrow* knobs and `SmsBombThrow` are gone, LassoArm / LassoBlendSeconds / LassoTilt / LassoForward / LassoIn take their place in
+"SMS Rematch (158)"; `SmsLassoHand`, `SmsLassoWeight` for the Boo and the drives. The grab, the single jumps, the dive's drop, the spin jump's
+boost as in 158.
+
+**Drive 159** (`SmsBomb.Drive.cs`, the arena run on its own, six runs, deleted before the commit): the Boo out of the fog solid with its tongue
+hanging (C2); the grab by the tongue (C5); the swing watched for 0.7 s standing still -- radius 2.80 both ends, 328 deg turned (480 deg/s),
+the Boo over the hand (C6); the lasso arm at full weight, the arm within 35 deg of straight up (up-dot 0.99), the wrist over the shoulder,
+lifted 0.54 m from the clip (C7); the tongue from the mouth to the hand, 2.33 m, root and tip on their points (C8); X with the Boo in hand: no
+spin, still swung (C9); A on the landing a single jump with the arm up (C10); the dive lets go, the arm down (C11, C12); the second grab and
+the walk into King Boo: the swung Boo bursts on his body 0.3 s in -- the hurt, the field cleared, the hand empty (C13); three swings and he is
+down (C15). Runs e-g found the arm: aimed in the skeleton's frame (e, f), then the hand's height measured against a 2.15-m guess when the
+wrist cannot pass his ear (g: the diagnostics showed the arm straight up, up-dot 0.99); run i 15 / 15 with the arm measured by its direction;
+run j the same with the swing 0.9 m over the hand.
+
+**Deviations, all knobs or stand-ins:** the lasso arm is a procedural pose (the shortest-arc turns), not an animation; the body keeps its clips.
+The Boo's look is the files' own colours through the ghost recipe's doubling with the eyes lit a little (FaceGlow) and a faint rim (Glow): Lift,
+Ambient, Opacity to taste. King Boo's hit cylinder is the game's body cylinder sized to the port's model; BooHeight 4. HoldSeconds off.

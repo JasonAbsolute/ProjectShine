@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-04 18:59 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-04 23:20 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1185,8 +1185,12 @@ own actor on the casino boss's model) appearing 5.5 m over the floor once he lan
 fight itself -- the attacks, the teleports, the faces -- is later passes on this branch; the animations another AI's. SMS 158: the BOMB BOOS
 and the SPIN -- X without the FLUDD is Mario's grounded spin (a new state): it grabs a Bomb Boo in reach, a second spin throws it; the Boos rise
 out of black foggy spots at the arena's centre (the supply; Random is a knob), drift to him and hover; three bursts on King Boo and he is down.
+SMS 159: Galaxy's way -- the spin takes the Boo BY THE TONGUE, Mario holds it up in one arm (a lasso pose on his skeleton) and the Boo swings round
+him; he walks it into King Boo (no throw). The Boo's look fixed (158's was purple and see-through): the files' own black body and yellow eyes, solid.
 Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `d4abcd5` ("SMS 158: the King Boo REMATCH, part 2 -- the Bomb Boos and the spin"; assets/Mario.cs the spin and the carry,
+- Branch `feature/kingboo-rematch` -- code tip `35ae973` ("SMS 159: the King Boo REMATCH, part 3 -- the Bomb Boo by the tongue"; assets/Mario.cs the lasso arm hook-up,
+  the throw removed; assets/Sms/Rematch/ SmsLassoArm.cs (new), SmsBombBoo.cs, BombBoo.gdshader, BombBoo.tscn, SmsKingBooRematch.cs (the hit cylinder),
+  SmsRematchIntro.cs (BooHeight 4), RematchArena.tscn) on the 158 commit ("SMS 158: the King Boo REMATCH, part 2 -- the Bomb Boos and the spin"; assets/Mario.cs the spin and the carry,
   assets/Sms/Rematch/ SmsBombBoo.cs, SmsBombBooSpawner.cs, BombBoo.gdshader, BombBoo.tscn, SmsKingBooRematch.cs (the hit points), RematchArena.tscn (the
   supply), assets/Sms/Sound/SmsActorSound.cs, models/Sms/Rematch/ bomb_boo.glb + bomb_boo_tongue.glb and their PNGs / .import) on the 157 commit
   ("SMS 157: the King Boo REMATCH, part 1 -- the transition"; assets/Sms/Rematch/
@@ -1195,9 +1199,14 @@ Further passes re-point this entry's tip.
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 4 commits past `feature/sounds`, 26 since `main`. ~1 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 6 commits past `feature/sounds`, 28 since `main`. ~1 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 159: in the arena. The Boo out of the fog is BLACK with yellow eyes and solid now, its pink tongue hanging. X near it: Mario's arm goes
+  up and the Boo swings round him on its tongue, just over his head, leaning into the turn -- walk toward King Boo and let it swing into him: it
+  bursts on him and he flips. X while holding does nothing; dive drops it; a spin jump (A out of a spin) speeds the swing. Knobs: BombBoo.tscn's root
+  (OrbitRadius, OrbitOverHand, OrbitDegPerSec, OrbitLeanDeg, HoldSeconds; Lift / Ambient / Opacity / FaceGlow / Glow for the look), Mario's SMS Rematch
+  group (LassoArm R / L, LassoTilt / LassoForward / LassoIn: the arm's lean), KingBoo (HitRadius / HitBelow / HitAbove), RematchIntro (BooHeight).
 - To try 158: in the arena (through the casino, or F6 on assets/Sms/Rematch/RematchArena.tscn). A black foggy spot forms at the middle and a black
   Boo rises out of it and drifts your way, stopping short. X (the X key on a keyboard): Mario spins -- within reach the Boo is snatched and spins
   over his head. Jump: single jumps only; dive (B): he drops it and it drifts back. X again: he spins and THROWS it the way he faces (or the
