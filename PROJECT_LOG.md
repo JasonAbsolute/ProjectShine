@@ -11795,3 +11795,36 @@ clip -- the body stays the clip's (btelesa_spit is the other base: LickClip "bte
 with the wait clip, not the appear clip (its 11-m bounce is the entrance's); he faces Mario through the wind-up and holds still from the snap;
 AttacksOn off gives 161's waiting boss. The other attacks (Boolossus Smash, Ghost Lightning, Breath, Fireballs, Ghost Wind), the faces, the HUD and
 the fight's end are later passes.
+
+### 163 -- the King Boo REMATCH, part 7: the Lick's tongue is the whip itself, a bit longer (feature/kingboo-rematch, code `b479640`)
+
+**Jaysonn:** "yeah that tounge aim i dont think looks very good if anything we just make the tounge stick out more in general not much but a bit.
+right now when attacking the tounge kinda looks weird and doesnt give a wet tounge whip very."
+
+**Out:** 162's FABRIK aim of the tongue onto Mario (`SmsTongueAim.cs` removed, with its snap / hold / retract / mark knobs). A straight tongue bent onto
+a point read as a stick, not a lick.
+
+**In: the roll clip's own whirl as the whip.** Measured again frame by frame (`glb162/tongue_track.py`): after the rear-up (frames 0-30, the tongue
+overhead) the tongue sweeps across the FRONT of him from his left to his right over frames 48-66 -- the tip 9 m out, crossing straight ahead at frame
+57, descending as it goes (5.7 m under the body origin straight ahead, 6.4 m at its lowest at frame 62) -- at some 50 m/s. That is the wet whip.
+`SmsTongueStretch.cs` (new): a SkeletonModifier3D under his skeleton that scales each tongue joint's pose position by TongueStretch (1.15: every
+segment a bit longer, the root a bit further out of the mouth -- "not much but a bit"), blended in from the entrance; the joints' places after the
+pose are read in the same pass for the hit.
+
+**The hit is the whip's geometry** (`SmsKingBooRematch.cs`): over the clip frames the tongue crosses the front (LickHitFromFrame 50 to LickHitToFrame
+66, MSD_SE_BS_TELESA_LICK at the window's start) any tongue joint, or the point between two, inside Mario's damage cylinder (42 u across, 130 u tall
+from his feet) grown by LickThickness 0.35 is the plain hit -- `Mario.TakeDamage`, the common enemy profile, once per lick. The clip runs at
+LickClipSpeed 1.5, so the whip comes through 0.56 s into the lick: the doc's half second of wind-up. The spot re-set so the whip's TIP skims the floor
+through Mario and nothing of the tongue goes into the floor: LickDistance 8.7 m (the tip's forward reach at the crossing), LickHeight 6.4 m (the
+tip's lowest point under the body origin); the shaft behind the tip passes 2.8 m up. Lower, and the tongue comes through higher up Mario but its tip
+digs into the floor to his right. The lick's stages for the drives: 0 wind-up, 1 the whip live, 2 the clip's tail (cut at LickEndFrame 80), 3 the
+wait before he vanishes. A hit mid-lick still breaks the lick off; the teleports, the gaps, the spots are 162's.
+
+**Drive 163** (`SmsKingBoo.Drive.cs`, deleted before the commit; run r, 15 / 15): the stretch (the chain 9.15 m in the wait = 7.96 x 1.15, C1b), the
+whip live 0.58 s in (C5), five joints with 11.3 m of reach through a standing Mario -- the closest tongue point 0.48 m from his middle, the hit 1.57 m
+over his feet, HP 8 -> 7, hurt (C6-7), a held jump (3.4 m) clearing it with the closest point 1.65 m off (C9), a hit mid-whip breaking the lick off
+(C12), the rest as 162. The .err: Godot's "resources still in use at exit" after the drive's Quit, as before.
+
+**Deviations, all knobs:** the whip is whatever the clip does -- it comes through Mario's upper body straight ahead (the shaft) with the tip at the
+floor beyond him; Mario off to his left meets it higher, to his right lower. TongueStretch 1.15 applies in every clip (the idle tongue hangs a bit
+longer too). LickClipSpeed 1.5 for the half-second tell (1 = the clip's own pace, the whip at 0.85 s).

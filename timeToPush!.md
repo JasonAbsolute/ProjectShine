@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-05 01:33 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-05 01:56 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1192,8 +1192,11 @@ he is above it); the lasso arm out to the side, clear of his head (it was inside
 lasso hand, the tongue rooted in the middle of the Boo's mouth and ending in the middle of the fist, the swing 3.6 m. SMS 162: King Boo's MOVES -- he
 teleports between spots (the hide clip under a fade, a fade in elsewhere) and LICKS: in front of Mario, the roll clip's rear-up as the half-second tell,
 the tongue re-aimed onto the floor under Mario (a new SkeletonModifier3D, FABRIK over the tongue chain); the plain hit; a jump clears it; a swung Boo
-through the lick breaks it off; the gaps shorten per hit. Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `0b7a612` ("SMS 162: the King Boo REMATCH, part 6 -- the teleports and the Lick"; assets/Sms/Rematch/
+through the lick breaks it off; the gaps shorten per hit. SMS 163: the tongue aim dropped (it looked wrong) -- the roll clip's own whirl is the
+whip, the tongue a bit longer (SmsTongueStretch), the hit the whip's joints through Mario over its front crossing, the spot where the tip skims the
+floor through him. Further passes re-point this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `b479640` ("SMS 163: the King Boo REMATCH, part 7 -- the Lick's tongue is the whip itself, a bit longer";
+  assets/Sms/Rematch/ SmsTongueStretch.cs NEW, SmsTongueAim.cs REMOVED, SmsKingBooRematch.cs) on the 162 commit ("SMS 162: the King Boo REMATCH, part 6 -- the teleports and the Lick"; assets/Sms/Rematch/
   SmsTongueAim.cs NEW, SmsKingBooRematch.cs, SmsArenaFloor.cs) on the 161 commit ("SMS 161: the King Boo REMATCH, part 5 -- the fist on the tongue"; assets/Mario.cs the hand poses and the grip,
   assets/Sms/Rematch/ SmsBombBoo.cs, SmsLassoArm.cs) on the 160 commit ("SMS 160: the King Boo REMATCH, part 4 -- the Bomb Boo floats as Sunshine's Boos do"; assets/Mario.cs the
   arm's lean, assets/Sms/Rematch/ SmsBombBoo.cs, SmsBombBooSpawner.cs, SmsLassoArm.cs, BombBoo.tscn) on the 159 commit ("SMS 159: the King Boo REMATCH, part 3 -- the Bomb Boo by the tongue"; assets/Mario.cs the lasso arm hook-up,
@@ -1207,9 +1210,13 @@ through the lick breaks it off; the gaps shorten per hit. Further passes re-poin
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 12 commits past `feature/sounds`, 34 since `main`. ~1 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 14 commits past `feature/sounds`, 36 since `main`. ~1 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 163: the lick again: he fades in 8.7 m ahead and high, rears up with the tongue overhead, then the tongue whips across the front of him
+  low, left to right, through where you stand -- the clip's own whirl, no re-aim; the tongue a bit longer everywhere (TongueStretch 1.15). Jump at the
+  rear-up to clear it. Knobs: LickDistance / LickHeight (the tip skims the floor at 8.7 / 6.4), LickClipSpeed, LickHitFromFrame / LickHitToFrame,
+  LickThickness, TongueStretch.
 - To try 162: in the arena, 3 s after King Boo's laugh he vanishes and fades in 6 m in front of you, low; half a second of rearing up with the
   tongue overhead, then it snaps onto the floor where you stand -- jump at the tell to clear it, stand and it knocks you down (a point of HP). He
   hops off to another spot and comes again every 2-4 s, quicker per hit; swing a Boo into him while he waits or mid-lick (it breaks the lick off).
