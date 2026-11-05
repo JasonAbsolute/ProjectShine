@@ -4,15 +4,21 @@ using System.Collections.Generic;
 
 /// <summary>
 /// SMS pass 164: the BOOLOSSUS SMASH (KINGBOO_REMATCH_gdoc.txt, attack 2: "Crown glows white. A Boolossus falls from above Mario and tries to slam down
-/// on him. On landing it splits into 15 Boos that spread out as a shockwave, then vanish after one second"). King Boo makes one (SmsKingBooRematch's
-/// Smash move) and it runs on its own: it APPEARS DropHeight over Mario (a fade in; MSD_SE_EN_TELESA_APPEAR), HANGS there HangSeconds drifting after
-/// him at TrackSpeed with its SHADOW on the floor under it (the tell -- the shadow grows as it falls), then FALLS under SmashGravity and LANDS (the
-/// roulette's thud): Mario within its body (BodyRadius, from the model's own width x ModelScale) takes the plain hit (Mario.TakeDamage, the common
-/// enemy profile) and it SPLITS -- it is gone in a flash and WaveCount Boos (<see cref="SmsWaveBoo"/>, boo.glb at WaveBooScale) spread out from its
-/// footprint in a ring at WaveSpeed, WaveHeight over the floor, for WaveSeconds, each the plain hit on Mario it runs through, fading over their last
-/// WaveFadeSeconds (MSD_SE_EN_TELESA_DISAPPEAR) -- a jump clears the ring. The models: Boolossus.obj (Jaysonn's Downloads, run through Blender:
-/// models/Sms/Rematch/boolossus.glb, 1.07 m across at scale 1) and Teresa.dae (boo.glb, 2.5 m across) on GhostBoo.gdshader (the ghost's screen mix at
-/// Opacity, a soft rim). Signals: Landed(hitMario), Finished (the Boos are gone, the node frees itself).
+/// on him. On landing it splits into 15 Boos that spread out as a shockwave, then vanish after one second"). King Boo makes them (SmsKingBooRematch's
+/// Smash move) and each runs on its own. Pass 165 (Jaysonn: "see Boolossuses DIVE down into the arena, and maybe 3 of them, not just one; some effects"):
+/// it no longer fades in over Mario and drops -- it APPEARS DiveHeight over the floor and DiveDistance out from Mario along its approach (an appear puff,
+/// MSD_SE_EN_TELESA_APPEAR) and DIVES at him: it falls under SmashGravity from DiveStartSpeed, steering its flat speed so it lands exactly on the TARGET
+/// (its shadow on the floor, growing: the tell); the target follows Mario (at TrackSpeed) until LockSeconds before the landing, then is fixed -- the dodge
+/// window; the body leans into the dive (DiveTilt) and trails ghost wisps (TrailColor). It LANDS (the roulette's thud, the Boo crush, a camera shake --
+/// LandShake -- a ring of light racing out over the floor (RingColor, RingGrow, RingSeconds) and a burst of pale smoke (SmokeColor)): Mario within its
+/// body (BodyRadius, from the model's own width x ModelScale) takes the plain hit (Mario.TakeDamage, the common enemy profile) and it SPLITS -- gone in
+/// a flash and a squash, and WaveCount Boos (<see cref="SmsWaveBoo"/>, boo.glb at WaveBooScale) spread out from its footprint in a ring at WaveSpeed,
+/// WaveHeight over the floor, for WaveSeconds, each the plain hit on a Mario it runs through, fading over their last WaveFadeSeconds into a puff each
+/// (the port's EnemyDisap burst, tinted) -- a jump clears the ring. The models: Boolossus.obj (Jaysonn's Downloads, run through Blender:
+/// models/Sms/Rematch/boolossus.glb, 1.07 m across at scale 1) and Teresa.dae (boo.glb, 2.5 m across) on GhostBoo.gdshader. 165: the Boos are SOLID
+/// WHITE (WaveBooOpacity 1, no vertex colours -- boo.glb's are dark blue, mean 0.1 / 0.12 / 0.16, and multiplied in under a 0.75 screen mix they read as
+/// the Bomb Boos' old purple); the Boolossus keeps the ghost's mix at Opacity. Signals: Landed(hitMario), Finished (the Boos are gone, the node frees
+/// itself).
 /// </summary>
 public partial class SmsBoolossus : Node3D
 {
@@ -21,18 +27,37 @@ public partial class SmsBoolossus : Node3D
     [Export(PropertyHint.Range, "0.5,12,0.1")] public float ModelScale = 5.5f;
     [Export(PropertyHint.Range, "0.1,1,0.01")] public float Opacity = 0.75f;
     [Export] public float Lift = 1f, Glow = 0.5f;
-    /// <summary>The model's face is on its +Z side (off: on -Z). It is turned to face the camera's side as it hangs.</summary>
+    /// <summary>The model's face is on its +Z side (off: on -Z). It faces along its dive, then the camera's side on the floor.</summary>
     [Export] public bool FacesPlusZ = false;
-    /// <summary>The shadow on the floor under it: its darkness and its size at the full fall (x the body's radius).</summary>
+    /// <summary>The shadow on the floor under the target: its darkness and its size at the landing (x the body's radius).</summary>
     [Export(PropertyHint.Range, "0,1,0.05")] public float ShadowOpacity = 0.55f;
     [Export] public float ShadowScale = 1.1f;
-    [ExportGroup("The fall")]
-    /// <summary>How high over Mario it appears, how long it hangs there (drifting after him at TrackSpeed), the fade in, and the fall's gravity (30 from 16 m
-    /// is a 1.03 s fall; the game's is 19).</summary>
-    [Export] public float DropHeight = 16f, HangSeconds = 0.45f, TrackSpeed = 6f, FadeInSeconds = 0.25f;
+    [ExportGroup("The dive (165)")]
+    /// <summary>Where it appears: this high over the floor, this far out from Mario along its approach direction (King Boo gives one per Boolossus); the
+    /// fade in; its speed downward as it appears; the fall's gravity (30 from 24 m at 6 m/s down is a 1.08 s dive; the game's gravity is 19).</summary>
+    [Export] public float DiveHeight = 24f, DiveDistance = 20f, FadeInSeconds = 0.2f, DiveStartSpeed = 6f;
     [Export] public float SmashGravity = 30f;
+    /// <summary>The target follows Mario at this speed (m/s; 0 = where he was when it appeared) until this many seconds before the landing, then holds --
+    /// the dodge: Mario runs at about 8 m/s, so 0.6 s is near five metres. Its flat speed toward the target is capped at MaxDiveSpeed.</summary>
+    [Export] public float TrackSpeed = 6f, LockSeconds = 0.6f, MaxDiveSpeed = 45f;
+    /// <summary>How far the body leans into the dive (1 = it faces straight along its path; 0 = upright, facing its target).</summary>
+    [Export(PropertyHint.Range, "0,1,0.05")] public float DiveTilt = 0.8f;
     /// <summary>The body on Mario at the landing: its radius (0 = the model's own half width x ModelScale) and how high the hit reaches over the floor.</summary>
     [Export] public float BodyRadius = 0f, BodyHitHeight = 5f;
+    [ExportGroup("The effects (165)")]
+    /// <summary>The ghost wisps it trails as it dives (their colour; 0 alpha = none), the puff as it appears, the puff as each Boo vanishes.</summary>
+    [Export] public Color TrailColor = new Color(0.7f, 0.85f, 1f, 0.55f);
+    [Export] public bool AppearPuff = true, BooVanishPuff = true;
+    /// <summary>The landing: the ring of light over the floor (its colour, how many body radii it races out to, over how long), the smoke (its colour, how
+    /// many puffs), the camera shake (x the hip drop's; 0 = none).</summary>
+    [Export] public Color RingColor = new Color(0.75f, 0.85f, 1f, 0.9f);
+    [Export] public float RingGrow = 3.5f, RingSeconds = 0.5f;
+    [Export] public Color SmokeColor = new Color(0.8f, 0.82f, 0.95f, 0.8f);
+    [Export(PropertyHint.Range, "0,80,1")] public int SmokeCount = 36;
+    [Export(PropertyHint.Range, "0,3,0.1")] public float LandShake = 1f;
+    /// <summary>The Boos' puffs and the appear puff: the port's enemy-vanish burst, tinted this colour.</summary>
+    [Export] public Color PuffTint = new Color(0.7f, 0.85f, 1f, 1f);
+    [Export] public PackedScene PuffScene;
     [ExportGroup("The wave")]
     /// <summary>The Boos it splits into: how many, their size (boo.glb is 2.5 m across at 1), how fast they spread, how long they live, how high over the
     /// floor they ride (a jump clears them), their fade at the end, and where the ring starts (0 = the body's radius).</summary>
@@ -40,6 +65,10 @@ public partial class SmsBoolossus : Node3D
     [Export(PropertyHint.Range, "0.1,2,0.05")] public float WaveBooScale = 0.55f;
     [Export] public float WaveSpeed = 9f, WaveSeconds = 1f, WaveHeight = 0.9f, WaveFadeSeconds = 0.25f, WaveStartRadius = 0f;
     [Export] public bool BooFacesPlusZ = true;
+    /// <summary>165: the Boos' look -- solid (1) white; their vertex colours (dark blue in boo.glb) left out unless BooVertexColors.</summary>
+    [Export(PropertyHint.Range, "0.1,1,0.01")] public float WaveBooOpacity = 1f;
+    [Export] public bool BooVertexColors = false;
+    [Export] public float BooLift = 1f;
     /// <summary>The Boos' own hit radius (0 = the model's half width x WaveBooScale, 0.7 m; 1.1 reaches a little past the ghost's skin, so fifteen of them
     /// close the ring out to about 8 m -- beyond that the wave has gaps a Mario can stand in).</summary>
     [Export] public float BooRadius = 1.1f;
@@ -52,7 +81,7 @@ public partial class SmsBoolossus : Node3D
     [Signal] public delegate void LandedEventHandler(bool hitMario);
     [Signal] public delegate void FinishedEventHandler();
 
-    public enum Phase { Idle, Hang, Fall, Wave, Gone }
+    public enum Phase { Idle, Dive, Wave, Gone }
     public Phase State { get; private set; } = Phase.Idle;
     public float FloorY { get; private set; } = float.NaN;
     public float BottomY => GlobalPosition.Y + _modelBottom * ModelScale;
@@ -61,16 +90,36 @@ public partial class SmsBoolossus : Node3D
     public bool WaveHitMario => _waveHits > 0;
     public int WaveHits => _waveHits;
     public Vector3 LandingPoint { get; private set; }
-    public float FallSeconds { get; private set; }
-    public float HangLeft => Mathf.Max(0f, HangSeconds - _t);
+    public Vector3 StartPoint { get; private set; }
+    public Vector3 Target => _target;
+    public bool TargetLocked => _locked;
+    public float DiveSeconds { get; private set; }
     public float Vy => _vy;
+    public Vector3 Velocity => _vel;
+    public float TimeToLand => _tRem;
     public float OpacityShown => _opacityShown;
+    /// <summary>For the drives: how far the face points DOWN (degrees; 0 = level) -- the lean into the dive.</summary>
+    public float ModelPitchDeg
+    {
+        get
+        {
+            if (_model == null) return 0f;
+            Vector3 z = _model.GlobalTransform.Basis.Z.Normalized();
+            float faceY = FacesPlusZ ? z.Y : -z.Y;
+            return Mathf.RadToDeg(MathF.Asin(Mathf.Clamp(-faceY, -1f, 1f)));
+        }
+    }
+    public bool TrailEmitting => _trail != null && _trail.Emitting;
+    public int ShakesStarted { get; private set; }
     public static readonly List<SmsBoolossus> All = new();
     public static readonly List<SmsWaveBoo> Boos = new();
+    public static int RingsMade, SmokesMade, PuffsMade;
     public int BoosOut { get { int n = 0; foreach (var b in _boos) if (b != null && IsInstanceValid(b)) n++; return n; } }
 
-    private Node3D _model; private MeshInstance3D _shadow; private readonly List<ShaderMaterial> _mats = new(); private SmsActorSound _sound;
-    private Mario _mario; private float _t, _vy, _opacityShown, _modelBottom = 0.035f, _modelHalfWidth = 0.535f; private int _waveHits;
+    private const float U = 74.44f;
+    private Node3D _model; private MeshInstance3D _shadow; private readonly List<ShaderMaterial> _mats = new(); private SmsActorSound _sound; private GpuParticles3D _trail;
+    private Mario _mario; private float _t, _vy, _tRem, _opacityShown, _modelBottom = 0.035f, _modelHalfWidth = 0.535f; private int _waveHits;
+    private Vector3 _target, _vel; private bool _locked;
     private readonly List<SmsWaveBoo> _boos = new(); private float _waveT; private bool _waveSounded;
 
     public override void _Ready()
@@ -101,45 +150,64 @@ public partial class SmsBoolossus : Node3D
         else GD.PushWarning($"[SMS boolossus] {GetPath()}: no Model child (boolossus.glb)");
         _shadow = new MeshInstance3D { Name = "Shadow", TopLevel = true, Visible = false, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
         _shadow.Mesh = new QuadMesh { Size = Vector2.One * 2f };
-        _shadow.MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0f, 0f, 0f, ShadowOpacity), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, NoDepthTest = false, RenderPriority = 1 };
+        _shadow.MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0f, 0f, 0f, ShadowOpacity), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, RenderPriority = 1 };
         AddChild(_shadow);
+        if (TrailColor.A > 0.01f) { _trail = SmsSmashFx.Trail(TrailColor, Mathf.Max(0.6f, Radius * 0.55f), Radius * 0.6f); AddChild(_trail); }
         BooScene ??= ResourceLoader.Exists("res://models/Sms/Rematch/boo.glb") ? GD.Load<PackedScene>("res://models/Sms/Rematch/boo.glb") : null;
+        PuffScene ??= ResourceLoader.Exists("res://assets/Sms/Fx/EnemyDisap.tscn") ? GD.Load<PackedScene>("res://assets/Sms/Fx/EnemyDisap.tscn") : null;
         _sound = SmsActorSound.Attach(this);
         if (_model != null) _model.Visible = false;
-        if (DebugPrint) GD.Print($"[SMS boolossus] {Name}: {_mats.Count} materials, model bottom {_modelBottom:F3} half width {_modelHalfWidth:F3} (x{ModelScale}: radius {Radius:F2} m), boo scene {(BooScene != null ? "yes" : "NONE")}");
+        if (DebugPrint) GD.Print($"[SMS boolossus] {Name}: {_mats.Count} materials, model bottom {_modelBottom:F3} half width {_modelHalfWidth:F3} (x{ModelScale}: radius {Radius:F2} m), boo scene {(BooScene != null ? "yes" : "NONE")}, puff scene {(PuffScene != null ? "yes" : "NONE")}, trail {(_trail != null ? "yes" : "none")}");
     }
     public override void _ExitTree() { All.Remove(this); }
 
-    /// <summary>Over Mario: it appears DropHeight over the floor under him and hangs. The floor's y is the caller's (King Boo's probe).</summary>
-    public void Begin(Mario mario, float floorY)
+    /// <summary>165: the dive. It appears DiveHeight over the floor, DiveDistance out from Mario along <paramref name="approachDir"/> (flat; any length),
+    /// and dives at where he stands. The floor's y is the caller's (King Boo's probe under Mario).</summary>
+    public void Begin(Mario mario, float floorY, Vector3 approachDir)
     {
         if (State != Phase.Idle) return;
         _mario = mario; FloorY = floorY;
         Vector3 m = mario.GlobalPosition;
-        GlobalPosition = new Vector3(m.X, floorY + DropHeight, m.Z);
-        FaceCamera();
-        State = Phase.Hang; _t = 0f; _vy = 0f;
-        if (_model != null) _model.Visible = true;
-        _shadow.Visible = true; PlaceShadow(0f);
+        approachDir.Y = 0f; if (approachDir.LengthSquared() < 1e-4f) approachDir = Vector3.Forward;
+        approachDir = approachDir.Normalized();
+        _target = new Vector3(m.X, floorY, m.Z); _locked = false;
+        StartPoint = new Vector3(m.X + approachDir.X * DiveDistance, floorY + DiveHeight - _modelBottom * ModelScale, m.Z + approachDir.Z * DiveDistance);
+        GlobalPosition = StartPoint;
+        _vy = Mathf.Max(0f, DiveStartSpeed); _vel = new Vector3(-approachDir.X, -_vy, -approachDir.Z); _tRem = 9f;
+        State = Phase.Dive; _t = 0f; DiveSeconds = 0f;
+        if (_model != null) { _model.Visible = true; Lean(0f); }
+        _shadow.Visible = true; PlaceShadow();
+        if (_trail != null) { _trail.Restart(); _trail.Emitting = true; }
+        if (AppearPuff && PuffScene != null) SmsSmashFx.Puff(PuffScene, GetParent(), GlobalPosition + Vector3.Up * (Radius * 0.6f), Radius * 1.6f, PuffTint);
         if (_sound != null && !string.IsNullOrEmpty(AppearSe)) _sound.Play(AppearSe);
-        if (DebugPrint) GD.Print($"[SMS boolossus] {Name}: appears at {GlobalPosition} over Mario {m} (floor {floorY:F2})");
+        if (DebugPrint) GD.Print($"[SMS boolossus] {Name}: appears at {GlobalPosition}, {DiveDistance} m out from Mario {m} (floor {floorY:F2}), and dives");
     }
-    private void FaceCamera()
-    {
-        var cam = GetViewport()?.GetCamera3D();
-        Vector3 to = cam != null ? cam.GlobalPosition - GlobalPosition : (_mario != null ? -_mario.SmsFacingDir() : Vector3.Back); to.Y = 0f;
-        if (to.LengthSquared() < 1e-4f) return;
-        float yaw = MathF.Atan2(to.X, to.Z) + (FacesPlusZ ? 0f : MathF.PI);
-        Rotation = new Vector3(0f, yaw, 0f);
-    }
+    /// <summary>The 164 call: a dive from straight over Mario's far side (the camera's).</summary>
+    public void Begin(Mario mario, float floorY) => Begin(mario, floorY, -mario.SmsFacingDir());
+
     private void SetOpacity(float o) { _opacityShown = o; foreach (var m in _mats) m.SetShaderParameter("opacity", o); }
     private void SetFlash(float f) { foreach (var m in _mats) m.SetShaderParameter("flash", f); }
-    private void PlaceShadow(float fallK)
+    private void PlaceShadow()
     {
         if (_shadow == null || float.IsNaN(FloorY)) return;
-        float r = Radius * ShadowScale * Mathf.Lerp(0.45f, 1f, fallK);
-        _shadow.GlobalTransform = new Transform3D(new Basis(Vector3.Right, -MathF.PI / 2f).Scaled(new Vector3(r, r, 1f)), new Vector3(GlobalPosition.X, FloorY + 0.04f, GlobalPosition.Z));
-        if (_shadow.MaterialOverride is StandardMaterial3D sm) sm.AlbedoColor = new Color(0f, 0f, 0f, ShadowOpacity * Mathf.Clamp(_opacityShown / Mathf.Max(0.01f, Opacity), 0f, 1f));
+        float k = State == Phase.Dive ? Mathf.Clamp(1f - _tRem / 1.2f, 0f, 1f) : 1f;
+        float r = Radius * ShadowScale * Mathf.Lerp(0.4f, 1f, k);
+        _shadow.GlobalTransform = new Transform3D(new Basis(Vector3.Right, -MathF.PI / 2f).Scaled(new Vector3(r, r, 1f)), new Vector3(_target.X, FloorY + 0.04f, _target.Z));
+        if (_shadow.MaterialOverride is StandardMaterial3D sm) sm.AlbedoColor = new Color(0f, 0f, 0f, ShadowOpacity * Mathf.Clamp(_opacityShown / Mathf.Max(0.01f, Opacity), 0f, 1f) * Mathf.Lerp(0.5f, 1f, k));
+    }
+    /// <summary>The body turned along its path by DiveTilt (its face along the velocity), else upright facing the target; <paramref name="k"/> 0 = upright.</summary>
+    private void Lean(float k)
+    {
+        if (_model == null) return;
+        Vector3 flat = _vel; flat.Y = 0f;
+        if (flat.LengthSquared() < 1e-6f) { flat = _target - GlobalPosition; flat.Y = 0f; }
+        if (flat.LengthSquared() < 1e-6f) flat = Vector3.Forward;
+        Basis upright = Basis.LookingAt(flat.Normalized(), Vector3.Up);
+        Vector3 along = _vel.LengthSquared() > 1e-6f ? _vel.Normalized() : flat.Normalized();
+        Basis dive = Mathf.Abs(along.Dot(Vector3.Up)) > 0.999f ? upright : Basis.LookingAt(along, Vector3.Up);
+        Basis b = new Basis(upright.GetRotationQuaternion().Slerp(dive.GetRotationQuaternion(), Mathf.Clamp(k * DiveTilt, 0f, 1f)));
+        if (FacesPlusZ) b *= new Basis(Vector3.Up, MathF.PI);
+        _model.GlobalBasis = b.Scaled(Vector3.One * ModelScale);
     }
 
     public override void _Process(double delta)
@@ -148,24 +216,27 @@ public partial class SmsBoolossus : Node3D
         if (_mario == null || !IsInstanceValid(_mario)) _mario = GetTree().GetFirstNodeInGroup("player") as Mario;
         switch (State)
         {
-            case Phase.Hang:
-                _t += dt;
+            case Phase.Dive:
+                _t += dt; DiveSeconds += dt;
                 SetOpacity(Opacity * Mathf.Clamp(FadeInSeconds > 0f ? _t / FadeInSeconds : 1f, 0f, 1f));
-                if (_mario != null && TrackSpeed > 0f)
+                // the time left to the floor at the fall's own pace, the target followed until the lock, the flat speed set to land on it
+                float h = Mathf.Max(0f, BottomY - FloorY);
+                _tRem = SmashGravity > 0f ? (-_vy + MathF.Sqrt(_vy * _vy + 2f * SmashGravity * h)) / SmashGravity : (_vy > 0f ? h / _vy : 9f);
+                if (!_locked && _tRem <= LockSeconds) { _locked = true; if (DebugPrint) GD.Print($"[SMS boolossus] {Name}: the target LOCKS at {_target} ({_tRem:F2} s to the landing)"); }
+                if (!_locked && _mario != null && TrackSpeed > 0f)
                 {
-                    Vector3 to = _mario.GlobalPosition - GlobalPosition; to.Y = 0f;
+                    Vector3 to = new Vector3(_mario.GlobalPosition.X, FloorY, _mario.GlobalPosition.Z) - _target;
                     float step = TrackSpeed * dt;
                     if (to.Length() > step) to = to.Normalized() * step;
-                    GlobalPosition += to;
+                    _target += to;
                 }
-                PlaceShadow(0f);
-                if (_t >= HangSeconds) { State = Phase.Fall; FallSeconds = 0f; if (DebugPrint) GD.Print($"[SMS boolossus] {Name}: FALLS from {GlobalPosition}"); }
-                break;
-            case Phase.Fall:
-                FallSeconds += dt;
+                Vector3 flat = new Vector3(_target.X - GlobalPosition.X, 0f, _target.Z - GlobalPosition.Z) / Mathf.Max(_tRem, dt);
+                if (flat.Length() > MaxDiveSpeed) flat = flat.Normalized() * MaxDiveSpeed;
                 _vy += SmashGravity * dt;
-                GlobalPosition += Vector3.Down * (_vy * dt);
-                PlaceShadow(Mathf.Clamp(1f - (BottomY - FloorY) / Mathf.Max(0.1f, DropHeight), 0f, 1f));
+                _vel = new Vector3(flat.X, -_vy, flat.Z);
+                GlobalPosition += _vel * dt;
+                Lean(Mathf.Clamp(_t / 0.25f, 0f, 1f));
+                PlaceShadow();
                 if (BottomY <= FloorY) Land();
                 break;
             case Phase.Wave:
@@ -184,22 +255,28 @@ public partial class SmsBoolossus : Node3D
         }
     }
 
-    /// <summary>The slam: the floor met -- Mario inside the body is the plain hit; the Boolossus splits into the wave.</summary>
+    /// <summary>The slam: the floor met -- the ring, the smoke, the shake; Mario inside the body is the plain hit; the Boolossus splits into the wave.</summary>
     private void Land()
     {
         GlobalPosition = new Vector3(GlobalPosition.X, FloorY - _modelBottom * ModelScale, GlobalPosition.Z);
         LandingPoint = new Vector3(GlobalPosition.X, FloorY, GlobalPosition.Z);
+        if (_trail != null) _trail.Emitting = false;
+        Lean(0f); FaceCamera();
         bool hit = false;
         if (_mario != null)
         {
             Vector3 m = _mario.GlobalPosition;
-            float r = Radius + SmsParams.Mario.DamageRadius / 74.44f;
+            float r = Radius + SmsParams.Mario.DamageRadius / U;
             if (new Vector2(m.X - LandingPoint.X, m.Z - LandingPoint.Z).Length() <= r && m.Y < FloorY + BodyHitHeight) { hit = true; _mario.TakeDamage(LandingPoint + Vector3.Up * 1f, Mario.SmsDamageProfile.EnemyCommon); }
         }
         HitMario = hit;
         if (_sound != null && !string.IsNullOrEmpty(LandSe)) _sound.Play(LandSe);
         if (_sound != null && !string.IsNullOrEmpty(SplitSe)) _sound.Play(SplitSe);
         SetFlash(1f);
+        Node fxParent = GetParent() ?? this;
+        if (RingColor.A > 0.01f && RingSeconds > 0f) SmsSmashFx.Ring(fxParent, LandingPoint, Radius, Radius * RingGrow, RingSeconds, RingColor);
+        if (SmokeCount > 0 && SmokeColor.A > 0.01f) SmsSmashFx.Smoke(fxParent, LandingPoint, Radius, SmokeCount, SmokeColor);
+        if (LandShake > 0f && SmsCameraShake.Current != null) { SmsCameraShake.Current.Start(SmsCameraShake.Kind.HipDrop, LandShake); ShakesStarted++; }
         State = Phase.Wave; _waveT = 0f; _waveSounded = false;
         float r0 = WaveStartRadius > 0f ? WaveStartRadius : Radius;
         for (int i = 0; i < WaveCount; i++)
@@ -207,19 +284,28 @@ public partial class SmsBoolossus : Node3D
             float a = i / (float)WaveCount * MathF.Tau;
             var dir = new Vector3(MathF.Sin(a), 0f, MathF.Cos(a));
             var boo = new SmsWaveBoo { Name = $"WaveBoo{i}" };
-            GetParent().AddChild(boo);
+            fxParent.AddChild(boo);
             boo.Launch(BooScene, LandingPoint + dir * r0 + Vector3.Up * WaveHeight, dir, this);
             _boos.Add(boo);
         }
-        if (DebugPrint) GD.Print($"[SMS boolossus] {Name}: LANDS at {LandingPoint} after {FallSeconds:F2} s ({(hit ? "ON Mario" : "a miss")}; Mario at {(_mario != null ? _mario.GlobalPosition.ToString() : "?")}, radius {Radius:F2}) -> {WaveCount} Boos at {r0:F2} m");
+        if (DebugPrint) GD.Print($"[SMS boolossus] {Name}: LANDS at {LandingPoint} after {DiveSeconds:F2} s ({(hit ? "ON Mario" : "a miss")}; Mario at {(_mario != null ? _mario.GlobalPosition.ToString() : "?")}, radius {Radius:F2}, the target was {_target}) -> {WaveCount} Boos at {r0:F2} m");
         EmitSignal(SignalName.Landed, hit);
+    }
+    private void FaceCamera()
+    {
+        if (_model == null) return;
+        var cam = GetViewport()?.GetCamera3D();
+        Vector3 to = cam != null ? cam.GlobalPosition - GlobalPosition : (_mario != null ? -_mario.SmsFacingDir() : Vector3.Back); to.Y = 0f;
+        if (to.LengthSquared() < 1e-4f) return;
+        float yaw = MathF.Atan2(to.X, to.Z) + (FacesPlusZ ? 0f : MathF.PI);
+        _model.GlobalBasis = new Basis(Vector3.Up, yaw).Scaled(Vector3.One * ModelScale);
     }
     internal void BooHit() { _waveHits++; }
 }
 
-/// <summary>164: one Boo of the Boolossus's wave -- boo.glb at the owner's WaveBooScale on GhostBoo.gdshader, riding outward along its line at WaveSpeed,
-/// WaveHeight over the floor, for WaveSeconds, fading over the last WaveFadeSeconds, then gone. Mario in its body (its own radius + his damage cylinder)
-/// takes the plain hit, once per Boo.</summary>
+/// <summary>164: one Boo of the Boolossus's wave -- boo.glb at the owner's WaveBooScale on GhostBoo.gdshader (165: solid white, no vertex colours), riding
+/// outward along its line at WaveSpeed, WaveHeight over the floor, for WaveSeconds, fading over the last WaveFadeSeconds into a puff, then gone. Mario in
+/// its body (its own radius + his damage cylinder) takes the plain hit, once per Boo.</summary>
 public partial class SmsWaveBoo : Node3D
 {
     public SmsBoolossus Maker;
@@ -227,13 +313,17 @@ public partial class SmsWaveBoo : Node3D
     public float Age { get; private set; }
     public bool Hit { get; private set; }
     public float Radius { get; private set; } = 0.7f;
-    private Node3D _model; private readonly List<ShaderMaterial> _mats = new(); private Vector3 _from; private float _halfHeight = 0.6f;
+    public float OpacityShown { get; private set; }
+    public bool UsesVertexColor { get; private set; }
+    public int MaterialsMade => _mats.Count;
+    private Node3D _model; private readonly List<ShaderMaterial> _mats = new(); private Vector3 _from; private float _halfHeight = 0.6f; private bool _puffed;
 
     public void Launch(PackedScene scene, Vector3 at, Vector3 dir, SmsBoolossus owner)
     {
         Maker = owner; Dir = dir; _from = at; GlobalPosition = at;
         SmsBoolossus.Boos.Add(this);
         float k = owner.WaveBooScale;
+        UsesVertexColor = owner.BooVertexColors; OpacityShown = owner.WaveBooOpacity;
         if (scene != null)
         {
             _model = scene.Instantiate<Node3D>(); _model.Name = "Model"; AddChild(_model); _model.Scale = Vector3.One * k;
@@ -249,7 +339,7 @@ public partial class SmsWaveBoo : Node3D
                     if (shader == null) break;
                     var sm = new ShaderMaterial { Shader = shader };
                     if (mi.GetActiveMaterial(s) is BaseMaterial3D bm && bm.AlbedoTexture != null) sm.SetShaderParameter("base_tex", bm.AlbedoTexture);
-                    sm.SetShaderParameter("use_vertex_color", true); sm.SetShaderParameter("lift", 1.8f); sm.SetShaderParameter("ambient", 0.35f); sm.SetShaderParameter("glow", owner.Glow); sm.SetShaderParameter("opacity", owner.Opacity);
+                    sm.SetShaderParameter("use_vertex_color", owner.BooVertexColors); sm.SetShaderParameter("lift", owner.BooLift); sm.SetShaderParameter("ambient", 0.35f); sm.SetShaderParameter("glow", owner.Glow); sm.SetShaderParameter("opacity", owner.WaveBooOpacity);
                     mi.SetSurfaceOverrideMaterial(s, sm); _mats.Add(sm);
                 }
             }
@@ -269,7 +359,9 @@ public partial class SmsWaveBoo : Node3D
         if (left <= Maker.WaveFadeSeconds)
         {
             float k = Mathf.Clamp(left / Mathf.Max(0.01f, Maker.WaveFadeSeconds), 0f, 1f);
-            foreach (var m in _mats) { m.SetShaderParameter("opacity", Maker.Opacity * k); m.SetShaderParameter("flash", (1f - k) * 0.6f); }
+            OpacityShown = Maker.WaveBooOpacity * k;
+            foreach (var m in _mats) { m.SetShaderParameter("opacity", OpacityShown); m.SetShaderParameter("flash", (1f - k) * 0.6f); }
+            if (!_puffed && Maker.BooVanishPuff && Maker.PuffScene != null) { _puffed = true; SmsSmashFx.Puff(Maker.PuffScene, GetParent(), GlobalPosition, Radius * 1.3f, Maker.PuffTint); }
         }
         if (!Hit)
         {
@@ -285,4 +377,130 @@ public partial class SmsWaveBoo : Node3D
         if (Age >= Maker.WaveSeconds) QueueFree();
     }
     public override void _ExitTree() { SmsBoolossus.Boos.Remove(this); }
+}
+
+/// <summary>165: the smash's EFFECTS, built in code from the port's Fx textures (assets/Sms/Fx/tex): the dive's wisp trail (radgrad, additive), the landing's
+/// ring of light racing out over the floor (hamonring3_flat, additive; <see cref="SmsGhostRing"/> grows and fades itself away) and its pale smoke burst
+/// (kemuball3, a one-shot that frees itself when its puffs are gone), and the port's enemy-vanish burst (EnemyDisap.tscn, an SmsFxBurst) tinted, for the
+/// Boos' vanishing and the Boolossus's appearing.</summary>
+public static class SmsSmashFx
+{
+    private const string Tex = "res://assets/Sms/Fx/tex/";
+    private static Texture2D Load(string name) => ResourceLoader.Exists(Tex + name) ? GD.Load<Texture2D>(Tex + name) : null;
+    private static StandardMaterial3D Additive(Texture2D tex, Color color, bool particles)
+    {
+        var m = new StandardMaterial3D
+        {
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, AlbedoColor = color, AlbedoTexture = tex, VertexColorUseAsAlbedo = particles,
+            BillboardMode = particles ? BaseMaterial3D.BillboardModeEnum.Particles : BaseMaterial3D.BillboardModeEnum.Disabled
+        };
+        return m;
+    }
+    private static GradientTexture1D Fade(float a0, float a1, float mid = 0.3f)
+    {
+        var g = new Gradient { Offsets = new float[] { 0f, mid, 1f }, Colors = new Color[] { new Color(1f, 1f, 1f, a0 * 0.6f), new Color(1f, 1f, 1f, a0), new Color(1f, 1f, 1f, a1) } };
+        return new GradientTexture1D { Gradient = g };
+    }
+
+    /// <summary>The wisp trail: a child emitter whose puffs stay in the world where they were shed (LocalCoords off), rising a little.</summary>
+    public static GpuParticles3D Trail(Color color, float puffSize, float emitRadius)
+    {
+        var pm = new ParticleProcessMaterial
+        {
+            Direction = new Vector3(0f, 1f, 0f), Spread = 180f, InitialVelocityMin = 0.3f, InitialVelocityMax = 1.4f, Gravity = new Vector3(0f, 1.2f, 0f),
+            ScaleMin = 0.6f, ScaleMax = 1.3f, DampingMin = 0.5f, DampingMax = 1f, EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = Mathf.Max(0.1f, emitRadius),
+            ColorRamp = Fade(1f, 0f, 0.25f)
+        };
+        var p = new GpuParticles3D
+        {
+            Name = "DiveTrail", Amount = 56, Lifetime = 0.75, Emitting = false, LocalCoords = false, FixedFps = 60, ProcessMaterial = pm,
+            DrawPass1 = new QuadMesh { Size = Vector2.One * puffSize, Material = Additive(Load("radgrad_raw.png"), color, true) },
+            VisibilityAabb = new Aabb(new Vector3(-40f, -40f, -40f), new Vector3(80f, 80f, 80f))
+        };
+        return p;
+    }
+
+    /// <summary>The landing's ring of light, flat on the floor at <paramref name="at"/>, from radius <paramref name="r0"/> to <paramref name="r1"/> over
+    /// <paramref name="seconds"/>, fading; it frees itself.</summary>
+    public static SmsGhostRing Ring(Node parent, Vector3 at, float r0, float r1, float seconds, Color color)
+    {
+        var ring = new SmsGhostRing { Name = "SmashRing", R0 = r0, R1 = r1, Seconds = seconds, Tint = color, Tex = Load("hamonring3_flat.png") };
+        parent.AddChild(ring);
+        ring.GlobalPosition = at + Vector3.Up * 0.08f;
+        SmsBoolossus.RingsMade++;
+        return ring;
+    }
+
+    /// <summary>The landing's smoke: <paramref name="count"/> pale puffs bursting out along the floor from the body's edge, braking, rising a little; a one-shot
+    /// that frees itself when its puffs are gone.</summary>
+    public static GpuParticles3D Smoke(Node parent, Vector3 at, float radius, int count, Color color)
+    {
+        var pm = new ParticleProcessMaterial
+        {
+            Direction = new Vector3(1f, 0f, 0f), Spread = 180f, Flatness = 1f, InitialVelocityMin = 7f, InitialVelocityMax = 13f, Gravity = new Vector3(0f, 0.8f, 0f),
+            DampingMin = 9f, DampingMax = 14f, ScaleMin = 0.8f, ScaleMax = 1.4f, EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Ring, EmissionRingAxis = Vector3.Up,
+            EmissionRingRadius = Mathf.Max(0.2f, radius * 0.7f), EmissionRingInnerRadius = Mathf.Max(0.1f, radius * 0.4f), EmissionRingHeight = 0.2f,
+            ColorRamp = Fade(1f, 0f, 0.2f)
+        };
+        var p = new GpuParticles3D
+        {
+            Name = "SmashSmoke", Amount = count, Lifetime = 0.9, OneShot = true, Explosiveness = 0.95f, Emitting = false, LocalCoords = false, FixedFps = 60, ProcessMaterial = pm,
+            DrawPass1 = new QuadMesh { Size = Vector2.One * Mathf.Max(1.2f, radius * 0.9f), Material = Additive(Load("kemuball3_raw.png"), color, true) },
+            VisibilityAabb = new Aabb(new Vector3(-30f, -10f, -30f), new Vector3(60f, 20f, 60f))
+        };
+        parent.AddChild(p);
+        p.GlobalPosition = at + Vector3.Up * 0.6f;
+        p.Finished += p.QueueFree;
+        p.Emitting = true;
+        SmsBoolossus.SmokesMade++;
+        return p;
+    }
+
+    /// <summary>The port's enemy-vanish burst (EnemyDisap.tscn: blue-grey smoke and a glow) at <paramref name="at"/>, x <paramref name="scale"/>, its glow tinted.</summary>
+    public static SmsFxBurst Puff(PackedScene scene, Node parent, Vector3 at, float scale, Color tint)
+    {
+        if (scene == null || parent == null) return null;
+        if (scene.Instantiate() is not SmsFxBurst b) return null;
+        parent.AddChild(b);
+        b.Play(new Transform3D(Basis.Identity.Scaled(Vector3.One * Mathf.Max(0.1f, scale)), at));
+        var v = new Vector4(tint.R, tint.G, tint.B, 1f);
+        b.SetShaderParam("prm", v); b.SetShaderParam("env", v);
+        SmsBoolossus.PuffsMade++;
+        return b;
+    }
+}
+
+/// <summary>165: a ring of light flat on the floor that grows from R0 to R1 over Seconds while it fades, then frees itself (the Boolossus's landing).</summary>
+public partial class SmsGhostRing : MeshInstance3D
+{
+    public float R0 = 3f, R1 = 10f, Seconds = 0.5f; public Color Tint = new Color(0.75f, 0.85f, 1f, 0.9f); public Texture2D Tex;
+    public float Age { get; private set; }
+    public float RadiusNow { get; private set; }
+    private StandardMaterial3D _mat;
+    public override void _Ready()
+    {
+        TopLevel = true; CastShadow = ShadowCastingSetting.Off;
+        Mesh = new QuadMesh { Size = Vector2.One * 2f };
+        _mat = new StandardMaterial3D
+        {
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, AlbedoColor = Tint, AlbedoTexture = Tex, RenderPriority = 2
+        };
+        MaterialOverride = _mat;
+        Apply(0f);
+    }
+    private void Apply(float k)
+    {
+        RadiusNow = Mathf.Lerp(R0, R1, 1f - (1f - k) * (1f - k));                            // fast out, slowing
+        GlobalBasis = new Basis(Vector3.Right, -MathF.PI / 2f).Scaled(new Vector3(RadiusNow, RadiusNow, 1f));
+        _mat.AlbedoColor = new Color(Tint.R, Tint.G, Tint.B, Tint.A * (1f - k));
+    }
+    public override void _Process(double delta)
+    {
+        Age += (float)delta;
+        float k = Seconds > 0f ? Mathf.Clamp(Age / Seconds, 0f, 1f) : 1f;
+        Apply(k);
+        if (k >= 1f) QueueFree();
+    }
 }

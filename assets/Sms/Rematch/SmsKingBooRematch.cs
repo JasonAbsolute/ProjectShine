@@ -30,10 +30,14 @@ using System.Linq;
 /// Pass 164: THE BOOLOSSUS SMASH (the doc's attack 2: "Crown glows white. A Boolossus falls from above Mario and tries to slam down on him. On landing it
 /// splits into 15 Boos that spread out as a shockwave, then vanish after one second"). A move is now one of three (the doc's near-random pick):
 /// a hop to another spot (RepositionChance), else an attack -- a SMASH by SmashChance, else the lick. The smash is made where he stands: the laugh clip
-/// (SmashClip, the second laugh voice) with his CROWN pulsing to SmashCrownColor (white; the crown material's colour register) through SmashTellSeconds
-/// -- the tell -- then the Boolossus scene (SmashScene: <see cref="SmsBoolossus"/>, its own knobs) is put over Mario and runs on its own (the hang,
-/// the fall, the slam, the wave of Boos); he watches SmashWatchSeconds more, the crown back to yellow, and the wait and the gap run again. A swung
-/// Bomb Boo hits him through the tell (the smash is called off; a Boolossus already out carries on). The faces and the other attacks are
+/// (SmashClip, the second laugh voice) with his CROWN GLOWING the attack's colour (the doc: white for the smash; 165, Jaysonn: "king boo's crown should
+/// glow the color listed in the doc to show that's the attack he's using") -- a light at the crown joint (CrownGlowSize, an additive quad of the port's
+/// radial gradient), the crown shader's own glow term (crown_glow / crown_glow_k) and its colour register, pulsing at CrownPulseHz through
+/// SmashTellSeconds, the tell, then held -- then the Boolossi: 165, SmashCount of them (three), SmashStagger apart, each the Boolossus scene (SmashScene:
+/// <see cref="SmsBoolossus"/>, its own knobs) DIVING in at Mario from its own direction (SmashSpreadDeg apart about a random first; from where King
+/// Boo stands when SmashFromKingBoo) and running on its own (the dive, the slam, the wave of Boos); he watches SmashWatchSeconds past the last, the
+/// crown dark again, and the wait and the gap run again. A swung Bomb Boo hits him through the tell (the smash is called off; Boolossi already out
+/// carry on). The lick has no crown colour (the doc). The faces and the other attacks are
 /// later passes; the animations another hand's. The model is the casino boss's (btelesa.glb at 1 / 74.44) with its shader materials
 /// (BossTelesaBody/Crown/Ha/Mouth.tres: opacity, tint, mask_k, base_tex), copied per instance. Signals: Spawned (the appear starts), Laughed
 /// (the laugh starts), ReadyForFight (the wait begins -- the fight may start), Hit, Defeated; 162: Teleported (he has arrived somewhere), LickStarted
@@ -112,12 +116,19 @@ public partial class SmsKingBooRematch : Node3D
     [Export(PropertyHint.Range, "0,1,0.05")] public float SmashChance = 0.5f;
     /// <summary>The Boolossus (Boolossus.tscn carries its own knobs: the height, the fall, the wave).</summary>
     [Export] public PackedScene SmashScene;
-    /// <summary>The tell: his crown pulses to this colour (white) at this rate for this long before the Boolossus appears; the clip he plays through the
-    /// smash and its voice; how long he watches after the Boolossus is out before the wait and the gap run again.</summary>
+    /// <summary>The tell: his crown glows this colour (the doc: white) pulsing at this rate for this long before the first Boolossus; the clip he plays
+    /// through the smash and its voice; how long he watches after the last Boolossus is out before the wait and the gap run again.</summary>
     [Export] public Color SmashCrownColor = new Color(1f, 1f, 1f);
     [Export] public float SmashTellSeconds = 0.6f, CrownPulseHz = 6f, SmashWatchSeconds = 1f;
     [Export] public string SmashClip = "btelesa_laugh";
     [Export] public string SmashSe = "MSD_SE_BS_TELESA_V_LAUGH2";
+    /// <summary>165: how many Boolossi a smash makes, how far apart in time, and their approach directions (the first at random, the rest this many
+    /// degrees on; SmashFromKingBoo: the first from where he stands). The crown's light: its size (metres across; 0 = the shader's glow alone) and
+    /// strength.</summary>
+    [Export(PropertyHint.Range, "1,6,1")] public int SmashCount = 3;
+    [Export] public float SmashStagger = 0.5f, SmashSpreadDeg = 120f;
+    [Export] public bool SmashFromKingBoo = true;
+    [Export] public float CrownGlowSize = 3.2f, CrownGlowStrength = 1.2f;
     [ExportGroup("")]
     [Export] public bool DebugPrint;
 
@@ -165,6 +176,12 @@ public partial class SmsKingBooRematch : Node3D
     public SmsBoolossus Boolossus => _boolossus != null && IsInstanceValid(_boolossus) ? _boolossus : null;
     public Vector3 CrownColorNow => _crownNow;
     public bool SmashLaunched => _smashLaunched;
+    /// <summary>165: the crown's glow now (0 = dark, its colour), how many Boolossi this smash has launched, the last one's approach direction.</summary>
+    public float CrownGlowK => _crownGlowK;
+    public Color CrownGlowColor => _crownGlowColor;
+    public bool CrownGlowShown => _crownGlow != null && _crownGlow.Visible;
+    public int SmashLaunchedCount => _smashLaunchedCount;
+    public Vector3 LastApproachDir => _lastApproach;
     public Vector3 LastSpot { get; private set; }
     public float HoverOverFloor => _hoverOverFloor;
     public Vector3 ArenaCentre => _arenaCentre;
@@ -196,7 +213,8 @@ public partial class SmsKingBooRematch : Node3D
 
     private Node3D _model; private AnimationPlayer _anim; private Skeleton3D _skel; private int _bBody = -1;
     private readonly List<ShaderMaterial> _mats = new(); private ShaderMaterial _bodyMat, _crownMat; private Vector3 _crownRest = new(1f, 1f, 0f), _crownNow = new(1f, 1f, 0f);
-    private SmsBoolossus _boolossus; private float _smashT; private bool _smashLaunched, _smashClipEnded;
+    private SmsBoolossus _boolossus; private float _smashT; private bool _smashLaunched, _smashClipEnded; private int _smashLaunchedCount, _bCrown = -1; private float _smashNextAt, _smashBaseAngle; private Vector3 _lastApproach;
+    private MeshInstance3D _crownGlow; private StandardMaterial3D _crownGlowMat; private float _crownGlowK; private Color _crownGlowColor = new(1f, 1f, 1f);
     private GpuParticles3D _chika; private Node3D _glow; private SmsActorSound _sound; private SmsTongueStretch _tongue;
     private Mario _mario; private float _yaw, _hoverT, _blinkT; private int _eyeNow = -1; private Vector3 _home; private bool _laughSounded;
     private float _hurtT, _hurtLen, _hurtYaw0; private bool _flashOn;
@@ -217,6 +235,7 @@ public partial class SmsKingBooRematch : Node3D
             if (_skel != null)
             {
                 _bBody = _skel.FindBone("jnt_body"); if (_bBody < 0 && _skel.GetBoneCount() > 1) _bBody = 1;
+                _bCrown = _skel.FindBone("jnt_crown");
                 if (!Engine.IsEditorHint()) { _tongue = new SmsTongueStretch { Name = "TongueStretch", Debug = DebugPrint, Stretch = TongueStretch }; _skel.AddChild(_tongue); }
             }
             foreach (Node n in _model.FindChildren("*", "MeshInstance3D", true, false))
@@ -241,6 +260,18 @@ public partial class SmsKingBooRematch : Node3D
         EyeClose ??= LoadTex("res://models/Eniemes/BossTelesa/N_nbtelesa_eye_close.png");
         _chika = GetNodeOrNull<GpuParticles3D>("ChikaFx"); _glow = GetNodeOrNull<Node3D>("GlowFx");
         foreach (Node3D fx in new Node3D[] { _chika, _glow }) if (fx != null) { fx.TopLevel = true; fx.Visible = false; }
+        if (!Engine.IsEditorHint() && CrownGlowSize > 0f)                                 // 165: the crown's light -- a camera-facing additive quad of the port's radial gradient
+        {
+            var tex = ResourceLoader.Exists("res://assets/Sms/Fx/tex/radgrad_raw.png") ? GD.Load<Texture2D>("res://assets/Sms/Fx/tex/radgrad_raw.png") : null;
+            _crownGlowMat = new StandardMaterial3D
+            {
+                Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+                BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, NoDepthTest = true,
+                AlbedoTexture = tex, AlbedoColor = new Color(1f, 1f, 1f, 0f), RenderPriority = 3
+            };
+            _crownGlow = new MeshInstance3D { Name = "CrownGlowFx", TopLevel = true, Visible = false, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Mesh = new QuadMesh { Size = Vector2.One * CrownGlowSize }, MaterialOverride = _crownGlowMat };
+            AddChild(_crownGlow);
+        }
         _opacitySolid = GhostOpacity;
         foreach (var m in _mats) { m.SetShaderParameter("tint", new Vector3(1f, 1f, 1f)); m.SetShaderParameter("mask_k", 0f); }
         SetOpacity(GhostOpacity);
@@ -249,7 +280,7 @@ public partial class SmsKingBooRematch : Node3D
         SmashScene ??= ResourceLoader.Exists("res://assets/Sms/Rematch/Boolossus.tscn") ? GD.Load<PackedScene>("res://assets/Sms/Rematch/Boolossus.tscn") : null;
         _yaw = Rotation.Y; _home = Position;
         if (_model != null) _model.Visible = false;
-        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: {_mats.Count} materials, clips {(_anim != null ? string.Join(",", _anim.GetAnimationList()) : "none")}, body joint {_bBody}, tongue {(_tongue != null && _tongue.Bound ? "bound" : "none")}, crown material {(_crownMat != null ? "found" : "NONE")}, Boolossus scene {(SmashScene != null ? "loaded" : "NONE")}");
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: {_mats.Count} materials, clips {(_anim != null ? string.Join(",", _anim.GetAnimationList()) : "none")}, body joint {_bBody}, tongue {(_tongue != null && _tongue.Bound ? "bound" : "none")}, crown material {(_crownMat != null ? "found" : "NONE")}, crown joint {_bCrown}, Boolossus scene {(SmashScene != null ? "loaded" : "NONE")}");
         SmsKingBooDriveHook();
     }
     partial void SmsKingBooDriveHook();
@@ -263,6 +294,7 @@ public partial class SmsKingBooRematch : Node3D
         Hp = Math.Max(1, HitPoints); HitsTaken = 0;
         if (_model != null) _model.Visible = true;
         if (_tongue != null) { _tongue.Stretch = TongueStretch; _tongue.On = TongueStretch > 1.001f; }
+        SetCrownGlow(_crownGlowColor, 0f);
         PlayClip(BckAppear);
         ReadArena();
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: appears at {GlobalPosition} ({_hoverOverFloor:F2} m over the floor; the arena's middle {_arenaCentre}, radius {_arenaRadius:F1})");
@@ -354,7 +386,7 @@ public partial class SmsKingBooRematch : Node3D
             EmitSignal(SignalName.Defeated);
         }
         else if (State == Phase.Lick && n == LickClip) _lickClipEnded = true;
-        else if (State == Phase.Smash && n == SmashClip) _smashClipEnded = true;
+        else if (State == Phase.Smash && n == SmashClip) { if (_smashLaunchedCount < SmashCount) PlayClip(SmashClip); else _smashClipEnded = true; }
     }
 
     private void EnterWait(float gap)
@@ -390,8 +422,24 @@ public partial class SmsKingBooRematch : Node3D
         return true;
     }
     private void AbortLick() { _lickStage = -1; _lickClipEnded = false; }
-    private void AbortSmash() { SetCrown(_crownRest); _smashClipEnded = false; }
+    private void AbortSmash() { SetCrownGlow(_crownGlowColor, 0f); _smashClipEnded = false; }
     private void SetCrown(Vector3 c) { _crownNow = c; _crownMat?.SetShaderParameter("crown_c0", c); }
+    /// <summary>165: the crown GLOWS <paramref name="color"/> by <paramref name="k"/> (0 = its own yellow, dark): the light at the crown joint, the shader's glow
+    /// term, the colour register toward the colour.</summary>
+    private void SetCrownGlow(Color color, float k)
+    {
+        _crownGlowColor = color; _crownGlowK = Mathf.Clamp(k, 0f, 1f);
+        var c = new Vector3(color.R, color.G, color.B);
+        SetCrown(_crownRest.Lerp(c, _crownGlowK));
+        _crownMat?.SetShaderParameter("crown_glow", c); _crownMat?.SetShaderParameter("crown_glow_k", _crownGlowK * 0.9f);
+        if (_crownGlow != null)
+        {
+            _crownGlow.Visible = _crownGlowK > 0.02f && State != Phase.Hidden && State != Phase.Gone;
+            if (_crownGlowMat != null) _crownGlowMat.AlbedoColor = new Color(color.R, color.G, color.B, Mathf.Clamp(_crownGlowK * CrownGlowStrength, 0f, 1f));
+        }
+    }
+    /// <summary>jnt_crown's place in the world (the crown's light sits there), else a little over the body joint.</summary>
+    public Vector3 CrownPoint => _skel != null && _bCrown >= 0 ? _skel.GlobalTransform * _skel.GetBoneGlobalPose(_bCrown).Origin : BodyPoint + Vector3.Up * 3f;
     private void SetFlash(bool on)
     {
         _flashOn = on;
@@ -432,39 +480,48 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>164: the smash, where he stands: the laugh clip and its voice, the crown pulsing white through the tell, then the Boolossus over Mario.</summary>
     private void BeginSmash()
     {
-        State = Phase.Smash; _smashT = 0f; _smashLaunched = false; _smashClipEnded = false; MovesMade++; SmashesMade++; Position = _home;
+        State = Phase.Smash; _smashT = 0f; _smashLaunched = false; _smashClipEnded = false; _smashLaunchedCount = 0; _smashNextAt = SmashTellSeconds; MovesMade++; SmashesMade++; Position = _home;
+        var m0 = M();
+        _smashBaseAngle = SmashFromKingBoo && m0 != null ? MathF.Atan2(GlobalPosition.X - m0.GlobalPosition.X, GlobalPosition.Z - m0.GlobalPosition.Z) : (float)(_rng.NextDouble() * Math.Tau);
         PlayClip(SmashClip);
         if (_sound != null && !string.IsNullOrEmpty(SmashSe)) _sound.Play(SmashSe);
-        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: move {MovesMade}: SMASH {SmashesMade} -- the crown glows (the Boolossus in {SmashTellSeconds:F2} s)");
+        SetCrownGlow(SmashCrownColor, 0f);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: move {MovesMade}: SMASH {SmashesMade} -- the crown glows {SmashCrownColor} ({SmashCount} Boolossi from {SmashTellSeconds:F2} s, {SmashStagger:F2} s apart)");
         EmitSignal(SignalName.SmashStarted);
     }
     private void SmashTick(float dt)
     {
         _smashT += dt;
         FaceTick(dt);
-        if (!_smashLaunched)
+        if (_smashLaunchedCount < SmashCount)
         {
-            float k = 0.5f + 0.5f * MathF.Sin(_smashT * MathF.Tau * CrownPulseHz - MathF.PI / 2f);
-            SetCrown(_crownRest.Lerp(new Vector3(SmashCrownColor.R, SmashCrownColor.G, SmashCrownColor.B), k));
-            if (_smashT >= SmashTellSeconds)
+            if (!_smashLaunched)                                      // the tell: the crown pulsing up to the colour
+            {
+                float k = 0.5f + 0.5f * MathF.Sin(_smashT * MathF.Tau * CrownPulseHz - MathF.PI / 2f);
+                SetCrownGlow(SmashCrownColor, Mathf.Lerp(0.35f, 1f, k) * Mathf.Clamp(_smashT / 0.15f, 0f, 1f));
+            }
+            if (_smashT >= _smashNextAt)
             {
                 var m = M();
                 if (m == null || SmashScene == null) { EndSmash(); return; }
-                var b = SmashScene.Instantiate<SmsBoolossus>(); b.Name = $"Boolossus{SmashesMade}"; b.DebugPrint = DebugPrint;
+                int i = _smashLaunchedCount;
+                float ang = _smashBaseAngle + Mathf.DegToRad(SmashSpreadDeg) * i;
+                _lastApproach = new Vector3(MathF.Sin(ang), 0f, MathF.Cos(ang));
+                var b = SmashScene.Instantiate<SmsBoolossus>(); b.Name = $"Boolossus{SmashesMade}_{i + 1}"; b.DebugPrint = DebugPrint;
                 (GetTree().CurrentScene ?? GetParent()).AddChild(b);
                 float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
-                b.Landed += hit => { if (hit) SmashHits++; if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the Boolossus has landed -- {(hit ? "ON Mario" : "a miss")}"); EmitSignal(SignalName.Smashed, hit); };
-                b.Begin(m, fy);
-                _boolossus = b; _smashLaunched = true;
-                SetCrown(new Vector3(SmashCrownColor.R, SmashCrownColor.G, SmashCrownColor.B));
-                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the Boolossus is out over Mario at {m.GlobalPosition}");
+                b.Landed += hit => { if (hit) SmashHits++; if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: a Boolossus has landed -- {(hit ? "ON Mario" : "a miss")}"); EmitSignal(SignalName.Smashed, hit); };
+                b.Begin(m, fy, _lastApproach);
+                _boolossus = b; _smashLaunched = true; _smashLaunchedCount++; _smashNextAt += SmashStagger;
+                SetCrownGlow(SmashCrownColor, 1f);
+                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: Boolossus {_smashLaunchedCount} of {SmashCount} dives in from {_lastApproach} at Mario {m.GlobalPosition}");
             }
         }
-        else if (_smashT >= SmashTellSeconds + SmashWatchSeconds || _smashClipEnded) EndSmash();
+        else if (_smashT >= _smashNextAt - SmashStagger + SmashWatchSeconds || _smashClipEnded) EndSmash();
     }
     private void EndSmash()
     {
-        SetCrown(_crownRest); _smashClipEnded = false;
+        SetCrownGlow(_crownGlowColor, 0f); _smashClipEnded = false;
         EnterWait(NextGap());
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: back to the wait after the smash, the next move in {_gapT:F1} s");
     }
@@ -673,6 +730,7 @@ public partial class SmsKingBooRematch : Node3D
         bool show = State != Phase.Hidden && State != Phase.Gone && _model != null && _model.Visible && _opacityShown > 0.02f;
         Vector3 at = BodyPoint;
         if (_chika != null) { bool on = show && Twinkle; _chika.Visible = on; _chika.Emitting = on; if (on) _chika.GlobalPosition = at; }
+        if (_crownGlow != null && _crownGlow.Visible) { if (!show) _crownGlow.Visible = false; else _crownGlow.GlobalPosition = CrownPoint; }
         if (_glow != null)
         {
             _glow.Visible = show && Glow > 0f;
