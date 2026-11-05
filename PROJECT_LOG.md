@@ -11828,3 +11828,53 @@ over his feet, HP 8 -> 7, hurt (C6-7), a held jump (3.4 m) clearing it with the 
 **Deviations, all knobs:** the whip is whatever the clip does -- it comes through Mario's upper body straight ahead (the shaft) with the tip at the
 floor beyond him; Mario off to his left meets it higher, to his right lower. TongueStretch 1.15 applies in every clip (the idle tongue hangs a bit
 longer too). LickClipSpeed 1.5 for the half-second tell (1 = the clip's own pace, the whip at 0.85 s).
+
+### 164 -- the King Boo REMATCH, part 8: the BOOLOSSUS SMASH (feature/kingboo-rematch, code `2e5a532`)
+
+**Jaysonn:** "yeah thats looking good! next lets do the, Boolossus Smash next i have some models in the downloads folder the doc listed and you can start
+on that"
+
+**The doc** (attack 2): "Crown glows white. A Boolossus falls from above Mario and tries to slam down on him. On landing it splits into 15 Boos that spread
+out as a shockwave, then vanish after one second." The plain hit for both the slam and the Boos.
+
+**The models** (`models/Sms/Rematch/`, Blender headless, `ps157/convert_boolossus.py`): Boolossus.obj + .mtl + Textures/telesa2_0..5.png -> `boolossus.glb`
+-- 550 vertices, 1.07 m across at scale 1, the bottom at its origin; five of the six textures are 8x8 colour swatches (a pale blue-white body (210, 239,
+246), yellow eyes, a red tongue, pink cheeks, white teeth) and the face sheet 64x64; no vertex colours, no alpha, as the doc warned. Teresa.dae (the plain
+Boo, Galaxy's centimetres x 0.01, its vertex colours kept as the Bomb Boo's were) -> `boo.glb`, 2.5 m across. Godot pulled the textures out of the glbs
+on import (boolossus_telesa2_*.png, boo_teresa.png). `GhostBoo.gdshader` (new): the white ghosts' look -- texture x (vertex colour + `ambient`) x `lift`
+when the mesh has vertex colours (the Boo, lift 1.8 -- the TEV recipe's doubling), else texture x `lift` (the Boolossus, 1); `opacity` 0.75 (King Boo's
+0.72), a soft blue-white rim (`glow`), a `flash`. The doc's TEV steps for the Boo (indirect texturing through IndDummy / TeresaInd4) are not reproduced:
+the Boos are on screen for a second.
+
+**The Boolossus** (`SmsBoolossus.cs`, `Boolossus.tscn`; the 15 Boos are `SmsWaveBoo` in the same file, made in code): King Boo makes one over Mario and
+it runs on its own. It APPEARS DropHeight 16 m over the floor under Mario (a FadeInSeconds 0.25 fade, MSD_SE_EN_TELESA_APPEAR), facing the camera's side
+(FacesPlusZ: the model's face is on its -Z); HANGS HangSeconds 0.45 drifting after Mario at TrackSpeed 6 m/s with its SHADOW on the floor under it (a dark
+quad, ShadowOpacity 0.55, growing from 45 % to ShadowScale 1.1 x the body radius as it falls -- the tell); FALLS under SmashGravity 30 (1.03 s from 16 m;
+the game's gravity is 19); LANDS -- the roulette's thud (MSD_SE_BS_TELESA_RLT_DOWN) and the Boo crush: Mario within the body (BodyRadius 0 = the model's
+half width x ModelScale 5.5 = 2.94 m; BodyHitHeight 5) takes the plain hit; the Boolossus is gone in a flash and a squash over 0.15 s and WaveCount 15
+Boos stand in a ring at WaveStartRadius (0 = the body's radius), WaveHeight 0.9 over the floor, each riding straight outward along its own line at
+WaveSpeed 9 m/s (the ring is 12 m across at the end) for WaveSeconds 1, fading over WaveFadeSeconds 0.25 (MSD_SE_EN_TELESA_DISAPPEAR); a Boo through
+Mario's damage cylinder (BooRadius 1.1 -- the model's own 0.7 would leave 1 m gaps at 8 m; fifteen 1.1-m Boos close the ring out to about 8 m, gappy
+beyond: the far wave can be stood through) is the plain hit, once per Boo; a jump clears the ring (its top is 1.5 m up). Signals Landed(hit), Finished;
+the node frees itself when the Boos are gone. Static lists All / Boos for the drives.
+
+**King Boo** (`SmsKingBooRematch.cs`): a move is one of three (the doc's near-random pick): a hop to another spot by RepositionChance 0.3, else an
+attack -- a SMASH by SmashChance 0.5 (SmashOn, the scene loaded), else the lick. The smash is made where he stands: the laugh clip (SmashClip) with
+MSD_SE_BS_TELESA_V_LAUGH2, his CROWN pulsing from its yellow to SmashCrownColor (white) at CrownPulseHz 6 through SmashTellSeconds 0.6 -- the crown
+material's colour register `crown_c0` (the copy per instance), the tell -- then the Boolossus scene (SmashScene, Boolossus.tscn) is put over Mario
+(the floor under him probed) and runs on its own; the crown holds white while he watches SmashWatchSeconds 1 more, then yellow again and the wait
+with the next gap. A swung Bomb Boo hits him through the tell (the smash is called off, the crown yellow; a Boolossus already out carries on).
+Signals SmashStarted, Smashed(hit); read-outs SmashesMade / SmashHits / Boolossus / CrownColorNow / LastMove.
+
+**Drive 164** (`SmsKingBoo.Drive.cs`, deleted before the commit; five runs, s-w; run w 14 / 14, every move a smash): the first move a smash where he
+stands with the laugh clip (C2); the crown's blue channel up to 0.99 through the tell, the Boolossus 0.62 s in at 16.00 m over Mario's spot (C3); the hang,
+the fall accelerating to 30.8 m/s, 1.04 s, landing 0.19 m from a standing Mario (C4) -- the plain hit, HP 8 -> 7, hurt (C5); 15 Boos in a ring at 2.94 m,
+0.90 m up (C6), at 7.35 m half a second on (C7), gone at 1.03 s with the Boolossus freed (C8), King Boo back in the wait, the crown yellow (C9); a Mario
+who ran across the arena is missed by the slam, 7.2 m from it (C10), and two adjacent Boos of the ring run through him standing there, HP -1 (C11); a
+held jump over the ring, 3.4 m high, clears it (C12); a hit through the tell takes a point and calls the smash off, no Boolossus (C13); the end (C14).
+The run's lessons: the Boolossus hangs straight over Mario, so "run away from it" has no direction (the drive crosses the arena through its middle); run
+13 m and the ring never reaches you; stand 8 m out with 0.7-m Boos and you may stand in a gap.
+
+**Deviations, all knobs:** the Boolossus's size (ModelScale 5.5 = 6 m across, about two Marios tall; King Boo is 9 m), height, hang, gravity and the
+wave's numbers are mine -- the doc gives only "15 Boos" and "one second"; the Boo hit radius 1.1 over the model's 0.7 so the ring is closed near its
+start; the crown glow is the colour register pulsed, not a bloom; the laugh clip as the summon pose; the Boolossus faces the camera, not King Boo.
