@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-05 00:44 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-05 01:33 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1189,8 +1189,12 @@ SMS 159: Galaxy's way -- the spin takes the Boo BY THE TONGUE, Mario holds it up
 him; he walks it into King Boo (no throw). The Boo's look fixed (158's was purple and see-through): the files' own black body and yellow eyes, solid.
 SMS 160: the Boo FLOATS as Sunshine's Boos do (telesa.prm: the bob and the tilt, the wander between random goals, the touch that hurts Mario unless
 he is above it); the lasso arm out to the side, clear of his head (it was inside it). SMS 161: the arm further out, the closed FIST as the
-lasso hand, the tongue rooted in the middle of the Boo's mouth and ending in the middle of the fist, the swing 3.6 m. Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `7ffdff0` ("SMS 161: the King Boo REMATCH, part 5 -- the fist on the tongue"; assets/Mario.cs the hand poses and the grip,
+lasso hand, the tongue rooted in the middle of the Boo's mouth and ending in the middle of the fist, the swing 3.6 m. SMS 162: King Boo's MOVES -- he
+teleports between spots (the hide clip under a fade, a fade in elsewhere) and LICKS: in front of Mario, the roll clip's rear-up as the half-second tell,
+the tongue re-aimed onto the floor under Mario (a new SkeletonModifier3D, FABRIK over the tongue chain); the plain hit; a jump clears it; a swung Boo
+through the lick breaks it off; the gaps shorten per hit. Further passes re-point this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `0b7a612` ("SMS 162: the King Boo REMATCH, part 6 -- the teleports and the Lick"; assets/Sms/Rematch/
+  SmsTongueAim.cs NEW, SmsKingBooRematch.cs, SmsArenaFloor.cs) on the 161 commit ("SMS 161: the King Boo REMATCH, part 5 -- the fist on the tongue"; assets/Mario.cs the hand poses and the grip,
   assets/Sms/Rematch/ SmsBombBoo.cs, SmsLassoArm.cs) on the 160 commit ("SMS 160: the King Boo REMATCH, part 4 -- the Bomb Boo floats as Sunshine's Boos do"; assets/Mario.cs the
   arm's lean, assets/Sms/Rematch/ SmsBombBoo.cs, SmsBombBooSpawner.cs, SmsLassoArm.cs, BombBoo.tscn) on the 159 commit ("SMS 159: the King Boo REMATCH, part 3 -- the Bomb Boo by the tongue"; assets/Mario.cs the lasso arm hook-up,
   the throw removed; assets/Sms/Rematch/ SmsLassoArm.cs (new), SmsBombBoo.cs, BombBoo.gdshader, BombBoo.tscn, SmsKingBooRematch.cs (the hit cylinder),
@@ -1203,9 +1207,14 @@ lasso hand, the tongue rooted in the middle of the Boo's mouth and ending in the
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 10 commits past `feature/sounds`, 32 since `main`. ~1 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 12 commits past `feature/sounds`, 34 since `main`. ~1 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 162: in the arena, 3 s after King Boo's laugh he vanishes and fades in 6 m in front of you, low; half a second of rearing up with the
+  tongue overhead, then it snaps onto the floor where you stand -- jump at the tell to clear it, stand and it knocks you down (a point of HP). He
+  hops off to another spot and comes again every 2-4 s, quicker per hit; swing a Boo into him while he waits or mid-lick (it breaks the lick off).
+  Knobs: KingBooRematch.tscn's "The fight (162)" group (the gaps, the fades, LickDistance / LickHeight, the clip and its frames, the hit's radius and
+  clear height, AttacksOn off = the old waiting boss).
 - To try 161: grab a Boo: the arm is further out, the hand a closed FIST on the tongue, the tongue from the middle of the Boo's mouth into the
   middle of the fist, the Boo swinging wider (3.6 m). Knobs: Mario's LassoTilt / LassoForward / LassoIn, BombBoo.tscn's TongueOffset and OrbitRadius.
 - To try 160: in the arena. The Boo out of the fog bobs and tilts like the hotel's Boos and wanders about the middle on its own -- it no longer

@@ -11742,3 +11742,56 @@ swing at 3.6 m (C7), the fist gone again after the drop (C12). Run o: 16 / 16.
 
 **Deviations, all knobs:** LassoTilt / LassoForward / LassoIn; TongueOffset; OrbitRadius. The grip is the closed hand model's centre -- another
 character's fist model gives its own.
+
+### 162 -- the King Boo REMATCH, part 6: the teleports and the Lick (feature/kingboo-rematch, code `0b7a612`)
+
+**Jaysonn:** "Next: King Boo's teleports and the Lick attack for this we will reuse some animations from the king boo. we wont use the new model since
+its hard to animate and i feel this will keep the same old feel we can use betelsa_roll to use as a lick attack or we can use that as a base and
+chnage where the tounge is to make it look more like an attack"
+
+**The doc** (KINGBOO_REMATCH_gdoc.txt): quick and light, teleports between spots, does not walk; the Lick: "He teleports directly in front of Mario
+and licks, with half a second of wind-up before it lands. The wind-up is the whole tell and a jump clears it"; the plain hit; the pace: short gaps
+that shorten per hit.
+
+**The clips, measured** (`glb162/tongue_track.py`: btelesa.glb's animations read straight from the file, the tongue joints' places per bck frame):
+no casino clip is a lunge. btelesa_roll (139 frames) is the ROULETTE SPIN -- the body rears up 2.3 m by frame 30 with the tongue whipped up
+overhead (10 m), plunges 2 m under its height by frame 60 and is back by 80 while the tongue whirls round; btelesa_lick licks the lips; btelesa_spit
+rears the head back and thrusts it; btelesa_hide hops 6 m up then dives 17 m down (the casino's hide under the roulette); btelesa_appear shoots up
+from 17 m under. The tongue chain jnt_sita_1 -> 2 -> 3 -> 4 -> eff_sita is 7.8 m long from a root 2.2 m in front of the body joint.
+
+**The Lick = the roll clip for the body, the TONGUE CHANGED** (`SmsTongueAim.cs`, new): a SkeletonModifier3D under his Skeleton3D, as Mario's lasso
+arm is, that after the clip has posed him bends the tongue chain onto a point in the world -- a FABRIK pass with the clip's own segment lengths
+(the tip lands on the mark when it is within reach, the tongue curls on the way; out of reach it points straight at it), then each joint turned by
+the shortest arc so its child lies on the chain. Weight blends in over the snap and out over the pull back; the joints' places after the pose are
+read in the same pass for the hit.
+
+**His moves** (`SmsKingBooRematch.cs`, phases Vanish / Arrive / Lick beside the old ones): while he waits a GAP runs down -- GapAtStart 3.5 s with
+all his hit points to GapAtLastHit 1.8 at his last, give or take GapJitter 0.6; the first move FirstAttackDelay 3 s into the fight -- then a move.
+He VANISHES: the hide clip (its hop up) under a fade of TeleportOutSeconds 0.4 with MSD_SE_BS_TELESA_DISAPPEAR; and ARRIVES: a fade in of
+TeleportInSeconds 0.3, settling down TeleportInDrop 1.2 m, the appear voice, facing Mario -- usually LickDistance 6 m in front of Mario along his
+face (his body joint is 4.3 m behind his own face, so his face comes about 1.7 m from Mario), LickHeight 3 m over the floor, for the LICK; by
+RepositionChance 0.3 just another spot (within three quarters of the floor's radius of its middle, SpotMinFromMario 7 to SpotMaxFromMario 16 m from
+Mario) and a half gap. The lick: the roll clip (LickClip, LickClipSpeed 1); at LickStrikeFrame 30 -- the half second, the tongue overhead, V_ROLL
+sounded at the start -- the tongue SNAPS (LickSnapSeconds 0.12, MSD_SE_BS_TELESA_LICK) onto the mark: the floor under Mario + LickAimUp 0.3, where he
+is at that moment; holds LickHoldSeconds 0.15; pulls back over LickRetractSeconds 0.3 under the clip's tail, which is cut at LickEndFrame 80 for the
+wait (the body is back at its height by then; BodyMinOverFloor 2.6 lifts the node through the plunge so the body never dips into the floor);
+AfterLickSeconds 0.4 later he vanishes to another spot and the gap runs again. THE HIT, through the snap and the hold, once per lick: Mario within
+LickHitRadius 1.2 m of the mark, his feet lower than LickClearHeight 0.8 m over its floor, the tongue's tip come within LickTipSlack 1 m of the mark
+(out of reach = a miss) -> `Mario.TakeDamage` with the common enemy profile: the plain hit, a point of HP, the knockdown. A jump at the tell clears
+it (his held jump is 3.4 m; a tap's hop 1.4 m -- in run p the hop came down to 0.7 m during the hold and was licked). He can be hit by a swung Bomb
+Boo while he waits AND through the lick (the hit breaks the lick off: the hurt as before, the tongue let go); not between spots. Signals Teleported,
+LickStarted, Licked(hit); the drives read LickStage, the counts, the gap, the spots. `SmsArenaFloor.cs`: Centre / Radius from the vertices (the
+arena is 26 m across) for the spots.
+
+**Drive 162** (`SmsKingBoo.Drive.cs`, deleted before the commit): the arena run on its own, the Bomb Boo supply stopped for the flow. The first move
+at 3.0 s (C2), the fade to 0 and 12 m moved (C3), the lick's spot 6.0 m ahead at 2.9 m over the floor (C4), the snap at 0.52 s (C5), the five joints
+aimed with 9.5 m of reach and the tip 0.55 m from a standing Mario's chest (C6), the hit: HP 8 -> 7, hurt (C7), away to a spot 9 m from Mario at the
+hover height 1.4 s after the lick (C8), the next lick JUMPED over -- a miss, no HP lost (C9), a hit while he waits (C10) and the gap after it 2.07 s
+(C11), a hit mid-lick breaking it off (C12), the third hit: down and gone, no more moves (C13-14). Run q: 14 / 14. The .err's only line is Godot's
+"1 resources still in use at exit" after the drive's Quit.
+
+**Deviations, all knobs** (KingBooRematch.tscn's "The fight (162)" group): the lick is the roll clip's rear-up with the tongue re-aimed, not a lunge
+clip -- the body stays the clip's (btelesa_spit is the other base: LickClip "btelesa_spit", LickStrikeFrame 40, LickEndFrame 99); the arrival is a fade
+with the wait clip, not the appear clip (its 11-m bounce is the entrance's); he faces Mario through the wind-up and holds still from the snap;
+AttacksOn off gives 161's waiting boss. The other attacks (Boolossus Smash, Ghost Lightning, Breath, Fireballs, Ghost Wind), the faces, the HUD and
+the fight's end are later passes.
