@@ -8,8 +8,9 @@ using System.Collections.Generic;
 /// laugh clip with the long laugh (MSD_SE_BS_TELESA_V_LAUGH1), and the wait loop -- hovering (HoverBob), turning to face Mario (FaceMario),
 /// the soft glow and the twinkle at his body (the casino boss's GlowFx / ChikaFx, "a slight glow on him throughout"), the blink loop on his
 /// eyes (btelesa_twait's 150-frame table), the ghost's screen mix at GhostOpacity. Pass 158: HIS HIT POINTS -- a thrown Bomb Boo bursting on him
-/// (SmsBombBoo) is <see cref="TakeHit"/>: a point off, the hit clip with a full turn about himself (the doc's hurt flip, until its own
-/// animation comes), a flash, more solid (OpacityPerHit); at none left the down clip and he is gone (Defeated). The attacks, the teleports
+/// (SmsBombBoo; 159: SWUNG into his body's hit cylinder, HitRadius / HitBelow / HitAbove) is <see cref="TakeHit"/>: a point off, the hit clip
+/// with a full turn about himself (the doc's hurt flip, until its own animation comes), a flash, more solid (OpacityPerHit); at none left the
+/// down clip and he is gone (Defeated). The attacks, the teleports
 /// and the faces are later passes; the animations another hand's. The model is the casino boss's (btelesa.glb at 1 / 74.44) with its shader materials
 /// (BossTelesaBody/Crown/Ha/Mouth.tres: opacity, tint, mask_k, base_tex), copied per instance. Signals: Spawned (the appear starts), Laughed
 /// (the laugh starts), Ready (the wait begins -- the fight may start).
@@ -41,6 +42,9 @@ public partial class SmsKingBooRematch : Node3D
     [Export(PropertyHint.Range, "0,0.3,0.01")] public float OpacityPerHit = 0.1f;
     /// <summary>The hurt's sound (the casino boss's damage cry) and the down's.</summary>
     [Export] public string HurtSe = "MSD_SE_BS_TELESA_DAMAGE", DownSe = "MSD_SE_BS_TELESA_DOWN";
+    /// <summary>159: his BODY for the swung Bomb Boo -- a cylinder about jnt_body: this radius, this far under the joint to this far over it (metres; the
+    /// game's body hit cylinder is 350 u across, 550 tall from 200 under the joint: 4.7 / 2.7 / 4.7). A little inside the visible body.</summary>
+    [Export] public float HitRadius = 4f, HitBelow = 2.5f, HitAbove = 4.5f;
     [ExportGroup("")]
     [Export] public bool DebugPrint;
 
@@ -64,6 +68,15 @@ public partial class SmsKingBooRematch : Node3D
     public int MaterialsCopied => _mats.Count;
     /// <summary>jnt_body's place in the world (where the glow sits).</summary>
     public Vector3 BodyPoint => _skel != null && _bBody >= 0 ? _skel.GlobalTransform * _skel.GetBoneGlobalPose(_bBody).Origin : GlobalPosition;
+    /// <summary>159: a point (a swung Bomb Boo, with its own reach) is in his body's hit cylinder (HitRadius, HitBelow, HitAbove about jnt_body).</summary>
+    public bool InHitCylinder(Vector3 p, float extra = 0f)
+    {
+        Vector3 b = BodyPoint;
+        if (p.Y < b.Y - HitBelow - extra || p.Y > b.Y + HitAbove + extra) return false;
+        return new Vector2(p.X - b.X, p.Z - b.Z).Length() <= HitRadius + extra;
+    }
+    /// <summary>The cylinder's lowest point over the world's floor, for the drives.</summary>
+    public float HitBottomY => BodyPoint.Y - HitBelow;
 
     // the clips used, their bck frame counts (one bck frame = 1 / 60 s) and loops -- SmsBossTelesa's table
     private const string BckAppear = "btelesa_appear", BckLaugh = "btelesa_laugh", BckWait = "btelesa_wait", BckHit = "btelesa_hit", BckDown = "btelesa_down";

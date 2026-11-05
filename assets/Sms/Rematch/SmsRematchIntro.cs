@@ -19,8 +19,9 @@ public partial class SmsRematchIntro : Node
     [Export] public NodePath BooPath = "../KingBoo";
     [Export] public NodePath BooSpawnPath = "../BooSpawn";
     [Export] public NodePath FloorPath = "../Arena";
-    /// <summary>Mario is revealed this high over the floor under his marker (falls in); King Boo hovers this high over the floor under his.</summary>
-    [Export] public float FallHeight = 22f, BooHeight = 5.5f;
+    /// <summary>Mario is revealed this high over the floor under his marker (falls in); King Boo hovers this high over the floor under his (159: 4 --
+    /// his body's hit cylinder reaches down to 1.5 m, where a Bomb Boo swung at Mario's arm height, about 2.3 m, reaches it).</summary>
+    [Export] public float FallHeight = 22f, BooHeight = 4f;
     [ExportGroup("The card")]
     [Export] public string Line1 = "You call that a fight fit for a king?";
     [Export] public string Line2 = "I'll show you a real fight...";

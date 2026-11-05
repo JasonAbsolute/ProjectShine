@@ -853,18 +853,23 @@ public partial class Mario : CharacterBody3D
 
     // ------------------------------------------------------------------ SMS REMATCH (pass 158): the SPIN and the Bomb Boo ----------------
     /// <summary>X without the FLUDD (KINGBOO_REMATCH_gdoc.txt): Galaxy's grounded spin, MarioState.spin -- its own state, so the rematch can give it
-    /// properties. It GRABS a Bomb Boo (SmsBombBoo) within BombGrabRadius (and under BombGrabHeight); with one in hand it THROWS it his way --
-    /// the stick's way when held, a King Boo within BombThrowAssistDeg of that pulling the throw onto himself -- BombThrowAt seconds in, at
-    /// BombThrowSpeed with BombThrowUp of rise. The spin lasts SpinSeconds (SpinTurns of the body; the ma_spin_p clip stands in for its own
-    /// animation), the stick steers him through it at SpinMoveSpeed, A leaves it in a spin jump; SpinCooldown before the next. A Bomb Boo in
-    /// hand: single jumps only, no hip drop, a dive drops it, a spin jump makes it spin faster (the doc). The X key stands in for the pad's X.</summary>
+    /// properties. It GRABS a Bomb Boo (SmsBombBoo) within BombGrabRadius (and under BombGrabHeight) BY THE TONGUE (159): he holds the tongue up in
+    /// one hand -- the LASSO ARM, SmsLassoArm on his skeleton, LassoArm R or L, blended in over LassoBlendSeconds -- and the Boo swings round him on
+    /// it; he walks it into King Boo (it is NOT thrown; X with a Boo in hand does nothing, the doc's "run and single jump, nothing else"). The spin
+    /// lasts SpinSeconds (SpinTurns of the body; the ma_spin_p clip stands in for its own animation), the stick steers him through it at
+    /// SpinMoveSpeed, A leaves it in a spin jump; SpinCooldown before the next. A Bomb Boo in hand: single jumps only, no hip drop, a dive drops
+    /// it, a spin jump makes the Boo swing faster (the doc). The X key stands in for the pad's X.</summary>
     [ExportGroup("SMS Rematch (158): the spin and the Bomb Boo")]
     [Export] public bool SmsSpinEnabled = true;
     [Export] public float SpinSeconds = 0.6f, SpinTurns = 2f, SpinMoveSpeed = 7f, SpinSteerAccel = 40f, SpinCooldown = 0.2f;
     [Export] public float BombGrabRadius = 2.8f, BombGrabHeight = 3.5f;
-    [Export] public float BombThrowAt = 0.12f, BombThrowSpeed = 22f, BombThrowUp = 4f, BombThrowAssistDeg = 35f;
+    [Export(PropertyHint.Enum, "R,L")] public string LassoArm = "R";
+    [Export] public float LassoBlendSeconds = 0.15f;
+    /// <summary>The raised arm's lean: the upper arm outward and forward, the forearm in over the head (fractions of straight up).</summary>
+    [Export] public float LassoTilt = 0.35f, LassoForward = 0.2f, LassoIn = 0.2f;
     [ExportGroup("")]
-    private SmsBombBoo _smsBomb; private float _smsSpinT, _smsSpinCooldown; private bool _smsSpinThrew, _smsSpinGrabbed, _smsSpinKeyPrev, _smsSpinKeyEdge; private int _smsSpinCount;
+    private SmsBombBoo _smsBomb; private float _smsSpinT, _smsSpinCooldown; private bool _smsSpinGrabbed, _smsSpinKeyPrev, _smsSpinKeyEdge; private int _smsSpinCount;
+    private SmsLassoArm _smsLasso;                   // 159: the arm up while he swings a Bomb Boo (built on the skeleton at his setup)
 
     // Backflip: hold Z to squat (ma_sqwat), press A to backflip (ma_jump_rolling).
     // Toned down slightly below SIDEFLIP_JUMP_VELOCITY — was matching it exactly
@@ -2916,7 +2921,7 @@ public partial class Mario : CharacterBody3D
 
         // Waist tilt: lean forward based on speed, disabled while carrying
         bool isRunning = stateOfMario == MarioState.running || stateOfMario == MarioState.sprinting;
-        bool isCarrying = heldBody != null || _smsBomb != null;
+        bool isCarrying = heldBody != null;
 
         if (UseSmsPhysics)
         {
@@ -3063,8 +3068,8 @@ public partial class Mario : CharacterBody3D
                 SmsSpinFrame(delta, stickStrength, inputDirWorld);
                 goto EndFrame;
             }
-            if (UseSmsPhysics && SmsSpinEnabled && !_smsHasFludd && _smsPadDisabledTicks == 0 && _smsSpinCooldown <= 0f
-                && (Input.IsActionJustPressed("button_x") || _smsSpinKeyEdge) && SmsSpinCanStart())
+            if (UseSmsPhysics && SmsSpinEnabled && !_smsHasFludd && _smsPadDisabledTicks == 0 && _smsSpinCooldown <= 0f && _smsBomb == null
+                && (Input.IsActionJustPressed("button_x") || _smsSpinKeyEdge) && SmsSpinCanStart())   // 159: not with a Boo in hand (the doc: run and single jump, nothing else)
             {
                 SmsSpinStart();
                 goto EndFrame;
@@ -11218,7 +11223,7 @@ public partial class Mario : CharacterBody3D
         // NOTE: AnimationTree activation is now handled by SetMarioState()
         // This function only updates the blend parameter for smooth transitions
 
-        bool isCarrying = (heldBody != null || _smsBomb != null);   // 158: the Bomb Boo over his head
+        bool isCarrying = (heldBody != null);
 
         // Smooth blend transition
         float targetBlend = (isCarrying || SmsFluddUpperBlend) ? 1.0f : 0.0f; // the FLUDD pump rides the same upper-body blend
@@ -13396,7 +13401,7 @@ public partial class Mario : CharacterBody3D
         // went IDLE, while CarryBlend was still fading out (83 ms) -- five frames of the arms blending THROUGH the carrying pose
         // (jnt_arm_R1 176 deg, jnt_arm_L1 155 deg, jnt_head 36 deg, jnt_chest 22 deg off the grips): the squat end's flail. ma_pump's
         // frame 0 and ma_sqend's first frame are the same grip pose, so the fade from ma_pump is invisible, as the game's switch is.
-        string want = heldBody != null || _smsBomb != null || !UseSmsPhysics ? "ma_carry_p" : SmsFluddUpperClipName(_fluddPumpBound); // the column's clip (pass 46; 158: the Bomb Boo)
+        string want = heldBody != null || !UseSmsPhysics ? "ma_carry_p" : SmsFluddUpperClipName(_fluddPumpBound); // the column's clip (pass 46)
         if (want != _fluddUpperAnim && tree.GetNode("Animation 2") is AnimationNodeAnimation an && animPlayer.HasAnimation(want))
         {
             an.Animation = want;
@@ -17746,16 +17751,16 @@ public partial class Mario : CharacterBody3D
         StopWaistIKHard();
         if (animPlayer != null) animPlayer.SpeedScale = 1f;
         spinBuffer = 0; spinInput = false; spinTracking = false;
-        _smsSpinT = 0f; _smsSpinThrew = false; _smsSpinGrabbed = false; _smsSpinCount++;
+        _smsSpinT = 0f; _smsSpinGrabbed = false; _smsSpinCount++;
         stateOfMario = MarioState.spin;
         SetMarioState(stateOfMario);
         isSpining(true);
         if (footSparks != null) footSparks.Emitting = true;
-        if (SmsDebugPrint) GD.Print($"[SMS spin] X: the spin ({SpinSeconds} s, {SpinTurns} turns){(_smsBomb != null ? $" -- the Bomb Boo leaves at {BombThrowAt} s" : "")}");
+        if (SmsDebugPrint) GD.Print($"[SMS spin] X: the spin ({SpinSeconds} s, {SpinTurns} turns)");
     }
 
-    /// <summary>One frame of the spin: the body turns, the stick steers, the throw at BombThrowAt, else the grab; A leaves it in a spin jump; it ends at
-    /// SpinSeconds or off the floor.</summary>
+    /// <summary>One frame of the spin: the body turns, the stick steers, a Bomb Boo in reach is grabbed; A leaves it in a spin jump; it ends at SpinSeconds or
+    /// off the floor.</summary>
     private void SmsSpinFrame(double delta, float stickStrength, Vector3 inputDirWorld)
     {
         float dt = (float)delta;
@@ -17765,8 +17770,7 @@ public partial class Mario : CharacterBody3D
         if (stickStrength > 0.1f && inputDirWorld != Vector3.Zero) { Vector3 d = inputDirWorld.Normalized(); target = new Vector2(d.X, d.Z) * SpinMoveSpeed * stickStrength; }
         Vector2 nv = cur.MoveToward(target, SpinSteerAccel * dt);
         velocity.X = nv.X; velocity.Z = nv.Y; velocity.Y = -2f;
-        if (_smsBomb != null && !_smsSpinThrew && !_smsSpinGrabbed && _smsSpinT >= BombThrowAt) SmsBombThrow(stickStrength, inputDirWorld);   // the one he came in holding
-        else if (_smsBomb == null && !_smsSpinThrew && !_smsSpinGrabbed) SmsBombTryGrab();                                                       // the grab (never the throw in the same spin)
+        if (_smsBomb == null && !_smsSpinGrabbed) SmsBombTryGrab();
         if (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space"))
         {
             SmsSpinEnd(false);
@@ -17800,52 +17804,43 @@ public partial class Mario : CharacterBody3D
         }
         if (best == null || !best.Grab(this)) return;
         _smsBomb = best; _smsSpinGrabbed = true;
-        SetMarioState(stateOfMario);   // the carry pose
-        if (SmsDebugPrint) GD.Print($"[SMS spin] the Bomb Boo {best.Name} grabbed at {bestD:F2} m");
+        SmsLassoOn(true);              // 159: the arm up with the tongue
+        if (SmsDebugPrint) GD.Print($"[SMS spin] the Bomb Boo {best.Name} grabbed by the tongue at {bestD:F2} m");
     }
 
-    /// <summary>The Bomb Boo in hand thrown: the stick's way when held, else his face, at BombThrowSpeed with BombThrowUp of rise -- a King Boo within
-    /// BombThrowAssistDeg of that pulls the throw onto himself (a lob that lands on his body under the Boo's gravity).</summary>
-    private void SmsBombThrow(float stickStrength, Vector3 inputDirWorld)
-    {
-        var boo = _smsBomb; _smsBomb = null; _smsSpinThrew = true;
-        if (boo == null || !IsInstanceValid(boo)) return;
-        Vector3 dir = stickStrength > 0.3f && inputDirWorld != Vector3.Zero ? inputDirWorld.Normalized() : (_smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir());
-        dir.Y = 0f; if (dir.LengthSquared() < 1e-6f) dir = Vector3.Forward; dir = dir.Normalized();
-        Vector3 vel = dir * BombThrowSpeed + Vector3.Up * BombThrowUp;
-        string assist = "";
-        if (GetTree().GetFirstNodeInGroup("sms_rematch_boss") is SmsKingBooRematch boss && boss.CanBeHit && BombThrowAssistDeg > 0f)
-        {
-            Vector3 to = boss.BodyPoint - boo.GlobalPosition; Vector3 flat = new Vector3(to.X, 0f, to.Z);
-            if (flat.LengthSquared() > 1e-4f && Mathf.RadToDeg(flat.Normalized().AngleTo(dir)) <= BombThrowAssistDeg)
-            {
-                float dist = flat.Length(), t = dist / Mathf.Max(1f, BombThrowSpeed);
-                float vy = to.Y / t + 0.5f * boo.ThrowGravity * t;
-                vel = flat.Normalized() * BombThrowSpeed + Vector3.Up * Mathf.Clamp(vy, -BombThrowSpeed, BombThrowSpeed);
-                assist = $", onto King Boo {dist:F1} m off ({Mathf.RadToDeg(flat.Normalized().AngleTo(dir)):F0} deg of the aim)";
-            }
-        }
-        boo.Throw(vel);
-        SetMarioState(stateOfMario);   // the carry pose off
-        if (SmsDebugPrint) GD.Print($"[SMS spin] the Bomb Boo thrown at {vel.Length():F1} m/s{assist}");
-    }
-
-    /// <summary>The Bomb Boo in hand let go (a dive, a hit, a death, a demo): it drifts again.</summary>
+    /// <summary>The Bomb Boo he swings let go (a dive, a hit, a death, a demo): it drifts again.</summary>
     public void SmsBombDrop()
     {
         if (_smsBomb == null) return;
         var boo = _smsBomb; _smsBomb = null;
         if (IsInstanceValid(boo)) boo.Drop();
-        if (animTree != null && animTree.Active && heldBody == null) animTree.Set(CARRY_BLEND_PATH, 0.0f);
-        if (SmsDebugPrint) GD.Print("[SMS spin] the Bomb Boo dropped");
+        SmsLassoOn(false);
+        if (SmsDebugPrint) GD.Print("[SMS spin] the Bomb Boo let go");
     }
     /// <summary>The Boo in hand is gone on its own (King Boo's hit cleared the field): the hands empty.</summary>
     public void SmsBombGone(SmsBombBoo boo)
     {
         if (_smsBomb != boo) return;
         _smsBomb = null;
-        if (animTree != null && animTree.Active && heldBody == null) animTree.Set(CARRY_BLEND_PATH, 0.0f);
+        SmsLassoOn(false);
     }
+
+    /// <summary>159: the lasso arm (SmsLassoArm under his Skeleton3D, built once) up or down; its knobs pushed each time.</summary>
+    private void SmsLassoOn(bool on)
+    {
+        if (_smsLasso == null || !IsInstanceValid(_smsLasso))
+        {
+            if (skeleton == null) return;
+            _smsLasso = new SmsLassoArm { Name = "SmsLassoArm", Side = LassoArm == "L" ? "L" : "R" };
+            skeleton.AddChild(_smsLasso);
+        }
+        _smsLasso.BlendSeconds = LassoBlendSeconds; _smsLasso.Tilt = LassoTilt; _smsLasso.Forward = LassoForward; _smsLasso.In = LassoIn;
+        _smsLasso.On = on;
+    }
+    /// <summary>159: where the raised hand is (the tongue's end) -- the lasso arm's hand after its pose; a point over his head when the arm is not up yet.</summary>
+    public Vector3 SmsLassoHand => _smsLasso != null && IsInstanceValid(_smsLasso) && _smsLasso.HandValid && _smsLasso.Weight > 0.5f
+        ? _smsLasso.HandPoint : GlobalPosition + Vector3.Up * (SmsUnits.UnitsToMetres(SmsUnits.MarioHeightUnits) + 0.4f);
+    public float SmsLassoWeight => _smsLasso != null && IsInstanceValid(_smsLasso) ? _smsLasso.Weight : 0f;
 
     /// <summary>Once a physics frame: the spin's cooldown and the X key's edge; the Bomb Boo in hand dropped by the statuses that cannot hold it.</summary>
     private void SmsBombTick(double delta)
@@ -18934,7 +18929,7 @@ public partial class Mario : CharacterBody3D
         // Apply carry blend to ALL animations when holding an object (except diving)
         if (animTree != null && animTree.Active)
         {
-            if (((heldBody != null || _smsBomb != null) && !isDiving) || SmsFluddUpperBlend)   // 158: the Bomb Boo over his head takes the carry pose too
+            if ((heldBody != null && !isDiving) || SmsFluddUpperBlend)
             {
                 animTree.Set(CARRY_BLEND_PATH, 1.0f); // Full carry blend
             }
@@ -19299,7 +19294,7 @@ public partial class Mario : CharacterBody3D
     /// </summary>
     private void SmsLaunch(SmsAir.Launch kind)
     {
-        if (kind == SmsAir.Launch.RotateJump && _smsBomb != null) _smsBomb.SpinBoost();   // 158: a spin jump makes the Bomb Boo in hand spin faster (the doc)
+        if (kind == SmsAir.Launch.RotateJump && _smsBomb != null) _smsBomb.SpinBoost();   // 158: a spin jump makes the Bomb Boo he swings go faster (the doc)
         Vector3 velXZ = new Vector3(velocity.X, 0f, velocity.Z);
         float speed = velXZ.Length();
         // On the ground SMS velocity always points along mFaceAngle, so the takeoff face IS the velocity
