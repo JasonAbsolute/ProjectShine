@@ -11667,3 +11667,45 @@ run j the same with the swing 0.9 m over the hand.
 **Deviations, all knobs or stand-ins:** the lasso arm is a procedural pose (the shortest-arc turns), not an animation; the body keeps its clips.
 The Boo's look is the files' own colours through the ghost recipe's doubling with the eyes lit a little (FaceGlow) and a faint rim (Glow): Lift,
 Ambient, Opacity to taste. King Boo's hit cylinder is the game's body cylinder sized to the port's model; BooHeight 4. HoldSeconds off.
+
+### 160 -- the King Boo REMATCH, part 4: the Bomb Boo floats as Sunshine's Boos do (feature/kingboo-rematch, code `4d49169`)
+
+**Jaysonn:** "nice marios arm is a little inside him here is the image how it looks and we should make bomb boo float around and everything just
+like normal boos from mario sunshine. BoobombArmref.ppng.png is the image screen shot"
+
+**The screenshot** (Ref/BooBombArmref.ppng.png) showed three things: the swung Boo PALE GREY, the tongue ending INSIDE Mario's head, and the free Boo
+right -- black, yellow-eyed, its pink tongue hanging. (1) The grey: 159's carried pulse mixed a tenth of white into a near-black body every frame;
+a tenth of white is a mid-grey in sRGB. Gone: no pulse on the plain swing; the spin-jump boost shows a small one (0.06..0.1), the HoldSeconds
+warning a stronger one (0.12..0.24). (2) The arm: Mario's shoulder sits under the brim of a head wider than his shoulders and his arm is 0.33 m
+long, so 159's arm straight up ran through the head, the wrist inside it at his ear. Now the upper arm leans 60 deg OUT (LassoTilt 1.7 = tan 60) and
+a little forward (0.3), the forearm 22 deg out as well (LassoIn -0.4; negative = outward): the shoulder-to-wrist line 43 deg from straight up, the
+wrist 1.23 m up and 0.48 m out from his axis -- beside the head, clear of it. The tongue runs to it from the swinging Boo.
+
+**The float** (`SmsBombBoo.cs`, Drifting; "The float (Sunshine's Boo, telesa.prm)" knobs). TTelesa's numbers as SmsTelesa carries them from the
+shipped /enemy/telesa.prm, on a flyer with no graph: out of the fog it rises and fades in (opacity 0 -> 1 with the scale) to its BASE POINT
+(BaseLiftOverFloor 1.2 m over the floor where it rose -- the game's Boo keeps the height it was placed at); over the base its FLY HEIGHT (50..100 u
+picked at random, risen to at 1 u a tick) and the BOB (FlyAmplitude 50..75 u over FlyFrequency 200..400 ticks a cycle: the height swings a metre
+and a half to two over 3.3..6.7 s), its nose TILTING 10 - 35 cos(phase) degrees with the bob (-25 rising, 45 sinking; eased as SmsTelesa eases
+it). It WANDERS as TNerveWalkerGraphWander does with no graph (SmsSmallEnemy.GoToRandomNextGraphNode): a random goal within WanderRadiusUnits
+(800 u = 10.7 m; 0.3..1 of it) of the base, walkToCurPathNode toward it -- turning TurnSpeed (1..1.5 deg a tick, picked per Boo) and moving
+MarchSpeed (1..1.7 u a tick, 0.8..1.4 m/s) along its face -- reached within ReachedUnits (100), WaitTicks (100) hovering, the next. It HURTS
+Mario on touch (TTelesa::attackToMario: TouchHurts; its attack cylinder TouchRadius 0.9 m across, TouchHeight 1.4 tall, against his damage cylinder
+42 u across, 160 tall; NOT when he is above it -- his feet over the body's middle less 50 u -- so a jump on it is safe) through
+Mario.TakeDamage(EnemyCommon): the knock-down and his 300 ticks of invincibility space the hits; a hurt drops a Boo he carries. SeeksMario (off)
+is 158's drift toward him instead, stopping DriftStopDistance short. A drop puts a new base under where the swing left it and the wander goes on.
+The spawner's note: a Centre spawn now drifts about the middle. The spin's grab, the swing, the hit on King Boo, the dive's drop are 159's.
+
+**Drive 160** (`SmsBomb.Drive.cs`, the arena run on its own, two runs, deleted before the commit): the drive steers Mario now (the stick toward a
+world point in the camera's frame: Lstick_up = the camera's forward). The Boo out of the fog with a Sunshine Boo's numbers picked (C2); seven
+seconds of floating -- the height swinging 1.76 m, the pitch -25..45, the base clear of the floor (C3); the wander -- 6.4 m from its rise, a
+goal reached, waiting at it (C4); Mario walked into it: the touch knocks him down, 8 hp -> 7 (C5); X: the grab (C6); the swing at 2.8 m, 480
+deg/s, over the hand (C7); the arm 43 deg from up, the wrist 0.48 m out (C8); the tongue (C9); a single jump with it (C10); the dive's drop
+with a new base, the arm down (C11, C12); walked into King Boo: the burst, the hit (C13); the hurt over (C14); three and he is down, Mario at
+7 hp (C15). Run k: the first grab's arm was 37 deg with the wrist 0.44 m out (the forearm straighter than wanted: LassoIn -0.15 -> -0.4), and a
+SECOND Boo wandered into Mario mid-carry -- the touch hurt him and dropped the first, as it should: the drive holds the supply to one Boo out for
+its flow (MaxOut, a knob; the game's two stay). Run l: 15 / 15, the .err empty.
+
+**Deviations, all knobs or stand-ins:** the lasso arm's lean (LassoTilt / LassoForward / LassoIn) is a stand-in for the one-arm animation. The
+Bomb Boo's float is TTelesa's (telesa.prm) without the Boo's graph, fade loop, hose stun, block or imitators -- a Bomb Boo has none of those; its
+touch damage is the common enemy profile (the game's Boo's). TouchHurts ON by default ("everything just like normal boos"): off = 158's harmless
+Boo. SeeksMario off. The base stands 1.2 m over the floor where the Boo rose (the Boo keeps it; a drop re-reads the floor under it).
