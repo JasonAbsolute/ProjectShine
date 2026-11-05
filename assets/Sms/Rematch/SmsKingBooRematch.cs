@@ -26,11 +26,18 @@ using System.Linq;
 /// feet) grown by LickThickness is the plain hit -- Mario.TakeDamage with the common enemy profile, the knockdown -- once per lick; the whip comes
 /// through at Mario's legs from LickHeight (the tip skimming the floor), so a jump at the tell clears it. The clip is cut at LickEndFrame for the wait; AfterLickSeconds later he
 /// vanishes to another spot and the gap runs again. He can be hit by a swung Bomb Boo while he waits AND through the lick (the hit breaks the lick
-/// off: the hurt as before); not while he is between spots. The faces and the other attacks are
+/// off: the hurt as before); not while he is between spots.
+/// Pass 164: THE BOOLOSSUS SMASH (the doc's attack 2: "Crown glows white. A Boolossus falls from above Mario and tries to slam down on him. On landing it
+/// splits into 15 Boos that spread out as a shockwave, then vanish after one second"). A move is now one of three (the doc's near-random pick):
+/// a hop to another spot (RepositionChance), else an attack -- a SMASH by SmashChance, else the lick. The smash is made where he stands: the laugh clip
+/// (SmashClip, the second laugh voice) with his CROWN pulsing to SmashCrownColor (white; the crown material's colour register) through SmashTellSeconds
+/// -- the tell -- then the Boolossus scene (SmashScene: <see cref="SmsBoolossus"/>, its own knobs) is put over Mario and runs on its own (the hang,
+/// the fall, the slam, the wave of Boos); he watches SmashWatchSeconds more, the crown back to yellow, and the wait and the gap run again. A swung
+/// Bomb Boo hits him through the tell (the smash is called off; a Boolossus already out carries on). The faces and the other attacks are
 /// later passes; the animations another hand's. The model is the casino boss's (btelesa.glb at 1 / 74.44) with its shader materials
 /// (BossTelesaBody/Crown/Ha/Mouth.tres: opacity, tint, mask_k, base_tex), copied per instance. Signals: Spawned (the appear starts), Laughed
 /// (the laugh starts), ReadyForFight (the wait begins -- the fight may start), Hit, Defeated; 162: Teleported (he has arrived somewhere), LickStarted
-/// (the wind-up), Licked(hit) (the whip has passed, with whether it got him).
+/// (the wind-up), Licked(hit) (the whip has passed, with whether it got him); 164: SmashStarted (the tell), Smashed(hit) (the Boolossus has landed).
 /// </summary>
 public partial class SmsKingBooRematch : Node3D
 {
@@ -99,6 +106,18 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>The body joint never dips closer than this to the floor through the lick clip's plunge (the node lifts).</summary>
     [Export] public float BodyMinOverFloor = 2.6f;
     [Export] public string LickWindSe = "MSD_SE_BS_TELESA_V_ROLL", LickSe = "MSD_SE_BS_TELESA_LICK";
+    [ExportGroup("The fight (164): the Boolossus Smash")]
+    /// <summary>The smash runs at all; of his attacks this share are smashes (the rest licks).</summary>
+    [Export] public bool SmashOn = true;
+    [Export(PropertyHint.Range, "0,1,0.05")] public float SmashChance = 0.5f;
+    /// <summary>The Boolossus (Boolossus.tscn carries its own knobs: the height, the fall, the wave).</summary>
+    [Export] public PackedScene SmashScene;
+    /// <summary>The tell: his crown pulses to this colour (white) at this rate for this long before the Boolossus appears; the clip he plays through the
+    /// smash and its voice; how long he watches after the Boolossus is out before the wait and the gap run again.</summary>
+    [Export] public Color SmashCrownColor = new Color(1f, 1f, 1f);
+    [Export] public float SmashTellSeconds = 0.6f, CrownPulseHz = 6f, SmashWatchSeconds = 1f;
+    [Export] public string SmashClip = "btelesa_laugh";
+    [Export] public string SmashSe = "MSD_SE_BS_TELESA_V_LAUGH2";
     [ExportGroup("")]
     [Export] public bool DebugPrint;
 
@@ -112,8 +131,12 @@ public partial class SmsKingBooRematch : Node3D
     [Signal] public delegate void TeleportedEventHandler();
     [Signal] public delegate void LickStartedEventHandler();
     [Signal] public delegate void LickedEventHandler(bool hit);
+    /// <summary>164: the smash's tell begins; the Boolossus has landed (whether its body got Mario).</summary>
+    [Signal] public delegate void SmashStartedEventHandler();
+    [Signal] public delegate void SmashedEventHandler(bool hitMario);
 
-    public enum Phase { Hidden, Appear, Laugh, Wait, Hurt, Down, Gone, Vanish, Arrive, Lick }
+    public enum Phase { Hidden, Appear, Laugh, Wait, Hurt, Down, Gone, Vanish, Arrive, Lick, Smash }
+    public enum Move { None, Hop, Lick, Smash }
     public Phase State { get; private set; } = Phase.Hidden;
     public string Clip => _anim != null ? (string)_anim.CurrentAnimation : "";
     public bool IsSpawned => State != Phase.Hidden;
@@ -121,7 +144,7 @@ public partial class SmsKingBooRematch : Node3D
     public int Hp { get; private set; } = -1;
     public int HitsTaken { get; private set; }
     /// <summary>A Bomb Boo bursts on him while he waits or licks (not between spots, through the hurt, the down, the entrance).</summary>
-    public bool CanBeHit => State == Phase.Wait || State == Phase.Lick;
+    public bool CanBeHit => State == Phase.Wait || State == Phase.Lick || State == Phase.Smash;
     public bool IsAlive => State != Phase.Down && State != Phase.Gone;
     public int MaterialsCopied => _mats.Count;
     /// <summary>162, for the drives: the lick's stage (-1 none, 0 wind-up, 1 the whip live, 2 the clip's tail, 3 the wait after), the counts, the gap left,
@@ -134,7 +157,14 @@ public partial class SmsKingBooRematch : Node3D
     public int LickMisses { get; private set; }
     public float GapNow => _gapT;
     public float LastGap { get; private set; }
-    public bool LastMoveWasLick => _moveIsLick;
+    public bool LastMoveWasLick => LastMove == Move.Lick;
+    public Move LastMove { get; private set; }
+    /// <summary>164: the smashes made, how many landed ON Mario, the last Boolossus (while it lives), the crown's colour register now (yellow at rest).</summary>
+    public int SmashesMade { get; private set; }
+    public int SmashHits { get; private set; }
+    public SmsBoolossus Boolossus => _boolossus != null && IsInstanceValid(_boolossus) ? _boolossus : null;
+    public Vector3 CrownColorNow => _crownNow;
+    public bool SmashLaunched => _smashLaunched;
     public Vector3 LastSpot { get; private set; }
     public float HoverOverFloor => _hoverOverFloor;
     public Vector3 ArenaCentre => _arenaCentre;
@@ -165,7 +195,8 @@ public partial class SmsKingBooRematch : Node3D
     private static readonly int[] BlinkEyes = { 0, 1, 2, 1, 0, 1, 2, 1, 0, 1, 2, 1, 0 };                   // open / half / close
 
     private Node3D _model; private AnimationPlayer _anim; private Skeleton3D _skel; private int _bBody = -1;
-    private readonly List<ShaderMaterial> _mats = new(); private ShaderMaterial _bodyMat;
+    private readonly List<ShaderMaterial> _mats = new(); private ShaderMaterial _bodyMat, _crownMat; private Vector3 _crownRest = new(1f, 1f, 0f), _crownNow = new(1f, 1f, 0f);
+    private SmsBoolossus _boolossus; private float _smashT; private bool _smashLaunched, _smashClipEnded;
     private GpuParticles3D _chika; private Node3D _glow; private SmsActorSound _sound; private SmsTongueStretch _tongue;
     private Mario _mario; private float _yaw, _hoverT, _blinkT; private int _eyeNow = -1; private Vector3 _home; private bool _laughSounded;
     private float _hurtT, _hurtLen, _hurtYaw0; private bool _flashOn;
@@ -199,6 +230,7 @@ public partial class SmsKingBooRematch : Node3D
                     mi.SetSurfaceOverrideMaterial(i, copy);
                     _mats.Add(copy);
                     if ((sm.ResourceName ?? "").StartsWith("_mat_body") || _bodyMat == null) _bodyMat = copy;
+                    if ((sm.ResourceName ?? "").StartsWith("_mat_crown")) { _crownMat = copy; var c0 = copy.GetShaderParameter("crown_c0"); if (c0.VariantType == Variant.Type.Vector3) _crownRest = _crownNow = c0.AsVector3(); }
                 }
             }
         }
@@ -214,9 +246,10 @@ public partial class SmsKingBooRematch : Node3D
         SetOpacity(GhostOpacity);
         ApplyEye(0);
         _sound = SmsActorSound.Attach(this);
+        SmashScene ??= ResourceLoader.Exists("res://assets/Sms/Rematch/Boolossus.tscn") ? GD.Load<PackedScene>("res://assets/Sms/Rematch/Boolossus.tscn") : null;
         _yaw = Rotation.Y; _home = Position;
         if (_model != null) _model.Visible = false;
-        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: {_mats.Count} materials, clips {(_anim != null ? string.Join(",", _anim.GetAnimationList()) : "none")}, body joint {_bBody}, tongue {(_tongue != null && _tongue.Bound ? "bound" : "none")}");
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: {_mats.Count} materials, clips {(_anim != null ? string.Join(",", _anim.GetAnimationList()) : "none")}, body joint {_bBody}, tongue {(_tongue != null && _tongue.Bound ? "bound" : "none")}, crown material {(_crownMat != null ? "found" : "NONE")}, Boolossus scene {(SmashScene != null ? "loaded" : "NONE")}");
         SmsKingBooDriveHook();
     }
     partial void SmsKingBooDriveHook();
@@ -321,6 +354,7 @@ public partial class SmsKingBooRematch : Node3D
             EmitSignal(SignalName.Defeated);
         }
         else if (State == Phase.Lick && n == LickClip) _lickClipEnded = true;
+        else if (State == Phase.Smash && n == SmashClip) _smashClipEnded = true;
     }
 
     private void EnterWait(float gap)
@@ -341,8 +375,8 @@ public partial class SmsKingBooRematch : Node3D
     public bool TakeHit(SmsBombBoo by)
     {
         if (!CanBeHit) return false;
-        bool midLick = State == Phase.Lick;
-        AbortLick();
+        bool midLick = State == Phase.Lick, midSmash = State == Phase.Smash;
+        AbortLick(); AbortSmash();
         Hp = Math.Max(0, Hp - 1); HitsTaken++;
         State = Phase.Hurt; _hurtT = 0f; _hurtYaw0 = _yaw; Position = _home;
         PlayClip(BckHit);
@@ -351,11 +385,13 @@ public partial class SmsKingBooRematch : Node3D
         _opacitySolid = Mathf.Clamp(GhostOpacity + OpacityPerHit * HitsTaken, 0.1f, 1f);
         SetOpacity(_opacitySolid);
         if (_sound != null && !string.IsNullOrEmpty(HurtSe)) _sound.Play(HurtSe);
-        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: HIT by {by?.Name ?? "?"}{(midLick ? " mid-lick" : "")} -> {Hp} left (the hit clip, {_hurtLen:F2} s)");
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: HIT by {by?.Name ?? "?"}{(midLick ? " mid-lick" : midSmash ? " mid-smash (the tell called off)" : "")} -> {Hp} left (the hit clip, {_hurtLen:F2} s)");
         EmitSignal(SignalName.Hit, Hp);
         return true;
     }
     private void AbortLick() { _lickStage = -1; _lickClipEnded = false; }
+    private void AbortSmash() { SetCrown(_crownRest); _smashClipEnded = false; }
+    private void SetCrown(Vector3 c) { _crownNow = c; _crownMat?.SetShaderParameter("crown_c0", c); }
     private void SetFlash(bool on)
     {
         _flashOn = on;
@@ -376,12 +412,61 @@ public partial class SmsKingBooRematch : Node3D
     private void StartMove(bool? lick = null)
     {
         if (M() == null) { _gapT = 0.5f; return; }
-        _moveIsLick = lick ?? (_rng.NextDouble() >= RepositionChance);
+        Move pick = lick.HasValue ? (lick.Value ? Move.Lick : Move.Hop) : PickMove();
+        LastMove = pick;
+        if (pick == Move.Smash) { BeginSmash(); return; }
+        _moveIsLick = pick == Move.Lick;
         AbortLick();
         State = Phase.Vanish; _fadeT = 0f; MovesMade++;
         if (!string.IsNullOrEmpty(TeleportClip)) PlayClip(TeleportClip);
         if (_sound != null && !string.IsNullOrEmpty(VanishSe)) _sound.Play(VanishSe);
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: move {MovesMade}: vanishes from {GlobalPosition} ({(_moveIsLick ? "for the LICK" : "to another spot")})");
+    }
+    /// <summary>The doc's near-random pick: a hop by RepositionChance, else an attack -- a smash by SmashChance (when on and its scene is there), else the lick.</summary>
+    private Move PickMove()
+    {
+        if (_rng.NextDouble() < RepositionChance) return Move.Hop;
+        if (SmashOn && SmashScene != null && _rng.NextDouble() < SmashChance) return Move.Smash;
+        return Move.Lick;
+    }
+    /// <summary>164: the smash, where he stands: the laugh clip and its voice, the crown pulsing white through the tell, then the Boolossus over Mario.</summary>
+    private void BeginSmash()
+    {
+        State = Phase.Smash; _smashT = 0f; _smashLaunched = false; _smashClipEnded = false; MovesMade++; SmashesMade++; Position = _home;
+        PlayClip(SmashClip);
+        if (_sound != null && !string.IsNullOrEmpty(SmashSe)) _sound.Play(SmashSe);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: move {MovesMade}: SMASH {SmashesMade} -- the crown glows (the Boolossus in {SmashTellSeconds:F2} s)");
+        EmitSignal(SignalName.SmashStarted);
+    }
+    private void SmashTick(float dt)
+    {
+        _smashT += dt;
+        FaceTick(dt);
+        if (!_smashLaunched)
+        {
+            float k = 0.5f + 0.5f * MathF.Sin(_smashT * MathF.Tau * CrownPulseHz - MathF.PI / 2f);
+            SetCrown(_crownRest.Lerp(new Vector3(SmashCrownColor.R, SmashCrownColor.G, SmashCrownColor.B), k));
+            if (_smashT >= SmashTellSeconds)
+            {
+                var m = M();
+                if (m == null || SmashScene == null) { EndSmash(); return; }
+                var b = SmashScene.Instantiate<SmsBoolossus>(); b.Name = $"Boolossus{SmashesMade}"; b.DebugPrint = DebugPrint;
+                (GetTree().CurrentScene ?? GetParent()).AddChild(b);
+                float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
+                b.Landed += hit => { if (hit) SmashHits++; if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the Boolossus has landed -- {(hit ? "ON Mario" : "a miss")}"); EmitSignal(SignalName.Smashed, hit); };
+                b.Begin(m, fy);
+                _boolossus = b; _smashLaunched = true;
+                SetCrown(new Vector3(SmashCrownColor.R, SmashCrownColor.G, SmashCrownColor.B));
+                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the Boolossus is out over Mario at {m.GlobalPosition}");
+            }
+        }
+        else if (_smashT >= SmashTellSeconds + SmashWatchSeconds || _smashClipEnded) EndSmash();
+    }
+    private void EndSmash()
+    {
+        SetCrown(_crownRest); _smashClipEnded = false;
+        EnterWait(NextGap());
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: back to the wait after the smash, the next move in {_gapT:F1} s");
     }
     /// <summary>Another spot of the arena: within SpotRadius of its middle (three quarters of the floor's radius), SpotMinFromMario to SpotMaxFromMario from Mario, over floor.</summary>
     private Vector3 RandomSpot()
@@ -563,6 +648,7 @@ public partial class SmsKingBooRematch : Node3D
             }
         }
         else if (State == Phase.Lick) LickTick(dt);
+        else if (State == Phase.Smash) SmashTick(dt);
         if (Blink) BlinkTick(dt);
         PlaceFx();
     }
