@@ -35,7 +35,7 @@ public partial class SmsFireballs : Node3D
     [ExportGroup("The lava balls")]
     /// <summary>A ball's size at birth (metres across: the radius is half), how long it lives (it shrinks to nothing over this), where its fade begins (0..1
     /// of the life), how far in from the floor's edge the wall is, whether the ball bursts on Mario.</summary>
-    [Export] public float Size = 2f, LifeSeconds = 6f, WallInset = 0.6f;
+    [Export] public float Size = 3f, LifeSeconds = 6f, WallInset = 0.6f;   // 173: 3 m across (Jaysonn: "make the lava balls bigger"; 2 before)
     /// <summary>How high over the floor the fire reaches: a Mario whose feet are higher is over it (the jump; a hop is not enough).</summary>
     [Export] public float HitHeight = 1.6f;
     [Export(PropertyHint.Range, "0,1,0.05")] public float FadeFrom = 0.65f;

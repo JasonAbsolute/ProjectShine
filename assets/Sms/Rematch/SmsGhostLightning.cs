@@ -17,6 +17,10 @@ using System.Collections.Generic;
 /// FLASHES (hitmrk1) with white spark CROSSES raining down the wall, sparks pouring off each glowing POST, bolts CRAWLING along the floor at its foot; dimmer
 /// through the warning, full as it closes -- and once the gap is under ZapGap, ZAPS jump it: bolts flickering between the two walls at random spots. The meet
 /// bursts with crosses, streaks and flashes along the seam, over 170's shockwave ring and shake.
+/// Pass 173 (Jaysonn: "make the electricity move more yellow"): the colours go YELLOW (BoltColorA a warm white-yellow, BoltColorB an amber -- the shader,
+/// the particles, the posts, the lights, the zaps and the ring all take them) and everything moves MORE: the streaks dart (2-6 m/s, were 0.4-1.6), the arcs
+/// drift faster, the floor bolts race (5-10 m/s), the zaps flicker quicker (ZapChance 0.5 a frame, 1-3 frames on), the wall's arcs re-roll JitterHz 26 times a
+/// second (18) and wave harder (Wave 0.28).
 /// </summary>
 public partial class SmsGhostLightning : Node3D
 {
@@ -31,9 +35,10 @@ public partial class SmsGhostLightning : Node3D
     /// 1.5 s and the squeezes come 1.55 s apart, so a Mario who stands still would take all three).</summary>
     [Export] public bool OneShockPerAttack = true;
     [ExportGroup("The look")]
-    /// <summary>The bolts' colours (the shock's cyan toward its blue), their brightness, how many bolt columns a wall carries, the floor sparks per wall.</summary>
-    [Export] public Color BoltColorA = new Color(0.435f, 1f, 1f), BoltColorB = new Color(0.25f, 0.34f, 1f);
-    [Export] public float Intensity = 1.2f, BoltsPerMetre = 1f;
+    /// <summary>The bolts' colours (173: a warm white-yellow toward an amber -- the shock's cyan (0.435, 1, 1) toward its blue (0.25, 0.34, 1) before), their
+    /// brightness, how many bolt columns a wall carries; the wall shader's re-roll rate (arcs a second) and how hard its arcs wave along the wall.</summary>
+    [Export] public Color BoltColorA = new Color(1f, 0.95f, 0.5f), BoltColorB = new Color(1f, 0.62f, 0.1f);
+    [Export] public float Intensity = 1.2f, BoltsPerMetre = 1f, JitterHz = 26f, Wave = 0.28f;
     /// <summary>170: the arcs run along the wall -- this many stacked up it; the glowing POSTS at the walls' ends they jump between (metres wide; 0 = none);
     /// a cyan light on each wall (energy; 0 = none); the meet's shockwave ring on the floor (metres across at its widest; 0 = none) and camera shake (0 = none).</summary>
     [Export(PropertyHint.Range, "1,16,1")] public int Arcs = 6;
@@ -53,6 +58,7 @@ public partial class SmsGhostLightning : Node3D
     [Export(PropertyHint.Range, "0,1,0.05")] public float WarnFx = 0.35f;
     [Export(PropertyHint.Range, "0,8,1")] public int GapZaps = 4;
     [Export] public float ZapGap = 7f, ZapWidth = 1f, ZapBrightness = 1.8f;
+    [Export(PropertyHint.Range, "0,1,0.05")] public float ZapChance = 0.5f;
     [Export(PropertyHint.Range, "0,300,1")] public int MeetSparks = 120;
     [Export(PropertyHint.Range, "0,200,1")] public int MeetStreaks = 60;
     [Export(PropertyHint.Range, "0,40,1")] public int MeetFlashes = 12;
@@ -117,6 +123,7 @@ public partial class SmsGhostLightning : Node3D
         var m = new ShaderMaterial { Shader = shader };
         m.SetShaderParameter("bolt_tex", bolt); m.SetShaderParameter("color_a", new Vector3(BoltColorA.R, BoltColorA.G, BoltColorA.B)); m.SetShaderParameter("color_b", new Vector3(BoltColorB.R, BoltColorB.G, BoltColorB.B));
         m.SetShaderParameter("rows", (float)Mathf.Max(1, Arcs)); m.SetShaderParameter("stretch", Mathf.Max(0.5f, WallLength * BoltsPerMetre * 0.2f)); m.SetShaderParameter("intensity", Intensity); m.SetShaderParameter("seed", seed);
+        m.SetShaderParameter("jitter_hz", JitterHz); m.SetShaderParameter("wave", Wave);   // 173
         return m;
     }
     private MeshInstance3D MakeWall(string name, ShaderMaterial mat)
@@ -133,7 +140,7 @@ public partial class SmsGhostLightning : Node3D
                 mi.AddChild(post); _posts.Add(post);
             }
         }
-        if (LightEnergy > 0f) { var l = new OmniLight3D { Name = name + "Light", LightColor = new Color(0.5f, 0.9f, 1f), LightEnergy = 0f, OmniRange = WallLength * 0.9f, ShadowEnabled = false, Position = new Vector3(0f, -WallHeight * 0.3f, 0f) }; mi.AddChild(l); if (name == "WallA") _lightA = l; else _lightB = l; }
+        if (LightEnergy > 0f) { var l = new OmniLight3D { Name = name + "Light", LightColor = BoltColorA.Lerp(new Color(1f, 1f, 1f), 0.25f), LightEnergy = 0f, OmniRange = WallLength * 0.9f, ShadowEnabled = false, Position = new Vector3(0f, -WallHeight * 0.3f, 0f) }; mi.AddChild(l); if (name == "WallA") _lightA = l; else _lightB = l; }
         return mi;
     }
 
@@ -151,7 +158,8 @@ public partial class SmsGhostLightning : Node3D
         return _streakMat = m;
     }
     private GradientTexture1D StreakRamp() => Grad(new[] { 0f, 0.2143f, 1f }, new[] { new Color(BoltColorA.R, BoltColorA.G, BoltColorA.B, 1f), new Color(BoltColorB.R, BoltColorB.G, BoltColorB.B, 1f), new Color(BoltColorB.R, BoltColorB.G, BoltColorB.B, 0f) });
-    private static GradientTexture1D CrossRamp() => Grad(new[] { 0f, 1f }, new[] { new Color(1f, 1f, 1f, 1f), new Color(0.7f, 0.9f, 1f, 0f) });
+    private GradientTexture1D CrossRamp() => Grad(new[] { 0f, 1f }, new[] { new Color(1f, 1f, 1f, 1f), new Color(BoltColorA.R, BoltColorA.G, BoltColorA.B, 0f) });
+    private Color Pale(float k) => BoltColorA.Lerp(new Color(1f, 1f, 1f), k);
     private GpuParticles3D Emitter(Node parent, string name, int amount, double life, ParticleProcessMaterial pm, Mesh mesh, Mesh mesh2, Vector3 pos, bool oneShot = false)
     {
         var p = new GpuParticles3D { Name = name, Amount = Mathf.Max(1, amount), Lifetime = life, Emitting = false, Visible = !oneShot ? false : true, LocalCoords = !oneShot, FixedFps = 60, Interpolate = true, OneShot = oneShot, Explosiveness = oneShot ? 1f : 0f, ProcessMaterial = pm, DrawPass1 = mesh, VisibilityAabb = new Aabb(new Vector3(-20f, -8f, -20f), new Vector3(40f, 20f, 40f)), Position = pos };
@@ -166,18 +174,18 @@ public partial class SmsGhostLightning : Node3D
         float hl = WallLength * 0.5f, hh = WallHeight * 0.5f;
         if (WallStreaks > 0)
         {
-            var pm = new ParticleProcessMaterial { EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(hl, hh, 0.12f), ParticleFlagAlignY = true, Direction = new Vector3(1f, 0f, 0f), Spread = 180f, InitialVelocityMin = 0.4f, InitialVelocityMax = 1.6f, Gravity = Vector3.Zero, AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = 540f, AngularVelocityMax = 1620f, ScaleMin = 0.6f, ScaleMax = 1.6f, LifetimeRandomness = 0.3f, ColorRamp = StreakRamp() };
+            var pm = new ParticleProcessMaterial { EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(hl, hh, 0.12f), ParticleFlagAlignY = true, Direction = new Vector3(1f, 0f, 0f), Spread = 180f, InitialVelocityMin = 2f, InitialVelocityMax = 6f, Gravity = Vector3.Zero, AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = 540f, AngularVelocityMax = 1620f, ScaleMin = 0.6f, ScaleMax = 1.6f, LifetimeRandomness = 0.3f, ColorRamp = StreakRamp() };
             _wallFx.Add(Emitter(wall, "Streaks", WallStreaks, 0.22, pm, new QuadMesh { Size = new Vector2(0.55f, 2.2f), Material = StreakMat() }, null, Vector3.Zero));
         }
         if (WallArcs > 0)
         {
             var am = AddMat(FxTex("biri_r"), true); am.ParticlesAnimHFrames = 2; am.ParticlesAnimVFrames = 1; am.ParticlesAnimLoop = false;
-            var pm = new ParticleProcessMaterial { EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(hl, hh, 0.2f), Direction = new Vector3(0f, 1f, 0f), Spread = 180f, InitialVelocityMin = 0f, InitialVelocityMax = 1.5f, Gravity = Vector3.Zero, AngleMin = 0f, AngleMax = 360f, AnimOffsetMin = 0f, AnimOffsetMax = 1f, ScaleMin = 0.6f, ScaleMax = 1.5f, ColorRamp = Grad(new[] { 0f, 0.875f, 1f }, new[] { new Color(0.62f, 1f, 1f, 1f), new Color(0.62f, 1f, 1f, 1f), new Color(0.62f, 1f, 1f, 0f) }) };
+            var pm = new ParticleProcessMaterial { EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(hl, hh, 0.2f), Direction = new Vector3(0f, 1f, 0f), Spread = 180f, InitialVelocityMin = 1f, InitialVelocityMax = 4f, Gravity = Vector3.Zero, AngleMin = 0f, AngleMax = 360f, AnimOffsetMin = 0f, AnimOffsetMax = 1f, ScaleMin = 0.6f, ScaleMax = 1.5f, ColorRamp = Grad(new[] { 0f, 0.875f, 1f }, new[] { Pale(0.3f), Pale(0.3f), new Color(Pale(0.3f), 0f) }) };
             _wallFx.Add(Emitter(wall, "Arcs", WallArcs, 0.13, pm, new QuadMesh { Size = Vector2.One * 1.6f, Material = am }, null, Vector3.Zero));
         }
         if (WallFlashes > 0)
         {
-            var pm = new ParticleProcessMaterial { EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(hl, hh, 0.1f), Direction = new Vector3(0f, 1f, 0f), Spread = 0f, InitialVelocityMin = 0f, InitialVelocityMax = 0f, Gravity = Vector3.Zero, Color = new Color(0.34f, 0.81f, 1f, 1f) };
+            var pm = new ParticleProcessMaterial { EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(hl, hh, 0.1f), Direction = new Vector3(0f, 1f, 0f), Spread = 0f, InitialVelocityMin = 0f, InitialVelocityMax = 0f, Gravity = Vector3.Zero, Color = Pale(0.4f) };
             _wallFx.Add(Emitter(wall, "Flashes", WallFlashes, 0.05, pm, new QuadMesh { Size = Vector2.One * 0.9f, Material = AddMat(FxTex("hitmrk1"), true) }, null, Vector3.Zero));
         }
         if (WallSparks > 0)
@@ -191,13 +199,13 @@ public partial class SmsGhostLightning : Node3D
             var cm = AddMat(FxTex("shikaku"), false);
             foreach (float side in new[] { -1f, 1f })
             {
-                var pm = new ParticleProcessMaterial { EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(0.15f, hh, 0.15f), ParticleFlagAlignY = true, Direction = new Vector3(side, 0.6f, 0f), Spread = 70f, InitialVelocityMin = 2f, InitialVelocityMax = 5f, Gravity = new Vector3(0f, -18f, 0f), ColorRamp = Grad(new[] { 0f, 1f }, new[] { new Color(0.8f, 1f, 1f, 1f), new Color(0.4f, 0.7f, 1f, 0f) }) };
+                var pm = new ParticleProcessMaterial { EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(0.15f, hh, 0.15f), ParticleFlagAlignY = true, Direction = new Vector3(side, 0.6f, 0f), Spread = 70f, InitialVelocityMin = 2f, InitialVelocityMax = 5f, Gravity = new Vector3(0f, -18f, 0f), ColorRamp = Grad(new[] { 0f, 1f }, new[] { Pale(0.5f), new Color(BoltColorB, 0f) }) };
                 _wallFx.Add(Emitter(wall, side < 0f ? "PostSparksA" : "PostSparksB", PostSparks, 0.45, pm, new QuadMesh { Size = new Vector2(0.06f, 0.26f), Material = cm, Orientation = PlaneMesh.OrientationEnum.X }, new QuadMesh { Size = new Vector2(0.06f, 0.26f), Material = cm, Orientation = PlaneMesh.OrientationEnum.Z }, new Vector3(side * hl, 0f, 0f)));
             }
         }
         if (FloorCrawl > 0)
         {
-            var pm = new ParticleProcessMaterial { EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(hl, 0.05f, 0.3f), ParticleFlagAlignY = true, Direction = new Vector3(1f, 0f, 0f), Spread = 25f, InitialVelocityMin = 2f, InitialVelocityMax = 5f, Gravity = Vector3.Zero, AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = 540f, AngularVelocityMax = 1620f, ScaleMin = 0.7f, ScaleMax = 1.3f, LifetimeRandomness = 0.3f, ColorRamp = StreakRamp() };
+            var pm = new ParticleProcessMaterial { EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(hl, 0.05f, 0.3f), ParticleFlagAlignY = true, Direction = new Vector3(1f, 0f, 0f), Spread = 25f, InitialVelocityMin = 5f, InitialVelocityMax = 10f, Gravity = Vector3.Zero, AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = 540f, AngularVelocityMax = 1620f, ScaleMin = 0.7f, ScaleMax = 1.3f, LifetimeRandomness = 0.3f, ColorRamp = StreakRamp() };
             var pm2 = (ParticleProcessMaterial)pm.Duplicate(); pm2.Direction = new Vector3(-1f, 0f, 0f);
             _wallFx.Add(Emitter(wall, "FloorCrawlA", Mathf.Max(1, FloorCrawl / 2), 0.25, pm, new QuadMesh { Size = new Vector2(0.4f, 1.6f), Material = StreakMat() }, null, new Vector3(0f, -hh + 0.1f, 0.15f)));
             _wallFx.Add(Emitter(wall, "FloorCrawlB", Mathf.Max(1, FloorCrawl / 2), 0.25, pm2, new QuadMesh { Size = new Vector2(0.4f, 1.6f), Material = StreakMat() }, null, new Vector3(0f, -hh + 0.1f, 0.15f)));
@@ -228,12 +236,12 @@ public partial class SmsGhostLightning : Node3D
             var (z, left) = _zaps[i];
             if (!on) { if (z.Visible) z.Visible = false; _zaps[i] = (z, 0); continue; }
             if (left > 0) { left--; if (left == 0) z.Visible = false; _zaps[i] = (z, left); continue; }
-            if (_rng.NextDouble() > 0.35) continue;                                                            // off for a few frames more
+            if (_rng.NextDouble() > ZapChance) continue;                                                       // off for a few frames more
             float along = ((float)_rng.NextDouble() - 0.5f) * WallLength * 0.9f, h = FloorY + WallHeight * (0.15f + 0.75f * (float)_rng.NextDouble());
             z.GlobalPosition = new Vector3(_centre.X + _side.X * along, h, _centre.Z + _side.Z * along);
             z.GlobalBasis = new Basis(_side, _axis, _side.Cross(_axis)).Orthonormalized();                     // the quads' Y (the bolt) along the gap's axis
             foreach (Node c in z.GetChildren()) if (c is MeshInstance3D q && q.Mesh is QuadMesh qm) { qm.Size = new Vector2(ZapWidth, _gap); if (qm.Material is StandardMaterial3D sm) sm.Uv1Scale = new Vector3(1f, Mathf.Max(1f, _gap / 2.7f), 1f); }
-            z.Visible = true; _zaps[i] = (z, 2 + _rng.Next(0, 3)); ZapsFlashed++;
+            z.Visible = true; _zaps[i] = (z, 1 + _rng.Next(0, 3)); ZapsFlashed++;
         }
     }
     private void WallFx(bool on, float ratio)
@@ -349,7 +357,7 @@ public partial class SmsGhostLightning : Node3D
         }
         if (MeetFlashes > 0)
         {
-            var pm = new ParticleProcessMaterial { EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(0.3f, WallHeight * 0.5f, WallLength * 0.5f), Direction = new Vector3(0f, 1f, 0f), Spread = 0f, InitialVelocityMin = 0f, InitialVelocityMax = 0f, Gravity = Vector3.Zero, ScaleMin = 0.8f, ScaleMax = 2f, Color = new Color(0.5f, 0.9f, 1f, 1f) };
+            var pm = new ParticleProcessMaterial { EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = new Vector3(0.3f, WallHeight * 0.5f, WallLength * 0.5f), Direction = new Vector3(0f, 1f, 0f), Spread = 0f, InitialVelocityMin = 0f, InitialVelocityMax = 0f, Gravity = Vector3.Zero, ScaleMin = 0.8f, ScaleMax = 2f, Color = Pale(0.4f) };
             var p = Emitter(parent, "MeetFlashes", MeetFlashes, 0.08, pm, new QuadMesh { Size = Vector2.One * 1.4f, Material = AddMat(FxTex("hitmrk1"), true) }, null, Vector3.Zero, true);
             p.GlobalPosition = at; p.GlobalBasis = along; p.Finished += p.QueueFree; p.Emitting = true;
         }

@@ -82,6 +82,9 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public bool Twinkle = true;
     /// <summary>The hover: he bobs this many metres up and down over this many seconds (0 = still).</summary>
     [Export] public float HoverBob = 0.35f, HoverBobSeconds = 2.4f;
+    /// <summary>173 (Jaysonn: "king boo sits kinda low and his tongue is going into the stage"): he hovers this many metres HIGHER than where he was put
+    /// in the scene -- at the spawn, at every spot he teleports to (the lick's own LickHeight is not touched). 0 = as placed.</summary>
+    [Export] public float HoverLift = 4.5f;   // 3 m left the tongue's tip 0.8 m into the floor; 4.5 puts it about 0.75 m over it (the bob is 0.35)
     /// <summary>He turns to face Mario while he waits, at this many radians a second.</summary>
     [Export] public bool FaceMario = true;
     [Export] public float TurnSpeed = 3f;
@@ -195,6 +198,11 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public float SweepDeg = 150f, SweepSeconds = 1.6f;
     [Export] public SmsGhostBreath.Way SweepWay = SmsGhostBreath.Way.Random;
     [Export] public float BreathDownDeg = 10f, BreathSpeed = 22f, PuffSeconds = 1.5f, PuffSizeStart = 3f, PuffSizeEnd = 8f, BreathHitHeight = 1.2f, FreezeSeconds = 1f;   // 172: the puffs 3 -> 8 m (thicker)
+    /// <summary>173: the breath is aimed so the stream meets the floor this many metres out from the mouth whatever his height (he sits higher now; a fixed
+    /// 10 degrees from a mouth 5 m up would pass over a Mario standing near him). 0 = BreathDownDeg as it is.</summary>
+    [Export] public float BreathAimFloorAt = 10f;
+    /// <summary>The breath's aim as last launched (degrees under level), for the drives.</summary>
+    public float BreathDownDegUsed { get; private set; }
     [Export] public bool OneFreezePerAttack = true;
     [ExportGroup("The fight (168): Fireballs")]
     /// <summary>The fireballs run at all; the crown's colour for them (the doc: red -- a red-orange here, the lightning's red being deeper); the tell before
@@ -210,7 +218,7 @@ public partial class SmsKingBooRematch : Node3D
     /// (a Mario jumping higher is over it), whether a ball bursts on Mario.</summary>
     [Export(PropertyHint.Range, "1,8,1")] public int FireballPops = 3;
     [Export(PropertyHint.Range, "1,8,1")] public int FireballPerPop = 3;
-    [Export] public float FireballPopSeconds = 0.45f, FireballLobHeight = 6f, FireballScatter = 7f, FireballAimedWithin = 1.5f, FireballRollSpeed = 8f, FireballSize = 2f, FireballSeconds = 6f, FireballHitHeight = 1.6f;
+    [Export] public float FireballPopSeconds = 0.45f, FireballLobHeight = 6f, FireballScatter = 7f, FireballAimedWithin = 1.5f, FireballRollSpeed = 8f, FireballSize = 3f, FireballSeconds = 6f, FireballHitHeight = 1.6f;   // 173: 3 m balls (were 2)
     /// <summary>How many lava balls a Fireballs move pops in all.</summary>
     public int FireballCount => FireballPops * FireballPerPop;
     [Export] public bool FireballDiesOnHit = true;
@@ -455,7 +463,8 @@ public partial class SmsKingBooRematch : Node3D
         SetCrownGlow(_crownGlowColor, 0f);
         PlayClip(BckAppear);
         ReadArena();
-        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: appears at {GlobalPosition} ({_hoverOverFloor:F2} m over the floor; the arena's middle {_arenaCentre}, radius {_arenaRadius:F1})");
+        if (HoverLift != 0f) { Position += Vector3.Up * HoverLift; _home = Position; _hoverOverFloor += HoverLift; }   // 173: he sits higher than placed
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: appears at {GlobalPosition} ({_hoverOverFloor:F2} m over the floor{(HoverLift != 0f ? $", lifted {HoverLift:F1}" : "")}; the arena's middle {_arenaCentre}, radius {_arenaRadius:F1})");
         EmitSignal(SignalName.Spawned);
     }
 
@@ -791,7 +800,9 @@ public partial class SmsKingBooRematch : Node3D
             {
                 var m = M();
                 if (m == null) { EndBreath(); return; }
-                var b = new SmsGhostBreath { Name = $"GhostBreath{BreathsMade}", DebugPrint = DebugPrint, SweepDeg = SweepDeg, SweepSeconds = SweepSeconds, SweepWay = SweepWay, DownDeg = BreathDownDeg, BreathSpeed = BreathSpeed, PuffSeconds = PuffSeconds, PuffSizeStart = PuffSizeStart, PuffSizeEnd = PuffSizeEnd, HitHeight = BreathHitHeight, FreezeSeconds = FreezeSeconds, OneFreezePerAttack = OneFreezePerAttack };
+                float fyAim = FloorUnder(m.GlobalPosition); if (float.IsNaN(fyAim)) fyAim = m.GlobalPosition.Y;
+                BreathDownDegUsed = BreathAimFloorAt > 0f ? Mathf.RadToDeg(MathF.Atan2(Mathf.Max(0.1f, MouthPoint.Y - fyAim), BreathAimFloorAt)) : BreathDownDeg;   // 173: the floor met BreathAimFloorAt out
+                var b = new SmsGhostBreath { Name = $"GhostBreath{BreathsMade}", DebugPrint = DebugPrint, SweepDeg = SweepDeg, SweepSeconds = SweepSeconds, SweepWay = SweepWay, DownDeg = BreathDownDegUsed, BreathSpeed = BreathSpeed, PuffSeconds = PuffSeconds, PuffSizeStart = PuffSizeStart, PuffSizeEnd = PuffSizeEnd, HitHeight = BreathHitHeight, FreezeSeconds = FreezeSeconds, OneFreezePerAttack = OneFreezePerAttack };
                 (GetTree().CurrentScene ?? GetParent()).AddChild(b);
                 float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
                 b.Swept += hit => { if (hit) BreathHits++; _breathSwept = true; _crownFlashT = CrownFlashSeconds * 0.7f; EmitSignal(SignalName.Breathed, hit); };
