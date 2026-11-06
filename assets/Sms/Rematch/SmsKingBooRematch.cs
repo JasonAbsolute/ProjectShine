@@ -85,6 +85,17 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>173 (Jaysonn: "king boo sits kinda low and his tongue is going into the stage"): he hovers this many metres HIGHER than where he was put
     /// in the scene -- at the spawn, at every spot he teleports to (the lick's own LickHeight is not touched). 0 = as placed.</summary>
     [Export] public float HoverLift = 4.5f;   // 3 m left the tongue's tip 0.8 m into the floor; 4.5 puts it about 0.75 m over it (the bob is 0.35)
+    [ExportGroup("The intro (174)")]
+    /// <summary>174 (Jaysonn: "king boo appears just like the casino fight, laughs and then goes underground and the fight starts"): the intro's SURFACE --
+    /// he rises out of the floor (from IntroSinkDepth under it, over IntroRiseSeconds, the appear clip and voice, as the casino boss surfaces from his table),
+    /// LAUGHS for IntroLaughSeconds (the laugh clip looping, the long laugh voice), SINKS back (over IntroSinkSeconds, the vanish voice) and is hidden. The
+    /// fight then starts with SpawnRising: up out of the floor at his spot over SpawnRiseSeconds, no second laugh.</summary>
+    [Export] public float IntroRiseSeconds = 1.6f, IntroLaughSeconds = 3.4f, IntroSinkSeconds = 1.1f, IntroSinkDepth = 7f, SpawnRiseSeconds = 1.2f;
+    /// <summary>The laugh clip carries his body 3.6 m up over his node (the crown 9.6): through the intro's laugh the node is lowered by that (smoothed over
+    /// IntroLaughHoldSeconds, so the clip's own bounce stays) and his body laughs at the hover height, where it rose to.</summary>
+    [Export] public bool IntroLaughBodyHeld = true;
+    [Export] public float IntroLaughHoldSeconds = 0.35f;
+    [ExportGroup("")]
     /// <summary>He turns to face Mario while he waits, at this many radians a second.</summary>
     [Export] public bool FaceMario = true;
     [Export] public float TurnSpeed = 3f;
@@ -241,6 +252,9 @@ public partial class SmsKingBooRematch : Node3D
     [Signal] public delegate void SpawnedEventHandler();
     [Signal] public delegate void LaughedEventHandler();
     [Signal] public delegate void ReadyForFightEventHandler();
+    /// <summary>174: the intro's surface begins (he breaks the floor), and he has sunk back under it (the intro may start the fight).</summary>
+    [Signal] public delegate void IntroSurfacingEventHandler();
+    [Signal] public delegate void IntroSunkEventHandler();
     /// <summary>158: a Bomb Boo burst on him (the hit points left) / the last one took him down.</summary>
     [Signal] public delegate void HitEventHandler(int hpLeft);
     [Signal] public delegate void DefeatedEventHandler();
@@ -268,7 +282,7 @@ public partial class SmsKingBooRematch : Node3D
     [Signal] public delegate void FlungEventHandler();
     [Signal] public delegate void WindDoneEventHandler(int flings);
 
-    public enum Phase { Hidden, Appear, Laugh, Wait, Hurt, Down, Gone, Vanish, Arrive, Lick, Smash, Lightning, Breath, Fireballs, Wind }
+    public enum Phase { Hidden, Appear, Laugh, Wait, Hurt, Down, Gone, Vanish, Arrive, Lick, Smash, Lightning, Breath, Fireballs, Wind, IntroRise, IntroLaugh, IntroSink }
     public enum Move { None, Hop, Lick, Smash, Lightning, Breath, Fireballs, Wind }
     public Phase State { get; private set; } = Phase.Hidden;
     /// <summary>The clip he is on (the assigned one while it is held paused: 167).</summary>
@@ -373,6 +387,13 @@ public partial class SmsKingBooRematch : Node3D
     public Vector3 CrownFxPoint => CrownPoint + Vector3.Up * CrownFxLift;
     private GpuParticles3D _chika; private Node3D _glow; private SmsActorSound _sound; private SmsTongueStretch _tongue;
     private Mario _mario; private float _yaw, _hoverT, _blinkT; private int _eyeNow = -1; private Vector3 _home; private bool _laughSounded;
+    private float _introT, _introFloorY, _introBodyLift; private Vector3 _introTop; private bool _spawnRise, _spawnQuiet;   // 174
+    public float IntroBodyLift => _introBodyLift;
+    /// <summary>174, for the drives: the intro surface's floor (world y), his top (the hover), how far into the intro phase he is (seconds).</summary>
+    public float IntroFloorY => _introFloorY;
+    public Vector3 IntroTop => _introTop;
+    public float IntroPhaseSeconds => _introT;
+    public bool IsSpawnRising => _spawnRise;
     private float _hurtT, _hurtLen, _hurtYaw0; private bool _flashOn;
     // 162
     private readonly Random _rng = new(162);
@@ -452,6 +473,14 @@ public partial class SmsKingBooRematch : Node3D
     partial void SmsKingBooDriveHook();
     private static Texture2D LoadTex(string path) => ResourceLoader.Exists(path) ? GD.Load<Texture2D>(path) : null;
 
+    /// <summary>174: the fight's start after the intro's surface -- he rises out of the floor at his spot (the appear clip and voice, over SpawnRiseSeconds)
+    /// straight into the wait: no laugh (the intro had it).</summary>
+    public void SpawnRising()
+    {
+        if (State != Phase.Hidden || Engine.IsEditorHint()) return;
+        _spawnRise = true; _spawnQuiet = true;
+        Spawn();
+    }
     /// <summary>He appears: the appear clip, then the laugh with the long laugh, then the wait. Nothing happens twice.</summary>
     public void Spawn()
     {
@@ -464,8 +493,102 @@ public partial class SmsKingBooRematch : Node3D
         PlayClip(BckAppear);
         ReadArena();
         if (HoverLift != 0f) { Position += Vector3.Up * HoverLift; _home = Position; _hoverOverFloor += HoverLift; }   // 173: he sits higher than placed
-        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: appears at {GlobalPosition} ({_hoverOverFloor:F2} m over the floor{(HoverLift != 0f ? $", lifted {HoverLift:F1}" : "")}; the arena's middle {_arenaCentre}, radius {_arenaRadius:F1})");
+        if (_spawnRise)                                                                                                  // 174: up out of the floor
+        {
+            _introTop = Position; _introFloorY = Position.Y - _hoverOverFloor; _introT = 0f;
+            Position = new Vector3(Position.X, _introFloorY - IntroSinkDepth, Position.Z);
+            if (_sound != null && !string.IsNullOrEmpty(ArriveSe)) _sound.Play(ArriveSe);
+        }
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: appears at {GlobalPosition} ({_hoverOverFloor:F2} m over the floor{(HoverLift != 0f ? $", lifted {HoverLift:F1}" : "")}{(_spawnRise ? $", rising out of the floor over {SpawnRiseSeconds:F1} s" : "")}; the arena's middle {_arenaCentre}, radius {_arenaRadius:F1})");
         EmitSignal(SignalName.Spawned);
+    }
+
+    /// <summary>174: the intro's SURFACE at a spot (placedAt: the hover height as the intro places him, the lift added here), facing yaw -- the rise
+    /// out of the floor, the laugh, the sink; IntroSurfacing now, IntroSunk at the end (he is Hidden again: SpawnRising starts the fight).</summary>
+    public void IntroSurface(Vector3 placedAt, float yaw)
+    {
+        if (State != Phase.Hidden || Engine.IsEditorHint()) return;
+        GlobalPosition = placedAt; _yaw = yaw; Rotation = new Vector3(0f, yaw, 0f);
+        Hp = Math.Max(1, HitPoints); HitsTaken = 0;
+        ReadArena();
+        if (HoverLift != 0f) { Position += Vector3.Up * HoverLift; _hoverOverFloor += HoverLift; }
+        _introTop = Position; _introFloorY = Position.Y - _hoverOverFloor; _introT = 0f; _hoverT = 0f; _introBodyLift = 0f;
+        Position = new Vector3(Position.X, _introFloorY - IntroSinkDepth, Position.Z);
+        if (_model != null) _model.Visible = true;
+        if (_tongue != null) { _tongue.Stretch = TongueStretch; _tongue.On = TongueStretch > 1.001f; }
+        SetCrownGlow(_crownGlowColor, 0f);
+        State = Phase.IntroRise;
+        PlayClip(BckAppear);
+        if (_sound != null && !string.IsNullOrEmpty(ArriveSe)) _sound.Play(ArriveSe);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: INTRO -- surfaces at {_introTop} ({_hoverOverFloor:F2} m over the floor at {_introFloorY:F2}) from {IntroSinkDepth} m under, over {IntroRiseSeconds:F1} s; laughs {IntroLaughSeconds:F1} s; sinks over {IntroSinkSeconds:F1} s");
+        EmitSignal(SignalName.IntroSurfacing);
+    }
+    /// <summary>174: the intro cut short (the player skipped): under the floor at once, hidden; IntroSunk.</summary>
+    public void IntroAbort()
+    {
+        if (State != Phase.IntroRise && State != Phase.IntroLaugh && State != Phase.IntroSink) return;
+        Position = new Vector3(Position.X, _introFloorY - IntroSinkDepth, Position.Z);
+        if (_model != null) _model.Visible = false;
+        State = Phase.Hidden;
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: INTRO cut short -- under the floor");
+        EmitSignal(SignalName.IntroSunk);
+    }
+    /// <summary>174: a voice from his sound node for the intro (the laugh before he shows).</summary>
+    public void PlayVoice(string se, float db = 0f) { if (_sound == null) _sound = SmsActorSound.Attach(this); if (_sound != null && !string.IsNullOrEmpty(se)) _sound.Play(se, db); }
+    private void IntroTick(float dt)
+    {
+        _introT += dt;
+        if (State == Phase.IntroRise)
+        {
+            float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp(_introT / Mathf.Max(0.1f, IntroRiseSeconds), 0f, 1f));
+            Position = new Vector3(_introTop.X, Mathf.Lerp(_introFloorY - IntroSinkDepth, _introTop.Y, k), _introTop.Z);
+            FaceTick(dt);
+            if (_introT >= IntroRiseSeconds)
+            {
+                State = Phase.IntroLaugh; _introT = 0f; _hoverT = 0f; LaughPlayed = true;
+                PlayClip(BckLaugh);
+                if (_sound != null && !string.IsNullOrEmpty(LaughSe)) _sound.Play(LaughSe, LaughDb);
+                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: INTRO -- up; the laugh ({IntroLaughSeconds:F1} s)");
+                EmitSignal(SignalName.Laughed);
+            }
+        }
+        else if (State == Phase.IntroLaugh)
+        {
+            _hoverT += dt;
+            if (IntroLaughBodyHeld) _introBodyLift = Mathf.Lerp(_introBodyLift, BodyPoint.Y - GlobalPosition.Y, 1f - MathF.Exp(-dt / Mathf.Max(0.05f, IntroLaughHoldSeconds)));   // the clip's lift of the body, taken out
+            Position = _introTop + Vector3.Up * ((HoverBob > 0f && HoverBobSeconds > 0f ? MathF.Sin(_hoverT / HoverBobSeconds * MathF.Tau) * HoverBob : 0f) - _introBodyLift);
+            FaceTick(dt);
+            if (_introT >= IntroLaughSeconds)
+            {
+                State = Phase.IntroSink; _introT = 0f; _introTop = new Vector3(_introTop.X, Position.Y, _introTop.Z); _introBodyLift = 0f;
+                PlayClip(BckWait);
+                if (_sound != null && !string.IsNullOrEmpty(VanishSe)) _sound.Play(VanishSe);
+                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: INTRO -- sinks");
+            }
+        }
+        else if (State == Phase.IntroSink)
+        {
+            float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp(_introT / Mathf.Max(0.1f, IntroSinkSeconds), 0f, 1f));
+            Position = new Vector3(_introTop.X, Mathf.Lerp(_introTop.Y, _introFloorY - IntroSinkDepth, k), _introTop.Z);
+            if (_introT >= IntroSinkSeconds)
+            {
+                if (_model != null) _model.Visible = false;
+                State = Phase.Hidden;
+                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: INTRO -- under the floor, hidden; the fight may be started (SpawnRising)");
+                EmitSignal(SignalName.IntroSunk);
+            }
+        }
+    }
+
+    /// <summary>174: the quiet spawn's appear clip ended before the rise did -- the wait begins once he is up.</summary>
+    private void QuietReadyWhenUp()
+    {
+        if (State != Phase.Appear) return;
+        if (_spawnRise) { GetTree().CreateTimer(0.05f).Timeout += QuietReadyWhenUp; return; }
+        Position = _home;
+        EnterWait(FirstAttackDelay);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: up at his spot -- waits, the fight may start (the first move in {FirstAttackDelay:F1} s)");
+        EmitSignal(SignalName.ReadyForFight);
     }
 
     /// <summary>162: his hover height over the floor from where he was put, the arena's middle and radius from its floor (SmsArenaFloor), for the spots.</summary>
@@ -522,11 +645,21 @@ public partial class SmsKingBooRematch : Node3D
         string n = name;
         if (State == Phase.Appear && n == BckAppear)
         {
+            if (_spawnQuiet)                                                                       // 174: the intro had the laugh -- the wait (the rise finishes under it)
+            {
+                _spawnQuiet = false; if (_spawnRise && _introT < SpawnRiseSeconds) { PlayClip(BckWait); CallDeferred(nameof(QuietReadyWhenUp)); return; }
+                _spawnRise = false; Position = _home;
+                EnterWait(FirstAttackDelay);
+                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: up at his spot -- waits, the fight may start (the first move in {FirstAttackDelay:F1} s)");
+                EmitSignal(SignalName.ReadyForFight);
+                return;
+            }
             State = Phase.Laugh; _laughSounded = false;
             PlayClip(BckLaugh);
             if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the laugh");
             EmitSignal(SignalName.Laughed);
         }
+        else if (State == Phase.IntroLaugh && n == BckLaugh) { PlayClip(_introT + 1.5f <= IntroLaughSeconds ? BckLaugh : BckWait); }   // 174: the laugh loops while the intro laughs
         else if (State == Phase.Laugh && n == BckLaugh)
         {
             EnterWait(FirstAttackDelay);
@@ -1082,6 +1215,14 @@ public partial class SmsKingBooRematch : Node3D
     {
         if (State == Phase.Hidden || Engine.IsEditorHint()) return;
         float dt = (float)delta;
+        if (State == Phase.IntroRise || State == Phase.IntroLaugh || State == Phase.IntroSink) { IntroTick(dt); if (Blink) BlinkTick(dt); PlaceFx(); return; }   // 174
+        if (State == Phase.Appear && _spawnRise)                                                                                                       // 174: up out of the floor at the spawn
+        {
+            _introT += dt;
+            float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp(_introT / Mathf.Max(0.1f, SpawnRiseSeconds), 0f, 1f));
+            Position = new Vector3(_introTop.X, Mathf.Lerp(_introFloorY - IntroSinkDepth, _introTop.Y, k), _introTop.Z);
+            if (k >= 1f) { _spawnRise = false; Position = _home; }
+        }
         // the long laugh with the laugh clip (the casino boss plays it two bck frames in: a thirtieth of a second, dropped here)
         if (State == Phase.Laugh && !_laughSounded)
         {

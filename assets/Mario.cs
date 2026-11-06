@@ -17668,6 +17668,16 @@ public partial class Mario : CharacterBody3D
         }
     }
 
+    /// <summary>174: a demo turns him to face a way (the rematch intro's look-about, SmsRematchIntro): the facing latched and the armature turned --
+    /// SmsCarryTo's face part alone: no voice, no state change, no move. The caller holds the controls (CameraLocked).</summary>
+    public void SmsDemoFace(Vector3 f)
+    {
+        f.Y = 0f;
+        if (f.LengthSquared() <= 1e-6f) return;
+        f = f.Normalized(); lastFacingDirection = f; SmsLatchFace(f, 2);
+        if (armature != null) armature.Rotation = armature.Rotation with { Y = BaseYawFromDir(f) };
+    }
+
     /// <summary>The body's half height off its first CollisionShape3D (his fruit are centred RigidBody3Ds; the game's object origin is its
     /// ground point), else half the game's hit height.</summary>
     private static float SmsBodyHalfHeight(RigidBody3D rb, SmsTakeData d)

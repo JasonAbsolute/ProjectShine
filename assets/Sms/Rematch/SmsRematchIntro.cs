@@ -10,6 +10,14 @@ using System;
 /// off. After a miss (GameData.CameFromMiss) the card is skipped: he falls straight in and King Boo comes.
 /// Knobs: the lines and their timing, the heights, the fade, SkipAllowed, the card's font (LabelSettings). PlayWithoutGameData: the intro
 /// runs when the scene is opened on its own too (F6), as it does when the casino sends him here.
+/// Pass 174 (Jaysonn: "mario lands then a cutscene starts where mario looks around looking from where the laughing is coming from and the king boo
+/// appears just like the casino fight laughs and then goes underground and the fight starts"): with Cutscene on, CutsceneDelay after Mario lands
+/// his controls lock (CameraLocked) and a cutscene camera takes over -- a LAUGH from nowhere (King Boo's long laugh), Mario LOOKS ABOUT for it
+/// (his body turning left, then right, eased; LookSeconds), then turns to where King Boo SURFACES: SurfaceDistance in front of him toward the
+/// BooSpawn marker, rising out of the floor as the casino boss rises from his table (the appear clip and voice), LAUGHING for IntroLaughSeconds
+/// (his knob) with the camera off to the side on the two of them (SurfaceCamSide / Height), then SINKING back under the floor; AfterSinkSeconds on the empty spot, the game
+/// camera is back, Mario is free, and King Boo rises at his BooSpawn spot for the fight (SpawnRising: no second laugh) -- FightReady as before.
+/// A skips the cutscene too (the fight starts at once). After a miss the cutscene is skipped like the card. Cutscene off = the 157 intro.
 /// </summary>
 public partial class SmsRematchIntro : Node
 {
@@ -38,13 +46,24 @@ public partial class SmsRematchIntro : Node
     /// <summary>King Boo comes this long after Mario lands -- or this long after the reveal if he never lands (a fall off the edge).</summary>
     [Export] public float BooSpawnDelay = 0.5f, BooSpawnTimeout = 5f;
     [Export] public bool PlayWithoutGameData = true;
+    [ExportGroup("The cutscene (174)")]
+    /// <summary>The cutscene runs at all; the beat after Mario lands before it starts; how long he looks about before King Boo surfaces (the laugh
+    /// comes at its start); where King Boo surfaces (metres in front of Mario toward the BooSpawn marker; 0 = at the marker); the beat on the
+    /// empty spot after he sinks before the fight starts; the cutscene camera's field of view.</summary>
+    [Export] public bool Cutscene = true;
+    [Export] public float CutsceneDelay = 0.4f, LookSeconds = 2.6f, SurfaceDistance = 7f, AfterSinkSeconds = 0.6f, CutsceneFov = 50f;
+    /// <summary>The surface shot's camera: how far off the line between Mario and King Boo (metres, a side two-shot) and how high.</summary>
+    [Export] public float SurfaceCamSide = 17f, SurfaceCamHeight = 3.8f;
+    /// <summary>How far Mario turns looking about (degrees, left then right) and how quickly his turns ease (degrees a second).</summary>
+    [Export] public float LookTurnDeg = 45f, LookTurnDegPerSec = 240f;
+    [ExportGroup("")]
     [Export] public bool DebugPrint;
 
     [Signal] public delegate void CardShownEventHandler();
     [Signal] public delegate void RevealedEventHandler();
     [Signal] public delegate void FightReadyEventHandler();
 
-    public enum Phase { Waiting, Card, Falling, Spawned, Done }
+    public enum Phase { Waiting, Card, Falling, Spawned, Done, LookAbout, Surfaced, Sunk }
     public Phase State { get; private set; } = Phase.Waiting;
     public bool Skipped { get; private set; }
     public bool CameFromMiss { get; private set; }
@@ -53,6 +72,15 @@ public partial class SmsRematchIntro : Node
 
     private Mario _mario; private Node3D _marioSpawn, _booSpawn; private SmsKingBooRematch _boo; private SmsArenaFloor _floor;
     private float _t, _sinceReveal, _landedAt = -1f; private bool _booSpawned;
+    // 174: the cutscene
+    private Camera3D _cam, _gameCam; private float _cut, _sunkAt = -1f, _faceYaw, _faceYaw0, _faceTarget; private Vector3 _surfaceSpot, _camFrom, _camAt, _camTo; private bool _cutsceneRan, _cutsceneSkipped; private int _looks;
+    /// <summary>174, for the drives: the cutscene ran, was skipped; where King Boo surfaced; Mario's facing yaw now (radians) and the number of look turns made; the cutscene camera (while it runs).</summary>
+    public bool CutsceneRan => _cutsceneRan;
+    public bool CutsceneSkipped => _cutsceneSkipped;
+    public Vector3 SurfaceSpot => _surfaceSpot;
+    public float FaceYawNow => _faceYaw;
+    public int LooksMade => _looks;
+    public Camera3D CutsceneCamera => _cam;
 
     public override void _Ready()
     {
@@ -102,8 +130,117 @@ public partial class SmsRematchIntro : Node
         {
             _sinceReveal += dt;
             if (_landedAt < 0f && _mario != null && IsInstanceValid(_mario) && _mario.IsOnFloor()) _landedAt = _sinceReveal;
-            if (!_booSpawned && ((_landedAt >= 0f && _sinceReveal - _landedAt >= BooSpawnDelay) || _sinceReveal >= BooSpawnTimeout)) SpawnBoo();
+            bool cutscene = Cutscene && !CameFromMiss && _boo != null && !_cutsceneRan;
+            if (cutscene && State == Phase.Falling && _landedAt >= 0f && _sinceReveal - _landedAt >= CutsceneDelay) { BeginCutscene(); return; }
+            if (cutscene && State == Phase.Falling && _sinceReveal >= BooSpawnTimeout) { SpawnBoo(); return; }   // he never landed (off the edge): no cutscene -- the 157 spawn, with the laugh
+            if (!cutscene && !_booSpawned && ((_landedAt >= 0f && _sinceReveal - _landedAt >= BooSpawnDelay) || _sinceReveal >= BooSpawnTimeout)) SpawnBoo();
         }
+        if (State == Phase.LookAbout || State == Phase.Surfaced || State == Phase.Sunk) CutsceneTick(dt);
+    }
+
+    // ---- 174: the cutscene ---------------------------------------------------------------------------------------------------------------------
+    private static Vector3 Flat(Vector3 v) { v.Y = 0f; return v.LengthSquared() > 1e-6f ? v.Normalized() : Vector3.Forward; }
+    private static float Yaw(Vector3 dir) => MathF.Atan2(dir.X, dir.Z);
+    private static Vector3 Dir(float yaw) => new Vector3(MathF.Sin(yaw), 0f, MathF.Cos(yaw));
+    /// <summary>Mario has landed: his controls lock, the cutscene camera takes over, the laugh sounds from nowhere, he looks about for it.</summary>
+    private void BeginCutscene()
+    {
+        _cutsceneRan = true; State = Phase.LookAbout; _cut = 0f; _looks = 0;
+        _mario.CameraLocked = true;
+        Vector3 mp = _mario.GlobalPosition, landed = Flat(_mario.SmsFacingDir());
+        // where he will surface: toward the BooSpawn marker, SurfaceDistance out (or at the marker), over the floor there
+        Vector3 toBoo = _booSpawn != null ? Flat(_booSpawn.GlobalPosition - mp) : landed;
+        Vector3 face = toBoo;                                                                                // the look-about is about the way the laugh comes from
+        _faceYaw = Yaw(face); _faceYaw0 = _faceYaw; _faceTarget = _faceYaw;
+        _mario.SmsDemoFace(face);                                                                            // squared up to it from the first frame (his landing facing is the marker's)
+        Vector3 spot = SurfaceDistance > 0f ? mp + toBoo * SurfaceDistance : (_booSpawn != null ? _booSpawn.GlobalPosition : mp + face * 7f);
+        float? fy = _floor?.FloorYUnder(spot.X, spot.Z, spot.Y + 100f, 400f, Exclude()) ?? FloorY;
+        if (!fy.HasValue && _booSpawn != null) { spot = _booSpawn.GlobalPosition; fy = _floor?.FloorYUnder(spot.X, spot.Z, spot.Y + 100f, 400f, Exclude()) ?? FloorY; }
+        _surfaceSpot = new Vector3(spot.X, (fy ?? mp.Y) + BooHeight, spot.Z);
+        // the camera: in front of him, a little to one side, low, on his face as he looks about (nearly head-on: his face shows through both turns)
+        _gameCam = GetViewport().GetCamera3D();
+        _cam = new Camera3D { Name = "IntroCutsceneCamera", Fov = CutsceneFov };
+        (GetTree().CurrentScene ?? GetParent()).AddChild(_cam);
+        Vector3 side = new Vector3(-face.Z, 0f, face.X);                                                  // in front of the way he landed facing: his turns are about it
+        _camFrom = mp + face * 3.6f + side * 0.4f + Vector3.Up * 1.45f; _camAt = mp + Vector3.Up * 1.15f;
+        _camTo = mp + face * 4.1f + side * 0.5f + Vector3.Up * 1.55f;
+        PlaceCam(0f); _cam.Current = true;
+        _boo.PlayVoice(_boo.LaughSe, _boo.LaughDb);                                                        // the laugh, from nowhere
+        if (DebugPrint) GD.Print($"[SMS rematch intro] CUTSCENE: Mario landed at {mp} facing {landed} (turned to {face}), the laugh; he looks about for {LookSeconds:F1} s; King Boo will surface at {_surfaceSpot} ({(spot - mp).Length():F1} m away); the camera at {_camFrom}");
+    }
+    private void PlaceCam(float k)
+    {
+        if (_cam == null) return;
+        _cam.GlobalPosition = _camFrom.Lerp(_camTo, k);
+        _cam.LookAt(_camAt, Vector3.Up);
+        if (!_cam.Current) _cam.Current = true;
+    }
+    private void CutsceneTick(float dt)
+    {
+        _cut += dt;
+        if (SkipAllowed && !_cutsceneSkipped && (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space"))) { SkipCutscene(); return; }
+        if (State == Phase.LookAbout)
+        {
+            // the look about: left, then right, then toward where the laugh is (King Boo's spot), each turn eased
+            float t1 = LookSeconds * 0.12f, t2 = LookSeconds * 0.5f, t3 = LookSeconds * 0.84f;
+            float baseYaw = Yaw(Flat(_surfaceSpot - _mario.GlobalPosition));
+            float want = _cut < t1 ? _faceYaw0 : _cut < t2 ? _faceYaw0 + Mathf.DegToRad(LookTurnDeg) : _cut < t3 ? _faceYaw0 - Mathf.DegToRad(LookTurnDeg) : baseYaw;   // left, right (about the way he landed facing), then to the laugh
+            if (_cut >= t1 && _looks == 0) _looks = 1; if (_cut >= t2 && _looks == 1) _looks = 2; if (_cut >= t3 && _looks == 2) _looks = 3;
+            TurnMario(want, dt);
+            PlaceCam(Mathf.Clamp(_cut / Mathf.Max(0.1f, LookSeconds), 0f, 1f));
+            if (_cut >= LookSeconds) Surface();
+        }
+        else if (State == Phase.Surfaced)
+        {
+            TurnMario(Yaw(Flat(_boo.GlobalPosition - _mario.GlobalPosition)), dt);
+            float total = _boo.IntroRiseSeconds + _boo.IntroLaughSeconds + _boo.IntroSinkSeconds;
+            // the side two-shot's aim: between Mario's head and King Boo's body, following the body (eased)
+            Vector3 body = _boo.BodyPoint; body.Y = Mathf.Max(body.Y, _boo.IntroFloorY + 1.5f);   // not under the floor while he is
+            Vector3 want = (_mario.GlobalPosition + Vector3.Up * 1.2f).Lerp(body, 0.62f);
+            _camAt = _camAt.Lerp(want, 1f - MathF.Exp(-5f * dt));
+            PlaceCam(Mathf.Clamp(_cut / Mathf.Max(0.1f, total), 0f, 1f));
+            if (_sunkAt >= 0f && _cut - _sunkAt >= AfterSinkSeconds) EndCutscene();
+        }
+    }
+    private void TurnMario(float wantYaw, float dt)
+    {
+        float step = Mathf.DegToRad(LookTurnDegPerSec) * dt;
+        float d = Mathf.Wrap(wantYaw - _faceYaw, -MathF.PI, MathF.PI);
+        _faceYaw += Mathf.Clamp(d, -step, step);
+        _mario.SmsDemoFace(Dir(_faceYaw));
+    }
+    /// <summary>The look about is over: King Boo surfaces at the spot, the camera off to the side on the two of them, pushing in a little through the laugh.</summary>
+    private void Surface()
+    {
+        State = Phase.Surfaced; _cut = 0f; _sunkAt = -1f;
+        Vector3 mp = _mario.GlobalPosition, toSpot = Flat(_surfaceSpot - mp), side = new Vector3(-toSpot.Z, 0f, toSpot.X);
+        // a side two-shot (he is far too big to frame from behind Mario 7 m away): from SurfaceCamSide metres off the line between them, a little behind
+        // Mario, SurfaceCamHeight up, looking between Mario's head and King Boo's body; pushing in a little through the laugh
+        Vector3 mid = (mp + _surfaceSpot) * 0.5f; mid.Y = mp.Y;
+        _camFrom = mid + side * SurfaceCamSide + toSpot * -2f + Vector3.Up * SurfaceCamHeight; _camAt = (mp + Vector3.Up * 1.2f).Lerp(new Vector3(_surfaceSpot.X, _surfaceSpot.Y - BooHeight + 2f, _surfaceSpot.Z), 0.5f);
+        _camTo = mid + side * (SurfaceCamSide * 0.85f) + toSpot * -1.5f + Vector3.Up * (SurfaceCamHeight + 0.6f);
+        PlaceCam(0f);
+        _boo.IntroSunk += OnIntroSunk;
+        _boo.IntroSurface(_surfaceSpot, Yaw(Flat(mp - _surfaceSpot)));
+        if (DebugPrint) GD.Print($"[SMS rematch intro] CUTSCENE: King Boo surfaces at {_surfaceSpot}, facing Mario");
+    }
+    private void OnIntroSunk() { _sunkAt = _cut; if (_boo != null) _boo.IntroSunk -= OnIntroSunk; if (DebugPrint) GD.Print($"[SMS rematch intro] CUTSCENE: he has sunk; the fight in {AfterSinkSeconds:F1} s"); }
+    /// <summary>A skips the cutscene: King Boo under the floor at once, the fight starts.</summary>
+    private void SkipCutscene()
+    {
+        _cutsceneSkipped = true;
+        if (_boo != null) { _boo.IntroSunk -= OnIntroSunk; _boo.IntroAbort(); }
+        if (DebugPrint) GD.Print("[SMS rematch intro] the cutscene skipped");
+        EndCutscene();
+    }
+    /// <summary>The cutscene is over: the game camera back, Mario free, King Boo rising at his spot for the fight.</summary>
+    private void EndCutscene()
+    {
+        State = Phase.Sunk;
+        if (_gameCam != null && IsInstanceValid(_gameCam)) _gameCam.Current = true;
+        if (_cam != null && IsInstanceValid(_cam)) { _cam.QueueFree(); _cam = null; }
+        _mario.CameraLocked = false;
+        SpawnBoo();
     }
 
     /// <summary>The card is over: Mario revealed FallHeight over the floor (falling), the screen fading in on him.</summary>
@@ -136,7 +273,7 @@ public partial class SmsRematchIntro : Node
             _boo.GlobalPosition = at;
             if (_booSpawn != null) _boo.GlobalRotation = new Vector3(0f, _booSpawn.GlobalRotation.Y, 0f);
             _boo.ReadyForFight += () => { State = Phase.Done; if (DebugPrint) GD.Print("[SMS rematch intro] the fight may start"); EmitSignal(SignalName.FightReady); };
-            _boo.Spawn();
+            if (_cutsceneRan) _boo.SpawnRising(); else _boo.Spawn();                                    // 174: after the cutscene he rises at his spot, no second laugh
         }
         else
         {
