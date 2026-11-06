@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-05 14:56 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-05 16:12 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1198,8 +1198,13 @@ floor through him. SMS 164: the BOOLOSSUS SMASH -- the crown pulses white, a Boo
 into 15 Boos (Teresa.dae -> boo.glb) that ring outward for a second; the plain hit for both; a jump clears the ring; ~110 KB of new model files.
 SMS 165: THREE Boolossi DIVE in from 20 m out and 24 m up (the target locks 0.6 s before the landing), with effects (a wisp trail, a ring of light and
 smoke on the landing, the camera shake, puffs); the Boos solid white; the CROWN GLOWS the attack's colour (white for the smash) -- a light at the crown
-and two new uniforms in the shared BossTelesaToon.gdshaderinc (0 = the casino's crown unchanged). Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `43fbcb8` ("SMS 165: the King Boo REMATCH, part 9 -- three Boolossi DIVE in, with effects; the Boos white; the crown
+and two new uniforms in the shared BossTelesaToon.gdshaderinc (0 = the casino's crown unchanged). SMS 165b (after screenshots): the Boolossus
+faces its dive; the Boos are the port's own hotel Boo (telesa.glb; the doc's Galaxy boo.glb REMOVED -- its export lost the GX mirror wrap); the
+crown SHINES (a sliding sheen + rim in the shader, solid while lit, sparkles, a flash, a quickening pulse) with no halo quad. Further passes re-point
+this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `1bace54` ("SMS 165b: the King Boo REMATCH, part 9b -- the Boolossus faces its dive, the Boos are the port's own, the
+  crown SHINES"; assets/Sms/Rematch/ SmsBoolossus.cs, SmsKingBooRematch.cs, GhostBoo.gdshader, Boolossus.tscn; assets/Sms/Enemy/BossTelesa/BossTelesaToon.gdshaderinc;
+  models/Sms/Rematch/ boo.glb + boo_teresa.png REMOVED) on the 165 commit ("SMS 165: the King Boo REMATCH, part 9 -- three Boolossi DIVE in, with effects; the Boos white; the crown
   GLOWS the attack's colour"; assets/Sms/Rematch/ SmsBoolossus.cs, SmsKingBooRematch.cs; assets/Sms/Enemy/BossTelesa/BossTelesaToon.gdshaderinc two new uniforms) on the 164 commit
   ("SMS 164: the King Boo REMATCH, part 8 -- the BOOLOSSUS SMASH"; assets/Sms/Rematch/ SmsBoolossus.cs,
   Boolossus.tscn, GhostBoo.gdshader NEW, SmsKingBooRematch.cs; models/Sms/Rematch/ boolossus.glb + boo.glb and their textures NEW) on the 163 commit ("SMS 163: the King Boo REMATCH, part 7 -- the Lick's tongue is the whip itself, a bit longer";
@@ -1217,9 +1222,13 @@ and two new uniforms in the shared BossTelesaToon.gdshaderinc (0 = the casino's 
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 18 commits past `feature/sounds`, 40 since `main`. ~1.1 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 20 commits past `feature/sounds`, 42 since `main`. ~1.1 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 165b: the SMASH once more: the crown flashes white-hot and then SHINES -- a sliding sheen, sparkles rising out of it, pulsing faster
+  toward the launch; the Boolossi dive face first; the Boos ringing out are the hotel Boos (sleepy eyes, fangs, red tongues). Knobs: KingBoo's
+  CrownShine / CrownFlashSeconds / CrownPulseQuicken / CrownSparkles / CrownFxLift (CrownGlowSize for a halo after all); Boolossus.tscn's Opacity,
+  SmokeCount / SmokeColor, WaveBooScale.
 - To try 165: the SMASH again: his crown now visibly GLOWS white through the tell (a light on the crown), then THREE Boolossi dive in half a second
   apart from three sides, each trailing wisps and aiming at where you stand -- their shadows show the targets, which lock 0.6 s before the landing: keep
   running and they miss. Each landing: a ring of light, smoke, a camera shake, then 15 WHITE Boos ringing outward (jump them) and vanishing in puffs.

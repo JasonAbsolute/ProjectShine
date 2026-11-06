@@ -11942,3 +11942,55 @@ knocked down by the first is under the others too (his invincibility holds). The
 are mine (the doc names none): their colours, sizes and counts are knobs on Boolossus.tscn ("The effects (165)"). The crown's glow is a light plus the
 shader term, not a bloom pass (the arena's environment has no glow); turning glow on in RematchArena.tscn's Environment would make the white crown and
 the rings bloom.
+
+### 165b -- the King Boo REMATCH, part 9b: the Boolossus faces its dive, the Boos are the port's own, the crown SHINES (feature/kingboo-rematch, code `1bace54`)
+
+**Jaysonn:** "ok boolouses is facing the wrong way but thats the right idea! the boos coming out from him tho i thing still look wrong. and the crown glow
+should be like a shinny glow not like a light bulb glow should be like a good indicator im activating this abibilty! and casting booloues attack"
+
+**Seen, not guessed.** The headless drives cannot show a look, so the drive got a SCREENSHOT mode: `SMS_SHOT=1` picks `SmsShotDrive`, which runs the arena
+in a WINDOW (run_window.ps1: run_bounded.ps1 without --headless, 1280x720; started in the logged-on desktop session with `schtasks /create ... /it`),
+forces the smash, moves a camera of its own in close and saves PNGs (`Viewport.GetTexture().GetImage().SavePng`) of the crown through the tell, King Boo
+from Mario's side, the Boolossus mid-dive from the side and from the game camera, the landing, the Boos spreading, a Boo at eye level, the game's view.
+Three rounds (a, c, d; b lost its scripts to the editor's own rebuild replacing the DLL under it). The helpers live in ps157/ (run_window.ps1,
+run_shot165.bat, sched_interactive.ps1 unused); the PNGs are not committed.
+
+**What the first round showed** (shots165a): the wave Boos white with a big RED CAP over the top and back of the head; the diving Boolossus a translucent
+lavender blob from the side (white from the front); the landing a blown-out white blot; the crown a soft white ball of light behind it -- the bulb.
+
+**The Boos** (`SmsBoolossus.cs`, SmsWaveBoo): the red cap's mechanism, read from boo.glb and Teresa.dae: the face sheet teresa.0.png is 256 x 128 with
+the TONGUE in a 32-px strip at its left edge and HALF a face (one eye, the mouth) at its right; the body's UVs run from u 0 to 3 -- the BMD's GX mirror
+wrap mirrored the half face into a whole one and folded the back onto white, and the .dae export dropped the wrap mode. Under Godot's repeat, the back's
+u 1.01..1.5 wrapped into the tongue strip; and 122 top-of-head vertices sit at u 0..0.1 in the strip outright -- the real material must carry a texture
+matrix the export lost too. Rather than guess it: the port already HAS the hotel Boo (`models/Eniemes/Telesa/telesa.glb`, 1.84 m across at 0.013434, its
+materials bound to assets/Sms/Enemy/Telesa/TelesaBody / Eye / Kiba / Mouth.tres on TelesaToon.gdshader, `fade` 0..1, the clips telesa_wait etc.) -- the
+Sunshine Boo as SmsTelesa draws it. The wave Boos are that now: the glb instanced at BooModelScale 0.013434 x WaveBooScale 1, its four ShaderMaterials
+copied per Boo (the ghost shader only for another scene's StandardMaterial3D surfaces), `fade` = WaveBooOpacity 1 and down to 0 over the last
+WaveFadeSeconds, the wait clip playing from a random frame, facing outward (+Z: the eyes' centroid at z +45 of the body's -7). boo.glb, boo_teresa.png
+and their .import files are REMOVED from the repo. The second round showed the ring of real Boos, sleepy blue eyes, fangs, red tongues, coming at the
+camera.
+
+**The Boolossus** (`SmsBoolossus.cs`, `GhostBoo.gdshader`): the face is on +Z (Boolossus.obj: the eyes, teeth, tongue and cheeks at +0.3..+0.4 z of the
+body's middle; FacesPlusZ on) -- shot 4 shows it diving face first at Mario, tongue out. The shader UNSHADED now, as the port's Boos are (TelesaToon): under
+the arena's violet ambient (0.45, 0.4, 0.65 x 0.7) the lambert body read lavender from every side but the sun's; a soft shade of its own (shade_min 0.72
+to 1 by the normal against a light from the camera's upper left) keeps the round body readable; Opacity 0.75 -> 0.9. The landing smoke: a mix blend and
+24 puffs at alpha 0.5 (36 additive ones piled up to a white blot); the ring stays additive.
+
+**The crown** (`SmsKingBooRematch.cs`, `BossTelesaToon.gdshaderinc`): the halo quad is off by default (CrownGlowSize 0 -- in shots a and c it sat at the
+crown's base as a white ball, the bulb). Instead the crown SHINES: the shader's crown_glow term is a sheen -- the sphere map (N_btelesa_env2) sampled at
+an offset that slides with TIME while the crown is lit (sin 7.3 / cos 5.1 x 0.22), x 2.2, plus a rim at the silhouette (1 - |view z|)^2 x 1.3, plus 0.3,
+all in the attack's colour, x crown_glow_k -- and the crown's `opacity` goes to 1 while it shines (the ghost mix of 0.72 had capped it at dim: a crown can
+never be brighter than its mix with a black sky). Sparkles: the twinkle stars (ChikaFx duplicated, its process material copied) -- 36, scale 0.4-0.95,
+rising at 1.5-4 m/s from a 1.5-m sphere about the crown's middle (CrownFxLift 1.2 m over jnt_crown, which is the crown's base), in the colour. The
+rhythm: an activation FLASH (CrownFlashSeconds 0.15 at k 1.8, white-hot) then the pulse between 0.5 and 1 at CrownPulseHz 6 quickening to x2 by the end
+of the tell, a 0.1-s flash at each Boolossus's launch, held pulsing through the launches, dark at the end / at a hit / at the entrance. CrownShine (1)
+scales the whole. Shot d-2 from Mario's side: a bright white-gold crown with pink gems and sparkles over his head against the black sky -- the indicator.
+
+**Drive 165 v165-5** (`SmsKingBoo.Drive.cs`, deleted before the commit; run z2, 17 / 17): the hotel Boos' four TelesaToon materials copied, fade 1.00, the
+clip playing (C10); the flash (the shine to 1.80), the pulse to 1.00 in white, the register (1, 1, 1), the sparkles on, no halo (C3); the crown dark, the
+sparkles off, the register yellow in the wait (C12) and after a hit through the tell (C16); the rest as 165.
+
+**Deviations, all knobs:** the Boos are the port's Sunshine Boo, not the doc's Galaxy Teresa (the same character; the doc's file lost its wrap mode); the
+crown's shine is the shader's sheen plus sparkles, no bloom pass (the arena has none). Knobs: KingBoo's "The fight (164)" (CrownFlashSeconds,
+CrownPulseQuicken, CrownShine, CrownSparkles, CrownFxLift, CrownGlowSize / Strength for a halo after all); Boolossus.tscn's Opacity, SmokeColor /
+SmokeCount, WaveBooScale, WaveBooOpacity, BooClip.
