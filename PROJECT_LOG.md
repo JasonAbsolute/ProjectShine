@@ -12127,3 +12127,60 @@ BreathDownDeg, BreathSpeed, PuffSeconds, PuffSizeStart / End, BreathHitHeight, F
 look (BreathColor, GlintColor, PuffAlpha, Puffs, Glints, GlintSize, MouthGlowSize, HitRadiusK, SpreadDeg, Sink, the sounds, BreathSeEvery);
 SmsIceBlock's (BlockWidth / Height, PopSeconds, ShardSeconds, IceColor, GlintColor, Glints, Shards, FrostPuffs, GlintSize, ShardSize, FreezeSe,
 ShatterSe); Mario.FrostImmunityTicks; SmsBodyOverlay.SteadyFogFactor.
+
+### 168 -- the King Boo REMATCH, part 12: FIREBALLS, the burn (feature/kingboo-rematch, code `1efb8eb`)
+
+**Jaysonn:** "Fireballs next (doc attack 5, the burn) and, Ghost Wind next (doc attack 6, the fling)" (the wind is 169).
+
+**The doc** (attack 5): "Crown glows red. Fireballs shoot off in random directions and bounce off the arena walls. They shrink as they travel and fade out."
+The hit: "Fireballs: the burn. Set fireDown on the profile, which routes into SmsFireDownEnter and the ms_firedmg_a cloud." The port has it:
+`Mario.SmsDamageProfile.Fire` (dmgfire.prm: 1 HP, FIRE_DOWN, 300 ticks invincible) -- the Bob-omb's blast and the fire Chomps call it -- which launches
+him at FireDownForce 50 in ma_firejmp with the burn's cloud at his feet, two bounces, ma_fjpend, up.
+
+**The fireballs** (`SmsFireballs.cs`: the volley node and `SmsFireball`): King Boo makes one at his mouth and it runs on its own. The VOLLEY: Count 8
+balls spat over VolleySeconds 1 (one every seventh of a second), each along a random way within SpreadDeg 140 about the way to Mario (the doc's random
+directions; the bounces scatter them further; 0 = all at him), at Speed 14 m/s, lobbed from the mouth (3.7 m up) to the floor over DropSeconds 0.5 under
+20 m/s^2 and ROLLING on along it at the same flat speed. A ball: Size 2 m across at birth -- an orange core (kemuball3_fire, additive, 1.7 r), 26 flame
+tongues licking up off it (fire1_raw, a yellow-orange-red ramp, 1.7 r quads, local coordinates so they shrink with the ball), 14 embers trailing in the
+world (glow1_spark, 0.16 m), an OmniLight (energy 2.5, range 8, no shadow) -- SHRINKING linearly to nothing over LifeSeconds 5 (dead at 6 %), fading from
+FadeFrom 0.65 of its life, BOUNCING off the arena wall (the floor's circle less WallInset 0.6: when the ball's edge reaches it the flat velocity is mirrored
+about the inward normal, the ball pushed back inside, a flare of 1.35 for 0.12 s, MSD_SE_MA_BOUND at -6 dB, pitch 0.8) as often as it reaches it. THE
+HIT: the ball's sphere meeting Mario's damage cylinder (42 u across, 130 u tall from his feet) is `Mario.TakeDamage(the ball, Fire)` -- the burn; the ball
+bursts (DiesOnHit: a 0.3 s collapse) when it took (his HP fell or he went down) -- unless his feet are HitHeight 1.6 m over the floor: the full jump clears
+a ball (3.4 m), a hop (1.4 m) does not. MSD_SE_BS_TELESA_FIRE as the volley begins (the casino boss's chili fire), the fire Chomp's re-burn whoosh per
+ball (-4 dB, pitch 0.9-1.1). The volley over, Shot(count); the last ball dead, Finished and the node frees. `Cancel()` (King Boo hit through it) fizzles
+every ball out, the node going 0.6 s later. Read-outs State / Spat / Burns / BouncesMade / Alive / Balls / ArenaCentre / ArenaRadius / FloorY /
+CentreYaw; a ball's Vel / R0 / R / Age / Life / OnFloor / Bounces / HitMario / Dead / Fizzling / ScaleShown. Static All / BurnCount.
+
+**King Boo** (`SmsKingBooRematch.cs`): the Fireballs move -- FireballWeight 1 in the weight picker (FireballsOn). Where he stands, FACING Mario: the crown
+RED-ORANGE (FireballCrownColor (1, 0.32, 0.02); the doc has "red" for this and the lightning both, so the lightning keeps the deeper (1, 0.12, 0.08)) with
+the flash-then-quickening pulse through FireballTellSeconds 0.6 as the casino spit clip rears his head, played at the speed that lands FireballHoldFrame 50
+(the thrust) at the tell's end; then the `SmsFireballs` at the mouth (`MouthPoint`, jnt_sita_1) with its knobs copied from King Boo's "The fight (168)"
+group (FireballCount / VolleySeconds / SpreadDeg / Speed / Size / Seconds / HitHeight / DiesOnHit), the clip HELD at the thrust through the volley and let
+run on when it is out (its end puts the wait loop on), FireballWatchSeconds 0.4 later `EnterWait` -- the balls roll on on their own, usually into the next
+move (a 5-s life against a 2-4 s gap: the arena stays busy). CanBeHit through it; `AbortFireballs` (a swung Bomb Boo) cancels the node and lets the clip
+go. Signals FireballsStarted, FireballsShot, FireballBurned, FireballsDone(burns). Read-outs FireballVolleys / FireballBurns / Fireballs /
+FireballsLaunched.
+
+**Drive 168** (`SmsKingBoo.Drive.cs`, deleted before the commit; runs af-aj, 10 / 10 at the last): the crown -- the flash to 1.8, the pulse to 1, the
+register (1, 0.32, 0.02), the sparkles -- and the first ball at 0.63 s (C3); eight balls over 1.00 s from within 0.29 m of the mouth 3.66 m up, each at
+14.0 m/s within 8 deg of the way to Mario (spread 0 for the test), 2.00 m across, the first three on the floor, the spit clip held (C4); a standing Mario
+BURNED by the first to reach him at tick 599 (FIRE_DOWN, the fire kind, 1 HP, the ball burst), the first wall bounce at 680, a second burn at 749 by a
+ball returning off the far wall -- 150 drive ticks (2.5 s) after the first, his invincibility just out; 8 -> 6 HP (C5); seven of eight bounced inward at
+the wall at 14.0 (C6); half their size at 2.5 s, all dead 4.68 s after the last spat (C7); a Mario who JUMPS when the first of a short train of four (0.3 s
+apart in time, spread 0) is 2.6 m off clears it -- feet to 3.43 m, the balls passing 0.69 m into his spot, no burn on the way out (C8); a hit through the
+arc's third volley (its ways 53 deg apart after three) cuts it off: Done, not emitting, the three fizzling, the crown dark, the clip let go (C9); the end
+(C10). Run af's fails: the lob's gravity sign (the balls flew UP from the mouth and bounced at 30 m -- fixed), a cancelled node freezing its balls mid-air
+(the tick now runs through Done), the drive reading volley 2's Finished for volley 1 (per-volley logs). Run ag-ai: the second burn by the returning balls
+(a legitimate consequence of spread 0; the check now wants the first burn before any bounce and burns 2.5 s apart), and the dodge: the jump trace showed
+Mario's held jump is FAST (apex 3.41 m at 0.40 s, under 1.6 m again by 0.68 s), so a jump 0.34 s early met the third ball on the way down -- the fire now
+has a HitHeight (1.6 m) and the drive jumps when the first ball is 2.6 m off. Two windowed shot runs (i, j): the first balls read as pale yellow eggs, so
+the core went orange and smaller and the flames bigger and more (26 at 1.7 r); the floor glows orange under them, the crown reads as flaming. The .err:
+Godot's "ObjectDB instances leaked at exit" as before.
+
+**Deviations, all knobs:** the volley's count (8), arc (140), speed (14), size (2 m), life (5 s), the drop and the wall inset are mine (the doc gives
+random directions, the bounce, the shrink, the fade); the hit height (1.6) and the jump dodge are mine; the crown is red-orange rather than the lightning's
+red; the returning balls can burn a Mario the outbound pass burned once his 2.5 s are up. Knobs: King Boo's "The fight (168)" (FireballsOn,
+FireballCrownColor, FireballTellSeconds / WatchSeconds, FireballClip, FireballHoldFrame, FireballCount, FireballVolleySeconds, FireballSpreadDeg,
+FireballSpeed, FireballSize, FireballSeconds, FireballHitHeight, FireballDiesOnHit) and FireballWeight; SmsFireballs' own (DropSeconds, WallInset,
+FadeFrom, CoreColor / FlameColor / EmberColor, Lights, LightEnergy, LightRange, Flames, Embers, VolleySe / SpitSe / BounceSe).
