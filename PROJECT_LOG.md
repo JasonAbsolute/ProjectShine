@@ -11994,3 +11994,55 @@ sparkles off, the register yellow in the wait (C12) and after a hit through the 
 crown's shine is the shader's sheen plus sparkles, no bloom pass (the arena has none). Knobs: KingBoo's "The fight (164)" (CrownFlashSeconds,
 CrownPulseQuicken, CrownShine, CrownSparkles, CrownFxLift, CrownGlowSize / Strength for a halo after all); Boolossus.tscn's Opacity, SmokeColor /
 SmokeCount, WaveBooScale, WaveBooOpacity, BooClip.
+
+### 166 -- the King Boo REMATCH, part 10: GHOST LIGHTNING (feature/kingboo-rematch, code `be6e222`)
+
+**Jaysonn:** "ok yeah i think it looks good for now! we will fine tune it later. lets do the, Ghost Lightning next, and the, Ghost Breath (the freeze) next"
+(the breath is 167).
+
+**The doc** (attack 3): "Crown glows red. Two walls of lightning close in on Mario from either side and try to squash him. Three times in a row, fast."
+The hit: "Ghost Lightning: the shock. SmsElectricDamageEnter, which already locks Mario for 120 ticks and runs the ma_shock clip with its sparks and
+closing puff." The port has `Mario.TakeShock()` for the enemies: ELECTRIC_DAMAGE as the Electrokoopas give it -- the hurt state in ma_shock with the
+biri sparks and the negative body overlay, 1 HP, the lock 120 ticks (1.0 s at the port's tick), then 60 ticks' grace.
+
+**The walls** (`SmsGhostLightning.cs`, `GhostLightning.gdshader`): King Boo makes one node where Mario stands and it runs on its own. A squeeze is two
+WALLS -- quads WallLength 10 m wide and WallHeight 5 m tall, their faces toward each other -- WallGap 12 m apart about Mario's spot across a squeeze AXIS
+(flat; the first at random, each next turned SqueezeTurnDeg 60), the open ends along the walls. They appear dim (`warn` 1 -> 0.5) and harmless through
+WarnSeconds 0.45 -- the tell -- then CLOSE at WallSpeed 8 m/s each (the gap shuts at 16 m/s: 0.75 s from 12 m; MSD_SE_EF_LIGHTNING as they start; cyan
+sparks along each wall's foot), MEET (a flash of white for 0.15 s, a burst of MeetSparks 48 along the seam), and SqueezePause 0.2 later the next squeeze
+appears about where Mario is THEN; SqueezeCount 3, then Finished and the node frees itself. The shader: `tiles` columns (BoltsPerMetre 1) of the shock's
+bolt sheet (biri_l1.png, the Electrokoopa's streak, white with its alpha), each column shoved sideways, flipped and stretched by a hash of (column, time)
+re-rolled jitter_hz 18 times a second so the bolts jump about, a second wider layer behind, the shock's colour ramp (ms_m_biri_a: cyan (111, 255, 255)
+toward blue (63, 87, 255)) by the bolt's brightness, additive, two-sided, thinning toward the top, a hot core at the floor, a flicker of 35 %; `warn`
+dims it, `flash` whitens it.
+
+**The hit:** through the close, a wall face at Mario's body -- across the axis within WallThickness 0.5 + his damage radius 0.56 of the wall's plane,
+along the axis within the wall's half length, his feet under the wall's height -- or the half gap shut to his radius: `Mario.TakeShock()` (its own
+guards: not while invincible, hurt, dead, swimming) and MSD_SE_MA_DAMAGE_ELEC at him. Once per squeeze, and ONCE PER ATTACK with OneShockPerAttack (on):
+run aa shocked a standing Mario three times (the lock and grace are 1.5 s, the squeezes come 1.55 s apart), 3 HP for standing still -- too much for one
+move, so the later squeezes of an attack leave a shocked Mario alone (off = the game's own rule). The dodge: run out of the open ends -- 5 m from the
+centre in the 0.45 s warning plus the 0.75 s close; a 5-m wall is not jumped. `Cancel()` (King Boo hit through the attack) takes the walls away.
+Read-outs for the drives: State / Squeeze / Centre / Axis / Gap / HitThisSqueeze / WallAPoint / WallBPoint / WallIntensityShown / SqueezesDone /
+MeetBursts.
+
+**King Boo** (`SmsKingBooRematch.cs`): the attacks are picked by WEIGHT (LickWeight / SmashWeight / LightningWeight, 1 each; the doc's near-random; a
+hop first by RepositionChance; 164's SmashChance is gone). The Lightning move: where he stands, the laugh clip looped (LightningClip / LightningSe), the
+crown RED (LightningCrownColor (1, 0.12, 0.08)) with the same flash-then-quickening pulse as the smash through LightningTellSeconds 0.5, then the
+SmsGhostLightning about Mario (the walls' and squeezes' knobs live on King Boo under "The fight (166)" and are copied onto the node), a flash of the crown
+at each meet, LightningWatchSeconds 0.3 after the last, the crown dark, the wait and the gap. CanBeHit through it; a swung Bomb Boo cancels the walls.
+Signals LightningStarted, LightningSqueezed(hit) (the signal could not be named Lightning: a property of that name reads the live node). Read-outs
+LightningsMade / LightningHits / Lightning / LightningLaunched.
+
+**Drive 166** (`SmsKingBoo.Drive.cs`, deleted before the commit; run ab, 11 / 11): the red crown -- the flash to 1.8, the pulse to 1, the register (1,
+0.12, 0.08), the sparkles -- and the walls at 0.52 s (C3); 12.0 m apart, 0.00 m off Mario, a flat unit axis, no hit and the walls dim through the 0.45 s
+warning (C4); the gap shut at 15.6 m/s with the floor sparks (C5); the shock on a standing Mario, HP 8 -> 7, ma_shock's hurt (C6); three squeezes, the axis
+turned 60 deg, each re-centred within 0.00 m, 0.35 s between (the meet's 0.15 + the pause's 0.2) (C7); one shock in all, the lock 1.00 s, King Boo back
+in the wait with the crown dark and the node freed, three meet bursts (C8); a Mario who runs out of the open ends untouched by all three, 13.8 m from the
+last centre (C9); a hit through the attack cancelling the walls, the crown dark (C10); the end (C11). A windowed run (the shot drive, forced lightning)
+showed two tall curtains of blue-white bolts either side of Mario with cyan sparks at their feet, closing in; the bolts read more as vertical streaks
+than jagged forks. The .err: Godot's "2 ObjectDB instances leaked at exit" (the drive's references) as in 165.
+
+**Deviations, all knobs:** the walls' size, gap, speed and the warning are mine (the doc gives "fast" and "three"); OneShockPerAttack is a port-side
+mercy; the lightning is cyan-blue (the shock's own colours) under a RED crown, as the doc has it; no camera shake on the meet. Knobs: King Boo's "The
+fight (166)" (LightningOn, LightningCrownColor, LightningTellSeconds / WatchSeconds, the clip and voice, WallLength / WallHeight / WallGap / WallSpeed,
+SqueezeCount / WarnSeconds / SqueezePause / SqueezeTurnDeg, OneShockPerAttack) and the weights.
