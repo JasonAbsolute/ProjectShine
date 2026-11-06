@@ -34,6 +34,9 @@ public partial class SmsBodyOverlay : Node
 
     /// <summary>The fog's pulse: 30 ticks of the director's 120 Hz move tick = 0.25 s (65536 / 0x888 = 30 ticks a cycle).</summary>
     [Export] public float FogPeriodSeconds = 0.25f;
+    /// <summary>167: the fog held at one factor instead of the pulse (the rematch's frost: Mario tells it each tick while he is frozen), and that factor.</summary>
+    public bool SteadyFog;
+    [Export(PropertyHint.Range, "0,1,0.01")] public float SteadyFogFactor = 0.5f;
     [ExportGroup("Goop skin (pass 111)")]
     /// <summary>Mario's own pollution masks from ma_mdl1.bmd / ma_hnd2l.bmd (H_ma_polmask1_i4, H_ma_polmask_hand_i4): the intensity decides
     /// which texels goop first (dark) and last (bright). Assigned per surface by name: the hand surfaces take the hand mask.</summary>
@@ -348,7 +351,7 @@ public partial class SmsBodyOverlay : Node
             return;
         // SMS_AddDamageFogEffect: s = sin(moveTick x 0x888), the factor at his depth (700 - 300 s) / 1200
         float s = Mathf.Sin((float)(_clock / FogPeriodSeconds) * Mathf.Tau);
-        SetFogFactor(7f / 12f - 0.25f * s);
+        SetFogFactor(SteadyFog ? SteadyFogFactor : 7f / 12f - 0.25f * s);
     }
 
     private void SetFogFactor(float f)

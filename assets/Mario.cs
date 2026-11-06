@@ -11431,22 +11431,59 @@ public partial class Mario : CharacterBody3D
     /// (kickFruitEffect) is not baked. Returns false while immune.</summary>
     public bool SmsKickFreeze()
     {
-        if (_smsFreezeImmunityTicks > 0) return false;
+        if (_smsFreezeImmunityTicks > 0 || _smsFrostHold) return false;
         _smsFreezeTicks = SmsFreezeParams.KickFreezeFrames * SmsUnits.TicksPerFrame;
         return true;
     }
     private int _smsFreezeTicks, _smsFreezeImmunityTicks; private float _smsFreezeAccum;
     private static class SmsFreezeParams { public const int KickFreezeFrames = 2, NoFreezeFrames = 2; }   // mario.prm mKickFreezeTime / mNoFreezeTime (sms_shipped_params.json)
     public bool SmsFrozen => _smsFreezeTicks > 0;
-    /// <summary>MarioMain.cpp 31-38 / 96: the freeze counts down a tick a tick; when it runs out the immunity starts.</summary>
+    /// <summary>167: THE FROST -- the rematch's Ghost Breath (KINGBOO_REMATCH_gdoc.txt: "a hit freezes Mario for one second"; "nothing in Sunshine freezes, so
+    /// this is built from nothing"). The kick freeze's skip of his move (mFreezeTimer, MarioMain.cpp 96), held for <paramref name="seconds"/>: nothing
+    /// moves him (a Mario in the air hangs there), his POSE is held (the animation tree and the player paused), his body carries the frost fog (SmsFrostFog:
+    /// the damage fog's shader in an ice blue; SmsAfterMove), no HP, none of the hurt. Refused -- false -- while invincible, down or shocked, dead, in a
+    /// demo, talking, swimming, already frozen or within a thaw's immunity. A hit through it (SmsDamageExec, TakeShock) thaws him first. The ice about
+    /// him is the attacker's to draw (SmsIceBlock).</summary>
+    public bool SmsFreezeFor(float seconds)
+    {
+        if (!UseSmsPhysics || seconds <= 0f || _smsFreezeTicks > 0 || _smsFreezeImmunityTicks > 0 || _smsInvincibleTicks > 0 || _health <= 0) return false;
+        if (stateOfMario == MarioState.dead || stateOfMario == MarioState.hurt || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.talking || stateOfMario == MarioState.swimming) return false;
+        _smsFreezeTicks = Math.Max(1, Mathf.RoundToInt(seconds * SmsUnits.TicksPerSecond));
+        _smsFrostHold = true; _smsFrostSeconds = seconds; SmsFrostCount++;
+        if (animTree != null) { _smsFrostTreeMode = animTree.CallbackModeProcess; animTree.CallbackModeProcess = AnimationMixer.AnimationCallbackModeProcess.Manual; }   // the pose held
+        if (animPlayer != null) { _smsFrostPlayerSpeed = animPlayer.SpeedScale; animPlayer.SpeedScale = 0f; }                                              // a clip driven directly, too
+        velocity = Vector3.Zero;
+        if (SmsDebugPrint) GD.Print($"[SMS frost] FROZEN {seconds:F2} s ({_smsFreezeTicks} ticks) in {stateOfMario}{(IsOnFloor() ? "" : ", in the air")}; the tree {(animTree != null ? _smsFrostTreeMode.ToString() : "none")} paused");
+        return true;
+    }
+    private bool _smsFrostHold; private float _smsFrostSeconds, _smsFrostPlayerSpeed = 1f; private AnimationMixer.AnimationCallbackModeProcess _smsFrostTreeMode;
+    /// <summary>167: the frost fog's colour (an ice blue; framebuffer values as the damage pink is) and a thaw's immunity to another freeze (ticks).</summary>
+    public static readonly Color SmsFrostFog = new Color(0.55f, 0.85f, 1f);
+    public const int FrostImmunityTicks = 60;
+    /// <summary>167, for the ice and the drives: he is in the frost (not the kick's two-frame freeze), his pose is held by it, how many times he has been, the seconds left.</summary>
+    public bool SmsFrosted => _smsFrostHold && _smsFreezeTicks > 0;
+    public bool SmsFrostPoseHeld => _smsFrostHold && animTree != null && animTree.CallbackModeProcess == AnimationMixer.AnimationCallbackModeProcess.Manual;
+    public int SmsFrostCount { get; private set; }
+    public float SmsFrostLeft => _smsFrostHold ? _smsFreezeTicks / SmsUnits.TicksPerSecond : 0f;
+    /// <summary>MarioMain.cpp 31-38 / 96: the freeze counts down a tick a tick; when it runs out the immunity starts (167: a frost's end is the thaw).</summary>
     private void SmsFreezeTick(double delta)
     {
         int n = SmsUnits.TicksFor(delta, ref _smsFreezeAccum);
         for (int i = 0; i < n; i++)
         {
-            if (_smsFreezeTicks > 0) { if (--_smsFreezeTicks == 0) _smsFreezeImmunityTicks = SmsFreezeParams.NoFreezeFrames * SmsUnits.TicksPerFrame; }
+            if (_smsFreezeTicks > 0) { if (--_smsFreezeTicks == 0) { _smsFreezeImmunityTicks = SmsFreezeParams.NoFreezeFrames * SmsUnits.TicksPerFrame; if (_smsFrostHold) SmsThaw(); } }
             else if (_smsFreezeImmunityTicks > 0) _smsFreezeImmunityTicks--;
         }
+    }
+    /// <summary>167: the frost ends -- the tree and the player run again, FrostImmunityTicks of immunity to another freeze. Also what a hit through the frost does first.</summary>
+    private void SmsThaw()
+    {
+        if (!_smsFrostHold) return;
+        _smsFrostHold = false; _smsFreezeTicks = 0;
+        _smsFreezeImmunityTicks = Math.Max(_smsFreezeImmunityTicks, FrostImmunityTicks);
+        if (animTree != null && animTree.CallbackModeProcess == AnimationMixer.AnimationCallbackModeProcess.Manual) animTree.CallbackModeProcess = _smsFrostTreeMode;
+        if (animPlayer != null && animPlayer.SpeedScale == 0f) animPlayer.SpeedScale = _smsFrostPlayerSpeed;
+        if (SmsDebugPrint) GD.Print($"[SMS frost] THAWED after {_smsFrostSeconds:F2} s: {stateOfMario}, the tree {(animTree != null ? animTree.CallbackModeProcess.ToString() : "none")}, immune {FrostImmunityTicks} ticks");
     }
 
     /// <summary>findNearestTakeNPC (MarDirectorEvent.cpp 61): a liftable NPC (isNowCanTaken) in his isTakeSituation.</summary>
@@ -11785,6 +11822,7 @@ public partial class Mario : CharacterBody3D
         // and dmgenemycommon.prm gives no invincibility), but ours keep touching him through the fall.
         if (stateOfMario == MarioState.hurt)
             return;
+        if (_smsFrostHold) SmsThaw();   // 167: a hit through the frost breaks the ice -- the knockdown as ever
         if (stateOfMario == MarioState.swimming)
         {
             SmsSwimDamageExec(attackerPos, p); // SWIM_P_DAMAGE; air instead of HP under water
@@ -16465,6 +16503,7 @@ public partial class Mario : CharacterBody3D
             return;
         if (stateOfMario == MarioState.hurt)
             return; // port-side, as for the knockdowns: not while he is down or already shocked
+        if (_smsFrostHold) SmsThaw();   // 167: a shock through the frost breaks the ice
         SmsElectricDamageEnter("an electric hit");
     }
 
@@ -19913,8 +19952,9 @@ public partial class Mario : CharacterBody3D
         // addDamageFog() (MarioDraw.cpp 2184): the fog while mInvincibilityFrames > 0, OR while DIRTY on SLIP paint -- yellow-green (0x82, 0x96, 0x00)
         // while mStandingOnGraffitoTimer > 240, the damage pink (0xFF, 0x00, 0x80) below it (the HP tick comes at 360); never while talking
         bool smsSlipDirty = _smsDirty && _smsPollution == SmsPollution.Slip;
-        _smsBodyOverlay?.SetFogColor(smsSlipDirty && _smsFogTimer > SmsParams.Dirty.FogTimeYellow ? SmsBodyOverlay.GoopYellow : SmsBodyOverlay.DamagePink);
-        _smsBodyOverlay?.SetDamageFog((_smsInvincibleTicks > 0 || smsSlipDirty) && stateOfMario != MarioState.talking);
+        _smsBodyOverlay?.SetFogColor(_smsFrostHold ? SmsFrostFog : (smsSlipDirty && _smsFogTimer > SmsParams.Dirty.FogTimeYellow ? SmsBodyOverlay.GoopYellow : SmsBodyOverlay.DamagePink));   // 167: the frost's ice blue first
+        _smsBodyOverlay?.SetDamageFog((_smsInvincibleTicks > 0 || smsSlipDirty || _smsFrostHold) && stateOfMario != MarioState.talking);
+        if (_smsBodyOverlay != null) _smsBodyOverlay.SteadyFog = _smsFrostHold;   // 167: the frost holds the fog steady (no damage pulse)
         // addDirty() (MarioDraw.cpp 2139, every frame from MarioMain.cpp 136): mDirty into every body / hand material's konst alpha -- the goop
         // skin (pass 111). The goop texture: the STAGE's (H_ma_rak_dummy is swapped at load for the stage's one h_ma_rak.bti -- never per goop),
         // unless SmsSkinFromLayer (pass 113) hands him the layer's texture by pass 108's rule
