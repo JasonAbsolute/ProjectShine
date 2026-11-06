@@ -12,23 +12,25 @@ using System.Collections.Generic;
 /// window; the body leans into the dive (DiveTilt) and trails ghost wisps (TrailColor). It LANDS (the roulette's thud, the Boo crush, a camera shake --
 /// LandShake -- a ring of light racing out over the floor (RingColor, RingGrow, RingSeconds) and a burst of pale smoke (SmokeColor)): Mario within its
 /// body (BodyRadius, from the model's own width x ModelScale) takes the plain hit (Mario.TakeDamage, the common enemy profile) and it SPLITS -- gone in
-/// a flash and a squash, and WaveCount Boos (<see cref="SmsWaveBoo"/>, boo.glb at WaveBooScale) spread out from its footprint in a ring at WaveSpeed,
+/// a flash and a squash, and WaveCount Boos (<see cref="SmsWaveBoo"/>, the hotel Boo at WaveBooScale) spread out from its footprint in a ring at WaveSpeed,
 /// WaveHeight over the floor, for WaveSeconds, each the plain hit on a Mario it runs through, fading over their last WaveFadeSeconds into a puff each
-/// (the port's EnemyDisap burst, tinted) -- a jump clears the ring. The models: Boolossus.obj (Jaysonn's Downloads, run through Blender:
-/// models/Sms/Rematch/boolossus.glb, 1.07 m across at scale 1) and Teresa.dae (boo.glb, 2.5 m across) on GhostBoo.gdshader. 165: the Boos are SOLID
-/// WHITE (WaveBooOpacity 1, no vertex colours -- boo.glb's are dark blue, mean 0.1 / 0.12 / 0.16, and multiplied in under a 0.75 screen mix they read as
-/// the Bomb Boos' old purple); the Boolossus keeps the ghost's mix at Opacity. Signals: Landed(hitMario), Finished (the Boos are gone, the node frees
-/// itself).
+/// (the port's EnemyDisap burst, tinted) -- a jump clears the ring. The Boolossus model: Boolossus.obj (Jaysonn's Downloads, run through Blender:
+/// models/Sms/Rematch/boolossus.glb, 1.07 m across at scale 1, its face on +Z) on GhostBoo.gdshader (unshaded: the arena's violet ambient made it a
+/// lavender blob; a soft shade of its own, the ghost's mix at Opacity). The Boos: 165c, the port's OWN hotel Boo (models/Eniemes/Telesa/telesa.glb with
+/// its TelesaToon materials, the game's look; the doc's Galaxy Teresa.dae came out with its tongue strip wrapped over the top of the head -- its UVs run
+/// to u 3 for a GX mirror wrap the export lost -- and is dropped), playing telesa_wait, fading by the materials' `fade`. Signals: Landed(hitMario),
+/// Finished (the Boos are gone, the node frees itself).
 /// </summary>
 public partial class SmsBoolossus : Node3D
 {
     [ExportGroup("The look")]
     /// <summary>The model's size (1.07 m across at 1): 5.5 = about 6 m, Mario twice over; the ghost's screen mix; the body's brightness and rim.</summary>
     [Export(PropertyHint.Range, "0.5,12,0.1")] public float ModelScale = 5.5f;
-    [Export(PropertyHint.Range, "0.1,1,0.01")] public float Opacity = 0.75f;
+    [Export(PropertyHint.Range, "0.1,1,0.01")] public float Opacity = 0.9f;
     [Export] public float Lift = 1f, Glow = 0.5f;
-    /// <summary>The model's face is on its +Z side (off: on -Z). It faces along its dive, then the camera's side on the floor.</summary>
-    [Export] public bool FacesPlusZ = false;
+    /// <summary>The model's face is on its +Z side (Boolossus.obj: its eyes, teeth, tongue and cheeks all sit at +0.3..+0.4 z of the body's middle; off = on -Z).
+    /// It faces along its dive, then the camera's side on the floor.</summary>
+    [Export] public bool FacesPlusZ = true;
     /// <summary>The shadow on the floor under the target: its darkness and its size at the landing (x the body's radius).</summary>
     [Export(PropertyHint.Range, "0,1,0.05")] public float ShadowOpacity = 0.55f;
     [Export] public float ShadowScale = 1.1f;
@@ -52,23 +54,24 @@ public partial class SmsBoolossus : Node3D
     /// many puffs), the camera shake (x the hip drop's; 0 = none).</summary>
     [Export] public Color RingColor = new Color(0.75f, 0.85f, 1f, 0.9f);
     [Export] public float RingGrow = 3.5f, RingSeconds = 0.5f;
-    [Export] public Color SmokeColor = new Color(0.8f, 0.82f, 0.95f, 0.8f);
-    [Export(PropertyHint.Range, "0,80,1")] public int SmokeCount = 36;
+    [Export] public Color SmokeColor = new Color(0.8f, 0.82f, 0.95f, 0.5f);
+    [Export(PropertyHint.Range, "0,80,1")] public int SmokeCount = 24;
     [Export(PropertyHint.Range, "0,3,0.1")] public float LandShake = 1f;
     /// <summary>The Boos' puffs and the appear puff: the port's enemy-vanish burst, tinted this colour.</summary>
     [Export] public Color PuffTint = new Color(0.7f, 0.85f, 1f, 1f);
     [Export] public PackedScene PuffScene;
     [ExportGroup("The wave")]
-    /// <summary>The Boos it splits into: how many, their size (boo.glb is 2.5 m across at 1), how fast they spread, how long they live, how high over the
-    /// floor they ride (a jump clears them), their fade at the end, and where the ring starts (0 = the body's radius).</summary>
+    /// <summary>The Boos it splits into: how many, their size (1 = the hotel Boo's own, 1.8 m across; BooModelScale is the glb's game units to metres), how
+    /// fast they spread, how long they live, how high over the floor they ride (a jump clears them), their fade at the end, and where the ring starts (0 =
+    /// the body's radius).</summary>
     [Export(PropertyHint.Range, "1,40,1")] public int WaveCount = 15;
-    [Export(PropertyHint.Range, "0.1,2,0.05")] public float WaveBooScale = 0.55f;
+    [Export(PropertyHint.Range, "0.1,3,0.05")] public float WaveBooScale = 1f;
+    [Export] public float BooModelScale = 0.013434f;
     [Export] public float WaveSpeed = 9f, WaveSeconds = 1f, WaveHeight = 0.9f, WaveFadeSeconds = 0.25f, WaveStartRadius = 0f;
     [Export] public bool BooFacesPlusZ = true;
-    /// <summary>165: the Boos' look -- solid (1) white; their vertex colours (dark blue in boo.glb) left out unless BooVertexColors.</summary>
+    /// <summary>165: the Boos' solidity (the materials' fade; 1 = the game's Boo as it is) and their idle clip (telesa_wait; "" = none).</summary>
     [Export(PropertyHint.Range, "0.1,1,0.01")] public float WaveBooOpacity = 1f;
-    [Export] public bool BooVertexColors = false;
-    [Export] public float BooLift = 1f;
+    [Export] public string BooClip = "telesa_wait";
     /// <summary>The Boos' own hit radius (0 = the model's half width x WaveBooScale, 0.7 m; 1.1 reaches a little past the ghost's skin, so fifteen of them
     /// close the ring out to about 8 m -- beyond that the wave has gaps a Mario can stand in).</summary>
     [Export] public float BooRadius = 1.1f;
@@ -153,7 +156,7 @@ public partial class SmsBoolossus : Node3D
         _shadow.MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0f, 0f, 0f, ShadowOpacity), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, RenderPriority = 1 };
         AddChild(_shadow);
         if (TrailColor.A > 0.01f) { _trail = SmsSmashFx.Trail(TrailColor, Mathf.Max(0.6f, Radius * 0.55f), Radius * 0.6f); AddChild(_trail); }
-        BooScene ??= ResourceLoader.Exists("res://models/Sms/Rematch/boo.glb") ? GD.Load<PackedScene>("res://models/Sms/Rematch/boo.glb") : null;
+        BooScene ??= ResourceLoader.Exists("res://models/Eniemes/Telesa/telesa.glb") ? GD.Load<PackedScene>("res://models/Eniemes/Telesa/telesa.glb") : null;
         PuffScene ??= ResourceLoader.Exists("res://assets/Sms/Fx/EnemyDisap.tscn") ? GD.Load<PackedScene>("res://assets/Sms/Fx/EnemyDisap.tscn") : null;
         _sound = SmsActorSound.Attach(this);
         if (_model != null) _model.Visible = false;
@@ -303,9 +306,10 @@ public partial class SmsBoolossus : Node3D
     internal void BooHit() { _waveHits++; }
 }
 
-/// <summary>164: one Boo of the Boolossus's wave -- boo.glb at the owner's WaveBooScale on GhostBoo.gdshader (165: solid white, no vertex colours), riding
-/// outward along its line at WaveSpeed, WaveHeight over the floor, for WaveSeconds, fading over the last WaveFadeSeconds into a puff, then gone. Mario in
-/// its body (its own radius + his damage cylinder) takes the plain hit, once per Boo.</summary>
+/// <summary>164: one Boo of the Boolossus's wave -- 165c: the port's hotel Boo (telesa.glb at BooModelScale x WaveBooScale, its TelesaToon materials copied
+/// per Boo and faded by `fade`, its wait clip playing), riding outward along its line at WaveSpeed, WaveHeight over the floor, for WaveSeconds, fading
+/// over the last WaveFadeSeconds into a puff, then gone. Mario in its body (its own radius + his damage cylinder) takes the plain hit, once per Boo.
+/// Another scene as BooScene (StandardMaterial3D surfaces) gets GhostBoo.gdshader instead.</summary>
 public partial class SmsWaveBoo : Node3D
 {
     public SmsBoolossus Maker;
@@ -314,21 +318,24 @@ public partial class SmsWaveBoo : Node3D
     public bool Hit { get; private set; }
     public float Radius { get; private set; } = 0.7f;
     public float OpacityShown { get; private set; }
-    public bool UsesVertexColor { get; private set; }
+    /// <summary>The materials are the hotel Boo's own (TelesaToon, faded by `fade`), else GhostBoo copies.</summary>
+    public bool UsesTelesaMaterials { get; private set; }
+    public bool ClipPlaying => _anim != null && _anim.IsPlaying();
     public int MaterialsMade => _mats.Count;
+    private AnimationPlayer _anim;
     private Node3D _model; private readonly List<ShaderMaterial> _mats = new(); private Vector3 _from; private float _halfHeight = 0.6f; private bool _puffed;
 
     public void Launch(PackedScene scene, Vector3 at, Vector3 dir, SmsBoolossus owner)
     {
         Maker = owner; Dir = dir; _from = at; GlobalPosition = at;
         SmsBoolossus.Boos.Add(this);
-        float k = owner.WaveBooScale;
-        UsesVertexColor = owner.BooVertexColors; OpacityShown = owner.WaveBooOpacity;
+        float k = owner.BooModelScale * owner.WaveBooScale;
+        OpacityShown = owner.WaveBooOpacity;
         if (scene != null)
         {
             _model = scene.Instantiate<Node3D>(); _model.Name = "Model"; AddChild(_model); _model.Scale = Vector3.One * k;
             var shader = ResourceLoader.Exists("res://assets/Sms/Rematch/GhostBoo.gdshader") ? GD.Load<Shader>("res://assets/Sms/Rematch/GhostBoo.gdshader") : null;
-            var aabb = new Aabb(); bool first = true;
+            var aabb = new Aabb(); bool first = true; int telesa = 0;
             foreach (Node n in _model.FindChildren("*", "MeshInstance3D", true, false))
             {
                 var mi = (MeshInstance3D)n;
@@ -336,14 +343,24 @@ public partial class SmsWaveBoo : Node3D
                 Aabb a = mi.Transform * mi.GetAabb(); aabb = first ? a : aabb.Merge(a); first = false;
                 for (int s = 0; s < mi.Mesh.GetSurfaceCount(); s++)
                 {
-                    if (shader == null) break;
+                    if (mi.GetActiveMaterial(s) is ShaderMaterial own)                   // the hotel Boo's TelesaToon materials: a copy per Boo, faded by `fade`
+                    {
+                        var copy = (ShaderMaterial)own.Duplicate();
+                        copy.SetShaderParameter("fade", owner.WaveBooOpacity);
+                        mi.SetSurfaceOverrideMaterial(s, copy); _mats.Add(copy); telesa++;
+                        continue;
+                    }
+                    if (shader == null) continue;                                         // another scene: the ghost shader over its albedo texture
                     var sm = new ShaderMaterial { Shader = shader };
                     if (mi.GetActiveMaterial(s) is BaseMaterial3D bm && bm.AlbedoTexture != null) sm.SetShaderParameter("base_tex", bm.AlbedoTexture);
-                    sm.SetShaderParameter("use_vertex_color", owner.BooVertexColors); sm.SetShaderParameter("lift", owner.BooLift); sm.SetShaderParameter("ambient", 0.35f); sm.SetShaderParameter("glow", owner.Glow); sm.SetShaderParameter("opacity", owner.WaveBooOpacity);
+                    sm.SetShaderParameter("use_vertex_color", false); sm.SetShaderParameter("lift", 1f); sm.SetShaderParameter("glow", owner.Glow); sm.SetShaderParameter("opacity", owner.WaveBooOpacity);
                     mi.SetSurfaceOverrideMaterial(s, sm); _mats.Add(sm);
                 }
             }
+            UsesTelesaMaterials = telesa > 0 && telesa == _mats.Count;
             if (!first) { Radius = Mathf.Max(aabb.Size.X, aabb.Size.Z) * 0.5f * k; _halfHeight = aabb.Size.Y * 0.5f * k; }
+            foreach (Node n in _model.FindChildren("*", "AnimationPlayer", true, false)) { _anim = n as AnimationPlayer; if (_anim != null) break; }
+            if (_anim != null && !string.IsNullOrEmpty(owner.BooClip) && _anim.HasAnimation(owner.BooClip)) { _anim.GetAnimation(owner.BooClip).LoopMode = Animation.LoopModeEnum.Linear; _anim.Play(owner.BooClip); _anim.Seek(GD.Randf() * (float)_anim.GetAnimation(owner.BooClip).Length, true); }
         }
         if (owner.BooRadius > 0f) Radius = owner.BooRadius;
         float yaw = MathF.Atan2(dir.X, dir.Z) + (owner.BooFacesPlusZ ? 0f : MathF.PI);
@@ -360,7 +377,7 @@ public partial class SmsWaveBoo : Node3D
         {
             float k = Mathf.Clamp(left / Mathf.Max(0.01f, Maker.WaveFadeSeconds), 0f, 1f);
             OpacityShown = Maker.WaveBooOpacity * k;
-            foreach (var m in _mats) { m.SetShaderParameter("opacity", OpacityShown); m.SetShaderParameter("flash", (1f - k) * 0.6f); }
+            foreach (var m in _mats) { if (UsesTelesaMaterials) m.SetShaderParameter("fade", OpacityShown); else { m.SetShaderParameter("opacity", OpacityShown); m.SetShaderParameter("flash", (1f - k) * 0.6f); } }
             if (!_puffed && Maker.BooVanishPuff && Maker.PuffScene != null) { _puffed = true; SmsSmashFx.Puff(Maker.PuffScene, GetParent(), GlobalPosition, Radius * 1.3f, Maker.PuffTint); }
         }
         if (!Hit)
@@ -387,11 +404,11 @@ public static class SmsSmashFx
 {
     private const string Tex = "res://assets/Sms/Fx/tex/";
     private static Texture2D Load(string name) => ResourceLoader.Exists(Tex + name) ? GD.Load<Texture2D>(Tex + name) : null;
-    private static StandardMaterial3D Additive(Texture2D tex, Color color, bool particles)
+    private static StandardMaterial3D Additive(Texture2D tex, Color color, bool particles, bool additive = true)
     {
         var m = new StandardMaterial3D
         {
-            Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
+            Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = additive ? BaseMaterial3D.BlendModeEnum.Add : BaseMaterial3D.BlendModeEnum.Mix, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded,
             CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, AlbedoColor = color, AlbedoTexture = tex, VertexColorUseAsAlbedo = particles,
             BillboardMode = particles ? BaseMaterial3D.BillboardModeEnum.Particles : BaseMaterial3D.BillboardModeEnum.Disabled
         };
@@ -432,8 +449,8 @@ public static class SmsSmashFx
         return ring;
     }
 
-    /// <summary>The landing's smoke: <paramref name="count"/> pale puffs bursting out along the floor from the body's edge, braking, rising a little; a one-shot
-    /// that frees itself when its puffs are gone.</summary>
+    /// <summary>The landing's smoke: <paramref name="count"/> pale puffs (a mix blend, not additive) bursting out along the floor from the body's edge, braking,
+    /// rising a little; a one-shot that frees itself when its puffs are gone.</summary>
     public static GpuParticles3D Smoke(Node parent, Vector3 at, float radius, int count, Color color)
     {
         var pm = new ParticleProcessMaterial
@@ -446,7 +463,7 @@ public static class SmsSmashFx
         var p = new GpuParticles3D
         {
             Name = "SmashSmoke", Amount = count, Lifetime = 0.9, OneShot = true, Explosiveness = 0.95f, Emitting = false, LocalCoords = false, FixedFps = 60, ProcessMaterial = pm,
-            DrawPass1 = new QuadMesh { Size = Vector2.One * Mathf.Max(1.2f, radius * 0.9f), Material = Additive(Load("kemuball3_raw.png"), color, true) },
+            DrawPass1 = new QuadMesh { Size = Vector2.One * Mathf.Max(1.2f, radius * 0.9f), Material = Additive(Load("kemuball3_raw.png"), color, true, false) },   // a mix blend: additive puffs piled up to a white blot
             VisibilityAabb = new Aabb(new Vector3(-30f, -10f, -30f), new Vector3(60f, 20f, 60f))
         };
         parent.AddChild(p);

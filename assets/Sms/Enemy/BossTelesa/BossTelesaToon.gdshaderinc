@@ -8,7 +8,8 @@ uniform vec3 tint = vec3(1.0);                              // K1 = unk348: the 
 uniform float mask_k : hint_range(0.0, 1.0) = 0.0;         // K2_A: the polmask threshold the brk animates (0 = all eye sheet / white)
 uniform sampler2D env_tex : filter_linear, repeat_disable;  // N_btelesa_env2: the crown's sphere map
 uniform vec3 crown_c0 = vec3(1.0, 1.0, 0.0);                // _mat_crown's TEVREG0 (255, 255, 0)
-uniform vec3 crown_glow = vec3(1.0);                        // SMS 165 (the rematch): the crown lit the attack's colour, added x crown_glow_k (0 = the game's crown)
+uniform vec3 crown_glow = vec3(1.0);                        // SMS 165 (the rematch): the crown SHINING the attack's colour x crown_glow_k (0 = the game's crown): the sphere
+                                                            // map's highlights sliding over it and a rim at its edges, in the colour; over 1 = the activation flash
 uniform float crown_glow_k : hint_range(0.0, 2.0) = 0.0;
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear, repeat_disable;   // H_ma_rak_dummy = TScreenTexture
 uniform float screen_gain = 1.0;                            // DEVIATION knob: x the picture behind him in his mix (1 = the game's copy as is)
@@ -38,7 +39,11 @@ void fragment() {
 		vec3 s1 = clamp((crown_c0 + mix(toon, v_lit0, 0.375) - 0.5) * 0.5, 0.0, 1.0);        // stage 1
 		vec3 s2 = clamp(s1 * t, 0.0, 1.0);                                                    // stage 2: x the sheet
 		vec2 env_uv = v_nrm_view.xy * 0.5 + 0.5;                                              // texgen NRM: the sphere map
-		him = clamp(s2 + 0.5 * texture(env_tex, env_uv).rgb + crown_glow * crown_glow_k, 0.0, 1.0);   // stage 3: + HALF x env (+ the 165 glow)
+		vec3 env = texture(env_tex, env_uv).rgb;
+		vec2 sweep = env_uv + vec2(sin(TIME * 7.3), cos(TIME * 5.1)) * 0.22 * min(crown_glow_k, 1.0);         // 165: the sheen slides while it shines
+		float rim = pow(1.0 - clamp(abs(v_nrm_view.z), 0.0, 1.0), 2.0);
+		vec3 shine = crown_glow * (texture(env_tex, sweep).rgb * 2.2 + rim * 1.3 + 0.3) * crown_glow_k;
+		him = clamp(s2 + 0.5 * env + shine, 0.0, 1.0);                                      // stage 3: + HALF x env (+ the 165 shine)
 	} else {
 		vec3 s1 = clamp(0.625 + mix(toon, v_lit0, 0.625) - 0.5, 0.0, 1.0);                   // stage 1
 		him = clamp(t + mix(s1, v_spec, 0.625) - 0.5, 0.0, 1.0);                              // stage 2: the sheet + mix(shade, glint, 5/8) - 1/2

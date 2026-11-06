@@ -30,10 +30,11 @@ using System.Linq;
 /// Pass 164: THE BOOLOSSUS SMASH (the doc's attack 2: "Crown glows white. A Boolossus falls from above Mario and tries to slam down on him. On landing it
 /// splits into 15 Boos that spread out as a shockwave, then vanish after one second"). A move is now one of three (the doc's near-random pick):
 /// a hop to another spot (RepositionChance), else an attack -- a SMASH by SmashChance, else the lick. The smash is made where he stands: the laugh clip
-/// (SmashClip, the second laugh voice) with his CROWN GLOWING the attack's colour (the doc: white for the smash; 165, Jaysonn: "king boo's crown should
-/// glow the color listed in the doc to show that's the attack he's using") -- a light at the crown joint (CrownGlowSize, an additive quad of the port's
-/// radial gradient), the crown shader's own glow term (crown_glow / crown_glow_k) and its colour register, pulsing at CrownPulseHz through
-/// SmashTellSeconds, the tell, then held -- then the Boolossi: 165, SmashCount of them (three), SmashStagger apart, each the Boolossus scene (SmashScene:
+/// (SmashClip, the second laugh voice) with his CROWN SHINING the attack's colour (the doc: white for the smash; 165, Jaysonn: "king boo's crown should
+/// glow the color listed in the doc to show that's the attack he's using ... a shiny glow, not a light-bulb glow") -- the crown shader's shine
+/// (crown_glow / crown_glow_k: the sphere map's highlights sliding over it and a rim, in the colour), its colour register, SPARKLES at the crown (the
+/// twinkle stars in the colour, CrownSparkles) and a faint halo (CrownGlowSize), all flashing up at the activation (CrownFlashSeconds) and then pulsing,
+/// quicker and quicker, through SmashTellSeconds, the tell, then held -- then the Boolossi: 165, SmashCount of them (three), SmashStagger apart, each the Boolossus scene (SmashScene:
 /// <see cref="SmsBoolossus"/>, its own knobs) DIVING in at Mario from its own direction (SmashSpreadDeg apart about a random first; from where King
 /// Boo stands when SmashFromKingBoo) and running on its own (the dive, the slam, the wave of Boos); he watches SmashWatchSeconds past the last, the
 /// crown dark again, and the wait and the gap run again. A swung Bomb Boo hits him through the tell (the smash is called off; Boolossi already out
@@ -123,12 +124,19 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public string SmashClip = "btelesa_laugh";
     [Export] public string SmashSe = "MSD_SE_BS_TELESA_V_LAUGH2";
     /// <summary>165: how many Boolossi a smash makes, how far apart in time, and their approach directions (the first at random, the rest this many
-    /// degrees on; SmashFromKingBoo: the first from where he stands). The crown's light: its size (metres across; 0 = the shader's glow alone) and
-    /// strength.</summary>
+    /// degrees on; SmashFromKingBoo: the first from where he stands).</summary>
     [Export(PropertyHint.Range, "1,6,1")] public int SmashCount = 3;
     [Export] public float SmashStagger = 0.5f, SmashSpreadDeg = 120f;
     [Export] public bool SmashFromKingBoo = true;
-    [Export] public float CrownGlowSize = 3.2f, CrownGlowStrength = 1.2f;
+    /// <summary>The crown's SHINE (165c): the activation flash (this long at white-hot; again at each Boolossus's launch), the pulse quickening from
+    /// CrownPulseHz to this many times it by the end of the tell, the sparkles (how many; 0 = none) rising out of the crown this far over its joint, and a
+    /// halo quad (metres across; 0 = none -- it read as a bulb) with its strength. The crown goes solid while it shines (its ghost mix kept it dim).</summary>
+    [Export] public float CrownFlashSeconds = 0.15f, CrownPulseQuicken = 2f;
+    /// <summary>How bright the crown's shine is (x the shader's term; 1 = as tuned from the screenshots: a bright white-gold at the pulse's peak, white at the flash).</summary>
+    [Export(PropertyHint.Range, "0,3,0.05")] public float CrownShine = 1f;
+    [Export(PropertyHint.Range, "0,64,1")] public int CrownSparkles = 36;
+    [Export] public float CrownFxLift = 1.2f;
+    [Export] public float CrownGlowSize = 0f, CrownGlowStrength = 0.35f;
     [ExportGroup("")]
     [Export] public bool DebugPrint;
 
@@ -180,6 +188,8 @@ public partial class SmsKingBooRematch : Node3D
     public float CrownGlowK => _crownGlowK;
     public Color CrownGlowColor => _crownGlowColor;
     public bool CrownGlowShown => _crownGlow != null && _crownGlow.Visible;
+    public bool CrownSparklesOn => _crownSpark != null && _crownSpark.Emitting;
+    public float CrownShineK => _crownShineK;
     public int SmashLaunchedCount => _smashLaunchedCount;
     public Vector3 LastApproachDir => _lastApproach;
     public Vector3 LastSpot { get; private set; }
@@ -214,7 +224,10 @@ public partial class SmsKingBooRematch : Node3D
     private Node3D _model; private AnimationPlayer _anim; private Skeleton3D _skel; private int _bBody = -1;
     private readonly List<ShaderMaterial> _mats = new(); private ShaderMaterial _bodyMat, _crownMat; private Vector3 _crownRest = new(1f, 1f, 0f), _crownNow = new(1f, 1f, 0f);
     private SmsBoolossus _boolossus; private float _smashT; private bool _smashLaunched, _smashClipEnded; private int _smashLaunchedCount, _bCrown = -1; private float _smashNextAt, _smashBaseAngle; private Vector3 _lastApproach;
-    private MeshInstance3D _crownGlow; private StandardMaterial3D _crownGlowMat; private float _crownGlowK; private Color _crownGlowColor = new(1f, 1f, 1f);
+    private MeshInstance3D _crownGlow; private StandardMaterial3D _crownGlowMat; private float _crownGlowK, _crownShineK, _pulsePhase; private Color _crownGlowColor = new(1f, 1f, 1f);
+    private GpuParticles3D _crownSpark; private ParticleProcessMaterial _crownSparkMat; private float _crownFlashT;
+    /// <summary>Where the crown's sparkles and halo sit: the crown joint lifted CrownFxLift into the crown.</summary>
+    public Vector3 CrownFxPoint => CrownPoint + Vector3.Up * CrownFxLift;
     private GpuParticles3D _chika; private Node3D _glow; private SmsActorSound _sound; private SmsTongueStretch _tongue;
     private Mario _mario; private float _yaw, _hoverT, _blinkT; private int _eyeNow = -1; private Vector3 _home; private bool _laughSounded;
     private float _hurtT, _hurtLen, _hurtYaw0; private bool _flashOn;
@@ -271,6 +284,15 @@ public partial class SmsKingBooRematch : Node3D
             };
             _crownGlow = new MeshInstance3D { Name = "CrownGlowFx", TopLevel = true, Visible = false, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Mesh = new QuadMesh { Size = Vector2.One * CrownGlowSize }, MaterialOverride = _crownGlowMat };
             AddChild(_crownGlow);
+        }
+        if (!Engine.IsEditorHint() && CrownSparkles > 0 && _chika != null && _chika.ProcessMaterial is ParticleProcessMaterial chikaMat)   // 165c: the sparkles -- the twinkle stars, smaller, rising off the crown, in the colour
+        {
+            _crownSpark = (GpuParticles3D)_chika.Duplicate();
+            _crownSpark.Name = "CrownSparkFx"; _crownSpark.TopLevel = true; _crownSpark.Visible = false; _crownSpark.Emitting = false; _crownSpark.Amount = CrownSparkles; _crownSpark.Lifetime = 0.55; _crownSpark.OneShot = false;
+            _crownSparkMat = (ParticleProcessMaterial)chikaMat.Duplicate();
+            _crownSparkMat.EmissionSphereRadius = 1.5f; _crownSparkMat.ScaleMin = 0.4f; _crownSparkMat.ScaleMax = 0.95f; _crownSparkMat.Direction = new Vector3(0f, 1f, 0f); _crownSparkMat.Spread = 70f; _crownSparkMat.InitialVelocityMin = 1.5f; _crownSparkMat.InitialVelocityMax = 4f; _crownSparkMat.Gravity = new Vector3(0f, 2f, 0f);
+            _crownSpark.ProcessMaterial = _crownSparkMat;
+            AddChild(_crownSpark);
         }
         _opacitySolid = GhostOpacity;
         foreach (var m in _mats) { m.SetShaderParameter("tint", new Vector3(1f, 1f, 1f)); m.SetShaderParameter("mask_k", 0f); }
@@ -424,18 +446,26 @@ public partial class SmsKingBooRematch : Node3D
     private void AbortLick() { _lickStage = -1; _lickClipEnded = false; }
     private void AbortSmash() { SetCrownGlow(_crownGlowColor, 0f); _smashClipEnded = false; }
     private void SetCrown(Vector3 c) { _crownNow = c; _crownMat?.SetShaderParameter("crown_c0", c); }
-    /// <summary>165: the crown GLOWS <paramref name="color"/> by <paramref name="k"/> (0 = its own yellow, dark): the light at the crown joint, the shader's glow
-    /// term, the colour register toward the colour.</summary>
+    /// <summary>165: the crown SHINES <paramref name="color"/> by <paramref name="k"/> (0 = its own yellow, dark; over 1 = the activation flash): the shader's
+    /// shine term, the colour register toward the colour, the sparkles, the faint halo.</summary>
     private void SetCrownGlow(Color color, float k)
     {
-        _crownGlowColor = color; _crownGlowK = Mathf.Clamp(k, 0f, 1f);
+        _crownGlowColor = color; _crownShineK = Mathf.Clamp(k, 0f, 2f); _crownGlowK = Mathf.Min(_crownShineK, 1f);
         var c = new Vector3(color.R, color.G, color.B);
         SetCrown(_crownRest.Lerp(c, _crownGlowK));
-        _crownMat?.SetShaderParameter("crown_glow", c); _crownMat?.SetShaderParameter("crown_glow_k", _crownGlowK * 0.9f);
+        _crownMat?.SetShaderParameter("crown_glow", c); _crownMat?.SetShaderParameter("crown_glow_k", _crownShineK * CrownShine);
+        _crownMat?.SetShaderParameter("opacity", Mathf.Lerp(_opacitySolid, 1f, _crownGlowK));                 // solid while it shines
+        bool on = _crownGlowK > 0.02f && State != Phase.Hidden && State != Phase.Gone;
         if (_crownGlow != null)
         {
-            _crownGlow.Visible = _crownGlowK > 0.02f && State != Phase.Hidden && State != Phase.Gone;
+            _crownGlow.Visible = on;
             if (_crownGlowMat != null) _crownGlowMat.AlbedoColor = new Color(color.R, color.G, color.B, Mathf.Clamp(_crownGlowK * CrownGlowStrength, 0f, 1f));
+        }
+        if (_crownSpark != null)
+        {
+            if (on && !_crownSpark.Emitting) { _crownSpark.GlobalPosition = CrownFxPoint; _crownSpark.Restart(); }
+            _crownSpark.Visible = on; _crownSpark.Emitting = on;
+            if (_crownSparkMat != null) _crownSparkMat.Color = new Color(color.R, color.G, color.B, 1f);
         }
     }
     /// <summary>jnt_crown's place in the world (the crown's light sits there), else a little over the body joint.</summary>
@@ -480,7 +510,7 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>164: the smash, where he stands: the laugh clip and its voice, the crown pulsing white through the tell, then the Boolossus over Mario.</summary>
     private void BeginSmash()
     {
-        State = Phase.Smash; _smashT = 0f; _smashLaunched = false; _smashClipEnded = false; _smashLaunchedCount = 0; _smashNextAt = SmashTellSeconds; MovesMade++; SmashesMade++; Position = _home;
+        State = Phase.Smash; _smashT = 0f; _smashLaunched = false; _smashClipEnded = false; _smashLaunchedCount = 0; _smashNextAt = SmashTellSeconds; _pulsePhase = 0f; _crownFlashT = 0f; MovesMade++; SmashesMade++; Position = _home;
         var m0 = M();
         _smashBaseAngle = SmashFromKingBoo && m0 != null ? MathF.Atan2(GlobalPosition.X - m0.GlobalPosition.X, GlobalPosition.Z - m0.GlobalPosition.Z) : (float)(_rng.NextDouble() * Math.Tau);
         PlayClip(SmashClip);
@@ -493,13 +523,17 @@ public partial class SmsKingBooRematch : Node3D
     {
         _smashT += dt;
         FaceTick(dt);
+        // the crown: the activation FLASH (and one at each launch), else the shine pulsing -- quicker and quicker through the tell, then at its quickest
+        _crownFlashT -= dt;
+        if (_smashT < CrownFlashSeconds || _crownFlashT > 0f) SetCrownGlow(SmashCrownColor, 1.8f);
+        else
+        {
+            float hz = CrownPulseHz * Mathf.Lerp(1f, Mathf.Max(1f, CrownPulseQuicken), Mathf.Clamp(_smashT / Mathf.Max(0.1f, SmashTellSeconds), 0f, 1f));
+            _pulsePhase += dt * hz * MathF.Tau;
+            SetCrownGlow(SmashCrownColor, Mathf.Lerp(0.5f, 1f, 0.5f + 0.5f * MathF.Sin(_pulsePhase - MathF.PI / 2f)));
+        }
         if (_smashLaunchedCount < SmashCount)
         {
-            if (!_smashLaunched)                                      // the tell: the crown pulsing up to the colour
-            {
-                float k = 0.5f + 0.5f * MathF.Sin(_smashT * MathF.Tau * CrownPulseHz - MathF.PI / 2f);
-                SetCrownGlow(SmashCrownColor, Mathf.Lerp(0.35f, 1f, k) * Mathf.Clamp(_smashT / 0.15f, 0f, 1f));
-            }
             if (_smashT >= _smashNextAt)
             {
                 var m = M();
@@ -513,7 +547,7 @@ public partial class SmsKingBooRematch : Node3D
                 b.Landed += hit => { if (hit) SmashHits++; if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: a Boolossus has landed -- {(hit ? "ON Mario" : "a miss")}"); EmitSignal(SignalName.Smashed, hit); };
                 b.Begin(m, fy, _lastApproach);
                 _boolossus = b; _smashLaunched = true; _smashLaunchedCount++; _smashNextAt += SmashStagger;
-                SetCrownGlow(SmashCrownColor, 1f);
+                _crownFlashT = CrownFlashSeconds * 0.7f;
                 if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: Boolossus {_smashLaunchedCount} of {SmashCount} dives in from {_lastApproach} at Mario {m.GlobalPosition}");
             }
         }
@@ -730,7 +764,8 @@ public partial class SmsKingBooRematch : Node3D
         bool show = State != Phase.Hidden && State != Phase.Gone && _model != null && _model.Visible && _opacityShown > 0.02f;
         Vector3 at = BodyPoint;
         if (_chika != null) { bool on = show && Twinkle; _chika.Visible = on; _chika.Emitting = on; if (on) _chika.GlobalPosition = at; }
-        if (_crownGlow != null && _crownGlow.Visible) { if (!show) _crownGlow.Visible = false; else _crownGlow.GlobalPosition = CrownPoint; }
+        if (_crownGlow != null && _crownGlow.Visible) { if (!show) _crownGlow.Visible = false; else _crownGlow.GlobalPosition = CrownFxPoint; }
+        if (_crownSpark != null && _crownSpark.Visible) { if (!show) { _crownSpark.Visible = false; _crownSpark.Emitting = false; } else _crownSpark.GlobalPosition = CrownFxPoint; }
         if (_glow != null)
         {
             _glow.Visible = show && Glow > 0f;
