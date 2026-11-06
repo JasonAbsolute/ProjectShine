@@ -11440,7 +11440,9 @@ public partial class Mario : CharacterBody3D
     public bool SmsFrozen => _smsFreezeTicks > 0;
     /// <summary>167: THE FROST -- the rematch's Ghost Breath (KINGBOO_REMATCH_gdoc.txt: "a hit freezes Mario for one second"; "nothing in Sunshine freezes, so
     /// this is built from nothing"). The kick freeze's skip of his move (mFreezeTimer, MarioMain.cpp 96), held for <paramref name="seconds"/>: nothing
-    /// moves him (a Mario in the air hangs there), his POSE is held (the animation tree and the player paused), his body carries the frost fog (SmsFrostFog:
+    /// moves him (a Mario in the air hangs there), his POSE is a frame of the SHOCK clip (171, Jaysonn: "use a frame from mario getting shocked for the
+    /// freeze" -- SmsFrostPoseClip at SmsFrostPoseAt of its length, played on the player and paused there, the hurt eyes; the animation tree paused
+    /// behind it; "" = his own pose held), his body carries the frost fog (SmsFrostFog:
     /// the damage fog's shader in an ice blue; SmsAfterMove), no HP, none of the hurt. Refused -- false -- while invincible, down or shocked, dead, in a
     /// demo, talking, swimming, already frozen or within a thaw's immunity. A hit through it (SmsDamageExec, TakeShock) thaws him first. The ice about
     /// him is the attacker's to draw (SmsIceBlock).</summary>
@@ -11450,13 +11452,33 @@ public partial class Mario : CharacterBody3D
         if (stateOfMario == MarioState.dead || stateOfMario == MarioState.hurt || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.talking || stateOfMario == MarioState.swimming) return false;
         _smsFreezeTicks = Math.Max(1, Mathf.RoundToInt(seconds * SmsUnits.TicksPerSecond));
         _smsFrostHold = true; _smsFrostSeconds = seconds; SmsFrostCount++;
-        if (animTree != null) { _smsFrostTreeMode = animTree.CallbackModeProcess; animTree.CallbackModeProcess = AnimationMixer.AnimationCallbackModeProcess.Manual; }   // the pose held
-        if (animPlayer != null) { _smsFrostPlayerSpeed = animPlayer.SpeedScale; animPlayer.SpeedScale = 0f; }                                              // a clip driven directly, too
+        if (animTree != null) { _smsFrostTreeMode = animTree.CallbackModeProcess; animTree.CallbackModeProcess = AnimationMixer.AnimationCallbackModeProcess.Manual; }   // the tree paused
+        if (animPlayer != null)
+        {
+            _smsFrostPlayerSpeed = animPlayer.SpeedScale;
+            if (!string.IsNullOrEmpty(SmsFrostPoseClip) && animPlayer.HasAnimation(SmsFrostPoseClip))                                                         // 171: the shock's frame
+            {
+                animPlayer.SpeedScale = 1f;
+                animPlayer.Play(SmsFrostPoseClip);
+                animPlayer.Seek(Mathf.Clamp(SmsFrostPoseAt, 0f, 0.99f) * animPlayer.CurrentAnimationLength, true);
+                _smsFrostClip = SmsFrostPoseClip;
+                SetEyeTexture(hurtEyeTexture ?? sleepingEyeTexture);                                                                                      // ma_shock_tx: the eyes squeezed shut
+            }
+            animPlayer.SpeedScale = 0f;                                                                                                                       // held there (a clip driven directly, too)
+        }
         velocity = Vector3.Zero;
-        if (SmsDebugPrint) GD.Print($"[SMS frost] FROZEN {seconds:F2} s ({_smsFreezeTicks} ticks) in {stateOfMario}{(IsOnFloor() ? "" : ", in the air")}; the tree {(animTree != null ? _smsFrostTreeMode.ToString() : "none")} paused");
+        if (SmsDebugPrint) GD.Print($"[SMS frost] FROZEN {seconds:F2} s ({_smsFreezeTicks} ticks) in {stateOfMario}{(IsOnFloor() ? "" : ", in the air")}; the pose {(_smsFrostClip != "" ? $"{_smsFrostClip} at {SmsFrostPoseAt:F2}" : "his own")}, the tree {(animTree != null ? _smsFrostTreeMode.ToString() : "none")} paused");
         return true;
     }
-    private bool _smsFrostHold; private float _smsFrostSeconds, _smsFrostPlayerSpeed = 1f; private AnimationMixer.AnimationCallbackModeProcess _smsFrostTreeMode;
+    private bool _smsFrostHold; private float _smsFrostSeconds, _smsFrostPlayerSpeed = 1f; private AnimationMixer.AnimationCallbackModeProcess _smsFrostTreeMode; private string _smsFrostClip = "";
+    /// <summary>171: the clip the frozen Mario holds a frame of (the shock's ma_shock; "" = his own pose) and where in it (0..1 of its length).</summary>
+    [Export] public string SmsFrostPoseClip = "ma_shock";
+    [Export(PropertyHint.Range, "0,0.99,0.01")] public float SmsFrostPoseAt = 0.5f;
+    /// <summary>171, for the drives: the clip he holds while frozen, its frame (seconds) and the player's speed -- "" when not frozen or holding his own pose.</summary>
+    public string SmsFrostPoseNow => _smsFrostHold && _smsFrostClip != "" && animPlayer != null ? $"{animPlayer.CurrentAnimation}@{animPlayer.CurrentAnimationPosition:F3}/{animPlayer.CurrentAnimationLength:F3}x{animPlayer.SpeedScale:F1}" : "";
+    /// <summary>171, for the drives: the eye texture his eye material holds -- awake / sleep / hurt / tired / other (the damage fog's copies
+    /// follow it since 171: SmsBodyOverlay.SyncAlbedo).</summary>
+    public string SmsEyeNow => leftEyeMaterial == null ? "none" : leftEyeMaterial.AlbedoTexture == awakeEyeTexture ? "awake" : leftEyeMaterial.AlbedoTexture == sleepingEyeTexture ? "sleep" : leftEyeMaterial.AlbedoTexture == hurtEyeTexture ? "hurt" : leftEyeMaterial.AlbedoTexture == tiredEyeTexture ? "tired" : "other";
     /// <summary>167: the frost fog's colour (an ice blue; framebuffer values as the damage pink is) and a thaw's immunity to another freeze (ticks).</summary>
     public static readonly Color SmsFrostFog = new Color(0.55f, 0.85f, 1f);
     public const int FrostImmunityTicks = 60;
@@ -11481,6 +11503,7 @@ public partial class Mario : CharacterBody3D
         if (!_smsFrostHold) return;
         _smsFrostHold = false; _smsFreezeTicks = 0;
         _smsFreezeImmunityTicks = Math.Max(_smsFreezeImmunityTicks, FrostImmunityTicks);
+        if (_smsFrostClip != "" && animPlayer != null) { animPlayer.Stop(true); _smsFrostClip = ""; SleepStatus(false); }   // 171: the shock frame let go (the pose kept until the tree's next frame), the eyes open
         if (animTree != null && animTree.CallbackModeProcess == AnimationMixer.AnimationCallbackModeProcess.Manual) animTree.CallbackModeProcess = _smsFrostTreeMode;
         if (animPlayer != null && animPlayer.SpeedScale == 0f) animPlayer.SpeedScale = _smsFrostPlayerSpeed;
         if (SmsDebugPrint) GD.Print($"[SMS frost] THAWED after {_smsFrostSeconds:F2} s: {stateOfMario}, the tree {(animTree != null ? animTree.CallbackModeProcess.ToString() : "none")}, immune {FrostImmunityTicks} ticks");
