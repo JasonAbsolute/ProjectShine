@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-05 23:46 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-06 00:16 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1215,8 +1215,12 @@ clip (ma_shock at half its length, the eyes squeezed shut) instead of the pose h
 shader copies now follow the eye textures (the knockdown's hurt eyes were hidden under the pink fog since the damage passes). SMS 172: the
 lightning walls crackle with the shock's own particles (bolt streaks, arcs, flashes, spark crosses, post sparks, floor crawl) and ZAPS jump the gap as
 they close; the fireballs are MOLTEN LAVA BALLS (LavaBall.gdshader NEW) popping out of the CROWN three at a time, lobbed down about Mario with landing
-marks, bouncing and rolling; the breath is THICKER (bigger, denser puffs and a solid core). Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `085883d` ("SMS 172: the King Boo REMATCH, part 16 -- the ELECTRICITY, LAVA BALLS out of the crown, a THICKER breath";
+marks, bouncing and rolling; the breath is THICKER (bigger, denser puffs and a solid core). SMS 173: King Boo sits 4.5 m HIGHER (HoverLift; the
+tongue clear of the floor) with the breath re-aimed to meet the floor 10 m out whatever his height, the lava balls 3 m across, the electricity YELLOW
+and quicker. Further passes re-point this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `fd00c6f` ("SMS 173: the King Boo REMATCH, part 17 -- he sits HIGHER, the lava balls BIGGER, the electricity YELLOW and quicker";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsFireballs.cs, SmsGhostLightning.cs) on the 172 commit
+  ("SMS 172: the King Boo REMATCH, part 16 -- the ELECTRICITY, LAVA BALLS out of the crown, a THICKER breath";
   assets/Sms/Rematch/ LavaBall.gdshader NEW, SmsFireballs.cs, SmsGhostLightning.cs, SmsGhostBreath.cs, SmsKingBooRematch.cs, three shader .uid files) on the 171 commit
   ("SMS 171: the King Boo REMATCH, part 15 -- the freeze holds a frame of the SHOCK";
   assets/Mario.cs, assets/Sms/Fx/SmsBodyOverlay.cs) on the 170 commit ("SMS 170: the King Boo REMATCH, part 14 -- the EFFECTS pass"; assets/Sms/Rematch/
@@ -1246,9 +1250,12 @@ marks, bouncing and rolling; the breath is THICKER (bigger, denser puffs and a s
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 34 commits past `feature/sounds`, 56 since `main`. ~1.1 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 36 commits past `feature/sounds`, 58 since `main`. ~1.1 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 173: King Boo floats 4.5 m HIGHER (his tongue no longer goes into the floor; HoverLift on him), the breath still comes down to the floor 10 m
+  out (BreathAimFloorAt), the lava balls are 3 m across (FireballSize), and the electricity is YELLOW and busier (SmsGhostLightning: BoltColorA / BoltColorB,
+  JitterHz, Wave, ZapChance).
 - To try 172: the lightning walls now CRACKLE -- bolt streaks, arcs, flashes and sparks all over them, sparks off the posts, bolts along the floor, and
   horizontal ZAPS jumping the gap as the walls close; the fireballs are now LAVA BALLS popping out of the CROWN three at a time (three pops), arcing
   down at the orange rings on the floor (one lands near you each pop), bouncing and rolling on; the breath is a THICK bank of cold. Knobs: SmsGhostLightning

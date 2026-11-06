@@ -12384,3 +12384,43 @@ Mario and the rest scatter (the doc's "random directions"); a landed ball rolls 
 (WallStreaks, WallArcs, WallFlashes, WallSparks, PostSparks, FloorCrawl, WarnFx, GapZaps, ZapGap, ZapWidth, ZapBrightness, MeetSparks, MeetStreaks,
 MeetFlashes), SmsFireballs (Pops, PerPop, PopSeconds, LobHeight, Scatter, AimedWithin, RollSpeed, Bounce, LandingMarks, Flames, Embers, Drips, Smoke,
 HeatAtEnd, GlowColor, LightEnergy), SmsGhostBreath (Puffs, PuffAlpha, SpreadDeg, CorePuffs, CoreSizeStart / End, CoreAlpha, CoreSpreadDeg, HitRadiusK).
+
+### 173 -- the King Boo REMATCH, part 17: he sits HIGHER, the lava balls BIGGER, the electricity YELLOW and quicker (feature/kingboo-rematch, code `fd00c6f`)
+
+**Jaysonn:** "ok looking good. make the lava balls bigger. make the electricity move more yellow, and king boo sits kinda low and his tongue is going into the
+stage. need to make him sit higher so it looks more normal".
+
+**He sits higher** (`SmsKingBooRematch.cs`): his hover height was read off where he was placed in the scene (4 m over the floor), and with the stretched
+tongue (TongueStretch 1.15) hanging from a mouth 4.4 m up, its tip went 4 m into the floor. `HoverLift` (4.5 m): at the spawn, after ReadArena reads the
+placed height, he is moved up by it, `_home` with him and `_hoverOverFloor` grows by it -- so every spot he teleports to is lifted too (the lick keeps its own
+LickHeight 6.4, the tongue skimming the floor by design). The placed 4 m becomes 8.5: his body 8.18 m over the floor, the mouth 8.85, the tongue's tip 0.76 m
+OVER the floor. 3 m was tried first and left the tip 0.76 m into the floor (the tongue is long: about 8 m from the mouth); 4.5 clears it with the 0.35-m
+bob to spare. The scene file is untouched (it is among Jaysonn's live edits). **The breath re-aimed:** 167 aimed the breath a fixed BreathDownDeg (10) under
+level, which from a mouth 1.8 m up met the floor about 10 m out; from 8 m up it would meet it 45 m out -- over the arena's edge, and over the head of a
+Mario standing within 8 m of him. `BreathAimFloorAt` (10 m): the aim is now atan(mouth height over the floor under Mario / 10) -- 38.9 degrees from the
+lifted mouth -- so the stream meets the floor where it did and rolls on along the slab as before (the flat speed 22 cos 38.9 = 17 m/s); `BreathDownDegUsed`
+reads the angle; 0 = the fixed knob. **Bigger lava balls:** the template's FireballSize 3 (was 2).
+
+**Bigger lava balls** (`SmsFireballs.cs`): Size 3 m (was 2) -- the radius 1.5; the crust sphere, the glow (2.8 R), the flames, the drips, the smoke, the landing
+ring (2.6 R = 3.9 m) and the hit (R + Mario's radius) all follow. The lob's targets stay inside the wall less the size.
+
+**Yellow, quicker electricity** (`SmsGhostLightning.cs`): "make the electricity move more yellow" -- read as both: the COLOUR -- BoltColorA (1, 0.95, 0.5), a
+warm white-yellow, BoltColorB (1, 0.62, 0.1), an amber (the shock's own cyan (0.435, 1, 1) and blue (0.25, 0.34, 1) before); the wall shader's color_a / color_b,
+the streak ramps, the arcs (BoltColorA toward white, `Pale`), the flashes, the crosses' fade, the post sparks (toward the amber), the OmniLights, the posts,
+the zaps and the meet's ring and flashes all take them -- and the MOTION: the streaks dart at 2-6 m/s (0.4-1.6), the arcs drift at 1-4 (0-1.5), the floor bolts
+race at 5-10 (2-5), the zaps flicker quicker (ZapChance 0.5 a frame, 1-3 frames on; 0.35 and 2-4), and the wall shader's arcs re-roll JitterHz 26 times a second
+(18) and wave harder (Wave 0.28; 0.18) -- the two uniforms the shader always had, now set from knobs. Mario's own shock (ShockSparks.tscn) keeps the game's cyan.
+
+**Verified** (headless drive v173-2, deleted before the commit; 172's drive with 173's checks added, the three attacks forced in turn on a standing Mario):
+C0b he appears 8.5 m over the floor ("lifted 4.5"), the body 8.18 m up, the tongue's tip 0.76 m over the floor (v173-1 with a 3-m lift: the tip 0.76 m UNDER
+it -- the one fail, the lift raised); C0c the balls 3 m; C1b BoltColorA / B yellow and amber, the streaks at 2.0-6.0 m/s, 26 Hz, wave 0.28; C6b the first ball's
+radius 1.50; C7b the breath aimed 38.9 degrees down for a mouth 8.07 m up (atan(8.07 / 10) = 38.9), King Boo's readout agreeing; and all of 172's checks again
+(16 wall emitters emitting at the warn and the close, 4 zaps shown at once, 3 meets, the shock (hp 8 -> 7), 3 x 3 pops out of the crown 0.12 m off its point over
+0.90 s, the lob to 18.8 m over the floor (the crown at 12.8), the mark, 8 landings, 8.0 m/s rolling, 2 burns (hp 7 -> 5), the thick breath's core, the freeze) --
+14/14, no errors. A windowed shot run (13 shots): King Boo high over the floor from the side with Mario for scale -- the tongue's tip at the railing's height,
+clear of the floor -- and from the game camera (he sits at the top of the frame now, the tongue hanging into view); the walls golden-yellow with white-hot
+cores; the 3-m lava balls close, with the embers and the landing rings.
+
+**Deviations, all knobs:** HoverLift 4.5 is my reading of "sit higher" -- enough to clear the tongue; from the game camera near him he now sits high in the
+frame (HoverLift is live in the inspector). BreathAimFloorAt keeps the breath's reach where 167 had it rather than letting the lift change the attack. Knobs:
+King Boo (HoverLift, BreathAimFloorAt, FireballSize), SmsGhostLightning (BoltColorA, BoltColorB, JitterHz, Wave, ZapChance), SmsFireballs (Size).
