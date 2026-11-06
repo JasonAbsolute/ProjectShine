@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-05 16:56 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-05 18:17 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1202,8 +1202,13 @@ and two new uniforms in the shared BossTelesaToon.gdshaderinc (0 = the casino's 
 faces its dive; the Boos are the port's own hotel Boo (telesa.glb; the doc's Galaxy boo.glb REMOVED -- its export lost the GX mirror wrap); the
 crown SHINES (a sliding sheen + rim in the shader, solid while lit, sparkles, a flash, a quickening pulse) with no halo quad. SMS 166: GHOST
 LIGHTNING -- the crown red, two walls of bolts (a new shader on the shock's biri sheet) close on Mario three times, the shock (Mario.TakeShock) when
-a wall reaches him; the attacks picked by weight. Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `be6e222` ("SMS 166: the King Boo REMATCH, part 10 -- GHOST LIGHTNING"; assets/Sms/Rematch/ SmsGhostLightning.cs,
+a wall reaches him; the attacks picked by weight. SMS 167: GHOST BREATH -- the crown frosty blue, a stream of cold mist sweeping across the
+arena along the floor; the hit is a new FREEZE on Mario (Mario.SmsFreezeFor: a second with his pose held and a frost fog, inside an ice block that
+shatters as he thaws; no HP) -- a jump as the cold reaches him clears it. Mario.cs and SmsBodyOverlay.cs are touched. Further passes re-point this
+entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `c571a6c` ("SMS 167: the King Boo REMATCH, part 11 -- GHOST BREATH, the freeze"; assets/Sms/Rematch/
+  SmsGhostBreath.cs, SmsIceBlock.cs, IceBlock.gdshader NEW, SmsKingBooRematch.cs; assets/Mario.cs (SmsFreezeFor, the frost), assets/Sms/Fx/SmsBodyOverlay.cs
+  (SteadyFog)) on the 166 commit ("SMS 166: the King Boo REMATCH, part 10 -- GHOST LIGHTNING"; assets/Sms/Rematch/ SmsGhostLightning.cs,
   GhostLightning.gdshader NEW, SmsKingBooRematch.cs) on the 165b commit ("SMS 165b: the King Boo REMATCH, part 9b -- the Boolossus faces its dive, the Boos are the port's own, the
   crown SHINES"; assets/Sms/Rematch/ SmsBoolossus.cs, SmsKingBooRematch.cs, GhostBoo.gdshader, Boolossus.tscn; assets/Sms/Enemy/BossTelesa/BossTelesaToon.gdshaderinc;
   models/Sms/Rematch/ boo.glb + boo_teresa.png REMOVED) on the 165 commit ("SMS 165: the King Boo REMATCH, part 9 -- three Boolossi DIVE in, with effects; the Boos white; the crown
@@ -1224,9 +1229,14 @@ a wall reaches him; the attacks picked by weight. Further passes re-point this e
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 22 commits past `feature/sounds`, 44 since `main`. ~1.1 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 24 commits past `feature/sounds`, 46 since `main`. ~1.1 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 167: when the crown goes FROSTY BLUE and he turns his head to one side, a stream of cold mist comes out of his mouth and sweeps across
+  the arena along the floor (1.6 s, 150 deg, 22 m/s, from your left or your right at random). JUMP as it reaches you: feet 1.2 m up are over it. Caught,
+  you are FROZEN a second in a block of ice (no HP) -- the pose held, a blue frost on the body -- and it shatters as you thaw; a lick through the ice
+  is the knockdown as ever. Knobs: KingBoo's "The fight (167)" (SweepDeg / SweepSeconds / SweepWay, BreathSpeed, PuffSeconds, PuffSizeStart / End,
+  BreathHitHeight, FreezeSeconds, BreathCrownColor, OneFreezePerAttack), BreathWeight, SmsIceBlock's look, SmsBodyOverlay.SteadyFogFactor.
 - To try 166: when the crown goes RED, two walls of lightning appear 12 m apart either side of you, dim for half a second, then close at 8 m/s
   each -- run out of the open ends (along the walls); a wall reaching you is the shock (ma_shock, 1 HP), once per attack. Three squeezes, the axis
   turning 60 deg, each re-centred on you. Knobs: KingBoo's "The fight (166)" (WallLength / WallHeight / WallGap / WallSpeed, SqueezeCount, WarnSeconds,

@@ -12046,3 +12046,84 @@ than jagged forks. The .err: Godot's "2 ObjectDB instances leaked at exit" (the 
 mercy; the lightning is cyan-blue (the shock's own colours) under a RED crown, as the doc has it; no camera shake on the meet. Knobs: King Boo's "The
 fight (166)" (LightningOn, LightningCrownColor, LightningTellSeconds / WatchSeconds, the clip and voice, WallLength / WallHeight / WallGap / WallSpeed,
 SqueezeCount / WarnSeconds / SqueezePause / SqueezeTurnDeg, OneShockPerAttack) and the weights.
+
+### 167 -- the King Boo REMATCH, part 11: GHOST BREATH, the freeze (feature/kingboo-rematch, code `c571a6c`)
+
+**Jaysonn:** "lets do the, Ghost Lightning next, and the, Ghost Breath (the freeze) next" (the lightning was 166).
+
+**The doc** (attack 4): "Crown glows frosty blue. He blows cold breath in a sweep across the arena, left to right or right to left. A hit freezes Mario
+for one second." The hit: "Ghost Breath: the one reaction Sunshine does not have. There is no ice or freeze anywhere in the game, so the one second freeze
+is a new state." The port had one freeze already -- pass 112's durian kick, mFreezeTimer: Mario's move skipped for two frames (`_smsFreezeTicks` at
+Mario.cs 2249, `goto EndFrame`) -- which is the right bone for it.
+
+**The frost** (`Mario.cs`): `SmsFreezeFor(seconds)` -- the kick freeze's skip held for the second: nothing moves him (velocity zero, the move skipped; a
+Mario in the air hangs there), his POSE is held (the animation tree's callback mode set Manual and the player's speed 0 for the duration -- the tree
+keeps its state, unlike toggling Active -- both put back at the thaw), his body carries the frost fog (the damage fog's own shader, `SmsFrostFog` an ice
+blue (0.55, 0.85, 1), held STEADY at 0.5 instead of the damage pulse: `SmsBodyOverlay.SteadyFog` / `SteadyFogFactor`, new), no HP, none of the hurt.
+Refused (false) while invincible, down or shocked, dead, in a demo, talking, swimming, already frozen or within a thaw's immunity (`FrostImmunityTicks`
+60). The thaw (`SmsThaw`) runs off the freeze tick; a knockdown (`SmsDamageExec`) or a shock (`TakeShock`) through the frost thaws him first, so a lick
+through the ice is the knockdown as ever. Read-outs `SmsFrosted` / `SmsFrostPoseHeld` / `SmsFrostCount` / `SmsFrostLeft`. The kick freeze is refused
+while frosted.
+
+**The ice** (`SmsIceBlock.cs`, `IceBlock.gdshader`): the attacker draws the freeze -- a six-sided block (a CylinderMesh of six segments, BlockWidth 1.9 m
+across, BlockHeight 2.05 m from his feet) in a small shader: translucent ice blue (alpha 0.22), a fresnel rim (the edges and the turned faces brighter
+and more solid), a frost mottle from the port's stardust tile, a highlight sliding down it, `flash` for the pop-in; unshaded (165b: the arena's violet
+ambient turns shaded whites lavender), front faces only. It pops in over PopSeconds 0.1 from a quarter size and white-hot with a ring of frost puffs and
+Mario's fright (MSD_SE_MV30_FRIGHT_01), ice glints (star4s, 0.18 m) drift off it, it follows him. While `Mario.SmsFrosted`; the frame he is not, it
+SHATTERS: gone, 36 chips (the port's shikaku square, 0.14 m, ice blue, tumbling at up to 540 deg/s, flung at 5-12 m/s under gravity 14) with a poof of
+frost and the glass break (MSD_SE_OBJ_GLASS_BREAK, the casino floor's: the port has no ice sound). `Freeze(mario, parent)` returns the block already on
+him. Read-outs All / Made / Shatters / Shattered.
+
+**The breath** (`SmsGhostBreath.cs`): King Boo makes one at his mouth and it runs on its own. A STREAM of cold: puffs of pale mist (kemuball3_raw,
+mix-blended at PuffAlpha 0.55, 320 of them over PuffSeconds 1.5 -- 213 a second -- each growing from PuffSizeStart 2 m to PuffSizeEnd 6 m across, a
+world-space emitter whose basis follows the aim), ice glints in it (star4s, 0.45 m, additive), a cold light at the mouth (a radgrad billboard, 3 m),
+blown at BreathSpeed 22 m/s (0.85-1 of it), SpreadDeg 6, aimed DownDeg 10 under level so it reaches the floor ten metres out and ROLLS along it: the puffs
+sink at Sink 4 m/s^2 and collide with a GpuParticlesCollisionBox3D slab under the floor (rigid, friction 0.15, the collision radius HitRadiusK x the
+puff's scale). The mouth sweeps SweepDeg 150 about the way to Mario over SweepSeconds 1.6, linearly; SweepWay Random / LeftToRight / RightToLeft as
+Mario sees it facing King Boo (`SideFor`: his left is up x his facing). THE COLD IS THE STREAM: every frame of blowing records a ray (time, mouth, aim);
+the puff that left along it sits at mouth + aim x speed x age, sunk by half x Sink x age^2, no lower than its ball on the floor, its ball HitRadiusK 0.4 of
+its size at that age; a live puff (age under PuffSeconds) whose ball meets Mario's damage cylinder (42 u across, 130 u tall from his feet) is the hit --
+unless his feet are HitHeight 1.2 m or more over the floor: the cold hugs the floor, so a jump as it reaches him clears it (the dodge; the cold crosses a
+spot in about a third of a second, a held jump is airborne for a second). The hit calls `Mario.SmsFreezeFor(FreezeSeconds 1)` (its own refusals) and
+`SmsIceBlock.Freeze`; once per attack (OneFreezePerAttack). MSD_SE_BS_TELESA_BREATHE as the blow begins and every BreathSeEvery 0.8 s, the bottle's wind
+under it. The sweep over, the emitters stop, Swept(hit); PuffSeconds + 0.2 later Finished and the node frees. `Cancel()` (King Boo hit through it) cuts
+the breath off: no more cold, the puffs out fade, the node goes when they have. Read-outs State / SweepK / YawNow / DirNow / StartYaw / EndYaw /
+CentreYaw / Side / MouthPoint / Emitting / RaysBlown / NearestCold(feet) / FreezeAt / FreezeCount.
+
+**King Boo** (`SmsKingBooRematch.cs`): the Breath move -- BreathWeight 1 in the weight picker beside the lick, the smash and the lightning (BreathOn).
+Where he stands: the crown FROSTY BLUE (BreathCrownColor (0.35, 0.68, 1)) with the smash's flash-then-quickening pulse through BreathTellSeconds 0.7, the
+casino spit clip (btelesa_spit, 99 frames: the head rears back by frame 24 and thrusts at 48) played at the speed that lands BreathHoldFrame 50 at the
+tell's end; he faces Mario through the first 40 % of the tell (the sweep's centre is read there), then TURNS toward the side the sweep starts from
+(smoothstep over the rest of the tell -- the tell shows the way the cold will come); at the tell's end the `SmsGhostBreath` is made with the mouth
+(`MouthPoint`: jnt_sita_1, the tongue's root at the lips, in the world; else ahead of and under the body joint), the clip PAUSED at the thrust
+(`BreathClipHeld`) and his yaw driven by the sweep's; the sweep over, the clip runs on (its end puts the wait loop on), BreathWatchSeconds 0.3 later
+`EnterWait` -- the cold still rolling on its own. CanBeHit through it; `AbortBreath` (a swung Bomb Boo) cancels the node and lets the clip go. Signals
+BreathStarted, Breathed(hit). Read-outs BreathsMade / BreathHits / Breath / BreathLaunched / BreathSide / BreathClipHeld / MouthPoint. `Clip` now reports
+the assigned clip while it is paused (CurrentAnimation is empty then). The sweep's knobs sit on King Boo under "The fight (167)" and are copied onto the
+node.
+
+**Drive 167** (`SmsKingBoo.Drive.cs`, deleted before the commit; runs ac / ad / ae, 12 / 12 at the last): the frosty crown -- the flash to 1.8, the pulse
+to 1, the register (0.55, 0.85, 1) then (0.35, 0.68, 1), the sparkles -- and the cold out at 0.72 s (C3); from the mouth 0.00 m off King Boo's own
+MouthPoint, 3.66 m over the floor, aim y -0.174 (10 deg down), 75 deg from the way to Mario, the body 0 deg off the mouth's yaw at the launch and 0 deg
+off Mario at 40 % of the tell, the spit clip held, the puffs emitting (C4); the sweep 150 deg in 1.60 s, the body turned 149 deg with it (C5); a standing
+Mario FROZEN 1.42 s after the blow began at 17.8 m from the mouth (the sweep's half 0.8 s plus the travel 0.8 s), HP 8 -> 8, Swept(true) (C6); through the
+0.98 s: the pose held, not moved, one ice block, the fog on and ice blue (C7); the thaw: moving again (idle), one shatter, no ice left, no second freeze
+from the same breath, King Boo in the wait with the crown dark and the wait clip, the node let go (C8); a Mario who JUMPS when the nearest cold is within
+6 m (feet to 3.43 m) is over it, the cold having passed 1.13 m into his spot (C9); the first breath's node gone 1.70 s after its sweep (C9b); a hit
+through the sweep cuts the breath off -- Done, not emitting, the crown dark, the clip let go, no breath alive (C10); the end (C11). Run ac's two fails:
+`Clip` empty while the spit was paused (fixed, above) and the drive reading the second breath's Finished for the first (the drive). Three windowed shot
+runs (f, g, h) tuned the look: the plume read thin at 180 puffs of 1.6-4.5 m (now 320 of 2-6 m: a continuous arc of mist); the block at alpha 0.42 with
+the pulsing fog made Mario a white silhouette (now alpha 0.22 and a steady fog: the frosted Mario shows inside a clear faceted block); the chips came out
+as 1-m slabs and the glints at twice their size -- ParticleProcessMaterial's ScaleMin / ScaleMax did nothing visible on these one-shot quads, so the sizes
+are the quads' now (ShardSize 0.14, GlintSize 0.18 / 0.45) and a poof of frost goes with the break; the crown shot after the flash. The .err: Godot's
+"ObjectDB instances leaked at exit" as in 165 / 166.
+
+**Deviations, all knobs:** the sweep's arc (150), its seconds (1.6), the cold's speed (22) and life (1.5 s, 33 m), the sink, the hit height and the jump
+dodge are mine (the doc gives the sweep and the second); a Mario frozen in the air hangs there until he thaws; the ice block and the chips are the port's
+own look (nothing in Sunshine freezes); the crown reads pale icy-blue more than a deep blue (BreathCrownColor). Mario.cs is touched (SmsFreezeFor /
+SmsThaw at the freeze block, two lines in the fog, a line each in SmsDamageExec and TakeShock) and SmsBodyOverlay.cs (SteadyFog). Knobs: King Boo's
+"The fight (167)" (BreathOn, BreathCrownColor, BreathTellSeconds / WatchSeconds, BreathClip, BreathHoldFrame, SweepDeg, SweepSeconds, SweepWay,
+BreathDownDeg, BreathSpeed, PuffSeconds, PuffSizeStart / End, BreathHitHeight, FreezeSeconds, OneFreezePerAttack) and BreathWeight; SmsGhostBreath's
+look (BreathColor, GlintColor, PuffAlpha, Puffs, Glints, GlintSize, MouthGlowSize, HitRadiusK, SpreadDeg, Sink, the sounds, BreathSeEvery);
+SmsIceBlock's (BlockWidth / Height, PopSeconds, ShardSeconds, IceColor, GlintColor, Glints, Shards, FrostPuffs, GlintSize, ShardSize, FreezeSe,
+ShatterSe); Mario.FrostImmunityTicks; SmsBodyOverlay.SteadyFogFactor.
