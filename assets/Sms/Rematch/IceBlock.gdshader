@@ -8,10 +8,10 @@ render_mode blend_mix, depth_draw_never, cull_back, unshaded, shadows_disabled, 
 
 uniform vec4 ice_color : source_color = vec4(0.70, 0.88, 1.0, 0.22);
 uniform vec3 rim_color : source_color = vec3(0.92, 0.98, 1.0);
-uniform float rim_k : hint_range(0.0, 2.0) = 0.7;
+uniform float rim_k : hint_range(0.0, 2.0) = 0.5;
 uniform float rim_power : hint_range(0.5, 8.0) = 2.6;
 uniform sampler2D frost_tex : filter_linear, repeat_enable;
-uniform float frost_k : hint_range(0.0, 1.0) = 0.2;
+uniform float frost_k : hint_range(0.0, 1.0) = 0.15;
 uniform float flash : hint_range(0.0, 1.0) = 0.0;
 
 void fragment() {

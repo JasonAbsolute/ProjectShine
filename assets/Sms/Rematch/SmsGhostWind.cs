@@ -27,7 +27,12 @@ public partial class SmsGhostWind : Node3D
     [ExportGroup("The funnel")]
     [Export] public float Height = 8f, TopRadius = 2.8f, BaseRadius = 0.8f, SpinDegPerSec = 420f;
     [Export] public Color Tint = new Color(0.82f, 0.66f, 1f);
-    [Export(PropertyHint.Range, "0,1,0.01")] public float Alpha = 0.8f;
+    [Export(PropertyHint.Range, "0,1,0.01")] public float Alpha = 0.5f;
+    /// <summary>170 (Jaysonn: "more like a gust of wind"): the streaks of wind spiralling up the funnel -- how many ribbons, their width, the turns each makes
+    /// from the foot to the head, how fast the set spins (degrees a second; the funnel's own spin is SpinDegPerSec) -- and the debris whirling in it.</summary>
+    [Export(PropertyHint.Range, "0,8,1")] public int Ribbons = 4;
+    [Export] public float RibbonWidth = 0.55f, RibbonTurns = 1.6f, RibbonSpinDegPerSec = 300f;
+    [Export(PropertyHint.Range, "0,64,1")] public int Debris = 22;
     [Export(PropertyHint.Range, "0,64,1")] public int Dust = 36;
     [Export(PropertyHint.Range, "0,64,1")] public int Wisps = 16;
     [ExportGroup("The fling")]
@@ -172,7 +177,8 @@ public partial class SmsTornado : Node3D
     public int FlingsMade { get; private set; }
     public float FunnelYaw => _funnel != null ? _funnel.Rotation.Y : 0f;
 
-    private SmsGhostWind _owner; private MeshInstance3D _funnel, _ring; private ShaderMaterial _mat; private StandardMaterial3D _ringMat; private GpuParticles3D _dust, _wisps;
+    private SmsGhostWind _owner; private MeshInstance3D _funnel, _ring; private ShaderMaterial _mat; private StandardMaterial3D _ringMat; private GpuParticles3D _dust, _wisps, _debris;
+    private Node3D _gust; private readonly List<ShaderMaterial> _ribbonMats = new(); private float _gustSpin;
     private float _dissT, _wobblePhase; private bool _started;
 
     public void Setup(SmsGhostWind owner, Vector3 at, float heading0)
@@ -203,6 +209,20 @@ public partial class SmsTornado : Node3D
             _dust = new GpuParticles3D { Name = "Dust", TopLevel = true, Amount = owner.Dust, Lifetime = 0.9, Emitting = true, LocalCoords = false, FixedFps = 60, Interpolate = true, DrawOrder = GpuParticles3D.DrawOrderEnum.ViewDepth, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One, Material = mat }, VisibilityAabb = new Aabb(new Vector3(-60f, -10f, -60f), new Vector3(120f, 40f, 120f)) };
             AddChild(_dust);
         }
+        if (owner.Ribbons > 0) MakeGust(owner);
+        if (owner.Debris > 0)
+        {
+            var pm = new ParticleProcessMaterial
+            {
+                EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Ring, EmissionRingAxis = Vector3.Up, EmissionRingRadius = owner.BaseRadius * 2.2f, EmissionRingInnerRadius = owner.BaseRadius * 1.2f, EmissionRingHeight = owner.Height * 0.5f,
+                Direction = new Vector3(0f, 1f, 0f), Spread = 30f, InitialVelocityMin = 1.5f, InitialVelocityMax = 3.5f, Gravity = new Vector3(0f, 0.5f, 0f),
+                ScaleMin = 1f, ScaleMax = 1f, AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -500f, AngularVelocityMax = 500f,
+                Color = new Color(0.36f, 0.3f, 0.42f, 1f), ColorRamp = SmsGhostWind.Fade(new Color(1f, 1f, 1f, 0f), new Color(1f, 1f, 1f, 1f), new Color(1f, 1f, 1f, 0.9f), new Color(1f, 1f, 1f, 0f))
+            };
+            var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Mix, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = SmsGhostWind.Tex("shikaku"), CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true };
+            _debris = new GpuParticles3D { Name = "Debris", Amount = owner.Debris, Lifetime = 1.4, Emitting = true, LocalCoords = true, FixedFps = 60, Interpolate = true, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = new Vector2(0.22f, 0.14f), Material = mat }, VisibilityAabb = new Aabb(new Vector3(-10f, -2f, -10f), new Vector3(20f, 16f, 20f)) };
+            (_gust ?? (Node3D)this).AddChild(_debris);                             // in the gust's frame: it whirls with the spin
+        }
         if (owner.Wisps > 0)
         {
             var pm = new ParticleProcessMaterial
@@ -214,9 +234,45 @@ public partial class SmsTornado : Node3D
             };
             var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = SmsGhostWind.Tex("star4s_raw"), CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true };
             _wisps = new GpuParticles3D { Name = "Wisps", Amount = owner.Wisps, Lifetime = 1.2, Emitting = true, LocalCoords = true, FixedFps = 60, Interpolate = true, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One * 0.5f, Material = mat }, VisibilityAabb = new Aabb(new Vector3(-10f, -2f, -10f), new Vector3(20f, 16f, 20f)) };
-            AddChild(_wisps);
+            (_gust ?? (Node3D)this).AddChild(_wisps);                              // in the gust's frame: they whirl with it
         }
         _started = true;
+    }
+
+    /// <summary>170: the GUST -- Ribbons helix ribbons (an ArrayMesh each: RibbonTurns turns from the foot to the head, the radius growing with the funnel's,
+    /// RibbonWidth across, 48 steps) under one node that spins at RibbonSpinDegPerSec, each with the ribbon shader at its own phase; the wisps and the debris
+    /// ride in the same frame so they whirl.</summary>
+    private void MakeGust(SmsGhostWind owner)
+    {
+        _gust = new Node3D { Name = "Gust" }; AddChild(_gust);
+        var shader = ResourceLoader.Exists("res://assets/Sms/Rematch/WindRibbon.gdshader") ? GD.Load<Shader>("res://assets/Sms/Rematch/WindRibbon.gdshader") : null;
+        var tex = SmsGhostWind.Tex("kemuri1_raw") ?? SmsGhostWind.Tex("kemuball3_raw");
+        for (int r = 0; r < owner.Ribbons; r++)
+        {
+            float phase0 = r / (float)owner.Ribbons * MathF.Tau, heightK = 0.85f + 0.15f * (r % 2), radiusK = 1.05f + 0.12f * (r % 3);
+            var st = new SurfaceTool(); st.Begin(Mesh.PrimitiveType.Triangles);
+            const int steps = 48; var prev = new Vector3[2]; var prevUv = new Vector2[2];
+            for (int i = 0; i <= steps; i++)
+            {
+                float u = i / (float)steps, ang = phase0 + u * owner.RibbonTurns * MathF.Tau, y = u * owner.Height * heightK;
+                float rad = Mathf.Lerp(owner.BaseRadius, owner.TopRadius, u) * radiusK;
+                Vector3 c = new Vector3(MathF.Cos(ang) * rad, y, MathF.Sin(ang) * rad);
+                Vector3 up = Vector3.Up * (owner.RibbonWidth * 0.5f);
+                Vector3[] cur = { c - up, c + up }; Vector2[] uv = { new Vector2(u, 0f), new Vector2(u, 1f) };
+                if (i > 0)
+                {
+                    Vector3 n = (prev[1] - prev[0]).Cross(cur[0] - prev[0]); n = n.LengthSquared() > 1e-10f ? n.Normalized() : Vector3.Up;
+                    foreach (var (p, t) in new[] { (prev[0], prevUv[0]), (prev[1], prevUv[1]), (cur[0], uv[0]), (cur[0], uv[0]), (prev[1], prevUv[1]), (cur[1], uv[1]) }) { st.SetNormal(n); st.SetUV(t); st.AddVertex(p); }
+                }
+                prev = cur; prevUv = uv;
+            }
+            var mesh = st.Commit();
+            ShaderMaterial mat = null;
+            if (shader != null) { mat = new ShaderMaterial { Shader = shader, RenderPriority = 2 }; if (tex != null) mat.SetShaderParameter("streak_tex", tex); mat.SetShaderParameter("phase", phase0); mat.SetShaderParameter("tint", new Vector3(0.94f, 0.9f, 1f)); _ribbonMats.Add(mat); }
+            var mi = new MeshInstance3D { Name = $"Ribbon{r + 1}", Mesh = mesh, MaterialOverride = mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+            _gust.AddChild(mi);
+        }
+        _gust.Scale = new Vector3(0.3f, 0.02f, 0.3f);
     }
 
     /// <summary>A frame: the rise, the hunt (turning toward Mario no faster than TurnDegPerSec, the wobble), the spin, the dissipation past the life.</summary>
@@ -225,7 +281,8 @@ public partial class SmsTornado : Node3D
         if (Gone || !_started) return;
         if (pastLife && !Dissipating) Dissipate();
         float riseK = Mathf.Clamp(age / Mathf.Max(0.05f, _owner.RiseSeconds), 0f, 1f); RiseK = riseK;
-        Spin += Mathf.DegToRad(_owner.SpinDegPerSec) * dt;
+        Spin += Mathf.DegToRad(_owner.SpinDegPerSec) * dt; _gustSpin += Mathf.DegToRad(_owner.RibbonSpinDegPerSec) * dt;
+        if (_gust != null) { _gust.Rotation = new Vector3(0f, _gustSpin, 0f); if (!Dissipating) _gust.Scale = new Vector3(Mathf.Lerp(0.3f, 1f, riseK), Mathf.Max(0.02f, riseK), Mathf.Lerp(0.3f, 1f, riseK)); }
         if (_funnel != null) { _funnel.Rotation = new Vector3(0f, Spin, 0f); _funnel.Scale = new Vector3(Mathf.Lerp(0.3f, 1f, riseK), Mathf.Max(0.02f, riseK), Mathf.Lerp(0.3f, 1f, riseK)); }
         if (_ring != null) { _ring.Rotation = new Vector3(-MathF.PI / 2f, 0f, -Spin * 0.3f); }
         if (hunting && !Dissipating)
@@ -251,7 +308,9 @@ public partial class SmsTornado : Node3D
         if (Dissipating)
         {
             _dissT += dt; float k = Mathf.Clamp(_dissT / 0.8f, 0f, 1f);
-            _mat?.SetShaderParameter("fade", k);
+            _mat?.SetShaderParameter("fade", k); foreach (var rm in _ribbonMats) rm.SetShaderParameter("fade", k);
+            if (_gust != null) _gust.Scale = new Vector3(1f + k * 0.6f, Mathf.Max(0.02f, 1f - k), 1f + k * 0.6f);
+            if (_debris != null && k > 0.3f) _debris.Emitting = false;
             if (_ringMat != null) _ringMat.AlbedoColor = new Color(_owner.Tint.R, _owner.Tint.G, _owner.Tint.B, 0.5f * (1f - k));
             if (_funnel != null) _funnel.Scale = new Vector3(1f + k * 0.6f, Mathf.Max(0.02f, 1f - k), 1f + k * 0.6f);
             if (k >= 1f) { Gone = true; Visible = false; if (_dust != null) _dust.Emitting = false; GetTree().CreateTimer(1f).Timeout += () => { if (IsInstanceValid(this)) QueueFree(); }; }

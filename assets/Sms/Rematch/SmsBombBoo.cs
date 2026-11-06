@@ -90,6 +90,12 @@ public partial class SmsBombBoo : Node3D
     [ExportGroup("")]
     [Export] public PackedScene BurstFxScene;
     [Export] public Color BurstColor = new Color(0.55f, 0.2f, 0.85f);
+    /// <summary>170 (Jaysonn: "bomb boos need to explode when hitting king boo"): swung into him it EXPLODES -- the Bob-omb's blast (BombExplosion.tscn: the
+    /// 10_bomb fireball with its glow, smoke, scraps, shockwave and sparks) at this scale, the water flower's boom, a kick of the camera -- over its own puff.</summary>
+    [Export] public bool ExplodeOnKingBoo = true;
+    [Export] public PackedScene ExplosionFxScene;
+    [Export] public float ExplosionScale = 1.4f, ExplosionShake = 1f;
+    [Export] public string ExplodeSe = "MSD_SE_PO_WFLOWER_EXPLOSION";
     [Export] public int Seed = 0;
     [Export] public bool DebugPrint;
 
@@ -159,6 +165,7 @@ public partial class SmsBombBoo : Node3D
             }
         }
         BurstFxScene ??= ResourceLoader.Exists("res://assets/Sms/Fx/EnemyDisap.tscn") ? GD.Load<PackedScene>("res://assets/Sms/Fx/EnemyDisap.tscn") : null;
+        ExplosionFxScene ??= ResourceLoader.Exists("res://assets/Sms/Enemy/Bomb/BombExplosion.tscn") ? GD.Load<PackedScene>("res://assets/Sms/Enemy/Bomb/BombExplosion.tscn") : null;
         _sound = SmsActorSound.Attach(this);
         _yaw = Rotation.Y;
         // TTelesa::init's setFlyParam + TWalkerEnemy's speeds: at random in their ranges
@@ -417,6 +424,7 @@ public partial class SmsBombBoo : Node3D
         State = Phase.Gone;
         Puff(hitKingBoo ? 1.6f : 1.1f);
         if (!string.IsNullOrEmpty(BurstSe)) _sound?.Play(BurstSe);
+        if (hitKingBoo && ExplodeOnKingBoo) Blast();
         if (hitKingBoo) BossNow()?.TakeHit(this);
         if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: burst{(hitKingBoo ? " on King Boo" : "")} at {GlobalPosition}");
         EmitSignal(SignalName.Burst, hitKingBoo);
@@ -433,6 +441,24 @@ public partial class SmsBombBoo : Node3D
         if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: vanishes");
         Gone();
     }
+    /// <summary>170: the Bob-omb's blast at the Boo, the boom, the shake.</summary>
+    private void Blast()
+    {
+        if (ExplosionFxScene != null && IsInsideTree())
+        {
+            var fx = ExplosionFxScene.Instantiate<Node3D>();
+            fx.TopLevel = true;
+            GetParent().AddChild(fx);
+            var at = new Transform3D(Basis.FromScale(Vector3.One * ExplosionScale), GlobalPosition);
+            fx.GlobalTransform = at;
+            if (fx is SmsFxBurst b) b.Play(at);
+            else if (fx is GpuParticles3D gp) { gp.OneShot = true; gp.Emitting = true; gp.Finished += gp.QueueFree; }
+            Blasts++;
+        }
+        if (!string.IsNullOrEmpty(ExplodeSe)) _sound?.Play(ExplodeSe);
+        if (ExplosionShake > 0f) SmsCameraShake.Current?.Start(SmsCameraShake.Kind.Damage, ExplosionShake);
+    }
+    public static int Blasts;
     private void Puff(float scale)
     {
         if (BurstFxScene == null || !IsInsideTree()) return;

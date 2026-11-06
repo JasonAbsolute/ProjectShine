@@ -273,8 +273,29 @@ public partial class SmsFireball : Node3D
         if (_light != null && _owner != null) _light.LightEnergy = _owner.LightEnergy * a * Mathf.Clamp(_k * 1.5f, 0.2f, 1f);
         if (_embers != null) { _embers.GlobalPosition = GlobalPosition; _embers.Emitting = !Fizzling && a > 0.1f; }
     }
-    /// <summary>Out in a few frames: the ball collapsing, no more hits.</summary>
-    public void Fizzle() { if (!Fizzling && !Dead) { Fizzling = true; _fizzleT = 0f; HitMario = true; if (_flames != null) _flames.Emitting = false; } }
+    /// <summary>Out in a few frames: the ball collapsing, no more hits. 170: a ball that got Mario BURSTS -- a flash of flame and a ring.</summary>
+    public void Fizzle() { if (!Fizzling && !Dead) { bool burst = HitMario; Fizzling = true; _fizzleT = 0f; HitMario = true; if (_flames != null) _flames.Emitting = false; if (burst) Burst(); } }
+    private void Burst()
+    {
+        var pm = new ParticleProcessMaterial
+        {
+            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = R * 0.6f,
+            Direction = new Vector3(0f, 1f, 0f), Spread = 180f, InitialVelocityMin = 3f, InitialVelocityMax = 7f, Gravity = new Vector3(0f, 2f, 0f), DampingMin = 3f, DampingMax = 6f,
+            ScaleMin = 1f, ScaleMax = 1f, ScaleCurve = SmsFireballs.Ramp(1f, 0.2f), AngleMin = -180f, AngleMax = 180f,
+            Color = new Color(1f, 1f, 1f, 1f), ColorRamp = SmsFireballs.Fade(new Color(1f, 0.95f, 0.6f, 1f), new Color(1f, 0.5f, 0.1f, 1f), new Color(0.8f, 0.12f, 0.02f, 0.7f), new Color(0.3f, 0.03f, 0.01f, 0f))
+        };
+        var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = SmsFireballs.Tex("fire1_raw"), CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true };
+        var p = new GpuParticles3D { Name = "Burst", TopLevel = true, Amount = 20, Lifetime = 0.5, OneShot = true, Explosiveness = 1f, Emitting = false, LocalCoords = false, FixedFps = 60, Interpolate = true, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One * (R0 * 1.6f), Material = mat }, VisibilityAabb = new Aabb(new Vector3(-10f, -5f, -10f), new Vector3(20f, 20f, 20f)) };
+        (GetParent() ?? this).AddChild(p); p.GlobalPosition = GlobalPosition; p.Finished += p.QueueFree; p.Emitting = true;
+        var rtex = SmsFireballs.Tex("hamonring3_flat");
+        var rmat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, AlbedoTexture = rtex, AlbedoColor = new Color(1f, 0.6f, 0.2f, 0.9f) };
+        var ring = new MeshInstance3D { Name = "BurstRing", TopLevel = true, Mesh = new QuadMesh { Size = Vector2.One }, MaterialOverride = rmat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        (GetParent() ?? this).AddChild(ring); ring.GlobalPosition = new Vector3(GlobalPosition.X, FloorY + 0.1f, GlobalPosition.Z); ring.Rotation = new Vector3(-MathF.PI / 2f, 0f, 0f);
+        float size = R0 * 6f; var tw = ring.CreateTween();
+        tw.TweenMethod(Callable.From<float>(k => { ring.Scale = Vector3.One * Mathf.Max(0.05f, size * k); rmat.AlbedoColor = new Color(1f, 0.6f, 0.2f, 0.9f * (1f - k)); }), 0f, 1f, 0.35f);
+        tw.TweenCallback(Callable.From(ring.QueueFree));
+        SmsCameraShake.Current?.Start(SmsCameraShake.Kind.Damage, 0.5f);
+    }
     private void Die()
     {
         Dead = true; Visible = false;

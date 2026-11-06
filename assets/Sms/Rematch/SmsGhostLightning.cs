@@ -29,6 +29,10 @@ public partial class SmsGhostLightning : Node3D
     /// <summary>The bolts' colours (the shock's cyan toward its blue), their brightness, how many bolt columns a wall carries, the floor sparks per wall.</summary>
     [Export] public Color BoltColorA = new Color(0.435f, 1f, 1f), BoltColorB = new Color(0.25f, 0.34f, 1f);
     [Export] public float Intensity = 1.2f, BoltsPerMetre = 1f;
+    /// <summary>170: the arcs run along the wall -- this many stacked up it; the glowing POSTS at the walls' ends they jump between (metres wide; 0 = none);
+    /// a cyan light on each wall (energy; 0 = none); the meet's shockwave ring on the floor (metres across at its widest; 0 = none) and camera shake (0 = none).</summary>
+    [Export(PropertyHint.Range, "1,16,1")] public int Arcs = 6;
+    [Export] public float PostWidth = 0.9f, LightEnergy = 3f, MeetRing = 14f, MeetShake = 0.6f;
     [Export(PropertyHint.Range, "0,120,1")] public int FloorSparks = 40;
     [Export(PropertyHint.Range, "0,120,1")] public int MeetSparks = 48;
     [ExportGroup("The sounds")]
@@ -58,6 +62,7 @@ public partial class SmsGhostLightning : Node3D
     private const float U = 74.44f;
     private Mario _mario; private SmsActorSound _sound; private readonly Random _rng = new(166);
     private MeshInstance3D _wallA, _wallB; private ShaderMaterial _matA, _matB; private GpuParticles3D _sparksA, _sparksB;
+    private OmniLight3D _lightA, _lightB; private readonly List<MeshInstance3D> _posts = new();
     private Vector3 _centre, _axis = Vector3.Right, _side = Vector3.Forward; private float _gap, _t, _warnK, _baseAngle; private bool _hit, _closeSounded;
 
     public override void _Ready() { All.Add(this); }
@@ -83,13 +88,24 @@ public partial class SmsGhostLightning : Node3D
         if (shader == null) return null;
         var m = new ShaderMaterial { Shader = shader };
         m.SetShaderParameter("bolt_tex", bolt); m.SetShaderParameter("color_a", new Vector3(BoltColorA.R, BoltColorA.G, BoltColorA.B)); m.SetShaderParameter("color_b", new Vector3(BoltColorB.R, BoltColorB.G, BoltColorB.B));
-        m.SetShaderParameter("tiles", Mathf.Max(1f, WallLength * BoltsPerMetre)); m.SetShaderParameter("intensity", Intensity); m.SetShaderParameter("seed", seed);
+        m.SetShaderParameter("rows", (float)Mathf.Max(1, Arcs)); m.SetShaderParameter("stretch", Mathf.Max(0.5f, WallLength * BoltsPerMetre * 0.2f)); m.SetShaderParameter("intensity", Intensity); m.SetShaderParameter("seed", seed);
         return m;
     }
     private MeshInstance3D MakeWall(string name, ShaderMaterial mat)
     {
         var mi = new MeshInstance3D { Name = name, Mesh = new QuadMesh { Size = new Vector2(WallLength, WallHeight) }, MaterialOverride = mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Visible = false };
         AddChild(mi);
+        if (PostWidth > 0f)                                                            // 170: the posts the arcs jump between, at the wall's ends
+        {
+            var tex = ResourceLoader.Exists("res://assets/Sms/Fx/tex/glow3_raw.png") ? GD.Load<Texture2D>("res://assets/Sms/Fx/tex/glow3_raw.png") : null;
+            foreach (float side in new[] { -1f, 1f })
+            {
+                var pm = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, AlbedoTexture = tex, AlbedoColor = new Color(BoltColorA.R, BoltColorA.G, BoltColorA.B, 0.9f) };
+                var post = new MeshInstance3D { Name = name + (side < 0f ? "PostA" : "PostB"), Mesh = new QuadMesh { Size = new Vector2(PostWidth, WallHeight * 1.08f) }, MaterialOverride = pm, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Position = new Vector3(side * WallLength * 0.5f, 0f, 0f) };
+                mi.AddChild(post); _posts.Add(post);
+            }
+        }
+        if (LightEnergy > 0f) { var l = new OmniLight3D { Name = name + "Light", LightColor = new Color(0.5f, 0.9f, 1f), LightEnergy = 0f, OmniRange = WallLength * 0.9f, ShadowEnabled = false, Position = new Vector3(0f, -WallHeight * 0.3f, 0f) }; mi.AddChild(l); if (name == "WallA") _lightA = l; else _lightB = l; }
         return mi;
     }
     private GpuParticles3D MakeSparks(string name)
@@ -128,7 +144,7 @@ public partial class SmsGhostLightning : Node3D
         foreach (var (p, w) in new[] { (_sparksA, _wallA), (_sparksB, _wallB) })
             if (p != null && w != null) { p.GlobalPosition = new Vector3(w.GlobalPosition.X, FloorY + 0.1f, w.GlobalPosition.Z); p.GlobalBasis = w.GlobalBasis; }
     }
-    private void SetWarn(float k) { _warnK = 1f - k; _matA?.SetShaderParameter("warn", k); _matB?.SetShaderParameter("warn", k); }
+    private void SetWarn(float k) { _warnK = 1f - k; _matA?.SetShaderParameter("warn", k); _matB?.SetShaderParameter("warn", k); foreach (var l in new[] { _lightA, _lightB }) if (l != null) l.LightEnergy = LightEnergy * Mathf.Lerp(1f, 0.3f, k); foreach (var p in _posts) if (p.MaterialOverride is StandardMaterial3D pm) pm.AlbedoColor = new Color(BoltColorA.R, BoltColorA.G, BoltColorA.B, Mathf.Lerp(0.9f, 0.35f, k)); }
     private void SetFlash(float f) { _matA?.SetShaderParameter("flash", f); _matB?.SetShaderParameter("flash", f); }
     private void Sparks(bool on) { foreach (var p in new[] { _sparksA, _sparksB }) if (p != null) { p.Visible = on; p.Emitting = on; } }
 
@@ -155,7 +171,7 @@ public partial class SmsGhostLightning : Node3D
                 if (_gap <= 0.01f)
                 {
                     State = Phase.Meet; _t = 0f; SetFlash(1f); Sparks(false);
-                    MeetBurst();
+                    MeetBurst(); MeetRingAndShake();
                     SqueezesDone++;
                     if (DebugPrint) GD.Print($"[SMS lightning] {Name}: squeeze {Squeeze} MEETS -- {(_hit ? "Mario shocked" : "a miss")}");
                     EmitSignal(SignalName.Squeezed, _hit);
@@ -212,6 +228,20 @@ public partial class SmsGhostLightning : Node3D
         p.GlobalPosition = _centre + Vector3.Up * (WallHeight * 0.5f); p.GlobalBasis = Basis.LookingAt(_side, Vector3.Up);   // the box's long side along the walls
         p.Finished += p.QueueFree; p.Emitting = true;
         MeetBursts++;
+    }
+    /// <summary>170: the meet's shockwave -- a ring of the shock's cyan racing out along the floor from the seam -- and a kick of the camera.</summary>
+    private void MeetRingAndShake()
+    {
+        if (MeetShake > 0f) SmsCameraShake.Current?.Start(SmsCameraShake.Kind.Damage, MeetShake);
+        if (MeetRing <= 0f) return;
+        var tex = ResourceLoader.Exists("res://assets/Sms/Fx/tex/hamonring3_flat.png") ? GD.Load<Texture2D>("res://assets/Sms/Fx/tex/hamonring3_flat.png") : null;
+        var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, AlbedoTexture = tex, AlbedoColor = new Color(BoltColorA.R, BoltColorA.G, BoltColorA.B, 0.9f) };
+        var ring = new MeshInstance3D { Name = "MeetRing", TopLevel = true, Mesh = new QuadMesh { Size = Vector2.One }, MaterialOverride = mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        (GetParent() ?? this).AddChild(ring);
+        ring.GlobalPosition = _centre + Vector3.Up * 0.12f; ring.Rotation = new Vector3(-MathF.PI / 2f, 0f, 0f);
+        float size = MeetRing; var tw = ring.CreateTween();
+        tw.TweenMethod(Callable.From<float>(k => { ring.Scale = Vector3.One * Mathf.Max(0.05f, size * k); mat.AlbedoColor = new Color(BoltColorA.R, BoltColorA.G, BoltColorA.B, 0.9f * (1f - k)); }), 0f, 1f, 0.45f);
+        tw.TweenCallback(Callable.From(ring.QueueFree));
     }
     private void Finish()
     {

@@ -16,9 +16,15 @@ public partial class SmsIceBlock : Node3D
 {
     /// <summary>The block's size (metres across, tall from his feet), its pop-in, how long the shards last.</summary>
     [Export] public float BlockWidth = 1.9f, BlockHeight = 2.05f, PopSeconds = 0.1f, ShardSeconds = 0.9f;
+    /// <summary>170: the ice is a jagged CHUNK (Jaysonn: "a chunk of ice, not just a smooth block"): how far its facets are pushed in and out (0 = a smooth
+    /// egg), how many spikes stick out of it and how far, the facets about and up it.</summary>
+    [Export(PropertyHint.Range, "0,0.5,0.01")] public float Jag = 0.22f;
+    [Export(PropertyHint.Range, "0,12,1")] public int Spikes = 5;
+    [Export] public float SpikeOut = 0.45f;
+    [Export(PropertyHint.Range, "5,16,1")] public int FacetsAround = 9, FacetsUp = 6;
     /// <summary>A glint's and a shard's size (metres; the quads -- the process material's scale range did not take here).</summary>
     [Export] public float GlintSize = 0.18f, ShardSize = 0.14f;
-    [Export] public Color IceColor = new Color(0.7f, 0.88f, 1f, 0.22f), GlintColor = new Color(0.75f, 0.95f, 1f);
+    [Export] public Color IceColor = new Color(0.7f, 0.88f, 1f, 0.15f), GlintColor = new Color(0.75f, 0.95f, 1f);
     [Export(PropertyHint.Range, "0,64,1")] public int Glints = 20;
     [Export(PropertyHint.Range, "0,120,1")] public int Shards = 36;
     [Export(PropertyHint.Range, "0,40,1")] public int FrostPuffs = 14;
@@ -57,8 +63,7 @@ public partial class SmsIceBlock : Node3D
         _mesh = new MeshInstance3D
         {
             Name = "Block", CastShadow = GeometryInstance3D.ShadowCastingSetting.Off,
-            Mesh = new CylinderMesh { TopRadius = BlockWidth * 0.46f, BottomRadius = BlockWidth * 0.5f, Height = BlockHeight, RadialSegments = 6, Rings = 1, CapTop = true, CapBottom = true },
-            MaterialOverride = _mat, Position = Vector3.Up * (BlockHeight * 0.5f), Rotation = new Vector3(0f, Mathf.DegToRad(30f), 0f), Scale = Vector3.One * 0.25f
+            Mesh = ChunkMesh(Made), MaterialOverride = _mat, Position = Vector3.Up * (BlockHeight * 0.5f), Rotation = new Vector3(0f, Mathf.DegToRad(30f + 47f * (Made % 7)), 0f), Scale = Vector3.One * 0.25f
         };
         AddChild(_mesh);
         if (Glints > 0) MakeGlints();
@@ -148,6 +153,41 @@ public partial class SmsIceBlock : Node3D
         AddChild(p);
         p.GlobalPosition = GlobalPosition + Vector3.Up * (BlockHeight * 0.5f);
         p.Emitting = true;
+    }
+    /// <summary>170: the chunk -- a sphere of FacetsAround x FacetsUp facets stretched to the block's size, every vertex pushed in or out by up to Jag (a
+    /// seeded dice), Spikes of them pushed out SpikeOut further, built unindexed with each facet's own normal so the rim catches every face (flat shading).</summary>
+    private ArrayMesh ChunkMesh(int seed)
+    {
+        var rng = new Random(170 + seed * 31);
+        int na = Mathf.Max(5, FacetsAround), nu = Mathf.Max(3, FacetsUp);
+        var pts = new Vector3[nu + 1, na];
+        var spikes = new HashSet<(int, int)>(); for (int i = 0; i < Spikes; i++) spikes.Add((1 + rng.Next(nu - 1), rng.Next(na)));
+        for (int j = 0; j <= nu; j++)
+        {
+            float v = j / (float)nu, lat = Mathf.Lerp(-MathF.PI / 2f, MathF.PI / 2f, v);
+            for (int i = 0; i < na; i++)
+            {
+                float lon = i / (float)na * MathF.Tau;
+                float r = 1f + ((float)rng.NextDouble() * 2f - 1f) * Jag + (spikes.Contains((j, i)) ? SpikeOut : 0f);
+                if (j == 0 || j == nu) r = 1f + ((float)rng.NextDouble() * 2f - 1f) * Jag * 0.5f;
+                pts[j, i] = new Vector3(MathF.Cos(lat) * MathF.Cos(lon) * BlockWidth * 0.5f, MathF.Sin(lat) * BlockHeight * 0.5f, MathF.Cos(lat) * MathF.Sin(lon) * BlockWidth * 0.5f) * r;
+            }
+        }
+        var st = new SurfaceTool(); st.Begin(Mesh.PrimitiveType.Triangles);
+        void Tri(Vector3 a, Vector3 b, Vector3 c, Vector2 ua, Vector2 ub, Vector2 uc)
+        {
+            Vector3 n = (b - a).Cross(c - a); if (n.LengthSquared() < 1e-10f) return; n = n.Normalized();
+            st.SetNormal(n); st.SetUV(ua); st.AddVertex(a); st.SetNormal(n); st.SetUV(ub); st.AddVertex(b); st.SetNormal(n); st.SetUV(uc); st.AddVertex(c);
+        }
+        for (int j = 0; j < nu; j++)
+            for (int i = 0; i < na; i++)
+            {
+                int i2 = (i + 1) % na;
+                Vector3 p00 = pts[j, i], p10 = pts[j, i2], p01 = pts[j + 1, i], p11 = pts[j + 1, i2];
+                Vector2 u00 = new(i / (float)na, j / (float)nu), u10 = new((i + 1) / (float)na, j / (float)nu), u01 = new(i / (float)na, (j + 1) / (float)nu), u11 = new((i + 1) / (float)na, (j + 1) / (float)nu);
+                Tri(p00, p01, p10, u00, u01, u10); Tri(p10, p01, p11, u10, u01, u11);
+            }
+        return st.Commit();
     }
     private static Texture2D Tex(string name) { string p = $"res://assets/Sms/Fx/tex/{name}.png"; return ResourceLoader.Exists(p) ? GD.Load<Texture2D>(p) : null; }
     private static CurveTexture Ramp(float a, float b)
