@@ -5,39 +5,52 @@ using System.Collections.Generic;
 /// <summary>
 /// SMS pass 168: FIREBALLS (KINGBOO_REMATCH_gdoc.txt, attack 5: "Crown glows red. Fireballs shoot off in random directions and bounce off the arena walls.
 /// They shrink as they travel and fade out"; the hit: "the burn. Set fireDown on the profile, which routes into SmsFireDownEnter and the ms_firedmg_a
-/// cloud" -- Mario.SmsDamageProfile.Fire, the fire enemies' own). King Boo makes one at his mouth and it runs on its own: a VOLLEY of Count fireballs
-/// spat over VolleySeconds, each along a random way within SpreadDeg about the way to Mario (the doc's random directions; the bounces scatter them further),
-/// at Speed, dropping from the mouth to the floor over DropSeconds and ROLLING on along it. A fireball (<see cref="SmsFireball"/>) is a ball of fire Size
-/// metres across at its birth -- a white-hot core (the port's fire smoke ball, additive), flames licking up off it (fire1_raw, yellow to red), embers trailing in
-/// the world, a light on the floor -- that SHRINKS to nothing over LifeSeconds and fades over the last of them, BOUNCING off the arena's wall (the floor's
-/// circle less WallInset: its flat way mirrored about the wall's normal, a flare, MSD_SE_MA_BOUND) as often as it reaches it. THE HIT: a fireball's ball
-/// meeting Mario's damage cylinder is Mario.TakeDamage(the ball, Fire) -- the burn: FIRE_DOWN's launch, ma_firejmp, the fire cloud, 1 HP, 300 ticks
-/// invincible (its own refusals: invincible, down, a demo) -- and the ball bursts (DiesOnHit) -- unless his feet are HitHeight over the floor: a jump clears a rolling ball, a hop does not.
-/// MSD_SE_BS_TELESA_FIRE as the volley begins (the casino boss's own fire), a whoosh per ball. <see cref="Cancel"/> (King Boo hit through it) fizzles every ball
-/// out. Signals Shot(count) as the last ball leaves, Burned per burn, Bounced per bounce, Finished as the last ball dies.
+/// cloud" -- Mario.SmsDamageProfile.Fire, the fire enemies' own). Pass 172 (Jaysonn: "fireballs should be more like molten lava balls and should come from
+/// the crown popping a few out at once"): King Boo makes one at his CROWN and it runs on its own -- Pops POPS of PerPop LAVA BALLS at once, PopSeconds apart,
+/// each ball LOBBED out of the crown (LobHeight over it, under gravity) to come down about Mario: one of every pop within AimedWithin of him, the rest anywhere
+/// out to Scatter (a ring on the floor marks where each will land, LandingMarks); a ball that lands BOUNCES (Bounce of its fall, a splat of lava each time) and
+/// ROLLS on at RollSpeed along its way, bouncing off the arena's wall (the floor's circle less WallInset: its flat way mirrored about the wall's normal, a
+/// flare, MSD_SE_MA_BOUND) as often as it reaches it. A ball (<see cref="SmsFireball"/>) is a MOLTEN LAVA BALL Size metres across at its birth -- a sphere
+/// of dark crust with glowing cracks and molten pools (LavaBall.gdshader; its heat cooling as it ages), a glow about it, flames licking off it, embers and
+/// DRIPS of lava trailing in the world, a smoke trail, a light on the floor; the crust rolls with it -- that SHRINKS to nothing over LifeSeconds and fades over
+/// the last of them. THE HIT: a ball meeting Mario's damage cylinder is Mario.TakeDamage(the ball, Fire) -- the burn: FIRE_DOWN's launch, ma_firejmp, the
+/// fire cloud, 1 HP, 300 ticks invincible (its own refusals: invincible, down, a demo) -- and the ball BURSTS (DiesOnHit: a splash of lava, flames, a ring,
+/// smoke, a kick of the camera) -- unless his feet are HitHeight over the floor: a jump clears a rolling ball, a hop does not. MSD_SE_BS_TELESA_FIRE as the
+/// first pop comes (the casino boss's own fire), a pop sound per pop. <see cref="Cancel"/> (King Boo hit through it) fizzles every ball out. Signals
+/// Shot(count) as the last pop leaves, Burned per burn, Bounced per bounce (the wall's or the floor's), Finished as the last ball dies.
 /// </summary>
 public partial class SmsFireballs : Node3D
 {
     public enum Phase { Idle, Volley, Flying, Done }
-    [ExportGroup("The volley")]
-    /// <summary>How many fireballs, over how long, within what arc about the way to Mario (degrees; 0 = all straight at him), how fast they fly (m/s), how long
-    /// one takes to drop from the mouth to the floor.</summary>
-    [Export(PropertyHint.Range, "1,24,1")] public int Count = 8;
-    [Export] public float VolleySeconds = 1f, SpreadDeg = 140f, Speed = 14f, DropSeconds = 0.5f;
-    [ExportGroup("The fireballs")]
-    /// <summary>A fireball's size at birth (metres across its ball: the radius is half), how long it lives (it shrinks to nothing over this), where its fade
-    /// begins (0..1 of the life), how far in from the floor's edge the wall is, whether the ball bursts on Mario.</summary>
-    [Export] public float Size = 2f, LifeSeconds = 5f, WallInset = 0.6f;
+    [ExportGroup("The pops (172)")]
+    /// <summary>How many POPS out of the crown and how many balls each (a few at once), the time between pops, how high over the crown they lob (metres),
+    /// how far about Mario they come down (metres: one ball of every pop within AimedWithin of him, the rest anywhere out to Scatter), how fast a landed
+    /// ball rolls on (m/s; 0 = at the speed it came down with), how much of its fall a landing keeps (0 = it lands and rolls; 0.35 = a bounce or two first),
+    /// whether a ring on the floor marks where each ball will land.</summary>
+    [Export(PropertyHint.Range, "1,8,1")] public int Pops = 3;
+    [Export(PropertyHint.Range, "1,8,1")] public int PerPop = 3;
+    [Export] public float PopSeconds = 0.45f, LobHeight = 6f, Scatter = 7f, AimedWithin = 1.5f, RollSpeed = 8f;
+    [Export(PropertyHint.Range, "0,0.8,0.05")] public float Bounce = 0.35f;
+    [Export] public bool LandingMarks = true;
+    [ExportGroup("The lava balls")]
+    /// <summary>A ball's size at birth (metres across: the radius is half), how long it lives (it shrinks to nothing over this), where its fade begins (0..1
+    /// of the life), how far in from the floor's edge the wall is, whether the ball bursts on Mario.</summary>
+    [Export] public float Size = 2f, LifeSeconds = 6f, WallInset = 0.6f;
     /// <summary>How high over the floor the fire reaches: a Mario whose feet are higher is over it (the jump; a hop is not enough).</summary>
     [Export] public float HitHeight = 1.6f;
     [Export(PropertyHint.Range, "0,1,0.05")] public float FadeFrom = 0.65f;
     [Export] public bool DiesOnHit = true;
     [ExportGroup("The look")]
-    [Export] public Color CoreColor = new Color(1f, 0.72f, 0.28f), FlameColor = new Color(1f, 0.42f, 0.06f), EmberColor = new Color(1f, 0.7f, 0.25f);
+    /// <summary>The glow about a ball and its light, the flames' colour, the embers' and drips' colour; how many flames, embers, drips and smoke puffs a ball
+    /// carries (0 = none each); how cool a ball is at the end of its life (the crust's heat: 1 = molten, 0 = dark).</summary>
+    [Export] public Color GlowColor = new Color(1f, 0.45f, 0.1f), FlameColor = new Color(1f, 0.42f, 0.06f), EmberColor = new Color(1f, 0.7f, 0.25f);
     [Export] public bool Lights = true;
-    [Export] public float LightEnergy = 2.5f, LightRange = 8f;
-    [Export(PropertyHint.Range, "0,64,1")] public int Flames = 26;
-    [Export(PropertyHint.Range, "0,64,1")] public int Embers = 14;
+    [Export] public float LightEnergy = 3f, LightRange = 9f;
+    [Export(PropertyHint.Range, "0,64,1")] public int Flames = 16;
+    [Export(PropertyHint.Range, "0,64,1")] public int Embers = 24;
+    [Export(PropertyHint.Range, "0,32,1")] public int Drips = 10;
+    [Export(PropertyHint.Range, "0,32,1")] public int Smoke = 18;
+    [Export(PropertyHint.Range, "0,1,0.05")] public float HeatAtEnd = 0.3f;
     [ExportGroup("The sounds")]
     [Export] public string VolleySe = "MSD_SE_BS_TELESA_FIRE", SpitSe = "MSD_SE_BS_WANWAN_REBURN1", BounceSe = "MSD_SE_MA_BOUND";
     [ExportGroup("")]
@@ -50,48 +63,65 @@ public partial class SmsFireballs : Node3D
 
     public Phase State { get; private set; } = Phase.Idle;
     public int Spat { get; private set; }
+    public int PopsMade { get; private set; }
     public int Burns { get; private set; }
     public int BouncesMade { get; private set; }
+    public int Landings { get; private set; }
     public int Alive => _balls.Count;
     public IReadOnlyList<SmsFireball> Balls => _balls;
     public float FloorY { get; private set; }
     public Vector3 ArenaCentre => _centre;
     public float ArenaRadius => _radius;
     public float CentreYaw => _yawCentre;
+    public Vector3 SpoutPoint => _spout != null ? _spout() : GlobalPosition;
+    public int Count => Pops * PerPop;
     public static readonly List<SmsFireballs> All = new();
     public static int BurnCount;
 
     private const float U = 74.44f;
-    private Mario _mario; private Func<Vector3> _mouth; private SmsActorSound _sound; private readonly Random _rng = new(168);
+    public const float G = 20f;                                                 // the lob's gravity (m/s^2; the port's fire balls fell at this since 168)
+    private Mario _mario; private Func<Vector3> _spout; private SmsActorSound _sound; private readonly Random _rng = new(168);
     private readonly List<SmsFireball> _balls = new(); private readonly List<SmsFireball> _dead = new();
     private Vector3 _centre; private float _radius = 26f, _yawCentre, _t, _nextAt;
 
     public override void _Ready() { All.Add(this); }
     public override void _ExitTree() { All.Remove(this); }
 
-    /// <summary>The volley begins: from the mouth (read per ball), about yawCentre (the way to Mario), inside the arena given, over the floor at floorY.</summary>
-    public void Begin(Mario mario, float floorY, Func<Vector3> mouth, float yawCentre, Vector3 arenaCentre, float arenaRadius)
+    /// <summary>The pops begin: out of the spout (the crown's top, read per pop), about yawCentre (the way to Mario), inside the arena given, over the floor at floorY.</summary>
+    public void Begin(Mario mario, float floorY, Func<Vector3> spout, float yawCentre, Vector3 arenaCentre, float arenaRadius)
     {
         if (State != Phase.Idle) return;
-        _mario = mario; FloorY = floorY; _mouth = mouth; _yawCentre = yawCentre; _centre = arenaCentre; _radius = Mathf.Max(5f, arenaRadius);
+        _mario = mario; FloorY = floorY; _spout = spout; _yawCentre = yawCentre; _centre = arenaCentre; _radius = Mathf.Max(5f, arenaRadius);
         _sound = SmsActorSound.Attach(this);
-        GlobalPosition = mouth();
+        GlobalPosition = spout();
         State = Phase.Volley; _t = 0f; _nextAt = 0f;
         if (_sound != null && !string.IsNullOrEmpty(VolleySe)) _sound.Play(VolleySe);
-        if (DebugPrint) GD.Print($"[SMS fireballs] {Name}: the VOLLEY -- {Count} over {VolleySeconds:F2} s within {SpreadDeg} deg of yaw {Mathf.RadToDeg(yawCentre):F0}, {Speed} m/s, {Size} m across, {LifeSeconds} s; the wall at {_radius - WallInset:F1} m about {_centre}");
+        if (DebugPrint) GD.Print($"[SMS fireballs] {Name}: the POPS -- {Pops} x {PerPop} lava balls {PopSeconds:F2} s apart out of the crown at {GlobalPosition}, lobbed {LobHeight} m up to come down within {Scatter} m of Mario (one within {AimedWithin} m), {Size} m across, {LifeSeconds} s, rolling at {RollSpeed} m/s; the wall at {_radius - WallInset:F1} m about {_centre}");
     }
 
-    private void Spit()
+    /// <summary>One pop: PerPop balls out of the crown at once, each lobbed to its own spot about Mario.</summary>
+    private void Pop()
     {
-        float yaw = _yawCentre + ((float)_rng.NextDouble() - 0.5f) * Mathf.DegToRad(SpreadDeg);
-        Vector3 dir = new Vector3(MathF.Sin(yaw), 0f, MathF.Cos(yaw));
-        Vector3 from = _mouth != null ? _mouth() : GlobalPosition;
-        var b = new SmsFireball { Name = $"Fireball{Spat + 1}" };
-        (GetParent() ?? this).AddChild(b);
-        b.Setup(this, from, dir * Speed, Size * 0.5f, LifeSeconds, FloorY, DropSeconds);
-        _balls.Add(b); Spat++;
-        if (_sound != null && !string.IsNullOrEmpty(SpitSe)) _sound.Play(SpitSe, -4f, 0.9f + 0.2f * (float)_rng.NextDouble());
-        if (DebugPrint) GD.Print($"[SMS fireballs] {Name}: fireball {Spat} of {Count} spat from {from} along yaw {Mathf.RadToDeg(yaw):F0}");
+        Vector3 from = SpoutPoint;
+        Vector3 m = _mario != null && IsInstanceValid(_mario) ? _mario.GlobalPosition : _centre;
+        for (int i = 0; i < PerPop; i++)
+        {
+            float ang = (float)(_rng.NextDouble() * Math.Tau);
+            float dist = i == 0 ? AimedWithin * (float)Math.Sqrt(_rng.NextDouble()) : Mathf.Lerp(AimedWithin, Scatter, (float)Math.Sqrt(_rng.NextDouble()));
+            Vector3 target = new Vector3(m.X + MathF.Sin(ang) * dist, FloorY, m.Z + MathF.Cos(ang) * dist);
+            Vector3 cd = new Vector3(target.X - _centre.X, 0f, target.Z - _centre.Z); float cl = cd.Length(), wallR = _radius - WallInset - Size;
+            if (cl > wallR && cl > 1e-3f) target = new Vector3(_centre.X + cd.X / cl * wallR, FloorY, _centre.Z + cd.Z / cl * wallR);   // inside the wall
+            float r0 = Size * 0.5f;
+            float h = Mathf.Max(0.5f, LobHeight), tUp = MathF.Sqrt(2f * h / G), apexY = from.Y + h, tDown = MathF.Sqrt(2f * Mathf.Max(0.1f, apexY - (FloorY + r0)) / G), T = tUp + tDown;
+            Vector3 flat = new Vector3(target.X - from.X, 0f, target.Z - from.Z) / T;
+            var b = new SmsFireball { Name = $"LavaBall{Spat + 1}" };
+            (GetParent() ?? this).AddChild(b);
+            b.Setup(this, from, flat, G * tUp, r0, LifeSeconds, FloorY, target, (float)_rng.NextDouble() * 100f);
+            _balls.Add(b); Spat++;
+            if (DebugPrint) GD.Print($"[SMS fireballs] {Name}: lava ball {Spat} of {Count} pops out of the crown at {from} toward {target} ({dist:F1} m from Mario{(i == 0 ? ", the aimed one" : "")}; {T:F2} s in the air, up {G * tUp:F1} m/s, across {flat.Length():F1} m/s)");
+        }
+        PopsMade++;
+        if (_sound != null && !string.IsNullOrEmpty(SpitSe)) _sound.Play(SpitSe, -3f, 0.85f + 0.2f * (float)_rng.NextDouble());
     }
 
     public override void _Process(double delta)
@@ -101,9 +131,8 @@ public partial class SmsFireballs : Node3D
         _t += dt;
         if (State == Phase.Volley)
         {
-            float step = Count > 1 ? VolleySeconds / (Count - 1) : 0f;
-            while (Spat < Count && _t >= _nextAt) { Spit(); _nextAt += Mathf.Max(0.01f, step); }
-            if (Spat >= Count) { State = Phase.Flying; EmitSignal(SignalName.Shot, Spat); }
+            while (PopsMade < Pops && _t >= _nextAt) { Pop(); _nextAt += Mathf.Max(0.05f, PopSeconds); }
+            if (PopsMade >= Pops) { State = Phase.Flying; EmitSignal(SignalName.Shot, Spat); }
         }
         TickBalls(dt);
         if (State == Phase.Flying && _balls.Count == 0) Finish();
@@ -114,9 +143,10 @@ public partial class SmsFireballs : Node3D
         foreach (var b in _balls)
         {
             if (!IsInstanceValid(b)) { _dead.Add(b); continue; }
-            b.Tick(dt, _mario, _centre, _radius - WallInset, out bool bounced, out bool burned);
+            b.Tick(dt, _mario, _centre, _radius - WallInset, out bool bounced, out bool burned, out bool landed);
             if (bounced) { BouncesMade++; if (_sound != null && !string.IsNullOrEmpty(BounceSe)) _sound.Play(BounceSe, -6f, 0.8f); EmitSignal(SignalName.Bounced); }
-            if (burned) { Burns++; BurnCount++; if (DebugPrint) GD.Print($"[SMS fireballs] {Name}: {b.Name} BURNS Mario at {b.GlobalPosition} (r {b.R:F2}, age {b.Age:F2}); hp {_mario?.SmsHP}"); EmitSignal(SignalName.Burned); }
+            if (landed) { Landings++; if (DebugPrint) GD.Print($"[SMS fireballs] {Name}: {b.Name} LANDS at {b.GlobalPosition} after {b.Bounces} bounce{(b.Bounces == 1 ? "" : "s")}, rolling at {b.Vel.Length():F1} m/s"); }
+            if (burned) { Burns++; BurnCount++; if (DebugPrint) GD.Print($"[SMS fireballs] {Name}: {b.Name} BURNS Mario at {b.GlobalPosition} (r {b.R:F2}, age {b.Age:F2}, {(b.OnFloor ? "rolling" : "in the air")}); hp {_mario?.SmsHP}"); EmitSignal(SignalName.Burned); }
             if (b.Dead) _dead.Add(b);
         }
         foreach (var b in _dead) _balls.Remove(b);
@@ -124,17 +154,17 @@ public partial class SmsFireballs : Node3D
     private void Finish()
     {
         State = Phase.Done; All.Remove(this);
-        if (DebugPrint) GD.Print($"[SMS fireballs] {Name}: finished -- {Spat} spat, {BouncesMade} bounce{(BouncesMade == 1 ? "" : "s")}, {Burns} burn{(Burns == 1 ? "" : "s")}");
+        if (DebugPrint) GD.Print($"[SMS fireballs] {Name}: finished -- {Spat} popped in {PopsMade} pops, {Landings} landings, {BouncesMade} bounce{(BouncesMade == 1 ? "" : "s")}, {Burns} burn{(Burns == 1 ? "" : "s")}");
         EmitSignal(SignalName.Finished);
         QueueFree();
     }
-    /// <summary>King Boo hit through the attack: no more spat, every ball fizzles out.</summary>
+    /// <summary>King Boo hit through the attack: no more pops, every ball fizzles out.</summary>
     public void Cancel()
     {
         if (State == Phase.Done) return;
         State = Phase.Done; All.Remove(this);
         foreach (var b in _balls) if (IsInstanceValid(b)) b.Fizzle();
-        if (DebugPrint) GD.Print($"[SMS fireballs] {Name}: cut off after {Spat} of {Count} ({_balls.Count} fizzling)");
+        if (DebugPrint) GD.Print($"[SMS fireballs] {Name}: cut off after {PopsMade} of {Pops} pops ({_balls.Count} fizzling)");
         EmitSignal(SignalName.Finished);
         GetTree().CreateTimer(0.6f).Timeout += () => { if (IsInstanceValid(this)) QueueFree(); };
     }
@@ -150,10 +180,15 @@ public partial class SmsFireballs : Node3D
         var g = new Gradient { Offsets = new float[] { 0f, 0.15f, 0.6f, 1f }, Colors = new Color[] { c0, c1, c2, c3 } };
         return new GradientTexture1D { Gradient = g };
     }
+    /// <summary>An additive, unshaded, vertex-coloured particle billboard of a texture.</summary>
+    public static StandardMaterial3D AddBillboard(Texture2D tex) => new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = tex, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true };
+    /// <summary>The same, not a billboard (an align_y streak: the quad's Y along the particle's way).</summary>
+    public static StandardMaterial3D AddStreak(Texture2D tex) => new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, AlbedoTexture = tex, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true };
 }
 
-/// <summary>One fireball (168): the ball of fire and its flight -- the drop from the mouth to the floor, the roll at constant speed, the bounces off the arena
-/// wall, the shrink to nothing over its life, the burn on Mario. The flames scale with the node (local coordinates); the embers trail in the world.</summary>
+/// <summary>One lava ball (168, molten since 172): the crust sphere and its flight -- the lob out of the crown, the bounces and the landing, the roll at
+/// RollSpeed, the bounces off the arena wall, the shrink to nothing over its life (the crust cooling), the burn on Mario. The flames and the glow scale with
+/// the node (local coordinates); the embers, drips and smoke trail in the world.</summary>
 public partial class SmsFireball : Node3D
 {
     public Vector3 Vel { get; private set; }
@@ -167,54 +202,89 @@ public partial class SmsFireball : Node3D
     public int Bounces { get; private set; }
     public bool HitMario { get; private set; }
     public float FloorY { get; private set; }
+    public Vector3 Target { get; private set; }
+    public float Heat { get; private set; } = 1f;
+    public float Vy => _vy;
     public float ScaleShown => _k;
 
     private const float U = 74.44f;
-    private SmsFireballs _owner; private MeshInstance3D _core; private StandardMaterial3D _coreMat; private GpuParticles3D _flames, _embers; private OmniLight3D _light;
-    private float _vy, _drop, _k = 1f, _flare, _fizzleT; private bool _dropping;
+    private SmsFireballs _owner; private MeshInstance3D _core, _glow, _mark; private ShaderMaterial _crust; private StandardMaterial3D _glowMat, _markMat; private GpuParticles3D _flames, _embers, _drips, _smoke; private OmniLight3D _light;
+    private float _vy, _k = 1f, _flare, _fizzleT, _seed; private bool _inAir;
 
-    public void Setup(SmsFireballs owner, Vector3 from, Vector3 vel, float radius, float life, float floorY, float dropSeconds)
+    public void Setup(SmsFireballs owner, Vector3 from, Vector3 flatVel, float vy0, float radius, float life, float floorY, Vector3 target, float seed)
     {
-        _owner = owner; Vel = vel; R0 = R = Mathf.Max(0.1f, radius); Life = Mathf.Max(0.5f, life); FloorY = floorY; GlobalPosition = from;
-        float h = from.Y - (floorY + R0);
-        _drop = Mathf.Max(0.05f, dropSeconds); _dropping = h > 0.05f;
-        _vy = _dropping ? (-h / _drop + 0.5f * 20f * _drop) : 0f;                          // a lob: down to the floor in DropSeconds under 20 m/s^2
-        _coreMat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, AlbedoTexture = SmsFireballs.Tex("kemuball3_fire"), AlbedoColor = owner.CoreColor, RenderPriority = 2 };
-        _core = new MeshInstance3D { Name = "Core", Mesh = new QuadMesh { Size = Vector2.One * (R0 * 1.7f) }, MaterialOverride = _coreMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        _owner = owner; Vel = flatVel; _vy = vy0; R0 = R = Mathf.Max(0.1f, radius); Life = Mathf.Max(0.5f, life); FloorY = floorY; Target = target; _seed = seed; GlobalPosition = from; _inAir = true;
+        var shader = ResourceLoader.Exists("res://assets/Sms/Rematch/LavaBall.gdshader") ? GD.Load<Shader>("res://assets/Sms/Rematch/LavaBall.gdshader") : null;
+        if (shader != null) { _crust = new ShaderMaterial { Shader = shader }; _crust.SetShaderParameter("seed", seed); _crust.SetShaderParameter("heat", 1f); }
+        _core = new MeshInstance3D { Name = "Crust", Mesh = new SphereMesh { Radius = R0, Height = R0 * 2f, RadialSegments = 28, Rings = 14 }, MaterialOverride = (Material)_crust ?? new StandardMaterial3D { AlbedoColor = new Color(0.1f, 0.04f, 0.02f), EmissionEnabled = true, Emission = owner.GlowColor }, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        _core.Rotation = new Vector3(seed, seed * 1.7f, 0f);
         AddChild(_core);
+        _glowMat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, AlbedoTexture = SmsFireballs.Tex("glow3_raw"), AlbedoColor = new Color(owner.GlowColor.R, owner.GlowColor.G, owner.GlowColor.B, 0.55f), RenderPriority = 1 };
+        _glow = new MeshInstance3D { Name = "Glow", Mesh = new QuadMesh { Size = Vector2.One * (R0 * 2.8f) }, MaterialOverride = _glowMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        AddChild(_glow);
         if (owner.Flames > 0)
         {
             var pm = new ParticleProcessMaterial
             {
-                EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = R0 * 0.55f,
-                Direction = new Vector3(0f, 1f, 0f), Spread = 40f, InitialVelocityMin = R0 * 2f, InitialVelocityMax = R0 * 4.5f, Gravity = new Vector3(0f, R0 * 3f, 0f),
-                ScaleMin = 1f, ScaleMax = 1f, ScaleCurve = SmsFireballs.Ramp(1f, 0.25f), AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -90f, AngularVelocityMax = 90f,
-                Color = new Color(1f, 1f, 1f, 1f), ColorRamp = SmsFireballs.Fade(new Color(1f, 0.9f, 0.35f, 1f), owner.FlameColor, new Color(0.8f, 0.1f, 0.02f, 0.85f), new Color(0.4f, 0.03f, 0.01f, 0f))
+                EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = R0 * 0.8f,
+                Direction = new Vector3(0f, 1f, 0f), Spread = 50f, InitialVelocityMin = R0 * 1.5f, InitialVelocityMax = R0 * 3.5f, Gravity = new Vector3(0f, R0 * 3f, 0f),
+                ScaleMin = 1f, ScaleMax = 1f, ScaleCurve = SmsFireballs.Ramp(1f, 0.2f), AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -90f, AngularVelocityMax = 90f,
+                Color = new Color(1f, 1f, 1f, 1f), ColorRamp = SmsFireballs.Fade(new Color(1f, 0.9f, 0.35f, 0.9f), owner.FlameColor, new Color(0.8f, 0.1f, 0.02f, 0.7f), new Color(0.4f, 0.03f, 0.01f, 0f))
             };
-            var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = SmsFireballs.Tex("fire1_raw"), CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true };
-            _flames = new GpuParticles3D { Name = "Flames", Amount = owner.Flames, Lifetime = 0.4, Emitting = true, LocalCoords = true, FixedFps = 60, Interpolate = true, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One * (R0 * 1.7f), Material = mat }, VisibilityAabb = new Aabb(new Vector3(-6f, -6f, -6f), new Vector3(12f, 12f, 12f)) };
+            _flames = new GpuParticles3D { Name = "Flames", Amount = owner.Flames, Lifetime = 0.35, Emitting = true, LocalCoords = true, FixedFps = 60, Interpolate = true, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One * (R0 * 1.1f), Material = SmsFireballs.AddBillboard(SmsFireballs.Tex("fire1_raw")) }, VisibilityAabb = new Aabb(new Vector3(-6f, -6f, -6f), new Vector3(12f, 12f, 12f)) };
             AddChild(_flames);
         }
         if (owner.Embers > 0)
         {
             var pm = new ParticleProcessMaterial
             {
-                EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = R0 * 0.5f,
-                Direction = new Vector3(0f, 1f, 0f), Spread = 180f, InitialVelocityMin = 0.5f, InitialVelocityMax = 2.5f, Gravity = new Vector3(0f, -3f, 0f), DampingMin = 1f, DampingMax = 2f,
-                ScaleMin = 1f, ScaleMax = 1f, Color = new Color(owner.EmberColor.R, owner.EmberColor.G, owner.EmberColor.B, 1f),
-                ColorRamp = SmsFireballs.Fade(new Color(1f, 1f, 1f, 1f), new Color(1f, 1f, 1f, 1f), new Color(1f, 0.6f, 0.3f, 0.7f), new Color(1f, 0.3f, 0.1f, 0f))
+                EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = R0 * 0.7f,
+                Direction = new Vector3(0f, 1f, 0f), Spread = 180f, InitialVelocityMin = 0.8f, InitialVelocityMax = 3f, Gravity = new Vector3(0f, -4f, 0f), DampingMin = 0.5f, DampingMax = 1.5f,
+                ScaleMin = 0.7f, ScaleMax = 1.3f, Color = new Color(owner.EmberColor.R, owner.EmberColor.G, owner.EmberColor.B, 1f),
+                ColorRamp = SmsFireballs.Fade(new Color(1f, 1f, 1f, 1f), new Color(1f, 1f, 1f, 1f), new Color(1f, 0.55f, 0.25f, 0.7f), new Color(0.8f, 0.2f, 0.05f, 0f))
             };
-            var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = SmsFireballs.Tex("glow1_spark"), CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true };
-            _embers = new GpuParticles3D { Name = "Embers", TopLevel = true, Amount = owner.Embers, Lifetime = 0.7, Emitting = true, LocalCoords = false, FixedFps = 60, Interpolate = true, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One * 0.16f, Material = mat }, VisibilityAabb = new Aabb(new Vector3(-60f, -10f, -60f), new Vector3(120f, 30f, 120f)) };
+            _embers = new GpuParticles3D { Name = "Embers", TopLevel = true, Amount = owner.Embers, Lifetime = 0.9, Emitting = true, LocalCoords = false, FixedFps = 60, Interpolate = true, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One * 0.16f, Material = SmsFireballs.AddBillboard(SmsFireballs.Tex("glow1_spark")) }, VisibilityAabb = new Aabb(new Vector3(-60f, -10f, -60f), new Vector3(120f, 30f, 120f)) };
             AddChild(_embers);
         }
-        if (owner.Lights) { _light = new OmniLight3D { Name = "Light", LightColor = new Color(1f, 0.55f, 0.18f), LightEnergy = owner.LightEnergy, OmniRange = owner.LightRange, ShadowEnabled = false }; AddChild(_light); }
+        if (owner.Drips > 0)
+        {
+            var pm = new ParticleProcessMaterial
+            {
+                EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = R0 * 0.75f, ParticleFlagAlignY = true,
+                Direction = new Vector3(0f, -1f, 0f), Spread = 70f, InitialVelocityMin = 0.5f, InitialVelocityMax = 2f, Gravity = new Vector3(0f, -14f, 0f),
+                ScaleMin = 0.7f, ScaleMax = 1.3f, Color = new Color(1f, 1f, 1f, 1f),
+                ColorRamp = SmsFireballs.Fade(new Color(1f, 0.9f, 0.5f, 1f), new Color(1f, 0.55f, 0.1f, 1f), new Color(0.9f, 0.25f, 0.03f, 0.9f), new Color(0.4f, 0.05f, 0.01f, 0f))
+            };
+            _drips = new GpuParticles3D { Name = "Drips", TopLevel = true, Amount = owner.Drips, Lifetime = 0.6, Emitting = true, LocalCoords = false, FixedFps = 60, Interpolate = true, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = new Vector2(0.09f, 0.34f), Material = SmsFireballs.AddStreak(SmsFireballs.Tex("glow1_spark")) }, VisibilityAabb = new Aabb(new Vector3(-60f, -10f, -60f), new Vector3(120f, 30f, 120f)) };
+            AddChild(_drips);
+        }
+        if (owner.Smoke > 0)
+        {
+            var pm = new ParticleProcessMaterial
+            {
+                EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = R0 * 0.6f,
+                Direction = new Vector3(0f, 1f, 0f), Spread = 30f, InitialVelocityMin = 0.4f, InitialVelocityMax = 1.2f, Gravity = new Vector3(0f, 1.6f, 0f), DampingMin = 0.5f, DampingMax = 1f,
+                ScaleMin = 1f, ScaleMax = 1f, ScaleCurve = SmsFireballs.Ramp(0.6f, 2.2f), AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -30f, AngularVelocityMax = 30f,
+                Color = new Color(1f, 1f, 1f, 1f), ColorRamp = SmsFireballs.Fade(new Color(0.35f, 0.2f, 0.15f, 0f), new Color(0.16f, 0.12f, 0.11f, 0.5f), new Color(0.12f, 0.1f, 0.1f, 0.3f), new Color(0.1f, 0.1f, 0.1f, 0f))
+            };
+            var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Mix, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = SmsFireballs.Tex("kemuball3_raw"), CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true };
+            _smoke = new GpuParticles3D { Name = "Smoke", TopLevel = true, Amount = owner.Smoke, Lifetime = 1.1, Emitting = true, LocalCoords = false, FixedFps = 60, Interpolate = true, DrawOrder = GpuParticles3D.DrawOrderEnum.ViewDepth, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One * (R0 * 1.1f), Material = mat }, VisibilityAabb = new Aabb(new Vector3(-60f, -10f, -60f), new Vector3(120f, 30f, 120f)) };
+            AddChild(_smoke);
+        }
+        if (owner.Lights) { _light = new OmniLight3D { Name = "Light", LightColor = new Color(1f, 0.5f, 0.15f), LightEnergy = owner.LightEnergy, OmniRange = owner.LightRange, ShadowEnabled = false }; AddChild(_light); }
+        if (owner.LandingMarks)
+        {
+            _markMat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, AlbedoTexture = SmsFireballs.Tex("hamonring3_flat"), AlbedoColor = new Color(1f, 0.45f, 0.1f, 0.5f) };
+            _mark = new MeshInstance3D { Name = "LandingMark", TopLevel = true, Mesh = new QuadMesh { Size = Vector2.One * (R0 * 2.6f) }, MaterialOverride = _markMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+            AddChild(_mark); _mark.GlobalPosition = new Vector3(target.X, FloorY + 0.08f, target.Z); _mark.Rotation = new Vector3(-MathF.PI / 2f, 0f, 0f);
+        }
+        Apply();
     }
 
-    /// <summary>A frame: the flight (the drop, the roll, the wall), the shrink, the burn on Mario.</summary>
-    public void Tick(float dt, Mario mario, Vector3 centre, float wallR, out bool bounced, out bool burned)
+    /// <summary>A frame: the flight (the lob, the bounces, the roll, the wall), the shrink and the cooling, the burn on Mario.</summary>
+    public void Tick(float dt, Mario mario, Vector3 centre, float wallR, out bool bounced, out bool burned, out bool landed)
     {
-        bounced = false; burned = false;
+        bounced = false; burned = false; landed = false;
         if (Dead) return;
         Age += dt;
         Vector3 p = GlobalPosition;
@@ -223,16 +293,29 @@ public partial class SmsFireball : Node3D
             _fizzleT += dt; _k = Mathf.Max(0f, 1f - _fizzleT / 0.3f); R = R0 * _k;
             Apply(); if (_k <= 0f) Die(); return;
         }
-        // the size: shrinking to nothing over the life, the fade over its last part
+        // the size: shrinking to nothing over the life, the fade over its last part, the crust cooling
         float life01 = Mathf.Clamp(Age / Life, 0f, 1f);
         _k = Mathf.Max(0f, 1f - life01); R = R0 * _k;
+        Heat = Mathf.Lerp(1f, _owner != null ? _owner.HeatAtEnd : 0.3f, life01);
         if (_k <= 0.06f) { Die(); return; }
         // the flight
         p += Vel * dt;
-        if (_dropping)
+        if (_inAir)
         {
-            _vy -= 20f * dt; p.Y += _vy * dt;
-            if (p.Y <= FloorY + R) { p.Y = FloorY + R; _dropping = false; OnFloor = true; }
+            _vy -= SmsFireballs.G * dt; p.Y += _vy * dt;
+            if (p.Y <= FloorY + R && _vy < 0f)
+            {
+                p.Y = FloorY + R;
+                float bounce = _owner != null ? _owner.Bounce : 0.35f;
+                if (bounce > 0f && -_vy > 3f && Bounces < 2) { _vy = -_vy * bounce; Bounces++; bounced = true; _flare = 0.1f; Splat(p, 0.6f); }
+                else
+                {
+                    _vy = 0f; _inAir = false; OnFloor = true; landed = true; _flare = 0.12f; Splat(p, 1f);
+                    float roll = _owner != null ? _owner.RollSpeed : 0f; float sp = Vel.Length();
+                    if (roll > 0f && sp > 1e-3f) Vel = Vel / sp * roll;
+                    if (_mark != null) { _mark.QueueFree(); _mark = null; }
+                }
+            }
         }
         else p.Y = FloorY + R;
         // the wall: the flat way mirrored about the inward normal
@@ -244,6 +327,9 @@ public partial class SmsFireball : Node3D
             float over = dist + R - wallR; p -= d / dist * over;
         }
         GlobalPosition = p;
+        // the crust rolls with the way it moves (in the air it turns as well: a tumbling bomb)
+        float sp2 = Vel.Length();
+        if (_core != null && sp2 > 1e-3f && R > 1e-3f) _core.Rotate(Vector3.Up.Cross(Vel / sp2).Normalized(), (OnFloor ? sp2 : sp2 * 0.5f) * dt / R);
         _flare -= dt;
         Apply();
         // the burn
@@ -264,17 +350,45 @@ public partial class SmsFireball : Node3D
     }
     private void Apply()
     {
-        float s = Mathf.Max(0.01f, _k) * (_flare > 0f ? 1.35f : 1f);
+        float s = Mathf.Max(0.01f, _k) * (_flare > 0f ? 1.25f : 1f);
         Scale = Vector3.One * s;
         float life01 = Mathf.Clamp(Age / Life, 0f, 1f), fadeFrom = _owner != null ? _owner.FadeFrom : 0.65f;
         float a = life01 > fadeFrom ? 1f - (life01 - fadeFrom) / Mathf.Max(0.05f, 1f - fadeFrom) : 1f;
         if (Fizzling) a = _k;
-        if (_coreMat != null && _owner != null) _coreMat.AlbedoColor = new Color(_owner.CoreColor.R, _owner.CoreColor.G, _owner.CoreColor.B, a);
-        if (_light != null && _owner != null) _light.LightEnergy = _owner.LightEnergy * a * Mathf.Clamp(_k * 1.5f, 0.2f, 1f);
-        if (_embers != null) { _embers.GlobalPosition = GlobalPosition; _embers.Emitting = !Fizzling && a > 0.1f; }
+        _crust?.SetShaderParameter("heat", Heat * a);
+        _crust?.SetShaderParameter("emissive", Fizzling ? 1f + 2f * (1f - _k) : 1f);
+        if (_glowMat != null && _owner != null) _glowMat.AlbedoColor = new Color(_owner.GlowColor.R, _owner.GlowColor.G, _owner.GlowColor.B, 0.55f * a * (0.5f + 0.5f * Heat) * (_flare > 0f ? 1.5f : 1f));
+        if (_light != null && _owner != null) _light.LightEnergy = _owner.LightEnergy * a * Mathf.Clamp(_k * 1.5f, 0.2f, 1f) * (0.5f + 0.5f * Heat);
+        bool trailing = !Fizzling && a > 0.1f;
+        foreach (var p in new[] { _embers, _drips, _smoke }) if (p != null) { p.GlobalPosition = GlobalPosition; p.Emitting = trailing; }
+        if (_drips != null) _drips.Emitting = trailing && Heat > 0.45f;                         // a cooled ball no longer drips
+        if (_mark != null && _markMat != null) _markMat.AlbedoColor = new Color(1f, 0.45f, 0.1f, 0.3f + 0.3f * MathF.Sin(Age * 14f));
     }
-    /// <summary>Out in a few frames: the ball collapsing, no more hits. 170: a ball that got Mario BURSTS -- a flash of flame and a ring.</summary>
-    public void Fizzle() { if (!Fizzling && !Dead) { bool burst = HitMario; Fizzling = true; _fizzleT = 0f; HitMario = true; if (_flames != null) _flames.Emitting = false; if (burst) Burst(); } }
+    /// <summary>A splat of lava where the ball meets the floor: drops flung out (align_y streaks under gravity) and a small ring; k scales it.</summary>
+    private void Splat(Vector3 at, float k)
+    {
+        var pm = new ParticleProcessMaterial
+        {
+            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = R * 0.5f, ParticleFlagAlignY = true,
+            Direction = new Vector3(0f, 1f, 0f), Spread = 60f, InitialVelocityMin = 3f * k, InitialVelocityMax = 7f * k, Gravity = new Vector3(0f, -16f, 0f),
+            ScaleMin = 0.7f, ScaleMax = 1.4f, Color = new Color(1f, 1f, 1f, 1f),
+            ColorRamp = SmsFireballs.Fade(new Color(1f, 0.9f, 0.5f, 1f), new Color(1f, 0.55f, 0.1f, 1f), new Color(0.9f, 0.25f, 0.03f, 0.9f), new Color(0.4f, 0.05f, 0.01f, 0f))
+        };
+        var p = new GpuParticles3D { Name = "Splat", TopLevel = true, Amount = Mathf.Max(4, Mathf.RoundToInt(14f * k)), Lifetime = 0.55, OneShot = true, Explosiveness = 1f, Emitting = false, LocalCoords = false, FixedFps = 60, Interpolate = true, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = new Vector2(0.1f, 0.4f), Material = SmsFireballs.AddStreak(SmsFireballs.Tex("glow1_spark")) }, VisibilityAabb = new Aabb(new Vector3(-10f, -5f, -10f), new Vector3(20f, 20f, 20f)) };
+        (GetParent() ?? this).AddChild(p); p.GlobalPosition = new Vector3(at.X, FloorY + R * 0.3f, at.Z); p.Finished += p.QueueFree; p.Emitting = true;
+        Ring(at, R * 4f * k, new Color(1f, 0.5f, 0.12f, 0.8f), 0.3f);
+    }
+    private void Ring(Vector3 at, float size, Color c, float seconds)
+    {
+        var rmat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, AlbedoTexture = SmsFireballs.Tex("hamonring3_flat"), AlbedoColor = c };
+        var ring = new MeshInstance3D { Name = "LavaRing", TopLevel = true, Mesh = new QuadMesh { Size = Vector2.One }, MaterialOverride = rmat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        (GetParent() ?? this).AddChild(ring); ring.GlobalPosition = new Vector3(at.X, FloorY + 0.1f, at.Z); ring.Rotation = new Vector3(-MathF.PI / 2f, 0f, 0f);
+        var tw = ring.CreateTween();
+        tw.TweenMethod(Callable.From<float>(k => { ring.Scale = Vector3.One * Mathf.Max(0.05f, size * k); rmat.AlbedoColor = new Color(c.R, c.G, c.B, c.A * (1f - k)); }), 0f, 1f, seconds);
+        tw.TweenCallback(Callable.From(ring.QueueFree));
+    }
+    /// <summary>Out in a few frames: the ball collapsing, no more hits. 170: a ball that got Mario BURSTS -- 172: a splash of lava, flames, a ring, smoke.</summary>
+    public void Fizzle() { if (!Fizzling && !Dead) { bool burst = HitMario; Fizzling = true; _fizzleT = 0f; HitMario = true; if (_flames != null) _flames.Emitting = false; if (_mark != null) { _mark.QueueFree(); _mark = null; } if (burst) Burst(); } }
     private void Burst()
     {
         var pm = new ParticleProcessMaterial
@@ -284,23 +398,28 @@ public partial class SmsFireball : Node3D
             ScaleMin = 1f, ScaleMax = 1f, ScaleCurve = SmsFireballs.Ramp(1f, 0.2f), AngleMin = -180f, AngleMax = 180f,
             Color = new Color(1f, 1f, 1f, 1f), ColorRamp = SmsFireballs.Fade(new Color(1f, 0.95f, 0.6f, 1f), new Color(1f, 0.5f, 0.1f, 1f), new Color(0.8f, 0.12f, 0.02f, 0.7f), new Color(0.3f, 0.03f, 0.01f, 0f))
         };
-        var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = SmsFireballs.Tex("fire1_raw"), CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true };
-        var p = new GpuParticles3D { Name = "Burst", TopLevel = true, Amount = 20, Lifetime = 0.5, OneShot = true, Explosiveness = 1f, Emitting = false, LocalCoords = false, FixedFps = 60, Interpolate = true, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One * (R0 * 1.6f), Material = mat }, VisibilityAabb = new Aabb(new Vector3(-10f, -5f, -10f), new Vector3(20f, 20f, 20f)) };
+        var p = new GpuParticles3D { Name = "Burst", TopLevel = true, Amount = 20, Lifetime = 0.5, OneShot = true, Explosiveness = 1f, Emitting = false, LocalCoords = false, FixedFps = 60, Interpolate = true, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One * (R0 * 1.6f), Material = SmsFireballs.AddBillboard(SmsFireballs.Tex("fire1_raw")) }, VisibilityAabb = new Aabb(new Vector3(-10f, -5f, -10f), new Vector3(20f, 20f, 20f)) };
         (GetParent() ?? this).AddChild(p); p.GlobalPosition = GlobalPosition; p.Finished += p.QueueFree; p.Emitting = true;
-        var rtex = SmsFireballs.Tex("hamonring3_flat");
-        var rmat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, AlbedoTexture = rtex, AlbedoColor = new Color(1f, 0.6f, 0.2f, 0.9f) };
-        var ring = new MeshInstance3D { Name = "BurstRing", TopLevel = true, Mesh = new QuadMesh { Size = Vector2.One }, MaterialOverride = rmat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
-        (GetParent() ?? this).AddChild(ring); ring.GlobalPosition = new Vector3(GlobalPosition.X, FloorY + 0.1f, GlobalPosition.Z); ring.Rotation = new Vector3(-MathF.PI / 2f, 0f, 0f);
-        float size = R0 * 6f; var tw = ring.CreateTween();
-        tw.TweenMethod(Callable.From<float>(k => { ring.Scale = Vector3.One * Mathf.Max(0.05f, size * k); rmat.AlbedoColor = new Color(1f, 0.6f, 0.2f, 0.9f * (1f - k)); }), 0f, 1f, 0.35f);
-        tw.TweenCallback(Callable.From(ring.QueueFree));
+        Splat(GlobalPosition, 1.6f);                                                                   // the lava flung out
+        var sm = new ParticleProcessMaterial
+        {
+            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = R0 * 0.5f,
+            Direction = new Vector3(0f, 1f, 0f), Spread = 60f, InitialVelocityMin = 1.5f, InitialVelocityMax = 3.5f, Gravity = new Vector3(0f, 2f, 0f), DampingMin = 1f, DampingMax = 2f,
+            ScaleMin = 1f, ScaleMax = 1f, ScaleCurve = SmsFireballs.Ramp(0.6f, 1.8f), AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -40f, AngularVelocityMax = 40f,
+            Color = new Color(1f, 1f, 1f, 1f), ColorRamp = SmsFireballs.Fade(new Color(0.3f, 0.15f, 0.1f, 0f), new Color(0.15f, 0.11f, 0.1f, 0.6f), new Color(0.12f, 0.1f, 0.1f, 0.35f), new Color(0.1f, 0.1f, 0.1f, 0f))
+        };
+        var smat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Mix, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = SmsFireballs.Tex("kemuball3_raw"), CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true };
+        var s = new GpuParticles3D { Name = "BurstSmoke", TopLevel = true, Amount = 8, Lifetime = 1.1, OneShot = true, Explosiveness = 0.8f, Emitting = false, LocalCoords = false, FixedFps = 60, Interpolate = true, DrawOrder = GpuParticles3D.DrawOrderEnum.ViewDepth, ProcessMaterial = sm, DrawPass1 = new QuadMesh { Size = Vector2.One * (R0 * 1.4f), Material = smat }, VisibilityAabb = new Aabb(new Vector3(-10f, -5f, -10f), new Vector3(20f, 20f, 20f)) };
+        (GetParent() ?? this).AddChild(s); s.GlobalPosition = GlobalPosition; s.Finished += s.QueueFree; s.Emitting = true;
+        Ring(GlobalPosition, R0 * 6f, new Color(1f, 0.6f, 0.2f, 0.9f), 0.35f);
         SmsCameraShake.Current?.Start(SmsCameraShake.Kind.Damage, 0.5f);
     }
     private void Die()
     {
         Dead = true; Visible = false;
         if (_light != null) _light.LightEnergy = 0f;
-        if (_embers != null) _embers.Emitting = false;
-        GetTree().CreateTimer(0.8f).Timeout += () => { if (IsInstanceValid(this)) QueueFree(); };
+        foreach (var p in new[] { _embers, _drips, _smoke }) if (p != null) p.Emitting = false;
+        if (_mark != null) { _mark.QueueFree(); _mark = null; }
+        GetTree().CreateTimer(1.3f).Timeout += () => { if (IsInstanceValid(this)) QueueFree(); };
     }
 }

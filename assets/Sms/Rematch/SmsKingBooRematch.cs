@@ -61,9 +61,10 @@ using System.Linq;
 /// Pass 168: FIREBALLS (the doc's attack 5: "Crown glows red. Fireballs shoot off in random directions and bounce off the arena walls. They shrink as
 /// they travel and fade out"; the hit "the burn ... fireDown on the profile": Mario.SmsDamageProfile.Fire). Made where he stands: the crown RED-ORANGE
 /// (FireballCrownColor; the lightning's red is deeper -- the doc has both red) through FireballTellSeconds as the spit clip rears, then the thrust (the
-/// clip held at it) and a VOLLEY of fireballs out of the mouth (<see cref="SmsFireballs"/>, its own knobs: the count, the arc, the speed, the size, the life,
-/// the bounces, the burn) over FireballVolleySeconds, facing Mario throughout; FireballWatchSeconds after the volley, the wait (the balls rolling on their
-/// own). A swung Bomb Boo hits him through it (the balls fizzle out). Signals FireballsStarted (the tell), FireballsShot (the last ball is out),
+/// clip held at it) and -- 172, Jaysonn: "more like molten lava balls ... from the crown popping a few out at once" -- POPS of LAVA BALLS out of the CROWN
+/// (<see cref="SmsFireballs"/>, its own knobs: the pops and how many each, the lob, where they come down about Mario, the size, the life, the roll, the
+/// bounces, the burn), FireballPopSeconds apart, facing Mario throughout; FireballWatchSeconds after the last pop, the wait (the balls rolling on their
+/// own). A swung Bomb Boo hits him through it (the balls fizzle out). Signals FireballsStarted (the tell), FireballsShot (the last pop is out),
 /// FireballBurned (a ball got Mario), FireballsDone(burns) (the last ball has died).
 /// Pass 169: GHOST WIND (the doc's attack 6: "Crown glows pink, for now. Tornados come at Mario and fling him around the arena"; the hit "knocked back and
 /// flung": the port's fling since pass 94, Mario.SmsThrowMario -- the Cataquack's). Made where he stands: the crown PINK (WindCrownColor) through
@@ -193,7 +194,7 @@ public partial class SmsKingBooRematch : Node3D
     /// over it: the jump); the freeze's seconds; one freeze per attack.</summary>
     [Export] public float SweepDeg = 150f, SweepSeconds = 1.6f;
     [Export] public SmsGhostBreath.Way SweepWay = SmsGhostBreath.Way.Random;
-    [Export] public float BreathDownDeg = 10f, BreathSpeed = 22f, PuffSeconds = 1.5f, PuffSizeStart = 2f, PuffSizeEnd = 6f, BreathHitHeight = 1.2f, FreezeSeconds = 1f;
+    [Export] public float BreathDownDeg = 10f, BreathSpeed = 22f, PuffSeconds = 1.5f, PuffSizeStart = 3f, PuffSizeEnd = 8f, BreathHitHeight = 1.2f, FreezeSeconds = 1f;   // 172: the puffs 3 -> 8 m (thicker)
     [Export] public bool OneFreezePerAttack = true;
     [ExportGroup("The fight (168): Fireballs")]
     /// <summary>The fireballs run at all; the crown's colour for them (the doc: red -- a red-orange here, the lightning's red being deeper); the tell before
@@ -203,11 +204,15 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public float FireballTellSeconds = 0.6f, FireballWatchSeconds = 0.4f;
     [Export] public string FireballClip = "btelesa_spit";
     [Export] public int FireballHoldFrame = 50;
-    /// <summary>The volley (SmsFireballs' knobs, set here as a template): how many balls over how long, the arc about the way to Mario they are spat into
-    /// (degrees; 0 = all at him), their speed (m/s), a ball's size at birth (metres across), how long one lives (shrinking to nothing), how high over the floor the fire reaches (a Mario
-    /// jumping higher is over it), whether a ball bursts on Mario.</summary>
-    [Export(PropertyHint.Range, "1,24,1")] public int FireballCount = 8;
-    [Export] public float FireballVolleySeconds = 1f, FireballSpreadDeg = 140f, FireballSpeed = 14f, FireballSize = 2f, FireballSeconds = 5f, FireballHitHeight = 1.6f;
+    /// <summary>The pops (SmsFireballs' knobs, set here as a template; 172): how many POPS out of the crown and how many lava balls each, the time between
+    /// pops, how high over the crown they lob (metres), how far about Mario they come down (metres; one of each pop lands within 1.5 m of him), how fast a
+    /// landed ball rolls on (m/s), a ball's size at birth (metres across), how long one lives (shrinking to nothing), how high over the floor the fire reaches
+    /// (a Mario jumping higher is over it), whether a ball bursts on Mario.</summary>
+    [Export(PropertyHint.Range, "1,8,1")] public int FireballPops = 3;
+    [Export(PropertyHint.Range, "1,8,1")] public int FireballPerPop = 3;
+    [Export] public float FireballPopSeconds = 0.45f, FireballLobHeight = 6f, FireballScatter = 7f, FireballAimedWithin = 1.5f, FireballRollSpeed = 8f, FireballSize = 2f, FireballSeconds = 6f, FireballHitHeight = 1.6f;
+    /// <summary>How many lava balls a Fireballs move pops in all.</summary>
+    public int FireballCount => FireballPops * FireballPerPop;
     [Export] public bool FireballDiesOnHit = true;
     [ExportGroup("The fight (169): Ghost Wind")]
     /// <summary>The wind runs at all; the crown's colour for it (the doc: pink, for now); the tell before the tornados rise; how long he watches after they
@@ -823,7 +828,7 @@ public partial class SmsKingBooRematch : Node3D
         PlayClip(FireballClip);
         if (_anim != null && FireballTellSeconds > 0.05f) _anim.SpeedScale *= Mathf.Clamp(FireballHoldFrame / 60f / FireballTellSeconds, 0.2f, 4f);   // the thrust lands at the tell's end
         SetCrownGlow(FireballCrownColor, 0f);
-        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: move {MovesMade}: FIREBALLS {FireballVolleys} -- the crown glows {FireballCrownColor} ({FireballCount} balls from {FireballTellSeconds:F2} s over {FireballVolleySeconds:F2} s)");
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: move {MovesMade}: FIREBALLS {FireballVolleys} -- the crown glows {FireballCrownColor} ({FireballCount} lava balls in {FireballPops} pops from {FireballTellSeconds:F2} s, {FireballPopSeconds:F2} s apart, out of the crown)");
         EmitSignal(SignalName.FireballsStarted);
     }
     private void FireballsTick(float dt)
@@ -844,18 +849,18 @@ public partial class SmsKingBooRematch : Node3D
             {
                 var m = M();
                 if (m == null) { EndFireballs(); return; }
-                var f = new SmsFireballs { Name = $"Fireballs{FireballVolleys}", DebugPrint = DebugPrint, Count = FireballCount, VolleySeconds = FireballVolleySeconds, SpreadDeg = FireballSpreadDeg, Speed = FireballSpeed, Size = FireballSize, LifeSeconds = FireballSeconds, HitHeight = FireballHitHeight, DiesOnHit = FireballDiesOnHit };
+                var f = new SmsFireballs { Name = $"Fireballs{FireballVolleys}", DebugPrint = DebugPrint, Pops = FireballPops, PerPop = FireballPerPop, PopSeconds = FireballPopSeconds, LobHeight = FireballLobHeight, Scatter = FireballScatter, AimedWithin = FireballAimedWithin, RollSpeed = FireballRollSpeed, Size = FireballSize, LifeSeconds = FireballSeconds, HitHeight = FireballHitHeight, DiesOnHit = FireballDiesOnHit };
                 (GetTree().CurrentScene ?? GetParent()).AddChild(f);
                 float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
                 Vector3 d = m.GlobalPosition - GlobalPosition; float yawTo = d.LengthSquared() > 1e-4f ? MathF.Atan2(d.X, d.Z) : _yaw;
                 f.Shot += n => { _fireShot = true; _crownFlashT = CrownFlashSeconds * 0.7f; EmitSignal(SignalName.FireballsShot); };
                 f.Burned += () => { FireballBurns++; EmitSignal(SignalName.FireballBurned); };
                 f.Finished += () => { int burns = f.Burns; if (_fireballs == f) _fireballs = null; EmitSignal(SignalName.FireballsDone, burns); };
-                f.Begin(m, fy, () => MouthPoint, yawTo, _arenaCentre, _arenaRadius);
+                f.Begin(m, fy, () => CrownFxPoint, yawTo, _arenaCentre, _arenaRadius);                                                        // 172: out of the crown
                 float frame = ClipFrameNow(FireballClip);
                 if (_anim != null && _anim.IsPlaying() && _anim.CurrentAnimation == FireballClip) { _anim.Pause(); _fireClipHeld = true; }   // the thrust held through the volley
                 _fireballs = f; _fireLaunched = true; _crownFlashT = CrownFlashSeconds;
-                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the fireballs come out of the mouth at {MouthPoint} (the clip held at frame {frame:F0})");
+                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the lava balls pop out of the crown at {CrownFxPoint} (the clip held at frame {frame:F0})");
             }
         }
         else

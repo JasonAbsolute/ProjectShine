@@ -17,6 +17,9 @@ using System.Collections.Generic;
 /// shatters as he thaws. Once per attack unless OneFreezePerAttack is off (the stream passes once anyway). MSD_SE_BS_TELESA_BREATHE as the blow begins (and
 /// every BreathSeEvery), the bottle's wind under it. <see cref="Cancel"/> (King Boo hit through the attack) cuts the breath off: no more cold, the puffs
 /// out fade. Signals Swept(hit) as the sweep ends, Finished as the last puff goes.
+/// Pass 172 (Jaysonn: "the breath attack should be thicker"): the puffs bigger (3 -> 8 m), more of them (520), more solid (PuffAlpha 0.72), scattered wider
+/// (9 deg), and a second, DENSE CORE down the middle of the stream (CorePuffs: smaller, whiter, nearly solid puffs, hugging the ray) so the breath reads as a
+/// thick rolling bank of cold rather than a line of puffs. The cold that hits is HitRadiusK of a puff's size as before (0.35 of the bigger puffs: 1.05 -> 2.8 m).
 /// </summary>
 public partial class SmsGhostBreath : Node3D
 {
@@ -31,20 +34,25 @@ public partial class SmsGhostBreath : Node3D
     [Export] public float DownDeg = 10f;
     /// <summary>How fast the cold blows (m/s), how long a puff of it lives (seconds; its reach is the two multiplied), how hard it sinks (m/s^2), how wide
     /// the stream scatters (degrees either side).</summary>
-    [Export] public float BreathSpeed = 22f, PuffSeconds = 1.5f, Sink = 4f, SpreadDeg = 6f;
+    [Export] public float BreathSpeed = 22f, PuffSeconds = 1.5f, Sink = 4f, SpreadDeg = 9f;
     [ExportGroup("The hit")]
     /// <summary>A puff's size as it leaves the mouth and at its end (metres across), what part of that is the cold that hits (0.4: the smoke ball's solid
     /// middle), how high over the floor the cold reaches -- a Mario whose feet are higher is over it -- and how long the freeze holds him.</summary>
-    [Export] public float PuffSizeStart = 2f, PuffSizeEnd = 6f;
-    [Export(PropertyHint.Range, "0.1,0.6,0.01")] public float HitRadiusK = 0.4f;
+    [Export] public float PuffSizeStart = 3f, PuffSizeEnd = 8f;
+    [Export(PropertyHint.Range, "0.1,0.6,0.01")] public float HitRadiusK = 0.35f;
     [Export] public float HitHeight = 1.2f, FreezeSeconds = 1f;
     [Export] public bool OneFreezePerAttack = true;
     [ExportGroup("The look")]
     /// <summary>The mist's colour and how solid it is, the glints' colour, how many puffs and glints the stream carries, the cold light at the mouth (metres
     /// across; 0 = none).</summary>
     [Export] public Color BreathColor = new Color(0.8f, 0.93f, 1f), GlintColor = new Color(0.6f, 0.95f, 1f);
-    [Export(PropertyHint.Range, "0,1,0.01")] public float PuffAlpha = 0.55f;
-    [Export(PropertyHint.Range, "0,600,1")] public int Puffs = 320;
+    [Export(PropertyHint.Range, "0,1,0.01")] public float PuffAlpha = 0.72f;
+    [Export(PropertyHint.Range, "0,800,1")] public int Puffs = 520;
+    /// <summary>172: the dense CORE down the middle of the stream -- how many puffs (0 = none), their size as they leave and at their end (metres across), how
+    /// solid they are, how far they scatter (degrees either side; the stream's own is SpreadDeg).</summary>
+    [Export(PropertyHint.Range, "0,400,1")] public int CorePuffs = 180;
+    [Export] public float CoreSizeStart = 1.6f, CoreSizeEnd = 4.5f, CoreSpreadDeg = 3f;
+    [Export(PropertyHint.Range, "0,1,0.01")] public float CoreAlpha = 0.9f;
     [Export(PropertyHint.Range, "0,200,1")] public int Glints = 90;
     [Export] public float MouthGlowSize = 3f;
     /// <summary>A glint's size (metres; the quad -- the process material's scale range did not take here).</summary>
@@ -74,6 +82,8 @@ public partial class SmsGhostBreath : Node3D
     public float FloorY { get; private set; }
     public Vector3 MouthPoint => _mouthNow;
     public bool Emitting => _puffs != null && _puffs.Emitting;
+    public bool CoreEmitting => _core != null && _core.Emitting;
+    public int CorePuffCount => _core != null ? _core.Amount : 0;
     public int RaysBlown => _rays.Count;
     public float Age => _age;
     public Vector3 FreezePoint { get; private set; }
@@ -83,7 +93,7 @@ public partial class SmsGhostBreath : Node3D
 
     private const float U = 74.44f;
     private Mario _mario; private Func<Vector3> _mouth; private SmsActorSound _sound; private readonly Random _rng = new(167);
-    private GpuParticles3D _puffs, _glints; private MeshInstance3D _glow; private StandardMaterial3D _glowMat; private GpuParticlesCollisionBox3D _slab;
+    private GpuParticles3D _puffs, _glints, _core; private MeshInstance3D _glow; private StandardMaterial3D _glowMat; private GpuParticlesCollisionBox3D _slab;
     private readonly List<(float t, Vector3 o, Vector3 d)> _rays = new();
     private float _t, _age, _yawCentre, _yawNow, _seT, _tailT; private int _side = 1; private Vector3 _dirNow = Vector3.Forward, _mouthNow; private bool _hit;
 
@@ -111,10 +121,11 @@ public partial class SmsGhostBreath : Node3D
         _sound = SmsActorSound.Attach(this);
         _mouthNow = mouth();
         GlobalPosition = _mouthNow;
-        _puffs = MakePuffs(); _glints = MakeGlints(); MakeGlow(); MakeSlab();
+        _puffs = MakePuffs(); _core = MakeCore(); _glints = MakeGlints(); MakeGlow(); MakeSlab();
         State = Phase.Blow; _t = 0f; _age = 0f; _seT = 0f;
         Aim(0f);
         if (_puffs != null) { _puffs.Visible = true; _puffs.Emitting = true; }
+        if (_core != null) { _core.Visible = true; _core.Emitting = true; }
         if (_glints != null) { _glints.Visible = true; _glints.Emitting = true; }
         if (_glow != null) _glow.Visible = true;
         if (_sound != null) { if (!string.IsNullOrEmpty(BreathSe)) _sound.Play(BreathSe); if (!string.IsNullOrEmpty(WindSe)) _sound.Play(WindSe, -6f); }
@@ -167,7 +178,7 @@ public partial class SmsGhostBreath : Node3D
         _mouthNow = _mouth != null ? _mouth() : GlobalPosition;
         GlobalPosition = _mouthNow;
         var basis = Basis.LookingAt(_dirNow, Vector3.Up);
-        foreach (var p in new[] { _puffs, _glints }) if (p != null) { p.GlobalPosition = _mouthNow; p.GlobalBasis = basis; }
+        foreach (var p in new[] { _puffs, _core, _glints }) if (p != null) { p.GlobalPosition = _mouthNow; p.GlobalBasis = basis; }
         if (_glow != null) _glow.GlobalPosition = _mouthNow + _dirNow * 0.6f;
     }
 
@@ -187,6 +198,7 @@ public partial class SmsGhostBreath : Node3D
             {
                 State = Phase.Tail; _tailT = 0f;
                 if (_puffs != null) _puffs.Emitting = false;
+                if (_core != null) _core.Emitting = false;
                 if (_glints != null) _glints.Emitting = false;
                 if (DebugPrint) GD.Print($"[SMS breath] {Name}: the sweep is over ({_rays.Count} rays) -- {(_hit ? "it FROZE Mario" : "a miss so far")}; the cold rolls on {PuffSeconds:F1} s");
                 EmitSignal(SignalName.Swept, _hit);
@@ -231,6 +243,27 @@ public partial class SmsGhostBreath : Node3D
         };
         var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Mix, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = tex, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true };
         var p = new GpuParticles3D { Name = "ColdPuffs", TopLevel = true, CollisionBaseSize = HitRadiusK, Amount = Puffs, Lifetime = PuffSeconds, Emitting = false, Visible = false, LocalCoords = false, FixedFps = 60, Interpolate = true, DrawOrder = GpuParticles3D.DrawOrderEnum.ViewDepth, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One, Material = mat }, VisibilityAabb = new Aabb(new Vector3(-60f, -10f, -60f), new Vector3(120f, 40f, 120f)) };
+        AddChild(p);
+        return p;
+    }
+    /// <summary>172: the dense core of the stream -- smaller, whiter, nearly solid puffs hugging the ray, sinking and rolling with the rest.</summary>
+    private GpuParticles3D MakeCore()
+    {
+        if (CorePuffs <= 0) return null;
+        var tex = Tex("kemuball3_raw");
+        Color c = BreathColor.Lerp(new Color(1f, 1f, 1f), 0.2f);                   // a shade whiter than the stream, still the cold's blue
+        var pm = new ParticleProcessMaterial
+        {
+            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = 0.25f,
+            Direction = new Vector3(0f, 0f, -1f), Spread = Mathf.Max(0.5f, CoreSpreadDeg), InitialVelocityMin = BreathSpeed * 0.92f, InitialVelocityMax = BreathSpeed * 1.02f,
+            Gravity = new Vector3(0f, -Sink * 1.1f, 0f), ScaleMin = 1f, ScaleMax = 1f, ScaleCurve = Ramp(CoreSizeStart, CoreSizeEnd),
+            AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -60f, AngularVelocityMax = 60f,
+            Color = new Color(c.R, c.G, c.B, 1f),
+            ColorRamp = Fade(new Color(1f, 1f, 1f, 0f), new Color(1f, 1f, 1f, CoreAlpha), new Color(0.95f, 0.98f, 1f, CoreAlpha * 0.7f), new Color(0.9f, 0.95f, 1f, 0f)),
+            CollisionMode = ParticleProcessMaterial.CollisionModeEnum.Rigid, CollisionFriction = 0.15f, CollisionBounce = 0f, CollisionUseScale = true
+        };
+        var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Mix, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = tex, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, RenderPriority = 1 };
+        var p = new GpuParticles3D { Name = "ColdCore", TopLevel = true, CollisionBaseSize = HitRadiusK, Amount = CorePuffs, Lifetime = PuffSeconds * 0.9, Emitting = false, Visible = false, LocalCoords = false, FixedFps = 60, Interpolate = true, DrawOrder = GpuParticles3D.DrawOrderEnum.ViewDepth, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One, Material = mat }, VisibilityAabb = new Aabb(new Vector3(-60f, -10f, -60f), new Vector3(120f, 40f, 120f)) };
         AddChild(p);
         return p;
     }
@@ -297,6 +330,7 @@ public partial class SmsGhostBreath : Node3D
         if (State == Phase.Done) return;
         State = Phase.Done; All.Remove(this);
         if (_puffs != null) _puffs.Emitting = false;
+        if (_core != null) _core.Emitting = false;
         if (_glints != null) _glints.Emitting = false;
         if (_glow != null) _glow.Visible = false;
         if (DebugPrint) GD.Print($"[SMS breath] {Name}: cut off at sweep {SweepK:F2}");
