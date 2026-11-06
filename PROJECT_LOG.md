@@ -12321,3 +12321,66 @@ not a bug. A windowed shot run (3 shots): the shock pose with the eyes squeezed 
 
 **Deviations:** none asked for; the fog fix changes the knockdown's look (the hurt eyes now show through the pink fog, as the game's BTP does). Knobs:
 `Mario.SmsFrostPoseClip`, `Mario.SmsFrostPoseAt`. The wind stays as 170 left it.
+
+### 172 -- the King Boo REMATCH, part 16: the ELECTRICITY, LAVA BALLS out of the crown, a THICKER breath (feature/kingboo-rematch, code `085883d`)
+
+**Jaysonn:** "ok particle effects for electric need to be better. fireballs should be more like molten lava balls and should come from the crown popping a
+few out at once. the breath attack should be thicker".
+
+**The electricity** (`SmsGhostLightning.cs`): 166-170's walls had the bolt shader and 40 small squares rising off the floor line. Now each wall carries the
+SHOCK'S OWN particles -- the port's ShockSparks (ms_m_biri_a / b / c, pass 51) scaled to the wall and spread over its whole face, as children of the wall
+quad (local coordinates: they ride it as it closes): bolt STREAKS twisting about their own axis (`ShockStreak.gdshader` with biri_l1, 0.55 x 2.2 m quads at
+0.6-1.6 scale, 0.22 s each; WallStreaks 90 live), ARCS popping (biri_r's two frames at random, 1.6 m, 0.13 s; WallArcs 14), one-frame FLASHES (hitmrk1,
+0.9 m; WallFlashes 6) with white spark CROSSES (shikaku, two crossed align_y quads) raining down the wall under gravity (WallSparks 60), sparks pouring off
+each glowing POST (PostSparks 24 a post), bolts CRAWLING along the floor at the wall's foot both ways (FloorCrawl 30); AmountRatio WarnFx 0.35 through the
+warning, 1 as the wall closes, off at the meet. Once the gap is under ZapGap (7 m) ZAPS jump it: GapZaps 4 nodes of two crossed quads (ZapWidth 1 m wide,
+as long as the gap, biri_l1 repeating along them, the colour x ZapBrightness 1.8 so the additive bolt punches through the wall's light), each placed at a
+random spot along and up the gap, on for 2-4 frames, then off until its 35 %-a-frame coin comes up again. The meet's burst grew: MeetSparks 120 crosses,
+MeetStreaks 60 bolt streaks bursting from the seam, MeetFlashes 12, over 170's ring and shake. The hit is as it was. Readouts: WallFxCount, WallFxEmitting,
+ZapsShown, ZapsFlashed, Side.
+
+**Lava balls out of the crown** (`SmsFireballs.cs` rewritten, `LavaBall.gdshader` new, `SmsKingBooRematch.cs` template): 168's volley of 8 fire balls spat
+from the mouth along a 140-degree fan is gone. King Boo's crown now POPS Pops 3 x PerPop 3 LAVA BALLS, PopSeconds 0.45 apart (the spout is CrownFxPoint,
+the crown's top), each LOBBED LobHeight 6 m over the crown under the port's 20 m/s^2 to come down at its own spot about Mario -- one ball of every pop
+within AimedWithin 1.5 m of him, the rest anywhere from there out to Scatter 7 m (clamped inside the wall), the lob solved from the flight time (up, then
+down to the floor) -- with a pulsing orange RING on the floor where it will land (LandingMarks). A ball that reaches the floor BOUNCES (Bounce 0.35 of its
+fall, up to twice, a SPLAT of lava drops and a small ring each time) and then ROLLS on along its way at RollSpeed 8 m/s (0 = the speed it came down with),
+bouncing off the arena wall as 168's did; the burn, the shrink to nothing over LifeSeconds (now 6) and the fade are 168's. The ball itself is a SphereMesh
+(28 x 14) in `LavaBall.gdshader`: in the sphere's own space (no seam) a domain-warped 3-D voronoi whose cell edges are the CRACKS (orange, a white-hot
+middle, pinching and widening along their length), a second finer voronoi for the small cracks, some cells wholly MOLTEN (pools, pulsing), a dark red heat
+haze fading out from every crack, a two-tone dark crust between under a fixed lambert, a fresnel rim of the glow, the whole pattern drifting slowly;
+`heat` 1 -> HeatAtEnd 0.3 over the ball's life (the cracks narrow and dim, the pools fade), `emissive` up through the fizzle. The maths was chosen on the
+CPU first (tools/projectshine/rematch157/lava_preview.py, three balls at three heats -- a regular honeycomb at the first try, warped and pooled at the
+second) and written into the GLSL line for line. About the crust: a glow billboard (glow3_raw, 2.8 R), Flames 16 licking off it, Embers 24 and Drips 10
+(align_y streaks under gravity, off once the ball cools under 0.45) trailing in the world, Smoke 18 (a dark trail), an orange OmniLight (3, 9 m); the crust
+ROLLS with the ball (its sphere turned about Up x Vel by the distance over the radius; half as fast tumbling in the air). A ball that gets Mario BURSTS:
+flames, a splat of lava drops, a ring, dark smoke, a kick of the camera. Signals and readouts as 168's plus PopsMade, Landings, SpoutPoint, Target, Heat,
+Vy. King Boo's template: FireballPops, FireballPerPop, FireballPopSeconds, FireballLobHeight, FireballScatter, FireballAimedWithin, FireballRollSpeed,
+FireballSize, FireballSeconds 6, FireballHitHeight (FireballCount is now the product); the debug line and the class doc follow.
+
+**A thicker breath** (`SmsGhostBreath.cs`): the puffs 3 -> 8 m (were 2 -> 6; King Boo's PuffSizeStart / PuffSizeEnd too), Puffs 520 (320), PuffAlpha 0.72
+(0.55), SpreadDeg 9 (6), and a DENSE CORE down the middle of the stream -- CorePuffs 180 smaller puffs (CoreSizeStart 1.6 -> CoreSizeEnd 4.5 m) at
+CoreAlpha 0.9 within CoreSpreadDeg 3, a shade whiter than the stream, sinking a little harder, rolling along the slab with the rest -- so the breath reads
+as a thick bank of cold rather than a line of puffs. The cold that hits: HitRadiusK 0.35 of a puff's size (1.05 -> 2.8 m; was 0.4 of 2 -> 6 = 0.8 -> 2.4),
+the jump clearing it as before. Readouts: CoreEmitting, CorePuffCount.
+
+**Also committed:** the editor's `.uid` files for GhostWind / IceBlock / WindRibbon.gdshader (it generated them when it scanned 167-170's shaders).
+
+**Verified** (headless drive v172-2, deleted before the commit; the card skipped, the three attacks forced one at a time by the weights on a standing Mario,
+King Boo hopping instead of a second volley while the balls roll): C0 the template reads 3 x 3 pops and 3 -> 8 puffs; C1 16 emitters over the two walls,
+all 16 emitting at the warning and the close; C2 the gap seen under 7 m with 4 zaps shown at once, 3 meets burst; C3 the shock lands (hp 8 -> 7); C4 3 pops
+of 9 balls over 0.90 s, the first ball born 0.12 m from the crown's fx point; C5 in the air, the highest 14.3 m over the floor (the crown at 8.3), a landing
+mark, 8 landings, rolling at 8.0 m/s, a target 0.4 m from Mario, 24 bounces; C6 two burns (hp 7 -> 5; the second after the 2.5-s invincibility, the balls
+rolling 6 s); C7 puffs 3 -> 8, the core's 180 emitting; C8 Mario frozen once -- 9/9, no errors (v172-1 was the same 9/9 before the look tweaks). The first
+build failed on one debug line still naming FireballVolleySeconds. A windowed shot run (11 shots): the walls alive with twisting bolts, arcs, cyan flashes
+and sparks as they close on Mario, bright horizontal zaps across the gap (v172-1's 0.6-m zaps at plain brightness were lost in the walls' light), the meet's
+burst about the shocked Mario; two lava balls popping out of the glowing crown, the balls arcing up with smoke trails and the orange landing rings around
+Mario, a close pass of a rolling ball -- the cracked glowing crust, embers, the light on the floor -- the game view with a burned Mario, the burst; the breath
+a thick pale-blue column from the side, the frozen Mario inside the bank from the game camera, the sweep from above.
+
+**Deviations, all knobs:** the landing marks (none in the doc) telegraph a lob that would otherwise fall from off-screen; one ball of each pop is aimed near
+Mario and the rest scatter (the doc's "random directions"); a landed ball rolls at a set RollSpeed. A standing Mario can be burned twice in one attack
+(FireballSeconds / FireballDiesOnHit tune that). The electricity is the game's own ms_m_biri particles re-used, not a new design. Knobs: SmsGhostLightning
+(WallStreaks, WallArcs, WallFlashes, WallSparks, PostSparks, FloorCrawl, WarnFx, GapZaps, ZapGap, ZapWidth, ZapBrightness, MeetSparks, MeetStreaks,
+MeetFlashes), SmsFireballs (Pops, PerPop, PopSeconds, LobHeight, Scatter, AimedWithin, RollSpeed, Bounce, LandingMarks, Flames, Embers, Drips, Smoke,
+HeatAtEnd, GlowColor, LightEnergy), SmsGhostBreath (Puffs, PuffAlpha, SpreadDeg, CorePuffs, CoreSizeStart / End, CoreAlpha, CoreSpreadDeg, HitRadiusK).
