@@ -12424,3 +12424,58 @@ cores; the 3-m lava balls close, with the embers and the landing rings.
 **Deviations, all knobs:** HoverLift 4.5 is my reading of "sit higher" -- enough to clear the tongue; from the game camera near him he now sits high in the
 frame (HoverLift is live in the inspector). BreathAimFloorAt keeps the breath's reach where 167 had it rather than letting the lift change the attack. Knobs:
 King Boo (HoverLift, BreathAimFloorAt, FireballSize), SmsGhostLightning (BoltColorA, BoltColorB, JitterHz, Wave, ZapChance), SmsFireballs (Size).
+
+### 174 -- the King Boo REMATCH, part 18: the INTRO CUTSCENE -- Mario looks about for the laugh, King Boo surfaces, laughs, sinks, the fight starts (feature/kingboo-rematch, code `4aafc9b`)
+
+**Jaysonn:** "nice lets clean up the intro a bit and have him laugh for a bit longer. or we could have it where mario lands then a cutscene starts where
+mario looks around looking from where the laughing is coming from and the king boo appears just liek the casino fight laughs and then goes underground
+and the fight starts". The cutscene (his laugh in it is longer too: 3.4 s, IntroLaughSeconds).
+
+**The cutscene** (`SmsRematchIntro.cs`, Cutscene on): the card and the fall as 157 had them; CutsceneDelay (0.4 s) after Mario lands his controls lock
+(Mario.CameraLocked) and a cutscene camera takes over (a Camera3D added to the scene, `IntroCutsceneCamera`, CutsceneFov 50; re-asserted current every frame
+-- the game camera takes current back otherwise). King Boo's long laugh plays from nowhere (his sound node, `PlayVoice`, while he is still hidden). Mario is
+squared up to the way the laugh comes from (toward the BooSpawn marker; `SmsDemoFace`) and **LOOKS ABOUT**: a turn left LookTurnDeg (45 degrees), a turn right,
+then to where the laugh is, each eased at LookTurnDegPerSec (240 degrees a second) -- the three turns at 12 %, 50 % and 84 % of LookSeconds (2.6). The camera
+sits in front of him, low (1.45 m) and nearly head-on (3.6 m out, 0.4 to one side), on his face, pushing in a little (to 4.1 / 0.5 / 1.55) through the turns.
+**He SURFACES**: SurfaceDistance (7 m) in front of Mario toward the marker (0 = at the marker; the floor found under the spot, BooHeight over it) --
+`IntroSurface(spot, yaw)` on King Boo, facing Mario -- the camera a **side two-shot**: from the middle of the line between them, 2 m back toward Mario,
+SurfaceCamSide (17 m) off to the side, SurfaceCamHeight (3.8 m) up, aimed between Mario's head and King Boo's body (0.62 of the way to the body, eased, never
+under the floor while he is), pushing in a little (0.85 of the side, 0.6 m higher) through the laugh; Mario turns to follow him. He rises, laughs, sinks (his own timings below);
+`IntroSunk` + AfterSinkSeconds (0.6) on the empty spot, then **the fight**: the game camera current again, the cutscene camera freed, Mario free, and
+`SpawnBoo` as before but with `SpawnRising` -- King Boo rises out of the floor at his BooSpawn spot, no second laugh -- FightReady as before. **A skips** it
+(button_a / key_space, SkipAllowed as the card's): `IntroAbort` (he is under the floor at once) and the fight starts. After a miss (CameFromMiss) the cutscene
+is skipped like the card; if Mario never lands by BooSpawnTimeout (off the edge) he comes the 157 way, with the laugh; Cutscene off = the 157 intro. The
+Phase gains LookAbout, Surfaced, Sunk; readouts for the drives CutsceneRan, CutsceneSkipped, SurfaceSpot, FaceYawNow, LooksMade, CutsceneCamera.
+
+**King Boo's part** (`SmsKingBooRematch.cs`): `IntroSurface(placedAt, yaw)` (Hidden only): placed at the spot (HoverLift added as at the spawn), the hover
+read (`_introTop`, the floor under it `IntroFloorY`), put IntroSinkDepth (7 m) under the floor and shown; **IntroRise** (1.6 s, the appear clip `BckAppear`
+and the arrive voice): a smooth-stepped rise to the hover, turning to Mario; **IntroLaugh** (3.4 s): the laugh clip and the long laugh (`Laughed`), the hover
+bob -- the laugh clip carries his body 3.6 m up over the node (the crown 9.6 m): with IntroLaughBodyHeld the node is lowered by the body's lift, smoothed
+over IntroLaughHoldSeconds (0.35) so the clip's own bounce stays, and he laughs at the hover height he rose to (off: he laughs 3.6 m higher than he rose);
+**IntroSink** (1.1 s, the wait clip, the vanish voice): back under, hidden, `IntroSunk`. `IntroAbort`: under the floor at once, hidden, IntroSunk.
+`SpawnRising` (Hidden only): `Spawn` with `_spawnRise` -- he starts IntroSinkDepth under his spot and rises over SpawnRiseSeconds (1.2) through the appear
+clip and voice, then the wait -- `_spawnQuiet`: no laugh (the intro had it), ReadyForFight once he is up (`QuietReadyWhenUp` waits for the rise). `PlayVoice
+(se, db)` (a voice from his sound node before he shows). The property that clashed with the method is `IsSpawnRising`; readouts IntroFloorY, IntroTop,
+IntroPhaseSeconds, IntroBodyLift. Signals IntroSurfacing, IntroSunk. The Phase gains IntroRise, IntroLaugh, IntroSink (their own tick: the blink and the
+FX placement only -- no hover, hurt or attacks).
+
+**Mario** (`Mario.cs`): `SmsDemoFace(dir)` -- a demo turns him to face a way: the facing latched (`SmsLatchFace`, source 2), `lastFacingDirection` set, the
+armature's yaw set (`BaseYawFromDir`) -- SmsCarryTo's face part alone, no voice, no state change, no move; the caller holds the controls.
+
+**Verified** (headless drive v174-9, deleted before the commit; the intro run with DebugPrint through the cutscene): C1 the cutscene begins within a second
+of the landing -- Mario's controls locked, `IntroCutsceneCamera` current; C2 his facing swings more than 80 degrees through the look-about (3 turns made)
+and ends on King Boo's spot; C3 King Boo surfaces 7.0 m from Mario, from 7 m under the floor to 8.5 m over it (the hover) in 1.6 s, laughs 3.4 s (Laughed
+once), facing Mario; C4 he sinks in 1.1 s, IntroSunk once; C5 the game camera current again, the controls free, King Boo rising at BooSpawn (IsSpawnRising)
+into the wait, FightReady, laughs == 1 -- 5/5, no errors. Nine drive iterations: v174-1 passed the flow (the clash of `SpawnRising` the property with the
+method fixed first); v174-2..8 were the camera -- King Boo filled the frame from over Mario's shoulder (he is 8 m across from 7 m away), the laugh clip
+lifted his body out of the top of it (hence IntroLaughBodyHeld), Mario's look-about read from the side (the camera moved in front of his landing facing,
+then the turns made about the marker's way with him squared up to it first, LookTurnDeg 45 so his face stays in the shot) -- v174-9 relaxed C2 to the
+45-degree turns. A windowed shot run (8 shots): Mario's face through both turns; King Boo surfacing and laughing beside him from the side (the tongue out,
+his body at the hover, Mario for scale), sinking; then rising at his spot from the game camera, crown and all. The fall-off-the-edge timeout (the 157 spawn)
+was not in the drive.
+
+**Deviations, all knobs:** the camera is my framing -- a low near-head-on shot of Mario looking about, a side two-shot for the surface (over his shoulder King
+Boo is far too big from 7 m); A skips the cutscene as it does the card; the laugh clip's body lift is held out; Mario is squared up to the marker's way as
+the cutscene starts (his landing facing is the marker's anyway). Knobs: the intro (Cutscene, CutsceneDelay, LookSeconds, LookTurnDeg, LookTurnDegPerSec,
+SurfaceDistance, AfterSinkSeconds, CutsceneFov, SurfaceCamSide, SurfaceCamHeight, SkipAllowed), King Boo (IntroRiseSeconds, IntroLaughSeconds,
+IntroSinkSeconds, IntroSinkDepth, SpawnRiseSeconds, IntroLaughBodyHeld, IntroLaughHoldSeconds).
