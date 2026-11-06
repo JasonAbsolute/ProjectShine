@@ -29,7 +29,7 @@ using System.Linq;
 /// off: the hurt as before); not while he is between spots.
 /// Pass 164: THE BOOLOSSUS SMASH (the doc's attack 2: "Crown glows white. A Boolossus falls from above Mario and tries to slam down on him. On landing it
 /// splits into 15 Boos that spread out as a shockwave, then vanish after one second"). A move is now one of three (the doc's near-random pick):
-/// a hop to another spot (RepositionChance), else an attack -- a SMASH by SmashChance, else the lick. The smash is made where he stands: the laugh clip
+/// a hop to another spot (RepositionChance), else an attack by weight (166; 164 had a SmashChance). The smash is made where he stands: the laugh clip
 /// (SmashClip, the second laugh voice) with his CROWN SHINING the attack's colour (the doc: white for the smash; 165, Jaysonn: "king boo's crown should
 /// glow the color listed in the doc to show that's the attack he's using ... a shiny glow, not a light-bulb glow") -- the crown shader's shine
 /// (crown_glow / crown_glow_k: the sphere map's highlights sliding over it and a rim, in the colour), its colour register, SPARKLES at the crown (the
@@ -38,11 +38,17 @@ using System.Linq;
 /// <see cref="SmsBoolossus"/>, its own knobs) DIVING in at Mario from its own direction (SmashSpreadDeg apart about a random first; from where King
 /// Boo stands when SmashFromKingBoo) and running on its own (the dive, the slam, the wave of Boos); he watches SmashWatchSeconds past the last, the
 /// crown dark again, and the wait and the gap run again. A swung Bomb Boo hits him through the tell (the smash is called off; Boolossi already out
-/// carry on). The lick has no crown colour (the doc). The faces and the other attacks are
+/// carry on). The lick has no crown colour (the doc).
+/// Pass 166: GHOST LIGHTNING (the doc's attack 3: "Crown glows red. Two walls of lightning close in on Mario from either side and try to squash him.
+/// Three times in a row, fast"). The attacks are picked by WEIGHT now (LickWeight / SmashWeight / LightningWeight; the doc: near-random), a hop first by
+/// RepositionChance. The lightning is made where he stands: the crown RED (LightningCrownColor) through LightningTellSeconds with the laugh, then an
+/// <see cref="SmsGhostLightning"/> about Mario (its own knobs: the walls, the three squeezes, the shock) watched to its end, LightningWatchSeconds more,
+/// the crown dark, the wait and the gap. A swung Bomb Boo hits him through it (the walls go). The faces and the other attacks are
 /// later passes; the animations another hand's. The model is the casino boss's (btelesa.glb at 1 / 74.44) with its shader materials
 /// (BossTelesaBody/Crown/Ha/Mouth.tres: opacity, tint, mask_k, base_tex), copied per instance. Signals: Spawned (the appear starts), Laughed
 /// (the laugh starts), ReadyForFight (the wait begins -- the fight may start), Hit, Defeated; 162: Teleported (he has arrived somewhere), LickStarted
-/// (the wind-up), Licked(hit) (the whip has passed, with whether it got him); 164: SmashStarted (the tell), Smashed(hit) (the Boolossus has landed).
+/// (the wind-up), Licked(hit) (the whip has passed, with whether it got him); 164: SmashStarted (the tell), Smashed(hit) (the Boolossus has landed); 166:
+/// LightningStarted (the tell), LightningSqueezed(hit) per squeeze.
 /// </summary>
 public partial class SmsKingBooRematch : Node3D
 {
@@ -112,9 +118,9 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public float BodyMinOverFloor = 2.6f;
     [Export] public string LickWindSe = "MSD_SE_BS_TELESA_V_ROLL", LickSe = "MSD_SE_BS_TELESA_LICK";
     [ExportGroup("The fight (164): the Boolossus Smash")]
-    /// <summary>The smash runs at all; of his attacks this share are smashes (the rest licks).</summary>
+    /// <summary>The smash runs at all; the attacks' WEIGHTS (166: the doc's near-random pick -- an attack's chance is its weight over the sum; 0 = never).</summary>
     [Export] public bool SmashOn = true;
-    [Export(PropertyHint.Range, "0,1,0.05")] public float SmashChance = 0.5f;
+    [Export(PropertyHint.Range, "0,10,0.5")] public float LickWeight = 1f, SmashWeight = 1f, LightningWeight = 1f;
     /// <summary>The Boolossus (Boolossus.tscn carries its own knobs: the height, the fall, the wave).</summary>
     [Export] public PackedScene SmashScene;
     /// <summary>The tell: his crown glows this colour (the doc: white) pulsing at this rate for this long before the first Boolossus; the clip he plays
@@ -137,6 +143,19 @@ public partial class SmsKingBooRematch : Node3D
     [Export(PropertyHint.Range, "0,64,1")] public int CrownSparkles = 36;
     [Export] public float CrownFxLift = 1.2f;
     [Export] public float CrownGlowSize = 0f, CrownGlowStrength = 0.35f;
+    [ExportGroup("The fight (166): Ghost Lightning")]
+    /// <summary>The lightning runs at all; the crown's colour for it (the doc: red); the tell before the walls appear; the clip and voice through it; how
+    /// long he watches after the last squeeze. The walls and the squeezes are SmsGhostLightning's own knobs (set here as a template).</summary>
+    [Export] public bool LightningOn = true;
+    [Export] public Color LightningCrownColor = new Color(1f, 0.12f, 0.08f);
+    [Export] public float LightningTellSeconds = 0.5f, LightningWatchSeconds = 0.3f;
+    [Export] public string LightningClip = "btelesa_laugh", LightningSe = "MSD_SE_BS_TELESA_V_LAUGH2";
+    /// <summary>The walls: each one's length, height, how far apart they start, how fast each closes; the squeezes: how many, the tell before each closes,
+    /// the pause after each, the axis's turn between them.</summary>
+    [Export] public float WallLength = 10f, WallHeight = 5f, WallGap = 12f, WallSpeed = 8f;
+    [Export(PropertyHint.Range, "1,6,1")] public int SqueezeCount = 3;
+    [Export] public float WarnSeconds = 0.45f, SqueezePause = 0.2f, SqueezeTurnDeg = 60f;
+    [Export] public bool OneShockPerAttack = true;
     [ExportGroup("")]
     [Export] public bool DebugPrint;
 
@@ -153,9 +172,12 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>164: the smash's tell begins; the Boolossus has landed (whether its body got Mario).</summary>
     [Signal] public delegate void SmashStartedEventHandler();
     [Signal] public delegate void SmashedEventHandler(bool hitMario);
+    /// <summary>166: the lightning's tell begins; a squeeze has met (whether it shocked Mario).</summary>
+    [Signal] public delegate void LightningStartedEventHandler();
+    [Signal] public delegate void LightningSqueezedEventHandler(bool hitMario);
 
-    public enum Phase { Hidden, Appear, Laugh, Wait, Hurt, Down, Gone, Vanish, Arrive, Lick, Smash }
-    public enum Move { None, Hop, Lick, Smash }
+    public enum Phase { Hidden, Appear, Laugh, Wait, Hurt, Down, Gone, Vanish, Arrive, Lick, Smash, Lightning }
+    public enum Move { None, Hop, Lick, Smash, Lightning }
     public Phase State { get; private set; } = Phase.Hidden;
     public string Clip => _anim != null ? (string)_anim.CurrentAnimation : "";
     public bool IsSpawned => State != Phase.Hidden;
@@ -163,7 +185,7 @@ public partial class SmsKingBooRematch : Node3D
     public int Hp { get; private set; } = -1;
     public int HitsTaken { get; private set; }
     /// <summary>A Bomb Boo bursts on him while he waits or licks (not between spots, through the hurt, the down, the entrance).</summary>
-    public bool CanBeHit => State == Phase.Wait || State == Phase.Lick || State == Phase.Smash;
+    public bool CanBeHit => State == Phase.Wait || State == Phase.Lick || State == Phase.Smash || State == Phase.Lightning;
     public bool IsAlive => State != Phase.Down && State != Phase.Gone;
     public int MaterialsCopied => _mats.Count;
     /// <summary>162, for the drives: the lick's stage (-1 none, 0 wind-up, 1 the whip live, 2 the clip's tail, 3 the wait after), the counts, the gap left,
@@ -191,6 +213,11 @@ public partial class SmsKingBooRematch : Node3D
     public bool CrownSparklesOn => _crownSpark != null && _crownSpark.Emitting;
     public float CrownShineK => _crownShineK;
     public int SmashLaunchedCount => _smashLaunchedCount;
+    /// <summary>166: the lightnings made, the squeezes that shocked Mario, the one running (while it lives).</summary>
+    public int LightningsMade { get; private set; }
+    public int LightningHits { get; private set; }
+    public SmsGhostLightning Lightning => _lightning != null && IsInstanceValid(_lightning) ? _lightning : null;
+    public bool LightningLaunched => _lightningLaunched;
     public Vector3 LastApproachDir => _lastApproach;
     public Vector3 LastSpot { get; private set; }
     public float HoverOverFloor => _hoverOverFloor;
@@ -226,6 +253,7 @@ public partial class SmsKingBooRematch : Node3D
     private SmsBoolossus _boolossus; private float _smashT; private bool _smashLaunched, _smashClipEnded; private int _smashLaunchedCount, _bCrown = -1; private float _smashNextAt, _smashBaseAngle; private Vector3 _lastApproach;
     private MeshInstance3D _crownGlow; private StandardMaterial3D _crownGlowMat; private float _crownGlowK, _crownShineK, _pulsePhase; private Color _crownGlowColor = new(1f, 1f, 1f);
     private GpuParticles3D _crownSpark; private ParticleProcessMaterial _crownSparkMat; private float _crownFlashT;
+    private SmsGhostLightning _lightning; private float _lightningT; private bool _lightningLaunched, _lightningDone;
     /// <summary>Where the crown's sparkles and halo sit: the crown joint lifted CrownFxLift into the crown.</summary>
     public Vector3 CrownFxPoint => CrownPoint + Vector3.Up * CrownFxLift;
     private GpuParticles3D _chika; private Node3D _glow; private SmsActorSound _sound; private SmsTongueStretch _tongue;
@@ -409,6 +437,7 @@ public partial class SmsKingBooRematch : Node3D
         }
         else if (State == Phase.Lick && n == LickClip) _lickClipEnded = true;
         else if (State == Phase.Smash && n == SmashClip) { if (_smashLaunchedCount < SmashCount) PlayClip(SmashClip); else _smashClipEnded = true; }
+        else if (State == Phase.Lightning && n == LightningClip) { if (!_lightningDone) PlayClip(LightningClip); }
     }
 
     private void EnterWait(float gap)
@@ -429,8 +458,8 @@ public partial class SmsKingBooRematch : Node3D
     public bool TakeHit(SmsBombBoo by)
     {
         if (!CanBeHit) return false;
-        bool midLick = State == Phase.Lick, midSmash = State == Phase.Smash;
-        AbortLick(); AbortSmash();
+        bool midLick = State == Phase.Lick, midSmash = State == Phase.Smash, midLightning = State == Phase.Lightning;
+        AbortLick(); AbortSmash(); AbortLightning();
         Hp = Math.Max(0, Hp - 1); HitsTaken++;
         State = Phase.Hurt; _hurtT = 0f; _hurtYaw0 = _yaw; Position = _home;
         PlayClip(BckHit);
@@ -439,12 +468,13 @@ public partial class SmsKingBooRematch : Node3D
         _opacitySolid = Mathf.Clamp(GhostOpacity + OpacityPerHit * HitsTaken, 0.1f, 1f);
         SetOpacity(_opacitySolid);
         if (_sound != null && !string.IsNullOrEmpty(HurtSe)) _sound.Play(HurtSe);
-        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: HIT by {by?.Name ?? "?"}{(midLick ? " mid-lick" : midSmash ? " mid-smash (the tell called off)" : "")} -> {Hp} left (the hit clip, {_hurtLen:F2} s)");
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: HIT by {by?.Name ?? "?"}{(midLick ? " mid-lick" : midSmash ? " mid-smash (the tell called off)" : midLightning ? " mid-lightning (the walls gone)" : "")} -> {Hp} left (the hit clip, {_hurtLen:F2} s)");
         EmitSignal(SignalName.Hit, Hp);
         return true;
     }
     private void AbortLick() { _lickStage = -1; _lickClipEnded = false; }
     private void AbortSmash() { SetCrownGlow(_crownGlowColor, 0f); _smashClipEnded = false; }
+    private void AbortLightning() { if (_lightning != null && IsInstanceValid(_lightning)) _lightning.Cancel(); _lightning = null; SetCrownGlow(_crownGlowColor, 0f); }
     private void SetCrown(Vector3 c) { _crownNow = c; _crownMat?.SetShaderParameter("crown_c0", c); }
     /// <summary>165: the crown SHINES <paramref name="color"/> by <paramref name="k"/> (0 = its own yellow, dark; over 1 = the activation flash): the shader's
     /// shine term, the colour register toward the colour, the sparkles, the faint halo.</summary>
@@ -493,6 +523,7 @@ public partial class SmsKingBooRematch : Node3D
         Move pick = lick.HasValue ? (lick.Value ? Move.Lick : Move.Hop) : PickMove();
         LastMove = pick;
         if (pick == Move.Smash) { BeginSmash(); return; }
+        if (pick == Move.Lightning) { BeginLightning(); return; }
         _moveIsLick = pick == Move.Lick;
         AbortLick();
         State = Phase.Vanish; _fadeT = 0f; MovesMade++;
@@ -500,12 +531,17 @@ public partial class SmsKingBooRematch : Node3D
         if (_sound != null && !string.IsNullOrEmpty(VanishSe)) _sound.Play(VanishSe);
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: move {MovesMade}: vanishes from {GlobalPosition} ({(_moveIsLick ? "for the LICK" : "to another spot")})");
     }
-    /// <summary>The doc's near-random pick: a hop by RepositionChance, else an attack -- a smash by SmashChance (when on and its scene is there), else the lick.</summary>
+    /// <summary>The doc's near-random pick: a hop by RepositionChance, else an attack by its weight among those that are on.</summary>
     private Move PickMove()
     {
         if (_rng.NextDouble() < RepositionChance) return Move.Hop;
-        if (SmashOn && SmashScene != null && _rng.NextDouble() < SmashChance) return Move.Smash;
-        return Move.Lick;
+        float wl = Mathf.Max(0f, LickWeight), ws = SmashOn && SmashScene != null ? Mathf.Max(0f, SmashWeight) : 0f, wg = LightningOn ? Mathf.Max(0f, LightningWeight) : 0f;
+        float sum = wl + ws + wg;
+        if (sum <= 0f) return Move.Lick;
+        float r = (float)_rng.NextDouble() * sum;
+        if (r < wl) return Move.Lick;
+        if (r < wl + ws) return Move.Smash;
+        return Move.Lightning;
     }
     /// <summary>164: the smash, where he stands: the laugh clip and its voice, the crown pulsing white through the tell, then the Boolossus over Mario.</summary>
     private void BeginSmash()
@@ -552,6 +588,53 @@ public partial class SmsKingBooRematch : Node3D
             }
         }
         else if (_smashT >= _smashNextAt - SmashStagger + SmashWatchSeconds || _smashClipEnded) EndSmash();
+    }
+    /// <summary>166: the lightning -- the crown red through the tell, then the three squeezes about Mario, watched to their end.</summary>
+    private void BeginLightning()
+    {
+        State = Phase.Lightning; _lightningT = 0f; _lightningWatchT = 0f; _lightningLaunched = false; _lightningDone = false; _pulsePhase = 0f; _crownFlashT = 0f; MovesMade++; LightningsMade++; Position = _home;
+        PlayClip(LightningClip);
+        if (_sound != null && !string.IsNullOrEmpty(LightningSe)) _sound.Play(LightningSe);
+        SetCrownGlow(LightningCrownColor, 0f);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: move {MovesMade}: LIGHTNING {LightningsMade} -- the crown glows {LightningCrownColor} (the walls in {LightningTellSeconds:F2} s)");
+        EmitSignal(SignalName.LightningStarted);
+    }
+    private void LightningTick(float dt)
+    {
+        _lightningT += dt;
+        FaceTick(dt);
+        _crownFlashT -= dt;
+        if (_lightningT < CrownFlashSeconds || _crownFlashT > 0f) SetCrownGlow(LightningCrownColor, 1.8f);
+        else
+        {
+            float hz = CrownPulseHz * Mathf.Lerp(1f, Mathf.Max(1f, CrownPulseQuicken), Mathf.Clamp(_lightningT / Mathf.Max(0.1f, LightningTellSeconds), 0f, 1f));
+            _pulsePhase += dt * hz * MathF.Tau;
+            SetCrownGlow(LightningCrownColor, Mathf.Lerp(0.5f, 1f, 0.5f + 0.5f * MathF.Sin(_pulsePhase - MathF.PI / 2f)));
+        }
+        if (!_lightningLaunched)
+        {
+            if (_lightningT >= LightningTellSeconds)
+            {
+                var m = M();
+                if (m == null) { EndLightning(); return; }
+                var l = new SmsGhostLightning { Name = $"GhostLightning{LightningsMade}", DebugPrint = DebugPrint, WallLength = WallLength, WallHeight = WallHeight, WallGap = WallGap, WallSpeed = WallSpeed, SqueezeCount = SqueezeCount, WarnSeconds = WarnSeconds, SqueezePause = SqueezePause, SqueezeTurnDeg = SqueezeTurnDeg, OneShockPerAttack = OneShockPerAttack };
+                (GetTree().CurrentScene ?? GetParent()).AddChild(l);
+                float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
+                l.Squeezed += hit => { if (hit) LightningHits++; _crownFlashT = CrownFlashSeconds * 0.7f; EmitSignal(SignalName.LightningSqueezed, hit); };
+                l.Finished += () => _lightningDone = true;
+                l.Begin(m, fy);
+                _lightning = l; _lightningLaunched = true; _crownFlashT = CrownFlashSeconds;
+                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the lightning is out about Mario at {m.GlobalPosition}");
+            }
+        }
+        else if (_lightningDone) { _lightningWatchT += dt; if (_lightningWatchT >= LightningWatchSeconds) EndLightning(); }   // the walls are done: a breath, then the wait
+    }
+    private float _lightningWatchT;
+    private void EndLightning()
+    {
+        SetCrownGlow(_crownGlowColor, 0f); _lightning = null; _lightningWatchT = 0f;
+        EnterWait(NextGap());
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: back to the wait after the lightning ({LightningHits} shock{(LightningHits == 1 ? "" : "s")} so far), the next move in {_gapT:F1} s");
     }
     private void EndSmash()
     {
@@ -740,6 +823,7 @@ public partial class SmsKingBooRematch : Node3D
         }
         else if (State == Phase.Lick) LickTick(dt);
         else if (State == Phase.Smash) SmashTick(dt);
+        else if (State == Phase.Lightning) LightningTick(dt);
         if (Blink) BlinkTick(dt);
         PlaceFx();
     }
