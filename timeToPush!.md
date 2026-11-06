@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-06 01:54 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-06 02:44 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1218,8 +1218,12 @@ they close; the fireballs are MOLTEN LAVA BALLS (LavaBall.gdshader NEW) popping 
 marks, bouncing and rolling; the breath is THICKER (bigger, denser puffs and a solid core). SMS 173: King Boo sits 4.5 m HIGHER (HoverLift; the
 tongue clear of the floor) with the breath re-aimed to meet the floor 10 m out whatever his height, the lava balls 3 m across, the electricity YELLOW
 and quicker. SMS 174: the intro CUTSCENE -- Mario lands, a laugh from nowhere, he looks about for it, King Boo surfaces 7 m in front of him (as the casino
-boss rises from his table), laughs 3.4 s, sinks back under the floor, then rises at his spot for the fight; A skips it. Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `4aafc9b` ("SMS 174: the King Boo REMATCH, part 18 -- the INTRO CUTSCENE: Mario looks about for the laugh, King Boo surfaces, laughs, sinks, the fight starts";
+boss rises from his table), laughs 3.4 s, sinks back under the floor, then rises at his spot for the fight; A skips it. SMS 175: Mario looks about with his
+HEAD (a new SmsHeadLook modifier: left, right, ahead, the shoulders following; his body standing), his head on King Boo as he laughs; King Boo surfaces 12 m out
+(7 stood them too close) with the two-shot's camera back for it. Further passes re-point this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `6c59007` ("SMS 175: the King Boo REMATCH, part 19 -- Mario LOOKS ABOUT with his HEAD (a new look-around), King Boo surfaces 12 m out";
+  assets/Sms/SmsHeadLook.cs NEW (+ .uid), assets/Mario.cs, assets/Sms/Rematch/SmsRematchIntro.cs) on the 174 commit
+  ("SMS 174: the King Boo REMATCH, part 18 -- the INTRO CUTSCENE: Mario looks about for the laugh, King Boo surfaces, laughs, sinks, the fight starts";
   assets/Mario.cs, assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsRematchIntro.cs) on the 173 commit
   ("SMS 173: the King Boo REMATCH, part 17 -- he sits HIGHER, the lava balls BIGGER, the electricity YELLOW and quicker";
   assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsFireballs.cs, SmsGhostLightning.cs) on the 172 commit
@@ -1253,9 +1257,12 @@ boss rises from his table), laughs 3.4 s, sinks back under the floor, then rises
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 38 commits past `feature/sounds`, 60 since `main`. ~1.1 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 40 commits past `feature/sounds`, 62 since `main`. ~1.1 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 175: in the cutscene Mario now looks about with his HEAD (left, right, ahead and a little up, his shoulders following, his body still), then
+  looks up at King Boo as he surfaces 12 m away (he was 7). Knobs on the intro node: LookTurnDeg, LookUpDeg, LookChestShare, LookSeconds, SurfaceDistance,
+  SurfaceCamSide / SurfaceCamHeight / SurfaceCamAim.
 - To try 174: the intro is a CUTSCENE now -- land, hear the laugh, Mario looks about for it, King Boo surfaces in front of him, laughs, sinks, then rises
   at his spot for the fight (A skips it). Knobs on the intro node (Cutscene, CutsceneDelay, LookSeconds, LookTurnDeg, SurfaceDistance, SurfaceCamSide /
   SurfaceCamHeight, AfterSinkSeconds) and on King Boo (IntroRiseSeconds, IntroLaughSeconds, IntroSinkSeconds, IntroSinkDepth, SpawnRiseSeconds).

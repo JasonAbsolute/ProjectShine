@@ -12479,3 +12479,52 @@ Boo is far too big from 7 m); A skips the cutscene as it does the card; the laug
 the cutscene starts (his landing facing is the marker's anyway). Knobs: the intro (Cutscene, CutsceneDelay, LookSeconds, LookTurnDeg, LookTurnDegPerSec,
 SurfaceDistance, AfterSinkSeconds, CutsceneFov, SurfaceCamSide, SurfaceCamHeight, SkipAllowed), King Boo (IntroRiseSeconds, IntroLaughSeconds,
 IntroSinkSeconds, IntroSinkDepth, SpawnRiseSeconds, IntroLaughBodyHeld, IntroLaughHoldSeconds).
+
+### 175 -- the King Boo REMATCH, part 19: Mario LOOKS ABOUT with his HEAD (a new look-around), King Boo surfaces 12 m out (feature/kingboo-rematch, code `6c59007`)
+
+**Jaysonn:** "ok few things lets make them not stand so close in that one shot and lets make a new animation for mario where he looks around not just
+have him rotate. otherwise its a good start. lets keep going".
+
+**The look-around** (`assets/Sms/SmsHeadLook.cs`, NEW): 174 turned Mario's whole body left and right on the spot. The game has no look-around clip to
+borrow -- its idles glance (ma_wait turns jnt_head -37 then +70 degrees over its 6 s, ma_swait -61 / +60 with a tilt) -- so the look-around is a
+skeleton modifier on his head, in the project's own style (HeadForwardLock, SmsBoneRotZ). It turns `jnt_head` on its own after the clip has posed it:
+YAW about the skeleton's up (positive = to his left), PITCH about his left axis (MarioHeadCtrl's Rz convention: negative = up, as HeadForwardLock's -12),
+from the REST pose -- so the clip's own glance is taken out while it is on, slerped in and out by a weight over EaseSeconds (0.25) -- and ADDS a share
+of the yaw (ChestShare 0.3) to `jnt_chest` about the same up, so the shoulders follow. The axes are taken every frame from the bones' posed frames
+(SkeletonUp / SkeletonForward: the model's up and forward in the skeleton's own space -- Mario's skeleton faces +Z there, the drive measured it; his
+armature carries the half turn and the 1 / 74.44 scale), so the rig's joint orientations (the head's rest is a flip of the chest's) do not matter.
+It is the LAST modifier under his Skeleton3D (after HeadForwardLock, the jiggles and the gun-angle Rz), so it replaces the head while a demo has it.
+Driven two ways: `Play` a sequence of looks (yaw, pitch, the turn's seconds, the hold's seconds -- each turn smooth-stepped, each look held; the last
+held until Stop) or `Track` a world point every frame (yaw from the body's forward to it, pitch from the head to it, clamped MaxYaw 75 / MaxPitch
+50); `Stop` eases back to the clip. Readouts for the drives: YawNow / PitchNow / Step / Playing / Tracking / Weight / Runs, and `DrawnGlobalPoseWith`
+(a bone's global pose as it would be drawn at a yaw / pitch: Godot 4.3+ restores the clip's poses after the skin update, so readers outside the
+modifier pass see the clip's alone). **Mario** (`Mario.cs`): made with the gun-angle head rot (`SmsSetupHeadGunRot`, appended last) and exposed as
+`SmsHeadLook`.
+
+**The intro** (`SmsRematchIntro.cs`): the look-about is the head's. Mario's body stands square to where the laugh comes from (as 174 placed him); his
+head: a beat (8 % of LookSeconds -- the laugh registers), LEFT LookTurnDeg (60 degrees) and a little up (LookUpDeg 10), held; RIGHT, held; then AHEAD,
+half up -- the turns 12 / 16 / 12 % of LookSeconds (2.6 s: 0.31 / 0.42 / 0.31 s), the holds 18 / 18 / 16 % (0.47 / 0.47 / 0.42 s); the chest takes
+LookChestShare (0.3) of each turn. LooksMade reads the sequence's step. As King Boo surfaces and laughs the head TRACKS his body (37 degrees up from
+12 m) while the body turns to him (LookTurnDegPerSec 240, as 174); at the cutscene's end, or the skip, the head eases back to the clip. **Not so
+close:** King Boo surfaces SurfaceDistance 12 m in front of Mario (7); the side two-shot's camera SurfaceCamSide 22 m off the line (17), SurfaceCamHeight
+4.6 (3.8), aimed SurfaceCamAim 0.7 of the way from Mario's head to King Boo's body (0.62, now a knob -- the crown wants the room above). 174's body
+turns (LookTurnDeg 45 on the body) are gone.
+
+**Verified** (headless drive v175-3, deleted before the commit; 174's drive with the head checks): C1 the cutscene within a second of the landing as
+before; C2 the head's yaw reaches -60 and +60 degrees through 3 looks at full weight while the body's yaw does not move (180..180, 0 degrees), then he
+faces King Boo as he laughs; C2b the axes on the posed rig -- a +0.5 rad yaw turns the head about the vertical (axis.up 1.00) 37 degrees to his LEFT
+(29, plus the chest's 9 under it), the chest's share about the vertical the same way (9 degrees), a -0.5 rad pitch turns about a horizontal axis
+(axis.up 0.00) and tips his facing UP (y +0.48); C2c at the laugh the head is 37 degrees up on King Boo's body (the line to it: 35), and off again
+after the cutscene (weight 0); C3 he surfaces 12.0 m from Mario, 7 m under to 8.5 over the floor in 1.6 s, one 3.4-s laugh, facing him; C4 the 1.1-s
+sink; C5 the rise at BooSpawn into the wait, FightReady, laughs == 1 -- 7/7, no errors. Three drive iterations: v175-1 (a `Ready` property hid
+Node.Ready -- renamed HasBones; the chest's share was about the chest's local Y, which measured near horizontal: axis.up 0.16 -- the rig's chest frame
+is not the head's; hence the posed-frame axes), v175-2 (the pitch read upside down: the facing tipped DOWN -0.48 for a negative pitch -- the
+skeleton's -Z measured pointing world +Z, so SkeletonForward +Z), v175-3 7/7. Two windowed shot runs (9 shots each): Mario's head turned to his left
+(the back of the cap, the shoulder following), then his right (the face in profile), then ahead and a little up, his body still through all three;
+the two-shot with Mario at the left looking up at King Boo surfacing and laughing 12 m off -- the first run clipped the crown at the top of the
+frame, the second (SurfaceCamAim 0.7, 22 m, 4.6 up) has it in.
+
+**Deviations, all knobs:** the look-around is procedural -- the head and a third of it on the chest over the standing idle -- not a hand-made clip; its
+beats, angles and shares are mine (LookTurnDeg, LookUpDeg, LookChestShare, LookSeconds on the intro node; ChestShare, EaseSeconds, MaxYaw / MaxPitch
+on the modifier); the head tracking King Boo through the laugh is mine too. Knobs: the intro (SurfaceDistance, SurfaceCamSide, SurfaceCamHeight,
+SurfaceCamAim, LookTurnDeg, LookUpDeg, LookChestShare, LookSeconds, LookTurnDegPerSec).
