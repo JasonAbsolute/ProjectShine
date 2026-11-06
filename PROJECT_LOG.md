@@ -12184,3 +12184,59 @@ red; the returning balls can burn a Mario the outbound pass burned once his 2.5 
 FireballCrownColor, FireballTellSeconds / WatchSeconds, FireballClip, FireballHoldFrame, FireballCount, FireballVolleySeconds, FireballSpreadDeg,
 FireballSpeed, FireballSize, FireballSeconds, FireballHitHeight, FireballDiesOnHit) and FireballWeight; SmsFireballs' own (DropSeconds, WallInset,
 FadeFrom, CoreColor / FlameColor / EmberColor, Lights, LightEnergy, LightRange, Flames, Embers, VolleySe / SpitSe / BounceSe).
+
+### 169 -- the King Boo REMATCH, part 13: GHOST WIND, the fling (feature/kingboo-rematch, code `40fd3d3`)
+
+**Jaysonn:** "Fireballs next (doc attack 5, the burn) and, Ghost Wind next (doc attack 6, the fling)" (the fireballs were 168).
+
+**The doc** (attack 6): "Crown glows pink, for now. Tornados come at Mario and fling him around the arena." The hit: "Ghost Wind: knocked back and flung.
+Nothing to reuse here. The Chucksters are not in the port, so there is no thrown-by-a-Pianta state to borrow, and the fling is new work either way." The
+port does have a fling, newer than the doc's survey: pass 94's THROWN_DOWN / THROWN_END (`Mario.SmsThrowMario(dir, speed, thrower)`, pass 128 for any
+thrower -- the NPC throw and the Cataquack's flip, 140 units a frame straight up = 33 m): he faces back along the flight and flails (ANIM_THROWN) until
+the second bounce, then THROWN_END. The tornado uses it.
+
+**The tornados** (`SmsGhostWind.cs`: the wind node and `SmsTornado`; `GhostWind.gdshader`): King Boo makes one and it runs on its own. Count 2 tornados
+rise out of the floor SpawnRadius 0.7 x the arena's radius (18.5 m) from its middle -- the first at a random bearing, the next SpawnSpreadDeg 150 on,
+re-rolled up to twelve times until none is nearer Mario than SpawnMinFromMario 8 m -- growing over RiseSeconds 0.6 (the funnel's scale from 0.3 / 0.02 to
+1). Then each HUNTS: it turns toward Mario no faster than TurnDegPerSec 70 and moves at Speed 6 m/s (Mario's run outpaces it; a sidestep works) with a
+sideways wobble of Wobble 0.6 m at 2.2 rad/s, kept a metre inside the wall; after LifeSeconds 7 it dissipates over 0.8 s (the shader's `fade`, the funnel
+flaring out and sinking) and is gone. The funnel: a CylinderMesh cone Height 8 m, TopRadius 2.8 / BaseRadius 0.8, 24 segments, open ends, turning
+SpinDegPerSec 420 about its axis; the shader (two-sided, unshaded, mix-blended): two layers of the port's smoke streak (kemuri1_raw) scrolling round at
+`spin` 1.2 turns a second and up at `rise`, the second finer and the other way, the sum sharpened (pow 1.4), banded along the height (9 bands sliding),
+fading in over the lowest 12 % and out over the top 30 %, the faces turned from the camera more solid than the middle (a hollow funnel), tint (0.82, 0.66,
+1.0), alpha 0.8. At its foot: 36 dust puffs (kemuball3_raw, a grey violet, mix-blended, from a ring 0.6-1.3 m, lifted, 1.2 -> 2.8 m), a soft ring on the
+floor (hamonring3_soft, additive, counter-turning), and 16 ghost wisps (star4s, additive, rising inside, local to the funnel). MSD_SE_MA_BOTTLE_WIND as
+they rise and every WindSeEvery 1.2 s. THE HIT: Mario's feet within Radius 1.7 m (+ his 0.56) of a risen tornado's axis, under its height, is the FLING:
+`Mario.SmsThrowMario(dir, FlingSpeed 85, this)` with dir = up x FlingUpK 0.75 + out from the axis x 0.25, normalised -- vy 64 and 21 along the flat: he
+rises about 10 m and lands about 18 m away, flailing backwards, two bounces, up; no HP (the thrown state is the hurt state for its duration). Not while he
+is down or flung (the hurt state), frozen (167), or within FlingGraceSeconds 2 of the last fling; one fling a frame. The last tornado gone, Finished and
+the node frees; `Cancel()` dissipates them all and frees 1.2 s later. Read-outs State / Flings / Alive / Tornados / ArenaCentre / ArenaRadius / FloorY /
+Age / LastFlingAt / LastFlingPoint; a tornado's RiseK / Spin / Heading / SpeedNow / Dissipating / Gone / FlingsMade / FunnelYaw. Static All / FlingCount.
+
+**King Boo** (`SmsKingBooRematch.cs`): the Wind move -- WindWeight 1 in the weight picker (WindOn); the six attacks now share it (lick, smash, lightning,
+breath, fireballs, wind). Where he stands, facing Mario: the crown PINK (WindCrownColor (1, 0.45, 0.8), the doc's "pink, for now") with the flash-then-
+quickening pulse through WindTellSeconds 0.6, the laugh clip and the second laugh voice; then the `SmsGhostWind` with its knobs copied from "The fight
+(169)" (TornadoCount, TornadoSpawnRadius, TornadoMinFromMario, TornadoSeconds, TornadoSpeed, TornadoTurnDegPerSec, TornadoHeight, TornadoRadius,
+FlingSpeed, FlingUpK, FlingGraceSeconds), a crown flash as they rise and at each fling; WindWatchSeconds 0.6 after they rise, `EnterWait` -- the tornados
+hunt on through his next moves (a 7-s life against a 2-4 s gap: two winds' tornados can be up at once, with fireballs rolling under them). CanBeHit
+through it; `AbortWind` (a swung Bomb Boo through the tell or the watch) dissipates them; tornados already let go are not his to call back. Signals
+WindStarted, WindSpawned(count), Flung, WindDone(flings). Read-outs WindsMade / WindFlings / Wind / WindLaunched.
+
+**Drive 169** (`SmsKingBoo.Drive.cs`, deleted before the commit; runs ak-al, 10 / 10 at the last): the pink crown -- the flash to 1.8, the pulse to 1, the
+register (1, 0.45, 0.8), the sparkles -- and the tornados up at 0.60 s (C3); two, 18.5 m out, 150 deg apart, 20.2 and 17.0 m from Mario, risen over the
+rise, spinning (C4); closing on him at 6.0-6.1 m/s, 17.0 -> 7.7 m (C5); a standing Mario FLUNG by the one that reached him: the Thrown kind, HP 8 -> 8, up
+10.5 m, carried 18.4 m, down 2.77 s (C6); the tornados gone 7.82 s after they rose (7 + the 0.8 s dissipation), the flings 2 s apart at least, King Boo
+seen in the wait meanwhile (C7); a Mario who RUNS from the second wind's tornados (away from the nearest, bending toward the middle near the wall) is never
+flung, the tornados having closed 20 -> 7 m (C8); a hit through the third wind's watch dissipates its two tornados, the crown dark, the node let go (C9);
+the end (C10). Run ak's fails: the fling carried him only 4 m (FlingUpK 0.93 left 6 units a frame along the flat; now 0.75 and 85: 18 m), the drive's
+bookkeeping of overlapping winds (wind 1's end arriving under wind 2's index; per-node hooks now), a cancel test that fired after King Boo had let the wind
+go (the watch is 0.6 s). Two windowed shot runs (k, l): the funnels read as faint smooth mist cones at alpha 0.6 and 7 m, so the shader's churn was
+sharpened and banded harder, the tint deepened, the cone raised to 8 m and the dust doubled in size; now tall pale violet funnels with a glowing ring and
+dust at the foot, Mario flung high and flailing between two of them. The .err: Godot's "ObjectDB instances leaked at exit" as before.
+
+**Deviations, all knobs:** the tornados' count (2), where they rise (0.7 R, 150 deg apart, 8 m from Mario), their speed (6), turning (70 deg/s), life (7 s)
+and the funnel's size are mine (the doc gives "tornados come at Mario and fling him"); the fling reuses the Cataquack's thrown state (the doc expected new
+work); the crown is the doc's pink "for now"; loose tornados outlive the move and a later hit on King Boo does not dispel them. Knobs: King Boo's "The
+fight (169)" (WindOn, WindCrownColor, WindTellSeconds / WatchSeconds, WindClip / WindSe, TornadoCount, TornadoSpawnRadius, TornadoMinFromMario,
+TornadoSeconds, TornadoSpeed, TornadoTurnDegPerSec, TornadoHeight, TornadoRadius, FlingSpeed, FlingUpK, FlingGraceSeconds) and WindWeight; SmsGhostWind's
+own (SpawnSpreadDeg, RiseSeconds, Wobble, TopRadius / BaseRadius, SpinDegPerSec, Tint, Alpha, Dust, Wisps, WindSe, WindSeEvery).

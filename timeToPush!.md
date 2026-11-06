@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-05 19:08 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-05 19:32 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1206,8 +1206,11 @@ a wall reaches him; the attacks picked by weight. SMS 167: GHOST BREATH -- the c
 arena along the floor; the hit is a new FREEZE on Mario (Mario.SmsFreezeFor: a second with his pose held and a frost fog, inside an ice block that
 shatters as he thaws; no HP) -- a jump as the cold reaches him clears it. Mario.cs and SmsBodyOverlay.cs are touched. SMS 168: FIREBALLS --
 the crown red-orange, a volley of fireballs spat out of his mouth that roll along the floor, bounce off the arena wall and shrink away; the hit is
-the port's burn (Mario.TakeDamage with the Fire profile: FIRE_DOWN, 1 HP); the full jump clears a ball. Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `1efb8eb` ("SMS 168: the King Boo REMATCH, part 12 -- FIREBALLS, the burn"; assets/Sms/Rematch/
+the port's burn (Mario.TakeDamage with the Fire profile: FIRE_DOWN, 1 HP); the full jump clears a ball. SMS 169: GHOST WIND -- the crown pink,
+two ghost tornados rise out of the floor and hunt Mario for 7 s; one that reaches him FLINGS him (the port's thrown state, Mario.SmsThrowMario: up
+10 m, 18 m across, no HP); a run outpaces them. All six of the doc's attacks are in. Further passes re-point this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `40fd3d3` ("SMS 169: the King Boo REMATCH, part 13 -- GHOST WIND, the fling"; assets/Sms/Rematch/
+  SmsGhostWind.cs, GhostWind.gdshader NEW, SmsKingBooRematch.cs) on the 168 commit ("SMS 168: the King Boo REMATCH, part 12 -- FIREBALLS, the burn"; assets/Sms/Rematch/
   SmsFireballs.cs NEW, SmsKingBooRematch.cs) on the 167 commit ("SMS 167: the King Boo REMATCH, part 11 -- GHOST BREATH, the freeze"; assets/Sms/Rematch/
   SmsGhostBreath.cs, SmsIceBlock.cs, IceBlock.gdshader NEW, SmsKingBooRematch.cs; assets/Mario.cs (SmsFreezeFor, the frost), assets/Sms/Fx/SmsBodyOverlay.cs
   (SteadyFog)) on the 166 commit ("SMS 166: the King Boo REMATCH, part 10 -- GHOST LIGHTNING"; assets/Sms/Rematch/ SmsGhostLightning.cs,
@@ -1231,9 +1234,13 @@ the port's burn (Mario.TakeDamage with the Fire profile: FIRE_DOWN, 1 HP); the f
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 26 commits past `feature/sounds`, 48 since `main`. ~1.1 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 28 commits past `feature/sounds`, 50 since `main`. ~1.1 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 169: when the crown goes PINK, two ghost TORNADOS rise out of the floor 18 m out and come at you at 6 m/s for 7 s, turning slowly --
+  run or sidestep and they never catch you; one that reaches you FLINGS you (Sunshine's Cataquack throw: 10 m up, 18 m across, the flail and the
+  bounces, no HP). They outlive his move, so two winds' worth can be up at once. All six attacks are in and picked by weight. Knobs: KingBoo's
+  "The fight (169)" (TornadoCount / Speed / TurnDegPerSec / Seconds / Height / Radius, FlingSpeed / FlingUpK / FlingGraceSeconds, WindCrownColor) and WindWeight.
 - To try 168: when the crown goes RED-ORANGE (a flaming crown), he spits a volley of eight FIREBALLS out of his mouth that drop to the floor
   and roll across the arena at 14 m/s in a 140-deg fan, bouncing off the wall and shrinking away over 5 s. A ball reaching you is the BURN (Sunshine's
   fire hit: 1 HP, the launch, the cloud); a full JUMP clears one (feet over 1.6 m), a hop does not; watch the ones coming back off the wall. Knobs:
