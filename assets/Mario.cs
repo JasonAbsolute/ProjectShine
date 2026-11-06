@@ -332,6 +332,9 @@ public partial class Mario : CharacterBody3D
     private bool _smsSquatEndReady = false;                       // the runtime ma_sqend BaseSM state exists
     private string _smsSquatClipNow = "";                         // the squat clip the BaseSM is on
     private SmsBoneRotZ _smsHeadGunRot;                           // MarioHeadCtrl: Rz(gun angle / 2) on jnt_head while the angle is negative
+    private SmsHeadLook _smsHeadLook;                             // 175: the demos' look-about (the head turned on its own axes from its rest, the chest's share)
+    /// <summary>175: the head look-about modifier for the demos (SmsRematchIntro's cutscene): Play a sequence of looks, Track a point, Stop.</summary>
+    public SmsHeadLook SmsHeadLook => _smsHeadLook;
     private bool _fluddDashAnimOn = false;                        // ma_turbo_dash is the tree's current state
     private bool _fluddTurboAnimReady = false;                    // the ma_turbo_dash state was added to BaseSM
     private bool _fluddBroadJump = false;                         // this singleJump is a BROAD_JUMP (ma_broad_jump)
@@ -14597,6 +14600,8 @@ public partial class Mario : CharacterBody3D
         _smsHeadGunRot = new SmsBoneRotZ { Name = "SmsHeadGunAngle", BoneNames = new[] { "jnt_head" }, Angles = new float[1] };
         skeleton.AddChild(_smsHeadGunRot);
         skeleton.MoveChild(_smsHeadGunRot, 0);
+        _smsHeadLook = new SmsHeadLook { Name = "SmsHeadLook" };   // 175: last in the modifier order -- it REPLACES the head's pose while a demo has it
+        skeleton.AddChild(_smsHeadLook);
     }
 
     /// <summary>calcGunAngle() (WaterGun.cpp 216) for this tick. In MARIO_STATUS_SQUAT the target is the angle itself plus the stick's
