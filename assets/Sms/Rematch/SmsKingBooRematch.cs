@@ -58,6 +58,13 @@ using System.Linq;
 /// doc's second with his pose held and the frost fog on him, no HP -- and the ICE about him (<see cref="SmsIceBlock"/>) that shatters as he thaws; the
 /// cold hugs the floor, so a jump as it reaches him clears it. BreathWatchSeconds after the sweep, the wait and the gap (the cold still rolling). A swung
 /// Bomb Boo hits him through it (the breath cuts off). Signals BreathStarted (the tell), Breathed(hit) (the sweep is over).
+/// Pass 168: FIREBALLS (the doc's attack 5: "Crown glows red. Fireballs shoot off in random directions and bounce off the arena walls. They shrink as
+/// they travel and fade out"; the hit "the burn ... fireDown on the profile": Mario.SmsDamageProfile.Fire). Made where he stands: the crown RED-ORANGE
+/// (FireballCrownColor; the lightning's red is deeper -- the doc has both red) through FireballTellSeconds as the spit clip rears, then the thrust (the
+/// clip held at it) and a VOLLEY of fireballs out of the mouth (<see cref="SmsFireballs"/>, its own knobs: the count, the arc, the speed, the size, the life,
+/// the bounces, the burn) over FireballVolleySeconds, facing Mario throughout; FireballWatchSeconds after the volley, the wait (the balls rolling on their
+/// own). A swung Bomb Boo hits him through it (the balls fizzle out). Signals FireballsStarted (the tell), FireballsShot (the last ball is out),
+/// FireballBurned (a ball got Mario), FireballsDone(burns) (the last ball has died).
 /// </summary>
 public partial class SmsKingBooRematch : Node3D
 {
@@ -129,7 +136,7 @@ public partial class SmsKingBooRematch : Node3D
     [ExportGroup("The fight (164): the Boolossus Smash")]
     /// <summary>The smash runs at all; the attacks' WEIGHTS (166: the doc's near-random pick -- an attack's chance is its weight over the sum; 0 = never).</summary>
     [Export] public bool SmashOn = true;
-    [Export(PropertyHint.Range, "0,10,0.5")] public float LickWeight = 1f, SmashWeight = 1f, LightningWeight = 1f, BreathWeight = 1f;
+    [Export(PropertyHint.Range, "0,10,0.5")] public float LickWeight = 1f, SmashWeight = 1f, LightningWeight = 1f, BreathWeight = 1f, FireballWeight = 1f;
     /// <summary>The Boolossus (Boolossus.tscn carries its own knobs: the height, the fall, the wave).</summary>
     [Export] public PackedScene SmashScene;
     /// <summary>The tell: his crown glows this colour (the doc: white) pulsing at this rate for this long before the first Boolossus; the clip he plays
@@ -182,6 +189,20 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public SmsGhostBreath.Way SweepWay = SmsGhostBreath.Way.Random;
     [Export] public float BreathDownDeg = 10f, BreathSpeed = 22f, PuffSeconds = 1.5f, PuffSizeStart = 2f, PuffSizeEnd = 6f, BreathHitHeight = 1.2f, FreezeSeconds = 1f;
     [Export] public bool OneFreezePerAttack = true;
+    [ExportGroup("The fight (168): Fireballs")]
+    /// <summary>The fireballs run at all; the crown's colour for them (the doc: red -- a red-orange here, the lightning's red being deeper); the tell before
+    /// the first ball; how long he watches after the volley before the wait; the clip (the casino spit, held at FireballHoldFrame through the volley).</summary>
+    [Export] public bool FireballsOn = true;
+    [Export] public Color FireballCrownColor = new Color(1f, 0.32f, 0.02f);
+    [Export] public float FireballTellSeconds = 0.6f, FireballWatchSeconds = 0.4f;
+    [Export] public string FireballClip = "btelesa_spit";
+    [Export] public int FireballHoldFrame = 50;
+    /// <summary>The volley (SmsFireballs' knobs, set here as a template): how many balls over how long, the arc about the way to Mario they are spat into
+    /// (degrees; 0 = all at him), their speed (m/s), a ball's size at birth (metres across), how long one lives (shrinking to nothing), how high over the floor the fire reaches (a Mario
+    /// jumping higher is over it), whether a ball bursts on Mario.</summary>
+    [Export(PropertyHint.Range, "1,24,1")] public int FireballCount = 8;
+    [Export] public float FireballVolleySeconds = 1f, FireballSpreadDeg = 140f, FireballSpeed = 14f, FireballSize = 2f, FireballSeconds = 5f, FireballHitHeight = 1.6f;
+    [Export] public bool FireballDiesOnHit = true;
     [ExportGroup("")]
     [Export] public bool DebugPrint;
 
@@ -204,9 +225,14 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>167: the breath's tell begins; the sweep is over (whether the cold froze Mario).</summary>
     [Signal] public delegate void BreathStartedEventHandler();
     [Signal] public delegate void BreathedEventHandler(bool hitMario);
+    /// <summary>168: the fireballs' tell begins; the last ball is out; a ball burned Mario; the last ball has died (the burns in all).</summary>
+    [Signal] public delegate void FireballsStartedEventHandler();
+    [Signal] public delegate void FireballsShotEventHandler();
+    [Signal] public delegate void FireballBurnedEventHandler();
+    [Signal] public delegate void FireballsDoneEventHandler(int burns);
 
-    public enum Phase { Hidden, Appear, Laugh, Wait, Hurt, Down, Gone, Vanish, Arrive, Lick, Smash, Lightning, Breath }
-    public enum Move { None, Hop, Lick, Smash, Lightning, Breath }
+    public enum Phase { Hidden, Appear, Laugh, Wait, Hurt, Down, Gone, Vanish, Arrive, Lick, Smash, Lightning, Breath, Fireballs }
+    public enum Move { None, Hop, Lick, Smash, Lightning, Breath, Fireballs }
     public Phase State { get; private set; } = Phase.Hidden;
     /// <summary>The clip he is on (the assigned one while it is held paused: 167).</summary>
     public string Clip => _anim != null ? (string)(_anim.IsPlaying() ? _anim.CurrentAnimation : _anim.AssignedAnimation) : "";
@@ -215,7 +241,7 @@ public partial class SmsKingBooRematch : Node3D
     public int Hp { get; private set; } = -1;
     public int HitsTaken { get; private set; }
     /// <summary>A Bomb Boo bursts on him while he waits or licks (not between spots, through the hurt, the down, the entrance).</summary>
-    public bool CanBeHit => State == Phase.Wait || State == Phase.Lick || State == Phase.Smash || State == Phase.Lightning || State == Phase.Breath;
+    public bool CanBeHit => State == Phase.Wait || State == Phase.Lick || State == Phase.Smash || State == Phase.Lightning || State == Phase.Breath || State == Phase.Fireballs;
     public bool IsAlive => State != Phase.Down && State != Phase.Gone;
     public int MaterialsCopied => _mats.Count;
     /// <summary>162, for the drives: the lick's stage (-1 none, 0 wind-up, 1 the whip live, 2 the clip's tail, 3 the wait after), the counts, the gap left,
@@ -255,6 +281,11 @@ public partial class SmsKingBooRematch : Node3D
     public bool BreathLaunched => _breathLaunched;
     public int BreathSide => _breathSide;
     public bool BreathClipHeld => _breathClipHeld;
+    /// <summary>168: the volleys made, the balls that burned Mario in all, the volley running (while it lives), whether this volley is out.</summary>
+    public int FireballVolleys { get; private set; }
+    public int FireballBurns { get; private set; }
+    public SmsFireballs Fireballs => _fireballs != null && IsInstanceValid(_fireballs) ? _fireballs : null;
+    public bool FireballsLaunched => _fireLaunched;
     /// <summary>The mouth: the tongue's root joint (jnt_sita_1, at the lips) in the world, else a little ahead of and under the body joint.</summary>
     public Vector3 MouthPoint => _skel != null && _bSita >= 0 ? _skel.GlobalTransform * _skel.GetBoneGlobalPose(_bSita).Origin : BodyPoint + new Vector3(MathF.Sin(_yaw), 0f, MathF.Cos(_yaw)) * 2.2f - Vector3.Up * 0.8f;
     public Vector3 LastApproachDir => _lastApproach;
@@ -294,6 +325,7 @@ public partial class SmsKingBooRematch : Node3D
     private GpuParticles3D _crownSpark; private ParticleProcessMaterial _crownSparkMat; private float _crownFlashT;
     private SmsGhostLightning _lightning; private float _lightningT; private bool _lightningLaunched, _lightningDone;
     private SmsGhostBreath _breath; private float _breathT, _breathWatchT, _breathYawCentre; private bool _breathLaunched, _breathSwept, _breathClipHeld; private int _breathSide = 1, _bSita = -1;
+    private SmsFireballs _fireballs; private float _fireT, _fireWatchT; private bool _fireLaunched, _fireShot, _fireClipHeld;
     /// <summary>Where the crown's sparkles and halo sit: the crown joint lifted CrownFxLift into the crown.</summary>
     public Vector3 CrownFxPoint => CrownPoint + Vector3.Up * CrownFxLift;
     private GpuParticles3D _chika; private Node3D _glow; private SmsActorSound _sound; private SmsTongueStretch _tongue;
@@ -480,6 +512,7 @@ public partial class SmsKingBooRematch : Node3D
         else if (State == Phase.Smash && n == SmashClip) { if (_smashLaunchedCount < SmashCount) PlayClip(SmashClip); else _smashClipEnded = true; }
         else if (State == Phase.Lightning && n == LightningClip) { if (!_lightningDone) PlayClip(LightningClip); }
         else if (State == Phase.Breath && n == BreathClip) { _breathClipHeld = false; PlayClip(BckWait); }
+        else if (State == Phase.Fireballs && n == FireballClip) { _fireClipHeld = false; PlayClip(BckWait); }
     }
 
     private void EnterWait(float gap)
@@ -500,8 +533,8 @@ public partial class SmsKingBooRematch : Node3D
     public bool TakeHit(SmsBombBoo by)
     {
         if (!CanBeHit) return false;
-        bool midLick = State == Phase.Lick, midSmash = State == Phase.Smash, midLightning = State == Phase.Lightning, midBreath = State == Phase.Breath;
-        AbortLick(); AbortSmash(); AbortLightning(); AbortBreath();
+        bool midLick = State == Phase.Lick, midSmash = State == Phase.Smash, midLightning = State == Phase.Lightning, midBreath = State == Phase.Breath, midFire = State == Phase.Fireballs;
+        AbortLick(); AbortSmash(); AbortLightning(); AbortBreath(); AbortFireballs();
         Hp = Math.Max(0, Hp - 1); HitsTaken++;
         State = Phase.Hurt; _hurtT = 0f; _hurtYaw0 = _yaw; Position = _home;
         PlayClip(BckHit);
@@ -510,13 +543,14 @@ public partial class SmsKingBooRematch : Node3D
         _opacitySolid = Mathf.Clamp(GhostOpacity + OpacityPerHit * HitsTaken, 0.1f, 1f);
         SetOpacity(_opacitySolid);
         if (_sound != null && !string.IsNullOrEmpty(HurtSe)) _sound.Play(HurtSe);
-        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: HIT by {by?.Name ?? "?"}{(midLick ? " mid-lick" : midSmash ? " mid-smash (the tell called off)" : midLightning ? " mid-lightning (the walls gone)" : midBreath ? " mid-breath (the breath cut off)" : "")} -> {Hp} left (the hit clip, {_hurtLen:F2} s)");
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: HIT by {by?.Name ?? "?"}{(midLick ? " mid-lick" : midSmash ? " mid-smash (the tell called off)" : midLightning ? " mid-lightning (the walls gone)" : midBreath ? " mid-breath (the breath cut off)" : midFire ? " mid-volley (the fireballs fizzle)" : "")} -> {Hp} left (the hit clip, {_hurtLen:F2} s)");
         EmitSignal(SignalName.Hit, Hp);
         return true;
     }
     private void AbortLick() { _lickStage = -1; _lickClipEnded = false; }
     private void AbortSmash() { SetCrownGlow(_crownGlowColor, 0f); _smashClipEnded = false; }
     private void AbortLightning() { if (_lightning != null && IsInstanceValid(_lightning)) _lightning.Cancel(); _lightning = null; SetCrownGlow(_crownGlowColor, 0f); }
+    private void AbortFireballs() { if (_fireballs != null && IsInstanceValid(_fireballs)) _fireballs.Cancel(); _fireballs = null; if (_fireClipHeld && _anim != null) { _anim.Play(); _fireClipHeld = false; } SetCrownGlow(_crownGlowColor, 0f); }
     private void AbortBreath() { if (_breath != null && IsInstanceValid(_breath)) _breath.Cancel(); _breath = null; if (_breathClipHeld && _anim != null) { _anim.Play(); _breathClipHeld = false; } SetCrownGlow(_crownGlowColor, 0f); }
     private void SetCrown(Vector3 c) { _crownNow = c; _crownMat?.SetShaderParameter("crown_c0", c); }
     /// <summary>165: the crown SHINES <paramref name="color"/> by <paramref name="k"/> (0 = its own yellow, dark; over 1 = the activation flash): the shader's
@@ -568,6 +602,7 @@ public partial class SmsKingBooRematch : Node3D
         if (pick == Move.Smash) { BeginSmash(); return; }
         if (pick == Move.Lightning) { BeginLightning(); return; }
         if (pick == Move.Breath) { BeginBreath(); return; }
+        if (pick == Move.Fireballs) { BeginFireballs(); return; }
         _moveIsLick = pick == Move.Lick;
         AbortLick();
         State = Phase.Vanish; _fadeT = 0f; MovesMade++;
@@ -579,14 +614,15 @@ public partial class SmsKingBooRematch : Node3D
     private Move PickMove()
     {
         if (_rng.NextDouble() < RepositionChance) return Move.Hop;
-        float wl = Mathf.Max(0f, LickWeight), ws = SmashOn && SmashScene != null ? Mathf.Max(0f, SmashWeight) : 0f, wg = LightningOn ? Mathf.Max(0f, LightningWeight) : 0f, wb = BreathOn ? Mathf.Max(0f, BreathWeight) : 0f;
-        float sum = wl + ws + wg + wb;
+        float wl = Mathf.Max(0f, LickWeight), ws = SmashOn && SmashScene != null ? Mathf.Max(0f, SmashWeight) : 0f, wg = LightningOn ? Mathf.Max(0f, LightningWeight) : 0f, wb = BreathOn ? Mathf.Max(0f, BreathWeight) : 0f, wf = FireballsOn ? Mathf.Max(0f, FireballWeight) : 0f;
+        float sum = wl + ws + wg + wb + wf;
         if (sum <= 0f) return Move.Lick;
         float r = (float)_rng.NextDouble() * sum;
         if (r < wl) return Move.Lick;
         if (r < wl + ws) return Move.Smash;
         if (r < wl + ws + wg) return Move.Lightning;
-        return Move.Breath;
+        if (r < wl + ws + wg + wb) return Move.Breath;
+        return Move.Fireballs;
     }
     /// <summary>164: the smash, where he stands: the laugh clip and its voice, the crown pulsing white through the tell, then the Boolossus over Mario.</summary>
     private void BeginSmash()
@@ -744,6 +780,66 @@ public partial class SmsKingBooRematch : Node3D
         _breath = null;   // the cold rolls on on its own
         EnterWait(NextGap());
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: back to the wait after the breath ({BreathHits} freeze{(BreathHits == 1 ? "" : "s")} so far), the next move in {_gapT:F1} s");
+    }
+    /// <summary>168: the fireballs -- the crown red-orange through the tell as the spit clip rears, facing Mario, then the thrust (the clip held) and the volley
+    /// out of the mouth (SmsFireballs, on its own); FireballWatchSeconds after the last ball leaves, the wait.</summary>
+    private void BeginFireballs()
+    {
+        State = Phase.Fireballs; _fireT = 0f; _fireWatchT = 0f; _fireLaunched = false; _fireShot = false; _fireClipHeld = false; _pulsePhase = 0f; _crownFlashT = 0f; MovesMade++; FireballVolleys++; Position = _home;
+        PlayClip(FireballClip);
+        if (_anim != null && FireballTellSeconds > 0.05f) _anim.SpeedScale *= Mathf.Clamp(FireballHoldFrame / 60f / FireballTellSeconds, 0.2f, 4f);   // the thrust lands at the tell's end
+        SetCrownGlow(FireballCrownColor, 0f);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: move {MovesMade}: FIREBALLS {FireballVolleys} -- the crown glows {FireballCrownColor} ({FireballCount} balls from {FireballTellSeconds:F2} s over {FireballVolleySeconds:F2} s)");
+        EmitSignal(SignalName.FireballsStarted);
+    }
+    private void FireballsTick(float dt)
+    {
+        _fireT += dt;
+        FaceTick(dt);
+        _crownFlashT -= dt;
+        if (_fireT < CrownFlashSeconds || _crownFlashT > 0f) SetCrownGlow(FireballCrownColor, 1.8f);
+        else
+        {
+            float hz = CrownPulseHz * Mathf.Lerp(1f, Mathf.Max(1f, CrownPulseQuicken), Mathf.Clamp(_fireT / Mathf.Max(0.1f, FireballTellSeconds), 0f, 1f));
+            _pulsePhase += dt * hz * MathF.Tau;
+            SetCrownGlow(FireballCrownColor, Mathf.Lerp(0.5f, 1f, 0.5f + 0.5f * MathF.Sin(_pulsePhase - MathF.PI / 2f)));
+        }
+        if (!_fireLaunched)
+        {
+            if (_fireT >= FireballTellSeconds)
+            {
+                var m = M();
+                if (m == null) { EndFireballs(); return; }
+                var f = new SmsFireballs { Name = $"Fireballs{FireballVolleys}", DebugPrint = DebugPrint, Count = FireballCount, VolleySeconds = FireballVolleySeconds, SpreadDeg = FireballSpreadDeg, Speed = FireballSpeed, Size = FireballSize, LifeSeconds = FireballSeconds, HitHeight = FireballHitHeight, DiesOnHit = FireballDiesOnHit };
+                (GetTree().CurrentScene ?? GetParent()).AddChild(f);
+                float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
+                Vector3 d = m.GlobalPosition - GlobalPosition; float yawTo = d.LengthSquared() > 1e-4f ? MathF.Atan2(d.X, d.Z) : _yaw;
+                f.Shot += n => { _fireShot = true; _crownFlashT = CrownFlashSeconds * 0.7f; EmitSignal(SignalName.FireballsShot); };
+                f.Burned += () => { FireballBurns++; EmitSignal(SignalName.FireballBurned); };
+                f.Finished += () => { int burns = f.Burns; if (_fireballs == f) _fireballs = null; EmitSignal(SignalName.FireballsDone, burns); };
+                f.Begin(m, fy, () => MouthPoint, yawTo, _arenaCentre, _arenaRadius);
+                float frame = ClipFrameNow(FireballClip);
+                if (_anim != null && _anim.IsPlaying() && _anim.CurrentAnimation == FireballClip) { _anim.Pause(); _fireClipHeld = true; }   // the thrust held through the volley
+                _fireballs = f; _fireLaunched = true; _crownFlashT = CrownFlashSeconds;
+                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the fireballs come out of the mouth at {MouthPoint} (the clip held at frame {frame:F0})");
+            }
+        }
+        else
+        {
+            var f = Fireballs;
+            if (f != null && f.State == SmsFireballs.Phase.Volley) { }                                                                    // the clip held through the volley
+            else if (_fireClipHeld && _anim != null) { _anim.Play(); _fireClipHeld = false; }                                   // the volley over: the clip runs on
+            if (_fireShot) { _fireWatchT += dt; if (_fireWatchT >= FireballWatchSeconds) EndFireballs(); }
+            else if (f == null) EndFireballs();
+        }
+    }
+    private void EndFireballs()
+    {
+        SetCrownGlow(_crownGlowColor, 0f); _fireWatchT = 0f;
+        if (_fireClipHeld && _anim != null) { _anim.Play(); _fireClipHeld = false; }
+        _fireballs = null;   // the balls roll on on their own
+        EnterWait(NextGap());
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: back to the wait after the fireballs ({FireballBurns} burn{(FireballBurns == 1 ? "" : "s")} so far), the next move in {_gapT:F1} s");
     }
     private void EndSmash()
     {
@@ -934,6 +1030,7 @@ public partial class SmsKingBooRematch : Node3D
         else if (State == Phase.Smash) SmashTick(dt);
         else if (State == Phase.Lightning) LightningTick(dt);
         else if (State == Phase.Breath) BreathTick(dt);
+        else if (State == Phase.Fireballs) FireballsTick(dt);
         if (Blink) BlinkTick(dt);
         PlaceFx();
     }
