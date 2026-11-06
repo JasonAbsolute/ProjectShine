@@ -12240,3 +12240,54 @@ work); the crown is the doc's pink "for now"; loose tornados outlive the move an
 fight (169)" (WindOn, WindCrownColor, WindTellSeconds / WatchSeconds, WindClip / WindSe, TornadoCount, TornadoSpawnRadius, TornadoMinFromMario,
 TornadoSeconds, TornadoSpeed, TornadoTurnDegPerSec, TornadoHeight, TornadoRadius, FlingSpeed, FlingUpK, FlingGraceSeconds) and WindWeight; SmsGhostWind's
 own (SpawnSpreadDeg, RiseSeconds, Wobble, TopRadius / BaseRadius, SpinDegPerSec, Tint, Alpha, Dust, Wisps, WindSe, WindSeEvery).
+
+### 170 -- the King Boo REMATCH, part 14: the EFFECTS pass (feature/kingboo-rematch, code `6e7b8a9`)
+
+**Jaysonn:** "ok for lightingn walls i need them to go horizonstally and the wind needs to look more like a guest of wind. and the block that freezes mario
+should be a chunk of ice not just a smooth block. do another pass on the effects and really put some effects on them and bomb boos need to explode when
+hitting king boo".
+
+**The lightning goes horizontal** (`GhostLightning.gdshader`, `SmsGhostLightning.cs`): 166's walls drew the shock's bolt sheet in vertical columns, so the
+walls read as curtains of vertical streaks. Now the bolts run ALONG each wall: `rows` (Arcs 6) horizontal arcs stacked up it, each the sheet laid sideways
+(the UV swapped), shoved up or down, flipped and re-rolled 18 times a second by the hash of (row, time), and WAVING along its length (`wave` 0.18, a sine
+over the wall's x), a wider second layer behind; the arcs brightest at the wall's ends (`end_glow`), where glowing POSTS stand (PostWidth 0.9 m, the glow
+quad in the shock's cyan, a child of each wall at +-WallLength / 2, dimmed through the warning) -- the arcs read as jumping between them; a cyan OmniLight
+on each wall (LightEnergy 3, range 0.9 x WallLength, no shadow, dimmed to 0.3 through the warning) lights the floor as they close; at the meet a SHOCKWAVE
+RING (hamonring3_flat, additive cyan, MeetRing 14 m across at its widest, a 0.45 s tween, freed) races out along the floor from the seam and the camera
+kicks (MeetShake 0.6 of the Damage shake). The warn / flash uniforms are as before.
+
+**The wind is a gust** (`SmsGhostWind.cs`, `WindRibbon.gdshader`): 169's funnel was a smooth cone of mist. Now Ribbons 4 HELIX RIBBONS of wind spiral up
+it: each an ArrayMesh built in `MakeGust` (48 steps, RibbonTurns 1.6 turns from the foot to the head, the radius following the funnel's from BaseRadius to
+TopRadius x 1.05-1.3, RibbonWidth 0.55 across, the heights 0.85 / 1.0 of the funnel's, u along the ribbon, v across), under one Gust node spinning at
+RibbonSpinDegPerSec 300 (the funnel keeps its own 420), each with the ribbon shader at its own phase: the port's smoke streak scrolling along it at `speed`
+1.6, soft across (sine over v), fading in over the first 15 % and out over the last 25 %, a pale white-violet, two-sided, mix-blended, `fade` with the
+dissipation. Debris 22 dark scraps (shikaku, 0.22 x 0.14, tumbling at up to 500 deg/s, from a ring 1-1.8 m out, lifted) and the wisps now live in the
+Gust's frame (local coordinates), so they WHIRL with the spin. The funnel itself is lighter behind them (Alpha 0.5). The gust rises and dissipates with
+the tornado (its scale and fade).
+
+**The ice is a chunk** (`SmsIceBlock.cs`): 167's six-sided prism read as a glass. `ChunkMesh(seed)`: a sphere of FacetsAround 9 x FacetsUp 6 facets stretched
+to BlockWidth x BlockHeight, every vertex pushed in or out radially by up to Jag 0.22 (a Random seeded by the block's number, so each freeze is a different
+chunk; the poles jittered half as much), Spikes 5 of them pushed out SpikeOut 0.45 further, built with SurfaceTool UNINDEXED with each facet's own normal so
+the fresnel rim catches every face -- a faceted, spiky lump of ice; the rim 0.5, the frost 0.15, the alpha 0.15 so the frosted Mario shows through the
+facets; each chunk turned to its own yaw. The pop-in, the glints, the shatter and the chips as before.
+
+**Bursts** (`SmsFireballs.cs`): a fireball that gets Mario BURSTS -- 20 flame tongues (fire1_raw, 1.6 r quads, yellow to red, shrinking) flung out, a ring of
+fire (hamonring3_flat, orange, 6 r across over 0.35 s) racing out along the floor, a kick of the camera (0.5) -- over the 0.3 s collapse.
+
+**The Bomb Boo explodes** (`SmsBombBoo.cs`): swung into King Boo (ExplodeOnKingBoo) it fires the Bob-omb's own blast at itself -- `BombExplosion.tscn` (pass
+130b's port of TEffectExplosion: the 10_bomb fireball sphere playing its bck / brk / btk, the glow, the smoke, the scraps with their trails, the shockwave,
+the sparks; an SmsFxBurst played at the Boo's transform at ExplosionScale 1.4) -- with the water flower's boom (MSD_SE_PO_WFLOWER_EXPLOSION; the port has no
+bomb sound) and a full Damage shake (ExplosionShake 1), over its own violet puff and burst sound; King Boo's hit as before. `Blasts` counts them. An expiring
+or dropped Boo still only puffs.
+
+**Verified** (drive v170-2, a windowed shot run, deleted before the commit; the headless variant just runs the fight 40 s): one attack at a time by the
+weights -- the arcs running along the walls between the posts in the warning and the close, Mario shocked at the seam at the meet (the ring is at its
+start in that frame); the gust: white ribbons spiralling up a lighter funnel with debris, from the side and close; the chunk about the frosted Mario
+(close and from above); a fireball's burst on Mario; a Bomb Boo teleported onto King Boo and burst: the blast's fireball swallowing him, then its smoke and
+scraps -- 14 shots, no errors. The first run stalled waiting on a 7-s wind life before the breath (the drive now moves on once its gust shots are taken).
+
+**Deviations, all knobs:** the arcs, posts, lights and ring are my reading of "go horizontally" (the arcs along the wall, the walls still closing from either
+side); the gust is ribbons and whirling debris rather than a particle vortex; the chunk is a jittered facet sphere, not a modelled crystal; the Bomb Boo's
+boom is the water flower's. Knobs: SmsGhostLightning (Arcs, PostWidth, LightEnergy, MeetRing, MeetShake), SmsGhostWind (Ribbons, RibbonWidth,
+RibbonTurns, RibbonSpinDegPerSec, Debris, Alpha), SmsIceBlock (Jag, Spikes, SpikeOut, FacetsAround, FacetsUp, IceColor), SmsBombBoo (ExplodeOnKingBoo,
+ExplosionFxScene, ExplosionScale, ExplosionShake, ExplodeSe).

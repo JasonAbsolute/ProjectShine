@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-05 19:32 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-05 20:02 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1208,8 +1208,12 @@ shatters as he thaws; no HP) -- a jump as the cold reaches him clears it. Mario.
 the crown red-orange, a volley of fireballs spat out of his mouth that roll along the floor, bounce off the arena wall and shrink away; the hit is
 the port's burn (Mario.TakeDamage with the Fire profile: FIRE_DOWN, 1 HP); the full jump clears a ball. SMS 169: GHOST WIND -- the crown pink,
 two ghost tornados rise out of the floor and hunt Mario for 7 s; one that reaches him FLINGS him (the port's thrown state, Mario.SmsThrowMario: up
-10 m, 18 m across, no HP); a run outpaces them. All six of the doc's attacks are in. Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `40fd3d3` ("SMS 169: the King Boo REMATCH, part 13 -- GHOST WIND, the fling"; assets/Sms/Rematch/
+10 m, 18 m across, no HP); a run outpaces them. All six of the doc's attacks are in. SMS 170: the EFFECTS pass -- the lightning's bolts run
+along the walls between glowing posts (lights, a meet shockwave), the tornado is a gust of spiralling ribbons and debris, the ice is a jagged chunk, a
+fireball bursts on Mario, and a Bomb Boo swung into King Boo EXPLODES with the Bob-omb's blast. Further passes re-point this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `6e7b8a9` ("SMS 170: the King Boo REMATCH, part 14 -- the EFFECTS pass"; assets/Sms/Rematch/
+  WindRibbon.gdshader NEW, GhostLightning.gdshader, IceBlock.gdshader, SmsGhostLightning.cs, SmsGhostWind.cs, SmsIceBlock.cs, SmsFireballs.cs, SmsBombBoo.cs) on the 169 commit
+  ("SMS 169: the King Boo REMATCH, part 13 -- GHOST WIND, the fling"; assets/Sms/Rematch/
   SmsGhostWind.cs, GhostWind.gdshader NEW, SmsKingBooRematch.cs) on the 168 commit ("SMS 168: the King Boo REMATCH, part 12 -- FIREBALLS, the burn"; assets/Sms/Rematch/
   SmsFireballs.cs NEW, SmsKingBooRematch.cs) on the 167 commit ("SMS 167: the King Boo REMATCH, part 11 -- GHOST BREATH, the freeze"; assets/Sms/Rematch/
   SmsGhostBreath.cs, SmsIceBlock.cs, IceBlock.gdshader NEW, SmsKingBooRematch.cs; assets/Mario.cs (SmsFreezeFor, the frost), assets/Sms/Fx/SmsBodyOverlay.cs
@@ -1234,9 +1238,14 @@ two ghost tornados rise out of the floor and hunt Mario for 7 s; one that reache
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 28 commits past `feature/sounds`, 50 since `main`. ~1.1 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 30 commits past `feature/sounds`, 52 since `main`. ~1.1 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 170 (the effects pass): the lightning walls now carry HORIZONTAL arcs jumping between glowing posts, light the floor and send a
+  shockwave ring out when they meet; the tornados are a GUST -- white ribbons of wind spiralling up with debris whirling in them; the ice on a frozen
+  Mario is a jagged CHUNK (a different one each time); a fireball that gets you BURSTS; and a Bomb Boo swung into King Boo EXPLODES with the Bob-omb's
+  blast. Knobs: SmsGhostLightning (Arcs, PostWidth, LightEnergy, MeetRing, MeetShake), SmsGhostWind (Ribbons, RibbonWidth, RibbonTurns, Debris),
+  SmsIceBlock (Jag, Spikes, SpikeOut), SmsBombBoo (ExplodeOnKingBoo, ExplosionScale, ExplosionShake, ExplodeSe).
 - To try 169: when the crown goes PINK, two ghost TORNADOS rise out of the floor 18 m out and come at you at 6 m/s for 7 s, turning slowly --
   run or sidestep and they never catch you; one that reaches you FLINGS you (Sunshine's Cataquack throw: 10 m up, 18 m across, the flail and the
   bounces, no HP). They outlive his move, so two winds' worth can be up at once. All six attacks are in and picked by weight. Knobs: KingBoo's
