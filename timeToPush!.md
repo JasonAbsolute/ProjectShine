@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-05 20:02 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-05 22:56 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1210,8 +1210,12 @@ the port's burn (Mario.TakeDamage with the Fire profile: FIRE_DOWN, 1 HP); the f
 two ghost tornados rise out of the floor and hunt Mario for 7 s; one that reaches him FLINGS him (the port's thrown state, Mario.SmsThrowMario: up
 10 m, 18 m across, no HP); a run outpaces them. All six of the doc's attacks are in. SMS 170: the EFFECTS pass -- the lightning's bolts run
 along the walls between glowing posts (lights, a meet shockwave), the tornado is a gust of spiralling ribbons and debris, the ice is a jagged chunk, a
-fireball bursts on Mario, and a Bomb Boo swung into King Boo EXPLODES with the Bob-omb's blast. Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `6e7b8a9` ("SMS 170: the King Boo REMATCH, part 14 -- the EFFECTS pass"; assets/Sms/Rematch/
+fireball bursts on Mario, and a Bomb Boo swung into King Boo EXPLODES with the Bob-omb's blast. SMS 171: the frozen Mario holds a frame of the SHOCK
+clip (ma_shock at half its length, the eyes squeezed shut) instead of the pose he was caught in; and a fix in SmsBodyOverlay.cs -- the damage fog's
+shader copies now follow the eye textures (the knockdown's hurt eyes were hidden under the pink fog since the damage passes). Further passes re-point
+this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `44f8ca4` ("SMS 171: the King Boo REMATCH, part 15 -- the freeze holds a frame of the SHOCK";
+  assets/Mario.cs, assets/Sms/Fx/SmsBodyOverlay.cs) on the 170 commit ("SMS 170: the King Boo REMATCH, part 14 -- the EFFECTS pass"; assets/Sms/Rematch/
   WindRibbon.gdshader NEW, GhostLightning.gdshader, IceBlock.gdshader, SmsGhostLightning.cs, SmsGhostWind.cs, SmsIceBlock.cs, SmsFireballs.cs, SmsBombBoo.cs) on the 169 commit
   ("SMS 169: the King Boo REMATCH, part 13 -- GHOST WIND, the fling"; assets/Sms/Rematch/
   SmsGhostWind.cs, GhostWind.gdshader NEW, SmsKingBooRematch.cs) on the 168 commit ("SMS 168: the King Boo REMATCH, part 12 -- FIREBALLS, the burn"; assets/Sms/Rematch/
@@ -1238,9 +1242,12 @@ fireball bursts on Mario, and a Bomb Boo swung into King Boo EXPLODES with the B
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 30 commits past `feature/sounds`, 52 since `main`. ~1.1 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 32 commits past `feature/sounds`, 54 since `main`. ~1.1 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 171: get caught by the Ghost Breath -- the frozen Mario now holds the SHOCK pose (arms out, knees bent, eyes squeezed shut) inside the
+  ice instead of whatever he was doing; and take any hit: the hurt eyes now show through the pink damage fog (they were hidden under it before).
+  Knobs on Mario: SmsFrostPoseClip ("ma_shock"; "" = his own pose), SmsFrostPoseAt (0.5 = halfway through the clip).
 - To try 170 (the effects pass): the lightning walls now carry HORIZONTAL arcs jumping between glowing posts, light the floor and send a
   shockwave ring out when they meet; the tornados are a GUST -- white ribbons of wind spiralling up with debris whirling in them; the ice on a frozen
   Mario is a jagged CHUNK (a different one each time); a fireball that gets you BURSTS; and a Bomb Boo swung into King Boo EXPLODES with the Bob-omb's

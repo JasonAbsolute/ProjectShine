@@ -12291,3 +12291,33 @@ side); the gust is ribbons and whirling debris rather than a particle vortex; th
 boom is the water flower's. Knobs: SmsGhostLightning (Arcs, PostWidth, LightEnergy, MeetRing, MeetShake), SmsGhostWind (Ribbons, RibbonWidth,
 RibbonTurns, RibbonSpinDegPerSec, Debris, Alpha), SmsIceBlock (Jag, Spikes, SpikeOut, FacetsAround, FacetsUp, IceColor), SmsBombBoo (ExplodeOnKingBoo,
 ExplosionFxScene, ExplosionScale, ExplosionShake, ExplodeSe).
+
+### 171 -- the King Boo REMATCH, part 15: the freeze holds a frame of the SHOCK; the eyes change under the fog (feature/kingboo-rematch, code `44f8ca4`)
+
+**Jaysonn:** "i think we should use a frame from mario getting shocked for the freeze one and that wind looks good".
+
+**The frost pose is the shock's frame** (`Mario.cs`, `SmsFreezeFor` / `SmsThaw`): 167 held whatever pose Mario was in when the breath got him (the tree
+and the player paused). Now the freeze plays `SmsFrostPoseClip` ("ma_shock", the electrocution's 0.18-s jitter clip, library-only like the knockdown clips)
+on the animation player, seeks `SmsFrostPoseAt` (0.5) of its length and holds the player at speed 0 there for the whole freeze -- arms flung out, knees
+bent -- with the hurt eyes (`SetEyeTexture(hurtEyeTexture)`, squeezed shut); the animation tree stays paused (Manual) behind it as in 167, so the state
+machine is where it was when the thaw hands it back. The thaw stops the clip (`Stop(true)`, the pose kept until the tree's next frame), opens the eyes
+(`SleepStatus(false)`) and restores the tree's mode and the player's speed. `""` in `SmsFrostPoseClip` = 167's behaviour (his own pose held).
+`SmsFrostPoseNow` ("ma_shock@0.092/0.183x0.0") and `SmsEyeNow` (awake / sleep / hurt / tired / other) are readouts for the drives.
+
+**The eyes change under the damage fog** (`SmsBodyOverlay.cs`, a fix the drive found): the fog (pass 97) swaps every body surface's StandardMaterial3D
+for a shader copy made at Bind, with `texture_albedo` set to the texture the surface had THEN. Mario's `SetEyeTexture` / `SleepStatus` write the BASE
+eye material's `albedo_texture`, so nothing they did showed while the copies were installed: the frost's hurt eyes stayed open (the first drive run and
+the first shots showed the open eye through the ice), and the knockdown's squeezed-shut eyes -- set since the damage passes -- were under the pink fog the
+whole time too. `FogSlot.Albedo` remembers what each copy carries; `SyncAlbedo` (each `_Process` while the copies are installed, and at the install)
+follows the base material's albedo texture (the override the copy replaced, else the mesh's own material) into the copy. The shot shows the eyes shut.
+
+**Verified** (headless drive v171-3, deleted before the commit; the breath forced, the card skipped): C1 the fight starts with the pose set to ma_shock,
+the clip in Mario's own AnimationPlayer (201 clips; the first drive build searched the subtree and found a different player without it); C2 the frozen
+Mario holds ma_shock@0.092/0.183 at speed 0 the whole 0.98-s freeze, the tree Manual, the eye material hurt AND the fogged eye surface (16 surfaces
+fogged) showing the hurt texture from the freeze's first tick; C3 the thaw leaves the player stopped, the tree running, the eyes awake on the base
+material with the fog off, Mario idle at the same HP -- 3/3. Of note: Mario's eye surface starts the scene with the glb's own eye texture
+(untitled_ma_mdl1_1.png, "other"); the first `SleepStatus(false)` puts Mario's awake texture on (the same picture, another object) -- a drive artifact,
+not a bug. A windowed shot run (3 shots): the shock pose with the eyes squeezed shut inside the ice chunk, from the side, the front and the game camera.
+
+**Deviations:** none asked for; the fog fix changes the knockdown's look (the hurt eyes now show through the pink fog, as the game's BTP does). Knobs:
+`Mario.SmsFrostPoseClip`, `Mario.SmsFrostPoseAt`. The wind stays as 170 left it.
