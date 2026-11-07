@@ -24,7 +24,7 @@ public partial class SmsHeadLook : SkeletonModifier3D
     /// which faces -Z, carries a half turn and the 1 / 74.44 scale), so +Z; -Z would read his pitch upside down.</summary>
     public Vector3 SkeletonUp = Vector3.Up, SkeletonForward = Vector3.Back;
     /// <summary>The limits a Track is clamped to (radians).</summary>
-    public float MaxYaw = Mathf.DegToRad(75f), MaxPitch = Mathf.DegToRad(50f);
+    public float MaxYaw = Mathf.DegToRad(75f), MaxPitch = Mathf.DegToRad(65f);   // 176b: 65 -- the pitch counts from under a leaning chest (the stance's 18)
 
     public float Weight { get; private set; }
     public float YawNow { get; private set; }
@@ -45,6 +45,7 @@ public partial class SmsHeadLook : SkeletonModifier3D
 
     private int _head = -1, _chest = -1, _headParent = -1;
     private Basis _headRest = Basis.Identity;
+    private Vector3 _headFwdLocal = Vector3.Back;   // the head's forward in its own frame (from the bind pose, where he faces the skeleton's forward)
     private List<Look> _seq; private int _step; private float _t, _fromYaw, _fromPitch; private bool _on, _holdAtEnd;
     private Vector3 _trackPoint, _trackForward; private float _trackYaw, _trackPitch;
 
@@ -53,7 +54,7 @@ public partial class SmsHeadLook : SkeletonModifier3D
         var skel = GetSkeleton();
         if (skel == null) return;
         _head = skel.FindBone(HeadBone); _chest = skel.FindBone(ChestBone);
-        if (_head >= 0) { _headRest = skel.GetBoneRest(_head).Basis.Orthonormalized(); _headParent = skel.GetBoneParent(_head); }
+        if (_head >= 0) { _headRest = skel.GetBoneRest(_head).Basis.Orthonormalized(); _headParent = skel.GetBoneParent(_head); _headFwdLocal = (skel.GetBoneGlobalRest(_head).Basis.Orthonormalized().Inverse() * SkeletonForward).Normalized(); }
     }
 
     /// <summary>The look-about: the looks in turn (each from where the head is, over its Turn seconds, then held Hold seconds). holdAtEnd: the
@@ -62,8 +63,10 @@ public partial class SmsHeadLook : SkeletonModifier3D
     {
         _seq = new List<Look>(looks); _step = 0; _t = 0f; _fromYaw = YawNow; _fromPitch = PitchNow; _on = true; _holdAtEnd = holdAtEnd; Tracking = false; Runs++;
     }
-    /// <summary>The head on a world point: yaw from the body's forward (world, flat) to it (positive = his left), pitch from the head to it (negative = up), clamped.</summary>
-    public void Track(Vector3 worldPoint, Vector3 bodyForward)
+    /// <summary>The head on a world point: the yaw (positive = his left) and pitch (negative = up) from where the clip's pose has the head's REST
+    /// looking -- under the chest as the clip turns and leans it (176: the battle stance turns the chest 45 degrees; the head still finds King Boo) --
+    /// to the point, clamped. bodyForward is kept for the readouts' sake and no longer steers.</summary>
+    public void Track(Vector3 worldPoint, Vector3 bodyForward = default)
     {
         _trackPoint = worldPoint; _trackForward = bodyForward; Tracking = true; _on = true; _seq = null;
     }
@@ -91,13 +94,17 @@ public partial class SmsHeadLook : SkeletonModifier3D
         }
         else if (Tracking)
         {
+            // from where the clip has the head's rest looking (under the posed parent: a turned, leaning chest) to the point, in the skeleton's space
             Vector3 headWorld = skel.GlobalTransform * skel.GetBoneGlobalPose(_head).Origin;
-            Vector3 d = _trackPoint - headWorld, flat = new Vector3(d.X, 0f, d.Z), fwd = new Vector3(_trackForward.X, 0f, _trackForward.Z);
-            if (flat.LengthSquared() > 1e-6f && fwd.LengthSquared() > 1e-6f)
+            Vector3 ds = (skel.GlobalBasis.Inverse() * (_trackPoint - headWorld));
+            Basis pG = _headParent >= 0 ? skel.GetBoneGlobalPose(_headParent).Basis.Orthonormalized() : Basis.Identity;
+            Vector3 rs = (pG * _headRest * _headFwdLocal).Normalized();
+            Vector3 dsF = new Vector3(ds.X, 0f, ds.Z), rsF = new Vector3(rs.X, 0f, rs.Z);
+            if (dsF.LengthSquared() > 1e-6f && rsF.LengthSquared() > 1e-6f)
             {
-                flat = flat.Normalized(); fwd = fwd.Normalized();
-                _trackYaw = Mathf.Clamp(MathF.Atan2(fwd.Cross(flat).Y, fwd.Dot(flat)), -MaxYaw, MaxYaw);   // + = to his left (counter-clockwise seen from above)
-                _trackPitch = Mathf.Clamp(-MathF.Atan2(d.Y, new Vector2(d.X, d.Z).Length()), -MaxPitch, MaxPitch);   // the game's Rz: negative = up
+                dsF = dsF.Normalized(); rsF = rsF.Normalized(); ds = ds.Normalized();
+                _trackYaw = Mathf.Clamp(MathF.Atan2(SkeletonUp.Dot(rsF.Cross(dsF)), rsF.Dot(dsF)), -MaxYaw, MaxYaw);   // + = to his left (counter-clockwise seen from above)
+                _trackPitch = Mathf.Clamp(-(MathF.Asin(Mathf.Clamp(ds.Y, -1f, 1f)) - MathF.Asin(Mathf.Clamp(rs.Y, -1f, 1f))), -MaxPitch, MaxPitch);   // the game's Rz: negative = up
             }
             float k = 1f - MathF.Exp(-dt / 0.12f);   // the head catches up smoothly
             wantYaw = Mathf.Lerp(YawNow, _trackYaw, k); wantPitch = Mathf.Lerp(PitchNow, _trackPitch, k);
@@ -120,11 +127,15 @@ public partial class SmsHeadLook : SkeletonModifier3D
         skel.SetBonePoseRotation(_head, cur.Slerp(target, Weight));
     }
 
-    /// <summary>The head's local rotation for a yaw / pitch, given its parent's global basis: rest, then the two turns mapped into the head's rest frame.</summary>
+    /// <summary>The head's local rotation for a yaw / pitch, given its parent's global basis: rest, then the pitch about the LEFT of where the rest
+    /// looks under that parent (so a pitch only raises the gaze, whichever way the chest is turned), then the yaw about the skeleton's up -- the axes
+    /// mapped into the head's rest frame.</summary>
     private Quaternion HeadTarget(Basis parentG, float yaw, float pitch)
     {
         Basis inv = (parentG * _headRest).Inverse();   // skeleton space -> the head's rest frame
-        Vector3 yawAxis = (inv * SkeletonUp).Normalized(), pitchAxis = (inv * Left).Normalized();
+        Vector3 rs = parentG * _headRest * _headFwdLocal; rs.Y = 0f;
+        Vector3 leftOfRest = rs.LengthSquared() > 1e-6f ? SkeletonUp.Cross(rs.Normalized()).Normalized() : Left;
+        Vector3 yawAxis = (inv * SkeletonUp).Normalized(), pitchAxis = (inv * leftOfRest).Normalized();
         return _headRest.GetRotationQuaternion() * new Quaternion(yawAxis, yaw) * new Quaternion(pitchAxis, pitch);
     }
 

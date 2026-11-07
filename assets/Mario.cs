@@ -2116,6 +2116,23 @@ public partial class Mario : CharacterBody3D
             return;
         }
 
+        // 176b: a demo clip HELD after a cutscene until the player's first input (the rematch intro's battle stance): he stands in it and the
+        // idle wind-down waits; the stick or a button ends it and this frame goes on as normal; a hit (anything taking the tree back) ends it too.
+        if (_smsDemoHold)
+        {
+            bool taken = _smsDemoClip == "" || stateOfMario != MarioState.idle || (animTree != null && animTree.Active);
+            if (taken) { _smsDemoHold = false; _smsDemoClip = ""; _smsDemoThen = ""; }
+            else if (SmsPlayerInputNow()) { _smsDemoHold = false; SmsEndDemoClip(); }
+            else
+            {
+                velocity = Vector3.Zero; Velocity = Vector3.Zero;
+                MoveAndSlide();
+                idleTimer = 480;   // no sitting down in the stance
+                wasOnFloor = IsOnFloor();
+                return;
+            }
+        }
+
         // A shine touched mid-air waits here, fully controllable, until Mario
         // actually lands — the cutscene shouldn't freeze him out of the sky.
         // Must return immediately: letting the rest of this frame's normal
@@ -17681,7 +17698,15 @@ public partial class Mario : CharacterBody3D
     }
 
     // ---- 176: demo clips ---------------------------------------------------------------------------------------------------------------------
-    private string _smsDemoClip = "", _smsDemoThen = "";
+    private string _smsDemoClip = "", _smsDemoThen = ""; private bool _smsDemoHold;
+    /// <summary>176b: keep the demo clip on after the cutscene hands the controls back, until the player's FIRST input (the stick or a button) --
+    /// the rematch intro's battle stance held until he moves. A hit, or anything else that takes the tree back, ends it too.</summary>
+    public void SmsHoldDemoClipUntilInput() { _smsDemoHold = _smsDemoClip != ""; }
+    public bool SmsDemoHolding => _smsDemoHold;
+    private static bool SmsPlayerInputNow() =>
+        Input.GetVector("Lstick_left", "Lstick_right", "Lstick_up", "Lstick_down").Length() > 0.25f || Input.IsActionPressed("button_a") || Input.IsActionPressed("button_b")
+        || Input.IsActionPressed("button_x") || Input.IsActionPressed("button_z") || Input.IsActionPressed("button_r") || Input.IsActionPressed("button_l")
+        || Input.IsActionPressed("key_space") || Input.IsActionPressed("key_z");
     /// <summary>176: a demo plays a clip by name OUTSIDE the AnimationTree (the rematch intro's custom ma_lookabout, SmsRematchIntro) -- the tree
     /// off and the player playing it, as the sit / sleep / hang code does -- until SmsEndDemoClip. speed scales the player. thenPlay: the clip
     /// to go on with when this one ENDS (the battle stance's drop-in, then its loop). False (nothing changed) if the player has no such clip.
@@ -17700,7 +17725,7 @@ public partial class Mario : CharacterBody3D
     public void SmsEndDemoClip()
     {
         if (_smsDemoClip == "") return;
-        _smsDemoClip = ""; _smsDemoThen = "";
+        _smsDemoClip = ""; _smsDemoThen = ""; _smsDemoHold = false;
         if (animPlayer != null) { animPlayer.SpeedScale = 1f; animPlayer.Stop(false); }
         if (animTree != null) animTree.Active = true;
     }

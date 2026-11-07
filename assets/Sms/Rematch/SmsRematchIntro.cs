@@ -20,7 +20,7 @@ using System;
 /// (the appear clip and voice), LAUGHING for IntroLaughSeconds (his knob) -- Mario in his BATTLE STANCE (176: StanceInClip then the StanceClip loop,
 /// the custom ma_battle_stance_in / ma_battle_stance), his head on King Boo, his body turned to him -- with the camera off to the side on the two of
 /// them (SurfaceCamSide / Height), then SINKING back under the floor; AfterSinkSeconds on the empty spot, the game camera is back,
-/// Mario is free (his head back to the clip), and King Boo rises at his BooSpawn spot for the fight (SpawnRising: no second laugh) -- FightReady as
+/// Mario is free (his head back to the clip; 176b: he HOLDS the stance until his first input, StanceHoldUntilInput), and King Boo rises at his BooSpawn spot for the fight (SpawnRising: no second laugh) -- FightReady as
 /// before. A skips the cutscene too (the fight starts at once). After a miss the cutscene is skipped like the card. Cutscene off = the 157 intro.
 /// </summary>
 public partial class SmsRematchIntro : Node
@@ -69,6 +69,9 @@ public partial class SmsRematchIntro : Node
     /// Mario DROPS INTO a battle stance (StanceInClip, one-shot) and HOLDS it (StanceClip, a loop) until the fight starts -- the custom clips
     /// ma_battle_stance_in / ma_battle_stance (assets/Mario/Anims). "" or a missing clip = his idle.</summary>
     [Export] public string StanceInClip = "ma_battle_stance_in", StanceClip = "ma_battle_stance";
+    /// <summary>176b (Jaysonn: "have him hold the fight pose until input from the player happens then he goes back to normal"): when the fight starts
+    /// Mario keeps the stance until the player's first input (the stick or a button; a hit ends it too); off = the idle as soon as the fight starts.</summary>
+    [Export] public bool StanceHoldUntilInput = true;
     [ExportGroup("")]
     [Export] public bool DebugPrint;
 
@@ -249,6 +252,7 @@ public partial class SmsRematchIntro : Node
         // 176: the look-about clip is over; under the camera cut he drops into the BATTLE STANCE and holds it (the drop-in, then the loop) -- or the tree's idle
         _mario.SmsEndDemoClip();
         _stanceUsed = _mario.SmsPlayDemoClip(StanceInClip, 1f, StanceClip) || _mario.SmsPlayDemoClip(StanceClip);
+        if (_mario.SmsHeadLook != null) _mario.SmsHeadLook.ChestShare = _stanceUsed ? 0f : 0.3f;        // 176b: the stance owns the chest; the head alone finds King Boo
         Vector3 mp = _mario.GlobalPosition, toSpot = Flat(_surfaceSpot - mp), side = new Vector3(-toSpot.Z, 0f, toSpot.X);
         // a side two-shot (he is far too big to frame from behind Mario 7 m away): from SurfaceCamSide metres off the line between them, a little behind
         // Mario, SurfaceCamHeight up, looking between Mario's head and King Boo's body; pushing in a little through the laugh
@@ -276,7 +280,8 @@ public partial class SmsRematchIntro : Node
         if (_gameCam != null && IsInstanceValid(_gameCam)) _gameCam.Current = true;
         if (_cam != null && IsInstanceValid(_cam)) { _cam.QueueFree(); _cam = null; }
         _mario.CameraLocked = false;
-        _mario.SmsEndDemoClip();                                                                           // 176: the stance (or a skipped look-about) ends; the tree's idle as the fight starts
+        if (_stanceUsed && StanceHoldUntilInput && !_cutsceneSkipped) _mario.SmsHoldDemoClipUntilInput();   // 176b: the stance held until the player moves
+        else _mario.SmsEndDemoClip();                                                                      // 176: the stance (or a skipped look-about) ends; the tree's idle as the fight starts
         _mario.SmsHeadLook?.Stop();                                                                        // 175: his head back to the clip
         SpawnBoo();
     }
