@@ -72,6 +72,14 @@ using System.Linq;
 /// life; the funnel; the fling) -- TornadoCount tornados rising out of the floor away from Mario and coming at him for TornadoSeconds -- watched
 /// WindWatchSeconds, then the wait (the tornados hunting on their own). A swung Bomb Boo hits him through it (the tornados dissipate). Signals WindStarted
 /// (the tell), WindSpawned(count), Flung (a tornado got Mario), WindDone(flings).
+/// Pass 177 (Jaysonn: "make king boo do his flip when hurt like in the normal fight" / "every 3 hits king boo will make a copy of himself like in luigis
+/// mansion 3 ... mario has to hit the real one for it to do any damage. this king boo however tends to stay away and more known to throw attacks not as fast
+/// or commonly"): the HURT is the casino boss's tumble (HurtClip btelesa_damage at HurtClipSpeed: head over heels, down and back up) -- and as he recovers
+/// from every CopyEveryHits-th hit a COPY splits off (a flash; a duplicate of this node, IsCopy, fading in at a far spot, laughing; MaxCopies out at once).
+/// A copy looks and moves like him, keeps CopyMinFromMario from Mario, waits CopyGapScale longer and only THROWS (the lava balls / the breath, at
+/// CopySpeedScale); a Bomb Boo swung into it bursts for nothing: the copy is REVEALED (RevealCopy: a laugh, it fades, gone). HitPoints 9. His defeat takes
+/// his copies with him. Every King Boo is in the group sms_rematch_boo (the Bomb Boos' targets); only the real one in sms_rematch_boss. Signals
+/// CopyMade(copy), CopyRevealed(copy); readouts IsCopy, Original, CopiesAlive, CopiesMade, Copies.
 /// </summary>
 public partial class SmsKingBooRematch : Node3D
 {
@@ -105,11 +113,14 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public bool Blink = true;
     [Export] public Texture2D EyeOpen, EyeHalf, EyeClose;
     [ExportGroup("The fight (158)")]
-    /// <summary>The doc's three hits; each Bomb Boo burst on him takes one.</summary>
-    [Export(PropertyHint.Range, "1,9,1")] public int HitPoints = 3;
-    /// <summary>The hurt: the hit clip with this many full turns about himself (the flip, until its animation comes), the flash's colour, and how
-    /// much more solid he gets per hit (the casino boss's +30 / 255 is 0.12).</summary>
-    [Export] public float HurtTurns = 1f;
+    /// <summary>The hits that take him down; each Bomb Boo burst on him takes one (177: 9 -- a copy of him every CopyEveryHits of them).</summary>
+    [Export(PropertyHint.Range, "1,12,1")] public int HitPoints = 9;
+    /// <summary>The hurt: 177 (Jaysonn: "make king boo do his flip when hurt like in the normal fight") -- the casino boss's spicy-hit reaction
+    /// btelesa_damage (he tumbles head over heels, drops and bounces back up over 3.6 s) at HurtClipSpeed; "" = the short flinch btelesa_hit with
+    /// HurtTurns full turns about himself. Then the flash's colour, and how much more solid he gets per hit (the casino boss's +30 / 255 is 0.12).</summary>
+    [Export] public string HurtClip = "btelesa_damage";
+    [Export(PropertyHint.Range, "0.5,3,0.05")] public float HurtClipSpeed = 1.25f;
+    [Export] public float HurtTurns = 0f;
     [Export] public Color HurtFlash = new Color(1f, 0.35f, 0.35f);
     [Export(PropertyHint.Range, "0,0.3,0.01")] public float OpacityPerHit = 0.1f;
     /// <summary>The hurt's sound (the casino boss's damage cry) and the down's.</summary>
@@ -117,6 +128,17 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>159: his BODY for the swung Bomb Boo -- a cylinder about jnt_body: this radius, this far under the joint to this far over it (metres; the
     /// game's body hit cylinder is 350 u across, 550 tall from 200 under the joint: 4.7 / 2.7 / 4.7). A little inside the visible body.</summary>
     [Export] public float HitRadius = 4f, HitBelow = 2.5f, HitAbove = 4.5f;
+    [ExportGroup("The copies (177)")]
+    /// <summary>177 (Jaysonn: "every 3 hits king boo will make a copy of himself like in luigis mansion 3 and will attack alongside the other one but mario
+    /// has to hit the real one for it to do any damage. this king boo however tends to stay away and more known to throw attacks not as fast or commonly"):
+    /// as he recovers from every CopyEveryHits-th hit (0 = never) a COPY of him splits off (a flash; it fades in at a far spot, laughing) while fewer than
+    /// MaxCopies are out. A copy looks and moves like him but takes no hits -- a Bomb Boo swung into it bursts for nothing and the copy is REVEALED (a laugh,
+    /// it fades away). It keeps CopyMinFromMario metres from Mario (its spots), waits CopyGapScale times longer between moves, and only THROWS: the lava
+    /// balls (CopyFireballs) and the breath (CopyBreath) at CopySpeedScale of his speed -- no lick, smash, lightning or wind. His defeat takes the copies with him.</summary>
+    [Export(PropertyHint.Range, "0,9,1")] public int CopyEveryHits = 3;
+    [Export(PropertyHint.Range, "0,4,1")] public int MaxCopies = 1;
+    [Export] public float CopyMinFromMario = 13f, CopyGapScale = 1.7f, CopySpeedScale = 0.75f, CopyFadeSeconds = 0.7f;
+    [Export] public bool CopyFireballs = true, CopyBreath = true;
     [ExportGroup("The fight (162): the teleports and the Lick")]
     /// <summary>The moves run at all (off: he waits as before, for the earlier passes' tests).</summary>
     [Export] public bool AttacksOn = true;
@@ -258,6 +280,9 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>158: a Bomb Boo burst on him (the hit points left) / the last one took him down.</summary>
     [Signal] public delegate void HitEventHandler(int hpLeft);
     [Signal] public delegate void DefeatedEventHandler();
+    /// <summary>177: a copy of him split off / a copy was hit and revealed (both from the REAL one).</summary>
+    [Signal] public delegate void CopyMadeEventHandler(SmsKingBooRematch copy);
+    [Signal] public delegate void CopyRevealedEventHandler(SmsKingBooRematch copy);
     /// <summary>162: he has arrived at a spot; the lick's wind-up begins; the tongue is pulled back (whether it got Mario).</summary>
     [Signal] public delegate void TeleportedEventHandler();
     [Signal] public delegate void LickStartedEventHandler();
@@ -291,6 +316,13 @@ public partial class SmsKingBooRematch : Node3D
     public bool LaughPlayed { get; private set; }
     public int Hp { get; private set; } = -1;
     public int HitsTaken { get; private set; }
+    /// <summary>177: this one is a COPY (takes no hits) of Original; the real one's copies out now, and made in all.</summary>
+    public bool IsCopy { get; private set; }
+    public SmsKingBooRematch Original { get; private set; }
+    public int CopiesAlive { get { int n = 0; foreach (var c in _copies) if (c != null && IsInstanceValid(c) && c.State != Phase.Gone) n++; return n; } }
+    public int CopiesMade { get; private set; }
+    public IReadOnlyList<SmsKingBooRematch> Copies => _copies;
+    private readonly List<SmsKingBooRematch> _copies = new(); private bool _copyPending, _revealing;
     /// <summary>A Bomb Boo bursts on him while he waits or licks (not between spots, through the hurt, the down, the entrance).</summary>
     public bool CanBeHit => State == Phase.Wait || State == Phase.Lick || State == Phase.Smash || State == Phase.Lightning || State == Phase.Breath || State == Phase.Fireballs || State == Phase.Wind;
     public bool IsAlive => State != Phase.Down && State != Phase.Gone;
@@ -404,6 +436,11 @@ public partial class SmsKingBooRematch : Node3D
     public override void _Ready()
     {
         _model = GetNodeOrNull<Node3D>("Model");
+        if (IsCopy)                                                                       // 177: a duplicate carries the real one's RUN-TIME children too -- made again below, so out they go
+        {
+            foreach (string n in new[] { "CrownGlowFx", "CrownSparkFx" }) { var old = GetNodeOrNull(n); if (old != null) { RemoveChild(old); old.QueueFree(); } }
+            if (_model != null) foreach (Node n in _model.FindChildren("TongueStretch", "", true, false)) { n.GetParent().RemoveChild(n); n.QueueFree(); }
+        }
         _anim = GetNodeOrNull<AnimationPlayer>("Model/AnimationPlayer");
         if (_model != null)
         {
@@ -433,6 +470,8 @@ public partial class SmsKingBooRematch : Node3D
         }
         else GD.PushWarning($"[SMS kingboo] {GetPath()}: no Model child (btelesa.glb)");
         if (_anim != null) _anim.AnimationFinished += OnClipEnd;
+        AddToGroup("sms_rematch_boo");                                                   // 177: every King Boo on the field, the real one and his copies (the Bomb Boos' targets)
+        if (IsCopy) RemoveFromGroup("sms_rematch_boss");                                 // 177: the boss group is the REAL one's alone (the supply, the intro, the Bomb Boos' default)
         EyeOpen ??= LoadTex("res://models/Eniemes/BossTelesa/N_nbtelesa_eye_open.png");
         EyeHalf ??= LoadTex("res://models/Eniemes/BossTelesa/N_nbtelesa_eye_half.png");
         EyeClose ??= LoadTex("res://models/Eniemes/BossTelesa/N_nbtelesa_eye_close.png");
@@ -477,14 +516,14 @@ public partial class SmsKingBooRematch : Node3D
     /// straight into the wait: no laugh (the intro had it).</summary>
     public void SpawnRising()
     {
-        if (State != Phase.Hidden || Engine.IsEditorHint()) return;
+        if (State != Phase.Hidden || Engine.IsEditorHint() || CopyMayNot("spawn")) return;
         _spawnRise = true; _spawnQuiet = true;
         Spawn();
     }
     /// <summary>He appears: the appear clip, then the laugh with the long laugh, then the wait. Nothing happens twice.</summary>
     public void Spawn()
     {
-        if (State != Phase.Hidden || Engine.IsEditorHint()) return;
+        if (State != Phase.Hidden || Engine.IsEditorHint() || CopyMayNot("spawn")) return;
         State = Phase.Appear; _home = Position; _hoverT = 0f;   // the hover bobs about where he was put
         Hp = Math.Max(1, HitPoints); HitsTaken = 0;
         if (_model != null) _model.Visible = true;
@@ -507,7 +546,7 @@ public partial class SmsKingBooRematch : Node3D
     /// out of the floor, the laugh, the sink; IntroSurfacing now, IntroSunk at the end (he is Hidden again: SpawnRising starts the fight).</summary>
     public void IntroSurface(Vector3 placedAt, float yaw)
     {
-        if (State != Phase.Hidden || Engine.IsEditorHint()) return;
+        if (State != Phase.Hidden || Engine.IsEditorHint() || CopyMayNot("surface for the intro")) return;
         GlobalPosition = placedAt; _yaw = yaw; Rotation = new Vector3(0f, yaw, 0f);
         Hp = Math.Max(1, HitPoints); HitsTaken = 0;
         ReadArena();
@@ -660,20 +699,25 @@ public partial class SmsKingBooRematch : Node3D
             EmitSignal(SignalName.Laughed);
         }
         else if (State == Phase.IntroLaugh && n == BckLaugh) { PlayClip(_introT + 1.5f <= IntroLaughSeconds ? BckLaugh : BckWait); }   // 174: the laugh loops while the intro laughs
-        else if (State == Phase.Laugh && n == BckLaugh)
+        else if (State == Phase.Laugh && n == BckLaugh && !_revealing)
         {
             EnterWait(FirstAttackDelay);
             if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: waits -- the fight may start (the first move in {FirstAttackDelay:F1} s)");
             EmitSignal(SignalName.ReadyForFight);
         }
-        else if (State == Phase.Hurt && n == BckHit)
+        else if (State == Phase.Hurt && (n == BckHit || n == HurtClip))
         {
             SetFlash(false); Rotation = new Vector3(0f, _yaw, 0f);
-            if (Hp > 0) { EnterWait(NextGap()); if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: back to the wait, {Hp} hit point(s) left, the next move in {_gapT:F1} s"); }
+            if (Hp > 0)
+            {
+                EnterWait(NextGap()); if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: back to the wait, {Hp} hit point(s) left, the next move in {_gapT:F1} s");
+                if (_copyPending) { _copyPending = false; SpawnCopy(); }                                            // 177: the split
+            }
             else
             {
                 State = Phase.Down; PlayClip(BckDown);
                 if (_sound != null && !string.IsNullOrEmpty(DownSe)) _sound.Play(DownSe);
+                foreach (var c in _copies.ToArray()) if (c != null && IsInstanceValid(c) && c.State != Phase.Gone) c.RevealCopy(null);   // 177: his copies go with him
                 if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: DOWN");
             }
         }
@@ -685,6 +729,7 @@ public partial class SmsKingBooRematch : Node3D
             if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: gone -- defeated (the fight's end is a later pass)");
             EmitSignal(SignalName.Defeated);
         }
+        else if (_revealing && n == BckLaugh) { State = Phase.Vanish; _fadeT = 0f; if (_sound != null && !string.IsNullOrEmpty(VanishSe)) _sound.Play(VanishSe); }   // 177: the found-out copy's laugh is over: it fades
         else if (State == Phase.Lick && n == LickClip) _lickClipEnded = true;
         else if (State == Phase.Smash && n == SmashClip) { if (_smashLaunchedCount < SmashCount) PlayClip(SmashClip); else _smashClipEnded = true; }
         else if (State == Phase.Lightning && n == LightningClip) { if (!_lightningDone) PlayClip(LightningClip); }
@@ -698,25 +743,78 @@ public partial class SmsKingBooRematch : Node3D
         State = Phase.Wait; _hoverT = 0f; Position = _home; _gapT = gap; LastGap = gap;
         PlayClip(BckWait);
     }
-    /// <summary>The gap before the next move: GapAtStart with every hit point, GapAtLastHit at his last one, give or take GapJitter.</summary>
+    /// <summary>The gap before the next move: GapAtStart with every hit point, GapAtLastHit at his last one, give or take GapJitter (a copy: CopyGapScale times it).</summary>
     private float NextGap()
     {
-        float k = HitPoints > 1 ? Mathf.Clamp(HitsTaken / (float)(HitPoints - 1), 0f, 1f) : 1f;
+        float k = HitPoints > 1 ? Mathf.Clamp((IsCopy && Original != null ? Original.HitsTaken : HitsTaken) / (float)(HitPoints - 1), 0f, 1f) : 1f;
         float g = Mathf.Lerp(GapAtStart, GapAtLastHit, k) + ((float)_rng.NextDouble() * 2f - 1f) * GapJitter;
-        return Mathf.Max(0.3f, g);
+        return Mathf.Max(0.3f, g) * (IsCopy ? Mathf.Max(0.2f, CopyGapScale) : 1f);
     }
+
+    // ---- 177: the copies ----------------------------------------------------------------------------------------------------------------------
+    /// <summary>A copy of him splits off: the flash on him, and a duplicate of this node (the scene's knobs with it) fading in at a far spot, laughing. The
+    /// copy is this class with IsCopy: no hits (RevealCopy), far spots, long gaps, the throws alone.</summary>
+    private void SpawnCopy()
+    {
+        if (IsCopy || GetParent() == null) return;
+        var copy = Duplicate((int)(DuplicateFlags.Scripts | DuplicateFlags.Groups | DuplicateFlags.UseInstantiation)) as SmsKingBooRematch;
+        if (copy == null) { GD.PushWarning($"[SMS kingboo] {Name}: the copy could not be made"); return; }
+        CopiesMade++;
+        copy.Name = $"{Name}Copy{CopiesMade}"; copy.IsCopy = true; copy.Original = this;
+        GetParent().AddChild(copy);
+        copy.GlobalTransform = GlobalTransform;
+        copy.BeginAsCopy(_hoverOverFloor, _opacitySolid);
+        _copies.Add(copy);
+        SetFlash(true); _splitFlashT = 0.25f;
+        if (_sound != null && !string.IsNullOrEmpty(LaughSe)) _sound.Play(LaughSe, LaughDb);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: a COPY splits off ({copy.Name}; {CopiesAlive} out, {CopiesMade} made) after hit {HitsTaken}");
+        EmitSignal(SignalName.CopyMade, copy);
+    }
+    private float _splitFlashT;
+    /// <summary>177: a copy throws at CopySpeedScale of his speed (the lava balls' pops and roll, the breath's sweep and stream); the real one at 1.</summary>
+    private float ThrowSpeedScale => IsCopy ? Mathf.Clamp(CopySpeedScale, 0.2f, 2f) : 1f;
+    /// <summary>The copy's start (on the duplicate, after it is in the tree): his hover and solidity, then it teleports in at a far spot like one of his moves.</summary>
+    private void BeginAsCopy(float hoverOverFloor, float opacity)
+    {
+        Hp = 1; HitsTaken = 0;
+        ReadArena(); _hoverOverFloor = hoverOverFloor; _opacitySolid = opacity; _home = Position;
+        if (_model != null) _model.Visible = true;
+        if (_tongue != null) { _tongue.Stretch = TongueStretch; _tongue.On = TongueStretch > 1.001f; }
+        SetCrownGlow(_crownGlowColor, 0f);
+        ArriveAt(RandomSpot());
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the copy arrives at {_dest} ({(M() != null ? Flat(_dest, M().GlobalPosition).ToString("F1") : "?")} m from Mario)");
+    }
+    /// <summary>A copy found out (a Bomb Boo burst on it; or the real one went down): its attack called off, a laugh, then it fades away and is gone.</summary>
+    public void RevealCopy(SmsBombBoo by)
+    {
+        if (!IsCopy || _revealing || State == Phase.Gone) return;
+        if (State == Phase.Vanish || State == Phase.Arrive) { SetOpacity(_opacitySolid); }                 // mid-teleport: shown where it is for the laugh
+        AbortLick(); AbortSmash(); AbortLightning(); AbortBreath(); AbortFireballs(); AbortWind();
+        _revealing = true; State = Phase.Laugh; _laughSounded = true; Position = _home; _gapT = 0f;
+        PlayClip(BckLaugh);
+        if (_sound != null && !string.IsNullOrEmpty(LaughSe)) _sound.Play(LaughSe, LaughDb);
+        SetFlash(true); _splitFlashT = 0.3f;
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the copy is FOUND OUT{(by != null ? $" by {by.Name}" : "")} -- it laughs and fades");
+        Original?.EmitSignal(SignalName.CopyRevealed, this);
+    }
+    /// <summary>A copy never does: the real one's entrances and the intro are his alone.</summary>
+    private bool CopyMayNot(string what) { if (IsCopy) { if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: a copy does not {what}"); return true; } return false; }
 
     /// <summary>158: a Bomb Boo burst on him. A point off, the hurt (the hit clip, HurtTurns about himself, the flash), the Hit signal; the last takes him
     /// down. False when he cannot be hit now. 162: through a lick it breaks the lick off.</summary>
     public bool TakeHit(SmsBombBoo by)
     {
         if (!CanBeHit) return false;
+        if (IsCopy) { RevealCopy(by); return true; }                                                           // 177: a copy takes no hit -- it is found out
         bool midLick = State == Phase.Lick, midSmash = State == Phase.Smash, midLightning = State == Phase.Lightning, midBreath = State == Phase.Breath, midFire = State == Phase.Fireballs, midWind = State == Phase.Wind;
         AbortLick(); AbortSmash(); AbortLightning(); AbortBreath(); AbortFireballs(); AbortWind();
         Hp = Math.Max(0, Hp - 1); HitsTaken++;
         State = Phase.Hurt; _hurtT = 0f; _hurtYaw0 = _yaw; Position = _home;
-        PlayClip(BckHit);
-        _hurtLen = _anim != null && _anim.HasAnimation(BckHit) ? (float)(_anim.GetAnimation(BckHit).Length / Mathf.Max(0.01f, _anim.SpeedScale)) : 0.7f;
+        string hurtClip = !string.IsNullOrEmpty(HurtClip) && _anim != null && _anim.HasAnimation(HurtClip) ? HurtClip : BckHit;   // 177: the casino's tumble, else the flinch
+        PlayClip(hurtClip);
+        if (_anim != null && hurtClip == HurtClip) _anim.SpeedScale *= Mathf.Max(0.1f, HurtClipSpeed);
+        _hurtLen = _anim != null && _anim.HasAnimation(hurtClip) ? (float)(_anim.GetAnimation(hurtClip).Length / Mathf.Max(0.01f, _anim.SpeedScale)) : 0.7f;
+        _copyPending = CopyEveryHits > 0 && Hp > 0 && HitsTaken % CopyEveryHits == 0 && CopiesAlive < MaxCopies;   // 177: a copy splits off as he recovers
         SetFlash(true);
         _opacitySolid = Mathf.Clamp(GhostOpacity + OpacityPerHit * HitsTaken, 0.1f, 1f);
         SetOpacity(_opacitySolid);
@@ -793,6 +891,12 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>The doc's near-random pick: a hop by RepositionChance, else an attack by its weight among those that are on.</summary>
     private Move PickMove()
     {
+        if (IsCopy)                                                                                        // 177: a copy only THROWS -- the lava balls, the breath -- or moves off
+        {
+            float cf = CopyFireballs && FireballsOn ? Mathf.Max(0f, FireballWeight) : 0f, cb = CopyBreath && BreathOn ? Mathf.Max(0f, BreathWeight) : 0f;
+            if (cf + cb <= 0f || _rng.NextDouble() < Mathf.Max(RepositionChance, 0.3f)) return Move.Hop;
+            return (float)_rng.NextDouble() * (cf + cb) < cf ? Move.Fireballs : Move.Breath;
+        }
         if (_rng.NextDouble() < RepositionChance) return Move.Hop;
         float wl = Mathf.Max(0f, LickWeight), ws = SmashOn && SmashScene != null ? Mathf.Max(0f, SmashWeight) : 0f, wg = LightningOn ? Mathf.Max(0f, LightningWeight) : 0f, wb = BreathOn ? Mathf.Max(0f, BreathWeight) : 0f, wf = FireballsOn ? Mathf.Max(0f, FireballWeight) : 0f, ww = WindOn ? Mathf.Max(0f, WindWeight) : 0f;
         float sum = wl + ws + wg + wb + wf + ww;
@@ -935,7 +1039,7 @@ public partial class SmsKingBooRematch : Node3D
                 if (m == null) { EndBreath(); return; }
                 float fyAim = FloorUnder(m.GlobalPosition); if (float.IsNaN(fyAim)) fyAim = m.GlobalPosition.Y;
                 BreathDownDegUsed = BreathAimFloorAt > 0f ? Mathf.RadToDeg(MathF.Atan2(Mathf.Max(0.1f, MouthPoint.Y - fyAim), BreathAimFloorAt)) : BreathDownDeg;   // 173: the floor met BreathAimFloorAt out
-                var b = new SmsGhostBreath { Name = $"GhostBreath{BreathsMade}", DebugPrint = DebugPrint, SweepDeg = SweepDeg, SweepSeconds = SweepSeconds, SweepWay = SweepWay, DownDeg = BreathDownDegUsed, BreathSpeed = BreathSpeed, PuffSeconds = PuffSeconds, PuffSizeStart = PuffSizeStart, PuffSizeEnd = PuffSizeEnd, HitHeight = BreathHitHeight, FreezeSeconds = FreezeSeconds, OneFreezePerAttack = OneFreezePerAttack };
+                var b = new SmsGhostBreath { Name = $"GhostBreath{BreathsMade}", DebugPrint = DebugPrint, SweepDeg = SweepDeg, SweepSeconds = SweepSeconds / ThrowSpeedScale, SweepWay = SweepWay, DownDeg = BreathDownDegUsed, BreathSpeed = BreathSpeed * ThrowSpeedScale, PuffSeconds = PuffSeconds, PuffSizeStart = PuffSizeStart, PuffSizeEnd = PuffSizeEnd, HitHeight = BreathHitHeight, FreezeSeconds = FreezeSeconds, OneFreezePerAttack = OneFreezePerAttack };
                 (GetTree().CurrentScene ?? GetParent()).AddChild(b);
                 float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
                 b.Swept += hit => { if (hit) BreathHits++; _breathSwept = true; _crownFlashT = CrownFlashSeconds * 0.7f; EmitSignal(SignalName.Breathed, hit); };
@@ -993,7 +1097,7 @@ public partial class SmsKingBooRematch : Node3D
             {
                 var m = M();
                 if (m == null) { EndFireballs(); return; }
-                var f = new SmsFireballs { Name = $"Fireballs{FireballVolleys}", DebugPrint = DebugPrint, Pops = FireballPops, PerPop = FireballPerPop, PopSeconds = FireballPopSeconds, LobHeight = FireballLobHeight, Scatter = FireballScatter, AimedWithin = FireballAimedWithin, RollSpeed = FireballRollSpeed, Size = FireballSize, LifeSeconds = FireballSeconds, HitHeight = FireballHitHeight, DiesOnHit = FireballDiesOnHit };
+                var f = new SmsFireballs { Name = $"Fireballs{FireballVolleys}", DebugPrint = DebugPrint, Pops = FireballPops, PerPop = FireballPerPop, PopSeconds = FireballPopSeconds / ThrowSpeedScale, LobHeight = FireballLobHeight, Scatter = FireballScatter, AimedWithin = FireballAimedWithin, RollSpeed = FireballRollSpeed * ThrowSpeedScale, Size = FireballSize, LifeSeconds = FireballSeconds, HitHeight = FireballHitHeight, DiesOnHit = FireballDiesOnHit };
                 (GetTree().CurrentScene ?? GetParent()).AddChild(f);
                 float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
                 Vector3 d = m.GlobalPosition - GlobalPosition; float yawTo = d.LengthSquared() > 1e-4f ? MathF.Atan2(d.X, d.Z) : _yaw;
@@ -1088,7 +1192,8 @@ public partial class SmsKingBooRematch : Node3D
         {
             float a = (float)(_rng.NextDouble() * Math.Tau), r = radius * Mathf.Sqrt((float)_rng.NextDouble());
             var p = new Vector3(_arenaCentre.X + Mathf.Cos(a) * r, _arenaCentre.Y, _arenaCentre.Z + Mathf.Sin(a) * r);
-            if (m != null && (Flat(p, m.GlobalPosition) < SpotMinFromMario || (SpotMaxFromMario > 0f && Flat(p, m.GlobalPosition) > SpotMaxFromMario))) continue;
+            float minFrom = IsCopy ? Mathf.Max(SpotMinFromMario, CopyMinFromMario) : SpotMinFromMario, maxFrom = IsCopy ? 0f : SpotMaxFromMario;   // 177: a copy keeps away
+            if (m != null && (Flat(p, m.GlobalPosition) < minFrom || (maxFrom > 0f && Flat(p, m.GlobalPosition) > maxFrom))) continue;
             float fy = FloorUnder(p); if (float.IsNaN(fy)) continue;
             _floorAtSpot = fy; p.Y = fy + _hoverOverFloor; return p;
         }
@@ -1230,11 +1335,12 @@ public partial class SmsKingBooRematch : Node3D
             if (_sound != null && !string.IsNullOrEmpty(LaughSe)) _sound.Play(LaughSe, LaughDb);
             else if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: no sound node for the laugh");
         }
+        if (_splitFlashT > 0f) { _splitFlashT -= dt; if (_splitFlashT <= 0f && State != Phase.Hurt) SetFlash(false); }   // 177: the split's / the reveal's flash
         if (State == Phase.Hurt)
         {
             _hurtT += dt;
             float k = _hurtLen > 0f ? Mathf.Clamp(_hurtT / _hurtLen, 0f, 1f) : 1f;
-            Rotation = new Vector3(0f, _hurtYaw0 + HurtTurns * MathF.Tau * Mathf.SmoothStep(0f, 1f, k), 0f);   // the flip about himself, until its animation comes
+            if (HurtTurns != 0f) Rotation = new Vector3(0f, _hurtYaw0 + HurtTurns * MathF.Tau * Mathf.SmoothStep(0f, 1f, k), 0f);   // the flinch's turn about himself (the tumble clip has its own)
             bool flash = ((int)(_hurtT * 15f) & 1) == 0 && k < 0.8f;
             if (flash != _flashOn) SetFlash(flash);
         }
@@ -1248,9 +1354,20 @@ public partial class SmsKingBooRematch : Node3D
         else if (State == Phase.Vanish)
         {
             _fadeT += dt;
-            float k = TeleportOutSeconds > 0f ? Mathf.Clamp(_fadeT / TeleportOutSeconds, 0f, 1f) : 1f;
+            float outSec = _revealing ? CopyFadeSeconds : TeleportOutSeconds;                               // 177: a found-out copy fades slower
+            float k = outSec > 0f ? Mathf.Clamp(_fadeT / outSec, 0f, 1f) : 1f;
             SetOpacity(_opacitySolid * (1f - k));
-            if (k >= 1f) ArriveAt(_moveIsLick ? LickSpot() : RandomSpot());
+            if (k >= 1f)
+            {
+                if (_revealing)                                                                            // 177: the found-out copy is gone
+                {
+                    State = Phase.Gone; if (_model != null) _model.Visible = false; PlaceFx();
+                    Original?._copies.Remove(this);
+                    if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the copy is gone");
+                    QueueFree(); return;
+                }
+                ArriveAt(_moveIsLick ? LickSpot() : RandomSpot());
+            }
         }
         else if (State == Phase.Arrive)
         {

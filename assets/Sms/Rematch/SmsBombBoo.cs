@@ -131,7 +131,13 @@ public partial class SmsBombBoo : Node3D
     public Node3D TongueNode => _tongue;
 
     private Node3D _model, _tongue; private readonly List<ShaderMaterial> _mats = new();
-    private Mario _mario; private SmsKingBooRematch _boss; private SmsActorSound _sound; private Random _rng;
+    private Mario _mario; private SmsKingBooRematch _boss, _hitBoss; private SmsActorSound _sound; private Random _rng;
+    /// <summary>177: every King Boo on the field -- the real one and his copies (the group sms_rematch_boo).</summary>
+    private IEnumerable<SmsKingBooRematch> BoosNow()
+    {
+        foreach (Node n in GetTree().GetNodesInGroup("sms_rematch_boo")) if (n is SmsKingBooRematch b) yield return b;
+    }
+    public SmsKingBooRematch HitBoss => _hitBoss;
     private float _t, _yaw, _boostLeft, _grace, _floorY = float.NaN;
     private Vector3 _base, _goal; private float _flyCur, _flyTarget, _bob, _bobAmp, _bobPhase, _bobFreq = 200f, _rotX, _march = 1f, _turn = 1f; private int _wait;
     private float _orbitAngle, _settle, _r0, _y0, _held;
@@ -346,8 +352,8 @@ public partial class SmsBombBoo : Node3D
                     if (left < 2f) pulse = 0.12f + 0.12f * MathF.Sin(_t * (12f + (2f - left) * 14f));
                 }
                 SetFlash(pulse);
-                var boss = BossNow();
-                if (boss != null && boss.CanBeHit && boss.InHitCylinder(p, OwnRadius * ModelScale)) { Explode(true); return; }
+                foreach (var boss in BoosNow())                                                        // 177: the real King Boo or a COPY of him -- whichever body it is swung into
+                    if (boss != null && IsInstanceValid(boss) && boss.CanBeHit && boss.InHitCylinder(p, OwnRadius * ModelScale)) { _hitBoss = boss; Explode(true); return; }
                 break;
             }
         }
@@ -425,7 +431,7 @@ public partial class SmsBombBoo : Node3D
         Puff(hitKingBoo ? 1.6f : 1.1f);
         if (!string.IsNullOrEmpty(BurstSe)) _sound?.Play(BurstSe);
         if (hitKingBoo && ExplodeOnKingBoo) Blast();
-        if (hitKingBoo) BossNow()?.TakeHit(this);
+        if (hitKingBoo) (_hitBoss != null && IsInstanceValid(_hitBoss) ? _hitBoss : BossNow())?.TakeHit(this);   // 177: the one it burst on (a copy is found out, no damage)
         if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: burst{(hitKingBoo ? " on King Boo" : "")} at {GlobalPosition}");
         EmitSignal(SignalName.Burst, hitKingBoo);
         Gone();
