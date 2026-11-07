@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-06 22:37 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-07 01:51 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1226,8 +1226,14 @@ HEAD (a new SmsHeadLook modifier: left, right, ahead, the shoulders following; h
 (assets/Mario/Anims, README there) and sit in Mario's AnimationPlayer (Player.tscn) to edit like any other. SMS 176b: the stance turns his WHOLE
 body (hips and legs, as the sprites) and he HOLDS it after the fight starts until the player's first input; the head finds King Boo over the turned chest.
 SMS 177: King Boo's hurt is his casino TUMBLE (btelesa_damage), and every third hit he splits off a COPY (Luigi's Mansion 3) that keeps away and only throws,
-slower and rarer; a Bomb Boo swung into the copy bursts for nothing and reveals it (a laugh, a fade); HitPoints 9. Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `2ea01af` ("SMS 177: the King Boo REMATCH, part 21 -- the HURT is his casino TUMBLE, and every third hit he splits off a COPY (Luigi's Mansion 3) that throws from afar and takes no damage";
+slower and rarer; HitPoints 9. SMS 178: the swing RISES with Mario's jump (the hit from the air -- King Boo is out of reach from the ground), every
+hurt ends in a TELEPORT to another spot (the reset), a hit on a copy is the same tumble and teleport with no damage (no more reveal-and-fade), three of him by the
+sixth hit (MaxCopies 2) with a TELL (CopyTell: a silver crown, or no fangs), and the frost breath's hit SHOWS (a flash, the frost splashing on him, the ice climbing
+him, a shake). Further passes re-point this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `6214430` ("SMS 178: the King Boo REMATCH, part 22 -- the swing RISES with Mario's jump (the hit from the air), every hurt ends in a TELEPORT, copies take hits and teleport too (no damage) with a TELL, three of him by the sixth hit, and the frost breath's hit SHOWS";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsBombBoo.cs, SmsGhostBreath.cs, SmsIceBlock.cs; assets/Sms/Enemy/BossTelesa/BossTelesaToon.gdshaderinc (crown_recolor, default 0: the casino boss unchanged);
+  tools/anim/probe_shader.gd NEW (+ .uid)) on the 177 commit
+  ("SMS 177: the King Boo REMATCH, part 21 -- the HURT is his casino TUMBLE, and every third hit he splits off a COPY (Luigi's Mansion 3) that throws from afar and takes no damage";
   assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsBombBoo.cs; tools/anim/probe_clip.gd NEW (+ .uid)) on the 176b commit
   ("SMS 176b: the King Boo REMATCH, part 20b -- the battle stance turns his whole BODY (as the sprites), and he HOLDS it after the fight starts until the player's first input";
   assets/Mario/Anims/ ma_battle_stance / ma_battle_stance_in .pose.json + .tres, assets/Sms/SmsHeadLook.cs, assets/Mario.cs, assets/Sms/Rematch/SmsRematchIntro.cs) on the 176 commit
@@ -1270,9 +1276,13 @@ slower and rarer; a Bomb Boo swung into the copy bursts for nothing and reveals 
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 46 commits past `feature/sounds`, 68 since `main`. ~1.2 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 48 commits past `feature/sounds`, 70 since `main`. ~1.2 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 178: swing a Bomb Boo and JUMP under King Boo -- the swing rises with the jump and bursts on his underside (from the ground it cannot reach him;
+  JumpSwingLift on the Bomb Boo); after every hit he teleports away (TeleportAfterHit); a hit on a COPY tumbles and teleports it too but does no damage; by the
+  sixth hit there are THREE of him -- the fake's crown is silver (CopyTell Crown; or Teeth: no fangs; CopyCrownColor); the frost breath's hit now flashes,
+  splashes and climbs him in ice with a camera shake (the ice's SplashPuffs / RingPuffs / HitShards / FlashSize / PopSeconds, the breath's HitShake).
 - To try 177: hit King Boo and he TUMBLES head over heels (HurtClip / HurtClipSpeed on him); after the third hit a COPY of him splits off and throws
   lava balls and breath from far away, slower and rarer -- hit the copy and it only laughs and fades; hit the real one for the damage. He has 9 hit points now
   (HitPoints); CopyEveryHits, MaxCopies, CopyMinFromMario, CopyGapScale, CopySpeedScale on him. NOTE: since 173 he hovers too high for the swing to reach

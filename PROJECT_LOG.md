@@ -12685,3 +12685,62 @@ one copy out at a time; the copy's reveal is a laugh and a fade (LM3's fakes pop
 pending:** since 173's HoverLift his hit cylinder starts 5.7 m over the floor and the swung Boo rides at Mario's hand plus 0.9 m -- Mario cannot reach
 him from the ground (the drives have been putting Mario beside the body). Knobs: HurtClip, HurtClipSpeed, HurtTurns, HitPoints, CopyEveryHits,
 MaxCopies, CopyMinFromMario, CopyGapScale, CopySpeedScale, CopyFadeSeconds, CopyFireballs, CopyBreath.
+
+### 178 -- the King Boo REMATCH, part 22: the swing RISES with Mario's jump, every hurt ends in a TELEPORT, copies take hits and teleport (no damage) with a TELL, three of him by the sixth hit, and the frost breath's hit SHOWS (feature/kingboo-rematch, code `6214430`)
+
+**Jaysonn:** "yeah having mario to jump to have the bomb hits him is right. we also need to make the frost breath look better since it looks like mario
+doesnt get hit but still is frozen. also the king boo should not disappear thats fake he should just take a hit and then vanish to a new spot. and then
+once we hit king boo 3 more time there 3 of them. we do need a way to tell them apart. like one doesnt have teeth? or like the crown is not the right
+color? im not sure yet. otherwise every time king boo gets hit he should be teleporting away once the hit animation is done to give the fight a 'reset'
+feel."
+
+**The jump** (`SmsBombBoo.cs`): since 173's HoverLift King Boo's body hangs 8.2-8.5 m over the floor and his hit cylinder (HitBelow 2.5) starts 6.7 m up,
+while the swung Boo rides at Mario's hand + 0.9 = 2.5 m: no hit from the ground (177's drives put Mario beside the body). Now the swing's height adds
+`JumpLiftNow`, eased toward `JumpSwingLift` (1.6 m) while Mario is off the floor and back to 0 on landing (`JumpSwingSeconds` 0.15 each way), so the Boo
+is flung up as he jumps. Mario's single jump peaks 1.70 m (measured: the real A); the Boo's own reach is 0.8 m (OwnRadius x ModelScale): from the ground
+the Boo's top sits 2.0 m under the cylinder; off a jump the burst lands on the way up (the lift 1.07 of its 1.6 by then, Mario 1.48 m up). No change to
+King Boo's cylinder: the burst is at his body's underside.
+
+**The reset** (`SmsKingBooRematch.cs`): `TeleportAfterHit` (on) -- the hurt's end (the tumble, 2.9 s) goes to Vanish with `_afterHit`: the hide clip, the
+vanish voice, `ArriveAt(RandomSpot())`, and the wait there with a FULL `NextGap` (the hop's arrival halves it; a hit's does not). Copies the same.
+
+**The copies** (`SmsKingBooRematch.cs`): 177 revealed a copy on a hit (a laugh, a fade, gone). Now `TakeHit` on a copy is the real one's hurt in every
+visible way -- the tumble, the flash, the cry, then the teleport -- and nothing else: no Hp off (`CopyHitsTaken` counts it), the `CopyHit(copy)` signal
+from the real one instead of `Hit` (so the Bomb Boo supply does not clear the field for a fake), its solidity tracking the real one's hits. `MaxCopies`
+2: the third hit makes one, the sixth a second -- three of him from hit six to nine. The dismissal (laugh + fade) stays for his defeat (`DismissCopy`).
+**The tell** -- `CopyTell`: `Crown` (default): the copy's crown is `CopyCrownColor`, a silver-blue (0.62, 0.7, 0.95), instead of gold -- the crown's rest
+colour is set so every attack glow lerps from it; `Teeth`: the copy's fangs are gone (the `_mat_ha` material's `opacity` 0, kept through every
+`SetOpacity`); `CrownAndTeeth`; `None` (the shell game). The crown could not be re-coloured by crown_c0 alone: the shader multiplies it into the sheet's
+gold / red strip (blue 0.1), so a blue c0 only dimmed the gold (the first shot run: a gold crown on the copy). `BossTelesaToon.gdshaderinc` (the casino
+boss's and the rematch's shared toon) gains `crown_recolor` (0 = the game's crown, every existing material unchanged; 1 = the strip read as its
+brightness x 1.6, so crown_c0 sets the hue), set to 1 on the copy's crown material in `ApplyTell` -- confirmed in the loaded shader with the new
+`tools/anim/probe_shader.gd` (a shader's uniforms with its includes expanded), and in the shots: a silver-white crown beside the gold.
+
+**The breath's hit** (`SmsGhostBreath.cs`, `SmsIceBlock.cs`): the cold's hit model was right -- the puff's ball (0.35 of its 3-8 m size) meets Mario's
+cylinder when the visible mist is on him -- but what happened then was a 0.1-s pop of the ice about his middle inside a white-out of 8-m puffs: no
+event. Now `SmsIceBlock.HitFrom(streamDir)` at the freeze: a FLASH of white-blue at his body (an additive radial quad, FlashSize 3.2 m, gone over
+FlashSeconds 0.28, growing a little), a SPLASH of frost puffs flung on past him along the stream and up (SplashPuffs 36: the breath breaking on him), a
+RING of mist spreading along the floor from his feet (RingPuffs 24, flat), ice crystals flung out (HitShards 22, the port's square spark, under gravity);
+the block CLIMBS him -- its height from 0.12 to 1 over PopSeconds (0.1 -> 0.22) with its base at his feet, the width catching up behind -- and the
+camera's damage shake (HitShake 0.8 x the game's). Readouts HitShown, FlashUp. The mist's density is as 172 left it (PuffAlpha 0.72): from inside the
+bank the flash and the ice are what read.
+
+**Verified** (headless drive v178-3, deleted before the commit): C0 Mario's jump (A) apex 1.70 m; C1 Mario on the floor under the real King Boo with a Boo
+swinging for 2 s: the Boo at most 2.46 m up, its top 1.98 m under the cylinder's bottom, no hit, the Boo kept; C2 A: the swing lifted 1.07 m by the
+burst, the Boo at y 5.78 + 0.8 against the bottom 6.77, 9 -> 8, Hit once, the tumble clip; C3 the hurt over at 2.92 s, he vanishes and arrives 11.0 m
+away, the gap there 3.10 s; C4 two TakeHits -> the first copy (CopyMade once): its crown rest colour (0.62, 0.7, 0.95), the real one's (1, 1, 0), its
+fangs kept, tell Crown; C5 a second Boo swung into the copy from a jump (Mario put under it): the copy's tumble (btelesa_damage), CopyHit once, hp 6
+still and Hit still 3, then it vanishes and arrives 15.1 m away and waits -- alive, one copy out; C6 three more TakeHits -> the second copy (CopyTell set
+to Teeth between): copies 2 / made 2, hp 3 -- three of him -- its fangs' opacity 0, its crown gold; C7 the breath (its weight alone, the moves on) on a
+standing Mario 10 m off: frozen 1.77 s into the breath, HitFrom run, the flash up at the hit, the ice's height 0.49 at 0.05 s and 1.00 at 0.33 s --
+8/8, no errors, twice (before and after the shader change). v178-1: the drive's lift threshold (the burst lands before the lift finishes) and a jump
+never pressed (a tick the gate skipped); v178-2 passed. Two shot runs (13 and 14 shots): the swing low under him from the ground; the tumble; the real
+one's gold crown and fangs close; from above, a silver-white crown on a copy beside a gold one; the teeth copy's mouth; the breath hit from the side at
+the freeze frame (the flash, the crystals), +0.15 s (the ice climbing), +0.5 s, and from behind Mario. The first run's paired shots had shared one camera
+(two in one tick) and the "game view" had sunk under the floor (an unflattened direction) -- the drive's own, fixed for the second.
+
+**Deviations, all knobs:** JumpSwingLift 1.6 (a single jump suffices; no change to King Boo's cylinder); the tell defaults to the crown (silver-blue) with
+the teeth as the other -- Jaysonn's pick pending ("im not sure yet"): CopyTell / CopyCrownColor; a hit on a copy does not clear the Bomb Boos; the full
+gap after a hit's teleport; the frost hit's look (SplashPuffs, RingPuffs, HitShards, FlashSize, FlashSeconds, PopSeconds, HitShake); the mist's density
+untouched (PuffAlpha). Knobs: SmsBombBoo (JumpSwingLift, JumpSwingSeconds), King Boo (TeleportAfterHit, MaxCopies, CopyTell, CopyCrownColor), the breath
+(HitShake), the ice (the five above).
