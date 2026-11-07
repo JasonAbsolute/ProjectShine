@@ -12637,3 +12637,51 @@ King Boo; the hold from the game camera and a close shot after the fight starts 
 **Deviations:** what ends the hold is mine -- the stick or any face / shoulder button, a hit, anything that takes the tree back; not the camera stick.
 The stance's width grew with the body's turn (the pose script's hip swings are about the world axes); every number is in the script. Knobs: the intro's
 `StanceHoldUntilInput`; the clips' scripts.
+
+### 177 -- the King Boo REMATCH, part 21: the HURT is his casino TUMBLE, and every third hit he splits off a COPY (Luigi's Mansion 3) that throws from afar and takes no damage (feature/kingboo-rematch, code `2ea01af`)
+
+**Jaysonn:** "ok lets make king boo do his flip when hurt like in the normal fight. and now lets really get the fight going. every 3 hits king boo will
+make a copy of himself like in luigis mansion 3 and will attack along side the other one but mario has to hit the real one for it to do any damage.
+this king boo however tends to stay away and more known to throw attacks not as fast or commonly." (The Bomb Boo expression work he asked for in the
+same message -- the tongue's motion, the look-shock with drool, the Galaxy spawn-in with mist and glowing eyes -- is the next passes'.)
+
+**The hurt** (`SmsKingBooRematch.cs`): 158's hurt was the short flinch `btelesa_hit` with a procedural turn about himself "until its animation comes".
+The casino fight's spicy hit plays `btelesa_damage` -- read with the new `tools/anim/probe_clip.gd` (a scene's clip sampled every N frames: a bone's
+height, how upright it is, its yaw): 3.63 s, the root dropping 1.5 m and bouncing back, `jnt_body` upside down at 0.5 s, sideways at 1-1.5 s, upright
+by 2 s -- a tumble head over heels. `HurtClip` (btelesa_damage) at `HurtClipSpeed` 1.25 (2.9 s), `HurtTurns` 0 (the clip has its own); "" gives the
+old flinch back. `HitPoints` 9 (range 1-12): the fight is longer now that copies come.
+
+**The copies** (`SmsKingBooRematch.cs`, `SmsBombBoo.cs`): as he recovers from every `CopyEveryHits`-th hit (3; the hit sets `_copyPending`, the
+recovery spawns, so the split comes out of the tumble) while fewer than `MaxCopies` (1) are out, `SpawnCopy`: a flash and his laugh, and
+`Duplicate(Scripts | Groups | UseInstantiation)` of his node -- the scene's knobs come with it; the run-time children it would carry twice (the
+TongueStretch modifier under the skeleton, CrownGlowFx, CrownSparkFx) are taken out in the copy's `_Ready` and made again -- added beside him with
+`IsCopy` and `Original` set, out of the boss group, and `BeginAsCopy`: his hover and solidity, then `ArriveAt(RandomSpot())` -- the teleport-in at a
+far spot. A copy's spots keep `CopyMinFromMario` (13 m) from Mario with no far cap (`RandomSpot`); its `NextGap` is the real one's (by the real
+one's hits) times `CopyGapScale` (1.7); `PickMove` gives it hops (at least 30 %) or THROWS alone -- the lava balls (`CopyFireballs`) and the breath
+(`CopyBreath`) at `CopySpeedScale` (0.75: the pops and the roll, the sweep and the stream) -- never the lick, the smash, the lightning or the wind;
+`Spawn` / `SpawnRising` / `IntroSurface` refuse it. Its `TakeHit` is `RevealCopy`: the attack called off, a laugh (the laugh clip and the long laugh,
+a flash), then the Vanish fade over `CopyFadeSeconds` (0.7) and `QueueFree`, `CopyRevealed(copy)` from the real one; no damage, no `Hit` (so the
+supply does not clear the field for a fake). His DOWN reveals every copy left. The Bomb Boo swung by Mario now tests EVERY King Boo in the group
+`sms_rematch_boo` (`BoosNow`) and bursts on the one whose body it is in (`HitBoss`): the real one's `TakeHit` or a copy's reveal; the supply, the
+intro and the drives keep `sms_rematch_boss`, the real one's alone. Signals `CopyMade(copy)`, `CopyRevealed(copy)`; readouts `IsCopy`, `Original`,
+`CopiesAlive`, `CopiesMade`, `Copies`.
+
+**Verified** (headless drive v177-4, deleted before the commit): C1 a Bomb Boo from the supply, GRABBED by Mario's spin (the real X beside it) and swung
+into the REAL King Boo -- the drive put Mario beside his body (he hovers 8.5 m up; the swing is at hand height: see below) -- bursts on him: 9 -> 8,
+the Hit signal, the hurt `btelesa_damage` at x1.24 for 2.93 s, jnt_body's up flipping sign through it (+0.15 at 0.33 s, -0.29 at 1.0 against -1
+upright) and -1.00 again in the wait; C2 two more hits (`TakeHit`, the mechanic's entry) and as he recovers from the third exactly one copy splits
+off (CopyMade once, CopiesAlive 1, CopiesMade 1, hp 6); C3 the copy IsCopy, Original the real one, in sms_rematch_boo and NOT in sms_rematch_boss,
+arriving 16.6 m from Mario, its gap after a throw 4.26 s against the real one's 2.68 after a hit (1.59 x); C3b over 14 s its moves were hops and the
+lava balls (later the breath) and nothing else; C4 a second Boo grabbed by the spin and swung into the COPY (Mario put beside the copy's body on the
+far side from the real one): "FOUND OUT by BombBoo2", CopyRevealed once, the copy laughs, fades and is freed within 2.5 s, the real one's hp 6
+untouched (its Hit signal still 3), Mario's hand empty, no copies out -- 5/5, no errors. v177-1: the drive put Mario between the copy and the real one
+when the real one happened to stand near it (the real one took the burst -- in play the first body in the group wins such an overlap) and compared
+the copy's halved post-hop gap; v177-2: the second Boo drifted out of the spin's reach (the drive re-tries); v177-3: the Hit count. A shot run (7
+shots from the drive's own camera): the tumble early / mid (upside down, the red flash) / late; the copy arriving; the real one and the copy side by
+side over the arena, Mario and a Bomb Boo below; the copy found out, laughing, and fading.
+
+**Deviations, all knobs:** the tumble at 1.25 x (the casino's is 1 x -- 3.65 s felt long for a nine-hit fight); HitPoints 9 (two copies over a fight);
+one copy out at a time; the copy's reveal is a laugh and a fade (LM3's fakes pop); a hit on a copy does not clear the Bomb Boos. **A design call
+pending:** since 173's HoverLift his hit cylinder starts 5.7 m over the floor and the swung Boo rides at Mario's hand plus 0.9 m -- Mario cannot reach
+him from the ground (the drives have been putting Mario beside the body). Knobs: HurtClip, HurtClipSpeed, HurtTurns, HitPoints, CopyEveryHits,
+MaxCopies, CopyMinFromMario, CopyGapScale, CopySpeedScale, CopyFadeSeconds, CopyFireballs, CopyBreath.
