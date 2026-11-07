@@ -19,6 +19,9 @@ using System.Collections.Generic;
 /// Blender, their vertex colours kept) at ModelScale, on BombBoo.gdshader -- the maroon body texture with its yellow eyes x the dark vertex
 /// colours x Lift, Opacity 1 (159: 158's was purple and see-through), the eyes glowing a little (FaceGlow), a faint violet rim (Glow).
 /// Signals: Grabbed, Dropped, Burst(hitKingBoo), Touched.
+/// Pass 177: a swung Boo tests every King Boo on the field (the group sms_rematch_boo: the real one and his copies) and bursts on the one whose body it
+/// is in (HitBoss). Pass 178 (Jaysonn: "having mario jump to have the bomb hit him is right"): the swing RISES with Mario's jump -- JumpSwingLift over the
+/// hand while he is in the air (JumpSwingSeconds in and out) -- so a King Boo hovering 8.5 m up is hit from a jump's apex and never from the ground.
 /// </summary>
 public partial class SmsBombBoo : Node3D
 {
@@ -74,6 +77,11 @@ public partial class SmsBombBoo : Node3D
     /// wrist comes to his ear, 1.3 m up on a 2.15 m body -- 0.9 puts the Boo just over his head, the tongue rising to it), this fast (degrees a second; 480 = a
     /// turn in 0.75 s), leaning this far outward.</summary>
     [Export] public float OrbitRadius = 3.6f, OrbitOverHand = 0.9f, OrbitDegPerSec = 480f, OrbitLeanDeg = 25f;
+    /// <summary>178 (Jaysonn: "having mario jump to have the bomb hit him is right"): while Mario is IN THE AIR the swing rises this much higher over his hand
+    /// (the Boo flung up as he jumps, eased in over JumpSwingSeconds and back down as he lands) -- King Boo hovers 8.5 m up (173), his body's hit cylinder
+    /// starting 5.7 m over the floor: a swing from the ground (2.5 m up) cannot reach him; a jump's apex with this lift can.</summary>
+    [Export] public float JumpSwingLift = 1.6f, JumpSwingSeconds = 0.15f;
+    public float JumpLiftNow { get; private set; }
     /// <summary>From the grab to the full swing (the radius and the height ease in).</summary>
     [Export] public float OrbitSettleSeconds = 0.35f;
     [Export] public bool OrbitClockwise = false;
@@ -325,7 +333,8 @@ public partial class SmsBombBoo : Node3D
                 float k = Mathf.SmoothStep(0f, 1f, _settle);
                 _orbitAngle += Mathf.DegToRad(OrbitSpeedNow) * dt * (OrbitClockwise ? -1f : 1f);
                 float r = Mathf.Lerp(_r0, OrbitRadius, k);
-                float y = Mathf.Lerp(_y0, hand.Y + OrbitOverHand, k);
+                JumpLiftNow = Mathf.MoveToward(JumpLiftNow, mario.IsOnFloor() ? 0f : JumpSwingLift, dt * JumpSwingLift / Mathf.Max(0.02f, JumpSwingSeconds));   // 178: the swing rises with his jump
+                float y = Mathf.Lerp(_y0, hand.Y + OrbitOverHand + JumpLiftNow, k);
                 Vector3 c = mario.GlobalPosition;
                 Vector3 p = new Vector3(c.X + MathF.Cos(_orbitAngle) * r, y, c.Z + MathF.Sin(_orbitAngle) * r);
                 OrbitRadiusNow = r;
@@ -401,7 +410,7 @@ public partial class SmsBombBoo : Node3D
         Vector3 rel = GlobalPosition - mario.GlobalPosition;
         _orbitAngle = MathF.Atan2(rel.Z, rel.X);
         _r0 = MathF.Max(0.3f, new Vector2(rel.X, rel.Z).Length()); _y0 = GlobalPosition.Y;
-        OrbitRadiusNow = _r0;
+        OrbitRadiusNow = _r0; JumpLiftNow = 0f;
         if (!string.IsNullOrEmpty(GrabSe)) _sound?.Play(GrabSe);
         if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: grabbed by the tongue at {_r0:F2} m -- the swing");
         EmitSignal(SignalName.Grabbed);

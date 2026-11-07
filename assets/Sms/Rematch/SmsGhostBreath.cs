@@ -42,6 +42,9 @@ public partial class SmsGhostBreath : Node3D
     [Export(PropertyHint.Range, "0.1,0.6,0.01")] public float HitRadiusK = 0.35f;
     [Export] public float HitHeight = 1.2f, FreezeSeconds = 1f;
     [Export] public bool OneFreezePerAttack = true;
+    /// <summary>178 (Jaysonn: "it looks like mario doesn't get hit but still is frozen"): the camera's damage shake on the freeze (x the game's; 0 = none) --
+    /// the hit's own look is the ice's (SmsIceBlock.HitFrom: the splash, the flash, the ice climbing him).</summary>
+    [Export(PropertyHint.Range, "0,2,0.05")] public float HitShake = 0.8f;
     [ExportGroup("The look")]
     /// <summary>The mist's colour and how solid it is, the glints' colour, how many puffs and glints the stream carries, the cold light at the mouth (metres
     /// across; 0 = none).</summary>
@@ -223,7 +226,9 @@ public partial class SmsGhostBreath : Node3D
         if (!ColdOn(feet, out Vector3 at)) return;
         if (!_mario.SmsFreezeFor(FreezeSeconds)) return;                    // refused: invincible, down, a demo...
         _hit = true; Hits++; FreezeCount++; FreezePoint = at; FreezeAt = _age;
-        SmsIceBlock.Freeze(_mario, GetParent() ?? this, DebugPrint);
+        var ice = SmsIceBlock.Freeze(_mario, GetParent() ?? this, DebugPrint);
+        if (ice != null) ice.HitFrom(_dirNow);                               // 178: the IMPACT -- the cold splashing on him along the stream, the flash, the shake
+        if (HitShake > 0f) SmsCameraShake.Current?.Start(SmsCameraShake.Kind.Damage, HitShake);
         if (DebugPrint) GD.Print($"[SMS breath] {Name}: the cold GETS Mario at {feet} ({new Vector2(at.X - _mouthNow.X, at.Z - _mouthNow.Z).Length():F1} m from the mouth, {_age:F2} s in, sweep {SweepK:F2}) -- FROZEN {FreezeSeconds:F1} s, hp {_mario.SmsHP}");
     }
 

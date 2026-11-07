@@ -15,7 +15,13 @@ using System.Collections.Generic;
 public partial class SmsIceBlock : Node3D
 {
     /// <summary>The block's size (metres across, tall from his feet), its pop-in, how long the shards last.</summary>
-    [Export] public float BlockWidth = 1.9f, BlockHeight = 2.05f, PopSeconds = 0.1f, ShardSeconds = 0.9f;
+    [Export] public float BlockWidth = 1.9f, BlockHeight = 2.05f, PopSeconds = 0.22f, ShardSeconds = 0.9f;   // 178: the pop 0.1 -> 0.22, the ice CLIMBING him from the feet
+    /// <summary>178 (Jaysonn: "it looks like mario doesn't get hit but still is frozen"): THE IMPACT as the cold gets him -- a flash of white-blue at his body
+    /// (FlashSize m, FlashSeconds), a SPLASH of frost puffs flung on along the stream's way and up (SplashPuffs), a RING of mist spreading from his feet along
+    /// the floor (RingPuffs), ice crystals flung out (HitShards) -- and the block grows from his FEET up over PopSeconds instead of popping about his middle.</summary>
+    [Export(PropertyHint.Range, "0,80,1")] public int SplashPuffs = 36, RingPuffs = 24, HitShards = 22;
+    [Export] public float FlashSize = 3.2f, FlashSeconds = 0.28f;
+    [Export] public Color FlashColor = new Color(0.85f, 0.95f, 1f);
     /// <summary>170: the ice is a jagged CHUNK (Jaysonn: "a chunk of ice, not just a smooth block"): how far its facets are pushed in and out (0 = a smooth
     /// egg), how many spikes stick out of it and how far, the facets about and up it.</summary>
     [Export(PropertyHint.Range, "0,0.5,0.01")] public float Jag = 0.22f;
@@ -89,9 +95,21 @@ public partial class SmsIceBlock : Node3D
         if (Shattered) return;
         Follow();
         _popT += dt;
-        float k = Mathf.Clamp(_popT / Mathf.Max(0.01f, PopSeconds), 0f, 1f);
-        if (_mesh != null) _mesh.Scale = Vector3.One * Mathf.Lerp(0.25f, 1f, 1f - (1f - k) * (1f - k));
+        float k = Mathf.Clamp(_popT / Mathf.Max(0.01f, PopSeconds), 0f, 1f), e = 1f - (1f - k) * (1f - k);
+        if (_mesh != null)   // 178: the ice climbs him -- tall from the feet up (its base stays at the floor), the width catching up behind
+        {
+            float sy = Mathf.Lerp(0.12f, 1f, e), sxz = Mathf.Lerp(0.55f, 1f, Mathf.Clamp(k * 1.25f, 0f, 1f));
+            _mesh.Scale = new Vector3(sxz, sy, sxz); _mesh.Position = Vector3.Up * (BlockHeight * 0.5f * sy);
+        }
         _mat?.SetShaderParameter("flash", Mathf.Max(0f, 1f - _popT / (PopSeconds * 1.8f)));
+        if (_flash != null && IsInstanceValid(_flash))   // 178: the impact flash -- bright at once, gone over FlashSeconds, growing a little
+        {
+            float f = Mathf.Clamp(_popT / Mathf.Max(0.01f, FlashSeconds), 0f, 1f);
+            _flash.Scale = Vector3.One * FlashSize * Mathf.Lerp(0.6f, 1.15f, f);
+            if (_flashMat != null) _flashMat.AlbedoColor = new Color(FlashColor.R, FlashColor.G, FlashColor.B, (1f - f) * (1f - f) * 0.95f);
+            _flash.GlobalPosition = GlobalPosition + Vector3.Up * (BlockHeight * 0.5f);
+            if (f >= 1f) { _flash.QueueFree(); _flash = null; }
+        }
         if (_age > 0.05f && (Target == null || !IsInstanceValid(Target) || !Target.SmsFrosted)) Shatter();
     }
 
@@ -121,6 +139,58 @@ public partial class SmsIceBlock : Node3D
         var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = Tex("star4s_raw"), CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true };
         _glints = new GpuParticles3D { Name = "IceGlints", TopLevel = true, Amount = Glints, Lifetime = 0.7, Emitting = true, LocalCoords = false, FixedFps = 60, Interpolate = true, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One * GlintSize, Material = mat }, VisibilityAabb = new Aabb(new Vector3(-6f, -6f, -6f), new Vector3(12f, 12f, 12f)) };
         AddChild(_glints);
+    }
+    private MeshInstance3D _flash; private StandardMaterial3D _flashMat;
+    /// <summary>178: the cold GETS him -- called by the breath with the stream's direction: a flash at his body, the frost SPLASHING on past him along the stream
+    /// and up (the breath breaking on him), a ring of mist spreading along the floor from his feet, ice crystals flung out. Once.</summary>
+    public void HitFrom(Vector3 streamDir)
+    {
+        if (_hitShown) return; _hitShown = true;
+        Vector3 d = new Vector3(streamDir.X, 0f, streamDir.Z); d = d.LengthSquared() > 1e-6f ? d.Normalized() : Vector3.Forward;
+        Vector3 body = GlobalPosition + Vector3.Up * (BlockHeight * 0.5f);
+        if (FlashSize > 0f)
+        {
+            _flashMat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, NoDepthTest = true, AlbedoTexture = Tex("radgrad_raw"), AlbedoColor = new Color(FlashColor.R, FlashColor.G, FlashColor.B, 0.95f), RenderPriority = 4 };
+            _flash = new MeshInstance3D { Name = "FrostFlash", TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Mesh = new QuadMesh { Size = Vector2.One, Material = _flashMat }, Scale = Vector3.One * FlashSize * 0.6f };
+            AddChild(_flash); _flash.GlobalPosition = body;
+        }
+        if (SplashPuffs > 0) Burst("FrostSplash", SplashPuffs, body, d * 0.75f + Vector3.Up * 0.45f, 35f, 6f, 11f, 0.9f, 2.4f, new Color(0.86f, 0.95f, 1f), 0.6f, 0.75, 3f, -1.5f);
+        if (RingPuffs > 0) Burst("FrostRing", RingPuffs, GlobalPosition + Vector3.Up * 0.25f, Vector3.Up * 0.05f, 180f, 4f, 7f, 0.7f, 2.2f, new Color(0.9f, 0.97f, 1f), 0.5f, 0.7, 4f, 0.2f, flat: true);
+        if (HitShards > 0) ShardsFrom("HitShards", HitShards, body, d * 0.5f + Vector3.Up, 90f, 6f, 13f);
+        if (DebugPrint) GD.Print($"[SMS ice] {Name}: the HIT shows -- the flash, {SplashPuffs} splash puffs on along {d}, {RingPuffs} ring puffs, {HitShards} crystals");
+    }
+    private bool _hitShown;
+    public bool HitShown => _hitShown;
+    public bool FlashUp => _flash != null && IsInstanceValid(_flash);
+    /// <summary>A one-shot burst of the port's smoke ball, mix-blended: count, from a point, a direction and spread, speeds, sizes, colour, alpha, life, damping, gravity.</summary>
+    private void Burst(string name, int count, Vector3 at, Vector3 dir, float spread, float v0, float v1, float s0, float s1, Color col, float alpha, double life, float damp, float gravity, bool flat = false)
+    {
+        var pm = new ParticleProcessMaterial
+        {
+            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = flat ? 0.6f : 0.4f,
+            Direction = dir.Normalized(), Spread = spread, Flatness = flat ? 1f : 0f, InitialVelocityMin = v0, InitialVelocityMax = v1, Gravity = new Vector3(0f, gravity, 0f), DampingMin = damp, DampingMax = damp * 1.6f,
+            ScaleMin = 1f, ScaleMax = 1f, ScaleCurve = Ramp(s0, s1), AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -70f, AngularVelocityMax = 70f,
+            Color = new Color(col.R, col.G, col.B, 1f), ColorRamp = Fade(new Color(1f, 1f, 1f, alpha), new Color(1f, 1f, 1f, alpha), new Color(1f, 1f, 1f, alpha * 0.55f), new Color(1f, 1f, 1f, 0f))
+        };
+        var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Mix, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = Tex("kemuball3_raw"), DisableReceiveShadows = true };
+        var p = new GpuParticles3D { Name = name, TopLevel = true, Amount = count, Lifetime = life, OneShot = true, Explosiveness = 0.9f, Emitting = false, LocalCoords = false, FixedFps = 60, Interpolate = true, DrawOrder = GpuParticles3D.DrawOrderEnum.ViewDepth, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One, Material = mat }, VisibilityAabb = new Aabb(new Vector3(-12f, -4f, -12f), new Vector3(24f, 12f, 24f)) };
+        AddChild(p); p.GlobalPosition = at;
+        p.Finished += p.QueueFree; p.Emitting = true;
+    }
+    /// <summary>A one-shot of the ice shards (the port's square spark, ice blue, tumbling, under gravity) from a point, a direction and spread, speeds.</summary>
+    private void ShardsFrom(string name, int count, Vector3 at, Vector3 dir, float spread, float v0, float v1)
+    {
+        var pm = new ParticleProcessMaterial
+        {
+            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = 0.5f,
+            Direction = dir.Normalized(), Spread = spread, InitialVelocityMin = v0, InitialVelocityMax = v1, Gravity = new Vector3(0f, -14f, 0f), DampingMin = 0.5f, DampingMax = 1.5f,
+            ScaleMin = 0.6f, ScaleMax = 1.4f, AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -540f, AngularVelocityMax = 540f,
+            Color = new Color(0.8f, 0.93f, 1f, 1f), ColorRamp = Fade(new Color(1f, 1f, 1f, 0.9f), new Color(1f, 1f, 1f, 0.9f), new Color(1f, 1f, 1f, 0.8f), new Color(1f, 1f, 1f, 0f))
+        };
+        var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Mix, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = Tex("shikaku") ?? Tex("glow1_spark"), DisableReceiveShadows = true };
+        var p = new GpuParticles3D { Name = name, TopLevel = true, Amount = count, Lifetime = ShardSeconds, OneShot = true, Explosiveness = 1f, Emitting = false, LocalCoords = false, FixedFps = 60, Interpolate = true, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One * ShardSize, Material = mat }, VisibilityAabb = new Aabb(new Vector3(-12f, -4f, -12f), new Vector3(24f, 12f, 24f)) };
+        AddChild(p); p.GlobalPosition = at;
+        p.Finished += p.QueueFree; p.Emitting = true;
     }
     /// <summary>The frost about him as the ice snaps on: a one-shot ring of pale puffs.</summary>
     private void FrostBurst(float size = 1f)

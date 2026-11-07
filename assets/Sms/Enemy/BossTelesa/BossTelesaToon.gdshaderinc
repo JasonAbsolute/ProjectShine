@@ -11,6 +11,8 @@ uniform vec3 crown_c0 = vec3(1.0, 1.0, 0.0);                // _mat_crown's TEVR
 uniform vec3 crown_glow = vec3(1.0);                        // SMS 165 (the rematch): the crown SHINING the attack's colour x crown_glow_k (0 = the game's crown): the sphere
                                                             // map's highlights sliding over it and a rim at its edges, in the colour; over 1 = the activation flash
 uniform float crown_glow_k : hint_range(0.0, 2.0) = 0.0;
+uniform float crown_recolor : hint_range(0.0, 1.0) = 0.0;   // SMS 178 (the rematch's copies): 1 = the sheet's gold / red strip read as its BRIGHTNESS alone, so crown_c0 sets the
+                                                            // crown's HUE (a silver-blue crown is the fake's tell); 0 = the game's crown, the strip's gold under crown_c0
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear, repeat_disable;   // H_ma_rak_dummy = TScreenTexture
 uniform float screen_gain = 1.0;                            // DEVIATION knob: x the picture behind him in his mix (1 = the game's copy as is)
 
@@ -37,7 +39,8 @@ void fragment() {
 		him = base + mix(shade, v_spec, 0.5) - 0.5;                                           // stage 6, unclamped
 	} else if (part == 1) {
 		vec3 s1 = clamp((crown_c0 + mix(toon, v_lit0, 0.375) - 0.5) * 0.5, 0.0, 1.0);        // stage 1
-		vec3 s2 = clamp(s1 * t, 0.0, 1.0);                                                    // stage 2: x the sheet
+		vec3 strip = mix(t, vec3(dot(t, vec3(0.299, 0.587, 0.114)) * 1.6), crown_recolor);   // 178: the strip's brightness alone when the crown is re-coloured
+		vec3 s2 = clamp(s1 * strip, 0.0, 1.0);                                                // stage 2: x the sheet
 		vec2 env_uv = v_nrm_view.xy * 0.5 + 0.5;                                              // texgen NRM: the sphere map
 		vec3 env = texture(env_tex, env_uv).rgb;
 		vec2 sweep = env_uv + vec2(sin(TIME * 7.3), cos(TIME * 5.1)) * 0.22 * min(crown_glow_k, 1.0);         // 165: the sheen slides while it shines
