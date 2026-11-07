@@ -27,6 +27,8 @@ using System.Collections.Generic;
 /// trembles, its eyes burn brighter, its tongue drops out and it DROOLS glossy drops until he looks away (The shock group); and it comes UP THROUGH THE FLOOR in
 /// a burst of BLACK smoke (The rise group; the black pool, the mist and the glowing eyes before it are the supply's, SmsBombBooSpawner). Its rim glow and its
 /// burst puff are grey-black now, not violet.
+/// Pass 180 (Jaysonn: "a worried animation, not just frozen"): the shocked Boo WORRIES -- it shakes its head side to side, leans back from Mario, cowers with a
+/// nervous breath and sweats beads off the top of its head (the Worry* and Sweat* knobs in The shock group), on top of 179's tremble, stare, eyes, tongue and drool.
 /// </summary>
 public partial class SmsBombBoo : Node3D
 {
@@ -84,6 +86,18 @@ public partial class SmsBombBoo : Node3D
     [Export(PropertyHint.Range, "0.05,1.5,0.05")] public float ShockHopSeconds = 0.35f;
     [Export(PropertyHint.Range, "0,90,1")] public float ShockTongueDroopDeg = 62f;
     [Export] public string ShockSe = "";
+    /// <summary>180 (Jaysonn: "when mario looks at the boos they should be doing like a worried animation not just frozen"): the WORRY while shocked -- the body
+    /// SHAKES side to side about its stare (WorryShakeDeg either way at WorryShakeHz: a "no, no, no"), LEANS BACK from Mario (WorryLeanDeg, nose up), COWERS
+    /// (WorryCower: squashed down and pushed out) with a quick nervous BREATH on it (WorryBreathHz), and SWEATS -- beads (SweatRadius, SweatColor) flung off the
+    /// top of its head every SweatEvery seconds, arcing out and falling. All eased in over the first 0.3 s of the shock. 0 / off = 179's frozen Boo.</summary>
+    [Export(PropertyHint.Range, "0,45,0.5")] public float WorryShakeDeg = 10f;
+    [Export(PropertyHint.Range, "0.2,10,0.1")] public float WorryShakeHz = 3f, WorryBreathHz = 4f;
+    [Export(PropertyHint.Range, "0,60,1")] public float WorryLeanDeg = 14f;
+    [Export(PropertyHint.Range, "0,0.4,0.01")] public float WorryCower = 0.1f;
+    [Export] public bool WorrySweat = true;
+    [Export(PropertyHint.Range, "0.05,3,0.01")] public float SweatEvery = 0.3f;
+    [Export(PropertyHint.Range, "0.02,0.3,0.005")] public float SweatRadius = 0.07f;
+    [Export] public Color SweatColor = new Color(0.9f, 0.96f, 1f, 0.95f);
     [Export] public bool ShockDrool = true;
     [Export(PropertyHint.Range, "0.03,0.3,0.005")] public float DroolRadius = 0.11f;
     [Export(PropertyHint.Range, "0.05,3,0.01")] public float DroolEvery = 0.2f, DroolLife = 1.1f, DroolClingSeconds = 0.35f;
@@ -203,6 +217,13 @@ public partial class SmsBombBoo : Node3D
     public int DroolOut => _drool?.Live ?? 0;
     public int DroolMade => _drool?.Made ?? 0;
     public float DroolLowestY => _drool?.LowestY ?? float.NaN;
+    /// <summary>180: the worry now -- the shake's yaw off the stare (degrees), the lean (degrees, - = nose up), the cower's squash (the model's height as a fraction of
+    /// its rest), the sweat beads out / made.</summary>
+    public float WorryYawDeg { get; private set; }
+    public float WorryPitchDeg { get; private set; }
+    public float WorrySquash { get; private set; } = 1f;
+    public int SweatOut => _sweat?.Live ?? 0;
+    public int SweatMade => _sweat?.Made ?? 0;
     public float EyeGlowNow { get; private set; }
     public float TongueYawDeg => _tYaw;
     public float TonguePitchDeg => _tPitch;
@@ -213,7 +234,7 @@ public partial class SmsBombBoo : Node3D
 
     private Node3D _model, _tongue; private readonly List<ShaderMaterial> _mats = new(), _bodyMats = new();
     private float _tPitch, _tYaw, _tonguePhase, _yawPrev; private bool _yawPrevKnown;
-    private float _shockT, _lookAwayT, _droolT; private Vector3 _shockPos; private DroolPool _drool;
+    private float _shockT, _lookAwayT, _droolT, _sweatT; private Vector3 _shockPos; private DropPool _drool, _sweat; private int _sweatSide = 1;
     private Mario _mario; private SmsKingBooRematch _boss, _hitBoss; private SmsActorSound _sound; private Random _rng;
     /// <summary>177: every King Boo on the field -- the real one and his copies (the group sms_rematch_boo).</summary>
     private IEnumerable<SmsKingBooRematch> BoosNow()
@@ -325,10 +346,11 @@ public partial class SmsBombBoo : Node3D
     private void SetShock(bool on)
     {
         if (Shocked == on) return;
-        Shocked = on; _shockT = 0f; _lookAwayT = 0f; _droolT = DroolEvery * 0.5f;
+        Shocked = on; _shockT = 0f; _lookAwayT = 0f; _droolT = DroolEvery * 0.5f; _sweatT = SweatEvery * 0.6f;
         if (on) { _shockPos = GlobalPosition; Shocks++; if (!string.IsNullOrEmpty(ShockSe)) _sound?.Play(ShockSe); }
         else
         {
+            WorryYawDeg = 0f; WorryPitchDeg = 0f; WorrySquash = 1f;
             if (_model != null) _model.Scale = Vector3.One * ModelScale;
             EyeGlowNow = FaceGlow; foreach (var m in _bodyMats) m.SetShaderParameter("face_glow", FaceGlow);
             GlobalTransform = new Transform3D(FaceBasis(_yaw, _rotX), _shockPos);
@@ -345,12 +367,18 @@ public partial class SmsBombBoo : Node3D
             Vector3 d = mario.GlobalPosition - _shockPos; d.Y = 0f;
             if (d.LengthSquared() > 1e-4f) _yaw = Mathf.LerpAngle(_yaw, MathF.Atan2(d.X, d.Z), Mathf.Clamp(ShockTurnSpeed * dt, 0f, 1f));
         }
+        // 180: the WORRY -- the head shake about the stare, the lean back, the cower with its nervous breath (all eased in over 0.3 s)
+        float ease = Mathf.SmoothStep(0f, 1f, Mathf.Clamp(_shockT / 0.3f, 0f, 1f));
+        WorryYawDeg = WorryShakeDeg * MathF.Sin(MathF.Tau * WorryShakeHz * _shockT) * ease;
+        WorryPitchDeg = -WorryLeanDeg * ease;
         Vector3 jitter = ShockTremble > 0f ? new Vector3(Rand() - 0.5f, Rand() - 0.5f, Rand() - 0.5f) * (2f * ShockTremble) : Vector3.Zero;
-        GlobalTransform = new Transform3D(FaceBasis(_yaw, _rotX), _shockPos + jitter);
+        GlobalTransform = new Transform3D(FaceBasis(_yaw + Mathf.DegToRad(WorryYawDeg), _rotX + WorryPitchDeg), _shockPos + jitter);
         if (_model != null)
         {
             float h = ShockHopSeconds > 0f && _shockT < ShockHopSeconds ? MathF.Sin(MathF.PI * _shockT / ShockHopSeconds) * ShockHop : 0f;   // the startle: tall and thin, then back
-            _model.Scale = new Vector3(1f - 0.5f * h, 1f + h, 1f - 0.5f * h) * ModelScale;
+            float c = WorryCower * ease * (1f + 0.3f * MathF.Sin(MathF.Tau * WorryBreathHz * _shockT));                                       // the cower: squashed down, pushed out, breathing
+            _model.Scale = new Vector3(1f - 0.5f * h + 0.5f * c, 1f + h - c, 1f - 0.5f * h + 0.5f * c) * ModelScale;
+            WorrySquash = 1f + h - c;
         }
         EyeGlowNow = FaceGlow * (ShockEyeGlow + 0.35f * MathF.Sin(Age * 57f));                      // the flicker: 9 Hz
         foreach (var m in _bodyMats) m.SetShaderParameter("face_glow", EyeGlowNow);
@@ -358,7 +386,19 @@ public partial class SmsBombBoo : Node3D
         if (ShockDrool)
         {
             _droolT += dt;
-            if (_droolT >= DroolEvery) { _droolT -= DroolEvery; (_drool ??= new DroolPool(this)).Drip(MouthPoint, GlobalTransform.Basis, FacesPlusZ, Rand(), Rand(), Rand()); }
+            if (_droolT >= DroolEvery) { _droolT -= DroolEvery; (_drool ??= new DropPool(this, DroolRadius, DroolColor, DroolLife, "Drool")).Drip(MouthPoint, GlobalTransform.Basis.Orthonormalized(), FacesPlusZ, Rand(), Rand(), Rand()); }
+        }
+        if (WorrySweat)                                                                                 // 180: a bead off the top of the head, this side then that, arcing out
+        {
+            _sweatT += dt;
+            if (_sweatT >= SweatEvery)
+            {
+                _sweatT -= SweatEvery; _sweatSide = -_sweatSide;
+                Basis b = GlobalTransform.Basis.Orthonormalized(); Vector3 face = FacesPlusZ ? b.Z : -b.Z;
+                Vector3 at = GlobalPosition + b * (new Vector3(_sweatSide * 0.55f, 0.75f, FacesPlusZ ? 0.15f : -0.15f) * ModelScale);
+                Vector3 vel = b.X * (_sweatSide * (1.4f + 0.6f * Rand())) + Vector3.Up * (2f + 0.8f * Rand()) + face * 0.4f;
+                (_sweat ??= new DropPool(this, SweatRadius, SweatColor, 0.8f, "Sweat")).Fling(at, vel, 0.7f + 0.6f * Rand());
+            }
         }
         if (TouchHurts && mario != null) TouchCheck(mario);
     }
@@ -397,36 +437,48 @@ public partial class SmsBombBoo : Node3D
 
     /// <summary>179: the shocked Boo's DROOL (the Galaxy ref: glossy grey drops about the mouth) -- a sphere each, DroolColor with the light's highlight and a little
     /// light of its own for the dark arena, dribbling from the mouth: each clings to a point about the mouth growing to size, then falls under DroolGravity drifting
-    /// a little outward, shrinking away over its last third. Pooled under a world-fixed node of the Boo's; the pool ticks on after the shock so the last drops fall.</summary>
-    private sealed class DroolPool
+    /// a little outward, shrinking away over its last third. Pooled under a world-fixed node of the Boo's; the pool ticks on after the shock so the last drops fall.
+    /// 180: the same pool, in its own radius and colour, carries the SWEAT -- beads flung off the head (Fling), falling from the start.</summary>
+    private sealed class DropPool
     {
         private sealed class Drop { public MeshInstance3D Mi; public Vector3 Pos, Vel, Cling; public float Age, ClingFor, Life, Size = 1f; public bool Live, Falling; }
-        private readonly SmsBombBoo _boo; private readonly Node3D _root; private readonly List<Drop> _drops = new(); private readonly SphereMesh _mesh; private readonly StandardMaterial3D _mat;
+        private readonly SmsBombBoo _boo; private readonly Node3D _root; private readonly List<Drop> _drops = new(); private readonly SphereMesh _mesh; private readonly StandardMaterial3D _mat; private readonly float _life;
         public int Made { get; private set; }
         public int Live { get { int n = 0; foreach (var d in _drops) if (d.Live) n++; return n; } }
         public float LowestY { get { float y = float.NaN; foreach (var d in _drops) if (d.Live && (float.IsNaN(y) || d.Pos.Y < y)) y = d.Pos.Y; return y; } }
-        public DroolPool(SmsBombBoo boo)
+        /// <summary>A pool of glossy drops of one radius and colour (180: the drool's and the sweat's), each living `life` seconds once it falls.</summary>
+        public DropPool(SmsBombBoo boo, float radius, Color c, float life, string name)
         {
-            _boo = boo;
-            _root = new Node3D { Name = "Drool", TopLevel = true }; boo.AddChild(_root); _root.GlobalTransform = Transform3D.Identity;
-            _mesh = new SphereMesh { Radius = boo.DroolRadius, Height = boo.DroolRadius * 2f, RadialSegments = 14, Rings = 8 };
-            Color c = boo.DroolColor;
+            _boo = boo; _life = life;
+            _root = new Node3D { Name = name, TopLevel = true }; boo.AddChild(_root); _root.GlobalTransform = Transform3D.Identity;
+            _mesh = new SphereMesh { Radius = radius, Height = radius * 2f, RadialSegments = 14, Rings = 8 };
             _mat = new StandardMaterial3D { AlbedoColor = c, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, Roughness = 0.12f, Metallic = 0.05f, EmissionEnabled = true, Emission = new Color(c.R * 0.3f, c.G * 0.3f, c.B * 0.3f) };
+        }
+        private Drop Take()
+        {
+            foreach (var x in _drops) if (!x.Live) return x;
+            if (_drops.Count >= _boo.DroolMaxOut) return null;
+            var d = new Drop { Mi = new MeshInstance3D { Mesh = _mesh, MaterialOverride = _mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off } };
+            _root.AddChild(d.Mi); _drops.Add(d);
+            return d;
         }
         /// <summary>A new drop at the mouth: to one side of its middle (r2), a little under it (r3), clinging r1 x DroolClingSeconds before it falls.</summary>
         public void Drip(Vector3 mouth, Basis b, bool facesPlusZ, float r1, float r2, float r3)
         {
-            Drop d = null; foreach (var x in _drops) if (!x.Live) { d = x; break; }
-            if (d == null)
-            {
-                if (_drops.Count >= _boo.DroolMaxOut) return;
-                d = new Drop { Mi = new MeshInstance3D { Mesh = _mesh, MaterialOverride = _mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off } };
-                _root.AddChild(d.Mi); _drops.Add(d);
-            }
-            d.Live = true; d.Falling = false; d.Age = 0f; d.Life = _boo.DroolLife; d.ClingFor = _boo.DroolClingSeconds * r1; d.Size = 0.7f + 0.6f * r3;   // drops of 0.7..1.3 x DroolRadius (the ref's vary)
+            var d = Take(); if (d == null) return;
+            d.Live = true; d.Falling = false; d.Age = 0f; d.Life = _life; d.ClingFor = _boo.DroolClingSeconds * r1; d.Size = 0.7f + 0.6f * r3;   // drops of 0.7..1.3 x the radius (the ref's vary)
             d.Cling = new Vector3((r2 - 0.5f) * 0.34f, -0.04f - 0.12f * r3, facesPlusZ ? 0.06f : -0.06f);   // the Boo's own frame: x its sideways, z its face
             d.Vel = Vector3.Zero; d.Pos = mouth + b * d.Cling;
             d.Mi.Visible = true; d.Mi.Scale = Vector3.One * (0.2f * d.Size); d.Mi.GlobalPosition = d.Pos;
+            Made++;
+        }
+        /// <summary>180: a bead FLUNG from a point with a velocity (the sweat): no cling, full size at once, falling under the gravity from the start.</summary>
+        public void Fling(Vector3 at, Vector3 vel, float size)
+        {
+            var d = Take(); if (d == null) return;
+            d.Live = true; d.Falling = true; d.Age = 0f; d.Life = _life; d.ClingFor = 0f; d.Size = size; d.Cling = Vector3.Zero;
+            d.Vel = vel; d.Pos = at;
+            d.Mi.Visible = true; d.Mi.Scale = Vector3.One * d.Size; d.Mi.GlobalPosition = d.Pos;
             Made++;
         }
         /// <summary>The drops' tick; a falling drop is gone at the floor (<paramref name="floorY"/>, NaN = none known) or at the end of its life.</summary>
@@ -436,8 +488,8 @@ public partial class SmsBombBoo : Node3D
             {
                 if (!d.Live) continue;
                 d.Age += dt;
-                if (d.Falling && !float.IsNaN(floorY) && d.Pos.Y <= floorY + _boo.DroolRadius) { d.Live = false; d.Mi.Visible = false; continue; }
-                if (d.Age <= d.ClingFor) { d.Pos = mouth + b * d.Cling; d.Mi.Scale = Vector3.One * (d.Size * Mathf.Lerp(0.2f, 1f, d.ClingFor > 0f ? d.Age / d.ClingFor : 1f)); }
+                if (d.Falling && !float.IsNaN(floorY) && d.Pos.Y <= floorY + _mesh.Radius) { d.Live = false; d.Mi.Visible = false; continue; }
+                if (!d.Falling && d.Age <= d.ClingFor) { d.Pos = mouth + b * d.Cling; d.Mi.Scale = Vector3.One * (d.Size * Mathf.Lerp(0.2f, 1f, d.ClingFor > 0f ? d.Age / d.ClingFor : 1f)); }
                 else
                 {
                     if (!d.Falling) { d.Falling = true; Vector3 outward = facesPlusZ ? b.Z : -b.Z; outward.Y = 0f; d.Vel = (outward.LengthSquared() > 1e-6f ? outward.Normalized() : Vector3.Zero) * 0.25f + b.X * (d.Cling.X * 0.6f); }
@@ -511,6 +563,7 @@ public partial class SmsBombBoo : Node3D
         if (_grace > 0f) _grace -= dt;
         var mario = MarioNow();
         _drool?.Tick(dt, MouthPoint, GlobalTransform.Basis.Orthonormalized(), FacesPlusZ, _floorY);   // 179: the drops out there fall on, shocked or not, to the floor
+        _sweat?.Tick(dt, MouthPoint, GlobalTransform.Basis.Orthonormalized(), FacesPlusZ, _floorY);   // 180: the sweat beads too
         switch (State)
         {
             case Phase.Rising:
@@ -753,7 +806,7 @@ public partial class SmsBombBoo : Node3D
         // the sound node plays out on its own: the Boo's visuals go now, the node a moment later
         if (_model != null) _model.Visible = false;
         if (_tongue != null) _tongue.Visible = false;
-        _drool?.HideAll();
+        _drool?.HideAll(); _sweat?.HideAll();
         SetPhysicsProcess(false);
         if (IsInsideTree()) GetTree().CreateTimer(2.0).Timeout += QueueFree; else QueueFree();
     }

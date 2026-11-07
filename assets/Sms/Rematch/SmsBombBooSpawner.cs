@@ -48,8 +48,8 @@ public partial class SmsBombBooSpawner : Node3D
     [Export] public bool EyesGlow = true;
     [Export(PropertyHint.Range, "0,3,0.05")] public float EyesDelay = 0.3f, EyesFadeSeconds = 0.3f;
     [Export] public Color EyeColor = new Color(1f, 0.82f, 0.08f);
-    [Export] public Vector2 EyeSize = new Vector2(0.2f, 0.4f);
-    [Export(PropertyHint.Range, "0.05,1.5,0.01")] public float EyeGap = 0.34f, EyeHeight = 0.14f;
+    [Export] public Vector2 EyeSize = new Vector2(0.27f, 0.54f);   // 180 (Jaysonn: "the eyes a little bigger"): 179's 0.2 x 0.4
+    [Export(PropertyHint.Range, "0.05,1.5,0.01")] public float EyeGap = 0.42f, EyeHeight = 0.16f;
     [Export] public Texture2D GlowTexture;
     [ExportGroup("")]
     [Export] public bool DebugPrint;
