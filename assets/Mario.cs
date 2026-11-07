@@ -10876,6 +10876,12 @@ public partial class Mario : CharacterBody3D
 
     private void OnAnimationFinished(StringName animName)
     {
+        // 176: a demo clip's end -- on to the clip it named (the stance's drop-in -> the stance loop), else hold its last frame for the caller
+        if (_smsDemoClip != "" && animName == _smsDemoClip)
+        {
+            if (_smsDemoThen != "") { animPlayer.Play(_smsDemoThen); _smsDemoClip = _smsDemoThen; _smsDemoThen = ""; }
+            return;
+        }
         // PICKUP RAISE finished
         if (stateOfMario == MarioState.pickupRaise && animName == "ma_raise")
         {
@@ -14767,7 +14773,8 @@ public partial class Mario : CharacterBody3D
         ["ma_ladder_hang_kick"] = 1, ["ma_ladder_roll_up"] = 1, ["ma_ladder_roll_down"] = 1,
         ["ma_hiped"] = 2, ["ma_hipsr"] = 2, ["ma_hipat"] = 2, ["ma_jump"] = 2, ["ma_roll"] = 2, ["ma_run2"] = 2,
         ["ma_tjmp2"] = 2, ["ma_tjmp1"] = 2, ["ma_jump_rolling"] = 2, ["ma_step1"] = 2, ["ma_step2"] = 2, ["ma_step3"] = 2,
-        ["ma_jkick"] = 2, ["ma_dgrun"] = 2, ["ma_turbo_dash"] = 2, ["ma_giant_rolling"] = 2, ["ma_monteman_wait"] = 2, ["ma_demo_gate_out_appear_get"] = 2
+        ["ma_jkick"] = 2, ["ma_dgrun"] = 2, ["ma_turbo_dash"] = 2, ["ma_giant_rolling"] = 2, ["ma_monteman_wait"] = 2, ["ma_demo_gate_out_appear_get"] = 2,
+        ["ma_battle_stance_in"] = 2, ["ma_battle_stance"] = 2   // 176: the rematch intro's battle stance (assets/Mario/Anims): fists, as the sprite refs
     };
 
     private static readonly System.Text.RegularExpressions.Regex SmsClipSuffix = new(@" \d+$");
@@ -17672,6 +17679,37 @@ public partial class Mario : CharacterBody3D
             GetNodeOrNull<SmsMarioSound>("SmsSound")?.OnTaken();   // 154c: MARIO_STATUS_TAKEN's voice (soundMovement: MV06_DAMAGE_WATER)
         }
     }
+
+    // ---- 176: demo clips ---------------------------------------------------------------------------------------------------------------------
+    private string _smsDemoClip = "", _smsDemoThen = "";
+    /// <summary>176: a demo plays a clip by name OUTSIDE the AnimationTree (the rematch intro's custom ma_lookabout, SmsRematchIntro) -- the tree
+    /// off and the player playing it, as the sit / sleep / hang code does -- until SmsEndDemoClip. speed scales the player. thenPlay: the clip
+    /// to go on with when this one ENDS (the battle stance's drop-in, then its loop). False (nothing changed) if the player has no such clip.
+    /// The caller holds the controls (CameraLocked: the state loop freezes him and touches no clip).</summary>
+    public bool SmsPlayDemoClip(string name, float speed = 1f, string thenPlay = "")
+    {
+        if (animPlayer == null || string.IsNullOrEmpty(name) || !animPlayer.HasAnimation(name)) return false;
+        if (animTree != null) animTree.Active = false;
+        animPlayer.SpeedScale = speed;
+        animPlayer.Play(name);
+        _smsDemoClip = name; _smsDemoThen = !string.IsNullOrEmpty(thenPlay) && animPlayer.HasAnimation(thenPlay) ? thenPlay : "";
+        return true;
+    }
+    /// <summary>176: the demo clip is over -- the player stopped, the tree back on (its state's clip takes over on the next frame; a camera cut
+    /// hides the step). Nothing if no demo clip is on.</summary>
+    public void SmsEndDemoClip()
+    {
+        if (_smsDemoClip == "") return;
+        _smsDemoClip = ""; _smsDemoThen = "";
+        if (animPlayer != null) { animPlayer.SpeedScale = 1f; animPlayer.Stop(false); }
+        if (animTree != null) animTree.Active = true;
+    }
+    /// <summary>176: a clip's length in seconds (0 = no such clip) -- a cutscene times itself to its clip.</summary>
+    public float SmsClipLength(string name) => animPlayer != null && !string.IsNullOrEmpty(name) && animPlayer.HasAnimation(name) ? (float)animPlayer.GetAnimation(name).Length : 0f;
+    /// <summary>176, for the drives: the demo clip playing (name@position/length), "" when none; whether the tree is off for one.</summary>
+    public string SmsDemoClipNow => _smsDemoClip != "" && animPlayer != null ? $"{animPlayer.CurrentAnimation}@{animPlayer.CurrentAnimationPosition:F2}/{animPlayer.CurrentAnimationLength:F2}" : "";
+    public bool SmsDemoClipOn => _smsDemoClip != "";
+    public bool SmsTreeActive => animTree != null && animTree.Active;
 
     /// <summary>174: a demo turns him to face a way (the rematch intro's look-about, SmsRematchIntro): the facing latched and the armature turned --
     /// SmsCarryTo's face part alone: no voice, no state change, no move. The caller holds the controls (CameraLocked).</summary>

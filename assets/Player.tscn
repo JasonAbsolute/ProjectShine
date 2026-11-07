@@ -237,6 +237,9 @@
 [ext_resource type="PackedScene" uid="uid://cslipsmoke060" path="res://assets/Sms/Fx/SlipSmoke.tscn" id="244_slips"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Fx/GoopSinkRipple.tscn" id="245_goopr"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Sound/SmsMarioSound.tscn" id="246_smsnd"]
+[ext_resource type="Animation" path="res://assets/Mario/Anims/ma_lookabout.tres" id="247_lookabout"]
+[ext_resource type="Animation" path="res://assets/Mario/Anims/ma_battle_stance_in.tres" id="248_stancein"]
+[ext_resource type="Animation" path="res://assets/Mario/Anims/ma_battle_stance.tres" id="249_stance"]
 
 [sub_resource type="CylinderShape3D" id="CylinderShape3D_fpjfl"]
 height = 1.8701391
@@ -1026,6 +1029,9 @@ resource_name = "ma_carry_idle"
 [sub_resource type="AnimationLibrary" id="AnimationLibrary_lux1s"]
 _data = {
 &"ma_2jmed": SubResource("Animation_rsnwd"),
+&"ma_battle_stance": ExtResource("249_stance"),
+&"ma_battle_stance_in": ExtResource("248_stancein"),
+&"ma_lookabout": ExtResource("247_lookabout"),
 &"ma_2jmp1": ExtResource("4_baiqo"),
 &"ma_2jmp2": ExtResource("5_ec4k7"),
 &"ma_bdwn": ExtResource("6_l6cxq"),

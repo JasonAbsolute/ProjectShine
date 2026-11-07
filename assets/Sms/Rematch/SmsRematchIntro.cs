@@ -13,11 +13,13 @@ using System;
 /// Pass 174 (Jaysonn: "mario lands then a cutscene starts where mario looks around looking from where the laughing is coming from and the king boo
 /// appears just like the casino fight laughs and then goes underground and the fight starts"): with Cutscene on, CutsceneDelay after Mario lands
 /// his controls lock (CameraLocked) and a cutscene camera takes over -- a LAUGH from nowhere (King Boo's long laugh), Mario LOOKS ABOUT for it
-/// (175, Jaysonn: "a new animation for mario where he looks around not just have him rotate": his body stands; his HEAD turns -- Mario.SmsHeadLook,
-/// a modifier on jnt_head with a share on the chest -- a beat, left LookTurnDeg, right, then ahead, a little up (LookUpDeg), over LookSeconds), then
+/// (176, Jaysonn: "a new animation ... more like a 'where am i' look around": the LookClip, a real clip of his -- the custom ma_lookabout, baked from
+/// assets/Mario/Anims/ma_lookabout.pose.json by tools/anim/bake_anim.gd and edited like any clip in the Animation panel -- played outside the
+/// AnimationTree (Mario.SmsPlayDemoClip) for its length (LookSeconds 0 = the clip's), his body standing; no clip = 175's head look-about), then
 /// King Boo SURFACES: SurfaceDistance in front of him toward the BooSpawn marker, rising out of the floor as the casino boss rises from his table
-/// (the appear clip and voice), LAUGHING for IntroLaughSeconds (his knob) -- Mario's head on him, his body turning to him -- with the camera off to the
-/// side on the two of them (SurfaceCamSide / Height), then SINKING back under the floor; AfterSinkSeconds on the empty spot, the game camera is back,
+/// (the appear clip and voice), LAUGHING for IntroLaughSeconds (his knob) -- Mario in his BATTLE STANCE (176: StanceInClip then the StanceClip loop,
+/// the custom ma_battle_stance_in / ma_battle_stance), his head on King Boo, his body turned to him -- with the camera off to the side on the two of
+/// them (SurfaceCamSide / Height), then SINKING back under the floor; AfterSinkSeconds on the empty spot, the game camera is back,
 /// Mario is free (his head back to the clip), and King Boo rises at his BooSpawn spot for the fight (SpawnRising: no second laugh) -- FightReady as
 /// before. A skips the cutscene too (the fight starts at once). After a miss the cutscene is skipped like the card. Cutscene off = the 157 intro.
 /// </summary>
@@ -53,14 +55,20 @@ public partial class SmsRematchIntro : Node
     /// comes at its start); where King Boo surfaces (metres in front of Mario toward the BooSpawn marker; 0 = at the marker); the beat on the
     /// empty spot after he sinks before the fight starts; the cutscene camera's field of view.</summary>
     [Export] public bool Cutscene = true;
-    [Export] public float CutsceneDelay = 0.4f, LookSeconds = 2.6f, SurfaceDistance = 12f, AfterSinkSeconds = 0.6f, CutsceneFov = 50f;   // 175: 12 m (7 stood them too close)
+    [Export] public float CutsceneDelay = 0.4f, LookSeconds = 0f, SurfaceDistance = 12f, AfterSinkSeconds = 0.6f, CutsceneFov = 50f;   // 176: LookSeconds 0 = the clip's length; 175: 12 m (7 stood them too close)
     /// <summary>The surface shot's camera: how far off the line between Mario and King Boo (metres, a side two-shot) and how high.</summary>
     [Export] public float SurfaceCamSide = 22f, SurfaceCamHeight = 4.6f;
     /// <summary>Where the surface shot's camera looks: 0 = at Mario's head, 1 = at King Boo's body, between for both (the crown needs room above).</summary>
     [Export(PropertyHint.Range, "0,1,0.01")] public float SurfaceCamAim = 0.7f;
-    /// <summary>175, the look-about: how far Mario's HEAD turns each way (degrees), how far up it tilts while he searches (degrees), the share of the
-    /// turn his chest takes; how quickly his BODY turns to King Boo once he has surfaced (degrees a second).</summary>
-    [Export] public float LookTurnDeg = 60f, LookUpDeg = 10f, LookChestShare = 0.3f, LookTurnDegPerSec = 240f;
+    /// <summary>176, the look-about: the clip Mario plays while he looks about (his own AnimationPlayer's; the custom ma_lookabout -- edit it in the
+    /// Animation panel, or re-bake it from assets/Mario/Anims/ma_lookabout.pose.json), at LookClipSpeed; "" or a missing clip = 175's head look-about
+    /// (a modifier turning his head 60 degrees each way). LookTurnDegPerSec: how quickly his BODY turns to King Boo once he has surfaced.</summary>
+    [Export] public string LookClip = "ma_lookabout";
+    [Export] public float LookClipSpeed = 1f, LookTurnDegPerSec = 240f;
+    /// <summary>176 (Jaysonn: "when it cuts to the side view of the stand off i want mario to do this battle stance"): on the cut to the two-shot
+    /// Mario DROPS INTO a battle stance (StanceInClip, one-shot) and HOLDS it (StanceClip, a loop) until the fight starts -- the custom clips
+    /// ma_battle_stance_in / ma_battle_stance (assets/Mario/Anims). "" or a missing clip = his idle.</summary>
+    [Export] public string StanceInClip = "ma_battle_stance_in", StanceClip = "ma_battle_stance";
     [ExportGroup("")]
     [Export] public bool DebugPrint;
 
@@ -78,7 +86,11 @@ public partial class SmsRematchIntro : Node
     private Mario _mario; private Node3D _marioSpawn, _booSpawn; private SmsKingBooRematch _boo; private SmsArenaFloor _floor;
     private float _t, _sinceReveal, _landedAt = -1f; private bool _booSpawned;
     // 174: the cutscene
-    private Camera3D _cam, _gameCam; private float _cut, _sunkAt = -1f, _faceYaw; private Vector3 _surfaceSpot, _camFrom, _camAt, _camTo; private bool _cutsceneRan, _cutsceneSkipped; private int _looks;
+    private Camera3D _cam, _gameCam; private float _cut, _sunkAt = -1f, _faceYaw, _lookLen; private Vector3 _surfaceSpot, _camFrom, _camAt, _camTo; private bool _cutsceneRan, _cutsceneSkipped, _lookClipUsed, _stanceUsed; private int _looks;
+    /// <summary>176, for the drives: the look-about ran on the LookClip (else the head modifier), how long it runs; the stance clips played on the cut.</summary>
+    public bool LookClipUsed => _lookClipUsed;
+    public float LookLength => _lookLen;
+    public bool StanceUsed => _stanceUsed;
     /// <summary>174, for the drives: the cutscene ran, was skipped; where King Boo surfaced; Mario's facing yaw now (radians) and the number of look turns made; the cutscene camera (while it runs).</summary>
     public bool CutsceneRan => _cutsceneRan;
     public bool CutsceneSkipped => _cutsceneSkipped;
@@ -171,12 +183,16 @@ public partial class SmsRematchIntro : Node
         _camTo = mp + face * 4.1f + side * 0.5f + Vector3.Up * 1.55f;
         PlaceCam(0f); _cam.Current = true;
         _boo.PlayVoice(_boo.LaughSe, _boo.LaughDb);                                                        // the laugh, from nowhere
-        // 175: the look-about is his HEAD's (the body stands): a beat, then left, right, and ahead a little up -- each turn eased, each look held
+        // 176: the look-about is a CLIP of his (the custom ma_lookabout: a glance left, right, then up with a shrug), played outside the tree for its
+        // length, his body standing where he landed; no such clip = 175's head look-about (a modifier turning his head: a beat, left, right, ahead)
+        float clipLen = _mario.SmsClipLength(LookClip) / Mathf.Max(0.05f, LookClipSpeed);
+        _lookClipUsed = clipLen > 0f && _mario.SmsPlayDemoClip(LookClip, LookClipSpeed);
+        _lookLen = LookSeconds > 0f ? LookSeconds : _lookClipUsed ? clipLen : 2.6f;
         var look = _mario.SmsHeadLook;
-        if (look != null && look.HasBones)
+        if (!_lookClipUsed && look != null && look.HasBones)
         {
-            float L = Mathf.Max(0.5f, LookSeconds), T = Mathf.DegToRad(LookTurnDeg), U = -Mathf.DegToRad(LookUpDeg);   // negative pitch = up
-            look.ChestShare = LookChestShare;
+            float L = Mathf.Max(0.5f, _lookLen), T = Mathf.DegToRad(60f), U = -Mathf.DegToRad(10f);   // negative pitch = up
+            look.ChestShare = 0.3f;
             look.Play(new[] {
                 new SmsHeadLook.Look(0f, 0f, 0f, 0.08f * L),              // the beat: the laugh registers
                 new SmsHeadLook.Look(T, U, 0.12f * L, 0.18f * L),         // left, up a little
@@ -184,7 +200,7 @@ public partial class SmsRematchIntro : Node
                 new SmsHeadLook.Look(0f, 0.5f * U, 0.12f * L, 0.16f * L), // ahead: where he will come from
             });
         }
-        if (DebugPrint) GD.Print($"[SMS rematch intro] CUTSCENE: Mario landed at {mp} facing {landed} (turned to {face}), the laugh; he looks about for {LookSeconds:F1} s (head {(look != null && look.HasBones ? "turning" : "NOT available")}); King Boo will surface at {_surfaceSpot} ({(spot - mp).Length():F1} m away); the camera at {_camFrom}");
+        if (DebugPrint) GD.Print($"[SMS rematch intro] CUTSCENE: Mario landed at {mp} facing {landed} (turned to {face}), the laugh; he looks about for {_lookLen:F2} s ({(_lookClipUsed ? $"the clip {LookClip} at x{LookClipSpeed:F2}" : look != null && look.HasBones ? $"no clip {LookClip}: the head modifier" : "NO clip and no head modifier")}); King Boo will surface at {_surfaceSpot} ({(spot - mp).Length():F1} m away); the camera at {_camFrom}");
     }
     private void PlaceCam(float k)
     {
@@ -199,12 +215,12 @@ public partial class SmsRematchIntro : Node
         if (SkipAllowed && !_cutsceneSkipped && (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space"))) { SkipCutscene(); return; }
         if (State == Phase.LookAbout)
         {
-            // 175: the look about is the head's (SmsHeadLook, started in BeginCutscene); the body stands square to where the laugh comes from
+            // 176: the look about is the clip's (or 175's head modifier's, started in BeginCutscene); the body stands square to where the laugh comes from
             var look = _mario.SmsHeadLook;
-            _looks = look != null ? Mathf.Max(0, look.Step - 1) : 0;                                      // the looks made (the beat is step 0)
+            _looks = !_lookClipUsed && look != null ? Mathf.Max(0, look.Step - 1) : 0;                   // the head modifier's looks made (the beat is step 0)
             TurnMario(Yaw(Flat(_surfaceSpot - _mario.GlobalPosition)), dt);
-            PlaceCam(Mathf.Clamp(_cut / Mathf.Max(0.1f, LookSeconds), 0f, 1f));
-            if (_cut >= LookSeconds) Surface();
+            PlaceCam(Mathf.Clamp(_cut / Mathf.Max(0.1f, _lookLen), 0f, 1f));
+            if (_cut >= _lookLen) Surface();
         }
         else if (State == Phase.Surfaced)
         {
@@ -230,6 +246,9 @@ public partial class SmsRematchIntro : Node
     private void Surface()
     {
         State = Phase.Surfaced; _cut = 0f; _sunkAt = -1f;
+        // 176: the look-about clip is over; under the camera cut he drops into the BATTLE STANCE and holds it (the drop-in, then the loop) -- or the tree's idle
+        _mario.SmsEndDemoClip();
+        _stanceUsed = _mario.SmsPlayDemoClip(StanceInClip, 1f, StanceClip) || _mario.SmsPlayDemoClip(StanceClip);
         Vector3 mp = _mario.GlobalPosition, toSpot = Flat(_surfaceSpot - mp), side = new Vector3(-toSpot.Z, 0f, toSpot.X);
         // a side two-shot (he is far too big to frame from behind Mario 7 m away): from SurfaceCamSide metres off the line between them, a little behind
         // Mario, SurfaceCamHeight up, looking between Mario's head and King Boo's body; pushing in a little through the laugh
@@ -239,7 +258,7 @@ public partial class SmsRematchIntro : Node
         PlaceCam(0f);
         _boo.IntroSunk += OnIntroSunk;
         _boo.IntroSurface(_surfaceSpot, Yaw(Flat(mp - _surfaceSpot)));
-        if (DebugPrint) GD.Print($"[SMS rematch intro] CUTSCENE: King Boo surfaces at {_surfaceSpot}, facing Mario");
+        if (DebugPrint) GD.Print($"[SMS rematch intro] CUTSCENE: King Boo surfaces at {_surfaceSpot}, facing Mario; Mario {(_stanceUsed ? $"drops into the stance ({StanceInClip} -> {StanceClip})" : "stands (no stance clip)")}");
     }
     private void OnIntroSunk() { _sunkAt = _cut; if (_boo != null) _boo.IntroSunk -= OnIntroSunk; if (DebugPrint) GD.Print($"[SMS rematch intro] CUTSCENE: he has sunk; the fight in {AfterSinkSeconds:F1} s"); }
     /// <summary>A skips the cutscene: King Boo under the floor at once, the fight starts.</summary>
@@ -257,6 +276,7 @@ public partial class SmsRematchIntro : Node
         if (_gameCam != null && IsInstanceValid(_gameCam)) _gameCam.Current = true;
         if (_cam != null && IsInstanceValid(_cam)) { _cam.QueueFree(); _cam = null; }
         _mario.CameraLocked = false;
+        _mario.SmsEndDemoClip();                                                                           // 176: the stance (or a skipped look-about) ends; the tree's idle as the fight starts
         _mario.SmsHeadLook?.Stop();                                                                        // 175: his head back to the clip
         SpawnBoo();
     }
