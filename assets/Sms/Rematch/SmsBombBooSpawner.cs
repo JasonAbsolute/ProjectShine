@@ -12,6 +12,9 @@ using System.Collections.Generic;
 /// from Mario), the floor found under the point. King Boo's hit clears every Boo on the field (the doc) and the supply pauses ClearPause
 /// seconds; his defeat stops it. Knobs: the timing (FirstDelay, SpawnInterval, FogSeconds, ClearPause), the cap (MaxOut), the Boo's own
 /// (ExpireSeconds and the rest on BombBooScene's root), the place (SpawnMode, ArenaRadius, MinFromMario, FloorOffset).
+/// Pass 179 (Jaysonn: "when spawning in they should have that mist effect with the eyes glowing before they spawn in", "keep it black not purple"): the spot is
+/// Galaxy's -- a BLACK pool on the floor with low black mist rolling off it and two GLOWING YELLOW EYES in it that face Mario, FogSeconds long; then the Boo comes
+/// up THROUGH the floor in black smoke (SmsBombBoo.RiseFromUnder) as the eyes go out and the pool fades. The Fog group.
 /// </summary>
 public partial class SmsBombBooSpawner : Node3D
 {
@@ -29,10 +32,25 @@ public partial class SmsBombBooSpawner : Node3D
     /// <summary>Start without waiting for the intro's FightReady.</summary>
     [Export] public bool StartAtOnce = false;
     [Export] public bool Enabled = true;
-    [ExportGroup("Fog")]
-    [Export] public Color FogColor = new Color(0.12f, 0.03f, 0.2f, 0.85f);
+    [ExportGroup("Fog (179: the black spot, its mist and the glowing eyes)")]
+    /// <summary>179 (Jaysonn: "when spawning in they should have that mist effect with the eyes glowing before they spawn in", "keep it black not purple"; the Galaxy
+    /// refs): the spot is BLACK -- a dark pool on the floor (FogDisc: FogDiscRadius, FogDiscColor), low black mist rolling off it (FogMist; FogColor, FogRadius,
+    /// FogTexture empty = the game's dark smoke ball) and, EyesDelay in, two GLOWING EYES in it (EyeColor, EyeSize, EyeGap apart, EyeHeight over the floor; GlowTexture empty
+    /// = a soft disc) that face Mario and pulse -- until the Boo comes up through the floor (SmsBombBoo.RiseFromUnder): the eyes go out over EyesFadeSeconds, the
+    /// pool over its rise. 158-178: a violet mist and nothing else.</summary>
+    [Export] public bool FogMist = true;
+    [Export] public Color FogColor = new Color(0.03f, 0.03f, 0.035f, 0.7f);
     [Export] public float FogRadius = 1.1f;
     [Export] public Texture2D FogTexture;
+    [Export] public bool FogDisc = true;
+    [Export(PropertyHint.Range, "0.3,5,0.05")] public float FogDiscRadius = 1.7f;
+    [Export] public Color FogDiscColor = new Color(0f, 0f, 0f, 0.88f);
+    [Export] public bool EyesGlow = true;
+    [Export(PropertyHint.Range, "0,3,0.05")] public float EyesDelay = 0.3f, EyesFadeSeconds = 0.3f;
+    [Export] public Color EyeColor = new Color(1f, 0.82f, 0.08f);
+    [Export] public Vector2 EyeSize = new Vector2(0.2f, 0.4f);
+    [Export(PropertyHint.Range, "0.05,1.5,0.01")] public float EyeGap = 0.34f, EyeHeight = 0.14f;
+    [Export] public Texture2D GlowTexture;
     [ExportGroup("")]
     [Export] public bool DebugPrint;
 
@@ -42,14 +60,24 @@ public partial class SmsBombBooSpawner : Node3D
     public int SpawnCount { get; private set; }
     public int OutNow { get { int n = 0; foreach (var b in SmsBombBoo.All) if (b != null && IsInstanceValid(b) && b.State != SmsBombBoo.Phase.Gone) n++; return n; } }
     public float NextIn => _timer;
+    /// <summary>179, for the drives: the spot (fogging, how long), the eyes (shown, their alpha, where, how far off Mario's line they face), the pool's alpha.</summary>
+    public bool Fogging => _fogging;
+    public float FogTime => _fogT;
+    public float EyesAlpha { get; private set; }
+    public float DiscAlpha { get; private set; }
+    public bool EyesShown => _eyes != null && _eyes.Visible && EyesAlpha > 0.5f;
+    public Vector3 EyesPoint => _eyes != null ? _eyes.GlobalPosition : Vector3.Zero;
+    public float EyesOffMarioDeg { get; private set; } = 180f;
 
     private float _timer; private bool _fogging; private GpuParticles3D _fog; private Vector3 _fogAt; private float _fogT;
+    private Node3D _eyes; private MeshInstance3D _disc; private StandardMaterial3D _eyeMat, _discMat; private bool _fading; private float _fadeT, _riseSeconds = 0.7f;
     private SmsKingBooRematch _boss; private SmsRematchIntro _intro; private Mario _mario; private readonly Random _rng = new(158);
 
     public override void _Ready()
     {
         BombBooScene ??= ResourceLoader.Exists("res://assets/Sms/Rematch/BombBoo.tscn") ? GD.Load<PackedScene>("res://assets/Sms/Rematch/BombBoo.tscn") : null;
         FogTexture ??= ResourceLoader.Exists("res://assets/Sms/Fx/tex/kemuball3_dark.png") ? GD.Load<Texture2D>("res://assets/Sms/Fx/tex/kemuball3_dark.png") : null;
+        GlowTexture ??= ResourceLoader.Exists("res://assets/Sms/Fx/tex/radgrad_raw.png") ? GD.Load<Texture2D>("res://assets/Sms/Fx/tex/radgrad_raw.png") : null;
         if (Engine.IsEditorHint()) return;
         SmsBombSupplyDriveHook();
         CallDeferred(nameof(Wire));
@@ -96,9 +124,15 @@ public partial class SmsBombBooSpawner : Node3D
         if (_fogging)
         {
             _fogT += dt;
-            if (_fogT >= FogSeconds) { _fogging = false; SpawnBoo(_fogAt); if (_fog != null) _fog.Emitting = false; }
+            SpotTick();
+            if (_fogT >= FogSeconds)
+            {
+                _fogging = false; var boo = SpawnBoo(_fogAt); if (_fog != null) _fog.Emitting = false;
+                _fading = true; _fadeT = 0f; _riseSeconds = boo != null ? boo.RiseSeconds : 0.7f;                 // 179: the eyes go out, the pool fades over the rise
+            }
             return;
         }
+        if (_fading) FadeTick(dt);
         if (_boss != null && !_boss.IsAlive) { Stop(); return; }
         if (OutNow >= MaxOut) return;
         _timer -= dt;
@@ -137,21 +171,28 @@ public partial class SmsBombBooSpawner : Node3D
         return hit.Count > 0 ? hit["position"].AsVector3().Y : null;
     }
 
+    /// <summary>The spot: the low black mist (179: broader, slower and lower than 158's violet puffs -- it rolls off the pool), the dark pool and the eyes at the
+    /// floor (the spawn point is FloorOffset over it).</summary>
     private void StartFog(Vector3 at)
     {
-        _fogging = true; _fogT = 0f; _fogAt = at;
-        if (_fog == null)
+        _fogging = true; _fogT = 0f; _fogAt = at; _fading = false;
+        float floorY = at.Y - FloorOffset;
+        if (_fog == null && FogMist)
         {
-            _fog = new GpuParticles3D { Name = "Fog", TopLevel = true, Amount = 36, Lifetime = 1.2, OneShot = false, Emitting = false, FixedFps = 60,
+            // 179: a thin, low veil of black wisps over the pool (a column of 40 big puffs hid the pool and the eyes), casting no shadow (the puffs' shadow drew a
+            // hard grey disc on the floor)
+            _fog = new GpuParticles3D { Name = "Fog", TopLevel = true, Amount = 18, Lifetime = 1.0, OneShot = false, Emitting = false, FixedFps = 60,
                 VisibilityAabb = new Aabb(new Vector3(-4f, -2f, -4f), new Vector3(8f, 6f, 8f)) };
             var pm = new ParticleProcessMaterial
             {
-                EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = FogRadius, Direction = Vector3.Up, Spread = 60f,
-                InitialVelocityMin = 0.2f, InitialVelocityMax = 0.9f, Gravity = new Vector3(0f, 0.4f, 0f), ScaleMin = 0.7f, ScaleMax = 1.5f, LifetimeRandomness = 0.4f
+                EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = FogRadius, Direction = Vector3.Up, Spread = 85f,
+                InitialVelocityMin = 0.1f, InitialVelocityMax = 0.35f, Gravity = new Vector3(0f, 0.1f, 0f), ScaleMin = 0.8f, ScaleMax = 1.4f, LifetimeRandomness = 0.4f,
+                AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -40f, AngularVelocityMax = 40f
             };
+            Color lin = FogColor.SrgbToLinear(); lin.A = FogColor.A;                                    // the ramp reaches the particle shader raw (no sRGB decode): given in linear
             var ramp = new Gradient();
-            ramp.SetColor(0, new Color(FogColor.R, FogColor.G, FogColor.B, 0f)); ramp.SetColor(1, new Color(FogColor.R, FogColor.G, FogColor.B, 0f));
-            ramp.AddPoint(0.25f, FogColor); ramp.AddPoint(0.7f, FogColor);
+            ramp.SetColor(0, new Color(lin.R, lin.G, lin.B, 0f)); ramp.SetColor(1, new Color(lin.R, lin.G, lin.B, 0f));
+            ramp.AddPoint(0.25f, lin); ramp.AddPoint(0.7f, lin);
             pm.ColorRamp = new GradientTexture1D { Gradient = ramp };
             _fog.ProcessMaterial = pm;
             var mat = new StandardMaterial3D
@@ -160,23 +201,79 @@ public partial class SmsBombBooSpawner : Node3D
                 VertexColorUseAsAlbedo = true, AlbedoTexture = FogTexture, CullMode = BaseMaterial3D.CullModeEnum.Disabled, NoDepthTest = false
             };
             _fog.DrawPass1 = new QuadMesh { Size = new Vector2(1.4f, 1.4f), Material = mat };
+            _fog.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
             AddChild(_fog);
         }
-        _fog.GlobalPosition = at;
-        _fog.Restart(); _fog.Emitting = true;
-        if (DebugPrint) GD.Print($"[SMS bomb supply] {Name}: a foggy spot at {at}");
+        if (_fog != null) { _fog.GlobalPosition = new Vector3(at.X, floorY + 0.15f, at.Z); _fog.Restart(); _fog.Emitting = true; }
+        if (FogDisc)
+        {
+            if (_disc == null)
+            {
+                _discMat = new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, AlbedoColor = FogDiscColor, AlbedoTexture = GlowTexture, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
+                _disc = new MeshInstance3D { Name = "FogPool", TopLevel = true, Mesh = new QuadMesh { Size = new Vector2(FogDiscRadius * 2f, FogDiscRadius * 2f), Orientation = PlaneMesh.OrientationEnum.Y }, MaterialOverride = _discMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+                AddChild(_disc);
+            }
+            _disc.GlobalTransform = new Transform3D(Basis.Identity, new Vector3(at.X, floorY + 0.03f, at.Z)); _disc.Visible = true; DiscAlpha = 0f;
+            _discMat.AlbedoColor = FogDiscColor with { A = 0f };
+        }
+        if (EyesGlow)
+        {
+            if (_eyes == null)
+            {
+                _eyeMat = new StandardMaterial3D { ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, AlbedoColor = EyeColor, AlbedoTexture = GlowTexture, CullMode = BaseMaterial3D.CullModeEnum.Disabled, RenderPriority = 10 };   // drawn after the mist: the glow shows through it
+                _eyes = new Node3D { Name = "FogEyes", TopLevel = true };
+                var quad = new QuadMesh { Size = EyeSize };
+                _eyes.AddChild(new MeshInstance3D { Name = "L", Mesh = quad, MaterialOverride = _eyeMat, Position = new Vector3(-EyeGap * 0.5f, 0f, 0f), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+                _eyes.AddChild(new MeshInstance3D { Name = "R", Mesh = quad, MaterialOverride = _eyeMat, Position = new Vector3(EyeGap * 0.5f, 0f, 0f), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+                AddChild(_eyes);
+            }
+            _eyes.GlobalTransform = new Transform3D(Basis.Identity, new Vector3(at.X, floorY + EyeHeight, at.Z)); _eyes.Visible = false; EyesAlpha = 0f;
+            _eyeMat.AlbedoColor = EyeColor with { A = 0f };
+        }
+        if (DebugPrint) GD.Print($"[SMS bomb supply] {Name}: a black spot at {at} (the floor {floorY:F2})");
     }
-    private void StopFog() { _fogging = false; if (_fog != null) _fog.Emitting = false; }
-
-    private void SpawnBoo(Vector3 at)
+    /// <summary>179: the spot while the mist rolls -- the pool fading in over its first quarter second, the eyes coming on EyesDelay in (a fifth of a second), facing
+    /// Mario (their quads' +Z at him) and pulsing.</summary>
+    private void SpotTick()
     {
-        if (BombBooScene == null) { GD.PushWarning($"[SMS bomb supply] {GetPath()}: no BombBooScene (assets/Sms/Rematch/BombBoo.tscn)"); return; }
+        if (_disc != null && _disc.Visible) { DiscAlpha = Mathf.Clamp(_fogT / 0.25f, 0f, 1f); _discMat.AlbedoColor = FogDiscColor with { A = FogDiscColor.A * DiscAlpha }; }
+        if (_eyes == null || !EyesGlow) return;
+        EyesAlpha = Mathf.Clamp((_fogT - EyesDelay) / 0.2f, 0f, 1f);
+        _eyes.Visible = EyesAlpha > 0f;
+        _eyeMat.AlbedoColor = EyeColor with { A = EyesAlpha };
+        if (_mario == null || !IsInstanceValid(_mario)) _mario = GetTree().GetFirstNodeInGroup("player") as Mario;
+        Vector3 pos = _eyes.GlobalPosition;
+        Vector3 to = _mario != null ? _mario.GlobalPosition - pos : Vector3.Back; to.Y = 0f;
+        float yaw = to.LengthSquared() > 1e-4f ? MathF.Atan2(to.X, to.Z) : 0f;
+        float pulse = 1f + 0.08f * MathF.Sin(_fogT * MathF.Tau * 5f);
+        _eyes.GlobalTransform = new Transform3D(new Basis(Vector3.Up, yaw).Scaled(Vector3.One * pulse), pos);
+        EyesOffMarioDeg = to.LengthSquared() > 1e-4f ? Mathf.RadToDeg(MathF.Acos(Mathf.Clamp(_eyes.GlobalBasis.Z.Normalized().Dot(to.Normalized()), -1f, 1f))) : 180f;
+    }
+    /// <summary>179: the Boo is coming up -- the eyes go out over EyesFadeSeconds, the pool over the Boo's rise.</summary>
+    private void FadeTick(float dt)
+    {
+        _fadeT += dt;
+        if (_eyes != null && _eyes.Visible) { EyesAlpha = EyesFadeSeconds > 0f ? Mathf.Clamp(1f - _fadeT / EyesFadeSeconds, 0f, 1f) : 0f; _eyeMat.AlbedoColor = EyeColor with { A = EyesAlpha }; if (EyesAlpha <= 0f) _eyes.Visible = false; }
+        if (_disc != null && _disc.Visible) { DiscAlpha = Mathf.Clamp(1f - _fadeT / Mathf.Max(0.05f, _riseSeconds), 0f, 1f); _discMat.AlbedoColor = FogDiscColor with { A = FogDiscColor.A * DiscAlpha }; if (DiscAlpha <= 0f) _disc.Visible = false; }
+        if ((_eyes == null || !_eyes.Visible) && (_disc == null || !_disc.Visible)) _fading = false;
+    }
+    private void StopFog()
+    {
+        _fogging = false; _fading = false; if (_fog != null) _fog.Emitting = false;
+        if (_eyes != null) { _eyes.Visible = false; EyesAlpha = 0f; }
+        if (_disc != null) { _disc.Visible = false; DiscAlpha = 0f; }
+    }
+
+    private SmsBombBoo SpawnBoo(Vector3 at)
+    {
+        if (BombBooScene == null) { GD.PushWarning($"[SMS bomb supply] {GetPath()}: no BombBooScene (assets/Sms/Rematch/BombBoo.tscn)"); return null; }
         var boo = BombBooScene.Instantiate<SmsBombBoo>();
         boo.Name = $"BombBoo{++SpawnCount}";
         if (DebugPrint) boo.DebugPrint = true;
         GetParent().AddChild(boo);
         boo.GlobalPosition = at;
-        if (DebugPrint) GD.Print($"[SMS bomb supply] {Name}: {boo.Name} out of the fog at {at} ({OutNow} out)");
+        if (DebugPrint) GD.Print($"[SMS bomb supply] {Name}: {boo.Name} out of the spot at {at} ({OutNow} out)");
         EmitSignal(SignalName.Spawned, boo);
+        return boo;
     }
 }

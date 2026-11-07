@@ -22,6 +22,11 @@ using System.Collections.Generic;
 /// Pass 177: a swung Boo tests every King Boo on the field (the group sms_rematch_boo: the real one and his copies) and bursts on the one whose body it
 /// is in (HitBoss). Pass 178 (Jaysonn: "having mario jump to have the bomb hit him is right"): the swing RISES with Mario's jump -- JumpSwingLift over the
 /// hand while he is in the air (JumpSwingSeconds in and out) -- so a King Boo hovering 8.5 m up is hit from a jump's apex and never from the ground.
+/// Pass 179 (Jaysonn: "make the boo bombs more expressive", "more like galaxy", "keep it black not purple"): the hanging TONGUE MOVES (it sways, wags, lags
+/// behind a turn and tucks under with the drift -- The tongue group); a Boo Mario LOOKS AT is SHOCKED, Galaxy's way -- it freezes where it is, startles,
+/// trembles, its eyes burn brighter, its tongue drops out and it DROOLS glossy drops until he looks away (The shock group); and it comes UP THROUGH THE FLOOR in
+/// a burst of BLACK smoke (The rise group; the black pool, the mist and the glowing eyes before it are the supply's, SmsBombBooSpawner). Its rim glow and its
+/// burst puff are grey-black now, not violet.
 /// </summary>
 public partial class SmsBombBoo : Node3D
 {
@@ -40,7 +45,8 @@ public partial class SmsBombBoo : Node3D
     [Export(PropertyHint.Range, "0,1,0.01")] public float Ambient = 0f;
     /// <summary>The eyes' own light (the bright texels) and the faint rim.</summary>
     [Export(PropertyHint.Range, "0,3,0.05")] public float FaceGlow = 0.5f;
-    [Export] public Color GlowColor = new Color(0.35f, 0.1f, 0.55f);
+    /// <summary>The rim's colour: 179 a cool grey (Jaysonn: "keep it black not purple"; 158-178 had a violet rim, (0.35, 0.1, 0.55)).</summary>
+    [Export] public Color GlowColor = new Color(0.22f, 0.22f, 0.28f);
     [Export(PropertyHint.Range, "0,3,0.05")] public float Glow = 0.25f;
     /// <summary>The tongue's root in the MOUTH (model metres, before ModelScale; 161, measured on the model: the body is 2.5 m wide, 1.8 tall and 2.1 deep about
     /// its origin, the face on its +Z side -- the mouth's centre at (0, -0.6, 0.86), the eyes at (0, 0.15, 0.93)), how far it droops when it just hangs
@@ -48,6 +54,56 @@ public partial class SmsBombBoo : Node3D
     [Export] public Vector3 TongueOffset = new Vector3(0f, -0.6f, 0.85f);
     [Export(PropertyHint.Range, "-60,80,1")] public float TongueRestDroopDeg = 35f;
     [Export] public bool FacesPlusZ = true;
+    [ExportGroup("The tongue (179: it moves)")]
+    /// <summary>179 (Jaysonn: "their tongue just kinda statically hangs and it needs to have motion like everything else"): the hanging tongue SWAYS -- its droop
+    /// bobbing TongueSwayDeg either way and WAGGING TongueWagDeg side to side at about TongueWagHz (each Boo at its own phase), LAGGING behind a turn (TongueTurnLag
+    /// degrees for every degree a second the body turns, opposite to the turn) and tucking under as it drifts (TongueMoveTuckDeg more droop at a full drift of
+    /// 1.4 m/s); it follows its target at TongueFollow a second (lower = a heavier, lazier tongue). Shocked (below) it drops to ShockTongueDroopDeg and quivers.</summary>
+    [Export(PropertyHint.Range, "0,30,0.5")] public float TongueSwayDeg = 7f, TongueWagDeg = 12f;
+    [Export(PropertyHint.Range, "0.1,4,0.05")] public float TongueWagHz = 0.9f;
+    [Export(PropertyHint.Range, "0,1,0.01")] public float TongueTurnLag = 0.15f;
+    [Export(PropertyHint.Range, "0,30,0.5")] public float TongueMoveTuckDeg = 8f;
+    [Export(PropertyHint.Range, "1,30,0.5")] public float TongueFollow = 9f;
+    [ExportGroup("The shock (179, Galaxy: looked at, it freezes)")]
+    /// <summary>179 (Jaysonn: "when mario looks at them they get shocked and kinda stay in place, have drool effects coming from their mouth", the Galaxy refs): a
+    /// drifting Boo that Mario FACES (within LookConeDeg -- the whole cone -- of his facing, LookRange away or nearer) is SHOCKED: it stops where it is (the drift,
+    /// the bob and the tilt frozen), startles (a squash-and-stretch hop of ShockHop over ShockHopSeconds), TREMBLES (ShockTremble metres of jitter), its eyes
+    /// burning ShockEyeGlow x brighter and flickering, turning to STARE BACK at him (ShockTurnSpeed), its tongue dropped out and quivering, and it DROOLS -- glossy drops (DroolRadius, DroolColor) dribbling
+    /// from the mouth every DroolEvery seconds, each clinging up to DroolClingSeconds before it falls (DroolGravity) and pops after DroolLife; DroolMaxOut at
+    /// once. It stays shocked at least ShockMinSeconds and until he has looked away for LookAwaySeconds; a grab ends it; the touch still hurts. Off: 178's Boo,
+    /// which never minded being looked at.</summary>
+    [Export] public bool LookShock = true;
+    [Export(PropertyHint.Range, "5,120,1")] public float LookConeDeg = 40f;
+    [Export(PropertyHint.Range, "1,40,0.5")] public float LookRange = 12f;
+    [Export(PropertyHint.Range, "0,5,0.05")] public float LookAwaySeconds = 0.6f, ShockMinSeconds = 0.8f;
+    [Export(PropertyHint.Range, "0,0.2,0.005")] public float ShockTremble = 0.035f;
+    /// <summary>Shocked, it turns to STARE BACK at Mario this fast (a second to close the angle at 1; 0 = it keeps facing where it drifted).</summary>
+    [Export(PropertyHint.Range, "0,20,0.5")] public float ShockTurnSpeed = 8f;
+    [Export(PropertyHint.Range, "1,6,0.1")] public float ShockEyeGlow = 2.4f;
+    [Export(PropertyHint.Range, "0,0.6,0.01")] public float ShockHop = 0.22f;
+    [Export(PropertyHint.Range, "0.05,1.5,0.05")] public float ShockHopSeconds = 0.35f;
+    [Export(PropertyHint.Range, "0,90,1")] public float ShockTongueDroopDeg = 62f;
+    [Export] public string ShockSe = "";
+    [Export] public bool ShockDrool = true;
+    [Export(PropertyHint.Range, "0.03,0.3,0.005")] public float DroolRadius = 0.11f;
+    [Export(PropertyHint.Range, "0.05,3,0.01")] public float DroolEvery = 0.2f, DroolLife = 1.1f, DroolClingSeconds = 0.35f;
+    [Export(PropertyHint.Range, "0,20,0.1")] public float DroolGravity = 5.5f;
+    [Export] public Color DroolColor = new Color(0.8f, 0.84f, 0.9f, 0.92f);
+    [Export(PropertyHint.Range, "1,30,1")] public int DroolMaxOut = 12;
+    [ExportGroup("The rise (179: up through the floor, Galaxy)")]
+    /// <summary>179 (Jaysonn: "when spawning in they should have that mist effect with the eyes glowing before they spawn in"; the black pool, the mist and the
+    /// glowing eyes BEFORE it are the supply's, SmsBombBooSpawner): the Boo comes UP THROUGH THE FLOOR -- it starts SpawnDepth under its spawn point (hidden by
+    /// the floor) and rises to its height over RiseSeconds, growing from RiseScaleFrom to full, solid from the start -- in a burst of BLACK SMOKE at the spot
+    /// (RiseSmokePuffs puffs, RiseSmokeSize, RiseSmokeSeconds, RiseSmokeColor; SmokeTexture empty = the game's dark smoke ball). Off: 158's rise (it scales up
+    /// from nothing and fades in at the spawn point).</summary>
+    [Export] public bool RiseFromUnder = true;
+    [Export(PropertyHint.Range, "0,4,0.05")] public float SpawnDepth = 1.3f;
+    [Export(PropertyHint.Range, "0.05,1,0.05")] public float RiseScaleFrom = 0.75f;
+    [Export] public bool RiseSmoke = true;
+    [Export(PropertyHint.Range, "0,60,1")] public int RiseSmokePuffs = 22;
+    [Export(PropertyHint.Range, "0.3,4,0.05")] public float RiseSmokeSize = 1.5f, RiseSmokeSeconds = 1.1f;
+    [Export] public Color RiseSmokeColor = new Color(0.09f, 0.09f, 0.11f, 0.95f);
+    [Export] public Texture2D SmokeTexture;
     [ExportGroup("The float (Sunshine's Boo, telesa.prm)")]
     /// <summary>Its base point stands this high over the floor where it rose (the game's Boo keeps the height it was placed at); the fly height and the bob
     /// ride on it. 1.2: the body (0.85 m to its bottom at scale 0.8) clears the floor at the bob's lowest.</summary>
@@ -97,7 +153,8 @@ public partial class SmsBombBoo : Node3D
     [Export] public string AppearSe = "MSD_SE_EN_TELESA_APPEAR", GrabSe = "MSD_SE_EN_TELESA_FIX", BurstSe = "MSD_SE_EN_TELESA_CRUSH", GoneSe = "MSD_SE_EN_TELESA_DISAPPEAR";
     [ExportGroup("")]
     [Export] public PackedScene BurstFxScene;
-    [Export] public Color BurstColor = new Color(0.55f, 0.2f, 0.85f);
+    /// <summary>The burst puff's colour: 179 a dark smoke grey (Jaysonn: "keep it black not purple"; 158-178's was violet, (0.55, 0.2, 0.85)).</summary>
+    [Export] public Color BurstColor = new Color(0.25f, 0.25f, 0.28f);
     /// <summary>170 (Jaysonn: "bomb boos need to explode when hitting king boo"): swung into him it EXPLODES -- the Bob-omb's blast (BombExplosion.tscn: the
     /// 10_bomb fireball with its glow, smoke, scraps, shockwave and sparks) at this scale, the water flower's boom, a kick of the camera -- over its own puff.</summary>
     [Export] public bool ExplodeOnKingBoo = true;
@@ -137,8 +194,26 @@ public partial class SmsBombBoo : Node3D
     public Vector3 MouthPoint => GlobalTransform * (TongueOffset * ModelScale);
     public int MaterialCount => _mats.Count;
     public Node3D TongueNode => _tongue;
+    /// <summary>179, for the drives: the shock (on, how long, whether Mario faces it now, how many so far), the drool (drops out / made, the lowest one's height),
+    /// the eyes' glow now, the tongue's wag (yaw, degrees, + = to its left) and droop (pitch, degrees) and its root, the rise (where it started, its smoke), the opacity set.</summary>
+    public bool Shocked { get; private set; }
+    public float ShockSeconds => _shockT;
+    public bool LookedAtNow { get; private set; }
+    public int Shocks { get; private set; }
+    public int DroolOut => _drool?.Live ?? 0;
+    public int DroolMade => _drool?.Made ?? 0;
+    public float DroolLowestY => _drool?.LowestY ?? float.NaN;
+    public float EyeGlowNow { get; private set; }
+    public float TongueYawDeg => _tYaw;
+    public float TonguePitchDeg => _tPitch;
+    public Vector3 TongueRootPoint => _tongue != null ? _tongue.GlobalPosition : GlobalPosition;
+    public float RiseStartY { get; private set; } = float.NaN;
+    public bool RiseSmokeFired { get; private set; }
+    public float OpacityNow { get; private set; }
 
-    private Node3D _model, _tongue; private readonly List<ShaderMaterial> _mats = new();
+    private Node3D _model, _tongue; private readonly List<ShaderMaterial> _mats = new(), _bodyMats = new();
+    private float _tPitch, _tYaw, _tonguePhase, _yawPrev; private bool _yawPrevKnown;
+    private float _shockT, _lookAwayT, _droolT; private Vector3 _shockPos; private DroolPool _drool;
     private Mario _mario; private SmsKingBooRematch _boss, _hitBoss; private SmsActorSound _sound; private Random _rng;
     /// <summary>177: every King Boo on the field -- the real one and his copies (the group sms_rematch_boo).</summary>
     private IEnumerable<SmsKingBooRematch> BoosNow()
@@ -174,10 +249,12 @@ public partial class SmsBombBoo : Node3D
                     sm.SetShaderParameter("glow_color", new Vector3(GlowColor.R, GlowColor.G, GlowColor.B));
                     sm.SetShaderParameter("glow", Glow);
                     mi.SetSurfaceOverrideMaterial(s, sm);
-                    _mats.Add(sm);
+                    _mats.Add(sm); if (root == _model) _bodyMats.Add(sm);
                 }
             }
         }
+        EyeGlowNow = FaceGlow;
+        SmokeTexture ??= ResourceLoader.Exists("res://assets/Sms/Fx/tex/kemuball3_dark.png") ? GD.Load<Texture2D>("res://assets/Sms/Fx/tex/kemuball3_dark.png") : null;
         BurstFxScene ??= ResourceLoader.Exists("res://assets/Sms/Fx/EnemyDisap.tscn") ? GD.Load<PackedScene>("res://assets/Sms/Fx/EnemyDisap.tscn") : null;
         ExplosionFxScene ??= ResourceLoader.Exists("res://assets/Sms/Enemy/Bomb/BombExplosion.tscn") ? GD.Load<PackedScene>("res://assets/Sms/Enemy/Bomb/BombExplosion.tscn") : null;
         _sound = SmsActorSound.Attach(this);
@@ -188,7 +265,8 @@ public partial class SmsBombBoo : Node3D
         _bobFreq = MathF.Max(1f, Lerp(FlyFrequencyMin, FlyFrequencyMax, Rand()));
         _march = Lerp(MarchSpeedLow, MarchSpeedHigh, Rand()); _turn = Lerp(TurnSpeedLow, TurnSpeedHigh, Rand());
         _rotX = FlyAngBase - FlyAngMax;
-        SetScaleK(0.01f);
+        _tonguePhase = Rand() * MathF.Tau; _tPitch = TongueRestDroopDeg; _tYaw = 0f;
+        SetScaleK(RiseFromUnder ? RiseScaleFrom : 0.01f, RiseFromUnder ? 1f : 0f);
         if (!string.IsNullOrEmpty(AppearSe)) _sound?.Play(AppearSe);
         if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: {_mats.Count} materials, at {GlobalPosition}; fly {_flyTarget:F0} u, bob {_bobAmp:F0} u / {_bobFreq:F0} ticks, march {_march:F2} u/t, turn {_turn:F2} deg/t");
     }
@@ -196,19 +274,183 @@ public partial class SmsBombBoo : Node3D
     private float Rand() => (float)_rng.NextDouble();
     private static float Lerp(float a, float b, float t) => a + (b - a) * t;
 
-    /// <summary>The body and the hanging tongue at the model scale x k (the rise), the fade with it.</summary>
-    private void SetScaleK(float k)
+    /// <summary>The body and the hanging tongue at the model scale x k (the rise), the fade to <paramref name="alpha"/> (179: up through the floor it stays solid).</summary>
+    private void SetScaleK(float k, float alpha)
     {
         if (_model != null) _model.Scale = Vector3.One * ModelScale * k;
         TongueRest(k);
-        foreach (var m in _mats) m.SetShaderParameter("opacity", Opacity * Mathf.Clamp(k, 0f, 1f));
+        OpacityNow = Opacity * Mathf.Clamp(alpha, 0f, 1f);
+        foreach (var m in _mats) m.SetShaderParameter("opacity", OpacityNow);
     }
-    /// <summary>The tongue just hanging out of the mouth: its root at TongueOffset, drooping TongueRestDroopDeg.</summary>
+    /// <summary>The tongue just hanging out of the mouth: its root at TongueOffset, drooping _tPitch (TongueRestDroopDeg and the sway, TongueSway) and turned
+    /// _tYaw to the side (the wag).</summary>
     private void TongueRest(float k = 1f)
     {
         if (_tongue == null) return;
-        _tongue.Transform = new Transform3D(new Basis(Vector3.Right, Mathf.DegToRad(TongueRestDroopDeg)).Scaled(Vector3.One * ModelScale * k), TongueOffset * ModelScale * k);
+        Basis b = new Basis(Vector3.Up, Mathf.DegToRad(_tYaw)) * new Basis(Vector3.Right, Mathf.DegToRad(_tPitch));
+        _tongue.Transform = new Transform3D(b.Scaled(Vector3.One * ModelScale * k), TongueOffset * ModelScale * k);
         TongueLength = TongueModelLength * ModelScale * k; TongueTip = _tongue.GlobalTransform * new Vector3(0f, 0f, TongueModelLength);
+    }
+    /// <summary>179: the hanging tongue's motion -- its droop and wag targets (the sway and the wag on their sines, the lag behind a turn, the tuck under with the
+    /// drift; shocked: dropped out to ShockTongueDroopDeg and quivering) followed at TongueFollow a second.</summary>
+    private void TongueSway(float dt, float speedMps)
+    {
+        float yawRate = 0f;
+        if (_yawPrevKnown && dt > 1e-5f) yawRate = Mathf.RadToDeg(Mathf.Wrap(_yaw - _yawPrev, -MathF.PI, MathF.PI)) / dt;
+        _yawPrev = _yaw; _yawPrevKnown = true;
+        float w = MathF.Tau * TongueWagHz * Age + _tonguePhase;
+        float pitchT, yawT;
+        if (Shocked)
+        {
+            pitchT = ShockTongueDroopDeg + 3f * MathF.Sin(Age * 88f);                                   // the quiver: 14 Hz, 3 degrees
+            yawT = 3f * MathF.Sin(Age * 97f + 1f);
+        }
+        else
+        {
+            pitchT = TongueRestDroopDeg + TongueSwayDeg * MathF.Sin(w * 1.37f) + TongueMoveTuckDeg * Mathf.Clamp(speedMps / 1.4f, 0f, 1.5f);
+            yawT = TongueWagDeg * MathF.Sin(w) - Mathf.Clamp(yawRate * TongueTurnLag, -35f, 35f);
+        }
+        float f = Mathf.Clamp(TongueFollow * dt, 0f, 1f);
+        _tPitch += (pitchT - _tPitch) * f; _tYaw += (yawT - _tYaw) * f;
+    }
+    /// <summary>179: Mario FACES it -- it lies within LookConeDeg (the whole cone) of his facing, LookRange away or nearer, flat.</summary>
+    private bool LookedAt(Mario mario)
+    {
+        Vector3 to = GlobalPosition - mario.GlobalPosition; to.Y = 0f;
+        float d = to.Length(); if (d > LookRange || d < 1e-3f) return false;
+        Vector3 f = mario.SmsFacingDir(); f.Y = 0f; if (f.LengthSquared() < 1e-6f) return false;
+        return f.Normalized().Dot(to / d) >= MathF.Cos(Mathf.DegToRad(LookConeDeg * 0.5f));
+    }
+    /// <summary>179: into the shock (it holds where it hangs) or out of it (the float goes on from there: a half wait, then the next goal).</summary>
+    private void SetShock(bool on)
+    {
+        if (Shocked == on) return;
+        Shocked = on; _shockT = 0f; _lookAwayT = 0f; _droolT = DroolEvery * 0.5f;
+        if (on) { _shockPos = GlobalPosition; Shocks++; if (!string.IsNullOrEmpty(ShockSe)) _sound?.Play(ShockSe); }
+        else
+        {
+            if (_model != null) _model.Scale = Vector3.One * ModelScale;
+            EyeGlowNow = FaceGlow; foreach (var m in _bodyMats) m.SetShaderParameter("face_glow", FaceGlow);
+            GlobalTransform = new Transform3D(FaceBasis(_yaw, _rotX), _shockPos);
+            _wait = WaitTicks / 2;
+        }
+        if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: {(on ? "SHOCKED -- Mario faces it; it holds" : "the shock over -- it floats on")} at {GlobalPosition}");
+    }
+    /// <summary>179: a shocked tick -- held at the shock spot with the tremble, the startle's squash and stretch, the eyes' glow and flicker, the tongue dropped out,
+    /// a drop of drool every DroolEvery; the touch still hurts.</summary>
+    private void ShockTick(float dt, Mario mario)
+    {
+        if (mario != null)                                                                              // it turns to stare back at him (the ref: caught, it faces Mario)
+        {
+            Vector3 d = mario.GlobalPosition - _shockPos; d.Y = 0f;
+            if (d.LengthSquared() > 1e-4f) _yaw = Mathf.LerpAngle(_yaw, MathF.Atan2(d.X, d.Z), Mathf.Clamp(ShockTurnSpeed * dt, 0f, 1f));
+        }
+        Vector3 jitter = ShockTremble > 0f ? new Vector3(Rand() - 0.5f, Rand() - 0.5f, Rand() - 0.5f) * (2f * ShockTremble) : Vector3.Zero;
+        GlobalTransform = new Transform3D(FaceBasis(_yaw, _rotX), _shockPos + jitter);
+        if (_model != null)
+        {
+            float h = ShockHopSeconds > 0f && _shockT < ShockHopSeconds ? MathF.Sin(MathF.PI * _shockT / ShockHopSeconds) * ShockHop : 0f;   // the startle: tall and thin, then back
+            _model.Scale = new Vector3(1f - 0.5f * h, 1f + h, 1f - 0.5f * h) * ModelScale;
+        }
+        EyeGlowNow = FaceGlow * (ShockEyeGlow + 0.35f * MathF.Sin(Age * 57f));                      // the flicker: 9 Hz
+        foreach (var m in _bodyMats) m.SetShaderParameter("face_glow", EyeGlowNow);
+        TongueSway(dt, 0f); TongueRest();
+        if (ShockDrool)
+        {
+            _droolT += dt;
+            if (_droolT >= DroolEvery) { _droolT -= DroolEvery; (_drool ??= new DroolPool(this)).Drip(MouthPoint, GlobalTransform.Basis, FacesPlusZ, Rand(), Rand(), Rand()); }
+        }
+        if (TouchHurts && mario != null) TouchCheck(mario);
+    }
+    /// <summary>179: the black smoke the Boo comes up through (Galaxy's Bomb Boo: a burst of dark puffs round it at the floor) -- a one-shot emitter at the spot,
+    /// freed when its puffs are gone.</summary>
+    private void FireRiseSmoke(Vector3 at)
+    {
+        if (RiseSmokePuffs <= 0 || !IsInsideTree()) return;
+        var p = new GpuParticles3D { Name = Name + "RiseSmoke", TopLevel = true, Amount = RiseSmokePuffs, Lifetime = RiseSmokeSeconds, OneShot = true, Explosiveness = 0.9f, FixedFps = 60,
+            VisibilityAabb = new Aabb(new Vector3(-5f, -2f, -5f), new Vector3(10f, 8f, 10f)) };
+        var pm = new ParticleProcessMaterial
+        {
+            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = 0.45f * RiseSmokeSize, Direction = Vector3.Up, Spread = 75f,
+            InitialVelocityMin = 1.2f * RiseSmokeSize, InitialVelocityMax = 2.6f * RiseSmokeSize, Gravity = new Vector3(0f, -0.6f, 0f), DampingMin = 2.2f, DampingMax = 3f,
+            ScaleMin = 0.8f * RiseSmokeSize, ScaleMax = 1.4f * RiseSmokeSize, LifetimeRandomness = 0.3f, AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -70f, AngularVelocityMax = 70f
+        };
+        // the ramp's colour reaches the particle shader raw (no sRGB decode: a 0.09 grey drew as a 0.33 grey), so it is given in linear
+        Color lin = RiseSmokeColor.SrgbToLinear(); lin.A = RiseSmokeColor.A;
+        var ramp = new Gradient();
+        ramp.SetColor(0, lin); ramp.SetColor(1, new Color(lin.R, lin.G, lin.B, 0f));
+        ramp.AddPoint(0.45f, lin);
+        pm.ColorRamp = new GradientTexture1D { Gradient = ramp };
+        p.ProcessMaterial = pm;
+        var mat = new StandardMaterial3D
+        {
+            ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles,
+            VertexColorUseAsAlbedo = true, AlbedoTexture = SmokeTexture, CullMode = BaseMaterial3D.CullModeEnum.Disabled
+        };
+        p.DrawPass1 = new QuadMesh { Size = new Vector2(1.4f, 1.4f), Material = mat };
+        p.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        p.Finished += p.QueueFree;
+        GetParent().AddChild(p);
+        p.GlobalPosition = at + Vector3.Up * 0.4f; p.Emitting = true;                                  // a little off the floor: the puffs' lower halves were cut by it
+        RiseSmokeFired = true;
+    }
+
+    /// <summary>179: the shocked Boo's DROOL (the Galaxy ref: glossy grey drops about the mouth) -- a sphere each, DroolColor with the light's highlight and a little
+    /// light of its own for the dark arena, dribbling from the mouth: each clings to a point about the mouth growing to size, then falls under DroolGravity drifting
+    /// a little outward, shrinking away over its last third. Pooled under a world-fixed node of the Boo's; the pool ticks on after the shock so the last drops fall.</summary>
+    private sealed class DroolPool
+    {
+        private sealed class Drop { public MeshInstance3D Mi; public Vector3 Pos, Vel, Cling; public float Age, ClingFor, Life, Size = 1f; public bool Live, Falling; }
+        private readonly SmsBombBoo _boo; private readonly Node3D _root; private readonly List<Drop> _drops = new(); private readonly SphereMesh _mesh; private readonly StandardMaterial3D _mat;
+        public int Made { get; private set; }
+        public int Live { get { int n = 0; foreach (var d in _drops) if (d.Live) n++; return n; } }
+        public float LowestY { get { float y = float.NaN; foreach (var d in _drops) if (d.Live && (float.IsNaN(y) || d.Pos.Y < y)) y = d.Pos.Y; return y; } }
+        public DroolPool(SmsBombBoo boo)
+        {
+            _boo = boo;
+            _root = new Node3D { Name = "Drool", TopLevel = true }; boo.AddChild(_root); _root.GlobalTransform = Transform3D.Identity;
+            _mesh = new SphereMesh { Radius = boo.DroolRadius, Height = boo.DroolRadius * 2f, RadialSegments = 14, Rings = 8 };
+            Color c = boo.DroolColor;
+            _mat = new StandardMaterial3D { AlbedoColor = c, Transparency = BaseMaterial3D.TransparencyEnum.Alpha, Roughness = 0.12f, Metallic = 0.05f, EmissionEnabled = true, Emission = new Color(c.R * 0.3f, c.G * 0.3f, c.B * 0.3f) };
+        }
+        /// <summary>A new drop at the mouth: to one side of its middle (r2), a little under it (r3), clinging r1 x DroolClingSeconds before it falls.</summary>
+        public void Drip(Vector3 mouth, Basis b, bool facesPlusZ, float r1, float r2, float r3)
+        {
+            Drop d = null; foreach (var x in _drops) if (!x.Live) { d = x; break; }
+            if (d == null)
+            {
+                if (_drops.Count >= _boo.DroolMaxOut) return;
+                d = new Drop { Mi = new MeshInstance3D { Mesh = _mesh, MaterialOverride = _mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off } };
+                _root.AddChild(d.Mi); _drops.Add(d);
+            }
+            d.Live = true; d.Falling = false; d.Age = 0f; d.Life = _boo.DroolLife; d.ClingFor = _boo.DroolClingSeconds * r1; d.Size = 0.7f + 0.6f * r3;   // drops of 0.7..1.3 x DroolRadius (the ref's vary)
+            d.Cling = new Vector3((r2 - 0.5f) * 0.34f, -0.04f - 0.12f * r3, facesPlusZ ? 0.06f : -0.06f);   // the Boo's own frame: x its sideways, z its face
+            d.Vel = Vector3.Zero; d.Pos = mouth + b * d.Cling;
+            d.Mi.Visible = true; d.Mi.Scale = Vector3.One * (0.2f * d.Size); d.Mi.GlobalPosition = d.Pos;
+            Made++;
+        }
+        /// <summary>The drops' tick; a falling drop is gone at the floor (<paramref name="floorY"/>, NaN = none known) or at the end of its life.</summary>
+        public void Tick(float dt, Vector3 mouth, Basis b, bool facesPlusZ, float floorY)
+        {
+            foreach (var d in _drops)
+            {
+                if (!d.Live) continue;
+                d.Age += dt;
+                if (d.Falling && !float.IsNaN(floorY) && d.Pos.Y <= floorY + _boo.DroolRadius) { d.Live = false; d.Mi.Visible = false; continue; }
+                if (d.Age <= d.ClingFor) { d.Pos = mouth + b * d.Cling; d.Mi.Scale = Vector3.One * (d.Size * Mathf.Lerp(0.2f, 1f, d.ClingFor > 0f ? d.Age / d.ClingFor : 1f)); }
+                else
+                {
+                    if (!d.Falling) { d.Falling = true; Vector3 outward = facesPlusZ ? b.Z : -b.Z; outward.Y = 0f; d.Vel = (outward.LengthSquared() > 1e-6f ? outward.Normalized() : Vector3.Zero) * 0.25f + b.X * (d.Cling.X * 0.6f); }
+                    float fall = d.Age - d.ClingFor;
+                    d.Vel += Vector3.Down * (_boo.DroolGravity * dt); d.Pos += d.Vel * dt;
+                    float left = d.Life - fall;
+                    if (left <= 0f) { d.Live = false; d.Mi.Visible = false; continue; }
+                    d.Mi.Scale = Vector3.One * (d.Size * Mathf.Clamp(left / (d.Life * 0.33f), 0.05f, 1f));
+                }
+                d.Mi.GlobalPosition = d.Pos;
+            }
+        }
+        public void HideAll() { foreach (var d in _drops) { d.Live = false; d.Mi.Visible = false; } }
     }
     /// <summary>The tongue stretched from the mouth to <paramref name="hand"/>: its +Z along the line, scaled to the length, its width kept.</summary>
     private void TongueTo(Vector3 hand)
@@ -268,23 +510,42 @@ public partial class SmsBombBoo : Node3D
         if (_boostLeft > 0f) _boostLeft -= dt;
         if (_grace > 0f) _grace -= dt;
         var mario = MarioNow();
+        _drool?.Tick(dt, MouthPoint, GlobalTransform.Basis.Orthonormalized(), FacesPlusZ, _floorY);   // 179: the drops out there fall on, shocked or not, to the floor
         switch (State)
         {
             case Phase.Rising:
             {
                 float k = RiseSeconds > 0f ? Mathf.Clamp(_t / RiseSeconds, 0f, 1f) : 1f;
-                SetScaleK(Mathf.Max(0.01f, Mathf.SmoothStep(0f, 1f, k)));
-                if (float.IsNaN(_floorY)) { _floorY = FloorUnder(GlobalPosition); _base = new Vector3(GlobalPosition.X, (float.IsNaN(_floorY) ? GlobalPosition.Y : _floorY) + BaseLiftOverFloor, GlobalPosition.Z); _spawnY = GlobalPosition.Y; }
-                GlobalPosition = GlobalPosition with { Y = Mathf.Lerp(_spawnY, _base.Y, Mathf.SmoothStep(0f, 1f, k)) };
+                if (float.IsNaN(_floorY))
+                {
+                    Vector3 spot = GlobalPosition;
+                    _floorY = FloorUnder(spot); _base = new Vector3(spot.X, (float.IsNaN(_floorY) ? spot.Y : _floorY) + BaseLiftOverFloor, spot.Z);
+                    _spawnY = spot.Y - (RiseFromUnder ? SpawnDepth : 0f); RiseStartY = _spawnY;        // 179: it starts under the floor and comes up through it
+                    if (RiseFromUnder) GlobalPosition = spot with { Y = _spawnY };
+                    if (RiseSmoke) FireRiseSmoke(new Vector3(spot.X, (float.IsNaN(_floorY) ? spot.Y : _floorY) + 0.05f, spot.Z));
+                }
+                float s = Mathf.SmoothStep(0f, 1f, k);
+                TongueSway(dt, 0f);
+                if (RiseFromUnder) SetScaleK(Mathf.Lerp(RiseScaleFrom, 1f, s), 1f); else SetScaleK(Mathf.Max(0.01f, s), s);
+                GlobalPosition = GlobalPosition with { Y = Mathf.Lerp(_spawnY, _base.Y, s) };
                 FaceMario(mario, dt);
-                if (k >= 1f) { State = Phase.Drifting; _t = 0f; SetScaleK(1f); _wait = WaitTicks / 2; NextGoal(); }
+                if (k >= 1f) { State = Phase.Drifting; _t = 0f; SetScaleK(1f, 1f); _wait = WaitTicks / 2; NextGoal(); }
                 break;
             }
             case Phase.Drifting:
             {
                 if (ExpireSeconds > 0f && _t >= ExpireSeconds) { Vanish(); return; }
+                // 179: looked at -> the shock; shocked, it holds where it hangs until he has looked away long enough
+                LookedAtNow = LookShock && mario != null && LookedAt(mario);
+                if (Shocked)
+                {
+                    _shockT += dt; _lookAwayT = LookedAtNow ? 0f : _lookAwayT + dt;
+                    if (_shockT >= ShockMinSeconds && _lookAwayT >= LookAwaySeconds) SetShock(false);
+                }
+                else if (LookedAtNow) SetShock(true);
+                if (Shocked) { ShockTick(dt, mario); break; }
                 Vector3 p = GlobalPosition;
-                Vector3 basePos = new Vector3(p.X, _base.Y, p.Z);
+                Vector3 basePos = new Vector3(p.X, _base.Y, p.Z); Vector3 base0 = basePos;
                 if (SeeksMario)
                 {
                     if (mario != null)
@@ -321,7 +582,7 @@ public partial class SmsBombBoo : Node3D
                 float nx = FlyAngBase - FlyAngMax * MathF.Cos(ph);
                 _rotX = MathF.Abs(nx - _rotX) <= 5f ? nx : Lerp(_rotX, nx, 0.2f);
                 GlobalTransform = new Transform3D(FaceBasis(_yaw, _rotX), basePos + Vector3.Up * ((_flyCur + _bob) / U));
-                TongueRest();
+                TongueSway(dt, dt > 1e-5f ? new Vector2(basePos.X - base0.X, basePos.Z - base0.Z).Length() / dt : 0f); TongueRest();
                 if (TouchHurts && mario != null) TouchCheck(mario);
                 break;
             }
@@ -405,6 +666,7 @@ public partial class SmsBombBoo : Node3D
     public bool Grab(Mario mario)
     {
         if (State != Phase.Drifting || _grace > 0f || mario == null) return false;
+        SetShock(false);                                                                                 // 179: grabbed, the shock is over
         _mario = mario; _marioRidKnown = false;
         State = Phase.Carried; _t = 0f; _boostLeft = 0f; _held = 0f; _settle = 0f;
         Vector3 rel = GlobalPosition - mario.GlobalPosition;
@@ -491,6 +753,7 @@ public partial class SmsBombBoo : Node3D
         // the sound node plays out on its own: the Boo's visuals go now, the node a moment later
         if (_model != null) _model.Visible = false;
         if (_tongue != null) _tongue.Visible = false;
+        _drool?.HideAll();
         SetPhysicsProcess(false);
         if (IsInsideTree()) GetTree().CreateTimer(2.0).Timeout += QueueFree; else QueueFree();
     }
