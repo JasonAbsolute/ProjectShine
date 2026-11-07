@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-06 18:32 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-06 21:45 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1223,8 +1223,12 @@ HEAD (a new SmsHeadLook modifier: left, right, ahead, the shoulders following; h
 (7 stood them too close) with the two-shot's camera back for it. SMS 176: CUSTOM ANIMATIONS -- the look-around is a real clip now, Mario's
 "where am I?" (ma_lookabout: left, right, then up with a shrug), and on the cut to the stand-off he drops into a BATTLE STANCE from Jaysonn's sprite refs
 (ma_battle_stance_in, then the ma_battle_stance loop, fists closed) and holds it until the fight; the clips are baked from pose scripts by tools/anim/bake_anim.gd
-(assets/Mario/Anims, README there) and sit in Mario's AnimationPlayer (Player.tscn) to edit like any other. Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `9c4ffba` ("SMS 176: the King Boo REMATCH, part 20 -- CUSTOM ANIMATIONS: Mario's \"where am I?\" look-around and his BATTLE STANCE as real clips, baked from pose scripts";
+(assets/Mario/Anims, README there) and sit in Mario's AnimationPlayer (Player.tscn) to edit like any other. SMS 176b: the stance turns his WHOLE
+body (hips and legs, as the sprites) and he HOLDS it after the fight starts until the player's first input; the head finds King Boo over the turned chest.
+Further passes re-point this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `946e1e9` ("SMS 176b: the King Boo REMATCH, part 20b -- the battle stance turns his whole BODY (as the sprites), and he HOLDS it after the fight starts until the player's first input";
+  assets/Mario/Anims/ ma_battle_stance / ma_battle_stance_in .pose.json + .tres, assets/Sms/SmsHeadLook.cs, assets/Mario.cs, assets/Sms/Rematch/SmsRematchIntro.cs) on the 176 commit
+  ("SMS 176: the King Boo REMATCH, part 20 -- CUSTOM ANIMATIONS: Mario's \"where am I?\" look-around and his BATTLE STANCE as real clips, baked from pose scripts";
   assets/Mario/Anims/ NEW (README.md, ma_lookabout / ma_battle_stance_in / ma_battle_stance .pose.json + .tres), tools/anim/bake_anim.gd NEW (+ .uid), assets/Player.tscn,
   assets/Mario.cs, assets/Sms/Rematch/SmsRematchIntro.cs) on the 175 commit
   ("SMS 175: the King Boo REMATCH, part 19 -- Mario LOOKS ABOUT with his HEAD (a new look-around), King Boo surfaces 12 m out";
@@ -1263,9 +1267,11 @@ HEAD (a new SmsHeadLook modifier: left, right, ahead, the shoulders following; h
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 42 commits past `feature/sounds`, 64 since `main`. ~1.2 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 44 commits past `feature/sounds`, 66 since `main`. ~1.2 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 176b: in the stance Mario's whole body is turned three-quarters to the camera (hips and legs too) and he KEEPS the stance after the fight starts
+  until you touch the stick or a button (StanceHoldUntilInput on the intro node); his head finds King Boo over the turned chest.
 - To try 176: the look-around is a real clip (ma_lookabout: a glance left, right, then up with a shrug) and on the cut to the stand-off Mario drops into
   a BATTLE STANCE (fists up, crouched, bouncing) until the fight starts. Open assets/Player.tscn -> AnimationPlayer -> the Animation panel to scrub or edit
   the three clips, or edit assets/Mario/Anims/<name>.pose.json and re-bake (README.md there). Intro knobs: LookClip, LookClipSpeed, StanceInClip, StanceClip.

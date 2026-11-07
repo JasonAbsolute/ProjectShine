@@ -12593,3 +12593,47 @@ the frame draws) with the fists closed; the two-shot and the fight as 175.
 bladed guard, left foot forward); the shrug's hands are open at shoulder height (the game's palms-up pose would need the hand bones turned -- a key
 away in the editor); the stance's hands are fists via `SmsHandTable` (not a knob); the head tracks King Boo through the stance. Knobs: the intro
 (`LookClip`, `LookClipSpeed`, `LookSeconds`, `StanceInClip`, `StanceClip`), and every number in the two pose scripts.
+
+### 176b -- the King Boo REMATCH, part 20b: the battle stance turns his whole BODY (as the sprites), held after the fight starts until the player's first input (feature/kingboo-rematch, code `946e1e9`)
+
+**Jaysonn:** "ok close! but i think mario should turn his body like in the sprites also just a finer detail. and lets have him hold the fight pose
+until input from the player happens then he goes back to normal".
+
+**The body's turn** (`assets/Mario/Anims/ma_battle_stance*.pose.json` -> `.tres`, re-baked): 176 turned only the chest (30). Now `center` -- the root
+of hips, legs, chest and head -- turns 35 degrees to his right (`["up", -35]`), the chest 10 more on top (45 in all), so his left shoulder and left
+foot lead and his chest is three-quarters to the side camera, as in the sprite sheets; the head turns 45 back onto the enemy in the clip (in the
+cutscene the tracking owns it); the front foot's toes turn 25 toward the enemy. The legs' swings are about the WORLD axes, so the front leg still
+reaches toward the enemy while the hips face off to the side -- the stance came out wider front to back (43 units; 23 before). Both ankles still sit
+where the idle's do (9.1 / 9.2 vs 9.0 / 8.8). The drop-in's halfway key turns 15 on the way. The baker's read-back: the head's yaw -1 (onto the
+enemy through the body's turn), feet z +14 / -29.
+
+**The head over a turned chest** (`SmsHeadLook.cs`): 176's `Track` measured the yaw from the BODY's forward to the target and applied it to the head
+from its rest under the chest -- right while the chest faces where the body does, 30 degrees off once the stance turned the chest (the drive had read
+the clip's head, not the drawn one, and missed it). Now the yaw is measured from where the clip's pose has the head's rest looking (the parent's
+posed basis times the head's rest, times the head's own forward from the bind pose, `_headFwdLocal`) to the target, flat, and the pitch from that
+rest forward's elevation to the target's; `HeadTarget` pitches about the LEFT of that rest forward (a pure raise of the gaze whichever way the chest
+faces) and then yaws about the skeleton's up; `MaxPitch` 65 (the pitch counts from under the leaning chest: the stance's 18 forward + 37 up to King
+Boo = 55). The drive now reads the DRAWN head (`DrawnGlobalPoseWith` at the modifier's yaw / pitch): on King Boo's body to the degree (yaw 0 / pitch
+24 against 0 / 24 in skeleton space). The chest share is 0 while the stance runs (the intro sets it; the stance owns the chest).
+
+**The hold** (`Mario.cs`): `SmsHoldDemoClipUntilInput()` -- called as the cutscene hands the controls back -- keeps the demo clip on until the player's
+FIRST input. In `_PhysicsProcess`, right after the CameraLocked block: while holding, if the clip is gone, the state is not idle or something took the
+tree back (a hit: TakeDamage -> SetMarioState re-activates the tree), the hold just ends; else if the stick is pushed (over 0.25) or A / B / X / Z /
+R / L / space / Z is down, the hold ends with `SmsEndDemoClip` and THAT frame runs as normal (the input is not lost); else he is held: velocity zero,
+MoveAndSlide, `idleTimer` reset to 480 so the idle wind-down never sits him down in the stance, and the frame returns (as the lock does) -- the idle
+state's per-frame `SetMarioState(idle)`, which would re-activate the tree, never runs. The camera stick does not end it. `SmsDemoHolding` reads it.
+
+**The intro** (`SmsRematchIntro.cs`): `StanceHoldUntilInput` (on): `EndCutscene` holds the stance when it ran (a skipped cutscene ends the clip as
+before); off = the idle as soon as the fight starts.
+
+**Verified** (headless drive v176-6, deleted before the commit): C2a the centre bone's forward 35 degrees to his right in the stance; the drawn head
+on King Boo's body (off by 0); crouched (head bone 79.8), the drop-in then the loop, the tree off; C2d at the fight's start +0.33 s and +0.92 s with
+no input: the demo clip `ma_battle_stance@...`, holding, the tree off, Mario at his spot in idle; the stick pushed at +1.0 s for 12 ticks: 15 ticks
+later the demo clip off, the hold off, the tree back, Mario 1.3 m on (v176-5's verdict ran at +0.5 s, before the push -- the one fail, the verdict
+moved to +1.33 s); C2c's pitch at the laugh -60 (from under the chest's lean; the bound widened to 70); 174-176's checks as before -- 9/9, no errors.
+A shot run (15 shots): the stance from the side and front three-quarter -- the body turned, the near fist forward, the fists closed, the eyes up on
+King Boo; the hold from the game camera and a close shot after the fight starts (the HUD up, the stance kept); the idle back after the stick.
+
+**Deviations:** what ends the hold is mine -- the stick or any face / shoulder button, a hit, anything that takes the tree back; not the camera stick.
+The stance's width grew with the body's turn (the pose script's hip swings are about the world axes); every number is in the script. Knobs: the intro's
+`StanceHoldUntilInput`; the clips' scripts.
