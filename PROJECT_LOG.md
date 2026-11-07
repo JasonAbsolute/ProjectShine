@@ -12822,3 +12822,58 @@ shocked Boo turns to face Mario (the ref; `ShockTurnSpeed` 0 keeps 178's facing)
 (`RiseFromUnder` off = 158's rise); `LookConeDeg` 40, a generous "facing"; the touch of a shocked Boo still hurts (the bomb it is). Knobs: SmsBombBoo (The
 tongue, The shock, The rise groups; GlowColor, BurstColor), the supply (The fog group: FogMist, FogColor, FogDisc, FogDiscRadius, FogDiscColor, EyesGlow,
 EyesDelay, EyesFadeSeconds, EyeColor, EyeSize, EyeGap, EyeHeight).
+
+### 180 -- the King Boo REMATCH, part 24: the shocked Bomb Boo WORRIES (a head shake, a lean back, a cower, a breath, sweat), the spot's eyes a little bigger, and the intro's sink is King Boo's HIDE clip -- a leap and a DIVE through the floor in a twinkle burst, a flash, a ring of ghost mist and a shock ring (feature/kingboo-rematch, code `d7dd6ba`)
+
+**Jaysonn:** "ok better lets make the eyes alittle bigger and then when mario looks at the boos they should be doing like a worrired animation not just
+frozzen. also in the cutscene when king boos goes down use the animation of him hidding. and give it effects lets make it look good"
+
+**The eyes** (`SmsBombBooSpawner.cs`): `EyeSize` 0.27 x 0.54 (179's 0.2 x 0.4), `EyeGap` 0.42, `EyeHeight` 0.16.
+
+**The worry** (`SmsBombBoo.cs`, The shock group): the Bomb Boo has no rig, so the worry is built from what it has -- its one body, its tongue, its drops.
+Shocked, on top of 179's hold, stare, tremble, eye glow, tongue drop and drool, it now SHAKES its head side to side about the stare (`WorryShakeDeg` 10
+either way on a sine at `WorryShakeHz` 3: a "no, no, no" -- the yaw added to `FaceBasis`), LEANS BACK from Mario (`WorryLeanDeg` 14: the pitch, nose up),
+COWERS (`WorryCower` 0.1: the model squashed to 0.9 of its height and pushed out half that) with a quick nervous BREATH on the cower (`WorryBreathHz` 4, +-
+30 %), and SWEATS (`WorrySweat`): beads of `SweatRadius` 0.07 x 0.7..1.3 in `SweatColor`, a pale blue-white, flung from the top of its head (+-0.55 to a
+side, 0.75 up, a little toward the face, in its frame x ModelScale) every `SweatEvery` 0.3 s, alternating sides, at 1.4-2 m/s out and 2-2.8 up, arcing out
+under the drool's gravity, 0.8 s or the floor. All of it eases in over the shock's first 0.3 s (`ease`) and is zeroed the tick the shock ends (`SetShock(false)`:
+the yaw, the lean, the scale back to ModelScale). The drool's `DroolPool` became `DropPool(boo, radius, colour, life, name)` -- `Drip` for the drool (a
+cling, then the fall), `Fling(at, vel, size)` for the sweat (falling from the start) -- two pools, both ticked every tick to the floor. Readouts
+`WorryYawDeg`, `WorryPitchDeg`, `WorrySquash` (the height as a fraction of rest), `SweatOut` / `SweatMade`.
+
+**The dive** (`SmsKingBooRematch.cs`, The intro group): 174's sink lowered the node 7 m over 1.1 s under the wait clip. The hide clip read with
+`tools/anim/probe_clip.gd` (`btelesa_hide`, 0.72 s, 21 frames at 30): the body joint at 0.7 u at frame 0, 449 u (6 m) UP at frame 6, 397 u at frame 12 and
+-788 u (10.6 m DOWN) at frame 18 -- the casino boss's hop-and-plunge into his table. Now `IntroDiveClip` (btelesa_hide, "" = 174's sink) plays at the
+sink's start at `IntroDiveClipSpeed` 0.85 (0.86 s; `PlayClip` then the SpeedScale, as the hurt clip does), the node HELD at the laugh height (`DiveTick`:
+`Position = _introTop`) so the clip itself leaps the body 6 m over the hover and plunges it 2 m under the floor, and he is hidden at the clip's length
+(`_diveLen`) -- no node lerp. `OnClipEnd` has no branch for it: the clip holds its last frame (under the floor) until then. The effects: `DiveSparkle` at
+the top of the leap (the body's first tick down, or 0.3 of the clip in) -- his `ChikaFx` twinkle emitter copied as a one-shot of `DiveSparkles` 60 stars,
+1.6-3 x, flung every way at 4-10 m/s under a light gravity; his glow swelling `DiveGlowBoost` 2.5 x through the leap's first quarter (`_glowBoost` into
+`PlaceFx`'s strength) and out (0) once the body is within a metre of the floor; and `DiveSplash` as the body comes down to `DiveSplashAt` 2.2 m over the
+floor: a FLASH on the stone (a flat additive quad of the port's radial, `DiveFlashSize` 12 m, growing 0.5 -> 1.1 and fading over `DiveFlashSeconds` 0.45,
+`DiveFxTick`), a SHOCK RING (`DiveShockRing`: the port's hamonring2_add flat, racing from 2 m out to 2.2 x the flash over 1.8 x its seconds, fading), a RING
+of ghost mist along the floor (`DiveRingPuffs` 36: the smoke ball, 2-5 m, 7-13 m/s flat, 1 s), a SPLASH of it thrown up (`DiveSplashPuffs` 28, 1.5-4 m,
+6-13 m/s, 1.1 s), the camera kicked (`DiveShake` 0.6 x the damage shake) and the vanish voice (moved from the sink's start); the puffs 30 % toward white
+from `DiveColor` (0.8, 0.7, 1). The flash and the ring are drawn over the depth: the arena's floor is a shallow dome, and a flat 12-26 m quad at the
+spot's height dipped under it further out and was cut into chunks (the first ring shot). `DiveFxTick` runs from the top of `_Process` so the flash and the
+ring finish after he is hidden; `IntroAbort` resets the glow. Readouts `DiveOn`, `DiveSparkled`, `DiveSplashed`, `DiveSplashT`, `DiveBodyTopY`, `DiveFlashUp`.
+
+**Verified** (headless drive v180-5, deleted before the commit; the cutscene played, the card skipped): C0b the cutscene's sink -- the hide clip the one
+playing through all 52 ticks of the sink, the body from the laugh's 9.27 to a top of 15.27 (6 m up), the twinkle burst fired (0.26 s in), the splash fired at
+0.68 s with the body 2.0 m over the floor, the flash still up as he was hidden; C1 the spot as 179 had it with the eyes 0.27 x 0.54; C2 / C2b / C3 / C4 as
+179; C5b 1.7 s into the shock: the head shake -10.0..10.0 deg over 1.3 s, the lean -14.0 deg, the squash down to 0.870 of its height (breathing: 0.926 at
+the read), sweat made 6 / out 3; C5 held (0.055 m), its face 0 deg off Mario at the read (the shake is +-10), the drool a drop 1.09 m under the mouth at
+most and the lowest 0.04 m over the floor, the eyes at 1.06, the tongue at 62 deg, the model's height = the squash, Mario's hp kept; C6 the shock over: the
+yaw 0, the lean 0, the scale back to 0.800, 0.012 m off the shock spot; C6b / C7 / C8 as 179 -- 13/13, no errors. v180-1 13/13 but C6b: the Boo's random
+goal took it back within LookRange of the standing Mario and it was shocked again (right: the drive now holds the look-shock off for the float check);
+v180-4 a C5 read at one instant found the drops high (the Boo hung low and its drops died at the floor in 0.3 s) -- the drop depth is read over the whole
+window. Four shot runs (11 shots each): the leap (the body tilted over the floor, the tongue out, the crown high above the head -- the clip's own stretch);
+the splash 0.2 s on (a column of lilac puffs, the floor glowing violet, big golden twinkle stars raining from the top of the leap); the ring 0.47 s on from
+above (the shock ring out to 12 m across the stone, the first run's chunks gone with the depth fix); the worried Boo close (leaning back, cowering, two
+sweat beads in the air, the drool); the 179 shots again (the spot's bigger eyes, the rise, the stare over Mario's shoulder). A shot run that produced no
+log: the project root's run_window.ps1 had gone with 179's cleanup -- copied back from ps157 for the runs and deleted again.
+
+**Deviations, all knobs:** the worry is procedural (no rig): a head shake, a lean, a cower, a breath and sweat beads (Worry* / Sweat*; the drool stays);
+the dive's node holds at the laugh height and the clip's own plunge takes him under (the clip is 0.72 s: the body crosses 16 m in 0.2 s, a blur -- its
+speed knob is there); the dive's colours are King Boo's violet-white (`DiveColor`; the "black, not purple" was the Bomb Boo's); the crown rides high over
+the head at the top of the leap for a tenth of a second (the hide clip's own stretch); the teleports in the fight still fade (the dive is the cutscene's).
