@@ -12528,3 +12528,68 @@ frame, the second (SurfaceCamAim 0.7, 22 m, 4.6 up) has it in.
 beats, angles and shares are mine (LookTurnDeg, LookUpDeg, LookChestShare, LookSeconds on the intro node; ChestShare, EaseSeconds, MaxYaw / MaxPitch
 on the modifier); the head tracking King Boo through the laugh is mine too. Knobs: the intro (SurfaceDistance, SurfaceCamSide, SurfaceCamHeight,
 SurfaceCamAim, LookTurnDeg, LookUpDeg, LookChestShare, LookSeconds, LookTurnDegPerSec).
+
+### 176 -- the King Boo REMATCH, part 20: CUSTOM ANIMATIONS -- Mario's "where am I?" look-around and his BATTLE STANCE as real clips, baked from pose scripts (feature/kingboo-rematch, code `9c4ffba`)
+
+**Jaysonn:** "did you do this new animation in code or was it done to see it in the editor as a brand new animation?" -- in code (175's modifier) --
+"yeah i want it to be an animation and new one since i want it to be more like a 'where am i' look around. and this will be a start to being able
+to do custom animations"; then, with three sprite sheets of Mario's RPG battle stance: "when it cuts to the side view of the stand off i want mario
+to do this battle stance ready".
+
+**The pipeline** (`assets/Mario/Anims/`, `tools/anim/bake_anim.gd`, both NEW): a custom clip is written as a POSE SCRIPT and baked into a real
+`Animation`. The script (`<name>.pose.json`) names a base clip and frame (the idle `ma_wait` at 0) and KEYS at times; each key poses joints by
+turns about the BODY's axes in degrees -- `up` (+ = to his left), `left` (+ = nod / tip forward, - = look up), `forward` (+ = roll toward his left
+shoulder: it swings the left arm out at a shoulder) -- and `move_up` / `move_left` / `move_forward` translations in the rig's units (he stands 117;
+`center` down 10 is a crouch). A turn is applied AT the joint, the turns in the order written about the fixed axes, and the children follow (turn the
+chest and the head rides along, then its own turn adds). Joints not named hold the base pose. The baker (headless: `godot --headless -s
+tools/anim/bake_anim.gd -- <pose.json> <out.tres>`) instances Mario's scene, reads the base pose off the base clip's own tracks, poses each key down
+the bone chains (local = parent⁻¹ · R_world · parent · base, the move added to the origin), writes the clip on the same `Armature/Skeleton3D:bone`
+paths his other clips use -- a cubic rotation key on every posed bone at every key time, one key at 0 on every other bone, position keys where a
+joint moves -- and reads the SAVED file back (`CACHE_MODE_IGNORE`: the scene holds the old clip at that path in the cache) to print the head's yaw
+and pitch and the hands' and feet's positions at each key. The baked clips sit in Mario's AnimationPlayer's library (`assets/Player.tscn`: three
+ext_resources and three `_data` entries beside the game's `models/ma_*.res`), so they show in the Animation panel and play by bare name; edit them
+there or re-bake (a bake overwrites; editor edits are not written back to the script -- one source of truth per clip). `README.md` has all of it.
+The script's words are also what the local previewer draws (`tools/projectshine/rematch157/anim176/pose_tools.py` / `pose_preview.py` on the
+Mac: the game's BMD rig + the BCK idle, stick figures front / side / top at the key times; `stance_feet.py` / `stance_arms.py` / `shrug_fit.py` fit
+joints to wrist / ankle targets) -- the bake read-backs matched the previewer's forward kinematics to 0.1 unit.
+
+**The clips.** `ma_lookabout` (3.0 s, one-shot): a beat while the laugh registers (0.2 s, the head starting left); head 50 and chest 22 to the left
+(72 of head turn), a little up, the left arm raised forward with the hand feeling out, held; the same to the right; then ahead and 16 up with a
+SHRUG -- shoulders up, arms out, forearms up, wrists at x +-31 / y 80 (the first bake had them at his cheeks: the forearm turn and pitch composed
+the other way round; the turns are now ordered pitch-then-yaw everywhere, `fix_order.py`); the head cocked 12 (roll); back toward the idle by 3.0.
+`ma_battle_stance_in` (0.45 s, one-shot): from the idle the fists come up and the left foot steps forward as the weight drops onto the stance's
+pose. `ma_battle_stance` (0.9 s, a loop ending on its first pose): the bladed guard of the sprite sheets -- `center` down 10, chest leaning 18 and
+turned 30 to his right so the left shoulder leads, head turned back onto the enemy (the tracking modifier owns it in the cutscene anyway), left leg
+forward (hip -30, knee 44, foot -14) and right back (hip 20, knee 24, foot -44) so both ankles sit where the idle's do (9.3 / 7.9 vs 9.0 / 8.8; the
+stance 23 units front to back), the left fist out at chin height (wrist x 15, y 67, z 27), the right in at the chest (x -20, y 61, z 1), a bounce
+(3 units up at 0.45 s, the fists pumping). The first bake had both fists at his eyes; `stance_arms.py` re-fit them.
+
+**Playing them** (`Mario.cs`): `SmsPlayDemoClip(name, speed, thenPlay)` plays a clip OUTSIDE the AnimationTree -- the tree off, the player on it,
+the way the sit / sleep / hang code already does -- with an optional clip to go on with when it ends (the `AnimationFinished` hook: the drop-in
+hands over to the loop); `SmsEndDemoClip` stops the player and turns the tree back on; `SmsClipLength`; readouts `SmsDemoClipNow` (name@position/
+length), `SmsDemoClipOn`, `SmsTreeActive`. While `CameraLocked` the state loop freezes him and touches no clip, so a demo clip holds. The two stance
+clips are in `SmsHandTable` with hand 2 -- `SmsCurrentClip` reads the player's clip while the tree is off, so the FIST meshes (ma_hnd3) show, as in
+the refs.
+
+**The intro** (`SmsRematchIntro.cs`): the look-about plays `LookClip` (`ma_lookabout`, at `LookClipSpeed`) for its length (`LookSeconds` 0 = the
+clip's), the body standing where he landed; a missing clip falls back to 175's head modifier (fixed 60 / 10 / 0.3). On the cut to the two-shot
+`Surface()` ends it and plays `StanceInClip` then the `StanceClip` loop (`ma_battle_stance_in` / `ma_battle_stance`; "" or missing = he stands):
+Mario crouches into the guard and bounces in it through King Boo's rise, laugh and sink, his body turning to King Boo and his head on him
+(SmsHeadLook.Track, as 175); `EndCutscene` (the fight, or a skip) ends the demo clip: the tree's idle as the game camera returns. Readouts
+`LookClipUsed`, `LookLength`, `StanceUsed`. 175's `LookTurnDeg` / `LookUpDeg` / `LookChestShare` are gone (the clip has them).
+
+**Verified** (headless drive v176-4, deleted before the commit; 175's drive with the clip checks): C1 the cutscene within a second of the landing;
+C2 `ma_lookabout` is in his player (3.00 s), `LookClipUsed`, the demo clip `ma_lookabout@...` seen with the tree off, its position reaching 2.98 s,
+his drawn head (the head bone's global pose against its rest, read outside the modifier pass -- the clip's own pose) turning -86..+84 degrees and
+17 up over it while his body's yaw held (180..180), then facing King Boo; C2a on the cut the demo clip `ma_battle_stance_in`, then the
+`ma_battle_stance` loop through the laugh with the tree off, his head bone at y 79.8 against the idle's 92.6 (crouched), and at the fight's start
+the demo clip off and the tree back; C2b / C2c 175's head-axes and tracking checks (37 degrees up on King Boo, off after); C3 / C4 / C5 174's surface
+(12.0 m, 1.60 s), laugh (3.42 s, once), sink (1.12 s) and fight (rising at BooSpawn, FightReady, one laugh) -- 8/8, no errors, twice (before and
+after the fists). Four shot runs (13 shots each): the look-about left, right, shrug and cocked from the intro's camera; the stance from the drive's
+own close camera (side and front three-quarter -- the intro re-takes its camera every `_Process`, so the drive's `_Process` takes it back before
+the frame draws) with the fists closed; the two-shot and the fight as 175.
+
+**Deviations, all editable:** the clips are mine -- the game has no look-around or battle stance; the stance follows Jaysonn's sprite sheets (a
+bladed guard, left foot forward); the shrug's hands are open at shoulder height (the game's palms-up pose would need the hand bones turned -- a key
+away in the editor); the stance's hands are fists via `SmsHandTable` (not a knob); the head tracks King Boo through the stance. Knobs: the intro
+(`LookClip`, `LookClipSpeed`, `LookSeconds`, `StanceInClip`, `StanceClip`), and every number in the two pose scripts.
