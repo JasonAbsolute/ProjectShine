@@ -12744,3 +12744,81 @@ the teeth as the other -- Jaysonn's pick pending ("im not sure yet"): CopyTell /
 gap after a hit's teleport; the frost hit's look (SplashPuffs, RingPuffs, HitShards, FlashSize, FlashSeconds, PopSeconds, HitShake); the mist's density
 untouched (PuffAlpha). Knobs: SmsBombBoo (JumpSwingLift, JumpSwingSeconds), King Boo (TeleportAfterHit, MaxCopies, CopyTell, CopyCrownColor), the breath
 (HitShake), the ice (the five above).
+
+### 179 -- the King Boo REMATCH, part 23: the Bomb Boo's EXPRESSIONS -- its tongue MOVES, a Boo Mario LOOKS AT is SHOCKED (it freezes, stares back, trembles and DROOLS), and it spawns Galaxy's way (a BLACK pool with GLOWING EYES, then up through the floor in black smoke); black, not purple (feature/kingboo-rematch, code `2bba752`)
+
+**Jaysonn** (177): "make the boo bombs more expressive thier tounge just kinda staticlly hangs and it needs to have motion like everything else and we need
+effects for the boo bomb like in mario galaxy - like when mario looks at them they get shocked and kinda stay in place have drool effects comming from
+thier mouth i put some refs in the folder called BooBombRefs in the refs folder ... when spawnning in they should have that mist effect with the eyes
+glowing before they spawn in. just make it more like galaxy and make it look good and fun!" -- and now: "yeah do the bomb boo effects and keep it black
+not purple". The refs (Ref/BooBombRefs): the shocked Boo with grey drool bubbles about its mouth; a flat dark pool on the floor with two yellow eyes in it;
+the Boo rising out of black puffs; the swing with a dark cloud and eyes behind.
+
+**The tongue** (`SmsBombBoo.cs`, The tongue group): `TongueRest` was a fixed 35-degree droop. Now `TongueSway` drives a droop and a yaw the rest follows at
+`TongueFollow` 9 a second: the droop bobs `TongueSwayDeg` 7 either way and the tongue wags `TongueWagDeg` 12 side to side on sines at about `TongueWagHz` 0.9
+(each Boo at its own phase), lags behind a turn (`TongueTurnLag` 0.15 degrees for every degree a second the body turns, opposite to it) and tucks under as
+it drifts (`TongueMoveTuckDeg` 8 at a full 1.4 m/s). The yaw turns the tongue about the Boo's up, the droop about its right; the root stays at TongueOffset.
+
+**The shock** (`SmsBombBoo.cs`, The shock group): a drifting Boo that Mario FACES -- the line to it within `LookConeDeg` 40 (the whole cone) of his
+`SmsFacingDir`, `LookRange` 12 m or nearer, flat -- is SHOCKED (`SetShock`): it holds where it hangs (`_shockPos`; the drift, the fly height, the bob
+and the tilt frozen), startles with a squash-and-stretch hop (`ShockHop` 0.22 over `ShockHopSeconds` 0.35: tall and thin, then back), TREMBLES
+(`ShockTremble` 0.035 m of jitter a tick), turns to STARE BACK at him (`ShockTurnSpeed` 8), its eyes burn `ShockEyeGlow` 2.4 x `FaceGlow` with a 9 Hz
+flicker (face_glow on the body's materials only), its tongue drops out to `ShockTongueDroopDeg` 62 and quivers, and it DROOLS: `DroolPool` -- spheres of
+`DroolRadius` 0.11 x 0.7..1.3 (the ref's vary), `DroolColor` a pale blue-grey (0.8, 0.84, 0.9) with a 0.3 emission so they show in the dark arena and the
+light's highlight, pooled (`DroolMaxOut` 12) under a world-fixed node of the Boo's -- a drop every `DroolEvery` 0.2 s at a point about the mouth (to a
+side, a little under, a little out, in the Boo's frame), clinging there up to `DroolClingSeconds` 0.35 while it grows, then falling under `DroolGravity`
+5.5 drifting a little outward, shrinking over its last third, gone at the floor (the Boo's `_floorY` + its radius; the first run's drops fell 3 m through
+the stone) or after `DroolLife` 1.1 s. It stays shocked at least `ShockMinSeconds` 0.8 and until he has looked away `LookAwaySeconds` 0.6; then the float
+goes on from the shock spot (a half wait, the next goal); a grab ends it (`Grab` -> `SetShock(false)`); the touch still hurts (`TouchCheck` in
+`ShockTick`). `LookShock` off = 178's Boo. `ShockSe` empty (no sound: nothing in the Boo's set fits). Readouts `Shocked`, `ShockSeconds`, `LookedAtNow`,
+`Shocks`, `DroolOut` / `DroolMade` / `DroolLowestY`, `EyeGlowNow`, `TongueYawDeg` / `TonguePitchDeg` / `TongueRootPoint`.
+
+**The rise** (`SmsBombBoo.cs`, The rise group): `RiseFromUnder` -- on its first tick the Boo drops `SpawnDepth` 1.3 m under its spawn point (the floor
+hides it: at scale 0.8 x 0.75 its top is 0.46 m under the stone) and comes UP THROUGH THE FLOOR over `RiseSeconds`, growing from `RiseScaleFrom` 0.75 to
+full, solid from the start (`SetScaleK(k, alpha)`; off = 158's scale-from-nothing and fade), while `FireRiseSmoke` bursts BLACK SMOKE at the spot: a
+one-shot emitter 0.4 m off the floor (the puffs' lower halves were cut by it), `RiseSmokePuffs` 22 of `RiseSmokeSize` 1.5 (0.8..1.4 x the game's dark
+smoke ball, `SmokeTexture`), flung up and out at 1.2..2.6 m/s under a light gravity and damping, turning, over `RiseSmokeSeconds` 1.1, `RiseSmokeColor`
+(0.09, 0.09, 0.11) at 0.95 fading from 45 %, no shadow, freed when done. Readouts `RiseStartY`, `RiseSmokeFired`, `OpacityNow`.
+
+**Black, not purple** (`SmsBombBoo.cs`): the rim glow `GlowColor` a cool grey (0.22, 0.22, 0.28) -- 158-178's violet (0.35, 0.1, 0.55); the burst puff
+`BurstColor` a dark smoke grey (0.25, 0.25, 0.28) -- 158-178's violet (0.55, 0.2, 0.85). The body itself was already a near-black (the maroon sheet x the
+dark vertex colours x Lift 2) and reads black in the shots.
+
+**The spot** (`SmsBombBooSpawner.cs`, The fog group): black. A dark POOL on the floor (`FogDisc`: a flat quad of `FogDiscRadius` 1.7 with the port's soft
+radial as its alpha, `FogDiscColor` black at 0.88, 3 cm over the floor, in over its first quarter second), a thin low veil of black mist rolling off it
+(`FogMist`; `FogColor` (0.03, 0.03, 0.035) at 0.7: 158's column of 40 violet puffs became 18 wisps of 0.8..1.4 at 0.1..0.35 m/s, 1 s each -- the column hid
+the pool and the eyes -- and they cast no shadow now: the puffs' shadow drew a hard grey disc on the floor), and `EyesDelay` 0.3 s in two GLOWING YELLOW
+EYES in it (`EyesGlow`: two quads of `EyeSize` 0.2 x 0.4 on the soft radial, additive `EyeColor` (1, 0.82, 0.08), `EyeGap` 0.34 apart, `EyeHeight` 0.14
+over the floor, in over a fifth of a second, RenderPriority 10 so they draw after the mist and show through it) that FACE MARIO (`SpotTick`: the pair's
++Z at him every tick) and pulse 8 % at 5 Hz. When the Boo comes up (`FadeTick`) the eyes go out over `EyesFadeSeconds` 0.3 and the pool over the Boo's
+`RiseSeconds`; `StopFog` (the field cleared) hides both at once. A particle colour ramp reaches the particle shader RAW -- no sRGB decode -- so a 0.09
+grey drew as a 0.33 grey (and 158's violet mist was brighter than its (0.12, 0.03, 0.2) said): both ramps (the mist's, the rise smoke's) are now given
+in linear (`SrgbToLinear`), the alpha kept. Readouts `Fogging`, `FogTime`, `EyesShown` / `EyesAlpha` / `EyesPoint` / `EyesOffMarioDeg`, `DiscAlpha`.
+`SpawnBoo` returns the Boo (its RiseSeconds times the pool's fade).
+
+**Verified** (headless drive v179-4, deleted before the commit; the card skipped, the cutscene, King Boo's moves off, the supply held to one Boo): C1 the
+spot 0.55 s in: the fog and pool colours black, the pool at full alpha, the eyes shown (alpha 1) at the floor + 0.14 facing Mario (0.0 deg off), yellow; C2
+two ticks after the spawn: the Boo at y -0.10 under the floor at 1.00 (its start -0.10, SpawnDepth 1.3), opacity 1.00, the smoke fired, Rising; C2b 12 ticks
+into the drift: y 2.57, the eyes gone (alpha 0.00), the pool gone (0.00), full size; C3 3 s of the float with the look-shock held off (Mario stands facing
+the middle, where the spot is): the tongue's yaw -21.8..10.4 deg and its droop 29.5..47.7 deg over the 3 s, its root 0.000 m off the mouth, no shock; C4
+Mario put 6 m off and turned to face it with the stick (10 ticks at most, then the exact aim -- the drive's stick is 8-way): shocked the tick he faced it
+(his facing 18 deg off, inside the cone), LookedAtNow, one shock; C5 1.7 s on: held (moved 0.045 m flat / 0.016 up: the tremble), its face 0 deg off
+Mario, drool made 8 / out 3 / the lowest 1.40 (the mouth 2.19, the floor 1.00 -- none through it), eye glow 1.06 (rest 0.5), the tongue at 62.2 deg,
+the hop over (the model's scale y 0.800), Mario's hp 8 -> 8 and no touch; C6 Mario put 13.5 m off: 1.1 s later the shock over, the eyes at 0.50, the body
+0.043 m off the shock spot (the float resumed); C6b 3 s on: moved 1.93 m, a goal reached, the drool gone (0 out); C7 faced again (5 m), shocked, X beside
+it (BombGrabRadius - 0.8): grabbed, Carried, the shock ended; C8 the colours: the mist, the pool and the rise smoke dark, the rim and the burst grey, no
+violet -- 11/11, no errors. v179-1: 8/11 -- two drive expectations (C2 read the Boo a tick before its first tick; C3 counted a shock from before the
+look-shock was held off, Mario having stood facing the spot) and the drops falling through the floor (fixed: gone at the floor); v179-2 11/11; v179-3 (the
+stick cut to 10 ticks, Mario's hp checked) and v179-4 (the stare-back, its face checked) 11/11. Five windowed shot runs (7 shots each): the dark pool with
+the two yellow eyes in it facing the camera and thin mist over it; the Boo half up through the floor in black smoke and nearly up; the tongue close in
+front of the face; the shocked Boo over Mario's shoulder, staring back, drops falling; the drool close (glossy drops on the tongue and below it); the
+stand-off from the side. Run an: the drive's 24 ticks of stick ran Mario into the Boo (the damage stars, the LIFE meter) and the Boo froze facing away --
+the stick cut, the stare-back added. A hard grey disc of 1.7 m radius lay on the floor at the spot in every shot: the mist off (run ap) and the pool off
+(run aq) each left it -- it is KING BOO's shadow (he hovers 8.5 m over the spot; his tongue hangs into the top of the frame), untouched. The smoke
+read grey in run ao (the raw ramp): black after the linear ramps (run ar).
+
+**Deviations, all knobs:** the drool is drops (the Galaxy ref's bubbles), not the Piranha's strands -- 0.22 m spheres that read from across the arena; the
+shocked Boo turns to face Mario (the ref; `ShockTurnSpeed` 0 keeps 178's facing); no shock sound (`ShockSe`); the body comes up through the floor
+(`RiseFromUnder` off = 158's rise); `LookConeDeg` 40, a generous "facing"; the touch of a shocked Boo still hurts (the bomb it is). Knobs: SmsBombBoo (The
+tongue, The shock, The rise groups; GlowColor, BurstColor), the supply (The fog group: FogMist, FogColor, FogDisc, FogDiscRadius, FogDiscColor, EyesGlow,
+EyesDelay, EyesFadeSeconds, EyeColor, EyeSize, EyeGap, EyeHeight).
