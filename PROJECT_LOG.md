@@ -13133,3 +13133,36 @@ logs deleted.
 (its first 4.6 s) and the long laugh is not heard in the intro (`IntroLaughSe` "" puts it back); the chuckle is cut at the dive rather than played out
 (`IntroLaughStopsAtDive`); the pitch is the casino's (`IntroLaughPitch` 1.1-1.2 for higher still); the intro is 1.2 s longer. Next (Jaysonn): the freeze
 breath "still feels like I'm unfairly getting hit", and a little King Boo-themed cutscene when he splits into two, and into three.
+
+### 187 -- the King Boo REMATCH, part 31: the FREEZE BREATH made fair -- only the DENSE cold freezes (a puff's ball shrinks with its own fade and is gone past three quarters of its life: the thin edge and the fading tail no longer hit; the ball 0.3 of the puff, the core's size), a jump clears it at 1 m, and the ICE is a shield (a hit or a shock through the frost shatters it and does nothing else: no knockdown, no HP) (feature/kingboo-rematch, code `471b32d`)
+
+**Jaysonn:** "also the freeze breath needs to be tweaked still feels like im unfairly getting hit"
+
+**Why it felt unfair** (`SmsGhostBreath.cs`, 167 / 172): the cold that froze was every live puff's ball -- `HitRadiusK` 0.35 of a puff that grows
+`PuffSizeStart` 3 -> `PuffSizeEnd` 8 m over its `PuffSeconds` 1.5 life -- for the WHOLE life, while the puff itself fades out over its last third (the
+`Fade` ramp: alpha in over the first tenth, 0.75 of full by two thirds, 0 at the end). So the biggest ball (2.8 m) belonged to a puff you could barely see,
+25-33 m out, and the mist's thin blue edge froze as surely as its white core. And a freeze was a set-up: `SmsDamageExec` / `TakeShock` thawed a frozen
+Mario and let the hit LAND (the knockdown, the HP) -- at 185's pace a frozen Mario was licked or shocked before he thawed.
+
+**The cold** (`SmsGhostBreath.cs`): `HitRadius(age)` = `PuffSize(age)` x `HitRadiusK` 0.3 (0.9 -> 2.4 m: the dense white core, `CoreSizeStart` 1.6 ->
+`CoreSizeEnd` 4.5 m across, is what freezes) x the puff's own fade (`PuffFade`, the ramp's curve; `HitFollowsFade`), and 0 past `HitLifeK` 0.75 of its life
+(the freeze's reach `BreathSpeed` 22 x 1.5 x 0.75 = 25 m; the mist rolls on harmless to 33); `ColdOn` and `NearestCold` use it. `HitHeight` 1.2 -> 1.0, and
+King Boo's `BreathHitHeight` (copied onto each breath in `BreathTick`) the same: a held jump has his feet over 1 m for 0.55 s of its arc, over 1.2 for 0.5.
+
+**The ice** (`Mario.cs`): `SmsFrostShields` (default on, beside `SmsFrostPoseClip`) -- in `SmsDamageExec` and `TakeShock` a frosted Mario's ice shatters
+(`SmsThaw`) and the method returns: no knockdown, no HP, no electric damage. The freeze is the penalty -- a second standing still -- not a set-up. Off =
+167's: the hit thaws him and lands. (The patch kept Mario.cs's CRLF working copy byte for byte; git normalises to LF as ever.)
+
+**Verified** (headless drive v187-2, deleted before the commit): C14 -- after 185's lightning checks, Mario idle again, the breath called by hand
+(`DriveBreath`: `BeginBreath`) with Mario standing 12.8 m off: the breath's `HitLifeK` 0.75, `HitRadiusK` 0.3, `HitHeight` 1, its ball at half a puff's
+life 1.35 m against the full 1.65, none at 0.9 of its life; the dense cold FROZE him 1.26 s into the sweep (9.8 m from the mouth, sweep 0.79); 20 ticks into
+the freeze `TakeDamage` from King Boo's point: "[SMS frost] the ICE took the hit -- shattered, no damage", Mario idle, not hurt, HP 7 before and after;
+the breath over, King Boo back in the wait; 186-179's checks as before -- 26/26, no errors. v187-1 passed C14 and failed 179's C5 / C6 -- the drive, not
+the game: the trace 185 left in showed Mario in `sideFlipTurning` (the stick's U-turn) at the aim, settling 25 degrees off the Boo once the turn finished,
+so the Boo saw him look away and the shock lapsed (185's unexplained lapse, run cn, was this); the drive now keeps his aim on the Boo through the shock
+(every 10 ticks), as a player's stick would. No shot run (a hit rule). The clean rebuild 0 errors; the drive and the logs deleted.
+
+**Deviations, all knobs:** the doc's "a hit freezes Mario for one second" stands; the ice shielding him from the other attacks is mine (`SmsFrostShields`
+off = 167's); the freezing reach is 25 m of the mist's 33 (`HitLifeK` 1 = the whole life); the thin edges harmless (`HitFollowsFade` off = the full ball);
+the copies still breathe (`CopyBreath`), each breath its own freeze. Next (Jaysonn): a little King Boo-themed cutscene when he splits into two, and into
+three -- "showing three of him will now be attacking".
