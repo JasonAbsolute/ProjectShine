@@ -13103,3 +13103,33 @@ the logs, shots165/, run_window.ps1 and this pass's scheduled tasks deleted.
 up to 24 closes that on this arena); a standing jump tapped short (1.7 m apex) does not clear 2.2 m -- the jump must be held (`WallHeight` 1.5 would let a
 tap over). Open: the C5 shock that ended early once (run cn) is unexplained -- if Jaysonn sees a shocked Boo wake while he is still looking at it, the
 drive's trace is the tool.
+
+### 186 -- the King Boo REMATCH, part 30: the BEGINNING LAUGH is the casino intro's CHUCKLE (MSD_SE_BS_TELESA_V_LAUGH1B, the climbing "hee-hee-hee" the casino plays as the roulette seats; the long V_LAUGH1 before), at IntroLaughPitch, the intro laughing 4.6 s and the chuckle cut at his dive; SmsActorSound gets Stop(se) / IsPlaying(se) (feature/kingboo-rematch, code `6f59cea`)
+
+**Jaysonn:** "make the beginning laugh more high pitched like in the casino fight"
+
+**What the two fights play** (measured with tools/projectshine/rematch157/laugh186/pitch.py -- an autocorrelation f0 per 40 ms frame, voiced frames only):
+`MSD_SE_BS_TELESA_V_LAUGH1`, the long laugh, 2.25 s, eight syllables flat at 296-320 Hz (median 305) -- the rematch intro's laugh since 157, and the sound
+the casino boss gives at his laugh clip (the port's own choice there: the game's bck 6 has no sound table). `MSD_SE_BS_TELESA_V_LAUGH1B`, the chuckle, 6.0 s
+-- the casino's BEGINNING laugh: the game restarts it every frame of the roulette's fall (in effect silence) and the last start plays out whole as the disc
+seats (155b / 156c); its "hee-hee-hee" climbs 308 -> 360 Hz over 0.3-3.4 s (twelve syllables), then a low "haa" (208 / 268 Hz, 3.4-4.7 s) and a second run
+at 330-376 to 5.9 s. `V_LAUGH2` (the smash's second laugh) is the highest, 435-540 Hz, 1.5 s. So "more high pitched like the casino" is the chuckle: the same
+median only 8 % up, but climbing, quick and twice as many syllables -- the ear hears it higher.
+
+**The change** (`SmsKingBooRematch.cs`): `IntroLaughSe` = `MSD_SE_BS_TELESA_V_LAUGH1B` ("" = `LaughSe` as before), played on his sound node as the intro's
+laugh begins (`IntroTick`: the rise over -> `IntroLaugh`) at `LaughDb` and `IntroLaughPitch` 1 (the casino's `IntroLaughPitch` is 1 too; over 1 higher and
+quicker -- Godot's PitchScale resamples, so 1.2 is 20 % higher and 20 % shorter); `IntroLaughSeconds` 3.4 -> 4.6 so the chuckle's climbing run and its first
+"haa" are heard before the dive (the laugh clip loops under it as 174 had it); `IntroLaughStopsAtDive` true: at the sink's start `_sound.Stop(IntroLaughSeNow)`
+cuts the chuckle (off: its second run plays out over the dive, the splash and the vanish voice). The fight's other laughs -- a spawn with no intro, a copy
+found out (`DismissCopy`), the smash's own `SmashSe` -- keep `LaughSe`. Readouts `IntroLaughSeNow`, `IntroLaughPlaying`. `SmsActorSound.cs`: `Stop(se)` --
+every player on the node whose stream is that sound stopped (a one-shot still going, the loop), logged "stop se" -- and `IsPlaying(se)`.
+
+**Verified** (headless drive v186-1, deleted before the commit): C13 -- as the intro's laugh began the actor sound's `PlayLog` last laugh was
+`kingboo/ MSD_SE_BS_TELESA_V_LAUGH1B` (no V_LAUGH1), his node still playing it 2 s in (the long laugh would be nearly over), the intro laughing 4.6 s, and
+not playing it 3 ticks into the sink; 185-179's checks as before -- 25/25, no errors. No shot run (a sound). The clean rebuild 0 errors; the drive and the
+logs deleted.
+
+**Deviations, all knobs:** the casino plays the chuckle at the roulette's seat and the long laugh at the appear -- here the chuckle IS the appear's laugh
+(its first 4.6 s) and the long laugh is not heard in the intro (`IntroLaughSe` "" puts it back); the chuckle is cut at the dive rather than played out
+(`IntroLaughStopsAtDive`); the pitch is the casino's (`IntroLaughPitch` 1.1-1.2 for higher still); the intro is 1.2 s longer. Next (Jaysonn): the freeze
+breath "still feels like I'm unfairly getting hit", and a little King Boo-themed cutscene when he splits into two, and into three.
