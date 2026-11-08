@@ -13250,3 +13250,30 @@ of three -- the real one in the middle under his gold crown, the silver-crowned 
 rebuild 0 errors; the drive, the logs, shots165/, run_window.ps1 and the pass's scheduled tasks deleted.
 
 **Deviations, all knobs:** `SplitCamLookUp` is a framing choice (-4..8); none new in the scene.
+
+### 191 -- the King Boo REMATCH, part 35: a hit on a FAKE is the MOCK -- the bomb bursts, the copy does not flinch: it LAUGHS IT OFF (the laugh clip and the short high cackle), rocks and bobs, PHASES see-through (flickering, the crown with it), then teleports off to another spot; the real one keeps the tumble -- the contrast is the tell (feature/kingboo-rematch, code `b0ec9c4`)
+
+**Jaysonn:** "ok we need something else for when mario hits the fake king boos. almost like the bomb explodes and the boo doesnt flinch and just laughs?
+otherwise what ideas do you have?" -- offered laugh-it-off-and-teleport (my pick), a ghost the bomb passes through, pop-the-fake, a punish; "yes lets do
+that your idea".
+
+**The mock** (`SmsKingBooRematch.cs`): a Bomb Boo bursting on a COPY (`CopyMock`, on) no longer runs 178's hurt (the tumble, the flash, then the teleport
+off): `TakeHit` sends it to the new phase `Mock`. `BeginMock` plays the laugh clip and `CopyMockSe` (`MSD_SE_BS_TELESA_V_LAUGH2`, the short high cackle)
+and flares the crown its own colour (`CopyCrownColor`, 1.5, fading out); `MockTick`, for `CopyMockSeconds` (1.3), rocks it `CopyMockRockDeg` (9) either
+way at 3 Hz and bobs it `CopyMockBob` (0.45 m) at 2 Hz, both dying out, while its opacity PHASES -- flickering at `CopyMockFlickerHz` (5) between solid
+and `CopyMockOpacity` (0.3) of its solid, deepest at the middle, solid again by the end, the crown's opacity with the body (a steady dim read as a grey
+blob against the black sky: white at 0.3 over black IS grey; the flicker reads as a ghost). Then `CopyMockTeleports` (on): 178's reset -- the vanish, the
+arrival at another spot, a full gap there; off: back to the wait where it is. The real one is untouched: his hurt, his tumble, his hp. `OnClipEnd` holds
+the wait clip when a long mock outlasts the laugh clip; `DismissCopy` puts a mid-mock rotation back. Readouts `MocksGiven`, `MockOpacityMin`,
+`OpacitySolidNow`.
+
+**Verified** (headless drive v191-3, deleted before the commit): C17 -- a copy out, a Bomb Boo burst on it: it never flinched (no Hurt phase, no hurt
+flash), went into Mock with the laugh clip (`btelesa_laugh`) and the cackle, rolled 8.4 deg, bobbed 0.39 m, dipped to 0.31 of its solid with the crown
+shining 1.48, then vanished and arrived 12.8 m off in the wait (teleports 1, was 0), the real one's hp 7/7 and hits 3/3 unchanged, 2.0 s; 190-179's
+checks as before -- 29/29, no errors. One shot run (39 shots): the fake laughing with its tongue out beside the real one, solid at the flicker's peak and
+dim a tenth of a second later; the fake's crown rides high through the laugh as in the chorus (the laugh clip's own pose). The clean rebuild 0 errors;
+the drive, the logs, shots165/, run_window.ps1 and the scheduled tasks (this pass's and the stale ones from 154-162) deleted.
+
+**Deviations, all knobs:** 178's tumble-and-teleport on a copy is gone unless `CopyMock` is off; the cackle, the rock, the bob, the flicker and the
+teleport-off are mine (`CopyMockSe`, `CopyMockRockDeg`, `CopyMockBob`, `CopyMockFlickerHz`, `CopyMockTeleports`); the bomb's burst on the copy is as
+before.
