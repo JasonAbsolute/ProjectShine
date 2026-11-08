@@ -13064,3 +13064,42 @@ the last and 3 m from the Boos out -- a spread the doc does not spell out; the a
 spots keep 8 m off the rim (`ArenaRadius` up to 24 lets them out to `EdgeMargin` from the edge); 158's fixed seed (`Random(158)`) stays: the same spots
 every fight in the same order from the same Mario -- a seed knob is a line if wanted; the spawner node's scene note still describes Centre as the default
 (the note is Jaysonn's scene file, left alone).
+
+### 185 -- the King Boo REMATCH, part 29: the pace UP (a move about every 2 s at the start, every second by the end; the first in 2 s; fewer plain hops) and the THUNDER WALLS long and LOW (18 x 2.2 m, were 10 x 5: a held jump clears them, the open ends are 9 m off -- the dodge is the jump) (feature/kingboo-rematch, code `678f213`)
+
+**Jaysonn:** "i think we may need to speed up the rate of which king boo attacks it feels too easy. however i want the thunder walls to be jump over able
+more easily. but make them longer"
+
+**The pace** (`SmsKingBooRematch.cs`, The fight group): `FirstAttackDelay` 3 -> 2; `GapAtStart` 3.5 -> 2.2, `GapAtLastHit` 1.8 -> 1.0, `GapJitter` 0.6 ->
+0.5 -- `NextGap` is 162's lerp by his hits taken over `HitPoints` - 1, so a move comes about every 2 s with all his hit points and every second at his last,
+give or take half; `RepositionChance` 0.3 -> 0.2 (fewer of the moves are a bare hop to another spot, more are attacks; the half gap after a hop stays).
+The teleports (0.4 out, 0.3 in), the lick's wind-up and the tells are as they were.
+
+**The walls** (`WallLength` / `WallHeight` on King Boo, copied onto each `SmsGhostLightning` he makes in `LightningTick`; the same defaults on
+`SmsGhostLightning.cs`): 10 x 5 -> 18 x 2.2. The hit test is 166's: `HitCheck` returns before anything when Mario's feet (`GlobalPosition.Y`) are at or over
+`FloorY + WallHeight`, else a wall face within `WallThickness` + his damage radius of him, within the wall's length, is the shock. The port's jump table
+(pass 34): a held standing jump, vy 42, peaks at 3.03 m in 0.35 s -- his feet are over 2.2 m for 0.37 s of the arc (over 5 m never: a spin jump, 70, or the
+triple, 75, was needed); the wall's face takes 0.1 s to pass through him at `WallSpeed` 8, so the jump has a quarter second of slack either way. The open
+ends were 5 m off Mario (a run out along the wall), now 9 m: the dodge is the jump. `WallGap` 12 and `WallSpeed` 8 stay -- the walls appear 6 m either side
+and meet in 0.75 s after the 0.45 s warning; the posts, the electricity and the zaps scale with the new size (the face is 40 m2, was 50).
+
+**Verified** (headless drive v185-4, deleted before the commit): C12 -- after 181's teleport check the lightning called by hand (`DriveLightning`: the move
+picked, `BeginLightning`) on a Mario standing in the arena: the walls out 18 x 2.2 (King Boo's knobs and the walls' own equal), three squeezes; the drive
+pressed A and held it 30 ticks the tick the gap came under 7.2 m (16 m/s of closing: the face reaches him at a gap of 1.6, 0.35 s on -- the apex): his feet
+topped 3.43 m over the floor, every squeeze a miss (0 hits on the walls and on King Boo's count), his HP kept; the gaps 2.2 / 1.0 +- 0.5, the first 2, the hop
+chance 0.2, the gap set after the lightning 1.69 s (one hit taken of nine); C12b the control -- the same walls on a STANDING Mario: shocked at the first
+squeeze (once: `OneShockPerAttack`), one hit point off -- the low wall still hits, the jump is what clears it; 184-179's checks as before -- 24/24, no
+errors. v185-1 failed 179's C4 (Mario faces the Boo: the shock): with 184's random spots the Boo drifts from wherever it rose, and in run cl it left Mario's
+20-degree half-cone (6 m off, aimed once) before the shock came -- the drive now re-aims him every 10 ticks until the shock, as a player's stick would
+(v185-2 23/23). v185-3 added C12b and failed 179's C5 / C6 once (run cn): the shock ENDED early -- over by the 1.7 s check with Mario idle, aimed, 6.0 m off
+and the Boo held (`ShockMinSeconds` 0.8 + `LookAwaySeconds` 0.6: the Boo saw him look away for 0.6 s); a tick-by-tick trace of the shock added to the
+drive (v185-4): it did not recur -- shocked and looked-at every 12 ticks for the 1.7 s, Mario idle 0.8-1.4 degrees off the Boo at 5.9 m -- the trace stays
+in the drive for the next time. One shot run (31 shots): the two long low walls either side of Mario seen from across the arena (King Boo over them); Mario
+at the top of his jump as the walls meet under his feet; the second wall from behind him; the 179-184 shots again. The clean rebuild 0 errors; the drive,
+the logs, shots165/, run_window.ps1 and this pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** the doc's pace is words ("quick and light"; shorter per hit) -- 2.2 / 1.0 s are mine; the walls' 18 x 2.2 are mine (the doc:
+"two walls of lightning close in on Mario from either side and try to squash him"); the walls can still be run round at their ends, 9 m off (`WallLength`
+up to 24 closes that on this arena); a standing jump tapped short (1.7 m apex) does not clear 2.2 m -- the jump must be held (`WallHeight` 1.5 would let a
+tap over). Open: the C5 shock that ended early once (run cn) is unexplained -- if Jaysonn sees a shocked Boo wake while he is still looking at it, the
+drive's trace is the tool.
