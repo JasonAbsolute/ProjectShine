@@ -250,6 +250,9 @@ public partial class SmsKingBooRematch : Node3D
     /// (the copy fades in at a far spot while the fight runs).</summary>
     [Export] public bool SplitCutscene = true;
     [Export] public float SplitLineSpacing = 11f, SplitCopyEvery = 0.6f, SplitHoldSeconds = 1.3f, SplitCamDistance = 0f, SplitCamHeight = 4.5f, SplitCamFov = 50f;   // 11: his body is 9 m across (7 had two of him touching)
+    /// <summary>190 (Jaysonn: "move them up a bit, they sit too low in the frame"): the point the camera looks at, this far over the hover height at the line's middle --
+    /// lower = the line sits higher in the frame. 188's 4 (the middle of the laughing bodies) had them in the lower half; 1.5 lifts them about a seventh of the frame.</summary>
+    [Export(PropertyHint.Range, "-4,8,0.5")] public float SplitCamLookUp = 1.5f;
     [Export(PropertyHint.Range, "0,0.3,0.01")] public float SplitLaughSpread = 0.08f;
     /// <summary>189 (Jaysonn: "no need for the text on the screen"): the card lines are EMPTY -- no card; the scene is the line of him and the chorus. 188's lines were
     /// "Now there are TWO of me!" and "THREE of me! Can you keep up, Mario?" -- put text here for the card back.</summary>

@@ -33,6 +33,7 @@ public partial class SmsSplitCutscene : Node
     public bool Skipped { get; private set; }
     public int Laughs { get; private set; }
     public bool ChorusDone { get; private set; }
+    public float CamDistance { get; private set; }
 
     private SmsKingBooRematch _boss; private Mario _mario;
     private readonly List<SmsKingBooRematch> _line = new();          // in line order, left to right as Mario sees them
@@ -101,7 +102,7 @@ public partial class SmsSplitCutscene : Node
         _cam = new Camera3D { Name = "SplitCutsceneCamera", Fov = fov, ProcessMode = ProcessModeEnum.Always };
         (tree?.CurrentScene ?? GetParent()).AddChild(_cam);
         _cam.GlobalPosition = centre + toMario * dist + Vector3.Up * boss.SplitCamHeight;
-        _cam.LookAt(centre + Vector3.Up * 4f, Vector3.Up);                                                          // the middle of the laughing bodies
+        _cam.LookAt(centre + Vector3.Up * boss.SplitCamLookUp, Vector3.Up);                                         // 190: SplitCamLookUp over the hover (188's 4, the bodies' middle, sat them low)
         _cam.Current = true;
         // the card: a line in the intro card's style, over the scene (no black); it fades in once the first of him is up
         string text = n >= 3 ? boss.SplitLine3 : boss.SplitLine2;
@@ -112,7 +113,8 @@ public partial class SmsSplitCutscene : Node
             (tree?.CurrentScene ?? GetParent()).AddChild(_card);
         }
         State = Phase.Running; _t = 0f;
-        if (DebugPrint) GD.Print($"[SMS split] {Name}: {n} of him -- the line about {centre} (spacing {spacing}, Mario {toMario}), the camera {dist:F1} m out {boss.SplitCamHeight} m up at {fov} deg; the chorus at {_tAll:F2} s, the end at {_tEnd:F2} s; the world frozen {_paused}; the card '{text}'");
+        CamDistance = dist;
+        if (DebugPrint) GD.Print($"[SMS split] {Name}: {n} of him -- the line about {centre} (spacing {spacing}, Mario {toMario}), the camera {dist:F1} m out {boss.SplitCamHeight} m up at {fov} deg looking {boss.SplitCamLookUp} m over the hover; the chorus at {_tAll:F2} s, the end at {_tEnd:F2} s; the world frozen {_paused}; the card '{text}'");
     }
     private void Always(Node n) { if (n != null && n.ProcessMode != ProcessModeEnum.Always) { _alwaysed.Add(n); n.ProcessMode = ProcessModeEnum.Always; } }
 
