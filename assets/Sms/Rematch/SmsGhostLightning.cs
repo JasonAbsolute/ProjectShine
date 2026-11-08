@@ -11,7 +11,8 @@ using System.Collections.Generic;
 /// SqueezePause later the next, re-centred on where Mario is then. The dodge: out of the open ends, along the walls. THE HIT: through the closing, a wall
 /// face reaching Mario's body (WallThickness deep, within the wall's length and height) or the gap closing on him is the SHOCK -- Mario.TakeShock(), the
 /// port's ELECTRIC_DAMAGE (120 ticks locked in ma_shock with its sparks, 1 HP; MSD_SE_MA_DAMAGE_ELEC) -- once per squeeze, and once per attack unless
-/// OneShockPerAttack is off; a jump does not clear a 5-m wall. <see cref="Cancel"/> (King Boo hit through the attack) takes the walls away. Signals Squeezed(hit) per squeeze, Finished.
+/// OneShockPerAttack is off; a jump did not clear 166's 5-m wall (185: 2.2 m, a held jump clears it; Mario's feet over the wall's top as the face passes = no
+/// shock). <see cref="Cancel"/> (King Boo hit through the attack) takes the walls away. Signals Squeezed(hit) per squeeze, Finished.
 /// Pass 172 (Jaysonn: "particle effects for electric need to be better"): each wall carries the SHOCK'S OWN electricity (ms_m_biri_a / b / c, the port's
 /// ShockSparks, scaled to the wall) over its whole face -- bolt STREAKS twisting about their own axis (ShockStreak.gdshader, biri_l1), ARCS popping (biri_r),
 /// FLASHES (hitmrk1) with white spark CROSSES raining down the wall, sparks pouring off each glowing POST, bolts CRAWLING along the floor at its foot; dimmer
@@ -26,8 +27,10 @@ public partial class SmsGhostLightning : Node3D
 {
     [ExportGroup("The walls")]
     /// <summary>Each wall's length (the open ends are this far apart to run through), its height, how far apart they start (both sides of Mario), how fast
-    /// each closes (both close: the gap shuts at twice this), and how deep its face hits.</summary>
-    [Export] public float WallLength = 10f, WallHeight = 5f, WallGap = 12f, WallSpeed = 8f, WallThickness = 0.5f;
+    /// each closes (both close: the gap shuts at twice this), and how deep its face hits. 185 (Jaysonn: "jump-over-able more easily, but longer"): 18 m long
+    /// and 2.2 m tall (10 and 5 before: a held jump, apex 3.03 m, clears 2.2 with 0.37 s to spare; 5 m took a spin or triple jump) -- the dodge is the jump,
+    /// not the run round the end. King Boo's own knobs of the same names set these on each attack.</summary>
+    [Export] public float WallLength = 18f, WallHeight = 2.2f, WallGap = 12f, WallSpeed = 8f, WallThickness = 0.5f;
     /// <summary>The squeezes: how many, the tell before each closes, the pause after each meets, and how far the axis turns from one to the next.</summary>
     [Export(PropertyHint.Range, "1,6,1")] public int SqueezeCount = 3;
     [Export] public float WarnSeconds = 0.45f, SqueezePause = 0.2f, SqueezeTurnDeg = 60f;

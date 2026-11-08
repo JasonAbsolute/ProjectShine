@@ -244,12 +244,14 @@ public partial class SmsKingBooRematch : Node3D
     [ExportGroup("The fight (162): the teleports and the Lick")]
     /// <summary>The moves run at all (off: he waits as before, for the earlier passes' tests).</summary>
     [Export] public bool AttacksOn = true;
-    /// <summary>Seconds from the fight's start (the wait begins) to his first move.</summary>
-    [Export] public float FirstAttackDelay = 3f;
-    /// <summary>The gap between moves: this long with all his hit points, this long at his last one (the doc's pace: shorter per hit), give or take the jitter.</summary>
-    [Export] public float GapAtStart = 3.5f, GapAtLastHit = 1.8f, GapJitter = 0.6f;
-    /// <summary>The chance a move is only a hop to another spot of the arena (no lick); the gap after one is half.</summary>
-    [Export(PropertyHint.Range, "0,1,0.05")] public float RepositionChance = 0.3f;
+    /// <summary>Seconds from the fight's start (the wait begins) to his first move. 185 (Jaysonn: "speed up the rate at which king boo attacks, it feels too
+    /// easy"): 3 -> 2.</summary>
+    [Export] public float FirstAttackDelay = 2f;
+    /// <summary>The gap between moves: this long with all his hit points, this long at his last one (the doc's pace: shorter per hit), give or take the jitter.
+    /// 185: 3.5 / 1.8 / 0.6 -> 2.2 / 1.0 / 0.5 -- a move about every 2 s at the start, every second by the end.</summary>
+    [Export] public float GapAtStart = 2.2f, GapAtLastHit = 1f, GapJitter = 0.5f;
+    /// <summary>The chance a move is only a hop to another spot of the arena (no lick); the gap after one is half. 185: 0.3 -> 0.2 (more of the moves are attacks).</summary>
+    [Export(PropertyHint.Range, "0,1,0.05")] public float RepositionChance = 0.2f;
     /// <summary>The teleport: the fade out (the hide clip plays under it: its hop up; longer than 0.5 s shows its dive down too), the fade in, how far he
     /// settles down as he fades in, and the clip for the vanish ("" = none).</summary>
     [Export] public float TeleportOutSeconds = 0.4f, TeleportInSeconds = 0.3f, TeleportInDrop = 1.2f;
@@ -312,8 +314,10 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public float LightningTellSeconds = 0.5f, LightningWatchSeconds = 0.3f;
     [Export] public string LightningClip = "btelesa_laugh", LightningSe = "MSD_SE_BS_TELESA_V_LAUGH2";
     /// <summary>The walls: each one's length, height, how far apart they start, how fast each closes; the squeezes: how many, the tell before each closes,
-    /// the pause after each, the axis's turn between them.</summary>
-    [Export] public float WallLength = 10f, WallHeight = 5f, WallGap = 12f, WallSpeed = 8f;
+    /// the pause after each, the axis's turn between them. 185 (Jaysonn: "I want the thunder walls to be jump-over-able more easily, but make them longer"):
+    /// WallHeight 5 -> 2.2 (a held jump's apex is 3.03 m, his feet over a 2.2 m wall for 0.37 s of it; 5 m took a spin or triple jump), WallLength 10 -> 18
+    /// (the open ends were 5 m off: a run out; now 9 m -- the dodge is the jump).</summary>
+    [Export] public float WallLength = 18f, WallHeight = 2.2f, WallGap = 12f, WallSpeed = 8f;
     [Export(PropertyHint.Range, "1,6,1")] public int SqueezeCount = 3;
     [Export] public float WarnSeconds = 0.45f, SqueezePause = 0.2f, SqueezeTurnDeg = 60f;
     [Export] public bool OneShockPerAttack = true;
