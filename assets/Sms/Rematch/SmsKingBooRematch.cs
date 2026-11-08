@@ -103,6 +103,15 @@ public partial class SmsKingBooRematch : Node3D
     /// LAUGHS for IntroLaughSeconds (the laugh clip looping, the long laugh voice), SINKS back (over IntroSinkSeconds, the vanish voice) and is hidden. The
     /// fight then starts with SpawnRising: up out of the floor at his spot over SpawnRiseSeconds, no second laugh.</summary>
     [Export] public float IntroRiseSeconds = 1.6f, IntroLaughSeconds = 3.4f, IntroSinkSeconds = 1.1f, IntroSinkDepth = 7f, SpawnRiseSeconds = 1.2f;
+    /// <summary>182 (Jaysonn: "during the intro king boo gets stuck on the floor for a second; make the appear animation clean and smooth"): the appear clip
+    /// (btelesa_appear, 0.97 s) is itself a LEAP -- the body spins up from 17 m under the node to 11 m over it by 0.33 s and lands back at the node by 0.6 s --
+    /// and 174's node, lerping up from 7 m under the floor meanwhile, let the body pop out, fall back under the stone and sit at floor level for half a second
+    /// before the lerp caught up. Now the node waits AT the hover height and the clip's own leap is the rise: the body comes up from 9 m under the floor and
+    /// lands at the hover in one arc, the clip at IntroAppearClipSpeed (0.6: 1.6 s), its overshoot over the hover damped by RiseLeapDamp (0 = the clip's full 11 m
+    /// leap, 1 = none: the node moves down to meet it). The same at the fight's spawn. IntroRiseSeconds / SpawnRiseSeconds only time the old lerp when the clip
+    /// is missing.</summary>
+    [Export(PropertyHint.Range, "0.2,2,0.05")] public float IntroAppearClipSpeed = 0.6f;
+    [Export(PropertyHint.Range, "0,1,0.05")] public float RiseLeapDamp = 0.6f;
     /// <summary>The laugh clip carries his body 3.6 m up over his node (the crown 9.6): through the intro's laugh the node is lowered by that (smoothed over
     /// IntroLaughHoldSeconds, so the clip's own bounce stays) and his body laughs at the hover height, where it rose to.</summary>
     [Export] public bool IntroLaughBodyHeld = true;
@@ -128,7 +137,7 @@ public partial class SmsKingBooRematch : Node3D
     /// RISES -- the intro's surface and the fight's spawn -- from the rise's start a GLOW pulses on the stone where he will come up (RiseGlowSize m at RiseGlowHz,
     /// growing) with wisps of ghost mist seeping up out of it (RiseWisps a second), and as the body breaks the floor (its middle RiseBreakAt m under it) the
     /// dive's splash in reverse: a FLASH there, a SHOCK RING, a RING of mist along the floor, a SPLASH of it thrown up, the camera kicked (RiseShake), his glow
-    /// swelling RiseGlowBoost x and settling, and twinkle stars STREAMING up round his body till he is up (RiseSparkles a second). The TELEPORTS (TeleportFx) -- a
+    /// swelling RiseGlowBoost x and settling, and twinkle stars SHED off his body till he is up (RiseSparkles a second; 182: flung out and down, falling, not 181's column up past his crown). The TELEPORTS (TeleportFx) -- a
     /// poof of ghost mist and a burst of stars at his body as he fades out, and a flash, a poof and stars where he fades in (a copy's arrival, the found-out copy's
     /// fade and his split the same), TeleportPuffs / TeleportSparkles each, TeleportFxScale against the dive's sizes. All in DiveColor. Off: 174's bare rises
     /// and 162's bare fades.</summary>
@@ -141,6 +150,8 @@ public partial class SmsKingBooRematch : Node3D
     [Export(PropertyHint.Range, "0,120,1")] public int RiseWisps = 30, RiseSparkles = 50;
     [Export] public bool TeleportFx = true;
     [Export(PropertyHint.Range, "0,80,1")] public int TeleportPuffs = 20, TeleportSparkles = 30;
+    /// <summary>182: the arrival's stars (they clustered at his crown -- Jaysonn: "not a fan of the crown sparkle effect"); off = the flash and the poof alone.</summary>
+    [Export] public bool TeleportInStars = false;
     [Export(PropertyHint.Range, "0.2,2,0.05")] public float TeleportFxScale = 1f;
     [ExportGroup("")]
     /// <summary>He turns to face Mario while he waits, at this many radians a second.</summary>
@@ -248,7 +259,7 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public float CrownFlashSeconds = 0.15f, CrownPulseQuicken = 2f;
     /// <summary>How bright the crown's shine is (x the shader's term; 1 = as tuned from the screenshots: a bright white-gold at the pulse's peak, white at the flash).</summary>
     [Export(PropertyHint.Range, "0,3,0.05")] public float CrownShine = 1f;
-    [Export(PropertyHint.Range, "0,64,1")] public int CrownSparkles = 36;
+    [Export(PropertyHint.Range, "0,64,1")] public int CrownSparkles = 0;   // 182 (Jaysonn: "not a fan of the crown sparkle effect"): off -- the tell is the crown's colour and halo alone; 165c's 36 puts them back
     [Export] public float CrownFxLift = 1.2f;
     [Export] public float CrownGlowSize = 0f, CrownGlowStrength = 0.35f;
     [ExportGroup("The fight (166): Ghost Lightning")]
@@ -591,9 +602,9 @@ public partial class SmsKingBooRematch : Node3D
         {
             _introTop = Position; _introFloorY = Position.Y - _hoverOverFloor; _introT = 0f;
             Position = new Vector3(Position.X, _introFloorY - IntroSinkDepth, Position.Z);
-            _riseClipPending = RiseFx && RiseTellSeconds > 0f;                                                           // 181: the tell first (the appear clip played above is replaced till then)
+            _riseClipPending = RiseFx && RiseTellSeconds > 0f; _riseClipStarted = false; RiseLeapTopY = float.NegativeInfinity;   // 181: the tell first (the appear clip played above is replaced till then)
             if (_riseClipPending) { _introT = -RiseTellSeconds; PlayClip(BckWait); }
-            else if (_sound != null && !string.IsNullOrEmpty(ArriveSe)) _sound.Play(ArriveSe);
+            else StartAppearClip();
             RiseFxBegin(new Vector3(_introTop.X, _introFloorY, _introTop.Z));                                            // 181: the glow on the stone, the wisps
         }
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: appears at {GlobalPosition} ({_hoverOverFloor:F2} m over the floor{(HoverLift != 0f ? $", lifted {HoverLift:F1}" : "")}{(_spawnRise ? $", rising out of the floor over {SpawnRiseSeconds:F1} s" : "")}; the arena's middle {_arenaCentre}, radius {_arenaRadius:F1})");
@@ -615,9 +626,9 @@ public partial class SmsKingBooRematch : Node3D
         if (_tongue != null) { _tongue.Stretch = TongueStretch; _tongue.On = TongueStretch > 1.001f; }
         SetCrownGlow(_crownGlowColor, 0f);
         State = Phase.IntroRise;
-        _riseClipPending = RiseFx && RiseTellSeconds > 0f;                                                               // 181: the tell first -- the glow and the wisps alone, then the clip and the rise
+        _riseClipPending = RiseFx && RiseTellSeconds > 0f; _riseClipStarted = false; RiseLeapTopY = float.NegativeInfinity;   // 181: the tell first -- the glow and the wisps alone, then the clip and the rise
         if (_riseClipPending) { _introT = -RiseTellSeconds; PlayClip(BckWait); }
-        else { PlayClip(BckAppear); if (_sound != null && !string.IsNullOrEmpty(ArriveSe)) _sound.Play(ArriveSe); }
+        else StartAppearClip();
         RiseFxBegin(new Vector3(_introTop.X, _introFloorY, _introTop.Z));                                                // 181: the glow on the stone, the wisps
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: INTRO -- surfaces at {_introTop} ({_hoverOverFloor:F2} m over the floor at {_introFloorY:F2}) from {IntroSinkDepth} m under, over {IntroRiseSeconds:F1} s; laughs {IntroLaughSeconds:F1} s; sinks over {IntroSinkSeconds:F1} s");
         EmitSignal(SignalName.IntroSurfacing);
@@ -640,11 +651,15 @@ public partial class SmsKingBooRematch : Node3D
         if (State == Phase.IntroRise)
         {
             RiseClipWhenDue();
-            float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp(_introT / Mathf.Max(0.1f, IntroRiseSeconds), 0f, 1f));
-            Position = new Vector3(_introTop.X, Mathf.Lerp(_introFloorY - IntroSinkDepth, _introTop.Y, k), _introTop.Z);
+            if (_riseClipStarted) RiseNodeTick();                                                                                       // 182: the clip's own leap is the rise
+            else if (!_riseClipPending)
+            {
+                float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp(_introT / Mathf.Max(0.1f, IntroRiseSeconds), 0f, 1f));                  // 174's lerp: no appear clip
+                Position = new Vector3(_introTop.X, Mathf.Lerp(_introFloorY - IntroSinkDepth, _introTop.Y, k), _introTop.Z);
+            }
             FaceTick(dt);
             RiseFxTick(dt);
-            if (_introT >= IntroRiseSeconds)
+            if (_introT >= RiseLength)
             {
                 RiseFxEnd();
                 State = Phase.IntroLaugh; _introT = 0f; _hoverT = 0f; LaughPlayed = true;
@@ -818,15 +833,40 @@ public partial class SmsKingBooRematch : Node3D
     private bool AnyFxAlive => _flashes.Count > 0 || _diveRing != null || (_riseGlow != null && IsInstanceValid(_riseGlow) && _riseGlow.Visible);
     /// <summary>DiveColor x FlashBoost (over 1: an additive quad brighter than its texture) at an alpha.</summary>
     private Color Bright(float alpha) => new Color(DiveColor.R * FlashBoost, DiveColor.G * FlashBoost, DiveColor.B * FlashBoost, alpha);
-    private bool _riseClipPending;
+    private bool _riseClipPending, _riseClipStarted; private float _riseLen;
+    /// <summary>182, for the drives: the highest the body got in the rise's leap; the rise's length (the clip's at its speed).</summary>
+    public float RiseLeapTopY { get; private set; } = float.NegativeInfinity;
+    public float RiseLength => _riseClipStarted ? _riseLen : IntroRiseSeconds;
     /// <summary>181: the tell is over (the rise clock has reached 0): the appear clip and the appear voice start -- the body comes up.</summary>
     private void RiseClipWhenDue()
     {
         if (!_riseClipPending || _introT < 0f) return;
+        StartAppearClip();
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the RISE's tell is over -- the appear clip, he comes up");
+    }
+    /// <summary>182: the appear clip at IntroAppearClipSpeed, the node put at the hover height (the clip's own leap carries the body from 17 m under the node up
+    /// and back to it), the appear voice; the rise lasts the clip. No clip: 174's lerp (IntroRiseSeconds / SpawnRiseSeconds).</summary>
+    private void StartAppearClip()
+    {
         _riseClipPending = false;
         PlayClip(BckAppear);
+        if (_anim != null && _anim.HasAnimation(BckAppear))
+        {
+            _anim.SpeedScale *= Mathf.Max(0.1f, IntroAppearClipSpeed);
+            _riseLen = (float)(_anim.GetAnimation(BckAppear).Length / Mathf.Max(0.01f, _anim.SpeedScale));
+            _riseClipStarted = true;
+            Position = _introTop;
+        }
+        else _riseClipStarted = false;
         if (_sound != null && !string.IsNullOrEmpty(ArriveSe)) _sound.Play(ArriveSe);
-        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the RISE's tell is over -- the appear clip, he comes up");
+    }
+    /// <summary>182: the node through the rise -- at the hover height, dropped by RiseLeapDamp of the clip's lift of the body over it, so the leap's overshoot is
+    /// damped and the body lands at the hover as the clip settles (the lift read off the pose: the body joint over the node).</summary>
+    private void RiseNodeTick()
+    {
+        float lift = BodyPoint.Y - GlobalPosition.Y;
+        Position = new Vector3(_introTop.X, _introTop.Y - RiseLeapDamp * Mathf.Max(0f, lift), _introTop.Z);
+        if (BodyPoint.Y > RiseLeapTopY) RiseLeapTopY = BodyPoint.Y;
     }
     /// <summary>181: a rise begins (the intro's surface, the fight's spawn): the glow on the stone where he will come up and the wisps seeping out of it.</summary>
     private void RiseFxBegin(Vector3 floorSpot)
@@ -870,17 +910,25 @@ public partial class SmsKingBooRematch : Node3D
                 _riseStars = (GpuParticles3D)_chika.Duplicate();
                 _riseStars.Name = "RiseStarsFx"; _riseStars.TopLevel = true; _riseStars.Visible = true; _riseStars.Amount = RiseSparkles; _riseStars.Lifetime = 1.0; _riseStars.OneShot = false; _riseStars.Emitting = false; _riseStars.LocalCoords = false;
                 var pm = (ParticleProcessMaterial)chikaMat.Duplicate();
-                pm.EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere; pm.EmissionSphereRadius = 3f; pm.Direction = Vector3.Up; pm.Spread = 25f;
-                pm.InitialVelocityMin = 3f; pm.InitialVelocityMax = 7f; pm.Gravity = new Vector3(0f, 1.5f, 0f); pm.ScaleMin = 1.2f; pm.ScaleMax = 2.4f;
-                _riseStars.ProcessMaterial = pm;
-                AddChild(_riseStars); _riseStars.GlobalPosition = BodyPoint; _riseStars.Emitting = true;
+                // 182: sparks shed OUT and DOWN off his body as he rises (Jaysonn: "not a fan of the crown sparkle effect" -- 181's column of stars rose up past his
+                // crown, and stars sent up off the body gathered at the crown as he landed): flung sideways and down out of the sphere about his body, falling
+                pm.EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere; pm.EmissionSphereRadius = 3.5f; pm.Direction = Vector3.Down; pm.Spread = 100f;
+                pm.InitialVelocityMin = 2f; pm.InitialVelocityMax = 6f; pm.Gravity = new Vector3(0f, -8f, 0f); pm.ScaleMin = 1.2f; pm.ScaleMax = 2.2f;
+                _riseStars.ProcessMaterial = pm; _riseStars.Lifetime = 0.8;
+                AddChild(_riseStars); _riseStars.GlobalPosition = BodyPoint + Vector3.Up * 1.5f; _riseStars.Emitting = true;                  // the body's middle (the joint sits low in the sphere)
             }
             if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the RISE breaks the floor at {at} ({_riseT:F2} s in; the body at {BodyPoint.Y:F2})");
         }
         if (_riseBroke)
         {
             _glowBoost = 1f + (RiseGlowBoost - 1f) * Mathf.Max(0f, 1f - (_riseT - _riseBreakT) / 0.6f);
-            if (_riseStars != null && IsInstanceValid(_riseStars)) _riseStars.GlobalPosition = BodyPoint;
+            if (_riseStars != null && IsInstanceValid(_riseStars))
+            {
+                _riseStars.GlobalPosition = BodyPoint + Vector3.Up * 1.5f;
+                // 182: the stars stream off him only while he shoots UP to his hover height -- stars shed over it (the leap's 4 m overshoot and the drop back,
+                // half a second) sank slower than he did, and he left them hanging about his crown as he landed
+                if (_riseStars.Emitting && (BodyPoint.Y > _introTop.Y || BodyPoint.Y < RiseLeapTopY - 0.3f)) _riseStars.Emitting = false;
+            }
         }
     }
     /// <summary>181: the rise is over (he is up, or the intro was cut): the stars stop streaming (the live ones finish), the wisps too, the glow on the stone goes out.</summary>
@@ -901,14 +949,15 @@ public partial class SmsKingBooRematch : Node3D
         StarBurst("TeleportOutStars", at, TeleportSparkles, s);
         TeleportOutFxFired++;
     }
-    /// <summary>181: a flash, a poof and stars where he fades in (the arrival; a copy's too).</summary>
+    /// <summary>181: a flash and a poof where he fades in (the arrival; a copy's too) -- at his body's middle. 182 (Jaysonn: "not a fan of the crown sparkle effect"):
+    /// no stars here, and the flash down off the crown; TeleportInStars puts the stars back.</summary>
     private void TeleportInFx()
     {
         if (!TeleportFx) return;
-        Vector3 at = Position + Vector3.Up * 3f; float s = TeleportFxScale;                                            // high on his body, by the crown: lower, the flash hid inside the fading body (shot run ay)
+        Vector3 at = Position + Vector3.Up * 2f; float s = TeleportFxScale;
         FlashAt("TeleportInFlash", at, DiveFlashSize * 0.8f * s, DiveFlashSeconds, flat: false, 0.5f, 1.2f);
         if (TeleportPuffs > 0) DiveBurst("TeleportInPuffs", TeleportPuffs, at, Vector3.Up, 180f, 3f * s, 6f * s, 2f * s, 4.5f * s, MistColor, 0.8f, 0.8, 3f, 0.5f);
-        StarBurst("TeleportInStars", at, TeleportSparkles, s);
+        if (TeleportInStars) StarBurst("TeleportInStars", at, TeleportSparkles, s);
         TeleportInFxFired++;
     }
     /// <summary>A continuous emitter of the port's smoke ball (mix-blended) at a point: count alive, their life, a direction and spread, speeds, sizes, colour, alpha,
@@ -1014,7 +1063,7 @@ public partial class SmsKingBooRematch : Node3D
         {
             if (_spawnQuiet)                                                                       // 174: the intro had the laugh -- the wait (the rise finishes under it)
             {
-                _spawnQuiet = false; if (_spawnRise && _introT < SpawnRiseSeconds) { PlayClip(BckWait); CallDeferred(nameof(QuietReadyWhenUp)); return; }
+                _spawnQuiet = false; if (_spawnRise && _introT < (_riseClipStarted ? _riseLen : SpawnRiseSeconds)) { PlayClip(BckWait); CallDeferred(nameof(QuietReadyWhenUp)); return; }
                 _spawnRise = false; Position = _home;
                 EnterWait(FirstAttackDelay);
                 if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: up at his spot -- waits, the fight may start (the first move in {FirstAttackDelay:F1} s)");
@@ -1675,10 +1724,14 @@ public partial class SmsKingBooRematch : Node3D
         {
             _introT += dt;
             RiseClipWhenDue();
-            float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp(_introT / Mathf.Max(0.1f, SpawnRiseSeconds), 0f, 1f));
-            Position = new Vector3(_introTop.X, Mathf.Lerp(_introFloorY - IntroSinkDepth, _introTop.Y, k), _introTop.Z);
+            if (_riseClipStarted) RiseNodeTick();                                                                                       // 182: the clip's own leap is the rise
+            else if (!_riseClipPending)
+            {
+                float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp(_introT / Mathf.Max(0.1f, SpawnRiseSeconds), 0f, 1f));                  // 174's lerp: no appear clip
+                Position = new Vector3(_introTop.X, Mathf.Lerp(_introFloorY - IntroSinkDepth, _introTop.Y, k), _introTop.Z);
+            }
             RiseFxTick(dt);
-            if (k >= 1f) { _spawnRise = false; Position = _home; RiseFxEnd(); }
+            if (_introT >= (_riseClipStarted ? _riseLen : SpawnRiseSeconds)) { _spawnRise = false; Position = _home; RiseFxEnd(); }
         }
         // the long laugh with the laugh clip (the casino boss plays it two bck frames in: a thirtieth of a second, dropped here)
         if (State == Phase.Laugh && !_laughSounded)
