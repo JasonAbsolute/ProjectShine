@@ -102,7 +102,7 @@ public partial class SmsKingBooRematch : Node3D
     /// he rises out of the floor (from IntroSinkDepth under it, over IntroRiseSeconds, the appear clip and voice, as the casino boss surfaces from his table),
     /// LAUGHS for IntroLaughSeconds (the laugh clip looping, the long laugh voice), SINKS back (over IntroSinkSeconds, the vanish voice) and is hidden. The
     /// fight then starts with SpawnRising: up out of the floor at his spot over SpawnRiseSeconds, no second laugh.</summary>
-    [Export] public float IntroRiseSeconds = 1.6f, IntroLaughSeconds = 3.4f, IntroSinkSeconds = 1.1f, IntroSinkDepth = 7f, SpawnRiseSeconds = 1.2f;
+    [Export] public float IntroRiseSeconds = 1.6f, IntroLaughSeconds = 4.6f, IntroSinkSeconds = 1.1f, IntroSinkDepth = 7f, SpawnRiseSeconds = 1.2f;   // 186: the laugh 3.4 -> 4.6 (the chuckle's run)
     /// <summary>182 (Jaysonn: "during the intro king boo gets stuck on the floor for a second; make the appear animation clean and smooth"): the appear clip
     /// (btelesa_appear, 0.97 s) is itself a LEAP -- the body spins up from 17 m under the node to 11 m over it by 0.33 s and lands back at the node by 0.6 s --
     /// and 174's node, lerping up from 7 m under the floor meanwhile, let the body pop out, fall back under the stone and sit at floor level for half a second
@@ -199,9 +199,17 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>He turns to face Mario while he waits, at this many radians a second.</summary>
     [Export] public bool FaceMario = true;
     [Export] public float TurnSpeed = 3f;
-    /// <summary>The long laugh at the laugh clip (through SmsActorSound: his sound node) and its gain.</summary>
+    /// <summary>The long laugh at the laugh clip (through SmsActorSound: his sound node) and its gain -- the fight's laughs (a spawn with no intro, a copy
+    /// found out, the smash's second laugh is its own).</summary>
     [Export] public string LaughSe = "MSD_SE_BS_TELESA_V_LAUGH1";
     [Export] public float LaughDb = 0f;
+    /// <summary>186 (Jaysonn: "make the beginning laugh more high pitched like in the casino fight"): the INTRO's laugh is the casino intro's CHUCKLE --
+    /// MSD_SE_BS_TELESA_V_LAUGH1B, the 6 s "hee-hee-hee" the casino plays whole as the roulette seats (its syllables climb 310 -> 360 Hz; the long laugh
+    /// V_LAUGH1 sits flat at 300) -- at IntroLaughPitch (1 = as the casino plays it; over 1 higher and quicker), and it is CUT at his dive (IntroLaughStopsAtDive;
+    /// off: it plays out over the dive and the splash). IntroLaughSeconds 3.4 -> 4.6 to hear the chuckle's run before the dive. "" = LaughSe as before.</summary>
+    [Export] public string IntroLaughSe = "MSD_SE_BS_TELESA_V_LAUGH1B";
+    [Export(PropertyHint.Range, "0.5,2,0.05")] public float IntroLaughPitch = 1f;
+    [Export] public bool IntroLaughStopsAtDive = true;
     [Export] public bool Blink = true;
     [Export] public Texture2D EyeOpen, EyeHalf, EyeClose;
     [ExportGroup("The fight (158)")]
@@ -422,6 +430,9 @@ public partial class SmsKingBooRematch : Node3D
     public string Clip => _anim != null ? (string)(_anim.IsPlaying() ? _anim.CurrentAnimation : _anim.AssignedAnimation) : "";
     public bool IsSpawned => State != Phase.Hidden;
     public bool LaughPlayed { get; private set; }
+    /// <summary>186: the intro's laugh sound (IntroLaughSe, else LaughSe); whether his sound node is playing it now (for the drives).</summary>
+    public string IntroLaughSeNow => !string.IsNullOrEmpty(IntroLaughSe) ? IntroLaughSe : LaughSe;
+    public bool IntroLaughPlaying => _sound != null && !string.IsNullOrEmpty(IntroLaughSeNow) && _sound.IsPlaying(IntroLaughSeNow);
     public int Hp { get; private set; } = -1;
     public int HitsTaken { get; private set; }
     /// <summary>177: this one is a COPY (takes no hits) of Original; the real one's copies out now, and made in all.</summary>
@@ -712,8 +723,9 @@ public partial class SmsKingBooRematch : Node3D
                 RiseFxEnd();
                 State = Phase.IntroLaugh; _introT = 0f; _hoverT = 0f; LaughPlayed = true;
                 PlayClip(BckLaugh);
-                if (_sound != null && !string.IsNullOrEmpty(LaughSe)) _sound.Play(LaughSe, LaughDb);
-                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: INTRO -- up; the laugh ({IntroLaughSeconds:F1} s)");
+                string laugh = IntroLaughSeNow;                                                                                                  // 186: the casino intro's chuckle, pitched
+                if (_sound != null && !string.IsNullOrEmpty(laugh)) _sound.Play(laugh, LaughDb, Mathf.Clamp(IntroLaughPitch, 0.25f, 4f));
+                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: INTRO -- up; the laugh {laugh} at pitch {IntroLaughPitch} ({IntroLaughSeconds:F1} s)");
                 EmitSignal(SignalName.Laughed);
             }
         }
@@ -726,6 +738,7 @@ public partial class SmsKingBooRematch : Node3D
             if (_introT >= IntroLaughSeconds)
             {
                 State = Phase.IntroSink; _introT = 0f; _introTop = new Vector3(_introTop.X, Position.Y, _introTop.Z); _introBodyLift = 0f;
+                if (IntroLaughStopsAtDive && _sound != null && !string.IsNullOrEmpty(IntroLaughSeNow)) _sound.Stop(IntroLaughSeNow);           // 186: the chuckle cut at the dive
                 _diveOn = !string.IsNullOrEmpty(IntroDiveClip) && _anim != null && _anim.HasAnimation(IntroDiveClip);                       // 180: the hide clip's dive
                 if (_diveOn)
                 {

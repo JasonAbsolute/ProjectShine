@@ -225,6 +225,21 @@ public partial class SmsActorSound : Node3D
         else SetBase(p, MasterDb + SeDb(se) + extraDb);
     }
     public void StopAll() { foreach (var p in _all) if (p.Playing) p.Stop(); }
+    /// <summary>186: one sound stopped wherever it plays on this node (a one-shot still going, its loop) -- King Boo's intro chuckle cut at his dive.</summary>
+    public void Stop(string se)
+    {
+        var s = Stream(se); if (s == null) return;
+        bool any = false;
+        foreach (var p in _all) if (p.Playing && p.Stream == s) { p.Stop(); any = true; }
+        if (any) Log("stop " + se);
+    }
+    /// <summary>186, for the drives: the sound is playing on this node now (a one-shot or its loop).</summary>
+    public bool IsPlaying(string se)
+    {
+        var s = Stream(se); if (s == null) return false;
+        foreach (var p in _all) if (p.Playing && p.Stream == s) return true;
+        return false;
+    }
 
     // ---- the tick
     public override void _PhysicsProcess(double delta)
