@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180 + 181), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-07 17:58 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180 + 181 + 182), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-07 19:05 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1236,8 +1236,12 @@ WORRIES (a head shake, a lean back, a cower with a nervous breath, sweat beads o
 leap and a DIVE through the floor in a burst of his twinkle stars, a flash on the stone, a ring of ghost mist, a shock ring and a camera kick. SMS 181: his RISES
 (the intro's and the fight's) have their effects -- a glow pulsing on the stone with wisps seeping up before he breaks through (a 0.7 s tell), then the flash, the shock
 ring, the mist and twinkle stars streaming up round him -- and so does every TELEPORT (a poof and stars as he goes, a flash, a poof and stars where he comes in); the
-flashes brighter and bigger. Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `2608391` ("SMS 181: the King Boo REMATCH, part 25 -- effects for him COMING UP out of the ground (a glow pulsing on the stone and wisps before he breaks through, then the flash, the shock ring, the mist and twinkle stars streaming up round him) and for every TELEPORT (a poof and stars as he goes, a flash, a poof and stars where he comes in); the flashes brighter and bigger";
+flashes brighter and bigger. SMS 182: the APPEAR is clean and smooth -- the appear clip's own leap is the rise (the node waits at the hover height, the body
+comes up out of the floor in one arc, no stall on the stone) -- and the CROWN SPARKLES are off (the tell's stars, the teleport-in stars; the rise's stars shed
+off his body instead of a column up past his crown). Further passes re-point this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `fe66876` ("SMS 182: the King Boo REMATCH, part 26 -- the APPEAR is clean and smooth (the appear clip's own leap is the rise: the node waits at the hover height and the body comes up out of the floor in one arc, no stall on the stone) and the CROWN SPARKLES are off (the tell's stars, the teleport-in stars, and the rise's stars shed off his body instead of a column up past his crown)";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs) on the 181 commit
+  ("SMS 181: the King Boo REMATCH, part 25 -- effects for him COMING UP out of the ground (a glow pulsing on the stone and wisps before he breaks through, then the flash, the shock ring, the mist and twinkle stars streaming up round him) and for every TELEPORT (a poof and stars as he goes, a flash, a poof and stars where he comes in); the flashes brighter and bigger";
   assets/Sms/Rematch/ SmsKingBooRematch.cs) on the 180 commit
   ("SMS 180: the King Boo REMATCH, part 24 -- the shocked Bomb Boo WORRIES (it shakes its head, leans back, cowers, breathes, sweats), the spot's eyes a little bigger, and the intro's sink is King Boo's HIDE clip -- a leap and a DIVE through the floor in a twinkle burst, a flash, a ring of ghost mist and a shock ring";
   assets/Sms/Rematch/ SmsBombBoo.cs, SmsBombBooSpawner.cs, SmsKingBooRematch.cs) on the 179 commit
@@ -1289,9 +1293,13 @@ flashes brighter and bigger. Further passes re-point this entry's tip.
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 54 commits past `feature/sounds`, 76 since `main`. ~1.2 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 56 commits past `feature/sounds`, 78 since `main`. ~1.2 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 182: watch the cutscene's APPEAR -- after the glow's tell King Boo comes up out of the floor in one clean arc (the appear clip's own leap, no
+  stall on the stone) and settles at his hover height; twinkle stars shed off his body only while he shoots up, nothing at his crown; the crown's own sparkles
+  are gone from the tells and the teleport-ins (IntroAppearClipSpeed / RiseLeapDamp, CrownSparkles 0 / TeleportInStars off, Twinkle for the ambient stars on
+  KingBoo).
 - To try 181: watch King Boo COME UP -- in the cutscene and at the fight's start a pool of light pulses on the stone with wisps rising from it, then he bursts
   through in a flash, a shock ring and a splash of ghost mist with twinkle stars streaming up round him; every teleport now ends in a poof of mist and stars and
   begins with a flash where he comes in (RiseFx / RiseTellSeconds / RiseGlowSize / RiseWisps / RiseSparkles, TeleportFx / TeleportPuffs / TeleportSparkles /

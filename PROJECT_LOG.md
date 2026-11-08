@@ -12924,3 +12924,47 @@ for the runs and deleted.
 the fade, not its start; the rises' and teleports' colours are King Boo's violet-white (`DiveColor`); `FlashBoost` over 1 brightens every flash, the ring
 and the glow together; the rise's break reads the body joint against `RiseBreakAt`, as the dive does; the defeat (the down) has no new effect ("the fight's
 end is a later pass").
+
+### 182 -- the King Boo REMATCH, part 26: the APPEAR is clean and smooth (the appear clip's own leap is the rise: the node waits at the hover height and the body comes up out of the floor in one arc, no stall on the stone) and the CROWN SPARKLES are off (the tell's stars, the teleport-in stars, and the rise's stars shed off his body instead of a column up past his crown) (feature/kingboo-rematch, code `fe66876`)
+
+**Jaysonn:** "hmm not a fan of the crown sparkle effect. and during the intro it seems king boo get stcuk on the fllor for a second. can you make the appear
+animatin look clean and smooth?"
+
+**The stall** (`SmsKingBooRematch.cs`): the appear clip (`btelesa_appear`, 0.97 s) is itself a LEAP -- probed joint by joint (tools/anim/probe_clip.gd), the
+body spins up from 17 m under the node to 11 m over it by 0.33 s and lands back at the node by 0.6 s -- and 174's node, lerping up from `IntroSinkDepth` 7 m
+under the floor over `IntroRiseSeconds` meanwhile, let the body pop out of the floor, fall back under the stone and sit at floor level for half a second till
+the lerp caught up (by the probe's numbers against 174's 1.6 s lerp). Now the node waits AT the hover height (`StartAppearClip`: `Position = _introTop`
+as the clip starts, after 181's `RiseTellSeconds` 0.7 tell) and the clip's own leap IS the rise: the body comes up from 9 m under the floor and lands at the
+hover in one arc, the clip at `IntroAppearClipSpeed` 0.6 (1.6 s; `_anim.SpeedScale` x it, `_riseLen` the clip's length over it), its overshoot over the hover
+damped by `RiseLeapDamp` 0.6 (`RiseNodeTick` each tick: the node lowered from `_introTop` by that share of the body's lift over it, the lift read off the pose
+-- 0 = the clip's full 11 m leap, 1 = none, the node moving down to meet it), `RiseLength` the clip's. The same at the fight's spawn rise (`_spawnRise`; the
+quiet spawn's wait-for-up reads `_riseLen`). `IntroRiseSeconds` / `SpawnRiseSeconds` only time the old lerp when the clip is missing (`_riseClipStarted`
+false). Readout `RiseLeapTopY` (the highest the body got).
+
+**The crown sparkles**: `CrownSparkles` 36 -> 0 -- 165c's twinkle stars rising off the crown through a move's tell (`_crownSpark`, made only when the knob
+is over 0); the tell is the crown's colour and halo alone now, 36 puts them back. `TeleportInStars` (new) false -- 181's arrival stars (`StarBurst` in
+`TeleportInFx`) clustered at his crown: the arrival is the flash and the poof alone, both down at the body's middle (`Position` + 2, not + 3 by the crown;
+`TeleportOutFx` unchanged). The rise's stars (`RiseSparkles` 50, `_riseStars`: ChikaFx copied) were 181's column up past his crown (3-7 m/s up from a 3 m
+sphere at the body joint): they now SHED off his body -- a 3.5 m sphere at the body's middle (`BodyPoint` + 1.5: the joint sits low in the sphere), flung
+`Down` with a 100-degree spread at 2-6 m/s under a gravity of 8, 0.8 s each -- and only while he shoots UP to his hover height (`RiseFxTick`: the emitter
+closes once `BodyPoint.Y` passes `_introTop.Y`, or the body is 0.3 m under `RiseLeapTopY`): stars shed over it (the leap's 4 m overshoot and the drop back,
+half a second) sank slower than he did and he left them hanging about his crown as he landed (runs ba-bd).
+
+**Verified** (headless drive v182-6, deleted before the commit): C0e the rise is CLEAN -- once the body broke the floor it never dipped back under it and
+spent 4 ticks within 3 m of it (the drive's bound 15; the old lerp by the probe's numbers: half a second at floor level), the leap's top 13.84 against a landing at 9.58 (the clip's 11 m damped 0.6), 30 of
+94 ticks after the break coming down (the leap's landing), the rise 1.64 s at the clip's 0.6; C0c / C0d the cutscene's and the spawn's rise effects as in 181
+(the glow seen, the break at 0.79 s, the stars seen, the flash up, all off once up); C9 the teleport after the hit: the out-poof once, the in-flash once, no
+stars at the crown; 181's, 180's and 179's checks as before -- 17/17, no errors. v182-1: C0e's dip check read the break's own 2.2 m under the floor as a dip
+(the break fires with the body at `RiseBreakAt` under it) -- the drive waits for the body to be up first (`_wasUp`); v182-2 17/17; v182-3 the stars sent out
+and down; v182-4 falling; v182-5 stopped at the leap's top; v182-6 stopped at the hover height, 17/17 each. Five shot runs (17 shots each): the glow on the
+stone; the break; the stars trailing under him as he shoots up; the landing at the hover -- run ba's column of stars past the crown (181), bb's stars sent up
+off the body gathered at the crown in a white blob (he came down faster than they rose), bc's falling stars still hung over the crown (the body dropped 4 m
+in half a second, the stars 3), bd's stopped at the leap's top still left a few, be: a bare crown, the ambient twinkle's few small stars about him only
+(157's `Twinkle`); the teleport-in with the flash and no stars; the 181-179 shots again. run_window.ps1 copied to the project root for the shot runs and
+deleted; the drive, the logs and shots165/ deleted; a clean rebuild 0 errors.
+
+**Deviations, all knobs:** the rise is the clip's length (1.6 s at `IntroAppearClipSpeed` 0.6, after `RiseTellSeconds` 0.7) -- `IntroRiseSeconds` /
+`SpawnRiseSeconds` no longer time it unless the clip is missing; the leap still overshoots the hover by ~4 m before he settles (`RiseLeapDamp` 1 = none, 0 =
+the clip's 11 m); `CrownSparkles` 0 takes the stars out of every move's tell too (the crown's colour and halo stay); the rise's stars stream only up to his
+hover height, none through the overshoot and the settle; the ambient twinkle (`Twinkle`) still puts a few small stars about his body -- the knob if that is
+the sparkle he meant. Next: the fight's END -- the defeat and the Shine's spawn (Jaysonn: "lets do the ending of the fight also spawning the shine and such").
