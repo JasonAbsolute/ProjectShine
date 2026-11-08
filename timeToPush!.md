@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180 + 181 + 182 + 183 + 184 + 185 + 186 + 187), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-08 02:25 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180 + 181 + 182 + 183 + 184 + 185 + 186 + 187 + 188), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-08 04:57 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1246,8 +1246,11 @@ last spot and 3 m from any Boo out. SMS 185: the pace UP (a move about every 2 s
 THUNDER WALLS long and LOW (18 x 2.2 m: a held jump clears them, the ends 9 m off). SMS 186: the BEGINNING LAUGH is the casino intro's chuckle (V_LAUGH1B,
 the climbing hee-hee-hee), the intro laughing 4.6 s, the chuckle cut at his dive; SmsActorSound gets Stop(se). SMS 187: the FREEZE BREATH made fair -- only
 the dense cold freezes (the thin edge and the fading tail no longer hit), a jump clears it at 1 m, and the ICE is a shield (a hit through the frost shatters it and
-does nothing else; Mario.cs SmsFrostShields). Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `471b32d` ("SMS 187: the King Boo REMATCH, part 31 -- the FREEZE BREATH made fair: only the DENSE cold freezes (a puff's ball shrinks with its own fade and is gone past three quarters of its life -- the thin edge and the fading tail no longer hit; the ball 0.3 of the puff, the core's size), a jump clears it at 1 m, and the ICE is a shield (a hit or a shock through the frost shatters it and does nothing else: no knockdown, no HP)";
+does nothing else; Mario.cs SmsFrostShields). SMS 188: the SPLIT's CUTSCENE -- the world freezes, a camera cuts to a line of him across the arena, his copies come
+in beside him in violet mist, all laugh together under a card line, then every one of them attacks (SmsSplitCutscene.cs, new). Further passes re-point this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `0932892` ("SMS 188: the King Boo REMATCH, part 32 -- the SPLIT's CUTSCENE: as the hurt that earns a copy ends the world freezes and a camera cuts to a LINE across the arena -- he vanishes in a poof and comes back at his place out of violet ghost mist, laughing; his copies come in beside him one by one in a flash and the mist; all of them turn on Mario and LAUGH TOGETHER under a card line; the world runs again with every one of them attacking";
+  assets/Sms/Rematch/ SmsSplitCutscene.cs (+ .uid, new), SmsKingBooRematch.cs) on the 187 commit
+  ("SMS 187: the King Boo REMATCH, part 31 -- the FREEZE BREATH made fair: only the DENSE cold freezes (a puff's ball shrinks with its own fade and is gone past three quarters of its life -- the thin edge and the fading tail no longer hit; the ball 0.3 of the puff, the core's size), a jump clears it at 1 m, and the ICE is a shield (a hit or a shock through the frost shatters it and does nothing else: no knockdown, no HP)";
   assets/Sms/Rematch/ SmsGhostBreath.cs, SmsKingBooRematch.cs, assets/ Mario.cs) on the 186 commit
   ("SMS 186: the King Boo REMATCH, part 30 -- the BEGINNING LAUGH is the casino intro's CHUCKLE (MSD_SE_BS_TELESA_V_LAUGH1B, the climbing hee-hee-hee the casino plays as the roulette seats; the long V_LAUGH1 before), at IntroLaughPitch, the intro laughing 4.6 s and the chuckle cut at his dive; SmsActorSound gets Stop(se) / IsPlaying(se)";
   assets/Sms/Rematch/ SmsKingBooRematch.cs, assets/Sms/Sound/ SmsActorSound.cs) on the 185 commit
@@ -1311,9 +1314,13 @@ does nothing else; Mario.cs SmsFrostShields). Further passes re-point this entry
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 66 commits past `feature/sounds`, 88 since `main`. ~1.2 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 68 commits past `feature/sounds`, 90 since `main`. ~1.2 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 188: hit him three times -- the world freezes, the camera cuts to a line of him across the arena, his copy comes in beside him out of violet
+  mist, they laugh together under "Now there are TWO of me!" (and "THREE of me!" at six hits), then all of them attack; A skips it. Knobs in The split's
+  cutscene group on KingBoo: SplitCutscene (off = the old quiet split), SplitLineSpacing, SplitCopyEvery, SplitHoldSeconds, SplitCam* , SplitLine2 / SplitLine3,
+  SplitMistColor / SplitMistPuffs, SplitLaughSpread, SplitSkipAllowed.
 - To try 187: the freeze breath -- only the thick white core of the cold freezes you now (the thin mist and its fading tail are harmless), a held jump
   clears it, and while you are frozen the ICE takes any hit for you (it shatters, nothing else happens). Knobs: HitLifeK / HitRadiusK / HitFollowsFade /
   HitHeight on the breath (BreathHitHeight on KingBoo), SmsFrostShields on Mario.

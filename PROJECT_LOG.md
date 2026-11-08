@@ -13166,3 +13166,47 @@ so the Boo saw him look away and the shock lapsed (185's unexplained lapse, run 
 off = 167's); the freezing reach is 25 m of the mist's 33 (`HitLifeK` 1 = the whole life); the thin edges harmless (`HitFollowsFade` off = the full ball);
 the copies still breathe (`CopyBreath`), each breath its own freeze. Next (Jaysonn): a little King Boo-themed cutscene when he splits into two, and into
 three -- "showing three of him will now be attacking".
+
+### 188 -- the King Boo REMATCH, part 32: the SPLIT's CUTSCENE -- as the hurt that earns a copy ends the world freezes and a camera cuts to a LINE across the arena: he vanishes in a poof and comes back at his place out of violet ghost mist, laughing; his copies come in beside him one by one in a flash and the mist; all of them turn on Mario and LAUGH TOGETHER under a card line ("Now there are TWO of me!" / "THREE of me! Can you keep up, Mario?"); the world runs again with every one of them attacking (feature/kingboo-rematch, code `0932892`)
+
+**Jaysonn:** "we need a little cutscene that plays when he splits into two. and three. showing three of him will now be attacking. make it king boo themed"
+
+**The cutscene** (`SmsSplitCutscene.cs`, new): a Node King Boo makes in `OnClipEnd` as the hurt that earns a copy ends (`_copyPending`: 177's every
+`CopyEveryHits` hits up to `MaxCopies`; `SplitCutscene` off = 177's `SpawnCopy` with the fight running), `ProcessMode` Always with the WORLD FROZEN -- the
+tree paused as the Shine's appear demo does, so Mario, the Bomb Boos, the supply and the game camera hold while he, his copies and the cutscene run on
+(their `ProcessMode` set Always for the length of it and back). `Begin`: the new copy made held (`SpawnCopyHeld`: `SpawnCopy` without the arrival, the
+model hidden, the Split phase); the LINE laid across the arena's middle (`ArenaCentre`, the floor under it + `HoverOverFloor`) facing Mario -- `SplitLineSpacing`
+11 apart (his body is 9 m across; 7 had two of him touching), the real one in the middle slot, the copies already out beside him, the new one last, left to
+right as Mario sees them; the beats: the real one poofs where he was at 0 (`SplitHide`: 181's teleport-out) and comes in at 0.45 s, each copy `SplitCopyEvery`
+0.6 later; the chorus 1.0 s after the last comes in; the end `SplitHoldSeconds` 1.3 after (3.35 s with two of him, 3.95 with three). Coming in (`SplitShowAt`):
+placed, turned on Mario, the arrival's flash and poof, a boil of violet ghost mist (`SplitMist`: `SplitMistPuffs` 70 smoke balls of 4-9 m flung up and out at
+5-11 m/s in `SplitMistColor` (0.48, 0.22, 0.62) -- a violet that reads on the black sky -- and half as many low along the floor), the opacity up over 0.3 s
+(`SplitFade`: the crown with the body, the model hidden at 0), then 0.35 s later the laugh clip and the long laugh (`SplitLaugh(pitch)`). The CHORUS: all turn
+on Mario (`SplitFace`) and laugh together, the copies a shade off his pitch either way (`SplitLaughSpread` 0.08: 1.08, 0.92, 1.16...). The CARD: a
+`SmsRematchCard` with one line in the intro card's style and no black (`SplitLine2` at two of him, `SplitLine3` at three; "" = none), in 0.9 s after the
+start, out over the last 0.45. The CAMERA: Mario's side of the line, `SplitCamDistance` out (0 = the lens that fits the line's half width (n-1)/2 x spacing +
+5.5 m and the laughing bodies' half height 6.5 m at `SplitCamFov` 50 and the viewport's aspect, x 1.25 + 2: 19.4 m for two, 27 for three), `SplitCamHeight`
+4.5 over the hover, looking at the middle of the bodies (4 m over the hover). A or space skips to the end (`SplitSkipAllowed`). `End`: everyone shown at
+his place, `SplitEnd` (`EnterWait(NextGap())`: the copies' gaps `CopyGapScale`d), the game camera back, the card and the camera freed, the world running,
+`Finished`. Readouts `State`, `Time`, `LineCount`, `SlotOf`, `BooAt`, `Camera`, `Card`, `WorldFrozen`, `Skipped`, `Laughs`, `ChorusDone`.
+
+**King Boo** (`SmsKingBooRematch.cs`): the `Split` phase (every move called off, the flash off; he keeps his eyes on Mario while shown; the cutscene places
+him), the hooks above, `SplitMist`, `SpawnCopyHeld`, `FloorYAt`; readouts `SplitNow`, `SplitsShown`. The copy's own tell (178: the silver crown, `CopyTell`)
+shows which is which in the line.
+
+**Verified** (headless drive v188-4, deleted before the commit): C15 -- after 187's breath check his hits taken set to `CopyEveryHits` - 1 and a hit: the
+hurt, then the cutscene -- the tree paused through it (200 ticks, Mario 0.00 m moved) under `SplitCutsceneCamera`, two of him in the line 11.0 m apart on
+their places (0.00 m off), the copy made and shown, the chorus at 2.06 s with 4 laughs (two as each came in, two together), the card up (alpha 1.00); over at
+3.35 s: the world running, the game camera current again, both in the WAIT 11 m apart, one copy alive; then the last hit -- the copy dismissed with him
+(183's C10 now reads a dismissed copy still laughing or fading as gone: 177's dismissal takes 2.2 s, the check comes at 1.5); 187-179's checks as before --
+27/27, no errors. Three shot runs from the cutscene's own camera: bn framed one of him filling the screen -- his body is 9 m tall and across (the 182 shots:
+8.5 m at 22 m), not the 6 I framed for, and two of him 7 m apart touched: the lens fits the bodies' width and height, the spacing 11 (bo); bo showed the held
+copy as a BLACK silhouette with a solid silver crown -- the ghost shader draws black at opacity 0 and `SetCrownGlow` leaves the crown at his solid -- the
+model hidden till shown, the crown faded with the body (bp): he comes into the line at the right in the violet mist with his vanish's stars at the left; the
+copy fading in beside him under the card; the two laughing together with the crowns thrown up (the laugh clip's own) and the card line over them. The clean
+rebuild 0 errors; the drive, the logs, shots165/, run_window.ps1 and this pass's scheduled tasks deleted. `SmsSplitCutscene.cs.uid` (Godot's) committed with
+the script, as the other Rematch scripts' are.
+
+**Deviations, all knobs:** the cutscene is mine (the doc has the split, not a scene); the world freezes 3.4-4 s mid-fight (`SplitCutscene` off = 177's);
+the line stands at the arena's middle, so after it he and the copies are within `CopyMinFromMario` of Mario till their next hop; the laugh clip throws the
+crowns 6 m up (the game's clip); the card's lines are knobs per count; the chorus pitches are mine.
