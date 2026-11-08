@@ -115,11 +115,33 @@ public partial class SmsKingBooRematch : Node3D
     /// and the vanish voice at that moment; everything in DiveColor. "" = 174's plain sink (the wait clip lowered over IntroSinkSeconds).</summary>
     [Export] public string IntroDiveClip = "btelesa_hide";
     [Export(PropertyHint.Range, "0.3,2,0.05")] public float IntroDiveClipSpeed = 0.85f;
-    [Export(PropertyHint.Range, "0,120,1")] public int DiveSparkles = 60, DiveRingPuffs = 36, DiveSplashPuffs = 28;
-    [Export] public float DiveSplashAt = 2.2f, DiveFlashSize = 12f, DiveFlashSeconds = 0.45f, DiveShake = 0.6f;
+    [Export(PropertyHint.Range, "0,120,1")] public int DiveSparkles = 80, DiveRingPuffs = 44, DiveSplashPuffs = 36;
+    [Export] public float DiveSplashAt = 2.2f, DiveFlashSize = 16f, DiveFlashSeconds = 0.45f, DiveShake = 0.6f;
+    /// <summary>181: the flashes' and the rise glow's brightness over the colour (an additive quad brighter than its texture: 1 = the colour as is; the first shots' flashes
+    /// read as a faint ring on a 6 m ghost).</summary>
+    [Export(PropertyHint.Range, "0.5,4,0.1")] public float FlashBoost = 1.8f;
     [Export(PropertyHint.Range, "1,6,0.1")] public float DiveGlowBoost = 2.5f;
     [Export] public bool DiveShockRing = true;
     [Export] public Color DiveColor = new Color(0.8f, 0.7f, 1f);
+    [ExportGroup("The rise and the teleports (181: effects)")]
+    /// <summary>181 (Jaysonn: "we also need effects of him coming from the ground; we basically want everything to have some type of effect, make it flashy"): the
+    /// RISES -- the intro's surface and the fight's spawn -- from the rise's start a GLOW pulses on the stone where he will come up (RiseGlowSize m at RiseGlowHz,
+    /// growing) with wisps of ghost mist seeping up out of it (RiseWisps a second), and as the body breaks the floor (its middle RiseBreakAt m under it) the
+    /// dive's splash in reverse: a FLASH there, a SHOCK RING, a RING of mist along the floor, a SPLASH of it thrown up, the camera kicked (RiseShake), his glow
+    /// swelling RiseGlowBoost x and settling, and twinkle stars STREAMING up round his body till he is up (RiseSparkles a second). The TELEPORTS (TeleportFx) -- a
+    /// poof of ghost mist and a burst of stars at his body as he fades out, and a flash, a poof and stars where he fades in (a copy's arrival, the found-out copy's
+    /// fade and his split the same), TeleportPuffs / TeleportSparkles each, TeleportFxScale against the dive's sizes. All in DiveColor. Off: 174's bare rises
+    /// and 162's bare fades.</summary>
+    [Export] public bool RiseFx = true;
+    /// <summary>The TELL before a rise: the glow and the wisps alone on the stone this long before the appear clip starts and he comes up (the appear clip's own first
+    /// fifth of a second rushes the body up from 23 m under; without the tell the glow had 0.19 s). 0 = he comes up at once.</summary>
+    [Export(PropertyHint.Range, "0,3,0.05")] public float RiseTellSeconds = 0.7f;
+    [Export] public float RiseGlowSize = 14f, RiseGlowHz = 3f, RiseBreakAt = 2.2f, RiseShake = 0.5f;
+    [Export(PropertyHint.Range, "1,6,0.1")] public float RiseGlowBoost = 2f;
+    [Export(PropertyHint.Range, "0,120,1")] public int RiseWisps = 30, RiseSparkles = 50;
+    [Export] public bool TeleportFx = true;
+    [Export(PropertyHint.Range, "0,80,1")] public int TeleportPuffs = 20, TeleportSparkles = 30;
+    [Export(PropertyHint.Range, "0.2,2,0.05")] public float TeleportFxScale = 1f;
     [ExportGroup("")]
     /// <summary>He turns to face Mario while he waits, at this many radians a second.</summary>
     [Export] public bool FaceMario = true;
@@ -569,7 +591,10 @@ public partial class SmsKingBooRematch : Node3D
         {
             _introTop = Position; _introFloorY = Position.Y - _hoverOverFloor; _introT = 0f;
             Position = new Vector3(Position.X, _introFloorY - IntroSinkDepth, Position.Z);
-            if (_sound != null && !string.IsNullOrEmpty(ArriveSe)) _sound.Play(ArriveSe);
+            _riseClipPending = RiseFx && RiseTellSeconds > 0f;                                                           // 181: the tell first (the appear clip played above is replaced till then)
+            if (_riseClipPending) { _introT = -RiseTellSeconds; PlayClip(BckWait); }
+            else if (_sound != null && !string.IsNullOrEmpty(ArriveSe)) _sound.Play(ArriveSe);
+            RiseFxBegin(new Vector3(_introTop.X, _introFloorY, _introTop.Z));                                            // 181: the glow on the stone, the wisps
         }
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: appears at {GlobalPosition} ({_hoverOverFloor:F2} m over the floor{(HoverLift != 0f ? $", lifted {HoverLift:F1}" : "")}{(_spawnRise ? $", rising out of the floor over {SpawnRiseSeconds:F1} s" : "")}; the arena's middle {_arenaCentre}, radius {_arenaRadius:F1})");
         EmitSignal(SignalName.Spawned);
@@ -590,8 +615,10 @@ public partial class SmsKingBooRematch : Node3D
         if (_tongue != null) { _tongue.Stretch = TongueStretch; _tongue.On = TongueStretch > 1.001f; }
         SetCrownGlow(_crownGlowColor, 0f);
         State = Phase.IntroRise;
-        PlayClip(BckAppear);
-        if (_sound != null && !string.IsNullOrEmpty(ArriveSe)) _sound.Play(ArriveSe);
+        _riseClipPending = RiseFx && RiseTellSeconds > 0f;                                                               // 181: the tell first -- the glow and the wisps alone, then the clip and the rise
+        if (_riseClipPending) { _introT = -RiseTellSeconds; PlayClip(BckWait); }
+        else { PlayClip(BckAppear); if (_sound != null && !string.IsNullOrEmpty(ArriveSe)) _sound.Play(ArriveSe); }
+        RiseFxBegin(new Vector3(_introTop.X, _introFloorY, _introTop.Z));                                                // 181: the glow on the stone, the wisps
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: INTRO -- surfaces at {_introTop} ({_hoverOverFloor:F2} m over the floor at {_introFloorY:F2}) from {IntroSinkDepth} m under, over {IntroRiseSeconds:F1} s; laughs {IntroLaughSeconds:F1} s; sinks over {IntroSinkSeconds:F1} s");
         EmitSignal(SignalName.IntroSurfacing);
     }
@@ -601,7 +628,7 @@ public partial class SmsKingBooRematch : Node3D
         if (State != Phase.IntroRise && State != Phase.IntroLaugh && State != Phase.IntroSink) return;
         Position = new Vector3(Position.X, _introFloorY - IntroSinkDepth, Position.Z);
         if (_model != null) _model.Visible = false;
-        State = Phase.Hidden; _glowBoost = 1f;
+        State = Phase.Hidden; _glowBoost = 1f; RiseFxEnd(); _riseClipPending = false;
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: INTRO cut short -- under the floor");
         EmitSignal(SignalName.IntroSunk);
     }
@@ -612,11 +639,14 @@ public partial class SmsKingBooRematch : Node3D
         _introT += dt;
         if (State == Phase.IntroRise)
         {
+            RiseClipWhenDue();
             float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp(_introT / Mathf.Max(0.1f, IntroRiseSeconds), 0f, 1f));
             Position = new Vector3(_introTop.X, Mathf.Lerp(_introFloorY - IntroSinkDepth, _introTop.Y, k), _introTop.Z);
             FaceTick(dt);
+            RiseFxTick(dt);
             if (_introT >= IntroRiseSeconds)
             {
+                RiseFxEnd();
                 State = Phase.IntroLaugh; _introT = 0f; _hoverT = 0f; LaughPlayed = true;
                 PlayClip(BckLaugh);
                 if (_sound != null && !string.IsNullOrEmpty(LaughSe)) _sound.Play(LaughSe, LaughDb);
@@ -667,14 +697,25 @@ public partial class SmsKingBooRematch : Node3D
         }
     }
     private bool _diveOn, _diveSparkled, _diveSplashed; private float _diveLen, _diveBodyTop = float.NegativeInfinity, _diveLastBodyY, _glowBoost = 1f;
-    private MeshInstance3D _diveFlash, _diveRing; private StandardMaterial3D _diveFlashMat, _diveRingMat; private float _diveFxT;
-    /// <summary>180, for the drives: the dive (on, the twinkle burst fired, the splash fired and when, how high the body leapt).</summary>
+    private sealed class Flash { public MeshInstance3D Mi; public StandardMaterial3D Mat; public float T, Size, Seconds, From, To; }
+    private readonly List<Flash> _flashes = new();                                                            // 181: the flashes alive (the dive's, a rise's, the teleports')
+    private MeshInstance3D _diveRing; private StandardMaterial3D _diveRingMat; private float _diveFxT;
+    private bool _riseFxOn, _riseBroke; private float _riseT, _riseFloorY, _riseBreakT = -1f, _riseGlowT, _riseGlowBreakT = -1f; private Vector3 _riseSpot; private MeshInstance3D _riseGlow; private StandardMaterial3D _riseGlowMat; private GpuParticles3D _riseWisps, _riseStars;
+    /// <summary>180, for the drives: the dive (on, the twinkle burst fired, the splash fired and when, how high the body leapt, a flash alive); 181: the rise
+    /// (its effects running, the floor glow up, the body broken through and when, the stars streaming), the teleports' effects fired.</summary>
     public bool DiveOn => _diveOn;
     public bool DiveSparkled => _diveSparkled;
     public bool DiveSplashed => _diveSplashed;
     public float DiveSplashT { get; private set; } = -1f;
     public float DiveBodyTopY => _diveBodyTop;
-    public bool DiveFlashUp => _diveFlash != null && IsInstanceValid(_diveFlash);
+    public bool DiveFlashUp => _flashes.Count > 0;
+    public bool RiseFxOn => _riseFxOn;
+    public bool RiseGlowUp => _riseGlow != null && IsInstanceValid(_riseGlow) && _riseGlow.Visible;
+    public bool RiseBroke => _riseBroke;
+    public float RiseBreakT => _riseBreakT;
+    public bool RiseStarsOn => _riseStars != null && IsInstanceValid(_riseStars) && _riseStars.Emitting;
+    public int TeleportOutFxFired { get; private set; }
+    public int TeleportInFxFired { get; private set; }
     /// <summary>180: the intro's DIVE -- the node holds at the laugh height while the hide clip leaps the body up and plunges it through the floor; the twinkle burst
     /// at the top of the leap (the body starts down, or 0.3 of the clip in), the glow swelling through the leap and out once the body is under, the SPLASH as the body
     /// comes down to DiveSplashAt over the floor.</summary>
@@ -690,63 +731,202 @@ public partial class SmsKingBooRematch : Node3D
         _diveLastBodyY = by;
     }
     /// <summary>The twinkle stars burst off him at the top of the leap: his ChikaFx emitter copied as a one-shot, flung every way under a light gravity.</summary>
-    private void DiveSparkle(Vector3 at)
+    private void DiveSparkle(Vector3 at) { StarBurst("DiveSparkFx", at, DiveSparkles, 1f); if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the DIVE's twinkle burst at {at} ({_introT:F2} s in)"); }
+    /// <summary>A one-shot burst of his twinkle stars (his ChikaFx emitter copied): count, at a point, the dive's sizes x scale (he is 6 m across: big stars).</summary>
+    private void StarBurst(string name, Vector3 at, int count, float scale)
     {
-        if (DiveSparkles <= 0 || _chika == null || _chika.ProcessMaterial is not ParticleProcessMaterial chikaMat) return;
+        if (count <= 0 || _chika == null || _chika.ProcessMaterial is not ParticleProcessMaterial chikaMat) return;
         var p = (GpuParticles3D)_chika.Duplicate();
-        p.Name = "DiveSparkFx"; p.TopLevel = true; p.Visible = true; p.Amount = DiveSparkles; p.Lifetime = 0.9; p.OneShot = true; p.Explosiveness = 1f; p.Emitting = false; p.LocalCoords = false;
+        p.Name = name; p.TopLevel = true; p.Visible = true; p.Amount = count; p.Lifetime = 0.9; p.OneShot = true; p.Explosiveness = 1f; p.Emitting = false; p.LocalCoords = false;
         var pm = (ParticleProcessMaterial)chikaMat.Duplicate();
-        pm.EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere; pm.EmissionSphereRadius = 2.2f; pm.Direction = Vector3.Up; pm.Spread = 180f;
-        pm.InitialVelocityMin = 4f; pm.InitialVelocityMax = 10f; pm.Gravity = new Vector3(0f, -4f, 0f); pm.ScaleMin = 1.6f; pm.ScaleMax = 3f;   // big stars: he is 6 m across
+        pm.EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere; pm.EmissionSphereRadius = 2.2f * scale; pm.Direction = Vector3.Up; pm.Spread = 180f;
+        pm.InitialVelocityMin = 4f * scale; pm.InitialVelocityMax = 10f * scale; pm.Gravity = new Vector3(0f, -4f, 0f); pm.ScaleMin = 1.6f * scale; pm.ScaleMax = 3f * scale;
         p.ProcessMaterial = pm;
         AddChild(p); p.GlobalPosition = at; p.Finished += p.QueueFree; p.Emitting = true;
-        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the DIVE's twinkle burst at {at} ({_introT:F2} s in)");
     }
-    /// <summary>The body goes through the floor: a flash of light on the stone, a ring of ghost mist racing out along it, a splash of it thrown up, a shock ring, the
-    /// camera kicked, the vanish voice.</summary>
+    /// <summary>A flash of light: a flat additive radial on the stone (flat) or a camera-facing one at a point, size m, growing from -> to of it and fading over
+    /// seconds (FxTick). Drawn over the depth: the arena's floor is a shallow dome -- a flat quad this wide dipped under it and was cut in chunks.</summary>
+    private void FlashAt(string name, Vector3 at, float size, float seconds, bool flat, float from = 0.5f, float to = 1.1f)
+    {
+        var tex = FxTex("radgrad_raw"); if (size <= 0f || tex == null) return;
+        var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, NoDepthTest = true, AlbedoTexture = tex, AlbedoColor = Bright(0.95f), RenderPriority = 4, BillboardMode = flat ? BaseMaterial3D.BillboardModeEnum.Disabled : BaseMaterial3D.BillboardModeEnum.Enabled };
+        var mi = new MeshInstance3D { Name = name, TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Mesh = new QuadMesh { Size = Vector2.One, Orientation = flat ? PlaneMesh.OrientationEnum.Y : PlaneMesh.OrientationEnum.Z, Material = mat }, Scale = Vector3.One * size * from };
+        AddChild(mi); mi.GlobalPosition = at + (flat ? Vector3.Up * 0.06f : Vector3.Zero);
+        _flashes.Add(new Flash { Mi = mi, Mat = mat, T = 0f, Size = size, Seconds = Mathf.Max(0.01f, seconds), From = from, To = to });
+    }
+    /// <summary>The shock ring racing out along the floor from a point to `size` x 2.2 over seconds x 1.8, fading (FxTick); one at a time.</summary>
+    private void ShockRingAt(Vector3 at, float size, float seconds)
+    {
+        var ringTex = FxTex("hamonring2_add") ?? FxTex("hamonring2"); if (ringTex == null) return;
+        if (_diveRing != null && IsInstanceValid(_diveRing)) { _diveRing.QueueFree(); _diveRing = null; }
+        _diveRingMat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, NoDepthTest = true, AlbedoTexture = ringTex, AlbedoColor = Bright(0.9f), RenderPriority = 4 };
+        _diveRing = new MeshInstance3D { Name = "ShockRingFx", TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Mesh = new QuadMesh { Size = Vector2.One, Orientation = PlaneMesh.OrientationEnum.Y, Material = _diveRingMat }, Scale = Vector3.One * 2f };
+        AddChild(_diveRing); _diveRing.GlobalPosition = at + Vector3.Up * 0.1f;
+        _diveFxT = 0f; _ringSize = size; _ringSeconds = Mathf.Max(0.01f, seconds);
+    }
+    private float _ringSize = 12f, _ringSeconds = 0.45f;
+    /// <summary>The floor BURST where his body meets the stone (the dive's splash; 181: the rise's breakthrough too): the flash, the shock ring, a ring of ghost mist
+    /// racing out along the floor, a splash of it thrown up.</summary>
+    private void FloorBurst(string name, Vector3 at)
+    {
+        FlashAt(name + "Flash", at, DiveFlashSize, DiveFlashSeconds, flat: true);
+        if (DiveShockRing) ShockRingAt(at, DiveFlashSize, DiveFlashSeconds);
+        Color mist = MistColor;
+        if (DiveRingPuffs > 0) DiveBurst(name + "RingPuffs", DiveRingPuffs, at + Vector3.Up * 0.5f, Vector3.Up * 0.05f, 180f, 8f, 15f, 2.5f, 6f, mist, 0.75f, 1.0, 4f, 0.3f, flat: true);   // a 6 m ghost: the mist races out wide
+        if (DiveSplashPuffs > 0) DiveBurst(name + "SplashPuffs", DiveSplashPuffs, at + Vector3.Up * 0.8f, Vector3.Up, 35f, 7f, 15f, 2f, 5f, mist, 0.75f, 1.1, 2.5f, -6f);
+    }
+    private Color MistColor => new Color(Mathf.Lerp(DiveColor.R, 1f, 0.3f), Mathf.Lerp(DiveColor.G, 1f, 0.3f), Mathf.Lerp(DiveColor.B, 1f, 0.3f));
+    /// <summary>The body goes through the floor: the floor burst, the camera kicked, the vanish voice.</summary>
     private void DiveSplash(Vector3 at)
     {
-        var tex = FxTex("radgrad_raw");
-        if (DiveFlashSize > 0f && tex != null)
-        {
-            // the arena's floor is a shallow dome: a flat quad this wide dips under it further out and was cut in chunks -- drawn over the depth instead (an additive glow)
-            _diveFlashMat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, NoDepthTest = true, AlbedoTexture = tex, AlbedoColor = new Color(DiveColor.R, DiveColor.G, DiveColor.B, 0.95f), RenderPriority = 4 };
-            _diveFlash = new MeshInstance3D { Name = "DiveFlashFx", TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Mesh = new QuadMesh { Size = Vector2.One, Orientation = PlaneMesh.OrientationEnum.Y, Material = _diveFlashMat }, Scale = Vector3.One * DiveFlashSize * 0.5f };
-            AddChild(_diveFlash); _diveFlash.GlobalPosition = at + Vector3.Up * 0.06f;
-        }
-        var ringTex = FxTex("hamonring2_add") ?? FxTex("hamonring2");
-        if (DiveShockRing && ringTex != null)
-        {
-            _diveRingMat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, NoDepthTest = true, AlbedoTexture = ringTex, AlbedoColor = new Color(DiveColor.R, DiveColor.G, DiveColor.B, 0.9f), RenderPriority = 4 };
-            _diveRing = new MeshInstance3D { Name = "DiveRingFx", TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Mesh = new QuadMesh { Size = Vector2.One, Orientation = PlaneMesh.OrientationEnum.Y, Material = _diveRingMat }, Scale = Vector3.One * 1.5f };
-            AddChild(_diveRing); _diveRing.GlobalPosition = at + Vector3.Up * 0.1f;
-        }
-        _diveFxT = 0f;
-        Color mist = new Color(Mathf.Lerp(DiveColor.R, 1f, 0.3f), Mathf.Lerp(DiveColor.G, 1f, 0.3f), Mathf.Lerp(DiveColor.B, 1f, 0.3f));
-        if (DiveRingPuffs > 0) DiveBurst("DiveRingPuffs", DiveRingPuffs, at + Vector3.Up * 0.4f, Vector3.Up * 0.05f, 180f, 7f, 13f, 2f, 5f, mist, 0.7f, 1.0, 4f, 0.3f, flat: true);     // a 6 m ghost went in: the mist races out wide
-        if (DiveSplashPuffs > 0) DiveBurst("DiveSplashPuffs", DiveSplashPuffs, at + Vector3.Up * 0.6f, Vector3.Up, 35f, 6f, 13f, 1.5f, 4f, mist, 0.7f, 1.1, 2.5f, -6f);
+        FloorBurst("Dive", at);
         if (DiveShake > 0f) SmsCameraShake.Current?.Start(SmsCameraShake.Kind.Damage, DiveShake);
         if (_sound != null && !string.IsNullOrEmpty(VanishSe)) _sound.Play(VanishSe);
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the DIVE's splash at {at} ({_introT:F2} s in; the body at {BodyPoint.Y:F2})");
     }
-    /// <summary>The flash and the shock ring run out: the flash grows a little and fades over DiveFlashSeconds, the ring races out to the flash's size and fades.</summary>
-    private void DiveFxTick(float dt)
+    /// <summary>The flashes and the shock ring run out: a flash grows from -> to of its size and fades over its seconds; the ring races out and fades. 181: the rise's
+    /// floor glow pulses and grows while it is up.</summary>
+    private void FxTick(float dt)
     {
-        _diveFxT += dt;
-        float f = Mathf.Clamp(_diveFxT / Mathf.Max(0.01f, DiveFlashSeconds), 0f, 1f);
-        if (_diveFlash != null && IsInstanceValid(_diveFlash))
+        for (int i = _flashes.Count - 1; i >= 0; i--)
         {
-            _diveFlash.Scale = Vector3.One * DiveFlashSize * Mathf.Lerp(0.5f, 1.1f, f);
-            _diveFlashMat.AlbedoColor = new Color(DiveColor.R, DiveColor.G, DiveColor.B, (1f - f) * (1f - f) * 0.95f);
-            if (f >= 1f) { _diveFlash.QueueFree(); _diveFlash = null; }
+            var fl = _flashes[i];
+            if (fl.Mi == null || !IsInstanceValid(fl.Mi)) { _flashes.RemoveAt(i); continue; }
+            fl.T += dt; float f = Mathf.Clamp(fl.T / fl.Seconds, 0f, 1f);
+            fl.Mi.Scale = Vector3.One * fl.Size * Mathf.Lerp(fl.From, fl.To, f);
+            fl.Mat.AlbedoColor = Bright((1f - f) * (1f - f) * 0.95f);
+            if (f >= 1f) { fl.Mi.QueueFree(); _flashes.RemoveAt(i); }
         }
         if (_diveRing != null && IsInstanceValid(_diveRing))
         {
-            float r = Mathf.Clamp(_diveFxT / Mathf.Max(0.01f, DiveFlashSeconds * 1.8f), 0f, 1f);
-            _diveRing.Scale = Vector3.One * Mathf.Lerp(2f, DiveFlashSize * 2.2f, Mathf.SmoothStep(0f, 1f, r));
-            _diveRingMat.AlbedoColor = new Color(DiveColor.R, DiveColor.G, DiveColor.B, (1f - r) * 0.9f);
+            _diveFxT += dt;
+            float r = Mathf.Clamp(_diveFxT / (_ringSeconds * 1.8f), 0f, 1f);
+            _diveRing.Scale = Vector3.One * Mathf.Lerp(2f, _ringSize * 2.2f, Mathf.SmoothStep(0f, 1f, r));
+            _diveRingMat.AlbedoColor = Bright((1f - r) * 0.9f);
             if (r >= 1f) { _diveRing.QueueFree(); _diveRing = null; }
         }
+        if (_riseGlow != null && IsInstanceValid(_riseGlow) && _riseGlow.Visible)
+        {
+            _riseGlowT += dt;                                                                                                                   // its own clock: it fades on after the rise is over
+            float a = _riseGlowBreakT >= 0f ? Mathf.Max(0f, 1f - (_riseGlowT - _riseGlowBreakT) / 0.4f) : Mathf.Clamp(_riseGlowT / 0.3f, 0f, 1f);   // in over 0.3 s, out over 0.4 s after the break
+            float pulse = 0.75f + 0.25f * MathF.Sin(MathF.Tau * RiseGlowHz * _riseGlowT);
+            _riseGlow.Scale = Vector3.One * RiseGlowSize * (0.7f + 0.3f * Mathf.Clamp(_riseGlowT / 1.2f, 0f, 1f)) * (0.92f + 0.08f * pulse);
+            _riseGlowMat.AlbedoColor = Bright(a * pulse);
+            if (_riseGlowBreakT >= 0f && a <= 0f) _riseGlow.Visible = false;
+        }
+    }
+    private bool AnyFxAlive => _flashes.Count > 0 || _diveRing != null || (_riseGlow != null && IsInstanceValid(_riseGlow) && _riseGlow.Visible);
+    /// <summary>DiveColor x FlashBoost (over 1: an additive quad brighter than its texture) at an alpha.</summary>
+    private Color Bright(float alpha) => new Color(DiveColor.R * FlashBoost, DiveColor.G * FlashBoost, DiveColor.B * FlashBoost, alpha);
+    private bool _riseClipPending;
+    /// <summary>181: the tell is over (the rise clock has reached 0): the appear clip and the appear voice start -- the body comes up.</summary>
+    private void RiseClipWhenDue()
+    {
+        if (!_riseClipPending || _introT < 0f) return;
+        _riseClipPending = false;
+        PlayClip(BckAppear);
+        if (_sound != null && !string.IsNullOrEmpty(ArriveSe)) _sound.Play(ArriveSe);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the RISE's tell is over -- the appear clip, he comes up");
+    }
+    /// <summary>181: a rise begins (the intro's surface, the fight's spawn): the glow on the stone where he will come up and the wisps seeping out of it.</summary>
+    private void RiseFxBegin(Vector3 floorSpot)
+    {
+        if (!RiseFx) return;
+        _riseFxOn = true; _riseBroke = false; _riseT = 0f; _riseBreakT = -1f; _riseGlowT = 0f; _riseGlowBreakT = -1f; _riseSpot = floorSpot; _riseFloorY = floorSpot.Y;
+        var tex = FxTex("radgrad_raw");
+        if (RiseGlowSize > 0f && tex != null)
+        {
+            if (_riseGlow == null || !IsInstanceValid(_riseGlow))
+            {
+                _riseGlowMat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, NoDepthTest = true, AlbedoTexture = tex, AlbedoColor = new Color(DiveColor.R, DiveColor.G, DiveColor.B, 0f), RenderPriority = 3 };
+                _riseGlow = new MeshInstance3D { Name = "RiseGlowFx", TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Mesh = new QuadMesh { Size = Vector2.One, Orientation = PlaneMesh.OrientationEnum.Y, Material = _riseGlowMat } };
+                AddChild(_riseGlow);
+            }
+            _riseGlow.GlobalPosition = floorSpot + Vector3.Up * 0.05f; _riseGlow.Scale = Vector3.One * RiseGlowSize * 0.7f; _riseGlow.Visible = true;
+            _riseGlowMat.AlbedoColor = Bright(0f);
+        }
+        if (RiseWisps > 0)
+        {
+            if (_riseWisps != null && IsInstanceValid(_riseWisps)) { _riseWisps.QueueFree(); _riseWisps = null; }
+            _riseWisps = Emitter("RiseWispsFx", RiseWisps, 1.1, floorSpot + Vector3.Up * 0.3f, Vector3.Up, 70f, 1.5f, 3.2f, 2f, 4.5f, MistColor, 0.6f, 1.5f, 0.4f, 2.2f);
+        }
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the RISE's glow and wisps at {floorSpot}");
+    }
+    /// <summary>181: a rise's tick -- the body breaking the floor fires the floor burst, the kick, the glow's swell and the stars streaming up round him.</summary>
+    private void RiseFxTick(float dt)
+    {
+        if (!_riseFxOn) return;
+        _riseT += dt;
+        if (!_riseBroke && BodyPoint.Y > _riseFloorY - RiseBreakAt)
+        {
+            _riseBroke = true; _riseBreakT = _riseT; _riseGlowBreakT = _riseGlowT;
+            Vector3 at = new Vector3(BodyPoint.X, _riseFloorY, BodyPoint.Z);
+            FloorBurst("Rise", at);
+            if (RiseShake > 0f) SmsCameraShake.Current?.Start(SmsCameraShake.Kind.Damage, RiseShake);
+            if (_riseWisps != null && IsInstanceValid(_riseWisps)) _riseWisps.Emitting = false;
+            if (RiseSparkles > 0 && _chika != null && _chika.ProcessMaterial is ParticleProcessMaterial chikaMat)
+            {
+                if (_riseStars != null && IsInstanceValid(_riseStars)) { _riseStars.QueueFree(); _riseStars = null; }
+                _riseStars = (GpuParticles3D)_chika.Duplicate();
+                _riseStars.Name = "RiseStarsFx"; _riseStars.TopLevel = true; _riseStars.Visible = true; _riseStars.Amount = RiseSparkles; _riseStars.Lifetime = 1.0; _riseStars.OneShot = false; _riseStars.Emitting = false; _riseStars.LocalCoords = false;
+                var pm = (ParticleProcessMaterial)chikaMat.Duplicate();
+                pm.EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere; pm.EmissionSphereRadius = 3f; pm.Direction = Vector3.Up; pm.Spread = 25f;
+                pm.InitialVelocityMin = 3f; pm.InitialVelocityMax = 7f; pm.Gravity = new Vector3(0f, 1.5f, 0f); pm.ScaleMin = 1.2f; pm.ScaleMax = 2.4f;
+                _riseStars.ProcessMaterial = pm;
+                AddChild(_riseStars); _riseStars.GlobalPosition = BodyPoint; _riseStars.Emitting = true;
+            }
+            if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the RISE breaks the floor at {at} ({_riseT:F2} s in; the body at {BodyPoint.Y:F2})");
+        }
+        if (_riseBroke)
+        {
+            _glowBoost = 1f + (RiseGlowBoost - 1f) * Mathf.Max(0f, 1f - (_riseT - _riseBreakT) / 0.6f);
+            if (_riseStars != null && IsInstanceValid(_riseStars)) _riseStars.GlobalPosition = BodyPoint;
+        }
+    }
+    /// <summary>181: the rise is over (he is up, or the intro was cut): the stars stop streaming (the live ones finish), the wisps too, the glow on the stone goes out.</summary>
+    private void RiseFxEnd()
+    {
+        if (!_riseFxOn) return;
+        _riseFxOn = false; _glowBoost = 1f;
+        if (_riseStars != null && IsInstanceValid(_riseStars)) { var s = _riseStars; s.Emitting = false; GetTree().CreateTimer(1.2).Timeout += () => { if (IsInstanceValid(s)) s.QueueFree(); }; _riseStars = null; }
+        if (_riseWisps != null && IsInstanceValid(_riseWisps)) { var w = _riseWisps; w.Emitting = false; GetTree().CreateTimer(1.8).Timeout += () => { if (IsInstanceValid(w)) w.QueueFree(); }; _riseWisps = null; }
+        if (_riseGlow != null && IsInstanceValid(_riseGlow) && !_riseBroke) _riseGlow.Visible = false;
+    }
+    /// <summary>181: the teleports' effects -- a poof of ghost mist and a burst of stars at his body the moment he is gone.</summary>
+    private void TeleportOutFx()
+    {
+        if (!TeleportFx) return;
+        Vector3 at = BodyPoint + Vector3.Up * 1.5f; float s = TeleportFxScale;                                        // the body joint sits low in the sphere
+        if (TeleportPuffs > 0) DiveBurst("TeleportOutPuffs", TeleportPuffs, at, Vector3.Up, 180f, 3f * s, 6f * s, 2f * s, 4.5f * s, MistColor, 0.8f, 0.8, 3f, 0.5f);
+        StarBurst("TeleportOutStars", at, TeleportSparkles, s);
+        TeleportOutFxFired++;
+    }
+    /// <summary>181: a flash, a poof and stars where he fades in (the arrival; a copy's too).</summary>
+    private void TeleportInFx()
+    {
+        if (!TeleportFx) return;
+        Vector3 at = Position + Vector3.Up * 3f; float s = TeleportFxScale;                                            // high on his body, by the crown: lower, the flash hid inside the fading body (shot run ay)
+        FlashAt("TeleportInFlash", at, DiveFlashSize * 0.8f * s, DiveFlashSeconds, flat: false, 0.5f, 1.2f);
+        if (TeleportPuffs > 0) DiveBurst("TeleportInPuffs", TeleportPuffs, at, Vector3.Up, 180f, 3f * s, 6f * s, 2f * s, 4.5f * s, MistColor, 0.8f, 0.8, 3f, 0.5f);
+        StarBurst("TeleportInStars", at, TeleportSparkles, s);
+        TeleportInFxFired++;
+    }
+    /// <summary>A continuous emitter of the port's smoke ball (mix-blended) at a point: count alive, their life, a direction and spread, speeds, sizes, colour, alpha,
+    /// damping, gravity; the rise's wisps. Freed by the caller.</summary>
+    private GpuParticles3D Emitter(string name, int count, double life, Vector3 at, Vector3 dir, float spread, float v0, float v1, float s0, float s1, Color col, float alpha, float damp, float gravity, float radius)
+    {
+        var scale = new Curve { MinValue = 0f, MaxValue = Mathf.Max(1f, Mathf.Max(s0, s1) * 1.1f) }; scale.AddPoint(new Vector2(0f, s0)); scale.AddPoint(new Vector2(1f, s1));
+        var fade = new Gradient { Offsets = new float[] { 0f, 0.2f, 0.7f, 1f }, Colors = new Color[] { new Color(1f, 1f, 1f, 0f), new Color(1f, 1f, 1f, alpha), new Color(1f, 1f, 1f, alpha * 0.6f), new Color(1f, 1f, 1f, 0f) } };
+        var pm = new ParticleProcessMaterial
+        {
+            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = radius, Direction = dir.Normalized(), Spread = spread, InitialVelocityMin = v0, InitialVelocityMax = v1,
+            Gravity = new Vector3(0f, gravity, 0f), DampingMin = damp, DampingMax = damp * 1.6f, ScaleMin = 1f, ScaleMax = 1f, ScaleCurve = new CurveTexture { Curve = scale },
+            AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -50f, AngularVelocityMax = 50f, Color = new Color(col.R, col.G, col.B, 1f), ColorRamp = new GradientTexture1D { Gradient = fade }
+        };
+        var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Mix, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = FxTex("kemuball3_raw"), DisableReceiveShadows = true };
+        var p = new GpuParticles3D { Name = name, TopLevel = true, Amount = count, Lifetime = life, OneShot = false, Emitting = false, LocalCoords = false, FixedFps = 60, Interpolate = true, DrawOrder = GpuParticles3D.DrawOrderEnum.ViewDepth, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One, Material = mat }, VisibilityAabb = new Aabb(new Vector3(-10f, -4f, -10f), new Vector3(20f, 14f, 20f)), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        AddChild(p); p.GlobalPosition = at; p.Emitting = true;
+        return p;
     }
     /// <summary>A one-shot burst of the port's smoke ball (mix-blended): count, from a point, a direction and spread, speeds, sizes, colour, alpha, life, damping, gravity.</summary>
     private void DiveBurst(string name, int count, Vector3 at, Vector3 dir, float spread, float v0, float v1, float s0, float s1, Color col, float alpha, double life, float damp, float gravity, bool flat = false)
@@ -884,7 +1064,7 @@ public partial class SmsKingBooRematch : Node3D
             if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: gone -- defeated (the fight's end is a later pass)");
             EmitSignal(SignalName.Defeated);
         }
-        else if (_revealing && n == BckLaugh) { State = Phase.Vanish; _fadeT = 0f; if (_sound != null && !string.IsNullOrEmpty(VanishSe)) _sound.Play(VanishSe); }   // 177: the found-out copy's laugh is over: it fades
+        else if (_revealing && n == BckLaugh) { State = Phase.Vanish; _fadeT = 0f; if (_sound != null && !string.IsNullOrEmpty(VanishSe)) _sound.Play(VanishSe); }   // 177: the found-out copy's laugh is over: it fades (181: a poof at the end of the fade)
         else if (State == Phase.Lick && n == LickClip) _lickClipEnded = true;
         else if (State == Phase.Smash && n == SmashClip) { if (_smashLaunchedCount < SmashCount) PlayClip(SmashClip); else _smashClipEnded = true; }
         else if (State == Phase.Lightning && n == LightningClip) { if (!_lightningDone) PlayClip(LightningClip); }
@@ -1390,6 +1570,7 @@ public partial class SmsKingBooRematch : Node3D
         PlayClip(BckWait);
         SetOpacity(0f);
         if (_sound != null && !string.IsNullOrEmpty(ArriveSe)) _sound.Play(ArriveSe);
+        TeleportInFx();                                                                                     // 181: a flash, a poof and stars where he comes in
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: arrives at {dest} (floor {_floorAtSpot:F2}; Mario {(M() != null ? Flat(dest, M().GlobalPosition).ToString("F1") : "?")} m off)");
         EmitSignal(SignalName.Teleported);
     }
@@ -1486,16 +1667,18 @@ public partial class SmsKingBooRematch : Node3D
     public override void _Process(double delta)
     {
         if (Engine.IsEditorHint()) return;
-        if (_diveFlash != null || _diveRing != null) DiveFxTick((float)delta);                                                                                  // 180: the dive's flash and ring run out after he is hidden
+        if (AnyFxAlive) FxTick((float)delta);                                                                                                                   // 180 / 181: the flashes, the ring and the rise glow run on, hidden or not
         if (State == Phase.Hidden) return;
         float dt = (float)delta;
         if (State == Phase.IntroRise || State == Phase.IntroLaugh || State == Phase.IntroSink) { IntroTick(dt); if (Blink) BlinkTick(dt); PlaceFx(); return; }   // 174
         if (State == Phase.Appear && _spawnRise)                                                                                                       // 174: up out of the floor at the spawn
         {
             _introT += dt;
+            RiseClipWhenDue();
             float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp(_introT / Mathf.Max(0.1f, SpawnRiseSeconds), 0f, 1f));
             Position = new Vector3(_introTop.X, Mathf.Lerp(_introFloorY - IntroSinkDepth, _introTop.Y, k), _introTop.Z);
-            if (k >= 1f) { _spawnRise = false; Position = _home; }
+            RiseFxTick(dt);
+            if (k >= 1f) { _spawnRise = false; Position = _home; RiseFxEnd(); }
         }
         // the long laugh with the laugh clip (the casino boss plays it two bck frames in: a thirtieth of a second, dropped here)
         if (State == Phase.Laugh && !_laughSounded)
@@ -1528,6 +1711,7 @@ public partial class SmsKingBooRematch : Node3D
             SetOpacity(_opacitySolid * (1f - k));
             if (k >= 1f)
             {
+                TeleportOutFx();                                                                           // 181: the poof and the stars where he is the moment he is gone (the hide clip has hopped him up by then)
                 if (_revealing)                                                                            // 177: the found-out copy is gone
                 {
                     State = Phase.Gone; if (_model != null) _model.Visible = false; PlaceFx();
