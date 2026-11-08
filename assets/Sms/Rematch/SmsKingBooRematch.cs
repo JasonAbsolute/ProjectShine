@@ -272,6 +272,19 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>178 (Jaysonn: "every time king boo gets hit he should be teleporting away once the hit animation is done to give the fight a 'reset' feel"):
     /// after the hurt he vanishes and arrives at another spot (a full gap there) instead of waiting where he was hit. Copies too.</summary>
     [Export] public bool TeleportAfterHit = true;
+    /// <summary>191 (Jaysonn: "something else for when Mario hits the fake King Boos -- the bomb explodes and the Boo doesn't flinch and just laughs"): a hit on a
+    /// COPY is the MOCK -- the bomb bursts on it as ever, but it does not flinch: no tumble, no flash; it LAUGHS (the laugh clip and CopyMockSe, the short high
+    /// cackle) with a mocking rock (CopyMockRockDeg either way at 3 Hz) and bob, PHASES see-through -- flickering between solid and CopyMockOpacity of its solid at
+    /// CopyMockFlickerHz, the crown with it (a ghost: nothing to hit), its crown flaring its own colour and fading, for CopyMockSeconds; then it teleports off to another spot (CopyMockTeleports; off: back to the wait
+    /// where it is). The real one keeps the tumble -- the contrast is the tell. Off: 178's -- the copy tumbles and teleports like him.</summary>
+    [Export] public bool CopyMock = true, CopyMockTeleports = true;
+    [Export] public string CopyMockSe = "MSD_SE_BS_TELESA_V_LAUGH2";
+    [Export(PropertyHint.Range, "0.4,3,0.05")] public float CopyMockSeconds = 1.3f;
+    [Export(PropertyHint.Range, "0,1,0.05")] public float CopyMockOpacity = 0.3f;
+    [Export(PropertyHint.Range, "0,30,1")] public float CopyMockRockDeg = 9f;
+    [Export(PropertyHint.Range, "0,1.5,0.05")] public float CopyMockBob = 0.45f;
+    /// <summary>The see-through FLICKERS at this rate (the body phasing in and out, the crown with it); 0 = a steady dip (it read as a dark grey blob against the black sky).</summary>
+    [Export(PropertyHint.Range, "0,12,0.5")] public float CopyMockFlickerHz = 5f;
     [ExportGroup("The fight (162): the teleports and the Lick")]
     /// <summary>The moves run at all (off: he waits as before, for the earlier passes' tests).</summary>
     [Export] public bool AttacksOn = true;
@@ -446,7 +459,7 @@ public partial class SmsKingBooRematch : Node3D
     [Signal] public delegate void FlungEventHandler();
     [Signal] public delegate void WindDoneEventHandler(int flings);
 
-    public enum Phase { Hidden, Appear, Laugh, Wait, Hurt, Down, Gone, Vanish, Arrive, Lick, Smash, Lightning, Breath, Fireballs, Wind, IntroRise, IntroLaugh, IntroSink, Split }
+    public enum Phase { Hidden, Appear, Laugh, Wait, Hurt, Down, Gone, Vanish, Arrive, Lick, Smash, Lightning, Breath, Fireballs, Wind, IntroRise, IntroLaugh, IntroSink, Split, Mock }
     public enum Move { None, Hop, Lick, Smash, Lightning, Breath, Fireballs, Wind }
     public Phase State { get; private set; } = Phase.Hidden;
     /// <summary>The clip he is on (the assigned one while it is held paused: 167).</summary>
@@ -1057,6 +1070,7 @@ public partial class SmsKingBooRematch : Node3D
     public bool ShineSpawned { get; private set; }
     public bool HurtFlashOn => _flashOn;
     public float GlowBoostNow => _glowBoost;
+    public float OpacitySolidNow => _opacitySolid;
     /// <summary>The down clip begins (the last hit's hurt is over): the mist and the stars boil off his body, the blink, the glow and the crown's flare run in DeathTick.</summary>
     private void DeathBegin()
     {
@@ -1278,6 +1292,7 @@ public partial class SmsKingBooRematch : Node3D
             EmitSignal(SignalName.Laughed);
         }
         else if (State == Phase.IntroLaugh && n == BckLaugh) { PlayClip(_introT + 1.5f <= IntroLaughSeconds ? BckLaugh : BckWait); }   // 174: the laugh loops while the intro laughs
+        else if (State == Phase.Mock && n == BckLaugh) PlayClip(BckWait);                                                                 // 191: a long mock outlasts the laugh clip
         else if (State == Phase.Laugh && n == BckLaugh && !_revealing)
         {
             EnterWait(FirstAttackDelay);
@@ -1481,7 +1496,7 @@ public partial class SmsKingBooRematch : Node3D
         if (!IsCopy || _revealing || State == Phase.Gone) return;
         if (State == Phase.Vanish || State == Phase.Arrive) { SetOpacity(_opacitySolid); }                 // mid-teleport: shown where it is for the laugh
         AbortLick(); AbortSmash(); AbortLightning(); AbortBreath(); AbortFireballs(); AbortWind();
-        _revealing = true; State = Phase.Laugh; _laughSounded = true; Position = _home; _gapT = 0f;
+        _revealing = true; State = Phase.Laugh; _laughSounded = true; Position = _home; Rotation = new Vector3(0f, _yaw, 0f); _gapT = 0f;   // 191: a mock's rock undone
         PlayClip(BckLaugh);
         if (_sound != null && !string.IsNullOrEmpty(LaughSe)) _sound.Play(LaughSe, LaughDb);
         SetFlash(true); _splitFlashT = 0.3f;
@@ -1499,6 +1514,7 @@ public partial class SmsKingBooRematch : Node3D
         AbortLick(); AbortSmash(); AbortLightning(); AbortBreath(); AbortFireballs(); AbortWind();
         if (IsCopy) CopyHitsTaken++;                                                                             // 178: a copy takes the hit LIKE the real one -- the tumble, then the teleport -- but no damage
         else { Hp = Math.Max(0, Hp - 1); HitsTaken++; }
+        if (IsCopy && CopyMock) { BeginMock(by); return true; }                                                  // 191: the fake LAUGHS IT OFF -- no flinch
         State = Phase.Hurt; _hurtT = 0f; _hurtYaw0 = _yaw; Position = _home;
         string hurtClip = !string.IsNullOrEmpty(HurtClip) && _anim != null && _anim.HasAnimation(HurtClip) ? HurtClip : BckHit;   // 177: the casino's tumble, else the flinch
         PlayClip(hurtClip);
@@ -1512,6 +1528,51 @@ public partial class SmsKingBooRematch : Node3D
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: HIT by {by?.Name ?? "?"}{(midLick ? " mid-lick" : midSmash ? " mid-smash (the tell called off)" : midLightning ? " mid-lightning (the walls gone)" : midBreath ? " mid-breath (the breath cut off)" : midFire ? " mid-volley (the fireballs fizzle)" : midWind ? " mid-wind (the tornados gone)" : "")} -> {(IsCopy ? $"a COPY: no damage (its hit {CopyHitsTaken})" : $"{Hp} left")} (the hit clip, {_hurtLen:F2} s)");
         if (IsCopy) Original?.EmitSignal(SignalName.CopyHit, this); else EmitSignal(SignalName.Hit, Hp);
         return true;
+    }
+    // ---- 191: THE MOCK -- a copy hit laughs it off ------------------------------------------------------------------------------------------------
+    private float _mockT; private int _mockYawSign = 1;
+    /// <summary>191, for the drives: the mocks this copy has given; the lowest its opacity dipped through the last.</summary>
+    public int MocksGiven { get; private set; }
+    public float MockOpacityMin { get; private set; } = 1f;
+    /// <summary>The bomb burst on this copy: it laughs it off. The laugh clip and the cackle, the crown flaring its colour; the rock, the bob and the see-through run in MockTick.</summary>
+    private void BeginMock(SmsBombBoo by)
+    {
+        State = Phase.Mock; _mockT = 0f; MocksGiven++; MockOpacityMin = _opacityShown; _mockYawSign = (_rng.NextDouble() < 0.5) ? -1 : 1;
+        Position = _home; Rotation = new Vector3(0f, _yaw, 0f);
+        SetFlash(false); _splitFlashT = 0f;
+        PlayClip(BckLaugh);
+        if (_sound != null && !string.IsNullOrEmpty(CopyMockSe)) _sound.Play(CopyMockSe, LaughDb);
+        SetCrownGlow(CopyCrownColor, 1.5f);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: HIT by {by?.Name ?? "?"} -- a COPY: it LAUGHS IT OFF (no flinch; its hit {CopyHitsTaken}), see-through to {CopyMockOpacity} of its solid for {CopyMockSeconds:F1} s, then {(CopyMockTeleports ? "off to another spot" : "the wait")}");
+        if (Original != null) Original.EmitSignal(SignalName.CopyHit, this);
+    }
+    private void MockTick(float dt)
+    {
+        _mockT += dt;
+        float k = Mathf.Clamp(_mockT / Mathf.Max(0.05f, CopyMockSeconds), 0f, 1f), ease = 1f - k;
+        // see-through: the body PHASES -- flickering between solid and CopyMockOpacity at CopyMockFlickerHz, deepest at the middle, solid again by the end (a steady dim read
+        // as a dark grey blob against the black sky: white at 0.3 over black IS grey; the flicker reads as a ghost)
+        float dip = MathF.Sin(MathF.PI * k) * (CopyMockFlickerHz > 0f ? 0.5f + 0.5f * MathF.Sin(_mockT * MathF.Tau * CopyMockFlickerHz - MathF.PI * 0.5f) : 1f);
+        float o = _opacitySolid - (_opacitySolid - Mathf.Min(_opacitySolid, CopyMockOpacity)) * dip;
+        SetOpacity(o); if (o < MockOpacityMin) MockOpacityMin = o;
+        float roll = Mathf.DegToRad(CopyMockRockDeg) * MathF.Sin(_mockT * MathF.Tau * 3f) * ease * _mockYawSign;      // the mocking rock, dying out
+        Rotation = new Vector3(0f, _yaw, roll);
+        Position = _home + Vector3.Up * (CopyMockBob * MathF.Abs(MathF.Sin(_mockT * MathF.Tau * 2f)) * ease);          // the bob
+        SetCrownGlow(CopyCrownColor, 1.5f * ease);
+        _crownMat?.SetShaderParameter("opacity", Mathf.Lerp(_opacitySolid, 1f, _crownGlowK) * (o / Mathf.Max(0.01f, _opacitySolid)));   // the crown phases with the body (SetCrownGlow leaves it solid)
+        if (k >= 1f) EndMock();
+    }
+    private void EndMock()
+    {
+        SetOpacity(_opacitySolid); Rotation = new Vector3(0f, _yaw, 0f); Position = _home; SetCrownGlow(_crownGlowColor, 0f);   // SetCrownGlow puts the crown's opacity back
+        if (CopyMockTeleports)                                                                                          // 178's reset: off to another spot, a full gap there
+        {
+            _afterHit = true; _moveIsLick = false; State = Phase.Vanish; _fadeT = 0f; MovesMade++;
+            if (!string.IsNullOrEmpty(TeleportClip)) PlayClip(TeleportClip);
+            if (_sound != null && !string.IsNullOrEmpty(VanishSe)) _sound.Play(VanishSe);
+            if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the mock is over -- vanishes to another spot");
+        }
+        else { EnterWait(NextGap()); if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the mock is over -- the wait, the next move in {_gapT:F1} s"); }
     }
     private void AbortLick() { _lickStage = -1; _lickClipEnded = false; }
     private void AbortSmash() { SetCrownGlow(_crownGlowColor, 0f); _smashClipEnded = false; }
@@ -2103,6 +2164,7 @@ public partial class SmsKingBooRematch : Node3D
         else if (State == Phase.Fireballs) FireballsTick(dt);
         else if (State == Phase.Wind) WindTick(dt);
         else if (State == Phase.Down) DeathTick(dt);                                                                                  // 183
+        else if (State == Phase.Mock) MockTick(dt);                                                                                   // 191
         if (Blink) BlinkTick(dt);
         PlaceFx();
     }
