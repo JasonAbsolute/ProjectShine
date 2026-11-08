@@ -13032,3 +13032,35 @@ and stars at the Shine's appearance are not the game's (`ShineFlashSize` 0 / `Sh
 shine-get demo faces it); its exit is the Shine scene's own unless `ShineExitLevel`; the twinkle stars' faint square halo (the game's IA8 star texture has a
 little alpha everywhere; `kira_add.gdshader` adds it) shows at the big sizes against the black sky -- left as the port has it (a shader cut of the low alpha
 would take it out of every twinkle). Open: where the Shine's exit should lead (the plaza? the casino?) -- Jaysonn's call.
+
+### 184 -- the King Boo REMATCH, part 28: the Bomb Boos spawn in RANDOM places -- the supply's Random mode is the default (158's Centre was for the playtests) and its spots are picked with rules: on the arena's stone and EdgeMargin inside its edge, MinFromMario to MaxFromMario from Mario, MinFromLast from the last spot, MinFromBoos from any Boo out (feature/kingboo-rematch, code `fda300f`)
+
+**Jaysonn:** "ok we now need the bomb boos to spawn in random locations"
+
+**The pick** (`SmsBombBooSpawner.cs`): `SpawnMode` `Random` by default -- the doc's "Black foggy spots appear at random through the fight"; `Centre` (this
+node's point) stays as the knob 158 made for the playtests. `FindFloor` at the wiring (and lazily at the first pick): the arena's `SmsArenaFloor`, its
+`Centre` and `Radius` (26.4 m here, read off the planet's mesh). `SpotRadius` = the lesser of `ArenaRadius` 18 and the floor's radius less `EdgeMargin` 2.5.
+`PickPoint` in Random: up to 24 draws of a point uniform in the disc of that radius about the arena's middle (angle, radius = R x sqrt(u)); each draw's
+floor is found with a ray (`FloorUnder`) -- no hit means off the stone and the draw is dropped (158 rayed AFTER the pick and a point past the edge kept
+the node's height: a spot in the air); each is scored by its MISS in metres -- nearer Mario than `MinFromMario` 4, farther than `MaxFromMario` 14 (0 =
+no cap), nearer `LastSpot` than `MinFromLast` 6 (not the same place twice running; the first spot has no last), nearer a Boo out than `MinFromBoos` 3
+(each one summed) -- and the first draw that misses by nothing is taken, else the one that missed least; no floor found in 24 draws: the node's point.
+`FloorOffset` over the floor as before. Readouts `LastSpot`, `SpotsMade`, `LastPickDraws`, `LastPickMiss`, `ArenaCentre`, `ArenaFloorRadius`,
+`SpotRadius`; `DebugPrint` lists every spot with its distances, draws and miss.
+
+**Verified** (headless drive v184-2, deleted before the commit): a sampling phase after the intro -- the supply's interval at 0.3 s, six Boos vanished as
+they rose, each `LastSpot` recorded -- then C11: every one of the six on the stone (the floor found under it: y 1.2-1.3 against Mario's 0.99 on the dome),
+within the spots' radius 18 of the middle (the floor's 26.4), 4..14 m from Mario (5.9, 4.0, 10.5, 11.8, 11.9, 11.9; Mario at (0, 10), 10 m from the middle),
+6 m or more from the one before (5/5), all six off the middle (4.3-14.7 m; Centre mode would put them all at the node), spread over 19.1 m, every pick met
+its rules (22 draws for the six, 1-8 each: the Mario ring 4..14 m is the binding rule), the spots (0.1, 14.7) (4.0, 9.5) (-4.7, -0.5) (3.7, -2.3)
+(-11.9, 8.6) (-6.9, -0.8); the interval restored, 183's, 182's, 181's, 180's and 179's checks on the seventh spot's Boo as before -- 22/22, no errors
+(v184-1 the same 22/22; v184-2 the floor read at the wiring so the readouts are right before the first pick). A shot run (28 shots): three sampled spots
+from over the arena (the camera 30 m up over the middle, 14 m back, Mario and King Boo in the frame) -- the first beyond Mario toward the far rim, its
+two eyes glowing in the black pool; the second at Mario's side with the first's vanish puff behind; the third across the arena; the 179-183 shots again.
+The clean rebuild 0 errors; the drive, the logs, shots165/, run_window.ps1 and this pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** the spots are capped `MaxFromMario` 14 m from Mario (0 = anywhere on the stone, the doc's plain "at random") and kept 6 m from
+the last and 3 m from the Boos out -- a spread the doc does not spell out; the arena's floor radius (26.4) is not the cap -- `ArenaRadius` 18 is, so the
+spots keep 8 m off the rim (`ArenaRadius` up to 24 lets them out to `EdgeMargin` from the edge); 158's fixed seed (`Random(158)`) stays: the same spots
+every fight in the same order from the same Mario -- a seed knob is a line if wanted; the spawner node's scene note still describes Centre as the default
+(the note is Jaysonn's scene file, left alone).
