@@ -238,6 +238,24 @@ public partial class SmsKingBooRematch : Node3D
     [Export(PropertyHint.Range, "0,9,1")] public int CopyEveryHits = 3;
     [Export(PropertyHint.Range, "0,4,1")] public int MaxCopies = 2;   // 178: "once we hit king boo 3 more times there's 3 of them"
     [Export] public float CopyMinFromMario = 13f, CopyGapScale = 1.7f, CopySpeedScale = 0.75f, CopyFadeSeconds = 0.7f;
+    [ExportGroup("The split's cutscene (188)")]
+    /// <summary>188 (Jaysonn: "a little cutscene that plays when he splits into two, and three, showing three of him will now be attacking; make it King Boo
+    /// themed"): as the hurt that earns a copy ends, the world FREEZES (the Shine demo's stop-the-world: Mario, the Boos, the supply held; he, his copies and
+    /// the cutscene run on) and a cutscene camera cuts to a LINE across the arena's middle, facing Mario: he vanishes in a poof where he was and comes back at
+    /// his place in the line out of a boil of violet-black ghost mist, laughing; his copies come in beside him one by one, each in a flash and the mist
+    /// (SplitCopyEvery apart; a copy already out teleports to its place), SplitLineSpacing apart; then all of them turn on Mario and LAUGH TOGETHER (the copies
+    /// a shade off his pitch, SplitLaughSpread: a chorus of him), a card line over it (SplitLine2 at two of him, SplitLine3 at three; "" = no card; the intro
+    /// card's style), SplitHoldSeconds of the chorus, and the world runs again with every one of them in the wait at his place -- all attacking. A pressed
+    /// skips to the end. The camera: Mario's side of the line, SplitCamDistance out (0 = far enough to frame the line), SplitCamHeight up. Off: 177's split
+    /// (the copy fades in at a far spot while the fight runs).</summary>
+    [Export] public bool SplitCutscene = true;
+    [Export] public float SplitLineSpacing = 11f, SplitCopyEvery = 0.6f, SplitHoldSeconds = 1.3f, SplitCamDistance = 0f, SplitCamHeight = 4.5f, SplitCamFov = 50f;   // 11: his body is 9 m across (7 had two of him touching)
+    [Export(PropertyHint.Range, "0,0.3,0.01")] public float SplitLaughSpread = 0.08f;
+    [Export] public string SplitLine2 = "Now there are TWO of me!", SplitLine3 = "THREE of me! Can you keep up, Mario?";
+    [Export] public Color SplitMistColor = new Color(0.48f, 0.22f, 0.62f);   // a violet that reads against the black sky (0.32, 0.12, 0.45 was near-black there)
+    [Export(PropertyHint.Range, "0,200,1")] public int SplitMistPuffs = 70;
+    [Export] public bool SplitSkipAllowed = true;
+    [ExportGroup("")]
     [Export] public bool CopyFireballs = true, CopyBreath = true;
     /// <summary>178 (Jaysonn: "the king boo should not disappear thats fake he should just take a hit and then vanish to a new spot ... we do need a way to tell
     /// them apart. like one doesn't have teeth? or like the crown is not the right color?"): a hit on a copy is the TUMBLE and the teleport like the real one's,
@@ -423,7 +441,7 @@ public partial class SmsKingBooRematch : Node3D
     [Signal] public delegate void FlungEventHandler();
     [Signal] public delegate void WindDoneEventHandler(int flings);
 
-    public enum Phase { Hidden, Appear, Laugh, Wait, Hurt, Down, Gone, Vanish, Arrive, Lick, Smash, Lightning, Breath, Fireballs, Wind, IntroRise, IntroLaugh, IntroSink }
+    public enum Phase { Hidden, Appear, Laugh, Wait, Hurt, Down, Gone, Vanish, Arrive, Lick, Smash, Lightning, Breath, Fireballs, Wind, IntroRise, IntroLaugh, IntroSink, Split }
     public enum Move { None, Hop, Lick, Smash, Lightning, Breath, Fireballs, Wind }
     public Phase State { get; private set; } = Phase.Hidden;
     /// <summary>The clip he is on (the assigned one while it is held paused: 167).</summary>
@@ -1266,7 +1284,12 @@ public partial class SmsKingBooRematch : Node3D
             SetFlash(false); Rotation = new Vector3(0f, _yaw, 0f);
             if (Hp > 0 || IsCopy)
             {
-                if (_copyPending) { _copyPending = false; SpawnCopy(); }                                            // 177: the split
+                if (_copyPending)                                                                                   // 177: the split
+                {
+                    _copyPending = false;
+                    if (SplitCutscene && !IsCopy && BeginSplitCutscene()) return;                                       // 188: the split's cutscene -- the line of him, the laugh, the card; the fight resumes after
+                    SpawnCopy();
+                }
                 if (TeleportAfterHit)                                                                               // 178: the "reset" -- away to another spot, a full gap there
                 {
                     _afterHit = true; _moveIsLick = false; State = Phase.Vanish; _fadeT = 0f; MovesMade++;
@@ -1349,6 +1372,102 @@ public partial class SmsKingBooRematch : Node3D
         SetCrownGlow(_crownGlowColor, 0f);
         ArriveAt(RandomSpot());
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the copy arrives at {_dest} ({(M() != null ? Flat(_dest, M().GlobalPosition).ToString("F1") : "?")} m from Mario); the tell {CopyTell}");
+    }
+    // ---- 188: THE SPLIT'S CUTSCENE -- the hooks the cutscene node drives ----------------------------------------------------------------------------------
+    /// <summary>188, for the drives: the cutscene running now (the real one's).</summary>
+    public SmsSplitCutscene SplitNow => _split != null && IsInstanceValid(_split) ? _split : null;
+    public int SplitsShown { get; private set; }
+    private SmsSplitCutscene _split;
+    /// <summary>The hurt that earns a copy is over: the cutscene node made and begun (it makes the copy itself). False = no cutscene (no Mario / no parent): 177's split.</summary>
+    private bool BeginSplitCutscene()
+    {
+        var m = M(); if (m == null || GetParent() == null) return false;
+        if (_split != null && IsInstanceValid(_split)) return false;
+        var cs = new SmsSplitCutscene { Name = $"SplitCutscene{SplitsShown + 1}", DebugPrint = DebugPrint };
+        (GetTree().CurrentScene ?? GetParent()).AddChild(cs);
+        _split = cs; SplitsShown++;
+        cs.Begin(this, m);
+        return true;
+    }
+    /// <summary>Into the Split phase: every move called off, the flash off, upright; the node waits for the cutscene's calls.</summary>
+    public void SplitBegin()
+    {
+        AbortLick(); AbortSmash(); AbortLightning(); AbortBreath(); AbortFireballs(); AbortWind();
+        SetFlash(false); _splitFlashT = 0f; Rotation = new Vector3(0f, _yaw, 0f);
+        State = Phase.Split; _gapT = 0f;
+        PlayClip(BckWait);
+    }
+    /// <summary>Gone in a poof where he is (181's teleport-out effects), unseen.</summary>
+    public void SplitHide()
+    {
+        if (_opacityShown > 0.02f && _model != null && _model.Visible) TeleportOutFx();
+        SetOpacity(0f);
+        if (_model != null) _model.Visible = false;                                                         // the ghost shader draws BLACK at opacity 0 (run bo: a black silhouette with a crown)
+    }
+    /// <summary>Put at his place in the line, facing Mario, the arrival's flash and poof there; shown by SplitFade.</summary>
+    public void SplitShowAt(Vector3 dest)
+    {
+        Position = dest; _home = dest; _dest = dest; LastSpot = dest;
+        FaceNow();
+        PlayClip(BckWait);
+        TeleportInFx();
+        if (_sound != null && !string.IsNullOrEmpty(ArriveSe)) _sound.Play(ArriveSe);
+    }
+    /// <summary>His opacity through the arrival: 0..1 of his solid -- the crown with the body (SetCrownGlow leaves the crown solid), the model hidden at 0.</summary>
+    public void SplitFade(float k)
+    {
+        k = Mathf.Clamp(k, 0f, 1f);
+        SetOpacity(_opacitySolid * k);
+        _crownMat?.SetShaderParameter("opacity", Mathf.Lerp(_opacitySolid, 1f, _crownGlowK) * k);
+        if (_model != null) _model.Visible = k > 0.02f;
+    }
+    /// <summary>The laugh clip and the laugh, at a pitch (1 = his; a copy a shade off: the chorus).</summary>
+    public void SplitLaugh(float pitch = 1f)
+    {
+        PlayClip(BckLaugh);
+        if (_sound != null && !string.IsNullOrEmpty(LaughSe)) _sound.Play(LaughSe, LaughDb, Mathf.Clamp(pitch, 0.5f, 2f));
+    }
+    /// <summary>Turned on Mario at once.</summary>
+    public void SplitFace() => FaceNow();
+    /// <summary>The violet-black ghost mist boiling up where one of him comes into the line (SplitMistColor, SplitMistPuffs; the dive's smoke balls).</summary>
+    public void SplitMist(Vector3 at)
+    {
+        if (SplitMistPuffs <= 0) return;
+        DiveBurst("SplitMist", SplitMistPuffs, at + Vector3.Up * 3f, Vector3.Up, 170f, 5f, 11f, 4f, 9f, SplitMistColor, 0.85f, 1.4, 2f, -1f);              // bigger than his 9 m body: it boils OUT of him
+        DiveBurst("SplitMistLow", SplitMistPuffs / 2, at - Vector3.Up * (_hoverOverFloor - 0.6f), Vector3.Up * 0.05f, 180f, 5f, 10f, 2.5f, 6f, SplitMistColor, 0.7f, 1.2, 3f, 0.2f, flat: true);
+    }
+    /// <summary>The floor under a point (NaN when none), for the cutscene's line.</summary>
+    public float FloorYAt(Vector3 p) => FloorUnder(p);
+    /// <summary>The cutscene is over: the wait at his place, the gap running (a copy's its own); the real one's reference dropped.</summary>
+    public void SplitEnd()
+    {
+        SplitFade(1f); SetCrownGlow(_crownGlowColor, 0f);
+        Position = _home;
+        EnterWait(NextGap());
+        if (!IsCopy) _split = null;
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the split's cutscene is over -- waits at {_home}, the next move in {_gapT:F1} s");
+    }
+    /// <summary>A copy made for the cutscene: as SpawnCopy, but held unseen in the Split phase for the cutscene to place and show.</summary>
+    public SmsKingBooRematch SpawnCopyHeld()
+    {
+        if (IsCopy || GetParent() == null) return null;
+        var copy = Duplicate((int)(DuplicateFlags.Scripts | DuplicateFlags.Groups | DuplicateFlags.UseInstantiation)) as SmsKingBooRematch;
+        if (copy == null) { GD.PushWarning($"[SMS kingboo] {Name}: the copy could not be made"); return null; }
+        CopiesMade++;
+        copy.Name = $"{Name}Copy{CopiesMade}"; copy.IsCopy = true; copy.Original = this;
+        GetParent().AddChild(copy);
+        copy.GlobalTransform = GlobalTransform;
+        copy.Hp = 1; copy.HitsTaken = 0;
+        copy.ReadArena(); copy._hoverOverFloor = _hoverOverFloor; copy._opacitySolid = _opacitySolid; copy._home = copy.Position;
+        if (copy._model != null) copy._model.Visible = false;                                               // unseen till the cutscene shows it (SplitFade)
+        if (copy._tongue != null) { copy._tongue.Stretch = TongueStretch; copy._tongue.On = TongueStretch > 1.001f; }
+        copy.ApplyTell();
+        copy.SetCrownGlow(copy._crownGlowColor, 0f);
+        copy.State = Phase.Split; copy.SetOpacity(0f); copy.PlayClip(BckWait);
+        _copies.Add(copy);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: a COPY splits off for the cutscene ({copy.Name}; {CopiesAlive} out, {CopiesMade} made) after hit {HitsTaken}");
+        EmitSignal(SignalName.CopyMade, copy);
+        return copy;
     }
     /// <summary>A copy dismissed (the real one went down): its attack called off, a laugh, then it fades away and is gone. (177 ran this on a hit too; 178: a
     /// hit on a copy is the tumble and the teleport, like the real one's -- the tell is how the player knows.)</summary>
@@ -1938,6 +2057,7 @@ public partial class SmsKingBooRematch : Node3D
             FaceTick(dt);
             if (AttacksOn && _gapT > 0f) { _gapT -= dt; if (_gapT <= 0f) StartMove(); }
         }
+        else if (State == Phase.Split) { if (_opacityShown > 0.02f) FaceTick(dt); }                                                   // 188: the cutscene places him; he keeps his eyes on Mario
         else if (State == Phase.Vanish)
         {
             _fadeT += dt;
