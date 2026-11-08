@@ -244,14 +244,16 @@ public partial class SmsKingBooRematch : Node3D
     /// the cutscene run on) and a cutscene camera cuts to a LINE across the arena's middle, facing Mario: he vanishes in a poof where he was and comes back at
     /// his place in the line out of a boil of violet-black ghost mist, laughing; his copies come in beside him one by one, each in a flash and the mist
     /// (SplitCopyEvery apart; a copy already out teleports to its place), SplitLineSpacing apart; then all of them turn on Mario and LAUGH TOGETHER (the copies
-    /// a shade off his pitch, SplitLaughSpread: a chorus of him), a card line over it (SplitLine2 at two of him, SplitLine3 at three; "" = no card; the intro
-    /// card's style), SplitHoldSeconds of the chorus, and the world runs again with every one of them in the wait at his place -- all attacking. A pressed
+    /// a shade off his pitch, SplitLaughSpread: a chorus of him), a card line over it only when SplitLine2 / SplitLine3 have text (189: none -- "no need for the
+    /// text on the screen"; the intro card's style), SplitHoldSeconds of the chorus, and the world runs again with every one of them in the wait at his place -- all attacking. A pressed
     /// skips to the end. The camera: Mario's side of the line, SplitCamDistance out (0 = far enough to frame the line), SplitCamHeight up. Off: 177's split
     /// (the copy fades in at a far spot while the fight runs).</summary>
     [Export] public bool SplitCutscene = true;
     [Export] public float SplitLineSpacing = 11f, SplitCopyEvery = 0.6f, SplitHoldSeconds = 1.3f, SplitCamDistance = 0f, SplitCamHeight = 4.5f, SplitCamFov = 50f;   // 11: his body is 9 m across (7 had two of him touching)
     [Export(PropertyHint.Range, "0,0.3,0.01")] public float SplitLaughSpread = 0.08f;
-    [Export] public string SplitLine2 = "Now there are TWO of me!", SplitLine3 = "THREE of me! Can you keep up, Mario?";
+    /// <summary>189 (Jaysonn: "no need for the text on the screen"): the card lines are EMPTY -- no card; the scene is the line of him and the chorus. 188's lines were
+    /// "Now there are TWO of me!" and "THREE of me! Can you keep up, Mario?" -- put text here for the card back.</summary>
+    [Export] public string SplitLine2 = "", SplitLine3 = "";
     [Export] public Color SplitMistColor = new Color(0.48f, 0.22f, 0.62f);   // a violet that reads against the black sky (0.32, 0.12, 0.45 was near-black there)
     [Export(PropertyHint.Range, "0,200,1")] public int SplitMistPuffs = 70;
     [Export] public bool SplitSkipAllowed = true;

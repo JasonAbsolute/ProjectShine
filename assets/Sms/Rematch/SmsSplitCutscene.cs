@@ -11,8 +11,9 @@ using System.Collections.Generic;
 /// SplitCamFov). The beats: King Boo vanishes in a poof where he was (0 s); comes back at his place in the line out of a boil of violet-black ghost mist
 /// (SplitMist) with the arrival's flash, fading in, and LAUGHS (the long laugh); his copies come in beside him one by one, SplitCopyEvery apart, each the
 /// same way (a copy already out teleports to its place; the new one is made here, SpawnCopyHeld); then all of them turn on Mario and LAUGH TOGETHER -- the
-/// copies a shade off his pitch either way (SplitLaughSpread: a chorus of him) -- under a card line (SplitLine2 / SplitLine3 in the intro card's style, no
-/// black) for SplitHoldSeconds; the card fades, the camera goes back, the world runs again and every one of them is in the wait at his place: all attacking.
+/// copies a shade off his pitch either way (SplitLaughSpread: a chorus of him) -- for SplitHoldSeconds, under a card line only when SplitLine2 / SplitLine3
+/// have text (189, Jaysonn: "no need for the text on the screen" -- none by default); the camera goes back, the world runs again and every one of them is in
+/// the wait at his place: all attacking.
 /// A (or space) skips to the end (SplitSkipAllowed). Signals Finished.
 /// </summary>
 public partial class SmsSplitCutscene : Node
