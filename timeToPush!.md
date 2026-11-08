@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-07 05:01 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180 + 181), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-07 17:58 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1233,8 +1233,13 @@ him, a shake). SMS 179: the Bomb Boo's EXPRESSIONS -- its tongue MOVES (it sways
 hangs, startles, trembles, stares back, its eyes burn and it DROOLS glossy drops) until he looks away, and it spawns Galaxy's way (a BLACK pool on the floor with two
 GLOWING EYES in it facing Mario, then the Boo up THROUGH the floor in black smoke); its rim glow and burst puff grey-black, not violet. SMS 180: the shocked Boo
 WORRIES (a head shake, a lean back, a cower with a nervous breath, sweat beads off its head), the spot's eyes a little bigger, and the intro's sink is King Boo's HIDE clip -- a
-leap and a DIVE through the floor in a burst of his twinkle stars, a flash on the stone, a ring of ghost mist, a shock ring and a camera kick. Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `d7dd6ba` ("SMS 180: the King Boo REMATCH, part 24 -- the shocked Bomb Boo WORRIES (it shakes its head, leans back, cowers, breathes, sweats), the spot's eyes a little bigger, and the intro's sink is King Boo's HIDE clip -- a leap and a DIVE through the floor in a twinkle burst, a flash, a ring of ghost mist and a shock ring";
+leap and a DIVE through the floor in a burst of his twinkle stars, a flash on the stone, a ring of ghost mist, a shock ring and a camera kick. SMS 181: his RISES
+(the intro's and the fight's) have their effects -- a glow pulsing on the stone with wisps seeping up before he breaks through (a 0.7 s tell), then the flash, the shock
+ring, the mist and twinkle stars streaming up round him -- and so does every TELEPORT (a poof and stars as he goes, a flash, a poof and stars where he comes in); the
+flashes brighter and bigger. Further passes re-point this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `2608391` ("SMS 181: the King Boo REMATCH, part 25 -- effects for him COMING UP out of the ground (a glow pulsing on the stone and wisps before he breaks through, then the flash, the shock ring, the mist and twinkle stars streaming up round him) and for every TELEPORT (a poof and stars as he goes, a flash, a poof and stars where he comes in); the flashes brighter and bigger";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs) on the 180 commit
+  ("SMS 180: the King Boo REMATCH, part 24 -- the shocked Bomb Boo WORRIES (it shakes its head, leans back, cowers, breathes, sweats), the spot's eyes a little bigger, and the intro's sink is King Boo's HIDE clip -- a leap and a DIVE through the floor in a twinkle burst, a flash, a ring of ghost mist and a shock ring";
   assets/Sms/Rematch/ SmsBombBoo.cs, SmsBombBooSpawner.cs, SmsKingBooRematch.cs) on the 179 commit
   ("SMS 179: the King Boo REMATCH, part 23 -- the Bomb Boo's EXPRESSIONS: its tongue MOVES, a Boo Mario LOOKS AT is SHOCKED (it freezes, stares back, trembles and DROOLS), and it spawns Galaxy's way (a BLACK pool with GLOWING EYES, then up through the floor in black smoke); black, not purple";
   assets/Sms/Rematch/ SmsBombBoo.cs, SmsBombBooSpawner.cs) on the 178 commit
@@ -1284,9 +1289,13 @@ leap and a DIVE through the floor in a burst of his twinkle stars, a flash on th
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 52 commits past `feature/sounds`, 74 since `main`. ~1.2 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 54 commits past `feature/sounds`, 76 since `main`. ~1.2 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 181: watch King Boo COME UP -- in the cutscene and at the fight's start a pool of light pulses on the stone with wisps rising from it, then he bursts
+  through in a flash, a shock ring and a splash of ghost mist with twinkle stars streaming up round him; every teleport now ends in a poof of mist and stars and
+  begins with a flash where he comes in (RiseFx / RiseTellSeconds / RiseGlowSize / RiseWisps / RiseSparkles, TeleportFx / TeleportPuffs / TeleportSparkles /
+  TeleportFxScale, FlashBoost on KingBoo).
 - To try 180: FACE a Bomb Boo and watch it WORRY -- it shakes its head, leans back from you, cowers and breathes fast, sweat beads fly off its head (the
   Worry* / Sweat* knobs in The shock group on BombBoo.tscn's root); the spot's eyes are bigger (the supply's EyeSize). In the cutscene King Boo now LEAPS and
   DIVES through the floor with his hide clip -- a burst of twinkle stars at the top, then a flash on the stone, a ring of ghost mist, a shock ring and a camera

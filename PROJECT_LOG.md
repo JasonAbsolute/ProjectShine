@@ -12877,3 +12877,50 @@ log: the project root's run_window.ps1 had gone with 179's cleanup -- copied bac
 the dive's node holds at the laugh height and the clip's own plunge takes him under (the clip is 0.72 s: the body crosses 16 m in 0.2 s, a blur -- its
 speed knob is there); the dive's colours are King Boo's violet-white (`DiveColor`; the "black, not purple" was the Bomb Boo's); the crown rides high over
 the head at the top of the leap for a tenth of a second (the hide clip's own stretch); the teleports in the fight still fade (the dive is the cutscene's).
+
+### 181 -- the King Boo REMATCH, part 25: effects for him COMING UP out of the ground (a glow pulsing on the stone and wisps before he breaks through, then the flash, the shock ring, the mist and twinkle stars streaming up round him) and for every TELEPORT (a poof and stars as he goes, a flash, a poof and stars where he comes in); the flashes brighter and bigger (feature/kingboo-rematch, code `2608391`)
+
+**Jaysonn:** "we also needs eefects of him coming from the ground we bascially went everything to have some type of effect and make it flashy kinda. does
+that make sense?"
+
+**The rises** (`SmsKingBooRematch.cs`, The rise and the teleports group): the intro's surface (`IntroSurface` -> `IntroRise`) and the fight's spawn
+(`SpawnRising` -> `Appear` with `_spawnRise`) share `RiseFxBegin` / `RiseFxTick` / `RiseFxEnd`. From the rise's start a GLOW pulses on the stone where he will
+come up (`RiseGlowSize` 14 m, `RiseGlowHz` 3, in over 0.3 s, growing 0.7 -> 1 over 1.2 s; `FlashBoost` x `DiveColor`, additive, flat, over the depth) with
+wisps of ghost mist seeping up out of it (`Emitter`: `RiseWisps` 30 alive, 2-4.5 m, 1.5-3.2 m/s up with a 70-degree spread, 1.1 s each). The rise now opens
+with a TELL (`RiseTellSeconds` 0.7): the node sits under the floor with the wait clip while the glow and the wisps run, and only then the appear clip and
+the appear voice start (`RiseClipWhenDue`: `_introT` runs from -0.7; the clip's own first fifth of a second rushes the body up from 23 m under the node --
+without the tell the glow had 0.19 s, run bt). As the body joint comes up to `RiseBreakAt` 2.2 m under the floor: `FloorBurst` (the dive's splash shared --
+the flash, the shock ring, the ring of mist along the floor, the splash of it thrown up), the camera kicked (`RiseShake` 0.5), his glow swelling
+`RiseGlowBoost` 2 x and settling over 0.6 s (`_glowBoost`), and twinkle stars STREAMING up round his body till he is up (`RiseSparkles` 50 alive: his ChikaFx
+copied as a continuous emitter from a 3 m sphere at the body, 3-7 m/s up, following the body). `RiseFxEnd` (he is up, or the intro cut) closes the stars
+and the wisps (the live ones finish, freed after), puts the glow out if it never broke, and resets the glow boost; the glow after a break fades on its own
+clock (`_riseGlowT`) so it finishes after the rise ends. Readouts `RiseFxOn`, `RiseGlowUp`, `RiseBroke`, `RiseBreakT`, `RiseStarsOn`.
+
+**The teleports** (`TeleportFx`): `TeleportOutFx` -- a POOF of ghost mist (`TeleportPuffs` 20, 2-4.5 m) and a burst of stars (`TeleportSparkles` 30) at his
+body (+1.5 m) the moment he is gone -- the END of the fade (the Vanish tick's k >= 1, before `ArriveAt` or the found-out copy's free): fired at the fade's
+start (run aw) the hide clip's hop had carried him 6 m up off the poof. `TeleportInFx` in `ArriveAt` -- a camera-facing FLASH (0.8 x `DiveFlashSize`, 0.5 ->
+1.2), the poof and the stars 3 m over the node, by his crown (at +1.2 the flash hid inside the fading body, run ay); his teleports and a copy's arrival alike.
+`TeleportFxScale` 1 against the dive's sizes. Readouts `TeleportOutFxFired`, `TeleportInFxFired`.
+
+**The flashes, brighter and bigger**: `FlashBoost` 1.8 -- `Bright(alpha)` = `DiveColor` x it on every flash, the shock ring and the rise glow (an additive
+quad brighter than its texture; the first shots' flashes read as a faint ring on a 6 m ghost); `DiveFlashSize` 12 -> 16; the ring puffs 44 of 2.5-6 m at
+8-15 m/s, the splash puffs 36 of 2-5 m at 7-15 m/s, the twinkle burst 80. Under it: 180's one dive flash became `FlashAt` (a list of live flashes, flat or
+camera-facing), `ShockRingAt`, `FloorBurst`, `StarBurst(name, at, count, scale)`, `Emitter`, and `FxTick` for them all from the top of `_Process` (hidden or
+not; `AnyFxAlive`). `IntroAbort` ends the rise's effects and the pending clip.
+
+**Verified** (headless drive v181-5, deleted before the commit): C0c the cutscene's RISE -- fx on and the glow up from the first tick of the rise (the body
+at -6.4), the tell over at 0.7 s, the break at 0.89 s with the body at -1.21 (the floor 0.90), the flash up, the stars streaming while he rose, everything
+off at the laugh; C0d the fight's SPAWN rise the same (the break at 0.88 s), all off as he waits; C9 a hit (`TakeHit` with the held Boo) -> the hurt -> the
+teleport: the out-poof once (3.6 s after the hit, at the fade's end), the in-flash once, back in the wait; 180's and 179's checks as before -- 16/16, no
+errors. v181-1: C0c failed on a break at 0.19 s -- the appear clip's rush with no tell: the tell added (v181-2 16/16); v181-3 the sizes and the boost;
+v181-4 the out-poof moved to the fade's end; v181-5 the in-flash back by the crown. Four shot runs (16 shots each): the glow on the stone before anything
+shows (a bright pool of violet-white light with wisps over it; faint before the boost); the break (his body bursting up out of the pool of light, Mario
+watching); the stars streaming up round him 0.5 s on (the first run's camera sat in the floor plane: the arena seen from its side, his body half under
+the stone -- a camera fix); the teleport-in flash and stars by his crown as he fades in; the out-poof shot caught the arrival instead (the drive's timing
+-- the poof is checked by the drive, not shown); the 180 and 179 shots again. The project root's run_window.ps1 was gone again (180's cleanup) -- copied back
+for the runs and deleted.
+
+**Deviations, all knobs:** the tell holds him under the floor 0.7 s longer at both rises (`RiseTellSeconds` 0 = at once); the out-poof fires at the END of
+the fade, not its start; the rises' and teleports' colours are King Boo's violet-white (`DiveColor`); `FlashBoost` over 1 brightens every flash, the ring
+and the glow together; the rise's break reads the body joint against `RiseBreakAt`, as the dive does; the defeat (the down) has no new effect ("the fight's
+end is a later pass").
