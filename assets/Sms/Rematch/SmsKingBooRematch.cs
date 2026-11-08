@@ -344,7 +344,7 @@ public partial class SmsKingBooRematch : Node3D
     /// over it: the jump); the freeze's seconds; one freeze per attack.</summary>
     [Export] public float SweepDeg = 150f, SweepSeconds = 1.6f;
     [Export] public SmsGhostBreath.Way SweepWay = SmsGhostBreath.Way.Random;
-    [Export] public float BreathDownDeg = 10f, BreathSpeed = 22f, PuffSeconds = 1.5f, PuffSizeStart = 3f, PuffSizeEnd = 8f, BreathHitHeight = 1.2f, FreezeSeconds = 1f;   // 172: the puffs 3 -> 8 m (thicker)
+    [Export] public float BreathDownDeg = 10f, BreathSpeed = 22f, PuffSeconds = 1.5f, PuffSizeStart = 3f, PuffSizeEnd = 8f, BreathHitHeight = 1f, FreezeSeconds = 1f;   // 172: the puffs 3 -> 8 m (thicker); 187: the jump clears the cold at 1 m (1.2)
     /// <summary>173: the breath is aimed so the stream meets the floor this many metres out from the mouth whatever his height (he sits higher now; a fixed
     /// 10 degrees from a mouth 5 m up would pass over a Mario standing near him). 0 = BreathDownDeg as it is.</summary>
     [Export] public float BreathAimFloorAt = 10f;

@@ -11498,6 +11498,9 @@ public partial class Mario : CharacterBody3D
     }
     private bool _smsFrostHold; private float _smsFrostSeconds, _smsFrostPlayerSpeed = 1f; private AnimationMixer.AnimationCallbackModeProcess _smsFrostTreeMode; private string _smsFrostClip = "";
     /// <summary>171: the clip the frozen Mario holds a frame of (the shock's ma_shock; "" = his own pose) and where in it (0..1 of its length).</summary>
+    /// <summary>187 (the King Boo rematch; Jaysonn: "the freeze breath still feels like I'm unfairly getting hit"): while he is FROZEN the ice is his shield -- a hit or a shock
+    /// shatters it (he thaws at once) and does nothing else: no knockdown, no HP, no shock. Off: 167's -- the hit thaws him and lands as ever.</summary>
+    [Export] public bool SmsFrostShields = true;
     [Export] public string SmsFrostPoseClip = "ma_shock";
     [Export(PropertyHint.Range, "0,0.99,0.01")] public float SmsFrostPoseAt = 0.5f;
     /// <summary>171, for the drives: the clip he holds while frozen, its frame (seconds) and the player's speed -- "" when not frozen or holding his own pose.</summary>
@@ -11871,7 +11874,11 @@ public partial class Mario : CharacterBody3D
         // and dmgenemycommon.prm gives no invincibility), but ours keep touching him through the fall.
         if (stateOfMario == MarioState.hurt)
             return;
-        if (_smsFrostHold) SmsThaw();   // 167: a hit through the frost breaks the ice -- the knockdown as ever
+        if (_smsFrostHold)              // 167: a hit through the frost breaks the ice; 187: the ICE takes the hit (SmsFrostShields) -- shattered, no knockdown, no HP
+        {
+            SmsThaw();
+            if (SmsFrostShields) { if (SmsDebugPrint) GD.Print("[SMS frost] the ICE took the hit -- shattered, no damage"); return; }
+        }
         if (stateOfMario == MarioState.swimming)
         {
             SmsSwimDamageExec(attackerPos, p); // SWIM_P_DAMAGE; air instead of HP under water
@@ -16555,7 +16562,11 @@ public partial class Mario : CharacterBody3D
             return;
         if (stateOfMario == MarioState.hurt)
             return; // port-side, as for the knockdowns: not while he is down or already shocked
-        if (_smsFrostHold) SmsThaw();   // 167: a shock through the frost breaks the ice
+        if (_smsFrostHold)              // 167: a shock through the frost breaks the ice; 187: the ICE takes the shock (SmsFrostShields)
+        {
+            SmsThaw();
+            if (SmsFrostShields) { if (SmsDebugPrint) GD.Print("[SMS frost] the ICE took the shock -- shattered, no damage"); return; }
+        }
         SmsElectricDamageEnter("an electric hit");
     }
 

@@ -35,12 +35,19 @@ public partial class SmsGhostBreath : Node3D
     /// <summary>How fast the cold blows (m/s), how long a puff of it lives (seconds; its reach is the two multiplied), how hard it sinks (m/s^2), how wide
     /// the stream scatters (degrees either side).</summary>
     [Export] public float BreathSpeed = 22f, PuffSeconds = 1.5f, Sink = 4f, SpreadDeg = 9f;
-    [ExportGroup("The hit")]
+    [ExportGroup("The hit (187: the cold that freezes is the DENSE cold)")]
+    /// <summary>187 (Jaysonn: "the freeze breath still feels like I'm unfairly getting hit"): a puff freezes only while it is SOLID -- its ball is HitRadiusK of its
+    /// size scaled by its own fade (the puffs fade in over the first tenth of their life and out over the last third: the thin blue edge and the fading tail
+    /// no longer freeze), and never past HitLifeK of its life (0.75: the freeze's reach is 25 m, the mist rolls on harmless to 33); HitRadiusK 0.35 -> 0.3 (the
+    /// dense white core's own size, 4.5 m across at the end); HitHeight 1.2 -> 1.0 (a jump clears the cold a little earlier and later: his feet are over 1 m for
+    /// 0.55 s of a held jump). 167-186: the full ball to the end of the puff's life, invisible mist freezing him.</summary>
+    [Export(PropertyHint.Range, "0.3,1,0.05")] public float HitLifeK = 0.75f;
+    [Export] public bool HitFollowsFade = true;
     /// <summary>A puff's size as it leaves the mouth and at its end (metres across), what part of that is the cold that hits (0.4: the smoke ball's solid
     /// middle), how high over the floor the cold reaches -- a Mario whose feet are higher is over it -- and how long the freeze holds him.</summary>
     [Export] public float PuffSizeStart = 3f, PuffSizeEnd = 8f;
-    [Export(PropertyHint.Range, "0.1,0.6,0.01")] public float HitRadiusK = 0.35f;
-    [Export] public float HitHeight = 1.2f, FreezeSeconds = 1f;
+    [Export(PropertyHint.Range, "0.1,0.6,0.01")] public float HitRadiusK = 0.3f;
+    [Export] public float HitHeight = 1f, FreezeSeconds = 1f;
     [Export] public bool OneFreezePerAttack = true;
     /// <summary>178 (Jaysonn: "it looks like mario doesn't get hit but still is frozen"): the camera's damage shake on the freeze (x the game's; 0 = none) --
     /// the hit's own look is the ice's (SmsIceBlock.HitFrom: the splash, the flash, the ice climbing him).</summary>
@@ -135,7 +142,21 @@ public partial class SmsGhostBreath : Node3D
         if (DebugPrint) GD.Print($"[SMS breath] {Name}: BLOWS from {_mouthNow} ({_mouthNow.Y - FloorY:F2} m over the floor), {SweepDeg} deg over {SweepSeconds} s from Mario's {(_side > 0 ? "left" : "right")} (yaw {Mathf.RadToDeg(StartYaw):F0} -> {Mathf.RadToDeg(EndYaw):F0}), {BreathSpeed} m/s for {PuffSeconds} s ({BreathSpeed * PuffSeconds:F0} m), {DownDeg} deg down");
     }
 
-    private float PuffSize(float age) => Mathf.Lerp(PuffSizeStart, PuffSizeEnd, Mathf.Clamp(age / Mathf.Max(0.01f, PuffSeconds), 0f, 1f));
+    public float PuffSize(float age) => Mathf.Lerp(PuffSizeStart, PuffSizeEnd, Mathf.Clamp(age / Mathf.Max(0.01f, PuffSeconds), 0f, 1f));
+    /// <summary>187: a puff's own fade at this age (the ColorRamp Fade draws: in over the first tenth, 0.75 of full by two thirds, out by the end), 0..1.</summary>
+    private float PuffFade(float age)
+    {
+        float k = Mathf.Clamp(age / Mathf.Max(0.01f, PuffSeconds), 0f, 1f);
+        if (k < 0.1f) return k / 0.1f;
+        if (k < 0.65f) return Mathf.Lerp(1f, 0.75f, (k - 0.1f) / 0.55f);
+        return Mathf.Lerp(0.75f, 0f, (k - 0.65f) / 0.35f);
+    }
+    /// <summary>187: the cold's ball at this age -- HitRadiusK of the puff's size, by its fade (HitFollowsFade), none past HitLifeK of its life.</summary>
+    public float HitRadius(float age)
+    {
+        if (age < 0f || age > PuffSeconds * HitLifeK) return 0f;
+        return PuffSize(age) * HitRadiusK * (HitFollowsFade ? PuffFade(age) : 1f);
+    }
     /// <summary>Where the puff blown along a ray is at this age: out at BreathSpeed, sunk, no lower than its ball on the floor.</summary>
     private Vector3 PuffCentre((float t, Vector3 o, Vector3 d) ray, float age)
     {
@@ -151,9 +172,9 @@ public partial class SmsGhostBreath : Node3D
         float best = 999f;
         foreach (var ray in _rays)
         {
-            float age = _age - ray.t; if (age < 0f || age > PuffSeconds) continue;
+            float age = _age - ray.t; float r = HitRadius(age); if (r <= 0f) continue;
             Vector3 c = PuffCentre(ray, age);
-            best = Mathf.Min(best, new Vector2(c.X - feet.X, c.Z - feet.Z).Length() - PuffSize(age) * HitRadiusK);
+            best = Mathf.Min(best, new Vector2(c.X - feet.X, c.Z - feet.Z).Length() - r);
         }
         return best;
     }
@@ -165,8 +186,8 @@ public partial class SmsGhostBreath : Node3D
         float mr = SmsParams.Mario.DamageRadius / U, mh = SmsParams.Mario.DamageHeight / U;
         foreach (var ray in _rays)
         {
-            float age = _age - ray.t; if (age < 0f || age > PuffSeconds) continue;
-            Vector3 c = PuffCentre(ray, age); float r = PuffSize(age) * HitRadiusK;
+            float age = _age - ray.t; float r = HitRadius(age); if (r <= 0f) continue;                                   // 187: the dense cold only
+            Vector3 c = PuffCentre(ray, age);
             if (c.Y + r < feet.Y || c.Y - r > feet.Y + mh) continue;
             if (new Vector2(c.X - feet.X, c.Z - feet.Z).Length() <= r + mr) { at = c; return true; }
         }
