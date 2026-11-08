@@ -13225,3 +13225,28 @@ wait; 188-179's checks as before -- 27/27, no errors. One shot run (34 shots): t
 clean rebuild 0 errors; the drive, the logs, shots165/, run_window.ps1 and the pass's scheduled tasks deleted.
 
 **Deviations:** none new -- the card is a knob either way.
+
+### 190 -- the King Boo REMATCH, part 34: the split cutscene's line sits HIGHER in the frame (the camera looks SplitCamLookUp 1.5 m over the hover, was 4: the bodies up a seventh of the frame, the floor the lower third) and the SECOND split -- THREE of him -- is verified and shot (the copy already out teleports from its spot to its place in the line, the lens pulls back to fit the three) (feature/kingboo-rematch, code `f9e130e`)
+
+**Jaysonn:** "ok move them up a bit they sit too low in the frame and then do it again for the last phase where he spawns a third one"
+
+**The frame** (`SmsKingBooRematch.cs`, `SmsSplitCutscene.cs`): the camera's look-at point is a knob, `SplitCamLookUp` -- this far over the hover height
+at the line's middle. 188's 4 m (the middle of the laughing bodies) put the frame's centre on them, so with the laugh clip's lift and the floor's rim the
+bodies sat in the lower half; 1.5 drops the frame's centre 2.5 m, which at the two-line's 19.4 m (a 50-degree lens: 9 m of half height) is a seventh of
+the frame -- the bodies ride up into the upper half and the floor is the lower third; the three-line at 26.9 m shifts a tenth. Readout `CamDistance`.
+Nothing else of the scene moves (the camera's distance, height, FOV; the beats; the mist; the chorus).
+
+**The second split**: no code -- 188's `Begin` already lays out n of him (the real one in the middle slot, the copies already out beside him, the new one
+last), fits the lens to the longer line (half width (n-1)/2 x 11 + 5.5: 26.9 m for three), and brings a copy already out in with its own poof where it
+was (`SplitHide`) and the arrival at its place; this pass drives and shoots it.
+
+**Verified** (headless drive v190-1, deleted before the commit): C16 -- after 188's two-of-him cutscene, his hits taken set to 2 x `CopyEveryHits` - 1 and
+a hit: the hurt, then the SECOND cutscene -- three in the line, the real one in the middle, the first copy (in the wait at (-4.8, 2.5), 5.5 m from its slot)
+poofed where it was and came in at slot 0, the new one (KingBooCopy2) made held and shown at slot 2, 11.0 m apart, 0.00 m off their slots, the camera 26.9 m
+out (19.4 m for two), the chorus at 2.65 s with 6 laughs (three as each came in, three together), over at 3.96 s with two copies alive and all three in the
+wait; then the last hit with both copies dismissed; 189-179's checks as before -- 28/28, no errors. One shot run (36 shots): the two-of-him chorus with the
+bodies in the upper half of the frame (189's sat them in the lower); the third coming into the line in the violet mist, Mario small at the bottom; the chorus
+of three -- the real one in the middle under his gold crown, the silver-crowned copies either side, Mario at the bottom of the frame facing them. The clean
+rebuild 0 errors; the drive, the logs, shots165/, run_window.ps1 and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** `SplitCamLookUp` is a framing choice (-4..8); none new in the scene.
