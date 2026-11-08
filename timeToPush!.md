@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180 + 181 + 182 + 183 + 184 + 185 + 186 + 187 + 188), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-08 04:57 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180 + 181 + 182 + 183 + 184 + 185 + 186 + 187 + 188 + 189), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-08 14:06 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1247,8 +1247,11 @@ THUNDER WALLS long and LOW (18 x 2.2 m: a held jump clears them, the ends 9 m of
 the climbing hee-hee-hee), the intro laughing 4.6 s, the chuckle cut at his dive; SmsActorSound gets Stop(se). SMS 187: the FREEZE BREATH made fair -- only
 the dense cold freezes (the thin edge and the fading tail no longer hit), a jump clears it at 1 m, and the ICE is a shield (a hit through the frost shatters it and
 does nothing else; Mario.cs SmsFrostShields). SMS 188: the SPLIT's CUTSCENE -- the world freezes, a camera cuts to a line of him across the arena, his copies come
-in beside him in violet mist, all laugh together under a card line, then every one of them attacks (SmsSplitCutscene.cs, new). Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `0932892` ("SMS 188: the King Boo REMATCH, part 32 -- the SPLIT's CUTSCENE: as the hurt that earns a copy ends the world freezes and a camera cuts to a LINE across the arena -- he vanishes in a poof and comes back at his place out of violet ghost mist, laughing; his copies come in beside him one by one in a flash and the mist; all of them turn on Mario and LAUGH TOGETHER under a card line; the world runs again with every one of them attacking";
+in beside him in violet mist, all laugh together under a card line, then every one of them attacks (SmsSplitCutscene.cs, new). SMS 189: the card is off --
+no text on the screen (SplitLine2 / SplitLine3 empty). Further passes re-point this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `9626cb5` ("SMS 189: the King Boo REMATCH, part 33 -- the split cutscene's CARD is off: no text on the screen (SplitLine2 / SplitLine3 empty; text in them brings the card back) -- the scene is the line of him and the chorus";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsSplitCutscene.cs) on the 188 commit
+  ("SMS 188: the King Boo REMATCH, part 32 -- the SPLIT's CUTSCENE: as the hurt that earns a copy ends the world freezes and a camera cuts to a LINE across the arena -- he vanishes in a poof and comes back at his place out of violet ghost mist, laughing; his copies come in beside him one by one in a flash and the mist; all of them turn on Mario and LAUGH TOGETHER under a card line; the world runs again with every one of them attacking";
   assets/Sms/Rematch/ SmsSplitCutscene.cs (+ .uid, new), SmsKingBooRematch.cs) on the 187 commit
   ("SMS 187: the King Boo REMATCH, part 31 -- the FREEZE BREATH made fair: only the DENSE cold freezes (a puff's ball shrinks with its own fade and is gone past three quarters of its life -- the thin edge and the fading tail no longer hit; the ball 0.3 of the puff, the core's size), a jump clears it at 1 m, and the ICE is a shield (a hit or a shock through the frost shatters it and does nothing else: no knockdown, no HP)";
   assets/Sms/Rematch/ SmsGhostBreath.cs, SmsKingBooRematch.cs, assets/ Mario.cs) on the 186 commit
@@ -1314,9 +1317,10 @@ in beside him in violet mist, all laugh together under a card line, then every o
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 68 commits past `feature/sounds`, 90 since `main`. ~1.2 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 70 commits past `feature/sounds`, 92 since `main`. ~1.2 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 189: the split cutscene with no text over it (SplitLine2 / SplitLine3 on KingBoo: text there brings the card back).
 - To try 188: hit him three times -- the world freezes, the camera cuts to a line of him across the arena, his copy comes in beside him out of violet
   mist, they laugh together under "Now there are TWO of me!" (and "THREE of me!" at six hits), then all of them attack; A skips it. Knobs in The split's
   cutscene group on KingBoo: SplitCutscene (off = the old quiet split), SplitLineSpacing, SplitCopyEvery, SplitHoldSeconds, SplitCam* , SplitLine2 / SplitLine3,

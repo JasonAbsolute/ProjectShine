@@ -13210,3 +13210,18 @@ the script, as the other Rematch scripts' are.
 **Deviations, all knobs:** the cutscene is mine (the doc has the split, not a scene); the world freezes 3.4-4 s mid-fight (`SplitCutscene` off = 177's);
 the line stands at the arena's middle, so after it he and the copies are within `CopyMinFromMario` of Mario till their next hop; the laugh clip throws the
 crowns 6 m up (the game's clip); the card's lines are knobs per count; the chorus pitches are mine.
+
+### 189 -- the King Boo REMATCH, part 33: the split cutscene's CARD is off -- no text on the screen (SplitLine2 / SplitLine3 empty; text in them brings the card back); the scene is the line of him and the chorus (feature/kingboo-rematch, code `9626cb5`)
+
+**Jaysonn:** "no need for the text on the screen."
+
+**The change** (`SmsKingBooRematch.cs`): `SplitLine2` / `SplitLine3` default to "" -- 188's "Now there are TWO of me!" / "THREE of me! Can you keep up, Mario?"
+are kept in the knob's note; `SmsSplitCutscene.Begin` makes no `SmsRematchCard` for an empty line (188's rule), so nothing else moves: the freeze, the line,
+the violet mist, the laughs as each comes in, the chorus at 2.05 s, the end at 3.35 s (3.95 with three). The class notes updated.
+
+**Verified** (headless drive v189-1, deleted before the commit): C15 reads the card against the knob -- no card node made and none seen with the line empty;
+the rest as 188: the world frozen through it (Mario unmoved), two of him 11 m apart on their places, the copy shown, 4 laughs, over at 3.35 s with both in the
+wait; 188-179's checks as before -- 27/27, no errors. One shot run (34 shots): the chorus, two of him laughing at Mario, the crowns thrown up, no text. The
+clean rebuild 0 errors; the drive, the logs, shots165/, run_window.ps1 and the pass's scheduled tasks deleted.
+
+**Deviations:** none new -- the card is a knob either way.
