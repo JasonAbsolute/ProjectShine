@@ -106,6 +106,12 @@ public partial class SmsBombBooSpawner : Node3D
     private void OnBossHit(int hpLeft)
     {
         ClearAll();
+        if (hpLeft <= 0)                                                                                               // 183: the LAST hit ends the supply (the casino's forceAllItemKill) -- no Boo through the down and the Shine
+        {
+            Stop();
+            if (DebugPrint) GD.Print($"[SMS bomb supply] {Name}: King Boo's LAST hit -- the field cleared, the supply over");
+            return;
+        }
         _timer = Mathf.Max(_timer, ClearPause);
         if (DebugPrint) GD.Print($"[SMS bomb supply] {Name}: King Boo hit ({hpLeft} left) -- the field cleared, next in {_timer:F1} s");
     }
@@ -133,7 +139,7 @@ public partial class SmsBombBooSpawner : Node3D
             return;
         }
         if (_fading) FadeTick(dt);
-        if (_boss != null && !_boss.IsAlive) { Stop(); return; }
+        if (_boss != null && !_boss.IsAlive) { ClearAll(); Stop(); return; }                                          // 183: the field cleared with the stop
         if (OutNow >= MaxOut) return;
         _timer -= dt;
         if (_timer > 0f) return;

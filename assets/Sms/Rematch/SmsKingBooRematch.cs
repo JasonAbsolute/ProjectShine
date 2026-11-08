@@ -153,6 +153,48 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>182: the arrival's stars (they clustered at his crown -- Jaysonn: "not a fan of the crown sparkle effect"); off = the flash and the poof alone.</summary>
     [Export] public bool TeleportInStars = false;
     [Export(PropertyHint.Range, "0.2,2,0.05")] public float TeleportFxScale = 1f;
+    [ExportGroup("The end: the defeat and the Shine (183)")]
+    /// <summary>183 (Jaysonn: "lets do the ending of the fight also spawning the shine and such"): his DEFEAT and the SHINE. The last hit's hurt ends in the down clip
+    /// (btelesa_down, 3.3 s: a spinning tumble that climbs 2.6 m by its end) with DeathFx -- his body blinking the hurt flash (DeathBlinkHz), ghost mist boiling off
+    /// him (DeathMist alive) and twinkle stars shed off him (DeathSparkles alive), his glow swelling to DeathGlowBoost x, the crown flaring white, quicker and quicker,
+    /// the camera rumbling (DeathRumble every 0.4 s), the node SINKING DeathSink m so the tumble ends low -- and at the clip's end he BURSTS: a flash DeathFlashSize m across, a shock ring on the floor under him, a
+    /// poof of DeathPuffs and a burst of DeathStars (DeathFxScale x the dive's sizes), the camera kicked (DeathShake), an afterglow fading over
+    /// DeathAfterglowSeconds where he was; Gone, Defeated (the supply stops). ShineDelaySeconds after the burst, the SHINE: the ShineScene (empty =
+    /// res://shine_sprite.tscn) added beside him, placed at ShineSpawnPoint, else ShineOverFloor m over the floor at the arena's middle, its back to Mario (so
+    /// its demo camera, before it, looks past it at him); it materialises in a GOLDEN flash and stars (ShineFlashSize, ShineStars, ShineFlashColor) and appears
+    /// the game's way (makeShineAppearWithDemo: TShine::appearWithDemo, ShineSprite's SmsAppear) FROM where he burst (ShineFromBurst; else at its spot) -- up
+    /// 2 s, a loop down onto its spot, the settle -- with the demo (ShineDemo: the world
+    /// frozen, the Shine's camera watching from ShineCamOffset at ShineCamFov; ShineDemoTicks 720 = 6 s: up 2, the loop 2, the settle 2; 0 = the Shine scene's own
+    /// 1200, 10 s; his effects run on through it). ShineExitLevel /
+    /// ShineExitScene set the Shine's exit (the save card, then that scene); off = the Shine scene's own (the card, control back). The casino boss's Shine came
+    /// 240 ticks into his down, at his point, no burst.</summary>
+    [Export] public bool DeathFx = true;
+    /// <summary>He SINKS this far through the down clip (smoothed; the body kept 2 m over the floor), so the tumble ends low and the burst and the Shine's flight are
+    /// down by the floor, not 13 m up in the black sky (the clip itself climbs 2.6 m). 0 = he dies where he hovered.</summary>
+    [Export(PropertyHint.Range, "0,12,0.5")] public float DeathSink = 6f;
+    [Export(PropertyHint.Range, "0,30,0.5")] public float DeathBlinkHz = 8f;
+    [Export(PropertyHint.Range, "0,120,1")] public int DeathMist = 40, DeathSparkles = 40;
+    [Export(PropertyHint.Range, "1,6,0.1")] public float DeathGlowBoost = 3f;
+    [Export] public bool DeathCrownFlare = true;
+    [Export(PropertyHint.Range, "0,2,0.05")] public float DeathRumble = 0.25f, DeathShake = 1.2f;
+    [Export] public float DeathFlashSize = 30f, DeathFlashSeconds = 0.6f, DeathAfterglowSeconds = 2.5f;
+    [Export(PropertyHint.Range, "0,200,1")] public int DeathPuffs = 60, DeathStars = 150;
+    [Export(PropertyHint.Range, "0.2,3,0.05")] public float DeathFxScale = 1.6f;
+    [Export] public PackedScene ShineScene;
+    [Export] public Node3D ShineSpawnPoint;
+    [Export] public float ShineOverFloor = 1.2f, ShineDelaySeconds = 1f;
+    [Export] public bool ShineFromBurst = true, ShineDemo = true;
+    [Export(PropertyHint.Range, "0,2400,10")] public int ShineDemoTicks = 720;
+    /// <summary>The Shine's demo camera: where it sits in the Shine's placed frame (x right, y up, z forward -- its back is to Mario, so the camera looks past the Shine at him)
+    /// and its field of view. The Shine scene's own (0, 2.5, 7) at 75 degrees showed a speck in the black sky through the flight from 13 m up. Zero = the Shine's own.</summary>
+    [Export] public Vector3 ShineCamOffset = new Vector3(0f, 7f, 9f);
+    [Export(PropertyHint.Range, "0,120,1")] public float ShineCamFov = 40f;
+    /// <summary>The Shine's appearance: a GOLDEN flash (ShineFlashSize m) and a burst of golden stars (ShineStars) where it materialises.</summary>
+    [Export] public float ShineFlashSize = 12f;
+    [Export(PropertyHint.Range, "0,200,1")] public int ShineStars = 60;
+    [Export] public Color ShineFlashColor = new Color(1f, 0.85f, 0.35f);
+    [Export] public bool ShineExitLevel = false;
+    [Export(PropertyHint.File, "*.tscn")] public string ShineExitScene = "";
     [ExportGroup("")]
     /// <summary>He turns to face Mario while he waits, at this many radians a second.</summary>
     [Export] public bool FaceMario = true;
@@ -340,6 +382,8 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>158: a Bomb Boo burst on him (the hit points left) / the last one took him down.</summary>
     [Signal] public delegate void HitEventHandler(int hpLeft);
     [Signal] public delegate void DefeatedEventHandler();
+    /// <summary>183: the Shine is in the arena (the fight's end), appearing.</summary>
+    [Signal] public delegate void ShineAppearingEventHandler(Node3D shine);
     /// <summary>177: a copy of him split off / 178: a copy took a (harmless) hit (both from the REAL one).</summary>
     [Signal] public delegate void CopyMadeEventHandler(SmsKingBooRematch copy);
     [Signal] public delegate void CopyHitEventHandler(SmsKingBooRematch copy);
@@ -712,7 +756,7 @@ public partial class SmsKingBooRematch : Node3D
         }
     }
     private bool _diveOn, _diveSparkled, _diveSplashed; private float _diveLen, _diveBodyTop = float.NegativeInfinity, _diveLastBodyY, _glowBoost = 1f;
-    private sealed class Flash { public MeshInstance3D Mi; public StandardMaterial3D Mat; public float T, Size, Seconds, From, To; }
+    private sealed class Flash { public MeshInstance3D Mi; public StandardMaterial3D Mat; public float T, Size, Seconds, From, To; public Color? Col; }   // 183: Col = its own colour (the Shine's gold), else DiveColor
     private readonly List<Flash> _flashes = new();                                                            // 181: the flashes alive (the dive's, a rise's, the teleports')
     private MeshInstance3D _diveRing; private StandardMaterial3D _diveRingMat; private float _diveFxT;
     private bool _riseFxOn, _riseBroke; private float _riseT, _riseFloorY, _riseBreakT = -1f, _riseGlowT, _riseGlowBreakT = -1f; private Vector3 _riseSpot; private MeshInstance3D _riseGlow; private StandardMaterial3D _riseGlowMat; private GpuParticles3D _riseWisps, _riseStars;
@@ -748,7 +792,7 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>The twinkle stars burst off him at the top of the leap: his ChikaFx emitter copied as a one-shot, flung every way under a light gravity.</summary>
     private void DiveSparkle(Vector3 at) { StarBurst("DiveSparkFx", at, DiveSparkles, 1f); if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the DIVE's twinkle burst at {at} ({_introT:F2} s in)"); }
     /// <summary>A one-shot burst of his twinkle stars (his ChikaFx emitter copied): count, at a point, the dive's sizes x scale (he is 6 m across: big stars).</summary>
-    private void StarBurst(string name, Vector3 at, int count, float scale)
+    private void StarBurst(string name, Vector3 at, int count, float scale, Color? col = null)
     {
         if (count <= 0 || _chika == null || _chika.ProcessMaterial is not ParticleProcessMaterial chikaMat) return;
         var p = (GpuParticles3D)_chika.Duplicate();
@@ -756,18 +800,19 @@ public partial class SmsKingBooRematch : Node3D
         var pm = (ParticleProcessMaterial)chikaMat.Duplicate();
         pm.EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere; pm.EmissionSphereRadius = 2.2f * scale; pm.Direction = Vector3.Up; pm.Spread = 180f;
         pm.InitialVelocityMin = 4f * scale; pm.InitialVelocityMax = 10f * scale; pm.Gravity = new Vector3(0f, -4f, 0f); pm.ScaleMin = 1.6f * scale; pm.ScaleMax = 3f * scale;
+        if (col.HasValue) pm.Color = new Color(col.Value.R, col.Value.G, col.Value.B, 1f);                                                   // 183: the Shine's gold
         p.ProcessMaterial = pm;
         AddChild(p); p.GlobalPosition = at; p.Finished += p.QueueFree; p.Emitting = true;
     }
     /// <summary>A flash of light: a flat additive radial on the stone (flat) or a camera-facing one at a point, size m, growing from -> to of it and fading over
     /// seconds (FxTick). Drawn over the depth: the arena's floor is a shallow dome -- a flat quad this wide dipped under it and was cut in chunks.</summary>
-    private void FlashAt(string name, Vector3 at, float size, float seconds, bool flat, float from = 0.5f, float to = 1.1f)
+    private void FlashAt(string name, Vector3 at, float size, float seconds, bool flat, float from = 0.5f, float to = 1.1f, Color? col = null)
     {
         var tex = FxTex("radgrad_raw"); if (size <= 0f || tex == null) return;
-        var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, NoDepthTest = true, AlbedoTexture = tex, AlbedoColor = Bright(0.95f), RenderPriority = 4, BillboardMode = flat ? BaseMaterial3D.BillboardModeEnum.Disabled : BaseMaterial3D.BillboardModeEnum.Enabled };
+        var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, NoDepthTest = true, AlbedoTexture = tex, AlbedoColor = col.HasValue ? Bright(col.Value, 0.95f) : Bright(0.95f), RenderPriority = 4, BillboardMode = flat ? BaseMaterial3D.BillboardModeEnum.Disabled : BaseMaterial3D.BillboardModeEnum.Enabled };
         var mi = new MeshInstance3D { Name = name, TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Mesh = new QuadMesh { Size = Vector2.One, Orientation = flat ? PlaneMesh.OrientationEnum.Y : PlaneMesh.OrientationEnum.Z, Material = mat }, Scale = Vector3.One * size * from };
         AddChild(mi); mi.GlobalPosition = at + (flat ? Vector3.Up * 0.06f : Vector3.Zero);
-        _flashes.Add(new Flash { Mi = mi, Mat = mat, T = 0f, Size = size, Seconds = Mathf.Max(0.01f, seconds), From = from, To = to });
+        _flashes.Add(new Flash { Mi = mi, Mat = mat, T = 0f, Size = size, Seconds = Mathf.Max(0.01f, seconds), From = from, To = to, Col = col });
     }
     /// <summary>The shock ring racing out along the floor from a point to `size` x 2.2 over seconds x 1.8, fading (FxTick); one at a time.</summary>
     private void ShockRingAt(Vector3 at, float size, float seconds)
@@ -809,7 +854,7 @@ public partial class SmsKingBooRematch : Node3D
             if (fl.Mi == null || !IsInstanceValid(fl.Mi)) { _flashes.RemoveAt(i); continue; }
             fl.T += dt; float f = Mathf.Clamp(fl.T / fl.Seconds, 0f, 1f);
             fl.Mi.Scale = Vector3.One * fl.Size * Mathf.Lerp(fl.From, fl.To, f);
-            fl.Mat.AlbedoColor = Bright((1f - f) * (1f - f) * 0.95f);
+            fl.Mat.AlbedoColor = fl.Col.HasValue ? Bright(fl.Col.Value, (1f - f) * (1f - f) * 0.95f) : Bright((1f - f) * (1f - f) * 0.95f);
             if (f >= 1f) { fl.Mi.QueueFree(); _flashes.RemoveAt(i); }
         }
         if (_diveRing != null && IsInstanceValid(_diveRing))
@@ -833,6 +878,7 @@ public partial class SmsKingBooRematch : Node3D
     private bool AnyFxAlive => _flashes.Count > 0 || _diveRing != null || (_riseGlow != null && IsInstanceValid(_riseGlow) && _riseGlow.Visible);
     /// <summary>DiveColor x FlashBoost (over 1: an additive quad brighter than its texture) at an alpha.</summary>
     private Color Bright(float alpha) => new Color(DiveColor.R * FlashBoost, DiveColor.G * FlashBoost, DiveColor.B * FlashBoost, alpha);
+    private Color Bright(Color c, float alpha) => new Color(c.R * FlashBoost, c.G * FlashBoost, c.B * FlashBoost, alpha);
     private bool _riseClipPending, _riseClipStarted; private float _riseLen;
     /// <summary>182, for the drives: the highest the body got in the rise's leap; the rise's length (the clip's at its speed).</summary>
     public float RiseLeapTopY { get; private set; } = float.NegativeInfinity;
@@ -959,6 +1005,122 @@ public partial class SmsKingBooRematch : Node3D
         if (TeleportPuffs > 0) DiveBurst("TeleportInPuffs", TeleportPuffs, at, Vector3.Up, 180f, 3f * s, 6f * s, 2f * s, 4.5f * s, MistColor, 0.8f, 0.8, 3f, 0.5f);
         if (TeleportInStars) StarBurst("TeleportInStars", at, TeleportSparkles, s);
         TeleportInFxFired++;
+    }
+
+    // ---- 183: THE END -- the defeat and the Shine ---------------------------------------------------------------------------------------------
+    private bool _deathOn, _shinePending; private float _deathT, _deathLen, _deathRumbleT, _shineT; private GpuParticles3D _deathMist, _deathStars; private Vector3 _burstAt, _deathHome; private Node3D _shine;
+    /// <summary>183, for the drives: the death effects running (through the down clip); he burst (where); the Shine node once it is in the arena.</summary>
+    public bool DeathFxOn => _deathOn;
+    public bool Burst { get; private set; }
+    public Vector3 BurstAt => _burstAt;
+    public Node3D Shine => _shine != null && IsInstanceValid(_shine) ? _shine : null;
+    public bool ShineSpawned { get; private set; }
+    public bool HurtFlashOn => _flashOn;
+    public float GlowBoostNow => _glowBoost;
+    /// <summary>The down clip begins (the last hit's hurt is over): the mist and the stars boil off his body, the blink, the glow and the crown's flare run in DeathTick.</summary>
+    private void DeathBegin()
+    {
+        _deathT = 0f; _deathRumbleT = 0f; _deathHome = Position;
+        _deathLen = _anim != null && _anim.HasAnimation(BckDown) ? (float)(_anim.GetAnimation(BckDown).Length / Mathf.Max(0.01f, _anim.SpeedScale)) : 3.3f;
+        if (!DeathFx) return;
+        _deathOn = true;
+        Vector3 at = BodyPoint + Vector3.Up * 1.5f;                                                                                       // the body's middle (the joint sits low in the sphere)
+        if (DeathMist > 0) _deathMist = Emitter("DeathMistFx", DeathMist, 1.0, at, Vector3.Up, 180f, 1.5f, 4f, 2.5f, 5f, MistColor, 0.7f, 1.2f, 0.5f, 2.5f);
+        if (DeathSparkles > 0 && _chika != null && _chika.ProcessMaterial is ParticleProcessMaterial chikaMat)
+        {
+            _deathStars = (GpuParticles3D)_chika.Duplicate();
+            _deathStars.Name = "DeathStarsFx"; _deathStars.TopLevel = true; _deathStars.Visible = true; _deathStars.Amount = DeathSparkles; _deathStars.Lifetime = 0.9; _deathStars.OneShot = false; _deathStars.Emitting = false; _deathStars.LocalCoords = false;
+            var pm = (ParticleProcessMaterial)chikaMat.Duplicate();
+            pm.EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere; pm.EmissionSphereRadius = 3.5f; pm.Direction = Vector3.Up; pm.Spread = 180f;
+            pm.InitialVelocityMin = 3f; pm.InitialVelocityMax = 7f; pm.Gravity = new Vector3(0f, -3f, 0f); pm.ScaleMin = 1.2f; pm.ScaleMax = 2.4f;
+            _deathStars.ProcessMaterial = pm;
+            AddChild(_deathStars); _deathStars.GlobalPosition = at; _deathStars.Emitting = true;
+        }
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the DEATH's effects on -- the mist and the stars at {at}, the blink at {DeathBlinkHz} Hz, the glow to {DeathGlowBoost} x, the crown {(DeathCrownFlare ? "flaring" : "as is")}");
+    }
+    /// <summary>A tick of the down clip: the blink, the glow's swell, the crown's flare (quicker and quicker, to the activation flash by the end), the emitters on the
+    /// body, the rumble.</summary>
+    private void DeathTick(float dt)
+    {
+        _deathT += dt;
+        float k = _deathLen > 0f ? Mathf.Clamp(_deathT / _deathLen, 0f, 1f) : 1f;
+        if (DeathSink > 0f)                                                                                                               // the sink: the tumble ends low
+        {
+            Position = _deathHome + Vector3.Down * (DeathSink * Mathf.SmoothStep(0f, 1f, k));
+            float fy = float.IsNaN(_floorAtSpot) ? _introFloorY : _floorAtSpot;
+            if (BodyPoint.Y < fy + 2f) Position += Vector3.Up * (fy + 2f - BodyPoint.Y);
+        }
+        if (!_deathOn) return;
+        if (DeathBlinkHz > 0f) { bool flash = ((int)(_deathT * DeathBlinkHz * 2f) & 1) == 0; if (flash != _flashOn) SetFlash(flash); }
+        _glowBoost = 1f + (DeathGlowBoost - 1f) * k;
+        if (DeathCrownFlare) { float hz = Mathf.Lerp(2f, 9f, k); SetCrownGlow(new Color(1f, 1f, 1f), 0.5f + 0.5f * (0.5f + 0.5f * MathF.Sin(_deathT * hz * MathF.Tau)) + k); }
+        Vector3 at = BodyPoint + Vector3.Up * 1.5f;
+        if (_deathMist != null && IsInstanceValid(_deathMist)) _deathMist.GlobalPosition = at;
+        if (_deathStars != null && IsInstanceValid(_deathStars)) _deathStars.GlobalPosition = at;
+        if (DeathRumble > 0f) { _deathRumbleT -= dt; if (_deathRumbleT <= 0f) { _deathRumbleT = 0.4f; SmsCameraShake.Current?.Start(SmsCameraShake.Kind.Damage, DeathRumble); } }
+    }
+    /// <summary>The down clip is over: he BURSTS where the tumble ended -- the flash, the shock ring on the floor under him, the poof, the stars, the kick, the
+    /// afterglow -- the emitters close; the Shine's clock starts. His effects run on through the Shine's stop-the-world (ProcessMode Always till they are done).</summary>
+    private void DeathBurst()
+    {
+        Vector3 at = BodyPoint + Vector3.Up * 1.5f; _burstAt = at; Burst = true;
+        _deathOn = false; _glowBoost = 1f; SetFlash(false); SetCrownGlow(_crownGlowColor, 0f);
+        if (_deathMist != null && IsInstanceValid(_deathMist)) { var m = _deathMist; m.Emitting = false; GetTree().CreateTimer(2.5).Timeout += () => { if (IsInstanceValid(m)) m.QueueFree(); }; _deathMist = null; }
+        if (_deathStars != null && IsInstanceValid(_deathStars)) { var s = _deathStars; s.Emitting = false; GetTree().CreateTimer(1.5).Timeout += () => { if (IsInstanceValid(s)) s.QueueFree(); }; _deathStars = null; }
+        if (DeathFx)
+        {
+            float s = DeathFxScale;
+            if (DeathFlashSize > 0f) FlashAt("DeathFlash", at, DeathFlashSize, DeathFlashSeconds, flat: false, 0.3f, 1.4f);
+            if (DeathFlashSize > 0f && DeathAfterglowSeconds > 0f) FlashAt("DeathAfterglow", at, DeathFlashSize * 0.6f, DeathAfterglowSeconds, flat: false, 1f, 0.5f);   // lingers, shrinking as it fades
+            float fy = FloorUnder(at); if (float.IsNaN(fy)) fy = float.IsNaN(_floorAtSpot) ? _introFloorY : _floorAtSpot;
+            if (DiveShockRing) ShockRingAt(new Vector3(at.X, fy, at.Z), DiveFlashSize * s, DiveFlashSeconds * 1.6f);
+            if (DeathPuffs > 0) DiveBurst("DeathPuffs", DeathPuffs, at, Vector3.Up, 180f, 4f * s, 8f * s, 3f * s, 6f * s, MistColor, 0.85f, 1.3, 3.5f, 0.8f);
+            StarBurst("DeathStars", at, DeathStars, s);
+            if (DeathShake > 0f) SmsCameraShake.Current?.Start(SmsCameraShake.Kind.Damage, DeathShake);
+        }
+        ProcessMode = ProcessModeEnum.Always;
+        _shinePending = true; _shineT = 0f;
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: BURSTS at {at} -- the flash {DeathFlashSize} m, {DeathPuffs} puffs, {DeathStars} stars, the floor at {FloorUnder(at):F2}; the Shine in {ShineDelaySeconds:F1} s");
+    }
+    /// <summary>Gone: the Shine ShineDelaySeconds after the burst; once it is there and his last flash is out, back to the world's clock.</summary>
+    private void GoneTick(float dt)
+    {
+        _shineT += dt;
+        if (_shinePending) { if (_shineT >= ShineDelaySeconds) SpawnShine(); }
+        else if (ShineSpawned && !AnyFxAlive && _shineT >= ShineDelaySeconds + 1.5f && ProcessMode == ProcessModeEnum.Always) ProcessMode = ProcessModeEnum.Inherit;   // the Shine's stars done too
+    }
+    /// <summary>The SHINE (makeShineAppearWithDemo, "the boss shine"): the ShineScene beside him in the arena, placed at ShineSpawnPoint or ShineOverFloor m over the
+    /// floor at the arena's middle with its back to Mario, appearing the game's way from where he burst (ShineFromBurst) with the demo (ShineDemo), its exit set
+    /// (ShineExitLevel / ShineExitScene), its save flag this scene + his name.</summary>
+    private void SpawnShine()
+    {
+        _shinePending = false;
+        var scene = ShineScene ?? (ResourceLoader.Exists("res://shine_sprite.tscn") ? GD.Load<PackedScene>("res://shine_sprite.tscn") : null);
+        if (scene == null) { GD.PushWarning($"[SMS kingboo] {GetPath()}: no ShineScene and no res://shine_sprite.tscn -- no Shine at the fight's end"); return; }
+        var node = scene.Instantiate<Node3D>();
+        Node parent = GetParent() ?? GetTree().CurrentScene;
+        parent.AddChild(node);
+        float fy = FloorUnder(_arenaCentre); if (float.IsNaN(fy)) fy = float.IsNaN(_introFloorY) ? _arenaCentre.Y : _introFloorY;
+        Vector3 placed = ShineSpawnPoint != null ? ShineSpawnPoint.GlobalPosition : new Vector3(_arenaCentre.X, fy + ShineOverFloor, _arenaCentre.Z);
+        var m = M(); Vector3 away = m != null ? placed - m.GlobalPosition : Vector3.Forward; away.Y = 0f;
+        if (away.LengthSquared() < 1e-4f) away = Vector3.Forward; away = away.Normalized();
+        float yaw = Mathf.Atan2(-away.X, -away.Z);                                                                                        // SmsMath.DirFromYaw(yaw) = away: its back to Mario
+        node.GlobalPosition = placed; node.GlobalRotation = new Vector3(0f, yaw, 0f);
+        _shine = node; ShineSpawned = true;
+        if (node is ShineSprite s)
+        {
+            if (string.IsNullOrEmpty(s.ShineId)) s.ShineId = $"{GetTree().CurrentScene?.SceneFilePath ?? ""}:{Name}:rematch";              // 118c: the spawned Shine's save flag
+            if (ShineExitLevel) { s.ExitLevel = true; if (!string.IsNullOrEmpty(ShineExitScene)) s.ExitScene = ShineExitScene; }
+            int ticks = ShineDemoTicks > 0 ? ShineDemoTicks : s.SmsAppearDemoTicks;
+            if (ShineCamOffset != Vector3.Zero) s.SmsAppearCamOffset = ShineCamOffset;
+            if (ShineFromBurst) s.SmsAppearFrom(_burstAt, ticks, ShineDemo); else s.SmsAppear(ticks, ShineDemo);
+            if (ShineCamFov > 0f && s.SmsAppearCam != null) s.SmsAppearCam.Fov = ShineCamFov;
+        }
+        Vector3 start = ShineFromBurst ? _burstAt : placed;                                                                                // the golden flash and stars where it materialises
+        if (ShineFlashSize > 0f) FlashAt("ShineFlash", start, ShineFlashSize, 0.5f, flat: false, 0.4f, 1.3f, ShineFlashColor);
+        StarBurst("ShineStars", start, ShineStars, 0.7f, ShineFlashColor);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the SHINE -- {node.Name} placed at {placed} (the floor {fy:F2}, Mario {(m != null ? Flat(placed, m.GlobalPosition).ToString("F1") : "?")} m off), appearing from {(ShineFromBurst ? _burstAt.ToString() : "its spot")}, the demo {ShineDemo}");
+        EmitSignal(SignalName.ShineAppearing, node);
     }
     /// <summary>A continuous emitter of the port's smoke ball (mix-blended) at a point: count alive, their life, a direction and spread, speeds, sizes, colour, alpha,
     /// damping, gravity; the rise's wisps. Freed by the caller.</summary>
@@ -1102,15 +1264,17 @@ public partial class SmsKingBooRematch : Node3D
                 State = Phase.Down; PlayClip(BckDown);
                 if (_sound != null && !string.IsNullOrEmpty(DownSe)) _sound.Play(DownSe);
                 foreach (var c in _copies.ToArray()) if (c != null && IsInstanceValid(c) && c.State != Phase.Gone) c.DismissCopy();   // 177: his copies go with him
-                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: DOWN");
+                DeathBegin();                                                                                                        // 183: the mist, the stars, the blink, the glow and the crown through the tumble
+                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: DOWN ({_deathLen:F2} s of the down clip, then the burst)");
             }
         }
         else if (State == Phase.Down && n == BckDown)
         {
+            DeathBurst();                                                                                                            // 183: he bursts where the tumble ended; the Shine follows
             State = Phase.Gone;
             if (_model != null) _model.Visible = false;
             PlaceFx();
-            if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: gone -- defeated (the fight's end is a later pass)");
+            if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: gone -- defeated; the Shine in {ShineDelaySeconds:F1} s");
             EmitSignal(SignalName.Defeated);
         }
         else if (_revealing && n == BckLaugh) { State = Phase.Vanish; _fadeT = 0f; if (_sound != null && !string.IsNullOrEmpty(VanishSe)) _sound.Play(VanishSe); }   // 177: the found-out copy's laugh is over: it fades (181: a poof at the end of the fade)
@@ -1717,6 +1881,7 @@ public partial class SmsKingBooRematch : Node3D
     {
         if (Engine.IsEditorHint()) return;
         if (AnyFxAlive) FxTick((float)delta);                                                                                                                   // 180 / 181: the flashes, the ring and the rise glow run on, hidden or not
+        if (State == Phase.Gone) GoneTick((float)delta);                                                                                                       // 183: the Shine after the burst
         if (State == Phase.Hidden) return;
         float dt = (float)delta;
         if (State == Phase.IntroRise || State == Phase.IntroLaugh || State == Phase.IntroSink) { IntroTick(dt); if (Blink) BlinkTick(dt); PlaceFx(); return; }   // 174
@@ -1795,6 +1960,7 @@ public partial class SmsKingBooRematch : Node3D
         else if (State == Phase.Breath) BreathTick(dt);
         else if (State == Phase.Fireballs) FireballsTick(dt);
         else if (State == Phase.Wind) WindTick(dt);
+        else if (State == Phase.Down) DeathTick(dt);                                                                                  // 183
         if (Blink) BlinkTick(dt);
         PlaceFx();
     }
