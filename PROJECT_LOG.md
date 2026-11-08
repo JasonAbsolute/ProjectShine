@@ -12968,3 +12968,67 @@ deleted; the drive, the logs and shots165/ deleted; a clean rebuild 0 errors.
 the clip's 11 m); `CrownSparkles` 0 takes the stars out of every move's tell too (the crown's colour and halo stay); the rise's stars stream only up to his
 hover height, none through the overshoot and the settle; the ambient twinkle (`Twinkle`) still puts a few small stars about his body -- the knob if that is
 the sparkle he meant. Next: the fight's END -- the defeat and the Shine's spawn (Jaysonn: "lets do the ending of the fight also spawning the shine and such").
+
+### 183 -- the King Boo REMATCH, part 27: the fight's END -- his DEFEAT (the down clip's tumble with his body blinking, ghost mist and stars boiling off him, his glow swelling and his crown flaring, sinking low, then a BURST: a flash, a shock ring, a poof, stars, a kick, an afterglow) and the SHINE (materialising in a golden flash where he burst, flying the game's way down onto its spot at the arena's middle under a demo camera with the world frozen); the Bomb Boo supply ends at the last hit (feature/kingboo-rematch, code `dc28a2b`)
+
+**Jaysonn:** "ok and also lets do the ending of the fight also spawning the shine and such"
+
+**The defeat** (`SmsKingBooRematch.cs`, The end: the defeat and the Shine group): the last hit's hurt ends in the down clip (`btelesa_down`, 3.3 s -- probed
+with tools/anim/probe_clip.gd: a spinning tumble, the body climbing 2.6 m by its end) with `DeathFx`. `DeathBegin` at the down: a mist emitter (`Emitter`,
+`DeathMist` 40 alive, 2.5-5 m, 1.5-4 m/s every way) and a star emitter (ChikaFx copied, `DeathSparkles` 40 alive, 3-7 m/s every way under a gravity of 3) at
+the body's middle. `DeathTick` through the clip: the hurt flash toggled at `DeathBlinkHz` 8 (`SetFlash`), `_glowBoost` 1 -> `DeathGlowBoost` 3 with the clip's
+progress, the crown `SetCrownGlow(white, 0.5..1 pulsing at 2 -> 9 Hz + the progress)` -- white, quicker and quicker, the activation flash by the end
+(`DeathCrownFlare`), the emitters following the body, `SmsCameraShake` Damage x `DeathRumble` 0.25 every 0.4 s, and the node SINKING: `Position` =
+`_deathHome` down `DeathSink` 6 m x SmoothStep of the progress, the body kept 2 m over the floor (`_floorAtSpot` / `_introFloorY`) -- so the tumble ends low
+(the body at 7.1 m against 9.8 at the down's start) and the burst and the Shine's flight are by the floor, not 13 m up in the black sky (runs bf, bg).
+`DeathBurst` at the clip's end (OnClipEnd, before Gone): `_burstAt` = the body's middle; a camera-facing `FlashAt` of `DeathFlashSize` 30 m over
+`DeathFlashSeconds` 0.6 (0.3 -> 1.4) and an AFTERGLOW (0.6 x the size, `DeathAfterglowSeconds` 2.5, 1 -> 0.5: shrinking as it fades), `ShockRingAt` on the
+floor under him (`FloorUnder`; `DiveFlashSize` x `DeathFxScale` 1.6), a POOF (`DiveBurst`, `DeathPuffs` 60 of 3-6 m x 1.6 at 4-8 m/s x 1.6, every way, 1.3 s)
+and `StarBurst` of `DeathStars` 150 x 1.6, the camera kicked `DeathShake` 1.2; the death emitters close (freed after), `SetFlash(false)`, the crown's glow off,
+`ProcessMode` Always (his effects run on through the Shine's stop-the-world), the Shine's clock started. Then Gone: the model hidden, `Defeated`.
+
+**The Shine**: `GoneTick` (from the top of `_Process`, Gone only): `ShineDelaySeconds` 1 after the burst `SpawnShine` -- the `ShineScene` (empty =
+`res://shine_sprite.tscn`, as the casino boss's and the Chomp's) instantiated beside him (his parent, else the current scene), placed at `ShineSpawnPoint`
+(a Node3D) or `ShineOverFloor` 1.2 m over `FloorUnder(_arenaCentre)` at the arena's middle, with its back to Mario (yaw = atan2(-away.x, -away.z):
+`SmsMath.DirFromYaw` = away from him, so its demo camera, before it, looks past it at Mario); a `ShineSprite`: `ShineId` = this scene's path + his name +
+":rematch" when empty (118c's save flag for a spawned Shine), `ExitLevel` / `ExitScene` set when `ShineExitLevel` (`ShineExitScene`; off = the Shine scene's
+own: the save card, then control back), `SmsAppearCamOffset` = `ShineCamOffset` (0, 7, 9) in the Shine's placed frame (x right, y up, z forward) unless zero,
+then `SmsAppearFrom(_burstAt, ticks, ShineDemo)` (`ShineFromBurst`; else `SmsAppear` at its spot) with `ShineDemoTicks` 720 (0 = the Shine scene's own
+`SmsAppearDemoTicks` 1200) -- the game's TShine::appearWithDemo: up 240 ticks (3.2 m, 2 s), a half-sine loop down onto its spot over the rest less the
+settle's 240 (720: 2 s; the arc's height half the distance), the settle 240, spinning; `ShineDemo` true = the world frozen (`SmsAppearStopWorld`) and the
+Shine's own camera current, its `Fov` set to `ShineCamFov` 40 (the Shine's own (0, 2.5, 7) at 75 degrees showed a speck in the black sky through the
+flight). Where it materialises: a GOLDEN `FlashAt` (`ShineFlashSize` 12, 0.5 s, 0.4 -> 1.3, `ShineFlashColor` (1, 0.85, 0.35)) and a `StarBurst` of
+`ShineStars` 60 x 0.7 in the gold -- `Flash` has a `Col` (else `DiveColor`), `StarBurst` a colour (the process material's Color), `Bright(Color, alpha)`.
+Once the Shine is out, his flashes gone and 1.5 s past the delay (the Shine's stars done), `ProcessMode` back to Inherit. Readouts `DeathFxOn`, `Burst`,
+`BurstAt`, `Shine`, `ShineSpawned`, `HurtFlashOn`, `GlowBoostNow`; the signal `ShineAppearing(shine)`.
+
+**The supply** (`SmsBombBooSpawner.cs`): `OnBossHit` with 0 left clears the field and `Stop`s -- the casino's forceAllItemKill at the boss's death; before,
+the supply ran on through the hurt (3.6 s) and a Boo spawned, drifting through the down, the burst and the Shine (run bg's 17g). The not-alive stop in the
+tick clears the field too.
+
+**Verified** (headless drive v183-5, deleted before the commit; its node ProcessMode Always to tick through the Shine's stop-the-world; `DriveSetHp(1)` then
+`TakeHit(null)` after 181's teleport check): C10 the DOWN -- the death effects on, 24 flash toggles in 1.5 s, the glow 1.91 x and climbing, the crown's shine
+to 1.43, the copies gone, not alive, the supply stopped at the last hit with no Boo out (and not running at the down), the clip `btelesa_down`; C10b the
+BURST 3.32 s after the down, 7.13 m up against the body's 9.81 at the down's start (sunk), the flash up, the emitters closed, Gone; C10c the SHINE 1.00 s
+after the burst, a ShineSprite in appear state 2 (rising) at the burst point, placed (0.08, 2.10, 0) = the arena's middle 1.2 m over its floor (0.90; the
+intro's spot 1.00), the demo running, the world paused, the Shine's `SmsShineAppearCam` current, the id
+`res://assets/Sms/Rematch/RematchArena.tscn:KingBoo:rematch`, no exit; C10d the flight's END -- the top 10.34 (3.2 m over the burst), down onto its
+placed spot within a mm, the demo over at 6.0 s, the world running, the camera gone, King Boo Gone, back on Inherit, his flashes out; 182's, 181's, 180's
+and 179's checks as before -- 21/21, no errors. v183-1 21/21 at the Shine's 10 s with the burst 13 m up (the speck); v183-2 the supply's stop at the last
+hit and the 6 s demo; v183-3 the sink and a camera from above ((0, 9, 10) at 45: a good start, a steep settle); v183-4 a low camera ((0, 4.5, 8) at 42:
+the black sky behind the burst); v183-5 (0, 7, 9) at 40 and the Shine's stars at 0.7. Six shot runs (25 shots each): the tumble blinking white with the
+crown flaring and the stars shed; the mist and the stars trailing off him as he spins, his glow swelled; the burst low over Mario with the ring racing out
+along the floor under it; the afterglow with the stars and the puffs falling; the Shine materialising in gold under the demo camera with the rim and the
+floor behind it; its flight down with its own sparkle trail and Mario standing below; the settle; the Shine floating at the middle with Mario before it.
+Run bj made no shots: it started while my own rebuild was rewriting the DLL (the scripts' classes not found, every node bare) -- the two were issued
+together; the run re-issued alone (bk). The drive's idle Mario had fallen asleep by the ending (his Z over the Shine in bh's 17g): the stick tapped at the
+last hit and after the demo. The clean rebuild 0 errors; the drive, the logs, shots165/, run_window.ps1 and the probe's logs deleted, this pass's
+scheduled tasks too.
+
+**Deviations, all knobs:** the casino boss dies where he hovers (no sink, no burst) and his Shine comes 240 ticks into the down at his point -- here the
+sink (`DeathSink` 0 = none), the burst, and the Shine 1 s after it from the burst point (`ShineFromBurst` off = at its spot); the demo is 6 s, not the
+Shine's 10 (`ShineDemoTicks` 0 = the Shine's own), from a camera King Boo places (`ShineCamOffset` / `ShineCamFov` zero = the Shine's own); the golden flash
+and stars at the Shine's appearance are not the game's (`ShineFlashSize` 0 / `ShineStars` 0 = none); the Shine's back is to Mario (its placed yaw -- the
+shine-get demo faces it); its exit is the Shine scene's own unless `ShineExitLevel`; the twinkle stars' faint square halo (the game's IA8 star texture has a
+little alpha everywhere; `kira_add.gdshader` adds it) shows at the big sizes against the black sky -- left as the port has it (a shader cut of the low alpha
+would take it out of every twinkle). Open: where the Shine's exit should lead (the plaza? the casino?) -- Jaysonn's call.

@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180 + 181 + 182), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-07 19:05 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180 + 181 + 182 + 183), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-07 20:07 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1238,8 +1238,13 @@ leap and a DIVE through the floor in a burst of his twinkle stars, a flash on th
 ring, the mist and twinkle stars streaming up round him -- and so does every TELEPORT (a poof and stars as he goes, a flash, a poof and stars where he comes in); the
 flashes brighter and bigger. SMS 182: the APPEAR is clean and smooth -- the appear clip's own leap is the rise (the node waits at the hover height, the body
 comes up out of the floor in one arc, no stall on the stone) -- and the CROWN SPARKLES are off (the tell's stars, the teleport-in stars; the rise's stars shed
-off his body instead of a column up past his crown). Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `fe66876` ("SMS 182: the King Boo REMATCH, part 26 -- the APPEAR is clean and smooth (the appear clip's own leap is the rise: the node waits at the hover height and the body comes up out of the floor in one arc, no stall on the stone) and the CROWN SPARKLES are off (the tell's stars, the teleport-in stars, and the rise's stars shed off his body instead of a column up past his crown)";
+off his body instead of a column up past his crown). SMS 183: the fight's END -- his DEFEAT (the down clip's tumble with his body blinking, mist and stars boiling off
+him, his glow and crown flaring, sinking low, then a BURST: a flash, a shock ring, a poof, stars, a kick, an afterglow) and the SHINE (a golden flash where he burst,
+the game's appear flight down onto its spot at the arena's middle under a demo camera, the world frozen); the Bomb Boo supply ends at the last hit. Further passes
+re-point this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `dc28a2b` ("SMS 183: the King Boo REMATCH, part 27 -- the fight's END: his DEFEAT (the down clip's tumble with his body blinking, ghost mist and stars boiling off him, his glow swelling and his crown flaring, sinking low, then a BURST -- a flash, a shock ring, a poof, stars, a kick, an afterglow) and the SHINE (materialising in a golden flash where he burst, flying the game's way down onto its spot at the arena's middle under a demo camera with the world frozen); the Bomb Boo supply ends at the last hit";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsBombBooSpawner.cs) on the 182 commit
+  ("SMS 182: the King Boo REMATCH, part 26 -- the APPEAR is clean and smooth (the appear clip's own leap is the rise: the node waits at the hover height and the body comes up out of the floor in one arc, no stall on the stone) and the CROWN SPARKLES are off (the tell's stars, the teleport-in stars, and the rise's stars shed off his body instead of a column up past his crown)";
   assets/Sms/Rematch/ SmsKingBooRematch.cs) on the 181 commit
   ("SMS 181: the King Boo REMATCH, part 25 -- effects for him COMING UP out of the ground (a glow pulsing on the stone and wisps before he breaks through, then the flash, the shock ring, the mist and twinkle stars streaming up round him) and for every TELEPORT (a poof and stars as he goes, a flash, a poof and stars where he comes in); the flashes brighter and bigger";
   assets/Sms/Rematch/ SmsKingBooRematch.cs) on the 180 commit
@@ -1293,9 +1298,14 @@ off his body instead of a column up past his crown). Further passes re-point thi
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 56 commits past `feature/sounds`, 78 since `main`. ~1.2 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 58 commits past `feature/sounds`, 80 since `main`. ~1.2 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 183: BEAT him -- on the last hit King Boo tumbles, blinking white with mist and stars pouring off him and his crown flaring, sinks low and BURSTS in
+  a flash, a shock ring and a cloud of mist and stars; a second later the SHINE materialises in a golden flash where he burst and flies down onto its spot at
+  the arena's middle while the world freezes and a camera watches (6 s); grab it as any Shine (the save card, then control back -- ShineExitLevel /
+  ShineExitScene on KingBoo send it somewhere). Knobs in The end group on KingBoo: DeathSink, DeathFlashSize, DeathPuffs / DeathStars, ShineDelaySeconds,
+  ShineDemoTicks, ShineCamOffset / ShineCamFov, ShineOverFloor, ShineSpawnPoint. The Bomb Boos are gone from the last hit on.
 - To try 182: watch the cutscene's APPEAR -- after the glow's tell King Boo comes up out of the floor in one clean arc (the appear clip's own leap, no
   stall on the stone) and settles at his hover height; twinkle stars shed off his body only while he shoots up, nothing at his crown; the crown's own sparkles
   are gone from the tells and the teleport-ins (IntroAppearClipSpeed / RiseLeapDamp, CrownSparkles 0 / TeleportInStars off, Twinkle for the ambient stars on
