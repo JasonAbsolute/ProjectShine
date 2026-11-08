@@ -8,8 +8,9 @@ using System.Collections.Generic;
 /// start (the intro's FightReady; at once without an intro, or StartAtOnce) every SpawnInterval seconds, while fewer than MaxOut Boos are out
 /// and King Boo stands: a black foggy spot (FogSeconds of dark smoke at the point) and a Bomb Boo rising out of it -- which then floats as Sunshine's Boos
 /// do (160: wandering within its WanderRadiusUnits of the spot, so a Centre spawn drifts about the middle of the arena). Where: SpawnMode --
-/// Centre (this node's point: for the playtests, as Jaysonn asked), Random (anywhere within ArenaRadius of this node, at least MinFromMario
-/// from Mario), the floor found under the point. King Boo's hit clears every Boo on the field (the doc) and the supply pauses ClearPause
+/// Centre (this node's point: for the playtests, as Jaysonn asked), Random (184, the default now: a spot on the arena's stone, EdgeMargin inside
+/// its edge, MinFromMario..MaxFromMario from Mario, MinFromLast from the last spot, MinFromBoos from the Boos out), the floor found under the
+/// point. King Boo's hit clears every Boo on the field (the doc) and the supply pauses ClearPause
 /// seconds; his defeat stops it. Knobs: the timing (FirstDelay, SpawnInterval, FogSeconds, ClearPause), the cap (MaxOut), the Boo's own
 /// (ExpireSeconds and the rest on BombBooScene's root), the place (SpawnMode, ArenaRadius, MinFromMario, FloorOffset).
 /// Pass 179 (Jaysonn: "when spawning in they should have that mist effect with the eyes glowing before they spawn in", "keep it black not purple"): the spot is
@@ -21,9 +22,15 @@ public partial class SmsBombBooSpawner : Node3D
     public enum Modes { Centre, Random }
 
     [Export] public PackedScene BombBooScene;
-    [Export] public Modes SpawnMode = Modes.Centre;
-    /// <summary>Random: within this of this node (x and z), and never nearer Mario than MinFromMario.</summary>
+    /// <summary>184 (Jaysonn: "we now need the bomb boos to spawn in random locations"; the doc: "Black foggy spots appear at random through the fight"): Random
+    /// is the default now -- 158's Centre (this node's point) was for the playtests. The random spot: within ArenaRadius of this node AND, when the arena's floor
+    /// (SmsArenaFloor) is found, EdgeMargin inside its edge (never a spot hanging off the stone: the floor must be found under it); MinFromMario to MaxFromMario
+    /// from Mario (0 = no cap: reachable, not on top of him); MinFromLast from the last spot (not the same place twice running) and MinFromBoos from any Boo out.
+    /// Up to 24 draws; the one that fits, else the one that misses by least.</summary>
+    [Export] public Modes SpawnMode = Modes.Random;
     [Export] public float ArenaRadius = 18f, MinFromMario = 4f;
+    [Export(PropertyHint.Range, "0,40,0.5")] public float MaxFromMario = 14f;
+    [Export(PropertyHint.Range, "0,10,0.5")] public float EdgeMargin = 2.5f, MinFromLast = 6f, MinFromBoos = 3f;
     [ExportGroup("Supply")]
     [Export] public float FirstDelay = 1.5f, SpawnInterval = 6f, FogSeconds = 1.1f, ClearPause = 2f;
     [Export(PropertyHint.Range, "1,12,1")] public int MaxOut = 2;
@@ -88,6 +95,7 @@ public partial class SmsBombBooSpawner : Node3D
     {
         _boss = GetTree().GetFirstNodeInGroup("sms_rematch_boss") as SmsKingBooRematch;
         if (_boss != null) { _boss.Hit += OnBossHit; _boss.Defeated += Stop; }
+        FindFloor();                                                                                                          // 184: the arena's floor for the random spots (its middle and radius)
         foreach (Node n in GetTree().CurrentScene?.FindChildren("*", "", true, false) ?? new Godot.Collections.Array<Node>())
             if (n is SmsRematchIntro i) { _intro = i; break; }
         if (StartAtOnce || _intro == null || _intro.State == SmsRematchIntro.Phase.Done) Start();
@@ -148,24 +156,66 @@ public partial class SmsBombBooSpawner : Node3D
         StartFog(at);
     }
 
+    /// <summary>184, for the drives: the last spot picked (the floor point), how many, the last pick's draws and its misses (0 = every rule met), the arena read.</summary>
+    public Vector3 LastSpot { get; private set; }
+    public int SpotsMade { get; private set; }
+    public int LastPickDraws { get; private set; }
+    public float LastPickMiss { get; private set; }
+    public Vector3 ArenaCentre => _floor != null && IsInstanceValid(_floor) && _floor.Radius > 1f ? _floor.Centre : GlobalPosition;
+    public float ArenaFloorRadius => _floor != null && IsInstanceValid(_floor) && _floor.Radius > 1f ? _floor.Radius : ArenaRadius + EdgeMargin;
+    /// <summary>The spot's radius about the middle: ArenaRadius, and EdgeMargin inside the floor's edge when the floor is known.</summary>
+    public float SpotRadius => Mathf.Max(1f, Mathf.Min(ArenaRadius, ArenaFloorRadius - EdgeMargin));
+    private SmsArenaFloor _floor; private bool _floorLooked;
+    private void FindFloor()
+    {
+        if (_floorLooked) return;
+        _floorLooked = true;
+        foreach (Node n in GetTree().CurrentScene?.FindChildren("*", "StaticBody3D", true, false) ?? new Godot.Collections.Array<Node>()) if (n is SmsArenaFloor f) { _floor = f; break; }
+        if (DebugPrint) GD.Print($"[SMS bomb supply] {Name}: the arena's floor {(_floor != null ? $"{_floor.Name}: middle {_floor.Centre}, radius {_floor.Radius:F1}" : "NOT found")} -- the random spots within {SpotRadius:F1} m of {ArenaCentre}");
+    }
+
     private Vector3 PickPoint()
     {
         if (_mario == null || !IsInstanceValid(_mario)) _mario = GetTree().GetFirstNodeInGroup("player") as Mario;
-        Vector3 p = GlobalPosition;
+        Vector3 p = GlobalPosition; LastPickDraws = 0; LastPickMiss = 0f;
         if (SpawnMode == Modes.Random)
         {
-            for (int tries = 0; tries < 12; tries++)
+            FindFloor();
+            Vector3 mid = ArenaCentre; float radius = SpotRadius;
+            Vector3? best = null; float bestMiss = float.MaxValue;
+            for (int draw = 1; draw <= 24; draw++)
             {
-                float a = (float)(_rng.NextDouble() * Math.PI * 2.0), r = ArenaRadius * MathF.Sqrt((float)_rng.NextDouble());
-                Vector3 c = GlobalPosition + new Vector3(MathF.Cos(a) * r, 0f, MathF.Sin(a) * r);
-                if (_mario == null || new Vector2(c.X - _mario.GlobalPosition.X, c.Z - _mario.GlobalPosition.Z).Length() >= MinFromMario) { p = c; break; }
-                p = c;
+                LastPickDraws = draw;
+                float a = (float)(_rng.NextDouble() * Math.PI * 2.0), r = radius * MathF.Sqrt((float)_rng.NextDouble());
+                Vector3 c = new Vector3(mid.X + MathF.Cos(a) * r, GlobalPosition.Y, mid.Z + MathF.Sin(a) * r);
+                float? fy = FloorUnder(c);
+                if (!fy.HasValue) continue;                                                                                  // off the stone: never
+                c.Y = fy.Value;
+                float miss = 0f;                                                                                             // how far the draw misses the rules, in metres
+                if (_mario != null)
+                {
+                    float dm = Flat(c, _mario.GlobalPosition);
+                    if (dm < MinFromMario) miss += MinFromMario - dm;
+                    if (MaxFromMario > 0f && dm > MaxFromMario) miss += dm - MaxFromMario;
+                }
+                if (SpotsMade > 0 && MinFromLast > 0f) { float dl = Flat(c, LastSpot); if (dl < MinFromLast) miss += MinFromLast - dl; }
+                if (MinFromBoos > 0f) foreach (var b in SmsBombBoo.All) if (b != null && IsInstanceValid(b) && b.State != SmsBombBoo.Phase.Gone) { float db = Flat(c, b.GlobalPosition); if (db < MinFromBoos) miss += MinFromBoos - db; }
+                if (miss < bestMiss) { bestMiss = miss; best = c; }
+                if (miss <= 0f) break;
             }
+            if (best.HasValue) { p = best.Value; LastPickMiss = bestMiss; p.Y += FloorOffset; }
+            else { float? fy = FloorUnder(p); if (fy.HasValue) p.Y = fy.Value + FloorOffset; LastPickMiss = 99f; }     // no floor found anywhere: the node's point
         }
-        float? floor = FloorUnder(p);
-        if (floor.HasValue) p.Y = floor.Value + FloorOffset;
+        else
+        {
+            float? floor = FloorUnder(p);
+            if (floor.HasValue) p.Y = floor.Value + FloorOffset;
+        }
+        LastSpot = p; SpotsMade++;
+        if (DebugPrint) GD.Print($"[SMS bomb supply] {Name}: spot {SpotsMade} at ({p.X:F1}, {p.Z:F1}) -- {Flat(p, ArenaCentre):F1} m from the middle (the spots' radius {SpotRadius:F1} of the floor's {ArenaFloorRadius:F1}), {(_mario != null ? Flat(p, _mario.GlobalPosition).ToString("F1") : "?")} m from Mario, {LastPickDraws} draw(s), miss {LastPickMiss:F2}");
         return p;
     }
+    private static float Flat(Vector3 a, Vector3 b) => new Vector2(a.X - b.X, a.Z - b.Z).Length();
 
     private float? FloorUnder(Vector3 p)
     {
