@@ -474,6 +474,34 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public float VolleySpacing = 0.4f, VolleyLobHeight = 9f, VolleyScatter = 5f, VolleyAimedWithin = 1f, VolleyBlastRadius = 3.5f, VolleyBlastHeight = 1.6f;
     [Export] public bool VolleyDud = true;
     [Export] public float VolleyDudSeconds = 6f, VolleyDudMinFromMario = 2.5f;
+    [ExportGroup("The fight (201): the AMBUSH from below")]
+    /// <summary>201 (Jaysonn: "lets do 1" -- the ambush from below): he SINKS where he stands (the hide clip, the fade, his poof -- AmbushSinkSeconds) and his glow
+    /// POOL (the rise's glow and wisps, AmbushPoolSize m across) HUNTS Mario across the stone for AmbushHuntSeconds -- sliding toward his feet at AmbushHuntSpeed,
+    /// AmbushHuntQuicken times that by the end -- then STOPS and flares for AmbushTellSeconds (the tell), and he ERUPTS there (the appear clip's leap through
+    /// the floor, the rise's burst, kick and stars) with a shock RING racing out to AmbushRingRadius over AmbushRingSeconds: a Mario within it whose feet are
+    /// under AmbushRingHeight is hit (the common enemy damage) -- a jump at the break clears it. He is up at the pool's spot (the ambush moves him), the wait.
+    /// Under the floor he cannot be hit. The weight among the attacks.</summary>
+    [Export] public bool AmbushOn = true;
+    [Export(PropertyHint.Range, "0,10,0.5")] public float AmbushWeight = 1f;
+    [Export] public float AmbushSinkSeconds = 0.5f, AmbushHuntSeconds = 3f, AmbushHuntSpeed = 6f, AmbushHuntQuicken = 1.6f, AmbushTellSeconds = 0.45f;
+    [Export] public float AmbushPoolSize = 7f, AmbushRingRadius = 5f, AmbushRingSeconds = 0.45f, AmbushRingHeight = 1.6f;
+    [Export] public Color AmbushRingColor = new Color(0.8f, 0.7f, 1f, 0.9f);
+    [ExportGroup("The fight (201): the BOO CIRCLE (Super Mario World's ghost houses)")]
+    /// <summary>201 (Jaysonn: "a circle of boos attack similar to how ghost houses used to have them in super mario world"): his laugh through the tell (the crown
+    /// CircleCrownColor, CircleTellSeconds), then a RING of hotel Boos (SmsBooCircle: CircleCount places, CircleGap of them empty -- the gap) forms about Mario,
+    /// CircleRadius out, CircleHeight over the floor, turning once every CircleRevSeconds; it holds CircleHoldSeconds, then CLOSES to CircleMinRadius by
+    /// CircleSeconds (drifting after him at CircleDriftSpeed), and fades. A Boo touching Mario hurts him (the common enemy damage); out through the gap, or over
+    /// (a Boo's top is CircleHeight + its half height). CircleWatchSeconds after the ring is up, the wait (the ring runs on its own; one at a time). A hit on him
+    /// through it fades the ring.</summary>
+    [Export] public bool CircleOn = true;
+    [Export(PropertyHint.Range, "0,10,0.5")] public float CircleWeight = 1f;
+    [Export] public Color CircleCrownColor = new Color(0.75f, 0.55f, 1f);
+    [Export] public float CircleTellSeconds = 0.8f, CircleWatchSeconds = 0.5f;
+    [Export] public string CircleClip = "";
+    [Export(PropertyHint.Range, "3,16,1")] public int CircleCount = 8;
+    [Export(PropertyHint.Range, "1,4,1")] public int CircleGap = 1;
+    [Export] public float CircleRadius = 7f, CircleMinRadius = 1f, CircleHeight = 1.5f, CircleRevSeconds = 4f, CircleHoldSeconds = 2f, CircleSeconds = 8f, CircleDriftSpeed = 1f;
+    private string CircleClipNow => string.IsNullOrEmpty(CircleClip) ? BckLaugh : CircleClip;
     [ExportGroup("The fight (169): Ghost Wind")]
     /// <summary>The wind runs at all; the crown's colour for it (the doc: pink, for now); the tell before the tornados rise; how long he watches after they
     /// have risen before the wait; the clip and voice through it.</summary>
@@ -566,14 +594,23 @@ public partial class SmsKingBooRematch : Node3D
     [Signal] public delegate void VolleySpatEventHandler(int count);
     [Signal] public delegate void VolleyBlastedEventHandler(bool hitMario);
     [Signal] public delegate void VolleyDoneEventHandler(int hits);
+    /// <summary>201: the ambush -- he sinks; the pool stops hunting (the tell); he erupts (whether the ring got Mario); he is up (the hits). The circle -- the tell; the ring made (its Boos); a Boo got Mario; the ring is gone (the hits).</summary>
+    [Signal] public delegate void AmbushStartedEventHandler();
+    [Signal] public delegate void AmbushTellEventHandler();
+    [Signal] public delegate void AmbushEruptedEventHandler(bool hitMario);
+    [Signal] public delegate void AmbushDoneEventHandler(int hits);
+    [Signal] public delegate void CircleStartedEventHandler();
+    [Signal] public delegate void CircleMadeEventHandler(int boos);
+    [Signal] public delegate void CircleHitEventHandler();
+    [Signal] public delegate void CircleDoneEventHandler(int hits);
     /// <summary>169: the wind's tell begins; the tornados have risen; a tornado flung Mario; the last tornado is gone (the flings in all).</summary>
     [Signal] public delegate void WindStartedEventHandler();
     [Signal] public delegate void WindSpawnedEventHandler(int count);
     [Signal] public delegate void FlungEventHandler();
     [Signal] public delegate void WindDoneEventHandler(int flings);
 
-    public enum Phase { Hidden, Appear, Laugh, Wait, Hurt, Down, Gone, Vanish, Arrive, Lick, Smash, Lightning, Breath, Fireballs, Wind, IntroRise, IntroLaugh, IntroSink, Split, Mock, Volley }
-    public enum Move { None, Hop, Lick, Smash, Lightning, Breath, Fireballs, Wind, Volley }
+    public enum Phase { Hidden, Appear, Laugh, Wait, Hurt, Down, Gone, Vanish, Arrive, Lick, Smash, Lightning, Breath, Fireballs, Wind, IntroRise, IntroLaugh, IntroSink, Split, Mock, Volley, Ambush, Circle }
+    public enum Move { None, Hop, Lick, Smash, Lightning, Breath, Fireballs, Wind, Volley, Ambush, Circle }
     public Phase State { get; private set; } = Phase.Hidden;
     /// <summary>The clip he is on (the assigned one while it is held paused: 167).</summary>
     public string Clip => _anim != null ? (string)(_anim.IsPlaying() ? _anim.CurrentAnimation : _anim.AssignedAnimation) : "";
@@ -597,7 +634,7 @@ public partial class SmsKingBooRematch : Node3D
     public Vector3 CrownRestColor => _crownRest;
     private ShaderMaterial _teethMat;
     /// <summary>A Bomb Boo bursts on him while he waits or licks (not between spots, through the hurt, the down, the entrance).</summary>
-    public bool CanBeHit => State == Phase.Wait || State == Phase.Lick || State == Phase.Smash || State == Phase.Lightning || State == Phase.Breath || State == Phase.Fireballs || State == Phase.Wind || State == Phase.Volley;
+    public bool CanBeHit => State == Phase.Wait || State == Phase.Lick || State == Phase.Smash || State == Phase.Lightning || State == Phase.Breath || State == Phase.Fireballs || State == Phase.Wind || State == Phase.Volley || State == Phase.Circle || (State == Phase.Ambush && _ambushStage == 3 && _riseBroke);   // 201: under the floor he is out of reach
     public bool IsAlive => State != Phase.Down && State != Phase.Gone;
     public int MaterialsCopied => _mats.Count;
     /// <summary>162, for the drives: the lick's stage (-1 none, 0 wind-up, 1 the whip live, 2 the clip's tail, 3 the wait after), the counts, the gap left,
@@ -648,6 +685,20 @@ public partial class SmsKingBooRematch : Node3D
     public SmsBooVolley Volley => _volley != null && IsInstanceValid(_volley) ? _volley : null;
     public bool VolleyLaunched => _volleyLaunched;
     public SmsBombBoo VolleyDudBoo { get; private set; }
+    /// <summary>201: the ambushes made and their hits; the stage now (0 the sink, 1 the hunt, 2 the tell, 3 the erupt), the pool's floor point, how far through the hunt, the ring's radius now and
+    /// whether it got him; the circles made and their hits, the circle running (while it lives), whether this one's ring is out.</summary>
+    public int AmbushesMade { get; private set; }
+    public int AmbushHits { get; private set; }
+    public int AmbushStage => State == Phase.Ambush ? _ambushStage : -1;
+    public Vector3 AmbushPool => _ambushPool;
+    public float AmbushHuntK => AmbushHuntSeconds > 0f ? Mathf.Clamp(_ambushHuntT / AmbushHuntSeconds, 0f, 1f) : 1f;
+    public float AmbushRingRadiusNow { get; private set; }
+    public bool AmbushRingHit { get; private set; }
+    public int AmbushBreaks { get; private set; }
+    public int CirclesMade { get; private set; }
+    public int CircleHits { get; private set; }
+    public SmsBooCircle Circle => _circle != null && IsInstanceValid(_circle) ? _circle : null;
+    public bool CircleLaunched => _circleLaunched;
     /// <summary>169: the winds made, the flings in all, the wind running (while it lives), whether this wind's tornados are up.</summary>
     public int WindsMade { get; private set; }
     public int WindFlings { get; private set; }
@@ -694,6 +745,8 @@ public partial class SmsKingBooRematch : Node3D
     private SmsGhostBreath _breath; private float _breathT, _breathWatchT, _breathYawCentre; private bool _breathLaunched, _breathSwept, _breathClipHeld; private int _breathSide = 1, _bSita = -1;
     private SmsFireballs _fireballs; private float _fireT, _fireWatchT; private bool _fireLaunched, _fireShot, _fireClipHeld;
     private SmsBooVolley _volley; private float _volleyT, _volleyWatchT; private bool _volleyLaunched, _volleySpat, _volleyClipHeld;   // 200
+    private int _ambushStage; private float _ambushT, _ambushHuntT, _ambushRingT = -1f, _riseGlowSizeNow = 14f, _riseGlowFlare = 1f; private Vector3 _ambushPool; private bool _ambushHitDone;   // 201
+    private SmsBooCircle _circle; private float _circleT, _circleWatchT; private bool _circleLaunched;   // 201
     private SmsGhostWind _wind; private float _windT, _windWatchT; private bool _windLaunched, _windDone;
     /// <summary>Where the crown's sparkles and halo sit: the crown joint lifted CrownFxLift into the crown.</summary>
     public Vector3 CrownFxPoint => CrownPoint + Vector3.Up * CrownFxLift;
@@ -1047,8 +1100,8 @@ public partial class SmsKingBooRematch : Node3D
             _riseGlowT += dt;                                                                                                                   // its own clock: it fades on after the rise is over
             float a = _riseGlowBreakT >= 0f ? Mathf.Max(0f, 1f - (_riseGlowT - _riseGlowBreakT) / 0.4f) : Mathf.Clamp(_riseGlowT / 0.3f, 0f, 1f);   // in over 0.3 s, out over 0.4 s after the break
             float pulse = 0.75f + 0.25f * MathF.Sin(MathF.Tau * RiseGlowHz * _riseGlowT);
-            _riseGlow.Scale = Vector3.One * RiseGlowSize * (0.7f + 0.3f * Mathf.Clamp(_riseGlowT / 1.2f, 0f, 1f)) * (0.92f + 0.08f * pulse);
-            _riseGlowMat.AlbedoColor = Bright(a * pulse);
+            _riseGlow.Scale = Vector3.One * _riseGlowSizeNow * _riseGlowFlare * (0.7f + 0.3f * Mathf.Clamp(_riseGlowT / 1.2f, 0f, 1f)) * (0.92f + 0.08f * pulse);   // 201: the ambush's pool is smaller (AmbushPoolSize) and flares at its tell
+            _riseGlowMat.AlbedoColor = Bright(Mathf.Min(1f, a * pulse * _riseGlowFlare));
             if (_riseGlowBreakT >= 0f && a <= 0f) _riseGlow.Visible = false;
         }
     }
@@ -1095,7 +1148,7 @@ public partial class SmsKingBooRematch : Node3D
     private void RiseFxBegin(Vector3 floorSpot)
     {
         if (!RiseFx) return;
-        _riseFxOn = true; _riseBroke = false; _riseT = 0f; _riseBreakT = -1f; _riseGlowT = 0f; _riseGlowBreakT = -1f; _riseSpot = floorSpot; _riseFloorY = floorSpot.Y;
+        _riseFxOn = true; _riseBroke = false; _riseT = 0f; _riseBreakT = -1f; _riseGlowT = 0f; _riseGlowBreakT = -1f; _riseSpot = floorSpot; _riseFloorY = floorSpot.Y; _riseGlowSizeNow = RiseGlowSize; _riseGlowFlare = 1f;
         var tex = FxTex("radgrad_raw");
         if (RiseGlowSize > 0f && tex != null)
         {
@@ -1530,6 +1583,8 @@ public partial class SmsKingBooRematch : Node3D
         else if (State == Phase.Breath && n == BreathClip) { _breathClipHeld = false; PlayClip(BckWait); }
         else if (State == Phase.Fireballs && n == FireballClip) { _fireClipHeld = false; PlayClip(BckWait); }
         else if (State == Phase.Volley && n == VolleyClip) { _volleyClipHeld = false; PlayClip(BckWait); }   // 200
+        else if (State == Phase.Circle && n == CircleClipNow) { if (!_circleLaunched) PlayClip(CircleClipNow); else PlayClip(BckWait); }   // 201: the laugh through the tell, the wait after
+        else if (State == Phase.Ambush && n == BckAppear && _ambushStage == 3) PlayClip(BckWait);                                              // 201: up out of the floor
         else if (State == Phase.Wind && n == WindClip) { if (!_windLaunched) PlayClip(WindClip); else PlayClip(BckWait); }
     }
 
@@ -1599,7 +1654,7 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>Into the Split phase: every move called off, the flash off, upright; the node waits for the cutscene's calls.</summary>
     public void SplitBegin()
     {
-        AbortLick(); AbortSmash(); AbortLightning(); AbortBreath(); AbortFireballs(); AbortWind(); AbortVolley();
+        AbortLick(); AbortSmash(); AbortLightning(); AbortBreath(); AbortFireballs(); AbortWind(); AbortVolley(); AbortAmbush(); AbortCircle();
         SetFlash(false); _splitFlashT = 0f; Rotation = new Vector3(0f, _yaw, 0f);
         State = Phase.Split; _gapT = 0f;
         PlayClip(BckWait);
@@ -1745,7 +1800,7 @@ public partial class SmsKingBooRematch : Node3D
     {
         if (!IsCopy || _revealing || State == Phase.Gone) return;
         if (State == Phase.Vanish || State == Phase.Arrive) { SetOpacity(_opacitySolid); }                 // mid-teleport: shown where it is for the laugh
-        AbortLick(); AbortSmash(); AbortLightning(); AbortBreath(); AbortFireballs(); AbortWind(); AbortVolley();
+        AbortLick(); AbortSmash(); AbortLightning(); AbortBreath(); AbortFireballs(); AbortWind(); AbortVolley(); AbortAmbush(); AbortCircle();
         _revealing = true; State = Phase.Laugh; _laughSounded = true; Position = _home; Rotation = new Vector3(0f, _yaw, 0f); _gapT = 0f;   // 191: a mock's rock undone
         PlayClip(BckLaugh);
         if (_sound != null && !string.IsNullOrEmpty(LaughSe)) _sound.Play(LaughSe, LaughDb);
@@ -1760,8 +1815,8 @@ public partial class SmsKingBooRematch : Node3D
     public bool TakeHit(SmsBombBoo by)
     {
         if (!CanBeHit) return false;
-        bool midLick = State == Phase.Lick, midSmash = State == Phase.Smash, midLightning = State == Phase.Lightning, midBreath = State == Phase.Breath, midFire = State == Phase.Fireballs || State == Phase.Volley, midWind = State == Phase.Wind;   // 200: a volley cut off reads as a fire
-        AbortLick(); AbortSmash(); AbortLightning(); AbortBreath(); AbortFireballs(); AbortWind(); AbortVolley();
+        bool midLick = State == Phase.Lick, midSmash = State == Phase.Smash, midLightning = State == Phase.Lightning, midBreath = State == Phase.Breath, midFire = State == Phase.Fireballs || State == Phase.Volley || State == Phase.Circle || State == Phase.Ambush, midWind = State == Phase.Wind;   // 200/201: a volley, a circle or an ambush cut off reads as a fire
+        AbortLick(); AbortSmash(); AbortLightning(); AbortBreath(); AbortFireballs(); AbortWind(); AbortVolley(); AbortAmbush(); AbortCircle();
         if (IsCopy) CopyHitsTaken++;                                                                             // 178: a copy takes the hit LIKE the real one -- the tumble, then the teleport -- but no damage
         else { Hp = Math.Max(0, Hp - 1); HitsTaken++; }
         if (IsCopy && CopyMock) { BeginMock(by); return true; }                                                  // 191: the fake LAUGHS IT OFF -- no flinch
@@ -1912,6 +1967,8 @@ public partial class SmsKingBooRematch : Node3D
         if (pick == Move.Breath) { BeginBreath(); return; }
         if (pick == Move.Fireballs) { BeginFireballs(); return; }
         if (pick == Move.Volley) { BeginVolley(); return; }
+        if (pick == Move.Ambush) { BeginAmbush(); return; }
+        if (pick == Move.Circle) { BeginCircle(); return; }
         if (pick == Move.Wind) { BeginWind(); return; }
         _moveIsLick = pick == Move.Lick;
         AbortLick();
@@ -1932,7 +1989,8 @@ public partial class SmsKingBooRematch : Node3D
         }
         if (_rng.NextDouble() < RepositionChance) return Move.Hop;
         float wl = Mathf.Max(0f, LickWeight), ws = SmashOn && SmashScene != null ? Mathf.Max(0f, SmashWeight) : 0f, wg = LightningOn ? Mathf.Max(0f, LightningWeight) : 0f, wb = BreathOn ? Mathf.Max(0f, BreathWeight) : 0f, wf = FireballsOn ? Mathf.Max(0f, FireballWeight) : 0f, ww = WindOn ? Mathf.Max(0f, WindWeight) : 0f, wv = VolleyOn ? Mathf.Max(0f, VolleyWeight) : 0f;
-        float sum = wl + ws + wg + wb + wf + ww + wv;
+        float wa = AmbushOn ? Mathf.Max(0f, AmbushWeight) : 0f, wc = CircleOn && Circle == null ? Mathf.Max(0f, CircleWeight) : 0f;   // 201: one circle at a time
+        float sum = wl + ws + wg + wb + wf + ww + wv + wa + wc;
         if (sum <= 0f) return Move.Lick;
         float r = (float)_rng.NextDouble() * sum;
         if (r < wl) return Move.Lick;
@@ -1941,7 +1999,9 @@ public partial class SmsKingBooRematch : Node3D
         if (r < wl + ws + wg + wb) return Move.Breath;
         if (r < wl + ws + wg + wb + wf) return Move.Fireballs;
         if (r < wl + ws + wg + wb + wf + ww) return Move.Wind;
-        return Move.Volley;
+        if (r < wl + ws + wg + wb + wf + ww + wv) return Move.Volley;
+        if (r < wl + ws + wg + wb + wf + ww + wv + wa) return Move.Ambush;
+        return Move.Circle;
     }
     /// <summary>164: the smash, where he stands: the laugh clip and its voice, the crown pulsing white through the tell, then the Boolossus over Mario.</summary>
     private void BeginSmash()
@@ -2227,6 +2287,172 @@ public partial class SmsKingBooRematch : Node3D
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: back to the wait after the volley ({VolleyHits} hit{(VolleyHits == 1 ? "" : "s")} so far), the next move in {_gapT:F1} s");
     }
     private void AbortVolley() { if (_volley != null && IsInstanceValid(_volley)) _volley.Cancel(); _volley = null; if (_volleyClipHeld && _anim != null) { _anim.Play(); _volleyClipHeld = false; } SetCrownGlow(_crownGlowColor, 0f); }
+    /// <summary>201: the AMBUSH from below -- he sinks where he stands, his glow pool hunts Mario across the stone, stops and flares, and he erupts there with a shock ring.
+    /// The rise's own effects (181/182: the glow and wisps, the appear clip's leap, the floor burst, the kick, the stars) carry it; the pool is the rise's glow, moved.</summary>
+    private void BeginAmbush()
+    {
+        State = Phase.Ambush; _ambushStage = 0; _ambushT = 0f; _ambushHuntT = 0f; _ambushRingT = -1f; _ambushHitDone = false; AmbushRingHit = false; AmbushRingRadiusNow = 0f; MovesMade++; AmbushesMade++; Position = _home;
+        float fy = FloorUnder(BodyPoint); if (float.IsNaN(fy)) fy = float.IsNaN(_floorAtSpot) ? GlobalPosition.Y - _hoverOverFloor : _floorAtSpot;
+        _ambushPool = new Vector3(BodyPoint.X, fy, BodyPoint.Z);
+        if (!string.IsNullOrEmpty(TeleportClip)) PlayClip(TeleportClip);
+        if (_sound != null && !string.IsNullOrEmpty(VanishSe)) _sound.Play(VanishSe);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: move {MovesMade}: AMBUSH {AmbushesMade} -- he sinks at {_ambushPool} ({AmbushSinkSeconds} s), the pool hunts Mario {AmbushHuntSeconds} s at {AmbushHuntSpeed} m/s (x{AmbushHuntQuicken} by the end), the tell {AmbushTellSeconds} s, the ring {AmbushRingRadius} m");
+        EmitSignal(SignalName.AmbushStarted);
+    }
+    private void AmbushTick(float dt)
+    {
+        _ambushT += dt;
+        var m = M(); if (m == null) { EndAmbush(); return; }
+        float marioR = SmsParams.Mario.DamageRadius / 74.44f;
+        switch (_ambushStage)
+        {
+            case 0:   // the sink: the hide clip, the fade (a hop's vanish), his poof; then the pool
+            {
+                float k = AmbushSinkSeconds > 0f ? Mathf.Clamp(_ambushT / AmbushSinkSeconds, 0f, 1f) : 1f;
+                SetOpacity(_opacitySolid * (1f - k));
+                if (k >= 1f)
+                {
+                    TeleportOutFx();
+                    RiseFxBegin(_ambushPool); _riseGlowSizeNow = AmbushPoolSize;
+                    Position = new Vector3(_ambushPool.X, _ambushPool.Y - IntroSinkDepth, _ambushPool.Z);
+                    _ambushStage = 1; _ambushT = 0f; _ambushHuntT = 0f;
+                    if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: under the floor -- the pool at {_ambushPool} hunts");
+                }
+                break;
+            }
+            case 1:   // the hunt: the pool slides toward Mario's feet, quicker as it goes, inside the arena; he rides under it
+            {
+                _ambushHuntT += dt; float hk = AmbushHuntK;
+                Vector3 d = m.GlobalPosition - _ambushPool; d.Y = 0f; float dist = d.Length();
+                float speed = AmbushHuntSpeed * Mathf.Lerp(1f, Mathf.Max(1f, AmbushHuntQuicken), hk), step = MathF.Min(dist, speed * dt);
+                if (dist > 1e-3f) _ambushPool += d / dist * step;
+                Vector3 cd = _ambushPool - _arenaCentre; cd.Y = 0f; float cl = cd.Length(), lim = Mathf.Max(3f, _arenaRadius - 2f);
+                if (cl > lim) _ambushPool = new Vector3(_arenaCentre.X + cd.X / cl * lim, _ambushPool.Y, _arenaCentre.Z + cd.Z / cl * lim);
+                float fy = FloorUnder(_ambushPool + Vector3.Up); if (!float.IsNaN(fy)) _ambushPool.Y = fy;
+                _riseSpot = _ambushPool; _riseFloorY = _ambushPool.Y;
+                if (_riseGlow != null && IsInstanceValid(_riseGlow)) _riseGlow.GlobalPosition = _ambushPool + Vector3.Up * 0.05f;
+                if (_riseWisps != null && IsInstanceValid(_riseWisps)) _riseWisps.GlobalPosition = _ambushPool + Vector3.Up * 0.3f;
+                Position = new Vector3(_ambushPool.X, _ambushPool.Y - IntroSinkDepth, _ambushPool.Z);
+                if (hk >= 1f)
+                {
+                    _ambushStage = 2; _ambushT = 0f;
+                    if (_sound != null && !string.IsNullOrEmpty(LaughSe)) _sound.Play(LaughSe, LaughDb - 4f, 0.8f);                           // a low chuckle under the stone
+                    if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the pool STOPS at {_ambushPool} ({Flat(_ambushPool, m.GlobalPosition):F2} m from Mario) -- the tell");
+                    EmitSignal(SignalName.AmbushTell);
+                }
+                break;
+            }
+            case 2:   // the tell: the pool flares
+            {
+                _riseGlowFlare = 1f + 0.7f * Mathf.Clamp(_ambushT / Mathf.Max(0.05f, AmbushTellSeconds), 0f, 1f);
+                if (_ambushT >= AmbushTellSeconds)
+                {
+                    _ambushStage = 3; _ambushT = 0f; _riseGlowFlare = 1f;
+                    _introTop = _ambushPool + Vector3.Up * _hoverOverFloor; _home = _introTop; _dest = _introTop; LastSpot = _introTop; _floorAtSpot = _ambushPool.Y;
+                    RiseLeapTopY = float.NegativeInfinity; SetOpacity(_opacitySolid); FaceNow();
+                    _riseClipPending = true; StartAppearClip();                                                                                   // 182: the clip's own leap carries him up through the floor
+                    if (!_riseClipStarted) Position = new Vector3(_ambushPool.X, _ambushPool.Y - IntroSinkDepth, _ambushPool.Z);
+                    if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: ERUPTS at {_ambushPool} (the rise {RiseLength:F2} s)");
+                }
+                break;
+            }
+            case 3:   // the erupt: the leap, the break (the floor burst, the stars), the shock ring racing out
+            {
+                if (_riseClipStarted) RiseNodeTick();
+                else { float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp(_ambushT / Mathf.Max(0.1f, IntroRiseSeconds), 0f, 1f)); Position = new Vector3(_introTop.X, Mathf.Lerp(_ambushPool.Y - IntroSinkDepth, _introTop.Y, k), _introTop.Z); }
+                FaceTick(dt);
+                RiseFxTick(dt);
+                if (_riseBroke && _ambushRingT < 0f)
+                {
+                    _ambushRingT = 0f; AmbushBreaks++;
+                    Vector3 at = new Vector3(_riseSpot.X, _riseFloorY, _riseSpot.Z);
+                    if (AmbushRingRadius > 0.5f) SmsSmashFx.Ring(GetTree().CurrentScene ?? GetParent(), at, 1f, AmbushRingRadius, Mathf.Max(0.1f, AmbushRingSeconds), AmbushRingColor);
+                }
+                if (_ambushRingT >= 0f)
+                {
+                    _ambushRingT += dt;
+                    float r = AmbushRingRadius * Mathf.Clamp(_ambushRingT / Mathf.Max(0.05f, AmbushRingSeconds), 0f, 1f); AmbushRingRadiusNow = r;   // read on past the hit (the drives, the shots)
+                    if (!_ambushHitDone)
+                    {
+                        Vector3 feet = m.GlobalPosition;
+                        if (feet.Y - _riseFloorY < AmbushRingHeight && Flat(feet, _riseSpot) <= r + marioR && m.stateOfMario != Mario.MarioState.hurt && m.stateOfMario != Mario.MarioState.dead)
+                        {
+                            int hp = m.SmsHP; m.TakeDamage(new Vector3(_riseSpot.X, _riseFloorY + 1f, _riseSpot.Z), Mario.SmsDamageProfile.EnemyCommon);
+                            if (m.SmsHP < hp || m.stateOfMario == Mario.MarioState.hurt) { _ambushHitDone = true; AmbushRingHit = true; AmbushHits++; if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the ring GETS Mario at {Flat(feet, _riseSpot):F2} m (r {r:F2}); hp {m.SmsHP}"); EmitSignal(SignalName.AmbushErupted, true); }
+                        }
+                        if (!_ambushHitDone && _ambushRingT >= AmbushRingSeconds) { _ambushHitDone = true; EmitSignal(SignalName.AmbushErupted, false); }
+                    }
+                }
+                if (_ambushT >= RiseLength) EndAmbush();
+                break;
+            }
+        }
+    }
+    private void EndAmbush()
+    {
+        RiseFxEnd(); _riseGlowSizeNow = RiseGlowSize; _riseGlowFlare = 1f;
+        if (_ambushStage >= 2) Position = _introTop;
+        SetOpacity(_opacitySolid);
+        if (_ambushRingT >= 0f && !_ambushHitDone) { _ambushHitDone = true; EmitSignal(SignalName.AmbushErupted, false); }
+        EnterWait(NextGap());
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: up at {GlobalPosition} after the ambush ({AmbushHits} hit{(AmbushHits == 1 ? "" : "s")} so far), the next move in {_gapT:F1} s");
+        EmitSignal(SignalName.AmbushDone, AmbushHits);
+    }
+    private void AbortAmbush()
+    {
+        if (State != Phase.Ambush) return;
+        RiseFxEnd(); _riseGlowSizeNow = RiseGlowSize; _riseGlowFlare = 1f; _riseClipPending = false;
+        Position = _ambushStage >= 2 ? _introTop : _home; SetOpacity(_opacitySolid);
+        if (_model != null) _model.Visible = true;
+    }
+    /// <summary>201: the BOO CIRCLE -- his laugh through the tell (the crown violet), then the ring of hotel Boos about Mario (SmsBooCircle, on its own); CircleWatchSeconds after it is up, the wait.</summary>
+    private void BeginCircle()
+    {
+        State = Phase.Circle; _circleT = 0f; _circleWatchT = 0f; _circleLaunched = false; _pulsePhase = 0f; _crownFlashT = 0f; MovesMade++; CirclesMade++; Position = _home;
+        PlayClip(CircleClipNow);
+        if (_sound != null && !string.IsNullOrEmpty(LaughSe)) _sound.Play(LaughSe, LaughDb);
+        SetCrownGlow(CircleCrownColor, 0f);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: move {MovesMade}: BOO CIRCLE {CirclesMade} -- the crown glows {CircleCrownColor} ({CircleCount} places, {CircleGap} empty, {CircleRadius} m about Mario in {CircleTellSeconds:F2} s; a turn every {CircleRevSeconds} s, closing to {CircleMinRadius} m by {CircleSeconds} s)");
+        EmitSignal(SignalName.CircleStarted);
+    }
+    private void CircleTick(float dt)
+    {
+        _circleT += dt;
+        FaceTick(dt);
+        _crownFlashT -= dt;
+        if (_circleT < CrownFlashSeconds || _crownFlashT > 0f) SetCrownGlow(CircleCrownColor, 1.8f);
+        else
+        {
+            float hz = CrownPulseHz * Mathf.Lerp(1f, Mathf.Max(1f, CrownPulseQuicken), Mathf.Clamp(_circleT / Mathf.Max(0.1f, CircleTellSeconds), 0f, 1f));
+            _pulsePhase += dt * hz * MathF.Tau;
+            SetCrownGlow(CircleCrownColor, Mathf.Lerp(0.5f, 1f, 0.5f + 0.5f * MathF.Sin(_pulsePhase - MathF.PI / 2f)));
+        }
+        if (!_circleLaunched)
+        {
+            if (_circleT >= CircleTellSeconds)
+            {
+                var m = M();
+                if (m == null) { EndCircle(); return; }
+                var c = new SmsBooCircle { Name = $"BooCircle{CirclesMade}", DebugPrint = DebugPrint, Count = CircleCount, Gap = CircleGap, Radius = CircleRadius, MinRadius = CircleMinRadius, Height = CircleHeight, RevSeconds = CircleRevSeconds / ThrowSpeedScale, HoldSeconds = CircleHoldSeconds, Seconds = CircleSeconds, DriftSpeed = CircleDriftSpeed };
+                (GetTree().CurrentScene ?? GetParent()).AddChild(c);
+                float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
+                c.Hit += () => { CircleHits++; EmitSignal(SignalName.CircleHit); };
+                c.Finished += () => { int hits = c.Hits; if (_circle == c) _circle = null; EmitSignal(SignalName.CircleDone, hits); };
+                c.Begin(m, fy, _arenaCentre, _arenaRadius);
+                _circle = c; _circleLaunched = true; _crownFlashT = CrownFlashSeconds;
+                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the Boo circle is up about {m.GlobalPosition} ({c.BoosOut} Boos)");
+                EmitSignal(SignalName.CircleMade, c.BoosOut);
+            }
+        }
+        else { _circleWatchT += dt; if (_circleWatchT >= CircleWatchSeconds) EndCircle(); }
+    }
+    private void EndCircle()
+    {
+        SetCrownGlow(_crownGlowColor, 0f); _circleWatchT = 0f;   // the ring runs on its own (kept in _circle: a hit on him fades it; one at a time)
+        EnterWait(NextGap());
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: back to the wait after the circle ({CircleHits} hit{(CircleHits == 1 ? "" : "s")} so far), the next move in {_gapT:F1} s");
+    }
+    private void AbortCircle() { if (_circle != null && IsInstanceValid(_circle)) _circle.Cancel(); _circle = null; if (State == Phase.Circle) SetCrownGlow(_crownGlowColor, 0f); }
     /// <summary>169: the wind -- the crown pink through the tell with the laugh, then the tornados rising away from Mario (SmsGhostWind, on their own);
     /// WindWatchSeconds after they are up, the wait.</summary>
     private void BeginWind()
@@ -2521,6 +2747,8 @@ public partial class SmsKingBooRematch : Node3D
         else if (State == Phase.Breath) BreathTick(dt);
         else if (State == Phase.Fireballs) FireballsTick(dt);
         else if (State == Phase.Volley) VolleyTick(dt);                                                                               // 200
+        else if (State == Phase.Ambush) AmbushTick(dt);                                                                               // 201
+        else if (State == Phase.Circle) CircleTick(dt);                                                                               // 201
         else if (State == Phase.Wind) WindTick(dt);
         else if (State == Phase.Down) DeathTick(dt);                                                                                  // 183
         else if (State == Phase.Mock) MockTick(dt);                                                                                   // 191
