@@ -24,8 +24,9 @@ using System.Collections.Generic;
 public partial class SmsBoolossus : Node3D
 {
     [ExportGroup("The look")]
-    /// <summary>The model's size (1.07 m across at 1): 5.5 = about 6 m, Mario twice over; the ghost's screen mix; the body's brightness and rim.</summary>
-    [Export(PropertyHint.Range, "0.5,12,0.1")] public float ModelScale = 5.5f;
+    /// <summary>The model's size (1.07 m across at 1): 6.5 = about 7 m, Mario twice over and more; the ghost's screen mix; the body's brightness and rim.
+    /// 192 (Jaysonn: "make Boolossus a little bigger"): 5.5 -> 6.5 (a sixth bigger; its body hit and its shadow grow with it).</summary>
+    [Export(PropertyHint.Range, "0.5,12,0.1")] public float ModelScale = 6.5f;
     [Export(PropertyHint.Range, "0.1,1,0.01")] public float Opacity = 0.9f;
     [Export] public float Lift = 1f, Glow = 0.5f;
     /// <summary>The model's face is on its +Z side (Boolossus.obj: its eyes, teeth, tongue and cheeks all sit at +0.3..+0.4 z of the body's middle; off = on -Z).
@@ -63,11 +64,14 @@ public partial class SmsBoolossus : Node3D
     [ExportGroup("The wave")]
     /// <summary>The Boos it splits into: how many, their size (1 = the hotel Boo's own, 1.8 m across; BooModelScale is the glb's game units to metres), how
     /// fast they spread, how long they live, how high over the floor they ride (a jump clears them), their fade at the end, and where the ring starts (0 =
-    /// the body's radius).</summary>
+    /// the body's radius). 192 (Jaysonn: "have the boos last for 3 seconds instead of 1"): WaveSeconds 1 -> 3, and the Boos SLOW as they go -- they burst
+    /// out at WaveSpeed and ease to a stop WaveReach out (at 9 m/s and 10 m: 5.9 m in the first second, 8.3 by two, 9.3 by three), hanging there as a ring
+    /// of hazards until they fade; at the old constant speed three seconds would carry them 27 m, off the arena. WaveReach 0 = the constant speed as before.</summary>
     [Export(PropertyHint.Range, "1,40,1")] public int WaveCount = 15;
     [Export(PropertyHint.Range, "0.1,3,0.05")] public float WaveBooScale = 1f;
     [Export] public float BooModelScale = 0.013434f;
-    [Export] public float WaveSpeed = 9f, WaveSeconds = 1f, WaveHeight = 0.9f, WaveFadeSeconds = 0.25f, WaveStartRadius = 0f;
+    [Export] public float WaveSpeed = 9f, WaveSeconds = 3f, WaveHeight = 0.9f, WaveFadeSeconds = 0.25f, WaveStartRadius = 0f;
+    [Export(PropertyHint.Range, "0,30,0.5")] public float WaveReach = 10f;
     [Export] public bool BooFacesPlusZ = true;
     /// <summary>165: the Boos' solidity (the materials' fade; 1 = the game's Boo as it is) and their idle clip (telesa_wait; "" = none).</summary>
     [Export(PropertyHint.Range, "0.1,1,0.01")] public float WaveBooOpacity = 1f;
@@ -89,6 +93,8 @@ public partial class SmsBoolossus : Node3D
     public float FloorY { get; private set; } = float.NaN;
     public float BottomY => GlobalPosition.Y + _modelBottom * ModelScale;
     public float Radius => BodyRadius > 0f ? BodyRadius : _modelHalfWidth * ModelScale;
+    /// <summary>192: how far a wave Boo has ridden from its start at this age -- out at WaveSpeed, easing to a stop WaveReach out (0: WaveSpeed x age as before).</summary>
+    public float WaveDistance(float age) => WaveReach > 0f ? WaveReach * (1f - MathF.Exp(-age * WaveSpeed / WaveReach)) : WaveSpeed * age;
     public bool HitMario { get; private set; }
     public bool WaveHitMario => _waveHits > 0;
     public int WaveHits => _waveHits;
@@ -371,7 +377,7 @@ public partial class SmsWaveBoo : Node3D
     {
         if (Maker == null || !IsInstanceValid(Maker)) { QueueFree(); return; }
         float dt = (float)delta; Age += dt;
-        GlobalPosition = _from + Dir * (Maker.WaveSpeed * Age);
+        GlobalPosition = _from + Dir * Maker.WaveDistance(Age);                                                       // 192: out fast, easing to a stop WaveReach out
         float left = Maker.WaveSeconds - Age;
         if (left <= Maker.WaveFadeSeconds)
         {

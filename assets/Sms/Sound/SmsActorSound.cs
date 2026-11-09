@@ -233,6 +233,20 @@ public partial class SmsActorSound : Node3D
         foreach (var p in _all) if (p.Playing && p.Stream == s) { p.Stop(); any = true; }
         if (any) Log("stop " + se);
     }
+    /// <summary>192: one sound's pitch wherever it plays on this node now (a one-shot still going, its loop) -- King Boo's intro chuckle climbing as it goes.</summary>
+    public void SetPitch(string se, float pitch)
+    {
+        var s = Stream(se); if (s == null) return;
+        pitch = Mathf.Clamp(pitch, 0.05f, 8f);
+        foreach (var p in _all) if (p.Playing && p.Stream == s) p.PitchScale = pitch;
+    }
+    /// <summary>192, for the drives: the pitch the sound plays at now on this node (0 = not playing).</summary>
+    public float PitchOf(string se)
+    {
+        var s = Stream(se); if (s == null) return 0f;
+        foreach (var p in _all) if (p.Playing && p.Stream == s) return p.PitchScale;
+        return 0f;
+    }
     /// <summary>186, for the drives: the sound is playing on this node now (a one-shot or its loop).</summary>
     public bool IsPlaying(string se)
     {

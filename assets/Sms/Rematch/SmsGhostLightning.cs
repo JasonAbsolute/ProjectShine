@@ -31,6 +31,12 @@ public partial class SmsGhostLightning : Node3D
     /// and 2.2 m tall (10 and 5 before: a held jump, apex 3.03 m, clears 2.2 with 0.37 s to spare; 5 m took a spin or triple jump) -- the dodge is the jump,
     /// not the run round the end. King Boo's own knobs of the same names set these on each attack.</summary>
     [Export] public float WallLength = 18f, WallHeight = 2.2f, WallGap = 12f, WallSpeed = 8f, WallThickness = 0.5f;
+    /// <summary>192 (Jaysonn: "the hit boxes for the electric wall are still off from the visuals"): the shock reaches this far up the wall -- 0.85 of WallHeight
+    /// (1.87 m): the shader fades the bolts out over the quad's top quarter, so feet already over the bolts were shocked at 1. And a wall is a SLAB now --
+    /// WallThickness about its drawn face, plus Mario's 42 u -- so a Mario past a wall (he jumped it and came down outside) is clear; before, everything beyond
+    /// a face counted and a clean jump was shocked on the way down. ShowHitBox draws the two slabs in red while the walls stand (King Boo's ShowHitBoxes).</summary>
+    [Export(PropertyHint.Range, "0.3,1.2,0.05")] public float WallHitTopK = 0.85f;
+    [Export] public bool ShowHitBox;
     /// <summary>The squeezes: how many, the tell before each closes, the pause after each meets, and how far the axis turns from one to the next.</summary>
     [Export(PropertyHint.Range, "1,6,1")] public int SqueezeCount = 3;
     [Export] public float WarnSeconds = 0.45f, SqueezePause = 0.2f, SqueezeTurnDeg = 60f;
@@ -133,6 +139,13 @@ public partial class SmsGhostLightning : Node3D
     {
         var mi = new MeshInstance3D { Name = name, Mesh = new QuadMesh { Size = new Vector2(WallLength, WallHeight) }, MaterialOverride = mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Visible = false };
         AddChild(mi);
+        if (ShowHitBox)                                                                // 192: the slab that shocks, drawn (its length, WallHitTopK of the height, WallThickness deep; Mario's own cylinder is King Boo's to draw)
+        {
+            float hh = WallHeight * WallHitTopK;
+            var bm = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, AlbedoColor = new Color(1f, 0.15f, 0.15f, 0.3f), RenderPriority = 2 };
+            var box = new MeshInstance3D { Name = name + "HitBox", Mesh = new BoxMesh { Size = new Vector3(WallLength, hh, WallThickness) }, MaterialOverride = bm, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Position = new Vector3(0f, (hh - WallHeight) * 0.5f, 0f) };
+            mi.AddChild(box);
+        }
         if (PostWidth > 0f)                                                            // 170: the posts the arcs jump between, at the wall's ends
         {
             var tex = FxTex("glow3_raw");
@@ -326,12 +339,14 @@ public partial class SmsGhostLightning : Node3D
         if (_hit || _mario == null || !IsInstanceValid(_mario)) return;
         if (OneShockPerAttack && Hits > 0) return;
         Vector3 p = _mario.GlobalPosition;
-        if (p.Y >= FloorY + WallHeight) return;
+        if (p.Y >= FloorY + WallHeight * WallHitTopK) return;                                                  // 192: his feet over the bolts (the quad's top quarter is the fade)
         Vector3 d = p - _centre; d.Y = 0f;
         float across = Mathf.Abs(d.Dot(_axis)), along = Mathf.Abs(d.Dot(_side)), r = SmsParams.Mario.DamageRadius / U;
         if (along > WallLength * 0.5f + r) return;
         float half = _gap * 0.5f;
-        if (across >= half - WallThickness - r || half <= r)
+        bool slab = Mathf.Abs(across - half) <= WallThickness * 0.5f + r;                                       // 192: the wall's own slab about its drawn face -- past it (jumped) is clear
+        bool shut = half <= r;                                                                                  // the gap closed on him
+        if (slab || shut)
         {
             _hit = true; Hits++;
             var before = _mario.stateOfMario;

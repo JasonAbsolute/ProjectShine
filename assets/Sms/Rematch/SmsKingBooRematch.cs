@@ -210,6 +210,14 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public string IntroLaughSe = "MSD_SE_BS_TELESA_V_LAUGH1B";
     [Export(PropertyHint.Range, "0.5,2,0.05")] public float IntroLaughPitch = 1f;
     [Export] public bool IntroLaughStopsAtDive = true;
+    /// <summary>192 (Jaysonn: "have King Boo's laugh start low but then get higher in the intro cutscene; it doesn't need to scale back low"): the chuckle's pitch
+    /// RISES through the laugh -- from IntroLaughPitchFrom to IntroLaughPitchTo (both x IntroLaughPitch) over IntroLaughSeconds, evenly in pitch (each second the
+    /// same musical step: 0.7 -> 1.4 is an octave, a low chuckle climbing to the casino's cackle and past it), never back down. The clip itself climbs 308 -> 360 Hz
+    /// over its first two seconds, then dips to 330 and wobbles; the ramp carries it over that. Higher is quicker too (the pitch scale), so the laugh gathers pace
+    /// as it climbs. Both 1 = 186's flat laugh.</summary>
+    [Export(PropertyHint.Range, "0.4,2,0.05")] public float IntroLaughPitchFrom = 0.7f, IntroLaughPitchTo = 1.4f;
+    /// <summary>192: the intro laugh's pitch now (From at the laugh's start, To at the dive).</summary>
+    public float IntroLaughPitchNow => Mathf.Clamp(IntroLaughPitch, 0.25f, 4f) * IntroLaughPitchFrom * MathF.Pow(Mathf.Max(0.05f, IntroLaughPitchTo) / Mathf.Max(0.05f, IntroLaughPitchFrom), State == Phase.IntroLaugh ? Mathf.Clamp(_introT / Mathf.Max(0.05f, IntroLaughSeconds), 0f, 1f) : 0f);
     [Export] public bool Blink = true;
     [Export] public Texture2D EyeOpen, EyeHalf, EyeClose;
     [ExportGroup("The fight (158)")]
@@ -362,6 +370,10 @@ public partial class SmsKingBooRematch : Node3D
     /// WallHeight 5 -> 2.2 (a held jump's apex is 3.03 m, his feet over a 2.2 m wall for 0.37 s of it; 5 m took a spin or triple jump), WallLength 10 -> 18
     /// (the open ends were 5 m off: a run out; now 9 m -- the dodge is the jump).</summary>
     [Export] public float WallLength = 18f, WallHeight = 2.2f, WallGap = 12f, WallSpeed = 8f;
+    /// <summary>192 (Jaysonn: "the hit boxes for the electric wall are still off from the visuals"): how far up the wall the shock reaches, as a part of WallHeight --
+    /// 0.85 (1.87 m): the bolts fade out over the quad's top quarter, so feet already over them were shocked at 1. (Also in the walls' code this pass: a wall is a
+    /// slab about its drawn face -- a Mario who jumped a wall and came down outside it is clear; before, everything beyond a face counted.)</summary>
+    [Export(PropertyHint.Range, "0.3,1.2,0.05")] public float WallHitTopK = 0.85f;
     [Export(PropertyHint.Range, "1,6,1")] public int SqueezeCount = 3;
     [Export] public float WarnSeconds = 0.45f, SqueezePause = 0.2f, SqueezeTurnDeg = 60f;
     [Export] public bool OneShockPerAttack = true;
@@ -380,7 +392,11 @@ public partial class SmsKingBooRematch : Node3D
     /// over it: the jump); the freeze's seconds; one freeze per attack.</summary>
     [Export] public float SweepDeg = 150f, SweepSeconds = 1.6f;
     [Export] public SmsGhostBreath.Way SweepWay = SmsGhostBreath.Way.Random;
-    [Export] public float BreathDownDeg = 10f, BreathSpeed = 22f, PuffSeconds = 1.5f, PuffSizeStart = 3f, PuffSizeEnd = 8f, BreathHitHeight = 1f, FreezeSeconds = 1f;   // 172: the puffs 3 -> 8 m (thicker); 187: the jump clears the cold at 1 m (1.2)
+    [Export] public float BreathDownDeg = 10f, BreathSpeed = 22f, PuffSeconds = 1.5f, PuffSizeStart = 3f, PuffSizeEnd = 8f, BreathHitHeight = 1f, FreezeSeconds = 1f;
+    /// <summary>192 (Jaysonn: "the hit boxes for the freeze breath are still off from the visuals"): how much the mist SLOWS once it rolls on the floor (the puffs'
+    /// collision friction, taken off their speed every frame they touch the stone) -- 0: the mist slides out with the cold that freezes, as the hit maths always
+    /// had it; 0.15 (before) stalled the visible mist about 10 m out while the freeze ran on to 25 m, so Mario was frozen with the mist still 5-10 m behind him.</summary>
+    [Export(PropertyHint.Range, "0,1,0.01")] public float BreathFloorDrag = 0f;   // 172: the puffs 3 -> 8 m (thicker); 187: the jump clears the cold at 1 m (1.2)
     /// <summary>173: the breath is aimed so the stream meets the floor this many metres out from the mouth whatever his height (he sits higher now; a fixed
     /// 10 degrees from a mouth 5 m up would pass over a Mario standing near him). 0 = BreathDownDeg as it is.</summary>
     [Export] public float BreathAimFloorAt = 10f;
@@ -420,6 +436,11 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public float FlingSpeed = 85f, FlingUpK = 0.75f, FlingGraceSeconds = 2f;
     [ExportGroup("")]
     [Export] public bool DebugPrint;
+    /// <summary>192 (Jaysonn: "the hit boxes for the electric wall and freeze breath are still off from the visuals"): the hits DRAWN, to judge them in play --
+    /// Mario's damage cylinder (green: 42 u across, 130 u tall from his feet, the game's), each lightning wall's slab (red: its length, WallHitTopK of its height,
+    /// its thickness) while it stands, and every live puff of the breath's cold at its hit radius (red balls). A hit is a red volume touching the green one
+    /// (the breath's only with his feet under BreathHitHeight). Off for play.</summary>
+    [Export] public bool ShowHitBoxes;
 
     [Signal] public delegate void SpawnedEventHandler();
     [Signal] public delegate void LaughedEventHandler();
@@ -760,14 +781,15 @@ public partial class SmsKingBooRematch : Node3D
                 State = Phase.IntroLaugh; _introT = 0f; _hoverT = 0f; LaughPlayed = true;
                 PlayClip(BckLaugh);
                 string laugh = IntroLaughSeNow;                                                                                                  // 186: the casino intro's chuckle, pitched
-                if (_sound != null && !string.IsNullOrEmpty(laugh)) _sound.Play(laugh, LaughDb, Mathf.Clamp(IntroLaughPitch, 0.25f, 4f));
-                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: INTRO -- up; the laugh {laugh} at pitch {IntroLaughPitch} ({IntroLaughSeconds:F1} s)");
+                if (_sound != null && !string.IsNullOrEmpty(laugh)) _sound.Play(laugh, LaughDb, IntroLaughPitchNow);                             // 192: from the ramp's low start
+                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: INTRO -- up; the laugh {laugh} at pitch {IntroLaughPitchNow:F2} rising to {IntroLaughPitch * IntroLaughPitchTo:F2} ({IntroLaughSeconds:F1} s)");
                 EmitSignal(SignalName.Laughed);
             }
         }
         else if (State == Phase.IntroLaugh)
         {
             _hoverT += dt;
+            if (_sound != null && (IntroLaughPitchFrom != 1f || IntroLaughPitchTo != 1f) && !string.IsNullOrEmpty(IntroLaughSeNow)) _sound.SetPitch(IntroLaughSeNow, IntroLaughPitchNow);   // 192: the chuckle climbs
             if (IntroLaughBodyHeld) _introBodyLift = Mathf.Lerp(_introBodyLift, BodyPoint.Y - GlobalPosition.Y, 1f - MathF.Exp(-dt / Mathf.Max(0.05f, IntroLaughHoldSeconds)));   // the clip's lift of the body, taken out
             Position = _introTop + Vector3.Up * ((HoverBob > 0f && HoverBobSeconds > 0f ? MathF.Sin(_hoverT / HoverBobSeconds * MathF.Tau) * HoverBob : 0f) - _introBodyLift);
             FaceTick(dt);
@@ -1574,6 +1596,25 @@ public partial class SmsKingBooRematch : Node3D
         }
         else { EnterWait(NextGap()); if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the mock is over -- the wait, the next move in {_gapT:F1} s"); }
     }
+    // ---- 192: the hits drawn ------------------------------------------------------------------------------------------------------------------------
+    private MeshInstance3D _marioHitBox;
+    /// <summary>192, for the drives: Mario's cylinder is drawn now.</summary>
+    public bool MarioHitBoxShown => _marioHitBox != null && IsInstanceValid(_marioHitBox) && _marioHitBox.Visible;
+    /// <summary>ShowHitBoxes: Mario's damage cylinder (the game's 42 u across, 130 u tall from his feet) drawn green where he stands; the walls and the breath draw their own.</summary>
+    private void HitBoxTick()
+    {
+        if (!ShowHitBoxes) { if (_marioHitBox != null && IsInstanceValid(_marioHitBox)) _marioHitBox.Visible = false; return; }
+        var m = M(); if (m == null) return;
+        float r = SmsParams.Mario.DamageRadius / U, h = SmsParams.Mario.DamageHeight / U;
+        if (_marioHitBox == null || !IsInstanceValid(_marioHitBox))
+        {
+            var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, AlbedoColor = new Color(0.2f, 1f, 0.3f, 0.3f), RenderPriority = 3 };
+            _marioHitBox = new MeshInstance3D { Name = "MarioHitBox", TopLevel = true, Mesh = new CylinderMesh { TopRadius = r, BottomRadius = r, Height = h, RadialSegments = 24, Rings = 1 }, MaterialOverride = mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+            AddChild(_marioHitBox);
+        }
+        _marioHitBox.Visible = true;
+        _marioHitBox.GlobalTransform = new Transform3D(Basis.Identity, m.GlobalPosition + Vector3.Up * (h * 0.5f));
+    }
     private void AbortLick() { _lickStage = -1; _lickClipEnded = false; }
     private void AbortSmash() { SetCrownGlow(_crownGlowColor, 0f); _smashClipEnded = false; }
     private void AbortLightning() { if (_lightning != null && IsInstanceValid(_lightning)) _lightning.Cancel(); _lightning = null; SetCrownGlow(_crownGlowColor, 0f); }
@@ -1745,7 +1786,7 @@ public partial class SmsKingBooRematch : Node3D
             {
                 var m = M();
                 if (m == null) { EndLightning(); return; }
-                var l = new SmsGhostLightning { Name = $"GhostLightning{LightningsMade}", DebugPrint = DebugPrint, WallLength = WallLength, WallHeight = WallHeight, WallGap = WallGap, WallSpeed = WallSpeed, SqueezeCount = SqueezeCount, WarnSeconds = WarnSeconds, SqueezePause = SqueezePause, SqueezeTurnDeg = SqueezeTurnDeg, OneShockPerAttack = OneShockPerAttack };
+                var l = new SmsGhostLightning { Name = $"GhostLightning{LightningsMade}", DebugPrint = DebugPrint, WallLength = WallLength, WallHeight = WallHeight, WallGap = WallGap, WallSpeed = WallSpeed, SqueezeCount = SqueezeCount, WarnSeconds = WarnSeconds, SqueezePause = SqueezePause, SqueezeTurnDeg = SqueezeTurnDeg, OneShockPerAttack = OneShockPerAttack, WallHitTopK = WallHitTopK, ShowHitBox = ShowHitBoxes };   // 192
                 (GetTree().CurrentScene ?? GetParent()).AddChild(l);
                 float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
                 l.Squeezed += hit => { if (hit) LightningHits++; _crownFlashT = CrownFlashSeconds * 0.7f; EmitSignal(SignalName.LightningSqueezed, hit); };
@@ -1801,7 +1842,7 @@ public partial class SmsKingBooRematch : Node3D
                 if (m == null) { EndBreath(); return; }
                 float fyAim = FloorUnder(m.GlobalPosition); if (float.IsNaN(fyAim)) fyAim = m.GlobalPosition.Y;
                 BreathDownDegUsed = BreathAimFloorAt > 0f ? Mathf.RadToDeg(MathF.Atan2(Mathf.Max(0.1f, MouthPoint.Y - fyAim), BreathAimFloorAt)) : BreathDownDeg;   // 173: the floor met BreathAimFloorAt out
-                var b = new SmsGhostBreath { Name = $"GhostBreath{BreathsMade}", DebugPrint = DebugPrint, SweepDeg = SweepDeg, SweepSeconds = SweepSeconds / ThrowSpeedScale, SweepWay = SweepWay, DownDeg = BreathDownDegUsed, BreathSpeed = BreathSpeed * ThrowSpeedScale, PuffSeconds = PuffSeconds, PuffSizeStart = PuffSizeStart, PuffSizeEnd = PuffSizeEnd, HitHeight = BreathHitHeight, FreezeSeconds = FreezeSeconds, OneFreezePerAttack = OneFreezePerAttack };
+                var b = new SmsGhostBreath { Name = $"GhostBreath{BreathsMade}", DebugPrint = DebugPrint, SweepDeg = SweepDeg, SweepSeconds = SweepSeconds / ThrowSpeedScale, SweepWay = SweepWay, DownDeg = BreathDownDegUsed, BreathSpeed = BreathSpeed * ThrowSpeedScale, PuffSeconds = PuffSeconds, PuffSizeStart = PuffSizeStart, PuffSizeEnd = PuffSizeEnd, HitHeight = BreathHitHeight, FreezeSeconds = FreezeSeconds, OneFreezePerAttack = OneFreezePerAttack, ShowHitBox = ShowHitBoxes, FloorDrag = BreathFloorDrag };   // 192
                 (GetTree().CurrentScene ?? GetParent()).AddChild(b);
                 float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
                 b.Swept += hit => { if (hit) BreathHits++; _breathSwept = true; _crownFlashT = CrownFlashSeconds * 0.7f; EmitSignal(SignalName.Breathed, hit); };
@@ -2082,6 +2123,7 @@ public partial class SmsKingBooRematch : Node3D
     public override void _Process(double delta)
     {
         if (Engine.IsEditorHint()) return;
+        if (!IsCopy) HitBoxTick();                                                                                                                      // 192: Mario's cylinder drawn (ShowHitBoxes)
         if (AnyFxAlive) FxTick((float)delta);                                                                                                                   // 180 / 181: the flashes, the ring and the rise glow run on, hidden or not
         if (State == Phase.Gone) GoneTick((float)delta);                                                                                                       // 183: the Shine after the burst
         if (State == Phase.Hidden) return;

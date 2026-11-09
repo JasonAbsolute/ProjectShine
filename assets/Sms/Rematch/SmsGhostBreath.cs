@@ -49,6 +49,16 @@ public partial class SmsGhostBreath : Node3D
     [Export(PropertyHint.Range, "0.1,0.6,0.01")] public float HitRadiusK = 0.3f;
     [Export] public float HitHeight = 1f, FreezeSeconds = 1f;
     [Export] public bool OneFreezePerAttack = true;
+    /// <summary>192 (Jaysonn: "the hit boxes for the freeze breath are still off from the visuals"): the cold that freezes DRAWN -- a red ball on every live puff's
+    /// hit (its HitRadius, where the hit maths puts it), so the cold you see and the cold that counts can be compared in play (King Boo's ShowHitBoxes; his
+    /// cylinder is drawn there too). The same pass pins the dense white core to the hit maths: its puffs now leave at BreathSpeed (0.97-1.03 of it; 0.92-1.02
+    /// before) and sink at Sink (1.1 x before), so the solid white front IS the hit front -- the pale outer mist (0.85-1 of the speed) trails behind it, harmless.
+    /// And the REAL mismatch, found with the balls drawn: the puffs' floor collision carried a FRICTION of 0.15 -- Godot takes that much of a particle's speed
+    /// EVERY FRAME it touches the floor, so a puff that rolled onto the stone 9 m out stopped dead within 2 m more while the cold that freezes ran on to 25 m:
+    /// Mario was frozen with the visible mist 5-10 m behind him. FloorDrag is that friction, 0 now: the mist slides out with the hit maths (the hit maths never
+    /// slowed a puff on the floor); 0.15 brings the old stall back (and the hit back out of step with it).</summary>
+    [Export] public bool ShowHitBox;
+    [Export(PropertyHint.Range, "0,1,0.01")] public float FloorDrag = 0f;
     /// <summary>178 (Jaysonn: "it looks like mario doesn't get hit but still is frozen"): the camera's damage shake on the freeze (x the game's; 0 = none) --
     /// the hit's own look is the ice's (SmsIceBlock.HitFrom: the splash, the flash, the ice climbing him).</summary>
     [Export(PropertyHint.Range, "0,2,0.05")] public float HitShake = 0.8f;
@@ -104,6 +114,10 @@ public partial class SmsGhostBreath : Node3D
     private const float U = 74.44f;
     private Mario _mario; private Func<Vector3> _mouth; private SmsActorSound _sound; private readonly Random _rng = new(167);
     private GpuParticles3D _puffs, _glints, _core; private MeshInstance3D _glow; private StandardMaterial3D _glowMat; private GpuParticlesCollisionBox3D _slab;
+    private MultiMeshInstance3D _hitBalls;                                                                                                   // 192: the hit, drawn
+    /// <summary>192, for the drives: the hit balls drawn this frame (0 when ShowHitBox is off); the balls shown or hidden for a frame (the shots compare the mist with and without them).</summary>
+    public int HitBallsDrawn { get; private set; }
+    public bool HitBallsShown { get => _hitBalls != null && _hitBalls.Visible; set { if (_hitBalls != null) _hitBalls.Visible = value; } }
     private readonly List<(float t, Vector3 o, Vector3 d)> _rays = new();
     private float _t, _age, _yawCentre, _yawNow, _seT, _tailT; private int _side = 1; private Vector3 _dirNow = Vector3.Forward, _mouthNow; private bool _hit;
 
@@ -132,6 +146,7 @@ public partial class SmsGhostBreath : Node3D
         _mouthNow = mouth();
         GlobalPosition = _mouthNow;
         _puffs = MakePuffs(); _core = MakeCore(); _glints = MakeGlints(); MakeGlow(); MakeSlab();
+        if (ShowHitBox) MakeHitBalls();                                                                                                      // 192
         State = Phase.Blow; _t = 0f; _age = 0f; _seT = 0f;
         Aim(0f);
         if (_puffs != null) { _puffs.Visible = true; _puffs.Emitting = true; }
@@ -236,6 +251,28 @@ public partial class SmsGhostBreath : Node3D
             if (_tailT >= PuffSeconds + 0.2f) { Finish(); return; }
         }
         HitCheck();
+        if (_hitBalls != null) HitBallsTick();                                                                                               // 192
+    }
+
+    /// <summary>192: the cold that counts, drawn -- a translucent red ball per live puff, at its hit radius, where the hit maths puts it.</summary>
+    private void MakeHitBalls()
+    {
+        var mm = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, Mesh = new SphereMesh { Radius = 1f, Height = 2f, RadialSegments = 16, Rings = 8 }, InstanceCount = 320, VisibleInstanceCount = 0 };
+        var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, AlbedoColor = new Color(1f, 0.15f, 0.15f, 0.3f), RenderPriority = 2 };
+        _hitBalls = new MultiMeshInstance3D { Name = "HitBalls", TopLevel = true, Multimesh = mm, MaterialOverride = mat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        AddChild(_hitBalls);
+        _hitBalls.GlobalTransform = Transform3D.Identity;
+    }
+    private void HitBallsTick()
+    {
+        var mm = _hitBalls.Multimesh; int n = 0;
+        foreach (var ray in _rays)
+        {
+            float age = _age - ray.t; float r = HitRadius(age); if (r <= 0f) continue;
+            if (n >= mm.InstanceCount) break;
+            mm.SetInstanceTransform(n++, new Transform3D(Basis.Identity.Scaled(Vector3.One * r), PuffCentre(ray, age)));
+        }
+        mm.VisibleInstanceCount = n; HitBallsDrawn = n;
     }
 
     private void HitCheck()
@@ -265,7 +302,7 @@ public partial class SmsGhostBreath : Node3D
             AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -40f, AngularVelocityMax = 40f,
             Color = new Color(BreathColor.R, BreathColor.G, BreathColor.B, 1f),
             ColorRamp = Fade(new Color(1f, 1f, 1f, 0f), new Color(1f, 1f, 1f, PuffAlpha), new Color(0.92f, 0.96f, 1f, PuffAlpha * 0.75f), new Color(0.9f, 0.95f, 1f, 0f)),
-            CollisionMode = ParticleProcessMaterial.CollisionModeEnum.Rigid, CollisionFriction = 0.15f, CollisionBounce = 0f, CollisionUseScale = true
+            CollisionMode = ParticleProcessMaterial.CollisionModeEnum.Rigid, CollisionFriction = Mathf.Clamp(FloorDrag, 0f, 1f), CollisionBounce = 0f, CollisionUseScale = true   // 192: FloorDrag (0.15 before: the mist stalled 10 m out)
         };
         var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Mix, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = tex, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true };
         var p = new GpuParticles3D { Name = "ColdPuffs", TopLevel = true, CollisionBaseSize = HitRadiusK, Amount = Puffs, Lifetime = PuffSeconds, Emitting = false, Visible = false, LocalCoords = false, FixedFps = 60, Interpolate = true, DrawOrder = GpuParticles3D.DrawOrderEnum.ViewDepth, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One, Material = mat }, VisibilityAabb = new Aabb(new Vector3(-60f, -10f, -60f), new Vector3(120f, 40f, 120f)) };
@@ -281,12 +318,12 @@ public partial class SmsGhostBreath : Node3D
         var pm = new ParticleProcessMaterial
         {
             EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = 0.25f,
-            Direction = new Vector3(0f, 0f, -1f), Spread = Mathf.Max(0.5f, CoreSpreadDeg), InitialVelocityMin = BreathSpeed * 0.92f, InitialVelocityMax = BreathSpeed * 1.02f,
-            Gravity = new Vector3(0f, -Sink * 1.1f, 0f), ScaleMin = 1f, ScaleMax = 1f, ScaleCurve = Ramp(CoreSizeStart, CoreSizeEnd),
+            Direction = new Vector3(0f, 0f, -1f), Spread = Mathf.Max(0.5f, CoreSpreadDeg), InitialVelocityMin = BreathSpeed * 0.97f, InitialVelocityMax = BreathSpeed * 1.03f,   // 192: the core rides WITH the hit maths (0.92-1.02 and 1.1 x the sink before: the hit led the white front)
+            Gravity = new Vector3(0f, -Sink, 0f), ScaleMin = 1f, ScaleMax = 1f, ScaleCurve = Ramp(CoreSizeStart, CoreSizeEnd),
             AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -60f, AngularVelocityMax = 60f,
             Color = new Color(c.R, c.G, c.B, 1f),
             ColorRamp = Fade(new Color(1f, 1f, 1f, 0f), new Color(1f, 1f, 1f, CoreAlpha), new Color(0.95f, 0.98f, 1f, CoreAlpha * 0.7f), new Color(0.9f, 0.95f, 1f, 0f)),
-            CollisionMode = ParticleProcessMaterial.CollisionModeEnum.Rigid, CollisionFriction = 0.15f, CollisionBounce = 0f, CollisionUseScale = true
+            CollisionMode = ParticleProcessMaterial.CollisionModeEnum.Rigid, CollisionFriction = Mathf.Clamp(FloorDrag, 0f, 1f), CollisionBounce = 0f, CollisionUseScale = true   // 192: FloorDrag
         };
         var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Mix, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = tex, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, RenderPriority = 1 };
         var p = new GpuParticles3D { Name = "ColdCore", TopLevel = true, CollisionBaseSize = HitRadiusK, Amount = CorePuffs, Lifetime = PuffSeconds * 0.9, Emitting = false, Visible = false, LocalCoords = false, FixedFps = 60, Interpolate = true, DrawOrder = GpuParticles3D.DrawOrderEnum.ViewDepth, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One, Material = mat }, VisibilityAabb = new Aabb(new Vector3(-60f, -10f, -60f), new Vector3(120f, 40f, 120f)) };
@@ -359,6 +396,7 @@ public partial class SmsGhostBreath : Node3D
         if (_core != null) _core.Emitting = false;
         if (_glints != null) _glints.Emitting = false;
         if (_glow != null) _glow.Visible = false;
+        if (_hitBalls != null) _hitBalls.Visible = false;
         if (DebugPrint) GD.Print($"[SMS breath] {Name}: cut off at sweep {SweepK:F2}");
         EmitSignal(SignalName.Finished);
         GetTree().CreateTimer(PuffSeconds + 0.2f).Timeout += () => { if (IsInstanceValid(this)) QueueFree(); };
