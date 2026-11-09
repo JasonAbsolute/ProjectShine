@@ -13277,3 +13277,49 @@ the drive, the logs, shots165/, run_window.ps1 and the scheduled tasks (this pas
 **Deviations, all knobs:** 178's tumble-and-teleport on a copy is gone unless `CopyMock` is off; the cackle, the rock, the bob, the flicker and the
 teleport-off are mine (`CopyMockSe`, `CopyMockRockDeg`, `CopyMockBob`, `CopyMockFlickerHz`, `CopyMockTeleports`); the bomb's burst on the copy is as
 before.
+
+### 192 -- the King Boo REMATCH, part 36: the Boolossus a sixth BIGGER and its wave of Boos lasting 3 s (bursting out, easing to a stop WaveReach out); the thunder walls' and the freeze breath's HITS put with their visuals (a wall is a SLAB about its drawn face and its shock stops where the bolts fade; the breath's mist no longer STALLS on the floor 10 m out while the cold that freezes ran on to 25 -- FloorDrag 0; ShowHitBoxes draws every hit volume in play); the intro laugh starts LOW and CLIMBS (IntroLaughPitchFrom 0.7 -> IntroLaughPitchTo 1.4) (feature/kingboo-rematch, code `751d118`)
+
+**Jaysonn:** "bolossuses smash lets make booloussose a little bigger and have the boos last for 3 seconds instead of 1. i think the hit boxes for electric
+wall and freeze breath are still off from the visuals. and lets have king boos laugh start low but then gets higher in the intro cutscene dont need it to
+scale back low."
+
+**The Boolossus** (`SmsBoolossus.cs`): `ModelScale` 5.5 -> 6.5 (its body hit radius and its shadow grow with it: 3.48 m); `WaveSeconds` 1 -> 3, and the Boos
+SLOW as they go -- out at `WaveSpeed` (9 m/s), easing to a stop `WaveReach` (10 m) out: 5.9 m in the first second, 8.3 by two, 9.3 by three, hanging there as
+a ring of hazards until they fade (at the old constant speed three seconds would have carried them 27 m, off the arena); `WaveReach` 0 = the constant speed
+as before. `WaveDistance(age)`.
+
+**The walls** (`SmsGhostLightning.cs`): the shock reaches `WallHitTopK` (0.85) of `WallHeight` -- 1.87 m: the shader fades the bolts out over the quad's top
+quarter, so feet already over the bolts were shocked at the full 2.2; and a wall is a SLAB (`WallThickness` about its drawn face, plus Mario's 42 u): before,
+everything BEYOND a face counted, so a Mario who jumped a wall cleanly was shocked on the way down as the squeeze went on behind him. `ShowHitBox` draws the
+two slabs in red.
+
+**The breath** (`SmsGhostBreath.cs`): the real mismatch, found with the hit balls drawn (`ShowHitBox`: a red ball on every live puff's hit) against the mist in
+GPU shots -- the puffs' floor collision carried a FRICTION of 0.15, and Godot takes that much of a particle's speed every frame it touches the floor
+(`mix(VELOCITY, 0, friction)` in the rigid-collision branch), so a puff that rolled onto the stone about 9 m out stopped dead within 2 m more, while the cold
+that freezes (the CPU model, never slowed on the floor) ran on to 25 m: Mario was frozen with the visible mist 5-10 m behind him. `FloorDrag` (0 now; 0.15 =
+the old stall) is that friction on the puffs and the core; the dense core's speed and sink pinned to the model's (0.97-1.03 x `BreathSpeed`, `Sink`;
+0.92-1.02 and 1.1 x before). Shot pairs with the balls drawn and then hidden a few frames on show the mist front at Mario's cylinder as the red reaches it.
+Readouts `HitBallsDrawn`, `HitBallsShown`.
+
+**King Boo** (`SmsKingBooRematch.cs`): `ShowHitBoxes` (off) -- Mario's damage cylinder (green, the game's 42 u across, 130 u tall from his feet) drawn where he
+stands and passed to the walls (the red slabs) and the breath (the red balls): a hit is a red volume on the green one. `WallHitTopK` and `BreathFloorDrag`
+mirrored for the attacks he makes. **The intro laugh**: `IntroLaughPitchFrom` (0.7) -> `IntroLaughPitchTo` (1.4), x `IntroLaughPitch`, over
+`IntroLaughSeconds`, evenly in pitch (an octave: a low chuckle climbing to the casino's cackle and past it), never back down; the clip's own run (308 -> 360
+Hz, a dip to 330, a wobble) rides on the ramp. Higher is quicker too, so the laugh gathers pace. Both 1 = 186's flat laugh. `IntroLaughPitchNow`.
+`SmsActorSound.cs`: `SetPitch(se, pitch)` and `PitchOf(se)`.
+
+**Verified** (headless drive v192-5, deleted before the commit): C18 one Boolossus (SmashCount 1 for the drive) -- ModelScale 6.5, radius 3.48 m, the wave 3 s
+easing to 10 m: all fifteen Boos out 1 s after the landing 9.46 m from it (the model's 9.46, off by 0.000), all fifteen still out at 2.5 s (12.43 m), gone by
+3.6 s; Mario stepped aside at the lock, a miss, his HP kept. C19 the intro laugh's pitch 0.700 at the start -> 0.946 at 2 s -> 1.400 at the dive, no drop,
+the sound node's player carrying the ramp exactly. C12 Mario jumped all three squeezes with no shock (feet 3.43 m at the top), C12b a standing Mario shocked
+when the slab reached him (across 0.00 of 0.81 -- the face at Mario's 42 u plus half the thickness), C14 the standing Mario frozen 1.32 s in, 11.1 m from
+the mouth; 191-179's checks as before -- 31/31, no errors. Shot runs (50 shots): the wall's red slab seen along the wall and through its face beside Mario's
+green cylinder mid-jump, the bolts' wisps reaching above the slab; the breath's red tube reaching Mario's cylinder and, with the balls hidden a few frames on,
+the mist front at the cylinder; from above the mist alone running the whole arc to Mario and past; the Boolossus diving in over a small Mario; the ring of
+Boos 1 s after the landing and still out at 2.5 s. The clean rebuild 0 errors; the drive, the logs, shots165/, run_window.ps1 and the pass's scheduled tasks
+deleted.
+
+**Deviations, all knobs:** the Boos' ease-out (`WaveReach`; 0 = constant speed), `WallHitTopK`, the slab rule, `FloorDrag` 0 and the core's speed/sink pinning
+are mine -- the fixes for what Jaysonn felt; `ModelScale` 6.5 and `WaveSeconds` 3 are his numbers; the laugh ramp's 0.7 and 1.4 are my reading of "start low,
+then higher".
