@@ -13485,3 +13485,20 @@ scheduled tasks deleted.
 **Deviations, all knobs:** the proportional trim (the look-about clip at 1.5 x, the laugh 2 s) is my way of fitting the 7.5 s; the loop point 7.5 s, the -1.3 dB
 match and the file's place are mine. I cannot hear it from here: Jaysonn judges the sync and the level. For the full 3 s laugh at the cost of the cue, raise
 `FightCueSeconds` (8.5 fits it) or lower `AfterSinkSeconds` / `RiseTellSeconds`.
+
+### 198 -- the King Boo REMATCH, part 42: his clip changes CROSS-FADE (ClipBlendSeconds 0.25: the pose he is in melts into the new clip's first frames -- the wait into the laugh, the laugh into the dive, the tumble into the wait, the laugh's own loop -- instead of the game's hard cut between bcks; 0 = the cut) (feature/kingboo-rematch, code `25b88bf`)
+
+**Jaysonn:** "is there a setting for king boos animations to make them blend together a little better?"
+
+**The blend** (`SmsKingBooRematch.cs`): there was none -- `PlayClip` played every clip from its first frame with a hard cut (`Play`, `Seek(0)`), as the game cuts
+between its bcks. Now `ClipBlendSeconds` (0.25): the new clip starts through AnimationPlayer's custom blend -- the old pose fades out over that long as the new
+clip plays from its top -- every time one of his clips changes while he is seen: the wait into the laugh, the laugh into the hide clip's dive, the hurt tumble
+into the wait, the spit clip's rear, the laugh clip's own loop (its last frame melts into its first). The first clip of all and any clip starting while he is
+unseen (opacity 0, hidden) cut as before: nothing to blend from. The copies have it too (duplicated from him). Readouts `ClipBlends` / `ClipStarts`.
+
+**Verified** (headless drive v198-1, deleted before the commit): C27 ClipBlendSeconds 0.25, 42 of his 46 clip starts blended by the second split (the four cuts: the
+intro's first clip, the hidden arrivals); 197-179's checks as before -- 41/41, no errors (the clip names, the laugh's loop and the hurt's timings unchanged by
+the blend). No shots: a blend is motion. The clean rebuild 0 errors; the drive, the log and the pass's scheduled task deleted.
+
+**Deviations, all knobs:** the game cuts; 0.25 s is my pick for "a little better" (over 0.4 the quick clips -- the hit, the lick's thrust -- go mushy). Not
+committed: Godot's detect-3D keeps rewriting seven texture .import files in the working tree (VRAM compression) -- the editor's own doing, Jaysonn's to commit.
