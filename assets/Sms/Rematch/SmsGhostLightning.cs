@@ -34,7 +34,8 @@ public partial class SmsGhostLightning : Node3D
     /// <summary>192 (Jaysonn: "the hit boxes for the electric wall are still off from the visuals"): the shock reaches this far up the wall -- 0.85 of WallHeight
     /// (1.87 m): the shader fades the bolts out over the quad's top quarter, so feet already over the bolts were shocked at 1. And a wall is a SLAB now --
     /// WallThickness about its drawn face, plus Mario's 42 u -- so a Mario past a wall (he jumped it and came down outside) is clear; before, everything beyond
-    /// a face counted and a clean jump was shocked on the way down. ShowHitBox draws the two slabs in red while the walls stand (King Boo's ShowHitBoxes).</summary>
+    /// a face counted and a clean jump was shocked on the way down. 193: the slab is the ONLY test -- 192 had kept a "gap shut" test that zapped a Mario outside
+    /// the walls as they met. ShowHitBox draws the two slabs in red while the walls stand (King Boo's ShowHitBoxes).</summary>
     [Export(PropertyHint.Range, "0.3,1.2,0.05")] public float WallHitTopK = 0.85f;
     [Export] public bool ShowHitBox;
     /// <summary>The squeezes: how many, the tell before each closes, the pause after each meets, and how far the axis turns from one to the next.</summary>
@@ -345,8 +346,10 @@ public partial class SmsGhostLightning : Node3D
         if (along > WallLength * 0.5f + r) return;
         float half = _gap * 0.5f;
         bool slab = Mathf.Abs(across - half) <= WallThickness * 0.5f + r;                                       // 192: the wall's own slab about its drawn face -- past it (jumped) is clear
-        bool shut = half <= r;                                                                                  // the gap closed on him
-        if (slab || shut)
+        // 193 (Jaysonn: "got hit by lightning from jumping over it where it spawned in"): the old "gap shut" test (half <= r) is gone -- it shocked a Mario OUTSIDE
+        // the walls the moment they met, wherever he stood along them (he had jumped a wall where it stood and was clear of it). A Mario inside is always reached by a
+        // face's slab first (the band is wider than his radius), so nothing is lost.
+        if (slab)
         {
             _hit = true; Hits++;
             var before = _mario.stateOfMario;

@@ -102,7 +102,7 @@ public partial class SmsKingBooRematch : Node3D
     /// he rises out of the floor (from IntroSinkDepth under it, over IntroRiseSeconds, the appear clip and voice, as the casino boss surfaces from his table),
     /// LAUGHS for IntroLaughSeconds (the laugh clip looping, the long laugh voice), SINKS back (over IntroSinkSeconds, the vanish voice) and is hidden. The
     /// fight then starts with SpawnRising: up out of the floor at his spot over SpawnRiseSeconds, no second laugh.</summary>
-    [Export] public float IntroRiseSeconds = 1.6f, IntroLaughSeconds = 4.6f, IntroSinkSeconds = 1.1f, IntroSinkDepth = 7f, SpawnRiseSeconds = 1.2f;   // 186: the laugh 3.4 -> 4.6 (the chuckle's run)
+    [Export] public float IntroRiseSeconds = 1.6f, IntroLaughSeconds = 3f, IntroSinkSeconds = 1.1f, IntroSinkDepth = 7f, SpawnRiseSeconds = 1.2f;   // 186: the laugh 3.4 -> 4.6 (the chuckle's run); 193 (Jaysonn: "the laugh doesn't have to be that long"): 4.6 -> 3 (192's climb runs over whatever the length is)
     /// <summary>182 (Jaysonn: "during the intro king boo gets stuck on the floor for a second; make the appear animation clean and smooth"): the appear clip
     /// (btelesa_appear, 0.97 s) is itself a LEAP -- the body spins up from 17 m under the node to 11 m over it by 0.33 s and lands back at the node by 0.6 s --
     /// and 174's node, lerping up from 7 m under the floor meanwhile, let the body pop out, fall back under the stone and sit at floor level for half a second
@@ -265,7 +265,7 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>189 (Jaysonn: "no need for the text on the screen"): the card lines are EMPTY -- no card; the scene is the line of him and the chorus. 188's lines were
     /// "Now there are TWO of me!" and "THREE of me! Can you keep up, Mario?" -- put text here for the card back.</summary>
     [Export] public string SplitLine2 = "", SplitLine3 = "";
-    [Export] public Color SplitMistColor = new Color(0.48f, 0.22f, 0.62f);   // a violet that reads against the black sky (0.32, 0.12, 0.45 was near-black there)
+    [Export] public Color SplitMistColor = new Color(0.88f, 0.92f, 1f);     // 193 (Jaysonn: "the purple smoke -- I want that white so it looks ghostly"): a cold white; 188's violet (0.48, 0.22, 0.62) before
     [Export(PropertyHint.Range, "0,200,1")] public int SplitMistPuffs = 70;
     [Export] public bool SplitSkipAllowed = true;
     [ExportGroup("")]
@@ -1471,7 +1471,7 @@ public partial class SmsKingBooRematch : Node3D
     }
     /// <summary>Turned on Mario at once.</summary>
     public void SplitFace() => FaceNow();
-    /// <summary>The violet-black ghost mist boiling up where one of him comes into the line (SplitMistColor, SplitMistPuffs; the dive's smoke balls).</summary>
+    /// <summary>The ghost mist boiling up where one of him comes into the line (SplitMistColor -- 193: a cold white, violet before; SplitMistPuffs; the dive's smoke balls).</summary>
     public void SplitMist(Vector3 at)
     {
         if (SplitMistPuffs <= 0) return;

@@ -17973,6 +17973,19 @@ public partial class Mario : CharacterBody3D
         SmsLassoOn(false);
         if (SmsDebugPrint) GD.Print("[SMS spin] the Bomb Boo let go");
     }
+    /// <summary>193 (the King Boo rematch; Jaysonn: "if Mario gets hit while holding the Bomb Boo, the Boo should explode and go away"): the Boo in hand BURSTS
+    /// when he is hurt (a hit, a shock), killed or frozen holding it -- its puff and pop, no blast, no hit on King Boo -- and is gone, instead of drifting off to be
+    /// grabbed again. Off: the drop as before. The dives, the ground pound and the rest still let it go.</summary>
+    [Export] public bool SmsBombBurstsOnHit = true;
+    public int SmsBombBursts { get; private set; }
+    public void SmsBombBurst(string why)
+    {
+        if (_smsBomb == null) return;
+        var boo = _smsBomb; _smsBomb = null; SmsBombBursts++;
+        if (IsInstanceValid(boo)) boo.Explode(false);
+        SmsLassoOn(false);
+        if (SmsDebugPrint) GD.Print($"[SMS spin] the Bomb Boo in hand BURST ({why})");
+    }
     /// <summary>The Boo in hand is gone on its own (King Boo's hit cleared the field): the hands empty.</summary>
     public void SmsBombGone(SmsBombBoo boo)
     {
@@ -18023,6 +18036,7 @@ public partial class Mario : CharacterBody3D
         _smsSpinKeyEdge = x && !_smsSpinKeyPrev; _smsSpinKeyPrev = x;
         if (_smsBomb == null) return;
         if (!IsInstanceValid(_smsBomb) || !_smsBomb.IsCarried) { SmsBombGone(_smsBomb); return; }
+        if (SmsBombBurstsOnHit && (stateOfMario == MarioState.hurt || stateOfMario == MarioState.dead || SmsFrozen)) { SmsBombBurst(SmsFrozen ? "frozen" : stateOfMario.ToString()); return; }   // 193: a hit bursts it
         switch (stateOfMario)
         {
             case MarioState.diving: case MarioState.singleJumpDive: case MarioState.doubleJumpDive: case MarioState.tripleJumpDive: case MarioState.bellySlidingFromDive:
