@@ -167,8 +167,24 @@ public partial class SmsBombBoo : Node3D
     [Export] public string AppearSe = "MSD_SE_EN_TELESA_APPEAR", GrabSe = "MSD_SE_EN_TELESA_FIX", BurstSe = "MSD_SE_EN_TELESA_CRUSH", GoneSe = "MSD_SE_EN_TELESA_DISAPPEAR";
     [ExportGroup("")]
     [Export] public PackedScene BurstFxScene;
-    /// <summary>The burst puff's colour: 179 a dark smoke grey (Jaysonn: "keep it black not purple"; 158-178's was violet, (0.55, 0.2, 0.85)).</summary>
+    /// <summary>The burst puff's colour: 179 a dark smoke grey (Jaysonn: "keep it black not purple"; 158-178's was violet, (0.55, 0.2, 0.85)). 202: the glow's tint only
+    /// (PuffFlashColor); the smoke is the Boo's own black (The puff group).</summary>
     [Export] public Color BurstColor = new Color(0.25f, 0.25f, 0.28f);
+    [ExportGroup("The puff (202: black smoke)")]
+    /// <summary>202 (Jaysonn: "the bomb boos puffs are white when going away from getting hit, like when mario gets hit while swinging him around"): a burst or a vanish
+    /// puffs BLACK -- the Boo's own smoke (PuffSmokePuffs puffs, PuffSmokeScale x the rise's size, blown out every way; both x the burst's scale) under a brief
+    /// dark-violet flash (PuffFlash, PuffFlashColor; the port's burst with its white smoke turned off). 158-201: the port's enemy-vanish burst, whose white smoke
+    /// took no tint.</summary>
+    [Export] public bool PuffSmoke = true, PuffFlash = true;
+    [Export(PropertyHint.Range, "0,60,1")] public int PuffSmokePuffs = 18;
+    [Export(PropertyHint.Range, "0.3,4,0.05")] public float PuffSmokeScale = 1.1f;
+    [Export] public Color PuffFlashColor = new Color(0.45f, 0.25f, 0.6f);
+    /// <summary>202 (Jaysonn: "the bomb boos tongue looks off, like two models on top of each other"): the body glb's own tongue (Galaxy's, baked into the one body
+    /// mesh under the port's swinging tongue) is taken out of the mesh as it loads -- the triangles whose texels lie in the tongue's island of the texture (u under
+    /// HideBodyTongueMaxU; the body's island starts at 0.55). Off: both tongues, as 159-201.</summary>
+    [Export] public bool HideBodyTongue = true;
+    [Export(PropertyHint.Range, "0,1,0.01")] public float HideBodyTongueMaxU = 0.3f;
+    [ExportGroup("")]
     /// <summary>170 (Jaysonn: "bomb boos need to explode when hitting king boo"): swung into him it EXPLODES -- the Bob-omb's blast (BombExplosion.tscn: the
     /// 10_bomb fireball with its glow, smoke, scraps, shockwave and sparks) at this scale, the water flower's boom, a kick of the camera -- over its own puff.</summary>
     [Export] public bool ExplodeOnKingBoo = true;
@@ -296,6 +312,7 @@ public partial class SmsBombBoo : Node3D
         All.Add(this);
         _rng = new Random(Seed != 0 ? Seed : (int)(GetInstanceId() & 0x7fffffff));
         _model = GetNodeOrNull<Node3D>("Model"); _tongue = GetNodeOrNull<Node3D>("Tongue");
+        StripBodyTongue();                                                                              // 202: the body's own tongue out of the mesh before the materials are read
         var shader = ResourceLoader.Exists("res://assets/Sms/Rematch/BombBoo.gdshader") ? GD.Load<Shader>("res://assets/Sms/Rematch/BombBoo.gdshader") : null;
         foreach (var root in new[] { _model, _tongue })
         {
@@ -449,16 +466,20 @@ public partial class SmsBombBoo : Node3D
     }
     /// <summary>179: the black smoke the Boo comes up through (Galaxy's Bomb Boo: a burst of dark puffs round it at the floor) -- a one-shot emitter at the spot,
     /// freed when its puffs are gone.</summary>
-    private void FireRiseSmoke(Vector3 at)
+    private void FireRiseSmoke(Vector3 at) => FireSmokeAt(at, 1f, RiseSmokePuffs, true, "RiseSmoke");
+    /// <summary>202: the Boo's black smoke anywhere -- <paramref name="count"/> puffs at <paramref name="at"/>, RiseSmokeSize x <paramref name="sizeScale"/> across, blown up and out of the floor
+    /// (<paramref name="up"/>: the rise) or out every way (a burst). The rise's smoke since 179; the puffs of a burst or a vanish since 202.</summary>
+    private void FireSmokeAt(Vector3 at, float sizeScale, int count, bool up, string tag)
     {
-        if (RiseSmokePuffs <= 0 || !IsInsideTree()) return;
-        var p = new GpuParticles3D { Name = Name + "RiseSmoke", TopLevel = true, Amount = RiseSmokePuffs, Lifetime = RiseSmokeSeconds, OneShot = true, Explosiveness = 0.9f, FixedFps = 60,
-            VisibilityAabb = new Aabb(new Vector3(-5f, -2f, -5f), new Vector3(10f, 8f, 10f)) };
+        if (count <= 0 || !IsInsideTree()) return;
+        float size = RiseSmokeSize * Mathf.Max(0.1f, sizeScale);
+        var p = new GpuParticles3D { Name = Name + tag, TopLevel = true, Amount = count, Lifetime = RiseSmokeSeconds, OneShot = true, Explosiveness = 0.9f, FixedFps = 60,
+            VisibilityAabb = new Aabb(new Vector3(-6f, -4f, -6f), new Vector3(12f, 10f, 12f)) };
         var pm = new ParticleProcessMaterial
         {
-            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = 0.45f * RiseSmokeSize, Direction = Vector3.Up, Spread = 75f,
-            InitialVelocityMin = 1.2f * RiseSmokeSize, InitialVelocityMax = 2.6f * RiseSmokeSize, Gravity = new Vector3(0f, -0.6f, 0f), DampingMin = 2.2f, DampingMax = 3f,
-            ScaleMin = 0.8f * RiseSmokeSize, ScaleMax = 1.4f * RiseSmokeSize, LifetimeRandomness = 0.3f, AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -70f, AngularVelocityMax = 70f
+            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = 0.45f * size, Direction = up ? Vector3.Up : Vector3.Forward, Spread = up ? 75f : 180f,
+            InitialVelocityMin = 1.2f * size, InitialVelocityMax = 2.6f * size, Gravity = new Vector3(0f, up ? -0.6f : 0.4f, 0f), DampingMin = 2.2f, DampingMax = 3f,
+            ScaleMin = 0.8f * size, ScaleMax = 1.4f * size, LifetimeRandomness = 0.3f, AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -70f, AngularVelocityMax = 70f
         };
         // the ramp's colour reaches the particle shader raw (no sRGB decode: a 0.09 grey drew as a 0.33 grey), so it is given in linear
         Color lin = RiseSmokeColor.SrgbToLinear(); lin.A = RiseSmokeColor.A;
@@ -476,8 +497,47 @@ public partial class SmsBombBoo : Node3D
         p.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         p.Finished += p.QueueFree;
         GetParent().AddChild(p);
-        p.GlobalPosition = at + Vector3.Up * 0.4f; p.Emitting = true;                                  // a little off the floor: the puffs' lower halves were cut by it
-        RiseSmokeFired = true;
+        p.GlobalPosition = at + (up ? Vector3.Up * 0.4f : Vector3.Zero); p.Emitting = true;           // the rise's a little off the floor: the puffs' lower halves were cut by it
+        if (up) RiseSmokeFired = true; else PuffSmokesFired++;
+    }
+    /// <summary>202, for the drives: the black puffs fired (a burst, a vanish, a blast), the body's own tongue triangles taken out.</summary>
+    public int PuffSmokesFired { get; private set; }
+    public int BodyTongueTrisStripped { get; private set; }
+    public bool BodyTongueStripped { get; private set; }
+    private static ArrayMesh _strippedBody; private static Mesh _strippedFrom; private static int _strippedCount;
+    /// <summary>202 (Jaysonn: "the bomb boos tongue looks off, like two models on top of each other"): the body glb carries Galaxy's own tongue in its one mesh (two
+    /// strips of 74 and 48 triangles, the texture's tongue island at u 0.01-0.21; the body, eyes, mouth and fangs sit past u 0.55), under the port's swinging tongue
+    /// (bomb_boo_tongue.glb) since 159 -- two tongues. The body's is taken out of the mesh as it loads: the triangles whose three corners lie in that island
+    /// (HideBodyTongueMaxU), the rest kept as they were, the mesh shared by every Boo.</summary>
+    private void StripBodyTongue()
+    {
+        if (!HideBodyTongue || _model == null) return;
+        foreach (Node n in _model.FindChildren("*", "MeshInstance3D", true, false))
+        {
+            var mi = (MeshInstance3D)n;
+            if (mi.Mesh == null || mi.Mesh.GetSurfaceCount() < 1) continue;
+            if (_strippedBody != null && _strippedFrom == mi.Mesh) { mi.Mesh = _strippedBody; BodyTongueTrisStripped = _strippedCount; BodyTongueStripped = true; return; }
+            if (mi.Mesh is not ArrayMesh src) continue;
+            var arrays = src.SurfaceGetArrays(0);
+            var uvs = arrays[(int)Mesh.ArrayType.TexUV].AsVector2Array(); var idx = arrays[(int)Mesh.ArrayType.Index].AsInt32Array();
+            if (uvs.Length == 0 || idx.Length < 3) continue;
+            var keep = new List<int>(idx.Length); int dropped = 0;
+            for (int i = 0; i + 2 < idx.Length; i += 3)
+            {
+                bool tongue = uvs[idx[i]].X < HideBodyTongueMaxU && uvs[idx[i + 1]].X < HideBodyTongueMaxU && uvs[idx[i + 2]].X < HideBodyTongueMaxU;
+                if (tongue) dropped++; else { keep.Add(idx[i]); keep.Add(idx[i + 1]); keep.Add(idx[i + 2]); }
+            }
+            if (dropped == 0) { BodyTongueStripped = true; return; }
+            arrays[(int)Mesh.ArrayType.Index] = keep.ToArray();
+            var mesh = new ArrayMesh();
+            mesh.AddSurfaceFromArrays(src.SurfaceGetPrimitiveType(0), arrays, null, null, src.SurfaceGetFormat(0));
+            mesh.SurfaceSetMaterial(0, src.SurfaceGetMaterial(0));
+            for (int s = 1; s < src.GetSurfaceCount(); s++) { mesh.AddSurfaceFromArrays(src.SurfaceGetPrimitiveType(s), src.SurfaceGetArrays(s), null, null, src.SurfaceGetFormat(s)); mesh.SurfaceSetMaterial(s, src.SurfaceGetMaterial(s)); }
+            _strippedBody = mesh; _strippedFrom = src; _strippedCount = dropped;
+            mi.Mesh = mesh; BodyTongueTrisStripped = dropped; BodyTongueStripped = true;
+            if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: the body's own tongue taken out of the mesh -- {dropped} triangles under u {HideBodyTongueMaxU} ({keep.Count / 3} kept)");
+            return;
+        }
     }
 
     /// <summary>179: the shocked Boo's DROOL (the Galaxy ref: glossy grey drops about the mouth) -- a sphere each, DroolColor with the light's highlight and a little
@@ -952,16 +1012,22 @@ public partial class SmsBombBoo : Node3D
         if (ExplosionShake > 0f) SmsCameraShake.Current?.Start(SmsCameraShake.Kind.Damage, ExplosionShake);
     }
     public static int Blasts;
+    /// <summary>The puff of a burst or a vanish. 202 (Jaysonn: "the bomb boos puffs are white when going away from getting hit"): BLACK -- the Boo's own smoke (the rise's,
+    /// PuffSmokePuffs x scale puffs, PuffSmokeScale x scale across, blown out every way) under a brief dark-violet flash (the port's burst with its white smoke turned
+    /// off: its tint only ever reached the glow -- the smoke is a plain material, so 158-201's puffs stayed white whatever BurstColor said).</summary>
     private void Puff(float scale)
     {
-        if (BurstFxScene == null || !IsInsideTree()) return;
+        if (!IsInsideTree()) return;
+        if (PuffSmoke) FireSmokeAt(GlobalPosition, PuffSmokeScale * scale, Mathf.Max(4, Mathf.RoundToInt(PuffSmokePuffs * scale)), false, "PuffSmoke");
+        if (BurstFxScene == null || !PuffFlash) return;
         var fx = BurstFxScene.Instantiate<Node3D>();
         fx.Transform = new Transform3D(Basis.FromScale(Vector3.One * scale), GlobalPosition);
         GetParent().AddChild(fx);
+        if (fx.GetNodeOrNull<GpuParticles3D>("Smoke") is GpuParticles3D white) white.Visible = false;   // the port's white smoke off: the black stands in
         if (fx is SmsFxBurst b)
         {
-            b.SetShaderParam("prm", new Vector4(BurstColor.R, BurstColor.G, BurstColor.B, 1f));
-            b.SetShaderParam("env", new Vector4(BurstColor.R * 0.4f, BurstColor.G * 0.4f, BurstColor.B * 0.4f, 1f));
+            b.SetShaderParam("prm", new Vector4(PuffFlashColor.R, PuffFlashColor.G, PuffFlashColor.B, 1f));
+            b.SetShaderParam("env", new Vector4(PuffFlashColor.R * 0.4f, PuffFlashColor.G * 0.4f, PuffFlashColor.B * 0.4f, 1f));
         }
     }
     private void Gone()
