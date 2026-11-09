@@ -217,7 +217,16 @@ public partial class SmsKingBooRematch : Node3D
     /// as it climbs. Both 1 = 186's flat laugh.</summary>
     [Export(PropertyHint.Range, "0.4,2,0.05")] public float IntroLaughPitchFrom = 0.75f, IntroLaughPitchTo = 1.15f;   // 194 (Jaysonn: "the laugh is too high pitched at the end"): 0.7 -> 1.4 (an octave) was shrill at the top; now it ends a shade over the casino's own
     /// <summary>192: the intro laugh's pitch now (From at the laugh's start, To at the dive).</summary>
-    public float IntroLaughPitchNow => Mathf.Clamp(IntroLaughPitch, 0.25f, 4f) * IntroLaughPitchFrom * MathF.Pow(Mathf.Max(0.05f, IntroLaughPitchTo) / Mathf.Max(0.05f, IntroLaughPitchFrom), State == Phase.IntroLaugh ? Mathf.Clamp(_introT / Mathf.Max(0.05f, IntroLaughSeconds), 0f, 1f) : 0f);
+    public float IntroLaughPitchNow => Mathf.Clamp(IntroLaughPitch, 0.25f, 4f) * IntroLaughPitchFrom * MathF.Pow(Mathf.Max(0.05f, IntroLaughPitchTo) / Mathf.Max(0.05f, IntroLaughPitchFrom), State == Phase.IntroLaugh ? Mathf.Clamp(_introT / Mathf.Max(0.05f, IntroLaughLength), 0f, 1f) : 0f);
+    /// <summary>197: the intro laugh's length THIS time -- the intro director's trim to the music's cue (SmsRematchIntro.FightCueSeconds), else IntroLaughSeconds. NaN = the knob.</summary>
+    public float IntroLaughOverride { get; set; } = float.NaN;
+    public float IntroLaughLength => float.IsNaN(IntroLaughOverride) ? IntroLaughSeconds : Mathf.Max(0.3f, IntroLaughOverride);
+    /// <summary>197: a clip's played length in seconds (its bck frames at 60; the clip's own length when the table has no row).</summary>
+    public float ClipSeconds(string name) => Clips.TryGetValue(name, out var c) ? c.frames / 60f : (_anim != null && _anim.HasAnimation(name) ? (float)_anim.GetAnimation(name).Length : 1f);
+    /// <summary>197: the intro's FIXED beats after the look-about and before the fight, for the director's cue: the rise tell, the appear clip's rise at its speed, the
+    /// dive clip at its speed (IntroSinkSeconds when there is no dive clip) -- the laugh and the look-about are the trimmable rest.</summary>
+    public float IntroFixedSeconds => RiseTellSeconds + ClipSeconds(BckAppear) / Mathf.Max(0.1f, IntroAppearClipSpeed)
+        + (!string.IsNullOrEmpty(IntroDiveClip) && _anim != null && _anim.HasAnimation(IntroDiveClip) ? ClipSeconds(IntroDiveClip) / Mathf.Max(0.1f, IntroDiveClipSpeed) : IntroSinkSeconds);
     [Export] public bool Blink = true;
     [Export] public Texture2D EyeOpen, EyeHalf, EyeClose;
     [ExportGroup("The fight (158)")]
@@ -460,10 +469,25 @@ public partial class SmsKingBooRematch : Node3D
     [ExportGroup("The music and the mix (195)")]
     /// <summary>195 (Jaysonn: "lower the volume a bit and throw in the boss music now"): the BOSS MUSIC -- the casino King Boo's theme (MSD_BGM_BOSS, t_boss.com:
     /// 4.2 s in and a 95 s loop, rendered from the game's sequence) on the Music bus, filled into BossMusic by his sound node (set a stream by hand to use another),
-    /// started at the intro's cut to Mario in his BATTLE STANCE (the side two-shot as King Boo surfaces: BossMusicAtIntro, 196; off: as the fight begins, his spawn rise after the intro's dive) and FADED over BossMusicFadeSeconds
+    /// started at the cue BossMusicCue (197: the intro's first frame, Mario looking about; 196: the cut to the stance; 195: the fight) and FADED over BossMusicFadeSeconds
     /// as the last hit takes him down. BossMusicDb on top of the music's own level (SmsActorSound.MusicDb -4 and the game's volume for the track). Off: no music.</summary>
     [Export] public AudioStreamPlayer BossMusic;
-    [Export] public bool BossMusicOn = true, BossMusicAtIntro = true;   // 196 (Jaysonn: "have the music start when it pans to Mario in the battle stance frame"): on -- the intro's cut to the side two-shot, Mario dropping into the stance as King Boo surfaces; 195 started it at the fight
+    [Export] public bool BossMusicOn = true;
+    /// <summary>197 (Jaysonn: "try a different song -- Antasma Final Battle; the music starts right when Mario looks around, and the fight starts within 7.5 s of the song
+    /// starting to cue the proper music timing"): WHEN it starts -- LookAbout: the intro cutscene's first frame, Mario looking about for the laugh (the intro then trims
+    /// its beats so the fight begins FightCueSeconds in: SmsRematchIntro); StanceCut: 196's, the cut to Mario in the battle stance as King Boo surfaces; Fight: 195's,
+    /// his spawn rise after the dive. The fight is the last chance: with LookAbout or StanceCut set and no cutscene run, it starts at the fight.
+    /// WHAT plays -- BossMusicStream (a stream set by hand), else the file BossMusicFile when it exists (the Antasma Final Battle mp3, 2:48, under
+    /// assets/Sms/Sound/Music/), else the casino theme his sound node fills in (MSD_BGM_BOSS). A file or a hand-set stream loops (BossMusicLoop) back to
+    /// BossMusicLoopOffset (7.5 s: past the song's quiet rise, to where it is going) and plays at SmsActorSound.MusicDb + BossMusicDb + BossMusicStreamDb (-1.3: the
+    /// Antasma mp3 sits 1.2 dB under the casino theme's render -- RMS -19.5 against -18.3 dBFS -- so the two come out alike); the casino theme at its own level + BossMusicDb.</summary>
+    public enum BossMusicCues { Fight, StanceCut, LookAbout }
+    [Export] public BossMusicCues BossMusicCue = BossMusicCues.LookAbout;
+    [Export] public AudioStream BossMusicStream;
+    [Export] public string BossMusicFile = "res://assets/Sms/Sound/Music/AntasmaFinalBattle.mp3";
+    [Export] public bool BossMusicLoop = true;
+    [Export(PropertyHint.Range, "0,60,0.1")] public float BossMusicLoopOffset = 7.5f;
+    [Export(PropertyHint.Range, "-24,12,0.1")] public float BossMusicStreamDb = -1.3f;
     [Export(PropertyHint.Range, "-24,12,0.5")] public float BossMusicDb = 0f;
     [Export(PropertyHint.Range, "0.1,6,0.1")] public float BossMusicFadeSeconds = 2f;
     /// <summary>195: the rematch's SOUND EFFECTS level -- every SMS actor's sounds (his voice and attacks, the Bomb Boos, the Boolossi) through SmsActorSound.MasterDb while
@@ -760,7 +784,7 @@ public partial class SmsKingBooRematch : Node3D
             RiseFxBegin(new Vector3(_introTop.X, _introFloorY, _introTop.Z));                                            // 181: the glow on the stone, the wisps
         }
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: appears at {GlobalPosition} ({_hoverOverFloor:F2} m over the floor{(HoverLift != 0f ? $", lifted {HoverLift:F1}" : "")}{(_spawnRise ? $", rising out of the floor over {SpawnRiseSeconds:F1} s" : "")}; the arena's middle {_arenaCentre}, radius {_arenaRadius:F1})");
-        StartBossMusic("the fight begins");                                                                                                        // 195 (the intro's surface may have started it already)
+        MusicCue(BossMusicCues.Fight, "the fight begins");                                                                                         // 195 / 197: the fight's cue (the last chance when the cutscene's never came)
         EmitSignal(SignalName.Spawned);
     }
 
@@ -779,7 +803,7 @@ public partial class SmsKingBooRematch : Node3D
         if (_tongue != null) { _tongue.Stretch = TongueStretch; _tongue.On = TongueStretch > 1.001f; }
         SetCrownGlow(_crownGlowColor, 0f);
         State = Phase.IntroRise;
-        if (BossMusicAtIntro) StartBossMusic("the intro's surface");                                                                               // 195
+        MusicCue(BossMusicCues.StanceCut, "the intro's cut to the stance");                                                                        // 196 / 197
         _riseClipPending = RiseFx && RiseTellSeconds > 0f; _riseClipStarted = false; RiseLeapTopY = float.NegativeInfinity;   // 181: the tell first -- the glow and the wisps alone, then the clip and the rise
         if (_riseClipPending) { _introT = -RiseTellSeconds; PlayClip(BckWait); }
         else StartAppearClip();
@@ -820,7 +844,7 @@ public partial class SmsKingBooRematch : Node3D
                 PlayClip(BckLaugh);
                 string laugh = IntroLaughSeNow;                                                                                                  // 186: the casino intro's chuckle, pitched
                 if (_sound != null && !string.IsNullOrEmpty(laugh)) _sound.Play(laugh, LaughDb, IntroLaughPitchNow);                             // 192: from the ramp's low start
-                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: INTRO -- up; the laugh {laugh} at pitch {IntroLaughPitchNow:F2} rising to {IntroLaughPitch * IntroLaughPitchTo:F2} ({IntroLaughSeconds:F1} s)");
+                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: INTRO -- up; the laugh {laugh} at pitch {IntroLaughPitchNow:F2} rising to {IntroLaughPitch * IntroLaughPitchTo:F2} ({IntroLaughLength:F1} s{(float.IsNaN(IntroLaughOverride) ? "" : $", trimmed from {IntroLaughSeconds:F1} for the music's cue")})");
                 EmitSignal(SignalName.Laughed);
             }
         }
@@ -831,7 +855,7 @@ public partial class SmsKingBooRematch : Node3D
             if (IntroLaughBodyHeld) _introBodyLift = Mathf.Lerp(_introBodyLift, BodyPoint.Y - GlobalPosition.Y, 1f - MathF.Exp(-dt / Mathf.Max(0.05f, IntroLaughHoldSeconds)));   // the clip's lift of the body, taken out
             Position = _introTop + Vector3.Up * ((HoverBob > 0f && HoverBobSeconds > 0f ? MathF.Sin(_hoverT / HoverBobSeconds * MathF.Tau) * HoverBob : 0f) - _introBodyLift);
             FaceTick(dt);
-            if (_introT >= IntroLaughSeconds)
+            if (_introT >= IntroLaughLength)                                                                                                 // 197: the director's trim, else the knob
             {
                 State = Phase.IntroSink; _introT = 0f; _introTop = new Vector3(_introTop.X, Position.Y, _introTop.Z); _introBodyLift = 0f;
                 if (IntroLaughStopsAtDive && _sound != null && !string.IsNullOrEmpty(IntroLaughSeNow)) _sound.Stop(IntroLaughSeNow);           // 186: the chuckle cut at the dive
@@ -1138,15 +1162,33 @@ public partial class SmsKingBooRematch : Node3D
     public bool BossMusicPlaying => BossMusic != null && IsInstanceValid(BossMusic) && BossMusic.Playing;
     public bool BossMusicFaded { get; private set; }
     public float BossMusicVolumeDb => BossMusic != null && IsInstanceValid(BossMusic) ? BossMusic.VolumeDb : float.NaN;
-    /// <summary>The boss music starts (once; the real one's alone): the casino theme from its top at its level plus BossMusicDb.</summary>
+    /// <summary>197: a cue of the intro or the fight reached -- the music starts when it is the cue set (the fight: the last chance when none came).</summary>
+    public void MusicCue(BossMusicCues cue, string why)
+    {
+        if (cue == BossMusicCue || (cue == BossMusicCues.Fight && !BossMusicStarted)) StartBossMusic(why);
+    }
+    /// <summary>197, for the drives: what plays -- the file's name, "stream" for a hand-set one, "casino" for the filled theme; its length.</summary>
+    public string BossMusicStreamName { get; private set; } = "";
+    public float BossMusicLength => BossMusic != null && IsInstanceValid(BossMusic) && BossMusic.Stream != null ? (float)BossMusic.Stream.GetLength() : 0f;
+    /// <summary>The boss music starts (once; the real one's alone): the stream set, the file, or the casino theme; looped; at its level plus BossMusicDb.</summary>
     private void StartBossMusic(string why)
     {
-        if (IsCopy || !BossMusicOn || BossMusicStarted || BossMusic == null || !IsInstanceValid(BossMusic) || BossMusic.Stream == null) return;
+        if (IsCopy || !BossMusicOn || BossMusicStarted) return;
+        if (BossMusic == null || !IsInstanceValid(BossMusic)) { BossMusic = new AudioStreamPlayer { Name = "Music_BossMusic", Bus = SmsActorSound.MusicBus }; AddChild(BossMusic); }
         ReadMusicBase();
+        AudioStream own = BossMusicStream ?? (!string.IsNullOrEmpty(BossMusicFile) && ResourceLoader.Exists(BossMusicFile) ? GD.Load<AudioStream>(BossMusicFile) : null);
+        if (own != null)
+        {
+            if (own is AudioStreamMP3 mp3) { mp3.Loop = BossMusicLoop; mp3.LoopOffset = BossMusicLoopOffset; }
+            else if (own is AudioStreamOggVorbis ogg) { ogg.Loop = BossMusicLoop; ogg.LoopOffset = BossMusicLoopOffset; }
+            BossMusic.Stream = own; BossMusic.VolumeDb = SmsActorSound.MusicDb + BossMusicDb + BossMusicStreamDb;
+            BossMusicStreamName = BossMusicStream != null ? "stream" : BossMusicFile.GetFile();
+        }
+        else if (BossMusic.Stream != null) { BossMusic.VolumeDb = (float.IsNaN(_musicBaseDb) ? SmsActorSound.MusicDb : _musicBaseDb) + BossMusicDb; BossMusicStreamName = "casino"; }
+        else return;
         BossMusicStarted = true; BossMusicFaded = false;
-        BossMusic.VolumeDb = _musicBaseDb + BossMusicDb;
         BossMusic.Play();
-        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the BOSS MUSIC starts ({why}) at {BossMusic.VolumeDb:F1} dB, {(BossMusic.Stream is AudioStreamWav w ? w.GetLength().ToString("F1") : "?")} s");
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the BOSS MUSIC starts ({why}): {BossMusicStreamName}, {BossMusicLength:F1} s{(own != null && BossMusicLoop ? $", looping to {BossMusicLoopOffset:F1} s" : "")}, at {BossMusic.VolumeDb:F1} dB");
     }
     /// <summary>The boss music fades out over BossMusicFadeSeconds and stops (the last hit's down; the arena unloading).</summary>
     private void FadeBossMusic(string why)
@@ -1385,7 +1427,7 @@ public partial class SmsKingBooRematch : Node3D
             if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the laugh");
             EmitSignal(SignalName.Laughed);
         }
-        else if (State == Phase.IntroLaugh && n == BckLaugh) { PlayClip(_introT + 1.5f <= IntroLaughSeconds ? BckLaugh : BckWait); }   // 174: the laugh loops while the intro laughs
+        else if (State == Phase.IntroLaugh && n == BckLaugh) { PlayClip(_introT + 1.5f <= IntroLaughLength ? BckLaugh : BckWait); }   // 174: the laugh loops while the intro laughs
         else if (State == Phase.Mock && n == BckLaugh) PlayClip(BckWait);                                                                 // 191: a long mock outlasts the laugh clip
         else if (State == Phase.Laugh && n == BckLaugh && !_revealing)
         {
