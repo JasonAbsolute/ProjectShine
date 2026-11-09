@@ -13423,3 +13423,28 @@ run_window.ps1 and the pass's scheduled tasks deleted.
 **Deviations, all knobs:** the casino theme as the rematch's music (`BossMusic`: set another stream by hand), its start at the fight (`BossMusicAtIntro`) and the
 -4 dB (`SfxDb`) are my reading of "lower the volume a bit and throw in the boss music"; the spiral's numbers (`TornadoInnerRadius` 0.12, `TornadoSpeed` 6 along
 the ring, `MaxOrbitDegPerSec` 110, one cycle) are mine. I cannot hear the mix from here: Jaysonn judges the levels.
+
+### 196 -- the King Boo REMATCH, part 40: the copies TELEPORT ABOUT and keep APART (a copy's move is a hop 0.6 of the time, 0.3 before, and waits 1.3 x his gap, 1.7 before; every spot any of him picks keeps SpotMinFromBoos 11 m from the other King Boos, where they stand or where they are going); the boss music starts at the intro's CUT to Mario in the battle stance (as King Boo surfaces), not at the fight (feature/kingboo-rematch, code `96d0214`)
+
+**Jaysonn:** "ok we need to let the other fake boos teleport around since they tend to blob up and it makes the fight clustered for the wrong reason. and lets have the
+music start when it pans to mario in the battle stance frame"
+
+**The copies** (`SmsKingBooRematch.cs`): why they blobbed -- a copy's move was a hop only 0.3 of the time (a throw otherwise) at 1.7 x his gap (a hop every 12 s or
+so), and `RandomSpot` knew nothing of the other King Boos: a spot 13 m from Mario, anywhere on the stone, next to another of him as often as not. Now:
+`CopyRepositionChance` 0.6 -- a copy's move is a TELEPORT to another spot more often than a throw; `CopyGapScale` 1.7 -> 1.3 -- they move about more (the throws
+come about as often as before: 0.4 of the moves at 1.3 x against 0.7 at 1.7 x). And every spot any of him picks -- his hops and the copies' -- keeps
+`SpotMinFromBoos` (11 m: his body is 9 m across, the split line's spacing) from every OTHER King Boo (`SpotNow`: where it stands, or its destination mid-teleport);
+24 draws, the first that clears Mario, the floor and the others taken, else the roomiest of those that clear Mario. Readouts `LastSpotRoom`, `DriveDrawSpot`.
+
+**The music** (`SmsKingBooRematch.cs`): `BossMusicAtIntro` on -- the theme starts at `IntroSurface`, the intro's cut to the side two-shot where Mario drops into the
+battle stance as King Boo surfaces (195 started it at the fight, after the dive); it plays on through his rise, the laugh, the dive and the fight, and fades at the
+down as before. Off = 195's.
+
+**Verified** (headless drive v196-1, deleted before the commit): C23 the music silent through the look-about, playing within 3 ticks of the Surfaced cut with the
+stance clip on, on through the rise and the laugh and the fight at -6.5 dB. C25 after the three-of-him cutscene: 40 spot draws from each copy -- 80 of 80 cleared
+Mario by CopyMinFromMario and the other King Boos by 11 m (the least room 11.2 m, no fallback needed); the copies left alone (their moves on) both teleported
+within 6.3 s; while they waited the closest two of him stood 11.0 m apart. 195-179's checks as before -- 39/39, no errors. No shots: nothing new to see
+(the copies' spacing is the same line spacing as the cutscene's). The clean rebuild 0 errors; the drive, the logs and the pass's scheduled task deleted.
+
+**Deviations, all knobs:** 0.6 / 1.3 / 11 m are my numbers for "teleport around" and "blob up"; the cut to the two-shot is my reading of "the battle stance frame"
+(the only shot of Mario in the stance). Not touched: a copy's teleport-off after the mock (191) and the cutscene's line (188) -- both already keep them apart.
