@@ -187,6 +187,15 @@ public partial class SmsBombBoo : Node3D
     [Export] public Color LobTrailColor = new Color(0.12f, 0.11f, 0.14f, 0.8f), LobMarkColor = new Color(1f, 0.82f, 0.25f, 0.6f), LobBlastColor = new Color(0.62f, 0.45f, 0.85f, 0.9f);
     /// <summary>Where the body's bottom meets the floor at the landing (metres over it; the body is 0.85 m to its bottom at scale 0.8).</summary>
     [Export] public float LobLandLift = 0.9f;
+    [ExportGroup("The fuse (200b: it BLINKS RED before it blows)")]
+    /// <summary>200b (Jaysonn: "make the bomb boos flash red signalling they are about to blow up"): a Boo about to blow BLINKS RED -- the body mixed to FuseFlashColor and
+    /// glowing it (FuseEmit), FuseFlashMax strong at the brightest, the blink QUICKENING from FuseBlinkHzFrom to FuseBlinkHzTo as the moment nears: a spat Boo through
+    /// its fall (the lit ones; the dud only slowly and faintly, FuseDudHz -- lit, but long), the floating dud through its fuse's last DudWarnSeconds, a held Boo through a
+    /// timed hold's last 2 s (HoldSeconds). The eyes stay yellow. 158-200: a faint WHITE pulse (the swing's boost keeps it, white).</summary>
+    [Export] public Color FuseFlashColor = new Color(1f, 0.05f, 0.02f);
+    [Export(PropertyHint.Range, "0,1,0.05")] public float FuseFlashMax = 0.75f;   // 0.9 with the glow at 1.6 saturated the body to a flat salmon blob (run cm): 0.75 / 0.8 keeps its shading red
+    [Export(PropertyHint.Range, "0,4,0.1")] public float FuseEmit = 0.8f;
+    [Export] public float FuseBlinkHzFrom = 3f, FuseBlinkHzTo = 10f, FuseDudHz = 2f, DudWarnSeconds = 2.5f;
     [ExportGroup("")]
     [Export] public bool DebugPrint;
 
@@ -304,6 +313,7 @@ public partial class SmsBombBoo : Node3D
                     sm.SetShaderParameter("face_glow", root == _tongue ? 0f : FaceGlow);
                     sm.SetShaderParameter("glow_color", new Vector3(GlowColor.R, GlowColor.G, GlowColor.B));
                     sm.SetShaderParameter("glow", Glow);
+                    sm.SetShaderParameter("flash_color", new Vector3(FuseFlashColor.R, FuseFlashColor.G, FuseFlashColor.B)); sm.SetShaderParameter("flash_emit", FuseEmit);   // 200b
                     mi.SetSurfaceOverrideMaterial(s, sm);
                     _mats.Add(sm); if (root == _model) _bodyMats.Add(sm);
                 }
@@ -552,7 +562,27 @@ public partial class SmsBombBoo : Node3D
         _tongue.GlobalTransform = new Transform3D(new Basis(x * ModelScale, y * ModelScale, z * (len / TongueModelLength)), mouth);
         TongueLength = len; TongueTip = hand;
     }
-    private void SetFlash(float f) { foreach (var m in _mats) m.SetShaderParameter("flash", f); }
+    /// <summary>The body's flash: <paramref name="f"/> of <paramref name="color"/> (200b: the fuse's red unless told -- the boost's pulse passes white).</summary>
+    private void SetFlash(float f, Color? color = null)
+    {
+        Color c = color ?? FuseFlashColor; FlashNow = f; FlashColorNow = c;
+        foreach (var m in _mats) { m.SetShaderParameter("flash", f); m.SetShaderParameter("flash_color", new Vector3(c.R, c.G, c.B)); }
+    }
+    /// <summary>200b: the red blink -- a square-ish pulse at <paramref name="hz"/> (the phase carried, so a quickening rate never skips), <paramref name="amp"/> at its brightest.</summary>
+    private float Blink(float dt, float hz, float amp)
+    {
+        _fusePhase += dt * MathF.Tau * Mathf.Max(0.1f, hz);
+        float s = 0.5f + 0.5f * MathF.Sin(_fusePhase);
+        return amp * Mathf.SmoothStep(0.25f, 0.75f, s);
+    }
+    /// <summary>200b: the fuse blink <paramref name="k"/> (0..1) of the way to the blow -- the rate from FuseBlinkHzFrom to FuseBlinkHzTo, the strength from 0.55 to 1 of FuseFlashMax.</summary>
+    private float FuseBlink(float dt, float k) { k = Mathf.Clamp(k, 0f, 1f); return Blink(dt, Mathf.Lerp(FuseBlinkHzFrom, FuseBlinkHzTo, k), FuseFlashMax * Mathf.Lerp(0.55f, 1f, k)); }
+    /// <summary>200b, for the drives: the flash set now and its colour; the body material's own flash colour as the shader has it.</summary>
+    public float FlashNow { get; private set; }
+    public Color FlashColorNow { get; private set; }
+    public Vector3 FlashColorParam => _bodyMats.Count > 0 ? _bodyMats[0].GetShaderParameter("flash_color").AsVector3() : Vector3.Zero;
+    public float FlashParam => _bodyMats.Count > 0 ? _bodyMats[0].GetShaderParameter("flash").AsSingle() : 0f;
+    private float _fusePhase;
 
     private Mario MarioNow()
     {
@@ -629,7 +659,7 @@ public partial class SmsBombBoo : Node3D
                 GlobalTransform = new Transform3D(FaceBasis(_yaw, _lobTumble % 360f), p);
                 TongueSway(dt, 0f); TongueRest();
                 float k = Mathf.Clamp(_lobT / Mathf.Max(0.1f, LobFlightSeconds), 0f, 1f);
-                SetFlash(_lobDud ? 0.08f + 0.06f * MathF.Sin(_lobT * 10f) : 0.1f + 0.12f * MathF.Sin(_lobT * (8f + 22f * k)));   // the fuse: quicker as it comes down
+                SetFlash(_lobDud ? Blink(dt, FuseDudHz, FuseFlashMax * 0.4f) : FuseBlink(dt, k));                                   // 200b: the fuse BLINKS RED, quicker and brighter as it comes down (the dud slow and faint: lit, but long)
                 if (_lobMarkMat != null) _lobMarkMat.AlbedoColor = LobMarkColor with { A = LobMarkColor.A * (0.55f + 0.45f * MathF.Sin(_lobT * (6f + 14f * k))) };
                 if (_lobTrail != null && IsInstanceValid(_lobTrail)) _lobTrail.GlobalPosition = p;
                 if (p.Y <= _floorY + LobLandLift && _lobVel.Y < 0f)
@@ -659,7 +689,7 @@ public partial class SmsBombBoo : Node3D
                 {
                     _dudFuse -= dt;
                     if (_dudFuse <= 0f) { Detonate(); return; }
-                    if (_dudFuse < 2f) SetFlash(0.12f + 0.12f * MathF.Sin(_t * (12f + (2f - _dudFuse) * 14f)));
+                    if (_dudFuse < DudWarnSeconds) SetFlash(FuseBlink(dt, 1f - _dudFuse / Mathf.Max(0.1f, DudWarnSeconds)));           // 200b: its last seconds BLINK RED, quicker to the blow
                 }
                 // 179: looked at -> the shock; shocked, it holds where it hangs until he has looked away long enough
                 LookedAtNow = LookShock && mario != null && LookedAt(mario);
@@ -739,15 +769,15 @@ public partial class SmsBombBoo : Node3D
                 GlobalTransform = new Transform3D(b, p);
                 TongueTo(hand);
                 // 160: no pulse on the plain swing (a tenth of white on a near-black body read as a GREY Boo, Jaysonn's screenshot); the boost and the hold's warning show
-                float pulse = _boostLeft > 0f ? 0.06f + 0.04f * MathF.Sin(_t * 18f) : 0f;
+                float pulse = _boostLeft > 0f ? 0.06f + 0.04f * MathF.Sin(_t * 18f) : 0f; bool red = false;
                 if (HoldSeconds > 0f)
                 {
                     _held += dt;
                     float left = HoldSeconds - _held;
                     if (left <= 0f) { Explode(false); return; }
-                    if (left < 2f) pulse = 0.12f + 0.12f * MathF.Sin(_t * (12f + (2f - left) * 14f));
+                    if (left < 2f) { pulse = FuseBlink(dt, 1f - left / 2f); red = true; }                                                // 200b: the hold's last 2 s BLINK RED
                 }
-                SetFlash(pulse);
+                SetFlash(pulse, red ? null : Colors.White);
                 foreach (var boss in BoosNow())                                                        // 177: the real King Boo or a COPY of him -- whichever body it is swung into
                     if (boss != null && IsInstanceValid(boss) && boss.CanBeHit && boss.InHitCylinder(p, OwnRadius * ModelScale)) { _hitBoss = boss; Explode(true); return; }
                 break;

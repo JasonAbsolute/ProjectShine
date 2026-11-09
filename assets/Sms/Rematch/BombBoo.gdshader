@@ -5,6 +5,8 @@
 // Now: colour = texture x (vertex colour + `ambient`) x `tint` x `lift` (2 = the recipe's doubling), so the body is a dark red-grey and the eyes
 // bright yellow; `opacity` 1 = solid; `face_glow` lets the bright texels (the eyes) emit a little in the dark arena; the rim (`glow_color` x `glow`)
 // is faint by default; `flash` whitens the body (the carried Boo's pulse, a timed hold's warning).
+// 200b (Jaysonn: "make the bomb boos flash red signalling they are about to blow up"): `flash` now mixes the body toward `flash_color` (red by default; the
+// carried Boo's boost pulse passes white) and emits it x `flash_emit` so the blink reads in the dark arena; the yellow eyes are left out of the mix.
 shader_type spatial;
 render_mode blend_mix, depth_draw_always, cull_back, diffuse_lambert, specular_disabled;
 
@@ -17,6 +19,8 @@ uniform float face_glow : hint_range(0.0, 3.0) = 0.5;
 uniform vec3 glow_color : source_color = vec3(0.35, 0.1, 0.55);
 uniform float glow : hint_range(0.0, 3.0) = 0.25;
 uniform float flash : hint_range(0.0, 1.0) = 0.0;
+uniform vec3 flash_color : source_color = vec3(1.0, 0.05, 0.02);
+uniform float flash_emit : hint_range(0.0, 4.0) = 0.8;
 
 void fragment() {
 	vec4 t = texture(base_tex, UV);
@@ -24,8 +28,9 @@ void fragment() {
 	float lum = dot(t.rgb, vec3(0.299, 0.587, 0.114));
 	float face = smoothstep(0.45, 0.7, lum);                      // the yellow eyes (lum 0.76); the pink mouth (0.31) and the body stay dark
 	float rim = pow(1.0 - clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0), 2.5);
-	ALBEDO = mix(lit, vec3(1.0), flash);
-	EMISSION = t.rgb * face * face_glow + glow_color * glow * rim * (1.0 - flash) + vec3(0.6) * flash;
+	float body_flash = flash * (1.0 - face);                      // 200b: the eyes keep their yellow through the blink
+	ALBEDO = mix(lit, flash_color, body_flash);
+	EMISSION = t.rgb * face * face_glow + glow_color * glow * rim * (1.0 - flash) + flash_color * body_flash * flash_emit;
 	ROUGHNESS = 0.8;
 	ALPHA = opacity * t.a;
 }
