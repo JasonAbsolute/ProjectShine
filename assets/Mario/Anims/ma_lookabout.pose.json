@@ -1,6 +1,6 @@
 {
  "name": "ma_lookabout",
- "comment": "SMS 176 -- Mario's 'where am I?' look-around for the rematch intro (Jaysonn). Over the idle (ma_wait frame 0): a glance left with the shoulders turning and the left hand feeling out, a glance right the same, then up with a SHRUG (arms out, forearms up and out, palms up), the head cocked; back to the idle at the end. Axes: up (+ = his left), left (+ = nod down, - = look up / raise forward), forward (+ = roll to his left shoulder; + swings the LEFT arm OUT, - the right). Degrees.",
+ "comment": "SMS 176 -- Mario's 'where am I?' look-around for the rematch intro (Jaysonn). Over the idle (ma_wait frame 0): a glance left with the shoulders turning and the left hand feeling out, a glance right the same, then UP, the head cocked (199: no shrug -- Jaysonn: 'the shrug breaks the theme'; 176's arms-out, forearms-up, palms-up at 2.2-2.6 s are gone, the arms rest at the idle); back to the idle at the end. Axes: up (+ = his left), left (+ = nod down, - = look up / raise forward), forward (+ = roll to his left shoulder; + swings the LEFT arm OUT, - the right). Degrees.",
  "base_clip": "ma_wait",
  "base_frame": 0,
  "fps": 30,
@@ -216,58 +216,6 @@
       "left",
       -4
      ]
-    ],
-    "jnt_sldr_L": [
-     [
-      "forward",
-      6
-     ]
-    ],
-    "jnt_sldr_R": [
-     [
-      "forward",
-      -6
-     ]
-    ],
-    "jnt_arm_L1": [
-     [
-      "left",
-      -15
-     ],
-     [
-      "forward",
-      20
-     ]
-    ],
-    "jnt_arm_R1": [
-     [
-      "left",
-      -15
-     ],
-     [
-      "forward",
-      -20
-     ]
-    ],
-    "jnt_arm_L2": [
-     [
-      "left",
-      -25
-     ],
-     [
-      "forward",
-      40
-     ]
-    ],
-    "jnt_arm_R2": [
-     [
-      "left",
-      -25
-     ],
-     [
-      "forward",
-      -40
-     ]
     ]
    }
   },
@@ -292,58 +240,6 @@
      [
       "left",
       -4
-     ]
-    ],
-    "jnt_sldr_L": [
-     [
-      "forward",
-      6
-     ]
-    ],
-    "jnt_sldr_R": [
-     [
-      "forward",
-      -6
-     ]
-    ],
-    "jnt_arm_L1": [
-     [
-      "left",
-      -15
-     ],
-     [
-      "forward",
-      20
-     ]
-    ],
-    "jnt_arm_R1": [
-     [
-      "left",
-      -15
-     ],
-     [
-      "forward",
-      -20
-     ]
-    ],
-    "jnt_arm_L2": [
-     [
-      "left",
-      -25
-     ],
-     [
-      "forward",
-      40
-     ]
-    ],
-    "jnt_arm_R2": [
-     [
-      "left",
-      -25
-     ],
-     [
-      "forward",
-      -40
      ]
     ]
    }

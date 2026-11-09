@@ -35,6 +35,13 @@ public partial class SmsGhostBreath : Node3D
     /// <summary>How fast the cold blows (m/s), how long a puff of it lives (seconds; its reach is the two multiplied), how hard it sinks (m/s^2), how wide
     /// the stream scatters (degrees either side).</summary>
     [Export] public float BreathSpeed = 22f, PuffSeconds = 1.5f, Sink = 4f, SpreadDeg = 9f;
+    /// <summary>199 (Jaysonn: "the breath coming out of his mouth a bit wider -- King Boo has a wide mouth, one point of contact looks off"): the cold leaves a MOUTH
+    /// MouthWidth across and MouthHeight tall (a box at the mouth point, across the stream; 157-198: a point 0.7 m across) -- the puffs, the dense core and the
+    /// glints all born across it, the mouth's light stretched to its width -- and the cold that freezes runs in HitLanes lanes across it (each frame a ray from
+    /// each lane: the left edge, the middle, the right edge), so the hit is as wide as the stream from the first metre.</summary>
+    [Export(PropertyHint.Range, "0.5,9,0.1")] public float MouthWidth = 4.5f;
+    [Export(PropertyHint.Range, "0.2,4,0.1")] public float MouthHeight = 1.4f;
+    [Export(PropertyHint.Range, "1,7,1")] public int HitLanes = 3;
     [ExportGroup("The hit (187: the cold that freezes is the DENSE cold)")]
     /// <summary>187 (Jaysonn: "the freeze breath still feels like I'm unfairly getting hit"): a puff freezes only while it is SOLID -- its ball is HitRadiusK of its
     /// size scaled by its own fade (the puffs fade in over the first tenth of their life and out over the last third: the thin blue edge and the fading tail
@@ -105,6 +112,8 @@ public partial class SmsGhostBreath : Node3D
     public bool CoreEmitting => _core != null && _core.Emitting;
     public int CorePuffCount => _core != null ? _core.Amount : 0;
     public int RaysBlown => _rays.Count;
+    /// <summary>199, for the drives: the frames the blow ran (one HitLanes set of rays each) -- RaysBlown is HitLanes x this.</summary>
+    public int BlowFrames { get; private set; }
     public float Age => _age;
     public Vector3 FreezePoint { get; private set; }
     public float FreezeAt { get; private set; } = -1f;
@@ -158,6 +167,11 @@ public partial class SmsGhostBreath : Node3D
     }
 
     public float PuffSize(float age) => Mathf.Lerp(PuffSizeStart, PuffSizeEnd, Mathf.Clamp(age / Mathf.Max(0.01f, PuffSeconds), 0f, 1f));
+    /// <summary>199: the mouth's emission box about the mouth point, in the emitters' frame (x across the stream, y up, z along it).</summary>
+    public Vector3 MouthExtents => new Vector3(Mathf.Max(0.1f, MouthWidth * 0.5f), Mathf.Max(0.05f, MouthHeight * 0.5f), 0.2f);
+    /// <summary>199, for the drives: the mist puffs' emission shape and box, as made.</summary>
+    public string PuffEmission => _puffs?.ProcessMaterial is ParticleProcessMaterial pm ? $"{pm.EmissionShape} {pm.EmissionBoxExtents}" : "none";
+    public Vector3 PuffEmissionExtents => _puffs?.ProcessMaterial is ParticleProcessMaterial pm ? pm.EmissionBoxExtents : Vector3.Zero;
     /// <summary>187: a puff's own fade at this age (the ColorRamp Fade draws: in over the first tenth, 0.75 of full by two thirds, out by the end), 0..1.</summary>
     private float PuffFade(float age)
     {
@@ -230,7 +244,13 @@ public partial class SmsGhostBreath : Node3D
         {
             _t += dt; _seT += dt;
             Aim(SweepK);
-            _rays.Add((_age, _mouthNow, _dirNow));
+            int lanes = Mathf.Max(1, HitLanes); Vector3 across = Vector3.Up.Cross(_dirNow); across = across.LengthSquared() > 1e-6f ? across.Normalized() : Vector3.Right;
+            BlowFrames++;
+            for (int i = 0; i < lanes; i++)                                                                                                   // 199: a ray from each lane across the mouth
+            {
+                float k = lanes > 1 ? (i / (float)(lanes - 1)) * 2f - 1f : 0f;
+                _rays.Add((_age, _mouthNow + across * (k * MouthWidth * 0.5f), _dirNow));
+            }
             if (_glowMat != null) _glowMat.AlbedoColor = new Color(GlintColor.R, GlintColor.G, GlintColor.B, 0.45f + 0.2f * MathF.Sin(_age * 22f));
             if (BreathSeEvery > 0f && _seT >= BreathSeEvery && _sound != null && !string.IsNullOrEmpty(BreathSe)) { _seT = 0f; _sound.Play(BreathSe); }
             if (_t >= SweepSeconds)
@@ -296,7 +316,7 @@ public partial class SmsGhostBreath : Node3D
         var tex = Tex("kemuball3_raw");
         var pm = new ParticleProcessMaterial
         {
-            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = 0.35f,
+            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = MouthExtents,                                   // 199: born across the mouth
             Direction = new Vector3(0f, 0f, -1f), Spread = Mathf.Max(0.5f, SpreadDeg), InitialVelocityMin = BreathSpeed * 0.85f, InitialVelocityMax = BreathSpeed,
             Gravity = new Vector3(0f, -Sink, 0f), ScaleMin = 1f, ScaleMax = 1f, ScaleCurve = Ramp(PuffSizeStart, PuffSizeEnd),
             AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -40f, AngularVelocityMax = 40f,
@@ -317,7 +337,7 @@ public partial class SmsGhostBreath : Node3D
         Color c = BreathColor.Lerp(new Color(1f, 1f, 1f), 0.2f);                   // a shade whiter than the stream, still the cold's blue
         var pm = new ParticleProcessMaterial
         {
-            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = 0.25f,
+            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = MouthExtents * new Vector3(0.9f, 0.8f, 1f),       // 199: the dense core across the mouth, a shade inside the mist
             Direction = new Vector3(0f, 0f, -1f), Spread = Mathf.Max(0.5f, CoreSpreadDeg), InitialVelocityMin = BreathSpeed * 0.97f, InitialVelocityMax = BreathSpeed * 1.03f,   // 192: the core rides WITH the hit maths (0.92-1.02 and 1.1 x the sink before: the hit led the white front)
             Gravity = new Vector3(0f, -Sink, 0f), ScaleMin = 1f, ScaleMax = 1f, ScaleCurve = Ramp(CoreSizeStart, CoreSizeEnd),
             AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -60f, AngularVelocityMax = 60f,
@@ -336,7 +356,7 @@ public partial class SmsGhostBreath : Node3D
         var tex = Tex("star4s_raw");
         var pm = new ParticleProcessMaterial
         {
-            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = 0.3f,
+            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Box, EmissionBoxExtents = MouthExtents,                                   // 199: the glints across the mouth too
             Direction = new Vector3(0f, 0f, -1f), Spread = Mathf.Max(0.5f, SpreadDeg) * 1.4f, InitialVelocityMin = BreathSpeed * 0.9f, InitialVelocityMax = BreathSpeed * 1.1f,
             Gravity = new Vector3(0f, -Sink * 0.8f, 0f), ScaleMin = 0.7f, ScaleMax = 1.2f, AngularVelocityMin = -300f, AngularVelocityMax = 300f,
             Color = new Color(GlintColor.R, GlintColor.G, GlintColor.B, 1f),
@@ -357,7 +377,7 @@ public partial class SmsGhostBreath : Node3D
             BillboardMode = BaseMaterial3D.BillboardModeEnum.Enabled, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, NoDepthTest = true,
             AlbedoTexture = Tex("radgrad_raw"), AlbedoColor = new Color(GlintColor.R, GlintColor.G, GlintColor.B, 0.5f), RenderPriority = 3
         };
-        _glow = new MeshInstance3D { Name = "ColdLight", TopLevel = true, Visible = false, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Mesh = new QuadMesh { Size = Vector2.One * MouthGlowSize }, MaterialOverride = _glowMat };
+        _glow = new MeshInstance3D { Name = "ColdLight", TopLevel = true, Visible = false, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Mesh = new QuadMesh { Size = new Vector2(Mathf.Max(MouthGlowSize, MouthWidth * 0.9f), MouthGlowSize) }, MaterialOverride = _glowMat };   // 199: the light stretched across the mouth
         AddChild(_glow);
     }
     /// <summary>A slab under the floor for the puffs to roll along (GPU particles collide with these, not with the world).</summary>

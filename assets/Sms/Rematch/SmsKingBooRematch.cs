@@ -422,6 +422,11 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public float SweepDeg = 150f, SweepSeconds = 1.6f;
     [Export] public SmsGhostBreath.Way SweepWay = SmsGhostBreath.Way.Random;
     [Export] public float BreathDownDeg = 10f, BreathSpeed = 22f, PuffSeconds = 1.5f, PuffSizeStart = 3f, PuffSizeEnd = 8f, BreathHitHeight = 1f, FreezeSeconds = 1f;
+    /// <summary>199 (Jaysonn: "the breath a bit wider -- King Boo has a wide mouth, one point of contact looks off"): the mouth the cold leaves, metres across and tall
+    /// (his body is 9 m across; the mouth some 5), and how many lanes the cold that freezes runs in across it (SmsGhostBreath's MouthWidth / MouthHeight / HitLanes).</summary>
+    [Export(PropertyHint.Range, "0.5,9,0.1")] public float BreathMouthWidth = 4.5f;
+    [Export(PropertyHint.Range, "0.2,4,0.1")] public float BreathMouthHeight = 1.4f;
+    [Export(PropertyHint.Range, "1,7,1")] public int BreathHitLanes = 3;
     /// <summary>192 (Jaysonn: "the hit boxes for the freeze breath are still off from the visuals"): how much the mist SLOWS once it rolls on the floor (the puffs'
     /// collision friction, taken off their speed every frame they touch the stone) -- 0: the mist slides out with the cold that freezes, as the hit maths always
     /// had it; 0.15 (before) stalled the visible mist about 10 m out while the freeze ran on to 25 m, so Mario was frozen with the mist still 5-10 m behind him.</summary>
@@ -2033,7 +2038,7 @@ public partial class SmsKingBooRematch : Node3D
                 if (m == null) { EndBreath(); return; }
                 float fyAim = FloorUnder(m.GlobalPosition); if (float.IsNaN(fyAim)) fyAim = m.GlobalPosition.Y;
                 BreathDownDegUsed = BreathAimFloorAt > 0f ? Mathf.RadToDeg(MathF.Atan2(Mathf.Max(0.1f, MouthPoint.Y - fyAim), BreathAimFloorAt)) : BreathDownDeg;   // 173: the floor met BreathAimFloorAt out
-                var b = new SmsGhostBreath { Name = $"GhostBreath{BreathsMade}", DebugPrint = DebugPrint, SweepDeg = SweepDeg, SweepSeconds = SweepSeconds / ThrowSpeedScale, SweepWay = SweepWay, DownDeg = BreathDownDegUsed, BreathSpeed = BreathSpeed * ThrowSpeedScale, PuffSeconds = PuffSeconds, PuffSizeStart = PuffSizeStart, PuffSizeEnd = PuffSizeEnd, HitHeight = BreathHitHeight, FreezeSeconds = FreezeSeconds, OneFreezePerAttack = OneFreezePerAttack, ShowHitBox = ShowHitBoxes, FloorDrag = BreathFloorDrag };   // 192
+                var b = new SmsGhostBreath { Name = $"GhostBreath{BreathsMade}", DebugPrint = DebugPrint, SweepDeg = SweepDeg, SweepSeconds = SweepSeconds / ThrowSpeedScale, SweepWay = SweepWay, DownDeg = BreathDownDegUsed, BreathSpeed = BreathSpeed * ThrowSpeedScale, PuffSeconds = PuffSeconds, PuffSizeStart = PuffSizeStart, PuffSizeEnd = PuffSizeEnd, HitHeight = BreathHitHeight, FreezeSeconds = FreezeSeconds, OneFreezePerAttack = OneFreezePerAttack, ShowHitBox = ShowHitBoxes, FloorDrag = BreathFloorDrag, MouthWidth = BreathMouthWidth, MouthHeight = BreathMouthHeight, HitLanes = BreathHitLanes };   // 192 / 199
                 (GetTree().CurrentScene ?? GetParent()).AddChild(b);
                 float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
                 b.Swept += hit => { if (hit) BreathHits++; _breathSwept = true; _crownFlashT = CrownFlashSeconds * 0.7f; EmitSignal(SignalName.Breathed, hit); };
