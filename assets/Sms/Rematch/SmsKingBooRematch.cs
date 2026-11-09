@@ -89,6 +89,10 @@ public partial class SmsKingBooRematch : Node3D
 {
     /// <summary>The ghost's screen mix (the casino boss's GhostOpacity; the game's ghost is 0.588).</summary>
     [Export(PropertyHint.Range, "0.1,1,0.01")] public float GhostOpacity = 0.72f;
+    /// <summary>198 (Jaysonn: "a setting for King Boo's animations to blend together a little better?"): every clip change CROSS-FADES over this long -- the pose he is in
+    /// melts into the new clip's first frames (the wait into the laugh, the laugh into the dive, the hurt tumble into the wait, the laugh's own loop) instead of the
+    /// game's hard cut between bcks. 0.25 s reads as one body moving; 0 = the hard cut as before; over 0.4 the quick clips (the hit, the lick's thrust) go mushy.</summary>
+    [Export(PropertyHint.Range, "0,0.6,0.05")] public float ClipBlendSeconds = 0.25f;
     /// <summary>The glow quad's strength (x his opacity) and whether the twinkle stars show.</summary>
     [Export(PropertyHint.Range, "0,2,0.05")] public float Glow = 0.9f;
     [Export] public bool Twinkle = true;
@@ -1386,6 +1390,9 @@ public partial class SmsKingBooRematch : Node3D
     }
     private static float Flat(Vector3 a, Vector3 b) => new Vector2(a.X - b.X, a.Z - b.Z).Length();
 
+    /// <summary>A clip from its top at the bck's own rate. 198 (Jaysonn: "a setting for King Boo's animations to blend together a little better?"): the new clip
+    /// CROSS-FADES from the pose he is in over ClipBlendSeconds (AnimationPlayer's custom blend: the old pose fades out as the new clip plays from its first frame) --
+    /// the game cuts between bcks hard; 0 = that cut. The first clip of all, and any clip starting while he is unseen, cuts (nothing to blend from).</summary>
     private void PlayClip(string name)
     {
         if (_anim == null || !_anim.HasAnimation(name)) { if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: no clip {name}"); CallDeferred(nameof(OnClipEnd), new StringName(name)); return; }
@@ -1393,10 +1400,17 @@ public partial class SmsKingBooRematch : Node3D
         var (frames, loop) = Clips.TryGetValue(name, out var c) ? c : (60, false);
         clip.LoopMode = loop ? Animation.LoopModeEnum.Linear : Animation.LoopModeEnum.None;
         float rate = clip.Length > 0f ? frames / (float)clip.Length : 60f;
-        _anim.Play(name);
-        _anim.Seek(0f, true);
+        bool seen = _model != null && _model.Visible && _opacityShown > 0.02f;
+        double blend = ClipBlendSeconds > 0f && _clipsPlayed > 0 && seen ? ClipBlendSeconds : -1.0;
+        if (blend > 0.0) { _anim.Play(name, blend); ClipBlends++; }
+        else { _anim.Play(name); _anim.Seek(0f, true); }
+        _clipsPlayed++;
         _anim.SpeedScale = 60f / rate;
     }
+    private int _clipsPlayed;
+    /// <summary>198, for the drives: how many clip starts cross-faded, of how many starts.</summary>
+    public int ClipBlends { get; private set; }
+    public int ClipStarts => _clipsPlayed;
     /// <summary>The bck frame the clip named is at now (a big number when it is not the one playing).</summary>
     private float ClipFrameNow(string name)
     {
