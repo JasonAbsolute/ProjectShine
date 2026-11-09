@@ -32,7 +32,7 @@ using System.Collections.Generic;
 /// </summary>
 public partial class SmsBombBoo : Node3D
 {
-    public enum Phase { Rising, Drifting, Carried, Gone }
+    public enum Phase { Rising, Drifting, Carried, Gone, Lobbed }   // 200: Lobbed -- spat by King Boo, in the air
     /// <summary>The tongue glb's length along its +Z (its root at the origin), metres at scale 1 (76.6 cm in the .dae).</summary>
     public const float TongueModelLength = 0.766f;
     private const float U = SmsUnits.UnitsPerMetre;
@@ -176,14 +176,49 @@ public partial class SmsBombBoo : Node3D
     [Export] public float ExplosionScale = 1.4f, ExplosionShake = 1f;
     [Export] public string ExplodeSe = "MSD_SE_PO_WFLOWER_EXPLOSION";
     [Export] public int Seed = 0;
+    [ExportGroup("The lob (200: spat by King Boo -- the Bomb Boo volley)")]
+    /// <summary>200 (Jaysonn: "one more attack involving boos"): a Boo King Boo SPITS flies on a lob (<see cref="Lob"/>: SmsBooVolley sets the arc, the target, the
+    /// blast), TUMBLING head over heels at LobTumbleDegPerSec, its fuse flashing quicker as it comes down, a trail of black puffs behind it (LobTrail), a RING on
+    /// the floor where it will land (LobMarkColor: the blast's own footprint; a dud's the body's). Landed, it BLASTS -- the Bob-omb explosion, a ring of light
+    /// LobBlastColor out to the blast radius, Mario within it whose feet are under the blast height HIT (the common enemy damage: a jump clears it) -- or, a DUD,
+    /// it thuds down in black smoke and FLOATS there as one of the supply's: Mario's to grab, its fuse still burning (DudFuseLeft; it blasts when that runs out).</summary>
+    [Export(PropertyHint.Range, "0,1080,10")] public float LobTumbleDegPerSec = 420f;
+    [Export] public bool LobTrail = true;
+    [Export] public Color LobTrailColor = new Color(0.12f, 0.11f, 0.14f, 0.8f), LobMarkColor = new Color(1f, 0.82f, 0.25f, 0.6f), LobBlastColor = new Color(0.62f, 0.45f, 0.85f, 0.9f);
+    /// <summary>Where the body's bottom meets the floor at the landing (metres over it; the body is 0.85 m to its bottom at scale 0.8).</summary>
+    [Export] public float LobLandLift = 0.9f;
+    [ExportGroup("")]
     [Export] public bool DebugPrint;
 
     [Signal] public delegate void GrabbedEventHandler();
     [Signal] public delegate void DroppedEventHandler();
     [Signal] public delegate void BurstEventHandler(bool hitKingBoo);
     [Signal] public delegate void TouchedEventHandler();
+    /// <summary>200: the lob came down (a dud floats on; else the blast follows at once); the blast on the floor (whether it got Mario).</summary>
+    [Signal] public delegate void LandedEventHandler(bool dud);
+    [Signal] public delegate void BlastedEventHandler(bool hitMario);
 
     public static readonly List<SmsBombBoo> All = new();
+    /// <summary>200, for the drives: the lob -- in the air now, a dud, where it was spat from and where it comes down, the flight's length and age, the tumble so far,
+    /// whether it has landed (and where) and blasted (and whether that got Mario), the dud's fuse left (seconds; 0 = none), the mark's radius; the blasts on the floor
+    /// and the hits of all Boos.</summary>
+    public bool IsLobbed => State == Phase.Lobbed;
+    public bool LobDud { get; private set; }
+    public Vector3 LobFrom { get; private set; }
+    public Vector3 LobTarget { get; private set; }
+    public float LobFlightSeconds { get; private set; }
+    public float LobAge => _lobT;
+    public float LobTumbleDeg => _lobTumble;
+    public bool HasLanded { get; private set; }
+    public Vector3 LandedAt { get; private set; }
+    public bool HasBlasted { get; private set; }
+    public bool BlastHitMario { get; private set; }
+    public float BlastRadius => _lobBlastR;
+    public float DudFuseLeft => _dudFuse;
+    public float LobMarkRadius { get; private set; }
+    public Vector3 LobVelocity => _lobVel;
+    public static int FloorBlasts, FloorBlastHits, Lobs, Duds;
+    private Vector3 _lobVel; private float _lobT, _lobTumble, _lobBlastR, _lobBlastH, _dudFuse; private bool _lobDud; private MeshInstance3D _lobMark; private StandardMaterial3D _lobMarkMat; private GpuParticles3D _lobTrail;
     public Phase State { get; private set; } = Phase.Rising;
     public bool IsFree => State == Phase.Drifting;
     public bool IsCarried => State == Phase.Carried;
@@ -585,9 +620,47 @@ public partial class SmsBombBoo : Node3D
                 if (k >= 1f) { State = Phase.Drifting; _t = 0f; SetScaleK(1f, 1f); _wait = WaitTicks / 2; NextGoal(); }
                 break;
             }
+            case Phase.Lobbed:                                                                                     // 200: spat by King Boo -- the lob, the tumble, the fuse, the landing
+            {
+                _lobT += dt;
+                _lobVel = _lobVel with { Y = _lobVel.Y - SmsFireballs.G * dt };
+                Vector3 p = GlobalPosition + _lobVel * dt;
+                _lobTumble += dt * LobTumbleDegPerSec;
+                GlobalTransform = new Transform3D(FaceBasis(_yaw, _lobTumble % 360f), p);
+                TongueSway(dt, 0f); TongueRest();
+                float k = Mathf.Clamp(_lobT / Mathf.Max(0.1f, LobFlightSeconds), 0f, 1f);
+                SetFlash(_lobDud ? 0.08f + 0.06f * MathF.Sin(_lobT * 10f) : 0.1f + 0.12f * MathF.Sin(_lobT * (8f + 22f * k)));   // the fuse: quicker as it comes down
+                if (_lobMarkMat != null) _lobMarkMat.AlbedoColor = LobMarkColor with { A = LobMarkColor.A * (0.55f + 0.45f * MathF.Sin(_lobT * (6f + 14f * k))) };
+                if (_lobTrail != null && IsInstanceValid(_lobTrail)) _lobTrail.GlobalPosition = p;
+                if (p.Y <= _floorY + LobLandLift && _lobVel.Y < 0f)
+                {
+                    p.Y = _floorY + LobLandLift; GlobalPosition = p; HasLanded = true; LandedAt = p;
+                    if (_lobTrail != null && IsInstanceValid(_lobTrail)) { _lobTrail.Emitting = false; var tr = _lobTrail; GetTree().CreateTimer(1.0).Timeout += () => { if (IsInstanceValid(tr)) tr.QueueFree(); }; _lobTrail = null; }
+                    if (_lobMark != null && IsInstanceValid(_lobMark)) { _lobMark.QueueFree(); } _lobMark = null; _lobMarkMat = null;
+                    if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: the lob comes down at {p} after {_lobT:F2} s ({Flat2(p, LobTarget):F2} m off its mark){(_lobDud ? " -- a DUD: it floats here, the fuse burning " + _dudFuse.ToString("F1") + " s" : " -- the BLAST")}");
+                    EmitSignal(SignalName.Landed, _lobDud);
+                    if (!_lobDud) { Detonate(); return; }
+                    // the dud: a thud of black smoke, then it floats from here as one of the supply's (Drop()'s re-basing), its fuse still burning
+                    if (RiseSmoke) FireRiseSmoke(new Vector3(p.X, _floorY + 0.05f, p.Z));
+                    State = Phase.Drifting; _t = 0f; _grace = DropGraceSeconds; SetFlash(0f);
+                    _base = new Vector3(p.X, _floorY + BaseLiftOverFloor, p.Z);
+                    _flyCur = Mathf.Clamp((p.Y - _base.Y) * U - _bob, 0f, _flyTarget);
+                    if (mario != null) { Vector3 tm = mario.GlobalPosition - p; if (tm.LengthSquared() > 1e-4f) _yaw = MathF.Atan2(tm.X, tm.Z); }
+                    _rotX = 0f; GlobalTransform = new Transform3D(FaceBasis(_yaw, _rotX), p);
+                    TongueRest(); _wait = WaitTicks; NextGoal();
+                    if (!string.IsNullOrEmpty(AppearSe)) _sound?.Play(AppearSe);
+                }
+                break;
+            }
             case Phase.Drifting:
             {
                 if (ExpireSeconds > 0f && _t >= ExpireSeconds) { Vanish(); return; }
+                if (_lobDud && _dudFuse > 0f)                                                                       // 200: the dud's fuse -- it blasts where it floats when that runs out (grabbed, the hold's own clock takes over)
+                {
+                    _dudFuse -= dt;
+                    if (_dudFuse <= 0f) { Detonate(); return; }
+                    if (_dudFuse < 2f) SetFlash(0.12f + 0.12f * MathF.Sin(_t * (12f + (2f - _dudFuse) * 14f)));
+                }
                 // 179: looked at -> the shock; shocked, it holds where it hangs until he has looked away long enough
                 LookedAtNow = LookShock && mario != null && LookedAt(mario);
                 if (Shocked)
@@ -760,6 +833,66 @@ public partial class SmsBombBoo : Node3D
         EmitSignal(SignalName.Burst, hitKingBoo);
         Gone();
     }
+    /// <summary>200: SPAT by King Boo (the Bomb Boo volley, SmsBooVolley) -- it flies from <paramref name="from"/> on a lob to <paramref name="target"/> (a floor point:
+    /// the apex <paramref name="apexOver"/> metres over the higher of the mouth and the landing, SmsFireballs.G the gravity), tumbling, its fuse flashing quicker as it
+    /// falls, a ring on the floor marking the blast's footprint. Landed, <see cref="Detonate"/> -- or, <paramref name="dud"/>, it floats there as a supply Boo with
+    /// <paramref name="dudFuseSeconds"/> on its fuse (0 = it never blasts on its own).</summary>
+    public void Lob(Vector3 from, Vector3 target, float apexOver, bool dud, float blastRadius, float blastHeight, float dudFuseSeconds)
+    {
+        if (State == Phase.Gone || State == Phase.Carried) return;
+        State = Phase.Lobbed; _t = 0f; _lobT = 0f; _lobTumble = 0f; _lobDud = dud; LobDud = dud; _lobBlastR = Mathf.Max(0.5f, blastRadius); _lobBlastH = Mathf.Max(0.2f, blastHeight); _dudFuse = dud ? Mathf.Max(0f, dudFuseSeconds) : 0f;
+        _floorY = target.Y; LobFrom = from; LobTarget = target; HasLanded = false; HasBlasted = false; BlastHitMario = false; _grace = DropGraceSeconds;
+        GlobalPosition = from; SetScaleK(1f, 1f); SetShock(false);
+        float g = SmsFireballs.G, landY = target.Y + LobLandLift;
+        float apexY = Mathf.Max(from.Y, landY) + Mathf.Max(0.5f, apexOver);
+        float vy0 = MathF.Sqrt(2f * g * Mathf.Max(0.1f, apexY - from.Y)), tUp = vy0 / g, tDown = MathF.Sqrt(2f * Mathf.Max(0.05f, apexY - landY) / g);
+        LobFlightSeconds = tUp + tDown;
+        _lobVel = new Vector3((target.X - from.X) / LobFlightSeconds, vy0, (target.Z - from.Z) / LobFlightSeconds);
+        if (new Vector2(_lobVel.X, _lobVel.Z).LengthSquared() > 1e-6f) _yaw = MathF.Atan2(_lobVel.X, _lobVel.Z);
+        GlobalTransform = new Transform3D(FaceBasis(_yaw, 0f), from);
+        // the mark on the floor: the blast's footprint (a dud: the body's own)
+        LobMarkRadius = dud ? OwnRadius * ModelScale * 1.3f : _lobBlastR;
+        var tex = SmsFireballs.Tex("hamonring3_flat");
+        _lobMarkMat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, AlbedoTexture = tex, AlbedoColor = LobMarkColor };
+        _lobMark = new MeshInstance3D { Name = "LobMark", TopLevel = true, Mesh = new QuadMesh { Size = Vector2.One * (LobMarkRadius * 2f) }, MaterialOverride = _lobMarkMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        AddChild(_lobMark); _lobMark.GlobalPosition = new Vector3(target.X, target.Y + 0.08f, target.Z); _lobMark.Rotation = new Vector3(-MathF.PI / 2f, 0f, 0f);
+        if (LobTrail)
+        {
+            _lobTrail = SmsSmashFx.Trail(LobTrailColor, 0.7f, 0.35f); _lobTrail.Name = "LobTrail"; _lobTrail.TopLevel = true; _lobTrail.Amount = 40; _lobTrail.Lifetime = 0.6;
+            AddChild(_lobTrail); _lobTrail.GlobalPosition = from; _lobTrail.Emitting = true;
+        }
+        Lobs++; if (dud) Duds++;
+        if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: SPAT from {from} toward {target} ({Flat2(from, target):F1} m), the apex {apexY - from.Y:F1} m up, {LobFlightSeconds:F2} s in the air{(dud ? $", a DUD (fuse {_dudFuse:F1} s)" : $", the blast {_lobBlastR:F1} m")}");
+    }
+    /// <summary>200: the blast on the floor -- the puff and the Bob-omb explosion where it is, a ring of light out to the blast radius, Mario within that radius whose
+    /// feet are under the blast height hit (the common enemy damage); then gone. A dud's fuse ends here too.</summary>
+    public void Detonate()
+    {
+        if (State == Phase.Gone) return;
+        if (State == Phase.Carried) MarioNow()?.SmsBombGone(this);
+        State = Phase.Gone; HasBlasted = true; FloorBlasts++;
+        Vector3 at = GlobalPosition; float fy = float.IsNaN(_floorY) ? FloorUnder(at) : _floorY; if (float.IsNaN(fy)) fy = at.Y - LobLandLift;
+        Puff(1.3f);
+        if (!string.IsNullOrEmpty(BurstSe)) _sound?.Play(BurstSe);
+        Blast();
+        if (GetParent() != null) SmsSmashFx.Ring(GetParent(), new Vector3(at.X, fy, at.Z), 0.4f, _lobBlastR, 0.35f, LobBlastColor);
+        var mario = MarioNow();
+        if (mario != null && IsInstanceValid(mario))
+        {
+            Vector3 feet = mario.GlobalPosition; float mr = SmsParams.Mario.DamageRadius / U;
+            if (feet.Y - fy < _lobBlastH && Flat2(feet, at) <= _lobBlastR + mr && mario.stateOfMario != Mario.MarioState.hurt && mario.stateOfMario != Mario.MarioState.dead)
+            {
+                int hp = mario.SmsHP;
+                mario.TakeDamage(new Vector3(at.X, fy + 1f, at.Z), Mario.SmsDamageProfile.EnemyCommon);
+                if (mario.SmsHP < hp || mario.stateOfMario == Mario.MarioState.hurt) { BlastHitMario = true; FloorBlastHits++; }
+            }
+        }
+        if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: BLASTS on the floor at {at} ({_lobBlastR:F1} m) -- {(BlastHitMario ? "Mario HIT" : "Mario clear")}");
+        EmitSignal(SignalName.Blasted, BlastHitMario);
+        EmitSignal(SignalName.Burst, false);
+        Gone();
+    }
+    private static float Flat2(Vector3 a, Vector3 b) => new Vector2(a.X - b.X, a.Z - b.Z).Length();
     /// <summary>Cleared (King Boo's hit clears the field; the expiry): a small puff and gone.</summary>
     public void Vanish()
     {
@@ -807,6 +940,8 @@ public partial class SmsBombBoo : Node3D
         if (_model != null) _model.Visible = false;
         if (_tongue != null) _tongue.Visible = false;
         _drool?.HideAll(); _sweat?.HideAll();
+        if (_lobMark != null && IsInstanceValid(_lobMark)) _lobMark.QueueFree(); _lobMark = null; _lobMarkMat = null;                       // 200: the lob's mark and trail go with it
+        if (_lobTrail != null && IsInstanceValid(_lobTrail)) _lobTrail.Emitting = false;
         SetPhysicsProcess(false);
         if (IsInsideTree()) GetTree().CreateTimer(2.0).Timeout += QueueFree; else QueueFree();
     }
