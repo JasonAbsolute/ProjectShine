@@ -13448,3 +13448,40 @@ within 6.3 s; while they waited the closest two of him stood 11.0 m apart. 195-1
 
 **Deviations, all knobs:** 0.6 / 1.3 / 11 m are my numbers for "teleport around" and "blob up"; the cut to the two-shot is my reading of "the battle stance frame"
 (the only shot of Mario in the stance). Not touched: a copy's teleport-off after the mock (191) and the cutscene's line (188) -- both already keep them apart.
+
+### 197 -- the King Boo REMATCH, part 41: the music is ANTASMA FINAL BATTLE (Jaysonn's mp3 from Ref/, now assets/Sms/Sound/Music/AntasmaFinalBattle.mp3, looping back to 7.5 s), it starts on the intro's FIRST frame (Mario looking about for the laugh), and the FIGHT STARTS ON ITS CUE: 7.5 s after the music begins (FightCueSeconds) -- the intro trims the look-about and the laugh in proportion to land there (x0.67: 3 s each -> 2 s) (feature/kingboo-rematch, code `c0ab8a7`)
+
+**Jaysonn:** "ok getting better! lets actually try a different song i have it in Ref folder called Antasma Final Battle put it somewhere in the project that would be
+good. and we want the music to start right when mario looks around and then the fight needs to start within 7.5 seconds of the song starting to cue the proper
+music timing"
+
+**The song:** `Ref/Antasma Final Battle - Mario & Luigi Dream Team SUPER MARIO GALAXY MOVIE SCORE.mp3` (2.8 MB, 2:48, 48 kHz) copied to
+`assets/Sms/Sound/Music/AntasmaFinalBattle.mp3` beside the game's two rendered BGMs and imported (the mp3 importer; the loop is set at run time). Measured
+(`music197/envelope.py`): it rises out of silence over its first 4 s; RMS -19.5 dBFS overall, the loud part -17.8 (the casino theme's render -18.3 / -16.8).
+
+**King Boo** (`SmsKingBooRematch.cs`): `BossMusicCue` (LookAbout / StanceCut / Fight; 195's `BossMusicAtIntro` replaced) -- `MusicCue(cue)` from the intro's beats
+and the fight's spawn starts it when it is the cue set; the fight is the last chance (no cutscene run: it starts there). What plays: `BossMusicStream` (set by
+hand), else the file `BossMusicFile` when it exists (the Antasma mp3), else the casino theme his sound node fills in; a file or a hand-set stream LOOPS
+(`BossMusicLoop`) back to `BossMusicLoopOffset` (7.5 s: past the quiet rise, to where the song is going) and plays at `SmsActorSound.MusicDb` + `BossMusicDb` +
+`BossMusicStreamDb` (-1.3: the mp3 1.2 dB under the casino render by RMS, so the two come out alike; -5.3 dB in all). `IntroLaughOverride` / `IntroLaughLength`:
+the laugh's length THIS intro (the director's trim) -- the laugh's end, its clip loop and the pitch ramp use it. `IntroFixedSeconds`: the rise tell + the appear
+clip at its speed + the dive clip at its speed (3.20 s). `ClipSeconds(name)`: a clip's played length (its bck frames at 60).
+
+**The intro** (`SmsRematchIntro.cs`): `FightCueSeconds` (7.5) -- the fight (the cutscene over, Mario free, King Boo rising for it) lands this long after the music's
+cue on the look-about's first frame. The fixed beats (`IntroFixedSeconds` + `AfterSinkSeconds`, 0.6 -> 0.3) are what they are; the look-about and the laugh share
+what is left and are trimmed in proportion when it is less than they want (the look-about clip played quicker, the laugh shorter), never under `LookMinScale`
+(0.5); with room to spare the empty-spot pause after the dive takes the slack (up to `CueSlackMax` 1.5) so the fight lands ON the cue; 0 = no cue. Readouts
+`MusicCueAt`, `FightStartAt` (the cue's own clock -- the cutscene's restarts at the surface, which had a first measure read 2 s short), `PlannedFightAt`,
+`CueTrim`, `LookNaturalSeconds` / `LookPlayedSeconds`.
+
+**Verified** (headless drive v197-3, deleted before the commit): C23 the music plays `AntasmaFinalBattle.mp3` (167.7 s, the Music bus, looping to 7.5 s, -5.3 dB),
+silent through the card, playing within 3 ticks of the look-about's first frame, on through the stance cut, the rise, the laugh and the fight; MasterDb -4. C26
+the cutscene ended 7.51 s after the music began (planned 7.50): the fixed beats 3.20 + the pause 0.3, the look-about and the laugh trimmed x0.67 (3 -> 2 s each).
+C13 / C19 the chuckle still on halfway through the 2 s laugh, its pitch 0.75 -> 0.93 -> 1.15, cut at the dive. 196-179's checks as before -- 40/40, no errors. No
+shots (nothing new to see). Three runs lost to my batching the build with the run again; no harm to the PC. The headless import pass flipped ten textures'
+.import files to VRAM compression (Godot's detect-3D): reverted, not committed. The clean rebuild 0 errors; the drive, the import runner's logs and the pass's
+scheduled tasks deleted.
+
+**Deviations, all knobs:** the proportional trim (the look-about clip at 1.5 x, the laugh 2 s) is my way of fitting the 7.5 s; the loop point 7.5 s, the -1.3 dB
+match and the file's place are mine. I cannot hear it from here: Jaysonn judges the sync and the level. For the full 3 s laugh at the cost of the cue, raise
+`FightCueSeconds` (8.5 fits it) or lower `AfterSinkSeconds` / `RiseTellSeconds`.
