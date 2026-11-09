@@ -212,10 +212,10 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public bool IntroLaughStopsAtDive = true;
     /// <summary>192 (Jaysonn: "have King Boo's laugh start low but then get higher in the intro cutscene; it doesn't need to scale back low"): the chuckle's pitch
     /// RISES through the laugh -- from IntroLaughPitchFrom to IntroLaughPitchTo (both x IntroLaughPitch) over IntroLaughSeconds, evenly in pitch (each second the
-    /// same musical step: 0.7 -> 1.4 is an octave, a low chuckle climbing to the casino's cackle and past it), never back down. The clip itself climbs 308 -> 360 Hz
+    /// same musical step: 0.75 -> 1.15 is seven semitones, a low chuckle climbing to a shade over the casino's own; 192's 0.7 -> 1.4 was an octave, shrill at the top), never back down. The clip itself climbs 308 -> 360 Hz
     /// over its first two seconds, then dips to 330 and wobbles; the ramp carries it over that. Higher is quicker too (the pitch scale), so the laugh gathers pace
     /// as it climbs. Both 1 = 186's flat laugh.</summary>
-    [Export(PropertyHint.Range, "0.4,2,0.05")] public float IntroLaughPitchFrom = 0.7f, IntroLaughPitchTo = 1.4f;
+    [Export(PropertyHint.Range, "0.4,2,0.05")] public float IntroLaughPitchFrom = 0.75f, IntroLaughPitchTo = 1.15f;   // 194 (Jaysonn: "the laugh is too high pitched at the end"): 0.7 -> 1.4 (an octave) was shrill at the top; now it ends a shade over the casino's own
     /// <summary>192: the intro laugh's pitch now (From at the laugh's start, To at the dive).</summary>
     public float IntroLaughPitchNow => Mathf.Clamp(IntroLaughPitch, 0.25f, 4f) * IntroLaughPitchFrom * MathF.Pow(Mathf.Max(0.05f, IntroLaughPitchTo) / Mathf.Max(0.05f, IntroLaughPitchFrom), State == Phase.IntroLaugh ? Mathf.Clamp(_introT / Mathf.Max(0.05f, IntroLaughSeconds), 0f, 1f) : 0f);
     [Export] public bool Blink = true;
@@ -267,6 +267,17 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public string SplitLine2 = "", SplitLine3 = "";
     [Export] public Color SplitMistColor = new Color(0.88f, 0.92f, 1f);     // 193 (Jaysonn: "the purple smoke -- I want that white so it looks ghostly"): a cold white; 188's violet (0.48, 0.22, 0.62) before
     [Export(PropertyHint.Range, "0,200,1")] public int SplitMistPuffs = 70;
+    /// <summary>194 (Jaysonn: "the effects could be a little better for the splitting cutscene when he spawns 2 and 3"): each of him now GATHERS out of the mist --
+    /// SplitGatherPuffs puffs from a shell SplitGatherRadius out are drawn into his middle over SplitFadeSeconds while the body fades in FLICKERING (SplitFlicker,
+    /// 0 = a plain fade), a ring of cold light (SplitRing: to SplitRingRadius over SplitRingSeconds) races out over the stone under him with a glow there, and the
+    /// moment he is solid the mist BOILS back out of him (SplitMistPuffs, as before) with a flash: the pop. 188-193: the arrival's teleport flash and the boil only.</summary>
+    [Export(PropertyHint.Range, "0.2,1.5,0.05")] public float SplitFadeSeconds = 0.7f;
+    [Export(PropertyHint.Range, "0,400,1")] public int SplitGatherPuffs = 160;
+    [Export(PropertyHint.Range, "0,120,1")] public int SplitGatherStars = 40;
+    [Export(PropertyHint.Range, "3,20,0.5")] public float SplitGatherRadius = 10f;
+    [Export(PropertyHint.Range, "0,1,0.05")] public float SplitFlicker = 0.3f;
+    [Export] public bool SplitRing = true;
+    [Export] public float SplitRingRadius = 13f, SplitRingSeconds = 0.8f;
     [Export] public bool SplitSkipAllowed = true;
     [ExportGroup("")]
     [Export] public bool CopyFireballs = true, CopyBreath = true;
@@ -1446,14 +1457,77 @@ public partial class SmsKingBooRematch : Node3D
         SetOpacity(0f);
         if (_model != null) _model.Visible = false;                                                         // the ghost shader draws BLACK at opacity 0 (run bo: a black silhouette with a crown)
     }
-    /// <summary>Put at his place in the line, facing Mario, the arrival's flash and poof there; shown by SplitFade.</summary>
-    public void SplitShowAt(Vector3 dest)
+    /// <summary>Put at his place in the line, facing Mario, the arrival's flash and poof there (teleportFx; 194: off -- the cutscene's gather draws its own); shown by SplitFade.</summary>
+    public void SplitShowAt(Vector3 dest, bool teleportFx = true)
     {
         Position = dest; _home = dest; _dest = dest; LastSpot = dest;
         FaceNow();
         PlayClip(BckWait);
-        TeleportInFx();
+        if (teleportFx) TeleportInFx();
         if (_sound != null && !string.IsNullOrEmpty(ArriveSe)) _sound.Play(ArriveSe);
+    }
+    /// <summary>194: the mist GATHERING into one of him coming into the line at `at` (the hover point): puffs from a shell SplitGatherRadius out drawn into his middle
+    /// over SplitFadeSeconds, the ring of cold light racing out over the stone under him, the glow there. The cutscene fades the body in over the same time.</summary>
+    public void SplitGather(Vector3 at)
+    {
+        float floorY = FloorUnder(at); if (float.IsNaN(floorY)) floorY = at.Y - _hoverOverFloor;
+        Vector3 body = at + Vector3.Up * SplitBodyCentreLift, floor = new Vector3(at.X, floorY, at.Z);
+        float seconds = Mathf.Max(0.2f, SplitFadeSeconds);
+        if (SplitGatherPuffs > 0) GatherBurst("SplitGather", SplitGatherPuffs, body, SplitGatherRadius, seconds, SplitMistColor);
+        if (SplitGatherStars > 0) GatherStars("SplitGatherStars", SplitGatherStars, body, SplitGatherRadius * 1.1f, seconds);
+        if (SplitRing && SplitRingRadius > 1f) SmsSmashFx.Ring(this, floor, 1.5f, SplitRingRadius, Mathf.Max(0.2f, SplitRingSeconds), new Color(SplitMistColor.R, SplitMistColor.G, SplitMistColor.B, 0.9f));
+        FlashAt("SplitGlow", floor, 14f, seconds + 0.3f, flat: true, 0.4f, 1f, SplitMistColor);
+        SplitGathers++;
+    }
+    /// <summary>194: the POP as he turns solid -- the mist boiling back out of him (SplitMist) and a flash at his middle.</summary>
+    public void SplitPop(Vector3 at)
+    {
+        SplitMist(at);
+        FlashAt("SplitPop", at + Vector3.Up * SplitBodyCentreLift, 10f, 0.3f, flat: false, 0.6f, 1.5f, SplitMistColor);
+        SplitPops++;
+    }
+    /// <summary>194 (Jaysonn: "the white puffs are going in at the top of King Boo, needs to be his centre"): his body's CENTRE over the node, read off the WAIT pose as he
+    /// waits (the body joint over the node, plus the hit cylinder's middle over the joint: (HitAbove - HitBelow) / 2) -- the gather, the pop and the boil are centred there.
+    /// Before it is read (never waited yet) the knob SplitBodyLiftGuess stands in; 188-194a put them a fixed 3 m over the node, the top of him.</summary>
+    [Export(PropertyHint.Range, "-3,10,0.1")] public float SplitBodyLiftGuess = 0f;   // measured (drive dc): the joint sits 0.14 m UNDER the node in the wait, the body -2.6..+4.4 about it
+    public float WaitBodyLift { get; private set; } = float.NaN;
+    public float SplitBodyCentreLift => (float.IsNaN(WaitBodyLift) ? SplitBodyLiftGuess : WaitBodyLift) + (HitAbove - HitBelow) * 0.5f;
+    /// <summary>194, for the drives: the gathers and the pops this node has drawn.</summary>
+    public int SplitGathers { get; private set; }
+    public int SplitPops { get; private set; }
+    /// <summary>194: his twinkle stars drawn INWARD with the mist -- born on a shell `radius` out, streaming to `centre` over `seconds`: the sparkle of him gathering.</summary>
+    private void GatherStars(string name, int count, Vector3 centre, float radius, float seconds)
+    {
+        if (count <= 0 || _chika == null || _chika.ProcessMaterial is not ParticleProcessMaterial chikaMat) return;
+        var p = (GpuParticles3D)_chika.Duplicate();
+        p.Name = name; p.TopLevel = true; p.Visible = true; p.Amount = count; p.Lifetime = seconds; p.OneShot = true; p.Explosiveness = 0.5f; p.Emitting = false; p.LocalCoords = false;
+        var pm = (ParticleProcessMaterial)chikaMat.Duplicate();
+        pm.EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.SphereSurface; pm.EmissionSphereRadius = Mathf.Max(1f, radius);
+        pm.Direction = Vector3.Up; pm.Spread = 0f; pm.InitialVelocityMin = 0f; pm.InitialVelocityMax = 0f; pm.Gravity = Vector3.Zero;
+        pm.RadialVelocityMin = -radius / seconds * 1.3f; pm.RadialVelocityMax = -radius / seconds * 0.8f;
+        pm.ScaleMin = 1.4f; pm.ScaleMax = 2.6f;
+        pm.Color = new Color(SplitMistColor.R, SplitMistColor.G, SplitMistColor.B, 1f);
+        p.ProcessMaterial = pm; p.VisibilityAabb = new Aabb(new Vector3(-24f, -12f, -24f), new Vector3(48f, 30f, 48f));
+        AddChild(p); p.GlobalPosition = centre; p.Finished += p.QueueFree; p.Emitting = true;
+    }
+    /// <summary>194: a one-shot of the smoke ball drawn INWARD -- `count` puffs born on a shell `radius` out from `centre`, flying to it over `seconds` (the radial
+    /// velocity, negative), shrinking and fading as they arrive: the mist gathering into a body.</summary>
+    private void GatherBurst(string name, int count, Vector3 centre, float radius, float seconds, Color col)
+    {
+        var scale = new Curve { MinValue = 0f, MaxValue = 6f }; scale.AddPoint(new Vector2(0f, 4.5f)); scale.AddPoint(new Vector2(1f, 1.4f));                  // big soft puffs overlapping (v194-2's 2.4 -> 0.7 read as a swarm of beads), shrinking as they close in
+        var fade = new Gradient { Offsets = new float[] { 0f, 0.15f, 0.75f, 1f }, Colors = new Color[] { new Color(1f, 1f, 1f, 0f), new Color(1f, 1f, 1f, 0.55f), new Color(1f, 1f, 1f, 0.55f), new Color(1f, 1f, 1f, 0f) } };
+        var pm = new ParticleProcessMaterial
+        {
+            EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.SphereSurface, EmissionSphereRadius = Mathf.Max(1f, radius),
+            Direction = Vector3.Up, Spread = 0f, InitialVelocityMin = 0f, InitialVelocityMax = 0f, Gravity = Vector3.Zero,
+            RadialVelocityMin = -radius / seconds * 1.15f, RadialVelocityMax = -radius / seconds * 0.7f,                                       // inward: the shell to the middle in about `seconds` -- the speeds spread, so it is a stream, not one clean shell (v194-1 read as rings of beads)
+            ScaleMin = 0.6f, ScaleMax = 1.3f, ScaleCurve = new CurveTexture { Curve = scale }, AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -90f, AngularVelocityMax = 90f,
+            Color = new Color(col.R, col.G, col.B, 1f), ColorRamp = new GradientTexture1D { Gradient = fade }
+        };
+        var mat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Mix, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = FxTex("kemuball3_raw"), DisableReceiveShadows = true };
+        var p = new GpuParticles3D { Name = name, TopLevel = true, Amount = count, Lifetime = seconds, OneShot = true, Explosiveness = 0.6f, Emitting = false, LocalCoords = false, FixedFps = 60, Interpolate = true, DrawOrder = GpuParticles3D.DrawOrderEnum.ViewDepth, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One, Material = mat }, VisibilityAabb = new Aabb(new Vector3(-24f, -12f, -24f), new Vector3(48f, 30f, 48f)), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        AddChild(p); p.GlobalPosition = centre;
+        p.Finished += p.QueueFree; p.Emitting = true;
     }
     /// <summary>His opacity through the arrival: 0..1 of his solid -- the crown with the body (SetCrownGlow leaves the crown solid), the model hidden at 0.</summary>
     public void SplitFade(float k)
@@ -1475,7 +1549,7 @@ public partial class SmsKingBooRematch : Node3D
     public void SplitMist(Vector3 at)
     {
         if (SplitMistPuffs <= 0) return;
-        DiveBurst("SplitMist", SplitMistPuffs, at + Vector3.Up * 3f, Vector3.Up, 170f, 5f, 11f, 4f, 9f, SplitMistColor, 0.85f, 1.4, 2f, -1f);              // bigger than his 9 m body: it boils OUT of him
+        DiveBurst("SplitMist", SplitMistPuffs, at + Vector3.Up * SplitBodyCentreLift, Vector3.Up, 170f, 5f, 11f, 4f, 9f, SplitMistColor, 0.85f, 1.4, 2f, -1f);   // bigger than his 9 m body: it boils OUT of him (194: from his centre)
         DiveBurst("SplitMistLow", SplitMistPuffs / 2, at - Vector3.Up * (_hoverOverFloor - 0.6f), Vector3.Up * 0.05f, 180f, 5f, 10f, 2.5f, 6f, SplitMistColor, 0.7f, 1.2, 3f, 0.2f, flat: true);
     }
     /// <summary>The floor under a point (NaN when none), for the cutscene's line.</summary>
@@ -2162,6 +2236,7 @@ public partial class SmsKingBooRematch : Node3D
         {
             _hoverT += dt;
             if (HoverBob > 0f && HoverBobSeconds > 0f) Position = _home + Vector3.Up * (MathF.Sin(_hoverT / HoverBobSeconds * MathF.Tau) * HoverBob);
+            if (_hoverT > 0.3f && _skel != null && _bBody >= 0) { float lift = BodyPoint.Y - GlobalPosition.Y; WaitBodyLift = float.IsNaN(WaitBodyLift) ? lift : Mathf.Lerp(WaitBodyLift, lift, 0.05f); }   // 194: the wait pose's body height over the node, for the split's effects (past the clip blend)
             FaceTick(dt);
             if (AttacksOn && _gapT > 0f) { _gapT -= dt; if (_gapT <= 0f) StartMove(); }
         }

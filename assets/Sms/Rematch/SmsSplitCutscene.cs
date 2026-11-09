@@ -42,7 +42,7 @@ public partial class SmsSplitCutscene : Node
     private readonly List<int> _stage = new();                         // 0 waiting, 1 shown (fading in), 2 laughed
     private readonly List<float> _laughPitch = new();
     private Camera3D _cam, _gameCam; private SmsRematchCard _card; private Node _cardHolder;
-    private float _t, _tAll, _tEnd, _fadeSeconds = 0.3f, _laughAfter = 0.35f; private bool _paused, _allLaughed, _ended;
+    private float _t, _tAll, _tEnd, _fadeSeconds = 0.55f, _laughAfter = 0.35f; private bool _paused, _allLaughed, _ended; private readonly List<bool> _popped = new();   // 194
     private readonly List<Node> _alwaysed = new();
 
     /// <summary>Begun by the real one as his hurt ends: the copy made (held unseen), the line laid out, the world frozen, the camera cut.</summary>
@@ -68,8 +68,9 @@ public partial class SmsSplitCutscene : Node
         {
             float off = (i - (n - 1) * 0.5f) * spacing;
             Vector3 s = centre + side * off; float sy = boss.FloorYAt(s); if (!float.IsNaN(sy)) s.Y = sy + boss.HoverOverFloor;
-            _line.Add(order[i]); _slots.Add(s); _stage.Add(0);
+            _line.Add(order[i]); _slots.Add(s); _stage.Add(0); _popped.Add(false);
         }
+        _fadeSeconds = Mathf.Max(0.2f, boss.SplitFadeSeconds);                                                     // 194: the gather's length (0.3 before)
         // the beats: the real one first (he poofs at 0, comes in at 0.45), then the copies -- those already out first, the new one last -- SplitCopyEvery apart
         float every = Mathf.Max(0.2f, boss.SplitCopyEvery);
         for (int i = 0; i < n; i++) { _showAt.Add(0f); _laughPitch.Add(1f); }
@@ -133,14 +134,17 @@ public partial class SmsSplitCutscene : Node
                 _stage[i] = 1;
                 if (b.IsCopy && b.State != SmsKingBooRematch.Phase.Split) b.SplitBegin();
                 b.SplitHide();                                                                                    // a copy already out: the poof where it was
-                b.SplitShowAt(_slots[i]); b.SplitFade(Skipped ? 1f : 0f);
-                _boss.SplitMist(_slots[i]);
-                if (DebugPrint) GD.Print($"[SMS split] {Name}: {b.Name} comes into the line at slot {i} {_slots[i]} ({_t:F2} s)");
+                b.SplitShowAt(_slots[i], teleportFx: false); b.SplitFade(Skipped ? 1f : 0f);
+                if (!Skipped) _boss.SplitGather(_slots[i]); else _boss.SplitMist(_slots[i]);                       // 194: the mist GATHERS into him as he fades in (skipped: the boil at once)
+                if (DebugPrint) GD.Print($"[SMS split] {Name}: {b.Name} comes into the line at slot {i} {_slots[i]} ({_t:F2} s) -- the mist gathering over {_fadeSeconds:F2} s");
             }
             if (_stage[i] == 1)
             {
                 float k = Skipped ? 1f : Mathf.Clamp((_t - at) / _fadeSeconds, 0f, 1f);
-                b.SplitFade(k);
+                float flicker = k < 1f ? 1f - Mathf.Clamp(_boss.SplitFlicker, 0f, 1f) * (0.5f + 0.5f * MathF.Sin((_t - at) * MathF.Tau * 9f)) : 1f;   // 194: a ghost flickering in
+                float body = Mathf.Clamp((k - 0.3f) / 0.7f, 0f, 1f);                                                                                   // the body FORMS as the mist arrives: nothing for the gather's first third, then up quick
+                b.SplitFade(MathF.Pow(body, 0.7f) * flicker);
+                if (k >= 1f && !_popped[i]) { _popped[i] = true; if (!Skipped) _boss.SplitPop(_slots[i]); }       // 194: solid -- the mist boils back out of him, the flash
                 if (k >= 1f && (_t >= at + _fadeSeconds + _laughAfter || Skipped)) { _stage[i] = 2; if (!Skipped) { b.SplitLaugh(_laughPitch[i]); Laughs++; } }
             }
         }
