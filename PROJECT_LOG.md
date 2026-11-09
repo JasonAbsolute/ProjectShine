@@ -13531,3 +13531,48 @@ the logs, the shots and the pass's scheduled tasks deleted.
 **Deviations, all knobs:** 4.5 x 1.4 m is my read of his mouth (his body is some 9 m across; wider = `BreathMouthWidth`); 3 lanes (more = a denser hit, no
 wider); the look-about's look up stays (Jaysonn named the shrug), and there is no shot of it -- the intro is not in the shot drive; the bake's numbers are the
 check. Not committed: the editor's seven detect-3D .import rewrites (Jaysonn's, as in 198).
+
+### 200 -- the King Boo REMATCH, part 44: a new attack, the BOMB BOO VOLLEY (he rears back and SPITS three lit Bomb Boos out of his mouth on high lobs about Mario, a ring on the floor marking where each comes down; two BLAST where they land -- the Bob-omb explosion, a 3.5 m ring of light, a standing Mario within it hit, a jump clears it -- the LAST is a DUD that thuds down and floats there as a live Bomb Boo for Mario to grab, its fuse still burning: 6 s, then it blasts where it floats) (feature/kingboo-rematch, code `fea5b41`)
+
+**Jaysonn:** "ok i think we may need one more attack involving boos somehow. any ideas?" -- of three offered (shy Boos that creep up from behind and freeze
+when faced, a Boo guard ring at half health, the Bomb Boo volley), "3 for sure" (and "how could we do 1? theres no fludd in the fight?" -- answered in the
+thread: the stare and the stomp would be its counters; not built).
+
+**The volley** (NEW `assets/Sms/Rematch/SmsBooVolley.cs` + .uid): on its own once King Boo launches it (as `SmsFireballs` is): `Count` (3) Bomb Boos out of
+the mouth `Spacing` (0.4 s) apart, each lobbed `LobHeight` (9 m) over the mouth to come down about Mario -- the first within `AimedWithin` (1 m) of him, the
+rest anywhere out to `Scatter` (5 m), all inside the arena's wall (`WallInset` 2 m) -- the Boos the supply's own scene under the supply's parent, so King
+Boo's hit clears them with the field. The LAST is the DUD (`Dud`): it comes down at least `DudMinFromMario` (2.5 m) from him, never on him. Signals `Spat`,
+`Landed(dud)`, `Blasted(hitMario)`, `Finished` (every Boo down; the dud floats on).
+
+**The lobbed Boo** (`SmsBombBoo.cs`): a new phase, LOBBED (`Lob(from, target, apexOver, dud, blastRadius, blastHeight, dudFuse)`): the flight under
+`SmsFireballs.G`, TUMBLING head over heels (`LobTumbleDegPerSec` 420), the fuse flashing quicker as it falls, a trail of black puffs (`LobTrail`), a RING on
+the floor at the landing (`LobMarkColor`, the Boo's eye yellow: the blast's footprint; a dud's the body's). Landed, `Detonate()`: the puff, the Bob-omb
+explosion (170's `Blast`), a ring of light (`LobBlastColor`) out to the blast radius, Mario within it whose feet are under the blast height HIT (the common
+enemy damage; his invincibility spaces the hits); gone. A DUD thuds down in black smoke (the rise smoke at the floor) and floats from there as any supply Boo
+(`Drop()`'s re-basing): grabbable by the spin, shocked when looked at, hurting on touch, cleared with the field -- its fuse (`DudFuseLeft`) burning while it
+drifts; out, it detonates where it floats; in Mario's hand the hold's own clock takes over (`HoldSeconds`; a hit on him bursts it, 193). Readouts for the
+drives (`IsLobbed`, `LobTarget`, `LobFlightSeconds`, `HasLanded`, `HasBlasted`, `BlastHitMario`, `DudFuseLeft`...); counts `Lobs`, `Duds`, `FloorBlasts`,
+`FloorBlastHits`.
+
+**The move** (`SmsKingBooRematch.cs`): VOLLEY (`Phase.Volley`, `Move.Volley`; `VolleyOn`, `VolleyWeight` 1 among the attacks' weights): where he stands, the
+crown YELLOW (`VolleyCrownColor`, the Bomb Boo's eyes) through `VolleyTellSeconds` (0.7) as the spit clip rears, the clip held at its thrust (`VolleyHoldFrame`
+50) through the spit, facing Mario; `VolleyWatchSeconds` (0.5) after the last Boo leaves, the wait. The volley's knobs mirrored as a template (`VolleyCount` 3,
+`VolleySpacing` 0.4, `VolleyLobHeight` 9, `VolleyScatter` 5, `VolleyAimedWithin` 1, `VolleyBlastRadius` 3.5, `VolleyBlastHeight` 1.6, `VolleyDud`,
+`VolleyDudSeconds` 6, `VolleyDudMinFromMario` 2.5). A hit on him through it cuts the spit off (the field clears). `CopyVolley` (false): a copy may spit them
+too (its Boos are real). Signals `VolleyStarted`, `VolleySpat(count)`, `VolleyBlasted(hitMario)`, `VolleyDone(hits)`; readouts `VolleysMade`, `VolleyHits`,
+`Volley`, `VolleyDudBoo`.
+
+**Verified** (headless drive v200-2, deleted before the commit): C29 the crown yellow through a 0.72 s tell, 3 Boos spat 0.4 s apart out of the mouth in the
+air on lobs, the marks about a standing Mario (the aimed 0.71 m from him, the farthest 2.99, the dud's 3.95 at the body's radius 1.04 vs the blast's 3.50, all
+inside the wall); C30 the two lit Boos blast where they land (0.09 m off their marks), the aimed one's blast HIT him (HP 6 -> 5), the far one (2.19 m) did not
+(his invincibility), the dud came down whole and floated free with 3 s on its fuse (the drive's short fuse) and blasted where it floated 3.02 s later, Mario
+8 m off untouched; C31 a second volley's dud (the 6 s fuse) grabbed by the real X (the spin within BombGrabRadius): carried, its fuse holding at 5.2 s.
+199-179's checks as before -- 45/45 (the breath's stand now put 11 m from him: left at a Boo's random spot he stood 26.9 m off once and the sweep missed).
+Shots (run cl): 28a the tell over Mario's shoulder (the rear-back, the crown yellow), 28b the three Boos arcing over their marks from the side, 28b2 one coming
+down on its mark, 28c the blast on Mario, 28d the dud floating in its thud smoke, 28e its last-second flashing, 28f its own blast. The clean rebuild 0 errors;
+the drive, the logs, the shots and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** the dud is always the LAST Boo (a tell the player can learn; `VolleyDud` off = three blasts); 2.2 s in the air at 9 m over the
+mouth (the marks show ~2 s ahead); the blast's reach 3.5 m and the dud's fuse 6 s are my picks; a dud's mark is smaller than a blast's (the body's footprint)
+-- the one visible hint besides the order; `CopyVolley` off (the copies' Boos would litter the field). Not committed: the editor's seven detect-3D .import
+rewrites (Jaysonn's, as in 198-199).
