@@ -13576,3 +13576,27 @@ the drive, the logs, the shots and the pass's scheduled tasks deleted.
 mouth (the marks show ~2 s ahead); the blast's reach 3.5 m and the dud's fuse 6 s are my picks; a dud's mark is smaller than a blast's (the body's footprint)
 -- the one visible hint besides the order; `CopyVolley` off (the copies' Boos would litter the field). Not committed: the editor's seven detect-3D .import
 rewrites (Jaysonn's, as in 198-199).
+
+### 200b -- the King Boo REMATCH, part 45: the Bomb Boos BLINK RED before they blow (a spat Boo through its fall, quicker and brighter as it comes down; the floating dud through its fuse's last 2.5 s; a timed hold's last 2 s), the eyes kept yellow; the dud only slow and faint in the air (feature/kingboo-rematch, code `cdfa089`)
+
+**Jaysonn:** "make the bomb boos flash red signalling they are about to blow up"
+
+**The red** (`BombBoo.gdshader`): `flash` mixed the body to WHITE (158's carried-Boo pulse) -- a tenth of it read as a grey Boo (160). Now `flash` mixes the
+body toward `flash_color` (red by default) and EMITS it x `flash_emit`, so the blink reads in the dark arena; the yellow eyes are left out of the mix (`face`).
+
+**The blink** (`SmsBombBoo.cs`, The fuse group): `FuseFlashColor` (1, 0.05, 0.02), `FuseFlashMax` 0.75 (the body's mix at the brightest), `FuseEmit` 0.8 (its
+glow), the blink QUICKENING from `FuseBlinkHzFrom` (3 Hz) to `FuseBlinkHzTo` (10 Hz) as the moment nears -- a square-ish pulse (a smoothstep of the sine, its
+phase carried so a quickening rate never skips a beat). Where: a spat Boo through its fall (k = its age over the flight); the dud only slow and faint in the
+air (`FuseDudHz` 2 Hz at 0.4 of the strength: lit, but long) and DARK once down until its fuse's last `DudWarnSeconds` (2.5 s), then the blink to the blow; a
+held Boo through a timed hold's last 2 s (`HoldSeconds`). The swing's boost pulse keeps its white (`SetFlash` takes a colour). Readouts `FlashNow` /
+`FlashColorNow` and the body material's own `FlashParam` / `FlashColorParam`.
+
+**Verified** (headless drive v200b-2, deleted before the commit): C32 the lit Boos' flash peaks at 0.75 through the fall (the shader's own 0.75), red (1, 0.05,
+0.02) in the body material, the aimed one blinking 3 times in its first 0.9 s and 8 in its last; the dud 0.30 at most in the air, 0 on the floor until its last
+2.5 s, 0.75 through them; 200-179's checks as before -- 46/46. Shots (run cn): 28b3 a lit Boo red mid-fall, its smoke behind it; 28e the dud red in its last
+seconds (run cm's 0.9 / 1.6 saturated the body to a flat salmon blob; 0.75 / 0.8 keeps its shading). The clean rebuild 0 errors; the drive, the logs, the shots
+and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** 0.75 of the way to pure red at the brightest and a 0.8 glow are my picks for "flash red" that still shows a Boo; 3 -> 10 Hz over
+the fall; the dud's quiet, then 2.5 s of warning (`DudWarnSeconds`) out of its 6 s fuse. Not committed: the editor's seven detect-3D .import rewrites
+(Jaysonn's, as in 198-200).
