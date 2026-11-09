@@ -245,7 +245,12 @@ public partial class SmsKingBooRematch : Node3D
     /// balls (CopyFireballs) and the breath (CopyBreath) at CopySpeedScale of his speed -- no lick, smash, lightning or wind. His defeat takes the copies with him.</summary>
     [Export(PropertyHint.Range, "0,9,1")] public int CopyEveryHits = 3;
     [Export(PropertyHint.Range, "0,4,1")] public int MaxCopies = 2;   // 178: "once we hit king boo 3 more times there's 3 of them"
-    [Export] public float CopyMinFromMario = 13f, CopyGapScale = 1.7f, CopySpeedScale = 0.75f, CopyFadeSeconds = 0.7f;
+    [Export] public float CopyMinFromMario = 13f, CopyGapScale = 1.3f, CopySpeedScale = 0.75f, CopyFadeSeconds = 0.7f;   // 196: CopyGapScale 1.7 -> 1.3 (the copies move about more)
+    /// <summary>196 (Jaysonn: "let the other fake Boos teleport around -- they tend to blob up and it makes the fight clustered for the wrong reason"): a copy's move is a
+    /// TELEPORT to another spot by this chance (0.6; 177's 0.3), a throw otherwise; and every spot any of him picks -- his hops and the copies' -- keeps SpotMinFromBoos
+    /// (11 m: his body is 9 m across) from every other King Boo, where it stands or where it is going. The copies wait CopyGapScale 1.3 x his gap (1.7 before).</summary>
+    [Export(PropertyHint.Range, "0,1,0.05")] public float CopyRepositionChance = 0.6f;
+    [Export(PropertyHint.Range, "0,25,0.5")] public float SpotMinFromBoos = 11f;
     [ExportGroup("The split's cutscene (188)")]
     /// <summary>188 (Jaysonn: "a little cutscene that plays when he splits into two, and three, showing three of him will now be attacking; make it King Boo
     /// themed"): as the hurt that earns a copy ends, the world FREEZES (the Shine demo's stop-the-world: Mario, the Boos, the supply held; he, his copies and
@@ -455,10 +460,10 @@ public partial class SmsKingBooRematch : Node3D
     [ExportGroup("The music and the mix (195)")]
     /// <summary>195 (Jaysonn: "lower the volume a bit and throw in the boss music now"): the BOSS MUSIC -- the casino King Boo's theme (MSD_BGM_BOSS, t_boss.com:
     /// 4.2 s in and a 95 s loop, rendered from the game's sequence) on the Music bus, filled into BossMusic by his sound node (set a stream by hand to use another),
-    /// started as the fight begins (his spawn rise after the intro's dive; BossMusicAtIntro: as he surfaces in the intro instead) and FADED over BossMusicFadeSeconds
+    /// started at the intro's cut to Mario in his BATTLE STANCE (the side two-shot as King Boo surfaces: BossMusicAtIntro, 196; off: as the fight begins, his spawn rise after the intro's dive) and FADED over BossMusicFadeSeconds
     /// as the last hit takes him down. BossMusicDb on top of the music's own level (SmsActorSound.MusicDb -4 and the game's volume for the track). Off: no music.</summary>
     [Export] public AudioStreamPlayer BossMusic;
-    [Export] public bool BossMusicOn = true, BossMusicAtIntro = false;
+    [Export] public bool BossMusicOn = true, BossMusicAtIntro = true;   // 196 (Jaysonn: "have the music start when it pans to Mario in the battle stance frame"): on -- the intro's cut to the side two-shot, Mario dropping into the stance as King Boo surfaces; 195 started it at the fight
     [Export(PropertyHint.Range, "-24,12,0.5")] public float BossMusicDb = 0f;
     [Export(PropertyHint.Range, "0.1,6,0.1")] public float BossMusicFadeSeconds = 2f;
     /// <summary>195: the rematch's SOUND EFFECTS level -- every SMS actor's sounds (his voice and attacks, the Bomb Boos, the Boolossi) through SmsActorSound.MasterDb while
@@ -1827,7 +1832,7 @@ public partial class SmsKingBooRematch : Node3D
         if (IsCopy)                                                                                        // 177: a copy only THROWS -- the lava balls, the breath -- or moves off
         {
             float cf = CopyFireballs && FireballsOn ? Mathf.Max(0f, FireballWeight) : 0f, cb = CopyBreath && BreathOn ? Mathf.Max(0f, BreathWeight) : 0f;
-            if (cf + cb <= 0f || _rng.NextDouble() < Mathf.Max(RepositionChance, 0.3f)) return Move.Hop;
+            if (cf + cb <= 0f || _rng.NextDouble() < Mathf.Max(RepositionChance, CopyRepositionChance)) return Move.Hop;   // 196: a copy mostly TELEPORTS about (0.3 before)
             return (float)_rng.NextDouble() * (cf + cb) < cf ? Move.Fireballs : Move.Breath;
         }
         if (_rng.NextDouble() < RepositionChance) return Move.Hop;
@@ -2116,22 +2121,41 @@ public partial class SmsKingBooRematch : Node3D
         EnterWait(NextGap());
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: back to the wait after the smash, the next move in {_gapT:F1} s");
     }
-    /// <summary>Another spot of the arena: within SpotRadius of its middle (three quarters of the floor's radius), SpotMinFromMario to SpotMaxFromMario from Mario, over floor.</summary>
+    /// <summary>Another spot of the arena: within SpotRadius of its middle (three quarters of the floor's radius), SpotMinFromMario to SpotMaxFromMario from Mario, over floor.
+    /// 196 (Jaysonn: "the fake Boos tend to blob up"): and SpotMinFromBoos from every OTHER King Boo (the real one and the copies -- where each is, or where it is going
+    /// mid-teleport); 24 draws, the first that clears everything taken, else the one farthest from the others among those that clear Mario and the floor.</summary>
     private Vector3 RandomSpot()
     {
         var m = M();
         float radius = SpotRadius > 0f ? SpotRadius : _arenaRadius * 0.75f;
-        for (int i = 0; i < 16; i++)
+        var others = new List<Vector3>();
+        var real = IsCopy ? Original : this;
+        if (real != null && IsInstanceValid(real))
+        {
+            if (real != this && real.State != Phase.Gone && real.State != Phase.Hidden) others.Add(real.SpotNow);
+            foreach (var c in real.Copies) if (c != null && c != this && IsInstanceValid(c) && c.State != Phase.Gone && c.State != Phase.Hidden && c.State != Phase.Laugh) others.Add(c.SpotNow);
+        }
+        Vector3 best = Vector3.Zero; float bestFy = float.NaN, bestRoom = -1f;
+        for (int i = 0; i < 24; i++)
         {
             float a = (float)(_rng.NextDouble() * Math.Tau), r = radius * Mathf.Sqrt((float)_rng.NextDouble());
             var p = new Vector3(_arenaCentre.X + Mathf.Cos(a) * r, _arenaCentre.Y, _arenaCentre.Z + Mathf.Sin(a) * r);
             float minFrom = IsCopy ? Mathf.Max(SpotMinFromMario, CopyMinFromMario) : SpotMinFromMario, maxFrom = IsCopy ? 0f : SpotMaxFromMario;   // 177: a copy keeps away
             if (m != null && (Flat(p, m.GlobalPosition) < minFrom || (maxFrom > 0f && Flat(p, m.GlobalPosition) > maxFrom))) continue;
             float fy = FloorUnder(p); if (float.IsNaN(fy)) continue;
-            _floorAtSpot = fy; p.Y = fy + _hoverOverFloor; return p;
+            float room = float.MaxValue; foreach (var o in others) room = Mathf.Min(room, Flat(p, o));
+            if (room >= SpotMinFromBoos) { _floorAtSpot = fy; p.Y = fy + _hoverOverFloor; LastSpotRoom = room; return p; }
+            if (room > bestRoom) { bestRoom = room; best = p; bestFy = fy; }
         }
-        _floorAtSpot = FloorUnder(_home); return _home;
+        if (bestRoom >= 0f) { _floorAtSpot = bestFy; best.Y = bestFy + _hoverOverFloor; LastSpotRoom = bestRoom; return best; }     // nothing cleared the others: the roomiest that cleared Mario
+        _floorAtSpot = FloorUnder(_home); LastSpotRoom = -1f; return _home;
     }
+    /// <summary>196: where this one of him stands for the others' spot picking -- his destination mid-teleport (Vanish / Arrive), else where he is.</summary>
+    public Vector3 SpotNow => State == Phase.Vanish || State == Phase.Arrive ? _dest : GlobalPosition;
+    /// <summary>196, for the drives: how far the last spot picked was from the nearest other King Boo (a big number: none; -1: no spot cleared Mario and the home was kept).</summary>
+    public float LastSpotRoom { get; private set; } = float.MaxValue;
+    /// <summary>196, for the drives: a spot drawn as a hop would draw it (nothing moves).</summary>
+    public Vector3 DriveDrawSpot() => RandomSpot();
     /// <summary>The lick's spot: LickDistance in front of Mario along his face (behind him, or beside him, when there is no floor there), LickHeight over the floor.</summary>
     private Vector3 LickSpot()
     {
