@@ -13388,3 +13388,38 @@ re-saved); no harm to the PC. The clean rebuild 0 errors; the drive, the logs, s
 **Deviations, all knobs:** the gather (puffs, stars, radius, time), the flicker, the ring and the pop are my design of "better effects"; 0.75 -> 1.15 is my reading
 of "too high at the end" (`IntroLaughPitchTo` 1 = ending on the casino's own pitch). Known, not this pass: the twinkle stars' faint square halos against the
 black sky (`ChikaFx`'s texture), seen behind the gathering stars.
+
+### 195 -- the King Boo REMATCH, part 39: the BOSS MUSIC (the casino King Boo's theme, MSD_BGM_BOSS, starts as the fight begins after the intro's dive and fades as the last hit takes him down) with the rematch's effects a bit UNDER it (SfxDb -4 on every SMS actor's sounds while the arena is loaded); the WIND is FIVE tornados on an even ring that CIRCLES the arena while it breathes IN to the middle and back OUT (the Spiral pattern; 169's hunt kept as a knob) (feature/kingboo-rematch, code `180faed`)
+
+**Jaysonn:** "ok we're getting there. i think we should lower the volume a bit and throw in the boss music now. see how it feels. also lets spawn 5 tornados for the
+wind attack and have the wind pattern go into the middle then back out while circling around the arena"
+
+**The music** (`SmsActorSound.cs`, `SmsKingBooRematch.cs`): the rematch's King Boo gets a `BossMusic` slot his sound node fills with the casino boss theme
+(`MSD_BGM_BOSS`: t_boss.com rendered from the game's sequence, 4.2 s in and a 95 s loop, 98.9 s; a 2D player on the Music bus at `SmsActorSound.MusicDb` -4 and
+the track's own -2.5: -6.5 dB). `StartBossMusic` as the fight begins -- his spawn rise after the intro's dive (`BossMusicAtIntro`: as he surfaces in the intro
+instead; off -- the intro keeps its rumble and the laugh alone); `FadeBossMusic` over `BossMusicFadeSeconds` (2) as the down clip begins; stopped if the arena
+unloads. `BossMusicDb` on top; `BossMusicOn`. Copies never start it. Readouts `BossMusicStarted` / `BossMusicPlaying` / `BossMusicFaded` / `BossMusicVolumeDb`.
+
+**The mix**: `SfxDb` (-4) -- the real one sets `SmsActorSound.MasterDb` to it in his `_Ready` and puts it back in `_ExitTree`: every SMS actor's sounds in the
+arena (his voice and attacks, the Bomb Boos, the Boolossi, the walls, the breath) a bit under the music; Mario's own sounds are not his. 0 = 157-194's level.
+
+**The wind** (`SmsGhostWind.cs`, `SmsKingBooRematch.cs`): `TornadoCount` 2 -> 5 and the PATTERN (`Pattern` / `TornadoPattern`): Spiral -- the five rise evenly
+spaced on a ring `SpawnRadius` (0.7 of the arena: 18.5 m) out, the ring turned so none rises within `SpawnMinFromMario` (8 m) of Mario (16 turns tried, the one
+with the most room when none clears); then the whole ring CIRCLES the arena, all one way (a random way each attack, `OrbitSign`) at `Speed` (6 m/s) along the
+ring -- no faster than `MaxOrbitDegPerSec` (110) about the middle, so they do not whip round at the centre -- while its radius BREATHES: `SpiralRadiusAt(age)`
+is a cosine from the outer ring IN to `InnerRadius` (0.12 of the arena: 3.2 m -- the five bunch at the middle without sitting on each other) and back OUT,
+`SpiralCycles` (1) times over the active life (`LifeSeconds` 7 past the 0.6 s rise): in by 3.8 s, out by 7, then the dissipation as before. Each tornado's
+`Heading` follows its motion; the fling, the wall clamp, the funnel, the gust and the sounds are 169-170's. Hunt = 169's: each turns toward Mario and comes at
+him. Readouts `OrbitAngle` / `OrbitRadiusNow` / `OrbitTurned`; King Boo mirrors `TornadoInnerRadius`, `TornadoSpiralCycles`.
+
+**Verified** (headless drive v195-2, deleted before the commit): C23 the music -- the slot filled (98.9 s, the Music bus), started as the fight began (never
+through the intro), playing at -6.5 dB, MasterDb -4; C23b faded at the down (not playing 2.5 s in). C24 the wind -- five tornados 18.5 m out, bearings 72-72
+deg apart, the nearest 10.6 m from Mario; the ring turned 287 deg one way over the life, the least radius 3.2 m at 3.79 s of 7, the last 18.5 m at 6.99 s,
+the five within 0.00 m of one radius throughout (384 ticks); Mario kept clear (the middle while the ring is wide, the edge while it is narrow) and kept his HP.
+194-179's checks as before -- 38/38, no errors. One shot run (59 shots): from 48 m over the arena, the five on their ring as it rises, closing and turned,
+bunched at the middle, out again turned 290 deg; from Mario's edge, the funnels in the middle. The clean rebuild 0 errors; the drive, the logs, shots165/,
+run_window.ps1 and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** the casino theme as the rematch's music (`BossMusic`: set another stream by hand), its start at the fight (`BossMusicAtIntro`) and the
+-4 dB (`SfxDb`) are my reading of "lower the volume a bit and throw in the boss music"; the spiral's numbers (`TornadoInnerRadius` 0.12, `TornadoSpeed` 6 along
+the ring, `MaxOrbitDegPerSec` 110, one cycle) are mine. I cannot hear the mix from here: Jaysonn judges the levels.
