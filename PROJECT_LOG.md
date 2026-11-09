@@ -13323,3 +13323,34 @@ deleted.
 **Deviations, all knobs:** the Boos' ease-out (`WaveReach`; 0 = constant speed), `WallHitTopK`, the slab rule, `FloorDrag` 0 and the core's speed/sink pinning
 are mine -- the fixes for what Jaysonn felt; `ModelScale` 6.5 and `WaveSeconds` 3 are his numbers; the laugh ramp's 0.7 and 1.4 are my reading of "start low,
 then higher".
+
+### 193 -- the King Boo REMATCH, part 37: the thunder walls' last wrong shock gone (192 had kept a "gap shut" test that zapped a Mario OUTSIDE the walls as they met: he had jumped one where it stood); a Bomb Boo in Mario's hand BURSTS when he is hit (hurt, shocked, frozen or killed: the pop and gone, no drift); the split cutscene's mist WHITE (a cold white, violet before); the intro laugh SHORTER (IntroLaughSeconds 4.6 -> 3, the climb runs over it) (feature/kingboo-rematch, code `3bb1296`)
+
+**Jaysonn:** "ok yeah i just got hit by lightning from jumping over it where it spawned in. need to fix the hit box. and if mario gets hit while holding the
+bomb boo the boo should explode and go away. also the splitting cutscene has it do purple smoke effects i want that to be white so it looks ghostly. and the
+intro cutscene i think the laugh doesn't have to be that long make it shorter"
+
+**The walls** (`SmsGhostLightning.cs`): the shock is the SLAB alone. 192's `HitCheck` kept 185's second test, `half <= r` -- "the gap closed on him" -- with no
+look at where he stood across the walls, so the moment the two faces met EVERY Mario within the walls' length and under the hit top was shocked, outside
+the walls or not. Jaysonn jumped a wall where it stood (the warning, or the first of its run), came down outside it, and was zapped 0.7 s later as the
+walls met. A Mario inside is always reached by a face's slab before the gap is that small (the band, half the thickness plus his 42 u, is wider than his
+radius), so the test did nothing for him and only hurt the one who had got out. Gone.
+
+**The Bomb Boo in hand** (`Mario.cs`: `SmsBombTick` / `SmsBombBurst`, `SmsBombBurstsOnHit` on): it bursts -- `SmsBombBoo.Explode(false)`: its puff and pop, no
+blast, no hit on King Boo, gone -- when he is hurt (a hit, a shock), killed or frozen holding it, instead of the drop that let it drift off to be grabbed
+again. The dives, the ground pound, the water and the rest still let it go. Readout `SmsBombBursts`. Off: the drop as before.
+
+**King Boo** (`SmsKingBooRematch.cs`): `SplitMistColor` (0.48, 0.22, 0.62) -> (0.88, 0.92, 1) -- a cold white; the puffs are the same smoke balls.
+`IntroLaughSeconds` 4.6 -> 3: 192's pitch climb (0.7 -> 1.4) runs over whatever the length is, so it climbs quicker now; the dive comes 1.6 s sooner; the
+intro director's total follows.
+
+**Verified** (headless drive v193-1, deleted before the commit): C12c a third lightning with Mario put 1.5 m OUTSIDE wall A as each of the three squeezes
+stood -- no shock through any of them, not as the walls met (hits 0, King Boo's count unchanged, HP kept; he stayed 1.50 m outside the near face); C12 Mario
+still jumps all three and C12b a standing Mario is still shocked by the slab. C21 a Bomb Boo grabbed with X (the real grab), then `TakeDamage` on Mario:
+hurt, HP down one, his hand empty, the Boo gone (not drifting), the burst counted. C13 the laugh 3 s (cut at the dive); C19 the climb 0.70 -> 1.12 at 2 s
+-> 1.40 at the dive, no drop. 192-179's checks as before -- 33/33, no errors. One shot run (50 shots): the split cutscenes' mist white -- pale puffs boiling
+about each of him as he comes into the line, the chorus of three in it. The clean rebuild 0 errors; the drive, the patch script, the logs, shots165/,
+run_window.ps1 and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** the white's exact shade (`SplitMistColor`), 3 s for the laugh (`IntroLaughSeconds`) and the burst on a FREEZE too
+(`SmsBombBurstsOnHit` covers hurt, dead and frozen) are my reading; the slab-only rule is the fix.
