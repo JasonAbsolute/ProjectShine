@@ -13502,3 +13502,32 @@ the blend). No shots: a blend is motion. The clean rebuild 0 errors; the drive, 
 
 **Deviations, all knobs:** the game cuts; 0.25 s is my pick for "a little better" (over 0.4 the quick clips -- the hit, the lick's thrust -- go mushy). Not
 committed: Godot's detect-3D keeps rewriting seven texture .import files in the working tree (VRAM compression) -- the editor's own doing, Jaysonn's to commit.
+
+### 199 -- the King Boo REMATCH, part 43: the BREATH leaves a WIDE MOUTH (BreathMouthWidth 4.5 x 1.4 m: the mist, its dense core and the glints born across it, the mouth's light stretched to it, and the cold that freezes in 3 lanes across it -- one 0.7 m point of contact before) and Mario's look-about WITHOUT THE SHRUG (the arms rest; the glances and the look up stay) (feature/kingboo-rematch, code `ee0d6ef`)
+
+**Jaysonn:** "ok solid looks much more smooth. now i think we need to make the breath coming out of his mouth a bit bigger? like wider? king boo has a wide
+mouth so one point of contact looks a bit off. also lets not do marios shrug animation during the look around since it breaks the theme."
+
+**The wide mouth** (`SmsGhostBreath.cs`): the cold left a POINT -- the puffs, the dense core and the glints all born in a 0.7 m sphere at the mouth point, and
+one ray a frame down the middle, so the stream was a rope for its first metres and the hit a line. Now the mouth is a BOX across the stream, `MouthWidth`
+(4.5 m) by `MouthHeight` (1.4 m): the puffs' emission, the core's (0.9 x 0.8 of it) and the glints' are that box (Sphere -> Box, `EmissionBoxExtents` = half
+the width, half the height, 0.2 m deep), the mouth's light (the glow quad) stretches to 0.9 of the width, and the cold that freezes runs in `HitLanes` (3)
+lanes across it -- each frame of the blow a ray from the left edge, the middle and the right edge (Up x the stream's direction, k = -1, 0, +1 of half the
+width), so the hit is as wide as the mist from the first metre (the middle lane is the old ray: a standing Mario freezes as before). Readouts `PuffEmission` /
+`PuffEmissionExtents` / `BlowFrames`. King Boo (`SmsKingBooRematch.cs`): `BreathMouthWidth` / `BreathMouthHeight` / `BreathHitLanes` (4.5 / 1.4 / 3), handed
+to every breath he launches.
+
+**The look-about without the shrug** (`assets/Mario/Anims/ma_lookabout.pose.json` + `ma_lookabout.tres`): the look-about's keys at 2.2 and 2.6 s raised both
+shoulders and arms (`jnt_sldr_L/R`, `jnt_arm_L1/R1`, `jnt_arm_L2/R2` -- the shrug under the look up). Those joints are out of both keys: the arms rest through
+the look up; the head and chest keys (the glances left and right, the look up) stay. Re-baked with `tools/anim/bake_anim.gd` (`[BAKE] OK`; the hands at idle
+height through 2.2-2.6 s, where they rose).
+
+**Verified** (headless drive v199-2, deleted before the commit): C28 the breath's mouth 4.5 x 1.4, the puffs' emission Box (2.25, 0.7, 0.2), 675 rays over 225
+blow frames (3 a frame), a standing Mario frozen; 198-179's checks as before -- 42/42, no errors. Shots (run ck): 27a/27a2 the mist leaving across the whole
+mouth with the three lanes drawn / alone, 27b from behind Mario, 24a-c the hit balls vs the mist as before (24a's camera 16 m out: the wider stream filled the
+old 11 m view). The drive's shots now wait their turn (run cj had three cameras up at once -- its 27b saved 24b's view). The clean rebuild 0 errors; the drive,
+the logs, the shots and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** 4.5 x 1.4 m is my read of his mouth (his body is some 9 m across; wider = `BreathMouthWidth`); 3 lanes (more = a denser hit, no
+wider); the look-about's look up stays (Jaysonn named the shrug), and there is no shot of it -- the intro is not in the shot drive; the bake's numbers are the
+check. Not committed: the editor's seven detect-3D .import rewrites (Jaysonn's, as in 198).

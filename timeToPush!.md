@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180 + 181 + 182 + 183 + 184 + 185 + 186 + 187 + 188 + 189 + 190 + 191 + 192 + 193 + 194 + 195 + 196 + 197 + 198), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-08 20:58 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180 + 181 + 182 + 183 + 184 + 185 + 186 + 187 + 188 + 189 + 190 + 191 + 192 + 193 + 194 + 195 + 196 + 197 + 198 + 199), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-08 22:10 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1256,8 +1256,10 @@ the mist and his stars gather into his centre as he forms, flickering, a ring un
 (the casino theme, from the fight's start, faded at the down) with the effects -4 dB under it; the wind is five tornados on a ring circling the arena in to the
 middle and back out. SMS 196: the copies teleport about and keep 11 m apart; the music starts at the intro's cut to Mario in the battle stance.
 SMS 197: the music is Jaysonn's Antasma Final Battle mp3 (NEW: assets/Sms/Sound/Music/AntasmaFinalBattle.mp3 + .import, 2.8 MB), from the intro's first frame, the
-fight on its cue 7.5 s in. SMS 198: his clip changes cross-fade (ClipBlendSeconds 0.25). Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `25b88bf` ("SMS 198: the King Boo REMATCH, part 42 -- his clip changes CROSS-FADE (ClipBlendSeconds 0.25: the pose he is in melts into the new clip's first frames -- the wait into the laugh, the laugh into the dive, the tumble into the wait, the laugh's own loop -- instead of the game's hard cut between bcks; 0 = the cut)";
+fight on its cue 7.5 s in. SMS 198: his clip changes cross-fade (ClipBlendSeconds 0.25). SMS 199: the breath leaves a 4.5 m mouth, its hit in 3 lanes; Mario's look-about without the shrug. Further passes re-point this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `ee0d6ef` ("SMS 199: the King Boo REMATCH, part 43 -- the BREATH leaves a WIDE MOUTH (BreathMouthWidth 4.5 x 1.4 m: the mist, its dense core and the glints born across it, the mouth's light stretched to it, and the cold that freezes in 3 lanes across it -- one 0.7 m point of contact before) and Mario's look-about WITHOUT THE SHRUG (the arms rest; the glances and the look up stay)";
+  assets/Sms/Rematch/ SmsGhostBreath.cs, SmsKingBooRematch.cs; assets/Mario/Anims/ ma_lookabout.pose.json, ma_lookabout.tres) on the 198 commit
+  ("SMS 198: the King Boo REMATCH, part 42 -- his clip changes CROSS-FADE (ClipBlendSeconds 0.25: the pose he is in melts into the new clip's first frames -- the wait into the laugh, the laugh into the dive, the tumble into the wait, the laugh's own loop -- instead of the game's hard cut between bcks; 0 = the cut)";
   assets/Sms/Rematch/ SmsKingBooRematch.cs) on the 197 commit
   ("SMS 197: the King Boo REMATCH, part 41 -- the music is ANTASMA FINAL BATTLE (Jaysonn's mp3 from Ref/, now assets/Sms/Sound/Music/AntasmaFinalBattle.mp3, looping back to 7.5 s), it starts on the intro's FIRST frame (Mario looking about for the laugh), and the FIGHT STARTS ON ITS CUE: 7.5 s after the music begins (FightCueSeconds) -- the intro trims the look-about and the laugh in proportion to land there (x0.67: 3 s each -> 2 s)";
   assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsRematchIntro.cs; NEW assets/Sms/Sound/Music/AntasmaFinalBattle.mp3 + .import) on the 196 commit
@@ -1343,9 +1345,10 @@ fight on its cue 7.5 s in. SMS 198: his clip changes cross-fade (ClipBlendSecond
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 88 commits past `feature/sounds`, 110 since `main`. ~4 MB of new files (197's 2.8 MB mp3). The range carries none of Jaysonn's
+  this file's own commit on top of them; 90 commits past `feature/sounds`, 112 since `main`. ~4 MB of new files (197's 2.8 MB mp3). The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 199: the breath leaving his whole mouth, its freeze as wide as the mist (BreathMouthWidth / BreathMouthHeight / BreathHitLanes on KingBoo: 4.5 x 1.4 m, 3 lanes; 0.7 x 0.7, 1 = the old point); Mario's look-about with the arms resting (the shrug keys out of assets/Mario/Anims/ma_lookabout.pose.json, re-bake with tools/anim/bake_anim.gd).
 - To try 198: King Boo's clips melting into each other (ClipBlendSeconds on KingBoo: 0 = the old hard cut, 0.25 = one body moving, over 0.4 = mushy).
 - To try 197: Antasma Final Battle from the intro's first frame, the fight landing 7.5 s in (FightCueSeconds / LookMinScale / AfterSinkSeconds on the intro node;
   BossMusicCue / BossMusicFile / BossMusicLoopOffset / BossMusicStreamDb on KingBoo); the look-about and the laugh run quicker (2 s each) to make the cue.
