@@ -442,9 +442,28 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>The tornados (SmsGhostWind's knobs, set here as a template): how many, how far out from the arena's middle they rise (x its radius), how far from
     /// Mario at least, how long they live; how fast they come at him (m/s) and how quickly they can turn (degrees a second); the funnel's height; the wind's reach
     /// about the axis; the fling's speed (the game's throw units: 140 lifts Mario 33 m) and how much of it is up; the grace after a fling.</summary>
-    [Export(PropertyHint.Range, "1,6,1")] public int TornadoCount = 2;
+    [Export(PropertyHint.Range, "1,8,1")] public int TornadoCount = 5;   // 195 (Jaysonn: "spawn 5 tornados"): 2 -> 5
     [Export] public float TornadoSpawnRadius = 0.7f, TornadoMinFromMario = 8f, TornadoSeconds = 7f, TornadoSpeed = 6f, TornadoTurnDegPerSec = 70f, TornadoHeight = 8f, TornadoRadius = 1.7f;
+    /// <summary>195 (Jaysonn: "have the wind pattern go into the middle then back out while circling around the arena"): the tornados' PATTERN -- Spiral: the five rise
+    /// evenly spaced on a ring TornadoSpawnRadius out and the ring CIRCLES the arena at TornadoSpeed along it (all one way, a random way each attack) while it
+    /// breathes IN to TornadoInnerRadius (x the arena's: 0.12 of 26 m is 3 m -- they bunch at the middle without sitting on each other) and back OUT,
+    /// TornadoSpiralCycles times over TornadoSeconds. Hunt: 169's -- each comes at Mario.</summary>
+    [Export] public SmsGhostWind.Patterns TornadoPattern = SmsGhostWind.Patterns.Spiral;
+    [Export(PropertyHint.Range, "0,0.6,0.01")] public float TornadoInnerRadius = 0.12f;
+    [Export(PropertyHint.Range, "0.5,3,0.5")] public float TornadoSpiralCycles = 1f;
     [Export] public float FlingSpeed = 85f, FlingUpK = 0.75f, FlingGraceSeconds = 2f;
+    [ExportGroup("The music and the mix (195)")]
+    /// <summary>195 (Jaysonn: "lower the volume a bit and throw in the boss music now"): the BOSS MUSIC -- the casino King Boo's theme (MSD_BGM_BOSS, t_boss.com:
+    /// 4.2 s in and a 95 s loop, rendered from the game's sequence) on the Music bus, filled into BossMusic by his sound node (set a stream by hand to use another),
+    /// started as the fight begins (his spawn rise after the intro's dive; BossMusicAtIntro: as he surfaces in the intro instead) and FADED over BossMusicFadeSeconds
+    /// as the last hit takes him down. BossMusicDb on top of the music's own level (SmsActorSound.MusicDb -4 and the game's volume for the track). Off: no music.</summary>
+    [Export] public AudioStreamPlayer BossMusic;
+    [Export] public bool BossMusicOn = true, BossMusicAtIntro = false;
+    [Export(PropertyHint.Range, "-24,12,0.5")] public float BossMusicDb = 0f;
+    [Export(PropertyHint.Range, "0.1,6,0.1")] public float BossMusicFadeSeconds = 2f;
+    /// <summary>195: the rematch's SOUND EFFECTS level -- every SMS actor's sounds (his voice and attacks, the Bomb Boos, the Boolossi) through SmsActorSound.MasterDb while
+    /// this arena is loaded (put back when it unloads); Mario's own sounds are not his. -4: "a bit" under the music. 0 = 157-194's level.</summary>
+    [Export(PropertyHint.Range, "-24,6,0.5")] public float SfxDb = -4f;
     [ExportGroup("")]
     [Export] public bool DebugPrint;
     /// <summary>192 (Jaysonn: "the hit boxes for the electric wall and freeze breath are still off from the visuals"): the hits DRAWN, to judge them in play --
@@ -696,6 +715,7 @@ public partial class SmsKingBooRematch : Node3D
         SetOpacity(GhostOpacity);
         ApplyEye(0);
         _sound = SmsActorSound.Attach(this);
+        if (!IsCopy) { _sfxDbWas = SmsActorSound.MasterDb; _sfxDbSet = true; SmsActorSound.MasterDb = SfxDb; }                                       // 195: the rematch's effects level
         SmashScene ??= ResourceLoader.Exists("res://assets/Sms/Rematch/Boolossus.tscn") ? GD.Load<PackedScene>("res://assets/Sms/Rematch/Boolossus.tscn") : null;
         _yaw = Rotation.Y; _home = Position;
         if (_model != null) _model.Visible = false;
@@ -735,6 +755,7 @@ public partial class SmsKingBooRematch : Node3D
             RiseFxBegin(new Vector3(_introTop.X, _introFloorY, _introTop.Z));                                            // 181: the glow on the stone, the wisps
         }
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: appears at {GlobalPosition} ({_hoverOverFloor:F2} m over the floor{(HoverLift != 0f ? $", lifted {HoverLift:F1}" : "")}{(_spawnRise ? $", rising out of the floor over {SpawnRiseSeconds:F1} s" : "")}; the arena's middle {_arenaCentre}, radius {_arenaRadius:F1})");
+        StartBossMusic("the fight begins");                                                                                                        // 195 (the intro's surface may have started it already)
         EmitSignal(SignalName.Spawned);
     }
 
@@ -753,6 +774,7 @@ public partial class SmsKingBooRematch : Node3D
         if (_tongue != null) { _tongue.Stretch = TongueStretch; _tongue.On = TongueStretch > 1.001f; }
         SetCrownGlow(_crownGlowColor, 0f);
         State = Phase.IntroRise;
+        if (BossMusicAtIntro) StartBossMusic("the intro's surface");                                                                               // 195
         _riseClipPending = RiseFx && RiseTellSeconds > 0f; _riseClipStarted = false; RiseLeapTopY = float.NegativeInfinity;   // 181: the tell first -- the glow and the wisps alone, then the clip and the rise
         if (_riseClipPending) { _introT = -RiseTellSeconds; PlayClip(BckWait); }
         else StartAppearClip();
@@ -1104,9 +1126,43 @@ public partial class SmsKingBooRematch : Node3D
     public bool HurtFlashOn => _flashOn;
     public float GlowBoostNow => _glowBoost;
     public float OpacitySolidNow => _opacitySolid;
+    // ---- 195: the boss music and the mix ------------------------------------------------------------------------------------------------------------------
+    private float _sfxDbWas; private bool _sfxDbSet;
+    /// <summary>195, for the drives: the music started (and is playing now); faded out.</summary>
+    public bool BossMusicStarted { get; private set; }
+    public bool BossMusicPlaying => BossMusic != null && IsInstanceValid(BossMusic) && BossMusic.Playing;
+    public bool BossMusicFaded { get; private set; }
+    public float BossMusicVolumeDb => BossMusic != null && IsInstanceValid(BossMusic) ? BossMusic.VolumeDb : float.NaN;
+    /// <summary>The boss music starts (once; the real one's alone): the casino theme from its top at its level plus BossMusicDb.</summary>
+    private void StartBossMusic(string why)
+    {
+        if (IsCopy || !BossMusicOn || BossMusicStarted || BossMusic == null || !IsInstanceValid(BossMusic) || BossMusic.Stream == null) return;
+        ReadMusicBase();
+        BossMusicStarted = true; BossMusicFaded = false;
+        BossMusic.VolumeDb = _musicBaseDb + BossMusicDb;
+        BossMusic.Play();
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the BOSS MUSIC starts ({why}) at {BossMusic.VolumeDb:F1} dB, {(BossMusic.Stream is AudioStreamWav w ? w.GetLength().ToString("F1") : "?")} s");
+    }
+    /// <summary>The boss music fades out over BossMusicFadeSeconds and stops (the last hit's down; the arena unloading).</summary>
+    private void FadeBossMusic(string why)
+    {
+        if (!BossMusicPlaying || BossMusicFaded) return;
+        BossMusicFaded = true;
+        var tw = CreateTween(); tw.TweenProperty(BossMusic, "volume_db", -60f, Mathf.Max(0.05f, BossMusicFadeSeconds)); tw.TweenCallback(Callable.From(() => { if (BossMusic != null && IsInstanceValid(BossMusic)) BossMusic.Stop(); }));
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the boss music fades over {BossMusicFadeSeconds:F1} s ({why})");
+    }
+    private float _musicBaseDb = float.NaN;
+    /// <summary>The music player's level as his sound node filled it (SmsActorSound.MusicDb + the track's own), read once before anything changes it.</summary>
+    private void ReadMusicBase() { if (float.IsNaN(_musicBaseDb) && BossMusic != null && IsInstanceValid(BossMusic)) _musicBaseDb = BossMusic.VolumeDb; }
+    public override void _ExitTree()
+    {
+        if (_sfxDbSet) { SmsActorSound.MasterDb = _sfxDbWas; _sfxDbSet = false; }                                                            // 195: the effects level put back
+        if (BossMusicPlaying) BossMusic.Stop();
+    }
     /// <summary>The down clip begins (the last hit's hurt is over): the mist and the stars boil off his body, the blink, the glow and the crown's flare run in DeathTick.</summary>
     private void DeathBegin()
     {
+        FadeBossMusic("the down");                                                                                                                 // 195
         _deathT = 0f; _deathRumbleT = 0f; _deathHome = Position;
         _deathLen = _anim != null && _anim.HasAnimation(BckDown) ? (float)(_anim.GetAnimation(BckDown).Length / Mathf.Max(0.01f, _anim.SpeedScale)) : 3.3f;
         if (!DeathFx) return;
@@ -2034,7 +2090,7 @@ public partial class SmsKingBooRematch : Node3D
             {
                 var m = M();
                 if (m == null) { EndWind(); return; }
-                var w = new SmsGhostWind { Name = $"GhostWind{WindsMade}", DebugPrint = DebugPrint, Count = TornadoCount, SpawnRadius = TornadoSpawnRadius, SpawnMinFromMario = TornadoMinFromMario, LifeSeconds = TornadoSeconds, Speed = TornadoSpeed, TurnDegPerSec = TornadoTurnDegPerSec, Height = TornadoHeight, Radius = TornadoRadius, FlingSpeed = FlingSpeed, FlingUpK = FlingUpK, FlingGraceSeconds = FlingGraceSeconds };
+                var w = new SmsGhostWind { Name = $"GhostWind{WindsMade}", DebugPrint = DebugPrint, Count = TornadoCount, SpawnRadius = TornadoSpawnRadius, SpawnMinFromMario = TornadoMinFromMario, LifeSeconds = TornadoSeconds, Speed = TornadoSpeed, TurnDegPerSec = TornadoTurnDegPerSec, Height = TornadoHeight, Radius = TornadoRadius, FlingSpeed = FlingSpeed, FlingUpK = FlingUpK, FlingGraceSeconds = FlingGraceSeconds, Pattern = TornadoPattern, InnerRadius = TornadoInnerRadius, SpiralCycles = TornadoSpiralCycles };   // 195: the pattern
                 (GetTree().CurrentScene ?? GetParent()).AddChild(w);
                 float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
                 w.Spawned += n => { _crownFlashT = CrownFlashSeconds; EmitSignal(SignalName.WindSpawned, n); };

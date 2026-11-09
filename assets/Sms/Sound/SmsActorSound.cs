@@ -109,6 +109,7 @@ public partial class SmsActorSound : Node3D
             // not filled: FireSound (the FIRE is a loop; StateTick runs it)
         },
         ["gatekeeper"] = new[] { ("BossMusic", "MSD_BGM_CHUBOSS") },           // 156: TBiancoGateKeeper::startBGM at the appear demo, stopBGM at the finish demo (the script's own lines)
+        ["kingboo"] = new[] { ("BossMusic", "MSD_BGM_BOSS") },                 // 195: the rematch's King Boo -- the casino boss theme (t_boss.com), started as the fight begins, faded at his death (SmsKingBooRematch's own lines)
         ["telesa"] = new[]
         {
             ("FixSound", "MSD_SE_EN_TELESA_FIX"),               // changeByJuice: the box Boo into its block

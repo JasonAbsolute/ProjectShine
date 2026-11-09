@@ -20,8 +20,18 @@ public partial class SmsGhostWind : Node3D
     [ExportGroup("The tornados")]
     /// <summary>How many, how far out from the arena's middle they rise (x its radius), the bearings between them, how far from Mario at least, how long they
     /// take to rise, how long they live.</summary>
-    [Export(PropertyHint.Range, "1,6,1")] public int Count = 2;
+    [Export(PropertyHint.Range, "1,8,1")] public int Count = 5;
     [Export] public float SpawnRadius = 0.7f, SpawnSpreadDeg = 150f, SpawnMinFromMario = 8f, RiseSeconds = 0.6f, LifeSeconds = 7f;
+    /// <summary>195 (Jaysonn: "spawn 5 tornados for the wind attack and have the wind pattern go into the middle then back out while circling around the arena"):
+    /// the PATTERN. Hunt: 169's -- each turns toward Mario and comes at him. Spiral: the Count of them rise evenly spaced on a ring SpawnRadius out (the ring
+    /// turned so none is within SpawnMinFromMario of him), then the whole ring CIRCLES the arena (all one way, a random way each attack) at Speed along the
+    /// ring (no faster than MaxOrbitDegPerSec about the middle, so they do not whip round at the centre) while its radius BREATHES -- in to InnerRadius (x the
+    /// arena's) and back out to SpawnRadius, SpiralCycles times over the life (1: in by the middle of the life, out by its end) -- a spiral in, a spiral out.</summary>
+    public enum Patterns { Hunt, Spiral }
+    [Export] public Patterns Pattern = Patterns.Spiral;
+    [Export(PropertyHint.Range, "0,0.6,0.01")] public float InnerRadius = 0.12f;
+    [Export(PropertyHint.Range, "0.5,3,0.5")] public float SpiralCycles = 1f;
+    [Export(PropertyHint.Range, "20,240,5")] public float MaxOrbitDegPerSec = 110f;
     /// <summary>How fast one comes at Mario (m/s), how quickly it can turn toward him (degrees a second), its wobble (metres either side).</summary>
     [Export] public float Speed = 6f, TurnDegPerSec = 70f, Wobble = 0.6f;
     [ExportGroup("The funnel")]
@@ -54,6 +64,14 @@ public partial class SmsGhostWind : Node3D
     public Phase State { get; private set; } = Phase.Idle;
     public int Flings { get; private set; }
     public IReadOnlyList<SmsTornado> Tornados => _tornados;
+    /// <summary>195: the way the ring circles (+1 anticlockwise seen from above, -1 clockwise); the ring's radius the spiral asks for at this age (metres from the middle).</summary>
+    public int OrbitSign { get; private set; } = 1;
+    public float SpiralRadiusAt(float age)
+    {
+        float t = MathF.Max(0f, age - RiseSeconds), active = MathF.Max(0.5f, LifeSeconds - RiseSeconds), period = active / MathF.Max(0.5f, SpiralCycles);
+        float k = 0.5f - 0.5f * MathF.Cos(MathF.Tau * t / period);                                                   // 0 at the start (out), 1 half a cycle in (the middle), 0 again at the cycle's end
+        return Mathf.Lerp(_radius * SpawnRadius, _radius * InnerRadius, k);
+    }
     public int Alive { get { int n = 0; foreach (var t in _tornados) if (IsInstanceValid(t) && !t.Gone) n++; return n; } }
     public float FloorY { get; private set; }
     public Vector3 ArenaCentre => _centre;
@@ -81,23 +99,39 @@ public partial class SmsGhostWind : Node3D
         GlobalPosition = new Vector3(_centre.X, floorY, _centre.Z);
         float a0 = (float)(_rng.NextDouble() * Math.Tau);
         Vector3 mp = mario != null && IsInstanceValid(mario) ? mario.GlobalPosition : _centre;
-        for (int i = 0; i < Mathf.Max(1, Count); i++)
+        int n = Mathf.Max(1, Count);
+        OrbitSign = _rng.NextDouble() < 0.5 ? -1 : 1;
+        if (Pattern == Patterns.Spiral)
         {
-            Vector3 p = Vector3.Zero; bool ok = false;
+            // 195: an even ring, turned so none of them rises within SpawnMinFromMario of Mario (the turn with the most room wins when none clears)
+            float best = -1f, bestA = a0;
+            for (int tries = 0; tries < 16; tries++)
+            {
+                float a = a0 + tries * MathF.Tau / (n * 16f), minD = float.MaxValue;
+                for (int i = 0; i < n; i++) { float ai = a + i * MathF.Tau / n; minD = MathF.Min(minD, new Vector2(_centre.X + MathF.Cos(ai) * _radius * SpawnRadius - mp.X, _centre.Z + MathF.Sin(ai) * _radius * SpawnRadius - mp.Z).Length()); }
+                if (minD > best) { best = minD; bestA = a; }
+                if (minD >= SpawnMinFromMario) break;
+            }
+            a0 = bestA;
+        }
+        for (int i = 0; i < n; i++)
+        {
+            Vector3 p = Vector3.Zero; bool ok = false; float ang = a0;
             for (int tries = 0; tries < 12 && !ok; tries++)
             {
-                float a = a0 + Mathf.DegToRad(SpawnSpreadDeg) * i + (tries > 0 ? (float)(_rng.NextDouble() - 0.5) * 1.2f : 0f);
-                p = new Vector3(_centre.X + MathF.Cos(a) * _radius * SpawnRadius, floorY, _centre.Z + MathF.Sin(a) * _radius * SpawnRadius);
-                ok = new Vector2(p.X - mp.X, p.Z - mp.Z).Length() >= SpawnMinFromMario;
+                ang = Pattern == Patterns.Spiral ? a0 + i * MathF.Tau / n : a0 + Mathf.DegToRad(SpawnSpreadDeg) * i + (tries > 0 ? (float)(_rng.NextDouble() - 0.5) * 1.2f : 0f);
+                p = new Vector3(_centre.X + MathF.Cos(ang) * _radius * SpawnRadius, floorY, _centre.Z + MathF.Sin(ang) * _radius * SpawnRadius);
+                ok = Pattern == Patterns.Spiral || new Vector2(p.X - mp.X, p.Z - mp.Z).Length() >= SpawnMinFromMario;
             }
             var t = new SmsTornado { Name = $"Tornado{i + 1}" };
             (GetParent() ?? this).AddChild(t);
             t.Setup(this, p, (float)(_rng.NextDouble() * Math.Tau));
+            t.OrbitAngle = ang;
             _tornados.Add(t);
         }
         State = Phase.Rising; _age = 0f; _seT = 0f;
         if (_sound != null && !string.IsNullOrEmpty(WindSe)) _sound.Play(WindSe);
-        if (DebugPrint) GD.Print($"[SMS wind] {Name}: {_tornados.Count} tornado{(_tornados.Count == 1 ? "" : "s")} rise {SpawnRadius * _radius:F1} m out, {Speed} m/s at Mario for {LifeSeconds} s; the fling {FlingSpeed} ({FlingUpK:F2} up)");
+        if (DebugPrint) GD.Print($"[SMS wind] {Name}: {_tornados.Count} tornado{(_tornados.Count == 1 ? "" : "s")} rise {SpawnRadius * _radius:F1} m out, {Pattern} -- {(Pattern == Patterns.Spiral ? $"circling {(OrbitSign > 0 ? "anticlockwise" : "clockwise")} at {Speed} m/s, in to {InnerRadius * _radius:F1} m and out again {SpiralCycles}x" : $"{Speed} m/s at Mario")} for {LifeSeconds} s; the fling {FlingSpeed} ({FlingUpK:F2} up)");
         EmitSignal(SignalName.Spawned, _tornados.Count);
     }
 
@@ -176,6 +210,10 @@ public partial class SmsTornado : Node3D
     public float SpeedNow { get; private set; }
     public int FlingsMade { get; private set; }
     public float FunnelYaw => _funnel != null ? _funnel.Rotation.Y : 0f;
+    /// <summary>195: its bearing about the arena's middle (radians; the spiral turns it) and its distance from the middle now.</summary>
+    public float OrbitAngle { get; set; }
+    public float OrbitRadiusNow { get; private set; }
+    public float OrbitTurned { get; private set; }
 
     private SmsGhostWind _owner; private MeshInstance3D _funnel, _ring; private ShaderMaterial _mat; private StandardMaterial3D _ringMat; private GpuParticles3D _dust, _wisps, _debris;
     private Node3D _gust; private readonly List<ShaderMaterial> _ribbonMats = new(); private float _gustSpin;
@@ -285,7 +323,20 @@ public partial class SmsTornado : Node3D
         if (_gust != null) { _gust.Rotation = new Vector3(0f, _gustSpin, 0f); if (!Dissipating) _gust.Scale = new Vector3(Mathf.Lerp(0.3f, 1f, riseK), Mathf.Max(0.02f, riseK), Mathf.Lerp(0.3f, 1f, riseK)); }
         if (_funnel != null) { _funnel.Rotation = new Vector3(0f, Spin, 0f); _funnel.Scale = new Vector3(Mathf.Lerp(0.3f, 1f, riseK), Mathf.Max(0.02f, riseK), Mathf.Lerp(0.3f, 1f, riseK)); }
         if (_ring != null) { _ring.Rotation = new Vector3(-MathF.PI / 2f, 0f, -Spin * 0.3f); }
-        if (hunting && !Dissipating)
+        if (hunting && !Dissipating && _owner.Pattern == SmsGhostWind.Patterns.Spiral)                                   // 195: the ring circles the arena, breathing in to the middle and out
+        {
+            float r = _owner.SpiralRadiusAt(age);
+            float omega = MathF.Min(_owner.Speed / MathF.Max(1f, r), Mathf.DegToRad(_owner.MaxOrbitDegPerSec));           // Speed along the ring, capped about the middle
+            OrbitAngle += _owner.OrbitSign * omega * dt; OrbitTurned += omega * dt;
+            Vector3 was = GlobalPosition;
+            Vector3 p = new Vector3(_owner.ArenaCentre.X + MathF.Cos(OrbitAngle) * r, _owner.FloorY, _owner.ArenaCentre.Z + MathF.Sin(OrbitAngle) * r);
+            Vector3 moved = p - was; moved.Y = 0f;
+            if (moved.LengthSquared() > 1e-6f) Heading = moved.Normalized();
+            SpeedNow = dt > 1e-5f ? moved.Length() / dt : 0f;
+            OrbitRadiusNow = r;
+            GlobalPosition = p;
+        }
+        else if (hunting && !Dissipating)
         {
             Vector3 to = marioPos - GlobalPosition; to.Y = 0f;
             if (to.LengthSquared() > 1e-4f)
