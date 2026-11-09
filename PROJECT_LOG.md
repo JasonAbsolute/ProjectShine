@@ -13640,3 +13640,31 @@ above, 30c2 tight about him, 30d the Boos fading. The clean rebuild 0 errors; th
 0.45 s flare are my picks; the circle's Boos are at head height so a plain jump does not clear them (`CircleHeight`; higher = jump under them); the ring closes
 to 1 m, so a Mario who never leaves is hit (`CircleMinRadius` 2 = a safe middle); the ring drifts 1 m/s after him (0 = fixed, as SMW's). Not committed: the
 editor's detect-3D .import rewrites (Jaysonn's, as in 198-200b).
+
+### 202 -- the King Boo REMATCH, part 47: the Bomb Boo's PUFFS are BLACK (its own smoke under a dark-violet flash: the burst in Mario's hand, a vanish, the volley's blasts -- 158-201's port burst kept its white smoke whatever the tint) and it has ONE TONGUE (the body glb's own tongue strip, baked under the port's swinging tongue since 159, taken out of the mesh as it loads) (feature/kingboo-rematch, code `89e8db8`)
+
+**Jaysonn:** "lets fix up the effects for some things like how the bomb boos puffs are white when going away from getting hit. like when mario gets hit
+while swinging him around. and other effects like that. also i think the bomb boos tounge looks off. like two models ontop of each other."
+
+**The puff** (`SmsBombBoo.cs`): `Puff()` was the port's enemy-vanish burst (`EnemyDisap.tscn`) tinted `BurstColor` -- but `SetShaderParam` reaches only its
+GLOW (the JpaDirBillboardAdd shader); its SMOKE is a plain StandardMaterial3D on the white kemuball3_enemy texture, so every puff -- the burst in Mario's
+hand (193), a vanish (the field cleared, an expiry), the volley's floor blasts and the dud's own (200) -- stayed WHITE whatever the tint. Now The puff group:
+the Boo's own BLACK smoke (the rise's emitter, `FireSmokeAt`: `PuffSmokePuffs` 18 x the burst's scale, `RiseSmokeSize` x `PuffSmokeScale` 1.1 across, blown
+out every way, `RiseSmokeColor`) under a brief dark-violet FLASH (`PuffFlash`, `PuffFlashColor` (0.45, 0.25, 0.6): the port's burst with its white Smoke
+node hidden). `FireRiseSmoke` is `FireSmokeAt(up)`. Readout `PuffSmokesFired`.
+
+**The tongue** (`SmsBombBoo.cs`): `bomb_boo.glb`'s one mesh carries Galaxy's own tongue (two strips, 74 + 48 triangles -- the texture's tongue island at
+u 0.01-0.21; the body, eyes, mouth and fangs sit past u 0.55; no skin, so no bone to fold it away), under the port's swinging tongue (`bomb_boo_tongue.glb`,
+159): two tongues, one hanging still inside the other. `StripBodyTongue` (`HideBodyTongue`, `HideBodyTongueMaxU` 0.3): as the Boo loads, the body mesh's
+triangles whose three corners lie in that island are taken out (the index array rebuilt, the vertices, materials and format kept; the stripped mesh shared by
+every Boo). Readouts `BodyTongueStripped` / `BodyTongueTrisStripped`. The glb itself is untouched (tools: `glb_nodes.py` / `glb_shells.py` in the pass's
+workspace read the shells).
+
+**Verified** (headless drive v202-2, deleted before the commit): C35 the burst in Mario's hand fired the Boo's black smoke (`BombBoo8PuffSmoke`, 20 puffs, the
+ramp's first colour (0.009, 0.009, 0.012) linear) with the port's burst's Smoke hidden; the body's tongue stripped, 122 triangles; 201-179's checks as before
+-- 49/49. Shots (run cq): 31a a supply Boo close -- one tongue; 31b its vanish -- the black puff with the violet flash in it; 14c the tongue wagging and 28c
+the volley's blast as before. The clean rebuild 0 errors; the drive, the logs, the shots and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** the vanish, the hand burst and the blasts share one puff (scale 0.9 / 1.1 / 1.3); the flash is a dark violet (`PuffFlashColor`;
+the port's mint was the enemy-vanish's) -- off = smoke alone; the tongue island's bound (0.3) sits well between the tongue (0.21) and the body (0.55). Not
+committed: the editor's detect-3D .import rewrites (Jaysonn's, as in 198-201).
