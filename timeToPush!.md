@@ -1171,7 +1171,7 @@ Expect `0` from the rev-list. No PR, no merge. The working tree still carries Ja
 `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
 `addons/godot_ai` churn: his, leave them.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180 + 181 + 182 + 183 + 184 + 185 + 186 + 187 + 188 + 189 + 190 + 191 + 192 + 193), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-08 17:28 PST
+### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180 + 181 + 182 + 183 + 184 + 185 + 186 + 187 + 188 + 189 + 190 + 191 + 192 + 193 + 194), AFTER #17: this branch stacks on `feature/sounds`, updated 2026-11-08 18:30 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1251,8 +1251,11 @@ in beside him in violet mist, all laugh together under a card line, then every o
 no text on the screen (SplitLine2 / SplitLine3 empty). SMS 190: the line sits higher in the frame (SplitCamLookUp) and the second split -- three of him --
 is verified and shot. SMS 191: a hit on a fake is the mock -- it laughs it off, phases see-through and teleports off (CopyMock). SMS 192: the Boolossus bigger
 and its Boos out 3 s; the walls' and the breath's hits put with their visuals (ShowHitBoxes draws them); the intro laugh climbs. SMS 193: the walls' last wrong
-shock (outside them at the meet) gone; a Bomb Boo in hand bursts on a hit; the split mist white; the intro laugh 3 s. Further passes re-point this entry's tip.
-- Branch `feature/kingboo-rematch` -- code tip `3bb1296` ("SMS 193: the King Boo REMATCH, part 37 -- the thunder walls' last wrong shock gone (192 had kept a 'gap shut' test that zapped a Mario OUTSIDE the walls as they met: he had jumped one where it stood); a Bomb Boo in Mario's hand BURSTS when he is hit (hurt, shocked, frozen or killed: the pop and gone, no drift); the split cutscene's mist WHITE (a cold white, violet before); the intro laugh SHORTER (IntroLaughSeconds 4.6 -> 3, the climb runs over it)";
+shock (outside them at the meet) gone; a Bomb Boo in hand bursts on a hit; the split mist white; the intro laugh 3 s. SMS 194: the split's arrivals rebuilt --
+the mist and his stars gather into his centre as he forms, flickering, a ring under him, the pop; the laugh's climb ends at 1.15. Further passes re-point this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `40a4945` ("SMS 194: the King Boo REMATCH, part 38 -- the split cutscene's arrivals REBUILT: each of him GATHERS out of the mist (white puffs and his twinkle stars streaming in from 10 m to his body's CENTRE while the body forms, flickering, a ring of cold light racing out over the stone under him), then POPS solid (the mist boiling back out, a flash); the effects centred on the body as measured off the wait pose; the intro laugh's climb ends LOWER (IntroLaughPitchTo 1.4 -> 1.15, From 0.7 -> 0.75)";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsSplitCutscene.cs) on the 193 commit
+  ("SMS 193: the King Boo REMATCH, part 37 -- the thunder walls' last wrong shock gone (192 had kept a 'gap shut' test that zapped a Mario OUTSIDE the walls as they met: he had jumped one where it stood); a Bomb Boo in Mario's hand BURSTS when he is hit (hurt, shocked, frozen or killed: the pop and gone, no drift); the split cutscene's mist WHITE (a cold white, violet before); the intro laugh SHORTER (IntroLaughSeconds 4.6 -> 3, the climb runs over it)";
   assets/Sms/Rematch/ SmsGhostLightning.cs, SmsKingBooRematch.cs; assets/Mario.cs) on the 192 commit
   ("SMS 192: the King Boo REMATCH, part 36 -- the Boolossus a sixth BIGGER and its wave of Boos lasting 3 s (bursting out, easing to a stop WaveReach out); the thunder walls' and the freeze breath's HITS put with their visuals (a wall is a SLAB about its drawn face and its shock stops where the bolts fade; the breath's mist no longer STALLS on the floor 10 m out while the cold that freezes ran on to 25 -- FloorDrag 0; ShowHitBoxes draws every hit volume in play); the intro laugh starts LOW and CLIMBS (IntroLaughPitchFrom 0.7 -> IntroLaughPitchTo 1.4)";
   assets/Sms/Rematch/ SmsBoolossus.cs, SmsGhostLightning.cs, SmsGhostBreath.cs, SmsKingBooRematch.cs; assets/Sms/Sound/SmsActorSound.cs) on the 191 commit
@@ -1328,9 +1331,12 @@ shock (outside them at the meet) gone; a Bomb Boo in hand bursts on a hit; the s
   Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
   (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
   models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
-  this file's own commit on top of them; 78 commits past `feature/sounds`, 100 since `main`. ~1.2 MB of new files. The range carries none of Jaysonn's
+  this file's own commit on top of them; 80 commits past `feature/sounds`, 102 since `main`. ~1.2 MB of new files. The range carries none of Jaysonn's
   live edits (assets/Level.tscn and the rest). NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says
   the rematch is done (more passes follow on this branch).
+- To try 194: the split cutscenes -- each of him gathers out of white mist and sparkles into his centre, flickering, a ring under him, then pops solid
+  (SplitGatherPuffs / SplitGatherStars / SplitGatherRadius / SplitFadeSeconds / SplitFlicker / SplitRing on KingBoo); the intro laugh's climb ends at 1.15
+  (IntroLaughPitchFrom / IntroLaughPitchTo on KingBoo).
 - To try 193: jump a thunder wall where it stands and wait outside it -- no shock as the walls meet; take a hit holding a Bomb Boo -- it pops and is gone
   (SmsBombBurstsOnHit on Mario); the split cutscene's white mist (SplitMistColor on KingBoo); the shorter intro laugh (IntroLaughSeconds 3).
 - To try 192: the Boolossus smash -- bigger, its ring of Boos out 3 s and slowing (ModelScale, WaveSeconds, WaveReach on Boolossus.tscn); the thunder

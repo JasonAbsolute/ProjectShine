@@ -13354,3 +13354,37 @@ run_window.ps1 and the pass's scheduled tasks deleted.
 
 **Deviations, all knobs:** the white's exact shade (`SplitMistColor`), 3 s for the laugh (`IntroLaughSeconds`) and the burst on a FREEZE too
 (`SmsBombBurstsOnHit` covers hurt, dead and frozen) are my reading; the slab-only rule is the fix.
+
+### 194 -- the King Boo REMATCH, part 38: the split cutscene's arrivals REBUILT -- each of him GATHERS out of the mist (white puffs and his twinkle stars streaming in from 10 m to his body's CENTRE while the body forms, flickering, a ring of cold light racing out over the stone under him), then POPS solid (the mist boiling back out, a flash); the effects centred on the body as measured off the wait pose (the joint sits at the node, the body -2.6..+4.4 about it: the old fixed 3 m was his top); the intro laugh's climb ends LOWER (IntroLaughPitchTo 1.4 -> 1.15, From 0.7 -> 0.75) (feature/kingboo-rematch, code `40a4945`)
+
+**Jaysonn:** "hmm i think the effects could be a little better for the splitting cutscene when he spawns 2 and 3. also intro the laugh is too high pitched at the
+end." -- and, on the first cut: "the white puffs are going in at the top of king boo, needs to be his center".
+
+**The arrivals** (`SmsKingBooRematch.cs`, `SmsSplitCutscene.cs`): 188-193 had each of him arrive with the teleport-in flash and a boil of mist over a 0.3 s fade.
+Now, as each comes into the line: `SplitGather` -- `SplitGatherPuffs` (160) white smoke balls born on a shell `SplitGatherRadius` (10 m) out stream INTO his
+body's centre over `SplitFadeSeconds` (0.7; a negative radial velocity, the speeds spread 0.7-1.15 so it is a stream, not one clean shell -- the first cut's
+rings of beads), big and soft and shrinking as they close in (4.5 -> 1.4 m at 0.55 alpha; the first cut's 2.4 -> 0.7 read as a swarm of beads); his twinkle
+stars (`SplitGatherStars`, 40) stream in with them; a ring of cold light (`SplitRing`, to `SplitRingRadius` 13 m over `SplitRingSeconds` 0.8) races out over
+the stone under him with a glow there. The body FORMS as the mist arrives: nothing for the gather's first third, then up quick (k^0.7), FLICKERING at 9 Hz
+by `SplitFlicker` (0.3; 0 = a plain fade -- a thin white over the black sky is a grey shadow, the flicker reads as a ghost phasing in). The moment he is solid,
+`SplitPop`: the mist boils back out of him (`SplitMistPuffs`, as before) with a flash at his middle. Skipped with A: the boil at once, as before.
+
+**Centred on the body**: the first cut put the gather, the pop and the boil 3 m over the node -- his TOP (Jaysonn saw the puffs go in at the crown). Measured in
+the drive: in the wait pose the body joint sits 0.14 m UNDER the node and the hit cylinder runs -2.6..+4.4 about it, so the body's centre is 0.86 m over the
+node. `WaitBodyLift` reads the joint's height off him as he waits (past the clip blend, smoothed), `SplitBodyCentreLift` = that + (HitAbove - HitBelow) / 2, and
+the three effects use it; `SplitBodyLiftGuess` (0) stands in before any wait. His arena hovers him 8.5 m over the floor.
+
+**The laugh** (`SmsKingBooRematch.cs`): `IntroLaughPitchFrom` 0.7 -> 0.75, `IntroLaughPitchTo` 1.4 -> 1.15 -- seven semitones instead of an octave; it ends a
+shade over the casino's own pitch rather than shrill.
+
+**Verified** (headless drive v194-4, deleted before the commit): C22 after the two-of-him cutscene -- two gathers and two pops drawn, the fade 0.7 s with the
+flicker 0.3 and the ring on, the wait pose's lift read (-0.14 m), the effects' centre 0.86 m over the node and within the hit cylinder; C22b after the
+three-of-him cutscene -- five gathers and five pops in all; C19 the laugh 0.751 -> 0.999 at 2 s -> 1.149 at the dive, no drop, the player following; 193-179's
+checks as before -- 35/35, no errors. Shot runs (54 shots): the mist and the stars streaming in about his body (not his crown) with the body a grey ghost in
+it, the body forming with the puffs closing on its middle, the pop with the boil out of his centre, the copy flickering in grey as the mist gathers on it, the
+third gathering beside the two, the chorus of three. Two shot runs and the first clean-up were lost to my batching the build with the run (the lesson
+re-saved); no harm to the PC. The clean rebuild 0 errors; the drive, the logs, shots165/, run_window.ps1 and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** the gather (puffs, stars, radius, time), the flicker, the ring and the pop are my design of "better effects"; 0.75 -> 1.15 is my reading
+of "too high at the end" (`IntroLaughPitchTo` 1 = ending on the casino's own pitch). Known, not this pass: the twinkle stars' faint square halos against the
+black sky (`ChikaFx`'s texture), seen behind the gathering stars.
