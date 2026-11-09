@@ -13600,3 +13600,43 @@ and the pass's scheduled tasks deleted.
 **Deviations, all knobs:** 0.75 of the way to pure red at the brightest and a 0.8 glow are my picks for "flash red" that still shows a Boo; 3 -> 10 Hz over
 the fall; the dud's quiet, then 2.5 s of warning (`DudWarnSeconds`) out of its 6 s fuse. Not committed: the editor's seven detect-3D .import rewrites
 (Jaysonn's, as in 198-200).
+
+### 201 -- the King Boo REMATCH, part 46: two new attacks -- the AMBUSH from below (he sinks where he stands, his glow pool hunts Mario across the stone for 3 s, stops and flares, and he erupts there through the floor with a 5 m shock ring; jump at the break; he is up at the pool's spot) and the BOO CIRCLE, Super Mario World's ghost-house ring (seven hotel Boos on eight places about Mario, one gap, turning once every 4 s at head height; it holds 2 s, closes on him over 8 s and fades; out through the gap as it comes round) (feature/kingboo-rematch, code `3fa8076`)
+
+**Jaysonn:** "lets do 1 and i kinda wanna have a circle of boos attack similar to how ghosts house used to have them in super mario world"
+
+**The ambush** (`SmsKingBooRematch.cs`, `Phase.Ambush` / `Move.Ambush`; `AmbushOn`, `AmbushWeight` 1): from the wait he SINKS where he stands -- the hide clip,
+the body fading over `AmbushSinkSeconds` (0.5), his poof -- and his glow POOL comes up on the stone under him: the rise's own glow and wisps (181),
+`AmbushPoolSize` (7 m) across, which HUNTS Mario for `AmbushHuntSeconds` (3): it slides toward his feet at `AmbushHuntSpeed` (6 m/s), `AmbushHuntQuicken`
+(1.6) times that by the end, never past the arena's edge, leaving its mist behind it, King Boo riding 7 m under it. Then it STOPS and FLARES for
+`AmbushTellSeconds` (0.45; a low chuckle under the stone) and he ERUPTS there: the appear clip's leap up through the floor (182), the rise's floor burst,
+kick and stars, and a shock RING (`AmbushRingColor`) racing out to `AmbushRingRadius` (5 m) over `AmbushRingSeconds` (0.45): a Mario within it whose feet are
+under `AmbushRingHeight` (1.6 m) is hit (the common enemy damage) -- a jump at the break clears it. He is up at the pool's spot (the ambush moves him), the
+wait. Under the floor (the sink, the hunt, the tell) he cannot be hit. Signals `AmbushStarted` / `AmbushTell` / `AmbushErupted(hit)` / `AmbushDone(hits)`;
+readouts `AmbushStage`, `AmbushPool`, `AmbushHuntK`, `AmbushRingRadiusNow`, `AmbushRingHit`, `AmbushBreaks`, `AmbushesMade`, `AmbushHits`. The rise's glow
+takes a size and a flare now (the pool is smaller than the intro's 14 m glow and swells at the tell).
+
+**The Boo circle** (NEW `assets/Sms/Rematch/SmsBooCircle.cs` + .uid; `SmsKingBooRematch.cs` `Phase.Circle` / `Move.Circle`; `CircleOn`, `CircleWeight` 1, one
+at a time): his laugh through the tell (the crown `CircleCrownColor`, a pale violet, `CircleTellSeconds` 0.8), then a RING of hotel Boos (`telesa.glb` on its
+own TelesaToon materials, as the Boolossus's wave Boos; `BooScale` 1.1, `BooRadius` 1.1 m) forms about Mario where he stands: `CircleCount` (8) places,
+`CircleGap` (1) of them EMPTY -- the gap -- `CircleRadius` (7 m) out, `CircleHeight` (1.5 m) over the floor (the Boos' middles; a Boo's top is that plus half
+its height), facing the middle, TURNING once every `CircleRevSeconds` (4; the way at random), fading in over 0.4 s. It holds its size `CircleHoldSeconds` (2),
+then CLOSES to `CircleMinRadius` (1 m) by `CircleSeconds` (8) while it drifts after Mario at `CircleDriftSpeed` (1 m/s), and FADES (a puff per Boo). A Boo
+whose body meets Mario's damage cylinder hurts him (the common enemy damage). Out through the gap as it comes round, or over a Boo. `CircleWatchSeconds`
+(0.5) after the ring is up, the wait (the ring runs on its own; a hit on him through it fades it). Signals `CircleStarted` / `CircleMade(boos)` /
+`CircleHit` / `CircleDone(hits)`; readouts `CirclesMade`, `CircleHits`, `Circle` (`RadiusNow`, `Angle`, `GapBearing`, `Centre`, `Boos`...).
+
+**Verified** (headless drive v201-3, deleted before the commit): C33 he sank (the body to 0.03, his poof), the pool came up under him and hunted a standing
+Mario from 6 m to under his feet (hunt k 0.99; 11.7 m from the middle at most), stopped (the tell), he broke the floor 0.67 s after it, the ring got Mario at
+r 0.08 (HP 5 -> 4), and he ended up 0.00 m off the pool at his hover height (8.5 m); never hittable under the floor. C34 the crown violet, 7 Boos at 7.00 m
+(err 0.000) 1.5 m up, one 90-degree gap where `GapBearing` says (the others 45), turning 90.7 deg in the first second, the radius held 7 m then 3.99 at 5 s, a
+Boo got the standing Mario at r 1.66 (7.3 s), the ring faded at 1.01 m at 7.98 s, King Boo back in the wait within 1.5 s. 200b-179's checks as before --
+48/48 (the drive heals Mario's two hits afterwards; without that he died in the copies' breath later -- run ds). Shots (run cp): 29a the pool hunting Mario
+with its mist behind it, 29b the stop and flare under him, 29c the break's ring and burst on him, 29c2 King Boo shooting up through the floor, 29d up at the
+pool's spot; 30a the ring from above (the gap), 30b from Mario's shoulder (the shy Boos turning at head height), 30b2 one passing close, 30c closing from
+above, 30c2 tight about him, 30d the Boos fading. The clean rebuild 0 errors; the drive, the logs, the shots and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** the pool hunts a standing Mario to his feet (a running Mario stays ahead: 6 m/s rising to 9.6); the ring 5 m / 0.45 s and the
+0.45 s flare are my picks; the circle's Boos are at head height so a plain jump does not clear them (`CircleHeight`; higher = jump under them); the ring closes
+to 1 m, so a Mario who never leaves is hit (`CircleMinRadius` 2 = a safe middle); the ring drifts 1 m/s after him (0 = fixed, as SMW's). Not committed: the
+editor's detect-3D .import rewrites (Jaysonn's, as in 198-200b).
