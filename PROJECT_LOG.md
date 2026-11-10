@@ -13736,3 +13736,25 @@ an extra I added for the motion; `TrailStreaks` 0 takes them out. The first shot
 reference as his phase ends ("the balls roll on on their own") -- the shot drive now keeps the maker itself; the first headless run's check came before the
 balls had settled to a roll (they fall from 20 m and bounce twice, ~4 s) -- it now waits for the roll. Not committed: the editor's detect-3D .import rewrites
 (Jaysonn's, as in 198-203).
+
+### 205 -- the King Boo REMATCH, part 50: a FIREBALL GOING OUT ends in a little PUFF (dark smoke rising from where it was, a flash, a ring of light, embers flung out; 168-204's balls shrank to nothing and winked out) (feature/kingboo-rematch, code `9cc33df`)
+
+**Jaysonn:** "nice we just need the effect to look alittle better when it goes away like alittle puff?"
+
+**`SmsFireballs.cs`** (the maker's knobs, "The look": `EndPuff` on, `EndPuffs` 10, `EndSparks` 12, `EndPuffScale` 0.9). A ball's natural end -- shrunk to nothing over
+`LifeSeconds` -- and a fizzle that is not a burst on Mario reach `Die()`; the burst on Mario (168) keeps its own effects (`_burst`). `Die()` now fires `EndPuff()`
+first: `EndPuffs` puffs of dark smoke (kemuball3, mix; a tight sphere 0.3 x the size, 0.8-2 m/s with a 70 deg spread, rising at 1 m/s^2, growing 0.6 -> 1.35 over
+0.7 s, brown -> dark -> gone), `EndSparks` embers (glow1_spark, 2-5 m/s every way, falling at 8 m/s^2, 0.55 s), one FLASH (glow3_raw, 2.4 x the size, bright at once,
+swelling 0.7 -> 1.5 and gone in 0.26 s), and the ring of light (2.8 x the size, 0.3 s). Everything is sized from the ball's BIRTH radius x `EndPuffScale` (it is
+tiny by its end) and left in the world as TopLevel one-shots that free themselves. Readouts `EndPuffsFired` on the ball, `EndPuffsMade` on the maker. `Die()` also
+stops the trail and the streaks (204) with the embers.
+
+**Verified:** shots (run cx) 32e a ball that went out on its own, 0.1 s on -- the smoke dome with the embers in it and the flash over it; 32e2 a quarter second on
+-- the smoke darker, spreading, the embers falling. Headless drive v205-1 (deleted before the commit): C40 the first balls to reach the end of their life fired their
+puff (3 dead, 3 puffed, `EndPuffsMade` 3, an EndPuff emitter live in the world), 2.1 s after the trail check; 204-179's checks as before -- 54/54. The clean rebuild
+0 errors; the drive, the logs, the shots and the pass's tasks deleted.
+
+**Deviations, all knobs:** the puff's numbers are mine; the first cut (run cw) read as a pale haze -- the smoke is now tighter and darker and the flash was added.
+The first two shot rounds caught the wrong death (a ball that had burst on Mario, no puff by design) and then none (the maker drops a dead ball from its list the
+same frame) -- the shot drive now keeps its own list of the balls and waits for one that went out on its own. "It" in the ask read as the fireball, the thing of
+the pass before. Not committed: the editor's detect-3D .import rewrites (Jaysonn's, as in 198-204).
