@@ -62,6 +62,15 @@ public partial class SmsFireballs : Node3D
     [Export] public float TrailSeconds = 0.55f, TrailSize = 1.15f, TrailBack = 0.25f;
     [Export(PropertyHint.Range, "0,64,1")] public int TrailStreaks = 20;
     [Export(PropertyHint.Range, "0,1.5,0.05")] public float TrailLean = 0.7f;
+    /// <summary>205 (Jaysonn: "the effect could look a little better when it goes away, like a little puff"): a ball GOING OUT -- the end of its life (it has shrunk to
+    /// nothing) or a fizzle that is not a burst on Mario -- ends in a small PUFF where it was: EndPuffs puffs of dark smoke rising and spreading, EndSparks embers flung
+    /// out and falling, and a small ring of light, all EndPuffScale x the ball's birth size (it is tiny by then). The burst on Mario has its own effects (168). Off: 168-204's
+    /// -- it just winks out.</summary>
+    [Export] public bool EndPuff = true;
+    [Export(PropertyHint.Range, "0,40,1")] public int EndPuffs = 10;
+    [Export(PropertyHint.Range, "0,40,1")] public int EndSparks = 12;
+    [Export(PropertyHint.Range, "0.2,2,0.05")] public float EndPuffScale = 0.9f;
+    public int EndPuffsMade { get; set; }
     [ExportGroup("The sounds")]
     [Export] public string VolleySe = "MSD_SE_BS_TELESA_FIRE", SpitSe = "MSD_SE_BS_WANWAN_REBURN1", BounceSe = "MSD_SE_MA_BOUND";
     [ExportGroup("")]
@@ -473,6 +482,7 @@ public partial class SmsFireball : Node3D
     public void Fizzle() { if (!Fizzling && !Dead) { bool burst = HitMario; Fizzling = true; _fizzleT = 0f; HitMario = true; if (_flames != null) _flames.Emitting = false; if (_mark != null) { _mark.QueueFree(); _mark = null; } if (burst) Burst(); } }
     private void Burst()
     {
+        _burst = true;                                                                                 // 205: the burst stands in for the end puff
         var pm = new ParticleProcessMaterial
         {
             EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = R * 0.6f,
@@ -498,10 +508,53 @@ public partial class SmsFireball : Node3D
     }
     private void Die()
     {
+        if (!_burst) EndPuff();                                                                        // 205: the little puff as it goes out (the burst on Mario brought its own)
         Dead = true; Visible = false;
         if (_light != null) _light.LightEnergy = 0f;
-        foreach (var p in new[] { _embers, _drips, _smoke }) if (p != null) p.Emitting = false;
+        foreach (var p in new[] { _embers, _drips, _smoke, _trail, _streaks }) if (p != null) p.Emitting = false;
         if (_mark != null) { _mark.QueueFree(); _mark = null; }
         GetTree().CreateTimer(1.3f).Timeout += () => { if (IsInstanceValid(this)) QueueFree(); };
+    }
+    private bool _burst;
+    /// <summary>205, for the drives: the puffs this ball made going out (0 or 1).</summary>
+    public int EndPuffsFired { get; private set; }
+    /// <summary>205: the small puff where the ball goes out -- dark smoke rising and spreading, a few embers flung out and falling, a small ring of light; sized from the
+    /// ball's BIRTH radius (EndPuffScale x it: the ball itself has shrunk to nothing by its end), left in the world (TopLevel one-shots that free themselves).</summary>
+    private void EndPuff()
+    {
+        if (_owner == null || !_owner.EndPuff || !IsInsideTree()) return;
+        float s = Mathf.Max(0.3f, R0 * _owner.EndPuffScale);
+        Vector3 at = GlobalPosition;
+        if (_owner.EndPuffs > 0)
+        {
+            var sm = new ParticleProcessMaterial
+            {
+                EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = s * 0.3f,
+                Direction = new Vector3(0f, 1f, 0f), Spread = 70f, InitialVelocityMin = 0.8f, InitialVelocityMax = 2f, Gravity = new Vector3(0f, 1f, 0f), DampingMin = 1.5f, DampingMax = 3f,
+                ScaleMin = 1f, ScaleMax = 1f, ScaleCurve = SmsFireballs.Ramp(0.6f, 1.35f), AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -60f, AngularVelocityMax = 60f,   // run cw: 0.5 -> 1.7 spread into a pale haze; tighter, and darker below
+                Color = new Color(1f, 1f, 1f, 1f), ColorRamp = SmsFireballs.Fade(new Color(0.45f, 0.26f, 0.16f, 0.2f), new Color(0.17f, 0.12f, 0.1f, 0.9f), new Color(0.11f, 0.09f, 0.09f, 0.55f), new Color(0.08f, 0.08f, 0.08f, 0f))
+            };
+            var smat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Mix, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true, BillboardMode = BaseMaterial3D.BillboardModeEnum.Particles, AlbedoTexture = SmsFireballs.Tex("kemuball3_raw"), CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true };
+            var p = new GpuParticles3D { Name = "EndPuff", TopLevel = true, Amount = _owner.EndPuffs, Lifetime = 0.7, OneShot = true, Explosiveness = 0.9f, Emitting = false, LocalCoords = false, FixedFps = 60, Interpolate = true, DrawOrder = GpuParticles3D.DrawOrderEnum.ViewDepth, ProcessMaterial = sm, DrawPass1 = new QuadMesh { Size = Vector2.One * (s * 1.1f), Material = smat }, VisibilityAabb = new Aabb(new Vector3(-8f, -4f, -8f), new Vector3(16f, 12f, 16f)) };
+            (GetParent() ?? this).AddChild(p); p.GlobalPosition = at; p.Finished += p.QueueFree; p.Emitting = true;
+        }
+        if (_owner.EndSparks > 0)
+        {
+            var pm = new ParticleProcessMaterial
+            {
+                EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = s * 0.3f,
+                Direction = new Vector3(0f, 1f, 0f), Spread = 180f, InitialVelocityMin = 2f, InitialVelocityMax = 5f, Gravity = new Vector3(0f, -8f, 0f), DampingMin = 0.5f, DampingMax = 1.5f,
+                ScaleMin = 0.7f, ScaleMax = 1.3f, Color = new Color(_owner.EmberColor.R, _owner.EmberColor.G, _owner.EmberColor.B, 1f),
+                ColorRamp = SmsFireballs.Fade(new Color(1f, 1f, 1f, 1f), new Color(1f, 1f, 1f, 1f), new Color(1f, 0.55f, 0.25f, 0.7f), new Color(0.8f, 0.2f, 0.05f, 0f))
+            };
+            var p = new GpuParticles3D { Name = "EndSparks", TopLevel = true, Amount = _owner.EndSparks, Lifetime = 0.55, OneShot = true, Explosiveness = 1f, Emitting = false, LocalCoords = false, FixedFps = 60, Interpolate = true, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One * 0.16f, Material = SmsFireballs.AddBillboard(SmsFireballs.Tex("glow1_spark")) }, VisibilityAabb = new Aabb(new Vector3(-8f, -4f, -8f), new Vector3(16f, 12f, 16f)) };
+            (GetParent() ?? this).AddChild(p); p.GlobalPosition = at; p.Finished += p.QueueFree; p.Emitting = true;
+        }
+        // the flash: one glow, bright at once, swelling a little and gone in a quarter second (the "pop" of the puff; run cw had the smoke alone, a haze)
+        var fm = new ParticleProcessMaterial { EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Point, Direction = Vector3.Up, Spread = 0f, InitialVelocityMin = 0f, InitialVelocityMax = 0f, Gravity = Vector3.Zero, ScaleMin = 1f, ScaleMax = 1f, ScaleCurve = SmsFireballs.Ramp(0.7f, 1.5f), Color = new Color(1f, 1f, 1f, 1f), ColorRamp = SmsFireballs.Fade(new Color(1f, 0.95f, 0.7f, 1f), new Color(1f, 0.6f, 0.2f, 0.9f), new Color(1f, 0.35f, 0.08f, 0.4f), new Color(0.6f, 0.1f, 0.02f, 0f)) };
+        var f = new GpuParticles3D { Name = "EndFlash", TopLevel = true, Amount = 1, Lifetime = 0.26, OneShot = true, Explosiveness = 1f, Emitting = false, LocalCoords = false, FixedFps = 60, Interpolate = true, ProcessMaterial = fm, DrawPass1 = new QuadMesh { Size = Vector2.One * (s * 2.4f), Material = SmsFireballs.AddBillboard(SmsFireballs.Tex("glow3_raw")) }, VisibilityAabb = new Aabb(new Vector3(-8f, -4f, -8f), new Vector3(16f, 12f, 16f)) };
+        (GetParent() ?? this).AddChild(f); f.GlobalPosition = at + Vector3.Up * (s * 0.3f); f.Finished += f.QueueFree; f.Emitting = true;
+        Ring(at, s * 2.8f, new Color(1f, 0.55f, 0.15f, 0.9f), 0.3f);
+        EndPuffsFired++; _owner.EndPuffsMade++;
     }
 }
