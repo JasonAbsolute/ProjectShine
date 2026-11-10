@@ -51,6 +51,17 @@ public partial class SmsFireballs : Node3D
     [Export(PropertyHint.Range, "0,32,1")] public int Drips = 10;
     [Export(PropertyHint.Range, "0,32,1")] public int Smoke = 18;
     [Export(PropertyHint.Range, "0,1,0.05")] public float HeatAtEnd = 0.3f;
+    /// <summary>204 (Jaysonn: "the fireballs need the fire to trail behind them -- right now there are sparks; give them more feel that they are moving"): the FIRE TRAIL.
+    /// Flame puffs are left in the WORLD behind each ball as it flies and rolls (TrailPuffs alive at once, each TrailSeconds long, born TrailSize x the ball's radius,
+    /// shrinking and rising as they go from yellow through the flame colour to a dark red), drifting back along the way it came (TrailBack: their speed backward as a
+    /// fraction of the ball's -- 0 = left where they were born); thin hot STREAKS along the motion (TrailStreaks of them, a quarter second each); and the ball's own
+    /// flames LEAN BACK with its speed (TrailLean: 0 = straight up as before, 1 = laid flat back at the roll speed). Trail off = 168's: the flames ride on the ball
+    /// and only the embers, drips and smoke are left behind.</summary>
+    [Export] public bool Trail = true;
+    [Export(PropertyHint.Range, "0,200,1")] public int TrailPuffs = 72;
+    [Export] public float TrailSeconds = 0.55f, TrailSize = 1.15f, TrailBack = 0.25f;
+    [Export(PropertyHint.Range, "0,64,1")] public int TrailStreaks = 20;
+    [Export(PropertyHint.Range, "0,1.5,0.05")] public float TrailLean = 0.7f;
     [ExportGroup("The sounds")]
     [Export] public string VolleySe = "MSD_SE_BS_TELESA_FIRE", SpitSe = "MSD_SE_BS_WANWAN_REBURN1", BounceSe = "MSD_SE_MA_BOUND";
     [ExportGroup("")]
@@ -219,6 +230,16 @@ public partial class SmsFireball : Node3D
     private const float U = 74.44f;
     private SmsFireballs _owner; private MeshInstance3D _core, _glow, _mark; private ShaderMaterial _crust; private StandardMaterial3D _glowMat, _markMat; private GpuParticles3D _flames, _embers, _drips, _smoke; private OmniLight3D _light;
     private float _vy, _k = 1f, _flare, _fizzleT, _seed; private bool _inAir;
+    // 204: the fire trail -- the world puffs and the streaks behind the ball, and the ball's own flames' material (its direction leans back with the speed)
+    private GpuParticles3D _trail, _streaks; private ParticleProcessMaterial _flamesPm, _trailPm, _streaksPm;
+    /// <summary>204, for the drives: the trail emitter is on and world-space, where it emits from (it rides the ball), how many puffs it keeps, the streaks' count,
+    /// and how far the ball's own flames lean back along the way it moves (the flames' direction dotted with the motion reversed: 0 = straight up, 1 = flat back).</summary>
+    public bool TrailOn => _trail != null && IsInstanceValid(_trail) && _trail.Emitting && !_trail.LocalCoords;
+    public Vector3 TrailEmitPoint => _trail != null && IsInstanceValid(_trail) ? _trail.GlobalPosition : GlobalPosition;
+    public int TrailPuffsNow => _trail != null && IsInstanceValid(_trail) ? _trail.Amount : 0;
+    public int TrailStreaksNow => _streaks != null && IsInstanceValid(_streaks) && _streaks.Emitting ? _streaks.Amount : 0;
+    public float TrailLeanNow { get; private set; }
+    public float TrailBackSpeedNow => _trailPm != null ? _trailPm.InitialVelocityMax : 0f;
     /// <summary>203: every ball in the world (they live in the arena, not under their maker: a cancelled maker is freed while its balls still fizzle) -- the field clear's list.</summary>
     public static readonly List<SmsFireball> All = new();
     public override void _Ready() { All.Add(this); }
@@ -255,7 +276,31 @@ public partial class SmsFireball : Node3D
                 Color = new Color(1f, 1f, 1f, 1f), ColorRamp = SmsFireballs.Fade(new Color(1f, 0.9f, 0.35f, 0.9f), owner.FlameColor, new Color(0.8f, 0.1f, 0.02f, 0.7f), new Color(0.4f, 0.03f, 0.01f, 0f))
             };
             _flames = new GpuParticles3D { Name = "Flames", Amount = owner.Flames, Lifetime = 0.35, Emitting = true, LocalCoords = true, FixedFps = 60, Interpolate = true, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One * (R0 * 1.1f), Material = SmsFireballs.AddBillboard(SmsFireballs.Tex("fire1_raw")) }, VisibilityAabb = new Aabb(new Vector3(-6f, -6f, -6f), new Vector3(12f, 12f, 12f)) };
-            AddChild(_flames);
+            AddChild(_flames); _flamesPm = pm;
+        }
+        if (owner.Trail && owner.TrailPuffs > 0)   // 204: the fire left behind it -- world puffs born at the ball, drifting back the way it came, rising and dying
+        {
+            _trailPm = new ParticleProcessMaterial
+            {
+                EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = R0 * 0.55f,
+                Direction = new Vector3(0f, 0f, 1f), Spread = 22f, InitialVelocityMin = 0.5f, InitialVelocityMax = 1.5f, Gravity = new Vector3(0f, R0 * 1.6f, 0f), DampingMin = 0.5f, DampingMax = 1f,
+                ScaleMin = 0.85f, ScaleMax = 1.15f, ScaleCurve = SmsFireballs.Ramp(1f, 0.25f), AngleMin = -180f, AngleMax = 180f, AngularVelocityMin = -120f, AngularVelocityMax = 120f,
+                Color = new Color(1f, 1f, 1f, 1f), ColorRamp = SmsFireballs.Fade(new Color(1f, 0.95f, 0.5f, 0.95f), owner.FlameColor, new Color(0.85f, 0.12f, 0.02f, 0.6f), new Color(0.35f, 0.03f, 0.01f, 0f))
+            };
+            _trail = new GpuParticles3D { Name = "Trail", TopLevel = true, Amount = owner.TrailPuffs, Lifetime = Mathf.Max(0.1f, owner.TrailSeconds), Emitting = true, LocalCoords = false, FixedFps = 60, Interpolate = true, ProcessMaterial = _trailPm, DrawPass1 = new QuadMesh { Size = Vector2.One * (R0 * owner.TrailSize), Material = SmsFireballs.AddBillboard(SmsFireballs.Tex("fire1_raw")) }, VisibilityAabb = new Aabb(new Vector3(-60f, -10f, -60f), new Vector3(120f, 30f, 120f)) };
+            AddChild(_trail);
+        }
+        if (owner.Trail && owner.TrailStreaks > 0)   // 204: hot streaks along the motion (aligned to their own velocity, which runs back the way the ball came)
+        {
+            _streaksPm = new ParticleProcessMaterial
+            {
+                EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = R0 * 0.5f, ParticleFlagAlignY = true,
+                Direction = new Vector3(0f, 0f, 1f), Spread = 12f, InitialVelocityMin = 2f, InitialVelocityMax = 4f, Gravity = Vector3.Zero, DampingMin = 2f, DampingMax = 4f,
+                ScaleMin = 0.8f, ScaleMax = 1.2f, Color = new Color(1f, 1f, 1f, 1f),
+                ColorRamp = SmsFireballs.Fade(new Color(1f, 0.95f, 0.6f, 1f), new Color(1f, 0.6f, 0.15f, 0.9f), new Color(0.9f, 0.25f, 0.05f, 0.5f), new Color(0.4f, 0.05f, 0.01f, 0f))
+            };
+            _streaks = new GpuParticles3D { Name = "Streaks", TopLevel = true, Amount = owner.TrailStreaks, Lifetime = 0.28, Emitting = true, LocalCoords = false, FixedFps = 60, Interpolate = true, ProcessMaterial = _streaksPm, DrawPass1 = new QuadMesh { Size = new Vector2(R0 * 0.12f, R0 * 0.9f), Material = SmsFireballs.AddStreak(SmsFireballs.Tex("glow1_spark")) }, VisibilityAabb = new Aabb(new Vector3(-60f, -10f, -60f), new Vector3(120f, 30f, 120f)) };
+            AddChild(_streaks);
         }
         if (owner.Embers > 0)
         {
@@ -383,8 +428,22 @@ public partial class SmsFireball : Node3D
         if (_glowMat != null && _owner != null) _glowMat.AlbedoColor = new Color(_owner.GlowColor.R, _owner.GlowColor.G, _owner.GlowColor.B, 0.55f * a * (0.5f + 0.5f * Heat) * (_flare > 0f ? 1.5f : 1f));
         if (_light != null && _owner != null) _light.LightEnergy = _owner.LightEnergy * a * Mathf.Clamp(_k * 1.5f, 0.2f, 1f) * (0.5f + 0.5f * Heat);
         bool trailing = !Fizzling && a > 0.1f;
-        foreach (var p in new[] { _embers, _drips, _smoke }) if (p != null) { p.GlobalPosition = GlobalPosition; p.Emitting = trailing; }
+        foreach (var p in new[] { _embers, _drips, _smoke, _trail, _streaks }) if (p != null) { p.GlobalPosition = GlobalPosition; p.Emitting = trailing; }
         if (_drips != null) _drips.Emitting = trailing && Heat > 0.45f;                         // a cooled ball no longer drips
+        // 204: the fire streams BACK the way the ball moves -- the trail's puffs and streaks are given the motion reversed as their way, their speed from the ball's; the ball's own flames lean back with it
+        Vector3 v = new Vector3(Vel.X, _inAir ? _vy : 0f, Vel.Z); float speed = v.Length();
+        if (speed > 0.3f)
+        {
+            Vector3 back = -v / speed; float roll = _owner != null && _owner.RollSpeed > 0.5f ? _owner.RollSpeed : 8f; float speedK = Mathf.Clamp(speed / roll, 0f, 1.5f);
+            if (_trailPm != null) { float bk = (_owner != null ? _owner.TrailBack : 0.25f) * speed; _trailPm.Direction = back; _trailPm.InitialVelocityMin = bk * 0.6f; _trailPm.InitialVelocityMax = bk; _trailPm.ScaleMin = 0.85f * s; _trailPm.ScaleMax = 1.15f * s; }   // the puffs born as big as the ball is now (it shrinks over its life; the emitter is TopLevel, the ball's scale does not reach it)
+            if (_streaksPm != null) { _streaksPm.Direction = back; _streaksPm.InitialVelocityMin = speed * 0.3f; _streaksPm.InitialVelocityMax = speed * 0.5f; }
+            if (_flamesPm != null && _owner != null)
+            {
+                Vector3 flat = new Vector3(back.X, 0f, back.Z); float fl = flat.Length(); flat = fl > 1e-4f ? flat / fl : Vector3.Zero;
+                Vector3 dir = (Vector3.Up + flat * (_owner.TrailLean * speedK)).Normalized();
+                _flamesPm.Direction = dir; TrailLeanNow = dir.Dot(flat);
+            }
+        }
         if (_mark != null && _markMat != null) _markMat.AlbedoColor = new Color(1f, 0.45f, 0.1f, 0.3f + 0.3f * MathF.Sin(Age * 14f));
     }
     /// <summary>A splat of lava where the ball meets the floor: drops flung out (align_y streaks under gravity) and a small ring; k scales it.</summary>
