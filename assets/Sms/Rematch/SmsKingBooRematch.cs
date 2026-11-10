@@ -297,6 +297,11 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public bool SplitRing = true;
     [Export] public float SplitRingRadius = 13f, SplitRingSeconds = 0.8f;
     [Export] public bool SplitSkipAllowed = true;
+    /// <summary>203 (Jaysonn: "when the cutscene plays for phase 2 and 3, all the attacks go away"): as the cutscene cuts in, EVERY attack live in the arena is gone
+    /// at once -- his and his copies' thunder walls, tornados, fireballs, breath, the Bomb Boos he spat (in the air, or a dud on the floor), the Boo circle, the
+    /// Boolossi and their wave, and the ice on Mario (he thaws) -- under the cut, no effects. The supply's Boos and the one in Mario's hand are his and stay.
+    /// Off: 188-202's -- the attacks freeze with the world and run on (a tornado stands through the whole cutscene) when it ends.</summary>
+    [Export] public bool SplitClearsAttacks = true;
     [ExportGroup("")]
     [Export] public bool CopyFireballs = true, CopyBreath = true;
     /// <summary>178 (Jaysonn: "the king boo should not disappear thats fake he should just take a hit and then vanish to a new spot ... we do need a way to tell
@@ -469,10 +474,11 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>The spit (SmsBooVolley's knobs, set here as a template): how many Bomb Boos out of the MOUTH, the time between them, how high over the mouth they
     /// lob (metres), how far about Mario they come down (metres; the first within VolleyAimedWithin of him, the rest anywhere out to VolleyScatter), the
     /// blast's reach on the floor and how high it reaches (Mario's feet higher are over it: the jump), whether the LAST one is a DUD -- a live Bomb Boo that
-    /// floats where it lands for Mario to grab, at least VolleyDudMinFromMario from him -- and how long its fuse burns once down (0 = it never blasts on its own).</summary>
+    /// floats where it lands for Mario to grab, at least VolleyDudMinFromMario from him -- and how long its fuse burns once down (0 = it never blasts on its own).
+    /// 203 (Jaysonn: "let's not have a dud for King Boo's Bomb Boo attack"): VolleyDud is OFF -- every Boo he spits is lit and blasts where it lands; on = 200's dud.</summary>
     [Export(PropertyHint.Range, "1,8,1")] public int VolleyCount = 3;
     [Export] public float VolleySpacing = 0.4f, VolleyLobHeight = 9f, VolleyScatter = 5f, VolleyAimedWithin = 1f, VolleyBlastRadius = 3.5f, VolleyBlastHeight = 1.6f;
-    [Export] public bool VolleyDud = true;
+    [Export] public bool VolleyDud = false;
     [Export] public float VolleyDudSeconds = 6f, VolleyDudMinFromMario = 2.5f;
     [ExportGroup("The fight (201): the AMBUSH from below")]
     /// <summary>201 (Jaysonn: "lets do 1" -- the ambush from below): he SINKS where he stands (the hide clip, the fade, his poof -- AmbushSinkSeconds) and his glow

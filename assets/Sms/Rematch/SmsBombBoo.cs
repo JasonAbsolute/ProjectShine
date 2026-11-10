@@ -994,6 +994,19 @@ public partial class SmsBombBoo : Node3D
         if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: vanishes");
         Gone();
     }
+    /// <summary>203 (the split's cutscene clears the field): SPAT by King Boo and still his -- in the air on its lob, or the dud floating where it landed -- it is gone
+    /// AT ONCE, no puff, no sound, its trail and its mark with it (the cut hides it). The supply's Boos and the one in Mario's hand are not touched. True = it went.</summary>
+    public bool VanishIfSpat()
+    {
+        if (State == Phase.Gone || State == Phase.Carried || IsQueuedForDeletion()) return false;
+        if (!(IsLobbed || LobDud)) return false;
+        bool inAir = IsLobbed;
+        State = Phase.Gone;
+        Visible = false;                                                                                     // the body, the tongue, the trail's puffs and the mark (TopLevel children) in one go
+        if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: cleared with the field ({(inAir ? "in the air" : "the dud on the floor")})");
+        Gone();
+        return true;
+    }
     /// <summary>170: the Bob-omb's blast at the Boo, the boom, the shake.</summary>
     private void Blast()
     {

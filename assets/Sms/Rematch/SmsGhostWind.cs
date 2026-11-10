@@ -179,11 +179,20 @@ public partial class SmsGhostWind : Node3D
     public void Cancel()
     {
         if (State == Phase.Done) return;
-        State = Phase.Done; All.Remove(this);
+        State = Phase.Done;                                                                                     // 203: it stays in All till it is freed (the field clear reaches a cancelled wind's dissipating tornados through it)
         foreach (var t in _tornados) if (IsInstanceValid(t)) t.Dissipate();
         if (DebugPrint) GD.Print($"[SMS wind] {Name}: cut off at {_age:F2} s");
         EmitSignal(SignalName.Finished);
         GetTree().CreateTimer(1.2f).Timeout += () => { if (IsInstanceValid(this)) QueueFree(); };
+    }
+    /// <summary>203: gone at once with the field (the split's cut) -- every tornado freed outright (no dissipate), this node too; true = anything went.</summary>
+    public bool VanishNow()
+    {
+        bool any = false;
+        foreach (var t in _tornados) if (IsInstanceValid(t) && t.VanishNow()) any = true;
+        if (State != Phase.Done) { State = Phase.Done; any = true; }
+        if (!IsQueuedForDeletion()) { QueueFree(); any = true; }
+        return any;
     }
     public static Texture2D Tex(string name) { string p = $"res://assets/Sms/Fx/tex/{name}.png"; return ResourceLoader.Exists(p) ? GD.Load<Texture2D>(p) : null; }
     public static CurveTexture Ramp(float a, float b)
@@ -218,6 +227,19 @@ public partial class SmsTornado : Node3D
     private SmsGhostWind _owner; private MeshInstance3D _funnel, _ring; private ShaderMaterial _mat; private StandardMaterial3D _ringMat; private GpuParticles3D _dust, _wisps, _debris;
     private Node3D _gust; private readonly List<ShaderMaterial> _ribbonMats = new(); private float _gustSpin;
     private float _dissT, _wobblePhase; private bool _started;
+    /// <summary>203: every tornado standing in the world (they live in the arena, not under their wind: a cancelled wind is freed before its tornados have dissipated) -- the field clear's list.</summary>
+    public static readonly List<SmsTornado> All = new();
+    public override void _Ready() { All.Add(this); }
+    public override void _ExitTree() { All.Remove(this); }
+    /// <summary>203: gone at once with the field (the split's cut): no dissipate, hidden and freed; true = it went.</summary>
+    public bool VanishNow()
+    {
+        if (Gone || IsQueuedForDeletion()) return false;
+        Gone = true; Dissipating = true; Visible = false;
+        if (_dust != null) _dust.Emitting = false;
+        QueueFree();
+        return true;
+    }
 
     public void Setup(SmsGhostWind owner, Vector3 at, float heading0)
     {

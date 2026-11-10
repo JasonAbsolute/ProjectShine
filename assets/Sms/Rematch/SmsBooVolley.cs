@@ -128,9 +128,17 @@ public partial class SmsBooVolley : Node3D
     public void Cancel()
     {
         if (State == Phase.Done) return;
-        State = Phase.Done; All.Remove(this);
+        State = Phase.Done;                                                                                     // 203: it stays in All till it is freed (the field clear)
         if (DebugPrint) GD.Print($"[SMS boo volley] {Name}: cut off after {SpatCount} of {Count}");
         EmitSignal(SignalName.Finished);
         GetTree().CreateTimer(0.3f).Timeout += () => { if (IsInstanceValid(this)) QueueFree(); };
+    }
+    /// <summary>203: gone at once with the field (the split's cut): no more spits, the node freed -- the Boos it spat go on their own (SmsBombBoo.VanishIfSpat); true = it went.</summary>
+    public bool VanishNow()
+    {
+        if (IsQueuedForDeletion()) return false;
+        State = Phase.Done;
+        QueueFree();
+        return true;
     }
 }

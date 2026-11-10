@@ -866,6 +866,12 @@ public partial class Mario : CharacterBody3D
     [Export] public bool SmsSpinEnabled = true;
     [Export] public float SpinSeconds = 0.6f, SpinTurns = 2f, SpinMoveSpeed = 7f, SpinSteerAccel = 40f, SpinCooldown = 0.2f;
     [Export] public float BombGrabRadius = 2.8f, BombGrabHeight = 3.5f;
+    /// <summary>203 (Jaysonn: "normal spin jump can also pick up Bomb Boos"): his SPIN JUMP (the stick spin and A; A out of the X spin) grabs a free Bomb Boo too --
+    /// within BombGrabRadius of him, under BombGrabHeight over his feet and as far as SpinJumpGrabBelow UNDER them (he is up in the air over it), while his hands are
+    /// empty -- the same tongue grab, the arm up, the swing. Off: 158's -- only the X spin grabs. SmsSpinJumpGrabsMade counts them for the drives.</summary>
+    [Export] public bool SpinJumpGrabs = true;
+    [Export] public float SpinJumpGrabBelow = 4f;
+    public int SmsSpinJumpGrabsMade { get; private set; }
     [Export(PropertyHint.Enum, "R,L")] public string LassoArm = "R";
     [Export] public float LassoBlendSeconds = 0.15f;
     /// <summary>The raised arm's lean, as fractions of straight up (the tangent of the angle): the upper arm outward (2.5 = 68 deg -- his head is wider than
@@ -11537,6 +11543,13 @@ public partial class Mario : CharacterBody3D
         if (animPlayer != null && animPlayer.SpeedScale == 0f) animPlayer.SpeedScale = _smsFrostPlayerSpeed;
         if (SmsDebugPrint) GD.Print($"[SMS frost] THAWED after {_smsFrostSeconds:F2} s: {stateOfMario}, the tree {(animTree != null ? animTree.CallbackModeProcess.ToString() : "none")}, immune {FrostImmunityTicks} ticks");
     }
+    /// <summary>203: the frost ended from outside (the split cutscene clears the field -- the ice on him goes with the attacks): the thaw now, the immunity as ever.</summary>
+    public void SmsThawNow(string why)
+    {
+        if (!_smsFrostHold) return;
+        SmsThaw();
+        if (SmsDebugPrint) GD.Print($"[SMS frost] thawed for {why}");
+    }
 
     /// <summary>findNearestTakeNPC (MarDirectorEvent.cpp 61): a liftable NPC (isNowCanTaken) in his isTakeSituation.</summary>
     private SmsNpc SmsNpcTakeOffered()
@@ -17947,7 +17960,7 @@ public partial class Mario : CharacterBody3D
     }
 
     /// <summary>The nearest free Bomb Boo within BombGrabRadius (x and z) and under BombGrabHeight over his feet is taken: it rides over his head.</summary>
-    private void SmsBombTryGrab()
+    private void SmsBombTryGrab(float below = 1.5f, string how = "the spin")
     {
         SmsBombBoo best = null; float bestD = float.MaxValue;
         foreach (var b in SmsBombBoo.All)
@@ -17955,13 +17968,14 @@ public partial class Mario : CharacterBody3D
             if (b == null || !IsInstanceValid(b) || !b.IsInsideTree() || !b.IsFree) continue;
             Vector3 rel = b.GlobalPosition - GlobalPosition; float dy = rel.Y; rel.Y = 0f;
             float d = rel.Length();
-            if (d > BombGrabRadius || dy < -1.5f || dy > BombGrabHeight) continue;
+            if (d > BombGrabRadius || dy < -below || dy > BombGrabHeight) continue;
             if (d < bestD) { bestD = d; best = b; }
         }
         if (best == null || !best.Grab(this)) return;
         _smsBomb = best; _smsSpinGrabbed = true;
         SmsLassoOn(true);              // 159: the arm up with the tongue
-        if (SmsDebugPrint) GD.Print($"[SMS spin] the Bomb Boo {best.Name} grabbed by the tongue at {bestD:F2} m");
+        if (how != "the spin") SmsSpinJumpGrabsMade++;
+        if (SmsDebugPrint) GD.Print($"[SMS spin] the Bomb Boo {best.Name} grabbed by the tongue at {bestD:F2} m ({how})");
     }
 
     /// <summary>The Bomb Boo he swings let go (a dive, a hit, a death, a demo): it drifts again.</summary>
@@ -18034,6 +18048,7 @@ public partial class Mario : CharacterBody3D
         if (_smsSpinCooldown > 0f) _smsSpinCooldown -= (float)delta;
         bool x = Input.IsKeyPressed(Key.X);
         _smsSpinKeyEdge = x && !_smsSpinKeyPrev; _smsSpinKeyPrev = x;
+        if (_smsBomb == null && SpinJumpGrabs && stateOfMario == MarioState.SpinJump && _smsPadDisabledTicks == 0) SmsBombTryGrab(SpinJumpGrabBelow, "the spin jump");   // 203: the spin jump grabs one too
         if (_smsBomb == null) return;
         if (!IsInstanceValid(_smsBomb) || !_smsBomb.IsCarried) { SmsBombGone(_smsBomb); return; }
         if (SmsBombBurstsOnHit && (stateOfMario == MarioState.hurt || stateOfMario == MarioState.dead || SmsFrozen)) { SmsBombBurst(SmsFrozen ? "frozen" : stateOfMario.ToString()); return; }   // 193: a hit bursts it

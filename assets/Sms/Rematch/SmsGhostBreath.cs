@@ -408,10 +408,21 @@ public partial class SmsGhostBreath : Node3D
         QueueFree();
     }
     /// <summary>King Boo hit through the attack: the breath cuts off -- no more cold; the puffs already out fade on their own, then the node goes.</summary>
+    /// <summary>203: gone at once with the field (the split's cut): the mist, the core, the glints, the glow and the balls hidden with the node, which is freed; true = it went.</summary>
+    public bool VanishNow()
+    {
+        if (IsQueuedForDeletion()) return false;
+        State = Phase.Done; Visible = false;
+        if (_puffs != null) _puffs.Emitting = false;
+        if (_core != null) _core.Emitting = false;
+        if (_glints != null) _glints.Emitting = false;
+        QueueFree();
+        return true;
+    }
     public void Cancel()
     {
         if (State == Phase.Done) return;
-        State = Phase.Done; All.Remove(this);
+        State = Phase.Done;                                                                                     // 203: it stays in All till it is freed (the field clear reaches a cancelled breath's hanging mist through it)
         if (_puffs != null) _puffs.Emitting = false;
         if (_core != null) _core.Emitting = false;
         if (_glints != null) _glints.Emitting = false;

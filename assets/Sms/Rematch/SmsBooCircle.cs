@@ -150,6 +150,14 @@ public partial class SmsBooCircle : Node3D
         State = Phase.Fading; _fadeT = 0f;
         if (DebugPrint) GD.Print($"[SMS boo circle] {Name}: cut off at {_t:F2} s ({RadiusNow:F2} m)");
     }
+    /// <summary>203: gone at once with the field (the split's cut): no fade, the ring (its Boos are its children) hidden and freed; true = it went.</summary>
+    public bool VanishNow()
+    {
+        if (State == Phase.Done || IsQueuedForDeletion()) return false;
+        State = Phase.Done; Visible = false;
+        QueueFree();
+        return true;
+    }
 }
 
 /// <summary>201: one Boo of the circle -- the hotel Boo at its place on the ring (its TelesaToon materials copied per Boo and faded by `fade`; another scene gets

@@ -34,6 +34,9 @@ public partial class SmsSplitCutscene : Node
     public int Laughs { get; private set; }
     public bool ChorusDone { get; private set; }
     public float CamDistance { get; private set; }
+    /// <summary>203, for the drives: how many attack pieces the cut cleared (-1 = the clear is off) and what they were.</summary>
+    public int FieldCleared { get; private set; } = -1;
+    public string FieldClearedNote { get; private set; } = "";
 
     private SmsKingBooRematch _boss; private Mario _mario;
     private readonly List<SmsKingBooRematch> _line = new();          // in line order, left to right as Mario sees them
@@ -85,6 +88,8 @@ public partial class SmsSplitCutscene : Node
         }
         _tAll = next - every + _fadeSeconds + _laughAfter + 0.35f;                                                   // the last one in, faded, laughed: the chorus
         _tEnd = _tAll + Mathf.Max(0.3f, boss.SplitHoldSeconds);
+        // 203: the FIELD CLEARED under the cut -- every attack live in the arena (his, his copies', their leftovers) gone at once, before the freeze would hold it
+        if (boss.SplitClearsAttacks) { FieldCleared = SmsRematchField.Clear(mario, Name, DebugPrint); FieldClearedNote = SmsRematchField.LastNote; }
         // everyone into the Split phase (their moves called off), running through the freeze
         foreach (var b in _line) { b.SplitBegin(); Always(b); }
         boss.SplitHide();                                                                                           // the poof where he was
@@ -178,5 +183,45 @@ public partial class SmsSplitCutscene : Node
         if (DebugPrint) GD.Print($"[SMS split] {Name}: over at {_t:F2} s{(Skipped ? " (skipped)" : "")} -- {_line.Count} of him in the wait, the world running");
         EmitSignal(SignalName.Finished);
         QueueFree();
+    }
+}
+
+/// <summary>203 (Jaysonn: "when the cutscene plays for phase 2 and 3, all the attacks go away"): THE FIELD -- everything an attack puts in the arena, found
+/// through each kind's own live list, and CLEARED at once: the thunder walls, the winds and their tornados (a cancelled wind's tornados stand in the arena on
+/// their own), the fireball makers and their balls (the same), the breaths with their mist, the volleys and the Bomb Boos they SPAT (in the air, or a dud
+/// floating where it landed -- never the supply's, never the one in Mario's hand), the Boo circles, the Boolossi and their wave Boos, and the ice on Mario (he
+/// thaws). No puffs, no sounds: it happens under the cutscene's cut. The cancels of 185-201 start FADES that the frozen world would hold for the cutscene's
+/// length -- a tornado dissipating, a fireball fizzling, a circle fading -- so this frees the nodes outright (QueueFree; the frame's end takes them even while
+/// the tree is paused). Clears, LastCount and LastNote are for the drives.</summary>
+public static class SmsRematchField
+{
+    public static int Clears { get; private set; }
+    public static int LastCount { get; private set; }
+    public static string LastNote { get; private set; } = "";
+    /// <summary>Everything gone now; how many pieces went.</summary>
+    public static int Clear(Mario mario, string why, bool debug = false)
+    {
+        var kinds = new Dictionary<string, int>();
+        void Count(string kind) { kinds[kind] = kinds.TryGetValue(kind, out int k) ? k + 1 : 1; }
+        static bool Live(Node n) => n != null && GodotObject.IsInstanceValid(n) && !n.IsQueuedForDeletion();
+        // the pieces before their makers (a maker's VanishNow frees its pieces too; counted here first, each by its kind -- run ea counted a wind's five tornados as "wind x1")
+        foreach (var a in SmsGhostLightning.All.ToArray()) if (Live(a) && a.VanishNow()) Count("thunder wall");
+        foreach (var t in SmsTornado.All.ToArray()) if (Live(t) && t.VanishNow()) Count("tornado");
+        foreach (var a in SmsGhostWind.All.ToArray()) if (Live(a) && a.VanishNow()) Count("wind");
+        foreach (var b in SmsFireball.All.ToArray()) if (Live(b) && b.VanishNow()) Count("fireball");
+        foreach (var a in SmsFireballs.All.ToArray()) if (Live(a) && a.VanishNow()) Count("fireball maker");
+        foreach (var a in SmsGhostBreath.All.ToArray()) if (Live(a) && a.VanishNow()) Count("breath");
+        foreach (var b in SmsBombBoo.All.ToArray()) if (Live(b) && b.VanishIfSpat()) Count("spat bomb boo");   // a safety net: every hit on the real one already clears the Boos (the supply's ClearAll, the doc's rule), 2.9 s before any cutscene
+        foreach (var a in SmsBooVolley.All.ToArray()) if (Live(a) && a.VanishNow()) Count("volley");
+        foreach (var a in SmsBooCircle.All.ToArray()) if (Live(a) && a.VanishNow()) Count("boo circle");
+        foreach (var b in SmsBoolossus.Boos.ToArray()) if (Live(b) && b.VanishNow()) Count("wave boo");
+        foreach (var a in SmsBoolossus.All.ToArray()) if (Live(a) && a.VanishNow()) Count("boolossus");
+        foreach (var i in SmsIceBlock.All.ToArray()) if (Live(i) && i.VanishNow()) Count("ice block");
+        if (mario != null && GodotObject.IsInstanceValid(mario) && mario.SmsFrosted) { mario.SmsThawNow(why); Count("mario thawed"); }
+        int n = 0; var parts = new List<string>();
+        foreach (var kv in kinds) { n += kv.Value; parts.Add($"{kv.Key} x{kv.Value}"); }
+        Clears++; LastCount = n; LastNote = parts.Count > 0 ? string.Join(", ", parts) : "nothing live";
+        if (debug) GD.Print($"[SMS field] cleared for {why}: {n} piece{(n == 1 ? "" : "s")} -- {LastNote}");
+        return n;
     }
 }

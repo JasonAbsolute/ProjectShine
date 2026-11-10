@@ -416,4 +416,14 @@ public partial class SmsGhostLightning : Node3D
         EmitSignal(SignalName.Finished);
         QueueFree();
     }
+    /// <summary>203: gone at once with the field (the split's cut) -- the walls hidden, the node freed; true = it was live.</summary>
+    public bool VanishNow()
+    {
+        if (State == Phase.Done || IsQueuedForDeletion()) return false;
+        State = Phase.Done; Visible = false;
+        foreach (var w in new[] { _wallA, _wallB }) if (w != null && IsInstanceValid(w)) w.Visible = false;
+        foreach (var (z, _) in _zaps) if (IsInstanceValid(z)) z.Visible = false;
+        QueueFree();
+        return true;
+    }
 }

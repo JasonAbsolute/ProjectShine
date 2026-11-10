@@ -113,6 +113,16 @@ public partial class SmsIceBlock : Node3D
         if (_age > 0.05f && (Target == null || !IsInstanceValid(Target) || !Target.SmsFrosted)) Shatter();
     }
 
+    /// <summary>203: gone at once with the field (the split's cut): no shards, no sound, hidden and freed (Mario's thaw is the field's: SmsThawNow); true = it went.</summary>
+    public bool VanishNow()
+    {
+        if (Shattered || IsQueuedForDeletion()) return false;
+        Shattered = true; All.Remove(this); Visible = false;
+        if (_glints != null) _glints.Emitting = false;
+        if (_flash != null && IsInstanceValid(_flash)) { _flash.QueueFree(); _flash = null; }
+        QueueFree();
+        return true;
+    }
     /// <summary>The block gone, the shards out, the break.</summary>
     public void Shatter()
     {

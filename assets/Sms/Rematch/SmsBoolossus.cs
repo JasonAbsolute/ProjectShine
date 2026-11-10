@@ -169,6 +169,14 @@ public partial class SmsBoolossus : Node3D
         if (DebugPrint) GD.Print($"[SMS boolossus] {Name}: {_mats.Count} materials, model bottom {_modelBottom:F3} half width {_modelHalfWidth:F3} (x{ModelScale}: radius {Radius:F2} m), boo scene {(BooScene != null ? "yes" : "NONE")}, puff scene {(PuffScene != null ? "yes" : "NONE")}, trail {(_trail != null ? "yes" : "none")}");
     }
     public override void _ExitTree() { All.Remove(this); }
+    /// <summary>203: gone at once with the field (the split's cut) -- its wave Boos freed outright, the body (shadow and trail with it) hidden and freed; true = anything went.</summary>
+    public bool VanishNow()
+    {
+        bool any = false;
+        foreach (var b in _boos) if (IsInstanceValid(b) && b.VanishNow()) any = true;
+        if (!IsQueuedForDeletion()) { State = Phase.Gone; Visible = false; if (_trail != null) _trail.Emitting = false; QueueFree(); any = true; }
+        return any;
+    }
 
     /// <summary>165: the dive. It appears DiveHeight over the floor, DiveDistance out from Mario along <paramref name="approachDir"/> (flat; any length),
     /// and dives at where he stands. The floor's y is the caller's (King Boo's probe under Mario).</summary>
@@ -400,6 +408,13 @@ public partial class SmsWaveBoo : Node3D
         if (Age >= Maker.WaveSeconds) QueueFree();
     }
     public override void _ExitTree() { SmsBoolossus.Boos.Remove(this); }
+    /// <summary>203: gone at once with the field (the split's cut): hidden and freed, no puff; true = it went.</summary>
+    public bool VanishNow()
+    {
+        if (IsQueuedForDeletion()) return false;
+        Visible = false; QueueFree();
+        return true;
+    }
 }
 
 /// <summary>165: the smash's EFFECTS, built in code from the port's Fx textures (assets/Sms/Fx/tex): the dive's wisp trail (radgrad, additive), the landing's

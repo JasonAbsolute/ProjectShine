@@ -162,11 +162,20 @@ public partial class SmsFireballs : Node3D
     public void Cancel()
     {
         if (State == Phase.Done) return;
-        State = Phase.Done; All.Remove(this);
+        State = Phase.Done;                                                                                     // 203: it stays in All till it is freed (the field clear)
         foreach (var b in _balls) if (IsInstanceValid(b)) b.Fizzle();
         if (DebugPrint) GD.Print($"[SMS fireballs] {Name}: cut off after {PopsMade} of {Pops} pops ({_balls.Count} fizzling)");
         EmitSignal(SignalName.Finished);
         GetTree().CreateTimer(0.6f).Timeout += () => { if (IsInstanceValid(this)) QueueFree(); };
+    }
+    /// <summary>203: gone at once with the field (the split's cut) -- every ball freed outright (no fizzle), this node too; true = anything went.</summary>
+    public bool VanishNow()
+    {
+        bool any = false;
+        foreach (var b in _balls) if (IsInstanceValid(b) && b.VanishNow()) any = true;
+        if (State != Phase.Done) { State = Phase.Done; any = true; }
+        if (!IsQueuedForDeletion()) { QueueFree(); any = true; }
+        return any;
     }
     public static Texture2D Tex(string name) { string p = $"res://assets/Sms/Fx/tex/{name}.png"; return ResourceLoader.Exists(p) ? GD.Load<Texture2D>(p) : null; }
     public static CurveTexture Ramp(float a, float b)
@@ -210,6 +219,20 @@ public partial class SmsFireball : Node3D
     private const float U = 74.44f;
     private SmsFireballs _owner; private MeshInstance3D _core, _glow, _mark; private ShaderMaterial _crust; private StandardMaterial3D _glowMat, _markMat; private GpuParticles3D _flames, _embers, _drips, _smoke; private OmniLight3D _light;
     private float _vy, _k = 1f, _flare, _fizzleT, _seed; private bool _inAir;
+    /// <summary>203: every ball in the world (they live in the arena, not under their maker: a cancelled maker is freed while its balls still fizzle) -- the field clear's list.</summary>
+    public static readonly List<SmsFireball> All = new();
+    public override void _Ready() { All.Add(this); }
+    public override void _ExitTree() { All.Remove(this); }
+    /// <summary>203: gone at once with the field (the split's cut): no fizzle, hidden and freed with its mark; true = it went.</summary>
+    public bool VanishNow()
+    {
+        if (Dead || IsQueuedForDeletion()) return false;
+        Dead = true; Fizzling = true; Visible = false;
+        if (_flames != null) _flames.Emitting = false;
+        if (_mark != null && IsInstanceValid(_mark)) { _mark.QueueFree(); _mark = null; }
+        QueueFree();
+        return true;
+    }
 
     public void Setup(SmsFireballs owner, Vector3 from, Vector3 flatVel, float vy0, float radius, float life, float floorY, Vector3 target, float seed)
     {
