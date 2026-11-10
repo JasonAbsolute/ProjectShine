@@ -37,6 +37,35 @@ public partial class SmsBombBoo : Node3D
     public const float TongueModelLength = 0.766f;
     private const float U = SmsUnits.UnitsPerMetre;
 
+    public enum Looks { Galaxy, Sunshine }
+    /// <summary>206 (Jaysonn: "let's experiment with the SMS Boos to replace the Bomb Boos -- swap the model and textures to look like the normal Boos from SMS"):
+    /// the Boo's LOOK. Sunshine = the game's own hotel Boo (models/Eniemes/Telesa/telesa.glb with the port's TelesaToon materials: the white body, the blue eyes, the
+    /// fangs, the red mouth and its own rigged tongue, telesa_wait playing) at SunshineScale (the game's 1/74.44: 1.84 m across, 1.3 m tall) in the Galaxy Boo's
+    /// place, with the Bomb Boo's ways kept -- the rise through the floor, the bob, the shock with its worry (telesa_hit_start / telesa_hit / telesa_hit_end
+    /// through it), the lasso grab, the fuse's red blink (BombBooSunshine.gdshader: the toon plus a flash and a tint), the lob and its blasts. Its own tongue shows
+    /// while it floats (SunshineOwnTongue); the port's lasso tongue -- in the mouth's own red -- only while Mario carries it, the model's collapsed then (off: the
+    /// model's tongue always collapsed, the port's tongue hanging and wagging as the Galaxy one's does). SunshineTint multiplies the body (white = the game's Boo; a
+    /// dark grey = a shadow Boo). SunshineMouthUnits: the lasso tongue's root at the mouth, game units (the lips sit at z 45-50, y 27-41). Galaxy = 158-205's black
+    /// Bomb Boo (bomb_boo.glb) as before.</summary>
+    [ExportGroup("Look (206): the Sunshine Boo")]
+    [Export] public Looks Look = Looks.Sunshine;
+    [Export] public string SunshineModel = "res://models/Eniemes/Telesa/telesa.glb";
+    [Export(PropertyHint.Range, "0.005,0.03,0.0005")] public float SunshineScale = 0.013434f;
+    [Export] public Vector3 SunshineMouthUnits = new Vector3(0f, 30f, 46f);
+    [Export] public bool SunshineOwnTongue = true;
+    [Export] public Color SunshineTint = new Color(1f, 1f, 1f);
+    [Export] public string SunshineWaitClip = "telesa_wait", SunshineShockStartClip = "telesa_hit_start", SunshineShockClip = "telesa_hit", SunshineShockEndClip = "telesa_hit_end";
+    /// <summary>206, for the drives: the Sunshine look is on (the model swapped in), the clip its player runs, whether the model's tongue is collapsed and the
+    /// port's shown, how many materials were dressed, the body's reach and scale in use, the lasso tongue's root in the body's frame.</summary>
+    public bool SunshineLook => Look == Looks.Sunshine && _sunshine;
+    public string SunshineClipNow => _anim != null && IsInstanceValid(_anim) ? _anim.CurrentAnimation : "";
+    public bool SunshineTongueCollapsed => _tongueHider != null && IsInstanceValid(_tongueHider) && _tongueHider.Active;
+    public bool PortTongueShown => _tongue != null && IsInstanceValid(_tongue) && _tongue.Visible;
+    public int SunshineMaterials { get; private set; }
+    public float BodyReach => _sunshine ? 68f * SunshineScale : OwnRadius * ModelScale;
+    public float BodyScale => _sunshine ? SunshineScale : ModelScale;
+    public Vector3 MouthLocal => _sunshine ? SunshineMouthUnits * SunshineScale : TongueOffset * ModelScale;
+    private bool _sunshine; private AnimationPlayer _anim; private Skeleton3D _skel; private SmsBoneCollapser _tongueHider; private string _animNext = ""; private readonly List<ShaderMaterial> _faceMats = new(); private ShaderMaterial _mouthMat;
     [ExportGroup("Look")]
     /// <summary>The glb at this scale (Galaxy's centimetres read as metres make the body 2.5 m wide: 0.8 = 2 m, 1.7 m tall against Mario's 2.15).</summary>
     [Export(PropertyHint.Range, "0.1,2,0.05")] public float ModelScale = 0.8f;
@@ -265,7 +294,7 @@ public partial class SmsBombBoo : Node3D
     public float OrbitAngle => _orbitAngle;
     public float TongueLength { get; private set; }
     public Vector3 TongueTip { get; private set; }
-    public Vector3 MouthPoint => GlobalTransform * (TongueOffset * ModelScale);
+    public Vector3 MouthPoint => GlobalTransform * MouthLocal;
     public int MaterialCount => _mats.Count;
     public Node3D TongueNode => _tongue;
     /// <summary>179, for the drives: the shock (on, how long, whether Mario faces it now, how many so far), the drool (drops out / made, the lowest one's height),
@@ -312,11 +341,13 @@ public partial class SmsBombBoo : Node3D
         All.Add(this);
         _rng = new Random(Seed != 0 ? Seed : (int)(GetInstanceId() & 0x7fffffff));
         _model = GetNodeOrNull<Node3D>("Model"); _tongue = GetNodeOrNull<Node3D>("Tongue");
-        StripBodyTongue();                                                                              // 202: the body's own tongue out of the mesh before the materials are read
+        if (Look == Looks.Sunshine) SwapToSunshine();                                                   // 206: the game's Boo in the Galaxy one's place
+        if (!_sunshine) StripBodyTongue();                                                              // 202: the Galaxy body's own tongue out of the mesh before the materials are read
+        if (_sunshine) DressSunshine();
         var shader = ResourceLoader.Exists("res://assets/Sms/Rematch/BombBoo.gdshader") ? GD.Load<Shader>("res://assets/Sms/Rematch/BombBoo.gdshader") : null;
         foreach (var root in new[] { _model, _tongue })
         {
-            if (root == null) continue;
+            if (root == null || _sunshine) continue;
             if (shader == null) continue;
             foreach (Node n in root.FindChildren("*", "MeshInstance3D", true, false))
             {
@@ -360,10 +391,11 @@ public partial class SmsBombBoo : Node3D
     /// <summary>The body and the hanging tongue at the model scale x k (the rise), the fade to <paramref name="alpha"/> (179: up through the floor it stays solid).</summary>
     private void SetScaleK(float k, float alpha)
     {
-        if (_model != null) _model.Scale = Vector3.One * ModelScale * k;
+        if (_model != null) _model.Scale = Vector3.One * BodyScale * k;
         TongueRest(k);
         OpacityNow = Opacity * Mathf.Clamp(alpha, 0f, 1f);
         foreach (var m in _mats) m.SetShaderParameter("opacity", OpacityNow);
+        foreach (var m in _faceMats) m.SetShaderParameter("opacity", OpacityNow);                        // 206: the Sunshine eyes and fangs fade with the body (no blink on them)
     }
     /// <summary>The tongue just hanging out of the mouth: its root at TongueOffset, drooping _tPitch (TongueRestDroopDeg and the sway, TongueSway) and turned
     /// _tYaw to the side (the wag).</summary>
@@ -371,7 +403,7 @@ public partial class SmsBombBoo : Node3D
     {
         if (_tongue == null) return;
         Basis b = new Basis(Vector3.Up, Mathf.DegToRad(_tYaw)) * new Basis(Vector3.Right, Mathf.DegToRad(_tPitch));
-        _tongue.Transform = new Transform3D(b.Scaled(Vector3.One * ModelScale * k), TongueOffset * ModelScale * k);
+        _tongue.Transform = new Transform3D(b.Scaled(Vector3.One * ModelScale * k), MouthLocal * k);   // 206: the root at whichever body's mouth
         TongueLength = TongueModelLength * ModelScale * k; TongueTip = _tongue.GlobalTransform * new Vector3(0f, 0f, TongueModelLength);
     }
     /// <summary>179: the hanging tongue's motion -- its droop and wag targets (the sway and the wag on their sines, the lag behind a turn, the tuck under with the
@@ -413,11 +445,12 @@ public partial class SmsBombBoo : Node3D
         else
         {
             WorryYawDeg = 0f; WorryPitchDeg = 0f; WorrySquash = 1f;
-            if (_model != null) _model.Scale = Vector3.One * ModelScale;
+            if (_model != null) _model.Scale = Vector3.One * BodyScale;
             EyeGlowNow = FaceGlow; foreach (var m in _bodyMats) m.SetShaderParameter("face_glow", FaceGlow);
             GlobalTransform = new Transform3D(FaceBasis(_yaw, _rotX), _shockPos);
             _wait = WaitTicks / 2;
         }
+        if (_sunshine) { if (on) PlayThen(SunshineShockStartClip, SunshineShockClip); else PlayThen(SunshineShockEndClip, SunshineWaitClip); }   // 206: the game's flinch, held through the shock
         if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: {(on ? "SHOCKED -- Mario faces it; it holds" : "the shock over -- it floats on")} at {GlobalPosition}");
     }
     /// <summary>179: a shocked tick -- held at the shock spot with the tremble, the startle's squash and stretch, the eyes' glow and flicker, the tongue dropped out,
@@ -439,7 +472,7 @@ public partial class SmsBombBoo : Node3D
         {
             float h = ShockHopSeconds > 0f && _shockT < ShockHopSeconds ? MathF.Sin(MathF.PI * _shockT / ShockHopSeconds) * ShockHop : 0f;   // the startle: tall and thin, then back
             float c = WorryCower * ease * (1f + 0.3f * MathF.Sin(MathF.Tau * WorryBreathHz * _shockT));                                       // the cower: squashed down, pushed out, breathing
-            _model.Scale = new Vector3(1f - 0.5f * h + 0.5f * c, 1f + h - c, 1f - 0.5f * h + 0.5f * c) * ModelScale;
+            _model.Scale = new Vector3(1f - 0.5f * h + 0.5f * c, 1f + h - c, 1f - 0.5f * h + 0.5f * c) * BodyScale;
             WorrySquash = 1f + h - c;
         }
         EyeGlowNow = FaceGlow * (ShockEyeGlow + 0.35f * MathF.Sin(Age * 57f));                      // the flicker: 9 Hz
@@ -457,7 +490,7 @@ public partial class SmsBombBoo : Node3D
             {
                 _sweatT -= SweatEvery; _sweatSide = -_sweatSide;
                 Basis b = GlobalTransform.Basis.Orthonormalized(); Vector3 face = FacesPlusZ ? b.Z : -b.Z;
-                Vector3 at = GlobalPosition + b * (new Vector3(_sweatSide * 0.55f, 0.75f, FacesPlusZ ? 0.15f : -0.15f) * ModelScale);
+                Vector3 at = GlobalPosition + b * (_sunshine ? new Vector3(_sweatSide * 42f, 88f, FacesPlusZ ? 15f : -15f) * SunshineScale : new Vector3(_sweatSide * 0.55f, 0.75f, FacesPlusZ ? 0.15f : -0.15f) * ModelScale);   // 206: off the top of whichever head
                 Vector3 vel = b.X * (_sweatSide * (1.4f + 0.6f * Rand())) + Vector3.Up * (2f + 0.8f * Rand()) + face * 0.4f;
                 (_sweat ??= new DropPool(this, SweatRadius, SweatColor, 0.8f, "Sweat")).Fling(at, vel, 0.7f + 0.6f * Rand());
             }
@@ -686,6 +719,7 @@ public partial class SmsBombBoo : Node3D
         float dt = (float)delta; Age += dt; _t += dt;
         if (_boostLeft > 0f) _boostLeft -= dt;
         if (_grace > 0f) _grace -= dt;
+        SunshineTick();                                                                                  // 206: the clip chain, the two tongues
         var mario = MarioNow();
         _drool?.Tick(dt, MouthPoint, GlobalTransform.Basis.Orthonormalized(), FacesPlusZ, _floorY);   // 179: the drops out there fall on, shocked or not, to the floor
         _sweat?.Tick(dt, MouthPoint, GlobalTransform.Basis.Orthonormalized(), FacesPlusZ, _floorY);   // 180: the sweat beads too
@@ -839,7 +873,7 @@ public partial class SmsBombBoo : Node3D
                 }
                 SetFlash(pulse, red ? null : Colors.White);
                 foreach (var boss in BoosNow())                                                        // 177: the real King Boo or a COPY of him -- whichever body it is swung into
-                    if (boss != null && IsInstanceValid(boss) && boss.CanBeHit && boss.InHitCylinder(p, OwnRadius * ModelScale)) { _hitBoss = boss; Explode(true); return; }
+                    if (boss != null && IsInstanceValid(boss) && boss.CanBeHit && boss.InHitCylinder(p, BodyReach)) { _hitBoss = boss; Explode(true); return; }
                 break;
             }
         }
@@ -941,7 +975,7 @@ public partial class SmsBombBoo : Node3D
         if (new Vector2(_lobVel.X, _lobVel.Z).LengthSquared() > 1e-6f) _yaw = MathF.Atan2(_lobVel.X, _lobVel.Z);
         GlobalTransform = new Transform3D(FaceBasis(_yaw, 0f), from);
         // the mark on the floor: the blast's footprint (a dud: the body's own)
-        LobMarkRadius = dud ? OwnRadius * ModelScale * 1.3f : _lobBlastR;
+        LobMarkRadius = dud ? BodyReach * 1.3f : _lobBlastR;
         var tex = SmsFireballs.Tex("hamonring3_flat");
         _lobMarkMat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, AlbedoTexture = tex, AlbedoColor = LobMarkColor };
         _lobMark = new MeshInstance3D { Name = "LobMark", TopLevel = true, Mesh = new QuadMesh { Size = Vector2.One * (LobMarkRadius * 2f) }, MaterialOverride = _lobMarkMat, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
@@ -983,6 +1017,88 @@ public partial class SmsBombBoo : Node3D
         Gone();
     }
     private static float Flat2(Vector3 a, Vector3 b) => new Vector2(a.X - b.X, a.Z - b.Z).Length();
+    // ---- 206: THE SUNSHINE LOOK -- the game's hotel Boo in the Galaxy body's place --------------------------------------------------------------------------
+    /// <summary>The Galaxy body out, telesa.glb in as "Model" at SunshineScale; its AnimationPlayer (telesa_wait looping, started at a random frame) and its skeleton
+    /// found; a bone collapser on the skeleton for its own tongue (jnt_bero1 / jnt_baro2), off while the tongue is to show.</summary>
+    private void SwapToSunshine()
+    {
+        var scene = ResourceLoader.Exists(SunshineModel) ? GD.Load<PackedScene>(SunshineModel) : null;
+        if (scene == null) { GD.PushWarning($"[SMS bomb boo] {Name}: no Sunshine Boo at {SunshineModel} -- the Galaxy body stays"); return; }
+        if (_model != null) { _model.Name = "ModelGalaxy"; _model.Visible = false; _model.QueueFree(); }
+        _model = scene.Instantiate<Node3D>(); _model.Name = "Model"; AddChild(_model); MoveChild(_model, 0); _model.Scale = Vector3.One * SunshineScale;
+        _sunshine = true;
+        foreach (Node n in _model.FindChildren("*", "AnimationPlayer", true, false)) { _anim = n as AnimationPlayer; if (_anim != null) break; }
+        foreach (Node n in _model.FindChildren("*", "Skeleton3D", true, false)) { _skel = n as Skeleton3D; if (_skel != null) break; }
+        PlayLoop(SunshineWaitClip);
+        if (_anim != null && _anim.IsPlaying()) _anim.Seek(Rand() * (float)_anim.CurrentAnimationLength, true);
+        if (_skel != null) { _tongueHider = new SmsBoneCollapser { Name = "TongueCollapser", Bones = new[] { "jnt_bero1", "jnt_baro2" }, Active = !SunshineOwnTongue }; _skel.AddChild(_tongueHider); }
+        if (_tongue != null && SunshineOwnTongue) _tongue.Visible = false;
+        if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: the SUNSHINE look -- {SunshineModel} at {SunshineScale} ({(_anim != null ? _anim.CurrentAnimation : "no player")}, {(_skel != null ? _skel.GetBoneCount() + " bones" : "no skeleton")}); its own tongue {(SunshineOwnTongue ? "shows while it floats, the lasso tongue while carried" : "collapsed, the lasso tongue hangs")}");
+    }
+    /// <summary>The materials: each of the model's TelesaToon materials copied onto BombBooSunshine.gdshader (the same uniforms plus opacity / tint / flash) -- the body
+    /// and the mouth blink with the fuse (_mats, _bodyMats), the eyes and the fangs only fade (_faceMats); the port's lasso tongue gets the mouth's material with
+    /// flat_tex (the tongue's red, the glb's UVs meaning nothing on the 8 x 8 texture).</summary>
+    private void DressSunshine()
+    {
+        var shader = ResourceLoader.Exists("res://assets/Sms/Rematch/BombBooSunshine.gdshader") ? GD.Load<Shader>("res://assets/Sms/Rematch/BombBooSunshine.gdshader") : null;
+        if (shader == null) GD.PushWarning($"[SMS bomb boo] {Name}: BombBooSunshine.gdshader missing -- the Boo keeps the game's materials (no fade-in, no blink)");
+        var tint = new Vector3(SunshineTint.R, SunshineTint.G, SunshineTint.B); var fc = new Vector3(FuseFlashColor.R, FuseFlashColor.G, FuseFlashColor.B);
+        if (_model != null)
+            foreach (Node n in _model.FindChildren("*", "MeshInstance3D", true, false))
+            {
+                var mi = (MeshInstance3D)n; if (mi.Mesh == null) continue;
+                for (int s = 0; s < mi.Mesh.GetSurfaceCount(); s++)
+                {
+                    if (mi.GetActiveMaterial(s) is not ShaderMaterial own) continue;
+                    var copy = (ShaderMaterial)own.Duplicate(); if (shader != null) copy.Shader = shader;
+                    string rn = (own.ResourceName ?? "").ToLowerInvariant(); string tp = (own.GetShaderParameter("base_tex").As<Texture2D>()?.ResourcePath ?? "").ToLowerInvariant();
+                    bool face = rn.Contains("_mat_eye") || rn.Contains("_mat_kiba") || tp.Contains("_eye") || tp.Contains("_kiba");
+                    copy.SetShaderParameter("opacity", 0f); copy.SetShaderParameter("tint", tint); copy.SetShaderParameter("flash", 0f); copy.SetShaderParameter("flash_color", fc); copy.SetShaderParameter("flash_emit", FuseEmit);
+                    mi.SetSurfaceOverrideMaterial(s, copy);
+                    if (face) _faceMats.Add(copy); else { _mats.Add(copy); _bodyMats.Add(copy); }
+                    if (rn.Contains("_mat_mouth")) _mouthMat = copy;
+                    SunshineMaterials++;
+                }
+            }
+        if (_tongue != null && (_mouthMat ?? (_bodyMats.Count > 0 ? _bodyMats[0] : null)) is ShaderMaterial src)
+            foreach (Node n in _tongue.FindChildren("*", "MeshInstance3D", true, false))
+            {
+                var mi = (MeshInstance3D)n; if (mi.Mesh == null) continue;
+                for (int s = 0; s < mi.Mesh.GetSurfaceCount(); s++)
+                {
+                    var tm = (ShaderMaterial)src.Duplicate(); tm.SetShaderParameter("cutout", false); tm.SetShaderParameter("flat_tex", true);
+                    mi.SetSurfaceOverrideMaterial(s, tm); _mats.Add(tm); SunshineMaterials++;
+                }
+            }
+        if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: dressed -- {_bodyMats.Count} body/mouth, {_faceMats.Count} eye/fang, {_mats.Count - _bodyMats.Count} tongue material(s) on {(shader != null ? "BombBooSunshine" : "the game's shader")}");
+    }
+    private void PlayLoop(string clip)
+    {
+        _animNext = "";
+        if (_anim == null || string.IsNullOrEmpty(clip) || !_anim.HasAnimation(clip)) return;
+        _anim.GetAnimation(clip).LoopMode = Animation.LoopModeEnum.Linear; _anim.Play(clip);
+    }
+    private void PlayThen(string clip, string next)
+    {
+        if (_anim == null) return;
+        if (string.IsNullOrEmpty(clip) || !_anim.HasAnimation(clip)) { PlayLoop(next); return; }
+        _anim.GetAnimation(clip).LoopMode = Animation.LoopModeEnum.None; _anim.Play(clip); _animNext = next;
+    }
+    /// <summary>A tick of the Sunshine look: the clip chain (a one-shot over -> the next, looping), and the two tongues -- the port's lasso tongue only while Mario
+    /// carries it, the model's own collapsed then (SunshineOwnTongue).</summary>
+    private void SunshineTick()
+    {
+        if (!_sunshine) return;
+        if (_anim != null && !string.IsNullOrEmpty(_animNext) && !_anim.IsPlaying()) PlayLoop(_animNext);
+        if (SunshineOwnTongue)
+        {
+            bool carried = State == Phase.Carried;
+            if (_tongue != null && State != Phase.Gone) _tongue.Visible = carried;
+            if (_tongueHider != null) _tongueHider.Active = carried;
+        }
+    }
+    /// <summary>206, for the drives and the shots: the body's tint, live.</summary>
+    public void SetTint(Color c) { SunshineTint = c; var v = new Vector3(c.R, c.G, c.B); foreach (var m in _mats) m.SetShaderParameter("tint", v); }
     /// <summary>Cleared (King Boo's hit clears the field; the expiry): a small puff and gone.</summary>
     public void Vanish()
     {
@@ -1053,5 +1169,17 @@ public partial class SmsBombBoo : Node3D
         if (_lobTrail != null && IsInstanceValid(_lobTrail)) _lobTrail.Emitting = false;
         SetPhysicsProcess(false);
         if (IsInsideTree()) GetTree().CreateTimer(2.0).Timeout += QueueFree; else QueueFree();
+    }
+}
+
+/// <summary>206: a SkeletonModifier3D that collapses the named bones to nothing after the animation each frame -- the Sunshine Boo's own tongue tucked away
+/// (jnt_bero1 / jnt_baro2) while the port's lasso tongue is out. Active = on.</summary>
+public partial class SmsBoneCollapser : SkeletonModifier3D
+{
+    public string[] Bones = System.Array.Empty<string>();
+    public override void _ProcessModificationWithDelta(double delta)
+    {
+        var sk = GetSkeleton(); if (sk == null) return;
+        foreach (var n in Bones) { int i = sk.FindBone(n); if (i >= 0) sk.SetBonePoseScale(i, Vector3.One * 0.001f); }
     }
 }
