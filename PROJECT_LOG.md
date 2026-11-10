@@ -13799,3 +13799,26 @@ is the texture's tongue colour as a flat; the shock plays the game's flinch clip
 (the lips sit at z 45-50). The Sunshine body's hit reach is 0.91 m against the Galaxy's 0.8. Not done: the Boo circle's and the Boolossus's Boos already wore this
 model (201, 165) -- nothing to change there. A note from the shots: Mario lies down and sleeps when the shot drive leaves him idle long enough (the game's own
 long-idle), not a hit -- the log shows him idle at full HP. Not committed: the editor's detect-3D .import rewrites (Jaysonn's, as in 198-205).
+
+### 206b -- the King Boo REMATCH, part 51b: the Sunshine Boo in the BOMB BOO's COLOURS (the game's textures recoloured in code as the Boo loads: the body's white near-black, the eye's grey yellow and its blue iris amber; the red mouth, the orange-red tongue and the white fangs kept -- 206's white blue-eyed Boo behind the knob) (feature/kingboo-rematch, code `1dcf3e3`)
+
+**Jaysonn:** "no i want you to replace its textures to match boo bombs yellow eyes black bodys"
+
+**`SmsBombBoo.cs`** (the knobs, "Look (206): the Sunshine Boo"): `SunshineBombColours` (on), `SunshineBodyColor` (0.09, 0.09, 0.1), `SunshineEyeColor` (1, 0.8, 0),
+`SunshineIrisColor` (1, 0.55, 0). No new texture files: `DressSunshine` swaps each copied material's `base_tex` for an ImageTexture built from the game's own texture
+(`Texture2D.GetImage`, RGBA8; cached per source and colour) -- `RecolourBody` on the 8 x 8 body texture (K_telesa_body: 32 white texels, the mouth's 16 dark red,
+the tongue's 16 orange-red): the white texels become `SunshineBodyColor`, the reds stay; `RecolourEye` on the 64 x 64 eye texture (K_telesa_eye: the grey of the
+eye at 199 / 204, the blue iris (63, 135, 199), the dark outline, soft alpha at the edges): a texel bluer than red by 0.2 becomes `SunshineIrisColor`, a grey over
+0.35 becomes `SunshineEyeColor` x its level over 0.8 (the shading kept), the dark outline and every alpha stay. The fangs (K_telesa_kiba) are left white. The
+colours are stored-byte values -- the toon reads `base_tex` raw, as the game's TEV did -- so a near-black texel is a near-black Boo under the toon's glint, and
+the yellow is the texture's yellow. The lasso tongue stays the texture's tongue red (206). Readouts for the drives: `SunshineBodyTexel` / `SunshineEyeTexel` /
+`SunshineIrisTexel`.
+
+**Verified:** shots (run da) 31a the face close -- black body, yellow eyes with amber lids, the red mouth and tongue, white fangs; 14c floating; 14g shocked, the
+sweat and drool; 33a / 33b carried on the red lasso. Headless drive v206-2 (deleted before the commit): C41c the body material's texture an ImageTexture in code,
+its 32 white texels the body colour and none white left, the eye texture's 1221 grey texels yellow and no blue left, the fangs untouched; 206's and the older Boo
+checks as before -- 57/57. The clean rebuild 0 errors; the drive, the logs, the shots and the pass's tasks deleted.
+
+**Deviations, all knobs:** the body is a very dark blue-grey (0.09, 0.09, 0.1), not pure black, so the toon's glint still draws its shape in the dark arena; the
+iris is amber rather than a pupil (the Galaxy Bomb Boo's eyes are plain yellow -- `SunshineIrisColor` = `SunshineEyeColor` gives that); the mouth's reds and the
+fangs are the game's. 206's `SunshineTint` stays white (it multiplies on top). Not committed: the editor's detect-3D .import rewrites (Jaysonn's, as in 198-206).
