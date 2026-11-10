@@ -13703,3 +13703,36 @@ drive, the logs and the pass's scheduled tasks deleted.
 Mario goes with the attacks (he thaws); the clear is silent (no puffs under the cut). The drive could only stage a COPY's attack for the test: a hit on the real
 one already cancels his own (and the supply vanishes every Bomb Boo at each hit, the doc's rule), 2.9 s before any cutscene. The spin jump's reach under his
 feet (4 m) is mine. Not committed: the editor's detect-3D .import rewrites (Jaysonn's, as in 198-202).
+
+### 204 -- the King Boo REMATCH, part 49: the FIREBALLS TRAIL FIRE (a stream of flame left in the world behind each ball as it flies and rolls, drifting back the way it came and rising as it dies; hot streaks along the motion; the ball's own flames leaning back with its speed -- 168-203's flames rode on the ball and only embers were left behind) (feature/kingboo-rematch, code `fc60daa`)
+
+**Jaysonn:** "the fire balls need the fire to trail behind it. right now thier are sparks but lets give the fireballs some more feel that are moving"
+
+**`SmsFireballs.cs`** (the maker's knobs, "The look": `Trail` on, `TrailPuffs` 72, `TrailSeconds` 0.55, `TrailSize` 1.15, `TrailBack` 0.25, `TrailStreaks` 20,
+`TrailLean` 0.7). Why the balls read as still: their `Flames` emitter is LocalCoords -- the fire rode along on the ball -- and the only things left in the world
+were the embers (sparks), the drips and the smoke. Now each ball carries three more things, all steered every frame from its own velocity (`Apply`, the 3D speed:
+flat plus the fall):
+- the TRAIL: a world-space GPUParticles3D (TopLevel, LocalCoords off, riding the ball) that leaves fire1_raw puffs where the ball WAS -- `TrailPuffs` alive at once
+  over `TrailSeconds`, born `TrailSize` x the ball's radius (scaled with the ball as it shrinks over its life), shrinking to a quarter, turning with the ball,
+  rising (gravity up 1.6 x the radius), coloured yellow-white -> `FlameColor` -> a dark red -> gone; their direction the motion REVERSED and their speed
+  `TrailBack` x the ball's (0.6..1 of it), so the stream stretches back the way it came;
+- the STREAKS: `TrailStreaks` thin glow1_spark streaks (AlignY: along their own velocity, 0.3..0.5 x the ball's, back the way it came), 0.28 s each, damped;
+- the LEAN: the ball's own `Flames` material's `Direction` = Up + back x `TrailLean` x (speed / `RollSpeed`, capped 1.5), normalised -- the fire on the ball lays
+  back with the speed (0.41 of flat at the roll's 6 m/s, 0.72 at the pop's 16 m/s).
+
+Readouts for the drives: `TrailOn` (on and world-space), `TrailEmitPoint`, `TrailPuffsNow`, `TrailStreaksNow`, `TrailLeanNow` (the flames' direction dotted with
+the motion reversed, flat), `TrailBackSpeedNow`. The trail stops with the embers when the ball fizzles or fades (`Apply`'s `trailing`); a vanish hides it with the
+ball. The drive partial: `DriveFireballs()`.
+
+**Verified:** shots (run ct) 32a the trails arcing out of the crown from the side; 32a2 the three pops in the air from Mario's side, a column of balls each with
+its fire behind; 32b a ball rolling at Mario from his shoulder, the fire laid back off it; 32c one rolling ball close, the stream of fire behind it along the
+stone; 32d the rolling trails from above. Headless drive v204-1 (deleted before the commit): C39 nine balls, 1547 moving samples (21 rolling): every one with its
+trail emitter on, world-space, 0.000 m off the ball, 72 puffs and 20 streaks, the drift back `TrailBack` x the ball's speed, the flames leaning 0.41..0.72 back;
+Mario untouched (stepped aside after the pops). 203-179's checks as before -- 53/53. The clean rebuild 0 errors; the drive, the logs, the shots and the pass's
+tasks deleted.
+
+**Deviations, all knobs:** the trail's numbers (72 puffs, 0.55 s, 1.15 x, 0.25 back, 20 streaks, 0.7 lean) are mine; `Trail` off = 168's look. The streaks are
+an extra I added for the motion; `TrailStreaks` 0 takes them out. The first shot run lost its three later shots because King Boo lets go of his `Fireballs`
+reference as his phase ends ("the balls roll on on their own") -- the shot drive now keeps the maker itself; the first headless run's check came before the
+balls had settled to a roll (they fall from 20 m and bounce twice, ~4 s) -- it now waits for the roll. Not committed: the editor's detect-3D .import rewrites
+(Jaysonn's, as in 198-203).
