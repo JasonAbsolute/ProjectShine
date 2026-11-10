@@ -13758,3 +13758,44 @@ puff (3 dead, 3 puffed, `EndPuffsMade` 3, an EndPuff emitter live in the world),
 The first two shot rounds caught the wrong death (a ball that had burst on Mario, no puff by design) and then none (the maker drops a dead ball from its list the
 same frame) -- the shot drive now keeps its own list of the balls and waits for one that went out on its own. "It" in the ask read as the fireball, the thing of
 the pass before. Not committed: the editor's detect-3D .import rewrites (Jaysonn's, as in 198-204).
+
+### 206 -- the King Boo REMATCH, part 51: the BOMB BOO in the SUNSHINE BOO's body (the experiment: the game's own hotel Boo -- telesa.glb, its toon materials, its blue eyes, fangs, red mouth and rigged tongue, telesa_wait playing -- in the Galaxy Boo's place, with every Bomb Boo way kept: the rise, the bob, the shock with the game's own flinch, the lasso grab in the mouth's red, the fuse's red blink, the lob; Look = Galaxy brings 158-205's black Boo back) (feature/kingboo-rematch, code `ef37016`)
+
+**Jaysonn:** "lets draw and experiment with the sms boos to replace the bomb boos since the different model kinda thorws things off. lets see if we can swap the
+model and textures to look like the noral boos from sms"
+
+**`SmsBombBoo.cs`** (the knobs, "Look (206): the Sunshine Boo"): `Look` (Galaxy / Sunshine; Sunshine by default), `SunshineModel` (`res://models/Eniemes/Telesa/telesa.glb`),
+`SunshineScale` 0.013434 (the game's 1/74.44: 1.84 m across, 1.3 m tall -- the Galaxy body was 2 m across), `SunshineMouthUnits` (0, 30, 46) (the lasso tongue's root
+at the lips, game units), `SunshineOwnTongue` (on), `SunshineTint` (white), the clips (`telesa_wait` / `telesa_hit_start` / `telesa_hit` / `telesa_hit_end`).
+- `SwapToSunshine` (in `_Ready`, before the materials): the Galaxy Model freed, telesa.glb instanced as "Model" at `SunshineScale`; its AnimationPlayer found
+  (telesa_wait looping from a random frame) and its Skeleton3D (14 bones); an `SmsBoneCollapser` (a SkeletonModifier3D, new, in this file) on the skeleton scales
+  `jnt_bero1` / `jnt_baro2` -- the model's own tongue -- to nothing while it is active.
+- `DressSunshine`: each of the model's four TelesaToon materials is copied onto **`BombBooSunshine.gdshader`** (NEW + .uid: TelesaToon's exact toon -- the bmd's TEV, the
+  white pulled toward the dark glint channel, the eyes and fangs cut out -- plus `opacity`, `tint`, the fuse's `flash` / `flash_color` / `flash_emit`, and
+  `flat_tex` / `flat_rgb`); the body and the mouth blink with the fuse (`_mats` / `_bodyMats`), the eyes and the fangs only fade (`_faceMats`, new). The port's
+  lasso tongue (bomb_boo_tongue.glb) gets the mouth's material with `flat_tex`: the texture is an 8 x 8 of three colours (the white, the mouth's dark red, the
+  tongue's orange-red) and the Galaxy tongue's UVs mean nothing on it -- a flat (232, 60, 32).
+- The two tongues (`SunshineOwnTongue`): the model's own wags in telesa_wait while the Boo floats, the port's lasso tongue hidden; CARRIED, the lasso tongue shows (the
+  rope from the mouth to Mario's fist, 159) and the model's own collapses (`SunshineTick`). Off: the model's always collapsed and the port's hangs and wags as the
+  Galaxy one's did.
+- The shock: `telesa_hit_start` then `telesa_hit` held (`PlayThen` / the clip chain in `SunshineTick`); the shock over, `telesa_hit_end` then the wait -- on top of
+  180's worry (the shake, the lean, the cower, the sweat, the drool: unchanged). `StripBodyTongue` (202) is the Galaxy body's and is skipped.
+- Every Galaxy-model number went through a switch: `BodyScale` (the model's scale), `MouthLocal` (the mouth in the body's frame), `BodyReach` (the hit on King Boo,
+  the dud's mark: 68 units = 0.91 m), the sweat's spot off the head. Readouts for the drives: `SunshineLook`, `SunshineClipNow`, `SunshineTongueCollapsed`,
+  `PortTongueShown`, `SunshineMaterials`; `SetTint(colour)` live.
+`SmsKingBoo.Drive.cs` (not committed): C3's "root in the mouth" and C5 / C6's scale read `BodyScale` / `MouthLocal`; C35 takes the Sunshine body (nothing to strip).
+
+**Verified:** shots (run cz) 14c the Sunshine Boo floating, its own tongue out; 14d / 14f / 14g shocked -- the lean, the sweat, the drool, the eyes squinting; 31a
+its face close (blue eyes, fangs, the red mouth and tongue); 33a / 33b carried on the lasso tongue, from Mario's side and from behind him -- its own tongue gone,
+the lasso red from its mouth to his fist; 33c the same Boo in a dark tint (0.3, 0.3, 0.36) for the comparison. Headless drive v206-1 (deleted before the commit):
+C41 Model holds a Skeleton3D and an AnimationPlayer on telesa_wait at 0.0134, five materials on BombBooSunshine, own tongue out, lasso tongue hidden, reach 0.914
+m, the Galaxy body gone; C41b carried -- the lasso tongue shown and the model's collapsed, telesa_hit seen through the shock; every Boo check as before (the rise,
+the sway, the shock, the drool, the grab, the burst, the blink, the volley) -- 56/56. The clean rebuild 0 errors; the drive, the logs, the shots and the pass's
+tasks deleted.
+
+**Deviations, all knobs:** Sunshine is the DEFAULT look now (Jaysonn's "experiment" shown rather than hidden behind a switch); the Boo is white as the game's -- a
+tint knob makes the shadow Boo (the 33c shot) if the white reads too much like the circle's and the wave's Boos, which wear the same model; the lasso tongue's red
+is the texture's tongue colour as a flat; the shock plays the game's flinch clips on top of 180's worry; the mouth point (0, 30, 46 units) is read off the model
+(the lips sit at z 45-50). The Sunshine body's hit reach is 0.91 m against the Galaxy's 0.8. Not done: the Boo circle's and the Boolossus's Boos already wore this
+model (201, 165) -- nothing to change there. A note from the shots: Mario lies down and sleeps when the shot drive leaves him idle long enough (the game's own
+long-idle), not a hit -- the log shows him idle at full HP. Not committed: the editor's detect-3D .import rewrites (Jaysonn's, as in 198-205).
