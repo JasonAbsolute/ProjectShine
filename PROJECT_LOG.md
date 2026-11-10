@@ -13668,3 +13668,38 @@ the volley's blast as before. The clean rebuild 0 errors; the drive, the logs, t
 **Deviations, all knobs:** the vanish, the hand burst and the blasts share one puff (scale 0.9 / 1.1 / 1.3); the flash is a dark violet (`PuffFlashColor`;
 the port's mint was the enemy-vanish's) -- off = smoke alone; the tongue island's bound (0.3) sits well between the tongue (0.21) and the body (0.55). Not
 committed: the editor's detect-3D .import rewrites (Jaysonn's, as in 198-201).
+
+### 203 -- the King Boo REMATCH, part 48: the split CUTSCENES CLEAR THE FIELD (as the phase 2 / phase 3 cutscene cuts in, every attack live in the arena is gone at once: his and his copies' tornados, walls, fireballs, breath, spat Bomb Boos, the Boo circle, the Boolossi and their wave, the ice on Mario -- 188-202 froze them with the world and ran them on after), the SPIN JUMP GRABS a Bomb Boo (the stick spin and A, or A out of the X spin, takes a free Boo by the tongue in the air -- the X spin alone before), and the volley has NO DUD (VolleyDud off: every Boo he spits is lit and blasts) (feature/kingboo-rematch, code `c62931d`)
+
+**Jaysonn:** "lets make it when the cutscnene plays for phase 2 and 3 that all the attacks go away. and lets also make it so normal spin jump can lso pick
+up bomb boos. and lets not have a dud for king boos bomb boo attack"
+
+**The field** (`SmsSplitCutscene.cs`: `SmsRematchField`, a static class beside the cutscene; the knob `SplitClearsAttacks` on KingBoo): `SmsSplitCutscene.Begin`
+calls `SmsRematchField.Clear` before `SplitBegin` and the freeze. Every kind's own live list is walked -- `SmsGhostLightning.All`, `SmsTornado.All` (NEW: the
+tornados live in the arena, not under their wind), `SmsGhostWind.All`, `SmsFireball.All` (NEW, the same), `SmsFireballs.All`, `SmsGhostBreath.All`,
+`SmsBombBoo.All` (`VanishIfSpat`: only a Boo King Boo spat, in the air or a dud floating; the supply's and the one in Mario's hand stay), `SmsBooVolley.All`,
+`SmsBooCircle.All`, `SmsBoolossus.Boos` / `.All`, `SmsIceBlock.All` (+ `Mario.SmsThawNow`) -- and each node's new `VanishNow` frees it OUTRIGHT (hidden,
+QueueFree: the frame's end takes it even while the tree is paused), no puff, no sound: the cut hides it. Why outright: 185-201's `Cancel()` calls start FADES
+(a tornado's 0.8 s dissipate, a fireball's fizzle, the circle's fade) that the frozen world holds for the cutscene's length -- a tornado stood through the whole
+thing and ran on after. `Cancel()` in the wind, the fireballs, the breath and the volley no longer removes the maker from its `All` (it leaves in `_ExitTree`),
+so a cancelled maker's leftovers are reachable. Readouts `SmsRematchField.Clears` / `LastCount` / `LastNote`, `SmsSplitCutscene.FieldCleared` / `FieldClearedNote`.
+
+**The spin jump** (`Mario.cs`, `patch_mario203.py`): `SpinJumpGrabs` (on), `SpinJumpGrabBelow` 4 m -- `SmsBombTick`: in `MarioState.SpinJump` with empty hands,
+`SmsBombTryGrab(below, "the spin jump")` takes the nearest free Boo within `BombGrabRadius`, under `BombGrabHeight` over his feet and up to `SpinJumpGrabBelow`
+UNDER them (he is up in the air over it: the spin jump keeps 0.8 of the run speed and peaks near 4 m -- run dz's 2.5 m missed, the Boo 2.3 m under him at the
+closest pass). Counter `SmsSpinJumpGrabsMade`. `SmsThawNow(why)`: the frost ended from outside (the field clear), its immunity as ever.
+
+**The dud** (`SmsKingBooRematch.cs`): `VolleyDud` false. 200's dud, its fuse, its grab and its blink stay behind the knob.
+
+**Verified** (headless drive v203-1, deleted before the commit): C38 the copy's five tornados stood as the hit on the real one landed and ran on through his
+2.9 s hurt; two ticks into the second cutscene's cut (the world frozen) tornados 0, winds 0, Boos in the air 0, volleys / fire / breaths / walls / circles /
+Boolossi 0; the cutscene cleared 6 (tornado x5, wind x1), Clears 1 -> 2. C37 Mario put 4 m from a free supply Boo (the X spin took nothing), A out of the spin:
+SpinJump seen, the Boo grabbed by the tongue in the air 0.13 s after A (2.75 m off, 2.27 m under his feet), `SmsSpinJumpGrabsMade` 0 -> 1, Carried. C36 the
+node's `VolleyDud` read false before the drive turned it on for 200's two dud volleys; a third volley with it off: 3 spat, 0 duds, 3 blasts at their landings,
+0 floating. 202-179's checks as before -- 52/52. No shots: nothing new to look at (the clear happens under the cutscene's cut). The clean rebuild 0 errors; the
+drive, the logs and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** the clear takes the spat Boos too (a dud on the floor goes with them) but never the supply's or the one in Mario's hand; the ice on
+Mario goes with the attacks (he thaws); the clear is silent (no puffs under the cut). The drive could only stage a COPY's attack for the test: a hit on the real
+one already cancels his own (and the supply vanishes every Bomb Boo at each hit, the doc's rule), 2.9 s before any cutscene. The spin jump's reach under his
+feet (4 m) is mine. Not committed: the editor's detect-3D .import rewrites (Jaysonn's, as in 198-202).
