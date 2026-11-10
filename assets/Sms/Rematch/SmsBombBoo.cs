@@ -55,6 +55,17 @@ public partial class SmsBombBoo : Node3D
     [Export] public bool SunshineOwnTongue = true;
     [Export] public Color SunshineTint = new Color(1f, 1f, 1f);
     [Export] public string SunshineWaitClip = "telesa_wait", SunshineShockStartClip = "telesa_hit_start", SunshineShockClip = "telesa_hit", SunshineShockEndClip = "telesa_hit_end";
+    /// <summary>206b (Jaysonn: "replace its textures to match the Bomb Boo's -- yellow eyes, black body"): the game's Boo textures RECOLOURED in code as the Boo loads
+    /// (no new files): on the 8 x 8 body texture the white texels become SunshineBodyColor (the mouth's dark red and the tongue's orange-red stay); on the eye texture
+    /// the grey of the eye becomes SunshineEyeColor (its shading kept), the blue of the iris SunshineIrisColor, the dark outline and the alpha stay. The fangs stay
+    /// white. Off: the game's white Boo with blue eyes (206). The colours are stored-byte values, read raw by the toon as the game's TEV read them.</summary>
+    [Export] public bool SunshineBombColours = true;
+    [Export] public Color SunshineBodyColor = new Color(0.09f, 0.09f, 0.1f), SunshineEyeColor = new Color(1f, 0.8f, 0f), SunshineIrisColor = new Color(1f, 0.55f, 0f);
+    /// <summary>206b, for the drives: the recoloured textures' samples -- the body's white texel as it is now, the eye's grey as it is now, the iris's blue as it is now.</summary>
+    public Color SunshineBodyTexel { get; private set; } = Colors.Transparent;
+    public Color SunshineEyeTexel { get; private set; } = Colors.Transparent;
+    public Color SunshineIrisTexel { get; private set; } = Colors.Transparent;
+    private static readonly Dictionary<string, ImageTexture> RecolourCache = new();
     /// <summary>206, for the drives: the Sunshine look is on (the model swapped in), the clip its player runs, whether the model's tongue is collapsed and the
     /// port's shown, how many materials were dressed, the body's reach and scale in use, the lasso tongue's root in the body's frame.</summary>
     public bool SunshineLook => Look == Looks.Sunshine && _sunshine;
@@ -1051,9 +1062,15 @@ public partial class SmsBombBoo : Node3D
                 {
                     if (mi.GetActiveMaterial(s) is not ShaderMaterial own) continue;
                     var copy = (ShaderMaterial)own.Duplicate(); if (shader != null) copy.Shader = shader;
-                    string rn = (own.ResourceName ?? "").ToLowerInvariant(); string tp = (own.GetShaderParameter("base_tex").As<Texture2D>()?.ResourcePath ?? "").ToLowerInvariant();
-                    bool face = rn.Contains("_mat_eye") || rn.Contains("_mat_kiba") || tp.Contains("_eye") || tp.Contains("_kiba");
+                    var srcTex = own.GetShaderParameter("base_tex").As<Texture2D>();
+                    string rn = (own.ResourceName ?? "").ToLowerInvariant(); string tp = (srcTex?.ResourcePath ?? "").ToLowerInvariant();
+                    bool eye = rn.Contains("_mat_eye") || tp.Contains("_eye"), fang = rn.Contains("_mat_kiba") || tp.Contains("_kiba"); bool face = eye || fang;
                     copy.SetShaderParameter("opacity", 0f); copy.SetShaderParameter("tint", tint); copy.SetShaderParameter("flash", 0f); copy.SetShaderParameter("flash_color", fc); copy.SetShaderParameter("flash_emit", FuseEmit);
+                    if (SunshineBombColours && srcTex != null && !fang)                                   // 206b: the Bomb Boo's colours on the game's textures
+                    {
+                        var bombTex = eye ? RecolourEye(srcTex) : RecolourBody(srcTex);
+                        if (bombTex != null) copy.SetShaderParameter("base_tex", bombTex);
+                    }
                     mi.SetSurfaceOverrideMaterial(s, copy);
                     if (face) _faceMats.Add(copy); else { _mats.Add(copy); _bodyMats.Add(copy); }
                     if (rn.Contains("_mat_mouth")) _mouthMat = copy;
@@ -1099,6 +1116,44 @@ public partial class SmsBombBoo : Node3D
     }
     /// <summary>206, for the drives and the shots: the body's tint, live.</summary>
     public void SetTint(Color c) { SunshineTint = c; var v = new Vector3(c.R, c.G, c.B); foreach (var m in _mats) m.SetShaderParameter("tint", v); }
+    /// <summary>206b: the body texture (8 x 8: the white, the mouth's dark red, the tongue's orange-red) with its WHITE texels turned SunshineBodyColor; cached per colour.</summary>
+    private ImageTexture RecolourBody(Texture2D src)
+    {
+        string key = $"{src.ResourcePath}|body|{SunshineBodyColor.ToHtml(false)}";
+        if (RecolourCache.TryGetValue(key, out var cached) && IsInstanceValid(cached)) { SunshineBodyTexel = SunshineBodyColor; return cached; }
+        var img = src.GetImage(); if (img == null) return null;
+        if (img.IsCompressed()) img.Decompress();
+        img.Convert(Image.Format.Rgba8);
+        for (int y = 0; y < img.GetHeight(); y++) for (int x = 0; x < img.GetWidth(); x++)
+        {
+            Color c = img.GetPixel(x, y);
+            if (c.R > 0.78f && c.G > 0.78f && c.B > 0.78f) img.SetPixel(x, y, new Color(SunshineBodyColor.R, SunshineBodyColor.G, SunshineBodyColor.B, c.A));   // the white: the body
+        }
+        var tex = ImageTexture.CreateFromImage(img); RecolourCache[key] = tex; SunshineBodyTexel = SunshineBodyColor;
+        if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: the body texture recoloured -- {img.GetWidth()}x{img.GetHeight()}, the white to {SunshineBodyColor}");
+        return tex;
+    }
+    /// <summary>206b: the eye texture with the grey of the eye turned SunshineEyeColor (its shading kept: x the grey's level over 0.8) and the blue of the iris
+    /// SunshineIrisColor; the dark outline and every alpha stay; cached per colour pair.</summary>
+    private ImageTexture RecolourEye(Texture2D src)
+    {
+        string key = $"{src.ResourcePath}|eye|{SunshineEyeColor.ToHtml(false)}|{SunshineIrisColor.ToHtml(false)}";
+        if (RecolourCache.TryGetValue(key, out var cached) && IsInstanceValid(cached)) { SunshineEyeTexel = SunshineEyeColor; SunshineIrisTexel = SunshineIrisColor; return cached; }
+        var img = src.GetImage(); if (img == null) return null;
+        if (img.IsCompressed()) img.Decompress();
+        img.Convert(Image.Format.Rgba8);
+        int eyes = 0, irises = 0;
+        for (int y = 0; y < img.GetHeight(); y++) for (int x = 0; x < img.GetWidth(); x++)
+        {
+            Color c = img.GetPixel(x, y); if (c.A <= 0.001f) continue;
+            if (c.B > c.R + 0.2f) { img.SetPixel(x, y, new Color(SunshineIrisColor.R, SunshineIrisColor.G, SunshineIrisColor.B, c.A)); irises++; }                      // the blue: the iris
+            else if (c.R > 0.35f && MathF.Abs(c.R - c.G) < 0.05f && MathF.Abs(c.G - c.B) < 0.05f)                                                                        // the grey: the eye, its shading kept
+            { float k = Mathf.Clamp(c.R / 0.8f, 0f, 1f); img.SetPixel(x, y, new Color(SunshineEyeColor.R * k, SunshineEyeColor.G * k, SunshineEyeColor.B * k, c.A)); eyes++; }
+        }
+        var tex = ImageTexture.CreateFromImage(img); RecolourCache[key] = tex; SunshineEyeTexel = SunshineEyeColor; SunshineIrisTexel = SunshineIrisColor;
+        if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: the eye texture recoloured -- {img.GetWidth()}x{img.GetHeight()}, {eyes} texels of the eye to {SunshineEyeColor}, {irises} of the iris to {SunshineIrisColor}");
+        return tex;
+    }
     /// <summary>Cleared (King Boo's hit clears the field; the expiry): a small puff and gone.</summary>
     public void Vanish()
     {
