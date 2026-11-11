@@ -13947,3 +13947,28 @@ the logs, the shots, the import pass's files and the pass's tasks deleted; the h
 **Deviations:** the fire column under the horizon is left out (under the floor); the 2.5 s fade and its place (the second split) are mine -- the game cuts
 to its roof sky with the room; TEV register 2 taken as black (above). One build failed on a doubled `[ExportGroup("")]` of mine (fixed, rebuilt); the
 drive run and the cleanup were launched in one batch -- the run's 60/60 and the clean status show the order held, but it was luck.
+
+### 208c -- the King Boo REMATCH, part 53c: the final phase's FIRE pulled DOWN the sky for the fight's downward camera -- the vrKoopa dome's elevations stretched from its top ring (final_stretch 2.5: the flames that ended 8 deg under the horizon now end ~55 deg under it, the red cap under that), the flame textures laid 1.6x down the taller band so the tongues keep their shape; final_drop to lower the whole dome besides (feature/kingboo-rematch, code `9c45b7d`)
+
+**Jaysonn:** "ok so we mainly have the camera facing down during the fight and the final fire effects are just red past a certain point is there any way to
+lower it but keep the fire looking high? i updated ref image with finalBox" / "it looks good just sits high so when looking down it just looks red"
+(`Ref/finalBox.png`: his fight camera, high over the arena looking down -- the whole sky past the fence flat red).
+
+**Why.** The game's roof dome puts its fire between +22.6 deg (its top ring) and -8 deg (where `ramp02` runs out) and its plain red cap from -17 deg down --
+made for Luigi's camera, which looks across the roof. Jaysonn's camera looks down over the fence: everything it sees of the sky is 15 to 65 deg under the
+horizon, the red cap, not the fire.
+
+**`RematchSky.gdshader`** (`final_sky`): the elevation the dome is read at is now `e = 22.6 + (e_true + final_drop - 22.6) / final_stretch` -- the top ring
+stays at +22.6 deg and everything under it reaches `final_stretch` times as far down, so the fire's band, the ramp, the cap and the streaks all stretch
+together and the dark red above the fire is untouched; fire A / fire B's texture heights (0.4 / 0.5 and 1.5 / 1.3 repeats down the band) are multiplied by
+`final_flame_tiles` so the stretched band is laid with more tongues instead of taller ones. Knobs (group "The final phase's sky" on `RematchSky.tres`):
+`final_stretch` 2.5 (1-5), `final_drop` 0 deg (-30..60), `final_flame_tiles` 1.6 (0.5-4); 1 / 0 / 1 = the game's roof sky exactly. Picked off
+`sky208/koopa_down_sheet.png` (the numpy copy drawn at pitch -40 and -15 for stretch 1 / 2 / 2.5 / 2.5 with 2.5 tiles).
+
+**Verified:** shots (run di) 35d "looking down on the arena" (Jaysonn's finalBox view: cam 26 up and 22 back, looking at the floor) -- flame all round the
+arena to the frame's bottom corners, no flat red; 35e "the camera pitched down in the fight" (the fight camera tilted 6 units lower) -- flame to the fence
+line under the dark red; 35a-c unchanged in kind (the horizon band taller, still dark red above). Headless drive v208c-1 (deleted before the commit): 60/60,
+C43 / C44 unchanged. The clean rebuild 0 errors; the drive, the logs, the shots and the pass's tasks deleted.
+
+**Deviations:** the stretch departs from the game's dome (its fire sits where Luigi's camera sees it); chosen for Jaysonn's camera, 1 / 0 / 1 puts it back.
+The shot drive's two new views (35d / 35e) live in the uncommitted drive partial as before.
