@@ -14,7 +14,8 @@ using System;
 /// appears just like the casino fight laughs and then goes underground and the fight starts"): with Cutscene on, CutsceneDelay after Mario lands
 /// his controls lock (CameraLocked) and a cutscene camera takes over -- a LAUGH from nowhere (King Boo's long laugh), Mario LOOKS ABOUT for it
 /// (176, Jaysonn: "a new animation ... more like a 'where am i' look around": the LookClip, a real clip of his -- the custom ma_lookabout, baked from
-/// assets/Mario/Anims/ma_lookabout.pose.json by tools/anim/bake_anim.gd and edited like any clip in the Animation panel -- played outside the
+/// assets/Mario/Anims/ma_lookabout.pose.json by tools/anim/bake_anim.gd and edited like any clip in the Animation panel; 207: the script generated
+/// from the curves in tools/anim/lookabout_curves.py and played at its own pace, LookKeepsPace -- played outside the
 /// AnimationTree (Mario.SmsPlayDemoClip) for its length (LookSeconds 0 = the clip's), his body standing; no clip = 175's head look-about), then
 /// King Boo SURFACES: SurfaceDistance in front of him toward the BooSpawn marker, rising out of the floor as the casino boss rises from his table
 /// (the appear clip and voice), LAUGHING for IntroLaughSeconds (his knob) -- Mario in his BATTLE STANCE (176: StanceInClip then the StanceClip loop,
@@ -64,21 +65,31 @@ public partial class SmsRematchIntro : Node
     [Export(PropertyHint.Range, "0,20,0.1")] public float FightCueSeconds = 7.5f;
     [Export(PropertyHint.Range, "0.3,1,0.05")] public float LookMinScale = 0.5f;
     [Export(PropertyHint.Range, "0,4,0.1")] public float CueSlackMax = 1.5f;
+    /// <summary>207 (Jaysonn: "the look around looks off"): the look-about plays at its OWN PACE -- the cue's trim comes out of King Boo's laugh first (never under
+    /// LaughMinScale of its knob) and the look-about is quickened only when that is not enough (then never under LookMinScale). With the 2.0 s look-about, the 3 s
+    /// laugh and the 7.5 s cue: the look-about 2.0 s as written, the laugh 2.0 s (what 197 played too). Off = 197's: both trimmed in proportion (197 quickened
+    /// the 3 s look-about x1.5, which is a good part of why it looked off).</summary>
+    [Export] public bool LookKeepsPace = true;
+    [Export(PropertyHint.Range, "0.3,1,0.05")] public float LaughMinScale = 0.5f;
     /// <summary>197, for the drives: the cutscene's clock when the music was cued (the look-about's first frame), when the fight started (the cutscene's end), the planned
-    /// fight time from the cue, the trim applied to the look-about and the laugh (1 = none), the look-about's natural and played lengths.</summary>
+    /// fight time from the cue, the trim applied to the look-about (CueTrim) and to the laugh (LaughTrim; 1 = none), the look-about's natural and played lengths;
+    /// 207: how far into the look-about we are (seconds, -1 outside it).</summary>
     public float MusicCueAt { get; private set; } = -1f;
     public float FightStartAt { get; private set; } = -1f;
     public float PlannedFightAt { get; private set; } = -1f;
     public float CueTrim { get; private set; } = 1f;
+    public float LaughTrim { get; private set; } = 1f;
     public float LookNaturalSeconds { get; private set; }
     public float LookPlayedSeconds => _lookLen;
+    public float LookElapsed => State == Phase.LookAbout ? _cut : -1f;
     private float _afterSink, _sinceCue;
     /// <summary>The surface shot's camera: how far off the line between Mario and King Boo (metres, a side two-shot) and how high.</summary>
     [Export] public float SurfaceCamSide = 22f, SurfaceCamHeight = 4.6f;
     /// <summary>Where the surface shot's camera looks: 0 = at Mario's head, 1 = at King Boo's body, between for both (the crown needs room above).</summary>
     [Export(PropertyHint.Range, "0,1,0.01")] public float SurfaceCamAim = 0.7f;
     /// <summary>176, the look-about: the clip Mario plays while he looks about (his own AnimationPlayer's; the custom ma_lookabout -- edit it in the
-    /// Animation panel, or re-bake it from assets/Mario/Anims/ma_lookabout.pose.json), at LookClipSpeed; "" or a missing clip = 175's head look-about
+    /// Animation panel, or re-bake it from assets/Mario/Anims/ma_lookabout.pose.json, which 207 generates from the curves in tools/anim/lookabout_curves.py:
+    /// a key every frame after the game's idle -- the head leads, the chest follows, the arms swing with it, no shrug, no head cock), at LookClipSpeed; "" or a missing clip = 175's head look-about
     /// (a modifier turning his head 60 degrees each way). LookTurnDegPerSec: how quickly his BODY turns to King Boo once he has surfaced.</summary>
     [Export] public string LookClip = "ma_lookabout";
     [Export] public float LookClipSpeed = 1f, LookTurnDegPerSec = 240f;
@@ -204,25 +215,35 @@ public partial class SmsRematchIntro : Node
         PlaceCam(0f); _cam.Current = true;
         MusicCueAt = 0f; _sinceCue = 0f; _boo.MusicCue(SmsKingBooRematch.BossMusicCues.LookAbout, "the look-about's first frame");   // 197: the music's cue; its own clock runs from here
         _boo.PlayVoice(_boo.LaughSe, _boo.LaughDb);                                                        // the laugh, from nowhere
-        // 176: the look-about is a CLIP of his (the custom ma_lookabout: a glance left, right, then up with a shrug), played outside the tree for its
-        // length, his body standing where he landed; no such clip = 175's head look-about (a modifier turning his head: a beat, left, right, ahead)
+        // 176: the look-about is a CLIP of his (the custom ma_lookabout; 207: a glance left, a sweep right and back, after the game's own idle, in 2.0 s), played
+        // outside the tree for its length, his body standing where he landed; no such clip = 175's head look-about (a modifier turning his head: a beat, left, right, ahead)
         float clipLenRaw = _mario.SmsClipLength(LookClip);
         float clipLen = clipLenRaw / Mathf.Max(0.05f, LookClipSpeed);
         float lookNatural = LookSeconds > 0f ? LookSeconds : clipLenRaw > 0f ? clipLen : 2.6f;
         LookNaturalSeconds = lookNatural;
         // 197: the music's cue -- the fixed beats after the look-about (King Boo's rise tell, rise and dive; the pause after) against FightCueSeconds; the look-about and
         // the laugh share what is left, trimmed in proportion when it is less than they want, the pause taking the slack (up to CueSlackMax) when it is more
-        float laughNatural = _boo.IntroLaughSeconds, trim = 1f; _afterSink = AfterSinkSeconds; _boo.IntroLaughOverride = float.NaN;
+        float laughNatural = _boo.IntroLaughSeconds, trim = 1f, laughTrim = 1f; _afterSink = AfterSinkSeconds; _boo.IntroLaughOverride = float.NaN;
         if (FightCueSeconds > 0f)
         {
             float fixedT = _boo.IntroFixedSeconds + AfterSinkSeconds, left = FightCueSeconds - fixedT, want = lookNatural + laughNatural;
-            if (left < want) trim = Mathf.Clamp(left / Mathf.Max(0.1f, want), LookMinScale, 1f);
+            if (left < want)
+            {
+                if (LookKeepsPace)
+                {
+                    // 207: the laugh gives first (down to LaughMinScale of itself); the look-about only what the laugh cannot (down to LookMinScale)
+                    float laughPlayed = Mathf.Clamp(left - lookNatural, laughNatural * LaughMinScale, laughNatural);
+                    float lookPlayed = Mathf.Clamp(left - laughPlayed, lookNatural * LookMinScale, lookNatural);
+                    laughTrim = laughPlayed / Mathf.Max(0.05f, laughNatural); trim = lookPlayed / Mathf.Max(0.05f, lookNatural);
+                }
+                else trim = laughTrim = Mathf.Clamp(left / Mathf.Max(0.1f, want), LookMinScale, 1f);
+            }
             else _afterSink = AfterSinkSeconds + Mathf.Min(left - want, CueSlackMax);
-            _boo.IntroLaughOverride = laughNatural * trim;
-            PlannedFightAt = fixedT - AfterSinkSeconds + _afterSink + want * trim;
+            _boo.IntroLaughOverride = laughNatural * laughTrim;
+            PlannedFightAt = fixedT - AfterSinkSeconds + _afterSink + lookNatural * trim + laughNatural * laughTrim;
         }
         else PlannedFightAt = -1f;
-        CueTrim = trim;
+        CueTrim = trim; LaughTrim = laughTrim;
         float lookSpeed = LookClipSpeed / trim;
         _lookClipUsed = clipLenRaw > 0f && _mario.SmsPlayDemoClip(LookClip, lookSpeed);
         _lookLen = lookNatural * trim;
@@ -238,7 +259,7 @@ public partial class SmsRematchIntro : Node
                 new SmsHeadLook.Look(0f, 0.5f * U, 0.12f * L, 0.16f * L), // ahead: where he will come from
             });
         }
-        if (DebugPrint) GD.Print($"[SMS rematch intro] CUTSCENE: Mario landed at {mp} facing {landed} (turned to {face}), the laugh; he looks about for {_lookLen:F2} s ({(_lookClipUsed ? $"the clip {LookClip} at x{LookClipSpeed / trim:F2}" : look != null && look.HasBones ? $"no clip {LookClip}: the head modifier" : "NO clip and no head modifier")}); King Boo will surface at {_surfaceSpot} ({(spot - mp).Length():F1} m away); the camera at {_camFrom}; the music's cue: the fight at {PlannedFightAt:F2} s of {FightCueSeconds} (fixed beats {_boo.IntroFixedSeconds:F2} + the pause {_afterSink:F2}; the look-about {lookNatural:F2} and the laugh {laughNatural:F2} trimmed x{trim:F2})");
+        if (DebugPrint) GD.Print($"[SMS rematch intro] CUTSCENE: Mario landed at {mp} facing {landed} (turned to {face}), the laugh; he looks about for {_lookLen:F2} s ({(_lookClipUsed ? $"the clip {LookClip} at x{LookClipSpeed / trim:F2}" : look != null && look.HasBones ? $"no clip {LookClip}: the head modifier" : "NO clip and no head modifier")}); King Boo will surface at {_surfaceSpot} ({(spot - mp).Length():F1} m away); the camera at {_camFrom}; the music's cue: the fight at {PlannedFightAt:F2} s of {FightCueSeconds} (fixed beats {_boo.IntroFixedSeconds:F2} + the pause {_afterSink:F2}; the look-about {lookNatural:F2} s x{trim:F2}, the laugh {laughNatural:F2} s x{laughTrim:F2} -- {(LookKeepsPace ? "the laugh gives first" : "trimmed in proportion")})");
     }
     private void PlaceCam(float k)
     {

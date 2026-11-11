@@ -2,7 +2,7 @@
 
 Clips of Mario's that are not from the game (SMS 176), all played by the King Boo rematch's intro:
 
-- `ma_lookabout` -- the "where am I?" look-around after he lands (3.0 s, one-shot).
+- `ma_lookabout` -- the "where am I?" look-around after he lands (2.0 s, one-shot; SMS 207: GENERATED from motion curves, see below).
 - `ma_battle_stance_in` -- the drop into his battle stance on the cut to the stand-off (0.45 s, one-shot) ...
 - `ma_battle_stance` -- ... and the stance itself, bouncing, held until the fight starts (0.9 s, loops).
 
@@ -34,6 +34,17 @@ Bake the script into the clip (from the project root; it overwrites the `.tres`)
 The bake keys every named joint at every key time (cubic between them), every other bone once at 0, and prints the head's yaw / pitch and the
 hands' height at each key so a wrong sign shows at once. The clip is then as editable as any other: a bake is only the starting point.
 Edits made in the editor are NOT written back to the script -- re-baking replaces them, so pick one source of truth per clip.
+
+**From motion curves (SMS 207).** `ma_lookabout.pose.json` is itself GENERATED: `tools/anim/lookabout_curves.py` holds the look-about as a
+few curves -- the head's world yaw and pitch, the chest's yaw, the arms' swing, a breath -- as (second, degrees) points joined by a monotone
+cubic, and writes the script with a key EVERY FRAME, so the baker's cubic has nothing to overshoot and the curve is what plays. The shape
+follows the game's own idle (ma_wait): the head leads, the chest follows a beat later with less of the turn, the arms swing with it, nothing
+stops dead. To change the look-about edit the numbers at the top of that file, then (from the project root):
+
+    python tools/anim/lookabout_curves.py
+    godot --headless -s tools/anim/bake_anim.gd -- res://assets/Mario/Anims/ma_lookabout.pose.json res://assets/Mario/Anims/ma_lookabout.tres
+
+Editing the generated `.pose.json` by hand works too, but the next run of the generator overwrites it.
 
 ## Playing one
 
