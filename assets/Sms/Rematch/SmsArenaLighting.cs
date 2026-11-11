@@ -47,6 +47,12 @@ public partial class SmsArenaLighting : Node
     [Export(PropertyHint.Range, "0,3,0.05")] public float ThunderDelay = 0.4f;
     [Export(PropertyHint.Range, "-30,12,0.5")] public float ThunderDb = 0f;
     [Export] public bool ThunderOnGreenToo = false;
+    /// <summary>211b (Jaysonn: "only plays after the intro cutscene to not ruin tension"): the thunder WAITS FOR THE FIGHT -- none through the card, Mario's fall and the intro
+    /// cutscene (the laugh from nowhere, the look-about, King Boo's rise and dive); once the intro director (IntroPath) is Done -- its FightReady, King Boo up at his spot -- it
+    /// rolls with the sky's next purple flash. A flash during the intro passes in silence (its thunder is dropped, not saved for the fight's start). Off = from the first frame,
+    /// as 211. No intro director at IntroPath (or anywhere in the scene) = no wait.</summary>
+    [Export] public bool ThunderAfterIntro = true;
+    [Export] public NodePath IntroPath = "../RematchIntro";
     [Export] public bool DebugPrint;
 
     // ---- readouts
@@ -71,8 +77,14 @@ public partial class SmsArenaLighting : Node
     /// <summary>211: thunders rolled so far, and whether the file was found.</summary>
     public int ThunderPlays { get; private set; }
     public bool ThunderFound => _thunder?.Stream != null;
+    /// <summary>211b: the thunder's wait for the fight is over (latched; open from the first frame with ThunderAfterIntro off or no intro director); the thunders it dropped
+    /// (flashes during the intro); whether the intro director was found; the sky's frame (of its 300-frame cycle) the last thunder rolled on.</summary>
+    public bool ThunderGateOpen { get; private set; }
+    public int ThunderHeld { get; private set; }
+    public bool IntroFound => _intro != null;
+    public float LastThunderFrame { get; private set; } = -1f;
 
-    private Godot.Environment _env; private DirectionalLight3D _sun; private ShaderMaterial _mat; private bool _wasFollowing;
+    private Godot.Environment _env; private DirectionalLight3D _sun; private ShaderMaterial _mat; private bool _wasFollowing; private SmsRematchIntro _intro;
     private AudioStreamPlayer _thunder; private int _thunderCycle = -1, _thunderCycleGreen = -1; private readonly Random _rng = new(209);
 
     public override void _Ready()
@@ -100,6 +112,8 @@ public partial class SmsArenaLighting : Node
             AddChild(_thunder);
             if (_thunder.Stream == null) GD.PushWarning($"[SMS lighting] {GetPath()}: no sound file for the thunder '{ThunderSe}'");
         }
+        _intro = GetNodeOrNull<SmsRematchIntro>(IntroPath) ?? GetTree()?.CurrentScene?.FindChildren("*", "Node", true, false).OfType<SmsRematchIntro>().FirstOrDefault();   // 211b: the thunder waits for its fight
+        if (DebugPrint) GD.Print($"[SMS lighting] the thunder {(ThunderAfterIntro && _intro != null ? $"waits for {_intro.Name}'s fight" : "rolls from the start")}");
     }
 
     public override void _ExitTree()
@@ -133,16 +147,25 @@ public partial class SmsArenaLighting : Node
         Vector3 cloud = (c0 + c1) * 0.5f * FlashAmountRead;                                            // the clouds show mix(c1, c0, texture): their middle
         FlashNow = peak * FlashAmountRead; FlashColorNow = new Color(cloud.X, cloud.Y, cloud.Z, 1f);
         Apply(FinalBlendRead, cloud, FlashStrength * (1f - FinalBlendRead));
-        // 211: the thunder -- ThunderDelay after the purple flash (frame 2), once a cycle; the green one (154) too if asked; none under the fire or with the flashes off
+        // 211: the thunder -- ThunderDelay after the purple flash (frame 2), once a cycle; the green one (154) too if asked; none under the fire or with the flashes off.
+        // 211b: and none before the fight -- the wait ends once the intro is Done; till then a flash's cycle is marked as had and its thunder dropped (Thunder), so the first
+        // of the fight comes on the next flash's beat, not the moment the wait ends
+        if (!ThunderGateOpen && (!ThunderAfterIntro || _intro == null || !IsInstanceValid(_intro) || _intro.State == SmsRematchIntro.Phase.Done))
+        {
+            ThunderGateOpen = true;
+            if (DebugPrint) GD.Print($"[SMS lighting] the thunder's wait is over ({(!ThunderAfterIntro ? "ThunderAfterIntro off" : _intro == null || !IsInstanceValid(_intro) ? "no intro director" : "the fight has started")}; {ThunderHeld} dropped in the intro)");
+        }
         if (_thunder != null && _thunder.Stream != null && FinalBlendRead < 0.5f && FlashAmountRead > 0.01f && SpeedRead > 0.001f)
         {
             int cycle = (int)Math.Floor(SkyTime * 30.0 * SpeedRead / 300.0); float lag = ThunderDelay * 30f * SpeedRead;
-            if (cycle != _thunderCycle && fc >= 2f + lag && fc < 150f) { _thunderCycle = cycle; Thunder(); }
-            if (ThunderOnGreenToo && cycle != _thunderCycleGreen && fc >= 154f + lag) { _thunderCycleGreen = cycle; Thunder(); }
+            if (cycle != _thunderCycle && fc >= 2f + lag && fc < 150f) { _thunderCycle = cycle; Thunder(fc); }
+            if (ThunderOnGreenToo && cycle != _thunderCycleGreen && fc >= 154f + lag) { _thunderCycleGreen = cycle; Thunder(fc); }
         }
     }
-    private void Thunder()
+    private void Thunder(float fc)
     {
+        if (!ThunderGateOpen) { ThunderHeld++; if (DebugPrint) GD.Print($"[SMS lighting] a thunder dropped (the intro is on: {_intro?.State}; the sky's cycle {_thunderCycle})"); return; }   // 211b
+        LastThunderFrame = fc;
         _thunder.VolumeDb = SmsActorSound.MasterDb + SmsActorSound.LevelDb(ThunderSe) + ThunderDb; _thunder.PitchScale = 0.9f + 0.2f * (float)_rng.NextDouble(); _thunder.Play();
         ThunderPlays++;                                                                            // (not in SmsActorSound's play log: the drives count that log against PlayCount)
         if (DebugPrint) GD.Print($"[SMS lighting] thunder {ThunderPlays} (the sky's cycle {_thunderCycle}, pitch {_thunder.PitchScale:F2})");
