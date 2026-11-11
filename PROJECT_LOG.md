@@ -13860,3 +13860,51 @@ clip 0.0 degrees (the idle stands at its frame 0 under CameraLocked); C26 the fi
 its 3.0); the laugh gives first under the cue (`LookKeepsPace` off = 197's). The pose script is now generated -- hand edits to it are overwritten by the next
 run of the generator; the `.tres` stays editable in the Animation panel as before (a re-bake overwrites it). The side shot's camera (2.8 m off his left) shows
 the back of his head at the right glance; the frontal shots carry the look. One shot run was cut short when Jaysonn closed the game window mid-run; rerun.
+
+### 208 -- the King Boo REMATCH, part 53: the arena's SKY is Luigi's Mansion's BOSS-ARENA SKY, ported from the GameCube disc (the vrball_B dome of the Bogmire, Boolossus and Chauncey fights: its three textures, its four texture scrolls, its colour flashes, drawn by a Godot sky shader on the arena's WorldEnvironment; the lighting untouched) (feature/kingboo-rematch, code `6644db3`)
+
+**Jaysonn:** "ok lets make a skybox fr the fight. can you use the skybox that happens in luigis mansion fights? like vs bogmire or boolouses." -- then
+"i think the decomp for luigis mansion would be good also i put it in logForLary" (the Luigi's Mansion Recompiled repo).
+
+**Where the sky came from.** The LM port's notes name the game's sky system: per map a descriptor (`lbl_80300C7C[map]`) loads a "VR ball" dome from
+`/Iwamoto/vr*.szp`. Jaysonn's disc (`luigis_mansion_3d.iso` in the FinModelUtility roms folder is the GameCube GLME01 disc) gave the rest:
+`tools/lm/lm_sky_rip.py` (NEW: reads the GC file table, Yay0 + RARC) pulled `/Iwamoto/vrball_B.szp` -- `vrb_mb.bmd`, `vrb_mb1-4.btk`, `vrb_mb.brk` --
+and `tools/lm/lm_sky_desc.py` (NEW) read the descriptors off main.dol: maps 10 (Chauncey), 11 (Boolossus) and 13 (Bogmire) all draw vrball_B with
+all four btks and the brk; map 9 (King Boo / Bowser) draws vrKoopa, map 2 (the mansion) vrball_M. The bmd's materials, textures, geometry and the
+animations were read with the project's J3D dumpers (bmd_mat_dump / bmd_geom / btk_dump / brk_dump) and the dome's vertex rings mapped to elevation
+(`sky208/dome_uv.py`).
+
+**What the game draws** (and what `RematchSky.gdshader` now draws, per pixel of sky): a dome round the camera, u = the way round, v = a curve of the
+elevation off the dome's rings (the base ball: 0 at the zenith, 0.535 at the horizon, 1 at the nadir; the streak dish: 0 at +74 deg, 0.31 at the
+horizon, 1 at -29 deg, nothing below). Material `vr_o2`, the BASE: colour = mix(C1, C0, bg04 x bg04) -- the cloud texture laid 6 times round, scrolling
+one repeat per 60 frames and breathing 1 -> 2.07 -> 1 in height, times itself laid 4 times round scrolling the other way per 80 frames (1 -> 2.4 -> 1);
+alpha = the gradient texture turned 180 (opaque at the horizon, gone above ~25 deg: the clear colour shows). C0 and C1 are BLACK but for the brk's
+FLASHES over a 300-frame cycle (10 s): C0 purple at frame 2, green at 154, lavender at 167; C1 grey at 12, blue at 118, dark red at 237 -- the
+"lightning" in the ghost dimension's clouds, each a second or two. Material `vr_q2`, the STREAKS, added: a = clamp(2 x sin_wave x sin_wave) x gradient
+-- the sine-wave texture (a bright sine curve with a soft fill under it) laid 8 times round, turned 180, scrolling +1 per 100 frames, its height
+breathing 3.38 -> 3.84 -> 3.48 -> 3.38, times itself laid 10 times round scrolling the other way per 140 frames (3.0 -> 3.38 -> 3.84 -> 3.0), times
+the gradient mirrored twice (a tent: full 5 deg under the horizon, nothing at the zenith or the rim); colour = mix(magenta (254,60,186), cyan
+(12,254,242), a) x a. The game's numbers are display values, so the result is converted to linear at the end.
+
+**Files.** `assets/Sms/Rematch/RematchSky.gdshader` (NEW, + .uid) -- the port, every uniform a knob; `RematchSky.tres` (NEW) -- the ShaderMaterial with
+the three textures; `assets/Sms/Rematch/Sky/lm_bg04.png` (64x128), `lm_sin_wave.png` (128x128), `lm_gs001m.png` (64x64) (NEW: the disc's I8 textures as
+8-bit grey PNGs, their .import pinned lossless with no mipmaps and no 3D auto-compression -- the shader fetches texels itself to give each axis GX's own
+wrap: repeat, mirror or clamp; a mirrored axis through a repeating sampler drew a dark hairline at every seam); `RematchArena.tscn` -- the
+WorldEnvironment's Environment draws the Sky (background mode Sky, `RematchSky.tres`); the ambient stays the colour it was, the fog leaves the sky
+alone, so nothing else in the arena is lit differently. The sky shows in the editor too.
+
+**Knobs** (shader parameters on `RematchSky.tres`): `brightness` 1 (the game), `streak_gain` 1, `flash_amount` 1 (0 = the clouds never flash),
+`base_lift` (black: a steady colour on the clouds between flashes), `clear_color` (black), `streak_dim` / `streak_bright` (the game's magenta and cyan),
+`speed` 1 (the game's 30 frames a second), `turn`.
+
+**Verified:** shots (run dg: 33b the look-about, 34a-c the horizon from the middle, tilted up, and the fight's view with King Boo against it, 15a the
+dive) -- the black-violet sky, the magenta arcs with cyan where two cross, the dark-red flash phase in some, no seams, no hairlines (run de showed
+the hairlines; run df a shader error -- a sampler passed to a function must carry the same hints at every call). `sky208/lm_sky_preview.py` (numpy,
+the same math) measured against MarioWiki's Boolossus and Bogmire arena shots: the band's mean (30,25,46) and its cyan peaks match. Headless drive
+v208-1 (deleted before the commit): C43 the WorldEnvironment draws a Sky whose material is RematchSky.tres on RematchSky.gdshader, the ambient still the
+colour (0.45, 0.4, 0.65) x 0.7, the fog on with sky affect 0 -- 59/59. The clean rebuild 0 errors; the drive, the logs, the shots, the import pass's
+files and the pass's tasks deleted. The headless import pass touched no other .import file.
+
+**Deviations:** none in the sky itself -- it is the disc's data; the knobs are mine (all at the game's values). A first version of this pass drew a
+hand-made sky (dark violet, procedural streaks) before Jaysonn pointed at the decomp; it is gone. The rip tools read only the sky archive and the DOL's
+string table; no game data is in the repo beyond the three 8-bit textures (19 KB). One shot run was lost to launching the pull with it.
