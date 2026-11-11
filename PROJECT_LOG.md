@@ -13822,3 +13822,41 @@ checks as before -- 57/57. The clean rebuild 0 errors; the drive, the logs, the 
 **Deviations, all knobs:** the body is a very dark blue-grey (0.09, 0.09, 0.1), not pure black, so the toon's glint still draws its shape in the dark arena; the
 iris is amber rather than a pupil (the Galaxy Bomb Boo's eyes are plain yellow -- `SunshineIrisColor` = `SunshineEyeColor` gives that); the mouth's reds and the
 fangs are the game's. 206's `SunshineTint` stays white (it multiplies on top). Not committed: the editor's detect-3D .import rewrites (Jaysonn's, as in 198-206).
+
+### 207 -- the King Boo REMATCH, part 52: Mario's LOOK-ABOUT rebuilt from MOTION CURVES after the game's own idle (a glance left, a sweep right, back to the front in 2.0 s; the head leads, the chest follows, the arms swing with it, no head cock, no reaching arm) and played at its OWN PACE (LookKeepsPace: the music cue's trim comes out of the laugh first -- 197 had quickened the 3 s clip x1.5) (feature/kingboo-rematch, code `ac331a7`)
+
+**Jaysonn:** "awesome the fight is looking good i think we can clean up the intro animation for mario the look around looks off and he still tilts his head can
+we fix this to look better?"
+
+**Why it looked off.** 176's clip was eight hand-set poses joined by the baker's cubic: the head whipped 144 degrees between two of them in 0.4 s -- 0.27 s once
+197 played the clip x1.5 to fit the 7.5 s cue, over 500 deg/s -- stood dead still at each side, turned as one block with the chest, raised an arm to "feel out"
+each glance, and ended with the head cocked 12 degrees (the half of the shrug 199 left in: "he still tilts his head"). The game's own idle (`ma_wait`, measured off
+the bck with `look207/idle_scan.py`) is itself a look-around: the head leads to 55 / -67, the chest follows a beat later with half the turn, the hands travel with
+it, nothing stops.
+
+**`tools/anim/lookabout_curves.py`** (NEW): the look-about as curves -- the head's world yaw (0, 0 at 0.07, 60 at 0.40, 55 at 0.65, -62 at 1.28, -58 at 1.52,
+0 at 1.92), its pitch (up 4-6 through the glances, never down), the chest's yaw (24 at 0.58, -24 at 1.42, -3 at the end: 0.15 s behind the head with 40% of the
+turn), the upper arms swinging 0.2 of the chest's yaw 0.05 s behind it (the right forward and the left back as the chest turns left), one breath (the chest back
+1.5 at the half) -- joined by a monotone cubic (Fritsch-Carlson: no overshoot, the speed continuous) and written to `assets/Mario/Anims/ma_lookabout.pose.json`
+as a key EVERY FRAME (61 keys, 2.0 s at 30 fps), so the baker's cubic has nothing to overshoot. The head's pitch is taken about its OWN lateral axis after its yaw
+(undo the chest's yaw, pitch, yaw to the heading), so the turn adds no roll of its own: roll 0.0 throughout. Edit the numbers at the top, run it, re-bake
+(`README.md` has the two commands). `ma_lookabout.pose.json` (generated) and `ma_lookabout.tres` (re-baked: 269 rotation keys over 61 poses, the feet and centre
+fixed, the hands at 60.3-62.4 against the idle's 60.3 / 61.0).
+
+**`SmsRematchIntro.cs`:** `LookKeepsPace` (on) -- the look-about plays at its own speed; the cue's trim comes out of King Boo's laugh first (never under
+`LaughMinScale` 0.5 of its knob) and the look-about is quickened only when that is not enough (then never under `LookMinScale`). With the 2.0 s look-about, the
+3 s laugh and the 7.5 s cue: the look-about 2.0 s as written, the laugh 2.0 s (what 197 played). Off = 197's proportional trim. Readouts `LaughTrim`,
+`LookElapsed`.
+
+**Verified:** shots (run dc, the intro's own camera as is) 33a the first frame, 33b the glance left at 0.40 s, 33c the drift, 33d the sweep through the front, 33e
+the glance right, 33f from his left side (the chest turned, the arms hanging), 33g back to the front -- no raised arm, no cocked head. Headless drive v207-1
+(deleted before the commit): C42 the clip 2.00 s played 2.00 s (trim x1.00, the laugh's x0.67), the head's world yaw off the skeleton -62 (1.29 s) .. +60
+(0.42 s), the left peak first, its quickest 338 deg/s a physics tick at a time (the curve's own peak 273), roll within 0.0, pitch +0..+7, the chest -24 (1.44 s)
+.. +24 (0.59 s) peaking after the head, the hands never over 1.4 units above the idle's, the head back at 0 at the end; the step from the tree's idle into the
+clip 0.0 degrees (the idle stands at its frame 0 under CameraLocked); C26 the fight 7.52 s after the cue; everything else as before -- 58/58. The clean rebuild
+0 errors; the drive, the logs, the shots and the pass's tasks deleted.
+
+**Deviations, all editable:** the curves' numbers are mine (the game's idle is the model, made alert and bigger: 60 / -62 against its 55 / -67, 2.0 s against
+its 3.0); the laugh gives first under the cue (`LookKeepsPace` off = 197's). The pose script is now generated -- hand edits to it are overwritten by the next
+run of the generator; the `.tres` stays editable in the Animation panel as before (a re-bake overwrites it). The side shot's camera (2.8 m off his left) shows
+the back of his head at the right glance; the frontal shots carry the look. One shot run was cut short when Jaysonn closed the game window mid-run; rerun.
