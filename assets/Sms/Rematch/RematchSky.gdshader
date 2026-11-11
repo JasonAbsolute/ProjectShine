@@ -52,7 +52,7 @@ uniform float final_flame_tiles : hint_range(0.5, 4.0) = 1.6;
 group_uniforms;
 
 group_uniforms Knobs;
-/** The whole sky brighter or dimmer (1 = the game); the streaks alone (1 = the game); the clouds' flashes (1 = the game's, 0 = never). */
+/** The whole sky brighter or dimmer (1 = the game); the streaks alone (1 = the game); the clouds' flashes (1 = the game's, 0 = never -- 209: the arena's lights follow this too). */
 uniform float brightness : hint_range(0.0, 4.0) = 1.0;
 uniform float streak_gain : hint_range(0.0, 4.0) = 1.0;
 uniform float flash_amount : hint_range(0.0, 2.0) = 1.0;
@@ -65,6 +65,12 @@ uniform vec3 streak_bright : source_color = vec3(0.047, 0.996, 0.949);
 /** How fast it all runs (1 = the game's 30 frames a second) and a turn of the whole sky (degrees). */
 uniform float speed : hint_range(0.0, 4.0) = 1.0;
 uniform float turn : hint_range(-180.0, 180.0) = 0.0;
+group_uniforms;
+
+group_uniforms Driven_by_the_game;
+/** 209: the sky's CLOCK (seconds), set every frame by the arena's ArenaLighting node so the lights below flash on the same frame as the clouds; below 0 = the
+    shader's own TIME (the editor's preview, or FollowSky off on that node). Not a knob. */
+uniform float sky_time = -1.0;
 group_uniforms;
 
 // the dome's v against the elevation (degrees): piecewise linear through its vertex rings
@@ -220,7 +226,7 @@ vec3 final_sky(vec3 d, float e_true, float f) {
 void sky() {
 	vec3 d = normalize(EYEDIR);
 	float e = degrees(asin(clamp(d.y, -1.0, 1.0)));
-	float f = TIME * 30.0 * speed;
+	float f = (sky_time >= 0.0 ? sky_time : TIME) * 30.0 * speed;                                   // 209: the game's clock when ArenaLighting runs it
 	vec3 col = final_blend < 0.999 ? boss_sky(d, e, f) * brightness : vec3(0.0);
 	if (final_blend > 0.001) col = mix(col, final_sky(d, e, f) * final_brightness, final_blend);
 	COLOR = to_linear(clamp(col, 0.0, 1.0));

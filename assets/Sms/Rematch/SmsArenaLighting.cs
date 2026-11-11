@@ -1,0 +1,153 @@
+using Godot;
+using System.Linq;
+
+/// <summary>
+/// SMS pass 209: the arena's LIGHTS FOLLOW THE SKY (Jaysonn: "the lighting that follows the sky and the lightning flashes"). Until now the arena's light was
+/// fixed -- a violet ambient, a thin violet fog, a cool blue-white sun -- under a sky that flashes and, in the final phase, burns: the floor stayed cold
+/// blue-grey under the fire (208c's shots). This node, every frame:
+///  * runs the SKY's CLOCK: it sets the sky material's sky_time (RematchSky.gdshader reads it in place of its own TIME while it is set), so the sky and the
+///    lights below share ONE clock and a flash lands on the same frame in both;
+///  * the FLASHES: Luigi's Mansion's boss-arena sky lights its clouds purple (frame 2 of its 300-frame cycle), grey (12), blue (118), green (154), lavender
+///    (167) and dark red (237) -- the same colour keys as the shader's (the brk's) and the same pulse (up over a few frames, down over a second or two) --
+///    and the cloud colour of the moment is ADDED to the ambient colour (FlashStrength x; 1 = as the sky shows it) and, fainter, to the sun's colour
+///    (FlashOnSun x that): the lightning lights the ground. The sky's own flash_amount scales both (0 there = no flashes anywhere);
+///  * the FINAL PHASE: as the sky goes over to the roof fight's fire (the material's final_blend, which King Boo drives through the second split's cutscene),
+///    the ambient, the fog colour and the sun blend from the arena's own values (read off the Environment and the sun at start: your inspector values stay
+///    the base) to FinalAmbient / FinalFog / FinalSun, and the flashes fade out with the old sky (the fire sky has none).
+/// The Environment is duplicated at start so nothing here is written into the saved resource. ProcessMode Always: it runs through the split cutscenes'
+/// frozen world as the sky itself does. Knobs: FollowSky (off = the lights as they were and the sky on its own clock), FlashStrength, FlashOnSun, the Final
+/// colours and energies. Readouts for the drives: SkyTime, FlashNow, FlashColorNow, FinalBlendRead, the Base values, MaterialFound.
+/// </summary>
+[GlobalClass]
+public partial class SmsArenaLighting : Node
+{
+    [ExportGroup("The lights follow the sky (209)")]
+    /// <summary>Off = the ambient, the fog and the sun stay as set on them, the sky runs on its own clock, no flashes below.</summary>
+    [Export] public bool FollowSky = true;
+    /// <summary>The WorldEnvironment and the sun this node drives (siblings by default).</summary>
+    [Export] public NodePath EnvironmentPath = "../WorldEnvironment";
+    [Export] public NodePath SunPath = "../DirectionalLight3D";
+    /// <summary>How hard the sky's flashes hit the ground: the cloud colour of the moment x this, added to the ambient colour (1 = the colour as the sky shows it; 0 = the ground never flashes).</summary>
+    [Export(PropertyHint.Range, "0,4,0.05")] public float FlashStrength = 1.5f;
+    /// <summary>The sun's share of a flash (x FlashStrength): the flash colours the sunlight too, so lit sides and shadows read differently under it.</summary>
+    [Export(PropertyHint.Range, "0,2,0.05")] public float FlashOnSun = 0.5f;
+
+    [ExportGroup("The final phase's light (209)")]
+    /// <summary>What the ambient, the fog and the sun become under the fire sky (blended in with the sky's own fade). The arena's own values are the other end.</summary>
+    [Export] public Color FinalAmbient = new(0.62f, 0.26f, 0.1f);
+    [Export(PropertyHint.Range, "0,4,0.05")] public float FinalAmbientEnergy = 0.9f;
+    [Export] public Color FinalFog = new(0.18f, 0.035f, 0.01f);
+    [Export] public Color FinalSun = new(1f, 0.6f, 0.3f);
+    [Export(PropertyHint.Range, "0,4,0.05")] public float FinalSunEnergy = 0.55f;
+    [Export] public bool DebugPrint;
+
+    // ---- readouts
+    /// <summary>The sky's clock (seconds; the shader's frame = this x 30 x its speed; wraps at an hour as the shader's own TIME does).</summary>
+    public double SkyTime { get; private set; }
+    /// <summary>The strongest of the sky's six pulses right now (0..1), the cloud colour added this frame (display values, before FlashStrength and flash_amount), the sky's final_blend as read.</summary>
+    public float FlashNow { get; private set; }
+    public Color FlashColorNow { get; private set; }
+    public float FinalBlendRead { get; private set; }
+    public float SpeedRead { get; private set; } = 1f;
+    public float FlashAmountRead { get; private set; } = 1f;
+    public Color BaseAmbient { get; private set; }
+    public Color BaseFog { get; private set; }
+    public Color BaseSun { get; private set; }
+    public float BaseAmbientEnergy { get; private set; }
+    public float BaseSunEnergy { get; private set; }
+    public bool MaterialFound => _mat != null;
+    public bool ClockHeld { get; private set; }
+    public int Ticks { get; private set; }
+    public Godot.Environment Env => _env;
+    public DirectionalLight3D Sun => _sun;
+
+    private Godot.Environment _env; private DirectionalLight3D _sun; private ShaderMaterial _mat; private bool _wasFollowing;
+
+    public override void _Ready()
+    {
+        if (Engine.IsEditorHint()) return;
+        ProcessMode = ProcessModeEnum.Always;
+        var we = GetNodeOrNull<WorldEnvironment>(EnvironmentPath) ?? GetTree()?.CurrentScene?.FindChildren("*", "WorldEnvironment", true, false).OfType<WorldEnvironment>().FirstOrDefault();
+        _sun = GetNodeOrNull<DirectionalLight3D>(SunPath) ?? GetTree()?.CurrentScene?.FindChildren("*", "DirectionalLight3D", true, false).OfType<DirectionalLight3D>().FirstOrDefault();
+        if (we?.Environment != null)
+        {
+            _env = (Godot.Environment)we.Environment.Duplicate();                                   // ours to write: the saved resource stays as the inspector has it
+            we.Environment = _env;
+            _mat = _env.Sky?.SkyMaterial as ShaderMaterial;
+            BaseAmbient = _env.AmbientLightColor; BaseAmbientEnergy = _env.AmbientLightEnergy; BaseFog = _env.FogLightColor;
+        }
+        if (_sun != null) { BaseSun = _sun.LightColor; BaseSunEnergy = _sun.LightEnergy; }
+        SkyTime = (Time.GetTicksMsec() / 1000.0) % 3600.0;                                            // where the shader's own TIME would be: the sky's phase at a load stays a matter of when, as before
+        if (DebugPrint) GD.Print($"[SMS lighting] {GetPath()}: environment {(we != null ? we.Name : "NONE")} (material {(_mat != null ? "found" : "NOT FOUND")}), sun {(_sun != null ? _sun.Name : "NONE")}; base ambient {BaseAmbient} x{BaseAmbientEnergy:F2}, fog {BaseFog}, sun {BaseSun} x{BaseSunEnergy:F2}; clock from {SkyTime:F2} s");
+        if (_env != null) Apply(0f, Vector3.Zero, 0f);
+        else GD.PushWarning($"[SMS lighting] {GetPath()}: no WorldEnvironment with an Environment at {EnvironmentPath} -- the lights stay as they are");
+    }
+
+    public override void _ExitTree()
+    {
+        if (_mat != null) _mat.SetShaderParameter("sky_time", -1f);                                  // the material is a shared resource: the sky back on its own clock
+    }
+
+    public override void _Process(double delta)
+    {
+        if (_env == null) return;
+        Ticks++;
+        if (!FollowSky)
+        {
+            if (_wasFollowing) { Apply(0f, Vector3.Zero, 0f); if (_mat != null) _mat.SetShaderParameter("sky_time", -1f); _wasFollowing = false; }
+            return;
+        }
+        _wasFollowing = true;
+        if (!ClockHeld) { SkyTime += delta; if (SkyTime >= 3600.0) SkyTime -= 3600.0; }
+        float k = 0f;
+        if (_mat != null)
+        {
+            _mat.SetShaderParameter("sky_time", (float)SkyTime);
+            Variant fb = _mat.GetShaderParameter("final_blend"), sp = _mat.GetShaderParameter("speed"), fa = _mat.GetShaderParameter("flash_amount");   // a parameter left at the shader's default reads nil on the headless renderer: keep the last / the shader's 1
+            if (fb.VariantType != Variant.Type.Nil) k = fb.AsSingle();
+            if (sp.VariantType != Variant.Type.Nil) SpeedRead = sp.AsSingle();
+            if (fa.VariantType != Variant.Type.Nil) FlashAmountRead = fa.AsSingle();
+        }
+        FinalBlendRead = Mathf.Clamp(k, 0f, 1f);
+        float fc = Mathf.PosMod((float)(SkyTime * 30.0 * SpeedRead), 300f);
+        var (c0, c1, peak) = SkyFlash(fc);
+        Vector3 cloud = (c0 + c1) * 0.5f * FlashAmountRead;                                            // the clouds show mix(c1, c0, texture): their middle
+        FlashNow = peak * FlashAmountRead; FlashColorNow = new Color(cloud.X, cloud.Y, cloud.Z, 1f);
+        Apply(FinalBlendRead, cloud, FlashStrength * (1f - FinalBlendRead));
+    }
+
+    /// <summary>The ambient, the fog and the sun for a blend k toward the fire and a flash colour x its strength (display values, as the inspector's own).</summary>
+    private void Apply(float k, Vector3 flash, float strength)
+    {
+        Color amb = BaseAmbient.Lerp(FinalAmbient, k); Color fog = BaseFog.Lerp(FinalFog, k); Color sun = BaseSun.Lerp(FinalSun, k);
+        _env.AmbientLightColor = new Color(amb.R + flash.X * strength, amb.G + flash.Y * strength, amb.B + flash.Z * strength, 1f);
+        _env.AmbientLightEnergy = Mathf.Lerp(BaseAmbientEnergy, FinalAmbientEnergy, k);
+        _env.FogLightColor = fog;
+        if (_sun != null)
+        {
+            float s = strength * FlashOnSun;
+            _sun.LightColor = new Color(sun.R + flash.X * s, sun.G + flash.Y * s, sun.B + flash.Z * s, 1f);
+            _sun.LightEnergy = Mathf.Lerp(BaseSunEnergy, FinalSunEnergy, k);
+        }
+    }
+
+    // ---- the shader's flashes, the same math (RematchSky.gdshader: pulse / c0 / c1)
+    private static float Ease(float k) { k = Mathf.Clamp(k, 0f, 1f); return 0.5f - 0.5f * Mathf.Cos(Mathf.Pi * k); }
+    /// <summary>A brk flash: nothing, up over a..b, down over b..c, nothing.</summary>
+    public static float Pulse(float f, float a, float b, float c) => f < a || f > c ? 0f : (f < b ? Ease((f - a) / (b - a)) : 1f - Ease((f - b) / (c - b)));
+    /// <summary>The sky's two cloud colours at frame fc of the 300-frame cycle (display values 0..1, before flash_amount) and the strongest pulse (0..1).</summary>
+    public static (Vector3 c0, Vector3 c1, float peak) SkyFlash(float fc)
+    {
+        float p1 = Pulse(fc, 0f, 2f, 19f), p2 = Pulse(fc, 149f, 154f, 164f), p3 = Pulse(fc, 164f, 167f, 189f);
+        float q1 = Pulse(fc, 9f, 12f, 39f), q2 = Pulse(fc, 108f, 118f, 166f), q3 = Pulse(fc, 226f, 237f, 300f);
+        Vector3 c0 = (new Vector3(100f, 0f, 150f) * p1 + new Vector3(92f, 211f, 97f) * p2 + new Vector3(144f, 111f, 168f) * p3) / 255f;
+        Vector3 c1 = (new Vector3(100f, 100f, 100f) * q1 + new Vector3(0f, 0f, 73f) * q2 + new Vector3(54f, 0f, 0f) * q3) / 255f;
+        return (c0, c1, Mathf.Max(Mathf.Max(p1, Mathf.Max(p2, p3)), Mathf.Max(q1, Mathf.Max(q2, q3))));
+    }
+    /// <summary>The frames the six flashes peak on.</summary>
+    public static readonly float[] PeakFrames = { 2f, 12f, 118f, 154f, 167f, 237f };
+
+    /// <summary>For the drives and the shots: the clock stopped at a moment (seconds; frame / (30 x speed) lands the sky on that frame of its cycle), and let go again.</summary>
+    public void HoldClock(double seconds) { SkyTime = seconds; ClockHeld = true; }
+    public void ReleaseClock() { ClockHeld = false; }
+}
