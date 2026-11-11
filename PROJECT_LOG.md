@@ -14107,3 +14107,24 @@ note. The scorch texture was retuned twice from the shots (above). The drive gai
 fireballs and the volley: a supply Boo bumping Mario cost HP in three runs). Remote steps were batched several times this pass (twice an upload with its
 build in the last stretch; the earlier count was lost to a context reset); every one landed in the right order (hashes, DONE lines and the drive's verdict
 checked), but it was luck, not procedure.
+
+### 211b -- the King Boo REMATCH, part 56b: the THUNDER WAITS FOR THE FIGHT: none through the card, Mario's fall and the intro cutscene (the laugh from nowhere, the look-about, King Boo's rise and dive) -- it rolls from the sky's first purple flash after King Boo is up for the fight (feature/kingboo-rematch, code `bc92231`)
+
+**Jaysonn** (on 211): "i do like the thunder noise but i think we can make it wjere the sound effect only plays after the intro cutscene to not
+ruin tension".
+
+**`assets/Sms/Rematch/SmsArenaLighting.cs`**, the "Thunder (211)" group: `ThunderAfterIntro` (on) and `IntroPath` (`../RematchIntro`; else the first
+`SmsRematchIntro` in the scene). The thunder waits until the intro director is `Done` -- its `FightReady`: King Boo up at his spot after the cutscene
+(or after the fall, when the cutscene is skipped or after a miss). While it waits, a purple flash's thunder is DROPPED (its cycle marked as had, not
+saved up), so the fight's first thunder comes on the next flash's beat (`ThunderDelay` 0.4 s after it), never at the moment the wait ends. The flashes
+themselves -- the sky's and 209's on the ground -- go on through the intro as before; only the sound waits. `ThunderAfterIntro` off = 211's (from the
+first frame); no intro director = no wait. Readouts: `ThunderGateOpen` (latched), `ThunderHeld` (thunders dropped in the intro), `IntroFound`,
+`LastThunderFrame` (the sky's frame the last one rolled on).
+
+**Verified:** headless drive v211b-1 (deleted before the commit), the intro run for real (the card skipped by the A press, the fall, the whole
+cutscene): C48 -- `ThunderAfterIntro` on and the director found; 0 thunders before the fight, 2 purple flashes' thunders dropped in the intro; the wait
+over at tick 762 with the intro `Done`, never before; the fight's first thunder 6.2 s later on the sky's frame 14.12 (due 14.00: 0.4 s after the flash
+on frame 2); 13 in all; everything else as before -- 68/68 on the committed build. The clean rebuild 0 errors; the drive, the logs and the task deleted.
+
+**Deviations:** none from the game (the thunder is mine: 211). The split cutscenes (188) are not held back -- the thunder rolls through them as before;
+only the intro was asked for.
