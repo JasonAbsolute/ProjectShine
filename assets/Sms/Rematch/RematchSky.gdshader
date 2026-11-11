@@ -41,6 +41,14 @@ uniform float final_brightness : hint_range(0.0, 4.0) = 1.0;
 uniform float final_fire_gain : hint_range(0.0, 4.0) = 1.0;
 uniform float final_streak_gain : hint_range(0.0, 4.0) = 1.0;
 uniform float final_turn : hint_range(-180.0, 180.0) = 0.0;
+/** 208c (Jaysonn: "the camera faces down during the fight and the final fire is just red past a certain point -- lower it but keep the fire looking high"): the dome's
+    elevations pulled DOWN from its top ring (+22.6 deg stays where it is; everything under it reaches final_stretch times as far down: at 2.5 the fire that ended
+    8 deg under the horizon ends 55 deg under it, the red cap under that), the whole dome lowered final_drop degrees on top, and the flame textures laid
+    final_flame_tiles times as many times down the taller band (1 = the tongues stretched with it; the band's height / final_flame_tiles keeps their shape).
+    1 / 0 / 1 = the game's roof sky exactly. */
+uniform float final_stretch : hint_range(1.0, 5.0) = 2.5;
+uniform float final_drop : hint_range(-30.0, 60.0) = 0.0;
+uniform float final_flame_tiles : hint_range(0.5, 4.0) = 1.6;
 group_uniforms;
 
 group_uniforms Knobs;
@@ -184,12 +192,13 @@ vec4 fire_layer(float u, float v, float f, vec3 c0, vec3 c1, vec2 fa_s, vec2 fb_
 	float gs = tex_wm(gs001m, vec2(-3.0 * (u - 0.5) + 0.5, 1.0 - v), 1, 0);
 	return vec4(mix(c0, c1, fb), fa * fb * ramp * bg * gs);
 }
-vec3 final_sky(vec3 d, float e, float f) {
+vec3 final_sky(vec3 d, float e_true, float f) {
 	float u = fract(atan(d.x, d.z) / 6.2831853 + final_turn / 360.0);
+	float e = 22.6 + (e_true + final_drop - 22.6) / max(0.1, final_stretch);           // 208c: the dome pulled down from its top ring
 	vec3 col = vec3(33.0, 0.0, 0.0) / 255.0;                                                    // 'vr_outout': the dark red box round everything
 	if (e < 22.6) {                                                                              // the fire balls' top ring
-		vec4 f1 = fire_layer(u, o2_v(e), f, vec3(234.0, 80.0, 16.0) / 255.0, vec3(254.0, 165.0, 16.0) / 255.0, vec2(6.0, 0.4), vec2(10.0, 0.5), 1.0);
-		vec4 f2 = fire_layer(fract(u - 75.6 / 360.0), p2_v(e), f, vec3(190.0, 0.0, 0.0) / 255.0, vec3(255.0, 137.0, 0.0) / 255.0, vec2(4.0, 1.5), vec2(10.0, 1.3), -1.0);
+		vec4 f1 = fire_layer(u, o2_v(e), f, vec3(234.0, 80.0, 16.0) / 255.0, vec3(254.0, 165.0, 16.0) / 255.0, vec2(6.0, 0.4 * final_flame_tiles), vec2(10.0, 0.5 * final_flame_tiles), 1.0);
+		vec4 f2 = fire_layer(fract(u - 75.6 / 360.0), p2_v(e), f, vec3(190.0, 0.0, 0.0) / 255.0, vec3(255.0, 137.0, 0.0) / 255.0, vec2(4.0, 1.5 * final_flame_tiles), vec2(10.0, 1.3 * final_flame_tiles), -1.0);
 		col += f1.rgb * f1.a * final_fire_gain + f2.rgb * f2.a * final_fire_gain;
 	}
 	float cap = clamp((-7.0 - e) / 10.0, 0.0, 1.0);                                             // 'vr_n2': the red glow below, in from -7 deg, full from -17
