@@ -13908,3 +13908,42 @@ files and the pass's tasks deleted. The headless import pass touched no other .i
 **Deviations:** none in the sky itself -- it is the disc's data; the knobs are mine (all at the game's values). A first version of this pass drew a
 hand-made sky (dark violet, procedural streaks) before Jaysonn pointed at the decomp; it is gone. The rip tools read only the sky archive and the DOL's
 string table; no game data is in the repo beyond the three 8-bit textures (19 KB). One shot run was lost to launching the pull with it.
+
+### 208b -- the King Boo REMATCH, part 53b: the FINAL PHASE's SKY -- at the second split the arena's sky cross-fades to Luigi's Mansion's FINAL-BOSS sky, the King Boo / Bowser roof fight's vrKoopa dome ported from the disc (a dark red backdrop, two layers of fire laid round the horizon, red-to-yellow streaks, a red glow below), the fade running through the frozen cutscene (feature/kingboo-rematch, code `a4bd443`)
+
+**Jaysonn:** "can you also make it in the finals phase it does the final boss skybox? the red fireery one?"
+
+**The sky.** `tools/lm/lm_sky_rip.py` had already pulled `/Iwamoto/vrKoopa.szp` off the disc (`k_vrbx.bmd`, `k_vrbx01-06.btk`, `k_vrbx.bck`; the DOL's
+table draws it for map 9, the roof). What the game draws, read off the bmd's six materials, its shapes' vertex rings (`sky208/lm/koopa_probe.py`) and the
+six scrolls: a box of dark red (33,0,0) round everything (`vr_outout`); **fire 1** (`vr_o2`, added): a ball whose v runs 0.012 at +22.6 deg (its top
+ring: no fire above), 0.496 at the horizon, 1 at the nadir; colour = mix(orange-red (234,80,16), orange-yellow (254,165,16), fire B), alpha = fire A x
+fire B x `ramp02` turned 180 (gone below -8 deg) x `bg04` (10 x round, turned 180, scrolling +1 per 120 frames, v clamped) x `gs001m` (3 x round, turned
+180: gone toward the top ring); fire A = `gaku_fire01` laid 6 x round and 0.4 tall scrolling UP a repeat per 150 frames, fire B 10 x round and 0.5 tall
+per 240 -- tongues of flame; **fire 2** (`vr_p2`, added): the same ball on its joint turned -75.6 deg (v 0.027 / 0.266 / 0.504 / 0.703 / 0.902 / 1),
+mix(deep red (190,0,0), orange (255,137,0)), fire A' 4 x round 1.5 tall, fire B' 10 x round 1.3 tall, its clouds scrolling the other way; the **red cap**
+(`vr_n2`, blended): plain red from -17 deg down, in from -7 (the vertex alpha); the **streaks** (`vr_q2`, added): the boss-arena sky's sine-wave streaks
+without the 180 turn, 1.2-1.5 tall, from +2 deg down to -17.5, red (255,0,0) to yellow (255,255,0). Left out: `vr_mat1`, a small fire column on a spinning
+joint 390 units under the horizon and off to one side -- under the arena's floor. TEV register 2 reads white in the file, but every stage naming it is a
+pass-through only if it is black and the game's own screenshots are orange, not white: taken as black. The game's numbers are display values: converted
+to linear at the end. `sky208/koopa_sky_preview.py` draws the same math in numpy (checked against MarioWiki's King Boo Bowser Fight shots: the wall of
+orange-yellow flame under dark red).
+
+**Files.** `RematchSky.gdshader`: `final_sky()` beside `boss_sky()`; `final_blend` (0 = the boss-arena sky, 1 = the final-boss sky; in between both are
+drawn and mixed), `final_brightness`, `final_fire_gain`, `final_streak_gain`, `final_turn`. `RematchSky.tres`: the two new textures.
+`assets/Sms/Rematch/Sky/lm_gaku_fire01.png` (128x128) and `lm_ramp02.png` (64x64) (NEW: the disc's I8 textures as 8-bit grey, `.import` pinned lossless,
+no mipmaps, no 3D auto-compression; `bg04`, `sin_wave` and `gs001m` are byte-identical in both domes and shared). **`SmsKingBooRematch.cs`** ("The final
+phase's sky (208b)"): `FinalSky` (on), `FinalSkyAtSplit` 2 (the second split: three of him; 1 = the first), `FinalSkyBlendSeconds` 2.5.
+`BeginSplitCutscene` starts the fade when `SplitsShown` reaches `FinalSkyAtSplit`; `FinalSkyTick` eases the shared sky material's `final_blend` up
+(smoothstep), ticked by the real one's `_Process` and -- while the world is frozen for the cutscene -- by `SmsSplitCutscene._Process` (one line there);
+the real one puts the blend back to 0 as he arrives (deferred in `_Ready`: the material is a shared resource) and as he leaves (`_ExitTree`). Readouts
+`FinalSkyBlend`, `FinalSkyBegun`, `FinalSkyMaterialFound`; `ResetFinalSky`; `DriveFinalSky` for the shot drive.
+
+**Verified:** shots (run dh) 35a-c -- the horizon over the fence, tilted up, and the fight's view: the wall of flame round the horizon under the dark red,
+King Boo against it (the shot drive forces the blend for its three frames and puts it back). Headless drive v208b-1 (deleted before the commit): C44 the
+blend 0 through the first split's cutscene, begun at the second's cut (0.00 then), climbing through the frozen cutscene to 1.00 over 261 ticks with no
+drop, 1.000 at the fight's return and the material's own `final_blend` 1.000; everything else as before -- 60/60. The clean rebuild 0 errors; the drive,
+the logs, the shots, the import pass's files and the pass's tasks deleted; the headless import pass touched no other `.import` file.
+
+**Deviations:** the fire column under the horizon is left out (under the floor); the 2.5 s fade and its place (the second split) are mine -- the game cuts
+to its roof sky with the room; TEV register 2 taken as black (above). One build failed on a doubled `[ExportGroup("")]` of mine (fixed, rebuilt); the
+drive run and the cleanup were launched in one batch -- the run's 60/60 and the clean status show the order held, but it was luck.
