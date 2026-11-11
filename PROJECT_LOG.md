@@ -13972,3 +13972,42 @@ C43 / C44 unchanged. The clean rebuild 0 errors; the drive, the logs, the shots 
 
 **Deviations:** the stretch departs from the game's dome (its fire sits where Luigi's camera sees it); chosen for Jaysonn's camera, 1 / 0 / 1 puts it back.
 The shot drive's two new views (35d / 35e) live in the uncommitted drive partial as before.
+
+### 209 -- the King Boo REMATCH, part 54: the arena's LIGHTS FOLLOW THE SKY -- Luigi's Mansion's lightning lights the ground (the sky's six cloud flashes added to the ambient and the sun on the same frame as in the clouds, the sky and the lights on one clock), and in the final phase the ambient, the fog and the sun blend to the fire's colours with the sky (feature/kingboo-rematch, code `0eac8f4`)
+
+**Jaysonn** (asked what else the fight needs, picked these two): "Do 1 and 2 together, the lighting that follows the sky and the lightning flashes."
+
+**Why.** The arena's light was fixed -- a violet ambient (0.45, 0.4, 0.65) x 0.7, a violet fog, a cool blue-white sun (0.75, 0.78, 1) x 0.6 -- under a sky
+that flashes every few seconds and, from the second split, burns: the floor stayed cold blue-grey under the fire (208c's 35d / 35e), and the clouds lit up
+with nothing on the ground answering.
+
+**NEW `assets/Sms/Rematch/SmsArenaLighting.cs`** (+ `.uid`), the `ArenaLighting` node in `RematchArena.tscn` (process mode Always: it runs through the
+frozen cutscenes as the sky does). Every frame: **the sky's clock** -- it sets the sky material's `sky_time`, and `RematchSky.gdshader` reads that in place
+of its own `TIME` while it is set (below 0 = `TIME`: the editor's preview, or FollowSky off); one clock for the sky and the lights, started where `TIME`
+would be so the sky's phase at a load stays a matter of when (the shader's only change: the new uniform in a "Driven by the game" group and the one line
+that reads it). **The flashes** -- the shader's own brk keys and pulse, ported: C0 purple (100, 0, 150) at frame 2 of the 300-frame cycle, green (92, 211,
+97) at 154, lavender (144, 111, 168) at 167; C1 grey (100, 100, 100) at 12, blue (0, 0, 73) at 118, dark red (54, 0, 0) at 237; the clouds show
+mix(C1, C0, texture), so their middle (C0 + C1) / 2 x the sky's `flash_amount` is the colour of the moment, ADDED to the ambient colour x `FlashStrength`
+(1.5) and to the sun's x `FlashStrength` x `FlashOnSun` (0.5); display values, as the inspector's own; the sky's `flash_amount` scales both. **The final
+phase** -- the material's `final_blend` (King Boo's, smoothstepped through the cutscene) blends the ambient, the fog colour and the sun from the arena's
+own values (read off the Environment and the sun at start: the inspector's numbers stay the base) to `FinalAmbient` (0.62, 0.26, 0.1) x
+`FinalAmbientEnergy` 0.9, `FinalFog` (0.18, 0.035, 0.01), `FinalSun` (1, 0.6, 0.3) x `FinalSunEnergy` 0.55; the flashes fade out with the old sky. The
+Environment is duplicated at start (a shallow copy: the Sky and its material stay the shared ones King Boo writes), so nothing is written into the saved
+resource. Knobs: `FollowSky`, `FlashStrength`, `FlashOnSun`, the Final colours and energies. Readouts: `SkyTime`, `FlashNow`, `FlashColorNow`,
+`FinalBlendRead`, the Base values, `MaterialFound`; `HoldClock` / `ReleaseClock` for the drives and the shots.
+
+**Verified:** shots (run dj) 36a-f, the fight camera pitched down with the clock held on a frame of the cycle -- 36a frame 60 (quiet: the base light), 36b
+154 (the green flash: the clouds green, the floor and King Boo lit green with them), 36c 2 (the purple: a lavender cast on the floor), 36d 12 (the grey with
+the purple's tail: the floor lifted bright lavender-grey); then the clock let go and the final sky on: 36e the same view and 36f the look-down, the floor
+warm brown-orange under the fire (208c's 35d / 35e were blue-grey under it). Headless drive v209-1 (deleted before the commit): C45 under the final sky the
+ambient (0.62, 0.26, 0.10) x 0.90, the fog (0.18, 0.04, 0.01), the sun (1.00, 0.60, 0.30) x 0.55 -- the Final values, no flash on them -- the base read
+(0.45, 0.40, 0.65) x 0.70 and (0.75, 0.78, 1.00) x 0.60, the material's `sky_time` the node's clock (149.92 = 149.92); C45b 8627 ticks sampled before the
+final phase: the strongest pulse 1.000 on frame 237.1 of the cycle (0.1 off the dark-red key), the ambient then (0.61, 0.40, 0.65) = the base + the cloud
+colour (0.11, 0, 0) x 1.5 to 0.0002, the sun (0.83, 0.78, 1.00) likewise, 3075 quiet ticks with the ambient exactly the base, the clock checked 143 times
+with 0 off; C43 now reads the lighting's BASE (the live ambient is driven); 62/62. The clean rebuild 0 errors; the drive, the logs, the shots and the tasks
+deleted.
+
+**Deviations:** the flashes on the ground are mine (the game's sky flashes alone; its arenas are prelit) -- `FlashStrength` 0 is the game; the fire's light
+is mine too -- `FollowSky` off is 208's fixed light. Run en of the headless drive stopped at 33 with C14 failing: the drive's spin jump at a Boo spawned on
+the rim sent Mario off the edge, where he fell for 10 s without anything ending it (a drive flake -- run eo passed 62/62 unchanged -- but worth a look in
+play: does falling off the arena end anything?). The shot run and its first pull went out in one batch (the pull re-done after DONE).
