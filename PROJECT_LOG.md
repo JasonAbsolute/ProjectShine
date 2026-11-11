@@ -14048,3 +14048,62 @@ committed build. The clean rebuild 0 errors; the drive, the logs, the shots and 
 first try was retuned once from the shots (above). Remote steps were batched four times this pass (an upload with a build twice, a run with its pull twice,
 a run with the cleanup once); every one happened to land in the right order (hashes, DONE lines and the drive's verdict checked), but it was luck, not
 procedure.
+
+### 211 -- the King Boo REMATCH, part 56: SCORCH MARKS on the floor where the Bomb Boos blast and the lava balls land (fading decals: glowing orange fresh, black for eight seconds, gone over ten more) and JAYSONN'S SOUNDS for the attacks (his FireStart / FireEnd on the lava balls, Boolossus's bound and pon, the cold breath's blow, the ice's freeze / unfreeze, the lightning's crackles and zap, the wind's gust, the sky's thunder) -- and the attacks' sounds switched on at all (`SmsActorSound.ActorOf` never knew the attack classes: their sounds had never played) (feature/kingboo-rematch, code `541aaf2`)
+
+**Jaysonn** (from the list of what else the fight needs): "lets do 6. Scorch marks where Bomb Boos blast and lava balls land. Fading decals on the floor.
+Right now a blast leaves nothing behind. and i made a new folder that has some fireball sound effects in the ref folder. lets add those" -- then "use
+fireEnd and fireStart in that folder and dlete the others"; "i also uploaded other sound effects to put in. for other attacks go look at them and some are
+named what they should be but other are more up for creative freedom"; and "the fire sounds need to be fireStart when shot out of the crown and then
+fireEnd when when it dissapears and shouldnt be too loud".
+
+**Scorch marks.** NEW `assets/Sms/Rematch/SmsScorchMarks.cs` (+ `.uid`), the `ScorchMarks` node in `RematchArena.tscn`: a pool of Decals (`MaxMarks` 24,
+the oldest reused). `SmsBombBoo.Blast` calls `MarkBlast` with the floor point under the blast -- a mark `BombSize` (1.3) x the blast's reach across (3.5 m
+-> 4.5 m), full black; `SmsFireball.Splat` calls `MarkLava` with the ball's radius and the splat's strength -- `LavaSize` (3.2) x the radius x the splat (a
+landing 1, a bounce 0.6, the burst on Mario 1.6, its going out 0.45 from the birth radius), 0.55 + 0.45 x the splat black (0.3..1). Three shapes drawn in
+code at start (128 px): a ragged disc (three sine lobes of angular noise), solid for `Core` (0.7) of the way out then softening to the ragged edge, a
+0.92-1 grain, near black (0.03) in the middle and a touch browner at the rim; the glow the same shape in `GlowColor` (1, 0.45, 0.1). Each mark: AlbedoMix
+1, a random turn, its size give or take 12 %, a box 3 m tall projecting down. A fresh mark GLOWS (the decal's emission at `GlowEnergy` 2.5, dying as the
+square over `GlowSeconds` 1.5), sits at strength x `Darkness` (1) for `HoldSeconds` (8), fades over `FadeSeconds` (10), is hidden after. The decals project
+onto the FLOOR ONLY: `SmsArenaFloor` puts its meshes on visual layer 2 as well (`DecalLayerSet`) and the decals cull to it, so Mario and the Boos walking
+over a mark are not stained. Readouts: `Made`, `Alive`, `LastAt`, `LastSize`, `LastStrength`, `Newest`, `NewestAlpha`, `NewestAge`, `Textures`, `Recent`
+(the last 16: where, size, strength, physics frame), `Advance(seconds)`.
+
+**The sounds.** NEW `assets/Sms/Sound/Rematch/` -- Jaysonn's twelve WAVs (+ `.import`), named by the knobs that play them: `FIREBALL_START` (his
+FireStart.wav), `FIREBALL_END` (FireEnd.wav), `BOOLOSSUS_BOUND` / `BOOLOSSUS_PON` (Luigi's Mansion's Boolossus: JA_SE_ENM_OBAKE_TS_BOUND_1 / _PON),
+`BREATH_BLOW` (Ocarina of Time's Freezzard blow), `ICE_FREEZE` / `ICE_UNFREEZE` (Link frozen / thawed), `ELECTRIC_ZAP` / `ELECTRIC_CRACKLE` /
+`ELECTRIC_CRACKLE_SHORT` (his Electric 240 / 321 / 322), `THUNDER` (thunder.wav), `WIND_GUST` (wind 20.wav). `SmsActorSound`: the lookup falls back to
+`Sound/Rematch/<name>.wav` after the game's; `RematchLevels`, each one's level in dB (`FIREBALL_START` -14, `FIREBALL_END` -15 -- the files peak at 0 dBFS,
+rms -8; `BOOLOSSUS_BOUND` 0, `BOOLOSSUS_PON` 2, `BREATH_BLOW` 0, `ICE_FREEZE` 5, `ICE_UNFREEZE` 4, `ELECTRIC_ZAP` -4, `ELECTRIC_CRACKLE` -2,
+`ELECTRIC_CRACKLE_SHORT` -5, `THUNDER` -6, `WIND_GUST` -1), `LevelDb(name)` for players outside the class. Where they play: `SmsFireballs` `SpitSe`
+`FIREBALL_START` as each ball pops out of the crown, `EndSe` `FIREBALL_END` the moment a ball disappears (the end of its roll, the burst on Mario, the
+cut-off; once per ball; `SeMinGap` 0.12 s so several going out together play one); `SmsBoolossus` `LandSe` `BOOLOSSUS_BOUND` as it lands, `SplitSe`
+`BOOLOSSUS_PON` as it splits; `SmsGhostBreath` `BreathSe` `BREATH_BLOW` as the blow begins and every `BreathSeEvery` 3.2 s (the file is 3.4 s);
+`SmsIceBlock` `FreezeSe` `ICE_FREEZE` as the ice snaps shut, `ShatterSe` `ICE_UNFREEZE` as it shatters; `SmsGhostWind` `WindSe` `WIND_GUST` as the tornados
+rise and every `WindSeEvery` 1.6 s (-6 dB, the pitch wandering); `SmsGhostLightning` `AppearSe` `ELECTRIC_CRACKLE` as the walls appear, `CrackleSe`
+`ELECTRIC_CRACKLE_SHORT` every `CrackleEvery` 0.45 s (x 0.7..1.3) while they stand and close, `CloseSe` `ELECTRIC_ZAP` as they close (the hit on Mario
+still the game's electric damage); `SmsArenaLighting`'s "Thunder (211)" group: `ThunderSe` `THUNDER` rolls `ThunderDelay` 0.4 s after the sky's big purple
+flash (once a 10 s cycle; `ThunderOnGreenToo` off; not under the fire sky), on its own player on the sfx bus, `ThunderDb` 0.
+
+**The bug.** `SmsActorSound.ActorOf` -- the table that says which script is which game actor -- had no entry for `SmsFireballs`, `SmsGhostBreath`,
+`SmsGhostLightning`, `SmsGhostWind`, `SmsBoolossus`, `SmsIceBlock`, `SmsBooCircle` or `SmsBooVolley`, so `Attach(this)` had returned null to every one of
+them since their passes and none of their sounds (the game's TELESA_FIRE, BOUND, BREATHE, the bottle wind, APPEAR / DISAPPEAR...) had ever played. Found
+when the drive logged no sounds at all (run et); the eight added.
+
+**Verified:** shots 38a-c (run do) -- 38a three fresh marks glowing orange on the stone (a blast's, a landing's, a small one where a ball went out); 38b
+the glow out: black ragged splats, 16-31 of 255 against the floor's 81-88 (run dm's 0.85 / 38 % core read as a grey smudge at 42-54, run dn's 0.9 / 60 %
+still grey at 35-44 -- `Darkness` 1, `Core` 0.7, grain 0.92 after); 38c two thirds through the fade. Headless drive v211-1 (deleted before the commit): C47
+8 blasts marked 8, 9 landings marked 9 (matched by physics frame: three land in one tick), the first decal right (cull mask 2, 4.8 m, at the mark, alpha
+1.00, both textures, glow 2.50), the life curve (glow 2.5 -> 0 after 1.5 s with the black full, half at hold + fade / 2, gone and hidden at the end); C47b
+FireStart / FireEnd found by the new lookup, 3 starts in the log for 3 pops, an end; C47c all ten others found and levelled, the breath's blow, the
+lightning's 9 crackles / 27 short / 9 zaps, Boolossus's bound and pon, 8 gusts, 15 thunders over 355 s (the ice's two found, no ice in this drive);
+everything else as before -- 67/67 on the committed build. The clean rebuild 0 errors; the drive, the logs, the shots and the tasks deleted.
+`Ref/FireSounds`' two mp3s and their `.import` deleted at Jaysonn's word (`Ref/` is not tracked).
+
+**Deviations:** the electric / thunder / wind names were Jaysonn's "creative freedom" -- which file goes where (240 the zap, 321 / 322 the crackles, the
+thunder on the sky's flashes) is my call; the thunder and the sky's flashes are not in the game. The FireEnd was first wired to the end puff alone (no
+sound for a ball bursting on Mario) and moved to the disappearance itself on Jaysonn's note; the fire levels dropped from -6 / -7 to -14 / -15 on the same
+note. The scorch texture was retuned twice from the shots (above). The drive gained a FieldClear (the free supply Boos vanished before the circle, the
+fireballs and the volley: a supply Boo bumping Mario cost HP in three runs). Remote steps were batched several times this pass (twice an upload with its
+build in the last stretch; the earlier count was lost to a context reset); every one landed in the right order (hashes, DONE lines and the drive's verdict
+checked), but it was luck, not procedure.
