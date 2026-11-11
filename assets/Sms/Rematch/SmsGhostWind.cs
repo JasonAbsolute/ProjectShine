@@ -52,8 +52,9 @@ public partial class SmsGhostWind : Node3D
     [Export(PropertyHint.Range, "0.3,1,0.01")] public float FlingUpK = 0.75f;
     [Export] public float FlingGraceSeconds = 2f;
     [ExportGroup("The sounds")]
-    [Export] public string WindSe = "MSD_SE_MA_BOTTLE_WIND";
-    [Export] public float WindSeEvery = 1.2f;
+    /// <summary>211: Jaysonn's wind (WIND_GUST, 2.4 s), played again every WindSeEvery with a little pitch wander -- a howl that keeps going.</summary>
+    [Export] public string WindSe = "WIND_GUST";
+    [Export] public float WindSeEvery = 1.6f;
     [ExportGroup("")]
     [Export] public bool DebugPrint;
 

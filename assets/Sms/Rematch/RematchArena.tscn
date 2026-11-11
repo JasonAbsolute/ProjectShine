@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3 uid="uid://d157arena"]
+[gd_scene load_steps=14 format=3 uid="uid://d157arena"]
 
 [ext_resource type="Script" uid="uid://3aw1w481iqnu" path="res://assets/Level.cs" id="1_level"]
 [ext_resource type="PackedScene" path="res://assets/Mario.tscn" id="2_mario"]
@@ -10,6 +10,7 @@
 [ext_resource type="Material" uid="uid://d208rematchsk" path="res://assets/Sms/Rematch/RematchSky.tres" id="8_sky"]
 [ext_resource type="Script" path="res://assets/Sms/Rematch/SmsArenaLighting.cs" id="9_lighting"]
 [ext_resource type="Script" path="res://assets/Sms/Rematch/SmsArenaEmbers.cs" id="10_embers"]
+[ext_resource type="Script" path="res://assets/Sms/Rematch/SmsScorchMarks.cs" id="11_scorch"]
 
 [sub_resource type="Sky" id="Sky_arena"]
 sky_material = ExtResource("8_sky")
@@ -39,7 +40,7 @@ ShowGoText = false
 HasFludd = false
 StageName = "Casino Delfino"
 ScenarioName = "King Boo's Rematch"
-metadata/_sms_note = "Pass 157: the KING BOO REMATCH arena (KINGBOO_REMATCH_gdoc.txt) -- Bouldergeist's planet from Super Mario Galaxy (Arena: models/Sms/Rematch/polta_planet.glb, the collision built from it at start), no FLUDD (the Level's HasFludd is off), a dark violet night; 208: under the SKY of Luigi's Mansion's boss arenas (WorldEnvironment -> Environment -> Sky -> RematchSky.tres: every look knob is a shader parameter on that material -- the colours, the streaks, the horizon bank, the drift; tools/projectshine/rematch157/sky208/sky_preview.py renders the same math to a PNG). (158 / 159) The BombBooSpawner child supplies the Bomb Boos -- Mario's weapon: X spins (no FLUDD), the spin grabs a Boo in reach by its tongue and it swings round him; walk it into King Boo and it bursts on him; three bursts and he is down. KingBoo waits BooHeight (4 m) up so the swung Boo reaches his body. The casino's RematchExit loads this scene once Mario falls through the shattered table; RematchIntro runs the entrance: black, the two-line card, Mario revealed falling in FallHeight over the floor at MarioSpawn, the fade in, King Boo (KingBoo, an SmsKingBooRematch) spawning BooHeight over the floor at BooSpawn with the long laugh. Opened on its own (F6) the same intro runs. The fight itself is a later pass: King Boo only hovers, glows and watches Mario for now. Knobs: on RematchIntro (the lines, their timing, the heights, the fade, the skip), on KingBoo (opacity, glow, hover, the laugh), on Arena (Brightness, AutoCollision); move MarioSpawn / BooSpawn to place them (x and z; the heights are read from the floor under them). 209: the ArenaLighting child makes the lights follow the sky -- the flashes on the ground, the fire's light in the final phase (its own note and knobs). 210: the ArenaEmbers child fills the air over the rim with rising embers in the final phase (its note and knobs); the Environment's GLOW is on (threshold 0.6: only the bright things bloom)."
+metadata/_sms_note = "Pass 157: the KING BOO REMATCH arena (KINGBOO_REMATCH_gdoc.txt) -- Bouldergeist's planet from Super Mario Galaxy (Arena: models/Sms/Rematch/polta_planet.glb, the collision built from it at start), no FLUDD (the Level's HasFludd is off), a dark violet night; 208: under the SKY of Luigi's Mansion's boss arenas (WorldEnvironment -> Environment -> Sky -> RematchSky.tres: every look knob is a shader parameter on that material -- the colours, the streaks, the horizon bank, the drift; tools/projectshine/rematch157/sky208/sky_preview.py renders the same math to a PNG). (158 / 159) The BombBooSpawner child supplies the Bomb Boos -- Mario's weapon: X spins (no FLUDD), the spin grabs a Boo in reach by its tongue and it swings round him; walk it into King Boo and it bursts on him; three bursts and he is down. KingBoo waits BooHeight (4 m) up so the swung Boo reaches his body. The casino's RematchExit loads this scene once Mario falls through the shattered table; RematchIntro runs the entrance: black, the two-line card, Mario revealed falling in FallHeight over the floor at MarioSpawn, the fade in, King Boo (KingBoo, an SmsKingBooRematch) spawning BooHeight over the floor at BooSpawn with the long laugh. Opened on its own (F6) the same intro runs. The fight itself is a later pass: King Boo only hovers, glows and watches Mario for now. Knobs: on RematchIntro (the lines, their timing, the heights, the fade, the skip), on KingBoo (opacity, glow, hover, the laugh), on Arena (Brightness, AutoCollision); move MarioSpawn / BooSpawn to place them (x and z; the heights are read from the floor under them). 209: the ArenaLighting child makes the lights follow the sky -- the flashes on the ground, the fire's light in the final phase (its own note and knobs). 210: the ArenaEmbers child fills the air over the rim with rising embers in the final phase (its note and knobs); the Environment's GLOW is on (threshold 0.6: only the bright things bloom). 211: the ScorchMarks child leaves fading black marks on the floor where the Bomb Boos blast and the lava balls land (its note and knobs)."
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_arena")
@@ -59,6 +60,10 @@ metadata/_sms_note = "Pass 209: the arena's LIGHTS FOLLOW THE SKY. Every frame t
 process_mode = 3
 script = ExtResource("10_embers")
 metadata/_sms_note = "Pass 210: EMBERS IN THE AIR for the final phase -- a field of sparks born in a ring round the arena's edge (RimIn inside the fence to RimOut out over the void, Below under the floor to Above over it; the floor's middle and radius read off the Arena at start), rising RiseMin-RiseMax m/s and wandering (Drift), each living LifeSeconds, bright yellow-orange going dim red; drawn additive at Brightness x so they bloom under the glow. Fades in with the sky's final_blend (King Boo's fade to the fire) and runs through the frozen cutscenes. Embers off = none."
+
+[node name="ScorchMarks" type="Node3D" parent="."]
+script = ExtResource("11_scorch")
+metadata/_sms_note = "Pass 211: SCORCH MARKS -- a pool of decals (MaxMarks) projected onto the floor where a Bomb Boo blasts (BombSize x its reach) and where a lava ball lands, bounces, bursts or goes out (LavaSize x its radius x the splat): a ragged black splat drawn in code, glowing orange for GlowSeconds, black for HoldSeconds, fading over FadeSeconds. The Arena puts its meshes on visual layer 2 for them, so Mario and the Boos are never stained. Scorch off = none."
 
 [node name="Arena" type="StaticBody3D" parent="."]
 script = ExtResource("3_floor")

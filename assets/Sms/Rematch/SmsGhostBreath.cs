@@ -85,9 +85,10 @@ public partial class SmsGhostBreath : Node3D
     /// <summary>A glint's size (metres; the quad -- the process material's scale range did not take here).</summary>
     [Export] public float GlintSize = 0.45f;
     [ExportGroup("The sounds")]
-    [Export] public string BreathSe = "MSD_SE_BS_TELESA_BREATHE", WindSe = "MSD_SE_MA_BOTTLE_WIND";
+    /// <summary>211: the breath is Jaysonn's Freezzard blow (BREATH_BLOW, 3.4 s; played again every BreathSeEvery while he blows), the game's bottle wind under it at -6 dB (empty WindSe for the blow alone).</summary>
+    [Export] public string BreathSe = "BREATH_BLOW", WindSe = "MSD_SE_MA_BOTTLE_WIND";
     /// <summary>The breathe sound again this often through the blow (0 = once).</summary>
-    [Export] public float BreathSeEvery = 0.8f;
+    [Export] public float BreathSeEvery = 3.2f;
     [ExportGroup("")]
     [Export] public bool DebugPrint;
 

@@ -1181,6 +1181,7 @@ public partial class SmsBombBoo : Node3D
     /// <summary>170: the Bob-omb's blast at the Boo, the boom, the shake.</summary>
     private void Blast()
     {
+        SmsScorchMarks.MarkBlast(new Vector3(GlobalPosition.X, float.IsNaN(_floorY) ? GlobalPosition.Y - BaseLiftOverFloor : _floorY, GlobalPosition.Z), _lobBlastR);   // 211: the scorch on the floor
         if (ExplosionFxScene != null && IsInsideTree())
         {
             var fx = ExplosionFxScene.Instantiate<Node3D>();

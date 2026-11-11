@@ -73,7 +73,11 @@ public partial class SmsGhostLightning : Node3D
     [Export(PropertyHint.Range, "0,200,1")] public int MeetStreaks = 60;
     [Export(PropertyHint.Range, "0,40,1")] public int MeetFlashes = 12;
     [ExportGroup("The sounds")]
-    [Export] public string CloseSe = "MSD_SE_EF_LIGHTNING", HitSe = "MSD_SE_MA_DAMAGE_ELEC";
+    /// <summary>211: Jaysonn's electric sounds -- a crackle as the walls appear (ELECTRIC_CRACKLE), short crackles every CrackleEvery while they stand and close (ELECTRIC_CRACKLE_SHORT, pitch wandering; 0 = none),
+    /// the big discharge as they close (ELECTRIC_ZAP); the hit on Mario still the game's own electric damage.</summary>
+    [Export] public string CloseSe = "ELECTRIC_ZAP", HitSe = "MSD_SE_MA_DAMAGE_ELEC", AppearSe = "ELECTRIC_CRACKLE", CrackleSe = "ELECTRIC_CRACKLE_SHORT";
+    [Export(PropertyHint.Range, "0,3,0.05")] public float CrackleEvery = 0.45f;
+    public int Crackles { get; private set; }
     [ExportGroup("")]
     [Export] public bool DebugPrint;
 
@@ -103,7 +107,7 @@ public partial class SmsGhostLightning : Node3D
     public static int MeetBursts;
 
     private const float U = 74.44f;
-    private Mario _mario; private SmsActorSound _sound; private readonly Random _rng = new(166);
+    private Mario _mario; private SmsActorSound _sound; private readonly Random _rng = new(166); private float _crackleT;
     private MeshInstance3D _wallA, _wallB; private ShaderMaterial _matA, _matB;
     private OmniLight3D _lightA, _lightB; private readonly List<MeshInstance3D> _posts = new();
     private readonly List<GpuParticles3D> _wallFx = new(); private readonly List<(Node3D node, int left)> _zaps = new(); private Material _streakMat;
@@ -277,6 +281,7 @@ public partial class SmsGhostLightning : Node3D
         State = Phase.Warn;
         foreach (var w in new[] { _wallA, _wallB }) if (w != null) w.Visible = true;
         PlaceWalls(); SetWarn(1f); SetFlash(0f); WallFx(true, WarnFx);
+        _crackleT = 0f; if (_sound != null && !string.IsNullOrEmpty(AppearSe)) _sound.Play(AppearSe, 0f, 0.95f + 0.1f * (float)_rng.NextDouble());   // 211: the crackle as the walls appear
         if (DebugPrint) GD.Print($"[SMS lightning] {Name}: squeeze {Squeeze} of {SqueezeCount} about {_centre}, axis {_axis}, {WallGap} m apart -- the warning");
     }
     private void PlaceWalls()
@@ -293,6 +298,11 @@ public partial class SmsGhostLightning : Node3D
         float dt = (float)delta;
         if (State == Phase.Idle || State == Phase.Done) return;
         _t += dt;
+        if ((State == Phase.Warn || State == Phase.Close) && CrackleEvery > 0.01f && _sound != null && !string.IsNullOrEmpty(CrackleSe))   // 211: the walls crackle while they stand and close
+        {
+            _crackleT += dt;
+            if (_crackleT >= CrackleEvery * (0.7f + 0.6f * (float)_rng.NextDouble())) { _crackleT = 0f; Crackles++; _sound.Play(CrackleSe, 0f, 0.85f + 0.3f * (float)_rng.NextDouble()); }
+        }
         switch (State)
         {
             case Phase.Warn:

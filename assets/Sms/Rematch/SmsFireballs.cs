@@ -72,7 +72,12 @@ public partial class SmsFireballs : Node3D
     [Export(PropertyHint.Range, "0.2,2,0.05")] public float EndPuffScale = 0.9f;
     public int EndPuffsMade { get; set; }
     [ExportGroup("The sounds")]
-    [Export] public string VolleySe = "MSD_SE_BS_TELESA_FIRE", SpitSe = "MSD_SE_BS_WANWAN_REBURN1", BounceSe = "MSD_SE_MA_BOUND";
+    /// <summary>The volley's start (the game's TELESA_FIRE), each pop out of the crown (211: Jaysonn's FireStart, assets/Sms/Sound/Rematch/FIREBALL_START.wav; the game's WANWAN_REBURN1 before), a bounce (the game's BOUND),
+    /// and 211: a ball disappearing -- going out at the end of its roll, bursting on Mario, or cut off (Jaysonn's FireEnd, FIREBALL_END.wav). The Db knobs are each one's level over SmsActorSound.RematchLevels' (0 = that table's).
+    /// SeMinGap: the same sound is not started twice within this (several balls going out in one tick play one FireEnd, not a stutter of them).</summary>
+    [Export] public string VolleySe = "MSD_SE_BS_TELESA_FIRE", SpitSe = "FIREBALL_START", BounceSe = "MSD_SE_MA_BOUND", EndSe = "FIREBALL_END";
+    [Export(PropertyHint.Range, "-30,12,0.5")] public float SpitSeDb = 0f, EndSeDb = 0f;
+    [Export(PropertyHint.Range, "0,1,0.01")] public float SeMinGap = 0.12f;
     [ExportGroup("")]
     [Export] public bool DebugPrint;
 
@@ -141,8 +146,18 @@ public partial class SmsFireballs : Node3D
             if (DebugPrint) GD.Print($"[SMS fireballs] {Name}: lava ball {Spat} of {Count} pops out of the crown at {from} toward {target} ({dist:F1} m from Mario{(i == 0 ? ", the aimed one" : "")}; {T:F2} s in the air, up {G * tUp:F1} m/s, across {flat.Length():F1} m/s)");
         }
         PopsMade++;
-        if (_sound != null && !string.IsNullOrEmpty(SpitSe)) _sound.Play(SpitSe, -3f, 0.85f + 0.2f * (float)_rng.NextDouble());
+        if (_sound != null && !string.IsNullOrEmpty(SpitSe)) _sound.Play(SpitSe, SpitSeDb, 0.85f + 0.2f * (float)_rng.NextDouble());
     }
+    /// <summary>211: a one-shot on this node's players, for the balls (the end sound) -- nothing if the name is empty, the file missing, or the same name started less than SeMinGap ago.</summary>
+    public void PlaySe(string se, float db = 0f, float pitch = 1f)
+    {
+        if (_sound == null || string.IsNullOrEmpty(se)) return;
+        ulong now = Time.GetTicksMsec();
+        if (_seLast.TryGetValue(se, out ulong last) && now - last < (ulong)(SeMinGap * 1000f)) return;
+        _seLast[se] = now; _sound.Play(se, db, pitch);
+    }
+    private readonly Dictionary<string, ulong> _seLast = new();
+    public Random Rng => _rng;
 
     public override void _Process(double delta)
     {
@@ -458,6 +473,7 @@ public partial class SmsFireball : Node3D
     /// <summary>A splat of lava where the ball meets the floor: drops flung out (align_y streaks under gravity) and a small ring; k scales it.</summary>
     private void Splat(Vector3 at, float k)
     {
+        SmsScorchMarks.MarkLava(new Vector3(at.X, FloorY, at.Z), R, k);                              // 211: the scorch where the lava hit the floor
         var pm = new ParticleProcessMaterial
         {
             EmissionShape = ParticleProcessMaterial.EmissionShapeEnum.Sphere, EmissionSphereRadius = R * 0.5f, ParticleFlagAlignY = true,
@@ -478,8 +494,11 @@ public partial class SmsFireball : Node3D
         tw.TweenMethod(Callable.From<float>(k => { ring.Scale = Vector3.One * Mathf.Max(0.05f, size * k); rmat.AlbedoColor = new Color(c.R, c.G, c.B, c.A * (1f - k)); }), 0f, 1f, seconds);
         tw.TweenCallback(Callable.From(ring.QueueFree));
     }
-    /// <summary>Out in a few frames: the ball collapsing, no more hits. 170: a ball that got Mario BURSTS -- 172: a splash of lava, flames, a ring, smoke.</summary>
-    public void Fizzle() { if (!Fizzling && !Dead) { bool burst = HitMario; Fizzling = true; _fizzleT = 0f; HitMario = true; if (_flames != null) _flames.Emitting = false; if (_mark != null) { _mark.QueueFree(); _mark = null; } if (burst) Burst(); } }
+    /// <summary>Out in a few frames: the ball collapsing, no more hits. 170: a ball that got Mario BURSTS -- 172: a splash of lava, flames, a ring, smoke. 211: Jaysonn's FireEnd as it goes.</summary>
+    public void Fizzle() { if (!Fizzling && !Dead) { bool burst = HitMario; Fizzling = true; _fizzleT = 0f; HitMario = true; if (_flames != null) _flames.Emitting = false; if (_mark != null) { _mark.QueueFree(); _mark = null; } PlayEnd(); if (burst) Burst(); } }
+    /// <summary>211: the end sound, once per ball, the moment it disappears (the fizzle's start -- the burst on Mario, the cut-off -- or the natural end; Jaysonn: "fireEnd when it disappears").</summary>
+    private void PlayEnd() { if (_endPlayed || _owner == null) return; _endPlayed = true; _owner.PlaySe(_owner.EndSe, _owner.EndSeDb, 0.9f + 0.2f * (float)_owner.Rng.NextDouble()); }
+    private bool _endPlayed;
     private void Burst()
     {
         _burst = true;                                                                                 // 205: the burst stands in for the end puff
@@ -508,6 +527,7 @@ public partial class SmsFireball : Node3D
     }
     private void Die()
     {
+        PlayEnd();                                                                                     // 211: the natural end (the fizzle's already played its)
         if (!_burst) EndPuff();                                                                        // 205: the little puff as it goes out (the burst on Mario brought its own)
         Dead = true; Visible = false;
         if (_light != null) _light.LightEnergy = 0f;
@@ -522,9 +542,11 @@ public partial class SmsFireball : Node3D
     /// ball's BIRTH radius (EndPuffScale x it: the ball itself has shrunk to nothing by its end), left in the world (TopLevel one-shots that free themselves).</summary>
     private void EndPuff()
     {
-        if (_owner == null || !_owner.EndPuff || !IsInsideTree()) return;
-        float s = Mathf.Max(0.3f, R0 * _owner.EndPuffScale);
+        if (_owner == null || !IsInsideTree()) return;
         Vector3 at = GlobalPosition;
+        SmsScorchMarks.MarkLava(new Vector3(at.X, FloorY, at.Z), R0, 0.45f);                        // 211: a small scorch where it went out (the FireEnd sound: PlayEnd, from Fizzle / Die)
+        if (!_owner.EndPuff) return;
+        float s = Mathf.Max(0.3f, R0 * _owner.EndPuffScale);
         if (_owner.EndPuffs > 0)
         {
             var sm = new ParticleProcessMaterial

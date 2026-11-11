@@ -1,4 +1,5 @@
 using Godot;
+using System;
 using System.Linq;
 
 /// <summary>
@@ -39,6 +40,13 @@ public partial class SmsArenaLighting : Node
     [Export] public Color FinalFog = new(0.18f, 0.035f, 0.01f);
     [Export] public Color FinalSun = new(1f, 0.6f, 0.3f);
     [Export(PropertyHint.Range, "0,4,0.05")] public float FinalSunEnergy = 0.55f;
+    [ExportGroup("Thunder (211)")]
+    /// <summary>211: Jaysonn's thunder (THUNDER, 2.4 s; assets/Sms/Sound/Rematch/) rolls ThunderDelay seconds after the sky's big flash (the purple one, frame 2 of the cycle: once every 10 s), and after the green one too
+    /// if ThunderOnGreenToo; not under the fire sky (no flashes there). ThunderDb over the sound table's level; empty ThunderSe = none.</summary>
+    [Export] public string ThunderSe = "THUNDER";
+    [Export(PropertyHint.Range, "0,3,0.05")] public float ThunderDelay = 0.4f;
+    [Export(PropertyHint.Range, "-30,12,0.5")] public float ThunderDb = 0f;
+    [Export] public bool ThunderOnGreenToo = false;
     [Export] public bool DebugPrint;
 
     // ---- readouts
@@ -60,8 +68,12 @@ public partial class SmsArenaLighting : Node
     public int Ticks { get; private set; }
     public Godot.Environment Env => _env;
     public DirectionalLight3D Sun => _sun;
+    /// <summary>211: thunders rolled so far, and whether the file was found.</summary>
+    public int ThunderPlays { get; private set; }
+    public bool ThunderFound => _thunder?.Stream != null;
 
     private Godot.Environment _env; private DirectionalLight3D _sun; private ShaderMaterial _mat; private bool _wasFollowing;
+    private AudioStreamPlayer _thunder; private int _thunderCycle = -1, _thunderCycleGreen = -1; private readonly Random _rng = new(209);
 
     public override void _Ready()
     {
@@ -81,6 +93,13 @@ public partial class SmsArenaLighting : Node
         if (DebugPrint) GD.Print($"[SMS lighting] {GetPath()}: environment {(we != null ? we.Name : "NONE")} (material {(_mat != null ? "found" : "NOT FOUND")}), sun {(_sun != null ? _sun.Name : "NONE")}; base ambient {BaseAmbient} x{BaseAmbientEnergy:F2}, fog {BaseFog}, sun {BaseSun} x{BaseSunEnergy:F2}; clock from {SkyTime:F2} s");
         if (_env != null) Apply(0f, Vector3.Zero, 0f);
         else GD.PushWarning($"[SMS lighting] {GetPath()}: no WorldEnvironment with an Environment at {EnvironmentPath} -- the lights stay as they are");
+        if (!string.IsNullOrEmpty(ThunderSe))                                                      // 211: the thunder's own player (not placed: it is the sky's)
+        {
+            SmsMarioSound.EnsureSfxBus();
+            _thunder = new AudioStreamPlayer { Name = "Thunder", Stream = SmsActorSound.Stream(ThunderSe), Bus = SmsActorSound.SfxBus, MaxPolyphony = 2, ProcessMode = ProcessModeEnum.Always };
+            AddChild(_thunder);
+            if (_thunder.Stream == null) GD.PushWarning($"[SMS lighting] {GetPath()}: no sound file for the thunder '{ThunderSe}'");
+        }
     }
 
     public override void _ExitTree()
@@ -114,6 +133,19 @@ public partial class SmsArenaLighting : Node
         Vector3 cloud = (c0 + c1) * 0.5f * FlashAmountRead;                                            // the clouds show mix(c1, c0, texture): their middle
         FlashNow = peak * FlashAmountRead; FlashColorNow = new Color(cloud.X, cloud.Y, cloud.Z, 1f);
         Apply(FinalBlendRead, cloud, FlashStrength * (1f - FinalBlendRead));
+        // 211: the thunder -- ThunderDelay after the purple flash (frame 2), once a cycle; the green one (154) too if asked; none under the fire or with the flashes off
+        if (_thunder != null && _thunder.Stream != null && FinalBlendRead < 0.5f && FlashAmountRead > 0.01f && SpeedRead > 0.001f)
+        {
+            int cycle = (int)Math.Floor(SkyTime * 30.0 * SpeedRead / 300.0); float lag = ThunderDelay * 30f * SpeedRead;
+            if (cycle != _thunderCycle && fc >= 2f + lag && fc < 150f) { _thunderCycle = cycle; Thunder(); }
+            if (ThunderOnGreenToo && cycle != _thunderCycleGreen && fc >= 154f + lag) { _thunderCycleGreen = cycle; Thunder(); }
+        }
+    }
+    private void Thunder()
+    {
+        _thunder.VolumeDb = SmsActorSound.MasterDb + SmsActorSound.LevelDb(ThunderSe) + ThunderDb; _thunder.PitchScale = 0.9f + 0.2f * (float)_rng.NextDouble(); _thunder.Play();
+        ThunderPlays++;                                                                            // (not in SmsActorSound's play log: the drives count that log against PlayCount)
+        if (DebugPrint) GD.Print($"[SMS lighting] thunder {ThunderPlays} (the sky's cycle {_thunderCycle}, pitch {_thunder.PitchScale:F2})");
     }
 
     /// <summary>The ambient, the fog and the sun for a blend k toward the fire and a flash colour x its strength (display values, as the inspector's own).</summary>

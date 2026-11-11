@@ -89,6 +89,9 @@ public partial class SmsActorSound : Node3D
         ["SmsGateKeeper"] = "gatekeeper",                                     // 156: its BossMusic slot (no tables: TBiancoGateKeeper's own sounds are a later pass)
         ["SmsKingBooRematch"] = "kingboo",                                    // 157: the rematch's King Boo -- Play(se) by name (the casino boss's laugh); no slot table of his own
         ["SmsBombBoo"] = "bombboo",                                           // 158: the rematch's Bomb Boo -- Play(se) by name (the small Boo's appear / fix / crush / vanish)
+        // 211: the rematch's attacks -- Play(se) by name. They had called Attach since their passes and got null back (not in this table): their sounds never played until now.
+        ["SmsFireballs"] = "fireballs", ["SmsGhostBreath"] = "breath", ["SmsGhostLightning"] = "lightning", ["SmsGhostWind"] = "wind",
+        ["SmsBoolossus"] = "boolossus", ["SmsIceBlock"] = "iceblock", ["SmsBooCircle"] = "boocircle", ["SmsBooVolley"] = "volley",
     };
     /// <summary>The script's sound slots and the game sound each stands for (the slot names are the species' own exports).</summary>
     private static readonly Dictionary<string, (string slot, string se)[]> Fill = new()
@@ -191,11 +194,23 @@ public partial class SmsActorSound : Node3D
         string folder = SmsMarioSoundTable.Sounds.TryGetValue(se, out var info) ? info.Folder : "Enemy";
         string path = SoundRoot + folder + "/" + se + ".wav";
         s = ResourceLoader.Exists(path) ? GD.Load<AudioStream>(path) : null;
+        if (s == null) { string own = SoundRoot + "Rematch/" + se + ".wav"; if (ResourceLoader.Exists(own)) { s = GD.Load<AudioStream>(own); path = own; } }   // 211: Jaysonn's own sounds (not the game's) live in Sound/Rematch/
         if (s == null && _missing.Add(se)) GD.PushWarning($"[SMS actor sound] no file for {se} ({path})");
         _streams[se] = s;
         return s;
     }
-    private static float SeDb(string se) => SmsMarioSoundTable.Sounds.TryGetValue(se, out var info) && info.Volume > 0 ? Mathf.LinearToDb(info.Volume / 127f) : 0f;
+    private static float SeDb(string se) => RematchLevels.TryGetValue(se, out float own) ? own : (SmsMarioSoundTable.Sounds.TryGetValue(se, out var info) && info.Volume > 0 ? Mathf.LinearToDb(info.Volume / 127f) : 0f);
+    /// <summary>211: the level (dB over the mix, 0 = as the file is) of each of Jaysonn's own sounds -- the WAVs under assets/Sms/Sound/Rematch/, named by the attacks' Se knobs. Not the game's: those carry the game's own volumes. Tune here.</summary>
+    public static readonly Dictionary<string, float> RematchLevels = new()
+    {
+        ["FIREBALL_START"] = -14f, ["FIREBALL_END"] = -15f,                                 // Ref/FireSounds: FireStart / FireEnd (loud files: peak 0, rms -8 dBFS; Jaysonn: "shouldn't be too loud" -- -6 / -7 were)
+        ["BOOLOSSUS_BOUND"] = 0f, ["BOOLOSSUS_PON"] = 2f,                                    // Luigi's Mansion's Boolossus: its bounce, a Boo popping off
+        ["BREATH_BLOW"] = 0f, ["ICE_FREEZE"] = 5f, ["ICE_UNFREEZE"] = 4f,                    // Ocarina of Time's Freezzard blow, Link frozen / thawed (quiet files)
+        ["ELECTRIC_ZAP"] = -4f, ["ELECTRIC_CRACKLE"] = -2f, ["ELECTRIC_CRACKLE_SHORT"] = -5f,  // the three electric: the big discharge, a crackle, a short one
+        ["THUNDER"] = -6f, ["WIND_GUST"] = -1f,
+    };
+    /// <summary>The level a name plays at (the game's table or RematchLevels), for players outside this class.</summary>
+    public static float LevelDb(string se) => SeDb(se);
     private void SetBase(AudioStreamPlayer3D p, float db) { _base[p] = db; p.VolumeDb = db + DistanceDb; }
     private void Log(string what)
     {

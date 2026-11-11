@@ -81,7 +81,8 @@ public partial class SmsBoolossus : Node3D
     [Export] public float BooRadius = 1.1f;
     [Export] public PackedScene BooScene;
     [ExportGroup("The sounds")]
-    [Export] public string AppearSe = "MSD_SE_EN_TELESA_APPEAR", LandSe = "MSD_SE_BS_TELESA_RLT_DOWN", SplitSe = "MSD_SE_EN_TELESA_CRUSH", WaveGoneSe = "MSD_SE_EN_TELESA_DISAPPEAR";
+    /// <summary>211: Jaysonn's Luigi's Mansion Boolossus sounds -- its bounce as it lands (BOOLOSSUS_BOUND), a Boo popping off as it splits (BOOLOSSUS_PON); the appear and the wave's end still the game's.</summary>
+    [Export] public string AppearSe = "MSD_SE_EN_TELESA_APPEAR", LandSe = "BOOLOSSUS_BOUND", SplitSe = "BOOLOSSUS_PON", WaveGoneSe = "MSD_SE_EN_TELESA_DISAPPEAR";
     [ExportGroup("")]
     [Export] public bool DebugPrint;
 

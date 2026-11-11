@@ -5,7 +5,7 @@ using Godot;
 /// .dae with its real vertex colours, run through Blender; Galaxy's centimetres read as the port's metres, ArenaScale on the Model child
 /// re-sizes it). The collision is built from the model at start: one trimesh per mesh, the vertices carried into this body's space (the
 /// glb's scale baked into the triangles, as the roulette discs do). TopY is the highest point (the drives and the intro's spawn heights read
-/// it); the intro finds the floor under a point with a ray; 162: Centre / Radius (the vertices' span) place King Boo's teleport spots. Knobs: AutoCollision (off: your own CollisionShape3D children), Brightness
+/// it); the intro finds the floor under a point with a ray; 162: Centre / Radius (the vertices' span) place King Boo's teleport spots. 211: the meshes also carry visual layer 2, the scorch marks' decal layer. Knobs: AutoCollision (off: your own CollisionShape3D children), Brightness
 /// (an albedo multiplier on every material; 1 = the file's).
 /// </summary>
 public partial class SmsArenaFloor : StaticBody3D
@@ -23,6 +23,8 @@ public partial class SmsArenaFloor : StaticBody3D
     /// <summary>162: the floor's middle (x / z at TopY) and its radius (half its wider span), from the vertices -- King Boo's teleport spots.</summary>
     public Vector3 Centre { get; private set; }
     public float Radius { get; private set; }
+    /// <summary>211: the floor's meshes carry visual layer 2 as well, for the scorch marks' decals.</summary>
+    public bool DecalLayerSet { get; private set; }
     private float _minX = float.NaN, _maxX, _minZ, _maxZ;
 
     public override void _Ready()
@@ -34,6 +36,7 @@ public partial class SmsArenaFloor : StaticBody3D
             var mi = (MeshInstance3D)n;
             if (mi.Mesh == null) continue;
             Meshes++;
+            mi.Layers |= SmsScorchMarks.FloorLayer; DecalLayerSet = true;                           // 211: the scorch marks' decals project onto this layer only (not Mario, not the Boos)
             if (Mathf.Abs(Brightness - 1f) > 1e-3f)
                 for (int s = 0; s < mi.Mesh.GetSurfaceCount(); s++)
                     if (mi.GetActiveMaterial(s) is BaseMaterial3D bm)

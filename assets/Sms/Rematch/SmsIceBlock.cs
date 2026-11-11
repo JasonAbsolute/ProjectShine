@@ -34,7 +34,8 @@ public partial class SmsIceBlock : Node3D
     [Export(PropertyHint.Range, "0,64,1")] public int Glints = 20;
     [Export(PropertyHint.Range, "0,120,1")] public int Shards = 36;
     [Export(PropertyHint.Range, "0,40,1")] public int FrostPuffs = 14;
-    [Export] public string FreezeSe = "MSD_SE_MV30_FRIGHT_01", ShatterSe = "MSD_SE_OBJ_GLASS_BREAK";
+    /// <summary>211: Jaysonn's Ocarina of Time sounds -- Link frozen as the ice snaps shut (ICE_FREEZE), thawed as it shatters (ICE_UNFREEZE).</summary>
+    [Export] public string FreezeSe = "ICE_FREEZE", ShatterSe = "ICE_UNFREEZE";
     [Export] public bool DebugPrint;
 
     public Mario Target { get; private set; }
