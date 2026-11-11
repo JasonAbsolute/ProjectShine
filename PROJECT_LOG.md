@@ -14011,3 +14011,40 @@ deleted.
 is mine too -- `FollowSky` off is 208's fixed light. Run en of the headless drive stopped at 33 with C14 failing: the drive's spin jump at a Boo spawned on
 the rim sent Mario off the edge, where he fell for 10 s without anything ending it (a drive flake -- run eo passed 62/62 unchanged -- but worth a look in
 play: does falling off the arena end anything?). The shot run and its first pull went out in one batch (the pull re-done after DONE).
+
+### 210 -- the King Boo REMATCH, part 55: EMBERS IN THE AIR for the final phase (a field of glowing sparks born in a ring round the arena's edge and out over the void, rising and wandering, fading in with the sky's fire) and GLOW on the arena (only what is brighter than the threshold blooms: the flames, King Boo's white, the lava balls, the embers) (feature/kingboo-rematch, code `e8b91f7`)
+
+**Jaysonn** (from the list of what else the fight needs): "3. Embers in the air for the final phase. The fireballs shed sparks, but the air itself is empty.
+A sparse field of rising embers over the arena's rim and the void, drifting and fading in with the sky, ties the floor to the fire dome. 4. Glow (bloom).
+Off in the arena's Environment. With it on, thresholded so only bright things bloom, the fire sky and lava balls read hotter and King Boo's glow halos
+properly."
+
+**NEW `assets/Sms/Rematch/SmsArenaEmbers.cs`** (+ `.uid`), the `ArenaEmbers` node in `RematchArena.tscn` (process mode Always, as the sky and the lights):
+one GPU particle field built after the floor has measured itself -- a RING round the arena's edge from `RimIn` (3 m) inside the fence to `RimOut` (12 m)
+out over the void, between `Below` (4 m) under the floor and `Above` (2 m) over it (the floor's middle, radius 26.4 and height read off the Arena); `Count`
+450 sparks, each born over a moment (no popping), rising `RiseMin`..`RiseMax` (0.6-2 m/s) with a little lift, wandering on turbulence (`Drift` 1), living
+`LifeSeconds` 7 give or take 40 %, shrinking toward the end; the fireballs' `glow1_spark` quad `Size` 0.3 m across, additive, `EmberBright` (1, 0.85, 0.35)
+going `EmberDim` (1, 0.3, 0.05) and out, at `Brightness` 2 -- over 1, so they bloom. It fades in WITH THE SKY: every frame the field's alpha is the sky
+material's `final_blend` (King Boo's fade to the roof fight's fire); the field starts emitting as the blend leaves 0 (pre-rolled 6.3 s, so the air is
+already full) and stops when it is back at 0. Readouts: `Built`, `Centre`, `Radius`, `RingOuter` / `RingInner` / `RingHeight`, `BlendRead`, `AlphaNow`,
+`EmittingNow`, `FirstEmitBlend`.
+
+**The glow** (`RematchArena.tscn`'s Environment; 209's lighting node copies it with the rest): `glow_enabled`, Screen blend, `glow_intensity` 0.7,
+`glow_hdr_threshold` 0.6 with `glow_hdr_scale` 0.8 -- a pixel blooms by how far its brightest channel is over 0.6, fully at 1.4: the fire's yellow flames
+(0.99) half, King Boo's lit white and his glow, the crown and the twinkles, the lava balls' flames, the embers (2.0) fully; the floor (under 0.5) not at
+all, the HUD never (drawn after). Level 2 added to the default 3 and 5 for a tighter halo on small bright things.
+
+**Verified:** shots (run dl) 37a-e -- 37a the fight camera pitched down under the final sky: a band of glowing sparks over the fence and the void all round,
+the flames softer and hotter under the glow (against 209's 36e); 37b Jaysonn's look-down: the sparks a sparse field all round the disc over the void
+(against 36f); 37c from the rim looking out: embers rising near the camera against the fire; 37d King Boo close against the fire: his halo, the sparks
+along the fence (against 35c); 37e under the boss sky with the glow alone: King Boo's soft halo, the streaks' cyan crossings glowing, the floor untouched
+(against 34c / 36a). Run dk (the first try: Size 0.14, Count 320, Brightness 1.6) showed the embers as specks you had to look for from the fight camera --
+made bigger, brighter and more. Headless drive v210-1 (deleted before the commit): C46 the field built from the measured floor (ring 23.41..38.41 m, 6 m
+tall, at the floor's middle and height; 450 of 450; pre-roll 6.3 s; Always), 8635 ticks under the boss sky with 0 emitting, started at blend 0.002, under
+the final sky emitting at alpha 1.000 (the material's too); C46b the glow on with Screen / 0.7 / 0.6 / 0.8; everything else as before -- 64/64 on the
+committed build. The clean rebuild 0 errors; the drive, the logs, the shots and the tasks deleted.
+
+**Deviations:** both effects are mine (Luigi's Mansion's roof has neither embers nor bloom) -- `Embers` off and `glow_enabled` off are the game. The embers'
+first try was retuned once from the shots (above). Remote steps were batched four times this pass (an upload with a build twice, a run with its pull twice,
+a run with the cleanup once); every one happened to land in the right order (hashes, DONE lines and the drive's verdict checked), but it was luck, not
+procedure.
