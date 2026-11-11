@@ -302,6 +302,14 @@ public partial class SmsKingBooRematch : Node3D
     /// Boolossi and their wave, and the ice on Mario (he thaws) -- under the cut, no effects. The supply's Boos and the one in Mario's hand are his and stay.
     /// Off: 188-202's -- the attacks freeze with the world and run on (a tornado stands through the whole cutscene) when it ends.</summary>
     [Export] public bool SplitClearsAttacks = true;
+    /// <summary>208b (Jaysonn: "in the final phase it does the final boss skybox, the red fiery one"): at the split cutscene that opens the FINAL PHASE (FinalSkyAtSplit: 2 = the
+    /// second split, three of him; 1 = the first) the arena's sky cross-fades over FinalSkyBlendSeconds from Luigi's Mansion's boss-arena sky to its FINAL-BOSS sky -- the
+    /// King Boo / Bowser roof fight's vrKoopa dome (RematchSky.gdshader's final_blend: the dark red, the two fire layers, the red-to-yellow streaks). The fade runs
+    /// through the cutscene (the cutscene node ticks it while the world is frozen) and on after it. Off = the boss-arena sky through the whole fight.</summary>
+    [ExportGroup("The final phase's sky (208b)")]
+    [Export] public bool FinalSky = true;
+    [Export(PropertyHint.Range, "1,3,1")] public int FinalSkyAtSplit = 2;
+    [Export(PropertyHint.Range, "0,10,0.1")] public float FinalSkyBlendSeconds = 2.5f;
     [ExportGroup("")]
     [Export] public bool CopyFireballs = true, CopyBreath = true;
     /// <summary>178 (Jaysonn: "the king boo should not disappear thats fake he should just take a hit and then vanish to a new spot ... we do need a way to tell
@@ -775,6 +783,7 @@ public partial class SmsKingBooRematch : Node3D
     public override void _Ready()
     {
         _model = GetNodeOrNull<Node3D>("Model");
+        if (!IsCopy && !Engine.IsEditorHint()) CallDeferred(nameof(ResetFinalSky));                                // 208b: a fresh fight starts under the boss-arena sky (the sky material is a shared resource)
         if (IsCopy)                                                                       // 177: a duplicate carries the real one's RUN-TIME children too -- made again below, so out they go
         {
             foreach (string n in new[] { "CrownGlowFx", "CrownSparkFx" }) { var old = GetNodeOrNull(n); if (old != null) { RemoveChild(old); old.QueueFree(); } }
@@ -1304,6 +1313,7 @@ public partial class SmsKingBooRematch : Node3D
     {
         if (_sfxDbSet) { SmsActorSound.MasterDb = _sfxDbWas; _sfxDbSet = false; }                                                            // 195: the effects level put back
         if (BossMusicPlaying) BossMusic.Stop();
+        if (!IsCopy && FinalSkyBlend > 0f) SetFinalSky(0f);                                                                                   // 208b: the shared sky material back to the boss-arena sky
     }
     /// <summary>The down clip begins (the last hit's hurt is over): the mist and the stars boil off his body, the blink, the glow and the crown's flare run in DeathTick.</summary>
     private void DeathBegin()
@@ -1655,8 +1665,41 @@ public partial class SmsKingBooRematch : Node3D
         (GetTree().CurrentScene ?? GetParent()).AddChild(cs);
         _split = cs; SplitsShown++;
         cs.Begin(this, m);
+        if (FinalSky && SplitsShown == FinalSkyAtSplit) BeginFinalSky();                                                                       // 208b: the final phase's sky
         return true;
     }
+    // ---- 208b: THE FINAL PHASE's SKY ------------------------------------------------------------------------------------------------------------------------------
+    /// <summary>208b, for the drives: how far the sky has gone over to the final-boss sky (0 = the boss-arena sky, 1 = all the way), whether the fade has begun.</summary>
+    public float FinalSkyBlend { get; private set; }
+    public bool FinalSkyBegun { get; private set; }
+    public bool FinalSkyMaterialFound => SkyMaterial() != null;
+    private ShaderMaterial _skyMat; private bool _skyLooked; private float _finalSkyT = -1f;
+    private ShaderMaterial SkyMaterial()
+    {
+        if (_skyLooked) return _skyMat;
+        _skyLooked = true;
+        var we = GetTree()?.CurrentScene?.FindChildren("*", "WorldEnvironment", true, false).OfType<WorldEnvironment>().FirstOrDefault();
+        _skyMat = we?.Environment?.Sky?.SkyMaterial as ShaderMaterial;
+        return _skyMat;
+    }
+    /// <summary>The sky's blend set on the shared material (it is a resource: the real one puts it back to 0 when he arrives and when he leaves).</summary>
+    private void SetFinalSky(float k)
+    {
+        FinalSkyBlend = k;
+        var mat = SkyMaterial(); if (mat != null) mat.SetShaderParameter("final_blend", k);
+    }
+    private void BeginFinalSky() { if (FinalSkyBegun) return; FinalSkyBegun = true; _finalSkyT = 0f; FinalSkyTick(0f); if (DebugPrint) GD.Print($"[SMS rematch] the FINAL PHASE's sky begins (split {SplitsShown}, over {FinalSkyBlendSeconds:F1} s; material {(SkyMaterial() != null ? "found" : "NOT FOUND")})"); }
+    /// <summary>Ticked by the real one's _Process and, while the world is frozen for the cutscene, by the cutscene node.</summary>
+    public void FinalSkyTick(float dt)
+    {
+        if (_finalSkyT < 0f) return;
+        _finalSkyT += dt;
+        float k = FinalSkyBlendSeconds <= 0.01f ? 1f : Mathf.Clamp(_finalSkyT / FinalSkyBlendSeconds, 0f, 1f);
+        SetFinalSky(k * k * (3f - 2f * k));
+        if (k >= 1f) _finalSkyT = -1f;
+    }
+    /// <summary>For the drives / a restart: the sky back to the boss-arena sky at once.</summary>
+    public void ResetFinalSky() { _finalSkyT = -1f; FinalSkyBegun = false; SetFinalSky(0f); }
     /// <summary>Into the Split phase: every move called off, the flash off, upright; the node waits for the cutscene's calls.</summary>
     public void SplitBegin()
     {
@@ -2670,7 +2713,7 @@ public partial class SmsKingBooRematch : Node3D
     public override void _Process(double delta)
     {
         if (Engine.IsEditorHint()) return;
-        if (!IsCopy) HitBoxTick();                                                                                                                      // 192: Mario's cylinder drawn (ShowHitBoxes)
+        if (!IsCopy) { HitBoxTick(); FinalSkyTick((float)delta); }                                                                                          // 192: Mario's cylinder drawn (ShowHitBoxes); 208b: the final sky's fade
         if (AnyFxAlive) FxTick((float)delta);                                                                                                                   // 180 / 181: the flashes, the ring and the rise glow run on, hidden or not
         if (State == Phase.Gone) GoneTick((float)delta);                                                                                                       // 183: the Shine after the burst
         if (State == Phase.Hidden) return;

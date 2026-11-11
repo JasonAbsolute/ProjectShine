@@ -129,6 +129,7 @@ public partial class SmsSplitCutscene : Node
         if (State != Phase.Running) return;
         float dt = (float)delta; _t += dt;
         if (_boss == null || !IsInstanceValid(_boss)) { End(); return; }
+        _boss.FinalSkyTick(dt);                                                                                         // 208b: the final sky's fade runs through the frozen world
         if (_boss.SplitSkipAllowed && !Skipped && (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space"))) { Skipped = true; _card?.Skip(); _t = Mathf.Max(_t, _tAll); }
         for (int i = 0; i < _line.Count; i++)
         {

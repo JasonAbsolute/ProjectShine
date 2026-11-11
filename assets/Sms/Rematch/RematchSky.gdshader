@@ -24,10 +24,23 @@ shader_type sky;
 render_mode use_debanding;
 
 group_uniforms The_games_textures;
-/** The disc's three textures (assets/Sms/Rematch/Sky/lm_*.png, 8-bit grey): the clouds, the sine wave, the gradient. Fetched by hand (GX wrap per axis). */
+/** The disc's textures (assets/Sms/Rematch/Sky/lm_*.png, 8-bit grey): the clouds, the sine wave, the gradient; 208b: the fire noise and the ramp of the final-boss sky. Fetched by hand (GX wrap per axis). */
 uniform sampler2D bg04 : filter_nearest, repeat_enable;
 uniform sampler2D sin_wave : filter_nearest, repeat_enable;
 uniform sampler2D gs001m : filter_nearest, repeat_enable;
+uniform sampler2D gaku_fire01 : filter_nearest, repeat_enable;
+uniform sampler2D ramp02 : filter_nearest, repeat_enable;
+group_uniforms;
+
+group_uniforms The_final_phases_sky;
+/** 208b: how far the sky has gone over to Luigi's Mansion's FINAL-BOSS sky (the King Boo / Bowser roof fight's vrKoopa dome: a dark red backdrop, two layers of
+    fire laid round the horizon, red-to-yellow streaks, a red glow below). King Boo drives this at the final split (FinalSky on his node); 1 here = always the final sky. */
+uniform float final_blend : hint_range(0.0, 1.0) = 0.0;
+/** The final sky's own knobs: the whole of it brighter or dimmer, its fire alone, its streaks alone (1 = the game), a turn of it (degrees). */
+uniform float final_brightness : hint_range(0.0, 4.0) = 1.0;
+uniform float final_fire_gain : hint_range(0.0, 4.0) = 1.0;
+uniform float final_streak_gain : hint_range(0.0, 4.0) = 1.0;
+uniform float final_turn : hint_range(-180.0, 180.0) = 0.0;
 group_uniforms;
 
 group_uniforms Knobs;
@@ -101,11 +114,9 @@ float tex_wm(sampler2D t, vec2 uv, int mu, int mv) {
 	return mix(mix(texelFetch(t, ivec2(x0, y0), 0).r, texelFetch(t, ivec2(x1, y0), 0).r, f.x), mix(texelFetch(t, ivec2(x0, y1), 0).r, texelFetch(t, ivec2(x1, y1), 0).r, f.x), f.y);
 }
 
-void sky() {
-	vec3 d = normalize(EYEDIR);
-	float e = degrees(asin(clamp(d.y, -1.0, 1.0)));
+// ---- the boss-arena sky (vrball_B), display-referred
+vec3 boss_sky(vec3 d, float e, float f) {
 	float u = fract(atan(d.x, d.z) / 6.2831853 + turn / 360.0);
-	float f = TIME * 30.0 * speed;
 	// ---- the base ball (vr_o2)
 	float v0 = base_v(e);
 	float fa = mod(f, 60.0), fb = mod(f, 80.0);
@@ -132,5 +143,76 @@ void sky() {
 		float amt = clamp(w1 * w2 * 2.0, 0.0, 1.0) * g2 * streak_gain;
 		col += mix(streak_dim, streak_bright, amt) * amt;
 	}
-	COLOR = to_linear(clamp(col * brightness, 0.0, 1.0));
+	return col;
+}
+
+// ---- 208b: the final-boss sky (vrKoopa: the King Boo / Bowser roof fight), display-referred. Its dome's v against the elevation, per shape:
+float o2_v(float e) {
+	if (e >= 22.6) return mix(0.012, 0.0, (e - 22.6) / 67.4);
+	if (e >= 7.3) return mix(0.25, 0.012, (e - 7.3) / 15.3);
+	if (e >= 0.0) return mix(0.496, 0.25, e / 7.3);
+	if (e >= -7.0) return mix(0.727, 0.496, (e + 7.0) / 7.0);
+	if (e >= -17.0) return mix(0.902, 0.727, (e + 17.0) / 10.0);
+	return mix(1.0, 0.902, (e + 90.0) / 73.0);
+}
+float p2_v(float e) {
+	if (e >= 22.6) return mix(0.027, 0.0, (e - 22.6) / 67.4);
+	if (e >= 7.3) return mix(0.266, 0.027, (e - 7.3) / 15.3);
+	if (e >= 0.0) return mix(0.504, 0.266, e / 7.3);
+	if (e >= -7.0) return mix(0.703, 0.504, (e + 7.0) / 7.0);
+	if (e >= -17.0) return mix(0.902, 0.703, (e + 17.0) / 10.0);
+	return mix(1.0, 0.902, (e + 90.0) / 73.0);
+}
+float q2k_v(float e) {
+	if (e >= 2.0) return mix(0.18, 0.0, (e - 2.0) / 88.0);
+	if (e >= -0.7) return mix(0.285, 0.18, (e + 0.7) / 2.7);
+	if (e >= -2.7) return mix(0.391, 0.285, (e + 2.7) / 2.0);
+	if (e >= -5.3) return mix(0.523, 0.391, (e + 5.3) / 2.6);
+	if (e >= -8.0) return mix(0.668, 0.523, (e + 8.0) / 2.7);
+	if (e >= -10.7) return mix(0.789, 0.668, (e + 10.7) / 2.7);
+	if (e >= -13.3) return mix(0.887, 0.789, (e + 13.3) / 2.6);
+	return mix(1.0, 0.887, (e + 17.5) / 4.2);
+}
+// one fire ball ('vr_o2' / 'vr_p2'): colour = mix(c0, c1, fire B); alpha = fire A x fire B x the ramp (turned 180: gone below -8 deg) x the clouds (10 x round,
+// turned 180, scrolling, v clamped) x the gradient (3 x round, turned 180: gone toward the top ring). Fire A scrolls UP a repeat per 150 frames, fire B per 240.
+vec4 fire_layer(float u, float v, float f, vec3 c0, vec3 c1, vec2 fa_s, vec2 fb_s, float bg_sign) {
+	float ta = mod(f, 150.0) / 150.0, tb = mod(f, 240.0) / 240.0, tbg = bg_sign * mod(f, 120.0) / 120.0;
+	float fa = tex_wm(gaku_fire01, vec2(fa_s.x * (u - 0.5) + 0.5, fa_s.y * (v - 0.5) + 0.5 + 0.82 + ta), 1, 1);
+	float fb = tex_wm(gaku_fire01, vec2(fb_s.x * (u - 0.5) + 0.5 + 0.2, fb_s.y * (v - 0.5) + 0.5 + 0.5125 + tb), 1, 1);
+	float ramp = tex_wm(ramp02, vec2(1.0 - u, 1.0 - v), 0, 0);
+	float bg = tex_wm(bg04, vec2(-10.0 * (u - 0.5) + 0.5 + tbg, -0.834766 * (v - 0.5) + 0.5 - 0.253906), 1, 0);
+	float gs = tex_wm(gs001m, vec2(-3.0 * (u - 0.5) + 0.5, 1.0 - v), 1, 0);
+	return vec4(mix(c0, c1, fb), fa * fb * ramp * bg * gs);
+}
+vec3 final_sky(vec3 d, float e, float f) {
+	float u = fract(atan(d.x, d.z) / 6.2831853 + final_turn / 360.0);
+	vec3 col = vec3(33.0, 0.0, 0.0) / 255.0;                                                    // 'vr_outout': the dark red box round everything
+	if (e < 22.6) {                                                                              // the fire balls' top ring
+		vec4 f1 = fire_layer(u, o2_v(e), f, vec3(234.0, 80.0, 16.0) / 255.0, vec3(254.0, 165.0, 16.0) / 255.0, vec2(6.0, 0.4), vec2(10.0, 0.5), 1.0);
+		vec4 f2 = fire_layer(fract(u - 75.6 / 360.0), p2_v(e), f, vec3(190.0, 0.0, 0.0) / 255.0, vec3(255.0, 137.0, 0.0) / 255.0, vec2(4.0, 1.5), vec2(10.0, 1.3), -1.0);
+		col += f1.rgb * f1.a * final_fire_gain + f2.rgb * f2.a * final_fire_gain;
+	}
+	float cap = clamp((-7.0 - e) / 10.0, 0.0, 1.0);                                             // 'vr_n2': the red glow below, in from -7 deg, full from -17
+	col = mix(col, vec3(1.0, 0.0, 0.0), cap);
+	if (e <= 2.0 && e >= -17.5) {                                                                // 'vr_q2': the streaks, red to yellow, no 180 turn here
+		float vq = q2k_v(e);
+		float f5 = mod(f, 100.0), f6 = mod(f, 140.0);
+		float s5 = key4(f5, 35.0, 74.0, 1.18, 1.5428, 1.2801, 100.0, 1.18), t5 = f5 / 100.0;
+		float s6 = key4(f6, 53.0, 100.0, 1.0, 1.1834, 1.5428, 140.0, 1.0), t6 = -f6 / 140.0;
+		float w1 = tex_wm(sin_wave, vec2(8.0 * (u - 0.5) + 0.5 + 0.23 + t5, s5 * (vq - 0.5) + 0.5), 1, 0);
+		float w2 = tex_wm(sin_wave, vec2(10.0 * (u - 0.5) + 0.5 - 0.918959 + t6, s6 * (vq - 0.5) + 0.5), 1, 2);
+		float g2 = tex_wm(gs001m, vec2(2.0 * (u - 0.5) + 0.5, 2.0 * (vq - 0.5) + 0.5 - 0.5), 2, 2);
+		float amt = clamp(w1 * w2 * 2.0, 0.0, 1.0) * g2 * final_streak_gain;
+		col += mix(vec3(1.0, 0.0, 0.0), vec3(1.0, 1.0, 0.0), amt) * amt;
+	}
+	return col;
+}
+
+void sky() {
+	vec3 d = normalize(EYEDIR);
+	float e = degrees(asin(clamp(d.y, -1.0, 1.0)));
+	float f = TIME * 30.0 * speed;
+	vec3 col = final_blend < 0.999 ? boss_sky(d, e, f) * brightness : vec3(0.0);
+	if (final_blend > 0.001) col = mix(col, final_sky(d, e, f) * final_brightness, final_blend);
+	COLOR = to_linear(clamp(col, 0.0, 1.0));
 }
