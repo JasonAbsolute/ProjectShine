@@ -14312,3 +14312,54 @@ the Boolossus did, in the game's look and clip. Its toon has no fade: it pops in
 landing flash. The eaten sound's 94-ms lead is cut (the game plays the note 9 ticks after Yoshi's eat). The split still pops with Luigi's Mansion's
 BOOLOSSUS_PON. The names stay (`SmsBoolossus`, Boolossus.tscn, the drives' wording): only the body and the sound changed. Steps: the import helper was
 written and uploaded in the same tool batch (its checksum on the PC matched).
+
+### 216 -- the King Boo REMATCH, part 61: the MISS's QUIET (the game's demoModeIn: as the miss's jingle starts every sound effect goes silent but the system's and Mario's voice), the camera's slow ZOOM onto Mario when he dies on the floor (the game's normal dead demo), and King Boo's twinkle stars without their square halo (feature/kingboo-rematch, code `d6c27a7`)
+
+**Jaysonn**: "do this: The game quiets enemy and object sounds when you lose a life. The game slowly zooms the camera in on Mario when he dies on the
+floor. King Boo's twinkle stars have faint square halos. no coins since i want the fight to be hard." (The rest of that message -- a bigger Shine, a
+peaceful sky at the defeat, the faces -- follows on its own.)
+
+**The quiet.** The game: `MSBgm::startBGM` (MSoundBGM.cpp) for the miss's and the game over's jingles (and the shine get's) `stopTrackBGMs(3, 0)`, then
+`MSound::demoModeIn(0x16f, false)` (MSound.cpp 659): for each category bit, `setSeCategoryVolume(cat, 0)` -- JAIBasic's category volume multiplies
+every sound of it, so a playing one goes silent at once and a new one plays silent -- till the next stage's `MSound::initSound` restores them. A sound's
+category is its id's top hex digit: 0 FLUDD (PO), 1 Mario's moves (MA), 2 enemies and bosses (EN, BS), 3 objects, 4 system (SY), 5 environment (EV), 6
+water (WT), 7 Mario's voice (MV, MA_VO), 8 NPCs; 0x16F is all but 4 and 7 -- the system's sounds and his voice (his cry) play on. `gen_table154.py`:
+`SeInfo` gains the game's `Id` (**`assets/Sms/Sound/SmsMarioSoundTable.cs`** regenerated: every row gains its id, nothing else).
+**`assets/Sms/Sound/SmsActorSound.cs`**: `DemoMask`, `DemoModeIn`, `DemoModeOut`, `Category` (the table's id; Jaysonn's own sounds, no id: the attacks'
+2, THUNDER 5), `Muted`; every player remembers its sound, and a silent category's sit at -80 dB (`SetBase`, the distance tick) from that moment;
+readouts `PlayingNow`, `AudibleNow`. **`assets/Sms/Sound/SmsMarioSound.cs`**: the channels and the slots remember their sound and go silent by category
+(the voice, 7, plays on); `DemoChanged`; `_Ready` is initSound's (`DemoModeOut`); readouts `VoiceAudible`, `EffectsPlaying`, `EffectsAudible`.
+**`assets/Sms/Rematch/SmsArenaLighting.cs`**: the sky's thunder silent under it. **`assets/Mario.cs`**: `SmsMissTick` calls `DemoModeIn(0x16F)` after
+`StopAllMusic`, `DemoModeOut` before the stage moves.
+
+**The zoom.** The game (CameraDemo.cpp 219-272; cameragc.cpp 261, 820, 903): `execDeadDemoProc_` starts the dead demo 16 ticks after
+`MARIO_FLAG_GAME_OVER`; without the hell flag `ctrlNormalDeadDemo_` takes the place of the mode's control -- the look-at chases his body
+(`setMarioLookat_`: his origin + 35 u in the normal dead demo) at 0.03 a tick, the eye stays where it stopped, and a tick on a 343-tick zoom: `mFovy` at
+a steady pace toward clamp(10500 / the eye's distance to the look-at, 5, 80) degrees (`CLBChaseConstantSpecifyFrame`), the kind's fovy not reapplied
+meanwhile; `calcFinalPosAndAt_` keeps the look-at's elevation clamp (only the hell one skips it). **`assets/Sms/MarioCamData.cs`**: `GameOver`.
+**`assets/SunshineCamera.cs`**: the dead demo on any game over (212 had the hell flag only), the hell or the normal one (`_hellDemo`);
+`CtrlNormalDeadDemo`, the fov kept through `Apply`, the 35-u look point, the clamp kept; readouts `NormalDeadDemoOn`, `DeadDemoFov`, `DeadDemoFovTimer`
+(`HellDeadDemoOn` now the hell one alone). The camera ticks at 120 Hz: 16 ticks are 0.13 s, the zoom 2.86 s; the miss's wipe comes 2.2 s on, so it
+closes about two thirds of the way (50 -> 25 degrees here) before the bands.
+
+**The stars.** The game's IA8 star (`star4s_raw`) has a little alpha everywhere -- 4 to 20 of 255 over most of the quad -- and its arms run into the
+quad's edge (33 at an edge's middle), so a BIG star against a dark sky adds a faint square. **`assets/Sms/Fx/kira_add.gdshader`**: `alpha_floor` (the
+haze cut), `edge_fade` / `edge_from` (the quad's edge faded radially) -- 0 = the game's, as before; **`assets/Sms/Rematch/KingBooRematch.tscn`**: King
+Boo's star material (ChikaFx's, which his crown sparkles, rise, dive and death bursts copy) at 0.12 / 1 / 0.62. NEW
+`tools/projectshine/rematch157/star_preview216.py` rendered the shader's maths first: the light off the arms 37 % -> 12 %, the arms' own 88 % kept, the
+edge 0.
+
+**Verified:** the death drive v216-1 (deleted before the commit; the card skipped by A, the cutscene PLAYED; then King Boo's moves off, the supply
+stopped, Mario at 1 HP takes the plain hit while King Boo laughs): C55 the normal dead demo on 0.150 s after the death (not the hell one), the eye still
+(0.00 cm) through it, the fov 49.7 -> 48.3 (0.3 s) -> 36.8 (1.2 s) -> 25.46 (2.1 s; the steady pace's 25.40 toward its aim 14.24, 108 ticks left), never
+widening, the look-at 1 u off his body's 35 u; after the reload off, the fov 50.0; C56 at the miss's start (0.03 s after the death) the mask 0x16F, King
+Boo's laugh (playing at the death) silent -- 1 playing, 0 heard --, Mario's voice heard (MV08A_DOWN_03); a laugh started in the miss silent (2 playing,
+0 heard); his effects through the miss up to 4 playing, none heard; after the reload the mask 0 and the laugh heard; C57 King Boo's star material
+0.120 / 1.00 / 0.62 -- 3 / 3 (run death216b; run a failed C55 on the drive's own count: the camera's 16 ticks are 120 Hz, the drive's 60 -- the check
+now in seconds), and 3 / 3 windowed with its shots 42a / 42a2 (King Boo's rise and its stars) and 42b-d (the death: the fov 48.0, 36.8, 25.5). The fall
+drive (212 / 213's) 6 / 6 (run fall212d): the hell dead demo as before (the eye 0.00 u, the look-at 2246 u down). The regression drive 68 / 68 on the
+committed build (run fd). The clean rebuild 0 errors; the drive, the logs, the shots and the tasks deleted.
+
+**Deviations:** Jaysonn's own sounds have no game id: his attacks' sounds count as the enemies' (category 2, silent), the thunder as the environment's
+(5, silent). The shine get's jingle would call `demoModeIn` too; the port's shine get has no BGM yet, so it does not. The stars' cut is the port's (the
+game's texture keeps its haze): on King Boo's stars only -- the casino King Boo's, the NPC sparkles and the coin's keep 0 / 0.
