@@ -11,7 +11,7 @@ using System.Collections.Generic;
 /// (its shadow on the floor, growing: the tell); the target follows Mario (at TrackSpeed) until LockSeconds before the landing, then is fixed -- the dodge
 /// window; the body leans into the dive (DiveTilt) and trails ghost wisps (TrailColor). It LANDS (the roulette's thud, the Boo crush, a camera shake --
 /// LandShake -- a ring of light racing out over the floor (RingColor, RingGrow, RingSeconds) and a burst of pale smoke (SmokeColor)): Mario within its
-/// body (BodyRadius, from the model's own width x ModelScale) takes the plain hit (Mario.TakeDamage, the common enemy profile) and it SPLITS -- gone in
+/// body (BodyRadius; 215: half of BodySize) takes the plain hit (Mario.TakeDamage, the common enemy profile) and it SPLITS -- gone in
 /// a flash and a squash, and WaveCount Boos (<see cref="SmsWaveBoo"/>, the hotel Boo at WaveBooScale) spread out from its footprint in a ring at WaveSpeed,
 /// WaveHeight over the floor, for WaveSeconds, each the plain hit on a Mario it runs through, fading over their last WaveFadeSeconds into a puff each
 /// (the port's EnemyDisap burst, tinted) -- a jump clears the ring. The Boolossus model: Boolossus.obj (Jaysonn's Downloads, run through Blender:
@@ -20,17 +20,32 @@ using System.Collections.Generic;
 /// its TelesaToon materials, the game's look; the doc's Galaxy Teresa.dae came out with its tongue strip wrapped over the top of the head -- its UVs run
 /// to u 3 for a GX mirror wrap the export lost -- and is dropped), playing telesa_wait, fading by the materials' `fade`. Signals: Landed(hitMario),
 /// Finished (the Boos are gone, the node frees itself).
+/// Pass 215 (Jaysonn: "i want the big boo to be sleepy boo from sms. since boolouses kinda looks out of place and thus we can make the impact sound of it
+/// the death of sleepy boo like in sms when he gets eaten"): the body is the game's SLEEPY BOO -- TDebuTelesa's debutelesa.bmd (the hotel's, pass 152:
+/// models/Eniemes/Telesa/debutelesa.glb, the scene's Model child) in its own toon materials, playing its one clip (debutelesa_wait, its snoring sleep, at
+/// the game's pace), BodySize across (7 m, the Boolossus's size: the hit, the shadow and the circle as before); the landing sounds the Sleepy Boo's own
+/// EATEN, what the game plays as Yoshi swallows it. GhostLook puts the Boolossus's ghost shader back over any model (boolossus.glb stays in the project).
 /// </summary>
 public partial class SmsBoolossus : Node3D
 {
     [ExportGroup("The look")]
-    /// <summary>The model's size (1.07 m across at 1): 6.5 = about 7 m, Mario twice over and more; the ghost's screen mix; the body's brightness and rim.
-    /// 192 (Jaysonn: "make Boolossus a little bigger"): 5.5 -> 6.5 (a sixth bigger; its body hit and its shadow grow with it).</summary>
-    [Export(PropertyHint.Range, "0.5,12,0.1")] public float ModelScale = 6.5f;
+    /// <summary>215: the body's size side to side across its face, in metres -- the model is scaled to it whatever its units (the Sleepy Boo's glb is in the
+    /// game's: 306 u across, 4.1 m in the hotel), and its body hit is half of it (BodyRadius 0). 7 = the Boolossus's size since 192 (Jaysonn: "make Boolossus a
+    /// little bigger": ModelScale 5.5 -> 6.5 on its 1.07-m model).</summary>
+    [Export(PropertyHint.Range, "1,20,0.1")] public float BodySize = 7f;
+    /// <summary>215: off = the model in its own materials (the Sleepy Boo as the game draws it; its toon has no fade, so it shows at once under the appear
+    /// puff and squashes away at the split); on = GhostBoo.gdshader over every surface, the Boolossus's see-through ghost (Opacity = the ghost's mix, Lift /
+    /// Glow = the body's brightness and rim; the fade in and the landing's flash) -- for a model with no look of its own (boolossus.glb).</summary>
+    [Export] public bool GhostLook = false;
     [Export(PropertyHint.Range, "0.1,1,0.01")] public float Opacity = 0.9f;
     [Export] public float Lift = 1f, Glow = 0.5f;
-    /// <summary>The model's face is on its +Z side (Boolossus.obj: its eyes, teeth, tongue and cheeks all sit at +0.3..+0.4 z of the body's middle; off = on -Z).
-    /// It faces along its dive, then the camera's side on the floor.</summary>
+    /// <summary>215: the model's clip, looped from the dive's start to the split ("" = none): the Sleepy Boo's one bck, debutelesa_wait (its snoring sleep),
+    /// and that clip's length in the game's frames at 60 a second -- 94: the rip stretched it to 5.8 s, and the hotel's Sleepy Boo plays it at the game's
+    /// pace the same way (SmsSmallEnemy's bck rate); 0 = the clip's own length.</summary>
+    [Export] public string ModelClip = "debutelesa_wait";
+    [Export(PropertyHint.Range, "0,600,1")] public float ModelClipFrames = 94f;
+    /// <summary>The model's face is on its +Z side (the Sleepy Boo's, as the game's model; Boolossus.obj's too; off = on -Z). It faces along its dive, then
+    /// the camera's side on the floor.</summary>
     [Export] public bool FacesPlusZ = true;
     /// <summary>The shadow on the floor under the target: its darkness and its size at the landing (x the body's radius). 214 (Jaysonn: "the shadow from
     /// boolossus is a rectangle"): a round soft disc -- it was a bare quad (no texture: square) scaled across the world's X and Y, so laid flat it stretched one
@@ -52,7 +67,7 @@ public partial class SmsBoolossus : Node3D
     [Export] public float TrackSpeed = 6f, LockSeconds = 0.6f, MaxDiveSpeed = 45f;
     /// <summary>How far the body leans into the dive (1 = it faces straight along its path; 0 = upright, facing its target).</summary>
     [Export(PropertyHint.Range, "0,1,0.05")] public float DiveTilt = 0.8f;
-    /// <summary>The body on Mario at the landing: its radius (0 = the model's own half width x ModelScale) and how high the hit reaches over the floor.</summary>
+    /// <summary>The body on Mario at the landing: its radius (0 = half of BodySize) and how high the hit reaches over the floor.</summary>
     [Export] public float BodyRadius = 0f, BodyHitHeight = 5f;
     [ExportGroup("The effects (165)")]
     /// <summary>The ghost wisps it trails as it dives (their colour; 0 alpha = none), the puff as it appears, the puff as each Boo vanishes.</summary>
@@ -88,8 +103,11 @@ public partial class SmsBoolossus : Node3D
     [Export] public float BooRadius = 1.1f;
     [Export] public PackedScene BooScene;
     [ExportGroup("The sounds")]
-    /// <summary>211: Jaysonn's Luigi's Mansion Boolossus sounds -- its bounce as it lands (BOOLOSSUS_BOUND), a Boo popping off as it splits (BOOLOSSUS_PON); the appear and the wave's end still the game's.</summary>
-    [Export] public string AppearSe = "MSD_SE_EN_TELESA_APPEAR", LandSe = "BOOLOSSUS_BOUND", SplitSe = "BOOLOSSUS_PON", WaveGoneSe = "MSD_SE_EN_TELESA_DISAPPEAR";
+    /// <summary>The landing: 215 (Jaysonn: "we can make the impact sound of it the death of sleepy boo like in sms when he gets eaten") the Sleepy Boo's own
+    /// MSD_SE_EN_DB_TELSA_EATEN (TDebuTelesa::receiveMessage as Yoshi swallows it: the game's render, its 94-ms lead cut so it lands with the slam; 211's
+    /// Luigi's Mansion bounce, BOOLOSSUS_BOUND, stays in Sound/Rematch/); a Boo popping off as it splits (211: BOOLOSSUS_PON); the appear and the wave's end
+    /// the game's.</summary>
+    [Export] public string AppearSe = "MSD_SE_EN_TELESA_APPEAR", LandSe = "MSD_SE_EN_DB_TELSA_EATEN", SplitSe = "BOOLOSSUS_PON", WaveGoneSe = "MSD_SE_EN_TELESA_DISAPPEAR";
     [ExportGroup("")]
     [Export] public bool DebugPrint;
 
@@ -99,8 +117,8 @@ public partial class SmsBoolossus : Node3D
     public enum Phase { Idle, Dive, Wave, Gone }
     public Phase State { get; private set; } = Phase.Idle;
     public float FloorY { get; private set; } = float.NaN;
-    public float BottomY => GlobalPosition.Y + _modelBottom * ModelScale;
-    public float Radius => BodyRadius > 0f ? BodyRadius : _modelHalfWidth * ModelScale;
+    public float BottomY => GlobalPosition.Y + _modelBottom * _k;
+    public float Radius => BodyRadius > 0f ? BodyRadius : BodySize * 0.5f;
     /// <summary>192: how far a wave Boo has ridden from its start at this age -- out at WaveSpeed, easing to a stop WaveReach out (0: WaveSpeed x age as before).</summary>
     public float WaveDistance(float age) => WaveReach > 0f ? WaveReach * (1f - MathF.Exp(-age * WaveSpeed / WaveReach)) : WaveSpeed * age;
     public bool HitMario { get; private set; }
@@ -155,7 +173,14 @@ public partial class SmsBoolossus : Node3D
     public Color MarkColorNow { get; private set; }
     public bool MarkShown => _mark != null && _mark.Visible;
     public bool ShadowRound => _shadow?.MaterialOverride is StandardMaterial3D sm && sm.AlbedoTexture == _disc && _disc != null;
-    private Mario _mario; private float _t, _vy, _tRem, _opacityShown, _modelBottom = 0.035f, _modelHalfWidth = 0.535f; private int _waveHits;
+    /// <summary>215, for the drives: the model's scale (its units to metres: BodySize over its width), its width side to side at scale 1, its clip player,
+    /// and the surfaces under the ghost shader (0 = every one in its own material).</summary>
+    public float ScaleNow => _k;
+    public float ModelWidth => _modelWidth;
+    public AnimationPlayer ModelAnim => _anim;
+    public int GhostMaterials => _mats.Count;
+    private Mario _mario; private float _t, _vy, _tRem, _opacityShown, _modelBottom = 0.035f, _modelWidth = 1.07f, _k = 1f; private int _waveHits;
+    private AnimationPlayer _anim;
     private Vector3 _target, _vel; private bool _locked;
     private readonly List<SmsWaveBoo> _boos = new(); private float _waveT; private bool _waveSounded;
 
@@ -163,15 +188,15 @@ public partial class SmsBoolossus : Node3D
     {
         All.Add(this);
         _model = GetNodeOrNull<Node3D>("Model");
-        var shader = ResourceLoader.Exists("res://assets/Sms/Rematch/GhostBoo.gdshader") ? GD.Load<Shader>("res://assets/Sms/Rematch/GhostBoo.gdshader") : null;
+        var shader = GhostLook && ResourceLoader.Exists("res://assets/Sms/Rematch/GhostBoo.gdshader") ? GD.Load<Shader>("res://assets/Sms/Rematch/GhostBoo.gdshader") : null;   // 215: the ghost look only
         if (_model != null)
         {
-            _model.Scale = Vector3.One * ModelScale;
             var aabb = new Aabb(); bool first = true;
             foreach (Node n in _model.FindChildren("*", "MeshInstance3D", true, false))
             {
                 var mi = (MeshInstance3D)n;
                 if (mi.Mesh == null) continue;
+                mi.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;                                                       // 215: the round disc is its shadow (214) -- the opaque toon cast a second one, the body's outline, sliding over the floor far from the target with the arena's light
                 Aabb a = mi.Transform * mi.GetAabb(); aabb = first ? a : aabb.Merge(a); first = false;
                 for (int s = 0; s < mi.Mesh.GetSurfaceCount(); s++)
                 {
@@ -182,9 +207,12 @@ public partial class SmsBoolossus : Node3D
                     mi.SetSurfaceOverrideMaterial(s, sm); _mats.Add(sm);
                 }
             }
-            if (!first) { _modelBottom = aabb.Position.Y; _modelHalfWidth = Mathf.Max(aabb.Size.X, aabb.Size.Z) * 0.5f; }
+            if (!first) { _modelBottom = aabb.Position.Y; _modelWidth = aabb.Size.X; }
+            _k = BodySize / Mathf.Max(1e-4f, _modelWidth);                                                                       // 215: scaled to BodySize across, whatever the model's units
+            _model.Scale = Vector3.One * _k;
+            foreach (Node n in _model.FindChildren("*", "AnimationPlayer", true, false)) { _anim = n as AnimationPlayer; if (_anim != null) break; }
         }
-        else GD.PushWarning($"[SMS boolossus] {GetPath()}: no Model child (boolossus.glb)");
+        else GD.PushWarning($"[SMS boolossus] {GetPath()}: no Model child (debutelesa.glb)");
         _shadow = new MeshInstance3D { Name = "Shadow", TopLevel = true, Visible = false, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
         _shadow.Mesh = new QuadMesh { Size = Vector2.One * 2f };
         _shadow.MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0f, 0f, 0f, ShadowOpacity), AlbedoTexture = Disc(), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, RenderPriority = 1 };   // 214: the disc
@@ -201,7 +229,7 @@ public partial class SmsBoolossus : Node3D
         PuffScene ??= ResourceLoader.Exists("res://assets/Sms/Fx/EnemyDisap.tscn") ? GD.Load<PackedScene>("res://assets/Sms/Fx/EnemyDisap.tscn") : null;
         _sound = SmsActorSound.Attach(this);
         if (_model != null) _model.Visible = false;
-        if (DebugPrint) GD.Print($"[SMS boolossus] {Name}: {_mats.Count} materials, model bottom {_modelBottom:F3} half width {_modelHalfWidth:F3} (x{ModelScale}: radius {Radius:F2} m), boo scene {(BooScene != null ? "yes" : "NONE")}, puff scene {(PuffScene != null ? "yes" : "NONE")}, trail {(_trail != null ? "yes" : "none")}");
+        if (DebugPrint) GD.Print($"[SMS boolossus] {Name}: {_mats.Count} ghost materials, model bottom {_modelBottom:F3} width {_modelWidth:F3} (x{_k:F5}: {BodySize} m across, radius {Radius:F2} m), clip {(_anim != null && _anim.HasAnimation(ModelClip) ? ModelClip : "none")}, boo scene {(BooScene != null ? "yes" : "NONE")}, puff scene {(PuffScene != null ? "yes" : "NONE")}, trail {(_trail != null ? "yes" : "none")}");
     }
     public override void _ExitTree() { All.Remove(this); }
     /// <summary>203: gone at once with the field (the split's cut) -- its wave Boos freed outright, the body (shadow and trail with it) hidden and freed; true = anything went.</summary>
@@ -223,11 +251,11 @@ public partial class SmsBoolossus : Node3D
         approachDir.Y = 0f; if (approachDir.LengthSquared() < 1e-4f) approachDir = Vector3.Forward;
         approachDir = approachDir.Normalized();
         _target = new Vector3(m.X, floorY, m.Z); _locked = false;
-        StartPoint = new Vector3(m.X + approachDir.X * DiveDistance, floorY + DiveHeight - _modelBottom * ModelScale, m.Z + approachDir.Z * DiveDistance);
+        StartPoint = new Vector3(m.X + approachDir.X * DiveDistance, floorY + DiveHeight - _modelBottom * _k, m.Z + approachDir.Z * DiveDistance);
         GlobalPosition = StartPoint;
         _vy = Mathf.Max(0f, DiveStartSpeed); _vel = new Vector3(-approachDir.X, -_vy, -approachDir.Z); _tRem = 9f;
         State = Phase.Dive; _t = 0f; DiveSeconds = 0f;
-        if (_model != null) { _model.Visible = true; Lean(0f); }
+        if (_model != null) { _model.Visible = true; Lean(0f); PlayClip(); }
         _shadow.Visible = true; if (_mark != null) _mark.Visible = true; PlaceShadow();
         if (_trail != null) { _trail.Restart(); _trail.Emitting = true; }
         if (AppearPuff && PuffScene != null) SmsSmashFx.Puff(PuffScene, GetParent(), GlobalPosition + Vector3.Up * (Radius * 0.6f), Radius * 1.6f, PuffTint);
@@ -239,6 +267,19 @@ public partial class SmsBoolossus : Node3D
 
     private void SetOpacity(float o) { _opacityShown = o; foreach (var m in _mats) m.SetShaderParameter("opacity", o); }
     private void SetFlash(float f) { foreach (var m in _mats) m.SetShaderParameter("flash", f); }
+    /// <summary>215: the model's clip from its start at the game's pace (ModelClipFrames at 60 a second over the clip's length); KeepClip loops it -- a
+    /// replay as it ends, so the glb's shared clip is never changed (the hotel's Sleepy Boos use it too).</summary>
+    private void PlayClip()
+    {
+        if (_anim == null || string.IsNullOrEmpty(ModelClip) || !_anim.HasAnimation(ModelClip)) return;
+        float len = (float)_anim.GetAnimation(ModelClip).Length;
+        _anim.SpeedScale = ModelClipFrames > 0f && len > 0f ? len * 60f / ModelClipFrames : 1f;
+        _anim.Play(ModelClip); _anim.Seek(0.0, true);
+    }
+    private void KeepClip()
+    {
+        if (_anim != null && _model != null && _model.Visible && !_anim.IsPlaying() && !string.IsNullOrEmpty(ModelClip) && _anim.HasAnimation(ModelClip)) _anim.Play(ModelClip);
+    }
     private void PlaceShadow()
     {
         if (_shadow == null || float.IsNaN(FloorY)) return;
@@ -271,7 +312,7 @@ public partial class SmsBoolossus : Node3D
         Basis dive = Mathf.Abs(along.Dot(Vector3.Up)) > 0.999f ? upright : Basis.LookingAt(along, Vector3.Up);
         Basis b = new Basis(upright.GetRotationQuaternion().Slerp(dive.GetRotationQuaternion(), Mathf.Clamp(k * DiveTilt, 0f, 1f)));
         if (FacesPlusZ) b *= new Basis(Vector3.Up, MathF.PI);
-        _model.GlobalBasis = b.Scaled(Vector3.One * ModelScale);
+        _model.GlobalBasis = b.Scaled(Vector3.One * _k);
     }
 
     public override void _Process(double delta)
@@ -300,12 +341,13 @@ public partial class SmsBoolossus : Node3D
                 _vel = new Vector3(flat.X, -_vy, flat.Z);
                 GlobalPosition += _vel * dt;
                 Lean(Mathf.Clamp(_t / 0.25f, 0f, 1f));
+                KeepClip();
                 PlaceShadow();
                 if (BottomY <= FloorY) Land();
                 break;
             case Phase.Wave:
                 _waveT += dt;
-                if (_waveT < 0.15f) { SetOpacity(Opacity * (1f - _waveT / 0.15f)); if (_model != null) _model.Scale = new Vector3(ModelScale * (1f + _waveT * 2f), ModelScale * Mathf.Max(0.05f, 1f - _waveT * 6f), ModelScale * (1f + _waveT * 2f)); }
+                if (_waveT < 0.15f) { SetOpacity(Opacity * (1f - _waveT / 0.15f)); KeepClip(); if (_model != null) _model.Scale = new Vector3(_k * (1f + _waveT * 2f), _k * Mathf.Max(0.05f, 1f - _waveT * 6f), _k * (1f + _waveT * 2f)); }
                 else if (_model != null && _model.Visible) { _model.Visible = false; _shadow.Visible = false; }
                 if (!_waveSounded && _waveT >= WaveSeconds - WaveFadeSeconds) { _waveSounded = true; if (_sound != null && !string.IsNullOrEmpty(WaveGoneSe)) _sound.Play(WaveGoneSe); }
                 if (BoosOut == 0 && _waveT > 0.3f)
@@ -322,7 +364,7 @@ public partial class SmsBoolossus : Node3D
     /// <summary>The slam: the floor met -- the ring, the smoke, the shake; Mario inside the body is the plain hit; the Boolossus splits into the wave.</summary>
     private void Land()
     {
-        GlobalPosition = new Vector3(GlobalPosition.X, FloorY - _modelBottom * ModelScale, GlobalPosition.Z);
+        GlobalPosition = new Vector3(GlobalPosition.X, FloorY - _modelBottom * _k, GlobalPosition.Z);
         LandingPoint = new Vector3(GlobalPosition.X, FloorY, GlobalPosition.Z);
         if (_trail != null) _trail.Emitting = false;
         if (_mark != null) _mark.Visible = false;                                                                                   // 214: the circle goes as it lands (the volley's mark does)
@@ -363,7 +405,7 @@ public partial class SmsBoolossus : Node3D
         Vector3 to = cam != null ? cam.GlobalPosition - GlobalPosition : (_mario != null ? -_mario.SmsFacingDir() : Vector3.Back); to.Y = 0f;
         if (to.LengthSquared() < 1e-4f) return;
         float yaw = MathF.Atan2(to.X, to.Z) + (FacesPlusZ ? 0f : MathF.PI);
-        _model.GlobalBasis = new Basis(Vector3.Up, yaw).Scaled(Vector3.One * ModelScale);
+        _model.GlobalBasis = new Basis(Vector3.Up, yaw).Scaled(Vector3.One * _k);
     }
     internal void BooHit() { _waveHits++; }
 }

@@ -182,6 +182,7 @@ public static class SmsMarioSoundTable
         ["MSD_SE_EN_COMMON_BOYOYON"] = new SeInfo(120, 128, false, true, 0.47f, "Enemy"),
         ["MSD_SE_EN_COMMON_SMOKE"] = new SeInfo(68, 180, false, true, 1.37f, "Enemy"),
         ["MSD_SE_EN_COMMON_W_HIT_OK"] = new SeInfo(67, 240, false, true, 0.597f, "Enemy"),
+        ["MSD_SE_EN_DB_TELSA_EATEN"] = new SeInfo(127, 220, false, true, 0.534f, "Enemy"),
         ["MSD_SE_EN_TELESA_APPEAR"] = new SeInfo(70, 180, false, true, 0.492f, "Enemy"),
         ["MSD_SE_EN_TELESA_CRUSH"] = new SeInfo(100, 180, false, true, 0.511f, "Enemy"),
         ["MSD_SE_EN_TELESA_DISAPPEAR"] = new SeInfo(90, 200, false, true, 0.604f, "Enemy"),
