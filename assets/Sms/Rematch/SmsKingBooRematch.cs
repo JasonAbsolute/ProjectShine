@@ -1547,6 +1547,7 @@ public partial class SmsKingBooRematch : Node3D
             EmitSignal(SignalName.Laughed);
         }
         else if (State == Phase.IntroLaugh && n == BckLaugh) { PlayClip(_introT + 1.5f <= IntroLaughLength ? BckLaugh : BckWait); }   // 174: the laugh loops while the intro laughs
+        else if (State == Phase.Split && n == BckLaugh) PlayClip(BckWait);                                                                // 214 (Jaysonn: "he kinda pauses mid air"): a laugh over in the split's line -- back to the wait clip, never frozen in its last pose (run split214b: the real one held it 0.75 s, a copy 0.15 s, till the cut)
         else if (State == Phase.Mock && n == BckLaugh) PlayClip(BckWait);                                                                 // 191: a long mock outlasts the laugh clip
         else if (State == Phase.Laugh && n == BckLaugh && !_revealing)
         {

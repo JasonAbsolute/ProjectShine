@@ -32,9 +32,16 @@ public partial class SmsBoolossus : Node3D
     /// <summary>The model's face is on its +Z side (Boolossus.obj: its eyes, teeth, tongue and cheeks all sit at +0.3..+0.4 z of the body's middle; off = on -Z).
     /// It faces along its dive, then the camera's side on the floor.</summary>
     [Export] public bool FacesPlusZ = true;
-    /// <summary>The shadow on the floor under the target: its darkness and its size at the landing (x the body's radius).</summary>
+    /// <summary>The shadow on the floor under the target: its darkness and its size at the landing (x the body's radius). 214 (Jaysonn: "the shadow from
+    /// boolossus is a rectangle"): a round soft disc -- it was a bare quad (no texture: square) scaled across the world's X and Y, so laid flat it stretched one
+    /// way only (2 x r by 2 m: the rectangle).</summary>
     [Export(PropertyHint.Range, "0,1,0.05")] public float ShadowOpacity = 0.55f;
     [Export] public float ShadowScale = 1.1f;
+    /// <summary>214 (Jaysonn: "like bomb boo attack with the yellowish circles let have them be white to signal its a boolossus attack"): the landing's CIRCLE --
+    /// the Bomb Boo volley's mark (its ring texture, additive, pulsing quicker as the dive comes down) in WHITE, the body's whole footprint (the body's radius x
+    /// ShadowScale) about the target from the dive's start, the shadow growing inside it; gone as it lands. Off = the shadow alone.</summary>
+    [Export] public bool LandingMark = true;
+    [Export] public Color MarkColor = new Color(1f, 1f, 1f, 0.6f);
     [ExportGroup("The dive (165)")]
     /// <summary>Where it appears: this high over the floor, this far out from Mario along its approach direction (King Boo gives one per Boolossus); the
     /// fade in; its speed downward as it appears; the fall's gravity (30 from 24 m at 6 m/s down is a 1.08 s dive; the game's gravity is 19).</summary>
@@ -127,7 +134,27 @@ public partial class SmsBoolossus : Node3D
     public int BoosOut { get { int n = 0; foreach (var b in _boos) if (b != null && IsInstanceValid(b)) n++; return n; } }
 
     private const float U = 74.44f;
-    private Node3D _model; private MeshInstance3D _shadow; private readonly List<ShaderMaterial> _mats = new(); private SmsActorSound _sound; private GpuParticles3D _trail;
+    private Node3D _model; private MeshInstance3D _shadow, _mark; private StandardMaterial3D _markMat; private readonly List<ShaderMaterial> _mats = new(); private SmsActorSound _sound; private GpuParticles3D _trail;
+    private static ImageTexture _disc;
+    /// <summary>214: the shadow's round disc -- solid to 80 % of the way out, softening to nothing at the rim (alpha; white, the material's colour darkens it).</summary>
+    private static ImageTexture Disc()
+    {
+        if (_disc != null) return _disc;
+        const int N = 64; var img = Image.CreateEmpty(N, N, false, Image.Format.Rgba8);
+        for (int y = 0; y < N; y++)
+            for (int x = 0; x < N; x++)
+            {
+                float u = (x + 0.5f) / N * 2f - 1f, v = (y + 0.5f) / N * 2f - 1f, r = MathF.Sqrt(u * u + v * v);
+                img.SetPixel(x, y, new Color(1f, 1f, 1f, Mathf.SmoothStep(1f, 0.8f, r)));
+            }
+        return _disc = ImageTexture.CreateFromImage(img);
+    }
+    /// <summary>214, for the drives: the shadow's and the mark's world size across X and Z (metres) and the mark's colour as last placed.</summary>
+    public Vector2 ShadowSizeNow { get; private set; }
+    public Vector2 MarkSizeNow { get; private set; }
+    public Color MarkColorNow { get; private set; }
+    public bool MarkShown => _mark != null && _mark.Visible;
+    public bool ShadowRound => _shadow?.MaterialOverride is StandardMaterial3D sm && sm.AlbedoTexture == _disc && _disc != null;
     private Mario _mario; private float _t, _vy, _tRem, _opacityShown, _modelBottom = 0.035f, _modelHalfWidth = 0.535f; private int _waveHits;
     private Vector3 _target, _vel; private bool _locked;
     private readonly List<SmsWaveBoo> _boos = new(); private float _waveT; private bool _waveSounded;
@@ -160,8 +187,15 @@ public partial class SmsBoolossus : Node3D
         else GD.PushWarning($"[SMS boolossus] {GetPath()}: no Model child (boolossus.glb)");
         _shadow = new MeshInstance3D { Name = "Shadow", TopLevel = true, Visible = false, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
         _shadow.Mesh = new QuadMesh { Size = Vector2.One * 2f };
-        _shadow.MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0f, 0f, 0f, ShadowOpacity), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, RenderPriority = 1 };
+        _shadow.MaterialOverride = new StandardMaterial3D { AlbedoColor = new Color(0f, 0f, 0f, ShadowOpacity), AlbedoTexture = Disc(), Transparency = BaseMaterial3D.TransparencyEnum.Alpha, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, RenderPriority = 1 };   // 214: the disc
         AddChild(_shadow);
+        var ring = SmsFireballs.Tex("hamonring3_flat");                                                                          // 214: the volley's mark's ring, in white
+        if (LandingMark && ring != null)
+        {
+            _markMat = new StandardMaterial3D { Transparency = BaseMaterial3D.TransparencyEnum.Alpha, BlendMode = BaseMaterial3D.BlendModeEnum.Add, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, CullMode = BaseMaterial3D.CullModeEnum.Disabled, DisableReceiveShadows = true, AlbedoTexture = ring, AlbedoColor = MarkColor, RenderPriority = 2 };
+            _mark = new MeshInstance3D { Name = "LandingMark", TopLevel = true, Visible = false, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Mesh = new QuadMesh { Size = Vector2.One * 2f }, MaterialOverride = _markMat };
+            AddChild(_mark);
+        }
         if (TrailColor.A > 0.01f) { _trail = SmsSmashFx.Trail(TrailColor, Mathf.Max(0.6f, Radius * 0.55f), Radius * 0.6f); AddChild(_trail); }
         BooScene ??= ResourceLoader.Exists("res://models/Eniemes/Telesa/telesa.glb") ? GD.Load<PackedScene>("res://models/Eniemes/Telesa/telesa.glb") : null;
         PuffScene ??= ResourceLoader.Exists("res://assets/Sms/Fx/EnemyDisap.tscn") ? GD.Load<PackedScene>("res://assets/Sms/Fx/EnemyDisap.tscn") : null;
@@ -194,7 +228,7 @@ public partial class SmsBoolossus : Node3D
         _vy = Mathf.Max(0f, DiveStartSpeed); _vel = new Vector3(-approachDir.X, -_vy, -approachDir.Z); _tRem = 9f;
         State = Phase.Dive; _t = 0f; DiveSeconds = 0f;
         if (_model != null) { _model.Visible = true; Lean(0f); }
-        _shadow.Visible = true; PlaceShadow();
+        _shadow.Visible = true; if (_mark != null) _mark.Visible = true; PlaceShadow();
         if (_trail != null) { _trail.Restart(); _trail.Emitting = true; }
         if (AppearPuff && PuffScene != null) SmsSmashFx.Puff(PuffScene, GetParent(), GlobalPosition + Vector3.Up * (Radius * 0.6f), Radius * 1.6f, PuffTint);
         if (_sound != null && !string.IsNullOrEmpty(AppearSe)) _sound.Play(AppearSe);
@@ -210,8 +244,20 @@ public partial class SmsBoolossus : Node3D
         if (_shadow == null || float.IsNaN(FloorY)) return;
         float k = State == Phase.Dive ? Mathf.Clamp(1f - _tRem / 1.2f, 0f, 1f) : 1f;
         float r = Radius * ShadowScale * Mathf.Lerp(0.4f, 1f, k);
-        _shadow.GlobalTransform = new Transform3D(new Basis(Vector3.Right, -MathF.PI / 2f).Scaled(new Vector3(r, r, 1f)), new Vector3(_target.X, FloorY + 0.04f, _target.Z));
-        if (_shadow.MaterialOverride is StandardMaterial3D sm) sm.AlbedoColor = new Color(0f, 0f, 0f, ShadowOpacity * Mathf.Clamp(_opacityShown / Mathf.Max(0.01f, Opacity), 0f, 1f) * Mathf.Lerp(0.5f, 1f, k));
+        Basis flat = new Basis(Vector3.Right, -MathF.PI / 2f);                                                                   // the quad laid on the floor (it spans the world's X and Z)
+        _shadow.GlobalTransform = new Transform3D(flat.Scaled(new Vector3(r, 1f, r)), new Vector3(_target.X, FloorY + 0.04f, _target.Z));   // 214: scaled across X AND Z (it was X and Y: the rectangle)
+        ShadowSizeNow = new Vector2(_shadow.GlobalBasis.X.Length(), _shadow.GlobalBasis.Y.Length()) * 2f;
+        float shown = Mathf.Clamp(_opacityShown / Mathf.Max(0.01f, Opacity), 0f, 1f);
+        if (_shadow.MaterialOverride is StandardMaterial3D sm) sm.AlbedoColor = new Color(0f, 0f, 0f, ShadowOpacity * shown * Mathf.Lerp(0.5f, 1f, k));
+        if (_mark != null && _markMat != null)
+        {
+            // 214: the white circle -- the whole footprint from the start, pulsing as the volley's mark does (quicker as the dive comes down: k over the whole dive)
+            float R = Radius * ShadowScale, kDive = State == Phase.Dive ? Mathf.Clamp(DiveSeconds / Mathf.Max(0.05f, DiveSeconds + _tRem), 0f, 1f) : 1f;
+            _mark.GlobalTransform = new Transform3D(flat.Scaled(new Vector3(R, 1f, R)), new Vector3(_target.X, FloorY + 0.08f, _target.Z));
+            MarkSizeNow = new Vector2(_mark.GlobalBasis.X.Length(), _mark.GlobalBasis.Y.Length()) * 2f;
+            _markMat.AlbedoColor = MarkColor with { A = MarkColor.A * shown * (0.55f + 0.45f * MathF.Sin(_t * (6f + 14f * kDive))) };
+            MarkColorNow = _markMat.AlbedoColor;
+        }
     }
     /// <summary>The body turned along its path by DiveTilt (its face along the velocity), else upright facing the target; <paramref name="k"/> 0 = upright.</summary>
     private void Lean(float k)
@@ -279,6 +325,7 @@ public partial class SmsBoolossus : Node3D
         GlobalPosition = new Vector3(GlobalPosition.X, FloorY - _modelBottom * ModelScale, GlobalPosition.Z);
         LandingPoint = new Vector3(GlobalPosition.X, FloorY, GlobalPosition.Z);
         if (_trail != null) _trail.Emitting = false;
+        if (_mark != null) _mark.Visible = false;                                                                                   // 214: the circle goes as it lands (the volley's mark does)
         Lean(0f); FaceCamera();
         bool hit = false;
         if (_mario != null)

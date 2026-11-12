@@ -5,7 +5,8 @@ using Godot;
 /// delay): the request waits its delay, then the wipe runs frame by frame at the wiper's rate; a wipe out ends FULLY_FADED_OUT (solid),
 /// a fade in ends FULLY_FADED_IN (clear). The death wipe (10, Hx_Test2): four bands, each an Hx motion of 500 rows -- 2 frames of
 /// acceleration, 8 / 8 / 7 / 9 of cruise, 1 of braking (Hx_MotionSet) -- over timers of 11 / 11 / 10 / 12 frames, the earlier bands
-/// held complete. The hell death (2, Hx_Circle direction 0): the iris from 400 to 0 over 25 frames (400, 2, 13, 10). The plain fades
+/// held complete. The hell death (2, Hx_Circle direction 0): the iris from 400 to 0 over 25 frames (400, 2, 13, 10) -- black outside it with a hard
+/// edge and three faint rings inside (214: the game's; 61 drew a soft 60-px rim). The plain fades
 /// (startFadeout / startFadein): alpha over the frames given. The gate-in wipe (8, Hx_Test4; pass 127): a black spiral band winding in
 /// from the edge to the centre over 38 frames. The game-over wipe (0xD, Hx_GameOver) draws a texture the port does not
 /// have: a plain fade stands in. assets/Sms/Console/Fader.tscn holds the rect and its shader (Fader.gdshader); it sits above everything.
@@ -38,6 +39,11 @@ public partial class SmsFader : CanvasLayer
     private float[] _rows = new float[4];
     private float _plainSeconds, _plainT;
     private float _spiralStep, _spiralThin;   // Hx_Test4: rstep, thin
+    private int _irisA1, _irisA2, _irisA3;     // 214: Hx_Circle's a1 / a2 / a3 (u16; the rings' alpha is >> 8)
+    private Vector3 _irisDrift;                // 214: Hx_Circle's p1 / p2 / p3
+    /// <summary>214, for the drives: the iris's radius (frame px) and its three rings' darkness (0..1) as last drawn.</summary>
+    public float IrisRadius { get; private set; } = 400f;
+    public Vector3 IrisAlpha { get; private set; }
     // Hx motion
     private float _mT1, _mT2, _mT3, _mAcc, _mDec, _mVel, _mPos, _mFrames;
     private int _timer;
@@ -132,7 +138,8 @@ public partial class SmsFader : CanvasLayer
             case Wipe.Circle:
                 State = Status.FadingOut;
                 MotionSet(400f, 2f, 13f, 10f); _timer = 25;
-                SetParam("radius", 400f);
+                _irisA1 = _irisA2 = _irisA3 = 0; _irisDrift = Vector3.Zero;   // 214: Hx_Circle's state 0 -- the rings clear
+                SetParam("radius", 400f); SetParam("iris_alpha", Vector3.Zero); SetParam("iris_drift", Vector3.Zero);
                 Show(4);
                 break;
             case Wipe.FadeOut:
@@ -248,6 +255,14 @@ public partial class SmsFader : CanvasLayer
             float r = 400f - MotionUpdate();
             if (r < 0f) r = 0f;
             SetParam("radius", r);
+            // 214: Hx_Circle's three rings inside the hard edge -- drawn at this frame's darkness (a >> 8), then each ring past its radius darkens (a1 +0x180,
+            // a2 +0xC0, a3 +0x80 a frame, to 0xFF00) and its inner edge creeps out (p1 +0.05, p2 +0.12, p3 +0.25)
+            SetParam("iris_alpha", new Vector3((_irisA1 >> 8) / 255f, (_irisA2 >> 8) / 255f, (_irisA3 >> 8) / 255f));
+            SetParam("iris_drift", _irisDrift);
+            IrisAlpha = new Vector3((_irisA1 >> 8) / 255f, (_irisA2 >> 8) / 255f, (_irisA3 >> 8) / 255f); IrisRadius = r;
+            if (r > 22f) { _irisDrift.X += 0.05f; if (_irisA1 < 0xFF00) _irisA1 += 0x180; }
+            if (r > 42f) { _irisDrift.Y += 0.12f; if (_irisA2 < 0xFF00) _irisA2 += 0xC0; }
+            if (r > 62f) { _irisDrift.Z += 0.25f; if (_irisA3 < 0xFF00) _irisA3 += 0x80; }
             if (--_timer <= 0)
             {
                 _running = Wipe.None;
