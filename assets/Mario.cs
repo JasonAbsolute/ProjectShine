@@ -163,6 +163,8 @@ public partial class Mario : CharacterBody3D
     private int _smsInvincibleTicks = 0;      // mInvincibilityFrames: 120 Hz ticks (thinkParams runs in playerControl), from the attacker's InvincibleTime
     private bool _smsGameOver;                // MARIO_FLAG_GAME_OVER: loserExec() set it; a FIRE_DOWN may still fly with it (pass 56)
     private bool _smsLoserFalling;            // DOWN_LOSER: dropping in ANIM_LAND until the floor, then LOSER_DOWN's ma_die
+    private bool _smsFallDead;                // 212: MARIO_STATUS_FALL_DEAD -- the death plane's fall: he falls on, no control, his clip as it was (SmsFallDead)
+    private bool _smsHellDead;                // 212: CAMERA_FLAG_HELL_DEAD_DEMO / DEMO_FLAG_HELL_DEAD -- the camera's hell dead demo, the miss's iris
     private bool _smsDownFore = false;        // FORE_DOWN family (hit from behind: faces away, falls on his face) vs BACK_DOWN (faces the attacker, on his back)
     private int _smsDownType = 1;             // 0 SAFE, 1 SHORT, 2 the full DOWN
     private bool _smsDownAir = false;         // JUMP_*_DOWN: falling, horizontal speed forced to +-16 along the face every tick
@@ -2464,7 +2466,9 @@ public partial class Mario : CharacterBody3D
 
         if (stateOfMario == MarioState.dead)
         {
-            if (!IsOnFloor())
+            if (_smsFallDead)
+                SmsFallDeadStep(delta); // 212: fallDead() -- jumpProcess(0): the fall goes on
+            else if (!IsOnFloor())
                 velocity += GRAVITY * (float)delta;
             else if (_smsLoserFalling)
                 SmsLoserDown(); // downLoser(): jumpProcess() has landed -> LOSER_DOWN
@@ -15327,12 +15331,12 @@ public partial class Mario : CharacterBody3D
             if (_smsFader != null)
             {
                 if (_lives >= 0)
-                    _smsFader.StartWipe(SmsFader.Wipe.Arcs, 2.2f); // startWipe(10, 0.0f, 2.2f): Hx_Test2 -- the four curved bands
+                    _smsFader.StartWipe(_smsHellDead ? SmsFader.Wipe.Circle : SmsFader.Wipe.Arcs, _smsHellDead ? 2.0f : 2.2f); // checkDemoFlag(DEMO_FLAG_HELL_DEAD): startWipe(2, 0.0f, 2.0f) -- the iris (212: the death plane's fall); else startWipe(10, 0.0f, 2.2f): Hx_Test2 -- the four curved bands
                 else
                     _smsFader.StartWipe(SmsFader.Wipe.FadeOut, 2.0f, 1.0f); // startWipe(0xD, 0.0f, 2.0f): Hx_GameOver draws a texture the port lacks -- a plain fade
             }
             if (SmsDebugPrint)
-                GD.Print($"[SMS miss] TOO BAD! lives {_lives} ({(_lives >= 0 ? "the stage reloads after the wipe" : "game over")}), the wipe in {(_lives >= 0 ? 2.2f : 2.0f):F1} s");
+                GD.Print($"[SMS miss] TOO BAD! lives {_lives} ({(_lives >= 0 ? "the stage reloads after the wipe" : "game over")}), the {(_lives >= 0 ? (_smsHellDead ? "iris (a hell death)" : "death wipe") : "game-over fade")} in {(_lives >= 0 && !_smsHellDead ? 2.2f : 2.0f):F1} s");
             _smsMissTicks = 1;
             return;
         }
@@ -15382,6 +15386,61 @@ public partial class Mario : CharacterBody3D
         }
         SmsLoserDown();
     }
+
+    /// <summary>
+    /// 212: the DEATH PLANE's fall (TMario::thinkSituation, MarioMove.cpp 1886: the ground under him a death plane, its height over his feet --
+    /// <see cref="SmsDeathPlane"/> calls this the tick his feet cross under it): MARIO_FLAG_GAME_OVER, HP 0, MARIO_STATUS_FALL_DEAD -- fallDead()
+    /// (MarioJump.cpp 1278) is jumpProcess(0) alone: he falls on the way he was going, under the gravity and its cap, no control, his clip left as it
+    /// was (SmsFallDeadStep); the cry (MSD_SE_MV10B_CRY_JUMP_01, the FallCry slot) unless he is already in the long fall's ANIM_THROWN, which cried
+    /// it; the camera's HELL dead demo (CAMERA_FLAG_HELL_DEAD_DEMO: SmsCamMarioData.HellDead -- the eye stops and watches him fall away) and the
+    /// director's (DEMO_FLAG_HELL_DEAD: the miss's iris). The miss itself runs as for any death (SmsMissTick). Not ported: mAnmSound->stop() and the
+    /// Yoshi kill (no Yoshi). False (nothing done) when he is already finished -- a game over or the dead status.
+    /// </summary>
+    public bool SmsFallDead(string why)
+    {
+        if (_smsGameOver || stateOfMario == MarioState.dead)
+            return false;
+        _smsGameOver = true; // onFlag(MARIO_FLAG_GAME_OVER)
+        _health = 0;         // mHealth = 0
+        _smsFallDead = true; // changePlayerStatus(MARIO_STATUS_FALL_DEAD, 0, true)
+        _smsHellDead = true; // gpCamera->unk64 |= CAMERA_FLAG_HELL_DEAD_DEMO; onDemoFlag(DEMO_FLAG_HELL_DEAD)
+        _smsLoserFalling = false;
+        stateOfMario = MarioState.dead;
+        bool cry = !_smsLongFallAnim && FallCry != null && FallCry.Stream != null; // if (mAnimationId != ANIM_THROWN) startSoundActor(MSD_SE_MV10B_CRY_JUMP_01)
+        if (cry)
+            FallCry.Play();
+        SmsFallDeadCried = cry;
+        if (SmsDebugPrint)
+            GD.Print($"[SMS fall dead] {why}: his feet at {SmsFeetY():F2} -- game over, HP 0, FALL_DEAD (falling on at {velocity.Y:F1} m/s); the cry {(cry ? "played" : _smsLongFallAnim ? "already (the long fall's)" : "(FallCry slot empty)")}; the camera's hell dead demo, the iris");
+        return true;
+    }
+
+    /// <summary>212, for the drives: in the death plane's fall now (MARIO_STATUS_FALL_DEAD); its cry played at the death; the game-over flag; the lives as
+    /// the flag manager holds them (0x20001).</summary>
+    public bool SmsFallDeadNow => _smsFallDead;
+    public bool SmsFallDeadCried { get; private set; }
+    public bool SmsGameOverNow => _smsGameOver;
+    public int SmsLivesNow => _lives;
+
+    /// <summary>212: fallDead()'s jumpProcess(0): the gravity tick (SmsAir.GravityOnlyTick: Gravity a tick, capped at TerminalVy -- 30 m/s) on the way down,
+    /// the horizontal speed kept (no jumpingBasic: nothing brakes or steers it). The true vy is carried tick to tick (_smsFallDeadVy); the frame moves at
+    /// its ticks' pre-gravity mean, as the fire-down's does.</summary>
+    private void SmsFallDeadStep(double delta)
+    {
+        if (float.IsNaN(_smsFallDeadVy))
+            _smsFallDeadVy = SmsUnits.MpsToSpeed(velocity.Y);
+        int n = SmsUnits.TicksFor(delta, ref _smsFallDeadAccum);
+        if (n <= 0)
+            return;
+        float sumMv = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            SmsAir.GravityOnlyTick(ref _smsFallDeadVy, out float mv);
+            sumMv += mv;
+        }
+        velocity.Y = SmsUnits.SpeedToMps(sumMv / n);
+    }
+    private float _smsFallDeadAccum, _smsFallDeadVy = float.NaN;
 
     /// <summary>LOSER_DOWN (loserDown(), MarioRun.cpp 1474): ANIM_DIE on the ground; the reaction voices are not ported.</summary>
     private void SmsLoserDown()
@@ -19078,6 +19137,9 @@ public partial class Mario : CharacterBody3D
         _health = StartingHealth;
         _smsGameOver = false;
         _smsLoserFalling = false;
+        _smsFallDead = false;          // 212
+        _smsHellDead = false;
+        _smsFallDeadVy = float.NaN;
         SmsAirReset();
         _smsSwimAnim = "";
         animPlayer.SpeedScale = 1f;

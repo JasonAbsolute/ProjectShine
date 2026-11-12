@@ -40,6 +40,7 @@ public struct SmsCamMarioData
     public bool CamCancelPressed;       // MEANING_Y | MEANING_CAM_AB this frame: what leaves the L camera (read before Mario's half eats A / B)
     public bool YCamCanEnter;           // Mario's status gate for the Y press (MarioYCam.SmsYCamCanEnter): the rig's lock and inbetween checks are its own
     public bool Locked;                 // CameraLocked / the sign talk / the shine demo / dead: a demo holds him
+    public bool HellDead;               // 212: CAMERA_FLAG_HELL_DEAD_DEMO -- the death plane's fall (MARIO_STATUS_FALL_DEAD): the camera's hell dead demo
     public bool Talking;                // isTalkModeNow: the NPC talk from the B press to the balloon's fade (the talk kind holds the camera meanwhile; pass 86)
     public bool Teleported;             // the frame jumped him (a respawn, the intro's spawn): the camera warps behind him as a stage load does
     public bool Debug;                  // SmsDebugPrint
@@ -123,6 +124,7 @@ public partial class Mario
         d.CamCancelPressed = _camCancelPressed && !d.PadDead;
         d.YCamCanEnter = SmsYCamCanEnter();
         d.Locked = CameraLocked || stateOfMario == MarioState.talking || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.dead;
+        d.HellDead = _smsHellDead;
         d.Talking = _smsTalking;
         d.Debug = SmsDebugPrint;
         return d;

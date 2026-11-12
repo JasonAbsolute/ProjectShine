@@ -160,6 +160,13 @@ public partial class SunshineCamera : Node3D
     private float _finalRatio = 0f;                      // unk270
     private float _panOffset = 0f;                       // mHeightPanOffset
     private int _posFreeze = 0, _targetFreeze = 0;       // mPosFreezeFrames / mTargetFreezeFrames
+    // 212: the HELL dead demo (execDeadDemoProc_, CameraDemo.cpp 254): mDeadDemoCountdown, CAMERA_FLAG_DEAD_DEMO with CAMERA_FLAG_HELL_DEAD_DEMO
+    private int _deadDemoCountdown = 0;
+    private bool _deadDemo = false;
+    /// <summary>212, for the drives: the hell dead demo is on (the eye held; the look-at following him down until the pitch passes LimitMaxAngleX,
+    /// then the whole camera held -- Held).</summary>
+    public bool HellDeadDemoOn => _deadDemo;
+    public bool Held => (_flags & FlagFreeze) != 0;
     private bool _occluded = false;                      // MARIO_FLAG_OCCLUDED: the game peeks the framebuffer at his screen point; here an eye -> Mario ray
     // TCameraInbetween
     private int _ibFrames = 0;                           // mFramesRemaining
@@ -324,6 +331,7 @@ public partial class SunshineCamera : Node3D
         _slopeX = _addY = 0;
         _panOffset = 0f;
         _posFreeze = _targetFreeze = 0;
+        _deadDemoCountdown = 0; _deadDemo = false;   // 212: a stage load's camera has no dead demo
         HoldReset();
         _occluded = false;
         Apply();
@@ -344,6 +352,23 @@ public partial class SunshineCamera : Node3D
 
     /// <summary>For Mario: Respawn / RevealFromIntro -- the camera starts behind him as a stage load's does.</summary>
     public void SmsWarpBehind() => _warpRequested = true;
+
+    /// <summary>212: execDeadDemoProc_ (CameraDemo.cpp 254) for the HELL death -- the death plane's fall (Mario's HellDead: CAMERA_FLAG_HELL_DEAD_DEMO with
+    /// MARIO_FLAG_GAME_OVER): 16 ticks on, the dead demo (CAMERA_FLAG_DEAD_DEMO, mPosFreezeFrames 1) -- the eye stays where it was (CtrlNormal re-holds it
+    /// every tick) while the look-at follows him down, until the pitch passes LimitMaxAngleX (Tick). The normal death's dead demo (the eye held, the fov
+    /// closing on him over 343 ticks: ctrlNormalDeadDemo_, setMarioLookat_'s 35 u) is not ported: a death on the floor keeps the camera as before.</summary>
+    private void ExecDeadDemoProc()
+    {
+        if (_deadDemoCountdown > 0)
+        {
+            if (--_deadDemoCountdown > 0) return;
+            _deadDemo = true;
+            _posFreeze = 1;
+            if (_md.Debug) GD.Print($"[SMS camera] the hell dead demo: the eye stops at {_posU} ({(_posU - _md.PosU).Length():F0} u from him), the look-at follows him down");
+            return;
+        }
+        if (_md.HellDead) _deadDemoCountdown = 16;   // SMS_CheckMarioFlag(MARIO_FLAG_GAME_OVER) && !isTalkOrDemoModeNow() -- with the hell flag only (above)
+    }
 
     /// <summary>The scene takes the frame: this node on the look-at, the pivot's yaw the eye's bearing (Mario's stick direction), the
     /// Camera3D posed on the view with the kind's fov and near clip.</summary>
@@ -471,6 +496,7 @@ public partial class SunshineCamera : Node3D
     // ============================================================ one 120 Hz tick: ctrlGameCamera_ + calcFinalPosAndAt_ + calcExternalData_
     private void Tick(bool lEdge)
     {
+        if (!_deadDemo) ExecDeadDemoProc();   // 212: ctrlGameCamera_'s first line (cameragc.cpp): !(unk64 & CAMERA_FLAG_DEAD_DEMO) -> execDeadDemoProc_
         if ((_flags & FlagStickYaw) == 0 && _autoChaseOff > 0) _autoChaseOff--;
         if (_groundSkip != 0) _groundSkip--;
         if (_roofSkip != 0) _roofSkip--;
@@ -511,10 +537,21 @@ public partial class SunshineCamera : Node3D
         else if (SmsCamKinds.IsTalkKind(_mode)) CtrlTalk();
         else if (SmsCamKinds.IsDefiniteKind(_mode)) CtrlDefinite();
         else CtrlNormal();
-        // calcFinalPosAndAt_ (828): the shake is SmsCameraShake's own pass; the look-at's elevation from the eye clamped to the limits
+        // calcFinalPosAndAt_ (828): the shake is SmsCameraShake's own pass; the look-at's elevation from the eye clamped to the limits -- 212: but in the
+        // hell dead demo (isHellDeadDemo, cameragc.cpp 827) not clamped: once the actual pitch (last tick's unk256) passes LimitMaxAngleX the look-at
+        // stops too and the whole camera holds (mTargetFreezeFrames = 1, CAMERA_FLAG_UNK40)
         _viewPosU = _posU;
         _viewAtU = _atU;
-        RevisionLookatByAngleX(SmsCamNormal.LimitMinAngleX, SmsCamNormal.LimitMaxAngleX, _viewPosU, ref _viewAtU);
+        if (_deadDemo)
+        {
+            if (_finalPitch > SmsCamNormal.LimitMaxAngleX)
+            {
+                if ((_flags & FlagFreeze) == 0 && _md.Debug) GD.Print($"[SMS camera] the hell dead demo: the pitch {_finalPitch * 180f / 32768f:F1} deg is past the limit -- the whole camera holds");
+                _targetFreeze = 1;
+                _flags |= FlagFreeze;
+            }
+        }
+        else RevisionLookatByAngleX(SmsCamNormal.LimitMinAngleX, SmsCamNormal.LimitMaxAngleX, _viewPosU, ref _viewAtU);
         // calcExternalData_ (857): the actual camera's polar angles (unk256 / unk258) and ratio (unk270)
         CrossToPolar(_atU, _posU, out _, out _finalPitch, out _finalYaw);
         _finalRatio = Mathf.Clamp(CalcRatio(_p.XAngleMin, _p.XAngleMax, _finalPitch), 0f, 1f);
@@ -1181,10 +1218,14 @@ public partial class SunshineCamera : Node3D
             if (_posFreeze == 0) _posFreeze = 1;
             if (_targetFreeze == 0) _targetFreeze = 1;
         }
-        else if (moving || inputActive)
+        else
         {
-            _targetFreeze = 0;
-            _posFreeze = 0;
+            if (moving || inputActive)
+            {
+                _targetFreeze = 0;
+                _posFreeze = 0;
+            }
+            if (_deadDemo && _posFreeze == 0) _posFreeze = 1;   // 212: (cameragc.cpp 552) the dead demo holds the eye where it is, the look-at free
         }
 
         if (_posFreeze == 0 || _targetFreeze == 0)
