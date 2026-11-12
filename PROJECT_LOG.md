@@ -14219,3 +14219,51 @@ Mario's moves 0x1..., the enemies and bosses 0x2..., the objects 0x3...; the sys
 effect plays on through the jingle. The shine get's jingle (0x8001000A) cuts the music the same way in the game; the port's shine get has no BGM yet, so
 that cut is not wired. The renders are dry (no reverb), as 156's. A miss now takes as long as the jingle to move the stage (4.5 s; the game over 8.2 s):
 the game's own wait.
+
+### 214 -- the King Boo REMATCH, part 59: the IRIS's HARD EDGE (the game's Hx_Circle: black outside to a hard edge, three faint rings inside; 61's soft rim was the port's), King Boo IDLING through the split (no longer frozen mid-air in the laugh's last pose), and BOOLOSSUS's shadow ROUND with a WHITE CIRCLE where it will land (the Bomb Boo volley's mark, in white) (feature/kingboo-rematch, code `ffb552d`)
+
+**Jaysonn**: "ok the irs closing effects should not be a soft fade in the middle of the effects should be hard. also when king boo splits he should
+still be doing his idel animation after the split since right now he kinda pauses mid air wierdly", and on the way: "also the shadown from boolousus
+is a rectangle we need that to be a circle and like bomb boo attaack with the yellowish circles let have them be white to single its a boolousses
+attack".
+
+**The iris.** The game (hx_wiper.c 471: `Hx_Circle`, direction 0 -- the hell death's `startWipe(2, ...)`): each frame `Hxs1_Circle(r)` draws every
+row black up to the circle's edge (no blend: a hard edge), then `Hxs2_Circle` draws three rings 20 px wide inside it -- (r - 20 + p1 .. r) once r > 22,
+(r - 40 + p2 .. r - 20 + p1) once r > 42, (r - 60 + p3 .. r - 40 + p2) once r > 62 -- black at a1 / a2 / a3 >> 8 (a1 +0x180, a2 +0xC0, a3 +0x80 a
+frame, to 0xFF00; p1 +0.05, p2 +0.12, p3 +0.25 px a frame), so they start clear and darken a little as the iris closes. 61 drew a 60-px smoothstep rim
+instead: the soft fade was the port's. **`assets/Sms/Console/Fader.gdshader`**, mode 4: black outside the radius with no blend; inside it the three
+rings at `iris_alpha` (NEW uniform: a >> 8 as 0..1) from their inner edges at `iris_drift` (NEW uniform: p1 / p2 / p3), each only once the radius is
+past 22 / 42 / 62. **`assets/Sms/Console/SmsFader.cs`**: `Hx_Circle`'s a1 / a2 / a3 and p1 / p2 / p3 -- cleared as the wipe starts (its state 0), each
+frame drawn at their values, then grown as the game grows them; readouts `IrisRadius`, `IrisAlpha`.
+
+**King Boo in the split.** In each split cutscene King Boo and his copies (duplicates of the same node) laugh together in the line (`SplitLaugh`: the
+one-shot `btelesa_laugh`, 89 frames). When the laugh ended, `OnClipEnd` had no branch for the Split phase: the clip stopped on its last frame and he
+hung in that pose (the "pauses mid air") till the cutscene cut back to the fight; after it the wait clip was already running.
+**`assets/Sms/Rematch/SmsKingBooRematch.cs`**: `OnClipEnd` -- in the Split phase a laugh over goes to the wait clip (`BckWait`), as the Mock phase's
+does (191). The cutscene's timing is unchanged.
+
+**Boolossus.** Its shadow was a bare `QuadMesh` (no texture, so square) scaled (r, r, 1) after it was turned flat about X, i.e. along the world's X and
+Y: on the floor 2r long one way and 2 m the other (the rectangle). **`assets/Sms/Rematch/SmsBoolossus.cs`**: the shadow takes a round soft disc (NEW
+`Disc()`: a 64-px texture made in code, solid to 80 % of the radius, fading to nothing at the rim) and is scaled (r, 1, r), along X and Z; it stays
+dark (`ShadowOpacity` 0.55, `ShadowScale` 1.1, as before). NEW `LandingMark` (on) / `MarkColor` (white, alpha 0.6): the WHITE CIRCLE -- the Bomb Boo
+volley's mark (its ring texture `hamonring3_flat`, additive, pulsing quicker as the dive comes down) in white, at the body's whole footprint (`Radius`
+x `ShadowScale`: 7.65 m across here) about the target from the dive's start, with the shadow growing inside it; hidden as it lands (`Land()`).
+Readouts `ShadowSizeNow`, `MarkSizeNow`, `MarkColorNow`, `MarkShown`, `ShadowRound`.
+
+**Verified:** the split drive v214-1 (deleted before the commit; the intro skipped by A, King Boo's attacks and the supply off): C52 one Boolossus
+smash -- 65 dive ticks, the shadow the disc and as long along Z as along X every tick, the circle 7.65 m across and white every tick, gone after the
+landing; then two splits (King Boo's hits set one short of a copy, then a hit): C51b through each cutscene no King Boo shown in the line with his clip
+stopped -- before the fix (run split214b) this failed: 54 frozen ticks, the real one holding the laugh's last pose 0.75 s and a copy 0.15 s till the
+cut (KingBoo 3.00 s into the cutscene, `btelesa_laugh` stopped at 1.47 s); C51 for 3 s after each cutscene every one of him in the wait playing
+`btelesa_wait`, the clip and his body moving (this passed before the fix too: the freeze was inside the cutscene); C53 the iris started over the
+arena: 25 steps, the radius down to 0, the rings never lighter and at the end 0.110 / 0.051 / 0.031 dark (28 / 13 / 8 of 255) -- 6 / 6 (run
+split214c), and 6 / 6 again windowed with its shots 40a-f (40a / 40c each split's chorus, 40b / 40d a second after it; 40e the white circle round
+Mario with the round shadow inside it -- the floor 72-76 luminance inside the circle, 98-106 off its upper corners, where a square shadow would be
+dark; 40f the iris halfway, its hard edge). The regression drive 68 / 68 on the committed build (run fb). The clean rebuild 0 errors; the drive, the
+logs, the shots and the tasks deleted.
+
+**Deviations:** the iris is drawn in the wiper's 640 x 448 frame stretched to the window (every wipe since 61), so on a 16:9 window it is an ellipse;
+in the game's 4:3 frame it is a circle. The three rings are the game's and faint (11 / 5 / 3 % dark at the end): easy to miss. The shadow's disc and
+the white circle are the port's own (the rematch's Boolossus smash is the design doc's attack). Steps: the ssh options were first kept in a zsh
+variable, which zsh does not split into words, so a few calls ran on ssh's defaults (the same key, no timeouts or batch mode); spelled out in full
+since. A local image read was batched with the crop that wrote it, and re-read alone.
