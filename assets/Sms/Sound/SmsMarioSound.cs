@@ -1,6 +1,7 @@
 using Godot;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 /// <summary>Mario's and FLUDD's sounds, the way the game fires them (pass 154). Three sources, all the game's own:
 ///  1. The ANIMATION tables (mario.szs's bas files, SmsMarioSoundTable.Clips): TMario::animSound -> MAnmSound::animeLoop fires a sound when the
@@ -89,6 +90,8 @@ public partial class SmsMarioSound : Node3D
     {
         public readonly AudioStreamPlayer P2; public readonly AudioStreamPlayer3D P3;
         public float BaseDb; public readonly bool IsVoice;
+        public string Se = "";                   // 216: the sound it holds (its category for the demo mode)
+        private bool Muted => SmsActorSound.Muted(Se);
         public Chan(Node parent, string name, bool positional, bool voice)
         {
             IsVoice = voice;
@@ -100,15 +103,16 @@ public partial class SmsMarioSound : Node3D
             else { P2 = new AudioStreamPlayer { Name = name, Bus = SfxBus, MaxPolyphony = 1 }; parent.AddChild(P2); }
         }
         public bool Playing => P3 != null ? P3.Playing : P2.Playing;
+        public float VolumeDb => P3 != null ? P3.VolumeDb : P2.VolumeDb;
         public void Stop() { if (P3 != null) P3.Stop(); else P2.Stop(); }
-        public void Play(AudioStream s, float db, float pitch, float distDb)
+        public void Play(AudioStream s, float db, float pitch, float distDb, string se)
         {
-            BaseDb = db;
-            if (P3 != null) { P3.Stream = s; P3.VolumeDb = db + distDb; P3.PitchScale = pitch; P3.Play(); }
-            else { P2.Stream = s; P2.VolumeDb = db; P2.PitchScale = pitch; P2.Play(); }
+            BaseDb = db; Se = se;
+            if (P3 != null) { P3.Stream = s; P3.VolumeDb = Muted ? -80f : db + distDb; P3.PitchScale = pitch; P3.Play(); }
+            else { P2.Stream = s; P2.VolumeDb = Muted ? -80f : db; P2.PitchScale = pitch; P2.Play(); }
         }
-        public void SetDb(float db, float distDb) { BaseDb = db; if (P3 != null) P3.VolumeDb = db + distDb; else P2.VolumeDb = db; }
-        public void ApplyDistance(float distDb) { if (P3 != null) P3.VolumeDb = BaseDb + distDb; }
+        public void SetDb(float db, float distDb) { BaseDb = db; ApplyDistance(distDb); }
+        public void ApplyDistance(float distDb) { if (P3 != null) P3.VolumeDb = Muted ? -80f : BaseDb + distDb; else P2.VolumeDb = Muted ? -80f : BaseDb; }
     }
 
     private Mario _mario;
@@ -140,6 +144,8 @@ public partial class SmsMarioSound : Node3D
         _tree = _mario.GetNodeOrNull<AnimationTree>("AnimationTree");
         _ap = _mario.GetNodeOrNull<AnimationPlayer>("AnimationPlayer");
         EnsureSfxBus(); ApplySfxVolume();
+        SmsActorSound.DemoModeOut("a stage's load");   // 216: MSound::initSound -- every category back to its volume (the miss's demo mode ends with the stage it was in)
+        _nodes.Add(this);
         _voice = new Chan(this, "Voice", Positional, true);
         for (int i = 0; i < _se.Length; i++) _se[i] = new Chan(this, $"Se{i}", Positional, false);
         if (FillMarioSlots) FillSlots();
@@ -202,6 +208,7 @@ public partial class SmsMarioSound : Node3D
         var s = Stream(se); if (s == null) return;
         slot = new AudioStreamPlayer3D { Name = "Slot_" + name, Bus = SfxBus, MaxPolyphony = 1, AttenuationModel = AudioStreamPlayer3D.AttenuationModelEnum.Disabled, AttenuationFilterDb = 0f, MaxDistance = 0f, Stream = s, VolumeDb = MasterDb + SeDb(se) + db };
         AddChild(slot); SlotsFilled++;   // 154d: under THIS node (at Mario's origin), not Mario -- 154c's _mario.AddChild in _Ready failed ("parent busy setting up children"): the ten slots were never in the tree, so never heard
+        _slots.Add((slot, se, slot.VolumeDb));
     }
     private void Fill2D(ref AudioStreamPlayer slot, string name, string se, float db)
     {
@@ -209,7 +216,34 @@ public partial class SmsMarioSound : Node3D
         var s = Stream(se); if (s == null) return;
         slot = new AudioStreamPlayer { Name = "Slot_" + name, Bus = SfxBus, MaxPolyphony = 1, Stream = s, VolumeDb = MasterDb + SeDb(se) + db };
         AddChild(slot); SlotsFilled++;
+        _slots.Add((slot, se, slot.VolumeDb));
     }
+    // ------------------------------------------------------------------------------------------------------------------------------ 216: the demo mode
+    private static readonly List<SmsMarioSound> _nodes = new();
+    private readonly List<(Node p, string se, float db)> _slots = new();   // the slots filled here, with their own level (Mario.cs plays them directly)
+    /// <summary>216: SmsActorSound.DemoModeIn / DemoModeOut changed the silent categories -- every channel of every Mario's sound node re-levelled at once
+    /// (a playing sound of a silent category goes quiet; his voice, category 7, and the system sounds, 4, play on).</summary>
+    public static void DemoChanged() { foreach (var n in _nodes) if (IsInstanceValid(n)) n.ApplyDemo(); }
+    /// <summary>216, for the drives: his voice playing and heard; his effects (the pool, the loops, the slots but the voice ones) playing now, and heard.</summary>
+    public bool VoiceAudible => _voice != null && _voice.Playing && _voice.VolumeDb > -79f;
+    public int EffectsPlaying => _se.Count(c => c != null && c.Playing) + _loops.Values.Count(c => c.Playing) + _slots.Count(s => IsInstanceValid(s.p) && SlotPlaying(s.p) && SmsActorSound.Category(s.se) != 7);
+    public int EffectsAudible => _se.Count(c => c != null && c.Playing && c.VolumeDb > -79f) + _loops.Values.Count(c => c.Playing && c.VolumeDb > -79f)
+        + _slots.Count(s => IsInstanceValid(s.p) && SlotPlaying(s.p) && SmsActorSound.Category(s.se) != 7 && SlotDb(s.p) > -79f);
+    private static bool SlotPlaying(Node p) => p is AudioStreamPlayer3D p3 ? p3.Playing : p is AudioStreamPlayer p2 && p2.Playing;
+    private static float SlotDb(Node p) => p is AudioStreamPlayer3D p3 ? p3.VolumeDb : p is AudioStreamPlayer p2 ? p2.VolumeDb : -80f;
+    private void ApplyDemo()
+    {
+        foreach (var c in _se) c?.ApplyDistance(DistanceDb);
+        foreach (var c in _loops.Values) c.ApplyDistance(DistanceDb);
+        _voice?.ApplyDistance(VoiceDistanceDb);
+        foreach (var (p, se, db) in _slots)
+        {
+            if (!IsInstanceValid(p)) continue;
+            float v = SmsActorSound.Muted(se) ? -80f : db;
+            if (p is AudioStreamPlayer3D p3) p3.VolumeDb = v; else if (p is AudioStreamPlayer p2) p2.VolumeDb = v;
+        }
+    }
+    public override void _ExitTree() { _nodes.Remove(this); }
     /// <summary>The TAKE (Mario.SmsCarryTo with a facing: King Boo's ride, the gates): MARIO_STATUS_TAKEN's voice, MV06_DAMAGE_WATER (soundMovement).</summary>
     public void OnTaken() { if (JumpVoices) PlayVoice(Pick("MSD_SE_MV06_DAMAGE_WATER_0", 3)); }
 
@@ -267,7 +301,7 @@ public partial class SmsMarioSound : Node3D
         Chan p = null;
         for (int i = 0; i < _se.Length; i++) { var c = _se[(_seNext + i) % _se.Length]; if (!c.Playing) { p = c; _seNext = (_seNext + i + 1) % _se.Length; break; } }
         if (p == null) { p = _se[_seNext]; _seNext = (_seNext + 1) % _se.Length; }
-        p.Play(s, MasterDb + SeDb(se) + extraDb, pitch, DistanceDb);
+        p.Play(s, MasterDb + SeDb(se) + extraDb, pitch, DistanceDb, se);
         Log(se);
     }
     /// <summary>The voice channel: the game's startMarioVoice -- one voice at a time, a new one replaces the old.</summary>
@@ -275,7 +309,7 @@ public partial class SmsMarioSound : Node3D
     {
         if (!SoundOn) return;
         var s = Stream(se); if (s == null) return;
-        _voice.Stop(); _voice.Play(s, MasterDb + VoiceDb + SeDb(se), 1f, VoiceDistanceDb);
+        _voice.Stop(); _voice.Play(s, MasterDb + VoiceDb + SeDb(se), 1f, VoiceDistanceDb, se);
         LastVoice = se; Log("voice " + se);
     }
     public void StopVoice(string why = "")
@@ -295,7 +329,7 @@ public partial class SmsMarioSound : Node3D
             return;
         }
         var s = Stream(se); if (s == null) return;
-        if (!p.Playing) { p.Play(s, MasterDb + SeDb(se) + db, 1f, DistanceDb); Log("loop " + se); }
+        if (!p.Playing) { p.Play(s, MasterDb + SeDb(se) + db, 1f, DistanceDb, se); Log("loop " + se); }
         else p.SetDb(MasterDb + SeDb(se) + db, DistanceDb);
     }
 

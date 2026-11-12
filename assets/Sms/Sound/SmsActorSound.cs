@@ -69,6 +69,9 @@ public partial class SmsActorSound : Node3D
     public int SlotsFilled { get; private set; }
     public bool LoopPlaying(string se) => _loops.TryGetValue(se, out var p) && p.Playing;
     public IEnumerable<string> LoopsOn => _loops.Where(kv => kv.Value.Playing).Select(kv => kv.Key);
+    /// <summary>216, for the drives: this node's players playing now, and those of them heard (not silenced by the demo mode).</summary>
+    public int PlayingNow => _all.Count(p => p.Playing);
+    public int AudibleNow => _all.Count(p => p.Playing && p.VolumeDb > -79f);
 
     private Node3D _owner; private SmsSmallEnemy _enemy;
     private readonly List<AudioStreamPlayer3D> _all = new();           // every player this node made (the curve goes on all of them)
@@ -76,6 +79,7 @@ public partial class SmsActorSound : Node3D
     private readonly Dictionary<string, AudioStreamPlayer3D> _loops = new();
     private readonly Dictionary<string, AudioStreamPlayer3D> _held = new();  // the tables' 0x11 .. 0x12 sounds
     private readonly Dictionary<AudioStreamPlayer3D, float> _base = new();
+    private readonly Dictionary<AudioStreamPlayer3D, string> _seOf = new();   // 216: the sound each player holds (its category for the demo mode)
     private readonly List<(string name, AudioStreamPlayer3D p, bool was, float pos)> _slotWatch = new();   // the script's slot plays, logged as they start (or restart)
     private static readonly Dictionary<string, AudioStream> _streams = new();
     private static readonly HashSet<string> _missing = new();
@@ -182,7 +186,7 @@ public partial class SmsActorSound : Node3D
             }
             if (f.GetValue(_owner) is AudioStreamPlayer3D have && have.Stream != null) continue;    // set by hand in the inspector
             var s = Stream(se); if (s == null) continue;
-            var p = Make("Slot_" + slot); p.Stream = s; SetBase(p, MasterDb + SeDb(se));
+            var p = Make("Slot_" + slot); p.Stream = s; _seOf[p] = se; SetBase(p, MasterDb + SeDb(se));
             f.SetValue(_owner, p); SlotsFilled++; _slotWatch.Add((slot, p, false, 0f));
         }
     }
@@ -204,6 +208,40 @@ public partial class SmsActorSound : Node3D
         }
         return n;
     }
+
+    // ---- 216: the miss's quiet (MSound::demoModeIn / demoModeOut)
+    /// <summary>216: MSound::demoModeIn's mask -- the sound-effect categories set to volume 0 (JAIBasic::setSeCategoryVolume: a playing sound goes
+    /// silent at once and a new one plays silent), a bit per category, the sound id's top hex digit: 0 FLUDD, 1 Mario's moves, 2 enemies and bosses,
+    /// 3 objects, 4 system, 5 environment, 6 water, 7 Mario's voice, 8 NPCs. 0 = none. The miss's and the game over's jingles set 0x16F (MSBgm::startBGM:
+    /// everything but the system sounds and his voice -- his cry plays on); the next stage's load clears it (MSound::initSound).</summary>
+    public static int DemoMask { get; private set; }
+    public const int MissDemoMask = 0x16F;
+    public static void DemoModeIn(int mask, string why)
+    {
+        DemoMask = mask;
+        foreach (var a in All) if (IsInstanceValid(a)) a.DistanceTick();
+        SmsMarioSound.DemoChanged();
+        if (DebugPrint) GD.Print($"[SMS actor sound] {why}: demo mode in, categories 0x{mask:X} silent");
+    }
+    public static void DemoModeOut(string why)
+    {
+        if (DemoMask == 0) return;
+        DemoMask = 0;
+        foreach (var a in All) if (IsInstanceValid(a)) a.DistanceTick();
+        SmsMarioSound.DemoChanged();
+        if (DebugPrint) GD.Print($"[SMS actor sound] {why}: demo mode out");
+    }
+    /// <summary>216: a sound's category -- its game id's top hex digit (the table's Id); -1 for a BGM. Jaysonn's own sounds (Sound/Rematch/, no id) are the
+    /// rematch's attacks -- the enemies' (2) -- but THUNDER, the sky's: the environment (5).</summary>
+    public static int Category(string se)
+    {
+        if (string.IsNullOrEmpty(se)) return -1;
+        if (SmsMarioSoundTable.Sounds.TryGetValue(se, out var info)) return info.Id < 0x10000u ? (int)(info.Id >> 12) : -1;
+        return se == "THUNDER" ? 5 : 2;
+    }
+    /// <summary>216: the sound is silent under the demo mode now.</summary>
+    public static bool Muted(string se) { int c = DemoMask != 0 ? Category(se) : -1; return c >= 0 && ((DemoMask >> c) & 1) != 0; }
+    private string SeOf(AudioStreamPlayer3D p) => _seOf.TryGetValue(p, out var se) ? se : "";
 
     // ---- the files and the game's levels
     public static AudioStream Stream(string se)
@@ -229,7 +267,7 @@ public partial class SmsActorSound : Node3D
     };
     /// <summary>The level a name plays at (the game's table or RematchLevels), for players outside this class.</summary>
     public static float LevelDb(string se) => SeDb(se);
-    private void SetBase(AudioStreamPlayer3D p, float db) { _base[p] = db; p.VolumeDb = db + DistanceDb; }
+    private void SetBase(AudioStreamPlayer3D p, float db) { _base[p] = db; p.VolumeDb = Muted(SeOf(p)) ? -80f : db + DistanceDb; }   // 216: silent under the demo mode
     private void Log(string what)
     {
         PlayCount++;
@@ -246,13 +284,13 @@ public partial class SmsActorSound : Node3D
         AudioStreamPlayer3D p = null;
         for (int i = 0; i < _se.Length; i++) { var c = _se[(_seNext + i) % _se.Length]; if (!c.Playing) { p = c; _seNext = (_seNext + i + 1) % _se.Length; break; } }
         if (p == null) { p = _se[_seNext]; _seNext = (_seNext + 1) % _se.Length; }
-        p.Stream = s; SetBase(p, MasterDb + SeDb(se) + extraDb); p.PitchScale = pitch; p.Play();
+        p.Stream = s; _seOf[p] = se; SetBase(p, MasterDb + SeDb(se) + extraDb); p.PitchScale = pitch; p.Play();
         Log(se);
     }
     /// <summary>A continuous sound: on while `on`, stopped when not (the game restarts these every frame a state holds; a looping WAV loops its region).</summary>
     public void Loop(string se, bool on, float extraDb = 0f, float pitch = 1f)
     {
-        if (!_loops.TryGetValue(se, out var p)) { p = Make("Loop_" + se); _loops[se] = p; }
+        if (!_loops.TryGetValue(se, out var p)) { p = Make("Loop_" + se); _loops[se] = p; _seOf[p] = se; }
         if (!on || !Enabled) { if (p.Playing) { p.Stop(); Log("loop-off " + se); } return; }
         var s = Stream(se); if (s == null) return;
         if (!p.Playing) { p.Stream = s; SetBase(p, MasterDb + SeDb(se) + extraDb); p.PitchScale = pitch; p.Play(); Log("loop " + se); }
@@ -323,7 +361,7 @@ public partial class SmsActorSound : Node3D
             }
         }
         DistanceDb = db;
-        foreach (var p in _all) p.VolumeDb = _base[p] + db;
+        foreach (var p in _all) p.VolumeDb = Muted(SeOf(p)) ? -80f : _base[p] + db;   // 216: a silent category stays silent
     }
     /// <summary>MAnmSound::animeLoop over the species' table for the clip the enemy plays: the entries between last tick's frame and this one fire; a
     /// new clip fires its entries up to the frame it is first seen at (setBckAnm starts the clip and its sound cursor at frame 0; the node sees it a
@@ -358,7 +396,7 @@ public partial class SmsActorSound : Node3D
         if ((e.Flags & 0x10) != 0)
         {
             // 0x11 the start of a held sound, 0x12 its end (JAIAnimation: the entry pair shares the id; the sound runs between the two frames)
-            if (!_held.TryGetValue(e.Se, out var p)) { p = Make("Held_" + e.Se); _held[e.Se] = p; }
+            if (!_held.TryGetValue(e.Se, out var p)) { p = Make("Held_" + e.Se); _held[e.Se] = p; _seOf[p] = e.Se; }
             if ((e.Flags & 0xF) == 1) { var s = Stream(e.Se); if (s == null) return; p.Stream = s; SetBase(p, db); p.PitchScale = e.Pitch; p.Play(); Log("held " + e.Se); }
             else if (p.Playing) { p.Stop(); Log("held-off " + e.Se); }
             return;

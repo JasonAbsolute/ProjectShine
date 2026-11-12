@@ -15339,6 +15339,8 @@ public partial class Mario : CharacterBody3D
             // the decomp's enum names them one place off): those jingles first stopTrackBGMs(3, 0) -- every music track cut at once, no fade (the
             // boss's, the stage's) -- then play on their own track, whose end the Miss state waits for below
             _smsMissMusicStopped = SmsActorSound.StopAllMusic(this, _lives >= 0 ? "the miss" : "the game over");
+            // 216: then MSound::demoModeIn(0x16f, false) -- the sound effects silent but the system's and his voice (his cry plays on), till the next stage's load
+            SmsActorSound.DemoModeIn(SmsActorSound.MissDemoMask, _lives >= 0 ? "the miss" : "the game over");
             _smsMissJingle = _lives >= 0 ? MissJingle : GameOverJingle;
             if (_smsMissJingle != null && _smsMissJingle.Stream != null)
                 _smsMissJingle.Play();
@@ -15360,6 +15362,7 @@ public partial class Mario : CharacterBody3D
         if (!(faded && bgmDone))
             return;
         _smsMissTicks = int.MinValue;
+        SmsActorSound.DemoModeOut("the stage moves"); // 216: the next stage's MSound::initSound restores every category (here before the load: the statics outlive the scene)
         if (_lives >= 0)
         {
             if (GameData.Instance != null)

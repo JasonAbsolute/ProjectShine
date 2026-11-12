@@ -155,6 +155,7 @@ public partial class SmsArenaLighting : Node
             ThunderGateOpen = true;
             if (DebugPrint) GD.Print($"[SMS lighting] the thunder's wait is over ({(!ThunderAfterIntro ? "ThunderAfterIntro off" : _intro == null || !IsInstanceValid(_intro) ? "no intro director" : "the fight has started")}; {ThunderHeld} dropped in the intro)");
         }
+        if (_thunder != null && _thunder.Playing && SmsActorSound.Muted(ThunderSe)) _thunder.VolumeDb = -80f;   // 216: the miss's demo mode -- the sky's thunder is the environment's (category 5): silent at once
         if (_thunder != null && _thunder.Stream != null && FinalBlendRead < 0.5f && FlashAmountRead > 0.01f && SpeedRead > 0.001f)
         {
             int cycle = (int)Math.Floor(SkyTime * 30.0 * SpeedRead / 300.0); float lag = ThunderDelay * 30f * SpeedRead;
@@ -166,7 +167,7 @@ public partial class SmsArenaLighting : Node
     {
         if (!ThunderGateOpen) { ThunderHeld++; if (DebugPrint) GD.Print($"[SMS lighting] a thunder dropped (the intro is on: {_intro?.State}; the sky's cycle {_thunderCycle})"); return; }   // 211b
         LastThunderFrame = fc;
-        _thunder.VolumeDb = SmsActorSound.MasterDb + SmsActorSound.LevelDb(ThunderSe) + ThunderDb; _thunder.PitchScale = 0.9f + 0.2f * (float)_rng.NextDouble(); _thunder.Play();
+        _thunder.VolumeDb = SmsActorSound.Muted(ThunderSe) ? -80f : SmsActorSound.MasterDb + SmsActorSound.LevelDb(ThunderSe) + ThunderDb; _thunder.PitchScale = 0.9f + 0.2f * (float)_rng.NextDouble(); _thunder.Play();   // 216: silent under the miss's demo mode
         ThunderPlays++;                                                                            // (not in SmsActorSound's play log: the drives count that log against PlayCount)
         if (DebugPrint) GD.Print($"[SMS lighting] thunder {ThunderPlays} (the sky's cycle {_thunderCycle}, pitch {_thunder.PitchScale:F2})");
     }

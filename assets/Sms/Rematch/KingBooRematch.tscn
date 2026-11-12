@@ -37,9 +37,12 @@ color_ramp = SubResource("GradientTexture1D_chika_alpha")
 color_initial_ramp = SubResource("GradientTexture1D_chika_env")
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_chika"]
-resource_name = "the port's kira star (star4s_raw), lerp(env -> white, I), additive"
+resource_name = "the port's kira star (star4s_raw), lerp(env -> white, I), additive; 216: the haze under 0.12 cut and the quad's edge faded (no square halo against the night sky)"
 shader = ExtResource("3_kira")
 shader_parameter/tex = ExtResource("4_star")
+shader_parameter/alpha_floor = 0.12
+shader_parameter/edge_fade = 1.0
+shader_parameter/edge_from = 0.62
 
 [sub_resource type="QuadMesh" id="QuadMesh_chika"]
 material = SubResource("ShaderMaterial_chika")
