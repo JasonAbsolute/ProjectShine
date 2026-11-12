@@ -14128,3 +14128,54 @@ on frame 2); 13 in all; everything else as before -- 68/68 on the committed buil
 
 **Deviations:** none from the game (the thunder is mine: 211). The split cutscenes (188) are not held back -- the thunder rolls through them as before;
 only the intro was asked for.
+
+### 212 -- the King Boo REMATCH, part 57: a DEATH PLANE under the arena: a fall off it ends in the game's fall death (the cry, the camera stops and watches him fall away, the iris, TOO BAD!, a life down, the fight again from the fall-in) -- the death plane, the fall death and the camera's hell dead demo ported for any level (feature/kingboo-rematch, code `7b96df8`)
+
+**Jaysonn**: "ok can you now implment the death zone if mario were to fall off?" (until now a fall off the rim fell for ever: nothing ended it).
+
+**The game** (doldecomp/sms): `TMario::thinkSituation` (MarioMove.cpp 1886) reads the ground under him; when it is a death plane
+(`TBGCheckData::isDeathPlane`) over his feet -- the tick he drops through it -- `MARIO_FLAG_GAME_OVER`, `mHealth` 0, `MARIO_STATUS_FALL_DEAD` (`fallDead()`,
+MarioJump.cpp 1278: `jumpProcess(0)` alone -- he falls on, no control), the cry `MSD_SE_MV10B_CRY_JUMP_01` (unless already in the long fall's
+`ANIM_THROWN`), the camera's `CAMERA_FLAG_HELL_DEAD_DEMO` and the director's `DEMO_FLAG_HELL_DEAD`. The camera (`execDeadDemoProc_`, CameraDemo.cpp 254;
+cameragc.cpp 552 / 827): 16 ticks on, the dead demo -- the eye held where it is (`mPosFreezeFrames` re-set every tick), the look-at following him down,
+not clamped to the pitch limits; once the pitch passes `mSLLimitMaxAngleX` the whole camera holds (`mTargetFreezeFrames`, `CAMERA_FLAG_UNK40`). The
+director (MarDirectorDirect.cpp, `STATE_UNK7`): with `DEMO_FLAG_HELL_DEAD` the miss's wipe is the IRIS (`startWipe(2, 0, 2.0)`), not the death wipe's
+bands (`startWipe(10, 0, 2.2)`).
+
+**NEW `assets/Sms/SmsDeathPlane.cs`** (+ `.uid`): a `[GlobalClass]` Node3D -- a flat plane at its own height, everywhere (no edges); the physics frame
+Mario's feet (the bottom of his capsule) go from above it to under it, `Mario.SmsFallDead`. Knobs: `Active` (off = no death: he falls for ever, as
+before), `MarioPath` (else the first Mario in the scene). A child named `Preview` is hidden in play (the editor's sheet). Readouts: `Deaths`,
+`LastFeetY`, `LastFrame`, `MarioFound`.
+
+**`assets/Mario.cs`**: `SmsFallDead(why)` -- thinkSituation's branch: the game-over flag, HP 0, FALL_DEAD (the dead status with `_smsFallDead`), the cry
+on the `FallCry` slot unless the long fall's `ma_thrown` already cried it, the hell flag (false, nothing done, when he is already finished);
+`SmsFallDeadStep` -- `fallDead()`'s `jumpProcess(0)`: `SmsAir.GravityOnlyTick` at 120 Hz on the carried vy (Gravity 1 a tick, the `TerminalVy` -75 cap:
+30 m/s), the horizontal speed kept; the Miss state's wipe: the hell flag -> `Wipe.Circle` 2.0 s, else the bands as before; `Respawn` clears both flags.
+Readouts: `SmsFallDeadNow`, `SmsFallDeadCried`, `SmsGameOverNow`, `SmsLivesNow`. **`assets/Sms/MarioCamData.cs`**: `HellDead` (the camera's read of
+the hell flag). **`assets/SunshineCamera.cs`**: `ExecDeadDemoProc` (ctrlGameCamera_'s first line, the hell death only), the eye held through the dead
+demo, the look-at clamp skipped in it and the whole camera held past `LimitMaxAngleX`; cleared on a stage load (`PlaceBehind`); readouts
+`HellDeadDemoOn`, `Held`.
+
+**`assets/Sms/Rematch/RematchArena.tscn`**: the `DeathPlane` node at y -25 -- about 26 m under the floor (0.9), 5 m under the rock's lowest point (its
+vertices span -20.14..2.30, the fence's top), so a fall past the rock's side always reaches it -- with its `Preview`: a red see-through 110 m sheet
+(unshaded, both sides), the editor's only; the root note extended; `load_steps` 14 -> 17.
+
+**Verified:** headless fall drive v212-1 (deleted before the commit; the intro as in play, the card and the cutscene skipped by A, King Boo's moves and
+the supply off, Mario put 1.5 m over the top and 3 m beyond the rim -- from there all of it the game's own): C49 the plane in the arena (Active, y -25,
+under the rock, the sheet hidden, Mario found, no deaths); C49b the fall death 1.30 s into the fall, his feet at -25.41, at the terminal 30.2 m/s, the
+horizontal speed kept (0 -> 0), game over, HP 0, FALL_DEAD, the cry played; C49c the camera's dead demo on by half a second, the eye then still for a
+second (0.00 u) while the look-at followed him 2246 u down; C49d the lives 4 -> 3, the iris 2.05 s after the death (never the bands), the stage
+reloaded 2.88 s on as a miss's (no card, the fight up again, HP 8 / 8, not game over, the new plane's deaths 0, the camera's dead demo off) -- 4 / 4,
+and 4 / 4 again windowed with its shots 39a-e (39a Mario dropping past the rock's side; 39b the death, the camera stopped; 39c him falling away in the
+held camera under TOO BAD!; 39d the iris closing; 39e the arena again, the lives at 3). The regression drive (the plane OFF for it): run ey 67 / 68 --
+C30 failed on a supply Bomb Boo still RISING out of its spot when the volley's field clear ran (it cleared only the drifting ones): it bumped Mario, HP
+down two not one; the drive's clear now takes the rising ones too -- run ez 68 / 68 on the committed build. The clean rebuild 0 errors; the drive, the
+logs, the shots and the tasks deleted.
+
+**Deviations:** not ported -- `mAnmSound->stop()` and the Yoshi kill (no Yoshi); the NORMAL death's dead demo (the eye held, the fov closing on him over
+343 ticks): a death on the floor keeps its camera as before; no miss jingle (Mario's `MissJingle` slot is empty, for every miss in the port) and the boss
+music runs on to the reload. The plane is a flat plane with no edges (the game's is a floor polygon of the death type under him): under this arena
+nothing else is there, so it is the same. The regression and shot drives turn it off (a rim flake, the fake hit's knock off the rim, would reload the
+arena mid-run); the fall drive tests it. The scene's two notes were corrected after the runs (text only: "25 m under the floor's top" -> "about 26 m
+under the floor"). Remote steps: twice a read-only check bundled (a local grep with an ssh; a remote for loop without its parentheses, which re-ran a
+read four times).
