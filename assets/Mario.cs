@@ -146,8 +146,12 @@ public partial class Mario : CharacterBody3D
     private int _lives;
     /// <summary>Where a miss with no life left goes (the game: the save / title flow). Empty: the stage reloads with the lives reset.</summary>
     [Export] public string GameOverScene = "";
-    /// <summary>The miss jingle's slot (the game starts a BGM as the Miss state begins and waits for it before the stage moves).</summary>
+    /// <summary>The miss jingle's slot (the game starts a BGM as the Miss state begins and waits for it before the stage moves). 213: filled by his sound
+    /// node with MSD_BGM_MISS (k_miss.com, 4.5 s) on the Music bus when empty.</summary>
     [Export] public AudioStreamPlayer MissJingle;
+    /// <summary>213: the GAME OVER jingle's slot -- the miss with no life left starts MSD_BGM_GAMEOVER (k_gameover.com, 8.2 s) instead, the same way;
+    /// filled by his sound node when empty.</summary>
+    [Export] public AudioStreamPlayer GameOverJingle;
 
     // On a shine grab the HUD appears immediately but the count doesn't tick up
     // until this delay (mid-cutscene), per the reference footage.
@@ -708,6 +712,11 @@ public partial class Mario : CharacterBody3D
     private SmsConsoleStr _smsConsoleStr;               // Console/ConsoleStr.tscn: the console's big text -- TOO BAD! (pass 58)
     private SmsFader _smsFader;                         // Console/Fader.tscn: TSMSFader + the Hx wiper -- the death wipe, the fades (pass 58)
     private int _smsMissTicks = -1;                     // the director's Miss state: -1 idle, 0 the pending tick, then counting; MinValue once the stage moved
+    private AudioStreamPlayer _smsMissJingle;           // 213: the jingle the Miss state started (MissJingle, or GameOverJingle with no life left)
+    private int _smsMissMusicStopped;                   // 213: the music players it stopped as it began
+    /// <summary>213, for the drives: the jingle the Miss state started (null before it began), and how many music players it stopped.</summary>
+    public AudioStreamPlayer SmsMissJingleNow => _smsMissJingle;
+    public int SmsMissMusicStopped => _smsMissMusicStopped;
     private int _smsCenterBone = -2;                    // the 'center' joint (getCenterAnmMtx)
     private float _smsHipAttackTicks;                   // hipAttacking() mStatusTimer through the fall (120 Hz ticks); > SuperHipAttackCt = the super hip drop
     /// <summary>hipAttacking() mStatusState == 3: this hip drop fell longer than jump.prm's mSuperHipAttackCt (80 ticks, 0.67 s), so it is the
@@ -15326,8 +15335,13 @@ public partial class Mario : CharacterBody3D
             if (GameData.Instance != null)
                 GameData.Instance.Lives = _lives;
             _smsConsoleStr?.StartAppearMiss();
-            if (MissJingle != null && MissJingle.Stream != null)
-                MissJingle.Play();
+            // 213: MSBgm::startBGM(lives left ? MSD_BGM_MISS : MSD_BGM_GAMEOVER) (MSoundBGM.cpp; the director's literals 0x8001000C / 0x80010028 --
+            // the decomp's enum names them one place off): those jingles first stopTrackBGMs(3, 0) -- every music track cut at once, no fade (the
+            // boss's, the stage's) -- then play on their own track, whose end the Miss state waits for below
+            _smsMissMusicStopped = SmsActorSound.StopAllMusic(this, _lives >= 0 ? "the miss" : "the game over");
+            _smsMissJingle = _lives >= 0 ? MissJingle : GameOverJingle;
+            if (_smsMissJingle != null && _smsMissJingle.Stream != null)
+                _smsMissJingle.Play();
             if (_smsFader != null)
             {
                 if (_lives >= 0)
@@ -15336,13 +15350,13 @@ public partial class Mario : CharacterBody3D
                     _smsFader.StartWipe(SmsFader.Wipe.FadeOut, 2.0f, 1.0f); // startWipe(0xD, 0.0f, 2.0f): Hx_GameOver draws a texture the port lacks -- a plain fade
             }
             if (SmsDebugPrint)
-                GD.Print($"[SMS miss] TOO BAD! lives {_lives} ({(_lives >= 0 ? "the stage reloads after the wipe" : "game over")}), the {(_lives >= 0 ? (_smsHellDead ? "iris (a hell death)" : "death wipe") : "game-over fade")} in {(_lives >= 0 && !_smsHellDead ? 2.2f : 2.0f):F1} s");
+                GD.Print($"[SMS miss] TOO BAD! lives {_lives} ({(_lives >= 0 ? "the stage reloads after the wipe" : "game over")}), the {(_lives >= 0 ? (_smsHellDead ? "iris (a hell death)" : "death wipe") : "game-over fade")} in {(_lives >= 0 && !_smsHellDead ? 2.2f : 2.0f):F1} s; {_smsMissMusicStopped} music player(s) stopped, the {(_lives >= 0 ? "miss" : "game-over")} jingle {(_smsMissJingle != null && _smsMissJingle.Stream != null ? $"plays ({_smsMissJingle.Stream.GetLength():F1} s)" : "(slot empty)")}");
             _smsMissTicks = 1;
             return;
         }
         _smsMissTicks++;
         bool faded = _smsFader != null ? _smsFader.IsFullyFadedOut : _smsMissTicks > 120 * 4; // no fader: four seconds
-        bool bgmDone = MissJingle == null || !MissJingle.Playing || _smsMissTicks >= 1200 * 4; // MSBgm::getHandle(2) == 0 || 1200 frames
+        bool bgmDone = _smsMissJingle == null || !_smsMissJingle.Playing || _smsMissTicks >= 1200 * 4; // MSBgm::getHandle(2) == 0 || 1200 frames (213: the jingle that played)
         if (!(faded && bgmDone))
             return;
         _smsMissTicks = int.MinValue;

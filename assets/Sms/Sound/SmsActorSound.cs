@@ -187,6 +187,24 @@ public partial class SmsActorSound : Node3D
         }
     }
 
+    // ---- 213: the music cut (MSBgm::stopTrackBGMs(3, 0))
+    /// <summary>213: every music player in the scene -- a 2D AudioStreamPlayer on the Music bus that is playing: the bosses' themes (King Boo's,
+    /// the gatekeeper's, the rematch's), any stage music -- stopped at once, no fade, as the game's miss / game-over / shine-get jingles cut every
+    /// BGM track before they start (MSBgm::startBGM). Returns how many it stopped.</summary>
+    public static int StopAllMusic(Node from, string why)
+    {
+        var root = from != null && from.IsInsideTree() ? from.GetTree().Root : null;
+        if (root == null) return 0;
+        int n = 0;
+        foreach (Node c in root.FindChildren("*", "AudioStreamPlayer", true, false))
+        {
+            if (c is not AudioStreamPlayer p || !p.Playing || p.Bus.ToString() != MusicBus) continue;
+            p.Stop(); n++;
+            if (DebugPrint) GD.Print($"[SMS actor sound] {why}: the music {p.GetParent()?.Name}/{p.Name} stopped");
+        }
+        return n;
+    }
+
     // ---- the files and the game's levels
     public static AudioStream Stream(string se)
     {

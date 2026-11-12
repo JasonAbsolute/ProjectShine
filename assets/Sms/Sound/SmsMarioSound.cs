@@ -51,8 +51,8 @@ public partial class SmsMarioSound : Node3D
     [Export] public bool FluddSounds = true;
     [Export] public bool FluddPackClanks = true;         // PO_FRICTION_A/B/C with the steps while he carries FLUDD (the bas entries of category 0)
     /// <summary>154c: Mario.cs's own sound slots (FallCry, FireDamageSound, ElectricDamageSound, ExertVoice, PumpSqueakIn / Out, FencePunchSound,
-    /// FenceCatchSound, HpRecover, SmsWarpInWipeSound -- each documented with its game SE and played by Mario.cs at the game's moment) get
-    /// players with the baked sounds when they are empty. A slot you fill yourself in the inspector is left alone.</summary>
+    /// FenceCatchSound, HpRecover, SmsWarpInWipeSound -- each documented with its game SE and played by Mario.cs at the game's moment; 213: and the
+    /// MissJingle / GameOverJingle music slots) get players with the baked sounds when they are empty. A slot you fill yourself in the inspector is left alone.</summary>
     [Export] public bool FillMarioSlots = true;
 
     [ExportGroup("Deviations")]
@@ -183,7 +183,18 @@ public partial class SmsMarioSound : Node3D
         Fill3D(ref _mario.FenceCatchSound, "FenceCatchSound", "MSD_SE_MA_FENCE_CATCH", 0f);
         Fill2D(ref _mario.HpRecover, "HpRecover", "MSD_SE_SY_HP_RECOVER", 0f);
         Fill2D(ref _mario.SmsWarpInWipeSound, "SmsWarpInWipeSound", "MSD_SE_MA_INTO_DOKAN", 0f);
+        FillMusic(ref _mario.MissJingle, "MissJingle", "MSD_BGM_MISS");             // 213: the miss's jingle (k_miss.com) and the game over's (k_gameover.com),
+        FillMusic(ref _mario.GameOverJingle, "GameOverJingle", "MSD_BGM_GAMEOVER"); //      on the Music bus as the bosses' themes are
         if (DebugPrint) GD.Print($"[SMS sound] {SlotsFilled} of Mario's sound slots filled");
+    }
+    /// <summary>213: a MUSIC slot of Mario's -- a 2D player on the Music bus with the game's BGM, at SmsActorSound.MusicDb + the sound table's volume (the
+    /// bosses' themes' level: the renders share MSD_BGM_BOSS's normalisation, so the game's balance holds); SmsActorSound.Music off = left empty.</summary>
+    private void FillMusic(ref AudioStreamPlayer slot, string name, string se)
+    {
+        if (slot != null || !SmsActorSound.Music) return;
+        var s = Stream(se); if (s == null) return;
+        slot = new AudioStreamPlayer { Name = "Music_" + name, Bus = SmsActorSound.MusicBus, MaxPolyphony = 1, Stream = s, VolumeDb = SmsActorSound.MusicDb + SeDb(se) };
+        AddChild(slot); SlotsFilled++;
     }
     private void Fill3D(ref AudioStreamPlayer3D slot, string name, string se, float db)
     {

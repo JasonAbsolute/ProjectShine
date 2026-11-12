@@ -146,6 +146,8 @@ public static class SmsMarioSoundTable
     {
         ["MSD_BGM_BOSS"] = new SeInfo(95, 64, true, false, 98.918f, "Music"),
         ["MSD_BGM_CHUBOSS"] = new SeInfo(127, 64, true, false, 57.204f, "Music"),
+        ["MSD_BGM_GAMEOVER"] = new SeInfo(110, 64, false, false, 8.194f, "Music"),
+        ["MSD_BGM_MISS"] = new SeInfo(100, 64, false, false, 4.475f, "Music"),
         ["MSD_SE_BS_DAMAGE_SYMBL"] = new SeInfo(127, 220, false, true, 0.579f, "Enemy"),
         ["MSD_SE_BS_TELESA_BREATHE"] = new SeInfo(60, 180, false, true, 0.551f, "Enemy"),
         ["MSD_SE_BS_TELESA_DAMAGE"] = new SeInfo(120, 220, false, true, 1.223f, "Enemy"),
