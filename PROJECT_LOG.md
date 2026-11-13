@@ -14412,3 +14412,29 @@ drive, the logs, the shots and the tasks deleted.
 
 **Deviations:** the bigger Shine is the port's (the game's boss Shines are the normal size; its shine get keeps the game's). The night is the port's
 own (no game has this sky). With `ShineSpawnPoint` set, the root goes to that node unlowered: the bigger star's centre sits 3 m over it.
+
+### 218 -- the King Boo REMATCH, part 63: the fight sky's STREAKS in the game's colours (the faint ones the game's MAGENTA again, not a dark red-pink: RematchSky's colour knobs read as picked, as 217's night) (feature/kingboo-rematch, code `421e226`)
+
+**Jaysonn**: "i have a note saying, Fix the fight sky's streak colours? what would this mean?" -- then, told what it meant: "Fix the streak
+colours to match the game"
+
+**`assets/Sms/Rematch/RematchSky.gdshader`**: `picked()` (217's, for the night's colours) moves up beside `to_linear()` and now takes the fight
+sky's colour knobs too: `streak_dim` and `streak_bright` (the streaks: faint = the game's magenta, where two curves cross = its cyan), `base_lift`
+and `clear_color`. Godot hands a `source_color` vec3 to the shader in linear (Forward+ and Mobile convert the inspector's colour) but this sky's
+maths is display-referred (`to_linear` at the end): converted twice, the magenta (254, 60, 186) was drawn as (253, 11, 125) x the streak's
+strength -- darker and redder, a wine red-pink -- and the cyan (12, 254, 242) as (1, 253, 226). `base_lift` and `clear_color` are black on
+`RematchSky.tres` (black picked is black): no change today; set, they now show as picked.
+
+**Verified:** the streak drive v218 (deleted before the commit; windowed; the card skipped by A, the cutscene played, his moves off; the sky's
+clock held at frame 80 of 300, no flash; shots 45a the game's camera, 45b the drive's camera at the arena's middle 3 m up, 6 degrees up, looking
+away from him, the HUD off, 45c the same with the cyan set to the magenta and the flashes off): C61 the streak pixels of 45c (R 30 or more, every
+other pixel) have the magenta's own G / R and B / R within 0.04 -- 27368 pixels, median 0.227 / 0.733, the magenta's 0.236 / 0.732 (run
+streak218b); on the 217 shader 0.032 / 0.500, a FAIL as it should be (run streak218a). Before against after (`tools/projectshine/rematch157/
+compare218.py`), only the streaks changed: the plain sky between them black in both (under 1 / 255 on average after, 5 at most), the floor's mean
+the same. The regression drive 68 / 68 (run fj; run fi stopped at 49 / 1, C16 190's second split never came: Jaysonn's local
+`RematchArena.tscn` sets King Boo's `HitPoints = 3`, so the hit meant for the second split was his last -- the drive now pins the committed 9 for
+its own run, his scene untouched). Run fj's error stream carried two `ObjectDisposedException`s from before this pass: a Bomb Boo of a freed volley
+detonating (`SmsBooVolley.cs` line 101, its `Spit` lambda) and a fireball's signal on a freed King Boo (`SmsKingBooRematch.cs` line 2292,
+`FireballsTick`) -- logged, the checks unaffected. The clean rebuild 0 errors; the drive, the logs, the shots and the tasks deleted.
+
+**Deviations:** none -- the streaks are drawn in the game's colours now; their shapes, their strength (`streak_gain`) and the flashes are as before.
