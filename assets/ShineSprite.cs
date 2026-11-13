@@ -964,6 +964,9 @@ public partial class ShineSprite : Node3D
     /// as it flies -- the game's camera is a hand-placed stage tool (DEVIATION). false = the current camera stays.</summary>
     [Export] public bool SmsAppearCamera = true;
     [Export] public Vector3 SmsAppearCamOffset = new Vector3(0f, 2.5f, 7f);
+    /// <summary>217: how far over the shine's root that demo camera looks (metres; 0.5 = as before). A spawner that scales the shine scales this with it
+    /// (King Boo's ShineScale), so the camera stays on the star's middle.</summary>
+    [Export] public float SmsAppearLookUp = 0.5f;
     /// <summary>STATE_WAIT: mRotateSpeed 2 deg a tick after an appear (the game's idle spin, 240 deg/s). Shines placed at level start keep IdleSpinSpeed.</summary>
     [Export] public float SmsIdleSpinDegPerTick = 2f;
     /// <summary>MSD_SE_SHINE_APPEAR (+ the appear jingle BGM 0x8001002D) at the appear; MSD_SE_SHINE_EXIST while it flies -- slots, no streams yet.</summary>
@@ -1040,7 +1043,7 @@ public partial class ShineSprite : Node3D
                 Vector3 f = SmsMath.DirFromYaw(SmsInitialYaw);
                 Basis frame = new Basis(f.Cross(Vector3.Up), Vector3.Up, f);   // x = the shine's right, z = its forward
                 _apCam.GlobalPosition = SmsInitialPosition + frame * SmsAppearCamOffset;
-                _apCam.LookAt(GlobalPosition + Vector3.Up * 0.5f, Vector3.Up);
+                _apCam.LookAt(GlobalPosition + Vector3.Up * SmsAppearLookUp, Vector3.Up);
                 _apCam.MakeCurrent();
             }
         }
@@ -1062,7 +1065,7 @@ public partial class ShineSprite : Node3D
         {
             GlobalPosition = _apPosU / SmsUnits.UnitsPerMetre;
             Rotation = new Vector3(Rotation.X, Mathf.DegToRad(_apRotYDeg), Rotation.Z);
-            if (_apCam != null && IsInstanceValid(_apCam)) _apCam.LookAt(GlobalPosition + Vector3.Up * 0.5f, Vector3.Up);
+            if (_apCam != null && IsInstanceValid(_apCam)) _apCam.LookAt(GlobalPosition + Vector3.Up * SmsAppearLookUp, Vector3.Up);
         }
     }
 

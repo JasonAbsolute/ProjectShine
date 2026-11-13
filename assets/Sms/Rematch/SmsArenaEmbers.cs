@@ -8,7 +8,8 @@ using System.Linq;
 /// RiseMin..RiseMax m/s with a little lift, wandering on turbulence (Drift), each living LifeSeconds (give or take 40 %), a soft spark (the fireballs' glow1_spark)
 /// Size metres across, bright yellow-orange going dim red and out, drawn additive at Brightness x (over 1: hot enough to bloom under the arena's glow).
 /// It fades in WITH THE SKY: every frame the field's alpha is the sky material's final_blend (King Boo's fade to the roof fight's fire); the field starts emitting
-/// as the blend leaves 0 (pre-rolled, so the air is already full) and stops when the blend is back at 0. ProcessMode Always: the embers keep drifting through the
+/// as the blend leaves 0 (pre-rolled, so the air is already full) and stops when the blend is back at 0; 217: x (1 - the sky's peace_blend) -- the night after the
+/// defeat puts them out. ProcessMode Always: the embers keep drifting through the
 /// split cutscenes' frozen world, as the sky does. Knobs: Embers (off = none), Count, RimIn / RimOut, Below / Above, RiseMin / RiseMax, Drift, LifeSeconds,
 /// Size, EmberBright / EmberDim, Brightness. Readouts for the drives: Built, Centre, Radius, RingOuter / RingInner / RingHeight, BlendRead, AlphaNow, EmittingNow,
 /// FirstEmitBlend.
@@ -109,10 +110,14 @@ public partial class SmsArenaEmbers : Node3D
     {
         if (_p == null) return;
         Ticks++;
-        var sky = Sky(); float k = 0f;
-        if (sky != null) { Variant v = sky.GetShaderParameter("final_blend"); if (v.VariantType != Variant.Type.Nil) k = v.AsSingle(); }
+        var sky = Sky(); float k = 0f, peace = 0f;
+        if (sky != null)
+        {
+            Variant v = sky.GetShaderParameter("final_blend"); if (v.VariantType != Variant.Type.Nil) k = v.AsSingle();
+            Variant pv = sky.GetShaderParameter("peace_blend"); if (pv.VariantType != Variant.Type.Nil) peace = Mathf.Clamp(pv.AsSingle(), 0f, 1f);   // 217: the night puts them out
+        }
         BlendRead = Mathf.Clamp(k, 0f, 1f);
-        AlphaNow = BlendRead;
+        AlphaNow = BlendRead * (1f - peace);
         _mat.AlbedoColor = new Color(1f, 1f, 1f, AlphaNow);
         bool want = AlphaNow > 0.001f;
         if (want && !_p.Emitting) { _p.Emitting = true; if (FirstEmitBlend < 0f) FirstEmitBlend = BlendRead; if (DebugPrint) GD.Print($"[SMS embers] {GetPath()}: the field starts (the sky's blend {BlendRead:F3})"); }

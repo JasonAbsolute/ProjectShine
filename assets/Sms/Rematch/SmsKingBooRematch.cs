@@ -199,6 +199,11 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public Color ShineFlashColor = new Color(1f, 0.85f, 0.35f);
     [Export] public bool ShineExitLevel = false;
     [Export(PropertyHint.File, "*.tscn")] public string ShineExitScene = "";
+    /// <summary>217 (Jaysonn: "can you make the shine bigger when it spawns? its very samll right now"): the Shine's size over its scene's own (the game's 1.5 m star:
+    /// small in this 60-m arena) -- its glow, light and sparkles grow with it, its centre kept at the normal one's height over the floor (so Mario still walks into
+    /// it; with ShineSpawnPoint the root goes where that node is), its demo camera looking at the bigger star's middle. In his hands at the shine-get it is the
+    /// game's size again (the get demo drives it at the game's scale). 1 = the scene's own.</summary>
+    [Export(PropertyHint.Range, "0.5,5,0.1")] public float ShineScale = 2.5f;
     [ExportGroup("")]
     /// <summary>He turns to face Mario while he waits, at this many radians a second.</summary>
     [Export] public bool FaceMario = true;
@@ -310,6 +315,12 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public bool FinalSky = true;
     [Export(PropertyHint.Range, "1,3,1")] public int FinalSkyAtSplit = 2;
     [Export(PropertyHint.Range, "0,10,0.1")] public float FinalSkyBlendSeconds = 2.5f;
+    /// <summary>217 (Jaysonn: "when the boss is beat we should have the skybbox transform to somthing nice like the aurua lights to signal its now peacefull"): at his
+    /// BURST the sky cross-fades over PeaceSkySeconds to the PEACEFUL NIGHT -- RematchSky.gdshader's peace_blend: a clear sky of stars and the northern lights --
+    /// from whichever sky the fight was under (the boss arena's or the final fire), the arena's lights going calm with it (ArenaLighting's Peace colours: the
+    /// flashes and the thunder gone), the embers out. The fade runs through the Shine's stop-the-world (he keeps processing till it is done). Off = the fight's sky stays.</summary>
+    [Export] public bool PeaceSky = true;
+    [Export(PropertyHint.Range, "0,20,0.5")] public float PeaceSkySeconds = 6f;
     [ExportGroup("")]
     [Export] public bool CopyFireballs = true, CopyBreath = true;
     /// <summary>178 (Jaysonn: "the king boo should not disappear thats fake he should just take a hit and then vanish to a new spot ... we do need a way to tell
@@ -1314,6 +1325,7 @@ public partial class SmsKingBooRematch : Node3D
         if (_sfxDbSet) { SmsActorSound.MasterDb = _sfxDbWas; _sfxDbSet = false; }                                                            // 195: the effects level put back
         if (BossMusicPlaying) BossMusic.Stop();
         if (!IsCopy && FinalSkyBlend > 0f) SetFinalSky(0f);                                                                                   // 208b: the shared sky material back to the boss-arena sky
+        if (!IsCopy && PeaceSkyBlend > 0f) SetPeaceSky(0f);                                                                                   // 217: and off the night
     }
     /// <summary>The down clip begins (the last hit's hurt is over): the mist and the stars boil off his body, the blink, the glow and the crown's flare run in DeathTick.</summary>
     private void DeathBegin()
@@ -1379,6 +1391,7 @@ public partial class SmsKingBooRematch : Node3D
         }
         ProcessMode = ProcessModeEnum.Always;
         _shinePending = true; _shineT = 0f;
+        BeginPeaceSky();                                                                                                                   // 217: the night comes
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: BURSTS at {at} -- the flash {DeathFlashSize} m, {DeathPuffs} puffs, {DeathStars} stars, the floor at {FloorUnder(at):F2}; the Shine in {ShineDelaySeconds:F1} s");
     }
     /// <summary>Gone: the Shine ShineDelaySeconds after the burst; once it is there and his last flash is out, back to the world's clock.</summary>
@@ -1386,7 +1399,7 @@ public partial class SmsKingBooRematch : Node3D
     {
         _shineT += dt;
         if (_shinePending) { if (_shineT >= ShineDelaySeconds) SpawnShine(); }
-        else if (ShineSpawned && !AnyFxAlive && _shineT >= ShineDelaySeconds + 1.5f && ProcessMode == ProcessModeEnum.Always) ProcessMode = ProcessModeEnum.Inherit;   // the Shine's stars done too
+        else if (ShineSpawned && !AnyFxAlive && _shineT >= ShineDelaySeconds + 1.5f && !PeaceSkyRunning && ProcessMode == ProcessModeEnum.Always) ProcessMode = ProcessModeEnum.Inherit;   // the Shine's stars done too (217: and the night's fade)
     }
     /// <summary>The SHINE (makeShineAppearWithDemo, "the boss shine"): the ShineScene beside him in the arena, placed at ShineSpawnPoint or ShineOverFloor m over the
     /// floor at the arena's middle with its back to Mario, appearing the game's way from where he burst (ShineFromBurst) with the demo (ShineDemo), its exit set
@@ -1400,11 +1413,13 @@ public partial class SmsKingBooRematch : Node3D
         Node parent = GetParent() ?? GetTree().CurrentScene;
         parent.AddChild(node);
         float fy = FloorUnder(_arenaCentre); if (float.IsNaN(fy)) fy = float.IsNaN(_introFloorY) ? _arenaCentre.Y : _introFloorY;
-        Vector3 placed = ShineSpawnPoint != null ? ShineSpawnPoint.GlobalPosition : new Vector3(_arenaCentre.X, fy + ShineOverFloor, _arenaCentre.Z);
+        float k = Mathf.Max(0.05f, ShineScale);
+        Vector3 placed = ShineSpawnPoint != null ? ShineSpawnPoint.GlobalPosition : new Vector3(_arenaCentre.X, fy + ShineOverFloor - ShineCentreOverRoot * (k - 1f), _arenaCentre.Z);   // 217: the star's centre where the normal one has it
         var m = M(); Vector3 away = m != null ? placed - m.GlobalPosition : Vector3.Forward; away.Y = 0f;
         if (away.LengthSquared() < 1e-4f) away = Vector3.Forward; away = away.Normalized();
         float yaw = Mathf.Atan2(-away.X, -away.Z);                                                                                        // SmsMath.DirFromYaw(yaw) = away: its back to Mario
         node.GlobalPosition = placed; node.GlobalRotation = new Vector3(0f, yaw, 0f);
+        if (MathF.Abs(k - 1f) > 1e-3f) node.Scale = node.Scale * k;                                                                       // 217: bigger -- after its _Ready, so its effects (built at the scene's scale) grow with it
         _shine = node; ShineSpawned = true;
         if (node is ShineSprite s)
         {
@@ -1412,6 +1427,7 @@ public partial class SmsKingBooRematch : Node3D
             if (ShineExitLevel) { s.ExitLevel = true; if (!string.IsNullOrEmpty(ShineExitScene)) s.ExitScene = ShineExitScene; }
             int ticks = ShineDemoTicks > 0 ? ShineDemoTicks : s.SmsAppearDemoTicks;
             if (ShineCamOffset != Vector3.Zero) s.SmsAppearCamOffset = ShineCamOffset;
+            s.SmsAppearLookUp *= k;                                                                                                       // 217: the demo camera on the bigger star's middle
             if (ShineFromBurst) s.SmsAppearFrom(_burstAt, ticks, ShineDemo); else s.SmsAppear(ticks, ShineDemo);
             if (ShineCamFov > 0f && s.SmsAppearCam != null) s.SmsAppearCam.Fov = ShineCamFov;
         }
@@ -1700,7 +1716,33 @@ public partial class SmsKingBooRematch : Node3D
         if (k >= 1f) _finalSkyT = -1f;
     }
     /// <summary>For the drives / a restart: the sky back to the boss-arena sky at once.</summary>
-    public void ResetFinalSky() { _finalSkyT = -1f; FinalSkyBegun = false; SetFinalSky(0f); }
+    public void ResetFinalSky() { _finalSkyT = -1f; FinalSkyBegun = false; SetFinalSky(0f); _peaceSkyT = -1f; PeaceSkyBegun = false; SetPeaceSky(0f); }   // 217: and the night's
+    // ---- 217: the peaceful night after the defeat (PeaceSky)
+    public float PeaceSkyBlend { get; private set; }
+    public bool PeaceSkyBegun { get; private set; }
+    public bool PeaceSkyRunning => _peaceSkyT >= 0f && _peaceSkyT < PeaceSkySeconds;
+    private float _peaceSkyT = -1f;
+    /// <summary>217: the Shine scene's star centre over its root at its own scale (SmsStarLocal (0, 200, 0) x 0.006 = 1.2 m) -- a bigger Shine is lowered by
+    /// this x (ShineScale - 1) so its centre stays at the normal one's height.</summary>
+    private const float ShineCentreOverRoot = 1.2f;
+    private void SetPeaceSky(float k)
+    {
+        PeaceSkyBlend = k;
+        var mat = SkyMaterial(); if (mat != null) mat.SetShaderParameter("peace_blend", k);
+    }
+    private void BeginPeaceSky()
+    {
+        if (!PeaceSky || PeaceSkyBegun || IsCopy) return;
+        PeaceSkyBegun = true; _peaceSkyT = 0f; PeaceSkyTick(0f);
+        if (DebugPrint) GD.Print($"[SMS rematch] the PEACEFUL night begins (over {PeaceSkySeconds:F1} s; the sky material {(SkyMaterial() != null ? "found" : "NOT FOUND")})");
+    }
+    public void PeaceSkyTick(float dt)
+    {
+        if (_peaceSkyT < 0f) return;
+        _peaceSkyT += dt;
+        float k = PeaceSkySeconds <= 0.01f ? 1f : Mathf.Clamp(_peaceSkyT / PeaceSkySeconds, 0f, 1f);
+        SetPeaceSky(k * k * (3f - 2f * k));
+    }
     /// <summary>Into the Split phase: every move called off, the flash off, upright; the node waits for the cutscene's calls.</summary>
     public void SplitBegin()
     {
@@ -2714,7 +2756,7 @@ public partial class SmsKingBooRematch : Node3D
     public override void _Process(double delta)
     {
         if (Engine.IsEditorHint()) return;
-        if (!IsCopy) { HitBoxTick(); FinalSkyTick((float)delta); }                                                                                          // 192: Mario's cylinder drawn (ShowHitBoxes); 208b: the final sky's fade
+        if (!IsCopy) { HitBoxTick(); FinalSkyTick((float)delta); PeaceSkyTick((float)delta); }                                                                                          // 192: Mario's cylinder drawn (ShowHitBoxes); 208b: the final sky's fade
         if (AnyFxAlive) FxTick((float)delta);                                                                                                                   // 180 / 181: the flashes, the ring and the rise glow run on, hidden or not
         if (State == Phase.Gone) GoneTick((float)delta);                                                                                                       // 183: the Shine after the burst
         if (State == Phase.Hidden) return;

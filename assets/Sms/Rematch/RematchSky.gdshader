@@ -51,6 +51,29 @@ uniform float final_drop : hint_range(-30.0, 60.0) = 0.0;
 uniform float final_flame_tiles : hint_range(0.5, 4.0) = 1.6;
 group_uniforms;
 
+group_uniforms The_peaceful_sky;
+/** 217 (Jaysonn: "when the boss is beat we should have the skybbox transform to somthing nice like the aurua lights to signal its now peacefull"): how far the sky
+    has gone over to the PEACEFUL NIGHT after King Boo's defeat -- a clear navy sky full of stars and the northern lights: three curtains (green at their lower
+    edge, teal, violet at the top) waving round the sky, fine rays drifting along them, a faint glow under each edge. The port's own (no game has this sky).
+    King Boo drives it from his burst (PeaceSky on his node); 1 here = always the night. Drawn first in tools/projectshine/rematch157/aurora_preview217.py. */
+uniform float peace_blend : hint_range(0.0, 1.0) = 0.0;
+/** The night's colours: the zenith, the sky at 30 degrees, the glow at the horizon, under the horizon (display values, as the rest of this sky). */
+uniform vec3 peace_zenith : source_color = vec3(0.012, 0.022, 0.075);
+uniform vec3 peace_mid : source_color = vec3(0.03, 0.075, 0.17);
+uniform vec3 peace_horizon : source_color = vec3(0.08, 0.2, 0.27);
+uniform vec3 peace_below : source_color = vec3(0.025, 0.045, 0.075);
+/** The curtains' colours up from their lower edge; their strength (0 = none); all three raised or lowered (degrees: the fight's camera looks down, so only the
+    sky's lowest 15 degrees or so show over the rim -- at -5 the lowest curtain's edge sits just over the rim from there, the first one's a few degrees up); how fast
+    they wave and their rays drift (1 = the port's slow sway); the stars' strength. */
+uniform vec3 aurora_green : source_color = vec3(0.3, 1.0, 0.58);
+uniform vec3 aurora_teal : source_color = vec3(0.12, 0.82, 0.8);
+uniform vec3 aurora_violet : source_color = vec3(0.9, 0.38, 0.95);
+uniform float aurora_gain : hint_range(0.0, 4.0) = 0.9;
+uniform float aurora_lift : hint_range(-20.0, 40.0) = -5.0;
+uniform float aurora_speed : hint_range(0.0, 8.0) = 1.0;
+uniform float star_gain : hint_range(0.0, 4.0) = 1.0;
+group_uniforms;
+
 group_uniforms Knobs;
 /** The whole sky brighter or dimmer (1 = the game); the streaks alone (1 = the game); the clouds' flashes (1 = the game's, 0 = never -- 209: the arena's lights follow this too). */
 uniform float brightness : hint_range(0.0, 4.0) = 1.0;
@@ -223,11 +246,55 @@ vec3 final_sky(vec3 d, float e_true, float f) {
 	return col;
 }
 
+// ---- 217: the peaceful night after the defeat (the port's own), display-referred: the same maths as aurora_preview217.py
+float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+// 217: Godot hands a source_color vec3 to the shader in LINEAR (Forward+ and Mobile convert the colour you pick), but this sky's maths is display-referred
+// (to_linear at the very end) -- converted twice, the night came out near black (the shot drive's first run: the horizon's (20, 51, 69) drawn (4, 8, 13)).
+// So the night's colours go back to the values picked first. (The boss-arena sky's streak colours above go through the same double step; left as they are.)
+vec3 picked(vec3 c) { return mix(c * 12.92, 1.055 * pow(max(c, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
+// one curtain: its lower edge waving round the sky (two waves), the light falling off up its height, rays along it, thicker in places
+vec3 aurora_curtain(float az, float e, float ts, float base, float amp, float k1, float k2, float height, float strength, float ph, float drift, vec3 cg, vec3 ct, vec3 cv) {
+	float ec = base + aurora_lift + amp * sin(k1 * az + ph + ts * 0.11) + 0.35 * amp * sin(k2 * az - ph * 1.7 - ts * 0.17);
+	float y = (e - ec) / height;
+	float prof = y >= 0.0 ? exp(-y * 1.25) * (1.0 - smoothstep(0.72, 1.0, y)) : smoothstep(-0.12, 0.0, y) + 0.22 * exp(y * 9.0);
+	float a = az + drift * ts;
+	float rays = 0.55 + 0.45 * (0.5 + 0.5 * sin(a * 61.0 + 2.6 * sin(a * 7.0 + ts * 0.23))) * (0.5 + 0.5 * sin(a * 97.0 - ts * 0.19 + ph));
+	float gate = smoothstep(0.15, 0.85, 0.5 + 0.5 * sin(az + ph * 0.6 + ts * 0.035)) * 0.8 + 0.2;
+	vec3 c = cg * (1.0 - smoothstep(0.0, 0.35, y)) + ct * (smoothstep(0.0, 0.35, y) * (1.0 - smoothstep(0.35, 0.65, y))) + cv * smoothstep(0.35, 0.65, y);
+	return c * prof * rays * gate * strength * aurora_gain;
+}
+vec3 peace_sky(vec3 d, float e, float ts) {
+	float az = atan(d.x, d.z);
+	vec3 col = mix(mix(picked(peace_horizon), picked(peace_mid), smoothstep(0.0, 30.0, e)), picked(peace_zenith), smoothstep(25.0, 85.0, e));
+	col = mix(col, picked(peace_below), smoothstep(0.0, 12.0, -e));
+	// the stars: one in a cell of a 360 / 327-degree grid on the sky's angles, about a fifth of the cells lit, twinkling slowly, none near the horizon
+	float cell = 360.0 / 327.0, azd = degrees(az);
+	vec2 g = floor(vec2(azd, e) / cell);
+	float h = hash2(g), h2 = hash2(g + vec2(17.0, -5.0));
+	vec2 c = (g + 0.2 + 0.6 * vec2(h, h2)) * cell;
+	float dd = length(vec2((azd - c.x) * cos(radians(e)), e - c.y));
+	float lit = step(0.82, hash2(g + vec2(-3.0, 11.0)));
+	float tw = 0.65 + 0.35 * sin(ts * (0.7 + 1.3 * h) + h2 * 6.28);
+	float sz = 0.05 + 0.07 * h2;
+	col += vec3(0.85, 0.9, 1.0) * lit * tw * exp(-(dd / sz) * (dd / sz)) * (0.35 + 0.65 * h) * smoothstep(2.0, 12.0, e) * star_gain;
+	// the curtains: (base elevation, wave, waves round the sky, a second wave's count, height, strength, phase, drift)
+	vec3 cg = picked(aurora_green), ct = picked(aurora_teal), cv = picked(aurora_violet);
+	col += aurora_curtain(az, e, ts, 9.0, 3.0, 2.0, 5.0, 20.0, 1.0, 0.0, 0.02, cg, ct, cv);
+	col += aurora_curtain(az, e, ts, 17.0, 5.0, 3.0, 7.0, 17.0, 0.75, 2.1, -0.014, cg, ct, cv);
+	col += aurora_curtain(az, e, ts, 4.0, 1.5, 4.0, 9.0, 11.0, 0.55, 4.4, 0.031, cg, ct, cv);
+	return col;
+}
+
 void sky() {
 	vec3 d = normalize(EYEDIR);
 	float e = degrees(asin(clamp(d.y, -1.0, 1.0)));
-	float f = (sky_time >= 0.0 ? sky_time : TIME) * 30.0 * speed;                                   // 209: the game's clock when ArenaLighting runs it
-	vec3 col = final_blend < 0.999 ? boss_sky(d, e, f) * brightness : vec3(0.0);
-	if (final_blend > 0.001) col = mix(col, final_sky(d, e, f) * final_brightness, final_blend);
+	float secs = sky_time >= 0.0 ? sky_time : TIME;
+	float f = secs * 30.0 * speed;                                                                    // 209: the game's clock when ArenaLighting runs it
+	vec3 col = vec3(0.0);
+	if (peace_blend < 0.999) {
+		col = final_blend < 0.999 ? boss_sky(d, e, f) * brightness : vec3(0.0);
+		if (final_blend > 0.001) col = mix(col, final_sky(d, e, f) * final_brightness, final_blend);
+	}
+	if (peace_blend > 0.001) col = mix(col, peace_sky(d, e, secs * aurora_speed), peace_blend);      // 217: the night after the defeat
 	COLOR = to_linear(clamp(col, 0.0, 1.0));
 }

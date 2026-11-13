@@ -14,7 +14,9 @@ using System.Linq;
 ///    (FlashOnSun x that): the lightning lights the ground. The sky's own flash_amount scales both (0 there = no flashes anywhere);
 ///  * the FINAL PHASE: as the sky goes over to the roof fight's fire (the material's final_blend, which King Boo drives through the second split's cutscene),
 ///    the ambient, the fog colour and the sun blend from the arena's own values (read off the Environment and the sun at start: your inspector values stay
-///    the base) to FinalAmbient / FinalFog / FinalSun, and the flashes fade out with the old sky (the fire sky has none).
+///    the base) to FinalAmbient / FinalFog / FinalSun, and the flashes fade out with the old sky (the fire sky has none);
+///  * 217: the PEACEFUL NIGHT after King Boo's defeat (the material's peace_blend, which he drives from his burst): from wherever they were to PeaceAmbient /
+///    PeaceFog / PeaceSun, the flashes and the thunder gone with the stormy sky.
 /// The Environment is duplicated at start so nothing here is written into the saved resource. ProcessMode Always: it runs through the split cutscenes'
 /// frozen world as the sky itself does. Knobs: FollowSky (off = the lights as they were and the sky on its own clock), FlashStrength, FlashOnSun, the Final
 /// colours and energies. Readouts for the drives: SkyTime, FlashNow, FlashColorNow, FinalBlendRead, the Base values, MaterialFound.
@@ -40,6 +42,14 @@ public partial class SmsArenaLighting : Node
     [Export] public Color FinalFog = new(0.18f, 0.035f, 0.01f);
     [Export] public Color FinalSun = new(1f, 0.6f, 0.3f);
     [Export(PropertyHint.Range, "0,4,0.05")] public float FinalSunEnergy = 0.55f;
+    [ExportGroup("The peaceful night's light (217)")]
+    /// <summary>217: what they become as the sky goes over to the PEACEFUL night after King Boo's defeat (the sky's peace_blend, which he drives from his burst): a
+    /// moonlit blue ambient, a dark teal fog, a pale moon for the sun -- and the flashes and the thunder gone with the stormy sky.</summary>
+    [Export] public Color PeaceAmbient = new(0.36f, 0.5f, 0.62f);
+    [Export(PropertyHint.Range, "0,4,0.05")] public float PeaceAmbientEnergy = 0.9f;
+    [Export] public Color PeaceFog = new(0.04f, 0.09f, 0.12f);
+    [Export] public Color PeaceSun = new(0.72f, 0.85f, 1f);
+    [Export(PropertyHint.Range, "0,4,0.05")] public float PeaceSunEnergy = 0.7f;
     [ExportGroup("Thunder (211)")]
     /// <summary>211: Jaysonn's thunder (THUNDER, 2.4 s; assets/Sms/Sound/Rematch/) rolls ThunderDelay seconds after the sky's big flash (the purple one, frame 2 of the cycle: once every 10 s), and after the green one too
     /// if ThunderOnGreenToo; not under the fire sky (no flashes there). ThunderDb over the sound table's level; empty ThunderSe = none.</summary>
@@ -62,6 +72,8 @@ public partial class SmsArenaLighting : Node
     public float FlashNow { get; private set; }
     public Color FlashColorNow { get; private set; }
     public float FinalBlendRead { get; private set; }
+    /// <summary>217: the sky's peace_blend as read (0 = the fight's sky, 1 = the peaceful night).</summary>
+    public float PeaceBlendRead { get; private set; }
     public float SpeedRead { get; private set; } = 1f;
     public float FlashAmountRead { get; private set; } = 1f;
     public Color BaseAmbient { get; private set; }
@@ -140,13 +152,15 @@ public partial class SmsArenaLighting : Node
             if (fb.VariantType != Variant.Type.Nil) k = fb.AsSingle();
             if (sp.VariantType != Variant.Type.Nil) SpeedRead = sp.AsSingle();
             if (fa.VariantType != Variant.Type.Nil) FlashAmountRead = fa.AsSingle();
+            Variant pb = _mat.GetShaderParameter("peace_blend");                                       // 217: nil until King Boo sets it = 0
+            PeaceBlendRead = pb.VariantType != Variant.Type.Nil ? Mathf.Clamp(pb.AsSingle(), 0f, 1f) : 0f;
         }
         FinalBlendRead = Mathf.Clamp(k, 0f, 1f);
         float fc = Mathf.PosMod((float)(SkyTime * 30.0 * SpeedRead), 300f);
         var (c0, c1, peak) = SkyFlash(fc);
         Vector3 cloud = (c0 + c1) * 0.5f * FlashAmountRead;                                            // the clouds show mix(c1, c0, texture): their middle
-        FlashNow = peak * FlashAmountRead; FlashColorNow = new Color(cloud.X, cloud.Y, cloud.Z, 1f);
-        Apply(FinalBlendRead, cloud, FlashStrength * (1f - FinalBlendRead));
+        FlashNow = peak * FlashAmountRead * (1f - PeaceBlendRead); FlashColorNow = new Color(cloud.X, cloud.Y, cloud.Z, 1f);
+        Apply(FinalBlendRead, cloud, FlashStrength * (1f - FinalBlendRead) * (1f - PeaceBlendRead));   // 217: the night has no flashes
         // 211: the thunder -- ThunderDelay after the purple flash (frame 2), once a cycle; the green one (154) too if asked; none under the fire or with the flashes off.
         // 211b: and none before the fight -- the wait ends once the intro is Done; till then a flash's cycle is marked as had and its thunder dropped (Thunder), so the first
         // of the fight comes on the next flash's beat, not the moment the wait ends
@@ -156,7 +170,7 @@ public partial class SmsArenaLighting : Node
             if (DebugPrint) GD.Print($"[SMS lighting] the thunder's wait is over ({(!ThunderAfterIntro ? "ThunderAfterIntro off" : _intro == null || !IsInstanceValid(_intro) ? "no intro director" : "the fight has started")}; {ThunderHeld} dropped in the intro)");
         }
         if (_thunder != null && _thunder.Playing && SmsActorSound.Muted(ThunderSe)) _thunder.VolumeDb = -80f;   // 216: the miss's demo mode -- the sky's thunder is the environment's (category 5): silent at once
-        if (_thunder != null && _thunder.Stream != null && FinalBlendRead < 0.5f && FlashAmountRead > 0.01f && SpeedRead > 0.001f)
+        if (_thunder != null && _thunder.Stream != null && FinalBlendRead < 0.5f && PeaceBlendRead < 0.5f && FlashAmountRead > 0.01f && SpeedRead > 0.001f)   // 217: none under the night
         {
             int cycle = (int)Math.Floor(SkyTime * 30.0 * SpeedRead / 300.0); float lag = ThunderDelay * 30f * SpeedRead;
             if (cycle != _thunderCycle && fc >= 2f + lag && fc < 150f) { _thunderCycle = cycle; Thunder(fc); }
@@ -172,18 +186,20 @@ public partial class SmsArenaLighting : Node
         if (DebugPrint) GD.Print($"[SMS lighting] thunder {ThunderPlays} (the sky's cycle {_thunderCycle}, pitch {_thunder.PitchScale:F2})");
     }
 
-    /// <summary>The ambient, the fog and the sun for a blend k toward the fire and a flash colour x its strength (display values, as the inspector's own).</summary>
+    /// <summary>The ambient, the fog and the sun for a blend k toward the fire and a flash colour x its strength (display values, as the inspector's own); 217: then
+    /// toward the peaceful night by the sky's peace_blend.</summary>
     private void Apply(float k, Vector3 flash, float strength)
     {
-        Color amb = BaseAmbient.Lerp(FinalAmbient, k); Color fog = BaseFog.Lerp(FinalFog, k); Color sun = BaseSun.Lerp(FinalSun, k);
+        float p = PeaceBlendRead;
+        Color amb = BaseAmbient.Lerp(FinalAmbient, k).Lerp(PeaceAmbient, p); Color fog = BaseFog.Lerp(FinalFog, k).Lerp(PeaceFog, p); Color sun = BaseSun.Lerp(FinalSun, k).Lerp(PeaceSun, p);
         _env.AmbientLightColor = new Color(amb.R + flash.X * strength, amb.G + flash.Y * strength, amb.B + flash.Z * strength, 1f);
-        _env.AmbientLightEnergy = Mathf.Lerp(BaseAmbientEnergy, FinalAmbientEnergy, k);
+        _env.AmbientLightEnergy = Mathf.Lerp(Mathf.Lerp(BaseAmbientEnergy, FinalAmbientEnergy, k), PeaceAmbientEnergy, p);
         _env.FogLightColor = fog;
         if (_sun != null)
         {
             float s = strength * FlashOnSun;
             _sun.LightColor = new Color(sun.R + flash.X * s, sun.G + flash.Y * s, sun.B + flash.Z * s, 1f);
-            _sun.LightEnergy = Mathf.Lerp(BaseSunEnergy, FinalSunEnergy, k);
+            _sun.LightEnergy = Mathf.Lerp(Mathf.Lerp(BaseSunEnergy, FinalSunEnergy, k), PeaceSunEnergy, p);
         }
     }
 
