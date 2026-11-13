@@ -14363,3 +14363,52 @@ committed build (run fd). The clean rebuild 0 errors; the drive, the logs, the s
 **Deviations:** Jaysonn's own sounds have no game id: his attacks' sounds count as the enemies' (category 2, silent), the thunder as the environment's
 (5, silent). The shine get's jingle would call `demoModeIn` too; the port's shine get has no BGM yet, so it does not. The stars' cut is the port's (the
 game's texture keeps its haze): on King Boo's stars only -- the casino King Boo's, the NPC sparkles and the coin's keep 0 / 0.
+
+### 217 -- the King Boo REMATCH, part 62: the SHINE two and a half times bigger when it spawns (its star's centre where the normal one's is, its demo camera on the bigger star's middle), and the PEACEFUL NIGHT after the defeat (from his burst the sky fades to a starry night with the northern lights, the arena's lights calm, the thunder and the embers gone) (feature/kingboo-rematch, code `45435d6`)
+
+**Jaysonn**: "can you make the shine bigger when it spawns? its very samll right now ... when the boss is beat we should have the skybbox transform
+to somthing nice like the aurua lights to signal its now peacefull" (The same message's miss quiet, slow zoom and stars were 216; its faces are a
+mockup, not in this commit.)
+
+**The Shine.** **`assets/Sms/Rematch/SmsKingBooRematch.cs`**: `ShineScale` (2.5) -- `SpawnShine` scales the Shine's root after `AddChild` (after its
+`_Ready`, so the flare, the glow and the stars it builds at the scene's scale grow with it) and lowers it 1.2 m x (`ShineScale` - 1)
+(`ShineCentreOverRoot`: `SmsStarLocal` (0, 200, 0) x the scene's 0.006), so the star's centre stays 2.4 m over the floor as the normal Shine's; its
+demo camera's look point x `ShineScale`. **`assets/ShineSprite.cs`**: `SmsAppearLookUp` (0.5 m = as before), how far over the root the appear demo's
+camera looks. The shine get is the game's size again (`SmsDemoDrive` puts the root at the model's 1 / 74.44); a `ShineSpawnPoint`, when set, still
+takes the root as it is.
+
+**The night.** **`assets/Sms/Rematch/RematchSky.gdshader`**: `peace_blend` (0 the fight's sky, 1 the night) and its knobs -- `peace_zenith` / `mid` /
+`horizon` / `below` (navy, a teal glow at the horizon), `aurora_green` / `teal` / `violet` (each curtain green at its lower edge, then teal, violet at
+the top), `aurora_gain` 0.9, `aurora_lift` -5 (degrees: the lowest curtain's edge just over the rim from the fight's camera), `aurora_speed`,
+`star_gain`; `peace_sky()`: a star in about one cell in five of a 1.1-degree grid, twinkling, none near the horizon; three curtains
+(`aurora_curtain`: the lower edge waving round the sky on two sines, the light falling off up its height, rays drifting along it, thicker in places)
+-- the same maths as NEW `tools/projectshine/rematch157/aurora_preview217.py`; `picked()`: a `source_color` vec3 reaches the shader in linear (Forward+
+and Mobile convert the inspector's colour) but this sky's maths is display-referred (`to_linear` at the end) -- converted twice, the night came out
+near black (the first shot run drew the horizon's (20, 51, 69) as (4, 8, 13)), so the night's colours go back to the picked values first (the
+boss-arena sky's two streak colours take the same double step; left as they are). `SmsKingBooRematch.cs`: `PeaceSky` (on), `PeaceSkySeconds` (6) --
+from his burst (`DeathBurst`: `BeginPeaceSky`) the blend eases 0 -> 1, on through the Shine's stop-the-world (he stays ProcessMode Always till it is
+done; `GoneTick` waits for it); a new fight or his leaving puts it back to 0 (`ResetFinalSky`, `_ExitTree`).
+**`assets/Sms/Rematch/SmsArenaLighting.cs`**: `PeaceAmbient` (0.36, 0.5, 0.62) / `PeaceAmbientEnergy` 0.9, `PeaceFog` (0.04, 0.09, 0.12), `PeaceSun`
+(0.72, 0.85, 1) / `PeaceSunEnergy` 0.7 -- the ambient, the fog and the sun go on from wherever they were (the final phase's fire light) by the sky's
+`peace_blend` (`PeaceBlendRead`); the flashes x (1 - it); no thunder once it is past half. **`assets/Sms/Rematch/SmsArenaEmbers.cs`**: the embers'
+alpha x (1 - `peace_blend`).
+
+**The faces (a mockup, not in this commit).** King Boo's face is his body's eye sheet (`N_nbtelesa_eye_open.png`, shared by both eyes, mirrored across
+the face: the sheet's x runs toward the face's middle, its y down it -- `tools/projectshine/rematch157/faces217/face_uvmap217.py`). Two sheets painted
+on the game's own (`faces217/paint_faces217.py`, every colour the game's): face 2 (6-4 HP) the top line sheared down toward the middle, ~18 degrees --
+cross; face 3 (3-1 HP) sheared further (~27 degrees) over the pupil's top, the iris the roll sheet's red, the pupil 80 % size. A throwaway face drive
+put each on him (the blink off) and shot him close (`faces217/faces_sheet217.png`) -- C60 4 / 4 (run faces217c).
+
+**Verified:** the defeat drive v217 (deleted before the commit; the card skipped by A, the cutscene played; his moves off, the supply stopped, the
+final phase's fire sky on, his HP set to 1 and the hit): C58 the night begun at his burst, the blend 0.501 at 3 s, 0.075 as the Shine came, 0.501 2 s
+into its demo (the tree paused), 1.000 at the end, never falling back; the ambient at `PeaceAmbient` (0.000 off), its energy 0.90; the flash 0; no
+thunder after half; the embers 1.00 -> 0; C59 the Shine's root at 0.015 (0.006 x 2.5), its star's centre 3.00 m over it, the root placed 1.80 m lower
+(the centre 2.4 m over the floor), the demo camera's look-up 1.25 m -- 2 / 2 headless (run defeat217a) and 3 / 3 windowed with C58b, the night's
+colours as picked: 41.5 degrees up, drawn (7.0, 16.0, 38.0), picked (6.8, 16.6, 38.8) (run defeatshot217b; run a, 2 / 2, drew them near black: the
+fix above), its shots 43a-f. The regression drive 68 / 68 (run fh; run fe failed C10c on its own check -- the Shine placed `ShineOverFloor` over the
+floor; it now allows `ShineScale`'s drop; run ff's Godot found no C# classes, started the instant the build ended; run fg lost Mario off the rim after
+a spin jump at a supply Boo near the edge, before the breath test -- the drive's own setup, nothing of this pass). The clean rebuild 0 errors; the
+drive, the logs, the shots and the tasks deleted.
+
+**Deviations:** the bigger Shine is the port's (the game's boss Shines are the normal size; its shine get keeps the game's). The night is the port's
+own (no game has this sky). With `ShineSpawnPoint` set, the root goes to that node unlowered: the bigger star's centre sits 3 m over it.
