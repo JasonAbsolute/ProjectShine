@@ -82,7 +82,7 @@ uniform float flash_amount : hint_range(0.0, 2.0) = 1.0;
 /** A steady colour on the clouds between the flashes (the game has none: black), and the colour the ball fades to above ~25 deg (the game's clear colour). */
 uniform vec3 base_lift : source_color = vec3(0.0, 0.0, 0.0);
 uniform vec3 clear_color : source_color = vec3(0.0, 0.0, 0.0);
-/** The streaks' two colours: faint = the game's magenta, where two curves cross = the game's cyan. */
+/** The streaks' two colours: faint = the game's magenta, where two curves cross = the game's cyan (218: drawn as picked -- see picked()). */
 uniform vec3 streak_dim : source_color = vec3(0.996, 0.235, 0.729);
 uniform vec3 streak_bright : source_color = vec3(0.047, 0.996, 0.949);
 /** How fast it all runs (1 = the game's 30 frames a second) and a turn of the whole sky (degrees). */
@@ -134,6 +134,11 @@ float key4(float f, float f1, float f2, float v0, float v1, float v2, float f3, 
 float pulse(float f, float a, float b, float c) { return f < a || f > c ? 0.0 : (f < b ? ease((f - a) / (b - a)) : 1.0 - ease((f - b) / (c - b))); }
 float mirror1(float x) { return 1.0 - abs(mod(x, 2.0) - 1.0); }
 vec3 to_linear(vec3 c) { return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), step(0.04045, c)); }
+// 217 / 218: Godot hands a source_color vec3 to the shader in LINEAR (Forward+ and Mobile convert the colour you pick), but this sky's maths is
+// display-referred (to_linear at the very end) -- converted twice, a colour came out darker and deeper: 217's night near black (the horizon's
+// (20, 51, 69) drawn (4, 8, 13)), the boss-arena sky's faint streaks a dark red-pink ((254, 60, 186) drawn as (253, 11, 125) x their strength) till
+// 218. So every colour knob here goes back to the value picked first.
+vec3 picked(vec3 c) { return mix(c * 12.92, 1.055 * pow(max(c, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
 // GX texture wrap per axis (0 clamp, 1 repeat, 2 mirror) with bilinear filtering: a sampler's own wrap mode is the same on both axes and a
 // mirrored axis fed through a repeating sampler blends the last row into the first at every seam (a dark hairline across the sky), so the four
 // texels are fetched by hand.
@@ -166,8 +171,8 @@ vec3 boss_sky(vec3 d, float e, float f) {
 	vec3 c0 = (vec3(100.0, 0.0, 150.0) * pulse(fc, 0.0, 2.0, 19.0) + vec3(92.0, 211.0, 97.0) * pulse(fc, 149.0, 154.0, 164.0) + vec3(144.0, 111.0, 168.0) * pulse(fc, 164.0, 167.0, 189.0)) / 255.0 * flash_amount;
 	vec3 c1 = (vec3(100.0, 100.0, 100.0) * pulse(fc, 9.0, 12.0, 39.0) + vec3(0.0, 0.0, 73.0) * pulse(fc, 108.0, 118.0, 166.0) + vec3(54.0, 0.0, 0.0) * pulse(fc, 226.0, 237.0, 300.0)) / 255.0 * flash_amount;
 	float ab = a * b;
-	vec3 base = mix(c1, c0, ab) + base_lift * ab;
-	vec3 col = mix(clear_color, base, g);
+	vec3 base = mix(c1, c0, ab) + picked(base_lift) * ab;
+	vec3 col = mix(picked(clear_color), base, g);
 	// ---- the streaks (vr_q2), added
 	if (e > -29.0) {
 		float v1 = dish_v(e);
@@ -178,7 +183,7 @@ vec3 boss_sky(vec3 d, float e, float f) {
 		float w2 = tex_wm(sin_wave, vec2(-10.0 * (u - 0.5) + 0.5 + t4, -s4 * (v1 - 0.5) + 0.5 + 1.5), 1, 2);
 		float g2 = tex_wm(gs001m, vec2(2.0 * (u - 0.5) + 0.5, 2.0 * (v1 - 0.5) + 0.5 - 0.5), 2, 2);
 		float amt = clamp(w1 * w2 * 2.0, 0.0, 1.0) * g2 * streak_gain;
-		col += mix(streak_dim, streak_bright, amt) * amt;
+		col += mix(picked(streak_dim), picked(streak_bright), amt) * amt;
 	}
 	return col;
 }
@@ -248,10 +253,6 @@ vec3 final_sky(vec3 d, float e_true, float f) {
 
 // ---- 217: the peaceful night after the defeat (the port's own), display-referred: the same maths as aurora_preview217.py
 float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-// 217: Godot hands a source_color vec3 to the shader in LINEAR (Forward+ and Mobile convert the colour you pick), but this sky's maths is display-referred
-// (to_linear at the very end) -- converted twice, the night came out near black (the shot drive's first run: the horizon's (20, 51, 69) drawn (4, 8, 13)).
-// So the night's colours go back to the values picked first. (The boss-arena sky's streak colours above go through the same double step; left as they are.)
-vec3 picked(vec3 c) { return mix(c * 12.92, 1.055 * pow(max(c, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
 // one curtain: its lower edge waving round the sky (two waves), the light falling off up its height, rays along it, thicker in places
 vec3 aurora_curtain(float az, float e, float ts, float base, float amp, float k1, float k2, float height, float strength, float ph, float drift, vec3 cg, vec3 ct, vec3 cv) {
 	float ec = base + aurora_lift + amp * sin(k1 * az + ph + ts * 0.11) + 0.35 * amp * sin(k2 * az - ph * 1.7 - ts * 0.17);
