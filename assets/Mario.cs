@@ -20232,8 +20232,20 @@ public partial class Mario : CharacterBody3D
     [Signal] public delegate void SmsShineGetExitEventHandler(string scene);
     /// <summary>The SHINE! letters through the console (TConsoleStr::startAppearShineGet); false = your Wonderful! popup.</summary>
     [Export] public bool SmsShineGetLetters = true;
-    /// <summary>MSD_BGM_CHUBOSS, the shine-get fanfare (the pending step starts it) -- a player to fire; no stream yet (the sound front).</summary>
+    /// <summary>The shine get's fanfare (BGM 0x8001000A, k_clear.com, 5.1 s; the decomp names it MSD_BGM_CHUBOSS, one place off mSound.asn's
+    /// MSD_BGM_GET_SHINE) -- the pending step starts it. A 2D player on the Music bus, filled by SmsMarioSound when empty (220).</summary>
     [Export] public AudioStreamPlayer ShineGetFanfare;
+    private int _smsShineMusicStopped = -1;          // 220: the music players the get's fanfare cut (-1 = no get yet)
+    private bool _smsShineDemoMode;                  // 220: the get's demoModeIn is on (off when control comes back, or before the stage moves)
+    public int SmsShineMusicStopped => _smsShineMusicStopped;
+    public bool SmsShineDemoModeOn => _smsShineDemoMode;
+    /// <summary>220: the get's quiet over (MSound::demoModeOut / the next stage's initSound) -- once, whichever way the demo ends.</summary>
+    private void SmsShineDemoModeOut(string why)
+    {
+        if (!_smsShineDemoMode) return;
+        _smsShineDemoMode = false;
+        SmsActorSound.DemoModeOut(why);
+    }
     private float _smsShineDemoT = -1f;              // seconds since the demo began (-1 = no demo)
     private Transform3D _smsShineDemoFrame;          // origin = his position, +Z = the facing, +X = its left (SMS is right-handed, +Z forward)
     private Camera3D _smsShineCam;
@@ -20279,6 +20291,11 @@ public partial class Mario : CharacterBody3D
         _smsShineCam.MakeCurrent();
         // the pending step: the letters, the fanfare, the fade registered; the count-up as before
         if (SmsShineGetLetters && _smsConsoleStr != null) _smsConsoleStr.StartAppearShineGet(shine.ShineText); else SpawnShineGetPopup();   // 118b: the shine's own word, if any
+        // 220: MSBgm::startBGM(0x8001000A, the decomp's MSD_BGM_CHUBOSS -- k_clear.com, the fanfare) cuts the music first, as the miss's jingle does
+        // (stopTrackBGMs(3, 0): every music track at once, no fade -- a Shine's appear fanfare still going with them) and sets demoModeIn(0x16F):
+        // every sound effect silent but the system's (the touch's chime) and Mario's voice, till the stage moves (here: till control comes back)
+        _smsShineMusicStopped = SmsActorSound.StopAllMusic(this, "the shine get");
+        SmsActorSound.DemoModeIn(SmsActorSound.MissDemoMask, "the shine get"); _smsShineDemoMode = true;
         ShineGetFanfare?.Play();
         SmsShineFadeAlpha_(0f);
         ScheduleShineCountUp();
@@ -20346,6 +20363,7 @@ public partial class Mario : CharacterBody3D
         {
             _smsShineDemoT = -1f;   // the state was left some other way (a reload, his debug keys): nothing to drive
             SmsShineFadeAlpha_(0f);
+            SmsShineDemoModeOut("the shine get left early");   // 220
         }
     }
 
@@ -20376,6 +20394,9 @@ public partial class Mario : CharacterBody3D
     private void SmsShineGetFinish(ShineSprite shine, int next)
     {
         if (shine != null && !IsInstanceValid(shine)) shine = null;
+        // 220: the get's quiet ends here, every way out: the stage moving (the game's next initSound -- the statics outlive the scene, as the miss's),
+        // the title, or (his option) control coming back where he stands
+        SmsShineDemoModeOut(next == 1 ? "the shine get: to the title" : shine != null && shine.ExitLevel ? "the shine get: the stage moves" : "the shine get: control back");
         if (next == 1)
         {
             string title = SmsCardSave.Current?.TitleScene ?? "";

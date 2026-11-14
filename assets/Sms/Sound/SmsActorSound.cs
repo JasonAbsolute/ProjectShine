@@ -96,6 +96,7 @@ public partial class SmsActorSound : Node3D
         // 211: the rematch's attacks -- Play(se) by name. They had called Attach since their passes and got null back (not in this table): their sounds never played until now.
         ["SmsFireballs"] = "fireballs", ["SmsGhostBreath"] = "breath", ["SmsGhostLightning"] = "lightning", ["SmsGhostWind"] = "wind",
         ["SmsBoolossus"] = "boolossus", ["SmsIceBlock"] = "iceblock", ["SmsBooCircle"] = "boocircle", ["SmsBooVolley"] = "volley",
+        ["ShineSprite"] = "shine",                                            // 220: the Shine -- its appear (the chime and the fanfare), its hum while it is out, the chime at the touch
     };
     /// <summary>The script's sound slots and the game sound each stands for (the slot names are the species' own exports).</summary>
     private static readonly Dictionary<string, (string slot, string se)[]> Fill = new()
@@ -117,6 +118,9 @@ public partial class SmsActorSound : Node3D
         },
         ["gatekeeper"] = new[] { ("BossMusic", "MSD_BGM_CHUBOSS") },           // 156: TBiancoGateKeeper::startBGM at the appear demo, stopBGM at the finish demo (the script's own lines)
         ["kingboo"] = new[] { ("BossMusic", "MSD_BGM_BOSS") },                 // 195: the rematch's King Boo -- the casino boss theme (t_boss.com), started as the fight begins, faded at his death (SmsKingBooRematch's own lines)
+        // 220: the Shine's appear fanfare (TShine::appearWithTime / appearSimple: MSBgm::startBGM(0x8001002D) = mSound.asn's MSD_BGM_SHINE_APPEAR, t_shine_appear.com,
+        // 4.6 s) -- its own BGM track (2); startBGM cuts no music for it (only the miss's, the game over's and the shine get's). The chime and the hum are Play / Loop.
+        ["shine"] = new[] { ("AppearSound", "MSD_BGM_SHINE_APPEAR") },
         ["telesa"] = new[]
         {
             ("FixSound", "MSD_SE_EN_TELESA_FIX"),               // changeByJuice: the box Boo into its block

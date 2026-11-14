@@ -199,6 +199,9 @@ public partial class ShineSprite : Node3D
             BuildShineEffects();
 
         CaptureNeutralPose();
+        // 220: the Shine's sounds (SmsActorSound "shine"): the AppearSound slot gets the appear fanfare, the chime at the appear and at the touch play
+        // on the node's pool, positional at the Shine, and MSD_SE_SHINE_EXIST hums while it is out (SmsHumTick)
+        _sound = SmsActorSound.Attach(this);
     }
 
     /// <summary>
@@ -217,6 +220,7 @@ public partial class ShineSprite : Node3D
             return;
 
         _spawnEntrancePlaying = true;
+        SmsAppearSounds();   // 220: an appear is an appear (TShine::appearSimple plays the same two)
         _processModeBeforeSpawnEntrance = ProcessMode;
         ProcessMode = ProcessModeEnum.Always;
 
@@ -475,6 +479,10 @@ public partial class ShineSprite : Node3D
         {
             _collected = true;
             _pickupZone.SetDeferred(Area3D.PropertyName.Monitoring, false);
+            // 220: TShine::touchPlayer -- MSD_SE_SY_GET_SHINE at the touch (before the demo: an airborne Mario lands first); the hum ends (STATE_GOT)
+            _sound?.Loop(HumSe, false);
+            _sound?.Play(GetChimeSe);
+            SmsGetChimes++;
         }
     }
 
@@ -969,8 +977,18 @@ public partial class ShineSprite : Node3D
     [Export] public float SmsAppearLookUp = 0.5f;
     /// <summary>STATE_WAIT: mRotateSpeed 2 deg a tick after an appear (the game's idle spin, 240 deg/s). Shines placed at level start keep IdleSpinSpeed.</summary>
     [Export] public float SmsIdleSpinDegPerTick = 2f;
-    /// <summary>MSD_SE_SHINE_APPEAR (+ the appear jingle BGM 0x8001002D) at the appear; MSD_SE_SHINE_EXIST while it flies -- slots, no streams yet.</summary>
+    /// <summary>The appear fanfare (MSD_BGM_SHINE_APPEAR, BGM 0x8001002D -- t_shine_appear.com, 4.6 s): a 2D player on the Music bus, filled by
+    /// SmsActorSound when empty (220; set your own here and it is kept). Its chime, MSD_SE_SHINE_APPEAR, plays with it; MSD_SE_SHINE_EXIST hums
+    /// while the Shine is out (SmsHumTick).</summary>
     [Export] public AudioStreamPlayer AppearSound;
+    // 220: the Shine's sounds -- the game's ids (Item.cpp: appearWithTime 707, control 549-615, touchPlayer 670)
+    public const string AppearChimeSe = "MSD_SE_SHINE_APPEAR", HumSe = "MSD_SE_SHINE_EXIST", GetChimeSe = "MSD_SE_SY_GET_SHINE";
+    private SmsActorSound _sound;
+    public SmsActorSound SmsSound => _sound;
+    /// <summary>For the drives: the appears' sounds started, the touch's chime played.</summary>
+    public int SmsAppearSoundsPlayed { get; private set; }
+    public int SmsGetChimes { get; private set; }
+    public bool SmsHumOn => _sound != null && _sound.LoopPlaying(HumSe);
     public Vector3 SmsInitialPosition { get; private set; }
     public const float SmsUpSpeed = 1.0f, SmsCircleRateY = 0.5f, SmsSpeedDownRate = 0.99f;   // mUpSpeed, mCircleRateY, mSpeedDownRate (Item.cpp 412-414)
     public const int SmsMoveUpTicks = 240, SmsFloatTicks = 240;                              // initMapObj (795): mMoveUpTime 240, mAppearWaitTime 0, mFloatTime 240
@@ -1027,7 +1045,7 @@ public partial class ShineSprite : Node3D
         _apState = 1;
         Visible = true;                     // TItem::appear
         if (_pickupZone != null) _pickupZone.Monitoring = false;   // HIT_FILTER_NO_COLLISION until the float ends
-        AppearSound?.Play();
+        SmsAppearSounds();
         _apDemo = withDemo; _apDemoLeft = demoTicks;
         if (withDemo)
         {
@@ -1055,6 +1073,24 @@ public partial class ShineSprite : Node3D
     public override void _PhysicsProcess(double delta)
     {
         if (_apState != 0) SmsAppearTick((float)delta);
+        SmsHumTick();
+    }
+
+    /// <summary>220: appearWithTime / appearSimple (Item.cpp 706-709): MSD_SE_SHINE_APPEAR at the Shine and MSBgm::startBGM(0x8001002D), the fanfare.</summary>
+    private void SmsAppearSounds()
+    {
+        _sound?.Play(AppearChimeSe);
+        AppearSound?.Play();
+        SmsAppearSoundsPlayed++;
+    }
+    /// <summary>220: TShine::control calls startSoundActor(MSD_SE_SHINE_EXIST) every tick of STATE_NORMAL (a placed Shine), MOVING_UP / DOWN / CIRCLE,
+    /// FLOAT and WAIT -- not APPEAR_WAIT, not GOT. A level sound (id 0x81C1, the 0x800 bit clear): kept alive by the calls, so a loop here, on while
+    /// the Shine is out and shown, off once it is taken. Positional at the Shine, with the game's camera-distance fade (SmsActorSound).</summary>
+    private void SmsHumTick()
+    {
+        if (_sound == null) return;
+        bool on = IsVisibleInTree() && !_collected && !_ending && !_smsDriven && !_inCutscene && _apState != 1;
+        _sound.Loop(HumSe, on);
     }
 
     private void SmsAppearTick(float d)

@@ -191,6 +191,7 @@ public partial class SmsMarioSound : Node3D
         Fill2D(ref _mario.SmsWarpInWipeSound, "SmsWarpInWipeSound", "MSD_SE_MA_INTO_DOKAN", 0f);
         FillMusic(ref _mario.MissJingle, "MissJingle", "MSD_BGM_MISS");             // 213: the miss's jingle (k_miss.com) and the game over's (k_gameover.com),
         FillMusic(ref _mario.GameOverJingle, "GameOverJingle", "MSD_BGM_GAMEOVER"); //      on the Music bus as the bosses' themes are
+        FillMusic(ref _mario.ShineGetFanfare, "ShineGetFanfare", "MSD_BGM_GET_SHINE");   // 220: the shine get's fanfare (0x8001000A, the decomp's MSD_BGM_CHUBOSS -- k_clear.com, 5.1 s)
         if (DebugPrint) GD.Print($"[SMS sound] {SlotsFilled} of Mario's sound slots filled");
     }
     /// <summary>213: a MUSIC slot of Mario's -- a 2D player on the Music bus with the game's BGM, at SmsActorSound.MusicDb + the sound table's volume (the
