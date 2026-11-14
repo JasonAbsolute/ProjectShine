@@ -14518,3 +14518,57 @@ were; the drive, the logs and the tasks deleted. The drive's A at the card save 
 the rematch's) ends the quiet when control comes back, and the cut music stays stopped. The appear fanfare does not hold the appear demo open: the
 game's director waits for it (`MSBgm::getHandle(2)`) before ending a demo, the port's demo keeps its own length (the rematch's 6 s, the fanfare 4.6).
 The renders are dry (no reverb), as 156's. The hum fades with the camera's distance on the port's one curve (full to 1200 u, silent at 12000 u).
+
+### 221 -- the King Boo REMATCH, part 66: his DEATH CAMERA pans out to a wide shot of the whole arena and holds it while the Shine comes out where he burst and jumps to the middle, then glides back; the Shine's HUM loops without its drop (each note's release kept) (feature/kingboo-rematch, code `2ee78b2`)
+
+**Jaysonn**: "ok the sound system needs work for spawning in the shine and the camera angle is not right again. i want when king boo dies the cam
+pans out like petey phriana when he dies. where its almost looking at the entire aerna then the shine jumps to the middle"; "the loop sound of the
+shine shinning seems to appruptly loop".
+
+**The game.** Petey (`bosspakkun.cpp` `TNerveBPDie`) calls `makeShineAppearWithDemo("シャイン（ボス用）", "ボスシャインカメラ", ..)` at the end of
+his death clip; that camera tool (biancoBoss.szs `map/tables.bin`) is a placed fixed camera, CAMERA_MODE_DEFINITE_A, at (494, 400, 383) u with a
+600-frame demo, which the inbetween swings to (16 frames) and which keeps looking at the Shine. Scaled to the rematch arena it frames 35 % of the
+floor; Jaysonn asked for nearly all of it, so the wide shot is the port's own. The hum: MSD_SE_SHINE_EXIST's sequence starts a 1.04-s note every 100
+ticks, and `TTrack::noteOn` stops the voice's last note with `noteOff(slot, 0)` -> `TChannel::stop(0)` -> `EVENT_RELEASE`, so the old note releases
+(SimpleADSR release 500) while the new one attacks (3000). The baker cut the old note dead and the new attack began from 0: a drop of up to 44 dB
+once a second, the loop's seam among them (-27.5 -> -71.7 dBFS, 10-ms windows).
+
+**The camera.** **`assets/Sms/Rematch/SmsKingBooRematch.cs`**: `DeathCamWide` (on), `DeathCamDistance` 42, `DeathCamHeight` 22, `DeathCamLookUp` 3,
+`DeathCamFov` 50, `DeathCamPanSeconds` 1.2, `DeathCamBackSeconds` 0.8. At the burst (`DeathBurst` -> `DeathCamBegin`) a camera of his own,
+SmsDeathWideCam, takes the picture from the gameplay camera (the current one; when the shake's render camera has it -- his rumble through the down --
+the Camera3D in the SunshineCamera rig) and eases (smoothstep; the yaw and the pitch on their own, no roll) out to the wide spot: `DeathCamDistance` m
+from the arena's middle along the gameplay camera's own bearing, `DeathCamHeight` m over the floor, looking at `DeathCamLookUp` m over the middle, at
+`DeathCamFov` (42 / 22 / 3 / 50: 97 % of the floor in frame, 24 degrees down, the Shine's whole flight from a burst out to 0.9 of the floor's radius
+in frame -- `tools/projectshine/rematch157/widecam221b.py`). `DeathCamFit` pulls it back along its line of sight (2 m at a time, at most
+`DeathCamDistance` more) when the Shine's flight would leave the frame: the star's centre through ShineSprite's rise and `TShine::movingCircle`'s
+loop, its top, bottom and sides with a fifth more. It holds there with the Shine's own demo camera off (`SmsAppearCamera` false); at the Shine's demo
+end (`SpawnEntranceFinished`; or no demo, no Shine) it glides back over `DeathCamBackSeconds` onto the gameplay camera's live pose, hands it the
+picture and is freed, and only then is King Boo back on the world's clock (`GoneTick`). A shake that runs renders the wide shot shaken and hands it
+back; one frozen by the stop-the-world gives the picture back (`DeathCamKeepView`); `_ExitTree` hands it back. `ShineDemoTicks` 720 -> 600 (Petey's
+tool: up 2 s, the loop 1 s, the settle 2 s). `ShinePlaced`: SpawnShine's placed spot, shared with the fit. Readouts `DeathCamPhase`, `DeathCamNode`,
+`DeathCamReturnTo`, `DeathCamWidePos`, `DeathCamWideBase`, `DeathCamPushedBack`, `DeathCamWideLook`. `DeathCamWide` off = 183's Shine camera
+(`ShineCamOffset` / `ShineCamFov`).
+
+**The hum.** **`assets/Sms/Sound/Object/MSD_SE_SHINE_EXIST.wav`**: re-baked with each note's release kept (`tools/projectshine/sound154/sms_audio.py
+--release-tails`: a note cut by the next note on its voice plays its release; off by default, so no other sound of record changes; `adopt157.py`).
+The same length (3.23 s) and loop (70000-103332): the 10-ms levels through the loop -38.0 to -27.0 dBFS (median -31.2), the seam 0.3 dB (was 44.2).
+The table row is unchanged (`gen_table154.py`: the table is the one shipped).
+
+**Verified:** the death camera drive v221 (deleted before the commit; his HP set to 1 and the hit -- the real down, burst, Shine and demo; the Shine
+never touched, no card save): C66 the pan and the wide shot -- the wide camera made 0.000-0.015 m from the gameplay camera (the shake's render camera
+was current at the burst; the rig's camera found and handed back to), the pan 1.20 s with a top speed of 36.1 m/s (smoothstep's 1.5 x the mean), the
+hold 0.000 m off the wide spot at fov 50 looking 0.00 degrees off, 97.5 % of the floor in frame (rays to the real floor), the Shine's own camera off,
+the star in frame on 300 / 300 ticks of its flight, the view never lost; C67 the glide back -- released at the demo's end, 0.80 s, top speed 54.1 m/s,
+the hand-over 0.000-0.025 m, the wide camera freed, King Boo back on the world's clock; C68 the hum -- the stream the Shine plays loops forward over
+70000-103332, the file's levels as above. 3 / 3 in runs b (the burst where the fight left him, 4.6 m from the middle toward the camera), d (him put 21
+m out behind for the down: the burst lands 8.4 m out -- the down clip carries his body 12.6 m the way he faces) and f (him 30 m out at the side: the
+burst 30.6 m out, past the floor's edge; the shot pulled back 8 m, the star in frame on all 300 ticks -- run e, before the fit, lost it on 86) and
+the windowed run shotb (shots 47a-e; the burst 14.7 m out at the side). The regression drive 68 / 68 (run fm; C10d now waits for the hand-back). The
+import (`run_import221`: the hum's `.import`) and the clean rebuild 0 errors; the drive, the logs, the shots and the tasks deleted. Seen in the
+regression's error output, not touched: an ObjectDisposedException from a `SmsBooVolley` lambda (`SmsBooVolley.cs` line 101) when a volley's Bomb Boo
+detonates after the volley is gone.
+
+**Deviations:** the game's camera for Petey's Shine stands about 1250 u (17 m) from where it lands and keeps turning to look at it; the port's wide
+shot stands about 47 m from the middle and holds its look on the middle -- Jaysonn's "almost looking at the entire arena". The game's inbetween to
+the fixed camera is 16 frames and it cuts back from a DEFINITE camera; the port pans out over 1.2 s and glides back over 0.8 s. The hum keeps the
+game's release on each note but is still the whole sequence baked into one looped file.
