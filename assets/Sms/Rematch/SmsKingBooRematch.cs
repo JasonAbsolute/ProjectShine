@@ -168,8 +168,8 @@ public partial class SmsKingBooRematch : Node3D
     /// its demo camera, before it, looks past it at him); it materialises in a GOLDEN flash and stars (ShineFlashSize, ShineStars, ShineFlashColor) and appears
     /// the game's way (makeShineAppearWithDemo: TShine::appearWithDemo, ShineSprite's SmsAppear) FROM where he burst (ShineFromBurst; else at its spot) -- up
     /// 2 s, a loop down onto its spot, the settle -- with the demo (ShineDemo: the world
-    /// frozen, the Shine's camera watching from ShineCamOffset at ShineCamFov; ShineDemoTicks 720 = 6 s: up 2, the loop 2, the settle 2; 0 = the Shine scene's own
-    /// 1200, 10 s; his effects run on through it). ShineExitLevel /
+    /// frozen, the Shine's camera watching from ShineCamOffset at ShineCamFov -- 221: the wide shot instead, DeathCamWide; ShineDemoTicks 600 = 5 s: up 2, the loop 1,
+    /// the settle 2, Petey's (183 had 720); 0 = the Shine scene's own 1200, 10 s; his effects run on through it). ShineExitLevel /
     /// ShineExitScene set the Shine's exit (the save card, then that scene); off = the Shine scene's own (the card, control back). The casino boss's Shine came
     /// 240 ticks into his down, at his point, no burst.</summary>
     [Export] public bool DeathFx = true;
@@ -188,8 +188,8 @@ public partial class SmsKingBooRematch : Node3D
     [Export] public Node3D ShineSpawnPoint;
     [Export] public float ShineOverFloor = 1.2f, ShineDelaySeconds = 1f;
     [Export] public bool ShineFromBurst = true, ShineDemo = true;
-    [Export(PropertyHint.Range, "0,2400,10")] public int ShineDemoTicks = 720;
-    /// <summary>The Shine's demo camera: where it sits in the Shine's placed frame (x right, y up, z forward -- its back is to Mario, so the camera looks past the Shine at him)
+    [Export(PropertyHint.Range, "0,2400,10")] public int ShineDemoTicks = 600;   // 221: Petey's -- biancoBoss's boss Shine camera (ボスシャインカメラ) runs 600: up 2 s, the jump 1 s, the settle 2 s (183 had 720: a 2-s glide)
+    /// <summary>The Shine's demo camera (221: only with DeathCamWide off): where it sits in the Shine's placed frame (x right, y up, z forward -- its back is to Mario, so the camera looks past the Shine at him)
     /// and its field of view. The Shine scene's own (0, 2.5, 7) at 75 degrees showed a speck in the black sky through the flight from 13 m up. Zero = the Shine's own.</summary>
     [Export] public Vector3 ShineCamOffset = new Vector3(0f, 7f, 9f);
     [Export(PropertyHint.Range, "0,120,1")] public float ShineCamFov = 40f;
@@ -204,6 +204,20 @@ public partial class SmsKingBooRematch : Node3D
     /// it; with ShineSpawnPoint the root goes where that node is), its demo camera looking at the bigger star's middle. In his hands at the shine-get it is the
     /// game's size again (the get demo drives it at the game's scale). 1 = the scene's own.</summary>
     [Export(PropertyHint.Range, "0.5,5,0.1")] public float ShineScale = 2.5f;
+    /// <summary>221 (Jaysonn: "when king boo dies the cam pans out like petey phriana when he dies. where its almost looking at the entire aerna then the shine jumps
+    /// to the middle"): at his burst the camera PANS OUT -- from where the gameplay camera stands, back along its own bearing from the arena's middle and up -- to a
+    /// wide shot of the arena: DeathCamDistance m out from the middle, DeathCamHeight m over the floor, looking at DeathCamLookUp m over the middle, DeathCamFov
+    /// degrees (42 / 22 / 3 / 50: 97 % of the floor in frame, 24 degrees down, and the Shine's whole flight -- a burst anywhere out to 0.9 of the floor's radius,
+    /// its loop up to half that distance high, the star's top and bottom -- in frame: tools/projectshine/rematch157/widecam221b.py; a burst farther out pulls the
+    /// shot back along its line of sight till the flight fits, DeathCamFit), eased over DeathCamPanSeconds. It
+    /// holds there while the Shine comes out where he burst and jumps to the middle (the Shine's own demo camera off), and when the Shine's demo is over it glides
+    /// back to the gameplay camera over DeathCamBackSeconds. Off = 183's: the Shine's own camera (ShineCamOffset / ShineCamFov).</summary>
+    [Export] public bool DeathCamWide = true;
+    [Export(PropertyHint.Range, "10,80,0.5")] public float DeathCamDistance = 42f;
+    [Export(PropertyHint.Range, "2,40,0.5")] public float DeathCamHeight = 22f;
+    [Export(PropertyHint.Range, "-5,10,0.1")] public float DeathCamLookUp = 3f;
+    [Export(PropertyHint.Range, "20,90,1")] public float DeathCamFov = 50f;
+    [Export(PropertyHint.Range, "0,5,0.05")] public float DeathCamPanSeconds = 1.2f, DeathCamBackSeconds = 0.8f;
     [ExportGroup("")]
     /// <summary>He turns to face Mario while he waits, at this many radians a second.</summary>
     [Export] public bool FaceMario = true;
@@ -1271,6 +1285,15 @@ public partial class SmsKingBooRematch : Node3D
     public Vector3 BurstAt => _burstAt;
     public Node3D Shine => _shine != null && IsInstanceValid(_shine) ? _shine : null;
     public bool ShineSpawned { get; private set; }
+    /// <summary>221, for the drives: the death camera's phase (0 off, 1 the pan out, 2 the hold, 3 the glide back), its node (null when off), the camera it took
+    /// the picture from and hands it back to, the wide shot's spot (after the fit), its spot as the knobs put it, how far the fit pulled it back, its look point.</summary>
+    public int DeathCamPhase => _deathCamPhase;
+    public Camera3D DeathCamNode => _deathCam != null && IsInstanceValid(_deathCam) ? _deathCam : null;
+    public Camera3D DeathCamReturnTo => _deathCamWas != null && IsInstanceValid(_deathCamWas) ? _deathCamWas : null;
+    public Vector3 DeathCamWidePos => _dcWidePos;
+    public Vector3 DeathCamWideBase => _dcWideBase;
+    public float DeathCamPushedBack => _dcPushedBack;
+    public Vector3 DeathCamWideLook => _dcWideLook;
     public bool HurtFlashOn => _flashOn;
     public float GlowBoostNow => _glowBoost;
     public float OpacitySolidNow => _opacitySolid;
@@ -1326,6 +1349,7 @@ public partial class SmsKingBooRematch : Node3D
         if (BossMusicPlaying) BossMusic.Stop();
         if (!IsCopy && FinalSkyBlend > 0f) SetFinalSky(0f);                                                                                   // 208b: the shared sky material back to the boss-arena sky
         if (!IsCopy && PeaceSkyBlend > 0f) SetPeaceSky(0f);                                                                                   // 217: and off the night
+        if (_deathCamPhase != 0) DeathCamEnd();                                                                                               // 221: the picture back to the gameplay camera
     }
     /// <summary>The down clip begins (the last hit's hurt is over): the mist and the stars boil off his body, the blink, the glow and the crown's flare run in DeathTick.</summary>
     private void DeathBegin()
@@ -1392,14 +1416,178 @@ public partial class SmsKingBooRematch : Node3D
         ProcessMode = ProcessModeEnum.Always;
         _shinePending = true; _shineT = 0f;
         BeginPeaceSky();                                                                                                                   // 217: the night comes
+        DeathCamBegin();                                                                                                                   // 221: the camera pans out
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: BURSTS at {at} -- the flash {DeathFlashSize} m, {DeathPuffs} puffs, {DeathStars} stars, the floor at {FloorUnder(at):F2}; the Shine in {ShineDelaySeconds:F1} s");
     }
     /// <summary>Gone: the Shine ShineDelaySeconds after the burst; once it is there and his last flash is out, back to the world's clock.</summary>
     private void GoneTick(float dt)
     {
         _shineT += dt;
+        DeathCamTick(dt);                                                                                                                  // 221
         if (_shinePending) { if (_shineT >= ShineDelaySeconds) SpawnShine(); }
-        else if (ShineSpawned && !AnyFxAlive && _shineT >= ShineDelaySeconds + 1.5f && !PeaceSkyRunning && ProcessMode == ProcessModeEnum.Always) ProcessMode = ProcessModeEnum.Inherit;   // the Shine's stars done too (217: and the night's fade)
+        else if (ShineSpawned && !AnyFxAlive && _shineT >= ShineDelaySeconds + 1.5f && !PeaceSkyRunning && _deathCamPhase == 0 && ProcessMode == ProcessModeEnum.Always) ProcessMode = ProcessModeEnum.Inherit;   // the Shine's stars done too (217: and the night's fade; 221: and the camera handed back)
+    }
+    // 221: the death camera (DeathCamWide) -- its phase (0 off, 1 the pan out, 2 the hold, 3 the glide back), its clock, its node and the camera it took the
+    // picture from, the pose it eases from and to (a spot, a yaw and a pitch, a fov), the wide shot's spot and look point
+    private int _deathCamPhase;
+    private float _deathCamT;
+    private Camera3D _deathCam, _deathCamWas;
+    private Vector3 _dcFromPos, _dcToPos, _dcWidePos, _dcWideLook, _dcWideBase;
+    private float _dcFromYaw, _dcFromPitch, _dcFromFov, _dcToYaw, _dcToPitch, _dcToFov, _dcPushedBack;
+    /// <summary>221: the burst -- the camera PANS OUT to the wide shot (DeathCamWide): a camera of his own takes the picture where the gameplay camera stands and
+    /// eases (smoothstep, DeathCamPanSeconds) out to DeathCamDistance m from the arena's middle along the gameplay camera's own bearing from it, DeathCamHeight m
+    /// over the floor, looking at DeathCamLookUp m over the middle, its fov to DeathCamFov; the yaw and the pitch turn on their own (no roll, any turn). The
+    /// game's own for Petey (bosspakkun TNerveBPDie: makeShineAppearWithDemo(.., "ボスシャインカメラ", ..)) is a placed fixed camera the inbetween swings to.</summary>
+    private void DeathCamBegin()
+    {
+        if (!DeathCamWide || IsCopy || _deathCamPhase != 0) return;
+        var tree = GetTree(); var from = DeathCamGameplay();
+        if (tree == null || from == null) return;
+        float fy = FloorUnder(_arenaCentre); if (float.IsNaN(fy)) fy = float.IsNaN(_introFloorY) ? _arenaCentre.Y : _introFloorY;
+        var mid = new Vector3(_arenaCentre.X, fy, _arenaCentre.Z);
+        Vector3 bearing = from.GlobalPosition - mid; bearing.Y = 0f;
+        bearing = bearing.LengthSquared() > 1e-4f ? bearing.Normalized() : Vector3.Back;
+        _dcWidePos = mid + bearing * DeathCamDistance + Vector3.Up * DeathCamHeight;
+        _dcWideLook = mid + Vector3.Up * DeathCamLookUp;
+        _dcWideBase = _dcWidePos;
+        _deathCamWas = from;
+        _deathCam = new Camera3D
+        {
+            Name = "SmsDeathWideCam", ProcessMode = ProcessModeEnum.Always, Projection = from.Projection, Near = from.Near, Far = Mathf.Max(from.Far, DeathCamDistance * 3f),
+            KeepAspect = from.KeepAspect, CullMask = from.CullMask, Environment = from.Environment, Attributes = from.Attributes, HOffset = from.HOffset, VOffset = from.VOffset
+        };
+        (tree.CurrentScene ?? tree.Root).AddChild(_deathCam);
+        DeathCamFit(fy);
+        var t = from.GlobalTransform;
+        _dcFromPos = t.Origin; (_dcFromYaw, _dcFromPitch) = DeathCamYawPitch(-t.Basis.Z); _dcFromFov = from.Fov;
+        _dcToPos = _dcWidePos; (_dcToYaw, _dcToPitch) = DeathCamYawPitch(_dcWideLook - _dcWidePos); _dcToFov = DeathCamFov;
+        _deathCamT = 0f; _deathCamPhase = 1;
+        DeathCamPose(DeathCamPanSeconds > 0f ? 0f : 1f);
+        _deathCam.MakeCurrent();
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the DEATH CAMERA pans out -- from {from.Name} at {_dcFromPos} (fov {_dcFromFov:F0}) to {_dcWidePos} looking at {_dcWideLook} (fov {DeathCamFov:F0}; {(_dcPushedBack > 0f ? $"pulled back {_dcPushedBack:F0} m to keep the Shine's flight from {_burstAt} in frame" : "the Shine's flight in frame")}) over {DeathCamPanSeconds:F2} s");
+    }
+    /// <summary>221: the wide shot pulled back along its line of sight (2 m at a time, at most DeathCamDistance more) until the Shine's whole flight is in frame
+    /// with a margin -- its star's centre through ShineSprite.SmsAppear's rise (SmsUpSpeed x SmsMoveUpTicks) and loop (TShine::movingCircle: the straight line to
+    /// its spot plus a hump of SmsCircleRateY x the flat distance), the star's top, bottom and sides (1.5 m x ShineScale, a fifth more). His burst comes where the
+    /// down clip leaves his body, 12 m and more from where he hovered: one far out at the edge can leave the default frame; most never move it.</summary>
+    private void DeathCamFit(float fy)
+    {
+        _dcPushedBack = 0f;
+        if (DeathCamNode == null) return;
+        float k = Mathf.Max(0.05f, ShineScale), upm = SmsUnits.UnitsPerMetre;
+        Vector3 placedRoot = ShinePlaced(fy, k), lift = Vector3.Up * (ShineCentreOverRoot * k);
+        Vector3 topRoot = (ShineFromBurst ? _burstAt : placedRoot) + Vector3.Up * (ShineSprite.SmsUpSpeed * ShineSprite.SmsMoveUpTicks / upm);
+        float flat = new Vector2(placedRoot.X - topRoot.X, placedRoot.Z - topRoot.Z).Length() * upm;                          // in units, as movingCircle has it
+        if (flat == 0f) flat = 1000f;
+        float yDelta = (placedRoot.Y - topRoot.Y) * upm; if (yDelta > 0f) flat += yDelta;
+        float hump = flat * ShineSprite.SmsCircleRateY / upm, half = 0.75f * k * 1.2f;
+        var pts = new List<Vector3> { (ShineFromBurst ? _burstAt : placedRoot) + lift, topRoot + lift };
+        for (int i = 1; i <= 12; i++) { float t = i / 12f; Vector3 r = topRoot.Lerp(placedRoot, t); r.Y += hump * MathF.Sin(MathF.PI * t); pts.Add(r + lift); }
+        Vector3 view = _dcWideLook - _dcWidePos; Vector3 back = -view.Normalized(), right = view.Cross(Vector3.Up).Normalized();
+        var (yaw, pitch) = DeathCamYawPitch(view); var basis = Basis.FromEuler(new Vector3(pitch, yaw, 0f));
+        var was = _deathCam.GlobalTransform; float wasFov = _deathCam.Fov;
+        _deathCam.Fov = DeathCamFov;
+        float extra = 0f;
+        for (; extra < DeathCamDistance; extra += 2f)
+        {
+            _deathCam.GlobalTransform = new Transform3D(basis, _dcWidePos + back * extra);
+            bool all = true;
+            foreach (var c in pts)
+                if (!_deathCam.IsPositionInFrustum(c + Vector3.Up * half) || !_deathCam.IsPositionInFrustum(c + Vector3.Down * half) || !_deathCam.IsPositionInFrustum(c + right * half) || !_deathCam.IsPositionInFrustum(c - right * half)) { all = false; break; }
+            if (all) break;
+        }
+        _dcPushedBack = Mathf.Min(extra, DeathCamDistance); _dcWidePos += back * _dcPushedBack;
+        _deathCam.GlobalTransform = was; _deathCam.Fov = wasFov;
+    }
+    /// <summary>221: a frame of the death camera -- the pan out; the hold (the wide shot fixed while the Shine comes out where he burst and jumps to the middle;
+    /// with no demo to wait for -- ShineDemo off, another Shine scene, the Shine gone -- straight on to the glide); the glide back onto the gameplay camera's
+    /// LIVE pose (the world runs again and it moves), then the picture handed back.</summary>
+    private void DeathCamTick(float dt)
+    {
+        if (_deathCamPhase == 0) return;
+        if (DeathCamNode == null) { DeathCamEnd(); return; }
+        _deathCamT += dt;
+        if (_deathCamPhase == 1)
+        {
+            float k = DeathCamPanSeconds > 0f ? _deathCamT / DeathCamPanSeconds : 1f;
+            DeathCamPose(k);
+            if (k >= 1f) { _deathCamPhase = 2; _deathCamT = 0f; }
+        }
+        else if (_deathCamPhase == 2 && ShineSpawned && !(Shine is ShineSprite s && s.SmsAppearDemoRunning)) DeathCamRelease();
+        if (_deathCamPhase == 3)
+        {
+            var to = DeathCamReturnTo;
+            if (to == null) { DeathCamEnd(); return; }
+            var t = to.GlobalTransform;
+            _dcToPos = t.Origin; (_dcToYaw, _dcToPitch) = DeathCamYawPitch(-t.Basis.Z); _dcToFov = to.Fov;
+            float k = DeathCamBackSeconds > 0f ? _deathCamT / DeathCamBackSeconds : 1f;
+            DeathCamPose(k);
+            if (k >= 1f) { DeathCamEnd(); return; }
+        }
+        DeathCamKeepView();
+    }
+    /// <summary>221: the Shine's demo is over (its SpawnEntranceFinished; or no Shine at all): the wide shot glides back from where it is to the gameplay camera
+    /// over DeathCamBackSeconds.</summary>
+    private void DeathCamRelease()
+    {
+        if (_deathCamPhase != 1 && _deathCamPhase != 2) return;
+        if (DeathCamNode == null || DeathCamReturnTo == null) { DeathCamEnd(); return; }
+        var t = _deathCam.GlobalTransform;
+        _dcFromPos = t.Origin; (_dcFromYaw, _dcFromPitch) = DeathCamYawPitch(-t.Basis.Z); _dcFromFov = _deathCam.Fov;
+        _deathCamPhase = 3; _deathCamT = 0f;
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the death camera glides back to {_deathCamWas.Name} over {DeathCamBackSeconds:F2} s");
+    }
+    /// <summary>221: the death camera off -- the picture back to the gameplay camera (when the view is still the wide shot's, or the shake's of it), the wide
+    /// camera freed.</summary>
+    private void DeathCamEnd()
+    {
+        var cam = DeathCamNode; var was = DeathCamReturnTo;
+        var cur = IsInsideTree() ? GetViewport()?.GetCamera3D() : null; var shake = SmsCameraShake.Current?.Camera;
+        if (was != null && was.IsInsideTree() && (cur == null || cur == cam || (shake != null && cur == shake))) was.MakeCurrent();
+        cam?.QueueFree();
+        _deathCam = null; _deathCamPhase = 0; _deathCamT = 0f;
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the death camera is over -- the picture {(was != null ? $"back with {was.Name}" : "left as it is (no gameplay camera)")}");
+    }
+    /// <summary>221: the wide shot's pose k of the way (smoothstep) from the from-pose to the to-pose: the spot straight, the yaw the short way round, the pitch,
+    /// the fov.</summary>
+    private void DeathCamPose(float k)
+    {
+        if (DeathCamNode == null) return;
+        float e = Mathf.SmoothStep(0f, 1f, Mathf.Clamp(k, 0f, 1f));
+        var basis = Basis.FromEuler(new Vector3(Mathf.Lerp(_dcFromPitch, _dcToPitch, e), Mathf.LerpAngle(_dcFromYaw, _dcToYaw, e), 0f));   // YXZ: the yaw, then the pitch
+        _deathCam.GlobalTransform = new Transform3D(basis, _dcFromPos.Lerp(_dcToPos, e));
+        _deathCam.Fov = Mathf.Lerp(_dcFromFov, _dcToFov, e);
+    }
+    /// <summary>221: a view direction's yaw (about +Y, 0 = looking down -Z) and pitch (up positive).</summary>
+    private static (float Yaw, float Pitch) DeathCamYawPitch(Vector3 dir)
+    {
+        dir = dir.LengthSquared() > 1e-8f ? dir.Normalized() : Vector3.Forward;
+        return (MathF.Atan2(-dir.X, -dir.Z), MathF.Asin(Mathf.Clamp(dir.Y, -1f, 1f)));
+    }
+    /// <summary>221: the camera the picture is taken from and handed back to -- the current one, unless that is the shake's render camera (SmsCameraShake renders
+    /// whoever made itself current, shaken: his rumble through the down has it current), then the scene's gameplay camera (the Camera3D in the SunshineCamera rig).</summary>
+    private Camera3D DeathCamGameplay()
+    {
+        var cur = GetViewport()?.GetCamera3D(); var shake = SmsCameraShake.Current?.Camera;
+        if (cur != null && cur != shake) return cur;
+        var scene = GetTree()?.CurrentScene;
+        if (scene != null)
+            foreach (var c in scene.FindChildren("*", "Camera3D", true, false).OfType<Camera3D>())
+            {
+                if (c == shake || !c.IsInsideTree()) continue;
+                for (Node p = c.GetParent(); p != null; p = p.GetParent()) if (p is SunshineCamera) return c;
+            }
+        return cur;
+    }
+    /// <summary>221: the wide shot keeps the picture through its phases -- taken back when nothing has it, or the gameplay camera, or a shake camera that cannot run
+    /// (the Shine's stop-the-world froze it mid-shake); a shake that runs renders the wide shot shaken and hands it back itself.</summary>
+    private void DeathCamKeepView()
+    {
+        var cam = DeathCamNode; if (cam == null || !IsInsideTree()) return;
+        var cur = GetViewport()?.GetCamera3D();
+        if (cur == cam) return;
+        var shake = SmsCameraShake.Current;
+        if (cur == null || cur == _deathCamWas || (shake != null && cur == shake.Camera && !shake.CanProcess())) cam.MakeCurrent();
     }
     /// <summary>The SHINE (makeShineAppearWithDemo, "the boss shine"): the ShineScene beside him in the arena, placed at ShineSpawnPoint or ShineOverFloor m over the
     /// floor at the arena's middle with its back to Mario, appearing the game's way from where he burst (ShineFromBurst) with the demo (ShineDemo), its exit set
@@ -1408,13 +1596,13 @@ public partial class SmsKingBooRematch : Node3D
     {
         _shinePending = false;
         var scene = ShineScene ?? (ResourceLoader.Exists("res://shine_sprite.tscn") ? GD.Load<PackedScene>("res://shine_sprite.tscn") : null);
-        if (scene == null) { GD.PushWarning($"[SMS kingboo] {GetPath()}: no ShineScene and no res://shine_sprite.tscn -- no Shine at the fight's end"); return; }
+        if (scene == null) { GD.PushWarning($"[SMS kingboo] {GetPath()}: no ShineScene and no res://shine_sprite.tscn -- no Shine at the fight's end"); DeathCamRelease(); return; }
         var node = scene.Instantiate<Node3D>();
         Node parent = GetParent() ?? GetTree().CurrentScene;
         parent.AddChild(node);
         float fy = FloorUnder(_arenaCentre); if (float.IsNaN(fy)) fy = float.IsNaN(_introFloorY) ? _arenaCentre.Y : _introFloorY;
         float k = Mathf.Max(0.05f, ShineScale);
-        Vector3 placed = ShineSpawnPoint != null ? ShineSpawnPoint.GlobalPosition : new Vector3(_arenaCentre.X, fy + ShineOverFloor - ShineCentreOverRoot * (k - 1f), _arenaCentre.Z);   // 217: the star's centre where the normal one has it
+        Vector3 placed = ShinePlaced(fy, k);                                                                                               // 217: the star's centre where the normal one has it
         var m = M(); Vector3 away = m != null ? placed - m.GlobalPosition : Vector3.Forward; away.Y = 0f;
         if (away.LengthSquared() < 1e-4f) away = Vector3.Forward; away = away.Normalized();
         float yaw = Mathf.Atan2(-away.X, -away.Z);                                                                                        // SmsMath.DirFromYaw(yaw) = away: its back to Mario
@@ -1428,6 +1616,7 @@ public partial class SmsKingBooRematch : Node3D
             int ticks = ShineDemoTicks > 0 ? ShineDemoTicks : s.SmsAppearDemoTicks;
             if (ShineCamOffset != Vector3.Zero) s.SmsAppearCamOffset = ShineCamOffset;
             s.SmsAppearLookUp *= k;                                                                                                       // 217: the demo camera on the bigger star's middle
+            if (_deathCamPhase != 0) { s.SmsAppearCamera = false; s.SpawnEntranceFinished += DeathCamRelease; }                          // 221: the wide shot watches it; its demo's end sends the camera back
             if (ShineFromBurst) s.SmsAppearFrom(_burstAt, ticks, ShineDemo); else s.SmsAppear(ticks, ShineDemo);
             if (ShineCamFov > 0f && s.SmsAppearCam != null) s.SmsAppearCam.Fov = ShineCamFov;
         }
@@ -1725,6 +1914,9 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>217: the Shine scene's star centre over its root at its own scale (SmsStarLocal (0, 200, 0) x 0.006 = 1.2 m) -- a bigger Shine is lowered by
     /// this x (ShineScale - 1) so its centre stays at the normal one's height.</summary>
     private const float ShineCentreOverRoot = 1.2f;
+    /// <summary>The Shine's placed root: ShineSpawnPoint, else ShineOverFloor over the floor fy at the arena's middle, lowered ShineCentreOverRoot x (k - 1) for its
+    /// size k (217: the star's centre where the normal one has it). 221: SpawnShine places it there; the death camera frames its flight to there.</summary>
+    private Vector3 ShinePlaced(float fy, float k) => ShineSpawnPoint != null ? ShineSpawnPoint.GlobalPosition : new Vector3(_arenaCentre.X, fy + ShineOverFloor - ShineCentreOverRoot * (k - 1f), _arenaCentre.Z);
     private void SetPeaceSky(float k)
     {
         PeaceSkyBlend = k;
