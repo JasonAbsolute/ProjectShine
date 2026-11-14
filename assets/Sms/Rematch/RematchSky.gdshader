@@ -79,6 +79,12 @@ group_uniforms Knobs;
 uniform float brightness : hint_range(0.0, 4.0) = 1.0;
 uniform float streak_gain : hint_range(0.0, 4.0) = 1.0;
 uniform float flash_amount : hint_range(0.0, 2.0) = 1.0;
+/** 219 (Jaysonn: "so there are color flashes that happen in the skybox and sometimes hey have a hard line. can you make it soft?"): the game's own two seams,
+    seen only while a flash lights the clouds, blended away -- the clouds' first layer repeats top to bottom but its texture does not tile that way (a straight
+    line that sweeps up and down the sky as the layer breathes), and the fade over the clouds is clamped round the sky (an up-down line in the sky's +Z
+    direction, about 19 to 44 deg up). 1 = soft (0.12 of the texture's height either side of the cloud line, 0.03 of the way round either side of the
+    fade's), more = wider; 0 = the game's hard lines. */
+uniform float flash_soften : hint_range(0.0, 4.0) = 1.0;
 /** A steady colour on the clouds between the flashes (the game has none: black), and the colour the ball fades to above ~25 deg (the game's clear colour). */
 uniform vec3 base_lift : source_color = vec3(0.0, 0.0, 0.0);
 uniform vec3 clear_color : source_color = vec3(0.0, 0.0, 0.0);
@@ -164,9 +170,19 @@ vec3 boss_sky(vec3 d, float e, float f) {
 	float fa = mod(f, 60.0), fb = mod(f, 80.0);
 	float sa = key3(fa, 30.0, 1.0, 2.0747, 60.0, 1.0), ta = fa / 60.0;
 	float sb = key3(fb, 39.0, 1.0, 2.3961, 80.0, 1.0), tb = -fb / 80.0;
-	float a = tex_wm(bg04, vec2(6.0 * (u - 0.5) + 0.5 + ta, sa * (v0 - 0.5) + 0.5), 1, 1);
+	float va = sa * (v0 - 0.5) + 0.5;
+	float a = tex_wm(bg04, vec2(6.0 * (u - 0.5) + 0.5 + ta, va), 1, 1);
 	float b = tex_wm(bg04, vec2(4.0 * (u - 0.5) + 0.5 + tb, sb * (v0 - 0.5) + 0.5), 1, 2);
 	float g = tex_wm(gs001m, vec2(1.0 - u, 1.0 - v0), 0, 0);
+	// 219: the two seams softened (flash_soften; tools/projectshine/rematch157/sky208/flash219_fix.py draws the same): near the cloud layer's row seam
+	// (va a whole number) its read fades into the MIRRORED read, which has the same rows either side of the line; near u = 0 the fade goes over to the
+	// mean of its two edge columns
+	if (flash_soften > 0.001) {
+		float sd = abs(va - round(va));
+		if (sd < 0.12 * flash_soften) a = mix(a, tex_wm(bg04, vec2(6.0 * (u - 0.5) + 0.5 + ta, va), 1, 2), 1.0 - smoothstep(0.0, 0.12 * flash_soften, sd));
+		float ud = min(u, 1.0 - u);
+		if (ud < 0.03 * flash_soften) g = mix(g, 0.5 * (tex_wm(gs001m, vec2(0.0, 1.0 - v0), 0, 0) + tex_wm(gs001m, vec2(1.0, 1.0 - v0), 0, 0)), 1.0 - smoothstep(0.0, 0.03 * flash_soften, ud));
+	}
 	float fc = mod(f, 300.0);
 	vec3 c0 = (vec3(100.0, 0.0, 150.0) * pulse(fc, 0.0, 2.0, 19.0) + vec3(92.0, 211.0, 97.0) * pulse(fc, 149.0, 154.0, 164.0) + vec3(144.0, 111.0, 168.0) * pulse(fc, 164.0, 167.0, 189.0)) / 255.0 * flash_amount;
 	vec3 c1 = (vec3(100.0, 100.0, 100.0) * pulse(fc, 9.0, 12.0, 39.0) + vec3(0.0, 0.0, 73.0) * pulse(fc, 108.0, 118.0, 166.0) + vec3(54.0, 0.0, 0.0) * pulse(fc, 226.0, 237.0, 300.0)) / 255.0 * flash_amount;
