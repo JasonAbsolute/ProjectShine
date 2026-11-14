@@ -14469,3 +14469,52 @@ the drive, the logs, the shots and the tasks deleted.
 **Deviations:** the softened lines are the port's (the game draws them hard): `flash_soften` 0 gives the game's sky back. The cloud line's twin
 under the horizon (behind the arena's rim from the fight's camera) is softened the same way (`flash219_fix.py`: the green's 25.2 across, 17.2
 beside -> 11.9, 18.7).
+
+### 220 -- the King Boo REMATCH, part 65: the SHINE's SOUNDS, the game's own: the appear's chime and fanfare, the Shine's hum while it is out, the chime at the touch, the Shine Get's fanfare (cutting the music, the effects quiet but the system's and Mario's voice) -- for every Shine in the port (feature/kingboo-rematch, code `885282a`)
+
+**Jaysonn**: "yeah can you do the shine sounds? otherwise i think everything looks ok for now!" (the rest of the rework proposed after 219 -- the HUD
+in the cutscenes, the appear's camera and flash, the exit after the Shine Get -- not done: his call)
+
+**The game** (`Item.cpp`: `TShine::appearWithTime` 706-709, `control` 536-615, `touchPlayer` 664; `MarDirectorDirect.cpp` 843-852; `MSoundBGM.cpp`
+`startBGM`; `BackgroundMusic.hpp`, whose enum sits one place off `mSound.asn`'s names): an appear plays `MSD_SE_SHINE_APPEAR` at the Shine and
+`MSBgm::startBGM(0x8001002D)` -- mSound.asn's `MSD_BGM_SHINE_APPEAR`, t_shine_appear.com -- which cuts no music; every tick of STATE_NORMAL /
+MOVING_UP / DOWN / CIRCLE / FLOAT / WAIT the Shine calls `MSD_SE_SHINE_EXIST` (id 0x81C1: the 0x800 bit clear, a level sound kept alive by the
+calls); the touch plays `MSD_SE_SY_GET_SHINE`; the Shine Get's pending step starts 0x8001000A (the decomp's `MSD_BGM_CHUBOSS` = mSound.asn's
+`MSD_BGM_GET_SHINE`, k_clear.com), and `startBGM` for it first stops music tracks 0 and 1 at once and sets `demoModeIn(0x16F)` -- every sound
+effect silent but the system's and Mario's voice -- as the miss's jingle does.
+
+**The sounds.** NEW **`assets/Sms/Sound/Music/MSD_BGM_SHINE_APPEAR.wav`** (4.56 s), **`MSD_BGM_GET_SHINE.wav`** (5.14 s) (+ `.import`) -- rendered
+from the disc's sequences with the game's instruments (`tools/projectshine/sound154/sms_bgm.py`, `trim213.py`, NEW `level220.py`: level213.py's
+MSD_BGM_BOSS normalisation, held 0.03 dB under it for MSD_BGM_GET_SHINE so its peak stays under full scale, every file computed before any is
+written; `adopt156.py`). NEW **`assets/Sms/Sound/Object/MSD_SE_SHINE_APPEAR.wav`** (3.39 s), **`MSD_SE_SHINE_EXIST.wav`** (3.23 s, a loop region
+70000-103333), **`MSD_SE_SY_GET_SHINE.wav`** (1.57 s) (+ `.import`) -- baked by `sms_audio.py` (`adopt157.py`). `sms_audio.py` fix: a note whose
+track routes oscillator 0 (OscRoute 0) with no SimpleADSR plays at full level to its note-off (the track's osc 0 is still `Player::sEnvelopeDef`
+with a null attack table and `TOscillator::getOffset` returns 1.0; the baker used `sAdsTable`, which falls to 0 at once: MSD_SE_SHINE_APPEAR baked
+0.01 s); no sound of record is under 0.05 s, none re-baked. **`assets/Sms/Sound/SmsMarioSoundTable.cs`**: the five rows (`gen_table154.py`; the
+table otherwise the one shipped).
+
+**The code.** **`assets/Sms/Sound/SmsActorSound.cs`**: `ShineSprite` is the actor "shine"; its `AppearSound` slot gets MSD_BGM_SHINE_APPEAR (a 2D
+player on the Music bus). **`assets/ShineSprite.cs`**: the sound node attached in `_Ready`; `SmsAppearSounds` -- the chime (positional, on the
+node's pool) and the `AppearSound` fanfare, for the game's appear and the tween entrance alike; `SmsHumTick` (every physics tick) --
+MSD_SE_SHINE_EXIST looping while the Shine is shown, not taken, not in the get or its end, not in the appear's wait; the touch
+(`OnPickupBodyEntered`) -- the hum off, MSD_SE_SY_GET_SHINE; readouts `SmsSound`, `SmsHumOn`, `SmsAppearSoundsPlayed`, `SmsGetChimes`.
+**`assets/Sms/Sound/SmsMarioSound.cs`**: Mario's `ShineGetFanfare` slot filled with MSD_BGM_GET_SHINE. **`assets/Mario.cs`**: `SmsShineGetBegin` --
+`StopAllMusic`, `DemoModeIn(0x16F)`, then the fanfare; the quiet ends once, whichever way the demo ends (`SmsShineGetFinish`: the stage moving, the
+title, control back; the state left early); readouts `SmsShineMusicStopped`, `SmsShineDemoModeOn`.
+
+**Verified:** the shine sound drive v220 (deleted before the commit; headless: the card skipped by A, the cutscene played, his moves off; his HP set
+to 1 and the hit -- the real down, burst, Shine and demo; a stand-in stage music on the Music bus from half a second after the burst; after the demo
+Mario put 3 m off and walked in with the stick, the real PickupZone): C63 the appear -- the Shine's sound node on, `AppearSound` = MSD_BGM_SHINE_APPEAR
+(4.55 s, the Music bus) playing at once with the chime heard on the Shine; 2 s into the stop-the-world demo the fanfare at 1.95 s (not paused with the
+tree), over by 5.2 s; the stand-in music left playing; C64 the hum looping and heard on all 408 ticks of the flight, the settle and the wait, heard at
+the camera before the touch, off from the touch; C65 the touch 0.82 s after the settle -- the chime once; at the Shine Get's start the stand-in cut
+(1 music player stopped), the demo mask 0x16F with the chime still heard, the fanfare = MSD_BGM_GET_SHINE (5.14 s, the Music bus) playing and still at
+3 s; the card save (A), then control back with the mask out -- 3 / 3 (run shinesound220a). The regression drive 68 / 68 (run fl). The import
+(`run_import220`: the five `.import` files) and the clean rebuild 0 errors; `Mario.cs` and `SmsActorSound.cs` kept CRLF in the working copy as they
+were; the drive, the logs and the tasks deleted. The drive's A at the card save saved: the rematch Shine is now in the save file (its flag was fresh:
+"set -- the count is now 3"; the file as the run left it kept at `tools/projectshine/rematch157/save220/`); left for Jaysonn to say.
+
+**Deviations:** the music cut and the quiet at the Shine Get last till the stage moves in the game; a Shine whose `ExitLevel` is off (his option --
+the rematch's) ends the quiet when control comes back, and the cut music stays stopped. The appear fanfare does not hold the appear demo open: the
+game's director waits for it (`MSBgm::getHandle(2)`) before ending a demo, the port's demo keeps its own length (the rematch's 6 s, the fanfare 4.6).
+The renders are dry (no reverb), as 156's. The hum fades with the camera's distance on the port's one curve (full to 1200 u, silent at 12000 u).
