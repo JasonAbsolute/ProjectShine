@@ -14438,3 +14438,34 @@ detonating (`SmsBooVolley.cs` line 101, its `Spit` lambda) and a fireball's sign
 `FireballsTick`) -- logged, the checks unaffected. The clean rebuild 0 errors; the drive, the logs, the shots and the tasks deleted.
 
 **Deviations:** none -- the streaks are drawn in the game's colours now; their shapes, their strength (`streak_gain`) and the flashes are as before.
+
+### 219 -- the King Boo REMATCH, part 64: the fight sky's FLASHES without their HARD LINES (the clouds' texture seam and the fade's seam round the sky blended away: RematchSky's flash_soften) (feature/kingboo-rematch, code `896f2a5`)
+
+**Jaysonn**: "so there are color flashes that happen in the skybox and sometimes hey have a hard line. can you make it soft?"
+
+**`assets/Sms/Rematch/RematchSky.gdshader`**: `flash_soften` (1; 0 = the game's hard lines, more = wider). The lines are the game's own, seen only
+while a flash lights the clouds (Luigi's Mansion's `vrb_mb.bmd` draws them the same: its TEX1 #0 wraps the cloud texture repeat both ways). The
+base ball's first cloud layer (`lm_bg04`, 6 times round) repeats top to bottom but the texture does not tile that way (its bottom row is 0.52 off
+its top row on average, neighbouring rows 0.025), so where its rows start over a straight line crosses the sky, sweeping up and down as the layer
+breathes 1 -> 2.07 -> 1 tall; and the fade over the clouds (`lm_gs001m`, clamped, read at 1 - u) meets its own right and left edges at u = 0, the
+sky's +Z direction: an up-down line about 19 to 44 deg up, the edges up to 0.129 apart. Within 0.12 x `flash_soften` of the texture's height
+either side of the cloud line the layer's read fades into the MIRRORED read (the same rows either side of the line, so no step); within 0.03 x
+`flash_soften` of the way round either side of u = 0 the fade goes over to its two edge columns' mean. Drawn first in
+`tools/projectshine/rematch157/sky208/flash219_fix.py` (`lm_sky_preview.py`'s maths with the same blend; `flash219_probe.py`,
+`flash219_probe2.py` (the disc's wrap modes) and `flash219_probe3.py` (the fade's line) found the two seams).
+
+**Verified:** the flash drive v219 (deleted before the commit; windowed; the card skipped by A, the cutscene played, his moves off; the sky's clock
+held on the peaks of the grey (frame 12), the green (154) and the lavender (167) flashes; the drive's camera at the arena's middle 3 m up, 15 deg
+up, looking straight at the fade's line (+Z, away from him; he and the HUD hidden), each flash shot with `flash_soften` 0 and 1 (46a-f), then the
+green from the game's camera (46g-h); each shot read in sky directions, so the lines' curve on the screen does not matter): C62 the cloud line's
+step across it (0.73 deg over against under) against the steps beside it (1.47 against 2.93 deg), 161 samples 40 deg either side of the view --
+the game's grey 7.9 / 5.2 (1.51 x), green 42.7 / 11.6 (3.66 x), lavender 36.1 / 5.8 (6.25 x); soft 4.7 / 4.6 (1.02 x), 9.2 / 16.7 (0.55 x),
+5.1 / 7.1 (0.71 x); the grey's fade line, 20-42 deg up, across it against pairs beside it: the game's 10.36 / 3.43, soft 4.27 / 3.64 (of 255) --
+1 / 1, its error stream empty (run flash219a; `flash219_fix.py` had drawn the same lines 7.8 / 6.1, 44.1 / 8.4, 35.4 / 3.1, soft 5.2 / 5.3,
+9.4 / 15.3, 3.8 / 5.6). The before / after sheet: `tools/projectshine/rematch157/shots219a/flash_before_after219.png` (`compose219.py`). The
+regression drive 68 / 68 (run fk; it pins the committed `HitPoints` 9 against Jaysonn's local `RematchArena.tscn` 3). The clean rebuild 0 errors;
+the drive, the logs, the shots and the tasks deleted.
+
+**Deviations:** the softened lines are the port's (the game draws them hard): `flash_soften` 0 gives the game's sky back. The cloud line's twin
+under the horizon (behind the arena's rim from the fight's camera) is softened the same way (`flash219_fix.py`: the green's 25.2 across, 17.2
+beside -> 11.9, 18.7).
