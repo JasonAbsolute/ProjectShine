@@ -14572,3 +14572,63 @@ detonates after the volley is gone.
 shot stands about 47 m from the middle and holds its look on the middle -- Jaysonn's "almost looking at the entire arena". The game's inbetween to
 the fixed camera is 16 frames and it cuts back from a DEFINITE camera; the port pans out over 1.2 s and glides back over 0.8 s. The hum keeps the
 game's release on each note but is still the whole sequence baked into one looped file.
+
+### 222 -- the King Boo REMATCH, part 67: the death camera CUTS to the wide shot and cuts back (no pan); the LINE down the arena floor gone (the floor's stone rows re-mapped unbroken round the ring); the console hides through a Shine's appear demo and behaves the game's way at the shine get; the volley's and his attacks' signals safe after their owner is gone (feature/kingboo-rematch, code `e3fac61`)
+
+**Jaysonn**: "oh no that camera angle is wrong for the wide shot it shouldnt pan it should cut"; "Fix the floor line and volley error, and make
+sure the hud behaves correctly when collecting a shine".
+
+**The cut.** **`assets/Sms/Rematch/SmsKingBooRematch.cs`**: `DeathCamPanSeconds` and `DeathCamBackSeconds` 0 (221 had 1.2 / 0.8): at his burst the
+camera cuts to the wide shot (`DeathCamBegin` poses the camera at the wide spot on its first frame), and when the Shine's demo is over it cuts
+straight back to the gameplay camera (`DeathCamRelease` -> `DeathCamEnd`, no glide) -- as the game cuts to and from Petey's placed Shine camera
+(bosspakkun `TNerveBPDie`: `makeShineAppearWithDemo`'s camera tool). The knobs over 0 give 221's eased pan and glide. Everything else of 221's camera
+stays (the wide spot, the fit for a far burst, the Shine's own demo camera off, the hand-back).
+
+**The floor line.** **`models/Sms/Rematch/polta_planet.glb`**: the arena floor (mesh3, lambert4_v, the 64 x 64 stone tile Z_isiblock01) is built from
+20 wedges (a spoke every 18 degrees) in rings, and every wedge of a band mapped the SAME stretch of the tile, so across each spoke the texture's u
+jumped by a fraction of a tile (0.57 at 10 m, 1.07 at 20 m) and the stones were cut mid-block: a straight seam down every spoke -- the one Jaysonn saw
+runs from the middle toward the fight camera's start (world +Z), which looks straight down it (219's and 221's shots). Re-mapped by
+`tools/projectshine/rematch157/floorfix222.py`: the four outer bands (5.33-25.12 m: where Mario walks) split into the tile's five stone ROWS (the dark
+mortar lines at pixel rows 6 / 21 / 32 / 44 / 58, read from the texture), each row mapping u = N x the angle round the ring / 360 with N a WHOLE number
+of tiles (7-25 by row: the original's own density at the row's middle, rounded), so the stones run on unbroken across every spoke and close up on
+themselves at 360 degrees. The positions, normals and vertex colours are the original quads' own, interpolated; v is the original's; the inner stones
+(to 5.33 m), the step ring, the walls, the rock and the textures are untouched. 1741 vertices / 900 triangles for the floor (was 421 / 260).
+`floorview222.py` renders the floor from above the way the port draws it (the tile x the vertex colour, REPEAT, bilinear) for the before / after
+(`view222/`); `floor222.py` lists the seams.
+
+**The console (the HUD) at a Shine.** The game's console runs its camera demo whenever the camera is a demo camera (`TGCConsole2::performMovement`:
+`gpCamera->isDemoCamera()` -> `startCameraDemo`: the counters, the lives and the life meter go; `endCameraDemo` three frames after it is not) and
+brings the star HUD in for the shine get (DIRECTOR_FLAG_SHINE_TAKEN, set by `fireGetStar` at the landing). The port's console
+(`assets/Sms/SmsStandardHud.cs`) learned a demo only from Mario (`Demo`: the camera locked, a talk, the get, death): a Shine's appear demo and the
+rematch's death camera are not his to report, so the counters stayed up through them; and a Shine touched in the AIR locked the camera for the fall,
+which the console took for a demo -- the counters went off with no SHINE_TAKEN, and the get then found the console already in its demo: no shine
+counter for the count-up. **`assets/Sms/SmsStandardHud.cs`**: a registry of camera-demo owners (`CameraDemoBegin` / `CameraDemoEnd` by the node's
+id; an owner freed mid-demo drops out), `InDemo` = Mario's `Demo` or an owner's, read by the console itself every frame (its process mode is Always:
+the Shine's stop-the-world freezes Mario's feed); every demo test in the console reads `InDemo`; readout `InCameraDemo`. **`assets/ShineSprite.cs`**:
+`SmsAppear` with its demo reports the demo; `SmsAppearDemoEnd` and `_ExitTree` end it. `SmsKingBooRematch.cs`: the death camera reports from
+`DeathCamBegin` to `DeathCamEnd`. **`assets/Mario.cs`** (`SmsStandardHudFeed`): the lock through the fall after an air touch (`_pendingShine` set) is
+no demo; the get at the landing is, with `ShineDemo`, as before.
+
+**The volley error (and his attacks').** **`assets/Sms/Rematch/SmsBooVolley.cs`**: a spat Bomb Boo lives under the supply's parent and outlives its
+volley (freed once every Boo is down, or with King Boo's hit and the split's field clear) -- its dud floats on with its fuse burning, and when it
+landed or blasted after that the volley's handlers ran `EmitSignal` on the freed volley (`ObjectDisposedException` from `SmsBombBoo.Detonate`, in
+every regression run's error output). The handlers return when the volley is gone (the static totals still count). The same guard on the eleven
+handlers King Boo hangs on his attack nodes (the Boolossus, the walls, the breath, the volley, the Boo circle, the wind, the fireballs: a copy
+dismissed while its fireballs flew threw the same from `SmsFireballs.Finished`, seen in run fn).
+
+**Verified:** the shine hud drive v222 (deleted before the commit; windowed, shots 48a-i): C69 the console through the Shine's appear -- its demo 0.02 s
+after the burst, no pane of the coins / lives / star / life meter on screen on any of the 324 ticks from 0.6 s after the burst to the camera's end (the
+world paused through the Shine's demo), the demo over 0.03 s after the camera came back and the coins back 0.15 s after; C70 the touch in the AIR
+(Mario dropped from 5 m beside the star) -- the fall 15 ticks with the console in no demo, the get at the landing bringing the star HUD in at once with
+the coins beside it and the lives away, the count 3 -> 4 at 2.7 s with the digits following; C71 the card save answered "Continue" (the pointer read
+before A: nothing written, the save file's md5 as before), control back, the console's demo over and the coins on screen -- 3 / 3 (run shotb). The
+death camera drive (221's, its checks reworked for the cuts): the wide camera at the wide spot on the burst's tick (0.000 m off), never moving through
+the hold, the picture back with the gameplay camera on the demo's own tick -- 3 / 3 (run g, King Boo put 30 m out: the fit pulled the shot back 8 m,
+the star in frame on all 300 ticks). The regression drive 68 / 68 (run fq; run fp had C33 fail on its own sampling -- the ring's hit, the break and
+the ambush's end fell between two of its ticks -- read steadier now). The import (`run_import222`: the glb; the four texture `.import` files it also
+rewrote put back), the clean rebuild 0 errors; `Mario.cs` kept CRLF in the working copy; the drive, the logs, the shots and the tasks deleted. The save
+file was backed up first (`tools/projectshine/rematch157/save222/`) and is unchanged; the test-saved rematch Shine from 220 is still in it (his call).
+
+**Deviations:** the game's console reads the camera's own state (`isDemoCamera`); the port's is told by the demos' owners. The floor's stone rows close
+up on whole tiles round each ring, so a row's stones are 4-10 % wider at its outer edge than its inner (the original's were the same, cut at the
+spokes). The Shine's appear flash is still the port's own; the Shine Get still hands control back in the arena (his option, `ShineExitLevel` off).
