@@ -1364,6 +1364,7 @@ public partial class SmsKingBooRematch : Node3D
         if (!IsCopy && PeaceSkyBlend > 0f) SetPeaceSky(0f);                                                                                   // 217: and off the night
         if (_deathCamPhase != 0) DeathCamEnd();                                                                                               // 221: the picture back to the gameplay camera
         if (_shineReady != null && IsInstanceValid(_shineReady) && !_shineReady.IsQueuedForDeletion()) { _shineReady.QueueFree(); _shineReady = null; }   // 224: a Shine made ahead and never brought out goes with him
+        GcQuietEnd("he leaves the tree");                                                                                                     // 226
     }
     /// <summary>The down clip begins (the last hit's hurt is over): the mist and the stars boil off his body, the blink, the glow and the crown's flare run in DeathTick.</summary>
     private void DeathBegin()
@@ -1843,11 +1844,16 @@ public partial class SmsKingBooRematch : Node3D
             }
             else
             {
+                var swDown = System.Diagnostics.Stopwatch.StartNew(); double tClip, tSe, tCopies;                                   // 226: where the down's frame goes (it ran 58-68 ms)
                 State = Phase.Down; PlayClip(BckDown);
+                tClip = swDown.Elapsed.TotalMilliseconds;
                 if (_sound != null && !string.IsNullOrEmpty(DownSe)) _sound.Play(DownSe);
+                tSe = swDown.Elapsed.TotalMilliseconds;
                 foreach (var c in _copies.ToArray()) if (c != null && IsInstanceValid(c) && c.State != Phase.Gone) c.DismissCopy();   // 177: his copies go with him
+                tCopies = swDown.Elapsed.TotalMilliseconds;
                 DeathBegin();                                                                                                        // 183: the mist, the stars, the blink, the glow and the crown through the tumble
                 if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: DOWN ({_deathLen:F2} s of the down clip, then the burst)");
+                if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the DOWN's entry took {swDown.Elapsed.TotalMilliseconds:F1} ms on the main thread -- the down clip {tClip:F1}, its sound {tSe - tClip:F1}, the copies dismissed {tCopies - tSe:F1}, DeathBegin (the music fade, the mist, the stars) {swDown.Elapsed.TotalMilliseconds - tCopies:F1}");
             }
         }
         else if (State == Phase.Down && n == BckDown)
@@ -2177,7 +2183,55 @@ public partial class SmsKingBooRematch : Node3D
         if (_sound != null && !string.IsNullOrEmpty(HurtSe)) _sound.Play(HurtSe);
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: HIT by {by?.Name ?? "?"}{(midLick ? " mid-lick" : midSmash ? " mid-smash (the tell called off)" : midLightning ? " mid-lightning (the walls gone)" : midBreath ? " mid-breath (the breath cut off)" : midFire ? " mid-volley (the fireballs fizzle)" : midWind ? " mid-wind (the tornados gone)" : "")} -> {(IsCopy ? $"a COPY: no damage (its hit {CopyHitsTaken})" : $"{Hp} left")} (the hit clip, {_hurtLen:F2} s)");
         if (IsCopy) Original?.EmitSignal(SignalName.CopyHit, this); else EmitSignal(SignalName.Hit, Hp);
+        if (!IsCopy && Hp == 0) GcQuietBegin("the fatal hit");                                                       // 226: the collector's one pause now, under the blast and his flash, then none through his death, the Shine and the card
         return true;
+    }
+    // ---- 226: THE COLLECTOR HELD OFF -- .NET's no-GC region through his death, the Shine and the card save -------------------------------------------------
+    /// <summary>226: the .NET garbage collector's pauses -- 41-45 ms each, whenever its budget (about 8 MB; the port makes about 1 MB of garbage a second
+    /// in play) fills -- fell into the frame of his down and the frame the card save opened on. From the fatal hit the collector is asked for a NO-GC
+    /// REGION of GcQuietMegabytes: it collects once, then (the collector's own compacting collection, under the blast and his flash) holds off until the
+    /// region ends -- when control is back after the card save (a second's grace), after GcQuietMaxSeconds, or when he leaves the tree -- or until the
+    /// region's bytes run out (then the collector resumes on its own: the fallback for a player who dawdles before the Shine). Off = the collector as it is.</summary>
+    [Export] public bool GcQuietThroughDeath = true;
+    [Export(PropertyHint.Range, "16,240,8")] public int GcQuietMegabytes = 64;
+    [Export(PropertyHint.Range, "10,600,5")] public float GcQuietMaxSeconds = 120f;
+    private bool _gcQuiet, _gcSawGet; private float _gcQuietT, _gcBackT = -1f; private double _gcPause0, _gcPausedInside; private int _gcCount0, _gcCollectionsInside;
+    public bool GcQuietOn => _gcQuiet;
+    public float GcQuietSeconds => _gcQuietT;
+    /// <summary>For the drives: the collector's pause time (ms) and collections inside the region (its own first collection excluded) -- live while it
+    /// is on, frozen at its end.</summary>
+    public double GcQuietPausedMs => _gcQuiet ? GC.GetTotalPauseDuration().TotalMilliseconds - _gcPause0 : _gcPausedInside;
+    public int GcQuietCollections => _gcQuiet ? GC.CollectionCount(0) - _gcCount0 : _gcCollectionsInside;
+    private void GcQuietBegin(string why)
+    {
+        if (!GcQuietThroughDeath || _gcQuiet || IsCopy) return;
+        if (System.Runtime.GCSettings.LatencyMode == System.Runtime.GCLatencyMode.NoGCRegion) return;
+        var sw = System.Diagnostics.Stopwatch.StartNew(); bool ok = false; string note = "";
+        try { ok = GC.TryStartNoGCRegion((long)GcQuietMegabytes * 1048576L); }
+        catch (Exception e) { note = e.GetType().Name + ": " + e.Message; }
+        _gcQuiet = ok; _gcQuietT = 0f; _gcSawGet = false; _gcBackT = -1f;
+        _gcPause0 = GC.GetTotalPauseDuration().TotalMilliseconds; _gcCount0 = GC.CollectionCount(0);
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: {why}: the collector's NO-GC REGION {(ok ? "begun" : "REFUSED")} ({GcQuietMegabytes} MB{(note != "" ? "; " + note : "")}) in {sw.Elapsed.TotalMilliseconds:F1} ms (its own collection first); the heap {GC.GetTotalMemory(false) / 1048576.0:F1} MB");
+    }
+    private void GcQuietEnd(string why)
+    {
+        if (!_gcQuiet) return;
+        _gcPausedInside = GC.GetTotalPauseDuration().TotalMilliseconds - _gcPause0; _gcCollectionsInside = GC.CollectionCount(0) - _gcCount0;
+        _gcQuiet = false;
+        bool still = System.Runtime.GCSettings.LatencyMode == System.Runtime.GCLatencyMode.NoGCRegion;
+        if (still) { try { GC.EndNoGCRegion(); } catch (InvalidOperationException) { still = false; } }
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: {why}: the collector's no-GC region {(still ? "ended" : "had ENDED ON ITS OWN (its bytes ran out)")} after {_gcQuietT:F1} s -- {GcQuietCollections} collection(s) and {GcQuietPausedMs:F0} ms of pauses inside it; the heap {GC.GetTotalMemory(false) / 1048576.0:F1} MB");
+    }
+    private void GcQuietTick(float dt)
+    {
+        if (!_gcQuiet) return;
+        _gcQuietT += dt;
+        if (System.Runtime.GCSettings.LatencyMode != System.Runtime.GCLatencyMode.NoGCRegion) { GcQuietEnd("the budget passed"); return; }
+        if (_gcQuietT > GcQuietMaxSeconds) { GcQuietEnd($"{GcQuietMaxSeconds:F0} s"); return; }
+        var m = M(); if (m == null) return;
+        if (m.SmsShineDemoRunning) { _gcSawGet = true; _gcBackT = -1f; return; }
+        bool cardOpen = SmsCardSave.Current != null && SmsCardSave.Current.IsOpen;
+        if (_gcSawGet && !cardOpen && m.stateOfMario != Mario.MarioState.shineGet) { if (_gcBackT < 0f) _gcBackT = 0f; _gcBackT += dt; if (_gcBackT >= 1f) GcQuietEnd("control back after the card save"); }
     }
     // ---- 191: THE MOCK -- a copy hit laughs it off ------------------------------------------------------------------------------------------------
     private float _mockT; private int _mockYawSign = 1;
@@ -3011,7 +3065,7 @@ public partial class SmsKingBooRematch : Node3D
     public override void _Process(double delta)
     {
         if (Engine.IsEditorHint()) return;
-        if (!IsCopy) { HitBoxTick(); FinalSkyTick((float)delta); PeaceSkyTick((float)delta); }                                                                                          // 192: Mario's cylinder drawn (ShowHitBoxes); 208b: the final sky's fade
+        if (!IsCopy) { HitBoxTick(); FinalSkyTick((float)delta); PeaceSkyTick((float)delta); GcQuietTick((float)delta); }                                      // 226: the collector held off through his death and the Shine                                                                                          // 192: Mario's cylinder drawn (ShowHitBoxes); 208b: the final sky's fade
         if (AnyFxAlive) FxTick((float)delta);                                                                                                                   // 180 / 181: the flashes, the ring and the rise glow run on, hidden or not
         if (State == Phase.Gone) GoneTick((float)delta);                                                                                                       // 183: the Shine after the burst
         if (State == Phase.Hidden) return;
