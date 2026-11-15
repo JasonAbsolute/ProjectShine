@@ -14716,3 +14716,40 @@ it; the rest their first draw) -- a hitch of the same kind, `Mario.cs` / the con
 
 **Deviations:** the Shine now exists in the arena from the fight's start (hidden, inert; no code enumerates Shines). The frame of the cut is still
 1.5 frames long (its first draw).
+
+### 225 -- the King Boo REMATCH, part 70: the hitch at the Shine Get's landing gone (the SHINE! letters built at the console's start: 73 ms -> 32-34 ms); the four other baked music tracks -- the boss and mid-boss themes, the miss and game-over jingles -- re-rendered with the game's release curves the right way round (feature/kingboo-rematch, code `22abc1e`)
+
+**Jaysonn**: "Fix the Shine Get landing's hitch too, Re-render the four other baked music tracks with the corrected curves".
+
+**The landing.** Measured with a stopwatch through `StartShineGet` (the windowed drive, 1930 x 1086): 44 ms on the main thread -- 3.5 before the
+get's begin (the flag, the state, the hands), then `SmsShineGetBegin` 38: the SHINE! letters' first build (`TConsoleStr::startAppearShineGet`: the six
+glyph textures loaded, the gradient shader compiled, twelve materials, the two spark emitters) 31.6, the fade layer and the count-up 3.0, the music cut
+and the fanfare 1.4, the Shine's collect sequence 1.3, the camera 0.4, the kills 0.3; the frame itself 73 ms. **`assets/Sms/Console/SmsConsoleStr.cs`**:
+a new knob, `ShineLettersAhead` (on): the ShineGet root, the word's letters, their gradient shader and the spark emitters are built at the console's
+`_Ready`, hidden (`EnsureShineGetNodes`, shared with `StartAppearShineGet`, which now only rebuilds for another word or with the knob off). Measured
+after: the frame of the get's begin 32 / 34 / 37 ms over three runs at 60 fps (a frame is 17; the rest is the camera, the fade layer, Mario's new clip).
+
+**The music.** 223 found the baker reading JASOscillator's curve tables backwards in time (`TOscillator::calc` indexes a falling segment by the time
+elapsed; the baker read the remaining time and took the table as the distance remaining), so a curved release dropped to silence at the note-off,
+swelled back to full and cut dead -- and every instrument of the two boss themes, two of the miss jingle's six and three of the game over's seven have
+curved releases. `tools/projectshine/sound154`: `sms_audio.py` got a `LEGACY_CURVES` switch (`SMS_LEGACY_CURVES=1`: the pre-223 reading, for
+reproduction only), and with it the four shipped files were reproduced BYTE FOR BYTE from the disc's sequences first (`sms_bgm.py --one-cycle` for
+the themes, `--no-loop` + `trim213.py` + `level213.py` for the jingles; NEW `level225.py`: a theme put back on the level its shipped file had -- file
+= raw x the shipped norm, held under full scale -- with its loop chunk carried over verbatim, the wave module having dropped it), then rendered with
+the curves the right way round: **`assets/Sms/Sound/Music/MSD_BGM_BOSS.wav`** (98.9 s, loop 133806-3165385, norm 0.7281: -0.09 dB on its own peak),
+**`MSD_BGM_CHUBOSS.wav`** (57.2 s, loop 38533-1830533, norm 1.0138: +0.25 dB), **`MSD_BGM_MISS.wav`** (4.475 s), **`MSD_BGM_GAMEOVER.wav`** (8.194 s)
+-- the same lengths, loops and trims, so the table is unchanged; the RMS within 0.5 dB of before; the probe's hard cuts gone (BOSS 56 -> 0 clicks,
+CHUBOSS 40 -> 5, the five its own drum transients) and the rests between notes now rests (the old swelling tails filled them). `adopt156.py`: the record.
+
+**Verified:** the shine hud drive v225 (deleted before the commit; windowed at 1930 x 1086, no shots, no recording): NEW C73 the landing's frame --
+the longest frame within 0.25 s of the get's begin 32 / 34 / 37 ms (want under 50), the letters built ahead as 'SHINE!'; C72 the spawn's frame 19-23
+ms; C69, C70, C71 as 223 -- 5 / 5 (runs r, t, u). The death camera drive 3 / 3 (run l). The regression drive 68 / 68 (run fu). The import
+(`run_import225`: the four WAVs), the clean rebuild 0 errors; the drive, the logs, the recording and the tasks deleted; `Mario.cs` and `GameData.cs`
+(instrumented for the measurements, then put back) unchanged. The save file is unchanged.
+
+**Also measured, not changed:** .NET collections -- the drive's frame watch read the collector's counts in every long frame: a gen2 collection fell
+into a 57-67 ms frame now and then (the heap 26-39 MB), once right at the landing; `GCSettings.LatencyMode` `SustainedLowLatency` was tried in
+`GameData._Ready` and made no difference (the long frames with a collection in them were other first-time work: the down's emitters 58-63 ms at his
+death's start, the card save's scene 59-66 ms as it opens), so it was taken out. Those two frames are the next hitches of the sequence.
+
+**Deviations:** the SHINE! letters now exist (hidden) from the console's start. The music is still the port's dry render (no reverb).
