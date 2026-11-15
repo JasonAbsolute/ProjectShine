@@ -107,8 +107,8 @@ public partial class Mario
         d.OnWireTop = onWire && !d.OnWireHang; // on the wire but not hanging/rolling = on top (WIRE_WAIT / WALK / the turns / Return)
         d.ReadyGun = _smsHasFludd && stateOfMario == MarioState.crouch;
         d.PadDead = _smsPadDisabledTicks > 0;
-        d.AimR = !d.PadDead && Input.IsActionPressed("button_r");   // pass 114: a dead pad has no MEANING_R / MEANING_L / MEANING_CAM_L
-        d.CamL = !d.PadDead && Input.IsActionPressed("button_l");
+        d.AimR = !d.PadDead && Input.IsActionPressed(SmsNames.Of("button_r"));   // pass 114: a dead pad has no MEANING_R / MEANING_L / MEANING_CAM_L
+        d.CamL = !d.PadDead && Input.IsActionPressed(SmsNames.Of("button_l"));
         float lMin = SmsFluddCurrent.LAngleMin;
         d.AimRatio = lMin != 0f ? Mathf.Clamp(_fluddGunAngle / lMin, 0f, 1f) : 0f; // CLBCalcRatio<s16>(0, mLAngleMin, angle), clamped
         d.Downed = stateOfMario == MarioState.hurt || stateOfMario == MarioState.dead;

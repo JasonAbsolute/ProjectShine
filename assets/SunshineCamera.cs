@@ -123,6 +123,51 @@ public partial class SunshineCamera : Node3D
     private Rid _marioRid;
     private bool _hasMarioRid = false;
     private readonly CylinderShape3D _wallShape = new CylinderShape3D();
+    // 227: the rig's physics queries without their garbage -- ONE ray query, ONE shape query and ONE exclude list re-used (the game walks its own
+    // wall planes; the port asked the world up to a dozen times a tick and made a query object, an exclude list and a result dictionary each time,
+    // finalizable wrappers the .NET collector carried to gen1: 226's 41-45 ms pauses). Results sit in a ring of 32 and are disposed 32 casts on.
+    private PhysicsRayQueryParameters3D _rayQ;
+    private PhysicsShapeQueryParameters3D _shapeQ;
+    private Array<Rid> _exclude;
+    private readonly Dictionary[] _hitRing = new Dictionary[32];
+    private int _hitAt;
+
+    /// <summary>The exclude list back to Mario's body alone (the casts add the bodies that let the camera pass as they meet them).</summary>
+    private void ExcludeReset()
+    {
+        _exclude ??= new Array<Rid>();
+        _exclude.Clear();
+        if (_hasMarioRid) _exclude.Add(_marioRid);
+    }
+
+    /// <summary>A ray against camera-solid bodies (the arm's mask), the exclude list as it stands now.</summary>
+    private Dictionary CastRay(PhysicsDirectSpaceState3D space, Vector3 from, Vector3 to)
+    {
+        _rayQ ??= new PhysicsRayQueryParameters3D { CollideWithBodies = true, CollideWithAreas = false };
+        _rayQ.From = from; _rayQ.To = to; _rayQ.CollisionMask = _mask; _rayQ.Exclude = _exclude;
+        return Keep(space.IntersectRay(_rayQ));
+    }
+
+    /// <summary>The wall disc rested against the world at the point given, the exclude list as it stands now.</summary>
+    private Dictionary RestWallDisc(PhysicsDirectSpaceState3D space, Vector3 centreM)
+    {
+        _shapeQ ??= new PhysicsShapeQueryParameters3D { Shape = _wallShape };
+        _shapeQ.Transform = new Transform3D(Basis.Identity, centreM); _shapeQ.CollisionMask = _mask; _shapeQ.Exclude = _exclude;
+        return Keep(space.GetRestInfo(_shapeQ));
+    }
+
+    private Dictionary Keep(Dictionary d)
+    {
+        _hitRing[_hitAt]?.Dispose(); _hitRing[_hitAt] = d; _hitAt = (_hitAt + 1) & 31;
+        return d;
+    }
+
+    public override void _ExitTree()
+    {
+        for (int i = 0; i < _hitRing.Length; i++) { _hitRing[i]?.Dispose(); _hitRing[i] = null; }
+        _rayQ?.Dispose(); _rayQ = null; _shapeQ?.Dispose(); _shapeQ = null; SmsFree.Array(_exclude); _exclude = null;
+        _areaQuery?.Dispose(); _areaQuery = null;
+    }
 
     // ============================================================ the game's state (units, BAM)
     /// <summary>TTargetCamera (Camera.hpp 26): Pos = mPosition (the panned eye), At = mTarget (the look point), Desired = unk18 (the polar
@@ -275,11 +320,11 @@ public partial class SunshineCamera : Node3D
         if (_warpRequested || _md.Teleported)
             WarpBehind();
         // the C-stick through the pad library (PADClamp's sub-stick region 59 / 31 / 15 and JUTGamePad's 42): mCompSPos[6] = x, [7] = y (up +)
-        Vector2 sub = SmsStick.PadSubStick(Input.GetVector(RStickLeft, RStickRight, RStickUp, RStickDown));
+        Vector2 sub = SmsStick.PadSubStick(Input.GetVector(SmsNames.Of(RStickLeft), SmsNames.Of(RStickRight), SmsNames.Of(RStickUp), SmsNames.Of(RStickDown)));   // 227: the names made once
         if (_md.PadDead) sub = Vector2.Zero;   // pass 114: TMarioGamePad::mDisabledFrames skips the sub stick (mCompSPos[6], [7]) and the L edge too
         _cx = sub.X;
         _cy = -sub.Y;
-        bool lEdge = !_md.PadDead && InputMap.HasAction(LButtonAction) && Input.IsActionJustPressed(LButtonAction);
+        bool lEdge = !_md.PadDead && InputMap.HasAction(SmsNames.Of(LButtonAction)) && Input.IsActionJustPressed(SmsNames.Of(LButtonAction));
         int n = SmsUnits.TicksFor(delta, ref _tickAccum);
         for (int i = 0; i < n; i++)
             Tick(lEdge && i == 0);
@@ -662,21 +707,22 @@ public partial class SunshineCamera : Node3D
     {
         _areaQuery ??= new PhysicsPointQueryParameters3D { CollideWithAreas = true, CollideWithBodies = false, CollisionMask = uint.MaxValue };
         _areaQuery.Position = M(_md.PosU + new Vector3(0f, 75f, 0f));
-        var hits = GetWorld3D().DirectSpaceState.IntersectPoint(_areaQuery, 8);
+        var hits = GetWorld3D().DirectSpaceState.IntersectPoint(_areaQuery, 8);   // 227: the hit list and each hit disposed here, not by the finalizer
         SmsCameraArea best = null;
         SmsCamKind? tagged = null;
-        foreach (Dictionary h in hits)
+        foreach (Dictionary h in hits) using (h)
         {
-            if (h["collider"].AsGodotObject() is not Node n)
+            if (h[SmsKeys.Collider].AsGodotObject() is not Node n)
                 continue;
             if (n is SmsCameraArea a)
             {
                 if (best == null || a.Priority > best.Priority)
                     best = a;
             }
-            else if (tagged == null && n.HasMeta("sms_camera_kind") && System.Enum.TryParse(n.GetMeta("sms_camera_kind").AsString(), true, out SmsCamKind k))
+            else if (tagged == null && n.HasMeta(SmsNames.Of("sms_camera_kind")) && System.Enum.TryParse(n.GetMeta(SmsNames.Of("sms_camera_kind")).AsString(), true, out SmsCamKind k))
                 tagged = k;
         }
+        SmsFree.Array(hits);
         // 153l: a definite kind is a camera map tool's (TCubeCameraInfo::unk38): the area must carry its Eye; one without is the stage's own kind
         _areaTool = null;
         if (best != null && SmsCamKinds.IsDefiniteKind(best.Kind))
@@ -1551,26 +1597,18 @@ public partial class SunshineCamera : Node3D
         var space = GetWorld3D()?.DirectSpaceState;
         if (space == null) return false;
         bool moved = false;
-        var exclude = new Array<Rid>();
-        if (_hasMarioRid) exclude.Add(_marioRid);
+        ExcludeReset();   // 227: the shared exclude list and shape query
         for (int k = 0; k < 4; k++)
         {
             Vector3 centreU = new Vector3(_cur.Pos.X, _prev.Pos.Y + 10f, _cur.Pos.Z);
-            var q = new PhysicsShapeQueryParameters3D
-            {
-                Shape = _wallShape,
-                Transform = new Transform3D(Basis.Identity, M(centreU)),
-                CollisionMask = _mask,
-                Exclude = exclude,
-            };
-            Dictionary info = space.GetRestInfo(q);
+            Dictionary info = RestWallDisc(space, M(centreU));
             if (info.Count == 0) break;
-            Vector3 n = (Vector3)info["normal"];
-            Vector3 point = (Vector3)info["point"];
-            Rid rid = (Rid)info["rid"];
-            if (CameraPasses((ulong)info["collider_id"]))
+            Vector3 n = (Vector3)info[SmsKeys.Normal];
+            Vector3 point = (Vector3)info[SmsKeys.Point];
+            Rid rid = (Rid)info[SmsKeys.Rid];
+            if (CameraPasses((ulong)info[SmsKeys.ColliderId]))
             {
-                exclude.Add(rid);
+                _exclude.Add(rid);
                 continue;
             }
             if (MathF.Abs(n.Y) > 0.6f)
@@ -1586,7 +1624,7 @@ public partial class SunshineCamera : Node3D
             _cur.Pos.Z += push * nXZ.Z;
             posCpy.X += (radius - sd) * nXZ.X;
             posCpy.Z += (radius - sd) * nXZ.Z;
-            exclude.Add(rid); // that body is done; another wall may still touch
+            _exclude.Add(rid); // that body is done; another wall may still touch
         }
         return moved;
     }
@@ -1612,19 +1650,17 @@ public partial class SunshineCamera : Node3D
         if (space == null) return false;
         Vector3 from = M(new Vector3(xU, yU, zU));
         Vector3 to = from + Vector3.Down * M(100000f);
-        var exclude = new Array<Rid>();
-        if (_hasMarioRid) exclude.Add(_marioRid);
+        ExcludeReset();   // 227: the shared exclude list and ray query
         for (int k = 0; k < 4; k++)
         {
-            var q = PhysicsRayQueryParameters3D.Create(from, to, _mask, exclude);
-            Dictionary hit = space.IntersectRay(q);
+            Dictionary hit = CastRay(space, from, to);
             if (hit.Count == 0) return false;
-            if (CameraPasses((ulong)hit["collider_id"]))
+            if (CameraPasses((ulong)hit[SmsKeys.ColliderId]))
             {
-                exclude.Add((Rid)hit["rid"]);
+                _exclude.Add((Rid)hit[SmsKeys.Rid]);
                 continue;
             }
-            groundYU = U(((Vector3)hit["position"]).Y);
+            groundYU = U(((Vector3)hit[SmsKeys.Position]).Y);
             return true;
         }
         return false;
@@ -1635,16 +1671,14 @@ public partial class SunshineCamera : Node3D
     {
         var space = GetWorld3D()?.DirectSpaceState;
         if (space == null) return false;
-        var exclude = new Array<Rid>();
-        if (_hasMarioRid) exclude.Add(_marioRid);
+        ExcludeReset();   // 227: the shared exclude list and ray query
         for (int k = 0; k < 4; k++)
         {
-            var q = PhysicsRayQueryParameters3D.Create(fromM, toM, _mask, exclude);
-            Dictionary hit = space.IntersectRay(q);
+            Dictionary hit = CastRay(space, fromM, toM);
             if (hit.Count == 0) return false;
-            if (CameraPasses((ulong)hit["collider_id"]))
+            if (CameraPasses((ulong)hit[SmsKeys.ColliderId]))
             {
-                exclude.Add((Rid)hit["rid"]);
+                _exclude.Add((Rid)hit[SmsKeys.Rid]);
                 continue;
             }
             return true;
@@ -1659,7 +1693,7 @@ public partial class SunshineCamera : Node3D
         if (GodotObject.InstanceFromId(colliderId) is not Node node) return false;
         for (int i = 0; i < 4 && node != null; i++)
         {
-            if (node.HasMeta("sms_camera_pass")) return true;
+            if (node.HasMeta(SmsNames.Of("sms_camera_pass"))) return true;
             node = node.GetParent();
         }
         return false;

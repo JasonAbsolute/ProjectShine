@@ -107,8 +107,8 @@ public partial class Mario
         if (!UseSmsPhysics)
             return;
         bool padDead = _smsPadDisabledTicks > 0;   // pass 114: TMarioGamePad::mDisabledFrames -- no MEANING_Y / MEANING_CAM_AB while the pad is dead
-        _camYPressed = !padDead && Input.IsActionJustPressed("button_y");
-        _camCancelPressed = !padDead && (_camYPressed || Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space") || Input.IsActionJustPressed("button_b"));
+        _camYPressed = !padDead && Input.IsActionJustPressed(SmsNames.Of("button_y"));
+        _camCancelPressed = !padDead && (_camYPressed || Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space")) || Input.IsActionJustPressed(SmsNames.Of("button_b")));
         bool on = SmsYCamOn;
         if (on != _ycamWasOn)
         {
@@ -130,9 +130,9 @@ public partial class Mario
         // MEANING_CAM_AB: in the mode A and B are the camera's, not MEANING_A / MEANING_B -- nothing of Mario's sees them this frame (no jump,
         // no dive, no A-held lift), the frame whose press ENDS the mode included (the rig reads the edge from _camCancelPressed above). The
         // input block already buffered that press as a jump: drop it.
-        Input.ActionRelease("button_a");
-        Input.ActionRelease("key_space");
-        Input.ActionRelease("button_b");
+        Input.ActionRelease(SmsNames.Of("button_a"));
+        Input.ActionRelease(SmsNames.Of("key_space"));
+        Input.ActionRelease(SmsNames.Of("button_b"));
         jumpBuffer = 0;
         SmsYCamFaceLook(); // in every status but the hang family (playerControl 2451): on the ground and through a jump
         if (SmsDebugPrint)
