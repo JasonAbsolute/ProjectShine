@@ -5162,6 +5162,9 @@ public partial class Mario : CharacterBody3D
                 armature.Rotation = new Vector3(0f, YawFromDir(lockDir), 0f);
                 spinJumpDirLocked = false;
             }
+            // 228: the touchdown's face and momentum agree (the spin jump landed facing its takeoff with the momentum 30 deg off to one side)
+            if (UseSmsPhysics)
+                SmsLandFacing(airStateAtImpact);
 
             // Enter landing (guarded internally)
             if (!IsLandingState(stateOfMario))
@@ -6051,6 +6054,54 @@ public partial class Mario : CharacterBody3D
         || s == MarioState.singleJumpLanding
         || s == MarioState.doubleJumpLanding
         || s == MarioState.tripleJumpLanding;
+
+    /// <summary>228 (Jaysonn: a spin jump lands "facing about 30 degrees wrong but with the right momentum"). In the air the game keeps mFaceAngle at
+    /// the takeoff face and the stick only adds a SIDEWAYS drift to the velocity (doJumping: sideVel along mFaceAngle + 0x4000; never a turn), so he
+    /// comes down facing the takeoff direction with his momentum off to one side -- a spin jump's long, slow fall (vy 70, gravity 0.35 on the way
+    /// down) builds 30 degrees or more of it, and the spinning model snapping to the takeoff face at the touchdown made the two plain. The port
+    /// used to face the takeoff through the landing window (ma_laend) and only then turn him to his momentum (the run's first tick). The game's own
+    /// landing (jumpSlipCommon: walkProcess along mFaceAngle at mForwardVel) DROPS the drift instead: he slides along his face. LandingKeepsDrift
+    /// on (the port's way, Jaysonn's "right momentum" kept): on the touchdown frame his face and the model take the momentum's bearing -- moving
+    /// backward along it (a backflip, a U-turn jump's slide) he keeps facing forward -- so face and motion agree from the first frame. Off = the
+    /// game's rule: the momentum turns onto his face (the forward component kept, the side drift gone), the face as it was. SmsLastLandDriftDeg is
+    /// the drift the last touchdown found (signed, degrees; for the drives).</summary>
+    [ExportGroup("SMS (228): the landing's facing")]
+    [Export] public bool LandingKeepsDrift = true;
+    [ExportGroup("")]
+    public float SmsLastLandDriftDeg { get; private set; }
+    public int SmsLandFacingCount { get; private set; }
+
+    private void SmsLandFacing(MarioState airState)
+    {
+        Vector3 velXZ = new Vector3(velocity.X, 0f, velocity.Z);
+        float speed = velXZ.Length();
+        if (speed < 0.5f)
+            return;
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+        Vector3 moveDir = velXZ / speed;
+        bool backward = moveDir.Dot(face) < 0f;                 // sliding backward along his face: he keeps facing forward
+        Vector3 along = backward ? -moveDir : moveDir;           // the bearing he should face: his motion's line, forward sense
+        SmsLastLandDriftDeg = Mathf.RadToDeg(face.SignedAngleTo(along, Vector3.Up));
+        SmsLandFacingCount++;
+        Vector3 newFace;
+        if (LandingKeepsDrift)
+        {
+            newFace = along;                                     // the momentum kept, the face turned onto it
+        }
+        else
+        {
+            float fwd = velXZ.Dot(face);                         // mForwardVel: the component along mFaceAngle; the side velocity ended with the air
+            velocity.X = face.X * fwd;
+            velocity.Z = face.Z * fwd;
+            newFace = face;
+        }
+        lastFacingDirection = newFace;
+        SmsLatchFace(newFace, 1);                                // the run's first tick keeps it (no second latch to the velocity)
+        if (armature != null)
+            armature.Rotation = new Vector3(0f, YawFromDir(newFace), 0f);
+        if (SmsDebugPrint && MathF.Abs(SmsLastLandDriftDeg) > 2f)
+            GD.Print($"[SMS land] from {airState}: the momentum {SmsLastLandDriftDeg:F1} deg off the takeoff face{(backward ? " (sliding backward)" : "")} -- {(LandingKeepsDrift ? "he faces it" : "it turns onto his face (the game's rule)")}");
+    }
 
     private void EnterLanding(MarioState landingState, string animName)
     {
