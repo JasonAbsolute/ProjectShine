@@ -14838,3 +14838,37 @@ The death camera drive 3 / 3 (run n). The regression drive 68 / 68 (run fw). The
 **Deviations:** the floor's surface tag is read once per floor piece and remembered (a tag changed at run time would not be seen; nothing in the
 project does that). The result dictionaries live 64 casts (Mario) / 32 (the camera) before they are disposed instead of until the collector finds
 them. King Boo's and the HUD's garbage (about 0.2 MB/s each) is not touched.
+
+### 228 -- the King Boo REMATCH, part 73: a spin jump came down facing its takeoff with the momentum 30 degrees off to one side; the touchdown now turns his face (and the model) onto the way he is moving, the momentum kept -- `LandingKeepsDrift` off is the game's own rule, the drift dropped and the slide along his face (feature/kingboo-rematch, code `c7b1af2`)
+
+**Jaysonn**: "mario will spin jump and then be facing about 30 degrees wrong but will have the right momentum."
+
+**What it was.** In the air the game keeps mFaceAngle at the takeoff face and the stick only adds a SIDEWAYS drift to the velocity
+(`TMario::doJumping`: sideVel = mag x sin(stick - face) x JumpSlideControl along mFaceAngle + 0x4000; the face never turns), and the port does the
+same (`SmsAirTick`). So he comes down facing the takeoff direction with his momentum off to one side -- a spin jump's long, slow fall (vy 70,
+gravity 0.35 on the way down; 1.7 s in the air) builds 30-45 degrees of it with the stick held across, and the spinning model snapping to the
+takeoff face at the touchdown made the two plain. The port faced the takeoff through the landing window (ma_laend: the SpinJump's own snap, a plain
+jump's air yaw left as it was) and only then turned him to his momentum (the run's first tick latches the face to the velocity). The game's own
+landing (`jumpSlipCommon`: walkProcess along mFaceAngle at mForwardVel) does the opposite: it DROPS the drift and he slides along his face.
+
+**The fix.** **`assets/Mario.cs`**: `SmsLandFacing(airState)` on the touchdown frame of every landing from the air under the SMS physics (after the
+state snaps, before `EnterLanding`): `LandingKeepsDrift` (on): his face, `lastFacingDirection` and the model take the momentum's bearing
+(`SmsLatchFace` as a ground face, so the run's first tick does not latch a second time) -- moving BACKWARD along it (a backflip, a U-turn jump's
+slide) he keeps facing forward along the line -- so face and motion agree from the first frame and the landing window carries them together. Off =
+the game's rule: the velocity is folded onto his face (the forward component kept, the side drift gone), the face as it was. Standing still (under
+0.5 m/s) nothing changes. Readouts `SmsLastLandDriftDeg` (the drift the last touchdown found, signed degrees) and `SmsLandFacingCount`; a
+`DebugPrint` line when the drift is over 2 degrees. Nothing else moved: the legacy (non-SMS) landing keeps its own snap.
+
+**Verified:** the shine hud drive v228 (deleted before the commit; windowed at 1930 x 1086; the land mode: no fight, three trials from the arena's
+centre) NEW C78 the touchdown faces its momentum -- (A) a run, the stick spun through its four quadrants and A (the real stick-spin jump, 98 air
+frames), the stick then held across his takeoff face through the air (re-picked as the camera swung): the drift built 43.5 degrees; on the
+touchdown the model, his face and his velocity's bearing agree (0.0 deg apart) and the velocity's bearing is unchanged across it (0.0 deg); (B) a
+plain jump the same way: 20.9 degrees of drift, the same agreement; (C) the spin jump with `LandingKeepsDrift` off: the velocity's bearing turned
+43.5 degrees onto the takeoff face, the model and the face on it (the game's rule) -- 1 / 1 (run ah; run ag before it built no drift: the stick
+picked once at takeoff turned with the camera through the long flight, and showed Godot's `CharacterBody3D.Velocity` carries the frame's pre-move
+value, so the verdict reads a frame after the touchdown). The quiet shine hud run 8 / 8 (ai). The death camera drive 3 / 3 (o). The regression
+drive 68 / 68 (fx; no touchdown in it drifted over 2 degrees). The clean rebuild 0 errors; the drive, the logs, the helper and the tasks deleted. The
+save file is unchanged.
+
+**Deviations:** with the knob on, his landing keeps the sideways drift the game would drop (the port always has; the face now follows it at once
+rather than after the landing window). With it off the port is the game's: the drift is lost at the touchdown.
