@@ -14786,3 +14786,55 @@ ms, under the blast). The death camera drive 3 / 3 (run m: the region through it
 **Deviations:** the collector's one pause moves to the fatal hit's frame (55-57 ms there, under the Bomb Boo's blast and his flash) instead of landing
 at random through the cutscene; the heap grows by up to 64 MB through the sequence. The garbage itself (the camera rig's and Mario's ray queries and
 StringNames, about 1.4 MB/s) is left as it is: a port-wide pass of its own.
+
+### 227 -- the King Boo REMATCH, part 72: the port's garbage rate cut from about 1.4 MB/s to about 0.6 in the quiet fight; the camera rig's and Mario's physics queries made once and re-used (one ray query, one exclude list, the result dictionaries disposed), every Godot name they hand the engine (input actions, metadata keys, groups, clips, states) made once (SmsNames), the slide collisions and the floor's surface tag read without a new wrapper a frame (feature/kingboo-rematch, code `e5dbf7d`)
+
+**Jaysonn**: "Cut the port's garbage rate (the camera rig's and Mario's ray queries and StringNames)".
+
+**What the garbage was.** The allocation probe (226) grew a type listener: the runtime's own `GCAllocationTick` events, in-process, name the type
+that crossed each 100 KB line -- a sample of what is being made. The port's garbage was Godot wrappers: `StringName` (a C# string handed to a call
+that wants a StringName -- `Input.IsActionPressed("button_a")`, `HasMeta("sms_surface")`, `_sm.Travel("ma_wait")` -- is converted on every call),
+the ray-query parameters, the exclude lists and the result dictionaries of every cast (Mario casts several a tick: the floor under the feet, the
+water, the ledges, the walls, the steps; the camera rig up to a dozen: the occlusion ray, the ground probe, the wall disc, the camera cubes), the
+`Variant` made from every string key read out of a result (`hit["position"]`: a native string and a finalizable Disposer each time), and the
+`KinematicCollision3D` of every `GetSlideCollision(i)` (the engine re-uses its cached one only while nothing else holds it; a live C# wrapper does,
+so every read made a new native object and a new wrapper). Each wrapper carries a finalizer and two entries in the runtime's disposables tracker,
+and survives a gen0 pass -- which is why every collection here was a gen1 or worse at 41-45 ms (226).
+
+**The fix.** NEW **`assets/Sms/SmsNames.cs`**: `SmsNames.Of(string)` -> `StringName` and `SmsNames.Path(string)` -> `NodePath`, made once per string
+and looked up after (one dictionary; main-thread, as the callers are); `SmsKeys`: the result dictionaries' keys (position, normal, collider,
+collider_id, rid, point, shape) as Variants made once; `SmsFree.Array`: a typed Godot array let go at once (`Array<T>` is not IDisposable; the
+untyped array under it is). NEW **`assets/Sms/MarioRays.cs`** (a partial of Mario): `SmsRayQuery(from, to, mask?, areas, hitFromInside, exclude)`
+sets ONE `PhysicsRayQueryParameters3D` for the cast (his mask, bodies, no areas, his body excluded unless told otherwise), `SmsIntersect` casts it
+and keeps the result in a ring of 64, disposed 64 casts on (no caller keeps one past its frame); `SmsRayExcludeSelf` a second re-used exclude list
+for the casts that add a body (what he holds, the trunk he hugs); `SmsPointQuery` the water check's point query; `SmsSlideHit(i)`
+`GetSlideCollision` with the last wrapper disposed first (the engine's cache serves again); `SmsStateNode` BaseSM's state with the playback's
+StringName disposed once read; `SmsSurfaceTag` the ground class of a floor piece read once and remembered (`SmsSurfaceTagOf` walked three
+ancestors' metadata lists and groups every frame on a floor without the meta -- two arrays and a wrapper per name; the level's sms_ tags are set in
+the scene, nothing in the project changes one after a node is made); the shared objects let go in `_ExitTree`. **`assets/Mario.cs`**: the 16
+direct cast sites and `SmsRay` (23 callers) through `SmsRayQuery` / `SmsIntersect`, the same masks and options; the water check through the shared
+point query, its hit list and each hit disposed; 7 `GetSlideCollision` loops through `SmsSlideHit`; the 5 state reads through `SmsStateNode`; the 2
+surface-tag readers through `SmsSurfaceTag`; 109 `Input.*` actions, 3 `Input.GetVector`, 2 `InputMap.HasAction`, 111 clip / state names
+(`animPlayer.Play` / `HasAnimation` / `GetAnimation`, `_sm.Travel`), 13 metadata and group keys wrapped in `SmsNames.Of`; 54 result keys to
+`SmsKeys`; the console's ShineTimer search (every 2 s while the level has none) by child index with a re-used stack (`GetChildren()` made an array
+and an enumerator per node, hundreds a walk). **`assets/SunshineCamera.cs`**: ONE ray query, ONE shape query (the wall disc) and ONE exclude list
+re-used (`ExcludeReset` / `CastRay` / `RestWallDisc`; the results in a ring of 32), the camera-cube hit list and each hit disposed, the C-stick's
+four actions, the L button, `sms_camera_pass` and `sms_camera_kind` through `SmsNames.Of`, the result keys through `SmsKeys`, the shared objects let
+go in `_ExitTree`. **`assets/Sms/MarioCamData.cs`**, **`assets/Sms/MarioYCam.cs`**: their 9 Input actions through `SmsNames.Of`. No behaviour
+changed: every cast keeps its mask, areas, HitFromInside and exclude list; the names are the same names.
+
+**Measured.** The probe (5-s windows in the quiet fight, windowed at 1930 x 1086, the systems switched off one at a time): everything on 1416 ->
+593 KB/s; Mario off 769 -> 216 (Mario's own share about 0.65 -> 0.4 MB/s); the camera rig off 731 -> 334 (its share about 0.7 -> 0.2); all four off
+159 -> 159 (the floor). In the shine hud drive's own run, the fight after the card save made 600-1070 KB/s in 226 and makes 220-510 now; his death,
+the Shine and the get 1065-1433 -> 330-640. What is left, by type: the engine's strings read into C# (`CurrentAnimation`, names: the decoder's
+buffers, 29% -- plain strings, gen0 garbage, no finalizer), the tracker's entries for wrappers still made elsewhere (King Boo's, the HUD's: 21%),
+Variant Disposers (11%), dictionaries (7%), Vector3 arrays (7%, not Mario's or the camera's), StringNames (7%).
+
+**Verified:** the shine hud drive v227 (deleted before the commit; windowed at 1930 x 1086): the allocation probe runs ad / ae (the numbers above);
+the quiet run 8 / 8 (run af: the spawn's frame 18 ms, the down's 35, the landing's 33, the card's 28, the no-GC region 24.8 s with 0 collections).
+The death camera drive 3 / 3 (run n). The regression drive 68 / 68 (run fw). The build 0 errors (a headless import pass wrote the two new scripts'
+.uid files); the clean rebuild 0 errors; the drive, the logs, the helper and the tasks deleted. The save file is unchanged.
+
+**Deviations:** the floor's surface tag is read once per floor piece and remembered (a tag changed at run time would not be seen; nothing in the
+project does that). The result dictionaries live 64 casts (Mario) / 32 (the camera) before they are disposed instead of until the collector finds
+them. King Boo's and the HUD's garbage (about 0.2 MB/s each) is not touched.
