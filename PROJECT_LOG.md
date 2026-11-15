@@ -14753,3 +14753,36 @@ into a 57-67 ms frame now and then (the heap 26-39 MB), once right at the landin
 death's start, the card save's scene 59-66 ms as it opens), so it was taken out. Those two frames are the next hitches of the sequence.
 
 **Deviations:** the SHINE! letters now exist (hidden) from the console's start. The music is still the port's dry render (no reverb).
+
+### 226 -- the King Boo REMATCH, part 71: the two hitches left in the sequence (his death's start, the card save's opening) were the .NET garbage collector's pauses; from the fatal hit the collector is held off (a no-GC region) through his death, the Shine, the get and the card save -- no collection, no pause inside it (feature/kingboo-rematch, code `d0004ce`)
+
+**Jaysonn**: "Fix the two remaining hitches (his death's start, the card save opening)".
+
+**What they were.** The drive's frame watch grew the collector's own pause clock (`GC.GetTotalPauseDuration`) per long frame: the frame of his down
+ran 59-62 ms with 41-44 ms of collector pause in it (a gen1 collection; the down's own entry is 12 ms on the main thread: the mist and star emitters
+10, the down sound 1.8), and the frame of the card save's opening 59-62 ms with 42-45 ms of pause (a gen2). Not rendering, not first-time work: the
+collector. Its budget (about 8 MB) fills every eight seconds or so of play -- the port makes about 1.4 MB of garbage a second in the quiet fight (an
+allocation probe, the systems switched off one at a time: the camera rig about 0.7 MB/s, Mario about 0.65, King Boo 0.3, the HUD 0.2, the rest 0.16)
+-- and every collection here is a gen1 or worse at 41-45 ms (finalizable Godot wrappers -- StringNames, ray-query parameters and dictionaries --
+survive a gen0 pass), so a pause lands wherever the budget happens to fill; in the drive's replay that is the down and the card. `GCLatencyMode`
+`SustainedLowLatency` (225) could not help: gen1 pauses are not what it governs.
+
+**The fix.** **`assets/Sms/Rematch/SmsKingBooRematch.cs`**: `GcQuietThroughDeath` (on): at the FATAL hit -- under the blast and his flash --
+`GC.TryStartNoGCRegion(GcQuietMegabytes, 64)` asks the collector for a no-GC region: it collects once there (28-38 ms, its own compacting collection,
+the heap down to 9 MB), then holds off until the region ends -- when control is back after the card save (a second's grace), after `GcQuietMaxSeconds`
+(120), or when he leaves the tree (`EndNoGCRegion`, guarded) -- or until its bytes run out, when the collector resumes on its own (the fallback for a
+player who dawdles before the Shine; the region's end is then reported as its own). `GcQuietTick` watches Mario's shine demo and the card. Readouts
+`GcQuietOn`, `GcQuietSeconds`, `GcQuietCollections`, `GcQuietPausedMs` (frozen at the end). Off = the collector as it is. The down's entry got a
+stopwatch print under `DebugPrint`, as the spawn's.
+
+**Verified:** the shine hud drive v226 (deleted before the commit; windowed at 1930 x 1086, no shots, no recording): NEW C74 the down's frame -- the
+longest frame within 0.25 s of his death's start 35-37 ms (want under 50; was 59-62); NEW C75 the card save's opening frame 28-29 ms (was 59-66; the
+window looks 0.15 s back from the card's stamp, where the collector's frame fell); NEW C77 the collector held off -- the region 24.8-24.9 s from the
+fatal hit to a second after control came back, 0 collections and 0 ms of pauses inside it, over at the verdict; C69-C73 as 225 (the spawn's frame
+18-24 ms, the landing's 29-33) -- 8 / 8 (run ab). The one long frame left in the run is the fatal hit's (55-57 ms: the region's own collection, 28
+ms, under the blast). The death camera drive 3 / 3 (run m: the region through it, 0 collections, ended as he left the tree). The regression drive 68 /
+68 (run fv). The clean rebuild 0 errors; the drive, the logs, the helper and the tasks deleted. The save file is unchanged.
+
+**Deviations:** the collector's one pause moves to the fatal hit's frame (55-57 ms there, under the Bomb Boo's blast and his flash) instead of landing
+at random through the cutscene; the heap grows by up to 64 MB through the sequence. The garbage itself (the camera rig's and Mario's ray queries and
+StringNames, about 1.4 MB/s) is left as it is: a port-wide pass of its own.
