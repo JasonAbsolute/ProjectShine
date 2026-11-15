@@ -287,6 +287,7 @@ public partial class ShineSprite : Node3D
 
     public override void _ExitTree()
     {
+        SmsStandardHud.CameraDemoEnd(this);   // 222: gone mid-demo, the console's demo goes with it
         // Never strand the game paused if a scene transition removes the Shine
         // before its entrance tween completes.
         if (_spawnEntrancePlaying && _pausedTreeForSpawnEntrance)
@@ -1049,6 +1050,7 @@ public partial class ShineSprite : Node3D
         _apDemo = withDemo; _apDemoLeft = demoTicks;
         if (withDemo)
         {
+            SmsStandardHud.CameraDemoBegin(this);   // 222: a camera demo for the console (the counters, the lives and the life meter go till it ends)
             _apModeBefore = ProcessMode;
             ProcessMode = ProcessModeEnum.Always;
             var tree = GetTree();
@@ -1155,6 +1157,7 @@ public partial class ShineSprite : Node3D
     private void SmsAppearDemoEnd()
     {
         _apDemo = false;
+        SmsStandardHud.CameraDemoEnd(this);   // 222: the console's endCameraDemo follows (three frames on)
         var tree = GetTree();
         if (_apPausedTree && tree != null) tree.Paused = false;
         _apPausedTree = false;

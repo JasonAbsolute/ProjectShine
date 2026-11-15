@@ -13268,7 +13268,7 @@ public partial class Mario : CharacterBody3D
         _stdHud.Idle = stateOfMario == MarioState.idle && !_smsTalking;   // MARIO_STATUS_WAIT: READ_BILLBOARD (the NPC talk) is not it
         _stdHud.Dead = stateOfMario == MarioState.dead || _health <= 0;
         _stdHud.ShineDemo = stateOfMario == MarioState.shineGet;
-        _stdHud.Demo = CameraLocked || stateOfMario == MarioState.talking || _stdHud.ShineDemo || _stdHud.Dead;
+        _stdHud.Demo = (CameraLocked && _pendingShine == null) || stateOfMario == MarioState.talking || _stdHud.ShineDemo || _stdHud.Dead;   // 222: not the fall after a Shine touched in the air -- the game's demo camera and DIRECTOR_FLAG_SHINE_TAKEN (fireGetStar) come at the landing; counting the lock sent the counters off with no SHINE_TAKEN and the shine get found the console already in its demo: no shine counter
     }
 
     private void SmsStandardHudTick()

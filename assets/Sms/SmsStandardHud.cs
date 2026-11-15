@@ -1,5 +1,6 @@
 using Godot;
 using System;
+using System.Collections.Generic;
 
 /// <summary>
 /// The game's standard HUD besides the water gauge: TGCConsole2 (GC2D/GCConsole2.cpp) driving the panes of game_6/scrn/standard_1.blo
@@ -80,6 +81,28 @@ public partial class SmsStandardHud : Control
     public bool Idle;               // MARIO_STATUS_WAIT
     public bool Demo;               // a camera demo runs: the camera locked, a talk, the shine get, death
     public bool ShineDemo;          // the demo is the shine get (DIRECTOR_FLAG_SHINE_TAKEN)
+    /// <summary>222 (Jaysonn: "make sure the hud behaves correctly when collecting a shine"): the camera demos that are not Mario's to report --
+    /// the Shine's appear demo (ShineSprite.SmsAppear with its demo: makeShineAppearWithDemo's camera tool) and the rematch's death camera (King
+    /// Boo's wide shot, the port's camera for that demo). The game's console starts its camera demo whenever the camera is a demo camera
+    /// (TGCConsole2::performMovement: gpCamera->isDemoCamera(), or MARIO_FLAG_GAME_OVER) and ends it once it is not: the counters, the lives and the
+    /// life meter go while a Shine comes out and come back after. The Shine's demo stops the world and Mario's feed with it, so each owner reports
+    /// here and the console (process mode Always) reads the set itself every frame. An owner freed mid-demo drops out.</summary>
+    private static readonly HashSet<ulong> CameraDemoOwners = new();
+    public static void CameraDemoBegin(GodotObject owner) { if (owner != null) CameraDemoOwners.Add(owner.GetInstanceId()); }
+    public static void CameraDemoEnd(GodotObject owner) { if (owner != null) CameraDemoOwners.Remove(owner.GetInstanceId()); }
+    public static bool CameraDemoRunning
+    {
+        get
+        {
+            if (CameraDemoOwners.Count == 0) return false;
+            CameraDemoOwners.RemoveWhere(id => GodotObject.InstanceFromId(id) == null);
+            return CameraDemoOwners.Count > 0;
+        }
+    }
+    /// <summary>222: a camera demo, whoever reports it -- Mario (Demo: the camera locked, a talk, the shine get, death) or an owner above.</summary>
+    public bool InDemo => Demo || CameraDemoRunning;
+    /// <summary>222, for the drives: the console is in its camera demo (startCameraDemo ran, endCameraDemo not yet).</summary>
+    public bool InCameraDemo => _inDemo;
     public bool Dead;
     public bool TimerRunning;       // his ShineTimer runs (the game's startMoveTimer)
     public bool TimerReached;       // it stopped at its target (his TimerReachedTarget: the game's startDisappearTimer)
@@ -284,7 +307,7 @@ public partial class SmsStandardHud : Control
         var telop = SmsHudLayer.Current?.Telop;
         if (telop != null)
         {
-            telop.MarioWaiting = Idle && !Demo && !_timerVisible;
+            telop.MarioWaiting = Idle && !InDemo && !_timerVisible;
             telop.Paused = GetTree().Paused;
         }
     }
@@ -301,10 +324,11 @@ public partial class SmsStandardHud : Control
             _loaded = true;
             LoadCounts(); // the first frame: Mario's setup has fed the fields by now
         }
-        // the camera demo (startCameraDemo / endCameraDemo)
-        if (Demo && !_inDemo)
+        // the camera demo (startCameraDemo / endCameraDemo) -- 222: Mario's or a Shine's / the death camera's (InDemo)
+        bool demo = InDemo;
+        if (demo && !_inDemo)
             StartCameraDemo();
-        else if (!Demo && _inDemo)
+        else if (!demo && _inDemo)
         {
             if (++_demoEndCount >= 3) // endCameraDemo waits three frames
                 EndCameraDemo();
@@ -312,7 +336,7 @@ public partial class SmsStandardHud : Control
         else
             _demoEndCount = 0;
 
-        if (!_started && !Demo)
+        if (!_started && !demo)
         {
             // perform (3854), unk39: the first frame of the level brings the coin counter and the lives in
             _started = true;
@@ -447,7 +471,7 @@ public partial class SmsStandardHud : Control
         // the idle peek: MARIO_STATUS_WAIT with the star HUD away, 200 frames (unk30 starts at -400; any other frame zeroes it, as the
         // game's intro demo does, so it is 200 here too)
         bool starAway = !_starVisible || !_shineSlide.AtZero(_now);
-        if (Idle && !Demo && starAway)
+        if (Idle && !InDemo && starAway)
         {
             if (++_idleCount > IdleFrames)
             {
@@ -650,7 +674,7 @@ public partial class SmsStandardHud : Control
         }
         // updateStarHudAutoHide (1061): out, settled, nothing on the clocks, no demo: away again, the lives with it -- unless Jaysonn's
         // IdleHold keeps them while he stands (the console's unk60 guard, never set in the game)
-        if (_starVisible && !_starAppearing && !_starLeaving && _shineSlide.AtZero(_now) && !Demo && _blueTimer == 0 && _shineTimer == 0
+        if (_starVisible && !_starAppearing && !_starLeaving && _shineSlide.AtZero(_now) && !InDemo && _blueTimer == 0 && _shineTimer == 0
             && !GetTree().Paused // updateStarHudAutoHide (1070): not under STATE_PAUSE_MENU / STATE_CARD_SAVE -- the pause brought them in to stay
             && !(SmsHud.IdleHold && Idle))
         {
@@ -741,7 +765,7 @@ public partial class SmsStandardHud : Control
     {
         // his ShineTimer: a start brings the timer in (startAppearTimer + startMoveTimer), the target reached takes it away
         // (startDisappearTimer); stopped early it stays frozen, as the game's does once stopMoveTimer is called
-        if (TimerRunning && !_timerWasRunning && !_timerVisible && !Demo)
+        if (TimerRunning && !_timerWasRunning && !_timerVisible && !InDemo)
             StartInsertTimer();
         if (!TimerRunning && _timerWasRunning && _timerVisible && TimerReached)
             StartDisappearTimer();
@@ -1044,7 +1068,7 @@ public partial class SmsStandardHud : Control
                 _lMeter.ToggleInterval = rate / SmsHud.Fps;
             if (_lifeBeat < (int)(rate * 2f))
             {
-                if (_lifeShown >= 1 && _lifeShown <= 3 && _lifeBeat == (int)(1.5f * rate) && !Demo && LifeBeep != null && LifeBeep.Stream != null)
+                if (_lifeShown >= 1 && _lifeShown <= 3 && _lifeBeat == (int)(1.5f * rate) && !InDemo && LifeBeep != null && LifeBeep.Stream != null)
                     LifeBeep.Play();
                 _lifeBeat++;
             }

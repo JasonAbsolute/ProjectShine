@@ -97,8 +97,17 @@ public partial class SmsBooVolley : Node3D
         (_booParent ?? GetParent()).AddChild(boo);
         boo.GlobalPosition = from;
         boo.Lob(from, target, LobHeight, dud, BlastRadius, BlastHeight, DudSeconds);
-        boo.Landed += d => { Landings++; EmitSignal(SignalName.Landed, d); };
-        boo.Blasted += hit => { Blasts++; BlastCount++; if (hit) { Hits++; HitCount++; } EmitSignal(SignalName.Blasted, hit); };
+        // 222: a Boo outlives its volley (under the supply's parent: the volley is freed once every Boo is down, or with King Boo's hit and the split's
+        // field clear) -- its dud floats on, its fuse burning; when it lands or blasts after that, the volley's counts and signals are gone with it
+        // (EmitSignal on the freed volley threw ObjectDisposedException from SmsBombBoo.Detonate). The drives' totals still count.
+        boo.Landed += d => { if (!IsInstanceValid(this) || IsQueuedForDeletion()) return; Landings++; EmitSignal(SignalName.Landed, d); };
+        boo.Blasted += hit =>
+        {
+            BlastCount++; if (hit) HitCount++;
+            if (!IsInstanceValid(this) || IsQueuedForDeletion()) return;
+            Blasts++; if (hit) Hits++;
+            EmitSignal(SignalName.Blasted, hit);
+        };
         _boos.Add(boo); SpatCount++; if (dud) DudBoo = boo;
         if (_sound != null && !string.IsNullOrEmpty(SpitSe)) _sound.Play(SpitSe, -2f, 0.9f + 0.2f * (float)_rng.NextDouble());
         if (DebugPrint) GD.Print($"[SMS boo volley] {Name}: Boo {SpatCount} of {Count} out of the mouth at {from} toward {target} ({new Vector2(target.X - m.X, target.Z - m.Z).Length():F1} m from Mario{(i == 0 && !dud ? ", the aimed one" : dud ? ", the DUD" : "")}; {boo.LobFlightSeconds:F2} s in the air)");

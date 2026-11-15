@@ -205,19 +205,20 @@ public partial class SmsKingBooRematch : Node3D
     /// game's size again (the get demo drives it at the game's scale). 1 = the scene's own.</summary>
     [Export(PropertyHint.Range, "0.5,5,0.1")] public float ShineScale = 2.5f;
     /// <summary>221 (Jaysonn: "when king boo dies the cam pans out like petey phriana when he dies. where its almost looking at the entire aerna then the shine jumps
-    /// to the middle"): at his burst the camera PANS OUT -- from where the gameplay camera stands, back along its own bearing from the arena's middle and up -- to a
-    /// wide shot of the arena: DeathCamDistance m out from the middle, DeathCamHeight m over the floor, looking at DeathCamLookUp m over the middle, DeathCamFov
+    /// to the middle"; 222: "it shouldnt pan it should cut"): at his burst the camera CUTS to a wide shot of the arena -- out from the middle along the gameplay
+    /// camera's own bearing: DeathCamDistance m out, DeathCamHeight m over the floor, looking at DeathCamLookUp m over the middle, DeathCamFov
     /// degrees (42 / 22 / 3 / 50: 97 % of the floor in frame, 24 degrees down, and the Shine's whole flight -- a burst anywhere out to 0.9 of the floor's radius,
     /// its loop up to half that distance high, the star's top and bottom -- in frame: tools/projectshine/rematch157/widecam221b.py; a burst farther out pulls the
-    /// shot back along its line of sight till the flight fits, DeathCamFit), eased over DeathCamPanSeconds. It
-    /// holds there while the Shine comes out where he burst and jumps to the middle (the Shine's own demo camera off), and when the Shine's demo is over it glides
-    /// back to the gameplay camera over DeathCamBackSeconds. Off = 183's: the Shine's own camera (ShineCamOffset / ShineCamFov).</summary>
+    /// shot back along its line of sight till the flight fits, DeathCamFit). It holds there while the Shine comes out where he burst and jumps to the middle (the
+    /// Shine's own demo camera off), and when the Shine's demo is over it CUTS back to the gameplay camera -- as the game cuts to and from Petey's placed Shine
+    /// camera. DeathCamPanSeconds / DeathCamBackSeconds over 0 = 221's eased pan out and glide back instead. Off = 183's: the Shine's own camera
+    /// (ShineCamOffset / ShineCamFov).</summary>
     [Export] public bool DeathCamWide = true;
     [Export(PropertyHint.Range, "10,80,0.5")] public float DeathCamDistance = 42f;
     [Export(PropertyHint.Range, "2,40,0.5")] public float DeathCamHeight = 22f;
     [Export(PropertyHint.Range, "-5,10,0.1")] public float DeathCamLookUp = 3f;
     [Export(PropertyHint.Range, "20,90,1")] public float DeathCamFov = 50f;
-    [Export(PropertyHint.Range, "0,5,0.05")] public float DeathCamPanSeconds = 1.2f, DeathCamBackSeconds = 0.8f;
+    [Export(PropertyHint.Range, "0,5,0.05")] public float DeathCamPanSeconds = 0f, DeathCamBackSeconds = 0f;   // 222: cuts (221 had 1.2 / 0.8)
     [ExportGroup("")]
     /// <summary>He turns to face Mario while he waits, at this many radians a second.</summary>
     [Export] public bool FaceMario = true;
@@ -1434,10 +1435,10 @@ public partial class SmsKingBooRematch : Node3D
     private Camera3D _deathCam, _deathCamWas;
     private Vector3 _dcFromPos, _dcToPos, _dcWidePos, _dcWideLook, _dcWideBase;
     private float _dcFromYaw, _dcFromPitch, _dcFromFov, _dcToYaw, _dcToPitch, _dcToFov, _dcPushedBack;
-    /// <summary>221: the burst -- the camera PANS OUT to the wide shot (DeathCamWide): a camera of his own takes the picture where the gameplay camera stands and
-    /// eases (smoothstep, DeathCamPanSeconds) out to DeathCamDistance m from the arena's middle along the gameplay camera's own bearing from it, DeathCamHeight m
-    /// over the floor, looking at DeathCamLookUp m over the middle, its fov to DeathCamFov; the yaw and the pitch turn on their own (no roll, any turn). The
-    /// game's own for Petey (bosspakkun TNerveBPDie: makeShineAppearWithDemo(.., "ボスシャインカメラ", ..)) is a placed fixed camera the inbetween swings to.</summary>
+    /// <summary>221 / 222: the burst -- the camera CUTS to the wide shot (DeathCamWide; DeathCamPanSeconds over 0: a camera of his own takes the picture where the
+    /// gameplay camera stands and eases out, smoothstep, the yaw and the pitch turning on their own with no roll): DeathCamDistance m from the arena's middle along
+    /// the gameplay camera's own bearing from it, DeathCamHeight m over the floor, looking at DeathCamLookUp m over the middle, at DeathCamFov. The game's own for
+    /// Petey (bosspakkun TNerveBPDie: makeShineAppearWithDemo(.., "ボスシャインカメラ", ..)) is a placed fixed camera it cuts to.</summary>
     private void DeathCamBegin()
     {
         if (!DeathCamWide || IsCopy || _deathCamPhase != 0) return;
@@ -1464,7 +1465,8 @@ public partial class SmsKingBooRematch : Node3D
         _deathCamT = 0f; _deathCamPhase = 1;
         DeathCamPose(DeathCamPanSeconds > 0f ? 0f : 1f);
         _deathCam.MakeCurrent();
-        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the DEATH CAMERA pans out -- from {from.Name} at {_dcFromPos} (fov {_dcFromFov:F0}) to {_dcWidePos} looking at {_dcWideLook} (fov {DeathCamFov:F0}; {(_dcPushedBack > 0f ? $"pulled back {_dcPushedBack:F0} m to keep the Shine's flight from {_burstAt} in frame" : "the Shine's flight in frame")}) over {DeathCamPanSeconds:F2} s");
+        SmsStandardHud.CameraDemoBegin(this);                                                                                                // 222: a camera demo for the console: the counters, the lives and the life meter go
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the DEATH CAMERA {(DeathCamPanSeconds > 0f ? $"pans out over {DeathCamPanSeconds:F2} s" : "CUTS")} -- from {from.Name} at {_dcFromPos} (fov {_dcFromFov:F0}) to {_dcWidePos} looking at {_dcWideLook} (fov {DeathCamFov:F0}; {(_dcPushedBack > 0f ? $"pulled back {_dcPushedBack:F0} m to keep the Shine's flight from {_burstAt} in frame" : "the Shine's flight in frame")})");
     }
     /// <summary>221: the wide shot pulled back along its line of sight (2 m at a time, at most DeathCamDistance more) until the Shine's whole flight is in frame
     /// with a margin -- its star's centre through ShineSprite.SmsAppear's rise (SmsUpSpeed x SmsMoveUpTicks) and loop (TShine::movingCircle: the straight line to
@@ -1499,9 +1501,9 @@ public partial class SmsKingBooRematch : Node3D
         _dcPushedBack = Mathf.Min(extra, DeathCamDistance); _dcWidePos += back * _dcPushedBack;
         _deathCam.GlobalTransform = was; _deathCam.Fov = wasFov;
     }
-    /// <summary>221: a frame of the death camera -- the pan out; the hold (the wide shot fixed while the Shine comes out where he burst and jumps to the middle;
-    /// with no demo to wait for -- ShineDemo off, another Shine scene, the Shine gone -- straight on to the glide); the glide back onto the gameplay camera's
-    /// LIVE pose (the world runs again and it moves), then the picture handed back.</summary>
+    /// <summary>221 / 222: a frame of the death camera -- the pan out (none for a cut: the hold at once); the hold (the wide shot fixed while the Shine comes out
+    /// where he burst and jumps to the middle; with no demo to wait for -- ShineDemo off, another Shine scene, the Shine gone -- straight on to the release); the
+    /// glide back, if one is set, onto the gameplay camera's LIVE pose (the world runs again and it moves), then the picture handed back.</summary>
     private void DeathCamTick(float dt)
     {
         if (_deathCamPhase == 0) return;
@@ -1526,12 +1528,12 @@ public partial class SmsKingBooRematch : Node3D
         }
         DeathCamKeepView();
     }
-    /// <summary>221: the Shine's demo is over (its SpawnEntranceFinished; or no Shine at all): the wide shot glides back from where it is to the gameplay camera
-    /// over DeathCamBackSeconds.</summary>
+    /// <summary>221 / 222: the Shine's demo is over (its SpawnEntranceFinished; or no Shine at all): the camera CUTS back to the gameplay camera -- or, with
+    /// DeathCamBackSeconds over 0, the wide shot glides back from where it is onto the gameplay camera's live pose over that long.</summary>
     private void DeathCamRelease()
     {
         if (_deathCamPhase != 1 && _deathCamPhase != 2) return;
-        if (DeathCamNode == null || DeathCamReturnTo == null) { DeathCamEnd(); return; }
+        if (DeathCamNode == null || DeathCamReturnTo == null || DeathCamBackSeconds <= 0f) { DeathCamEnd(); return; }
         var t = _deathCam.GlobalTransform;
         _dcFromPos = t.Origin; (_dcFromYaw, _dcFromPitch) = DeathCamYawPitch(-t.Basis.Z); _dcFromFov = _deathCam.Fov;
         _deathCamPhase = 3; _deathCamT = 0f;
@@ -1546,6 +1548,7 @@ public partial class SmsKingBooRematch : Node3D
         if (was != null && was.IsInsideTree() && (cur == null || cur == cam || (shake != null && cur == shake))) was.MakeCurrent();
         cam?.QueueFree();
         _deathCam = null; _deathCamPhase = 0; _deathCamT = 0f;
+        SmsStandardHud.CameraDemoEnd(this);                                                                                                  // 222: and the console comes back (endCameraDemo, three frames on)
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the death camera is over -- the picture {(was != null ? $"back with {was.Name}" : "left as it is (no gameplay camera)")}");
     }
     /// <summary>221: the wide shot's pose k of the way (smoothstep) from the from-pose to the to-pose: the spot straight, the yaw the short way round, the pitch,
@@ -2324,7 +2327,7 @@ public partial class SmsKingBooRematch : Node3D
                 var b = SmashScene.Instantiate<SmsBoolossus>(); b.Name = $"Boolossus{SmashesMade}_{i + 1}"; b.DebugPrint = DebugPrint;
                 (GetTree().CurrentScene ?? GetParent()).AddChild(b);
                 float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
-                b.Landed += hit => { if (hit) SmashHits++; if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: a Boolossus has landed -- {(hit ? "ON Mario" : "a miss")}"); EmitSignal(SignalName.Smashed, hit); };
+                b.Landed += hit => { if (!IsInstanceValid(this) || IsQueuedForDeletion()) return; if (hit) SmashHits++; if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: a Boolossus has landed -- {(hit ? "ON Mario" : "a miss")}"); EmitSignal(SignalName.Smashed, hit); };
                 b.Begin(m, fy, _lastApproach);
                 _boolossus = b; _smashLaunched = true; _smashLaunchedCount++; _smashNextAt += SmashStagger;
                 _crownFlashT = CrownFlashSeconds * 0.7f;
@@ -2364,7 +2367,7 @@ public partial class SmsKingBooRematch : Node3D
                 var l = new SmsGhostLightning { Name = $"GhostLightning{LightningsMade}", DebugPrint = DebugPrint, WallLength = WallLength, WallHeight = WallHeight, WallGap = WallGap, WallSpeed = WallSpeed, SqueezeCount = SqueezeCount, WarnSeconds = WarnSeconds, SqueezePause = SqueezePause, SqueezeTurnDeg = SqueezeTurnDeg, OneShockPerAttack = OneShockPerAttack, WallHitTopK = WallHitTopK, ShowHitBox = ShowHitBoxes };   // 192
                 (GetTree().CurrentScene ?? GetParent()).AddChild(l);
                 float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
-                l.Squeezed += hit => { if (hit) LightningHits++; _crownFlashT = CrownFlashSeconds * 0.7f; EmitSignal(SignalName.LightningSqueezed, hit); };
+                l.Squeezed += hit => { if (!IsInstanceValid(this) || IsQueuedForDeletion()) return; if (hit) LightningHits++; _crownFlashT = CrownFlashSeconds * 0.7f; EmitSignal(SignalName.LightningSqueezed, hit); };
                 l.Finished += () => _lightningDone = true;
                 l.Begin(m, fy);
                 _lightning = l; _lightningLaunched = true; _crownFlashT = CrownFlashSeconds;
@@ -2420,7 +2423,7 @@ public partial class SmsKingBooRematch : Node3D
                 var b = new SmsGhostBreath { Name = $"GhostBreath{BreathsMade}", DebugPrint = DebugPrint, SweepDeg = SweepDeg, SweepSeconds = SweepSeconds / ThrowSpeedScale, SweepWay = SweepWay, DownDeg = BreathDownDegUsed, BreathSpeed = BreathSpeed * ThrowSpeedScale, PuffSeconds = PuffSeconds, PuffSizeStart = PuffSizeStart, PuffSizeEnd = PuffSizeEnd, HitHeight = BreathHitHeight, FreezeSeconds = FreezeSeconds, OneFreezePerAttack = OneFreezePerAttack, ShowHitBox = ShowHitBoxes, FloorDrag = BreathFloorDrag, MouthWidth = BreathMouthWidth, MouthHeight = BreathMouthHeight, HitLanes = BreathHitLanes };   // 192 / 199
                 (GetTree().CurrentScene ?? GetParent()).AddChild(b);
                 float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
-                b.Swept += hit => { if (hit) BreathHits++; _breathSwept = true; _crownFlashT = CrownFlashSeconds * 0.7f; EmitSignal(SignalName.Breathed, hit); };
+                b.Swept += hit => { if (!IsInstanceValid(this) || IsQueuedForDeletion()) return; if (hit) BreathHits++; _breathSwept = true; _crownFlashT = CrownFlashSeconds * 0.7f; EmitSignal(SignalName.Breathed, hit); };
                 b.Finished += () => { if (_breath == b) _breath = null; };
                 b.Begin(m, fy, () => MouthPoint, _breathYawCentre, _breathSide);
                 float frame = ClipFrameNow(BreathClip);
@@ -2479,9 +2482,11 @@ public partial class SmsKingBooRematch : Node3D
                 (GetTree().CurrentScene ?? GetParent()).AddChild(f);
                 float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
                 Vector3 d = m.GlobalPosition - GlobalPosition; float yawTo = d.LengthSquared() > 1e-4f ? MathF.Atan2(d.X, d.Z) : _yaw;
-                f.Shot += n => { _fireShot = true; _crownFlashT = CrownFlashSeconds * 0.7f; EmitSignal(SignalName.FireballsShot); };
-                f.Burned += () => { FireballBurns++; EmitSignal(SignalName.FireballBurned); };
-                f.Finished += () => { int burns = f.Burns; if (_fireballs == f) _fireballs = null; EmitSignal(SignalName.FireballsDone, burns); };
+                // 222: the fireballs live under the scene, not under him -- a copy dismissed (or him gone) while they fly is freed first, and their signals then
+                // found a disposed object (ObjectDisposedException from SmsFireballs, as the volley's Boos had it): nothing to report once he is gone
+                f.Shot += n => { if (!IsInstanceValid(this) || IsQueuedForDeletion()) return; _fireShot = true; _crownFlashT = CrownFlashSeconds * 0.7f; EmitSignal(SignalName.FireballsShot); };
+                f.Burned += () => { if (!IsInstanceValid(this) || IsQueuedForDeletion()) return; FireballBurns++; EmitSignal(SignalName.FireballBurned); };
+                f.Finished += () => { if (!IsInstanceValid(this) || IsQueuedForDeletion()) return; int burns = f.Burns; if (_fireballs == f) _fireballs = null; EmitSignal(SignalName.FireballsDone, burns); };
                 f.Begin(m, fy, () => CrownFxPoint, yawTo, _arenaCentre, _arenaRadius);                                                        // 172: out of the crown
                 float frame = ClipFrameNow(FireballClip);
                 if (_anim != null && _anim.IsPlaying() && _anim.CurrentAnimation == FireballClip) { _anim.Pause(); _fireClipHeld = true; }   // the thrust held through the volley
@@ -2543,9 +2548,9 @@ public partial class SmsKingBooRematch : Node3D
                 var v = new SmsBooVolley { Name = $"BooVolley{VolleysMade}", DebugPrint = DebugPrint, Count = VolleyCount, Spacing = VolleySpacing / ThrowSpeedScale, LobHeight = VolleyLobHeight, Scatter = VolleyScatter, AimedWithin = VolleyAimedWithin, BlastRadius = VolleyBlastRadius, BlastHeight = VolleyBlastHeight, Dud = VolleyDud, DudSeconds = VolleyDudSeconds, DudMinFromMario = VolleyDudMinFromMario };
                 (GetTree().CurrentScene ?? GetParent()).AddChild(v);
                 float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
-                v.Spat += n => { _volleySpat = true; _crownFlashT = CrownFlashSeconds * 0.7f; VolleyDudBoo = v.DudBoo; EmitSignal(SignalName.VolleySpat, n); };
-                v.Blasted += hit => { if (hit) VolleyHits++; EmitSignal(SignalName.VolleyBlasted, hit); };
-                v.Finished += () => { int hits = v.Hits; if (_volley == v) _volley = null; EmitSignal(SignalName.VolleyDone, hits); };
+                v.Spat += n => { if (!IsInstanceValid(this) || IsQueuedForDeletion()) return; _volleySpat = true; _crownFlashT = CrownFlashSeconds * 0.7f; VolleyDudBoo = v.DudBoo; EmitSignal(SignalName.VolleySpat, n); };
+                v.Blasted += hit => { if (!IsInstanceValid(this) || IsQueuedForDeletion()) return; if (hit) VolleyHits++; EmitSignal(SignalName.VolleyBlasted, hit); };
+                v.Finished += () => { if (!IsInstanceValid(this) || IsQueuedForDeletion()) return; int hits = v.Hits; if (_volley == v) _volley = null; EmitSignal(SignalName.VolleyDone, hits); };
                 v.Begin(m, fy, () => MouthPoint, _arenaCentre, _arenaRadius, scene, parent, DebugPrint);
                 float frame = ClipFrameNow(VolleyClip);
                 if (_anim != null && _anim.IsPlaying() && _anim.CurrentAnimation == VolleyClip) { _anim.Pause(); _volleyClipHeld = true; }   // the thrust held through the spit
@@ -2720,8 +2725,8 @@ public partial class SmsKingBooRematch : Node3D
                 var c = new SmsBooCircle { Name = $"BooCircle{CirclesMade}", DebugPrint = DebugPrint, Count = CircleCount, Gap = CircleGap, Radius = CircleRadius, MinRadius = CircleMinRadius, Height = CircleHeight, RevSeconds = CircleRevSeconds / ThrowSpeedScale, HoldSeconds = CircleHoldSeconds, Seconds = CircleSeconds, DriftSpeed = CircleDriftSpeed };
                 (GetTree().CurrentScene ?? GetParent()).AddChild(c);
                 float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
-                c.Hit += () => { CircleHits++; EmitSignal(SignalName.CircleHit); };
-                c.Finished += () => { int hits = c.Hits; if (_circle == c) _circle = null; EmitSignal(SignalName.CircleDone, hits); };
+                c.Hit += () => { if (!IsInstanceValid(this) || IsQueuedForDeletion()) return; CircleHits++; EmitSignal(SignalName.CircleHit); };
+                c.Finished += () => { if (!IsInstanceValid(this) || IsQueuedForDeletion()) return; int hits = c.Hits; if (_circle == c) _circle = null; EmitSignal(SignalName.CircleDone, hits); };
                 c.Begin(m, fy, _arenaCentre, _arenaRadius);
                 _circle = c; _circleLaunched = true; _crownFlashT = CrownFlashSeconds;
                 if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the Boo circle is up about {m.GlobalPosition} ({c.BoosOut} Boos)");
@@ -2769,9 +2774,9 @@ public partial class SmsKingBooRematch : Node3D
                 var w = new SmsGhostWind { Name = $"GhostWind{WindsMade}", DebugPrint = DebugPrint, Count = TornadoCount, SpawnRadius = TornadoSpawnRadius, SpawnMinFromMario = TornadoMinFromMario, LifeSeconds = TornadoSeconds, Speed = TornadoSpeed, TurnDegPerSec = TornadoTurnDegPerSec, Height = TornadoHeight, Radius = TornadoRadius, FlingSpeed = FlingSpeed, FlingUpK = FlingUpK, FlingGraceSeconds = FlingGraceSeconds, Pattern = TornadoPattern, InnerRadius = TornadoInnerRadius, SpiralCycles = TornadoSpiralCycles };   // 195: the pattern
                 (GetTree().CurrentScene ?? GetParent()).AddChild(w);
                 float fy = FloorUnder(m.GlobalPosition); if (float.IsNaN(fy)) fy = m.GlobalPosition.Y;
-                w.Spawned += n => { _crownFlashT = CrownFlashSeconds; EmitSignal(SignalName.WindSpawned, n); };
-                w.Flung += () => { WindFlings++; _crownFlashT = CrownFlashSeconds * 0.7f; EmitSignal(SignalName.Flung); };
-                w.Finished += () => { int fl = w.Flings; if (_wind == w) _wind = null; _windDone = true; EmitSignal(SignalName.WindDone, fl); };
+                w.Spawned += n => { if (!IsInstanceValid(this) || IsQueuedForDeletion()) return; _crownFlashT = CrownFlashSeconds; EmitSignal(SignalName.WindSpawned, n); };
+                w.Flung += () => { if (!IsInstanceValid(this) || IsQueuedForDeletion()) return; WindFlings++; _crownFlashT = CrownFlashSeconds * 0.7f; EmitSignal(SignalName.Flung); };
+                w.Finished += () => { if (!IsInstanceValid(this) || IsQueuedForDeletion()) return; int fl = w.Flings; if (_wind == w) _wind = null; _windDone = true; EmitSignal(SignalName.WindDone, fl); };
                 w.Begin(m, fy, _arenaCentre, _arenaRadius);
                 _wind = w; _windLaunched = true;
                 if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the tornados rise about the arena {_arenaCentre} ({_arenaRadius:F1})");
