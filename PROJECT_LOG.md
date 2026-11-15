@@ -14632,3 +14632,54 @@ file was backed up first (`tools/projectshine/rematch157/save222/`) and is uncha
 **Deviations:** the game's console reads the camera's own state (`isDemoCamera`); the port's is told by the demos' owners. The floor's stone rows close
 up on whole tiles round each ring, so a row's stones are 4-10 % wider at its outer edge than its inner (the original's were the same, cut at the
 spokes). The Shine's appear flash is still the port's own; the Shine Get still hands control back in the arena (his option, `ShineExitLevel` off).
+
+### 223 -- the King Boo REMATCH, part 68: his death plays out in full (the burst's flash and afterglow, the ring, the puffs, the stars, the down's emitters) BEFORE the Shine comes and the camera cuts; the Shine's get chime and its two fanfares re-rendered with the game's release curves the right way round (the chime rings out, the fanfares' notes decay instead of swelling back and cutting) (feature/kingboo-rematch, code `50e91d0`)
+
+**Jaysonn**: "i think i want king boo to full die animations and all like effects then the shine cutscene plays. also the sounds sound off when
+collecting the shine. seems jittery?"
+
+**His death first.** **`assets/Sms/Rematch/SmsKingBooRematch.cs`**: a new knob, `ShineAfterDeathFx` (on): once he bursts the Shine and the death
+camera's cut WAIT until every effect of his death is gone -- the burst's flash and its afterglow (`DeathAfterglowSeconds` 2.5, the last of them), the
+shock ring, the burst's puff and star emitters, the down's mist and twinkle emitters -- then `ShineDelaySeconds` more (0.5; 183's 1 s ran from the
+burst), then the Shine comes out where he burst and the camera cuts to the wide shot WITH it. `DeathCamBegin` moved from `DeathBurst` into
+`SpawnShine` (the knob off: at the burst, as 222). The burst's `DiveBurst` / `StarBurst` hand back their emitters, the down's mist and stars are
+freed once their particles are out (1.1 / 1.0 s; 183 waited 2.5 / 1.5) and all are tracked (`DeathFxAlive`; readouts `DeathFxOutAt`,
+`DeathFxWaitSeconds`). Measured: his effects out 2.50 s after the burst, the cut and the Shine 3.00 s after it, the console (the counters, the
+lives) up through all of it and off with the cut.
+
+**The sounds.** The Master bus was RECORDED in the running game (`AudioEffectRecord`, 48 kHz WASAPI) from the last hit to control back, five
+runs, and laid against the drive's log: no dropout, no click and no level wobble in the chime, the fanfares or the hum (every "gap" in the
+recording was the quiet between sounds: the chime's own 95-ms lead-in after the hum stops, the silence between his down sound and a footstep); the
+audio thread never missed its 10-ms period (the time since the last mix read every frame and every tick: 0 of ~3,300 reads over 12 ms, at
+1280 x 720 and at Jaysonn's 1930 x 1086); and the five WAVs probed clean. What IS off is in the renders of the sounds themselves,
+`tools/projectshine/sound154/sms_audio.py`: (1) the envelope's curved segments (JASOscillator's modes 1 / 2 / 3: the driver's tables) were read
+backwards in time -- the decomp's `TOscillator::calc` indexes a falling segment by the time elapsed (value = target + |scale| x table[16 f]:
+SampleCell's 1 -> 0 run is an exponential-like decay) and a rising one by the time remaining; the baker read the remaining time for both and took
+the table as the distance remaining, so a curved release dropped to silence AT the note-off and swelled back to full by its end, where the voice
+stopped dead. The BGM baker renders every release: in MSD_BGM_SHINE_APPEAR all 39 notes (releases 0.45-2.4 s) and in MSD_BGM_GET_SHINE 75 of 202
+(0.17 s) did that -- notes ducking out and re-swelling into a hard cut. (2) the SE baker cut a gated note dead at its note-off (no release at all
+unless 221's `--release-tails`, which covered only a note the next note on its voice took over): MSD_SE_SY_GET_SHINE is 43 bell notes on one
+instrument (release 1.56 s, SampleCell) across three tracks, each note 83 ms -- it rendered as 43 dry 83-ms blips, a stutter, where the game's rings
+out as a cascade. Fixed (`_shape` by the decomp; `--release-tails` covers every gated note) and re-rendered: **`assets/Sms/Sound/Object/MSD_SE_SY_GET_SHINE.wav`**
+(3.07 s, was 1.57: the body as before, -12 dBFS, then the ring-out to 3.07 s), **`assets/Sms/Sound/Music/MSD_BGM_GET_SHINE.wav`** and
+**`MSD_BGM_SHINE_APPEAR.wav`** (the same lengths and levels: the pipeline of 220 -- `sms_bgm.py`, `trim213.py`, `level220.py` -- reproduces the
+shipped files byte for byte before the fix). The hum and the appear chime (linear releases) re-render byte-identical. **`assets/Sms/Sound/SmsMarioSoundTable.cs`**:
+the chime's row, 3.067 s (`gen_table154.py`; the only change). The new chime in the recording of run k: at the touch, its body and its ring-out
+under the fanfare, no gap but its lead-in. (`chime223.py`, `curves223.py`, `drift223.py`, `align223.py`, `seam223.py`, `loopflux223.py`, `cmp223.py`
+in sound154/ are the probes.)
+
+**Verified:** the shine hud drive v223 (deleted before the commit; windowed, shots 48a-i): C69 the console up on 161 ticks of his death's effects and
+21 panes at the cut 3.00 s after the burst, its demo 0.12 s after the cut, no pane on screen and never out of its demo on the 263 ticks from 0.6 s
+after the cut to the camera's end, the demo over 0.03 s after the camera came back and the coins back 0.15 s after; C70 the touch in the air and the
+get as 222; C71 the card and control back, the save file unchanged -- 3 / 3 (run k). The death camera drive: the burst with the death camera off,
+his effects last seen alive 2.48 s after it, the cut 3.00 s after it with the Shine on the next tick, the wide camera at the wide spot on the cut's
+tick (0.000 m off, King Boo put 30 m out: pulled back 8 m, the star in frame on all 299 ticks), the cut back on the demo's own tick -- 3 / 3 (run
+j). The regression drive 68 / 68 (run fs). The drives' checks: C69's window opens 0.6 s after the cut (the console's demo comes 0.12 s after it and
+the panes take 0.33 s more to slide off); C66 and C10c judge his effects by their last live tick (the Shine's own appear flash joins the effects
+list on the cut's tick). The import (`run_import223`: the three WAVs), the clean rebuild 0 errors; the drive, the logs, the shots, the recordings
+and the tasks deleted. The save file is unchanged.
+
+**Deviations:** the Shine's sounds are still the port's dry renders of the game's sequences (no reverb). The other baked music (MSD_BGM_BOSS,
+CHUBOSS, MISS, GAMEOVER: every instrument of the first two has a curved release) still carries the old curves -- its re-render is a separate call.
+The frame the Shine spawns on runs 130-140 ms (a hitch at the cut; the audio rides through it). Seven texture `.import` files in the working copy
+carry Godot's own detect-3D conversion (compress mode 2) and are not in this commit.
