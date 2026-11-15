@@ -509,7 +509,7 @@ public static class SmsMarioSoundTable
         ["MSD_SE_SHINE_APPEAR"] = new SeInfo(100, 255, false, true, 3.388f, "Object", id: 0x4821u),
         ["MSD_SE_SHINE_EXIST"] = new SeInfo(127, 255, true, false, 3.229f, "Object", id: 0x81C1u),
         ["MSD_SE_SY_1UP"] = new SeInfo(118, 239, false, true, 0.989f, id: 0x4841u),
-        ["MSD_SE_SY_GET_SHINE"] = new SeInfo(110, 255, false, true, 1.572f, "Object", id: 0x4814u),
+        ["MSD_SE_SY_GET_SHINE"] = new SeInfo(110, 255, false, true, 3.067f, "Object", id: 0x4814u),
         ["MSD_SE_SY_HP_RECOVER"] = new SeInfo(100, 208, false, true, 0.596f, id: 0x4801u),
         ["MSD_SE_SY_NEWP_AIR_TAME"] = new SeInfo(90, 208, true, false, 3.219f, id: 0x4022u),
         ["MSD_SE_SY_SELECT_POMP"] = new SeInfo(85, 240, false, true, 0.479f, id: 0x811u),

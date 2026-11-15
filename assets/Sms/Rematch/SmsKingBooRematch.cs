@@ -163,13 +163,14 @@ public partial class SmsKingBooRematch : Node3D
     /// him (DeathMist alive) and twinkle stars shed off him (DeathSparkles alive), his glow swelling to DeathGlowBoost x, the crown flaring white, quicker and quicker,
     /// the camera rumbling (DeathRumble every 0.4 s), the node SINKING DeathSink m so the tumble ends low -- and at the clip's end he BURSTS: a flash DeathFlashSize m across, a shock ring on the floor under him, a
     /// poof of DeathPuffs and a burst of DeathStars (DeathFxScale x the dive's sizes), the camera kicked (DeathShake), an afterglow fading over
-    /// DeathAfterglowSeconds where he was; Gone, Defeated (the supply stops). ShineDelaySeconds after the burst, the SHINE: the ShineScene (empty =
+    /// DeathAfterglowSeconds where he was; Gone, Defeated (the supply stops). ShineDelaySeconds after the burst -- 223: after his effects are OUT (ShineAfterDeathFx: the
+    /// afterglow is the last, 2.5 s) -- the SHINE, and the cut to the death camera with it: the ShineScene (empty =
     /// res://shine_sprite.tscn) added beside him, placed at ShineSpawnPoint, else ShineOverFloor m over the floor at the arena's middle, its back to Mario (so
     /// its demo camera, before it, looks past it at him); it materialises in a GOLDEN flash and stars (ShineFlashSize, ShineStars, ShineFlashColor) and appears
     /// the game's way (makeShineAppearWithDemo: TShine::appearWithDemo, ShineSprite's SmsAppear) FROM where he burst (ShineFromBurst; else at its spot) -- up
     /// 2 s, a loop down onto its spot, the settle -- with the demo (ShineDemo: the world
     /// frozen, the Shine's camera watching from ShineCamOffset at ShineCamFov -- 221: the wide shot instead, DeathCamWide; ShineDemoTicks 600 = 5 s: up 2, the loop 1,
-    /// the settle 2, Petey's (183 had 720); 0 = the Shine scene's own 1200, 10 s; his effects run on through it). ShineExitLevel /
+    /// the settle 2, Petey's (183 had 720); 0 = the Shine scene's own 1200, 10 s; 223: his effects are over before it -- ShineAfterDeathFx off: they run on through it). ShineExitLevel /
     /// ShineExitScene set the Shine's exit (the save card, then that scene); off = the Shine scene's own (the card, control back). The casino boss's Shine came
     /// 240 ticks into his down, at his point, no burst.</summary>
     [Export] public bool DeathFx = true;
@@ -186,7 +187,11 @@ public partial class SmsKingBooRematch : Node3D
     [Export(PropertyHint.Range, "0.2,3,0.05")] public float DeathFxScale = 1.6f;
     [Export] public PackedScene ShineScene;
     [Export] public Node3D ShineSpawnPoint;
-    [Export] public float ShineOverFloor = 1.2f, ShineDelaySeconds = 1f;
+    /// <summary>223 (Jaysonn: "i want king boo to full die animations and all like effects then the shine cutscene plays"): the Shine (and the cut to the death
+    /// camera) WAIT for his death to play out -- the burst's flash, afterglow, shock ring, puffs and stars and the down's mist and twinkle emitters all gone --
+    /// then ShineDelaySeconds more; off = 183's: ShineDelaySeconds after the burst, his effects running on under the Shine's demo.</summary>
+    [Export] public bool ShineAfterDeathFx = true;
+    [Export] public float ShineOverFloor = 1.2f, ShineDelaySeconds = 0.5f;   // 223: 0.5 after the effects (183: 1 s after the burst)
     [Export] public bool ShineFromBurst = true, ShineDemo = true;
     [Export(PropertyHint.Range, "0,2400,10")] public int ShineDemoTicks = 600;   // 221: Petey's -- biancoBoss's boss Shine camera (ボスシャインカメラ) runs 600: up 2 s, the jump 1 s, the settle 2 s (183 had 720: a 2-s glide)
     /// <summary>The Shine's demo camera (221: only with DeathCamWide off): where it sits in the Shine's placed frame (x right, y up, z forward -- its back is to Mario, so the camera looks past the Shine at him)
@@ -205,7 +210,8 @@ public partial class SmsKingBooRematch : Node3D
     /// game's size again (the get demo drives it at the game's scale). 1 = the scene's own.</summary>
     [Export(PropertyHint.Range, "0.5,5,0.1")] public float ShineScale = 2.5f;
     /// <summary>221 (Jaysonn: "when king boo dies the cam pans out like petey phriana when he dies. where its almost looking at the entire aerna then the shine jumps
-    /// to the middle"; 222: "it shouldnt pan it should cut"): at his burst the camera CUTS to a wide shot of the arena -- out from the middle along the gameplay
+    /// to the middle"; 222: "it shouldnt pan it should cut"; 223: "king boo to full die animations and all like effects then the shine cutscene plays"): once his
+    /// death has played out (ShineAfterDeathFx) the camera CUTS to a wide shot of the arena as the Shine comes -- out from the middle along the gameplay
     /// camera's own bearing: DeathCamDistance m out, DeathCamHeight m over the floor, looking at DeathCamLookUp m over the middle, DeathCamFov
     /// degrees (42 / 22 / 3 / 50: 97 % of the floor in frame, 24 degrees down, and the Shine's whole flight -- a burst anywhere out to 0.9 of the floor's radius,
     /// its loop up to half that distance high, the star's top and bottom -- in frame: tools/projectshine/rematch157/widecam221b.py; a burst farther out pulls the
@@ -1063,9 +1069,9 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>The twinkle stars burst off him at the top of the leap: his ChikaFx emitter copied as a one-shot, flung every way under a light gravity.</summary>
     private void DiveSparkle(Vector3 at) { StarBurst("DiveSparkFx", at, DiveSparkles, 1f); if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the DIVE's twinkle burst at {at} ({_introT:F2} s in)"); }
     /// <summary>A one-shot burst of his twinkle stars (his ChikaFx emitter copied): count, at a point, the dive's sizes x scale (he is 6 m across: big stars).</summary>
-    private void StarBurst(string name, Vector3 at, int count, float scale, Color? col = null)
+    private GpuParticles3D StarBurst(string name, Vector3 at, int count, float scale, Color? col = null)
     {
-        if (count <= 0 || _chika == null || _chika.ProcessMaterial is not ParticleProcessMaterial chikaMat) return;
+        if (count <= 0 || _chika == null || _chika.ProcessMaterial is not ParticleProcessMaterial chikaMat) return null;
         var p = (GpuParticles3D)_chika.Duplicate();
         p.Name = name; p.TopLevel = true; p.Visible = true; p.Amount = count; p.Lifetime = 0.9; p.OneShot = true; p.Explosiveness = 1f; p.Emitting = false; p.LocalCoords = false;
         var pm = (ParticleProcessMaterial)chikaMat.Duplicate();
@@ -1074,6 +1080,7 @@ public partial class SmsKingBooRematch : Node3D
         if (col.HasValue) pm.Color = new Color(col.Value.R, col.Value.G, col.Value.B, 1f);                                                   // 183: the Shine's gold
         p.ProcessMaterial = pm;
         AddChild(p); p.GlobalPosition = at; p.Finished += p.QueueFree; p.Emitting = true;
+        return p;
     }
     /// <summary>A flash of light: a flat additive radial on the stone (flat) or a camera-facing one at a point, size m, growing from -> to of it and fading over
     /// seconds (FxTick). Drawn over the depth: the arena's floor is a shallow dome -- a flat quad this wide dipped under it and was cut in chunks.</summary>
@@ -1401,8 +1408,8 @@ public partial class SmsKingBooRematch : Node3D
     {
         Vector3 at = BodyPoint + Vector3.Up * 1.5f; _burstAt = at; Burst = true;
         _deathOn = false; _glowBoost = 1f; SetFlash(false); SetCrownGlow(_crownGlowColor, 0f);
-        if (_deathMist != null && IsInstanceValid(_deathMist)) { var m = _deathMist; m.Emitting = false; GetTree().CreateTimer(2.5).Timeout += () => { if (IsInstanceValid(m)) m.QueueFree(); }; _deathMist = null; }
-        if (_deathStars != null && IsInstanceValid(_deathStars)) { var s = _deathStars; s.Emitting = false; GetTree().CreateTimer(1.5).Timeout += () => { if (IsInstanceValid(s)) s.QueueFree(); }; _deathStars = null; }
+        if (_deathMist != null && IsInstanceValid(_deathMist)) { var m = _deathMist; m.Emitting = false; _deathFxNodes.Add(m); GetTree().CreateTimer(1.1).Timeout += () => { if (IsInstanceValid(m)) m.QueueFree(); }; _deathMist = null; }   // 223: freed once its 1.0-s wisps are out (183 waited 2.5)
+        if (_deathStars != null && IsInstanceValid(_deathStars)) { var s = _deathStars; s.Emitting = false; _deathFxNodes.Add(s); GetTree().CreateTimer(1.0).Timeout += () => { if (IsInstanceValid(s)) s.QueueFree(); }; _deathStars = null; }   // (its 0.9-s stars)
         if (DeathFx)
         {
             float s = DeathFxScale;
@@ -1410,23 +1417,38 @@ public partial class SmsKingBooRematch : Node3D
             if (DeathFlashSize > 0f && DeathAfterglowSeconds > 0f) FlashAt("DeathAfterglow", at, DeathFlashSize * 0.6f, DeathAfterglowSeconds, flat: false, 1f, 0.5f);   // lingers, shrinking as it fades
             float fy = FloorUnder(at); if (float.IsNaN(fy)) fy = float.IsNaN(_floorAtSpot) ? _introFloorY : _floorAtSpot;
             if (DiveShockRing) ShockRingAt(new Vector3(at.X, fy, at.Z), DiveFlashSize * s, DiveFlashSeconds * 1.6f);
-            if (DeathPuffs > 0) DiveBurst("DeathPuffs", DeathPuffs, at, Vector3.Up, 180f, 4f * s, 8f * s, 3f * s, 6f * s, MistColor, 0.85f, 1.3, 3.5f, 0.8f);
-            StarBurst("DeathStars", at, DeathStars, s);
+            if (DeathPuffs > 0) _deathFxNodes.Add(DiveBurst("DeathPuffs", DeathPuffs, at, Vector3.Up, 180f, 4f * s, 8f * s, 3f * s, 6f * s, MistColor, 0.85f, 1.3, 3.5f, 0.8f));
+            _deathFxNodes.Add(StarBurst("DeathStars", at, DeathStars, s));
             if (DeathShake > 0f) SmsCameraShake.Current?.Start(SmsCameraShake.Kind.Damage, DeathShake);
         }
         ProcessMode = ProcessModeEnum.Always;
-        _shinePending = true; _shineT = 0f;
+        _shinePending = true; _shineT = 0f; _deathFxWaitT = 0f; _deathFxOutAt = -1f;
         BeginPeaceSky();                                                                                                                   // 217: the night comes
-        DeathCamBegin();                                                                                                                   // 221: the camera pans out
-        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: BURSTS at {at} -- the flash {DeathFlashSize} m, {DeathPuffs} puffs, {DeathStars} stars, the floor at {FloorUnder(at):F2}; the Shine in {ShineDelaySeconds:F1} s");
+        if (!ShineAfterDeathFx) DeathCamBegin();                                                                                           // 221: the camera to the wide shot (223: at the Shine instead, once his effects are out)
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: BURSTS at {at} -- the flash {DeathFlashSize} m, {DeathPuffs} puffs, {DeathStars} stars, the floor at {FloorUnder(at):F2}; the Shine {(ShineAfterDeathFx ? $"{ShineDelaySeconds:F1} s after his effects are out" : $"in {ShineDelaySeconds:F1} s")}");
     }
-    /// <summary>Gone: the Shine ShineDelaySeconds after the burst; once it is there and his last flash is out, back to the world's clock.</summary>
+    /// <summary>223: his death still showing -- a flash (the burst's, its afterglow), the shock ring, the burst's puff and star emitters, the down's mist and
+    /// twinkle emitters (each freed once its particles are out).</summary>
+    public bool DeathFxAlive => AnyFxAlive || _deathFxNodes.Exists(n => n != null && IsInstanceValid(n) && !n.IsQueuedForDeletion());
+    /// <summary>223, for the drives: seconds after the burst at which his effects were out (-1 = not yet), the wait the Shine sat out for them.</summary>
+    public float DeathFxOutAt => _deathFxOutAt;
+    public float DeathFxWaitSeconds => _deathFxWaitT;
+    private readonly List<Node> _deathFxNodes = new(); private float _deathFxWaitT, _deathFxOutAt = -1f;
+    /// <summary>Gone: the Shine ShineDelaySeconds after the burst (223: after his effects are out, ShineAfterDeathFx -- the cut to the death camera with it);
+    /// once it is there and his last flash is out, back to the world's clock.</summary>
     private void GoneTick(float dt)
     {
-        _shineT += dt;
         DeathCamTick(dt);                                                                                                                  // 221
-        if (_shinePending) { if (_shineT >= ShineDelaySeconds) SpawnShine(); }
-        else if (ShineSpawned && !AnyFxAlive && _shineT >= ShineDelaySeconds + 1.5f && !PeaceSkyRunning && _deathCamPhase == 0 && ProcessMode == ProcessModeEnum.Always) ProcessMode = ProcessModeEnum.Inherit;   // the Shine's stars done too (217: and the night's fade; 221: and the camera handed back)
+        if (_shinePending)
+        {
+            if (ShineAfterDeathFx && DeathFxAlive) { _deathFxWaitT += dt; return; }                                                       // 223: his death plays out first
+            if (_deathFxOutAt < 0f) _deathFxOutAt = _deathFxWaitT;
+            _shineT += dt;
+            if (_shineT >= ShineDelaySeconds) SpawnShine();
+            return;
+        }
+        _shineT += dt;
+        if (ShineSpawned && !AnyFxAlive && _shineT >= ShineDelaySeconds + 1.5f && !PeaceSkyRunning && _deathCamPhase == 0 && ProcessMode == ProcessModeEnum.Always) ProcessMode = ProcessModeEnum.Inherit;   // the Shine's stars done too (217: and the night's fade; 221: and the camera handed back)
     }
     // 221: the death camera (DeathCamWide) -- its phase (0 off, 1 the pan out, 2 the hold, 3 the glide back), its clock, its node and the camera it took the
     // picture from, the pose it eases from and to (a spot, a yaw and a pitch, a fov), the wide shot's spot and look point
@@ -1598,6 +1620,7 @@ public partial class SmsKingBooRematch : Node3D
     private void SpawnShine()
     {
         _shinePending = false;
+        if (ShineAfterDeathFx) DeathCamBegin();                                                                                            // 223: the cut to the wide shot comes WITH the Shine, his death played out (makeShineAppearWithDemo sets the camera as the Shine appears)
         var scene = ShineScene ?? (ResourceLoader.Exists("res://shine_sprite.tscn") ? GD.Load<PackedScene>("res://shine_sprite.tscn") : null);
         if (scene == null) { GD.PushWarning($"[SMS kingboo] {GetPath()}: no ShineScene and no res://shine_sprite.tscn -- no Shine at the fight's end"); DeathCamRelease(); return; }
         var node = scene.Instantiate<Node3D>();
@@ -1647,7 +1670,7 @@ public partial class SmsKingBooRematch : Node3D
         return p;
     }
     /// <summary>A one-shot burst of the port's smoke ball (mix-blended): count, from a point, a direction and spread, speeds, sizes, colour, alpha, life, damping, gravity.</summary>
-    private void DiveBurst(string name, int count, Vector3 at, Vector3 dir, float spread, float v0, float v1, float s0, float s1, Color col, float alpha, double life, float damp, float gravity, bool flat = false)
+    private GpuParticles3D DiveBurst(string name, int count, Vector3 at, Vector3 dir, float spread, float v0, float v1, float s0, float s1, Color col, float alpha, double life, float damp, float gravity, bool flat = false)
     {
         var scale = new Curve { MinValue = 0f, MaxValue = Mathf.Max(1f, Mathf.Max(s0, s1) * 1.1f) }; scale.AddPoint(new Vector2(0f, s0)); scale.AddPoint(new Vector2(1f, s1));
         var fade = new Gradient { Offsets = new float[] { 0f, 0.1f, 0.65f, 1f }, Colors = new Color[] { new Color(1f, 1f, 1f, alpha), new Color(1f, 1f, 1f, alpha), new Color(1f, 1f, 1f, alpha * 0.55f), new Color(1f, 1f, 1f, 0f) } };
@@ -1662,6 +1685,7 @@ public partial class SmsKingBooRematch : Node3D
         var p = new GpuParticles3D { Name = name, TopLevel = true, Amount = count, Lifetime = life, OneShot = true, Explosiveness = 0.9f, Emitting = false, LocalCoords = false, FixedFps = 60, Interpolate = true, DrawOrder = GpuParticles3D.DrawOrderEnum.ViewDepth, ProcessMaterial = pm, DrawPass1 = new QuadMesh { Size = Vector2.One, Material = mat }, VisibilityAabb = new Aabb(new Vector3(-14f, -4f, -14f), new Vector3(28f, 14f, 28f)), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
         AddChild(p); p.GlobalPosition = at;
         p.Finished += p.QueueFree; p.Emitting = true;
+        return p;
     }
     private static Texture2D FxTex(string name) { string p = $"res://assets/Sms/Fx/tex/{name}.png"; return ResourceLoader.Exists(p) ? GD.Load<Texture2D>(p) : null; }
 
