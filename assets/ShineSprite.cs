@@ -1017,6 +1017,24 @@ public partial class ShineSprite : Node3D
         SmsInitialYaw = GlobalRotation.Y;
         SmsInitialPosition = GlobalPosition;
     }
+    /// <summary>224: a Shine made ahead of its moment (King Boo's, at the fight's start: its instantiate and _Ready ran 100 ms on the frame it
+    /// appeared on) waits PARKED -- hidden (no hum: SmsHumTick reads the visibility), its pickup zone off (a hidden Shine at the arena's middle must
+    /// not be collected) -- until SmsPlaceAt and SmsAppear / SmsAppearFrom bring it out (SmsAppear shows it; the zone comes back at the float's end).</summary>
+    public void SmsPark()
+    {
+        Visible = false;
+        if (_pickupZone != null) _pickupZone.Monitoring = false;
+        SmsParked = true;
+    }
+    public bool SmsParked { get; private set; }
+    /// <summary>224: the placed transform set outright -- the spot the appear flight returns to and the yaw it spins back to -- for a Shine whose
+    /// first frame already latched a parking spot (the latch is first-come: _Process or the first use).</summary>
+    public void SmsPlaceAt(Vector3 globalPos, float yaw)
+    {
+        GlobalPosition = globalPos; GlobalRotation = new Vector3(0f, yaw, 0f);
+        _smsPlacedLatched = true; SmsInitialPosition = globalPos; SmsInitialYaw = yaw;
+        SmsParked = false;
+    }
     /// <summary>The script's appear from somewhere else (makeShineAppearWithTime / WithDemo set mPosition first): the placed spot stays, the flight
     /// starts at startGlobal.</summary>
     public void SmsAppearFrom(Vector3 startGlobal, int demoTicks, bool withDemo)

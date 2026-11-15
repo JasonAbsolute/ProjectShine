@@ -191,6 +191,10 @@ public partial class SmsKingBooRematch : Node3D
     /// camera) WAIT for his death to play out -- the burst's flash, afterglow, shock ring, puffs and stars and the down's mist and twinkle emitters all gone --
     /// then ShineDelaySeconds more; off = 183's: ShineDelaySeconds after the burst, his effects running on under the Shine's demo.</summary>
     [Export] public bool ShineAfterDeathFx = true;
+    /// <summary>224: the Shine is MADE AHEAD -- instanced, hidden and without its pickup zone, at the fight's start (its scene's instantiate and its _Ready, the
+    /// effects and their materials, ran 100 ms on the main thread: a 135-ms frame right at the cut) -- so the frame it appears on only places and shows it.
+    /// Off = made on that frame, as before.</summary>
+    [Export] public bool ShineMadeAhead = true;
     [Export] public float ShineOverFloor = 1.2f, ShineDelaySeconds = 0.5f;   // 223: 0.5 after the effects (183: 1 s after the burst)
     [Export] public bool ShineFromBurst = true, ShineDemo = true;
     [Export(PropertyHint.Range, "0,2400,10")] public int ShineDemoTicks = 600;   // 221: Petey's -- biancoBoss's boss Shine camera (ボスシャインカメラ) runs 600: up 2 s, the jump 1 s, the settle 2 s (183 had 720: a 2-s glide)
@@ -816,6 +820,7 @@ public partial class SmsKingBooRematch : Node3D
     {
         _model = GetNodeOrNull<Node3D>("Model");
         if (!IsCopy && !Engine.IsEditorHint()) CallDeferred(nameof(ResetFinalSky));                                // 208b: a fresh fight starts under the boss-arena sky (the sky material is a shared resource)
+        if (!IsCopy && !Engine.IsEditorHint() && ShineMadeAhead) CallDeferred(nameof(MakeShineAhead));          // 224: the Shine instanced now (the load's frame), parked hidden till his death
         if (IsCopy)                                                                       // 177: a duplicate carries the real one's RUN-TIME children too -- made again below, so out they go
         {
             foreach (string n in new[] { "CrownGlowFx", "CrownSparkFx" }) { var old = GetNodeOrNull(n); if (old != null) { RemoveChild(old); old.QueueFree(); } }
@@ -1358,6 +1363,7 @@ public partial class SmsKingBooRematch : Node3D
         if (!IsCopy && FinalSkyBlend > 0f) SetFinalSky(0f);                                                                                   // 208b: the shared sky material back to the boss-arena sky
         if (!IsCopy && PeaceSkyBlend > 0f) SetPeaceSky(0f);                                                                                   // 217: and off the night
         if (_deathCamPhase != 0) DeathCamEnd();                                                                                               // 221: the picture back to the gameplay camera
+        if (_shineReady != null && IsInstanceValid(_shineReady) && !_shineReady.IsQueuedForDeletion()) { _shineReady.QueueFree(); _shineReady = null; }   // 224: a Shine made ahead and never brought out goes with him
     }
     /// <summary>The down clip begins (the last hit's hurt is over): the mist and the stars boil off his body, the blink, the glow and the crown's flare run in DeathTick.</summary>
     private void DeathBegin()
@@ -1617,24 +1623,50 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>The SHINE (makeShineAppearWithDemo, "the boss shine"): the ShineScene beside him in the arena, placed at ShineSpawnPoint or ShineOverFloor m over the
     /// floor at the arena's middle with its back to Mario, appearing the game's way from where he burst (ShineFromBurst) with the demo (ShineDemo), its exit set
     /// (ShineExitLevel / ShineExitScene), its save flag this scene + his name.</summary>
-    private void SpawnShine()
+    /// <summary>224: the Shine's node instanced and added beside him (its _Ready builds its effects and their materials; ShineScale after it, so the effects grow
+    /// with it) -- 100 ms of main thread, so MakeShineAhead does it at the fight's start and SpawnShine only places it.</summary>
+    private Node3D MakeShine()
     {
-        _shinePending = false;
-        if (ShineAfterDeathFx) DeathCamBegin();                                                                                            // 223: the cut to the wide shot comes WITH the Shine, his death played out (makeShineAppearWithDemo sets the camera as the Shine appears)
         var scene = ShineScene ?? (ResourceLoader.Exists("res://shine_sprite.tscn") ? GD.Load<PackedScene>("res://shine_sprite.tscn") : null);
-        if (scene == null) { GD.PushWarning($"[SMS kingboo] {GetPath()}: no ShineScene and no res://shine_sprite.tscn -- no Shine at the fight's end"); DeathCamRelease(); return; }
+        if (scene == null) { GD.PushWarning($"[SMS kingboo] {GetPath()}: no ShineScene and no res://shine_sprite.tscn -- no Shine at the fight's end"); return null; }
         var node = scene.Instantiate<Node3D>();
         Node parent = GetParent() ?? GetTree().CurrentScene;
         parent.AddChild(node);
+        float k = Mathf.Max(0.05f, ShineScale);
+        if (MathF.Abs(k - 1f) > 1e-3f) node.Scale = node.Scale * k;                                                                       // 217: bigger -- after its _Ready, so its effects (built at the scene's scale) grow with it
+        return node;
+    }
+    private Node3D _shineReady;
+    public bool ShineMadeAheadNow => _shineReady != null && IsInstanceValid(_shineReady);
+    private void MakeShineAhead()
+    {
+        if (_shineReady != null || ShineSpawned || _shinePending) return;
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        var node = MakeShine(); if (node == null) return;
+        if (node is ShineSprite s) s.SmsPark(); else node.Visible = false;
+        _shineReady = node;
+        foreach (string se in new[] { ShineSprite.AppearChimeSe, ShineSprite.HumSe, ShineSprite.GetChimeSe }) SmsActorSound.Stream(se);     // its sounds' streams loaded now too (the first Play loaded them)
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the SHINE made ahead ({node.Name}, parked hidden, no pickup; its three sounds loaded) in {sw.Elapsed.TotalMilliseconds:F1} ms");
+    }
+    private void SpawnShine()
+    {
+        _shinePending = false;
+        var sw = System.Diagnostics.Stopwatch.StartNew(); double tCam, tInst, tPlace, tAppear;                                          // 224: where the spawn's frame goes
+        if (ShineAfterDeathFx) DeathCamBegin();                                                                                            // 223: the cut to the wide shot comes WITH the Shine, his death played out (makeShineAppearWithDemo sets the camera as the Shine appears)
+        tCam = sw.Elapsed.TotalMilliseconds;
+        bool ahead = _shineReady != null && IsInstanceValid(_shineReady) && !_shineReady.IsQueuedForDeletion();
+        var node = ahead ? _shineReady : MakeShine(); _shineReady = null;                                                                 // 224: the one made at the fight's start, else made now
+        if (node == null) { DeathCamRelease(); return; }
+        tInst = sw.Elapsed.TotalMilliseconds;
         float fy = FloorUnder(_arenaCentre); if (float.IsNaN(fy)) fy = float.IsNaN(_introFloorY) ? _arenaCentre.Y : _introFloorY;
         float k = Mathf.Max(0.05f, ShineScale);
         Vector3 placed = ShinePlaced(fy, k);                                                                                               // 217: the star's centre where the normal one has it
         var m = M(); Vector3 away = m != null ? placed - m.GlobalPosition : Vector3.Forward; away.Y = 0f;
         if (away.LengthSquared() < 1e-4f) away = Vector3.Forward; away = away.Normalized();
         float yaw = Mathf.Atan2(-away.X, -away.Z);                                                                                        // SmsMath.DirFromYaw(yaw) = away: its back to Mario
-        node.GlobalPosition = placed; node.GlobalRotation = new Vector3(0f, yaw, 0f);
-        if (MathF.Abs(k - 1f) > 1e-3f) node.Scale = node.Scale * k;                                                                       // 217: bigger -- after its _Ready, so its effects (built at the scene's scale) grow with it
+        if (node is ShineSprite placing) placing.SmsPlaceAt(placed, yaw); else { node.GlobalPosition = placed; node.GlobalRotation = new Vector3(0f, yaw, 0f); }   // 224: the placed spot set outright (a Shine made ahead latched its parking spot on its first frame)
         _shine = node; ShineSpawned = true;
+        tPlace = sw.Elapsed.TotalMilliseconds;
         if (node is ShineSprite s)
         {
             if (string.IsNullOrEmpty(s.ShineId)) s.ShineId = $"{GetTree().CurrentScene?.SceneFilePath ?? ""}:{Name}:rematch";              // 118c: the spawned Shine's save flag
@@ -1646,10 +1678,12 @@ public partial class SmsKingBooRematch : Node3D
             if (ShineFromBurst) s.SmsAppearFrom(_burstAt, ticks, ShineDemo); else s.SmsAppear(ticks, ShineDemo);
             if (ShineCamFov > 0f && s.SmsAppearCam != null) s.SmsAppearCam.Fov = ShineCamFov;
         }
+        tAppear = sw.Elapsed.TotalMilliseconds;
         Vector3 start = ShineFromBurst ? _burstAt : placed;                                                                                // the golden flash and stars where it materialises
         if (ShineFlashSize > 0f) FlashAt("ShineFlash", start, ShineFlashSize, 0.5f, flat: false, 0.4f, 1.3f, ShineFlashColor);
         StarBurst("ShineStars", start, ShineStars, 0.7f, ShineFlashColor);
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the SHINE -- {node.Name} placed at {placed} (the floor {fy:F2}, Mario {(m != null ? Flat(placed, m.GlobalPosition).ToString("F1") : "?")} m off), appearing from {(ShineFromBurst ? _burstAt.ToString() : "its spot")}, the demo {ShineDemo}");
+        if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the SHINE's spawn took {sw.Elapsed.TotalMilliseconds:F1} ms on the main thread ({(ahead ? "the Shine made ahead" : "the Shine made now")}) -- the death camera {tCam:F1}, {(ahead ? "taking the made one" : "its instantiate and add (its _Ready: the effects and their materials)")} {tInst - tCam:F1}, the placing {tPlace - tInst:F1}, the appear (its sounds, the stop-the-world, the HUD) {tAppear - tPlace:F1}, the flash and the stars {sw.Elapsed.TotalMilliseconds - tAppear:F1}");
         EmitSignal(SignalName.ShineAppearing, node);
     }
     /// <summary>A continuous emitter of the port's smoke ball (mix-blended) at a point: count alive, their life, a direction and spread, speeds, sizes, colour, alpha,
