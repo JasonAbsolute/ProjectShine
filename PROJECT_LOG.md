@@ -14683,3 +14683,36 @@ and the tasks deleted. The save file is unchanged.
 CHUBOSS, MISS, GAMEOVER: every instrument of the first two has a curved release) still carries the old curves -- its re-render is a separate call.
 The frame the Shine spawns on runs 130-140 ms (a hitch at the cut; the audio rides through it). Seven texture `.import` files in the working copy
 carry Godot's own detect-3D conversion (compress mode 2) and are not in this commit.
+
+### 224 -- the King Boo REMATCH, part 69: the frame HITCH at the Shine's spawn gone: the Shine is made at the fight's start and parked hidden, so the frame of the cut only places and shows it (135 ms -> 25-29 ms) (feature/kingboo-rematch, code `f859c52`)
+
+**Jaysonn**: "Fix the frame hitch at the Shine's spawn".
+
+**The hitch, measured.** A stopwatch through `SpawnShine` on the frame of the cut (the windowed drive, 1930 x 1086): 114.8 ms on the main thread --
+the Shine scene's `Instantiate` 58.0 ms, its `AddChild` (`ShineSprite._Ready`: the effects -- the light, the glow and ring quads and their materials,
+the rays shader, the sparkle emitter -- and the sound node) 42.1, the death camera 5.1, the appear (its sounds' first loads, the stop-the-world, the
+HUD) 5.9, the flash and the stars 3.6, the placing 0.2; the frame itself 135 ms (the drive's frame watch: one `_Process` to the next).
+
+**The fix.** **`assets/Sms/Rematch/SmsKingBooRematch.cs`**: a new knob, `ShineMadeAhead` (on): the Shine is instanced and added when the fight
+loads (`MakeShineAhead`, deferred from `_Ready`, the real King Boo only -- not his copies), PARKED, and its three sounds' streams (the appear chime,
+the hum, the get chime) are loaded then too; `SpawnShine` takes the made one, places it (`SmsPlaceAt`) and runs the appear as before -- `MakeShine`
+(the instantiate, the add, 217's scale) factored out and used by both; a Shine made ahead and never brought out is freed with him (`_ExitTree`). Off
+= made on that frame, as before. **`assets/ShineSprite.cs`**: `SmsPark` -- hidden (no hum: `SmsHumTick` reads the visibility), its pickup zone off
+(a hidden Shine at the arena's middle must not be collected by Mario walking through) -- and `SmsPlaceAt`, the placed transform set outright (the
+spot the appear flight returns to, the yaw it spins back to) for a Shine whose first frame already latched its parking spot; `SmsAppear` shows it
+and the zone comes back at the float's end, as before. Measured after: the spawn 12.3-14.8 ms on the main thread (the death camera 5, the appear
+3.5-5.9, the flash and stars 3.4), the frame of the cut 25-29 ms (a frame at 60 fps is 17: the rest is the Shine's first draw); the making ahead
+101-119 ms on the load's frame.
+
+**Verified:** the shine hud drive v224 (deleted before the commit; windowed at 1930 x 1086, no shots): NEW C72 the Shine's spawn frame -- the
+longest frame within 0.25 s of the cut 25 / 26 / 29 ms over three runs (want under 50); C69 the console through the appear, C70 the touch and the
+get, C71 the card and control back as 223 -- 4 / 4 (runs m, n, o). The death camera drive 3 / 3 (run k: the cut 3.00 s after the burst with the
+Shine on the next tick, at the wide spot from its first frame). The regression drive 68 / 68 (run ft: C10c's Shine still appears FROM the burst
+point, the placed spot the made Shine's). The clean rebuild 0 errors; the drive, the logs, the recording and the tasks deleted. The save file is
+unchanged.
+
+**Also measured, not changed:** the frame of the SHINE GET's landing runs 73 ms (`StartShineGet` 44 ms: the SHINE! letters' first build 31.6 ms of
+it; the rest their first draw) -- a hitch of the same kind, `Mario.cs` / the console's letters, left for its own pass.
+
+**Deviations:** the Shine now exists in the arena from the fight's start (hidden, inert; no code enumerates Shines). The frame of the cut is still
+1.5 frames long (its first draw).
