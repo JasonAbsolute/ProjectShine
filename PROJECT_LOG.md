@@ -14872,3 +14872,51 @@ save file is unchanged.
 
 **Deviations:** with the knob on, his landing keeps the sideways drift the game would drop (the port always has; the face now follows it at once
 rather than after the landing window). With it off the port is the game's: the drift is lost at the touchdown.
+
+### 229 -- the King Boo REMATCH, part 74: the Bomb Boos KEEP OFF THE RIM -- the arena floor measures its own STONE (the walkable top's edge, 25.1 m, apart from the kerb and the rock's shoulder), a Boo's wander goals and its body stay `RimMargin` (3 m) inside that edge, a Boo let go or landed as a dud past it comes straight back in, and the supply's margin and the volley's wall are measured from the same edge (feature/kingboo-rematch, code `d05ba70`)
+
+**Jaysonn**: "Keep Bomb Boo spawns a few metres from the rim" (twice a drive's spin jump at a Boo near the edge had taken Mario off the arena --
+runs en of 209 and fg of 217 -- and a fall is a death since 212).
+
+**What it was.** Not the spots: the supply draws them within `ArenaRadius` 18 m of the middle and the stone's edge is 25.1 m out, so every spot was
+7 m inside it (184). It was the WANDER -- a Boo's goals are drawn within `WanderRadiusUnits` (800 u, 10.7 m) of where it rose (TTelesa's graph
+wander with no graph), so one risen 18 m out could float 28 m out, over the void; a Boo let go off the lasso at the edge floated where it was
+dropped; a dud landed at the edge did the same. And the one "edge" the port knew was the arena model's half-span (`SmsArenaFloor.Radius`, 26.4 m):
+the broken wall's kerb (25.3-25.6, standing 0.3-1.3 m over the stone) and the rock's shoulder (out to 26.4) are in it, so the supply's `EdgeMargin`
+(26.4 - 2.5 = 23.9 m, over the 18 cap: never the bound) and the volley's wall (26.4 - 2 = 24.4 m: 0.7 m from the stone's edge) were measured from
+past the stone.
+
+**The fix.** **`assets/Sms/Rematch/SmsArenaFloor.cs`**: the STONE measured at load from the vertices already walked for the collision -- the fullest
+0.1-m level of world y is the stone's level (`StoneY` 1.05: 1762 of the model's 2255 vertices lie within `StoneBand` 0.2 of it; the kerb starts
+0.3 m over it, the rock's shoulder 0.3 over and then down), the vertices on it give `StoneCentre` (their span's middle; the model's own is 8 cm off,
+the rock being lopsided) and `StoneRadius` (the widest of them about it: 25.12 m). `StoneRadiusOverride` (0 = measured), `RimClear(point)` = how far
+inside the edge a point lies, `Current` = the arena's floor for anything that needs it (set in `_Ready`, cleared in `_ExitTree`).
+**`assets/Sms/Rematch/SmsBombBoo.cs`**, The rim group: `KeepOffTheRim` (on), `RimMargin` 3 m. `NextGoal` draws up to twelve times for a goal
+`RimMargin` or more inside the stone's edge; none (a base at or past the edge) and the goal is straight toward the middle, as far as the wander
+reaches. The drift tick HOLDS the body at the margin: it may never move further out than that line (its turn toward the next goal is an arc, march /
+turn rate = 0.5-1.3 m in radius at the game's speeds, so a swing round at a goal on the margin would carry the body up to 2.6 m past it; held, it
+slides along the margin instead); from beyond the margin it may only come in. A Boo let go (`Drop`) or a dud landing within the margin or past it
+skips its hover and heads in at once. Readouts `GoalDraws`, `GoalsPulledIn`, `RimHeldTicks`, `RimClearNow`, `GoalRimClear`, `RimRuleOn`. Off = 160's
+free wander. No arena floor: no rule. **`assets/Sms/Rematch/SmsBombBooSpawner.cs`**: `EdgeMargin` is measured from the stone's edge now
+(`ArenaStoneRadius`; `SpotRadius` = min(`ArenaRadius`, `StoneRadius` - `EdgeMargin`): with the defaults still 18, so the spots are where they were),
+`ArenaCentre` is the stone's middle. **`assets/Sms/Rematch/SmsKingBooRematch.cs`**: the volley is handed the stone's radius for its wall (25.1 -
+`WallInset` 2 = 23.1 m; was 24.4); his own `_arenaRadius` (the teleport spots, the wind's ring, the fireballs, the copies) is as it was.
+
+**Verified:** NEW rim drive v229 (deleted before the commit; headless): C78 the stone measured -- radius 25.12 against the drive's own ray march out
+along eight bearings (the last floor within the band: 24.80-25.10), the level the floor under the middle, the middle 8 cm from the model's, the span
+1.29 m wider, 1762 vertices; C79 twelve real supply picks with the cap off (`ArenaRadius` 40, `EdgeMargin` 3, no cap from Mario): every one 3 m or
+more inside the edge (the least 3.50), five past the old 18-m cap, stone under each, every pick clean (12 draws for 12 spots); C80 a Boo risen 1 m
+inside the edge (quick: march 6 u, turn 12 deg, hovers of 6 ticks): 7 goals all 3.06 m or more inside, 6 reached in 5.8 s, once inside the margin
+the body never nearer the edge than 3.01 m, no pick pulled in; C80b a Boo risen ON the margin facing out (Mario stood outside it through the rise;
+march 6 u, turn 6 deg: the game's turning ratio, a 0.77-m arc): its turn in would have swung the body 1.5 m out -- held 14 ticks, its least clearance
+3.00 m, 5 goals all inside (the least 3.43), 4 reached; C81 a dud lobbed to 2 m past the edge: landed 1.96 m past it, no hover, its first goal 5.04 m
+inside, back inside the margin 1.18 s after landing; C82 the same Boo as C80's with `KeepOffTheRim` off: 5 of its first 7 goals within 3 m of the
+edge or past it (one 8.73 m past -- 160's wander, the bug); C83 the volley with Mario 0.6 m inside the edge: three marks, all within the wall, all
+three clamped onto it at 23.12-23.20 m from the middle, the volley's radius the stone's 25.12 -- 7 / 7 (run c; runs a-b before the hold and C80b).
+The regression drive 68 / 68 (fz: C11's spots, C6b's float, the volley's and the circle's Boos as before). The clean rebuild 0 errors; the drive,
+the logs and the tasks deleted. The HUD and death-camera drives were not run: nothing of theirs changed.
+
+**Deviations:** the margin is the port's (the game's hotel Boos wander their room; this arena has no wall to stop them -- the doc's "at random"
+spots stand). The volley's marks come down at most 23.1 m out (was 24.4) -- only a Mario within 2 m of the edge sees the difference. A Boo over the
+void (dropped or landed there) floats in at its march speed rather than vanishing. `StoneRadius` is one number for a round arena; another shape
+would want `StoneRadiusOverride` or a new measure.
