@@ -1114,7 +1114,7 @@ STILL OPEN, carried forward: `feature/enemy-pinna2` (entry #14, SMS 147 and 148,
 the only copy of #11's text. The exit-time C# finalize crash from #10's batch has still not recurred, now across the 151-153n
 passes as well.
 
-### #17 -- PENDING -- queued 2026-11-03 02:42 PST (Kiro) -- PUSH ONLY, its PR FOLDED INTO #18's (SMS 154 + 154b + 154c + 154d + 155 + 155b + 156 + 156b + 156c + 156d + 156e), updated 2026-11-17 01:30 PST
+### #17 -- DONE 2026-11-17 -- pushed for the record, NO PR of its own (its code ships in #18's PR) -- queued 2026-11-03 02:42 PST (Kiro) -- PUSH ONLY, its PR FOLDED INTO #18's (SMS 154 + 154b + 154c + 154d + 155 + 155b + 156 + 156b + 156c + 156d + 156e), updated 2026-11-17 01:30 PST
 Push the twelfth feature branch: `feature/sounds`, branched from `main` `90efb17` (the trunk after PR #14, Sirena Beach's ghosts). The SOUND
 branch -- the project had no audio at all. SMS 154: Mario's and FLUDD's sound effects from the game's own banks, fired the way the game fires them:
 the footsteps and the pack's clanks off his animation tables (mario.szs's bas files), the jump voices by jump kind with the game's odds of the
@@ -1177,7 +1177,15 @@ tip), so this branch gets NO PR of its own: push it for the record (the commands
 the rematch. Do not open a second PR for it -- the two would land the same code twice (the rule above). Mark this entry DONE with #18's PR URL
 when that PR merges.
 
-### #18 -- PENDING -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH + PR (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180 + 181 + 182 + 183 + 184 + 185 + 186 + 187 + 188 + 189 + 190 + 191 + 192 + 193 + 194 + 195 + 196 + 197 + 198 + 199 + 200 + 200b + 201 + 202 + 203 + 204 + 205 + 206 + 206b + 207 + 208 + 208b + 208c + 209 + 210 + 211 + 211b + 212 + 213 + 214 + 215 + 216 + 217 + 218 + 219 + 220 + 221 + 222 + 223 + 224 + 225 + 226 + 227 + 228 + 229, with #17's SMS 154-156e in its history), PLAYTESTED BY JAYSONN through 229 (2026-11-17), updated 2026-11-17 01:30 PST
+Result: `feature/sounds` pushed as a NEW remote branch, 22 commits over `main` `90efb17`, which matches the entry exactly with no
+off-by-one for once. `git rev-list --count origin/feature/sounds..feature/sounds` returned `0`. `git merge-base feature/sounds main`
+is `90efb17`, so it sits straight on the trunk with no merge in it.
+NO PR OF ITS OWN, as the 2026-11-17 update instructs. `git merge-base --is-ancestor feature/sounds feature/kingboo-rematch` confirms
+every one of these 22 commits is already in #18's history, so #18's single PR carries the sounds into `main` with the rematch. Opening
+a second PR would land the same code twice. The 11 log entries 154 through 156e are in the range this branch adds.
+This entry closes with #18's PR URL once that PR merges.
+
+### #18 -- DONE 2026-11-17 -- PR OPEN, awaiting Jaysonn's merge (the URL goes in both headings at close-out) -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH + PR (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180 + 181 + 182 + 183 + 184 + 185 + 186 + 187 + 188 + 189 + 190 + 191 + 192 + 193 + 194 + 195 + 196 + 197 + 198 + 199 + 200 + 200b + 201 + 202 + 203 + 204 + 205 + 206 + 206b + 207 + 208 + 208b + 208c + 209 + 210 + 211 + 211b + 212 + 213 + 214 + 215 + 216 + 217 + 218 + 219 + 220 + 221 + 222 + 223 + 224 + 225 + 226 + 227 + 228 + 229, with #17's SMS 154-156e in its history), PLAYTESTED BY JAYSONN through 229 (2026-11-17), updated 2026-11-17 01:30 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1665,3 +1673,35 @@ the title prefilled and the body from `pr157.md` by the clipboard). ONE merge on
 tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher,
 BossTelesa and Mario `.tres` re-saves, the Koopa, Goop and polta `.png.import` flips, the `addons/godot_ai` churn and `KINGBOO_REMATCH_gdoc.txt`
 at the root: his, leave them (none of them belong in this PR).
+Result: `feature/kingboo-rematch` pushed as a NEW remote branch, 183 commits over `main` `90efb17`, 935 files / +1471489 / -480.
+`git rev-list --count origin/feature/kingboo-rematch..feature/kingboo-rematch` returned `0`. `git merge-base feature/kingboo-rematch main`
+is exactly `90efb17`, so the stack sits on the trunk with no merge in it, and `git merge-base --is-ancestor feature/sounds
+feature/kingboo-rematch` confirms #17's 22 sound commits are in this history. The named code tips `d05ba70` (229), `79b4c87` (156e) and
+`7df58ad` (#17's tip) are all ancestors. PROJECT_LOG.md gains 91 entries in this range: 11 for the sounds (154 to 156e) and 80 for the
+rematch (157 to 229).
+THE INSERTION COUNT IS NOT WHAT IT LOOKS LIKE, the same as #16. 1440192 of the 1471489 insertions are four `.glb.import` files under
+models/Sms/Rematch/ (`polta_planet`, `polta_parts`, `bomb_boo`, `bomb_boo_tongue`), 11.67 MB each. Everything hand-written in the branch
+is the other 31297 insertions. 406 of the 935 files are binary, which is the WAVs, the mp3, the sky textures and the models.
+NOTE on the commit count: the entry says 182, measured 183. The extra one is `1b5c817`, this entry's own commit, which cannot count
+itself. The same off-by-one as every entry with a PR so far, and always the queue file's own commit.
+ONE CORRECTION TO THE PR BODY, and it is a factual one rather than formatting. Kiro's body said "About 28 MB of new files". Measured,
+the branch adds 95.1 MB: 50.3 MB of real assets and 44.8 MB in those four `.glb.import` files. The undercount came from leaving out the
+two baked music tracks, `MSD_BGM_BOSS.wav` at 12.1 MB and `MSD_BGM_CHUBOSS.wav` at 7.0 MB, which entry #17 names itself. The sentence now
+gives both figures and says the import share is the project's standing bloat rather than anything this branch did. The largest single
+file is `MSD_BGM_BOSS.wav` at 12.1 MB, so nothing is near GitHub's 100 MB per-file limit and the push went through in one go.
+Hygiene: 0 of Jaysonn's live edits in the range, and `KINGBOO_REMATCH_gdoc.txt` is not in it either, still untracked at the root as he
+left it. 26 tracked edits of his were in the working tree before the push and all 26 after.
+PR body: `pr157.md` was already at the project root and is byte for byte identical to this entry's inline blockquote, 7986 bytes and pure
+ASCII, so no extraction and no paragraph repair was needed this time, unlike #15 and #16. After the size correction and the attribution
+footer it is 8336 bytes.
+`gh auth status` still prints "You are not logged into any GitHub hosts", the ninth entry running, so the browser route. The compare URL
+with the body prefilled measures 12416 characters, over the ~8000 ceiling #8 established, so the title went in the URL and the body went
+by the clipboard, read with `[System.IO.File]::ReadAllText` under explicit UTF-8 rather than `Get-Content -Raw`, which is what mojibaked
+#16's footer glyph.
+ONE merge path, as the entry insists: this branch gets the PR and is NOT also merged into local `main`. `feature/sounds` gets neither.
+THE TRUNK TIP AND THIS ENTRY'S PR NUMBER: read them from `git log --oneline -1 main` and from GitHub. A commit cannot state its own sha,
+and this result paragraph is committed BEFORE the PR is opened, per the #6 order, so it cannot state the PR number either.
+STILL OPEN, carried forward: `feature/enemy-pinna2` (entry #14, SMS 147 and 148, the Bullet Bill and the ground Electrokoopa) and
+`feature/select-stages` (entry #11, SMS 135) are both still pushed and still waiting on Jaysonn's playtest, untouched since 2026-11-03,
+and `feature/select-stages` holds the only copy of #11's text. Both now sit far behind the trunk and will conflict at the tails of
+PROJECT_LOG.md and this file when they do land.
