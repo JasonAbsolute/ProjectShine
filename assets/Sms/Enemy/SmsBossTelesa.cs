@@ -148,6 +148,28 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     [ExportGroup("Deviations (1 / on = the game)")]
     /// <summary>x the discs' spin (rouletteStart's 0.05..0.1 + 0.03 a lost hit point, degrees a tick).</summary>
     [Export(PropertyHint.Range, "0,4,0.05")] public float RouletteSpeedScale = 1f;
+    /// <summary>231 (Jaysonn: "the slot machine still struggles to follow King Boo -- spray his area before he pops up and he teleports into the right spot, but
+    /// the slot slowly comes into frame"): the game's slot hangs at (joint - 700) + mHoseiPosY, and the hosei is left wherever the LAST spit's drop-away took it
+    /// (-100 u a tick for 400 ticks: tens of thousands of units) and only decays back -- x 0.96 a tick through the appear clip (mHoseiPosY *= 0.96f), x 0.99 a
+    /// tick through the roll (slotStart) -- so after a spit the machine comes back up on an exponential tail, seconds behind him when the tongue is sprayed
+    /// early in the appear. On: the hosei is ZEROED as the appear begins, so the machine rides his body up bolted to it and lands at the clip's frame 78 with
+    /// the SLT_LAND thump, and the roll's cut to the rest pose takes it along in the same frame. Off = the game's tail.</summary>
+    [Export] public bool SlotSnapsAtAppear = true;
+    /// <summary>231 (Jaysonn: "King Boo's model lingers when dying"): btelesa_down ends with his body at a sixth of its size (jnt_body's scale 0.15 / 0.11 / 0.17 at
+    /// the last key) and the game holds that pose through the 240 ticks to the Shine, inside the ms_btls_down burst; here the burst is thinner and the little
+    /// body showed through it. On: the body is HIDDEN the tick the burst fires (the down clip's end), the ambient effects with it. Off = the game's hold.</summary>
+    [Export] public bool HideBodyAtBurst = true;
+    /// <summary>231 (Jaysonn: "the confetti is not right, we can barely see it"): TBossTelesa::fanfale emits ms_btls_fubuki at the STAGE ORIGIN, and the .jpa's own
+    /// emitter sits 2207 u over that -- 1707 u (23 m) over the casino's table (its face is the stage's y 500) -- raining 60-u squares over a 900-u circle for
+    /// 180 frames, 15 u a frame at first and drifting at 3.5 once the air has slowed them. From the room's fixed camera that top is 10 m above the frame, so the
+    /// game's own rain is seen only in its last seconds at the frame's top edge. Here: this high over the discs' walking face (the middle ring's), at the table's
+    /// middle (his x / z) -- 1000 u (13.4 m) puts the rain's start at the frame's top, over his crown, so it falls in view past him and the slot machine to the
+    /// table. 1707 = the game's placement (mostly out of frame); 650 = 153's: 8.7 m over the slot machine's top, a small cloud thrown up.</summary>
+    [Export(PropertyHint.Range, "0,3000,10")] public float ConfettiHeightUnits = 1000f;
+    /// <summary>231: the appear clip's frame at which the slot machine LANDS -- the camera shake (shakebtelesaappear) and MSD_SE_BS_TELESA_SLT_LAND. The game checks
+    /// frame 78 (TNerveBossTelesaAppear: checkPass(78.0f)) of a clip that is 59 frames long (btelesa_appear.bck), so its thump and shake never came; 56 is the
+    /// clip's last frames, where his body settles onto the machine. 78 = the game's (silent).</summary>
+    [Export(PropertyHint.Range, "1,200,1")] public float SlotLandFrame = 56f;
     /// <summary>x the speed of what he spits (fruit 6..10 u a tick, coins, enemies, the attackers' first lift).</summary>
     [Export(PropertyHint.Range, "0.1,3,0.05")] public float SpitSpeedScale = 1f;
     /// <summary>Spits a Boo attacker every (400 + 100 x lost HP) ticks while he waits for the spray (TNerveBossTelesaAppear). Off = he only laughs.</summary>
@@ -403,6 +425,13 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     public float BodyMaskParam => _bodyMat != null ? (float)_bodyMat.GetShaderParameter("mask_k") : -1f;
     public Color Tint => _tint;
     public bool IsHidden => _hidden;
+    /// <summary>231, for the drives: the body model shown now, the confetti bursts fired and where the last one was placed (metres).</summary>
+    public bool BodyShown => _model != null && _model.Visible;
+    public int ConfettiBursts { get; private set; }
+    public Vector3 ConfettiAt => _confettiAt;
+    private Vector3 _confettiAt;
+    /// <summary>231, for the drives: the slot machine's landings (the thump and the shake at SlotLandFrame of the appear clip).</summary>
+    public int SlotLandings { get; private set; }
     public bool IsSpicy => _spicy;
     public bool CollisionOn => _collisionOn;
     public bool SlotRolling => _slotRolling;
@@ -1193,7 +1222,15 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         int r = Slot != null ? Slot.SlotResult() : _slotResult;
         if (r == SmsTelesaSlot.Fruit || r == SmsTelesaSlot.Coin)
         {
-            if (FanfareFxScene != null) SpawnBurst(FanfareFxScene, new Transform3D(Basis.Identity, (Slot != null ? Slot.GlobalPosition + Vector3.Up * (650f / U) : GlobalPosition)));
+            if (FanfareFxScene != null)
+            {
+                Vector3 at = Pos();                                                                                // 231: the game's emit -- the table's middle (his x / z), ConfettiHeightUnits over the table's FACE (the stage's y 500; the discs' walking faces here, else the floor under him)
+                var disc = RouletteAt(1) ?? RouletteAt(0) ?? RouletteAt(2);
+                float face = disc != null && IsInstanceValid(disc) ? disc.FaceYUnits : (float.IsNaN(_floorY) ? at.Y - TransYUnits : _floorY);
+                Vector3 top = new Vector3(at.X, face + ConfettiHeightUnits, at.Z) / U;
+                _confettiAt = top; ConfettiBursts++;
+                SpawnBurst(FanfareFxScene, new Transform3D(Basis.Identity, top));
+            }
             var s = r == SmsTelesaSlot.Fruit ? Fanfare1Sound : Fanfare2Sound;
             if (s != null && s.Stream != null) s.Play();
         }
@@ -1466,6 +1503,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
                     if (!IsBck(BckAppear))
                     {
                         SetBck(BckAppear);
+                        if (SlotSnapsAtAppear) _hoseiY = 0f;             // 231: the machine bolted to his body through the appear (no exponential tail from the last spit's drop-away)
                         _alpha = TargetAlpha();                      // the knob read live (GhostOpacity set after the spawn)
                         if (!_bgmStarted) { _bgmStarted = true; if (BossMusic != null && BossMusic.Stream != null && !BossMusic.Playing) BossMusic.Play(); }   // unk384: the boss BGM
                         if (Slot != null) { Slot.Visible = true; Slot.RandomReset(); }
@@ -1473,7 +1511,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
                     }
                 }
                 else if (BckEnded() && !IsBck(BckWait)) SetBck(BckWait);
-                if (BckPassed(BckAppear, 78f)) { SmsCameraShake.Current?.StartMode(ShakeLand, 1f); if (LandSound != null && LandSound.Stream != null) LandSound.Play(); }
+                if (BckPassed(BckAppear, SlotLandFrame)) { SmsCameraShake.Current?.StartMode(ShakeLand, 1f); if (LandSound != null && LandSound.Stream != null) LandSound.Play(); SlotLandings++; }   // 231: SlotLandFrame (the game's 78 is past the 59-frame clip: never)
                 if (_time > AppearSpitAfterTicks && SpitsBooAttackers)
                 {
                     int interval = TelesaGenerateInterval + (Math.Max(1, HitPoints) - _hp) * 100;
@@ -1580,6 +1618,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
                             Vector3 bodyAt = JointUnits(_bBody) / U;
                             if (DownFxScene != null) SpawnBurst(DownFxScene, new Transform3D(Basis.FromScale(Vector3.One * 5f), bodyAt));                  // ms_btls_down
                             if (_fruitHitFx >= 0) SpawnTintedBurst(DownFxScene, new Transform3D(Basis.FromScale(Vector3.One * 6f), bodyAt), _tint);   // ms_btls_down_pe / _gr / _or
+                            if (HideBodyAtBurst && _model != null) { _model.Visible = false; PlaceAmbientFx(); StopDrool(); }   // 231: the sixth-size body gone with the burst (the game held it inside a thicker one)
                             ForceAllItemKill();
                             SlotStop();
                         }
