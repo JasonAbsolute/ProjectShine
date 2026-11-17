@@ -14920,3 +14920,93 @@ the logs and the tasks deleted. The HUD and death-camera drives were not run: no
 spots stand). The volley's marks come down at most 23.1 m out (was 24.4) -- only a Mario within 2 m of the edge sees the difference. A Boo over the
 void (dropped or landed there) floats in at its march speed rather than vanishing. `StoneRadius` is one number for a round arena; another shape
 would want `StoneRadiusOverride` or a new measure.
+
+### 230 -- the King Boo REMATCH, part 75: the CASINO FIGHT's sounds checked, and every actor sound FADES BY THE GAME'S OWN RULE for it -- a placed Shine's hum is heard within 16 m and gone at 48 m (it hummed across the whole level at half volume), King Boo's DOWN and his vanishes play flat wherever the camera is; the one casino sound the game has and the port lacks is the hover hum, a DSP oscillator voice the baker cannot render (feature/kingboo-rematch, code `65e5d5c`)
+
+**Jaysonn**: "Check which casino-fight sounds are still missing" and "the shine can be heard from the start. should only hear it when close to one or
+when it spawns in".
+
+**The Shine's hum.** 155 gave every actor sound ONE distance curve: full within 1200 u of the camera, a straight fade to silence at 12000 u (161 m, the
+largest of MSHandle's category distances). The game fades each sound by ITS OWN rule (`MSHandle::setSeDistanceVolume` / `calcVolume`): a sound whose
+JAISoundInfo sw bits carry `JAISeSwBit_NoDistanceVolume` (0x2) plays FLAT at any distance; the rest fade from 1200 u to silence at their CATEGORY's
+distance (`smSeCategory` by the id's top digit: enemies, bosses, objects and NPCs 6000 u; FLUDD, Mario and his voice 8000; system 12000; environment
+7000) times the sound's curve factor (sw bits 16-18: 1 = 4/3, 2 = 5/3, 3 = 2, 4 = 3/4, 5 = 1/2, 6 = 1/4, 7 = the category's short range 150 / 500 u).
+`MSD_SE_SHINE_EXIST` (0x81C1: category 8, curve 5) is full within 16 m and GONE at 3600 u = 48 m; the port faded it to 161 m, so a Shine 80 m across
+the level hummed at half volume from the first frame. The bake record (`out154/sms_sfx.json`) carries every SE's sw bits;
+`tools/projectshine/sound154/swbits230_all.py` lists the non-default ones: King Boo's DISAPPEAR, DOWN, ESCAPE, FRUIT_HIT, RLT_DOWN, RLT_SET, THANKYOU
+and V_APPEAR, the Sleepy Boo's EATEN and the Shine's appear chime are FLAT; the box Boo's FIX fades to 102 m (x4/3), the Chain Chomp's REBURN1 to 145 m
+(x2), the Shine's hum to 48 m (x1/2); Mario's voices (x5/3) go through SmsMarioSound, flat by Jaysonn's choice, untouched.
+
+**The fix.** **`assets/Sms/Sound/SmsActorSound.cs`**: `GameDistanceRule` (static, on): `SilentUnitsFor(se)` = the category's distance by the id times
+the curve factor from a table of the non-default sounds (`DistanceCurve`: -1 flat, 1-7 the selector), `FullVolumeUnits` + that fade;
+`DistanceDbFor(se, units)` the game's straight line to silence (-80 dB past it; 0 for a flat sound). `DistanceTick` sets every channel by its OWN sound's
+rule (`SetBase` too, from the last camera distance); `DistanceDb` reports the default-curve value. A sound the table does not know is an enemy's
+(category 2). Off = 155's one curve (`SilentUnits`, still the fallback).
+
+**The casino fight's sounds**, checked against bosstelesa.cpp's every `startSoundActor` and the btelesa / telesa bas tables (155's work stands): the
+laugh, the fruit hit, the down, the vanishes, the thank-you, the spicy fire loop, the three fanfares, the slot's drums (OBJ_SLOT_SPIN, SLT_STOP), the
+discs' three speeds (RLT_MOVE1 / 2 / 3), the intro's rumble and chuckle (RLT_DOWN, RLT_SET, V_LAUGH1B), the clips' own (V_APPEAR, SPICY_HIT, DAMAGE,
+LICK, V_ROLL, BREATHE, V_LAUGH2), the Boo attackers' appear / vanish / crush / fix and the glass break -- all wired. NOT in the port:
+`MSD_SE_EN_TELESA_FLY`, the hover hum of King Boo (btelesa_wait f0, pitch 0.64) and of every Boo (telesa_wait f0) -- bank 0 program 0xF7 is a DSP
+OSCILLATOR voice (`JASBankMgr::noteOnOsc`: a logical channel of type 2 on waveform 7, no sample), which sms_audio.py cannot render; and
+`MSD_SE_BS_TELESA_SLT_LAND`, the slot machine's thump at the appear's frame 78 -- never heard in the game either, the clip being 59 frames long (231
+moves it to a frame the clip has).
+
+**Verified:** the casino drive v231 (deleted before the commit; headless, in the rematch arena): C84 the rule's numbers -- the hum silent at 3600 u,
+the DOWN never, the laugh and the slot's rattle at 6000, the Shine Get chime at 12000, the FIX at 7600, an unknown sound at 6000; the hum 0 dB at
+1000 u, -6.02 at 2400, -80 at 3700; the DOWN 0 dB at 50000 u -- and C85 a ShineSprite placed 70 m from the camera: its hum loop plays at -84 dB (its
+own -4 dB level and -80: silent), moved to 30 m it sits 4.9 dB under its 10-m level (the rule's -4.92), at 10 m at its level and counted audible --
+2 / 2 (run e; runs a-d built the drive). The regression drive 68 / 68 (ga), the shine hud quiet run 8 / 8 (aj). The clean rebuild 0 errors; the
+drive, the logs, the shots and the tasks deleted. The save file is unchanged.
+
+**Deviations:** Mario's own sounds stay flat (154b, Jaysonn's call: the game fades them too). Every other actor sound now fades exactly as the game's
+tables say; a sound not in the bake record (a loop the scripts name by hand) fades as an enemy's.
+
+### 231 -- the King Boo REMATCH, part 76: the CASINO FIGHT touched up -- the slot machine comes up BOLTED to King Boo (no more seconds-long climb after a spit, nor when the tongue is sprayed as he pops up), his body goes WITH the death's burst (a sixth-size body no longer sits there through the wait to the Shine), the fanfare's CONFETTI is the game's (125 squares of 0.8 m raining over the table for 6 s, in frame, no shadows), and the slot machine's landing thump finally fires (feature/kingboo-rematch, code `572614e`)
+
+**Jaysonn**: "king boo model lingers when dying"; "slot machine still struggles to follow king boo -- if mario is spraying king boo's area before he
+pops up he will teleport into the right spot (i think this is how it should be which is good but double check) however the slot will slowly come into
+frame"; "confetti is not right we can barely see it"; "double check that the fight and set pieces are working as should".
+
+**The slot.** The game hangs the machine at (his joint - 700) + mHoseiPosY, and the hosei is left wherever the last SPIT's drop-away took it:
+`TNerveBossTelesaSpitSlotItem` takes 100 u a tick off it from tick 200 to 600 (the port measured -52100 u), nothing resets it, and it only DECAYS back --
+x 0.96 a tick through the appear clip, x 0.99 a tick through the roll (slotStart). So after the first spit the machine comes back on an exponential
+tail: a normal appear lands it seconds late, and the tongue sprayed early in the appear (his collision is on from the appear's first tick, in the game
+too) cuts him to the roll at his rest pose -- the "teleport", the game's own -- while the machine crawls up at x 0.99. **`assets/Sms/Enemy/SmsBossTelesa.cs`**:
+`SlotSnapsAtAppear` (on) zeroes the hosei as the appear begins: the machine rides jnt_body up bolted to it (153h / j's ride) and the roll's cut takes
+it to the seat in the same frame. Off = the game's tail. And the landing: `TNerveBossTelesaAppear` checks frame 78 of btelesa_appear for the shake and
+`MSD_SE_BS_TELESA_SLT_LAND`, but the clip is 59 frames long (its .bck; the glb's 59 keys), so neither ever came -- `SlotLandFrame` (56; 78 = the
+game's, silent) puts the thump and the shake where his body settles onto the machine.
+
+**The death.** btelesa_down ends with jnt_body scaled to 0.15 / 0.11 / 0.17 (the glb's last key) and the game holds that pose through the 240 nerve
+ticks to the Shine, inside the ms_btls_down burst; the port's burst is thinner and the little body showed through it. `HideBodyAtBurst` (on): the
+body (and the ambient effects, the drool) hidden the tick the burst fires -- the down clip's last frame -- and kept hidden through the wait. Off = the
+game's hold.
+
+**The confetti.** 153b's BtlsFubuki.tscn was a cloud of 180 scraps of 0.14 x 0.2 m thrown UP from a 4-m box over the slot for 2.6 s -- hard to see
+from the room's camera. ms_btls_fubuki.jpa (jpa_dump.py): a 900-u circle 2207 u over the STAGE ORIGIN (1707 u, 23 m, over the table's face at y 500)
+rains 1.25 squares a frame for 100 frames, each 60 u (0.8 m), 180 frames of life, falling 15 u a frame at first and drifting at 3.5 once the air
+resistance (0.98 a frame) has them, spinning 9 degrees a frame, opaque with a hard alpha test, white / yellow / red.
+**`assets/Sms/Enemy/BossTelesa/BtlsFubuki.tscn`** rebuilt from it: a 12-m ring, 125 pieces of 0.8 m, 6 s (+-30 %), spawned over 3.3 s, the fall
+4.5 m/s easing to 1.6 (a directional velocity curve), a 1-1.6 m/s random drift damped away, spinning +-430 deg/s, white / yellow / red per piece,
+shrinking out over the last quarter, no shadows (the first cut's squares cast black diamonds over the table). `ConfettiHeightUnits` (1000): the game's
+1707 is 10 m above the frame's top from the room's fixed camera -- its rain is seen only in its last seconds at the top edge -- so the port starts it
+at 13.4 m over the face, the frame's top, over his crown, and it falls in view past him and the machine to the table; 1707 = the game's placement,
+650 = 153's.
+
+**Verified:** the casino drive v231 (deleted before the commit; headless and windowed at 1930 x 1086 in the rematch arena, KingBooArena.tscn
+instanced 80 m over its middle as the 153 drive did, Rematch off, no intro ride): C86 the first appear -- the hosei 0 as it begins, the machine shown
+and bolted (lag 0 u from its tenth tick, 0 at the landing frame 57 where the thump fired once, 0 half a second after); C88 the fanfare (the tongue
+sprayed, ForceResult Fruit) -- one confetti burst at his x / z, 13.4 m over the discs' face, 125 pieces of 0.80 m for 6.0 s, one shot; shots 50a-b
+(1 s and 2.5 s in: the squares raining round him, no shadows); C87 Jaysonn's case -- after the spit the hosei read -52100 u; ForceHide, HideWait, the
+tongue sprayed on the appear's THIRD tick: the roll a tick later and the machine within 5 u of its seat the SAME tick, its worst lag through the roll
+0 u (it used to climb for seconds); C89 the down forced (one hit point, spicy) -- the body shown through all 198 ticks of the down clip, hidden on
+the burst's tick (frame 198 of 199), kept hidden, the Shine 120 ticks (2 s) after with the body still hidden; shot 50d the burst without the body --
+4 / 4 with 230's two (run e; runs a-d built the drive: the game's frame 78 found unreachable, a 57 landing missed on a tick boundary, the ring shape
+mis-numbered as POINTS and drawing nothing, the confetti shadows). The regression drive 68 / 68 (ga), the shine hud quiet run 8 / 8 (aj). The clean
+rebuild 0 errors; the drive, the logs, the shots and the tasks deleted. The save file is unchanged.
+
+**Deviations, all knobs:** `SlotSnapsAtAppear` (the game's hosei tail), `HideBodyAtBurst` (the game's held body), `SlotLandFrame` 56 (the game's
+silent 78), `ConfettiHeightUnits` 1000 (the game's 1707, out of frame); the confetti's fixed per-piece colour (the game's flicker white-yellow-red every
+12 frames) and its shrink-out (the game's scale runs 1 to 0 over the whole life). Not changed: the Shine comes 240 nerve ticks after the burst, which
+the port's nerves run at 120 Hz -- 2 s where the game, at 30 frames a second, waits 8; nothing but the burst's smoke is on screen either way.

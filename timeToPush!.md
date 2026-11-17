@@ -1754,3 +1754,38 @@ STILL OPEN, carried forward: `feature/enemy-pinna2` (entry #14, SMS 147 and 148)
 both still pushed and still waiting on Jaysonn's playtest, untouched since 2026-11-03 and now 183 commits behind the trunk.
 `feature/select-stages` holds the only copy of #11's text. Three merged branches are safe to delete besides: `feature/enemy-sirena`,
 `feature/kingboo-rematch` and, once PR #16 is closed, `feature/sounds`.
+
+### #19 -- PENDING -- queued 2026-11-17 03:41 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 230 + 231), updated 2026-11-17 03:41 PST
+Push the fourteenth feature branch: `feature/kingboo-casino`, branched from `main` `d7887ae` (the trunk after PR #15, the rematch and the sounds, and its
+"#17 and #18 done" commit). The CASINO fight's touch-ups after Jaysonn's playtest of the trunk. SMS 230: every actor sound fades by the GAME's OWN RULE for
+it (MSHandle's category distances and the sound's curve bits: a placed Shine's hum is heard within 16 m and gone at 48 m -- it hummed across the whole level
+at half volume -- King Boo's DOWN and his vanishes play flat anywhere), and the casino fight's sounds checked against the game's: all wired but the hover hum
+(a DSP oscillator voice the baker cannot render) and the slot machine's landing thump (the game checks a frame its clip never reaches; 231 moves it) --
+assets/Sms/Sound/SmsActorSound.cs. SMS 231: the slot machine comes up BOLTED to King Boo (SlotSnapsAtAppear: the hosei zeroed as the appear begins; the
+game left it on an exponential tail after each spit, seconds behind him), his body goes WITH the death's burst (HideBodyAtBurst: the sixth-size body of
+the down clip's last frame no longer sits through the wait to the Shine), the fanfare's CONFETTI rebuilt from ms_btls_fubuki.jpa (125 squares of 0.8 m
+raining over the table for 6 s, spinning, white / yellow / red, no shadows; ConfettiHeightUnits 1000 starts it at the frame's top over his crown -- the
+game's 1707 is out of frame) and the slot's landing thump at a frame the appear clip has (SlotLandFrame 56; the game's 78 never came) --
+assets/Sms/Enemy/SmsBossTelesa.cs, assets/Sms/Enemy/BossTelesa/BtlsFubuki.tscn. NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT
+open a PR until he says these touch-ups are done (more passes follow on this branch: the Mixed result's hot-spring bubbles next). Further passes re-point
+this entry's tip.
+- Branch `feature/kingboo-casino` -- code tip `572614e` ("SMS 231: the CASINO FIGHT touched up -- the slot machine comes up BOLTED to King Boo ..., his body
+  goes WITH the death's burst ..., the fanfare's CONFETTI is the game's ..., and the slot machine's landing thump finally fires"; assets/Sms/Enemy/
+  SmsBossTelesa.cs, BossTelesa/BtlsFubuki.tscn) on the 230 commit (`65e5d5c`, "SMS 230: the CASINO FIGHT's sounds checked, and every actor sound FADES BY
+  THE GAME'S OWN RULE for it ..."; assets/Sms/Sound/SmsActorSound.cs) on `main` `d7887ae`; the branch tip is this file's own commit on top of them; 3
+  commits since `main`. No new files. The range carries none of Jaysonn's live edits (assets/Level.tscn, KingBooArena.tscn, RematchArena.tscn,
+  SmsHiddenCoin.cs, the .tres and .import churn).
+- To try 231: play the casino fight. Beat a round (spray his tongue; three fruit) and watch the fanfare: confetti rains over the whole table from over his
+  crown for six seconds (Confetti Height Units on BossTelesa, 1000; 1707 = where the game puts it, mostly above the picture). After his spit, when he hides
+  and comes back, the slot machine comes up under him with him and thumps as he settles (Slot Snaps At Appear; Slot Land Frame) -- spray his tongue the
+  moment he pops up and the machine is under him in the same frame as he cuts to his roll. Beat him: at the end of his tumble the burst takes his body with
+  it (Hide Body At Burst; off = the game's, the tiny body held until the Shine). Press the editor's Build first: the C# changed.
+- To try 230: start far from a Shine and walk up to it -- silent beyond about 48 m, rising from about 16 m to full; King Boo's defeat sound, his vanishes
+  and the Shine's appear chime are heard at full from anywhere, as the game has them. Nothing else changed in how the sounds are picked or played.
+```
+git push -u origin feature/kingboo-casino
+git rev-list --count origin/feature/kingboo-casino..feature/kingboo-casino
+```
+Expect `0` from the rev-list. No PR, no merge. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
+`assets/Sms/SmsHiddenCoin.cs`, his `KingBooArena.tscn` and `RematchArena.tscn` edits, the `.tres` re-saves, the `.png.import` flips, the `addons/godot_ai`
+churn and `KINGBOO_REMATCH_gdoc.txt` at the root: his, leave them.
