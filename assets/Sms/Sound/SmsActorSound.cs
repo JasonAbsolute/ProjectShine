@@ -37,8 +37,51 @@ public partial class SmsActorSound : Node3D
     /// <summary>The game's camera-distance curve on the actors' sounds (off = flat, like Mario's).</summary>
     public static bool Positional = true;
     /// <summary>MSound::init's JAIGlobalParameter values: full volume within 1200 u of the camera, a straight fade to silence at 12000 u (the
-    /// largest of MSHandle's per-category distances; minDistanceVolume 0). 155 had JAudio's defaults (1000 / 5000): too quick a fade.</summary>
+    /// largest of MSHandle's per-category distances; minDistanceVolume 0). 155 had JAudio's defaults (1000 / 5000): too quick a fade.
+    /// 230: SilentUnits is the fade's end only for a sound the table does not know; a known sound fades by the GAME's OWN RULE for it (GameDistanceRule).</summary>
     public static float FullVolumeUnits = 1200f, SilentUnits = 12000f;
+    /// <summary>230 (Jaysonn: "the shine can be heard from the start -- should only hear it when close to one"): each sound's distance fade is the game's own
+    /// for THAT sound, not one curve for all. MSHandle::setSeDistanceVolume: a sound with JAISeSwBit_NoDistanceVolume (bit 0x2 of its sw bits) plays FLAT
+    /// wherever the camera is (King Boo's DOWN, DISAPPEAR, ESCAPE, FRUIT_HIT, THANKYOU, V_APPEAR, RLT_SET, RLT_DOWN; the Shine's appear chime); the rest fade
+    /// from 1200 u to silence at their CATEGORY's distance (smSeCategory by the id's top digit: enemies / bosses / objects / NPCs 6000 u, FLUDD / Mario /
+    /// voices 8000, system 12000, environment 7000) times the sound's own curve factor (sw bits 16-18: 1 = 4/3, 2 = 5/3, 3 = 2, 4 = 3/4, 5 = 1/2, 6 = 1/4,
+    /// 7 = the category's short range 150 / 500 u). The Shine's hum (SHINE_EXIST, 0x81C1: NPCs, curve 5) is full within 16 m and GONE at 48 m -- 155-229
+    /// faded every actor sound to 161 m, so a Shine across the level hummed at half volume. Off = 155's one curve (SilentUnits).</summary>
+    public static bool GameDistanceRule = true;
+    /// <summary>230: the sounds whose sw bits are not the default (curve 0, distance on), from the bake record's JAISoundInfo (tools/projectshine/sound154/
+    /// swbits230_all.py): -1 = flat (NoDistanceVolume), 1-7 = the curve selector. Every other sound: curve 0.</summary>
+    private static readonly Dictionary<string, int> DistanceCurve = new()
+    {
+        ["MSD_SE_BS_TELESA_DISAPPEAR"] = -1, ["MSD_SE_BS_TELESA_DOWN"] = -1, ["MSD_SE_BS_TELESA_ESCAPE"] = -1, ["MSD_SE_BS_TELESA_FRUIT_HIT"] = -1,
+        ["MSD_SE_BS_TELESA_RLT_DOWN"] = -1, ["MSD_SE_BS_TELESA_RLT_SET"] = -1, ["MSD_SE_BS_TELESA_THANKYOU"] = -1, ["MSD_SE_BS_TELESA_V_APPEAR"] = -1,
+        ["MSD_SE_EN_DB_TELSA_EATEN"] = -1, ["MSD_SE_SHINE_APPEAR"] = -1, ["MSD_SE_MA_INTO_DOKAN"] = -1,
+        ["MSD_SE_BS_WANWAN_REBURN1"] = 3, ["MSD_SE_EN_TELESA_FIX"] = 1, ["MSD_SE_SHINE_EXIST"] = 5,
+    };
+    /// <summary>230: MSHandle::smSeCategory's distances by the id's category (index = id >> 12), and the short range curve 7 uses.</summary>
+    private static readonly float[] CategoryMaxUnits = { 8000f, 8000f, 6000f, 6000f, 12000f, 12000f, 7000f, 8000f, 6000f, 8000f, 8000f, 8000f, 8000f, 8000f, 8000f, 8000f };
+    private static readonly float[] CategoryShortUnits = { 150f, 150f, 500f, 500f, 500f, 500f, 500f, 500f, 500f, 500f, 500f, 500f, 500f, 500f, 500f, 500f };
+    /// <summary>230: where the sound goes silent, game units from the camera (float.PositiveInfinity = flat: never), by the game's rule for it.</summary>
+    public static float SilentUnitsFor(string se)
+    {
+        if (!GameDistanceRule) return SilentUnits;
+        int cat = Category(se);
+        if (cat < 0 || cat > 15) return SilentUnits;
+        int curve = DistanceCurve.TryGetValue(se, out int c) ? c : 0;
+        if (curve < 0) return float.PositiveInfinity;
+        float fade = CategoryMaxUnits[cat] - FullVolumeUnits;
+        switch (curve) { case 1: fade *= 4f / 3f; break; case 2: fade *= 5f / 3f; break; case 3: fade *= 2f; break; case 4: fade *= 0.75f; break; case 5: fade *= 0.5f; break; case 6: fade *= 0.25f; break; case 7: fade = CategoryShortUnits[cat]; break; }
+        return FullVolumeUnits + Mathf.Max(1f, fade);
+    }
+    /// <summary>230: the distance volume for a sound at <paramref name="units"/> from the camera (MSHandle::calcVolume: 1 within FullVolumeUnits, a straight line
+    /// to 0 at its silent distance), in dB (-80 = silent).</summary>
+    public static float DistanceDbFor(string se, float units)
+    {
+        if (!Positional) return 0f;
+        float silent = SilentUnitsFor(se);
+        if (float.IsPositiveInfinity(silent) || units < FullVolumeUnits) return 0f;
+        float f = 1f - (units - FullVolumeUnits) / Mathf.Max(1f, silent - FullVolumeUnits);
+        return f > 0.0001f ? Mathf.LinearToDb(f) : -80f;
+    }
     public static float MasterDb = 0f;
     /// <summary>The intro's laugh. Game: what the game's engine makes of rouletteFall's per-frame V_LAUGH1B -- through the descent the restarted
     /// laugh's first 20-40 ms, 30 times a second (MSD_SE_BS_TELESA_V_LAUGH1B_ROULETTE, baked from that run of the SE sequence: a breath flutter some
@@ -271,7 +314,8 @@ public partial class SmsActorSound : Node3D
     };
     /// <summary>The level a name plays at (the game's table or RematchLevels), for players outside this class.</summary>
     public static float LevelDb(string se) => SeDb(se);
-    private void SetBase(AudioStreamPlayer3D p, float db) { _base[p] = db; p.VolumeDb = Muted(SeOf(p)) ? -80f : db + DistanceDb; }   // 216: silent under the demo mode
+    private void SetBase(AudioStreamPlayer3D p, float db) { _base[p] = db; string se = SeOf(p); p.VolumeDb = Muted(se) ? -80f : db + (float.IsNaN(_lastUnits) ? 0f : DistanceDbFor(se, _lastUnits)); }   // 216: silent under the demo mode; 230: the sound's own fade
+    private float _lastUnits = float.NaN;
     private void Log(string what)
     {
         PlayCount++;
@@ -346,26 +390,23 @@ public partial class SmsActorSound : Node3D
             _slotWatch[i] = (name, p, now, at);
         }
     }
-    /// <summary>The game's distance volume (JAISound::setDistanceVolumeCommon) for the camera's distance to the actor, on every channel.</summary>
+    /// <summary>The game's distance volume (JAISound::setDistanceVolumeCommon) for the camera's distance to the actor, on every channel -- 230: by each
+    /// channel's own sound's rule (DistanceDbFor); DistanceDb reports the actor's default-curve value (a sound of category 2 at this distance).</summary>
     private void DistanceTick()
     {
-        float db = 0f;
+        float units = float.NaN;
         if (Positional)
         {
             var cam = GetViewport()?.GetCamera3D();
-            if (cam != null)
-            {
-                float d = (cam.GlobalPosition - _owner.GlobalPosition).Length() * SmsUnits.UnitsPerMetre;
-                if (d >= FullVolumeUnits)
-                {
-                    float over = d - FullVolumeUnits, range = Mathf.Max(1f, SilentUnits - FullVolumeUnits);
-                    float f = over < range ? 1f - over / range : 0f;
-                    db = f > 0.0001f ? Mathf.LinearToDb(f) : -80f;
-                }
-            }
+            if (cam != null) units = (cam.GlobalPosition - _owner.GlobalPosition).Length() * SmsUnits.UnitsPerMetre;
         }
-        DistanceDb = db;
-        foreach (var p in _all) p.VolumeDb = Muted(SeOf(p)) ? -80f : _base[p] + db;   // 216: a silent category stays silent
+        _lastUnits = units;
+        DistanceDb = float.IsNaN(units) ? 0f : DistanceDbFor("", units);
+        foreach (var p in _all)
+        {
+            string se = SeOf(p);
+            p.VolumeDb = Muted(se) ? -80f : _base[p] + (float.IsNaN(units) ? 0f : DistanceDbFor(se, units));   // 216: a silent category stays silent
+        }
     }
     /// <summary>MAnmSound::animeLoop over the species' table for the clip the enemy plays: the entries between last tick's frame and this one fire; a
     /// new clip fires its entries up to the frame it is first seen at (setBckAnm starts the clip and its sound cursor at frame 0; the node sees it a
