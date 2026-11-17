@@ -42,6 +42,14 @@ the URL it produced. Jaysonn can also just run the commands himself.
   own commits non-ancestors of `origin/main`, so any later `git merge-base --is-ancestor <pass sha> origin/main` check will say NO even though
   the code is present -- compare trees (`git diff origin/main main`) rather than ancestry after a squash merge.
 
+- **A STACKED branch gets NO PR of its own.** If branch B was cut from branch A's tip, then A's commits are in B's history and B's PR
+  carries A's code. Open ONE PR, B's. Merging B first is the clean order, because GitHub's squash of B lands A and B together as one
+  commit and `main` is complete in a single step. A's own PR, opened afterwards, will then report conflicts in every file BOTH branches
+  touched, and those are NOT conflicts to resolve: `main` holds the newer version of each (B's passes changed them after A's tip), so
+  resolving toward A reverts them. **Close A's PR without merging.** This happened on 2026-11-17 with `feature/sounds` (A) and
+  `feature/kingboo-rematch` (B): PR #15 (B) squash-merged the whole stack, PR #16 (A) was opened after it and had to be closed. The
+  check that settles it: `git diff --name-only <B> origin/main` empty means the squash took everything, so A has nothing left to give.
+
 ## Entries
 
 ### #1 -- DONE 2026-10-25 -- https://github.com/JasonAbsolute/ProjectShine/commit/144b11e -- queued 2026-10-25 02:15 PDT (Kiro)
@@ -1114,7 +1122,7 @@ STILL OPEN, carried forward: `feature/enemy-pinna2` (entry #14, SMS 147 and 148,
 the only copy of #11's text. The exit-time C# finalize crash from #10's batch has still not recurred, now across the 151-153n
 passes as well.
 
-### #17 -- DONE 2026-11-17 -- pushed for the record, NO PR of its own (its code ships in #18's PR) -- queued 2026-11-03 02:42 PST (Kiro) -- PUSH ONLY, its PR FOLDED INTO #18's (SMS 154 + 154b + 154c + 154d + 155 + 155b + 156 + 156b + 156c + 156d + 156e), updated 2026-11-17 01:30 PST
+### #17 -- DONE 2026-11-17 -- https://github.com/JasonAbsolute/ProjectShine/pull/15 (SQUASH-merged by Jaysonn, inside #18's PR) -- ACTION LEFT: close PR #16, do not resolve it -- queued 2026-11-03 02:42 PST (Kiro) -- PUSH ONLY, its PR FOLDED INTO #18's (SMS 154 + 154b + 154c + 154d + 155 + 155b + 156 + 156b + 156c + 156d + 156e), updated 2026-11-17 01:30 PST
 Push the twelfth feature branch: `feature/sounds`, branched from `main` `90efb17` (the trunk after PR #14, Sirena Beach's ghosts). The SOUND
 branch -- the project had no audio at all. SMS 154: Mario's and FLUDD's sound effects from the game's own banks, fired the way the game fires them:
 the footsteps and the pack's clanks off his animation tables (mario.szs's bas files), the jump voices by jump kind with the game's odds of the
@@ -1185,7 +1193,31 @@ every one of these 22 commits is already in #18's history, so #18's single PR ca
 a second PR would land the same code twice. The 11 log entries 154 through 156e are in the range this branch adds.
 This entry closes with #18's PR URL once that PR merges.
 
-### #18 -- DONE 2026-11-17 -- PR OPEN, awaiting Jaysonn's merge (the URL goes in both headings at close-out) -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH + PR (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180 + 181 + 182 + 183 + 184 + 185 + 186 + 187 + 188 + 189 + 190 + 191 + 192 + 193 + 194 + 195 + 196 + 197 + 198 + 199 + 200 + 200b + 201 + 202 + 203 + 204 + 205 + 206 + 206b + 207 + 208 + 208b + 208c + 209 + 210 + 211 + 211b + 212 + 213 + 214 + 215 + 216 + 217 + 218 + 219 + 220 + 221 + 222 + 223 + 224 + 225 + 226 + 227 + 228 + 229, with #17's SMS 154-156e in its history), PLAYTESTED BY JAYSONN through 229 (2026-11-17), updated 2026-11-17 01:30 PST
+
+MERGED 2026-11-17 inside #18's PR, as this entry's update instructed: https://github.com/JasonAbsolute/ProjectShine/pull/15
+(SQUASH-merged by Jaysonn). `main` is now `9b85369`. The sound code is on the trunk and was verified there directly, not inferred:
+317 WAVs under assets/Sms/Sound/Mario/, and `SmsMarioSound.cs`, `SmsActorSound.cs`, `SmsMarioSoundTable.cs`, `MSD_BGM_BOSS.wav` and
+`MSD_BGM_CHUBOSS.wav` all present. No separate merge of `feature/sounds` was needed or made.
+
+PR #16 EXISTS AND MUST BE CLOSED, NOT FIXED. Jaysonn opened a second PR for `feature/sounds` after #15 had merged
+(https://github.com/JasonAbsolute/ProjectShine/pull/16, titled "Feature/sounds", no description), and GitHub reports "This branch has
+conflicts that must be resolved" in nine files: PROJECT_LOG.md, assets/Mario.cs, assets/Player.tscn, the two Music WAVs,
+SmsActorSound.cs, SmsMarioSound.cs, SmsMarioSoundTable.cs and this file.
+THE ACTION: close PR #16 with the "Close pull request" button. Do not resolve the conflicts, do not rebase, do not merge. Nothing is
+lost by closing it, because `git diff --name-only feature/kingboo-rematch main` is EMPTY: #15's squash carried all 935 files of the
+stack, the 22 sound commits included.
+WHY RESOLVING IT WOULD BE WRONG, measured rather than assumed. Every one of those nine files was modified by the rematch passes AFTER
+`feature/sounds`'s tip `7df58ad`: `git rev-list --count 7df58ad..feature/kingboo-rematch -- <file>` gives Mario.cs 20 commits,
+SmsActorSound.cs 9, SmsMarioSoundTable.cs 6, SmsMarioSound.cs 3, Player.tscn 1, each music WAV 1 (pass 225 re-rendered them with the
+release curves the right way round), PROJECT_LOG.md 80 and this file 82. So `main` holds the NEWER version of all nine and the branch
+holds the 156e version. Taking the branch's side would roll Mario.cs back past twenty passes of the rematch, undo 225's music render
+and drop entries 157 to 229 from the log. The conflict is the stack telling you the branch is spent, not that work is missing.
+A CORRECTION to what the local Claude advised before the merges: it said to merge the SOUNDS PR first. That was wrong. Merging #18's
+PR first was the better order and is what Jaysonn did, because the squash of the upper branch lands the whole stack in one commit and
+leaves nothing to reconcile. The new rule at the top of this file records it that way round.
+`feature/sounds` can be deleted, local and remote, once PR #16 is closed.
+
+### #18 -- DONE 2026-11-17 -- https://github.com/JasonAbsolute/ProjectShine/pull/15 (SQUASH-merged by Jaysonn) -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH + PR (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180 + 181 + 182 + 183 + 184 + 185 + 186 + 187 + 188 + 189 + 190 + 191 + 192 + 193 + 194 + 195 + 196 + 197 + 198 + 199 + 200 + 200b + 201 + 202 + 203 + 204 + 205 + 206 + 206b + 207 + 208 + 208b + 208c + 209 + 210 + 211 + 211b + 212 + 213 + 214 + 215 + 216 + 217 + 218 + 219 + 220 + 221 + 222 + 223 + 224 + 225 + 226 + 227 + 228 + 229, with #17's SMS 154-156e in its history), PLAYTESTED BY JAYSONN through 229 (2026-11-17), updated 2026-11-17 01:30 PST
 Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
 are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
 custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
@@ -1705,3 +1737,20 @@ STILL OPEN, carried forward: `feature/enemy-pinna2` (entry #14, SMS 147 and 148,
 `feature/select-stages` (entry #11, SMS 135) are both still pushed and still waiting on Jaysonn's playtest, untouched since 2026-11-03,
 and `feature/select-stages` holds the only copy of #11's text. Both now sit far behind the trunk and will conflict at the tails of
 PROJECT_LOG.md and this file when they do land.
+MERGED BY JAYSONN as a **SQUASH**: PR https://github.com/JasonAbsolute/ProjectShine/pull/15, `main` is now `9b85369`, one commit with
+a single parent `90efb17`. Local `main` was advanced with `git fetch origin main:main` and then checked out, which moves the ref
+without touching the working tree, and all 26 of Jaysonn's tracked edits were identical before and after.
+Verified by TREE, the way a squash requires: `git diff --name-only feature/kingboo-rematch main` is EMPTY, so every one of the 935
+files matches the branch, both log files and #17's 22 sound commits included. Spot-checked on the trunk: the sound scripts and the two
+baked music tracks, 317 Mario WAVs, and the whole of assets/Sms/Rematch/ with its 24 scripts and 9 shaders.
+THE PR WAS OPENED WITHOUT ITS BODY. PR #15 carries the title but GitHub shows "No description provided", so the prefilled compare URL's
+title took and `pr157.md`'s 8336 characters never reached the form. The body is worth pasting into the PR description after the fact,
+since it is the only written account of 91 passes outside PROJECT_LOG.md. The same happened to PR #16, which got the default
+"Feature/sounds" title and no body. For the next entry: paste and confirm the body BEFORE pressing Create, and read it back through the
+API (`/repos/.../pulls/<n>`) to check it landed, as #16's footer check did.
+`pr157.md` and `pr154.md` deleted from the project root.
+THE TRUNK TIP: read it from `git log --oneline -1 main`, not from a sha written here. A commit cannot state its own sha.
+STILL OPEN, carried forward: `feature/enemy-pinna2` (entry #14, SMS 147 and 148) and `feature/select-stages` (entry #11, SMS 135) are
+both still pushed and still waiting on Jaysonn's playtest, untouched since 2026-11-03 and now 183 commits behind the trunk.
+`feature/select-stages` holds the only copy of #11's text. Three merged branches are safe to delete besides: `feature/enemy-sirena`,
+`feature/kingboo-rematch` and, once PR #16 is closed, `feature/sounds`.
