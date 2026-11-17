@@ -123,6 +123,51 @@ public partial class SunshineCamera : Node3D
     private Rid _marioRid;
     private bool _hasMarioRid = false;
     private readonly CylinderShape3D _wallShape = new CylinderShape3D();
+    // 227: the rig's physics queries without their garbage -- ONE ray query, ONE shape query and ONE exclude list re-used (the game walks its own
+    // wall planes; the port asked the world up to a dozen times a tick and made a query object, an exclude list and a result dictionary each time,
+    // finalizable wrappers the .NET collector carried to gen1: 226's 41-45 ms pauses). Results sit in a ring of 32 and are disposed 32 casts on.
+    private PhysicsRayQueryParameters3D _rayQ;
+    private PhysicsShapeQueryParameters3D _shapeQ;
+    private Array<Rid> _exclude;
+    private readonly Dictionary[] _hitRing = new Dictionary[32];
+    private int _hitAt;
+
+    /// <summary>The exclude list back to Mario's body alone (the casts add the bodies that let the camera pass as they meet them).</summary>
+    private void ExcludeReset()
+    {
+        _exclude ??= new Array<Rid>();
+        _exclude.Clear();
+        if (_hasMarioRid) _exclude.Add(_marioRid);
+    }
+
+    /// <summary>A ray against camera-solid bodies (the arm's mask), the exclude list as it stands now.</summary>
+    private Dictionary CastRay(PhysicsDirectSpaceState3D space, Vector3 from, Vector3 to)
+    {
+        _rayQ ??= new PhysicsRayQueryParameters3D { CollideWithBodies = true, CollideWithAreas = false };
+        _rayQ.From = from; _rayQ.To = to; _rayQ.CollisionMask = _mask; _rayQ.Exclude = _exclude;
+        return Keep(space.IntersectRay(_rayQ));
+    }
+
+    /// <summary>The wall disc rested against the world at the point given, the exclude list as it stands now.</summary>
+    private Dictionary RestWallDisc(PhysicsDirectSpaceState3D space, Vector3 centreM)
+    {
+        _shapeQ ??= new PhysicsShapeQueryParameters3D { Shape = _wallShape };
+        _shapeQ.Transform = new Transform3D(Basis.Identity, centreM); _shapeQ.CollisionMask = _mask; _shapeQ.Exclude = _exclude;
+        return Keep(space.GetRestInfo(_shapeQ));
+    }
+
+    private Dictionary Keep(Dictionary d)
+    {
+        _hitRing[_hitAt]?.Dispose(); _hitRing[_hitAt] = d; _hitAt = (_hitAt + 1) & 31;
+        return d;
+    }
+
+    public override void _ExitTree()
+    {
+        for (int i = 0; i < _hitRing.Length; i++) { _hitRing[i]?.Dispose(); _hitRing[i] = null; }
+        _rayQ?.Dispose(); _rayQ = null; _shapeQ?.Dispose(); _shapeQ = null; SmsFree.Array(_exclude); _exclude = null;
+        _areaQuery?.Dispose(); _areaQuery = null;
+    }
 
     // ============================================================ the game's state (units, BAM)
     /// <summary>TTargetCamera (Camera.hpp 26): Pos = mPosition (the panned eye), At = mTarget (the look point), Desired = unk18 (the polar
@@ -160,6 +205,23 @@ public partial class SunshineCamera : Node3D
     private float _finalRatio = 0f;                      // unk270
     private float _panOffset = 0f;                       // mHeightPanOffset
     private int _posFreeze = 0, _targetFreeze = 0;       // mPosFreezeFrames / mTargetFreezeFrames
+    // 212: the HELL dead demo (execDeadDemoProc_, CameraDemo.cpp 254): mDeadDemoCountdown, CAMERA_FLAG_DEAD_DEMO with CAMERA_FLAG_HELL_DEAD_DEMO
+    private int _deadDemoCountdown = 0;
+    private bool _deadDemo = false;
+    // 216: the NORMAL dead demo (ctrlNormalDeadDemo_, CameraDemo.cpp 219): CAMERA_FLAG_DEAD_DEMO without the hell flag -- mDeadDemoCountdownToFovZoom,
+    // mDeadDemoFovZoomTimer and the fovy it closes (mFovy, not reset from the kind while it runs)
+    private bool _hellDemo = false;
+    private int _fovZoomCountdown = 0, _fovZoomTimer = 0;
+    private float _deadFov = 50f;
+    /// <summary>212, for the drives: the hell dead demo is on (the eye held; the look-at following him down until the pitch passes LimitMaxAngleX,
+    /// then the whole camera held -- Held).</summary>
+    public bool HellDeadDemoOn => _deadDemo && _hellDemo;
+    /// <summary>216, for the drives: the normal dead demo is on (a death on the floor: the eye held, the look-at chasing his body, the fov closing on him),
+    /// the fov it has closed to (degrees) and the zoom's ticks left (343 at its start).</summary>
+    public bool NormalDeadDemoOn => _deadDemo && !_hellDemo;
+    public float DeadDemoFov => _deadFov;
+    public int DeadDemoFovTimer => _fovZoomTimer;
+    public bool Held => (_flags & FlagFreeze) != 0;
     private bool _occluded = false;                      // MARIO_FLAG_OCCLUDED: the game peeks the framebuffer at his screen point; here an eye -> Mario ray
     // TCameraInbetween
     private int _ibFrames = 0;                           // mFramesRemaining
@@ -258,11 +320,11 @@ public partial class SunshineCamera : Node3D
         if (_warpRequested || _md.Teleported)
             WarpBehind();
         // the C-stick through the pad library (PADClamp's sub-stick region 59 / 31 / 15 and JUTGamePad's 42): mCompSPos[6] = x, [7] = y (up +)
-        Vector2 sub = SmsStick.PadSubStick(Input.GetVector(RStickLeft, RStickRight, RStickUp, RStickDown));
+        Vector2 sub = SmsStick.PadSubStick(Input.GetVector(SmsNames.Of(RStickLeft), SmsNames.Of(RStickRight), SmsNames.Of(RStickUp), SmsNames.Of(RStickDown)));   // 227: the names made once
         if (_md.PadDead) sub = Vector2.Zero;   // pass 114: TMarioGamePad::mDisabledFrames skips the sub stick (mCompSPos[6], [7]) and the L edge too
         _cx = sub.X;
         _cy = -sub.Y;
-        bool lEdge = !_md.PadDead && InputMap.HasAction(LButtonAction) && Input.IsActionJustPressed(LButtonAction);
+        bool lEdge = !_md.PadDead && InputMap.HasAction(SmsNames.Of(LButtonAction)) && Input.IsActionJustPressed(SmsNames.Of(LButtonAction));
         int n = SmsUnits.TicksFor(delta, ref _tickAccum);
         for (int i = 0; i < n; i++)
             Tick(lEdge && i == 0);
@@ -324,6 +386,7 @@ public partial class SunshineCamera : Node3D
         _slopeX = _addY = 0;
         _panOffset = 0f;
         _posFreeze = _targetFreeze = 0;
+        _deadDemoCountdown = 0; _deadDemo = false; _hellDemo = false; _fovZoomCountdown = 0; _fovZoomTimer = 0;   // 212 / 216: a stage load's camera has no dead demo
         HoldReset();
         _occluded = false;
         Apply();
@@ -345,6 +408,50 @@ public partial class SunshineCamera : Node3D
     /// <summary>For Mario: Respawn / RevealFromIntro -- the camera starts behind him as a stage load's does.</summary>
     public void SmsWarpBehind() => _warpRequested = true;
 
+    /// <summary>212: execDeadDemoProc_ (CameraDemo.cpp 254) -- MARIO_FLAG_GAME_OVER seen (not in a talk): 16 ticks on, the dead demo (CAMERA_FLAG_DEAD_DEMO,
+    /// mPosFreezeFrames 1). The HELL death -- the death plane's fall (Mario's HellDead: CAMERA_FLAG_HELL_DEAD_DEMO) -- keeps the mode's control with the eye
+    /// held (CtrlNormal re-holds it every tick) while the look-at follows him down, until the pitch passes LimitMaxAngleX (Tick). 216: any other death is
+    /// the NORMAL dead demo -- mDeadDemoCountdownToFovZoom 1, and ctrlNormalDeadDemo_ takes the control (CtrlNormalDeadDemo: the slow zoom onto him).</summary>
+    private void ExecDeadDemoProc()
+    {
+        if (_deadDemoCountdown > 0)
+        {
+            if (--_deadDemoCountdown > 0) return;
+            _deadDemo = true;
+            _posFreeze = 1;
+            _hellDemo = _md.HellDead;
+            if (_hellDemo)
+            {
+                if (_md.Debug) GD.Print($"[SMS camera] the hell dead demo: the eye stops at {_posU} ({(_posU - _md.PosU).Length():F0} u from him), the look-at follows him down");
+                return;
+            }
+            _fovZoomCountdown = 1; _deadFov = _viewFov;
+            if (_md.Debug) GD.Print($"[SMS camera] the normal dead demo: the eye stops at {_posU} ({(_posU - _md.PosU).Length():F0} u from him), the fov {_deadFov:F1} closes on him");
+            return;
+        }
+        if (_md.GameOver && !_md.Talking) _deadDemoCountdown = 16;   // SMS_CheckMarioFlag(MARIO_FLAG_GAME_OVER) && !isTalkOrDemoModeNow()
+    }
+    /// <summary>216: ctrlNormalDeadDemo_ (CameraDemo.cpp 219), in place of the mode's control through a death on the floor: the look-at chases his body
+    /// (setMarioLookat_'s 35 u over his origin; the inbetween's at) at 0.03 a tick, the eye stays where it stopped (nothing moves it), and a tick on, over
+    /// 343 ticks, the fov closes at a steady pace toward clamp(10500 / the eye's distance to the look-at, 5, 80) degrees (CLBChaseConstantSpecifyFrame on the
+    /// ticks left): a slow zoom onto him, about 9 degrees from the usual 1200 u.</summary>
+    private void CtrlNormalDeadDemo()
+    {
+        ChaseDecrease(ref _atU.X, _lookPoint.X, 0.03f); ChaseDecrease(ref _atU.Y, _lookPoint.Y, 0.03f); ChaseDecrease(ref _atU.Z, _lookPoint.Z, 0.03f);
+        if (_fovZoomCountdown > 0)
+        {
+            if (--_fovZoomCountdown > 0) return;
+            _fovZoomTimer = 343;
+            return;
+        }
+        if (_fovZoomTimer > 0)
+        {
+            _fovZoomTimer--;
+            float dist = (_atU - _posU).Length();
+            if (dist > 0.001f) ChaseFrame(ref _deadFov, Mathf.Clamp(10500f / dist, 5f, 80f), _fovZoomTimer);
+        }
+    }
+
     /// <summary>The scene takes the frame: this node on the look-at, the pivot's yaw the eye's bearing (Mario's stick direction), the
     /// Camera3D posed on the view with the kind's fov and near clip.</summary>
     private void Apply()
@@ -353,7 +460,7 @@ public partial class SunshineCamera : Node3D
         GlobalPosition = M(_atU);
         _pivot.GlobalRotation = new Vector3(0f, _finalYaw * SmsUnits.BamToRad, 0f); // global: Mario.cs rotates the stick by the body's basis and then by this yaw
         Vector3 dir = atM - eyeM;
-        if (_demo == null) { _viewUp = Vector3.Up; _viewFov = _p.Fovy; _viewNearU = _p.NearClip; }   // mUp = CLBConstUpVec, mFovy / mNear the kind's (the demo writes its own)
+        if (_demo == null) { _viewUp = Vector3.Up; _viewFov = _deadDemo && !_hellDemo ? _deadFov : _p.Fovy; _viewNearU = _p.NearClip; }   // mUp = CLBConstUpVec, mFovy / mNear the kind's (the demo writes its own; 216: the normal dead demo keeps its closing fovy)
         if (dir.LengthSquared() > 1e-10f)
         {
             Vector3 up = MathF.Abs(dir.Normalized().Dot(_viewUp)) > 0.999f ? _camera.GlobalBasis.Y : _viewUp;
@@ -471,6 +578,7 @@ public partial class SunshineCamera : Node3D
     // ============================================================ one 120 Hz tick: ctrlGameCamera_ + calcFinalPosAndAt_ + calcExternalData_
     private void Tick(bool lEdge)
     {
+        if (!_deadDemo) ExecDeadDemoProc();   // 212: ctrlGameCamera_'s first line (cameragc.cpp): !(unk64 & CAMERA_FLAG_DEAD_DEMO) -> execDeadDemoProc_
         if ((_flags & FlagStickYaw) == 0 && _autoChaseOff > 0) _autoChaseOff--;
         if (_groundSkip != 0) _groundSkip--;
         if (_roofSkip != 0) _roofSkip--;
@@ -479,6 +587,7 @@ public partial class SunshineCamera : Node3D
         float yOff = _cur.Ratio * _p.XRotRatioAtOffsetY + _p.AtOffsetY;
         if (_md.KickRoofRollUp) yOff += 260f;
         if (_mode == SmsCamKind.DefiniteD2) yOff += DefiniteAtOffsetY;
+        if (_deadDemo && !_hellDemo) yOff = 35f;   // 216: isNormalDeadDemo -> 35 u (his body on the floor)
         _lookPoint = _md.PosU + new Vector3(0f, yOff, 0f);
         _prev = _cur;
         // controlByCameraCode_ + execCameraModeChangeProc_: only while the game is in play (director state 4), never under a demo's hold
@@ -507,14 +616,26 @@ public partial class SunshineCamera : Node3D
         if (_autoChaseOff > _p.AutoChaseCompleteFrame) _autoChaseOff = _p.AutoChaseCompleteFrame;
         // occlusion (MARIO_FLAG_OCCLUDED): the game reads the framebuffer at his screen point; a ray from the eye to his waist stands in
         _occluded = RayHits(M(_posU), M(_md.PosU + new Vector3(0f, 80f, 0f)));
-        if (_mode == SmsCamKind.LNormal) CtrlL();
+        if (_deadDemo && !_hellDemo) CtrlNormalDeadDemo();   // 216: isNormalDeadDemo -> ctrlNormalDeadDemo_ in place of the mode's control (cameragc.cpp 910)
+        else if (_mode == SmsCamKind.LNormal) CtrlL();
         else if (SmsCamKinds.IsTalkKind(_mode)) CtrlTalk();
         else if (SmsCamKinds.IsDefiniteKind(_mode)) CtrlDefinite();
         else CtrlNormal();
-        // calcFinalPosAndAt_ (828): the shake is SmsCameraShake's own pass; the look-at's elevation from the eye clamped to the limits
+        // calcFinalPosAndAt_ (828): the shake is SmsCameraShake's own pass; the look-at's elevation from the eye clamped to the limits -- 212: but in the
+        // hell dead demo (isHellDeadDemo, cameragc.cpp 827) not clamped: once the actual pitch (last tick's unk256) passes LimitMaxAngleX the look-at
+        // stops too and the whole camera holds (mTargetFreezeFrames = 1, CAMERA_FLAG_UNK40)
         _viewPosU = _posU;
         _viewAtU = _atU;
-        RevisionLookatByAngleX(SmsCamNormal.LimitMinAngleX, SmsCamNormal.LimitMaxAngleX, _viewPosU, ref _viewAtU);
+        if (_deadDemo && _hellDemo)   // 216: the hell one only (the normal dead demo keeps the clamp below, as the game's calcFinalPosAndAt_ does)
+        {
+            if (_finalPitch > SmsCamNormal.LimitMaxAngleX)
+            {
+                if ((_flags & FlagFreeze) == 0 && _md.Debug) GD.Print($"[SMS camera] the hell dead demo: the pitch {_finalPitch * 180f / 32768f:F1} deg is past the limit -- the whole camera holds");
+                _targetFreeze = 1;
+                _flags |= FlagFreeze;
+            }
+        }
+        else RevisionLookatByAngleX(SmsCamNormal.LimitMinAngleX, SmsCamNormal.LimitMaxAngleX, _viewPosU, ref _viewAtU);
         // calcExternalData_ (857): the actual camera's polar angles (unk256 / unk258) and ratio (unk270)
         CrossToPolar(_atU, _posU, out _, out _finalPitch, out _finalYaw);
         _finalRatio = Mathf.Clamp(CalcRatio(_p.XAngleMin, _p.XAngleMax, _finalPitch), 0f, 1f);
@@ -586,21 +707,22 @@ public partial class SunshineCamera : Node3D
     {
         _areaQuery ??= new PhysicsPointQueryParameters3D { CollideWithAreas = true, CollideWithBodies = false, CollisionMask = uint.MaxValue };
         _areaQuery.Position = M(_md.PosU + new Vector3(0f, 75f, 0f));
-        var hits = GetWorld3D().DirectSpaceState.IntersectPoint(_areaQuery, 8);
+        var hits = GetWorld3D().DirectSpaceState.IntersectPoint(_areaQuery, 8);   // 227: the hit list and each hit disposed here, not by the finalizer
         SmsCameraArea best = null;
         SmsCamKind? tagged = null;
-        foreach (Dictionary h in hits)
+        foreach (Dictionary h in hits) using (h)
         {
-            if (h["collider"].AsGodotObject() is not Node n)
+            if (h[SmsKeys.Collider].AsGodotObject() is not Node n)
                 continue;
             if (n is SmsCameraArea a)
             {
                 if (best == null || a.Priority > best.Priority)
                     best = a;
             }
-            else if (tagged == null && n.HasMeta("sms_camera_kind") && System.Enum.TryParse(n.GetMeta("sms_camera_kind").AsString(), true, out SmsCamKind k))
+            else if (tagged == null && n.HasMeta(SmsNames.Of("sms_camera_kind")) && System.Enum.TryParse(n.GetMeta(SmsNames.Of("sms_camera_kind")).AsString(), true, out SmsCamKind k))
                 tagged = k;
         }
+        SmsFree.Array(hits);
         // 153l: a definite kind is a camera map tool's (TCubeCameraInfo::unk38): the area must carry its Eye; one without is the stage's own kind
         _areaTool = null;
         if (best != null && SmsCamKinds.IsDefiniteKind(best.Kind))
@@ -1181,10 +1303,14 @@ public partial class SunshineCamera : Node3D
             if (_posFreeze == 0) _posFreeze = 1;
             if (_targetFreeze == 0) _targetFreeze = 1;
         }
-        else if (moving || inputActive)
+        else
         {
-            _targetFreeze = 0;
-            _posFreeze = 0;
+            if (moving || inputActive)
+            {
+                _targetFreeze = 0;
+                _posFreeze = 0;
+            }
+            if (_deadDemo && _posFreeze == 0) _posFreeze = 1;   // 212: (cameragc.cpp 552) the dead demo holds the eye where it is, the look-at free
         }
 
         if (_posFreeze == 0 || _targetFreeze == 0)
@@ -1471,26 +1597,18 @@ public partial class SunshineCamera : Node3D
         var space = GetWorld3D()?.DirectSpaceState;
         if (space == null) return false;
         bool moved = false;
-        var exclude = new Array<Rid>();
-        if (_hasMarioRid) exclude.Add(_marioRid);
+        ExcludeReset();   // 227: the shared exclude list and shape query
         for (int k = 0; k < 4; k++)
         {
             Vector3 centreU = new Vector3(_cur.Pos.X, _prev.Pos.Y + 10f, _cur.Pos.Z);
-            var q = new PhysicsShapeQueryParameters3D
-            {
-                Shape = _wallShape,
-                Transform = new Transform3D(Basis.Identity, M(centreU)),
-                CollisionMask = _mask,
-                Exclude = exclude,
-            };
-            Dictionary info = space.GetRestInfo(q);
+            Dictionary info = RestWallDisc(space, M(centreU));
             if (info.Count == 0) break;
-            Vector3 n = (Vector3)info["normal"];
-            Vector3 point = (Vector3)info["point"];
-            Rid rid = (Rid)info["rid"];
-            if (CameraPasses((ulong)info["collider_id"]))
+            Vector3 n = (Vector3)info[SmsKeys.Normal];
+            Vector3 point = (Vector3)info[SmsKeys.Point];
+            Rid rid = (Rid)info[SmsKeys.Rid];
+            if (CameraPasses((ulong)info[SmsKeys.ColliderId]))
             {
-                exclude.Add(rid);
+                _exclude.Add(rid);
                 continue;
             }
             if (MathF.Abs(n.Y) > 0.6f)
@@ -1506,7 +1624,7 @@ public partial class SunshineCamera : Node3D
             _cur.Pos.Z += push * nXZ.Z;
             posCpy.X += (radius - sd) * nXZ.X;
             posCpy.Z += (radius - sd) * nXZ.Z;
-            exclude.Add(rid); // that body is done; another wall may still touch
+            _exclude.Add(rid); // that body is done; another wall may still touch
         }
         return moved;
     }
@@ -1532,19 +1650,17 @@ public partial class SunshineCamera : Node3D
         if (space == null) return false;
         Vector3 from = M(new Vector3(xU, yU, zU));
         Vector3 to = from + Vector3.Down * M(100000f);
-        var exclude = new Array<Rid>();
-        if (_hasMarioRid) exclude.Add(_marioRid);
+        ExcludeReset();   // 227: the shared exclude list and ray query
         for (int k = 0; k < 4; k++)
         {
-            var q = PhysicsRayQueryParameters3D.Create(from, to, _mask, exclude);
-            Dictionary hit = space.IntersectRay(q);
+            Dictionary hit = CastRay(space, from, to);
             if (hit.Count == 0) return false;
-            if (CameraPasses((ulong)hit["collider_id"]))
+            if (CameraPasses((ulong)hit[SmsKeys.ColliderId]))
             {
-                exclude.Add((Rid)hit["rid"]);
+                _exclude.Add((Rid)hit[SmsKeys.Rid]);
                 continue;
             }
-            groundYU = U(((Vector3)hit["position"]).Y);
+            groundYU = U(((Vector3)hit[SmsKeys.Position]).Y);
             return true;
         }
         return false;
@@ -1555,16 +1671,14 @@ public partial class SunshineCamera : Node3D
     {
         var space = GetWorld3D()?.DirectSpaceState;
         if (space == null) return false;
-        var exclude = new Array<Rid>();
-        if (_hasMarioRid) exclude.Add(_marioRid);
+        ExcludeReset();   // 227: the shared exclude list and ray query
         for (int k = 0; k < 4; k++)
         {
-            var q = PhysicsRayQueryParameters3D.Create(fromM, toM, _mask, exclude);
-            Dictionary hit = space.IntersectRay(q);
+            Dictionary hit = CastRay(space, fromM, toM);
             if (hit.Count == 0) return false;
-            if (CameraPasses((ulong)hit["collider_id"]))
+            if (CameraPasses((ulong)hit[SmsKeys.ColliderId]))
             {
-                exclude.Add((Rid)hit["rid"]);
+                _exclude.Add((Rid)hit[SmsKeys.Rid]);
                 continue;
             }
             return true;
@@ -1579,7 +1693,7 @@ public partial class SunshineCamera : Node3D
         if (GodotObject.InstanceFromId(colliderId) is not Node node) return false;
         for (int i = 0; i < 4 && node != null; i++)
         {
-            if (node.HasMeta("sms_camera_pass")) return true;
+            if (node.HasMeta(SmsNames.Of("sms_camera_pass"))) return true;
             node = node.GetParent();
         }
         return false;

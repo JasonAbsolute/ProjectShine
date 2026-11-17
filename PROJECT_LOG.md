@@ -11026,3 +11026,3897 @@ SmsRoulette.PondPressT, SunshineCamera.DemoRate. Files: `assets/Sms/Enemy/BossTe
 patch_camera153n.py, patch_mario153n.py, patch_drive153n.py, patch_drive153n2.py, patch_drive153n3.py (the fan's peppers set aside on the ring:
 a steep lob through his tongue cylinder had made him spicy early in runs ak / ap), fix_braces153n.py, patch_dbg153n.py (the probe, not shipped),
 patch_smoke153.py (74 checks), cap/as/*.
+
+### 154 -- SOUND, the first pass: Mario and FLUDD from the game's own banks, fired as the game fires them (feature/sounds, code `57ec923`)
+
+**Jaysonn (2026-11-03):** "lets finally take care of starting some sound effects" -- "Mario and FLUDD first (jumps, landings, voice, the spray
+and hover)". The project had no audio at all (57 empty sound slots on the species).
+
+**The source.** No AudioRes was on the PC; the disc image on E: (`super_mario_sunshine.iso` -- the header reads Super Mario Solarshine 0.7b9a,
+GMSE05, a mod build; its AudioRes has vanilla's layout and names) gave it through DolphinTool (`extract -s /AudioRes`): 24 `.aw` wave banks
+(1680 waves, GameCube AFC ADPCM), `msound.aaf` (the init blob: the SOUND TABLE of JAISoundInfo per id, 13 IBNK instrument banks -- bank number =
+list index, the third word its wave bank --, 3 WSYS wave tables with WINF / WBCT / C-DF ids, BARC), `mSound.asn` (1704 names; 32-byte records
+of name then id, the file starting 16 bytes in -- matches the decomp's SoundEffects.hpp), `sequence.arc` (se.scom first: the SE SEQUENCE).
+
+**How a Sunshine sound effect plays.** JAIBasic::startSeSequence runs se.scom; its root opens two pools of slot tracks, 27 in all = the
+categories' maxPlaying (2 POMP, 3 MARIO, 5 ENEMY, 5 OBJECT, 2 SYSTEM, 3 ENVIRONMENT, 3 WATER, 1 MARIO_VO, 3 NPC); the slots of a category share a
+handler. JAIGFrameSe writes a slot's ports (4 = the SE index within its category, 3 the distance wait, 6 the fx line, 0 = go -> interrupt 3); the
+handler polls port 0, calls a table by the index (0xC4 with the register-table flags) and opens child tracks, one per layer, each setting
+bank:program (register 6 through the 0x20 / 0x21 writes) and playing a note (key, velocity, duration); the voices' handlers read the SE index
+from a child port (ChildWritePort) and play key = index - 48 on a drum set. `sms_audio.py` ports JASSeqParser / JASTrack / JASSeqCtrl (the 0x80
+waits, 0x90 timed params, 0xA0 register ops, 0xB0 register-argument commands, 0xC0.. with the Arglist, call / jump tables, loops, ports,
+interrupts) and runs each id to its notes; TBasicInst::getParam / TDrumSet::getParam pick the wave (key region, velocity region, the vmap's
+wave id); the WSYS answers the id with the .aw and the wave's entry; the AFC decoder (16 coefficient pairs, 9-byte frames) gives the samples.
+The baker mixes the layers at the sequence's clock (tempo 120, timebase 48: 96 ticks a second) with the pitch (2^((key - base key) / 12) x the
+instrument's x the SE's), velocity / 127 x the instrument's volume, the wave looping under a long note; a SE whose notes keep coming (the hover:
+four layers re-fired every 40 / 60 ticks; the spray; the slide) is rendered to its steady period (120 or 127 ticks) with a loop region in a
+`smpl` chunk; a held single looping wave loops its own region; an irregular held pattern is cut at 6 s. 310 WAVs (19 MB) under
+assets/Sms/Sound/Mario/, named by their MSD_SE ids: every sound Mario's animation tables name, the voices and effects his code fires, all of FLUDD's.
+
+**The animation tables.** mario.szs's `mario/bas/*.bas` (123 clips, 381 entries): JAIAnimeFrameSoundData {id, start frame, end frame, pitch,
+flags, volume...}; TMario::animSound -> MAnmSound::animeLoop fires each as the bck frame crosses it (category 0, FLUDD's clanks, skipped without
+FLUDD; category 7 to the voice channel; the footsteps' id + the floor's material = the WALK_* variant). The bck frames run at 60 a second (ma_run1
+60 frames, ma_laend 30, ma_wait 180); the port's clips are frames / 60 s less 1/24 (a dropped last key), so frame = position x 60.
+`SmsMarioSoundTable.cs` is generated from the bas dump; `SmsMarioSound` reads the AnimationTree's state (ma_runblend by its mix: run1 under 0.5),
+or the AnimationPlayer when the tree is off, and fires the entries the frame crossed (a new clip starts at its frame; a wrap fires the tail then
+the head).
+
+**The state sounds** (MarioSound.cpp soundMovement; MarioMove.cpp 440-660; MSound::startMarioVoice 855+): JUMP -> MV21_JUMP_SMALL (the five
+takes; 30% MA_VO_JUMP_SMALL), SECOND_JUMP / WALL_JUMP / BROAD -> MV22_JUMP_MID (70% MA_VO_JUMP_MID), ULTRA / BACK / U_TURN / ROTATE -> MV23_JUMP_LARGE
+(50% MA_VO_JUMP_BIG), ROCKET -> MV24_JUMP_SPECIAL (50% MA_VO_JUMP_SPECIAL; turbo MV15_EXERT_INST, hover MV21), below 3 HP the MV41_JUMP_T set;
+HANGING MV15_EXERT_INST_02 (MV34_ACTION_T_02 tired), JUMP_CATCH MV13; the landing's stopVoice (soundMovement case 1, unless a trample);
+HIP_DROP -> HIP_ATTACK (bank 5's two layers); the wall down's WALL_COL_HEAD + MV03_DAMAGE_LITLE (25% MA_VO_DAMAGE_SMALL); hurt MV02; dead MV08A
+(15% MA_VO_DEAD); SLIP looping in the slip state; FALL_IN_WATER_SLW / DEP (vy under -12 m/s) and JUMP_FR_WATER_SLW.
+
+**FLUDD** (TWaterGun::emit 1795-1830, TNozzleTrigger 525-580, soundMovement 332-360, changeNozzle 1860-1875): Spray -> PO_NORMAL_NOZZLE_IMI (the
+nozzle's hiss, startSoundActorWithInfo with unk374) AND PO_WATER_HI (the water, with unk378 -- here its volume from 0.35 to 1 with the strength);
+Turbo -> WATER_HI; Hover -> PO_HOVER while it emits; the trigger nozzles: SY_NEWP_AIR_TAME while R builds the charge (INACTIVE), the nozzle's
+sound at the launch (ROCKET_TRIGGER; the turbo's LAUNCH_TRIGGER as the dash starts); R with no water -> ACTION_ON_EMPTY; the refill -> SUCK_WATER_B
+while the tank takes water; the nozzle change -> SY_SELECT_POMP / _BACK as it starts; the house progress 0 -> HAND_OFF, 18 -> 19 NOZZLE_OFF (spray),
+49 -> 50 DOWN_OFF. `Mario.SmsFluddSound` is the read-only probe (nozzle, emitting, R, water, strength, trigger state, dash, swap, house).
+
+**The node.** `assets/Sms/Sound/SmsMarioSound.cs` + `.tscn`, the Player's `SmsSound` child: one voice AudioStreamPlayer3D (the game's single Mario
+voice), a pool of six for effects, one per loop; the sound table's volume (0..127) applied per sound; the WAVs loaded by name from SoundDir.
+
+**Drive 154** (`SmsMarioSound.Drive.cs`, a partial on the node behind SMS_SFX_SMOKE=1, shipped for the runs only): a stage of its own 150 m over
+the casino room (the level's spawn sits in King Boo's room: his nodes freed by C# type -- FindChildren's type filter needs a registered class
+name --, then a 80 m floor and Mario set on it); the run (26 steps and 15 clanks in 2.5 s off ma_run1 / ma_run2), the jump's voice, the landing's
+cut (28 ticks, nothing playing), the hip drop's thud, the spray's two loops on and off, the nozzle swap, the hover's loop on and off. Runs a..h:
+a / b the stage on the lifted disc (ran into the dome, sstep at 0.9 m/s), d / e the floor missed him (the boss still carried him: not freed), g / h
+10 / 10 (h with the run mix read from SMS_RUN_MIX_PATH: ma_run2 at the sprint). Builds 154a..j, the last 0 errors without the drive file.
+
+**Deviations (logged):** FloorMaterial as one knob (the game reads the floor's sound material; the port's floors carry none -- the hook is
+`Footstep()`); no random pitch width (sw_bit 0x20000) and no distance curves; the baked layers at the sequence's first-cycle values (the random
+command reads 0; the numbered takes are their own files and the node picks); the spray's strength as a volume ramp (the game's info value runs the
+SE's own parameters). Not in this pass: the other species' slots (Sirena's, Ricco's... the port's 57), the music streams (Streams/Music/*.adp),
+the level's object sounds, Yoshi.
+
+**Knobs:** SmsSound -- Sounds: SoundOn, MasterDb, VoiceDb, StepDb, FluddDb, MaxDistance, DebugPrint; Pieces: AnimSounds, JumpVoices, LandingCutsVoice,
+ActionSounds, FluddSounds, FluddPackClanks; Deviations: FloorMaterial, VoiceVariantChance, TiredVoices; Files: SoundDir. Files: assets/Sms/Sound/
+(SmsMarioSound.cs, SmsMarioSound.tscn, SmsMarioSoundTable.cs, Mario/*.wav + .import), assets/Mario.cs (SmsFluddSound), assets/Player.tscn (the
+child). Tooling (tools/projectshine/sound154/): sms_audio.py (names / resolve / log / bake / bake-list), bas_dump.py, make_list154.py, gen_table154.py,
+patch_mario154.py, patch_player154.py, the decomp sources under decomp/, AudioRes/ and bas/ and bck/ copies, out154/ (the bake + sms_sfx.json).
+
+### 154b -- Mario's sounds flat: no camera-distance falloff, no panning, no low-pass; Positional brings the game's own curve (feature/sounds, code `ecaa420`)
+
+**Jaysonn on 154:** "the sound is like dependent on the camera position and i think for mario we dont want that? lots of it sounds muffled and
+its easy for it to sound far away esp in the king boo fight".
+
+**The cause.** 154 made every channel an AudioStreamPlayer3D (MaxDistance 40 m, inverse distance, UnitSize 10) and left Godot's distance
+low-pass at its defaults (attenuation_filter_cutoff_hz 5000, attenuation_filter_db -24): at King Boo's fixed camera -- the eye at the far wall,
+~30 m from the table -- his steps and voice came through 9 dB down and filtered, and every camera swing panned and swelled them.
+
+**The fix.** `SmsMarioSound.Chan`: a channel is a plain `AudioStreamPlayer` (the voice, the six effects, one per loop) -- the same volume
+wherever the camera stands, no panning, never a filter. Mario is the listener's reference. `Positional` (Camera distance, OFF) is the other way:
+`AudioStreamPlayer3D` channels with Godot's attenuation (Disabled) and filter (0 dB) off and the GAME's curve applied by the node each tick --
+`JAISound::setDistanceVolumeCommon`: full volume within `JAIGlobalParameter::maxVolumeDistance` (1000 u) of the camera, a straight fade to
+`minDistanceVolume` (0) at `distanceMax` (5000 u); curve bits (sw_bit 0x70000 >> 16) scale the fade's range -- the effects' 0 as is, the voices'
+2 (MARIO_VO's 0x90020020 / 0x10020020) four times longer, so they all but never fade; the game has no distance low-pass at all (its FIR is the
+fx line's). Knobs `FullVolumeUnits` 1000, `SilentUnits` 5000; readers `DistanceDb` / `VoiceDistanceDb`.
+
+**What the game does, for the record:** its SEs ARE positional (JAIActor positions, the camera's distance), but the curve is long and flat:
+nothing fades within 13 m of the camera, the fade runs to 67 m, the voices to four times that. Godot's defaults (falloff from the first metre,
+the low-pass) are what made 154 sound wrong, not the idea of distance. Flat is Jaysonn's call for Mario; the enemies' sounds (the next passes)
+will be positional with this curve.
+
+**Drive 154: 12 / 12** -- 154's ten and A11 (Positional off: every channel a flat AudioStreamPlayer, the distance volume 0 dB) and A12 (the curve
+exercised directly: 0 dB at 500 u, -6.02 dB at 3000, -80 at 5000; the voices' -1.16 dB at 3000). Headless run i; build 154k 0 errors (the drive
+partial out before the commit). Files: `assets/Sms/Sound/SmsMarioSound.cs`. Tooling: sound154/ship154/.
+
+### 154c -- the sound effects volume, the rollout's voice, the missing Mario sounds, Mario.cs's slots filled (feature/sounds, code `1c0c4ca`)
+
+**Jaysonn on 154b:** "rollout sounds funny. is it the right sound? and also can we have a sound effects slider or make it 50% right now its very
+loud. and do another pass to put in all the mario sound effects i think some are missing".
+
+**The volume.** `default_bus_layout.tres` (new): an `Sfx` bus and a `Music` bus, both sent to Master. Every SmsMarioSound channel and every filled
+slot plays on Sfx; `SfxVolume` (0..1, default 0.5 = -6.02 dB) sets the bus (`SetSfxVolume` / `GetSfxVolume` static, for a menu slider). The bus is
+made at runtime if the layout is missing. The game's own level: the SE sequence's track volume 0x78 / 127 and the mixer under the BGM -- the port's
+0 dB everything was the loud part; 50% is Jaysonn's number.
+
+**The rollout: the right sound, half of it.** The port's belly-slide rollout is the game's move (Mario.cs 3540: `catching()`: fwd > ClashSpeed ->
+ROTATE_BROAD_JUMP = `singleRollout` / `ma_roll_jump`; else CATCH_STOP = `bellyRollout` / `ma_roll`). `ma_roll_jump`'s bas table fires
+MA_ROPE_ROLL_FULL_A at f9 -- the roll sample (w2ndLoad wave 26) at pitch 0.67, the game's own for that animation -- and 154 played it alone;
+`setStatusToJumping(ROTATE_BROAD_JUMP)` adds MV22_JUMP_MID (70% MA_VO_JUMP_MID). Now both; `RollWhoosh` (Deviations) mutes the whoosh.
+
+**The missing, from the game's code:**
+- `bellySlidingFromDive` loops MA_SLIP (catching() starts it every frame; 154 looped it for the slope slip only); `wallSlide` loops SLIP_WALL
+  (wallSlipEffect + SLIP_WALL every frame vy < -10; 154 fired it once).
+- The spin jump: MV24_JUMP_SPECIAL (soundMovement's `isRotJump` rule fires MV24 the frame after setStatusToJumping's MV23 and replaces it) and
+  MA_ROLL_JUMP at the 10th tick (`unk22 == 10`).
+- The hurt by kind (`Mario.SmsDownKindName`): a hit -> WALL_COL_CMN_H (`unk28 == 2`: an actor) + MV03_DAMAGE_LITLE (25% MA_VO_DAMAGE_SMALL); the burn
+  -> MV05_DAMAGE_FIRE; the shock -> MV04_DAMAGE_ELEC; the throw -> MV25A_JUMP_HUGE at its 30th tick (`unk26 == 0x1E`; tired MV42). 154's MV02 for
+  every hurt was the wrong voice.
+- The cap: `SmsWearingCap` on -> off MA_HAT_STOLEN, off -> on MA_TAKE_HAT.
+- The take / put: the tables say TAKE_BARREL for `ma_raise` and `ma_put`; soundMovement picks TAKE_DRIAN / PUT_DRIAN for a fruit (`SmsHoldsFruit`)
+  and PUT_BARREL for the rest.
+- Treading water (`ma_swim_wait`): MA_WATER_WAIT by MSRandPlay's 5..60 frames (10..120 ticks here).
+- The TAKE: `Mario.SmsCarryTo` with a facing (King Boo's ride) calls `SmsMarioSound.OnTaken` -> MV06_DAMAGE_WATER (soundMovement's TAKEN).
+- The port's triple jump plays `ma_demo_gate_out_rolling_get` (no table); the game's ULTRA_JUMP is ANIM_ROLL: a clip alias to `ma_roll`'s ROLL_C.
+- **Mario.cs's own slots** (every one empty since its pass, each documented with its SE): FallCry MV10B_CRY_JUMP_01 (the 2-s fall), FireDamageSound
+  MA_DAMAGE_FIRE, ElectricDamageSound MA_DAMAGE_ELEC, ExertVoice MV15_EXERT_INST_01 (the raise's frame 11, the throw's 4), PumpSqueakIn / Out
+  PO_POMPING1 / 2, FencePunchSound / FenceCatchSound, HpRecover SY_HP_RECOVER, SmsWarpInWipeSound MA_INTO_DOKAN -- `FillMarioSlots` gives each
+  a flat player on Sfx with the baked sound when the slot is empty (a slot set in the inspector is left alone); Mario.cs plays them at the game's
+  moments. MissJingle and ShineGetFanfare are BGM sequences: the music pass. Four more bakes: SY_HP_RECOVER, MA_INTO_DOKAN, EF_LIGHTNING, SY_1UP
+  (314 WAVs).
+
+**Drive 154: 16 / 16** -- 154b's twelve + B1 (the Sfx bus, -6.02 dB, every channel on it, sent to Master), B2 (the ten slots filled, flat, on the
+bus), B3 (the dive's belly slide loops MA_SLIP at 15 m/s), B4 (A on the slide -> singleRollout with MA_VO_JUMP_MID_2). Headless run j; build 154m 0
+errors. Files: `default_bus_layout.tres` (new), `assets/Sms/Sound/SmsMarioSound.cs`, `SmsMarioSoundTable.cs`, `Mario/` +4 WAVs, `assets/Mario.cs`
+(SmsDownKindName, SmsHoldsFruit, the OnTaken hook). Knobs added: SfxVolume (Sounds), FillMarioSlots (Pieces), RollWhoosh (Deviations).
+Not in this pass: a menu slider (SetSfxVolume is its call), the coins' and items' sounds, the music.
+
+### 154d -- the dive's start grunt, the wall slide's thud by speed, the wall kick checked against the game (feature/sounds, code `c5c5f55`)
+
+**Jaysonn on 154c:** "ok missing the start of dive noise. otherwise also missing the wall kick sound?"
+
+**The dive.** The port's dive (`diving` / `singleJumpDive` / `doubleJumpDive` / `tripleJumpDive`, clip `ma_sldct`) is the game's
+MARIO_STATUS_JUMP_CATCH -- `jumpCatch()`, entered from a run (MarioRun.cpp 41 / 1087 / 1243 / 1558 with the isJumping flag) or a jump (MarioJump.cpp
+299 / 786). `setStatusToJumping` case JUMP_CATCH (MarioMove.cpp 551): `startVoice(MSD_SE_MV13_ACTION_SMALL_01)` -- the one take, the "hup" -- and
+the tired MV34_ACTION_T_01 under 3 HP. `ma_sldct` has no bas table: that grunt is the whole start-of-dive sound; the game has no whoosh for it. Now
+played on the dive's entry (not again when one dive state hands to another). 154c had MV13 on the TREE GRAB by mistake -- the game's tree catch has
+no voice (`barJumpSetting()` is empty; `ma_tree_catch`'s table plays the two hand slaps on the trunk, which AnimTick already fires; MA_SLIP_TREE is
+the slide DOWN the trunk with the stick held down) -- so the treeGrab case is gone.
+
+**The wall kick -- nothing missing, by the game's code.** `jumpWall()` -> `jumpingBasic(JUMP_SLIP, ANIM_WJMP)`: no sound effect. `setStatusToJumping`
+case WALL_JUMP -> MV22_JUMP_MID (wired since 154: `wallJump` -> the mid voice, 70% MA_VO_JUMP_MID); `ma_wjmp`'s bas table adds the push-off steps
+(WALK_STONE_L_HEEL f10, R_TIP f14) and FLUDD's clanks (PO_FRICTION_A f11, B f14), played since 154. **What was missing is the THUD as the wall slide
+starts.** MarioJump.cpp 236-246 (jumpingBasic case 2: fwd > 16 into a wall -> WALL_SLIDE, rumble 0x15, camera shake, `startSoundActor(getWallSound(
+mWallPlane->mSoundMaterial, mForwardVel))`); `MSound::getWallSound` (MSound.cpp 1090): under 15 units a tick MA_WALL_COL_CMN_VS, under 30 CMN_S, else
+CMN_H (material 0x1C -- a soft wall -- swaps in VERYSOFT / SOFT / HARD). The node plays it on the `wallSlide` entry, by the horizontal speed of the
+tick BEFORE (`_prevHSpeed`: the slide's own tick is already zeroed into the wall; `SmsUnits.MpsToSpeed` = m/s x 74.44 / 30 gives the game's units a
+tick): a walk-off jump (16..30) thuds soft, a run-off one (30..40; the port bonks above 40 like the game's ClashSpeed) thuds hard; CMN_VS is baked
+for completeness (the game's slide needs 16+, so it never plays from a slide). 154c's SLIP_WALL scrape loop stays under it. `WallHitSounds`
+(Deviations) turns the thud off. `WallHitSe(unitsPerTick)` is public static for the drive and anything else that hits a wall.
+
+**Bakes:** MA_WALL_COL_CMN_VS, MA_WALL_COL_VERYSOFT, MA_SLIP_TREE (317 WAVs; `tools/projectshine/sound154/merge154d.py` folds a side bake into
+the set and list154.txt).
+
+**A wall-slide bug the drive found (Mario.cs).** The drive's jump at an 11-m wall gave no slide: `[SMS wall] singleJump at fwd 32.3: wall below
+head height (feet + 150 units), ignored`. `SmsWallReachesHeight` (the game's `checkWallPlane(pos, 150, r)`: does the wall reach head height? --
+asked for the ledge-bit states before a jump's wall slide) cast its ray from the NODE ORIGIN, radius + 6 cm long (0.373 + 0.06 = 0.433 m); but
+Player.tscn's CollisionShape3D sits 11.6 cm off the origin (its transform's z -0.1157, and the Player node itself never turns -- the armature does),
+so a wall met moving toward -Z stood 0.489 m from the origin and the ray fell 5 cm short (the drive's diagnostic: rays of 0.4 miss, 0.5+ hit at
+0.490; the contact's XZ distance 0.490). Every single / double jump, side flip, wall jump, stomp or roll-jump into a wall facing roughly +Z (its
+normal within ~60 degrees of +Z) stopped dead against it instead of sliding; dives and belly rollouts never ask, so they slid, and walls facing -Z
+were fine (the origin is CLOSER to those). The ray now leaves the shape's own axis (`bodyCol.GlobalPosition`), as the step-up ray (anchored on the
+contact) always did. Patch: `tools/projectshine/sound154/patch_mario154d.py`. Not touched: the other origin-based probes (the 0.75-m face ray at
+Mario.cs ~12235, the ring of rays at ~17668) -- the same 11.6 cm applies to them; a look for the physics passes.
+
+**A 154c bug the run's .err showed.** `FillSlots` added the ten slot players to Mario inside `_Ready` -> Godot: "Parent node is busy setting up
+children, `add_child()` failed" -> they never entered the tree, and a player outside the tree plays nothing: the fall cry, the burn and the shock, the
+exert grunt, the pump squeaks, the fence punch and catch, the heal chime and the warp wipe were silent in 154c (B2 only checked the fields). They
+hang under the SmsSound node itself now (a node may add its own children in `_Ready`; the node sits at Mario's origin); B2 checks `IsInsideTree`.
+
+**Drive 154: 19 / 19** -- 154c's sixteen + B5 (B in a jump -> `diving`, clip `ma_sldct`, the voice MV13_ACTION_SMALL_01), B6 (a sprint-jump into an
+11-m wall -> `wallSlide`; the thud CMN_H for 31.1 units a tick, once, the SLIP_WALL loop under it), B7 (A on the slide -> `wallJump` with
+MV22_JUMP_MID_01, one voice, no thud, the scrape off). Headless run p; build 154u 0 errors. Two runs (m, o) played a binary OLDER than the build
+just made -- a stale `dotnet build` output with the editor open on the PC -- so the drive now prints a build marker on its first line and every run
+is read against it; the final build was a full `--no-incremental` one.
+Files: `assets/Sms/Sound/SmsMarioSound.cs` (the dive voice, the wall thud, the treeGrab case gone, FillSlots' parent), `SmsMarioSoundTable.cs`,
+`Mario/` +3 WAVs (+ .import), `assets/Mario.cs` (SmsWallReachesHeight, 4 lines).
+Knob added: WallHitSounds (Deviations).
+Not in this pass: the belly slide's wall bounce (MarioRun.cpp 1126, the same getWallSound on a ground slide into a wall -- the port's slide stops
+instead), the soft-wall material (every wall here is "common"), a menu slider, the coins' and items' sounds, the music.
+
+### 155 -- King Boo's fight sounds (the actors' sound node), the slow slide's silent flip, the sequencer's held notes (feature/sounds, code `6649ed9`)
+
+**Jaysonn:** "ok doo all the sound effects for the king boo fight also." / "also when mario slow belly slides and doesnt roll out but get up from dive is
+missing its little flip sound effect".
+
+**The node: `assets/Sms/Sound/SmsActorSound.cs`.** One node under an actor, attached from its _Ready (`SmsSmallEnemy` for every species the tables
+know -- one line in the base class; the slot machine's and the discs' scripts by a line each), doing the three things the game does for an actor:
+1. **Its animation sound tables.** The species' bas files (JAIAnimeSoundData, from `delfinoBoss.szs` `btelesa/bas/` and `casino1.szs` `telesa/bas/`,
+   decoded by `tools/projectshine/sound154/bas_dump155.py` into `SmsActorSoundTable.cs`, keyed "actor/clip"), fired as the bck passes each frame,
+   read off `SmsSmallEnemy.BckName` / `BckFrameNow` every tick (MAnmSound::animeLoop). Flags 0x11 / 0x12 pair a HELD sound between two frames
+   (JAIAnimation's loop start / end): King Boo's damage clip laughs f49.5-157, his wet clip f0-41. A clip change stops the held ones.
+2. **Its script's sound slots.** The exported `AudioStreamPlayer3D` fields Jaysonn's scripts already play at the game's moments, filled by field name
+   with the baked WAVs when empty (`Fill`); a slot set in the inspector is kept. (The players hang under the sound node: a parent cannot take
+   children inside its own _Ready -- 154d's lesson.)
+3. **Its continuous sounds.** What the game restarts every frame while a state holds (startSoundActor each tick), as loops keyed on the actor's state
+   (`StateTick`).
+Every channel is an AudioStreamPlayer3D on the actor (Godot pans it) with Godot's falloff and low-pass OFF and the GAME's distance curve applied by the
+node (JAISound::setDistanceVolumeCommon: full within 1000 u of the camera, a straight fade to silence at 5000 u): King Boo at the fixed camera's
+30 m sits about 3 dB under Mario, as in the game, never muffled. All on the Sfx bus. Knobs (static, one setting for every actor): `Enabled`,
+`Positional` (off = flat like Mario), `FullVolumeUnits`, `SilentUnits`, `MasterDb`, `DebugPrint`. The node logs its plays and the slots' starts
+(`PlayLog`) for the drives.
+
+**King Boo** (bosstelesa.cpp, btelesa's eight bas files): tables -- appear f0 V_APPEAR; bero_hit f15 SPICY_HIT (the pepper on his tongue); damage f0
+DAMAGE + DAMAGE_SYMBL, V_LAUGH1 held f49-157 at pitch 1.1; lick f47 LICK; roll f0 V_ROLL, f49 WANWAN_REBURN1 (pitch 1.2); spicy f1 BREATHE (0.88);
+wet V_LAUGH2 held f0-41. Slots -- LaughSound V_LAUGH1 (the port's laugh at the laugh clip; the game's bck 6 has no table -- a deviation kept),
+FruitHitSound FRUIT_HIT (a fruit on the body, not spicy), DownSound DOWN (0 HP), DisappearSound DISAPPEAR / EscapeSound ESCAPE (the hide, not spicy /
+spicy), ThankYouSound THANKYOU (hosed while he waits), LandSound SLT_LAND (the game checks frame 78 of the 59-frame appear clip -- dead code there,
+dead here too), Fanfare1 / 2 / 3 FANFALE_1 / 2 / 3 (three fruit / three coins / else). FireSound stays EMPTY: the FIRE is a loop through the spicy
+clip (calcRootMatrix restarts it every frame), run by the node; BossMusic stays for the music pass. Loops -- RLT_MOVE1 / 2 / 3 by how many discs
+roll (perform: getRollingRouletteNum every frame; the discs the boss found, `RouletteAt`), the intro's RLT_DOWN rumble and V_LAUGH1B laugh while the
+disc sinks with Mario (rouletteFall, IntroPhase 1), and RLT_SET at the DETACH -- the real one now: since 153l `DisappearSound` stood in there, and
+with the slot filled it would have played the hide's sound; `SmsBossTelesa.cs`'s two lines play RLT_SET through the node. **The slot machine**
+(`SmsTelesaSlot`): StopSound SLT_STOP per drum; OBJ_SLOT_SPIN looping while a drum rolls (calcRootMatrix every other frame) -- SpinSound stays empty,
+the node loops it. **The discs** (`SmsRoulette`): StopSound RLT_STOP.
+
+**The Boo attackers** (telesa.cpp, telesa's three bas files): tables -- down f0 EN_TELESA_FIX, clush f0 EN_COMMON_BOYOYON at pitch 0.6 (the box
+Boo's flinch). Slots -- FixSound EN_TELESA_FIX (the box Boo into its block), RecoverSound EN_TELSA_RECOVER, AppearSound EN_TELESA_APPEAR,
+DisappearSound EN_TELESA_DISAPPEAR, HitSound EN_COMMON_W_HIT_OK (TSmallEnemy::receiveMessage SPRAYED_BY_WATER's common water hit, a sound set).
+DownSound / CrushSound stay empty (their tables play those moments); WaitSound too: **EN_TELESA_FLY**, the hover hum (telesa_wait f0; King Boo's
+wait f0 at pitch 0.64 and spicy f12), is bank 0 program 0xF7 -- JASBankMgr::noteOn hands programs 0xF0+ to noteOnOsc: a DSP OSCILLATOR voice (the
+ucode's 64-sample "const pattern 0", Dolphin's SRC_CONST_PATTERN_0, a 5-note wobble at 87..110 Hz), not a wave the baker renders. The Boos' hover
+stays silent for now; the pattern lives in the game's DSP init data if it is ever wanted.
+
+**The sequencer fix (sms_audio.py).** A gate note (voice 0) with duration 0 is `wait(-1)`: TTrack::mainProc holds the track at checkNoteStop(0)
+until the note has ENDED -- a one-shot wave plays out and the sequence goes on; a looping wave never ends, so the track holds until the stop
+interrupt. 154's interpreter went straight on past such a note: King Boo's FIRE, SLT_SPIN, RLT_DOWN and RLT_MOVE1-3 never baked ("no wait in 20000
+steps": a gate note + a jmp to itself), and five of Mario's sounds -- PO_HAND_OFF, PO_NOZZLE_OFF, PO_DOWN_OFF, SY_SELECT_POMP, SY_SELECT_POMP_BACK
+-- had their later notes stacked on the first instead of after it. `Resolver.note_ticks` gives the note's length (FOREVER for a looping wave); the
+whole set re-baked, those five re-shipped.
+
+**The flip (Jaysonn's slow slide).** A on a slow belly slide is the game's CATCH_STOP -- the `ma_roll` flip (Mario.cs 3548: `bellyRollout`), whose
+table has MA_ROLL_C at frame 0. 154's AnimTick skipped every entry before the frame a new clip was first SEEN at (a tick or two in, 0.5..2 bck
+frames), so no clip's frame-0 sound ever fired: the flip's whoosh, the triple jump's (ma_roll by alias), ma_jump's push-off step (which fired only
+when the clip happened to be caught at exactly 0). Now a clip first seen within `ClipStartFrames` (6) of its start fires its entries up to there
+(the game's setAnimation starts the clip and its sound cursor at 0; MAnmSound::initAnmSound); a clip joined mid-way (the gait blend's run1 <-> run2
+swap) still skips its past. The slide that stops on its own is CATCH_LOST / `ma_lost` (`gettingUpFromSliding`): the game's table has two footsteps
+at f40 / f48 and no flip sound -- as here. **The tables' per-entry PITCH** now applies (JAIAnimation's setSpeedModifySound: 119 of Mario's entries
+are not 1.0 -- the double jump's steps at 1.11 / 1.20, the rope roll at 1.32, the Boo's flinch boing at 0.6).
+
+**Bakes:** 39 under `assets/Sms/Sound/Enemy/` (the table's `Folder` says where each sound lives; `merge_side.py` folds a side bake into the set).
+356 WAVs in all.
+
+**Drive 155: 11 / 11 -- C1 the nodes on King Boo, his slot machine, the three discs (and a Boo); C2 his ten slots filled, in the tree, on Sfx, Godot's falloff
+off, FireSound / BossMusic left; C3 SLT_STOP on the slot, RLT_STOP on the discs; C4 V_APPEAR at the appear clip's f0; C5 the tongue sprayed (the
+drive calls the TonguePart's SmsSprayedByWater) -> SlotStart: V_ROLL f0 + WANWAN_REBURN1 f49; C6 OBJ_SLOT_SPIN on while the drums roll, off at the
+last stop, SLT_STOP per stop (two on one tick = one sound, as the game's same-id start); C7 the fanfare; C8 the intro's RLT_DOWN + V_LAUGH1B loops,
+off as the disc seats, RLT_SET once at the DETACH; C9 the hide's DISAPPEAR with RLT_MOVE3 looping (the port's discs roll through the fight); C10 a
+Boo's node and APPEAR; C11 Mario's ma_jump f0 push-off step + clank on a jump (the clip-start rule). Headless run d (marker v155-4); build 155f 0 errors.**
+Files: `assets/Sms/Sound/SmsActorSound.cs` (new), `SmsActorSoundTable.cs` (new, generated), `SmsMarioSoundTable.cs` (regenerated: Pitch, Folder, 39
+more sounds), `SmsMarioSound.cs` (the clip-start rule, the pitch, the folder), `Enemy/` 39 WAVs (+ .import), `Mario/` 5 WAVs re-baked,
+`assets/Sms/Enemy/SmsSmallEnemy.cs` (+1 line), `SmsBossTelesa.cs` (2 lines), `BossTelesa/SmsTelesaSlot.cs` (+1), `BossTelesa/SmsRoulette.cs` (+1).
+Knob added: ClipStartFrames (SmsMarioSound, Deviations); the node's static knobs above.
+Not in this pass: the Boos' hover hum (the DSP oscillator), the Sleepy Boo's snore (EN_DB_TELESA_INHALE / EXHALE, its bas) and EATEN, the other
+species' slots, the fruit / pepper / coin item sounds, the casino BGM and fanfare music (BossMusic), a menu slider.
+
+### 155b -- the intro laugh as the game's engine plays it, the baker's envelopes / voice cuts / settled loops, the game's distance values (feature/sounds, code `1ebc9d1`)
+
+**Jaysonn:** "the little laughs are playing too ealry they should play once the elevator lowers and i think they need to be sped up? or higher
+pitched? i think sped up since they play before king boo apears."
+
+**The laugh.** `TBossTelesa::rouletteFall` calls `startSoundActor(MSD_SE_BS_TELESA_V_LAUGH1B)` EVERY FRAME of the disc's descent, next to the
+RLT_DOWN rumble. RLT_DOWN is a level sound (no 0x800 bit in its id: re-calling it each frame keeps it going); V_LAUGH1B is a ONE-SHOT (0x800), and
+for those `JAISeEntry::storeBuffer` finds the one already playing on the actor, `stop(0)`s it (`JAIBasic::releaseSeRegist` -> port 0 := 0 on its
+slot track) and registers a new one, which `MSound::mainLoop` starts at the frame's end (ports 4 := index, 0 := 1). The SE sequence's slot track
+polls that port every tick (96 a second): 0 closes the layer tracks, 1 reopens them from the SE's start. Modelled with the game's timing (30 frames
+a second, 3.2 ticks each: `sim_restart.py`, `bake_perframe.py`), the designed 8-syllable chuckle never gets past its opening 2-tick grace note --
+the laugh sample's first 20-40 ms, quiet breath before the first "heh" (RMS ~700 / 32767 over its first 100 ms; the voiced burst starts at 110 ms).
+The game's output over the descent is that breath restarted 30 times a second, some 30 dB under the rumble: to the ear, the rumble alone. So
+Jaysonn's memory is right -- no laugh on the ride; the laugh he hears is **V_APPEAR**, quicker and higher than the chuckle, as King Boo surfaces
+(the appear clip's table, since 155). 155's looped chuckle was a deviation; gone.
+- `SmsActorSound.IntroLaugh` (static knob): **Game** (default) -- `MSD_SE_BS_TELESA_V_LAUGH1B_ROULETTE`, the per-frame-restarted laugh baked from that
+  run of the SE sequence (a 16-tick loop: the 96 / 30 beat's five-frame pattern), in effect silence under RLT_DOWN; **Chuckle** -- the SE as designed
+  (what 155 played); **Off** -- the rumble alone. The same per-frame call plays V_LAUGH1 while Mario is GAME OVER (the port's LaughSound slot is
+  the laugh clip's, untouched).
+
+**The baker** (`tools/projectshine/sound154/sms_audio.py`): four things the game's driver does that 154's render did not. Every WAV re-baked (357;
+43 audibly changed, listed in `diff155b.txt`).
+1. **Volume envelopes.** A SE's `SimpleADSR` routed over oscillator 0 (`OscRoute 0` -- 50 of the 357 do it, no other mode occurs), else the
+   instrument's own oscillator 0 (the IBNK's TOsc: target, rate, ADS / release tables, width, vertex), run as `JASystem::TOscillator` does: table
+   times in 1/600 s (`dacRate / 80 / 600` updates), modes 0 linear / 1-3 the driver's square, square-root and sample-cell curve tables / 13 jump /
+   14 hold / 15 stop, the release from the level reached at the note-off, the voice over when the release table ends. SLIP swells in over 0.2 s
+   (its ADSR 120 / 100 / 120 / 29000 / 100); FIRE's roar dips to 43 % after 0.3 s (20 / 160 / 500 / 14000 / 200); RLT_DOWN swells over 0.17 s;
+   PO_FRICTION_A / B are quieter and shorter; a plain note's tail is the driver's 10-unit (17 ms) default release instead of 154's 30-ms fade --
+   every one-shot a touch tighter (the kicks, the water entries, the rope rolls; MV02_DAMAGE_MID_03, MV16, MV33_T_01 / 04 lose trailing silence).
+2. **Same-voice cutting.** `TTrack::noteOn` on a voice slot still sounding calls `noteOff` on it first: the laugh's grace note ends under its
+   syllable, each syllable under the next; notes on one (track, voice) never overlap.
+3. **CloseTrack and note-offs.** `CloseTrack` (0xC3) now closes the child as `TTrack::closeTrack` does (every note off, its children with it, its
+   events kept for the render); a held note's note-off is matched by (track, voice) after its note-on -- the old test compared the off's TIME with
+   the voice number and never matched. Bake-neutral for the 357 (no SE closes a layer mid-play); it is what let the per-frame restart be modelled.
+4. **Settled loop regions.** A held, looping note's WAV loop begins only once its envelope has settled (whole wave-loops later if need be) -- else
+   the attack sat inside the loop and the port's looping player pulsed it. RLT_DOWN, RLT_MOVE1-3, SLT_SPIN and FIRE's loop points moved.
+Plus the trailing silence trimmed off one-shots (10 ms past the last audible sample). Tools: `patch_env155b/c/d.py`, `patch_close155b.py`,
+`patch_offs155b.py`, `patch_loopsettle155b.py` (the model), `scan_oscroute.py`, `cmp_rebake.py`, `diff_bakes.py`, `adopt155b.py` (a re-bake into the
+set of record and the ship tree, keeping each sound's folder), `sim_restart.py`, `bake_perframe.py`.
+
+**The distance curve.** `MSound::init` sets `JAIGlobalParameter` maxVolumeDistance 1200 and distanceMax to the largest of `MSHandle::smSeCategory`'s
+per-category distances, 12000 (minDistanceVolume 0). 155 took JAudio's compiled-in defaults, 1000 / 5000 -- a fade more than twice too quick at the
+fixed camera. `FullVolumeUnits` 1200, `SilentUnits` 12000 now (Mario's channels are flat regardless).
+
+**Drive 155 run e: 12 / 12** -- C8 155b the intro's RLT_DOWN rumble and the V_LAUGH1B_ROULETTE flutter loop while the disc sinks, both off as it
+seats, RLT_SET once at the DETACH, the chuckle never; C10 155b the knobs at the game's values; C1-C7, C9-C11 as 155. Headless run (marker v155-5);
+build 0 errors. Not done: the Boos' hover hum (EN_TELESA_FLY, the DSP oscillator voice) as before; a menu SFX slider; the music streams.
+
+### 156 -- the boss music: the game's BGM sequences rendered with the game's instruments (feature/sounds, code `9c05a17`)
+
+**Jaysonn:** "can you also do the boss music?"
+
+**Which music.** The game's BGMs are SEQUENCES, not streams: `sequence.arc` holds one BMS per `MSD_BGM_*` id, played by the JAudio sequencer through
+the same instrument banks as the sound effects. `TNerveBossTelesaAppear` starts **MSD_BGM_MAP_SELECT** at King Boo's first appearance (bosstelesa.cpp
+2296) -- and so does `TBossPakkun::startBGM` (bosspakkun.cpp 862): despite its name, MAP_SELECT is `t_select.com`, THE boss theme (tempo 88, timebase
+120, 8 tracks, a 15-s loop). `TBiancoGateKeeper::startBGM` plays **MSD_BGM_CHUBOSS** (`t_chuboss.com`, the mid-boss theme: a 1.2-s intro and a 56-s
+loop) on BGM track 1 with the stage music ducked to 0 over 10 frames (gatekeeper.cpp 532), `stopTrackBGM(1, 10)` at its finish demo. `MSD_BGM_BOSS`
+(`t_boss.com`) is another piece, a 95-s loop at tempo 190; `MSD_BGM_CASINO` (`t_delfino_kajino`) the hotel casino's room music (3.4 s + 55 s). The
+BGM level is `MSBgm::smMainVolume` 0.75 over the sound table's volume.
+
+**The render -- `tools/projectshine/sound154/sms_bgm.py` (numpy).** The sequence runs in `sms_audio`'s TSeqParser model, which grew what a BGM needs
+(`patch_bgm156.py`): cmdTempo / cmdTimeBase (ticks a second = timebase x tempo / 60, logged per change), the tracks' VolumeMode, the transpose chain
+(mTransposeTotal), the pitch-range register's default (TRegisterParam::init: r7 = 12), param events tagged with their track, the instruments' effects
+(TInstRand / TInstSense). Then each note is rendered as `JASBankMgr::noteOn` sets its channel:
+- its wave from the bank's key / velocity region (or drum: its pan, its release), pitch `2^((key - wave key) / 12)` x the instrument's x the region's
+  x the pitch effects; volume = instrument x region x **(velocity / 127)^2** x the volume effects (the velocity curves live in TInstSense);
+- the TRACK CHAIN's volume at every sample (each track's timed volume **squared** -- VolumeMode 0 -- `TTrack::updateTrackAll`), its pitch
+  (`Player::pitchToCent`: pitch x 4 x r7 semitones, multiplied down the chain), the track's own pan (the default pan switch) + the drum's, moved over
+  their N ticks as `TTrack::writeTimeParam` / `mainProc` move them; the Osc1 VIBRATO (sVibratoDef's 48-unit triangle, 1/(600 x rate) s a unit,
+  depth = the track's Osc1 width -- timed params 10 / 9; `incSelfOsc` once an audio frame);
+- the mixer's sine pan law (`updateMixer`: sinfT), the note's envelope (the instrument's oscillator 0 or the track's SimpleADSR, 155b's `Envelope`),
+  its release at the note-off or the next note on its (track, voice).
+Stereo, 32 kHz, 16-bit, peaks at -1 dBFS. **The loop:** the event stream (notes, offs, params per tick) repeats once the intro is over -- the smallest
+period over the last two cycles, walked back to the earliest tick it holds from; two cycles are rendered and the SECOND is the WAV's loop region (its
+`smpl` chunk -> Godot's loop), so the notes ringing over the loop point are in it: seamless (the boss theme: 30 s, loop 15-30). `--one-cycle` keeps
+the intro + that second cycle (the mid-boss theme: 57 s, 7.3 MB instead of 14.5). `check156.py`: the first chord's spectral peaks land on the
+sequence's keys (146.7 Hz = key 50, 300 Hz = key 62). **Not rendered:** the GC's reverb (no track sets fxmix; the game's effect comes from the stage's
+AX effect line -- the mix is dry; an AudioEffectReverb on the Music bus stands in), the IIR filters, the dolby channel, tremolo (no instrument here
+has one). WAV only: no Ogg encoder on either machine (ffmpeg / oggenc absent) -- `winget install Gyan.FFmpeg` on the PC would let the music ship as
+Ogg at a tenth the size, Jaysonn's call.
+
+**The port.** `SmsActorSound.Fill` now takes a script's `AudioStreamPlayer` (2D) slot too: a player on the **Music** bus with the game's track, its WAV
+looping, at `MusicDb` (-4 dB) + the BGM's own level; a slot set by hand in the inspector is kept. King Boo: `BossMusic` = MSD_BGM_MAP_SELECT -- his
+script's own lines already start it at the first Appear (unk384) and fade it out at the down (MSBgm::stopBGM 10 frames). The Gatekeeper
+(`SmsGateKeeper`, a StaticBody3D, so `SmsActorSound.Attach(this)` from its _Ready; `ActorOf["SmsGateKeeper"] = "gatekeeper"`): `BossMusic` =
+MSD_BGM_CHUBOSS -- its script plays / stops it at the appear / finish demos. Knobs: `Music` (off = the slots left empty), `MusicDb`. Files under
+`assets/Sms/Sound/Music/` (3.8 + 7.3 MB), in the tables with Folder Music (`adopt156.py`). Rendered, not shipped (size): MSD_BGM_BOSS, MSD_BGM_CASINO
+-- a `python3 sms_bgm.py OUT NAME` away.
+
+**Drive 155 run g: 13 / 13** -- C12 156 King Boo's BossMusic a 2D player on the Music bus, the 30-s stereo stream looping 15-30 s, playing since his
+first appearance; C2 the eleventh slot a 2D player; C1-C11 as 155b. Headless (marker v156-1); build 0 errors. Open: the stage BGMs (the same
+renderer; Ogg would be wanted first), the Gatekeeper's own sound effects, the Boos' hover hum, a menu SFX / music slider.
+
+### 156b -- King Boo's boss music is the BOSS theme, t_boss.com (feature/sounds, code `65111ac`)
+
+**Jaysonn:** "ok the laugh part is gone and its using the file select music not the boss music."
+
+Right. `bosstelesa.cpp` 2296 and `bosspakkun.cpp` 862 start what the decomp calls `MSD_BGM_MAP_SELECT` -- but the decomp's `BackgroundMusic.hpp`
+numbers that **0x8001000D**, and the game's own name table (`mSound.asn`, which this port's tables follow) calls 0x8001000D **MSD_BGM_BOSS**:
+`sequence.arc`'s `t_boss.com`, 4.2 s + a 95-s loop at tempo 190, 15 tracks -- the boss theme. The asn's MSD_BGM_MAP_SELECT is 0x8001000E,
+`t_select.com`: the FILE SELECT music, which 156 rendered and shipped by the decomp's name. The decomp's enum is shifted one place against the asn
+for every BGM (its DOLPIC is a special 0x80010800 and the rest run one behind); the literal ids it kept agree with the asn (the Gatekeeper's
+0x8001000B = asn CHUBOSS, the Manta's 0x8001002B = asn CHUBOSS_MANTA), so the asn's names are the right ones: the Gatekeeper's MSD_BGM_CHUBOSS stands.
+Lesson for the sound passes: take a BGM from the decomp by its NUMBER, never by the enum's name.
+
+`assets/Sms/Sound/Music/MSD_BGM_BOSS.wav` (99 s stereo, 12.7 MB: the intro + the second rendered cycle, looping from 4.18 s -- `--one-cycle`, since
+two would be 25 MB) replaces MSD_BGM_MAP_SELECT.wav; `SmsActorSound.Fill` for King Boo = MSD_BGM_BOSS; the tables know the new file. The file-select
+render stays under `tools/projectshine/sound154/out156/` should the file select screen ever want it.
+
+**Drive 155 run h: 13 / 13** -- C12 156b King Boo's BossMusic the 98.9-s stereo stream, loop 133806-3165384, on the Music bus, playing since his first
+appearance. Headless (marker v156-2); build 0 errors.
+
+### 156c -- the intro's chuckle, once, as the disc seats (feature/sounds, code `4437366`)
+
+**Jaysonn:** "ok still no laugh in the beginning but the music is right!"
+
+155b was half right. `rouletteFall` restarts the one-shot V_LAUGH1B every frame of the descent and nothing audible comes of that (its first 20-40 ms,
+the breath before the first "heh", 30 times a second under the rumble). But the frame the disc seats, `rouletteFall` returns TRUE **before** its
+`startSoundActor` calls -- so the start from the frame before is never stopped, and the whole 8-syllable chuckle plays out from the moment the
+elevator lowers into place: 6 s, through the slot machine's fall, before King Boo appears. That is the laugh of the intro -- exactly Jaysonn's "they
+should play once the elevator lowers" -- and the one 155b took away along with the loop.
+
+`SmsActorSound.StateTick`, `IntroLaugh = Game`: the ROULETTE flutter loop through the fall as before, and `MSD_SE_BS_TELESA_V_LAUGH1B` (the SE as
+designed, 155b's envelope bake) played ONCE the tick the fall ends (`_prevFall`). Chuckle mode stays 155's loop through the descent; Off plays nothing.
+
+**Drive 155 run i: 13 / 13** -- C8 156c the rumble and the flutter loop off at the seat, RLT_SET at the DETACH, the chuckle played once there (t669),
+never looped; the rest as 156b. Headless (marker v156-3); build 0 errors.
+
+### 156d -- the intro chuckle's pitch knob; the baker's velocity curve and gate times (feature/sounds, code `45e1b40`)
+
+**Jaysonn:** "i feel like the laugh should be sped up? some points seem like the laugh is too low".
+
+**What the sequence says.** `MSD_SE_BS_TELESA_V_LAUGH1B` is four layer tracks, each a grace note (2 ticks, keys 30-38) into a syllable (200 ticks,
+keys 18-33) twice, the layers 70 ticks apart. Bank 2 program 78's region for keys up to 38 plays the laugh sample (root key 60) at x4, so key 36 is
+the sample's own speed, 33 is 0.84 of it, 25-27 are 0.53-0.6, and the second layer's second syllable, key 18, is 0.35 -- an octave and a half down.
+Each syllable holds a second and fades over the next (SimpleADSR 10 / 600 / 700 / 0 / 1), so three or four sound at once. The pitch arithmetic is
+`JASBankMgr::noteOn`'s (`C5BASE_PITCHTABLE[key + 60 - wave key]` x the region's pitch x the sample's rate / 32000) and checks out against the decomp's
+table; no SE modifier (JALSystem) touches this id; the SE sequence's clock is its own TimeBase 48 / Tempo 120 (96 ticks a second). So the port plays
+the chuckle as deep and as paced as the data has it. Rather than argue with an ear: **`SmsBossTelesa.IntroLaughPitch`** (inspector, 0.5 .. 2, default
+1 = the game's notes), one factor for pitch and pace together, as a tape speed -- 1.25 is a quarter faster and higher; it scales the per-frame flutter
+too.
+
+**The baker, two more of JASBankMgr::noteOn's rules.** (1) A note's volume is instrument x region x **(velocity / 127)²** -- 154 took velocity linear,
+so soft notes (velocity 70-90; 48 of the sounds have one) sat 3-5 dB too loud against the loud ones. (2) A gate note sounds only **duration x gate /
+100** (cmdNoteOn's gate byte -> seqTimeToDspTime -> TChannel::play's countdown -> updatecallLogicalChannel releases its oscillators; a gate that rounds
+under one DSP frame is no gate) while the track waits the whole duration -- the model read the byte and dropped it: FLUDD's ACTION_ON / OFF clicks, the
+sprinkler and the water triggers (gate 40 %) rang two and a half times too long. 51 WAVs re-baked (`diff156d.txt`): SLIP and its three kin, the FLUDD
+clicks and triggers, FRICTION_A / B, WT_DRY_UP, King Boo's DOWN / SPICY_HIT / V_APPEAR / V_LAUGH1 / V_LAUGH1B (its soft syllables a little under its loud
+ones now) and the flutter, the Boo's FIX, the common water hit. The BGM renderer had both rules already (156) and takes the frame rounding too.
+
+**Drive 155 run j: 13 / 13** (marker v156-4); build 0 errors. Tools: `patch_gate156d.py`, `patch_velo156d.py`, `scan_gate156.py`, `patch_laugh156d.py`,
+`patch_boss156d.py` (the PC's SmsBossTelesa.cs).
+
+### 156e -- the sounds back to 156c's (feature/sounds, code `79b4c87`)
+
+**Jaysonn:** "hmm go back to the one before that."
+
+156d had rendered two of `JASBankMgr::noteOn`'s rules into the SE set -- the note volume's (velocity / 127)² and a gate note sounding only its gate
+share -- and 51 WAVs changed, the intro chuckle among them (its soft syllables fell under its loud ones). Jaysonn preferred what he had, so
+`assets/Sms/Sound/Mario/`, `Enemy/` and `SmsMarioSoundTable.cs` are exactly 156c's again (`git checkout 4437366 -- ...`; the local set of record and
+ship tree restored from the 156c bake, byte for byte). The baker keeps both rules behind switches, OFF (`sms_audio.py` `VELOCITY_SQUARED`,
+`GATE_TIMES`), so a future bake reproduces this set; `sms_bgm.py` keeps both for the music, which was judged right with them. The `IntroLaughPitch`
+knob (156d) stays: at 1 it changes nothing. Build 0 errors; no drive (no code moved).
+
+### 157 -- the King Boo REMATCH, part 1: the transition (feature/kingboo-rematch, code `c5e718b`)
+
+**Jaysonn:** "awesome so rember how i said i want a custom fight? ...KINGBOO_REMATCH_gdoc.txt is the desgin doc i have i have anohter AI taking care
+of animations so i want you to work on the transition to the fight following this doc"
+
+The custom fight that follows the roulette fight (the design doc at the project root, `KINGBOO_REMATCH_gdoc.txt`, INTRO 1-6): this pass is the
+way from one fight to the other, on a new branch off `feature/sounds` (it needs the sound work: the laugh, the glass). Nothing of the game's own
+King Boo fight changes unless the knob is on; `KingBooArena.tscn` turns it on.
+
+**The casino's way out** (`assets/Sms/Rematch/SmsRematchExit.cs`, `SmsFloorShatter.cs`, `FloorShatter.gdshader`; `KingBooArena.tscn` gains a
+`RematchExit` child with a `FloorShatter` child, and `Rematch = true` on BossTelesa). `SmsBossTelesa` has a `Rematch` knob (off = the game): when
+he is down and `DownToShineTicks` have run -- the tick the Shine would appear -- `StartRematch()` begins the exit instead of `SpawnShine()` (the
+exit found by export, else a sibling, else the `sms_rematch_exit` group). The exit's FloorShatter takes the three roulette discs (the
+`sms_roulette` group within 60 m), hides each disc's model and puts a copy of its own triangles in its place -- the glb's surfaces re-read, every
+triangle on its own vertices, the disc's own textures and colours through the shader's `albedo_tex` / `use_vertex_color`, so nothing changes to
+the eye -- cut into Voronoi cells about random seeds spread evenly over the disc's area (CellAreaM2, 8 m² a cell, 128 cells a disc at most:
+93 / 126 / 128 on the three; CUSTOM0 carries each cell's pivot and index). Over CrackSeconds (1.4) the cell borders light up as cracks
+spreading from the table's centre to the rim (the two nearest seeds per fragment; `crack_width`, `crack_color` pale blue, `crack_glow` an
+emission), HoldSeconds (0.5) later the table BREAKS: the discs' collision goes (`CollisionLayer = 0`, the trimesh shapes disabled, the roll
+stopped), every cell flies as a rigid shard in the vertex shader -- kicked outward (Kick 2.5 m/s) and up (Pop 1.5), tumbling (Spin 2.5 rad/s),
+falling (Gravity 14), the rim's cells RimDelay (0.18 s) after the centre's -- and fades out from FadeStart (1.4 s) to ShardSeconds (2.4), when the
+shard meshes are freed. MSD_SE_OBJ_GLASS_BREAK plays at the break (baked from the game's bank, `assets/Sms/Sound/Object/`; a new Object folder in
+the sound table). Mario falls through the broken table into the LOAD TRIGGER -- a box TriggerDepth (8 m) under the arena node, TriggerWidth (70)
+across (a position test on Mario, no Area3D) -- the screen fades to black (FadeOutSeconds 0.7) and the arena loads (`ArenaScene`, empty =
+`RematchArena.tscn`); `GameData.RematchFrom` keeps the casino's scene path. FallSeconds (6) is a fail-safe load after the break. The room's
+drum has no floor and its paint runs 13 m under the table: the trigger at 8 m gives about a second of fall among the shards before the fade, and
+the black lands before the paint runs out.
+
+**The arena** (`assets/Sms/Rematch/RematchArena.tscn`): Bouldergeist's planet from Super Mario Galaxy, as the doc asks -- `PoltaBattlePlanet.dae`
+from Jaysonn's Downloads run through Blender 4.2 headless (`tools/projectshine/rematch157/pc/convert_arena.py`: the Collada import, Galaxy's
+centimetres scaled to metres in the vertices, each material's Base Color made texture x Color Attribute so the glTF export writes COLOR_0 and
+Godot's importer multiplies the vertex colours in, the fence (saku) a cut-out) to `models/Sms/Rematch/polta_planet.glb` (234 KB, 864
+triangles, 52.7 m across, the floor's top at 2.3 m; `polta_parts.glb`, the breakable rock set, converted too but not placed -- it sits beside
+the planet in the file, Bouldergeist's to raise). The `_bake.dae` twins (the vertex colours as a second UV set into vertexColors_planet.png)
+were not needed: the plain file carries the colours per vertex. `SmsArenaFloor.cs` (the Arena StaticBody3D) builds one trimesh per mesh at
+start (the glb's transform baked into the triangles, as the discs do), reads TopY / BottomY, and finds the floor under a point with a ray
+(`FloorYUnder`, Mario's body excluded). The Level root has `HasFludd` OFF (the doc: no FLUDD -- Mario arrives without the pack, R and X dead),
+`ShowGoText` off, the pause bar "Casino Delfino / King Boo's Rematch". A near-black violet sky, a cold dim ambient, a thin violet fog, a dim
+blue directional light -- the editor's to change. No edge catch yet: off the planet Mario falls into the void (a later pass).
+
+**The entrance** (`SmsRematchIntro.cs` + `SmsRematchCard`): the scene starts black (the fader set black, Mario held with `SuppressForIntro`,
+King Boo hidden); the two-line card over the black -- "You call that a fight fit for a king?" then "I'll show you a real fight..." under it,
+Delfino at 46 px white with a black shadow on a CanvasLayer at 110 (above the fader's 100), BlackBefore 0.6 / LineFadeIn 0.45 / Line1Hold 1.9 /
+LineGap 0.3 / Line2Hold 2.3 / LinesFadeOut 0.5 / BlackAfter 0.35 (6.8 s in all; A skips it) -- then Mario is revealed FallHeight (22 m) over
+the floor under his marker (`RevealFromIntro` at the marker's x / z and facing; the height from the floor ray) and the screen fades in
+(FadeInSeconds 0.7) on him falling; BooSpawnDelay (0.5 s) after he lands (BooSpawnTimeout 5 s after the reveal at the latest) King Boo spawns
+BooHeight (5.5 m) over the floor at his marker and the fight may start (`FightReady`). After a miss (`GameData.CameFromMiss`) the card is
+skipped: the fall at once. Opened on its own (F6) the same intro runs.
+
+**King Boo for the rematch** (`SmsKingBooRematch.cs`, `KingBooRematch.tscn`): the arena's own actor, apart from the casino's `SmsBossTelesa`
+(the roulette fight's 1600 lines stay as they are). The same model (btelesa.glb at 1 / 74.44) with its shader materials copied per instance
+(`opacity` = GhostOpacity 0.72, white tint, no mask), the casino boss's ChikaFx twinkle and GlowFx quad at `jnt_body` ("a slight glow on him
+throughout": Glow 0.9 x his opacity), the blink loop on his eyes (btelesa_twait's 150-frame table), the clips at the game's rate (one bck frame
+= 1 / 60 s, SmsSmallEnemy's rule). This pass is his ENTRANCE only: `Spawn()` -> `btelesa_appear`, then `btelesa_laugh` with the LONG laugh
+(MSD_SE_BS_TELESA_V_LAUGH1 through his SmsActorSound node; `ActorOf["SmsKingBooRematch"] = "kingboo"`, no slot table), then `btelesa_wait`
+looping while he hovers (HoverBob 0.35 m over 2.4 s) and turns to face Mario (TurnSpeed 3 rad/s). The attacks, the teleports, the three faces,
+the hurt flip and the Boo bombs are later passes; the new animations another hand's.
+
+**Drive 157** (`SmsRematch.Drive.cs`, v157-3, three runs, deleted before the commit): in the casino it waits for his appear, kills him
+(`DriveKill`: spicy, 1 hp, the Die nerve), and watches the exit begin at the Shine's moment with no Shine (C2, 5.3 s after the kill), the
+cracks and the break 1.90 s later with the three discs re-cut (347 cells, 2312 triangles), their collision off and models hidden (C3), Mario
+through the floor and the fade out (C5), the load fully black with RematchFrom set (C6, through the exit's `Loading` signal: the scene change
+takes the old scene out of the tree the same tick); in the arena the card over black with Mario held (C7), the floor's collision (C13), the
+reveal 22 m up and falling with the fade in (C8), no FLUDD (C9), the landing (C10), King Boo's appear / laugh (logged) / wait 5.5 m over the
+floor (C11), the intro done (C12), the screen in (C14). Run k found two things: King Boo's hover bobbed about his ORIGINAL place (the home
+read at `_Ready`, now at `Spawn`), and the arena came in 100x too big (Blender's Collada import keeps the file's centimetres; the vertices are
+scaled now). Run l found the floor ray hitting Mario himself (he waits at his marker; excluded now) and the trigger 1.6 m under the disc faces
+firing 0.27 s after the break (8 m now). Run m: 14 / 14 (the .err carries one benign "1 resources still in use at exit": a Resource
+wrapper not yet collected at the quit).
+
+**Deviations, all knobs:** the game has none of this (the Shine ends the fight): the crack and shatter, the card, the arena, the no-FLUDD
+rematch are the doc's. `Rematch` off on BossTelesa = the game's Shine. The glass break is the game's own object sound (MSD_SE_OBJ_GLASS_BREAK).
+The arena's scale is Galaxy's centimetres as metres (52.7 m across; the roulette table is 67 m): resize the Arena's Model child to taste. No
+music in the arena yet, no way back to the casino, no edge catch.
+
+### 158 -- the King Boo REMATCH, part 2: the Bomb Boos and the spin (feature/kingboo-rematch, code `d4abcd5`)
+
+**Jaysonn:** "ok that was pretty fucking slick., next: the Boo bombs (spawn spots, grab, carry, throw) for this they can spawn anywehrre on the map
+put for play testing purpose lets have them just spawn in the middle also lets make a new button press of X when mario doesnt have fludd on
+where he will do a grounded spin. (make this a new state of grounded spin since we will add speical properties to it)"
+
+The doc's HOW MARIO DEALS DAMAGE: the Bomb Boos (Galaxy's black Boos) are his only weapon; the grounded spin grabs one, it spins over his
+head, a dive drops it, and landing it on King Boo takes a hit point. Three pieces this pass: the SPIN (Mario), the BOMB BOO (the actor and
+its supply), KING BOO'S HIT POINTS.
+
+**The spin** (`assets/Mario.cs`): `MarioState.spin`, a NEW state next to the old `groundSpin` (the stick-rotate + R spin of the pre-SMS port, left as
+it is), so the rematch can give it properties. X without the FLUDD (`!_smsHasFludd`; the pad live; the X key stands in for the pad's X) from the
+old spin's statuses (standing, walking, running, the landings), hands empty of the game's takeables, the cooldown over -> `SmsSpinStart`: the
+body turns SpinTurns (2) full turns over SpinSeconds (0.6) in `SmsSpinFrame` (the armature, as the old spin does it; `ma_spin_p` stands in for the
+spin's own animation, the spin-jump blur rings with it), the stick steers him through it at SpinMoveSpeed (7 m/s) keeping what speed he had,
+A leaves it in a spin jump; SpinCooldown (0.2 s) before the next. Hands empty: the nearest FREE Bomb Boo within BombGrabRadius (2.8 m across,
+under BombGrabHeight 3.5 up) is GRABBED the moment it is in reach. A Boo in hand: the spin THROWS it BombThrowAt (0.12 s) in -- the stick's way
+when held, else his face, at BombThrowSpeed (22 m/s) with BombThrowUp (4 m/s) of rise; a King Boo within BombThrowAssistDeg (35) of the aim
+pulls the throw onto himself (a lob at the throw speed whose rise lands it on his body point under the Boo's gravity: the aim help, for a chase
+camera and a 2.4-m target 18 m off). A grab never throws in the same spin (run a did: grabbed at 0.02 s, thrown at 0.12). The carry (the doc's
+"run and single jump, nothing else"): `_smsBomb` set makes every jump a SINGLE jump (the chain stage is dropped at both decision sites -- the
+landing's A at 3462 and `StartJumpFromLanding`, which run b found), L in the air gives no hip drop, a DIVE (and a belly slide, a rollout, a hip
+drop in flight, a hit, a death, the swim, a talk, a demo, the hangs) DROPS it (`SmsBombTick`), a SPIN JUMP (`SmsLaunch(RotateJump)`) makes the Boo
+spin faster (SpinJumpBoost x2 for 2.5 s). While he carries it his arms take the carry pose (`CARRY_BLEND_PATH`, ma_carry_p over whatever the body
+does -- the two-handed fruit hold stands in for the doc's one-arm blend until that animation comes) and the waist lean is off, as with a fruit.
+Public: `SmsBombHeld`, `SmsSpinning`, `SmsSpinCount`, `SmsSpinTime`, `SmsBombDrop()`, `SmsBombGone(boo)`. Knobs under "SMS Rematch (158)" on his
+inspector: SmsSpinEnabled, SpinSeconds, SpinTurns, SpinMoveSpeed, SpinSteerAccel, SpinCooldown, BombGrabRadius, BombGrabHeight, BombThrowAt,
+BombThrowSpeed, BombThrowUp, BombThrowAssistDeg.
+
+**The Bomb Boo** (`assets/Sms/Rematch/SmsBombBoo.cs`, `BombBoo.tscn`, `BombBoo.gdshader`): `BombTeresa.dae` (the body, 986 triangles) and
+`BombTeresaTongue.dae` from Jaysonn's Downloads through Blender headless as the arena was (`pc/convert_bombboo.py`: centimetres to metres, the
+vertex colours into COLOR_0) -> `models/Sms/Rematch/bomb_boo.glb` (35 KB) + `bomb_boo_tongue.glb` (7 KB). Galaxy's centimetres make the body
+2.5 m wide, 2.1 tall: ModelScale 0.8 (2 m wide, 1.7 tall; Mario is 2.15 m in the port's metres: 160 u / 74.44). The tongue hangs at
+TongueOffset under the body's origin (its glb has it from the origin down). The materials' BodyMat_v (ambient 64 / 64 / 64 / 150: partly
+see-through) is the shader: the BombTeresa texture x the vertex colours x `tint`, `opacity` 0.78, a dark-violet rim (`glow_color`, `glow`) so the
+black body reads against the dark arena, `flash` for the carry's pulse and the throw. Its life: RISING out of the fog (RiseSeconds 0.7, scaling
+up and lifting to HoverHeight), DRIFTING toward Mario at DriftSpeed (1.6 m/s) stopping DriftStopDistance (1.6 m) short, HoverHeight (1.3 m) over
+the floor under it (a ray every eight ticks, Mario's body excluded), bobbing (0.2 m / 1.8 s), facing him (FacesPlusZ: flip if the model's
+face is the other way); ExpireSeconds (0 = never) and it vanishes on its own; CARRIED: over his head (his height + CarryOver + half its own),
+spinning at CarrySpin (360 deg/s; x SpinJumpBoost after his spin jump), a faint pulse; dropped: drifting again, no grab for DropGraceSeconds
+(0.6); THROWN: the flight under ThrowGravity (9), each tick's sweep against King Boo's body point (KingBooHitRadius 2.4) -- a hit BURSTS it on him
+(`SmsKingBooRematch.TakeHit`); a ray against the floor and walls, ThrowSeconds (2.5) or a fall far below the floor burst it for nothing. The
+burst is the port's EnemyDisap puff recoloured violet; the sounds are the small Boo's (MSD_SE_EN_TELESA_APPEAR / FIX / CRUSH / DISAPPEAR through
+an SmsActorSound node, `ActorOf["SmsBombBoo"] = "bombboo"`). Signals: Grabbed, Dropped, Thrown, Burst(hitKingBoo). Static `All`.
+
+**The supply** (`SmsBombBooSpawner.cs`, the arena's `BombBooSpawner` at the centre): from the fight's start (the intro's FightReady; at once with
+no intro, or StartAtOnce) every SpawnInterval (6 s) while fewer than MaxOut (2) are out and King Boo stands: a black foggy spot (a GPUParticles3D
+of dark violet smoke on kemuball3_dark, FogSeconds 1.1) and a Bomb Boo rising out of it. SpawnMode Centre -- this node's point, the middle of
+the arena, for the playtests as Jaysonn asked -- or Random: anywhere within ArenaRadius (18 m) of it, never nearer Mario than MinFromMario (4),
+the floor found under the point by a ray. King Boo's hit CLEARS every Boo on the field (the doc) and pauses the supply ClearPause (2 s); his
+defeat stops it. Knobs: the supply's (FirstDelay, SpawnInterval, FogSeconds, ClearPause, MaxOut, FloorOffset, StartAtOnce, Enabled), the place
+(SpawnMode, ArenaRadius, MinFromMario), the fog (FogColor, FogRadius, FogTexture).
+
+**King Boo's hit points** (`SmsKingBooRematch.cs`): HitPoints (3, the doc). `TakeHit(boo)` while he waits: a point off, the HURT -- the hit clip
+(btelesa_hit, 0.7 s) with HurtTurns (1) full turns about himself (the doc's "flips around in a hurt animation", until its own animation comes),
+the body flashing HurtFlash red through the shader's tint / mask, the damage cry (MSD_SE_BS_TELESA_DAMAGE), OpacityPerHit (0.1) more solid --
+then the wait again; at none left the DOWN: the down clip (btelesa_down, 3.3 s) with the down sound, then he is gone (Defeated). The fight's
+end -- the Shine, a way back to the casino -- is a later pass: for now the arena is quiet once he is gone. Signals Hit(hpLeft), Defeated;
+`Hp`, `HitsTaken`, `CanBeHit` (only while he waits), `IsAlive`.
+
+**Drive 158** (`SmsBomb.Drive.cs`, the arena run on its own, four runs, deleted before the commit): A skips the card; the supply runs from
+FightReady in mode Centre (C1); the first Boo out of the fog at the centre with its two shader materials and the appear sound (C2); drifting
+to Mario at hover height (C3); X -> MarioState.spin, the armature turning, the count (C4); the grab: carried 3.4 m over his feet (C5); A, then A
+on the landing = a SINGLE jump with the Boo in hand (C6, run b caught `StartJumpFromLanding` giving a double); the dive drops it (C7); a second
+spin grabs again -- the nearest free Boo, a new one that had drifted to him (C8); the spin with it THROWS it onto King Boo through the aim help
+(C9); the burst takes a hit point, the field clears, the supply pauses (C10); the hurt over in 0.7 s (C11); three throws and he is down and gone,
+the supply stopped (C12). Run d: 12 / 12, the .err empty (a first run's glb-texture UID warnings went with the second import).
+
+**Deviations, all knobs or stand-ins:** the game has none of this. The spin's clip (ma_spin_p), the carry pose (ma_carry_p, two hands), the hurt
+flip (the hit clip + a turn) and the down are stand-ins for the animations another hand makes. The aim help (BombThrowAssistDeg 35) is mine, 0 =
+pure aim. Boos do not hurt Mario on touch (the doc says nothing of it; Galaxy's do: a knob for a later pass if wanted). The supply spawns at the
+centre for the playtests (Random is there). No HUD for his hit points yet.
+
+### 159 -- the King Boo REMATCH, part 3: the Bomb Boo by the tongue (feature/kingboo-rematch, code `35ae973`)
+
+**Jaysonn:** "ok the bomb boos textures are not right. they are just prueple and see thru. also the animiation blend needs to have one of marios
+arms in the air like hes spiining it around like a lasso. and the bomb boo should have a tounge that mario is holding onto while he spins around
+mario. and while he spins it around mario like that he lets it hit king boo not sending it flinging towards his facing direction"
+
+Galaxy's way, then: Mario holds the Bomb Boo's TONGUE up in one hand and the Boo SWINGS ROUND HIM; he walks it into the target. 158's over-the-head
+spin and throw are gone.
+
+**The look** (`BombBoo.gdshader`, the Boo's Look knobs). What the files hold, read in Blender (`pc/inspect_bombboo.py`): BombTeresa.png is a dark
+maroon body (0.42, 0.05, 0.03) with YELLOW eyes (1, 0.78, 0) and a pink mouth; the vertex colours are all dark (mean 0.18 linear, none over 0.4); the
+material's ambient is 64 / 64 / 64 / 150, its colour registers (0,0,0,-89) / (1023,1023,1023,255) the ghost recipe's -- the stage output doubled.
+158 multiplied texture x vertex colour straight (near black) under a violet rim at 0.9 and drew it at 78 %: a purple see-through silhouette. Now:
+colour = texture x (vertex colour + Ambient 0) x Lift 2 (the recipe's doubling) -- a near-black red body with bright yellow eyes; Opacity 1 (solid;
+Galaxy's own alpha 150 / 255 is a knob away); FaceGlow 0.5 lets the eyes (the texels over 0.45 luminance; the pink mouth stays dark) emit a
+little in the dark arena; the rim is faint (Glow 0.25, a darker violet). The tongue model on the same shader, no face glow. Lift / Ambient
+brighten the body if it reads too black.
+
+**The swing** (`SmsBombBoo.cs`, Carried). The grab takes the TONGUE: the Boo keeps its place and swings round Mario from there -- the radius and
+the height ease from where it was to OrbitRadius (2.8 m) and OrbitOverHand (0.9 m) over his raised hand over OrbitSettleSeconds (0.35) -- at
+OrbitDegPerSec (480: a turn in 0.75 s; his spin jump x SpinJumpBoost 1.7 for 2.5 s), facing in at him (the tongue leads from its mouth to his
+hand), leaning OrbitLeanDeg (25) outward with the swing. The TONGUE model (bomb_boo_tongue.glb: 76.6 cm along its +Z from its root) is re-posed
+every tick from the mouth (TongueOffset in the body's frame) to his hand: its +Z along the line, its length scaled to the distance, its width
+kept; drifting, it hangs from the mouth drooping TongueRestDroopDeg (35). HIT: the Boo's point (with OwnRadius 1 m x ModelScale) inside King
+Boo's body cylinder -- `SmsKingBooRematch.InHitCylinder`: HitRadius 4 m about jnt_body, HitBelow 2.5 under it to HitAbove 4.5 over it (the
+game's body cylinder is 350 u across and 550 tall from 200 under the joint) -- bursts it on him: `TakeHit`, the hurt, the field cleared. Nothing
+is thrown: there is no Thrown phase any more. HoldSeconds (0 = never) bursts a Boo held too long in his hand for nothing, flashing faster
+over its last 2 s (Galaxy's held Bomb Boo blows up on its own; off by default). King Boo waits lower for it: RematchIntro.BooHeight 5.5 -> 4 m,
+his cylinder's bottom at 2.18 m over the floor, where a Boo swung over Mario's head (2.2 m) reaches.
+
+**The lasso arm** (`SmsLassoArm.cs`: a SkeletonModifier3D under his Skeleton3D, as the port's other bone systems are -- SmsWaistLean, SmsBoneRotZ,
+SmsUpperPose, the JiggleBones). Built once at the first grab (`Mario.SmsLassoOn`), after the clip has posed him: the upper arm (jnt_arm_R1; LassoArm
+R or L) is turned by the shortest arc about its own origin so the shoulder-to-elbow line points up -- LassoTilt (0.35) outward, LassoForward (0.2)
+ahead; the side read off the chest-to-shoulder vector, the forward by the right-hand rule, so it holds through every clip and facing -- and
+the forearm (jnt_arm_R2) up and LassoIn (0.2) over the head; the hand is left as the clip has it. The turn is taken in the WORLD (run e aimed
+"up" along the skeleton's own axis: the armature is turned, and the wrist came out at waist height), carried into the skeleton's frame, then
+into the bone's local pose against its parent's global pose and written with SetBonePoseRotation -- the way the port's modifiers write. Weight
+blends in over LassoBlendSeconds (0.15) and out again; the body's own clips -- the run, the jumps, the landings -- play on under it, the other
+arm free. `HandPoint` is the wrist's place in the world read in the same pass (a Skeleton3D restores the clip's poses once the frame is drawn,
+so a read from outside would give the arm down); the Boo's tongue ends there and the swing rides over it. 158's two-hand carry blend
+(ma_carry_p) and the waist-lean cut no longer apply to the Boo. What the pose IS on this Mario: his arms are short next to his head -- the
+shoulder is 1.0 m over his feet and the raised wrist comes to 1.32, his ear, on a 2.15 m body (the clip had it at 0.78) -- so the Boo swings
+0.9 m over the hand, just over his head, the tongue rising to it. The real one-arm animation is the other hand's; this holds until then.
+
+**Mario** (`assets/Mario.cs`): X with a Boo in hand does nothing now (the doc: run and single jump, nothing else) -- the spin cannot start with
+one; the BombThrow* knobs and `SmsBombThrow` are gone, LassoArm / LassoBlendSeconds / LassoTilt / LassoForward / LassoIn take their place in
+"SMS Rematch (158)"; `SmsLassoHand`, `SmsLassoWeight` for the Boo and the drives. The grab, the single jumps, the dive's drop, the spin jump's
+boost as in 158.
+
+**Drive 159** (`SmsBomb.Drive.cs`, the arena run on its own, six runs, deleted before the commit): the Boo out of the fog solid with its tongue
+hanging (C2); the grab by the tongue (C5); the swing watched for 0.7 s standing still -- radius 2.80 both ends, 328 deg turned (480 deg/s),
+the Boo over the hand (C6); the lasso arm at full weight, the arm within 35 deg of straight up (up-dot 0.99), the wrist over the shoulder,
+lifted 0.54 m from the clip (C7); the tongue from the mouth to the hand, 2.33 m, root and tip on their points (C8); X with the Boo in hand: no
+spin, still swung (C9); A on the landing a single jump with the arm up (C10); the dive lets go, the arm down (C11, C12); the second grab and
+the walk into King Boo: the swung Boo bursts on his body 0.3 s in -- the hurt, the field cleared, the hand empty (C13); three swings and he is
+down (C15). Runs e-g found the arm: aimed in the skeleton's frame (e, f), then the hand's height measured against a 2.15-m guess when the
+wrist cannot pass his ear (g: the diagnostics showed the arm straight up, up-dot 0.99); run i 15 / 15 with the arm measured by its direction;
+run j the same with the swing 0.9 m over the hand.
+
+**Deviations, all knobs or stand-ins:** the lasso arm is a procedural pose (the shortest-arc turns), not an animation; the body keeps its clips.
+The Boo's look is the files' own colours through the ghost recipe's doubling with the eyes lit a little (FaceGlow) and a faint rim (Glow): Lift,
+Ambient, Opacity to taste. King Boo's hit cylinder is the game's body cylinder sized to the port's model; BooHeight 4. HoldSeconds off.
+
+### 160 -- the King Boo REMATCH, part 4: the Bomb Boo floats as Sunshine's Boos do (feature/kingboo-rematch, code `4d49169`)
+
+**Jaysonn:** "nice marios arm is a little inside him here is the image how it looks and we should make bomb boo float around and everything just
+like normal boos from mario sunshine. BoobombArmref.ppng.png is the image screen shot"
+
+**The screenshot** (Ref/BooBombArmref.ppng.png) showed three things: the swung Boo PALE GREY, the tongue ending INSIDE Mario's head, and the free Boo
+right -- black, yellow-eyed, its pink tongue hanging. (1) The grey: 159's carried pulse mixed a tenth of white into a near-black body every frame;
+a tenth of white is a mid-grey in sRGB. Gone: no pulse on the plain swing; the spin-jump boost shows a small one (0.06..0.1), the HoldSeconds
+warning a stronger one (0.12..0.24). (2) The arm: Mario's shoulder sits under the brim of a head wider than his shoulders and his arm is 0.33 m
+long, so 159's arm straight up ran through the head, the wrist inside it at his ear. Now the upper arm leans 60 deg OUT (LassoTilt 1.7 = tan 60) and
+a little forward (0.3), the forearm 22 deg out as well (LassoIn -0.4; negative = outward): the shoulder-to-wrist line 43 deg from straight up, the
+wrist 1.23 m up and 0.48 m out from his axis -- beside the head, clear of it. The tongue runs to it from the swinging Boo.
+
+**The float** (`SmsBombBoo.cs`, Drifting; "The float (Sunshine's Boo, telesa.prm)" knobs). TTelesa's numbers as SmsTelesa carries them from the
+shipped /enemy/telesa.prm, on a flyer with no graph: out of the fog it rises and fades in (opacity 0 -> 1 with the scale) to its BASE POINT
+(BaseLiftOverFloor 1.2 m over the floor where it rose -- the game's Boo keeps the height it was placed at); over the base its FLY HEIGHT (50..100 u
+picked at random, risen to at 1 u a tick) and the BOB (FlyAmplitude 50..75 u over FlyFrequency 200..400 ticks a cycle: the height swings a metre
+and a half to two over 3.3..6.7 s), its nose TILTING 10 - 35 cos(phase) degrees with the bob (-25 rising, 45 sinking; eased as SmsTelesa eases
+it). It WANDERS as TNerveWalkerGraphWander does with no graph (SmsSmallEnemy.GoToRandomNextGraphNode): a random goal within WanderRadiusUnits
+(800 u = 10.7 m; 0.3..1 of it) of the base, walkToCurPathNode toward it -- turning TurnSpeed (1..1.5 deg a tick, picked per Boo) and moving
+MarchSpeed (1..1.7 u a tick, 0.8..1.4 m/s) along its face -- reached within ReachedUnits (100), WaitTicks (100) hovering, the next. It HURTS
+Mario on touch (TTelesa::attackToMario: TouchHurts; its attack cylinder TouchRadius 0.9 m across, TouchHeight 1.4 tall, against his damage cylinder
+42 u across, 160 tall; NOT when he is above it -- his feet over the body's middle less 50 u -- so a jump on it is safe) through
+Mario.TakeDamage(EnemyCommon): the knock-down and his 300 ticks of invincibility space the hits; a hurt drops a Boo he carries. SeeksMario (off)
+is 158's drift toward him instead, stopping DriftStopDistance short. A drop puts a new base under where the swing left it and the wander goes on.
+The spawner's note: a Centre spawn now drifts about the middle. The spin's grab, the swing, the hit on King Boo, the dive's drop are 159's.
+
+**Drive 160** (`SmsBomb.Drive.cs`, the arena run on its own, two runs, deleted before the commit): the drive steers Mario now (the stick toward a
+world point in the camera's frame: Lstick_up = the camera's forward). The Boo out of the fog with a Sunshine Boo's numbers picked (C2); seven
+seconds of floating -- the height swinging 1.76 m, the pitch -25..45, the base clear of the floor (C3); the wander -- 6.4 m from its rise, a
+goal reached, waiting at it (C4); Mario walked into it: the touch knocks him down, 8 hp -> 7 (C5); X: the grab (C6); the swing at 2.8 m, 480
+deg/s, over the hand (C7); the arm 43 deg from up, the wrist 0.48 m out (C8); the tongue (C9); a single jump with it (C10); the dive's drop
+with a new base, the arm down (C11, C12); walked into King Boo: the burst, the hit (C13); the hurt over (C14); three and he is down, Mario at
+7 hp (C15). Run k: the first grab's arm was 37 deg with the wrist 0.44 m out (the forearm straighter than wanted: LassoIn -0.15 -> -0.4), and a
+SECOND Boo wandered into Mario mid-carry -- the touch hurt him and dropped the first, as it should: the drive holds the supply to one Boo out for
+its flow (MaxOut, a knob; the game's two stay). Run l: 15 / 15, the .err empty.
+
+**Deviations, all knobs or stand-ins:** the lasso arm's lean (LassoTilt / LassoForward / LassoIn) is a stand-in for the one-arm animation. The
+Bomb Boo's float is TTelesa's (telesa.prm) without the Boo's graph, fade loop, hose stun, block or imitators -- a Bomb Boo has none of those; its
+touch damage is the common enemy profile (the game's Boo's). TouchHurts ON by default ("everything just like normal boos"): off = 158's harmless
+Boo. SeeksMario off. The base stands 1.2 m over the floor where the Boo rose (the Boo keeps it; a drop re-reads the floor under it).
+
+### 161 -- the King Boo REMATCH, part 5: the fist on the tongue (feature/kingboo-rematch, code `7ffdff0`)
+
+**Jaysonn:** "ok lets have it alittle more out and have marios fist closed be the hand model and lets make sure the tounge is positioned more in the
+middle and lets make the tounge radius spin lon[ger]"
+
+**The arm further out** (`Mario.cs` LassoTilt 1.7 -> 2.5, LassoIn -0.4 -> -0.7; `SmsLassoArm.cs` the same defaults): the upper arm 68 deg out and a
+little forward, the forearm 35 deg out; the shoulder-to-wrist line 45 deg from straight up (160: 43), the wrist 1.33 m up and 0.60 m out from his
+axis (160: 0.48) -- well clear of the head.
+
+**The fist** (`Mario.cs`): two hand poses of their own, LassoR / LassoL -- the lasso side's CLOSED FIST model (the scene's RightHandClosed /
+LeftHandClosed, ma_hnd3) shown and its open hand hidden, the OTHER hand as the clip has it (open) -- picked by SmsHandPose while a Bomb Boo is
+held (ahead of the clip's hand column, after the cap's WithHat). ApplyHandPose knows them: the free side's open albedo stays, the lasso side's
+fist is visible.
+
+**The tongue in the middle** -- both ends. (1) The MOUTH: measured on the model (`pc/mouth161.py`: each polygon's UV centre sampled on BombTeresa.png,
+the pink polygons the mouth, the yellow the eyes). The body is 2.5 m wide, 1.8 tall and 2.1 deep about its origin with the face on its +Z side; the
+mouth's centre is at (0, -0.60, 0.86) in model metres, the eyes at (0, 0.15, 0.93) -- the tongue's root was at (0, -0.25, 1.0), a third of a metre
+too high, in the eyes. TongueOffset is (0, -0.6, 0.85) now: the root in the middle of the mouth, a little inside the lip. (2) The FIST: the tongue
+ends at the GRIP -- the closed hand model's mesh centre, carried into the hand bone's frame (`Mario.SmsLassoSetGrip`: the RightHandBone
+BoneAttachment3D rides the M_hand1_R bone; attachment-to-mesh is their local transforms, so the global pair at any moment gives the relation
+exactly; `SmsLassoArm.SetGrip(bone, local)`), 16.5 cm from the wrist joint, where 159-160 ended it. `SmsLassoArm.HandPoint` is the grip now,
+`WristPoint` the joint.
+
+**The swing longer** (`SmsBombBoo.cs`): OrbitRadius 2.8 -> 3.6 m. The swung Boo's reach into King Boo grows with it.
+
+**Drive 161** (`SmsBomb.Drive.cs`, two runs, deleted before the commit): 160's flow with the fist shown and the other hidden (C9b), the grip off the
+wrist and the tongue ending in it (C9), the root in the mouth in the Boo's own frame (run n read its world height against the offset: the 25-deg
+outward lean of the swing tips the face up, -0.15 m where the offset is -0.48 -- the check, not the root), the arm 45 deg / 0.60 m out (C8), the
+swing at 3.6 m (C7), the fist gone again after the drop (C12). Run o: 16 / 16.
+
+**Deviations, all knobs:** LassoTilt / LassoForward / LassoIn; TongueOffset; OrbitRadius. The grip is the closed hand model's centre -- another
+character's fist model gives its own.
+
+### 162 -- the King Boo REMATCH, part 6: the teleports and the Lick (feature/kingboo-rematch, code `0b7a612`)
+
+**Jaysonn:** "Next: King Boo's teleports and the Lick attack for this we will reuse some animations from the king boo. we wont use the new model since
+its hard to animate and i feel this will keep the same old feel we can use betelsa_roll to use as a lick attack or we can use that as a base and
+chnage where the tounge is to make it look more like an attack"
+
+**The doc** (KINGBOO_REMATCH_gdoc.txt): quick and light, teleports between spots, does not walk; the Lick: "He teleports directly in front of Mario
+and licks, with half a second of wind-up before it lands. The wind-up is the whole tell and a jump clears it"; the plain hit; the pace: short gaps
+that shorten per hit.
+
+**The clips, measured** (`glb162/tongue_track.py`: btelesa.glb's animations read straight from the file, the tongue joints' places per bck frame):
+no casino clip is a lunge. btelesa_roll (139 frames) is the ROULETTE SPIN -- the body rears up 2.3 m by frame 30 with the tongue whipped up
+overhead (10 m), plunges 2 m under its height by frame 60 and is back by 80 while the tongue whirls round; btelesa_lick licks the lips; btelesa_spit
+rears the head back and thrusts it; btelesa_hide hops 6 m up then dives 17 m down (the casino's hide under the roulette); btelesa_appear shoots up
+from 17 m under. The tongue chain jnt_sita_1 -> 2 -> 3 -> 4 -> eff_sita is 7.8 m long from a root 2.2 m in front of the body joint.
+
+**The Lick = the roll clip for the body, the TONGUE CHANGED** (`SmsTongueAim.cs`, new): a SkeletonModifier3D under his Skeleton3D, as Mario's lasso
+arm is, that after the clip has posed him bends the tongue chain onto a point in the world -- a FABRIK pass with the clip's own segment lengths
+(the tip lands on the mark when it is within reach, the tongue curls on the way; out of reach it points straight at it), then each joint turned by
+the shortest arc so its child lies on the chain. Weight blends in over the snap and out over the pull back; the joints' places after the pose are
+read in the same pass for the hit.
+
+**His moves** (`SmsKingBooRematch.cs`, phases Vanish / Arrive / Lick beside the old ones): while he waits a GAP runs down -- GapAtStart 3.5 s with
+all his hit points to GapAtLastHit 1.8 at his last, give or take GapJitter 0.6; the first move FirstAttackDelay 3 s into the fight -- then a move.
+He VANISHES: the hide clip (its hop up) under a fade of TeleportOutSeconds 0.4 with MSD_SE_BS_TELESA_DISAPPEAR; and ARRIVES: a fade in of
+TeleportInSeconds 0.3, settling down TeleportInDrop 1.2 m, the appear voice, facing Mario -- usually LickDistance 6 m in front of Mario along his
+face (his body joint is 4.3 m behind his own face, so his face comes about 1.7 m from Mario), LickHeight 3 m over the floor, for the LICK; by
+RepositionChance 0.3 just another spot (within three quarters of the floor's radius of its middle, SpotMinFromMario 7 to SpotMaxFromMario 16 m from
+Mario) and a half gap. The lick: the roll clip (LickClip, LickClipSpeed 1); at LickStrikeFrame 30 -- the half second, the tongue overhead, V_ROLL
+sounded at the start -- the tongue SNAPS (LickSnapSeconds 0.12, MSD_SE_BS_TELESA_LICK) onto the mark: the floor under Mario + LickAimUp 0.3, where he
+is at that moment; holds LickHoldSeconds 0.15; pulls back over LickRetractSeconds 0.3 under the clip's tail, which is cut at LickEndFrame 80 for the
+wait (the body is back at its height by then; BodyMinOverFloor 2.6 lifts the node through the plunge so the body never dips into the floor);
+AfterLickSeconds 0.4 later he vanishes to another spot and the gap runs again. THE HIT, through the snap and the hold, once per lick: Mario within
+LickHitRadius 1.2 m of the mark, his feet lower than LickClearHeight 0.8 m over its floor, the tongue's tip come within LickTipSlack 1 m of the mark
+(out of reach = a miss) -> `Mario.TakeDamage` with the common enemy profile: the plain hit, a point of HP, the knockdown. A jump at the tell clears
+it (his held jump is 3.4 m; a tap's hop 1.4 m -- in run p the hop came down to 0.7 m during the hold and was licked). He can be hit by a swung Bomb
+Boo while he waits AND through the lick (the hit breaks the lick off: the hurt as before, the tongue let go); not between spots. Signals Teleported,
+LickStarted, Licked(hit); the drives read LickStage, the counts, the gap, the spots. `SmsArenaFloor.cs`: Centre / Radius from the vertices (the
+arena is 26 m across) for the spots.
+
+**Drive 162** (`SmsKingBoo.Drive.cs`, deleted before the commit): the arena run on its own, the Bomb Boo supply stopped for the flow. The first move
+at 3.0 s (C2), the fade to 0 and 12 m moved (C3), the lick's spot 6.0 m ahead at 2.9 m over the floor (C4), the snap at 0.52 s (C5), the five joints
+aimed with 9.5 m of reach and the tip 0.55 m from a standing Mario's chest (C6), the hit: HP 8 -> 7, hurt (C7), away to a spot 9 m from Mario at the
+hover height 1.4 s after the lick (C8), the next lick JUMPED over -- a miss, no HP lost (C9), a hit while he waits (C10) and the gap after it 2.07 s
+(C11), a hit mid-lick breaking it off (C12), the third hit: down and gone, no more moves (C13-14). Run q: 14 / 14. The .err's only line is Godot's
+"1 resources still in use at exit" after the drive's Quit.
+
+**Deviations, all knobs** (KingBooRematch.tscn's "The fight (162)" group): the lick is the roll clip's rear-up with the tongue re-aimed, not a lunge
+clip -- the body stays the clip's (btelesa_spit is the other base: LickClip "btelesa_spit", LickStrikeFrame 40, LickEndFrame 99); the arrival is a fade
+with the wait clip, not the appear clip (its 11-m bounce is the entrance's); he faces Mario through the wind-up and holds still from the snap;
+AttacksOn off gives 161's waiting boss. The other attacks (Boolossus Smash, Ghost Lightning, Breath, Fireballs, Ghost Wind), the faces, the HUD and
+the fight's end are later passes.
+
+### 163 -- the King Boo REMATCH, part 7: the Lick's tongue is the whip itself, a bit longer (feature/kingboo-rematch, code `b479640`)
+
+**Jaysonn:** "yeah that tounge aim i dont think looks very good if anything we just make the tounge stick out more in general not much but a bit.
+right now when attacking the tounge kinda looks weird and doesnt give a wet tounge whip very."
+
+**Out:** 162's FABRIK aim of the tongue onto Mario (`SmsTongueAim.cs` removed, with its snap / hold / retract / mark knobs). A straight tongue bent onto
+a point read as a stick, not a lick.
+
+**In: the roll clip's own whirl as the whip.** Measured again frame by frame (`glb162/tongue_track.py`): after the rear-up (frames 0-30, the tongue
+overhead) the tongue sweeps across the FRONT of him from his left to his right over frames 48-66 -- the tip 9 m out, crossing straight ahead at frame
+57, descending as it goes (5.7 m under the body origin straight ahead, 6.4 m at its lowest at frame 62) -- at some 50 m/s. That is the wet whip.
+`SmsTongueStretch.cs` (new): a SkeletonModifier3D under his skeleton that scales each tongue joint's pose position by TongueStretch (1.15: every
+segment a bit longer, the root a bit further out of the mouth -- "not much but a bit"), blended in from the entrance; the joints' places after the
+pose are read in the same pass for the hit.
+
+**The hit is the whip's geometry** (`SmsKingBooRematch.cs`): over the clip frames the tongue crosses the front (LickHitFromFrame 50 to LickHitToFrame
+66, MSD_SE_BS_TELESA_LICK at the window's start) any tongue joint, or the point between two, inside Mario's damage cylinder (42 u across, 130 u tall
+from his feet) grown by LickThickness 0.35 is the plain hit -- `Mario.TakeDamage`, the common enemy profile, once per lick. The clip runs at
+LickClipSpeed 1.5, so the whip comes through 0.56 s into the lick: the doc's half second of wind-up. The spot re-set so the whip's TIP skims the floor
+through Mario and nothing of the tongue goes into the floor: LickDistance 8.7 m (the tip's forward reach at the crossing), LickHeight 6.4 m (the
+tip's lowest point under the body origin); the shaft behind the tip passes 2.8 m up. Lower, and the tongue comes through higher up Mario but its tip
+digs into the floor to his right. The lick's stages for the drives: 0 wind-up, 1 the whip live, 2 the clip's tail (cut at LickEndFrame 80), 3 the
+wait before he vanishes. A hit mid-lick still breaks the lick off; the teleports, the gaps, the spots are 162's.
+
+**Drive 163** (`SmsKingBoo.Drive.cs`, deleted before the commit; run r, 15 / 15): the stretch (the chain 9.15 m in the wait = 7.96 x 1.15, C1b), the
+whip live 0.58 s in (C5), five joints with 11.3 m of reach through a standing Mario -- the closest tongue point 0.48 m from his middle, the hit 1.57 m
+over his feet, HP 8 -> 7, hurt (C6-7), a held jump (3.4 m) clearing it with the closest point 1.65 m off (C9), a hit mid-whip breaking the lick off
+(C12), the rest as 162. The .err: Godot's "resources still in use at exit" after the drive's Quit, as before.
+
+**Deviations, all knobs:** the whip is whatever the clip does -- it comes through Mario's upper body straight ahead (the shaft) with the tip at the
+floor beyond him; Mario off to his left meets it higher, to his right lower. TongueStretch 1.15 applies in every clip (the idle tongue hangs a bit
+longer too). LickClipSpeed 1.5 for the half-second tell (1 = the clip's own pace, the whip at 0.85 s).
+
+### 164 -- the King Boo REMATCH, part 8: the BOOLOSSUS SMASH (feature/kingboo-rematch, code `2e5a532`)
+
+**Jaysonn:** "yeah thats looking good! next lets do the, Boolossus Smash next i have some models in the downloads folder the doc listed and you can start
+on that"
+
+**The doc** (attack 2): "Crown glows white. A Boolossus falls from above Mario and tries to slam down on him. On landing it splits into 15 Boos that spread
+out as a shockwave, then vanish after one second." The plain hit for both the slam and the Boos.
+
+**The models** (`models/Sms/Rematch/`, Blender headless, `ps157/convert_boolossus.py`): Boolossus.obj + .mtl + Textures/telesa2_0..5.png -> `boolossus.glb`
+-- 550 vertices, 1.07 m across at scale 1, the bottom at its origin; five of the six textures are 8x8 colour swatches (a pale blue-white body (210, 239,
+246), yellow eyes, a red tongue, pink cheeks, white teeth) and the face sheet 64x64; no vertex colours, no alpha, as the doc warned. Teresa.dae (the plain
+Boo, Galaxy's centimetres x 0.01, its vertex colours kept as the Bomb Boo's were) -> `boo.glb`, 2.5 m across. Godot pulled the textures out of the glbs
+on import (boolossus_telesa2_*.png, boo_teresa.png). `GhostBoo.gdshader` (new): the white ghosts' look -- texture x (vertex colour + `ambient`) x `lift`
+when the mesh has vertex colours (the Boo, lift 1.8 -- the TEV recipe's doubling), else texture x `lift` (the Boolossus, 1); `opacity` 0.75 (King Boo's
+0.72), a soft blue-white rim (`glow`), a `flash`. The doc's TEV steps for the Boo (indirect texturing through IndDummy / TeresaInd4) are not reproduced:
+the Boos are on screen for a second.
+
+**The Boolossus** (`SmsBoolossus.cs`, `Boolossus.tscn`; the 15 Boos are `SmsWaveBoo` in the same file, made in code): King Boo makes one over Mario and
+it runs on its own. It APPEARS DropHeight 16 m over the floor under Mario (a FadeInSeconds 0.25 fade, MSD_SE_EN_TELESA_APPEAR), facing the camera's side
+(FacesPlusZ: the model's face is on its -Z); HANGS HangSeconds 0.45 drifting after Mario at TrackSpeed 6 m/s with its SHADOW on the floor under it (a dark
+quad, ShadowOpacity 0.55, growing from 45 % to ShadowScale 1.1 x the body radius as it falls -- the tell); FALLS under SmashGravity 30 (1.03 s from 16 m;
+the game's gravity is 19); LANDS -- the roulette's thud (MSD_SE_BS_TELESA_RLT_DOWN) and the Boo crush: Mario within the body (BodyRadius 0 = the model's
+half width x ModelScale 5.5 = 2.94 m; BodyHitHeight 5) takes the plain hit; the Boolossus is gone in a flash and a squash over 0.15 s and WaveCount 15
+Boos stand in a ring at WaveStartRadius (0 = the body's radius), WaveHeight 0.9 over the floor, each riding straight outward along its own line at
+WaveSpeed 9 m/s (the ring is 12 m across at the end) for WaveSeconds 1, fading over WaveFadeSeconds 0.25 (MSD_SE_EN_TELESA_DISAPPEAR); a Boo through
+Mario's damage cylinder (BooRadius 1.1 -- the model's own 0.7 would leave 1 m gaps at 8 m; fifteen 1.1-m Boos close the ring out to about 8 m, gappy
+beyond: the far wave can be stood through) is the plain hit, once per Boo; a jump clears the ring (its top is 1.5 m up). Signals Landed(hit), Finished;
+the node frees itself when the Boos are gone. Static lists All / Boos for the drives.
+
+**King Boo** (`SmsKingBooRematch.cs`): a move is one of three (the doc's near-random pick): a hop to another spot by RepositionChance 0.3, else an
+attack -- a SMASH by SmashChance 0.5 (SmashOn, the scene loaded), else the lick. The smash is made where he stands: the laugh clip (SmashClip) with
+MSD_SE_BS_TELESA_V_LAUGH2, his CROWN pulsing from its yellow to SmashCrownColor (white) at CrownPulseHz 6 through SmashTellSeconds 0.6 -- the crown
+material's colour register `crown_c0` (the copy per instance), the tell -- then the Boolossus scene (SmashScene, Boolossus.tscn) is put over Mario
+(the floor under him probed) and runs on its own; the crown holds white while he watches SmashWatchSeconds 1 more, then yellow again and the wait
+with the next gap. A swung Bomb Boo hits him through the tell (the smash is called off, the crown yellow; a Boolossus already out carries on).
+Signals SmashStarted, Smashed(hit); read-outs SmashesMade / SmashHits / Boolossus / CrownColorNow / LastMove.
+
+**Drive 164** (`SmsKingBoo.Drive.cs`, deleted before the commit; five runs, s-w; run w 14 / 14, every move a smash): the first move a smash where he
+stands with the laugh clip (C2); the crown's blue channel up to 0.99 through the tell, the Boolossus 0.62 s in at 16.00 m over Mario's spot (C3); the hang,
+the fall accelerating to 30.8 m/s, 1.04 s, landing 0.19 m from a standing Mario (C4) -- the plain hit, HP 8 -> 7, hurt (C5); 15 Boos in a ring at 2.94 m,
+0.90 m up (C6), at 7.35 m half a second on (C7), gone at 1.03 s with the Boolossus freed (C8), King Boo back in the wait, the crown yellow (C9); a Mario
+who ran across the arena is missed by the slam, 7.2 m from it (C10), and two adjacent Boos of the ring run through him standing there, HP -1 (C11); a
+held jump over the ring, 3.4 m high, clears it (C12); a hit through the tell takes a point and calls the smash off, no Boolossus (C13); the end (C14).
+The run's lessons: the Boolossus hangs straight over Mario, so "run away from it" has no direction (the drive crosses the arena through its middle); run
+13 m and the ring never reaches you; stand 8 m out with 0.7-m Boos and you may stand in a gap.
+
+**Deviations, all knobs:** the Boolossus's size (ModelScale 5.5 = 6 m across, about two Marios tall; King Boo is 9 m), height, hang, gravity and the
+wave's numbers are mine -- the doc gives only "15 Boos" and "one second"; the Boo hit radius 1.1 over the model's 0.7 so the ring is closed near its
+start; the crown glow is the colour register pulsed, not a bloom; the laugh clip as the summon pose; the Boolossus faces the camera, not King Boo.
+
+### 165 -- the King Boo REMATCH, part 9: three Boolossi DIVE in, with effects; the Boos white; the crown GLOWS the attack's colour (feature/kingboo-rematch, code `43fbcb8`)
+
+**Jaysonn:** "ok nice but the texutres of boos flying out have the problem bomb boos have. and i wanna see boolouses dive down into the arena and have
+maybe 3 of them happen not just one. and i want some effects on it also. also king boos crown should glow the color listed in the doc to show thats the
+attack hes using."
+
+**The Boos' look** (`SmsBoolossus.cs`, SmsWaveBoo): the mechanism, read from boo.glb (`glb162/vcol_stats.py`): its COLOR_0 is dark blue -- mean 0.10 /
+0.12 / 0.16 linear, 82 % of the vertices under 0.25 (the hotel Boo's TEV recipe doubles the stage and lerps the vertex alpha; the plain multiply does
+not) -- so (vertex + 0.35) x 1.8 tinted the white sheet blue-grey, and under the 0.75 screen mix over the violet arena that is the Bomb Boos' old "purple
+and see-through". Now: WaveBooOpacity 1 (solid) and the vertex colours left out (BooVertexColors off; BooLift 1) -- the white sheet as it is, as the Bomb
+Boo fix did. The Boolossus keeps the ghost's mix at Opacity 0.75 (its textures are flat swatches; it read fine).
+
+**The DIVE** (`SmsBoolossus.cs`, the Hang / Fall phases replaced by Dive): a Boolossus appears DiveHeight 24 m over the floor and DiveDistance 20 m out
+from Mario along an approach direction King Boo gives it (FadeInSeconds 0.2, an appear puff, MSD_SE_EN_TELESA_APPEAR) and dives: it falls under
+SmashGravity 30 from DiveStartSpeed 6 m/s, and every tick its flat velocity is set to (target - position) / (time left to the floor at the fall's own
+pace), capped at MaxDiveSpeed 45 -- so it lands exactly on the TARGET whatever the target does. The target follows Mario at TrackSpeed 6 m/s until
+LockSeconds 0.6 before the landing, then holds: the dodge window (Mario runs at about 9 m/s, so 0.6 s is 5 m -- past the body's 2.94 + 0.56 m). The
+shadow sits under the target and grows as the landing nears (the tell). The body leans into the dive (DiveTilt 0.8 of the velocity's direction, 51 deg
+at full speed; upright again on the floor, facing the camera's side) and trails ghost wisps. A 24-m dive at gravity 30 from 6 m/s is 1.08 s; 20 m out
+is 18.8 m/s flat. `Begin(mario, floorY, approachDir)`; the 164 `Begin(mario, floorY)` still works (from Mario's far side).
+
+**THREE of them** (`SmsKingBooRematch.cs`): SmashCount 3, SmashStagger 0.5 s apart (0.6, 1.1, 1.6 s into the smash), their approaches SmashSpreadDeg 120
+apart about the first -- from where King Boo stands when SmashFromKingBoo (on), else a random first; the laugh clip is looped until the last is out
+(it is 1.48 s; three launches end at 1.6); SmashWatchSeconds 1 after the last, then the wait and the gap. Read-outs SmashLaunchedCount / LastApproachDir.
+
+**The EFFECTS** (`SmsSmashFx`, `SmsGhostRing`, in `SmsBoolossus.cs`, built in code from the port's Fx textures `assets/Sms/Fx/tex/`):
+- the dive's wisp TRAIL: a GPUParticles3D child (56 puffs, 0.75 s, radgrad additive, TrailColor pale blue-white), its puffs left in the world where they
+  were shed (LocalCoords off), rising a little; on from the appear, off at the landing;
+- the landing's RING of light (SmsGhostRing: a flat quad of hamonring3_flat -- the port's white ring with its alpha -- additive, RingColor, from the body's
+  radius to RingGrow 3.5 radii over RingSeconds 0.5, fast out and slowing, fading; it frees itself);
+- the landing's SMOKE (a one-shot GPUParticles3D: SmokeCount 36 puffs of kemuball3 in SmokeColor, bursting out along the floor from a ring at the
+  body's edge at 7-13 m/s, braking hard, rising a little, 0.9 s; it frees itself when its puffs are gone);
+- the CAMERA SHAKE (the port's SmsCameraShake.Current, the hip drop's shake x LandShake 1; 0 = none);
+- the APPEAR PUFF and each Boo's VANISH PUFF (the port's EnemyDisap.tscn burst -- the small enemies' blue-grey smoke and glow -- x the body's size,
+  its glow tinted PuffTint; 3 + 45 per smash).
+  Counters RingsMade / SmokesMade / PuffsMade and ShakesStarted for the drives.
+
+**The CROWN GLOW** (`SmsKingBooRematch.cs`; `assets/Sms/Enemy/BossTelesa/BossTelesaToon.gdshaderinc`): the doc's colours -- the Lick none, the Smash
+white (the later attacks: red, frosty blue, red, pink). 164 pulsed the crown's colour register alone, which the crown shader halves and mixes with the
+sheet and the sphere map: too subtle to read as a glow. Now three things at once, `SetCrownGlow(color, k)`: a LIGHT at the crown joint (jnt_crown;
+`CrownGlowFx`, an additive camera-facing quad of the port's radial gradient, CrownGlowSize 3.2 m, CrownGlowStrength 1.2, drawn through the crown), the
+crown shader's own glow term (two new uniforms in the shared include, `crown_glow` and `crown_glow_k`, added into the crown's last stage; 0 = the
+casino's crown exactly as it was -- the casino's BossTelesa reads the same include) and the colour register toward the colour. Through the tell it
+pulses at CrownPulseHz 6 between 0.35 and 1, holds at 1 while the Boolossi launch, and goes dark at the end, at a hit (the smash called off) and at
+the entrance. Read-outs CrownGlowK / CrownGlowColor / CrownGlowShown / CrownPoint.
+
+**Drive 165** (`SmsKingBoo.Drive.cs`, deleted before the commit; runs x-y; run y 17 / 17): the crown's light shown and k 1.00 in white, the register
+(1, 1, 1) through the tell (C3); three Boolossi at 0.63 / +0.50 / +0.50 s (C4), 20.00 m out, 24.00 m up, 120 and 120 deg apart (C5); the first's dive
+-- flat 18.8 m/s, down to 38.3 m/s accelerating, a 51-deg lean, 1.08 s (C6) -- the lock 0.58 s before the landing and the landing 0.00 m from the locked
+target (C7); the slam on a standing Mario, HP 8 -> 7, hurt (C8); the trail on then off, 3 appear puffs, the ring 2.94 -> 9.41 m, the smoke, one shake
+(C9); 15 solid white Boos (opacity 1.00, no vertex colours) in a ring at 2.94 m, 0.90 m up (C10); all three down, 45 Boos gone in 48 puffs, 3 rings, 3
+smokes (C11); King Boo back in the wait, the crown dark (C12); with one Boolossus: a Mario who ran is missed, 7.3 m off, the target locked behind him
+(C13), and two Boos of the ring run through him standing (C14); a held jump over the ring clears it (C15); a hit through the tell (k 0.36) takes a point
+and calls the smash off, the crown dark, no Boolossus (C16); the end (C17). Run x's one fail was the drive's: Mario ran 10 m past the landing, beyond the
+closed ring (the 164 finding); he stops 5.5 m from the locked target now. Run x's .err also had Godot's "8 ObjectDB instances leaked at exit" once
+(the drive held freed Boolossi); run y's .err is empty.
+
+**Deviations, all knobs:** the doc says "falls from above Mario"; Jaysonn asked to see them dive -- so they come in from 20 m out and 24 m up at a 50-deg
+dive, three of them (the doc: one). The second and third target where Mario is when each launches and track him until their own locks, so a Mario
+knocked down by the first is under the others too (his invincibility holds). The approach spread is 120 deg about King Boo's own direction. The effects
+are mine (the doc names none): their colours, sizes and counts are knobs on Boolossus.tscn ("The effects (165)"). The crown's glow is a light plus the
+shader term, not a bloom pass (the arena's environment has no glow); turning glow on in RematchArena.tscn's Environment would make the white crown and
+the rings bloom.
+
+### 165b -- the King Boo REMATCH, part 9b: the Boolossus faces its dive, the Boos are the port's own, the crown SHINES (feature/kingboo-rematch, code `1bace54`)
+
+**Jaysonn:** "ok boolouses is facing the wrong way but thats the right idea! the boos coming out from him tho i thing still look wrong. and the crown glow
+should be like a shinny glow not like a light bulb glow should be like a good indicator im activating this abibilty! and casting booloues attack"
+
+**Seen, not guessed.** The headless drives cannot show a look, so the drive got a SCREENSHOT mode: `SMS_SHOT=1` picks `SmsShotDrive`, which runs the arena
+in a WINDOW (run_window.ps1: run_bounded.ps1 without --headless, 1280x720; started in the logged-on desktop session with `schtasks /create ... /it`),
+forces the smash, moves a camera of its own in close and saves PNGs (`Viewport.GetTexture().GetImage().SavePng`) of the crown through the tell, King Boo
+from Mario's side, the Boolossus mid-dive from the side and from the game camera, the landing, the Boos spreading, a Boo at eye level, the game's view.
+Three rounds (a, c, d; b lost its scripts to the editor's own rebuild replacing the DLL under it). The helpers live in ps157/ (run_window.ps1,
+run_shot165.bat, sched_interactive.ps1 unused); the PNGs are not committed.
+
+**What the first round showed** (shots165a): the wave Boos white with a big RED CAP over the top and back of the head; the diving Boolossus a translucent
+lavender blob from the side (white from the front); the landing a blown-out white blot; the crown a soft white ball of light behind it -- the bulb.
+
+**The Boos** (`SmsBoolossus.cs`, SmsWaveBoo): the red cap's mechanism, read from boo.glb and Teresa.dae: the face sheet teresa.0.png is 256 x 128 with
+the TONGUE in a 32-px strip at its left edge and HALF a face (one eye, the mouth) at its right; the body's UVs run from u 0 to 3 -- the BMD's GX mirror
+wrap mirrored the half face into a whole one and folded the back onto white, and the .dae export dropped the wrap mode. Under Godot's repeat, the back's
+u 1.01..1.5 wrapped into the tongue strip; and 122 top-of-head vertices sit at u 0..0.1 in the strip outright -- the real material must carry a texture
+matrix the export lost too. Rather than guess it: the port already HAS the hotel Boo (`models/Eniemes/Telesa/telesa.glb`, 1.84 m across at 0.013434, its
+materials bound to assets/Sms/Enemy/Telesa/TelesaBody / Eye / Kiba / Mouth.tres on TelesaToon.gdshader, `fade` 0..1, the clips telesa_wait etc.) -- the
+Sunshine Boo as SmsTelesa draws it. The wave Boos are that now: the glb instanced at BooModelScale 0.013434 x WaveBooScale 1, its four ShaderMaterials
+copied per Boo (the ghost shader only for another scene's StandardMaterial3D surfaces), `fade` = WaveBooOpacity 1 and down to 0 over the last
+WaveFadeSeconds, the wait clip playing from a random frame, facing outward (+Z: the eyes' centroid at z +45 of the body's -7). boo.glb, boo_teresa.png
+and their .import files are REMOVED from the repo. The second round showed the ring of real Boos, sleepy blue eyes, fangs, red tongues, coming at the
+camera.
+
+**The Boolossus** (`SmsBoolossus.cs`, `GhostBoo.gdshader`): the face is on +Z (Boolossus.obj: the eyes, teeth, tongue and cheeks at +0.3..+0.4 z of the
+body's middle; FacesPlusZ on) -- shot 4 shows it diving face first at Mario, tongue out. The shader UNSHADED now, as the port's Boos are (TelesaToon): under
+the arena's violet ambient (0.45, 0.4, 0.65 x 0.7) the lambert body read lavender from every side but the sun's; a soft shade of its own (shade_min 0.72
+to 1 by the normal against a light from the camera's upper left) keeps the round body readable; Opacity 0.75 -> 0.9. The landing smoke: a mix blend and
+24 puffs at alpha 0.5 (36 additive ones piled up to a white blot); the ring stays additive.
+
+**The crown** (`SmsKingBooRematch.cs`, `BossTelesaToon.gdshaderinc`): the halo quad is off by default (CrownGlowSize 0 -- in shots a and c it sat at the
+crown's base as a white ball, the bulb). Instead the crown SHINES: the shader's crown_glow term is a sheen -- the sphere map (N_btelesa_env2) sampled at
+an offset that slides with TIME while the crown is lit (sin 7.3 / cos 5.1 x 0.22), x 2.2, plus a rim at the silhouette (1 - |view z|)^2 x 1.3, plus 0.3,
+all in the attack's colour, x crown_glow_k -- and the crown's `opacity` goes to 1 while it shines (the ghost mix of 0.72 had capped it at dim: a crown can
+never be brighter than its mix with a black sky). Sparkles: the twinkle stars (ChikaFx duplicated, its process material copied) -- 36, scale 0.4-0.95,
+rising at 1.5-4 m/s from a 1.5-m sphere about the crown's middle (CrownFxLift 1.2 m over jnt_crown, which is the crown's base), in the colour. The
+rhythm: an activation FLASH (CrownFlashSeconds 0.15 at k 1.8, white-hot) then the pulse between 0.5 and 1 at CrownPulseHz 6 quickening to x2 by the end
+of the tell, a 0.1-s flash at each Boolossus's launch, held pulsing through the launches, dark at the end / at a hit / at the entrance. CrownShine (1)
+scales the whole. Shot d-2 from Mario's side: a bright white-gold crown with pink gems and sparkles over his head against the black sky -- the indicator.
+
+**Drive 165 v165-5** (`SmsKingBoo.Drive.cs`, deleted before the commit; run z2, 17 / 17): the hotel Boos' four TelesaToon materials copied, fade 1.00, the
+clip playing (C10); the flash (the shine to 1.80), the pulse to 1.00 in white, the register (1, 1, 1), the sparkles on, no halo (C3); the crown dark, the
+sparkles off, the register yellow in the wait (C12) and after a hit through the tell (C16); the rest as 165.
+
+**Deviations, all knobs:** the Boos are the port's Sunshine Boo, not the doc's Galaxy Teresa (the same character; the doc's file lost its wrap mode); the
+crown's shine is the shader's sheen plus sparkles, no bloom pass (the arena has none). Knobs: KingBoo's "The fight (164)" (CrownFlashSeconds,
+CrownPulseQuicken, CrownShine, CrownSparkles, CrownFxLift, CrownGlowSize / Strength for a halo after all); Boolossus.tscn's Opacity, SmokeColor /
+SmokeCount, WaveBooScale, WaveBooOpacity, BooClip.
+
+### 166 -- the King Boo REMATCH, part 10: GHOST LIGHTNING (feature/kingboo-rematch, code `be6e222`)
+
+**Jaysonn:** "ok yeah i think it looks good for now! we will fine tune it later. lets do the, Ghost Lightning next, and the, Ghost Breath (the freeze) next"
+(the breath is 167).
+
+**The doc** (attack 3): "Crown glows red. Two walls of lightning close in on Mario from either side and try to squash him. Three times in a row, fast."
+The hit: "Ghost Lightning: the shock. SmsElectricDamageEnter, which already locks Mario for 120 ticks and runs the ma_shock clip with its sparks and
+closing puff." The port has `Mario.TakeShock()` for the enemies: ELECTRIC_DAMAGE as the Electrokoopas give it -- the hurt state in ma_shock with the
+biri sparks and the negative body overlay, 1 HP, the lock 120 ticks (1.0 s at the port's tick), then 60 ticks' grace.
+
+**The walls** (`SmsGhostLightning.cs`, `GhostLightning.gdshader`): King Boo makes one node where Mario stands and it runs on its own. A squeeze is two
+WALLS -- quads WallLength 10 m wide and WallHeight 5 m tall, their faces toward each other -- WallGap 12 m apart about Mario's spot across a squeeze AXIS
+(flat; the first at random, each next turned SqueezeTurnDeg 60), the open ends along the walls. They appear dim (`warn` 1 -> 0.5) and harmless through
+WarnSeconds 0.45 -- the tell -- then CLOSE at WallSpeed 8 m/s each (the gap shuts at 16 m/s: 0.75 s from 12 m; MSD_SE_EF_LIGHTNING as they start; cyan
+sparks along each wall's foot), MEET (a flash of white for 0.15 s, a burst of MeetSparks 48 along the seam), and SqueezePause 0.2 later the next squeeze
+appears about where Mario is THEN; SqueezeCount 3, then Finished and the node frees itself. The shader: `tiles` columns (BoltsPerMetre 1) of the shock's
+bolt sheet (biri_l1.png, the Electrokoopa's streak, white with its alpha), each column shoved sideways, flipped and stretched by a hash of (column, time)
+re-rolled jitter_hz 18 times a second so the bolts jump about, a second wider layer behind, the shock's colour ramp (ms_m_biri_a: cyan (111, 255, 255)
+toward blue (63, 87, 255)) by the bolt's brightness, additive, two-sided, thinning toward the top, a hot core at the floor, a flicker of 35 %; `warn`
+dims it, `flash` whitens it.
+
+**The hit:** through the close, a wall face at Mario's body -- across the axis within WallThickness 0.5 + his damage radius 0.56 of the wall's plane,
+along the axis within the wall's half length, his feet under the wall's height -- or the half gap shut to his radius: `Mario.TakeShock()` (its own
+guards: not while invincible, hurt, dead, swimming) and MSD_SE_MA_DAMAGE_ELEC at him. Once per squeeze, and ONCE PER ATTACK with OneShockPerAttack (on):
+run aa shocked a standing Mario three times (the lock and grace are 1.5 s, the squeezes come 1.55 s apart), 3 HP for standing still -- too much for one
+move, so the later squeezes of an attack leave a shocked Mario alone (off = the game's own rule). The dodge: run out of the open ends -- 5 m from the
+centre in the 0.45 s warning plus the 0.75 s close; a 5-m wall is not jumped. `Cancel()` (King Boo hit through the attack) takes the walls away.
+Read-outs for the drives: State / Squeeze / Centre / Axis / Gap / HitThisSqueeze / WallAPoint / WallBPoint / WallIntensityShown / SqueezesDone /
+MeetBursts.
+
+**King Boo** (`SmsKingBooRematch.cs`): the attacks are picked by WEIGHT (LickWeight / SmashWeight / LightningWeight, 1 each; the doc's near-random; a
+hop first by RepositionChance; 164's SmashChance is gone). The Lightning move: where he stands, the laugh clip looped (LightningClip / LightningSe), the
+crown RED (LightningCrownColor (1, 0.12, 0.08)) with the same flash-then-quickening pulse as the smash through LightningTellSeconds 0.5, then the
+SmsGhostLightning about Mario (the walls' and squeezes' knobs live on King Boo under "The fight (166)" and are copied onto the node), a flash of the crown
+at each meet, LightningWatchSeconds 0.3 after the last, the crown dark, the wait and the gap. CanBeHit through it; a swung Bomb Boo cancels the walls.
+Signals LightningStarted, LightningSqueezed(hit) (the signal could not be named Lightning: a property of that name reads the live node). Read-outs
+LightningsMade / LightningHits / Lightning / LightningLaunched.
+
+**Drive 166** (`SmsKingBoo.Drive.cs`, deleted before the commit; run ab, 11 / 11): the red crown -- the flash to 1.8, the pulse to 1, the register (1,
+0.12, 0.08), the sparkles -- and the walls at 0.52 s (C3); 12.0 m apart, 0.00 m off Mario, a flat unit axis, no hit and the walls dim through the 0.45 s
+warning (C4); the gap shut at 15.6 m/s with the floor sparks (C5); the shock on a standing Mario, HP 8 -> 7, ma_shock's hurt (C6); three squeezes, the axis
+turned 60 deg, each re-centred within 0.00 m, 0.35 s between (the meet's 0.15 + the pause's 0.2) (C7); one shock in all, the lock 1.00 s, King Boo back
+in the wait with the crown dark and the node freed, three meet bursts (C8); a Mario who runs out of the open ends untouched by all three, 13.8 m from the
+last centre (C9); a hit through the attack cancelling the walls, the crown dark (C10); the end (C11). A windowed run (the shot drive, forced lightning)
+showed two tall curtains of blue-white bolts either side of Mario with cyan sparks at their feet, closing in; the bolts read more as vertical streaks
+than jagged forks. The .err: Godot's "2 ObjectDB instances leaked at exit" (the drive's references) as in 165.
+
+**Deviations, all knobs:** the walls' size, gap, speed and the warning are mine (the doc gives "fast" and "three"); OneShockPerAttack is a port-side
+mercy; the lightning is cyan-blue (the shock's own colours) under a RED crown, as the doc has it; no camera shake on the meet. Knobs: King Boo's "The
+fight (166)" (LightningOn, LightningCrownColor, LightningTellSeconds / WatchSeconds, the clip and voice, WallLength / WallHeight / WallGap / WallSpeed,
+SqueezeCount / WarnSeconds / SqueezePause / SqueezeTurnDeg, OneShockPerAttack) and the weights.
+
+### 167 -- the King Boo REMATCH, part 11: GHOST BREATH, the freeze (feature/kingboo-rematch, code `c571a6c`)
+
+**Jaysonn:** "lets do the, Ghost Lightning next, and the, Ghost Breath (the freeze) next" (the lightning was 166).
+
+**The doc** (attack 4): "Crown glows frosty blue. He blows cold breath in a sweep across the arena, left to right or right to left. A hit freezes Mario
+for one second." The hit: "Ghost Breath: the one reaction Sunshine does not have. There is no ice or freeze anywhere in the game, so the one second freeze
+is a new state." The port had one freeze already -- pass 112's durian kick, mFreezeTimer: Mario's move skipped for two frames (`_smsFreezeTicks` at
+Mario.cs 2249, `goto EndFrame`) -- which is the right bone for it.
+
+**The frost** (`Mario.cs`): `SmsFreezeFor(seconds)` -- the kick freeze's skip held for the second: nothing moves him (velocity zero, the move skipped; a
+Mario in the air hangs there), his POSE is held (the animation tree's callback mode set Manual and the player's speed 0 for the duration -- the tree
+keeps its state, unlike toggling Active -- both put back at the thaw), his body carries the frost fog (the damage fog's own shader, `SmsFrostFog` an ice
+blue (0.55, 0.85, 1), held STEADY at 0.5 instead of the damage pulse: `SmsBodyOverlay.SteadyFog` / `SteadyFogFactor`, new), no HP, none of the hurt.
+Refused (false) while invincible, down or shocked, dead, in a demo, talking, swimming, already frozen or within a thaw's immunity (`FrostImmunityTicks`
+60). The thaw (`SmsThaw`) runs off the freeze tick; a knockdown (`SmsDamageExec`) or a shock (`TakeShock`) through the frost thaws him first, so a lick
+through the ice is the knockdown as ever. Read-outs `SmsFrosted` / `SmsFrostPoseHeld` / `SmsFrostCount` / `SmsFrostLeft`. The kick freeze is refused
+while frosted.
+
+**The ice** (`SmsIceBlock.cs`, `IceBlock.gdshader`): the attacker draws the freeze -- a six-sided block (a CylinderMesh of six segments, BlockWidth 1.9 m
+across, BlockHeight 2.05 m from his feet) in a small shader: translucent ice blue (alpha 0.22), a fresnel rim (the edges and the turned faces brighter
+and more solid), a frost mottle from the port's stardust tile, a highlight sliding down it, `flash` for the pop-in; unshaded (165b: the arena's violet
+ambient turns shaded whites lavender), front faces only. It pops in over PopSeconds 0.1 from a quarter size and white-hot with a ring of frost puffs and
+Mario's fright (MSD_SE_MV30_FRIGHT_01), ice glints (star4s, 0.18 m) drift off it, it follows him. While `Mario.SmsFrosted`; the frame he is not, it
+SHATTERS: gone, 36 chips (the port's shikaku square, 0.14 m, ice blue, tumbling at up to 540 deg/s, flung at 5-12 m/s under gravity 14) with a poof of
+frost and the glass break (MSD_SE_OBJ_GLASS_BREAK, the casino floor's: the port has no ice sound). `Freeze(mario, parent)` returns the block already on
+him. Read-outs All / Made / Shatters / Shattered.
+
+**The breath** (`SmsGhostBreath.cs`): King Boo makes one at his mouth and it runs on its own. A STREAM of cold: puffs of pale mist (kemuball3_raw,
+mix-blended at PuffAlpha 0.55, 320 of them over PuffSeconds 1.5 -- 213 a second -- each growing from PuffSizeStart 2 m to PuffSizeEnd 6 m across, a
+world-space emitter whose basis follows the aim), ice glints in it (star4s, 0.45 m, additive), a cold light at the mouth (a radgrad billboard, 3 m),
+blown at BreathSpeed 22 m/s (0.85-1 of it), SpreadDeg 6, aimed DownDeg 10 under level so it reaches the floor ten metres out and ROLLS along it: the puffs
+sink at Sink 4 m/s^2 and collide with a GpuParticlesCollisionBox3D slab under the floor (rigid, friction 0.15, the collision radius HitRadiusK x the
+puff's scale). The mouth sweeps SweepDeg 150 about the way to Mario over SweepSeconds 1.6, linearly; SweepWay Random / LeftToRight / RightToLeft as
+Mario sees it facing King Boo (`SideFor`: his left is up x his facing). THE COLD IS THE STREAM: every frame of blowing records a ray (time, mouth, aim);
+the puff that left along it sits at mouth + aim x speed x age, sunk by half x Sink x age^2, no lower than its ball on the floor, its ball HitRadiusK 0.4 of
+its size at that age; a live puff (age under PuffSeconds) whose ball meets Mario's damage cylinder (42 u across, 130 u tall from his feet) is the hit --
+unless his feet are HitHeight 1.2 m or more over the floor: the cold hugs the floor, so a jump as it reaches him clears it (the dodge; the cold crosses a
+spot in about a third of a second, a held jump is airborne for a second). The hit calls `Mario.SmsFreezeFor(FreezeSeconds 1)` (its own refusals) and
+`SmsIceBlock.Freeze`; once per attack (OneFreezePerAttack). MSD_SE_BS_TELESA_BREATHE as the blow begins and every BreathSeEvery 0.8 s, the bottle's wind
+under it. The sweep over, the emitters stop, Swept(hit); PuffSeconds + 0.2 later Finished and the node frees. `Cancel()` (King Boo hit through it) cuts
+the breath off: no more cold, the puffs out fade, the node goes when they have. Read-outs State / SweepK / YawNow / DirNow / StartYaw / EndYaw /
+CentreYaw / Side / MouthPoint / Emitting / RaysBlown / NearestCold(feet) / FreezeAt / FreezeCount.
+
+**King Boo** (`SmsKingBooRematch.cs`): the Breath move -- BreathWeight 1 in the weight picker beside the lick, the smash and the lightning (BreathOn).
+Where he stands: the crown FROSTY BLUE (BreathCrownColor (0.35, 0.68, 1)) with the smash's flash-then-quickening pulse through BreathTellSeconds 0.7, the
+casino spit clip (btelesa_spit, 99 frames: the head rears back by frame 24 and thrusts at 48) played at the speed that lands BreathHoldFrame 50 at the
+tell's end; he faces Mario through the first 40 % of the tell (the sweep's centre is read there), then TURNS toward the side the sweep starts from
+(smoothstep over the rest of the tell -- the tell shows the way the cold will come); at the tell's end the `SmsGhostBreath` is made with the mouth
+(`MouthPoint`: jnt_sita_1, the tongue's root at the lips, in the world; else ahead of and under the body joint), the clip PAUSED at the thrust
+(`BreathClipHeld`) and his yaw driven by the sweep's; the sweep over, the clip runs on (its end puts the wait loop on), BreathWatchSeconds 0.3 later
+`EnterWait` -- the cold still rolling on its own. CanBeHit through it; `AbortBreath` (a swung Bomb Boo) cancels the node and lets the clip go. Signals
+BreathStarted, Breathed(hit). Read-outs BreathsMade / BreathHits / Breath / BreathLaunched / BreathSide / BreathClipHeld / MouthPoint. `Clip` now reports
+the assigned clip while it is paused (CurrentAnimation is empty then). The sweep's knobs sit on King Boo under "The fight (167)" and are copied onto the
+node.
+
+**Drive 167** (`SmsKingBoo.Drive.cs`, deleted before the commit; runs ac / ad / ae, 12 / 12 at the last): the frosty crown -- the flash to 1.8, the pulse
+to 1, the register (0.55, 0.85, 1) then (0.35, 0.68, 1), the sparkles -- and the cold out at 0.72 s (C3); from the mouth 0.00 m off King Boo's own
+MouthPoint, 3.66 m over the floor, aim y -0.174 (10 deg down), 75 deg from the way to Mario, the body 0 deg off the mouth's yaw at the launch and 0 deg
+off Mario at 40 % of the tell, the spit clip held, the puffs emitting (C4); the sweep 150 deg in 1.60 s, the body turned 149 deg with it (C5); a standing
+Mario FROZEN 1.42 s after the blow began at 17.8 m from the mouth (the sweep's half 0.8 s plus the travel 0.8 s), HP 8 -> 8, Swept(true) (C6); through the
+0.98 s: the pose held, not moved, one ice block, the fog on and ice blue (C7); the thaw: moving again (idle), one shatter, no ice left, no second freeze
+from the same breath, King Boo in the wait with the crown dark and the wait clip, the node let go (C8); a Mario who JUMPS when the nearest cold is within
+6 m (feet to 3.43 m) is over it, the cold having passed 1.13 m into his spot (C9); the first breath's node gone 1.70 s after its sweep (C9b); a hit
+through the sweep cuts the breath off -- Done, not emitting, the crown dark, the clip let go, no breath alive (C10); the end (C11). Run ac's two fails:
+`Clip` empty while the spit was paused (fixed, above) and the drive reading the second breath's Finished for the first (the drive). Three windowed shot
+runs (f, g, h) tuned the look: the plume read thin at 180 puffs of 1.6-4.5 m (now 320 of 2-6 m: a continuous arc of mist); the block at alpha 0.42 with
+the pulsing fog made Mario a white silhouette (now alpha 0.22 and a steady fog: the frosted Mario shows inside a clear faceted block); the chips came out
+as 1-m slabs and the glints at twice their size -- ParticleProcessMaterial's ScaleMin / ScaleMax did nothing visible on these one-shot quads, so the sizes
+are the quads' now (ShardSize 0.14, GlintSize 0.18 / 0.45) and a poof of frost goes with the break; the crown shot after the flash. The .err: Godot's
+"ObjectDB instances leaked at exit" as in 165 / 166.
+
+**Deviations, all knobs:** the sweep's arc (150), its seconds (1.6), the cold's speed (22) and life (1.5 s, 33 m), the sink, the hit height and the jump
+dodge are mine (the doc gives the sweep and the second); a Mario frozen in the air hangs there until he thaws; the ice block and the chips are the port's
+own look (nothing in Sunshine freezes); the crown reads pale icy-blue more than a deep blue (BreathCrownColor). Mario.cs is touched (SmsFreezeFor /
+SmsThaw at the freeze block, two lines in the fog, a line each in SmsDamageExec and TakeShock) and SmsBodyOverlay.cs (SteadyFog). Knobs: King Boo's
+"The fight (167)" (BreathOn, BreathCrownColor, BreathTellSeconds / WatchSeconds, BreathClip, BreathHoldFrame, SweepDeg, SweepSeconds, SweepWay,
+BreathDownDeg, BreathSpeed, PuffSeconds, PuffSizeStart / End, BreathHitHeight, FreezeSeconds, OneFreezePerAttack) and BreathWeight; SmsGhostBreath's
+look (BreathColor, GlintColor, PuffAlpha, Puffs, Glints, GlintSize, MouthGlowSize, HitRadiusK, SpreadDeg, Sink, the sounds, BreathSeEvery);
+SmsIceBlock's (BlockWidth / Height, PopSeconds, ShardSeconds, IceColor, GlintColor, Glints, Shards, FrostPuffs, GlintSize, ShardSize, FreezeSe,
+ShatterSe); Mario.FrostImmunityTicks; SmsBodyOverlay.SteadyFogFactor.
+
+### 168 -- the King Boo REMATCH, part 12: FIREBALLS, the burn (feature/kingboo-rematch, code `1efb8eb`)
+
+**Jaysonn:** "Fireballs next (doc attack 5, the burn) and, Ghost Wind next (doc attack 6, the fling)" (the wind is 169).
+
+**The doc** (attack 5): "Crown glows red. Fireballs shoot off in random directions and bounce off the arena walls. They shrink as they travel and fade out."
+The hit: "Fireballs: the burn. Set fireDown on the profile, which routes into SmsFireDownEnter and the ms_firedmg_a cloud." The port has it:
+`Mario.SmsDamageProfile.Fire` (dmgfire.prm: 1 HP, FIRE_DOWN, 300 ticks invincible) -- the Bob-omb's blast and the fire Chomps call it -- which launches
+him at FireDownForce 50 in ma_firejmp with the burn's cloud at his feet, two bounces, ma_fjpend, up.
+
+**The fireballs** (`SmsFireballs.cs`: the volley node and `SmsFireball`): King Boo makes one at his mouth and it runs on its own. The VOLLEY: Count 8
+balls spat over VolleySeconds 1 (one every seventh of a second), each along a random way within SpreadDeg 140 about the way to Mario (the doc's random
+directions; the bounces scatter them further; 0 = all at him), at Speed 14 m/s, lobbed from the mouth (3.7 m up) to the floor over DropSeconds 0.5 under
+20 m/s^2 and ROLLING on along it at the same flat speed. A ball: Size 2 m across at birth -- an orange core (kemuball3_fire, additive, 1.7 r), 26 flame
+tongues licking up off it (fire1_raw, a yellow-orange-red ramp, 1.7 r quads, local coordinates so they shrink with the ball), 14 embers trailing in the
+world (glow1_spark, 0.16 m), an OmniLight (energy 2.5, range 8, no shadow) -- SHRINKING linearly to nothing over LifeSeconds 5 (dead at 6 %), fading from
+FadeFrom 0.65 of its life, BOUNCING off the arena wall (the floor's circle less WallInset 0.6: when the ball's edge reaches it the flat velocity is mirrored
+about the inward normal, the ball pushed back inside, a flare of 1.35 for 0.12 s, MSD_SE_MA_BOUND at -6 dB, pitch 0.8) as often as it reaches it. THE
+HIT: the ball's sphere meeting Mario's damage cylinder (42 u across, 130 u tall from his feet) is `Mario.TakeDamage(the ball, Fire)` -- the burn; the ball
+bursts (DiesOnHit: a 0.3 s collapse) when it took (his HP fell or he went down) -- unless his feet are HitHeight 1.6 m over the floor: the full jump clears
+a ball (3.4 m), a hop (1.4 m) does not. MSD_SE_BS_TELESA_FIRE as the volley begins (the casino boss's chili fire), the fire Chomp's re-burn whoosh per
+ball (-4 dB, pitch 0.9-1.1). The volley over, Shot(count); the last ball dead, Finished and the node frees. `Cancel()` (King Boo hit through it) fizzles
+every ball out, the node going 0.6 s later. Read-outs State / Spat / Burns / BouncesMade / Alive / Balls / ArenaCentre / ArenaRadius / FloorY /
+CentreYaw; a ball's Vel / R0 / R / Age / Life / OnFloor / Bounces / HitMario / Dead / Fizzling / ScaleShown. Static All / BurnCount.
+
+**King Boo** (`SmsKingBooRematch.cs`): the Fireballs move -- FireballWeight 1 in the weight picker (FireballsOn). Where he stands, FACING Mario: the crown
+RED-ORANGE (FireballCrownColor (1, 0.32, 0.02); the doc has "red" for this and the lightning both, so the lightning keeps the deeper (1, 0.12, 0.08)) with
+the flash-then-quickening pulse through FireballTellSeconds 0.6 as the casino spit clip rears his head, played at the speed that lands FireballHoldFrame 50
+(the thrust) at the tell's end; then the `SmsFireballs` at the mouth (`MouthPoint`, jnt_sita_1) with its knobs copied from King Boo's "The fight (168)"
+group (FireballCount / VolleySeconds / SpreadDeg / Speed / Size / Seconds / HitHeight / DiesOnHit), the clip HELD at the thrust through the volley and let
+run on when it is out (its end puts the wait loop on), FireballWatchSeconds 0.4 later `EnterWait` -- the balls roll on on their own, usually into the next
+move (a 5-s life against a 2-4 s gap: the arena stays busy). CanBeHit through it; `AbortFireballs` (a swung Bomb Boo) cancels the node and lets the clip
+go. Signals FireballsStarted, FireballsShot, FireballBurned, FireballsDone(burns). Read-outs FireballVolleys / FireballBurns / Fireballs /
+FireballsLaunched.
+
+**Drive 168** (`SmsKingBoo.Drive.cs`, deleted before the commit; runs af-aj, 10 / 10 at the last): the crown -- the flash to 1.8, the pulse to 1, the
+register (1, 0.32, 0.02), the sparkles -- and the first ball at 0.63 s (C3); eight balls over 1.00 s from within 0.29 m of the mouth 3.66 m up, each at
+14.0 m/s within 8 deg of the way to Mario (spread 0 for the test), 2.00 m across, the first three on the floor, the spit clip held (C4); a standing Mario
+BURNED by the first to reach him at tick 599 (FIRE_DOWN, the fire kind, 1 HP, the ball burst), the first wall bounce at 680, a second burn at 749 by a
+ball returning off the far wall -- 150 drive ticks (2.5 s) after the first, his invincibility just out; 8 -> 6 HP (C5); seven of eight bounced inward at
+the wall at 14.0 (C6); half their size at 2.5 s, all dead 4.68 s after the last spat (C7); a Mario who JUMPS when the first of a short train of four (0.3 s
+apart in time, spread 0) is 2.6 m off clears it -- feet to 3.43 m, the balls passing 0.69 m into his spot, no burn on the way out (C8); a hit through the
+arc's third volley (its ways 53 deg apart after three) cuts it off: Done, not emitting, the three fizzling, the crown dark, the clip let go (C9); the end
+(C10). Run af's fails: the lob's gravity sign (the balls flew UP from the mouth and bounced at 30 m -- fixed), a cancelled node freezing its balls mid-air
+(the tick now runs through Done), the drive reading volley 2's Finished for volley 1 (per-volley logs). Run ag-ai: the second burn by the returning balls
+(a legitimate consequence of spread 0; the check now wants the first burn before any bounce and burns 2.5 s apart), and the dodge: the jump trace showed
+Mario's held jump is FAST (apex 3.41 m at 0.40 s, under 1.6 m again by 0.68 s), so a jump 0.34 s early met the third ball on the way down -- the fire now
+has a HitHeight (1.6 m) and the drive jumps when the first ball is 2.6 m off. Two windowed shot runs (i, j): the first balls read as pale yellow eggs, so
+the core went orange and smaller and the flames bigger and more (26 at 1.7 r); the floor glows orange under them, the crown reads as flaming. The .err:
+Godot's "ObjectDB instances leaked at exit" as before.
+
+**Deviations, all knobs:** the volley's count (8), arc (140), speed (14), size (2 m), life (5 s), the drop and the wall inset are mine (the doc gives
+random directions, the bounce, the shrink, the fade); the hit height (1.6) and the jump dodge are mine; the crown is red-orange rather than the lightning's
+red; the returning balls can burn a Mario the outbound pass burned once his 2.5 s are up. Knobs: King Boo's "The fight (168)" (FireballsOn,
+FireballCrownColor, FireballTellSeconds / WatchSeconds, FireballClip, FireballHoldFrame, FireballCount, FireballVolleySeconds, FireballSpreadDeg,
+FireballSpeed, FireballSize, FireballSeconds, FireballHitHeight, FireballDiesOnHit) and FireballWeight; SmsFireballs' own (DropSeconds, WallInset,
+FadeFrom, CoreColor / FlameColor / EmberColor, Lights, LightEnergy, LightRange, Flames, Embers, VolleySe / SpitSe / BounceSe).
+
+### 169 -- the King Boo REMATCH, part 13: GHOST WIND, the fling (feature/kingboo-rematch, code `40fd3d3`)
+
+**Jaysonn:** "Fireballs next (doc attack 5, the burn) and, Ghost Wind next (doc attack 6, the fling)" (the fireballs were 168).
+
+**The doc** (attack 6): "Crown glows pink, for now. Tornados come at Mario and fling him around the arena." The hit: "Ghost Wind: knocked back and flung.
+Nothing to reuse here. The Chucksters are not in the port, so there is no thrown-by-a-Pianta state to borrow, and the fling is new work either way." The
+port does have a fling, newer than the doc's survey: pass 94's THROWN_DOWN / THROWN_END (`Mario.SmsThrowMario(dir, speed, thrower)`, pass 128 for any
+thrower -- the NPC throw and the Cataquack's flip, 140 units a frame straight up = 33 m): he faces back along the flight and flails (ANIM_THROWN) until
+the second bounce, then THROWN_END. The tornado uses it.
+
+**The tornados** (`SmsGhostWind.cs`: the wind node and `SmsTornado`; `GhostWind.gdshader`): King Boo makes one and it runs on its own. Count 2 tornados
+rise out of the floor SpawnRadius 0.7 x the arena's radius (18.5 m) from its middle -- the first at a random bearing, the next SpawnSpreadDeg 150 on,
+re-rolled up to twelve times until none is nearer Mario than SpawnMinFromMario 8 m -- growing over RiseSeconds 0.6 (the funnel's scale from 0.3 / 0.02 to
+1). Then each HUNTS: it turns toward Mario no faster than TurnDegPerSec 70 and moves at Speed 6 m/s (Mario's run outpaces it; a sidestep works) with a
+sideways wobble of Wobble 0.6 m at 2.2 rad/s, kept a metre inside the wall; after LifeSeconds 7 it dissipates over 0.8 s (the shader's `fade`, the funnel
+flaring out and sinking) and is gone. The funnel: a CylinderMesh cone Height 8 m, TopRadius 2.8 / BaseRadius 0.8, 24 segments, open ends, turning
+SpinDegPerSec 420 about its axis; the shader (two-sided, unshaded, mix-blended): two layers of the port's smoke streak (kemuri1_raw) scrolling round at
+`spin` 1.2 turns a second and up at `rise`, the second finer and the other way, the sum sharpened (pow 1.4), banded along the height (9 bands sliding),
+fading in over the lowest 12 % and out over the top 30 %, the faces turned from the camera more solid than the middle (a hollow funnel), tint (0.82, 0.66,
+1.0), alpha 0.8. At its foot: 36 dust puffs (kemuball3_raw, a grey violet, mix-blended, from a ring 0.6-1.3 m, lifted, 1.2 -> 2.8 m), a soft ring on the
+floor (hamonring3_soft, additive, counter-turning), and 16 ghost wisps (star4s, additive, rising inside, local to the funnel). MSD_SE_MA_BOTTLE_WIND as
+they rise and every WindSeEvery 1.2 s. THE HIT: Mario's feet within Radius 1.7 m (+ his 0.56) of a risen tornado's axis, under its height, is the FLING:
+`Mario.SmsThrowMario(dir, FlingSpeed 85, this)` with dir = up x FlingUpK 0.75 + out from the axis x 0.25, normalised -- vy 64 and 21 along the flat: he
+rises about 10 m and lands about 18 m away, flailing backwards, two bounces, up; no HP (the thrown state is the hurt state for its duration). Not while he
+is down or flung (the hurt state), frozen (167), or within FlingGraceSeconds 2 of the last fling; one fling a frame. The last tornado gone, Finished and
+the node frees; `Cancel()` dissipates them all and frees 1.2 s later. Read-outs State / Flings / Alive / Tornados / ArenaCentre / ArenaRadius / FloorY /
+Age / LastFlingAt / LastFlingPoint; a tornado's RiseK / Spin / Heading / SpeedNow / Dissipating / Gone / FlingsMade / FunnelYaw. Static All / FlingCount.
+
+**King Boo** (`SmsKingBooRematch.cs`): the Wind move -- WindWeight 1 in the weight picker (WindOn); the six attacks now share it (lick, smash, lightning,
+breath, fireballs, wind). Where he stands, facing Mario: the crown PINK (WindCrownColor (1, 0.45, 0.8), the doc's "pink, for now") with the flash-then-
+quickening pulse through WindTellSeconds 0.6, the laugh clip and the second laugh voice; then the `SmsGhostWind` with its knobs copied from "The fight
+(169)" (TornadoCount, TornadoSpawnRadius, TornadoMinFromMario, TornadoSeconds, TornadoSpeed, TornadoTurnDegPerSec, TornadoHeight, TornadoRadius,
+FlingSpeed, FlingUpK, FlingGraceSeconds), a crown flash as they rise and at each fling; WindWatchSeconds 0.6 after they rise, `EnterWait` -- the tornados
+hunt on through his next moves (a 7-s life against a 2-4 s gap: two winds' tornados can be up at once, with fireballs rolling under them). CanBeHit
+through it; `AbortWind` (a swung Bomb Boo through the tell or the watch) dissipates them; tornados already let go are not his to call back. Signals
+WindStarted, WindSpawned(count), Flung, WindDone(flings). Read-outs WindsMade / WindFlings / Wind / WindLaunched.
+
+**Drive 169** (`SmsKingBoo.Drive.cs`, deleted before the commit; runs ak-al, 10 / 10 at the last): the pink crown -- the flash to 1.8, the pulse to 1, the
+register (1, 0.45, 0.8), the sparkles -- and the tornados up at 0.60 s (C3); two, 18.5 m out, 150 deg apart, 20.2 and 17.0 m from Mario, risen over the
+rise, spinning (C4); closing on him at 6.0-6.1 m/s, 17.0 -> 7.7 m (C5); a standing Mario FLUNG by the one that reached him: the Thrown kind, HP 8 -> 8, up
+10.5 m, carried 18.4 m, down 2.77 s (C6); the tornados gone 7.82 s after they rose (7 + the 0.8 s dissipation), the flings 2 s apart at least, King Boo
+seen in the wait meanwhile (C7); a Mario who RUNS from the second wind's tornados (away from the nearest, bending toward the middle near the wall) is never
+flung, the tornados having closed 20 -> 7 m (C8); a hit through the third wind's watch dissipates its two tornados, the crown dark, the node let go (C9);
+the end (C10). Run ak's fails: the fling carried him only 4 m (FlingUpK 0.93 left 6 units a frame along the flat; now 0.75 and 85: 18 m), the drive's
+bookkeeping of overlapping winds (wind 1's end arriving under wind 2's index; per-node hooks now), a cancel test that fired after King Boo had let the wind
+go (the watch is 0.6 s). Two windowed shot runs (k, l): the funnels read as faint smooth mist cones at alpha 0.6 and 7 m, so the shader's churn was
+sharpened and banded harder, the tint deepened, the cone raised to 8 m and the dust doubled in size; now tall pale violet funnels with a glowing ring and
+dust at the foot, Mario flung high and flailing between two of them. The .err: Godot's "ObjectDB instances leaked at exit" as before.
+
+**Deviations, all knobs:** the tornados' count (2), where they rise (0.7 R, 150 deg apart, 8 m from Mario), their speed (6), turning (70 deg/s), life (7 s)
+and the funnel's size are mine (the doc gives "tornados come at Mario and fling him"); the fling reuses the Cataquack's thrown state (the doc expected new
+work); the crown is the doc's pink "for now"; loose tornados outlive the move and a later hit on King Boo does not dispel them. Knobs: King Boo's "The
+fight (169)" (WindOn, WindCrownColor, WindTellSeconds / WatchSeconds, WindClip / WindSe, TornadoCount, TornadoSpawnRadius, TornadoMinFromMario,
+TornadoSeconds, TornadoSpeed, TornadoTurnDegPerSec, TornadoHeight, TornadoRadius, FlingSpeed, FlingUpK, FlingGraceSeconds) and WindWeight; SmsGhostWind's
+own (SpawnSpreadDeg, RiseSeconds, Wobble, TopRadius / BaseRadius, SpinDegPerSec, Tint, Alpha, Dust, Wisps, WindSe, WindSeEvery).
+
+### 170 -- the King Boo REMATCH, part 14: the EFFECTS pass (feature/kingboo-rematch, code `6e7b8a9`)
+
+**Jaysonn:** "ok for lightingn walls i need them to go horizonstally and the wind needs to look more like a guest of wind. and the block that freezes mario
+should be a chunk of ice not just a smooth block. do another pass on the effects and really put some effects on them and bomb boos need to explode when
+hitting king boo".
+
+**The lightning goes horizontal** (`GhostLightning.gdshader`, `SmsGhostLightning.cs`): 166's walls drew the shock's bolt sheet in vertical columns, so the
+walls read as curtains of vertical streaks. Now the bolts run ALONG each wall: `rows` (Arcs 6) horizontal arcs stacked up it, each the sheet laid sideways
+(the UV swapped), shoved up or down, flipped and re-rolled 18 times a second by the hash of (row, time), and WAVING along its length (`wave` 0.18, a sine
+over the wall's x), a wider second layer behind; the arcs brightest at the wall's ends (`end_glow`), where glowing POSTS stand (PostWidth 0.9 m, the glow
+quad in the shock's cyan, a child of each wall at +-WallLength / 2, dimmed through the warning) -- the arcs read as jumping between them; a cyan OmniLight
+on each wall (LightEnergy 3, range 0.9 x WallLength, no shadow, dimmed to 0.3 through the warning) lights the floor as they close; at the meet a SHOCKWAVE
+RING (hamonring3_flat, additive cyan, MeetRing 14 m across at its widest, a 0.45 s tween, freed) races out along the floor from the seam and the camera
+kicks (MeetShake 0.6 of the Damage shake). The warn / flash uniforms are as before.
+
+**The wind is a gust** (`SmsGhostWind.cs`, `WindRibbon.gdshader`): 169's funnel was a smooth cone of mist. Now Ribbons 4 HELIX RIBBONS of wind spiral up
+it: each an ArrayMesh built in `MakeGust` (48 steps, RibbonTurns 1.6 turns from the foot to the head, the radius following the funnel's from BaseRadius to
+TopRadius x 1.05-1.3, RibbonWidth 0.55 across, the heights 0.85 / 1.0 of the funnel's, u along the ribbon, v across), under one Gust node spinning at
+RibbonSpinDegPerSec 300 (the funnel keeps its own 420), each with the ribbon shader at its own phase: the port's smoke streak scrolling along it at `speed`
+1.6, soft across (sine over v), fading in over the first 15 % and out over the last 25 %, a pale white-violet, two-sided, mix-blended, `fade` with the
+dissipation. Debris 22 dark scraps (shikaku, 0.22 x 0.14, tumbling at up to 500 deg/s, from a ring 1-1.8 m out, lifted) and the wisps now live in the
+Gust's frame (local coordinates), so they WHIRL with the spin. The funnel itself is lighter behind them (Alpha 0.5). The gust rises and dissipates with
+the tornado (its scale and fade).
+
+**The ice is a chunk** (`SmsIceBlock.cs`): 167's six-sided prism read as a glass. `ChunkMesh(seed)`: a sphere of FacetsAround 9 x FacetsUp 6 facets stretched
+to BlockWidth x BlockHeight, every vertex pushed in or out radially by up to Jag 0.22 (a Random seeded by the block's number, so each freeze is a different
+chunk; the poles jittered half as much), Spikes 5 of them pushed out SpikeOut 0.45 further, built with SurfaceTool UNINDEXED with each facet's own normal so
+the fresnel rim catches every face -- a faceted, spiky lump of ice; the rim 0.5, the frost 0.15, the alpha 0.15 so the frosted Mario shows through the
+facets; each chunk turned to its own yaw. The pop-in, the glints, the shatter and the chips as before.
+
+**Bursts** (`SmsFireballs.cs`): a fireball that gets Mario BURSTS -- 20 flame tongues (fire1_raw, 1.6 r quads, yellow to red, shrinking) flung out, a ring of
+fire (hamonring3_flat, orange, 6 r across over 0.35 s) racing out along the floor, a kick of the camera (0.5) -- over the 0.3 s collapse.
+
+**The Bomb Boo explodes** (`SmsBombBoo.cs`): swung into King Boo (ExplodeOnKingBoo) it fires the Bob-omb's own blast at itself -- `BombExplosion.tscn` (pass
+130b's port of TEffectExplosion: the 10_bomb fireball sphere playing its bck / brk / btk, the glow, the smoke, the scraps with their trails, the shockwave,
+the sparks; an SmsFxBurst played at the Boo's transform at ExplosionScale 1.4) -- with the water flower's boom (MSD_SE_PO_WFLOWER_EXPLOSION; the port has no
+bomb sound) and a full Damage shake (ExplosionShake 1), over its own violet puff and burst sound; King Boo's hit as before. `Blasts` counts them. An expiring
+or dropped Boo still only puffs.
+
+**Verified** (drive v170-2, a windowed shot run, deleted before the commit; the headless variant just runs the fight 40 s): one attack at a time by the
+weights -- the arcs running along the walls between the posts in the warning and the close, Mario shocked at the seam at the meet (the ring is at its
+start in that frame); the gust: white ribbons spiralling up a lighter funnel with debris, from the side and close; the chunk about the frosted Mario
+(close and from above); a fireball's burst on Mario; a Bomb Boo teleported onto King Boo and burst: the blast's fireball swallowing him, then its smoke and
+scraps -- 14 shots, no errors. The first run stalled waiting on a 7-s wind life before the breath (the drive now moves on once its gust shots are taken).
+
+**Deviations, all knobs:** the arcs, posts, lights and ring are my reading of "go horizontally" (the arcs along the wall, the walls still closing from either
+side); the gust is ribbons and whirling debris rather than a particle vortex; the chunk is a jittered facet sphere, not a modelled crystal; the Bomb Boo's
+boom is the water flower's. Knobs: SmsGhostLightning (Arcs, PostWidth, LightEnergy, MeetRing, MeetShake), SmsGhostWind (Ribbons, RibbonWidth,
+RibbonTurns, RibbonSpinDegPerSec, Debris, Alpha), SmsIceBlock (Jag, Spikes, SpikeOut, FacetsAround, FacetsUp, IceColor), SmsBombBoo (ExplodeOnKingBoo,
+ExplosionFxScene, ExplosionScale, ExplosionShake, ExplodeSe).
+
+### 171 -- the King Boo REMATCH, part 15: the freeze holds a frame of the SHOCK; the eyes change under the fog (feature/kingboo-rematch, code `44f8ca4`)
+
+**Jaysonn:** "i think we should use a frame from mario getting shocked for the freeze one and that wind looks good".
+
+**The frost pose is the shock's frame** (`Mario.cs`, `SmsFreezeFor` / `SmsThaw`): 167 held whatever pose Mario was in when the breath got him (the tree
+and the player paused). Now the freeze plays `SmsFrostPoseClip` ("ma_shock", the electrocution's 0.18-s jitter clip, library-only like the knockdown clips)
+on the animation player, seeks `SmsFrostPoseAt` (0.5) of its length and holds the player at speed 0 there for the whole freeze -- arms flung out, knees
+bent -- with the hurt eyes (`SetEyeTexture(hurtEyeTexture)`, squeezed shut); the animation tree stays paused (Manual) behind it as in 167, so the state
+machine is where it was when the thaw hands it back. The thaw stops the clip (`Stop(true)`, the pose kept until the tree's next frame), opens the eyes
+(`SleepStatus(false)`) and restores the tree's mode and the player's speed. `""` in `SmsFrostPoseClip` = 167's behaviour (his own pose held).
+`SmsFrostPoseNow` ("ma_shock@0.092/0.183x0.0") and `SmsEyeNow` (awake / sleep / hurt / tired / other) are readouts for the drives.
+
+**The eyes change under the damage fog** (`SmsBodyOverlay.cs`, a fix the drive found): the fog (pass 97) swaps every body surface's StandardMaterial3D
+for a shader copy made at Bind, with `texture_albedo` set to the texture the surface had THEN. Mario's `SetEyeTexture` / `SleepStatus` write the BASE
+eye material's `albedo_texture`, so nothing they did showed while the copies were installed: the frost's hurt eyes stayed open (the first drive run and
+the first shots showed the open eye through the ice), and the knockdown's squeezed-shut eyes -- set since the damage passes -- were under the pink fog the
+whole time too. `FogSlot.Albedo` remembers what each copy carries; `SyncAlbedo` (each `_Process` while the copies are installed, and at the install)
+follows the base material's albedo texture (the override the copy replaced, else the mesh's own material) into the copy. The shot shows the eyes shut.
+
+**Verified** (headless drive v171-3, deleted before the commit; the breath forced, the card skipped): C1 the fight starts with the pose set to ma_shock,
+the clip in Mario's own AnimationPlayer (201 clips; the first drive build searched the subtree and found a different player without it); C2 the frozen
+Mario holds ma_shock@0.092/0.183 at speed 0 the whole 0.98-s freeze, the tree Manual, the eye material hurt AND the fogged eye surface (16 surfaces
+fogged) showing the hurt texture from the freeze's first tick; C3 the thaw leaves the player stopped, the tree running, the eyes awake on the base
+material with the fog off, Mario idle at the same HP -- 3/3. Of note: Mario's eye surface starts the scene with the glb's own eye texture
+(untitled_ma_mdl1_1.png, "other"); the first `SleepStatus(false)` puts Mario's awake texture on (the same picture, another object) -- a drive artifact,
+not a bug. A windowed shot run (3 shots): the shock pose with the eyes squeezed shut inside the ice chunk, from the side, the front and the game camera.
+
+**Deviations:** none asked for; the fog fix changes the knockdown's look (the hurt eyes now show through the pink fog, as the game's BTP does). Knobs:
+`Mario.SmsFrostPoseClip`, `Mario.SmsFrostPoseAt`. The wind stays as 170 left it.
+
+### 172 -- the King Boo REMATCH, part 16: the ELECTRICITY, LAVA BALLS out of the crown, a THICKER breath (feature/kingboo-rematch, code `085883d`)
+
+**Jaysonn:** "ok particle effects for electric need to be better. fireballs should be more like molten lava balls and should come from the crown popping a
+few out at once. the breath attack should be thicker".
+
+**The electricity** (`SmsGhostLightning.cs`): 166-170's walls had the bolt shader and 40 small squares rising off the floor line. Now each wall carries the
+SHOCK'S OWN particles -- the port's ShockSparks (ms_m_biri_a / b / c, pass 51) scaled to the wall and spread over its whole face, as children of the wall
+quad (local coordinates: they ride it as it closes): bolt STREAKS twisting about their own axis (`ShockStreak.gdshader` with biri_l1, 0.55 x 2.2 m quads at
+0.6-1.6 scale, 0.22 s each; WallStreaks 90 live), ARCS popping (biri_r's two frames at random, 1.6 m, 0.13 s; WallArcs 14), one-frame FLASHES (hitmrk1,
+0.9 m; WallFlashes 6) with white spark CROSSES (shikaku, two crossed align_y quads) raining down the wall under gravity (WallSparks 60), sparks pouring off
+each glowing POST (PostSparks 24 a post), bolts CRAWLING along the floor at the wall's foot both ways (FloorCrawl 30); AmountRatio WarnFx 0.35 through the
+warning, 1 as the wall closes, off at the meet. Once the gap is under ZapGap (7 m) ZAPS jump it: GapZaps 4 nodes of two crossed quads (ZapWidth 1 m wide,
+as long as the gap, biri_l1 repeating along them, the colour x ZapBrightness 1.8 so the additive bolt punches through the wall's light), each placed at a
+random spot along and up the gap, on for 2-4 frames, then off until its 35 %-a-frame coin comes up again. The meet's burst grew: MeetSparks 120 crosses,
+MeetStreaks 60 bolt streaks bursting from the seam, MeetFlashes 12, over 170's ring and shake. The hit is as it was. Readouts: WallFxCount, WallFxEmitting,
+ZapsShown, ZapsFlashed, Side.
+
+**Lava balls out of the crown** (`SmsFireballs.cs` rewritten, `LavaBall.gdshader` new, `SmsKingBooRematch.cs` template): 168's volley of 8 fire balls spat
+from the mouth along a 140-degree fan is gone. King Boo's crown now POPS Pops 3 x PerPop 3 LAVA BALLS, PopSeconds 0.45 apart (the spout is CrownFxPoint,
+the crown's top), each LOBBED LobHeight 6 m over the crown under the port's 20 m/s^2 to come down at its own spot about Mario -- one ball of every pop
+within AimedWithin 1.5 m of him, the rest anywhere from there out to Scatter 7 m (clamped inside the wall), the lob solved from the flight time (up, then
+down to the floor) -- with a pulsing orange RING on the floor where it will land (LandingMarks). A ball that reaches the floor BOUNCES (Bounce 0.35 of its
+fall, up to twice, a SPLAT of lava drops and a small ring each time) and then ROLLS on along its way at RollSpeed 8 m/s (0 = the speed it came down with),
+bouncing off the arena wall as 168's did; the burn, the shrink to nothing over LifeSeconds (now 6) and the fade are 168's. The ball itself is a SphereMesh
+(28 x 14) in `LavaBall.gdshader`: in the sphere's own space (no seam) a domain-warped 3-D voronoi whose cell edges are the CRACKS (orange, a white-hot
+middle, pinching and widening along their length), a second finer voronoi for the small cracks, some cells wholly MOLTEN (pools, pulsing), a dark red heat
+haze fading out from every crack, a two-tone dark crust between under a fixed lambert, a fresnel rim of the glow, the whole pattern drifting slowly;
+`heat` 1 -> HeatAtEnd 0.3 over the ball's life (the cracks narrow and dim, the pools fade), `emissive` up through the fizzle. The maths was chosen on the
+CPU first (tools/projectshine/rematch157/lava_preview.py, three balls at three heats -- a regular honeycomb at the first try, warped and pooled at the
+second) and written into the GLSL line for line. About the crust: a glow billboard (glow3_raw, 2.8 R), Flames 16 licking off it, Embers 24 and Drips 10
+(align_y streaks under gravity, off once the ball cools under 0.45) trailing in the world, Smoke 18 (a dark trail), an orange OmniLight (3, 9 m); the crust
+ROLLS with the ball (its sphere turned about Up x Vel by the distance over the radius; half as fast tumbling in the air). A ball that gets Mario BURSTS:
+flames, a splat of lava drops, a ring, dark smoke, a kick of the camera. Signals and readouts as 168's plus PopsMade, Landings, SpoutPoint, Target, Heat,
+Vy. King Boo's template: FireballPops, FireballPerPop, FireballPopSeconds, FireballLobHeight, FireballScatter, FireballAimedWithin, FireballRollSpeed,
+FireballSize, FireballSeconds 6, FireballHitHeight (FireballCount is now the product); the debug line and the class doc follow.
+
+**A thicker breath** (`SmsGhostBreath.cs`): the puffs 3 -> 8 m (were 2 -> 6; King Boo's PuffSizeStart / PuffSizeEnd too), Puffs 520 (320), PuffAlpha 0.72
+(0.55), SpreadDeg 9 (6), and a DENSE CORE down the middle of the stream -- CorePuffs 180 smaller puffs (CoreSizeStart 1.6 -> CoreSizeEnd 4.5 m) at
+CoreAlpha 0.9 within CoreSpreadDeg 3, a shade whiter than the stream, sinking a little harder, rolling along the slab with the rest -- so the breath reads
+as a thick bank of cold rather than a line of puffs. The cold that hits: HitRadiusK 0.35 of a puff's size (1.05 -> 2.8 m; was 0.4 of 2 -> 6 = 0.8 -> 2.4),
+the jump clearing it as before. Readouts: CoreEmitting, CorePuffCount.
+
+**Also committed:** the editor's `.uid` files for GhostWind / IceBlock / WindRibbon.gdshader (it generated them when it scanned 167-170's shaders).
+
+**Verified** (headless drive v172-2, deleted before the commit; the card skipped, the three attacks forced one at a time by the weights on a standing Mario,
+King Boo hopping instead of a second volley while the balls roll): C0 the template reads 3 x 3 pops and 3 -> 8 puffs; C1 16 emitters over the two walls,
+all 16 emitting at the warning and the close; C2 the gap seen under 7 m with 4 zaps shown at once, 3 meets burst; C3 the shock lands (hp 8 -> 7); C4 3 pops
+of 9 balls over 0.90 s, the first ball born 0.12 m from the crown's fx point; C5 in the air, the highest 14.3 m over the floor (the crown at 8.3), a landing
+mark, 8 landings, rolling at 8.0 m/s, a target 0.4 m from Mario, 24 bounces; C6 two burns (hp 7 -> 5; the second after the 2.5-s invincibility, the balls
+rolling 6 s); C7 puffs 3 -> 8, the core's 180 emitting; C8 Mario frozen once -- 9/9, no errors (v172-1 was the same 9/9 before the look tweaks). The first
+build failed on one debug line still naming FireballVolleySeconds. A windowed shot run (11 shots): the walls alive with twisting bolts, arcs, cyan flashes
+and sparks as they close on Mario, bright horizontal zaps across the gap (v172-1's 0.6-m zaps at plain brightness were lost in the walls' light), the meet's
+burst about the shocked Mario; two lava balls popping out of the glowing crown, the balls arcing up with smoke trails and the orange landing rings around
+Mario, a close pass of a rolling ball -- the cracked glowing crust, embers, the light on the floor -- the game view with a burned Mario, the burst; the breath
+a thick pale-blue column from the side, the frozen Mario inside the bank from the game camera, the sweep from above.
+
+**Deviations, all knobs:** the landing marks (none in the doc) telegraph a lob that would otherwise fall from off-screen; one ball of each pop is aimed near
+Mario and the rest scatter (the doc's "random directions"); a landed ball rolls at a set RollSpeed. A standing Mario can be burned twice in one attack
+(FireballSeconds / FireballDiesOnHit tune that). The electricity is the game's own ms_m_biri particles re-used, not a new design. Knobs: SmsGhostLightning
+(WallStreaks, WallArcs, WallFlashes, WallSparks, PostSparks, FloorCrawl, WarnFx, GapZaps, ZapGap, ZapWidth, ZapBrightness, MeetSparks, MeetStreaks,
+MeetFlashes), SmsFireballs (Pops, PerPop, PopSeconds, LobHeight, Scatter, AimedWithin, RollSpeed, Bounce, LandingMarks, Flames, Embers, Drips, Smoke,
+HeatAtEnd, GlowColor, LightEnergy), SmsGhostBreath (Puffs, PuffAlpha, SpreadDeg, CorePuffs, CoreSizeStart / End, CoreAlpha, CoreSpreadDeg, HitRadiusK).
+
+### 173 -- the King Boo REMATCH, part 17: he sits HIGHER, the lava balls BIGGER, the electricity YELLOW and quicker (feature/kingboo-rematch, code `fd00c6f`)
+
+**Jaysonn:** "ok looking good. make the lava balls bigger. make the electricity move more yellow, and king boo sits kinda low and his tongue is going into the
+stage. need to make him sit higher so it looks more normal".
+
+**He sits higher** (`SmsKingBooRematch.cs`): his hover height was read off where he was placed in the scene (4 m over the floor), and with the stretched
+tongue (TongueStretch 1.15) hanging from a mouth 4.4 m up, its tip went 4 m into the floor. `HoverLift` (4.5 m): at the spawn, after ReadArena reads the
+placed height, he is moved up by it, `_home` with him and `_hoverOverFloor` grows by it -- so every spot he teleports to is lifted too (the lick keeps its own
+LickHeight 6.4, the tongue skimming the floor by design). The placed 4 m becomes 8.5: his body 8.18 m over the floor, the mouth 8.85, the tongue's tip 0.76 m
+OVER the floor. 3 m was tried first and left the tip 0.76 m into the floor (the tongue is long: about 8 m from the mouth); 4.5 clears it with the 0.35-m
+bob to spare. The scene file is untouched (it is among Jaysonn's live edits). **The breath re-aimed:** 167 aimed the breath a fixed BreathDownDeg (10) under
+level, which from a mouth 1.8 m up met the floor about 10 m out; from 8 m up it would meet it 45 m out -- over the arena's edge, and over the head of a
+Mario standing within 8 m of him. `BreathAimFloorAt` (10 m): the aim is now atan(mouth height over the floor under Mario / 10) -- 38.9 degrees from the
+lifted mouth -- so the stream meets the floor where it did and rolls on along the slab as before (the flat speed 22 cos 38.9 = 17 m/s); `BreathDownDegUsed`
+reads the angle; 0 = the fixed knob. **Bigger lava balls:** the template's FireballSize 3 (was 2).
+
+**Bigger lava balls** (`SmsFireballs.cs`): Size 3 m (was 2) -- the radius 1.5; the crust sphere, the glow (2.8 R), the flames, the drips, the smoke, the landing
+ring (2.6 R = 3.9 m) and the hit (R + Mario's radius) all follow. The lob's targets stay inside the wall less the size.
+
+**Yellow, quicker electricity** (`SmsGhostLightning.cs`): "make the electricity move more yellow" -- read as both: the COLOUR -- BoltColorA (1, 0.95, 0.5), a
+warm white-yellow, BoltColorB (1, 0.62, 0.1), an amber (the shock's own cyan (0.435, 1, 1) and blue (0.25, 0.34, 1) before); the wall shader's color_a / color_b,
+the streak ramps, the arcs (BoltColorA toward white, `Pale`), the flashes, the crosses' fade, the post sparks (toward the amber), the OmniLights, the posts,
+the zaps and the meet's ring and flashes all take them -- and the MOTION: the streaks dart at 2-6 m/s (0.4-1.6), the arcs drift at 1-4 (0-1.5), the floor bolts
+race at 5-10 (2-5), the zaps flicker quicker (ZapChance 0.5 a frame, 1-3 frames on; 0.35 and 2-4), and the wall shader's arcs re-roll JitterHz 26 times a second
+(18) and wave harder (Wave 0.28; 0.18) -- the two uniforms the shader always had, now set from knobs. Mario's own shock (ShockSparks.tscn) keeps the game's cyan.
+
+**Verified** (headless drive v173-2, deleted before the commit; 172's drive with 173's checks added, the three attacks forced in turn on a standing Mario):
+C0b he appears 8.5 m over the floor ("lifted 4.5"), the body 8.18 m up, the tongue's tip 0.76 m over the floor (v173-1 with a 3-m lift: the tip 0.76 m UNDER
+it -- the one fail, the lift raised); C0c the balls 3 m; C1b BoltColorA / B yellow and amber, the streaks at 2.0-6.0 m/s, 26 Hz, wave 0.28; C6b the first ball's
+radius 1.50; C7b the breath aimed 38.9 degrees down for a mouth 8.07 m up (atan(8.07 / 10) = 38.9), King Boo's readout agreeing; and all of 172's checks again
+(16 wall emitters emitting at the warn and the close, 4 zaps shown at once, 3 meets, the shock (hp 8 -> 7), 3 x 3 pops out of the crown 0.12 m off its point over
+0.90 s, the lob to 18.8 m over the floor (the crown at 12.8), the mark, 8 landings, 8.0 m/s rolling, 2 burns (hp 7 -> 5), the thick breath's core, the freeze) --
+14/14, no errors. A windowed shot run (13 shots): King Boo high over the floor from the side with Mario for scale -- the tongue's tip at the railing's height,
+clear of the floor -- and from the game camera (he sits at the top of the frame now, the tongue hanging into view); the walls golden-yellow with white-hot
+cores; the 3-m lava balls close, with the embers and the landing rings.
+
+**Deviations, all knobs:** HoverLift 4.5 is my reading of "sit higher" -- enough to clear the tongue; from the game camera near him he now sits high in the
+frame (HoverLift is live in the inspector). BreathAimFloorAt keeps the breath's reach where 167 had it rather than letting the lift change the attack. Knobs:
+King Boo (HoverLift, BreathAimFloorAt, FireballSize), SmsGhostLightning (BoltColorA, BoltColorB, JitterHz, Wave, ZapChance), SmsFireballs (Size).
+
+### 174 -- the King Boo REMATCH, part 18: the INTRO CUTSCENE -- Mario looks about for the laugh, King Boo surfaces, laughs, sinks, the fight starts (feature/kingboo-rematch, code `4aafc9b`)
+
+**Jaysonn:** "nice lets clean up the intro a bit and have him laugh for a bit longer. or we could have it where mario lands then a cutscene starts where
+mario looks around looking from where the laughing is coming from and the king boo appears just liek the casino fight laughs and then goes underground
+and the fight starts". The cutscene (his laugh in it is longer too: 3.4 s, IntroLaughSeconds).
+
+**The cutscene** (`SmsRematchIntro.cs`, Cutscene on): the card and the fall as 157 had them; CutsceneDelay (0.4 s) after Mario lands his controls lock
+(Mario.CameraLocked) and a cutscene camera takes over (a Camera3D added to the scene, `IntroCutsceneCamera`, CutsceneFov 50; re-asserted current every frame
+-- the game camera takes current back otherwise). King Boo's long laugh plays from nowhere (his sound node, `PlayVoice`, while he is still hidden). Mario is
+squared up to the way the laugh comes from (toward the BooSpawn marker; `SmsDemoFace`) and **LOOKS ABOUT**: a turn left LookTurnDeg (45 degrees), a turn right,
+then to where the laugh is, each eased at LookTurnDegPerSec (240 degrees a second) -- the three turns at 12 %, 50 % and 84 % of LookSeconds (2.6). The camera
+sits in front of him, low (1.45 m) and nearly head-on (3.6 m out, 0.4 to one side), on his face, pushing in a little (to 4.1 / 0.5 / 1.55) through the turns.
+**He SURFACES**: SurfaceDistance (7 m) in front of Mario toward the marker (0 = at the marker; the floor found under the spot, BooHeight over it) --
+`IntroSurface(spot, yaw)` on King Boo, facing Mario -- the camera a **side two-shot**: from the middle of the line between them, 2 m back toward Mario,
+SurfaceCamSide (17 m) off to the side, SurfaceCamHeight (3.8 m) up, aimed between Mario's head and King Boo's body (0.62 of the way to the body, eased, never
+under the floor while he is), pushing in a little (0.85 of the side, 0.6 m higher) through the laugh; Mario turns to follow him. He rises, laughs, sinks (his own timings below);
+`IntroSunk` + AfterSinkSeconds (0.6) on the empty spot, then **the fight**: the game camera current again, the cutscene camera freed, Mario free, and
+`SpawnBoo` as before but with `SpawnRising` -- King Boo rises out of the floor at his BooSpawn spot, no second laugh -- FightReady as before. **A skips** it
+(button_a / key_space, SkipAllowed as the card's): `IntroAbort` (he is under the floor at once) and the fight starts. After a miss (CameFromMiss) the cutscene
+is skipped like the card; if Mario never lands by BooSpawnTimeout (off the edge) he comes the 157 way, with the laugh; Cutscene off = the 157 intro. The
+Phase gains LookAbout, Surfaced, Sunk; readouts for the drives CutsceneRan, CutsceneSkipped, SurfaceSpot, FaceYawNow, LooksMade, CutsceneCamera.
+
+**King Boo's part** (`SmsKingBooRematch.cs`): `IntroSurface(placedAt, yaw)` (Hidden only): placed at the spot (HoverLift added as at the spawn), the hover
+read (`_introTop`, the floor under it `IntroFloorY`), put IntroSinkDepth (7 m) under the floor and shown; **IntroRise** (1.6 s, the appear clip `BckAppear`
+and the arrive voice): a smooth-stepped rise to the hover, turning to Mario; **IntroLaugh** (3.4 s): the laugh clip and the long laugh (`Laughed`), the hover
+bob -- the laugh clip carries his body 3.6 m up over the node (the crown 9.6 m): with IntroLaughBodyHeld the node is lowered by the body's lift, smoothed
+over IntroLaughHoldSeconds (0.35) so the clip's own bounce stays, and he laughs at the hover height he rose to (off: he laughs 3.6 m higher than he rose);
+**IntroSink** (1.1 s, the wait clip, the vanish voice): back under, hidden, `IntroSunk`. `IntroAbort`: under the floor at once, hidden, IntroSunk.
+`SpawnRising` (Hidden only): `Spawn` with `_spawnRise` -- he starts IntroSinkDepth under his spot and rises over SpawnRiseSeconds (1.2) through the appear
+clip and voice, then the wait -- `_spawnQuiet`: no laugh (the intro had it), ReadyForFight once he is up (`QuietReadyWhenUp` waits for the rise). `PlayVoice
+(se, db)` (a voice from his sound node before he shows). The property that clashed with the method is `IsSpawnRising`; readouts IntroFloorY, IntroTop,
+IntroPhaseSeconds, IntroBodyLift. Signals IntroSurfacing, IntroSunk. The Phase gains IntroRise, IntroLaugh, IntroSink (their own tick: the blink and the
+FX placement only -- no hover, hurt or attacks).
+
+**Mario** (`Mario.cs`): `SmsDemoFace(dir)` -- a demo turns him to face a way: the facing latched (`SmsLatchFace`, source 2), `lastFacingDirection` set, the
+armature's yaw set (`BaseYawFromDir`) -- SmsCarryTo's face part alone, no voice, no state change, no move; the caller holds the controls.
+
+**Verified** (headless drive v174-9, deleted before the commit; the intro run with DebugPrint through the cutscene): C1 the cutscene begins within a second
+of the landing -- Mario's controls locked, `IntroCutsceneCamera` current; C2 his facing swings more than 80 degrees through the look-about (3 turns made)
+and ends on King Boo's spot; C3 King Boo surfaces 7.0 m from Mario, from 7 m under the floor to 8.5 m over it (the hover) in 1.6 s, laughs 3.4 s (Laughed
+once), facing Mario; C4 he sinks in 1.1 s, IntroSunk once; C5 the game camera current again, the controls free, King Boo rising at BooSpawn (IsSpawnRising)
+into the wait, FightReady, laughs == 1 -- 5/5, no errors. Nine drive iterations: v174-1 passed the flow (the clash of `SpawnRising` the property with the
+method fixed first); v174-2..8 were the camera -- King Boo filled the frame from over Mario's shoulder (he is 8 m across from 7 m away), the laugh clip
+lifted his body out of the top of it (hence IntroLaughBodyHeld), Mario's look-about read from the side (the camera moved in front of his landing facing,
+then the turns made about the marker's way with him squared up to it first, LookTurnDeg 45 so his face stays in the shot) -- v174-9 relaxed C2 to the
+45-degree turns. A windowed shot run (8 shots): Mario's face through both turns; King Boo surfacing and laughing beside him from the side (the tongue out,
+his body at the hover, Mario for scale), sinking; then rising at his spot from the game camera, crown and all. The fall-off-the-edge timeout (the 157 spawn)
+was not in the drive.
+
+**Deviations, all knobs:** the camera is my framing -- a low near-head-on shot of Mario looking about, a side two-shot for the surface (over his shoulder King
+Boo is far too big from 7 m); A skips the cutscene as it does the card; the laugh clip's body lift is held out; Mario is squared up to the marker's way as
+the cutscene starts (his landing facing is the marker's anyway). Knobs: the intro (Cutscene, CutsceneDelay, LookSeconds, LookTurnDeg, LookTurnDegPerSec,
+SurfaceDistance, AfterSinkSeconds, CutsceneFov, SurfaceCamSide, SurfaceCamHeight, SkipAllowed), King Boo (IntroRiseSeconds, IntroLaughSeconds,
+IntroSinkSeconds, IntroSinkDepth, SpawnRiseSeconds, IntroLaughBodyHeld, IntroLaughHoldSeconds).
+
+### 175 -- the King Boo REMATCH, part 19: Mario LOOKS ABOUT with his HEAD (a new look-around), King Boo surfaces 12 m out (feature/kingboo-rematch, code `6c59007`)
+
+**Jaysonn:** "ok few things lets make them not stand so close in that one shot and lets make a new animation for mario where he looks around not just
+have him rotate. otherwise its a good start. lets keep going".
+
+**The look-around** (`assets/Sms/SmsHeadLook.cs`, NEW): 174 turned Mario's whole body left and right on the spot. The game has no look-around clip to
+borrow -- its idles glance (ma_wait turns jnt_head -37 then +70 degrees over its 6 s, ma_swait -61 / +60 with a tilt) -- so the look-around is a
+skeleton modifier on his head, in the project's own style (HeadForwardLock, SmsBoneRotZ). It turns `jnt_head` on its own after the clip has posed it:
+YAW about the skeleton's up (positive = to his left), PITCH about his left axis (MarioHeadCtrl's Rz convention: negative = up, as HeadForwardLock's -12),
+from the REST pose -- so the clip's own glance is taken out while it is on, slerped in and out by a weight over EaseSeconds (0.25) -- and ADDS a share
+of the yaw (ChestShare 0.3) to `jnt_chest` about the same up, so the shoulders follow. The axes are taken every frame from the bones' posed frames
+(SkeletonUp / SkeletonForward: the model's up and forward in the skeleton's own space -- Mario's skeleton faces +Z there, the drive measured it; his
+armature carries the half turn and the 1 / 74.44 scale), so the rig's joint orientations (the head's rest is a flip of the chest's) do not matter.
+It is the LAST modifier under his Skeleton3D (after HeadForwardLock, the jiggles and the gun-angle Rz), so it replaces the head while a demo has it.
+Driven two ways: `Play` a sequence of looks (yaw, pitch, the turn's seconds, the hold's seconds -- each turn smooth-stepped, each look held; the last
+held until Stop) or `Track` a world point every frame (yaw from the body's forward to it, pitch from the head to it, clamped MaxYaw 75 / MaxPitch
+50); `Stop` eases back to the clip. Readouts for the drives: YawNow / PitchNow / Step / Playing / Tracking / Weight / Runs, and `DrawnGlobalPoseWith`
+(a bone's global pose as it would be drawn at a yaw / pitch: Godot 4.3+ restores the clip's poses after the skin update, so readers outside the
+modifier pass see the clip's alone). **Mario** (`Mario.cs`): made with the gun-angle head rot (`SmsSetupHeadGunRot`, appended last) and exposed as
+`SmsHeadLook`.
+
+**The intro** (`SmsRematchIntro.cs`): the look-about is the head's. Mario's body stands square to where the laugh comes from (as 174 placed him); his
+head: a beat (8 % of LookSeconds -- the laugh registers), LEFT LookTurnDeg (60 degrees) and a little up (LookUpDeg 10), held; RIGHT, held; then AHEAD,
+half up -- the turns 12 / 16 / 12 % of LookSeconds (2.6 s: 0.31 / 0.42 / 0.31 s), the holds 18 / 18 / 16 % (0.47 / 0.47 / 0.42 s); the chest takes
+LookChestShare (0.3) of each turn. LooksMade reads the sequence's step. As King Boo surfaces and laughs the head TRACKS his body (37 degrees up from
+12 m) while the body turns to him (LookTurnDegPerSec 240, as 174); at the cutscene's end, or the skip, the head eases back to the clip. **Not so
+close:** King Boo surfaces SurfaceDistance 12 m in front of Mario (7); the side two-shot's camera SurfaceCamSide 22 m off the line (17), SurfaceCamHeight
+4.6 (3.8), aimed SurfaceCamAim 0.7 of the way from Mario's head to King Boo's body (0.62, now a knob -- the crown wants the room above). 174's body
+turns (LookTurnDeg 45 on the body) are gone.
+
+**Verified** (headless drive v175-3, deleted before the commit; 174's drive with the head checks): C1 the cutscene within a second of the landing as
+before; C2 the head's yaw reaches -60 and +60 degrees through 3 looks at full weight while the body's yaw does not move (180..180, 0 degrees), then he
+faces King Boo as he laughs; C2b the axes on the posed rig -- a +0.5 rad yaw turns the head about the vertical (axis.up 1.00) 37 degrees to his LEFT
+(29, plus the chest's 9 under it), the chest's share about the vertical the same way (9 degrees), a -0.5 rad pitch turns about a horizontal axis
+(axis.up 0.00) and tips his facing UP (y +0.48); C2c at the laugh the head is 37 degrees up on King Boo's body (the line to it: 35), and off again
+after the cutscene (weight 0); C3 he surfaces 12.0 m from Mario, 7 m under to 8.5 over the floor in 1.6 s, one 3.4-s laugh, facing him; C4 the 1.1-s
+sink; C5 the rise at BooSpawn into the wait, FightReady, laughs == 1 -- 7/7, no errors. Three drive iterations: v175-1 (a `Ready` property hid
+Node.Ready -- renamed HasBones; the chest's share was about the chest's local Y, which measured near horizontal: axis.up 0.16 -- the rig's chest frame
+is not the head's; hence the posed-frame axes), v175-2 (the pitch read upside down: the facing tipped DOWN -0.48 for a negative pitch -- the
+skeleton's -Z measured pointing world +Z, so SkeletonForward +Z), v175-3 7/7. Two windowed shot runs (9 shots each): Mario's head turned to his left
+(the back of the cap, the shoulder following), then his right (the face in profile), then ahead and a little up, his body still through all three;
+the two-shot with Mario at the left looking up at King Boo surfacing and laughing 12 m off -- the first run clipped the crown at the top of the
+frame, the second (SurfaceCamAim 0.7, 22 m, 4.6 up) has it in.
+
+**Deviations, all knobs:** the look-around is procedural -- the head and a third of it on the chest over the standing idle -- not a hand-made clip; its
+beats, angles and shares are mine (LookTurnDeg, LookUpDeg, LookChestShare, LookSeconds on the intro node; ChestShare, EaseSeconds, MaxYaw / MaxPitch
+on the modifier); the head tracking King Boo through the laugh is mine too. Knobs: the intro (SurfaceDistance, SurfaceCamSide, SurfaceCamHeight,
+SurfaceCamAim, LookTurnDeg, LookUpDeg, LookChestShare, LookSeconds, LookTurnDegPerSec).
+
+### 176 -- the King Boo REMATCH, part 20: CUSTOM ANIMATIONS -- Mario's "where am I?" look-around and his BATTLE STANCE as real clips, baked from pose scripts (feature/kingboo-rematch, code `9c4ffba`)
+
+**Jaysonn:** "did you do this new animation in code or was it done to see it in the editor as a brand new animation?" -- in code (175's modifier) --
+"yeah i want it to be an animation and new one since i want it to be more like a 'where am i' look around. and this will be a start to being able
+to do custom animations"; then, with three sprite sheets of Mario's RPG battle stance: "when it cuts to the side view of the stand off i want mario
+to do this battle stance ready".
+
+**The pipeline** (`assets/Mario/Anims/`, `tools/anim/bake_anim.gd`, both NEW): a custom clip is written as a POSE SCRIPT and baked into a real
+`Animation`. The script (`<name>.pose.json`) names a base clip and frame (the idle `ma_wait` at 0) and KEYS at times; each key poses joints by
+turns about the BODY's axes in degrees -- `up` (+ = to his left), `left` (+ = nod / tip forward, - = look up), `forward` (+ = roll toward his left
+shoulder: it swings the left arm out at a shoulder) -- and `move_up` / `move_left` / `move_forward` translations in the rig's units (he stands 117;
+`center` down 10 is a crouch). A turn is applied AT the joint, the turns in the order written about the fixed axes, and the children follow (turn the
+chest and the head rides along, then its own turn adds). Joints not named hold the base pose. The baker (headless: `godot --headless -s
+tools/anim/bake_anim.gd -- <pose.json> <out.tres>`) instances Mario's scene, reads the base pose off the base clip's own tracks, poses each key down
+the bone chains (local = parent⁻¹ · R_world · parent · base, the move added to the origin), writes the clip on the same `Armature/Skeleton3D:bone`
+paths his other clips use -- a cubic rotation key on every posed bone at every key time, one key at 0 on every other bone, position keys where a
+joint moves -- and reads the SAVED file back (`CACHE_MODE_IGNORE`: the scene holds the old clip at that path in the cache) to print the head's yaw
+and pitch and the hands' and feet's positions at each key. The baked clips sit in Mario's AnimationPlayer's library (`assets/Player.tscn`: three
+ext_resources and three `_data` entries beside the game's `models/ma_*.res`), so they show in the Animation panel and play by bare name; edit them
+there or re-bake (a bake overwrites; editor edits are not written back to the script -- one source of truth per clip). `README.md` has all of it.
+The script's words are also what the local previewer draws (`tools/projectshine/rematch157/anim176/pose_tools.py` / `pose_preview.py` on the
+Mac: the game's BMD rig + the BCK idle, stick figures front / side / top at the key times; `stance_feet.py` / `stance_arms.py` / `shrug_fit.py` fit
+joints to wrist / ankle targets) -- the bake read-backs matched the previewer's forward kinematics to 0.1 unit.
+
+**The clips.** `ma_lookabout` (3.0 s, one-shot): a beat while the laugh registers (0.2 s, the head starting left); head 50 and chest 22 to the left
+(72 of head turn), a little up, the left arm raised forward with the hand feeling out, held; the same to the right; then ahead and 16 up with a
+SHRUG -- shoulders up, arms out, forearms up, wrists at x +-31 / y 80 (the first bake had them at his cheeks: the forearm turn and pitch composed
+the other way round; the turns are now ordered pitch-then-yaw everywhere, `fix_order.py`); the head cocked 12 (roll); back toward the idle by 3.0.
+`ma_battle_stance_in` (0.45 s, one-shot): from the idle the fists come up and the left foot steps forward as the weight drops onto the stance's
+pose. `ma_battle_stance` (0.9 s, a loop ending on its first pose): the bladed guard of the sprite sheets -- `center` down 10, chest leaning 18 and
+turned 30 to his right so the left shoulder leads, head turned back onto the enemy (the tracking modifier owns it in the cutscene anyway), left leg
+forward (hip -30, knee 44, foot -14) and right back (hip 20, knee 24, foot -44) so both ankles sit where the idle's do (9.3 / 7.9 vs 9.0 / 8.8; the
+stance 23 units front to back), the left fist out at chin height (wrist x 15, y 67, z 27), the right in at the chest (x -20, y 61, z 1), a bounce
+(3 units up at 0.45 s, the fists pumping). The first bake had both fists at his eyes; `stance_arms.py` re-fit them.
+
+**Playing them** (`Mario.cs`): `SmsPlayDemoClip(name, speed, thenPlay)` plays a clip OUTSIDE the AnimationTree -- the tree off, the player on it,
+the way the sit / sleep / hang code already does -- with an optional clip to go on with when it ends (the `AnimationFinished` hook: the drop-in
+hands over to the loop); `SmsEndDemoClip` stops the player and turns the tree back on; `SmsClipLength`; readouts `SmsDemoClipNow` (name@position/
+length), `SmsDemoClipOn`, `SmsTreeActive`. While `CameraLocked` the state loop freezes him and touches no clip, so a demo clip holds. The two stance
+clips are in `SmsHandTable` with hand 2 -- `SmsCurrentClip` reads the player's clip while the tree is off, so the FIST meshes (ma_hnd3) show, as in
+the refs.
+
+**The intro** (`SmsRematchIntro.cs`): the look-about plays `LookClip` (`ma_lookabout`, at `LookClipSpeed`) for its length (`LookSeconds` 0 = the
+clip's), the body standing where he landed; a missing clip falls back to 175's head modifier (fixed 60 / 10 / 0.3). On the cut to the two-shot
+`Surface()` ends it and plays `StanceInClip` then the `StanceClip` loop (`ma_battle_stance_in` / `ma_battle_stance`; "" or missing = he stands):
+Mario crouches into the guard and bounces in it through King Boo's rise, laugh and sink, his body turning to King Boo and his head on him
+(SmsHeadLook.Track, as 175); `EndCutscene` (the fight, or a skip) ends the demo clip: the tree's idle as the game camera returns. Readouts
+`LookClipUsed`, `LookLength`, `StanceUsed`. 175's `LookTurnDeg` / `LookUpDeg` / `LookChestShare` are gone (the clip has them).
+
+**Verified** (headless drive v176-4, deleted before the commit; 175's drive with the clip checks): C1 the cutscene within a second of the landing;
+C2 `ma_lookabout` is in his player (3.00 s), `LookClipUsed`, the demo clip `ma_lookabout@...` seen with the tree off, its position reaching 2.98 s,
+his drawn head (the head bone's global pose against its rest, read outside the modifier pass -- the clip's own pose) turning -86..+84 degrees and
+17 up over it while his body's yaw held (180..180), then facing King Boo; C2a on the cut the demo clip `ma_battle_stance_in`, then the
+`ma_battle_stance` loop through the laugh with the tree off, his head bone at y 79.8 against the idle's 92.6 (crouched), and at the fight's start
+the demo clip off and the tree back; C2b / C2c 175's head-axes and tracking checks (37 degrees up on King Boo, off after); C3 / C4 / C5 174's surface
+(12.0 m, 1.60 s), laugh (3.42 s, once), sink (1.12 s) and fight (rising at BooSpawn, FightReady, one laugh) -- 8/8, no errors, twice (before and
+after the fists). Four shot runs (13 shots each): the look-about left, right, shrug and cocked from the intro's camera; the stance from the drive's
+own close camera (side and front three-quarter -- the intro re-takes its camera every `_Process`, so the drive's `_Process` takes it back before
+the frame draws) with the fists closed; the two-shot and the fight as 175.
+
+**Deviations, all editable:** the clips are mine -- the game has no look-around or battle stance; the stance follows Jaysonn's sprite sheets (a
+bladed guard, left foot forward); the shrug's hands are open at shoulder height (the game's palms-up pose would need the hand bones turned -- a key
+away in the editor); the stance's hands are fists via `SmsHandTable` (not a knob); the head tracks King Boo through the stance. Knobs: the intro
+(`LookClip`, `LookClipSpeed`, `LookSeconds`, `StanceInClip`, `StanceClip`), and every number in the two pose scripts.
+
+### 176b -- the King Boo REMATCH, part 20b: the battle stance turns his whole BODY (as the sprites), held after the fight starts until the player's first input (feature/kingboo-rematch, code `946e1e9`)
+
+**Jaysonn:** "ok close! but i think mario should turn his body like in the sprites also just a finer detail. and lets have him hold the fight pose
+until input from the player happens then he goes back to normal".
+
+**The body's turn** (`assets/Mario/Anims/ma_battle_stance*.pose.json` -> `.tres`, re-baked): 176 turned only the chest (30). Now `center` -- the root
+of hips, legs, chest and head -- turns 35 degrees to his right (`["up", -35]`), the chest 10 more on top (45 in all), so his left shoulder and left
+foot lead and his chest is three-quarters to the side camera, as in the sprite sheets; the head turns 45 back onto the enemy in the clip (in the
+cutscene the tracking owns it); the front foot's toes turn 25 toward the enemy. The legs' swings are about the WORLD axes, so the front leg still
+reaches toward the enemy while the hips face off to the side -- the stance came out wider front to back (43 units; 23 before). Both ankles still sit
+where the idle's do (9.1 / 9.2 vs 9.0 / 8.8). The drop-in's halfway key turns 15 on the way. The baker's read-back: the head's yaw -1 (onto the
+enemy through the body's turn), feet z +14 / -29.
+
+**The head over a turned chest** (`SmsHeadLook.cs`): 176's `Track` measured the yaw from the BODY's forward to the target and applied it to the head
+from its rest under the chest -- right while the chest faces where the body does, 30 degrees off once the stance turned the chest (the drive had read
+the clip's head, not the drawn one, and missed it). Now the yaw is measured from where the clip's pose has the head's rest looking (the parent's
+posed basis times the head's rest, times the head's own forward from the bind pose, `_headFwdLocal`) to the target, flat, and the pitch from that
+rest forward's elevation to the target's; `HeadTarget` pitches about the LEFT of that rest forward (a pure raise of the gaze whichever way the chest
+faces) and then yaws about the skeleton's up; `MaxPitch` 65 (the pitch counts from under the leaning chest: the stance's 18 forward + 37 up to King
+Boo = 55). The drive now reads the DRAWN head (`DrawnGlobalPoseWith` at the modifier's yaw / pitch): on King Boo's body to the degree (yaw 0 / pitch
+24 against 0 / 24 in skeleton space). The chest share is 0 while the stance runs (the intro sets it; the stance owns the chest).
+
+**The hold** (`Mario.cs`): `SmsHoldDemoClipUntilInput()` -- called as the cutscene hands the controls back -- keeps the demo clip on until the player's
+FIRST input. In `_PhysicsProcess`, right after the CameraLocked block: while holding, if the clip is gone, the state is not idle or something took the
+tree back (a hit: TakeDamage -> SetMarioState re-activates the tree), the hold just ends; else if the stick is pushed (over 0.25) or A / B / X / Z /
+R / L / space / Z is down, the hold ends with `SmsEndDemoClip` and THAT frame runs as normal (the input is not lost); else he is held: velocity zero,
+MoveAndSlide, `idleTimer` reset to 480 so the idle wind-down never sits him down in the stance, and the frame returns (as the lock does) -- the idle
+state's per-frame `SetMarioState(idle)`, which would re-activate the tree, never runs. The camera stick does not end it. `SmsDemoHolding` reads it.
+
+**The intro** (`SmsRematchIntro.cs`): `StanceHoldUntilInput` (on): `EndCutscene` holds the stance when it ran (a skipped cutscene ends the clip as
+before); off = the idle as soon as the fight starts.
+
+**Verified** (headless drive v176-6, deleted before the commit): C2a the centre bone's forward 35 degrees to his right in the stance; the drawn head
+on King Boo's body (off by 0); crouched (head bone 79.8), the drop-in then the loop, the tree off; C2d at the fight's start +0.33 s and +0.92 s with
+no input: the demo clip `ma_battle_stance@...`, holding, the tree off, Mario at his spot in idle; the stick pushed at +1.0 s for 12 ticks: 15 ticks
+later the demo clip off, the hold off, the tree back, Mario 1.3 m on (v176-5's verdict ran at +0.5 s, before the push -- the one fail, the verdict
+moved to +1.33 s); C2c's pitch at the laugh -60 (from under the chest's lean; the bound widened to 70); 174-176's checks as before -- 9/9, no errors.
+A shot run (15 shots): the stance from the side and front three-quarter -- the body turned, the near fist forward, the fists closed, the eyes up on
+King Boo; the hold from the game camera and a close shot after the fight starts (the HUD up, the stance kept); the idle back after the stick.
+
+**Deviations:** what ends the hold is mine -- the stick or any face / shoulder button, a hit, anything that takes the tree back; not the camera stick.
+The stance's width grew with the body's turn (the pose script's hip swings are about the world axes); every number is in the script. Knobs: the intro's
+`StanceHoldUntilInput`; the clips' scripts.
+
+### 177 -- the King Boo REMATCH, part 21: the HURT is his casino TUMBLE, and every third hit he splits off a COPY (Luigi's Mansion 3) that throws from afar and takes no damage (feature/kingboo-rematch, code `2ea01af`)
+
+**Jaysonn:** "ok lets make king boo do his flip when hurt like in the normal fight. and now lets really get the fight going. every 3 hits king boo will
+make a copy of himself like in luigis mansion 3 and will attack along side the other one but mario has to hit the real one for it to do any damage.
+this king boo however tends to stay away and more known to throw attacks not as fast or commonly." (The Bomb Boo expression work he asked for in the
+same message -- the tongue's motion, the look-shock with drool, the Galaxy spawn-in with mist and glowing eyes -- is the next passes'.)
+
+**The hurt** (`SmsKingBooRematch.cs`): 158's hurt was the short flinch `btelesa_hit` with a procedural turn about himself "until its animation comes".
+The casino fight's spicy hit plays `btelesa_damage` -- read with the new `tools/anim/probe_clip.gd` (a scene's clip sampled every N frames: a bone's
+height, how upright it is, its yaw): 3.63 s, the root dropping 1.5 m and bouncing back, `jnt_body` upside down at 0.5 s, sideways at 1-1.5 s, upright
+by 2 s -- a tumble head over heels. `HurtClip` (btelesa_damage) at `HurtClipSpeed` 1.25 (2.9 s), `HurtTurns` 0 (the clip has its own); "" gives the
+old flinch back. `HitPoints` 9 (range 1-12): the fight is longer now that copies come.
+
+**The copies** (`SmsKingBooRematch.cs`, `SmsBombBoo.cs`): as he recovers from every `CopyEveryHits`-th hit (3; the hit sets `_copyPending`, the
+recovery spawns, so the split comes out of the tumble) while fewer than `MaxCopies` (1) are out, `SpawnCopy`: a flash and his laugh, and
+`Duplicate(Scripts | Groups | UseInstantiation)` of his node -- the scene's knobs come with it; the run-time children it would carry twice (the
+TongueStretch modifier under the skeleton, CrownGlowFx, CrownSparkFx) are taken out in the copy's `_Ready` and made again -- added beside him with
+`IsCopy` and `Original` set, out of the boss group, and `BeginAsCopy`: his hover and solidity, then `ArriveAt(RandomSpot())` -- the teleport-in at a
+far spot. A copy's spots keep `CopyMinFromMario` (13 m) from Mario with no far cap (`RandomSpot`); its `NextGap` is the real one's (by the real
+one's hits) times `CopyGapScale` (1.7); `PickMove` gives it hops (at least 30 %) or THROWS alone -- the lava balls (`CopyFireballs`) and the breath
+(`CopyBreath`) at `CopySpeedScale` (0.75: the pops and the roll, the sweep and the stream) -- never the lick, the smash, the lightning or the wind;
+`Spawn` / `SpawnRising` / `IntroSurface` refuse it. Its `TakeHit` is `RevealCopy`: the attack called off, a laugh (the laugh clip and the long laugh,
+a flash), then the Vanish fade over `CopyFadeSeconds` (0.7) and `QueueFree`, `CopyRevealed(copy)` from the real one; no damage, no `Hit` (so the
+supply does not clear the field for a fake). His DOWN reveals every copy left. The Bomb Boo swung by Mario now tests EVERY King Boo in the group
+`sms_rematch_boo` (`BoosNow`) and bursts on the one whose body it is in (`HitBoss`): the real one's `TakeHit` or a copy's reveal; the supply, the
+intro and the drives keep `sms_rematch_boss`, the real one's alone. Signals `CopyMade(copy)`, `CopyRevealed(copy)`; readouts `IsCopy`, `Original`,
+`CopiesAlive`, `CopiesMade`, `Copies`.
+
+**Verified** (headless drive v177-4, deleted before the commit): C1 a Bomb Boo from the supply, GRABBED by Mario's spin (the real X beside it) and swung
+into the REAL King Boo -- the drive put Mario beside his body (he hovers 8.5 m up; the swing is at hand height: see below) -- bursts on him: 9 -> 8,
+the Hit signal, the hurt `btelesa_damage` at x1.24 for 2.93 s, jnt_body's up flipping sign through it (+0.15 at 0.33 s, -0.29 at 1.0 against -1
+upright) and -1.00 again in the wait; C2 two more hits (`TakeHit`, the mechanic's entry) and as he recovers from the third exactly one copy splits
+off (CopyMade once, CopiesAlive 1, CopiesMade 1, hp 6); C3 the copy IsCopy, Original the real one, in sms_rematch_boo and NOT in sms_rematch_boss,
+arriving 16.6 m from Mario, its gap after a throw 4.26 s against the real one's 2.68 after a hit (1.59 x); C3b over 14 s its moves were hops and the
+lava balls (later the breath) and nothing else; C4 a second Boo grabbed by the spin and swung into the COPY (Mario put beside the copy's body on the
+far side from the real one): "FOUND OUT by BombBoo2", CopyRevealed once, the copy laughs, fades and is freed within 2.5 s, the real one's hp 6
+untouched (its Hit signal still 3), Mario's hand empty, no copies out -- 5/5, no errors. v177-1: the drive put Mario between the copy and the real one
+when the real one happened to stand near it (the real one took the burst -- in play the first body in the group wins such an overlap) and compared
+the copy's halved post-hop gap; v177-2: the second Boo drifted out of the spin's reach (the drive re-tries); v177-3: the Hit count. A shot run (7
+shots from the drive's own camera): the tumble early / mid (upside down, the red flash) / late; the copy arriving; the real one and the copy side by
+side over the arena, Mario and a Bomb Boo below; the copy found out, laughing, and fading.
+
+**Deviations, all knobs:** the tumble at 1.25 x (the casino's is 1 x -- 3.65 s felt long for a nine-hit fight); HitPoints 9 (two copies over a fight);
+one copy out at a time; the copy's reveal is a laugh and a fade (LM3's fakes pop); a hit on a copy does not clear the Bomb Boos. **A design call
+pending:** since 173's HoverLift his hit cylinder starts 5.7 m over the floor and the swung Boo rides at Mario's hand plus 0.9 m -- Mario cannot reach
+him from the ground (the drives have been putting Mario beside the body). Knobs: HurtClip, HurtClipSpeed, HurtTurns, HitPoints, CopyEveryHits,
+MaxCopies, CopyMinFromMario, CopyGapScale, CopySpeedScale, CopyFadeSeconds, CopyFireballs, CopyBreath.
+
+### 178 -- the King Boo REMATCH, part 22: the swing RISES with Mario's jump, every hurt ends in a TELEPORT, copies take hits and teleport (no damage) with a TELL, three of him by the sixth hit, and the frost breath's hit SHOWS (feature/kingboo-rematch, code `6214430`)
+
+**Jaysonn:** "yeah having mario to jump to have the bomb hits him is right. we also need to make the frost breath look better since it looks like mario
+doesnt get hit but still is frozen. also the king boo should not disappear thats fake he should just take a hit and then vanish to a new spot. and then
+once we hit king boo 3 more time there 3 of them. we do need a way to tell them apart. like one doesnt have teeth? or like the crown is not the right
+color? im not sure yet. otherwise every time king boo gets hit he should be teleporting away once the hit animation is done to give the fight a 'reset'
+feel."
+
+**The jump** (`SmsBombBoo.cs`): since 173's HoverLift King Boo's body hangs 8.2-8.5 m over the floor and his hit cylinder (HitBelow 2.5) starts 6.7 m up,
+while the swung Boo rides at Mario's hand + 0.9 = 2.5 m: no hit from the ground (177's drives put Mario beside the body). Now the swing's height adds
+`JumpLiftNow`, eased toward `JumpSwingLift` (1.6 m) while Mario is off the floor and back to 0 on landing (`JumpSwingSeconds` 0.15 each way), so the Boo
+is flung up as he jumps. Mario's single jump peaks 1.70 m (measured: the real A); the Boo's own reach is 0.8 m (OwnRadius x ModelScale): from the ground
+the Boo's top sits 2.0 m under the cylinder; off a jump the burst lands on the way up (the lift 1.07 of its 1.6 by then, Mario 1.48 m up). No change to
+King Boo's cylinder: the burst is at his body's underside.
+
+**The reset** (`SmsKingBooRematch.cs`): `TeleportAfterHit` (on) -- the hurt's end (the tumble, 2.9 s) goes to Vanish with `_afterHit`: the hide clip, the
+vanish voice, `ArriveAt(RandomSpot())`, and the wait there with a FULL `NextGap` (the hop's arrival halves it; a hit's does not). Copies the same.
+
+**The copies** (`SmsKingBooRematch.cs`): 177 revealed a copy on a hit (a laugh, a fade, gone). Now `TakeHit` on a copy is the real one's hurt in every
+visible way -- the tumble, the flash, the cry, then the teleport -- and nothing else: no Hp off (`CopyHitsTaken` counts it), the `CopyHit(copy)` signal
+from the real one instead of `Hit` (so the Bomb Boo supply does not clear the field for a fake), its solidity tracking the real one's hits. `MaxCopies`
+2: the third hit makes one, the sixth a second -- three of him from hit six to nine. The dismissal (laugh + fade) stays for his defeat (`DismissCopy`).
+**The tell** -- `CopyTell`: `Crown` (default): the copy's crown is `CopyCrownColor`, a silver-blue (0.62, 0.7, 0.95), instead of gold -- the crown's rest
+colour is set so every attack glow lerps from it; `Teeth`: the copy's fangs are gone (the `_mat_ha` material's `opacity` 0, kept through every
+`SetOpacity`); `CrownAndTeeth`; `None` (the shell game). The crown could not be re-coloured by crown_c0 alone: the shader multiplies it into the sheet's
+gold / red strip (blue 0.1), so a blue c0 only dimmed the gold (the first shot run: a gold crown on the copy). `BossTelesaToon.gdshaderinc` (the casino
+boss's and the rematch's shared toon) gains `crown_recolor` (0 = the game's crown, every existing material unchanged; 1 = the strip read as its
+brightness x 1.6, so crown_c0 sets the hue), set to 1 on the copy's crown material in `ApplyTell` -- confirmed in the loaded shader with the new
+`tools/anim/probe_shader.gd` (a shader's uniforms with its includes expanded), and in the shots: a silver-white crown beside the gold.
+
+**The breath's hit** (`SmsGhostBreath.cs`, `SmsIceBlock.cs`): the cold's hit model was right -- the puff's ball (0.35 of its 3-8 m size) meets Mario's
+cylinder when the visible mist is on him -- but what happened then was a 0.1-s pop of the ice about his middle inside a white-out of 8-m puffs: no
+event. Now `SmsIceBlock.HitFrom(streamDir)` at the freeze: a FLASH of white-blue at his body (an additive radial quad, FlashSize 3.2 m, gone over
+FlashSeconds 0.28, growing a little), a SPLASH of frost puffs flung on past him along the stream and up (SplashPuffs 36: the breath breaking on him), a
+RING of mist spreading along the floor from his feet (RingPuffs 24, flat), ice crystals flung out (HitShards 22, the port's square spark, under gravity);
+the block CLIMBS him -- its height from 0.12 to 1 over PopSeconds (0.1 -> 0.22) with its base at his feet, the width catching up behind -- and the
+camera's damage shake (HitShake 0.8 x the game's). Readouts HitShown, FlashUp. The mist's density is as 172 left it (PuffAlpha 0.72): from inside the
+bank the flash and the ice are what read.
+
+**Verified** (headless drive v178-3, deleted before the commit): C0 Mario's jump (A) apex 1.70 m; C1 Mario on the floor under the real King Boo with a Boo
+swinging for 2 s: the Boo at most 2.46 m up, its top 1.98 m under the cylinder's bottom, no hit, the Boo kept; C2 A: the swing lifted 1.07 m by the
+burst, the Boo at y 5.78 + 0.8 against the bottom 6.77, 9 -> 8, Hit once, the tumble clip; C3 the hurt over at 2.92 s, he vanishes and arrives 11.0 m
+away, the gap there 3.10 s; C4 two TakeHits -> the first copy (CopyMade once): its crown rest colour (0.62, 0.7, 0.95), the real one's (1, 1, 0), its
+fangs kept, tell Crown; C5 a second Boo swung into the copy from a jump (Mario put under it): the copy's tumble (btelesa_damage), CopyHit once, hp 6
+still and Hit still 3, then it vanishes and arrives 15.1 m away and waits -- alive, one copy out; C6 three more TakeHits -> the second copy (CopyTell set
+to Teeth between): copies 2 / made 2, hp 3 -- three of him -- its fangs' opacity 0, its crown gold; C7 the breath (its weight alone, the moves on) on a
+standing Mario 10 m off: frozen 1.77 s into the breath, HitFrom run, the flash up at the hit, the ice's height 0.49 at 0.05 s and 1.00 at 0.33 s --
+8/8, no errors, twice (before and after the shader change). v178-1: the drive's lift threshold (the burst lands before the lift finishes) and a jump
+never pressed (a tick the gate skipped); v178-2 passed. Two shot runs (13 and 14 shots): the swing low under him from the ground; the tumble; the real
+one's gold crown and fangs close; from above, a silver-white crown on a copy beside a gold one; the teeth copy's mouth; the breath hit from the side at
+the freeze frame (the flash, the crystals), +0.15 s (the ice climbing), +0.5 s, and from behind Mario. The first run's paired shots had shared one camera
+(two in one tick) and the "game view" had sunk under the floor (an unflattened direction) -- the drive's own, fixed for the second.
+
+**Deviations, all knobs:** JumpSwingLift 1.6 (a single jump suffices; no change to King Boo's cylinder); the tell defaults to the crown (silver-blue) with
+the teeth as the other -- Jaysonn's pick pending ("im not sure yet"): CopyTell / CopyCrownColor; a hit on a copy does not clear the Bomb Boos; the full
+gap after a hit's teleport; the frost hit's look (SplashPuffs, RingPuffs, HitShards, FlashSize, FlashSeconds, PopSeconds, HitShake); the mist's density
+untouched (PuffAlpha). Knobs: SmsBombBoo (JumpSwingLift, JumpSwingSeconds), King Boo (TeleportAfterHit, MaxCopies, CopyTell, CopyCrownColor), the breath
+(HitShake), the ice (the five above).
+
+### 179 -- the King Boo REMATCH, part 23: the Bomb Boo's EXPRESSIONS -- its tongue MOVES, a Boo Mario LOOKS AT is SHOCKED (it freezes, stares back, trembles and DROOLS), and it spawns Galaxy's way (a BLACK pool with GLOWING EYES, then up through the floor in black smoke); black, not purple (feature/kingboo-rematch, code `2bba752`)
+
+**Jaysonn** (177): "make the boo bombs more expressive thier tounge just kinda staticlly hangs and it needs to have motion like everything else and we need
+effects for the boo bomb like in mario galaxy - like when mario looks at them they get shocked and kinda stay in place have drool effects comming from
+thier mouth i put some refs in the folder called BooBombRefs in the refs folder ... when spawnning in they should have that mist effect with the eyes
+glowing before they spawn in. just make it more like galaxy and make it look good and fun!" -- and now: "yeah do the bomb boo effects and keep it black
+not purple". The refs (Ref/BooBombRefs): the shocked Boo with grey drool bubbles about its mouth; a flat dark pool on the floor with two yellow eyes in it;
+the Boo rising out of black puffs; the swing with a dark cloud and eyes behind.
+
+**The tongue** (`SmsBombBoo.cs`, The tongue group): `TongueRest` was a fixed 35-degree droop. Now `TongueSway` drives a droop and a yaw the rest follows at
+`TongueFollow` 9 a second: the droop bobs `TongueSwayDeg` 7 either way and the tongue wags `TongueWagDeg` 12 side to side on sines at about `TongueWagHz` 0.9
+(each Boo at its own phase), lags behind a turn (`TongueTurnLag` 0.15 degrees for every degree a second the body turns, opposite to it) and tucks under as
+it drifts (`TongueMoveTuckDeg` 8 at a full 1.4 m/s). The yaw turns the tongue about the Boo's up, the droop about its right; the root stays at TongueOffset.
+
+**The shock** (`SmsBombBoo.cs`, The shock group): a drifting Boo that Mario FACES -- the line to it within `LookConeDeg` 40 (the whole cone) of his
+`SmsFacingDir`, `LookRange` 12 m or nearer, flat -- is SHOCKED (`SetShock`): it holds where it hangs (`_shockPos`; the drift, the fly height, the bob
+and the tilt frozen), startles with a squash-and-stretch hop (`ShockHop` 0.22 over `ShockHopSeconds` 0.35: tall and thin, then back), TREMBLES
+(`ShockTremble` 0.035 m of jitter a tick), turns to STARE BACK at him (`ShockTurnSpeed` 8), its eyes burn `ShockEyeGlow` 2.4 x `FaceGlow` with a 9 Hz
+flicker (face_glow on the body's materials only), its tongue drops out to `ShockTongueDroopDeg` 62 and quivers, and it DROOLS: `DroolPool` -- spheres of
+`DroolRadius` 0.11 x 0.7..1.3 (the ref's vary), `DroolColor` a pale blue-grey (0.8, 0.84, 0.9) with a 0.3 emission so they show in the dark arena and the
+light's highlight, pooled (`DroolMaxOut` 12) under a world-fixed node of the Boo's -- a drop every `DroolEvery` 0.2 s at a point about the mouth (to a
+side, a little under, a little out, in the Boo's frame), clinging there up to `DroolClingSeconds` 0.35 while it grows, then falling under `DroolGravity`
+5.5 drifting a little outward, shrinking over its last third, gone at the floor (the Boo's `_floorY` + its radius; the first run's drops fell 3 m through
+the stone) or after `DroolLife` 1.1 s. It stays shocked at least `ShockMinSeconds` 0.8 and until he has looked away `LookAwaySeconds` 0.6; then the float
+goes on from the shock spot (a half wait, the next goal); a grab ends it (`Grab` -> `SetShock(false)`); the touch still hurts (`TouchCheck` in
+`ShockTick`). `LookShock` off = 178's Boo. `ShockSe` empty (no sound: nothing in the Boo's set fits). Readouts `Shocked`, `ShockSeconds`, `LookedAtNow`,
+`Shocks`, `DroolOut` / `DroolMade` / `DroolLowestY`, `EyeGlowNow`, `TongueYawDeg` / `TonguePitchDeg` / `TongueRootPoint`.
+
+**The rise** (`SmsBombBoo.cs`, The rise group): `RiseFromUnder` -- on its first tick the Boo drops `SpawnDepth` 1.3 m under its spawn point (the floor
+hides it: at scale 0.8 x 0.75 its top is 0.46 m under the stone) and comes UP THROUGH THE FLOOR over `RiseSeconds`, growing from `RiseScaleFrom` 0.75 to
+full, solid from the start (`SetScaleK(k, alpha)`; off = 158's scale-from-nothing and fade), while `FireRiseSmoke` bursts BLACK SMOKE at the spot: a
+one-shot emitter 0.4 m off the floor (the puffs' lower halves were cut by it), `RiseSmokePuffs` 22 of `RiseSmokeSize` 1.5 (0.8..1.4 x the game's dark
+smoke ball, `SmokeTexture`), flung up and out at 1.2..2.6 m/s under a light gravity and damping, turning, over `RiseSmokeSeconds` 1.1, `RiseSmokeColor`
+(0.09, 0.09, 0.11) at 0.95 fading from 45 %, no shadow, freed when done. Readouts `RiseStartY`, `RiseSmokeFired`, `OpacityNow`.
+
+**Black, not purple** (`SmsBombBoo.cs`): the rim glow `GlowColor` a cool grey (0.22, 0.22, 0.28) -- 158-178's violet (0.35, 0.1, 0.55); the burst puff
+`BurstColor` a dark smoke grey (0.25, 0.25, 0.28) -- 158-178's violet (0.55, 0.2, 0.85). The body itself was already a near-black (the maroon sheet x the
+dark vertex colours x Lift 2) and reads black in the shots.
+
+**The spot** (`SmsBombBooSpawner.cs`, The fog group): black. A dark POOL on the floor (`FogDisc`: a flat quad of `FogDiscRadius` 1.7 with the port's soft
+radial as its alpha, `FogDiscColor` black at 0.88, 3 cm over the floor, in over its first quarter second), a thin low veil of black mist rolling off it
+(`FogMist`; `FogColor` (0.03, 0.03, 0.035) at 0.7: 158's column of 40 violet puffs became 18 wisps of 0.8..1.4 at 0.1..0.35 m/s, 1 s each -- the column hid
+the pool and the eyes -- and they cast no shadow now: the puffs' shadow drew a hard grey disc on the floor), and `EyesDelay` 0.3 s in two GLOWING YELLOW
+EYES in it (`EyesGlow`: two quads of `EyeSize` 0.2 x 0.4 on the soft radial, additive `EyeColor` (1, 0.82, 0.08), `EyeGap` 0.34 apart, `EyeHeight` 0.14
+over the floor, in over a fifth of a second, RenderPriority 10 so they draw after the mist and show through it) that FACE MARIO (`SpotTick`: the pair's
++Z at him every tick) and pulse 8 % at 5 Hz. When the Boo comes up (`FadeTick`) the eyes go out over `EyesFadeSeconds` 0.3 and the pool over the Boo's
+`RiseSeconds`; `StopFog` (the field cleared) hides both at once. A particle colour ramp reaches the particle shader RAW -- no sRGB decode -- so a 0.09
+grey drew as a 0.33 grey (and 158's violet mist was brighter than its (0.12, 0.03, 0.2) said): both ramps (the mist's, the rise smoke's) are now given
+in linear (`SrgbToLinear`), the alpha kept. Readouts `Fogging`, `FogTime`, `EyesShown` / `EyesAlpha` / `EyesPoint` / `EyesOffMarioDeg`, `DiscAlpha`.
+`SpawnBoo` returns the Boo (its RiseSeconds times the pool's fade).
+
+**Verified** (headless drive v179-4, deleted before the commit; the card skipped, the cutscene, King Boo's moves off, the supply held to one Boo): C1 the
+spot 0.55 s in: the fog and pool colours black, the pool at full alpha, the eyes shown (alpha 1) at the floor + 0.14 facing Mario (0.0 deg off), yellow; C2
+two ticks after the spawn: the Boo at y -0.10 under the floor at 1.00 (its start -0.10, SpawnDepth 1.3), opacity 1.00, the smoke fired, Rising; C2b 12 ticks
+into the drift: y 2.57, the eyes gone (alpha 0.00), the pool gone (0.00), full size; C3 3 s of the float with the look-shock held off (Mario stands facing
+the middle, where the spot is): the tongue's yaw -21.8..10.4 deg and its droop 29.5..47.7 deg over the 3 s, its root 0.000 m off the mouth, no shock; C4
+Mario put 6 m off and turned to face it with the stick (10 ticks at most, then the exact aim -- the drive's stick is 8-way): shocked the tick he faced it
+(his facing 18 deg off, inside the cone), LookedAtNow, one shock; C5 1.7 s on: held (moved 0.045 m flat / 0.016 up: the tremble), its face 0 deg off
+Mario, drool made 8 / out 3 / the lowest 1.40 (the mouth 2.19, the floor 1.00 -- none through it), eye glow 1.06 (rest 0.5), the tongue at 62.2 deg,
+the hop over (the model's scale y 0.800), Mario's hp 8 -> 8 and no touch; C6 Mario put 13.5 m off: 1.1 s later the shock over, the eyes at 0.50, the body
+0.043 m off the shock spot (the float resumed); C6b 3 s on: moved 1.93 m, a goal reached, the drool gone (0 out); C7 faced again (5 m), shocked, X beside
+it (BombGrabRadius - 0.8): grabbed, Carried, the shock ended; C8 the colours: the mist, the pool and the rise smoke dark, the rim and the burst grey, no
+violet -- 11/11, no errors. v179-1: 8/11 -- two drive expectations (C2 read the Boo a tick before its first tick; C3 counted a shock from before the
+look-shock was held off, Mario having stood facing the spot) and the drops falling through the floor (fixed: gone at the floor); v179-2 11/11; v179-3 (the
+stick cut to 10 ticks, Mario's hp checked) and v179-4 (the stare-back, its face checked) 11/11. Five windowed shot runs (7 shots each): the dark pool with
+the two yellow eyes in it facing the camera and thin mist over it; the Boo half up through the floor in black smoke and nearly up; the tongue close in
+front of the face; the shocked Boo over Mario's shoulder, staring back, drops falling; the drool close (glossy drops on the tongue and below it); the
+stand-off from the side. Run an: the drive's 24 ticks of stick ran Mario into the Boo (the damage stars, the LIFE meter) and the Boo froze facing away --
+the stick cut, the stare-back added. A hard grey disc of 1.7 m radius lay on the floor at the spot in every shot: the mist off (run ap) and the pool off
+(run aq) each left it -- it is KING BOO's shadow (he hovers 8.5 m over the spot; his tongue hangs into the top of the frame), untouched. The smoke
+read grey in run ao (the raw ramp): black after the linear ramps (run ar).
+
+**Deviations, all knobs:** the drool is drops (the Galaxy ref's bubbles), not the Piranha's strands -- 0.22 m spheres that read from across the arena; the
+shocked Boo turns to face Mario (the ref; `ShockTurnSpeed` 0 keeps 178's facing); no shock sound (`ShockSe`); the body comes up through the floor
+(`RiseFromUnder` off = 158's rise); `LookConeDeg` 40, a generous "facing"; the touch of a shocked Boo still hurts (the bomb it is). Knobs: SmsBombBoo (The
+tongue, The shock, The rise groups; GlowColor, BurstColor), the supply (The fog group: FogMist, FogColor, FogDisc, FogDiscRadius, FogDiscColor, EyesGlow,
+EyesDelay, EyesFadeSeconds, EyeColor, EyeSize, EyeGap, EyeHeight).
+
+### 180 -- the King Boo REMATCH, part 24: the shocked Bomb Boo WORRIES (a head shake, a lean back, a cower, a breath, sweat), the spot's eyes a little bigger, and the intro's sink is King Boo's HIDE clip -- a leap and a DIVE through the floor in a twinkle burst, a flash, a ring of ghost mist and a shock ring (feature/kingboo-rematch, code `d7dd6ba`)
+
+**Jaysonn:** "ok better lets make the eyes alittle bigger and then when mario looks at the boos they should be doing like a worrired animation not just
+frozzen. also in the cutscene when king boos goes down use the animation of him hidding. and give it effects lets make it look good"
+
+**The eyes** (`SmsBombBooSpawner.cs`): `EyeSize` 0.27 x 0.54 (179's 0.2 x 0.4), `EyeGap` 0.42, `EyeHeight` 0.16.
+
+**The worry** (`SmsBombBoo.cs`, The shock group): the Bomb Boo has no rig, so the worry is built from what it has -- its one body, its tongue, its drops.
+Shocked, on top of 179's hold, stare, tremble, eye glow, tongue drop and drool, it now SHAKES its head side to side about the stare (`WorryShakeDeg` 10
+either way on a sine at `WorryShakeHz` 3: a "no, no, no" -- the yaw added to `FaceBasis`), LEANS BACK from Mario (`WorryLeanDeg` 14: the pitch, nose up),
+COWERS (`WorryCower` 0.1: the model squashed to 0.9 of its height and pushed out half that) with a quick nervous BREATH on the cower (`WorryBreathHz` 4, +-
+30 %), and SWEATS (`WorrySweat`): beads of `SweatRadius` 0.07 x 0.7..1.3 in `SweatColor`, a pale blue-white, flung from the top of its head (+-0.55 to a
+side, 0.75 up, a little toward the face, in its frame x ModelScale) every `SweatEvery` 0.3 s, alternating sides, at 1.4-2 m/s out and 2-2.8 up, arcing out
+under the drool's gravity, 0.8 s or the floor. All of it eases in over the shock's first 0.3 s (`ease`) and is zeroed the tick the shock ends (`SetShock(false)`:
+the yaw, the lean, the scale back to ModelScale). The drool's `DroolPool` became `DropPool(boo, radius, colour, life, name)` -- `Drip` for the drool (a
+cling, then the fall), `Fling(at, vel, size)` for the sweat (falling from the start) -- two pools, both ticked every tick to the floor. Readouts
+`WorryYawDeg`, `WorryPitchDeg`, `WorrySquash` (the height as a fraction of rest), `SweatOut` / `SweatMade`.
+
+**The dive** (`SmsKingBooRematch.cs`, The intro group): 174's sink lowered the node 7 m over 1.1 s under the wait clip. The hide clip read with
+`tools/anim/probe_clip.gd` (`btelesa_hide`, 0.72 s, 21 frames at 30): the body joint at 0.7 u at frame 0, 449 u (6 m) UP at frame 6, 397 u at frame 12 and
+-788 u (10.6 m DOWN) at frame 18 -- the casino boss's hop-and-plunge into his table. Now `IntroDiveClip` (btelesa_hide, "" = 174's sink) plays at the
+sink's start at `IntroDiveClipSpeed` 0.85 (0.86 s; `PlayClip` then the SpeedScale, as the hurt clip does), the node HELD at the laugh height (`DiveTick`:
+`Position = _introTop`) so the clip itself leaps the body 6 m over the hover and plunges it 2 m under the floor, and he is hidden at the clip's length
+(`_diveLen`) -- no node lerp. `OnClipEnd` has no branch for it: the clip holds its last frame (under the floor) until then. The effects: `DiveSparkle` at
+the top of the leap (the body's first tick down, or 0.3 of the clip in) -- his `ChikaFx` twinkle emitter copied as a one-shot of `DiveSparkles` 60 stars,
+1.6-3 x, flung every way at 4-10 m/s under a light gravity; his glow swelling `DiveGlowBoost` 2.5 x through the leap's first quarter (`_glowBoost` into
+`PlaceFx`'s strength) and out (0) once the body is within a metre of the floor; and `DiveSplash` as the body comes down to `DiveSplashAt` 2.2 m over the
+floor: a FLASH on the stone (a flat additive quad of the port's radial, `DiveFlashSize` 12 m, growing 0.5 -> 1.1 and fading over `DiveFlashSeconds` 0.45,
+`DiveFxTick`), a SHOCK RING (`DiveShockRing`: the port's hamonring2_add flat, racing from 2 m out to 2.2 x the flash over 1.8 x its seconds, fading), a RING
+of ghost mist along the floor (`DiveRingPuffs` 36: the smoke ball, 2-5 m, 7-13 m/s flat, 1 s), a SPLASH of it thrown up (`DiveSplashPuffs` 28, 1.5-4 m,
+6-13 m/s, 1.1 s), the camera kicked (`DiveShake` 0.6 x the damage shake) and the vanish voice (moved from the sink's start); the puffs 30 % toward white
+from `DiveColor` (0.8, 0.7, 1). The flash and the ring are drawn over the depth: the arena's floor is a shallow dome, and a flat 12-26 m quad at the
+spot's height dipped under it further out and was cut into chunks (the first ring shot). `DiveFxTick` runs from the top of `_Process` so the flash and the
+ring finish after he is hidden; `IntroAbort` resets the glow. Readouts `DiveOn`, `DiveSparkled`, `DiveSplashed`, `DiveSplashT`, `DiveBodyTopY`, `DiveFlashUp`.
+
+**Verified** (headless drive v180-5, deleted before the commit; the cutscene played, the card skipped): C0b the cutscene's sink -- the hide clip the one
+playing through all 52 ticks of the sink, the body from the laugh's 9.27 to a top of 15.27 (6 m up), the twinkle burst fired (0.26 s in), the splash fired at
+0.68 s with the body 2.0 m over the floor, the flash still up as he was hidden; C1 the spot as 179 had it with the eyes 0.27 x 0.54; C2 / C2b / C3 / C4 as
+179; C5b 1.7 s into the shock: the head shake -10.0..10.0 deg over 1.3 s, the lean -14.0 deg, the squash down to 0.870 of its height (breathing: 0.926 at
+the read), sweat made 6 / out 3; C5 held (0.055 m), its face 0 deg off Mario at the read (the shake is +-10), the drool a drop 1.09 m under the mouth at
+most and the lowest 0.04 m over the floor, the eyes at 1.06, the tongue at 62 deg, the model's height = the squash, Mario's hp kept; C6 the shock over: the
+yaw 0, the lean 0, the scale back to 0.800, 0.012 m off the shock spot; C6b / C7 / C8 as 179 -- 13/13, no errors. v180-1 13/13 but C6b: the Boo's random
+goal took it back within LookRange of the standing Mario and it was shocked again (right: the drive now holds the look-shock off for the float check);
+v180-4 a C5 read at one instant found the drops high (the Boo hung low and its drops died at the floor in 0.3 s) -- the drop depth is read over the whole
+window. Four shot runs (11 shots each): the leap (the body tilted over the floor, the tongue out, the crown high above the head -- the clip's own stretch);
+the splash 0.2 s on (a column of lilac puffs, the floor glowing violet, big golden twinkle stars raining from the top of the leap); the ring 0.47 s on from
+above (the shock ring out to 12 m across the stone, the first run's chunks gone with the depth fix); the worried Boo close (leaning back, cowering, two
+sweat beads in the air, the drool); the 179 shots again (the spot's bigger eyes, the rise, the stare over Mario's shoulder). A shot run that produced no
+log: the project root's run_window.ps1 had gone with 179's cleanup -- copied back from ps157 for the runs and deleted again.
+
+**Deviations, all knobs:** the worry is procedural (no rig): a head shake, a lean, a cower, a breath and sweat beads (Worry* / Sweat*; the drool stays);
+the dive's node holds at the laugh height and the clip's own plunge takes him under (the clip is 0.72 s: the body crosses 16 m in 0.2 s, a blur -- its
+speed knob is there); the dive's colours are King Boo's violet-white (`DiveColor`; the "black, not purple" was the Bomb Boo's); the crown rides high over
+the head at the top of the leap for a tenth of a second (the hide clip's own stretch); the teleports in the fight still fade (the dive is the cutscene's).
+
+### 181 -- the King Boo REMATCH, part 25: effects for him COMING UP out of the ground (a glow pulsing on the stone and wisps before he breaks through, then the flash, the shock ring, the mist and twinkle stars streaming up round him) and for every TELEPORT (a poof and stars as he goes, a flash, a poof and stars where he comes in); the flashes brighter and bigger (feature/kingboo-rematch, code `2608391`)
+
+**Jaysonn:** "we also needs eefects of him coming from the ground we bascially went everything to have some type of effect and make it flashy kinda. does
+that make sense?"
+
+**The rises** (`SmsKingBooRematch.cs`, The rise and the teleports group): the intro's surface (`IntroSurface` -> `IntroRise`) and the fight's spawn
+(`SpawnRising` -> `Appear` with `_spawnRise`) share `RiseFxBegin` / `RiseFxTick` / `RiseFxEnd`. From the rise's start a GLOW pulses on the stone where he will
+come up (`RiseGlowSize` 14 m, `RiseGlowHz` 3, in over 0.3 s, growing 0.7 -> 1 over 1.2 s; `FlashBoost` x `DiveColor`, additive, flat, over the depth) with
+wisps of ghost mist seeping up out of it (`Emitter`: `RiseWisps` 30 alive, 2-4.5 m, 1.5-3.2 m/s up with a 70-degree spread, 1.1 s each). The rise now opens
+with a TELL (`RiseTellSeconds` 0.7): the node sits under the floor with the wait clip while the glow and the wisps run, and only then the appear clip and
+the appear voice start (`RiseClipWhenDue`: `_introT` runs from -0.7; the clip's own first fifth of a second rushes the body up from 23 m under the node --
+without the tell the glow had 0.19 s, run bt). As the body joint comes up to `RiseBreakAt` 2.2 m under the floor: `FloorBurst` (the dive's splash shared --
+the flash, the shock ring, the ring of mist along the floor, the splash of it thrown up), the camera kicked (`RiseShake` 0.5), his glow swelling
+`RiseGlowBoost` 2 x and settling over 0.6 s (`_glowBoost`), and twinkle stars STREAMING up round his body till he is up (`RiseSparkles` 50 alive: his ChikaFx
+copied as a continuous emitter from a 3 m sphere at the body, 3-7 m/s up, following the body). `RiseFxEnd` (he is up, or the intro cut) closes the stars
+and the wisps (the live ones finish, freed after), puts the glow out if it never broke, and resets the glow boost; the glow after a break fades on its own
+clock (`_riseGlowT`) so it finishes after the rise ends. Readouts `RiseFxOn`, `RiseGlowUp`, `RiseBroke`, `RiseBreakT`, `RiseStarsOn`.
+
+**The teleports** (`TeleportFx`): `TeleportOutFx` -- a POOF of ghost mist (`TeleportPuffs` 20, 2-4.5 m) and a burst of stars (`TeleportSparkles` 30) at his
+body (+1.5 m) the moment he is gone -- the END of the fade (the Vanish tick's k >= 1, before `ArriveAt` or the found-out copy's free): fired at the fade's
+start (run aw) the hide clip's hop had carried him 6 m up off the poof. `TeleportInFx` in `ArriveAt` -- a camera-facing FLASH (0.8 x `DiveFlashSize`, 0.5 ->
+1.2), the poof and the stars 3 m over the node, by his crown (at +1.2 the flash hid inside the fading body, run ay); his teleports and a copy's arrival alike.
+`TeleportFxScale` 1 against the dive's sizes. Readouts `TeleportOutFxFired`, `TeleportInFxFired`.
+
+**The flashes, brighter and bigger**: `FlashBoost` 1.8 -- `Bright(alpha)` = `DiveColor` x it on every flash, the shock ring and the rise glow (an additive
+quad brighter than its texture; the first shots' flashes read as a faint ring on a 6 m ghost); `DiveFlashSize` 12 -> 16; the ring puffs 44 of 2.5-6 m at
+8-15 m/s, the splash puffs 36 of 2-5 m at 7-15 m/s, the twinkle burst 80. Under it: 180's one dive flash became `FlashAt` (a list of live flashes, flat or
+camera-facing), `ShockRingAt`, `FloorBurst`, `StarBurst(name, at, count, scale)`, `Emitter`, and `FxTick` for them all from the top of `_Process` (hidden or
+not; `AnyFxAlive`). `IntroAbort` ends the rise's effects and the pending clip.
+
+**Verified** (headless drive v181-5, deleted before the commit): C0c the cutscene's RISE -- fx on and the glow up from the first tick of the rise (the body
+at -6.4), the tell over at 0.7 s, the break at 0.89 s with the body at -1.21 (the floor 0.90), the flash up, the stars streaming while he rose, everything
+off at the laugh; C0d the fight's SPAWN rise the same (the break at 0.88 s), all off as he waits; C9 a hit (`TakeHit` with the held Boo) -> the hurt -> the
+teleport: the out-poof once (3.6 s after the hit, at the fade's end), the in-flash once, back in the wait; 180's and 179's checks as before -- 16/16, no
+errors. v181-1: C0c failed on a break at 0.19 s -- the appear clip's rush with no tell: the tell added (v181-2 16/16); v181-3 the sizes and the boost;
+v181-4 the out-poof moved to the fade's end; v181-5 the in-flash back by the crown. Four shot runs (16 shots each): the glow on the stone before anything
+shows (a bright pool of violet-white light with wisps over it; faint before the boost); the break (his body bursting up out of the pool of light, Mario
+watching); the stars streaming up round him 0.5 s on (the first run's camera sat in the floor plane: the arena seen from its side, his body half under
+the stone -- a camera fix); the teleport-in flash and stars by his crown as he fades in; the out-poof shot caught the arrival instead (the drive's timing
+-- the poof is checked by the drive, not shown); the 180 and 179 shots again. The project root's run_window.ps1 was gone again (180's cleanup) -- copied back
+for the runs and deleted.
+
+**Deviations, all knobs:** the tell holds him under the floor 0.7 s longer at both rises (`RiseTellSeconds` 0 = at once); the out-poof fires at the END of
+the fade, not its start; the rises' and teleports' colours are King Boo's violet-white (`DiveColor`); `FlashBoost` over 1 brightens every flash, the ring
+and the glow together; the rise's break reads the body joint against `RiseBreakAt`, as the dive does; the defeat (the down) has no new effect ("the fight's
+end is a later pass").
+
+### 182 -- the King Boo REMATCH, part 26: the APPEAR is clean and smooth (the appear clip's own leap is the rise: the node waits at the hover height and the body comes up out of the floor in one arc, no stall on the stone) and the CROWN SPARKLES are off (the tell's stars, the teleport-in stars, and the rise's stars shed off his body instead of a column up past his crown) (feature/kingboo-rematch, code `fe66876`)
+
+**Jaysonn:** "hmm not a fan of the crown sparkle effect. and during the intro it seems king boo get stcuk on the fllor for a second. can you make the appear
+animatin look clean and smooth?"
+
+**The stall** (`SmsKingBooRematch.cs`): the appear clip (`btelesa_appear`, 0.97 s) is itself a LEAP -- probed joint by joint (tools/anim/probe_clip.gd), the
+body spins up from 17 m under the node to 11 m over it by 0.33 s and lands back at the node by 0.6 s -- and 174's node, lerping up from `IntroSinkDepth` 7 m
+under the floor over `IntroRiseSeconds` meanwhile, let the body pop out of the floor, fall back under the stone and sit at floor level for half a second till
+the lerp caught up (by the probe's numbers against 174's 1.6 s lerp). Now the node waits AT the hover height (`StartAppearClip`: `Position = _introTop`
+as the clip starts, after 181's `RiseTellSeconds` 0.7 tell) and the clip's own leap IS the rise: the body comes up from 9 m under the floor and lands at the
+hover in one arc, the clip at `IntroAppearClipSpeed` 0.6 (1.6 s; `_anim.SpeedScale` x it, `_riseLen` the clip's length over it), its overshoot over the hover
+damped by `RiseLeapDamp` 0.6 (`RiseNodeTick` each tick: the node lowered from `_introTop` by that share of the body's lift over it, the lift read off the pose
+-- 0 = the clip's full 11 m leap, 1 = none, the node moving down to meet it), `RiseLength` the clip's. The same at the fight's spawn rise (`_spawnRise`; the
+quiet spawn's wait-for-up reads `_riseLen`). `IntroRiseSeconds` / `SpawnRiseSeconds` only time the old lerp when the clip is missing (`_riseClipStarted`
+false). Readout `RiseLeapTopY` (the highest the body got).
+
+**The crown sparkles**: `CrownSparkles` 36 -> 0 -- 165c's twinkle stars rising off the crown through a move's tell (`_crownSpark`, made only when the knob
+is over 0); the tell is the crown's colour and halo alone now, 36 puts them back. `TeleportInStars` (new) false -- 181's arrival stars (`StarBurst` in
+`TeleportInFx`) clustered at his crown: the arrival is the flash and the poof alone, both down at the body's middle (`Position` + 2, not + 3 by the crown;
+`TeleportOutFx` unchanged). The rise's stars (`RiseSparkles` 50, `_riseStars`: ChikaFx copied) were 181's column up past his crown (3-7 m/s up from a 3 m
+sphere at the body joint): they now SHED off his body -- a 3.5 m sphere at the body's middle (`BodyPoint` + 1.5: the joint sits low in the sphere), flung
+`Down` with a 100-degree spread at 2-6 m/s under a gravity of 8, 0.8 s each -- and only while he shoots UP to his hover height (`RiseFxTick`: the emitter
+closes once `BodyPoint.Y` passes `_introTop.Y`, or the body is 0.3 m under `RiseLeapTopY`): stars shed over it (the leap's 4 m overshoot and the drop back,
+half a second) sank slower than he did and he left them hanging about his crown as he landed (runs ba-bd).
+
+**Verified** (headless drive v182-6, deleted before the commit): C0e the rise is CLEAN -- once the body broke the floor it never dipped back under it and
+spent 4 ticks within 3 m of it (the drive's bound 15; the old lerp by the probe's numbers: half a second at floor level), the leap's top 13.84 against a landing at 9.58 (the clip's 11 m damped 0.6), 30 of
+94 ticks after the break coming down (the leap's landing), the rise 1.64 s at the clip's 0.6; C0c / C0d the cutscene's and the spawn's rise effects as in 181
+(the glow seen, the break at 0.79 s, the stars seen, the flash up, all off once up); C9 the teleport after the hit: the out-poof once, the in-flash once, no
+stars at the crown; 181's, 180's and 179's checks as before -- 17/17, no errors. v182-1: C0e's dip check read the break's own 2.2 m under the floor as a dip
+(the break fires with the body at `RiseBreakAt` under it) -- the drive waits for the body to be up first (`_wasUp`); v182-2 17/17; v182-3 the stars sent out
+and down; v182-4 falling; v182-5 stopped at the leap's top; v182-6 stopped at the hover height, 17/17 each. Five shot runs (17 shots each): the glow on the
+stone; the break; the stars trailing under him as he shoots up; the landing at the hover -- run ba's column of stars past the crown (181), bb's stars sent up
+off the body gathered at the crown in a white blob (he came down faster than they rose), bc's falling stars still hung over the crown (the body dropped 4 m
+in half a second, the stars 3), bd's stopped at the leap's top still left a few, be: a bare crown, the ambient twinkle's few small stars about him only
+(157's `Twinkle`); the teleport-in with the flash and no stars; the 181-179 shots again. run_window.ps1 copied to the project root for the shot runs and
+deleted; the drive, the logs and shots165/ deleted; a clean rebuild 0 errors.
+
+**Deviations, all knobs:** the rise is the clip's length (1.6 s at `IntroAppearClipSpeed` 0.6, after `RiseTellSeconds` 0.7) -- `IntroRiseSeconds` /
+`SpawnRiseSeconds` no longer time it unless the clip is missing; the leap still overshoots the hover by ~4 m before he settles (`RiseLeapDamp` 1 = none, 0 =
+the clip's 11 m); `CrownSparkles` 0 takes the stars out of every move's tell too (the crown's colour and halo stay); the rise's stars stream only up to his
+hover height, none through the overshoot and the settle; the ambient twinkle (`Twinkle`) still puts a few small stars about his body -- the knob if that is
+the sparkle he meant. Next: the fight's END -- the defeat and the Shine's spawn (Jaysonn: "lets do the ending of the fight also spawning the shine and such").
+
+### 183 -- the King Boo REMATCH, part 27: the fight's END -- his DEFEAT (the down clip's tumble with his body blinking, ghost mist and stars boiling off him, his glow swelling and his crown flaring, sinking low, then a BURST: a flash, a shock ring, a poof, stars, a kick, an afterglow) and the SHINE (materialising in a golden flash where he burst, flying the game's way down onto its spot at the arena's middle under a demo camera with the world frozen); the Bomb Boo supply ends at the last hit (feature/kingboo-rematch, code `dc28a2b`)
+
+**Jaysonn:** "ok and also lets do the ending of the fight also spawning the shine and such"
+
+**The defeat** (`SmsKingBooRematch.cs`, The end: the defeat and the Shine group): the last hit's hurt ends in the down clip (`btelesa_down`, 3.3 s -- probed
+with tools/anim/probe_clip.gd: a spinning tumble, the body climbing 2.6 m by its end) with `DeathFx`. `DeathBegin` at the down: a mist emitter (`Emitter`,
+`DeathMist` 40 alive, 2.5-5 m, 1.5-4 m/s every way) and a star emitter (ChikaFx copied, `DeathSparkles` 40 alive, 3-7 m/s every way under a gravity of 3) at
+the body's middle. `DeathTick` through the clip: the hurt flash toggled at `DeathBlinkHz` 8 (`SetFlash`), `_glowBoost` 1 -> `DeathGlowBoost` 3 with the clip's
+progress, the crown `SetCrownGlow(white, 0.5..1 pulsing at 2 -> 9 Hz + the progress)` -- white, quicker and quicker, the activation flash by the end
+(`DeathCrownFlare`), the emitters following the body, `SmsCameraShake` Damage x `DeathRumble` 0.25 every 0.4 s, and the node SINKING: `Position` =
+`_deathHome` down `DeathSink` 6 m x SmoothStep of the progress, the body kept 2 m over the floor (`_floorAtSpot` / `_introFloorY`) -- so the tumble ends low
+(the body at 7.1 m against 9.8 at the down's start) and the burst and the Shine's flight are by the floor, not 13 m up in the black sky (runs bf, bg).
+`DeathBurst` at the clip's end (OnClipEnd, before Gone): `_burstAt` = the body's middle; a camera-facing `FlashAt` of `DeathFlashSize` 30 m over
+`DeathFlashSeconds` 0.6 (0.3 -> 1.4) and an AFTERGLOW (0.6 x the size, `DeathAfterglowSeconds` 2.5, 1 -> 0.5: shrinking as it fades), `ShockRingAt` on the
+floor under him (`FloorUnder`; `DiveFlashSize` x `DeathFxScale` 1.6), a POOF (`DiveBurst`, `DeathPuffs` 60 of 3-6 m x 1.6 at 4-8 m/s x 1.6, every way, 1.3 s)
+and `StarBurst` of `DeathStars` 150 x 1.6, the camera kicked `DeathShake` 1.2; the death emitters close (freed after), `SetFlash(false)`, the crown's glow off,
+`ProcessMode` Always (his effects run on through the Shine's stop-the-world), the Shine's clock started. Then Gone: the model hidden, `Defeated`.
+
+**The Shine**: `GoneTick` (from the top of `_Process`, Gone only): `ShineDelaySeconds` 1 after the burst `SpawnShine` -- the `ShineScene` (empty =
+`res://shine_sprite.tscn`, as the casino boss's and the Chomp's) instantiated beside him (his parent, else the current scene), placed at `ShineSpawnPoint`
+(a Node3D) or `ShineOverFloor` 1.2 m over `FloorUnder(_arenaCentre)` at the arena's middle, with its back to Mario (yaw = atan2(-away.x, -away.z):
+`SmsMath.DirFromYaw` = away from him, so its demo camera, before it, looks past it at Mario); a `ShineSprite`: `ShineId` = this scene's path + his name +
+":rematch" when empty (118c's save flag for a spawned Shine), `ExitLevel` / `ExitScene` set when `ShineExitLevel` (`ShineExitScene`; off = the Shine scene's
+own: the save card, then control back), `SmsAppearCamOffset` = `ShineCamOffset` (0, 7, 9) in the Shine's placed frame (x right, y up, z forward) unless zero,
+then `SmsAppearFrom(_burstAt, ticks, ShineDemo)` (`ShineFromBurst`; else `SmsAppear` at its spot) with `ShineDemoTicks` 720 (0 = the Shine scene's own
+`SmsAppearDemoTicks` 1200) -- the game's TShine::appearWithDemo: up 240 ticks (3.2 m, 2 s), a half-sine loop down onto its spot over the rest less the
+settle's 240 (720: 2 s; the arc's height half the distance), the settle 240, spinning; `ShineDemo` true = the world frozen (`SmsAppearStopWorld`) and the
+Shine's own camera current, its `Fov` set to `ShineCamFov` 40 (the Shine's own (0, 2.5, 7) at 75 degrees showed a speck in the black sky through the
+flight). Where it materialises: a GOLDEN `FlashAt` (`ShineFlashSize` 12, 0.5 s, 0.4 -> 1.3, `ShineFlashColor` (1, 0.85, 0.35)) and a `StarBurst` of
+`ShineStars` 60 x 0.7 in the gold -- `Flash` has a `Col` (else `DiveColor`), `StarBurst` a colour (the process material's Color), `Bright(Color, alpha)`.
+Once the Shine is out, his flashes gone and 1.5 s past the delay (the Shine's stars done), `ProcessMode` back to Inherit. Readouts `DeathFxOn`, `Burst`,
+`BurstAt`, `Shine`, `ShineSpawned`, `HurtFlashOn`, `GlowBoostNow`; the signal `ShineAppearing(shine)`.
+
+**The supply** (`SmsBombBooSpawner.cs`): `OnBossHit` with 0 left clears the field and `Stop`s -- the casino's forceAllItemKill at the boss's death; before,
+the supply ran on through the hurt (3.6 s) and a Boo spawned, drifting through the down, the burst and the Shine (run bg's 17g). The not-alive stop in the
+tick clears the field too.
+
+**Verified** (headless drive v183-5, deleted before the commit; its node ProcessMode Always to tick through the Shine's stop-the-world; `DriveSetHp(1)` then
+`TakeHit(null)` after 181's teleport check): C10 the DOWN -- the death effects on, 24 flash toggles in 1.5 s, the glow 1.91 x and climbing, the crown's shine
+to 1.43, the copies gone, not alive, the supply stopped at the last hit with no Boo out (and not running at the down), the clip `btelesa_down`; C10b the
+BURST 3.32 s after the down, 7.13 m up against the body's 9.81 at the down's start (sunk), the flash up, the emitters closed, Gone; C10c the SHINE 1.00 s
+after the burst, a ShineSprite in appear state 2 (rising) at the burst point, placed (0.08, 2.10, 0) = the arena's middle 1.2 m over its floor (0.90; the
+intro's spot 1.00), the demo running, the world paused, the Shine's `SmsShineAppearCam` current, the id
+`res://assets/Sms/Rematch/RematchArena.tscn:KingBoo:rematch`, no exit; C10d the flight's END -- the top 10.34 (3.2 m over the burst), down onto its
+placed spot within a mm, the demo over at 6.0 s, the world running, the camera gone, King Boo Gone, back on Inherit, his flashes out; 182's, 181's, 180's
+and 179's checks as before -- 21/21, no errors. v183-1 21/21 at the Shine's 10 s with the burst 13 m up (the speck); v183-2 the supply's stop at the last
+hit and the 6 s demo; v183-3 the sink and a camera from above ((0, 9, 10) at 45: a good start, a steep settle); v183-4 a low camera ((0, 4.5, 8) at 42:
+the black sky behind the burst); v183-5 (0, 7, 9) at 40 and the Shine's stars at 0.7. Six shot runs (25 shots each): the tumble blinking white with the
+crown flaring and the stars shed; the mist and the stars trailing off him as he spins, his glow swelled; the burst low over Mario with the ring racing out
+along the floor under it; the afterglow with the stars and the puffs falling; the Shine materialising in gold under the demo camera with the rim and the
+floor behind it; its flight down with its own sparkle trail and Mario standing below; the settle; the Shine floating at the middle with Mario before it.
+Run bj made no shots: it started while my own rebuild was rewriting the DLL (the scripts' classes not found, every node bare) -- the two were issued
+together; the run re-issued alone (bk). The drive's idle Mario had fallen asleep by the ending (his Z over the Shine in bh's 17g): the stick tapped at the
+last hit and after the demo. The clean rebuild 0 errors; the drive, the logs, shots165/, run_window.ps1 and the probe's logs deleted, this pass's
+scheduled tasks too.
+
+**Deviations, all knobs:** the casino boss dies where he hovers (no sink, no burst) and his Shine comes 240 ticks into the down at his point -- here the
+sink (`DeathSink` 0 = none), the burst, and the Shine 1 s after it from the burst point (`ShineFromBurst` off = at its spot); the demo is 6 s, not the
+Shine's 10 (`ShineDemoTicks` 0 = the Shine's own), from a camera King Boo places (`ShineCamOffset` / `ShineCamFov` zero = the Shine's own); the golden flash
+and stars at the Shine's appearance are not the game's (`ShineFlashSize` 0 / `ShineStars` 0 = none); the Shine's back is to Mario (its placed yaw -- the
+shine-get demo faces it); its exit is the Shine scene's own unless `ShineExitLevel`; the twinkle stars' faint square halo (the game's IA8 star texture has a
+little alpha everywhere; `kira_add.gdshader` adds it) shows at the big sizes against the black sky -- left as the port has it (a shader cut of the low alpha
+would take it out of every twinkle). Open: where the Shine's exit should lead (the plaza? the casino?) -- Jaysonn's call.
+
+### 184 -- the King Boo REMATCH, part 28: the Bomb Boos spawn in RANDOM places -- the supply's Random mode is the default (158's Centre was for the playtests) and its spots are picked with rules: on the arena's stone and EdgeMargin inside its edge, MinFromMario to MaxFromMario from Mario, MinFromLast from the last spot, MinFromBoos from any Boo out (feature/kingboo-rematch, code `fda300f`)
+
+**Jaysonn:** "ok we now need the bomb boos to spawn in random locations"
+
+**The pick** (`SmsBombBooSpawner.cs`): `SpawnMode` `Random` by default -- the doc's "Black foggy spots appear at random through the fight"; `Centre` (this
+node's point) stays as the knob 158 made for the playtests. `FindFloor` at the wiring (and lazily at the first pick): the arena's `SmsArenaFloor`, its
+`Centre` and `Radius` (26.4 m here, read off the planet's mesh). `SpotRadius` = the lesser of `ArenaRadius` 18 and the floor's radius less `EdgeMargin` 2.5.
+`PickPoint` in Random: up to 24 draws of a point uniform in the disc of that radius about the arena's middle (angle, radius = R x sqrt(u)); each draw's
+floor is found with a ray (`FloorUnder`) -- no hit means off the stone and the draw is dropped (158 rayed AFTER the pick and a point past the edge kept
+the node's height: a spot in the air); each is scored by its MISS in metres -- nearer Mario than `MinFromMario` 4, farther than `MaxFromMario` 14 (0 =
+no cap), nearer `LastSpot` than `MinFromLast` 6 (not the same place twice running; the first spot has no last), nearer a Boo out than `MinFromBoos` 3
+(each one summed) -- and the first draw that misses by nothing is taken, else the one that missed least; no floor found in 24 draws: the node's point.
+`FloorOffset` over the floor as before. Readouts `LastSpot`, `SpotsMade`, `LastPickDraws`, `LastPickMiss`, `ArenaCentre`, `ArenaFloorRadius`,
+`SpotRadius`; `DebugPrint` lists every spot with its distances, draws and miss.
+
+**Verified** (headless drive v184-2, deleted before the commit): a sampling phase after the intro -- the supply's interval at 0.3 s, six Boos vanished as
+they rose, each `LastSpot` recorded -- then C11: every one of the six on the stone (the floor found under it: y 1.2-1.3 against Mario's 0.99 on the dome),
+within the spots' radius 18 of the middle (the floor's 26.4), 4..14 m from Mario (5.9, 4.0, 10.5, 11.8, 11.9, 11.9; Mario at (0, 10), 10 m from the middle),
+6 m or more from the one before (5/5), all six off the middle (4.3-14.7 m; Centre mode would put them all at the node), spread over 19.1 m, every pick met
+its rules (22 draws for the six, 1-8 each: the Mario ring 4..14 m is the binding rule), the spots (0.1, 14.7) (4.0, 9.5) (-4.7, -0.5) (3.7, -2.3)
+(-11.9, 8.6) (-6.9, -0.8); the interval restored, 183's, 182's, 181's, 180's and 179's checks on the seventh spot's Boo as before -- 22/22, no errors
+(v184-1 the same 22/22; v184-2 the floor read at the wiring so the readouts are right before the first pick). A shot run (28 shots): three sampled spots
+from over the arena (the camera 30 m up over the middle, 14 m back, Mario and King Boo in the frame) -- the first beyond Mario toward the far rim, its
+two eyes glowing in the black pool; the second at Mario's side with the first's vanish puff behind; the third across the arena; the 179-183 shots again.
+The clean rebuild 0 errors; the drive, the logs, shots165/, run_window.ps1 and this pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** the spots are capped `MaxFromMario` 14 m from Mario (0 = anywhere on the stone, the doc's plain "at random") and kept 6 m from
+the last and 3 m from the Boos out -- a spread the doc does not spell out; the arena's floor radius (26.4) is not the cap -- `ArenaRadius` 18 is, so the
+spots keep 8 m off the rim (`ArenaRadius` up to 24 lets them out to `EdgeMargin` from the edge); 158's fixed seed (`Random(158)`) stays: the same spots
+every fight in the same order from the same Mario -- a seed knob is a line if wanted; the spawner node's scene note still describes Centre as the default
+(the note is Jaysonn's scene file, left alone).
+
+### 185 -- the King Boo REMATCH, part 29: the pace UP (a move about every 2 s at the start, every second by the end; the first in 2 s; fewer plain hops) and the THUNDER WALLS long and LOW (18 x 2.2 m, were 10 x 5: a held jump clears them, the open ends are 9 m off -- the dodge is the jump) (feature/kingboo-rematch, code `678f213`)
+
+**Jaysonn:** "i think we may need to speed up the rate of which king boo attacks it feels too easy. however i want the thunder walls to be jump over able
+more easily. but make them longer"
+
+**The pace** (`SmsKingBooRematch.cs`, The fight group): `FirstAttackDelay` 3 -> 2; `GapAtStart` 3.5 -> 2.2, `GapAtLastHit` 1.8 -> 1.0, `GapJitter` 0.6 ->
+0.5 -- `NextGap` is 162's lerp by his hits taken over `HitPoints` - 1, so a move comes about every 2 s with all his hit points and every second at his last,
+give or take half; `RepositionChance` 0.3 -> 0.2 (fewer of the moves are a bare hop to another spot, more are attacks; the half gap after a hop stays).
+The teleports (0.4 out, 0.3 in), the lick's wind-up and the tells are as they were.
+
+**The walls** (`WallLength` / `WallHeight` on King Boo, copied onto each `SmsGhostLightning` he makes in `LightningTick`; the same defaults on
+`SmsGhostLightning.cs`): 10 x 5 -> 18 x 2.2. The hit test is 166's: `HitCheck` returns before anything when Mario's feet (`GlobalPosition.Y`) are at or over
+`FloorY + WallHeight`, else a wall face within `WallThickness` + his damage radius of him, within the wall's length, is the shock. The port's jump table
+(pass 34): a held standing jump, vy 42, peaks at 3.03 m in 0.35 s -- his feet are over 2.2 m for 0.37 s of the arc (over 5 m never: a spin jump, 70, or the
+triple, 75, was needed); the wall's face takes 0.1 s to pass through him at `WallSpeed` 8, so the jump has a quarter second of slack either way. The open
+ends were 5 m off Mario (a run out along the wall), now 9 m: the dodge is the jump. `WallGap` 12 and `WallSpeed` 8 stay -- the walls appear 6 m either side
+and meet in 0.75 s after the 0.45 s warning; the posts, the electricity and the zaps scale with the new size (the face is 40 m2, was 50).
+
+**Verified** (headless drive v185-4, deleted before the commit): C12 -- after 181's teleport check the lightning called by hand (`DriveLightning`: the move
+picked, `BeginLightning`) on a Mario standing in the arena: the walls out 18 x 2.2 (King Boo's knobs and the walls' own equal), three squeezes; the drive
+pressed A and held it 30 ticks the tick the gap came under 7.2 m (16 m/s of closing: the face reaches him at a gap of 1.6, 0.35 s on -- the apex): his feet
+topped 3.43 m over the floor, every squeeze a miss (0 hits on the walls and on King Boo's count), his HP kept; the gaps 2.2 / 1.0 +- 0.5, the first 2, the hop
+chance 0.2, the gap set after the lightning 1.69 s (one hit taken of nine); C12b the control -- the same walls on a STANDING Mario: shocked at the first
+squeeze (once: `OneShockPerAttack`), one hit point off -- the low wall still hits, the jump is what clears it; 184-179's checks as before -- 24/24, no
+errors. v185-1 failed 179's C4 (Mario faces the Boo: the shock): with 184's random spots the Boo drifts from wherever it rose, and in run cl it left Mario's
+20-degree half-cone (6 m off, aimed once) before the shock came -- the drive now re-aims him every 10 ticks until the shock, as a player's stick would
+(v185-2 23/23). v185-3 added C12b and failed 179's C5 / C6 once (run cn): the shock ENDED early -- over by the 1.7 s check with Mario idle, aimed, 6.0 m off
+and the Boo held (`ShockMinSeconds` 0.8 + `LookAwaySeconds` 0.6: the Boo saw him look away for 0.6 s); a tick-by-tick trace of the shock added to the
+drive (v185-4): it did not recur -- shocked and looked-at every 12 ticks for the 1.7 s, Mario idle 0.8-1.4 degrees off the Boo at 5.9 m -- the trace stays
+in the drive for the next time. One shot run (31 shots): the two long low walls either side of Mario seen from across the arena (King Boo over them); Mario
+at the top of his jump as the walls meet under his feet; the second wall from behind him; the 179-184 shots again. The clean rebuild 0 errors; the drive,
+the logs, shots165/, run_window.ps1 and this pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** the doc's pace is words ("quick and light"; shorter per hit) -- 2.2 / 1.0 s are mine; the walls' 18 x 2.2 are mine (the doc:
+"two walls of lightning close in on Mario from either side and try to squash him"); the walls can still be run round at their ends, 9 m off (`WallLength`
+up to 24 closes that on this arena); a standing jump tapped short (1.7 m apex) does not clear 2.2 m -- the jump must be held (`WallHeight` 1.5 would let a
+tap over). Open: the C5 shock that ended early once (run cn) is unexplained -- if Jaysonn sees a shocked Boo wake while he is still looking at it, the
+drive's trace is the tool.
+
+### 186 -- the King Boo REMATCH, part 30: the BEGINNING LAUGH is the casino intro's CHUCKLE (MSD_SE_BS_TELESA_V_LAUGH1B, the climbing "hee-hee-hee" the casino plays as the roulette seats; the long V_LAUGH1 before), at IntroLaughPitch, the intro laughing 4.6 s and the chuckle cut at his dive; SmsActorSound gets Stop(se) / IsPlaying(se) (feature/kingboo-rematch, code `6f59cea`)
+
+**Jaysonn:** "make the beginning laugh more high pitched like in the casino fight"
+
+**What the two fights play** (measured with tools/projectshine/rematch157/laugh186/pitch.py -- an autocorrelation f0 per 40 ms frame, voiced frames only):
+`MSD_SE_BS_TELESA_V_LAUGH1`, the long laugh, 2.25 s, eight syllables flat at 296-320 Hz (median 305) -- the rematch intro's laugh since 157, and the sound
+the casino boss gives at his laugh clip (the port's own choice there: the game's bck 6 has no sound table). `MSD_SE_BS_TELESA_V_LAUGH1B`, the chuckle, 6.0 s
+-- the casino's BEGINNING laugh: the game restarts it every frame of the roulette's fall (in effect silence) and the last start plays out whole as the disc
+seats (155b / 156c); its "hee-hee-hee" climbs 308 -> 360 Hz over 0.3-3.4 s (twelve syllables), then a low "haa" (208 / 268 Hz, 3.4-4.7 s) and a second run
+at 330-376 to 5.9 s. `V_LAUGH2` (the smash's second laugh) is the highest, 435-540 Hz, 1.5 s. So "more high pitched like the casino" is the chuckle: the same
+median only 8 % up, but climbing, quick and twice as many syllables -- the ear hears it higher.
+
+**The change** (`SmsKingBooRematch.cs`): `IntroLaughSe` = `MSD_SE_BS_TELESA_V_LAUGH1B` ("" = `LaughSe` as before), played on his sound node as the intro's
+laugh begins (`IntroTick`: the rise over -> `IntroLaugh`) at `LaughDb` and `IntroLaughPitch` 1 (the casino's `IntroLaughPitch` is 1 too; over 1 higher and
+quicker -- Godot's PitchScale resamples, so 1.2 is 20 % higher and 20 % shorter); `IntroLaughSeconds` 3.4 -> 4.6 so the chuckle's climbing run and its first
+"haa" are heard before the dive (the laugh clip loops under it as 174 had it); `IntroLaughStopsAtDive` true: at the sink's start `_sound.Stop(IntroLaughSeNow)`
+cuts the chuckle (off: its second run plays out over the dive, the splash and the vanish voice). The fight's other laughs -- a spawn with no intro, a copy
+found out (`DismissCopy`), the smash's own `SmashSe` -- keep `LaughSe`. Readouts `IntroLaughSeNow`, `IntroLaughPlaying`. `SmsActorSound.cs`: `Stop(se)` --
+every player on the node whose stream is that sound stopped (a one-shot still going, the loop), logged "stop se" -- and `IsPlaying(se)`.
+
+**Verified** (headless drive v186-1, deleted before the commit): C13 -- as the intro's laugh began the actor sound's `PlayLog` last laugh was
+`kingboo/ MSD_SE_BS_TELESA_V_LAUGH1B` (no V_LAUGH1), his node still playing it 2 s in (the long laugh would be nearly over), the intro laughing 4.6 s, and
+not playing it 3 ticks into the sink; 185-179's checks as before -- 25/25, no errors. No shot run (a sound). The clean rebuild 0 errors; the drive and the
+logs deleted.
+
+**Deviations, all knobs:** the casino plays the chuckle at the roulette's seat and the long laugh at the appear -- here the chuckle IS the appear's laugh
+(its first 4.6 s) and the long laugh is not heard in the intro (`IntroLaughSe` "" puts it back); the chuckle is cut at the dive rather than played out
+(`IntroLaughStopsAtDive`); the pitch is the casino's (`IntroLaughPitch` 1.1-1.2 for higher still); the intro is 1.2 s longer. Next (Jaysonn): the freeze
+breath "still feels like I'm unfairly getting hit", and a little King Boo-themed cutscene when he splits into two, and into three.
+
+### 187 -- the King Boo REMATCH, part 31: the FREEZE BREATH made fair -- only the DENSE cold freezes (a puff's ball shrinks with its own fade and is gone past three quarters of its life: the thin edge and the fading tail no longer hit; the ball 0.3 of the puff, the core's size), a jump clears it at 1 m, and the ICE is a shield (a hit or a shock through the frost shatters it and does nothing else: no knockdown, no HP) (feature/kingboo-rematch, code `471b32d`)
+
+**Jaysonn:** "also the freeze breath needs to be tweaked still feels like im unfairly getting hit"
+
+**Why it felt unfair** (`SmsGhostBreath.cs`, 167 / 172): the cold that froze was every live puff's ball -- `HitRadiusK` 0.35 of a puff that grows
+`PuffSizeStart` 3 -> `PuffSizeEnd` 8 m over its `PuffSeconds` 1.5 life -- for the WHOLE life, while the puff itself fades out over its last third (the
+`Fade` ramp: alpha in over the first tenth, 0.75 of full by two thirds, 0 at the end). So the biggest ball (2.8 m) belonged to a puff you could barely see,
+25-33 m out, and the mist's thin blue edge froze as surely as its white core. And a freeze was a set-up: `SmsDamageExec` / `TakeShock` thawed a frozen
+Mario and let the hit LAND (the knockdown, the HP) -- at 185's pace a frozen Mario was licked or shocked before he thawed.
+
+**The cold** (`SmsGhostBreath.cs`): `HitRadius(age)` = `PuffSize(age)` x `HitRadiusK` 0.3 (0.9 -> 2.4 m: the dense white core, `CoreSizeStart` 1.6 ->
+`CoreSizeEnd` 4.5 m across, is what freezes) x the puff's own fade (`PuffFade`, the ramp's curve; `HitFollowsFade`), and 0 past `HitLifeK` 0.75 of its life
+(the freeze's reach `BreathSpeed` 22 x 1.5 x 0.75 = 25 m; the mist rolls on harmless to 33); `ColdOn` and `NearestCold` use it. `HitHeight` 1.2 -> 1.0, and
+King Boo's `BreathHitHeight` (copied onto each breath in `BreathTick`) the same: a held jump has his feet over 1 m for 0.55 s of its arc, over 1.2 for 0.5.
+
+**The ice** (`Mario.cs`): `SmsFrostShields` (default on, beside `SmsFrostPoseClip`) -- in `SmsDamageExec` and `TakeShock` a frosted Mario's ice shatters
+(`SmsThaw`) and the method returns: no knockdown, no HP, no electric damage. The freeze is the penalty -- a second standing still -- not a set-up. Off =
+167's: the hit thaws him and lands. (The patch kept Mario.cs's CRLF working copy byte for byte; git normalises to LF as ever.)
+
+**Verified** (headless drive v187-2, deleted before the commit): C14 -- after 185's lightning checks, Mario idle again, the breath called by hand
+(`DriveBreath`: `BeginBreath`) with Mario standing 12.8 m off: the breath's `HitLifeK` 0.75, `HitRadiusK` 0.3, `HitHeight` 1, its ball at half a puff's
+life 1.35 m against the full 1.65, none at 0.9 of its life; the dense cold FROZE him 1.26 s into the sweep (9.8 m from the mouth, sweep 0.79); 20 ticks into
+the freeze `TakeDamage` from King Boo's point: "[SMS frost] the ICE took the hit -- shattered, no damage", Mario idle, not hurt, HP 7 before and after;
+the breath over, King Boo back in the wait; 186-179's checks as before -- 26/26, no errors. v187-1 passed C14 and failed 179's C5 / C6 -- the drive, not
+the game: the trace 185 left in showed Mario in `sideFlipTurning` (the stick's U-turn) at the aim, settling 25 degrees off the Boo once the turn finished,
+so the Boo saw him look away and the shock lapsed (185's unexplained lapse, run cn, was this); the drive now keeps his aim on the Boo through the shock
+(every 10 ticks), as a player's stick would. No shot run (a hit rule). The clean rebuild 0 errors; the drive and the logs deleted.
+
+**Deviations, all knobs:** the doc's "a hit freezes Mario for one second" stands; the ice shielding him from the other attacks is mine (`SmsFrostShields`
+off = 167's); the freezing reach is 25 m of the mist's 33 (`HitLifeK` 1 = the whole life); the thin edges harmless (`HitFollowsFade` off = the full ball);
+the copies still breathe (`CopyBreath`), each breath its own freeze. Next (Jaysonn): a little King Boo-themed cutscene when he splits into two, and into
+three -- "showing three of him will now be attacking".
+
+### 188 -- the King Boo REMATCH, part 32: the SPLIT's CUTSCENE -- as the hurt that earns a copy ends the world freezes and a camera cuts to a LINE across the arena: he vanishes in a poof and comes back at his place out of violet ghost mist, laughing; his copies come in beside him one by one in a flash and the mist; all of them turn on Mario and LAUGH TOGETHER under a card line ("Now there are TWO of me!" / "THREE of me! Can you keep up, Mario?"); the world runs again with every one of them attacking (feature/kingboo-rematch, code `0932892`)
+
+**Jaysonn:** "we need a little cutscene that plays when he splits into two. and three. showing three of him will now be attacking. make it king boo themed"
+
+**The cutscene** (`SmsSplitCutscene.cs`, new): a Node King Boo makes in `OnClipEnd` as the hurt that earns a copy ends (`_copyPending`: 177's every
+`CopyEveryHits` hits up to `MaxCopies`; `SplitCutscene` off = 177's `SpawnCopy` with the fight running), `ProcessMode` Always with the WORLD FROZEN -- the
+tree paused as the Shine's appear demo does, so Mario, the Bomb Boos, the supply and the game camera hold while he, his copies and the cutscene run on
+(their `ProcessMode` set Always for the length of it and back). `Begin`: the new copy made held (`SpawnCopyHeld`: `SpawnCopy` without the arrival, the
+model hidden, the Split phase); the LINE laid across the arena's middle (`ArenaCentre`, the floor under it + `HoverOverFloor`) facing Mario -- `SplitLineSpacing`
+11 apart (his body is 9 m across; 7 had two of him touching), the real one in the middle slot, the copies already out beside him, the new one last, left to
+right as Mario sees them; the beats: the real one poofs where he was at 0 (`SplitHide`: 181's teleport-out) and comes in at 0.45 s, each copy `SplitCopyEvery`
+0.6 later; the chorus 1.0 s after the last comes in; the end `SplitHoldSeconds` 1.3 after (3.35 s with two of him, 3.95 with three). Coming in (`SplitShowAt`):
+placed, turned on Mario, the arrival's flash and poof, a boil of violet ghost mist (`SplitMist`: `SplitMistPuffs` 70 smoke balls of 4-9 m flung up and out at
+5-11 m/s in `SplitMistColor` (0.48, 0.22, 0.62) -- a violet that reads on the black sky -- and half as many low along the floor), the opacity up over 0.3 s
+(`SplitFade`: the crown with the body, the model hidden at 0), then 0.35 s later the laugh clip and the long laugh (`SplitLaugh(pitch)`). The CHORUS: all turn
+on Mario (`SplitFace`) and laugh together, the copies a shade off his pitch either way (`SplitLaughSpread` 0.08: 1.08, 0.92, 1.16...). The CARD: a
+`SmsRematchCard` with one line in the intro card's style and no black (`SplitLine2` at two of him, `SplitLine3` at three; "" = none), in 0.9 s after the
+start, out over the last 0.45. The CAMERA: Mario's side of the line, `SplitCamDistance` out (0 = the lens that fits the line's half width (n-1)/2 x spacing +
+5.5 m and the laughing bodies' half height 6.5 m at `SplitCamFov` 50 and the viewport's aspect, x 1.25 + 2: 19.4 m for two, 27 for three), `SplitCamHeight`
+4.5 over the hover, looking at the middle of the bodies (4 m over the hover). A or space skips to the end (`SplitSkipAllowed`). `End`: everyone shown at
+his place, `SplitEnd` (`EnterWait(NextGap())`: the copies' gaps `CopyGapScale`d), the game camera back, the card and the camera freed, the world running,
+`Finished`. Readouts `State`, `Time`, `LineCount`, `SlotOf`, `BooAt`, `Camera`, `Card`, `WorldFrozen`, `Skipped`, `Laughs`, `ChorusDone`.
+
+**King Boo** (`SmsKingBooRematch.cs`): the `Split` phase (every move called off, the flash off; he keeps his eyes on Mario while shown; the cutscene places
+him), the hooks above, `SplitMist`, `SpawnCopyHeld`, `FloorYAt`; readouts `SplitNow`, `SplitsShown`. The copy's own tell (178: the silver crown, `CopyTell`)
+shows which is which in the line.
+
+**Verified** (headless drive v188-4, deleted before the commit): C15 -- after 187's breath check his hits taken set to `CopyEveryHits` - 1 and a hit: the
+hurt, then the cutscene -- the tree paused through it (200 ticks, Mario 0.00 m moved) under `SplitCutsceneCamera`, two of him in the line 11.0 m apart on
+their places (0.00 m off), the copy made and shown, the chorus at 2.06 s with 4 laughs (two as each came in, two together), the card up (alpha 1.00); over at
+3.35 s: the world running, the game camera current again, both in the WAIT 11 m apart, one copy alive; then the last hit -- the copy dismissed with him
+(183's C10 now reads a dismissed copy still laughing or fading as gone: 177's dismissal takes 2.2 s, the check comes at 1.5); 187-179's checks as before --
+27/27, no errors. Three shot runs from the cutscene's own camera: bn framed one of him filling the screen -- his body is 9 m tall and across (the 182 shots:
+8.5 m at 22 m), not the 6 I framed for, and two of him 7 m apart touched: the lens fits the bodies' width and height, the spacing 11 (bo); bo showed the held
+copy as a BLACK silhouette with a solid silver crown -- the ghost shader draws black at opacity 0 and `SetCrownGlow` leaves the crown at his solid -- the
+model hidden till shown, the crown faded with the body (bp): he comes into the line at the right in the violet mist with his vanish's stars at the left; the
+copy fading in beside him under the card; the two laughing together with the crowns thrown up (the laugh clip's own) and the card line over them. The clean
+rebuild 0 errors; the drive, the logs, shots165/, run_window.ps1 and this pass's scheduled tasks deleted. `SmsSplitCutscene.cs.uid` (Godot's) committed with
+the script, as the other Rematch scripts' are.
+
+**Deviations, all knobs:** the cutscene is mine (the doc has the split, not a scene); the world freezes 3.4-4 s mid-fight (`SplitCutscene` off = 177's);
+the line stands at the arena's middle, so after it he and the copies are within `CopyMinFromMario` of Mario till their next hop; the laugh clip throws the
+crowns 6 m up (the game's clip); the card's lines are knobs per count; the chorus pitches are mine.
+
+### 189 -- the King Boo REMATCH, part 33: the split cutscene's CARD is off -- no text on the screen (SplitLine2 / SplitLine3 empty; text in them brings the card back); the scene is the line of him and the chorus (feature/kingboo-rematch, code `9626cb5`)
+
+**Jaysonn:** "no need for the text on the screen."
+
+**The change** (`SmsKingBooRematch.cs`): `SplitLine2` / `SplitLine3` default to "" -- 188's "Now there are TWO of me!" / "THREE of me! Can you keep up, Mario?"
+are kept in the knob's note; `SmsSplitCutscene.Begin` makes no `SmsRematchCard` for an empty line (188's rule), so nothing else moves: the freeze, the line,
+the violet mist, the laughs as each comes in, the chorus at 2.05 s, the end at 3.35 s (3.95 with three). The class notes updated.
+
+**Verified** (headless drive v189-1, deleted before the commit): C15 reads the card against the knob -- no card node made and none seen with the line empty;
+the rest as 188: the world frozen through it (Mario unmoved), two of him 11 m apart on their places, the copy shown, 4 laughs, over at 3.35 s with both in the
+wait; 188-179's checks as before -- 27/27, no errors. One shot run (34 shots): the chorus, two of him laughing at Mario, the crowns thrown up, no text. The
+clean rebuild 0 errors; the drive, the logs, shots165/, run_window.ps1 and the pass's scheduled tasks deleted.
+
+**Deviations:** none new -- the card is a knob either way.
+
+### 190 -- the King Boo REMATCH, part 34: the split cutscene's line sits HIGHER in the frame (the camera looks SplitCamLookUp 1.5 m over the hover, was 4: the bodies up a seventh of the frame, the floor the lower third) and the SECOND split -- THREE of him -- is verified and shot (the copy already out teleports from its spot to its place in the line, the lens pulls back to fit the three) (feature/kingboo-rematch, code `f9e130e`)
+
+**Jaysonn:** "ok move them up a bit they sit too low in the frame and then do it again for the last phase where he spawns a third one"
+
+**The frame** (`SmsKingBooRematch.cs`, `SmsSplitCutscene.cs`): the camera's look-at point is a knob, `SplitCamLookUp` -- this far over the hover height
+at the line's middle. 188's 4 m (the middle of the laughing bodies) put the frame's centre on them, so with the laugh clip's lift and the floor's rim the
+bodies sat in the lower half; 1.5 drops the frame's centre 2.5 m, which at the two-line's 19.4 m (a 50-degree lens: 9 m of half height) is a seventh of
+the frame -- the bodies ride up into the upper half and the floor is the lower third; the three-line at 26.9 m shifts a tenth. Readout `CamDistance`.
+Nothing else of the scene moves (the camera's distance, height, FOV; the beats; the mist; the chorus).
+
+**The second split**: no code -- 188's `Begin` already lays out n of him (the real one in the middle slot, the copies already out beside him, the new one
+last), fits the lens to the longer line (half width (n-1)/2 x 11 + 5.5: 26.9 m for three), and brings a copy already out in with its own poof where it
+was (`SplitHide`) and the arrival at its place; this pass drives and shoots it.
+
+**Verified** (headless drive v190-1, deleted before the commit): C16 -- after 188's two-of-him cutscene, his hits taken set to 2 x `CopyEveryHits` - 1 and
+a hit: the hurt, then the SECOND cutscene -- three in the line, the real one in the middle, the first copy (in the wait at (-4.8, 2.5), 5.5 m from its slot)
+poofed where it was and came in at slot 0, the new one (KingBooCopy2) made held and shown at slot 2, 11.0 m apart, 0.00 m off their slots, the camera 26.9 m
+out (19.4 m for two), the chorus at 2.65 s with 6 laughs (three as each came in, three together), over at 3.96 s with two copies alive and all three in the
+wait; then the last hit with both copies dismissed; 189-179's checks as before -- 28/28, no errors. One shot run (36 shots): the two-of-him chorus with the
+bodies in the upper half of the frame (189's sat them in the lower); the third coming into the line in the violet mist, Mario small at the bottom; the chorus
+of three -- the real one in the middle under his gold crown, the silver-crowned copies either side, Mario at the bottom of the frame facing them. The clean
+rebuild 0 errors; the drive, the logs, shots165/, run_window.ps1 and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** `SplitCamLookUp` is a framing choice (-4..8); none new in the scene.
+
+### 191 -- the King Boo REMATCH, part 35: a hit on a FAKE is the MOCK -- the bomb bursts, the copy does not flinch: it LAUGHS IT OFF (the laugh clip and the short high cackle), rocks and bobs, PHASES see-through (flickering, the crown with it), then teleports off to another spot; the real one keeps the tumble -- the contrast is the tell (feature/kingboo-rematch, code `b0ec9c4`)
+
+**Jaysonn:** "ok we need something else for when mario hits the fake king boos. almost like the bomb explodes and the boo doesnt flinch and just laughs?
+otherwise what ideas do you have?" -- offered laugh-it-off-and-teleport (my pick), a ghost the bomb passes through, pop-the-fake, a punish; "yes lets do
+that your idea".
+
+**The mock** (`SmsKingBooRematch.cs`): a Bomb Boo bursting on a COPY (`CopyMock`, on) no longer runs 178's hurt (the tumble, the flash, then the teleport
+off): `TakeHit` sends it to the new phase `Mock`. `BeginMock` plays the laugh clip and `CopyMockSe` (`MSD_SE_BS_TELESA_V_LAUGH2`, the short high cackle)
+and flares the crown its own colour (`CopyCrownColor`, 1.5, fading out); `MockTick`, for `CopyMockSeconds` (1.3), rocks it `CopyMockRockDeg` (9) either
+way at 3 Hz and bobs it `CopyMockBob` (0.45 m) at 2 Hz, both dying out, while its opacity PHASES -- flickering at `CopyMockFlickerHz` (5) between solid
+and `CopyMockOpacity` (0.3) of its solid, deepest at the middle, solid again by the end, the crown's opacity with the body (a steady dim read as a grey
+blob against the black sky: white at 0.3 over black IS grey; the flicker reads as a ghost). Then `CopyMockTeleports` (on): 178's reset -- the vanish, the
+arrival at another spot, a full gap there; off: back to the wait where it is. The real one is untouched: his hurt, his tumble, his hp. `OnClipEnd` holds
+the wait clip when a long mock outlasts the laugh clip; `DismissCopy` puts a mid-mock rotation back. Readouts `MocksGiven`, `MockOpacityMin`,
+`OpacitySolidNow`.
+
+**Verified** (headless drive v191-3, deleted before the commit): C17 -- a copy out, a Bomb Boo burst on it: it never flinched (no Hurt phase, no hurt
+flash), went into Mock with the laugh clip (`btelesa_laugh`) and the cackle, rolled 8.4 deg, bobbed 0.39 m, dipped to 0.31 of its solid with the crown
+shining 1.48, then vanished and arrived 12.8 m off in the wait (teleports 1, was 0), the real one's hp 7/7 and hits 3/3 unchanged, 2.0 s; 190-179's
+checks as before -- 29/29, no errors. One shot run (39 shots): the fake laughing with its tongue out beside the real one, solid at the flicker's peak and
+dim a tenth of a second later; the fake's crown rides high through the laugh as in the chorus (the laugh clip's own pose). The clean rebuild 0 errors;
+the drive, the logs, shots165/, run_window.ps1 and the scheduled tasks (this pass's and the stale ones from 154-162) deleted.
+
+**Deviations, all knobs:** 178's tumble-and-teleport on a copy is gone unless `CopyMock` is off; the cackle, the rock, the bob, the flicker and the
+teleport-off are mine (`CopyMockSe`, `CopyMockRockDeg`, `CopyMockBob`, `CopyMockFlickerHz`, `CopyMockTeleports`); the bomb's burst on the copy is as
+before.
+
+### 192 -- the King Boo REMATCH, part 36: the Boolossus a sixth BIGGER and its wave of Boos lasting 3 s (bursting out, easing to a stop WaveReach out); the thunder walls' and the freeze breath's HITS put with their visuals (a wall is a SLAB about its drawn face and its shock stops where the bolts fade; the breath's mist no longer STALLS on the floor 10 m out while the cold that freezes ran on to 25 -- FloorDrag 0; ShowHitBoxes draws every hit volume in play); the intro laugh starts LOW and CLIMBS (IntroLaughPitchFrom 0.7 -> IntroLaughPitchTo 1.4) (feature/kingboo-rematch, code `751d118`)
+
+**Jaysonn:** "bolossuses smash lets make booloussose a little bigger and have the boos last for 3 seconds instead of 1. i think the hit boxes for electric
+wall and freeze breath are still off from the visuals. and lets have king boos laugh start low but then gets higher in the intro cutscene dont need it to
+scale back low."
+
+**The Boolossus** (`SmsBoolossus.cs`): `ModelScale` 5.5 -> 6.5 (its body hit radius and its shadow grow with it: 3.48 m); `WaveSeconds` 1 -> 3, and the Boos
+SLOW as they go -- out at `WaveSpeed` (9 m/s), easing to a stop `WaveReach` (10 m) out: 5.9 m in the first second, 8.3 by two, 9.3 by three, hanging there as
+a ring of hazards until they fade (at the old constant speed three seconds would have carried them 27 m, off the arena); `WaveReach` 0 = the constant speed
+as before. `WaveDistance(age)`.
+
+**The walls** (`SmsGhostLightning.cs`): the shock reaches `WallHitTopK` (0.85) of `WallHeight` -- 1.87 m: the shader fades the bolts out over the quad's top
+quarter, so feet already over the bolts were shocked at the full 2.2; and a wall is a SLAB (`WallThickness` about its drawn face, plus Mario's 42 u): before,
+everything BEYOND a face counted, so a Mario who jumped a wall cleanly was shocked on the way down as the squeeze went on behind him. `ShowHitBox` draws the
+two slabs in red.
+
+**The breath** (`SmsGhostBreath.cs`): the real mismatch, found with the hit balls drawn (`ShowHitBox`: a red ball on every live puff's hit) against the mist in
+GPU shots -- the puffs' floor collision carried a FRICTION of 0.15, and Godot takes that much of a particle's speed every frame it touches the floor
+(`mix(VELOCITY, 0, friction)` in the rigid-collision branch), so a puff that rolled onto the stone about 9 m out stopped dead within 2 m more, while the cold
+that freezes (the CPU model, never slowed on the floor) ran on to 25 m: Mario was frozen with the visible mist 5-10 m behind him. `FloorDrag` (0 now; 0.15 =
+the old stall) is that friction on the puffs and the core; the dense core's speed and sink pinned to the model's (0.97-1.03 x `BreathSpeed`, `Sink`;
+0.92-1.02 and 1.1 x before). Shot pairs with the balls drawn and then hidden a few frames on show the mist front at Mario's cylinder as the red reaches it.
+Readouts `HitBallsDrawn`, `HitBallsShown`.
+
+**King Boo** (`SmsKingBooRematch.cs`): `ShowHitBoxes` (off) -- Mario's damage cylinder (green, the game's 42 u across, 130 u tall from his feet) drawn where he
+stands and passed to the walls (the red slabs) and the breath (the red balls): a hit is a red volume on the green one. `WallHitTopK` and `BreathFloorDrag`
+mirrored for the attacks he makes. **The intro laugh**: `IntroLaughPitchFrom` (0.7) -> `IntroLaughPitchTo` (1.4), x `IntroLaughPitch`, over
+`IntroLaughSeconds`, evenly in pitch (an octave: a low chuckle climbing to the casino's cackle and past it), never back down; the clip's own run (308 -> 360
+Hz, a dip to 330, a wobble) rides on the ramp. Higher is quicker too, so the laugh gathers pace. Both 1 = 186's flat laugh. `IntroLaughPitchNow`.
+`SmsActorSound.cs`: `SetPitch(se, pitch)` and `PitchOf(se)`.
+
+**Verified** (headless drive v192-5, deleted before the commit): C18 one Boolossus (SmashCount 1 for the drive) -- ModelScale 6.5, radius 3.48 m, the wave 3 s
+easing to 10 m: all fifteen Boos out 1 s after the landing 9.46 m from it (the model's 9.46, off by 0.000), all fifteen still out at 2.5 s (12.43 m), gone by
+3.6 s; Mario stepped aside at the lock, a miss, his HP kept. C19 the intro laugh's pitch 0.700 at the start -> 0.946 at 2 s -> 1.400 at the dive, no drop,
+the sound node's player carrying the ramp exactly. C12 Mario jumped all three squeezes with no shock (feet 3.43 m at the top), C12b a standing Mario shocked
+when the slab reached him (across 0.00 of 0.81 -- the face at Mario's 42 u plus half the thickness), C14 the standing Mario frozen 1.32 s in, 11.1 m from
+the mouth; 191-179's checks as before -- 31/31, no errors. Shot runs (50 shots): the wall's red slab seen along the wall and through its face beside Mario's
+green cylinder mid-jump, the bolts' wisps reaching above the slab; the breath's red tube reaching Mario's cylinder and, with the balls hidden a few frames on,
+the mist front at the cylinder; from above the mist alone running the whole arc to Mario and past; the Boolossus diving in over a small Mario; the ring of
+Boos 1 s after the landing and still out at 2.5 s. The clean rebuild 0 errors; the drive, the logs, shots165/, run_window.ps1 and the pass's scheduled tasks
+deleted.
+
+**Deviations, all knobs:** the Boos' ease-out (`WaveReach`; 0 = constant speed), `WallHitTopK`, the slab rule, `FloorDrag` 0 and the core's speed/sink pinning
+are mine -- the fixes for what Jaysonn felt; `ModelScale` 6.5 and `WaveSeconds` 3 are his numbers; the laugh ramp's 0.7 and 1.4 are my reading of "start low,
+then higher".
+
+### 193 -- the King Boo REMATCH, part 37: the thunder walls' last wrong shock gone (192 had kept a "gap shut" test that zapped a Mario OUTSIDE the walls as they met: he had jumped one where it stood); a Bomb Boo in Mario's hand BURSTS when he is hit (hurt, shocked, frozen or killed: the pop and gone, no drift); the split cutscene's mist WHITE (a cold white, violet before); the intro laugh SHORTER (IntroLaughSeconds 4.6 -> 3, the climb runs over it) (feature/kingboo-rematch, code `3bb1296`)
+
+**Jaysonn:** "ok yeah i just got hit by lightning from jumping over it where it spawned in. need to fix the hit box. and if mario gets hit while holding the
+bomb boo the boo should explode and go away. also the splitting cutscene has it do purple smoke effects i want that to be white so it looks ghostly. and the
+intro cutscene i think the laugh doesn't have to be that long make it shorter"
+
+**The walls** (`SmsGhostLightning.cs`): the shock is the SLAB alone. 192's `HitCheck` kept 185's second test, `half <= r` -- "the gap closed on him" -- with no
+look at where he stood across the walls, so the moment the two faces met EVERY Mario within the walls' length and under the hit top was shocked, outside
+the walls or not. Jaysonn jumped a wall where it stood (the warning, or the first of its run), came down outside it, and was zapped 0.7 s later as the
+walls met. A Mario inside is always reached by a face's slab before the gap is that small (the band, half the thickness plus his 42 u, is wider than his
+radius), so the test did nothing for him and only hurt the one who had got out. Gone.
+
+**The Bomb Boo in hand** (`Mario.cs`: `SmsBombTick` / `SmsBombBurst`, `SmsBombBurstsOnHit` on): it bursts -- `SmsBombBoo.Explode(false)`: its puff and pop, no
+blast, no hit on King Boo, gone -- when he is hurt (a hit, a shock), killed or frozen holding it, instead of the drop that let it drift off to be grabbed
+again. The dives, the ground pound, the water and the rest still let it go. Readout `SmsBombBursts`. Off: the drop as before.
+
+**King Boo** (`SmsKingBooRematch.cs`): `SplitMistColor` (0.48, 0.22, 0.62) -> (0.88, 0.92, 1) -- a cold white; the puffs are the same smoke balls.
+`IntroLaughSeconds` 4.6 -> 3: 192's pitch climb (0.7 -> 1.4) runs over whatever the length is, so it climbs quicker now; the dive comes 1.6 s sooner; the
+intro director's total follows.
+
+**Verified** (headless drive v193-1, deleted before the commit): C12c a third lightning with Mario put 1.5 m OUTSIDE wall A as each of the three squeezes
+stood -- no shock through any of them, not as the walls met (hits 0, King Boo's count unchanged, HP kept; he stayed 1.50 m outside the near face); C12 Mario
+still jumps all three and C12b a standing Mario is still shocked by the slab. C21 a Bomb Boo grabbed with X (the real grab), then `TakeDamage` on Mario:
+hurt, HP down one, his hand empty, the Boo gone (not drifting), the burst counted. C13 the laugh 3 s (cut at the dive); C19 the climb 0.70 -> 1.12 at 2 s
+-> 1.40 at the dive, no drop. 192-179's checks as before -- 33/33, no errors. One shot run (50 shots): the split cutscenes' mist white -- pale puffs boiling
+about each of him as he comes into the line, the chorus of three in it. The clean rebuild 0 errors; the drive, the patch script, the logs, shots165/,
+run_window.ps1 and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** the white's exact shade (`SplitMistColor`), 3 s for the laugh (`IntroLaughSeconds`) and the burst on a FREEZE too
+(`SmsBombBurstsOnHit` covers hurt, dead and frozen) are my reading; the slab-only rule is the fix.
+
+### 194 -- the King Boo REMATCH, part 38: the split cutscene's arrivals REBUILT -- each of him GATHERS out of the mist (white puffs and his twinkle stars streaming in from 10 m to his body's CENTRE while the body forms, flickering, a ring of cold light racing out over the stone under him), then POPS solid (the mist boiling back out, a flash); the effects centred on the body as measured off the wait pose (the joint sits at the node, the body -2.6..+4.4 about it: the old fixed 3 m was his top); the intro laugh's climb ends LOWER (IntroLaughPitchTo 1.4 -> 1.15, From 0.7 -> 0.75) (feature/kingboo-rematch, code `40a4945`)
+
+**Jaysonn:** "hmm i think the effects could be a little better for the splitting cutscene when he spawns 2 and 3. also intro the laugh is too high pitched at the
+end." -- and, on the first cut: "the white puffs are going in at the top of king boo, needs to be his center".
+
+**The arrivals** (`SmsKingBooRematch.cs`, `SmsSplitCutscene.cs`): 188-193 had each of him arrive with the teleport-in flash and a boil of mist over a 0.3 s fade.
+Now, as each comes into the line: `SplitGather` -- `SplitGatherPuffs` (160) white smoke balls born on a shell `SplitGatherRadius` (10 m) out stream INTO his
+body's centre over `SplitFadeSeconds` (0.7; a negative radial velocity, the speeds spread 0.7-1.15 so it is a stream, not one clean shell -- the first cut's
+rings of beads), big and soft and shrinking as they close in (4.5 -> 1.4 m at 0.55 alpha; the first cut's 2.4 -> 0.7 read as a swarm of beads); his twinkle
+stars (`SplitGatherStars`, 40) stream in with them; a ring of cold light (`SplitRing`, to `SplitRingRadius` 13 m over `SplitRingSeconds` 0.8) races out over
+the stone under him with a glow there. The body FORMS as the mist arrives: nothing for the gather's first third, then up quick (k^0.7), FLICKERING at 9 Hz
+by `SplitFlicker` (0.3; 0 = a plain fade -- a thin white over the black sky is a grey shadow, the flicker reads as a ghost phasing in). The moment he is solid,
+`SplitPop`: the mist boils back out of him (`SplitMistPuffs`, as before) with a flash at his middle. Skipped with A: the boil at once, as before.
+
+**Centred on the body**: the first cut put the gather, the pop and the boil 3 m over the node -- his TOP (Jaysonn saw the puffs go in at the crown). Measured in
+the drive: in the wait pose the body joint sits 0.14 m UNDER the node and the hit cylinder runs -2.6..+4.4 about it, so the body's centre is 0.86 m over the
+node. `WaitBodyLift` reads the joint's height off him as he waits (past the clip blend, smoothed), `SplitBodyCentreLift` = that + (HitAbove - HitBelow) / 2, and
+the three effects use it; `SplitBodyLiftGuess` (0) stands in before any wait. His arena hovers him 8.5 m over the floor.
+
+**The laugh** (`SmsKingBooRematch.cs`): `IntroLaughPitchFrom` 0.7 -> 0.75, `IntroLaughPitchTo` 1.4 -> 1.15 -- seven semitones instead of an octave; it ends a
+shade over the casino's own pitch rather than shrill.
+
+**Verified** (headless drive v194-4, deleted before the commit): C22 after the two-of-him cutscene -- two gathers and two pops drawn, the fade 0.7 s with the
+flicker 0.3 and the ring on, the wait pose's lift read (-0.14 m), the effects' centre 0.86 m over the node and within the hit cylinder; C22b after the
+three-of-him cutscene -- five gathers and five pops in all; C19 the laugh 0.751 -> 0.999 at 2 s -> 1.149 at the dive, no drop, the player following; 193-179's
+checks as before -- 35/35, no errors. Shot runs (54 shots): the mist and the stars streaming in about his body (not his crown) with the body a grey ghost in
+it, the body forming with the puffs closing on its middle, the pop with the boil out of his centre, the copy flickering in grey as the mist gathers on it, the
+third gathering beside the two, the chorus of three. Two shot runs and the first clean-up were lost to my batching the build with the run (the lesson
+re-saved); no harm to the PC. The clean rebuild 0 errors; the drive, the logs, shots165/, run_window.ps1 and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** the gather (puffs, stars, radius, time), the flicker, the ring and the pop are my design of "better effects"; 0.75 -> 1.15 is my reading
+of "too high at the end" (`IntroLaughPitchTo` 1 = ending on the casino's own pitch). Known, not this pass: the twinkle stars' faint square halos against the
+black sky (`ChikaFx`'s texture), seen behind the gathering stars.
+
+### 195 -- the King Boo REMATCH, part 39: the BOSS MUSIC (the casino King Boo's theme, MSD_BGM_BOSS, starts as the fight begins after the intro's dive and fades as the last hit takes him down) with the rematch's effects a bit UNDER it (SfxDb -4 on every SMS actor's sounds while the arena is loaded); the WIND is FIVE tornados on an even ring that CIRCLES the arena while it breathes IN to the middle and back OUT (the Spiral pattern; 169's hunt kept as a knob) (feature/kingboo-rematch, code `180faed`)
+
+**Jaysonn:** "ok we're getting there. i think we should lower the volume a bit and throw in the boss music now. see how it feels. also lets spawn 5 tornados for the
+wind attack and have the wind pattern go into the middle then back out while circling around the arena"
+
+**The music** (`SmsActorSound.cs`, `SmsKingBooRematch.cs`): the rematch's King Boo gets a `BossMusic` slot his sound node fills with the casino boss theme
+(`MSD_BGM_BOSS`: t_boss.com rendered from the game's sequence, 4.2 s in and a 95 s loop, 98.9 s; a 2D player on the Music bus at `SmsActorSound.MusicDb` -4 and
+the track's own -2.5: -6.5 dB). `StartBossMusic` as the fight begins -- his spawn rise after the intro's dive (`BossMusicAtIntro`: as he surfaces in the intro
+instead; off -- the intro keeps its rumble and the laugh alone); `FadeBossMusic` over `BossMusicFadeSeconds` (2) as the down clip begins; stopped if the arena
+unloads. `BossMusicDb` on top; `BossMusicOn`. Copies never start it. Readouts `BossMusicStarted` / `BossMusicPlaying` / `BossMusicFaded` / `BossMusicVolumeDb`.
+
+**The mix**: `SfxDb` (-4) -- the real one sets `SmsActorSound.MasterDb` to it in his `_Ready` and puts it back in `_ExitTree`: every SMS actor's sounds in the
+arena (his voice and attacks, the Bomb Boos, the Boolossi, the walls, the breath) a bit under the music; Mario's own sounds are not his. 0 = 157-194's level.
+
+**The wind** (`SmsGhostWind.cs`, `SmsKingBooRematch.cs`): `TornadoCount` 2 -> 5 and the PATTERN (`Pattern` / `TornadoPattern`): Spiral -- the five rise evenly
+spaced on a ring `SpawnRadius` (0.7 of the arena: 18.5 m) out, the ring turned so none rises within `SpawnMinFromMario` (8 m) of Mario (16 turns tried, the one
+with the most room when none clears); then the whole ring CIRCLES the arena, all one way (a random way each attack, `OrbitSign`) at `Speed` (6 m/s) along the
+ring -- no faster than `MaxOrbitDegPerSec` (110) about the middle, so they do not whip round at the centre -- while its radius BREATHES: `SpiralRadiusAt(age)`
+is a cosine from the outer ring IN to `InnerRadius` (0.12 of the arena: 3.2 m -- the five bunch at the middle without sitting on each other) and back OUT,
+`SpiralCycles` (1) times over the active life (`LifeSeconds` 7 past the 0.6 s rise): in by 3.8 s, out by 7, then the dissipation as before. Each tornado's
+`Heading` follows its motion; the fling, the wall clamp, the funnel, the gust and the sounds are 169-170's. Hunt = 169's: each turns toward Mario and comes at
+him. Readouts `OrbitAngle` / `OrbitRadiusNow` / `OrbitTurned`; King Boo mirrors `TornadoInnerRadius`, `TornadoSpiralCycles`.
+
+**Verified** (headless drive v195-2, deleted before the commit): C23 the music -- the slot filled (98.9 s, the Music bus), started as the fight began (never
+through the intro), playing at -6.5 dB, MasterDb -4; C23b faded at the down (not playing 2.5 s in). C24 the wind -- five tornados 18.5 m out, bearings 72-72
+deg apart, the nearest 10.6 m from Mario; the ring turned 287 deg one way over the life, the least radius 3.2 m at 3.79 s of 7, the last 18.5 m at 6.99 s,
+the five within 0.00 m of one radius throughout (384 ticks); Mario kept clear (the middle while the ring is wide, the edge while it is narrow) and kept his HP.
+194-179's checks as before -- 38/38, no errors. One shot run (59 shots): from 48 m over the arena, the five on their ring as it rises, closing and turned,
+bunched at the middle, out again turned 290 deg; from Mario's edge, the funnels in the middle. The clean rebuild 0 errors; the drive, the logs, shots165/,
+run_window.ps1 and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** the casino theme as the rematch's music (`BossMusic`: set another stream by hand), its start at the fight (`BossMusicAtIntro`) and the
+-4 dB (`SfxDb`) are my reading of "lower the volume a bit and throw in the boss music"; the spiral's numbers (`TornadoInnerRadius` 0.12, `TornadoSpeed` 6 along
+the ring, `MaxOrbitDegPerSec` 110, one cycle) are mine. I cannot hear the mix from here: Jaysonn judges the levels.
+
+### 196 -- the King Boo REMATCH, part 40: the copies TELEPORT ABOUT and keep APART (a copy's move is a hop 0.6 of the time, 0.3 before, and waits 1.3 x his gap, 1.7 before; every spot any of him picks keeps SpotMinFromBoos 11 m from the other King Boos, where they stand or where they are going); the boss music starts at the intro's CUT to Mario in the battle stance (as King Boo surfaces), not at the fight (feature/kingboo-rematch, code `96d0214`)
+
+**Jaysonn:** "ok we need to let the other fake boos teleport around since they tend to blob up and it makes the fight clustered for the wrong reason. and lets have the
+music start when it pans to mario in the battle stance frame"
+
+**The copies** (`SmsKingBooRematch.cs`): why they blobbed -- a copy's move was a hop only 0.3 of the time (a throw otherwise) at 1.7 x his gap (a hop every 12 s or
+so), and `RandomSpot` knew nothing of the other King Boos: a spot 13 m from Mario, anywhere on the stone, next to another of him as often as not. Now:
+`CopyRepositionChance` 0.6 -- a copy's move is a TELEPORT to another spot more often than a throw; `CopyGapScale` 1.7 -> 1.3 -- they move about more (the throws
+come about as often as before: 0.4 of the moves at 1.3 x against 0.7 at 1.7 x). And every spot any of him picks -- his hops and the copies' -- keeps
+`SpotMinFromBoos` (11 m: his body is 9 m across, the split line's spacing) from every OTHER King Boo (`SpotNow`: where it stands, or its destination mid-teleport);
+24 draws, the first that clears Mario, the floor and the others taken, else the roomiest of those that clear Mario. Readouts `LastSpotRoom`, `DriveDrawSpot`.
+
+**The music** (`SmsKingBooRematch.cs`): `BossMusicAtIntro` on -- the theme starts at `IntroSurface`, the intro's cut to the side two-shot where Mario drops into the
+battle stance as King Boo surfaces (195 started it at the fight, after the dive); it plays on through his rise, the laugh, the dive and the fight, and fades at the
+down as before. Off = 195's.
+
+**Verified** (headless drive v196-1, deleted before the commit): C23 the music silent through the look-about, playing within 3 ticks of the Surfaced cut with the
+stance clip on, on through the rise and the laugh and the fight at -6.5 dB. C25 after the three-of-him cutscene: 40 spot draws from each copy -- 80 of 80 cleared
+Mario by CopyMinFromMario and the other King Boos by 11 m (the least room 11.2 m, no fallback needed); the copies left alone (their moves on) both teleported
+within 6.3 s; while they waited the closest two of him stood 11.0 m apart. 195-179's checks as before -- 39/39, no errors. No shots: nothing new to see
+(the copies' spacing is the same line spacing as the cutscene's). The clean rebuild 0 errors; the drive, the logs and the pass's scheduled task deleted.
+
+**Deviations, all knobs:** 0.6 / 1.3 / 11 m are my numbers for "teleport around" and "blob up"; the cut to the two-shot is my reading of "the battle stance frame"
+(the only shot of Mario in the stance). Not touched: a copy's teleport-off after the mock (191) and the cutscene's line (188) -- both already keep them apart.
+
+### 197 -- the King Boo REMATCH, part 41: the music is ANTASMA FINAL BATTLE (Jaysonn's mp3 from Ref/, now assets/Sms/Sound/Music/AntasmaFinalBattle.mp3, looping back to 7.5 s), it starts on the intro's FIRST frame (Mario looking about for the laugh), and the FIGHT STARTS ON ITS CUE: 7.5 s after the music begins (FightCueSeconds) -- the intro trims the look-about and the laugh in proportion to land there (x0.67: 3 s each -> 2 s) (feature/kingboo-rematch, code `c0ab8a7`)
+
+**Jaysonn:** "ok getting better! lets actually try a different song i have it in Ref folder called Antasma Final Battle put it somewhere in the project that would be
+good. and we want the music to start right when mario looks around and then the fight needs to start within 7.5 seconds of the song starting to cue the proper
+music timing"
+
+**The song:** `Ref/Antasma Final Battle - Mario & Luigi Dream Team SUPER MARIO GALAXY MOVIE SCORE.mp3` (2.8 MB, 2:48, 48 kHz) copied to
+`assets/Sms/Sound/Music/AntasmaFinalBattle.mp3` beside the game's two rendered BGMs and imported (the mp3 importer; the loop is set at run time). Measured
+(`music197/envelope.py`): it rises out of silence over its first 4 s; RMS -19.5 dBFS overall, the loud part -17.8 (the casino theme's render -18.3 / -16.8).
+
+**King Boo** (`SmsKingBooRematch.cs`): `BossMusicCue` (LookAbout / StanceCut / Fight; 195's `BossMusicAtIntro` replaced) -- `MusicCue(cue)` from the intro's beats
+and the fight's spawn starts it when it is the cue set; the fight is the last chance (no cutscene run: it starts there). What plays: `BossMusicStream` (set by
+hand), else the file `BossMusicFile` when it exists (the Antasma mp3), else the casino theme his sound node fills in; a file or a hand-set stream LOOPS
+(`BossMusicLoop`) back to `BossMusicLoopOffset` (7.5 s: past the quiet rise, to where the song is going) and plays at `SmsActorSound.MusicDb` + `BossMusicDb` +
+`BossMusicStreamDb` (-1.3: the mp3 1.2 dB under the casino render by RMS, so the two come out alike; -5.3 dB in all). `IntroLaughOverride` / `IntroLaughLength`:
+the laugh's length THIS intro (the director's trim) -- the laugh's end, its clip loop and the pitch ramp use it. `IntroFixedSeconds`: the rise tell + the appear
+clip at its speed + the dive clip at its speed (3.20 s). `ClipSeconds(name)`: a clip's played length (its bck frames at 60).
+
+**The intro** (`SmsRematchIntro.cs`): `FightCueSeconds` (7.5) -- the fight (the cutscene over, Mario free, King Boo rising for it) lands this long after the music's
+cue on the look-about's first frame. The fixed beats (`IntroFixedSeconds` + `AfterSinkSeconds`, 0.6 -> 0.3) are what they are; the look-about and the laugh share
+what is left and are trimmed in proportion when it is less than they want (the look-about clip played quicker, the laugh shorter), never under `LookMinScale`
+(0.5); with room to spare the empty-spot pause after the dive takes the slack (up to `CueSlackMax` 1.5) so the fight lands ON the cue; 0 = no cue. Readouts
+`MusicCueAt`, `FightStartAt` (the cue's own clock -- the cutscene's restarts at the surface, which had a first measure read 2 s short), `PlannedFightAt`,
+`CueTrim`, `LookNaturalSeconds` / `LookPlayedSeconds`.
+
+**Verified** (headless drive v197-3, deleted before the commit): C23 the music plays `AntasmaFinalBattle.mp3` (167.7 s, the Music bus, looping to 7.5 s, -5.3 dB),
+silent through the card, playing within 3 ticks of the look-about's first frame, on through the stance cut, the rise, the laugh and the fight; MasterDb -4. C26
+the cutscene ended 7.51 s after the music began (planned 7.50): the fixed beats 3.20 + the pause 0.3, the look-about and the laugh trimmed x0.67 (3 -> 2 s each).
+C13 / C19 the chuckle still on halfway through the 2 s laugh, its pitch 0.75 -> 0.93 -> 1.15, cut at the dive. 196-179's checks as before -- 40/40, no errors. No
+shots (nothing new to see). Three runs lost to my batching the build with the run again; no harm to the PC. The headless import pass flipped ten textures'
+.import files to VRAM compression (Godot's detect-3D): reverted, not committed. The clean rebuild 0 errors; the drive, the import runner's logs and the pass's
+scheduled tasks deleted.
+
+**Deviations, all knobs:** the proportional trim (the look-about clip at 1.5 x, the laugh 2 s) is my way of fitting the 7.5 s; the loop point 7.5 s, the -1.3 dB
+match and the file's place are mine. I cannot hear it from here: Jaysonn judges the sync and the level. For the full 3 s laugh at the cost of the cue, raise
+`FightCueSeconds` (8.5 fits it) or lower `AfterSinkSeconds` / `RiseTellSeconds`.
+
+### 198 -- the King Boo REMATCH, part 42: his clip changes CROSS-FADE (ClipBlendSeconds 0.25: the pose he is in melts into the new clip's first frames -- the wait into the laugh, the laugh into the dive, the tumble into the wait, the laugh's own loop -- instead of the game's hard cut between bcks; 0 = the cut) (feature/kingboo-rematch, code `25b88bf`)
+
+**Jaysonn:** "is there a setting for king boos animations to make them blend together a little better?"
+
+**The blend** (`SmsKingBooRematch.cs`): there was none -- `PlayClip` played every clip from its first frame with a hard cut (`Play`, `Seek(0)`), as the game cuts
+between its bcks. Now `ClipBlendSeconds` (0.25): the new clip starts through AnimationPlayer's custom blend -- the old pose fades out over that long as the new
+clip plays from its top -- every time one of his clips changes while he is seen: the wait into the laugh, the laugh into the hide clip's dive, the hurt tumble
+into the wait, the spit clip's rear, the laugh clip's own loop (its last frame melts into its first). The first clip of all and any clip starting while he is
+unseen (opacity 0, hidden) cut as before: nothing to blend from. The copies have it too (duplicated from him). Readouts `ClipBlends` / `ClipStarts`.
+
+**Verified** (headless drive v198-1, deleted before the commit): C27 ClipBlendSeconds 0.25, 42 of his 46 clip starts blended by the second split (the four cuts: the
+intro's first clip, the hidden arrivals); 197-179's checks as before -- 41/41, no errors (the clip names, the laugh's loop and the hurt's timings unchanged by
+the blend). No shots: a blend is motion. The clean rebuild 0 errors; the drive, the log and the pass's scheduled task deleted.
+
+**Deviations, all knobs:** the game cuts; 0.25 s is my pick for "a little better" (over 0.4 the quick clips -- the hit, the lick's thrust -- go mushy). Not
+committed: Godot's detect-3D keeps rewriting seven texture .import files in the working tree (VRAM compression) -- the editor's own doing, Jaysonn's to commit.
+
+### 199 -- the King Boo REMATCH, part 43: the BREATH leaves a WIDE MOUTH (BreathMouthWidth 4.5 x 1.4 m: the mist, its dense core and the glints born across it, the mouth's light stretched to it, and the cold that freezes in 3 lanes across it -- one 0.7 m point of contact before) and Mario's look-about WITHOUT THE SHRUG (the arms rest; the glances and the look up stay) (feature/kingboo-rematch, code `ee0d6ef`)
+
+**Jaysonn:** "ok solid looks much more smooth. now i think we need to make the breath coming out of his mouth a bit bigger? like wider? king boo has a wide
+mouth so one point of contact looks a bit off. also lets not do marios shrug animation during the look around since it breaks the theme."
+
+**The wide mouth** (`SmsGhostBreath.cs`): the cold left a POINT -- the puffs, the dense core and the glints all born in a 0.7 m sphere at the mouth point, and
+one ray a frame down the middle, so the stream was a rope for its first metres and the hit a line. Now the mouth is a BOX across the stream, `MouthWidth`
+(4.5 m) by `MouthHeight` (1.4 m): the puffs' emission, the core's (0.9 x 0.8 of it) and the glints' are that box (Sphere -> Box, `EmissionBoxExtents` = half
+the width, half the height, 0.2 m deep), the mouth's light (the glow quad) stretches to 0.9 of the width, and the cold that freezes runs in `HitLanes` (3)
+lanes across it -- each frame of the blow a ray from the left edge, the middle and the right edge (Up x the stream's direction, k = -1, 0, +1 of half the
+width), so the hit is as wide as the mist from the first metre (the middle lane is the old ray: a standing Mario freezes as before). Readouts `PuffEmission` /
+`PuffEmissionExtents` / `BlowFrames`. King Boo (`SmsKingBooRematch.cs`): `BreathMouthWidth` / `BreathMouthHeight` / `BreathHitLanes` (4.5 / 1.4 / 3), handed
+to every breath he launches.
+
+**The look-about without the shrug** (`assets/Mario/Anims/ma_lookabout.pose.json` + `ma_lookabout.tres`): the look-about's keys at 2.2 and 2.6 s raised both
+shoulders and arms (`jnt_sldr_L/R`, `jnt_arm_L1/R1`, `jnt_arm_L2/R2` -- the shrug under the look up). Those joints are out of both keys: the arms rest through
+the look up; the head and chest keys (the glances left and right, the look up) stay. Re-baked with `tools/anim/bake_anim.gd` (`[BAKE] OK`; the hands at idle
+height through 2.2-2.6 s, where they rose).
+
+**Verified** (headless drive v199-2, deleted before the commit): C28 the breath's mouth 4.5 x 1.4, the puffs' emission Box (2.25, 0.7, 0.2), 675 rays over 225
+blow frames (3 a frame), a standing Mario frozen; 198-179's checks as before -- 42/42, no errors. Shots (run ck): 27a/27a2 the mist leaving across the whole
+mouth with the three lanes drawn / alone, 27b from behind Mario, 24a-c the hit balls vs the mist as before (24a's camera 16 m out: the wider stream filled the
+old 11 m view). The drive's shots now wait their turn (run cj had three cameras up at once -- its 27b saved 24b's view). The clean rebuild 0 errors; the drive,
+the logs, the shots and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** 4.5 x 1.4 m is my read of his mouth (his body is some 9 m across; wider = `BreathMouthWidth`); 3 lanes (more = a denser hit, no
+wider); the look-about's look up stays (Jaysonn named the shrug), and there is no shot of it -- the intro is not in the shot drive; the bake's numbers are the
+check. Not committed: the editor's seven detect-3D .import rewrites (Jaysonn's, as in 198).
+
+### 200 -- the King Boo REMATCH, part 44: a new attack, the BOMB BOO VOLLEY (he rears back and SPITS three lit Bomb Boos out of his mouth on high lobs about Mario, a ring on the floor marking where each comes down; two BLAST where they land -- the Bob-omb explosion, a 3.5 m ring of light, a standing Mario within it hit, a jump clears it -- the LAST is a DUD that thuds down and floats there as a live Bomb Boo for Mario to grab, its fuse still burning: 6 s, then it blasts where it floats) (feature/kingboo-rematch, code `fea5b41`)
+
+**Jaysonn:** "ok i think we may need one more attack involving boos somehow. any ideas?" -- of three offered (shy Boos that creep up from behind and freeze
+when faced, a Boo guard ring at half health, the Bomb Boo volley), "3 for sure" (and "how could we do 1? theres no fludd in the fight?" -- answered in the
+thread: the stare and the stomp would be its counters; not built).
+
+**The volley** (NEW `assets/Sms/Rematch/SmsBooVolley.cs` + .uid): on its own once King Boo launches it (as `SmsFireballs` is): `Count` (3) Bomb Boos out of
+the mouth `Spacing` (0.4 s) apart, each lobbed `LobHeight` (9 m) over the mouth to come down about Mario -- the first within `AimedWithin` (1 m) of him, the
+rest anywhere out to `Scatter` (5 m), all inside the arena's wall (`WallInset` 2 m) -- the Boos the supply's own scene under the supply's parent, so King
+Boo's hit clears them with the field. The LAST is the DUD (`Dud`): it comes down at least `DudMinFromMario` (2.5 m) from him, never on him. Signals `Spat`,
+`Landed(dud)`, `Blasted(hitMario)`, `Finished` (every Boo down; the dud floats on).
+
+**The lobbed Boo** (`SmsBombBoo.cs`): a new phase, LOBBED (`Lob(from, target, apexOver, dud, blastRadius, blastHeight, dudFuse)`): the flight under
+`SmsFireballs.G`, TUMBLING head over heels (`LobTumbleDegPerSec` 420), the fuse flashing quicker as it falls, a trail of black puffs (`LobTrail`), a RING on
+the floor at the landing (`LobMarkColor`, the Boo's eye yellow: the blast's footprint; a dud's the body's). Landed, `Detonate()`: the puff, the Bob-omb
+explosion (170's `Blast`), a ring of light (`LobBlastColor`) out to the blast radius, Mario within it whose feet are under the blast height HIT (the common
+enemy damage; his invincibility spaces the hits); gone. A DUD thuds down in black smoke (the rise smoke at the floor) and floats from there as any supply Boo
+(`Drop()`'s re-basing): grabbable by the spin, shocked when looked at, hurting on touch, cleared with the field -- its fuse (`DudFuseLeft`) burning while it
+drifts; out, it detonates where it floats; in Mario's hand the hold's own clock takes over (`HoldSeconds`; a hit on him bursts it, 193). Readouts for the
+drives (`IsLobbed`, `LobTarget`, `LobFlightSeconds`, `HasLanded`, `HasBlasted`, `BlastHitMario`, `DudFuseLeft`...); counts `Lobs`, `Duds`, `FloorBlasts`,
+`FloorBlastHits`.
+
+**The move** (`SmsKingBooRematch.cs`): VOLLEY (`Phase.Volley`, `Move.Volley`; `VolleyOn`, `VolleyWeight` 1 among the attacks' weights): where he stands, the
+crown YELLOW (`VolleyCrownColor`, the Bomb Boo's eyes) through `VolleyTellSeconds` (0.7) as the spit clip rears, the clip held at its thrust (`VolleyHoldFrame`
+50) through the spit, facing Mario; `VolleyWatchSeconds` (0.5) after the last Boo leaves, the wait. The volley's knobs mirrored as a template (`VolleyCount` 3,
+`VolleySpacing` 0.4, `VolleyLobHeight` 9, `VolleyScatter` 5, `VolleyAimedWithin` 1, `VolleyBlastRadius` 3.5, `VolleyBlastHeight` 1.6, `VolleyDud`,
+`VolleyDudSeconds` 6, `VolleyDudMinFromMario` 2.5). A hit on him through it cuts the spit off (the field clears). `CopyVolley` (false): a copy may spit them
+too (its Boos are real). Signals `VolleyStarted`, `VolleySpat(count)`, `VolleyBlasted(hitMario)`, `VolleyDone(hits)`; readouts `VolleysMade`, `VolleyHits`,
+`Volley`, `VolleyDudBoo`.
+
+**Verified** (headless drive v200-2, deleted before the commit): C29 the crown yellow through a 0.72 s tell, 3 Boos spat 0.4 s apart out of the mouth in the
+air on lobs, the marks about a standing Mario (the aimed 0.71 m from him, the farthest 2.99, the dud's 3.95 at the body's radius 1.04 vs the blast's 3.50, all
+inside the wall); C30 the two lit Boos blast where they land (0.09 m off their marks), the aimed one's blast HIT him (HP 6 -> 5), the far one (2.19 m) did not
+(his invincibility), the dud came down whole and floated free with 3 s on its fuse (the drive's short fuse) and blasted where it floated 3.02 s later, Mario
+8 m off untouched; C31 a second volley's dud (the 6 s fuse) grabbed by the real X (the spin within BombGrabRadius): carried, its fuse holding at 5.2 s.
+199-179's checks as before -- 45/45 (the breath's stand now put 11 m from him: left at a Boo's random spot he stood 26.9 m off once and the sweep missed).
+Shots (run cl): 28a the tell over Mario's shoulder (the rear-back, the crown yellow), 28b the three Boos arcing over their marks from the side, 28b2 one coming
+down on its mark, 28c the blast on Mario, 28d the dud floating in its thud smoke, 28e its last-second flashing, 28f its own blast. The clean rebuild 0 errors;
+the drive, the logs, the shots and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** the dud is always the LAST Boo (a tell the player can learn; `VolleyDud` off = three blasts); 2.2 s in the air at 9 m over the
+mouth (the marks show ~2 s ahead); the blast's reach 3.5 m and the dud's fuse 6 s are my picks; a dud's mark is smaller than a blast's (the body's footprint)
+-- the one visible hint besides the order; `CopyVolley` off (the copies' Boos would litter the field). Not committed: the editor's seven detect-3D .import
+rewrites (Jaysonn's, as in 198-199).
+
+### 200b -- the King Boo REMATCH, part 45: the Bomb Boos BLINK RED before they blow (a spat Boo through its fall, quicker and brighter as it comes down; the floating dud through its fuse's last 2.5 s; a timed hold's last 2 s), the eyes kept yellow; the dud only slow and faint in the air (feature/kingboo-rematch, code `cdfa089`)
+
+**Jaysonn:** "make the bomb boos flash red signalling they are about to blow up"
+
+**The red** (`BombBoo.gdshader`): `flash` mixed the body to WHITE (158's carried-Boo pulse) -- a tenth of it read as a grey Boo (160). Now `flash` mixes the
+body toward `flash_color` (red by default) and EMITS it x `flash_emit`, so the blink reads in the dark arena; the yellow eyes are left out of the mix (`face`).
+
+**The blink** (`SmsBombBoo.cs`, The fuse group): `FuseFlashColor` (1, 0.05, 0.02), `FuseFlashMax` 0.75 (the body's mix at the brightest), `FuseEmit` 0.8 (its
+glow), the blink QUICKENING from `FuseBlinkHzFrom` (3 Hz) to `FuseBlinkHzTo` (10 Hz) as the moment nears -- a square-ish pulse (a smoothstep of the sine, its
+phase carried so a quickening rate never skips a beat). Where: a spat Boo through its fall (k = its age over the flight); the dud only slow and faint in the
+air (`FuseDudHz` 2 Hz at 0.4 of the strength: lit, but long) and DARK once down until its fuse's last `DudWarnSeconds` (2.5 s), then the blink to the blow; a
+held Boo through a timed hold's last 2 s (`HoldSeconds`). The swing's boost pulse keeps its white (`SetFlash` takes a colour). Readouts `FlashNow` /
+`FlashColorNow` and the body material's own `FlashParam` / `FlashColorParam`.
+
+**Verified** (headless drive v200b-2, deleted before the commit): C32 the lit Boos' flash peaks at 0.75 through the fall (the shader's own 0.75), red (1, 0.05,
+0.02) in the body material, the aimed one blinking 3 times in its first 0.9 s and 8 in its last; the dud 0.30 at most in the air, 0 on the floor until its last
+2.5 s, 0.75 through them; 200-179's checks as before -- 46/46. Shots (run cn): 28b3 a lit Boo red mid-fall, its smoke behind it; 28e the dud red in its last
+seconds (run cm's 0.9 / 1.6 saturated the body to a flat salmon blob; 0.75 / 0.8 keeps its shading). The clean rebuild 0 errors; the drive, the logs, the shots
+and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** 0.75 of the way to pure red at the brightest and a 0.8 glow are my picks for "flash red" that still shows a Boo; 3 -> 10 Hz over
+the fall; the dud's quiet, then 2.5 s of warning (`DudWarnSeconds`) out of its 6 s fuse. Not committed: the editor's seven detect-3D .import rewrites
+(Jaysonn's, as in 198-200).
+
+### 201 -- the King Boo REMATCH, part 46: two new attacks -- the AMBUSH from below (he sinks where he stands, his glow pool hunts Mario across the stone for 3 s, stops and flares, and he erupts there through the floor with a 5 m shock ring; jump at the break; he is up at the pool's spot) and the BOO CIRCLE, Super Mario World's ghost-house ring (seven hotel Boos on eight places about Mario, one gap, turning once every 4 s at head height; it holds 2 s, closes on him over 8 s and fades; out through the gap as it comes round) (feature/kingboo-rematch, code `3fa8076`)
+
+**Jaysonn:** "lets do 1 and i kinda wanna have a circle of boos attack similar to how ghosts house used to have them in super mario world"
+
+**The ambush** (`SmsKingBooRematch.cs`, `Phase.Ambush` / `Move.Ambush`; `AmbushOn`, `AmbushWeight` 1): from the wait he SINKS where he stands -- the hide clip,
+the body fading over `AmbushSinkSeconds` (0.5), his poof -- and his glow POOL comes up on the stone under him: the rise's own glow and wisps (181),
+`AmbushPoolSize` (7 m) across, which HUNTS Mario for `AmbushHuntSeconds` (3): it slides toward his feet at `AmbushHuntSpeed` (6 m/s), `AmbushHuntQuicken`
+(1.6) times that by the end, never past the arena's edge, leaving its mist behind it, King Boo riding 7 m under it. Then it STOPS and FLARES for
+`AmbushTellSeconds` (0.45; a low chuckle under the stone) and he ERUPTS there: the appear clip's leap up through the floor (182), the rise's floor burst,
+kick and stars, and a shock RING (`AmbushRingColor`) racing out to `AmbushRingRadius` (5 m) over `AmbushRingSeconds` (0.45): a Mario within it whose feet are
+under `AmbushRingHeight` (1.6 m) is hit (the common enemy damage) -- a jump at the break clears it. He is up at the pool's spot (the ambush moves him), the
+wait. Under the floor (the sink, the hunt, the tell) he cannot be hit. Signals `AmbushStarted` / `AmbushTell` / `AmbushErupted(hit)` / `AmbushDone(hits)`;
+readouts `AmbushStage`, `AmbushPool`, `AmbushHuntK`, `AmbushRingRadiusNow`, `AmbushRingHit`, `AmbushBreaks`, `AmbushesMade`, `AmbushHits`. The rise's glow
+takes a size and a flare now (the pool is smaller than the intro's 14 m glow and swells at the tell).
+
+**The Boo circle** (NEW `assets/Sms/Rematch/SmsBooCircle.cs` + .uid; `SmsKingBooRematch.cs` `Phase.Circle` / `Move.Circle`; `CircleOn`, `CircleWeight` 1, one
+at a time): his laugh through the tell (the crown `CircleCrownColor`, a pale violet, `CircleTellSeconds` 0.8), then a RING of hotel Boos (`telesa.glb` on its
+own TelesaToon materials, as the Boolossus's wave Boos; `BooScale` 1.1, `BooRadius` 1.1 m) forms about Mario where he stands: `CircleCount` (8) places,
+`CircleGap` (1) of them EMPTY -- the gap -- `CircleRadius` (7 m) out, `CircleHeight` (1.5 m) over the floor (the Boos' middles; a Boo's top is that plus half
+its height), facing the middle, TURNING once every `CircleRevSeconds` (4; the way at random), fading in over 0.4 s. It holds its size `CircleHoldSeconds` (2),
+then CLOSES to `CircleMinRadius` (1 m) by `CircleSeconds` (8) while it drifts after Mario at `CircleDriftSpeed` (1 m/s), and FADES (a puff per Boo). A Boo
+whose body meets Mario's damage cylinder hurts him (the common enemy damage). Out through the gap as it comes round, or over a Boo. `CircleWatchSeconds`
+(0.5) after the ring is up, the wait (the ring runs on its own; a hit on him through it fades it). Signals `CircleStarted` / `CircleMade(boos)` /
+`CircleHit` / `CircleDone(hits)`; readouts `CirclesMade`, `CircleHits`, `Circle` (`RadiusNow`, `Angle`, `GapBearing`, `Centre`, `Boos`...).
+
+**Verified** (headless drive v201-3, deleted before the commit): C33 he sank (the body to 0.03, his poof), the pool came up under him and hunted a standing
+Mario from 6 m to under his feet (hunt k 0.99; 11.7 m from the middle at most), stopped (the tell), he broke the floor 0.67 s after it, the ring got Mario at
+r 0.08 (HP 5 -> 4), and he ended up 0.00 m off the pool at his hover height (8.5 m); never hittable under the floor. C34 the crown violet, 7 Boos at 7.00 m
+(err 0.000) 1.5 m up, one 90-degree gap where `GapBearing` says (the others 45), turning 90.7 deg in the first second, the radius held 7 m then 3.99 at 5 s, a
+Boo got the standing Mario at r 1.66 (7.3 s), the ring faded at 1.01 m at 7.98 s, King Boo back in the wait within 1.5 s. 200b-179's checks as before --
+48/48 (the drive heals Mario's two hits afterwards; without that he died in the copies' breath later -- run ds). Shots (run cp): 29a the pool hunting Mario
+with its mist behind it, 29b the stop and flare under him, 29c the break's ring and burst on him, 29c2 King Boo shooting up through the floor, 29d up at the
+pool's spot; 30a the ring from above (the gap), 30b from Mario's shoulder (the shy Boos turning at head height), 30b2 one passing close, 30c closing from
+above, 30c2 tight about him, 30d the Boos fading. The clean rebuild 0 errors; the drive, the logs, the shots and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** the pool hunts a standing Mario to his feet (a running Mario stays ahead: 6 m/s rising to 9.6); the ring 5 m / 0.45 s and the
+0.45 s flare are my picks; the circle's Boos are at head height so a plain jump does not clear them (`CircleHeight`; higher = jump under them); the ring closes
+to 1 m, so a Mario who never leaves is hit (`CircleMinRadius` 2 = a safe middle); the ring drifts 1 m/s after him (0 = fixed, as SMW's). Not committed: the
+editor's detect-3D .import rewrites (Jaysonn's, as in 198-200b).
+
+### 202 -- the King Boo REMATCH, part 47: the Bomb Boo's PUFFS are BLACK (its own smoke under a dark-violet flash: the burst in Mario's hand, a vanish, the volley's blasts -- 158-201's port burst kept its white smoke whatever the tint) and it has ONE TONGUE (the body glb's own tongue strip, baked under the port's swinging tongue since 159, taken out of the mesh as it loads) (feature/kingboo-rematch, code `89e8db8`)
+
+**Jaysonn:** "lets fix up the effects for some things like how the bomb boos puffs are white when going away from getting hit. like when mario gets hit
+while swinging him around. and other effects like that. also i think the bomb boos tounge looks off. like two models ontop of each other."
+
+**The puff** (`SmsBombBoo.cs`): `Puff()` was the port's enemy-vanish burst (`EnemyDisap.tscn`) tinted `BurstColor` -- but `SetShaderParam` reaches only its
+GLOW (the JpaDirBillboardAdd shader); its SMOKE is a plain StandardMaterial3D on the white kemuball3_enemy texture, so every puff -- the burst in Mario's
+hand (193), a vanish (the field cleared, an expiry), the volley's floor blasts and the dud's own (200) -- stayed WHITE whatever the tint. Now The puff group:
+the Boo's own BLACK smoke (the rise's emitter, `FireSmokeAt`: `PuffSmokePuffs` 18 x the burst's scale, `RiseSmokeSize` x `PuffSmokeScale` 1.1 across, blown
+out every way, `RiseSmokeColor`) under a brief dark-violet FLASH (`PuffFlash`, `PuffFlashColor` (0.45, 0.25, 0.6): the port's burst with its white Smoke
+node hidden). `FireRiseSmoke` is `FireSmokeAt(up)`. Readout `PuffSmokesFired`.
+
+**The tongue** (`SmsBombBoo.cs`): `bomb_boo.glb`'s one mesh carries Galaxy's own tongue (two strips, 74 + 48 triangles -- the texture's tongue island at
+u 0.01-0.21; the body, eyes, mouth and fangs sit past u 0.55; no skin, so no bone to fold it away), under the port's swinging tongue (`bomb_boo_tongue.glb`,
+159): two tongues, one hanging still inside the other. `StripBodyTongue` (`HideBodyTongue`, `HideBodyTongueMaxU` 0.3): as the Boo loads, the body mesh's
+triangles whose three corners lie in that island are taken out (the index array rebuilt, the vertices, materials and format kept; the stripped mesh shared by
+every Boo). Readouts `BodyTongueStripped` / `BodyTongueTrisStripped`. The glb itself is untouched (tools: `glb_nodes.py` / `glb_shells.py` in the pass's
+workspace read the shells).
+
+**Verified** (headless drive v202-2, deleted before the commit): C35 the burst in Mario's hand fired the Boo's black smoke (`BombBoo8PuffSmoke`, 20 puffs, the
+ramp's first colour (0.009, 0.009, 0.012) linear) with the port's burst's Smoke hidden; the body's tongue stripped, 122 triangles; 201-179's checks as before
+-- 49/49. Shots (run cq): 31a a supply Boo close -- one tongue; 31b its vanish -- the black puff with the violet flash in it; 14c the tongue wagging and 28c
+the volley's blast as before. The clean rebuild 0 errors; the drive, the logs, the shots and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** the vanish, the hand burst and the blasts share one puff (scale 0.9 / 1.1 / 1.3); the flash is a dark violet (`PuffFlashColor`;
+the port's mint was the enemy-vanish's) -- off = smoke alone; the tongue island's bound (0.3) sits well between the tongue (0.21) and the body (0.55). Not
+committed: the editor's detect-3D .import rewrites (Jaysonn's, as in 198-201).
+
+### 203 -- the King Boo REMATCH, part 48: the split CUTSCENES CLEAR THE FIELD (as the phase 2 / phase 3 cutscene cuts in, every attack live in the arena is gone at once: his and his copies' tornados, walls, fireballs, breath, spat Bomb Boos, the Boo circle, the Boolossi and their wave, the ice on Mario -- 188-202 froze them with the world and ran them on after), the SPIN JUMP GRABS a Bomb Boo (the stick spin and A, or A out of the X spin, takes a free Boo by the tongue in the air -- the X spin alone before), and the volley has NO DUD (VolleyDud off: every Boo he spits is lit and blasts) (feature/kingboo-rematch, code `c62931d`)
+
+**Jaysonn:** "lets make it when the cutscnene plays for phase 2 and 3 that all the attacks go away. and lets also make it so normal spin jump can lso pick
+up bomb boos. and lets not have a dud for king boos bomb boo attack"
+
+**The field** (`SmsSplitCutscene.cs`: `SmsRematchField`, a static class beside the cutscene; the knob `SplitClearsAttacks` on KingBoo): `SmsSplitCutscene.Begin`
+calls `SmsRematchField.Clear` before `SplitBegin` and the freeze. Every kind's own live list is walked -- `SmsGhostLightning.All`, `SmsTornado.All` (NEW: the
+tornados live in the arena, not under their wind), `SmsGhostWind.All`, `SmsFireball.All` (NEW, the same), `SmsFireballs.All`, `SmsGhostBreath.All`,
+`SmsBombBoo.All` (`VanishIfSpat`: only a Boo King Boo spat, in the air or a dud floating; the supply's and the one in Mario's hand stay), `SmsBooVolley.All`,
+`SmsBooCircle.All`, `SmsBoolossus.Boos` / `.All`, `SmsIceBlock.All` (+ `Mario.SmsThawNow`) -- and each node's new `VanishNow` frees it OUTRIGHT (hidden,
+QueueFree: the frame's end takes it even while the tree is paused), no puff, no sound: the cut hides it. Why outright: 185-201's `Cancel()` calls start FADES
+(a tornado's 0.8 s dissipate, a fireball's fizzle, the circle's fade) that the frozen world holds for the cutscene's length -- a tornado stood through the whole
+thing and ran on after. `Cancel()` in the wind, the fireballs, the breath and the volley no longer removes the maker from its `All` (it leaves in `_ExitTree`),
+so a cancelled maker's leftovers are reachable. Readouts `SmsRematchField.Clears` / `LastCount` / `LastNote`, `SmsSplitCutscene.FieldCleared` / `FieldClearedNote`.
+
+**The spin jump** (`Mario.cs`, `patch_mario203.py`): `SpinJumpGrabs` (on), `SpinJumpGrabBelow` 4 m -- `SmsBombTick`: in `MarioState.SpinJump` with empty hands,
+`SmsBombTryGrab(below, "the spin jump")` takes the nearest free Boo within `BombGrabRadius`, under `BombGrabHeight` over his feet and up to `SpinJumpGrabBelow`
+UNDER them (he is up in the air over it: the spin jump keeps 0.8 of the run speed and peaks near 4 m -- run dz's 2.5 m missed, the Boo 2.3 m under him at the
+closest pass). Counter `SmsSpinJumpGrabsMade`. `SmsThawNow(why)`: the frost ended from outside (the field clear), its immunity as ever.
+
+**The dud** (`SmsKingBooRematch.cs`): `VolleyDud` false. 200's dud, its fuse, its grab and its blink stay behind the knob.
+
+**Verified** (headless drive v203-1, deleted before the commit): C38 the copy's five tornados stood as the hit on the real one landed and ran on through his
+2.9 s hurt; two ticks into the second cutscene's cut (the world frozen) tornados 0, winds 0, Boos in the air 0, volleys / fire / breaths / walls / circles /
+Boolossi 0; the cutscene cleared 6 (tornado x5, wind x1), Clears 1 -> 2. C37 Mario put 4 m from a free supply Boo (the X spin took nothing), A out of the spin:
+SpinJump seen, the Boo grabbed by the tongue in the air 0.13 s after A (2.75 m off, 2.27 m under his feet), `SmsSpinJumpGrabsMade` 0 -> 1, Carried. C36 the
+node's `VolleyDud` read false before the drive turned it on for 200's two dud volleys; a third volley with it off: 3 spat, 0 duds, 3 blasts at their landings,
+0 floating. 202-179's checks as before -- 52/52. No shots: nothing new to look at (the clear happens under the cutscene's cut). The clean rebuild 0 errors; the
+drive, the logs and the pass's scheduled tasks deleted.
+
+**Deviations, all knobs:** the clear takes the spat Boos too (a dud on the floor goes with them) but never the supply's or the one in Mario's hand; the ice on
+Mario goes with the attacks (he thaws); the clear is silent (no puffs under the cut). The drive could only stage a COPY's attack for the test: a hit on the real
+one already cancels his own (and the supply vanishes every Bomb Boo at each hit, the doc's rule), 2.9 s before any cutscene. The spin jump's reach under his
+feet (4 m) is mine. Not committed: the editor's detect-3D .import rewrites (Jaysonn's, as in 198-202).
+
+### 204 -- the King Boo REMATCH, part 49: the FIREBALLS TRAIL FIRE (a stream of flame left in the world behind each ball as it flies and rolls, drifting back the way it came and rising as it dies; hot streaks along the motion; the ball's own flames leaning back with its speed -- 168-203's flames rode on the ball and only embers were left behind) (feature/kingboo-rematch, code `fc60daa`)
+
+**Jaysonn:** "the fire balls need the fire to trail behind it. right now thier are sparks but lets give the fireballs some more feel that are moving"
+
+**`SmsFireballs.cs`** (the maker's knobs, "The look": `Trail` on, `TrailPuffs` 72, `TrailSeconds` 0.55, `TrailSize` 1.15, `TrailBack` 0.25, `TrailStreaks` 20,
+`TrailLean` 0.7). Why the balls read as still: their `Flames` emitter is LocalCoords -- the fire rode along on the ball -- and the only things left in the world
+were the embers (sparks), the drips and the smoke. Now each ball carries three more things, all steered every frame from its own velocity (`Apply`, the 3D speed:
+flat plus the fall):
+- the TRAIL: a world-space GPUParticles3D (TopLevel, LocalCoords off, riding the ball) that leaves fire1_raw puffs where the ball WAS -- `TrailPuffs` alive at once
+  over `TrailSeconds`, born `TrailSize` x the ball's radius (scaled with the ball as it shrinks over its life), shrinking to a quarter, turning with the ball,
+  rising (gravity up 1.6 x the radius), coloured yellow-white -> `FlameColor` -> a dark red -> gone; their direction the motion REVERSED and their speed
+  `TrailBack` x the ball's (0.6..1 of it), so the stream stretches back the way it came;
+- the STREAKS: `TrailStreaks` thin glow1_spark streaks (AlignY: along their own velocity, 0.3..0.5 x the ball's, back the way it came), 0.28 s each, damped;
+- the LEAN: the ball's own `Flames` material's `Direction` = Up + back x `TrailLean` x (speed / `RollSpeed`, capped 1.5), normalised -- the fire on the ball lays
+  back with the speed (0.41 of flat at the roll's 6 m/s, 0.72 at the pop's 16 m/s).
+
+Readouts for the drives: `TrailOn` (on and world-space), `TrailEmitPoint`, `TrailPuffsNow`, `TrailStreaksNow`, `TrailLeanNow` (the flames' direction dotted with
+the motion reversed, flat), `TrailBackSpeedNow`. The trail stops with the embers when the ball fizzles or fades (`Apply`'s `trailing`); a vanish hides it with the
+ball. The drive partial: `DriveFireballs()`.
+
+**Verified:** shots (run ct) 32a the trails arcing out of the crown from the side; 32a2 the three pops in the air from Mario's side, a column of balls each with
+its fire behind; 32b a ball rolling at Mario from his shoulder, the fire laid back off it; 32c one rolling ball close, the stream of fire behind it along the
+stone; 32d the rolling trails from above. Headless drive v204-1 (deleted before the commit): C39 nine balls, 1547 moving samples (21 rolling): every one with its
+trail emitter on, world-space, 0.000 m off the ball, 72 puffs and 20 streaks, the drift back `TrailBack` x the ball's speed, the flames leaning 0.41..0.72 back;
+Mario untouched (stepped aside after the pops). 203-179's checks as before -- 53/53. The clean rebuild 0 errors; the drive, the logs, the shots and the pass's
+tasks deleted.
+
+**Deviations, all knobs:** the trail's numbers (72 puffs, 0.55 s, 1.15 x, 0.25 back, 20 streaks, 0.7 lean) are mine; `Trail` off = 168's look. The streaks are
+an extra I added for the motion; `TrailStreaks` 0 takes them out. The first shot run lost its three later shots because King Boo lets go of his `Fireballs`
+reference as his phase ends ("the balls roll on on their own") -- the shot drive now keeps the maker itself; the first headless run's check came before the
+balls had settled to a roll (they fall from 20 m and bounce twice, ~4 s) -- it now waits for the roll. Not committed: the editor's detect-3D .import rewrites
+(Jaysonn's, as in 198-203).
+
+### 205 -- the King Boo REMATCH, part 50: a FIREBALL GOING OUT ends in a little PUFF (dark smoke rising from where it was, a flash, a ring of light, embers flung out; 168-204's balls shrank to nothing and winked out) (feature/kingboo-rematch, code `9cc33df`)
+
+**Jaysonn:** "nice we just need the effect to look alittle better when it goes away like alittle puff?"
+
+**`SmsFireballs.cs`** (the maker's knobs, "The look": `EndPuff` on, `EndPuffs` 10, `EndSparks` 12, `EndPuffScale` 0.9). A ball's natural end -- shrunk to nothing over
+`LifeSeconds` -- and a fizzle that is not a burst on Mario reach `Die()`; the burst on Mario (168) keeps its own effects (`_burst`). `Die()` now fires `EndPuff()`
+first: `EndPuffs` puffs of dark smoke (kemuball3, mix; a tight sphere 0.3 x the size, 0.8-2 m/s with a 70 deg spread, rising at 1 m/s^2, growing 0.6 -> 1.35 over
+0.7 s, brown -> dark -> gone), `EndSparks` embers (glow1_spark, 2-5 m/s every way, falling at 8 m/s^2, 0.55 s), one FLASH (glow3_raw, 2.4 x the size, bright at once,
+swelling 0.7 -> 1.5 and gone in 0.26 s), and the ring of light (2.8 x the size, 0.3 s). Everything is sized from the ball's BIRTH radius x `EndPuffScale` (it is
+tiny by its end) and left in the world as TopLevel one-shots that free themselves. Readouts `EndPuffsFired` on the ball, `EndPuffsMade` on the maker. `Die()` also
+stops the trail and the streaks (204) with the embers.
+
+**Verified:** shots (run cx) 32e a ball that went out on its own, 0.1 s on -- the smoke dome with the embers in it and the flash over it; 32e2 a quarter second on
+-- the smoke darker, spreading, the embers falling. Headless drive v205-1 (deleted before the commit): C40 the first balls to reach the end of their life fired their
+puff (3 dead, 3 puffed, `EndPuffsMade` 3, an EndPuff emitter live in the world), 2.1 s after the trail check; 204-179's checks as before -- 54/54. The clean rebuild
+0 errors; the drive, the logs, the shots and the pass's tasks deleted.
+
+**Deviations, all knobs:** the puff's numbers are mine; the first cut (run cw) read as a pale haze -- the smoke is now tighter and darker and the flash was added.
+The first two shot rounds caught the wrong death (a ball that had burst on Mario, no puff by design) and then none (the maker drops a dead ball from its list the
+same frame) -- the shot drive now keeps its own list of the balls and waits for one that went out on its own. "It" in the ask read as the fireball, the thing of
+the pass before. Not committed: the editor's detect-3D .import rewrites (Jaysonn's, as in 198-204).
+
+### 206 -- the King Boo REMATCH, part 51: the BOMB BOO in the SUNSHINE BOO's body (the experiment: the game's own hotel Boo -- telesa.glb, its toon materials, its blue eyes, fangs, red mouth and rigged tongue, telesa_wait playing -- in the Galaxy Boo's place, with every Bomb Boo way kept: the rise, the bob, the shock with the game's own flinch, the lasso grab in the mouth's red, the fuse's red blink, the lob; Look = Galaxy brings 158-205's black Boo back) (feature/kingboo-rematch, code `ef37016`)
+
+**Jaysonn:** "lets draw and experiment with the sms boos to replace the bomb boos since the different model kinda thorws things off. lets see if we can swap the
+model and textures to look like the noral boos from sms"
+
+**`SmsBombBoo.cs`** (the knobs, "Look (206): the Sunshine Boo"): `Look` (Galaxy / Sunshine; Sunshine by default), `SunshineModel` (`res://models/Eniemes/Telesa/telesa.glb`),
+`SunshineScale` 0.013434 (the game's 1/74.44: 1.84 m across, 1.3 m tall -- the Galaxy body was 2 m across), `SunshineMouthUnits` (0, 30, 46) (the lasso tongue's root
+at the lips, game units), `SunshineOwnTongue` (on), `SunshineTint` (white), the clips (`telesa_wait` / `telesa_hit_start` / `telesa_hit` / `telesa_hit_end`).
+- `SwapToSunshine` (in `_Ready`, before the materials): the Galaxy Model freed, telesa.glb instanced as "Model" at `SunshineScale`; its AnimationPlayer found
+  (telesa_wait looping from a random frame) and its Skeleton3D (14 bones); an `SmsBoneCollapser` (a SkeletonModifier3D, new, in this file) on the skeleton scales
+  `jnt_bero1` / `jnt_baro2` -- the model's own tongue -- to nothing while it is active.
+- `DressSunshine`: each of the model's four TelesaToon materials is copied onto **`BombBooSunshine.gdshader`** (NEW + .uid: TelesaToon's exact toon -- the bmd's TEV, the
+  white pulled toward the dark glint channel, the eyes and fangs cut out -- plus `opacity`, `tint`, the fuse's `flash` / `flash_color` / `flash_emit`, and
+  `flat_tex` / `flat_rgb`); the body and the mouth blink with the fuse (`_mats` / `_bodyMats`), the eyes and the fangs only fade (`_faceMats`, new). The port's
+  lasso tongue (bomb_boo_tongue.glb) gets the mouth's material with `flat_tex`: the texture is an 8 x 8 of three colours (the white, the mouth's dark red, the
+  tongue's orange-red) and the Galaxy tongue's UVs mean nothing on it -- a flat (232, 60, 32).
+- The two tongues (`SunshineOwnTongue`): the model's own wags in telesa_wait while the Boo floats, the port's lasso tongue hidden; CARRIED, the lasso tongue shows (the
+  rope from the mouth to Mario's fist, 159) and the model's own collapses (`SunshineTick`). Off: the model's always collapsed and the port's hangs and wags as the
+  Galaxy one's did.
+- The shock: `telesa_hit_start` then `telesa_hit` held (`PlayThen` / the clip chain in `SunshineTick`); the shock over, `telesa_hit_end` then the wait -- on top of
+  180's worry (the shake, the lean, the cower, the sweat, the drool: unchanged). `StripBodyTongue` (202) is the Galaxy body's and is skipped.
+- Every Galaxy-model number went through a switch: `BodyScale` (the model's scale), `MouthLocal` (the mouth in the body's frame), `BodyReach` (the hit on King Boo,
+  the dud's mark: 68 units = 0.91 m), the sweat's spot off the head. Readouts for the drives: `SunshineLook`, `SunshineClipNow`, `SunshineTongueCollapsed`,
+  `PortTongueShown`, `SunshineMaterials`; `SetTint(colour)` live.
+`SmsKingBoo.Drive.cs` (not committed): C3's "root in the mouth" and C5 / C6's scale read `BodyScale` / `MouthLocal`; C35 takes the Sunshine body (nothing to strip).
+
+**Verified:** shots (run cz) 14c the Sunshine Boo floating, its own tongue out; 14d / 14f / 14g shocked -- the lean, the sweat, the drool, the eyes squinting; 31a
+its face close (blue eyes, fangs, the red mouth and tongue); 33a / 33b carried on the lasso tongue, from Mario's side and from behind him -- its own tongue gone,
+the lasso red from its mouth to his fist; 33c the same Boo in a dark tint (0.3, 0.3, 0.36) for the comparison. Headless drive v206-1 (deleted before the commit):
+C41 Model holds a Skeleton3D and an AnimationPlayer on telesa_wait at 0.0134, five materials on BombBooSunshine, own tongue out, lasso tongue hidden, reach 0.914
+m, the Galaxy body gone; C41b carried -- the lasso tongue shown and the model's collapsed, telesa_hit seen through the shock; every Boo check as before (the rise,
+the sway, the shock, the drool, the grab, the burst, the blink, the volley) -- 56/56. The clean rebuild 0 errors; the drive, the logs, the shots and the pass's
+tasks deleted.
+
+**Deviations, all knobs:** Sunshine is the DEFAULT look now (Jaysonn's "experiment" shown rather than hidden behind a switch); the Boo is white as the game's -- a
+tint knob makes the shadow Boo (the 33c shot) if the white reads too much like the circle's and the wave's Boos, which wear the same model; the lasso tongue's red
+is the texture's tongue colour as a flat; the shock plays the game's flinch clips on top of 180's worry; the mouth point (0, 30, 46 units) is read off the model
+(the lips sit at z 45-50). The Sunshine body's hit reach is 0.91 m against the Galaxy's 0.8. Not done: the Boo circle's and the Boolossus's Boos already wore this
+model (201, 165) -- nothing to change there. A note from the shots: Mario lies down and sleeps when the shot drive leaves him idle long enough (the game's own
+long-idle), not a hit -- the log shows him idle at full HP. Not committed: the editor's detect-3D .import rewrites (Jaysonn's, as in 198-205).
+
+### 206b -- the King Boo REMATCH, part 51b: the Sunshine Boo in the BOMB BOO's COLOURS (the game's textures recoloured in code as the Boo loads: the body's white near-black, the eye's grey yellow and its blue iris amber; the red mouth, the orange-red tongue and the white fangs kept -- 206's white blue-eyed Boo behind the knob) (feature/kingboo-rematch, code `1dcf3e3`)
+
+**Jaysonn:** "no i want you to replace its textures to match boo bombs yellow eyes black bodys"
+
+**`SmsBombBoo.cs`** (the knobs, "Look (206): the Sunshine Boo"): `SunshineBombColours` (on), `SunshineBodyColor` (0.09, 0.09, 0.1), `SunshineEyeColor` (1, 0.8, 0),
+`SunshineIrisColor` (1, 0.55, 0). No new texture files: `DressSunshine` swaps each copied material's `base_tex` for an ImageTexture built from the game's own texture
+(`Texture2D.GetImage`, RGBA8; cached per source and colour) -- `RecolourBody` on the 8 x 8 body texture (K_telesa_body: 32 white texels, the mouth's 16 dark red,
+the tongue's 16 orange-red): the white texels become `SunshineBodyColor`, the reds stay; `RecolourEye` on the 64 x 64 eye texture (K_telesa_eye: the grey of the
+eye at 199 / 204, the blue iris (63, 135, 199), the dark outline, soft alpha at the edges): a texel bluer than red by 0.2 becomes `SunshineIrisColor`, a grey over
+0.35 becomes `SunshineEyeColor` x its level over 0.8 (the shading kept), the dark outline and every alpha stay. The fangs (K_telesa_kiba) are left white. The
+colours are stored-byte values -- the toon reads `base_tex` raw, as the game's TEV did -- so a near-black texel is a near-black Boo under the toon's glint, and
+the yellow is the texture's yellow. The lasso tongue stays the texture's tongue red (206). Readouts for the drives: `SunshineBodyTexel` / `SunshineEyeTexel` /
+`SunshineIrisTexel`.
+
+**Verified:** shots (run da) 31a the face close -- black body, yellow eyes with amber lids, the red mouth and tongue, white fangs; 14c floating; 14g shocked, the
+sweat and drool; 33a / 33b carried on the red lasso. Headless drive v206-2 (deleted before the commit): C41c the body material's texture an ImageTexture in code,
+its 32 white texels the body colour and none white left, the eye texture's 1221 grey texels yellow and no blue left, the fangs untouched; 206's and the older Boo
+checks as before -- 57/57. The clean rebuild 0 errors; the drive, the logs, the shots and the pass's tasks deleted.
+
+**Deviations, all knobs:** the body is a very dark blue-grey (0.09, 0.09, 0.1), not pure black, so the toon's glint still draws its shape in the dark arena; the
+iris is amber rather than a pupil (the Galaxy Bomb Boo's eyes are plain yellow -- `SunshineIrisColor` = `SunshineEyeColor` gives that); the mouth's reds and the
+fangs are the game's. 206's `SunshineTint` stays white (it multiplies on top). Not committed: the editor's detect-3D .import rewrites (Jaysonn's, as in 198-206).
+
+### 207 -- the King Boo REMATCH, part 52: Mario's LOOK-ABOUT rebuilt from MOTION CURVES after the game's own idle (a glance left, a sweep right, back to the front in 2.0 s; the head leads, the chest follows, the arms swing with it, no head cock, no reaching arm) and played at its OWN PACE (LookKeepsPace: the music cue's trim comes out of the laugh first -- 197 had quickened the 3 s clip x1.5) (feature/kingboo-rematch, code `ac331a7`)
+
+**Jaysonn:** "awesome the fight is looking good i think we can clean up the intro animation for mario the look around looks off and he still tilts his head can
+we fix this to look better?"
+
+**Why it looked off.** 176's clip was eight hand-set poses joined by the baker's cubic: the head whipped 144 degrees between two of them in 0.4 s -- 0.27 s once
+197 played the clip x1.5 to fit the 7.5 s cue, over 500 deg/s -- stood dead still at each side, turned as one block with the chest, raised an arm to "feel out"
+each glance, and ended with the head cocked 12 degrees (the half of the shrug 199 left in: "he still tilts his head"). The game's own idle (`ma_wait`, measured off
+the bck with `look207/idle_scan.py`) is itself a look-around: the head leads to 55 / -67, the chest follows a beat later with half the turn, the hands travel with
+it, nothing stops.
+
+**`tools/anim/lookabout_curves.py`** (NEW): the look-about as curves -- the head's world yaw (0, 0 at 0.07, 60 at 0.40, 55 at 0.65, -62 at 1.28, -58 at 1.52,
+0 at 1.92), its pitch (up 4-6 through the glances, never down), the chest's yaw (24 at 0.58, -24 at 1.42, -3 at the end: 0.15 s behind the head with 40% of the
+turn), the upper arms swinging 0.2 of the chest's yaw 0.05 s behind it (the right forward and the left back as the chest turns left), one breath (the chest back
+1.5 at the half) -- joined by a monotone cubic (Fritsch-Carlson: no overshoot, the speed continuous) and written to `assets/Mario/Anims/ma_lookabout.pose.json`
+as a key EVERY FRAME (61 keys, 2.0 s at 30 fps), so the baker's cubic has nothing to overshoot. The head's pitch is taken about its OWN lateral axis after its yaw
+(undo the chest's yaw, pitch, yaw to the heading), so the turn adds no roll of its own: roll 0.0 throughout. Edit the numbers at the top, run it, re-bake
+(`README.md` has the two commands). `ma_lookabout.pose.json` (generated) and `ma_lookabout.tres` (re-baked: 269 rotation keys over 61 poses, the feet and centre
+fixed, the hands at 60.3-62.4 against the idle's 60.3 / 61.0).
+
+**`SmsRematchIntro.cs`:** `LookKeepsPace` (on) -- the look-about plays at its own speed; the cue's trim comes out of King Boo's laugh first (never under
+`LaughMinScale` 0.5 of its knob) and the look-about is quickened only when that is not enough (then never under `LookMinScale`). With the 2.0 s look-about, the
+3 s laugh and the 7.5 s cue: the look-about 2.0 s as written, the laugh 2.0 s (what 197 played). Off = 197's proportional trim. Readouts `LaughTrim`,
+`LookElapsed`.
+
+**Verified:** shots (run dc, the intro's own camera as is) 33a the first frame, 33b the glance left at 0.40 s, 33c the drift, 33d the sweep through the front, 33e
+the glance right, 33f from his left side (the chest turned, the arms hanging), 33g back to the front -- no raised arm, no cocked head. Headless drive v207-1
+(deleted before the commit): C42 the clip 2.00 s played 2.00 s (trim x1.00, the laugh's x0.67), the head's world yaw off the skeleton -62 (1.29 s) .. +60
+(0.42 s), the left peak first, its quickest 338 deg/s a physics tick at a time (the curve's own peak 273), roll within 0.0, pitch +0..+7, the chest -24 (1.44 s)
+.. +24 (0.59 s) peaking after the head, the hands never over 1.4 units above the idle's, the head back at 0 at the end; the step from the tree's idle into the
+clip 0.0 degrees (the idle stands at its frame 0 under CameraLocked); C26 the fight 7.52 s after the cue; everything else as before -- 58/58. The clean rebuild
+0 errors; the drive, the logs, the shots and the pass's tasks deleted.
+
+**Deviations, all editable:** the curves' numbers are mine (the game's idle is the model, made alert and bigger: 60 / -62 against its 55 / -67, 2.0 s against
+its 3.0); the laugh gives first under the cue (`LookKeepsPace` off = 197's). The pose script is now generated -- hand edits to it are overwritten by the next
+run of the generator; the `.tres` stays editable in the Animation panel as before (a re-bake overwrites it). The side shot's camera (2.8 m off his left) shows
+the back of his head at the right glance; the frontal shots carry the look. One shot run was cut short when Jaysonn closed the game window mid-run; rerun.
+
+### 208 -- the King Boo REMATCH, part 53: the arena's SKY is Luigi's Mansion's BOSS-ARENA SKY, ported from the GameCube disc (the vrball_B dome of the Bogmire, Boolossus and Chauncey fights: its three textures, its four texture scrolls, its colour flashes, drawn by a Godot sky shader on the arena's WorldEnvironment; the lighting untouched) (feature/kingboo-rematch, code `6644db3`)
+
+**Jaysonn:** "ok lets make a skybox fr the fight. can you use the skybox that happens in luigis mansion fights? like vs bogmire or boolouses." -- then
+"i think the decomp for luigis mansion would be good also i put it in logForLary" (the Luigi's Mansion Recompiled repo).
+
+**Where the sky came from.** The LM port's notes name the game's sky system: per map a descriptor (`lbl_80300C7C[map]`) loads a "VR ball" dome from
+`/Iwamoto/vr*.szp`. Jaysonn's disc (`luigis_mansion_3d.iso` in the FinModelUtility roms folder is the GameCube GLME01 disc) gave the rest:
+`tools/lm/lm_sky_rip.py` (NEW: reads the GC file table, Yay0 + RARC) pulled `/Iwamoto/vrball_B.szp` -- `vrb_mb.bmd`, `vrb_mb1-4.btk`, `vrb_mb.brk` --
+and `tools/lm/lm_sky_desc.py` (NEW) read the descriptors off main.dol: maps 10 (Chauncey), 11 (Boolossus) and 13 (Bogmire) all draw vrball_B with
+all four btks and the brk; map 9 (King Boo / Bowser) draws vrKoopa, map 2 (the mansion) vrball_M. The bmd's materials, textures, geometry and the
+animations were read with the project's J3D dumpers (bmd_mat_dump / bmd_geom / btk_dump / brk_dump) and the dome's vertex rings mapped to elevation
+(`sky208/dome_uv.py`).
+
+**What the game draws** (and what `RematchSky.gdshader` now draws, per pixel of sky): a dome round the camera, u = the way round, v = a curve of the
+elevation off the dome's rings (the base ball: 0 at the zenith, 0.535 at the horizon, 1 at the nadir; the streak dish: 0 at +74 deg, 0.31 at the
+horizon, 1 at -29 deg, nothing below). Material `vr_o2`, the BASE: colour = mix(C1, C0, bg04 x bg04) -- the cloud texture laid 6 times round, scrolling
+one repeat per 60 frames and breathing 1 -> 2.07 -> 1 in height, times itself laid 4 times round scrolling the other way per 80 frames (1 -> 2.4 -> 1);
+alpha = the gradient texture turned 180 (opaque at the horizon, gone above ~25 deg: the clear colour shows). C0 and C1 are BLACK but for the brk's
+FLASHES over a 300-frame cycle (10 s): C0 purple at frame 2, green at 154, lavender at 167; C1 grey at 12, blue at 118, dark red at 237 -- the
+"lightning" in the ghost dimension's clouds, each a second or two. Material `vr_q2`, the STREAKS, added: a = clamp(2 x sin_wave x sin_wave) x gradient
+-- the sine-wave texture (a bright sine curve with a soft fill under it) laid 8 times round, turned 180, scrolling +1 per 100 frames, its height
+breathing 3.38 -> 3.84 -> 3.48 -> 3.38, times itself laid 10 times round scrolling the other way per 140 frames (3.0 -> 3.38 -> 3.84 -> 3.0), times
+the gradient mirrored twice (a tent: full 5 deg under the horizon, nothing at the zenith or the rim); colour = mix(magenta (254,60,186), cyan
+(12,254,242), a) x a. The game's numbers are display values, so the result is converted to linear at the end.
+
+**Files.** `assets/Sms/Rematch/RematchSky.gdshader` (NEW, + .uid) -- the port, every uniform a knob; `RematchSky.tres` (NEW) -- the ShaderMaterial with
+the three textures; `assets/Sms/Rematch/Sky/lm_bg04.png` (64x128), `lm_sin_wave.png` (128x128), `lm_gs001m.png` (64x64) (NEW: the disc's I8 textures as
+8-bit grey PNGs, their .import pinned lossless with no mipmaps and no 3D auto-compression -- the shader fetches texels itself to give each axis GX's own
+wrap: repeat, mirror or clamp; a mirrored axis through a repeating sampler drew a dark hairline at every seam); `RematchArena.tscn` -- the
+WorldEnvironment's Environment draws the Sky (background mode Sky, `RematchSky.tres`); the ambient stays the colour it was, the fog leaves the sky
+alone, so nothing else in the arena is lit differently. The sky shows in the editor too.
+
+**Knobs** (shader parameters on `RematchSky.tres`): `brightness` 1 (the game), `streak_gain` 1, `flash_amount` 1 (0 = the clouds never flash),
+`base_lift` (black: a steady colour on the clouds between flashes), `clear_color` (black), `streak_dim` / `streak_bright` (the game's magenta and cyan),
+`speed` 1 (the game's 30 frames a second), `turn`.
+
+**Verified:** shots (run dg: 33b the look-about, 34a-c the horizon from the middle, tilted up, and the fight's view with King Boo against it, 15a the
+dive) -- the black-violet sky, the magenta arcs with cyan where two cross, the dark-red flash phase in some, no seams, no hairlines (run de showed
+the hairlines; run df a shader error -- a sampler passed to a function must carry the same hints at every call). `sky208/lm_sky_preview.py` (numpy,
+the same math) measured against MarioWiki's Boolossus and Bogmire arena shots: the band's mean (30,25,46) and its cyan peaks match. Headless drive
+v208-1 (deleted before the commit): C43 the WorldEnvironment draws a Sky whose material is RematchSky.tres on RematchSky.gdshader, the ambient still the
+colour (0.45, 0.4, 0.65) x 0.7, the fog on with sky affect 0 -- 59/59. The clean rebuild 0 errors; the drive, the logs, the shots, the import pass's
+files and the pass's tasks deleted. The headless import pass touched no other .import file.
+
+**Deviations:** none in the sky itself -- it is the disc's data; the knobs are mine (all at the game's values). A first version of this pass drew a
+hand-made sky (dark violet, procedural streaks) before Jaysonn pointed at the decomp; it is gone. The rip tools read only the sky archive and the DOL's
+string table; no game data is in the repo beyond the three 8-bit textures (19 KB). One shot run was lost to launching the pull with it.
+
+### 208b -- the King Boo REMATCH, part 53b: the FINAL PHASE's SKY -- at the second split the arena's sky cross-fades to Luigi's Mansion's FINAL-BOSS sky, the King Boo / Bowser roof fight's vrKoopa dome ported from the disc (a dark red backdrop, two layers of fire laid round the horizon, red-to-yellow streaks, a red glow below), the fade running through the frozen cutscene (feature/kingboo-rematch, code `a4bd443`)
+
+**Jaysonn:** "can you also make it in the finals phase it does the final boss skybox? the red fireery one?"
+
+**The sky.** `tools/lm/lm_sky_rip.py` had already pulled `/Iwamoto/vrKoopa.szp` off the disc (`k_vrbx.bmd`, `k_vrbx01-06.btk`, `k_vrbx.bck`; the DOL's
+table draws it for map 9, the roof). What the game draws, read off the bmd's six materials, its shapes' vertex rings (`sky208/lm/koopa_probe.py`) and the
+six scrolls: a box of dark red (33,0,0) round everything (`vr_outout`); **fire 1** (`vr_o2`, added): a ball whose v runs 0.012 at +22.6 deg (its top
+ring: no fire above), 0.496 at the horizon, 1 at the nadir; colour = mix(orange-red (234,80,16), orange-yellow (254,165,16), fire B), alpha = fire A x
+fire B x `ramp02` turned 180 (gone below -8 deg) x `bg04` (10 x round, turned 180, scrolling +1 per 120 frames, v clamped) x `gs001m` (3 x round, turned
+180: gone toward the top ring); fire A = `gaku_fire01` laid 6 x round and 0.4 tall scrolling UP a repeat per 150 frames, fire B 10 x round and 0.5 tall
+per 240 -- tongues of flame; **fire 2** (`vr_p2`, added): the same ball on its joint turned -75.6 deg (v 0.027 / 0.266 / 0.504 / 0.703 / 0.902 / 1),
+mix(deep red (190,0,0), orange (255,137,0)), fire A' 4 x round 1.5 tall, fire B' 10 x round 1.3 tall, its clouds scrolling the other way; the **red cap**
+(`vr_n2`, blended): plain red from -17 deg down, in from -7 (the vertex alpha); the **streaks** (`vr_q2`, added): the boss-arena sky's sine-wave streaks
+without the 180 turn, 1.2-1.5 tall, from +2 deg down to -17.5, red (255,0,0) to yellow (255,255,0). Left out: `vr_mat1`, a small fire column on a spinning
+joint 390 units under the horizon and off to one side -- under the arena's floor. TEV register 2 reads white in the file, but every stage naming it is a
+pass-through only if it is black and the game's own screenshots are orange, not white: taken as black. The game's numbers are display values: converted
+to linear at the end. `sky208/koopa_sky_preview.py` draws the same math in numpy (checked against MarioWiki's King Boo Bowser Fight shots: the wall of
+orange-yellow flame under dark red).
+
+**Files.** `RematchSky.gdshader`: `final_sky()` beside `boss_sky()`; `final_blend` (0 = the boss-arena sky, 1 = the final-boss sky; in between both are
+drawn and mixed), `final_brightness`, `final_fire_gain`, `final_streak_gain`, `final_turn`. `RematchSky.tres`: the two new textures.
+`assets/Sms/Rematch/Sky/lm_gaku_fire01.png` (128x128) and `lm_ramp02.png` (64x64) (NEW: the disc's I8 textures as 8-bit grey, `.import` pinned lossless,
+no mipmaps, no 3D auto-compression; `bg04`, `sin_wave` and `gs001m` are byte-identical in both domes and shared). **`SmsKingBooRematch.cs`** ("The final
+phase's sky (208b)"): `FinalSky` (on), `FinalSkyAtSplit` 2 (the second split: three of him; 1 = the first), `FinalSkyBlendSeconds` 2.5.
+`BeginSplitCutscene` starts the fade when `SplitsShown` reaches `FinalSkyAtSplit`; `FinalSkyTick` eases the shared sky material's `final_blend` up
+(smoothstep), ticked by the real one's `_Process` and -- while the world is frozen for the cutscene -- by `SmsSplitCutscene._Process` (one line there);
+the real one puts the blend back to 0 as he arrives (deferred in `_Ready`: the material is a shared resource) and as he leaves (`_ExitTree`). Readouts
+`FinalSkyBlend`, `FinalSkyBegun`, `FinalSkyMaterialFound`; `ResetFinalSky`; `DriveFinalSky` for the shot drive.
+
+**Verified:** shots (run dh) 35a-c -- the horizon over the fence, tilted up, and the fight's view: the wall of flame round the horizon under the dark red,
+King Boo against it (the shot drive forces the blend for its three frames and puts it back). Headless drive v208b-1 (deleted before the commit): C44 the
+blend 0 through the first split's cutscene, begun at the second's cut (0.00 then), climbing through the frozen cutscene to 1.00 over 261 ticks with no
+drop, 1.000 at the fight's return and the material's own `final_blend` 1.000; everything else as before -- 60/60. The clean rebuild 0 errors; the drive,
+the logs, the shots, the import pass's files and the pass's tasks deleted; the headless import pass touched no other `.import` file.
+
+**Deviations:** the fire column under the horizon is left out (under the floor); the 2.5 s fade and its place (the second split) are mine -- the game cuts
+to its roof sky with the room; TEV register 2 taken as black (above). One build failed on a doubled `[ExportGroup("")]` of mine (fixed, rebuilt); the
+drive run and the cleanup were launched in one batch -- the run's 60/60 and the clean status show the order held, but it was luck.
+
+### 208c -- the King Boo REMATCH, part 53c: the final phase's FIRE pulled DOWN the sky for the fight's downward camera -- the vrKoopa dome's elevations stretched from its top ring (final_stretch 2.5: the flames that ended 8 deg under the horizon now end ~55 deg under it, the red cap under that), the flame textures laid 1.6x down the taller band so the tongues keep their shape; final_drop to lower the whole dome besides (feature/kingboo-rematch, code `9c45b7d`)
+
+**Jaysonn:** "ok so we mainly have the camera facing down during the fight and the final fire effects are just red past a certain point is there any way to
+lower it but keep the fire looking high? i updated ref image with finalBox" / "it looks good just sits high so when looking down it just looks red"
+(`Ref/finalBox.png`: his fight camera, high over the arena looking down -- the whole sky past the fence flat red).
+
+**Why.** The game's roof dome puts its fire between +22.6 deg (its top ring) and -8 deg (where `ramp02` runs out) and its plain red cap from -17 deg down --
+made for Luigi's camera, which looks across the roof. Jaysonn's camera looks down over the fence: everything it sees of the sky is 15 to 65 deg under the
+horizon, the red cap, not the fire.
+
+**`RematchSky.gdshader`** (`final_sky`): the elevation the dome is read at is now `e = 22.6 + (e_true + final_drop - 22.6) / final_stretch` -- the top ring
+stays at +22.6 deg and everything under it reaches `final_stretch` times as far down, so the fire's band, the ramp, the cap and the streaks all stretch
+together and the dark red above the fire is untouched; fire A / fire B's texture heights (0.4 / 0.5 and 1.5 / 1.3 repeats down the band) are multiplied by
+`final_flame_tiles` so the stretched band is laid with more tongues instead of taller ones. Knobs (group "The final phase's sky" on `RematchSky.tres`):
+`final_stretch` 2.5 (1-5), `final_drop` 0 deg (-30..60), `final_flame_tiles` 1.6 (0.5-4); 1 / 0 / 1 = the game's roof sky exactly. Picked off
+`sky208/koopa_down_sheet.png` (the numpy copy drawn at pitch -40 and -15 for stretch 1 / 2 / 2.5 / 2.5 with 2.5 tiles).
+
+**Verified:** shots (run di) 35d "looking down on the arena" (Jaysonn's finalBox view: cam 26 up and 22 back, looking at the floor) -- flame all round the
+arena to the frame's bottom corners, no flat red; 35e "the camera pitched down in the fight" (the fight camera tilted 6 units lower) -- flame to the fence
+line under the dark red; 35a-c unchanged in kind (the horizon band taller, still dark red above). Headless drive v208c-1 (deleted before the commit): 60/60,
+C43 / C44 unchanged. The clean rebuild 0 errors; the drive, the logs, the shots and the pass's tasks deleted.
+
+**Deviations:** the stretch departs from the game's dome (its fire sits where Luigi's camera sees it); chosen for Jaysonn's camera, 1 / 0 / 1 puts it back.
+The shot drive's two new views (35d / 35e) live in the uncommitted drive partial as before.
+
+### 209 -- the King Boo REMATCH, part 54: the arena's LIGHTS FOLLOW THE SKY -- Luigi's Mansion's lightning lights the ground (the sky's six cloud flashes added to the ambient and the sun on the same frame as in the clouds, the sky and the lights on one clock), and in the final phase the ambient, the fog and the sun blend to the fire's colours with the sky (feature/kingboo-rematch, code `0eac8f4`)
+
+**Jaysonn** (asked what else the fight needs, picked these two): "Do 1 and 2 together, the lighting that follows the sky and the lightning flashes."
+
+**Why.** The arena's light was fixed -- a violet ambient (0.45, 0.4, 0.65) x 0.7, a violet fog, a cool blue-white sun (0.75, 0.78, 1) x 0.6 -- under a sky
+that flashes every few seconds and, from the second split, burns: the floor stayed cold blue-grey under the fire (208c's 35d / 35e), and the clouds lit up
+with nothing on the ground answering.
+
+**NEW `assets/Sms/Rematch/SmsArenaLighting.cs`** (+ `.uid`), the `ArenaLighting` node in `RematchArena.tscn` (process mode Always: it runs through the
+frozen cutscenes as the sky does). Every frame: **the sky's clock** -- it sets the sky material's `sky_time`, and `RematchSky.gdshader` reads that in place
+of its own `TIME` while it is set (below 0 = `TIME`: the editor's preview, or FollowSky off); one clock for the sky and the lights, started where `TIME`
+would be so the sky's phase at a load stays a matter of when (the shader's only change: the new uniform in a "Driven by the game" group and the one line
+that reads it). **The flashes** -- the shader's own brk keys and pulse, ported: C0 purple (100, 0, 150) at frame 2 of the 300-frame cycle, green (92, 211,
+97) at 154, lavender (144, 111, 168) at 167; C1 grey (100, 100, 100) at 12, blue (0, 0, 73) at 118, dark red (54, 0, 0) at 237; the clouds show
+mix(C1, C0, texture), so their middle (C0 + C1) / 2 x the sky's `flash_amount` is the colour of the moment, ADDED to the ambient colour x `FlashStrength`
+(1.5) and to the sun's x `FlashStrength` x `FlashOnSun` (0.5); display values, as the inspector's own; the sky's `flash_amount` scales both. **The final
+phase** -- the material's `final_blend` (King Boo's, smoothstepped through the cutscene) blends the ambient, the fog colour and the sun from the arena's
+own values (read off the Environment and the sun at start: the inspector's numbers stay the base) to `FinalAmbient` (0.62, 0.26, 0.1) x
+`FinalAmbientEnergy` 0.9, `FinalFog` (0.18, 0.035, 0.01), `FinalSun` (1, 0.6, 0.3) x `FinalSunEnergy` 0.55; the flashes fade out with the old sky. The
+Environment is duplicated at start (a shallow copy: the Sky and its material stay the shared ones King Boo writes), so nothing is written into the saved
+resource. Knobs: `FollowSky`, `FlashStrength`, `FlashOnSun`, the Final colours and energies. Readouts: `SkyTime`, `FlashNow`, `FlashColorNow`,
+`FinalBlendRead`, the Base values, `MaterialFound`; `HoldClock` / `ReleaseClock` for the drives and the shots.
+
+**Verified:** shots (run dj) 36a-f, the fight camera pitched down with the clock held on a frame of the cycle -- 36a frame 60 (quiet: the base light), 36b
+154 (the green flash: the clouds green, the floor and King Boo lit green with them), 36c 2 (the purple: a lavender cast on the floor), 36d 12 (the grey with
+the purple's tail: the floor lifted bright lavender-grey); then the clock let go and the final sky on: 36e the same view and 36f the look-down, the floor
+warm brown-orange under the fire (208c's 35d / 35e were blue-grey under it). Headless drive v209-1 (deleted before the commit): C45 under the final sky the
+ambient (0.62, 0.26, 0.10) x 0.90, the fog (0.18, 0.04, 0.01), the sun (1.00, 0.60, 0.30) x 0.55 -- the Final values, no flash on them -- the base read
+(0.45, 0.40, 0.65) x 0.70 and (0.75, 0.78, 1.00) x 0.60, the material's `sky_time` the node's clock (149.92 = 149.92); C45b 8627 ticks sampled before the
+final phase: the strongest pulse 1.000 on frame 237.1 of the cycle (0.1 off the dark-red key), the ambient then (0.61, 0.40, 0.65) = the base + the cloud
+colour (0.11, 0, 0) x 1.5 to 0.0002, the sun (0.83, 0.78, 1.00) likewise, 3075 quiet ticks with the ambient exactly the base, the clock checked 143 times
+with 0 off; C43 now reads the lighting's BASE (the live ambient is driven); 62/62. The clean rebuild 0 errors; the drive, the logs, the shots and the tasks
+deleted.
+
+**Deviations:** the flashes on the ground are mine (the game's sky flashes alone; its arenas are prelit) -- `FlashStrength` 0 is the game; the fire's light
+is mine too -- `FollowSky` off is 208's fixed light. Run en of the headless drive stopped at 33 with C14 failing: the drive's spin jump at a Boo spawned on
+the rim sent Mario off the edge, where he fell for 10 s without anything ending it (a drive flake -- run eo passed 62/62 unchanged -- but worth a look in
+play: does falling off the arena end anything?). The shot run and its first pull went out in one batch (the pull re-done after DONE).
+
+### 210 -- the King Boo REMATCH, part 55: EMBERS IN THE AIR for the final phase (a field of glowing sparks born in a ring round the arena's edge and out over the void, rising and wandering, fading in with the sky's fire) and GLOW on the arena (only what is brighter than the threshold blooms: the flames, King Boo's white, the lava balls, the embers) (feature/kingboo-rematch, code `e8b91f7`)
+
+**Jaysonn** (from the list of what else the fight needs): "3. Embers in the air for the final phase. The fireballs shed sparks, but the air itself is empty.
+A sparse field of rising embers over the arena's rim and the void, drifting and fading in with the sky, ties the floor to the fire dome. 4. Glow (bloom).
+Off in the arena's Environment. With it on, thresholded so only bright things bloom, the fire sky and lava balls read hotter and King Boo's glow halos
+properly."
+
+**NEW `assets/Sms/Rematch/SmsArenaEmbers.cs`** (+ `.uid`), the `ArenaEmbers` node in `RematchArena.tscn` (process mode Always, as the sky and the lights):
+one GPU particle field built after the floor has measured itself -- a RING round the arena's edge from `RimIn` (3 m) inside the fence to `RimOut` (12 m)
+out over the void, between `Below` (4 m) under the floor and `Above` (2 m) over it (the floor's middle, radius 26.4 and height read off the Arena); `Count`
+450 sparks, each born over a moment (no popping), rising `RiseMin`..`RiseMax` (0.6-2 m/s) with a little lift, wandering on turbulence (`Drift` 1), living
+`LifeSeconds` 7 give or take 40 %, shrinking toward the end; the fireballs' `glow1_spark` quad `Size` 0.3 m across, additive, `EmberBright` (1, 0.85, 0.35)
+going `EmberDim` (1, 0.3, 0.05) and out, at `Brightness` 2 -- over 1, so they bloom. It fades in WITH THE SKY: every frame the field's alpha is the sky
+material's `final_blend` (King Boo's fade to the roof fight's fire); the field starts emitting as the blend leaves 0 (pre-rolled 6.3 s, so the air is
+already full) and stops when it is back at 0. Readouts: `Built`, `Centre`, `Radius`, `RingOuter` / `RingInner` / `RingHeight`, `BlendRead`, `AlphaNow`,
+`EmittingNow`, `FirstEmitBlend`.
+
+**The glow** (`RematchArena.tscn`'s Environment; 209's lighting node copies it with the rest): `glow_enabled`, Screen blend, `glow_intensity` 0.7,
+`glow_hdr_threshold` 0.6 with `glow_hdr_scale` 0.8 -- a pixel blooms by how far its brightest channel is over 0.6, fully at 1.4: the fire's yellow flames
+(0.99) half, King Boo's lit white and his glow, the crown and the twinkles, the lava balls' flames, the embers (2.0) fully; the floor (under 0.5) not at
+all, the HUD never (drawn after). Level 2 added to the default 3 and 5 for a tighter halo on small bright things.
+
+**Verified:** shots (run dl) 37a-e -- 37a the fight camera pitched down under the final sky: a band of glowing sparks over the fence and the void all round,
+the flames softer and hotter under the glow (against 209's 36e); 37b Jaysonn's look-down: the sparks a sparse field all round the disc over the void
+(against 36f); 37c from the rim looking out: embers rising near the camera against the fire; 37d King Boo close against the fire: his halo, the sparks
+along the fence (against 35c); 37e under the boss sky with the glow alone: King Boo's soft halo, the streaks' cyan crossings glowing, the floor untouched
+(against 34c / 36a). Run dk (the first try: Size 0.14, Count 320, Brightness 1.6) showed the embers as specks you had to look for from the fight camera --
+made bigger, brighter and more. Headless drive v210-1 (deleted before the commit): C46 the field built from the measured floor (ring 23.41..38.41 m, 6 m
+tall, at the floor's middle and height; 450 of 450; pre-roll 6.3 s; Always), 8635 ticks under the boss sky with 0 emitting, started at blend 0.002, under
+the final sky emitting at alpha 1.000 (the material's too); C46b the glow on with Screen / 0.7 / 0.6 / 0.8; everything else as before -- 64/64 on the
+committed build. The clean rebuild 0 errors; the drive, the logs, the shots and the tasks deleted.
+
+**Deviations:** both effects are mine (Luigi's Mansion's roof has neither embers nor bloom) -- `Embers` off and `glow_enabled` off are the game. The embers'
+first try was retuned once from the shots (above). Remote steps were batched four times this pass (an upload with a build twice, a run with its pull twice,
+a run with the cleanup once); every one happened to land in the right order (hashes, DONE lines and the drive's verdict checked), but it was luck, not
+procedure.
+
+### 211 -- the King Boo REMATCH, part 56: SCORCH MARKS on the floor where the Bomb Boos blast and the lava balls land (fading decals: glowing orange fresh, black for eight seconds, gone over ten more) and JAYSONN'S SOUNDS for the attacks (his FireStart / FireEnd on the lava balls, Boolossus's bound and pon, the cold breath's blow, the ice's freeze / unfreeze, the lightning's crackles and zap, the wind's gust, the sky's thunder) -- and the attacks' sounds switched on at all (`SmsActorSound.ActorOf` never knew the attack classes: their sounds had never played) (feature/kingboo-rematch, code `541aaf2`)
+
+**Jaysonn** (from the list of what else the fight needs): "lets do 6. Scorch marks where Bomb Boos blast and lava balls land. Fading decals on the floor.
+Right now a blast leaves nothing behind. and i made a new folder that has some fireball sound effects in the ref folder. lets add those" -- then "use
+fireEnd and fireStart in that folder and dlete the others"; "i also uploaded other sound effects to put in. for other attacks go look at them and some are
+named what they should be but other are more up for creative freedom"; and "the fire sounds need to be fireStart when shot out of the crown and then
+fireEnd when when it dissapears and shouldnt be too loud".
+
+**Scorch marks.** NEW `assets/Sms/Rematch/SmsScorchMarks.cs` (+ `.uid`), the `ScorchMarks` node in `RematchArena.tscn`: a pool of Decals (`MaxMarks` 24,
+the oldest reused). `SmsBombBoo.Blast` calls `MarkBlast` with the floor point under the blast -- a mark `BombSize` (1.3) x the blast's reach across (3.5 m
+-> 4.5 m), full black; `SmsFireball.Splat` calls `MarkLava` with the ball's radius and the splat's strength -- `LavaSize` (3.2) x the radius x the splat (a
+landing 1, a bounce 0.6, the burst on Mario 1.6, its going out 0.45 from the birth radius), 0.55 + 0.45 x the splat black (0.3..1). Three shapes drawn in
+code at start (128 px): a ragged disc (three sine lobes of angular noise), solid for `Core` (0.7) of the way out then softening to the ragged edge, a
+0.92-1 grain, near black (0.03) in the middle and a touch browner at the rim; the glow the same shape in `GlowColor` (1, 0.45, 0.1). Each mark: AlbedoMix
+1, a random turn, its size give or take 12 %, a box 3 m tall projecting down. A fresh mark GLOWS (the decal's emission at `GlowEnergy` 2.5, dying as the
+square over `GlowSeconds` 1.5), sits at strength x `Darkness` (1) for `HoldSeconds` (8), fades over `FadeSeconds` (10), is hidden after. The decals project
+onto the FLOOR ONLY: `SmsArenaFloor` puts its meshes on visual layer 2 as well (`DecalLayerSet`) and the decals cull to it, so Mario and the Boos walking
+over a mark are not stained. Readouts: `Made`, `Alive`, `LastAt`, `LastSize`, `LastStrength`, `Newest`, `NewestAlpha`, `NewestAge`, `Textures`, `Recent`
+(the last 16: where, size, strength, physics frame), `Advance(seconds)`.
+
+**The sounds.** NEW `assets/Sms/Sound/Rematch/` -- Jaysonn's twelve WAVs (+ `.import`), named by the knobs that play them: `FIREBALL_START` (his
+FireStart.wav), `FIREBALL_END` (FireEnd.wav), `BOOLOSSUS_BOUND` / `BOOLOSSUS_PON` (Luigi's Mansion's Boolossus: JA_SE_ENM_OBAKE_TS_BOUND_1 / _PON),
+`BREATH_BLOW` (Ocarina of Time's Freezzard blow), `ICE_FREEZE` / `ICE_UNFREEZE` (Link frozen / thawed), `ELECTRIC_ZAP` / `ELECTRIC_CRACKLE` /
+`ELECTRIC_CRACKLE_SHORT` (his Electric 240 / 321 / 322), `THUNDER` (thunder.wav), `WIND_GUST` (wind 20.wav). `SmsActorSound`: the lookup falls back to
+`Sound/Rematch/<name>.wav` after the game's; `RematchLevels`, each one's level in dB (`FIREBALL_START` -14, `FIREBALL_END` -15 -- the files peak at 0 dBFS,
+rms -8; `BOOLOSSUS_BOUND` 0, `BOOLOSSUS_PON` 2, `BREATH_BLOW` 0, `ICE_FREEZE` 5, `ICE_UNFREEZE` 4, `ELECTRIC_ZAP` -4, `ELECTRIC_CRACKLE` -2,
+`ELECTRIC_CRACKLE_SHORT` -5, `THUNDER` -6, `WIND_GUST` -1), `LevelDb(name)` for players outside the class. Where they play: `SmsFireballs` `SpitSe`
+`FIREBALL_START` as each ball pops out of the crown, `EndSe` `FIREBALL_END` the moment a ball disappears (the end of its roll, the burst on Mario, the
+cut-off; once per ball; `SeMinGap` 0.12 s so several going out together play one); `SmsBoolossus` `LandSe` `BOOLOSSUS_BOUND` as it lands, `SplitSe`
+`BOOLOSSUS_PON` as it splits; `SmsGhostBreath` `BreathSe` `BREATH_BLOW` as the blow begins and every `BreathSeEvery` 3.2 s (the file is 3.4 s);
+`SmsIceBlock` `FreezeSe` `ICE_FREEZE` as the ice snaps shut, `ShatterSe` `ICE_UNFREEZE` as it shatters; `SmsGhostWind` `WindSe` `WIND_GUST` as the tornados
+rise and every `WindSeEvery` 1.6 s (-6 dB, the pitch wandering); `SmsGhostLightning` `AppearSe` `ELECTRIC_CRACKLE` as the walls appear, `CrackleSe`
+`ELECTRIC_CRACKLE_SHORT` every `CrackleEvery` 0.45 s (x 0.7..1.3) while they stand and close, `CloseSe` `ELECTRIC_ZAP` as they close (the hit on Mario
+still the game's electric damage); `SmsArenaLighting`'s "Thunder (211)" group: `ThunderSe` `THUNDER` rolls `ThunderDelay` 0.4 s after the sky's big purple
+flash (once a 10 s cycle; `ThunderOnGreenToo` off; not under the fire sky), on its own player on the sfx bus, `ThunderDb` 0.
+
+**The bug.** `SmsActorSound.ActorOf` -- the table that says which script is which game actor -- had no entry for `SmsFireballs`, `SmsGhostBreath`,
+`SmsGhostLightning`, `SmsGhostWind`, `SmsBoolossus`, `SmsIceBlock`, `SmsBooCircle` or `SmsBooVolley`, so `Attach(this)` had returned null to every one of
+them since their passes and none of their sounds (the game's TELESA_FIRE, BOUND, BREATHE, the bottle wind, APPEAR / DISAPPEAR...) had ever played. Found
+when the drive logged no sounds at all (run et); the eight added.
+
+**Verified:** shots 38a-c (run do) -- 38a three fresh marks glowing orange on the stone (a blast's, a landing's, a small one where a ball went out); 38b
+the glow out: black ragged splats, 16-31 of 255 against the floor's 81-88 (run dm's 0.85 / 38 % core read as a grey smudge at 42-54, run dn's 0.9 / 60 %
+still grey at 35-44 -- `Darkness` 1, `Core` 0.7, grain 0.92 after); 38c two thirds through the fade. Headless drive v211-1 (deleted before the commit): C47
+8 blasts marked 8, 9 landings marked 9 (matched by physics frame: three land in one tick), the first decal right (cull mask 2, 4.8 m, at the mark, alpha
+1.00, both textures, glow 2.50), the life curve (glow 2.5 -> 0 after 1.5 s with the black full, half at hold + fade / 2, gone and hidden at the end); C47b
+FireStart / FireEnd found by the new lookup, 3 starts in the log for 3 pops, an end; C47c all ten others found and levelled, the breath's blow, the
+lightning's 9 crackles / 27 short / 9 zaps, Boolossus's bound and pon, 8 gusts, 15 thunders over 355 s (the ice's two found, no ice in this drive);
+everything else as before -- 67/67 on the committed build. The clean rebuild 0 errors; the drive, the logs, the shots and the tasks deleted.
+`Ref/FireSounds`' two mp3s and their `.import` deleted at Jaysonn's word (`Ref/` is not tracked).
+
+**Deviations:** the electric / thunder / wind names were Jaysonn's "creative freedom" -- which file goes where (240 the zap, 321 / 322 the crackles, the
+thunder on the sky's flashes) is my call; the thunder and the sky's flashes are not in the game. The FireEnd was first wired to the end puff alone (no
+sound for a ball bursting on Mario) and moved to the disappearance itself on Jaysonn's note; the fire levels dropped from -6 / -7 to -14 / -15 on the same
+note. The scorch texture was retuned twice from the shots (above). The drive gained a FieldClear (the free supply Boos vanished before the circle, the
+fireballs and the volley: a supply Boo bumping Mario cost HP in three runs). Remote steps were batched several times this pass (twice an upload with its
+build in the last stretch; the earlier count was lost to a context reset); every one landed in the right order (hashes, DONE lines and the drive's verdict
+checked), but it was luck, not procedure.
+
+### 211b -- the King Boo REMATCH, part 56b: the THUNDER WAITS FOR THE FIGHT: none through the card, Mario's fall and the intro cutscene (the laugh from nowhere, the look-about, King Boo's rise and dive) -- it rolls from the sky's first purple flash after King Boo is up for the fight (feature/kingboo-rematch, code `bc92231`)
+
+**Jaysonn** (on 211): "i do like the thunder noise but i think we can make it wjere the sound effect only plays after the intro cutscene to not
+ruin tension".
+
+**`assets/Sms/Rematch/SmsArenaLighting.cs`**, the "Thunder (211)" group: `ThunderAfterIntro` (on) and `IntroPath` (`../RematchIntro`; else the first
+`SmsRematchIntro` in the scene). The thunder waits until the intro director is `Done` -- its `FightReady`: King Boo up at his spot after the cutscene
+(or after the fall, when the cutscene is skipped or after a miss). While it waits, a purple flash's thunder is DROPPED (its cycle marked as had, not
+saved up), so the fight's first thunder comes on the next flash's beat (`ThunderDelay` 0.4 s after it), never at the moment the wait ends. The flashes
+themselves -- the sky's and 209's on the ground -- go on through the intro as before; only the sound waits. `ThunderAfterIntro` off = 211's (from the
+first frame); no intro director = no wait. Readouts: `ThunderGateOpen` (latched), `ThunderHeld` (thunders dropped in the intro), `IntroFound`,
+`LastThunderFrame` (the sky's frame the last one rolled on).
+
+**Verified:** headless drive v211b-1 (deleted before the commit), the intro run for real (the card skipped by the A press, the fall, the whole
+cutscene): C48 -- `ThunderAfterIntro` on and the director found; 0 thunders before the fight, 2 purple flashes' thunders dropped in the intro; the wait
+over at tick 762 with the intro `Done`, never before; the fight's first thunder 6.2 s later on the sky's frame 14.12 (due 14.00: 0.4 s after the flash
+on frame 2); 13 in all; everything else as before -- 68/68 on the committed build. The clean rebuild 0 errors; the drive, the logs and the task deleted.
+
+**Deviations:** none from the game (the thunder is mine: 211). The split cutscenes (188) are not held back -- the thunder rolls through them as before;
+only the intro was asked for.
+
+### 212 -- the King Boo REMATCH, part 57: a DEATH PLANE under the arena: a fall off it ends in the game's fall death (the cry, the camera stops and watches him fall away, the iris, TOO BAD!, a life down, the fight again from the fall-in) -- the death plane, the fall death and the camera's hell dead demo ported for any level (feature/kingboo-rematch, code `7b96df8`)
+
+**Jaysonn**: "ok can you now implment the death zone if mario were to fall off?" (until now a fall off the rim fell for ever: nothing ended it).
+
+**The game** (doldecomp/sms): `TMario::thinkSituation` (MarioMove.cpp 1886) reads the ground under him; when it is a death plane
+(`TBGCheckData::isDeathPlane`) over his feet -- the tick he drops through it -- `MARIO_FLAG_GAME_OVER`, `mHealth` 0, `MARIO_STATUS_FALL_DEAD` (`fallDead()`,
+MarioJump.cpp 1278: `jumpProcess(0)` alone -- he falls on, no control), the cry `MSD_SE_MV10B_CRY_JUMP_01` (unless already in the long fall's
+`ANIM_THROWN`), the camera's `CAMERA_FLAG_HELL_DEAD_DEMO` and the director's `DEMO_FLAG_HELL_DEAD`. The camera (`execDeadDemoProc_`, CameraDemo.cpp 254;
+cameragc.cpp 552 / 827): 16 ticks on, the dead demo -- the eye held where it is (`mPosFreezeFrames` re-set every tick), the look-at following him down,
+not clamped to the pitch limits; once the pitch passes `mSLLimitMaxAngleX` the whole camera holds (`mTargetFreezeFrames`, `CAMERA_FLAG_UNK40`). The
+director (MarDirectorDirect.cpp, `STATE_UNK7`): with `DEMO_FLAG_HELL_DEAD` the miss's wipe is the IRIS (`startWipe(2, 0, 2.0)`), not the death wipe's
+bands (`startWipe(10, 0, 2.2)`).
+
+**NEW `assets/Sms/SmsDeathPlane.cs`** (+ `.uid`): a `[GlobalClass]` Node3D -- a flat plane at its own height, everywhere (no edges); the physics frame
+Mario's feet (the bottom of his capsule) go from above it to under it, `Mario.SmsFallDead`. Knobs: `Active` (off = no death: he falls for ever, as
+before), `MarioPath` (else the first Mario in the scene). A child named `Preview` is hidden in play (the editor's sheet). Readouts: `Deaths`,
+`LastFeetY`, `LastFrame`, `MarioFound`.
+
+**`assets/Mario.cs`**: `SmsFallDead(why)` -- thinkSituation's branch: the game-over flag, HP 0, FALL_DEAD (the dead status with `_smsFallDead`), the cry
+on the `FallCry` slot unless the long fall's `ma_thrown` already cried it, the hell flag (false, nothing done, when he is already finished);
+`SmsFallDeadStep` -- `fallDead()`'s `jumpProcess(0)`: `SmsAir.GravityOnlyTick` at 120 Hz on the carried vy (Gravity 1 a tick, the `TerminalVy` -75 cap:
+30 m/s), the horizontal speed kept; the Miss state's wipe: the hell flag -> `Wipe.Circle` 2.0 s, else the bands as before; `Respawn` clears both flags.
+Readouts: `SmsFallDeadNow`, `SmsFallDeadCried`, `SmsGameOverNow`, `SmsLivesNow`. **`assets/Sms/MarioCamData.cs`**: `HellDead` (the camera's read of
+the hell flag). **`assets/SunshineCamera.cs`**: `ExecDeadDemoProc` (ctrlGameCamera_'s first line, the hell death only), the eye held through the dead
+demo, the look-at clamp skipped in it and the whole camera held past `LimitMaxAngleX`; cleared on a stage load (`PlaceBehind`); readouts
+`HellDeadDemoOn`, `Held`.
+
+**`assets/Sms/Rematch/RematchArena.tscn`**: the `DeathPlane` node at y -25 -- about 26 m under the floor (0.9), 5 m under the rock's lowest point (its
+vertices span -20.14..2.30, the fence's top), so a fall past the rock's side always reaches it -- with its `Preview`: a red see-through 110 m sheet
+(unshaded, both sides), the editor's only; the root note extended; `load_steps` 14 -> 17.
+
+**Verified:** headless fall drive v212-1 (deleted before the commit; the intro as in play, the card and the cutscene skipped by A, King Boo's moves and
+the supply off, Mario put 1.5 m over the top and 3 m beyond the rim -- from there all of it the game's own): C49 the plane in the arena (Active, y -25,
+under the rock, the sheet hidden, Mario found, no deaths); C49b the fall death 1.30 s into the fall, his feet at -25.41, at the terminal 30.2 m/s, the
+horizontal speed kept (0 -> 0), game over, HP 0, FALL_DEAD, the cry played; C49c the camera's dead demo on by half a second, the eye then still for a
+second (0.00 u) while the look-at followed him 2246 u down; C49d the lives 4 -> 3, the iris 2.05 s after the death (never the bands), the stage
+reloaded 2.88 s on as a miss's (no card, the fight up again, HP 8 / 8, not game over, the new plane's deaths 0, the camera's dead demo off) -- 4 / 4,
+and 4 / 4 again windowed with its shots 39a-e (39a Mario dropping past the rock's side; 39b the death, the camera stopped; 39c him falling away in the
+held camera under TOO BAD!; 39d the iris closing; 39e the arena again, the lives at 3). The regression drive (the plane OFF for it): run ey 67 / 68 --
+C30 failed on a supply Bomb Boo still RISING out of its spot when the volley's field clear ran (it cleared only the drifting ones): it bumped Mario, HP
+down two not one; the drive's clear now takes the rising ones too -- run ez 68 / 68 on the committed build. The clean rebuild 0 errors; the drive, the
+logs, the shots and the tasks deleted.
+
+**Deviations:** not ported -- `mAnmSound->stop()` and the Yoshi kill (no Yoshi); the NORMAL death's dead demo (the eye held, the fov closing on him over
+343 ticks): a death on the floor keeps its camera as before; no miss jingle (Mario's `MissJingle` slot is empty, for every miss in the port) and the boss
+music runs on to the reload. The plane is a flat plane with no edges (the game's is a floor polygon of the death type under him): under this arena
+nothing else is there, so it is the same. The regression and shot drives turn it off (a rim flake, the fake hit's knock off the rim, would reload the
+arena mid-run); the fall drive tests it. The scene's two notes were corrected after the runs (text only: "25 m under the floor's top" -> "about 26 m
+under the floor"). Remote steps: twice a read-only check bundled (a local grep with an ssh; a remote for loop without its parentheses, which re-ran a
+read four times).
+
+### 213 -- the King Boo REMATCH, part 58: the MISS's MUSIC: a miss cuts every music track at once (the boss music with it) and plays the game's own TOO BAD! jingle (MSD_BGM_MISS), with no life left the game-over jingle (MSD_BGM_GAMEOVER), and the stage waits for its end -- for every miss in the port (feature/kingboo-rematch, code `823cbfc`)
+
+**Jaysonn**: "Add the miss jingle and stop the boss music" (212's deviations: no miss jingle -- Mario's `MissJingle` slot had always been empty -- and
+the boss music ran on to the reload).
+
+**The game:** the director's Miss state (MarDirectorDirect.cpp, `STATE_UNK7`) calls `MSBgm::startBGM(0x8001000C)` with a life left, `(0x80010028)` with
+none -- the decomp's source names them `MSD_BGM_BOSS` / `MSD_BGM_BOSSHANA_2ND3RD`, its enum one place off mSound.asn: they are `MSD_BGM_MISS`
+(k_miss.com) and `MSD_BGM_GAMEOVER` (k_gameover.com). `MSBgm::startBGM` (MSoundBGM.cpp) for those two (and 0x8001000A, the shine get's) first
+`stopTrackBGMs(3, 0)` -- every BGM track stopped at once, no fade -- and `demoModeIn(0x16f)`, then starts the jingle on its own track (2); the Miss state
+moves the stage once the fader is fully out AND that track's handle has ended (or 1200 frames).
+
+**The renders** (tools/projectshine/sound154): `sms_bgm.py` (156's renderer -- the sequence through the game's instrument banks, dry, 32 kHz stereo):
+k_miss.com 1112 ticks at 220 a second, 53 notes; k_gameover.com 2315 ticks at 200 a second, 157 notes; NEW `trim213.py` cut each 50 ms after its last
+sound over -66 dBFS (the render runs on in silence, and the port waits for the file's end: 7.36 -> 4.475 s, 11.34 -> 8.194 s); NEW `level213.py` put
+both on `MSD_BGM_BOSS`'s normalisation (x0.6445, x0.9002: each render is peak-normalised on its own, and `SmsActorSound.MusicDb` was set by ear on the
+boss theme, so on its normalisation the table's volumes -- 100 and 110 of 127 against the boss theme's 95 -- give the game's balance); `adopt156.py` into
+the sound record, `gen_table154.py`: `SmsMarioSoundTable.cs` gains the two rows and nothing else (the PC's table regenerated byte for byte first).
+
+**NEW `assets/Sms/Sound/Music/MSD_BGM_MISS.wav`, `MSD_BGM_GAMEOVER.wav`** (+ `.import`; 0.6 + 1.0 MB). **`assets/Sms/Sound/SmsMarioSoundTable.cs`**: the
+two rows (Music folder, no loop). **`assets/Sms/Sound/SmsActorSound.cs`**: `StopAllMusic(from, why)` -- every playing 2D AudioStreamPlayer on the Music
+bus in the tree stopped at once (the rematch's music, the casino King Boo's, the gatekeeper's, any stage music to come); the count.
+**`assets/Sms/Sound/SmsMarioSound.cs`**: `FillMusic` -- Mario's `MissJingle` and `GameOverJingle` filled when empty with the two renders, 2D players on the
+Music bus at `MusicDb` + the table's volume (`SmsActorSound.Music` off = left empty). **`assets/Mario.cs`**: the `GameOverJingle` slot (next to
+`MissJingle`); `SmsMissTick` at the Miss state's start: `StopAllMusic`, then the jingle -- `MissJingle` with a life left, `GameOverJingle` with none (it
+played `MissJingle` for both, had there been one) -- and the stage's wait on the one that played; readouts `SmsMissJingleNow`, `SmsMissMusicStopped`.
+
+**Verified:** the fall drive v213-1 (deleted before the commit), two legs from the intro as in play: leg 0 a fall with 4 lives -- C49 / C49b / C49c / C49d
+as 212's (the reload now 4.6 s after the death: the jingle's end, not the iris's 2.9 s); C50 the boss music (Jaysonn's Antasma mp3) playing as he fell,
+at the miss's start 1 music player stopped, the boss music off, no other music playing, the slot's `MSD_BGM_MISS.wav` (4.475 s, the Music bus) playing,
+its playback climbing to 4.46 s and the stage moving in the frame it ended (4.57 s on); leg 1 the lives set to 0, off the rim again -- C50b the boss music
+playing again (the fight's after the miss's load), at the miss's start lives -1, 1 stopped, no other music, the slot's `MSD_BGM_GAMEOVER.wav` (8.194 s)
+playing, the fade out (never the iris), the jingle ending 8.18 s on and the stage 8.20 s on, then this stage again from its start: lives 4, the card, no
+miss flag -- 6 / 6. The regression drive 68 / 68 on the committed build (run fa). The clean rebuild 0 errors; the drive, the logs and the tasks deleted.
+
+**Deviations:** not ported -- `demoModeIn(0x16f)`: at the miss the game also turns sound-effect categories 0-3, 5, 6 and 8 to silence (FLUDD's 0x0...,
+Mario's moves 0x1..., the enemies and bosses 0x2..., the objects 0x3...; the system sounds 0x4... and the voices 0x7... -- his cry -- play on); here every
+effect plays on through the jingle. The shine get's jingle (0x8001000A) cuts the music the same way in the game; the port's shine get has no BGM yet, so
+that cut is not wired. The renders are dry (no reverb), as 156's. A miss now takes as long as the jingle to move the stage (4.5 s; the game over 8.2 s):
+the game's own wait.
+
+### 214 -- the King Boo REMATCH, part 59: the IRIS's HARD EDGE (the game's Hx_Circle: black outside to a hard edge, three faint rings inside; 61's soft rim was the port's), King Boo IDLING through the split (no longer frozen mid-air in the laugh's last pose), and BOOLOSSUS's shadow ROUND with a WHITE CIRCLE where it will land (the Bomb Boo volley's mark, in white) (feature/kingboo-rematch, code `ffb552d`)
+
+**Jaysonn**: "ok the irs closing effects should not be a soft fade in the middle of the effects should be hard. also when king boo splits he should
+still be doing his idel animation after the split since right now he kinda pauses mid air wierdly", and on the way: "also the shadown from boolousus
+is a rectangle we need that to be a circle and like bomb boo attaack with the yellowish circles let have them be white to single its a boolousses
+attack".
+
+**The iris.** The game (hx_wiper.c 471: `Hx_Circle`, direction 0 -- the hell death's `startWipe(2, ...)`): each frame `Hxs1_Circle(r)` draws every
+row black up to the circle's edge (no blend: a hard edge), then `Hxs2_Circle` draws three rings 20 px wide inside it -- (r - 20 + p1 .. r) once r > 22,
+(r - 40 + p2 .. r - 20 + p1) once r > 42, (r - 60 + p3 .. r - 40 + p2) once r > 62 -- black at a1 / a2 / a3 >> 8 (a1 +0x180, a2 +0xC0, a3 +0x80 a
+frame, to 0xFF00; p1 +0.05, p2 +0.12, p3 +0.25 px a frame), so they start clear and darken a little as the iris closes. 61 drew a 60-px smoothstep rim
+instead: the soft fade was the port's. **`assets/Sms/Console/Fader.gdshader`**, mode 4: black outside the radius with no blend; inside it the three
+rings at `iris_alpha` (NEW uniform: a >> 8 as 0..1) from their inner edges at `iris_drift` (NEW uniform: p1 / p2 / p3), each only once the radius is
+past 22 / 42 / 62. **`assets/Sms/Console/SmsFader.cs`**: `Hx_Circle`'s a1 / a2 / a3 and p1 / p2 / p3 -- cleared as the wipe starts (its state 0), each
+frame drawn at their values, then grown as the game grows them; readouts `IrisRadius`, `IrisAlpha`.
+
+**King Boo in the split.** In each split cutscene King Boo and his copies (duplicates of the same node) laugh together in the line (`SplitLaugh`: the
+one-shot `btelesa_laugh`, 89 frames). When the laugh ended, `OnClipEnd` had no branch for the Split phase: the clip stopped on its last frame and he
+hung in that pose (the "pauses mid air") till the cutscene cut back to the fight; after it the wait clip was already running.
+**`assets/Sms/Rematch/SmsKingBooRematch.cs`**: `OnClipEnd` -- in the Split phase a laugh over goes to the wait clip (`BckWait`), as the Mock phase's
+does (191). The cutscene's timing is unchanged.
+
+**Boolossus.** Its shadow was a bare `QuadMesh` (no texture, so square) scaled (r, r, 1) after it was turned flat about X, i.e. along the world's X and
+Y: on the floor 2r long one way and 2 m the other (the rectangle). **`assets/Sms/Rematch/SmsBoolossus.cs`**: the shadow takes a round soft disc (NEW
+`Disc()`: a 64-px texture made in code, solid to 80 % of the radius, fading to nothing at the rim) and is scaled (r, 1, r), along X and Z; it stays
+dark (`ShadowOpacity` 0.55, `ShadowScale` 1.1, as before). NEW `LandingMark` (on) / `MarkColor` (white, alpha 0.6): the WHITE CIRCLE -- the Bomb Boo
+volley's mark (its ring texture `hamonring3_flat`, additive, pulsing quicker as the dive comes down) in white, at the body's whole footprint (`Radius`
+x `ShadowScale`: 7.65 m across here) about the target from the dive's start, with the shadow growing inside it; hidden as it lands (`Land()`).
+Readouts `ShadowSizeNow`, `MarkSizeNow`, `MarkColorNow`, `MarkShown`, `ShadowRound`.
+
+**Verified:** the split drive v214-1 (deleted before the commit; the intro skipped by A, King Boo's attacks and the supply off): C52 one Boolossus
+smash -- 65 dive ticks, the shadow the disc and as long along Z as along X every tick, the circle 7.65 m across and white every tick, gone after the
+landing; then two splits (King Boo's hits set one short of a copy, then a hit): C51b through each cutscene no King Boo shown in the line with his clip
+stopped -- before the fix (run split214b) this failed: 54 frozen ticks, the real one holding the laugh's last pose 0.75 s and a copy 0.15 s till the
+cut (KingBoo 3.00 s into the cutscene, `btelesa_laugh` stopped at 1.47 s); C51 for 3 s after each cutscene every one of him in the wait playing
+`btelesa_wait`, the clip and his body moving (this passed before the fix too: the freeze was inside the cutscene); C53 the iris started over the
+arena: 25 steps, the radius down to 0, the rings never lighter and at the end 0.110 / 0.051 / 0.031 dark (28 / 13 / 8 of 255) -- 6 / 6 (run
+split214c), and 6 / 6 again windowed with its shots 40a-f (40a / 40c each split's chorus, 40b / 40d a second after it; 40e the white circle round
+Mario with the round shadow inside it -- the floor 72-76 luminance inside the circle, 98-106 off its upper corners, where a square shadow would be
+dark; 40f the iris halfway, its hard edge). The regression drive 68 / 68 on the committed build (run fb). The clean rebuild 0 errors; the drive, the
+logs, the shots and the tasks deleted.
+
+**Deviations:** the iris is drawn in the wiper's 640 x 448 frame stretched to the window (every wipe since 61), so on a 16:9 window it is an ellipse;
+in the game's 4:3 frame it is a circle. The three rings are the game's and faint (11 / 5 / 3 % dark at the end): easy to miss. The shadow's disc and
+the white circle are the port's own (the rematch's Boolossus smash is the design doc's attack). Steps: the ssh options were first kept in a zsh
+variable, which zsh does not split into words, so a few calls ran on ssh's defaults (the same key, no timeouts or batch mode); spelled out in full
+since. A local image read was batched with the crop that wrote it, and re-read alone.
+
+### 215 -- the King Boo REMATCH, part 60: the SLEEPY BOO SMASH: King Boo's Boolossus is now the game's Sleepy Boo (its own model and toon look, snoring through its one clip at the game's pace, 7 m across as the Boolossus was), and its landing sounds the Sleepy Boo's own death, MSD_SE_EN_DB_TELSA_EATEN (what the game plays as Yoshi eats it) (feature/kingboo-rematch, code `f630cfd`)
+
+**Jaysonn**: "ok awesome i think the last change is i want the big boo to be sleepy boo from sms. since boolouses kinda looks out of place and thus we
+can make the impact sound of it the death of sleepy boo like in sms when he gets eaten. that way we keep the theme. lets do that."
+
+**The game:** `TDebuTelesa` (Enemy/DebuTelesa.cpp; pass 152's Sleepy Boo, Hotel Delfino's huge Boo asleep across a doorway) loads debutelesa.bmd and has
+one clip, `debutelesa_wait` (94 frames, looped: it snores). `receiveMessage`'s `HIT_MESSAGE_UNKB` -- Yoshi's eat -- plays `MSD_SE_EN_DB_TELSA_EATEN`
+(0x2938), then the base's kill: no death clip, Yoshi swallows it. The sound (`sms_audio.py resolve`): the sound table's priority 220, volume 127, pitch
+1.0123; se.scom plays bank 2 program 74 key 28 twice, at ticks 9 and 11 (a doubled note), wave 923 of w2ndLoad_0.aw (AFC, 22050 Hz, 9410 samples, x0.851).
+
+**The render** (tools/projectshine/sound154): `sms_audio.py extract` -- 0.626 s, 32 kHz, 2 notes, norm 0.56. NEW `trim215.py` cut its lead: the first
+note starts 9 ticks in (93.8 ms; as an impact, three frames after the slam), so the WAV starts 2 ms before the first sample over -50 dBFS (0.534 s; peak
+-0.2 dBFS, RMS -14.6 dBFS -- at the table's volume, 127 = 0 dB, about as loud as 211's `BOOLOSSUS_BOUND` at its 0 dB, RMS -16.1 dBFS). NEW `adopt215.py`
+into the sound record (folder Enemy); `gen_table154.py`: `SmsMarioSoundTable.cs` gains the one row and nothing else (the PC's table regenerated byte for
+byte first).
+
+**`assets/Sms/Rematch/Boolossus.tscn`**: the Model child is `models/Eniemes/Telesa/debutelesa.glb` (pass 152's model in its own toon materials:
+DebuTelesaBody.tres on EnemyToon, DebuTelesaEye.tres on EnemyToonCutout); the note. **`assets/Sms/Rematch/SmsBoolossus.cs`**: NEW `BodySize` (metres
+across, side to side; 7 = the Boolossus's size since 192) replaces `ModelScale` -- the model is scaled to it from its own width whatever its units (the
+Sleepy Boo is 306 u wide: x0.02288), and its body hit is half of it (3.5 m; the Boolossus's was 3.48: the shadow and the white circle 7.70 m across, were
+7.65). NEW `GhostLook` (off): the model keeps its own materials -- the toon has no fade, so it shows at once under the appear puff and squashes away at
+the split; on = GhostBoo.gdshader over it as before (for boolossus.glb, kept in the project). NEW `ModelClip` / `ModelClipFrames` (debutelesa_wait, 94):
+the clip from the dive's start to the split, at the game's pace -- 94 frames at 60 a second over the glb's 5.82 s, x3.713, as `SmsSmallEnemy` plays it --
+looped by a replay as it ends (the glb's shared clip is left alone: the hotel's Sleepy Boos play it too). The model casts no shadow of its own (the opaque
+toon cast its outline over the floor away from the target, beside 214's round disc). `LandSe` = `MSD_SE_EN_DB_TELSA_EATEN` (BOOLOSSUS_BOUND's file stays
+in Sound/Rematch/; the split's BOOLOSSUS_PON plays on). Readouts `ScaleNow`, `ModelWidth`, `ModelAnim`, `GhostMaterials`. **NEW
+`assets/Sms/Sound/Enemy/MSD_SE_EN_DB_TELSA_EATEN.wav`** (+ `.import`; 34 KB). **`assets/Sms/Sound/SmsMarioSoundTable.cs`**: the row.
+
+**Verified:** the split drive v215-1 (deleted before the commit; the intro skipped by A, King Boo's attacks and the supply off; one smash, then 214's two
+splits and the iris): C54 the smash's body -- the Model child debutelesa.glb, its 2 surfaces in their own materials (1 EnemyToon, 1 EnemyToonCutout), no
+ghost material, no mesh casting a shadow, 7.00 m across (x0.02288 on 306.0 u), radius 3.50 m; C54b debutelesa_wait playing all 65 dive ticks at x3.713,
+its position moving (0.00 -> 3.97 s of the clip); C54c the landing (tick 471): the eaten sound once in the play log, none before the dive, no
+BOOLOSSUS_BOUND; its file 0.534 s, the row Enemy volume 127, 0.00 dB; with 214's C51 / C51b / C52 / C53 -- 9 / 9 (run split214d), and 9 / 9 windowed
+(splitshot214b), whose shot 41a showed the model's own shadow on the floor beside the disc; with the shadow off, 9 / 9 again headless (split214e) and
+windowed (splitshot214c) with its shots 41a (the Sleepy Boo coming down over Mario, its shut eyes and mouth, only the round disc under it) and 41b (the
+landing: it squashes flat as its fifteen Boos burst out). The regression drive 68 / 68 on the committed build (run fc): C18 now reads BodySize 7 (it read
+ModelScale 6.4+), radius 3.50, the Boos 9.48 / 12.46 m out; C47c the smash's landing is the eaten sound (1), BOOLOSSUS_BOUND 0. The clean rebuild 0
+errors; the drive, the logs, the shots and the tasks deleted.
+
+**Deviations:** the smash is the design doc's attack, not the game's -- the game's Sleepy Boo never moves (no bind); here it dives, leans and squashes as
+the Boolossus did, in the game's look and clip. Its toon has no fade: it pops in under the appear puff (the Boolossus faded in over 0.2 s) and has no
+landing flash. The eaten sound's 94-ms lead is cut (the game plays the note 9 ticks after Yoshi's eat). The split still pops with Luigi's Mansion's
+BOOLOSSUS_PON. The names stay (`SmsBoolossus`, Boolossus.tscn, the drives' wording): only the body and the sound changed. Steps: the import helper was
+written and uploaded in the same tool batch (its checksum on the PC matched).
+
+### 216 -- the King Boo REMATCH, part 61: the MISS's QUIET (the game's demoModeIn: as the miss's jingle starts every sound effect goes silent but the system's and Mario's voice), the camera's slow ZOOM onto Mario when he dies on the floor (the game's normal dead demo), and King Boo's twinkle stars without their square halo (feature/kingboo-rematch, code `d6c27a7`)
+
+**Jaysonn**: "do this: The game quiets enemy and object sounds when you lose a life. The game slowly zooms the camera in on Mario when he dies on the
+floor. King Boo's twinkle stars have faint square halos. no coins since i want the fight to be hard." (The rest of that message -- a bigger Shine, a
+peaceful sky at the defeat, the faces -- follows on its own.)
+
+**The quiet.** The game: `MSBgm::startBGM` (MSoundBGM.cpp) for the miss's and the game over's jingles (and the shine get's) `stopTrackBGMs(3, 0)`, then
+`MSound::demoModeIn(0x16f, false)` (MSound.cpp 659): for each category bit, `setSeCategoryVolume(cat, 0)` -- JAIBasic's category volume multiplies
+every sound of it, so a playing one goes silent at once and a new one plays silent -- till the next stage's `MSound::initSound` restores them. A sound's
+category is its id's top hex digit: 0 FLUDD (PO), 1 Mario's moves (MA), 2 enemies and bosses (EN, BS), 3 objects, 4 system (SY), 5 environment (EV), 6
+water (WT), 7 Mario's voice (MV, MA_VO), 8 NPCs; 0x16F is all but 4 and 7 -- the system's sounds and his voice (his cry) play on. `gen_table154.py`:
+`SeInfo` gains the game's `Id` (**`assets/Sms/Sound/SmsMarioSoundTable.cs`** regenerated: every row gains its id, nothing else).
+**`assets/Sms/Sound/SmsActorSound.cs`**: `DemoMask`, `DemoModeIn`, `DemoModeOut`, `Category` (the table's id; Jaysonn's own sounds, no id: the attacks'
+2, THUNDER 5), `Muted`; every player remembers its sound, and a silent category's sit at -80 dB (`SetBase`, the distance tick) from that moment;
+readouts `PlayingNow`, `AudibleNow`. **`assets/Sms/Sound/SmsMarioSound.cs`**: the channels and the slots remember their sound and go silent by category
+(the voice, 7, plays on); `DemoChanged`; `_Ready` is initSound's (`DemoModeOut`); readouts `VoiceAudible`, `EffectsPlaying`, `EffectsAudible`.
+**`assets/Sms/Rematch/SmsArenaLighting.cs`**: the sky's thunder silent under it. **`assets/Mario.cs`**: `SmsMissTick` calls `DemoModeIn(0x16F)` after
+`StopAllMusic`, `DemoModeOut` before the stage moves.
+
+**The zoom.** The game (CameraDemo.cpp 219-272; cameragc.cpp 261, 820, 903): `execDeadDemoProc_` starts the dead demo 16 ticks after
+`MARIO_FLAG_GAME_OVER`; without the hell flag `ctrlNormalDeadDemo_` takes the place of the mode's control -- the look-at chases his body
+(`setMarioLookat_`: his origin + 35 u in the normal dead demo) at 0.03 a tick, the eye stays where it stopped, and a tick on a 343-tick zoom: `mFovy` at
+a steady pace toward clamp(10500 / the eye's distance to the look-at, 5, 80) degrees (`CLBChaseConstantSpecifyFrame`), the kind's fovy not reapplied
+meanwhile; `calcFinalPosAndAt_` keeps the look-at's elevation clamp (only the hell one skips it). **`assets/Sms/MarioCamData.cs`**: `GameOver`.
+**`assets/SunshineCamera.cs`**: the dead demo on any game over (212 had the hell flag only), the hell or the normal one (`_hellDemo`);
+`CtrlNormalDeadDemo`, the fov kept through `Apply`, the 35-u look point, the clamp kept; readouts `NormalDeadDemoOn`, `DeadDemoFov`, `DeadDemoFovTimer`
+(`HellDeadDemoOn` now the hell one alone). The camera ticks at 120 Hz: 16 ticks are 0.13 s, the zoom 2.86 s; the miss's wipe comes 2.2 s on, so it
+closes about two thirds of the way (50 -> 25 degrees here) before the bands.
+
+**The stars.** The game's IA8 star (`star4s_raw`) has a little alpha everywhere -- 4 to 20 of 255 over most of the quad -- and its arms run into the
+quad's edge (33 at an edge's middle), so a BIG star against a dark sky adds a faint square. **`assets/Sms/Fx/kira_add.gdshader`**: `alpha_floor` (the
+haze cut), `edge_fade` / `edge_from` (the quad's edge faded radially) -- 0 = the game's, as before; **`assets/Sms/Rematch/KingBooRematch.tscn`**: King
+Boo's star material (ChikaFx's, which his crown sparkles, rise, dive and death bursts copy) at 0.12 / 1 / 0.62. NEW
+`tools/projectshine/rematch157/star_preview216.py` rendered the shader's maths first: the light off the arms 37 % -> 12 %, the arms' own 88 % kept, the
+edge 0.
+
+**Verified:** the death drive v216-1 (deleted before the commit; the card skipped by A, the cutscene PLAYED; then King Boo's moves off, the supply
+stopped, Mario at 1 HP takes the plain hit while King Boo laughs): C55 the normal dead demo on 0.150 s after the death (not the hell one), the eye still
+(0.00 cm) through it, the fov 49.7 -> 48.3 (0.3 s) -> 36.8 (1.2 s) -> 25.46 (2.1 s; the steady pace's 25.40 toward its aim 14.24, 108 ticks left), never
+widening, the look-at 1 u off his body's 35 u; after the reload off, the fov 50.0; C56 at the miss's start (0.03 s after the death) the mask 0x16F, King
+Boo's laugh (playing at the death) silent -- 1 playing, 0 heard --, Mario's voice heard (MV08A_DOWN_03); a laugh started in the miss silent (2 playing,
+0 heard); his effects through the miss up to 4 playing, none heard; after the reload the mask 0 and the laugh heard; C57 King Boo's star material
+0.120 / 1.00 / 0.62 -- 3 / 3 (run death216b; run a failed C55 on the drive's own count: the camera's 16 ticks are 120 Hz, the drive's 60 -- the check
+now in seconds), and 3 / 3 windowed with its shots 42a / 42a2 (King Boo's rise and its stars) and 42b-d (the death: the fov 48.0, 36.8, 25.5). The fall
+drive (212 / 213's) 6 / 6 (run fall212d): the hell dead demo as before (the eye 0.00 u, the look-at 2246 u down). The regression drive 68 / 68 on the
+committed build (run fd). The clean rebuild 0 errors; the drive, the logs, the shots and the tasks deleted.
+
+**Deviations:** Jaysonn's own sounds have no game id: his attacks' sounds count as the enemies' (category 2, silent), the thunder as the environment's
+(5, silent). The shine get's jingle would call `demoModeIn` too; the port's shine get has no BGM yet, so it does not. The stars' cut is the port's (the
+game's texture keeps its haze): on King Boo's stars only -- the casino King Boo's, the NPC sparkles and the coin's keep 0 / 0.
+
+### 217 -- the King Boo REMATCH, part 62: the SHINE two and a half times bigger when it spawns (its star's centre where the normal one's is, its demo camera on the bigger star's middle), and the PEACEFUL NIGHT after the defeat (from his burst the sky fades to a starry night with the northern lights, the arena's lights calm, the thunder and the embers gone) (feature/kingboo-rematch, code `45435d6`)
+
+**Jaysonn**: "can you make the shine bigger when it spawns? its very samll right now ... when the boss is beat we should have the skybbox transform
+to somthing nice like the aurua lights to signal its now peacefull" (The same message's miss quiet, slow zoom and stars were 216; its faces are a
+mockup, not in this commit.)
+
+**The Shine.** **`assets/Sms/Rematch/SmsKingBooRematch.cs`**: `ShineScale` (2.5) -- `SpawnShine` scales the Shine's root after `AddChild` (after its
+`_Ready`, so the flare, the glow and the stars it builds at the scene's scale grow with it) and lowers it 1.2 m x (`ShineScale` - 1)
+(`ShineCentreOverRoot`: `SmsStarLocal` (0, 200, 0) x the scene's 0.006), so the star's centre stays 2.4 m over the floor as the normal Shine's; its
+demo camera's look point x `ShineScale`. **`assets/ShineSprite.cs`**: `SmsAppearLookUp` (0.5 m = as before), how far over the root the appear demo's
+camera looks. The shine get is the game's size again (`SmsDemoDrive` puts the root at the model's 1 / 74.44); a `ShineSpawnPoint`, when set, still
+takes the root as it is.
+
+**The night.** **`assets/Sms/Rematch/RematchSky.gdshader`**: `peace_blend` (0 the fight's sky, 1 the night) and its knobs -- `peace_zenith` / `mid` /
+`horizon` / `below` (navy, a teal glow at the horizon), `aurora_green` / `teal` / `violet` (each curtain green at its lower edge, then teal, violet at
+the top), `aurora_gain` 0.9, `aurora_lift` -5 (degrees: the lowest curtain's edge just over the rim from the fight's camera), `aurora_speed`,
+`star_gain`; `peace_sky()`: a star in about one cell in five of a 1.1-degree grid, twinkling, none near the horizon; three curtains
+(`aurora_curtain`: the lower edge waving round the sky on two sines, the light falling off up its height, rays drifting along it, thicker in places)
+-- the same maths as NEW `tools/projectshine/rematch157/aurora_preview217.py`; `picked()`: a `source_color` vec3 reaches the shader in linear (Forward+
+and Mobile convert the inspector's colour) but this sky's maths is display-referred (`to_linear` at the end) -- converted twice, the night came out
+near black (the first shot run drew the horizon's (20, 51, 69) as (4, 8, 13)), so the night's colours go back to the picked values first (the
+boss-arena sky's two streak colours take the same double step; left as they are). `SmsKingBooRematch.cs`: `PeaceSky` (on), `PeaceSkySeconds` (6) --
+from his burst (`DeathBurst`: `BeginPeaceSky`) the blend eases 0 -> 1, on through the Shine's stop-the-world (he stays ProcessMode Always till it is
+done; `GoneTick` waits for it); a new fight or his leaving puts it back to 0 (`ResetFinalSky`, `_ExitTree`).
+**`assets/Sms/Rematch/SmsArenaLighting.cs`**: `PeaceAmbient` (0.36, 0.5, 0.62) / `PeaceAmbientEnergy` 0.9, `PeaceFog` (0.04, 0.09, 0.12), `PeaceSun`
+(0.72, 0.85, 1) / `PeaceSunEnergy` 0.7 -- the ambient, the fog and the sun go on from wherever they were (the final phase's fire light) by the sky's
+`peace_blend` (`PeaceBlendRead`); the flashes x (1 - it); no thunder once it is past half. **`assets/Sms/Rematch/SmsArenaEmbers.cs`**: the embers'
+alpha x (1 - `peace_blend`).
+
+**The faces (a mockup, not in this commit).** King Boo's face is his body's eye sheet (`N_nbtelesa_eye_open.png`, shared by both eyes, mirrored across
+the face: the sheet's x runs toward the face's middle, its y down it -- `tools/projectshine/rematch157/faces217/face_uvmap217.py`). Two sheets painted
+on the game's own (`faces217/paint_faces217.py`, every colour the game's): face 2 (6-4 HP) the top line sheared down toward the middle, ~18 degrees --
+cross; face 3 (3-1 HP) sheared further (~27 degrees) over the pupil's top, the iris the roll sheet's red, the pupil 80 % size. A throwaway face drive
+put each on him (the blink off) and shot him close (`faces217/faces_sheet217.png`) -- C60 4 / 4 (run faces217c).
+
+**Verified:** the defeat drive v217 (deleted before the commit; the card skipped by A, the cutscene played; his moves off, the supply stopped, the
+final phase's fire sky on, his HP set to 1 and the hit): C58 the night begun at his burst, the blend 0.501 at 3 s, 0.075 as the Shine came, 0.501 2 s
+into its demo (the tree paused), 1.000 at the end, never falling back; the ambient at `PeaceAmbient` (0.000 off), its energy 0.90; the flash 0; no
+thunder after half; the embers 1.00 -> 0; C59 the Shine's root at 0.015 (0.006 x 2.5), its star's centre 3.00 m over it, the root placed 1.80 m lower
+(the centre 2.4 m over the floor), the demo camera's look-up 1.25 m -- 2 / 2 headless (run defeat217a) and 3 / 3 windowed with C58b, the night's
+colours as picked: 41.5 degrees up, drawn (7.0, 16.0, 38.0), picked (6.8, 16.6, 38.8) (run defeatshot217b; run a, 2 / 2, drew them near black: the
+fix above), its shots 43a-f. The regression drive 68 / 68 (run fh; run fe failed C10c on its own check -- the Shine placed `ShineOverFloor` over the
+floor; it now allows `ShineScale`'s drop; run ff's Godot found no C# classes, started the instant the build ended; run fg lost Mario off the rim after
+a spin jump at a supply Boo near the edge, before the breath test -- the drive's own setup, nothing of this pass). The clean rebuild 0 errors; the
+drive, the logs, the shots and the tasks deleted.
+
+**Deviations:** the bigger Shine is the port's (the game's boss Shines are the normal size; its shine get keeps the game's). The night is the port's
+own (no game has this sky). With `ShineSpawnPoint` set, the root goes to that node unlowered: the bigger star's centre sits 3 m over it.
+
+### 218 -- the King Boo REMATCH, part 63: the fight sky's STREAKS in the game's colours (the faint ones the game's MAGENTA again, not a dark red-pink: RematchSky's colour knobs read as picked, as 217's night) (feature/kingboo-rematch, code `421e226`)
+
+**Jaysonn**: "i have a note saying, Fix the fight sky's streak colours? what would this mean?" -- then, told what it meant: "Fix the streak
+colours to match the game"
+
+**`assets/Sms/Rematch/RematchSky.gdshader`**: `picked()` (217's, for the night's colours) moves up beside `to_linear()` and now takes the fight
+sky's colour knobs too: `streak_dim` and `streak_bright` (the streaks: faint = the game's magenta, where two curves cross = its cyan), `base_lift`
+and `clear_color`. Godot hands a `source_color` vec3 to the shader in linear (Forward+ and Mobile convert the inspector's colour) but this sky's
+maths is display-referred (`to_linear` at the end): converted twice, the magenta (254, 60, 186) was drawn as (253, 11, 125) x the streak's
+strength -- darker and redder, a wine red-pink -- and the cyan (12, 254, 242) as (1, 253, 226). `base_lift` and `clear_color` are black on
+`RematchSky.tres` (black picked is black): no change today; set, they now show as picked.
+
+**Verified:** the streak drive v218 (deleted before the commit; windowed; the card skipped by A, the cutscene played, his moves off; the sky's
+clock held at frame 80 of 300, no flash; shots 45a the game's camera, 45b the drive's camera at the arena's middle 3 m up, 6 degrees up, looking
+away from him, the HUD off, 45c the same with the cyan set to the magenta and the flashes off): C61 the streak pixels of 45c (R 30 or more, every
+other pixel) have the magenta's own G / R and B / R within 0.04 -- 27368 pixels, median 0.227 / 0.733, the magenta's 0.236 / 0.732 (run
+streak218b); on the 217 shader 0.032 / 0.500, a FAIL as it should be (run streak218a). Before against after (`tools/projectshine/rematch157/
+compare218.py`), only the streaks changed: the plain sky between them black in both (under 1 / 255 on average after, 5 at most), the floor's mean
+the same. The regression drive 68 / 68 (run fj; run fi stopped at 49 / 1, C16 190's second split never came: Jaysonn's local
+`RematchArena.tscn` sets King Boo's `HitPoints = 3`, so the hit meant for the second split was his last -- the drive now pins the committed 9 for
+its own run, his scene untouched). Run fj's error stream carried two `ObjectDisposedException`s from before this pass: a Bomb Boo of a freed volley
+detonating (`SmsBooVolley.cs` line 101, its `Spit` lambda) and a fireball's signal on a freed King Boo (`SmsKingBooRematch.cs` line 2292,
+`FireballsTick`) -- logged, the checks unaffected. The clean rebuild 0 errors; the drive, the logs, the shots and the tasks deleted.
+
+**Deviations:** none -- the streaks are drawn in the game's colours now; their shapes, their strength (`streak_gain`) and the flashes are as before.
+
+### 219 -- the King Boo REMATCH, part 64: the fight sky's FLASHES without their HARD LINES (the clouds' texture seam and the fade's seam round the sky blended away: RematchSky's flash_soften) (feature/kingboo-rematch, code `896f2a5`)
+
+**Jaysonn**: "so there are color flashes that happen in the skybox and sometimes hey have a hard line. can you make it soft?"
+
+**`assets/Sms/Rematch/RematchSky.gdshader`**: `flash_soften` (1; 0 = the game's hard lines, more = wider). The lines are the game's own, seen only
+while a flash lights the clouds (Luigi's Mansion's `vrb_mb.bmd` draws them the same: its TEX1 #0 wraps the cloud texture repeat both ways). The
+base ball's first cloud layer (`lm_bg04`, 6 times round) repeats top to bottom but the texture does not tile that way (its bottom row is 0.52 off
+its top row on average, neighbouring rows 0.025), so where its rows start over a straight line crosses the sky, sweeping up and down as the layer
+breathes 1 -> 2.07 -> 1 tall; and the fade over the clouds (`lm_gs001m`, clamped, read at 1 - u) meets its own right and left edges at u = 0, the
+sky's +Z direction: an up-down line about 19 to 44 deg up, the edges up to 0.129 apart. Within 0.12 x `flash_soften` of the texture's height
+either side of the cloud line the layer's read fades into the MIRRORED read (the same rows either side of the line, so no step); within 0.03 x
+`flash_soften` of the way round either side of u = 0 the fade goes over to its two edge columns' mean. Drawn first in
+`tools/projectshine/rematch157/sky208/flash219_fix.py` (`lm_sky_preview.py`'s maths with the same blend; `flash219_probe.py`,
+`flash219_probe2.py` (the disc's wrap modes) and `flash219_probe3.py` (the fade's line) found the two seams).
+
+**Verified:** the flash drive v219 (deleted before the commit; windowed; the card skipped by A, the cutscene played, his moves off; the sky's clock
+held on the peaks of the grey (frame 12), the green (154) and the lavender (167) flashes; the drive's camera at the arena's middle 3 m up, 15 deg
+up, looking straight at the fade's line (+Z, away from him; he and the HUD hidden), each flash shot with `flash_soften` 0 and 1 (46a-f), then the
+green from the game's camera (46g-h); each shot read in sky directions, so the lines' curve on the screen does not matter): C62 the cloud line's
+step across it (0.73 deg over against under) against the steps beside it (1.47 against 2.93 deg), 161 samples 40 deg either side of the view --
+the game's grey 7.9 / 5.2 (1.51 x), green 42.7 / 11.6 (3.66 x), lavender 36.1 / 5.8 (6.25 x); soft 4.7 / 4.6 (1.02 x), 9.2 / 16.7 (0.55 x),
+5.1 / 7.1 (0.71 x); the grey's fade line, 20-42 deg up, across it against pairs beside it: the game's 10.36 / 3.43, soft 4.27 / 3.64 (of 255) --
+1 / 1, its error stream empty (run flash219a; `flash219_fix.py` had drawn the same lines 7.8 / 6.1, 44.1 / 8.4, 35.4 / 3.1, soft 5.2 / 5.3,
+9.4 / 15.3, 3.8 / 5.6). The before / after sheet: `tools/projectshine/rematch157/shots219a/flash_before_after219.png` (`compose219.py`). The
+regression drive 68 / 68 (run fk; it pins the committed `HitPoints` 9 against Jaysonn's local `RematchArena.tscn` 3). The clean rebuild 0 errors;
+the drive, the logs, the shots and the tasks deleted.
+
+**Deviations:** the softened lines are the port's (the game draws them hard): `flash_soften` 0 gives the game's sky back. The cloud line's twin
+under the horizon (behind the arena's rim from the fight's camera) is softened the same way (`flash219_fix.py`: the green's 25.2 across, 17.2
+beside -> 11.9, 18.7).
+
+### 220 -- the King Boo REMATCH, part 65: the SHINE's SOUNDS, the game's own: the appear's chime and fanfare, the Shine's hum while it is out, the chime at the touch, the Shine Get's fanfare (cutting the music, the effects quiet but the system's and Mario's voice) -- for every Shine in the port (feature/kingboo-rematch, code `885282a`)
+
+**Jaysonn**: "yeah can you do the shine sounds? otherwise i think everything looks ok for now!" (the rest of the rework proposed after 219 -- the HUD
+in the cutscenes, the appear's camera and flash, the exit after the Shine Get -- not done: his call)
+
+**The game** (`Item.cpp`: `TShine::appearWithTime` 706-709, `control` 536-615, `touchPlayer` 664; `MarDirectorDirect.cpp` 843-852; `MSoundBGM.cpp`
+`startBGM`; `BackgroundMusic.hpp`, whose enum sits one place off `mSound.asn`'s names): an appear plays `MSD_SE_SHINE_APPEAR` at the Shine and
+`MSBgm::startBGM(0x8001002D)` -- mSound.asn's `MSD_BGM_SHINE_APPEAR`, t_shine_appear.com -- which cuts no music; every tick of STATE_NORMAL /
+MOVING_UP / DOWN / CIRCLE / FLOAT / WAIT the Shine calls `MSD_SE_SHINE_EXIST` (id 0x81C1: the 0x800 bit clear, a level sound kept alive by the
+calls); the touch plays `MSD_SE_SY_GET_SHINE`; the Shine Get's pending step starts 0x8001000A (the decomp's `MSD_BGM_CHUBOSS` = mSound.asn's
+`MSD_BGM_GET_SHINE`, k_clear.com), and `startBGM` for it first stops music tracks 0 and 1 at once and sets `demoModeIn(0x16F)` -- every sound
+effect silent but the system's and Mario's voice -- as the miss's jingle does.
+
+**The sounds.** NEW **`assets/Sms/Sound/Music/MSD_BGM_SHINE_APPEAR.wav`** (4.56 s), **`MSD_BGM_GET_SHINE.wav`** (5.14 s) (+ `.import`) -- rendered
+from the disc's sequences with the game's instruments (`tools/projectshine/sound154/sms_bgm.py`, `trim213.py`, NEW `level220.py`: level213.py's
+MSD_BGM_BOSS normalisation, held 0.03 dB under it for MSD_BGM_GET_SHINE so its peak stays under full scale, every file computed before any is
+written; `adopt156.py`). NEW **`assets/Sms/Sound/Object/MSD_SE_SHINE_APPEAR.wav`** (3.39 s), **`MSD_SE_SHINE_EXIST.wav`** (3.23 s, a loop region
+70000-103333), **`MSD_SE_SY_GET_SHINE.wav`** (1.57 s) (+ `.import`) -- baked by `sms_audio.py` (`adopt157.py`). `sms_audio.py` fix: a note whose
+track routes oscillator 0 (OscRoute 0) with no SimpleADSR plays at full level to its note-off (the track's osc 0 is still `Player::sEnvelopeDef`
+with a null attack table and `TOscillator::getOffset` returns 1.0; the baker used `sAdsTable`, which falls to 0 at once: MSD_SE_SHINE_APPEAR baked
+0.01 s); no sound of record is under 0.05 s, none re-baked. **`assets/Sms/Sound/SmsMarioSoundTable.cs`**: the five rows (`gen_table154.py`; the
+table otherwise the one shipped).
+
+**The code.** **`assets/Sms/Sound/SmsActorSound.cs`**: `ShineSprite` is the actor "shine"; its `AppearSound` slot gets MSD_BGM_SHINE_APPEAR (a 2D
+player on the Music bus). **`assets/ShineSprite.cs`**: the sound node attached in `_Ready`; `SmsAppearSounds` -- the chime (positional, on the
+node's pool) and the `AppearSound` fanfare, for the game's appear and the tween entrance alike; `SmsHumTick` (every physics tick) --
+MSD_SE_SHINE_EXIST looping while the Shine is shown, not taken, not in the get or its end, not in the appear's wait; the touch
+(`OnPickupBodyEntered`) -- the hum off, MSD_SE_SY_GET_SHINE; readouts `SmsSound`, `SmsHumOn`, `SmsAppearSoundsPlayed`, `SmsGetChimes`.
+**`assets/Sms/Sound/SmsMarioSound.cs`**: Mario's `ShineGetFanfare` slot filled with MSD_BGM_GET_SHINE. **`assets/Mario.cs`**: `SmsShineGetBegin` --
+`StopAllMusic`, `DemoModeIn(0x16F)`, then the fanfare; the quiet ends once, whichever way the demo ends (`SmsShineGetFinish`: the stage moving, the
+title, control back; the state left early); readouts `SmsShineMusicStopped`, `SmsShineDemoModeOn`.
+
+**Verified:** the shine sound drive v220 (deleted before the commit; headless: the card skipped by A, the cutscene played, his moves off; his HP set
+to 1 and the hit -- the real down, burst, Shine and demo; a stand-in stage music on the Music bus from half a second after the burst; after the demo
+Mario put 3 m off and walked in with the stick, the real PickupZone): C63 the appear -- the Shine's sound node on, `AppearSound` = MSD_BGM_SHINE_APPEAR
+(4.55 s, the Music bus) playing at once with the chime heard on the Shine; 2 s into the stop-the-world demo the fanfare at 1.95 s (not paused with the
+tree), over by 5.2 s; the stand-in music left playing; C64 the hum looping and heard on all 408 ticks of the flight, the settle and the wait, heard at
+the camera before the touch, off from the touch; C65 the touch 0.82 s after the settle -- the chime once; at the Shine Get's start the stand-in cut
+(1 music player stopped), the demo mask 0x16F with the chime still heard, the fanfare = MSD_BGM_GET_SHINE (5.14 s, the Music bus) playing and still at
+3 s; the card save (A), then control back with the mask out -- 3 / 3 (run shinesound220a). The regression drive 68 / 68 (run fl). The import
+(`run_import220`: the five `.import` files) and the clean rebuild 0 errors; `Mario.cs` and `SmsActorSound.cs` kept CRLF in the working copy as they
+were; the drive, the logs and the tasks deleted. The drive's A at the card save saved: the rematch Shine is now in the save file (its flag was fresh:
+"set -- the count is now 3"; the file as the run left it kept at `tools/projectshine/rematch157/save220/`); left for Jaysonn to say.
+
+**Deviations:** the music cut and the quiet at the Shine Get last till the stage moves in the game; a Shine whose `ExitLevel` is off (his option --
+the rematch's) ends the quiet when control comes back, and the cut music stays stopped. The appear fanfare does not hold the appear demo open: the
+game's director waits for it (`MSBgm::getHandle(2)`) before ending a demo, the port's demo keeps its own length (the rematch's 6 s, the fanfare 4.6).
+The renders are dry (no reverb), as 156's. The hum fades with the camera's distance on the port's one curve (full to 1200 u, silent at 12000 u).
+
+### 221 -- the King Boo REMATCH, part 66: his DEATH CAMERA pans out to a wide shot of the whole arena and holds it while the Shine comes out where he burst and jumps to the middle, then glides back; the Shine's HUM loops without its drop (each note's release kept) (feature/kingboo-rematch, code `2ee78b2`)
+
+**Jaysonn**: "ok the sound system needs work for spawning in the shine and the camera angle is not right again. i want when king boo dies the cam
+pans out like petey phriana when he dies. where its almost looking at the entire aerna then the shine jumps to the middle"; "the loop sound of the
+shine shinning seems to appruptly loop".
+
+**The game.** Petey (`bosspakkun.cpp` `TNerveBPDie`) calls `makeShineAppearWithDemo("シャイン（ボス用）", "ボスシャインカメラ", ..)` at the end of
+his death clip; that camera tool (biancoBoss.szs `map/tables.bin`) is a placed fixed camera, CAMERA_MODE_DEFINITE_A, at (494, 400, 383) u with a
+600-frame demo, which the inbetween swings to (16 frames) and which keeps looking at the Shine. Scaled to the rematch arena it frames 35 % of the
+floor; Jaysonn asked for nearly all of it, so the wide shot is the port's own. The hum: MSD_SE_SHINE_EXIST's sequence starts a 1.04-s note every 100
+ticks, and `TTrack::noteOn` stops the voice's last note with `noteOff(slot, 0)` -> `TChannel::stop(0)` -> `EVENT_RELEASE`, so the old note releases
+(SimpleADSR release 500) while the new one attacks (3000). The baker cut the old note dead and the new attack began from 0: a drop of up to 44 dB
+once a second, the loop's seam among them (-27.5 -> -71.7 dBFS, 10-ms windows).
+
+**The camera.** **`assets/Sms/Rematch/SmsKingBooRematch.cs`**: `DeathCamWide` (on), `DeathCamDistance` 42, `DeathCamHeight` 22, `DeathCamLookUp` 3,
+`DeathCamFov` 50, `DeathCamPanSeconds` 1.2, `DeathCamBackSeconds` 0.8. At the burst (`DeathBurst` -> `DeathCamBegin`) a camera of his own,
+SmsDeathWideCam, takes the picture from the gameplay camera (the current one; when the shake's render camera has it -- his rumble through the down --
+the Camera3D in the SunshineCamera rig) and eases (smoothstep; the yaw and the pitch on their own, no roll) out to the wide spot: `DeathCamDistance` m
+from the arena's middle along the gameplay camera's own bearing, `DeathCamHeight` m over the floor, looking at `DeathCamLookUp` m over the middle, at
+`DeathCamFov` (42 / 22 / 3 / 50: 97 % of the floor in frame, 24 degrees down, the Shine's whole flight from a burst out to 0.9 of the floor's radius
+in frame -- `tools/projectshine/rematch157/widecam221b.py`). `DeathCamFit` pulls it back along its line of sight (2 m at a time, at most
+`DeathCamDistance` more) when the Shine's flight would leave the frame: the star's centre through ShineSprite's rise and `TShine::movingCircle`'s
+loop, its top, bottom and sides with a fifth more. It holds there with the Shine's own demo camera off (`SmsAppearCamera` false); at the Shine's demo
+end (`SpawnEntranceFinished`; or no demo, no Shine) it glides back over `DeathCamBackSeconds` onto the gameplay camera's live pose, hands it the
+picture and is freed, and only then is King Boo back on the world's clock (`GoneTick`). A shake that runs renders the wide shot shaken and hands it
+back; one frozen by the stop-the-world gives the picture back (`DeathCamKeepView`); `_ExitTree` hands it back. `ShineDemoTicks` 720 -> 600 (Petey's
+tool: up 2 s, the loop 1 s, the settle 2 s). `ShinePlaced`: SpawnShine's placed spot, shared with the fit. Readouts `DeathCamPhase`, `DeathCamNode`,
+`DeathCamReturnTo`, `DeathCamWidePos`, `DeathCamWideBase`, `DeathCamPushedBack`, `DeathCamWideLook`. `DeathCamWide` off = 183's Shine camera
+(`ShineCamOffset` / `ShineCamFov`).
+
+**The hum.** **`assets/Sms/Sound/Object/MSD_SE_SHINE_EXIST.wav`**: re-baked with each note's release kept (`tools/projectshine/sound154/sms_audio.py
+--release-tails`: a note cut by the next note on its voice plays its release; off by default, so no other sound of record changes; `adopt157.py`).
+The same length (3.23 s) and loop (70000-103332): the 10-ms levels through the loop -38.0 to -27.0 dBFS (median -31.2), the seam 0.3 dB (was 44.2).
+The table row is unchanged (`gen_table154.py`: the table is the one shipped).
+
+**Verified:** the death camera drive v221 (deleted before the commit; his HP set to 1 and the hit -- the real down, burst, Shine and demo; the Shine
+never touched, no card save): C66 the pan and the wide shot -- the wide camera made 0.000-0.015 m from the gameplay camera (the shake's render camera
+was current at the burst; the rig's camera found and handed back to), the pan 1.20 s with a top speed of 36.1 m/s (smoothstep's 1.5 x the mean), the
+hold 0.000 m off the wide spot at fov 50 looking 0.00 degrees off, 97.5 % of the floor in frame (rays to the real floor), the Shine's own camera off,
+the star in frame on 300 / 300 ticks of its flight, the view never lost; C67 the glide back -- released at the demo's end, 0.80 s, top speed 54.1 m/s,
+the hand-over 0.000-0.025 m, the wide camera freed, King Boo back on the world's clock; C68 the hum -- the stream the Shine plays loops forward over
+70000-103332, the file's levels as above. 3 / 3 in runs b (the burst where the fight left him, 4.6 m from the middle toward the camera), d (him put 21
+m out behind for the down: the burst lands 8.4 m out -- the down clip carries his body 12.6 m the way he faces) and f (him 30 m out at the side: the
+burst 30.6 m out, past the floor's edge; the shot pulled back 8 m, the star in frame on all 300 ticks -- run e, before the fit, lost it on 86) and
+the windowed run shotb (shots 47a-e; the burst 14.7 m out at the side). The regression drive 68 / 68 (run fm; C10d now waits for the hand-back). The
+import (`run_import221`: the hum's `.import`) and the clean rebuild 0 errors; the drive, the logs, the shots and the tasks deleted. Seen in the
+regression's error output, not touched: an ObjectDisposedException from a `SmsBooVolley` lambda (`SmsBooVolley.cs` line 101) when a volley's Bomb Boo
+detonates after the volley is gone.
+
+**Deviations:** the game's camera for Petey's Shine stands about 1250 u (17 m) from where it lands and keeps turning to look at it; the port's wide
+shot stands about 47 m from the middle and holds its look on the middle -- Jaysonn's "almost looking at the entire arena". The game's inbetween to
+the fixed camera is 16 frames and it cuts back from a DEFINITE camera; the port pans out over 1.2 s and glides back over 0.8 s. The hum keeps the
+game's release on each note but is still the whole sequence baked into one looped file.
+
+### 222 -- the King Boo REMATCH, part 67: the death camera CUTS to the wide shot and cuts back (no pan); the LINE down the arena floor gone (the floor's stone rows re-mapped unbroken round the ring); the console hides through a Shine's appear demo and behaves the game's way at the shine get; the volley's and his attacks' signals safe after their owner is gone (feature/kingboo-rematch, code `e3fac61`)
+
+**Jaysonn**: "oh no that camera angle is wrong for the wide shot it shouldnt pan it should cut"; "Fix the floor line and volley error, and make
+sure the hud behaves correctly when collecting a shine".
+
+**The cut.** **`assets/Sms/Rematch/SmsKingBooRematch.cs`**: `DeathCamPanSeconds` and `DeathCamBackSeconds` 0 (221 had 1.2 / 0.8): at his burst the
+camera cuts to the wide shot (`DeathCamBegin` poses the camera at the wide spot on its first frame), and when the Shine's demo is over it cuts
+straight back to the gameplay camera (`DeathCamRelease` -> `DeathCamEnd`, no glide) -- as the game cuts to and from Petey's placed Shine camera
+(bosspakkun `TNerveBPDie`: `makeShineAppearWithDemo`'s camera tool). The knobs over 0 give 221's eased pan and glide. Everything else of 221's camera
+stays (the wide spot, the fit for a far burst, the Shine's own demo camera off, the hand-back).
+
+**The floor line.** **`models/Sms/Rematch/polta_planet.glb`**: the arena floor (mesh3, lambert4_v, the 64 x 64 stone tile Z_isiblock01) is built from
+20 wedges (a spoke every 18 degrees) in rings, and every wedge of a band mapped the SAME stretch of the tile, so across each spoke the texture's u
+jumped by a fraction of a tile (0.57 at 10 m, 1.07 at 20 m) and the stones were cut mid-block: a straight seam down every spoke -- the one Jaysonn saw
+runs from the middle toward the fight camera's start (world +Z), which looks straight down it (219's and 221's shots). Re-mapped by
+`tools/projectshine/rematch157/floorfix222.py`: the four outer bands (5.33-25.12 m: where Mario walks) split into the tile's five stone ROWS (the dark
+mortar lines at pixel rows 6 / 21 / 32 / 44 / 58, read from the texture), each row mapping u = N x the angle round the ring / 360 with N a WHOLE number
+of tiles (7-25 by row: the original's own density at the row's middle, rounded), so the stones run on unbroken across every spoke and close up on
+themselves at 360 degrees. The positions, normals and vertex colours are the original quads' own, interpolated; v is the original's; the inner stones
+(to 5.33 m), the step ring, the walls, the rock and the textures are untouched. 1741 vertices / 900 triangles for the floor (was 421 / 260).
+`floorview222.py` renders the floor from above the way the port draws it (the tile x the vertex colour, REPEAT, bilinear) for the before / after
+(`view222/`); `floor222.py` lists the seams.
+
+**The console (the HUD) at a Shine.** The game's console runs its camera demo whenever the camera is a demo camera (`TGCConsole2::performMovement`:
+`gpCamera->isDemoCamera()` -> `startCameraDemo`: the counters, the lives and the life meter go; `endCameraDemo` three frames after it is not) and
+brings the star HUD in for the shine get (DIRECTOR_FLAG_SHINE_TAKEN, set by `fireGetStar` at the landing). The port's console
+(`assets/Sms/SmsStandardHud.cs`) learned a demo only from Mario (`Demo`: the camera locked, a talk, the get, death): a Shine's appear demo and the
+rematch's death camera are not his to report, so the counters stayed up through them; and a Shine touched in the AIR locked the camera for the fall,
+which the console took for a demo -- the counters went off with no SHINE_TAKEN, and the get then found the console already in its demo: no shine
+counter for the count-up. **`assets/Sms/SmsStandardHud.cs`**: a registry of camera-demo owners (`CameraDemoBegin` / `CameraDemoEnd` by the node's
+id; an owner freed mid-demo drops out), `InDemo` = Mario's `Demo` or an owner's, read by the console itself every frame (its process mode is Always:
+the Shine's stop-the-world freezes Mario's feed); every demo test in the console reads `InDemo`; readout `InCameraDemo`. **`assets/ShineSprite.cs`**:
+`SmsAppear` with its demo reports the demo; `SmsAppearDemoEnd` and `_ExitTree` end it. `SmsKingBooRematch.cs`: the death camera reports from
+`DeathCamBegin` to `DeathCamEnd`. **`assets/Mario.cs`** (`SmsStandardHudFeed`): the lock through the fall after an air touch (`_pendingShine` set) is
+no demo; the get at the landing is, with `ShineDemo`, as before.
+
+**The volley error (and his attacks').** **`assets/Sms/Rematch/SmsBooVolley.cs`**: a spat Bomb Boo lives under the supply's parent and outlives its
+volley (freed once every Boo is down, or with King Boo's hit and the split's field clear) -- its dud floats on with its fuse burning, and when it
+landed or blasted after that the volley's handlers ran `EmitSignal` on the freed volley (`ObjectDisposedException` from `SmsBombBoo.Detonate`, in
+every regression run's error output). The handlers return when the volley is gone (the static totals still count). The same guard on the eleven
+handlers King Boo hangs on his attack nodes (the Boolossus, the walls, the breath, the volley, the Boo circle, the wind, the fireballs: a copy
+dismissed while its fireballs flew threw the same from `SmsFireballs.Finished`, seen in run fn).
+
+**Verified:** the shine hud drive v222 (deleted before the commit; windowed, shots 48a-i): C69 the console through the Shine's appear -- its demo 0.02 s
+after the burst, no pane of the coins / lives / star / life meter on screen on any of the 324 ticks from 0.6 s after the burst to the camera's end (the
+world paused through the Shine's demo), the demo over 0.03 s after the camera came back and the coins back 0.15 s after; C70 the touch in the AIR
+(Mario dropped from 5 m beside the star) -- the fall 15 ticks with the console in no demo, the get at the landing bringing the star HUD in at once with
+the coins beside it and the lives away, the count 3 -> 4 at 2.7 s with the digits following; C71 the card save answered "Continue" (the pointer read
+before A: nothing written, the save file's md5 as before), control back, the console's demo over and the coins on screen -- 3 / 3 (run shotb). The
+death camera drive (221's, its checks reworked for the cuts): the wide camera at the wide spot on the burst's tick (0.000 m off), never moving through
+the hold, the picture back with the gameplay camera on the demo's own tick -- 3 / 3 (run g, King Boo put 30 m out: the fit pulled the shot back 8 m,
+the star in frame on all 300 ticks). The regression drive 68 / 68 (run fq; run fp had C33 fail on its own sampling -- the ring's hit, the break and
+the ambush's end fell between two of its ticks -- read steadier now). The import (`run_import222`: the glb; the four texture `.import` files it also
+rewrote put back), the clean rebuild 0 errors; `Mario.cs` kept CRLF in the working copy; the drive, the logs, the shots and the tasks deleted. The save
+file was backed up first (`tools/projectshine/rematch157/save222/`) and is unchanged; the test-saved rematch Shine from 220 is still in it (his call).
+
+**Deviations:** the game's console reads the camera's own state (`isDemoCamera`); the port's is told by the demos' owners. The floor's stone rows close
+up on whole tiles round each ring, so a row's stones are 4-10 % wider at its outer edge than its inner (the original's were the same, cut at the
+spokes). The Shine's appear flash is still the port's own; the Shine Get still hands control back in the arena (his option, `ShineExitLevel` off).
+
+### 223 -- the King Boo REMATCH, part 68: his death plays out in full (the burst's flash and afterglow, the ring, the puffs, the stars, the down's emitters) BEFORE the Shine comes and the camera cuts; the Shine's get chime and its two fanfares re-rendered with the game's release curves the right way round (the chime rings out, the fanfares' notes decay instead of swelling back and cutting) (feature/kingboo-rematch, code `50e91d0`)
+
+**Jaysonn**: "i think i want king boo to full die animations and all like effects then the shine cutscene plays. also the sounds sound off when
+collecting the shine. seems jittery?"
+
+**His death first.** **`assets/Sms/Rematch/SmsKingBooRematch.cs`**: a new knob, `ShineAfterDeathFx` (on): once he bursts the Shine and the death
+camera's cut WAIT until every effect of his death is gone -- the burst's flash and its afterglow (`DeathAfterglowSeconds` 2.5, the last of them), the
+shock ring, the burst's puff and star emitters, the down's mist and twinkle emitters -- then `ShineDelaySeconds` more (0.5; 183's 1 s ran from the
+burst), then the Shine comes out where he burst and the camera cuts to the wide shot WITH it. `DeathCamBegin` moved from `DeathBurst` into
+`SpawnShine` (the knob off: at the burst, as 222). The burst's `DiveBurst` / `StarBurst` hand back their emitters, the down's mist and stars are
+freed once their particles are out (1.1 / 1.0 s; 183 waited 2.5 / 1.5) and all are tracked (`DeathFxAlive`; readouts `DeathFxOutAt`,
+`DeathFxWaitSeconds`). Measured: his effects out 2.50 s after the burst, the cut and the Shine 3.00 s after it, the console (the counters, the
+lives) up through all of it and off with the cut.
+
+**The sounds.** The Master bus was RECORDED in the running game (`AudioEffectRecord`, 48 kHz WASAPI) from the last hit to control back, five
+runs, and laid against the drive's log: no dropout, no click and no level wobble in the chime, the fanfares or the hum (every "gap" in the
+recording was the quiet between sounds: the chime's own 95-ms lead-in after the hum stops, the silence between his down sound and a footstep); the
+audio thread never missed its 10-ms period (the time since the last mix read every frame and every tick: 0 of ~3,300 reads over 12 ms, at
+1280 x 720 and at Jaysonn's 1930 x 1086); and the five WAVs probed clean. What IS off is in the renders of the sounds themselves,
+`tools/projectshine/sound154/sms_audio.py`: (1) the envelope's curved segments (JASOscillator's modes 1 / 2 / 3: the driver's tables) were read
+backwards in time -- the decomp's `TOscillator::calc` indexes a falling segment by the time elapsed (value = target + |scale| x table[16 f]:
+SampleCell's 1 -> 0 run is an exponential-like decay) and a rising one by the time remaining; the baker read the remaining time for both and took
+the table as the distance remaining, so a curved release dropped to silence AT the note-off and swelled back to full by its end, where the voice
+stopped dead. The BGM baker renders every release: in MSD_BGM_SHINE_APPEAR all 39 notes (releases 0.45-2.4 s) and in MSD_BGM_GET_SHINE 75 of 202
+(0.17 s) did that -- notes ducking out and re-swelling into a hard cut. (2) the SE baker cut a gated note dead at its note-off (no release at all
+unless 221's `--release-tails`, which covered only a note the next note on its voice took over): MSD_SE_SY_GET_SHINE is 43 bell notes on one
+instrument (release 1.56 s, SampleCell) across three tracks, each note 83 ms -- it rendered as 43 dry 83-ms blips, a stutter, where the game's rings
+out as a cascade. Fixed (`_shape` by the decomp; `--release-tails` covers every gated note) and re-rendered: **`assets/Sms/Sound/Object/MSD_SE_SY_GET_SHINE.wav`**
+(3.07 s, was 1.57: the body as before, -12 dBFS, then the ring-out to 3.07 s), **`assets/Sms/Sound/Music/MSD_BGM_GET_SHINE.wav`** and
+**`MSD_BGM_SHINE_APPEAR.wav`** (the same lengths and levels: the pipeline of 220 -- `sms_bgm.py`, `trim213.py`, `level220.py` -- reproduces the
+shipped files byte for byte before the fix). The hum and the appear chime (linear releases) re-render byte-identical. **`assets/Sms/Sound/SmsMarioSoundTable.cs`**:
+the chime's row, 3.067 s (`gen_table154.py`; the only change). The new chime in the recording of run k: at the touch, its body and its ring-out
+under the fanfare, no gap but its lead-in. (`chime223.py`, `curves223.py`, `drift223.py`, `align223.py`, `seam223.py`, `loopflux223.py`, `cmp223.py`
+in sound154/ are the probes.)
+
+**Verified:** the shine hud drive v223 (deleted before the commit; windowed, shots 48a-i): C69 the console up on 161 ticks of his death's effects and
+21 panes at the cut 3.00 s after the burst, its demo 0.12 s after the cut, no pane on screen and never out of its demo on the 263 ticks from 0.6 s
+after the cut to the camera's end, the demo over 0.03 s after the camera came back and the coins back 0.15 s after; C70 the touch in the air and the
+get as 222; C71 the card and control back, the save file unchanged -- 3 / 3 (run k). The death camera drive: the burst with the death camera off,
+his effects last seen alive 2.48 s after it, the cut 3.00 s after it with the Shine on the next tick, the wide camera at the wide spot on the cut's
+tick (0.000 m off, King Boo put 30 m out: pulled back 8 m, the star in frame on all 299 ticks), the cut back on the demo's own tick -- 3 / 3 (run
+j). The regression drive 68 / 68 (run fs). The drives' checks: C69's window opens 0.6 s after the cut (the console's demo comes 0.12 s after it and
+the panes take 0.33 s more to slide off); C66 and C10c judge his effects by their last live tick (the Shine's own appear flash joins the effects
+list on the cut's tick). The import (`run_import223`: the three WAVs), the clean rebuild 0 errors; the drive, the logs, the shots, the recordings
+and the tasks deleted. The save file is unchanged.
+
+**Deviations:** the Shine's sounds are still the port's dry renders of the game's sequences (no reverb). The other baked music (MSD_BGM_BOSS,
+CHUBOSS, MISS, GAMEOVER: every instrument of the first two has a curved release) still carries the old curves -- its re-render is a separate call.
+The frame the Shine spawns on runs 130-140 ms (a hitch at the cut; the audio rides through it). Seven texture `.import` files in the working copy
+carry Godot's own detect-3D conversion (compress mode 2) and are not in this commit.
+
+### 224 -- the King Boo REMATCH, part 69: the frame HITCH at the Shine's spawn gone: the Shine is made at the fight's start and parked hidden, so the frame of the cut only places and shows it (135 ms -> 25-29 ms) (feature/kingboo-rematch, code `f859c52`)
+
+**Jaysonn**: "Fix the frame hitch at the Shine's spawn".
+
+**The hitch, measured.** A stopwatch through `SpawnShine` on the frame of the cut (the windowed drive, 1930 x 1086): 114.8 ms on the main thread --
+the Shine scene's `Instantiate` 58.0 ms, its `AddChild` (`ShineSprite._Ready`: the effects -- the light, the glow and ring quads and their materials,
+the rays shader, the sparkle emitter -- and the sound node) 42.1, the death camera 5.1, the appear (its sounds' first loads, the stop-the-world, the
+HUD) 5.9, the flash and the stars 3.6, the placing 0.2; the frame itself 135 ms (the drive's frame watch: one `_Process` to the next).
+
+**The fix.** **`assets/Sms/Rematch/SmsKingBooRematch.cs`**: a new knob, `ShineMadeAhead` (on): the Shine is instanced and added when the fight
+loads (`MakeShineAhead`, deferred from `_Ready`, the real King Boo only -- not his copies), PARKED, and its three sounds' streams (the appear chime,
+the hum, the get chime) are loaded then too; `SpawnShine` takes the made one, places it (`SmsPlaceAt`) and runs the appear as before -- `MakeShine`
+(the instantiate, the add, 217's scale) factored out and used by both; a Shine made ahead and never brought out is freed with him (`_ExitTree`). Off
+= made on that frame, as before. **`assets/ShineSprite.cs`**: `SmsPark` -- hidden (no hum: `SmsHumTick` reads the visibility), its pickup zone off
+(a hidden Shine at the arena's middle must not be collected by Mario walking through) -- and `SmsPlaceAt`, the placed transform set outright (the
+spot the appear flight returns to, the yaw it spins back to) for a Shine whose first frame already latched its parking spot; `SmsAppear` shows it
+and the zone comes back at the float's end, as before. Measured after: the spawn 12.3-14.8 ms on the main thread (the death camera 5, the appear
+3.5-5.9, the flash and stars 3.4), the frame of the cut 25-29 ms (a frame at 60 fps is 17: the rest is the Shine's first draw); the making ahead
+101-119 ms on the load's frame.
+
+**Verified:** the shine hud drive v224 (deleted before the commit; windowed at 1930 x 1086, no shots): NEW C72 the Shine's spawn frame -- the
+longest frame within 0.25 s of the cut 25 / 26 / 29 ms over three runs (want under 50); C69 the console through the appear, C70 the touch and the
+get, C71 the card and control back as 223 -- 4 / 4 (runs m, n, o). The death camera drive 3 / 3 (run k: the cut 3.00 s after the burst with the
+Shine on the next tick, at the wide spot from its first frame). The regression drive 68 / 68 (run ft: C10c's Shine still appears FROM the burst
+point, the placed spot the made Shine's). The clean rebuild 0 errors; the drive, the logs, the recording and the tasks deleted. The save file is
+unchanged.
+
+**Also measured, not changed:** the frame of the SHINE GET's landing runs 73 ms (`StartShineGet` 44 ms: the SHINE! letters' first build 31.6 ms of
+it; the rest their first draw) -- a hitch of the same kind, `Mario.cs` / the console's letters, left for its own pass.
+
+**Deviations:** the Shine now exists in the arena from the fight's start (hidden, inert; no code enumerates Shines). The frame of the cut is still
+1.5 frames long (its first draw).
+
+### 225 -- the King Boo REMATCH, part 70: the hitch at the Shine Get's landing gone (the SHINE! letters built at the console's start: 73 ms -> 32-34 ms); the four other baked music tracks -- the boss and mid-boss themes, the miss and game-over jingles -- re-rendered with the game's release curves the right way round (feature/kingboo-rematch, code `22abc1e`)
+
+**Jaysonn**: "Fix the Shine Get landing's hitch too, Re-render the four other baked music tracks with the corrected curves".
+
+**The landing.** Measured with a stopwatch through `StartShineGet` (the windowed drive, 1930 x 1086): 44 ms on the main thread -- 3.5 before the
+get's begin (the flag, the state, the hands), then `SmsShineGetBegin` 38: the SHINE! letters' first build (`TConsoleStr::startAppearShineGet`: the six
+glyph textures loaded, the gradient shader compiled, twelve materials, the two spark emitters) 31.6, the fade layer and the count-up 3.0, the music cut
+and the fanfare 1.4, the Shine's collect sequence 1.3, the camera 0.4, the kills 0.3; the frame itself 73 ms. **`assets/Sms/Console/SmsConsoleStr.cs`**:
+a new knob, `ShineLettersAhead` (on): the ShineGet root, the word's letters, their gradient shader and the spark emitters are built at the console's
+`_Ready`, hidden (`EnsureShineGetNodes`, shared with `StartAppearShineGet`, which now only rebuilds for another word or with the knob off). Measured
+after: the frame of the get's begin 32 / 34 / 37 ms over three runs at 60 fps (a frame is 17; the rest is the camera, the fade layer, Mario's new clip).
+
+**The music.** 223 found the baker reading JASOscillator's curve tables backwards in time (`TOscillator::calc` indexes a falling segment by the time
+elapsed; the baker read the remaining time and took the table as the distance remaining), so a curved release dropped to silence at the note-off,
+swelled back to full and cut dead -- and every instrument of the two boss themes, two of the miss jingle's six and three of the game over's seven have
+curved releases. `tools/projectshine/sound154`: `sms_audio.py` got a `LEGACY_CURVES` switch (`SMS_LEGACY_CURVES=1`: the pre-223 reading, for
+reproduction only), and with it the four shipped files were reproduced BYTE FOR BYTE from the disc's sequences first (`sms_bgm.py --one-cycle` for
+the themes, `--no-loop` + `trim213.py` + `level213.py` for the jingles; NEW `level225.py`: a theme put back on the level its shipped file had -- file
+= raw x the shipped norm, held under full scale -- with its loop chunk carried over verbatim, the wave module having dropped it), then rendered with
+the curves the right way round: **`assets/Sms/Sound/Music/MSD_BGM_BOSS.wav`** (98.9 s, loop 133806-3165385, norm 0.7281: -0.09 dB on its own peak),
+**`MSD_BGM_CHUBOSS.wav`** (57.2 s, loop 38533-1830533, norm 1.0138: +0.25 dB), **`MSD_BGM_MISS.wav`** (4.475 s), **`MSD_BGM_GAMEOVER.wav`** (8.194 s)
+-- the same lengths, loops and trims, so the table is unchanged; the RMS within 0.5 dB of before; the probe's hard cuts gone (BOSS 56 -> 0 clicks,
+CHUBOSS 40 -> 5, the five its own drum transients) and the rests between notes now rests (the old swelling tails filled them). `adopt156.py`: the record.
+
+**Verified:** the shine hud drive v225 (deleted before the commit; windowed at 1930 x 1086, no shots, no recording): NEW C73 the landing's frame --
+the longest frame within 0.25 s of the get's begin 32 / 34 / 37 ms (want under 50), the letters built ahead as 'SHINE!'; C72 the spawn's frame 19-23
+ms; C69, C70, C71 as 223 -- 5 / 5 (runs r, t, u). The death camera drive 3 / 3 (run l). The regression drive 68 / 68 (run fu). The import
+(`run_import225`: the four WAVs), the clean rebuild 0 errors; the drive, the logs, the recording and the tasks deleted; `Mario.cs` and `GameData.cs`
+(instrumented for the measurements, then put back) unchanged. The save file is unchanged.
+
+**Also measured, not changed:** .NET collections -- the drive's frame watch read the collector's counts in every long frame: a gen2 collection fell
+into a 57-67 ms frame now and then (the heap 26-39 MB), once right at the landing; `GCSettings.LatencyMode` `SustainedLowLatency` was tried in
+`GameData._Ready` and made no difference (the long frames with a collection in them were other first-time work: the down's emitters 58-63 ms at his
+death's start, the card save's scene 59-66 ms as it opens), so it was taken out. Those two frames are the next hitches of the sequence.
+
+**Deviations:** the SHINE! letters now exist (hidden) from the console's start. The music is still the port's dry render (no reverb).
+
+### 226 -- the King Boo REMATCH, part 71: the two hitches left in the sequence (his death's start, the card save's opening) were the .NET garbage collector's pauses; from the fatal hit the collector is held off (a no-GC region) through his death, the Shine, the get and the card save -- no collection, no pause inside it (feature/kingboo-rematch, code `d0004ce`)
+
+**Jaysonn**: "Fix the two remaining hitches (his death's start, the card save opening)".
+
+**What they were.** The drive's frame watch grew the collector's own pause clock (`GC.GetTotalPauseDuration`) per long frame: the frame of his down
+ran 59-62 ms with 41-44 ms of collector pause in it (a gen1 collection; the down's own entry is 12 ms on the main thread: the mist and star emitters
+10, the down sound 1.8), and the frame of the card save's opening 59-62 ms with 42-45 ms of pause (a gen2). Not rendering, not first-time work: the
+collector. Its budget (about 8 MB) fills every eight seconds or so of play -- the port makes about 1.4 MB of garbage a second in the quiet fight (an
+allocation probe, the systems switched off one at a time: the camera rig about 0.7 MB/s, Mario about 0.65, King Boo 0.3, the HUD 0.2, the rest 0.16)
+-- and every collection here is a gen1 or worse at 41-45 ms (finalizable Godot wrappers -- StringNames, ray-query parameters and dictionaries --
+survive a gen0 pass), so a pause lands wherever the budget happens to fill; in the drive's replay that is the down and the card. `GCLatencyMode`
+`SustainedLowLatency` (225) could not help: gen1 pauses are not what it governs.
+
+**The fix.** **`assets/Sms/Rematch/SmsKingBooRematch.cs`**: `GcQuietThroughDeath` (on): at the FATAL hit -- under the blast and his flash --
+`GC.TryStartNoGCRegion(GcQuietMegabytes, 64)` asks the collector for a no-GC region: it collects once there (28-38 ms, its own compacting collection,
+the heap down to 9 MB), then holds off until the region ends -- when control is back after the card save (a second's grace), after `GcQuietMaxSeconds`
+(120), or when he leaves the tree (`EndNoGCRegion`, guarded) -- or until its bytes run out, when the collector resumes on its own (the fallback for a
+player who dawdles before the Shine; the region's end is then reported as its own). `GcQuietTick` watches Mario's shine demo and the card. Readouts
+`GcQuietOn`, `GcQuietSeconds`, `GcQuietCollections`, `GcQuietPausedMs` (frozen at the end). Off = the collector as it is. The down's entry got a
+stopwatch print under `DebugPrint`, as the spawn's.
+
+**Verified:** the shine hud drive v226 (deleted before the commit; windowed at 1930 x 1086, no shots, no recording): NEW C74 the down's frame -- the
+longest frame within 0.25 s of his death's start 35-37 ms (want under 50; was 59-62); NEW C75 the card save's opening frame 28-29 ms (was 59-66; the
+window looks 0.15 s back from the card's stamp, where the collector's frame fell); NEW C77 the collector held off -- the region 24.8-24.9 s from the
+fatal hit to a second after control came back, 0 collections and 0 ms of pauses inside it, over at the verdict; C69-C73 as 225 (the spawn's frame
+18-24 ms, the landing's 29-33) -- 8 / 8 (run ab). The one long frame left in the run is the fatal hit's (55-57 ms: the region's own collection, 28
+ms, under the blast). The death camera drive 3 / 3 (run m: the region through it, 0 collections, ended as he left the tree). The regression drive 68 /
+68 (run fv). The clean rebuild 0 errors; the drive, the logs, the helper and the tasks deleted. The save file is unchanged.
+
+**Deviations:** the collector's one pause moves to the fatal hit's frame (55-57 ms there, under the Bomb Boo's blast and his flash) instead of landing
+at random through the cutscene; the heap grows by up to 64 MB through the sequence. The garbage itself (the camera rig's and Mario's ray queries and
+StringNames, about 1.4 MB/s) is left as it is: a port-wide pass of its own.
+
+### 227 -- the King Boo REMATCH, part 72: the port's garbage rate cut from about 1.4 MB/s to about 0.6 in the quiet fight; the camera rig's and Mario's physics queries made once and re-used (one ray query, one exclude list, the result dictionaries disposed), every Godot name they hand the engine (input actions, metadata keys, groups, clips, states) made once (SmsNames), the slide collisions and the floor's surface tag read without a new wrapper a frame (feature/kingboo-rematch, code `e5dbf7d`)
+
+**Jaysonn**: "Cut the port's garbage rate (the camera rig's and Mario's ray queries and StringNames)".
+
+**What the garbage was.** The allocation probe (226) grew a type listener: the runtime's own `GCAllocationTick` events, in-process, name the type
+that crossed each 100 KB line -- a sample of what is being made. The port's garbage was Godot wrappers: `StringName` (a C# string handed to a call
+that wants a StringName -- `Input.IsActionPressed("button_a")`, `HasMeta("sms_surface")`, `_sm.Travel("ma_wait")` -- is converted on every call),
+the ray-query parameters, the exclude lists and the result dictionaries of every cast (Mario casts several a tick: the floor under the feet, the
+water, the ledges, the walls, the steps; the camera rig up to a dozen: the occlusion ray, the ground probe, the wall disc, the camera cubes), the
+`Variant` made from every string key read out of a result (`hit["position"]`: a native string and a finalizable Disposer each time), and the
+`KinematicCollision3D` of every `GetSlideCollision(i)` (the engine re-uses its cached one only while nothing else holds it; a live C# wrapper does,
+so every read made a new native object and a new wrapper). Each wrapper carries a finalizer and two entries in the runtime's disposables tracker,
+and survives a gen0 pass -- which is why every collection here was a gen1 or worse at 41-45 ms (226).
+
+**The fix.** NEW **`assets/Sms/SmsNames.cs`**: `SmsNames.Of(string)` -> `StringName` and `SmsNames.Path(string)` -> `NodePath`, made once per string
+and looked up after (one dictionary; main-thread, as the callers are); `SmsKeys`: the result dictionaries' keys (position, normal, collider,
+collider_id, rid, point, shape) as Variants made once; `SmsFree.Array`: a typed Godot array let go at once (`Array<T>` is not IDisposable; the
+untyped array under it is). NEW **`assets/Sms/MarioRays.cs`** (a partial of Mario): `SmsRayQuery(from, to, mask?, areas, hitFromInside, exclude)`
+sets ONE `PhysicsRayQueryParameters3D` for the cast (his mask, bodies, no areas, his body excluded unless told otherwise), `SmsIntersect` casts it
+and keeps the result in a ring of 64, disposed 64 casts on (no caller keeps one past its frame); `SmsRayExcludeSelf` a second re-used exclude list
+for the casts that add a body (what he holds, the trunk he hugs); `SmsPointQuery` the water check's point query; `SmsSlideHit(i)`
+`GetSlideCollision` with the last wrapper disposed first (the engine's cache serves again); `SmsStateNode` BaseSM's state with the playback's
+StringName disposed once read; `SmsSurfaceTag` the ground class of a floor piece read once and remembered (`SmsSurfaceTagOf` walked three
+ancestors' metadata lists and groups every frame on a floor without the meta -- two arrays and a wrapper per name; the level's sms_ tags are set in
+the scene, nothing in the project changes one after a node is made); the shared objects let go in `_ExitTree`. **`assets/Mario.cs`**: the 16
+direct cast sites and `SmsRay` (23 callers) through `SmsRayQuery` / `SmsIntersect`, the same masks and options; the water check through the shared
+point query, its hit list and each hit disposed; 7 `GetSlideCollision` loops through `SmsSlideHit`; the 5 state reads through `SmsStateNode`; the 2
+surface-tag readers through `SmsSurfaceTag`; 109 `Input.*` actions, 3 `Input.GetVector`, 2 `InputMap.HasAction`, 111 clip / state names
+(`animPlayer.Play` / `HasAnimation` / `GetAnimation`, `_sm.Travel`), 13 metadata and group keys wrapped in `SmsNames.Of`; 54 result keys to
+`SmsKeys`; the console's ShineTimer search (every 2 s while the level has none) by child index with a re-used stack (`GetChildren()` made an array
+and an enumerator per node, hundreds a walk). **`assets/SunshineCamera.cs`**: ONE ray query, ONE shape query (the wall disc) and ONE exclude list
+re-used (`ExcludeReset` / `CastRay` / `RestWallDisc`; the results in a ring of 32), the camera-cube hit list and each hit disposed, the C-stick's
+four actions, the L button, `sms_camera_pass` and `sms_camera_kind` through `SmsNames.Of`, the result keys through `SmsKeys`, the shared objects let
+go in `_ExitTree`. **`assets/Sms/MarioCamData.cs`**, **`assets/Sms/MarioYCam.cs`**: their 9 Input actions through `SmsNames.Of`. No behaviour
+changed: every cast keeps its mask, areas, HitFromInside and exclude list; the names are the same names.
+
+**Measured.** The probe (5-s windows in the quiet fight, windowed at 1930 x 1086, the systems switched off one at a time): everything on 1416 ->
+593 KB/s; Mario off 769 -> 216 (Mario's own share about 0.65 -> 0.4 MB/s); the camera rig off 731 -> 334 (its share about 0.7 -> 0.2); all four off
+159 -> 159 (the floor). In the shine hud drive's own run, the fight after the card save made 600-1070 KB/s in 226 and makes 220-510 now; his death,
+the Shine and the get 1065-1433 -> 330-640. What is left, by type: the engine's strings read into C# (`CurrentAnimation`, names: the decoder's
+buffers, 29% -- plain strings, gen0 garbage, no finalizer), the tracker's entries for wrappers still made elsewhere (King Boo's, the HUD's: 21%),
+Variant Disposers (11%), dictionaries (7%), Vector3 arrays (7%, not Mario's or the camera's), StringNames (7%).
+
+**Verified:** the shine hud drive v227 (deleted before the commit; windowed at 1930 x 1086): the allocation probe runs ad / ae (the numbers above);
+the quiet run 8 / 8 (run af: the spawn's frame 18 ms, the down's 35, the landing's 33, the card's 28, the no-GC region 24.8 s with 0 collections).
+The death camera drive 3 / 3 (run n). The regression drive 68 / 68 (run fw). The build 0 errors (a headless import pass wrote the two new scripts'
+.uid files); the clean rebuild 0 errors; the drive, the logs, the helper and the tasks deleted. The save file is unchanged.
+
+**Deviations:** the floor's surface tag is read once per floor piece and remembered (a tag changed at run time would not be seen; nothing in the
+project does that). The result dictionaries live 64 casts (Mario) / 32 (the camera) before they are disposed instead of until the collector finds
+them. King Boo's and the HUD's garbage (about 0.2 MB/s each) is not touched.
+
+### 228 -- the King Boo REMATCH, part 73: a spin jump came down facing its takeoff with the momentum 30 degrees off to one side; the touchdown now turns his face (and the model) onto the way he is moving, the momentum kept -- `LandingKeepsDrift` off is the game's own rule, the drift dropped and the slide along his face (feature/kingboo-rematch, code `c7b1af2`)
+
+**Jaysonn**: "mario will spin jump and then be facing about 30 degrees wrong but will have the right momentum."
+
+**What it was.** In the air the game keeps mFaceAngle at the takeoff face and the stick only adds a SIDEWAYS drift to the velocity
+(`TMario::doJumping`: sideVel = mag x sin(stick - face) x JumpSlideControl along mFaceAngle + 0x4000; the face never turns), and the port does the
+same (`SmsAirTick`). So he comes down facing the takeoff direction with his momentum off to one side -- a spin jump's long, slow fall (vy 70,
+gravity 0.35 on the way down; 1.7 s in the air) builds 30-45 degrees of it with the stick held across, and the spinning model snapping to the
+takeoff face at the touchdown made the two plain. The port faced the takeoff through the landing window (ma_laend: the SpinJump's own snap, a plain
+jump's air yaw left as it was) and only then turned him to his momentum (the run's first tick latches the face to the velocity). The game's own
+landing (`jumpSlipCommon`: walkProcess along mFaceAngle at mForwardVel) does the opposite: it DROPS the drift and he slides along his face.
+
+**The fix.** **`assets/Mario.cs`**: `SmsLandFacing(airState)` on the touchdown frame of every landing from the air under the SMS physics (after the
+state snaps, before `EnterLanding`): `LandingKeepsDrift` (on): his face, `lastFacingDirection` and the model take the momentum's bearing
+(`SmsLatchFace` as a ground face, so the run's first tick does not latch a second time) -- moving BACKWARD along it (a backflip, a U-turn jump's
+slide) he keeps facing forward along the line -- so face and motion agree from the first frame and the landing window carries them together. Off =
+the game's rule: the velocity is folded onto his face (the forward component kept, the side drift gone), the face as it was. Standing still (under
+0.5 m/s) nothing changes. Readouts `SmsLastLandDriftDeg` (the drift the last touchdown found, signed degrees) and `SmsLandFacingCount`; a
+`DebugPrint` line when the drift is over 2 degrees. Nothing else moved: the legacy (non-SMS) landing keeps its own snap.
+
+**Verified:** the shine hud drive v228 (deleted before the commit; windowed at 1930 x 1086; the land mode: no fight, three trials from the arena's
+centre) NEW C78 the touchdown faces its momentum -- (A) a run, the stick spun through its four quadrants and A (the real stick-spin jump, 98 air
+frames), the stick then held across his takeoff face through the air (re-picked as the camera swung): the drift built 43.5 degrees; on the
+touchdown the model, his face and his velocity's bearing agree (0.0 deg apart) and the velocity's bearing is unchanged across it (0.0 deg); (B) a
+plain jump the same way: 20.9 degrees of drift, the same agreement; (C) the spin jump with `LandingKeepsDrift` off: the velocity's bearing turned
+43.5 degrees onto the takeoff face, the model and the face on it (the game's rule) -- 1 / 1 (run ah; run ag before it built no drift: the stick
+picked once at takeoff turned with the camera through the long flight, and showed Godot's `CharacterBody3D.Velocity` carries the frame's pre-move
+value, so the verdict reads a frame after the touchdown). The quiet shine hud run 8 / 8 (ai). The death camera drive 3 / 3 (o). The regression
+drive 68 / 68 (fx; no touchdown in it drifted over 2 degrees). The clean rebuild 0 errors; the drive, the logs, the helper and the tasks deleted. The
+save file is unchanged.
+
+**Deviations:** with the knob on, his landing keeps the sideways drift the game would drop (the port always has; the face now follows it at once
+rather than after the landing window). With it off the port is the game's: the drift is lost at the touchdown.
+
+### 229 -- the King Boo REMATCH, part 74: the Bomb Boos KEEP OFF THE RIM -- the arena floor measures its own STONE (the walkable top's edge, 25.1 m, apart from the kerb and the rock's shoulder), a Boo's wander goals and its body stay `RimMargin` (3 m) inside that edge, a Boo let go or landed as a dud past it comes straight back in, and the supply's margin and the volley's wall are measured from the same edge (feature/kingboo-rematch, code `d05ba70`)
+
+**Jaysonn**: "Keep Bomb Boo spawns a few metres from the rim" (twice a drive's spin jump at a Boo near the edge had taken Mario off the arena --
+runs en of 209 and fg of 217 -- and a fall is a death since 212).
+
+**What it was.** Not the spots: the supply draws them within `ArenaRadius` 18 m of the middle and the stone's edge is 25.1 m out, so every spot was
+7 m inside it (184). It was the WANDER -- a Boo's goals are drawn within `WanderRadiusUnits` (800 u, 10.7 m) of where it rose (TTelesa's graph
+wander with no graph), so one risen 18 m out could float 28 m out, over the void; a Boo let go off the lasso at the edge floated where it was
+dropped; a dud landed at the edge did the same. And the one "edge" the port knew was the arena model's half-span (`SmsArenaFloor.Radius`, 26.4 m):
+the broken wall's kerb (25.3-25.6, standing 0.3-1.3 m over the stone) and the rock's shoulder (out to 26.4) are in it, so the supply's `EdgeMargin`
+(26.4 - 2.5 = 23.9 m, over the 18 cap: never the bound) and the volley's wall (26.4 - 2 = 24.4 m: 0.7 m from the stone's edge) were measured from
+past the stone.
+
+**The fix.** **`assets/Sms/Rematch/SmsArenaFloor.cs`**: the STONE measured at load from the vertices already walked for the collision -- the fullest
+0.1-m level of world y is the stone's level (`StoneY` 1.05: 1762 of the model's 2255 vertices lie within `StoneBand` 0.2 of it; the kerb starts
+0.3 m over it, the rock's shoulder 0.3 over and then down), the vertices on it give `StoneCentre` (their span's middle; the model's own is 8 cm off,
+the rock being lopsided) and `StoneRadius` (the widest of them about it: 25.12 m). `StoneRadiusOverride` (0 = measured), `RimClear(point)` = how far
+inside the edge a point lies, `Current` = the arena's floor for anything that needs it (set in `_Ready`, cleared in `_ExitTree`).
+**`assets/Sms/Rematch/SmsBombBoo.cs`**, The rim group: `KeepOffTheRim` (on), `RimMargin` 3 m. `NextGoal` draws up to twelve times for a goal
+`RimMargin` or more inside the stone's edge; none (a base at or past the edge) and the goal is straight toward the middle, as far as the wander
+reaches. The drift tick HOLDS the body at the margin: it may never move further out than that line (its turn toward the next goal is an arc, march /
+turn rate = 0.5-1.3 m in radius at the game's speeds, so a swing round at a goal on the margin would carry the body up to 2.6 m past it; held, it
+slides along the margin instead); from beyond the margin it may only come in. A Boo let go (`Drop`) or a dud landing within the margin or past it
+skips its hover and heads in at once. Readouts `GoalDraws`, `GoalsPulledIn`, `RimHeldTicks`, `RimClearNow`, `GoalRimClear`, `RimRuleOn`. Off = 160's
+free wander. No arena floor: no rule. **`assets/Sms/Rematch/SmsBombBooSpawner.cs`**: `EdgeMargin` is measured from the stone's edge now
+(`ArenaStoneRadius`; `SpotRadius` = min(`ArenaRadius`, `StoneRadius` - `EdgeMargin`): with the defaults still 18, so the spots are where they were),
+`ArenaCentre` is the stone's middle. **`assets/Sms/Rematch/SmsKingBooRematch.cs`**: the volley is handed the stone's radius for its wall (25.1 -
+`WallInset` 2 = 23.1 m; was 24.4); his own `_arenaRadius` (the teleport spots, the wind's ring, the fireballs, the copies) is as it was.
+
+**Verified:** NEW rim drive v229 (deleted before the commit; headless): C78 the stone measured -- radius 25.12 against the drive's own ray march out
+along eight bearings (the last floor within the band: 24.80-25.10), the level the floor under the middle, the middle 8 cm from the model's, the span
+1.29 m wider, 1762 vertices; C79 twelve real supply picks with the cap off (`ArenaRadius` 40, `EdgeMargin` 3, no cap from Mario): every one 3 m or
+more inside the edge (the least 3.50), five past the old 18-m cap, stone under each, every pick clean (12 draws for 12 spots); C80 a Boo risen 1 m
+inside the edge (quick: march 6 u, turn 12 deg, hovers of 6 ticks): 7 goals all 3.06 m or more inside, 6 reached in 5.8 s, once inside the margin
+the body never nearer the edge than 3.01 m, no pick pulled in; C80b a Boo risen ON the margin facing out (Mario stood outside it through the rise;
+march 6 u, turn 6 deg: the game's turning ratio, a 0.77-m arc): its turn in would have swung the body 1.5 m out -- held 14 ticks, its least clearance
+3.00 m, 5 goals all inside (the least 3.43), 4 reached; C81 a dud lobbed to 2 m past the edge: landed 1.96 m past it, no hover, its first goal 5.04 m
+inside, back inside the margin 1.18 s after landing; C82 the same Boo as C80's with `KeepOffTheRim` off: 5 of its first 7 goals within 3 m of the
+edge or past it (one 8.73 m past -- 160's wander, the bug); C83 the volley with Mario 0.6 m inside the edge: three marks, all within the wall, all
+three clamped onto it at 23.12-23.20 m from the middle, the volley's radius the stone's 25.12 -- 7 / 7 (run c; runs a-b before the hold and C80b).
+The regression drive 68 / 68 (fz: C11's spots, C6b's float, the volley's and the circle's Boos as before). The clean rebuild 0 errors; the drive,
+the logs and the tasks deleted. The HUD and death-camera drives were not run: nothing of theirs changed.
+
+**Deviations:** the margin is the port's (the game's hotel Boos wander their room; this arena has no wall to stop them -- the doc's "at random"
+spots stand). The volley's marks come down at most 23.1 m out (was 24.4) -- only a Mario within 2 m of the edge sees the difference. A Boo over the
+void (dropped or landed there) floats in at its march speed rather than vanishing. `StoneRadius` is one number for a round arena; another shape
+would want `StoneRadiusOverride` or a new measure.

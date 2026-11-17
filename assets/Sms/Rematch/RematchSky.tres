@@ -1,0 +1,17 @@
+[gd_resource type="ShaderMaterial" load_steps=7 format=3 uid="uid://d208rematchsk"]
+
+[ext_resource type="Shader" path="res://assets/Sms/Rematch/RematchSky.gdshader" id="1_sky"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Rematch/Sky/lm_bg04.png" id="2_bg04"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Rematch/Sky/lm_sin_wave.png" id="3_sin"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Rematch/Sky/lm_gs001m.png" id="4_gs"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Rematch/Sky/lm_gaku_fire01.png" id="5_fire"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Rematch/Sky/lm_ramp02.png" id="6_ramp"]
+
+[resource]
+resource_name = "SMS 208: Luigi's Mansion's boss-arena sky (the disc's vrball_B dome: its three textures, its scrolls, its colour flashes); 208b: the final-boss sky (vrKoopa: the fire, the red glow) behind final_blend -- the knobs are the shader parameters"
+shader = ExtResource("1_sky")
+shader_parameter/bg04 = ExtResource("2_bg04")
+shader_parameter/sin_wave = ExtResource("3_sin")
+shader_parameter/gs001m = ExtResource("4_gs")
+shader_parameter/gaku_fire01 = ExtResource("5_fire")
+shader_parameter/ramp02 = ExtResource("6_ramp")

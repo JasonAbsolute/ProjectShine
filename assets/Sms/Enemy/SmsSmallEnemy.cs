@@ -226,6 +226,7 @@ public abstract partial class SmsSmallEnemy : CharacterBody3D, ISmsSprayTarget
     {
         if (Engine.IsEditorHint()) { _model = GetNodeOrNull<Node3D>("Model"); EditorPreview(); return; }   // pass 128b: a [Tool] species dresses its model for the editor; no group, no reset, no tick there
         AddToGroup("sms_enemy");                                // pass 116: gpConductor->killEnemiesWithin (the shine get)
+        SmsActorSound.Attach(this);                             // 155: the species' sounds from the game's banks (its tables, its slots, its loops), when the tables know it
         _model = GetNodeOrNull<Node3D>("Model");
         _anim = GetNodeOrNull<AnimationPlayer>("Model/AnimationPlayer");
         if (_model != null) _modelScale = _model.Scale.X;          // the scene's own scale on the glb (the editor's size is the game's)

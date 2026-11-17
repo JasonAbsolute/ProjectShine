@@ -254,6 +254,7 @@ public partial class SmsGateKeeper : StaticBody3D, ISmsSprayTarget
             if (_basePin == null) { _basePin = new SmsGateKeeperBasePin { Name = "BasePin" }; _skel.AddChild(_basePin); }
         }
         if (AutoLayer) { CollisionLayer = SmsHiddenCoin.HideLayer; CollisionMask = 0; }
+        SmsActorSound.Attach(this);                             // 156: the game's sounds for this actor -- its BossMusic slot (MSD_BGM_CHUBOSS, the mid-boss theme) for now
         _head = GetNodeOrNull<SmsGateKeeperHead>("HeadHit");
         if (_head == null)
         {

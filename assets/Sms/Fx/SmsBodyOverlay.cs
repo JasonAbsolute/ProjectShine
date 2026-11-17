@@ -34,6 +34,9 @@ public partial class SmsBodyOverlay : Node
 
     /// <summary>The fog's pulse: 30 ticks of the director's 120 Hz move tick = 0.25 s (65536 / 0x888 = 30 ticks a cycle).</summary>
     [Export] public float FogPeriodSeconds = 0.25f;
+    /// <summary>167: the fog held at one factor instead of the pulse (the rematch's frost: Mario tells it each tick while he is frozen), and that factor.</summary>
+    public bool SteadyFog;
+    [Export(PropertyHint.Range, "0,1,0.01")] public float SteadyFogFactor = 0.5f;
     [ExportGroup("Goop skin (pass 111)")]
     /// <summary>Mario's own pollution masks from ma_mdl1.bmd / ma_hnd2l.bmd (H_ma_polmask1_i4, H_ma_polmask_hand_i4): the intensity decides
     /// which texels goop first (dark) and last (bright). Assigned per surface by name: the hand surfaces take the hand mask.</summary>
@@ -54,13 +57,15 @@ public partial class SmsBodyOverlay : Node
     public int PollutionUvNow => _polUv;
     private int _polUv;
 
-    /// <summary>One body surface: its mesh, surface index, the fog copy of its material, and the override it had before the fog.</summary>
+    /// <summary>One body surface: its mesh, surface index, the fog copy of its material, the override it had before the fog, and the albedo
+    /// texture the copy carries now (171: followed from the base material while installed -- the eye textures change under the fog).</summary>
     private sealed class FogSlot
     {
         public MeshInstance3D Mesh;
         public int Surface;
         public ShaderMaterial Material;
         public Material Restore;
+        public Texture2D Albedo;
     }
 
     private readonly List<MeshInstance3D> _meshes = new();
@@ -110,7 +115,7 @@ public partial class SmsBodyOverlay : Node
                     continue;
                 }
                 fogMat.ResourceName = $"damage fog: {label}";
-                _fogSlots.Add(new FogSlot { Mesh = mesh, Surface = s, Material = fogMat });
+                _fogSlots.Add(new FogSlot { Mesh = mesh, Surface = s, Material = fogMat, Albedo = (active as StandardMaterial3D)?.AlbedoTexture });
             }
         }
     }
@@ -344,11 +349,13 @@ public partial class SmsBodyOverlay : Node
     public override void _Process(double delta)
     {
         _clock += delta;
+        if (_fogApplied)
+            SyncAlbedo(); // 171: the eyes keep changing under the fog
         if (!_fogOn)
             return;
         // SMS_AddDamageFogEffect: s = sin(moveTick x 0x888), the factor at his depth (700 - 300 s) / 1200
         float s = Mathf.Sin((float)(_clock / FogPeriodSeconds) * Mathf.Tau);
-        SetFogFactor(7f / 12f - 0.25f * s);
+        SetFogFactor(SteadyFog ? SteadyFogFactor : 7f / 12f - 0.25f * s);
     }
 
     private void SetFogFactor(float f)
@@ -372,6 +379,7 @@ public partial class SmsBodyOverlay : Node
                 slot.Restore = slot.Mesh.GetSurfaceOverrideMaterial(slot.Surface);
                 slot.Mesh.SetSurfaceOverrideMaterial(slot.Surface, slot.Material);
             }
+            SyncAlbedo();
         }
         else
         {
@@ -381,6 +389,23 @@ public partial class SmsBodyOverlay : Node
                     slot.Mesh.SetSurfaceOverrideMaterial(slot.Surface, slot.Restore);
                 slot.Restore = null;
             }
+        }
+    }
+
+    /// <summary>171: the fog copy was made with the texture its surface had at Bind, but the EYE materials change under the fog -- Mario's
+    /// SetEyeTexture / SleepStatus write the base StandardMaterial3D's albedo_texture (the knockdown's eyes squeezed shut, the frost's shock
+    /// frame, the eyes opening at the thaw) and the swapped-in copy kept showing the open eye. While the copies are installed each one follows
+    /// its base material's albedo texture (the override it replaced, else the mesh's own material), every frame.</summary>
+    private void SyncAlbedo()
+    {
+        foreach (FogSlot slot in _fogSlots)
+        {
+            Material baseMat = slot.Restore ?? slot.Mesh.Mesh?.SurfaceGetMaterial(slot.Surface);
+            if (baseMat is not StandardMaterial3D std || std.AlbedoTexture == slot.Albedo)
+                continue;
+            slot.Albedo = std.AlbedoTexture;
+            if (slot.Albedo != null)
+                slot.Material.SetShaderParameter("texture_albedo", slot.Albedo);
         }
     }
 

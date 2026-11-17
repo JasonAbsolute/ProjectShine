@@ -1,0 +1,85 @@
+[gd_scene load_steps=14 format=3 uid="uid://d157kingboo"]
+
+[ext_resource type="Script" path="res://assets/Sms/Rematch/SmsKingBooRematch.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/BossTelesa/btelesa.glb" id="2_model"]
+[ext_resource type="Shader" path="res://assets/Sms/Fx/kira_add.gdshader" id="3_kira"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/star4s_raw.png" id="4_star"]
+[ext_resource type="Shader" path="res://assets/Sms/Enemy/BossTelesa/BtlsGlow.gdshader" id="5_glow"]
+[ext_resource type="Texture2D" path="res://assets/Sms/Fx/tex/radgrad_raw.png" id="6_radgrad"]
+
+[sub_resource type="Gradient" id="Gradient_chika_env"]
+offsets = PackedFloat32Array(0, 1)
+colors = PackedColorArray(0.7, 0.85, 1, 1, 1, 0.95, 0.6, 1)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_chika_env"]
+gradient = SubResource("Gradient_chika_env")
+
+[sub_resource type="Gradient" id="Gradient_chika_alpha"]
+offsets = PackedFloat32Array(0, 0.3, 1)
+colors = PackedColorArray(1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0)
+
+[sub_resource type="GradientTexture1D" id="GradientTexture1D_chika_alpha"]
+gradient = SubResource("Gradient_chika_alpha")
+
+[sub_resource type="ParticleProcessMaterial" id="ParticleProcessMaterial_chika"]
+resource_name = "ms_btls_chika_a / b: the twinkle around King Boo (the casino boss's, BossTelesa.tscn)"
+lifetime_randomness = 0.4
+emission_shape = 1
+emission_sphere_radius = 4.6
+direction = Vector3(0, 1, 0)
+spread = 180.0
+initial_velocity_min = 0.1
+initial_velocity_max = 0.5
+gravity = Vector3(0, 0, 0)
+scale_min = 0.35
+scale_max = 0.8
+color_ramp = SubResource("GradientTexture1D_chika_alpha")
+color_initial_ramp = SubResource("GradientTexture1D_chika_env")
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_chika"]
+resource_name = "the port's kira star (star4s_raw), lerp(env -> white, I), additive; 216: the haze under 0.12 cut and the quad's edge faded (no square halo against the night sky)"
+shader = ExtResource("3_kira")
+shader_parameter/tex = ExtResource("4_star")
+shader_parameter/alpha_floor = 0.12
+shader_parameter/edge_fade = 1.0
+shader_parameter/edge_from = 0.62
+
+[sub_resource type="QuadMesh" id="QuadMesh_chika"]
+material = SubResource("ShaderMaterial_chika")
+size = Vector2(0.873, 1.343)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_glow"]
+resource_name = "ms_btls_glow: the soft pale light at his body, x his opacity (the script sets strength)"
+shader = ExtResource("5_glow")
+shader_parameter/tex = ExtResource("6_radgrad")
+shader_parameter/prm_color = Vector3(0.75, 0.85, 1)
+shader_parameter/strength = 0.6
+shader_parameter/pulse = 0.12
+
+[sub_resource type="QuadMesh" id="QuadMesh_glow"]
+size = Vector2(10, 10)
+
+[node name="KingBooRematch" type="Node3D" groups=["sms_rematch_boss"]]
+script = ExtResource("1_script")
+metadata/_sms_note = "Pass 157: KING BOO for the REMATCH (KINGBOO_REMATCH_gdoc.txt) -- the arena's own actor, apart from the casino's BossTelesa. This pass is his entrance only: hidden until the intro calls Spawn(), then the appear clip, the laugh clip with the long laugh, and the wait loop -- hovering (HoverBob), turning to face Mario (FaceMario), the soft glow and the twinkle at his body (Glow, Twinkle), the blink loop, the ghost's screen mix (GhostOpacity). The attacks, the teleports, the three faces and the hurt flip are later passes. RematchArena.tscn carries one as KingBoo; the intro there places him BooHeight over the floor at the BooSpawn marker."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="ChikaFx" type="GPUParticles3D" parent="."]
+top_level = true
+visible = false
+emitting = false
+amount = 28
+lifetime = 0.7
+fixed_fps = 60
+visibility_aabb = AABB(-6, -6, -6, 12, 12, 12)
+process_material = SubResource("ParticleProcessMaterial_chika")
+draw_pass_1 = SubResource("QuadMesh_chika")
+
+[node name="GlowFx" type="MeshInstance3D" parent="."]
+top_level = true
+visible = false
+cast_shadow = 0
+mesh = SubResource("QuadMesh_glow")
+material_override = SubResource("ShaderMaterial_glow")

@@ -199,6 +199,9 @@ public partial class ShineSprite : Node3D
             BuildShineEffects();
 
         CaptureNeutralPose();
+        // 220: the Shine's sounds (SmsActorSound "shine"): the AppearSound slot gets the appear fanfare, the chime at the appear and at the touch play
+        // on the node's pool, positional at the Shine, and MSD_SE_SHINE_EXIST hums while it is out (SmsHumTick)
+        _sound = SmsActorSound.Attach(this);
     }
 
     /// <summary>
@@ -217,6 +220,7 @@ public partial class ShineSprite : Node3D
             return;
 
         _spawnEntrancePlaying = true;
+        SmsAppearSounds();   // 220: an appear is an appear (TShine::appearSimple plays the same two)
         _processModeBeforeSpawnEntrance = ProcessMode;
         ProcessMode = ProcessModeEnum.Always;
 
@@ -283,6 +287,7 @@ public partial class ShineSprite : Node3D
 
     public override void _ExitTree()
     {
+        SmsStandardHud.CameraDemoEnd(this);   // 222: gone mid-demo, the console's demo goes with it
         // Never strand the game paused if a scene transition removes the Shine
         // before its entrance tween completes.
         if (_spawnEntrancePlaying && _pausedTreeForSpawnEntrance)
@@ -475,6 +480,10 @@ public partial class ShineSprite : Node3D
         {
             _collected = true;
             _pickupZone.SetDeferred(Area3D.PropertyName.Monitoring, false);
+            // 220: TShine::touchPlayer -- MSD_SE_SY_GET_SHINE at the touch (before the demo: an airborne Mario lands first); the hum ends (STATE_GOT)
+            _sound?.Loop(HumSe, false);
+            _sound?.Play(GetChimeSe);
+            SmsGetChimes++;
         }
     }
 
@@ -964,10 +973,23 @@ public partial class ShineSprite : Node3D
     /// as it flies -- the game's camera is a hand-placed stage tool (DEVIATION). false = the current camera stays.</summary>
     [Export] public bool SmsAppearCamera = true;
     [Export] public Vector3 SmsAppearCamOffset = new Vector3(0f, 2.5f, 7f);
+    /// <summary>217: how far over the shine's root that demo camera looks (metres; 0.5 = as before). A spawner that scales the shine scales this with it
+    /// (King Boo's ShineScale), so the camera stays on the star's middle.</summary>
+    [Export] public float SmsAppearLookUp = 0.5f;
     /// <summary>STATE_WAIT: mRotateSpeed 2 deg a tick after an appear (the game's idle spin, 240 deg/s). Shines placed at level start keep IdleSpinSpeed.</summary>
     [Export] public float SmsIdleSpinDegPerTick = 2f;
-    /// <summary>MSD_SE_SHINE_APPEAR (+ the appear jingle BGM 0x8001002D) at the appear; MSD_SE_SHINE_EXIST while it flies -- slots, no streams yet.</summary>
+    /// <summary>The appear fanfare (MSD_BGM_SHINE_APPEAR, BGM 0x8001002D -- t_shine_appear.com, 4.6 s): a 2D player on the Music bus, filled by
+    /// SmsActorSound when empty (220; set your own here and it is kept). Its chime, MSD_SE_SHINE_APPEAR, plays with it; MSD_SE_SHINE_EXIST hums
+    /// while the Shine is out (SmsHumTick).</summary>
     [Export] public AudioStreamPlayer AppearSound;
+    // 220: the Shine's sounds -- the game's ids (Item.cpp: appearWithTime 707, control 549-615, touchPlayer 670)
+    public const string AppearChimeSe = "MSD_SE_SHINE_APPEAR", HumSe = "MSD_SE_SHINE_EXIST", GetChimeSe = "MSD_SE_SY_GET_SHINE";
+    private SmsActorSound _sound;
+    public SmsActorSound SmsSound => _sound;
+    /// <summary>For the drives: the appears' sounds started, the touch's chime played.</summary>
+    public int SmsAppearSoundsPlayed { get; private set; }
+    public int SmsGetChimes { get; private set; }
+    public bool SmsHumOn => _sound != null && _sound.LoopPlaying(HumSe);
     public Vector3 SmsInitialPosition { get; private set; }
     public const float SmsUpSpeed = 1.0f, SmsCircleRateY = 0.5f, SmsSpeedDownRate = 0.99f;   // mUpSpeed, mCircleRateY, mSpeedDownRate (Item.cpp 412-414)
     public const int SmsMoveUpTicks = 240, SmsFloatTicks = 240;                              // initMapObj (795): mMoveUpTime 240, mAppearWaitTime 0, mFloatTime 240
@@ -994,6 +1016,24 @@ public partial class ShineSprite : Node3D
         _smsPlacedLatched = true;
         SmsInitialYaw = GlobalRotation.Y;
         SmsInitialPosition = GlobalPosition;
+    }
+    /// <summary>224: a Shine made ahead of its moment (King Boo's, at the fight's start: its instantiate and _Ready ran 100 ms on the frame it
+    /// appeared on) waits PARKED -- hidden (no hum: SmsHumTick reads the visibility), its pickup zone off (a hidden Shine at the arena's middle must
+    /// not be collected) -- until SmsPlaceAt and SmsAppear / SmsAppearFrom bring it out (SmsAppear shows it; the zone comes back at the float's end).</summary>
+    public void SmsPark()
+    {
+        Visible = false;
+        if (_pickupZone != null) _pickupZone.Monitoring = false;
+        SmsParked = true;
+    }
+    public bool SmsParked { get; private set; }
+    /// <summary>224: the placed transform set outright -- the spot the appear flight returns to and the yaw it spins back to -- for a Shine whose
+    /// first frame already latched a parking spot (the latch is first-come: _Process or the first use).</summary>
+    public void SmsPlaceAt(Vector3 globalPos, float yaw)
+    {
+        GlobalPosition = globalPos; GlobalRotation = new Vector3(0f, yaw, 0f);
+        _smsPlacedLatched = true; SmsInitialPosition = globalPos; SmsInitialYaw = yaw;
+        SmsParked = false;
     }
     /// <summary>The script's appear from somewhere else (makeShineAppearWithTime / WithDemo set mPosition first): the placed spot stays, the flight
     /// starts at startGlobal.</summary>
@@ -1024,10 +1064,11 @@ public partial class ShineSprite : Node3D
         _apState = 1;
         Visible = true;                     // TItem::appear
         if (_pickupZone != null) _pickupZone.Monitoring = false;   // HIT_FILTER_NO_COLLISION until the float ends
-        AppearSound?.Play();
+        SmsAppearSounds();
         _apDemo = withDemo; _apDemoLeft = demoTicks;
         if (withDemo)
         {
+            SmsStandardHud.CameraDemoBegin(this);   // 222: a camera demo for the console (the counters, the lives and the life meter go till it ends)
             _apModeBefore = ProcessMode;
             ProcessMode = ProcessModeEnum.Always;
             var tree = GetTree();
@@ -1040,7 +1081,7 @@ public partial class ShineSprite : Node3D
                 Vector3 f = SmsMath.DirFromYaw(SmsInitialYaw);
                 Basis frame = new Basis(f.Cross(Vector3.Up), Vector3.Up, f);   // x = the shine's right, z = its forward
                 _apCam.GlobalPosition = SmsInitialPosition + frame * SmsAppearCamOffset;
-                _apCam.LookAt(GlobalPosition + Vector3.Up * 0.5f, Vector3.Up);
+                _apCam.LookAt(GlobalPosition + Vector3.Up * SmsAppearLookUp, Vector3.Up);
                 _apCam.MakeCurrent();
             }
         }
@@ -1052,6 +1093,24 @@ public partial class ShineSprite : Node3D
     public override void _PhysicsProcess(double delta)
     {
         if (_apState != 0) SmsAppearTick((float)delta);
+        SmsHumTick();
+    }
+
+    /// <summary>220: appearWithTime / appearSimple (Item.cpp 706-709): MSD_SE_SHINE_APPEAR at the Shine and MSBgm::startBGM(0x8001002D), the fanfare.</summary>
+    private void SmsAppearSounds()
+    {
+        _sound?.Play(AppearChimeSe);
+        AppearSound?.Play();
+        SmsAppearSoundsPlayed++;
+    }
+    /// <summary>220: TShine::control calls startSoundActor(MSD_SE_SHINE_EXIST) every tick of STATE_NORMAL (a placed Shine), MOVING_UP / DOWN / CIRCLE,
+    /// FLOAT and WAIT -- not APPEAR_WAIT, not GOT. A level sound (id 0x81C1, the 0x800 bit clear): kept alive by the calls, so a loop here, on while
+    /// the Shine is out and shown, off once it is taken. Positional at the Shine, with the game's camera-distance fade (SmsActorSound).</summary>
+    private void SmsHumTick()
+    {
+        if (_sound == null) return;
+        bool on = IsVisibleInTree() && !_collected && !_ending && !_smsDriven && !_inCutscene && _apState != 1;
+        _sound.Loop(HumSe, on);
     }
 
     private void SmsAppearTick(float d)
@@ -1062,7 +1121,7 @@ public partial class ShineSprite : Node3D
         {
             GlobalPosition = _apPosU / SmsUnits.UnitsPerMetre;
             Rotation = new Vector3(Rotation.X, Mathf.DegToRad(_apRotYDeg), Rotation.Z);
-            if (_apCam != null && IsInstanceValid(_apCam)) _apCam.LookAt(GlobalPosition + Vector3.Up * 0.5f, Vector3.Up);
+            if (_apCam != null && IsInstanceValid(_apCam)) _apCam.LookAt(GlobalPosition + Vector3.Up * SmsAppearLookUp, Vector3.Up);
         }
     }
 
@@ -1116,6 +1175,7 @@ public partial class ShineSprite : Node3D
     private void SmsAppearDemoEnd()
     {
         _apDemo = false;
+        SmsStandardHud.CameraDemoEnd(this);   // 222: the console's endCameraDemo follows (three frames on)
         var tree = GetTree();
         if (_apPausedTree && tree != null) tree.Paused = false;
         _apPausedTree = false;

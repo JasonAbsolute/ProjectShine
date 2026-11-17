@@ -34,6 +34,7 @@ public partial class Mario : CharacterBody3D
         sideFlipTurning,
         SpinJump,
         groundSpin,
+        spin,         // SMS REMATCH (pass 158): the grounded SPIN on X without the FLUDD (Galaxy's) -- grabs a Bomb Boo, throws the one in hand; its own state so the fight can give it properties (SmsSpinFrame)
         crouch,
         backFlip,
         bonk,
@@ -145,8 +146,12 @@ public partial class Mario : CharacterBody3D
     private int _lives;
     /// <summary>Where a miss with no life left goes (the game: the save / title flow). Empty: the stage reloads with the lives reset.</summary>
     [Export] public string GameOverScene = "";
-    /// <summary>The miss jingle's slot (the game starts a BGM as the Miss state begins and waits for it before the stage moves).</summary>
+    /// <summary>The miss jingle's slot (the game starts a BGM as the Miss state begins and waits for it before the stage moves). 213: filled by his sound
+    /// node with MSD_BGM_MISS (k_miss.com, 4.5 s) on the Music bus when empty.</summary>
     [Export] public AudioStreamPlayer MissJingle;
+    /// <summary>213: the GAME OVER jingle's slot -- the miss with no life left starts MSD_BGM_GAMEOVER (k_gameover.com, 8.2 s) instead, the same way;
+    /// filled by his sound node when empty.</summary>
+    [Export] public AudioStreamPlayer GameOverJingle;
 
     // On a shine grab the HUD appears immediately but the count doesn't tick up
     // until this delay (mid-cutscene), per the reference footage.
@@ -162,6 +167,8 @@ public partial class Mario : CharacterBody3D
     private int _smsInvincibleTicks = 0;      // mInvincibilityFrames: 120 Hz ticks (thinkParams runs in playerControl), from the attacker's InvincibleTime
     private bool _smsGameOver;                // MARIO_FLAG_GAME_OVER: loserExec() set it; a FIRE_DOWN may still fly with it (pass 56)
     private bool _smsLoserFalling;            // DOWN_LOSER: dropping in ANIM_LAND until the floor, then LOSER_DOWN's ma_die
+    private bool _smsFallDead;                // 212: MARIO_STATUS_FALL_DEAD -- the death plane's fall: he falls on, no control, his clip as it was (SmsFallDead)
+    private bool _smsHellDead;                // 212: CAMERA_FLAG_HELL_DEAD_DEMO / DEMO_FLAG_HELL_DEAD -- the camera's hell dead demo, the miss's iris
     private bool _smsDownFore = false;        // FORE_DOWN family (hit from behind: faces away, falls on his face) vs BACK_DOWN (faces the attacker, on his back)
     private int _smsDownType = 1;             // 0 SAFE, 1 SHORT, 2 the full DOWN
     private bool _smsDownAir = false;         // JUMP_*_DOWN: falling, horizontal speed forced to +-16 along the face every tick
@@ -331,6 +338,9 @@ public partial class Mario : CharacterBody3D
     private bool _smsSquatEndReady = false;                       // the runtime ma_sqend BaseSM state exists
     private string _smsSquatClipNow = "";                         // the squat clip the BaseSM is on
     private SmsBoneRotZ _smsHeadGunRot;                           // MarioHeadCtrl: Rz(gun angle / 2) on jnt_head while the angle is negative
+    private SmsHeadLook _smsHeadLook;                             // 175: the demos' look-about (the head turned on its own axes from its rest, the chest's share)
+    /// <summary>175: the head look-about modifier for the demos (SmsRematchIntro's cutscene): Play a sequence of looks, Track a point, Stop.</summary>
+    public SmsHeadLook SmsHeadLook => _smsHeadLook;
     private bool _fluddDashAnimOn = false;                        // ma_turbo_dash is the tree's current state
     private bool _fluddTurboAnimReady = false;                    // the ma_turbo_dash state was added to BaseSM
     private bool _fluddBroadJump = false;                         // this singleJump is a BROAD_JUMP (ma_broad_jump)
@@ -702,6 +712,11 @@ public partial class Mario : CharacterBody3D
     private SmsConsoleStr _smsConsoleStr;               // Console/ConsoleStr.tscn: the console's big text -- TOO BAD! (pass 58)
     private SmsFader _smsFader;                         // Console/Fader.tscn: TSMSFader + the Hx wiper -- the death wipe, the fades (pass 58)
     private int _smsMissTicks = -1;                     // the director's Miss state: -1 idle, 0 the pending tick, then counting; MinValue once the stage moved
+    private AudioStreamPlayer _smsMissJingle;           // 213: the jingle the Miss state started (MissJingle, or GameOverJingle with no life left)
+    private int _smsMissMusicStopped;                   // 213: the music players it stopped as it began
+    /// <summary>213, for the drives: the jingle the Miss state started (null before it began), and how many music players it stopped.</summary>
+    public AudioStreamPlayer SmsMissJingleNow => _smsMissJingle;
+    public int SmsMissMusicStopped => _smsMissMusicStopped;
     private int _smsCenterBone = -2;                    // the 'center' joint (getCenterAnmMtx)
     private float _smsHipAttackTicks;                   // hipAttacking() mStatusTimer through the fall (120 Hz ticks); > SuperHipAttackCt = the super hip drop
     /// <summary>hipAttacking() mStatusState == 3: this hip drop fell longer than jump.prm's mSuperHipAttackCt (80 ticks, 0.67 s), so it is the
@@ -849,6 +864,34 @@ public partial class Mario : CharacterBody3D
 
     [Export]
     public float GroundSpinDegPerSec = 2000f; // visual body-spin rate (matches SpinJump)
+
+    // ------------------------------------------------------------------ SMS REMATCH (pass 158): the SPIN and the Bomb Boo ----------------
+    /// <summary>X without the FLUDD (KINGBOO_REMATCH_gdoc.txt): Galaxy's grounded spin, MarioState.spin -- its own state, so the rematch can give it
+    /// properties. It GRABS a Bomb Boo (SmsBombBoo) within BombGrabRadius (and under BombGrabHeight) BY THE TONGUE (159): he holds the tongue up in
+    /// one hand -- the LASSO ARM, SmsLassoArm on his skeleton, LassoArm R or L, blended in over LassoBlendSeconds -- and the Boo swings round him on
+    /// it; he walks it into King Boo (it is NOT thrown; X with a Boo in hand does nothing, the doc's "run and single jump, nothing else"). The spin
+    /// lasts SpinSeconds (SpinTurns of the body; the ma_spin_p clip stands in for its own animation), the stick steers him through it at
+    /// SpinMoveSpeed, A leaves it in a spin jump; SpinCooldown before the next. A Bomb Boo in hand: single jumps only, no hip drop, a dive drops
+    /// it, a spin jump makes the Boo swing faster (the doc). The X key stands in for the pad's X.</summary>
+    [ExportGroup("SMS Rematch (158): the spin and the Bomb Boo")]
+    [Export] public bool SmsSpinEnabled = true;
+    [Export] public float SpinSeconds = 0.6f, SpinTurns = 2f, SpinMoveSpeed = 7f, SpinSteerAccel = 40f, SpinCooldown = 0.2f;
+    [Export] public float BombGrabRadius = 2.8f, BombGrabHeight = 3.5f;
+    /// <summary>203 (Jaysonn: "normal spin jump can also pick up Bomb Boos"): his SPIN JUMP (the stick spin and A; A out of the X spin) grabs a free Bomb Boo too --
+    /// within BombGrabRadius of him, under BombGrabHeight over his feet and as far as SpinJumpGrabBelow UNDER them (he is up in the air over it), while his hands are
+    /// empty -- the same tongue grab, the arm up, the swing. Off: 158's -- only the X spin grabs. SmsSpinJumpGrabsMade counts them for the drives.</summary>
+    [Export] public bool SpinJumpGrabs = true;
+    [Export] public float SpinJumpGrabBelow = 4f;
+    public int SmsSpinJumpGrabsMade { get; private set; }
+    [Export(PropertyHint.Enum, "R,L")] public string LassoArm = "R";
+    [Export] public float LassoBlendSeconds = 0.15f;
+    /// <summary>The raised arm's lean, as fractions of straight up (the tangent of the angle): the upper arm outward (2.5 = 68 deg -- his head is wider than
+    /// his shoulders and his arm 0.33 m long, so a straighter arm runs through the head; 161: "a little more out") and forward; the forearm in over the head
+    /// (negative = outward: -0.7 = 35 deg out).</summary>
+    [Export] public float LassoTilt = 2.5f, LassoForward = 0.3f, LassoIn = -0.7f;
+    [ExportGroup("")]
+    private SmsBombBoo _smsBomb; private float _smsSpinT, _smsSpinCooldown; private bool _smsSpinGrabbed, _smsSpinKeyPrev, _smsSpinKeyEdge; private int _smsSpinCount;
+    private SmsLassoArm _smsLasso;                   // 159: the arm up while he swings a Bomb Boo (built on the skeleton at his setup)
 
     // Backflip: hold Z to squat (ma_sqwat), press A to backflip (ma_jump_rolling).
     // Toned down slightly below SIDEFLIP_JUMP_VELOCITY — was matching it exactly
@@ -1228,6 +1271,8 @@ public partial class Mario : CharacterBody3D
         Closed,
         SlightlyOpen,
         WithHat,   // 121: the right hand holding the cap (the scene's RightHandWithHat), the left open -- the return pose
+        LassoR,    // 161: the right fist closed on the Bomb Boo's tongue, the left as the clip has it (open)
+        LassoL,    // 161: the same with the left
     }
 
     // Deliberately starts at an invalid value so the first ApplyHandPose always
@@ -1762,7 +1807,7 @@ public partial class Mario : CharacterBody3D
 
         InitLedgeRays();
         // if you have the animations, grab a reasonable duration
-        var hgup = animPlayer.GetAnimation("ma_hgup");
+        var hgup = animPlayer.GetAnimation(SmsNames.Of("ma_hgup"));
         if (hgup != null)
             ledgeClimbDur = (float)hgup.Length;
 
@@ -2088,6 +2133,23 @@ public partial class Mario : CharacterBody3D
             return;
         }
 
+        // 176b: a demo clip HELD after a cutscene until the player's first input (the rematch intro's battle stance): he stands in it and the
+        // idle wind-down waits; the stick or a button ends it and this frame goes on as normal; a hit (anything taking the tree back) ends it too.
+        if (_smsDemoHold)
+        {
+            bool taken = _smsDemoClip == "" || stateOfMario != MarioState.idle || (animTree != null && animTree.Active);
+            if (taken) { _smsDemoHold = false; _smsDemoClip = ""; _smsDemoThen = ""; }
+            else if (SmsPlayerInputNow()) { _smsDemoHold = false; SmsEndDemoClip(); }
+            else
+            {
+                velocity = Vector3.Zero; Velocity = Vector3.Zero;
+                MoveAndSlide();
+                idleTimer = 480;   // no sitting down in the stance
+                wasOnFloor = IsOnFloor();
+                return;
+            }
+        }
+
         // A shine touched mid-air waits here, fully controllable, until Mario
         // actually lands — the cutscene shouldn't freeze him out of the sky.
         // Must return immediately: letting the rest of this frame's normal
@@ -2119,13 +2181,14 @@ public partial class Mario : CharacterBody3D
         if (UseSmsPhysics)
         {
             SmsTakeTick(delta);
+            SmsBombTick(delta);                                          // 158: the Bomb Boo in hand (dropped by a dive, a hit, a death), the spin's cooldown and key
             SmsGoopFxTick();                                             // pass 107: the spin's goop fling follows the centre joint
             SmsRideApply(); // checkRideMovement: the actor's matrix carries him before his own move (pass 63)
             _smsTickStartPos = GlobalPosition; // mPrevPosition: the glass-wall goop's revert (pass 64)
         }
         UpdateCarryRunBlend((float)delta);
         UpdateRunAnimationSpeed();
-        if (Input.IsActionJustPressed("button_z") || Input.IsActionJustPressed("key_z"))
+        if (Input.IsActionJustPressed(SmsNames.Of("button_z")) || Input.IsActionJustPressed(SmsNames.Of("key_z")))
             GD.Print(
                 $"[DBG] key_z JustPressed | state={stateOfMario} | onFloor={IsOnFloor()} | canCrouch={CanEnterCrouch()}"
             );
@@ -2144,7 +2207,7 @@ public partial class Mario : CharacterBody3D
                 if (animDone || safety)
                 {
                     _backflipFalling = true;
-                    _sm.Travel("ma_land");
+                    _sm.Travel(SmsNames.Of("ma_land"));
                 }
             }
         }
@@ -2156,11 +2219,7 @@ public partial class Mario : CharacterBody3D
 
         // preserve previous-frame floor latch immediately so all early gotos don't affect it
         bool wasOnFloorPrev = wasOnFloor;
-        Vector2 LstickVec = Input.GetVector(
-            "Lstick_left",
-            "Lstick_right",
-            "Lstick_up",
-            "Lstick_down"
+        Vector2 LstickVec = Input.GetVector(SmsNames.Of("Lstick_left"), SmsNames.Of("Lstick_right"), SmsNames.Of("Lstick_up"), SmsNames.Of("Lstick_down")
         );
         if (UseSmsPhysics)
             LstickVec = SmsStick.PadStick(LstickVec); // the pad library (PADClamp 15 / 72 / 40, JUTGamePad / 54): mMainStick.mPosX / mPosY, what every stage below reads -- the 15 % dead zone is the game's, a pad's rest drift never reaches the wait's turn (pass 44)
@@ -2250,9 +2309,9 @@ public partial class Mario : CharacterBody3D
             _treeRegrabCooldown--;
 
         // Update jump buffer (works in air + on ground)
-        if (_smsTalkSwallowA && !Input.IsActionPressed("button_a") && !Input.IsActionPressed("key_space"))
+        if (_smsTalkSwallowA && !Input.IsActionPressed(SmsNames.Of("button_a")) && !Input.IsActionPressed(SmsNames.Of("key_space")))
             _smsTalkSwallowA = false; // the talk's A released: A is his again (PAD_FLAG_TALK_SELECT off, pass 85)
-        if (!_smsTalkSwallowA && _smsPadDisabledTicks == 0 && (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space")))   // pass 109: a dead pad has no edges
+        if (!_smsTalkSwallowA && _smsPadDisabledTicks == 0 && (Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space"))))   // pass 109: a dead pad has no edges
         {
             jumpBuffer = JUMP_BUFFER_FRAMES;
         }
@@ -2268,7 +2327,7 @@ public partial class Mario : CharacterBody3D
             velocity = Vector3.Zero;
 
             if (animPlayer.CurrentAnimation != "ma_raise")
-                animPlayer.Play("ma_raise");
+                animPlayer.Play(SmsNames.Of("ma_raise"));
 
             if (UseSmsPhysics)
             {
@@ -2412,7 +2471,9 @@ public partial class Mario : CharacterBody3D
 
         if (stateOfMario == MarioState.dead)
         {
-            if (!IsOnFloor())
+            if (_smsFallDead)
+                SmsFallDeadStep(delta); // 212: fallDead() -- jumpProcess(0): the fall goes on
+            else if (!IsOnFloor())
                 velocity += GRAVITY * (float)delta;
             else if (_smsLoserFalling)
                 SmsLoserDown(); // downLoser(): jumpProcess() has landed -> LOSER_DOWN
@@ -2468,7 +2529,7 @@ public partial class Mario : CharacterBody3D
             // running(): FLUDD_EMITTING && A && mForwardVel > DashMax - 1 -> BROAD_JUMP (before the ordinary jump reads A)
             // (changePlayerJumping() asks considerRotateJumpStart() first: a spun stick is the spin jump, not the broad jump)
             if (_fluddDashing && stateOfMario != MarioState.swimming && SmsDashState() && IsOnFloor() && !SmsOrBufferedSpin()
-                && (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space")))
+                && (Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space"))))
             {
                 Vector3 faceD = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
                 float fwdNow = SmsUnits.MpsToSpeed(new Vector3(velocity.X, 0f, velocity.Z).Dot(faceD));
@@ -2533,7 +2594,7 @@ public partial class Mario : CharacterBody3D
                 velocity += GRAVITY * (float)delta;
 
             // Run spin input detection so it works during stomp
-            Vector2 stompStick = Input.GetVector("Lstick_left", "Lstick_right", "Lstick_up", "Lstick_down");
+            Vector2 stompStick = Input.GetVector(SmsNames.Of("Lstick_left"), SmsNames.Of("Lstick_right"), SmsNames.Of("Lstick_up"), SmsNames.Of("Lstick_down"));
             UpdateSpinInput(stompStick);
             if (spinBuffer > 0)
                 spinBuffer--;
@@ -2659,7 +2720,7 @@ public partial class Mario : CharacterBody3D
                 SetMarioState(MarioState.groundPoundLanding);
 
                 // Get animation length for the landing timer
-                var hipedAnim = animPlayer.GetAnimation("ma_hiped");
+                var hipedAnim = animPlayer.GetAnimation(SmsNames.Of("ma_hiped"));
                 _groundPoundLandingTimer = hipedAnim != null ? (float)hipedAnim.Length : 0.5f;
                 _smsHipDrop.Land();
                 if (UseSmsPhysics && SmsDebugPrint)
@@ -2693,7 +2754,7 @@ public partial class Mario : CharacterBody3D
             // GP-jump can fire at ANY time during groundPoundLanding (both the impact
             // ma_hiped phase and the get-up ma_slped phase). Press A → launch.
             // Not a Sunshine move: only on the legacy path or with KeepGroundPoundJump.
-            if (!smsGpRules && (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space")))
+            if (!smsGpRules && (Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space"))))
             {
                 _groundPoundSlpedPlaying = false;
                 jumpChainStage = 0;
@@ -2771,10 +2832,10 @@ public partial class Mario : CharacterBody3D
                 {
                     // Neutral stick: play ma_slped and stay locked until it finishes
                     _groundPoundSlpedPlaying = true;
-                    var slpedAnim = animPlayer.GetAnimation("ma_slped");
+                    var slpedAnim = animPlayer.GetAnimation(SmsNames.Of("ma_slped"));
                     _groundPoundSlpedTimer = slpedAnim != null ? (float)slpedAnim.Length : 0.5f;
                     if (_sm != null)
-                        _sm.Travel("ma_slped");
+                        _sm.Travel(SmsNames.Of("ma_slped"));
                 }
                 else
                 {
@@ -2892,7 +2953,7 @@ public partial class Mario : CharacterBody3D
                     SetMarioState(stateOfMario);
                 }
             }
-            var gf = animPlayer.GetAnimation("ma_get_fail");
+            var gf = animPlayer.GetAnimation(SmsNames.Of("ma_get_fail"));
             if (gf != null)
                 pickupFailDur = (float)gf.Length;
         }
@@ -3038,6 +3099,21 @@ public partial class Mario : CharacterBody3D
             if (UseSmsPhysics && SmsCheckDescent())
                 goto EndFrame;
 
+            // === THE SPIN (SMS REMATCH, pass 158) === X without the FLUDD: Galaxy's grounded spin, its own state. Spinning, SmsSpinFrame owns
+            // the frame (the body turns, the stick steers, a Bomb Boo in reach is grabbed, the one in hand thrown); the entry needs the pad
+            // live, a ground status (the old ground spin's list), hands empty of the game's takeables and the cooldown over.
+            if (stateOfMario == MarioState.spin)
+            {
+                SmsSpinFrame(delta, stickStrength, inputDirWorld);
+                goto EndFrame;
+            }
+            if (UseSmsPhysics && SmsSpinEnabled && !_smsHasFludd && _smsPadDisabledTicks == 0 && _smsSpinCooldown <= 0f && _smsBomb == null
+                && (Input.IsActionJustPressed(SmsNames.Of("button_x")) || _smsSpinKeyEdge) && SmsSpinCanStart())   // 159: not with a Boo in hand (the doc: run and single jump, nothing else)
+            {
+                SmsSpinStart();
+                goto EndFrame;
+            }
+
             // === GROUNDED SPIN ===
             // Already grounded-spinning: keep spinning in place, damp motion,
             // and allow a spin-jump (A) in any direction at any time.
@@ -3062,7 +3138,7 @@ public partial class Mario : CharacterBody3D
                 velocity.Z = gsNew.Y;
                 velocity.Y = -2f;
 
-                if (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space"))
+                if (Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space")))
                 {
                     // Held direction -> jump that way; neutral -> straight up.
                     if (stickStrength > 0.2f && inputDirWorld != Vector3.Zero)
@@ -3092,7 +3168,7 @@ public partial class Mario : CharacterBody3D
             }
 
             // Enter grounded spin: an active spin input + tap R.
-            if (spinBuffer > 0 && Input.IsActionJustPressed("button_r") && CanEnterGroundSpin())
+            if (spinBuffer > 0 && Input.IsActionJustPressed(SmsNames.Of("button_r")) && CanEnterGroundSpin())
             {
                 StartGroundSpin();
                 goto EndFrame;
@@ -3117,12 +3193,12 @@ public partial class Mario : CharacterBody3D
                     velocity.Z = Mathf.MoveToward(velocity.Z, 0f, 60f * (float)delta);
                     velocity.Y = -2f;
 
-                    if (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space"))
+                    if (Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space")))
                     {
                         StartBackflip();
                         goto EndFrame;
                     }
-                    if (!Input.IsActionPressed("button_z") && !Input.IsActionPressed("key_z"))
+                    if (!Input.IsActionPressed(SmsNames.Of("button_z")) && !Input.IsActionPressed(SmsNames.Of("key_z")))
                     {
                         stateOfMario = MarioState.idle;
                         SetMarioState(stateOfMario);
@@ -3133,7 +3209,7 @@ public partial class Mario : CharacterBody3D
 
             // Enter crouch stance: hold Z on the ground (SMS: canSquat() -- the R click or L, the FLUDD out, not dashing).
             if (
-                (UseSmsPhysics ? SmsCanSquat() : (Input.IsActionPressed("button_z") || Input.IsActionPressed("key_z")))
+                (UseSmsPhysics ? SmsCanSquat() : (Input.IsActionPressed(SmsNames.Of("button_z")) || Input.IsActionPressed(SmsNames.Of("key_z"))))
                 && CanEnterCrouch()
             )
             {
@@ -3170,7 +3246,7 @@ public partial class Mario : CharacterBody3D
             }
 
             // hitNoKeepPull (MarioCheckCol.cpp 226): touching a PULLABLE handle with B HELD in a take situation -> TAKE accepted -> PULLING (pass 149)
-            if (UseSmsPhysics && heldBody == null && pendingPickup == null && !SmsBIsTalkB && Input.IsActionPressed("button_b") && SmsFindPullHandle(out SmsPullHandle smsPull))
+            if (UseSmsPhysics && heldBody == null && pendingPickup == null && !SmsBIsTalkB && Input.IsActionPressed(SmsNames.Of("button_b")) && SmsFindPullHandle(out SmsPullHandle smsPull))
             {
                 SmsPullBegin(smsPull);
                 goto EndFrame;
@@ -3178,7 +3254,7 @@ public partial class Mario : CharacterBody3D
 
             // hitWantToTake / canTake (MarioCheckCol.cpp 101, MarioCollision.cpp 130): touching a takeable with B HELD takes it -- from the
             // collision check, which runs before the status machine, so the take beats the dive (pass 62)
-            if (UseSmsPhysics && heldBody == null && pendingPickup == null && !SmsBIsTalkB && Input.IsActionPressed("button_b") && SmsFindTakeTarget(out RigidBody3D smsTake))
+            if (UseSmsPhysics && heldBody == null && pendingPickup == null && !SmsBIsTalkB && Input.IsActionPressed(SmsNames.Of("button_b")) && SmsFindTakeTarget(out RigidBody3D smsTake))
             {
                 _smsTakeAttached = false;
                 StartPickupRaise(smsTake);
@@ -3186,7 +3262,7 @@ public partial class Mario : CharacterBody3D
             }
 
             // MarioGamePad.cpp 100: with PAD_FLAG_TALK_NPC on, B is MEANING_TALK_B, never MEANING_B -- his own B does nothing by a talkable NPC (pass 85)
-            if (Input.IsActionJustPressed("button_b") && !SmsBIsTalkB)
+            if (Input.IsActionJustPressed(SmsNames.Of("button_b")) && !SmsBIsTalkB)
             {
                 Console.WriteLine(
                     stickStrength + " " + new Vector2(velocity.X, velocity.Z).Length()
@@ -3395,7 +3471,7 @@ public partial class Mario : CharacterBody3D
                         else if (direction == Vector3.Zero)
                         {
                             stateOfMario = MarioState.idle;
-                            animPlayer.Play("ma_wait");
+                            animPlayer.Play(SmsNames.Of("ma_wait"));
                             SetMarioState(stateOfMario);
                         }
                         else if (walkingStrength > .5f)
@@ -3424,10 +3500,10 @@ public partial class Mario : CharacterBody3D
                 else if (landingTimer != 0)
                 {
                     // IMPORTANT: never use stateHistory.Contains for chaining anymore
-                    if (Input.IsActionJustPressed("button_a"))
+                    if (Input.IsActionJustPressed(SmsNames.Of("button_a")))
                     {
                         // Use the current chain (only if timer is active)
-                        int stage = (jumpChainTimer > 0) ? jumpChainStage : 0;
+                        int stage = (jumpChainTimer > 0 && _smsBomb == null) ? jumpChainStage : 0;   // 158: single jumps only with a Bomb Boo in hand (the doc)
 
                         // consume chain on jump
                         jumpChainStage = 0;
@@ -3464,7 +3540,7 @@ public partial class Mario : CharacterBody3D
 
                         goto EndFrame;
                     }
-                    if (Input.IsActionJustPressed("button_b"))
+                    if (Input.IsActionJustPressed(SmsNames.Of("button_b")))
                     {
                         if (!UseSmsPhysics)
                         {
@@ -3496,7 +3572,7 @@ public partial class Mario : CharacterBody3D
                     {
                         gettingUpFromSlidingTimer = 53;
                         stateOfMario = MarioState.idle;
-                        animPlayer.Play("ma_wait");
+                        animPlayer.Play(SmsNames.Of("ma_wait"));
                         TriggerLandingDust();
                     }
                 }
@@ -3543,13 +3619,13 @@ public partial class Mario : CharacterBody3D
                             // jump); otherwise CATCH_STOP (bellyRollout: vy 30, slide speed kept, ma_roll then ma_slpla).
                             SmsRolloutLaunch();
                         }
-                        else if (Input.IsActionPressed("button_a") && !UseSmsPhysics && checkSpeedForBellyRoll(velocity))
+                        else if (Input.IsActionPressed(SmsNames.Of("button_a")) && !UseSmsPhysics && checkSpeedForBellyRoll(velocity))
                         {
                             stateOfMario = MarioState.bellyRollout;
                             velocity.Y = GETTING_UP_FROM_SLIDE_ROLL;
                             SetMarioState(stateOfMario);
                         }
-                        else if (!UseSmsPhysics && Input.IsActionPressed("button_a"))
+                        else if (!UseSmsPhysics && Input.IsActionPressed(SmsNames.Of("button_a")))
                         {
                             stateOfMario = MarioState.singleRollout;
                             // Roll jump - special animation, keeping AnimationPlayer
@@ -3559,7 +3635,7 @@ public partial class Mario : CharacterBody3D
                             // velocity.X = direction.X DIVE_SPEED_XZ;
                             // velocity.Z = direction.Z DIVE_SPEED_XZ;
                         }
-                        else if (Input.IsActionJustPressed("button_b"))
+                        else if (Input.IsActionJustPressed(SmsNames.Of("button_b")))
                         {
                             stateOfMario = MarioState.diving;
                             RotateArmature();
@@ -3727,7 +3803,7 @@ public partial class Mario : CharacterBody3D
                                 }
 
                                 if (
-                                    Input.IsActionJustPressed("button_b")
+                                    Input.IsActionJustPressed(SmsNames.Of("button_b"))
                                     && stateOfMario != MarioState.sideFlipTurning
                                 )
                                 {
@@ -3876,7 +3952,7 @@ public partial class Mario : CharacterBody3D
                                                                 != "ma_sleep_wait"
                                                             )
                                                             {
-                                                                animPlayer.Play("ma_sleep_wait");
+                                                                animPlayer.Play(SmsNames.Of("ma_sleep_wait"));
                                                                 Console.WriteLine(
                                                                     animPlayer.CurrentAnimation
                                                                         + " as;lkd"
@@ -3903,7 +3979,7 @@ public partial class Mario : CharacterBody3D
                                                                 animTree.Active = false;
 
                                                             sleepingTimer--;
-                                                            animPlayer.Play("ma_sleep");
+                                                            animPlayer.Play(SmsNames.Of("ma_sleep"));
                                                         }
                                                     }
                                                     else
@@ -3913,7 +3989,7 @@ public partial class Mario : CharacterBody3D
                                                             animTree.Active = false;
 
                                                         sittingTimerWait--;
-                                                        animPlayer.Play("ma_sit_wait");
+                                                        animPlayer.Play(SmsNames.Of("ma_sit_wait"));
                                                         SleepStatus(true);
                                                     }
                                                 }
@@ -3924,7 +4000,7 @@ public partial class Mario : CharacterBody3D
                                                         animTree.Active = false;
 
                                                     sittingAnimationTimer--;
-                                                    animPlayer.Play("ma_sit");
+                                                    animPlayer.Play(SmsNames.Of("ma_sit"));
                                                 }
                                             }
                                             else
@@ -4021,7 +4097,7 @@ public partial class Mario : CharacterBody3D
 
             // Carrying intercept: B in air must NOT dive — instead throw the held
             // object. This runs before any dive triggers downstream check button_b.
-            if (heldBody != null && Input.IsActionJustPressed("button_b"))
+            if (heldBody != null && Input.IsActionJustPressed(SmsNames.Of("button_b")))
             {
                 SmsStartJumpThrow(); // checkJumpingThrowStart(): MARIO_STATUS_JUMP_THROW
                 goto EndFrame;
@@ -4030,7 +4106,7 @@ public partial class Mario : CharacterBody3D
             // hitWantToTake / canTake in the air (pass 62d): isTakeSituation does not exclude the DIVE or the jumps, only the throwing
             // statuses, the hang family and CATCH; taking() lands him (waitProcess) when the floor is within 100 units. So a dive with B
             // held into a fruit near the floor takes it -- and never bonks: a fruit is a hit actor, not a wall.
-            if (UseSmsPhysics && heldBody == null && pendingPickup == null && Input.IsActionPressed("button_b") && SmsFindTakeTarget(out RigidBody3D smsTakeAir))
+            if (UseSmsPhysics && heldBody == null && pendingPickup == null && Input.IsActionPressed(SmsNames.Of("button_b")) && SmsFindTakeTarget(out RigidBody3D smsTakeAir))
             {
                 if (SmsFloorYBelow(SmsParams.Take.FloorLossUnits, out float smsTakeFloorY))
                     GlobalPosition = new Vector3(GlobalPosition.X, smsTakeFloorY, GlobalPosition.Z); // waitProcess: his feet to the floor
@@ -4042,14 +4118,14 @@ public partial class Mario : CharacterBody3D
 
             // While the aerial throw anim is still playing, swallow any B input so
             // the dive blocks below don't replace ma_throw with ma_sldct.
-            if (_aerialThrowLockTimer > 0f && Input.IsActionPressed("button_b"))
+            if (_aerialThrowLockTimer > 0f && Input.IsActionPressed(SmsNames.Of("button_b")))
             {
                 goto EndFrame;
             }
 
             // If we somehow reach here with B just pressed (intercept didn't fire),
             // log it so we can find the leak.
-            if (Input.IsActionJustPressed("button_b"))
+            if (Input.IsActionJustPressed(SmsNames.Of("button_b")))
             {
                 GD.Print(
                     $"[Throw] WARNING: airborne B press got past intercept (heldBody={(heldBody == null ? "null" : "set")}, state={stateOfMario})"
@@ -4133,7 +4209,7 @@ public partial class Mario : CharacterBody3D
             if (stateOfMario == MarioState.wallJump)
             {
                 // Allow dive out of wall jump (like in Super Mario Sunshine)
-                if (Input.IsActionJustPressed("button_b"))
+                if (Input.IsActionJustPressed(SmsNames.Of("button_b")))
                 {
                     stateOfMario = MarioState.diving;
                     SetMarioState(stateOfMario);
@@ -4188,16 +4264,16 @@ public partial class Mario : CharacterBody3D
                             FallCry.Play();
                         animTree.Active = false;
                         animPlayer.SpeedScale = 1f;
-                        animPlayer.Play("ma_thrown");
+                        animPlayer.Play(SmsNames.Of("ma_thrown"));
                         _smsLongFallAnim = true;
                     }
                     else if (!animPlayer.IsPlaying() || animPlayer.CurrentAnimation != "ma_thrown")
                     {
-                        animPlayer.Play("ma_thrown"); // keep it going for the rest of the fall
+                        animPlayer.Play(SmsNames.Of("ma_thrown")); // keep it going for the rest of the fall
                     }
                 }
                 // LAND_SAFE_DOWN (the fall after letting go of a ledge) takes no inputs at all until he lands
-                if (Input.IsActionJustPressed("button_b") && !_smsHangDropFall)
+                if (Input.IsActionJustPressed(SmsNames.Of("button_b")) && !_smsHangDropFall)
                 {
                     stateOfMario = MarioState.diving;
                     SetMarioState(stateOfMario);
@@ -4210,7 +4286,7 @@ public partial class Mario : CharacterBody3D
             // --- VARIABLE WALL JUMP HOLD ---
             if (!UseSmsPhysics && wallJumpHoldActive)
             {
-                if (Input.IsActionPressed("button_a"))
+                if (Input.IsActionPressed(SmsNames.Of("button_a")))
                 {
                     wallJumpHoldTime += (float)delta;
 
@@ -4248,7 +4324,8 @@ public partial class Mario : CharacterBody3D
 
             // --- GROUND POUND from air (L, as in Sunshine; L also re-centres the camera, which the camera scripts read from the same action) ---
             if (
-                Input.IsActionJustPressed("button_l")
+                Input.IsActionJustPressed(SmsNames.Of("button_l"))
+                && _smsBomb == null   // 158: no hip drop with a Bomb Boo in hand (the doc: run and single jump, nothing else)
                 && stateOfMario != MarioState.groundPoundStartup
                 && stateOfMario != MarioState.groundPoundFalling
                 && stateOfMario != MarioState.wallSlide
@@ -4282,17 +4359,17 @@ public partial class Mario : CharacterBody3D
                 {
                     // After rollout animation, play ma_slpla
                     if (_sm != null)
-                        _sm.Travel("ma_slpla");
+                        _sm.Travel(SmsNames.Of("ma_slpla"));
                 }
             }
-            if (Input.IsActionJustReleased("button_a"))
+            if (Input.IsActionJustReleased(SmsNames.Of("button_a")))
             {
                 initalJumpHold = false;
             }
 
             if (
                 (isJumping || stateOfMario == MarioState.singleJumpDive)
-                && (Input.IsActionPressed("key_space") || Input.IsActionPressed("button_a"))
+                && (Input.IsActionPressed(SmsNames.Of("key_space")) || Input.IsActionPressed(SmsNames.Of("button_a")))
                 && stateOfMario != MarioState.sideFlip
             )
             {
@@ -4324,8 +4401,8 @@ public partial class Mario : CharacterBody3D
                         }
 
                         if (
-                            Input.IsActionJustPressed("button_b")
-                            && Input.IsActionPressed("button_a")
+                            Input.IsActionJustPressed(SmsNames.Of("button_b"))
+                            && Input.IsActionPressed(SmsNames.Of("button_a"))
                         )
                         {
                             stateOfMario = MarioState.diving;
@@ -4354,8 +4431,8 @@ public partial class Mario : CharacterBody3D
                                 + (walkingStrength * 7);
                         }
                         if (
-                            Input.IsActionJustPressed("button_b")
-                            && Input.IsActionPressed("button_a")
+                            Input.IsActionJustPressed(SmsNames.Of("button_b"))
+                            && Input.IsActionPressed(SmsNames.Of("button_a"))
                         )
                         {
                             stateOfMario = MarioState.diving;
@@ -4368,7 +4445,7 @@ public partial class Mario : CharacterBody3D
                     }
                 }
             }
-            if (Input.IsActionJustPressed("button_b") && stateOfMario == MarioState.tripleJump)
+            if (Input.IsActionJustPressed(SmsNames.Of("button_b")) && stateOfMario == MarioState.tripleJump)
             {
                 //RotateArmature();
                 stateOfMario = MarioState.diving;
@@ -4379,13 +4456,13 @@ public partial class Mario : CharacterBody3D
                 goto EndFrame; // <-- ADD THIS
             }
 
-            if (stateOfMario == MarioState.singleRollout && Input.IsActionPressed("button_a"))
+            if (stateOfMario == MarioState.singleRollout && Input.IsActionPressed(SmsNames.Of("button_a")))
             {
                 rolloutAction(delta);
             }
             else if (
                 (stateOfMario == MarioState.sideFlip || stateOfMario == MarioState.SpinJump)
-                && Input.IsActionJustPressed("button_b")
+                && Input.IsActionJustPressed(SmsNames.Of("button_b"))
             )
             {
                 // Consume spin
@@ -4422,7 +4499,7 @@ public partial class Mario : CharacterBody3D
 
                 goto EndFrame; // prevent later air-control / other B blocks from fighting this frame
             }
-            else if (Input.IsActionJustPressed("button_b"))
+            else if (Input.IsActionJustPressed(SmsNames.Of("button_b")))
             {
                 if (stateOfMario != MarioState.diving)
                 {
@@ -4818,10 +4895,10 @@ public partial class Mario : CharacterBody3D
         {
             for (int i = 0; i < GetSlideCollisionCount(); i++)
             {
-                var col = GetSlideCollision(i);
+                var col = SmsSlideHit(i);
                 if (col.GetNormal().Y < 0.5f)
                     continue; // not floor-ish
-                if (col.GetCollider() is Node leafBody && leafBody.IsInGroup("palm_leaf_body"))
+                if (col.GetCollider() is Node leafBody && leafBody.IsInGroup(SmsNames.Of("palm_leaf_body")))
                 {
                     if (leafBody.GetParent() is ILeafBouncer bouncer)
                         bouncer.Bounce(GlobalPosition);
@@ -4843,7 +4920,7 @@ public partial class Mario : CharacterBody3D
         if (onFloorNow && stateOfMario == MarioState.ledgeHopUp)
         {
             stateOfMario = MarioState.idle;
-            animPlayer.Play("ma_wait");
+            animPlayer.Play(SmsNames.Of("ma_wait"));
             SetMarioState(stateOfMario);
             suppressLandingFrames = 2;
             landingEnteredThisContact = true;
@@ -4908,7 +4985,7 @@ public partial class Mario : CharacterBody3D
                 velocity.Y = 0f;
                 // pick your preferred "finish" anim
                 stateOfMario = MarioState.idle;
-                animPlayer.Play("ma_wait");
+                animPlayer.Play(SmsNames.Of("ma_wait"));
                 SetMarioState(stateOfMario);
 
                 // prevent re-trigger spam on the same contact
@@ -5085,6 +5162,9 @@ public partial class Mario : CharacterBody3D
                 armature.Rotation = new Vector3(0f, YawFromDir(lockDir), 0f);
                 spinJumpDirLocked = false;
             }
+            // 228: the touchdown's face and momentum agree (the spin jump landed facing its takeoff with the momentum 30 deg off to one side)
+            if (UseSmsPhysics)
+                SmsLandFacing(airStateAtImpact);
 
             // Enter landing (guarded internally)
             if (!IsLandingState(stateOfMario))
@@ -5172,7 +5252,7 @@ public partial class Mario : CharacterBody3D
 
     public override void _UnhandledInput(InputEvent @event)
     {
-        if (Input.IsActionJustPressed("key_esc"))
+        if (Input.IsActionJustPressed(SmsNames.Of("key_esc")))
         {
             if (Input.MouseMode == Input.MouseModeEnum.Captured)
                 Input.SetMouseMode(Input.MouseModeEnum.Visible);
@@ -5708,7 +5788,7 @@ public partial class Mario : CharacterBody3D
     private static bool SmsColliderIsSand(Node n)
     {
         for (Node q = n; q != null; q = q.GetParent())
-            if (q.IsInGroup("sms_sand") || q.Name.ToString().Contains("sand", StringComparison.OrdinalIgnoreCase)) return true;
+            if (q.IsInGroup(SmsNames.Of("sms_sand")) || q.Name.ToString().Contains("sand", StringComparison.OrdinalIgnoreCase)) return true;
         return false;
     }
 
@@ -5940,7 +6020,7 @@ public partial class Mario : CharacterBody3D
             return;
         // the game emits from rotateJumping (MARIO_STATUS_*_ROTATE_JUMP) and rotating (the ground spin, MarioRun.cpp 779) only: the port's
         // isSpining flag also serves the roll blurs and is left up by a landing, so the states gate it
-        bool spinning = _smsSpinning && (stateOfMario == MarioState.SpinJump || stateOfMario == MarioState.groundSpin);
+        bool spinning = _smsSpinning && (stateOfMario == MarioState.SpinJump || stateOfMario == MarioState.groundSpin || stateOfMario == MarioState.spin);
         if (spinning && _smsDirtyAmount > 0f)
             _smsGoopFx.FlingSet(SmsCenterTransform(), 1.75f * _smsDirtyAmount / 255f);
         else
@@ -5974,6 +6054,54 @@ public partial class Mario : CharacterBody3D
         || s == MarioState.singleJumpLanding
         || s == MarioState.doubleJumpLanding
         || s == MarioState.tripleJumpLanding;
+
+    /// <summary>228 (Jaysonn: a spin jump lands "facing about 30 degrees wrong but with the right momentum"). In the air the game keeps mFaceAngle at
+    /// the takeoff face and the stick only adds a SIDEWAYS drift to the velocity (doJumping: sideVel along mFaceAngle + 0x4000; never a turn), so he
+    /// comes down facing the takeoff direction with his momentum off to one side -- a spin jump's long, slow fall (vy 70, gravity 0.35 on the way
+    /// down) builds 30 degrees or more of it, and the spinning model snapping to the takeoff face at the touchdown made the two plain. The port
+    /// used to face the takeoff through the landing window (ma_laend) and only then turn him to his momentum (the run's first tick). The game's own
+    /// landing (jumpSlipCommon: walkProcess along mFaceAngle at mForwardVel) DROPS the drift instead: he slides along his face. LandingKeepsDrift
+    /// on (the port's way, Jaysonn's "right momentum" kept): on the touchdown frame his face and the model take the momentum's bearing -- moving
+    /// backward along it (a backflip, a U-turn jump's slide) he keeps facing forward -- so face and motion agree from the first frame. Off = the
+    /// game's rule: the momentum turns onto his face (the forward component kept, the side drift gone), the face as it was. SmsLastLandDriftDeg is
+    /// the drift the last touchdown found (signed, degrees; for the drives).</summary>
+    [ExportGroup("SMS (228): the landing's facing")]
+    [Export] public bool LandingKeepsDrift = true;
+    [ExportGroup("")]
+    public float SmsLastLandDriftDeg { get; private set; }
+    public int SmsLandFacingCount { get; private set; }
+
+    private void SmsLandFacing(MarioState airState)
+    {
+        Vector3 velXZ = new Vector3(velocity.X, 0f, velocity.Z);
+        float speed = velXZ.Length();
+        if (speed < 0.5f)
+            return;
+        Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
+        Vector3 moveDir = velXZ / speed;
+        bool backward = moveDir.Dot(face) < 0f;                 // sliding backward along his face: he keeps facing forward
+        Vector3 along = backward ? -moveDir : moveDir;           // the bearing he should face: his motion's line, forward sense
+        SmsLastLandDriftDeg = Mathf.RadToDeg(face.SignedAngleTo(along, Vector3.Up));
+        SmsLandFacingCount++;
+        Vector3 newFace;
+        if (LandingKeepsDrift)
+        {
+            newFace = along;                                     // the momentum kept, the face turned onto it
+        }
+        else
+        {
+            float fwd = velXZ.Dot(face);                         // mForwardVel: the component along mFaceAngle; the side velocity ended with the air
+            velocity.X = face.X * fwd;
+            velocity.Z = face.Z * fwd;
+            newFace = face;
+        }
+        lastFacingDirection = newFace;
+        SmsLatchFace(newFace, 1);                                // the run's first tick keeps it (no second latch to the velocity)
+        if (armature != null)
+            armature.Rotation = new Vector3(0f, YawFromDir(newFace), 0f);
+        if (SmsDebugPrint && MathF.Abs(SmsLastLandDriftDeg) > 2f)
+            GD.Print($"[SMS land] from {airState}: the momentum {SmsLastLandDriftDeg:F1} deg off the takeoff face{(backward ? " (sliding backward)" : "")} -- {(LandingKeepsDrift ? "he faces it" : "it turns onto his face (the game's rule)")}");
+    }
 
     private void EnterLanding(MarioState landingState, string animName)
     {
@@ -6012,7 +6140,7 @@ public partial class Mario : CharacterBody3D
         jumpHoldTime = 0f;
 
         // Once we actually jump, consume the chain window
-        int stage = (jumpChainTimer > 0) ? jumpChainStage : 0;
+        int stage = (jumpChainTimer > 0 && _smsBomb == null) ? jumpChainStage : 0;   // 158: single jumps only with a Bomb Boo in hand (the doc)
         jumpChainStage = 0;
         jumpChainTimer = 0;
 
@@ -6173,7 +6301,7 @@ public partial class Mario : CharacterBody3D
         Vector3 travelDirection = velocityXZ / speed;
         for (int i = 0; i < GetSlideCollisionCount(); i++)
         {
-            KinematicCollision3D kc = GetSlideCollision(i);
+            KinematicCollision3D kc = SmsSlideHit(i);
             if (UseSmsPhysics && SmsIsNonMapBody(kc.GetCollider() as Node))
                 continue; // the game's wall is the map (checkGroundAtJumping -> the BG walls); a fruit, a coin, another body is a hit actor -- no bonk
             Vector3 normal = kc.GetNormal();
@@ -6266,7 +6394,7 @@ public partial class Mario : CharacterBody3D
                     velocity.Z = _bonkAwayDirection.Z * BonkLandingSlideSpeed;
                 }
                 // SMS (SHORT_BACK_DOWN): the 16/tick knockback carries into the slide and decays below.
-                _sm.Travel("ma_sdown");
+                _sm.Travel(SmsNames.Of("ma_sdown"));
                 SpawnBonkStars(ComputeFeetPosition(), Vector3.Up); // shortBackDown() at mStatusTimer 0 (MarioRun.cpp 1421): PARTICLE_MS_DMG_C at mPosition again; its rumble (0x15, mMotorWall) is not ported
                 TriggerLandingDust();
             }
@@ -6722,7 +6850,7 @@ public partial class Mario : CharacterBody3D
         velocity.X = 0f;
         velocity.Z = 0f;
         stateOfMario = MarioState.idle;
-        animPlayer.Play("ma_wait");
+        animPlayer.Play(SmsNames.Of("ma_wait"));
         SetMarioState(stateOfMario);
         return true; // we already decided everything; skip the rest this frame
     }
@@ -6739,7 +6867,7 @@ public partial class Mario : CharacterBody3D
             if (stateOfMario == MarioState.pivot)
             {
                 stateOfMario = MarioState.idle;
-                animPlayer.Play("ma_wait");
+                animPlayer.Play(SmsNames.Of("ma_wait"));
                 SetMarioState(stateOfMario);
             }
             return false;
@@ -6755,7 +6883,7 @@ public partial class Mario : CharacterBody3D
             return false;
 
         // Jump from ground
-        if (Input.IsActionJustPressed("key_space") || Input.IsActionJustPressed("button_a"))
+        if (Input.IsActionJustPressed(SmsNames.Of("key_space")) || Input.IsActionJustPressed(SmsNames.Of("button_a")))
         {
             jumpChainStage = 0;
             jumpChainTimer = 0;
@@ -6908,8 +7036,8 @@ public partial class Mario : CharacterBody3D
             GD.Print($"[SMS hand] {pose} for {SmsCurrentClip()}{(heldBody != null ? " (carrying)" : "")}");
 
         bool openVisible = pose == HandPose.Open;
-        Color openAlbedoR = openVisible ? _rightHandOpenAlbedo : new Color(0, 0, 0, 0);
-        Color openAlbedoL = openVisible || pose == HandPose.WithHat ? _leftHandOpenAlbedo : new Color(0, 0, 0, 0);   // 121: the left stays open with the cap in the right
+        Color openAlbedoR = openVisible || pose == HandPose.LassoL ? _rightHandOpenAlbedo : new Color(0, 0, 0, 0);   // 161: the free hand open while the other grips the tongue
+        Color openAlbedoL = openVisible || pose == HandPose.WithHat || pose == HandPose.LassoR ? _leftHandOpenAlbedo : new Color(0, 0, 0, 0);   // 121: the left stays open with the cap in the right
         if (RightHandWithHat != null)
             RightHandWithHat.Visible = pose == HandPose.WithHat;
 
@@ -6920,9 +7048,9 @@ public partial class Mario : CharacterBody3D
 
         bool closed = pose == HandPose.Closed;
         if (RightClosedHand != null)
-            RightClosedHand.Visible = closed;
+            RightClosedHand.Visible = closed || pose == HandPose.LassoR;   // 161: the fist on the tongue
         if (LeftClosedHand != null)
-            LeftClosedHand.Visible = closed;
+            LeftClosedHand.Visible = closed || pose == HandPose.LassoL;
 
         bool slightly = pose == HandPose.SlightlyOpen;
         if (RightSlightlyOpenHand != null)
@@ -7045,21 +7173,31 @@ public partial class Mario : CharacterBody3D
         Node n = start;
         for (int depth = 0; n != null && depth < 3; depth++, n = n.GetParent())
         {
-            if (n.HasMeta("sms_surface"))
-                return n.GetMeta("sms_surface").AsString();
-            foreach (StringName m in n.GetMetaList())
+            if (n.HasMeta(SmsNames.Of("sms_surface")))
+                return n.GetMeta(SmsNames.Of("sms_surface")).AsString();
+            // 227: the lists and their names disposed as they are read (every frame on a floor without the meta), not left to the finalizer
+            string found = null;
+            var metas = n.GetMetaList();
+            foreach (StringName m in metas)
             {
                 // the group spelling used as a metadata key also works: sms_slider = anything
                 string ms = m.ToString();
-                if (ms.StartsWith("sms_") && ms != "sms_surface" && ms != "sms_pollution")
-                    return ms.Substring(4);
+                m.Dispose();
+                if (ms.StartsWith("sms_") && ms != "sms_surface" && ms != "sms_pollution") { found = ms.Substring(4); break; }
             }
-            foreach (StringName g in n.GetGroups())
+            SmsFree.Array(metas);
+            if (found != null)
+                return found;
+            var groups = n.GetGroups();
+            foreach (StringName g in groups)
             {
                 string gs = g.ToString();
-                if (gs.StartsWith("sms_"))
-                    return gs.Substring(4);
+                g.Dispose();
+                if (gs.StartsWith("sms_")) { found = gs.Substring(4); break; }
             }
+            SmsFree.Array(groups);
+            if (found != null)
+                return found;
         }
         return "normal";
     }
@@ -7073,7 +7211,7 @@ public partial class Mario : CharacterBody3D
         float cosMax = MathF.Cos(FloorMaxAngle);
         for (int i = 0; i < GetSlideCollisionCount(); i++)
         {
-            KinematicCollision3D c = GetSlideCollision(i);
+            KinematicCollision3D c = SmsSlideHit(i);
             if (c.GetNormal().Y >= cosMax - 1e-3f)
             {
                 hit = c.GetCollider() as Node;
@@ -7086,16 +7224,13 @@ public partial class Mario : CharacterBody3D
             // Standing still, or held by the floor snap alone, the body never moves into the floor and MoveAndSlide reports
             // no collision. checkGround() is a ray in the game; ask the floor under the feet directly.
             Vector3 from = new Vector3(GlobalPosition.X, SmsFeetY() + 0.1f, GlobalPosition.Z);
-            var q = PhysicsRayQueryParameters3D.Create(from, from + Vector3.Down * 0.8f, CollisionMask);
-            q.CollideWithAreas = false;
-            q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-            var r = GetWorld3D().DirectSpaceState.IntersectRay(q);
+            var r = SmsIntersect(SmsRayQuery(from, from + Vector3.Down * 0.8f));   // 227: the shared query (MarioRays.cs)
             if (r.Count > 0)
-                hit = r["collider"].AsGodotObject() as Node;
+                hit = r[SmsKeys.Collider].AsGodotObject() as Node;
         }
         if (hit == null)
             return; // nothing under the feet this frame: keep the last known surface
-        string tag = SmsSurfaceTagOf(hit).Trim().ToLowerInvariant();
+        string tag = SmsSurfaceTag(hit);
         SmsSlope.Surface s = SmsSlope.Surface.Normal;
         bool noSlip = false;
         switch (tag)
@@ -7226,7 +7361,7 @@ public partial class Mario : CharacterBody3D
         float mag = stick ? _smsIntendedMag : 0f;
 
         // slippingBasic(): B -> JUMP_CATCH with mVel.y = 20, at any time
-        if (Input.IsActionJustPressed("button_b"))
+        if (Input.IsActionJustPressed(SmsNames.Of("button_b")))
         {
             Vector3 dir = v.LengthSquared() > 1e-6f ? v.Normalized() : SmsMath.DirFromYaw(faceYaw);
             velocity.X = SmsUnits.SpeedToMps(v.X);
@@ -7240,7 +7375,7 @@ public partial class Mario : CharacterBody3D
         // slipForeCommon(): after 20 ticks, A jumps out when the surface's canSlipJump (JumpEnable) allows it. slipBackCommon():
         // facing uphill, A does nothing while the floor still slips.
         if (_smsSlipTicks > 20 && p.JumpEnable && !_slipFacingUphill
-            && (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space")))
+            && (Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space"))))
         {
             velocity.X = SmsUnits.SpeedToMps(v.X);
             velocity.Z = SmsUnits.SpeedToMps(v.Z);
@@ -7369,10 +7504,7 @@ public partial class Mario : CharacterBody3D
 
     private bool SmsRay(Vector3 from, Vector3 to, out Godot.Collections.Dictionary hit)
     {
-        var q = PhysicsRayQueryParameters3D.Create(from, to, CollisionMask);
-        q.CollideWithAreas = false;
-        q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        hit = GetWorld3D().DirectSpaceState.IntersectRay(q);
+        hit = SmsIntersect(SmsRayQuery(from, to));   // 227: the shared query, his body excluded, areas off (MarioRays.cs)
         return hit.Count > 0;
     }
 
@@ -7401,9 +7533,9 @@ public partial class Mario : CharacterBody3D
         Vector3 lowFrom = new Vector3(c.X, feetY + SmsUnits.UnitsToMetres(SmsParams.Hanging.WallLowUnits), c.Z);
         if (!SmsRay(lowFrom, lowFrom + probeDir * reach, out var low))
             return false;
-        if (low["collider"].AsGodotObject() is not StaticBody3D)
+        if (low[SmsKeys.Collider].AsGodotObject() is not StaticBody3D)
             return false; // environment only (AnimatableBody3D platforms included)
-        Vector3 n = ((Vector3)low["normal"]);
+        Vector3 n = ((Vector3)low[SmsKeys.Normal]);
         n.Y = 0f;
         if (n.LengthSquared() < 1e-6f)
             return false;
@@ -7413,13 +7545,13 @@ public partial class Mario : CharacterBody3D
         Vector3 highFrom = new Vector3(c.X, feetY + SmsUnits.UnitsToMetres(SmsParams.Hanging.WallHighUnits), c.Z);
         if (SmsRay(highFrom, highFrom + probeDir * reach, out _))
             return false; // reaches head height: that is a wall, not a ledge
-        Vector3 wallP = (Vector3)low["position"];
+        Vector3 wallP = (Vector3)low[SmsKeys.Position];
         Vector3 inside = wallP - n * SmsUnits.UnitsToMetres(SmsParams.Hanging.InsideUnits);
         Vector3 topFrom = new Vector3(inside.X, feetY + SmsUnits.UnitsToMetres(SmsParams.Hanging.TopSearchUnits), inside.Z);
         if (!SmsRay(topFrom, topFrom + Vector3.Down * (SmsUnits.UnitsToMetres(SmsParams.Hanging.TopSearchUnits) + 0.3f), out var top))
             return false;
-        float topY = ((Vector3)top["position"]).Y;
-        Vector3 topN = (Vector3)top["normal"];
+        float topY = ((Vector3)top[SmsKeys.Position]).Y;
+        Vector3 topN = (Vector3)top[SmsKeys.Normal];
         float above = topY - feetY;
         if (above <= SmsUnits.UnitsToMetres(SmsParams.Hanging.TopMinUnits) || topN.Y < 0.5f)
             return false;
@@ -7428,16 +7560,16 @@ public partial class Mario : CharacterBody3D
         Vector3 roofFrom = new Vector3(inside.X, topY + 0.02f, inside.Z);
         if (SmsRay(roofFrom, roofFrom + Vector3.Up * SmsUnits.UnitsToMetres(SmsParams.Hanging.HeadroomUnits), out _))
             return false; // no room to hang under a roof
-        Node topNode = top["collider"].AsGodotObject() as Node;
+        Node topNode = top[SmsKeys.Collider].AsGodotObject() as Node;
         if (topNode != null)
         {
-            string tag = SmsSurfaceTagOf(topNode).Trim().ToLowerInvariant();
+            string tag = SmsSurfaceTag(topNode);
             if (tag == "forceslip" || tag == "goop" || tag == "all" || tag == "noledge" || tag == "nograb")
                 return false;
         }
         if (SmsDebugPrint)
-            GD.Print($"[SMS ledge] grab from {stateOfMario}: top {SmsUnits.MetresToUnits(above):F0} units above the feet ({above:F2} m), wall '{(low["collider"].AsGodotObject() as Node)?.Name}'");
-        SmsEnterLedgeHang(wallP, n, topY, low["collider"].AsGodotObject());
+            GD.Print($"[SMS ledge] grab from {stateOfMario}: top {SmsUnits.MetresToUnits(above):F0} units above the feet ({above:F2} m), wall '{(low[SmsKeys.Collider].AsGodotObject() as Node)?.Name}'");
+        SmsEnterLedgeHang(wallP, n, topY, low[SmsKeys.Collider].AsGodotObject());
         return true;
     }
 
@@ -7497,7 +7629,7 @@ public partial class Mario : CharacterBody3D
         Vector3 from = new Vector3(xz.X, ledgeHangPos.Y, xz.Z);
         float y = ledgeHangPos.Y - drop;
         if (SmsRay(from, from + Vector3.Down * drop, out var g))
-            y = ((Vector3)g["position"]).Y;
+            y = ((Vector3)g[SmsKeys.Position]).Y;
         ledgePinned = false;
         _ledgePlatformBody = null;
         _smsHangMovingAnim = false;
@@ -7565,12 +7697,12 @@ public partial class Mario : CharacterBody3D
         bool headroom = SmsLedgeHeadroom();
         LockArmatureVisualRoot();
 
-        if (Input.IsActionJustPressed("button_b"))
+        if (Input.IsActionJustPressed(SmsNames.Of("button_b")))
         {
             SmsHangLetGo(true, "B");
             return;
         }
-        if ((Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space")) && headroom)
+        if ((Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space"))) && headroom)
         {
             SmsLedgeVault("A");
             return;
@@ -7612,20 +7744,20 @@ public partial class Mario : CharacterBody3D
                 Vector3 cand = _smsLedgeWallPoint + tangent * step; // the wall point, at the top height
                 Vector3 wallFrom = new Vector3(cand.X, cand.Y - SmsUnits.UnitsToMetres(20f), cand.Z) + nXZ * (capRadiusWorld + 0.05f);
                 if (SmsRay(wallFrom, wallFrom + intoWall * (capRadiusWorld + 0.05f + SmsUnits.UnitsToMetres(50f)), out var w)
-                    && w["collider"].AsGodotObject() is StaticBody3D)
+                    && w[SmsKeys.Collider].AsGodotObject() is StaticBody3D)
                 {
-                    Vector3 n2 = (Vector3)w["normal"];
+                    Vector3 n2 = (Vector3)w[SmsKeys.Normal];
                     n2.Y = 0f;
                     if (n2.LengthSquared() > 1e-6f)
                     {
                         n2 = n2.Normalized();
-                        Vector3 wp = (Vector3)w["position"];
+                        Vector3 wp = (Vector3)w[SmsKeys.Position];
                         Vector3 inside = wp - n2 * SmsUnits.UnitsToMetres(SmsParams.Hanging.InsideUnits);
                         Vector3 topFrom = new Vector3(inside.X, cand.Y + SmsUnits.UnitsToMetres(50f), inside.Z);
                         if (nXZ.Dot(n2) > SmsParams.Hanging.WallMovableAngle
                             && SmsRay(topFrom, topFrom + Vector3.Down * SmsUnits.UnitsToMetres(150f), out var t))
                         {
-                            float topY = ((Vector3)t["position"]).Y;
+                            float topY = ((Vector3)t[SmsKeys.Position]).Y;
                             if (topY > cand.Y - SmsUnits.UnitsToMetres(100f) && topY < cand.Y + SmsUnits.UnitsToMetres(50f))
                             {
                                 float movedUnits = SmsUnits.MetresToUnits((new Vector3(wp.X, 0f, wp.Z) - new Vector3(_smsLedgeWallPoint.X, 0f, _smsLedgeWallPoint.Z)).Length());
@@ -7695,12 +7827,12 @@ public partial class Mario : CharacterBody3D
                         GD.Print($"[SMS ledge] {_smsHangTicks} ticks hanging: ma_hang at AnmRapid {SmsParams.Hanging.AnmRapid:F0}x");
                     if (animTree != null)
                         animTree.Active = false;
-                    animPlayer.Play("ma_hang");
+                    animPlayer.Play(SmsNames.Of("ma_hang"));
                     _smsHangMovingAnim = true;
                 }
                 else if (!animPlayer.IsPlaying())
                 {
-                    animPlayer.Play("ma_hang");
+                    animPlayer.Play(SmsNames.Of("ma_hang"));
                 }
                 animPlayer.SpeedScale = SmsParams.Hanging.AnmRapid;
             }
@@ -7743,21 +7875,21 @@ public partial class Mario : CharacterBody3D
         Vector3 from = new Vector3(edgeAhead.X, feetY - SmsUnits.UnitsToMetres(10f), edgeAhead.Z);
         if (!SmsRay(from, from - face * (capRadiusWorld + SmsUnits.UnitsToMetres(SmsParams.Hanging.DescentEdgeUnits) + 0.05f), out var w))
             return false; // no cliff face below the edge ahead
-        if (w["collider"].AsGodotObject() is not StaticBody3D)
+        if (w[SmsKeys.Collider].AsGodotObject() is not StaticBody3D)
             return false;
-        Vector3 n = (Vector3)w["normal"];
+        Vector3 n = (Vector3)w[SmsKeys.Normal];
         n.Y = 0f;
         if (n.LengthSquared() < 1e-6f || n.Normalized().Dot(face) <= 0f)
             return false;
         n = n.Normalized();
-        Vector3 wp = (Vector3)w["position"];
+        Vector3 wp = (Vector3)w[SmsKeys.Position];
         // the ground beyond the edge must be more than 160 units below
         Vector3 beyond = new Vector3(wp.X, feetY + 0.05f, wp.Z) + n * 0.15f;
         if (SmsRay(beyond, beyond + Vector3.Down * (SmsUnits.UnitsToMetres(SmsParams.Hanging.DescentDropUnits) + 0.05f), out _))
             return false;
         if (SmsDebugPrint)
             GD.Print($"[SMS ledge] edge ahead at fwd {fwd:F1}: climb down (DESCEND)");
-        SmsEnterLedgeHang(new Vector3(wp.X, feetY, wp.Z), n, feetY, w["collider"].AsGodotObject());
+        SmsEnterLedgeHang(new Vector3(wp.X, feetY, wp.Z), n, feetY, w[SmsKeys.Collider].AsGodotObject());
         stateOfMario = MarioState.ledgeDescend;
         SetMarioState(stateOfMario); // ma_hgdwn, driven directly
         return true;
@@ -7951,7 +8083,7 @@ public partial class Mario : CharacterBody3D
 
         // Escape hop only — a plain vertical pop, not a directional
         // wall-kick, since this was never a real wall to push off of.
-        if (Input.IsActionJustPressed("button_a"))
+        if (Input.IsActionJustPressed(SmsNames.Of("button_a")))
         {
             velocity.Y = SLIP_HOP_UP_VEL;
             stateOfMario = MarioState.singleJump;
@@ -8299,7 +8431,7 @@ public partial class Mario : CharacterBody3D
         }
 
         // Allow jump to exit
-        if (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space"))
+        if (Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space")))
         {
             ExitGroundWall(stickStrength, inputDirWorld);
             return false; // fall through so jump logic can pick it up
@@ -8406,7 +8538,7 @@ public partial class Mario : CharacterBody3D
         else
         {
             stateOfMario = MarioState.idle;
-            animPlayer.Play("ma_wait");
+            animPlayer.Play(SmsNames.Of("ma_wait"));
             SetMarioState(stateOfMario);
         }
     }
@@ -8424,7 +8556,7 @@ public partial class Mario : CharacterBody3D
             // the animTree.Active=true / animPlayer.Stop at the top of that method)
             if (animTree != null)
                 animTree.Active = false;
-            animPlayer.Play("ma_hipsr");
+            animPlayer.Play(SmsNames.Of("ma_hipsr"));
         }
         velocity = Vector3.Zero;
         isJumping = false;
@@ -8581,7 +8713,7 @@ public partial class Mario : CharacterBody3D
         // face, which points INTO the wall, so jumpCatch() case 2 bounces him off) and L (HIP_DROP, whose first hipAttacking()
         // tick meets the wall in front of the face: the same knock-off), but in the shipped game as Jaysonn remembers it
         // neither does anything on a wall (L re-centres the camera), so neither does here.
-        if (Input.IsActionJustPressed("button_a"))
+        if (Input.IsActionJustPressed(SmsNames.Of("button_a")))
             DoWallJump();
     }
 
@@ -9354,19 +9486,12 @@ public partial class Mario : CharacterBody3D
         Vector3 probeFrom = chestP + Vector3.Up * probeUp + (-wallNXZ) * probeFwd;
         Vector3 probeTo = probeFrom + Vector3.Down * probeDownLen;
 
-        var space = GetWorld3D().DirectSpaceState;
-        var q = PhysicsRayQueryParameters3D.Create(probeFrom, probeTo);
-        q.CollisionMask = CollisionMask;
-        q.CollideWithBodies = true;
-        q.CollideWithAreas = false;
-        q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-
-        var hit = space.IntersectRay(q);
+        var hit = SmsIntersect(SmsRayQuery(probeFrom, probeTo));   // 227: the shared query (his mask, bodies, no areas, his body excluded)
         if (hit.Count == 0)
             return false;
 
-        Vector3 topP = (Vector3)hit["position"];
-        Vector3 topN = (Vector3)hit["normal"];
+        Vector3 topP = (Vector3)hit[SmsKeys.Position];
+        Vector3 topN = (Vector3)hit[SmsKeys.Normal];
 
         // Reject bogus top hits that are far away (prevents "zoom across map")
         Vector3 d = topP - chestP;
@@ -9472,7 +9597,7 @@ public partial class Mario : CharacterBody3D
 
         LockArmatureVisualRoot();
         // Drop (optional): press B to let go
-        if (Input.IsActionJustPressed("button_b"))
+        if (Input.IsActionJustPressed(SmsNames.Of("button_b")))
         {
             ExitLedgeHangToFall();
             return;
@@ -9491,7 +9616,7 @@ public partial class Mario : CharacterBody3D
         }
 
         // A = quick get up / hop
-        if (Input.IsActionJustPressed("button_a"))
+        if (Input.IsActionJustPressed(SmsNames.Of("button_a")))
         {
             // play hop anim and give impulse
             stateOfMario = MarioState.ledgeHopUp;
@@ -9548,7 +9673,7 @@ public partial class Mario : CharacterBody3D
         ledgeRegrabCooldown = LEDGE_REGRAB_COOLDOWN_FRAMES;
 
         stateOfMario = MarioState.idle;
-        animPlayer.Play("ma_wait");
+        animPlayer.Play(SmsNames.Of("ma_wait"));
         SetMarioState(stateOfMario);
         LockArmatureVisualRoot();
 
@@ -9688,8 +9813,8 @@ public partial class Mario : CharacterBody3D
         _treePinned = true;
 
         _treeGrabAnimT = 0f;
-        if (animPlayer != null && animPlayer.HasAnimation("ma_tree_catch"))
-            _treeGrabAnimDur = (float)animPlayer.GetAnimation("ma_tree_catch").Length;
+        if (animPlayer != null && animPlayer.HasAnimation(SmsNames.Of("ma_tree_catch")))
+            _treeGrabAnimDur = (float)animPlayer.GetAnimation(SmsNames.Of("ma_tree_catch")).Length;
 
         stateOfMario = MarioState.treeGrab;
         SetMarioState(stateOfMario);
@@ -9700,29 +9825,24 @@ public partial class Mario : CharacterBody3D
     private float SampleGroundUnderMario(out bool hit)
     {
         hit = false;
-        var space = GetWorld3D()?.DirectSpaceState;
-        if (space == null)
+        if (GetWorld3D()?.DirectSpaceState == null)
             return 0f;
 
         Vector3 from = GlobalPosition + new Vector3(0f, 0.1f, 0f);
         Vector3 to = from + new Vector3(0f, -TREE_GROUND_RAY, 0f);
-        var q = PhysicsRayQueryParameters3D.Create(from, to);
-        q.CollideWithAreas = false;
-        q.CollideWithBodies = true;
-        // Skip Mario himself + the trunk we're hugging
-        var excludes = new Godot.Collections.Array<Godot.Rid> { GetRid() };
+        // Skip Mario himself + the trunk we're hugging (227: the shared query and exclude list; every layer, as Create(from, to) had it)
+        var excludes = SmsRayExcludeSelf();
         if (_treeNode != null)
         {
             foreach (var child in _treeNode.GetChildren())
                 if (child is StaticBody3D sb)
                     excludes.Add(sb.GetRid());
         }
-        q.Exclude = excludes;
-        var result = space.IntersectRay(q);
+        var result = SmsIntersect(SmsRayQuery(from, to, uint.MaxValue, exclude: excludes));
         if (result.Count == 0)
             return 0f;
         hit = true;
-        return ((Vector3)result["position"]).Y;
+        return ((Vector3)result[SmsKeys.Position]).Y;
     }
 
     private float CurrentTreeRadius()
@@ -9755,7 +9875,7 @@ public partial class Mario : CharacterBody3D
         // grabbing (no time spent aiming a direction first) easily lands in this
         // window, since IsActionJustPressed only fires on the single frame of the
         // press — once that frame passes unchecked, the input is just gone.
-        if (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space"))
+        if (Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space")))
         {
             DoTreeJumpOff();
             return;
@@ -9781,7 +9901,7 @@ public partial class Mario : CharacterBody3D
         velocity = Vector3.Zero;
 
         // Jump off
-        if (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space"))
+        if (Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space")))
         {
             DoTreeJumpOff();
             return;
@@ -10084,21 +10204,13 @@ public partial class Mario : CharacterBody3D
         Vector3 from = rc.GlobalTransform.Origin;
         Vector3 to = from + rc.GlobalTransform.Basis * rc.TargetPosition;
 
-        var space = GetWorld3D().DirectSpaceState;
-
-        var q = PhysicsRayQueryParameters3D.Create(from, to);
-        q.CollisionMask = rc.CollisionMask;
-        q.CollideWithBodies = true;
-        q.CollideWithAreas = false;
-        q.Exclude = new Godot.Collections.Array<Rid> { GetRid() }; // exclude Mario body RID
-
-        var hit = space.IntersectRay(q);
+        var hit = SmsIntersect(SmsRayQuery(from, to, rc.CollisionMask));   // 227: the shared query; the sensor's mask, Mario's body excluded
 
         if (hit.Count > 0)
         {
-            var collider = hit["collider"];
-            var pos = (Vector3)hit["position"];
-            var normal = (Vector3)hit["normal"];
+            var collider = hit[SmsKeys.Collider];
+            var pos = (Vector3)hit[SmsKeys.Position];
+            var normal = (Vector3)hit[SmsKeys.Normal];
             GD.Print($"[{name}] HIT collider={collider} pos={pos} n={normal} from={from} to={to}");
         }
         else
@@ -10178,24 +10290,16 @@ public partial class Mario : CharacterBody3D
 
     private void SnapBodyToFloorUnderSelf()
     {
-        var space = GetWorld3D().DirectSpaceState;
-
         // cast from slightly above our current position straight down
         Vector3 from = GlobalPosition + Vector3.Up * (capHalfHeightWorld * 0.6f);
         Vector3 to = GlobalPosition + Vector3.Down * (capHalfHeightWorld * 2.5f);
 
-        var q = PhysicsRayQueryParameters3D.Create(from, to);
-        q.CollisionMask = CollisionMask;
-        q.CollideWithBodies = true;
-        q.CollideWithAreas = false;
-        q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-
-        var hit = space.IntersectRay(q);
+        var hit = SmsIntersect(SmsRayQuery(from, to));   // 227: the shared query
         if (hit.Count == 0)
             return;
 
-        Vector3 p = (Vector3)hit["position"];
-        Vector3 n = (Vector3)hit["normal"];
+        Vector3 p = (Vector3)hit[SmsKeys.Position];
+        Vector3 n = (Vector3)hit[SmsKeys.Normal];
 
         // only snap to reasonably walkable surfaces
         if (n.Dot(Vector3.Up) < 0.65f)
@@ -10228,7 +10332,7 @@ public partial class Mario : CharacterBody3D
         if (_sm != null)
         {
             float len = _sm.GetCurrentLength();
-            if (len > 0.0001f && _sm.GetCurrentNode().ToString().Contains("run"))
+            if (len > 0.0001f && SmsStateNode().Contains("run"))
                 _runBobPhase = _sm.GetCurrentPlayPosition() / len * Mathf.Tau * RunBobDipsPerLoop;
         }
 
@@ -10601,7 +10705,7 @@ public partial class Mario : CharacterBody3D
             else
             {
                 stateOfMario = MarioState.idle;
-                animPlayer.Play("ma_wait");
+                animPlayer.Play(SmsNames.Of("ma_wait"));
                 SetMarioState(stateOfMario);
             }
 
@@ -10680,7 +10784,7 @@ public partial class Mario : CharacterBody3D
         velocity.Y = 0f;
 
         stateOfMario = MarioState.pickupRaise;
-        animPlayer.Play("ma_raise");
+        animPlayer.Play(SmsNames.Of("ma_raise"));
     }
 
     private ShineSprite _pendingShine;
@@ -10788,12 +10892,12 @@ public partial class Mario : CharacterBody3D
                 );
 
             // Play once and hold on the last frame — never loop the cutscene.
-            var camAnim = _shineGetCamAP.GetAnimation("ShineGet");
+            var camAnim = _shineGetCamAP.GetAnimation(SmsNames.Of("ShineGet"));
             if (camAnim != null)
                 camAnim.LoopMode = Animation.LoopModeEnum.None;
 
             _shineGetCam.MakeCurrent();
-            _shineGetCamAP.Play("ShineGet");
+            _shineGetCamAP.Play(SmsNames.Of("ShineGet"));
             GD.Print(
                 $"[ShineGet] switched to ShineGetCam (current={_shineGetCam.Current}), playing '{_shineGetCamAP.CurrentAnimation}'"
             );
@@ -10831,6 +10935,12 @@ public partial class Mario : CharacterBody3D
 
     private void OnAnimationFinished(StringName animName)
     {
+        // 176: a demo clip's end -- on to the clip it named (the stance's drop-in -> the stance loop), else hold its last frame for the caller
+        if (_smsDemoClip != "" && animName == _smsDemoClip)
+        {
+            if (_smsDemoThen != "") { animPlayer.Play(_smsDemoThen); _smsDemoClip = _smsDemoThen; _smsDemoThen = ""; }
+            return;
+        }
         // PICKUP RAISE finished
         if (stateOfMario == MarioState.pickupRaise && animName == "ma_raise")
         {
@@ -10862,7 +10972,7 @@ public partial class Mario : CharacterBody3D
             Anim_DetachPickup(); // the tick released at frame 4 (throw) / 20 (put) already; a safety net for a clip that ended first
             _isThrowQueued = false; // clear so the next put-down plays ma_put correctly
             stateOfMario = MarioState.idle;
-            animPlayer.Play("ma_wait");
+            animPlayer.Play(SmsNames.Of("ma_wait"));
             SetMarioState(stateOfMario);
             return;
         }
@@ -10873,7 +10983,7 @@ public partial class Mario : CharacterBody3D
             if (SmsShineGetGame) return;   // pass 116: winDemo's stopProcess holds the last frame; the fade (5.333 s + 1 s) ends the demo
             CameraLocked = false;
             stateOfMario = MarioState.idle;
-            animPlayer.Play("ma_wait");
+            animPlayer.Play(SmsNames.Of("ma_wait"));
             SetMarioState(stateOfMario);
 
             // Return rendering to the normal gameplay camera.
@@ -11333,7 +11443,7 @@ public partial class Mario : CharacterBody3D
             return;
         SmsTalkTargetNpc = npc;
         _smsTalkPadFlag = true;
-        if (_smsTalkPadFlagPrev && Input.IsActionJustPressed("button_b"))
+        if (_smsTalkPadFlagPrev && Input.IsActionJustPressed(SmsNames.Of("button_b")))
         {
             npc.StartTalk();
             if (SmsDebugPrint)
@@ -11389,22 +11499,92 @@ public partial class Mario : CharacterBody3D
     /// (kickFruitEffect) is not baked. Returns false while immune.</summary>
     public bool SmsKickFreeze()
     {
-        if (_smsFreezeImmunityTicks > 0) return false;
+        if (_smsFreezeImmunityTicks > 0 || _smsFrostHold) return false;
         _smsFreezeTicks = SmsFreezeParams.KickFreezeFrames * SmsUnits.TicksPerFrame;
         return true;
     }
     private int _smsFreezeTicks, _smsFreezeImmunityTicks; private float _smsFreezeAccum;
     private static class SmsFreezeParams { public const int KickFreezeFrames = 2, NoFreezeFrames = 2; }   // mario.prm mKickFreezeTime / mNoFreezeTime (sms_shipped_params.json)
     public bool SmsFrozen => _smsFreezeTicks > 0;
-    /// <summary>MarioMain.cpp 31-38 / 96: the freeze counts down a tick a tick; when it runs out the immunity starts.</summary>
+    /// <summary>167: THE FROST -- the rematch's Ghost Breath (KINGBOO_REMATCH_gdoc.txt: "a hit freezes Mario for one second"; "nothing in Sunshine freezes, so
+    /// this is built from nothing"). The kick freeze's skip of his move (mFreezeTimer, MarioMain.cpp 96), held for <paramref name="seconds"/>: nothing
+    /// moves him (a Mario in the air hangs there), his POSE is a frame of the SHOCK clip (171, Jaysonn: "use a frame from mario getting shocked for the
+    /// freeze" -- SmsFrostPoseClip at SmsFrostPoseAt of its length, played on the player and paused there, the hurt eyes; the animation tree paused
+    /// behind it; "" = his own pose held), his body carries the frost fog (SmsFrostFog:
+    /// the damage fog's shader in an ice blue; SmsAfterMove), no HP, none of the hurt. Refused -- false -- while invincible, down or shocked, dead, in a
+    /// demo, talking, swimming, already frozen or within a thaw's immunity. A hit through it (SmsDamageExec, TakeShock) thaws him first. The ice about
+    /// him is the attacker's to draw (SmsIceBlock).</summary>
+    public bool SmsFreezeFor(float seconds)
+    {
+        if (!UseSmsPhysics || seconds <= 0f || _smsFreezeTicks > 0 || _smsFreezeImmunityTicks > 0 || _smsInvincibleTicks > 0 || _health <= 0) return false;
+        if (stateOfMario == MarioState.dead || stateOfMario == MarioState.hurt || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.talking || stateOfMario == MarioState.swimming) return false;
+        _smsFreezeTicks = Math.Max(1, Mathf.RoundToInt(seconds * SmsUnits.TicksPerSecond));
+        _smsFrostHold = true; _smsFrostSeconds = seconds; SmsFrostCount++;
+        if (animTree != null) { _smsFrostTreeMode = animTree.CallbackModeProcess; animTree.CallbackModeProcess = AnimationMixer.AnimationCallbackModeProcess.Manual; }   // the tree paused
+        if (animPlayer != null)
+        {
+            _smsFrostPlayerSpeed = animPlayer.SpeedScale;
+            if (!string.IsNullOrEmpty(SmsFrostPoseClip) && animPlayer.HasAnimation(SmsFrostPoseClip))                                                         // 171: the shock's frame
+            {
+                animPlayer.SpeedScale = 1f;
+                animPlayer.Play(SmsFrostPoseClip);
+                animPlayer.Seek(Mathf.Clamp(SmsFrostPoseAt, 0f, 0.99f) * animPlayer.CurrentAnimationLength, true);
+                _smsFrostClip = SmsFrostPoseClip;
+                SetEyeTexture(hurtEyeTexture ?? sleepingEyeTexture);                                                                                      // ma_shock_tx: the eyes squeezed shut
+            }
+            animPlayer.SpeedScale = 0f;                                                                                                                       // held there (a clip driven directly, too)
+        }
+        velocity = Vector3.Zero;
+        if (SmsDebugPrint) GD.Print($"[SMS frost] FROZEN {seconds:F2} s ({_smsFreezeTicks} ticks) in {stateOfMario}{(IsOnFloor() ? "" : ", in the air")}; the pose {(_smsFrostClip != "" ? $"{_smsFrostClip} at {SmsFrostPoseAt:F2}" : "his own")}, the tree {(animTree != null ? _smsFrostTreeMode.ToString() : "none")} paused");
+        return true;
+    }
+    private bool _smsFrostHold; private float _smsFrostSeconds, _smsFrostPlayerSpeed = 1f; private AnimationMixer.AnimationCallbackModeProcess _smsFrostTreeMode; private string _smsFrostClip = "";
+    /// <summary>171: the clip the frozen Mario holds a frame of (the shock's ma_shock; "" = his own pose) and where in it (0..1 of its length).</summary>
+    /// <summary>187 (the King Boo rematch; Jaysonn: "the freeze breath still feels like I'm unfairly getting hit"): while he is FROZEN the ice is his shield -- a hit or a shock
+    /// shatters it (he thaws at once) and does nothing else: no knockdown, no HP, no shock. Off: 167's -- the hit thaws him and lands as ever.</summary>
+    [Export] public bool SmsFrostShields = true;
+    [Export] public string SmsFrostPoseClip = "ma_shock";
+    [Export(PropertyHint.Range, "0,0.99,0.01")] public float SmsFrostPoseAt = 0.5f;
+    /// <summary>171, for the drives: the clip he holds while frozen, its frame (seconds) and the player's speed -- "" when not frozen or holding his own pose.</summary>
+    public string SmsFrostPoseNow => _smsFrostHold && _smsFrostClip != "" && animPlayer != null ? $"{animPlayer.CurrentAnimation}@{animPlayer.CurrentAnimationPosition:F3}/{animPlayer.CurrentAnimationLength:F3}x{animPlayer.SpeedScale:F1}" : "";
+    /// <summary>171, for the drives: the eye texture his eye material holds -- awake / sleep / hurt / tired / other (the damage fog's copies
+    /// follow it since 171: SmsBodyOverlay.SyncAlbedo).</summary>
+    public string SmsEyeNow => leftEyeMaterial == null ? "none" : leftEyeMaterial.AlbedoTexture == awakeEyeTexture ? "awake" : leftEyeMaterial.AlbedoTexture == sleepingEyeTexture ? "sleep" : leftEyeMaterial.AlbedoTexture == hurtEyeTexture ? "hurt" : leftEyeMaterial.AlbedoTexture == tiredEyeTexture ? "tired" : "other";
+    /// <summary>167: the frost fog's colour (an ice blue; framebuffer values as the damage pink is) and a thaw's immunity to another freeze (ticks).</summary>
+    public static readonly Color SmsFrostFog = new Color(0.55f, 0.85f, 1f);
+    public const int FrostImmunityTicks = 60;
+    /// <summary>167, for the ice and the drives: he is in the frost (not the kick's two-frame freeze), his pose is held by it, how many times he has been, the seconds left.</summary>
+    public bool SmsFrosted => _smsFrostHold && _smsFreezeTicks > 0;
+    public bool SmsFrostPoseHeld => _smsFrostHold && animTree != null && animTree.CallbackModeProcess == AnimationMixer.AnimationCallbackModeProcess.Manual;
+    public int SmsFrostCount { get; private set; }
+    public float SmsFrostLeft => _smsFrostHold ? _smsFreezeTicks / SmsUnits.TicksPerSecond : 0f;
+    /// <summary>MarioMain.cpp 31-38 / 96: the freeze counts down a tick a tick; when it runs out the immunity starts (167: a frost's end is the thaw).</summary>
     private void SmsFreezeTick(double delta)
     {
         int n = SmsUnits.TicksFor(delta, ref _smsFreezeAccum);
         for (int i = 0; i < n; i++)
         {
-            if (_smsFreezeTicks > 0) { if (--_smsFreezeTicks == 0) _smsFreezeImmunityTicks = SmsFreezeParams.NoFreezeFrames * SmsUnits.TicksPerFrame; }
+            if (_smsFreezeTicks > 0) { if (--_smsFreezeTicks == 0) { _smsFreezeImmunityTicks = SmsFreezeParams.NoFreezeFrames * SmsUnits.TicksPerFrame; if (_smsFrostHold) SmsThaw(); } }
             else if (_smsFreezeImmunityTicks > 0) _smsFreezeImmunityTicks--;
         }
+    }
+    /// <summary>167: the frost ends -- the tree and the player run again, FrostImmunityTicks of immunity to another freeze. Also what a hit through the frost does first.</summary>
+    private void SmsThaw()
+    {
+        if (!_smsFrostHold) return;
+        _smsFrostHold = false; _smsFreezeTicks = 0;
+        _smsFreezeImmunityTicks = Math.Max(_smsFreezeImmunityTicks, FrostImmunityTicks);
+        if (_smsFrostClip != "" && animPlayer != null) { animPlayer.Stop(true); _smsFrostClip = ""; SleepStatus(false); }   // 171: the shock frame let go (the pose kept until the tree's next frame), the eyes open
+        if (animTree != null && animTree.CallbackModeProcess == AnimationMixer.AnimationCallbackModeProcess.Manual) animTree.CallbackModeProcess = _smsFrostTreeMode;
+        if (animPlayer != null && animPlayer.SpeedScale == 0f) animPlayer.SpeedScale = _smsFrostPlayerSpeed;
+        if (SmsDebugPrint) GD.Print($"[SMS frost] THAWED after {_smsFrostSeconds:F2} s: {stateOfMario}, the tree {(animTree != null ? animTree.CallbackModeProcess.ToString() : "none")}, immune {FrostImmunityTicks} ticks");
+    }
+    /// <summary>203: the frost ended from outside (the split cutscene clears the field -- the ice on him goes with the attacks): the thaw now, the immunity as ever.</summary>
+    public void SmsThawNow(string why)
+    {
+        if (!_smsFrostHold) return;
+        SmsThaw();
+        if (SmsDebugPrint) GD.Print($"[SMS frost] thawed for {why}");
     }
 
     /// <summary>findNearestTakeNPC (MarDirectorEvent.cpp 61): a liftable NPC (isNowCanTaken) in his isTakeSituation.</summary>
@@ -11743,6 +11923,11 @@ public partial class Mario : CharacterBody3D
         // and dmgenemycommon.prm gives no invincibility), but ours keep touching him through the fall.
         if (stateOfMario == MarioState.hurt)
             return;
+        if (_smsFrostHold)              // 167: a hit through the frost breaks the ice; 187: the ICE takes the hit (SmsFrostShields) -- shattered, no knockdown, no HP
+        {
+            SmsThaw();
+            if (SmsFrostShields) { if (SmsDebugPrint) GD.Print("[SMS frost] the ICE took the hit -- shattered, no damage"); return; }
+        }
         if (stateOfMario == MarioState.swimming)
         {
             SmsSwimDamageExec(attackerPos, p); // SWIM_P_DAMAGE; air instead of HP under water
@@ -11975,7 +12160,7 @@ public partial class Mario : CharacterBody3D
             {
                 if (animTree != null)
                     animTree.Active = false;
-                animPlayer.Play("ma_damage_wait");
+                animPlayer.Play(SmsNames.Of("ma_damage_wait"));
                 _smsDamageWaitPhase = 2;
                 return;
             }
@@ -11988,7 +12173,7 @@ public partial class Mario : CharacterBody3D
         {
             if (animTree != null)
                 animTree.Active = false;
-            animPlayer.Play("ma_damage_wait"); // a direct ma_wait from the idle code: waiting() would show the pant
+            animPlayer.Play(SmsNames.Of("ma_damage_wait")); // a direct ma_wait from the idle code: waiting() would show the pant
             return;
         }
         _smsDamageWaitPhase = 0; // something else has the player
@@ -12010,19 +12195,13 @@ public partial class Mario : CharacterBody3D
         _smsInWater = false;
         _smsInShallowWater = false;
         float feetY = SmsFeetY();
-        var space = GetWorld3D().DirectSpaceState;
-        var q = new PhysicsPointQueryParameters3D
+        // 227: the shared point query; the hit list and each hit's dictionary disposed here, not left to the finalizer
+        var hits = GetWorld3D().DirectSpaceState.IntersectPoint(SmsPointQuery(new Vector3(GlobalPosition.X, feetY + 0.01f, GlobalPosition.Z)), 8);
+        foreach (var hit in hits) using (hit)
         {
-            Position = new Vector3(GlobalPosition.X, feetY + 0.01f, GlobalPosition.Z),
-            CollideWithAreas = true,
-            CollideWithBodies = false,
-            CollisionMask = uint.MaxValue,
-        };
-        foreach (var hit in space.IntersectPoint(q, 8))
-        {
-            if (hit["collider"].As<GodotObject>() is not Area3D area)
+            if (hit[SmsKeys.Collider].As<GodotObject>() is not Area3D area)
                 continue;
-            if (!area.IsInGroup("sms_water") && !area.HasMeta("sms_water"))
+            if (!area.IsInGroup(SmsNames.Of("sms_water")) && !area.HasMeta(SmsNames.Of("sms_water")))
                 continue;
             float surface = SmsWaterSurfaceOf(area);
             if (surface < feetY)
@@ -12031,23 +12210,21 @@ public partial class Mario : CharacterBody3D
             {
                 _smsInWater = true;
                 _smsWaterSurfaceY = surface;
-                _smsInShallowWater = area.IsInGroup("sms_pool") || area.HasMeta("sms_pool");   // pass 137: the pool flag follows the surface that won
+                _smsInShallowWater = area.IsInGroup(SmsNames.Of("sms_pool")) || area.HasMeta(SmsNames.Of("sms_pool"));   // pass 137: the pool flag follows the surface that won
             }
         }
+        SmsFree.Array(hits);
         if (!_smsInWater)
             return;
         Vector3 from = new Vector3(GlobalPosition.X, feetY + 0.05f, GlobalPosition.Z);
-        var rq = PhysicsRayQueryParameters3D.Create(from, from + Vector3.Down * 30f, CollisionMask);
-        rq.CollideWithAreas = false;
-        rq.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        var r = space.IntersectRay(rq);
-        _smsWaterFloorY = r.Count > 0 ? ((Vector3)r["position"]).Y : float.NegativeInfinity;
+        var r = SmsIntersect(SmsRayQuery(from, from + Vector3.Down * 30f));   // 227: the shared query
+        _smsWaterFloorY = r.Count > 0 ? ((Vector3)r[SmsKeys.Position]).Y : float.NegativeInfinity;
     }
 
     private static float SmsWaterSurfaceOf(Area3D area)
     {
-        if (area.HasMeta("sms_water_surface_y"))
-            return (float)area.GetMeta("sms_water_surface_y").AsDouble();
+        if (area.HasMeta(SmsNames.Of("sms_water_surface_y")))
+            return (float)area.GetMeta(SmsNames.Of("sms_water_surface_y")).AsDouble();
         foreach (Node child in area.GetChildren())
         {
             if (child is CollisionShape3D cs && cs.Shape is BoxShape3D box)
@@ -12232,11 +12409,8 @@ public partial class Mario : CharacterBody3D
             return true;
         Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
         Vector3 from = new Vector3(GlobalPosition.X, SmsFeetY() + 0.8f, GlobalPosition.Z);
-        var rq = PhysicsRayQueryParameters3D.Create(from, from + face * 0.75f, CollisionMask);
-        rq.CollideWithAreas = false;
-        rq.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        var r = GetWorld3D().DirectSpaceState.IntersectRay(rq);
-        return r.Count > 0 && ((Vector3)r["normal"]).Y < 0.5f;
+        var r = SmsIntersect(SmsRayQuery(from, from + face * 0.75f));   // 227: the shared query
+        return r.Count > 0 && ((Vector3)r[SmsKeys.Normal]).Y < 0.5f;
     }
 
     /// <summary>swimMain() for one physics frame: the jump check, the float limit, the status handler with doSwimming().</summary>
@@ -12254,8 +12428,8 @@ public partial class Mario : CharacterBody3D
         float feetY = SmsFeetY();
         bool stick = inputDirWorld.LengthSquared() > 1e-6f && _smsIntendedMag > 0f;
         Vector3 stickDir = stick ? new Vector3(inputDirWorld.X, 0f, inputDirWorld.Z).Normalized() : Vector3.Zero;
-        bool aPressed = Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space");
-        bool bPressed = Input.IsActionJustPressed("button_b");
+        bool aPressed = Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space"));
+        bool bPressed = Input.IsActionJustPressed(SmsNames.Of("button_b"));
         if (_smsDrowned)
         {
             // swimDown() / swimPDown(): no control, speed 0, buoyancy only; the game's death demo -> here R respawns
@@ -12714,8 +12888,8 @@ public partial class Mario : CharacterBody3D
         SmsRideSetup(); // the engine's platform carry off: checkRideMovement's own (pass 63)
         SmsFluddSetupTurboAnims(); // S5: ma_turbo_dash / ma_broad_jump as BaseSM states
         // the pump clips ping-pong (addUpper: ATTR_PING_PONG_LOOP; the tank's are slaved to Mario's)
-        if (animPlayer.HasAnimation("ma_pump"))
-            animPlayer.GetAnimation("ma_pump").LoopMode = Animation.LoopModeEnum.Pingpong;
+        if (animPlayer.HasAnimation(SmsNames.Of("ma_pump")))
+            animPlayer.GetAnimation(SmsNames.Of("ma_pump")).LoopMode = Animation.LoopModeEnum.Pingpong;
         if (_fluddTankAnim != null)
             foreach (string a in _fluddTankAnim.GetAnimationList())
                 if (a.Contains("pmp") || a.Contains("pump"))
@@ -12732,7 +12906,7 @@ public partial class Mario : CharacterBody3D
             string tankClips = _fluddTankAnim == null ? "none" : string.Join(", ", _fluddTankAnim.GetAnimationList());
             string hoverClips = _fluddNozzleAnim[1] == null ? "none" : string.Join(", ", _fluddNozzleAnim[1].GetAnimationList());
             string muzzles = string.Join(", ", new[] { 0, 1, 2, 3 }.Select(i => $"{SmsNozzleFolder[i]}: {(_fluddMuzzleBone[i] == null ? "no skeleton" : string.Join("/", _fluddMuzzleBone[i]))}"));
-            GD.Print($"[SMS fludd] pack on jnt_chest: tank bones {_fluddTankSkel?.GetBoneCount() ?? 0}, nozzle_center {(_fluddNozzleParent is BoneAttachment3D ? "yes" : "NO")}, tank clips [{tankClips}], hover clips [{hoverClips}]; spray on, hover second, housed; water {_fluddWater}; muzzle bones [{muzzles}]; R click action {(InputMap.HasAction("button_rclick") ? "yes" : "NO (the A+R burst is off)")}");
+            GD.Print($"[SMS fludd] pack on jnt_chest: tank bones {_fluddTankSkel?.GetBoneCount() ?? 0}, nozzle_center {(_fluddNozzleParent is BoneAttachment3D ? "yes" : "NO")}, tank clips [{tankClips}], hover clips [{hoverClips}]; spray on, hover second, housed; water {_fluddWater}; muzzle bones [{muzzles}]; R click action {(InputMap.HasAction(SmsNames.Of("button_rclick")) ? "yes" : "NO (the A+R burst is off)")}");
         }
     }
 
@@ -12753,9 +12927,9 @@ public partial class Mario : CharacterBody3D
         if (!_fluddReady)
             return;
         int n = SmsUnits.TicksFor(delta, ref _fluddTickAccum);
-        _fluddR = _smsPadDisabledTicks > 0 ? 0f : Input.GetActionStrength("button_r");   // pass 114: no MEANING_R while the pad is dead
+        _fluddR = _smsPadDisabledTicks > 0 ? 0f : Input.GetActionStrength(SmsNames.Of("button_r"));   // pass 114: no MEANING_R while the pad is dead
         // gunExec(): X swaps to the second nozzle and back (changeBackup: only from a finished tween)
-        if (_smsPadDisabledTicks == 0 && Input.IsActionJustPressed("button_x") && stateOfMario != MarioState.hurt && stateOfMario != MarioState.dead)   // pass 114: no MEANING_X either
+        if (_smsPadDisabledTicks == 0 && Input.IsActionJustPressed(SmsNames.Of("button_x")) && stateOfMario != MarioState.hurt && stateOfMario != MarioState.dead)   // pass 114: no MEANING_X either
         {
             if (_fluddSwitch <= 0f)
             {
@@ -12783,7 +12957,7 @@ public partial class Mario : CharacterBody3D
             if (SmsDebugPrint) GD.Print($"[SMS fludd] N: nozzle box -> {next} (X now swaps Spray <-> {_fluddSecond}); water {_fluddWater}/{SmsFluddCurrent.AmountMax}");
         }
         _fluddKeyN = keyN;
-        _fluddAFrame = Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space");
+        _fluddAFrame = Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space"));
         if (_fluddDrops != null)
             _fluddDrops.MarioPos = GlobalPosition;
         for (int i = 0; i < n; i++)
@@ -13106,7 +13280,7 @@ public partial class Mario : CharacterBody3D
         _stdHud.Idle = stateOfMario == MarioState.idle && !_smsTalking;   // MARIO_STATUS_WAIT: READ_BILLBOARD (the NPC talk) is not it
         _stdHud.Dead = stateOfMario == MarioState.dead || _health <= 0;
         _stdHud.ShineDemo = stateOfMario == MarioState.shineGet;
-        _stdHud.Demo = CameraLocked || stateOfMario == MarioState.talking || _stdHud.ShineDemo || _stdHud.Dead;
+        _stdHud.Demo = (CameraLocked && _pendingShine == null) || stateOfMario == MarioState.talking || _stdHud.ShineDemo || _stdHud.Dead;   // 222: not the fall after a Shine touched in the air -- the game's demo camera and DIRECTOR_FLAG_SHINE_TAKEN (fireGetStar) come at the landing; counting the lock sent the counters off with no SHINE_TAKEN and the shine get found the console already in its demo: no shine counter
     }
 
     private void SmsStandardHudTick()
@@ -13134,11 +13308,13 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>The level's ShineTimer (the stopwatch the console's timer shows) and his TimerHud nodes (hidden, the console draws
     /// t_0 instead), wherever the level put them.</summary>
+    private readonly System.Collections.Generic.Stack<Node> _stdHudWalk = new();   // 227: re-used; the walk runs every 2 s while the level has no ShineTimer
     private void SmsStandardHudFindLevelNodes()
     {
         if (_stdHud == null || !IsInsideTree())
             return;
-        var stack = new System.Collections.Generic.Stack<Node>();
+        var stack = _stdHudWalk;
+        stack.Clear();
         stack.Push(GetTree().Root);
         while (stack.Count > 0)
         {
@@ -13147,8 +13323,9 @@ public partial class Mario : CharacterBody3D
                 _stdHudTimer = st;
             else if (n is TimerHud th)
                 th.Visible = false;
-            foreach (Node c in n.GetChildren())
-                stack.Push(c);
+            int count = n.GetChildCount();
+            for (int i = 0; i < count; i++)   // 227: by index, the same order -- GetChildren() made an array (and its enumerator) per node, hundreds a walk
+                stack.Push(n.GetChild(i));
         }
     }
 
@@ -13400,7 +13577,7 @@ public partial class Mario : CharacterBody3D
             tree.ConnectNode("PumpScale", 0, "PumpSeek");
             tree.ConnectNode("CarryBlend", 1, "PumpScale");
         }
-        _fluddPumpLen = animPlayer.HasAnimation("ma_pump") ? animPlayer.GetAnimation("ma_pump").Length : 0.0;
+        _fluddPumpLen = animPlayer.HasAnimation(SmsNames.Of("ma_pump")) ? animPlayer.GetAnimation(SmsNames.Of("ma_pump")).Length : 0.0;
         animTree.Set(SMS_PUMP_SCALE_PATH, 0f);
         Variant back = animTree.Get(SMS_PUMP_SCALE_PATH);
         _fluddPumpSeekReady = back.VariantType == Variant.Type.Float && Mathf.IsZeroApprox((float)back) && _fluddPumpLen > 0.0;
@@ -13497,8 +13674,8 @@ public partial class Mario : CharacterBody3D
     public double SmsUpperDamageRunTime => _smsDgrunT;
     private void SmsSetupUpperDamageRun()
     {
-        if (skeleton == null || animPlayer == null || !animPlayer.HasAnimation("ma_dgrun")) return;
-        var clip = animPlayer.GetAnimation("ma_dgrun");
+        if (skeleton == null || animPlayer == null || !animPlayer.HasAnimation(SmsNames.Of("ma_dgrun"))) return;
+        var clip = animPlayer.GetAnimation(SmsNames.Of("ma_dgrun"));
         _smsDgrunGraft = new SmsUpperPose { Name = "SmsUpper_ma_dgrun" };
         skeleton.AddChild(_smsDgrunGraft);
         skeleton.MoveChild(_smsDgrunGraft, 0);
@@ -13664,7 +13841,7 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>MEANING_R, the GC trigger's click at the end of its travel: the button_rclick action when the map has one, else the
     /// pad's full pull (the analog is still the pressure; easing off the click keeps it -- the turbo's charge-then-go).</summary>
-    private bool SmsRClick() => InputMap.HasAction("button_rclick") ? Input.IsActionPressed("button_rclick") : _fluddR >= SmsParams.Squat.RClickPull;
+    private bool SmsRClick() => InputMap.HasAction(SmsNames.Of("button_rclick")) ? Input.IsActionPressed(SmsNames.Of("button_rclick")) : _fluddR >= SmsParams.Squat.RClickPull;
 
     /// <summary>gunExec() for one tick: the pressure, the nozzle's movement, the refill in water, the emit.</summary>
     private void SmsFluddGunExecTick()
@@ -14331,7 +14508,7 @@ public partial class Mario : CharacterBody3D
         return SmsRClick() || SmsSquatLHeld();
     }
 
-    private static bool SmsSquatLHeld() => Input.IsActionPressed("button_l") || Input.IsActionPressed("button_z") || Input.IsActionPressed("key_z");
+    private static bool SmsSquatLHeld() => Input.IsActionPressed(SmsNames.Of("button_l")) || Input.IsActionPressed(SmsNames.Of("button_z")) || Input.IsActionPressed(SmsNames.Of("key_z"));
 
     /// <summary>squating() / squatStandup() for one physics frame. True: the frame is his (the caller ends it). False: the stand-up
     /// was cut by A (JUMP) or the stick (RUN) and he is idle -- the ground logic runs on this frame.</summary>
@@ -14342,7 +14519,7 @@ public partial class Mario : CharacterBody3D
         velocity.X = 0f;
         velocity.Z = 0f;
         velocity.Y = -2f;
-        bool aFrame = Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space");
+        bool aFrame = Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space"));
         bool stick = _smsIntendedMag > 0f;
         if (_smsSquatEndTicks > 0)
         {
@@ -14457,7 +14634,7 @@ public partial class Mario : CharacterBody3D
         _smsSquatEndReady = false;
         if (animTree == null || animPlayer == null || animTree.TreeRoot is not AnimationNodeBlendTree tree || tree.GetNode("BaseSM") is not AnimationNodeStateMachine sm)
             return;
-        if (animPlayer.HasAnimation("ma_sqend") && sm.HasNode("ma_wait"))
+        if (animPlayer.HasAnimation(SmsNames.Of("ma_sqend")) && sm.HasNode("ma_wait"))
         {
             if (!sm.HasNode("ma_sqend"))
             {
@@ -14494,6 +14671,8 @@ public partial class Mario : CharacterBody3D
         _smsHeadGunRot = new SmsBoneRotZ { Name = "SmsHeadGunAngle", BoneNames = new[] { "jnt_head" }, Angles = new float[1] };
         skeleton.AddChild(_smsHeadGunRot);
         skeleton.MoveChild(_smsHeadGunRot, 0);
+        _smsHeadLook = new SmsHeadLook { Name = "SmsHeadLook" };   // 175: last in the modifier order -- it REPLACES the head's pose while a demo has it
+        skeleton.AddChild(_smsHeadLook);
     }
 
     /// <summary>calcGunAngle() (WaterGun.cpp 216) for this tick. In MARIO_STATUS_SQUAT the target is the angle itself plus the stick's
@@ -14623,8 +14802,8 @@ public partial class Mario : CharacterBody3D
         bool want = _fluddDashing && fwd >= SmsParams.Mario.DashMax - 1f && _fluddTurboAnimReady && _sm != null && animTree != null && animTree.Active;
         if (want)
         {
-            if ((string)_sm.GetCurrentNode() != "ma_turbo_dash")
-                _sm.Travel("ma_turbo_dash");
+            if (SmsStateNode() != "ma_turbo_dash")
+                _sm.Travel(SmsNames.Of("ma_turbo_dash"));
             _fluddDashAnimOn = true;
         }
         else if (_fluddDashAnimOn)
@@ -14659,7 +14838,8 @@ public partial class Mario : CharacterBody3D
         ["ma_ladder_hang_kick"] = 1, ["ma_ladder_roll_up"] = 1, ["ma_ladder_roll_down"] = 1,
         ["ma_hiped"] = 2, ["ma_hipsr"] = 2, ["ma_hipat"] = 2, ["ma_jump"] = 2, ["ma_roll"] = 2, ["ma_run2"] = 2,
         ["ma_tjmp2"] = 2, ["ma_tjmp1"] = 2, ["ma_jump_rolling"] = 2, ["ma_step1"] = 2, ["ma_step2"] = 2, ["ma_step3"] = 2,
-        ["ma_jkick"] = 2, ["ma_dgrun"] = 2, ["ma_turbo_dash"] = 2, ["ma_giant_rolling"] = 2, ["ma_monteman_wait"] = 2, ["ma_demo_gate_out_appear_get"] = 2
+        ["ma_jkick"] = 2, ["ma_dgrun"] = 2, ["ma_turbo_dash"] = 2, ["ma_giant_rolling"] = 2, ["ma_monteman_wait"] = 2, ["ma_demo_gate_out_appear_get"] = 2,
+        ["ma_battle_stance_in"] = 2, ["ma_battle_stance"] = 2   // 176: the rematch intro's battle stance (assets/Mario/Anims): fists, as the sprite refs
     };
 
     private static readonly System.Text.RegularExpressions.Regex SmsClipSuffix = new(@" \d+$");
@@ -14668,7 +14848,7 @@ public partial class Mario : CharacterBody3D
     /// the AnimationPlayer's clip while the tree is off.</summary>
     private string SmsCurrentClip()
     {
-        string clip = animTree != null && animTree.Active && _sm != null ? (string)_sm.GetCurrentNode() : animPlayer?.CurrentAnimation ?? "";
+        string clip = animTree != null && animTree.Active && _sm != null ? SmsStateNode() : animPlayer?.CurrentAnimation ?? "";
         return SmsClipSuffix.Replace(clip, "");
     }
 
@@ -14677,6 +14857,7 @@ public partial class Mario : CharacterBody3D
     private HandPose SmsHandPose()
     {
         if (_smsHandCap) return HandPose.WithHat;   // 121/122: the return pose, the cap in the right hand (TMario::calcAnim: hnd4r while the frame < 158)
+        if (_smsBomb != null) return LassoArm == "L" ? HandPose.LassoL : HandPose.LassoR;   // 161: the fist closed on the Bomb Boo's tongue
         string clip = SmsCurrentClip();
         int hand;
         if (heldBody != null)
@@ -14694,7 +14875,7 @@ public partial class Mario : CharacterBody3D
     {
         if (!UseSmsPhysics || animTree == null || animTree.TreeRoot is not AnimationNodeBlendTree tree || tree.GetNode("BaseSM") is not AnimationNodeStateMachine sm)
             return;
-        if (!sm.HasNode("ma_hipsr") && animPlayer.HasAnimation("ma_hipsr"))
+        if (!sm.HasNode("ma_hipsr") && animPlayer.HasAnimation(SmsNames.Of("ma_hipsr")))
             sm.AddNode("ma_hipsr", new AnimationNodeAnimation { Animation = "ma_hipsr" }, new Vector2(2000f, -120f));
         _smsHipsrInTree = sm.HasNode("ma_hipsr");
         if (SmsDebugPrint)
@@ -14718,7 +14899,7 @@ public partial class Mario : CharacterBody3D
             sm.AddNode(clip, new AnimationNodeAnimation { Animation = clip }, at);
             at += new Vector2(0f, 120f);
         }
-        if (animPlayer.HasAnimation("ma_turbo_dash"))
+        if (animPlayer.HasAnimation(SmsNames.Of("ma_turbo_dash")))
             ForceLoop("ma_turbo_dash");
         _fluddTurboAnimReady = sm.HasNode("ma_turbo_dash");
         if (SmsDebugPrint)
@@ -14880,7 +15061,7 @@ public partial class Mario : CharacterBody3D
         _smsRunBlendReady = false;
         if (animTree == null || animTree.TreeRoot is not AnimationNodeBlendTree tree || tree.GetNode("BaseSM") is not AnimationNodeStateMachine sm)
             return;
-        if (!animPlayer.HasAnimation("ma_run1") || !animPlayer.HasAnimation("ma_run2"))
+        if (!animPlayer.HasAnimation(SmsNames.Of("ma_run1")) || !animPlayer.HasAnimation(SmsNames.Of("ma_run2")))
             return;
         if (!sm.HasNode("ma_runblend"))
         {
@@ -14986,7 +15167,7 @@ public partial class Mario : CharacterBody3D
     {
         if (_smsWaist == null)
             return;
-        string node = animTree != null && animTree.Active && _sm != null ? (string)_sm.GetCurrentNode() : "";
+        string node = animTree != null && animTree.Active && _sm != null ? SmsStateNode() : "";
         bool apply = node == "ma_run1" || node == "ma_run2" || node == "ma_runblend";
         // MarioWaistCtrl's first branch (MarioDraw.cpp 486): in the squat family (status bit 0x8000) a gun angle above 0 -- the R squat's
         // forward aim -- bends the whole upper body forward by that angle in place of the run lean (Rz on chn_chest: the spray, which
@@ -15169,26 +15350,34 @@ public partial class Mario : CharacterBody3D
             if (GameData.Instance != null)
                 GameData.Instance.Lives = _lives;
             _smsConsoleStr?.StartAppearMiss();
-            if (MissJingle != null && MissJingle.Stream != null)
-                MissJingle.Play();
+            // 213: MSBgm::startBGM(lives left ? MSD_BGM_MISS : MSD_BGM_GAMEOVER) (MSoundBGM.cpp; the director's literals 0x8001000C / 0x80010028 --
+            // the decomp's enum names them one place off): those jingles first stopTrackBGMs(3, 0) -- every music track cut at once, no fade (the
+            // boss's, the stage's) -- then play on their own track, whose end the Miss state waits for below
+            _smsMissMusicStopped = SmsActorSound.StopAllMusic(this, _lives >= 0 ? "the miss" : "the game over");
+            // 216: then MSound::demoModeIn(0x16f, false) -- the sound effects silent but the system's and his voice (his cry plays on), till the next stage's load
+            SmsActorSound.DemoModeIn(SmsActorSound.MissDemoMask, _lives >= 0 ? "the miss" : "the game over");
+            _smsMissJingle = _lives >= 0 ? MissJingle : GameOverJingle;
+            if (_smsMissJingle != null && _smsMissJingle.Stream != null)
+                _smsMissJingle.Play();
             if (_smsFader != null)
             {
                 if (_lives >= 0)
-                    _smsFader.StartWipe(SmsFader.Wipe.Arcs, 2.2f); // startWipe(10, 0.0f, 2.2f): Hx_Test2 -- the four curved bands
+                    _smsFader.StartWipe(_smsHellDead ? SmsFader.Wipe.Circle : SmsFader.Wipe.Arcs, _smsHellDead ? 2.0f : 2.2f); // checkDemoFlag(DEMO_FLAG_HELL_DEAD): startWipe(2, 0.0f, 2.0f) -- the iris (212: the death plane's fall); else startWipe(10, 0.0f, 2.2f): Hx_Test2 -- the four curved bands
                 else
                     _smsFader.StartWipe(SmsFader.Wipe.FadeOut, 2.0f, 1.0f); // startWipe(0xD, 0.0f, 2.0f): Hx_GameOver draws a texture the port lacks -- a plain fade
             }
             if (SmsDebugPrint)
-                GD.Print($"[SMS miss] TOO BAD! lives {_lives} ({(_lives >= 0 ? "the stage reloads after the wipe" : "game over")}), the wipe in {(_lives >= 0 ? 2.2f : 2.0f):F1} s");
+                GD.Print($"[SMS miss] TOO BAD! lives {_lives} ({(_lives >= 0 ? "the stage reloads after the wipe" : "game over")}), the {(_lives >= 0 ? (_smsHellDead ? "iris (a hell death)" : "death wipe") : "game-over fade")} in {(_lives >= 0 && !_smsHellDead ? 2.2f : 2.0f):F1} s; {_smsMissMusicStopped} music player(s) stopped, the {(_lives >= 0 ? "miss" : "game-over")} jingle {(_smsMissJingle != null && _smsMissJingle.Stream != null ? $"plays ({_smsMissJingle.Stream.GetLength():F1} s)" : "(slot empty)")}");
             _smsMissTicks = 1;
             return;
         }
         _smsMissTicks++;
         bool faded = _smsFader != null ? _smsFader.IsFullyFadedOut : _smsMissTicks > 120 * 4; // no fader: four seconds
-        bool bgmDone = MissJingle == null || !MissJingle.Playing || _smsMissTicks >= 1200 * 4; // MSBgm::getHandle(2) == 0 || 1200 frames
+        bool bgmDone = _smsMissJingle == null || !_smsMissJingle.Playing || _smsMissTicks >= 1200 * 4; // MSBgm::getHandle(2) == 0 || 1200 frames (213: the jingle that played)
         if (!(faded && bgmDone))
             return;
         _smsMissTicks = int.MinValue;
+        SmsActorSound.DemoModeOut("the stage moves"); // 216: the next stage's MSound::initSound restores every category (here before the load: the statics outlive the scene)
         if (_lives >= 0)
         {
             if (GameData.Instance != null)
@@ -15230,6 +15419,61 @@ public partial class Mario : CharacterBody3D
         SmsLoserDown();
     }
 
+    /// <summary>
+    /// 212: the DEATH PLANE's fall (TMario::thinkSituation, MarioMove.cpp 1886: the ground under him a death plane, its height over his feet --
+    /// <see cref="SmsDeathPlane"/> calls this the tick his feet cross under it): MARIO_FLAG_GAME_OVER, HP 0, MARIO_STATUS_FALL_DEAD -- fallDead()
+    /// (MarioJump.cpp 1278) is jumpProcess(0) alone: he falls on the way he was going, under the gravity and its cap, no control, his clip left as it
+    /// was (SmsFallDeadStep); the cry (MSD_SE_MV10B_CRY_JUMP_01, the FallCry slot) unless he is already in the long fall's ANIM_THROWN, which cried
+    /// it; the camera's HELL dead demo (CAMERA_FLAG_HELL_DEAD_DEMO: SmsCamMarioData.HellDead -- the eye stops and watches him fall away) and the
+    /// director's (DEMO_FLAG_HELL_DEAD: the miss's iris). The miss itself runs as for any death (SmsMissTick). Not ported: mAnmSound->stop() and the
+    /// Yoshi kill (no Yoshi). False (nothing done) when he is already finished -- a game over or the dead status.
+    /// </summary>
+    public bool SmsFallDead(string why)
+    {
+        if (_smsGameOver || stateOfMario == MarioState.dead)
+            return false;
+        _smsGameOver = true; // onFlag(MARIO_FLAG_GAME_OVER)
+        _health = 0;         // mHealth = 0
+        _smsFallDead = true; // changePlayerStatus(MARIO_STATUS_FALL_DEAD, 0, true)
+        _smsHellDead = true; // gpCamera->unk64 |= CAMERA_FLAG_HELL_DEAD_DEMO; onDemoFlag(DEMO_FLAG_HELL_DEAD)
+        _smsLoserFalling = false;
+        stateOfMario = MarioState.dead;
+        bool cry = !_smsLongFallAnim && FallCry != null && FallCry.Stream != null; // if (mAnimationId != ANIM_THROWN) startSoundActor(MSD_SE_MV10B_CRY_JUMP_01)
+        if (cry)
+            FallCry.Play();
+        SmsFallDeadCried = cry;
+        if (SmsDebugPrint)
+            GD.Print($"[SMS fall dead] {why}: his feet at {SmsFeetY():F2} -- game over, HP 0, FALL_DEAD (falling on at {velocity.Y:F1} m/s); the cry {(cry ? "played" : _smsLongFallAnim ? "already (the long fall's)" : "(FallCry slot empty)")}; the camera's hell dead demo, the iris");
+        return true;
+    }
+
+    /// <summary>212, for the drives: in the death plane's fall now (MARIO_STATUS_FALL_DEAD); its cry played at the death; the game-over flag; the lives as
+    /// the flag manager holds them (0x20001).</summary>
+    public bool SmsFallDeadNow => _smsFallDead;
+    public bool SmsFallDeadCried { get; private set; }
+    public bool SmsGameOverNow => _smsGameOver;
+    public int SmsLivesNow => _lives;
+
+    /// <summary>212: fallDead()'s jumpProcess(0): the gravity tick (SmsAir.GravityOnlyTick: Gravity a tick, capped at TerminalVy -- 30 m/s) on the way down,
+    /// the horizontal speed kept (no jumpingBasic: nothing brakes or steers it). The true vy is carried tick to tick (_smsFallDeadVy); the frame moves at
+    /// its ticks' pre-gravity mean, as the fire-down's does.</summary>
+    private void SmsFallDeadStep(double delta)
+    {
+        if (float.IsNaN(_smsFallDeadVy))
+            _smsFallDeadVy = SmsUnits.MpsToSpeed(velocity.Y);
+        int n = SmsUnits.TicksFor(delta, ref _smsFallDeadAccum);
+        if (n <= 0)
+            return;
+        float sumMv = 0f;
+        for (int i = 0; i < n; i++)
+        {
+            SmsAir.GravityOnlyTick(ref _smsFallDeadVy, out float mv);
+            sumMv += mv;
+        }
+        velocity.Y = SmsUnits.SpeedToMps(sumMv / n);
+    }
+    private float _smsFallDeadAccum, _smsFallDeadVy = float.NaN;
+
     /// <summary>LOSER_DOWN (loserDown(), MarioRun.cpp 1474): ANIM_DIE on the ground; the reaction voices are not ported.</summary>
     private void SmsLoserDown()
     {
@@ -15244,7 +15488,7 @@ public partial class Mario : CharacterBody3D
             animTree.Active = true;
         }
         if (_sm != null)
-            _sm.Travel("ma_die");
+            _sm.Travel(SmsNames.Of("ma_die"));
     }
 
     private void SmsDownEnter(bool airborne, float fwd)
@@ -15594,7 +15838,7 @@ public partial class Mario : CharacterBody3D
         if (_sm == null || skeleton == null)
             return;
         bool run = stateOfMario is MarioState.walking or MarioState.running or MarioState.sprinting;
-        string node = _sm.GetCurrentNode().ToString();
+        string node = SmsStateNode();
         if (!run || node != _smsGaitClip)
         {
             _smsGaitPosPrev = -1.0;
@@ -15621,13 +15865,11 @@ public partial class Mario : CharacterBody3D
         int bone = skeleton.FindBone(joint);
         Vector3 foot = bone >= 0 ? (skeleton.GlobalTransform * skeleton.GetBoneGlobalPose(bone)).Origin : GlobalPosition;
         // calcGroundMtx: checkGround from the joint down (the joint hangs over the sole); the plane's tangents from his face angle
-        var q = PhysicsRayQueryParameters3D.Create(foot + Vector3.Up * 0.05f, foot - Vector3.Up * SmsUnits.UnitsToMetres(150f), CollisionMask,
-            new Godot.Collections.Array<Rid> { GetRid() });
-        var hit = GetWorld3D().DirectSpaceState.IntersectRay(q);
+        var hit = SmsIntersect(SmsRayQuery(foot + Vector3.Up * 0.05f, foot - Vector3.Up * SmsUnits.UnitsToMetres(150f)));   // 227: the shared query
         if (hit.Count == 0)
             return;
-        Vector3 ground = (Vector3)hit["position"];
-        Vector3 n = ((Vector3)hit["normal"]).Normalized();
+        Vector3 ground = (Vector3)hit[SmsKeys.Position];
+        Vector3 n = ((Vector3)hit[SmsKeys.Normal]).Normalized();
         if (n.LengthSquared() < 0.5f) n = Vector3.Up;
         Vector3 face = _smsFaceValid ? SmsMath.DirFromYaw(_smsFaceYaw) : SmsFacingOrVelocityDir();
         Vector3 fwd = face - n * face.Dot(n);
@@ -15635,7 +15877,7 @@ public partial class Mario : CharacterBody3D
             return;
         fwd = fwd.Normalized();
         Vector3 right = n.Cross(fwd).Normalized();                       // X x Y = Z: the game's frame is right-handed (its X column = (cos, dy, -sin))
-        SmsFootfall(joint, new Transform3D(new Basis(right, n, fwd), ground), hit["collider"].AsGodotObject() as Node); // pass 133: the dispatcher
+        SmsFootfall(joint, new Transform3D(new Basis(right, n, fwd), ground), hit[SmsKeys.Collider].AsGodotObject() as Node); // pass 133: the dispatcher
     }
 
     /// <summary>The sink lerps: (Max - Min)(1 - t) + Min with t = depth / SinkTime (flat 0.3 / 0.5 as shipped).</summary>
@@ -15742,7 +15984,7 @@ public partial class Mario : CharacterBody3D
         {
             animPlayer.SpeedScale = 1f;
             _smsOilAnimRate = 0f;
-            animPlayer.Play("ma_slpbk"); // the belly slide's clip (CATCH), as the port's bellySlidingFromDive
+            animPlayer.Play(SmsNames.Of("ma_slpbk")); // the belly slide's clip (CATCH), as the port's bellySlidingFromDive
         }
         if (SmsDebugPrint && !(s == MarioState.oilRun && was == MarioState.idle)) // (standing in goop is the game's WAIT <-> OIL_RUN every tick: not worth a line)
             GD.Print($"[SMS goop] {s} from {was} on '{_smsSurfaceNode}': brake {_smsOilBrake}, skid timer {_smsDirtyTimer}, fwd {_smsOilFwd:F1}");
@@ -15786,7 +16028,7 @@ public partial class Mario : CharacterBody3D
         float intendedYaw = stick ? SmsMath.YawFromDir(direction.Normalized()) : _smsFaceYaw;
         float mag = stick ? _smsIntendedMag : 0f;
         Vector3 v = new Vector3(SmsUnits.MpsToSpeed(velocity.X), 0f, SmsUnits.MpsToSpeed(velocity.Z));
-        if (Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space"))
+        if (Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space")))
         {
             // mInput & 2: setPlayerVelocity(0) and the jump -- a goop jump leaves with no run speed
             SmsOilExit();
@@ -15800,7 +16042,7 @@ public partial class Mario : CharacterBody3D
             SetMarioState(stateOfMario);
             return true;
         }
-        if (stateOfMario == MarioState.oilRun && Input.IsActionJustPressed("button_b") && heldBody == null)
+        if (stateOfMario == MarioState.oilRun && Input.IsActionJustPressed(SmsNames.Of("button_b")) && heldBody == null)
         {
             // mInput & 0x8000: mVel.y = 20, JUMP_CATCH(1) -- the dive off the goop
             Vector3 dir = v.LengthSquared() > 1e-6f ? v.Normalized() : SmsMath.DirFromYaw(_smsFaceYaw);
@@ -15886,7 +16128,7 @@ public partial class Mario : CharacterBody3D
         {
             // ANIM_RUN2 at 0.5 x mag x mSlipAnmSpeed (the legs pedal, up to 4.0); no stick: ANIM_SQWAT at 0.5 with the squat button held (mInput & L,
             // MarioRun.cpp 1282; pass 110), else ANIM_WAIT at 0.5
-            string clip = mag > 0f ? "ma_run2" : (SmsSquatLHeld() && animPlayer.HasAnimation("ma_sqwat") ? "ma_sqwat" : "ma_wait");
+            string clip = mag > 0f ? "ma_run2" : (SmsSquatLHeld() && animPlayer.HasAnimation(SmsNames.Of("ma_sqwat")) ? "ma_sqwat" : "ma_wait");
             float rate = mag > 0f ? 0.5f * mag * SmsParams.Dirty.SlipAnmSpeed : 0.5f;
             if (animTree != null)
                 animTree.Active = false;
@@ -16187,7 +16429,7 @@ public partial class Mario : CharacterBody3D
     private void SmsTickFireEnd(Vector3 stickDir)
     {
         velocity = Vector3.Zero; // waitProcess(): setPlayerVelocity(0), on the floor
-        bool aPressed = Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space"); // mInput & 2
+        bool aPressed = Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space")); // mInput & 2
         bool stick = stickDir.LengthSquared() > 1e-6f && _smsIntendedMag > 0f;                          // mInput & 1
         if (aPressed || stick)
         {
@@ -16378,6 +16620,7 @@ public partial class Mario : CharacterBody3D
             case MarioState.wallShuffle:
             case MarioState.carrying:
             case MarioState.groundSpin:
+            case MarioState.spin:
             case MarioState.sideFlipTurning:
             case MarioState.gettingUpFromSliding:
             case MarioState.bellySlidingFromDive:
@@ -16421,6 +16664,11 @@ public partial class Mario : CharacterBody3D
             return;
         if (stateOfMario == MarioState.hurt)
             return; // port-side, as for the knockdowns: not while he is down or already shocked
+        if (_smsFrostHold)              // 167: a shock through the frost breaks the ice; 187: the ICE takes the shock (SmsFrostShields)
+        {
+            SmsThaw();
+            if (SmsFrostShields) { if (SmsDebugPrint) GD.Print("[SMS frost] the ICE took the shock -- shattered, no damage"); return; }
+        }
         SmsElectricDamageEnter("an electric hit");
     }
 
@@ -16511,8 +16759,8 @@ public partial class Mario : CharacterBody3D
         if (animTree != null)
             animTree.Active = false;
         animPlayer.SpeedScale = 1f;
-        if (animPlayer.HasAnimation("ma_shock_down"))
-            animPlayer.Play("ma_shock_down");
+        if (animPlayer.HasAnimation(SmsNames.Of("ma_shock_down")))
+            animPlayer.Play(SmsNames.Of("ma_shock_down"));
         if (SmsDebugPrint)
             GD.Print("[SMS elec] the shock took the last HP: ELEC_DOWN (ma_shock_down)");
     }
@@ -16532,7 +16780,7 @@ public partial class Mario : CharacterBody3D
     {
         Node n = start;
         for (int depth = 0; n != null && depth < 3; depth++, n = n.GetParent())
-            if (n.HasMeta("sms_fence") || n.IsInGroup("sms_fence"))
+            if (n.HasMeta(SmsNames.Of("sms_fence")) || n.IsInGroup(SmsNames.Of("sms_fence")))
                 return true;
         return false;
     }
@@ -16547,7 +16795,7 @@ public partial class Mario : CharacterBody3D
         float cosMax = MathF.Cos(FloorMaxAngle);
         for (int i = 0; i < GetSlideCollisionCount(); i++)
         {
-            KinematicCollision3D c = GetSlideCollision(i);
+            KinematicCollision3D c = SmsSlideHit(i);
             Vector3 cn = c.GetNormal();
             if (cn.Y < cosMax - 1e-3f && cn.Y > -0.5f)
                 return c.GetCollider() as Node;
@@ -16566,11 +16814,11 @@ public partial class Mario : CharacterBody3D
         Vector3 to = at + face * SmsUnits.UnitsToMetres(frontUnits + radiusUnits);
         if (!SmsRay(from, to, out var h))
             return null;
-        Node body = h["collider"].AsGodotObject() as Node;
+        Node body = h[SmsKeys.Collider].AsGodotObject() as Node;
         if (!SmsIsFenceBody(body))
             return null;
-        point = (Vector3)h["position"];
-        normal = (Vector3)h["normal"];
+        point = (Vector3)h[SmsKeys.Position];
+        normal = (Vector3)h[SmsKeys.Normal];
         return body;
     }
 
@@ -16754,7 +17002,7 @@ public partial class Mario : CharacterBody3D
         Vector3 from = new Vector3(inside.X, feet.Y + SmsUnits.UnitsToMetres(160f), inside.Z);
         if (!SmsRay(from, from + Vector3.Down * SmsUnits.UnitsToMetres(160f), out var g))
             return false;
-        float topY = ((Vector3)g["position"]).Y;
+        float topY = ((Vector3)g[SmsKeys.Position]).Y;
         if (topY - feet.Y <= SmsUnits.UnitsToMetres(100f))
             return false;
         Vector3 roofFrom = new Vector3(inside.X, topY + 0.02f, inside.Z);
@@ -16764,7 +17012,7 @@ public partial class Mario : CharacterBody3D
         Vector3 nxz = new Vector3(_smsFenceNormal.X, 0f, _smsFenceNormal.Z).Normalized();
         _smsFenceAnim = "";
         animPlayer.SpeedScale = 1f;
-        SmsEnterLedgeHang(pt, nxz, topY, g["collider"].AsGodotObject());
+        SmsEnterLedgeHang(pt, nxz, topY, g[SmsKeys.Collider].AsGodotObject());
         _smsHangMovingAnim = false;
         stateOfMario = MarioState.ledgeClimb; // ASCEND = the hang's climb-up (ANIM_HGUP): onto the top
         SetMarioState(stateOfMario);
@@ -16781,8 +17029,8 @@ public partial class Mario : CharacterBody3D
         int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
         Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
         Vector3 feet = SmsFeet();
-        bool aPressed = Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space");
-        bool bPressed = Input.IsActionJustPressed("button_b");
+        bool aPressed = Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space"));
+        bool bPressed = Input.IsActionJustPressed(SmsNames.Of("button_b"));
         bool stick = stickDir.LengthSquared() > 1e-6f && _smsIntendedMag > 0f; // mInput & 1
         switch (_smsFence)
         {
@@ -16888,7 +17136,7 @@ public partial class Mario : CharacterBody3D
                 // jumpProcess(1): the floor under the new feet -> LANDING; the top -> ASCEND; a roof within 160 -> clamped under it
                 if (dv < 0f && SmsRay(newFeet + Vector3.Up * SmsUnits.UnitsToMetres(10f), newFeet + Vector3.Down * SmsUnits.UnitsToMetres(2f), out var gnd))
                 {
-                    GlobalPosition = new Vector3(GlobalPosition.X, ((Vector3)gnd["position"]).Y + SmsFeetOffset(), GlobalPosition.Z);
+                    GlobalPosition = new Vector3(GlobalPosition.X, ((Vector3)gnd[SmsKeys.Position]).Y + SmsFeetOffset(), GlobalPosition.Z);
                     SmsFenceLetGo(false, "the floor under his feet (jumpProcess case 1)");
                     return;
                 }
@@ -16896,7 +17144,7 @@ public partial class Mario : CharacterBody3D
                     return;
                 if (SmsRay(newFeet + Vector3.Up * SmsUnits.UnitsToMetres(80f), newFeet + Vector3.Up * SmsUnits.UnitsToMetres(160f), out var roof))
                 {
-                    float roofY = ((Vector3)roof["position"]).Y;
+                    float roofY = ((Vector3)roof[SmsKeys.Position]).Y;
                     if (roofY < newFeet.Y + SmsUnits.UnitsToMetres(160f))
                         newFeet.Y = roofY - SmsUnits.UnitsToMetres(160f);
                 }
@@ -16948,7 +17196,7 @@ public partial class Mario : CharacterBody3D
             return;
         for (int i = 0; i < GetSlideCollisionCount(); i++)
         {
-            KinematicCollision3D c = GetSlideCollision(i);
+            KinematicCollision3D c = SmsSlideHit(i);
             Vector3 cn = c.GetNormal();
             if (cn.Y > -0.5f)
                 continue;
@@ -17047,16 +17295,16 @@ public partial class Mario : CharacterBody3D
         }
         float groundY = float.NegativeInfinity;
         if (SmsRay(feet + Vector3.Up * 0.05f, feet + Vector3.Down * 60f, out var g))
-            groundY = ((Vector3)g["position"]).Y;
+            groundY = ((Vector3)g[SmsKeys.Position]).Y;
         else
             return 1;
         Vector3 from = new Vector3(feet.X, groundY + SmsUnits.UnitsToMetres(80f), feet.Z);
         if (!SmsRay(from, from + Vector3.Up * 60f, out var r))
             return 2;
-        Node roofBody = r["collider"].AsGodotObject() as Node;
+        Node roofBody = r[SmsKeys.Collider].AsGodotObject() as Node;
         if (!SmsIsFenceBody(roofBody))
             return 2;
-        float roofY = ((Vector3)r["position"]).Y;
+        float roofY = ((Vector3)r[SmsKeys.Position]).Y;
         if (roofY - groundY <= SmsUnits.UnitsToMetres(160f))
             return 1;
         float space = roofY - (SmsUnits.UnitsToMetres(160f) + feet.Y);
@@ -17065,7 +17313,7 @@ public partial class Mario : CharacterBody3D
         if (space > SmsUnits.UnitsToMetres(30f))
             return 2;
         _smsRoofY = roofY;
-        _smsRoofNormalY = ((Vector3)r["normal"]).Y;
+        _smsRoofNormalY = ((Vector3)r[SmsKeys.Normal]).Y;
         _smsFenceBody = roofBody;
         feet.Y = roofY - SmsUnits.UnitsToMetres(160f);
         return 0;
@@ -17075,8 +17323,8 @@ public partial class Mario : CharacterBody3D
     private void SmsTickRoof(double delta, Vector3 stickDir)
     {
         int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
-        bool aPressed = Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space");
-        bool bPressed = Input.IsActionJustPressed("button_b");
+        bool aPressed = Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space"));
+        bool bPressed = Input.IsActionJustPressed(SmsNames.Of("button_b"));
         bool stick = stickDir.LengthSquared() > 1e-6f && _smsIntendedMag > 0f; // mInput & 1 (0x20 = its absence)
         Vector3 face = SmsMath.DirFromYaw(_smsFaceYaw);
         switch (_smsRoof)
@@ -17086,7 +17334,7 @@ public partial class Mario : CharacterBody3D
                 // the roof re-found from feet + 80 (checkRoof); mStatusTimer; the stick after 120 ticks -> WAIT_ROOF; the events; the catch clip; pinned
                 Vector3 feet = SmsFeet();
                 if (SmsRay(feet + Vector3.Up * SmsUnits.UnitsToMetres(80f), feet + Vector3.Up * 60f, out var r))
-                    _smsRoofY = ((Vector3)r["position"]).Y;
+                    _smsRoofY = ((Vector3)r[SmsKeys.Position]).Y;
                 _smsRoofTicks += n;
                 if (stick && _smsRoofTicks > 120)
                 {
@@ -17217,7 +17465,7 @@ public partial class Mario : CharacterBody3D
                 animTree.Active = true;
             }
             if (_sm != null)
-                _sm.Travel("ma_die");
+                _sm.Travel(SmsNames.Of("ma_die"));
             return;
         }
 
@@ -17289,6 +17537,20 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>SMS_GetMarioHP (pass 153): his hit points as the enemies read them (King Boo's slot steers its result by them).</summary>
     public int SmsHP => _health;
+    /// <summary>154: what FLUDD is doing this tick, for the sounds (TWaterGun's state the game's sound code reads): the nozzle (0 spray 1 hover 2 rocket
+    /// 3 turbo), isEmitting, the R analog, the water, the spray strength (unk378), the trigger nozzle's state (0 inactive 1 active 2 dead), the turbo
+    /// dash, the nozzle-change progress and speed, the pack's house progress (1 housed .. 0 deployed).</summary>
+    public readonly struct SmsFluddProbe
+    {
+        public readonly bool HasFludd, Emitting, Dashing; public readonly int Nozzle, Water, WaterMax, TrigState; public readonly float R, Strength, Switch, SwitchSpeed, Stow;
+        public SmsFluddProbe(bool has, bool emitting, bool dashing, int nozzle, int water, int waterMax, int trig, float r, float strength, float sw, float swSpeed, float stow)
+        { HasFludd = has; Emitting = emitting; Dashing = dashing; Nozzle = nozzle; Water = water; WaterMax = waterMax; TrigState = trig; R = r; Strength = strength; Switch = sw; SwitchSpeed = swSpeed; Stow = stow; }
+    }
+    public SmsFluddProbe SmsFluddSound => new SmsFluddProbe(_fluddReady, _fluddEmitting, _fluddDashing, (int)_fluddNozzle, _fluddWater, SmsFluddCurrent.AmountMax, _fluddTrigState, _fluddR, _fluddSprayStrength, _fluddSwitch, _fluddSwitchSpeed, _fluddStow);
+    /// <summary>154c, for the sounds: the down in force (Knockdown / Fire / FireEnd / Electric / Thrown / ThrownEnd -- the game's MV03 / MV05 / MV04 /
+    /// MV25A voices go by it) and whether the body in his hands, or on its way there, is a fruit (TAKE_DRIAN / PUT_DRIAN against the barrel's).</summary>
+    public string SmsDownKindName => _smsDownKind.ToString();
+    public bool SmsHoldsFruit => (heldBody ?? pendingPickup) is Fruit;
     /// <summary>TMario::incHP (MarioCollision.cpp 25): under water (isUnderWater(): head below the surface less CanBreathDepth) the
     /// heal goes to the AIR, capped at mMaxAir -- a coin taken while submerged refills a unit of air and the meter steps back up --
     /// otherwise to the health, capped at HPMax; MSD_SE_SY_HP_RECOVER either way when it was not already full (pass 47).</summary>
@@ -17544,7 +17806,57 @@ public partial class Mario : CharacterBody3D
                 if (armature != null) armature.Rotation = armature.Rotation with { Y = BaseYawFromDir(f) };
             }
             stateOfMario = MarioState.idle; SetMarioState(MarioState.idle);   // the TAKE's moment: standing (the lock freezes the state machine, and a teleport off a ride left it in ledgeFall)
+            GetNodeOrNull<SmsMarioSound>("SmsSound")?.OnTaken();   // 154c: MARIO_STATUS_TAKEN's voice (soundMovement: MV06_DAMAGE_WATER)
         }
+    }
+
+    // ---- 176: demo clips ---------------------------------------------------------------------------------------------------------------------
+    private string _smsDemoClip = "", _smsDemoThen = ""; private bool _smsDemoHold;
+    /// <summary>176b: keep the demo clip on after the cutscene hands the controls back, until the player's FIRST input (the stick or a button) --
+    /// the rematch intro's battle stance held until he moves. A hit, or anything else that takes the tree back, ends it too.</summary>
+    public void SmsHoldDemoClipUntilInput() { _smsDemoHold = _smsDemoClip != ""; }
+    public bool SmsDemoHolding => _smsDemoHold;
+    private static bool SmsPlayerInputNow() =>
+        Input.GetVector(SmsNames.Of("Lstick_left"), SmsNames.Of("Lstick_right"), SmsNames.Of("Lstick_up"), SmsNames.Of("Lstick_down")).Length() > 0.25f || Input.IsActionPressed(SmsNames.Of("button_a")) || Input.IsActionPressed(SmsNames.Of("button_b"))
+        || Input.IsActionPressed(SmsNames.Of("button_x")) || Input.IsActionPressed(SmsNames.Of("button_z")) || Input.IsActionPressed(SmsNames.Of("button_r")) || Input.IsActionPressed(SmsNames.Of("button_l"))
+        || Input.IsActionPressed(SmsNames.Of("key_space")) || Input.IsActionPressed(SmsNames.Of("key_z"));
+    /// <summary>176: a demo plays a clip by name OUTSIDE the AnimationTree (the rematch intro's custom ma_lookabout, SmsRematchIntro) -- the tree
+    /// off and the player playing it, as the sit / sleep / hang code does -- until SmsEndDemoClip. speed scales the player. thenPlay: the clip
+    /// to go on with when this one ENDS (the battle stance's drop-in, then its loop). False (nothing changed) if the player has no such clip.
+    /// The caller holds the controls (CameraLocked: the state loop freezes him and touches no clip).</summary>
+    public bool SmsPlayDemoClip(string name, float speed = 1f, string thenPlay = "")
+    {
+        if (animPlayer == null || string.IsNullOrEmpty(name) || !animPlayer.HasAnimation(name)) return false;
+        if (animTree != null) animTree.Active = false;
+        animPlayer.SpeedScale = speed;
+        animPlayer.Play(name);
+        _smsDemoClip = name; _smsDemoThen = !string.IsNullOrEmpty(thenPlay) && animPlayer.HasAnimation(thenPlay) ? thenPlay : "";
+        return true;
+    }
+    /// <summary>176: the demo clip is over -- the player stopped, the tree back on (its state's clip takes over on the next frame; a camera cut
+    /// hides the step). Nothing if no demo clip is on.</summary>
+    public void SmsEndDemoClip()
+    {
+        if (_smsDemoClip == "") return;
+        _smsDemoClip = ""; _smsDemoThen = ""; _smsDemoHold = false;
+        if (animPlayer != null) { animPlayer.SpeedScale = 1f; animPlayer.Stop(false); }
+        if (animTree != null) animTree.Active = true;
+    }
+    /// <summary>176: a clip's length in seconds (0 = no such clip) -- a cutscene times itself to its clip.</summary>
+    public float SmsClipLength(string name) => animPlayer != null && !string.IsNullOrEmpty(name) && animPlayer.HasAnimation(name) ? (float)animPlayer.GetAnimation(name).Length : 0f;
+    /// <summary>176, for the drives: the demo clip playing (name@position/length), "" when none; whether the tree is off for one.</summary>
+    public string SmsDemoClipNow => _smsDemoClip != "" && animPlayer != null ? $"{animPlayer.CurrentAnimation}@{animPlayer.CurrentAnimationPosition:F2}/{animPlayer.CurrentAnimationLength:F2}" : "";
+    public bool SmsDemoClipOn => _smsDemoClip != "";
+    public bool SmsTreeActive => animTree != null && animTree.Active;
+
+    /// <summary>174: a demo turns him to face a way (the rematch intro's look-about, SmsRematchIntro): the facing latched and the armature turned --
+    /// SmsCarryTo's face part alone: no voice, no state change, no move. The caller holds the controls (CameraLocked).</summary>
+    public void SmsDemoFace(Vector3 f)
+    {
+        f.Y = 0f;
+        if (f.LengthSquared() <= 1e-6f) return;
+        f = f.Normalized(); lastFacingDirection = f; SmsLatchFace(f, 2);
+        if (armature != null) armature.Rotation = armature.Rotation with { Y = BaseYawFromDir(f) };
     }
 
     /// <summary>The body's half height off its first CollisionShape3D (his fruit are centred RigidBody3Ds; the game's object origin is its
@@ -17572,12 +17884,10 @@ public partial class Mario : CharacterBody3D
     private bool SmsFloorYBelow(float units, out float y)
     {
         y = GlobalPosition.Y;
-        var q = PhysicsRayQueryParameters3D.Create(GlobalPosition + Vector3.Up * 0.02f, GlobalPosition - Vector3.Up * SmsUnits.UnitsToMetres(units), CollisionMask,
-            new Godot.Collections.Array<Rid> { GetRid() });
-        var hit = GetWorld3D().DirectSpaceState.IntersectRay(q);
+        var hit = SmsIntersect(SmsRayQuery(GlobalPosition + Vector3.Up * 0.02f, GlobalPosition - Vector3.Up * SmsUnits.UnitsToMetres(units)));   // 227: the shared query
         if (hit.Count == 0)
             return IsOnFloor();
-        y = ((Vector3)hit["position"]).Y;
+        y = ((Vector3)hit[SmsKeys.Position]).Y;
         return true;
     }
 
@@ -17585,9 +17895,7 @@ public partial class Mario : CharacterBody3D
     {
         if (IsOnFloor())
             return true;
-        var q = PhysicsRayQueryParameters3D.Create(GlobalPosition + Vector3.Up * 0.02f, GlobalPosition - Vector3.Up * SmsUnits.UnitsToMetres(units), CollisionMask,
-            new Godot.Collections.Array<Rid> { GetRid() });
-        return GetWorld3D().DirectSpaceState.IntersectRay(q).Count > 0;
+        return SmsIntersect(SmsRayQuery(GlobalPosition + Vector3.Up * 0.02f, GlobalPosition - Vector3.Up * SmsUnits.UnitsToMetres(units))).Count > 0;   // 227: the shared query
     }
 
     /// <summary>mFloorTriangle->getNormal() for a tick grounded within 4 units: Godot's GetFloorNormal() is zero until MoveAndSlide has
@@ -17597,10 +17905,8 @@ public partial class Mario : CharacterBody3D
     {
         if (IsOnFloor())
             return GetFloorNormal();
-        var q = PhysicsRayQueryParameters3D.Create(GlobalPosition + Vector3.Up * 0.02f, GlobalPosition - Vector3.Up * SmsUnits.UnitsToMetres(4f), CollisionMask,
-            new Godot.Collections.Array<Rid> { GetRid() });
-        var hit = GetWorld3D().DirectSpaceState.IntersectRay(q);
-        return hit.Count > 0 ? ((Vector3)hit["normal"]).Normalized() : Vector3.Up;
+        var hit = SmsIntersect(SmsRayQuery(GlobalPosition + Vector3.Up * 0.02f, GlobalPosition - Vector3.Up * SmsUnits.UnitsToMetres(4f)));   // 227: the shared query
+        return hit.Count > 0 ? ((Vector3)hit[SmsKeys.Normal]).Normalized() : Vector3.Up;
     }
 
     /// <summary>isThrowStart() (MarioRun.cpp 50; the run, brake and turn ticks) and the wait side (MarioWait.cpp 566): B pressed while holding.
@@ -17643,19 +17949,17 @@ public partial class Mario : CharacterBody3D
 
     private bool SmsWallWithin(Vector3 p, float r)
     {
-        var space = GetWorld3D().DirectSpaceState;
-        var excl = new Godot.Collections.Array<Rid> { GetRid() };
+        var excl = SmsRayExcludeSelf();   // 227: the shared exclude list (his body, and what he holds) and query
         if (heldBody != null)
             excl.Add(heldBody.GetRid());
         for (int i = 0; i < 8; i++)
         {
             float a = i * Mathf.Tau / 8f;
-            var q = PhysicsRayQueryParameters3D.Create(p, p + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * r, CollisionMask, excl);
-            q.HitFromInside = true; // isTouchedOneWall counts a point already behind a wall plane within the radius: a ray starting inside the solid reports it
-            var hit = space.IntersectRay(q);
+            // isTouchedOneWall counts a point already behind a wall plane within the radius: a ray starting inside the solid reports it (HitFromInside)
+            var hit = SmsIntersect(SmsRayQuery(p, p + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * r, hitFromInside: true, exclude: excl));
             if (hit.Count == 0)
                 continue;
-            if (hit["collider"].AsGodotObject() is Node col && col is not RigidBody3D && col is not CharacterBody3D && col is not Area3D)
+            if (hit[SmsKeys.Collider].AsGodotObject() is Node col && col is not RigidBody3D && col is not CharacterBody3D && col is not Area3D)
                 return true;
         }
         return false;
@@ -17671,11 +17975,175 @@ public partial class Mario : CharacterBody3D
         _isThrowQueued = true;
         if (animTree != null)
             animTree.Active = false;
-        if (animPlayer.HasAnimation("ma_throw"))
-            animPlayer.Play("ma_throw");
+        if (animPlayer.HasAnimation(SmsNames.Of("ma_throw")))
+            animPlayer.Play(SmsNames.Of("ma_throw"));
         _aerialThrowLockTimer = AERIAL_THROW_LOCK_DURATION; // B's held frame must not read as a dive (the legacy guard)
         if (SmsDebugPrint)
             GD.Print($"[SMS take] JUMP_THROW: the {_smsTakeData.Name} leaves at frame 4 with his air speed x {SmsParams.Take.NormalThrowSpeedRate} added");
+    }
+
+    // ---------------------------------------------------------------------------------------------------------------
+    // SMS REMATCH (pass 158): the SPIN (X without the FLUDD) and the Bomb Boo in hand -- see the knobs above (SpinSeconds ...).
+    // ---------------------------------------------------------------------------------------------------------------
+
+    /// <summary>The Bomb Boo over his head (null = none) and the spin for the drives.</summary>
+    public SmsBombBoo SmsBombHeld => _smsBomb;
+    public bool SmsSpinning => stateOfMario == MarioState.spin;
+    public int SmsSpinCount => _smsSpinCount;
+    public float SmsSpinTime => _smsSpinT;
+
+    /// <summary>The spin may start: the old ground spin's statuses (standing, walking, running, the landings), no demo lock, no talk, the game's
+    /// takeables not in hand.</summary>
+    private bool SmsSpinCanStart() => CanEnterGroundSpin() && !CameraLocked && !_smsTalking && heldBody == null && pendingPickup == null;
+
+    private void SmsSpinStart()
+    {
+        StopWaistIKHard();
+        if (animPlayer != null) animPlayer.SpeedScale = 1f;
+        spinBuffer = 0; spinInput = false; spinTracking = false;
+        _smsSpinT = 0f; _smsSpinGrabbed = false; _smsSpinCount++;
+        stateOfMario = MarioState.spin;
+        SetMarioState(stateOfMario);
+        isSpining(true);
+        if (footSparks != null) footSparks.Emitting = true;
+        if (SmsDebugPrint) GD.Print($"[SMS spin] X: the spin ({SpinSeconds} s, {SpinTurns} turns)");
+    }
+
+    /// <summary>One frame of the spin: the body turns, the stick steers, a Bomb Boo in reach is grabbed; A leaves it in a spin jump; it ends at SpinSeconds or
+    /// off the floor.</summary>
+    private void SmsSpinFrame(double delta, float stickStrength, Vector3 inputDirWorld)
+    {
+        float dt = (float)delta;
+        _smsSpinT += dt;
+        if (armature != null) armature.RotateObjectLocal(Vector3.Up, SpinTurns * Mathf.Tau / Mathf.Max(0.05f, SpinSeconds) * dt);
+        Vector2 cur = new Vector2(velocity.X, velocity.Z), target = Vector2.Zero;
+        if (stickStrength > 0.1f && inputDirWorld != Vector3.Zero) { Vector3 d = inputDirWorld.Normalized(); target = new Vector2(d.X, d.Z) * SpinMoveSpeed * stickStrength; }
+        Vector2 nv = cur.MoveToward(target, SpinSteerAccel * dt);
+        velocity.X = nv.X; velocity.Z = nv.Y; velocity.Y = -2f;
+        if (_smsBomb == null && !_smsSpinGrabbed) SmsBombTryGrab();
+        if (Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space")))
+        {
+            SmsSpinEnd(false);
+            if (stickStrength > 0.2f && inputDirWorld != Vector3.Zero) { Vector3 gd = inputDirWorld.Normalized(); velocity.X = gd.X * RUN_SPEED; velocity.Z = gd.Z * RUN_SPEED; }
+            StartSpinJump();
+            return;
+        }
+        if (_smsSpinT >= SpinSeconds || !IsOnFloor()) SmsSpinEnd(true);
+    }
+
+    private void SmsSpinEnd(bool toIdle)
+    {
+        isSpining(false);
+        if (footSparks != null) footSparks.Emitting = false;
+        _smsSpinCooldown = SpinCooldown;
+        if (armature != null && _smsFaceValid) armature.Rotation = armature.Rotation with { Y = BaseYawFromDir(SmsMath.DirFromYaw(_smsFaceYaw)) };
+        if (toIdle) { stateOfMario = MarioState.idle; SetMarioState(stateOfMario); }
+    }
+
+    /// <summary>The nearest free Bomb Boo within BombGrabRadius (x and z) and under BombGrabHeight over his feet is taken: it rides over his head.</summary>
+    private void SmsBombTryGrab(float below = 1.5f, string how = "the spin")
+    {
+        SmsBombBoo best = null; float bestD = float.MaxValue;
+        foreach (var b in SmsBombBoo.All)
+        {
+            if (b == null || !IsInstanceValid(b) || !b.IsInsideTree() || !b.IsFree) continue;
+            Vector3 rel = b.GlobalPosition - GlobalPosition; float dy = rel.Y; rel.Y = 0f;
+            float d = rel.Length();
+            if (d > BombGrabRadius || dy < -below || dy > BombGrabHeight) continue;
+            if (d < bestD) { bestD = d; best = b; }
+        }
+        if (best == null || !best.Grab(this)) return;
+        _smsBomb = best; _smsSpinGrabbed = true;
+        SmsLassoOn(true);              // 159: the arm up with the tongue
+        if (how != "the spin") SmsSpinJumpGrabsMade++;
+        if (SmsDebugPrint) GD.Print($"[SMS spin] the Bomb Boo {best.Name} grabbed by the tongue at {bestD:F2} m ({how})");
+    }
+
+    /// <summary>The Bomb Boo he swings let go (a dive, a hit, a death, a demo): it drifts again.</summary>
+    public void SmsBombDrop()
+    {
+        if (_smsBomb == null) return;
+        var boo = _smsBomb; _smsBomb = null;
+        if (IsInstanceValid(boo)) boo.Drop();
+        SmsLassoOn(false);
+        if (SmsDebugPrint) GD.Print("[SMS spin] the Bomb Boo let go");
+    }
+    /// <summary>193 (the King Boo rematch; Jaysonn: "if Mario gets hit while holding the Bomb Boo, the Boo should explode and go away"): the Boo in hand BURSTS
+    /// when he is hurt (a hit, a shock), killed or frozen holding it -- its puff and pop, no blast, no hit on King Boo -- and is gone, instead of drifting off to be
+    /// grabbed again. Off: the drop as before. The dives, the ground pound and the rest still let it go.</summary>
+    [Export] public bool SmsBombBurstsOnHit = true;
+    public int SmsBombBursts { get; private set; }
+    public void SmsBombBurst(string why)
+    {
+        if (_smsBomb == null) return;
+        var boo = _smsBomb; _smsBomb = null; SmsBombBursts++;
+        if (IsInstanceValid(boo)) boo.Explode(false);
+        SmsLassoOn(false);
+        if (SmsDebugPrint) GD.Print($"[SMS spin] the Bomb Boo in hand BURST ({why})");
+    }
+    /// <summary>The Boo in hand is gone on its own (King Boo's hit cleared the field): the hands empty.</summary>
+    public void SmsBombGone(SmsBombBoo boo)
+    {
+        if (_smsBomb != boo) return;
+        _smsBomb = null;
+        SmsLassoOn(false);
+    }
+
+    /// <summary>159: the lasso arm (SmsLassoArm under his Skeleton3D, built once) up or down; its knobs pushed each time.</summary>
+    private void SmsLassoOn(bool on)
+    {
+        if (_smsLasso == null || !IsInstanceValid(_smsLasso))
+        {
+            if (skeleton == null) return;
+            _smsLasso = new SmsLassoArm { Name = "SmsLassoArm", Side = LassoArm == "L" ? "L" : "R" };
+            skeleton.AddChild(_smsLasso);
+        }
+        _smsLasso.BlendSeconds = LassoBlendSeconds; _smsLasso.Tilt = LassoTilt; _smsLasso.Forward = LassoForward; _smsLasso.In = LassoIn;
+        if (on && !_smsLasso.GripSet) SmsLassoSetGrip();
+        _smsLasso.On = on;
+    }
+    /// <summary>161: the TONGUE ends in the middle of the closed fist: the closed hand model's mesh centre (RightHandClosed / LeftHandClosed under the hand's
+    /// BoneAttachment3D, which rides the M_hand1 bone) carried into that bone's frame -- the attachment-to-mesh relation is their local transforms, so the
+    /// global pair at any one moment gives it exactly.</summary>
+    private void SmsLassoSetGrip()
+    {
+        if (_smsLasso == null || skeleton == null) return;
+        string side = LassoArm == "L" ? "Left" : "Right";
+        var attach = GetNodeOrNull<BoneAttachment3D>($"Armature/Skeleton3D/{side}HandBone");
+        var closed = attach?.GetNodeOrNull<Node3D>($"{side}HandClosed");
+        var mesh = closed != null ? FindFirstMeshInstance(closed) : null;
+        if (attach == null || mesh == null || mesh.Mesh == null) { if (SmsDebugPrint) GD.Print($"[SMS spin] no {side}HandClosed mesh under the hand bone: the tongue ends at the wrist"); return; }
+        Transform3D rel = attach.GlobalTransform.AffineInverse() * mesh.GlobalTransform;
+        Vector3 grip = rel * mesh.Mesh.GetAabb().GetCenter();
+        _smsLasso.SetGrip(attach.BoneName, grip);
+        if (SmsDebugPrint) GD.Print($"[SMS spin] the grip: the {side} fist's centre {grip} in the {attach.BoneName} bone's frame");
+    }
+    /// <summary>159: where the raised hand is (the tongue's end) -- the lasso arm's hand after its pose; a point over his head when the arm is not up yet.</summary>
+    public Vector3 SmsLassoHand => _smsLasso != null && IsInstanceValid(_smsLasso) && _smsLasso.HandValid && _smsLasso.Weight > 0.5f
+        ? _smsLasso.HandPoint : GlobalPosition + Vector3.Up * (SmsUnits.UnitsToMetres(SmsUnits.MarioHeightUnits) + 0.4f);
+    public float SmsLassoWeight => _smsLasso != null && IsInstanceValid(_smsLasso) ? _smsLasso.Weight : 0f;
+
+    /// <summary>Once a physics frame: the spin's cooldown and the X key's edge; the Bomb Boo in hand dropped by the statuses that cannot hold it.</summary>
+    private void SmsBombTick(double delta)
+    {
+        if (_smsSpinCooldown > 0f) _smsSpinCooldown -= (float)delta;
+        bool x = Input.IsKeyPressed(Key.X);
+        _smsSpinKeyEdge = x && !_smsSpinKeyPrev; _smsSpinKeyPrev = x;
+        if (_smsBomb == null && SpinJumpGrabs && stateOfMario == MarioState.SpinJump && _smsPadDisabledTicks == 0) SmsBombTryGrab(SpinJumpGrabBelow, "the spin jump");   // 203: the spin jump grabs one too
+        if (_smsBomb == null) return;
+        if (!IsInstanceValid(_smsBomb) || !_smsBomb.IsCarried) { SmsBombGone(_smsBomb); return; }
+        if (SmsBombBurstsOnHit && (stateOfMario == MarioState.hurt || stateOfMario == MarioState.dead || SmsFrozen)) { SmsBombBurst(SmsFrozen ? "frozen" : stateOfMario.ToString()); return; }   // 193: a hit bursts it
+        switch (stateOfMario)
+        {
+            case MarioState.diving: case MarioState.singleJumpDive: case MarioState.doubleJumpDive: case MarioState.tripleJumpDive: case MarioState.bellySlidingFromDive:
+            case MarioState.singleRollout: case MarioState.bellyRollout: case MarioState.gettingUpFromSliding:
+            case MarioState.groundPoundStartup: case MarioState.groundPoundFalling: case MarioState.groundPoundLanding: case MarioState.stomping:
+            case MarioState.hurt: case MarioState.dead: case MarioState.swimming: case MarioState.talking: case MarioState.shineGet:
+            case MarioState.ledgeHang: case MarioState.ledgeClimb: case MarioState.ledgeHopUp: case MarioState.ledgeDescend: case MarioState.fence: case MarioState.roofHang: case MarioState.wire:
+                if (SmsDebugPrint) GD.Print($"[SMS spin] {stateOfMario}: the Bomb Boo cannot be held through it");
+                SmsBombDrop();
+                break;
+        }
     }
 
     /// <summary>Once a physics frame: the thrown bodies' numbers, the carry pose for the tree-off frames, the jump throw's clock.</summary>
@@ -17712,13 +18180,13 @@ public partial class Mario : CharacterBody3D
                 _smsJumpThrow = false; // the swim took the body; the object stays held (no dropObject in MarioSwim.cpp)
                 _isThrowQueued = false;
             }
-            else if (!IsOnFloor() && animPlayer != null && animPlayer.HasAnimation("ma_throw") && animPlayer.CurrentAnimation != "ma_throw"
-                     && _smsJumpThrowT < animPlayer.GetAnimation("ma_throw").Length)
+            else if (!IsOnFloor() && animPlayer != null && animPlayer.HasAnimation(SmsNames.Of("ma_throw")) && animPlayer.CurrentAnimation != "ma_throw"
+                     && _smsJumpThrowT < animPlayer.GetAnimation(SmsNames.Of("ma_throw")).Length)
             {
                 // jumpingThrow(): setAnimation(ANIM_THROW) every tick -- the clip is the body's until he lands
                 if (animTree != null)
                     animTree.Active = false;
-                animPlayer.Play("ma_throw");
+                animPlayer.Play(SmsNames.Of("ma_throw"));
                 animPlayer.Seek(_smsJumpThrowT, true);
             }
             else if (IsOnFloor() && stateOfMario != MarioState.putDown)
@@ -17803,9 +18271,9 @@ public partial class Mario : CharacterBody3D
     /// <summary>ma_carry_p (the HOLDING_OBJECT upper clip, bck 0x4B) on the chn_chest subtree for the frames the tree does not run.</summary>
     private void SmsTakeSetupGraft()
     {
-        if (skeleton == null || animPlayer == null || !animPlayer.HasAnimation("ma_carry_p"))
+        if (skeleton == null || animPlayer == null || !animPlayer.HasAnimation(SmsNames.Of("ma_carry_p")))
             return;
-        var clip = animPlayer.GetAnimation("ma_carry_p");
+        var clip = animPlayer.GetAnimation(SmsNames.Of("ma_carry_p"));
         _smsCarryGraft = new SmsUpperPose { Name = "SmsUpper_ma_carry_p" };
         skeleton.AddChild(_smsCarryGraft);
         skeleton.MoveChild(_smsCarryGraft, 0);
@@ -17853,7 +18321,7 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>A floor whose owner is an actor: an AnimatableBody3D (a lift, a turntable, anything moved by code or an animation with
     /// sync_to_physics), or any body in the group "sms_ride".</summary>
-    private static bool SmsIsRideBody(Node n) => n is AnimatableBody3D || (n is PhysicsBody3D && n.IsInGroup("sms_ride"));
+    private static bool SmsIsRideBody(Node n) => n is AnimatableBody3D || (n is PhysicsBody3D && n.IsInGroup(SmsNames.Of("sms_ride")));
 
     /// <summary>!checkStatusType(MARIO_STATUS_FLAG_JUMPING), plus the states the port pins itself (the ledge and fence tracking is theirs).</summary>
     private bool SmsRideStateOk()
@@ -17935,7 +18403,7 @@ public partial class Mario : CharacterBody3D
         {
             for (int i = 0; i < GetSlideCollisionCount(); i++)
             {
-                var c = GetSlideCollision(i);
+                var c = SmsSlideHit(i);
                 if (c.GetNormal().Dot(UpDirection) > 0.5f && c.GetCollider() is Node3D n && SmsIsRideBody(n))
                 {
                     body = n;
@@ -17943,7 +18411,7 @@ public partial class Mario : CharacterBody3D
                 }
             }
             if (body == null && SmsRay(GlobalPosition + Vector3.Up * 0.05f, GlobalPosition - Vector3.Up * 0.15f, out var hit)
-                && hit["collider"].AsGodotObject() is Node3D fn && SmsIsRideBody(fn))
+                && hit[SmsKeys.Collider].AsGodotObject() is Node3D fn && SmsIsRideBody(fn))
                 body = fn;
         }
         if (body == null)
@@ -18229,7 +18697,7 @@ public partial class Mario : CharacterBody3D
     {
         Vector3 feet = SmsFeet();
         float floorY = SmsFloorYBelow(4000f, out float fy) ? fy : feet.Y - SmsUnits.UnitsToMetres(4000f);
-        float roofY = SmsRay(feet + Vector3.Up * 0.02f, feet + Vector3.Up * SmsUnits.UnitsToMetres(4000f), out var hit) ? ((Vector3)hit["position"]).Y : feet.Y + SmsUnits.UnitsToMetres(4000f);
+        float roofY = SmsRay(feet + Vector3.Up * 0.02f, feet + Vector3.Up * SmsUnits.UnitsToMetres(4000f), out var hit) ? ((Vector3)hit[SmsKeys.Position]).Y : feet.Y + SmsUnits.UnitsToMetres(4000f);
         return SmsUnits.MetresToUnits(roofY - floorY) >= SmsParams.Wire.ReturnHeadroom;
     }
 
@@ -18254,10 +18722,10 @@ public partial class Mario : CharacterBody3D
             return;
         }
         int n = SmsUnits.TicksFor(delta, ref _smsTickAccum);
-        bool aPressed = Input.IsActionJustPressed("button_a") || Input.IsActionJustPressed("key_space");
-        bool bPressed = Input.IsActionJustPressed("button_b");
-        bool rHeld = _smsPadDisabledTicks == 0 && Input.IsActionPressed("button_r");   // pass 114: a dead pad pumps nothing
-        bool bHeld = _smsPadDisabledTicks == 0 && Input.IsActionPressed("button_b");
+        bool aPressed = Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space"));
+        bool bPressed = Input.IsActionJustPressed(SmsNames.Of("button_b"));
+        bool rHeld = _smsPadDisabledTicks == 0 && Input.IsActionPressed(SmsNames.Of("button_r"));   // pass 114: a dead pad pumps nothing
+        bool bHeld = _smsPadDisabledTicks == 0 && Input.IsActionPressed(SmsNames.Of("button_b"));
         bool stick = stickDir.LengthSquared() > 1e-6f && _smsIntendedMag > 0f; // mInput & 1
         float intendedYaw = stick ? SmsMath.YawFromDir(stickDir) : 0f;
         float q = 1f / SmsUnits.TicksPerFrame;
@@ -18691,6 +19159,9 @@ public partial class Mario : CharacterBody3D
         _health = StartingHealth;
         _smsGameOver = false;
         _smsLoserFalling = false;
+        _smsFallDead = false;          // 212
+        _smsHellDead = false;
+        _smsFallDeadVy = float.NaN;
         SmsAirReset();
         _smsSwimAnim = "";
         animPlayer.SpeedScale = 1f;
@@ -18766,7 +19237,7 @@ public partial class Mario : CharacterBody3D
                         animTree.Active = false;
                     animPlayer.SpeedScale = 1f;
                     if (animPlayer.CurrentAnimation != "ma_t_wait")
-                        animPlayer.Play("ma_t_wait");
+                        animPlayer.Play(SmsNames.Of("ma_t_wait"));
                 }
                 else if (UseSmsPhysics && SmsWantsDamageWait())
                 {
@@ -18778,7 +19249,7 @@ public partial class Mario : CharacterBody3D
                     SetEyeTexture(tiredEyeTexture ?? awakeEyeTexture); // heavy-lidded: he is tired
                     if (_smsDamageWaitPhase == 0)
                     {
-                        animPlayer.Play("ma_damage_wait_start");
+                        animPlayer.Play(SmsNames.Of("ma_damage_wait_start"));
                         _smsDamageWaitPhase = 1;
                     }
                     else
@@ -18790,7 +19261,7 @@ public partial class Mario : CharacterBody3D
                 else
                 {
                     _smsDamageWaitPhase = 0;
-                    _sm.Travel("ma_wait");
+                    _sm.Travel(SmsNames.Of("ma_wait"));
                 }
                 break;
             case MarioState.talking:
@@ -18799,10 +19270,10 @@ public partial class Mario : CharacterBody3D
                 if (animTree != null)
                     animTree.Active = false;
                 if (animPlayer.CurrentAnimation != "ma_t_wait")
-                    animPlayer.Play("ma_t_wait");
+                    animPlayer.Play(SmsNames.Of("ma_t_wait"));
                 break;
             case MarioState.pivot:
-                _sm.Travel("ma_pivot");
+                _sm.Travel(SmsNames.Of("ma_pivot"));
                 break;
             case MarioState.sneak:
                 _sm.Travel(UseSmsPhysics && _smsRunBlendReady ? SmsGaitClip() : "ma_sstep");
@@ -18829,65 +19300,66 @@ public partial class Mario : CharacterBody3D
             case MarioState.doubleJump:
                 // Double jump: ma_2jmp1 while rising, ma_2jmp2 while falling
                 if (Velocity.Y > 0)
-                    _sm.Travel("ma_2jmp1");
+                    _sm.Travel(SmsNames.Of("ma_2jmp1"));
                 else
-                    _sm.Travel("ma_2jmp2");
+                    _sm.Travel(SmsNames.Of("ma_2jmp2"));
                 break;
             case MarioState.tripleJump:
-                _sm.Travel("ma_demo_gate_out_rolling_get");
+                _sm.Travel(SmsNames.Of("ma_demo_gate_out_rolling_get"));
                 break;
             case MarioState.singleJumpLanding:
             case MarioState.doubleJumpLanding:
             case MarioState.landing:
-                _sm.Travel("ma_laend");
+                _sm.Travel(SmsNames.Of("ma_laend"));
                 break;
             case MarioState.tripleJumpLanding:
-                _sm.Travel("ma_tjmp2");
+                _sm.Travel(SmsNames.Of("ma_tjmp2"));
                 break;
             case MarioState.diving:
             case MarioState.singleJumpDive:
-                _sm.Travel("ma_sldct");
+                _sm.Travel(SmsNames.Of("ma_sldct"));
                 break;
             case MarioState.doubleJumpDive:
             case MarioState.tripleJumpDive:
-                _sm.Travel("ma_sldct");
+                _sm.Travel(SmsNames.Of("ma_sldct"));
                 break;
             case MarioState.singleRollout:
-                _sm.Travel("ma_roll_jump");
+                _sm.Travel(SmsNames.Of("ma_roll_jump"));
                 break;
             case MarioState.bellySlidingFromDive:
-                _sm.Travel("ma_slpbk");
+                _sm.Travel(SmsNames.Of("ma_slpbk"));
                 break;
             case MarioState.bellyRollout:
-                _sm.Travel("ma_roll");
+                _sm.Travel(SmsNames.Of("ma_roll"));
                 break;
             case MarioState.gettingUpFromSliding:
-                _sm.Travel("ma_lost");
+                _sm.Travel(SmsNames.Of("ma_lost"));
                 break;
             case MarioState.sideFlip:
-                _sm.Travel("ma_tjmp1");
+                _sm.Travel(SmsNames.Of("ma_tjmp1"));
                 break;
             case MarioState.sideFlipTurning:
-                _sm.Travel("ma_trned");
+                _sm.Travel(SmsNames.Of("ma_trned"));
                 break;
             case MarioState.SpinJump:
             case MarioState.groundSpin:
-                _sm.Travel("ma_spin_p");
+            case MarioState.spin:   // 158: the clip stands in until the spin's own animation comes
+                _sm.Travel(SmsNames.Of("ma_spin_p"));
                 break;
             case MarioState.crouch:
-                _sm.Travel("ma_sqwat");
+                _sm.Travel(SmsNames.Of("ma_sqwat"));
                 break;
             case MarioState.bonk:
-                _sm.Travel("ma_bkdwn");
+                _sm.Travel(SmsNames.Of("ma_bkdwn"));
                 break;
             case MarioState.backFlip:
-                _sm.Travel("ma_jump_rolling");
+                _sm.Travel(SmsNames.Of("ma_jump_rolling"));
                 break;
             case MarioState.rolloutRun:
-                _sm.Travel("ma_run2");
+                _sm.Travel(SmsNames.Of("ma_run2"));
                 break;
             case MarioState.wallSlide:
-                _sm.Travel("ma_wsld");
+                _sm.Travel(SmsNames.Of("ma_wsld"));
                 break;
 
             case MarioState.slipping:
@@ -18901,38 +19373,38 @@ public partial class Mario : CharacterBody3D
                 _sm.Start(_slipFacingUphill ? "ma_slpbk" : "ma_slip");
                 break;
             case MarioState.wallJump:
-                _sm.Travel("ma_wjmp");
+                _sm.Travel(SmsNames.Of("ma_wjmp"));
                 break;
             case MarioState.ledgeFall:
-                _sm.Travel("ma_land");
+                _sm.Travel(SmsNames.Of("ma_land"));
                 break;
             case MarioState.fluddRocket:
-                _sm.Travel("ma_land"); // rocketing(): setAnimation(ANIM_LAND); the pump is the upper-body blend
+                _sm.Travel(SmsNames.Of("ma_land")); // rocketing(): setAnimation(ANIM_LAND); the pump is the upper-body blend
                 break;
             case MarioState.ledgeHang:
-                _sm.Travel("ma_hang");
+                _sm.Travel(SmsNames.Of("ma_hang"));
                 break;
             case MarioState.ledgeClimb:
-                _sm.Travel("ma_hgup");
+                _sm.Travel(SmsNames.Of("ma_hgup"));
                 break;
             case MarioState.ledgeHopUp:
-                _sm.Travel("ma_hgjmp");
+                _sm.Travel(SmsNames.Of("ma_hgjmp"));
                 break;
             case MarioState.ledgeDescend:
                 // ma_hgdwn is in the AnimationPlayer library but not in the tree: drive it directly (the next SetMarioState
                 // re-enables the tree)
                 if (animTree != null)
                     animTree.Active = false;
-                animPlayer.Play("ma_hgdwn");
+                animPlayer.Play(SmsNames.Of("ma_hgdwn"));
                 break;
             case MarioState.pickupFail:
-                _sm.Travel("ma_get_fail");
+                _sm.Travel(SmsNames.Of("ma_get_fail"));
                 break;
             case MarioState.pickupRaise:
                 // Keep AnimationPlayer for pickup animations
                 if (animTree != null)
                     animTree.Active = false;
-                animPlayer.Play("ma_raise");
+                animPlayer.Play(SmsNames.Of("ma_raise"));
                 break;
             case MarioState.carrying:
                 // Carrying uses AnimationTree with carry blend
@@ -18941,13 +19413,13 @@ public partial class Mario : CharacterBody3D
                     animTree.Active = true;
                     animTree.Set(CARRY_BLEND_PATH, 1.0f);
                 }
-                _sm.Travel("ma_wait");
+                _sm.Travel(SmsNames.Of("ma_wait"));
                 break;
             case MarioState.putDown:
                 // Keep AnimationPlayer for putdown animations
                 if (animTree != null)
                     animTree.Active = false;
-                animPlayer.Play("ma_put");
+                animPlayer.Play(SmsNames.Of("ma_put"));
                 break;
             case MarioState.shineGet:
                 // Keep AnimationPlayer for the shine-get cutscene animation
@@ -18955,10 +19427,10 @@ public partial class Mario : CharacterBody3D
                     animTree.Active = false;
                 animPlayer.SpeedScale = 1f;   // 116c: setAnimation(ANIM_DEMO_SHINE_GET, 1.0) -- the run's SpeedScale must not leak in (it ran the
                                               // 6.97 s clip out in 1.7 s and froze the LAST frame, the shine at the chest, under the raised shine)
-                animPlayer.Play("ma_demo_shine_get");
+                animPlayer.Play(SmsNames.Of("ma_demo_shine_get"));
                 break;
             case MarioState.wallPush:
-                _sm.Travel("ma_push");
+                _sm.Travel(SmsNames.Of("ma_push"));
                 break;
             case MarioState.wallShuffle:
                 // Wall shuffle direction is handled dynamically in TickGroundWall
@@ -18968,55 +19440,55 @@ public partial class Mario : CharacterBody3D
                 break;
             case MarioState.groundPoundStartup:
                 if (UseSmsPhysics && _smsHipsrInTree)
-                    _sm.Travel("ma_hipsr"); // no path to it: a teleport; the clip holds its last frame for the rest of the hover, as setAnimation(ANIM_HIPSR) does
+                    _sm.Travel(SmsNames.Of("ma_hipsr")); // no path to it: a teleport; the clip holds its last frame for the rest of the hover, as setAnimation(ANIM_HIPSR) does
                 else
                 {
                     if (animTree != null)
                         animTree.Active = false;
-                    animPlayer.Play("ma_hipsr");
+                    animPlayer.Play(SmsNames.Of("ma_hipsr"));
                 }
                 break;
             case MarioState.groundPoundFalling:
-                _sm.Travel("ma_hipat");
+                _sm.Travel(SmsNames.Of("ma_hipat"));
                 break;
             case MarioState.groundPoundLanding:
-                _sm.Travel("ma_hiped");
+                _sm.Travel(SmsNames.Of("ma_hiped"));
                 break;
             case MarioState.treeGrab:
                 if (animTree != null)
                     animTree.Active = false;
                 if (animPlayer.CurrentAnimation != "ma_tree_catch")
-                    animPlayer.Play("ma_tree_catch");
+                    animPlayer.Play(SmsNames.Of("ma_tree_catch"));
                 break;
             case MarioState.treeWait:
                 if (animTree != null)
                     animTree.Active = false;
                 if (animPlayer.CurrentAnimation != "ma_tree_wait")
-                    animPlayer.Play("ma_tree_wait");
+                    animPlayer.Play(SmsNames.Of("ma_tree_wait"));
                 break;
             case MarioState.treeClimb:
                 if (animTree != null)
                     animTree.Active = false;
                 if (animPlayer.CurrentAnimation != "ma_tree_climb")
-                    animPlayer.Play("ma_tree_climb");
+                    animPlayer.Play(SmsNames.Of("ma_tree_climb"));
                 break;
             case MarioState.treeMoveL:
                 if (animTree != null)
                     animTree.Active = false;
                 if (animPlayer.CurrentAnimation != "ma_tree_move_l")
-                    animPlayer.Play("ma_tree_move_l");
+                    animPlayer.Play(SmsNames.Of("ma_tree_move_l"));
                 break;
             case MarioState.treeMoveR:
                 if (animTree != null)
                     animTree.Active = false;
                 if (animPlayer.CurrentAnimation != "ma_tree_move_r")
-                    animPlayer.Play("ma_tree_move_r");
+                    animPlayer.Play(SmsNames.Of("ma_tree_move_r"));
                 break;
             case MarioState.treeTopReach:
                 if (animTree != null)
                     animTree.Active = false;
                 if (animPlayer.CurrentAnimation != "ma_tjmp2")
-                    animPlayer.Play("ma_tjmp2");
+                    animPlayer.Play(SmsNames.Of("ma_tjmp2"));
                 break;
         }
     }
@@ -19108,6 +19580,7 @@ public partial class Mario : CharacterBody3D
     /// </summary>
     private void SmsLaunch(SmsAir.Launch kind)
     {
+        if (kind == SmsAir.Launch.RotateJump && _smsBomb != null) _smsBomb.SpinBoost();   // 158: a spin jump makes the Bomb Boo he swings go faster (the doc)
         Vector3 velXZ = new Vector3(velocity.X, 0f, velocity.Z);
         float speed = velXZ.Length();
         // On the ground SMS velocity always points along mFaceAngle, so the takeoff face IS the velocity
@@ -19316,11 +19789,11 @@ public partial class Mario : CharacterBody3D
         if (dir.LengthSquared() < 1e-6f)
             return true;
         dir = dir.Normalized();
-        Vector3 from = new Vector3(GlobalPosition.X, SmsFeetY() + heightAboveFeet, GlobalPosition.Z);
-        var q = PhysicsRayQueryParameters3D.Create(from, from + dir * (capRadiusWorld + 0.06f), CollisionMask);
-        q.CollideWithAreas = false;
-        q.Exclude = new Godot.Collections.Array<Rid> { GetRid() };
-        return GetWorld3D().DirectSpaceState.IntersectRay(q).Count > 0;
+        // 154d: from the collision shape's own axis, not the node origin -- Player.tscn's cylinder sits 11.6 cm off it (CollisionShape3D at
+        // z -0.1157), so from the origin a ray of radius + 6 cm fell 5 cm short of any wall he met moving toward -Z and a jump's slide was refused
+        Vector3 axis = bodyCol != null ? bodyCol.GlobalPosition : GlobalPosition;
+        Vector3 from = new Vector3(axis.X, SmsFeetY() + heightAboveFeet, axis.Z);
+        return SmsIntersect(SmsRayQuery(from, from + dir * (capRadiusWorld + 0.06f))).Count > 0;   // 227: the shared query
     }
 
     /// <summary>World Y of the bottom of the collision shape (the feet). ComputeFeetPosition() is the capsule-style value used by the FX.</summary>
@@ -19388,7 +19861,7 @@ public partial class Mario : CharacterBody3D
         Vector3 wallN = Vector3.Zero, contact = Vector3.Zero;
         for (int i = 0; i < GetSlideCollisionCount(); i++)
         {
-            KinematicCollision3D c = GetSlideCollision(i);
+            KinematicCollision3D c = SmsSlideHit(i);
             Vector3 cn = c.GetNormal();
             if (cn.AngleTo(Vector3.Up) <= FloorMaxAngle)
                 continue;
@@ -19412,21 +19885,17 @@ public partial class Mario : CharacterBody3D
         float stepMax = SmsGroundContact.StepUpMetres;
         float probeY = feetY + stepMax + 0.05f; // just above the step limit: the game's feet + 30
         string where = fromGround ? "ground" : (landingFrame ? "landing frame" : "air");
-        var space = GetWorld3D().DirectSpaceState;
-        var exclude = new Godot.Collections.Array<Rid> { GetRid() };
+        // 227: the three probes through the shared query (his mask, areas off, his body excluded)
 
         // (1) Is the wall still there above the step limit? Ray from the body centre toward the contact, 6 cm past the face.
         Vector3 toContactXZ = new Vector3(contact.X - GlobalPosition.X, 0f, contact.Z - GlobalPosition.Z);
         Vector3 wallFrom = new Vector3(GlobalPosition.X, probeY, GlobalPosition.Z);
-        var qWall = PhysicsRayQueryParameters3D.Create(wallFrom, wallFrom + dir * (toContactXZ.Length() + 0.06f), CollisionMask);
-        qWall.CollideWithAreas = false;
-        qWall.Exclude = exclude;
-        var hWall = space.IntersectRay(qWall);
+        var hWall = SmsIntersect(SmsRayQuery(wallFrom, wallFrom + dir * (toContactXZ.Length() + 0.06f)));
         if (hWall.Count > 0)
         {
             if (SmsDebugPrint)
             {
-                GodotObject wallHit = hWall["collider"].As<GodotObject>();
+                GodotObject wallHit = hWall[SmsKeys.Collider].As<GodotObject>();
                 GD.Print($"[SMS step] {where} {preMoveState}: wall stays a wall (solid at feet + {SmsUnits.MetresToUnits(stepMax + 0.05f):F0} units: {wallHit?.GetType().Name} '{(wallHit as Node)?.Name}')");
             }
             return;
@@ -19434,19 +19903,16 @@ public partial class Mario : CharacterBody3D
 
         // (2) Where is the ground just past the riser face, read from the step limit down?
         Vector3 groundFrom = new Vector3(contact.X, probeY, contact.Z) + dir * 0.03f;
-        var qGround = PhysicsRayQueryParameters3D.Create(groundFrom, groundFrom + Vector3.Down * (stepMax + 0.05f + 0.5f), CollisionMask);
-        qGround.CollideWithAreas = false;
-        qGround.Exclude = exclude;
-        var hGround = space.IntersectRay(qGround);
+        var hGround = SmsIntersect(SmsRayQuery(groundFrom, groundFrom + Vector3.Down * (stepMax + 0.05f + 0.5f)));
         if (hGround.Count == 0)
         {
             if (SmsDebugPrint)
                 GD.Print($"[SMS step] {where} {preMoveState}: no ground within 0.5 m below the feet past the wall, wall stays a wall");
             return;
         }
-        Vector3 groundP = (Vector3)hGround["position"];
-        Vector3 groundN = (Vector3)hGround["normal"];
-        GodotObject hit = hGround["collider"].As<GodotObject>();
+        Vector3 groundP = (Vector3)hGround[SmsKeys.Position];
+        Vector3 groundN = (Vector3)hGround[SmsKeys.Normal];
+        GodotObject hit = hGround[SmsKeys.Collider].As<GodotObject>();
         float rise = groundP.Y - feetY;
         bool levelGeometry = hit is StaticBody3D || hit is AnimatableBody3D || hit is CsgShape3D;
         if (!levelGeometry || groundN.AngleTo(Vector3.Up) > FloorMaxAngle || rise > stepMax)
@@ -19480,13 +19946,10 @@ public partial class Mario : CharacterBody3D
         float treadDepth = -1f; // this riser's face to the next one, when there is one within 1.5 m (also the ramp's run)
         {
             Vector3 treadFrom = new Vector3(groundP.X, groundP.Y + 0.02f, groundP.Z) + dir * 0.005f;
-            var qTread = PhysicsRayQueryParameters3D.Create(treadFrom, treadFrom + dir * 1.5f, CollisionMask);
-            qTread.CollideWithAreas = false;
-            qTread.Exclude = exclude;
-            var hTread = space.IntersectRay(qTread);
+            var hTread = SmsIntersect(SmsRayQuery(treadFrom, treadFrom + dir * 1.5f));
             if (hTread.Count > 0)
             {
-                treadDepth = (((Vector3)hTread["position"]) - groundFrom).Dot(dir) + 0.03f; // riser face to next riser face (groundFrom sits 3 cm past the face)
+                treadDepth = (((Vector3)hTread[SmsKeys.Position]) - groundFrom).Dot(dir) + 0.03f; // riser face to next riser face (groundFrom sits 3 cm past the face)
                 float maxAdvance = MathF.Max(0f, treadDepth - 0.005f);                    // front edge stops 5 mm short
                 float wantLen = remaining.Length();
                 if (wantLen > maxAdvance)
@@ -19590,7 +20053,7 @@ public partial class Mario : CharacterBody3D
         // landing(): the fall timer runs while vy < 0 -- the plain fall only, the LAND_SAFE_DOWN drop has no timer
         if (stateOfMario == MarioState.ledgeFall && !_smsHangDropFall && vy < 0f)
             _smsFallTicks = Math.Min(_smsFallTicks + n, SMS_LONG_FALL_TICKS + 1);
-        bool aHeld = Input.IsActionPressed("button_a") || Input.IsActionPressed("key_space");
+        bool aHeld = Input.IsActionPressed(SmsNames.Of("button_a")) || Input.IsActionPressed(SmsNames.Of("key_space"));
         bool cancel = _smsFallCancel;
         SmsAir.GravityMode gmode = stateOfMario == MarioState.SpinJump ? SmsAir.GravityMode.SpinJump : SmsAir.GravityMode.Normal;
         float sumMoveVy = 0f;
@@ -19701,8 +20164,9 @@ public partial class Mario : CharacterBody3D
         // addDamageFog() (MarioDraw.cpp 2184): the fog while mInvincibilityFrames > 0, OR while DIRTY on SLIP paint -- yellow-green (0x82, 0x96, 0x00)
         // while mStandingOnGraffitoTimer > 240, the damage pink (0xFF, 0x00, 0x80) below it (the HP tick comes at 360); never while talking
         bool smsSlipDirty = _smsDirty && _smsPollution == SmsPollution.Slip;
-        _smsBodyOverlay?.SetFogColor(smsSlipDirty && _smsFogTimer > SmsParams.Dirty.FogTimeYellow ? SmsBodyOverlay.GoopYellow : SmsBodyOverlay.DamagePink);
-        _smsBodyOverlay?.SetDamageFog((_smsInvincibleTicks > 0 || smsSlipDirty) && stateOfMario != MarioState.talking);
+        _smsBodyOverlay?.SetFogColor(_smsFrostHold ? SmsFrostFog : (smsSlipDirty && _smsFogTimer > SmsParams.Dirty.FogTimeYellow ? SmsBodyOverlay.GoopYellow : SmsBodyOverlay.DamagePink));   // 167: the frost's ice blue first
+        _smsBodyOverlay?.SetDamageFog((_smsInvincibleTicks > 0 || smsSlipDirty || _smsFrostHold) && stateOfMario != MarioState.talking);
+        if (_smsBodyOverlay != null) _smsBodyOverlay.SteadyFog = _smsFrostHold;   // 167: the frost holds the fog steady (no damage pulse)
         // addDirty() (MarioDraw.cpp 2139, every frame from MarioMain.cpp 136): mDirty into every body / hand material's konst alpha -- the goop
         // skin (pass 111). The goop texture: the STAGE's (H_ma_rak_dummy is swapped at load for the stage's one h_ma_rak.bti -- never per goop),
         // unless SmsSkinFromLayer (pass 113) hands him the layer's texture by pass 108's rule
@@ -19760,8 +20224,20 @@ public partial class Mario : CharacterBody3D
     [Signal] public delegate void SmsShineGetExitEventHandler(string scene);
     /// <summary>The SHINE! letters through the console (TConsoleStr::startAppearShineGet); false = your Wonderful! popup.</summary>
     [Export] public bool SmsShineGetLetters = true;
-    /// <summary>MSD_BGM_CHUBOSS, the shine-get fanfare (the pending step starts it) -- a player to fire; no stream yet (the sound front).</summary>
+    /// <summary>The shine get's fanfare (BGM 0x8001000A, k_clear.com, 5.1 s; the decomp names it MSD_BGM_CHUBOSS, one place off mSound.asn's
+    /// MSD_BGM_GET_SHINE) -- the pending step starts it. A 2D player on the Music bus, filled by SmsMarioSound when empty (220).</summary>
     [Export] public AudioStreamPlayer ShineGetFanfare;
+    private int _smsShineMusicStopped = -1;          // 220: the music players the get's fanfare cut (-1 = no get yet)
+    private bool _smsShineDemoMode;                  // 220: the get's demoModeIn is on (off when control comes back, or before the stage moves)
+    public int SmsShineMusicStopped => _smsShineMusicStopped;
+    public bool SmsShineDemoModeOn => _smsShineDemoMode;
+    /// <summary>220: the get's quiet over (MSound::demoModeOut / the next stage's initSound) -- once, whichever way the demo ends.</summary>
+    private void SmsShineDemoModeOut(string why)
+    {
+        if (!_smsShineDemoMode) return;
+        _smsShineDemoMode = false;
+        SmsActorSound.DemoModeOut(why);
+    }
     private float _smsShineDemoT = -1f;              // seconds since the demo began (-1 = no demo)
     private Transform3D _smsShineDemoFrame;          // origin = his position, +Z = the facing, +X = its left (SMS is right-handed, +Z forward)
     private Camera3D _smsShineCam;
@@ -19780,6 +20256,7 @@ public partial class Mario : CharacterBody3D
     {
         // winDemo: the held object is dropped (HIT_MESSAGE_UNKD), the enemies within 2000 u are killed
         if (heldBody != null) Anim_DetachPickup();
+        SmsBombDrop();   // 158
         pendingPickup = null;
         SmsShineGetKillEnemies(SmsUnits.UnitsToMetres(2000f));
         // mFaceAngle.y = the shine's INITIAL rotation.y; velocity 0; HP and air full
@@ -19806,6 +20283,11 @@ public partial class Mario : CharacterBody3D
         _smsShineCam.MakeCurrent();
         // the pending step: the letters, the fanfare, the fade registered; the count-up as before
         if (SmsShineGetLetters && _smsConsoleStr != null) _smsConsoleStr.StartAppearShineGet(shine.ShineText); else SpawnShineGetPopup();   // 118b: the shine's own word, if any
+        // 220: MSBgm::startBGM(0x8001000A, the decomp's MSD_BGM_CHUBOSS -- k_clear.com, the fanfare) cuts the music first, as the miss's jingle does
+        // (stopTrackBGMs(3, 0): every music track at once, no fade -- a Shine's appear fanfare still going with them) and sets demoModeIn(0x16F):
+        // every sound effect silent but the system's (the touch's chime) and Mario's voice, till the stage moves (here: till control comes back)
+        _smsShineMusicStopped = SmsActorSound.StopAllMusic(this, "the shine get");
+        SmsActorSound.DemoModeIn(SmsActorSound.MissDemoMask, "the shine get"); _smsShineDemoMode = true;
         ShineGetFanfare?.Play();
         SmsShineFadeAlpha_(0f);
         ScheduleShineCountUp();
@@ -19873,6 +20355,7 @@ public partial class Mario : CharacterBody3D
         {
             _smsShineDemoT = -1f;   // the state was left some other way (a reload, his debug keys): nothing to drive
             SmsShineFadeAlpha_(0f);
+            SmsShineDemoModeOut("the shine get left early");   // 220
         }
     }
 
@@ -19903,6 +20386,9 @@ public partial class Mario : CharacterBody3D
     private void SmsShineGetFinish(ShineSprite shine, int next)
     {
         if (shine != null && !IsInstanceValid(shine)) shine = null;
+        // 220: the get's quiet ends here, every way out: the stage moving (the game's next initSound -- the statics outlive the scene, as the miss's),
+        // the title, or (his option) control coming back where he stands
+        SmsShineDemoModeOut(next == 1 ? "the shine get: to the title" : shine != null && shine.ExitLevel ? "the shine get: the stage moves" : "the shine get: control back");
         if (next == 1)
         {
             string title = SmsCardSave.Current?.TitleScene ?? "";
@@ -19931,7 +20417,7 @@ public partial class Mario : CharacterBody3D
         SmsShineFadeAlpha_(0f);
         CameraLocked = false;
         stateOfMario = MarioState.idle;
-        animPlayer.Play("ma_wait");
+        animPlayer.Play(SmsNames.Of("ma_wait"));
         SetMarioState(stateOfMario);
         camera?.MakeCurrent();
         if (SmsDebugPrint) GD.Print($"[SMS shine] demo over at {SmsShineGetEndTime:F2} s: control returned (the shine's ExitLevel is off)");
@@ -19980,6 +20466,7 @@ public partial class Mario : CharacterBody3D
         if (armature != null) armature.Rotation = new Vector3(0f, yaw, 0f);
         lastFacingDirection = face;
         if (heldBody != null) Anim_DetachPickup();
+        SmsBombDrop();   // 158
         pendingPickup = null;
         CameraLocked = true;
         stateOfMario = MarioState.shineGet;   // the demo state: input and the state machine off, the tree off for the direct clips
@@ -20236,6 +20723,7 @@ public partial class Mario : CharacterBody3D
         _smsWarpGate = gate;
         bool wasJumping = SmsWarpInJumping();
         if (heldBody != null) Anim_DetachPickup();
+        SmsBombDrop();   // 158
         pendingPickup = null;
         CameraLocked = true;
         stateOfMario = MarioState.shineGet;   // the demo lock: input and the state machine off (as the gate-out, pass 119)
@@ -20247,9 +20735,9 @@ public partial class Mario : CharacterBody3D
             // setAnimation(ANIM_JUMP) at its end frame when he was not jumping; a jumping Mario keeps his frame -- but the demo state's entry
             // (SetMarioState above) has just started ma_demo_shine_get, whose frame 0 carries the demo's 90-unit centre translation (the walk-in),
             // so the frozen pose would stand 1.2 m from his body (drive 127b, G7b). Hold the jump clip's last frame in both cases -- a tiny deviation.
-            if (animPlayer.HasAnimation("ma_jump"))
+            if (animPlayer.HasAnimation(SmsNames.Of("ma_jump")))
             {
-                animPlayer.Play("ma_jump");
+                animPlayer.Play(SmsNames.Of("ma_jump"));
                 animPlayer.Seek(animPlayer.CurrentAnimationLength, true);
             }
             animPlayer.SpeedScale = 0f;   // getMotionFrameCtrl().setRate(0): the pose freezes

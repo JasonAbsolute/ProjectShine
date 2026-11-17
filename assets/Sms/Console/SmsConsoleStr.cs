@@ -93,6 +93,25 @@ public partial class SmsConsoleStr : CanvasLayer
         }
         Build(CurrentText());
         Miss.Visible = false;
+        if (ShineLettersAhead) { EnsureShineGetNodes(ShineText); _shineRoot.Visible = false; foreach (var t in _shineLetters) t.Visible = false; }   // 225: the SHINE! letters built now, hidden
+    }
+
+    /// <summary>225: the SHINE! letters, their gradient shader and the two spark emitters are built at the console's start (their first build --
+    /// the six glyph textures loaded, a shader compiled, twelve materials -- ran 32 ms on the frame of the Shine Get's landing, a 73-ms frame); off =
+    /// built at the first shine get, as before.</summary>
+    [Export] public bool ShineLettersAhead = true;
+    /// <summary>The ShineGet root, the word's letters (rebuilt when the word changes) and the spark emitters, made once.</summary>
+    private void EnsureShineGetNodes(string text)
+    {
+        if (_shineRoot == null)
+        {
+            _shineRoot = new Control { Name = "ShineGet", MouseFilter = Control.MouseFilterEnum.Ignore };
+            AddChild(_shineRoot);
+        }
+        if (_shineBuilt != text) BuildShine(text);
+        if (_shineStreaks == null) { _shineStreaks = new SmsShineSparks { Name = "Streaks" }; _shineRoot.AddChild(_shineStreaks); }
+        if (_shineStars == null) { _shineStars = new SmsShineSparks { Name = "Stars" }; _shineRoot.AddChild(_shineStars); }
+        _shineRoot.MoveChild(_shineStreaks, 0); _shineRoot.MoveChild(_shineStars, -1);   // the lines under the letters (they would slice the ones still flying in), the stars over them
     }
 
     private string CurrentText()
@@ -144,15 +163,7 @@ public partial class SmsConsoleStr : CanvasLayer
     public void StartAppearShineGet(string text = null)
     {
         if (string.IsNullOrEmpty(text)) text = ShineText;
-        if (_shineRoot == null)
-        {
-            _shineRoot = new Control { Name = "ShineGet", MouseFilter = Control.MouseFilterEnum.Ignore };
-            AddChild(_shineRoot);
-        }
-        if (_shineBuilt != text) BuildShine(text);
-        if (_shineStreaks == null) { _shineStreaks = new SmsShineSparks { Name = "Streaks" }; _shineRoot.AddChild(_shineStreaks); }
-        if (_shineStars == null) { _shineStars = new SmsShineSparks { Name = "Stars" }; _shineRoot.AddChild(_shineStars); }
-        _shineRoot.MoveChild(_shineStreaks, 0); _shineRoot.MoveChild(_shineStars, -1);   // the lines under the letters (they would slice the ones still flying in), the stars over them
+        EnsureShineGetNodes(text);   // 225: made at _Ready (ShineLettersAhead); here only for another word, or with the knob off
         _shineStreaks.Clear(); _shineStars.Clear();
         _shineSparkStage = new int[_shineLetters.Length];
         foreach (var t in _shineLetters) { t.Visible = false; t.Modulate = new Color(1f, 1f, 1f, 0f); }

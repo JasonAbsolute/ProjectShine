@@ -1,0 +1,257 @@
+{
+ "name": "ma_battle_stance_in",
+ "comment": "SMS 176 -- Mario DROPS INTO the battle stance (the sprite sheets' first row: standing, a hop of the fists, the drop): from the idle, the fists come up and the left foot steps forward as the weight drops, landing on ma_battle_stance's first pose at the end (play that loop next). One-shot, 0.45 s.",
+ "base_clip": "ma_wait",
+ "base_frame": 0,
+ "fps": 30,
+ "length": 0.45,
+ "loop": false,
+ "keys": [
+  {
+   "t": 0.0,
+   "pose": {}
+  },
+  {
+   "t": 0.18,
+   "pose": {
+    "center": [
+     [
+      "move_up",
+      2
+     ],
+     [
+      "up",
+      -15
+     ]
+    ],
+    "jnt_chest": [
+     [
+      "left",
+      6
+     ],
+     [
+      "up",
+      -4
+     ]
+    ],
+    "jnt_head": [
+     [
+      "left",
+      0
+     ],
+     [
+      "up",
+      19
+     ]
+    ],
+    "jnt_arm_L1": [
+     [
+      "left",
+      -25
+     ],
+     [
+      "forward",
+      -15
+     ]
+    ],
+    "jnt_arm_L2": [
+     [
+      "left",
+      -70
+     ]
+    ],
+    "jnt_arm_R1": [
+     [
+      "left",
+      -15
+     ],
+     [
+      "forward",
+      15
+     ]
+    ],
+    "jnt_arm_R2": [
+     [
+      "left",
+      -80
+     ]
+    ],
+    "jnt_leg_L1": [
+     [
+      "left",
+      -22
+     ],
+     [
+      "forward",
+      4
+     ]
+    ],
+    "jnt_leg_L2": [
+     [
+      "left",
+      30
+     ]
+    ],
+    "jnt_foot_L": [
+     [
+      "left",
+      -8
+     ],
+     [
+      "up",
+      25
+     ]
+    ],
+    "jnt_leg_R1": [
+     [
+      "left",
+      6
+     ],
+     [
+      "forward",
+      -4
+     ]
+    ],
+    "jnt_leg_R2": [
+     [
+      "left",
+      6
+     ]
+    ],
+    "jnt_foot_R": [
+     [
+      "left",
+      -12
+     ]
+    ]
+   }
+  },
+  {
+   "t": 0.45,
+   "pose": {
+    "center": [
+     [
+      "move_up",
+      -10
+     ],
+     [
+      "up",
+      -35
+     ]
+    ],
+    "jnt_chest": [
+     [
+      "left",
+      18
+     ],
+     [
+      "up",
+      -10
+     ]
+    ],
+    "jnt_head": [
+     [
+      "left",
+      -2
+     ],
+     [
+      "up",
+      45
+     ]
+    ],
+    "jnt_sldr_L": [
+     [
+      "forward",
+      6
+     ]
+    ],
+    "jnt_sldr_R": [
+     [
+      "forward",
+      -4
+     ]
+    ],
+    "jnt_arm_L1": [
+     [
+      "left",
+      -30
+     ],
+     [
+      "forward",
+      -30
+     ]
+    ],
+    "jnt_arm_L2": [
+     [
+      "left",
+      -75
+     ]
+    ],
+    "jnt_arm_R1": [
+     [
+      "left",
+      -20
+     ],
+     [
+      "forward",
+      30
+     ]
+    ],
+    "jnt_arm_R2": [
+     [
+      "left",
+      -95
+     ]
+    ],
+    "jnt_leg_L1": [
+     [
+      "left",
+      -30
+     ],
+     [
+      "forward",
+      8
+     ]
+    ],
+    "jnt_leg_L2": [
+     [
+      "left",
+      44
+     ]
+    ],
+    "jnt_foot_L": [
+     [
+      "left",
+      -14
+     ],
+     [
+      "up",
+      25
+     ]
+    ],
+    "jnt_leg_R1": [
+     [
+      "left",
+      20
+     ],
+     [
+      "forward",
+      -8
+     ]
+    ],
+    "jnt_leg_R2": [
+     [
+      "left",
+      24
+     ]
+    ],
+    "jnt_foot_R": [
+     [
+      "left",
+      -44
+     ]
+    ]
+   }
+  }
+ ]
+}

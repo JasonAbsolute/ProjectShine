@@ -198,6 +198,11 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     /// AtOnce: the moment the scene starts (place him on the raised disc yourself -- 153b's).</summary>
     [Export] public IntroStarts IntroStart = IntroStarts.WhenMarioEntersRoom;
     public enum IntroStarts { WhenMarioEntersRoom, WhenMarioLandsOnDisc, AtOnce }
+    /// <summary>157: the KING BOO REMATCH (KINGBOO_REMATCH_gdoc.txt). On: when he is down and the game would make its Shine, the RematchExit
+    /// (an SmsRematchExit: the one set here, else a sibling, else the sms_rematch_exit group) starts instead -- the casino table cracks and
+    /// shatters, Mario falls through into the rematch arena. Off: the Shine, as the game has it. KingBooArena.tscn turns it on.</summary>
+    [Export] public bool Rematch = false;
+    [Export] public SmsRematchExit RematchExit;
     /// <summary>WhenMarioEntersRoom's reach from the table's centre (2450 u: the room's wall).</summary>
     [Export(PropertyHint.Range, "500,6000,10")] public float IntroTriggerRadiusUnits = 2450f;
     /// <summary>How high the centre disc starts for the intro ride, units (2000: scene.bin's rulet00 at y 2000 over the others' 0, all three then lifted 500 by
@@ -206,6 +211,9 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     /// <summary>153n, the intro's pace: x the game's -- the disc's fall (rouletteFall: 1 u a tick, 2000 u in 16.7 s), the camera's sweep (the bck at 30 frames
     /// a second: the same 16.7 s) and the slot's unseen drop, all together. 1 = the game's; 1.5 (Jaysonn: "a bit slow") = 11 s; 2 = 8 s.</summary>
     [Export(PropertyHint.Range, "0.25,4,0.05")] public float IntroSpeed = 1.5f;
+    /// <summary>156d: the intro chuckle's pitch AND pace (one factor, as a tape speed): 1 = the game's own notes -- its syllables sit at half to a third of the
+    /// laugh sample's speed, one and a half octaves down at the deepest; 1.25 is a quarter faster and higher. Also scales the per-frame flutter.</summary>
+    [Export(PropertyHint.Range, "0.5,2,0.05")] public float IntroLaughPitch = 1f;
     /// <summary>153n: the gold dome UP through the ride and pressed into its bowl over PondPressTicks (the disc's knob, ~1 s: rulet00.bck) from the landing, as the
     /// game plays the clip. Off: the bowl from the start (153c's table).</summary>
     [Export] public bool IntroPondPress = true;
@@ -633,12 +641,12 @@ public partial class SmsBossTelesa : SmsSmallEnemy
                 _introDiscY -= MathF.Min(IntroSpeed, left) / U;
                 disc.GlobalPosition = DiscPos(disc);
                 if (_introHold && left > 3f && _mario != null && IsInstanceValid(_mario)) _mario.SmsCarryTo(HoldPoint(disc));
-                else if (_introHold) { _introHold = false; if (DisappearSound != null && DisappearSound.Stream != null) DisappearSound.Play(); }   // the DETACH 3 u up: MSD_SE_BS_TELESA_RLT_SET stands in
+                else if (_introHold) { _introHold = false; GetNodeOrNull<SmsActorSound>("SmsSound")?.Play("MSD_SE_BS_TELESA_RLT_SET"); }   // the DETACH 3 u up: rouletteFall's MSD_SE_BS_TELESA_RLT_SET (155: the real one; DisappearSound stood in)
                 return;
             }
             _introDiscY = target;
             disc.GlobalPosition = DiscPos(disc);
-            if (_introHold) { _introHold = false; if (DisappearSound != null && DisappearSound.Stream != null) DisappearSound.Play(); }
+            if (_introHold) { _introHold = false; GetNodeOrNull<SmsActorSound>("SmsSound")?.Play("MSD_SE_BS_TELESA_RLT_SET"); }
             _intro = 2; _introSlotY = TransYUnits - SlotUnderUnits + 1500f;
             if (Slot != null) Slot.Visible = IntroSlotShown;
             if (IntroPondPress && disc.PondPressT < 1f) _pondPressTick = 0;   // the clip plays out from here: the dome sinks into the bowl
@@ -1403,6 +1411,28 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         if (shine is ShineSprite s) s.PlaySpawnEntrance();
         if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: the Shine at {shine.GlobalPosition}");
     }
+    /// <summary>157: the Rematch knob's exit (RematchExit, else a sibling SmsRematchExit, else the nearest in the sms_rematch_exit group) begun where the
+    /// Shine would appear. False (the Shine as usual) with the knob off or no exit to be found.</summary>
+    private bool StartRematch()
+    {
+        if (!Rematch) return false;
+        var exit = RematchExit;
+        if (exit == null && GetParent() != null) foreach (Node n in GetParent().GetChildren()) if (n is SmsRematchExit e) { exit = e; break; }
+        if (exit == null)
+        {
+            float best = float.MaxValue;
+            foreach (Node n in GetTree().GetNodesInGroup("sms_rematch_exit"))
+                if (n is SmsRematchExit e && e.IsInsideTree()) { float d = e.GlobalPosition.DistanceTo(GlobalPosition); if (d < best) { best = d; exit = e; } }
+        }
+        if (exit == null) { GD.PushWarning($"[SMS btelesa] {GetPath()}: Rematch is on but there is no SmsRematchExit (KingBooArena.tscn's RematchExit) -- the Shine instead"); return false; }
+        if (!exit.Begin()) return false;
+        _rematchBegun = true;
+        if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: the rematch begins ({exit.Name}) -- no Shine");
+        return true;
+    }
+    private bool _rematchBegun;
+    /// <summary>157: the rematch's exit was begun in place of the Shine.</summary>
+    public bool RematchBegun => _rematchBegun;
     /// <summary>LIVE_FLAG_DEAD at the end: the slot and the parts gone with him, the attackers too (DEVIATION: the game's manager keeps its Boos).</summary>
     protected override void Dead()
     {
@@ -1556,7 +1586,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
                         if (_dieTimer > DownToShineTicks)
                         {
                             _dieTimer = 0;
-                            SpawnShine();
+                            if (!StartRematch()) SpawnShine();   // 157: the rematch's way out instead of the Shine
                             OffAllCollision();
                             _stack.Clear();
                             Dead();

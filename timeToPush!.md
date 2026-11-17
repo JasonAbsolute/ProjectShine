@@ -1113,3 +1113,595 @@ STILL OPEN, carried forward: `feature/enemy-pinna2` (entry #14, SMS 147 and 148,
 `feature/select-stages` (entry #11, SMS 135) are both pushed and waiting on Jaysonn's playtest, and `feature/select-stages` holds
 the only copy of #11's text. The exit-time C# finalize crash from #10's batch has still not recurred, now across the 151-153n
 passes as well.
+
+### #17 -- DONE 2026-11-17 -- pushed for the record, NO PR of its own (its code ships in #18's PR) -- queued 2026-11-03 02:42 PST (Kiro) -- PUSH ONLY, its PR FOLDED INTO #18's (SMS 154 + 154b + 154c + 154d + 155 + 155b + 156 + 156b + 156c + 156d + 156e), updated 2026-11-17 01:30 PST
+Push the twelfth feature branch: `feature/sounds`, branched from `main` `90efb17` (the trunk after PR #14, Sirena Beach's ghosts). The SOUND
+branch -- the project had no audio at all. SMS 154: Mario's and FLUDD's sound effects from the game's own banks, fired the way the game fires them:
+the footsteps and the pack's clanks off his animation tables (mario.szs's bas files), the jump voices by jump kind with the game's odds of the
+grunts and the tired set, the landing cutting the voice, the hip drop, the wall hits, the damage cries, the slide, the water; the spray's two loops
+(volume with the pressure), the hover's loop, the rocket's charge and launch, the turbo's launch, the empty tank, the refill, the nozzle swap, the
+pack's deploy clicks. The waves are baked from the disc image's AudioRes by tools/projectshine/sound154/sms_audio.py (a port of the game's SE
+sequence player: one WAV per MSD_SE id, 310 under assets/Sms/Sound/Mario/, loops carried in smpl chunks). NOT yet playtested by Jaysonn: push the
+branch so it is on GitHub; do NOT open a PR until he says the sound work is done (more passes follow on this branch: the species' slots, the music). SMS 154b: Mario's sounds play FLAT -- no camera-distance falloff, no panning, no low-pass (154's 3D players made them quiet and muffled at King Boo's fixed camera); Positional (off) brings 3D channels back with the GAME's own distance curve (full within 1000 u, silent at 5000, the voices four times longer) instead of Godot's. SMS 154c: a SOUND EFFECTS volume (the Sfx bus, SfxVolume 0.5 = -6 dB; default_bus_layout.tres new), the rollout's voice over its whoosh (the game's ROTATE_BROAD_JUMP: MV22 + MA_ROPE_ROLL_FULL_A), and the missing Mario sounds (the dive's slide loop, the wall slide's loop, the spin jump's roll, the damage cries by kind, the throw's wail, the cap, the fruit's take / put, the water wait, the TAKE's cry) with Mario.cs's ten own sound slots filled from the game's banks. SMS 154d: the dive's start grunt (the game's JUMP_CATCH voice MV13, the tired MV34 under 3 HP) and the wall slide's thud by the speed he meets the wall with (getWallSound: soft under 30 units a tick, else hard) over the scrape; the wall kick checked against the game -- it has no sound effect of its own there, only the MV22 'woo' and ma_wjmp's push-off steps, both already played; the tree grab's wrong MV13 removed; and a Mario.cs fix the drive found -- a jump into a wall facing +Z never slid (the head-height ray left the node origin, 11.6 cm off the collision cylinder, and fell short). SMS 155: KING BOO's fight sounds from the game's banks through a new SmsActorSound node any species can take -- his animation sound tables, his script's eleven slots filled, the fire / roulette / intro / slot-machine loops, the Boo attackers' slots (assets/Sms/Sound/Enemy/, 39 WAVs); plus the slow slide's silent flip (a clip's frame-0 sounds never fired), the sequencer's held-note timing (five FLUDD / menu sounds re-baked) and the tables' per-entry pitch. SMS 155b: the intro's laugh as the game's engine really plays it -- rouletteFall restarts the one-shot V_LAUGH1B every frame, so its chuckle is never heard, only its first breath under the rumble (a knob: Game / Chuckle / Off; the laugh you hear is V_APPEAR as he surfaces); the baker's volume envelopes, same-voice note cuts, track closes and settled loop regions -- every WAV re-baked (357: 317 Mario/, 40 Enemy/); the game's own distance-curve values (1200 / 12000). SMS 156: the BOSS MUSIC -- the game's BGM sequences rendered with the game's instruments (sms_bgm.py: the tracks, their volumes / pans / bends / vibrato, the instruments' envelopes and velocity curves, the loop as the sequence loops): King Boo's BossMusic = MSD_BGM_MAP_SELECT, the boss theme he and Petey share; the Gatekeeper's = MSD_BGM_CHUBOSS, the mid-boss theme; music slots filled by the actors' sound node as 2D players on the Music bus (assets/Sms/Sound/Music/). SMS 156b: King Boo's music is the BOSS theme, t_boss.com (156 had the file select music: the decomp's BGM enum sits one place off the game's name table); Music/ is MSD_BGM_BOSS.wav (12.7 MB) + MSD_BGM_CHUBOSS.wav (7.3 MB). SMS 156c: the intro's chuckle plays once as the disc seats -- the game's last per-frame start of V_LAUGH1B is never stopped, so it plays out whole right as the elevator lowers into place. SMS 156d: IntroLaughPitch, King Boo's inspector knob for the chuckle's pitch and pace (1 = the game's notes); the baker squares velocity and honours gate times as the game does -- 51 WAVs re-baked. SMS 156e: those 51 WAVs back to 156c's at Jaysonn's call (the two rules now switches, off); the knob stays. Further passes re-point this entry's tip.
+- Branch `feature/sounds` -- code tip `79b4c87` ("SMS 156e: the sounds back to 156c's ...", the 51 WAVs + SmsMarioSoundTable.cs restored) on the 156d commit ("SMS 156d: the intro chuckle's pitch / pace as an inspector knob ...", assets/Sms/Sound/ SmsActorSound.cs, SmsMarioSoundTable.cs, 51 WAVs under Mario/ and Enemy/, assets/Sms/Enemy/SmsBossTelesa.cs) on the 156c commit ("SMS 156c: the intro's chuckle plays once as the disc seats ...", assets/Sms/Sound/SmsActorSound.cs) on the 156b commit ("SMS 156b: King Boo's boss music is the game's BOSS theme ...", assets/Sms/Sound/ SmsActorSound.cs, SmsMarioSoundTable.cs, Music/ MSD_BGM_BOSS.wav new, MSD_BGM_MAP_SELECT.wav removed) on the 156 commit ("SMS 156: the BOSS MUSIC ...", assets/Sms/Sound/ SmsActorSound.cs, SmsMarioSoundTable.cs, Music/ 2 WAVs new, assets/Sms/Enemy/Spawn/SmsGateKeeper.cs a line) on the 155b commit ("SMS 155b: the intro laugh as the game's engine really plays it ...", assets/Sms/Sound/ SmsActorSound.cs, SmsMarioSoundTable.cs, every WAV under Mario/ and Enemy/ re-baked + Enemy/MSD_SE_BS_TELESA_V_LAUGH1B_ROULETTE.wav new) on the 155 commit ("SMS 155: KING BOO's fight sounds ...", assets/Sms/Sound/ SmsActorSound.cs + SmsActorSoundTable.cs new, SmsMarioSound.cs, SmsMarioSoundTable.cs, Enemy/ 39 WAVs, Mario/ 5 WAVs, assets/Sms/Enemy/ SmsSmallEnemy.cs + SmsBossTelesa.cs + BossTelesa/SmsTelesaSlot.cs + SmsRoulette.cs a line or two each) on the 154d commit ("SMS 154d: the dive's start grunt ... and the wall slide's thud by speed ...", SmsMarioSound.cs, SmsMarioSoundTable.cs, Mario/ +3 WAVs, Mario.cs) on the 154c commit ("SMS 154c: a SOUND EFFECTS volume ...", default_bus_layout.tres, SmsMarioSound.cs, SmsMarioSoundTable.cs, Mario/ +4 WAVs, Mario.cs) on the 154b commit ("SMS 154b: Mario's sounds play FLAT ...") on the 154 commit ("SMS 154: SOUND -- Mario's and FLUDD's sound effects ...", assets/Sms/Sound/ new: SmsMarioSound.cs,
+  SmsMarioSound.tscn, SmsMarioSoundTable.cs, Mario/ 310 .wav + 310 .wav.import; assets/Mario.cs the SmsFluddSound probe; assets/Player.tscn the
+  SmsSound child) on `main` `90efb17`; the branch tip is this file's own commit on top of them; 22 commits since `main`. The 310 WAVs are 19 MB in
+  all (the biggest 0.4 MB); nothing near the 100 MB limit. The range carries none of Jaysonn's live edits (assets/Level.tscn and the rest).
+- To try 156e: the sounds are 156c's again (the chuckle as it was); IntroLaughPitch on King Boo's inspector still there, 1 = as is.
+- To try 156d: King Boo's inspector, IntroLaughPitch -- 1 is the game's own notes (deep: half to a third of the sample's speed), 1.25 a
+  quarter faster and higher; FLUDD's nozzle clicks are the short clicks they are in the game, soft notes everywhere a touch quieter.
+- To try 156c: King Boo's room -- as the elevator lowers into place, his chuckle (the little laughs, 6 s, through the slot machine's
+  fall); nothing but the rumble on the way down, as in the game.
+- To try 156b: King Boo's room -- the BOSS theme this time (t_boss.com: the brass-and-drums piece he and Petey share), from his first
+  appearance, looping after 4 s of intro, fading at the down.
+- To try 156: King Boo's room -- the boss theme starts as he surfaces (the game's own tune for him and Petey, rendered from its sequence),
+  loops seamlessly, fades at the down; the Gatekeeper's mid-boss theme on its appear demo. The Music bus sets the level (MusicDb -4 dB under it);
+  the render is dry -- a Reverb effect on the Music bus brings the GC's room back if wanted.
+- To try 155b: King Boo's room again. The ride down is the rumble alone now (the game's engine never lets that laugh be heard --
+  the knob SmsActorSound.IntroLaugh brings 155's chuckle back if wanted); his cackle comes as he surfaces, as before. The whole set
+  re-baked: Mario's slide swells in, King Boo's fire dips after its burst, the rumbles and the slot's rattle loop without a pulse,
+  one-shots end a touch tighter; his sounds carry further from the camera (the game's 12000-u fade, not 5000).
+- To try 155: King Boo's room. The intro ride rumbles and he laughs as the disc sinks (a clunk as it seats); his "appear" cry; spray his tongue:
+  the roll's "woo" and whirr, the drums' rattle, a clunk per drum, the fanfare; a pepper on the tongue: the spicy hit, then his fire roars
+  through the burn; a fruit on the hot body: the damage cry and his long laugh; a plain fruit: the gulp; he fades with a whoosh; the discs
+  rumble while they roll (a clunk when a switch stops one); hose him on the table: "thank you" and a giggle; the last hit: the down. The Boos
+  pop, bounce and splash as before, with their appear / vanish. Mario: A on a slow belly slide -- the little flip whooshes now.
+- To try 154d: dive (B in a run or a jump): the "hup" as it starts. Jump at a wall from a walk: a soft thud as the slide starts, then the
+  scrape; from a run: a hard thud. A on the slide: the kick's "woo" and his push-off steps -- the game has no other kick sound. WallHitSounds
+  (Deviations) turns the thud off. Grab a tree: the hand slaps only (154c's grunt there was wrong). Jump at a wall you are facing while
+  running toward the level's -Z (the camera's default 'away'): it slides now -- before, the head-height check missed and you stopped dead.
+- To try 154c: everything is at half volume now (SfxVolume on the Player's SmsSound, 0.5; the Sfx bus in the Audio panel). Dive, slide: the
+  slide hisses; A on the slide: the rollout's "woo" over its roll whoosh (RollWhoosh off = the voice alone). Spin jump: the roll at its 10th
+  tick. Get hit: the thud and the little cry; burn / shock: their cries with the slot sounds; thrown: the wail. Lose the cap, get it back.
+  Pick up a fruit vs a barrel. Tread water. Fall for 2 s: the cry. Pump an empty tank: the squeaks. Climb a fence: punch and catch.
+  Heal: the chime. Walk into King Boo's room: the "wah" as the ride takes you.
+- To try 154b: the same, with the camera anywhere -- King Boo's fixed camera included: Mario's sounds stay at one volume, centred, clear.
+  Positional (Camera distance, on the Player's SmsSound) puts them back in 3D with the game's long curve (FullVolumeUnits / SilentUnits).
+- To try 154: play. Run: his steps and FLUDD's pack clanking; jump: the small grunt, the double jump's "woo", the triple's "yahoo", the back / side
+  flip's big one, the spin jump's -- and the landing cuts them off, as the game does; hip drop: the thud; run into a wall: the hit and the cry; R:
+  the spray's water and the nozzle's hiss (quieter at a light press); the hover's loop in the air; X: the nozzle swap's chime; the rocket: the
+  charge's hiss then the launch. Knobs on the Player's SmsSound child: the volumes (Master / Voice / Step / Fludd dB), the pieces (AnimSounds,
+  JumpVoices, LandingCutsVoice, ActionSounds, FluddSounds, FluddPackClanks), FloorMaterial (Stone by default: the game reads it off the floor,
+  the port's floors have no material yet), VoiceVariantChance, TiredVoices, DebugPrint (every play in the output).
+```
+git push -u origin feature/sounds
+git rev-list --count origin/feature/sounds..feature/sounds
+```
+Expect `0` from the rev-list. No PR of its own, no merge (the UPDATE below). The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
+`assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher and BossTelesa `.tres` re-saves, the Koopa and Goop `.png.import` flips and the
+`addons/godot_ai` churn: his, leave them.
+
+UPDATE 2026-11-17 (Jaysonn, after playing the rematch through SMS 229: "so far play testing feels good", "ok lets update timetopush!"): the
+sound work for this release is done, and every one of this branch's 22 commits is in `feature/kingboo-rematch`'s history (#18 branched from this
+tip), so this branch gets NO PR of its own: push it for the record (the commands above) and #18's single PR carries the sounds into `main` with
+the rematch. Do not open a second PR for it -- the two would land the same code twice (the rule above). Mark this entry DONE with #18's PR URL
+when that PR merges.
+
+Result: `feature/sounds` pushed as a NEW remote branch, 22 commits over `main` `90efb17`, which matches the entry exactly with no
+off-by-one for once. `git rev-list --count origin/feature/sounds..feature/sounds` returned `0`. `git merge-base feature/sounds main`
+is `90efb17`, so it sits straight on the trunk with no merge in it.
+NO PR OF ITS OWN, as the 2026-11-17 update instructs. `git merge-base --is-ancestor feature/sounds feature/kingboo-rematch` confirms
+every one of these 22 commits is already in #18's history, so #18's single PR carries the sounds into `main` with the rematch. Opening
+a second PR would land the same code twice. The 11 log entries 154 through 156e are in the range this branch adds.
+This entry closes with #18's PR URL once that PR merges.
+
+### #18 -- DONE 2026-11-17 -- PR OPEN, awaiting Jaysonn's merge (the URL goes in both headings at close-out) -- queued 2026-11-04 02:37 PST (Kiro) -- PUSH + PR (SMS 157 + 158 + 159 + 160 + 161 + 162 + 163 + 164 + 165 + 165b + 166 + 167 + 168 + 169 + 170 + 171 + 172 + 173 + 174 + 175 + 176 + 176b + 177 + 178 + 179 + 180 + 181 + 182 + 183 + 184 + 185 + 186 + 187 + 188 + 189 + 190 + 191 + 192 + 193 + 194 + 195 + 196 + 197 + 198 + 199 + 200 + 200b + 201 + 202 + 203 + 204 + 205 + 206 + 206b + 207 + 208 + 208b + 208c + 209 + 210 + 211 + 211b + 212 + 213 + 214 + 215 + 216 + 217 + 218 + 219 + 220 + 221 + 222 + 223 + 224 + 225 + 226 + 227 + 228 + 229, with #17's SMS 154-156e in its history), PLAYTESTED BY JAYSONN through 229 (2026-11-17), updated 2026-11-17 01:30 PST
+Push the thirteenth feature branch: `feature/kingboo-rematch`, branched from `feature/sounds` at `7df58ad` (entry #17's tip: the 22 sound commits
+are in its history -- push #17 first, or this push carries them). THE KING BOO REMATCH, part 1: the transition from the roulette fight to the
+custom fight of `KINGBOO_REMATCH_gdoc.txt` (the design doc at the project root, Jaysonn's; not committed). SMS 157: King Boo's `Rematch` knob
+(on in KingBooArena.tscn; off = the game's Shine) -- when he is down, where the game makes its Shine, the casino table cracks like glass from the
+centre to the rim and breaks (the three roulette discs re-cut into Voronoi cells on their own triangles and textures, FloorShatter.gdshader; the
+collision goes, the pieces fly and fade, the game's glass-break sound), Mario falls through into a load trigger, the screen fades to black and the
+rematch arena loads: Bouldergeist's planet from Super Mario Galaxy (models/Sms/Rematch/polta_planet.glb -- the .dae from Jaysonn's Downloads run
+through Blender headless with its vertex colours kept), no FLUDD, a violet night; the two-line card over black ("You call that a fight fit for a
+king?" / "I'll show you a real fight..."), Mario revealed 22 m up and falling as the screen fades in, King Boo (SmsKingBooRematch, the arena's
+own actor on the casino boss's model) appearing 5.5 m over the floor once he lands, with the long laugh, then hovering and watching him. The
+fight itself -- the attacks, the teleports, the faces -- is later passes on this branch; the animations another AI's. SMS 158: the BOMB BOOS
+and the SPIN -- X without the FLUDD is Mario's grounded spin (a new state): it grabs a Bomb Boo in reach, a second spin throws it; the Boos rise
+out of black foggy spots at the arena's centre (the supply; Random is a knob), drift to him and hover; three bursts on King Boo and he is down.
+SMS 159: Galaxy's way -- the spin takes the Boo BY THE TONGUE, Mario holds it up in one arm (a lasso pose on his skeleton) and the Boo swings round
+him; he walks it into King Boo (no throw). The Boo's look fixed (158's was purple and see-through): the files' own black body and yellow eyes, solid.
+SMS 160: the Boo FLOATS as Sunshine's Boos do (telesa.prm: the bob and the tilt, the wander between random goals, the touch that hurts Mario unless
+he is above it); the lasso arm out to the side, clear of his head (it was inside it). SMS 161: the arm further out, the closed FIST as the
+lasso hand, the tongue rooted in the middle of the Boo's mouth and ending in the middle of the fist, the swing 3.6 m. SMS 162: King Boo's MOVES -- he
+teleports between spots (the hide clip under a fade, a fade in elsewhere) and LICKS: in front of Mario, the roll clip's rear-up as the half-second tell,
+the tongue re-aimed onto the floor under Mario (a new SkeletonModifier3D, FABRIK over the tongue chain); the plain hit; a jump clears it; a swung Boo
+through the lick breaks it off; the gaps shorten per hit. SMS 163: the tongue aim dropped (it looked wrong) -- the roll clip's own whirl is the
+whip, the tongue a bit longer (SmsTongueStretch), the hit the whip's joints through Mario over its front crossing, the spot where the tip skims the
+floor through him. SMS 164: the BOOLOSSUS SMASH -- the crown pulses white, a Boolossus (Boolossus.obj -> boolossus.glb) falls on Mario and splits
+into 15 Boos (Teresa.dae -> boo.glb) that ring outward for a second; the plain hit for both; a jump clears the ring; ~110 KB of new model files.
+SMS 165: THREE Boolossi DIVE in from 20 m out and 24 m up (the target locks 0.6 s before the landing), with effects (a wisp trail, a ring of light and
+smoke on the landing, the camera shake, puffs); the Boos solid white; the CROWN GLOWS the attack's colour (white for the smash) -- a light at the crown
+and two new uniforms in the shared BossTelesaToon.gdshaderinc (0 = the casino's crown unchanged). SMS 165b (after screenshots): the Boolossus
+faces its dive; the Boos are the port's own hotel Boo (telesa.glb; the doc's Galaxy boo.glb REMOVED -- its export lost the GX mirror wrap); the
+crown SHINES (a sliding sheen + rim in the shader, solid while lit, sparkles, a flash, a quickening pulse) with no halo quad. SMS 166: GHOST
+LIGHTNING -- the crown red, two walls of bolts (a new shader on the shock's biri sheet) close on Mario three times, the shock (Mario.TakeShock) when
+a wall reaches him; the attacks picked by weight. SMS 167: GHOST BREATH -- the crown frosty blue, a stream of cold mist sweeping across the
+arena along the floor; the hit is a new FREEZE on Mario (Mario.SmsFreezeFor: a second with his pose held and a frost fog, inside an ice block that
+shatters as he thaws; no HP) -- a jump as the cold reaches him clears it. Mario.cs and SmsBodyOverlay.cs are touched. SMS 168: FIREBALLS --
+the crown red-orange, a volley of fireballs spat out of his mouth that roll along the floor, bounce off the arena wall and shrink away; the hit is
+the port's burn (Mario.TakeDamage with the Fire profile: FIRE_DOWN, 1 HP); the full jump clears a ball. SMS 169: GHOST WIND -- the crown pink,
+two ghost tornados rise out of the floor and hunt Mario for 7 s; one that reaches him FLINGS him (the port's thrown state, Mario.SmsThrowMario: up
+10 m, 18 m across, no HP); a run outpaces them. All six of the doc's attacks are in. SMS 170: the EFFECTS pass -- the lightning's bolts run
+along the walls between glowing posts (lights, a meet shockwave), the tornado is a gust of spiralling ribbons and debris, the ice is a jagged chunk, a
+fireball bursts on Mario, and a Bomb Boo swung into King Boo EXPLODES with the Bob-omb's blast. SMS 171: the frozen Mario holds a frame of the SHOCK
+clip (ma_shock at half its length, the eyes squeezed shut) instead of the pose he was caught in; and a fix in SmsBodyOverlay.cs -- the damage fog's
+shader copies now follow the eye textures (the knockdown's hurt eyes were hidden under the pink fog since the damage passes). SMS 172: the
+lightning walls crackle with the shock's own particles (bolt streaks, arcs, flashes, spark crosses, post sparks, floor crawl) and ZAPS jump the gap as
+they close; the fireballs are MOLTEN LAVA BALLS (LavaBall.gdshader NEW) popping out of the CROWN three at a time, lobbed down about Mario with landing
+marks, bouncing and rolling; the breath is THICKER (bigger, denser puffs and a solid core). SMS 173: King Boo sits 4.5 m HIGHER (HoverLift; the
+tongue clear of the floor) with the breath re-aimed to meet the floor 10 m out whatever his height, the lava balls 3 m across, the electricity YELLOW
+and quicker. SMS 174: the intro CUTSCENE -- Mario lands, a laugh from nowhere, he looks about for it, King Boo surfaces 7 m in front of him (as the casino
+boss rises from his table), laughs 3.4 s, sinks back under the floor, then rises at his spot for the fight; A skips it. SMS 175: Mario looks about with his
+HEAD (a new SmsHeadLook modifier: left, right, ahead, the shoulders following; his body standing), his head on King Boo as he laughs; King Boo surfaces 12 m out
+(7 stood them too close) with the two-shot's camera back for it. SMS 176: CUSTOM ANIMATIONS -- the look-around is a real clip now, Mario's
+"where am I?" (ma_lookabout: left, right, then up with a shrug), and on the cut to the stand-off he drops into a BATTLE STANCE from Jaysonn's sprite refs
+(ma_battle_stance_in, then the ma_battle_stance loop, fists closed) and holds it until the fight; the clips are baked from pose scripts by tools/anim/bake_anim.gd
+(assets/Mario/Anims, README there) and sit in Mario's AnimationPlayer (Player.tscn) to edit like any other. SMS 176b: the stance turns his WHOLE
+body (hips and legs, as the sprites) and he HOLDS it after the fight starts until the player's first input; the head finds King Boo over the turned chest.
+SMS 177: King Boo's hurt is his casino TUMBLE (btelesa_damage), and every third hit he splits off a COPY (Luigi's Mansion 3) that keeps away and only throws,
+slower and rarer; HitPoints 9. SMS 178: the swing RISES with Mario's jump (the hit from the air -- King Boo is out of reach from the ground), every
+hurt ends in a TELEPORT to another spot (the reset), a hit on a copy is the same tumble and teleport with no damage (no more reveal-and-fade), three of him by the
+sixth hit (MaxCopies 2) with a TELL (CopyTell: a silver crown, or no fangs), and the frost breath's hit SHOWS (a flash, the frost splashing on him, the ice climbing
+him, a shake). SMS 179: the Bomb Boo's EXPRESSIONS -- its tongue MOVES (it sways, wags, lags behind a turn), a Boo Mario LOOKS AT is SHOCKED (it freezes where it
+hangs, startles, trembles, stares back, its eyes burn and it DROOLS glossy drops) until he looks away, and it spawns Galaxy's way (a BLACK pool on the floor with two
+GLOWING EYES in it facing Mario, then the Boo up THROUGH the floor in black smoke); its rim glow and burst puff grey-black, not violet. SMS 180: the shocked Boo
+WORRIES (a head shake, a lean back, a cower with a nervous breath, sweat beads off its head), the spot's eyes a little bigger, and the intro's sink is King Boo's HIDE clip -- a
+leap and a DIVE through the floor in a burst of his twinkle stars, a flash on the stone, a ring of ghost mist, a shock ring and a camera kick. SMS 181: his RISES
+(the intro's and the fight's) have their effects -- a glow pulsing on the stone with wisps seeping up before he breaks through (a 0.7 s tell), then the flash, the shock
+ring, the mist and twinkle stars streaming up round him -- and so does every TELEPORT (a poof and stars as he goes, a flash, a poof and stars where he comes in); the
+flashes brighter and bigger. SMS 182: the APPEAR is clean and smooth -- the appear clip's own leap is the rise (the node waits at the hover height, the body
+comes up out of the floor in one arc, no stall on the stone) -- and the CROWN SPARKLES are off (the tell's stars, the teleport-in stars; the rise's stars shed
+off his body instead of a column up past his crown). SMS 183: the fight's END -- his DEFEAT (the down clip's tumble with his body blinking, mist and stars boiling off
+him, his glow and crown flaring, sinking low, then a BURST: a flash, a shock ring, a poof, stars, a kick, an afterglow) and the SHINE (a golden flash where he burst,
+the game's appear flight down onto its spot at the arena's middle under a demo camera, the world frozen); the Bomb Boo supply ends at the last hit. SMS 184:
+the Bomb Boos spawn in RANDOM places -- the supply's Random mode is the default, its spots on the stone inside the arena's edge, 4-14 m from Mario, 6 m from the
+last spot and 3 m from any Boo out. SMS 185: the pace UP (a move about every 2 s at the start, every second by the end, the first in 2 s, fewer plain hops) and the
+THUNDER WALLS long and LOW (18 x 2.2 m: a held jump clears them, the ends 9 m off). SMS 186: the BEGINNING LAUGH is the casino intro's chuckle (V_LAUGH1B,
+the climbing hee-hee-hee), the intro laughing 4.6 s, the chuckle cut at his dive; SmsActorSound gets Stop(se). SMS 187: the FREEZE BREATH made fair -- only
+the dense cold freezes (the thin edge and the fading tail no longer hit), a jump clears it at 1 m, and the ICE is a shield (a hit through the frost shatters it and
+does nothing else; Mario.cs SmsFrostShields). SMS 188: the SPLIT's CUTSCENE -- the world freezes, a camera cuts to a line of him across the arena, his copies come
+in beside him in violet mist, all laugh together under a card line, then every one of them attacks (SmsSplitCutscene.cs, new). SMS 189: the card is off --
+no text on the screen (SplitLine2 / SplitLine3 empty). SMS 190: the line sits higher in the frame (SplitCamLookUp) and the second split -- three of him --
+is verified and shot. SMS 191: a hit on a fake is the mock -- it laughs it off, phases see-through and teleports off (CopyMock). SMS 192: the Boolossus bigger
+and its Boos out 3 s; the walls' and the breath's hits put with their visuals (ShowHitBoxes draws them); the intro laugh climbs. SMS 193: the walls' last wrong
+shock (outside them at the meet) gone; a Bomb Boo in hand bursts on a hit; the split mist white; the intro laugh 3 s. SMS 194: the split's arrivals rebuilt --
+the mist and his stars gather into his centre as he forms, flickering, a ring under him, the pop; the laugh's climb ends at 1.15. SMS 195: the boss music
+(the casino theme, from the fight's start, faded at the down) with the effects -4 dB under it; the wind is five tornados on a ring circling the arena in to the
+middle and back out. SMS 196: the copies teleport about and keep 11 m apart; the music starts at the intro's cut to Mario in the battle stance.
+SMS 197: the music is Jaysonn's Antasma Final Battle mp3 (NEW: assets/Sms/Sound/Music/AntasmaFinalBattle.mp3 + .import, 2.8 MB), from the intro's first frame, the
+fight on its cue 7.5 s in. SMS 198: his clip changes cross-fade (ClipBlendSeconds 0.25). SMS 199: the breath leaves a 4.5 m mouth, its hit in 3 lanes; Mario's look-about without the shrug. SMS 200: a new attack, the Bomb Boo volley (three spat on lobs, two blast where they land, the last a dud to grab). SMS 200b: the Bomb Boos blink red before they blow. SMS 201: two new attacks -- the ambush from below (his pool hunts Mario, he erupts with a ring) and the Boo circle (SMW's ghost-house ring, one gap, closing). SMS 202: the Bomb Boo's puffs black, its one tongue. SMS 203: the split cutscenes clear the field, the spin jump grabs a Bomb Boo, no dud. SMS 204: the fireballs trail fire. SMS 205: a fireball goes out in a puff. SMS 206: the Bomb Boo in the Sunshine Boo's body (Look). SMS 206b: in the Bomb Boo's colours (black, yellow eyes). SMS 207: Mario's look-about rebuilt from curves, at its own pace. SMS 208: the arena under Luigi's Mansion's boss-arena sky, ported from the disc. SMS 208b: the final phase under its final-boss sky, the fire. SMS 208c: that fire pulled down the sky for the fight's downward camera. SMS 209: the arena's lights follow the sky -- the flashes on the ground, the fire's light in the final phase. SMS 210: embers in the air for the final phase, glow on the arena. SMS 211: scorch marks on the floor, Jaysonn's sounds on the attacks (and the attacks' sounds switched on at all). SMS 211b: the thunder waits for the fight (none through the intro). SMS 212: a death plane under the arena -- a fall off it is the game's fall death (the camera stops and watches him fall, the iris, a life down). SMS 213: the miss's music -- every music track cut, the game's TOO BAD! jingle (the game-over one with no life left), the stage waiting for its end. SMS 214: the iris's hard edge (the game's own), King Boo idling through the split, Boolossus's shadow round with a white circle where it lands. SMS 215: the smash's Boolossus is the game's Sleepy Boo, its landing the Sleepy Boo's own eaten sound. SMS 216: the miss's quiet (every sound effect silent but Mario's voice), the slow zoom onto a Mario who dies on the floor, King Boo's stars without the square halo. SMS 217: the Shine two and a half times bigger when it spawns, and King Boo's defeat turns the sky to a peaceful starry night with the northern lights. SMS 218: the fight sky's faint streaks in the game's magenta (they were a dark red-pink). SMS 219: the fight sky's colour flashes without their hard lines. SMS 220: the Shine's sounds from the game -- the appear's chime and fanfare, its hum, the chime at the touch, the Shine Get's fanfare -- for every Shine. SMS 221: King Boo's death camera pans out to a wide shot of the whole arena while the Shine jumps to the middle; the Shine's hum loops without its drop. SMS 222: the death camera cuts (no pan); the line down the arena floor gone; the HUD hides through a Shine's appear and behaves the game's way at the shine get; the volley's freed-owner error gone. SMS 223: his death plays out in full before the Shine comes and the camera cuts; the Shine's get chime and its two fanfares re-rendered with the game's release curves the right way round. SMS 224: the frame hitch at the Shine's spawn gone (the Shine made at the fight's start, parked hidden). SMS 225: the hitch at the Shine Get's landing gone (the SHINE! letters built at the console's start); the boss and mid-boss themes and the miss and game-over jingles re-rendered with the release curves the right way round. SMS 226: the .NET collector held off (a no-GC region) from the fatal hit through his death, the Shine, the get and the card save -- the two hitches left were its pauses. SMS 227: the port's garbage rate cut from about 1.4 MB/s to about 0.6 (the camera rig's and Mario's physics queries re-used, every Godot name they hand the engine made once). SMS 228: a touchdown turns his face onto the way he is moving (a spin jump landed facing its takeoff, 30 degrees off its momentum). SMS 229: the Bomb Boos keep off the rim -- the arena floor measures its own stone's edge (25.1 m), a Boo's wander and its body stay RimMargin (3 m) inside it, one let go or landed past it comes straight back in; the supply's margin and the volley's wall from the same edge. Further passes re-point this entry's tip.
+- Branch `feature/kingboo-rematch` -- code tip `d05ba70` ("SMS 229: the King Boo REMATCH, part 74 -- the Bomb Boos KEEP OFF THE RIM: the arena floor measures its own STONE (the walkable top's edge, 25.1 m, apart from the kerb and the rock's shoulder), a Boo's wander goals and its body stay RimMargin (3 m) inside that edge, a Boo let go or landed as a dud past it comes straight back in, and the supply's margin and the volley's wall are measured from the same edge";
+  assets/Sms/Rematch/ SmsArenaFloor.cs, SmsBombBoo.cs, SmsBombBooSpawner.cs, SmsKingBooRematch.cs) on the 228 commit
+  ("SMS 228: the King Boo REMATCH, part 73 -- a spin jump came down facing its takeoff with the momentum 30 degrees off to one side; the touchdown now turns his face (and the model) onto the way he is moving, the momentum kept -- LandingKeepsDrift off is the game's own rule, the drift dropped and the slide along his face";
+  assets/ Mario.cs) on the 227 commit
+  ("SMS 227: the King Boo REMATCH, part 72 -- the port's garbage rate cut from about 1.4 MB/s to about 0.6 in the quiet fight: the camera rig's and Mario's physics queries made once and re-used (one ray query, one exclude list, the result dictionaries disposed), every Godot name they hand the engine (input actions, metadata keys, groups, clips, states) made once (SmsNames), the slide collisions and the floor's surface tag read without a new wrapper a frame";
+  assets/ Mario.cs, SunshineCamera.cs; assets/Sms/ SmsNames.cs (+ .uid, new), MarioRays.cs (+ .uid, new), MarioCamData.cs, MarioYCam.cs) on the 226 commit
+  ("SMS 226: the King Boo REMATCH, part 71 -- the two hitches left in the sequence (his death's start, the card save's opening) were the .NET garbage collector's pauses; from the fatal hit the collector is held off (a no-GC region) through his death, the Shine, the get and the card save -- no collection, no pause inside it";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs) on the 225 commit
+  ("SMS 225: the King Boo REMATCH, part 70 -- the hitch at the Shine Get's landing gone (the SHINE! letters built at the console's start: 73 ms -> 32-34 ms); the four other baked music tracks -- the boss and mid-boss themes, the miss and game-over jingles -- re-rendered with the game's release curves the right way round";
+  assets/Sms/Console/ SmsConsoleStr.cs; assets/Sms/Sound/Music/ MSD_BGM_BOSS.wav, MSD_BGM_CHUBOSS.wav, MSD_BGM_MISS.wav, MSD_BGM_GAMEOVER.wav) on the 224 commit
+  ("SMS 224: the King Boo REMATCH, part 69 -- the frame HITCH at the Shine's spawn gone: the Shine is made at the fight's start and parked hidden, so the frame of the cut only places and shows it (135 ms -> 25-29 ms)";
+  assets/ ShineSprite.cs; assets/Sms/Rematch/ SmsKingBooRematch.cs) on the 223 commit
+  ("SMS 223: the King Boo REMATCH, part 68 -- his death plays out in full (the burst's flash and afterglow, the ring, the puffs, the stars, the down's emitters) BEFORE the Shine comes and the camera cuts; the Shine's get chime and its two fanfares re-rendered with the game's release curves the right way round (the chime rings out, the fanfares' notes decay instead of swelling back and cutting)";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs; assets/Sms/Sound/ SmsMarioSoundTable.cs; assets/Sms/Sound/Object/ MSD_SE_SY_GET_SHINE.wav; assets/Sms/Sound/Music/ MSD_BGM_GET_SHINE.wav, MSD_BGM_SHINE_APPEAR.wav) on the 222 commit
+  ("SMS 222: the King Boo REMATCH, part 67 -- the death camera CUTS to the wide shot and cuts back (no pan); the LINE down the arena floor gone (the floor's stone rows re-mapped unbroken round the ring); the console hides through a Shine's appear demo and behaves the game's way at the shine get; the volley's and his attacks' signals safe after their owner is gone";
+  assets/ ShineSprite.cs, Mario.cs; assets/Sms/ SmsStandardHud.cs; assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsBooVolley.cs; models/Sms/Rematch/ polta_planet.glb) on the 221 commit
+  ("SMS 221: the King Boo REMATCH, part 66 -- his DEATH CAMERA pans out to a wide shot of the whole arena and holds it while the Shine comes out where he burst and jumps to the middle, then glides back; the Shine's HUM loops without its drop (each note's release kept)";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs; assets/Sms/Sound/Object/ MSD_SE_SHINE_EXIST.wav) on the 220 commit
+  ("SMS 220: the King Boo REMATCH, part 65 -- the SHINE's SOUNDS, the game's own: the appear's chime and fanfare, the Shine's hum while it is out, the chime at the touch, the Shine Get's fanfare (cutting the music, the effects quiet but the system's and Mario's voice) -- for every Shine in the port";
+  assets/ ShineSprite.cs, Mario.cs; assets/Sms/Sound/ SmsActorSound.cs, SmsMarioSound.cs, SmsMarioSoundTable.cs, Music/MSD_BGM_SHINE_APPEAR.wav + MSD_BGM_GET_SHINE.wav, Object/MSD_SE_SHINE_APPEAR.wav + MSD_SE_SHINE_EXIST.wav + MSD_SE_SY_GET_SHINE.wav (+ .import)) on the 219 commit
+  ("SMS 219: the King Boo REMATCH, part 64 -- the fight sky's FLASHES without their HARD LINES (the clouds' texture seam and the fade's seam round the sky blended away: RematchSky's flash_soften)";
+  assets/Sms/Rematch/ RematchSky.gdshader) on the 218 commit
+  ("SMS 218: the King Boo REMATCH, part 63 -- the fight sky's STREAKS in the game's colours (the faint ones the game's MAGENTA again, not a dark red-pink: RematchSky's colour knobs read as picked, as 217's night)";
+  assets/Sms/Rematch/ RematchSky.gdshader) on the 217 commit
+  ("SMS 217: the King Boo REMATCH, part 62 -- the SHINE two and a half times bigger when it spawns (its star's centre where the normal one's is, its demo camera on the bigger star's middle), and the PEACEFUL NIGHT after the defeat (from his burst the sky fades to a starry night with the northern lights, the arena's lights calm, the thunder and the embers gone)";
+  assets/ ShineSprite.cs; assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsArenaLighting.cs, SmsArenaEmbers.cs, RematchSky.gdshader) on the 216 commit
+  ("SMS 216: the King Boo REMATCH, part 61 -- the MISS's QUIET (the game's demoModeIn: as the miss's jingle starts every sound effect goes silent but the system's and Mario's voice), the camera's slow ZOOM onto Mario when he dies on the floor (the game's normal dead demo), and King Boo's twinkle stars without their square halo";
+  assets/ Mario.cs, SunshineCamera.cs; assets/Sms/ MarioCamData.cs; assets/Sms/Sound/ SmsActorSound.cs, SmsMarioSound.cs, SmsMarioSoundTable.cs; assets/Sms/Rematch/ SmsArenaLighting.cs, KingBooRematch.tscn; assets/Sms/Fx/ kira_add.gdshader) on the 215 commit
+  ("SMS 215: the King Boo REMATCH, part 60 -- the SLEEPY BOO SMASH: King Boo's Boolossus is now the game's Sleepy Boo (its own model and toon look, snoring through its one clip at the game's pace, 7 m across as the Boolossus was), and its landing sounds the Sleepy Boo's own death, MSD_SE_EN_DB_TELSA_EATEN (what the game plays as Yoshi eats it)";
+  assets/Sms/Rematch/ Boolossus.tscn, SmsBoolossus.cs; assets/Sms/Sound/ SmsMarioSoundTable.cs; NEW assets/Sms/Sound/Enemy/ MSD_SE_EN_DB_TELSA_EATEN.wav (+ .import, 34 KB)) on the 214 commit
+  ("SMS 214: the King Boo REMATCH, part 59 -- the IRIS's HARD EDGE (the game's Hx_Circle: black outside to a hard edge, three faint rings inside; 61's soft rim was the port's), King Boo IDLING through the split (no longer frozen mid-air in the laugh's last pose), and BOOLOSSUS's shadow ROUND with a WHITE CIRCLE where it will land (the Bomb Boo volley's mark, in white)";
+  assets/Sms/Console/ Fader.gdshader, SmsFader.cs; assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsBoolossus.cs) on the 213 commit
+  ("SMS 213: the King Boo REMATCH, part 58 -- the MISS's MUSIC: a miss cuts every music track at once (the boss music with it) and plays the game's own TOO BAD! jingle (MSD_BGM_MISS), with no life left the game-over jingle (MSD_BGM_GAMEOVER), and the stage waits for its end -- for every miss in the port";
+  assets/ Mario.cs; assets/Sms/Sound/ SmsActorSound.cs, SmsMarioSound.cs, SmsMarioSoundTable.cs; NEW assets/Sms/Sound/Music/ MSD_BGM_MISS.wav + MSD_BGM_GAMEOVER.wav (+ .import, 1.6 MB)) on the 212 commit
+  ("SMS 212: the King Boo REMATCH, part 57 -- a DEATH PLANE under the arena: a fall off it ends in the game's fall death (the cry, the camera stops and watches him fall away, the iris, TOO BAD!, a life down, the fight again from the fall-in) -- the death plane, the fall death and the camera's hell dead demo ported for any level";
+  assets/ Mario.cs, SunshineCamera.cs; assets/Sms/ MarioCamData.cs, NEW SmsDeathPlane.cs + .uid; assets/Sms/Rematch/ RematchArena.tscn) on the 211b commit
+  ("SMS 211b: the King Boo REMATCH, part 56b -- the THUNDER WAITS FOR THE FIGHT: none through the card, Mario's fall and the intro cutscene (the laugh from nowhere, the look-about, King Boo's rise and dive) -- it rolls from the sky's first purple flash after King Boo is up for the fight";
+  assets/Sms/Rematch/ SmsArenaLighting.cs) on the 211 commit
+  ("SMS 211: the King Boo REMATCH, part 56 -- SCORCH MARKS on the floor where the Bomb Boos blast and the lava balls land (fading decals: glowing orange fresh, black for eight seconds, gone over ten more) and JAYSONN'S SOUNDS for the attacks (his FireStart / FireEnd on the lava balls, Boolossus's bound and pon, the cold breath's blow, the ice's freeze / unfreeze, the lightning's crackles and zap, the wind's gust, the sky's thunder) -- and the attacks' sounds switched on at all (SmsActorSound.ActorOf never knew the attack classes: their sounds had never played)";
+  assets/Sms/Rematch/ RematchArena.tscn, SmsArenaFloor.cs, SmsBombBoo.cs, SmsFireballs.cs, SmsArenaLighting.cs, SmsGhostLightning.cs, SmsGhostWind.cs, SmsGhostBreath.cs, SmsIceBlock.cs, SmsBoolossus.cs; NEW SmsScorchMarks.cs + .uid; assets/Sms/Sound/ SmsActorSound.cs; NEW assets/Sms/Sound/Rematch/ (twelve WAVs + .import, 1 MB)) on the 210 commit
+  ("SMS 210: the King Boo REMATCH, part 55 -- EMBERS IN THE AIR for the final phase (a field of glowing sparks born in a ring round the arena's edge and out over the void, rising and wandering, fading in with the sky's fire) and GLOW on the arena (only what is brighter than the threshold blooms: the flames, King Boo's white, the lava balls, the embers)";
+  assets/Sms/Rematch/ RematchArena.tscn; NEW SmsArenaEmbers.cs + .uid) on the 209 commit
+  ("SMS 209: the King Boo REMATCH, part 54 -- the arena's LIGHTS FOLLOW THE SKY: Luigi's Mansion's lightning lights the ground (the sky's six cloud flashes added to the ambient and the sun on the same frame as in the clouds, the sky and the lights on one clock), and in the final phase the ambient, the fog and the sun blend to the fire's colours with the sky";
+  assets/Sms/Rematch/ RematchArena.tscn, RematchSky.gdshader; NEW SmsArenaLighting.cs + .uid) on the 208c commit
+  ("SMS 208c: the King Boo REMATCH, part 53c -- the final phase's FIRE pulled DOWN the sky for the fight's downward camera: the vrKoopa dome's elevations stretched from its top ring (final_stretch 2.5: the flames that ended 8 deg under the horizon now end ~55 deg under it, the red cap under that), the flame textures laid 1.6x down the taller band so the tongues keep their shape; final_drop to lower the whole dome besides";
+  assets/Sms/Rematch/ RematchSky.gdshader) on the 208b commit
+  ("SMS 208b: the King Boo REMATCH, part 53b -- the FINAL PHASE's SKY: at the second split the arena's sky cross-fades to Luigi's Mansion's FINAL-BOSS sky, the King Boo / Bowser roof fight's vrKoopa dome ported from the disc (a dark red backdrop, two layers of fire laid round the horizon, red-to-yellow streaks, a red glow below), the fade running through the frozen cutscene";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsSplitCutscene.cs, RematchSky.gdshader, RematchSky.tres; NEW Sky/lm_gaku_fire01.png + lm_ramp02.png (+ .import)) on the 208 commit
+  ("SMS 208: the King Boo REMATCH, part 53 -- the arena's SKY is Luigi's Mansion's BOSS-ARENA SKY, ported from the GameCube disc (the vrball_B dome of the Bogmire, Boolossus and Chauncey fights: its three textures, its four texture scrolls, its colour flashes, drawn by a Godot sky shader on the arena's WorldEnvironment; the lighting untouched)";
+  assets/Sms/Rematch/ RematchArena.tscn; NEW RematchSky.gdshader + .uid, RematchSky.tres, Sky/lm_bg04.png + lm_sin_wave.png + lm_gs001m.png (+ .import); NEW tools/lm/lm_sky_rip.py + lm_sky_desc.py) on the 207 commit
+  ("SMS 207: the King Boo REMATCH, part 52 -- Mario's LOOK-ABOUT rebuilt from MOTION CURVES after the game's own idle (a glance left, a sweep right, back to the front in 2.0 s; the head leads, the chest follows, the arms swing with it, no head cock, no reaching arm) and played at its OWN PACE (LookKeepsPace: the music cue's trim comes out of the laugh first -- 197 had quickened the 3 s clip x1.5)";
+  assets/Sms/Rematch/ SmsRematchIntro.cs; assets/Mario/Anims/ ma_lookabout.pose.json (generated) + ma_lookabout.tres (re-baked) + README.md; NEW tools/anim/lookabout_curves.py) on the 206b commit
+  ("SMS 206b: the King Boo REMATCH, part 51b -- the Sunshine Boo in the BOMB BOO's COLOURS (the game's textures recoloured in code as the Boo loads: the body's white near-black, the eye's grey yellow and its blue iris amber; the red mouth, the orange-red tongue and the white fangs kept -- 206's white blue-eyed Boo behind the knob)";
+  assets/Sms/Rematch/ SmsBombBoo.cs) on the 206 commit
+  ("SMS 206: the King Boo REMATCH, part 51 -- the BOMB BOO in the SUNSHINE BOO's body (the experiment: the game's own hotel Boo -- telesa.glb, its toon materials, its blue eyes, fangs, red mouth and rigged tongue, telesa_wait playing -- in the Galaxy Boo's place, with every Bomb Boo way kept: the rise, the bob, the shock with the game's own flinch, the lasso grab in the mouth's red, the fuse's red blink, the lob; Look = Galaxy brings 158-205's black Boo back)";
+  assets/Sms/Rematch/ SmsBombBoo.cs; NEW BombBooSunshine.gdshader + .uid) on the 205 commit
+  ("SMS 205: the King Boo REMATCH, part 50 -- a FIREBALL GOING OUT ends in a little PUFF (dark smoke rising from where it was, a flash, a ring of light, embers flung out; 168-204's balls shrank to nothing and winked out)";
+  assets/Sms/Rematch/ SmsFireballs.cs) on the 204 commit
+  ("SMS 204: the King Boo REMATCH, part 49 -- the FIREBALLS TRAIL FIRE (a stream of flame left in the world behind each ball as it flies and rolls, drifting back the way it came and rising as it dies; hot streaks along the motion; the ball's own flames leaning back with its speed -- 168-203's flames rode on the ball and only embers were left behind)";
+  assets/Sms/Rematch/ SmsFireballs.cs) on the 203 commit
+  ("SMS 203: the King Boo REMATCH, part 48 -- the split CUTSCENES CLEAR THE FIELD (as the phase 2 / phase 3 cutscene cuts in, every attack live in the arena is gone at once: his and his copies' tornados, walls, fireballs, breath, spat Bomb Boos, the Boo circle, the Boolossi and their wave, the ice on Mario -- 188-202 froze them with the world and ran them on after), the SPIN JUMP GRABS a Bomb Boo (the stick spin and A, or A out of the X spin, takes a free Boo by the tongue in the air -- the X spin alone before), and the volley has NO DUD (VolleyDud off: every Boo he spits is lit and blasts)";
+  assets/Mario.cs; assets/Sms/Rematch/ SmsKingBooRematch.cs SmsSplitCutscene.cs SmsBombBoo.cs SmsGhostLightning.cs SmsGhostWind.cs SmsFireballs.cs SmsGhostBreath.cs SmsBooVolley.cs SmsBooCircle.cs SmsBoolossus.cs SmsIceBlock.cs) on the 202 commit
+  ("SMS 202: the King Boo REMATCH, part 47 -- the Bomb Boo's PUFFS are BLACK (its own smoke under a dark-violet flash: the burst in Mario's hand, a vanish, the volley's blasts -- 158-201's port burst kept its white smoke whatever the tint) and it has ONE TONGUE (the body glb's own tongue strip, baked under the port's swinging tongue since 159, taken out of the mesh as it loads)";
+  assets/Sms/Rematch/ SmsBombBoo.cs) on the 201 commit
+  ("SMS 201: the King Boo REMATCH, part 46 -- two new attacks: the AMBUSH from below (he sinks where he stands, his glow pool hunts Mario across the stone for 3 s, stops and flares, and he erupts there through the floor with a 5 m shock ring -- jump at the break; he is up at the pool's spot) and the BOO CIRCLE, Super Mario World's ghost-house ring (seven hotel Boos on eight places about Mario, one gap, turning once every 4 s at head height; it holds 2 s, closes on him over 8 s and fades -- out through the gap as it comes round)";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs; NEW SmsBooCircle.cs + .uid) on the 200b commit
+  ("SMS 200b: the King Boo REMATCH, part 45 -- the Bomb Boos BLINK RED before they blow (a spat Boo through its fall, quicker and brighter as it comes down; the floating dud through its fuse's last 2.5 s; a timed hold's last 2 s), the eyes kept yellow; the dud only slow and faint in the air";
+  assets/Sms/Rematch/ SmsBombBoo.cs, BombBoo.gdshader) on the 200 commit
+  ("SMS 200: the King Boo REMATCH, part 44 -- a new attack, the BOMB BOO VOLLEY: he rears back and SPITS three lit Bomb Boos out of his mouth on high lobs about Mario, a ring on the floor marking where each comes down; two BLAST where they land (the Bob-omb explosion, a 3.5 m ring of light, a standing Mario within it hit -- a jump clears it), the LAST is a DUD that thuds down and floats there as a live Bomb Boo for Mario to grab, its fuse still burning (6 s, then it blasts where it floats)";
+  assets/Sms/Rematch/ SmsBombBoo.cs, SmsKingBooRematch.cs; NEW SmsBooVolley.cs + .uid) on the 199 commit
+  ("SMS 199: the King Boo REMATCH, part 43 -- the BREATH leaves a WIDE MOUTH (BreathMouthWidth 4.5 x 1.4 m: the mist, its dense core and the glints born across it, the mouth's light stretched to it, and the cold that freezes in 3 lanes across it -- one 0.7 m point of contact before) and Mario's look-about WITHOUT THE SHRUG (the arms rest; the glances and the look up stay)";
+  assets/Sms/Rematch/ SmsGhostBreath.cs, SmsKingBooRematch.cs; assets/Mario/Anims/ ma_lookabout.pose.json, ma_lookabout.tres) on the 198 commit
+  ("SMS 198: the King Boo REMATCH, part 42 -- his clip changes CROSS-FADE (ClipBlendSeconds 0.25: the pose he is in melts into the new clip's first frames -- the wait into the laugh, the laugh into the dive, the tumble into the wait, the laugh's own loop -- instead of the game's hard cut between bcks; 0 = the cut)";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs) on the 197 commit
+  ("SMS 197: the King Boo REMATCH, part 41 -- the music is ANTASMA FINAL BATTLE (Jaysonn's mp3 from Ref/, now assets/Sms/Sound/Music/AntasmaFinalBattle.mp3, looping back to 7.5 s), it starts on the intro's FIRST frame (Mario looking about for the laugh), and the FIGHT STARTS ON ITS CUE: 7.5 s after the music begins (FightCueSeconds) -- the intro trims the look-about and the laugh in proportion to land there (x0.67: 3 s each -> 2 s)";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsRematchIntro.cs; NEW assets/Sms/Sound/Music/AntasmaFinalBattle.mp3 + .import) on the 196 commit
+  ("SMS 196: the King Boo REMATCH, part 40 -- the copies TELEPORT ABOUT and keep APART (a copy's move is a hop 0.6 of the time, 0.3 before, and waits 1.3 x his gap, 1.7 before; every spot any of him picks keeps SpotMinFromBoos 11 m from the other King Boos, where they stand or where they are going); the boss music starts at the intro's CUT to Mario in the battle stance (as King Boo surfaces), not at the fight";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs) on the 195 commit
+  ("SMS 195: the King Boo REMATCH, part 39 -- the BOSS MUSIC (the casino King Boo's theme, MSD_BGM_BOSS, starts as the fight begins after the intro's dive and fades as the last hit takes him down) with the rematch's effects a bit UNDER it (SfxDb -4 on every SMS actor's sounds while the arena is loaded); the WIND is FIVE tornados on an even ring that CIRCLES the arena while it breathes IN to the middle and back OUT (the Spiral pattern; 169's hunt kept as a knob)";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsGhostWind.cs; assets/Sms/Sound/SmsActorSound.cs) on the 194 commit
+  ("SMS 194: the King Boo REMATCH, part 38 -- the split cutscene's arrivals REBUILT: each of him GATHERS out of the mist (white puffs and his twinkle stars streaming in from 10 m to his body's CENTRE while the body forms, flickering, a ring of cold light racing out over the stone under him), then POPS solid (the mist boiling back out, a flash); the effects centred on the body as measured off the wait pose; the intro laugh's climb ends LOWER (IntroLaughPitchTo 1.4 -> 1.15, From 0.7 -> 0.75)";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsSplitCutscene.cs) on the 193 commit
+  ("SMS 193: the King Boo REMATCH, part 37 -- the thunder walls' last wrong shock gone (192 had kept a 'gap shut' test that zapped a Mario OUTSIDE the walls as they met: he had jumped one where it stood); a Bomb Boo in Mario's hand BURSTS when he is hit (hurt, shocked, frozen or killed: the pop and gone, no drift); the split cutscene's mist WHITE (a cold white, violet before); the intro laugh SHORTER (IntroLaughSeconds 4.6 -> 3, the climb runs over it)";
+  assets/Sms/Rematch/ SmsGhostLightning.cs, SmsKingBooRematch.cs; assets/Mario.cs) on the 192 commit
+  ("SMS 192: the King Boo REMATCH, part 36 -- the Boolossus a sixth BIGGER and its wave of Boos lasting 3 s (bursting out, easing to a stop WaveReach out); the thunder walls' and the freeze breath's HITS put with their visuals (a wall is a SLAB about its drawn face and its shock stops where the bolts fade; the breath's mist no longer STALLS on the floor 10 m out while the cold that freezes ran on to 25 -- FloorDrag 0; ShowHitBoxes draws every hit volume in play); the intro laugh starts LOW and CLIMBS (IntroLaughPitchFrom 0.7 -> IntroLaughPitchTo 1.4)";
+  assets/Sms/Rematch/ SmsBoolossus.cs, SmsGhostLightning.cs, SmsGhostBreath.cs, SmsKingBooRematch.cs; assets/Sms/Sound/SmsActorSound.cs) on the 191 commit
+  ("SMS 191: the King Boo REMATCH, part 35 -- a hit on a FAKE is the MOCK: the bomb bursts, the copy does not flinch -- it LAUGHS IT OFF (the laugh clip and the short high cackle), rocks and bobs, PHASES see-through (flickering, the crown with it), then teleports off to another spot; the real one keeps the tumble -- the contrast is the tell";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs) on the 190 commit
+  ("SMS 190: the King Boo REMATCH, part 34 -- the split cutscene's line sits HIGHER in the frame (the camera looks SplitCamLookUp 1.5 m over the hover, was 4) and the SECOND split -- THREE of him -- is verified and shot (the copy already out teleports from its spot to its place in the line, the lens pulls back to fit the three)";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsSplitCutscene.cs) on the 189 commit
+  ("SMS 189: the King Boo REMATCH, part 33 -- the split cutscene's CARD is off: no text on the screen (SplitLine2 / SplitLine3 empty; text in them brings the card back) -- the scene is the line of him and the chorus";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsSplitCutscene.cs) on the 188 commit
+  ("SMS 188: the King Boo REMATCH, part 32 -- the SPLIT's CUTSCENE: as the hurt that earns a copy ends the world freezes and a camera cuts to a LINE across the arena -- he vanishes in a poof and comes back at his place out of violet ghost mist, laughing; his copies come in beside him one by one in a flash and the mist; all of them turn on Mario and LAUGH TOGETHER under a card line; the world runs again with every one of them attacking";
+  assets/Sms/Rematch/ SmsSplitCutscene.cs (+ .uid, new), SmsKingBooRematch.cs) on the 187 commit
+  ("SMS 187: the King Boo REMATCH, part 31 -- the FREEZE BREATH made fair: only the DENSE cold freezes (a puff's ball shrinks with its own fade and is gone past three quarters of its life -- the thin edge and the fading tail no longer hit; the ball 0.3 of the puff, the core's size), a jump clears it at 1 m, and the ICE is a shield (a hit or a shock through the frost shatters it and does nothing else: no knockdown, no HP)";
+  assets/Sms/Rematch/ SmsGhostBreath.cs, SmsKingBooRematch.cs, assets/ Mario.cs) on the 186 commit
+  ("SMS 186: the King Boo REMATCH, part 30 -- the BEGINNING LAUGH is the casino intro's CHUCKLE (MSD_SE_BS_TELESA_V_LAUGH1B, the climbing hee-hee-hee the casino plays as the roulette seats; the long V_LAUGH1 before), at IntroLaughPitch, the intro laughing 4.6 s and the chuckle cut at his dive; SmsActorSound gets Stop(se) / IsPlaying(se)";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs, assets/Sms/Sound/ SmsActorSound.cs) on the 185 commit
+  ("SMS 185: the King Boo REMATCH, part 29 -- the pace UP (a move about every 2 s at the start, every second by the end; the first in 2 s; fewer plain hops) and the THUNDER WALLS long and LOW (18 x 2.2 m, were 10 x 5: a held jump clears them, the open ends are 9 m off -- the dodge is the jump)";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsGhostLightning.cs) on the 184 commit
+  ("SMS 184: the King Boo REMATCH, part 28 -- the Bomb Boos spawn in RANDOM places: the supply's Random mode is the default (158's Centre was for the playtests) and its spots are picked with rules -- on the arena's stone and EdgeMargin inside its edge, MinFromMario to MaxFromMario from Mario, MinFromLast from the last spot, MinFromBoos from any Boo out";
+  assets/Sms/Rematch/ SmsBombBooSpawner.cs) on the 183 commit
+  ("SMS 183: the King Boo REMATCH, part 27 -- the fight's END: his DEFEAT (the down clip's tumble with his body blinking, ghost mist and stars boiling off him, his glow swelling and his crown flaring, sinking low, then a BURST -- a flash, a shock ring, a poof, stars, a kick, an afterglow) and the SHINE (materialising in a golden flash where he burst, flying the game's way down onto its spot at the arena's middle under a demo camera with the world frozen); the Bomb Boo supply ends at the last hit";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsBombBooSpawner.cs) on the 182 commit
+  ("SMS 182: the King Boo REMATCH, part 26 -- the APPEAR is clean and smooth (the appear clip's own leap is the rise: the node waits at the hover height and the body comes up out of the floor in one arc, no stall on the stone) and the CROWN SPARKLES are off (the tell's stars, the teleport-in stars, and the rise's stars shed off his body instead of a column up past his crown)";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs) on the 181 commit
+  ("SMS 181: the King Boo REMATCH, part 25 -- effects for him COMING UP out of the ground (a glow pulsing on the stone and wisps before he breaks through, then the flash, the shock ring, the mist and twinkle stars streaming up round him) and for every TELEPORT (a poof and stars as he goes, a flash, a poof and stars where he comes in); the flashes brighter and bigger";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs) on the 180 commit
+  ("SMS 180: the King Boo REMATCH, part 24 -- the shocked Bomb Boo WORRIES (it shakes its head, leans back, cowers, breathes, sweats), the spot's eyes a little bigger, and the intro's sink is King Boo's HIDE clip -- a leap and a DIVE through the floor in a twinkle burst, a flash, a ring of ghost mist and a shock ring";
+  assets/Sms/Rematch/ SmsBombBoo.cs, SmsBombBooSpawner.cs, SmsKingBooRematch.cs) on the 179 commit
+  ("SMS 179: the King Boo REMATCH, part 23 -- the Bomb Boo's EXPRESSIONS: its tongue MOVES, a Boo Mario LOOKS AT is SHOCKED (it freezes, stares back, trembles and DROOLS), and it spawns Galaxy's way (a BLACK pool with GLOWING EYES, then up through the floor in black smoke); black, not purple";
+  assets/Sms/Rematch/ SmsBombBoo.cs, SmsBombBooSpawner.cs) on the 178 commit
+  ("SMS 178: the King Boo REMATCH, part 22 -- the swing RISES with Mario's jump (the hit from the air), every hurt ends in a TELEPORT, copies take hits and teleport too (no damage) with a TELL, three of him by the sixth hit, and the frost breath's hit SHOWS";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsBombBoo.cs, SmsGhostBreath.cs, SmsIceBlock.cs; assets/Sms/Enemy/BossTelesa/BossTelesaToon.gdshaderinc (crown_recolor, default 0: the casino boss unchanged);
+  tools/anim/probe_shader.gd NEW (+ .uid)) on the 177 commit
+  ("SMS 177: the King Boo REMATCH, part 21 -- the HURT is his casino TUMBLE, and every third hit he splits off a COPY (Luigi's Mansion 3) that throws from afar and takes no damage";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsBombBoo.cs; tools/anim/probe_clip.gd NEW (+ .uid)) on the 176b commit
+  ("SMS 176b: the King Boo REMATCH, part 20b -- the battle stance turns his whole BODY (as the sprites), and he HOLDS it after the fight starts until the player's first input";
+  assets/Mario/Anims/ ma_battle_stance / ma_battle_stance_in .pose.json + .tres, assets/Sms/SmsHeadLook.cs, assets/Mario.cs, assets/Sms/Rematch/SmsRematchIntro.cs) on the 176 commit
+  ("SMS 176: the King Boo REMATCH, part 20 -- CUSTOM ANIMATIONS: Mario's \"where am I?\" look-around and his BATTLE STANCE as real clips, baked from pose scripts";
+  assets/Mario/Anims/ NEW (README.md, ma_lookabout / ma_battle_stance_in / ma_battle_stance .pose.json + .tres), tools/anim/bake_anim.gd NEW (+ .uid), assets/Player.tscn,
+  assets/Mario.cs, assets/Sms/Rematch/SmsRematchIntro.cs) on the 175 commit
+  ("SMS 175: the King Boo REMATCH, part 19 -- Mario LOOKS ABOUT with his HEAD (a new look-around), King Boo surfaces 12 m out";
+  assets/Sms/SmsHeadLook.cs NEW (+ .uid), assets/Mario.cs, assets/Sms/Rematch/SmsRematchIntro.cs) on the 174 commit
+  ("SMS 174: the King Boo REMATCH, part 18 -- the INTRO CUTSCENE: Mario looks about for the laugh, King Boo surfaces, laughs, sinks, the fight starts";
+  assets/Mario.cs, assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsRematchIntro.cs) on the 173 commit
+  ("SMS 173: the King Boo REMATCH, part 17 -- he sits HIGHER, the lava balls BIGGER, the electricity YELLOW and quicker";
+  assets/Sms/Rematch/ SmsKingBooRematch.cs, SmsFireballs.cs, SmsGhostLightning.cs) on the 172 commit
+  ("SMS 172: the King Boo REMATCH, part 16 -- the ELECTRICITY, LAVA BALLS out of the crown, a THICKER breath";
+  assets/Sms/Rematch/ LavaBall.gdshader NEW, SmsFireballs.cs, SmsGhostLightning.cs, SmsGhostBreath.cs, SmsKingBooRematch.cs, three shader .uid files) on the 171 commit
+  ("SMS 171: the King Boo REMATCH, part 15 -- the freeze holds a frame of the SHOCK";
+  assets/Mario.cs, assets/Sms/Fx/SmsBodyOverlay.cs) on the 170 commit ("SMS 170: the King Boo REMATCH, part 14 -- the EFFECTS pass"; assets/Sms/Rematch/
+  WindRibbon.gdshader NEW, GhostLightning.gdshader, IceBlock.gdshader, SmsGhostLightning.cs, SmsGhostWind.cs, SmsIceBlock.cs, SmsFireballs.cs, SmsBombBoo.cs) on the 169 commit
+  ("SMS 169: the King Boo REMATCH, part 13 -- GHOST WIND, the fling"; assets/Sms/Rematch/
+  SmsGhostWind.cs, GhostWind.gdshader NEW, SmsKingBooRematch.cs) on the 168 commit ("SMS 168: the King Boo REMATCH, part 12 -- FIREBALLS, the burn"; assets/Sms/Rematch/
+  SmsFireballs.cs NEW, SmsKingBooRematch.cs) on the 167 commit ("SMS 167: the King Boo REMATCH, part 11 -- GHOST BREATH, the freeze"; assets/Sms/Rematch/
+  SmsGhostBreath.cs, SmsIceBlock.cs, IceBlock.gdshader NEW, SmsKingBooRematch.cs; assets/Mario.cs (SmsFreezeFor, the frost), assets/Sms/Fx/SmsBodyOverlay.cs
+  (SteadyFog)) on the 166 commit ("SMS 166: the King Boo REMATCH, part 10 -- GHOST LIGHTNING"; assets/Sms/Rematch/ SmsGhostLightning.cs,
+  GhostLightning.gdshader NEW, SmsKingBooRematch.cs) on the 165b commit ("SMS 165b: the King Boo REMATCH, part 9b -- the Boolossus faces its dive, the Boos are the port's own, the
+  crown SHINES"; assets/Sms/Rematch/ SmsBoolossus.cs, SmsKingBooRematch.cs, GhostBoo.gdshader, Boolossus.tscn; assets/Sms/Enemy/BossTelesa/BossTelesaToon.gdshaderinc;
+  models/Sms/Rematch/ boo.glb + boo_teresa.png REMOVED) on the 165 commit ("SMS 165: the King Boo REMATCH, part 9 -- three Boolossi DIVE in, with effects; the Boos white; the crown
+  GLOWS the attack's colour"; assets/Sms/Rematch/ SmsBoolossus.cs, SmsKingBooRematch.cs; assets/Sms/Enemy/BossTelesa/BossTelesaToon.gdshaderinc two new uniforms) on the 164 commit
+  ("SMS 164: the King Boo REMATCH, part 8 -- the BOOLOSSUS SMASH"; assets/Sms/Rematch/ SmsBoolossus.cs,
+  Boolossus.tscn, GhostBoo.gdshader NEW, SmsKingBooRematch.cs; models/Sms/Rematch/ boolossus.glb + boo.glb and their textures NEW) on the 163 commit ("SMS 163: the King Boo REMATCH, part 7 -- the Lick's tongue is the whip itself, a bit longer";
+  assets/Sms/Rematch/ SmsTongueStretch.cs NEW, SmsTongueAim.cs REMOVED, SmsKingBooRematch.cs) on the 162 commit ("SMS 162: the King Boo REMATCH, part 6 -- the teleports and the Lick"; assets/Sms/Rematch/
+  SmsTongueAim.cs NEW, SmsKingBooRematch.cs, SmsArenaFloor.cs) on the 161 commit ("SMS 161: the King Boo REMATCH, part 5 -- the fist on the tongue"; assets/Mario.cs the hand poses and the grip,
+  assets/Sms/Rematch/ SmsBombBoo.cs, SmsLassoArm.cs) on the 160 commit ("SMS 160: the King Boo REMATCH, part 4 -- the Bomb Boo floats as Sunshine's Boos do"; assets/Mario.cs the
+  arm's lean, assets/Sms/Rematch/ SmsBombBoo.cs, SmsBombBooSpawner.cs, SmsLassoArm.cs, BombBoo.tscn) on the 159 commit ("SMS 159: the King Boo REMATCH, part 3 -- the Bomb Boo by the tongue"; assets/Mario.cs the lasso arm hook-up,
+  the throw removed; assets/Sms/Rematch/ SmsLassoArm.cs (new), SmsBombBoo.cs, BombBoo.gdshader, BombBoo.tscn, SmsKingBooRematch.cs (the hit cylinder),
+  SmsRematchIntro.cs (BooHeight 4), RematchArena.tscn) on the 158 commit ("SMS 158: the King Boo REMATCH, part 2 -- the Bomb Boos and the spin"; assets/Mario.cs the spin and the carry,
+  assets/Sms/Rematch/ SmsBombBoo.cs, SmsBombBooSpawner.cs, BombBoo.gdshader, BombBoo.tscn, SmsKingBooRematch.cs (the hit points), RematchArena.tscn (the
+  supply), assets/Sms/Sound/SmsActorSound.cs, models/Sms/Rematch/ bomb_boo.glb + bomb_boo_tongue.glb and their PNGs / .import) on the 157 commit
+  ("SMS 157: the King Boo REMATCH, part 1 -- the transition"; assets/Sms/Rematch/
+  SmsRematchExit.cs, SmsFloorShatter.cs, FloorShatter.gdshader, SmsRematchIntro.cs (+ SmsRematchCard), SmsKingBooRematch.cs, KingBooRematch.tscn,
+  SmsArenaFloor.cs, RematchArena.tscn and their .uid; assets/Sms/Enemy/BossTelesa/KingBooArena.tscn (RematchExit + FloorShatter children,
+  Rematch on), assets/Sms/Enemy/SmsBossTelesa.cs (the knob, StartRematch), assets/GameData.cs (RematchFrom), assets/Sms/Sound/SmsActorSound.cs
+  (the kingboo actor), SmsMarioSoundTable.cs (+ MSD_SE_OBJ_GLASS_BREAK), assets/Sms/Sound/Object/MSD_SE_OBJ_GLASS_BREAK.wav (+ .import),
+  models/Sms/Rematch/ polta_planet.glb + polta_parts.glb, their extracted PNGs and .import files) on `feature/sounds` `7df58ad`; the branch tip is
+  this file's own commit on top of them; 160 commits past `feature/sounds`, 182 since `main`. ~9 MB of new files (197's 2.8 MB mp3; 208 / 208b's five 34 KB sky textures; 211's twelve WAVs, 1 MB; 213's two jingles, 1.6 MB; 215's eaten sound, 34 KB; 220's five Shine sounds, 1.8 MB). The range carries none of Jaysonn's
+  live edits (assets/Level.tscn and the rest). PLAYTESTED BY JAYSONN through 229 (2026-11-17: "so far play testing feels good", "ok lets update
+  timetopush!"): push the branch AND open its PR -- the rematch is done to the design doc (the HP faces were scrapped; the way out of the arena
+  after the Shine is a later pass of its own, like a normal level's). #17's sound commits are in this branch's history and come with the PR (no
+  PR of their own: #17's UPDATE). ONE merge path only: this is a PR, so do NOT also merge it into local `main` (Kiro has not). It can be merged
+  once it is open (squash or merge commit, his call; `main` then needs `git merge --ff-only origin/main` here -- this repo's `pull.rebase` refuses
+  a pull over his unstaged work).
+- To try 229: play the fight and watch the Bomb Boos near the edge -- they float no nearer the stone's edge than 3 m now (Rim Margin on the BombBoo scene's root; Keep Off The Rim off = the old free wander), a Boo you drop at the edge or a dud that lands there heads back in at once, and King Boo's spat Boos come down no nearer than 2 m to the edge. Nothing else about them changed. Press the editor's Build first: the C# changed.
+- To try 228: run, spin the stick and jump, and hold the stick off to one side through the long flight -- he comes down facing the way he is moving (before, the takeoff direction, 30-45 degrees off it, until the landing clip ended). Landing Keeps Drift on Mario: off = the game's own landing, where the sideways drift is dropped and he slides along his face. Press the editor's Build first: the C# changed.
+- To try 227: play the fight for a few minutes and watch for hitches -- the port now makes less than half the garbage it did (the collector's pauses come less than half as often; the ones through his death are still held off by 226). Nothing should look or feel different: the rays, the inputs and the clips are the same, only made once. Press the editor's Build first: the C# changed.
+- To try 226: beat King Boo and watch the whole run from the last hit to the card save -- no hitch at his death's start or as the card opens (the .NET collector is held off from the fatal hit: Gc Quiet Through Death on KingBoo, 64 MB; the one pause it takes comes under the last blast). Press the editor's Build first: the C# changed.
+- To try 225: grab the Shine -- the landing no longer hitches (the SHINE! letters are built when the console loads: Shine Letters Ahead on the ConsoleStr layer). Then listen to the boss and mid-boss themes and the miss and game-over jingles: their notes' tails now decay the game's way instead of ducking out and swelling back into a cut. Press the editor's Build first: the C# changed.
+- To try 224: beat King Boo and watch the cut to the wide shot -- the Shine's appearance no longer hitches (the Shine is built when the fight loads, Shine Made Ahead on KingBoo; off = built on that frame as before). Press the editor's Build first: the C# changed.
+- To try 223: beat King Boo -- his death now plays out in full on the gameplay camera (the flash, the afterglow, the ring, the puffs and stars, about 2.5 s) and only then the Shine comes out where he burst and the camera cuts to the wide shot (Shine After Death Fx on KingBoo; Shine Delay Seconds 0.5 is the pause after his effects). Then grab the Shine and listen: the chime at the touch rings out instead of stuttering, and the two fanfares (the Shine's appear, the get) have their notes decaying naturally. Press the editor's Build first: the C# changed.
+- To try 222: beat King Boo -- the camera now CUTS to the wide shot when he bursts and cuts back when the Shine settles (no pan; Death Cam Pan Seconds / Back Seconds on KingBoo above 0 bring the pan back). The line down the arena floor is gone (the stones run unbroken round the ring). Through the Shine's cutscene the counters, lives and life meter leave the screen and come back after, as in the game; grab the Shine in the air or on the floor and the shine counter comes in with the count going up mid-cutscene. Press the editor's Build first: the C# changed.
+- To try 221: beat King Boo -- when he bursts, the camera pulls back and up to a wide shot of the whole arena and holds it while his Shine comes out where he burst and jumps to the middle; when the Shine settles, the camera glides back behind Mario. The Shine's hum now loops smoothly (no dip once a second). Press the editor's Build first: the C# changed. The wide shot's knobs are on KingBoo in the Inspector: Death Cam Wide (off = the old Shine camera), Death Cam Distance / Height / Look Up / Fov, Death Cam Pan Seconds / Back Seconds.
+- To try 220: beat King Boo -- when his Shine comes out you hear the game's chime and its Shine-appears fanfare, the Shine hums softly while it floats (louder as you walk up), and when you grab it a sparkly chime, then the game's Shine Get fanfare with every other sound quiet but Mario's voice; any music playing stops at the grab, as in the game. It is every Shine's now, not only the rematch's. Press the editor's Build first: the C# changed. (The test drive's save dialog saved the rematch Shine into your save file: it may show as already got -- ask Kiro to take it out.)
+- To try 219: start the King Boo fight and watch the sky's colour flashes (the grey, the green, the lavender) -- the lit clouds no longer stop at a straight line across the sky (nor at a seam straight up it in the +Z direction); they fade out softly. The knob is on the sky's material (RematchSky.tres, Knobs): flash_soften, 0 = the game's hard lines, 1 = soft, more = wider. Only the shader changed: no Build needed.
+- To try 218: start the King Boo fight and look at the sky -- the faint streaks are the game's magenta now (a soft pink-violet), not the dark red-pink they were; where two curves cross they still go cyan. Only the shader changed: no Build needed.
+- To try 217: beat King Boo -- from his burst the sky fades over 6 s from the fire to a calm starry night with the northern lights (green, teal and violet curtains low over the rim), the arena's light going a cool blue, the thunder and the embers gone; and the Shine that flies out is two and a half times the size it was, centred where it was (King Boo's ShineScale; the sky's knobs are on RematchSky.tres: peace_*, aurora_*, star_gain). Press the editor's Build first: the C# changed.
+- To try 216: lose a life on the floor (run out of HP) -- the camera stops and slowly zooms in on Mario as he lies there; through the miss (TOO BAD! and its jingle) every sound effect goes quiet but Mario's voice, as in the game; and King Boo's twinkle stars no longer show faint squares against the sky (his star material's alpha_floor / edge_fade; 0 = the game's). Press the editor's Build first: the C# changed.
+- To try 215: wait for King Boo's smash (his crown glows white) -- the game's Sleepy Boo now falls on you instead of the Boolossus, snoring as it comes down, and its landing plays the Sleepy Boo's own death sound from the game (the one Yoshi's eat makes); its fifteen Boos burst out as before (on the smash's node: BodySize = its size in metres; GhostLook on with the Model child set back to boolossus.glb brings the Boolossus back). Press the editor's Build first: the C# changed.
+- To try 214: fall off the edge -- the iris now closes with a hard black edge, as the game draws it (three faint rings just inside it); hit King Boo until he splits -- through the cutscene's laugh and after it every one of him keeps up his idle, never frozen mid-air; and when he smashes with Boolossus, a white circle pulses where it will land with its round shadow growing inside (the Boolossus's LandingMark / MarkColor knobs; ShadowOpacity / ShadowScale the shadow). Press the editor's Build first: the C# changed.
+- To try 213: lose a life (fall off, or run out of HP) -- the boss music cuts out at once and the game's own TOO BAD! jingle plays; the stage moves only once it has finished (4.5 s); with no lives left the game-over jingle plays instead (8.2 s) and the stage starts over from the card with the lives reset (Mario's MissJingle / GameOverJingle slots, filled with the game's renders; SmsActorSound.MusicDb sets the music's level). Press the editor's Build first: Mario.cs and the sound scripts changed.
+- To try 212: walk (or get knocked) off the arena's edge -- Mario cries out, the camera stops and watches him fall away into the void, the iris closes 2 s on, TOO BAD!, a life down, and the fight starts again from the fall-in (no card, no cutscene) (the arena's DeathPlane node at y -25: drag it up or down to move the line; Active off = he falls for ever, as before). Press the editor's Build first: Mario.cs and the camera changed.
+- To try 211b: the thunder now waits for the fight -- none through the card, the fall and the intro cutscene; it rolls from the sky's first purple flash after King Boo is up for the fight (ThunderAfterIntro on the arena's ArenaLighting node; off = from the first frame, as 211).
+- To try 211: a Bomb Boo's blast and a lava ball's landing leave a black scorch on the stone -- orange and glowing for a moment, black for 8 s, fading over 10 more (Darkness / BombSize / LavaSize / HoldSeconds / FadeSeconds / GlowEnergy on the arena's ScorchMarks node; Scorch off = none); and the attacks now have Jaysonn's sounds -- the lava balls' FireStart as each pops out of the crown and FireEnd as each disappears, Boolossus's bound and pon, the breath's blow, the ice's freeze / unfreeze, the lightning's crackles and zap, the wind's gust, thunder 0.4 s after the sky's purple flash (levels in dB in SmsActorSound.RematchLevels; each attack's *Se knob names its sound, empty = none; ThunderSe on the ArenaLighting node) -- and the game's own sounds on those attacks play at last (they never had).
+- To try 210: from the second split, glowing embers rise all round the arena's edge and out over the void (Count / Size / Brightness / RimIn / RimOut on the arena's ArenaEmbers node; Embers off = none); and the arena now blooms -- King Boo's white halos, the fire and the lava balls read hotter, the streaks' cyan crossings glow (the Environment's Glow section: glow_intensity 0.7 = how much, glow_hdr_threshold 0.6 = how bright before it blooms; glow_enabled off = before).
+- To try 209: the arena's lights follow the sky -- every few seconds the sky's flash (purple, grey, blue, green, lavender, dark red) lights the floor and King Boo on the same frame as the clouds; from the second split the floor, the fog and the sun go warm with the fire (FlashStrength / FlashOnSun / the Final colours on the arena's ArenaLighting node; FollowSky off = the fixed light of before).
+- To try 208c: the final phase's fire now reaches down the sky -- the fight camera looking down over the fence sees flame to the bottom of the frame instead of flat red (final_stretch 2.5 / final_drop 0 / final_flame_tiles 1.6 on RematchSky.tres; 1 / 0 / 1 = the game's own roof sky).
+- To try 208b: the final phase's sky -- at the second split the sky fades over 2.5 s to the roof fight's fire: a wall of orange-yellow flame round the horizon under dark red, red-to-yellow streaks, a red glow below the fence (FinalSky / FinalSkyAtSplit / FinalSkyBlendSeconds on KingBoo; final_blend, final_brightness, final_fire_gain on RematchSky.tres).
+- To try 208: the arena's sky -- Luigi's Mansion's boss-arena sky from the disc: black-violet, magenta streaks drifting low with cyan where they cross, the clouds flashing purple / grey / blue / green / dark red on a 10 s cycle (knobs on assets/Sms/Rematch/RematchSky.tres: brightness, streak_gain, flash_amount, base_lift, speed).
+- To try 207: Mario's look-about in the intro -- a glance left, a sweep right and back in 2.0 s after the game's own idle, no shrug, no head cock, at its own pace (the curves in tools/anim/lookabout_curves.py: edit, run, re-bake; LookKeepsPace / LaughMinScale on the intro node).
+- To try 206b: the Bomb Boos in the game's Boo body but the Bomb Boo's colours -- black, yellow-eyed (SunshineBombColours / SunshineBodyColor / SunshineEyeColor / SunshineIrisColor on BombBoo.tscn's root; off = the white blue-eyed Boo).
+- To try 206: the Bomb Boos as the game's own Boos -- white, blue-eyed, their own tongue wagging, the lasso tongue red when carried, the flinch when shocked (Look / SunshineTint / SunshineOwnTongue on BombBoo.tscn's root; Look = Galaxy for the black Boo).
+- To try 205: a fireball going out -- the little puff of smoke, the flash and the embers where it was (EndPuff / EndPuffs / EndSparks / EndPuffScale on the fireballs maker's knobs).
+- To try 204: the fireballs' fire TRAILING behind them as they fly and roll (Trail / TrailPuffs / TrailSeconds / TrailSize / TrailBack / TrailStreaks / TrailLean on the fireballs maker's knobs, "The look").
+- To try 203: the phase 2 / 3 cutscene with an attack running -- everything gone under the cut (SplitClearsAttacks on KingBoo); a spin jump onto a floating Bomb Boo -- grabbed in the air (SpinJumpGrabs / SpinJumpGrabBelow on Mario); the volley with no dud (VolleyDud on KingBoo brings it back).
+- To try 202: the Bomb Boo's puffs BLACK (a hit while swinging one, a vanish, the volley's blasts; PuffSmokePuffs / PuffSmokeScale / PuffFlash / PuffFlashColor on BombBoo.tscn's root) and its ONE tongue (HideBodyTongue).
+- To try 201: the AMBUSH from below (his pool hunting you, the stop and flare, the eruption's ring -- jump at the break; AmbushHuntSeconds / AmbushHuntSpeed / AmbushTellSeconds / AmbushRingRadius / AmbushPoolSize on KingBoo) and the BOO CIRCLE (SMW's ring, one gap, turning and closing -- out through the gap; CircleCount / CircleGap / CircleRadius / CircleMinRadius / CircleHeight / CircleRevSeconds / CircleHoldSeconds / CircleSeconds / CircleDriftSpeed on KingBoo).
+- To try 200b: the Bomb Boos blinking RED before they blow -- the spat ones through their fall, the dud in its last 2.5 s (FuseFlashColor / FuseFlashMax / FuseEmit / FuseBlinkHzFrom / FuseBlinkHzTo / DudWarnSeconds on BombBoo.tscn's root).
+- To try 200: the Bomb Boo VOLLEY -- the yellow crown, three Boos spat on lobs with their marks on the floor, two blasts (jump them), the last a dud to grab before its 6 s fuse runs out (VolleyOn / VolleyWeight / VolleyCount / VolleyLobHeight / VolleyScatter / VolleyBlastRadius / VolleyDud / VolleyDudSeconds on KingBoo; CopyVolley to let the fakes spit too).
+- To try 199: the breath leaving his whole mouth, its freeze as wide as the mist (BreathMouthWidth / BreathMouthHeight / BreathHitLanes on KingBoo: 4.5 x 1.4 m, 3 lanes; 0.7 x 0.7, 1 = the old point); Mario's look-about with the arms resting (the shrug keys out of assets/Mario/Anims/ma_lookabout.pose.json, re-bake with tools/anim/bake_anim.gd).
+- To try 198: King Boo's clips melting into each other (ClipBlendSeconds on KingBoo: 0 = the old hard cut, 0.25 = one body moving, over 0.4 = mushy).
+- To try 197: Antasma Final Battle from the intro's first frame, the fight landing 7.5 s in (FightCueSeconds / LookMinScale / AfterSinkSeconds on the intro node;
+  BossMusicCue / BossMusicFile / BossMusicLoopOffset / BossMusicStreamDb on KingBoo); the look-about and the laugh run quicker (2 s each) to make the cue.
+- To try 196: the fakes teleporting about and never nearer than 11 m to each other or to him (CopyRepositionChance / CopyGapScale / SpotMinFromBoos on KingBoo);
+  the music coming in on the cut to Mario's battle stance (BossMusicAtIntro on KingBoo; off = at the fight).
+- To try 195: the boss music from the fight's start (BossMusicOn / BossMusicDb / BossMusicAtIntro on KingBoo) over the effects at -4 dB (SfxDb); the wind --
+  five tornados on a ring circling the arena, in to the middle by 3.8 s and out by 7 (TornadoCount / TornadoPattern / TornadoInnerRadius / TornadoSpeed /
+  TornadoSeconds on KingBoo).
+- To try 194: the split cutscenes -- each of him gathers out of white mist and sparkles into his centre, flickering, a ring under him, then pops solid
+  (SplitGatherPuffs / SplitGatherStars / SplitGatherRadius / SplitFadeSeconds / SplitFlicker / SplitRing on KingBoo); the intro laugh's climb ends at 1.15
+  (IntroLaughPitchFrom / IntroLaughPitchTo on KingBoo).
+- To try 193: jump a thunder wall where it stands and wait outside it -- no shock as the walls meet; take a hit holding a Bomb Boo -- it pops and is gone
+  (SmsBombBurstsOnHit on Mario); the split cutscene's white mist (SplitMistColor on KingBoo); the shorter intro laugh (IntroLaughSeconds 3).
+- To try 192: the Boolossus smash -- bigger, its ring of Boos out 3 s and slowing (ModelScale, WaveSeconds, WaveReach on Boolossus.tscn); the thunder
+  walls and the freeze breath with ShowHitBoxes ON (KingBoo) to see the red hit volumes against the bolts and the mist and your own green cylinder
+  (WallHitTopK, BreathFloorDrag on KingBoo); the intro laugh climbing from low (IntroLaughPitchFrom / IntroLaughPitchTo on KingBoo).
+- To try 191: hit a FAKE with a Bomb Boo -- it laughs it off (no tumble), phases see-through and teleports away (CopyMock, CopyMockSeconds,
+  CopyMockOpacity, CopyMockFlickerHz on KingBoo); the real one still tumbles -- the contrast tells them apart.
+- To try 190: the split cutscenes -- the line of him sits higher in the frame (SplitCamLookUp on KingBoo: lower = higher in the frame), and the six-hit
+  split shows three of him, the first copy teleporting into the line.
+- To try 189: the split cutscene with no text over it (SplitLine2 / SplitLine3 on KingBoo: text there brings the card back).
+- To try 188: hit him three times -- the world freezes, the camera cuts to a line of him across the arena, his copy comes in beside him out of violet
+  mist, they laugh together under "Now there are TWO of me!" (and "THREE of me!" at six hits), then all of them attack; A skips it. Knobs in The split's
+  cutscene group on KingBoo: SplitCutscene (off = the old quiet split), SplitLineSpacing, SplitCopyEvery, SplitHoldSeconds, SplitCam* , SplitLine2 / SplitLine3,
+  SplitMistColor / SplitMistPuffs, SplitLaughSpread, SplitSkipAllowed.
+- To try 187: the freeze breath -- only the thick white core of the cold freezes you now (the thin mist and its fading tail are harmless), a held jump
+  clears it, and while you are frozen the ICE takes any hit for you (it shatters, nothing else happens). Knobs: HitLifeK / HitRadiusK / HitFollowsFade /
+  HitHeight on the breath (BreathHitHeight on KingBoo), SmsFrostShields on Mario.
+- To try 186: the intro's laugh is the casino's hee-hee-hee chuckle, cut as he dives (IntroLaughSe / IntroLaughPitch / IntroLaughStopsAtDive /
+  IntroLaughSeconds on KingBoo; IntroLaughPitch 1.2 for higher still).
+- To try 185: King Boo attacks about twice as often (GapAtStart / GapAtLastHit / GapJitter / FirstAttackDelay / RepositionChance on KingBoo), and the
+  thunder walls are long and low -- HOLD a jump as the wall reaches you to clear it (a short tap does not); running round the end is a 9 m dash
+  (WallLength / WallHeight on KingBoo).
+- To try 184: the Bomb Boos now come up in RANDOM places about the arena -- each black spot somewhere on the stone 4-14 m from you, never the same
+  place twice running (SpawnMode / ArenaRadius / EdgeMargin / MinFromMario / MaxFromMario / MinFromLast / MinFromBoos on BombBooSpawner; SpawnMode Centre
+  puts them back at the middle).
+- To try 183: BEAT him -- on the last hit King Boo tumbles, blinking white with mist and stars pouring off him and his crown flaring, sinks low and BURSTS in
+  a flash, a shock ring and a cloud of mist and stars; a second later the SHINE materialises in a golden flash where he burst and flies down onto its spot at
+  the arena's middle while the world freezes and a camera watches (6 s); grab it as any Shine (the save card, then control back -- ShineExitLevel /
+  ShineExitScene on KingBoo send it somewhere). Knobs in The end group on KingBoo: DeathSink, DeathFlashSize, DeathPuffs / DeathStars, ShineDelaySeconds,
+  ShineDemoTicks, ShineCamOffset / ShineCamFov, ShineOverFloor, ShineSpawnPoint. The Bomb Boos are gone from the last hit on.
+- To try 182: watch the cutscene's APPEAR -- after the glow's tell King Boo comes up out of the floor in one clean arc (the appear clip's own leap, no
+  stall on the stone) and settles at his hover height; twinkle stars shed off his body only while he shoots up, nothing at his crown; the crown's own sparkles
+  are gone from the tells and the teleport-ins (IntroAppearClipSpeed / RiseLeapDamp, CrownSparkles 0 / TeleportInStars off, Twinkle for the ambient stars on
+  KingBoo).
+- To try 181: watch King Boo COME UP -- in the cutscene and at the fight's start a pool of light pulses on the stone with wisps rising from it, then he bursts
+  through in a flash, a shock ring and a splash of ghost mist with twinkle stars streaming up round him; every teleport now ends in a poof of mist and stars and
+  begins with a flash where he comes in (RiseFx / RiseTellSeconds / RiseGlowSize / RiseWisps / RiseSparkles, TeleportFx / TeleportPuffs / TeleportSparkles /
+  TeleportFxScale, FlashBoost on KingBoo).
+- To try 180: FACE a Bomb Boo and watch it WORRY -- it shakes its head, leans back from you, cowers and breathes fast, sweat beads fly off its head (the
+  Worry* / Sweat* knobs in The shock group on BombBoo.tscn's root); the spot's eyes are bigger (the supply's EyeSize). In the cutscene King Boo now LEAPS and
+  DIVES through the floor with his hide clip -- a burst of twinkle stars at the top, then a flash on the stone, a ring of ghost mist, a shock ring and a camera
+  kick as he goes under (IntroDiveClip / IntroDiveClipSpeed, DiveSparkles, DiveFlashSize, DiveRingPuffs, DiveSplashPuffs, DiveShockRing, DiveShake, DiveColor on KingBoo).
+- To try 179: watch a Bomb Boo come: a BLACK pool on the floor, two yellow EYES in it looking at you, then the Boo up THROUGH the floor in black smoke; its
+  tongue moves as it floats; FACE it (within 12 m) and it is SHOCKED -- it stops dead, startles, trembles, stares back at you with burning eyes and DROOLS -- until
+  you look away for half a second (or spin to grab it; walking into it still hurts). Knobs on BombBoo.tscn's root (The tongue / The shock / The rise groups:
+  LookShock, LookConeDeg, LookRange, ShockTremble, DroolRadius, DroolEvery, RiseFromUnder, SpawnDepth, RiseSmokePuffs...) and the supply's Fog group (FogMist,
+  FogDisc, EyesGlow, EyeColor, EyeSize...). The rim glow and the burst puff are grey-black now (GlowColor, BurstColor), not violet.
+- To try 178: swing a Bomb Boo and JUMP under King Boo -- the swing rises with the jump and bursts on his underside (from the ground it cannot reach him;
+  JumpSwingLift on the Bomb Boo); after every hit he teleports away (TeleportAfterHit); a hit on a COPY tumbles and teleports it too but does no damage; by the
+  sixth hit there are THREE of him -- the fake's crown is silver (CopyTell Crown; or Teeth: no fangs; CopyCrownColor); the frost breath's hit now flashes,
+  splashes and climbs him in ice with a camera shake (the ice's SplashPuffs / RingPuffs / HitShards / FlashSize / PopSeconds, the breath's HitShake).
+- To try 177: hit King Boo and he TUMBLES head over heels (HurtClip / HurtClipSpeed on him); after the third hit a COPY of him splits off and throws
+  lava balls and breath from far away, slower and rarer -- hit the copy and it only laughs and fades; hit the real one for the damage. He has 9 hit points now
+  (HitPoints); CopyEveryHits, MaxCopies, CopyMinFromMario, CopyGapScale, CopySpeedScale on him. NOTE: since 173 he hovers too high for the swing to reach
+  from the ground -- a design call to make (he dips during attacks? the swing rises with a jump?).
+- To try 176b: in the stance Mario's whole body is turned three-quarters to the camera (hips and legs too) and he KEEPS the stance after the fight starts
+  until you touch the stick or a button (StanceHoldUntilInput on the intro node); his head finds King Boo over the turned chest.
+- To try 176: the look-around is a real clip (ma_lookabout: a glance left, right, then up with a shrug) and on the cut to the stand-off Mario drops into
+  a BATTLE STANCE (fists up, crouched, bouncing) until the fight starts. Open assets/Player.tscn -> AnimationPlayer -> the Animation panel to scrub or edit
+  the three clips, or edit assets/Mario/Anims/<name>.pose.json and re-bake (README.md there). Intro knobs: LookClip, LookClipSpeed, StanceInClip, StanceClip.
+- To try 175: in the cutscene Mario now looks about with his HEAD (left, right, ahead and a little up, his shoulders following, his body still), then
+  looks up at King Boo as he surfaces 12 m away (he was 7). Knobs on the intro node: LookTurnDeg, LookUpDeg, LookChestShare, LookSeconds, SurfaceDistance,
+  SurfaceCamSide / SurfaceCamHeight / SurfaceCamAim.
+- To try 174: the intro is a CUTSCENE now -- land, hear the laugh, Mario looks about for it, King Boo surfaces in front of him, laughs, sinks, then rises
+  at his spot for the fight (A skips it). Knobs on the intro node (Cutscene, CutsceneDelay, LookSeconds, LookTurnDeg, SurfaceDistance, SurfaceCamSide /
+  SurfaceCamHeight, AfterSinkSeconds) and on King Boo (IntroRiseSeconds, IntroLaughSeconds, IntroSinkSeconds, IntroSinkDepth, SpawnRiseSeconds).
+- To try 173: King Boo floats 4.5 m HIGHER (his tongue no longer goes into the floor; HoverLift on him), the breath still comes down to the floor 10 m
+  out (BreathAimFloorAt), the lava balls are 3 m across (FireballSize), and the electricity is YELLOW and busier (SmsGhostLightning: BoltColorA / BoltColorB,
+  JitterHz, Wave, ZapChance).
+- To try 172: the lightning walls now CRACKLE -- bolt streaks, arcs, flashes and sparks all over them, sparks off the posts, bolts along the floor, and
+  horizontal ZAPS jumping the gap as the walls close; the fireballs are now LAVA BALLS popping out of the CROWN three at a time (three pops), arcing
+  down at the orange rings on the floor (one lands near you each pop), bouncing and rolling on; the breath is a THICK bank of cold. Knobs: SmsGhostLightning
+  (WallStreaks, WallArcs, WallSparks, GapZaps, ZapBrightness, MeetSparks), King Boo (FireballPops, FireballPerPop, FireballPopSeconds, FireballLobHeight,
+  FireballScatter, FireballAimedWithin, FireballRollSpeed), SmsFireballs (Bounce, LandingMarks, Drips, Smoke, HeatAtEnd), SmsGhostBreath (Puffs, PuffAlpha,
+  CorePuffs, CoreAlpha, HitRadiusK).
+- To try 171: get caught by the Ghost Breath -- the frozen Mario now holds the SHOCK pose (arms out, knees bent, eyes squeezed shut) inside the
+  ice instead of whatever he was doing; and take any hit: the hurt eyes now show through the pink damage fog (they were hidden under it before).
+  Knobs on Mario: SmsFrostPoseClip ("ma_shock"; "" = his own pose), SmsFrostPoseAt (0.5 = halfway through the clip).
+- To try 170 (the effects pass): the lightning walls now carry HORIZONTAL arcs jumping between glowing posts, light the floor and send a
+  shockwave ring out when they meet; the tornados are a GUST -- white ribbons of wind spiralling up with debris whirling in them; the ice on a frozen
+  Mario is a jagged CHUNK (a different one each time); a fireball that gets you BURSTS; and a Bomb Boo swung into King Boo EXPLODES with the Bob-omb's
+  blast. Knobs: SmsGhostLightning (Arcs, PostWidth, LightEnergy, MeetRing, MeetShake), SmsGhostWind (Ribbons, RibbonWidth, RibbonTurns, Debris),
+  SmsIceBlock (Jag, Spikes, SpikeOut), SmsBombBoo (ExplodeOnKingBoo, ExplosionScale, ExplosionShake, ExplodeSe).
+- To try 169: when the crown goes PINK, two ghost TORNADOS rise out of the floor 18 m out and come at you at 6 m/s for 7 s, turning slowly --
+  run or sidestep and they never catch you; one that reaches you FLINGS you (Sunshine's Cataquack throw: 10 m up, 18 m across, the flail and the
+  bounces, no HP). They outlive his move, so two winds' worth can be up at once. All six attacks are in and picked by weight. Knobs: KingBoo's
+  "The fight (169)" (TornadoCount / Speed / TurnDegPerSec / Seconds / Height / Radius, FlingSpeed / FlingUpK / FlingGraceSeconds, WindCrownColor) and WindWeight.
+- To try 168: when the crown goes RED-ORANGE (a flaming crown), he spits a volley of eight FIREBALLS out of his mouth that drop to the floor
+  and roll across the arena at 14 m/s in a 140-deg fan, bouncing off the wall and shrinking away over 5 s. A ball reaching you is the BURN (Sunshine's
+  fire hit: 1 HP, the launch, the cloud); a full JUMP clears one (feet over 1.6 m), a hop does not; watch the ones coming back off the wall. Knobs:
+  KingBoo's "The fight (168)" (FireballCount / VolleySeconds / SpreadDeg / Speed / Size / Seconds / HitHeight, FireballCrownColor) and FireballWeight.
+- To try 167: when the crown goes FROSTY BLUE and he turns his head to one side, a stream of cold mist comes out of his mouth and sweeps across
+  the arena along the floor (1.6 s, 150 deg, 22 m/s, from your left or your right at random). JUMP as it reaches you: feet 1.2 m up are over it. Caught,
+  you are FROZEN a second in a block of ice (no HP) -- the pose held, a blue frost on the body -- and it shatters as you thaw; a lick through the ice
+  is the knockdown as ever. Knobs: KingBoo's "The fight (167)" (SweepDeg / SweepSeconds / SweepWay, BreathSpeed, PuffSeconds, PuffSizeStart / End,
+  BreathHitHeight, FreezeSeconds, BreathCrownColor, OneFreezePerAttack), BreathWeight, SmsIceBlock's look, SmsBodyOverlay.SteadyFogFactor.
+- To try 166: when the crown goes RED, two walls of lightning appear 12 m apart either side of you, dim for half a second, then close at 8 m/s
+  each -- run out of the open ends (along the walls); a wall reaching you is the shock (ma_shock, 1 HP), once per attack. Three squeezes, the axis
+  turning 60 deg, each re-centred on you. Knobs: KingBoo's "The fight (166)" (WallLength / WallHeight / WallGap / WallSpeed, SqueezeCount, WarnSeconds,
+  SqueezePause, SqueezeTurnDeg, OneShockPerAttack, LightningCrownColor) and the attack weights (LickWeight / SmashWeight / LightningWeight).
+- To try 165b: the SMASH once more: the crown flashes white-hot and then SHINES -- a sliding sheen, sparkles rising out of it, pulsing faster
+  toward the launch; the Boolossi dive face first; the Boos ringing out are the hotel Boos (sleepy eyes, fangs, red tongues). Knobs: KingBoo's
+  CrownShine / CrownFlashSeconds / CrownPulseQuicken / CrownSparkles / CrownFxLift (CrownGlowSize for a halo after all); Boolossus.tscn's Opacity,
+  SmokeCount / SmokeColor, WaveBooScale.
+- To try 165: the SMASH again: his crown now visibly GLOWS white through the tell (a light on the crown), then THREE Boolossi dive in half a second
+  apart from three sides, each trailing wisps and aiming at where you stand -- their shadows show the targets, which lock 0.6 s before the landing: keep
+  running and they miss. Each landing: a ring of light, smoke, a camera shake, then 15 WHITE Boos ringing outward (jump them) and vanishing in puffs.
+  Knobs: KingBoo's "The fight (164)" (SmashCount, SmashStagger, SmashSpreadDeg, CrownGlowSize / Strength) and Boolossus.tscn ("The dive (165)":
+  DiveHeight / DiveDistance / DiveStartSpeed / TrackSpeed / LockSeconds / DiveTilt; "The effects (165)": the trail, ring, smoke and puff colours,
+  LandShake; "The wave": WaveBooOpacity, BooVertexColors).
+- To try 164: half his attacks are now the SMASH: he stays put and laughs while his crown pulses white (0.6 s), then a Boolossus appears 16 m over
+  you with its shadow on the floor, drifts after you for half a second and drops (1 s). Run out of the shadow; when it lands it bursts into 15 Boos
+  that ring outward for a second -- jump the ring. Standing under it or in the ring is the plain hit. Knobs: KingBoo's "The fight (164)" (SmashChance,
+  SmashTellSeconds, the crown colour) and Boolossus.tscn (ModelScale, DropHeight, HangSeconds, SmashGravity, WaveCount / WaveSpeed / WaveSeconds /
+  WaveHeight, BooRadius, the shadow, the sounds).
+- To try 163: the lick again: he fades in 8.7 m ahead and high, rears up with the tongue overhead, then the tongue whips across the front of him
+  low, left to right, through where you stand -- the clip's own whirl, no re-aim; the tongue a bit longer everywhere (TongueStretch 1.15). Jump at the
+  rear-up to clear it. Knobs: LickDistance / LickHeight (the tip skims the floor at 8.7 / 6.4), LickClipSpeed, LickHitFromFrame / LickHitToFrame,
+  LickThickness, TongueStretch.
+- To try 162: in the arena, 3 s after King Boo's laugh he vanishes and fades in 6 m in front of you, low; half a second of rearing up with the
+  tongue overhead, then it snaps onto the floor where you stand -- jump at the tell to clear it, stand and it knocks you down (a point of HP). He
+  hops off to another spot and comes again every 2-4 s, quicker per hit; swing a Boo into him while he waits or mid-lick (it breaks the lick off).
+  Knobs: KingBooRematch.tscn's "The fight (162)" group (the gaps, the fades, LickDistance / LickHeight, the clip and its frames, the hit's radius and
+  clear height, AttacksOn off = the old waiting boss).
+- To try 161: grab a Boo: the arm is further out, the hand a closed FIST on the tongue, the tongue from the middle of the Boo's mouth into the
+  middle of the fist, the Boo swinging wider (3.6 m). Knobs: Mario's LassoTilt / LassoForward / LassoIn, BombBoo.tscn's TongueOffset and OrbitRadius.
+- To try 160: in the arena. The Boo out of the fog bobs and tilts like the hotel's Boos and wanders about the middle on its own -- it no longer
+  comes to you; go to it, and mind it: a touch knocks you down like a Sunshine Boo's (jump over it and it cannot). X near it: the arm goes up and OUT
+  beside his head now, the Boo swinging round over his head, no grey on it. Knobs: BombBoo.tscn's root, The float (WanderRadiusUnits, MarchSpeed /
+  TurnSpeed, the FlyHeight / FlyAmplitude / FlyFrequency ranges, BaseLiftOverFloor, WaitTicks, TouchHurts off = harmless, SeeksMario on = it comes to
+  you as before); Mario's SMS Rematch group (LassoTilt 1.7 / LassoForward 0.3 / LassoIn -0.4: the arm's lean, tangents of the angles).
+- To try 159: in the arena. The Boo out of the fog is BLACK with yellow eyes and solid now, its pink tongue hanging. X near it: Mario's arm goes
+  up and the Boo swings round him on its tongue, just over his head, leaning into the turn -- walk toward King Boo and let it swing into him: it
+  bursts on him and he flips. X while holding does nothing; dive drops it; a spin jump (A out of a spin) speeds the swing. Knobs: BombBoo.tscn's root
+  (OrbitRadius, OrbitOverHand, OrbitDegPerSec, OrbitLeanDeg, HoldSeconds; Lift / Ambient / Opacity / FaceGlow / Glow for the look), Mario's SMS Rematch
+  group (LassoArm R / L, LassoTilt / LassoForward / LassoIn: the arm's lean), KingBoo (HitRadius / HitBelow / HitAbove), RematchIntro (BooHeight).
+- To try 158: in the arena (through the casino, or F6 on assets/Sms/Rematch/RematchArena.tscn). A black foggy spot forms at the middle and a black
+  Boo rises out of it and drifts your way, stopping short. X (the X key on a keyboard): Mario spins -- within reach the Boo is snatched and spins
+  over his head. Jump: single jumps only; dive (B): he drops it and it drifts back. X again: he spins and THROWS it the way he faces (or the
+  stick's way); aimed roughly at King Boo it curves onto him -- he flips, flashes, every Boo on the field pops, and in 6 s the next comes.
+  Three hits and he goes down and vanishes (the fight's end is a later pass). Knobs: Mario's inspector, SMS Rematch (158): SpinSeconds,
+  SpinTurns, BombGrabRadius, BombThrowSpeed, BombThrowAssistDeg (0 = pure aim)...; the arena's BombBooSpawner (SpawnMode Centre / Random,
+  SpawnInterval, MaxOut); BombBoo.tscn's root (ModelScale, Opacity, DriftSpeed, HoverHeight, CarrySpin, ExpireSeconds); KingBoo (HitPoints).
+- To try 157: King Boo's room; beat him (three hits). Where the Shine came: the table cracks from the centre out, holds a breath, and breaks
+  under you -- the pieces fly off and fade -- you fall into the dark, black, the two lines, and you drop into Bouldergeist's arena with no FLUDD
+  (R and X do nothing); King Boo appears, laughs, and waits -- hovering, glowing, turning to watch you. Nothing attacks yet. A skips the card.
+  Knobs: KingBooArena.tscn's RematchExit (Enabled, FadeOutSeconds, TriggerDepth, ArenaScene) and its FloorShatter (CrackSeconds, HoldSeconds,
+  ShardSeconds, CellAreaM2 the piece size, CrackColor / CrackGlow, Kick / Pop / Spin / Gravity, ShatterSound); RematchArena.tscn's RematchIntro (the
+  two lines and their timing, FallHeight, BooHeight, FadeInSeconds, SkipAllowed, LabelSettings / FontSize), KingBoo (GhostOpacity, Glow, Twinkle,
+  HoverBob, FaceMario, LaughSe), Arena (Brightness); BossTelesa's Rematch off = the game's Shine. To open the arena on its own: F6 on
+  assets/Sms/Rematch/RematchArena.tscn (the same intro runs).
+- PR: title "Feature: the King Boo rematch and the port's sounds (SMS passes 154-229)"; base `main`; head `feature/kingboo-rematch`; body =
+  `pr157.md` at the project root (untracked -- delete it after the merge; plain ASCII, so the clipboard route cannot mojibake it as #16's did).
+  Measured 2026-11-17: the body is 8.0 KB and urlencodes to 11.7 KB, so the compare URL can carry the TITLE only; the body goes by the
+  clipboard (`Get-Content pr157.md -Raw | Set-Clipboard`) and is pasted into the form. The body's text, for the record (the file is the copy to use):
+  > The King Boo REMATCH -- a second King Boo fight, after the casino, on Bouldergeist's planet from Super Mario Galaxy, designed in Jaysonn's `KINGBOO_REMATCH_gdoc.txt` and built pass by pass on `feature/kingboo-rematch` (SMS 157-229, 73 passes), each pass read off the game's data or the doc and logged in `PROJECT_LOG.md` with its headless drive green before the commit. The branch stacks on `feature/sounds` (SMS 154-156e, the port's first audio: its 22 commits are in this branch's history and come with this PR): 182 commits over `main` `90efb17`.
+  >
+  > **The sounds (SMS 154-156e, `feature/sounds`).** Mario's and FLUDD's sound effects from the game's own banks, fired the way the game fires them -- the footsteps and the pack's clanks off his animation tables, the jump voices by jump kind with the game's odds, the landing cutting the voice, the spray's and the hover's loops, the rocket and turbo launches (310 WAVs under `assets/Sms/Sound/Mario/`, baked from the disc's AudioRes by `tools/projectshine/sound154/sms_audio.py`, a port of the game's SE sequence player). Mario's sounds play flat (no distance falloff), a Sound Effects volume (the Sfx bus, -6 dB), the game's BOSS theme and intro chuckle for the casino fight. `SmsActorSound.cs`, `SmsMarioSoundTable.cs`, `Player.tscn`'s SmsSound child.
+  >
+  > **The way in and the arena (157, 174-176b, 197, 207-212, 217-219).** When the casino's King Boo is down (`Rematch` on `KingBooArena.tscn`; off = the game's Shine) the roulette table cracks like glass and breaks, and Mario falls through to the planet: `polta_planet.glb` (the Galaxy .dae with its vertex colours; the stone's rings re-mapped in 222), Luigi's Mansion's boss-arena sky ported from the disc with its flashes and streaks (`RematchSky`), lighting that follows the sky, embers and glow in the final phase, scorch marks under the blasts, a death plane (a fall is the game's fall death: the cry, the camera watching him fall away, the iris, TOO BAD!, a life down), and the intro cutscene -- a laugh from nowhere, Mario's look-about (a real clip), King Boo surfacing to laugh and dive, Mario dropping into a battle stance from Jaysonn's sprite refs; A skips it. The music is Jaysonn's Antasma Final Battle mp3 from the intro's first frame, the fight starting on its cue. After his defeat the sky fades to a starry night with the northern lights.
+  >
+  > **King Boo (`SmsKingBooRematch.cs`; the casino's btelesa model and clips).** Nine hit points. He hovers 8.5 m up and teleports between spots (the hide clip under a fade; every rise and teleport has its glow, flash, ring, mist and stars), attacking on a pace that climbs from a move every 2 s to every second, his CROWN SHINING the colour of the attack he is casting: the LICK (the roll clip's whip), the BOOLOSSUS SMASH (three dive in -- the game's Sleepy Boo -- and burst into rings of Boos), GHOST LIGHTNING (long low walls of bolts closing on Mario, crackling and zapping; a held jump clears them), GHOST BREATH (a cold stream along the floor; the dense cold FREEZES Mario inside a jagged ice block that doubles as a shield), LAVA BALLS out of the crown (rolling, trailing fire, bursting), GHOST WIND (five tornados on a ring circling in and back out; one flings him), the BOMB BOO VOLLEY (three spat on lobs, blinking red, blasting where they land), the AMBUSH from below and the BOO CIRCLE (SMW's ghost-house ring with one gap). His hurt is the casino tumble; every third hit he SPLITS off a copy (Luigi's Mansion 3) in a cutscene -- the world freezes, a camera cuts to a line of him, the copies gather out of mist and all laugh -- and the copies teleport about, keep apart and mock a hit on a fake. His DEFEAT: the down's tumble, blinking, mist and stars, the sink, then the BURST (flash, ring, poof, stars, a camera kick, an afterglow), all of it played out before the Shine comes where he burst and the camera CUTS to a wide shot of the arena (the game's Petey Shine camera), then back when the Shine settles.
+  >
+  > **The Bomb Boos (`SmsBombBoo.cs`, `SmsBombBooSpawner.cs`, `SmsLassoArm.cs`), Mario's only weapon.** The supply: black foggy spots at random on the stone (a black pool, low mist, two glowing eyes facing Mario) and a Boo rising up through the floor in black smoke, floating as Sunshine's Boos do (telesa.prm: the bob, the tilt, the wander between goals), hurting on touch unless he is above it; it wears the Sunshine Boo's body in the Bomb Boo's colours. X without FLUDD is Mario's grounded SPIN: it takes a Boo BY THE TONGUE, Galaxy's way -- he holds it up in one fist (a lasso arm on his skeleton) and the Boo swings round him on a long radius, rising with his jump (King Boo is out of reach from the ground: the hit comes from a jump's apex), the spin jump speeding the swing; walked into King Boo it BURSTS on him and he takes a hit. A Boo Mario LOOKS AT is shocked: it freezes where it hangs, trembles, stares back, its eyes burn, it drools and worries (a head shake, a lean, a cower, sweat) until he looks away. King Boo's hit clears the field. 229: the Boos keep off the rim -- the arena floor measures its own stone's edge (25.1 m) and a Boo's wander and body stay 3 m inside it.
+  >
+  > **The Shine and the ending (183, 217, 220-228).** The Shine two and a half times its size; the game's Shine sounds for EVERY Shine (the appear's chime and fanfare, the hum, the chime at the touch, the Shine Get fanfare -- re-rendered in 223 and 225 after a baker bug, the envelope curves read backwards in time); the HUD hiding through the cutscenes as the game's console does; the SHINE Get landing and the card save. The frame hitches at the Shine's spawn and the get's landing are gone (the Shine and the SHINE! letters built ahead), the .NET collector is held off from the fatal hit to control back, and the port's garbage rate is cut from about 1.4 to about 0.6 MB/s (the camera rig's and Mario's physics queries re-used, every Godot name made once: `SmsNames.cs` and `MarioRays.cs`, new). 228: a touchdown turns Mario's face onto the way he is moving.
+  >
+  > **To try:** play the casino fight to its end (Sirena Beach's `KingBooArena.tscn`): the table breaks and the rematch begins; or F6 on `assets/Sms/Rematch/RematchArena.tscn`. Grab a Bomb Boo with X (no FLUDD), jump and swing it into King Boo; nine hits; mind the edge. Press the editor's Build first: the C# changed.
+  >
+  > **Knobs:** every node's knobs are grouped with plain-English notes in the Inspector (King Boo: The fight, one group per attack, The split, The death, The Shine, Sounds; the supply: the spots and the fog; the Boo: the float, the swing, the shock, the rim; the arena: the sky, the lighting, the embers, the scorch marks, the death plane). Where the port deviates from the game's own rule, that rule is the knob's off state.
+  >
+  > **Drives:** the regression drive (drive162) at 68 / 68 checks plus one headless drive per pass (windowed shot runs for the looks), every one green before its commit; the numbers per pass are in `PROJECT_LOG.md`.
+  >
+  > **Not in it / deviations (logged):** the way out of the arena after the Shine (a later pass of its own, like a normal level's exit); King Boo's HP faces (a 217 mockup, scrapped); the fight itself is the design doc's, tuned in Jaysonn's playtests (the game has no such fight), with Sunshine's own data wherever the doc is silent (the Boo's float, the Shine Get, the fall death, the miss and game-over jingles). Also in the range: `Mario.cs` (the spin, the lasso carry, the freeze, the throw, the fall death, the landing's facing, the shared rays), `SunshineCamera.cs` (the death demos, the shared rays), `MarioCamData.cs`, `MarioYCam.cs`, `SmsStandardHud.cs`, `ShineSprite.cs`, `SmsConsoleStr.cs`, `SmsBossTelesa.cs` (the `Rematch` knob), the sound scripts and the re-rendered music WAVs. About 28 MB of new files (19 MB of 154's WAVs, 197's 2.8 MB mp3, the sky textures, the jingles and the Shine sounds); nothing near GitHub's 100 MB limit. Jaysonn's live edits (`assets/Level.tscn` and the rest) are not in it.
+  compare URL: https://github.com/JasonAbsolute/ProjectShine/compare/main...feature/kingboo-rematch
+```
+git push -u origin feature/sounds
+git push -u origin feature/kingboo-rematch
+git rev-list --count origin/feature/kingboo-rematch..feature/kingboo-rematch
+gh auth status
+gh pr create --base main --head feature/kingboo-rematch --title "Feature: the King Boo rematch and the port's sounds (SMS passes 154-229)" --body-file pr157.md
+```
+Expect `0` from the rev-list. KEEP THE #6 ORDER: push both branches (#17's for the record; this push carries its commits anyway) -> write the
+result paragraph below, commit it and push -> only THEN open the PR (`gh pr create` if `gh auth status` is logged in, else the compare URL with
+the title prefilled and the body from `pr157.md` by the clipboard). ONE merge only: this is a PR, so do NOT also `git merge` it into local
+`main`. Once merged (squash or merge commit, his call): `git checkout main && git merge --ff-only origin/main` here (not `git pull`:
+`pull.rebase` refuses it over his unstaged work), mark #17 and #18 DONE with the PR's URL, delete `pr157.md`, tell Kiro the sha. The working
+tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of `assets/Sms/SmsHiddenCoin.cs`, the gatekeeper / launcher,
+BossTelesa and Mario `.tres` re-saves, the Koopa, Goop and polta `.png.import` flips, the `addons/godot_ai` churn and `KINGBOO_REMATCH_gdoc.txt`
+at the root: his, leave them (none of them belong in this PR).
+Result: `feature/kingboo-rematch` pushed as a NEW remote branch, 183 commits over `main` `90efb17`, 935 files / +1471489 / -480.
+`git rev-list --count origin/feature/kingboo-rematch..feature/kingboo-rematch` returned `0`. `git merge-base feature/kingboo-rematch main`
+is exactly `90efb17`, so the stack sits on the trunk with no merge in it, and `git merge-base --is-ancestor feature/sounds
+feature/kingboo-rematch` confirms #17's 22 sound commits are in this history. The named code tips `d05ba70` (229), `79b4c87` (156e) and
+`7df58ad` (#17's tip) are all ancestors. PROJECT_LOG.md gains 91 entries in this range: 11 for the sounds (154 to 156e) and 80 for the
+rematch (157 to 229).
+THE INSERTION COUNT IS NOT WHAT IT LOOKS LIKE, the same as #16. 1440192 of the 1471489 insertions are four `.glb.import` files under
+models/Sms/Rematch/ (`polta_planet`, `polta_parts`, `bomb_boo`, `bomb_boo_tongue`), 11.67 MB each. Everything hand-written in the branch
+is the other 31297 insertions. 406 of the 935 files are binary, which is the WAVs, the mp3, the sky textures and the models.
+NOTE on the commit count: the entry says 182, measured 183. The extra one is `1b5c817`, this entry's own commit, which cannot count
+itself. The same off-by-one as every entry with a PR so far, and always the queue file's own commit.
+ONE CORRECTION TO THE PR BODY, and it is a factual one rather than formatting. Kiro's body said "About 28 MB of new files". Measured,
+the branch adds 95.1 MB: 50.3 MB of real assets and 44.8 MB in those four `.glb.import` files. The undercount came from leaving out the
+two baked music tracks, `MSD_BGM_BOSS.wav` at 12.1 MB and `MSD_BGM_CHUBOSS.wav` at 7.0 MB, which entry #17 names itself. The sentence now
+gives both figures and says the import share is the project's standing bloat rather than anything this branch did. The largest single
+file is `MSD_BGM_BOSS.wav` at 12.1 MB, so nothing is near GitHub's 100 MB per-file limit and the push went through in one go.
+Hygiene: 0 of Jaysonn's live edits in the range, and `KINGBOO_REMATCH_gdoc.txt` is not in it either, still untracked at the root as he
+left it. 26 tracked edits of his were in the working tree before the push and all 26 after.
+PR body: `pr157.md` was already at the project root and is byte for byte identical to this entry's inline blockquote, 7986 bytes and pure
+ASCII, so no extraction and no paragraph repair was needed this time, unlike #15 and #16. After the size correction and the attribution
+footer it is 8336 bytes.
+`gh auth status` still prints "You are not logged into any GitHub hosts", the ninth entry running, so the browser route. The compare URL
+with the body prefilled measures 12416 characters, over the ~8000 ceiling #8 established, so the title went in the URL and the body went
+by the clipboard, read with `[System.IO.File]::ReadAllText` under explicit UTF-8 rather than `Get-Content -Raw`, which is what mojibaked
+#16's footer glyph.
+ONE merge path, as the entry insists: this branch gets the PR and is NOT also merged into local `main`. `feature/sounds` gets neither.
+THE TRUNK TIP AND THIS ENTRY'S PR NUMBER: read them from `git log --oneline -1 main` and from GitHub. A commit cannot state its own sha,
+and this result paragraph is committed BEFORE the PR is opened, per the #6 order, so it cannot state the PR number either.
+STILL OPEN, carried forward: `feature/enemy-pinna2` (entry #14, SMS 147 and 148, the Bullet Bill and the ground Electrokoopa) and
+`feature/select-stages` (entry #11, SMS 135) are both still pushed and still waiting on Jaysonn's playtest, untouched since 2026-11-03,
+and `feature/select-stages` holds the only copy of #11's text. Both now sit far behind the trunk and will conflict at the tails of
+PROJECT_LOG.md and this file when they do land.

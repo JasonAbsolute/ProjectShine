@@ -40,6 +40,8 @@ public struct SmsCamMarioData
     public bool CamCancelPressed;       // MEANING_Y | MEANING_CAM_AB this frame: what leaves the L camera (read before Mario's half eats A / B)
     public bool YCamCanEnter;           // Mario's status gate for the Y press (MarioYCam.SmsYCamCanEnter): the rig's lock and inbetween checks are its own
     public bool Locked;                 // CameraLocked / the sign talk / the shine demo / dead: a demo holds him
+    public bool HellDead;               // 212: CAMERA_FLAG_HELL_DEAD_DEMO -- the death plane's fall (MARIO_STATUS_FALL_DEAD): the camera's hell dead demo
+    public bool GameOver;               // 216: MARIO_FLAG_GAME_OVER (any death: loserExec, the fall death) -- execDeadDemoProc_'s trigger
     public bool Talking;                // isTalkModeNow: the NPC talk from the B press to the balloon's fade (the talk kind holds the camera meanwhile; pass 86)
     public bool Teleported;             // the frame jumped him (a respawn, the intro's spawn): the camera warps behind him as a stage load does
     public bool Debug;                  // SmsDebugPrint
@@ -105,8 +107,8 @@ public partial class Mario
         d.OnWireTop = onWire && !d.OnWireHang; // on the wire but not hanging/rolling = on top (WIRE_WAIT / WALK / the turns / Return)
         d.ReadyGun = _smsHasFludd && stateOfMario == MarioState.crouch;
         d.PadDead = _smsPadDisabledTicks > 0;
-        d.AimR = !d.PadDead && Input.IsActionPressed("button_r");   // pass 114: a dead pad has no MEANING_R / MEANING_L / MEANING_CAM_L
-        d.CamL = !d.PadDead && Input.IsActionPressed("button_l");
+        d.AimR = !d.PadDead && Input.IsActionPressed(SmsNames.Of("button_r"));   // pass 114: a dead pad has no MEANING_R / MEANING_L / MEANING_CAM_L
+        d.CamL = !d.PadDead && Input.IsActionPressed(SmsNames.Of("button_l"));
         float lMin = SmsFluddCurrent.LAngleMin;
         d.AimRatio = lMin != 0f ? Mathf.Clamp(_fluddGunAngle / lMin, 0f, 1f) : 0f; // CLBCalcRatio<s16>(0, mLAngleMin, angle), clamped
         d.Downed = stateOfMario == MarioState.hurt || stateOfMario == MarioState.dead;
@@ -123,6 +125,8 @@ public partial class Mario
         d.CamCancelPressed = _camCancelPressed && !d.PadDead;
         d.YCamCanEnter = SmsYCamCanEnter();
         d.Locked = CameraLocked || stateOfMario == MarioState.talking || stateOfMario == MarioState.shineGet || stateOfMario == MarioState.dead;
+        d.HellDead = _smsHellDead;
+        d.GameOver = _smsGameOver;
         d.Talking = _smsTalking;
         d.Debug = SmsDebugPrint;
         return d;
