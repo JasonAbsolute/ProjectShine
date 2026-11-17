@@ -29,6 +29,11 @@ using System.Collections.Generic;
 /// burst puff are grey-black now, not violet.
 /// Pass 180 (Jaysonn: "a worried animation, not just frozen"): the shocked Boo WORRIES -- it shakes its head side to side, leans back from Mario, cowers with a
 /// nervous breath and sweats beads off the top of its head (the Worry* and Sweat* knobs in The shock group), on top of 179's tremble, stare, eyes, tongue and drool.
+/// Pass 229 (Jaysonn: "keep Bomb Boo spawns a few metres from the rim"): the float KEEPS OFF THE RIM -- every wander goal RimMargin m or more inside the stone's edge
+/// (SmsArenaFloor.StoneRadius about StoneCentre, measured from the arena mesh at load), the body held at that margin (its turning arc could swing it past a goal there),
+/// and a Boo based beyond it (let go off the lasso at the edge, a dud landed there) heads straight in and skips its hover. The supply's spots were already 7 m in (its
+/// ArenaRadius 18 of the stone's 25.1); it was the wander -- goals up to WanderRadiusUnits (10.7 m) from where a Boo rose, so one that rose 18 m out could float 28 m
+/// out, over the void -- that put Boos at the edge. The rim group.
 /// </summary>
 public partial class SmsBombBoo : Node3D
 {
@@ -182,6 +187,25 @@ public partial class SmsBombBoo : Node3D
     [Export] public float ExpireSeconds = 0f;
     /// <summary>Out of the fog: the rise's length (it scales up, fades in and lifts to its height over it).</summary>
     [Export] public float RiseSeconds = 0.7f;
+    [ExportGroup("The rim (229): the float kept inside the stone's edge")]
+    /// <summary>229 (Jaysonn: "keep Bomb Boo spawns a few metres from the rim"; twice a drive's spin jump at a Boo near the edge took Mario off the arena -- a fall is a
+    /// death since 212): the float stays RimMargin or more inside the stone's edge (the arena floor's measured StoneRadius, 25.1 m here -- the kerb and the
+    /// rock's shoulder past it are not stone). Every wander goal is drawn inside it (twelve draws; none, as from a base at or past the edge: the goal is straight
+    /// toward the middle, and the hover before it is skipped), and the body itself is never carried past it -- its turn toward the next goal is an arc that could
+    /// swing it 2.6 m out past a goal on the margin; held there, it slides along the margin instead. From beyond the margin it may only come in. Off: 160's free
+    /// wander, goals anywhere within WanderRadiusUnits of the base. No arena floor in the scene: no rule.</summary>
+    [Export] public bool KeepOffTheRim = true;
+    /// <summary>229: the least distance inside the stone's edge, metres, for the goals and the body (the Boo's body is 1.8 m across; the lasso grabs from 2 m).</summary>
+    [Export(PropertyHint.Range, "0,12,0.5")] public float RimMargin = 3f;
+    /// <summary>229, for the drives: the last goal pick's draws, the picks that found no draw inside and went for the middle, the ticks the body was held at the margin,
+    /// how far inside the stone's edge the base and the goal lie now (metres; negative = beyond it; NaN = no stone), whether the rule is in force.</summary>
+    public int GoalDraws { get; private set; }
+    public int GoalsPulledIn { get; private set; }
+    public int RimHeldTicks { get; private set; }
+    public float RimClearNow => StoneNow()?.RimClear(_base) ?? float.NaN;
+    public float GoalRimClear => StoneNow()?.RimClear(_goal) ?? float.NaN;
+    public bool RimRuleOn => KeepOffTheRim && StoneNow() != null;
+    private SmsArenaFloor StoneNow() { var f = SmsArenaFloor.Current; return f != null && GodotObject.IsInstanceValid(f) && f.StoneRadius > 1f ? f : null; }
     [ExportGroup("The swing (carried by the tongue)")]
     /// <summary>Round Mario: this far out (161: 3.6 m, "the tongue radius longer"), this far OVER his raised hand (his arms are short next to his head: the raised
     /// wrist comes to his ear, 1.3 m up on a 2.15 m body -- 0.9 puts the Boo just over his head, the tongue rising to it), this fast (degrees a second; 480 = a
@@ -717,12 +741,27 @@ public partial class SmsBombBoo : Node3D
         Basis b = new Basis(Vector3.Up, yaw + (FacesPlusZ ? 0f : MathF.PI));
         return b * new Basis(Vector3.Right, Mathf.DegToRad(FacesPlusZ ? pitchDeg : -pitchDeg));
     }
-    /// <summary>goToRandomNextGraphNode with no graph: a random point within WanderRadiusUnits (0.3..1 of it) of the base.</summary>
+    /// <summary>goToRandomNextGraphNode with no graph: a random point within WanderRadiusUnits (0.3..1 of it) of the base. 229: kept RimMargin inside the stone's edge
+    /// (KeepOffTheRim) -- twelve draws for one that is; none, the goal is straight toward the stone's middle, as far as the wander reaches.</summary>
     private void NextGoal()
     {
-        float a = Rand() * MathF.Tau, r = WanderRadiusUnits / U * (0.3f + 0.7f * Rand());
-        _goal = new Vector3(_base.X + MathF.Cos(a) * r, _base.Y, _base.Z + MathF.Sin(a) * r);
+        var stone = KeepOffTheRim ? StoneNow() : null;
+        float keep = stone != null ? stone.StoneRadius - RimMargin : 0f;
+        int draws = stone != null ? 12 : 1;
+        for (int d = 0; d < draws; d++)
+        {
+            float a = Rand() * MathF.Tau, r = WanderRadiusUnits / U * (0.3f + 0.7f * Rand());
+            _goal = new Vector3(_base.X + MathF.Cos(a) * r, _base.Y, _base.Z + MathF.Sin(a) * r);
+            GoalDraws = d + 1;
+            if (stone == null || Flat2(_goal, stone.StoneCentre) <= keep) return;
+        }
+        GoalsPulledIn++;
+        Vector3 c = stone.StoneCentre; Vector3 to = new Vector3(c.X - _base.X, 0f, c.Z - _base.Z); float len = to.Length(), reach = WanderRadiusUnits / U;
+        _goal = len > 1e-3f ? new Vector3(_base.X + to.X / len * MathF.Min(len, reach), _base.Y, _base.Z + to.Z / len * MathF.Min(len, reach)) : new Vector3(c.X, _base.Y, c.Z);
+        if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: based {RimClearNow:F1} m inside the stone's edge -- no wander goal within {RimMargin} m of it in 12 draws; straight in toward the middle, to {_goal}");
     }
+    /// <summary>229: the base lies within RimMargin of the stone's edge or beyond it (a drop there, a dud landed there): the hover before the next goal is skipped.</summary>
+    private bool BeyondMargin() { if (!KeepOffTheRim) return false; float clear = RimClearNow; return !float.IsNaN(clear) && clear < RimMargin; }
 
     public override void _PhysicsProcess(double delta)
     {
@@ -783,6 +822,7 @@ public partial class SmsBombBoo : Node3D
                     if (mario != null) { Vector3 tm = mario.GlobalPosition - p; if (tm.LengthSquared() > 1e-4f) _yaw = MathF.Atan2(tm.X, tm.Z); }
                     _rotX = 0f; GlobalTransform = new Transform3D(FaceBasis(_yaw, _rotX), p);
                     TongueRest(); _wait = WaitTicks; NextGoal();
+                    if (BeyondMargin()) { _wait = 0; if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: the dud landed {RimClearNow:F1} m inside the stone's edge -- no hover, in it goes"); }   // 229
                     if (!string.IsNullOrEmpty(AppearSe)) _sound?.Play(AppearSe);
                 }
                 break;
@@ -831,6 +871,23 @@ public partial class SmsBombBoo : Node3D
                             float step = Mathf.DegToRad(_turn) * 60f * dt;
                             _yaw += Mathf.Clamp(diff, -step, step);
                             basePos += new Vector3(MathF.Sin(_yaw), 0f, MathF.Cos(_yaw)) * (_march * 60f / U * dt);
+                        }
+                    }
+                }
+                // 229: KeepOffTheRim -- the body never moves further OUT than RimMargin inside the stone's edge: its turn toward the next goal is an arc (march / turn rate,
+                // 0.9-1.3 m across at the game's speeds, so a swing round at a goal on the margin could carry the body 2.6 m past it); held here, it slides along the margin
+                // instead. From beyond the margin (let go there, a dud landed there) it may only come in.
+                if (KeepOffTheRim)
+                {
+                    var stone = StoneNow();
+                    if (stone != null)
+                    {
+                        float keepR = stone.StoneRadius - RimMargin, r = Flat2(basePos, stone.StoneCentre), r0 = Flat2(base0, stone.StoneCentre);
+                        if (r > keepR && r > r0 + 1e-4f && r > 1e-3f)
+                        {
+                            float rc = MathF.Max(keepR, r0);
+                            basePos = new Vector3(stone.StoneCentre.X + (basePos.X - stone.StoneCentre.X) / r * rc, basePos.Y, stone.StoneCentre.Z + (basePos.Z - stone.StoneCentre.Z) / r * rc);
+                            RimHeldTicks++;
                         }
                     }
                 }
@@ -951,7 +1008,8 @@ public partial class SmsBombBoo : Node3D
         _flyCur = Mathf.Clamp((GlobalPosition.Y - _base.Y) * U - _bob, 0f, _flyTarget);
         GlobalTransform = new Transform3D(FaceBasis(_yaw, _rotX), GlobalPosition);
         TongueRest(); _wait = WaitTicks; NextGoal();
-        if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: let go");
+        if (BeyondMargin()) _wait = 0;                                                                                  // 229: let go at the edge (or past it): no hover, straight in
+        if (DebugPrint) GD.Print($"[SMS bomb boo] {Name}: let go{(_wait == 0 ? $" {RimClearNow:F1} m inside the stone's edge -- in it goes" : "")}");
         EmitSignal(SignalName.Dropped);
     }
     /// <summary>The burst: the puff (BurstFxScene recoloured), the sound, King Boo's hit when it was swung into him, Mario's hand emptied, and the Boo gone.</summary>

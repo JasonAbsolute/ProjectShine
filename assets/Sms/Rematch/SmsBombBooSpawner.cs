@@ -26,7 +26,9 @@ public partial class SmsBombBooSpawner : Node3D
     /// is the default now -- 158's Centre (this node's point) was for the playtests. The random spot: within ArenaRadius of this node AND, when the arena's floor
     /// (SmsArenaFloor) is found, EdgeMargin inside its edge (never a spot hanging off the stone: the floor must be found under it); MinFromMario to MaxFromMario
     /// from Mario (0 = no cap: reachable, not on top of him); MinFromLast from the last spot (not the same place twice running) and MinFromBoos from any Boo out.
-    /// Up to 24 draws; the one that fits, else the one that misses by least.</summary>
+    /// Up to 24 draws; the one that fits, else the one that misses by least. 229: the edge is the STONE's (SmsArenaFloor.StoneRadius, the walkable top's own 25.1 m,
+    /// measured from the mesh), not the model's span (26.4, the kerb and the rock's shoulder) -- ArenaRadius 18 keeps the spots 7 m inside it; the Boos' own
+    /// wander keeps them RimMargin inside it after (SmsBombBoo).</summary>
     [Export] public Modes SpawnMode = Modes.Random;
     [Export] public float ArenaRadius = 18f, MinFromMario = 4f;
     [Export(PropertyHint.Range, "0,40,0.5")] public float MaxFromMario = 14f;
@@ -161,17 +163,20 @@ public partial class SmsBombBooSpawner : Node3D
     public int SpotsMade { get; private set; }
     public int LastPickDraws { get; private set; }
     public float LastPickMiss { get; private set; }
-    public Vector3 ArenaCentre => _floor != null && IsInstanceValid(_floor) && _floor.Radius > 1f ? _floor.Centre : GlobalPosition;
+    public Vector3 ArenaCentre => _floor != null && IsInstanceValid(_floor) && _floor.StoneRadius > 1f ? _floor.StoneCentre : _floor != null && IsInstanceValid(_floor) && _floor.Radius > 1f ? _floor.Centre : GlobalPosition;
     public float ArenaFloorRadius => _floor != null && IsInstanceValid(_floor) && _floor.Radius > 1f ? _floor.Radius : ArenaRadius + EdgeMargin;
-    /// <summary>The spot's radius about the middle: ArenaRadius, and EdgeMargin inside the floor's edge when the floor is known.</summary>
-    public float SpotRadius => Mathf.Max(1f, Mathf.Min(ArenaRadius, ArenaFloorRadius - EdgeMargin));
+    /// <summary>229: the STONE's radius -- the walkable top's own edge (SmsArenaFloor.StoneRadius, 25.1 m here), not the model's whole span (26.4: the kerb and the rock's
+    /// shoulder stand out past the stone). EdgeMargin is measured from it now; the floor's span when the stone was not measured.</summary>
+    public float ArenaStoneRadius => _floor != null && IsInstanceValid(_floor) && _floor.StoneRadius > 1f ? _floor.StoneRadius : ArenaFloorRadius;
+    /// <summary>The spot's radius about the middle: ArenaRadius, and EdgeMargin inside the stone's edge when the floor is known (229: the stone's edge; 184: the model's span).</summary>
+    public float SpotRadius => Mathf.Max(1f, Mathf.Min(ArenaRadius, ArenaStoneRadius - EdgeMargin));
     private SmsArenaFloor _floor; private bool _floorLooked;
     private void FindFloor()
     {
         if (_floorLooked) return;
         _floorLooked = true;
         foreach (Node n in GetTree().CurrentScene?.FindChildren("*", "StaticBody3D", true, false) ?? new Godot.Collections.Array<Node>()) if (n is SmsArenaFloor f) { _floor = f; break; }
-        if (DebugPrint) GD.Print($"[SMS bomb supply] {Name}: the arena's floor {(_floor != null ? $"{_floor.Name}: middle {_floor.Centre}, radius {_floor.Radius:F1}" : "NOT found")} -- the random spots within {SpotRadius:F1} m of {ArenaCentre}");
+        if (DebugPrint) GD.Print($"[SMS bomb supply] {Name}: the arena's floor {(_floor != null ? $"{_floor.Name}: middle {_floor.Centre}, radius {_floor.Radius:F1}, the stone's edge {_floor.StoneRadius:F2} about {_floor.StoneCentre}" : "NOT found")} -- the random spots within {SpotRadius:F1} m of {ArenaCentre} ({ArenaStoneRadius - SpotRadius:F1} m inside the stone's edge)");
     }
 
     private Vector3 PickPoint()

@@ -519,7 +519,8 @@ public partial class SmsKingBooRematch : Node3D
     /// lob (metres), how far about Mario they come down (metres; the first within VolleyAimedWithin of him, the rest anywhere out to VolleyScatter), the
     /// blast's reach on the floor and how high it reaches (Mario's feet higher are over it: the jump), whether the LAST one is a DUD -- a live Bomb Boo that
     /// floats where it lands for Mario to grab, at least VolleyDudMinFromMario from him -- and how long its fuse burns once down (0 = it never blasts on its own).
-    /// 203 (Jaysonn: "let's not have a dud for King Boo's Bomb Boo attack"): VolleyDud is OFF -- every Boo he spits is lit and blasts where it lands; on = 200's dud.</summary>
+    /// 203 (Jaysonn: "let's not have a dud for King Boo's Bomb Boo attack"): VolleyDud is OFF -- every Boo he spits is lit and blasts where it lands; on = 200's dud.
+    /// 229: the volley's wall (its WallInset inside the arena's edge) is measured from the STONE's edge (SmsArenaFloor.StoneRadius, 25.1 m), not the model's span (26.4).</summary>
     [Export(PropertyHint.Range, "1,8,1")] public int VolleyCount = 3;
     [Export] public float VolleySpacing = 0.4f, VolleyLobHeight = 9f, VolleyScatter = 5f, VolleyAimedWithin = 1f, VolleyBlastRadius = 3.5f, VolleyBlastHeight = 1.6f;
     [Export] public bool VolleyDud = false;
@@ -812,7 +813,7 @@ public partial class SmsKingBooRematch : Node3D
     private float _hurtT, _hurtLen, _hurtYaw0; private bool _flashOn;
     // 162
     private readonly Random _rng = new(162);
-    private float _gapT, _fadeT, _opacitySolid, _opacityShown, _hoverOverFloor = 4f, _arenaRadius = 12f, _floorAtSpot = float.NaN;
+    private float _gapT, _fadeT, _opacitySolid, _opacityShown, _hoverOverFloor = 4f, _arenaRadius = 12f, _stoneRadius = 12f, _floorAtSpot = float.NaN;
     private Vector3 _arenaCentre, _dest; private bool _moveIsLick, _lickHit, _lickClipEnded, _arenaRead;
     private int _lickStage = -1; private float _lickT, _stageT;
 
@@ -1740,9 +1741,9 @@ public partial class SmsKingBooRematch : Node3D
     {
         float fy = FloorUnder(GlobalPosition);
         _hoverOverFloor = float.IsNaN(fy) ? 4f : Mathf.Max(0.5f, GlobalPosition.Y - fy);
-        _arenaCentre = GlobalPosition; _arenaRadius = 12f;
+        _arenaCentre = GlobalPosition; _arenaRadius = 12f; _stoneRadius = 12f;
         var floor = GetTree().CurrentScene?.FindChildren("*", "StaticBody3D", true, false).OfType<SmsArenaFloor>().FirstOrDefault();
-        if (floor != null && floor.Radius > 1f) { _arenaCentre = floor.Centre; _arenaRadius = floor.Radius; }
+        if (floor != null && floor.Radius > 1f) { _arenaCentre = floor.Centre; _arenaRadius = floor.Radius; _stoneRadius = floor.StoneRadius > 1f ? floor.StoneRadius : floor.Radius; }   // 229: the stone's own edge for the volley's wall
         _arenaRead = true;
     }
     /// <summary>The ground under a point (a ray from 100 m over it, 400 m down, Mario left out): its world y, or NaN.</summary>
@@ -2663,7 +2664,7 @@ public partial class SmsKingBooRematch : Node3D
                 v.Spat += n => { if (!IsInstanceValid(this) || IsQueuedForDeletion()) return; _volleySpat = true; _crownFlashT = CrownFlashSeconds * 0.7f; VolleyDudBoo = v.DudBoo; EmitSignal(SignalName.VolleySpat, n); };
                 v.Blasted += hit => { if (!IsInstanceValid(this) || IsQueuedForDeletion()) return; if (hit) VolleyHits++; EmitSignal(SignalName.VolleyBlasted, hit); };
                 v.Finished += () => { if (!IsInstanceValid(this) || IsQueuedForDeletion()) return; int hits = v.Hits; if (_volley == v) _volley = null; EmitSignal(SignalName.VolleyDone, hits); };
-                v.Begin(m, fy, () => MouthPoint, _arenaCentre, _arenaRadius, scene, parent, DebugPrint);
+                v.Begin(m, fy, () => MouthPoint, _arenaCentre, _stoneRadius, scene, parent, DebugPrint);                                    // 229: the wall is the stone's edge (25.1 m), not the model's span (26.4)
                 float frame = ClipFrameNow(VolleyClip);
                 if (_anim != null && _anim.IsPlaying() && _anim.CurrentAnimation == VolleyClip) { _anim.Pause(); _volleyClipHeld = true; }   // the thrust held through the spit
                 _volley = v; _volleyLaunched = true; _crownFlashT = CrownFlashSeconds;
