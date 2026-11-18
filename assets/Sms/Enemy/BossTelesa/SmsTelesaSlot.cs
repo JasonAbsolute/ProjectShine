@@ -37,6 +37,12 @@ public partial class SmsTelesaSlot : Node3D
     public float SpeedOf(int i) => _spd[i];
     public bool HeldOf(int i) => _held[i];
     public int ForcedResult = int.MinValue;   // a drive's forced target (int.MinValue = none)
+    /// <summary>232: a forced MIXED result (ForcedResult = Mixed, the boss's ForceResult Mixed) cannot hold the drums to ONE target -- there is no face that
+    /// reads -1 -- so each drum is held to its own: FRUIT, COIN, ENEMY (TTelesaSlot::getSlotResult: three faces that differ = -1). The game's rates never
+    /// give a Mixed result (HitCollectRate 1.0 holds every drum to the first's target); a lower HitCollectRate knob lets one happen on its own.</summary>
+    private static readonly int[] MixedFaces = { Fruit, Coin, Enemy };
+    private bool _mixedForce;
+    private int TargetOf(int i) => _mixedForce ? MixedFaces[i] : _target;
 
     public override void _Ready()
     {
@@ -57,6 +63,7 @@ public partial class SmsTelesaSlot : Node3D
     public void RandomReset()
     {
         var rng = new Random();
+        _mixedForce = false;
         for (int i = 0; i < 3; i++) { _ang[i] = FaceDeg * rng.Next(0, 8); _held[i] = false; _toTarget[i] = false; _spd[i] = 0f; }
         ApplyDrums();
     }
@@ -71,7 +78,7 @@ public partial class SmsTelesaSlot : Node3D
             _spd[i] = s * StartSpeed;
         }
     }
-    public void StopAll() { for (int i = 0; i < 3; i++) { _spd[i] = 0f; _held[i] = false; _toTarget[i] = false; } }
+    public void StopAll() { _mixedForce = false; for (int i = 0; i < 3; i++) { _spd[i] = 0f; _held[i] = false; _toTarget[i] = false; } }
     /// <summary>TTelesaSlot::forceStopSlot(idx): the target decided (FirstHitCollectRate -> FRUIT / COIN by Mario's HP; else the drum's own forecast; the
     /// re-reads: last round's result -> JACKPOT; COIN with no coin rounds -> ENEMY / Mario at 6+ -> JACKPOT), the drum held to it or released.</summary>
     public void ForceStopSlot(int idx, float firstHitCollectRate, int marioHp, int lastResult, int coinRoundsLeft, Random rng)
@@ -86,7 +93,8 @@ public partial class SmsTelesaSlot : Node3D
         else { _target = ForecastResult(idx); _held[idx] = false; }
         if (_target == lastResult) _target = Jackpot;
         if (_target == Coin) { if (coinRoundsLeft == 0) _target = Enemy; else if (marioHp >= 6) _target = Jackpot; }
-        if (ForcedResult != int.MinValue) { _target = ForcedResult; _toTarget[idx] = true; _held[idx] = true; }   // a drive's override
+        if (ForcedResult == Mixed) { _mixedForce = true; _target = Fruit; for (int i = 0; i < 3; i++) { _toTarget[i] = true; _held[i] = true; } }   // 232: every drum held to its own face
+        else if (ForcedResult != int.MinValue) { _target = ForcedResult; _toTarget[idx] = true; _held[idx] = true; }   // a drive's override
         _firstStopPending = false;
     }
     /// <summary>isRollDrum: a drum still held -> true; else the rolling flag off.</summary>
@@ -132,7 +140,7 @@ public partial class SmsTelesaSlot : Node3D
     {
         for (int i = 0; i < 3; i++)
         {
-            if (_toTarget[i] && ForecastResult(i) == _target) { _held[i] = false; _toTarget[i] = false; }
+            if (_toTarget[i] && ForecastResult(i) == TargetOf(i)) { _held[i] = false; _toTarget[i] = false; }
             float s = _spd[i];
             if (s == 0f) continue;
             if (MathF.Abs(s) > CreepSpeed)

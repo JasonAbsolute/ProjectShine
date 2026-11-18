@@ -97,7 +97,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         KillRadius = 400f, KillHeight = 300f, KillDrop = 350f, HideMarioRadius = 300f, TongueObjectOver = 100f;
 
     // ------------------------------------------------------------------------------------------------------------------ the knobs
-    public enum SlotForce { TheGame, Coin, Enemy, Fruit, Jackpot }
+    public enum SlotForce { TheGame, Coin, Enemy, Fruit, Jackpot, Mixed }   // 232: Mixed -- the three drums on three different faces: the hot-spring bubbles
     [ExportGroup("The arena (empty = found: the sms_roulette group by size, the child Slot)")]
     /// <summary>The three roulette discs (the game's rulet00 / 01 / 02: the centre disc, the middle ring, the outer ring). Empty: the SmsRoulette bodies in the
     /// `sms_roulette` group, smallest first.</summary>
@@ -143,6 +143,10 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     [Export] public Godot.Collections.Array<PackedScene> SlotEnemyScenes = new();
     /// <summary>The Boo attacker (genAttacker: a TTelesa of the stage's manager made an attacker). Empty = res://assets/Sms/Enemy/Telesa.tscn.</summary>
     [Export] public PackedScene BooScene;
+    /// <summary>232: the HOT-SPRING BUBBLE (TBubble, manNameTable[0]: the MIXED result's spit -- twelve of them (SlotItemNum 6 x 2) out of the mouth, floating over the table, growing,
+    /// splitting, hurting on touch, a large water bottle when hosed). Empty = res://assets/Sms/Enemy/BossTelesa/OsenBubble.tscn. Its numbers are knobs on that scene.
+    /// The game's shipped slot never lands Mixed (HitCollectRate 1.0 holds every drum to the first's target); ForceResult Mixed, or a HitCollectRate under 1, does.</summary>
+    [Export] public PackedScene BubbleScene;
     /// <summary>How many Boo attackers can be out at once (the stage's TTelesaManager pool).</summary>
     [Export(PropertyHint.Range, "0,20,1")] public int MaxAttackers = 6;
     [ExportGroup("Deviations (1 / on = the game)")]
@@ -464,6 +468,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         CoconutScene ??= LoadIf("res://fruit_coconut.tscn"); PapayaScene ??= LoadIf("res://fruitpapaya.tscn"); PineappleScene ??= LoadIf("res://fruit_pineapple.tscn");
         DurianScene ??= LoadIf("res://fruit_durian.tscn"); RedPepperScene ??= LoadIf("res://fruit_red_pepper.tscn"); CoinScene ??= LoadIf("res://yellow_coin.tscn");
         BooScene ??= LoadIf("res://assets/Sms/Enemy/Telesa.tscn");
+        BubbleScene ??= LoadIf("res://assets/Sms/Enemy/BossTelesa/OsenBubble.tscn");   // 232
         if (SlotEnemyScenes == null || SlotEnemyScenes.Count == 0)
         {
             string[] defaults = { null, "res://assets/Sms/Enemy/Hamukuri.tscn", "res://assets/Sms/Enemy/FireHamukuri.tscn", "res://assets/Sms/Enemy/Bomb/BombHei.tscn", "res://assets/Sms/Enemy/Poihana.tscn",
@@ -732,7 +737,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         else if (MathF.Abs(_camOffY) > 1f) _camOffY *= CameraMoveSpeed;
         cam.DefiniteAtOffsetY = _camOffY;
     }
-    private int ForcedResultValue() => ForceResult switch { SlotForce.Coin => SmsTelesaSlot.Coin, SlotForce.Enemy => SmsTelesaSlot.Enemy, SlotForce.Fruit => SmsTelesaSlot.Fruit, SlotForce.Jackpot => SmsTelesaSlot.Jackpot, _ => int.MinValue };
+    private int ForcedResultValue() => ForceResult switch { SlotForce.Coin => SmsTelesaSlot.Coin, SlotForce.Enemy => SmsTelesaSlot.Enemy, SlotForce.Fruit => SmsTelesaSlot.Fruit, SlotForce.Jackpot => SmsTelesaSlot.Jackpot, SlotForce.Mixed => SmsTelesaSlot.Mixed, _ => int.MinValue };
     /// <summary>makeShineAppearWithDemo is the end: the body is freed with its slot (RelaunchTicks -1 in the scene); a relaunch would start the fight over.</summary>
     protected override void LaunchVelocity() { }
     protected override void MoveObjectPre()
@@ -1097,6 +1102,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         {
             if (n is not SmsSmallEnemy e || e == this || e.IsDead || !IsInstanceValid(e)) continue;
             if (e is SmsBossTelesa) continue;
+            if (e is SmsOsenBubble) continue;                      // 232 DEVIATION: a hot-spring bubble lives through it -- the game's cylinder would kill its twelve where they are born (pinned at the table's middle, 150 u up, inside it): dead code the game never ran
             if (e is SmsTelesa t && !t.Tangible) continue;
             if (CheckDistance(k, KillRadius, KillHeight, e.GlobalPosition * U, e.TakeHitRadiusUnits, e.TakeHitHeightUnits)) e.Kill();
         }
@@ -1240,7 +1246,7 @@ public partial class SmsBossTelesa : SmsSmallEnemy
 
     // ------------------------------------------------------------------------------------------------------------------ what he spits
     /// <summary>generateSlotItem (the spit clip's frame 40 in SpitSlotItem): by the slot's result -- FRUIT: 16 fruit and two peppers in a scattered 160-deg fan;
-    /// COIN: ten coins; ENEMY / JACKPOT / Mixed: small enemies (none for the unported Bubbles).</summary>
+    /// COIN: ten coins; ENEMY / JACKPOT: small enemies; MIXED (three faces that differ): SlotItemNum x 2 hot-spring bubbles (232: SmsOsenBubble).</summary>
     private void GenerateSlotItem()
     {
         _prepTimer = 0;
@@ -1298,13 +1304,14 @@ public partial class SmsBossTelesa : SmsSmallEnemy
                     if (randomKind > maxKind) randomKind = 1;
                     kind = randomKind;
                 }
-                PackedScene scene = kind < SlotEnemyScenes.Count ? SlotEnemyScenes[kind] : null;
+                PackedScene scene = kind == 0 ? BubbleScene : (kind < SlotEnemyScenes.Count ? SlotEnemyScenes[kind] : null);   // 232: kind 0 = the bubble (the game's manNameTable[0])
                 if (scene == null) continue;
-                Vector3 dir = PolarXZ(_yaw - angleOffset + angleStep * i, 200f).Normalized();
+                Vector3 dir = PolarXZ(_yaw - angleOffset + angleStep * i, 200f).Normalized();   // (the game keeps slotItemNum's 24-degree step for the Mixed round's twelve: the second six fan on past 60 degrees, round to his back)
                 dir.Y = 2f;
                 float sp = Prm.FirstBubbleSp * SpitSpeedScale;
                 Vector3 vel = new Vector3(dir.X * sp * Lerp(0.5f, 1f, Rand()), dir.Y * (2f + Lerp(0.5f, 1f, Rand())), dir.Z * sp * Lerp(0.5f, 1f, Rand()));
-                SpawnEnemy(scene, new Vector3(mouth.X, mouth.Y - 250f + 10f, mouth.Z), vel, kind != 0);
+                if (kind == 0) SpawnBubble(scene, new Vector3(mouth.X, mouth.Y - 250f + 10f, mouth.Z), vel);
+                else SpawnEnemy(scene, new Vector3(mouth.X, mouth.Y - 250f + 10f, mouth.Z), vel, true);
             }
         }
         if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: generateSlotItem result {_slotResult}: {_spit.Count} things");
@@ -1332,6 +1339,19 @@ public partial class SmsBossTelesa : SmsSmallEnemy
         coin.GlobalPosition = atUnits / U;
         SmsDropTable.Launch(coin, velUnits, 960, 0f);           // killByTimer(0x3C0)
         _spit.Add(coin);
+    }
+    /// <summary>232: a hot-spring bubble out of the mouth (the Mixed round): not tracked in the spit list (the game's kind 0 is left out of mSpitObjs: his hit's
+    /// forceAllItemKill never swallows a bubble, and a Mixed round's PrepareSlot does not wait on them); the pool (the bubble scene's MaxAlive) is the cap.</summary>
+    public int BubblesSpat { get; private set; }
+    private void SpawnBubble(PackedScene scene, Vector3 atUnits, Vector3 velUnits)
+    {
+        var node = scene.Instantiate<Node3D>();
+        if (node is not SmsOsenBubble b) { node.QueueFree(); GD.PushWarning($"[SMS btelesa] {GetPath()}: BubbleScene is not an SmsOsenBubble -- no bubbles"); return; }
+        if (!SmsOsenBubble.PoolFree(b.MaxAlive)) { if (DebugPrint) GD.Print($"[SMS btelesa] {Name}: the bubble pool is full ({SmsOsenBubble.Alive} of {b.MaxAlive} out) -- no bubble"); b.QueueFree(); return; }
+        b.RelaunchTicks = -1; b.DebugPrint = DebugPrint;
+        GetParent().AddChild(b);
+        b.SmsSpitFrom(atUnits / U, Mathf.RadToDeg(MathF.Atan2(velUnits.X, velUnits.Z)), velUnits);   // its heading: the fan's (the look with FaceCamera off)
+        BubblesSpat++;
     }
     private void SpawnEnemy(PackedScene scene, Vector3 atUnits, Vector3 velUnits, bool track)
     {
