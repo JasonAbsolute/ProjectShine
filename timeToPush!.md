@@ -1755,7 +1755,7 @@ both still pushed and still waiting on Jaysonn's playtest, untouched since 2026-
 `feature/select-stages` holds the only copy of #11's text. Three merged branches are safe to delete besides: `feature/enemy-sirena`,
 `feature/kingboo-rematch` and, once PR #16 is closed, `feature/sounds`.
 
-### #19 -- PENDING -- queued 2026-11-17 03:41 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 230 + 231), updated 2026-11-17 03:41 PST
+### #19 -- PENDING -- queued 2026-11-17 03:41 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 230 + 231 + 232), updated 2026-11-17 18:19 PST
 Push the fourteenth feature branch: `feature/kingboo-casino`, branched from `main` `d7887ae` (the trunk after PR #15, the rematch and the sounds, and its
 "#17 and #18 done" commit). The CASINO fight's touch-ups after Jaysonn's playtest of the trunk. SMS 230: every actor sound fades by the GAME's OWN RULE for
 it (MSHandle's category distances and the sound's curve bits: a placed Shine's hum is heard within 16 m and gone at 48 m -- it hummed across the whole level
@@ -1766,15 +1766,33 @@ game left it on an exponential tail after each spit, seconds behind him), his bo
 the down clip's last frame no longer sits through the wait to the Shine), the fanfare's CONFETTI rebuilt from ms_btls_fubuki.jpa (125 squares of 0.8 m
 raining over the table for 6 s, spinning, white / yellow / red, no shadows; ConfettiHeightUnits 1000 starts it at the frame's top over his crown -- the
 game's 1707 is out of frame) and the slot's landing thump at a frame the appear clip has (SlotLandFrame 56; the game's 78 never came) --
-assets/Sms/Enemy/SmsBossTelesa.cs, assets/Sms/Enemy/BossTelesa/BtlsFubuki.tscn. NOT yet playtested by Jaysonn: push the branch so it is on GitHub; do NOT
-open a PR until he says these touch-ups are done (more passes follow on this branch: the Mixed result's hot-spring bubbles next). Further passes re-point
-this entry's tip.
-- Branch `feature/kingboo-casino` -- code tip `572614e` ("SMS 231: the CASINO FIGHT touched up -- the slot machine comes up BOLTED to King Boo ..., his body
-  goes WITH the death's burst ..., the fanfare's CONFETTI is the game's ..., and the slot machine's landing thump finally fires"; assets/Sms/Enemy/
-  SmsBossTelesa.cs, BossTelesa/BtlsFubuki.tscn) on the 230 commit (`65e5d5c`, "SMS 230: the CASINO FIGHT's sounds checked, and every actor sound FADES BY
-  THE GAME'S OWN RULE for it ..."; assets/Sms/Sound/SmsActorSound.cs) on `main` `d7887ae`; the branch tip is this file's own commit on top of them; 3
-  commits since `main`. No new files. The range carries none of Jaysonn's live edits (assets/Level.tscn, KingBooArena.tscn, RematchArena.tscn,
+assets/Sms/Enemy/SmsBossTelesa.cs, assets/Sms/Enemy/BossTelesa/BtlsFubuki.tscn. SMS 232: the slot's MIXED result ported -- King Boo spits TWELVE HOT-SPRING
+BUBBLES (TBubble, the game's dead code: its shipped slot never lands Mixed, and its own kill cylinder would have popped them where they were born): they sink
+to the table, spread, rise to 4.7 m and grow to 5.5 m across, hurt and pop on touch, pop into a LARGE WATER BOTTLE when hosed, and after 8 s split into three
+children each that walk at Mario (the pool 30) -- assets/Sms/Enemy/BossTelesa/SmsOsenBubble.cs, OsenBubble.tscn, OsenBubble.gdshader (new), the model and its
+three textures under models/Eniemes/BossTelesa/bubble/ (new), SmsBossTelesa.cs (SlotForce Mixed, BubbleScene, the spit; the kill cylinder lets bubbles
+through), BossTelesa/SmsTelesaSlot.cs (a forced Mixed holds each drum to its own face), assets/Sms/Items/SmsWaterBottle.cs (LifeTicksOverride). NOT yet
+playtested by Jaysonn: push the branch so it is on GitHub; do NOT open a PR until he says these touch-ups are done (more passes follow on this branch: the
+fruit's look and roll next). Further passes re-point this entry's tip.
+- Branch `feature/kingboo-casino` -- code tip `1331ba7` ("SMS 232: the casino slot's MIXED result ported -- King Boo spits TWELVE HOT-SPRING BUBBLES ...";
+  assets/Sms/Enemy/BossTelesa/SmsOsenBubble.cs, OsenBubble.tscn, OsenBubble.gdshader, models/Eniemes/BossTelesa/bubble/*, assets/Sms/Enemy/SmsBossTelesa.cs,
+  BossTelesa/SmsTelesaSlot.cs, assets/Sms/Items/SmsWaterBottle.cs) on the 231 commit (`572614e`, "SMS 231: the CASINO FIGHT touched up -- the slot machine
+  comes up BOLTED to King Boo ..., his body goes WITH the death's burst ..., the fanfare's CONFETTI is the game's ..., and the slot machine's landing thump
+  finally fires"; assets/Sms/Enemy/SmsBossTelesa.cs, BossTelesa/BtlsFubuki.tscn) on the 230 commit (`65e5d5c`, "SMS 230: the CASINO FIGHT's sounds checked,
+  and every actor sound FADES BY THE GAME'S OWN RULE for it ..."; assets/Sms/Sound/SmsActorSound.cs) and 231's log commit (`51ecd1e`) on `main` `d7887ae`;
+  the branch tip is this file's own commit on top of them; 5 commits since `main`. New files (232): SmsOsenBubble.cs (+ .uid), OsenBubble.tscn,
+  OsenBubble.gdshader (+ .uid), models/Eniemes/BossTelesa/bubble/btelesa_osenbubbles_ind.glb, N_btelesa_bubble.png, N_btelesa_bubble_ind.png,
+  N_btelesa_bubble_spe.png (+ their .import). The range carries none of Jaysonn's live edits (assets/Level.tscn, KingBooArena.tscn, RematchArena.tscn,
   SmsHiddenCoin.cs, the .tres and .import churn).
+- To try 232: in the casino fight set Force Result to Mixed on BossTelesa (KingBooArena.tscn) and beat a round: the drums stop on three different faces,
+  the third fanfare plays (no confetti) and he spits twelve pink bubbles that sink to the table, spread round it, rise to about 4.7 m and swell to 5.5 m
+  across over two seconds, wobbling. Walk under one and jump into it: it hurts you and pops. Hose one (aim up with R held and the stick, or the hover):
+  it pops into a LARGE water bottle on the floor under it (a full refill, there for ten seconds). Leave them eight seconds: each swells and splits into
+  three smaller ones at head height that drift, then walk at you -- no more than thirty alive at once. Knobs on OsenBubble.tscn: The bubble (bubble.prm's
+  numbers: Live Time, Num Division, Max Scale, Add Pos Base Units, Rate Expand, Float Height Units, Max Alive), Deviations (Spit Sink Seconds, Spit Drag,
+  Face Camera -- 0 / off = the game's), The bottle, Look (Refraction off = the game's own flat blue; Opacity). With Force Result back on The Game the
+  round never comes (the game's rates never land Mixed) -- a Hit Collect Rate under 1 on BossTelesa lets it happen on its own. Press the editor's
+  Build first: the C# changed, and the new model imports on the first open.
 - To try 231: play the casino fight. Beat a round (spray his tongue; three fruit) and watch the fanfare: confetti rains over the whole table from over his
   crown for six seconds (Confetti Height Units on BossTelesa, 1000; 1707 = where the game puts it, mostly above the picture). After his spit, when he hides
   and comes back, the slot machine comes up under him with him and thumps as he settles (Slot Snaps At Appear; Slot Land Frame) -- spray his tongue the

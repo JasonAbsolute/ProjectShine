@@ -15010,3 +15010,65 @@ rebuild 0 errors; the drive, the logs, the shots and the tasks deleted. The save
 silent 78), `ConfettiHeightUnits` 1000 (the game's 1707, out of frame); the confetti's fixed per-piece colour (the game's flicker white-yellow-red every
 12 frames) and its shrink-out (the game's scale runs 1 to 0 over the whole life). Not changed: the Shine comes 240 nerve ticks after the burst, which
 the port's nerves run at 120 Hz -- 2 s where the game, at 30 frames a second, waits 8; nothing but the burst's smoke is on screen either way.
+
+### 232 -- the King Boo REMATCH, part 77: the casino slot's MIXED result ported -- King Boo spits TWELVE HOT-SPRING BUBBLES (TBubble, the game's dead code: its shipped slot can never land Mixed, and its own kill cylinder would have popped them where they were born); they sink to the table, spread, rise and grow, hurt and pop on touch, pop into a LARGE WATER BOTTLE when hosed, and split into three children that walk at Mario when their time runs out (feature/kingboo-casino, code `1331ba7`)
+
+**Jaysonn**: "Port the Mixed result's hot-spring bubbles".
+
+**The game.** `TBossTelesa::generateSlotItem`: a slot result of -1 (`TTelesaSlot::getSlotResult`: the three drums on three DIFFERENT faces) doubles
+`SlotItemNum` (6 -> 12) and spits `manNameTable[0]`, the bubble manager's `TBubble` (bosstelesa.cpp 80-395; `map/params/enemy/bubble.prm` in
+delfinoBoss.szs, read by `tools/projectshine/npc82/enemy128/prm_file.py`: LiveTime 1000, NumDivision 3, MaxScale 2, AddPosBase 200, RateExpand 1.001,
+DeadHeight 200, the walker's body scale 1.5..1.8, attack 90 x 120, damage 80 x 140, march 0.8..1.5, turn 3..5). The shipped game never shows one: the
+slot's HitCollectRate 1.0 holds every drum to the first drum's target, so the faces never differ; and had they, `TBossTelesaKillSmallEnemy`'s cylinder
+(400 x 300 at the table's middle, every HIT_CATEGORY_ENEMY body in it killed, on from the first frame to his death) would have taken all twelve the
+frame `calcRootMatrix` pinned them to their float height under his mouth. Built, parametered, modelled (`btelesa_osenbubbles_ind.bmd`, a 79-vertex
+dome of 143 u on one joint scaled 1.43, with three bck clips) and never seen.
+
+**The port.** **`assets/Sms/Enemy/BossTelesa/SmsOsenBubble.cs`** (new; a species on SmsSmallEnemy) + **`OsenBubble.tscn`**: the game's rules --
+twelve out of the mouth on the 24-degree fan (the second six on round to his back: the game kept the fan's step for the doubled count) at 5-10 u a
+tick (`FirstBubbleSp` x 0.5..1); a bubble FLOATS with its centre `FloatHeightUnits` (150) over the floor under it plus a rise of 1 u a tick to
+`AddPosBaseUnits` (200) -- `TBubble::calcRootMatrix` + unk1CC: 2 m to 4.7 m over the table in its first 1.7 s -- and bobs with its wait clip; GROWS
+x`RateExpand` (1.001) a tick from 1.5..1.8 to `MaxScale` (2.0: 5.5 m across); never lands (the game's gravity never brings the pinned centre down, so
+its spit velocity is never zeroed); after `LiveTime` (1000 nerve ticks, 8.3 s) it SPLITS -- the split clip's swell, then `NumDivision` (3) children at
+its point while the pool (`MaxAlive` 30) has room, each with a random +-2 u a tick drift, no rise, a fresh body scale; a child walks at Mario at 0.8 x
+its march for 40 ticks, coasts on its drift (x0.98) to 80, then walks at him for good; TOUCHED (the attack cylinder, 90 x 120 x its scale from its
+centre up -- over a standing Mario's head: the player jumps into them) it sends the common damage and pops; HOSED while it waits (`behaveToWater`) it
+pops and a LARGE water bottle (`FullRefill`, alive 1200 ticks: killByTimer 0x4B0) appears; jumped on it pops; the death is the split clip's swell and
+the common puff. No sounds (the game's bas table has none for its clips). The three bck clips are replayed from their keys on the one joint
+(`tools/projectshine/npc82/sirena151/bubble_keys232.py`: birth 60 frames -- the dome blows up from nothing with a jelly wobble -- the wait 40 looped
+with a squash-and-stretch and a +-10 u bob, the split 2: 1 -> 1.3); the dome is drawn with **`OsenBubble.gdshader`** from the bmd's MAT3
+(`tools/projectshine/rematch157/j3d_mat232.py`): the picture behind it refracted through the ind map and remapped between tevreg1's dark red and
+tevreg0's lavender, the rim alpha of N_btelesa_bubble, the N_btelesa_bubble_spe highlight; `Refraction` off = the game's own picture -- `TBubble::init`
+asks `SMS_ChangeTextureAll` for the screen texture under a name the model has not (`H_ma_rak_dummy`), so the dummy's flat (0, 172, 232) blue stays in
+the remap. **`assets/Sms/Enemy/SmsBossTelesa.cs`**: `SlotForce.Mixed`, `BubbleScene` (empty = OsenBubble.tscn), `SpawnBubble` / `BubblesSpat` (kind 0
+of generateSlotItem; not in the spit list, as the game's kind 0 is not in mSpitObjs); `KillSmallEnemies` lets a bubble through. **`SmsTelesaSlot.cs`**:
+`ForcedResult` Mixed holds each drum to its own face (FRUIT / COIN / ENEMY -- no one face reads -1). **`assets/Sms/Items/SmsWaterBottle.cs`**:
+`LifeTicksOverride`. Two things the base did not give it: its own floor ray (`BubbleGroundY`, casting through actors' bodies -- the base's took the
+first body it met, and twelve spat together or three children born at one point stacked skyward on one another's tops, each tick higher) and
+collision exceptions with every enemy body (ACTOR_TYPE_EFFECT_OBJ: no pushes -- the field blocked its own walk and sat on his body). The glb's image
+URI re-pointed at `N_btelesa_bubble.png` (the rip named a file it does not have; `tools/projectshine/rematch157/glb_uri232.py`).
+
+**Verified:** the casino drive v232 (deleted before the commit; headless and windowed at 1930 x 1086 in the rematch arena, KingBooArena.tscn instanced
+80 m over its middle, 230 / 231's six checks kept): C90 a forced Mixed round -- the drums on 2 / 0 / 1 (result -1), the third fanfare (no confetti),
+twelve bubbles spat within 4 m of the mouth at 5.7-9.5 u a tick, all sinking; C91 1 s on all twelve sunk to their float height (error 0.00 m) and
+growing (1.72-1.97); 2.5 s on all risen the full 200 u, at MaxScale 2.00, on the wait clip, their spit spent (under 0.5 u a tick), 4.6-10 m from the
+middle over 208 degrees; C92 the bubble farthest out brought down to a child's height, Mario 2.5 m downhill of it with the pack handed to him (the
+rematch arena's Level has no FLUDD) and the discs stilled, R in the squat with the stick down (the plain standing stream points 27 degrees DOWN, at the
+floor it cleans): popped 0.12 s in by his drops, a FULL water bottle at the floor under it (0.01 m off its floor) alive 1200 ticks, Mario unhurt; C93
+the LiveTime out 8.3 s after the spit: 11 of 11 parents split, 19 children made (the pool's 30 less the dying parents), 18 alive 2 s on, all generation
+1 at the float height, the field never over 30; the nearest child 5.6 -> 2.6 m from Mario in 2 s (the walk's 1.5 m/s); C94 Mario dropped into a child:
+HP 7 -> 6, popped 2 ticks on, no bottle -- 11 / 11 (run l; runs f-k built it: ten was twelve (SlotItemNum 6), the game's kill cylinder, the base's
+ground ray, the shader's non-constant uniform defaults, and the drive's own lessons -- a `Put` is undone by the roulette ride (`SmsRideApply` puts him
+back on the disc's deck every tick: `SmsCarryTo` instead), the turning discs carry Mario off any mark, a Mario dropped in from above TRAMPLES the
+bubble, the table is a dish whose faces fall 2 m toward the middle). Shots 51a-f (the spit, afloat at 1 s, risen at 2.5 s, the game's flat blue,
+hosed with the bottle, the children). The regression drive 68 / 68 (gc; gb's one miss was a wandering Bomb Boo touching Mario during a wall check),
+the shine hud quiet run 8 / 8 (ak). The clean rebuild 0 errors; the drive, the logs, the shots and the tasks deleted. The save file is unchanged.
+
+**Deviations, each a knob on the scene with the game's value as its off state:** `SpitSinkSeconds` 0.8 (the game pins a spat bubble to its float
+height on its first frame -- a jump cut from 15 m up at his mouth; here it sinks there, eased), `SpitDrag` 0.985 (the game's spat bubble is airborne
+for ever and slides at the spit speed to the room's wall; here the spit decays and the twelve hang 4-10 m round the table), `FaceCamera` (the dome
+turned to the camera; the game's turns with the walker's heading -- a half-shell seen from the side), `BottleOnFloor` (the bottle at the floor under
+the bubble; the game's hangs 50 u over where the bubble floated, 2-5 m up), `Refraction` (the material's intent; off = the game's flat blue). Not
+knobs: the kill cylinder lets bubbles through (without it the round cannot exist), and the bubbles' bodies pass through one another and his. Open:
+the float height -- the risen parents (4.7 m) are past the plain hose's reach; the game's numbers (`AddPosBaseUnits` 200) are kept, the hover nozzle
+or a jump reaches them, and the children float at 2 m.
