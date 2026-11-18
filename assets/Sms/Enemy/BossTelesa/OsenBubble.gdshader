@@ -9,8 +9,8 @@
 //            60-90 at its middle) x 2 = the bubble texture's alpha.
 //   stage 2: C = prev + REG2 (white) x TEXC of N_btelesa_bubble_spe (I4: a soft highlight blob); A = prev. Blend SRC_ALPHA / INV_SRC_ALPHA, no lighting (no
 //            rasterizer channel in any stage), cull back.
-// Here: `refraction` on (the intent: the screen behind the bubble, wobbled by the ind map and remapped) -- off = the game's own picture, the dummy's flat blue in
-// the remap (100, 135, 223). `refraction_uv` is the wobble's reach as a fraction of the screen (the GX offsets came to some 8 texels of a 640-wide screen).
+// Here: `refraction` OFF = the game's own picture, the dummy's flat blue in the remap (100, 135, 223): a pale blue bubble. On = the material's reach (the
+// screen behind the bubble, wobbled by the ind map and remapped), which in this dark red room reads as red jelly. `refraction_uv` is the wobble's reach as a fraction of the screen (the GX offsets came to some 8 texels of a 640-wide screen).
 // `opacity` x the alpha. The screen is read in display space (pow 1 / 2.2) as the TEV saw it; the result goes to ALBEDO in linear.
 shader_type spatial;
 render_mode blend_mix, depth_draw_opaque, cull_back, unshaded, shadows_disabled;
@@ -19,7 +19,7 @@ uniform sampler2D bubble_tex : source_color, filter_linear, repeat_disable;   //
 uniform sampler2D spe_tex : source_color, filter_linear, repeat_disable;      // N_btelesa_bubble_spe (the highlight)
 uniform sampler2D ind_tex : filter_linear, repeat_enable;                     // N_btelesa_bubble_ind (the warp: (a, i) -> (s, t))
 uniform sampler2D screen_tex : hint_screen_texture, filter_linear, repeat_disable;
-uniform bool refraction = true;
+uniform bool refraction = false;
 uniform float refraction_uv : hint_range(0.0, 0.1) = 0.015;
 uniform vec3 c0 = vec3(0.902, 0.784, 1.0);              // tevreg0 (230, 200, 255): the lights
 uniform vec3 c1 = vec3(0.392, 0.0, 0.0);                // tevreg1 (100, 0, -100): the darks (the blue clamps to 0)

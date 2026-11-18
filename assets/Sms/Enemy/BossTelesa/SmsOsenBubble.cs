@@ -33,8 +33,9 @@ using System.Collections.Generic;
 /// frame (from 15 m up at the mouth: a jump cut); here it sinks there over SpitSinkSeconds. SpitDrag -- the game's spat bubble never slows (airborne for ever)
 /// and slides to the wall; here the spit velocity decays by SpitDrag a tick, so the twelve spread 5-9 m from under his mouth and hang there. FaceCamera -- the
 /// dome turned to the camera (the game turns it with the walker's heading: a half-shell from the side). BottleOnFloor -- the bottle at the floor under the
-/// bubble (the game's appears 50 u over the bubble's centre and hangs there, 2-5 m up). Refraction (the shader) -- the screen behind the bubble (the material's
-/// intent; the game's texture swap misses by name and leaves the dummy's flat blue).</para>
+/// bubble (the game's appears 50 u over the bubble's centre and hangs there, 2-5 m up). Refraction (the shader; OFF) -- on, the screen behind the bubble
+/// refracted and remapped (the material's reach, which in this dark red room reads as red jelly); off, the game's own picture: its texture swap for the
+/// screen misses by name and the dummy's flat blue stays -- a pale blue bubble.</para>
 /// Knobs: The bubble (bubble.prm's six, FloatHeightUnits, MaxAlive), Deviations, The bottle, Look. Readouts for the drives: IsChild, Generation, RiseUnits,
 /// SpitVelUnits, FloatY, Alive (static), Splits, the clip.
 /// </summary>
@@ -85,8 +86,9 @@ public partial class SmsOsenBubble : SmsSmallEnemy
     /// <summary>The bottle at the FLOOR under the bubble. Off = the game: 50 u over the bubble's centre, where it floated (2-5 m up, hanging).</summary>
     [Export] public bool BottleOnFloor = true;
     [ExportGroup("Look")]
-    /// <summary>The screen behind the bubble, refracted (the material's intent). Off = the game's picture: the dummy texture's flat blue in the remap.</summary>
-    [Export] public bool Refraction = true;
+    /// <summary>Off (the game's picture: the dummy texture's flat blue in the remap -- a pale blue bubble, what the shipped game would have drawn). On = the
+    /// material's reach: the screen behind the bubble refracted through the ind map and remapped dark red -> lavender (red jelly in this room).</summary>
+    [Export] public bool Refraction = false;
     [Export(PropertyHint.Range, "0,0.1,0.001")] public float RefractionUv = 0.015f;
     [Export(PropertyHint.Range, "0,1,0.01")] public float Opacity = 1f;
     [Export] public Shader BubbleShader;
