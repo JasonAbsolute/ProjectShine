@@ -15011,7 +15011,7 @@ silent 78), `ConfettiHeightUnits` 1000 (the game's 1707, out of frame); the conf
 12 frames) and its shrink-out (the game's scale runs 1 to 0 over the whole life). Not changed: the Shine comes 240 nerve ticks after the burst, which
 the port's nerves run at 120 Hz -- 2 s where the game, at 30 frames a second, waits 8; nothing but the burst's smoke is on screen either way.
 
-### 232 -- the King Boo REMATCH, part 77: the casino slot's MIXED result ported -- King Boo spits TWELVE HOT-SPRING BUBBLES (TBubble, the game's dead code: its shipped slot can never land Mixed, and its own kill cylinder would have popped them where they were born); they sink to the table, spread, rise and grow, hurt and pop on touch, pop into a LARGE WATER BOTTLE when hosed, and split into three children that walk at Mario when their time runs out (feature/kingboo-casino, code `1331ba7`)
+### 232 -- the King Boo REMATCH, part 77: the casino slot's MIXED result ported -- King Boo spits TWELVE HOT-SPRING BUBBLES (TBubble, the game's dead code: its shipped slot can never land Mixed, and its own kill cylinder would have popped them where they were born); they sink to the table, spread, rise and grow, hurt and pop on touch, pop into a LARGE WATER BOTTLE when hosed, and split into three children that walk at Mario when their time runs out (feature/kingboo-casino, code `1331ba7` + 232b `8851d26`)
 
 **Jaysonn**: "Port the Mixed result's hot-spring bubbles".
 
@@ -15038,9 +15038,10 @@ the common puff. No sounds (the game's bas table has none for its clips). The th
 (`tools/projectshine/npc82/sirena151/bubble_keys232.py`: birth 60 frames -- the dome blows up from nothing with a jelly wobble -- the wait 40 looped
 with a squash-and-stretch and a +-10 u bob, the split 2: 1 -> 1.3); the dome is drawn with **`OsenBubble.gdshader`** from the bmd's MAT3
 (`tools/projectshine/rematch157/j3d_mat232.py`): the picture behind it refracted through the ind map and remapped between tevreg1's dark red and
-tevreg0's lavender, the rim alpha of N_btelesa_bubble, the N_btelesa_bubble_spe highlight; `Refraction` off = the game's own picture -- `TBubble::init`
-asks `SMS_ChangeTextureAll` for the screen texture under a name the model has not (`H_ma_rak_dummy`), so the dummy's flat (0, 172, 232) blue stays in
-the remap. **`assets/Sms/Enemy/SmsBossTelesa.cs`**: `SlotForce.Mixed`, `BubbleScene` (empty = OsenBubble.tscn), `SpawnBubble` / `BubblesSpat` (kind 0
+tevreg0's lavender, the rim alpha of N_btelesa_bubble, the N_btelesa_bubble_spe highlight -- with `Refraction` ON; OFF (the default, 232b) it draws
+the game's own picture: `TBubble::init` asks `SMS_ChangeTextureAll` for the screen texture under a name the model has not (`H_ma_rak_dummy`), so the
+dummy's flat (0, 172, 232) blue stays in the remap -- a pale blue bubble, where the refracted screen in this dark red room read as red jelly (shots 51c
+against 51f). **`assets/Sms/Enemy/SmsBossTelesa.cs`**: `SlotForce.Mixed`, `BubbleScene` (empty = OsenBubble.tscn), `SpawnBubble` / `BubblesSpat` (kind 0
 of generateSlotItem; not in the spit list, as the game's kind 0 is not in mSpitObjs); `KillSmallEnemies` lets a bubble through. **`SmsTelesaSlot.cs`**:
 `ForcedResult` Mixed holds each drum to its own face (FRUIT / COIN / ENEMY -- no one face reads -1). **`assets/Sms/Items/SmsWaterBottle.cs`**:
 `LifeTicksOverride`. Two things the base did not give it: its own floor ray (`BubbleGroundY`, casting through actors' bodies -- the base's took the
@@ -15068,7 +15069,7 @@ the shine hud quiet run 8 / 8 (ak). The clean rebuild 0 errors; the drive, the l
 height on its first frame -- a jump cut from 15 m up at his mouth; here it sinks there, eased), `SpitDrag` 0.985 (the game's spat bubble is airborne
 for ever and slides at the spit speed to the room's wall; here the spit decays and the twelve hang 4-10 m round the table), `FaceCamera` (the dome
 turned to the camera; the game's turns with the walker's heading -- a half-shell seen from the side), `BottleOnFloor` (the bottle at the floor under
-the bubble; the game's hangs 50 u over where the bubble floated, 2-5 m up), `Refraction` (the material's intent; off = the game's flat blue). Not
-knobs: the kill cylinder lets bubbles through (without it the round cannot exist), and the bubbles' bodies pass through one another and his. Open:
+the bubble; the game's hangs 50 u over where the bubble floated, 2-5 m up), `Refraction` (off by default, 232b: the game's flat blue; on = the
+material's intent, the screen behind it). Not knobs: the kill cylinder lets bubbles through (without it the round cannot exist), and the bubbles' bodies pass through one another and his. Open:
 the float height -- the risen parents (4.7 m) are past the plain hose's reach; the game's numbers (`AddPosBaseUnits` 200) are kept, the hover nozzle
 or a jump reaches them, and the children float at 2 m.
