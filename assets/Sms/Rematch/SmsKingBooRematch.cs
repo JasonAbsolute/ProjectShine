@@ -107,12 +107,17 @@ public partial class SmsKingBooRematch : Node3D
     /// LAUGHS for IntroLaughSeconds (the laugh clip looping, the long laugh voice), SINKS back (over IntroSinkSeconds, the vanish voice) and is hidden. The
     /// fight then starts with SpawnRising: up out of the floor at his spot over SpawnRiseSeconds, no second laugh.</summary>
     [Export] public float IntroRiseSeconds = 1.6f, IntroLaughSeconds = 3f, IntroSinkSeconds = 1.1f, IntroSinkDepth = 7f, SpawnRiseSeconds = 1.6f;   // 186: the laugh 3.4 -> 4.6 (the chuckle's run); 193 (Jaysonn: "the laugh doesn't have to be that long"): 4.6 -> 3 (192's climb runs over whatever the length is); 233: SpawnRiseSeconds 1.2 -> 1.6 (the emergence's length, SpawnRiseLeap off; the leap runs its clip)
-    /// <summary>233 / 233b (Jaysonn: "when the rematch starts King Boo kinda just appears after going underground again", then "he should just use the animation
-    /// of him coming from under in the intro"): how he comes up for the FIGHT after the cutscene's dive. On (the default) = the intro's own rise: after the tell
-    /// (the glow on the stone, the wisps) the casino appear clip's LEAP (182: the body from 17 m under the node to 11 m over it in a third of a second and back,
-    /// damped by RiseLeapDamp), the floor burst and the stars as his body breaks the surface, his cry. Off = 233's slow EMERGENCE: his body rises straight up
-    /// through the stone over SpawnRiseSeconds on his wait clip, the same effects, settling at his hover with no overshoot (kept as a knob).</summary>
-    [Export] public bool SpawnRiseLeap = true;
+    /// <summary>233 / 233b / 233c (Jaysonn: "when the rematch starts King Boo kinda just appears after going underground again" -> "he should just use the
+    /// animation of him coming from under in the intro" -> "he just appears, he's not like coming from the ground naturally"): how he comes up for the FIGHT after
+    /// the cutscene's dive, under the game camera. Clip Carried (the default): the intro's own appear clip (its squash and stretch, at IntroAppearClipSpeed) with his
+    /// BODY carried up out of the stone on a smooth curve over the clip's length (1.6 s) -- the clip's 17-m leap is the body's own translation, and from behind Mario
+    /// it took the body from under the floor to past the frame's top edge in four frames, so there was nothing of him to watch rise; here the node is placed each
+    /// tick so the body sits on the curve, no overshoot, the floor burst, the kick and the stars as it breaks the surface, his cry there. Clip Leap: 182's -- the clip's
+    /// own leap is the rise (what the intro's surface plays under its side camera, which sees the whole leap). Emergence: 233's -- the same curve on his wait clip.</summary>
+    [Export] public SpawnRiseStyle SpawnRise = SpawnRiseStyle.ClipCarried;
+    public enum SpawnRiseStyle { ClipCarried, ClipLeap, Emergence }
+    /// <summary>233b's knob, kept for the drives and the scenes: on = Clip Leap.</summary>
+    public bool SpawnRiseLeap => SpawnRise == SpawnRiseStyle.ClipLeap;
     /// <summary>182 (Jaysonn: "during the intro king boo gets stuck on the floor for a second; make the appear animation clean and smooth"): the appear clip
     /// (btelesa_appear, 0.97 s) is itself a LEAP -- the body spins up from 17 m under the node to 11 m over it by 0.33 s and lands back at the node by 0.6 s --
     /// and 174's node, lerping up from 7 m under the floor meanwhile, let the body pop out, fall back under the stone and sit at floor level for half a second
@@ -932,12 +937,19 @@ public partial class SmsKingBooRematch : Node3D
         {
             _introTop = Position; _introFloorY = Position.Y - _hoverOverFloor; _introT = 0f;
             Position = new Vector3(Position.X, _introFloorY - IntroSinkDepth, Position.Z);
-            RiseLeapTopY = float.NegativeInfinity; _riseClipStarted = false; _spawnCryPending = false;
-            if (SpawnRiseLeap)                                                                                           // 182: the casino clip's leap
+            RiseLeapTopY = float.NegativeInfinity; _riseClipStarted = false; _spawnCryPending = false; _riseCarried = false;
+            if (SpawnRise == SpawnRiseStyle.ClipLeap)                                                                    // 182: the casino clip's leap
             {
                 _riseClipPending = RiseFx && RiseTellSeconds > 0f;                                                       // 181: the tell first (the appear clip played above is replaced till then)
                 if (_riseClipPending) { _introT = -RiseTellSeconds; PlayClip(BckWait); }
                 else StartAppearClip();
+            }
+            else if (SpawnRise == SpawnRiseStyle.ClipCarried)                                                            // 233c: the clip's pose, the body carried up out of the stone on the curve; the cry as it breaks the surface
+            {
+                _riseCarried = true; _spawnCryPending = true;
+                _riseClipPending = RiseFx && RiseTellSeconds > 0f;
+                if (_riseClipPending) { _introT = -RiseTellSeconds; PlayClip(BckWait); }
+                else StartAppearClip(cry: false);
             }
             else                                                                                                         // 233: the slow emergence -- the tell, then 174's lerp up through the stone on the wait clip; the cry as he breaks it
             {
@@ -968,7 +980,7 @@ public partial class SmsKingBooRematch : Node3D
         SetCrownGlow(_crownGlowColor, 0f);
         State = Phase.IntroRise;
         MusicCue(BossMusicCues.StanceCut, "the intro's cut to the stance");                                                                        // 196 / 197
-        _riseClipPending = RiseFx && RiseTellSeconds > 0f; _riseClipStarted = false; RiseLeapTopY = float.NegativeInfinity;   // 181: the tell first -- the glow and the wisps alone, then the clip and the rise
+        _riseClipPending = RiseFx && RiseTellSeconds > 0f; _riseClipStarted = false; _riseCarried = false; RiseLeapTopY = float.NegativeInfinity;   // 181: the tell first -- the glow and the wisps alone, then the clip and the rise (233c: the intro's surface is the clip's own leap)
         if (_riseClipPending) { _introT = -RiseTellSeconds; PlayClip(BckWait); }
         else StartAppearClip();
         RiseFxBegin(new Vector3(_introTop.X, _introFloorY, _introTop.Z));                                                // 181: the glow on the stone, the wisps
@@ -1181,22 +1193,22 @@ public partial class SmsKingBooRematch : Node3D
     /// <summary>DiveColor x FlashBoost (over 1: an additive quad brighter than its texture) at an alpha.</summary>
     private Color Bright(float alpha) => new Color(DiveColor.R * FlashBoost, DiveColor.G * FlashBoost, DiveColor.B * FlashBoost, alpha);
     private Color Bright(Color c, float alpha) => new Color(c.R * FlashBoost, c.G * FlashBoost, c.B * FlashBoost, alpha);
-    private bool _riseClipPending, _riseClipStarted; private float _riseLen;
+    private bool _riseClipPending, _riseClipStarted, _riseCarried; private float _riseLen;   // 233c: _riseCarried = the fight's rise carries the body on the curve under the clip
     /// <summary>182, for the drives: the highest the body got in the rise's leap; the rise's length (the clip's at its speed).</summary>
     public float RiseLeapTopY { get; private set; } = float.NegativeInfinity;
     public float RiseLength => _riseClipStarted ? _riseLen : IntroRiseSeconds;
     /// <summary>233, for the director's rise shot: how long the fight's rise takes from SpawnRising -- the tell, then the emergence (SpawnRiseSeconds) or the leap clip.</summary>
-    public float SpawnRiseTotalSeconds => (RiseFx ? RiseTellSeconds : 0f) + (SpawnRiseLeap ? ClipSeconds(BckAppear) / Mathf.Max(0.1f, IntroAppearClipSpeed) : SpawnRiseSeconds);
+    public float SpawnRiseTotalSeconds => (RiseFx ? RiseTellSeconds : 0f) + (SpawnRise != SpawnRiseStyle.Emergence ? ClipSeconds(BckAppear) / Mathf.Max(0.1f, IntroAppearClipSpeed) : SpawnRiseSeconds);
     /// <summary>181: the tell is over (the rise clock has reached 0): the appear clip and the appear voice start -- the body comes up.</summary>
     private void RiseClipWhenDue()
     {
         if (!_riseClipPending || _introT < 0f) return;
-        StartAppearClip();
+        StartAppearClip(cry: !_riseCarried);                                                                                            // 233c: the carried rise cries as the body breaks the stone
         if (DebugPrint) GD.Print($"[SMS kingboo] {Name}: the RISE's tell is over -- the appear clip, he comes up");
     }
     /// <summary>182: the appear clip at IntroAppearClipSpeed, the node put at the hover height (the clip's own leap carries the body from 17 m under the node up
     /// and back to it), the appear voice; the rise lasts the clip. No clip: 174's lerp (IntroRiseSeconds / SpawnRiseSeconds).</summary>
-    private void StartAppearClip()
+    private void StartAppearClip(bool cry = true)
     {
         _riseClipPending = false;
         PlayClip(BckAppear);
@@ -1206,9 +1218,23 @@ public partial class SmsKingBooRematch : Node3D
             _riseLen = (float)(_anim.GetAnimation(BckAppear).Length / Mathf.Max(0.01f, _anim.SpeedScale));
             _riseClipStarted = true;
             Position = _introTop;
+            if (_riseCarried) { _riseCarryT = 0f; RiseCarriedTick(0f); }                                                                      // 233c: the body on the curve's start (under the stone) from the first frame
         }
         else _riseClipStarted = false;
-        if (_sound != null && !string.IsNullOrEmpty(ArriveSe)) _sound.Play(ArriveSe);
+        if (cry && _sound != null && !string.IsNullOrEmpty(ArriveSe)) _sound.Play(ArriveSe);
+    }
+    private float _riseCarryT;
+    /// <summary>233c: the fight's rise with the body CARRIED -- the appear clip plays its squash and stretch, and each tick the node is placed so the body joint sits on
+    /// a smooth curve from IntroSinkDepth under the floor up to the hover over the clip's length (the clip's own 17-m leap taken out: the node moves opposite to
+    /// the body's lift), so from the game camera he is seen coming up THROUGH the stone over the better part of a second, no overshoot, the pose the intro's.</summary>
+    private void RiseCarriedTick(float dt)
+    {
+        _riseCarryT += dt;
+        float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp(_riseCarryT / Mathf.Max(0.1f, _riseLen), 0f, 1f));
+        float bodyY = Mathf.Lerp(_introFloorY - IntroSinkDepth, _introTop.Y, k);
+        float lift = BodyPoint.Y - GlobalPosition.Y;                                                                                    // the clip's offset of the body over the node, read off the pose
+        Position = new Vector3(_introTop.X, bodyY - lift, _introTop.Z);
+        if (BodyPoint.Y > RiseLeapTopY) RiseLeapTopY = BodyPoint.Y;
     }
     /// <summary>182: the node through the rise -- at the hover height, dropped by RiseLeapDamp of the clip's lift of the body over it, so the leap's overshoot is
     /// damped and the body lands at the hover as the clip settles (the lift read off the pose: the body joint over the node).</summary>
@@ -3097,14 +3123,15 @@ public partial class SmsKingBooRematch : Node3D
         {
             _introT += dt;
             RiseClipWhenDue();
-            if (_riseClipStarted) RiseNodeTick();                                                                                       // 182: the clip's own leap is the rise
+            if (_riseClipStarted && _riseCarried) RiseCarriedTick(dt);                                                                  // 233c: the clip's pose, the body carried up the curve
+            else if (_riseClipStarted) RiseNodeTick();                                                                                  // 182: the clip's own leap is the rise
             else if (!_riseClipPending)
             {
                 float k = Mathf.SmoothStep(0f, 1f, Mathf.Clamp(_introT / Mathf.Max(0.1f, SpawnRiseSeconds), 0f, 1f));                  // 174's lerp: no appear clip (233: the emergence; k 0 through the tell)
                 Position = new Vector3(_introTop.X, Mathf.Lerp(_introFloorY - IntroSinkDepth, _introTop.Y, k), _introTop.Z);
             }
             RiseFxTick(dt);
-            if (_spawnCryPending && !_riseFxOn && _introT >= 0f) SpawnCry();                                                            // 233: no rise effects to break the floor with -- the cry as he starts up
+            if (_spawnCryPending && !_riseFxOn && BodyPoint.Y >= _introFloorY) SpawnCry();                                               // 233 / 233c: no rise effects to break the floor with -- the cry as the body reaches it
             if (_introT >= (_riseClipStarted ? _riseLen : SpawnRiseSeconds)) { _spawnRise = false; Position = _home; RiseFxEnd(); }
         }
         // the long laugh with the laugh clip (the casino boss plays it two bck frames in: a thirtieth of a second, dropped here)
