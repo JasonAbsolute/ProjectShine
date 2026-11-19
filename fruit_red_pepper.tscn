@@ -7,7 +7,7 @@
 resource_name = "m0_mat_togarasi"
 cull_mode = 2
 albedo_texture = ExtResource("1_vmo8g")
-roughness = 0.5
+metallic_specular = 0.0
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_rj52k"]
 resource_name = "FruitRedPepper_meshId0_name"
