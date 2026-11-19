@@ -1755,7 +1755,7 @@ both still pushed and still waiting on Jaysonn's playtest, untouched since 2026-
 `feature/select-stages` holds the only copy of #11's text. Three merged branches are safe to delete besides: `feature/enemy-sirena`,
 `feature/kingboo-rematch` and, once PR #16 is closed, `feature/sounds`.
 
-### #19 -- PENDING -- queued 2026-11-17 03:41 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 230 + 231 + 232 + 232b + 233 + 233b + 233c), updated 2026-11-18 23:26 PST -- was 2026-11-18 22:56 PST -- was 2026-11-18 22:29 PST -- was 2026-11-17 18:25 PST
+### #19 -- PENDING -- queued 2026-11-17 03:41 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 230 + 231 + 232 + 232b + 233 + 233b + 233c + 233d), updated 2026-11-19 00:10 PST -- was 2026-11-18 23:26 PST -- was 2026-11-18 22:56 PST -- was 2026-11-18 22:29 PST -- was 2026-11-17 18:25 PST
 Push the fourteenth feature branch: `feature/kingboo-casino`, branched from `main` `d7887ae` (the trunk after PR #15, the rematch and the sounds, and its
 "#17 and #18 done" commit). The CASINO fight's touch-ups after Jaysonn's playtest of the trunk. SMS 230: every actor sound fades by the GAME's OWN RULE for
 it (MSHandle's category distances and the sound's curve bits: a placed Shine's hum is heard within 16 m and gone at 48 m -- it hummed across the whole level
@@ -1781,11 +1781,14 @@ just use the animation of him coming from under in the intro") put the defaults 
 182's flow -- keeping both as knobs, off (SpawnRiseLeap on assets/Sms/Rematch/SmsKingBooRematch.cs; RiseInCutscene on assets/Sms/Rematch/SmsRematchIntro.cs);
 233c (Jaysonn: "no he just appears, he's not like coming from the ground naturally" -- the leap takes him from under the floor to out of the game camera's
 frame in 4 frames) CARRIES his body up through the stone on a smooth curve over the appear clip's 1.6 s while the clip plays its pose, the burst and the
-stars as he breaks the surface, no overshoot, no camera hold (SpawnRise = Clip Carried on KingBooRematch; Clip Leap = 182's, Emergence = 233's). NOT yet playtested by Jaysonn: push the branch so
+stars as he breaks the surface, no overshoot, no camera hold (SpawnRise = Clip Carried on KingBooRematch; Clip Leap = 182's, Emergence = 233's); 233d (Jaysonn: "ok no just undo what i said about him coming up") takes the ENTRANCE work OUT -- both rematch scripts back
+to 232b's byte for byte: the fight's rise is 182's leap after the tell under the game camera, as before 233; the confetti stays. NOT yet playtested by Jaysonn: push the branch so
 it is on GitHub; do NOT open a PR until he says these touch-ups are done (more passes follow on this branch: the fruit's look and roll next). Further
 passes re-point this entry's tip.
-- Branch `feature/kingboo-casino` -- code tip `3a7f4eb` ("SMS 233c: King Boo COMES UP THROUGH THE STONE for the fight -- the intro's appear clip plays its pose
-  while his body is CARRIED up out of the floor on a smooth curve ..."; assets/Sms/Rematch/SmsKingBooRematch.cs) on 233b's log commit (`6cf8f0b`) on the 233b
+- Branch `feature/kingboo-casino` -- code tip `a54f214` ("SMS 233d: the rematch's ENTRANCE work UNDONE at Jaysonn's word -- SmsKingBooRematch.cs and
+  SmsRematchIntro.cs back to 232b's (8ef659c) ..."; assets/Sms/Rematch/SmsKingBooRematch.cs, SmsRematchIntro.cs) on 233c's log commit (`7bbb891`) on the
+  233c commit (`3a7f4eb`, "SMS 233c: King Boo COMES UP THROUGH THE STONE for the fight -- the intro's appear clip plays its pose while his body is CARRIED
+  up out of the floor on a smooth curve ..."; assets/Sms/Rematch/SmsKingBooRematch.cs) on 233b's log commit (`6cf8f0b`) on the 233b
   commit (`5d412b1`, "SMS 233b: the rematch's entrance back to the intro's OWN rise under the GAME camera ..."; assets/Sms/Rematch/SmsKingBooRematch.cs,
   SmsRematchIntro.cs) on 233's log commit (`3b8d7ff`) on the 233 commit (`561521a`, "SMS 233: the casino fanfare's
   CONFETTI at the jpa's own 60 Hz and look ..., and the rematch's ENTRANCE: King Boo comes up for the fight in a slow EMERGENCE under the cutscene's own
@@ -1799,16 +1802,13 @@ passes re-point this entry's tip.
   comes up BOLTED to King Boo ..., his body goes WITH the death's burst ..., the fanfare's CONFETTI is the game's ..., and the slot machine's landing thump
   finally fires"; assets/Sms/Enemy/SmsBossTelesa.cs, BossTelesa/BtlsFubuki.tscn) on the 230 commit (`65e5d5c`, "SMS 230: the CASINO FIGHT's sounds checked,
   and every actor sound FADES BY THE GAME'S OWN RULE for it ..."; assets/Sms/Sound/SmsActorSound.cs) and 231's log commit (`51ecd1e`) on `main` `d7887ae`;
-  the branch tip is this file's own commit on top of them; 13 commits since `main`. No new files in 233 / 233b / 233c. New files (232): SmsOsenBubble.cs (+ .uid), OsenBubble.tscn,
+  the branch tip is this file's own commit on top of them; 15 commits since `main`. No new files in 233 / 233b / 233c / 233d. New files (232): SmsOsenBubble.cs (+ .uid), OsenBubble.tscn,
   OsenBubble.gdshader (+ .uid), models/Eniemes/BossTelesa/bubble/btelesa_osenbubbles_ind.glb, N_btelesa_bubble.png, N_btelesa_bubble_ind.png,
   N_btelesa_bubble_spe.png (+ their .import). The range carries none of Jaysonn's live edits (assets/Level.tscn, KingBooArena.tscn, RematchArena.tscn,
   SmsHiddenCoin.cs, the .tres and .import churn).
-- To try 233 / 233b / 233c: start the rematch and let the intro play: after King Boo's laugh and dive the game camera is back behind Mario; a glow
-  pulses on the stone at his spot with wisps, and he comes up THROUGH the stone over about a second -- his crown first, the burst and the stars as he
-  breaks the surface, his cry -- rising to his hover in the intro's own appear pose, never over it, and the fight is on. Knobs if you want them: on
-  KingBooRematch -- Spawn Rise (Clip Carried, this; Clip Leap = the appear clip's own 17-m leap, the old pop; Emergence = the same rise on his wait
-  pose), Intro Appear Clip Speed (0.6: the rise lasts the clip, 1.6 s); on RematchIntro -- Rise In Cutscene (on = the camera stays on his spot through
-  the rise, Rise Cam Side / Height / Aim, After Rise Seconds; off). In the casino fight beat a round and watch the fanfare: the confetti is now small crisp squares tumbling end over end as they fall fast and slow
+- To try 233 (after 233d): the rematch's entrance is as it was before 233 -- after King Boo's laugh and dive the game camera is back behind Mario
+  and he comes up at his spot by the intro's own animation (the glow and the wisps on the stone, then the leap out of the floor with the burst, the
+  stars and his cry); the entrance knobs of 233 / 233b / 233c are gone. In the casino fight beat a round and watch the fanfare: the confetti is now small crisp squares tumbling end over end as they fall fast and slow
   into a drift, each flickering grey / yellow / red, gone in three seconds -- Confetti Height Units on BossTelesa (1125; 1707 = the game's placement,
   mostly above the picture). Press the editor's Build first: the C# changed.
 - To try 232: in the casino fight set Force Result to Mixed on BossTelesa (KingBooArena.tscn) and beat a round: the drums stop on three different faces,

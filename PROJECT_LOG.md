@@ -15077,7 +15077,8 @@ or a jump reaches them, and the children float at 2 m.
 ### 233 -- the King Boo REMATCH, part 78: the casino fanfare's CONFETTI at the jpa's own 60 Hz and look (0.5-m alpha-tested squares fluttering along their fall, 12 m/s easing to 2.8, the colour cycling grey / yellow / red by age, 3 s), and the rematch's ENTRANCE -- King Boo comes up for the fight in a slow EMERGENCE under the cutscene's own camera (the shot moves to his spot after the dive; he rises through the stone over 1.6 s on the tell; control back once he is up) instead of the appear clip's 17-m leap under the game camera that read as a pop (feature/kingboo-casino, code `561521a` + 233b `5d412b1`: the
 entrance's defaults BACK to the intro's own leap under the game camera -- Jaysonn: "no it's not supposed to be a cutscene. he should just use the
 animation of him coming from under in the intro" -- both 233 changes kept as knobs, off; + 233c `3a7f4eb`: the body CARRIED up through the stone under the
-intro's appear clip, Jaysonn on 233b: "no he just appears, he's not like coming from the ground naturally")
+intro's appear clip, Jaysonn on 233b: "no he just appears, he's not like coming from the ground naturally"; + 233d `a54f214`: the ENTRANCE work
+UNDONE at Jaysonn's word -- both rematch scripts back to 232b's, the fight's rise 182's leap as before 233; the confetti stays)
 
 **Jaysonn**: "can you make the confetti look better its just like pixel blocks right now. also when the rematch starts kingboo kinda just appears
 after going underground again".
@@ -15154,7 +15155,18 @@ frame). **Clip Leap** = 182's (the intro's surface keeps it; `_riseCarried` rese
 entrance drive run e under the game camera -- the body -5.3 m at 0.19 s, -1.4 at 0.59, +4.1 at 0.99 (over the floor, the burst and the stars on), +8.6
 at 1.39, Wait at 1.64, its highest 9.99 (the hover's bob); shots 54e-k (the glow and the wisps, the crown breaking the stone under the burst, him half
 up with the ring and the stars, up); the regression 68 / 68 (gf); the shine hud quiet run 8 / 8 (an). Knobs: `SpawnRise` (Clip Carried / Clip Leap /
-Emergence); the carried rise's length is the clip's at `IntroAppearClipSpeed` (0.6: 1.6 s). Deviation: the carried rise is the port's. **Next:** the fruit (Jaysonn:
+Emergence); the carried rise's length is the clip's at `IntroAppearClipSpeed` (0.6: 1.6 s). Deviation: the carried rise is the port's.
+**233d -- UNDONE (Jaysonn, after 233c: "ok no just undo what i said about him coming up. let just undo this and go back to fruit").**
+`SmsKingBooRematch.cs` and `SmsRematchIntro.cs` are checked out from 232b's log commit `8ef659c` byte for byte (the diff against it empty) --
+233 / 233b / 233c touched no other line of them, so this takes out exactly the entrance: `SpawnRise` / `SpawnRiseLeap`, the carried rise
+(`RiseCarriedTick`), `SpawnCry` and the cry flag, `SpawnRiseTotalSeconds`, the emergence (`SpawnRiseSeconds` back to 1.2); `RiseInCutscene`,
+`Phase.Rising`, `BeginRiseShot`, the rise camera knobs, `AfterRiseSeconds`, `ControlBackAt`, `BooSpawnSpot`, `OnRoseForFight`. The fight's rise is
+182's again: the tell (the glow and the wisps), the casino appear clip's own leap out of the floor under the game camera, the burst, the stars
+and his cry, `RiseLeapDamp` 0.6 on the overshoot; the cutscene ends `AfterSinkSeconds` after his dive as 174 had it. The confetti (`BtlsFubuki.tscn`,
+`ConfettiHeightUnits` 1125) stays. Verified: the clean rebuild 0 errors; the DLL carries none of the entrance symbols and still ConfettiHeightUnits;
+no drive run (the files are the 232b bytes that passed 232's 68 / 68). The entrance drive, its runner, logs, shots and task deleted. Not touched:
+Jaysonn's live edits (he had `visible = false` on RematchArena's KingBoo node in his unsaved scene -- the "he doesn't show" of the evening -- and
+fixed it himself). **Next:** the fruit (Jaysonn:
 "they look weird and roll around oddly", "oddly shiny", "the chili pepper doesn't rotate") -- the research is in
 `tools/projectshine/rematch157/plan234.md`: the port's fruit materials are PBR plastic (roughness 0.5, specular 0.5) where the game's are flat-lit;
 the game rolls EVERY fruit including the pepper (`TMapObjBall::calcCurrentMtx`; the pepper is a ResetFruit in the casino's scene.bin -- the port's
