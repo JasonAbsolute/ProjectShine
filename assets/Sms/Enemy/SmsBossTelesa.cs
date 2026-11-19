@@ -167,9 +167,9 @@ public partial class SmsBossTelesa : SmsSmallEnemy
     /// emitter sits 2207 u over that -- 1707 u (23 m) over the casino's table (its face is the stage's y 500) -- raining 60-u squares over a 900-u circle for
     /// 180 frames, 15 u a frame at first and drifting at 3.5 once the air has slowed them. From the room's fixed camera that top is 10 m above the frame, so the
     /// game's own rain is seen only in its last seconds at the frame's top edge. Here: this high over the discs' walking face (the middle ring's), at the table's
-    /// middle (his x / z) -- 1000 u (13.4 m) puts the rain's start at the frame's top, over his crown, so it falls in view past him and the slot machine to the
-    /// table. 1707 = the game's placement (mostly out of frame); 650 = 153's: 8.7 m over the slot machine's top, a small cloud thrown up.</summary>
-    [Export(PropertyHint.Range, "0,3000,10")] public float ConfettiHeightUnits = 1000f;
+    /// middle (his x / z) -- 1125 u (15.1 m: what a piece falls in its 3 s at the jpa's speeds, 233) starts the rain just over the frame's top, over his crown, so it falls in view past him and the slot machine to the
+    /// table and pops there. 1707 = the game's placement (mostly out of frame); 1000 = 231's (its half-speed rain); 650 = 153's: 8.7 m over the slot machine's top, a small cloud thrown up.</summary>
+    [Export(PropertyHint.Range, "0,3000,10")] public float ConfettiHeightUnits = 1125f;
     /// <summary>231: the appear clip's frame at which the slot machine LANDS -- the camera shake (shakebtelesaappear) and MSD_SE_BS_TELESA_SLT_LAND. The game checks
     /// frame 78 (TNerveBossTelesaAppear: checkPass(78.0f)) of a clip that is 59 frames long (btelesa_appear.bck), so its thump and shake never came; 56 is the
     /// clip's last frames, where his body settles onto the machine. 78 = the game's (silent).</summary>

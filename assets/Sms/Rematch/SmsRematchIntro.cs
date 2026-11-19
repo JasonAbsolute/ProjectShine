@@ -20,8 +20,9 @@ using System;
 /// King Boo SURFACES: SurfaceDistance in front of him toward the BooSpawn marker, rising out of the floor as the casino boss rises from his table
 /// (the appear clip and voice), LAUGHING for IntroLaughSeconds (his knob) -- Mario in his BATTLE STANCE (176: StanceInClip then the StanceClip loop,
 /// the custom ma_battle_stance_in / ma_battle_stance), his head on King Boo, his body turned to him -- with the camera off to the side on the two of
-/// them (SurfaceCamSide / Height), then SINKING back under the floor; AfterSinkSeconds on the empty spot, the game camera is back,
-/// Mario is free (his head back to the clip; 176b: he HOLDS the stance until his first input, StanceHoldUntilInput), and King Boo rises at his BooSpawn spot for the fight (SpawnRising: no second laugh) -- FightReady as
+/// them (SurfaceCamSide / Height), then SINKING back under the floor; AfterSinkSeconds on the empty spot, then (233, RiseInCutscene) the shot moves to his
+/// BooSpawn spot and he comes up for the fight under it -- the slow emergence (his SpawnRiseLeap off), the music's cue on this beat -- and AfterRiseSeconds after he is up the game camera is back,
+/// Mario is free (his head back to the clip; 176b: he HOLDS the stance until his first input, StanceHoldUntilInput); RiseInCutscene off = the game camera back on the empty spot and King Boo rises at his BooSpawn spot during the cut (SpawnRising: no second laugh) -- FightReady as
 /// before. A skips the cutscene too (the fight starts at once). After a miss the cutscene is skipped like the card. Cutscene off = the 157 intro.
 /// </summary>
 public partial class SmsRematchIntro : Node
@@ -107,12 +108,25 @@ public partial class SmsRematchIntro : Node
     [Signal] public delegate void RevealedEventHandler();
     [Signal] public delegate void FightReadyEventHandler();
 
-    public enum Phase { Waiting, Card, Falling, Spawned, Done, LookAbout, Surfaced, Sunk }
+    public enum Phase { Waiting, Card, Falling, Spawned, Done, LookAbout, Surfaced, Sunk, Rising }
     public Phase State { get; private set; } = Phase.Waiting;
     public bool Skipped { get; private set; }
     public bool CameFromMiss { get; private set; }
     public float? FloorY { get; private set; }
     public SmsRematchCard Card { get; private set; }
+    /// <summary>233 (Jaysonn: "when the rematch starts King Boo kinda just appears after going underground again"): the camera STAYS on through the fight's rise.
+    /// After the dive and its pause the shot moves to his BooSpawn spot -- a side two-shot of Mario and the spot, like the surface's (RiseCamSide / Height, the aim
+    /// following his body up) -- and he comes up for the fight under it; the game camera and Mario's control come back AfterRiseSeconds after he is up. A skips
+    /// the rest (he goes on rising under the game camera). The music's cue (FightCueSeconds) marks the rise's START -- the beat the shot cuts to his spot -- and
+    /// ControlBackAt says when the player got him back. Off = 174's: the game camera back on the empty spot and he rises during the cut.</summary>
+    [Export] public bool RiseInCutscene = true;
+    [Export] public float RiseCamSide = 22f, RiseCamHeight = 4.6f, AfterRiseSeconds = 0.3f;   // the surface shot's distances (16 m stood him too big in frame as he came up)
+    [Export(PropertyHint.Range, "0,1,0.01")] public float RiseCamAim = 0.6f;
+    /// <summary>233, for the drives: on the cue's clock, when the player got control back (the cutscene's true end); whether the rise shot ran; the rise shot's camera.</summary>
+    public float ControlBackAt { get; private set; } = -1f;
+    public bool RiseShotRan { get; private set; }
+    public Camera3D CutsceneCameraNow => _cam != null && IsInstanceValid(_cam) ? _cam : null;
+    private float _roseAt = -1f; private bool _booReady, _riseShotOn; private Vector3 _riseSpot;
 
     private Mario _mario; private Node3D _marioSpawn, _booSpawn; private SmsKingBooRematch _boo; private SmsArenaFloor _floor;
     private float _t, _sinceReveal, _landedAt = -1f; private bool _booSpawned;
@@ -183,7 +197,7 @@ public partial class SmsRematchIntro : Node
             if (cutscene && State == Phase.Falling && _sinceReveal >= BooSpawnTimeout) { SpawnBoo(); return; }   // he never landed (off the edge): no cutscene -- the 157 spawn, with the laugh
             if (!cutscene && !_booSpawned && ((_landedAt >= 0f && _sinceReveal - _landedAt >= BooSpawnDelay) || _sinceReveal >= BooSpawnTimeout)) SpawnBoo();
         }
-        if (State == Phase.LookAbout || State == Phase.Surfaced || State == Phase.Sunk) CutsceneTick(dt);
+        if (State == Phase.LookAbout || State == Phase.Surfaced || State == Phase.Sunk || State == Phase.Rising) CutsceneTick(dt);   // 233: the rise shot too
     }
 
     // ---- 174: the cutscene ---------------------------------------------------------------------------------------------------------------------
@@ -291,9 +305,40 @@ public partial class SmsRematchIntro : Node
             Vector3 want = (_mario.GlobalPosition + Vector3.Up * 1.2f).Lerp(body, SurfaceCamAim);
             _camAt = _camAt.Lerp(want, 1f - MathF.Exp(-5f * dt));
             PlaceCam(Mathf.Clamp(_cut / Mathf.Max(0.1f, total), 0f, 1f));
-            if (_sunkAt >= 0f && _cut - _sunkAt >= _afterSink) EndCutscene();                                 // 197: the pause takes the cue's slack
+            if (_sunkAt >= 0f && _cut - _sunkAt >= _afterSink)                                                 // 197: the pause takes the cue's slack
+            {
+                if (RiseInCutscene && !_cutsceneSkipped) BeginRiseShot(); else EndCutscene();                  // 233: the camera on through his rise for the fight
+            }
+        }
+        else if (State == Phase.Rising)                                                                        // 233: the rise shot -- Mario square to his spot, his head on the body as it comes up, the camera's aim following it
+        {
+            TurnMario(Yaw(Flat(_riseSpot - _mario.GlobalPosition)), dt);
+            _mario.SmsHeadLook?.Track(_boo.BodyPoint, Dir(_faceYaw));
+            Vector3 body = _boo.BodyPoint; body.Y = Mathf.Max(body.Y, _boo.IntroFloorY + 1.5f);
+            Vector3 want = (_mario.GlobalPosition + Vector3.Up * 1.2f).Lerp(body, RiseCamAim);
+            _camAt = _camAt.Lerp(want, 1f - MathF.Exp(-5f * dt));
+            PlaceCam(Mathf.Clamp((_cut - _riseShotAt) / Mathf.Max(0.1f, _boo.SpawnRiseTotalSeconds + AfterRiseSeconds), 0f, 1f));
+            if (_roseAt >= 0f && _cut - _roseAt >= AfterRiseSeconds) EndCutscene();
+            else if (_cut - _riseShotAt > _boo.SpawnRiseTotalSeconds + 4f) { GD.PushWarning("[SMS rematch intro] the rise shot: he never reported himself up -- the fight anyway"); EndCutscene(); }
         }
     }
+    private float _riseShotAt;
+    /// <summary>233: the dive's pause is over -- King Boo placed at his spot and rising for the fight under the cutscene's camera: a side two-shot of Mario and
+    /// the spot (RiseCamSide off the line between them, a little behind Mario, RiseCamHeight up), pushing in a little as he comes up. The music's cue is this beat.</summary>
+    private void BeginRiseShot()
+    {
+        State = Phase.Rising; _riseShotOn = true; RiseShotRan = true; _riseShotAt = _cut; _roseAt = -1f; FightStartAt = _sinceCue;
+        _riseSpot = BooSpawnSpot();
+        Vector3 mp = _mario.GlobalPosition, toSpot = Flat(_riseSpot - mp), side = new Vector3(-toSpot.Z, 0f, toSpot.X);
+        Vector3 mid = (mp + _riseSpot) * 0.5f; mid.Y = mp.Y;
+        _camFrom = mid + side * RiseCamSide + toSpot * -2f + Vector3.Up * RiseCamHeight;
+        _camTo = mid + side * (RiseCamSide * 0.85f) + toSpot * -1.5f + Vector3.Up * (RiseCamHeight + 0.6f);
+        _camAt = (mp + Vector3.Up * 1.2f).Lerp(new Vector3(_riseSpot.X, _riseSpot.Y - BooHeight + 1.5f, _riseSpot.Z), RiseCamAim);
+        PlaceCam(0f);
+        if (DebugPrint && MusicCueAt >= 0f) GD.Print($"[SMS rematch intro] CUTSCENE: the RISE SHOT -- the cut to his spot {_riseSpot} {_sinceCue:F2} s after the music's cue (planned {PlannedFightAt:F2}, FightCueSeconds {FightCueSeconds}); the camera at {_camFrom}; he comes up over {_boo.SpawnRiseTotalSeconds:F2} s, control back {AfterRiseSeconds:F1} s after");
+        SpawnBoo();
+    }
+    private void OnRoseForFight() { _booReady = true; if (State == Phase.Rising) { _roseAt = _cut; if (DebugPrint) GD.Print($"[SMS rematch intro] CUTSCENE: he is up for the fight ({_cut - _riseShotAt:F2} s into the rise shot); control back in {AfterRiseSeconds:F1} s"); } else { State = Phase.Done; if (DebugPrint) GD.Print("[SMS rematch intro] the fight may start"); EmitSignal(SignalName.FightReady); } }
     private void TurnMario(float wantYaw, float dt)
     {
         float step = Mathf.DegToRad(LookTurnDegPerSec) * dt;
@@ -325,22 +370,27 @@ public partial class SmsRematchIntro : Node
     private void SkipCutscene()
     {
         _cutsceneSkipped = true;
+        if (State == Phase.Rising) { if (DebugPrint) GD.Print("[SMS rematch intro] the rise shot skipped -- he goes on rising under the game camera"); EndCutscene(); return; }   // 233
         if (_boo != null) { _boo.IntroSunk -= OnIntroSunk; _boo.IntroAbort(); }
         if (DebugPrint) GD.Print("[SMS rematch intro] the cutscene skipped");
         EndCutscene();
     }
-    /// <summary>The cutscene is over: the game camera back, Mario free, King Boo rising at his spot for the fight.</summary>
+    /// <summary>The cutscene is over: the game camera back, Mario free, King Boo rising at his spot for the fight (233: or already up, after the rise shot).</summary>
     private void EndCutscene()
     {
-        State = Phase.Sunk; FightStartAt = _sinceCue;                                                                                          // 197: on the cue's own clock (_cut restarts at the surface)
-        if (DebugPrint && MusicCueAt >= 0f) GD.Print($"[SMS rematch intro] CUTSCENE over -- the fight starts {_sinceCue:F2} s after the music's cue (planned {PlannedFightAt:F2}, FightCueSeconds {FightCueSeconds}; the look-about and the laugh trimmed x{CueTrim:F2}; the pause after the dive {_afterSink:F2} s)");
+        bool afterRise = State == Phase.Rising;
+        State = Phase.Sunk; ControlBackAt = _sinceCue;                                                                                          // 197: on the cue's own clock (_cut restarts at the surface); 233: the fight's beat was set when the rise began
+        if (!afterRise && !_riseShotOn) FightStartAt = _sinceCue;
+        if (DebugPrint && MusicCueAt >= 0f) GD.Print($"[SMS rematch intro] CUTSCENE over -- {(afterRise ? "the rise shot done, " : "")}control back {_sinceCue:F2} s after the music's cue (the fight's beat {FightStartAt:F2}, planned {PlannedFightAt:F2}, FightCueSeconds {FightCueSeconds}; the look-about and the laugh trimmed x{CueTrim:F2}; the pause after the dive {_afterSink:F2} s)");
         if (_gameCam != null && IsInstanceValid(_gameCam)) _gameCam.Current = true;
         if (_cam != null && IsInstanceValid(_cam)) { _cam.QueueFree(); _cam = null; }
         _mario.CameraLocked = false;
         if (_stanceUsed && StanceHoldUntilInput && !_cutsceneSkipped) _mario.SmsHoldDemoClipUntilInput();   // 176b: the stance held until the player moves
         else _mario.SmsEndDemoClip();                                                                      // 176: the stance (or a skipped look-about) ends; the tree's idle as the fight starts
         _mario.SmsHeadLook?.Stop();                                                                        // 175: his head back to the clip
-        SpawnBoo();
+        if (!_booSpawned) SpawnBoo();
+        else if (_booReady) { State = Phase.Done; if (DebugPrint) GD.Print("[SMS rematch intro] the fight may start"); EmitSignal(SignalName.FightReady); }   // 233: he came up under the rise shot
+        else State = Phase.Spawned;
     }
 
     /// <summary>The card is over: Mario revealed FallHeight over the floor (falling), the screen fading in on him.</summary>
@@ -362,17 +412,22 @@ public partial class SmsRematchIntro : Node
 
     private Godot.Collections.Array<Rid> Exclude() => _mario != null && IsInstanceValid(_mario) ? new Godot.Collections.Array<Rid> { _mario.GetRid() } : null;
 
+    /// <summary>233: where King Boo comes up for the fight -- the BooSpawn marker's x / z (else where he stands), BooHeight over the floor there.</summary>
+    private Vector3 BooSpawnSpot()
+    {
+        Vector3 at = _booSpawn != null ? _booSpawn.GlobalPosition : _boo.GlobalPosition;
+        float? fy = _floor?.FloorYUnder(at.X, at.Z, at.Y + 100f, 400f, Exclude()) ?? FloorY;
+        if (fy.HasValue) at.Y = fy.Value + BooHeight;
+        return at;
+    }
     private void SpawnBoo()
     {
         _booSpawned = true;
         if (_boo != null)
         {
-            Vector3 at = _booSpawn != null ? _booSpawn.GlobalPosition : _boo.GlobalPosition;
-            float? fy = _floor?.FloorYUnder(at.X, at.Z, at.Y + 100f, 400f, Exclude()) ?? FloorY;
-            if (fy.HasValue) at.Y = fy.Value + BooHeight;
-            _boo.GlobalPosition = at;
+            _boo.GlobalPosition = BooSpawnSpot();
             if (_booSpawn != null) _boo.GlobalRotation = new Vector3(0f, _booSpawn.GlobalRotation.Y, 0f);
-            _boo.ReadyForFight += () => { State = Phase.Done; if (DebugPrint) GD.Print("[SMS rematch intro] the fight may start"); EmitSignal(SignalName.FightReady); };
+            _boo.ReadyForFight += OnRoseForFight;
             if (_cutsceneRan) _boo.SpawnRising(); else _boo.Spawn();                                    // 174: after the cutscene he rises at his spot, no second laugh
         }
         else
@@ -380,8 +435,8 @@ public partial class SmsRematchIntro : Node
             GD.PushWarning($"[SMS rematch intro] {GetPath()}: BooPath {BooPath} is not an SmsKingBooRematch -- no King Boo");
             State = Phase.Done; EmitSignal(SignalName.FightReady); return;
         }
-        State = Phase.Spawned;
-        if (DebugPrint) GD.Print($"[SMS rematch intro] King Boo spawns at {_boo.GlobalPosition} ({(_landedAt >= 0f ? "Mario landed" : "timeout")})");
+        if (State != Phase.Rising) State = Phase.Spawned;                                                 // 233: under the rise shot the state stays Rising till control is back
+        if (DebugPrint) GD.Print($"[SMS rematch intro] King Boo spawns at {_boo.GlobalPosition} ({(_landedAt >= 0f ? "Mario landed" : "timeout")}{(State == Phase.Rising ? ", under the rise shot" : "")})");
     }
 }
 
