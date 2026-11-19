@@ -6,13 +6,18 @@ using System.Collections.Generic;
 /// SMS pass 157 (the King Boo REMATCH, KINGBOO_REMATCH_gdoc.txt): the casino table CRACKS like glass and SHATTERS. <see cref="Crack"/> takes the
 /// roulette discs round this node (the `sms_roulette` group within SearchRadius), hides each disc's model and puts a copy of its own
 /// triangles in its place (FloorShatter.gdshader, the disc's own textures: nothing changes to the eye), cut into Voronoi cells about random
-/// seeds spread over the disc's area (one per CellAreaM2). Over CrackSeconds the cell borders light up as cracks spreading from the table's
+/// seeds spread over the disc's area (one per CellAreaM2). Over CrackSeconds the cell borders show as cracks (dark seams) spreading from the table's
 /// centre to the rim; HoldSeconds later the table breaks: the discs' collision goes (Mario falls through), every cell flies as a rigid shard --
 /// kicked outward and up, tumbling, falling -- and fades out; the glass-break sound (MSD_SE_OBJ_GLASS_BREAK) plays. The shards are freed
 /// after ShardSeconds; the discs stay gone. Signals: Cracked (the first crack), Shattered (the break), Finished (the shards gone).
 /// DEVIATION: the game has nothing of this -- the Shine appears over the table. Knobs: the timing (CrackSeconds, HoldSeconds, ShardSeconds),
-/// the look (CrackWidth, CrackColor, CrackGlow, CellAreaM2), the shards' flight (Kick, Pop, Spin, Gravity, RimDelay, FadeStart) and the sound.
-/// </summary>
+/// the look (CrackWidth, CrackDarken, CrackColor, CrackGlow, CellAreaM2, MatchMaterial), the shards' flight (Kick, Pop, Spin, Gravity, RimDelay,
+/// FadeStart) and the sound.
+/// Pass 235 (Jaysonn: "the glass breaking at the end of the fight -- i don't want it to shine like glass or change the color, i just want the
+/// effect breaking"): the shards carry the disc's own MATERIAL (MatchMaterial: metallic 1 / specular 0.5 / roughness 1 on these discs, an unshaded
+/// surface, the vertex-colour flags, the emission -- 157's shader hard-coded a non-metal at roughness 0.9, so the table turned pale and glossy the
+/// moment the shards replaced it), the cracks are dark seams with NO glow (CrackGlow 1.6 -> 0, CrackDarken 0.6), and the shards' fade is a
+/// dissolve in the opaque pass rather than a blend.</summary>
 public partial class SmsFloorShatter : Node3D
 {
     private const float U = SmsUnits.UnitsPerMetre;
@@ -33,9 +38,15 @@ public partial class SmsFloorShatter : Node3D
     [Export(PropertyHint.Range, "1,100,0.5")] public float CellAreaM2 = 8f;
     /// <summary>The crack line's width as a fraction of the table's radius.</summary>
     [Export(PropertyHint.Range, "0.001,0.1,0.001")] public float CrackWidth = 0.012f;
+    /// <summary>235: how dark the crack seams go (0 = no visible cracks, the table just breaks; 1 = to a quarter of the colour).</summary>
+    [Export(PropertyHint.Range, "0,1,0.05")] public float CrackDarken = 0.6f;
+    /// <summary>The cracks' glow colour (with CrackGlow).</summary>
     [Export] public Color CrackColor = new Color(0.85f, 0.97f, 1f);
-    /// <summary>The cracks' glow (emission).</summary>
-    [Export(PropertyHint.Range, "0,8,0.1")] public float CrackGlow = 1.6f;
+    /// <summary>The cracks' glow (emission). 235: 0 -- 157's 1.6 lit the seams like glass.</summary>
+    [Export(PropertyHint.Range, "0,8,0.1")] public float CrackGlow = 0f;
+    /// <summary>235: the shards keep the disc's own material (metallic, specular, roughness, unshaded, emission, the vertex-colour flags) so nothing changes to
+    /// the eye when they replace it; off = 157's look (a non-metal at roughness 0.9: paler and glossier than the table).</summary>
+    [Export] public bool MatchMaterial = true;
     [ExportGroup("Flight")]
     /// <summary>Outward speed of a shard (m/s) and its upward pop; its tumble (rad/s); its fall (m/s^2); how much later the rim's cells break than the centre's (s).</summary>
     [Export] public float Kick = 2.5f, Pop = 1.5f, Spin = 2.5f, Gravity = 14f, RimDelay = 0.18f;
@@ -168,6 +179,13 @@ public partial class SmsFloorShatter : Node3D
 
     private struct Tri { public Vector3 A, B, C, Na, Nb, Nc; public Vector2 Ua, Ub, Uc; public Color Ca, Cb, Cc; public bool HasN, HasUv, HasC; public int Cell; }
 
+    /// <summary>StandardMaterial3D's texture channel as a dot-product mask (Gray = the mean of r g b).</summary>
+    private static Vector4 ChannelMask(BaseMaterial3D.TextureChannel ch) => ch switch
+    {
+        BaseMaterial3D.TextureChannel.Green => new Vector4(0, 1, 0, 0), BaseMaterial3D.TextureChannel.Blue => new Vector4(0, 0, 1, 0), BaseMaterial3D.TextureChannel.Alpha => new Vector4(0, 0, 0, 1),
+        BaseMaterial3D.TextureChannel.Grayscale => new Vector4(1f / 3f, 1f / 3f, 1f / 3f, 0), _ => new Vector4(1, 0, 0, 0)
+    };
+
     /// <summary>One disc's triangles, in its body's space, cut into cells and rebuilt as its Shards mesh; its model hidden.</summary>
     private void BuildShards(SmsRoulette disc, int index)
     {
@@ -263,16 +281,34 @@ public partial class SmsFloorShatter : Node3D
             mesh.AddSurfaceFromArrays(Mesh.PrimitiveType.Triangles, arr, null, null, flags);
             var sm = new ShaderMaterial { Shader = _shader };
             Texture2D tex = null; Color albedo = Colors.White; bool vertexColor = anyC;
+            float metallic = 0f, specular = 0.5f, roughness = 0.9f; bool unshaded = false, vcSrgb = false; Color emission = Colors.Black;   // 157's look when MatchMaterial is off
+            Texture2D roughTex = null, metalTex = null; Vector4 roughCh = new Vector4(1, 0, 0, 0), metalCh = new Vector4(1, 0, 0, 0); Vector3 uvScale = Vector3.One, uvOffset = Vector3.Zero;
             if (mat is BaseMaterial3D bm)
             {
                 tex = bm.AlbedoTexture; albedo = bm.AlbedoColor;
                 vertexColor = anyC && bm.VertexColorUseAsAlbedo;
+                if (MatchMaterial)                                                                                   // 235: the disc's own material on its shards
+                {
+                    metallic = bm.Metallic; specular = bm.MetallicSpecular; roughness = bm.Roughness;
+                    unshaded = bm.ShadingMode == BaseMaterial3D.ShadingModeEnum.Unshaded; vcSrgb = bm.VertexColorIsSrgb;
+                    if (bm.EmissionEnabled) emission = bm.Emission * bm.EmissionEnergyMultiplier;
+                    roughTex = bm.RoughnessTexture; metalTex = bm.MetallicTexture; uvScale = bm.Uv1Scale; uvOffset = bm.Uv1Offset;
+                    roughCh = ChannelMask(bm.RoughnessTextureChannel); metalCh = ChannelMask(bm.MetallicTextureChannel);
+                }
             }
             sm.SetShaderParameter("has_tex", tex != null);
             if (tex != null) sm.SetShaderParameter("albedo_tex", tex);
             sm.SetShaderParameter("albedo_color", albedo);
             sm.SetShaderParameter("use_vertex_color", vertexColor);
+            sm.SetShaderParameter("vertex_color_srgb", vcSrgb);
+            sm.SetShaderParameter("metallic", metallic); sm.SetShaderParameter("specular", specular); sm.SetShaderParameter("roughness", roughness);
+            sm.SetShaderParameter("has_rough_tex", roughTex != null); if (roughTex != null) sm.SetShaderParameter("rough_tex", roughTex); sm.SetShaderParameter("rough_channel", roughCh);
+            sm.SetShaderParameter("has_metal_tex", metalTex != null); if (metalTex != null) sm.SetShaderParameter("metal_tex", metalTex); sm.SetShaderParameter("metal_channel", metalCh);
+            sm.SetShaderParameter("unshaded", unshaded);
+            sm.SetShaderParameter("uv1_scale", uvScale); sm.SetShaderParameter("uv1_offset", uvOffset);
+            sm.SetShaderParameter("emission_color", new Vector3(emission.R, emission.G, emission.B));
             sm.SetShaderParameter("crack_width", CrackWidth);
+            sm.SetShaderParameter("crack_dark", CrackDarken);
             sm.SetShaderParameter("crack_color", new Vector3(CrackColor.R, CrackColor.G, CrackColor.B));
             sm.SetShaderParameter("crack_glow", CrackGlow);
             sm.SetShaderParameter("gravity", Gravity); sm.SetShaderParameter("spin", Spin); sm.SetShaderParameter("kick", Kick); sm.SetShaderParameter("pop", Pop);
