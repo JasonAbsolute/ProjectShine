@@ -20,9 +20,8 @@ using System;
 /// King Boo SURFACES: SurfaceDistance in front of him toward the BooSpawn marker, rising out of the floor as the casino boss rises from his table
 /// (the appear clip and voice), LAUGHING for IntroLaughSeconds (his knob) -- Mario in his BATTLE STANCE (176: StanceInClip then the StanceClip loop,
 /// the custom ma_battle_stance_in / ma_battle_stance), his head on King Boo, his body turned to him -- with the camera off to the side on the two of
-/// them (SurfaceCamSide / Height), then SINKING back under the floor; AfterSinkSeconds on the empty spot, then (233, RiseInCutscene) the shot moves to his
-/// BooSpawn spot and he comes up for the fight under it -- the slow emergence (his SpawnRiseLeap off), the music's cue on this beat -- and AfterRiseSeconds after he is up the game camera is back,
-/// Mario is free (his head back to the clip; 176b: he HOLDS the stance until his first input, StanceHoldUntilInput); RiseInCutscene off = the game camera back on the empty spot and King Boo rises at his BooSpawn spot during the cut (SpawnRising: no second laugh) -- FightReady as
+/// them (SurfaceCamSide / Height), then SINKING back under the floor; AfterSinkSeconds on the empty spot, the game camera is back,
+/// Mario is free (his head back to the clip; 176b: he HOLDS the stance until his first input, StanceHoldUntilInput), and King Boo rises at his BooSpawn spot for the fight (SpawnRising: no second laugh; 233 RiseInCutscene = the camera stays on his spot through the rise instead, off by default) -- FightReady as
 /// before. A skips the cutscene too (the fight starts at once). After a miss the cutscene is skipped like the card. Cutscene off = the 157 intro.
 /// </summary>
 public partial class SmsRematchIntro : Node
@@ -114,12 +113,12 @@ public partial class SmsRematchIntro : Node
     public bool CameFromMiss { get; private set; }
     public float? FloorY { get; private set; }
     public SmsRematchCard Card { get; private set; }
-    /// <summary>233 (Jaysonn: "when the rematch starts King Boo kinda just appears after going underground again"): the camera STAYS on through the fight's rise.
-    /// After the dive and its pause the shot moves to his BooSpawn spot -- a side two-shot of Mario and the spot, like the surface's (RiseCamSide / Height, the aim
-    /// following his body up) -- and he comes up for the fight under it; the game camera and Mario's control come back AfterRiseSeconds after he is up. A skips
-    /// the rest (he goes on rising under the game camera). The music's cue (FightCueSeconds) marks the rise's START -- the beat the shot cuts to his spot -- and
-    /// ControlBackAt says when the player got him back. Off = 174's: the game camera back on the empty spot and he rises during the cut.</summary>
-    [Export] public bool RiseInCutscene = true;
+    /// <summary>233 / 233b: whether the camera STAYS on through the fight's rise. Off (the default; Jaysonn 233b: "it's not supposed to be a cutscene") = 174's:
+    /// AfterSinkSeconds after the dive the game camera is back and Mario is free, and King Boo rises at his BooSpawn spot under it. On = after the dive's pause the
+    /// shot moves to his spot -- a side two-shot of Mario and the spot, like the surface's (RiseCamSide / Height, the aim following his body up) -- and he comes up
+    /// for the fight under it; the game camera and Mario's control come back AfterRiseSeconds after he is up; A skips the rest. Either way the music's cue
+    /// (FightCueSeconds) marks the beat he starts to rise (FightStartAt) and ControlBackAt says when the player got him back.</summary>
+    [Export] public bool RiseInCutscene = false;
     [Export] public float RiseCamSide = 22f, RiseCamHeight = 4.6f, AfterRiseSeconds = 0.3f;   // the surface shot's distances (16 m stood him too big in frame as he came up)
     [Export(PropertyHint.Range, "0,1,0.01")] public float RiseCamAim = 0.6f;
     /// <summary>233, for the drives: on the cue's clock, when the player got control back (the cutscene's true end); whether the rise shot ran; the rise shot's camera.</summary>

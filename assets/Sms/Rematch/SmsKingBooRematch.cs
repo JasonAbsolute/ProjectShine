@@ -106,14 +106,13 @@ public partial class SmsKingBooRematch : Node3D
     /// he rises out of the floor (from IntroSinkDepth under it, over IntroRiseSeconds, the appear clip and voice, as the casino boss surfaces from his table),
     /// LAUGHS for IntroLaughSeconds (the laugh clip looping, the long laugh voice), SINKS back (over IntroSinkSeconds, the vanish voice) and is hidden. The
     /// fight then starts with SpawnRising: up out of the floor at his spot over SpawnRiseSeconds, no second laugh.</summary>
-    [Export] public float IntroRiseSeconds = 1.6f, IntroLaughSeconds = 3f, IntroSinkSeconds = 1.1f, IntroSinkDepth = 7f, SpawnRiseSeconds = 1.6f;   // 186: the laugh 3.4 -> 4.6 (the chuckle's run); 193 (Jaysonn: "the laugh doesn't have to be that long"): 4.6 -> 3 (192's climb runs over whatever the length is); 233: SpawnRiseSeconds 1.2 -> 1.6 (the fight's rise is a slow emergence now)
-    /// <summary>233 (Jaysonn: "when the rematch starts King Boo kinda just appears after going underground again"): how he comes up for the FIGHT after the
-    /// cutscene's dive. Off (the default) = a slow EMERGENCE: after the tell (the glow on the stone, the wisps) his body rises straight up through the stone over
-    /// SpawnRiseSeconds on his wait clip, the floor burst and the stars as his body breaks the surface, his cry there, and he settles at his hover with no overshoot.
-    /// On = 182's: the casino appear clip's own LEAP (17 m in a fifth of a second, 11 m over his hover and back) -- from the game camera behind Mario it shot him
-    /// out of the floor and off the top of the frame in two frames, which read as a pop. The intro cutscene's own surface keeps the leap either way (its side camera
-    /// frames it).</summary>
-    [Export] public bool SpawnRiseLeap = false;
+    [Export] public float IntroRiseSeconds = 1.6f, IntroLaughSeconds = 3f, IntroSinkSeconds = 1.1f, IntroSinkDepth = 7f, SpawnRiseSeconds = 1.6f;   // 186: the laugh 3.4 -> 4.6 (the chuckle's run); 193 (Jaysonn: "the laugh doesn't have to be that long"): 4.6 -> 3 (192's climb runs over whatever the length is); 233: SpawnRiseSeconds 1.2 -> 1.6 (the emergence's length, SpawnRiseLeap off; the leap runs its clip)
+    /// <summary>233 / 233b (Jaysonn: "when the rematch starts King Boo kinda just appears after going underground again", then "he should just use the animation
+    /// of him coming from under in the intro"): how he comes up for the FIGHT after the cutscene's dive. On (the default) = the intro's own rise: after the tell
+    /// (the glow on the stone, the wisps) the casino appear clip's LEAP (182: the body from 17 m under the node to 11 m over it in a third of a second and back,
+    /// damped by RiseLeapDamp), the floor burst and the stars as his body breaks the surface, his cry. Off = 233's slow EMERGENCE: his body rises straight up
+    /// through the stone over SpawnRiseSeconds on his wait clip, the same effects, settling at his hover with no overshoot (kept as a knob).</summary>
+    [Export] public bool SpawnRiseLeap = true;
     /// <summary>182 (Jaysonn: "during the intro king boo gets stuck on the floor for a second; make the appear animation clean and smooth"): the appear clip
     /// (btelesa_appear, 0.97 s) is itself a LEAP -- the body spins up from 17 m under the node to 11 m over it by 0.33 s and lands back at the node by 0.6 s --
     /// and 174's node, lerping up from 7 m under the floor meanwhile, let the body pop out, fall back under the stone and sit at floor level for half a second
