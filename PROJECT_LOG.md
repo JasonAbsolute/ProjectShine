@@ -15073,3 +15073,67 @@ the bubble; the game's hangs 50 u over where the bubble floated, 2-5 m up), `Ref
 material's intent, the screen behind it). Not knobs: the kill cylinder lets bubbles through (without it the round cannot exist), and the bubbles' bodies pass through one another and his. Open:
 the float height -- the risen parents (4.7 m) are past the plain hose's reach; the game's numbers (`AddPosBaseUnits` 200) are kept, the hover nozzle
 or a jump reaches them, and the children float at 2 m.
+
+### 233 -- the King Boo REMATCH, part 78: the casino fanfare's CONFETTI at the jpa's own 60 Hz and look (0.5-m alpha-tested squares fluttering along their fall, 12 m/s easing to 2.8, the colour cycling grey / yellow / red by age, 3 s), and the rematch's ENTRANCE -- King Boo comes up for the fight in a slow EMERGENCE under the cutscene's own camera (the shot moves to his spot after the dive; he rises through the stone over 1.6 s on the tell; control back once he is up) instead of the appear clip's 17-m leap under the game camera that read as a pop (feature/kingboo-casino, code `561521a`)
+
+**Jaysonn**: "can you make the confetti look better its just like pixel blocks right now. also when the rematch starts kingboo kinda just appears
+after going underground again".
+
+**The confetti.** 231 built `BtlsFubuki.tscn` from `ms_btls_fubuki.jpa`'s numbers but read each jpa frame as 1/30 s (gen_fx.py's own header: a jpa
+frame is 1/60 -- the game calcs the particle manager twice a rendered frame) and drew each piece as a flat billboard: 0.8-m squares facing the camera,
+falling at 4.5 m/s easing to 1.6 over 6 s, one colour per piece. Pixel blocks. The jpa (`jpa_dump.py`; noclip's JPA.ts for the calc types): BSP1 shape
+DIRECTION (the quad's Y along its motion) with rot Y (it spins ABOUT that axis -- a square tumbling end over end as it falls, the flutter); base size
+1.2 x 50 = a 60-u quad, but alpha = texA x prmA under the alpha test GREATER 200, so only `P_msm_shikaku_i`'s 255 core draws: a 10/16 square of the
+quad, 37.5 u = 0.50 m, crisp-edged (the texture's 136 / 119 / 68 rim never passes); dir 15 u a FRAME down (12.1 m/s) under airResist 0.98 a frame and
+a 0.07 u/frame^2 gravity field (they meet at 2.8 m/s, the excess decaying with a 0.83-s time constant), omni 4 (3.2 m/s any way), two Random fields
+kicking the velocity; life 180 frames = 3.0 s +-30 %, 1.25 pieces a frame for 100 frames (125 over 1.67 s); the prm colour keys (0) 207,207,207 ->
+(4) 231,231,87 -> (8) 159,48,48 -> (12) 207,207,207 over 12 frames with calc 2 = REVERSE (a 24-frame ping-pong by each piece's AGE, lerped, no random
+phase: the pieces are out of step by their birth frames) -- every piece cycles grey / yellow / red five times in its fall; ESP1 alpha out from 0.875
+of life, which under the alpha test is a POP at about 0.90 (every texel fails once prmA < 201); rotate 0.05 half-turns a frame (540 deg/s) x (1 +-
+0.625), either way, from a random angle. **`tools/projectshine/rematch157/gen_fubuki233.py`** writes **`assets/Sms/Enemy/BossTelesa/BtlsFubuki.tscn`**
+from those: `particle_flag_align_y` + `rotate_y` (the piece's Y along its velocity, spinning about it), a 0.504-m QuadMesh, alpha scissor (no
+blending, as the jpa's BLEND ONE / ZERO + alpha test), a `color_ramp` of 83 points (the ping-pong by age with the pop at 0.90),
+`vertex_color_is_srgb` (the keys are the jpa's 0-255 values: without the flag 159,48,48 drew as pink), the fall as a directional velocity curve 12.1
+-> 2.8 m/s, the omni 1.6-3.2 m/s, spin 202-878 deg/s, lifetime 3 s +-30 %, explosiveness 0.44 (the 100-frame emission), 125 pieces, no shadows.
+**`SmsBossTelesa.cs`**: `ConfettiHeightUnits` 1000 -> 1125 (15.1 m over the discs' face: what a piece falls in its 3 s, so the rain starts just over
+the frame's top and pops at the table; 1707 = the game's, 1000 = 231's half-speed rain, 650 = 153's).
+
+**The entrance.** The intro director (174) ended the cutscene `AfterSinkSeconds` after King Boo's dive: the game camera cut back behind Mario and he
+rose for the fight at his BooSpawn spot under it, by the casino appear clip's own LEAP (182: jnt_body from -17.4 m to +11.1 m over the node in 0.35 s
+at 0.6x, then back) -- a new entrance drive (`SmsIntroShotDrive`, the game view snapped every 0.2 s from the dive: run a) shows the body 17.6 m UNDER
+the floor one shot and 8.1 m over it the next, off the frame's top by the third, then dropping back to the hover: from behind Mario, 18 m away, he
+shot out of the floor and off the top of the picture in two frames and was simply there when the eye caught up. A pop. **`assets/Sms/Rematch/
+SmsKingBooRematch.cs`**: `SpawnRiseLeap` (NEW knob, off): the fight's rise is a slow EMERGENCE -- after the tell (`RiseTellSeconds` 0.7: the glow
+pulsing on the stone, the wisps) his node rises straight up through the stone over `SpawnRiseSeconds` (1.2 -> 1.6) on 174's smoothstep lerp, on his
+WAIT clip (no leap pose), the floor burst, the kick, the glow's swell and the stars as his body breaks the surface (`RiseFxTick`, as before) and his
+appear cry there (`SpawnCry`; with `RiseFx` off, as he starts up), settling at his hover with no overshoot; `ReadyForFight` from `QuietReadyWhenUp`
+once the rise is done (the wait clip never ends). On = 182's leap. The intro cutscene's own surface keeps the leap (its side camera frames it).
+`SpawnRiseTotalSeconds` for the director. **`assets/Sms/Rematch/SmsRematchIntro.cs`**: `RiseInCutscene` (NEW knob, on): the camera STAYS through his
+rise -- after the dive's pause the shot moves to his BooSpawn spot (`Phase.Rising`; `BeginRiseShot`: a side two-shot of Mario and the spot like the
+surface's, `RiseCamSide` 22 m off the line between them, `RiseCamHeight` 4.6, the aim `RiseCamAim` 0.6 following his body up, pushing in a little;
+run b at 16 m stood him too big in frame as he came up) and he is spawned rising under it; `AfterRiseSeconds` (0.3) after his ReadyForFight the game
+camera and Mario's control come back (`EndCutscene`; FightReady then). A during the rise skips the rest (he goes on rising under the game camera). The
+music's cue (`FightCueSeconds` 7.5) marks the rise shot's CUT (`FightStartAt`: the same beat the cutscene used to end on, so the planner and C26 are
+untouched); `ControlBackAt` (new readout) says when the player got him back, 2.6 s later. Off = 174's. `SkipCutscene` / `EndCutscene` / `SpawnBoo`
+reworked for the new phase (`BooSpawnSpot` factored; the ReadyForFight handler `OnRoseForFight` serves both paths).
+
+**Verified:** the entrance drive (deleted before the commit; windowed at 1930 x 1086): run c -- IntroSunk, 0.3 s, the cut to his spot (the cutscene
+camera at 22 m off the line), the tell with the glow and the wisps (introT -0.69), the node rising from 7 m under over 1.6 s, the break 0.76 s in
+with the burst and the stars, the body never over its hover, Wait at introT 1.60 with ReadyForFight, the game camera back 0.3 s later (Done); shots
+54d-k: the glow ring and wisps, the crown breaking the stone under the burst, him rising framed whole beside Mario, up, the game view. The casino
+shot drive (run h, 11 / 11 with C88 brought to the 233 numbers: 125 pieces of 0.504 m for 3.0 s one shot at 15.1 m over the face at his x / z,
+align_y, rotate_y, the 83-point ramp, sRGB): shots 50a-b -- squares of mixed grey / yellow / red fluttering edge-on and face-on over the machine and
+him, crisp. The regression drive 68 / 68 (gd; C0c the cutscene's rise effects, C26 the fight on the music's cue, both green), the shine hud quiet run
+8 / 8 (al: the cutscene skipped by A -- the skip path). The clean rebuild 0 errors; the drive, its runner copy, the logs, the shots and the tasks
+deleted; the save file untouched. Not touched: Jaysonn's live edits (assets/Level.tscn, KingBooArena.tscn, RematchArena.tscn, KingBooRematch.tscn
+(the editor's unique_id churn), SmsHiddenCoin.cs, the .tres / .import churn).
+
+**Knobs:** BossTelesa -- `ConfettiHeightUnits` 1125 (the game's 1707 is out of frame). KingBooRematch -- `SpawnRiseLeap` (off = the emergence; on =
+the casino clip's leap), `SpawnRiseSeconds` 1.6. RematchIntro -- `RiseInCutscene` (on), `RiseCamSide` 22, `RiseCamHeight` 4.6, `RiseCamAim` 0.6,
+`AfterRiseSeconds` 0.3. **Deviations:** the emergence and the rise shot are the port's (the game has no second rise: this entrance is the rematch's
+own); the confetti's start height 1125 u against the game's 1707 (which the room's camera never sees) stays a knob. **Next:** the fruit (Jaysonn:
+"they look weird and roll around oddly", "oddly shiny", "the chili pepper doesn't rotate") -- the research is in
+`tools/projectshine/rematch157/plan234.md`: the port's fruit materials are PBR plastic (roughness 0.5, specular 0.5) where the game's are flat-lit;
+the game rolls EVERY fruit including the pepper (`TMapObjBall::calcCurrentMtx`; the pepper is a ResetFruit in the casino's scene.bin -- the port's
+"the pepper never spins" lock is not in the source); the pepper scene's mesh has its origin at its BASE with a default 0.5-m collision sphere, so it
+pivots about its end and, yawed 90, rolls about its own long axis -- no visible spin.
