@@ -15074,7 +15074,9 @@ material's intent, the screen behind it). Not knobs: the kill cylinder lets bubb
 the float height -- the risen parents (4.7 m) are past the plain hose's reach; the game's numbers (`AddPosBaseUnits` 200) are kept, the hover nozzle
 or a jump reaches them, and the children float at 2 m.
 
-### 233 -- the King Boo REMATCH, part 78: the casino fanfare's CONFETTI at the jpa's own 60 Hz and look (0.5-m alpha-tested squares fluttering along their fall, 12 m/s easing to 2.8, the colour cycling grey / yellow / red by age, 3 s), and the rematch's ENTRANCE -- King Boo comes up for the fight in a slow EMERGENCE under the cutscene's own camera (the shot moves to his spot after the dive; he rises through the stone over 1.6 s on the tell; control back once he is up) instead of the appear clip's 17-m leap under the game camera that read as a pop (feature/kingboo-casino, code `561521a`)
+### 233 -- the King Boo REMATCH, part 78: the casino fanfare's CONFETTI at the jpa's own 60 Hz and look (0.5-m alpha-tested squares fluttering along their fall, 12 m/s easing to 2.8, the colour cycling grey / yellow / red by age, 3 s), and the rematch's ENTRANCE -- King Boo comes up for the fight in a slow EMERGENCE under the cutscene's own camera (the shot moves to his spot after the dive; he rises through the stone over 1.6 s on the tell; control back once he is up) instead of the appear clip's 17-m leap under the game camera that read as a pop (feature/kingboo-casino, code `561521a` + 233b `5d412b1`: the
+entrance's defaults BACK to the intro's own leap under the game camera -- Jaysonn: "no it's not supposed to be a cutscene. he should just use the
+animation of him coming from under in the intro" -- both 233 changes kept as knobs, off)
 
 **Jaysonn**: "can you make the confetti look better its just like pixel blocks right now. also when the rematch starts kingboo kinda just appears
 after going underground again".
@@ -15103,12 +15105,13 @@ rose for the fight at his BooSpawn spot under it, by the casino appear clip's ow
 at 0.6x, then back) -- a new entrance drive (`SmsIntroShotDrive`, the game view snapped every 0.2 s from the dive: run a) shows the body 17.6 m UNDER
 the floor one shot and 8.1 m over it the next, off the frame's top by the third, then dropping back to the hover: from behind Mario, 18 m away, he
 shot out of the floor and off the top of the picture in two frames and was simply there when the eye caught up. A pop. **`assets/Sms/Rematch/
-SmsKingBooRematch.cs`**: `SpawnRiseLeap` (NEW knob, off): the fight's rise is a slow EMERGENCE -- after the tell (`RiseTellSeconds` 0.7: the glow
+SmsKingBooRematch.cs`**: `SpawnRiseLeap` (NEW knob; 233 shipped it off, 233b ON by default = the intro's own leap): with it off the fight's rise is a slow EMERGENCE -- after the tell (`RiseTellSeconds` 0.7: the glow
 pulsing on the stone, the wisps) his node rises straight up through the stone over `SpawnRiseSeconds` (1.2 -> 1.6) on 174's smoothstep lerp, on his
 WAIT clip (no leap pose), the floor burst, the kick, the glow's swell and the stars as his body breaks the surface (`RiseFxTick`, as before) and his
 appear cry there (`SpawnCry`; with `RiseFx` off, as he starts up), settling at his hover with no overshoot; `ReadyForFight` from `QuietReadyWhenUp`
 once the rise is done (the wait clip never ends). On = 182's leap. The intro cutscene's own surface keeps the leap (its side camera frames it).
-`SpawnRiseTotalSeconds` for the director. **`assets/Sms/Rematch/SmsRematchIntro.cs`**: `RiseInCutscene` (NEW knob, on): the camera STAYS through his
+`SpawnRiseTotalSeconds` for the director. **`assets/Sms/Rematch/SmsRematchIntro.cs`**: `RiseInCutscene` (NEW knob; 233 shipped it on, 233b OFF by default:
+"it's not supposed to be a cutscene" -- 174's cut back to the game camera at the dive stands): with it on the camera STAYS through his
 rise -- after the dive's pause the shot moves to his BooSpawn spot (`Phase.Rising`; `BeginRiseShot`: a side two-shot of Mario and the spot like the
 surface's, `RiseCamSide` 22 m off the line between them, `RiseCamHeight` 4.6, the aim `RiseCamAim` 0.6 following his body up, pushing in a little;
 run b at 16 m stood him too big in frame as he came up) and he is spawned rising under it; `AfterRiseSeconds` (0.3) after his ReadyForFight the game
@@ -15128,10 +15131,16 @@ him, crisp. The regression drive 68 / 68 (gd; C0c the cutscene's rise effects, C
 deleted; the save file untouched. Not touched: Jaysonn's live edits (assets/Level.tscn, KingBooArena.tscn, RematchArena.tscn, KingBooRematch.tscn
 (the editor's unique_id churn), SmsHiddenCoin.cs, the .tres / .import churn).
 
-**Knobs:** BossTelesa -- `ConfettiHeightUnits` 1125 (the game's 1707 is out of frame). KingBooRematch -- `SpawnRiseLeap` (off = the emergence; on =
-the casino clip's leap), `SpawnRiseSeconds` 1.6. RematchIntro -- `RiseInCutscene` (on), `RiseCamSide` 22, `RiseCamHeight` 4.6, `RiseCamAim` 0.6,
-`AfterRiseSeconds` 0.3. **Deviations:** the emergence and the rise shot are the port's (the game has no second rise: this entrance is the rematch's
-own); the confetti's start height 1125 u against the game's 1707 (which the room's camera never sees) stays a knob. **Next:** the fruit (Jaysonn:
+**Knobs:** BossTelesa -- `ConfettiHeightUnits` 1125 (the game's 1707 is out of frame). KingBooRematch -- `SpawnRiseLeap` (233b: ON = the intro's own
+leap, the default; off = 233's emergence), `SpawnRiseSeconds` 1.6 (the emergence's length). RematchIntro -- `RiseInCutscene` (233b: OFF; on = the rise
+shot), `RiseCamSide` 22, `RiseCamHeight` 4.6, `RiseCamAim` 0.6, `AfterRiseSeconds` 0.3. **Deviations:** the emergence and the rise shot are the port's
+and both are OFF (233b); the confetti's start height 1125 u against the game's 1707 (which the room's camera never sees) stays a knob. **233b, for the
+record:** the one thing that differs between the intro's rise and the fight's is the camera -- the cutscene's side camera, 22 m off, sees the whole leap
+(the body tops out 4.4 m over his hover); the game camera behind Mario has the frame's top edge about 1.5 m over his hover at that spot (the drive's
+UnprojectPosition: the body at 9.9 m at screen y 36 of 1086, at 13.9 m at y -84), so the top of the leap, and his crown whenever he hovers, is out of
+frame. That is what read as a pop; not changed (Jaysonn's call after playing it: `RiseLeapDamp` 0.6 trims the overshoot for both rises). Verified 233b:
+the entrance drive run d -- 174 / 182's flow to the tick (the tell at introT -0.69 under the game camera, the leap's top 13.9 m at 0.59 s, Wait and
+ReadyForFight at 1.64 s, FightReady at once); the regression 68 / 68 (ge); the shine hud quiet run 8 / 8 (am). **Next:** the fruit (Jaysonn:
 "they look weird and roll around oddly", "oddly shiny", "the chili pepper doesn't rotate") -- the research is in
 `tools/projectshine/rematch157/plan234.md`: the port's fruit materials are PBR plastic (roughness 0.5, specular 0.5) where the game's are flat-lit;
 the game rolls EVERY fruit including the pepper (`TMapObjBall::calcCurrentMtx`; the pepper is a ResetFruit in the casino's scene.bin -- the port's
