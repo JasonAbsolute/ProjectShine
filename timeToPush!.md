@@ -1755,7 +1755,7 @@ both still pushed and still waiting on Jaysonn's playtest, untouched since 2026-
 `feature/select-stages` holds the only copy of #11's text. Three merged branches are safe to delete besides: `feature/enemy-sirena`,
 `feature/kingboo-rematch` and, once PR #16 is closed, `feature/sounds`.
 
-### #19 -- PENDING -- queued 2026-11-17 03:41 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 230 + 231 + 232 + 232b + 233 + 233b + 233c + 233d), updated 2026-11-19 00:10 PST -- was 2026-11-18 23:26 PST -- was 2026-11-18 22:56 PST -- was 2026-11-18 22:29 PST -- was 2026-11-17 18:25 PST
+### #19 -- PENDING -- queued 2026-11-17 03:41 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 230 + 231 + 232 + 232b + 233 + 233b + 233c + 233d + 234), updated 2026-11-19 01:35 PST -- was 2026-11-19 00:10 PST -- was 2026-11-18 23:26 PST -- was 2026-11-18 22:56 PST -- was 2026-11-18 22:29 PST -- was 2026-11-17 18:25 PST
 Push the fourteenth feature branch: `feature/kingboo-casino`, branched from `main` `d7887ae` (the trunk after PR #15, the rematch and the sounds, and its
 "#17 and #18 done" commit). The CASINO fight's touch-ups after Jaysonn's playtest of the trunk. SMS 230: every actor sound fades by the GAME's OWN RULE for
 it (MSHandle's category distances and the sound's curve bits: a placed Shine's hum is heard within 16 m and gone at 48 m -- it hummed across the whole level
@@ -1782,11 +1782,18 @@ just use the animation of him coming from under in the intro") put the defaults 
 233c (Jaysonn: "no he just appears, he's not like coming from the ground naturally" -- the leap takes him from under the floor to out of the game camera's
 frame in 4 frames) CARRIES his body up through the stone on a smooth curve over the appear clip's 1.6 s while the clip plays its pose, the burst and the
 stars as he breaks the surface, no overshoot, no camera hold (SpawnRise = Clip Carried on KingBooRematch; Clip Leap = 182's, Emergence = 233's); 233d (Jaysonn: "ok no just undo what i said about him coming up") takes the ENTRANCE work OUT -- both rematch scripts back
-to 232b's byte for byte: the fight's rise is 182's leap after the tell under the game camera, as before 233; the confetti stays. NOT yet playtested by Jaysonn: push the branch so
-it is on GitHub; do NOT open a PR until he says these touch-ups are done (more passes follow on this branch: the fruit's look and roll next). Further
+to 232b's byte for byte: the fight's rise is 182's leap after the tell under the game camera, as before 233; the confetti stays. SMS 234: the FRUIT --
+every fruit scene's material MATTE (roughness 1, specular 0: the game's materials are a vertex-lit toon ramp with no specular; the port's 0.5 / 0.5 drew
+a plastic highlight band), the ROLL at the game's rate (SmsRollLikeTheGame on assets/Fruit.cs: |vxz| / (the game's body radius x Size) x 2 a tick, as
+calcCurrentMtx -- the port's smaller collision spheres spun them 1.3-2.2x faster, a durian 12 turns a second: a blur that read as no spin), and the red
+pepper rolling like the rest (the "SMS quirk: it never spins" lock was not in the game) -- assets/Fruit.cs, fruit_banana / fruit_coconut / fruit_durian /
+fruit_pineapple / fruit_red_pepper / fruitpapaya.tscn. NOT yet playtested by Jaysonn: push the branch so
+it is on GitHub; do NOT open a PR until he says these touch-ups are done (more passes follow on this branch). Further
 passes re-point this entry's tip.
-- Branch `feature/kingboo-casino` -- code tip `a54f214` ("SMS 233d: the rematch's ENTRANCE work UNDONE at Jaysonn's word -- SmsKingBooRematch.cs and
-  SmsRematchIntro.cs back to 232b's (8ef659c) ..."; assets/Sms/Rematch/SmsKingBooRematch.cs, SmsRematchIntro.cs) on 233c's log commit (`7bbb891`) on the
+- Branch `feature/kingboo-casino` -- code tip `25f9b25` ("SMS 234: the FRUIT -- matte like the game's ..., the ROLL at the game's rate ..., and the red
+  pepper rolling like the rest ..."; assets/Fruit.cs, fruit_banana.tscn, fruit_coconut.tscn, fruit_durian.tscn, fruit_pineapple.tscn, fruit_red_pepper.tscn,
+  fruitpapaya.tscn) on 233d's log commit (`0b9bc81`) on the 233d commit (`a54f214`, "SMS 233d: the rematch's ENTRANCE work UNDONE at Jaysonn's word --
+  SmsKingBooRematch.cs and SmsRematchIntro.cs back to 232b's (8ef659c) ..."; assets/Sms/Rematch/SmsKingBooRematch.cs, SmsRematchIntro.cs) on 233c's log commit (`7bbb891`) on the
   233c commit (`3a7f4eb`, "SMS 233c: King Boo COMES UP THROUGH THE STONE for the fight -- the intro's appear clip plays its pose while his body is CARRIED
   up out of the floor on a smooth curve ..."; assets/Sms/Rematch/SmsKingBooRematch.cs) on 233b's log commit (`6cf8f0b`) on the 233b
   commit (`5d412b1`, "SMS 233b: the rematch's entrance back to the intro's OWN rise under the GAME camera ..."; assets/Sms/Rematch/SmsKingBooRematch.cs,
@@ -1802,10 +1809,17 @@ passes re-point this entry's tip.
   comes up BOLTED to King Boo ..., his body goes WITH the death's burst ..., the fanfare's CONFETTI is the game's ..., and the slot machine's landing thump
   finally fires"; assets/Sms/Enemy/SmsBossTelesa.cs, BossTelesa/BtlsFubuki.tscn) on the 230 commit (`65e5d5c`, "SMS 230: the CASINO FIGHT's sounds checked,
   and every actor sound FADES BY THE GAME'S OWN RULE for it ..."; assets/Sms/Sound/SmsActorSound.cs) and 231's log commit (`51ecd1e`) on `main` `d7887ae`;
-  the branch tip is this file's own commit on top of them; 15 commits since `main`. No new files in 233 / 233b / 233c / 233d. New files (232): SmsOsenBubble.cs (+ .uid), OsenBubble.tscn,
+  the branch tip is this file's own commit on top of them; 17 commits since `main`. No new files in 233 / 233b / 233c / 233d / 234. New files (232): SmsOsenBubble.cs (+ .uid), OsenBubble.tscn,
   OsenBubble.gdshader (+ .uid), models/Eniemes/BossTelesa/bubble/btelesa_osenbubbles_ind.glb, N_btelesa_bubble.png, N_btelesa_bubble_ind.png,
   N_btelesa_bubble_spe.png (+ their .import). The range carries none of Jaysonn's live edits (assets/Level.tscn, KingBooArena.tscn, RematchArena.tscn,
   SmsHiddenCoin.cs, the .tres and .import churn).
+- To try 234: play the casino fight to a fruit round (spray his tongue; the drums land on fruit) and watch the spit: the coconuts, papayas, pineapples,
+  durians and the two red peppers tumble out turning at the game's own rate -- fast out of his mouth, slowing as they roll out on the table and
+  stopping where they stop -- the peppers turning like the rest; up close every fruit is matte (no plastic shine band), lit flat like Mario. A pepper at
+  rest sits as the game's does: its stem end a body radius over the table and the rod lying where the roll left it (pointing up it floats, down it pokes
+  through the table) -- that is the game's own placement (its pepper model has its origin at the base); say if you want it centred instead. Knob: Sms
+  Roll Like The Game on a fruit (off = the old faster spin from the collision sphere's radius). The look is each fruit scene's material (roughness /
+  specular in the inspector). Your sizes and collision spheres are untouched. Press the editor's Build first: the C# changed.
 - To try 233 (after 233d): the rematch's entrance is as it was before 233 -- after King Boo's laugh and dive the game camera is back behind Mario
   and he comes up at his spot by the intro's own animation (the glow and the wisps on the stone, then the leap out of the floor with the burst, the
   stars and his cry); the entrance knobs of 233 / 233b / 233c are gone. In the casino fight beat a round and watch the fanfare: the confetti is now small crisp squares tumbling end over end as they fall fast and slow

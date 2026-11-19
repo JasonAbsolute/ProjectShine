@@ -15172,3 +15172,58 @@ fixed it himself). **Next:** the fruit (Jaysonn:
 the game rolls EVERY fruit including the pepper (`TMapObjBall::calcCurrentMtx`; the pepper is a ResetFruit in the casino's scene.bin -- the port's
 "the pepper never spins" lock is not in the source); the pepper scene's mesh has its origin at its BASE with a default 0.5-m collision sphere, so it
 pivots about its end and, yawed 90, rolls about its own long axis -- no visible spin.
+
+### 234 -- the King Boo REMATCH, part 79: the FRUIT -- matte like the game's (every fruit scene's material roughness 1 / specular 0: the game's _fruit1 and _mat_togarasi are a vertex-lit toon ramp over the texture, no specular term), the ROLL at the game's rate (SmsRollLikeTheGame: |vxz| / (the game's body radius x Size) x 2 radians a tick, as TMapObjBall::calcCurrentMtx -- the port's smaller collision spheres spun them 1.3-2.2x faster, a blur that read as no spin), and the red pepper rolling like the rest (the "SMS quirk: it never spins" lock was not in the game) (feature/kingboo-casino, code `25f9b25`)
+
+**Jaysonn**: "the fruit just feel off in terms of looks they look oddly shiny? and i think when king boo spits fruit out they don't rotate? or maybe
+the chili pepper doesn't?"
+
+**The game** (`delfinoBoss.szs` -> `mapobj/fruitcoconut / fruitpapaya / fruitpine / fruitdurian / fruitbanana / redpepper.bmd` via gcm_tools.py;
+the materials by bmd_matfull153.py, the joints and vertex bounds by the new `tools/projectshine/rematch157/fruit234/bmd_geo234.py`; MapObjBall.cpp;
+TMarDirector::direct / TLiveActor::moveObject). Every fruit's material (`_fruit1`; the pepper's `_mat_togarasi`) is two TEV stages: the fruit
+texture and a TOON ramp (`H_toon_2_4i`, I4 32x32) looked up by the lit vertex colour (a type-10 SRTG texgen) -- a flat two-tone shade over the
+texture, no specular at all; the port's StandardMaterial3D had roughness 0.5 and the default specular 0.5, a PBR gloss band on every coconut and
+papaya (Mario's own materials sit at specular 0.19, the FLUDD's at 0: the fruit were the shiniest things in the room). `calcCurrentMtx` (318) rolls
+the model of EVERY ball object whose |vx| or |vz| is over the min speed (0.3 u a tick): the joint-0 matrix gets a turn of |vxz| / mBodyRadius x 2
+RADIANS (TRotation3f::setRotate is sin / cos) about the horizontal axis across the motion, concatenated on last tick's matrix (the roll accumulates),
+the translation (x, bottom + mBodyRadius, z); it runs from control(), which runs with bind() in moveObject() on EVERY 120-Hz simulation tick
+(direct(): dt = 600 / vsync, a tick per 5 units of it; the perform list's gate bits are never set). No type check: the pepper rolls (the casino's
+peppers are TResetFruit of the RedPepper data, turned 90 degrees about Y at the spit, the first at double speed). The body radii: coconut / papaya
+40, durian 45, pepper / pine / banana 50 units, x the scale (1.5 at the spit). Only the banana (-50 x m11 upright) and the pine (-10 x (1 - m11))
+correct the model's height. The pepper's geometry has its origin at its BASE (y 0..111 u, 146 long: a chili about 183 u long and 50 thick, tilted
+37 degrees; a rigid single-joint model, DRW1 direct), so the game puts the stem end at the ball's centre and the rod lies where the roll left it --
+at rest it floats, or pokes through the table. Jaysonn's pepper glb is the same geometry (the mesh matches the bmd: origin at the base, x the glb's
+1/100.8), so the port already did what the game does there. (233's "Next" note had the pepper "rolling about its own long axis -- no visible spin":
+wrong -- the rod is tilted off that axis and windmills; what hid the spin was its speed.)
+
+**The port, measured** (the casino drive's new fruit watch, run a, 16 fruit spat): every fruit rolled on every moving tick about the right axis at
+exactly the sim's rule -- metres(|vxz|) / HIS SPHERE's radius x 2 a tick. His models are about half the game's and his spheres with them: coconut
+0.475 m against the game's 0.806 (x1.70 the game's spin), durian 0.415 against 0.907 (x2.18), pineapple 0.498 against 1.008 (x2.02), pepper 0.75
+against 1.008 (x1.34), papaya 0.855 against 0.806 (x0.94). A durian out of King Boo's mouth turned 12 times a second (90 degrees a tick), a coconut
+60-70 degrees a tick: at 60 frames a second nothing of the turn can be followed -- a blur, "they don't rotate". The pepper's "never spins"
+LockRotation (Fruit.cs, Jaysonn's Oct-2 file) was a no-op under the ball sim (the sim rolls the model child, not the body) and live with
+SmsBallPhysics off.
+
+**The fix.** `assets/Fruit.cs`: `SmsRollLikeTheGame` (NEW knob, on) -- the roll's radius is the game's body radius x Size (`SmsRollRadius`;
+`SmsRollAnglePerTick` = metres(|vxz|) / R x 2), whatever the model's size: the game's angular rate; off = 115-233's sphere radius. The red pepper's
+LockRotation block went (with SmsBallPhysics off its AngularDamp 0 -> 0.5 so a kicked one settles). `fruit_banana / fruit_coconut / fruit_durian /
+fruit_pineapple / fruit_red_pepper / fruitpapaya.tscn` (the project root): the material's roughness 0.5 -> 1.0 (Godot's default: the line goes) and
+`metallic_specular` 0.5 -> 0.0 (`fruit234/matte234.py`).
+
+**Verified** (the casino drive, deleted before the commit; windowed 1280 x 720, run c, 16 fruit): C95 every fruit rolls on every moving tick about
+the axis across its motion (|dot| > 0.98 on 2110 of 2121 frames: the rest the frames of a wall bounce), the two peppers included (7.0 and 10.1
+turns), at the game's rate within 6 % (16 of 16; a tick's turn now 15-24 degrees in flight, the game's numbers to the tick); C96 16 of 16 matte;
+C97 the 14 round fruit all at rest within 5 s, their lowest vertex within 0.24 m of the table (the coconuts and durians within 7 cm; the papaya's
+own sphere, 0.57 against a model 0.675 tall at Size 1, puts it 16 cm under upright or 10 cm over on its side; the pineapple's 0.5 against 0.63:
+21-24 cm under) -- the peppers +0.62 m (the rod up, the stem end a body radius over the table) and -0.67 m (the rod down through the table), the
+game's own. Shots 55a-f: the spit at 0.3 / 1 / 3 / 7 s from Mario's side and low from the side, close-ups of a pepper, a coconut, a durian and a
+papaya at rest -- matte, on the table. The rest of the casino drive as before (C84-C92 green; C93's "nearest child nearer by 0.5 m or more" came
+out at exactly 0.5 and C94's touch popped the bubble with Mario's HP 7 -> 7, as in 233's run g: the 232 drive's own flakes -- Mario's drop into a
+child -- not the fruit, which are gone by then). The regression drive 68 / 68 (gg), the shine hud quiet run 8 / 8 (ao). Clean rebuild 0 errors;
+the drive, the runner copy, the logs, the shots and the tasks deleted; the save file untouched. Not touched: Jaysonn's live edits and his fruit
+SIZES (the scenes' scales and collision spheres).
+
+**Knobs:** Fruit -- `SmsRollLikeTheGame` (on; off = the sphere's radius, the old faster spin). The look is the scenes' materials (roughness /
+specular in the inspector; Diffuse Mode = Toon would give the game's two-tone shade). **Deviations:** none new -- the materials follow the game's
+(no specular), the roll radius is the game's, the pepper's base pivot is the game's own (a knob to centre it can come if he wants it sitting on the
+table); the papaya's and pineapple's spheres (his) sit them a little into the table.
