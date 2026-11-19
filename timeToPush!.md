@@ -1755,7 +1755,7 @@ both still pushed and still waiting on Jaysonn's playtest, untouched since 2026-
 `feature/select-stages` holds the only copy of #11's text. Three merged branches are safe to delete besides: `feature/enemy-sirena`,
 `feature/kingboo-rematch` and, once PR #16 is closed, `feature/sounds`.
 
-### #19 -- PENDING -- queued 2026-11-17 03:41 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 230 + 231 + 232 + 232b + 233 + 233b + 233c + 233d + 234), updated 2026-11-19 01:35 PST -- was 2026-11-19 00:10 PST -- was 2026-11-18 23:26 PST -- was 2026-11-18 22:56 PST -- was 2026-11-18 22:29 PST -- was 2026-11-17 18:25 PST
+### #19 -- PENDING -- queued 2026-11-17 03:41 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 230 + 231 + 232 + 232b + 233 + 233b + 233c + 233d + 234 + 235 + 236), updated 2026-11-19 03:15 PST -- was 2026-11-19 01:35 PST -- was 2026-11-19 00:10 PST -- was 2026-11-18 23:26 PST -- was 2026-11-18 22:56 PST -- was 2026-11-18 22:29 PST -- was 2026-11-17 18:25 PST
 Push the fourteenth feature branch: `feature/kingboo-casino`, branched from `main` `d7887ae` (the trunk after PR #15, the rematch and the sounds, and its
 "#17 and #18 done" commit). The CASINO fight's touch-ups after Jaysonn's playtest of the trunk. SMS 230: every actor sound fades by the GAME's OWN RULE for
 it (MSHandle's category distances and the sound's curve bits: a placed Shine's hum is heard within 16 m and gone at 48 m -- it hummed across the whole level
@@ -1787,12 +1787,19 @@ every fruit scene's material MATTE (roughness 1, specular 0: the game's material
 a plastic highlight band), the ROLL at the game's rate (SmsRollLikeTheGame on assets/Fruit.cs: |vxz| / (the game's body radius x Size) x 2 a tick, as
 calcCurrentMtx -- the port's smaller collision spheres spun them 1.3-2.2x faster, a durian 12 turns a second: a blur that read as no spin), and the red
 pepper rolling like the rest (the "SMS quirk: it never spins" lock was not in the game) -- assets/Fruit.cs, fruit_banana / fruit_coconut / fruit_durian /
-fruit_pineapple / fruit_red_pepper / fruitpapaya.tscn. NOT yet playtested by Jaysonn: push the branch so
+fruit_pineapple / fruit_red_pepper / fruitpapaya.tscn. SMS 235: the casino table's BREAK without the glass -- the shards carry the discs' own material
+(MatchMaterial: metallic 1 / specular 0.5 / roughness 1, the unshaded surface, the gold's 7 x 7 tiling, the linear filter; 157's shader drew a pale glossy
+non-metal the moment it swapped in), the cracks dark seams with no glow (CrackGlow 0, CrackDarken 0.6), the fade a dissolve in the opaque pass --
+assets/Sms/Rematch/SmsFloorShatter.cs, FloorShatter.gdshader. SMS 236: the pause menu's selection sparks round the WHOLE circle (the shader's angle
+step had stayed at the dumped rate 14 while the emitter fired the circle's division 10: a 103-degree gap; the step is the burst's own count now) --
+assets/Sms/Console/PauseSparks.tscn, PauseSparks.gdshader, SmsPauseMenu.cs. NOT yet playtested by Jaysonn: push the branch so
 it is on GitHub; do NOT open a PR until he says these touch-ups are done (more passes follow on this branch). Further
 passes re-point this entry's tip.
-- Branch `feature/kingboo-casino` -- code tip `25f9b25` ("SMS 234: the FRUIT -- matte like the game's ..., the ROLL at the game's rate ..., and the red
-  pepper rolling like the rest ..."; assets/Fruit.cs, fruit_banana.tscn, fruit_coconut.tscn, fruit_durian.tscn, fruit_pineapple.tscn, fruit_red_pepper.tscn,
-  fruitpapaya.tscn) on 233d's log commit (`0b9bc81`) on the 233d commit (`a54f214`, "SMS 233d: the rematch's ENTRANCE work UNDONE at Jaysonn's word --
+- Branch `feature/kingboo-casino` -- code tip `afeee08` ("SMS 236: the pause menu's selection sparks round the WHOLE circle ..."; assets/Sms/Console/
+  PauseSparks.tscn, PauseSparks.gdshader, SmsPauseMenu.cs) on the 235 commit (`cbd5bfd`, "SMS 235: the casino table's BREAK without the glass ...";
+  assets/Sms/Rematch/SmsFloorShatter.cs, FloorShatter.gdshader) on 234's log commit (`0c2761d`) on the 234 commit (`25f9b25`, "SMS 234: the FRUIT -- matte
+  like the game's ..., the ROLL at the game's rate ..., and the red pepper rolling like the rest ..."; assets/Fruit.cs, fruit_banana.tscn, fruit_coconut.tscn,
+  fruit_durian.tscn, fruit_pineapple.tscn, fruit_red_pepper.tscn, fruitpapaya.tscn) on 233d's log commit (`0b9bc81`) on the 233d commit (`a54f214`, "SMS 233d: the rematch's ENTRANCE work UNDONE at Jaysonn's word --
   SmsKingBooRematch.cs and SmsRematchIntro.cs back to 232b's (8ef659c) ..."; assets/Sms/Rematch/SmsKingBooRematch.cs, SmsRematchIntro.cs) on 233c's log commit (`7bbb891`) on the
   233c commit (`3a7f4eb`, "SMS 233c: King Boo COMES UP THROUGH THE STONE for the fight -- the intro's appear clip plays its pose while his body is CARRIED
   up out of the floor on a smooth curve ..."; assets/Sms/Rematch/SmsKingBooRematch.cs) on 233b's log commit (`6cf8f0b`) on the 233b
@@ -1809,10 +1816,17 @@ passes re-point this entry's tip.
   comes up BOLTED to King Boo ..., his body goes WITH the death's burst ..., the fanfare's CONFETTI is the game's ..., and the slot machine's landing thump
   finally fires"; assets/Sms/Enemy/SmsBossTelesa.cs, BossTelesa/BtlsFubuki.tscn) on the 230 commit (`65e5d5c`, "SMS 230: the CASINO FIGHT's sounds checked,
   and every actor sound FADES BY THE GAME'S OWN RULE for it ..."; assets/Sms/Sound/SmsActorSound.cs) and 231's log commit (`51ecd1e`) on `main` `d7887ae`;
-  the branch tip is this file's own commit on top of them; 17 commits since `main`. No new files in 233 / 233b / 233c / 233d / 234. New files (232): SmsOsenBubble.cs (+ .uid), OsenBubble.tscn,
+  the branch tip is this file's own commit on top of them; 20 commits since `main`. No new files in 233 / 233b / 233c / 233d / 234 / 235 / 236. New files (232): SmsOsenBubble.cs (+ .uid), OsenBubble.tscn,
   OsenBubble.gdshader (+ .uid), models/Eniemes/BossTelesa/bubble/btelesa_osenbubbles_ind.glb, N_btelesa_bubble.png, N_btelesa_bubble_ind.png,
   N_btelesa_bubble_spe.png (+ their .import). The range carries none of Jaysonn's live edits (assets/Level.tscn, KingBooArena.tscn, RematchArena.tscn,
   SmsHiddenCoin.cs, the .tres and .import churn).
+- To try 235: beat the casino fight. Where the Shine would come the table cracks and breaks as before, but now it is the TABLE breaking: no glow along
+  the cracks, no colour change when the cracking starts (the pieces are the table's own gold, red, green and marble, lit as the table was), dark seams
+  spreading from the centre for 1.4 s, then the pieces fly and tumble in their own colours and dissolve. Knobs on the FloorShatter node under
+  KingBooArena's RematchExit: Match Material (on), Crack Darken (0.6; 0 = no visible cracks, it just breaks), Crack Glow (0; 1.6 = the old lit glass),
+  the timing and the flight as before. The sound is still the glass-break sound -- say if you want it changed.
+- To try 236: pause the game and watch the yellow streaks around the highlighted option: ten of them, evenly spaced, all the way round (they used to
+  leave a gap over the right-hand quarter).
 - To try 234: play the casino fight to a fruit round (spray his tongue; the drums land on fruit) and watch the spit: the coconuts, papayas, pineapples,
   durians and the two red peppers tumble out turning at the game's own rate -- fast out of his mouth, slowing as they roll out on the table and
   stopping where they stop -- the peppers turning like the rest; up close every fruit is matte (no plastic shine band), lit flat like Mario. A pepper at

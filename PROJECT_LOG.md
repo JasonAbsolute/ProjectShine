@@ -15227,3 +15227,53 @@ SIZES (the scenes' scales and collision spheres).
 specular in the inspector; Diffuse Mode = Toon would give the game's two-tone shade). **Deviations:** none new -- the materials follow the game's
 (no specular), the roll radius is the game's, the pepper's base pivot is the game's own (a knob to centre it can come if he wants it sitting on the
 table); the papaya's and pineapple's spheres (his) sit them a little into the table.
+
+### 235 -- the King Boo REMATCH, part 80: the casino table's BREAK without the glass -- the shards carry the discs' own material (MatchMaterial: metallic 1 / specular 0.5 / roughness 1, the unshaded surface, the vertex colours, the gold's 7 x 7 UV tiling, the linear filter; 157's shader hard-coded a non-metal at roughness 0.9, so the whole table turned pale and glossy the moment the shards replaced it), the cracks are dark seams with no glow (CrackGlow 1.6 -> 0, CrackDarken), and the shards dissolve in the opaque pass instead of blending (feature/kingboo-casino, code `cbd5bfd`)
+
+**Jaysonn**: "the glass breaking at the end of the fight. i don't want it to shine like glass or change the color i just want the effect breaking."
+
+**What shone and what changed colour** (a new shatter drive at the room's fixed eye; the discs' materials read off the scene). The casino discs
+(rulet00 / 01 / 02.glb) are StandardMaterial3Ds with metallic 1.0, specular 0.5, roughness 1.0 (the glb's defaults), one surface Unshaded with vertex
+colours, the gold rim tiled 7 x 7 by `uv1_scale`, texture filter Linear (no mipmaps). `FloorShatter.gdshader` drew the shards with roughness 0.9 and
+Godot's defaults for the rest (metallic 0, specular 0.5): a non-metal lit diffusely with a specular band -- the frame the shards took the discs'
+place the table went pale and glossy (a 48-level mean difference over the table), the gold bowl's banding gone (the tiling), and the whole thing
+read as glass; the cracks were EMISSIVE (crack_color (0.85, 0.97, 1) x crack_glow 1.6: bright pale-blue lines all over the table as they spread, then
+glowing edges on every flying shard); the fade was a blend, the table in the transparent pass from the first crack.
+
+**The fix.** `FloorShatter.gdshader`: uniforms for the material (metallic, specular, roughness, their textures and channels, unshaded,
+emission_color, vertex_color_srgb, uv1_scale / uv1_offset), the albedo sampled with filter_linear as the discs do; an Unshaded surface drawn as
+EMISSION = its colour with ALBEDO 0; the seams darken the colour by `crack_dark` (0.6) with `crack_glow` 0 by default; the fade an alpha-scissor
+DISSOLVE (a per-cell speckle cut against the fade) so the material stays in the OPAQUE pass -- the depth prepass and the lighting path of the disc it
+replaces. `SmsFloorShatter.cs`: `MatchMaterial` (NEW knob, on) copies each disc surface's StandardMaterial3D into those uniforms (off = 157's look);
+`CrackDarken` (NEW, 0.6); `CrackGlow` 1.6 -> 0.
+
+**Verified** (the shatter drive, deleted before the commit; windowed 1280 x 720; the arena's sky clock HELD on frame 60 so the lights stand still --
+the rematch's lights follow its sky's 5-s cycle, and two frames half a second apart differ by 10-17 levels on their own, which hid the real
+difference for three runs): C99 the discs' own models shown again for a few frames at 0.2 s into the crack and then the shards: the two frames
+differ by 0.27 of 255 on average over the table (the worst row 2.3: the first seams at the centre; 157's shader: 48); C98 the three discs taken (347
+cells, 2312 triangles), the cracks 1.4 s, the break 0.5 s later, the shards gone by 2.4 s. Shots 56a-g: the table before, the shards in place (the same
+table), the cracks half way and at the rim (dark seams, the colours untouched), the break at 0.3 / 1.0 / 1.8 s (the pieces lifting and tumbling in
+the table's own colours, no lit edges). The regression drive 68 / 68 (gh), the shine hud quiet run 8 / 8 (ap), both on the tree with 236. Clean
+rebuild 0 errors; the drive, the runner copy, the logs, the shots and the tasks deleted; the save file untouched.
+
+**Knobs** (FloorShatter under the casino's RematchExit): `MatchMaterial` (on), `CrackDarken` 0.6 (0 = no visible cracks, the table just breaks),
+`CrackGlow` 0 (157's 1.6 = the lit-glass look), `CrackColor`, `CrackWidth`, the timing, the flight, the sound (MSD_SE_OBJ_GLASS_BREAK stays).
+**Deviation:** the shatter itself is the port's (157) -- the game puts its Shine over the table.
+
+### 236 -- the King Boo REMATCH, part 81: the pause menu's selection sparks round the WHOLE circle -- the shader's angle step followed the dumped rate (14) while the emitter fired the circle's division (10, pass 132), so the ten sparks covered 10/14 of the circle with a 103-degree gap; the step is now the burst's own count (JPAEmitter.cpp 415: (i << 16) / mEmitCount), set by the menu from the emitter's amount (feature/kingboo-casino, code `afeee08`)
+
+**Jaysonn**: "the pause screen effects of the rectangles coming out of the hovering option -- the effects are spaced out wrong and need to make a full
+circle rather than 3/4."
+
+**The bug.** `ms_2d_pause_sel` is a FixedInterval Circle emitter: an emit frame creates the volume's DIVISION (JPAEmitter.cpp 697: numToCreate =
+mVolumeSubdivision, 10) and each particle's angle is (idx << 16) / mEmitCount (415) -- ten sparks 36 degrees apart, all the way round. Pass 89 wrote
+the shader from the dumped RATE (14): `count = 14`, angle = i x 360 / 14; pass 132 corrected the node's amount to the division (10) without touching
+the shader's `count`: ten sparks at 14-way spacing = 257 degrees of circle, a 103-degree gap -- the 3/4 circle.
+
+**The fix.** `PauseSparks.tscn`: `shader_parameter/count` 14 -> 10. `SmsPauseMenu.cs`: SparksAt sets `count` from the emitter's Amount at every
+burst, so the two cannot drift apart again. `PauseSparks.gdshader`: the default 10 and the header's reading corrected.
+
+**Verified** (the pause drive, deleted before the commit; windowed: the rematch arena, the intro skipped, Start pressed, the first burst at bounce 3 of
+the pulse): C100 the emitter's amount 10, one shot, explosiveness 1, the shader's count 10; shots 57a-c at 4 / 9 / 14 frames into the burst -- ten
+yellow streaks flying out all round CONTINUE's ellipse, no gap. The regression drive 68 / 68 (gh), the shine hud quiet run 8 / 8 (ap). No knobs
+added; no deviation (the game's own geometry).
