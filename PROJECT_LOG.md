@@ -15076,7 +15076,8 @@ or a jump reaches them, and the children float at 2 m.
 
 ### 233 -- the King Boo REMATCH, part 78: the casino fanfare's CONFETTI at the jpa's own 60 Hz and look (0.5-m alpha-tested squares fluttering along their fall, 12 m/s easing to 2.8, the colour cycling grey / yellow / red by age, 3 s), and the rematch's ENTRANCE -- King Boo comes up for the fight in a slow EMERGENCE under the cutscene's own camera (the shot moves to his spot after the dive; he rises through the stone over 1.6 s on the tell; control back once he is up) instead of the appear clip's 17-m leap under the game camera that read as a pop (feature/kingboo-casino, code `561521a` + 233b `5d412b1`: the
 entrance's defaults BACK to the intro's own leap under the game camera -- Jaysonn: "no it's not supposed to be a cutscene. he should just use the
-animation of him coming from under in the intro" -- both 233 changes kept as knobs, off)
+animation of him coming from under in the intro" -- both 233 changes kept as knobs, off; + 233c `3a7f4eb`: the body CARRIED up through the stone under the
+intro's appear clip, Jaysonn on 233b: "no he just appears, he's not like coming from the ground naturally")
 
 **Jaysonn**: "can you make the confetti look better its just like pixel blocks right now. also when the rematch starts kingboo kinda just appears
 after going underground again".
@@ -15140,7 +15141,20 @@ record:** the one thing that differs between the intro's rise and the fight's is
 UnprojectPosition: the body at 9.9 m at screen y 36 of 1086, at 13.9 m at y -84), so the top of the leap, and his crown whenever he hovers, is out of
 frame. That is what read as a pop; not changed (Jaysonn's call after playing it: `RiseLeapDamp` 0.6 trims the overshoot for both rises). Verified 233b:
 the entrance drive run d -- 174 / 182's flow to the tick (the tell at introT -0.69 under the game camera, the leap's top 13.9 m at 0.59 s, Wait and
-ReadyForFight at 1.64 s, FightReady at once); the regression 68 / 68 (ge); the shine hud quiet run 8 / 8 (am). **Next:** the fruit (Jaysonn:
+ReadyForFight at 1.64 s, FightReady at once); the regression 68 / 68 (ge); the shine hud quiet run 8 / 8 (am).
+**233c -- the body CARRIED (Jaysonn on 233b: "no he just appears, he's not like coming from the ground naturally").** The leap is the pop: the
+appear clip's own translation takes the body from under the floor to past the hover in 4 frames and out of the game camera's frame by 0.25 s (the
+numbers above) -- nothing of him is seen rising; a flash, then he is there. `SmsKingBooRematch.cs`: `SpawnRise` (NEW enum knob, replaces 233b's bool;
+`SpawnRiseLeap` a read-only alias): **Clip Carried** (the default) -- after the tell the appear clip plays its pose (the squash and stretch, at
+`IntroAppearClipSpeed`), and each tick the node is placed so the BODY joint sits on a smoothstep curve from `IntroSinkDepth` under the floor up to the
+hover over the clip's 1.6 s (`RiseCarriedTick`: node.y = curve - the clip's lift of the body over the node, read off the pose -- the 17-m leap taken out);
+the body crosses the floor about 0.8 s in and rises the 8.5 m to the hover over the next 0.85 s, never over it; the burst, the kick and the stars as it
+breaks the surface, the cry there (`StartAppearClip(cry)`: the carried rise's cry at the break; the node on the curve's start from the clip's first
+frame). **Clip Leap** = 182's (the intro's surface keeps it; `_riseCarried` reset there). **Emergence** = 233's curve on the wait clip. Verified: the
+entrance drive run e under the game camera -- the body -5.3 m at 0.19 s, -1.4 at 0.59, +4.1 at 0.99 (over the floor, the burst and the stars on), +8.6
+at 1.39, Wait at 1.64, its highest 9.99 (the hover's bob); shots 54e-k (the glow and the wisps, the crown breaking the stone under the burst, him half
+up with the ring and the stars, up); the regression 68 / 68 (gf); the shine hud quiet run 8 / 8 (an). Knobs: `SpawnRise` (Clip Carried / Clip Leap /
+Emergence); the carried rise's length is the clip's at `IntroAppearClipSpeed` (0.6: 1.6 s). Deviation: the carried rise is the port's. **Next:** the fruit (Jaysonn:
 "they look weird and roll around oddly", "oddly shiny", "the chili pepper doesn't rotate") -- the research is in
 `tools/projectshine/rematch157/plan234.md`: the port's fruit materials are PBR plastic (roughness 0.5, specular 0.5) where the game's are flat-lit;
 the game rolls EVERY fruit including the pepper (`TMapObjBall::calcCurrentMtx`; the pepper is a ResetFruit in the casino's scene.bin -- the port's
